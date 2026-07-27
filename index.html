@@ -936,8 +936,12 @@ button:disabled{opacity:.35;cursor:default}
     <div id="ttxtEuro" style="background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px">
       <div id="euroLog" style="max-height:300px;overflow-y:auto"></div>
     </div>
+    <div id="euroLogFoot" style="margin-top:9px"></div>
   </div>
-  <div class="card"><div class="steplbl" id="euroTableLbl">Csoport</div><div id="euroTable" style="margin-top:4px"></div></div>
+  <div class="card"><div class="steplbl" id="euroTableLbl">Csoport</div><div id="euroTable" style="margin-top:4px"></div>
+    <button id="euroPathBtn" class="btn-mini" style="margin-top:9px;width:100%">📜 Az utad idáig</button>
+    <div id="euroPathBox" class="hide" style="margin-top:7px"></div>
+  </div>
   <div class="card"><div class="steplbl">A sorozat statisztikái</div><div id="euroStats" style="margin-top:4px"></div></div>
 </section>
 
@@ -3269,6 +3273,21 @@ function euroApplyResult(hi,ai,hg,ag){
   if(hg>ag){H.w++;H.pts+=3;A.l++;}
   else if(hg<ag){A.w++;A.pts+=3;H.l++;}
   else{H.d++;A.d++;H.pts++;A.pts++;}}
+/* ================= A MENETELÉS NAPLÓJA =================
+   A kampány közben a megtett út SEHOL nem maradt meg: az E.ties körönként
+   újraíródik (euroStartRound), a csoportkör fixtúráit pedig a nyolcaddöntő
+   indulásakor felülírjuk (E.fixtures=[]). Így a "hogyan jutottam idáig"
+   kérdésre a felület nem tudott válaszolni — csak a LEGUTÓBBI párharcot
+   őriztük (E.lastTie).
+   Ez a lista időrendben rögzíti a saját utat: minden lejátszott mérkőzés, a
+   csoportkör zárása és minden párharc eldőlése. Az S.euro részeként mentődik
+   (lásd a saveGame euro:S.euro mezőjét), tehát betöltés után is megvan.
+   Régi mentésben nincs benne — ilyenkor a lista üres, és a visszanéző panel
+   ezt meg is mondja, nem hazudik hiányzó adatot. */
+function euroPathPush(rec){
+  const E=S.euro;if(!E)return;
+  if(!E.path)E.path=[];
+  E.path.push(rec);}
 /* A user csoportjának tabellája, rendezve (pont → gólkülönbség → lőtt gól). */
 function euroGroupTable(g){
   return S.euro.groups[g].map(i=>({i,t:S.euro.teams[i],r:S.euro.table[i]}))
@@ -13061,6 +13080,11 @@ function euroFinishUserMatch(gf,ga){
     /* kieséses: a párharc adott meccse, SZEREP szerint tárolva */
     const t=E.ties[E.userTie],meIsA=t.a===ui;
     t.legs[E.idx]=meIsA?[gf,ga]:[ga,gf];}
+  /* A megtett út naplózása — MÉG a szakasz-léptetés előtt, ezért az E.idx és
+     az E.md itt pontosan a most lejátszott mérkőzésre mutat. */
+  euroPathPush({k:E.stage==="group"?"g":"ko",round:E.stage,
+    md:E.stage==="group"?E.md:null,leg:E.stage==="group"?null:E.idx,
+    opp:fx.o.n,home:!!fx.home,neutral:!!fx.neutral,mine:gf,theirs:ga});
   euroRecordStats(E.teams[oi],ga,gf);
   if(ga===0){const gk=euroGK();if(gk)euroAddStat("cleanSheets",gk.n,teamName);}
   /* a saját szezon-szintű kupamérleg (a jelentéshez) */
@@ -13092,6 +13116,10 @@ function euroFinishGroupStage(){
   const tbl=euroGroupTable(E.userG);
   E.groupRank=tbl.findIndex(r=>r.t.you)+1;
   E.advanced=E.groupRank<=2;
+  {const me=tbl.find(r=>r.t.you);
+   euroPathPush({k:"gEnd",rank:E.groupRank,advanced:E.advanced,
+     pts:me?me.r.pts:null,w:me?me.r.w:null,d:me?me.r.d:null,l:me?me.r.l:null,
+     gf:me?me.r.gf:null,ga:me?me.r.ga:null});}
   addLine(`📋 Csoportkör vége: a ${E.groupRank}. hely — ${E.advanced?"továbbjutottatok!":"búcsú a sorozattól."}`,"m life");
   if(!E.advanced){euroEliminated("group",null);return;}
   euroStartRound("r16",null);
@@ -13108,6 +13136,8 @@ function euroResolveRound(){
     /* a párharc feloldásának részletei — a kampány-összegzőn is kiírjuk, hogy
        kiderüljön, MI alapján dőlt el (összesítés / idegenben lőtt gól / büntetők) */
     E.lastTie={round,mine,theirs,how:ut.how,opp:E.teams[meIsA?ut.b:ut.a].n,won:userWon};
+    euroPathPush({k:"tie",round,mine,theirs,how:ut.how,won:userWon,
+      opp:E.teams[meIsA?ut.b:ut.a].n});
     addLine(`${userWon?"✅":"❌"} ${EURO_ROUND_NAMES[round]} — ${round==="final"?"":"összesítés "}${mine}:${theirs}, ${ut.how}. ${userWon?(round==="final"?"MEGNYERTÉTEK A SOROZATOT!":"Tovább!"):"Kiestetek."}`,"m life");}
   const winners=E.ties.map(t=>t.winner);
   if(!userWon){euroEliminated(round,winners);return;}
@@ -13222,7 +13252,8 @@ function startEuroCampaign(){
   const f=buildEuroField(comp);
   S.euro={comp,stage:"group",md:0,idx:0,teams:f.teams,groups:f.groups,table:f.table,
     userIdx:f.userIdx,userG:f.userG,userSlot:f.userSlot,
-    stats:{scorers:{},assists:{},cleanSheets:{}},fixtures:[]};
+    stats:{scorers:{},assists:{},cleanSheets:{}},fixtures:[],
+    path:[],pathOpen:false};   /* a menetelés naplója — lásd euroPathPush */
   S.euro.fixtures=buildEuroUserFixtures();
   euroLastLogHtml="";euroLastLogTitle="";   /* új kampány — nincs korábbi meccs-napló */
   addLine(`🏆 Kezdődik a(z) ${EURO_COMPS[comp].n}! A csoportban ${S.euro.groups[S.euro.userG].filter(i=>i!==S.euro.userIdx).map(i=>S.euro.teams[i].n).join(", ")} vár rátok.`,"m life");
@@ -13233,6 +13264,103 @@ function showEuroScreen(){
   $("scEuro").classList.remove("hide");
   renderEuroScreen();
   $("scEuro").scrollIntoView({behavior:"smooth"});}
+/* ---- AZ ELŐZŐ MÉRKŐZÉS FOLYTATÁSA ----
+   A napló alá nemcsak a végeredmény kerül, hanem az is, MI KÖVETKEZIK belőle:
+   a kieséses szakaszban a párharc állása és a visszavágó helyszíne, a párharc
+   eldőlésekor az összesítés és a következő kör, a csoportkörben a pillanatnyi
+   helyezés. A menetelés-naplóból (E.path) dolgozunk, nem a mutált állapotból:
+   a napló egyértelműen rögzíti, mi történt a mérkőzés UTÁN, míg az állapotból
+   ezt visszafejteni törékeny lenne (az E.stage és az E.idx addigra már a
+   KÖVETKEZŐ mérkőzésre mutat). */
+function euroLogFooterHtml(){
+  const E=S.euro;if(!E||!E.path||!E.path.length)return "";
+  let i=E.path.length-1;
+  while(i>=0&&E.path[i].k!=="g"&&E.path[i].k!=="ko")i--;
+  if(i<0)return "";
+  const m=E.path[i],after=E.path.slice(i+1);
+  const win=m.mine>m.theirs,lose=m.mine<m.theirs;
+  const col=win?"var(--grass)":lose?"var(--red)":"var(--gold)";
+  const word=win?"Győzelem":lose?"Vereség":"Döntetlen";
+  const where=m.neutral?"semleges pályán":(m.home?"hazai pályán":"idegenben");
+  const row=(t,c)=>`<div style="font-size:12.5px;margin-top:5px${c?`;color:${c}`:""}">${t}</div>`;
+  let h=`<div style="border-top:1px solid var(--line);padding-top:8px">`
+    +`<div style="font-size:14px;font-weight:700;color:${col}">${word} ${m.mine}:${m.theirs}</div>`
+    +`<div style="font-size:12px;color:var(--dim);margin-top:1px">${esc(m.opp)} ellen, ${where}</div>`;
+  const tie=after.find(x=>x.k==="tie"),gEnd=after.find(x=>x.k==="gEnd");
+  if(tie){
+    h+=row(`Párharc lezárva — ${tie.round==="final"?"":"összesítés "}<b>${tie.mine}:${tie.theirs}</b>, <b>${esc(tie.how)}</b> dőlt el.`);
+    h+=row(tie.won
+      ?(tie.round==="final"?`🏆 <b style="color:var(--gold)">Megnyertétek a sorozatot!</b>`
+                           :`✅ <b style="color:var(--grass)">Továbbjutottatok.</b>`)
+      :`❌ <b style="color:var(--red)">Kiestetek</b> — a menetelés itt véget ért.`);
+  }else if(gEnd){
+    h+=row(`Csoportkör vége — <b>${gEnd.rank}. hely</b>${gEnd.pts!=null?` (${gEnd.pts} pont, ${gEnd.gf}:${gEnd.ga})`:""}.`);
+    h+=row(gEnd.advanced?`✅ <b style="color:var(--grass)">Továbbjutottatok a nyolcaddöntőbe.</b>`
+                        :`❌ <b style="color:var(--red)">Búcsú a sorozattól.</b>`);
+  }else if(m.k==="ko"&&E.stage!=="done"&&E.ties&&E.userTie>=0&&E.idx===1){
+    /* az első mérkőzés lement, jön a visszavágó */
+    const t=E.ties[E.userTie],meIsA=t.a===E.userIdx,ag=euroTieAggregate(t);
+    const mine=meIsA?ag.aTot:ag.bTot,theirs=meIsA?ag.bTot:ag.aTot;
+    const nx=E.fixtures&&E.fixtures[E.idx];
+    h+=row(`A párharc állása: <b>${mine}:${theirs}</b> — `
+      +(mine>theirs?'<b style="color:var(--grass)">előnyben vagytok</b>'
+       :mine<theirs?'<b style="color:var(--red)">hátrányban vagytok</b>':"döntetlen")+".");
+    if(nx)h+=row(`Visszavágó: <b>${nx.home?"🏠 hazai pályán":"✈️ idegenben"}</b>, ${esc(nx.o.n)} ellen.`);
+    h+=row("Egyenlőségnél az idegenben lőtt gól dönt, utána büntetők.","var(--dim2)");
+  }else if(m.k==="g"&&E.stage==="group"){
+    const tbl=euroGroupTable(E.userG),pos=tbl.findIndex(r=>r.t.you)+1,me=tbl.find(r=>r.t.you);
+    const left=EURO_SCHEDULE.length-E.md;
+    h+=row(`A csoportban <b>${pos}. hely</b>${me?` — ${me.r.pts} pont, ${me.r.gf}:${me.r.ga}`:""}.`);
+    h+=row(left>0?`Még <b>${left}</b> forduló a csoportkörből. Az első két helyezett jut tovább.`
+                 :"A csoportkör véget ért.","var(--dim2)");}
+  /* ha új kör indult, mondjuk meg, mi jön és hol */
+  if(((tie&&tie.won)||(gEnd&&gEnd.advanced))&&E.stage!=="done"
+     &&EURO_ROUND_NAMES[E.stage]&&E.fixtures&&E.fixtures[0]){
+    const nx=E.fixtures[0];
+    h+=row(`Következik: <b>${EURO_ROUND_NAMES[E.stage]}</b> — ${esc(nx.o.n)} ellen, `
+      +(nx.neutral?"semleges pályán":(nx.home?"az első mérkőzés hazai pályán":"az első mérkőzés idegenben"))+".","var(--gold)");}
+  return h+`</div>`;}
+/* ---- AZ ÚT VISSZANÉZÉSE ----
+   A csoportkör összes eredménye és a lejátszott kieséses körök, a menetelés-
+   naplóból. A panel nyitottsága az S.euro-ban él, ezért túléli az újrarajzolást
+   és a mentést is. */
+function renderEuroPath(){
+  const E=S.euro,box=$("euroPathBox"),btn=$("euroPathBtn");
+  if(!box||!btn||!E)return;
+  const open=!!E.pathOpen;
+  box.classList.toggle("hide",!open);
+  btn.textContent=open?"▲ Az utad idáig — elrejtés":"📜 Az utad idáig";
+  if(!open)return;
+  const P=E.path||[];
+  if(!P.length){
+    box.innerHTML=`<div style="font-size:12.5px;color:var(--dim)">Ebben a sorozatban még nincs lejátszott mérkőzésed.</div>`;
+    return;}
+  const sc=(a,b)=>{const c=a>b?"var(--grass)":a<b?"var(--red)":"var(--gold)";
+    return `<b style="color:${c};font-family:var(--font-disp)">${a}:${b}</b>`;};
+  const venue=r=>r.neutral?"⚖️":(r.home?"🏠":"✈️");
+  const line=(left,right)=>`<div style="font-size:12.5px;display:flex;justify-content:space-between;gap:8px;padding:2px 0">
+    <span style="color:var(--dim)">${left}</span>${right}</div>`;
+  const hdr=t=>`<div style="font-size:11px;letter-spacing:1px;color:var(--gold);text-transform:uppercase;margin:8px 0 3px">${t}</div>`;
+  let h="";
+  const grp=P.filter(x=>x.k==="g"),gEnd=P.find(x=>x.k==="gEnd");
+  if(grp.length){
+    h+=hdr("Csoportkör").replace("margin:8px","margin:0px");
+    grp.forEach(r=>{h+=line(`${r.md!=null?`${r.md+1}. f. `:""}${venue(r)} ${esc(r.opp)}`,sc(r.mine,r.theirs));});
+    if(gEnd)h+=`<div style="font-size:12px;color:${gEnd.advanced?"var(--grass)":"var(--red)"};margin-top:3px">`
+      +`${gEnd.rank}. hely${gEnd.pts!=null?` · ${gEnd.pts} pont · ${gEnd.gf}:${gEnd.ga}`:""} — ${gEnd.advanced?"továbbjutás":"kiesés"}</div>`;}
+  EURO_ROUNDS.forEach(rd=>{
+    const legs=P.filter(x=>x.k==="ko"&&x.round===rd),tie=P.find(x=>x.k==="tie"&&x.round===rd);
+    if(!legs.length&&!tie)return;
+    h+=hdr(EURO_ROUND_NAMES[rd]);
+    legs.forEach(r=>{h+=line(`${r.leg!=null&&rd!=="final"?`${r.leg+1}. mérk. `:""}${venue(r)} ${esc(r.opp)}`,sc(r.mine,r.theirs));});
+    if(tie)h+=`<div style="font-size:12px;color:${tie.won?"var(--grass)":"var(--red)"};margin-top:1px">`
+      +`${rd==="final"?"":"Összesítés "}${tie.mine}:${tie.theirs} · ${esc(tie.how)} — `
+      +`${tie.won?(rd==="final"?"GYŐZELEM 🏆":"továbbjutás"):"kiesés"}</div>`;});
+  box.innerHTML=h;}
+$("euroPathBtn")&&($("euroPathBtn").onclick=()=>{
+  if(!S.euro)return;
+  S.euro.pathOpen=!S.euro.pathOpen;
+  renderEuroPath();saveGame();});
 function renderEuroScreen(){
   const E=S.euro;if(!E)return;
   const c=EURO_COMPS[E.comp],done=E.stage==="done",ko=E.stage!=="group"&&!done;
@@ -13246,6 +13374,7 @@ function renderEuroScreen(){
       logCard.classList.remove("hide");
       $("euroLogHead").innerHTML=`<div style="font-size:12.5px;color:var(--dim)">${euroLastLogTitle||""}</div>`;
       $("euroLog").innerHTML=euroLastLogHtml;
+      const ft=$("euroLogFoot");if(ft)ft.innerHTML=euroLogFooterHtml();
     }else logCard.classList.add("hide");}
   const stageTxt=done?"A sorozat véget ért"
     :ko?`${EURO_ROUND_NAMES[E.stage]} · ${E.stage==="final"?"egy mérkőzés semleges pályán":`${E.idx+1}/2. mérkőzés`}`
@@ -13338,7 +13467,8 @@ function renderEuroScreen(){
          <span>${esc(x.n)} <span style="color:var(--dim2);font-size:11px">${esc(x.club)}</span></span><b style="color:var(--gold);font-family:var(--font-disp);font-size:14px;min-width:22px;text-align:right">${x[key]}</b></div>`).join("")+`</div>`;};
   $("euroStats").innerHTML=lst(E.stats.scorers,"g","Góllövőlista")
     +lst(E.stats.assists,"a","Gólpasszok")
-    +lst(E.stats.cleanSheets,"c","Kapott gól nélkül");}
+    +lst(E.stats.cleanSheets,"c","Kapott gól nélkül");
+  renderEuroPath();}
 $("euroKickBtn")&&($("euroKickBtn").onclick=()=>{
   $("scEuro").classList.add("hide");
   $("scSim").classList.remove("hide");
