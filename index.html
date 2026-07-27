@@ -293,6 +293,13 @@ button:disabled{opacity:.35;cursor:default}
 .chCard .chDiff{display:inline-block;font-size:9.5px;letter-spacing:1.1px;text-transform:uppercase;font-weight:700;padding:2px 7px;border-radius:20px;margin-bottom:6px}
 .chCard .chDesc{font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.35;margin-bottom:7px}
 .chCard .chStake{font-size:11.5px;line-height:1.5;color:var(--dim)}
+/* "Mi számít bele" — a kihívás pontos szabálya. A felhasználó jelzése szerint
+   a legnagyobb frusztráció az volt, hogy nem derült ki, mikor érvényes a
+   teljesítés; ezért ez minden ajánlaton és az aktív kihívásoknál is ott van. */
+.chCard .chRule{font-size:11px;line-height:1.5;color:var(--dim2);background:var(--bg);
+  border-radius:7px;padding:6px 8px;margin-bottom:7px}
+.chmRule{font-size:11px;line-height:1.5;color:var(--dim2);background:var(--bg);
+  border-radius:7px;padding:6px 8px;margin-top:5px}
 .chCard .chStake .rw{color:var(--grass);font-weight:600}
 .chCard .chStake .pn{color:var(--red);font-weight:600}
 .chCard .chTake{margin-top:9px;width:100%}
@@ -1014,7 +1021,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.3.09";
+const APP_VERSION="2.4.00";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7535,6 +7542,85 @@ function challengeStatFor(name,stat){
      nem függ egyetlen játékostól, mindig teljesíthető;
    • kezdő-11 játékos-cél (egy pályán lévő csatár X gólt / egy kezdő X gólpasszt)
      — kis, reális számokkal. */
+/* ================= KIHÍVÁS-KALIBRÁCIÓ SZIMULÁCIÓVAL =================
+   A régi rendszer legnagyobb baja MÉRHETŐ volt: a célszámok ABSZOLÚT számok
+   voltak egy nehézség-szorzóval, és semmit nem tudtak arról, milyen erős vagy
+   a mezőnyhöz képest. 400-400 szimulált szezonnal mérve:
+     · "Tarts 6 meccsen át tiszta lapot" (KÖNNYŰ): a teljesítés esélye
+       gap −3/0/+3/+6 mellett 0% / 1% / 6% / 15% — vagyis még egy fölényes
+       csapatnak is csapda volt, sosem érte meg elvállalni;
+     · "Nyerj 12 meccset" (KÖNNYŰ): 2% / 55% / 98% / 100% — gyenge csapatnak
+       lehetetlen, erősnek ingyen jutalom, azaz tét nélküli;
+     · a legtöbb típus 0%-ról 100%-ra ugrott a szint-különbség függvényében.
+   Vagyis a "Könnyű/Közepes/Nehéz" címke nem a kihívás nehézségét írta le,
+   hanem azt, hogy épp mennyivel nőtted ki a mezőnyt.
+
+   AZ ÚJ MÓDSZER: a célszámot nem képlet adja, hanem a motor SAJÁT gólmodellje.
+   Vállaláskor lefuttatunk CH_SIM_N szezont/ablakot a TE aktuális szint-
+   különbségeddel, és a célt arra a percentilisre tesszük, ahol a kívánt
+   teljesítési arány kijön. Így a "Nehéz" mindig kb. ugyanolyan nehéz — akár
+   sereghajtó vagy, akár bajnokesélyes —, és egyetlen típus sem lehet se
+   teljesíthetetlen, se ingyen. */
+const CH_PASS_TARGET={easy:0.72,medium:0.48,hard:0.26};
+const CH_SIM_N=300;   /* 300 minta: ±3%-on belüli becslés, futásideje pár ms */
+function chLevelGap(){
+  try{return (typeof levelGap==="function")?levelGap():0;}catch(e){return 0;}}
+/* Egy ablak (rounds meccs) szimulálása a motor saját konstansaival. A képlet
+   BETŰRE ugyanaz, amit a meccs használ (SIM.BASE·e^(SIM.K·diff), hazai/idegen
+   előny, a mezőny szórása) — ezért amit itt mérünk, az a valódi játékmenet. */
+function chSimOne(gap,rounds){
+  const lam=d=>Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)));
+  const s={W:0,D:0,L:0,pts:0,GF:0,GA:0,cs:0,maxUnb:0,maxCS:0,comebacks:0,
+           bestHaul:0,awayW:0,scalps:0,zeroW:0,unb:0,csRun:0};
+  for(let r=0;r<rounds;r++){
+    const home=r%2===0;
+    const oppDelta=(Math.random()+Math.random()+Math.random()-1.5)/1.5*SIM.OPPSPREAD;
+    const d=gap-oppDelta+(home?SIM.HOME:SIM.AWAY);
+    const gf=poisson(lam(d)),ga=poisson(lam(-d));
+    s.GF+=gf;s.GA+=ga;
+    if(gf>ga){s.W++;s.pts+=3;if(!home)s.awayW++;if(ga===0)s.zeroW++;if(oppDelta<0)s.scalps++;}
+    else if(gf===ga){s.D++;s.pts++;}
+    else s.L++;
+    if(gf>=ga){s.unb++;if(s.unb>s.maxUnb)s.maxUnb=s.unb;}else s.unb=0;
+    if(ga===0){s.cs++;s.csRun++;if(s.csRun>s.maxCS)s.maxCS=s.csRun;}else s.csRun=0;
+    if(gf>s.bestHaul)s.bestHaul=gf;
+    if(gf>ga&&ga>=1&&Math.random()<0.5)s.comebacks++;}
+  return s;}
+/* Melyik szimulált mutató tartozik melyik kihívás-típushoz. */
+const CH_SIM_STAT={
+  teamWins:s=>s.W, teamPoints:s=>s.pts, teamGoals:s=>s.GF,
+  unbeatenStreak:s=>s.maxUnb, cleanStreak:s=>s.maxCS, teamCleanSheets:s=>s.cs,
+  comebacks:s=>s.comebacks, bigHaul:s=>s.bestHaul,
+  awayWins:s=>s.awayW, bigScalps:s=>s.scalps, zeroHeroWins:s=>s.zeroW,
+  teamConceded:s=>s.GA};
+/* A cél beállítása a kívánt teljesítési arányra. Inverz típusnál (pl. "ennél
+   kevesebb gólt kapj") a teljesítés azt jelenti, hogy ALATTA maradsz, ezért a
+   percentilis a másik oldalról jön. */
+function chCalibratedTarget(type,diff,rounds,inverse){
+  const fn=CH_SIM_STAT[type];if(!fn)return null;
+  const gap=chLevelGap(),vals=[];
+  for(let i=0;i<CH_SIM_N;i++)vals.push(fn(chSimOne(gap,rounds)));
+  const p=CH_PASS_TARGET[diff]||0.5;
+  /* NEM egyszerű percentilist veszünk. A mutatók egy része KIS EGÉSZ SZÁM
+     (a legjobb gólzápor tipikusan 2-5, a tiszta lapos sorozat 0-4), és ilyenkor
+     a percentilis nagyot téved: egyetlen egész lépés akár 30 százalékpontot is
+     ugorhat a teljesítési arányon. Mérve is ez jött ki — a percentiles változat
+     a "gólzápor" könnyű fokozatát 72% helyett 91%-ra tette.
+     Ezért VÉGIGPRÓBÁLJUK az összes szóba jöhető egész célt, mindegyikre
+     kiszámoljuk a tényleges teljesítési arányt a mintán, és azt választjuk,
+     amelyik a legközelebb esik a kívánt arányhoz. Folytonos mutatóknál ez
+     ugyanazt adja, mint a percentilis; a durva, diszkrét mutatóknál viszont a
+     lehető legjobb közelítést. */
+  let lo=Infinity,hi=-Infinity;
+  for(let i=0;i<vals.length;i++){if(vals[i]<lo)lo=vals[i];if(vals[i]>hi)hi=vals[i];}
+  const floor=inverse?0:1;
+  let best=null,bestErr=Infinity;
+  for(let t=Math.max(floor,lo-1);t<=hi+1;t++){
+    let ok=0;
+    for(let i=0;i<vals.length;i++)if(inverse?vals[i]<=t:vals[i]>=t)ok++;
+    const err=Math.abs(ok/vals.length-p);
+    if(err<bestErr-1e-9){bestErr=err;best=t;}}
+  return best==null?null:Math.max(floor,best);}
 function genChallenge(scope,diff,ctx){
   const mult=challengeDiffMult(diff);
   const short=scope==="short";
@@ -7548,42 +7634,101 @@ function genChallenge(scope,diff,ctx){
   const fwd=ctx.starters.filter(s=>["CS","JSZ","BSZ","TKP"].includes(s.pos));
   const outfield=ctx.starters.filter(s=>s.pos!=="KP");
   const R=(lo,hi)=>Math.max(1,Math.round((lo+Math.random()*(hi-lo))*mult));
+  /* A mérhető (szimulálható) típusok célja a KALIBRÁCIÓBÓL jön; ha valamiért
+     nem áll rendelkezésre (pl. hiányzó motor-konstans), a régi képlet a
+     tartalék, hogy sose maradjon kihívás cél nélkül. */
+  const W=short?Math.max(1,shortWindow):30;
+  const CAL=(type,fallback,inverse)=>{
+    const t=chCalibratedTarget(type,diff,W,inverse);
+    return (t==null||!isFinite(t))?fallback:t;};
   const templates=[
     /* --- CSAPATSZINTŰ (nincs játékos-függés) --- */
-    ()=>{const target=short?R(3,5):R(12,17);
+    ()=>{const target=CAL("teamWins",short?R(3,5):R(12,17));
       return {type:"teamWins",target,
-        desc:`Nyerj ${target} meccset ${horizon}`};},
-    ()=>{const target=short?R(8,12):R(38,52);
+        desc:`Nyerj ${target} meccset ${horizon}`,
+        rule:`Csak a vállalás UTÁNI bajnoki meccsek számítanak. A kupameccsek nem.`};},
+    ()=>{const target=CAL("teamPoints",short?R(8,12):R(38,52));
       return {type:"teamPoints",target,
-        desc:`Gyűjts ${target} pontot ${horizon}`};},
-    ()=>{const target=short?R(8,14):R(30,45);
+        desc:`Gyűjts ${target} pontot ${horizon}`,
+        rule:`Győzelem 3, döntetlen 1 pont. Csak a vállalás utáni bajnoki meccsek számítanak.`};},
+    ()=>{const target=CAL("teamGoals",short?R(8,14):R(30,45));
       return {type:"teamGoals",target,
-        desc:`Szerezz ${target} gólt csapatszinten ${horizon}`};},
+        desc:`Szerezz ${target} gólt csapatszinten ${horizon}`,
+        rule:`A csapat ÖSSZES bajnoki gólja számít, bárki szerzi. Csak a vállalás után.`};},
+    /* --- ÚJ CSALÁD: HOL és KI ELLEN nyersz (nem csak mennyit) --- */
+    ()=>{const target=CAL("awayWins",short?R(1,2):R(6,9));
+      return {type:"awayWins",target,
+        desc:`Nyerj ${target} meccset IDEGENBEN ${horizon}`,
+        rule:`Csak idegenbeli bajnoki győzelem számít (a ✈️ jelzésű meccsek), a vállalás után.`};},
+    ()=>{const target=CAL("bigScalps",short?R(1,2):R(5,8));
+      return {type:"bigScalps",target,
+        desc:`Győzz le ${target} nálad erősebb ellenfelet ${horizon}`,
+        rule:`Akkor számít, ha a legyőzött ellenfél Ratingje MAGASABB a kezdő 11-ed átlagánál. A vállalás után.`};},
+    ()=>{const target=CAL("zeroHeroWins",short?R(1,3):R(6,10));
+      return {type:"zeroHeroWins",target,
+        desc:`Nyerj ${target} meccset úgy, hogy gólt sem kapsz ${horizon}`,
+        rule:`Csak az a győzelem számít, ahol 0 gólt kaptál. A vállalás után.`};},
+    /* --- ÚJ CSALÁD: MEGŐRZŐ (inverz) — nem gyűjteni kell, hanem elkerülni.
+       Ez teljesen új játékérzet: nem hajszolsz egy számot, hanem VÉDESZ egyet. */
+    ()=>{const target=CAL("teamConceded",short?R(6,9):R(28,38),true);
+      return {type:"teamConceded",target,inverse:true,
+        desc:`Kapj LEGFELJEBB ${target} gólt ${horizon}`,
+        rule:`Fordított kihívás: akkor teljesül, ha a határidőig ENNYI vagy ENNÉL KEVESEBB gólt kapsz. A vállalás előtt kapott gólok nem számítanak.`};},
+    ()=>{if(short)return null;
+      const target=diff==="hard"?0:diff==="medium"?1:2;
+      return {type:"discipline",target,inverse:true,
+        desc:`Zárd a szezont legfeljebb ${target} piros lappal`,
+        rule:`Fordított kihívás: a vállalás után kapott piros lapokat számoljuk. ${target===0?"Egyetlen kiállítás sem fér bele.":""}`};},
     /* --- KEZDŐ-11 JÁTÉKOS-CÉL (csak pályán lévő) --- */
     ()=>{if(!fwd.length)return null;const s=pick(fwd);const target=short?R(2,4):R(6,11);
       return {type:"playerGoals",stat:"goals",playerName:s.p.n,target,
-        desc:`${shortName(s.p.n)} szerezzen ${target} gólt ${horizon}`};},
+        desc:`${shortName(s.p.n)} szerezzen ${target} gólt ${horizon}`,
+        rule:`Csak ${shortName(s.p.n)} saját, vállalás utáni bajnoki góljai számítanak. Ha eladod őt, a kihívás büntetés nélkül érvénytelenné válik — de játszatnod kell, hogy gólt szerezhessen.`};},
     ()=>{if(!outfield.length)return null;const s=pick(outfield);const target=short?R(2,3):R(5,9);
       return {type:"playerAssists",stat:"assists",playerName:s.p.n,target,
-        desc:`${shortName(s.p.n)} adjon ${target} gólpasszt ${horizon}`};},
+        desc:`${shortName(s.p.n)} adjon ${target} gólpasszt ${horizon}`,
+        rule:`Csak ${shortName(s.p.n)} vállalás utáni gólpasszai számítanak. Ha eladod őt, a kihívás büntetés nélkül érvénytelenné válik.`};},
     /* --- SOROZAT-ALAPÚ (a törékenység adja a feszültséget; ABSZOLÚT cél) --- */
-    ()=>{const target=short?R(4,6):R(8,13);
+    ()=>{const target=CAL("unbeatenStreak",short?R(4,6):R(8,13));
       return {type:"unbeatenStreak",target,
-        desc:`Építs ${target} meccses veretlenségi sorozatot ${horizon}`};},
-    ()=>{const target=short?R(3,4):R(5,8);
+        desc:`Építs ${target} meccses veretlenségi sorozatot ${horizon}`,
+        rule:`A sorozatot a vállalás UTÁN kell összehozni, egyhuzamban (győzelem vagy döntetlen). Vereség nullázza, de újrakezdheted — a legjobb sorozatod számít.`};},
+    ()=>{const target=CAL("cleanStreak",short?R(3,4):R(5,8));
       return {type:"cleanStreak",target,
-        desc:`Tarts ${target} meccsen át tiszta lapot egymás után ${horizon}`};},
+        desc:`Tarts ${target} meccsen át egymás után tiszta lapot ${horizon}`,
+        rule:`Egymást KÖVETŐ meccsek, mindegyiken 0 kapott góllal. Egyetlen kapott gól nullázza a sorozatot, de újrakezdheted — a legjobb sorozatod számít.`};},
     /* --- KAPUS/VÉDELEM (halmozó) --- */
-    ()=>{const target=short?R(3,5):R(10,16);
+    ()=>{const target=CAL("teamCleanSheets",short?R(3,5):R(10,16));
       return {type:"teamCleanSheets",target,
-        desc:`Zárj ${target} meccset kapott gól nélkül ${horizon}`};},
+        desc:`Zárj ${target} meccset kapott gól nélkül ${horizon}`,
+        rule:`Nem kell egymás után lenniük — a vállalás utáni összes 0 kapott gólos meccs számít.`};},
     /* --- DRÁMAI PILLANAT --- */
-    ()=>{const target=short?R(1,2):R(3,5);
+    ()=>{const target=CAL("comebacks",short?R(1,2):R(3,5));
       return {type:"comebacks",target,
-        desc:`Nyerj ${target} meccset hátrányból fordítva ${horizon}`};},
-    ()=>{const target=short?R(4,5):R(5,6);
+        desc:`Nyerj ${target} meccset hátrányból fordítva ${horizon}`,
+        rule:`Akkor számít, ha a meccs közben hátrányban voltál, és a végén mégis TE nyertél. A döntetlenre mentett meccs nem elég.`};},
+    ()=>{const target=CAL("bigHaul",short?R(4,5):R(5,6));
       return {type:"bigHaul",target,
-        desc:`Szerezz ${target} gólt egyetlen meccsen ${horizon}`};},
+        desc:`Szerezz ${target} gólt EGYETLEN meccsen ${horizon}`,
+        rule:`Egyetlen mérkőzésen belül kell összejönnie — a több meccsen szerzett gólok nem adódnak össze. A vállalás utáni legjobb meccsed számít.`};},
+    /* --- ÚJ CSALÁD: KI szerzi a gólokat (a keret mélysége és a kapus) --- */
+    ()=>{const target=short?R(2,3):R(6,10);
+      return {type:"subGoals",target,
+        desc:`A CSEREEMBEREID szerezzenek ${target} gólt ${horizon}`,
+        rule:`Csak az számít, ha a gólszerző NEM volt kezdő azon a meccsen. Ez a keret mélységét méri — érdemes erős padot építeni.`};},
+    ()=>{const target=short?R(6,9):R(22,32);
+      return {type:"keeperSaves",target,
+        desc:`A kapusod mutasson be ${target} bravúrt ${horizon}`,
+        rule:`A közvetítésben "bravúr"-ként jelzett védések számítanak, a vállalás után. Ha kapust cserélsz, a keret összes kapusának bravúrja beleszámít.`};},
+    /* --- ÚJ CSALÁD: A HÁTTÉRRENDSZEREK fejlesztése (kémia, skillek) --- */
+    ()=>{if(short)return null;const target=Math.max(2,R(2,4));
+      return {type:"chemPairsDone",target,
+        desc:`Építs fel ${target} teljes (5/5) párkémiát ${horizon}`,
+        rule:`Csak a vállalás után KÉSZRE vitt párosok számítanak. A kémiaépítés a meccsjutalmakból jön — játszasd együtt ugyanazt a párost.`};},
+    ()=>{if(short)return null;const target=Math.max(2,R(3,5));
+      return {type:"skillsComplete",target,
+        desc:`Vigyél teljes erejűre ${target} skillt ${horizon}`,
+        rule:`Akkor számít, ha egy skill eléri az utolsó fázisát (pl. 3/3). A vállaláskor már kész skillek nem számítanak bele.`};},
     /* ================= CSAPATÉPÍTŐ ("training ground") KIHÍVÁSOK =================
        Ezek nem a meccs-eredményt mérik, hanem azt, hogyan ÉPÍTED a keretet:
        igazolás, eladás, fiatalítás, taktika-fejlesztés. Nagy részük csak a
@@ -7592,55 +7737,66 @@ function genChallenge(scope,diff,ctx){
     /* --- 1. Új játékosok felvétele --- */
     ()=>{if(short)return null;const target=Math.max(3,R(4,6));
       return {type:"signings",target,
-        desc:`Vegyél fel ${target} új játékost a keretedbe ${horizon}`};},
+        desc:`Vegyél fel ${target} új játékost a keretedbe ${horizon}`,
+        rule:`A vállalás után a keretedbe KERÜLŐ játékosok számítanak — vásárlás, ingyen igazolás és ifi-akadémiáról felkerülő tehetség egyaránt.`};},
     /* --- 2. Rating-emelés több poszton --- */
     ()=>{if(short)return null;const target=Math.max(2,Math.min(5,R(3,3)));
       return {type:"ratingUps",target,
-        desc:`Emeld a Rating-szintet ${target} különböző poszton ${horizon}`};},
+        desc:`Emeld a Rating-szintet ${target} különböző poszton ${horizon}`,
+        rule:`KÜLÖNBÖZŐ posztokon kell Rating-növekedésnek történnie a vállalás után. Ugyanazon a poszton több játékos fejlődése egynek számít. A fejlődés a meccseken és az edzéstervvel jön.`};},
     /* --- 3. Eladás adott értékben --- */
     ()=>{if(short)return null;
       const target=Math.round((5000+Math.random()*5000)*mult/500)*500;
       return {type:"salesValue",target,
-        desc:`Adj el játékosokat ${target.toLocaleString("hu")} pont értékben ${horizon}`};},
+        desc:`Adj el játékosokat ${target.toLocaleString("hu")} pont értékben ${horizon}`,
+        rule:`Az eladási árak ADÓDNAK ÖSSZE, a vállalás után. A HUB-ban az "Elad" gombbal eladott játékosok számítanak.`};},
     /* --- 4. Új ember a kezdőben, sok meccsel --- */
     ()=>{if(short)return null;const target=Math.max(10,Math.min(24,R(15,15)));
       return {type:"newStarter",target,
-        desc:`Tegyél új játékost a kezdő 11-be, és játszasd legalább ${target} meccsen`};},
+        desc:`Tegyél új játékost a kezdő 11-be, és játszasd legalább ${target} meccsen`,
+        rule:`"Új" az, aki a szezon elején még NEM volt kezdő. Elég EGY ilyen ember — a legtöbb meccset lejátszott új kezdőd haladása számít.`};},
     /* --- 5. Fiatal igazolások --- */
     ()=>{if(short)return null;const target=Math.max(2,R(3,4));
       return {type:"youngSignings",target,
-        desc:`Igazolj le legalább ${target} húsz év alatti játékost ${horizon}`};},
+        desc:`Igazolj le legalább ${target} húsz év alatti játékost ${horizon}`,
+        rule:`A vállalás után, 20 év ALATTI korban igazolt játékosok számítanak. Az ifi-akadémiáról érkezők is beleszámítanak.`};},
     /* --- 6. Fiatalítás a kezdő 11-ben (nehézségfüggő cél: 3 / 4 / 5) --- */
     ()=>{if(short)return null;
       const target=diff==="hard"?5:diff==="medium"?4:3;
       return {type:"youthXI",target,
-        desc:`A szezon végére legyen ${target} darab 24 év alatti a kezdő 11-edben`};},
+        desc:`A szezon végére legyen ${target} darab 24 év alatti a kezdő 11-edben`,
+        rule:`Ez ÁLLAPOT-kihívás, nem gyűjtögetés: a HATÁRIDŐ pillanatában kell ennyi 24 év alattinak lennie a kezdő 11-ben. Közben szabadon változhat.`};},
     /* --- 7. Új taktika felhozatala --- */
     ()=>{if(short)return null;
       const act=S.tactics&&S.tactics.active;
       const target=Math.max(65,Math.min(85,Math.round(70*Math.sqrt(mult))));
       return {type:"tacticLevel",target,excludeTactic:act,
-        desc:`Emelj egy ÚJ taktikát ${target} fölötti szintre ${horizon}`};},
+        desc:`Emelj egy ÚJ taktikát ${target} fölötti szintre ${horizon}`,
+        rule:`A vállaláskor AKTÍV taktikád nem számít — egy másikat kell felhoznod. A taktika a használatával fejlődik, tehát váltanod kell rá.`};},
     /* --- 8. Taktikai illeszkedés --- */
     ()=>{if(short)return null;
       const target=Math.max(52,Math.min(70,Math.round(55*Math.sqrt(mult))));
       return {type:"tacticFit",target,
-        desc:`Érj el ${target}% fölötti illeszkedést az aktív taktikádnál`};},
+        desc:`Érj el ${target}% fölötti illeszkedést az aktív taktikádnál`,
+        rule:`ÁLLAPOT-kihívás: a határidő pillanatában kell ennyinek lennie. Az illeszkedést a keret összetétele adja — igazolással, felállással és taktikaváltással javíthatod.`};},
     /* --- 9. Nehézségi szint emelése (2 szezonos) --- */
     ()=>{if(short)return null;
       return {type:"diffRaise",target:5,seasonSpan:2,baseDiff:oppTargetRating||84,
-        desc:`Emeld a nehézségi szintet 5-tel 2 szezonon belül`};},
+        desc:`Emeld a nehézségi szintet 5-tel 2 szezonon belül`,
+        rule:`A mezőny erősségét a HUB "Nehézségi szint" gombjánál állíthatod, két szezon között. A vállaláskori szintedhez képest kell +5. Auto szintkövetéssel is teljesülhet.`};},
     /* --- RÖVID: poszt-tanulás indítása --- */
     /* Poszt-tanulás: MINDIG könnyű besorolás, és a jutalom a betanítási ár
        fele — vagyis a kihívás gyakorlatilag félárassá teszi a tanulást. Ezért
        a sablon felülírja a sorsolt nehézséget és a jutalmat is. */
     ()=>{if(!short)return null;
       return {type:"posLearn",target:1,forceDiff:"easy",forceReward:{kind:"posLearnRefund"},
-        desc:`Kezdj el betanítani egy új posztot valamelyik játékosodnak`};},
+        desc:`Kezdj el betanítani egy új posztot valamelyik játékosodnak`,
+        rule:`Elég ELINDÍTANI a betanítást (a játékos részletpaneljén) — nem kell befejezni. Jutalomként a befizetett ár felét visszakapod, tehát a tanulás gyakorlatilag féláras lesz.`};},
     /* --- RÖVID: öreg le, fiatal fel --- */
     ()=>{if(!short)return null;
       return {type:"renewOld",target:1,
-        desc:`Adj el egy 32 év fölötti játékost, és hozz a helyére 25 év alattit`};},
+        desc:`Adj el egy 32 év fölötti játékost, és hozz a helyére 25 év alattit`,
+        rule:`Mindkét lépés kell: egy 32 év FÖLÖTTI eladása ÉS egy 25 év ALATTI igazolása, a vállalás után. A sorrend mindegy.`};},
     /* --- RÖVID: a leggyengébb láncszem cseréje --- */
     ()=>{if(!short)return null;
       /* A leggyengébb láncszemet a KEZDŐ 11-BŐL választjuk, nem a teljes
@@ -7654,9 +7810,29 @@ function genChallenge(scope,diff,ctx){
       roster.forEach(pl=>{if(!worst||pOvr(pl)<pOvr(worst))worst=pl;});
       if(!worst)return null;
       return {type:"replaceWorst",target:1,targetName:worst.n,
-        desc:`Találj új játékost ${shortName(worst.n)} helyére (ő a leggyengébb láncszem)`};}
+        desc:`Találj új játékost ${shortName(worst.n)} helyére (ő a leggyengébb láncszem)`,
+        rule:`Akkor teljesül, ha ${shortName(worst.n)} már NINCS a keretedben (eladtad vagy elengedted). Nem elég a padra ültetni.`};}
   ];
-  for(let tries=0;tries<12;tries++){const t=pick(templates)();if(t)return t;}
+  /* ÉPESZŰSÉGI SZŰRŐ. A kalibráció matematikailag akkor is helyes célt ad, ha a
+     csapat reménytelenül alul van a mezőnyhöz képest — csak épp értelmetlen
+     kihívás lesz belőle ("Kapj legfeljebb 132 gólt", "Nyerj 1 meccset"). Ilyenkor
+     inkább MÁS típust ajánlunk: a sablon eldobódik, és jön a következő sorsolás.
+     Az alsó határ azt védi, hogy a cél ne legyen semmitmondó; a felső (csak a
+     kapott gólnál) azt, hogy a védekező kihívás tényleg védekezésről szóljon. */
+  const SANE_MIN={teamWins:2,teamPoints:4,teamGoals:6,unbeatenStreak:2,cleanStreak:2,
+    teamCleanSheets:1,comebacks:1,bigHaul:3,awayWins:1,bigScalps:1,zeroHeroWins:1,
+    subGoals:1,keeperSaves:3};
+  const SANE_MAX={teamConceded:Math.round(W*2.0)};
+  const sane=t=>{
+    if(!t)return false;
+    if(t.target==null||!isFinite(t.target))return false;
+    const mn=SANE_MIN[t.type];if(mn!=null&&t.target<mn)return false;
+    const mx=SANE_MAX[t.type];if(mx!=null&&t.target>mx)return false;
+    return true;};
+  for(let tries=0;tries<20;tries++){const t=pick(templates)();if(sane(t))return t;}
+  /* végső háló: ha semmi nem ment át (extrém csapaterő), adjuk vissza az első
+     érvényeset, hogy sose maradjon el a felajánlás */
+  for(let tries=0;tries<20;tries++){const t=pick(templates)();if(t)return t;}
   return null;}
 /* reward/punishment generálás — a scope és a nehézség szabja a mértéket, a
    legdurvább büntetések (játékos-vesztés) csak a hosszú+nehéz challenge-eknél. */
@@ -7769,8 +7945,33 @@ function challengeRawValue(ch){
     case "posLearn":     return S.chPosLearnStarted||0;
     case "renewOld":     return Math.min(S.chSoldOver32||0,S.chBoughtUnder25||0);
     case "replaceWorst": return chWorstReplaced(ch);
+    /* ---- ÚJ TÍPUSOK ---- */
+    case "awayWins":     return chCountFixtures(f=>!f.home&&f.gf>f.ga);
+    case "bigScalps":    return chCountFixtures(f=>f.gf>f.ga&&f.o&&f.o.ovr>teamOVRbase());
+    case "zeroHeroWins": return chCountFixtures(f=>f.gf>f.ga&&f.ga===0);
+    case "teamConceded": return S.GA||0;                  /* inverz */
+    case "discipline":   return S.reds||0;                /* inverz */
+    case "subGoals":     return S.chSeasonSubGoals||0;
+    case "keeperSaves":  return Object.values(S.seasonSaves||{}).reduce((a,b)=>a+b,0);
+    case "chemPairsDone":return chCompleteChemPairs();
+    case "skillsComplete":return chCompleteSkills();
   }
   return 0;}
+/* Hány lejátszott bajnoki meccs felel meg a feltételnek ebben a szezonban. */
+function chCountFixtures(fn){
+  return (S.fixtureResults||[]).filter(f=>{try{return fn(f);}catch(e){return false;}}).length;}
+/* Kész (5/5) párkémiák száma a teljes keretben. */
+function chCompleteChemPairs(){
+  let n=0;Object.values(S.chemPairs||{}).forEach(pr=>{if(pr&&pr.stages>=CHEM_PAIR_NEED)n++;});
+  return n;}
+/* Teljes erejű (minden fázis kész) skill-példányok száma a keretben. */
+function chCompleteSkills(){
+  let n=0;
+  const names=new Set((typeof fullCareerRoster==="function"?fullCareerRoster():[]).map(p=>p.n));
+  Object.entries(S.skills||{}).forEach(([nm,arr])=>{
+    if(!names.has(nm))return;
+    (arr||[]).forEach(inst=>{if(skillComplete(inst))n++;});});
+  return n;}
 /* ---- SEGÉDEK az új kihívás-típusokhoz ---- */
 /* Hány KÜLÖNBÖZŐ poszton nőtt Rating ebben a szezonban. */
 function chDistinctRatingUpPositions(){
@@ -7817,9 +8018,13 @@ function challengeProgress(ch){
   return Math.max(0,challengeRawValue(ch)-(ch.startProgress||0));}
 /* visszafelé kompatibilitás: a régi kód challengeCurrentValue-t hívott */
 function challengeCurrentValue(ch){return challengeRawValue(ch);}
-/* Teljesült-e? A vállalástól számított haladás elérte a célt (delta). */
+/* Teljesült-e? A vállalástól számított haladás elérte a célt (delta).
+   INVERZ kihívásnál (pl. "kapj legfeljebb X gólt", "max X piros lap") fordítva:
+   akkor teljesül, ha a haladás a cél ALATT vagy azon marad. Ezt a határidőnél
+   értékeljük ki — addig a panel "még belefér" állapotot mutat. */
 function challengeMet(ch){
-  return challengeProgress(ch)>=ch.target;}
+  const prog=challengeProgress(ch);
+  return ch.inverse?prog<=ch.target:prog>=ch.target;}
 /* ---- REWARD végrehajtás ---- */
 /* A poszt-tanulási visszatérítés LEÍRÁSA az ajánlatkor. A konkrét ár csak
    akkor derül ki, amikor a felhasználó kiválasztja, KI tanul új posztot —
@@ -8079,7 +8284,15 @@ let _challengeOffers=[];
 function showChallengeOffers(scope,count,resumeCb,opening){
   const ctx=challengeContext();
   _challengeOffers=[];
-  const seenDesc=new Set();
+  /* VÁLTOZATOSSÁG: a felajánlott csomagban minden kihívás MÁS TÍPUSÚ legyen.
+     Korábban csak a leírás egyezését szűrtük, így simán kaphattál három
+     "nyerj X meccset" variánst egyszerre — ettől tűnt szűknek a kínálat. */
+  const seenType=new Set(),seenDesc=new Set();
+  for(let tries=0;tries<count*10&&_challengeOffers.length<count;tries++){
+    const ch=buildChallengeOffer(scope,ctx);
+    if(ch&&!seenType.has(ch.type)&&!seenDesc.has(ch.desc)){
+      seenType.add(ch.type);seenDesc.add(ch.desc);_challengeOffers.push(ch);}}
+  /* ha a típus-szűrés miatt nem jött össze a darabszám, engedünk belőle */
   for(let tries=0;tries<count*6&&_challengeOffers.length<count;tries++){
     const ch=buildChallengeOffer(scope,ctx);
     if(ch&&!seenDesc.has(ch.desc)){seenDesc.add(ch.desc);_challengeOffers.push(ch);}}
@@ -8106,6 +8319,7 @@ function renderChallengeOffers(scope,resumeCb,opening){
     html+=`<div class="chCard" style="border-left-color:${col}">
       <span class="chDiff" style="background:color-mix(in srgb,${col} 22%,transparent);color:${col}">${challengeDiffLabel(ch.difficulty)}</span>
       <div class="chDesc">${esc(ch.desc)}</div>
+      ${ch.rule?`<div class="chRule">📋 <b>Mi számít bele:</b> ${esc(ch.rule)}</div>`:""}
       <div class="chStake">🏆 Jutalom: <span class="rw">${esc(ch.reward.desc)}</span><br>⚠ Büntetés: <span class="pn">${esc(ch.punishment.desc)}</span></div>
       <button class="btn-p chTake" data-ch="${i}">Elvállalom</button>
     </div>`;});
@@ -8129,7 +8343,10 @@ function renderChallengeOffers(scope,resumeCb,opening){
   $("twActions").appendChild(done);}
 /* Haladás szöveg a HUB-panelhez (pl. "3/5") — a vállalástól számított delta. */
 function challengeProgressText(ch){
-  return `${challengeProgress(ch)}/${ch.target}`;}
+  const prog=challengeProgress(ch);
+  /* Inverz kihívásnál a szám azt mutatja, mennyit "használtál el" a keretből —
+     ezért a max jelöléssel írjuk ki, hogy egyértelmű legyen az irány. */
+  return ch.inverse?`${prog}/${ch.target} (max)`:`${prog}/${ch.target}`;}
 /* Kiértékeli a lejárt challenge-eket. kind: "round" (rövid, évszakvégi) vagy
    "season" (hosszú, szezonvégi). A lejárt kihívások reward/punishmentet
    osztanak, majd kikerülnek az aktív listából. */
@@ -9448,7 +9665,10 @@ function playMatch(){
       euroFinishUserMatch(gf,ga);
     }else{
       if(gf>ga)S.W++;else if(gf<ga)S.L++;else S.D++;
-      S.fixtureResults.push({o:fx.o,gf,ga});
+      /* a home flag a kihívás-rendszernek kell (idegenbeli győzelmek); az
+         ellenfél ereje (o.ovr) már eddig is benne volt, abból jön a "nagy
+         skalp" mérése — így egyik új típushoz sem kell külön nyomkövetés */
+      S.fixtureResults.push({o:fx.o,gf,ga,home:!!fx.home});
       S.GF+=gf;S.GA+=ga;S.pts=3*S.W+S.D;}
     addLine(`VÉGE  ${title}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m "+cls);
     /* a fejléc a végeredményen áll meg, az óra "VÉGE" — a következő meccs
@@ -11173,13 +11393,18 @@ function renderChallengeModal(){
       const prog=challengeProgress(ch);
       const frac=Math.max(0,Math.min(1,prog/Math.max(1,ch.target)));
       const met=challengeMet(ch);
-      const col=met?"var(--grass)":"var(--gold)";
+      /* Inverz kihívásnál a "nem teljesült" azt jelenti, hogy TÚLLÉPTED a
+         keretet — az már visszafordíthatatlan, ezért piros, nem arany. */
+      const col=met?"var(--grass)":(ch.inverse?"var(--red)":"var(--gold)");
       html+=`<div class="chmCard" style="border-left-color:${col}">
         <div class="chmDesc">${esc(ch.desc)}</div>
         <div class="chmMeta">⏳ ${challengeDeadlineText(ch)} · ${ch.scope==="short"?"rövid":"hosszú"}</div>
         <div class="chmBar"><span style="width:${Math.round(frac*100)}%;background:${col}"></span></div>
-        <div class="chmProg" style="color:${col}">${met?"✓ teljesítve — a jutalom a határidőnél jár":"Haladás: "+challengeProgressText(ch)}</div>
+        <div class="chmProg" style="color:${col}">${met
+          ?(ch.inverse?"✓ egyelőre belefér — a határidőnél dől el ("+challengeProgressText(ch)+")":"✓ teljesítve — a jutalom a határidőnél jár")
+          :"Haladás: "+challengeProgressText(ch)}</div>
         <div class="chmStake">🏆 <span class="rw">${esc(ch.reward.desc)}</span> &nbsp;·&nbsp; ⚠ <span class="pn">${esc(ch.punishment.desc)}</span></div>
+        ${ch.rule?`<div class="chmRule">📋 <b>Mi számít bele:</b> ${esc(ch.rule)}</div>`:""}
       </div>`;});}
   if(resolved.length){
     html+=`<div class="chmSection">Lezárt kihívások ebben a szezonban (${resolved.length})</div>`;
