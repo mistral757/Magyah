@@ -964,6 +964,11 @@ button:disabled{opacity:.35;cursor:default}
     <div id="euroNext" style="margin-top:10px"></div>
     <button id="euroKickBtn" class="btn-y stepbtn">Kezdőrúgás</button>
     <button id="euroDoneBtn" class="btn-y stepbtn hide">Tovább a szezonzárásra</button>
+    <!-- A kupameccsek KÖZÖTT ugyanúgy elérhető a HUB, mint a bajnokság
+         közben: a keret, a felállás és a taktika a sorozat alatt is
+         állítható. Csak a következő meccs előtt látszik — a kampány
+         lezárása után a szezonzárás visz tovább. -->
+    <button id="euroHubBtn" class="btn-s hide" style="width:100%;margin-top:8px">⚙️ Ugrás a HUB-ba</button>
   </div>
   <div class="card hide" id="euroLogCard">
     <div class="steplbl">Az előző mérkőzés</div>
@@ -1009,7 +1014,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.3.07";
+const APP_VERSION="2.3.08";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -3604,17 +3609,20 @@ function euroAssistWeight(p){const c=p.pos[0];
    gól nélküli kapusok) — a user meccseit a playMatch könyveli, ide csak az
    AI-AI meccsek kerülnek. */
 function euroRecordStats(team,goals,oppGoals){
-  const st=S.euro.stats;
+  /* AI-csapat könyvelése — a saját keretünk SOHA nem jön erre (azt a playMatch
+     könyveli a recordScorer/recordAssist-on át), ezért itt az own mindig false.
+     A kulcsolás a közös euroAddStat-on megy, hogy a névrokonok szét legyenek
+     választva klub szerint. */
   for(let i=0;i<goals;i++){
     const sc=euroPickPlayer(team,euroScorerWeight);
-    if(sc){const k=sc.n;st.scorers[k]=st.scorers[k]||{n:k,club:team.n,g:0};st.scorers[k].g++;}
+    if(sc)euroAddStat("scorers",sc.n,team.n,false);
     if(Math.random()<0.62){
       const as=euroPickPlayer(team,euroAssistWeight);
-      if(as){const k=as.n;st.assists[k]=st.assists[k]||{n:k,club:team.n,a:0};st.assists[k].a++;}}
+      if(as)euroAddStat("assists",as.n,team.n,false);}
   }
   if(oppGoals===0){
     const gk=euroPickPlayer(team,p=>p.pos[0]==="KP"?10:0.001);
-    if(gk){const k=gk.n;st.cleanSheets[k]=st.cleanSheets[k]||{n:k,club:team.n,c:0};st.cleanSheets[k].c++;}}}
+    if(gk)euroAddStat("cleanSheets",gk.n,team.n,false);}}
 /* Egy eredmény könyvelése a csoporttabellába. */
 function euroApplyResult(hi,ai,hg,ag){
   const T=S.euro.table;
@@ -3696,12 +3704,24 @@ function euroFrozen(){return euroActive();}
    A liga-statisztikák továbbra is teljesen külön vödörben maradnak. */
 const EURO_TEMPO=0.5;
 function euroTempo(){return euroActive()?EURO_TEMPO:1;}
-function euroAddStat(kind,name,club){
+/* ---- KUPA-STATISZTIKA KULCSA: KLUB + NÉV ----
+   A kampány a te kereted MELLETT 31 AI-csapatot is könyvel, és a névkészletek
+   átfedhetnek: két különböző csapatban ülhet azonos nevű játékos. Amíg a
+   vödrök PUSZTÁN a névvel voltak kulcsolva, az ilyen névrokonok statjai
+   ÖSSZEADÓDTAK egyetlen sorba — a góllövőlista hazudott, és a BL arany-díjak
+   is rossz emberhez kerülhettek (a névegyezés miatt a rendszer a te
+   játékosodnak hihette az ellenfélét, vagy fordítva).
+   Mostantól a kulcs a klub és a név párosa, és minden sor megjegyzi, a TE
+   kereted tagja-e (own) — a tulajdonlást így nem névegyezés dönti el. */
+function euroStatKey(club,name){return club+"\u0000"+name;}
+function euroAddStat(kind,name,club,own){
   if(!S.euro)return;
   const st=S.euro.stats,key=kind==="scorers"?"g":kind==="assists"?"a":"c";
   const m=st[kind]=st[kind]||{};
-  m[name]=m[name]||{n:name,club:club,g:0,a:0,c:0};
-  m[name][key]=(m[name][key]||0)+1;}
+  const k=euroStatKey(club,name);
+  m[k]=m[k]||{n:name,club:club,own:!!own,g:0,a:0,c:0};
+  if(own)m[k].own=true;
+  m[k][key]=(m[k][key]||0)+1;}
 /* ---- SZEZON-SZINTŰ KUPA-VÖDÖR ----
    Az S.euro.stats a KAMPÁNY statisztikája: a teljes 32 csapatos mezőnyé, és a
    kampány végén (endEuroCampaign) az S.euro-val együtt megsemmisül. A
@@ -3714,11 +3734,11 @@ function seasonEuroBucket(){
   if(!S.seasonEuro)S.seasonEuro={scorers:{},assists:{},mvps:{},cleanSheets:{},W:0,D:0,L:0,GF:0,GA:0,matches:0};
   return S.seasonEuro;}
 function recordScorer(name){
-  if(euroActive()){euroAddStat("scorers",name,teamName);
+  if(euroActive()){euroAddStat("scorers",name,teamName,true);
     const b=seasonEuroBucket();b.scorers[name]=(b.scorers[name]||0)+1;}
   else S.scorers[name]=(S.scorers[name]||0)+1;}
 function recordAssist(name){
-  if(euroActive()){euroAddStat("assists",name,teamName);
+  if(euroActive()){euroAddStat("assists",name,teamName,true);
     const b=seasonEuroBucket();b.assists[name]=(b.assists[name]||0)+1;}
   else S.assists[name]=(S.assists[name]||0)+1;}
 /* ---- E3: EGYENES KIESÉSES SZAKASZ ----
@@ -4098,9 +4118,18 @@ function attrsOfPlayer(p){
    úgy, ahogy az effOvr is kezeli. A visszaadott objektum a bontást is viszi
    (_base = tiszta attribútum, _skill = skill-bónusz), hogy a HUB-nézet meg
    tudja mutatni, mennyi jön honnan. */
+/* ---- A SEBESSÉG-MAG: a leggyorsabb HAT ember ----
+   A többi tengelytől eltérően a sebesség NEM a teljes kezdő 11 átlaga. Egy
+   széljátékot vagy gyors kontrát nem tizenegy sprinter visz, hanem a gyors
+   gerinc: a szélsők, a csatár és a felfutó szélső védők. A tizenegyes átlagba
+   viszont beleszámít a kapus és a két lassú belső védő is, akiktől a rendszer
+   soha nem is várna gyorsaságot — így a valóban gyors kereteket is lehúzta.
+   Ezért a sebesség-tengelyt a hat leggyorsabb (súlyozott) emberre számoljuk. */
+const SPEED_CORE_N=6;
 function teamAttrStrengths(){
   const acc={},wsum={};
   ATTR_KEYS.forEach(k=>{acc[k]=0;wsum[k]=0;});
+  const sebPool=[];
   /* A felállás alapértelmezett slotlistája — ehhez képest mérjük a szerep-
      eltolást, hogy érintetlen felállásnál a hatás pontosan 0 legyen. Ha
      bármiért nincs meg (ismeretlen felállás, régi mentés), a slot saját kódja
@@ -4113,7 +4142,12 @@ function teamAttrStrengths(){
     ATTR_KEYS.forEach(k=>{
       const w=(ROLE_AXIS_W[k]&&ROLE_AXIS_W[k][role])||0;
       if(w<=0)return;
-      acc[k]+=((a[k]||0)+slotAxisShift(sl.pos,defPos,k))*fit*w;wsum[k]+=w;});});
+      const v=((a[k]||0)+slotAxisShift(sl.pos,defPos,k))*fit;
+      if(k==="seb"){sebPool.push({v,w});return;}
+      acc[k]+=v*w;wsum[k]+=w;});});
+  /* a sebesség-mag: a leggyorsabb hat súlyozott átlaga */
+  sebPool.sort((x,y)=>y.v-x.v);
+  sebPool.slice(0,SPEED_CORE_N).forEach(o=>{acc.seb+=o.v*o.w;wsum.seb+=o.w;});
   const base={},out={};
   ATTR_KEYS.forEach(k=>{base[k]=wsum[k]?acc[k]/wsum[k]:0;});
   const sb=skillAxisBonus();
@@ -4156,8 +4190,12 @@ function teamAttrStrengths(){
    tartozott; azzal a 2. fázis minden sebesség-súlyú taktikának ingyen fitet
    adott volna (a Széljáték 48% helyett 64%-ra ugrott volna, az összesített
    átlag 51%-ról 58%-ra). */
-const AXIS_OFFSET={ved:0.20, kapus:1.96, passz:1.44, gol:-1.64, seb:0.40};
-const AXIS_SCALE ={ved:1.58, kapus:3.78, passz:1.29, gol:1.65, seb:1.68};
+/* A seb offsetje/szórása ÚJRAMÉRVE, mert a tengely mostantól a leggyorsabb
+   HAT emberre számol (SPEED_CORE_N), nem a teljes tizenegyre: 2700 szintetikus
+   kifejlett keret, 7 felállás, 70-120 Rating-sávban. A telítődés alatti,
+   "tiszta" eltolás +4.95, a maradék szórása 2.1 körül állandó. */
+const AXIS_OFFSET={ved:0.20, kapus:1.96, passz:1.44, gol:-1.64, seb:4.95};
+const AXIS_SCALE ={ved:1.58, kapus:3.78, passz:1.29, gol:1.65, seb:2.10};
 const TACTIC_FIT_C=0.13;   /* a szórás tágassága — méréssel hangolva */
 /* Egy tengely VÁRT szintje a keret általános szintjéhez (a horgonyhoz) képest.
    JAVÍTVA — a sebesség szerkezeti hátránya:
@@ -4172,9 +4210,25 @@ const TACTIC_FIT_C=0.13;   /* a szórás tágassága — méréssel hangolva */
    keret általános szintje 99 fölé ér, a sebességtől sem várunk többet 99-nél —
    így a plafonon álló játékos pontosan "elvárás szerinti" (z=0), nem büntetett.
    99 alatt a viselkedés BETŰRE változatlan. */
+/* A korábbi megoldás egy KEMÉNY min(99, T+offset) volt. Ez csak akkor kapcsolt
+   be, amikor a horgony már 99 fölé ért — a mérés viszont azt mutatta, hogy a
+   sebesség ennél SOKKAL hamarabb, fokozatosan telítődik: a plafon közelében a
+   ±8-as kisorsolás és a poszt-profil miatt a keret átlaga már 95 körül lelassul,
+   és csak aszimptotikusan kúszik a 99-hez. Emiatt egy 100-as csapat sebessége
+   90-95 közt áll, miközben a többi tengelye 100 fölött — a merev elvárás pedig
+   MINDEN taktikát lehúzott ("a Sebesség húzza vissza" minden rendszernél).
+   Mostantól az elvárás ugyanazt a SIMA telítődési görbét követi, amit mértünk
+   (softplus-alapú lágy minimum, k=2.5). Így a plafonhoz szorult keret pontosan
+   elvárás szerinti (z≈0), nem büntetett — a sebesség viszont a plafon ALATT
+   továbbra is teljes értékű, megkülönböztető tengely marad. */
+const SPEED_SOFTCAP_K=2.5;
 function axisExpected(k,T){
   const base=T+(AXIS_OFFSET[k]||0);
-  return k==="seb"?Math.min(SPEED_MAX,base):base;}
+  if(k!=="seb")return base;
+  const d=(SPEED_MAX-base)/SPEED_SOFTCAP_K;
+  /* numerikusan stabil softplus: nagy d-nél ln(1+e^d) ≈ d */
+  const sp=d>30?d:Math.log(1+Math.exp(d));
+  return SPEED_MAX-SPEED_SOFTCAP_K*sp;}
 function tacticFit(key){
   const A=teamAttrStrengths(),w=TACTICS[key].attrProfile;
   /* a mezőny szintje a horgony (a kapus szándékosan kimarad belőle) */
@@ -4546,6 +4600,15 @@ function peakToTsi(peak){
 const YOUTH_BOOST_RATING=[6,12];
 const YOUTH_BOOST_TSI=[1000,2500];
 function youthBoostScale(){return Math.max(1,oppTargetRating/100);}
+/* ---- ÁRKORREKCIÓ (v2.3.08) ----
+   Egy hosszú karrier-végigjátszás azt mutatta, hogy a szigorúbb büdzsé mellett
+   a HUB-fejlesztések ára már elszakadt a bevételtől: gyakorlatilag semmire nem
+   maradt pénz a játékosvásárláson kívül. A szorzók egy helyen ülnek, hogy a
+   hangolás átlátható maradjon és ne kelljen képleteket újraírni. */
+const SCOUT_PRICE_MULT=0.75;        /* scout-fejlesztés  −25% */
+const ROSTER_EXPAND_PRICE_MULT=0.25;/* keretbővítés      −75% */
+const BOOST_PRICE_MULT=0.65;        /* ifi- és öreg-boost −35% */
+const FORMATION_PRICE_MULT=0.5;     /* fizetős felállásváltás −50% */
 function youthBoostPrice(){
   /* Az ifi-boost "egy topjátékos áránál" is drágább: a keret legdrágább
      játékosának VÉTELÁRÁHOZ (nem a szerényebb piaci értékhez) van kötve, és
@@ -4557,7 +4620,7 @@ function youthBoostPrice(){
   /* KIHÍVÁS-HATÁS: a boost-kedvezmény jutalom itt érvényesül (az öreg-boost
      ára ugyanezt a függvényt használja, tehát arra is hat). */
   const disc=1-(S.boostDiscount||0);
-  return Math.round(Math.max(18000,topBuy)*1.5*youthBoostScale()*disc/100)*100;}
+  return Math.round(Math.max(18000,topBuy)*1.5*youthBoostScale()*disc*BOOST_PRICE_MULT/100)*100;}
 function isYouthProspect(entry){return entry&&(entry.youthBonus||0)>0;}
 function applyYouthBoost(entry){
   const sc=youthBoostScale();
@@ -4675,7 +4738,7 @@ function scoutUpgradePrice(stars){
   const b=Math.log(20)/8, a=5000/Math.exp(b);
   const base=a*Math.exp(b*stars);
   const bump=1+0.28*Math.exp(-Math.pow((stars-4.5)/2.4,2));
-  return Math.round(base*bump/500)*500;}
+  return Math.round(base*bump*SCOUT_PRICE_MULT/500)*500;}
 function generateScout(){
   const idx=weightedIndex(SCOUT_STAR_W);
   return {name:pick(SCOUT_NAMES),stars:SCOUT_STAR_LEVELS[idx]};}
@@ -6306,9 +6369,20 @@ function underdogFactor(){
   const rel=Math.max(0,Math.min(1,gap/UNDERDOG_FULL_GAP));
   const abs=Math.max(0,Math.min(1,(oppTargetRating-80)/25));
   return Math.max(0,Math.min(1,rel*0.75+abs*0.25));}
-/* Szöveges címke a felülethez — hogy a felhasználó LÁSSA, mit kap érte. */
-function underdogLabel(u){
-  return u>=0.75?"hősies alávállalás":u>=0.5?"komoly kihívás":u>=0.25?"felfelé nyújtózol":u>0.05?"enyhe hátrány":"";}
+/* Szöveges címke a felülethez — hogy a felhasználó LÁSSA, mit kap érte.
+   FONTOS a két forrás szétválasztása: a faktornak van egy RELATÍV (mennyivel
+   vagy gyengébb a mezőnynél) és egy ABSZOLÚT (milyen magas a mezőny egyáltalán)
+   összetevője. Magas mezőnyön az abszolút tag akkor is ad bónuszt, ha a kereted
+   már fölé nőtt — ilyenkor viszont HAZUGSÁG volt "felfelé nyújtózol"-t írni:
+   a felhasználó épp azt látta, hogy "a kereted rég kinőtte a mezőnyt", és
+   mellette azt, hogy fölfelé nyújtózik. A címke ezért megnézi, tényleg
+   hátrányban vagy-e, és ha nem, a magasságra hivatkozik, nem alávállalásra. */
+function underdogLabel(u,gap){
+  if(u<=0.05)return "";
+  const behind=gap!=null?gap:0;      /* pozitív = a mezőny erősebb nálad */
+  if(behind<1)return u>=0.25?"magasan játszol":"";
+  return u>=0.75?"hősies alávállalás":u>=0.5?"komoly kihívás"
+    :u>=0.25?"felfelé nyújtózol":"enyhe hátrány";}
 document.querySelectorAll("#autoLevelGrid button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#autoLevelGrid button").forEach(x=>x.classList.remove("sel"));
   b.classList.add("sel");S.autoLevel=b.dataset.al==="on";
@@ -8200,6 +8274,8 @@ const S={idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,capMod:0,eventMod:0
      ajánl új párost. Az alap-kémia (közös klub/nemzet) eleve 5/5-ös párként
      kerül be a keret megalakulásakor. */
   chemPairs:{},chemInProgress:null,
+  /* SKILL-PADLÓ: türelem-számláló + szezonos kvóták + az első kémia jelzője */
+  matchesSinceSkill:0,seasonNewSkills:0,seasonSkillCont:0,firstChemDone:false,
   /* TAKTIKA (F1): levels = a 6 taktika szintje (50-99), active = az aktív
      taktika kulcsa vagy null (nincs taktika — semleges; a régi mentések és a
      rendszer bekapcsolása előtti állapot). */
@@ -8229,6 +8305,93 @@ const S={idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,capMod:0,eventMod:0
    hatás) vagy teljes. skillEffVal a típusnak megfelelően skálázza a felet:
    szorzós típusoknál (goalw/assistw/defense/discipline) az 1-től vett
    eltérés felét, additív típusoknál (rating/aura/mvp) a fél értéket adja. */
+/* ================= SKILL-PADLÓ: A GYŰJTÖGETÉS SOSEM ÁLLHAT LE =================
+   A skill-jutalmak eddig KIZÁRÓLAG teljesítmény-eseményekre indultak be
+   (mesterhármas, nagy győzelem, 3. meccsemberség, dupla bravúr, dupla
+   gólpassz). Egy túlvállalt runon — ahol a csapat 16-ból 16. — ezek szinte
+   sosem következnek be, így a játékos egész szezonban EGYETLEN skillt sem
+   kapott. Pedig épp ott kellene a fejlődés, ahol nehéz.
+   Mostantól van egy PADLÓ, a szezon eredményétől függetlenül:
+     · szezononként legalább SKILL_MIN_NEW új skill és SKILL_MIN_CONT folytatás,
+     · a mechanizmus egy türelem-számláló: ha SKILL_PITY_MATCHES meccsen át
+       semmi nem jön, a gép magától bedob egyet,
+     · a számláló minden KAPOTT skillnél és minden FOLYTATÁSNÁL nullázódik
+       (a kémiaépítés szándékosan NEM nullázza — az külön sáv).
+   Mivel a számláló minden 5. meccsen kényszerít, egy 30 fordulós szezonban
+   legalább 6 jutalom garantált — épp elég a 3+3-as padlóhoz. A típusválasztás
+   ezért kvóta-tudatos: mindig azt dobja be, amelyikből még hiányzik. */
+const SKILL_PITY_MATCHES=5;
+const SKILL_MIN_NEW=3;
+const SKILL_MIN_CONT=3;
+/* Az első kémia-prompt legkésőbb ekkorra lefut az ELSŐ szezonban. */
+const FIRST_CHEM_BY_ROUND=8;
+/* A türelem-jutalom TÍPUSA: azt tölti, amiből még hiányzik. null = mindkét
+   kvóta megvan, mehet a szokásos véletlen logika. */
+function pitySkillKind(){
+  const nNew=S.seasonNewSkills||0,nCont=S.seasonSkillCont||0;
+  const needNew=nNew<SKILL_MIN_NEW,needCont=nCont<SKILL_MIN_CONT;
+  const canCont=findIncompleteSkills().length>0;
+  if(needCont&&canCont&&(!needNew||nCont<=nNew))return "cont";
+  if(needNew)return "new";
+  if(needCont&&canCont)return "cont";
+  return null;}
+/* Könyvelés: minden tényleges skill-esemény nullázza a türelem-számlálót. */
+function noteSkillGranted(kind){
+  S.matchesSinceSkill=0;
+  if(kind==="cont")S.seasonSkillCont=(S.seasonSkillCont||0)+1;
+  else S.seasonNewSkills=(S.seasonNewSkills||0)+1;}
+/* ---- SEBESSÉG-SKILLEK A SEBESSÉG-TAKTIKÁKHOZ ----
+   Ha széljátékot vagy gyors kontrát játszol, és a rendszer illeszkedése 50%
+   fölött van, a sorsolás egyre nagyobb eséllyel hoz fel sebesség (pace) típusú
+   skillt. A hatás FOKOZATOS: 50%-nál még nulla, és onnan nő a maximumig — így
+   a jól illeszkedő sebesség-rendszer önmagát erősíti tovább, ahogy a
+   felhasználó kérte. */
+const PACE_TACTICS=["szeljatek","kontra"];
+const PACE_BIAS_MAX=0.75;
+function isPaceSkill(sk){
+  if(!sk)return false;
+  const types=[sk.type].concat(sk.combo?sk.combo.map(c=>c.type):[]);
+  return types.indexOf("pace")>=0;}
+function paceSkillBias(){
+  const act=S.tactics&&S.tactics.active;
+  if(!act||PACE_TACTICS.indexOf(act)<0)return 0;
+  const fit=(typeof tacticFit==="function")?tacticFit(act):0;
+  if(fit<=0.5)return 0;
+  return Math.min(PACE_BIAS_MAX,((fit-0.5)/0.5)*PACE_BIAS_MAX);}
+/* Egy új skill kihúzása a poolból, a sebesség-torzítással. */
+function drawSkillFromPool(){
+  if(!S.skillPool.length)S.skillPool=weightedShuffleSkills();
+  const b=paceSkillBias();
+  if(b>0&&Math.random()<b){
+    const i=S.skillPool.findIndex(isPaceSkill);
+    if(i>=0)return S.skillPool.splice(i,1)[0];}
+  return S.skillPool.shift();}
+/* ---- A PADLÓ BEVÁLTÁSA A SZEZON VÉGÉN ----
+   A türelem-számláló 30 fordulón át bőven kitermeli a 3+3-at, de a padló
+   ÍGÉRET, nem statisztikai valószínűség. Ezért a szezonzárásnál megnézzük, mi
+   hiányzik, és csendben pótoljuk (automatikus kiosztás + naplósor) — nem
+   nyitunk rá modális sorsolást, mert a szezonzáró jelentés folyamát nem
+   szakíthatja meg fél tucat felugró ablak. */
+function settleSkillFloor(){
+  if(gameMode!=="career")return;
+  let missNew=Math.max(0,SKILL_MIN_NEW-(S.seasonNewSkills||0));
+  let missCont=Math.max(0,SKILL_MIN_CONT-(S.seasonSkillCont||0));
+  if(!missNew&&!missCont)return;
+  const before=missNew+missCont;
+  /* előbb a folytatások — ezek a meglévő skilleket teszik teljes erejűvé */
+  while(missCont-->0){
+    const cands=findIncompleteSkills();
+    if(!cands.length)break;                 /* nincs mit folytatni */
+    const c=pick(cands);c.inst.stagesCompleted++;
+    noteSkillGranted("cont");
+    if(skillComplete(c.inst))addLine(`✅ Szezonzáró fejlesztés: ${esc(c.name)} — "${esc(c.inst.skill.name)}" teljes erejű lett.`,"m life");
+    else addLine(`🔧 Szezonzáró fejlesztés: ${esc(c.name)} — "${esc(c.inst.skill.name)}" (${c.inst.stagesCompleted}/${c.inst.stagesNeeded} fázis)`,"m life");}
+  while(missNew-->0){
+    const skill=drawSkillFromPool();
+    if(!skill)break;
+    autoAssignSkill(skill,rollStagesNeeded());
+    noteSkillGranted("new");}
+  if(before)updateSkillsLine();}
 function rollStagesNeeded(){return [2,3,4][weightedIndex([40,35,25])];}
 function skillComplete(inst){return inst.stagesCompleted>=inst.stagesNeeded;}
 function skillFraction(inst){return Math.min(1,inst.stagesCompleted/inst.stagesNeeded);}
@@ -8488,11 +8651,15 @@ function openHubMidSeason(){
      az átigazolási ablakot) belépett a HUB-ba, visszatéréskor a scWindow
      rejtve maradt — így nem tudta befejezni a checkpointot, a resumeCb sosem
      futott le, és a Kezdőrúgás véglegesen szürke maradt. */
+  /* A KUPA-KÉPERNYŐT is jegyeznünk kell: a HUB a kupameccsek közül is nyitható,
+     és visszatéréskor oda kell visszatalálni, nem a bajnoki nézetbe. */
   S._hubReturn={sim:!$("scSim").classList.contains("hide"),
                 pitch:!$("scPitch").classList.contains("hide"),
-                win:!$("scWindow").classList.contains("hide")};
+                win:!$("scWindow").classList.contains("hide"),
+                euro:!!($("scEuro")&&!$("scEuro").classList.contains("hide"))};
   $("scPitch").classList.add("hide");$("scSim").classList.add("hide");
   $("scWindow").classList.add("hide");
+  if($("scEuro"))$("scEuro").classList.add("hide");
   $("scHub").classList.remove("hide");
   $("hubNextSeasonBtn").textContent="← Vissza a szezonhoz";
   $("hubNextSeasonBtn").onclick=hubMidSeasonReturn;
@@ -8509,6 +8676,13 @@ function hubMidSeasonReturn(){
      közvetítés-panelen érhető el, tehát szezon közben vagyunk, ahol a pálya és
      a közvetítés is látszik. */
   const r=S._hubReturn||{sim:true,pitch:true};
+  /* KUPA: ha innen léptünk be, a sorozat-képernyő jön vissza — és semmi más,
+     különben a bajnoki nézet is alá csúszna. */
+  if(r.euro&&$("scEuro")){
+    $("scEuro").classList.remove("hide");
+    drawPitch();
+    $("scEuro").scrollIntoView({behavior:"smooth"});
+    return;}
   if(r.pitch)$("scPitch").classList.remove("hide");
   if(r.sim)$("scSim").classList.remove("hide");
   /* A félbehagyott évszakváltó panel visszatér — különben a checkpoint
@@ -9499,6 +9673,19 @@ function playMatch(){
     }
     /* KUPÁBAN FELE TEMPÓ: a skill-szerzés is feleannyi eséllyel indul be. */
     if(euroActive())skillReasons=skillReasons.filter(()=>Math.random()<EURO_TEMPO);
+    /* ---- TÜRELEM-SZÁMLÁLÓ (skill-padló) ----
+       Ha ezen a meccsen semmilyen teljesítmény-jutalom nem indult be, nő a
+       számláló; SKILL_PITY_MATCHES után a gép magától bedob egyet. Így egy
+       nyeretlen szezonban is folyamatosan épül a keret. */
+    if(!skillReasons.length){
+      S.matchesSinceSkill=(S.matchesSinceSkill||0)+1;
+      if(S.matchesSinceSkill>=SKILL_PITY_MATCHES)skillReasons.push("pity");}
+    /* ---- AZ ELSŐ KÉMIA-PROMPT GARANCIÁJA ----
+       A kémiaépítés a jutalmak 15%-a, ami az első szezonban simán elmaradhat.
+       Ez a mechanika viszont a játék egyik alappillére, ezért az első szezonban
+       legkésőbb a FIRST_CHEM_BY_ROUND. fordulóra mindenképp lefut egyszer. */
+    if(gameMode==="career"&&(S.seasonNumber||1)===1&&!S.firstChemDone
+       &&(S.idx||0)>=FIRST_CHEM_BY_ROUND)skillReasons.unshift("firstchem");
     /* --- karrier mód: játékos-nyitás esélye, jutalom-alapú (kisebb eséllyel,
        a skill-jutalomtól függetlenül) és időszakos random --- */
     let careerUnlockReasons=[];
@@ -9623,11 +9810,17 @@ function playMatch(){
     function processSkillQueue(reasons,cb){
       if(!reasons.length){cb();return;}
       const reason=reasons.shift();
+      /* A TÜRELEM-JUTALOM kvóta-tudatos: eldöntjük előre, új skill vagy
+         folytatás kell-e. A "firstchem" pedig kötelezően kémiaépítés. */
+      const forced=reason==="pity"?pitySkillKind():null;
       /* 15% eséllyel a jutalom KÉMIA-építés (nem skill). Ha van folyamatban
          lévő kémia, MINDIG azt lépteti tovább; különben új párost ajánl. */
       /* UNDERDOG: a szorosabb meccsek gyorsabban kovácsolnak össze — a
-         kémiaépítés esélye 15%-ról akár 27%-ig nő. */
-      if(Math.random()<0.15*(1+underdogFactor()*0.8)){
+         kémiaépítés esélye 15%-ról akár 27%-ig nő.
+         A türelem-jutalomnál viszont KIHAGYJUK a kémia-ágat: az a padló
+         garanciája, azt nem viheti el egy véletlen kémia-dobás. */
+      if(reason==="firstchem"||(reason!=="pity"&&Math.random()<0.15*(1+underdogFactor()*0.8))){
+        S.firstChemDone=true;
         if(S.chemInProgress&&S.chemPairs[S.chemInProgress]){
           if(S.auto){advanceChemInProgress();processSkillQueue(reasons,cb);}
           else showChemBuild(()=>processSkillQueue(reasons,cb));
@@ -9645,9 +9838,12 @@ function playMatch(){
       /* A folytatás esélye a hátralék méretével nő — így a rendszer önmagát
          egyensúlyban tartja: kevés félkész skillnél inkább újak jönnek,
          sok félkésznél pedig egyre inkább a meglévők fejeződnek be,
-         ahelyett hogy a hátralék korlátlanul nőhetne. */
+         ahelyett hogy a hátralék korlátlanul nőhetne.
+         A türelem-jutalomnál a kvóta dönt, nem a véletlen (forced). */
       const continueChance=Math.min(0.78,0.35+incompleteCands.length*0.09);
-      if(incompleteCands.length&&Math.random()<continueChance){
+      const goCont=forced?forced==="cont":Math.random()<continueChance;
+      if(incompleteCands.length&&goCont){
+        noteSkillGranted("cont");
         if(S.auto){
           const c=pick(incompleteCands);c.inst.stagesCompleted++;updateSkillsLine();
           if(skillComplete(c.inst))addLine(`✅ Fejlesztés kész: ${esc(c.name)} — "${esc(c.inst.skill.name)}" most már teljes erejű`,"m life");
@@ -9656,9 +9852,9 @@ function playMatch(){
         }else showSkillCompletion(()=>processSkillQueue(reasons,cb));
         return;
       }
-      if(!S.skillPool.length)S.skillPool=weightedShuffleSkills();
-      const skill=S.skillPool.shift();
+      const skill=drawSkillFromPool();
       const stagesNeeded=rollStagesNeeded();
+      noteSkillGranted("new");
       if(S.auto){autoAssignSkill(skill,stagesNeeded);processSkillQueue(reasons,cb);}
       else showSkillDraw(skill,reason,stagesNeeded,()=>processSkillQueue(reasons,cb));}
     if(skillReasons.length)processSkillQueue(skillReasons,afterAllRewards);
@@ -10403,7 +10599,7 @@ let extraRoster=[]; /* karrier módban a 15 aktív fölötti, MAX_CAREER_ROSTER-
    újrarendezzük az új posztokra (elsődlegesen a fő posztra, aztán rokonposztra),
    a kiszorulók a padra/tartalékba kerülnek, az üresen maradt slotokat a
    pad/tartalék tölti. Szezononként az első váltás ingyen, utána 10 000. */
-const FORMATION_CHANGE_COST=10000;
+const FORMATION_CHANGE_COST=Math.round(10000*FORMATION_PRICE_MULT);
 function formationChangeCost(){
   return (S.formationChangesThisSeason||0)<1?0:FORMATION_CHANGE_COST;}
 function applyFormationChange(newForm){
@@ -10732,7 +10928,7 @@ function currentRoster(){
   return r;}
 /* ---- jutalom-skill sorsolás és kiosztás ---- */
 let skillResumeCb=null;
-const SKILL_REASON_TXT={start:"Csapat kész — jutalom-skill!",hattrick:"Mesterhármas — jutalom-skill!",bigwin:"Nagyarányú győzelem — jutalom-skill!",mvp3:"Harmadik meccsembersége — jutalom-skill!",doublesave:"Két bravúr egy meccsen — jutalom-skill!",bigassist:"Kettős gólpassz — jutalom-skill!",challenge:"Kihívás teljesítve — válaszd ki, ki kapja!"};
+const SKILL_REASON_TXT={start:"Csapat kész — jutalom-skill!",hattrick:"Mesterhármas — jutalom-skill!",bigwin:"Nagyarányú győzelem — jutalom-skill!",mvp3:"Harmadik meccsembersége — jutalom-skill!",doublesave:"Két bravúr egy meccsen — jutalom-skill!",bigassist:"Kettős gólpassz — jutalom-skill!",challenge:"Kihívás teljesítve — válaszd ki, ki kapja!",pity:"Kemény menetelés — az edzőtábor meghozta a gyümölcsét!"};
 function findIncompleteSkills(){
   const out=[];
   const rosterNames=new Set((gameMode==="career"?fullCareerRoster():currentRoster()).map(p=>p.n));
@@ -11711,9 +11907,10 @@ function csReturnToHub(){
 /* ---- Keretbővítés ---- */
 const ROSTER_EXPAND_MAX=48;
 function rosterExpandPrice(cur){
-  /* 28→30 = 20000, majd lépésenként (+2 keret) +10000: 30→32 = 30000 ... 46→48 = 110000 */
+  /* 28→30 = 20000, majd lépésenként (+2 keret) +10000: 30→32 = 30000 ... 46→48 = 110000
+     — mindez a −75%-os korrekcióval: 5000 / 7500 / ... / 27500 */
   const step=Math.round((cur-28)/2);
-  return 20000+step*10000;}
+  return Math.round((20000+step*10000)*ROSTER_EXPAND_PRICE_MULT/500)*500;}
 $("hubRosterExpandBtn").onclick=()=>{
   $("scHub").classList.add("hide");
   $("scWindow").classList.remove("hide");
@@ -12111,7 +12308,22 @@ function showLevelChangePicker(direction){
   const w=levelWarnState();
   const teamNow=teamStrength().toFixed(1);
   const reasonTxt=`Két szezon között bármikor átállíthatod a mezőny erősségét — fel és le is. A kezdő 11-ed ereje: <b>${teamNow}</b> — ugyanaz a szám, ami a felállás alatt is látszik, és amivel a meccs számol.`;
-  $("twBody").innerHTML=`<p style="font-size:13px;color:var(--dim)">${reasonTxt} Jelenlegi mezőny: <b>${oppTargetRating} · ${diffTierLabel(oppTargetRating)}</b>.</p>
+  /* ---- MI EZ EGYÁLTALÁN? ----
+     A panel eddig rögtön a számokkal indult, és sehol nem mondta meg, mit
+     jelent a "meccs-erő", a "mezőny", vagy hogy a gombon látott állapot-
+     szövegek mihez képest értendők. Ez a nyitó doboz egyszer, emberi nyelven
+     elmagyarázza a három fogalmat és az előjelet — utána a számok is
+     értelmezhetők. */
+  const explain=`<div style="font-size:12px;line-height:1.55;background:var(--panel2);border-radius:8px;padding:9px 11px;margin-bottom:9px">
+    <b style="color:var(--gold)">Mit jelentenek ezek a számok?</b><br>
+    <b>Mezőny</b> — a 15 ellenfél átlagos erőssége. Ezt állítod ezzel a csúszkával.<br>
+    <b>Csapaterő</b> — a kezdő 11-ed nyers ereje, ami a felállás alatt is látszik.<br>
+    <b>Meccs-erő</b> — ami a pályán TÉNYLEGESEN számít: a csapaterő, plusz a morál,
+    az edző, a taktika, az aura- és védekező skillek meg a kapitány rutinja.
+    Ezért szokott eltérni a kettő — a meccs-erő a valósághűbb.<br>
+    <b>A zárójeles szám</b> a meccs-erőd és a mezőny különbsége: <b style="color:var(--grass)">+</b> = te vagy erősebb,
+    <b style="color:var(--red)">−</b> = a mezőny. A 0 körüli sáv a kiegyensúlyozott szezon.</div>`;
+  $("twBody").innerHTML=explain+`<p style="font-size:13px;color:var(--dim)">${reasonTxt} Jelenlegi mezőny: <b>${oppTargetRating} · ${diffTierLabel(oppTargetRating)}</b>.</p>
     <p style="font-size:12.5px;margin-top:7px;padding:7px 9px;border-radius:7px;line-height:1.5;
        background:${w.lvl>=2?"color-mix(in srgb,var(--red) 16%,transparent)":w.lvl===1?"color-mix(in srgb,var(--gold) 14%,transparent)":"var(--panel2)"};
        color:var(--ink)">${w.txt}</p>
@@ -13386,7 +13598,7 @@ function renderHub(){
     lvlBtn.style.opacity=canChange?"":"0.72";
     lvlBtn.style.cursor=canChange?"":"default";
     const g=levelGap();
-    const u=underdogFactor(),uLbl=underdogLabel(u);
+    const u=underdogFactor(),uLbl=underdogLabel(u,oppMatchStrength()-teamStrength());
     const state=w.lvl>=2?"a kereted rég kinőtte a mezőnyt":w.lvl===1?"a kereted a mezőny fölött jár"
       :w.lvl===-1?"kemény mezőny":"jó egyensúlyban vagy";
     lvlBtn.innerHTML=(canChange?(w.lvl>=2?"⚠️ ":"✦ "):"✦ ")+`Nehézségi szint — ${oppTargetRating}`
@@ -13628,7 +13840,7 @@ function euroFinishUserMatch(gf,ga){
     md:E.stage==="group"?E.md:null,leg:E.stage==="group"?null:E.idx,
     opp:fx.o.n,home:!!fx.home,neutral:!!fx.neutral,mine:gf,theirs:ga});
   euroRecordStats(E.teams[oi],ga,gf);
-  if(ga===0){const gk=euroGK();if(gk)euroAddStat("cleanSheets",gk.n,teamName);}
+  if(ga===0){const gk=euroGK();if(gk)euroAddStat("cleanSheets",gk.n,teamName,true);}
   /* a saját szezon-szintű kupamérleg (a jelentéshez) */
   const b=seasonEuroBucket();
   b.matches++;b.GF+=gf;b.GA+=ga;
@@ -13749,11 +13961,14 @@ function euroCampaignEnd(kind){
       {stat:"cleanSheets",key:"c",skillId:"bl_golden_gloves",label:"Aranykesztyű",unit:"kapott gól nélküli meccs",ms:"glove"}];
     E.goldenAwards=[];
     E.ownKings=[];
+    /* A TULAJDONLÁST a statisztika-sor own jelzője dönti el, NEM a névegyezés:
+       egy azonos nevű ellenfél-játékos így nem szerezheti meg neked (vagy tőled)
+       az arany-skillt. Régi mentésnél (nincs own mező) visszaesünk a névre. */
     const ownNames=new Set(fullCareerRoster().map(p=>p.n));
     awards.forEach(aw=>{
       const winner=topOf(E.stats[aw.stat],aw.key);
       if(!winner)return;
-      const isOwn=ownNames.has(winner.n);
+      const isOwn=winner.own!==undefined?!!winner.own:ownNames.has(winner.n);
       /* RUN: a királyi címet MINDEN sorozatban feljegyezzük (BL/EL/KL), mert a
          Run-mérő mérföldköve. A tartós arany-SKILLT viszont továbbra is CSAK a
          BL adja — az egyensúly ettől nem változik. */
@@ -13954,6 +14169,7 @@ function renderEuroScreen(){
         h+=`<div style="font-size:12.5px;color:${col};margin-top:2px">🥇 <b>${g.label}</b>: ${esc(shortName(g.name))} (${g.val} ${g.unit})${own}</div>`;});}
     nx.innerHTML=h;
     $("euroKickBtn").classList.add("hide");$("euroDoneBtn").classList.remove("hide");
+    if($("euroHubBtn"))$("euroHubBtn").classList.add("hide");
   }else{
     const fx=E.fixtures[E.idx];
     let extra="";
@@ -13965,6 +14181,7 @@ function renderEuroScreen(){
       <div style="font-size:15px;font-weight:700;margin-top:2px">${fx.neutral?"⚖️ Semleges pálya":fx.home?"🏠 Hazai pálya":"✈️ Idegenben"} — ${esc(fx.o.n)}</div>
       <div style="font-size:12px;color:var(--dim);margin-top:2px">Ellenfél ereje: ${Math.round(fx.o.ovr)} · a ti csapaterőtök: ${teamStrength().toFixed(1)}</div>${extra}`;
     $("euroKickBtn").classList.remove("hide");$("euroDoneBtn").classList.add("hide");
+    if($("euroHubBtn"))$("euroHubBtn").classList.toggle("hide",gameMode!=="career");
   }
   /* KIESÉSES SZAKASZ: a párharcok állása a csoporttabella helyett */
   if(E.stage!=="group"&&E.ties){
@@ -14005,8 +14222,8 @@ function renderEuroScreen(){
     const arr=Object.values(obj||{}).sort((a,b)=>(b[key]||0)-(a[key]||0)).slice(0,5).filter(x=>x[key]>0);
     if(!arr.length)return "";
     return `<div style="margin-top:8px"><div style="font-size:11px;letter-spacing:1px;color:var(--gold);text-transform:uppercase">${title}</div>`
-      +arr.map(x=>`<div style="font-size:12.5px;display:flex;justify-content:space-between;align-items:baseline;gap:8px">
-         <span>${esc(x.n)} <span style="color:var(--dim2);font-size:11px">${esc(x.club)}</span></span><b style="color:var(--gold);font-family:var(--font-disp);font-size:14px;min-width:22px;text-align:right">${x[key]}</b></div>`).join("")+`</div>`;};
+      +arr.map(x=>`<div style="font-size:12.5px;display:flex;justify-content:space-between;align-items:baseline;gap:8px${x.own?";font-weight:700":""}">
+         <span>${esc(x.n)} <span style="color:${x.own?"var(--gold)":"var(--dim2)"};font-size:11px">${esc(x.club)}${x.own?" · a tiéd":""}</span></span><b style="color:var(--gold);font-family:var(--font-disp);font-size:14px;min-width:22px;text-align:right">${x[key]}</b></div>`).join("")+`</div>`;};
   $("euroStats").innerHTML=lst(E.stats.scorers,"g","Góllövőlista")
     +lst(E.stats.assists,"a","Gólpasszok")
     +lst(E.stats.cleanSheets,"c","Kapott gól nélkül");
@@ -14017,6 +14234,7 @@ $("euroKickBtn")&&($("euroKickBtn").onclick=()=>{
   $("scSim").scrollIntoView({behavior:"smooth"});
   playMatch();});
 $("euroDoneBtn")&&($("euroDoneBtn").onclick=endEuroCampaign);
+$("euroHubBtn")&&($("euroHubBtn").onclick=openHubMidSeason);
 
 /* A szezonzárás kapuja: ha van esedékes európai indulás és a felhasználó nem
    mondott le róla, ELŐBB a kupa fut le (a szezonzáró öregedés/fejlődés ELŐTT,
@@ -14087,6 +14305,7 @@ function hubShowSeasonReport(){
        statisztikákkal zárul. A több szezonos (seasonSpan:2, érték N+2)
        kihívások nem záródnak korán: N+2 > N+1. */
     evaluateDueChallenges("season",(S.seasonNumber||1)+1);
+    settleSkillFloor();   /* a szezonos skill-padló beváltása, ha maradt hiány */
   }
   const report=advanceCareerSeason();
   const cardResults=determineSeasonCards();
@@ -14219,6 +14438,9 @@ function startNextCareerSeason(){
   S.chBoughtUnder25=0;       /* vettél-e 25 év alattit */
   S.chPosLearnStarted=0;     /* indítottál-e poszt-tanulást */
   S.seasonEuro=null;   /* a kupa szezon-statisztikája is nullázódik */
+  /* SKILL-PADLÓ: a szezonos kvóták nullázódnak, a türelem-számláló viszont
+     ÁTVISZÜNK — különben a szezonforduló ingyen nullázná a várakozást. */
+  S.seasonNewSkills=0;S.seasonSkillCont=0;
   S.resolvedChallenges=[];
   S.formationChangesThisSeason=0;
   S.moraleTarget=computeMoraleTarget();S.morale=S.moraleTarget;
@@ -14329,6 +14551,9 @@ function saveGame(){
         chSeasonMaxUnbeaten:S.chSeasonMaxUnbeaten,chSeasonMaxCleanStreak:S.chSeasonMaxCleanStreak,chSeasonComebacks:S.chSeasonComebacks,chSeasonBestHaul:S.chSeasonBestHaul,chSeasonCleanSheets:S.chSeasonCleanSheets,chSeasonSubGoals:S.chSeasonSubGoals,
         resolvedChallenges:S.resolvedChallenges,academy:S.academy,
         formationChangesThisSeason:S.formationChangesThisSeason,
+        /* skill-padló: türelem-számláló, szezonos kvóták, első kémia megvolt-e */
+        matchesSinceSkill:S.matchesSinceSkill,seasonNewSkills:S.seasonNewSkills,
+        seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,
         chemPairs:S.chemPairs,chemInProgress:S.chemInProgress,
         activeChallenges:S.activeChallenges,challengeLastOfferRound:S.challengeLastOfferRound,challengeLastOfferSeason:S.challengeLastOfferSeason,startChallengesDone:S.startChallengesDone,
         frozenAcademySeasons:S.frozenAcademySeasons,teamFormMalus:S.teamFormMalus,tsiBlocked:S.tsiBlocked,
@@ -14468,6 +14693,12 @@ function applySavedGame(d){
   S.resolvedChallenges=d.S.resolvedChallenges||[];
   S.academy=d.S.academy||[];
   S.formationChangesThisSeason=d.S.formationChangesThisSeason||0;
+  /* SKILL-PADLÓ (régi mentésben nincs — nulláról indul, ami helyes: a padló
+     a betöltés utáni szezontól kezd el számolni) */
+  S.matchesSinceSkill=d.S.matchesSinceSkill||0;
+  S.seasonNewSkills=d.S.seasonNewSkills||0;
+  S.seasonSkillCont=d.S.seasonSkillCont||0;
+  S.firstChemDone=!!d.S.firstChemDone;
   S.finalTable=d.S.finalTable||null;S.seasonClosed=!!d.S.seasonClosed;S.hubReportHtml=d.S.hubReportHtml||null;
   /* RUN: a mérő állapota. Régi mentésnél üresen indul, és a lusta
      mérföldkő-detektálás a meglévő előzményekből visszamenőleg feltölti. */
