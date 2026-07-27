@@ -1021,7 +1021,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.4.00";
+const APP_VERSION="2.4.01";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -3564,14 +3564,35 @@ const TACTIC_START_LIKED=[80,76,70],TACTIC_START_OTHER=60,TACTIC_MIN=50,TACTIC_M
    A pénzdíjak a SZEZONBÜDZSÉ SZORZÓI (nem fix összegek), hogy a jutalom a
    karrier előrehaladtával is arányos maradjon — a felhasználó által megadott
    40k/30k/15k arányokat (2 : 1.5 : 0.75) pontosan megőrizve. */
+/* Az oppDelta a KUPA KÖZÉPÉRTÉKÉHEZ képest értendő (lásd euroMidRating), nem a
+   bajnoki szinthez. A sávot teljes kampány-szimulációval hangoltuk — lásd ott. */
 const EURO_COMPS={
-  BL:{n:"Bajnokok Ligája",short:"BL",col:"#3b82f6",oppDelta:5,
+  BL:{n:"Bajnokok Ligája",short:"BL",col:"#3b82f6",oppDelta:1,
       champBoost:4,tacticBoost:3,prize:{win:2.0,final:1.0,semi:0.5}},
-  EL:{n:"Európa-liga",short:"EL",col:"#2ecc71",oppDelta:1,
+  EL:{n:"Európa-liga",short:"EL",col:"#2ecc71",oppDelta:-1,
       champBoost:3,tacticBoost:2,prize:{win:1.5,final:0.75,semi:0.375}},
-  KL:{n:"Konferencia-liga",short:"KL",col:"#cd7f32",oppDelta:-2,
+  KL:{n:"Konferencia-liga",short:"KL",col:"#cd7f32",oppDelta:-3,
       champBoost:2,tacticBoost:1,prize:{win:0.75,final:0.375,semi:0.1875}}
 };
+/* ---- A KUPA-MEZŐNY KÖZÉPÉRTÉKE ----
+   A kupa erőssége eddig KIZÁRÓLAG a bajnoki nehézségi szintet követte. Emiatt
+   két baj volt, mindkettő teljes kampány-szimulációval mérve (csoportkör + 3
+   párharc + döntő, 1500 kampány értékenként):
+     · aki egy szezon alatt kinőtte a mezőnyt, a kupát is besétálta: +8-as
+       csapaterő-fölénynél KL 98% / EL 93% / BL 74%, +12-nél 98/98/97 —
+       vagyis mindegy volt, melyik sorozatban indulsz;
+     · a kupa előtt le lehetett vinni a nehézségi szintet, és a kupa-mezőny
+       azonnal követte (a BL-mezőny 95-ről 80-ra esett) — olcsó trófea.
+   Mostantól a középérték ALSÓ KORLÁTJA a bajnoki szint, és ha a csapatod
+   legalább 1 Ratinggel a szint fölé nőtt, a középérték a CSAPATERŐDHÖZ igazodik
+   (csapaterő − 1). Szándékosan a csapaterő (teamStrength) a horgony, NEM a
+   meccs-erő: méréssel a meccs-erőre horgonyzott változat MINDEN sorozatban 0%
+   győzelmi esélyt adott, mert egy 10 meccses kampányt nem lehet végigvinni
+   saját szintű ellenfelek ellen. */
+function euroMidRating(){
+  const base=oppTargetRating||84;
+  const ts=(typeof teamStrength==="function")?teamStrength():0;
+  return Math.max(base,ts>=base+1?Math.round(ts-1):base);}
 /* Kvalifikáció a 16 csapatos bajnokság végeredménye alapján. */
 function euroQualifyFor(rank){return rank===1?"BL":rank<=3?"EL":rank<=5?"KL":null;}
 /* KÉT KÜLÖN MEZŐ, szándékosan:
@@ -3582,6 +3603,15 @@ function euroQualifyFor(rank){return rank===1?"BL":rank<=3?"EL":rank<=5?"KL":nul
    az új kvalifikáció felülírná a még le nem játszott kampányt, és a kupa
    némán kimaradna. A promóció (entry → current) a szezonindításkor történik. */
 function euroPending(){return gameMode==="career"&&!!S.euroCurrent;}
+/* ---- A NEHÉZSÉGI SZINT ZÁROLÁSA A KUPA MIATT ----
+   A kupa-mezőny a szezonzárás pillanatában épül fel, a HUB-ból viszont közvetlenül
+   előtte még át lehetett állítani a bajnoki szintet — és a kupa azonnal követte
+   (a BL-mezőny 95-ről 80-ra esett 15 pont levitelével). Ez olcsó trófeát adott.
+   Amíg a szezonra járó kupa le nincs játszva, a szint nem mozdítható. A kampány
+   végén (endEuroCampaign) az euroCurrent nullázódik, így a NYÁRI ablakban —
+   a szokásos két szezon közti pont — újra szabadon állítható. Ha lemondtál a
+   kupáról, nincs mit védeni: a zár azonnal felold. */
+function euroLocksLevel(){return euroPending()&&!S.euroOptOut;}
 function euroPendingComp(){return S.euroCurrent?EURO_COMPS[S.euroCurrent]:null;}
 
 /* ---- E2: MEZŐNY, SORSOLÁS, CSOPORTKÖR ----
@@ -3661,7 +3691,7 @@ function euroGroupTable(g){
 /* A MEZŐNY felépítése: 31 klub + a user, kalapos sorsolással 8 csoportba. */
 function buildEuroField(comp){
   const c=EURO_COMPS[comp];
-  const target=oppTargetRating+c.oppDelta;
+  const target=euroMidRating()+c.oppDelta;
   const cap=infinityMode?Infinity:RATING_CAP;
   /* csak klubcsapat, és a bajnoki ellenfelek sem térnek vissza */
   const used=new Set((typeof SEASON_OPPS!=="undefined"?SEASON_OPPS:[]).map(o=>o.n));
@@ -3684,7 +3714,9 @@ function buildEuroField(comp){
   const userIdx=flat.findIndex(t=>t.you);
   const userG=flat[userIdx].g;
   const userSlot=gIdx[userG].indexOf(userIdx);
-  return {teams:flat,groups:gIdx,table,userIdx,userG,userSlot};}
+  /* A kupa SZINTJÉT eltesszük: ebből számoljuk a kupameccsek rejtett
+     ellenfél-erősítését (lásd hiddenOppBuff), és a felület is ezt mutatja. */
+  return {teams:flat,groups:gIdx,table,userIdx,userG,userSlot,target};}
 /* A user 6 csoportmeccse a sorsolási tábla alapján. A fixture ALAKJA azonos a
    bajnokival ({o:{n,ovr},home}), hogy a meccs-motor változatlanul fogadja. */
 function buildEuroUserFixtures(){
@@ -9286,7 +9318,13 @@ function playMatch(){
      ~5 OVR-rel a kijelzett csapaterő fölé viszi a kifejlett kereteket. A
      nehézséghez kötött: a 84-es ajánlott szinten 0, feljebb fokozatosan nő, így
      a magasabb szintek kihívást adnak, ahogy a te rejtett bónuszaid fejlődnek. */
-  const hiddenOppBuff=gameMode==="career"?Math.max(0,(oppTargetRating-84)*0.35):0;
+  /* KUPÁBAN a kupa SAJÁT szintjéhez mérjük, nem a bajnokihoz. Enélkül a rejtett
+     erőtöbbleted (kémia, skillek, kapitány — a karrier során ~+2-ről +9 fölé nő)
+     teljesen kompenzálatlan maradt a kupában: méréssel ugyanaz a csapaterő-
+     fölény +2-es rejtett bónusszal 2%, +7-tel 33% BL-győzelmi esélyt adott.
+     A bajnoki viselkedés BETŰRE változatlan. */
+  const _buffLevel=(euroActive()&&S.euro&&S.euro.target!=null)?S.euro.target:oppTargetRating;
+  const hiddenOppBuff=gameMode==="career"?Math.max(0,(_buffLevel-84)*0.35):0;
   /* A kupadöntő SEMLEGES pályán megy — sem hazai előny, sem idegenbeli hátrány. */
   let diff=ovr-(fx.o.ovr+hiddenOppBuff)+tacticEffect()+(fx.neutral?0:(fx.home?SIM.HOME:SIM.AWAY));
   let lf=lam(diff),la=lam(-diff)*defenseMult();
@@ -12627,6 +12665,12 @@ $("hubLevelBtn").onclick=()=>{
   if(hubMidSeasonMode){
     addLine("✦ A nehézségi szintet két szezon között lehet átállítani — most csak tájékoztató.","m life");
     return;}
+  /* A kupa-mezőny a szezonzáráskor épül a mostani szintből — amíg a sorozat le
+     nincs játszva, a szint nem mozdítható (különben olcsó trófeát adna). */
+  if(euroLocksLevel()){
+    const c=euroPendingComp();
+    addLine(`✦ A nehézségi szint zárolva: még hátravan a(z) ${(c&&c.n)||"európai kupa"}. A sorozat mezőnye a mostani szintedből épül, ezért csak a kupa UTÁN, a nyári ablakban állítható át.`,"m life");
+    return;}
   startLevelChange(null);};
 /* ================= KARRIER MÓD — KARRIER LEZÁRÁSA =================
    Hosszú, olvasható szöveges összegzés a teljes karrierről: szezonról
@@ -13828,7 +13872,8 @@ function renderHub(){
   const lvlBtn=$("hubLevelBtn");
   if(gameMode==="career"){
     lvlBtn.classList.remove("hide");
-    const canChange=!hubMidSeasonMode;
+    const euroLock=euroLocksLevel();
+    const canChange=!hubMidSeasonMode&&!euroLock;
     const w=levelWarnState();
     lvlBtn.classList.toggle("warn",canChange&&w.lvl>=2);
     lvlBtn.classList.toggle("readonly",!canChange);
@@ -13841,7 +13886,9 @@ function renderHub(){
     lvlBtn.innerHTML=(canChange?(w.lvl>=2?"⚠️ ":"✦ "):"✦ ")+`Nehézségi szint — ${oppTargetRating}`
       +`<small>${S.autoLevel?"🔄 auto szintkövetés BE · ":""}${state} · meccs-erőd ${teamMatchStrength().toFixed(1)} (${g>=0?"+":""}${Math.round(g)})`
       +(uLbl?` · <b style="color:var(--grass)">⚡ ${uLbl}: +${Math.round(u*50)}% fejlődés</b>`:"")
-      +(canChange?"":" · <b>átállítani két szezon között lehet</b>")+`</small>`;
+      +(canChange?"":(euroLock
+        ? ` · <b>zárolva: előbb a(z) ${(euroPendingComp()&&euroPendingComp().short)||"kupa"} — a kupa után állítható</b>`
+        : " · <b>átállítani két szezon között lehet</b>"))+`</small>`;
   }else lvlBtn.classList.add("hide");
   /* Challenge-jutalom tokenek: a gombok csak akkor látszanak, ha van token */
   const nBoost=S.boostTokens||0,nFree=S.freePlayerTokens||0;
@@ -14245,7 +14292,7 @@ function startEuroCampaign(){
   const comp=S.euroCurrent;if(!comp||!EURO_COMPS[comp]){hubShowSeasonReport();return;}
   const f=buildEuroField(comp);
   S.euro={comp,stage:"group",md:0,idx:0,teams:f.teams,groups:f.groups,table:f.table,
-    userIdx:f.userIdx,userG:f.userG,userSlot:f.userSlot,
+    userIdx:f.userIdx,userG:f.userG,userSlot:f.userSlot,target:f.target,
     stats:{scorers:{},assists:{},cleanSheets:{}},fixtures:[],
     path:[],pathOpen:false};   /* a menetelés naplója — lásd euroPathPush */
   S.euro.fixtures=buildEuroUserFixtures();
@@ -14374,7 +14421,8 @@ function renderEuroScreen(){
     :ko?`${EURO_ROUND_NAMES[E.stage]} · ${E.stage==="final"?"egy mérkőzés semleges pályán":`${E.idx+1}/2. mérkőzés`}`
        :`Csoportkör · ${E.md+1}/${EURO_SCHEDULE.length}. forduló`;
   $("euroHead").innerHTML=`<div style="font-family:var(--font-disp);font-size:20px;color:${c.col}">${c.n}</div>`
-    +`<div style="font-size:12px;color:var(--dim);margin-top:2px">${stageTxt} · a keret és a taktika a szezonzáró állapoton fagyva</div>`;
+    +`<div style="font-size:12px;color:var(--dim);margin-top:2px">${stageTxt} · a keret és a taktika a szezonzáró állapoton fagyva</div>`
+    +(E.target!=null?`<div style="font-size:11.5px;color:var(--dim2);margin-top:3px">A sorozat mezőnye: <b style="color:${c.col}">${Math.round(E.target)}</b> — a bajnoki szinted (${oppTargetRating}) és a csapaterőd (${teamStrength().toFixed(1)}) közül a magasabbhoz igazítva, ${c.short}-szinttel.</div>`:"");
   const nx=$("euroNext");
   if(done){
     let h="";
