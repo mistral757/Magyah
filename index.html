@@ -230,6 +230,14 @@ button:disabled{opacity:.35;cursor:default}
   padding:3px 5px;border-radius:5px;white-space:nowrap;
   border:1px solid rgba(255,255,255,.45)}
 #formPreviewLbl{text-align:center;font-size:12px;color:var(--dim);margin-top:6px;line-height:1.55}
+/* Családtag-névkészlet: mód-választó + a dinamikusan szaporodó név-mezők.
+   A stílus a #clubSearch mintáját követi, hogy a beállító képernyőn egységes
+   maradjon a beviteli elemek megjelenése. */
+.famSelect,.famNameInput{width:100%;margin-top:6px;padding:9px 11px;border-radius:8px;
+  border:1px solid var(--line);background:var(--bg);color:var(--ink);
+  font-family:inherit;font-size:13.5px}
+.famSelect{cursor:pointer}
+#familyNameList .famNameInput{margin-top:5px}
 /* A középső középpályás helyek KOPPINTHATÓK: szaggatott keret jelzi, a keret
    színe pedig a megbízatást (védekező = védő-kék, támadó = csatár-piros). */
 #formPreview .pp.mid{border-style:dashed;border-width:1.5px;cursor:pointer}
@@ -572,8 +580,18 @@ button:disabled{opacity:.35;cursor:default}
     <button data-m="blind">Vak mód<small>csak név és poszt</small></button>
   </div>
   <div class="optgrid two" id="familyToggleGrid" style="margin-top:8px">
-    <button data-fam="on" class="sel">Legyen családtag<small>meglepetés-kör a drafton</small></button>
-    <button data-fam="off">Ne legyen családtag<small>tisztán a valós keretekből</small></button>
+    <button data-fam="on">Legyen családtag<small>meglepetés-kör a drafton</small></button>
+    <button data-fam="off" class="sel">Ne legyen családtag<small>tisztán a valós keretekből</small></button>
+  </div>
+  <div id="familyNameWrap" class="hide" style="margin-top:8px">
+    <label for="familyNameMode" style="display:block;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px">Kik lehetnek családtagok?</label>
+    <select id="familyNameMode" class="famSelect">
+      <option value="default">Szoki családtagok</option>
+      <option value="extend">Szoki, de én is hozzáadok</option>
+      <option value="custom">Én adom meg a neveket</option>
+    </select>
+    <div id="familyNameList" class="hide"></div>
+    <div id="familyNameHint" style="font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.45"></div>
   </div>
   <div class="optgrid two hide" id="careerStartGrid" style="margin-top:8px">
     <button data-cs="draft" class="sel">Draft<small>klubokat pörgetsz, játékosonként építkezel</small></button>
@@ -982,12 +1000,16 @@ button:disabled{opacity:.35;cursor:default}
 <script>
 /* ================= VERZIÓSZÁM =================
    Ez már nem demó, hanem élő, futó projekt (Netlify-on üzemel). A verziószám
-   sémája: MAJOR.MINOR.PATCH — a PATCH hibajavításnál és apró csiszolásnál nő,
-   a MINOR akkor, ha új funkció kerül a játékba (a PATCH ilyenkor 00-ra ugrik
-   vissza). A szám a fejlécben, a versionBadge-en látszik.
-   Frissítéskor csak ezt az egy sort kell módosítani — KIADÁSONKÉNT egyszer,
-   nem commitonként. */
-const APP_VERSION="2.3.02";
+   sémája: MAJOR.MINOR.PATCH, és LASSAN lépegetünk. A projekt 0.7.57-ről indult
+   (szerencseszám), és két hét alatt ~250 kiadást élt meg — ehhez mérten:
+     · PATCH — ez az ALAPÉRTELMEZÉS. Gyakorlatilag minden kiadás ide tartozik:
+       hibajavítás, csiszolás ÉS új funkció is.
+     · MINOR — kizárólag akkor, ha a projektgazda EXPLICIT kéri. Magadtól soha
+       ne lépj minort, akkor sem, ha nagynak érzed a változást.
+     · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
+   A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
+   sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
+const APP_VERSION="2.3.03";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -5639,7 +5661,30 @@ function applyTransfer(type){
 }
 
 /* ================= ÁLLAPOT ================= */
-let form="442",mode="classic",oppTargetRating=84,familyEnabled=true,wcEnabled=false,slots=[],rerolls=1,curSquad=null,pendingPlayer=null;
+let form="442",mode="classic",oppTargetRating=84,familyEnabled=false,wcEnabled=false,slots=[],rerolls=1,curSquad=null,pendingPlayer=null;
+/* ---- CSALÁDTAG-NÉVKÉSZLET ----
+   familyEnabled ALAPÉRTELMEZETTEN KI: a családtag-kör egy személyes extra, nem
+   az alapélmény része — aki kéri, az kapcsolja be. A HTML-ben is az "off" gomb
+   a kiválasztott (familyToggleGrid), a kettőnek EGYÜTT kell mozognia.
+   familyNameMode:
+     "default" — a beépített FAMILY_MEMBERS lista, változatlanul
+     "extend"  — a beépített lista + a felhasználó saját nevei
+     "custom"  — KIZÁRÓLAG a felhasználó nevei (a beépítettek erre a játékra
+                 kimaradnak; a lista maga nem sérül, csak nem használjuk)
+   A nevek nem mentődnek külön fájlba, csak a játékállásba — egy új karrier
+   megint az alapértelmezésről indul. */
+let familyNameMode="default";
+let familyCustomNames=[];
+const FAMILY_CUSTOM_MAX=30;   /* józan felső korlát a mezők szaporodására */
+/* A ténylegesen sorsolható névkészlet. Ha "custom" módban egyetlen nevet sem
+   adtak meg, a beépített listára esünk vissza — üres készletből nem lehet
+   sorsolni, és a néma összeomlásnál sokkal jobb, ha van kit behozni. A felület
+   ezt előre ki is írja, tehát nem meglepetés. */
+function familyNamePool(){
+  const custom=(familyCustomNames||[]).map(n=>String(n).trim()).filter(Boolean);
+  if(familyNameMode==="custom")return custom.length?[...new Set(custom)]:FAMILY_MEMBERS;
+  if(familyNameMode==="extend")return [...new Set(FAMILY_MEMBERS.concat(custom))];
+  return FAMILY_MEMBERS;}
 /* KÖZÉPPÁLYÁS SZEREP-FELÜLÍRÁSOK — felállásonként a középső középpályás slotok
    átállított kódja: { "433":{"6":"VKP"}, ... }. Csak az ALAPÉRTELMEZÉSTŐL
    ELTÉRŐ helyek szerepelnek benne (lásd setSlotRole), így az üres objektum
@@ -5831,12 +5876,71 @@ renderFormPreview(form);
 document.querySelectorAll("#modeGrid button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#modeGrid button").forEach(x=>x.classList.remove("sel"));
   b.classList.add("sel");mode=b.dataset.m;});
+/* ---- CSALÁDTAG-BEÁLLÍTÁSOK FELÜLETE ----
+   A kapcsoló és a névkészlet-panel láthatóságát EGY helyen döntjük el, hogy ne
+   lehessen kettészakadni. KÉSZ KLUBBAL indulva nincs draft, tehát nincs
+   családtag-kör sem (a maybeSpinFamily csak draftStage==="main" alatt fut) —
+   ilyenkor a kapcsoló félrevezető lenne, ezért elrejtjük. A familyEnabled
+   értékét NEM írjuk át: inert marad, és ha a felhasználó visszavált draftra,
+   ott találja, ahol hagyta. */
+function updateFamilySetupVisibility(){
+  const clubStart=(gameMode==="career"&&careerStart==="club");
+  const grid=$("familyToggleGrid"),wrap=$("familyNameWrap");
+  if(grid)grid.classList.toggle("hide",clubStart);
+  if(wrap)wrap.classList.toggle("hide",clubStart||!familyEnabled);}
+function familySyncCustomNames(){
+  familyCustomNames=[...document.querySelectorAll("#familyNameList .famNameInput")].map(i=>i.value);}
+function updateFamilyNameHint(){
+  const el=$("familyNameHint");if(!el)return;
+  const custom=(familyCustomNames||[]).map(n=>String(n).trim()).filter(Boolean);
+  const uniq=[...new Set(custom)].length;
+  let t,warn=false;
+  if(familyNameMode==="default")
+    t=`A szokásos ${FAMILY_MEMBERS.length} név közül sorsolunk.`;
+  else if(familyNameMode==="extend")
+    t=`A szokásos ${FAMILY_MEMBERS.length} név + a tieid (${uniq}) — összesen ${familyNamePool().length} névből sorsolunk.`;
+  else if(uniq)
+    t=`Csak a te ${uniq} neved játszik — a beépített neveket erre a játékra kihagyjuk.`;
+  else{t="Adj meg legalább egy nevet! Ha egyet sem adsz meg, a szokásos nevek játszanak.";warn=true;}
+  el.textContent=t;
+  el.style.color=warn?"var(--gold)":"var(--dim)";}
+/* Új név-mező akkor születik, amikor az UTOLSÓ mezőbe elkezdesz írni — így
+   mindig pontosan egy üres sor várakozik, és nem szaporodnak üres mezők. */
+function addFamilyNameInput(val){
+  const list=$("familyNameList");if(!list)return null;
+  if(list.children.length>=FAMILY_CUSTOM_MAX)return null;
+  const inp=document.createElement("input");
+  inp.type="text";inp.className="famNameInput";inp.maxLength=24;
+  inp.placeholder=`${list.children.length+1}. név…`;
+  inp.value=val||"";
+  inp.oninput=()=>{
+    familySyncCustomNames();
+    const all=[...list.querySelectorAll(".famNameInput")];
+    if(inp===all[all.length-1]&&inp.value.trim())addFamilyNameInput("");
+    updateFamilyNameHint();};
+  list.appendChild(inp);
+  return inp;}
+function renderFamilyNameInputs(){
+  const list=$("familyNameList");if(!list)return;
+  const needList=familyNameMode!=="default";
+  list.classList.toggle("hide",!needList);
+  if(needList&&!list.children.length){
+    (familyCustomNames.length?familyCustomNames:[""]).forEach(v=>addFamilyNameInput(v));
+    if(![...list.querySelectorAll(".famNameInput")].some(i=>!i.value.trim()))addFamilyNameInput("");}
+  familySyncCustomNames();
+  updateFamilyNameHint();}
 document.querySelectorAll("#familyToggleGrid button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#familyToggleGrid button").forEach(x=>x.classList.remove("sel"));
-  b.classList.add("sel");familyEnabled=b.dataset.fam==="on";});
+  b.classList.add("sel");familyEnabled=b.dataset.fam==="on";
+  updateFamilySetupVisibility();
+  if(familyEnabled)renderFamilyNameInputs();});
+$("familyNameMode")&&($("familyNameMode").onchange=()=>{
+  familyNameMode=$("familyNameMode").value;
+  renderFamilyNameInputs();});
 document.querySelectorAll("#careerStartGrid button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#careerStartGrid button").forEach(x=>x.classList.remove("sel"));
   b.classList.add("sel");careerStart=b.dataset.cs;
+  updateFamilySetupVisibility();   /* kész klubnál nincs draft → nincs családtag-kör */
   const nb=$("oppNextBtn");if(nb)nb.textContent=careerStart==="club"?"Irány a klubválasztás →":"Irány a draft →";
   /* Kész klubbal indulva a keretet nem te válogatod össze, ezért az ajánlott
      kiindulás alacsonyabb: a mezőny 80-ra áll (drafttal marad a 84). */
@@ -6144,10 +6248,10 @@ function spinFamily(){
   $("familyBody").innerHTML=`<div class="disp" style="text-align:center;font-size:22px;min-height:28px" id="familySpinName">?</div>`;
   $("familyActions").innerHTML="";
   let t=0;const iv=setInterval(()=>{
-    $("familySpinName").textContent=pick(FAMILY_MEMBERS);t+=90;
+    $("familySpinName").textContent=pick(familyNamePool());t+=90;
     if(t>=800){clearInterval(iv);land();}},90);
   function land(){
-    const name=pick(FAMILY_MEMBERS);
+    const name=pick(familyNamePool());
     familyState={name,total:99,attrs:{},slotIdx:null,pos:null,specialty:null};
     $("familySpinName").textContent=name;
     const note=document.createElement("div");
@@ -13881,6 +13985,11 @@ function saveGame(){
       CHEM:{total:CHEM.total,notes:CHEM.notes,goodPairs:[...CHEM.goodPairs]},
       phase,draftStage,benchCatIndex,
       familyRound,familyState,
+      /* A családtag-beállítások eddig NEM mentődtek: egy draft közbeni
+         újratöltés után a familyEnabled visszaesett az alapértékére, és a
+         felhasználó választása elveszett. A névkészlet miatt ez most már
+         érdemi adat, ezért mentjük. */
+      familyEnabled,familyNameMode,familyCustomNames,
       SEASON_OPPS,
       S:{
         idx:S.idx,W:S.W,D:S.D,L:S.L,GF:S.GF,GA:S.GA,pts:S.pts,reds:S.reds,injuries:S.injuries,
@@ -13973,6 +14082,12 @@ function applySavedGame(d){
   CHEM={total:d.CHEM.total,notes:d.CHEM.notes,goodPairs:new Set(d.CHEM.goodPairs||[])};
   phase=d.phase;draftStage=d.draftStage;benchCatIndex=d.benchCatIndex;
   familyRound=d.familyRound;familyState=d.familyState;
+  /* Régi mentésben ezek nincsenek meg — ilyenkor a korábbi viselkedést tartjuk:
+     a családtag-kör BE volt kapcsolva, a beépített névlistával. Így egy futó
+     draft nem veszíti el a családtagját az új alapérték (ki) miatt. */
+  familyEnabled=d.familyEnabled!==undefined?!!d.familyEnabled:true;
+  familyNameMode=d.familyNameMode||"default";
+  familyCustomNames=Array.isArray(d.familyCustomNames)?d.familyCustomNames:[];
   SEASON_OPPS=d.SEASON_OPPS;
   Object.assign(S,d.S);
   S.discWatch=d.S.discWatch||{};S.hotStreak=d.S.hotStreak||{};S.goallessStreak=d.S.goallessStreak||{};
@@ -14160,6 +14275,7 @@ $("modeClassicBtn").onclick=()=>{
   gameMode="classic";
   careerStart="draft";
   $("careerStartGrid")&&$("careerStartGrid").classList.add("hide");
+  updateFamilySetupVisibility();
   $("modeGrid").classList.remove("hide");   /* klasszikusban van értelme a vak módnak */
   $("scModeSelect").classList.add("hide");
   $("scFormation").classList.remove("hide");
@@ -14174,6 +14290,7 @@ $("modeCareerBtn").onclick=()=>{
   document.querySelector('#modeGrid button[data-m="classic"]').classList.add("sel");
   $("modeGrid").classList.add("hide");
   $("careerStartGrid")&&$("careerStartGrid").classList.remove("hide");
+  updateFamilySetupVisibility();
   $("scModeSelect").classList.add("hide");
   $("scFormation").classList.remove("hide");
   $("scFormation").scrollIntoView({behavior:"smooth"});};
