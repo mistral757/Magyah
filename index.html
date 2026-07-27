@@ -1021,7 +1021,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.4.02";
+const APP_VERSION="2.4.03";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4404,10 +4404,57 @@ function roleInFormation(pos,f){
   f=f||form;
   if((pos==="JSZ"||pos==="BSZ")&&WINGER_IS_ATTACKING[f])return "CSATAR";
   return getCategoryFor(pos);}
+/* ================= PÉNZNEM: MAGYAR FORINT =================
+   A gazdaság BELÜL továbbra is pontban számol — a mentés, az összehasonlítások,
+   a kihívás-célok és az egész balance érintetlen marad. Csak a KIJELZÉS forint,
+   egyetlen átváltási konstanssal. Így egy régi mentés is gond nélkül betöltődik.
+
+   AZ ÁRFOLYAM HORGONYA a csúcssztár: a TSI-plafonon álló, 26 éves játékos
+   vétele 21 600 pont. 2 M Ft/pont mellett ez 43,2 milliárd forint, azaz ~109
+   millió euró — pont annyi, amennyit egy valódi világklasszis ér. A többi ár
+   ugyanezzel a szorzóval mozdul, tehát az egymáshoz mért arányok változatlanok.
+
+   FELBONTÁS: a buyPrice és a computeSeasonBudget korábban 100 pontra kerekített,
+   ami forintban 200 M Ft-os lépcsőt adna — minden ár „…00 M Ft"-ra végződne, és
+   gépiesnek hatna. Egész pontra kerekítve az összegek élethűen egyenetlenek
+   lesznek (43 Mrd 186 M Ft), miközben egyetlen ár sem mozdul 0,5%-nál többet.
+
+   JELÖLÉS: Mrd = milliárd, M = millió. Szándékosan NEM nagy M / kis m: magyarul
+   az M hagyományosan milliót jelent, így a „12 M" ezerszeres félreolvasás lenne
+   milliárd értelemben — ráadásul telefonon a kis- és nagybetű közti különbség
+   túl gyenge jel egy 1000-szeres eltéréshez. */
+const HUF_PER_POINT=2000000;
+function pointsToHuf(p){return Math.round(p||0)*HUF_PER_POINT;}
+/* TELJES alak — büdzséhez, árakhoz, naplósorokhoz: "43 Mrd 186 M Ft".
+   Millió Ft-ra kerekít (a valós átigazolási díjakat is így közlik), és a
+   kerekítést a milliókon végzi, hogy a 999,6 M ne "1000 M"-ként jelenjen meg,
+   hanem rendesen átvigye a milliárdba. */
+function fmtFt(points){
+  const ft=pointsToHuf(points),neg=ft<0,a=Math.abs(ft);
+  const totalM=Math.round(a/1e6);
+  const mrd=Math.floor(totalM/1000),m=totalM%1000;
+  let s;
+  if(!totalM)s=a.toLocaleString("hu");
+  else if(mrd&&m)s=`${mrd.toLocaleString("hu")} Mrd ${m} M`;
+  else if(mrd)s=`${mrd.toLocaleString("hu")} Mrd`;
+  else s=`${m} M`;
+  return (neg?"−":"")+s+" Ft";}
+/* TÖMÖR alak — gombfeliratra, chipre, ahol kevés a hely: "43,186 Mrd Ft"
+   vagy "186 M Ft". Milliárd fölött 3 tizedes, alatta egész. */
+function fmtFtShort(points){
+  const ft=pointsToHuf(points),neg=ft<0,a=Math.abs(ft);
+  let s;
+  /* LEGFELJEBB 3 tizedes, a fölösleges nullák nélkül. Fix 3 tizedessel a kerek
+     összegek félreolvashatók lennének: 200 Mrd → "200,000 Mrd", ami magyarul
+     (ahol a vessző a tizedesjel) simán olvasható 200 ezer milliárdnak. */
+  if(a>=1e9)s=(a/1e9).toLocaleString("hu",{maximumFractionDigits:3})+" Mrd";
+  else if(a>=1e6)s=Math.round(a/1e6).toLocaleString("hu")+" M";
+  else s=a.toLocaleString("hu");
+  return (neg?"−":"")+s+" Ft";}
 /* A kiemelt, zöld, pénzes büdzsé-chip HTML-je — egységes megjelenés a HUB-ban
    és a szezonközi átigazolásnál. */
 function budgetChipHtml(extraClass){
-  return `<div class="budgetChip ${extraClass||""}"><span class="coin">💰</span><span class="bText"><span class="bLabel">Átigazolási büdzsé</span><span class="bAmount">${(S.transferBudget||0).toLocaleString("hu")}<span class="cur">pont</span></span></span></div>`;}
+  return `<div class="budgetChip ${extraClass||""}"><span class="coin">💰</span><span class="bText"><span class="bLabel">Átigazolási büdzsé</span><span class="bAmount">${fmtFt(S.transferBudget||0)}</span></span></div>`;}
 
 /* ================= JUTALOM-SKILLEK ================= */
 /* 16 egyedi képesség, 4 pozíciócsoportonként. Egy szezonban minden skillt
@@ -7431,7 +7478,10 @@ function buyPrice(entry){
      kiírt ár és a ténylegesen fizetett összeg egyezzen. */
   if(S.buySurcharge>0)p*=1.10;
   if(S.buyDiscountChance>0&&entry&&chBuyDiscountHits(entry.n))p*=0.75;
-  return Math.round(p/100)*100;}
+  /* EGÉSZ pontra kerekítünk (korábban 100-ra): forintban a 100 pontos lépcső
+     200 M Ft-os ugrás lenne, és minden ár "…00 M Ft"-ra végződne. Így az
+     összegek élethűen egyenetlenek, az érték viszont <0,5%-ot mozdul. */
+  return Math.round(p);}
 /* Determinisztikus "véletlen": a névből és a szezonból képzett hash dönti el,
    kapott-e kedvezményt ez a játékos. Így stabil marad két megjelenítés közt. */
 function chBuyDiscountHits(name){
@@ -7455,7 +7505,7 @@ function computeSeasonBudget(){
   if(teamR>90)budget+=(teamR-90)*700;
   /* KIHÍVÁS-HATÁS: edzői fizetésemelés (+) vagy megsapkázás (−). */
   if(S.salaryMod)budget*=(1+S.salaryMod);
-  return Math.round(budget/100)*100;}
+  return Math.round(budget);}   /* egész pont — lásd a buyPrice indoklását */
 function updateBar(){
   const f=slots.filter(s=>s.player).length;
   $("slotCount").textContent=`${f}/11 poszt betöltve`;
@@ -7780,7 +7830,7 @@ function genChallenge(scope,diff,ctx){
     ()=>{if(short)return null;
       const target=Math.round((5000+Math.random()*5000)*mult/500)*500;
       return {type:"salesValue",target,
-        desc:`Adj el játékosokat ${target.toLocaleString("hu")} pont értékben ${horizon}`,
+        desc:`Adj el játékosokat ${fmtFt(target)} értékben ${horizon}`,
         rule:`Az eladási árak ADÓDNAK ÖSSZE, a vállalás után. A HUB-ban az "Elad" gombbal eladott játékosok számítanak.`};},
     /* --- 4. Új ember a kezdőben, sok meccsel --- */
     ()=>{if(short)return null;const target=Math.max(10,Math.min(24,R(15,15)));
@@ -7872,7 +7922,7 @@ function genReward(scope,diff,ctx){
   const mult=challengeDiffMult(diff);
   const money=Math.round(challengeMoneyScale(ctx)*mult*(scope==="long"?1.5:1)/500)*500;
   const pool=[
-    {kind:"money",amount:money,desc:`+${money.toLocaleString("hu")} büdzsé`},
+    {kind:"money",amount:money,desc:`+${fmtFt(money)}`},
     {kind:"morale",amount:Math.round(10*mult),desc:`+${Math.round(10*mult)} morál`},
     {kind:"tsi",amount:Math.round(1500*mult),desc:`+${Math.round(1500*mult)} TSI egy játékosra`},
     {kind:"skill",desc:"egy skill egy játékosnak"},
@@ -7897,7 +7947,7 @@ function genPunishment(scope,diff,ctx){
   const money=Math.round(challengeMoneyScale(ctx)*mult*0.8/500)*500;
   const fm=scope==="long"?5:3;
   const pool=[
-    {kind:"money",amount:money,desc:`−${money.toLocaleString("hu")} büdzsé`},
+    {kind:"money",amount:money,desc:`−${fmtFt(money)}`},
     {kind:"morale",amount:Math.round(12*mult),desc:`−${Math.round(12*mult)} morál`},
     {kind:"formMalus",amount:fm,desc:`a csapat visszaesik: gyengébb forma ${fm} meccsen át`},
     {kind:"tsiBlock",desc:"egy játékos fejlődése befagy 1 szezonra"}];
@@ -8067,7 +8117,7 @@ function posLearnTypicalCost(){
   const costs=r.map(p=>careerPool&&careerPool[p.n]?posLearnCost(careerPool[p.n]):0).filter(x=>x>0).sort((a,b)=>a-b);
   return costs.length?costs[Math.floor(costs.length/2)]:7500;}
 function posLearnRefundDesc(){
-  return `a betanítási ár fele (kb. +${Math.round(posLearnTypicalCost()/2).toLocaleString("hu")} büdzsé)`;}
+  return `a betanítási ár fele (kb. +${fmtFt(Math.round(posLearnTypicalCost()/2))})`;}
 function applyChallengeReward(rw){
   if(!rw)return "";
   /* POSZT-TANULÁSI VISSZATÉRÍTÉS: a ténylegesen kifizetett ár fele. Az összeg
@@ -8077,7 +8127,7 @@ function applyChallengeReward(rw){
     const paid=S._posLearnLastCost||posLearnTypicalCost();
     const back=Math.round(paid/2/100)*100;
     S.transferBudget=(S.transferBudget||0)+back;
-    return `+${back.toLocaleString("hu")} büdzsé (a betanítási ár fele)`;}
+    return `+${fmtFt(back)} (a betanítási ár fele)`;}
   const roster=(typeof fullCareerRoster==="function")?fullCareerRoster().filter(Boolean):[];
   switch(rw.kind){
     /* ---- ÚJ, TARTÓS JUTALMAK ---- */
@@ -8101,7 +8151,7 @@ function applyChallengeReward(rw){
       return "befektetési lehetőség — a szezonzárónál választhatsz összeget";
     case "money":
       S.transferBudget=(S.transferBudget||0)+rw.amount;
-      return `+${rw.amount.toLocaleString("hu")} büdzsé`;
+      return `+${fmtFt(rw.amount)}`;
     case "morale":
       S.morale=Math.max(0,Math.min(100,S.morale+rw.amount));S.moraleTarget=S.morale;
       return `+${rw.amount} morál`;
@@ -8171,7 +8221,7 @@ function applyChallengePunishment(pn){
       return `fizetés-megsapkázás: a szezonos büdzséd ${Math.round(S.salaryMod*100)}%`;
     case "money":
       S.transferBudget=Math.max(0,(S.transferBudget||0)-pn.amount);
-      return `−${pn.amount.toLocaleString("hu")} büdzsé`;
+      return `−${fmtFt(pn.amount)}`;
     case "morale":
       S.morale=Math.max(0,Math.min(100,S.morale-pn.amount));S.moraleTarget=S.morale;
       return `−${pn.amount} morál`;
@@ -10378,7 +10428,7 @@ function twScout(){
   TW.candidates=cands;
   if(!cands.length){
     $("twBody").innerHTML=budgetBlocked
-      ?`<div class="h" style="color:var(--red)">Nincs elég büdzséd</div><p style="font-size:13px;margin-top:5px">A scout talált volna jelöltet, de a jelenlegi átigazolási büdzséd (${S.transferBudget}) nem elég egyikükre sem ezen a poszton.</p>`
+      ?`<div class="h" style="color:var(--red)">Nincs elég büdzséd</div><p style="font-size:13px;margin-top:5px">A scout talált volna jelöltet, de a jelenlegi átigazolási büdzséd (${fmtFt(S.transferBudget)}) nem elég egyikükre sem ezen a poszton.</p>`
       :`<div class="h" style="color:var(--red)">Nincs elérhető játékos</div><p style="font-size:13px;margin-top:5px">A scout üres kézzel tért vissza — mindenki más csapatnál van már ezen a poszton.</p>`;
     const btn=document.createElement("button");btn.className="btn-p stepbtn";btn.textContent="Tovább";
     btn.onclick=()=>twCycleComplete();
@@ -10406,7 +10456,7 @@ function twScout(){
   const info=document.createElement("div");
   info.style.cssText="font-size:11.5px;color:var(--dim);margin-top:6px";
   function updateInfoMsg(){
-    if(gameMode==="career")info.textContent=`Büdzsé: ${S.transferBudget} · a scout ${budget.remaining} jelölt TSI-jét engedi még megnézni — koppints a 👁 jelre.`;}
+    if(gameMode==="career")info.textContent=`Büdzsé: ${fmtFt(S.transferBudget)} · a scout ${budget.remaining} jelölt TSI-jét engedi még megnézni — koppints a 👁 jelre.`;}
   const updaters=[updateInfoMsg];
   cands.forEach(c=>{
     const row=document.createElement("div");row.className="prow";
@@ -10477,8 +10527,8 @@ function twConfirmBuy(cand,onConfirm,onBack){
     <div class="h" style="font-size:15px">${esc(cand.n)}</div>
     <div style="font-size:12px;color:var(--dim2);margin:3px 0 10px">${cand.pos.join("/")} · ${cand.age} év${revealed?` · ~${cand.estimatedTSI} TSI`:""}</div>
     <div style="font-size:12.5px;color:var(--dim2)">Vételár</div>
-    <div style="font-family:'Archivo Black';font-size:26px;color:${afford?"var(--gold)":"var(--red)"}">${price.toLocaleString("hu")}</div>
-    <div style="font-size:11.5px;color:var(--dim);margin-top:4px">Büdzsé: ${S.transferBudget.toLocaleString("hu")}${afford?"":" — nincs elég"}</div></div>`;
+    <div style="font-family:'Archivo Black';font-size:26px;color:${afford?"var(--gold)":"var(--red)"}">${fmtFtShort(price)}</div>
+    <div style="font-size:11.5px;color:var(--dim);margin-top:4px">Büdzsé: ${fmtFt(S.transferBudget)}${afford?"":" — nincs elég"}</div></div>`;
   $("twActions").innerHTML="";
   if(afford){
     const go=document.createElement("button");go.className="btn-y stepbtn";go.style.marginTop="10px";
@@ -10570,9 +10620,9 @@ function twShowPremiumOffer(cand,completeFn,opts){
   completeFn=completeFn||twCycleComplete;
   const basePrice=gameMode==="career"?buyPrice(cand):0;
   const premiumPrice=Math.round(basePrice*(1.3+Math.random()*0.3));
-  $("twBody").innerHTML=`<div class="h" style="color:var(--gold)">Magasabb árat kérnek</div><p style="font-size:13px;margin-top:5px">${esc(cand.n)} csak drágábban hajlandó jönni${gameMode==="career"?`: <b>${premiumPrice}</b> (a becsült ár ${basePrice} lett volna)`:""}. Megéri ennyiért?</p>`;
-  const yesBtn=document.createElement("button");yesBtn.className="btn-y stepbtn";yesBtn.textContent=gameMode==="career"?`Igen, megéri (${premiumPrice})`:"Igen, megéri";
-  yesBtn.onclick=()=>twFinalizeSigning(cand,`Extra árat kellett fizetni${gameMode==="career"?` (${premiumPrice})`:""}, de megjött ${esc(cand.n)}.`,premiumPrice,completeFn);
+  $("twBody").innerHTML=`<div class="h" style="color:var(--gold)">Magasabb árat kérnek</div><p style="font-size:13px;margin-top:5px">${esc(cand.n)} csak drágábban hajlandó jönni${gameMode==="career"?`: <b>${fmtFt(premiumPrice)}</b> (a becsült ár ${fmtFt(basePrice)} lett volna)`:""}. Megéri ennyiért?</p>`;
+  const yesBtn=document.createElement("button");yesBtn.className="btn-y stepbtn";yesBtn.textContent=gameMode==="career"?`Igen, megéri (${fmtFtShort(premiumPrice)})`:"Igen, megéri";
+  yesBtn.onclick=()=>twFinalizeSigning(cand,`Extra árat kellett fizetni${gameMode==="career"?` (${fmtFt(premiumPrice)})`:""}, de megjött ${esc(cand.n)}.`,premiumPrice,completeFn);
   const noBtn=document.createElement("button");noBtn.className="btn-s stepbtn";noBtn.style.marginTop="6px";
   noBtn.textContent=(opts&&opts.noRetry)?"Nem, túl drága — elállok (végleg)":"Nem, túl drága — elállok";
   /* Ha elállsz az ártól, a klub-szemlén ő is elveszett: enélkül a "nem"
@@ -10625,7 +10675,7 @@ function twShowPlacement(cand,completeFn){
       reserveBtn.textContent=`Tartalékba teszem (tele van a keret — ${MAX_CAREER_ROSTER}/${MAX_CAREER_ROSTER})`;
       reserveBtn.disabled=true;
     }else{
-      reserveBtn.textContent=`Tartalékba teszem (ár: ${finalPrice}) — nem cserél le senkit`;
+      reserveBtn.textContent=`Tartalékba teszem (ár: ${fmtFtShort(finalPrice)}) — nem cserél le senkit`;
       reserveBtn.onclick=()=>{
         extraRoster.push(cand);
         drafted.add(cand.n);markArrived(cand,finalPrice);
@@ -11162,7 +11212,7 @@ function autoRunPhase1(cycleNo){
       const basePrice=gameMode==="career"?buyPrice(cand):0;
       const premiumPrice=Math.round(basePrice*(1.3+Math.random()*0.3));
       if(gameMode==="career"&&premiumPrice>S.transferBudget){
-        addLine(`TÉL (${cycleNo}. kör): ${esc(cand.n)} magasabb árat kért (${premiumPrice}), de nem fértünk bele a büdzsébe — elálltunk.`,"m life");
+        addLine(`TÉL (${cycleNo}. kör): ${esc(cand.n)} magasabb árat kért (${fmtFt(premiumPrice)}), de nem fértünk bele a büdzsébe — elálltunk.`,"m life");
         return;}
       autoPlacePlayer(catDef.key,cand);
       if(gameMode==="career")S.transferBudget=Math.max(0,S.transferBudget-premiumPrice);
@@ -11921,7 +11971,7 @@ function renderFormationPicker(){
   const free=cost===0;
   $("hubFormationHint").innerHTML=`Jelenlegi felállás: <b>${FORM_LABELS[form]||form}</b>. A kezdő 11-et a rendszer automatikusan újrarendezi az új posztokra; a kiszorulók a padra/tartalékba kerülnek. `+
     (free?`Az idei első váltás <b style="color:var(--grass)">ingyenes</b>.`
-         :`Ára: <b>${cost.toLocaleString("hu")}</b> büdzsé (egyenleg: ${(S.transferBudget||0).toLocaleString("hu")}).`);
+         :`Ára: <b>${fmtFt(cost)}</b> (egyenleg: ${fmtFt(S.transferBudget||0)}).`);
   const body=$("hubFormationBody");body.innerHTML="";
   Object.keys(FORM_LABELS).forEach(f=>{
     const b=document.createElement("button");
@@ -11937,13 +11987,13 @@ function renderFormationPicker(){
       askHubTacticConfirm(
         `<div style="font-size:13px;line-height:1.5">Felállás: <b>${FORM_LABELS[form]||form}</b> → <b>${FORM_LABELS[f]}</b>.<br>`
         +`A kezdő 11-et a rendszer automatikusan újrarendezi az új posztokra; a kiszorulók a padra/tartalékba kerülnek.`
-        +(c>0?`<br>Ára: <b style="color:var(--gold)">${c.toLocaleString("hu")}</b> büdzsé.`:`<br><b style="color:var(--grass)">Ingyenes</b> (idei első váltás).`)
+        +(c>0?`<br>Ára: <b style="color:var(--gold)">${fmtFt(c)}</b>.`:`<br><b style="color:var(--grass)">Ingyenes</b> (idei első váltás).`)
         +`</div>`,
         ()=>{
           if(c>0)S.transferBudget-=c;
           S.formationChangesThisSeason=(S.formationChangesThisSeason||0)+1;
           applyFormationChange(f);
-          addLine(`📋 Felállás módosítva: ${FORM_LABELS[f]}${c>0?` (−${c.toLocaleString("hu")} büdzsé)`:" (ingyenes)"} — a kezdő 11 újrarendezve.`,"m life");
+          addLine(`📋 Felállás módosítva: ${FORM_LABELS[f]}${c>0?` (−${fmtFt(c)})`:" (ingyenes)"} — a kezdő 11 újrarendezve.`,"m life");
           $("hubFormationPicker").classList.add("hide");
           $("scHub").classList.remove("hide");
           renderHub();updateBar();saveGame();
@@ -12154,12 +12204,12 @@ function renderScoutUpgradePanel(){
     ${atMax
       ? `<span style="color:var(--grass)">A scoutod elérte a maximumot (${SCOUT_MAX_STARS}★) — pontosabb már nem lehet.</span>`
       : `Fejlesztés <b>${scout.stars}★ → ${nextStars}★</b>: a tévedés <b>${curPct}% → ${nextPct}%</b>-ra csökken.<br>
-         Ára: <b style="color:#ffd24a">${price.toLocaleString("hu")}</b>.<br>
-         ${affordable?"":`<span style="color:var(--red)">Nincs elég büdzséd (${S.transferBudget.toLocaleString("hu")}).</span>`}`}
+         Ára: <b style="color:#ffd24a">${fmtFt(price)}</b>.<br>
+         ${affordable?"":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget)}).</span>`}`}
   </p>`;
   $("twActions").innerHTML="";
   if(!atMax&&affordable){
-    const buy=document.createElement("button");buy.className="btn-y stepbtn";buy.textContent=`Fejlesztés megvásárlása (${price.toLocaleString("hu")})`;
+    const buy=document.createElement("button");buy.className="btn-y stepbtn";buy.textContent=`Fejlesztés megvásárlása (${fmtFtShort(price)})`;
     buy.onclick=()=>{
       if(S.transferBudget<price||scout.stars>=SCOUT_MAX_STARS)return;
       S.transferBudget-=price;
@@ -12205,12 +12255,12 @@ function renderRosterExpandPanel(){
     ${atMax
       ? `<span style="color:var(--grass)">A kereted elérte a maximumot (${ROSTER_EXPAND_MAX}).</span>`
       : `Bővítés <b>${MAX_CAREER_ROSTER} → ${MAX_CAREER_ROSTER+2}</b> hely.<br>
-         Ára: <b style="color:#ffd24a">${price.toLocaleString("hu")}</b>.<br>
-         ${affordable?"":`<span style="color:var(--red)">Nincs elég büdzséd (${S.transferBudget.toLocaleString("hu")}).</span>`}`}
+         Ára: <b style="color:#ffd24a">${fmtFt(price)}</b>.<br>
+         ${affordable?"":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget)}).</span>`}`}
   </p>`;
   $("twActions").innerHTML="";
   if(!atMax&&affordable){
-    const buy=document.createElement("button");buy.className="btn-y stepbtn";buy.textContent=`Bővítés megvásárlása (${price.toLocaleString("hu")})`;
+    const buy=document.createElement("button");buy.className="btn-y stepbtn";buy.textContent=`Bővítés megvásárlása (${fmtFtShort(price)})`;
     buy.onclick=()=>{
       if(S.transferBudget<price||MAX_CAREER_ROSTER>=ROSTER_EXPAND_MAX)return;
       S.transferBudget-=price;
@@ -12284,7 +12334,7 @@ function showCsSquad(sq){
   const revealedNames=new Set();
   const budget={remaining:computeRevealBudget(list.length,scout)};
   const info=document.createElement("div");info.style.cssText="font-size:12px;color:var(--dim);margin-top:6px";
-  function updateInfoMsg(){info.textContent=`Büdzsé: ${S.transferBudget} · a scout ${budget.remaining} játékos TSI-jét engedi még megnézni — koppints a 👁 jelre. Hátralévő pörgetés: ${left}/${maxSpins}.`;}
+  function updateInfoMsg(){info.textContent=`Büdzsé: ${fmtFt(S.transferBudget)} · a scout ${budget.remaining} játékos TSI-jét engedi még megnézni — koppints a 👁 jelre. Hátralévő pörgetés: ${left}/${maxSpins}.`;}
   const updaters=[updateInfoMsg];
   if(!list.length){
     const empty=document.createElement("p");empty.style.cssText="font-size:13px;color:var(--dim);margin-top:8px";
@@ -12759,7 +12809,7 @@ $("hubEndCareerBtn").onclick=()=>startEndCareer();
 /* ---- Infinity-vásárlás ---- */
 function infinityConfirm(title,body,price,onBuy){
   if(S.transferBudget<price){
-    $("hubIntro").textContent=`Ehhez ${price.toLocaleString("hu")} pont kell — jelenleg ${S.transferBudget.toLocaleString("hu")} van. A megmaradt büdzsé átjön a következő szezonra, szóval gyűjts még.`;
+    $("hubIntro").textContent=`Ehhez ${fmtFt(price)} kell — jelenleg ${fmtFt(S.transferBudget)} van. A megmaradt büdzsé átjön a következő szezonra, szóval gyűjts még.`;
     $("scHub").scrollIntoView({behavior:"smooth"});return;}
   $("scHub").classList.add("hide");
   $("scWindow").classList.remove("hide");
@@ -12769,7 +12819,7 @@ function infinityConfirm(title,body,price,onBuy){
   $("twBody").innerHTML=body;
   $("twActions").innerHTML="";
   const yes=document.createElement("button");yes.className="btn-y stepbtn";yes.style.marginTop="10px";
-  yes.textContent=`Megveszem — ${price.toLocaleString("hu")} pont`;
+  yes.textContent=`Megveszem — ${fmtFtShort(price)}`;
   yes.onclick=()=>{S.transferBudget-=price;onBuy();csReturnToHub();};
   const no=document.createElement("button");no.className="btn-s stepbtn";no.style.marginTop="6px";
   no.textContent="Mégsem";
@@ -12904,10 +12954,10 @@ function infinityReportHtml(){
   const sells=((S.transferLog&&S.transferLog.sells)||[]).slice().sort((x,y)=>y.credit-x.credit);
   if(buys.length||sells.length){
     h+=infSec("Az üzlet");
-    if(buys[0])h+=infRow("Legdrágább igazolás",sn(buys[0].n),`${buys[0].boughtFor.toLocaleString("hu")} pont`);
-    if(sells[0])h+=infRow("Legdrágább eladás",sn(sells[0].n),`${sells[0].credit.toLocaleString("hu")} pont · ${sells[0].season}. szezon`);
+    if(buys[0])h+=infRow("Legdrágább igazolás",sn(buys[0].n),`${fmtFt(buys[0].boughtFor)}`);
+    if(sells[0])h+=infRow("Legdrágább eladás",sn(sells[0].n),`${fmtFt(sells[0].credit)} · ${sells[0].season}. szezon`);
     if(sells.length>1)h+=infRow("Eladások összesen",sells.length+" játékos",
-      sells.reduce((x,y)=>x+y.credit,0).toLocaleString("hu")+" pont bevétel");}
+      fmtFt(sells.reduce((x,y)=>x+y.credit,0))+" bevétel");}
 
   /* ---- 6. A KAPITÁNYOK ---- */
   const capAgg={};
@@ -12938,7 +12988,7 @@ $("hubInfinityBtn").onclick=()=>infinityConfirm("∞ Infinity mód",
    · Visszavonulás csak ${INFINITY_RETIRE_AGE} éves kortól<br>
    · Az akadémia ${INFINITY_ACADEMY_MIN}-${INFINITY_ACADEMY_MAX}-ös Ratinggel ad tehetségeket<br>
    · A mezőny <b>${INFINITY_BASE_MAX}-ig</b> tolható<br><br>
-   <span style="color:var(--dim2)">Büdzséd: ${S.transferBudget.toLocaleString("hu")}</span></p>`,
+   <span style="color:var(--dim2)">Büdzséd: ${fmtFt(S.transferBudget)}</span></p>`,
   INFINITY_PRICE,()=>{
     infinityMode=true;
     /* RUN: a futás sebességét ez a szezonszám dönti el (2.0 súly). */
@@ -12965,7 +13015,7 @@ $("hubInfinityBtn").onclick=()=>infinityConfirm("∞ Infinity mód",
 $("hubInfinityTierBtn").onclick=()=>infinityConfirm("∞ További szintek",
   `<p style="font-size:13px;line-height:1.6">Megveszel <b>+${INFINITY_TIER_STEP} mezőnyszintet</b>.<br><br>
    Jelenlegi plafon: <b>${maxOppRating()}</b> → új plafon: <b>${maxOppRating()+INFINITY_TIER_STEP}</b><br><br>
-   <span style="color:var(--dim2)">Büdzséd: ${S.transferBudget.toLocaleString("hu")}</span></p>`,
+   <span style="color:var(--dim2)">Büdzséd: ${fmtFt(S.transferBudget)}</span></p>`,
   INFINITY_TIER_PRICE,()=>{
     infinityTiers++;
     addLine(`∞ +${INFINITY_TIER_STEP} szint megvéve — a mezőny mostantól ${maxOppRating()}-ig tolható.`,"m life");
@@ -12985,8 +13035,8 @@ $("hubYouthBoostBtn").onclick=()=>{
   const tLo=Math.round(YOUTH_BOOST_TSI[0]*sc),tHi=Math.round(YOUTH_BOOST_TSI[1]*sc);
   const affordable=S.transferBudget>=price;
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
-    Ára <b style="color:#00e5ff">${price.toLocaleString("hu")}</b> · hatása: <b>+${rLo}-${rHi} Rating</b> és <b>+${tLo}-${tHi} TSI</b> (a fejlődés berobban, a játékos ezután is tovább nő).<br>
-    ${affordable?"Válaszd ki, kit boostolsz:":`<span style="color:var(--red)">Nincs elég büdzséd (${S.transferBudget.toLocaleString("hu")}).</span>`}</p>`;
+    Ára <b style="color:#00e5ff">${fmtFt(price)}</b> · hatása: <b>+${rLo}-${rHi} Rating</b> és <b>+${tLo}-${tHi} TSI</b> (a fejlődés berobban, a játékos ezután is tovább nő).<br>
+    ${affordable?"Válaszd ki, kit boostolsz:":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget)}).</span>`}</p>`;
   $("twActions").innerHTML="";
   if(affordable)prospects.forEach(p=>{
     const e=careerPool[p.n];
@@ -13022,8 +13072,8 @@ $("hubOldBoostBtn").onclick=()=>{
   const tLo=Math.round(OLD_BOOST_TSI[0]*sc),tHi=Math.round(OLD_BOOST_TSI[1]*sc);
   const affordable=S.transferBudget>=price;
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
-    Ára <b style="color:#a67c4a">${price.toLocaleString("hu")}</b> · hatása: <b>+${tLo}-${tHi} TSI</b>, és a játékos <b>${OLD_BOOST_RETIRE_AGE} éves koráig</b> nem vonul vissza. Csak 30 fölötti játékosra, és mindenkire csak egyszer.<br>
-    ${affordable?"Válaszd ki az öreg rókát:":`<span style="color:var(--red)">Nincs elég büdzséd (${S.transferBudget.toLocaleString("hu")}).</span>`}</p>`;
+    Ára <b style="color:#a67c4a">${fmtFt(price)}</b> · hatása: <b>+${tLo}-${tHi} TSI</b>, és a játékos <b>${OLD_BOOST_RETIRE_AGE} éves koráig</b> nem vonul vissza. Csak 30 fölötti játékosra, és mindenkire csak egyszer.<br>
+    ${affordable?"Válaszd ki az öreg rókát:":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget)}).</span>`}</p>`;
   $("twActions").innerHTML="";
   if(affordable)vets.forEach(p=>{
     const e=careerPool[p.n];
@@ -13312,7 +13362,7 @@ function openPosLearnPicker(loc){
   $("twPanel").classList.remove("hide");
   $("twTitle").textContent="🎓 Poszt-tanulás";
   const needed=posLearnMatchesNeeded(e);
-  let body=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">${esc(shortName(p.n))} (Rating ${Math.round(pOvr(p))}, ${e.age} év) új posztot tanulhat. A tanulás <b>meccsenként</b> halad (kb. <b>${needed}</b> lejátszott meccs, a kor és a TSI szabja a tempót, a jó teljesítmény gyorsítja). Ha kész, teljes értékűen otthon lesz az új poszton.<br><br>Ára: <b>${cost.toLocaleString("hu")}</b> büdzsé. Egyenleged: ${(S.transferBudget||0).toLocaleString("hu")}.</p>`;
+  let body=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">${esc(shortName(p.n))} (Rating ${Math.round(pOvr(p))}, ${e.age} év) új posztot tanulhat. A tanulás <b>meccsenként</b> halad (kb. <b>${needed}</b> lejátszott meccs, a kor és a TSI szabja a tempót, a jó teljesítmény gyorsítja). Ha kész, teljes értékűen otthon lesz az új poszton.<br><br>Ára: <b>${fmtFt(cost)}</b>. Egyenleged: ${fmtFt(S.transferBudget||0)}.</p>`;
   $("twBody").innerHTML=body;
   $("twActions").innerHTML="";
   if((S.transferBudget||0)<cost){
@@ -13328,7 +13378,7 @@ function openPosLearnPicker(loc){
       S.transferBudget-=cost;
       e.posLearning={target:pos,needed:posLearnMatchesNeeded(e),progress:0,startedSeason:S.seasonNumber||1};
       S.chPosLearnStarted=(S.chPosLearnStarted||0)+1;   /* kihívás-könyvelés */
-      addLine(`🎓 Poszt-tanulás elindítva: ${esc(shortName(p.n))} elkezdte a(z) ${pos} poszt tanulását (−${cost.toLocaleString("hu")} büdzsé).`,"m life");
+      addLine(`🎓 Poszt-tanulás elindítva: ${esc(shortName(p.n))} elkezdte a(z) ${pos} poszt tanulását (−${fmtFt(cost)}).`,"m life");
       $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">🎓 Elindítva!</div><p style="font-size:13px;margin-top:5px">${esc(shortName(p.n))} mostantól a(z) <b>${pos}</b> posztot tanulja. A haladást a lenyíló játékos-panelen követheted. Szólunk, ha kész!</p>`;
       $("twActions").innerHTML="";
       const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";ok.onclick=()=>csReturnToHub();
@@ -13612,7 +13662,7 @@ function runIntroHtml(){
     ${done?"":`<div style="font-size:12.5px;margin-top:6px">
       <div>1. Told fel a mezőnyt a <b>100-as nehézségig</b> <span style="color:var(--dim2)">(most: ${oppTargetRating})</span></div>
       <div>2. <b>Nyerd meg a bajnokságot</b></div>
-      <div>3. Gyűjts össze <b>${INFINITY_PRICE.toLocaleString("hu")} pontot</b> <span style="color:var(--dim2)">(most: ${(S.transferBudget||0).toLocaleString("hu")})</span></div>
+      <div>3. Gyűjts össze <b>${fmtFt(INFINITY_PRICE)}</b> <span style="color:var(--dim2)">(most: ${fmtFt(S.transferBudget||0)})</span></div>
       <div>4. <b>Oldd fel az Infinityt</b> — és mindezt minél kevesebb szezon alatt</div>
     </div>`}
     <div style="font-size:11.5px;color:var(--dim2);margin-top:8px">
@@ -13827,11 +13877,11 @@ function renderHub(){
   $("hubInfinityTierBtn").classList.toggle("hide",!canTier);
   if(canInfinity){
     const ok=S.transferBudget>=INFINITY_PRICE;
-    $("hubInfinityBtn").textContent=`∞ Infinity mód megnyitása — ${INFINITY_PRICE.toLocaleString("hu")}`;
+    $("hubInfinityBtn").textContent=`∞ Infinity mód megnyitása — ${fmtFtShort(INFINITY_PRICE)}`;
     $("hubInfinityBtn").style.opacity=ok?"1":".5";}
   if(canTier){
     const ok=S.transferBudget>=INFINITY_TIER_PRICE;
-    $("hubInfinityTierBtn").textContent=`∞ +${INFINITY_TIER_STEP} szint — ${INFINITY_TIER_PRICE.toLocaleString("hu")}`;
+    $("hubInfinityTierBtn").textContent=`∞ +${INFINITY_TIER_STEP} szint — ${fmtFtShort(INFINITY_TIER_PRICE)}`;
     $("hubInfinityTierBtn").style.opacity=ok?"1":".5";}
   /* Az ifi-boost gomb akkor jelenik meg, ha van legalább egy akadémistád
      (youthBonus>0) a keretben — 100 előtt és után egyaránt elérhető. */
@@ -13839,7 +13889,7 @@ function renderHub(){
   $("hubYouthBoostBtn").classList.toggle("hide",!hasYouth);
   if(hasYouth){
     const price=youthBoostPrice(),ok=S.transferBudget>=price;
-    $("hubYouthBoostBtn").textContent=`⚡ Ifi-boost — ${price.toLocaleString("hu")}`;
+    $("hubYouthBoostBtn").textContent=`⚡ Ifi-boost — ${fmtFtShort(price)}`;
     $("hubYouthBoostBtn").style.opacity=ok?"1":".55";}
   /* Az "öreg csirkefogó" gomb akkor jelenik meg, ha van boostolható veterán
      (30+ éves, még nem boostolt) a keretben. */
@@ -13847,7 +13897,7 @@ function renderHub(){
   $("hubOldBoostBtn").classList.toggle("hide",!hasVeteran);
   if(hasVeteran){
     const price=oldBoostPrice(),ok=S.transferBudget>=price;
-    $("hubOldBoostBtn").textContent=`🎩 Öreg csirkefogó — ${price.toLocaleString("hu")}`;
+    $("hubOldBoostBtn").textContent=`🎩 Öreg csirkefogó — ${fmtFtShort(price)}`;
     $("hubOldBoostBtn").style.opacity=ok?"1":".55";}
   /* ---- SZINTLÉPÉS: SZABADON, KÉT SZEZON KÖZÖTT ----
      Nincs többé cím- vagy kudarc-feltétel. Szezon KÖZBEN viszont rejtve marad
@@ -13959,7 +14009,7 @@ function renderHub(){
           if(!res.ok){
             setDraftStatus(res.reason==="noreplacement"?"Nincs pótlás a tartalék-keretedben erre a posztra — előbb helyezz be valakit onnan.":"Nem sikerült eladni.");
             return;}
-          addLine(`💰 Eladtad ${esc(p.n)}-t ${res.credit} pontért — a büdzséd most ${S.transferBudget}.`,"m life");
+          addLine(`💰 Eladtad ${esc(p.n)}-t ${fmtFt(res.credit)}-ért — a büdzséd most ${fmtFt(S.transferBudget)}.`,"m life");
           $("hubPositionPicker").classList.add("hide");   /* az eladás azonnal bezárja a nyitott csere-panelt */
           renderHub();drawPitch();updateBar();saveGame();});};
       row.appendChild(sellBtn);}
@@ -14213,7 +14263,7 @@ function euroCampaignEnd(kind){
   E.prize=mult>0?Math.round(computeSeasonBudget()*mult):0;
   if(E.prize>0){
     S.transferBudget=(S.transferBudget||0)+E.prize;
-    addLine(`💰 ${c.n} — ${place} helyezés: +${E.prize} az átigazolási keretbe.`,"m life");}
+    addLine(`💰 ${c.n} — ${place} helyezés: +${fmtFt(E.prize)} az átigazolási keretbe.`,"m life");}
   if(kind==="win"){
     /* CHAMPION-KÁRTYA a döntő kezdő 11-ének. Halmozódásnál csak a MAGASABB
        marad (BL 4 > EL 3 > KL 2) — a bónusz nem hízik, hanem cserélődik. */
@@ -14430,7 +14480,7 @@ function renderEuroScreen(){
       h=`<div style="font-size:17px;font-weight:700;color:${c.col}">🏆 MEGNYERTÉTEK A(Z) ${esc(c.n.toUpperCase())}-T!</div>`;
       if(E.lastTie&&E.lastTie.round==="final")
         h+=`<div style="font-size:12.5px;color:var(--dim);margin-top:3px">Döntő: ${esc(E.lastTie.opp)} ellen ${E.lastTie.mine}:${E.lastTie.theirs} — <b style="color:var(--ink)">${esc(E.lastTie.how)}</b> dőlt el.</div>`;
-      if(E.prize)h+=`<div style="font-size:13px;margin-top:5px">💰 Pénzjutalom: <b>+${E.prize}</b> az átigazolási keretbe.</div>`;
+      if(E.prize)h+=`<div style="font-size:13px;margin-top:5px">💰 Pénzjutalom: <b>+${fmtFt(E.prize)}</b> az átigazolási keretbe.</div>`;
       if(E.championPlayers&&E.championPlayers.length)
         h+=`<div style="font-size:13px;margin-top:5px">🎖️ <b>Champion-kártya</b> (+${c.champBoost} Rating) a kezdő 11-nek:<br><span style="font-size:12px;color:var(--dim)">${E.championPlayers.map(esc).join(" · ")}</span></div>`;
       if(E.tacticBoosted)
@@ -14442,7 +14492,7 @@ function renderEuroScreen(){
       /* MI ALAPJÁN dőlt el a búcsú? (összesítés / idegenben lőtt gól / büntetők) */
       if(E.lastTie&&!E.lastTie.won&&E.outAt!=="group")
         h+=`<div style="font-size:12.5px;margin-top:3px">${esc(E.lastTie.opp)} ellen ${E.lastTie.mine}:${E.lastTie.theirs} — <b>${esc(E.lastTie.how)}</b> dőlt el.</div>`;
-      if(E.prize)h+=`<div style="font-size:13px;margin-top:5px">💰 Pénzjutalom: <b>+${E.prize}</b> az átigazolási keretbe.</div>`;
+      if(E.prize)h+=`<div style="font-size:13px;margin-top:5px">💰 Pénzjutalom: <b>+${fmtFt(E.prize)}</b> az átigazolási keretbe.</div>`;
       if(E.champion!=null&&E.teams[E.champion])
         h+=`<div style="font-size:12.5px;color:var(--dim);margin-top:5px">A sorozatot <b style="color:${c.col}">${esc(E.teams[E.champion].n)}</b> nyerte.</div>`;}
     /* BL EGYÉNI ARANY-DÍJAK — mindkét kimenetnél (a mezőny egészére) */
@@ -14547,16 +14597,16 @@ function renderInvestOffer(){
   box.innerHTML=`<div class="hubGroupTitle">💼 Befektetés</div>
     <div style="font-size:12.5px;color:var(--dim);line-height:1.5;margin-bottom:8px">
       Válassz összeget: most levonjuk a büdzsédből, és a <b>következő szezon elején kétszeresen</b> kapod vissza.
-      Legfeljebb a büdzséd felét teheted be (${cap.toLocaleString("hu")}).</div>`;
+      Legfeljebb a büdzséd felét teheted be (${fmtFt(cap)}).</div>`;
   const grid=document.createElement("div");grid.className="hubGrid";
   opts.forEach(v=>{
     const b=document.createElement("button");b.className="btn-s";
-    b.innerHTML=`${v.toLocaleString("hu")}<small>vissza: ${(v*2).toLocaleString("hu")}</small>`;
+    b.innerHTML=`${fmtFtShort(v)}<small>vissza: ${fmtFtShort(v*2)}</small>`;
     b.onclick=()=>{
       S.transferBudget=Math.max(0,(S.transferBudget||0)-v);
       S.investReturn=(S.investReturn||0)+v*2;
       S.investPending=false;
-      addLine(`💼 Befektettél ${v.toLocaleString("hu")} pontot — a következő szezon elején ${(v*2).toLocaleString("hu")} jön vissza.`,"m life");
+      addLine(`💼 Befektettél ${fmtFt(v)} — a következő szezon elején ${fmtFt(v*2)} jön vissza.`,"m life");
       renderHub();saveGame();};
     grid.appendChild(b);});
   const skip=document.createElement("button");skip.className="btn-s";
@@ -14611,12 +14661,12 @@ function hubShowSeasonReport(){
       S.summerPaidAfterSeason=closed;
       const b=computeSeasonBudget();
       S.transferBudget=(S.transferBudget||0)+b;
-      addLine(`💰 Megérkezett a nyári keret: +${b.toLocaleString("hu")} büdzsé. Most van itt az ideje az igazolásoknak.`,"m life");
+      addLine(`💰 Megérkezett a nyári keret: +${fmtFt(b)}. Most van itt az ideje az igazolásoknak.`,"m life");
       /* BEFEKTETÉS HOZAMA: a tavalyi befektetés kétszeresen jóváíródik —
          ugyanabban a pillanatban, mint a keret, hogy egyben lehessen tervezni. */
       if(S.investReturn>0){
         S.transferBudget=(S.transferBudget||0)+S.investReturn;
-        addLine(`💼 A befektetésed megtérült: +${S.investReturn.toLocaleString("hu")} büdzsé.`,"m life");
+        addLine(`💼 A befektetésed megtérült: +${fmtFt(S.investReturn)}.`,"m life");
         S.investReturn=0;}}}
   const cardResults=determineSeasonCards();
   let html="";
