@@ -229,7 +229,25 @@ button:disabled{opacity:.35;cursor:default}
   font-size:9.5px;font-weight:700;letter-spacing:.2px;color:#fff;
   padding:3px 5px;border-radius:5px;white-space:nowrap;
   border:1px solid rgba(255,255,255,.45)}
-#formPreviewLbl{text-align:center;font-size:12px;color:var(--dim);margin-top:6px}
+#formPreviewLbl{text-align:center;font-size:12px;color:var(--dim);margin-top:6px;line-height:1.55}
+/* A középső középpályás helyek KOPPINTHATÓK: szaggatott keret jelzi, a keret
+   színe pedig a megbízatást (védekező = védő-kék, támadó = csatár-piros). */
+#formPreview .pp.mid{border-style:dashed;border-width:1.5px;cursor:pointer}
+#formPreview .pp.mid:active{transform:translate(-50%,-50%) scale(.92)}
+#formPreview .pp.r-VKP{border-color:var(--pos-df)}
+#formPreview .pp.r-KKP{border-color:rgba(255,255,255,.8)}
+#formPreview .pp.r-TKP{border-color:var(--pos-fw)}
+/* HUB-oldali szerep-szerkesztő */
+#hubMidRoleBox{margin:8px 0 4px}
+.midRoleRow{display:flex;align-items:center;gap:8px;margin:5px 0}
+.midRoleRow .lbl{font-size:12px;color:var(--dim);min-width:74px}
+.midRoleSeg{display:flex;gap:4px;flex:1}
+.midRoleSeg button{flex:1;padding:6px 4px;border-radius:6px;font-size:11px;font-weight:700;
+  background:transparent;color:var(--dim);border:1px solid var(--line);cursor:pointer}
+.midRoleSeg button.on{color:#fff;border-color:transparent}
+.midRoleSeg button.on.s-VKP{background:var(--pos-df)}
+.midRoleSeg button.on.s-KKP{background:var(--pos-mf)}
+.midRoleSeg button.on.s-TKP{background:var(--pos-fw)}
 .btn-mini{padding:7px 8px;border-radius:7px;font-size:11.5px;font-weight:600;
   background:transparent;color:var(--dim);border:1px solid var(--line);cursor:pointer}
 .btn-mini:active{background:var(--panel2)}
@@ -897,9 +915,10 @@ button:disabled{opacity:.35;cursor:default}
      scHub-ot, így ha benne lenne, önmagát is elrejtené (ez volt a "nem működik
      a gomb" bug oka). -->
 <section class="card hide" id="hubFormationPicker">
-  <div class="steplbl">Felállás módosítása</div>
+  <div class="steplbl">Felállás és megbízatások</div>
   <p id="hubFormationHint" style="font-size:12.5px;color:var(--dim);margin:2px 0 4px;line-height:1.5"></p>
   <div id="hubFormationBody" class="hubGrid" style="grid-template-columns:1fr 1fr 1fr"></div>
+  <div id="hubMidRoleBox"></div>
   <button id="hubFormationCancel" class="btn-s stepbtn">Mégse</button>
 </section>
 
@@ -3543,6 +3562,62 @@ function slotAxisShift(curPos,defPos,key){
   const cur=SLOT_AXIS_BONUS[curPos],def=SLOT_AXIS_BONUS[defPos];
   if(!cur&&!def)return 0;
   return ((cur&&cur[key])||0)-((def&&def[key])||0);}
+/* ---- MELY SLOTOK SZEREPE ÍRHATÓ ÁT ----
+   Csak azok, amiknek a felállásban az ALAPÉRTELMEZETT kódja VKP/KKP/TKP —
+   vagyis a középső középpályás helyek. A szélső (JSZ/BSZ), a védők, a csatárok
+   és a kapus kötöttek: azokat a felállás ALAKJA adja, nem megbízatás kérdése.
+   Így a 4-4-2 két, a 4-3-3 / 4-2-3-1 / 3-5-2 / 5-3-2 / 4-5-1 három, a 3-4-3
+   pedig négy átállítható helyet kínál.
+   MEGJEGYZÉS: ezek a függvények a lentebb (ÁLLAPOT szakasz) deklarált
+   `slotRoles` globálist olvassák — ugyanaz az előre-hivatkozás, amit a
+   teamAttrStrengths is használ a `form` és a `slots` esetében. Kizárólag
+   felhasználói művelet hívja őket, jóval az inicializálás után. */
+const MID_ROLE_CODES=["VKP","KKP","TKP"];
+const MID_ROLE_LABEL={VKP:"védekező",KKP:"klasszikus",TKP:"támadó"};
+function isMidRoleSlot(f,i){
+  const F=FORMS[f];
+  return !!F&&MID_ROLE_CODES.includes(F.slots[i]);}
+/* Egy slot ÉRVÉNYES kódja: a játékos felülírása, ha van és megengedett;
+   különben a felállás alapértelmezése. */
+function effectiveSlotPos(f,i){
+  const F=FORMS[f];
+  if(!F)return null;
+  const def=F.slots[i];
+  if(!isMidRoleSlot(f,i))return def;
+  const ov=slotRoles&&slotRoles[f]&&slotRoles[f][i];
+  return MID_ROLE_CODES.includes(ov)?ov:def;}
+/* A felállás teljes slotlistája, a felülírásokkal együtt. */
+function effectiveSlotList(f){
+  const key=FORMS[f]?f:"442";
+  return FORMS[key].slots.map((p,i)=>effectiveSlotPos(key,i));}
+/* Beállítás. Ha az új kód épp az ALAPÉRTELMEZÉS, a felülírást TÖRÖLJÜK, nem
+   pedig azonos értékkel tároljuk — így az "érintetlen" állapot felismerhető
+   marad, és a mentés nem hízik fölöslegesen. */
+function setSlotRole(f,i,code){
+  if(!isMidRoleSlot(f,i)||!MID_ROLE_CODES.includes(code))return false;
+  if(!slotRoles[f])slotRoles[f]={};
+  if(code===FORMS[f].slots[i])delete slotRoles[f][i];
+  else slotRoles[f][i]=code;
+  if(!Object.keys(slotRoles[f]).length)delete slotRoles[f];
+  return true;}
+/* Körbeforgatás: védekező → klasszikus → támadó → védekező. */
+function cycleSlotRole(f,i,dir){
+  if(!isMidRoleSlot(f,i))return null;
+  const n=MID_ROLE_CODES.length;
+  const at=MID_ROLE_CODES.indexOf(effectiveSlotPos(f,i));
+  const next=MID_ROLE_CODES[((at+(dir||1))%n+n)%n];
+  setSlotRole(f,i,next);
+  return next;}
+/* Hány védekező / klasszikus / támadó középpályás van jelenleg beállítva. */
+function midRoleCounts(f){
+  const c={VKP:0,KKP:0,TKP:0};
+  const key=FORMS[f]?f:"442";
+  FORMS[key].slots.forEach((p,i)=>{if(isMidRoleSlot(key,i))c[effectiveSlotPos(key,i)]++;});
+  return c;}
+/* Emberi összefoglaló: "2 védekező · 1 támadó" (a nullákat kihagyja). */
+function midRoleText(f){
+  const m=midRoleCounts(f);
+  return MID_ROLE_CODES.filter(c=>m[c]>0).map(c=>`${m[c]} ${MID_ROLE_LABEL[c]}`).join(" · ");}
 /* ---- SKILL → TENGELY ----
    Melyik skill-típus melyik csapat-attribútumot erősíti. A "szórt" típusok
    (aura, rating, mvp) mind a négyre adnak keveset. A tisztán szervezési
@@ -5523,6 +5598,14 @@ function applyTransfer(type){
 
 /* ================= ÁLLAPOT ================= */
 let form="442",mode="classic",oppTargetRating=84,familyEnabled=true,wcEnabled=false,slots=[],rerolls=1,curSquad=null,pendingPlayer=null;
+/* KÖZÉPPÁLYÁS SZEREP-FELÜLÍRÁSOK — felállásonként a középső középpályás slotok
+   átállított kódja: { "433":{"6":"VKP"}, ... }. Csak az ALAPÉRTELMEZÉSTŐL
+   ELTÉRŐ helyek szerepelnek benne (lásd setSlotRole), így az üres objektum
+   pontosan azt jelenti, hogy minden felállás a saját alapbeállításán áll — és
+   a tengelyréteg (SLOT_AXIS_BONUS) is emiatt ad garantáltan 0 eltolást.
+   FELÁLLÁSONKÉNT tároljuk, hogy a felállásváltás ne felejtse el a korábbi
+   megbízatásokat: ha visszaváltasz, ugyanazt a képet kapod vissza. */
+let slotRoles={};
 /* Karrier-indulás módja: "draft" (klubokat pörgetve építkezel) vagy "club"
    (egy valós klub teljes keretével kezdesz — FIFA-s karrier érzet). */
 let careerStart="draft";
@@ -5674,14 +5757,30 @@ function renderFormPreview(f){
   const COL={KAPUS:"var(--pos-gk)",VEDO:"var(--pos-df)",KOZEPPALYAS:"var(--pos-mf)",CSATAR:"var(--pos-fw)"};
   const cnt={VEDO:0,KOZEPPALYAS:0,CSATAR:0};
   let html='<div class="ln"></div>';
-  F.slots.forEach((pos,i)=>{
+  F.slots.forEach((defPos,i)=>{
+    const pos=effectiveSlotPos(f,i);          /* a MEGBÍZATÁS szerinti kód */
     const role=roleInFormation(pos,f);        /* szerep az ELŐNÉZETT felállásban */
     if(pos!=="KP"&&cnt[role]!==undefined)cnt[role]++;
     const [x,y]=F.xy[i];
-    html+=`<span class="pp" style="left:${x}%;top:${y}%;background:${COL[role]||"var(--pos-mf)"}">${pos}</span>`;});
+    const mid=isMidRoleSlot(f,i);
+    html+=`<span class="pp${mid?` mid r-${pos}`:""}" data-i="${i}"`
+      +(mid?` role="button" tabindex="0" title="${MID_ROLE_LABEL[pos]} középpályás — koppints a váltáshoz"`:"")
+      +` style="left:${x}%;top:${y}%;background:${COL[role]||"var(--pos-mf)"}">${pos}</span>`;});
   box.innerHTML=html;
+  /* Koppintás/Enter: körbeforgatás, majd újrarajzolás. A draftban ez még
+     szabadon állítható — a keret ekkor még nincs meg, nincs mit felborítani. */
+  box.querySelectorAll(".pp.mid").forEach(el=>{
+    const i=parseInt(el.dataset.i,10);
+    const go=()=>{cycleSlotRole(f,i);renderFormPreview(f);};
+    el.onclick=go;
+    el.onkeydown=(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go();}};});
   const lbl=document.getElementById("formPreviewLbl");
-  if(lbl)lbl.textContent=`${FORM_LABELS_SETUP[f]||f} — ${cnt.VEDO} védő · ${cnt.KOZEPPALYAS} középpályás · ${cnt.CSATAR} csatár`;}
+  if(lbl){
+    const m=midRoleCounts(f);
+    const midTxt=MID_ROLE_CODES.filter(c=>m[c]>0).map(c=>`${m[c]} ${MID_ROLE_LABEL[c]}`).join(" · ");
+    lbl.innerHTML=`${FORM_LABELS_SETUP[f]||f} — ${cnt.VEDO} védő · ${cnt.KOZEPPALYAS} középpályás · ${cnt.CSATAR} csatár`
+      +`<br>Középpálya: <b>${midTxt}</b>`
+      +`<br><span style="font-size:11px;opacity:.72">A szaggatott helyekre koppintva átállíthatod a megbízatást.</span>`;}}
 const FORM_LABELS_SETUP={"442":"4-4-2","433":"4-3-3","4231":"4-2-3-1","352":"3-5-2","343":"3-4-3","532":"5-3-2","451":"4-5-1"};
 document.querySelectorAll("#formGrid button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#formGrid button").forEach(x=>x.classList.remove("sel"));
@@ -5756,7 +5855,7 @@ $("diffSlider").oninput=()=>{
 $("diffSliderVal").textContent=`${oppTargetRating} · ${diffTierLabel(oppTargetRating)}${oppTargetRating===84?" · ajánlott":""}`;
 updateOppRatingBadge();
 $("startBtn").onclick=()=>{
-  slots=FORMS[form].slots.map((p,i)=>({pos:p,xy:FORMS[form].xy[i],player:null,fit:1,origin:null}));
+  slots=FORMS[form].slots.map((p,i)=>({pos:effectiveSlotPos(form,i),xy:FORMS[form].xy[i],player:null,fit:1,origin:null}));
   rerolls=parseInt($("rerollSlider").value,10);
   /* RUN: a VÁLASZTOTT újrapörgetés-számot itt kell rögzíteni, mert a `rerolls`
      a draft során minden felhasználásnál csökken — a szezonindításkor már csak
@@ -9826,7 +9925,7 @@ function applyFormationChange(newForm){
   const pool=[];
   slots.forEach(s=>{if(s.player)pool.push(s.player);});
   form=newForm;
-  slots=FORMS[form].slots.map((p,i)=>({pos:FORMS[form].slots[i],xy:FORMS[form].xy[i],player:null,fit:1,origin:null}));
+  slots=FORMS[form].slots.map((p,i)=>({pos:effectiveSlotPos(form,i),xy:FORMS[form].xy[i],player:null,fit:1,origin:null}));
   const assigned=new Set();
   function candidatesFor(slotPos,exactOnly){
     return pool.filter(p=>!assigned.has(p)&&(exactOnly
@@ -10849,7 +10948,41 @@ function renderFormationPicker(){
       $("scHub").classList.remove("hide");
       renderHub();updateBar();saveGame();
       $("scHub").scrollIntoView({behavior:"smooth"});};
-    body.appendChild(b);});}
+    body.appendChild(b);});
+  renderMidRoleEditor();}
+/* ---- KÖZÉPPÁLYÁS MEGBÍZATÁSOK a HUB-ban ----
+   A felállás ALAKJA (hány védő / középpályás / csatár) pénzbe kerül és
+   szezononként korlátos. A középső középpályások MEGBÍZATÁSA viszont taktikai
+   utasítás, nem keret-átépítés, ezért ingyenes és bármikor állítható.
+   Következménye viszont van: a slot poszt-kódja megváltozik, ezért a kezdő 11-et
+   ugyanazzal a bevált logikával rendezzük újra, mint felállásváltásnál
+   (applyFormationChange) — akire nem illik az új megbízatás, padra kerülhet. */
+function renderMidRoleEditor(){
+  const box=$("hubMidRoleBox");
+  if(!box)return;
+  const idx=[];
+  (FORMS[form]||FORMS["442"]).slots.forEach((p,i)=>{if(isMidRoleSlot(form,i))idx.push(i);});
+  if(!idx.length){box.innerHTML="";return;}
+  let html=`<div class="steplbl" style="margin-top:12px">Középpályás megbízatások</div>`
+    +`<p style="font-size:12.5px;color:var(--dim);margin:2px 0 6px;line-height:1.5">`
+    +`A felállás alakja marad — csak azt állítod, mit kérsz a középső középpályásoktól. `
+    +`<b style="color:var(--grass)">Ingyenes</b>, de a kezdő 11 újrarendeződik. `
+    +`Jelenleg: <b>${midRoleText(form)}</b>.</p>`;
+  idx.forEach((i,n)=>{
+    const cur=effectiveSlotPos(form,i);
+    html+=`<div class="midRoleRow"><span class="lbl">Középső ${n+1}</span><span class="midRoleSeg">`
+      +MID_ROLE_CODES.map(c=>`<button data-i="${i}" data-c="${c}" class="${c===cur?`on s-${c}`:""}">${MID_ROLE_LABEL[c]}</button>`).join("")
+      +`</span></div>`;});
+  box.innerHTML=html;
+  box.querySelectorAll(".midRoleSeg button").forEach(b=>{
+    b.onclick=()=>{
+      const i=parseInt(b.dataset.i,10),c=b.dataset.c;
+      if(effectiveSlotPos(form,i)===c)return;      /* már ez van beállítva */
+      if(!setSlotRole(form,i,c))return;
+      applyFormationChange(form);   /* slotok újraépítése + a kezdő 11 újrarendezése */
+      addLine(`🧭 Megbízatás módosítva — a középpálya mostantól: ${midRoleText(form)}.`,"m life");
+      renderFormationPicker();
+      renderHub();updateBar();saveGame();};});}
 $("hubFormationCancel")&&($("hubFormationCancel").onclick=()=>{
   $("hubFormationPicker").classList.add("hide");
   $("scHub").classList.remove("hide");
@@ -12143,7 +12276,7 @@ function runMaxStartXI(){
   const pool=[];
   activeSquads().forEach(sq=>(sq.players||[]).forEach(p=>pool.push(p)));
   if(!pool.length)return 0;
-  const posList=(FORMS[form]||FORMS["442"]).slots;
+  const posList=effectiveSlotList(form);
   const used=new Set();let sum=0;
   posList.forEach(pos=>{
     let best=null;
@@ -13382,6 +13515,7 @@ function saveGame(){
       v:1,
       gameMode,scout,careerPool,careerStart,
       form,mode,oppTargetRating,rerolls,infinityMode,infinityTiers,careerBaseRating,MAX_CAREER_ROSTER,
+      slotRoles,
       slots:slots.map(s=>({pos:s.pos,xy:s.xy,player:s.player,fit:s.fit,origin:s.origin})),
       BENCH:{KAPUS:BENCH.KAPUS,VEDO:BENCH.VEDO,KOZEPPALYAS:BENCH.KOZEPPALYAS,CSATAR:BENCH.CSATAR},
       extraRoster,
@@ -13442,6 +13576,10 @@ function applySavedGame(d){
   gameMode=d.gameMode||"classic";careerStart=d.careerStart||"draft";scout=d.scout||null;careerPool=d.careerPool||null;
   ensureAllAttrs();   /* régi mentések migrációja: hiányzó attribútumok pótlása */
   form=d.form;mode=d.mode;
+  /* A szerep-felülírások: régi mentésben nincs meg → üres, vagyis minden
+     felállás az alapértelmezésén áll, és a tengelyréteg 0-t ad. A futó karrier
+     tehát pontosan úgy viselkedik a betöltés után is, mint eddig. */
+  slotRoles=d.slotRoles||{};
   oppTargetRating=d.oppTargetRating!=null?d.oppTargetRating:(d.difficulty&&DIFFS_LEGACY[d.difficulty]?DIFFS_LEGACY[d.difficulty]:80);
   /* Az Infinity végleges és megvásárolt állapot — ha nem töltődne vissza, egy
      böngésző-frissítés elvenné a 100 000 pontért vett módot. A régi mentések
