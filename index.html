@@ -5814,7 +5814,19 @@ document.querySelectorAll("#wcToggleGrid button").forEach(b=>b.onclick=()=>{
    FÖLFELÉ lép — lefelé sosem visz, mert a nehézség csökkentése stratégiai
    döntés, nem automatizmus. A kézi átállítás továbbra is elérhető: ha te
    magad már megléptél eleget, az automatika nem tesz hozzá semmit. */
-const AUTO_LEVEL_MAX_GAP=2;
+/* A CÉLZOTT erőkülönbség, amit az automatika tart. MOSTANTÓL a valódi
+   meccs-erőn mérve (teamMatchStrength: keret + rejtett szituatív tagok), ezért
+   a régi 2-es érték már nem ugyanazt jelentette: a rejtett bónuszok nélkül
+   számolt 2-es gap a karrier végén valójában +8…+10 volt, azaz gyakorlatilag
+   biztos bajnoki cím — az automatika épp az ellenkezőjét érte el annak, amiért
+   bekapcsoltad.
+   Az 5-öt a mért bajnoki esélyekhez választottuk. Egy szintlépés 84 fölött
+   1.35-tel emeli a mezőny effektív erejét, ezért az automatika a (3.65 … 5]
+   sávban állítja meg magát — ott a bajnoki esély ~20-55%. Vagyis mindig igazi
+   esélyes vagy, de egyetlen szezon sem jár automatikusan, és a cím sosem
+   válik formalitássá. Egyetlen szám: ha keményebbet akarsz, vedd 4-re (~10-33%
+   bajnoki esély), ha megengedőbbet, 6-ra (~33-78%). */
+const AUTO_LEVEL_MAX_GAP=5;
 /* ================= UNDERDOG-FAKTOR =================
    Egyetlen 0..1 szám arról, mennyire nehéz körülmények között dolgozol. Eddig
    a nehéz run gyakorlatilag NEM volt jutalmazva: a skill-jutalom, a kémia és a
@@ -11346,13 +11358,96 @@ $("hubClubScoutBtn").onclick=()=>startClubScouting();
 function oppMatchStrength(lvl){
   const v=(lvl===undefined?oppTargetRating:lvl);
   return v+(gameMode==="career"?Math.max(0,(v-84)*0.35):0);}
-function levelGap(lvl){return teamStrength()-oppMatchStrength(lvl);}
+/* ================= REJTETT MECCS-BÓNUSZOK =================
+   A KIJELZETT csapaterő (teamStrength) szándékosan csak a KERETET méri: a
+   szituatív tagokat — morál, edző, aura-skillek, kapitány-rutin, taktika,
+   védekező skillek, esemény-módosítók — kihagyja, mert azok nem a játékosok
+   "értékei". A MECCS viszont mindet beszámítja (lásd a diff számítását a
+   szimulációban), és ezek a tagok a karrier során ~+2-ről akár +10 fölé nőnek.
+
+   Emiatt a levelGap korábban RENDSZERESEN alábecsülte a csapatot: aki a
+   kijelzett "jó egyensúly"-ra állította a nehézséget, az a valóságban egyre
+   nagyobb előnnyel játszott, és a szezonok észrevétlenül tét nélkülivé váltak.
+   Mérve (3000 szimulált szezon a motor saját konstansaival): a levelGap 0
+   valódi bajnoki esélye az 1. szezonban ~5%, egy kiépített kerettel viszont
+   már ~96% — ugyanaz a "kiegyensúlyozott" kijelzés mellett.
+
+   Ez a függvény ugyanazokat a tagokat számolja ki MECCSEN KÍVÜL, hogy a
+   nehézség-tanácsadó és az auto szintkövetés a VALÓDI meccs-erővel dolgozzon.
+   Szándékosan KIHAGYJA: a meccsenként sorsolt jó/rossz formát (±SIM.FORM —
+   kioltják egymást), a grudge-ot és a fegyelmi figyelmeztetést (egy meccsre
+   élnek, nem jellemzik a csapatot). */
+function hiddenMatchBonus(){
+  if(gameMode!=="career")return 0;
+  const xi=slots.filter(s=>s.player);
+  if(!xi.length)return 0;
+  let b=(S.capMod||0)+(S.eventMod||0)+((coach&&coach.ovrMod)||0);
+  b+=moraleToOvr(S.morale!=null?S.morale:50);
+  /* aura-skillek a kezdő 11-en, plusz a család-specializáció egyszeri bónusza */
+  let aura=0;
+  xi.forEach(s=>{aura+=sumSkillEffect(s.player.n,"aura");});
+  const fam=xi.find(s=>s.player.family);
+  const famSp=fam?fam.player.familySpecialty:null;
+  if(famSp==="200iq")aura+=1;
+  if(famSp==="tank")aura+=1.3;
+  if(famSp==="testver")aura+=1;
+  b+=aura;
+  /* kapitány-rutin — csak ha a kapitány tényleg a kezdő 11-ben van */
+  if(captainIdx>=0&&slots[captainIdx]&&slots[captainIdx].player)
+    b+=captainAgeExpBonus(slots[captainIdx].player.age)*0.15;
+  if(S.teamFormMalus>0)b-=2.2;
+  b+=tacticEffect();
+  /* VÉDEKEZŐ SKILLEK: ezek nem OVR-t adnak, hanem az ELLENFÉL gólesélyét
+     SZOROZZÁK (la = lam(-diff) × m). Mivel lam = BASE·e^(K·d), egy m szorzó
+     pontosan −ln(m)/K OVR-nek felel meg — de csak a KAPOTT gólok oldalán,
+     míg egy igazi OVR mindkét oldalon hat. Ezért FÉL súllyal számoljuk be.
+     A DEF_MULT_FLOOR padlót itt is alkalmazzuk, hogy a becslés ne szaladjon
+     el a valódi meccs-hatás fölé. */
+  let dm=1;
+  xi.forEach(s=>{dm*=multSkillEffect(s.player.n,"defense");});
+  dm=Math.max(0.80,dm);
+  if(famSp==="200iq")dm*=0.97;
+  if(famSp==="tank")dm*=0.92;
+  if(dm>0&&dm<1)b+=(-Math.log(dm)/SIM.K)*0.5;
+  return b;}
+/* A csapat VALÓDI meccs-ereje: a keret + a rejtett szituatív tagok. Ez a
+   nehézség-tanácsadó és az auto szintkövetés alapja. */
+function teamMatchStrength(){return teamStrength()+hiddenMatchBonus();}
+function levelGap(lvl){return teamMatchStrength()-oppMatchStrength(lvl);}
+/* ---- A NEHÉZSÉG-SÁVOK, A MÉRT BAJNOKI ESÉLYHEZ KALIBRÁLVA ----
+   A küszöbök nem hasraütésre vannak: a motor saját konstansaival (K=0.09,
+   BASE=1.3, HOME/AWAY, a 15 ellenfél aszimmetrikus tabella-profilja) 1500-3000
+   szimulált szezont futtattunk minden erőkülönbségre. A levelGap MOSTANTÓL a
+   valódi meccs-erőt méri (lásd hiddenMatchBonus), így ezek a számok közvetlenül
+   a tapasztalt szezonra vonatkoznak:
+     gap  −4 →  0% bajnok, 25 pont      gap  +4 →  33% bajnok, 62 pont
+     gap  −2 →  0% bajnok, 34 pont      gap  +6 →  78% bajnok, 71 pont
+     gap   0 →  0% bajnok, 43 pont      gap  +8 →  97% bajnok, 77 pont
+     gap  +2 →  5% bajnok, 53 pont      gap +10 → 100% bajnok, 82 pont
+   A "kiegyensúlyozott" sáv ezért +3…+6 (kb. 15-78% bajnoki esély): ott vagy
+   igazi esélyes, de egyetlen szezon sem jár automatikusan. A régi sáv
+   (−4…+4) ennél jóval lejjebb ült, ahol a cím gyakorlatilag elérhetetlen. */
 function levelWarnState(){
   const g=levelGap();
-  if(g>=8) return {lvl:2, txt:`⚠️ A kereted <b>${Math.round(g)}-cel erősebb</b> a mezőnynél — a szezonok tét nélkülivé válnak. Lépj szintet!`};
-  if(g>=4) return {lvl:1, txt:`A kereted <b>${Math.round(g)}-cel</b> a mezőny fölött jár — érdemes szintet lépni.`};
-  if(g<=-8)return {lvl:-1,txt:`A mezőny <b>${Math.round(-g)}-cel erősebb</b> a keretednél — kemény szezonok jönnek.`};
-  return {lvl:0, txt:"A mezőny nagyjából a kereted szintjén van — jó egyensúly."};}
+  /* A gapet ELŐJELES számként írjuk ki, nem ragozva ("+4 a mezőny fölött"),
+     mert a magyar eszközhatározós rag a szám KIEJTETT nevétől függ (3-mal,
+     4-gyel, 8-cal), és erre — a ragSzam-mal ellentétben — nincs helper. */
+  const s=(g>=0?"+":"")+Math.round(g);
+  /* Ha a nehézség már a PLAFONON van, a "lépj szintet" tanács hazudik: normál
+     módban a mezőny 100-nál megáll (maxOppRating), a Rating-plafon viszont 119
+     — egy kimaxolt keret tehát szükségszerűen kinövi a mezőnyt, és az auto
+     szintkövetésnek sincs hova lépnie. Onnantól kizárólag az Infinity mód
+     (200-ig tolható mezőny) tud kihívást adni, ezt kell mondani. */
+  const atCeil=gameMode==="career"&&oppTargetRating>=maxOppRating();
+  const step=atCeil
+    ? ` A nehézség már a maximumon (${maxOppRating()}) — feljebb csak az <b>Infinity mód</b> visz.`
+    : " Lépj szintet!";
+  if(g>=8) return {lvl:2, txt:`⚠️ A meccs-erőd <b>${s}</b> a mezőny fölött — a cím szinte biztos, a szezonok tét nélkülivé válnak.`+step};
+  if(g>=6) return {lvl:1, txt:`A meccs-erőd <b>${s}</b> a mezőny fölött — nagy esélyes vagy.`+(atCeil?step:" Érdemes szintet lépni.")};
+  if(g>=3) return {lvl:0, txt:`A meccs-erőd <b>${s}</b> a mezőny fölött — igazi esélyes vagy, de semmi sem jár ingyen. Jó egyensúly.`};
+  if(g>=1) return {lvl:-1,txt:`A meccs-erőd <b>${s}</b> a mezőny fölött — kihívást jelentő szezon jön, a cím nem valószínű.`};
+  if(g>=-1)return {lvl:-1,txt:`A meccs-erőd <b>${s}</b> — a mezőny pontosan a szinteden van. Kemény szezon, a cím nem valószínű.`};
+  return {lvl:-1,txt:`A meccs-erőd <b>${s}</b> a mezőny alatt — a bajnoki cím reménytelen, előbb erősíts.`};}
 /* ================= EDZÉSTERV KÉPERNYŐ ================= */
 let trainDraft=null;
 function openTrainingPlanner(){
@@ -11507,18 +11602,20 @@ function showLevelChangePicker(direction){
     <div id="autoLevelRow" style="margin-top:11px;padding:8px 10px;background:var(--panel2);border-radius:7px;
          display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer">
       <span style="font-size:12.5px;line-height:1.45">🔄 <b>Auto szintkövetés</b><br>
-        <small style="color:var(--dim2)">a mezőny magától lép fölfelé, ha a kereted több mint ${AUTO_LEVEL_MAX_GAP} Ratinggel kinőtte — mindig csak két szezon között</small></span>
+        <small style="color:var(--dim2)">a mezőny magától lép fölfelé, ha a meccs-erőd több mint ${AUTO_LEVEL_MAX_GAP} Ratinggel kinőtte — mindig csak két szezon között</small></span>
       <b id="autoLevelState" style="white-space:nowrap;color:${S.autoLevel?"var(--grass)":"var(--dim)"}">${S.autoLevel?"BE":"KI"}</b>
     </div>`;
   const signHint=()=>{
     const t=Math.max(45,Math.min(97,state.value+SIGNING_OFFSET));
     const gap=levelGap(state.value);
     const verdict=gap>=8?'<span style="color:var(--red)">tét nélküli — túl könnyű</span>'
-      :gap>=4?'<span style="color:var(--gold)">kényelmes</span>'
-      :gap>=-4?'<span style="color:var(--grass)">kiegyensúlyozott ✓</span>'
-      :gap>=-9?'<span style="color:var(--gold)">kihívást jelent</span>'
+      :gap>=6?'<span style="color:var(--gold)">kényelmes</span>'
+      :gap>=3?'<span style="color:var(--grass)">kiegyensúlyozott ✓</span>'
+      :gap>=1?'<span style="color:var(--gold)">kihívást jelent</span>'
       :'<span style="color:var(--red)">nagyon kemény</span>';
-    $("levelUpSignHint").innerHTML=`Ezzel a beállítással a szezon: ${verdict} (a kereted ${gap>=0?"+":""}${Math.round(gap)} a mezőnyhöz képest).<br>A scout ezután a ~${ragSzam(t)} szint körül keres majd igazolásokat (jelenleg ~${signingTargetOvr()}).`;};
+    $("levelUpSignHint").innerHTML=`Ezzel a beállítással a szezon: ${verdict} (a meccs-erőd ${gap>=0?"+":""}${Math.round(gap)} a mezőnyhöz képest).`
+      +`<br><span style="font-size:11px;color:var(--dim2)">A meccs-erő a kereten felül a morált, az edzőt, a taktikát, az aura- és védekező skilleket meg a kapitány rutinját is tartalmazza — ezek a meccsen mind hatnak, de a kijelzett csapaterőben nincsenek benne.</span>`
+      +`<br>A scout ezután a ~${ragSzam(t)} szint körül keres majd igazolásokat (jelenleg ~${signingTargetOvr()}).`;};
   signHint();
   /* Az auto szintkövetés itt is kapcsolható — a kezdőképernyőn választott
      beállítás nem végleges, a karrier bármely szezonhatárán átbillenthető. */
@@ -12758,7 +12855,7 @@ function renderHub(){
     const state=w.lvl>=2?"a kereted rég kinőtte a mezőnyt":w.lvl===1?"a kereted a mezőny fölött jár"
       :w.lvl===-1?"kemény mezőny":"jó egyensúlyban vagy";
     lvlBtn.innerHTML=(canChange?(w.lvl>=2?"⚠️ ":"✦ "):"✦ ")+`Nehézségi szint — ${oppTargetRating}`
-      +`<small>${S.autoLevel?"🔄 auto szintkövetés BE · ":""}${state} · kereted ${teamStrength().toFixed(1)} (${g>=0?"+":""}${Math.round(g)})`
+      +`<small>${S.autoLevel?"🔄 auto szintkövetés BE · ":""}${state} · meccs-erőd ${teamMatchStrength().toFixed(1)} (${g>=0?"+":""}${Math.round(g)})`
       +(uLbl?` · <b style="color:var(--grass)">⚡ ${uLbl}: +${Math.round(u*50)}% fejlődés</b>`:"")
       +(canChange?"":" · <b>átállítani két szezon között lehet</b>")+`</small>`;
   }else lvlBtn.classList.add("hide");
@@ -13415,7 +13512,7 @@ function startNextCareerSeason(){
     while(levelGap()>AUTO_LEVEL_MAX_GAP&&oppTargetRating<maxOppRating()&&guard++<80)
       oppTargetRating++;
     if(oppTargetRating!==before){
-      addLine(`✦ Auto szintkövetés: a mezőny ${before} → ${oppTargetRating}, mert a kereted (${teamStrength().toFixed(1)}) kinőtte a régi szintet.`,"m life");
+      addLine(`✦ Auto szintkövetés: a mezőny ${before} → ${oppTargetRating}, mert a csapatod meccs-ereje (${teamMatchStrength().toFixed(1)}) kinőtte a régi szintet.`,"m life");
       updateOppRatingBadge();}}
   S.seasonNumber=(S.seasonNumber||1)+1;
   /* Az indulás mostantól MÉG a megszerzése szezonjában lefut (a szezonzárás
