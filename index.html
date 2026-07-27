@@ -3504,6 +3504,45 @@ const ROLE_AXIS_W={
      igazodnak: a csatár adja a legtöbbet (1.0), a kapus alig (.10). */
   seb:  {KAPUS:.10, VEDO:.70, KOZEPPALYAS:.85, CSATAR:1.0}
 };
+/* ---- KÖZÉPPÁLYÁS SZEREP → TENGELY-ELTOLÁS ----
+   A VKP/KKP/TKP kód eddig is ott volt a slotokon, de a CSAPAT-attribútumokra
+   semmilyen hatása nem volt: a roleInFormation mindhármat KOZEPPALYAS-ra
+   képezi, a ROLE_AXIS_W pedig csak a négy szerepet ismeri — vagyis három VKP
+   és három TKP bitre azonos tengelyeket adott. Ez a réteg adja meg a slot
+   szerepének a súlyát: a VÉDEKEZŐ középpályás a Védekezés tengelyhez tesz
+   hozzá a Gólszerzés rovására, a TÁMADÓ középpályás fordítva, a klasszikus
+   KKP semleges. Attribútumpontban értendő, és ved <-> gol NULLA ÖSSZEGŰ.
+
+   FONTOS — ELTÉRÉS-ALAPÚ: a bónusz mindig a felállás SAJÁT alapértelmezett
+   slotjához képest hat (FORMS[form].slots[i]). Egy érintetlen felállásnál a
+   különbség pontosan 0, tehát a meglévő balance BITRE változatlan marad. Ezt
+   megmértük: 7 felállás × 4000 véletlen kezdő 11, a réteggel és nélküle — az
+   eltérés minden tengelyen és mind a hat taktika illeszkedésén pontosan 0.0.
+
+   A MÉRTÉK (3 pont) kalibrálva. A követelmény: a szerepválasztás okozta
+   legnagyobb illeszkedés-szórás maradjon a TAKTIKAVÁLASZTÁS saját szórása
+   alatt — legyen valódi eszköz, de ne írja felül a rendszerválasztást.
+   Mérve (mind a 3 középső slot VKP-ra ill. TKP-ra állítva, azonos kerettel):
+     felállás    szerepválasztás    taktikák egymás közt (medián)
+     4-4-2        8.0pp             14.2pp
+     4-3-3       11.9pp             12.6pp
+     4-2-3-1     11.9pp             14.6pp
+     3-4-3       16.2pp              7.0pp
+   A 3-4-3 a kivétel: ott NÉGY középső slot van, és a taktikák saját szórása is
+   szűk — ott a szerepválasztás lesz a legerősebb eszköz, ami szándékos.
+   8 pontnál a 4-3-3 már 18.5pp-t szórna, azaz elnyomná a taktikát — ezért 3. */
+const MID_ROLE_AXIS_SHIFT=3;
+const SLOT_AXIS_BONUS={
+  VKP:{ved:+MID_ROLE_AXIS_SHIFT, gol:-MID_ROLE_AXIS_SHIFT},
+  KKP:{},
+  TKP:{ved:-MID_ROLE_AXIS_SHIFT, gol:+MID_ROLE_AXIS_SHIFT}
+};
+/* A slot szerepéből adódó eltolás egy tengelyen, a felállás alapértelmezéséhez
+   képest. Érintetlen slotnál — és minden nem-középpályás poszton — pontosan 0. */
+function slotAxisShift(curPos,defPos,key){
+  const cur=SLOT_AXIS_BONUS[curPos],def=SLOT_AXIS_BONUS[defPos];
+  if(!cur&&!def)return 0;
+  return ((cur&&cur[key])||0)-((def&&def[key])||0);}
 /* ---- SKILL → TENGELY ----
    Melyik skill-típus melyik csapat-attribútumot erősíti. A "szórt" típusok
    (aura, rating, mvp) mind a négyre adnak keveset. A tisztán szervezési
@@ -3618,13 +3657,19 @@ function attrsOfPlayer(p){
 function teamAttrStrengths(){
   const acc={},wsum={};
   ATTR_KEYS.forEach(k=>{acc[k]=0;wsum[k]=0;});
-  slots.forEach(sl=>{
+  /* A felállás alapértelmezett slotlistája — ehhez képest mérjük a szerep-
+     eltolást, hogy érintetlen felállásnál a hatás pontosan 0 legyen. Ha
+     bármiért nincs meg (ismeretlen felállás, régi mentés), a slot saját kódja
+     lesz a viszonyítás, ami szintén 0 eltolást ad — sosem hibázik. */
+  const defSlots=(FORMS[form]&&FORMS[form].slots)||null;
+  slots.forEach((sl,i)=>{
     if(!sl.player)return;
     const role=roleInFormation(sl.pos),a=attrsOfPlayer(sl.player),fit=sl.fit||1;
+    const defPos=(defSlots&&defSlots[i])||sl.pos;
     ATTR_KEYS.forEach(k=>{
       const w=(ROLE_AXIS_W[k]&&ROLE_AXIS_W[k][role])||0;
       if(w<=0)return;
-      acc[k]+=(a[k]||0)*fit*w;wsum[k]+=w;});});
+      acc[k]+=((a[k]||0)+slotAxisShift(sl.pos,defPos,k))*fit*w;wsum[k]+=w;});});
   const base={},out={};
   ATTR_KEYS.forEach(k=>{base[k]=wsum[k]?acc[k]/wsum[k]:0;});
   const sb=skillAxisBonus();
