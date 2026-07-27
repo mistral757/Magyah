@@ -987,7 +987,7 @@ button:disabled{opacity:.35;cursor:default}
    vissza). A szám a fejlécben, a versionBadge-en látszik.
    Frissítéskor csak ezt az egy sort kell módosítani — KIADÁSONKÉNT egyszer,
    nem commitonként. */
-const APP_VERSION="2.4.00";
+const APP_VERSION="2.3.02";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -5540,6 +5540,9 @@ function twAttrTarget(){
 /* Elfogyott-e az attribútum-keresési keret ebben az ablakban? */
 function twAttrLeft(){
   const sess=twSession();
+  /* Nyitott átigazolási ablak nélkül (pl. a szezon előtti keret-áttekintőben)
+     a TW még null — ilyenkor nincs mit elkölteni, és nem is szabad elszállni. */
+  if(!sess)return 0;
   if(sess.attrMax===undefined){
     /* KIHÍVÁS-JUTALOM: a megnyert extra keresések hozzáadódnak. */
     sess.attrMax=twAttrSearchesForScout()+(S.attrSpinBonus||0);
@@ -8024,6 +8027,7 @@ function startFirstSeason(){
   /* a szezon előtti HUB bezárása: a szezon alatt a HUB a meccsképernyő
      "Ugrás a HUB-ba" gombjával érhető el, és az alsó szezonváltó gomb is
      visszakapja a szerepét */
+  preSeasonHubMode=false;
   $("preSeasonHubNote").classList.add("hide");
   $("scHub").classList.add("hide");
   $("hubNextSeasonBtn").classList.remove("hide");
@@ -8050,11 +8054,15 @@ function openPreSeasonHub(){
   if(gameMode!=="career")return;
   if(S.transferBudget==null)S.transferBudget=0;
   hubMidSeasonMode=false;
+  preSeasonHubMode=true;
   $("scPitch").classList.remove("hide");
   $("scHub").classList.remove("hide");
   $("hubNextSeasonBtn").classList.add("hide");
   $("preSeasonHubNote").classList.remove("hide");
   renderHub();}
+/* true, amíg a legelső szezon előtti keret-áttekintőben vagyunk: ilyenkor az
+   átigazolás minden formája zárva (nincs büdzsé és nincs nyitott ablak sem). */
+let preSeasonHubMode=false;
 let hubMidSeasonMode=false;
 function openHubMidSeason(){
   if(gameMode==="career"&&S.transferBudget==null)S.transferBudget=0;
@@ -10044,7 +10052,26 @@ function applyFormationChange(newForm){
     extraRoster.forEach((p,r)=>{const v=pOvr(p);if(v>bestVal){bestVal=v;bi=r;}});
     if(bi>=0){s.player=extraRoster[bi];s.fit=fitFor(extraRoster[bi],s);s.origin=null;extraRoster.splice(bi,1);}
   });
+  refillBench();
   return true;}
+/* ---- A CSEREPAD HELYREÁLLÍTÁSA ----
+   A pad NÉGY HELYE ÁLLANDÓ: egy tároló, ami nem tűnhet el. A kezdő 11
+   feltöltése viszont kiemelhet onnan valakit (a fenti körök BENCH[key]=null-t
+   írnak), és korábban semmi nem pótolta — így egy felállás- vagy szerepváltás
+   után némán elfogyhatott a pad, a kiszorulók pedig tartalékként ültek tovább.
+   Mostantól minden üres pad-helyet visszatöltünk a tartalék-keretből.
+   A sorrend: előbb poszthű jelölt, aztán rokonposzt, végül BÁRKI — a pad-hely
+   inkább legyen idegen posztos emberrel tele, mint hogy eltűnjön. Aki idegen
+   pad-helyre kerül, a pad-hely posztján él tovább (a csere is arra megy be),
+   de a saját posztjai (p.pos) érintetlenek: onnan elmozdítva változatlanul
+   visszatér a régi valójába. */
+function refillBench(){
+  BENCH_CATS.forEach(c=>{
+    if(BENCH[c.key])return;
+    let i=extraRoster.findIndex(p=>p.pos.some(pp=>c.codes.includes(pp)));
+    if(i<0)i=extraRoster.findIndex(p=>c.codes.some(code=>canPlayPos(p,code)));
+    if(i<0&&extraRoster.length)i=0;
+    if(i>=0)BENCH[c.key]=extraRoster.splice(i,1)[0];});}
 let MAX_CAREER_ROSTER=28;   /* HUB-ban bővíthető keretméret (28 → 30 → ... → 48) */
 function findPlayerLocation(p){
   for(let i=0;i<slots.length;i++)if(slots[i].player===p)return{type:"slot",idx:i};
@@ -12197,10 +12224,16 @@ $("hubFreePlayerBtn").onclick=()=>{
   const cancel=document.createElement("button");cancel.className="btn-s stepbtn";cancel.style.marginTop="10px";cancel.textContent="Mégsem — a token megmarad";
   cancel.onclick=()=>csReturnToHub();$("twActions").appendChild(cancel);
   $("scWindow").scrollIntoView({behavior:"smooth"});};
-function hubRosterEntries(){
+/* includeEmptyBench: a KERETLISTÁHOZ az üres pad-helyeket is kiadjuk, hogy a
+   négy pad-tároló mindig látsszon (üresen is, "koppints és tölts ide valakit"
+   sorként). A csere-választóban viszont nem kellenek: ott csak valódi
+   játékosok lehetnek jelöltek. */
+function hubRosterEntries(includeEmptyBench){
   const out=[];
   slots.forEach((s,i)=>{if(s.player)out.push({type:"slot",idx:i,p:s.player});});
-  BENCH_CATS.forEach(c=>{if(BENCH[c.key])out.push({type:"bench",key:c.key,p:BENCH[c.key]});});
+  BENCH_CATS.forEach(c=>{
+    if(BENCH[c.key])out.push({type:"bench",key:c.key,p:BENCH[c.key]});
+    else if(includeEmptyBench)out.push({type:"bench",key:c.key,p:null,empty:true});});
   extraRoster.forEach((p,i)=>out.push({type:"extra",idx:i,p}));
   return out;}
 /* ---- POSZT-KOMPATIBILITÁS a HUB-cseréhez ----
@@ -12817,13 +12850,19 @@ function renderHub(){
   renderRunMeter();
 
   /* SZEZON KÖZBEN a HUB bármikor megnyitható, de az átigazolás nem elérhető —
-     az a nyári ablak dolga. A két gomb láthatóan letiltva jelenik meg (nem
-     némán hatástalanul), hogy egyértelmű legyen, miért nem használható. */
+     az a nyári ablak dolga. Ugyanez áll a LEGELSŐ szezon előtti keret-
+     áttekintőre: ott még nincs átigazolási büdzsé (az a szezonok teljesítésével
+     jön), és nyitott átigazolási ablak sincs. A gombok láthatóan letiltva
+     jelennek meg (nem némán hatástalanul), hogy egyértelmű legyen, miért nem
+     használhatók. */
+  const twBlocked=!!hubMidSeasonMode||!!preSeasonHubMode;
+  const twBlockMsg=hubMidSeasonMode?"Átigazolni csak a nyári ablakban lehet"
+    :"Az első szezon előtt még nincs átigazolási büdzsé — a nyári ablakban nyílik meg";
   ["hubBuyBtn","hubClubScoutBtn"].forEach(id=>{
     const b=$(id);if(!b)return;
-    b.disabled=!!hubMidSeasonMode;
-    b.style.opacity=hubMidSeasonMode?".45":"";
-    b.title=hubMidSeasonMode?"Átigazolni csak a nyári ablakban lehet":"";});
+    b.disabled=twBlocked;
+    b.style.opacity=twBlocked?".45":"";
+    b.title=twBlocked?twBlockMsg:"";});
   /* KÉPESSÉG-KERESÉS: a másik kettővel azonos szezon-zár, PLUSZ a saját
      feltételei (scout-csillag és a nyáranként elfogyó keret). A felirat
      mindig megmondja, MIÉRT nem elérhető — nem néma tiltás. */
@@ -12833,10 +12872,11 @@ function renderHub(){
         RAJZOLÁSAKOR még az ELŐZŐ átigazolás állapota — ezért itt nem használ-
         ható. A HUB-gomb maga a nyári belépő, így az elérhetőséget egyszerűen
         a szezon-fázis dönti el, ugyanúgy, mint a másik két gombnál. */
-     const maxA=twAttrSearchesForScout(),okNow=!hubMidSeasonMode;
+     const maxA=twAttrSearchesForScout(),okNow=!twBlocked;
      const leftA=(maxA&&okNow)?twAttrLeft():0;
      let sub,dis=true;
      if(hubMidSeasonMode)sub="átigazolni csak a nyári ablakban lehet";
+     else if(preSeasonHubMode)sub="az első szezon előtt még nem — a nyári ablakban nyílik";
      else if(!okNow)sub="csak két szezon között, a nyári ablakban";
      else if(!maxA)sub=`${TW_ATTR_MIN_STARS}★-os scout kell hozzá — a tiéd ${scout?scout.stars:0}★`;
      else if(leftA<=0)sub=`elfogyott ebben a nyárban (${maxA}/${maxA} felhasználva)`;
@@ -12958,7 +12998,19 @@ function renderHub(){
      elrejtése és a jelzés a menü-gombon. */
   renderInvestOffer();
   hubRefreshMenu();
-  hubRosterEntries().forEach(loc=>{
+  hubRosterEntries(true).forEach(loc=>{
+    /* ÜRES PAD-HELY: a tároló akkor is látszik, ha nincs benne senki — így nem
+       "tűnik el" a pad, és egy koppintással betölthető a tartalék-keretből. */
+    if(loc.empty){
+      const cat=BENCH_CATS.find(c=>c.key===loc.key);
+      const row=document.createElement("div");row.className="prow";
+      row.style.cssText="display:flex;align-items:center;opacity:.72";
+      row.innerHTML=`<span class="pos pc-${loc.key}">${cat.codes[0]}</span>
+        <span class="main"><div class="nm" style="color:var(--dim)">${esc(cat.label)} — üres <small>(pad)</small></div>
+        <div class="trait">Koppints, és beállíthatsz ide valakit a tartalék-keretből</div></span>`;
+      row.onclick=()=>openHubPositionPicker(loc);
+      box.appendChild(row);
+      return;}
     const p=loc.p;
     const row=document.createElement("div");row.className="prow";
     const posTxt=hubLocPosTxt(loc);
@@ -13040,9 +13092,14 @@ function openHubPositionPicker(loc){
   $("hubPositionPicker").classList.remove("hide");
   $("hubPositionPicker").scrollIntoView({behavior:"smooth"});
   const box=$("hubPosPickerBody");box.innerHTML="";
+  /* ÜRES PAD-HELY BETÖLTÉSE: ilyenkor nincs kit cserélni, csak betenni valakit.
+     Kizárólag a tartalék-keretből ajánlunk jelöltet — a kezdő 11-ből vagy egy
+     másik pad-helyről áthozva csak új lyukat ütnénk máshol. */
+  const fillEmptyBench=loc.type==="bench"&&!BENCH[loc.key];
   hubRosterEntries().forEach(other=>{
     if(other.type===loc.type&&other.idx===loc.idx&&other.key===loc.key)return;
     if(other.type==="bench"&&loc.type==="bench"&&other.key===loc.key)return;
+    if(fillEmptyBench&&other.type!=="extra")return;
     /* NINCS POSZT-MEGKÖTÉS: bárki bárhová behelyezhető. Az idegen poszton
        játszó ember automatikusan megkapja az illeszkedés-büntetést (fit 0.93,
        a swapPlayerLocations újraszámolja), és ez azonnal látszik is az
@@ -13062,14 +13119,23 @@ function openHubPositionPicker(loc){
     row.innerHTML=`<span class="pos pc-${getCategoryFor(posTxt)}">${posTxt}</span>
       <span class="main"><div class="nm">${esc(other.p.n)}${tag}</div>${prev}</span>`;
     row.onclick=()=>{
-      const ok=swapPlayerLocations(hubLocRef(loc),hubLocRef(other));
-      if(ok===false){$("hubPositionPicker").classList.add("hide");renderHub();return;}   /* elavult csere → ne mentsünk törött állapotot */
-      loc.p._arrivedAtIdx=0;other.p._arrivedAtIdx=0;
+      if(fillEmptyBench){
+        /* mozgatás, nem csere: a tartalékból a pad üres helyére */
+        const i=extraRoster.indexOf(other.p);
+        if(i<0){$("hubPositionPicker").classList.add("hide");renderHub();return;}
+        BENCH[loc.key]=extraRoster.splice(i,1)[0];
+        other.p._arrivedAtIdx=0;
+      }else{
+        const ok=swapPlayerLocations(hubLocRef(loc),hubLocRef(other));
+        if(ok===false){$("hubPositionPicker").classList.add("hide");renderHub();return;}   /* elavult csere → ne mentsünk törött állapotot */
+        loc.p._arrivedAtIdx=0;other.p._arrivedAtIdx=0;}
       $("hubPositionPicker").classList.add("hide");
       renderHub();drawPitch();updateBar();saveGame();};
     box.appendChild(row);});
   if(!box.children.length)
-    box.innerHTML=`<div style="font-size:12px;line-height:1.5;color:var(--dim2);padding:4px 2px">Nincs másik játékos a keretben, akivel cserélni lehetne.</div>`;}
+    box.innerHTML=`<div style="font-size:12px;line-height:1.5;color:var(--dim2);padding:4px 2px">${fillEmptyBench
+      ? "Üres a tartalék-kereted — előbb igazolj valakit, és őt teheted erre a pad-helyre."
+      : "Nincs másik játékos a keretben, akivel cserélni lehetne."}</div>`;}
 $("hubPosPickerCancel").onclick=()=>{$("hubPositionPicker").classList.add("hide");};
 $("hubNextSeasonBtn").onclick=hubNextSeasonFlow;
 /* Szezonvégi kártya-meghatározás — a MÉG NEM nullázott szezon-statokból
