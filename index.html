@@ -649,11 +649,13 @@ button:disabled{opacity:.35;cursor:default}
       <p class="mpP" style="text-align:center;letter-spacing:.22em;text-transform:uppercase;font-size:10px;color:rgba(225,173,102,.75)">Hajsza a győzelemért · szobakód</p>
       <div class="mpCode" id="mpLobbyCode">— — — —</div>
       <p class="mpP" style="text-align:center" id="mpLobbyHint">Add meg ezt a kódot a társadnak a másik gépen.</p>
+      <div style="text-align:center;font-size:11px;margin-top:4px" id="mpNetStatus">… kapcsolódás</div>
       <div class="mpPlayers" id="mpLobbyPlayers"></div>
       <div class="mpErr" id="mpLobbyMsg"></div>
     </div>
     <div class="mpBtns">
       <button class="mpBtn gold" id="mpReadyBtn">Készen állok</button>
+      <button class="mpBtn" id="mpInviteBtn">🔗 Meghívó link másolása</button>
       <button class="mpBtn" id="mpLobbyHomeBtn">Vissza a főmenübe — a szoba megmarad</button>
       <button class="mpBtn danger" id="mpLobbyLeaveBtn">✕ Végleg elhagyom a szobát</button>
     </div>
@@ -1180,7 +1182,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.4.08";
+const APP_VERSION="2.4.09";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -15532,23 +15534,33 @@ $("modeCareerBtn").onclick=()=>{
   $("scModeSelect").classList.add("hide");
   $("scFormation").classList.remove("hide");
   $("scFormation").scrollIntoView({behavior:"smooth"});};
-/* ================= MULTIPLAYER-VÁZ (F0) — hálózat nélkül =================
-   A "Hajsza a győzelemért" alapozása. ITT MÉG NINCS BACKEND: a szoba-állapot
-   a localStorage-ban él (MP_ROOMS_KEY), amit ugyanazon gép két böngészőfüle
-   megoszt — a storage-esemény adja az "élő" szinkront. Az F2 fázisban ugyanez
-   az API kap valódi hálózatot (Firebase/Supabase), a felület már kész.
-
-   ELVEK (a tervből):
-   · Az SP-ág érintetlen: az overlay csak TAKARJA a mai játékot, egyetlen
-     meglévő függvényhez sem nyúlunk.
-   · Több szoba lehet egyszerre; a szoba CSAK kifejezett kilépésre szűnik meg.
-   · Nincs időkorlát — a várakozó képernyő akkor is működik, ha a másik fél
-     napokig nem tér vissza.
-   · A tab-azonosító sessionStorage-ban van (fülenként külön), a szobák a
-     localStorage-ban (fülek közt közös) — így egy gépen két fül két játékos. */
+/* ================= MULTIPLAYER — HÁLÓZAT + SZOBÁK (F2) =================
+   Két CSERESZABATOS backend, azonos async API-val:
+   · "fb"    — Firebase Realtime Database, az éles út. A kliens LUSTÁN tölti be
+     az SDK-t (dinamikus import), kizárólag az MP-ágba lépéskor — az SP-játékos
+     soha nem tölt Firebase-t.
+   · "local" — az F0-s localStorage-szimuláció mint tartalék: ha a hálózat vagy
+     az adatbázis nem elérhető, ugyanazon a gépen két böngészőfül közt továbbra
+     is működik minden, és a felület kiírja, hogy helyi módban fut.
+   Szoba-séma: /mp/rooms/<KÓD> = {code,mode,createdAt,status,seed,
+   players:{<pid>:{role,ready}}}. A seed már MOST a szoba része — az F3 közös
+   indulása ezt osztja majd szét a két kliensnek.
+   Az apiKey NEM titok (nyilvános kliens-azonosító) — a hozzáférést az RTDB
+   szabályai védik, nem a kulcs. */
 const MP_ROOMS_KEY="harminc_nulla_mp_rooms_v1";
 const MP_TAB_KEY="harminc_nulla_mp_tab_v1";
+const MP_MYCODES_KEY="harminc_nulla_mp_mycodes_v1";
+const MP_FB_CONFIG={
+  apiKey:"AIzaSyDvib77Hp9MBMaUiveXBjFOF8vv1XcgxPc",
+  authDomain:"magyahok.firebaseapp.com",
+  projectId:"magyahok",
+  /* Az RTDB URL a konzolban, a Realtime Database létrehozásakor születik.
+     Ha más régiót választottál, EZT AZ EGY SORT kell átírni. */
+  databaseURL:"https://magyahok-default-rtdb.europe-west1.firebasedatabase.app",
+  appId:"1:606841822455:web:4d31d71ddbcf17468347f2"};
+const MP_FB_VER="10.12.2";
 const MP={active:false,activeRoom:null};
+let mpNet={mode:null,db:null,fns:null,unsub:null,initing:null,err:null};
 /* fülenkénti (session-) játékos-azonosító — újratöltést túlél, fület nem vált */
 function mpMyId(){
   let id=null;
@@ -15556,84 +15568,193 @@ function mpMyId(){
   if(!id){id="p"+Math.random().toString(36).slice(2,10);
     try{sessionStorage.setItem(MP_TAB_KEY,id);}catch(e){}}
   return id;}
-function mpRooms(){
-  try{return JSON.parse(localStorage.getItem(MP_ROOMS_KEY))||{};}catch(e){return {};}}
-function mpSaveRooms(r){
-  try{localStorage.setItem(MP_ROOMS_KEY,JSON.stringify(r));}catch(e){}}
+/* A saját szobakódjaim (helyben jegyezve): a "Szobáid" chipekhez — így az
+   RTDB-t nem kell tagság szerint lekérdezni, elég a jegyzett kódokat nézni. */
+function mpMyCodes(){
+  try{return JSON.parse(localStorage.getItem(MP_MYCODES_KEY))||[];}catch(e){return [];}}
+function mpRememberCode(c){
+  const a=mpMyCodes();
+  if(!a.includes(c)){a.push(c);try{localStorage.setItem(MP_MYCODES_KEY,JSON.stringify(a));}catch(e){}}}
+function mpForgetCode(c){
+  try{localStorage.setItem(MP_MYCODES_KEY,JSON.stringify(mpMyCodes().filter(x=>x!==c)));}catch(e){}}
 /* 4 jegyű kód, összetéveszthető karakterek (0/O, 1/I) nélkül */
 function mpMakeCode(){
   const CH="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const rooms=mpRooms();
-  for(let t=0;t<50;t++){
-    let c="";for(let i=0;i<4;i++)c+=CH[Math.floor(Math.random()*CH.length)];
-    if(!rooms[c])return c;}
-  return "R"+Date.now().toString(36).slice(-3).toUpperCase();}
-function mpCreateRoom(){
-  const rooms=mpRooms(),code=mpMakeCode();
-  rooms[code]={code,mode:"hajsza",createdAt:Date.now(),status:"lobby",
-    players:{[mpMyId()]:{role:"host",ready:false}}};
-  mpSaveRooms(rooms);
-  MP.activeRoom=code;
-  return code;}
-function mpJoinRoom(code){
-  code=(code||"").trim().toUpperCase();
-  const rooms=mpRooms(),room=rooms[code];
-  if(!room)return {ok:false,err:"Nincs ilyen szoba. Ellenőrizd a kódot!"};
-  if(room.players[mpMyId()]){MP.activeRoom=code;return {ok:true,code};}   /* visszatérés */
-  if(Object.keys(room.players).length>=2)return {ok:false,err:"Ez a szoba már betelt."};
-  room.players[mpMyId()]={role:"guest",ready:false};
-  mpSaveRooms(rooms);
-  MP.activeRoom=code;
-  return {ok:true,code};}
-function mpSetReady(flag){
-  const rooms=mpRooms(),room=rooms[MP.activeRoom];
-  if(!room||!room.players[mpMyId()])return;
-  room.players[mpMyId()].ready=!!flag;
-  mpSaveRooms(rooms);}
-function mpLeaveRoom(){
-  const rooms=mpRooms();
-  if(rooms[MP.activeRoom]){delete rooms[MP.activeRoom];mpSaveRooms(rooms);}
-  MP.activeRoom=null;}
-/* a SAJÁT szobáim (amikben benne vagyok) — a nyitólap visszalépő chipjeihez */
-function mpMyRooms(){
-  const rooms=mpRooms();
-  return Object.values(rooms).filter(r=>r.players&&r.players[mpMyId()]);}
+  let c="";for(let i=0;i<4;i++)c+=CH[Math.floor(Math.random()*CH.length)];
+  return c;}
+function mpNewRoomRecord(){
+  return {code:null,mode:"hajsza",createdAt:Date.now(),status:"lobby",
+    seed:makeWorldSeed(),   /* a közös világ magja — az F3 használja majd */
+    players:{[mpMyId()]:{role:"host",ready:false}}};}
+/* ---- LOCAL backend (tartalék) ---- */
+function mpLRooms(){
+  try{return JSON.parse(localStorage.getItem(MP_ROOMS_KEY))||{};}catch(e){return {};}}
+function mpLSave(r){
+  try{localStorage.setItem(MP_ROOMS_KEY,JSON.stringify(r));}catch(e){}}
+const mpBackendLocal={
+  name:"local",_cb:null,_code:null,
+  _notify(){if(this._cb)this._cb(mpLRooms()[this._code]||null);},
+  async create(){
+    const rooms=mpLRooms();
+    let code=mpMakeCode();for(let t=0;t<50&&rooms[code];t++)code=mpMakeCode();
+    const rec=mpNewRoomRecord();rec.code=code;rooms[code]=rec;
+    mpLSave(rooms);return {ok:true,code};},
+  async join(code){
+    const rooms=mpLRooms(),room=rooms[code];
+    if(!room)return {ok:false,err:"Nincs ilyen szoba. Ellenőrizd a kódot!"};
+    if(room.players[mpMyId()])return {ok:true,code};   /* visszatérés */
+    if(Object.keys(room.players).length>=2)return {ok:false,err:"Ez a szoba már betelt."};
+    room.players[mpMyId()]={role:"guest",ready:false};
+    mpLSave(rooms);this._notify();return {ok:true,code};},
+  async setReady(code,flag){
+    const rooms=mpLRooms(),room=rooms[code];
+    if(!room||!room.players[mpMyId()])return;
+    room.players[mpMyId()].ready=!!flag;
+    mpLSave(rooms);this._notify();},
+  async leave(code){
+    const rooms=mpLRooms();
+    if(rooms[code]){delete rooms[code];mpLSave(rooms);}
+    this._notify();},
+  async get(code){return mpLRooms()[code]||null;},
+  subscribe(code,cb){this._code=code;this._cb=cb;this._notify();},
+  unsubscribe(){this._cb=null;this._code=null;}};
+/* ---- FIREBASE backend ---- */
+const mpBackendFb={
+  name:"fb",
+  async create(){
+    const F=mpNet.fns;
+    for(let t=0;t<8;t++){
+      const code=mpMakeCode();
+      const ref=F.ref(mpNet.db,"mp/rooms/"+code);
+      const snap=await F.get(ref);
+      if(snap.exists())continue;
+      const rec=mpNewRoomRecord();rec.code=code;
+      await F.set(ref,rec);
+      return {ok:true,code};}
+    return {ok:false,err:"Nem sikerült szabad kódot találni — próbáld újra."};},
+  async join(code){
+    const F=mpNet.fns;
+    const snap=await F.get(F.ref(mpNet.db,"mp/rooms/"+code));
+    if(!snap.exists())return {ok:false,err:"Nincs ilyen szoba. Ellenőrizd a kódot!"};
+    const room=snap.val();
+    if(room.players&&room.players[mpMyId()])return {ok:true,code};
+    if(room.players&&Object.keys(room.players).length>=2)return {ok:false,err:"Ez a szoba már betelt."};
+    await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId()),{role:"guest",ready:false});
+    return {ok:true,code};},
+  async setReady(code,flag){
+    const F=mpNet.fns;
+    await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId()+"/ready"),!!flag);},
+  async leave(code){
+    const F=mpNet.fns;
+    await F.remove(F.ref(mpNet.db,"mp/rooms/"+code));},
+  async get(code){
+    const s=await mpNet.fns.get(mpNet.fns.ref(mpNet.db,"mp/rooms/"+code));
+    return s.exists()?s.val():null;},
+  subscribe(code,cb){
+    this.unsubscribe();
+    const F=mpNet.fns;
+    mpNet.unsub=F.onValue(F.ref(mpNet.db,"mp/rooms/"+code),
+      snap=>cb(snap.exists()?snap.val():null),
+      ()=>cb(null));},
+  unsubscribe(){if(mpNet.unsub){try{mpNet.unsub();}catch(e){}mpNet.unsub=null;}}};
+function mpBk(){return mpNet.mode==="fb"?mpBackendFb:mpBackendLocal;}
+/* Hálózat-inicializálás: lustán, csak az MP-ágba lépéskor. Ha az SDK-betöltés
+   vagy az adatbázis-elérés elhasal (offline, hiányzó RTDB, rossz URL), NEM
+   törik el semmi — helyi módba esünk vissza, és a lobby kiírja. */
+async function mpNetInit(){
+  if(mpNet.mode)return mpNet.mode;
+  if(mpNet.initing)return mpNet.initing;
+  mpNet.initing=(async()=>{
+    try{
+      const appM=await import(`https://www.gstatic.com/firebasejs/${MP_FB_VER}/firebase-app.js`);
+      const dbM=await import(`https://www.gstatic.com/firebasejs/${MP_FB_VER}/firebase-database.js`);
+      const app=appM.initializeApp(MP_FB_CONFIG,"mp");
+      const db=dbM.getDatabase(app);
+      /* kapcsolat-próba időkorláttal: tényleg válaszol-e az adatbázis */
+      await Promise.race([
+        dbM.get(dbM.ref(db,"mp/ping")),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error("időtúllépés")),7000))]);
+      mpNet.db=db;
+      mpNet.fns={ref:dbM.ref,get:dbM.get,set:dbM.set,remove:dbM.remove,onValue:dbM.onValue};
+      mpNet.mode="fb";
+    }catch(e){
+      mpNet.mode="local";
+      mpNet.err=(e&&e.message)||String(e);}
+    mpUpdateNetBadge();
+    return mpNet.mode;})();
+  return mpNet.initing;}
+function mpUpdateNetBadge(){
+  const el=$("mpNetStatus");if(!el)return;
+  if(mpNet.mode==="fb"){el.textContent="● online";el.style.color="#8fd99a";}
+  else if(mpNet.mode==="local"){el.textContent="○ helyi mód — csak ezen a gépen, két böngészőfül közt";el.style.color="#e6c98a";}
+  else{el.textContent="… kapcsolódás";el.style.color="rgba(243,242,242,.5)";}}
 /* ---- nézetváltás ---- */
+/* mpRoomCache: a legutóbb látott szoba-rekord. Az élő figyelő (subscribe) tölti,
+   a rajzolás ebből dolgozik — így a lobby sosem kér hálózatot rendereléskor. */
+let mpRoomCache=null;
 function mpShow(id){
   document.querySelectorAll("#mpEntry .mpView").forEach(v=>v.classList.toggle("on",v.id===id));
+  /* a lobbyból kilépve leiratkozunk, hogy ne fusson fölösleges figyelő */
+  if(id!=="mpViewLobby"){mpBk().unsubscribe();mpRoomCache=null;}
   if(id==="mpViewHome")mpRenderHomeRooms();
-  if(id==="mpViewLobby")mpRenderLobby();
+  if(id==="mpViewLobby")mpEnterLobby();
   $("mpEntry").scrollTop=0;}
-function mpRenderHomeRooms(){
+/* A "Szobáid" chipek: a helyben jegyzett kódokat kérdezzük le a backendtől.
+   A már nem létező szobák kódját elfelejtjük — így a lista magától takarít. */
+async function mpRenderHomeRooms(){
   const box=$("mpHomeRooms");if(!box)return;
-  const mine=mpMyRooms();
-  box.classList.toggle("hide",!mine.length);
-  if(!mine.length){box.innerHTML="";return;}
+  const codes=mpMyCodes();
+  if(!codes.length){box.classList.add("hide");box.innerHTML="";return;}
+  const bk=mpBk();
+  const rooms=[];
+  for(const c of codes){
+    let r=null;
+    try{r=await bk.get(c);}catch(e){}
+    if(r&&r.players&&r.players[mpMyId()])rooms.push(r);
+    else if(r===null&&mpNet.mode)mpForgetCode(c);}
+  box.classList.toggle("hide",!rooms.length);
+  if(!rooms.length){box.innerHTML="";return;}
   box.innerHTML=`<div class="lbl">Szobáid</div>`;
-  mine.forEach(r=>{
+  rooms.forEach(r=>{
     const b=document.createElement("button");b.className="mpRoomChip";
-    b.innerHTML=`<span>🏆 ${esc(r.code)}</span><span style="color:rgba(243,242,242,.55);font-size:12px">${Object.keys(r.players).length}/2 játékos</span>`;
+    b.innerHTML=`<span>🏆 ${esc(r.code)}</span><span style="color:rgba(243,242,242,.55);font-size:12px">${Object.keys(r.players||{}).length}/2 játékos</span>`;
     b.onclick=()=>{MP.activeRoom=r.code;mpShow("mpViewLobby");};
     box.appendChild(b);});}
+/* Belépés a lobbyba: feliratkozunk a szoba élő állapotára. A backend minden
+   változásnál visszahív (Firebase: onValue; helyi mód: storage-esemény). */
+function mpEnterLobby(){
+  mpRoomCache=null;
+  mpRenderLobby();   /* azonnali "betöltés" állapot */
+  mpBk().subscribe(MP.activeRoom,room=>{mpRoomCache=room;mpRenderLobby();});}
 function mpRenderLobby(){
-  const room=mpRooms()[MP.activeRoom];
+  const room=mpRoomCache;
+  mpUpdateNetBadge();
   if(!room){
-    /* a másik fél közben bezárta a szobát */
-    $("mpLobbyCode").textContent="— — — —";
+    $("mpLobbyCode").textContent=MP.activeRoom?MP.activeRoom.split("").join(" "):"— — — —";
     $("mpLobbyPlayers").innerHTML="";
+    $("mpLobbyMsg").textContent="";
+    $("mpLobbyHint").textContent="Kapcsolódás a szobához…";
+    $("mpReadyBtn").disabled=true;
+    return;}
+  if(room.closed){
+    $("mpLobbyPlayers").innerHTML="";
+    $("mpLobbyHint").textContent="";
     $("mpLobbyMsg").textContent="Ezt a szobát bezárták.";
     $("mpReadyBtn").disabled=true;
     return;}
   $("mpReadyBtn").disabled=false;
-  $("mpLobbyCode").textContent=room.code.split("").join(" ");
-  const ids=Object.keys(room.players);
-  const me=room.players[mpMyId()];
+  $("mpLobbyCode").textContent=String(room.code||MP.activeRoom).split("").join(" ");
+  const players=room.players||{};
+  const ids=Object.keys(players);
+  const me=players[mpMyId()];
   $("mpLobbyHint").textContent=ids.length<2
-    ?"Add meg ezt a kódot a társadnak a másik gépen (vagy egy másik böngészőfülben)."
+    ?(mpNet.mode==="fb"
+      ?"Add meg ezt a kódot a társadnak — bárhonnan csatlakozhat."
+      :"Add meg ezt a kódot a társadnak (helyi módban: egy másik böngészőfülben).")
     :"Mindketten a szobában vagytok.";
   const box=$("mpLobbyPlayers");box.innerHTML="";
   ids.forEach(id=>{
-    const p=room.players[id];
+    const p=players[id];
     const row=document.createElement("div");
     row.className="mpPl"+(p.ready?" rdy":"");
     row.innerHTML=`<span>${p.role==="host"?"👑 Házigazda":"🤝 Vendég"}${id===mpMyId()?" <b style='color:#e1ad66'>(te)</b>":""}</span>
@@ -15644,39 +15765,75 @@ function mpRenderLobby(){
     row.innerHTML=`<span>· · ·</span><span class="st wait">várunk a társadra…</span>`;
     box.appendChild(row);}
   $("mpReadyBtn").textContent=me&&me.ready?"Mégsem állok készen":"Készen állok";
-  const bothReady=ids.length===2&&ids.every(id=>room.players[id].ready);
+  const bothReady=ids.length===2&&ids.every(id=>players[id].ready);
   $("mpLobbyMsg").style.color=bothReady?"#8fd99a":"";
   $("mpLobbyMsg").textContent=bothReady
     ?"Mindketten készen álltok! A közös indulás a következő fejlesztési fázisban érkezik."
     :"";}
 /* ---- bekötés ---- */
 $("mpSoloBtn").onclick=()=>{$("mpEntry").classList.add("hide");};
-$("mpDuelBtn").onclick=()=>mpShow("mpViewMode");
+/* Az MP-ágba lépéskor indul a hálózat — az SP-játékos soha nem tölt Firebase-t. */
+$("mpDuelBtn").onclick=()=>{mpShow("mpViewMode");mpNetInit();};
 $("mpModeHajsza").onclick=()=>mpShow("mpViewRoom");
 document.querySelectorAll("#mpEntry .mpBack").forEach(b=>b.onclick=()=>mpShow(b.dataset.mpback));
-$("mpCreateBtn").onclick=()=>{mpCreateRoom();mpShow("mpViewLobby");};
-$("mpJoinBtn").onclick=()=>{
-  const res=mpJoinRoom($("mpJoinCode").value);
+/* közös gomb-állapotkezelés: a hálózati műveletek alatt tiltjuk a gombot */
+async function mpBusy(btn,label,fn){
+  const old=btn.textContent;btn.disabled=true;btn.textContent=label;
+  try{return await fn();}
+  finally{btn.disabled=false;btn.textContent=old;}}
+$("mpCreateBtn").onclick=()=>mpBusy($("mpCreateBtn"),"Szoba készül…",async()=>{
+  $("mpJoinErr").textContent="";
+  await mpNetInit();
+  const res=await mpBk().create();
+  if(!res.ok){$("mpJoinErr").textContent=res.err||"Nem sikerült létrehozni a szobát.";return;}
+  MP.activeRoom=res.code;mpRememberCode(res.code);
+  mpShow("mpViewLobby");});
+$("mpJoinBtn").onclick=()=>mpBusy($("mpJoinBtn"),"Csatlakozás…",async()=>{
+  const code=($("mpJoinCode").value||"").trim().toUpperCase();
+  if(!code){$("mpJoinErr").textContent="Írd be a szoba kódját.";return;}
+  await mpNetInit();
+  const res=await mpBk().join(code);
   if(!res.ok){$("mpJoinErr").textContent=res.err;return;}
+  MP.activeRoom=res.code;mpRememberCode(res.code);
   $("mpJoinErr").textContent="";$("mpJoinCode").value="";
-  mpShow("mpViewLobby");};
+  mpShow("mpViewLobby");});
 $("mpJoinCode").addEventListener("keydown",e=>{if(e.key==="Enter")$("mpJoinBtn").click();});
-$("mpReadyBtn").onclick=()=>{
-  const room=mpRooms()[MP.activeRoom];
-  if(!room)return;
-  const me=room.players[mpMyId()];
-  mpSetReady(!(me&&me.ready));
-  mpRenderLobby();};
+$("mpReadyBtn").onclick=async()=>{
+  const room=mpRoomCache;if(!room)return;
+  const me=(room.players||{})[mpMyId()];
+  const next=!(me&&me.ready);
+  $("mpReadyBtn").disabled=true;
+  try{await mpBk().setReady(MP.activeRoom,next);}catch(e){}
+  $("mpReadyBtn").disabled=false;};
+/* Meghívó link: a saját URL ?room=KÓD paraméterrel. A vágólap-írás nem
+   mindenhol engedélyezett (nem-biztonságos kontextus, régi böngésző), ezért
+   ha elhasal, kiírjuk a linket, hogy kézzel másolható legyen. */
+$("mpInviteBtn")&&($("mpInviteBtn").onclick=async()=>{
+  if(!MP.activeRoom)return;
+  const url=location.origin+location.pathname+"?room="+MP.activeRoom;
+  const btn=$("mpInviteBtn"),old="🔗 Meghívó link másolása";
+  try{
+    await navigator.clipboard.writeText(url);
+    btn.textContent="✓ Kimásolva";
+  }catch(e){
+    $("mpLobbyMsg").style.color="";
+    $("mpLobbyMsg").textContent=url;
+    btn.textContent="A link fent — jelöld ki és másold";}
+  setTimeout(()=>{btn.textContent=old;},2200);});
 $("mpLobbyHomeBtn").onclick=()=>mpShow("mpViewHome");
 /* A piros X kétlépcsős megerősítést kér — natív confirm helyett a gomb maga
    vált át, 3 másodperc után visszaáll. */
 let _mpLeaveArm=null;
-$("mpLobbyLeaveBtn").onclick=()=>{
+$("mpLobbyLeaveBtn").onclick=async()=>{
   const btn=$("mpLobbyLeaveBtn");
   if(_mpLeaveArm){
     clearTimeout(_mpLeaveArm);_mpLeaveArm=null;
     btn.textContent="✕ Végleg elhagyom a szobát";
-    mpLeaveRoom();mpShow("mpViewHome");
+    const code=MP.activeRoom;
+    mpBk().unsubscribe();
+    try{await mpBk().leave(code);}catch(e){}
+    mpForgetCode(code);MP.activeRoom=null;mpRoomCache=null;
+    mpShow("mpViewHome");
     return;}
   btn.textContent="Biztos? A szoba végleg bezárul — kattints még egyszer";
   _mpLeaveArm=setTimeout(()=>{_mpLeaveArm=null;
@@ -15707,16 +15864,31 @@ $("mpSeedBtn")&&($("mpSeedBtn").onclick=()=>{
   if(v===null)return;
   pendingWorldSeed=v.trim()?v.trim().toUpperCase():null;
   $("mpSeedBtn").textContent=pendingWorldSeed?`⚙ seed: ${pendingWorldSeed}`:"⚙ seed";});
-/* a másik fül változásai élőben látszanak (localStorage storage-esemény) */
+/* HELYI MÓD élő szinkronja: a másik fül localStorage-írása értesít minket.
+   (Firebase módban ez nem fut — ott az onValue figyelő dolgozik.) */
 window.addEventListener("storage",e=>{
-  if(e.key!==MP_ROOMS_KEY)return;
-  if($("mpViewLobby").classList.contains("on"))mpRenderLobby();
+  if(e.key!==MP_ROOMS_KEY||mpNet.mode==="fb")return;
+  if($("mpViewLobby").classList.contains("on"))mpBackendLocal._notify();
   if($("mpViewHome").classList.contains("on"))mpRenderHomeRooms();});
-/* újratöltés után: ha ez a fül szobában volt, egyből a lobbyjába tér vissza */
-(function mpBoot(){
-  mpRenderHomeRooms();
-  const mine=mpMyRooms();
-  if(mine.length===1){MP.activeRoom=mine[0].code;mpShow("mpViewLobby");}})();
+/* ---- INDULÁS ----
+   1) Meghívó link (?room=KÓD): egyből a szobába csatlakoztat.
+   2) Egyébként, ha ez a fül pontosan egy szobában volt, visszatér a lobbyjába.
+   Mindkettő NEM blokkolja az SP-t: a hálózat csak az MP-ágon indul. */
+(async function mpBoot(){
+  let invite=null;
+  try{invite=(new URLSearchParams(location.search).get("room")||"").trim().toUpperCase()||null;}catch(e){}
+  const codes=mpMyCodes();
+  if(!invite&&!codes.length)return;
+  await mpNetInit();
+  if(invite){
+    mpShow("mpViewRoom");
+    const res=await mpBk().join(invite);
+    if(res.ok){MP.activeRoom=res.code;mpRememberCode(res.code);mpShow("mpViewLobby");}
+    else{$("mpJoinErr").textContent=res.err;$("mpJoinCode").value=invite;}
+    return;}
+  await mpRenderHomeRooms();
+  const still=mpMyCodes();
+  if(still.length===1){MP.activeRoom=still[0];mpShow("mpViewLobby");}})();
 $("versionBadge").textContent="v"+APP_VERSION;
 /* A kezdőlapi lábléc-gombok. Egyelőre könnyű funkciók: a fogaskerék a
    mód-választás alatti beállításokhoz görget (a karrier mód beállításai a
