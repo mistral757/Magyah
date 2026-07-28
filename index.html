@@ -603,6 +603,9 @@ button:disabled{opacity:.35;cursor:default}
         <button class="mpBtn gold" id="mpSoloBtn" style="animation:magyahFadeUp .7s cubic-bezier(.2,.7,.2,1) 1.5s both, magyahPulse 5.5s ease-in-out 2.4s infinite">Egyedül játszom</button>
         <button class="mpBtn" id="mpDuelBtn" style="animation:magyahFadeUp .7s cubic-bezier(.2,.7,.2,1) 1.68s both">Gyere 1v1!</button>
       </div>
+      <!-- IDEIGLENES (F1): seed-teszt — reprodukálható világok ellenőrzéséhez.
+           A valódi seed-átadást az F3 (közös indulás) hozza, akkor ez kikerül. -->
+      <button id="mpSeedBtn" style="position:absolute;right:-10px;bottom:-18px;background:none;border:none;color:rgba(243,242,242,.28);font-size:10.5px;cursor:pointer;padding:8px;letter-spacing:.08em">⚙ seed</button>
     </div>
   </div>
 
@@ -1177,7 +1180,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.4.07";
+const APP_VERSION="2.4.08";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -3456,7 +3459,58 @@ const SQUADS=[
  {n:"Javier Saviola",pos:["CS"],ovr:80,nat:"Argentína",conf:0}]}
 ];
 const OPPONENTS=["Kecskemét","Haladás","ZTE","Diósgyőr","Vasas","Honvéd","MTK","Nyíregyháza","Kaposvár","Siófok","Pápa","Szolnok","Videoton","Újpest","Győri ETO","Debrecen","Fradi","Paks"];
-function shuffleArr(a){return a.slice().sort(()=>Math.random()-.5);}
+/* ================= DETERMINIZMUS-RÉTEG (Multiplayer F1) =================
+   A világ-generálás NEVESÍTETT véletlen-folyamokból dolgozik: ugyanaz a seed +
+   ugyanaz a címke → bitre ugyanaz a sorozat, HÍVÁSI SORRENDTŐL FÜGGETLENÜL.
+   Ez a multiplayer alapja (két kliens azonos világot generál, pedig a játékosok
+   más-más sorrendben kattintgatnak), és egyplayerben is értékes: egy seed
+   újra beírva ugyanazt a draftot, scoutot, edzőket és ellenféltáblát adja.
+
+   MI FUT SEEDELVE (a terv listája): scout, careerPool (TSI/kor/attribútumok/
+   személyiség/becslés), a 3 edzőkártya, az ellenféltábla szezononként, a
+   draft-pörgetések keret-sorrendje, a skill-készlet kezdő sorrendje.
+   MINDEN MÁS (meccs-szimuláció, formák, sérülések, személyes ajánlatok) marad
+   Math.random — a terv szerint ezeknek NEM kell egyeznie a két kliensen. */
+function xmur3(str){
+  let h=1779033703^str.length;
+  for(let i=0;i<str.length;i++){
+    h=Math.imul(h^str.charCodeAt(i),3432918353);
+    h=h<<13|h>>>19;}
+  return function(){
+    h=Math.imul(h^(h>>>16),2246822507);
+    h=Math.imul(h^(h>>>13),3266489909);
+    return (h^=h>>>16)>>>0;};}
+function mulberry32(a){
+  return function(){
+    a|=0;a=(a+0x6D2B79F5)|0;
+    let t=Math.imul(a^(a>>>15),1|a);
+    t=(t+Math.imul(t^(t>>>7),61|t))^t;
+    return ((t^(t>>>14))>>>0)/4294967296;};}
+/* worldSeed: a futó játék világ-seedje (mentésbe kerül, betöltéskor visszaáll).
+   pendingWorldSeed: a KÖVETKEZŐ új játékhoz kért seed (a seed-teszt gombból,
+   később az MP-szobából). Ha nincs, új játéknál véletlen seed születik. */
+let worldSeed=null,pendingWorldSeed=null;
+let draftSpinNo=0;        /* hányadik draft-landolásnál járunk — mentésbe kerül */
+let _lastCoachOffer=null; /* a legutóbb felkínált 3 edző — a seed-teszt ujjlenyomatához */
+function makeWorldSeed(){
+  const CH="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s="";for(let i=0;i<8;i++)s+=CH[Math.floor(Math.random()*CH.length)];
+  return s;}
+function ensureWorldSeed(){
+  if(!worldSeed)worldSeed=pendingWorldSeed||makeWorldSeed();
+  return worldSeed;}
+/* A nevesített folyam. A címkébe tedd bele a szezonszámot, ahol szezononként
+   újragenerálódik valami — pl. rngFor("s3:opponents"). */
+function rngFor(label){
+  return mulberry32(xmur3(ensureWorldSeed()+"|"+label)());}
+/* Fisher–Yates — seedelt folyammal determinisztikus, anélkül a régi viselkedés
+   (a korábbi sort-alapú keverés komparátor-trükkje seedelve nem lenne stabil). */
+function shuffleArr(a,rnd){
+  const r=rnd||Math.random,out=a.slice();
+  for(let i=out.length-1;i>0;i--){
+    const j=Math.floor(r()*(i+1));
+    const t=out[i];out[i]=out[j];out[j]=t;}
+  return out;}
 /* A draftolható és mindenhol használt keretek. A VB-győztes válogatottak
    (wc:true) fizikailag a SQUADS részei — így a jellemvonás-osztás, az
    ALL_PLAYERS és a valós-személy regiszter is látja őket. A kezdőlapi kapcsoló
@@ -3487,12 +3541,17 @@ const DIFFS_LEGACY={easy:75,medium:80,hard:85,veryhard:90,legend:95};
    "Nagyon nehéz" fokozat gyakorlatilag csak az igazi történelmi óriáscsapatokból
    (Barca, Real, Bayern, Man City, PSG, Liverpool, Juve stb.) válogat. */
 function buildOpponents(n,targetMean){
+  /* F1 — az ellenféltábla a világ része, szezononkénti nevesített folyammal.
+     A címkében a szezonszám ÉS a célerő is benne van: szintváltás után újra
+     generálva más táblát ad, de két azonos-seedű kliens azonos beállítással
+     bitre ugyanazt kapja. */
+  const _r=rngFor("s"+((typeof S!=="undefined"&&S.seasonNumber)||1)+":opponents:"+targetMean);
   targetMean=targetMean||SIM.OPPMEAN;
   const MAXDIST=6,CLOSEST_M=20;
   const ranked=activeSquads().map(sq=>({sq,avg:squadAvgOvr(sq)}))
     .sort((a,b)=>Math.abs(a.avg-targetMean)-Math.abs(b.avg-targetMean));
   const eligible=ranked.slice(0,CLOSEST_M).filter(x=>Math.abs(x.avg-targetMean)<=MAXDIST);
-  const real=shuffleArr(eligible).slice(0,n).map(x=>({n:`${x.sq.club} (${x.sq.season})`,ovr:x.avg}));
+  const real=shuffleArr(eligible,_r).slice(0,n).map(x=>({n:`${x.sq.club} (${x.sq.season})`,ovr:x.avg}));
   /* FIX — nehézségi "holt zóna" ~88-92 között. A legerősebb valós keret is csak
      ~88-as, de a MAXDIST=6 tolerancia miatt 90-es célnál még a 84-es keretek is
      "elég közeli"-nek számítottak, így 15 valós csapat összejött, a flavor-
@@ -3527,7 +3586,7 @@ function buildOpponents(n,targetMean){
        változatos, de ne mindig ugyanaz a 15 csapat legyen. */
     const usedNames=new Set(real.map(r=>r.n));
     const usedClubs=new Set(real.map(r=>r.n.replace(/ \([^)]*\)$/,"")));
-    const pool=shuffleArr(activeSquads().map(sq=>({sq,avg:squadAvgOvr(sq)})));
+    const pool=shuffleArr(activeSquads().map(sq=>({sq,avg:squadAvgOvr(sq)})),_r);
     const flavor=[];
     for(const x of pool){
       if(flavor.length>=need)break;
@@ -3535,15 +3594,15 @@ function buildOpponents(n,targetMean){
       if(usedNames.has(nm)||usedClubs.has(x.sq.club))continue;   /* egy klub csak egyszer, hogy ne jöjjön kétféle szezonnal */
       usedNames.add(nm);usedClubs.add(x.sq.club);
       /* a valós klub neve marad, de a rating a mezőnyszintre húzva (±4 szórással) */
-      flavor.push({n:nm,ovr:Math.max(50,Math.min(flavorCap,targetMean+(Math.random()*2-1)*4)),scaled:true});}
+      flavor.push({n:nm,ovr:Math.max(50,Math.min(flavorCap,targetMean+(_r()*2-1)*4)),scaled:true});}
     /* ha kevés a valós klub (nem fordulhat elő 76 klubbal, de biztonságból),
        a maradékot a helyi nevekkel töltjük fel */
     while(flavor.length<need){
-      const nm=pick(OPPONENTS);
-      flavor.push({n:nm,ovr:Math.max(50,Math.min(flavorCap,targetMean+(Math.random()*2-1)*4))});}
-    return shuffleArr(real.concat(flavor));
+      const nm=pick(OPPONENTS,_r);
+      flavor.push({n:nm,ovr:Math.max(50,Math.min(flavorCap,targetMean+(_r()*2-1)*4))});}
+    return shuffleArr(real.concat(flavor),_r);
   }
-  return shuffleArr(real);
+  return shuffleArr(real,_r);
 }
 /* Posztengedmények: csak reális, valós futballban is előforduló szomszédos
    szerepkör-váltásokat engedünk meg (pl. hátvéd ⇄ hátrébb húzódó középpályás,
@@ -3617,7 +3676,7 @@ const LEAD_LEVELS=["Gyenge","Középszerű","Megfelelő","Jó","Remek"];
 const COOP_LEVELS=["Bajkeverő","Öntörvényű","Kedves","Szimpatikus","Népszerű","Imádott"];
 const AGGRO_LEVELS=["Jámbor","Higgadt","Kiegyensúlyozott","Temperamentumos","Lobbanékony"];
 const LEADW=[8,28,38,20,6], COOPW=[5,10,25,30,20,10], AGGROW=[8,24,36,24,8];
-function weightedIndex(w){let tw=w.reduce((a,b)=>a+b,0),r=Math.random()*tw;
+function weightedIndex(w,rnd){let tw=w.reduce((a,b)=>a+b,0),r=(rnd||Math.random)()*tw;
   for(let i=0;i<w.length;i++){if(r<w[i])return i;r-=w[i];}return w.length-1;}
 (function assignTraits(){
   SQUADS.forEach(sq=>sq.players.forEach(p=>{
@@ -4727,7 +4786,7 @@ const CAREER_PLAYERS=(function buildCareerRegistry(){
    55%-os csúcs-arányú padlóval (sosem tűnik el teljesen a tudás).
 
    Minden konstans itt egy helyen van — playtesztelés után könnyen hangolható. */
-function generateTSI(refOvr){
+function generateTSI(refOvr,rnd){
   const normalized=Math.max(0,Math.min(1,(refOvr-60)/36));
   const baseCurve=150+Math.pow(normalized,2.5)*5500;
   /* TEHETSÉG-LUTRI — a draftkori tehetség NE legyen determinisztikus.
@@ -4737,8 +4796,9 @@ function generateTSI(refOvr){
      kockázatot és jutalmat ad: ugyanabból a tehetségből lehet elveszett ígéret
      vagy váratlan szupersztár — a scout csillagai (estimateTSI) épp ezt a
      bizonytalanságot jelzik. */
-  let variance=0.55+Math.random()*0.9;
-  const lottery=Math.random();
+  const r=rnd||Math.random;   /* opcionális seedelt folyam (F1) */
+  let variance=0.55+r()*0.9;
+  const lottery=r();
   if(lottery<0.06)variance*=1.35;        /* 6% — gyémánt: váratlanul beérő tehetség */
   else if(lottery<0.16)variance*=0.65;   /* 10% — elveszett ígéret */
   return Math.round(baseCurve*variance/10)*10;}
@@ -4940,8 +5000,9 @@ function ratingAtAge(peakOvr,age){
   const yearsOver=age-PEAK_END;
   const decline=age<=35?yearsOver*0.8:5*0.8+(age-35)*1.8;
   return Math.max(Math.round(peakOvr-decline),Math.round(peakOvr*0.55));}
-function generateStartAge(){
-  const r=(Math.random()+Math.random()+Math.random())/3;
+function generateStartAge(rnd){
+  const rr=rnd||Math.random;
+  const r=(rr()+rr()+rr())/3;
   return Math.round(17+r*21);}
 function generateCareerTSIs(){
   const map={};
@@ -4994,12 +5055,15 @@ function scoutUpgradePrice(stars){
   const bump=1+0.28*Math.exp(-Math.pow((stars-4.5)/2.4,2));
   return Math.round(base*bump*SCOUT_PRICE_MULT/500)*500;}
 function generateScout(){
-  const idx=weightedIndex(SCOUT_STAR_W);
-  return {name:pick(SCOUT_NAMES),stars:SCOUT_STAR_LEVELS[idx]};}
+  /* F1 — a kezdeti scout a világ része (a terv listáján szerepel): seedelt. */
+  const r=rngFor("scout:initial");
+  const idx=weightedIndex(SCOUT_STAR_W,r);
+  return {name:pick(SCOUT_NAMES,r),stars:SCOUT_STAR_LEVELS[idx]};}
 function scoutErrorMargin(stars,trueTSI){return Math.round((trueTSI||1000)*scoutErrorPct(stars));}
-function estimateTSI(trueTSI,stars){
+function estimateTSI(trueTSI,stars,rnd){
+  const rr=rnd||Math.random;
   const margin=trueTSI*scoutErrorPct(stars);
-  const r=((Math.random()+Math.random()+Math.random())/3-0.5)*2;
+  const r=((rr()+rr()+rr())/3-0.5)*2;
   return Math.max(50,Math.round((trueTSI+r*margin)/10)*10);}
 function maybeImproveScout(scout){
   if(scout.stars<SCOUT_MAX_STARS&&Math.random()<0.28)scout.stars=Math.min(SCOUT_MAX_STARS,scout.stars+0.5);
@@ -5012,15 +5076,19 @@ function initCareerPlayerPool(scout){
   const pool={};
   CAREER_PLAYERS.forEach(p=>{
     if(!wcOk(p))return;   /* VB-játékos csak akkor kerül a karrier-poolba, ha a VB be van kapcsolva */
-    const tsi=generateTSI(p.refOvr);
+    /* F1 — JÁTÉKOSONKÉNTI nevesített folyam: a sorrend, amiben a pool épül,
+       nem számít, a név címkéz. Két kliens (vagy két azonos-seedű run) így
+       bitre azonos TSI-t, kort, személyiséget és attribútumokat ad. */
+    const r=rngFor("pool:"+p.n);
+    const tsi=generateTSI(p.refOvr,r);
     const peak=tsiToPeakOvr(tsi);
-    const age=generateStartAge();
-    const leadI=weightedIndex(LEADW),coopI=weightedIndex(COOPW),aggroI=weightedIndex(AGGROW);
+    const age=generateStartAge(r);
+    const leadI=weightedIndex(LEADW,r),coopI=weightedIndex(COOPW,r),aggroI=weightedIndex(AGGROW,r);
     pool[p.n]={n:p.n,pos:p.pos.slice(),nat:p.nat,conf:p.conf,
       tsi,peak,age,startRating:ratingAtAge(peak,age),
-      estimatedTSI:estimateTSI(tsi,scout.stars),
+      estimatedTSI:estimateTSI(tsi,scout.stars,r),
       leadI,coopI,aggroI,formPoints:0};
-    initPlayerAttrs(pool[p.n]);});
+    initPlayerAttrs(pool[p.n],r);});
   return pool;}
 /* Egy pool-bejegyzésből a motor által elvárt, teljes játékos-alakú objektumot
    épít — ovr=startRating, feloldott személyiség-címkékkel. */
@@ -5097,7 +5165,7 @@ function attrHardCap(){
      saját sávjába (lásd ATTR_SPEC_CEIL). Egy 102-es középpályás így elvihet
      130-as passzt — a Ratingjét viszont a csökkenő hozamú görbe fékezi. */
   return rc===Infinity?Infinity:rc+35;}
-function initPlayerAttrs(entry){
+function initPlayerAttrs(entry,rnd){const _r=rnd||Math.random;
   if(!entry)return null;
   if(entry.attrs){
     /* MIGRÁCIÓ: a sebesség új attribútum — a korábbi mentésekben nincs benne.
@@ -5117,7 +5185,7 @@ function initPlayerAttrs(entry){
     /* A SEBESSÉG szélesebb sávban sorsolódik (±8): egyénibb tulajdonság, mint
        a képességek — két azonos Ratingű csatár közt nagy lehet a különbség. */
     const spread=k==="seb"?SPEED_ROLL_SPREAD:2;
-    const noise=Math.round(Math.random()*spread*2-spread);
+    const noise=Math.round(_r()*spread*2-spread);
     attrs[k]=Math.max(40,Math.min(attrCapFor(k),Math.round(base+(prof[k]||0)+noise)));});
   entry.attrs=attrs;
   entry.sebBase=attrs.seb;      /* a SZÜLETÉSI sebesség — a passzív plafon alapja */
@@ -6673,6 +6741,17 @@ $("diffSlider").oninput=()=>{
 $("diffSliderVal").textContent=`${oppTargetRating} · ${diffTierLabel(oppTargetRating)}${oppTargetRating===84?" · ajánlott":""}`;
 updateOppRatingBadge();
 $("startBtn").onclick=()=>{
+  /* ================= F1 — A VILÁG-SEED ITT SZÜLETIK =================
+     Ez a gomb a közös kapu minden új játékhoz (klasszikus, karrier-draft,
+     karrier-klub). Innentől MINDEN nevesített folyam (rngFor) ebből a seedből
+     származik: scout, pool, edzők, ellenféltábla, draft-sorrend, skill-készlet.
+     Ha a seed-teszt (vagy később az MP-szoba) kért egy konkrét seedet, azt
+     használjuk; különben véletlen születik. A skill-készletet is itt keverjük
+     újra seedelt folyammal — a betöltéskori S-literál keverése még seed előtt
+     futott, az placeholder volt. */
+  worldSeed=null;draftSpinNo=0;_lastCoachOffer=null;
+  ensureWorldSeed();
+  S.skillPool=weightedShuffleSkills(rngFor("skillpool"));
   slots=FORMS[form].slots.map((p,i)=>({pos:effectiveSlotPos(form,i),xy:FORMS[form].xy[i],player:null,fit:1,origin:null}));
   rerolls=parseInt($("rerollSlider").value,10);
   /* RUN: a VÁLASZTOTT újrapörgetés-számot itt kell rögzíteni, mert a `rerolls`
@@ -6874,7 +6953,13 @@ function spin(isReroll){
   },70);
   function land(){
     const pool=draftPool();
-    curSquad=pool[Math.floor(Math.random()*pool.length)];
+    /* F1 — a pörgetés-sorrend a világ része: az N. landolás mindkét kliensen
+       (és azonos seedű újrajátszásnál) ugyanazt a keretet adja. A számláló a
+       mentésbe kerül, hogy egy draft közbeni újratöltés se csússzon el.
+       Az animáció flicker-e fent marad Math.random — csak látvány. */
+    draftSpinNo++;
+    const r=rngFor("draft:spin:"+draftSpinNo);
+    curSquad=pool[Math.floor(r()*pool.length)];
     showSquadCard(curSquad);
     if(!squadHasUsablePlayer(curSquad)){
       setDraftStatus("Nincs beilleszthető játékos ebből a keretből — ingyen újrapörgetés!");
@@ -7439,8 +7524,12 @@ $("coachSpinBtn").onclick=()=>{
   },70);};
 function renderCoachChoices(){
   const box=$("coachChoices");box.innerHTML="";box.classList.remove("hide");
+  /* F1 — a 3 felkínált edző a világ része: seedelt folyamból sorsolódik.
+     (A pörgetés-animáció flicker-e marad Math.random — csak látvány.) */
+  const r=rngFor("coaches");
   const pool=COACHES.slice(),picks=[];
-  while(picks.length<3&&pool.length)picks.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+  while(picks.length<3&&pool.length)picks.push(pool.splice(Math.floor(r()*pool.length),1)[0]);
+  _lastCoachOffer=picks.map(c=>c.n);   /* a seed-teszt ujjlenyomatához */
   picks.forEach(c=>{
     const div=document.createElement("div");div.className="card";div.style.marginTop="10px";
     const tacs=(c.tactics||[]).map((k,i)=>`${TACTICS[k].n} <span style="color:var(--gold)">${TACTIC_START_LIKED[i]!==undefined?TACTIC_START_LIKED[i]:TACTIC_START_OTHER}</span>`).join(" · ");
@@ -8753,8 +8842,8 @@ function fmtSigned(v){return (v>=0?"+":"")+v.toFixed(2);}
    hat hívása megmaradt — a függvény nélkül a motor minden gólsorsolásnál
    ReferenceError-t dobott volna. A szintaxis-ellenőrzés nem fogja meg az
    ilyet, mert a hiányzó NÉV csak futásidőben derül ki. */
-function poisson(l){let L=Math.exp(-l),k=0,p=1;do{k++;p*=Math.random()}while(p>L);return k-1}
-function pick(a){return a[Math.floor(Math.random()*a.length)]}
+function poisson(l,rnd){const r=rnd||Math.random;let L=Math.exp(-l),k=0,p=1;do{k++;p*=r()}while(p>L);return k-1}
+function pick(a,rnd){return a[Math.floor((rnd||Math.random)()*a.length)]}
 function findSub(slot,victim){
   if(gameMode==="career"&&careerPool){
     const posOk=p=>p.pos.includes(slot.pos)||p.pos.some(pp=>RELATED[pp].includes(slot.pos));
@@ -8791,12 +8880,13 @@ function addOrExtendSub(slotIdx,duration,reason,curName){
    értéke arányosan alacsonyabb marad, kiegyensúlyozva a nagyobb gyakoriságot.
    FONTOS: a pool a MAIN_SKILLS-ből épül, így a BL arany-díjak sosem kerülnek
    bele — azok kizárólag a BL egyéni díjaival szerezhetők meg. */
-function weightedShuffleSkills(){
+function weightedShuffleSkills(rnd){
+  const _r=rnd||Math.random;
   const pool=MAIN_SKILLS.map((sk,idx)=>({sk,weight:idx<16?1:2.5}));
   const result=[];
   while(pool.length){
     const totalW=pool.reduce((s,x)=>s+x.weight,0);
-    let r=Math.random()*totalW,i=0;
+    let r=_r()*totalW,i=0;
     while(r>pool[i].weight){r-=pool[i].weight;i++;}
     result.push(pool[i].sk);pool.splice(i,1);}
   return result;}
@@ -9968,9 +10058,9 @@ function playMatch(){
        perces) eseménye után, így mindig időrendben, utolsóként jelenik meg. */
     runPendingDrama();
   },tickMs);
-  function weightedPick(arr,wfn){
+  function weightedPick(arr,wfn,rnd){
     const w=arr.map(wfn),tw=w.reduce((s,x)=>s+x,0);
-    let r=Math.random()*tw,i=0;
+    let r=(rnd||Math.random)()*tw,i=0;
     while(r>w[i]){r-=w[i];i++;}
     return i;}
   function fullTime(){
@@ -15108,6 +15198,7 @@ function saveGame(){
       v:1,
       gameMode,scout,careerPool,careerStart,
       form,mode,oppTargetRating,rerolls,infinityMode,infinityTiers,careerBaseRating,MAX_CAREER_ROSTER,
+      worldSeed,draftSpinNo,
       slotRoles,
       slots:slots.map(s=>({pos:s.pos,xy:s.xy,player:s.player,fit:s.fit,origin:s.origin})),
       BENCH:{KAPUS:BENCH.KAPUS,VEDO:BENCH.VEDO,KOZEPPALYAS:BENCH.KOZEPPALYAS,CSATAR:BENCH.CSATAR},
@@ -15177,6 +15268,12 @@ function applySavedGame(d){
   gameMode=d.gameMode||"classic";careerStart=d.careerStart||"draft";scout=d.scout||null;careerPool=d.careerPool||null;
   ensureAllAttrs();   /* régi mentések migrációja: hiányzó attribútumok pótlása */
   form=d.form;mode=d.mode;
+  /* F1 — a világ-seed a mentés része: betöltés után a szezononkénti
+     újragenerálás (ellenféltábla) ugyanabból a folyamból megy tovább. Régi
+     mentésben nincs — ott marad null, és az első rngFor-hívás új véletlen
+     seedet ad (a régi világ már úgyis legenerálódott). */
+  worldSeed=d.worldSeed||null;
+  draftSpinNo=d.draftSpinNo||0;
   /* A szerep-felülírások: régi mentésben nincs meg → üres, vagyis minden
      felállás az alapértelmezésén áll, és a tengelyréteg 0-t ad. A futó karrier
      tehát pontosan úgy viselkedik a betöltés után is, mint eddig. */
@@ -15584,6 +15681,32 @@ $("mpLobbyLeaveBtn").onclick=()=>{
   btn.textContent="Biztos? A szoba végleg bezárul — kattints még egyszer";
   _mpLeaveArm=setTimeout(()=>{_mpLeaveArm=null;
     btn.textContent="✕ Végleg elhagyom a szobát";},3000);};
+/* ---- IDEIGLENES (F1): SEED-TESZT ----
+   A világ ujjlenyomata: a seedelt generálási pontok kimenetének hash-e. Két
+   azonos-seedű run azonos ujjlenyomatot AD KÖTELEZŐEN — ezt méri a teszt.
+   A gomb megmutatja a futó világ seedjét + ujjlenyomatát, és beállítható vele
+   a KÖVETKEZŐ új játék seedje. Az F3-ban a szoba-seed veszi át a szerepét. */
+function mpWorldFingerprint(){
+  if(!worldSeed)return null;
+  const parts=[worldSeed];
+  if(typeof scout==="object"&&scout)parts.push("SC:"+scout.name+"/"+scout.stars);
+  if(typeof careerPool==="object"&&careerPool){
+    Object.keys(careerPool).sort().slice(0,40).forEach(n=>{
+      const e=careerPool[n];
+      parts.push(n+":"+e.tsi+":"+e.age+":"+e.startRating+":"+(e.attrs?ATTR_KEYS.map(k=>e.attrs[k]).join("."):""));});}
+  if(typeof SEASON_OPPS==="object"&&SEASON_OPPS&&SEASON_OPPS.length)
+    parts.push("OPP:"+SEASON_OPPS.map(o=>o.n+"~"+Math.round(o.ovr*10)).join(";"));
+  if(S&&S.skillPool&&S.skillPool.length)
+    parts.push("SK:"+S.skillPool.slice(0,8).map(sk=>sk.id).join(","));
+  if(_lastCoachOffer)parts.push("CO:"+_lastCoachOffer.join(","));
+  return xmur3(parts.join("|"))().toString(36).toUpperCase();}
+$("mpSeedBtn")&&($("mpSeedBtn").onclick=()=>{
+  const fp=mpWorldFingerprint();
+  const cur=worldSeed?`Futó világ seedje: ${worldSeed}\nUjjlenyomata: ${fp}\n\n`:"Még nincs futó világ.\n\n";
+  const v=prompt(cur+"A KÖVETKEZŐ új játék seedje (üresen hagyva: véletlen):",pendingWorldSeed||"");
+  if(v===null)return;
+  pendingWorldSeed=v.trim()?v.trim().toUpperCase():null;
+  $("mpSeedBtn").textContent=pendingWorldSeed?`⚙ seed: ${pendingWorldSeed}`:"⚙ seed";});
 /* a másik fül változásai élőben látszanak (localStorage storage-esemény) */
 window.addEventListener("storage",e=>{
   if(e.key!==MP_ROOMS_KEY)return;
