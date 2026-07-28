@@ -1021,7 +1021,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.4.03";
+const APP_VERSION="2.4.04";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -13344,6 +13344,28 @@ function buildHubDetail(loc){
       learnBtn.textContent="🎓 Poszt-tanulás indítása";
       learnBtn.onclick=(ev)=>{if(ev&&ev.stopPropagation)ev.stopPropagation();openPosLearnPicker(loc);};
       d.appendChild(learnBtn);}}
+  /* ---- HARMADIK MŰVELET: ELADÁS ----
+     Korábban a keretlistában, minden név mellett ott ült egy "Elad" gomb. Egy
+     visszafordíthatatlan művelet nem való a böngészés útjába, ezért ide került,
+     a posztcsere és a poszt-tanulás alá. Az ár a gombon látszik, forintban.
+     A megerősítő párbeszéd (askSellConfirm) változatlanul közbeiktatódik. */
+  if(!p.family){
+    const sellBtn=document.createElement("button");
+    sellBtn.className="btn-s stepbtn";sellBtn.style.marginTop="6px";
+    sellBtn.style.color="var(--gold)";sellBtn.style.borderColor="var(--gold)";
+    sellBtn.textContent=`💰 Eladás — ${fmtFt(sellValue(p))}`;
+    sellBtn.onclick=(ev)=>{
+      if(ev&&ev.stopPropagation)ev.stopPropagation();
+      askSellConfirm(p,()=>{
+        const res=releasePlayer(p,true);
+        if(!res.ok){
+          setDraftStatus(res.reason==="noreplacement"?"Nincs pótlás a tartalék-keretedben erre a posztra — előbb helyezz be valakit onnan.":"Nem sikerült eladni.");
+          return;}
+        addLine(`💰 Eladtad ${esc(p.n)}-t ${fmtFt(res.credit)}-ért — a büdzséd most ${fmtFt(S.transferBudget)}.`,"m life");
+        $("hubPositionPicker").classList.add("hide");   /* az eladás azonnal bezárja a nyitott csere-panelt */
+        hubExpandedKey=null;                            /* az eladott játékos részletei bezáródnak */
+        renderHub();drawPitch();updateBar();saveGame();});};
+    d.appendChild(sellBtn);}
   return d;}
 /* A poszt-tanulás poszt-választója: azok a posztok, amiket a játékos MÉG nem
    tud (nem szerepel a pos-listájában), az árral; a büdzséből fizetsz. */
@@ -13863,7 +13885,7 @@ function renderHub(){
     else eb.classList.add("hide");}
   const box=$("hubRoster");box.innerHTML="";
   renderSpecPanel();
-  $("hubIntro").textContent=`A teljes kereted itt tekinthető át (${fullCareerRoster().length}/${MAX_CAREER_ROSTER}). Koppints egy játékosra, hogy másik posztra helyezd, vagy add el az "Elad" gombbal.`
+  $("hubIntro").textContent=`A teljes kereted itt tekinthető át (${fullCareerRoster().length}/${MAX_CAREER_ROSTER}). Koppints egy játékosra a részletekért — ott találod a posztcserét, a poszt-tanulást és az eladást is.`
     +(S.tacticPrompt?` ⚙️ Új szezon: a Taktika gombnál most átállíthatod a rendszert — a váltás a szezon elején kerül a legkevesebbe.`:"");
   $("hubBudgetChip").innerHTML=budgetChipHtml();
   renderChallengePanel();
@@ -13997,22 +14019,11 @@ function renderHub(){
       <div class="trait">${ageTxt} · ${ratingTxt}</div></span>
       <span class="ovr">${ovrShown}</span>`;
     row.style.display="flex";row.style.alignItems="center";
-    if(!p.family){
-      const sellBtn=document.createElement("button");
-      sellBtn.className="btn-s";sellBtn.textContent=`Elad (${sellValue(p)})`;
-      sellBtn.style.cssText="margin-left:8px;padding:5px 9px;font-size:11.5px;flex-shrink:0";
-      sellBtn.onclick=(ev)=>{
-        ev.stopPropagation();
-        /* Az eladás visszafordíthatatlan, ezért megerősítést kérünk. */
-        askSellConfirm(p,()=>{
-          const res=releasePlayer(p,true);
-          if(!res.ok){
-            setDraftStatus(res.reason==="noreplacement"?"Nincs pótlás a tartalék-keretedben erre a posztra — előbb helyezz be valakit onnan.":"Nem sikerült eladni.");
-            return;}
-          addLine(`💰 Eladtad ${esc(p.n)}-t ${fmtFt(res.credit)}-ért — a büdzséd most ${fmtFt(S.transferBudget)}.`,"m life");
-          $("hubPositionPicker").classList.add("hide");   /* az eladás azonnal bezárja a nyitott csere-panelt */
-          renderHub();drawPitch();updateBar();saveGame();});};
-      row.appendChild(sellBtn);}
+    /* Az ELADÁS-gomb korábban itt, a sorban ült, minden játékos neve mellett.
+       Két baja volt: zsúfolttá tette a listát, és egy visszafordíthatatlan
+       műveletet tett egy koppintásnyira a puszta böngészés közben. Mostantól a
+       lenyitott részletek között van, a posztcsere és a poszt-tanulás alatt —
+       lásd buildHubDetail(). */
     row.onclick=()=>{
       const key=hubLocKey(loc);
       hubExpandedKey=(hubExpandedKey===key)?null:key;
@@ -14036,7 +14047,7 @@ function askSellConfirm(p,onYes){
   box.innerHTML=`<div style="font-size:15px;font-weight:700">${esc(p.n)}</div>
     <div style="font-size:12.5px;color:var(--dim);margin-top:3px">
       ${p.pos.join("/")}${e?` · ${e.age} év`:""} · Rating ${Math.round(pOvr(p))}${skills?` · ${skills} skill`:""}${tier?` · ${esc(String(tier).toUpperCase())}`:""}</div>
-    <div style="font-size:13px;margin-top:9px;line-height:1.5">Eladási ár: <b style="color:var(--gold)">${sellValue(p)}</b> pont.
+    <div style="font-size:13px;margin-top:9px;line-height:1.5">Eladási ár: <b style="color:var(--gold)">${fmtFt(sellValue(p))}</b>.
       A játékos véglegesen kikerül a keretedből — a skilljei és a felépített kémiája is elvész vele.</div>`;
   $("sellConfirmModal").classList.remove("hide");}
 $("sellConfirmYes")&&($("sellConfirmYes").onclick=()=>{
