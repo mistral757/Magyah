@@ -1251,7 +1251,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.0";
+const APP_VERSION="2.5.1";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -5466,8 +5466,17 @@ const CAREER_DEV_THRESHOLD=15;
    eltérés, −10…+8 sávban). A Rating-horgony (syncAttrsToRating) minden
    attribútumot 1:1-ben visz a Ratinggel — azt sem a bónusz, sem a büntetés
    nem érinti. Tehát edzés miatt senki nem lesz abszolút értelemben gyengébb. */
-const TRAIN_MAIN_PTS=0.5;    /* fő edzés: pont/meccs a választott attribútumra */
-const TRAIN_SEC_PTS=0.25;    /* mellék edzés: a fő fele */
+/* MEGEMELVE (0.5/0.25 → 0.8/0.4). Mérve: a régi értékekkel a fő edzés egy
+   30 meccses szezonban 15 pontot adott a választott attribútumra, ami épp
+   EGY specializációs lépés — vagyis egy teljes szezonnyi célzott edzés annyit
+   mozdított a taktika-illeszkedésen, mint egyetlen közepes igazolás. Így a
+   játékos joggal érezte, hogy nem éri meg edzéstervvel bajlódni: gyorsabb volt
+   venni valakit. 0.8-cal egy szezon 24 pontot ad (≈1,6 lépés), a kétszezonos
+   építkezés pedig már érdemben átszabja a csapat profilját — de nem szalad el:
+   a specializációs sáv (−10…+8) továbbra is kemény plafon, tehát az edzés
+   nem tud a poszt-profiltól korlátlanul eltávolodni. */
+const TRAIN_MAIN_PTS=0.8;    /* fő edzés: pont/meccs a választott attribútumra */
+const TRAIN_SEC_PTS=0.4;     /* mellék edzés: a fő fele */
 const TRAIN_SLOW=0.12;       /* a két nem edzett attribútum ennyivel lassabban gyűlik */
 const TRAIN_GROUP_MAX=2;     /* hány poszt-csoport választható edzésenként */
 const TRAIN_STATS=[
@@ -7876,8 +7885,33 @@ function ageValueMultiplier(age){
   if(age<=28)return 1.4-((age-23)/5)*0.3;
   if(age<=32)return 1.1-((age-28)/4)*0.5;
   return Math.max(0.15,0.6-(age-32)*0.08);}
+/* ---- MENNYI FEJLŐDÉS VAN MÉG HÁTRA ----
+   A csúcs (peak) és a JELENLEGI Rating különbsége. Csúcson vagy azon túl lévő
+   játékosnál 0. Ha a bejegyzésben nincs peak (nyers játékos-objektum, pl. az
+   eladásnál), a TSI-ből származtatjuk — ugyanaz a görbe. */
+function remainingUpside(entry){
+  if(!entry)return 0;
+  const peak=entry.peak||tsiToPeakOvr(entry.tsi||3000);
+  const now=entry.startRating||entry.ovr||ratingAtAge(peak,entry.age||24);
+  return Math.max(0,peak-now);}
+/* ---- AZ ÁR A MÉG ELÉRHETŐ TETŐVEL SKÁLÁZÓDIK ----
+   A régi képlet tisztán a TSI-ből és a korból árazott. Két baja volt:
+   1) a tsiToPeakOvr normál módban 96-nál TELÍTŐDIK, tehát TSI 6000 és 9000
+      ugyanoda ér fel — az ár mégis 1,5x volt köztük;
+   2) a kor-szorzó a 28 évest jutalmazta a legjobban, így egy csúcson lévő,
+      NULLA hátralévő fejlődésű játékos drágább volt, mint egy fiatal, aki
+      előtt még 18 Rating-pontnyi növekedés áll.
+   Emiatt egy 31 éves, TSI 9000-es (95-ös Rating, 1 pont híján a csúcson) közel
+   annyiba került, mint egy 20 éves TSI 6000-es, akinek UGYANAZ a 96-os csúcs
+   még teljesen előtte van. A szorzó ezt teszi helyre: a pivot ~8 pont
+   hátralévő fejlődésnél 1.0, tehát az átlagos jelölt ára alig mozdul, a
+   kifutott veterán olcsóbb, a fel nem tört tehetség drágább lesz.
+   A sávot szándékosan korlátozzuk (0.70–1.50): a kiszámíthatóság fontosabb,
+   mint hogy egy szélsőséges eset elszálljon. */
+function upsideMultiplier(entry){
+  return Math.max(0.70,Math.min(1.50,0.72+remainingUpside(entry)*0.035));}
 function marketValue(entry){
-  return Math.round(entry.tsi*1.2*ageValueMultiplier(entry.age));}
+  return Math.round(entry.tsi*1.2*ageValueMultiplier(entry.age)*upsideMultiplier(entry));}
 /* ================= ÁRAZÁS: VÁSÁRLÁS DRÁGA, ELADÁS SZERÉNY =================
    A marketValue a "tiszta" piaci érték — ez az alap. De a VÁSÁRLÁS ennél
    érezhetően többe kerül (átigazolási felár, jutalék, versengő ajánlatok), az
@@ -8140,9 +8174,35 @@ function genChallenge(scope,diff,ctx){
      nem áll rendelkezésre (pl. hiányzó motor-konstans), a régi képlet a
      tartalék, hogy sose maradjon kihívás cél nélkül. */
   const W=short?Math.max(1,shortWindow):30;
+  /* ---- ELMÉLETI PLAFON: SOSE KÉRJÜNK LEHETETLENT ----
+     A "22 pont 7 meccs alatt" hiba oka: ha a kalibráció nem ad értéket, a
+     tartalék-ág az R(lo,hi) tartományt a nehézségi szorzóval (max 1.25)
+     felszorozta — plafon nélkül. 7 meccsen viszont matematikailag 21 pont a
+     maximum. Ez a táblázat mondja meg, mennyi az adott típus abszolút
+     felső határa W meccsen; a cél sosem lépheti túl.
+     Az INVERZ típusoknál (kapott gól, piros lap: kevesebb a jobb) nincs
+     értelme felső korlátnak, azokat kihagyjuk. */
+  const chTargetCap=(type)=>{
+    switch(type){
+      case "teamPoints":      return 3*W;                 /* csak győzelem */
+      case "teamWins":
+      case "unbeatenStreak":
+      case "cleanStreak":
+      case "teamCleanSheets":
+      case "comebacks":
+      case "bigScalps":
+      case "zeroHeroWins":    return W;                   /* meccsenként legfeljebb egy */
+      case "awayWins":        return Math.ceil(W/2);      /* a meccsek fele idegenben */
+      case "teamGoals":       return 4*W;                 /* bőkezű, de nem végtelen */
+      case "bigHaul":         return 6;                   /* egy meccsen szerzett gólok */
+      default:                return Infinity;}};
   const CAL=(type,fallback,inverse)=>{
     const t=chCalibratedTarget(type,diff,W,inverse);
-    return (t==null||!isFinite(t))?fallback:t;};
+    let v=(t==null||!isFinite(t))?fallback:t;
+    if(!inverse){
+      const cap=chTargetCap(type);
+      if(isFinite(cap))v=Math.max(1,Math.min(cap,v));}
+    return v;};
   const templates=[
     /* --- CSAPATSZINTŰ (nincs játékos-függés) --- */
     ()=>{const target=CAL("teamWins",short?R(3,5):R(12,17));
@@ -8358,7 +8418,7 @@ function genReward(scope,diff,ctx){
   pool.push({kind:"boostDiscount",desc:"az ifi- és öreg-boost 10%-kal olcsóbb (tartós)"});
   pool.push({kind:"buyDiscount",desc:"igazolásoknál kis eséllyel 25% kedvezmény (tartós)"});
   if(scope==="long"){
-    pool.push({kind:"freePlayer",desc:"1 ingyen igazolás token"});
+    pool.push({kind:"freePlayer",desc:"a következő igazolásod INGYEN"});
     pool.push({kind:"salaryUp",desc:"edzői fizetésemelés: +10% szezonos büdzsé (tartós)"});
     pool.push({kind:"invest",desc:"befektetés: most beteszel egy összeget, jövőre duplán kapod vissza"});}
   return pick(pool);}
@@ -8609,7 +8669,7 @@ function applyChallengeReward(rw){
       return "1 ingyen boost-token";
     case "freePlayer":
       S.freePlayerTokens=(S.freePlayerTokens||0)+1;
-      return "1 ingyen igazolás-token";
+      return "a következő igazolásod INGYEN (bármilyen típusú)";
   }
   return rw.desc||"";}
 /* ---- PUNISHMENT végrehajtás ---- */
@@ -9438,8 +9498,7 @@ function hubMidSeasonReturn(){
   hubMidSeasonMode=false;
   twClearAnim();
   $("scHub").classList.add("hide");
-  $("hubNextSeasonBtn").textContent="Ugrás a nyár végére – maradunk a HUB-ban";
-  $("hubNextSeasonBtn").onclick=hubNextSeasonFlow;
+  setHubNextSeasonBtn();
   /* Mindkét képernyőt visszaállítjuk, ahogy a belépéskor álltak. Ha nincs
      feljegyzés (régi mentés), MINDKETTŐT felfedjük: ez a HUB-gomb csak a
      közvetítés-panelen érhető el, tehát szezon közben vagyunk, ahol a pálya és
@@ -11910,7 +11969,20 @@ function twFinalizeSigning(cand,note,overridePrice,completeFn){
   twShowPlacement(cand,completeFn);}
 function twShowPlacement(cand,completeFn){
   completeFn=completeFn||twCycleComplete;
-  const finalPrice=cand._negotiatedPrice!=null?cand._negotiatedPrice:(gameMode==="career"?buyPrice(cand):0);
+  const rawPrice=cand._negotiatedPrice!=null?cand._negotiatedPrice:(gameMode==="career"?buyPrice(cand):0);
+  /* ---- INGYEN IGAZOLÁS TOKEN ----
+     A token korábban három akadémistát kínált fel — vagyis épp a leggyengébb
+     játékosokat, amiket amúgy is ingyen kapsz. Mostantól a KÖVETKEZŐ igazolást
+     fedezi, BÁRMILYEN típusút: scout-jelöltet, klub-szemlés játékost, sőt a
+     megemelt ("magasabb árat kérnek") árat is. Itt, a fizetés egyetlen
+     tölcsérében váltjuk be, hogy egyik igazolási útvonalról se maradjon le. */
+  const freeTok=gameMode==="career"&&rawPrice>0&&(S.freePlayerTokens||0)>0;
+  const finalPrice=freeTok?0:rawPrice;
+  const payFor=(name)=>{
+    if(freeTok){
+      S.freePlayerTokens=Math.max(0,(S.freePlayerTokens||0)-1);
+      addLine(`🎁 Ingyen igazolás-token beváltva: ${esc(shortName(name))} nem került semmibe (${fmtFt(rawPrice)} megspórolva).`,"m life");
+    }else if(gameMode==="career")S.transferBudget=Math.max(0,S.transferBudget-finalPrice);};
   /* A GOMBOK LETAKARÍTÁSA — enélkül a "Magasabb árat kérnek" igen/nem gombjai
      ottragadtak a #twActions-ben a "Megegyeztünk!" alatt. */
   $("twActions").innerHTML="";
@@ -11926,6 +11998,11 @@ function twShowPlacement(cand,completeFn){
   const opts=[];
   slots.forEach((s,i)=>{if(catDef.codes.includes(s.pos))opts.push({type:"slot",idx:i,cur:s.player});});
   if(BENCH[catDef.key])opts.push({type:"bench",cur:BENCH[catDef.key]});
+  if(freeTok){
+    const ft=document.createElement("div");
+    ft.style.cssText="margin-top:10px;padding:9px 11px;border-radius:9px;font-size:12.5px;line-height:1.5;background:rgba(46,125,50,.14);border:1px solid #2e7d32;color:var(--ink)";
+    ft.innerHTML=`🎁 <b>Ingyen igazolás-token</b> — ez a szerződés <b>nem kerül semmibe</b> (${fmtFt(rawPrice)} helyett). A token a véglegesítéskor íródik le.`;
+    $("twBody").appendChild(ft);}
   const lbl=document.createElement("div");lbl.style.cssText="font-size:12.5px;color:var(--dim);margin-top:10px;margin-bottom:6px";
   lbl.textContent="Kit vált le az újonc?";
   $("twBody").appendChild(lbl);
@@ -11937,7 +12014,7 @@ function twShowPlacement(cand,completeFn){
       if(o.type==="slot"){slots[o.idx].player=cand;slots[o.idx].fit=fitFor(cand,slots[o.idx]);slots[o.idx].origin=null;}
       else BENCH[catDef.key]=cand;
       drafted.add(cand.n);markArrived(cand,finalPrice);
-      if(gameMode==="career")S.transferBudget=Math.max(0,S.transferBudget-finalPrice);
+      payFor(cand.n);
       drawPitch();updateBar();
       completeFn();};
     box.appendChild(row);});
@@ -11950,11 +12027,13 @@ function twShowPlacement(cand,completeFn){
       reserveBtn.textContent=`Tartalékba teszem (tele van a keret — ${MAX_CAREER_ROSTER}/${MAX_CAREER_ROSTER})`;
       reserveBtn.disabled=true;
     }else{
-      reserveBtn.textContent=`Tartalékba teszem (ár: ${fmtFtShort(finalPrice)}) — nem cserél le senkit`;
+      reserveBtn.textContent=freeTok
+        ?`Tartalékba teszem (🎁 INGYEN — token) — nem cserél le senkit`
+        :`Tartalékba teszem (ár: ${fmtFtShort(finalPrice)}) — nem cserél le senkit`;
       reserveBtn.onclick=()=>{
         extraRoster.push(cand);
         drafted.add(cand.n);markArrived(cand,finalPrice);
-        S.transferBudget=Math.max(0,S.transferBudget-finalPrice);
+        payFor(cand.n);
         drawPitch();updateBar();
         completeFn();};
     }
@@ -12575,6 +12654,12 @@ function eligibleForSkill(skill){
      aktuális felállásban TÁMADÓ szerepű (pl. 4-3-3 szárny), a CSATAR-skillekre
      is jogosult — a szerepe szerinti skillt kaphatja, ne csak középpályásat. */
   return currentRoster().filter(p=>{
+    /* UGYANAZT A SKILLT NE KAPHASSA MEG KÉTSZER. Eddig a poszt-szűrés volt az
+       egyetlen feltétel, így egy már meglévő képesség újra kiosztható volt —
+       a hatások (rating, aura, védekezés) pedig halmozódtak volna ugyanattól a
+       skilltől. A szűrés ITT van, a közös forrásnál, ezért a kézi kiosztásra
+       (renderSkillAssign) és az automatikusra (autoAssignSkill) egyaránt áll. */
+    if((S.skills[p.n]||[]).some(i=>i.skill&&i.skill.id===skill.id))return false;
     if(excl&&p.pos.every(pp=>excl.includes(pp)))return false;
     if(p.pos.some(pp=>catDef.codes.includes(pp)&&!(excl&&excl.includes(pp))))return true;
     if(cat2Def&&p.pos.some(pp=>cat2Def.codes.includes(pp)&&!(excl&&excl.includes(pp))))return true;
@@ -13203,8 +13288,7 @@ $("hubGoBtn").onclick=()=>{
   $("hubSeasonReport").classList.add("hide");
   $("careerStatsPanel").classList.add("hide");
   $("hubNextSeasonBtn").classList.remove("hide");
-  $("hubNextSeasonBtn").textContent="Ugrás a nyár végére – maradunk a HUB-ban";
-  $("hubNextSeasonBtn").onclick=hubNextSeasonFlow;
+  setHubNextSeasonBtn();
   renderHub();
   $("scHub").scrollIntoView({behavior:"smooth"});};
 $("hubBuyBtn").onclick=()=>{
@@ -14477,44 +14561,18 @@ $("hubBoostTokenBtn").onclick=()=>{
   const cancel=document.createElement("button");cancel.className="btn-s stepbtn";cancel.style.marginTop="10px";cancel.textContent="Mégsem";
   cancel.onclick=()=>csReturnToHub();$("twActions").appendChild(cancel);
   $("scWindow").scrollIntoView({behavior:"smooth"});};
-/* ---- CHALLENGE-JUTALOM: INGYEN IGAZOLÁS TOKEN beváltása ----
-   Három friss tehetséget ajánl fel (a mezőnyszinthez skálázva); a választott
-   ingyen a keretbe kerül. A token fizeti, nem a büdzséd. */
+/* ---- CHALLENGE-JUTALOM: INGYEN IGAZOLÁS TOKEN ----
+   ÚJ VISELKEDÉS: a token nem külön (gyenge) akadémista-választót nyit, hanem a
+   KÖVETKEZŐ igazolást fedezi, bármilyen típusút — a beváltás a twShowPlacement
+   fizetési tölcsérében történik. Ez a gomb már csak odavisz, ahol el lehet
+   költeni: a scout vásárlási folyamatába. */
 $("hubFreePlayerBtn").onclick=()=>{
   if((S.freePlayerTokens||0)<=0)return;
-  $("scHub").classList.add("hide");
-  $("scWindow").classList.remove("hide");
-  $("swapPanelWrap").classList.add("hide");
-  $("twPanel").classList.remove("hide");
-  $("twTitle").textContent="🎁 Ingyen igazolás beváltása";
-  if(fullCareerRoster().filter(Boolean).length>=MAX_CAREER_ROSTER){
-    $("twBody").innerHTML=`<p style="font-size:12.5px;color:var(--dim2)">A kereted tele van (${MAX_CAREER_ROSTER}). Előbb bővíts vagy adj el valakit — a token megmarad.</p>`;
-    $("twActions").innerHTML="";
-    const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";ok.onclick=()=>csReturnToHub();
-    $("twActions").appendChild(ok);
-    $("scWindow").scrollIntoView({behavior:"smooth"});return;}
-  /* három friss jelölt */
-  const cands=[];for(let i=0;i<3;i++)cands.push(generateAcademyPlayer());
-  $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">Van <b>${S.freePlayerTokens}</b> ingyen igazolás-tokened. Válaszd ki, kit igazolsz le ingyen a keretedbe:</p>`;
-  $("twActions").innerHTML="";
-  cands.forEach(prospect=>{
-    const b=document.createElement("button");b.className="btn-s stepbtn";b.style.marginTop="6px";b.style.textAlign="left";
-    b.innerHTML=`<b>${esc(shortName(prospect.n))}</b> <span style="color:var(--dim2)">${prospect.pos.join("/")} · ${prospect.age} év · Rating ${Math.round(pOvr(prospect))} · TSI ${careerPool[prospect.n]?careerPool[prospect.n].tsi:prospect.tsi}</span>`;
-    b.onclick=()=>{
-      if((S.freePlayerTokens||0)<=0)return;
-      if(fullCareerRoster().filter(Boolean).length>=MAX_CAREER_ROSTER)return;
-      S.freePlayerTokens--;
-      extraRoster.push(prospect);markArrived(prospect);drafted.add(prospect.n);
-      addLine(`🎁 Ingyen igazolás: ${esc(shortName(prospect.n))} (${prospect.pos.join("/")}, Rating ${Math.round(pOvr(prospect))}) a keretedbe került!`,"m life");
-      $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">🎁 Leigazolva!</div><p style="font-size:13px;margin-top:5px">${esc(shortName(prospect.n))} mostantól a kereted tagja (a tartalékban). Onnan beállíthatod a kezdőbe.</p>`;
-      $("twActions").innerHTML="";
-      const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";ok.onclick=()=>csReturnToHub();
-      $("twActions").appendChild(ok);
-      drawPitch();updateBar();saveGame();};
-    $("twActions").appendChild(b);});
-  const cancel=document.createElement("button");cancel.className="btn-s stepbtn";cancel.style.marginTop="10px";cancel.textContent="Mégsem — a token megmarad";
-  cancel.onclick=()=>csReturnToHub();$("twActions").appendChild(cancel);
-  $("scWindow").scrollIntoView({behavior:"smooth"});};
+  if(hubMidSeasonMode||preSeasonHubMode){
+    addLine("🎁 Az ingyen igazolás-token a nyári átigazolási ablakban használható — addig megmarad.","m life");
+    return;}
+  $("hubBuyBtn").click();
+};
 /* includeEmptyBench: a KERETLISTÁHOZ az üres pad-helyeket is kiadjuk, hogy a
    négy pad-tároló mindig látsszon (üresen is, "koppints és tölts ide valakit"
    sorként). A csere-választóban viszont nem kellenek: ott csak valódi
@@ -15171,6 +15229,12 @@ function renderHub(){
   const twBlocked=!!hubMidSeasonMode||!!preSeasonHubMode;
   const twBlockMsg=hubMidSeasonMode?"Átigazolni csak a nyári ablakban lehet"
     :"Az első szezon előtt még nincs átigazolási büdzsé — a nyári ablakban nyílik meg";
+  /* A továbblépő gomb felirata a kupa-indulástól függ, azt pedig a HUB-ban
+     lehet ki-be kapcsolni — ezért itt is frissítjük. Szezon közben viszont a
+     gomb "Vissza a szezonhoz", azt nem írhatjuk felül. */
+  if(!hubMidSeasonMode&&$("hubNextSeasonBtn")&&!$("hubNextSeasonBtn").classList.contains("hide")
+     &&$("hubNextSeasonBtn").textContent.indexOf("Irány a pályára")<0)
+    setHubNextSeasonBtn();
   ["hubBuyBtn","hubClubScoutBtn"].forEach(id=>{
     const b=$(id);if(!b)return;
     b.disabled=twBlocked;
@@ -15303,7 +15367,7 @@ function renderHub(){
   $("hubBoostTokenBtn").classList.toggle("hide",nBoost<=0);
   if(nBoost>0)$("hubBoostTokenBtn").textContent=`🎁 Ingyen boost${nBoost>1?` (${nBoost})`:""}`;
   $("hubFreePlayerBtn").classList.toggle("hide",nFree<=0);
-  if(nFree>0)$("hubFreePlayerBtn").textContent=`🎁 Ingyen igazolás${nFree>1?` (${nFree})`:""}`;
+  if(nFree>0)$("hubFreePlayerBtn").textContent=`🎁 Következő igazolás INGYEN${nFree>1?` (${nFree}×)`:""}`;
   $("hubTokenGroup").classList.toggle("hide",nBoost<=0&&nFree<=0);
   /* A "Nehézség" csoport csak akkor látszik, ha van benne látható gomb —
      különben egy üres, címkézett kártya lógna a HUB-ban. */
@@ -15442,6 +15506,10 @@ function openHubPositionPicker(loc){
       ? "Üres a tartalék-kereted — előbb igazolj valakit, és őt teheted erre a pad-helyre."
       : "Nincs másik játékos a keretben, akivel cserélni lehetne."}</div>`;}
 $("hubPosPickerCancel").onclick=()=>{$("hubPositionPicker").classList.add("hide");};
+/* Csak a KEZELŐT kötjük be itt. A feliratot NEM állítjuk: ez a sor a script
+   törzsében, top-level fut, a gameMode viszont csak jóval lejjebb (let) születik
+   meg — a hubNextSeasonBtnLabel() azt olvassa, tehát itt TDZ-hibát dobna és a
+   script megállna. A feliratot a renderHub() és a HUB-belépések állítják be. */
 $("hubNextSeasonBtn").onclick=hubNextSeasonFlow;
 /* Szezonvégi kártya-meghatározás — a MÉG NEM nullázott szezon-statokból
    (S.scorers/S.assists/S.mvps) dolgozik, tehát ennek muszáj lefutnia az
@@ -15931,6 +15999,20 @@ function hubNextSeasonFlow(){
   if(euroPending()&&!S.euroOptOut&&typeof startEuroCampaign==="function"){
     startEuroCampaign();return;}
   hubShowSeasonReport();}
+/* ---- A NYÁRI TOVÁBBLÉPŐ GOMB FELIRATA ----
+   Ha van megszerzett kupaindulás ÉS nem mondtunk le róla, a gomb nem "a nyár
+   végére ugrik", hanem a sorozatot indítja — a felirat mondja is, melyiket.
+   Egy helyen dől el, mert három hívó is állítja (HUB-belépés, szezonközi
+   visszatérés, szezonzárás), és külön-külön elcsúsztak volna. */
+function hubNextSeasonBtnLabel(){
+  if(euroPending()&&!S.euroOptOut){
+    const c=euroPendingComp();
+    return c?`🏆 Indulhat a(z) ${c.n}!`:"🏆 Indulhat a nemzetközi kupa!";}
+  return "Ugrás a nyár végére – maradunk a HUB-ban";}
+function setHubNextSeasonBtn(){
+  const b=$("hubNextSeasonBtn");if(!b)return;
+  b.textContent=hubNextSeasonBtnLabel();
+  b.onclick=hubNextSeasonFlow;}
 /* ---- BEFEKTETÉS (kihívás-jutalom) ----
    Választasz egy összeget a büdzsédből — MAX A FELÉT, hogy ne lehessen
    kockázat nélkül duplázni az egészet —, azt most elveszíted, és a következő
@@ -16394,8 +16476,17 @@ function applySavedGame(d){
      biztonságos alapértékek, hogy semmi ne törjön el. Az egyszerűsítés ELŐTTI
      típusú aktív kihívásokat (rating, teamStrength, money, mvp, saves, skills3)
      kiszűrjük — az új rendszer nem méri őket, így beragadnának teljesíthetetlenként. */
-  const CH_VALID_TYPES=["teamWins","teamPoints","teamGoals","playerGoals","playerAssists","teamMoney","unbeatenStreak","cleanStreak","comebacks","bigHaul","teamCleanSheets","subGoals"];
-  S.activeChallenges=(d.S.activeChallenges||[]).filter(c=>c&&CH_VALID_TYPES.includes(c.type));
+  /* JAVÍTVA — ELTŰNŐ VÁLLALÁSOK. Itt korábban ENGEDÉLYEZŐLISTA állt 12 típussal.
+     A kihívásrendszer azóta ~25 típust ismer (awayWins, bigScalps, signings,
+     tacticLevel, youthXI, zeroHeroWins, ...), és mindegyik ÚJ típusú vállalás
+     némán kiesett a mentés visszatöltésekor — pontosan ez volt a "ráfrissítés
+     után eltűnik a nagy vállalás" hiba. A lista nem is tudott naprakész maradni:
+     minden új típusnál kézzel kellett volna bővíteni, és nem történt meg.
+     Ezért TILTÓLISTÁRA fordítva: csak azt a néhány, egyszerűsítés ELŐTTI típust
+     dobjuk el, amit az új rendszer tényleg nem mér — minden más automatikusan
+     túléli, a jövőbeli típusok is. */
+  const CH_OBSOLETE_TYPES=["rating","teamStrength","money","mvp","saves","skills3"];
+  S.activeChallenges=(d.S.activeChallenges||[]).filter(c=>c&&c.type&&!CH_OBSOLETE_TYPES.includes(c.type));
   /* KEGYELMI MIGRÁCIÓ a régi mentésekhez: a korábbi időzítés-bug miatt egy
      szezon-határidős kihívás túlélhette a szezonváltást (deadline.value <=
      aktuális szezon). Az ilyen kihívás statisztikái már nullázódtak, ezért
@@ -16536,8 +16627,7 @@ function resumeUIFromSave(){
     }else{
       $("hubSeasonReport").classList.add("hide");
       $("careerStatsPanel").classList.add("hide");
-      $("hubNextSeasonBtn").textContent="Ugrás a nyár végére – maradunk a HUB-ban";
-      $("hubNextSeasonBtn").onclick=hubNextSeasonFlow;
+      setHubNextSeasonBtn();
     }
     renderHub();
     $("scHub").scrollIntoView({behavior:"smooth"});
