@@ -1090,6 +1090,10 @@ button:disabled{opacity:.35;cursor:default}
   <div class="card">
     <div class="steplbl" style="color:var(--gold)">Karrier HUB — a kereted</div>
     <p id="hubIntro" style="font-size:13px;color:var(--dim)">A teljes kereted itt tekinthető át. Koppints egy játékosra, hogy másik posztra helyezd — bárkivel elcserélheted a helyét, aki jelenleg a pályán vagy a padon van.</p>
+    <!-- INFINITY-SÁV: a Run-mérő FÖLÖTT, mert ez a karrier legnagyobb
+         mérföldköve. Amint feloldottad (bajnokság a 100-as mezőnyön), itt
+         várakozik — akkor is, ha még nincs rá pénzed. -->
+    <div id="hubInfinitySlot" class="hide" style="margin:10px 0 12px"></div>
     <div id="hubRunMeter" class="hide" style="margin:10px 0 12px;background:var(--bg);border:1px solid var(--panel2);border-radius:9px;padding:11px 13px"></div>
     <!-- A nehézségi szint a menün KÍVÜL marad: informatív, visszatérő döntés,
          és a figyelmeztető állapota (piros, lüktető) csak akkor ér valamit, ha
@@ -1251,7 +1255,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.1";
+const APP_VERSION="2.5.04";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7712,11 +7716,23 @@ function markArrived(p){
   if(age!=null){
     if(age<20)S.chYoungSignings=(S.chYoungSignings||0)+1;
     if(age<25)S.chBoughtUnder25=(S.chBoughtUnder25||0)+1;}}
+/* ---- JAVÍTVA: A FELÁLLÁS NÉHA ELTŰNT ----
+   A régi kód ELŐSZÖR kiürítette a pályát (pit.innerHTML=""), és utána, a
+   cikluson belül építette fel a 11 helyet. Ha bármelyik iteráció kivételt
+   dobott — egy hiányzó careerPool-bejegyzés, egy furcsa játékos-objektum, egy
+   fél állapotban lévő csere —, a felépítés félbeszakadt, és a pálya ÜRESEN
+   maradt: a felállás "eltűnt". Ezért mostantól
+     1) külön töredékbe (fragment) építünk, és csak KÉSZEN cseréljük be, tehát
+        a régi kép marad a helyén, amíg az új el nem készül;
+     2) minden hely külön try/catch-ben épül, így egyetlen hibás játékos nem
+        viheti magával az egész pályát — a többi tíz akkor is kirajzolódik. */
 function drawPitch(){
-  const pit=$("pitch");pit.innerHTML="";
+  const pit=$("pitch");
+  const frag=document.createDocumentFragment();
   const revealNums=phase==="season"||!blind();
   const showRatings=revealNums&&slots.every(s=>s.player);
   slots.forEach((s,idx)=>{
+   try{
     const d=document.createElement("div");
     d.className="slot pc-"+roleInFormation(s.pos)+(s.player?" filled":"")+(phase==="captain"?" cap-pick":"")+(idx===pendingCaptainIdx?" cap-chosen":"");
     d.style.left=s.xy[0]+"%";d.style.top=s.xy[1]+"%";
@@ -7734,7 +7750,17 @@ function drawPitch(){
     d.onclick=()=>{
       if(phase==="captain"&&s.player){selectCaptainCandidate(idx);return;}
       if(pendingPlayer&&d.classList.contains("open-elig")){place(pendingPlayer,s);}};
-    pit.appendChild(d);s.el=d;});}
+    frag.appendChild(d);s.el=d;
+   }catch(err){
+    /* Egyetlen hibás hely nem viheti magával a felállást: kirakunk egy
+       csupasz, kattintható helyőrzőt, és megyünk tovább. */
+    const d=document.createElement("div");
+    d.className="slot pc-"+getCategoryFor(s.pos)+(s.player?" filled":"");
+    d.style.left=s.xy[0]+"%";d.style.top=s.xy[1]+"%";
+    d.innerHTML=`<div class="dot">${esc(s.pos)}</div><div class="lbl">${s.player?esc(shortName(s.player.n)):""}</div>`;
+    frag.appendChild(d);s.el=d;}});
+  /* csak a KÉSZ képet tesszük ki — így sosem marad üresen a pálya */
+  pit.innerHTML="";pit.appendChild(frag);}
 const NAT_BY_NAME={};ALL_PLAYERS.forEach(p=>{if(!(p.n in NAT_BY_NAME))NAT_BY_NAME[p.n]=p.nat;});
 ICON_PLAYERS.forEach(p=>{if(!(p.n in NAT_BY_NAME))NAT_BY_NAME[p.n]=p.nat;});
 const NAME_PARTICLES=new Set(["de","da","do","dos","das","van","von","der","den","di","dí","le","la","el","al","bin","ibn"]);
@@ -7885,6 +7911,29 @@ function ageValueMultiplier(age){
   if(age<=28)return 1.4-((age-23)/5)*0.3;
   if(age<=32)return 1.1-((age-28)/4)*0.5;
   return Math.max(0.15,0.6-(age-32)*0.08);}
+/* ================= POTENCIÁL — EGY SZÁM A JÖVŐBELI ÉRTÉKRŐL =================
+   Eddig három külön jelzés keringett a kódban ugyanarról (TSI, kor, hátralévő
+   Rating-fejlődés), és minden hely a maga módján keverte őket. Ez a függvény
+   egyetlen 0-100-as számba fogja: mennyit ér a játékos MÉG EZUTÁN.
+     · a még elérhető Rating-emelkedés (peak − jelenlegi) a fő tag,
+     · a nyers tehetség (TSI) másodlagos — a csúcsot ez szabja,
+     · a fiatalság szorzó: ugyanaz a hátralévő fejlődés 18 évesen többet ér,
+       mint 27-en, mert több szezonon át élvezed.
+   Ezt használja a skill-kiosztás (kinek éri meg adni) és az árazás is. */
+function playerPotential(entry){
+  if(!entry)return 0;
+  const peak=entry.peak||tsiToPeakOvr(entry.tsi||3000);
+  const now=entry.startRating||entry.ovr||ratingAtAge(peak,entry.age||24);
+  const age=entry.age||24;
+  const up=Math.max(0,peak-now);                        /* 0..~30 */
+  const upScore=Math.min(1,up/22);                      /* 22 pont fölött telítődik */
+  const tsiScore=Math.min(1,(entry.tsi||0)/9000);
+  /* fiatalság: 18 alatt 1.0, 30 fölött 0.15 — lineárisan közte */
+  const youth=Math.max(0.15,Math.min(1,(31-age)/13));
+  return Math.round(100*(0.55*upScore+0.25*tsiScore+0.20*1)*youth*
+    /* a "hátralévő" tag nélkül a csúcson lévő öreg is magas pontot kapna,
+       ezért a fiatalság mellé a fejlődés is szoroz, enyhén */
+    (0.55+0.45*upScore));}
 /* ---- MENNYI FEJLŐDÉS VAN MÉG HÁTRA ----
    A csúcs (peak) és a JELENLEGI Rating különbsége. Csúcson vagy azon túl lévő
    játékosnál 0. Ha a bejegyzésben nincs peak (nyers játékos-objektum, pl. az
@@ -8923,18 +8972,14 @@ function evaluateDueChallenges(kind,currentValue){
 /* Auto-mód: felajánl és véletlenszerűen elvállal néhány challenge-et a
    limitig (a szezon-végigjátszás nem akad meg emberi választáson). */
 function autoHandleChallengeOffers(scope,count){
-  const ctx=challengeContext();
-  const limit=scope==="short"?CH_MAX_SHORT:CH_MAX_LONG;
-  let accepted=0;
-  const seen=new Set();
-  for(let tries=0;tries<count*6&&accepted<limit;tries++){
-    if(!canAcceptMore(scope))break;
-    const ch=buildChallengeOffer(scope,ctx);
-    if(ch&&!seen.has(ch.desc)){
-      seen.add(ch.desc);
-      /* auto: ~55% eséllyel vállal el egy felajánlottat */
-      if(Math.random()<0.55){acceptChallenge(ch);accepted++;
-        addLine(`🎯 Kihívás elvállalva: ${ch.desc}`,"m life");}}}
+  /* AUTO-VÉGIGJÁTSZÁSKOR NEM VÁLLALUNK KIHÍVÁST.
+     A kihívás vállalt kockázat: büntetéssel jár, ha nem teljesül, és a
+     jutalma is a te döntésed gyümölcse. Ha a gép a hátad mögött vállal
+     helyetted, akkor olyan büntetéseket (fizetés-megsapkázás, játékos-zárolás,
+     forma-malus) kapsz, amikről nem is tudtál — a korábbi ~55%-os automatikus
+     elfogadás pont ezt csinálta. Az auto-szezon mostantól kihagyja őket; a
+     kézi játék viselkedése változatlan. */
+  return;
 }
 function computeMoraleTarget(){
   /* A kezdő csapatmorál a teljes kezdő 11 vezetői és együttműködési
@@ -12688,7 +12733,24 @@ function renderSkillAssign(skill,stagesNeeded){
 function autoAssignSkill(skill,stagesNeeded){
   const roster=eligibleForSkill(skill);
   if(!roster.length)return;
-  const p=pick(roster);
+  /* ---- AUTO-KIOSZTÁS: A LEGTÖBBET ÍGÉRŐ KEZDŐNEK ----
+     Eddig VÉLETLEN jelöltet választott, így egy skill simán elkallódott egy
+     36 éves tartalékon, aki két szezon múlva visszavonul. Két szempont dönt:
+       1) a KEZDŐ 11-ben van-e (a skill csak pályán lévőn hat érdemben),
+       2) mekkora a potenciálja (playerPotential: hátralévő fejlődés, TSI, kor).
+     A kezdő-tagság erős előnyt kap, hogy a pad ne előzze meg a pályán lévőt.
+     Nem determinisztikus a legjobb kiválasztása: a top-mezőnyből súlyozottan
+     húzunk, hogy ne mindig ugyanaz a játékos gyűjtse be az összes skillt. */
+  const inXI=new Set(slots.filter(s=>s.player).map(s=>s.player.n));
+  const scored=roster.map(p=>{
+    const e=(careerPool&&careerPool[p.n])||p;
+    return {p,score:playerPotential(e)+(inXI.has(p.n)?60:0)};})
+    .sort((a,b)=>b.score-a.score);
+  const top=scored.slice(0,Math.max(1,Math.min(3,scored.length)));
+  const tw=top.reduce((s,x)=>s+x.score,0)||1;
+  let r=Math.random()*tw,pick_=top[0];
+  for(const x of top){r-=x.score;if(r<=0){pick_=x;break;}}
+  const p=pick_.p;
   if(!S.skills[p.n])S.skills[p.n]=[];
   S.skills[p.n].push({skill,stagesNeeded,stagesCompleted:1});updateSkillsLine();
   addLine(`🎖 Skill: ${esc(p.n)} megkapta a(z) "${esc(skill.name)}" képességet (1/${stagesNeeded} fázis)`,"m life");}
@@ -14413,6 +14475,19 @@ $("hubInfinityBtn").onclick=()=>infinityConfirm("∞ Infinity mód",
     infinityMode=true;
     /* RUN: a futás sebességét ez a szezonszám dönti el (2.0 súly). */
     {const R=runInit();if(R.infinitySeason==null)R.infinitySeason=S.seasonNumber||1;}
+    /* ---- A BEJELENTETT VISSZAVONULÁSOK ÉRVÉNYÜKET VESZTIK ----
+       Az Infinity ígérete az, hogy megszűnik a kor miatti hanyatlás, és
+       visszavonulni is csak 55 évesen lehet. Ehhez képest képmutató lett volna
+       életben hagyni a KORÁBBAN bejelentett búcsúkat: a 34 éves kapitányod
+       akkor is elment volna a szezon végén, miközben az egész mód arról szól,
+       hogy ez a határ megszűnt. Ezért minden függő bejelentést visszavonunk —
+       aki még nem távozott, az marad. */
+    {let cancelled=[];
+     Object.values(careerPool||{}).forEach(e=>{
+       if(e&&e.retirePlan&&e.age<INFINITY_RETIRE_AGE){
+         delete e.retirePlan;cancelled.push(e.n);}});
+     if(cancelled.length)
+       addLine(`∞ A bejelentett visszavonulások érvényüket vesztették: ${cancelled.map(n=>esc(shortName(n))).join(", ")} marad${cancelled.length>1?"nak":""} a pályán.`,"m life");}
     /* EGYSZERI HELYREÁLLÍTÁS a régi mentésekhez: a 119-es plafon alatt a
        leigazolt sztárok peakje (és így a basePeak-je is) 119-re csonkolt
        ragadhatott. Most, hogy a plafon feloldódott, a basePeak-et
@@ -15293,8 +15368,19 @@ function renderHub(){
      további +100-as tierhez a MINDENKORI plafont. Mindkettő csak akkor
      kattintható, ha a pénz is megvan — de a gomb már előbb látszik, hogy
      legyen mire gyűjteni (a büdzsé mostantól átjön a szezonok között). */
-  const canInfinity=!infinityMode&&oppTargetRating>=INFINITY_UNLOCK_RATING&&(S.consecutiveTitles||0)>=1;
-  const canTier=infinityMode&&oppTargetRating>=maxOppRating()&&(S.consecutiveTitles||0)>=1;
+  /* ---- JAVÍTVA: AZ INFINITY-FELOLDÁS ELTŰNT A SZINTLÉPÉSTŐL ----
+     A feltétel eddig az S.consecutiveTitles élő számlálóján állt. Csakhogy a
+     nehézségi szint MINDEN megváltoztatása nullázza azt (lásd a szintlépés
+     megerősítőjét) — vagyis aki 100-on megnyerte a szezont, majd hozzányúlt a
+     csúszkához, azonnal elvesztette a jogosultságot, és soha többé nem tudta
+     megvenni az Infinityt. Pontosan ez volt a bejelentett hiba.
+     Mostantól a SZEZONTÖRTÉNET dönt: ha valaha bajnok lettél a 100-as (vagy
+     magasabb) mezőnyön, a feloldás megvan és nem vehető el. Ez egyben azt is
+     jelenti, hogy nem kell épp 100-on ÁLLNOD a vásárláskor — a megszerzett
+     érdem nem évül el. */
+  const wonAtLevel=(lvl)=>(S.seasonHistory||[]).some(h=>h&&h.rank===1&&(h.oppRating||0)>=lvl);
+  const canInfinity=!infinityMode&&wonAtLevel(INFINITY_UNLOCK_RATING);
+  const canTier=infinityMode&&wonAtLevel(maxOppRating());
   $("hubInfinityBtn").classList.toggle("hide",!canInfinity);
   $("hubInfinityTierBtn").classList.toggle("hide",!canTier);
   if(canInfinity){
@@ -15305,6 +15391,42 @@ function renderHub(){
     const ok=S.transferBudget>=INFINITY_TIER_PRICE;
     $("hubInfinityTierBtn").textContent=`∞ +${INFINITY_TIER_STEP} szint — ${fmtFtShort(INFINITY_TIER_PRICE)}`;
     $("hubInfinityTierBtn").style.opacity=ok?"1":".5";}
+  /* ---- A KIEMELT INFINITY-SÁV (a Run-mérő fölött) ----
+     A gomb a Nehézség-almenüben lapult, becsukva — a karrier legnagyobb
+     mérföldköve gyakorlatilag láthatatlan volt. Itt egy önálló, feltűnő sávot
+     kap: mindig látszik, amint feloldottad, és akkor is, ha még gyűjtened
+     kell rá — a hiányzó összeggel együtt, hogy legyen mire spórolni. */
+  const slot=$("hubInfinitySlot");
+  if(slot){
+    const showInf=canInfinity||canTier;
+    slot.classList.toggle("hide",!showInf);
+    if(showInf){
+      const tier=canTier&&!canInfinity;
+      const price=tier?INFINITY_TIER_PRICE:INFINITY_PRICE;
+      const ok=(S.transferBudget||0)>=price;
+      const miss=Math.max(0,price-(S.transferBudget||0));
+      slot.innerHTML=
+        `<button id="hubInfinityHero" style="width:100%;cursor:${ok?"pointer":"default"};
+           background:linear-gradient(135deg,#1b1035,#3b1d6e 55%,#6d3bd1);
+           border:1px solid ${ok?"#c9a6ff":"rgba(201,166,255,.45)"};border-radius:12px;
+           padding:14px 16px;color:#fff;font-family:inherit;text-align:left;
+           box-shadow:${ok?"0 0 20px rgba(140,90,230,.35)":"none"};opacity:${ok?"1":".82"}">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+            <span style="font-family:var(--font-disp);font-size:19px;letter-spacing:.04em">∞ ${tier?`INFINITY +${INFINITY_TIER_STEP} SZINT`:"INFINITY MÓD"}</span>
+            <span style="font-size:13px;color:#e6d8ff;white-space:nowrap">${fmtFtShort(price)}</span>
+          </div>
+          <div style="font-size:12px;color:#cbb6f5;margin-top:5px;line-height:1.5">
+            ${tier
+              ? "A mezőny további 100 szinttel tolható feljebb."
+              : "Nincs többé Rating-plafon, nincs hanyatlás, a mezőny 200-ig tolható."}
+          </div>
+          <div style="font-size:12px;margin-top:7px;font-weight:700;color:${ok?"#b9ffcb":"#ffd9a0"}">
+            ${ok?"✓ Megvan rá a kereted — koppints!":`Még ${fmtFt(miss)} hiányzik`}
+          </div>
+        </button>`;
+      const hero=$("hubInfinityHero");
+      if(hero&&ok)hero.onclick=()=>{
+        (tier?$("hubInfinityTierBtn"):$("hubInfinityBtn")).click();};}}
   /* Az ifi-boost gomb akkor jelenik meg, ha van legalább egy akadémistád
      (youthBonus>0) a keretben — 100 előtt és után egyaránt elérhető. */
   const hasYouth=fullCareerRoster().some(p=>isYouthProspect(careerPool[p.n]));
