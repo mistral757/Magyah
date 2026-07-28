@@ -16225,7 +16225,31 @@ const SAVE_KEY_MP_PREFIX="30-0-save-mp-";     /* + szobakód + "-v1" */
 function mpSaveKeyFor(room){return SAVE_KEY_MP_PREFIX+room+"-v1";}
 function saveKey(){
   return (MP.active&&MP.activeRoom)?mpSaveKeyFor(MP.activeRoom):SAVE_KEY;}
+/* ---- VAN-E EGYÁLTALÁN MENTHETŐ JÁTÉK? ----
+   HIBA, amit ez javít: a fejléc 🏠 gombja (és a kontextusváltás) FELTÉTEL NÉLKÜL
+   mentett. A kezdőképernyőn viszont még nincs játék — ilyenkor egy ÜRES mentés
+   került az egyjátékos helyre (phase:"draft", nulla játékos, gameMode:"classic").
+   A következő indulásnál ez elrejtette a módválasztót, a "Folytatom" pedig egy
+   ÜRES DRAFTBA dobta a felhasználót, ahonnan nem volt út se előre, se vissza.
+
+   Ez az egyetlen predikátum dönti el mindkét irányban, hogy egy állapot valódi
+   játék-e: mentés előtt (ne írjunk szemetet) és betöltéskor (a már meglévő
+   szemetet dobjuk el). Amit valódi haladásnak tekintünk:
+     · a draftnál későbbi fázis (a csapat már áll),
+     · legalább egy leigazolt játékos a pályán (draft közben megállt építkezés),
+     · karrierben a legenerált játékos-pool (a scout már megvolt).  */
+function saveHasGame(d){
+  if(!d)return false;
+  if(d.phase&&d.phase!=="draft")return true;
+  if(d.slots&&d.slots.some(s=>s&&s.player))return true;
+  if(d.gameMode==="career"&&d.careerPool)return true;
+  return false;}
+function hasLiveGame(){
+  return saveHasGame({phase,gameMode,slots,careerPool});}
 function saveGame(){
+  /* A kezdőképernyőn nincs mit menteni — és ha mégis írnánk, a következő
+     indulást rontanánk el vele. */
+  if(!hasLiveGame())return;
   try{
     const data={
       v:1,
@@ -16549,7 +16573,7 @@ function initSaveSystem(){
   if(_mpBootIntent&&_mpBootIntent.room){
     const code=_mpBootIntent.room;
     MP.active=true;MP.activeRoom=code;MP.started=true;
-    const d=loadSavedGame(mpSaveKeyFor(code));
+    const d=mpRoomSave(code);   /* üres mentés nem számít folytathatónak */
     if(d){
       applySavedGame(d);
       MP.active=true;MP.activeRoom=code;MP.started=true;   /* a mentés felülírhatta */
@@ -16567,7 +16591,11 @@ function initSaveSystem(){
     $("mpEntry").classList.add("hide");}
   /* Egyébként MINDIG az egyjátékos helyet nézzük: az MP-karrierek a saját
      szobájuk helyén élnek, azokat a szoba-lobbyból lehet folytatni. */
-  const saved=loadSavedGame(SAVE_KEY);
+  let saved=loadSavedGame(SAVE_KEY);
+  /* ÖNGYÓGYÍTÁS: a korábbi verziók által írt ÜRES mentés (lásd saveHasGame) nem
+     folytatható — csendben eldobjuk, és a felhasználó a megszokott
+     módválasztóval indul, nem egy üres draftban ragad. */
+  if(saved&&!saveHasGame(saved)){clearSave(SAVE_KEY);saved=null;}
   if(!saved){$("scModeSelect").classList.remove("hide");return;}
   $("scModeSelect").classList.add("hide");
   $("resumeBanner").classList.remove("hide");
@@ -16658,8 +16686,13 @@ function mpSwitchContext(intent){
   if(mpCtxKey()===want){$("mpEntry").classList.add("hide");return;}
   try{sessionStorage.setItem(MP_BOOT_KEY,JSON.stringify(intent||{solo:true}));}catch(e){}
   location.reload();}
-/* Van-e félbehagyott karrier ebben a szobában? */
-function mpRoomSave(code){return code?loadSavedGame(mpSaveKeyFor(code)):null;}
+/* Van-e félbehagyott karrier ebben a szobában? Az ÜRES mentés (lásd
+   saveHasGame) nem számít annak: különben a "Szobáid" chip folytathatót
+   ígérne, a folytatás pedig üres draftba vinne. */
+function mpRoomSave(code){
+  if(!code)return null;
+  const d=loadSavedGame(mpSaveKeyFor(code));
+  return saveHasGame(d)?d:null;}
 let mpNet={mode:null,db:null,fns:null,unsub:null,initing:null,err:null};
 /* fülenkénti (session-) játékos-azonosító — újratöltést túlél, fület nem vált */
 function mpMyId(){
