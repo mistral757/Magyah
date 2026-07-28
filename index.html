@@ -654,6 +654,9 @@ button:disabled{opacity:.35;cursor:default}
       <div class="mpErr" id="mpLobbyMsg"></div>
     </div>
     <div class="mpBtns">
+      <!-- F7: ha ebben a szobában már fut karrier, azt folytatni lehet — a
+           ready/indulás helyett ez a fő művelet. -->
+      <button class="mpBtn gold hide" id="mpResumeBtn">▶ Folytatom ezt a szobát</button>
       <button class="mpBtn gold hide" id="mpStartBtn">⚽ Beállítom a közös világot →</button>
       <button class="mpBtn gold" id="mpReadyBtn">Készen állok</button>
       <button class="mpBtn" id="mpInviteBtn">🔗 Meghívó link másolása</button>
@@ -669,6 +672,10 @@ button:disabled{opacity:.35;cursor:default}
   </div>
   <div class="hdrCtl">
     <span id="oppRatingBadge" class="badge-version" style="background:var(--purple)"></span>
+    <!-- Vissza a kezdőlapra. Szándékosan a FEJLÉCBEN: az minden játékképernyőn
+         ott van, így egyetlen gomb elég ahhoz, hogy bárhonnan vissza lehessen
+         jutni — nem kell minden szekcióba külön gombot tenni. -->
+    <button id="homeBtn" title="Vissza a kezdőlapra" style="font-size:14px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer;line-height:1">🏠</button>
     <button id="themeToggle" title="Téma váltása" style="font-size:14px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer;line-height:1">◑</button>
     <span class="badge-version" id="versionBadge"></span>
   </div>
@@ -1183,7 +1190,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.4.11";
+const APP_VERSION="2.4.13";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -15211,7 +15218,18 @@ function startNextCareerSeason(){
    mentünk (sosem pörgetés/animáció közben), így a visszatöltött állapot mindig
    érvényes és folytatható. A teljes állapot menthető: draft, kémia, edző,
    kapitány, skillek, és maga a szezon (meccsről meccsre). */
-const SAVE_KEY="30-0-save-v1";
+/* ---- MENTÉSI HELYEK: AZ EGYJÁTÉKOS KARRIER SÉRTHETETLEN ----
+   Korábban EGYETLEN mentési hely volt, és a multiplayer karrier is ugyanoda írt
+   (a kettő azonos gameMode="career"-rel fut). Mérve: egy MP-játék indítása
+   NÉMÁN felülírta a 7. szezonjában járó egyjátékos karriert — visszaállíthatatlanul.
+   Mostantól minden szoba SAJÁT helyre ment, az egyjátékos pedig a régi,
+   változatlan kulcsra — így a meglévő mentések is érintetlenül betöltődnek.
+   Szobánként külön hely kell, mert a terv szerint több szoba futhat egyszerre. */
+const SAVE_KEY="30-0-save-v1";                /* egyjátékos — VÁLTOZATLAN */
+const SAVE_KEY_MP_PREFIX="30-0-save-mp-";     /* + szobakód + "-v1" */
+function mpSaveKeyFor(room){return SAVE_KEY_MP_PREFIX+room+"-v1";}
+function saveKey(){
+  return (MP.active&&MP.activeRoom)?mpSaveKeyFor(MP.activeRoom):SAVE_KEY;}
 function saveGame(){
   try{
     const data={
@@ -15278,15 +15296,16 @@ function saveGame(){
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
     };
-    localStorage.setItem(SAVE_KEY,JSON.stringify(data));
+    localStorage.setItem(saveKey(),JSON.stringify(data));
   }catch(e){/* pl. privát böngészés vagy tele tárhely — csendben elnyeljük */}}
-function loadSavedGame(){
+/* key nélkül a MOSTANI kontextus helyét olvassa (egyjátékos vagy az aktív szoba) */
+function loadSavedGame(key){
   try{
-    const raw=localStorage.getItem(SAVE_KEY);
+    const raw=localStorage.getItem(key||saveKey());
     if(!raw)return null;
     return JSON.parse(raw);
   }catch(e){return null;}}
-function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
+function clearSave(key){try{localStorage.removeItem(key||saveKey());}catch(e){}}
 function applySavedGame(d){
   gameMode=d.gameMode||"classic";careerStart=d.careerStart||"draft";scout=d.scout||null;careerPool=d.careerPool||null;
   ensureAllAttrs();   /* régi mentések migrációja: hiányzó attribútumok pótlása */
@@ -15513,7 +15532,32 @@ function resumeUIFromSave(){
     $("scSim").scrollIntoView({behavior:"smooth"});
     if(S.auto&&!S.playing&&S.idx<30)playMatch();}}
 function initSaveSystem(){
-  const saved=loadSavedGame();
+  /* ---- F7: SZOBÁBA TÖLTÉS ----
+     Ha a kezdőlapról egy szoba folytatását kértük, ide egyenesen az adott szoba
+     mentése töltődik be. Ehhez NEM kell hálózat: a karrier helyben él, a szoba
+     csak a közös világ eredete és a H2H csatornája. */
+  if(_mpBootIntent&&_mpBootIntent.room){
+    const code=_mpBootIntent.room;
+    MP.active=true;MP.activeRoom=code;MP.started=true;
+    const d=loadSavedGame(mpSaveKeyFor(code));
+    if(d){
+      applySavedGame(d);
+      MP.active=true;MP.activeRoom=code;MP.started=true;   /* a mentés felülírhatta */
+      _mpBootedIntoGame=true;
+      $("mpEntry").classList.add("hide");
+      resumeUIFromSave();
+      return;}
+    /* nincs még karrier ebben a szobában → a lobby várja (azt az mpBoot nyitja) */
+    MP.started=false;
+    return;}
+  /* ---- F7: EGYJÁTÉKOSBA TÖLTÉS ---- */
+  if(_mpBootIntent&&_mpBootIntent.solo){
+    MP.active=false;MP.activeRoom=null;MP.role=null;MP.started=false;
+    _mpBootedIntoGame=true;
+    $("mpEntry").classList.add("hide");}
+  /* Egyébként MINDIG az egyjátékos helyet nézzük: az MP-karrierek a saját
+     szobájuk helyén élnek, azokat a szoba-lobbyból lehet folytatni. */
+  const saved=loadSavedGame(SAVE_KEY);
   if(!saved){$("scModeSelect").classList.remove("hide");return;}
   $("scModeSelect").classList.add("hide");
   $("resumeBanner").classList.remove("hide");
@@ -15529,7 +15573,7 @@ function initSaveSystem(){
     $("resumeBanner").classList.add("hide");
     resumeUIFromSave();};
   $("resumeNoBtn").onclick=()=>{
-    clearSave();
+    clearSave(SAVE_KEY);   /* kifejezetten az EGYJÁTÉKOS helyet dobja el */
     $("resumeBanner").classList.add("hide");
     $("scModeSelect").classList.remove("hide");};}
 let gameMode="classic",scout=null,careerPool=null;
@@ -15582,6 +15626,30 @@ const MP_FB_CONFIG={
   appId:"1:606841822455:web:4d31d71ddbcf17468347f2"};
 const MP_FB_VER="10.12.2";
 const MP={active:false,activeRoom:null,role:null,started:false};
+/* ================= F7 — KONTEXTUSVÁLTÁS (egyjátékos ↔ szobák) =================
+   Minden szoba SAJÁT mentési helyen él, az egyjátékos a magáén. A váltás
+   viszont nem csak fájl-váltás: a teljes játékállapot több száz globálisban
+   (slots, S, careerPool, CHEM, BENCH, …) ül. Ezeket egyenként visszaállítani
+   törékeny lenne — egyetlen kifelejtett globális néma keveredést okozna a két
+   karrier között. Ezért a váltás ÚJRATÖLTÉSSEL megy: a szándékot a
+   sessionStorage viszi át, és az induló kód abba a kontextusba tölt be.
+   Semmi nem vész el, mert a váltás előtt mentünk. */
+const MP_BOOT_KEY="harminc_nulla_mp_boot_v1";
+let _mpBootIntent=null;
+try{const _r=sessionStorage.getItem(MP_BOOT_KEY);
+    sessionStorage.removeItem(MP_BOOT_KEY);
+    _mpBootIntent=_r?JSON.parse(_r):null;}catch(e){_mpBootIntent=null;}
+let _mpBootedIntoGame=false;   /* igaz, ha induláskor egyenesen játékba töltöttünk */
+function mpCtxKey(){return (MP.active&&MP.activeRoom)?("room:"+MP.activeRoom):"solo";}
+function mpSwitchContext(intent){
+  const want=intent&&intent.room?("room:"+intent.room):"solo";
+  /* meccs közben sosem mentünk (a mentés szabálya: csak lezárt pillanatokban) */
+  try{if(!S.playing)saveGame();}catch(e){}
+  if(mpCtxKey()===want){$("mpEntry").classList.add("hide");return;}
+  try{sessionStorage.setItem(MP_BOOT_KEY,JSON.stringify(intent||{solo:true}));}catch(e){}
+  location.reload();}
+/* Van-e félbehagyott karrier ebben a szobában? */
+function mpRoomSave(code){return code?loadSavedGame(mpSaveKeyFor(code)):null;}
 let mpNet={mode:null,db:null,fns:null,unsub:null,initing:null,err:null};
 /* fülenkénti (session-) játékos-azonosító — újratöltést túlél, fület nem vált */
 function mpMyId(){
@@ -15738,6 +15806,10 @@ async function mpPublishStart(){
 function mpGuestMaybeStart(room){
   if(!room||!room.start||MP.started||MP.role==="host")return;
   MP.started=true;
+  /* KRITIKUS: az MP.active-ot MÉG a beginNewGame ELŐTT be kell állítani,
+     különben a vendég első mentése az EGYJÁTÉKOS helyre menne, és felülírná a
+     saját karrierjét. (A házigazdánál ezt az mpStartBtn intézi.) */
+  MP.active=true;
   mpApplySettings(room.start.settings);
   pendingWorldSeed=room.start.seed;
   $("mpEntry").classList.add("hide");
@@ -15801,7 +15873,13 @@ async function mpRenderHomeRooms(){
   box.innerHTML=`<div class="lbl">Szobáid</div>`;
   rooms.forEach(r=>{
     const b=document.createElement("button");b.className="mpRoomChip";
-    b.innerHTML=`<span>🏆 ${esc(r.code)}</span><span style="color:rgba(243,242,242,.55);font-size:12px">${Object.keys(r.players||{}).length}/2 játékos</span>`;
+    /* F7: látszik, hol fut már karrier — így a chip nem csak szoba, hanem
+       "folytatható játék" is. */
+    const sv=mpRoomSave(r.code);
+    const jobb=sv
+      ?`<span style="color:#8fd99a;font-size:12px">▶ ${esc(String((sv.S&&sv.S.seasonNumber)||1))}. szezon — folytatható</span>`
+      :`<span style="color:rgba(243,242,242,.55);font-size:12px">${Object.keys(r.players||{}).length}/2 játékos</span>`;
+    b.innerHTML=`<span>🏆 ${esc(r.code)}</span>${jobb}`;
     b.onclick=()=>{MP.activeRoom=r.code;mpShow("mpViewLobby");};
     box.appendChild(b);});}
 /* Belépés a lobbyba: feliratkozunk a szoba élő állapotára. A backend minden
@@ -15848,6 +15926,20 @@ function mpRenderLobby(){
     const row=document.createElement("div");row.className="mpPl";row.style.opacity=".5";
     row.innerHTML=`<span>· · ·</span><span class="st wait">várunk a társadra…</span>`;
     box.appendChild(row);}
+  /* ---- F7: FUT-E MÁR KARRIER EBBEN A SZOBÁBAN? ----
+     Ha igen, a folytatás a fő művelet: a ready/indulás elrejtve, hogy egy
+     félreütés ne indítson új világot a meglévő fölé. */
+  const sv=mpRoomSave(MP.activeRoom);
+  const rb=$("mpResumeBtn");
+  if(rb){
+    rb.classList.toggle("hide",!sv);
+    if(sv){
+      const sn=(sv.S&&sv.S.seasonNumber)||1;
+      rb.textContent=`▶ Folytatom: ${sv.teamName||"a karriered"} — ${sn}. szezon`;}}
+  if(sv){
+    $("mpReadyBtn").classList.add("hide");
+    $("mpLobbyHint").textContent="Ebben a szobában már fut a közös karriered.";
+  }else $("mpReadyBtn").classList.remove("hide");
   $("mpReadyBtn").textContent=me&&me.ready?"Mégsem állok készen":"Készen állok";
   /* a saját szerepünk a szobából jön — ettől függ, ki állítja be a világot */
   MP.role=me?me.role:null;
@@ -15855,17 +15947,35 @@ function mpRenderLobby(){
   /* ---- F3: a HÁZIGAZDA beállító gombja / a VENDÉG várakozó üzenete ---- */
   const startBtn=$("mpStartBtn");
   if(startBtn){
-    startBtn.classList.toggle("hide",!(bothReady&&MP.role==="host"));
+    /* futó karrier mellett nincs "új világ" gomb — az felülírná a meglévőt */
+    startBtn.classList.toggle("hide",!(bothReady&&MP.role==="host"&&!sv));
     startBtn.disabled=false;}
   $("mpLobbyMsg").style.color=bothReady?"#8fd99a":"";
-  $("mpLobbyMsg").textContent=!bothReady?""
+  $("mpLobbyMsg").textContent=(sv||!bothReady)?""
     :(MP.role==="host"
       ?"Mindketten készen álltok! Te állítod be a közös világot."
       :"Mindketten készen álltok! A házigazda most állítja be a világot — mindjárt indul.");
-  /* a vendég indulása: amint a házigazda publikálta a beállításokat */
-  mpGuestMaybeStart(room);}
+  /* a vendég indulása: amint a házigazda publikálta a beállításokat.
+     Ha ITT MÁR FUT karrier, nem indítunk újat — a folytatás gomb visz be. */
+  if(!sv)mpGuestMaybeStart(room);}
 /* ---- bekötés ---- */
-$("mpSoloBtn").onclick=()=>{$("mpEntry").classList.add("hide");};
+/* F7: az "Egyedül játszom" mostantól KONTEXTUST VÁLT — ha épp egy szoba
+   karrierje fut a memóriában, az egyjátékos mentés töltődik be helyette. */
+$("mpSoloBtn").onclick=()=>mpSwitchContext({solo:true});
+$("mpResumeBtn")&&($("mpResumeBtn").onclick=()=>{
+  if(!MP.activeRoom)return;
+  mpSwitchContext({room:MP.activeRoom});});
+/* ---- VISSZA A KEZDŐLAPRA (fejléc-gomb, minden játékképernyőről) ----
+   A kezdőlap egy teljes képernyős réteg (#mpEntry), tehát a visszatérés nem
+   navigáció, csak a réteg visszamutatása — a futó játék állapota a memóriában
+   marad, és a mentés is a helyén van. Meccs KÖZBEN nem mentünk (a mentés
+   szabálya: csak lezárt pillanatokban), de a réteget akkor is visszahozzuk. */
+function goHomeScreen(){
+  try{if(!S.playing)saveGame();}catch(e){}
+  mpShow("mpViewHome");
+  $("mpEntry").classList.remove("hide");
+  window.scrollTo(0,0);}
+$("homeBtn")&&($("homeBtn").onclick=goHomeScreen);
 /* Az MP-ágba lépéskor indul a hálózat — az SP-játékos soha nem tölt Firebase-t. */
 $("mpDuelBtn").onclick=()=>{mpShow("mpViewMode");mpNetInit();};
 $("mpModeHajsza").onclick=()=>mpShow("mpViewRoom");
@@ -15978,8 +16088,17 @@ window.addEventListener("storage",e=>{
    2) Egyébként, ha ez a fül pontosan egy szobában volt, visszatér a lobbyjába.
    Mindkettő NEM blokkolja az SP-t: a hálózat csak az MP-ágon indul. */
 (async function mpBoot(){
+  /* F7: ha az indulás egyenesen egy futó karrierbe töltött (egyjátékos vagy
+     szoba), a kezdőlap-útvonalnak nincs dolga — nem navigálunk el a játékból. */
+  if(_mpBootedIntoGame)return;
   let invite=null;
   try{invite=(new URLSearchParams(location.search).get("room")||"").trim().toUpperCase()||null;}catch(e){}
+  /* F7: szoba-szándék mentés nélkül → nyissuk meg annak a szobának a lobbyját */
+  if(_mpBootIntent&&_mpBootIntent.room){
+    await mpNetInit();
+    MP.activeRoom=_mpBootIntent.room;
+    mpShow("mpViewLobby");
+    return;}
   const codes=mpMyCodes();
   if(!invite&&!codes.length)return;
   await mpNetInit();
