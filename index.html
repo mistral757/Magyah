@@ -1021,7 +1021,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.4.04";
+const APP_VERSION="2.4.05";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -5813,45 +5813,56 @@ const ICON_PLAYERS=[
 /* ================= CSALÁDTAG-KÖR =================
    A kezdő 11 pörgetés közül pontosan egy (véletlenszerűen kisorsolt) helyett
    egy családtag "pörgetődik ki" — nem valós klub-keretből, hanem ebből a
-   listából. Utána a felhasználó szabadon posztot ad neki, elosztja a
-   képességpontjait 11 kategória közt, és kiválaszt neki egy specialitást,
-   ami tényleges, mérhető hatással van a meccs-szimulációra. */
+   listából. Utána a felhasználó posztot ad neki, beállítja az életkorát,
+   elosztja a képességpontjait az öt valódi attribútum közt, végül kiválaszt
+   neki egy specialitást, ami tényleges, mérhető hatással van a szimulációra. */
 const FAMILY_MEMBERS=["Borsó","Fater","Anya","Simon","Jakab","Dani","Nóri","Dúcsi","Sacika Papa","Etyibaba","Mártin (Kalászka)","Marci","Anna","Ancsi","Meli","Andrus","Mosi","Dorek","Borsóka"];
-const FAMILY_ATTRS=[
- {key:"speed",label:"Sebesség"},{key:"tackle",label:"Labdaszerzés"},{key:"shot",label:"Lövőerő"},
- {key:"dive",label:"Védés — vetődés"},{key:"reflex",label:"Védés — reflex"},{key:"header",label:"Fejelés"},
- {key:"slide",label:"Becsúszás"},{key:"dribble",label:"Cselezés"},{key:"pass",label:"Passz"},
- {key:"cross",label:"Beadás"},{key:"stamina",label:"Erőnlét"}
-];
-/* Poszt-alapú "ajánlott elosztás" súlyprofilok — nem kőbe vésett szabály,
-   csak egy értelmes kiindulópont, amit a felhasználó utána kézzel bármikor
-   módosíthat a +/- gombokkal. A relatív súlyok összege nem kell 1-re jöjjön
-   ki, a familyRecommendedAttrs() úgyis normalizál a familyState.total-ra. */
-const FAMILY_POS_WEIGHTS={
- KP:{dive:5,reflex:5,pass:2,stamina:1.5,speed:1,tackle:.5,shot:.3,header:.5,slide:.3,dribble:.3,cross:.3},
- JV:{tackle:4,slide:3.5,speed:3,cross:2.5,stamina:3,pass:2,dribble:1.5,header:1.5,shot:.5,dive:.2,reflex:.2},
- BV:{tackle:4,slide:3.5,speed:3,cross:2.5,stamina:3,pass:2,dribble:1.5,header:1.5,shot:.5,dive:.2,reflex:.2},
- KV:{tackle:4.5,header:4,slide:3.5,stamina:2.5,pass:1.5,speed:1.5,shot:.3,dribble:.3,cross:.3,dive:.2,reflex:.2},
- VKP:{tackle:3.5,pass:3.5,slide:2.5,stamina:3.5,speed:1.5,header:1.5,dribble:1.5,shot:.5,cross:1,dive:.2,reflex:.2},
- KKP:{pass:4,stamina:3.5,dribble:2.5,tackle:2,shot:1.5,speed:2,cross:1.5,header:1,slide:1,dive:.2,reflex:.2},
- TKP:{pass:3.5,dribble:3.5,shot:2.5,speed:2.5,cross:2,stamina:2,tackle:.5,header:.5,slide:.3,dive:.2,reflex:.2},
- JSZ:{speed:4,dribble:3.5,cross:3.5,shot:2,stamina:2,pass:1.5,tackle:.3,header:.5,slide:.2,dive:.2,reflex:.2},
- BSZ:{speed:4,dribble:3.5,cross:3.5,shot:2,stamina:2,pass:1.5,tackle:.3,header:.5,slide:.2,dive:.2,reflex:.2},
- CS:{shot:4.5,header:3,speed:3,dribble:2.5,pass:1,stamina:2,cross:.5,tackle:.2,slide:.2,dive:.2,reflex:.2}
-};
+/* ================= CSALÁDTAG: AZ ÖT VALÓDI ATTRIBÚTUM =================
+   A régi rendszer 11 saját "képességet" osztatott szét (Lövőerő, Becsúszás,
+   Beadás...), amelyeket a motor SEHOL nem használt — a családtag valódi ereje
+   a careerPool-bejegyzés attrs mezőjéből jött, azt viszont a gép sorsolta.
+   Mostantól a felhasználó közvetlenül az ÖT ÉLES attribútumot osztja el
+   (Védekezés, Védés, Passz, Gólszerzés, Sebesség), ugyanazokat, amikkel minden
+   más játékos dolgozik — így a döntése tényleg számít.
+
+   PONTKERET ÉLETKOR SZERINT. A csúszka 15-41 év között mozog:
+     15 év  → 350 pont      (nyers tehetség, de van előtte 12 év fejlődés)
+     27 év  → 450 pont      (a csúcs)
+     35+ év → 400 pont      (rutinos veterán, már lefelé a görbén)
+   A 15→27 szakasz egyenletesen emelkedik, a 27→35 egyenletesen csökken, 35
+   fölött vízszintes. Ez adja a valódi döntést: a fiatal családtag gyengébben
+   indul, de előtte a teljes fejlődési ív; az öreg erős, de a görbe túlsó felén. */
+const FAMILY_AGE_MIN=15,FAMILY_AGE_MAX=41;
+function familyPointBudget(age){
+  const a=Math.max(FAMILY_AGE_MIN,Math.min(FAMILY_AGE_MAX,age));
+  if(a<=27)return Math.round(350+(a-15)/12*100);
+  if(a<=35)return Math.round(450-(a-27)/8*50);
+  return 400;}
+/* AJÁNLOTT ELOSZTÁS — nem külön súlytábla, hanem maga az ATTR_PROFILE, vagyis
+   pontosan az a forma, amit a motor egy adott poszton "tipikusnak" tart. Azt az
+   R szintet keressük, amelyen a profil szerinti öt érték összege épp a keretet
+   adja: Σ(R+profil[k]) = total  →  R = (total − Σprofil)/5. Így az ajánlás
+   posztHŰ és a kerettel automatikusan skálázódik. */
 function familyRecommendedAttrs(pos,total){
-  const weights=FAMILY_POS_WEIGHTS[pos]||{};
-  const totalW=FAMILY_ATTRS.reduce((s,a)=>s+(weights[a.key]||0.2),0);
-  const raw=FAMILY_ATTRS.map(a=>(weights[a.key]||0.2)/totalW*total);
+  const prof=ATTR_PROFILE[pos]||ATTR_PROFILE.KKP;
+  const sumProf=ATTR_KEYS.reduce((s,k)=>s+(prof[k]||0),0);
+  const R=(total-sumProf)/5;
+  const raw=ATTR_KEYS.map(k=>Math.max(0,R+(prof[k]||0)));
   const floors=raw.map(Math.floor);
-  let given=floors.reduce((s,v)=>s+v,0);
-  let remainder=total-given;
-  // a maradék pontokat a legnagyobb törtrésszel rendelkező attribútumok kapják, hogy pontosan total legyen az összeg
+  const given=floors.reduce((s,v)=>s+v,0);
+  const remainder=total-given;
   const order=raw.map((v,i)=>({i,frac:v-floors[i]})).sort((a,b)=>b.frac-a.frac);
   const out={};
-  FAMILY_ATTRS.forEach((a,i)=>out[a.key]=floors[i]);
-  for(let k=0;k<remainder;k++)out[FAMILY_ATTRS[order[k%order.length].i].key]++;
+  ATTR_KEYS.forEach((k,i)=>out[k]=floors[i]);
+  for(let k=0;k<Math.max(0,remainder);k++)out[ATTR_KEYS[order[k%order.length].i]]++;
   return out;}
+/* A családtag Ratingje a POSZT FŐ ATTRIBÚTUMÁBÓL jön — ugyanaz a horgony,
+   amit a posEffectiveRating is használ. Így ha valaki a fő attribútumra
+   koncentrál, az a Ratingjében is meglátszik, és nem kell külön szabály. */
+function familyStartRating(pos,attrs){
+  const key=attrTrainedBy(pos),prof=ATTR_PROFILE[pos]||ATTR_PROFILE.KKP;
+  return Math.max(40,Math.min(ratingCap()===Infinity?199:ratingCap(),
+    Math.round((attrs[key]||0)-(prof[key]||0))));}
 const FAMILY_SPECIALTIES=[
  {id:"200iq",name:"200 IQ",desc:"A csapat agya — enyhén növeli az egész keret teljesítményét támadásban és védekezésben egyaránt.",
   detail:"Pontos hatás: az egész csapat aura-bónusza +1 (nagyobb támadóerő), és a kapott gólok esélye ~3%-kal csökken (védelem ×0,97). Csendes, megbízható előny, hátrány nélkül — a legkiegyensúlyozottabb választás."},
@@ -6732,7 +6743,7 @@ function spinFamily(){
     if(t>=800){clearInterval(iv);land();}},90);
   function land(){
     const name=pick(familyNamePool());
-    familyState={name,total:99,attrs:{},slotIdx:null,pos:null,specialty:null};
+    familyState={name,age:27,total:familyPointBudget(27),attrs:{},slotIdx:null,pos:null,specialty:null};
     $("familySpinName").textContent=name;
     const note=document.createElement("div");
     note.style.cssText="text-align:center;font-size:13px;color:var(--dim);margin-top:8px;line-height:1.5";
@@ -6748,10 +6759,42 @@ function familyPickPosition(){
     if(s.player)return;
     const row=document.createElement("div");row.className="prow";
     row.innerHTML=`<span class="pos pc-${roleInFormation(s.pos)}">${s.pos}</span><span class="main"><div class="nm">${i+1}. hely a pályán</div></span>`;
-    row.onclick=()=>{familyState.slotIdx=i;familyState.pos=s.pos;familyPickAttrs();};
+    row.onclick=()=>{familyState.slotIdx=i;familyState.pos=s.pos;familyPickAge();};
     box.appendChild(row);});
   $("familyBody").appendChild(box);
   $("familyActions").innerHTML="";}
+/* ---- ÉLETKOR-VÁLASZTÁS ----
+   A poszt UTÁN és az attribútumok ELŐTT, mert az életkor szabja meg a
+   szétosztható pontkeretet (familyPointBudget). A csúszka élőben mutatja a
+   keretet és azt is, mit jelent az adott kor a fejlődés szempontjából. */
+function familyPickAge(){
+  if(familyState.age==null)familyState.age=27;
+  const draw=()=>{
+    const a=familyState.age,b=familyPointBudget(a);
+    const hint=a<=19?"Nyers tehetség — kevesebb ponttal indul, de előtte a teljes fejlődési ív."
+      :a<=24?"Fiatal, de már kész játékos — jó egyensúly a kezdőerő és a jövő között."
+      :a<=30?"A csúcson — a legtöbb pont osztható szét, a fejlődés viszont hamarosan lassul."
+      :a<=34?"Rutinos — még erős keret, de a görbe túlsó felén jár."
+      :"Veterán — állandó 400 pont; tapasztalat, kevés hátralévő fejlődés.";
+    $("familyBody").innerHTML=`
+      <div style="font-size:13px;color:var(--dim);margin-bottom:10px">Hány éves ${esc(familyState.name)}?</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-family:'Archivo Black';font-size:30px;color:var(--gold)">${a}</span>
+        <span style="font-size:13px;color:var(--dim)">szétosztható: <b style="color:var(--gold);font-size:16px">${b}</b> pont</span>
+      </div>
+      <input type="range" id="famAgeSlider" min="${FAMILY_AGE_MIN}" max="${FAMILY_AGE_MAX}" step="1" value="${a}"
+        style="width:100%;margin-top:8px;accent-color:var(--gold)">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--dim2);margin-top:2px">
+        <span>${FAMILY_AGE_MIN} · 350 pont</span><span>27 · 450</span><span>${FAMILY_AGE_MAX} · 400</span></div>
+      <div style="font-size:12px;color:var(--dim);margin-top:9px;line-height:1.5">${hint}</div>`;
+    const sl=$("famAgeSlider");
+    if(sl)sl.oninput=()=>{familyState.age=parseInt(sl.value,10);draw();};};
+  draw();
+  $("familyActions").innerHTML="";
+  const btn=document.createElement("button");btn.className="btn-y stepbtn";
+  btn.textContent="Tovább — képességpontok";
+  btn.onclick=()=>{familyState.total=familyPointBudget(familyState.age);familyPickAttrs();};
+  $("familyActions").appendChild(btn);}
 function familyRemaining(){
   const used=Object.values(familyState.attrs).reduce((s,v)=>s+v,0);
   return familyState.total-used;}
@@ -6759,8 +6802,8 @@ function familyPickAttrs(){
   familyState.attrs=familyRecommendedAttrs(familyState.pos,familyState.total);
   renderFamilyAttrs();}
 function familyEqualSplit(){
-  const n=FAMILY_ATTRS.length,base=Math.floor(familyState.total/n),rem=familyState.total-base*n;
-  FAMILY_ATTRS.forEach((a,idx)=>{familyState.attrs[a.key]=base+(idx<rem?1:0);});
+  const n=ATTR_KEYS.length,base=Math.floor(familyState.total/n),rem=familyState.total-base*n;
+  ATTR_KEYS.forEach((k,idx)=>{familyState.attrs[k]=base+(idx<rem?1:0);});
   renderFamilyAttrs();}
 function familyRecommendedSplit(){
   familyState.attrs=familyRecommendedAttrs(familyState.pos,familyState.total);
@@ -6771,15 +6814,21 @@ function familyAdjust(key,delta){
   familyState.attrs[key]+=delta;
   renderFamilyAttrs();}
 function renderFamilyAttrs(){
-  $("familyBody").innerHTML=`<div style="font-size:13px;color:var(--dim);margin-bottom:2px">${esc(familyState.name)} képességpontjai — összesen ${familyState.total} pont, oszd el ahogy szeretnéd</div>
-    <div id="familyRemaining">Hátralévő pont: ${familyRemaining()}</div>`;
+  /* A várható Rating élőben látszik: a poszt FŐ attribútumából jön, tehát a
+     felhasználó rögtön érzékeli, hogy oda érdemes tenni a pontokat. */
+  const mainKey=attrTrainedBy(familyState.pos);
+  $("familyBody").innerHTML=`<div style="font-size:13px;color:var(--dim);margin-bottom:2px">${esc(familyState.name)} — ${familyState.age} év · ${familyState.pos} poszt · <b>${familyState.total}</b> pont osztható szét</div>
+    <div id="familyRemaining">Hátralévő pont: ${familyRemaining()}</div>
+    <div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px;line-height:1.45">Ezek a VALÓDI attribútumok — ugyanazok, amikkel minden más játékos is játszik. A poszt kulcsattribútuma most a <b style="color:var(--gold)">${ATTR_LABELS[mainKey]}</b>; a várható Rating ebből számol: <b style="color:var(--gold)">${familyStartRating(familyState.pos,familyState.attrs)}</b></div>`;
   const list=document.createElement("div");
-  FAMILY_ATTRS.forEach(a=>{
+  ATTR_KEYS.forEach(k=>{
     const row=document.createElement("div");row.className="famrow";
-    const dec=document.createElement("button");dec.textContent="−";dec.onclick=()=>familyAdjust(a.key,-1);
-    const inc=document.createElement("button");inc.textContent="+";inc.onclick=()=>familyAdjust(a.key,1);
-    const lbl=document.createElement("span");lbl.className="famlbl";lbl.textContent=a.label;
-    const val=document.createElement("span");val.className="famval";val.textContent=familyState.attrs[a.key];
+    const dec=document.createElement("button");dec.textContent="−";dec.onclick=()=>familyAdjust(k,-1);
+    const inc=document.createElement("button");inc.textContent="+";inc.onclick=()=>familyAdjust(k,1);
+    const lbl=document.createElement("span");lbl.className="famlbl";
+    lbl.innerHTML=(k===mainKey?"★ ":"")+ATTR_LABELS[k];
+    if(k===mainKey)lbl.style.color="var(--gold)";
+    const val=document.createElement("span");val.className="famval";val.textContent=familyState.attrs[k];
     row.appendChild(lbl);row.appendChild(dec);row.appendChild(val);row.appendChild(inc);
     list.appendChild(row);});
   $("familyBody").appendChild(list);
@@ -6816,7 +6865,11 @@ function familyPickSpecialty(){
   $("familyBody").appendChild(list);
   $("familyActions").innerHTML="";}
 function finalizeFamilyPlacement(){
-  const player={n:familyState.name,pos:[familyState.pos],ovr:familyState.total,nat:"Magyarország",conf:1,
+  /* A Rating a poszt FŐ attribútumából jön, nem a pontkeretből: a keret 350-450,
+     az OVR-skála viszont 40-119 — a kettő nem ugyanaz a mérték. Korábban az
+     ovr=total miatt minden családtag fix 99-es volt. */
+  const ovr=familyStartRating(familyState.pos,familyState.attrs);
+  const player={n:familyState.name,pos:[familyState.pos],ovr,nat:"Magyarország",conf:1,
     family:true,familySpecialty:familyState.specialty,familyAttrs:{...familyState.attrs}};
   player.leadI=weightedIndex(LEADW);player.coopI=weightedIndex(COOPW);player.aggroI=weightedIndex(AGGROW);
   player.lead=LEAD_LEVELS[player.leadI];player.coop=COOP_LEVELS[player.coopI];player.aggro=AGGRO_LEVELS[player.aggroI];
@@ -6828,7 +6881,7 @@ function finalizeFamilyPlacement(){
      Most kap egy teljes értékű bejegyzést, így ugyanúgy fejlődik, mint bárki
      más. A _retireExtendTo miatt viszont SOHA nem vonul vissza: a család marad. */
   if(gameMode==="career"&&careerPool){
-    const age=20+Math.floor(Math.random()*3);          /* 20-22: van előtte pálya */
+    const age=familyState.age;   /* a csúszkán beállított kor, nem sorsolt */
     careerPool[player.n]={n:player.n,pos:[familyState.pos],nat:player.nat,conf:1,
       tsi:9000+Math.floor(Math.random()*1500),
       peak:Math.max(player.ovr,96),age,startRating:player.ovr,
@@ -6836,7 +6889,15 @@ function finalizeFamilyPlacement(){
       _retireExtendTo:9999,   /* a családtag sosem vonul vissza */
       family:true};
     careerPool[player.n].estimatedTSI=scout?estimateTSI(careerPool[player.n].tsi,scout.stars):careerPool[player.n].tsi;
+    /* A FELHASZNÁLÓ ELOSZTÁSA LESZ AZ ATTRIBÚTUM — nem sorsolunk. Az
+       initPlayerAttrs csak a hiányzó kiegészítő mezőket (sebBase, horgony,
+       draftRating) tölti fel, ezért utána írjuk felül az öt értéket. */
     if(typeof initPlayerAttrs==="function")initPlayerAttrs(careerPool[player.n]);
+    const E=careerPool[player.n];
+    ATTR_KEYS.forEach(k=>{E.attrs[k]=Math.max(0,Math.round(familyState.attrs[k]||0));});
+    E.attrs.seb=Math.min(SPEED_MAX,E.attrs.seb);   /* a sebesség kemény plafonja rá is áll */
+    E.sebBase=E.attrs.seb;
+    E._attrAnchor=E.startRating;                   /* innen indul a Rating↔attribútum szinkron */
     player.age=age;player.tsi=careerPool[player.n].tsi;
     player.estimatedTSI=careerPool[player.n].estimatedTSI;}
   const slot=slots[familyState.slotIdx];
@@ -14113,7 +14174,11 @@ $("hubNextSeasonBtn").onclick=hubNextSeasonFlow;
    ezeket a statokat) ELŐTT. Csak a legjobb, még el nem ért szintre lép
    fel valaki — egy már Diamond játékos nem eshet vissza Goldra. */
 function determineSeasonCards(){
-  const roster=currentRoster().filter(p=>!p.family);
+  /* A CSALÁDTAG IS KAPHAT SZEZONKÁRTYÁT. Korábban a .filter(p=>!p.family)
+     kizárta őket — akkor még nem volt valódi életkoruk, attribútumuk és
+     fejlődésük, így a kártya értelmezhetetlen lett volna rájuk. Mostantól
+     ugyanúgy játszanak, mint bárki más, tehát ugyanúgy ki is érdemelhetik. */
+  const roster=currentRoster();
   const perf=roster.map(p=>({p,g:S.scorers[p.n]||0,a:S.assists[p.n]||0,mvp:S.mvps[p.n]||0,
     saves:S.seasonSaves[p.n]||0,cs:S.seasonCleanSheets[p.n]||0}))
     .map(r=>({...r,combo:r.g+r.a,gkImpact:r.saves*0.6+r.cs*2.2}));
