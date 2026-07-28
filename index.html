@@ -718,6 +718,9 @@ button:disabled{opacity:.35;cursor:default}
     <div class="mpPlayers" id="h2hWaitPlayers"></div>
     <div class="mpErr" id="h2hWaitErr"></div>
     <div class="mpBtns" style="margin-top:4px">
+      <!-- F7: csak akkor jelenik meg, ha a szoba tényleg megszűnt — ez a kiút
+           az egyébként örökre megálló karrierből. -->
+      <button class="mpBtn gold hide" id="h2hWaitOrphanBtn">🎮 Egyedül folytatom ezt a karriert</button>
       <button class="mpBtn" id="h2hWaitHomeBtn">Vissza a kezdőlapra — a szoba megmarad</button>
       <button class="mpBtn danger" id="h2hWaitCancelBtn">✕ Most nem játszom le</button>
     </div>
@@ -6823,7 +6826,7 @@ function beginNewGame(){
   worldSeed=null;draftSpinNo=0;_lastCoachOffer=null;
   /* F6: friss karrier — a párharc tartós állapota is nulláról indul, különben
      egy korábbi szoba kiegyenlítése átszivárogna az újba. */
-  S.mpBalance=0;S.mpDecision=null;S.mpMateFinal=null;S.mpHistory=[];S.mpDuelLog=[];
+  S.mpBalance=0;S.mpDecision=null;S.mpMateFinal=null;S.mpHistory=[];S.mpDuelLog=[];S.mpOrphan=false;
   ensureWorldSeed();
   S.skillPool=weightedShuffleSkills(rngFor("skillpool"));
   slots=FORMS[form].slots.map((p,i)=>({pos:effectiveSlotPos(form,i),xy:FORMS[form].xy[i],player:null,fit:1,origin:null}));
@@ -8997,7 +9000,7 @@ const S={idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,capMod:0,eventMod:0
   mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
   /* F6: a párharc tartós állapota. A mpBalance a kiegyenlítő rating-eltolás,
      a mpHistory és a mpDuelLog pedig SZEZONOKON ÁTÍVELŐ — nem nullázódik. */
-  mpBalance:0,mpDecision:null,mpHistory:[],mpDuelLog:[],
+  mpBalance:0,mpDecision:null,mpHistory:[],mpDuelLog:[],mpOrphan:false,
   skillPool:weightedShuffleSkills(),skills:{},ratingAdj:{},winStreak:0,winlessStreak:0,fixtureResults:[],
   discWatch:{},hotStreak:{},goallessStreak:{},transferBudget:0,unbeatenStreak:0,cleanSheetStreak:0,
   /* PÁRKÉMIA-rendszer: chemPairs[kulcs] = {a,b,stages,need} — két játékos közti,
@@ -9510,6 +9513,13 @@ $("matchSpeedBtn")&&($("matchSpeedBtn").onclick=()=>{
    keretből fogyasztanak; ami nem fér bele, némán kimarad. A sorrend adja a
    rangsort: ami előbb próbál megszólalni, az kap helyet. */
 const GOAL_NOTE_BUDGET=2;
+/* F7: A PÁRHARC BŐKEZŰBB KÖZVETÍTÉST KAP.
+   Ez a szezon két csúcspontja, fix 0,25-ös tempóval — ott van idő olvasni, és
+   ott számít a hangulat. A gólonkénti ízesítő-keret tágabb, a hangulat-sorok
+   esélye pedig szorzót kap. KIZÁRÓLAG ÍZ: egyetlen olyan ágra sem hat, ami az
+   eredményt, a statisztikát vagy a fejlődést mozgatja. */
+const DUEL_GOAL_NOTE_BUDGET=4;
+const DUEL_FLAVOR_MULT=1.7;
 let goalNoteLeft=0;
 function addLine(html,cls,budgeted){
   if(budgeted){
@@ -9953,8 +9963,15 @@ function h2hPlayback(sim,iAmHome,onDone){
    Így a párharc teljes értékű karrier-meccs, és minden későbbi karrier-
    fejlesztés automatikusan ráérvényesül — nem kell két helyen fejleszteni. */
 const H2H_ROUNDS=[15,30];
-/* Közös karrier fut-e? (Az MP-állapot a mentés része, tehát újratöltés után is.) */
-function h2hRoomActive(){return !!(MP.active&&MP.activeRoom&&gameMode==="career");}
+/* Közös karrier fut-e? (Az MP-állapot a mentés része, tehát újratöltés után is.)
+   F7: az ELÁRVULT karrier itt esik ki. Ha a társad végleg elhagyta a szobát, a
+   párharc soha nem tudna lefutni, és a karriered örökre megállna a 15.
+   fordulónál. Ilyenkor a felhasználó egyetlen gombbal egyjátékosra fordíthatja
+   (mpOrphanCareer) — és onnantól ez az egy őrfüggvény kapcsol vissza MINDENT a
+   megszokott működésre: a párharc-fordulókat, a tabellát, a szezonzárás-cserét
+   és a verdiktet is. A MENTÉS HELYE viszont marad a szobáé, hogy a karrier ne
+   írja felül az egyjátékos mentésedet. */
+function h2hRoomActive(){return !!(MP.active&&MP.activeRoom&&gameMode==="career"&&!S.mpOrphan);}
 /* A SORON KÖVETKEZŐ forduló párharc-e? S.idx 0-alapú, a forduló 1-alapú.
    A kupa kizárva: ott a bajnoki forduló-index nem mozdul. */
 function h2hIsDuelRound(){
@@ -9972,6 +9989,42 @@ function h2hIAmHome(){
 function kickBtnLabel(){
   const r=Math.min(30,(S.idx||0)+1);
   return h2hIsDuelRound()?`⚔ PÁRHARC — ${r}. forduló`:`Kezdőrúgás — ${r}. forduló`;}
+/* ---- F7: ELÁRVULT KARRIER EGYJÁTÉKOSRA FORDÍTÁSA ----
+   A szobát bármelyik fél véglegesen bezárhatja (piros X). A másik oldalon
+   viszont ott van egy félkész karrier, amit kár lenne elveszíteni. Ez a
+   függvény továbbengedi:
+     · a MÉG LE NEM JÁTSZOTT párharc-fordulók helyére a mezőnyből kihagyott
+       csapat lép vissza (14 CPU + ő = 15, oda-vissza = 30 forduló) — így a
+       bajnokság újra teljes, és a tabella-invariánsok is állnak;
+     · a MÁR LEJÁTSZOTT párharcok eredménye megmarad, csak az ellenfél
+       megnevezése száll át ugyanerre a csapatra. Ez tudatos csere: az eredmény
+       valós (tényleg lejátszottad azt a fordulót), és enélkül annak a
+       csapatnak örökre hiányozna 1-2 meccse a tabellából. A wasDuel jelző
+       megőrzi, hogy eredetileg párharc volt.
+   A szoba-mentés HELYE nem változik — az egyjátékos karriered érintetlen. */
+function mpOrphanCareer(){
+  if(S.mpOrphan)return false;
+  /* MÉG a jelző beállítása ELŐTT kell kiolvasni: a kihagyott csapat kiszámítása
+     maga is a h2hRoomActive()-ra épül. */
+  const skipName=mpSkippedOppName();
+  const skipped=skipName?SEASON_OPPS.find(o=>o.n===skipName):null;
+  S.mpOrphan=true;
+  let converted=0,rewritten=0;
+  if(skipped){
+    /* a visszakerülő csapat hazai/idegen elosztása: az első párharc-forduló
+       hazai, a második idegenbeli — ahogy egy rendes oda-vissza pár */
+    let home=true;
+    (S.fixtures||[]).forEach(f=>{
+      if(!f||!f.duel)return;
+      f.duel=false;f.wasDuel=true;f.o=skipped;f.home=home;home=!home;converted++;});
+    (S.fixtureResults||[]).forEach(fr=>{
+      if(!fr||!fr.duel)return;
+      fr.duel=false;fr.wasDuel=true;fr.o=skipped;rewritten++;});}
+  addLine(`⚠ A társad véglegesen elhagyta a szobát. A karriered egyjátékosként folytatódik${
+    skipped?` — a párharc fordulóit a mezőnybe visszakerülő ${esc(skipped.n)} veszi át`:""}.`,"m life");
+  if(rewritten)addLine(`A már lejátszott ${rewritten} párharc eredménye megmarad, csak az ellenfél neve száll át — így a tabella nem marad hiányos.`,"m ev");
+  try{saveGame();}catch(e){}
+  return true;}
 /* A soron lévő párharc szkriptje. Egyszer használatos: a playMatch a belépéskor
    átveszi és kinullázza, hogy ne lóghasson be a következő fordulóba. */
 let h2hScript=null;
@@ -9987,6 +10040,7 @@ function h2hWaitHide(){$("h2hWait").classList.add("hide");}
 function h2hWaitShow(round,msg,mine,opp,what){
   const W=what||{mine:"A te kereted",opp:"A társad kerete",cancel:"✕ Most nem játszom le"};
   $("h2hWait").classList.remove("hide");
+  $("h2hWaitOrphanBtn").classList.add("hide");   /* csak a szoba-eltűnés mutatja */
   $("h2hWaitRound").textContent=typeof round==="number"?`${round}. FORDULÓ`:String(round);
   $("h2hWaitMsg").innerHTML=msg;
   $("h2hWaitCancelBtn").textContent=W.cancel;
@@ -10017,6 +10071,37 @@ function h2hWaitLeave(){
   h2hAbortWait();}
 $("h2hWaitCancelBtn")&&($("h2hWaitCancelBtn").onclick=h2hWaitLeave);
 $("h2hWaitHomeBtn")&&($("h2hWaitHomeBtn").onclick=()=>{h2hWaitLeave();goHomeScreen();});
+/* F7: a szoba megszűnt — megmutatjuk a kiutat. NEM automatikus: a karrier
+   egyjátékosra fordítása visszafordíthatatlan, ezért a felhasználó dönt.
+   Egy pillanatnyi hálózati hiba se rántsa el a döntést — ezért mondjuk ki, hogy
+   ez a lépés végleges, és hagyjuk a várakozást is nyitva. */
+function mpShowOrphanExit(round,why){
+  h2hWaitShow(round,
+    `<b>Ez a szoba már nem érhető el.</b><br>${esc(why)}`,
+    false,false,round==="SZEZONZÁRÁS"?H2H_WAIT_FINAL:null);
+  $("h2hWaitErr").textContent="A karriered megvan és mentve van — vagy megvárod a szobát, vagy egyedül viszed tovább.";
+  const ob=$("h2hWaitOrphanBtn");
+  if(!ob)return;
+  ob.classList.remove("hide");
+  ob.textContent="🎮 Egyedül folytatom ezt a karriert";
+  ob.disabled=false;
+  let armed=false,armTimer=null;
+  ob.onclick=()=>{
+    if(!armed){
+      armed=true;
+      ob.textContent="Biztos? Ez végleges — kattints még egyszer";
+      armTimer=setTimeout(()=>{armed=false;ob.textContent="🎮 Egyedül folytatom ezt a karriert";},3500);
+      return;}
+    clearTimeout(armTimer);
+    mpFinalWaitStop();
+    _h2hBusy=false;
+    if(_h2hPoll){clearTimeout(_h2hPoll);_h2hPoll=null;}
+    mpOrphanCareer();
+    h2hWaitHide();
+    /* onnantól minden a megszokott egyjátékos úton megy tovább */
+    if((S.idx||0)>=30){finish();return;}
+    $("kickBtn").disabled=false;
+    $("kickBtn").textContent=kickBtnLabel();};}
 /* A csere levezénylése. Minden lépés ÚJRAINDÍTHATÓ: ha a böngésző félúton
    újratölt, a szobában lévő állapotból pontosan ott folytatódik. */
 async function h2hBeginDuel(){
@@ -10041,8 +10126,8 @@ async function h2hBeginDuel(){
      párharcot nem lehet lejátszani — de nem is ragasztjuk oda a felhasználót:
      megmondjuk, mi történt, és a képernyő elhagyható. */
   if(!room&&mpNet.mode==="fb"){
-    h2hWaitShow(round,"Ez a szoba már nem érhető el.",false,false);
-    $("h2hWaitErr").textContent="A társad elhagyta a szobát, vagy nincs kapcsolat az adatbázissal. Próbáld újra később.";
+    mpShowOrphanExit(round,
+      "A társad véglegesen elhagyta a szobát (vagy épp nincs kapcsolat az adatbázissal).");
     _h2hBusy=false;return;}
   const myField=MP.role==="host"?"host":"guest";
   const oppField=myField==="host"?"guest":"host";
@@ -10188,6 +10273,14 @@ function mpFinalWait(onReady){
     try{ok=await mpSyncSeasonEnd();}catch(e){}
     if(!_mpFinalBusy)return;
     if(ok){mpFinalWaitStop();h2hWaitHide();onReady();return;}
+    /* F7: a szezonzárás is örökre elakadna egy megszűnt szobában — itt is ki
+       kell tudni lépni belőle. */
+    let room=null;
+    try{room=await mpBk().get(MP.activeRoom);}catch(e){}
+    if(!_mpFinalBusy)return;
+    if(!room&&mpNet.mode==="fb"){
+      mpShowOrphanExit("SZEZONZÁRÁS","A társad véglegesen elhagyta a szobát, így a közös tabella nem tud összeállni.");
+      _mpFinalBusy=false;return;}
     h2hWaitShow("SZEZONZÁRÁS",
       `<span class="h2hDot"></span>A szezonod lezárult. A közös tabellához a társad zárása is kell — amint ő is végigjátssza a 30. fordulót, összeáll a végeredmény.`,
       true,false,H2H_WAIT_FINAL);
@@ -10574,6 +10667,9 @@ function playMatch(){
      ceil(min/5) = t. Így a tick-ciklus szerkezete VÁLTOZATLAN marad — csak a
      poisson helyére lép a lista, és a súlyozott gólszerző-választás helyére a
      listában szereplő NÉV. */
+  /* F7: a hangulat-sorok esélye párharcban felszorozva (lásd DUEL_FLAVOR_MULT).
+     Csak ízesítésre használjuk — mechanikai valószínűséghez soha. */
+  const fp=p=>DUEL?Math.min(0.95,p*DUEL_FLAVOR_MULT):p;
   const duelBkt={mine:{},opp:{}};
   if(DUEL)(DUEL.sim.events||[]).forEach(e=>{
     if(e.type!=="goal")return;
@@ -10701,7 +10797,7 @@ function playMatch(){
          elveszett. Mostantól egy gólhoz legfeljebb GOAL_NOTE_BUDGET ízesítő
          sor tartozhat; a fölösleg némán kimarad. A sorrend adja a
          rangsorolást: ami előbb próbál megszólalni, az kap helyet. */
-      goalNoteLeft=GOAL_NOTE_BUDGET;
+      goalNoteLeft=DUEL?DUEL_GOAL_NOTE_BUDGET:GOAL_NOTE_BUDGET;
       mScore[scorer.n]=(mScore[scorer.n]||0)+1;recordScorer(scorer.n);
       updateGoallessStreak(scorer.n,true);
       let atxt="",asstSk=null,asstName=null;
@@ -10758,7 +10854,7 @@ function playMatch(){
         S.morale=Math.max(0,Math.min(100,S.morale+1));}
       /* SZITÁLÓS (fw_cannon): a lövőerő-skill birtokosának bombagól-kommentárja.
          A skill típusa "rating", ezért a lenti goalw-ág sosem szólalt meg rá. */
-      if(playerSkills(scorer.n).some(i=>i.skill&&i.skill.id==="fw_cannon")&&Math.random()<0.55){
+      if(playerSkills(scorer.n).some(i=>i.skill&&i.skill.id==="fw_cannon")&&Math.random()<fp(0.55)){
         const cannonTexts=[
           `→ BOMBAGÓL! ${esc(shortName(scorer.n))} húsz méterről bombázott a felső sarokba — Szitálós!`,
           `→ Ezt nem lehetett védeni! ${esc(shortName(scorer.n))} lövése ágyúgolyóként vágódott a hálóba.`,
@@ -10767,10 +10863,10 @@ function playMatch(){
           `→ Kapufa-belső, majd a hálóban! ${esc(shortName(scorer.n))} lövése akkorát csattant, hogy a lelátón is hallani lehetett.`];
         addLine(cannonTexts[Math.floor(Math.random()*cannonTexts.length)],"m skillnote",true);}
       const scorerSk=playerSkills(scorer.n).find(i=>i.skill.type==="goalw");
-      if(scorerSk&&Math.random()<0.6)addLine(`→ ${esc(scorerSk.skill.name)}${skillProgressSuffix(scorerSk)} — érződött a rutin`,"m skillnote",true);
-      if(asstSk&&Math.random()<0.6)addLine(`→ ${esc(asstSk.skill.name)}${skillProgressSuffix(asstSk)} — pontos volt az indítás`,"m skillnote",true);
+      if(scorerSk&&Math.random()<fp(0.6))addLine(`→ ${esc(scorerSk.skill.name)}${skillProgressSuffix(scorerSk)} — érződött a rutin`,"m skillnote",true);
+      if(asstSk&&Math.random()<fp(0.6))addLine(`→ ${esc(asstSk.skill.name)}${skillProgressSuffix(asstSk)} — pontos volt az indítás`,"m skillnote",true);
       /* F5: fejlett (88+) taktika hangja a gólnál — meccsenként max 1 */
-      if(!tacGoalFlavorShown&&S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)>=88&&Math.random()<0.35){
+      if(!tacGoalFlavorShown&&S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)>=88&&Math.random()<fp(0.35)){
         const tfl=TACTIC_FLAVOR[S.tactics.active];
         if(tfl&&tfl.goal.length){tacGoalFlavorShown=true;
           addLine(`→ ${tfl.goal[Math.floor(Math.random()*tfl.goal.length)]}`,"m skillnote",true);}}
@@ -10780,7 +10876,7 @@ function playMatch(){
          volt. A korábbi "gólpasszadó is elsüti" ág ezért megszűnt — ha valaki
          kiszolgálta a gólszerzőt, nem ő vitte be egyedül a labdát. */
       const scorerElastico=playerSkills(scorer.n).find(i=>i.skill.id==="mf_elastico");
-      if(scorerElastico&&!asstName&&Math.random()<0.6)
+      if(scorerElastico&&!asstName&&Math.random()<fp(0.6))
         addLine(`→ ${esc(shortName(scorer.n))} mozgását senki sem tudja követni, és mekkora csel! Elastico! Hirtelen lábmozdulatokkal tolta el védője mellett`,"m skillnote",true);
       /* SEBESSÉG-SKILLEK (3. fázis): a gólhoz fűzött íz, ami a SEBESSÉG-
          eseményre utal. A gólszerző és a gólpasszadó is elsütheti, de a
@@ -10807,7 +10903,7 @@ function playMatch(){
       addLine(`${oppMin}'  Gól: ${oppTxt}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");}
       /* F5: begyakorlatlan (78 alatti) aktív taktika bizonytalansága — a
          kapott gól után szólal meg, meccsenként legfeljebb egyszer */
-      if(!tacRawShown&&S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)<78&&Math.random()<0.28){
+      if(!tacRawShown&&S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)<78&&Math.random()<fp(0.28)){
         const tfl=TACTIC_FLAVOR[S.tactics.active];
         if(tfl&&tfl.raw.length){tacRawShown=true;
           addLine(`→ ${tfl.raw[Math.floor(Math.random()*tfl.raw.length)]}`,"m skillnote");}}
@@ -10830,7 +10926,7 @@ function playMatch(){
        szerelés, aura, fegyelem, forma, szabadrúgás mind némán, statisztikaként
        futott. Ez ad nekik saját, felismerhető pillanatot a közvetítésben, hatás
        nélkül (tisztán íz), hogy ne borítsa a balanszot. */
-    if(g===0&&og===0&&!skillFlavorShown&&Math.random()<0.12/18){
+    if(g===0&&og===0&&!skillFlavorShown&&Math.random()<fp(0.12)/18){
       const line=pickSkillFlavor(active,min,slots);
       if(line){skillFlavorShown=true;addLine(line.txt,line.cls);}}
     /* ---- KÁRTYASZINT-KOMMENTÁR (gyilkostól felfelé) ----
@@ -10842,7 +10938,7 @@ function playMatch(){
        több sztárnál pedig mindegyik elérje a garanciát */
     if(!tierQuoteShown){
       const eliteN=active.filter((a,i)=>{if(i===redIdx)return false;const t=playerCardTier(a.p.n);return t&&cardTierRank(t)>=cardTierRank("killer");}).length;
-      if(eliteN>0&&Math.random()<(0.12*eliteN)/18){
+      if(eliteN>0&&Math.random()<fp(0.12*eliteN)/18){
         const tq=pickTierQuote(active,gmin(min),redIdx);
         if(tq){tierQuoteShown=true;
           const d=document.createElement("div");d.className=tq.cls;d.innerHTML=tq.txt;
@@ -10854,7 +10950,10 @@ function playMatch(){
        az esemény történik meg, hogy "beugrik és betalál". A gól rendesen számít
        (eredmény, góllövőlista, forma), de a keret felállása változatlan marad.
        Csak akkor sülhet el, ha a pados játékost NEM cserélted be máshova. */
-    if(min>=50&&!supersubStruck){
+    /* PÁRHARCBAN a supersub nem süthet el: GÓLT adna hozzá helyben, az állást
+       viszont a közös eseménylista adja — a két képernyőn más eredmény állna.
+       (Ugyanaz az elv, mint a tizenegyesnél és a 90+ drámánál.) */
+    if(!DUEL&&min>=50&&!supersubStruck){
       const sc=BENCH.CSATAR;
       const scInUse=sc&&Object.values(S.subs).some(x=>x.sub&&x.sub.n===sc.n);
       if(sc&&!scInUse&&playerSkills(sc.n).some(i=>i.skill.id==="fw_supersub")&&Math.random()<0.05/18*(min>=75?1.8:1)){
@@ -10866,7 +10965,7 @@ function playMatch(){
         addLine(`${gmin(min)}'  🔥 A PADRÓL! ${esc(shortName(sc.n))} beugrik a semmiből és betalál — csereként is halálos!  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
         if(inst)addLine(`→ ${esc(inst.skill.name)}${skillProgressSuffix(inst)} — pont ezért ül a padon`,"m skillnote");
         maxDeficit=Math.max(maxDeficit,ga-gf);maxLead=Math.max(maxLead,gf-ga);}}
-    if(g===0&&og===0&&Math.random()<0.05){
+    if(g===0&&og===0&&Math.random()<fp(0.05)){
       const gk=active.find(a=>slots[a.idx].pos==="KP")||active[0];
       const grasshopperSk=playerSkills(gk.p.n).find(i=>i.skill.id==="gk_grasshopper");
       if(grasshopperSk){
@@ -10875,7 +10974,11 @@ function playMatch(){
           saveCount++;S.careerStats[gk.p.n]=S.careerStats[gk.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};S.careerStats[gk.p.n].saves++;
           S.seasonSaves[gk.p.n]=(S.seasonSaves[gk.p.n]||0)+1;
           addLine(`${gmin(min)}'  BRAVÚR! ${esc(shortName(gk.p.n))} hihetetlen vetődéssel fogja a labdát — ${esc(grasshopperSk.skill.name)}${skillProgressSuffix(grasshopperSk)}`,"m ev");
-        }else if(r<0.75){
+        /* PÁRHARCBAN a potyagól kimarad: KAPOTT GÓLT írna helyben, az állást
+           viszont a közös lista adja. A bravúr és a magabiztos ág marad — a
+           kapus-skill tehát a párharcban is megszólal, csak nem az eredményt
+           mozgató változatában. */
+        }else if(!DUEL&&r<0.75){
           ga++;
           updateTTBoard(fx,gf,ga,Math.min(90,min));
           addLine(`${gmin(min)}'  Potyagól! ${esc(shortName(gk.p.n))} nagyot hibázik, könnyű gólt kap  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
@@ -16188,7 +16291,7 @@ function saveGame(){
         /* F6: a párharc tartós állapota — a kiegyenlítő eltolás, a szezonzáró
            döntés, a közös előzmény és az egymás elleni napló. */
         mpMateFinal:S.mpMateFinal,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
-        mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,
+        mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
     };
@@ -16347,6 +16450,8 @@ function applySavedGame(d){
   S.mpDecision=d.S.mpDecision||null;
   S.mpHistory=d.S.mpHistory||[];
   S.mpDuelLog=d.S.mpDuelLog||[];
+  /* F7: az elárvult (egyjátékosra fordított) szoba-karrier jelzője */
+  S.mpOrphan=!!d.S.mpOrphan;
   /* RUN: a mérő állapota. Régi mentésnél üresen indul, és a lusta
      mérföldkő-detektálás a meglévő előzményekből visszamenőleg feltölti. */
   S.run=d.S.run||null;S.runOpen=!!d.S.runOpen;S.runGuideOpen=!!d.S.runGuideOpen;runInit();
@@ -16780,7 +16885,13 @@ function mpShow(id){
   if(id==="mpViewLobby")mpEnterLobby();
   $("mpEntry").scrollTop=0;}
 /* A "Szobáid" chipek: a helyben jegyzett kódokat kérdezzük le a backendtől.
-   A már nem létező szobák kódját elfelejtjük — így a lista magától takarít. */
+   A már nem létező szobák kódját elfelejtjük — így a lista magától takarít.
+
+   F7 — DE CSAK AKKOR, HA NINCS OTT KARRIER. Korábban egy megszűnt szoba kódja
+   azonnal kikerült a listából, és vele együtt a hozzá tartozó, HELYBEN MENTETT
+   karrier is elérhetetlenné vált: a mentés megvolt a localStorage-ban, de nem
+   vezetett hozzá egyetlen gomb sem. Ha van mentés, a chip marad — külön
+   jelöléssel, hogy a szoba már nincs meg, a karriered viszont folytatható. */
 async function mpRenderHomeRooms(){
   const box=$("mpHomeRooms");if(!box)return;
   const codes=mpMyCodes();
@@ -16790,28 +16901,42 @@ async function mpRenderHomeRooms(){
   for(const c of codes){
     let r=null;
     try{r=await bk.get(c);}catch(e){}
-    if(r&&r.players&&r.players[mpMyId()])rooms.push(r);
-    else if(r===null&&mpNet.mode)mpForgetCode(c);}
+    if(r&&r.players&&r.players[mpMyId()])rooms.push({code:c,room:r,gone:false});
+    else if(r===null&&mpNet.mode){
+      if(mpRoomSave(c))rooms.push({code:c,room:null,gone:true});
+      else mpForgetCode(c);}}
   box.classList.toggle("hide",!rooms.length);
   if(!rooms.length){box.innerHTML="";return;}
   box.innerHTML=`<div class="lbl">Szobáid</div>`;
-  rooms.forEach(r=>{
+  rooms.forEach(({code,room,gone})=>{
     const b=document.createElement("button");b.className="mpRoomChip";
     /* F7: látszik, hol fut már karrier — így a chip nem csak szoba, hanem
        "folytatható játék" is. */
-    const sv=mpRoomSave(r.code);
-    const jobb=sv
-      ?`<span style="color:#8fd99a;font-size:12px">▶ ${esc(String((sv.S&&sv.S.seasonNumber)||1))}. szezon — folytatható</span>`
-      :`<span style="color:rgba(243,242,242,.55);font-size:12px">${Object.keys(r.players||{}).length}/2 játékos</span>`;
-    b.innerHTML=`<span>🏆 ${esc(r.code)}</span>${jobb}`;
-    b.onclick=()=>{MP.activeRoom=r.code;mpShow("mpViewLobby");};
+    const sv=mpRoomSave(code);
+    const sn=sv?String((sv.S&&sv.S.seasonNumber)||1):null;
+    const jobb=gone
+      ?`<span style="color:#e6c98a;font-size:12px">⚠ a szoba megszűnt — ${sn}. szezon folytatható</span>`
+      :(sv
+        ?`<span style="color:#8fd99a;font-size:12px">▶ ${sn}. szezon — folytatható</span>`
+        :`<span style="color:rgba(243,242,242,.55);font-size:12px">${Object.keys((room&&room.players)||{}).length}/2 játékos</span>`);
+    b.innerHTML=`<span>${gone?"⚠":"🏆"} ${esc(code)}</span>${jobb}`;
+    /* megszűnt szobánál nincs mit lobbyzni — egyenesen a karrierbe visz */
+    b.onclick=()=>{
+      MP.activeRoom=code;
+      if(gone)mpSwitchContext({room:code});
+      else mpShow("mpViewLobby");};
     box.appendChild(b);});}
 /* Belépés a lobbyba: feliratkozunk a szoba élő állapotára. A backend minden
    változásnál visszahív (Firebase: onValue; helyi mód: storage-esemény). */
+/* F7: a figyelő szállított-e már? Enélkül a "még töltünk" és a "már nincs meg"
+   állapot ugyanúgy néz ki (mindkettő null szoba), és a felhasználó örökre a
+   "Kapcsolódás…" feliratot bámulja egy megszűnt szobánál. */
+let mpLobbyDelivered=false;
 function mpEnterLobby(){
-  mpRoomCache=null;
+  mpRoomCache=null;mpLobbyDelivered=false;
   mpRenderLobby();   /* azonnali "betöltés" állapot */
-  mpBk().subscribe(MP.activeRoom,room=>{mpRoomCache=room;mpRenderLobby();});}
+  mpBk().subscribe(MP.activeRoom,room=>{
+    mpRoomCache=room;mpLobbyDelivered=true;mpRenderLobby();});}
 function mpRenderLobby(){
   const room=mpRoomCache;
   mpUpdateNetBadge();
@@ -16819,8 +16944,19 @@ function mpRenderLobby(){
     $("mpLobbyCode").textContent=MP.activeRoom?MP.activeRoom.split("").join(" "):"— — — —";
     $("mpLobbyPlayers").innerHTML="";
     $("mpLobbyMsg").textContent="";
-    $("mpLobbyHint").textContent="Kapcsolódás a szobához…";
     $("mpReadyBtn").disabled=true;
+    $("mpStartBtn")&&$("mpStartBtn").classList.add("hide");
+    const sv=mpLobbyDelivered?mpRoomSave(MP.activeRoom):null;
+    /* megszűnt szoba, de van itt karriered: a folytatás az egyetlen értelmes
+       művelet — a lobbynak nincs mit mutatnia */
+    const rb=$("mpResumeBtn");
+    if(rb){
+      rb.classList.toggle("hide",!sv);
+      if(sv)rb.textContent=`▶ Folytatom egyedül: ${sv.teamName||"a karriered"} — ${(sv.S&&sv.S.seasonNumber)||1}. szezon`;}
+    $("mpLobbyHint").textContent=!mpLobbyDelivered
+      ?"Kapcsolódás a szobához…"
+      :(sv?"Ezt a szobát bezárták — a karriered viszont megvan, és egyedül folytatható."
+          :"Ezt a szobát bezárták, vagy nem érhető el.");
     return;}
   if(room.closed){
     $("mpLobbyPlayers").innerHTML="";
