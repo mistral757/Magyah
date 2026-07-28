@@ -654,6 +654,7 @@ button:disabled{opacity:.35;cursor:default}
       <div class="mpErr" id="mpLobbyMsg"></div>
     </div>
     <div class="mpBtns">
+      <button class="mpBtn gold hide" id="mpStartBtn">⚽ Beállítom a közös világot →</button>
       <button class="mpBtn gold" id="mpReadyBtn">Készen állok</button>
       <button class="mpBtn" id="mpInviteBtn">🔗 Meghívó link másolása</button>
       <button class="mpBtn" id="mpLobbyHomeBtn">Vissza a főmenübe — a szoba megmarad</button>
@@ -1182,7 +1183,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.4.10";
+const APP_VERSION="2.4.11";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -6742,20 +6743,22 @@ $("diffSlider").oninput=()=>{
 /* induló felirat: a valós szintnév + diszkrét „ajánlott" jelzés a 84-es alapon */
 $("diffSliderVal").textContent=`${oppTargetRating} · ${diffTierLabel(oppTargetRating)}${oppTargetRating===84?" · ajánlott":""}`;
 updateOppRatingBadge();
-$("startBtn").onclick=()=>{
-  /* ================= F1 — A VILÁG-SEED ITT SZÜLETIK =================
-     Ez a gomb a közös kapu minden új játékhoz (klasszikus, karrier-draft,
-     karrier-klub). Innentől MINDEN nevesített folyam (rngFor) ebből a seedből
-     származik: scout, pool, edzők, ellenféltábla, draft-sorrend, skill-készlet.
-     Ha a seed-teszt (vagy később az MP-szoba) kért egy konkrét seedet, azt
-     használjuk; különben véletlen születik. A skill-készletet is itt keverjük
-     újra seedelt folyammal — a betöltéskori S-literál keverése még seed előtt
-     futott, az placeholder volt. */
+/* ================= ÚJ JÁTÉK INDÍTÁSA — EGY KÖZÖS ÚTVONAL =================
+   Ezt hívja a "Kezdjük" gomb ÉS a multiplayer vendég-oldala is (F3). Azért van
+   külön függvényben, hogy a két mód ne váljon szét: minden jövőbeli
+   karrier-fejlesztés automatikusan érvényes marad a kétjátékos módra is.
+
+   F1 — A VILÁG-SEED ITT SZÜLETIK. Innentől MINDEN nevesített folyam (rngFor)
+   ebből a seedből származik: scout, pool, edzők, ellenféltábla, draft-sorrend,
+   skill-készlet. Ha valaki (seed-teszt vagy MP-szoba) kért konkrét seedet, azt
+   használjuk; különben véletlen születik. A skill-készletet is itt keverjük
+   újra seedelt folyammal — a betöltéskori S-literál keverése még seed előtt
+   futott, az placeholder volt. */
+function beginNewGame(){
   worldSeed=null;draftSpinNo=0;_lastCoachOffer=null;
   ensureWorldSeed();
   S.skillPool=weightedShuffleSkills(rngFor("skillpool"));
   slots=FORMS[form].slots.map((p,i)=>({pos:effectiveSlotPos(form,i),xy:FORMS[form].xy[i],player:null,fit:1,origin:null}));
-  rerolls=parseInt($("rerollSlider").value,10);
   /* RUN: a VÁLASZTOTT újrapörgetés-számot itt kell rögzíteni, mert a `rerolls`
      a draft során minden felhasználásnál csökken — a szezonindításkor már csak
      a maradékot látnánk, és a Run-pont magától kúszna felfelé. */
@@ -6767,7 +6770,22 @@ $("startBtn").onclick=()=>{
   }else{
     $("scOpponents").classList.remove("hide");
     $("scOpponents").scrollIntoView({behavior:"smooth"});
-  }};
+  }}
+$("startBtn").onclick=async()=>{
+  rerolls=parseInt($("rerollSlider").value,10);
+  /* MULTIPLAYER (F3): a HÁZIGAZDA állítja be a közös játékot. A beállítások és
+     a szoba seedje kimegy a szobába, a vendég ugyanezekkel indul — így a két
+     kliens bitre azonos világot generál (F1). A gomb csak a publikálás UTÁN
+     indít, hogy a vendég ne maradjon le. */
+  if(MP.active&&MP.role==="host"){
+    const btn=$("startBtn"),old=btn.textContent;
+    btn.disabled=true;btn.textContent="Közös világ indítása…";
+    const ok=await mpPublishStart();
+    btn.disabled=false;btn.textContent=old;
+    if(!ok){
+      alert("Nem sikerült elindítani a közös játékot — ellenőrizd a kapcsolatot, és próbáld újra.");
+      return;}}
+  beginNewGame();};
 /* ---- karrier scout sorsolása ---- */
 $("scoutSpinBtn").onclick=()=>{
   $("scoutSpinBtn").disabled=true;
@@ -15201,6 +15219,9 @@ function saveGame(){
       gameMode,scout,careerPool,careerStart,
       form,mode,oppTargetRating,rerolls,infinityMode,infinityTiers,careerBaseRating,MAX_CAREER_ROSTER,
       worldSeed,draftSpinNo,
+      /* MULTIPLAYER: a szoba-hovatartozás a mentés része, hogy egy újratöltés
+         után a futó közös karrier ne váljon némán egyjátékossá. */
+      mp:{active:MP.active,room:MP.activeRoom,role:MP.role},
       slotRoles,
       slots:slots.map(s=>({pos:s.pos,xy:s.xy,player:s.player,fit:s.fit,origin:s.origin})),
       BENCH:{KAPUS:BENCH.KAPUS,VEDO:BENCH.VEDO,KOZEPPALYAS:BENCH.KOZEPPALYAS,CSATAR:BENCH.CSATAR},
@@ -15275,6 +15296,7 @@ function applySavedGame(d){
      mentésben nincs — ott marad null, és az első rngFor-hívás új véletlen
      seedet ad (a régi világ már úgyis legenerálódott). */
   worldSeed=d.worldSeed||null;
+  if(d.mp){MP.active=!!d.mp.active;MP.activeRoom=d.mp.room||null;MP.role=d.mp.role||null;MP.started=!!d.mp.active;}
   draftSpinNo=d.draftSpinNo||0;
   /* A szerep-felülírások: régi mentésben nincs meg → üres, vagyis minden
      felállás az alapértelmezésén áll, és a tengelyréteg 0-t ad. A futó karrier
@@ -15559,7 +15581,7 @@ const MP_FB_CONFIG={
   databaseURL:"https://magyahok-default-rtdb.europe-west1.firebasedatabase.app",
   appId:"1:606841822455:web:4d31d71ddbcf17468347f2"};
 const MP_FB_VER="10.12.2";
-const MP={active:false,activeRoom:null};
+const MP={active:false,activeRoom:null,role:null,started:false};
 let mpNet={mode:null,db:null,fns:null,unsub:null,initing:null,err:null};
 /* fülenkénti (session-) játékos-azonosító — újratöltést túlél, fület nem vált */
 function mpMyId(){
@@ -15615,6 +15637,11 @@ const mpBackendLocal={
     const rooms=mpLRooms();
     if(rooms[code]){delete rooms[code];mpLSave(rooms);}
     this._notify();},
+  async publishStart(code,start){
+    const rooms=mpLRooms(),room=rooms[code];
+    if(!room)return;
+    room.start=start;room.status="starting";
+    mpLSave(rooms);this._notify();},
   async get(code){return mpLRooms()[code]||null;},
   subscribe(code,cb){this._code=code;this._cb=cb;this._notify();},
   unsubscribe(){this._cb=null;this._code=null;}};
@@ -15647,6 +15674,10 @@ const mpBackendFb={
   async leave(code){
     const F=mpNet.fns;
     await F.remove(F.ref(mpNet.db,"mp/rooms/"+code));},
+  async publishStart(code,start){
+    const F=mpNet.fns;
+    await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/start"),start);
+    await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/status"),"starting");},
   async get(code){
     const s=await mpNet.fns.get(mpNet.fns.ref(mpNet.db,"mp/rooms/"+code));
     return s.exists()?s.val():null;},
@@ -15658,6 +15689,59 @@ const mpBackendFb={
       ()=>cb(null));},
   unsubscribe(){if(mpNet.unsub){try{mpNet.unsub();}catch(e){}mpNet.unsub=null;}}};
 function mpBk(){return mpNet.mode==="fb"?mpBackendFb:mpBackendLocal;}
+/* ================= F3 — KÖZÖS INDULÁS =================
+   A házigazda a MEGSZOKOTT beállító képernyőn állítja be a játékot (nincs külön
+   MP-felület, tehát nincs mit duplán karbantartani), majd a "Kezdjük" gomb a
+   beállításokat + a szoba seedjét kiírja a szobába. A vendég kliense ezt
+   meglátja, ugyanezeket az értékeket állítja be magának, és ugyanazt a
+   beginNewGame()-et hívja — így a két világ az F1 determinizmusa miatt bitre
+   azonos lesz (scout, pool, edzők, ellenféltábla, draft-sorrend).
+
+   AMI SZÁNDÉKOSAN NEM UTAZIK: a csapatnév és minden személyes döntés. A világ
+   közös, a karrier nem. */
+function mpCollectSettings(){
+  return {gameMode:"career",careerStart,form,mode,
+    oppTargetRating,careerBaseRating,rerolls,
+    wcEnabled,familyEnabled,familyNameMode,
+    familyCustomNames:(familyCustomNames||[]).slice(),
+    slotRoles:JSON.parse(JSON.stringify(slotRoles||{})),
+    autoLevel:!!S.autoLevel};}
+function mpApplySettings(s){
+  if(!s)return;
+  gameMode="career";
+  careerStart=s.careerStart||"draft";
+  form=s.form||"442";mode="classic";
+  oppTargetRating=s.oppTargetRating||84;
+  careerBaseRating=s.careerBaseRating!=null?s.careerBaseRating:oppTargetRating;
+  rerolls=s.rerolls!=null?s.rerolls:1;
+  wcEnabled=!!s.wcEnabled;
+  familyEnabled=!!s.familyEnabled;
+  familyNameMode=s.familyNameMode||"default";
+  familyCustomNames=Array.isArray(s.familyCustomNames)?s.familyCustomNames.slice():[];
+  slotRoles=s.slotRoles?JSON.parse(JSON.stringify(s.slotRoles)):{};
+  S.autoLevel=!!s.autoLevel;
+  updateOppRatingBadge&&updateOppRatingBadge();}
+/* A házigazda publikálja az indulást. A seedet a SZOBA adja (a létrehozáskor
+   született), nem a helyi seed-teszt — így garantáltan ugyanaz a két kliensen. */
+async function mpPublishStart(){
+  try{
+    const room=await mpBk().get(MP.activeRoom);
+    if(!room)return false;
+    const seed=room.seed||makeWorldSeed();
+    pendingWorldSeed=seed;   /* a beginNewGame ezt fogja használni */
+    await mpBk().publishStart(MP.activeRoom,{seed,settings:mpCollectSettings(),at:Date.now()});
+    MP.started=true;
+    return true;
+  }catch(e){return false;}}
+/* A vendég oldala: a szoba "starting" állapotára ugyanazokkal az értékekkel
+   indul. Egyszer fut le (MP.started őrzi), akkor is, ha a figyelő többször hív. */
+function mpGuestMaybeStart(room){
+  if(!room||!room.start||MP.started||MP.role==="host")return;
+  MP.started=true;
+  mpApplySettings(room.start.settings);
+  pendingWorldSeed=room.start.seed;
+  $("mpEntry").classList.add("hide");
+  beginNewGame();}
 /* Hálózat-inicializálás: lustán, csak az MP-ágba lépéskor. Ha az SDK-betöltés
    vagy az adatbázis-elérés elhasal (offline, hiányzó RTDB, rossz URL), NEM
    törik el semmi — helyi módba esünk vissza, és a lobby kiírja. */
@@ -15765,11 +15849,21 @@ function mpRenderLobby(){
     row.innerHTML=`<span>· · ·</span><span class="st wait">várunk a társadra…</span>`;
     box.appendChild(row);}
   $("mpReadyBtn").textContent=me&&me.ready?"Mégsem állok készen":"Készen állok";
+  /* a saját szerepünk a szobából jön — ettől függ, ki állítja be a világot */
+  MP.role=me?me.role:null;
   const bothReady=ids.length===2&&ids.every(id=>players[id].ready);
+  /* ---- F3: a HÁZIGAZDA beállító gombja / a VENDÉG várakozó üzenete ---- */
+  const startBtn=$("mpStartBtn");
+  if(startBtn){
+    startBtn.classList.toggle("hide",!(bothReady&&MP.role==="host"));
+    startBtn.disabled=false;}
   $("mpLobbyMsg").style.color=bothReady?"#8fd99a":"";
-  $("mpLobbyMsg").textContent=bothReady
-    ?"Mindketten készen álltok! A közös indulás a következő fejlesztési fázisban érkezik."
-    :"";}
+  $("mpLobbyMsg").textContent=!bothReady?""
+    :(MP.role==="host"
+      ?"Mindketten készen álltok! Te állítod be a közös világot."
+      :"Mindketten készen álltok! A házigazda most állítja be a világot — mindjárt indul.");
+  /* a vendég indulása: amint a házigazda publikálta a beállításokat */
+  mpGuestMaybeStart(room);}
 /* ---- bekötés ---- */
 $("mpSoloBtn").onclick=()=>{$("mpEntry").classList.add("hide");};
 /* Az MP-ágba lépéskor indul a hálózat — az SP-játékos soha nem tölt Firebase-t. */
@@ -15820,6 +15914,15 @@ $("mpInviteBtn")&&($("mpInviteBtn").onclick=async()=>{
     $("mpLobbyMsg").textContent=url;
     btn.textContent="A link fent — jelöld ki és másold";}
   setTimeout(()=>{btn.textContent=old;},2200);});
+/* F3 — a házigazda átlép a MEGSZOKOTT beállító képernyőre. Nincs külön MP-UI:
+   ugyanaz a felállás/nehézség/családtag/újrapörgetés panel, csak MP-módban a
+   "Kezdjük" gomb előbb publikálja a beállításokat a szobába. */
+$("mpStartBtn")&&($("mpStartBtn").onclick=()=>{
+  MP.active=true;MP.started=false;
+  gameMode="career";careerStart="draft";
+  /* a karrier-beállítások megnyitása ugyanazzal a gombbal, amit az SP is használ */
+  $("modeCareerBtn").click();
+  $("mpEntry").classList.add("hide");});
 $("mpLobbyHomeBtn").onclick=()=>mpShow("mpViewHome");
 /* A piros X kétlépcsős megerősítést kér — natív confirm helyett a gomb maga
    vált át, 3 másodperc után visszaáll. */
