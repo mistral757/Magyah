@@ -1190,7 +1190,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.4.13";
+const APP_VERSION="2.4.14";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9625,6 +9625,92 @@ function updateTTDiff(){
     const col=lvl>=85?"var(--grass)":"var(--red)";
     html+=` <span style="color:${col};font-weight:700">⚙ ${esc(TACTICS[S.tactics.active].n)} ${lvl}</span>`;}
   el.innerHTML=html;}
+/* ================= F4/1 — MECCS-PILLANATKÉP =================
+   A motor ma "gazdag csapat egy szám ellen" felállásban dolgozik: a SAJÁT
+   csapatot ~110 hivatkozással olvassa globálisokból (slots, S.morale, S.subs,
+   S.tactics, CHEM, careerPool, coach…), az ellenfélről viszont mindössze két
+   adatot ismer (név és ovr). Egy játékos-játékos meccshez ez nem elég: ott
+   MINDKÉT oldal gazdag.
+
+   Ez a függvény összegyűjti egyetlen objektumba mindazt, amit a szimuláció a
+   csapat-oldalról használ. Két rétege van:
+     · SZIMULÁCIÓS rész (ovr, defMult, famSp, tacticEffect, tacticStyle,
+       chemPairs) — csupa SZÁM és rövid szöveg, tehát sorosítható és átküldhető
+       a hálózaton; ebből fut a gólvárhatóság-számítás;
+     · HELYI rész (active, gi, bi, capPlaying) — a közvetítés eseményeihez kell
+       (ki lő gólt, ki van jó formában), ez nem utazik.
+   A mai CPU-meccs a SAJÁT pillanatképét adja át, tehát a viselkedése betűre
+   változatlan — csak az útvonal lett általános. */
+function buildMatchSnapshot(){
+  const active=slots.map((s,idx)=>({
+    p:S.subs[idx]?S.subs[idx].sub:s.player,
+    fit:S.subs[idx]?0.93:s.fit,idx}));
+  const capPlaying=!S.subs[captainIdx];
+  const fam=active.find(a=>a.p.family);
+  const famSp=fam?fam.p.familySpecialty:null;
+  const goodW=active.map(a=>(hasFormlock(a.p.n)?3:1)*cardGoodFormWeight(a.p.n));
+  const gi=weightedIndex(goodW);
+  const badW=active.map((a,i)=>i===gi?0:((hasFormlock(a.p.n)||cardBadFormImmune(a.p.n))?0:1));
+  const bi=weightedIndex(badW);
+  const moraleMod=(S.morale-50)/50*2.5;
+  let sum=0,auraBonus=0;
+  active.forEach((a,k)=>{
+    let contrib;
+    const ent=gameMode==="career"&&careerPool?careerPool[a.p.n]:null;
+    if(ent&&ent.attrs&&slots[a.idx]&&!S.subs[a.idx]){
+      const eff=posEffectiveRating(ent,slots[a.idx].pos);
+      const mods=pOvr(a.p)-a.p.ovr;
+      contrib=eff+mods+(k===gi?SIM.FORM:0)+(k===bi?-SIM.FORM:0);
+    }else{
+      contrib=(pOvr(a.p)+(k===gi?SIM.FORM:0)+(k===bi?-SIM.FORM:0))*a.fit;
+    }
+    sum+=contrib;
+    auraBonus+=sumSkillEffect(a.p.n,"aura");});
+  if(famSp==="200iq")auraBonus+=1;
+  if(famSp==="tank")auraBonus+=1.3;
+  if(famSp==="testver")auraBonus+=1;
+  /* védekező skillek szorzata, padlóval — lásd a DEF_MULT_FLOOR indoklását */
+  const DEF_MULT_FLOOR=0.80;
+  let defMult=1;active.forEach(a=>{defMult*=multSkillEffect(a.p.n,"defense");});
+  defMult=Math.max(DEF_MULT_FLOOR,defMult);
+  if(famSp==="200iq")defMult*=0.97;
+  if(famSp==="tank")defMult*=0.92;
+  const capExp=(capPlaying&&captainIdx>=0&&slots[captainIdx].player)?captainAgeExpBonus(slots[captainIdx].player.age)*0.15:0;
+  const chFormMalus=(S.teamFormMalus>0)?-2.2:0;
+  const ovr=sum/11+S.capMod+S.eventMod+coach.ovrMod+moraleMod+auraBonus+capExp+chFormMalus;
+  const tacStyle=(S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)>=85)?TACTICS[S.tactics.active].style:null;
+  const activeNames=new Set(active.map(a=>a.p.n));
+  const chemPairs=completeChemPairsOnPitch(activeNames);
+  return {
+    /* --- szimulációs (sorosítható) --- */
+    teamName,ovr,defMult,famSp,
+    tacticEffect:tacticEffect(),tacticStyle:tacStyle,chemPairs,
+    /* --- helyi (a közvetítéshez) --- */
+    active,activeNames,capPlaying,gi,bi,moraleMod};}
+/* A gólvárhatóságok (λ) egy pillanatképből, egy megadott ellenfél-erő ellen.
+   venueAdj: hazai/idegen/semleges korrekció OVR-ekvivalensben.
+   A módosítók sorrendje BETŰRE a régi: család-specializáció → taktika-stílus →
+   párkémia. A sorrend számít (mind szorzó és vág a 0.15/4.5 határokhoz). */
+function matchLambdas(mine,oppOvr,venueAdj){
+  const lam=d=>Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)));
+  const diff=mine.ovr-oppOvr+mine.tacticEffect+venueAdj;
+  let lf=lam(diff),la=lam(-diff)*mine.defMult;
+  if(mine.famSp==="gol")lf=Math.min(4.5,lf*1.09);
+  if(mine.famSp==="testver"){lf=Math.max(.15,lf*0.82);la=Math.max(.15,la*0.82);}
+  if(mine.famSp==="psycho"){
+    const vol=0.75+Math.random()*0.8;
+    lf=Math.max(.15,Math.min(4.5,lf*vol));la=Math.max(.15,Math.min(4.5,la*vol));}
+  const st=mine.tacticStyle;
+  if(st){
+    const CL=x=>Math.max(.15,Math.min(4.5,x));
+    if(st==="bus"){lf=CL(lf*0.8);la=CL(la*0.8);}
+    else if(st==="counter"){if(diff<0)lf=CL(lf*1.15);}
+    else if(st==="possession"){la=CL(la*0.9);}
+    else if(st==="total"||st==="wings"){lf=CL(lf*1.1);la=CL(la*1.05);}
+    else if(st==="longball"){lf=CL(lf*1.08);}}
+  if(mine.chemPairs>0)
+    lf=Math.max(.15,Math.min(4.5,lf*(1+Math.min(0.18,mine.chemPairs*0.03))));
+  return {diff,lf,la};}
 function playMatch(){
   S.playing=true;$("kickBtn").disabled=true;
   /* A KUPA-KÉPERNYŐ MECCS-LOGJÁHOZ: megjelöljük, hol tart most a napló, hogy a
@@ -9648,65 +9734,24 @@ function playMatch(){
      Auto módban (szezon végigjátszása) marad a villámgyors 18 ms — ott nem a
      közvetítést nézed. A 0.25× így meccsenként életszerűbb, olvasható ütemet ad. */
   const tickMs=S.auto?18:Math.round(330/matchSpeed);
-  const active=slots.map((s,idx)=>({
-    p:S.subs[idx]?S.subs[idx].sub:s.player,
-    fit:S.subs[idx]?0.93:s.fit,idx}));
-  const capPlaying=!S.subs[captainIdx];
-  const fam=active.find(a=>a.p.family);
-  const famSp=fam?fam.p.familySpecialty:null;
-  const goodW=active.map(a=>(hasFormlock(a.p.n)?3:1)*cardGoodFormWeight(a.p.n));
-  const gi=weightedIndex(goodW);
-  const badW=active.map((a,i)=>i===gi?0:((hasFormlock(a.p.n)||cardBadFormImmune(a.p.n))?0:1));
-  const bi=weightedIndex(badW);
-  const moraleMod=(S.morale-50)/50*2.5;
+  /* F4/2: a csapat-oldali számítás egyetlen pillanatképbe került. A mai
+     CPU-meccs a SAJÁTJÁT adja át — a viselkedés változatlan, csak az útvonal
+     lett általános, hogy a H2H-hoz egy MÁSIK pillanatkép is beadható legyen. */
+  const MS=buildMatchSnapshot();
+  const active=MS.active;
+  const capPlaying=MS.capPlaying;
+  const famSp=MS.famSp;
+  const gi=MS.gi,bi=MS.bi;
+  const moraleMod=MS.moraleMod;
   /* KAPITÁNY-HATÁS: a ténylegesen realizált morált meccsenként mintavételezzük,
      hogy a szezon végén PONTOS átlagos hatást tudjunk mutatni (a választáskori
      becsléssel szemben). Kapitányváltáskor a számláló nullázódik. */
   S.moraleSum=(S.moraleSum||0)+S.morale;
   S.moraleSamples=(S.moraleSamples||0)+1;
-  let sum=0,auraBonus=0;
-  active.forEach((a,k)=>{
-    /* A hozzájárulás a poszton érvényes EFFEKTÍV Ratingből jön (attribútumok +
-       poszt-ismeret) — karrier módban. Ez adja a látható "rossz poszton
-       gyengébb" hatást átlátható módon. A subs (csere) és a klasszikus mód a
-       régi durva fit-et használja (nincs attribútum-rendszerük). */
-    let contrib;
-    const ent=gameMode==="career"&&careerPool?careerPool[a.p.n]:null;
-    if(ent&&ent.attrs&&slots[a.idx]&&!S.subs[a.idx]){
-      const eff=posEffectiveRating(ent,slots[a.idx].pos);
-      /* a nyers Rating-módosítók (grudge, skill, fegyelem) továbbra is hatnak,
-         az effektív érték csak az attribútum/poszt-illeszkedés részt váltja ki */
-      const mods=pOvr(a.p)-a.p.ovr;
-      contrib=eff+mods+(k===gi?SIM.FORM:0)+(k===bi?-SIM.FORM:0);
-    }else{
-      contrib=(pOvr(a.p)+(k===gi?SIM.FORM:0)+(k===bi?-SIM.FORM:0))*a.fit;
-    }
-    sum+=contrib;
-    auraBonus+=sumSkillEffect(a.p.n,"aura");});
-  if(famSp==="200iq")auraBonus+=1;
-  if(famSp==="tank")auraBonus+=1.3;
-  if(famSp==="testver")auraBonus+=1;
-  /* A védekező skillek SZORZÓDNAK a pályán lévő 11 emberen át — ez volt az
-     egyetlen korlátlanul halmozódó tag a láncban. Mérve: 5-6 védekező skill
-     -44%-ra vitte a kapott gólokat (≈5 OVR rejtett előny, +11 szezonpont),
-     vagyis egy védekező skillekre épített keret ingyen kapott egy bajnoki
-     címet. A DEF_MULT_FLOOR padló megtartja az első 2-3 skill teljes értékét
-     (≈1.9 OVR), és onnantól levágja az elszaladást. A család-specializáció
-     (200iq / tank) SZÁNDÉKOSAN a padló UTÁN jön: az egyszeri, nem halmozódó
-     bónusz így megőrzi az identitását, nem nyeli el a korlát. */
-  const DEF_MULT_FLOOR=0.80;
-  function defenseMult(){
-    let m=1;active.forEach(a=>{m*=multSkillEffect(a.p.n,"defense");});
-    m=Math.max(DEF_MULT_FLOOR,m);
-    if(famSp==="200iq")m*=0.97;
-    if(famSp==="tank")m*=0.92;
-    return m;}
-  /* A kapitány kora/tapasztalata állandó, kis csapatszintű teljesítmény-
-     bónuszt ad, amíg pályán van — a rutinos vezér stabilizálja a csapatot
-     (max ~+1.5 OVR a legtapasztaltabbnál). */
-  const capExp=(capPlaying&&captainIdx>=0&&slots[captainIdx].player)?captainAgeExpBonus(slots[captainIdx].player.age)*0.15:0;
-  const chFormMalus=(S.teamFormMalus>0)?-2.2:0;   /* challenge-büntetés: rossz forma csapatszinten */
-  let ovr=sum/11+S.capMod+S.eventMod+coach.ovrMod+moraleMod+auraBonus+capExp+chFormMalus;
+  /* A csapat-erő (sum/11 + minden módosító), a védekező szorzó és az aura a
+     pillanatképből jön — a számítás maga a buildMatchSnapshot-ban él. */
+  function defenseMult(){return MS.defMult;}
+  let ovr=MS.ovr;
   /* REJTETT ELLENFÉL-ERŐSÍTÉS (nem látszik a ratingben, csak a szimulációban):
      ellensúlyozza a kémia/skill/kapitány "rejtett" erőtöbbletet, ami különben
      ~5 OVR-rel a kijelzett csapaterő fölé viszi a kifejlett kereteket. A
@@ -9720,39 +9765,16 @@ function playMatch(){
   const _buffLevel=(euroActive()&&S.euro&&S.euro.target!=null)?S.euro.target:oppTargetRating;
   const hiddenOppBuff=gameMode==="career"?Math.max(0,(_buffLevel-84)*0.35):0;
   /* A kupadöntő SEMLEGES pályán megy — sem hazai előny, sem idegenbeli hátrány. */
-  let diff=ovr-(fx.o.ovr+hiddenOppBuff)+tacticEffect()+(fx.neutral?0:(fx.home?SIM.HOME:SIM.AWAY));
-  let lf=lam(diff),la=lam(-diff)*defenseMult();
+  /* A gólvárhatóságok a KÖZÖS matchLambdas-ból jönnek: család-specializáció,
+     taktika-stílus és párkémia mind ott, változatlan sorrendben. Ugyanezt a
+     függvényt hívja majd a H2H is, csak ott a másik oldal is pillanatkép. */
   function lam(d){return Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)))}
-  if(famSp==="gol")lf=Math.min(4.5,lf*1.09);
-  if(famSp==="testver"){lf=Math.max(.15,lf*0.82);la=Math.max(.15,la*0.82);}
-  if(famSp==="psycho"){
-    const vol=0.75+Math.random()*0.8;
-    lf=Math.max(.15,Math.min(4.5,lf*vol));la=Math.max(.15,Math.min(4.5,la*vol));}
-  /* TAKTIKA-STÍLUS (F4): a BEÉRETT (85+) aktív taktika a gólszám-KARAKTERT is
-     alakítja — a tacticEffect diff-hatásán felül ez adja a meccsek eltérő
-     "ízét". Begyakorlatlan (85 alatti) taktikánál nincs stílus-hatás.
-       busz: zárt meccsek — mindkét oldal gólszáma ×0.8 (több 1-0, 0-0)
-       kontra: az ERŐSEBB ellenfél ellen él — ha diff<0, a saját gólszám ×1.15
-       labdatartás: elveszik a labdát az ellenféltől — ellenfél ×0.9
-       totális/széljáték: nyílt sisak — saját ×1.1, ellenfél ×1.05
-       hosszú labdák: direkt játék — saját ×1.08 */
-  const tacStyle=(S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)>=85)?TACTICS[S.tactics.active].style:null;
-  if(tacStyle){
-    const CL=x=>Math.max(.15,Math.min(4.5,x));
-    if(tacStyle==="bus"){lf=CL(lf*0.8);la=CL(la*0.8);}
-    else if(tacStyle==="counter"){if(diff<0)lf=CL(lf*1.15);}
-    else if(tacStyle==="possession"){la=CL(la*0.9);}
-    else if(tacStyle==="total"||tacStyle==="wings"){lf=CL(lf*1.1);la=CL(la*1.05);}
-    else if(tacStyle==="longball"){lf=CL(lf*1.08);}
-  }
-  /* PÁRKÉMIA — csapatszintű hatás: minden pályán lévő, KÉSZ (5/5) páros
-     enyhén (~3%) növeli a csapat gólmennyiségét, összesen legfeljebb ~+18%-ig
-     (6 párosnál telítődik), hogy sok kész pár se csússzon el. */
-  const chemActiveNames=new Set(active.map(a=>a.p.n));
-  const chemPairCount=completeChemPairsOnPitch(chemActiveNames);
-  if(chemPairCount>0){
-    const teamChemBoost=Math.min(0.18,chemPairCount*0.03);
-    lf=Math.max(.15,Math.min(4.5,lf*(1+teamChemBoost)));}
+  const _L=matchLambdas(MS,fx.o.ovr+hiddenOppBuff,fx.neutral?0:(fx.home?SIM.HOME:SIM.AWAY));
+  let diff=_L.diff,lf=_L.lf,la=_L.la;
+  const chemPairCount=MS.chemPairs;
+  /* A pályán lévők névhalmaza a GÓLSZERZŐ-VÁLASZTÁSHOZ kell (a párkémia
+     játékos-szintű gólszorzójához) — nem csak a csapatszintű λ-hoz. */
+  const chemActiveNames=MS.activeNames;
   /* MEGJEGYZÉS: a korábbi külön "specializációs szorzó" megszűnt — az
      attribútum-hatás mostantól ÁTLÁTHATÓAN, a csapaterőben él: minden játékos
      a poszton érvényes EFFEKTÍV Ratingjével (attribútumok + poszt-ismeret)
