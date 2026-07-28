@@ -1190,7 +1190,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.4.14";
+const APP_VERSION="2.4.15";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9711,6 +9711,116 @@ function matchLambdas(mine,oppOvr,venueAdj){
   if(mine.chemPairs>0)
     lf=Math.max(.15,Math.min(4.5,lf*(1+Math.min(0.18,mine.chemPairs*0.03))));
   return {diff,lf,la};}
+/* ================= F4/3 — JÁTÉKOS-JÁTÉKOS (H2H) MECCS =================
+   A meccs alatt NINCS interakció, ezért nem kell élő szinkron. A folyamat:
+     1) a vendég átküldi a meccs-pillanatképét,
+     2) a HOST lefuttatja a szimulációt,
+     3) a host átküldi a teljes eseménylistát,
+     4) mindkét kliens LEJÁTSSZA, saját nézőpontból.
+   Így garantáltan ugyanazt látja a két játékos, és a hálózati késés láthatatlan.
+
+   A "vékony" pillanatkép szándékosan SZÁMOKAT visz, nem nyers állapotot: a
+   fogadó kliensnek nincs meg a másik keretének careerPool-ja, skilljei vagy
+   párkémiája, tehát nem tudná újraszámolni. A gól- és gólpassz-súlyokat ezért
+   a TULAJDONOS kliense számolja ki (ahol minden adat megvan), és készen küldi. */
+function h2hWireSnapshot(){
+  const MS=buildMatchSnapshot();
+  return {
+    teamName:teamName,
+    ovr:MS.ovr,defMult:MS.defMult,famSp:MS.famSp,
+    tacticEffect:MS.tacticEffect,tacticStyle:MS.tacticStyle,chemPairs:MS.chemPairs,
+    players:MS.active.map(a=>{
+      const pos=slots[a.idx]?slots[a.idx].pos:"KKP";
+      return {n:a.p.n,pos,
+        gw:(GOALW[pos]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"goalw")
+           *chemGoalMultForPlayer(a.p.n,MS.activeNames),
+        aw:(ASSTW[pos]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"assistw")};}),
+    formName:(MS.active[MS.gi]&&MS.active[MS.gi].p.n)||null,
+    weakName:(MS.active[MS.bi]&&MS.active[MS.bi].p.n)||null};}
+/* Súlyozott választás egy pillanatkép játékosai közül. */
+function h2hPick(players,key){
+  let tot=0;players.forEach(p=>{tot+=Math.max(0,p[key]||0);});
+  if(tot<=0)return players[Math.floor(Math.random()*players.length)];
+  let r=Math.random()*tot;
+  for(const p of players){r-=Math.max(0,p[key]||0);if(r<=0)return p;}
+  return players[players.length-1];}
+/* A szimuláció. RITMUSA AZONOS a CPU-meccsével: 18 tick × 5 perc,
+   tickenként poisson(λ/18) — így a teljes várható gólszám pontosan λ, és a
+   H2H nem lesz se gólgazdagabb, se szegényebb a megszokottnál.
+   A visszaadott eseménylista teljesen sorosítható: ez megy át a hálózaton. */
+function h2hSimulate(home,away){
+  const Lh=matchLambdas(home,away.ovr,SIM.HOME);
+  const La=matchLambdas(away,home.ovr,SIM.AWAY);
+  /* ---- KÉT NÉZET ÁTLAGA ----
+     A CPU-meccsen az ellenfél egyetlen szám, ezért elég a saját lf. H2H-ban
+     viszont MINDKÉT oldal gazdag, és ugyanarra a mennyiségre két becslés van:
+       Lh.lf  = mennyit lő a hazai (a hazai TÁMADÓ módosítóival)
+       La.la  = mennyit kap a vendég (a vendég VÉDEKEZŐ szorzójával)
+     Ha csak az elsőt használnánk, a másik csapat védekező skilljei (defMult)
+     és a védekező taktika-stílusa SEMMIT nem érnének a párharcban — pedig a
+     karrier egyik fő építőiránya. A kettő számtani átlaga mindkét oldal
+     munkáját beszámítja, és szimmetrikus: a hazai támadása és a vendég
+     védekezése egyforma súllyal szól bele. */
+  const CL=x=>Math.max(.15,Math.min(4.5,x));
+  const lamHome=CL((Lh.lf+La.la)/2);
+  const lamAway=CL((La.lf+Lh.la)/2);
+  const ev=[];let hg=0,ag=0;
+  ev.push({min:0,type:"start",home:home.teamName,away:away.teamName});
+  for(let t=1;t<=18;t++){
+    const min=t*5;
+    if(min===50)ev.push({min:45,type:"half",hg,ag});
+    const side=(who,lamTot,isHome)=>{
+      const g=poisson(lamTot/18);
+      for(let k=0;k<g;k++){
+        const sc=h2hPick(who.players,"gw");
+        let as=null;
+        if(Math.random()<0.75){
+          let guard=0;do{as=h2hPick(who.players,"aw");}while(as&&as.n===sc.n&&guard++<8);
+          if(as&&as.n===sc.n)as=null;}
+        if(isHome)hg++;else ag++;
+        ev.push({min:Math.max(1,min-Math.floor(Math.random()*5)),type:"goal",
+          side:isHome?"home":"away",scorer:sc.n,assist:as?as.n:null,hg,ag});}};
+    side(home,lamHome,true);
+    side(away,lamAway,false);}
+  ev.push({min:90,type:"end",hg,ag});
+  /* a gólok percét utólag rendezzük, hogy az idővonal monoton legyen */
+  ev.sort((a,b)=>a.min-b.min||(a.type==="start"?-1:b.type==="start"?1:0));
+  /* az állást újraszámoljuk a rendezett sorrendben */
+  let h=0,a2=0;
+  ev.forEach(e=>{if(e.type==="goal"){if(e.side==="home")h++;else a2++;e.hg=h;e.ag=a2;}});
+  return {events:ev,hg,ag,lam:{home:lamHome,away:lamAway}};}
+/* Az eseménylista LEJÁTSZÁSA. Mindkét kliens ugyanazt a listát kapja, de a
+   saját nézőpontjából mutatja: a "mi" oldalunk gólja ünnep, a másiké kapott gól.
+   A tempó fixen 0,25× (a specifikáció szerint), hogy a H2H olvasható legyen —
+   ez a meccs a karrier csúcspontja, nem átfutandó forduló. */
+const H2H_TICK_MS=Math.round(330/0.25);
+function h2hPlayback(sim,iAmHome,onDone){
+  const ev=sim.events.slice();
+  const meName=iAmHome?ev[0].home:ev[0].away;
+  const oppName=iAmHome?ev[0].away:ev[0].home;
+  const scoreTxt=e=>iAmHome?`${e.hg}:${e.ag}`:`${e.ag}:${e.hg}`;
+  $("scSim").classList.remove("hide");
+  $("ttTeam").textContent=String(meName).toUpperCase().slice(0,16);
+  addLine(`— PÁRHARC · ${esc(String(meName))} – ${esc(String(oppName))} —`,"mt");
+  let i=0;
+  const iv=setInterval(()=>{
+    if(i>=ev.length){clearInterval(iv);S.playing=false;if(onDone)onDone(sim);return;}
+    const e=ev[i++];
+    if(e.type==="start"){
+      addLine(`Kezdőrúgás! ${esc(String(e.home))} – ${esc(String(e.away))}`,"m");
+    }else if(e.type==="half"){
+      addLine(`FÉLIDŐ  ${scoreTxt(e)}`,"m draw");
+    }else if(e.type==="goal"){
+      const mine=(e.side==="home")===iAmHome;
+      const asst=e.assist?` (${esc(shortName(e.assist))})`:"";
+      addLine(`${e.min}'  ${mine?"GÓL!":"Kapott gól:"} ${esc(shortName(e.scorer))}${asst}  ${scoreTxt(e)}`,
+              mine?"m goal":"m oppgoal");
+    }else if(e.type==="end"){
+      const mineG=iAmHome?e.hg:e.ag, oppG=iAmHome?e.ag:e.hg;
+      addLine(`VÉGE  ${mineG}:${oppG}  —  ${mineG>oppG?"GYŐZELEM a párharcban!":mineG<oppG?"vereség a párharcban":"döntetlen"}`,
+              mineG>oppG?"m win":mineG<oppG?"m loss":"m draw");}
+  },S.auto?18:H2H_TICK_MS);
+  return ()=>clearInterval(iv);}
 function playMatch(){
   S.playing=true;$("kickBtn").disabled=true;
   /* A KUPA-KÉPERNYŐ MECCS-LOGJÁHOZ: megjelöljük, hol tart most a napló, hogy a
@@ -15733,6 +15843,17 @@ const mpBackendLocal={
     room.start=start;room.status="starting";
     mpLSave(rooms);this._notify();},
   async get(code){return mpLRooms()[code]||null;},
+  /* F4/3 — H2H csatorna: a szoba alatt egy "h2h/<forduló>" ág, két mezővel.
+     A vendég a pillanatképét írja, a host az eseménylistát. */
+  async h2hPut(code,round,field,val){
+    const rooms=mpLRooms(),room=rooms[code];
+    if(!room)return;
+    room.h2h=room.h2h||{};room.h2h[round]=room.h2h[round]||{};
+    room.h2h[round][field]=val;
+    mpLSave(rooms);this._notify();},
+  async h2hGet(code,round){
+    const room=mpLRooms()[code];
+    return (room&&room.h2h&&room.h2h[round])||null;},
   subscribe(code,cb){this._code=code;this._cb=cb;this._notify();},
   unsubscribe(){this._cb=null;this._code=null;}};
 /* ---- FIREBASE backend ---- */
@@ -15770,6 +15891,14 @@ const mpBackendFb={
     await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/status"),"starting");},
   async get(code){
     const s=await mpNet.fns.get(mpNet.fns.ref(mpNet.db,"mp/rooms/"+code));
+    return s.exists()?s.val():null;},
+  /* F4/3 — H2H csatorna (lásd a helyi backend azonos nevű metódusait) */
+  async h2hPut(code,round,field,val){
+    const F=mpNet.fns;
+    await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/h2h/"+round+"/"+field),val);},
+  async h2hGet(code,round){
+    const F=mpNet.fns;
+    const s=await F.get(F.ref(mpNet.db,"mp/rooms/"+code+"/h2h/"+round));
     return s.exists()?s.val():null;},
   subscribe(code,cb){
     this.unsubscribe();
