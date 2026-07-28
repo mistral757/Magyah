@@ -452,6 +452,9 @@ button:disabled{opacity:.35;cursor:default}
 .strow.strow8{grid-template-columns:1.7fr .5fr .5fr .5fr .4fr .4fr .4fr .4fr}
 .strow.tbl{grid-template-columns:24px 1.5fr .4fr .4fr .4fr .4fr .6fr .45fr}
 .strow.you{background:rgba(201,162,51,.16);font-weight:700;color:var(--gold)}
+/* F5: a TÁRSAD sora a közös tabellában — kiemelt, de a sajátodtól eltérő
+   színnel, hogy egy pillantásra el lehessen dönteni, ki hol áll. */
+.strow.mate{background:rgba(140,120,220,.16);font-weight:700;color:#b9a9f0}
 .strow:first-child{border-top:none}
 .strow.shead{background:var(--panel2);color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0;font-size:9.5px}
 .strow span{text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -8953,6 +8956,7 @@ function weightedShuffleSkills(rnd){
 const S={idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,capMod:0,eventMod:0,subs:{},resumeCb:null,
   morale:50,moraleTarget:50,moraleSum:0,moraleSamples:0,scorers:{},assists:{},mvps:{},goodForm:{},badForm:{},playerReds:{},playerInjuries:{},careerStats:{},clubScoutSpinsUsed:0,consecutiveTitles:0,consecutiveBadSeasons:0,seasonSaves:{},seasonCleanSheets:{},seasonMatches:{},seasonNumber:1,seasonHistory:[],
   grudge:new Set(),fixtures:[],playing:false,auto:false,
+  mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
   skillPool:weightedShuffleSkills(),skills:{},ratingAdj:{},winStreak:0,winlessStreak:0,fixtureResults:[],
   discWatch:{},hotStreak:{},goallessStreak:{},transferBudget:0,unbeatenStreak:0,cleanSheetStreak:0,
   /* PÁRKÉMIA-rendszer: chemPairs[kulcs] = {a,b,stages,need} — két játékos közti,
@@ -9282,6 +9286,38 @@ $("simGo").onclick=()=>{
     else{$("scPitch").classList.add("hide");showChallengeOffers("long",5,startFirstSeason,true);}
     return;}
   startFirstSeason();};
+/* ================= F5 — A SZEZON SORSOLÁSA =================
+   Egyjátékosban változatlan: 15 ellenfél oda-vissza = 30 forduló, és a
+   végtabella 16 csapatos (te + 15 CPU), mindenki 30 meccsel.
+
+   A KÖZÖS KARRIERBEN a 15. és a 30. forduló a PÁRHARCÉ, tehát a CPU-nak csak
+   28 hely marad. Ezért ott EGY ellenfél kimarad a mezőnyből: 14 × 2 = 28
+   bajnoki + 2 párharc = 30 forduló. A tabella így marad 16 csapatos —
+   14 CPU + a két menedzser —, és minden csapat pontosan 30 meccset játszik:
+   a CPU 13 másik CPU ellen oda-vissza (26 szimulált), plusz 2-2 valós meccs
+   a két menedzser ellen.
+
+   A kimaradó csapatot a SZOBA SEEDJE választja, nem a helyi véletlen: enélkül
+   a két kliens más mezőnyben játszana, és a közös tabella értelmét vesztené. */
+function mpSkippedOppName(){
+  if(!h2hRoomActive()||!SEASON_OPPS.length)return null;
+  const r=rngFor("s"+(S.seasonNumber||1)+":mpdrop");
+  return SEASON_OPPS[Math.floor(r()*SEASON_OPPS.length)].n;}
+/* A bajnokságban ténylegesen szereplő CPU-csapatok (MP-ben eggyel kevesebb). */
+function leagueOpps(){
+  const skip=mpSkippedOppName();
+  return skip?SEASON_OPPS.filter(o=>o.n!==skip):SEASON_OPPS.slice();}
+function buildSeasonFixtures(){
+  S.fixtures=[];
+  leagueOpps().forEach(o=>{S.fixtures.push({o,home:true});S.fixtures.push({o,home:false});});
+  S.fixtures.sort(()=>Math.random()-.5);
+  /* A párharc két HELYE. Maga a meccs nem innen dolgozik (a playMatch a társ
+     pillanatképéből épít fixture-t), de a helyfoglalás nélkül elcsúsznának a
+     fordulószámok: a 16. forduló a 16. CPU-meccsre mutatna, a végén pedig
+     kifutnánk a listából. */
+  if(h2hRoomActive())
+    H2H_ROUNDS.forEach(r=>S.fixtures.splice(r-1,0,
+      {duel:true,round:r,home:false,o:{n:"⚔ A társad",ovr:0}}));}
 function startFirstSeason(){
   phase="season";
   $("scPitch").classList.remove("hide");   /* a kihívás-képernyő elrejtette */
@@ -9300,9 +9336,10 @@ function startFirstSeason(){
   S.moraleTarget=computeMoraleTarget();S.morale=S.moraleTarget;
   S.moraleSum=0;S.moraleSamples=0;   /* KAPITÁNY: friss szezon → friss realizált-hatás mintavétel */
   S.transferBudget=gameMode==="career"?computeSeasonBudget():0;
-  SEASON_OPPS.forEach(o=>{S.fixtures.push({o,home:true});S.fixtures.push({o,home:false});});
-  S.fixtures.sort(()=>Math.random()-.5);
+  buildSeasonFixtures();
   addLine(`Sorsolás kész. 30 forduló vár rád, ${esc(teamName)}. Edző: ${coach.n}. Sok sikert!`,"m");
+  if(h2hRoomActive())
+    addLine(`⚔ A ${H2H_ROUNDS.join(". és a ")}. fordulóban a társad ellen játszol — a mezőny többi csapata ellen oda-vissza megy a bajnokság.`,"m ev");
   updateStanding();updateMorale();
   $("scSim").scrollIntoView({behavior:"smooth"});
   saveGame();};
@@ -9904,18 +9941,25 @@ function startRound(){
   if(h2hIsDuelRound()&&!h2hScript){h2hBeginDuel();return;}
   playMatch();}
 function h2hWaitHide(){$("h2hWait").classList.add("hide");}
-function h2hWaitShow(round,msg,mine,opp){
+/* A várakozó réteg. A "what" a két sor megnevezése — a párharcnál a keret, a
+   szezonzárásnál a zárójelentés vár egymásra. */
+function h2hWaitShow(round,msg,mine,opp,what){
+  const W=what||{mine:"A te kereted",opp:"A társad kerete",cancel:"✕ Most nem játszom le"};
   $("h2hWait").classList.remove("hide");
-  $("h2hWaitRound").textContent=`${round}. FORDULÓ`;
+  $("h2hWaitRound").textContent=typeof round==="number"?`${round}. FORDULÓ`:String(round);
   $("h2hWaitMsg").innerHTML=msg;
+  $("h2hWaitCancelBtn").textContent=W.cancel;
   const box=$("h2hWaitPlayers");box.innerHTML="";
   const row=(txt,ok)=>{
     const d=document.createElement("div");
     d.className="mpPl"+(ok?" rdy":"");
     d.innerHTML=`<span>${txt}</span><span class="st ${ok?"":"wait"}">${ok?"KÉSZ ✓":"várakozik…"}</span>`;
     box.appendChild(d);};
-  row(`${MP.role==="host"?"👑":"🤝"} A te kereted <b style="color:#e1ad66">(te)</b>`,!!mine);
-  row(`${MP.role==="host"?"🤝":"👑"} A társad kerete`,!!opp);}
+  row(`${MP.role==="host"?"👑":"🤝"} ${W.mine} <b style="color:#e1ad66">(te)</b>`,!!mine);
+  row(`${MP.role==="host"?"🤝":"👑"} ${W.opp}`,!!opp);}
+/* A szezonzárás-várakozó feliratai. */
+const H2H_WAIT_FINAL={mine:"A te szezonzárásod",opp:"A társad szezonzárása",
+  cancel:"✕ Most nem várom meg"};
 /* Kilépés a várakozásból. A pillanatkép a szobában MARAD — ha később
    visszatérsz, onnan folytatódik, nem kell újra felküldeni. */
 function h2hAbortWait(){
@@ -9924,8 +9968,14 @@ function h2hAbortWait(){
   h2hWaitHide();
   $("kickBtn").disabled=false;
   $("kickBtn").textContent=kickBtnLabel();}
-$("h2hWaitCancelBtn")&&($("h2hWaitCancelBtn").onclick=h2hAbortWait);
-$("h2hWaitHomeBtn")&&($("h2hWaitHomeBtn").onclick=()=>{h2hAbortWait();goHomeScreen();});
+/* A várakozó réteget KÉT folyamat használja: a párharc pillanatkép-cseréje és
+   a szezonzárás egyeztetése (F5). A két kiút ugyanaz, csak azt kell tudni,
+   melyik figyelőt kell leállítani. */
+function h2hWaitLeave(){
+  if(_mpFinalBusy){mpFinalWaitStop();h2hWaitHide();return;}
+  h2hAbortWait();}
+$("h2hWaitCancelBtn")&&($("h2hWaitCancelBtn").onclick=h2hWaitLeave);
+$("h2hWaitHomeBtn")&&($("h2hWaitHomeBtn").onclick=()=>{h2hWaitLeave();goHomeScreen();});
 /* A csere levezénylése. Minden lépés ÚJRAINDÍTHATÓ: ha a böngésző félúton
    újratölt, a szobában lévő állapotból pontosan ott folytatódik. */
 async function h2hBeginDuel(){
@@ -10018,6 +10068,74 @@ function duelGmin(m){
   const x=Math.max(1,Math.min(90,m|0));
   _lastGoalMin=Math.max(_lastGoalMin,x);
   return x;}
+/* ================= F5 — SZEZONZÁRÁS-CSERE =================
+   A közös végtabellához nem elég a saját szezonod: a 14 CPU-csapat mindkét
+   menedzser ellen játszott 2-2 meccset, és ha a társad eredményeit nem
+   könyveljük el nekik, hiányozna 2-2 meccsük, a tabella pedig hazudna.
+
+   Ezért a szezon végén mindkét kliens felteszi a szobába a saját zárását:
+   a mérlegét ÉS a CPU-k elleni 28 eredményét (a párharcok kimaradnak — azok a
+   két menedzser között mentek, CPU-t nem érintenek). Egy ilyen jelentés ~1 kB.
+
+   IDŐKORLÁT ITT SINCS: a társad akár napokkal később is zárhat. Addig a
+   verdikt vár, a karriered mentve van, és a kezdőlapra bármikor visszaléphetsz. */
+function mpSeasonKey(){return "s"+(S.seasonNumber||1)+"final";}
+function mpSeasonReport(){
+  return {
+    teamName:teamName,ovr:teamOVRbase(),
+    pts:S.pts,w:S.W,d:S.D,l:S.L,gf:S.GF,ga:S.GA,
+    /* CSAK a CPU-k elleni eredmények. A hivatkozás a mezőny SORSZÁMA (i), nem a
+       klubnév: a "kész klub" indulásnál a saját klubod kikerül az ellenfelek
+       közül, és a helyére másik csapat lép (clubExcludeSelfFromOpponents) —
+       vagyis a két kliens ellenféltáblája 1-1 néven ELTÉRHET. Sorszámra
+       hivatkozva a könyvelés akkor is pontos marad; a nevet csak tartalékként
+       (és régi adat kedvéért) küldjük. */
+    results:(S.fixtureResults||[]).filter(fr=>!fr.duel).map(fr=>{
+      const n=(fr.o&&fr.o.n!==undefined)?String(fr.o.n):String(fr.o||"");
+      return {i:SEASON_OPPS.findIndex(o=>o.n===n),n,gf:fr.gf,ga:fr.ga};})};}
+/* Megvan-e már a társ zárása? A mentés része, tehát egyszer kell megszerezni. */
+function mpMateFinal(){
+  const m=S.mpMateFinal;
+  return (m&&m.season===(S.seasonNumber||1))?m.rep:null;}
+let _mpFinalPoll=null,_mpFinalBusy=false;
+/* Feltölti a sajátunkat, és megpróbálja leszedni a társét. true, ha megvan. */
+async function mpSyncSeasonEnd(){
+  if(mpMateFinal())return true;
+  const key=mpSeasonKey();
+  const myField=MP.role==="host"?"host":"guest";
+  const oppField=myField==="host"?"guest":"host";
+  try{await mpNetInit();}catch(e){}
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){return false;}
+  /* A sajátunkat egyszer tesszük fel — a szezon már lezárult, nem változhat. */
+  if(!node||!node[myField]){
+    try{await mpBk().h2hPut(MP.activeRoom,key,myField,mpSeasonReport());}catch(e){}
+    try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}}
+  if(node&&node[oppField]){
+    S.mpMateFinal={season:(S.seasonNumber||1),rep:node[oppField]};
+    try{saveGame();}catch(e){}
+    return true;}
+  return false;}
+function mpFinalWaitStop(){
+  _mpFinalBusy=false;
+  if(_mpFinalPoll){clearTimeout(_mpFinalPoll);_mpFinalPoll=null;}}
+/* A verdikt előtti várakozás. Ugyanaz a réteg, mint a párharcnál — ugyanaz a
+   két kiút is: kezdőlap (a szoba és a karrier megmarad) vagy megszakítás. */
+function mpFinalWait(onReady){
+  if(_mpFinalBusy)return;
+  _mpFinalBusy=true;
+  const tick=async()=>{
+    if(!_mpFinalBusy)return;
+    let ok=false;
+    try{ok=await mpSyncSeasonEnd();}catch(e){}
+    if(!_mpFinalBusy)return;
+    if(ok){mpFinalWaitStop();h2hWaitHide();onReady();return;}
+    h2hWaitShow("SZEZONZÁRÁS",
+      `<span class="h2hDot"></span>A szezonod lezárult. A közös tabellához a társad zárása is kell — amint ő is végigjátssza a 30. fordulót, összeáll a végeredmény.`,
+      true,false,H2H_WAIT_FINAL);
+    _mpFinalPoll=setTimeout(tick,3000);};
+  h2hWaitShow("SZEZONZÁRÁS","Szezonzárás egyeztetése…",true,false,H2H_WAIT_FINAL);
+  tick();}
 function playMatch(){
   /* F4/4: a párharc szkriptje EGYSZER használatos — itt vesszük át és
      nullázzuk, hogy a meccs végén már ne lógjon be a következő fordulóba. */
@@ -12281,9 +12399,23 @@ function renderStatsTable(targetId){
    tabella jöjjön ki — a te eredményeid a ténylegesen lejátszott meccsekből. ---- */
 function buildFinalTable(){
   const lamFn=d=>Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)));
-  const teams=[{n:teamName,you:true,ovr:teamOVRbase(),pts:S.pts,gf:S.GF,ga:S.GA,w:S.W,d:S.D,l:S.L}]
-    .concat(SEASON_OPPS.map(o=>({n:o.n,you:false,ovr:o.ovr,pts:0,gf:0,ga:0,w:0,d:0,l:0})));
-  /* az ellenfelek TE elleni valós eredményei is beépülnek a saját mérlegükbe.
+  /* ---- F5: KÖZÖS TABELLA ----
+     Közös karrierben KÉT menedzser-sor van, és eggyel kevesebb CPU (a 15. és
+     30. forduló a párharcé — lásd buildSeasonFixtures). A mezőny így marad 16
+     csapatos, és mindenki 30 meccset játszik:
+       · menedzser: 28 valós CPU-meccs + 2 párharc,
+       · CPU: 2 valós az egyik menedzser ellen + 2 a másik ellen + 26 szimulált.
+     A társ sorát a szezonzárás-cseréből kapjuk; ha (még) nincs meg, egyjátékos
+     alakban áll össze a tabella — a finish() eleve megvárja, ezért ide már
+     jellemzően kész adattal érkezünk. */
+  const mateRep=h2hRoomActive()?mpMateFinal():null;
+  const oppList=h2hRoomActive()?leagueOpps():SEASON_OPPS;
+  const teams=[{n:teamName,you:true,player:true,ovr:teamOVRbase(),pts:S.pts,gf:S.GF,ga:S.GA,w:S.W,d:S.D,l:S.L}];
+  if(mateRep)teams.push({n:String(mateRep.teamName||"A társad"),you:false,player:true,mate:true,
+    ovr:mateRep.ovr||0,pts:mateRep.pts||0,gf:mateRep.gf||0,ga:mateRep.ga||0,
+    w:mateRep.w||0,d:mateRep.d||0,l:mateRep.l||0});
+  oppList.forEach(o=>teams.push({n:o.n,you:false,player:false,ovr:o.ovr,pts:0,gf:0,ga:0,w:0,d:0,l:0}));
+  /* Egy menedzser-eredmény TÜKRE a CPU sorába.
      FONTOS: a párosítás a NÉV alapján megy (fr.o.n === x.n), NEM objektum-
      referenciával. A referencia-azonosság (x.ref===fr.o) a mentés/betöltés JSON
      round-tripje után eltörik: a SEASON_OPPS és a fixtureResults külön
@@ -12291,15 +12423,25 @@ function buildFinalTable(){
      SEASON_OPPS-beli megfelelője — emiatt a user 2-2 meccse nem épült be, és az
      ellenfeleknek 2-vel kevesebb lejátszott meccse látszott. A klubnév
      (pl. "FC Barcelona (2014/15)") egyedi és túléli a szerializálást. */
-  S.fixtureResults.forEach(fr=>{
-    const oppName=(fr.o&&fr.o.n)!==undefined?fr.o.n:fr.o;
-    const t=teams.find(x=>!x.you&&x.n===oppName);
+  const creditOpp=(oppName,gf,ga)=>{
+    const t=teams.find(x=>!x.player&&x.n===oppName);
     if(!t)return;
-    t.gf+=fr.ga;t.ga+=fr.gf;
-    if(fr.gf>fr.ga)t.l++;
-    else if(fr.gf<fr.ga){t.w++;t.pts+=3;}
-    else{t.d++;t.pts++;}
-  });
+    t.gf+=ga;t.ga+=gf;
+    if(gf>ga)t.l++;
+    else if(gf<ga){t.w++;t.pts+=3;}
+    else{t.d++;t.pts++;}};
+  S.fixtureResults.forEach(fr=>{
+    /* a párharc a két menedzser között ment — CPU-sort nem érint, és mindkettő
+       mérlegében már benne van a saját oldaláról */
+    if(fr.duel)return;
+    creditOpp((fr.o&&fr.o.n)!==undefined?fr.o.n:fr.o,fr.gf,fr.ga);});
+  /* a TÁRSAD 28 CPU-meccse — enélkül a CPU-knak hiányozna 2-2 meccsük.
+     A sorszám (r.i) az elsődleges hivatkozás, a név csak tartalék — lásd a
+     mpSeasonReport indoklását a klub-indulás névcseréjéről. */
+  if(mateRep&&Array.isArray(mateRep.results))
+    mateRep.results.forEach(r=>{
+      const byIdx=(r.i>=0&&SEASON_OPPS[r.i])?SEASON_OPPS[r.i].n:null;
+      creditOpp(byIdx||r.n,r.gf|0,r.ga|0);});
   /* ASZIMMETRIKUS TABELLA-ERŐ: a valós szezonban minden ellenfél ~azonos erejű
      (a beállított nehézségen), ezért a tabella korábban irreálisan lapos volt —
      mindenki egymástól lopott pontot, a bajnoki küszöb leszorult. A tabella
@@ -12308,7 +12450,7 @@ function buildFinalTable(){
      szinted a középmezőnyben — ÁTLAGTARTÓAN, hogy a mezőny átlaga a beállított
      nehézségen maradjon. A te ELLENED játszott valós meccseket ez NEM érinti
      (azok fent már beépültek); csak a sosem játszott AI-vs-AI meccsekre hat. */
-  const opps=teams.filter(t=>!t.you);
+  const opps=teams.filter(t=>!t.player);
   if(opps.length){
     /* rangsor a valós erejük szerint (hogy a felismerhető erős klubok maradjanak
        felül), majd egy aszimmetrikus offset-profil rájuk vetítve */
@@ -12337,19 +12479,20 @@ function buildFinalTable(){
     const adj=meanOvr-tMean;
     ranked.forEach(t=>{t.tovr+=adj;});
   }
-  /* a te tabella-erőd a valós (boostok nélküli) csontváz-erőd marad */
-  teams.forEach(t=>{if(t.you)t.tovr=t.ovr;});
-  /* a 15 ellenfél egymás elleni, sosem lejátszott meccseit a széthúzott
-     tabella-erővel szimuláljuk; a semleges AI-vs-AI meccsen nincs hazai előny */
-  for(let i=1;i<teams.length;i++){
-    for(let j=1;j<teams.length;j++){
+  /* a menedzser-sorok tabella-ereje a valós (boostok nélküli) csontváz-erő */
+  teams.forEach(t=>{if(t.player)t.tovr=t.ovr;});
+  /* a CPU-csapatok egymás elleni, sosem lejátszott meccseit a széthúzott
+     tabella-erővel szimuláljuk; a semleges AI-vs-AI meccsen nincs hazai előny.
+     A menedzser-sorok ebből KIMARADNAK: az ő 30 meccsük mind valós. */
+  for(let i=0;i<opps.length;i++){
+    for(let j=0;j<opps.length;j++){
       if(i===j)continue;
-      const diff=teams[i].tovr-teams[j].tovr;
+      const diff=opps[i].tovr-opps[j].tovr;
       const gf=poisson(lamFn(diff)),ga=poisson(lamFn(-diff));
-      teams[i].gf+=gf;teams[i].ga+=ga;teams[j].gf+=ga;teams[j].ga+=gf;
-      if(gf>ga){teams[i].w++;teams[i].pts+=3;teams[j].l++;}
-      else if(gf<ga){teams[j].w++;teams[j].pts+=3;teams[i].l++;}
-      else{teams[i].d++;teams[j].d++;teams[i].pts++;teams[j].pts++;}
+      opps[i].gf+=gf;opps[i].ga+=ga;opps[j].gf+=ga;opps[j].ga+=gf;
+      if(gf>ga){opps[i].w++;opps[i].pts+=3;opps[j].l++;}
+      else if(gf<ga){opps[j].w++;opps[j].pts+=3;opps[i].l++;}
+      else{opps[i].d++;opps[j].d++;opps[i].pts++;opps[j].pts++;}
     }
   }
   teams.forEach(t=>{delete t.tovr;});
@@ -12361,7 +12504,7 @@ function renderFinalTable(teams){
   html+='<div class="strow tbl shead"><span>#</span><span>Csapat</span><span>M</span><span>GY</span><span>D</span><span>V</span><span>Gk</span><span>P</span></div>';
   teams.forEach((t,i)=>{
     const played=t.w+t.d+t.l;
-    html+=`<div class="strow tbl${t.you?" you":""}"><span>${i+1}.</span><span>${esc(t.n)}${t.you?" (TE)":""}</span><span>${played}</span><span>${t.w}</span><span>${t.d}</span><span>${t.l}</span><span>${t.gf}:${t.ga}</span><span>${t.pts}</span></div>`;});
+    html+=`<div class="strow tbl${t.you?" you":t.mate?" mate":""}"><span>${i+1}.</span><span>${esc(t.n)}${t.you?" (TE)":t.mate?" (A TÁRSAD)":""}</span><span>${played}</span><span>${t.w}</span><span>${t.d}</span><span>${t.l}</span><span>${t.gf}:${t.ga}</span><span>${t.pts}</span></div>`;});
   html+='</div></div>';
   return html;}
 function showSwapPanel(){
@@ -12471,6 +12614,19 @@ function autoResolveCheckpoint(round){
    (S.finalTable), a széria-számlálók pedig csak egyszer frissülnek
    (S.seasonClosed), így újratöltéskor újrafuthat torzítás nélkül. */
 function finish(){
+  /* ---- F5: A KÖZÖS TABELLA MEGVÁRJA A TÁRSADAT ----
+     A helyezésed a KÖZÖS mezőnyben dől el, és a helyezésből jön a szezon-
+     történet bejegyzése meg az európai kvalifikáció is. Ha a társad zárása még
+     nincs meg, egy 15 csapatos, hiányos tabellán számolnánk rangsort — és azt
+     véglegesítenénk. Ezért itt megállunk: a várakozó képernyő elhagyható
+     (a karriered mentve, a szoba megmarad), és bármikor visszatérve folytatódik.
+     A phase="verdict" MÁR MOST beáll, hogy egy újratöltés ide találjon vissza. */
+  if(gameMode==="career"&&h2hRoomActive()&&!S.seasonClosed&&!mpMateFinal()){
+    phase="verdict";
+    $("scSim").classList.add("hide");
+    try{saveGame();}catch(e){}
+    mpFinalWait(()=>finish());
+    return;}
   const pts=S.pts;
   const finalTeams=S.finalTable||buildFinalTable();
   const yourRank=finalTeams.findIndex(t=>t.you)+1;
@@ -15521,6 +15677,8 @@ function startNextCareerSeason(){
     S.euroCurrent=S.euroEntry.comp;S.euroOptOut=false;}
   else S.euroCurrent=null;
   S.finalTable=null;S.seasonClosed=false;S.hubReportHtml=null;S.fixtureResults=[];
+  /* F5: a társ szezonzárása szezononként új — a régit nem szabad átvinni */
+  S.mpMateFinal=null;
   S.idx=0;S.W=0;S.D=0;S.L=0;S.GF=0;S.GA=0;S.pts=0;S.reds=0;S.injuries=0;S.capMod=0;S.eventMod=0;S.subs={};
   S.scorers={};S.assists={};S.mvps={};S.goodForm={};S.badForm={};S.playerReds={};S.playerInjuries={};S.seasonSaves={};S.seasonCleanSheets={};S.seasonMatches={};S.tierQuoteCount={};
   S.grudge=new Set();S.fixtures=[];S.playing=false;
@@ -15582,8 +15740,7 @@ function startNextCareerSeason(){
       else ch.startProgress=challengeRawValue(ch);
     }});
   S._chAnchorPending=false;
-  SEASON_OPPS.forEach(o=>{S.fixtures.push({o,home:true});S.fixtures.push({o,home:false});});
-  S.fixtures.sort(()=>Math.random()-.5);
+  buildSeasonFixtures();
   $("scHub").classList.add("hide");
   $("scVerdict").classList.add("hide");
   $("scSim").classList.remove("hide");
@@ -15681,6 +15838,7 @@ function saveGame(){
         frozenAcademySeasons:S.frozenAcademySeasons,teamFormMalus:S.teamFormMalus,tsiBlocked:S.tsiBlocked,
         boostTokens:S.boostTokens,freePlayerTokens:S.freePlayerTokens,
         finalTable:S.finalTable,seasonClosed:S.seasonClosed,hubReportHtml:S.hubReportHtml,
+        mpMateFinal:S.mpMateFinal,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
     };
@@ -15830,6 +15988,9 @@ function applySavedGame(d){
   S.seasonSkillCont=d.S.seasonSkillCont||0;
   S.firstChemDone=!!d.S.firstChemDone;
   S.finalTable=d.S.finalTable||null;S.seasonClosed=!!d.S.seasonClosed;S.hubReportHtml=d.S.hubReportHtml||null;
+  /* F5: a társ szezonzárása. Régi mentésben nincs — ilyenkor a verdikt előtt
+     egyszerűen újra lekérjük a szobából. */
+  S.mpMateFinal=d.S.mpMateFinal||null;
   /* RUN: a mérő állapota. Régi mentésnél üresen indul, és a lusta
      mérföldkő-detektálás a meglévő előzményekből visszamenőleg feltölti. */
   S.run=d.S.run||null;S.runOpen=!!d.S.runOpen;S.runGuideOpen=!!d.S.runGuideOpen;runInit();
