@@ -1255,7 +1255,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.04";
+const APP_VERSION="2.5.05";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -6161,19 +6161,49 @@ function familyPointBudget(age){
    R szintet keressük, amelyen a profil szerinti öt érték összege épp a keretet
    adja: Σ(R+profil[k]) = total  →  R = (total − Σprofil)/5. Így az ajánlás
    posztHŰ és a kerettel automatikusan skálázódik. */
+/* ---- A CSALÁDTAG IS A MOTOR SZABÁLYAIT KAPJA ----
+   Minden MÁS játékos attribútuma a születésekor így születik:
+     Math.max(40, Math.min(attrCapFor(k), ...))
+   vagyis 40 a padló mindenhol, és a plafon attribútumfüggő — a SEBESSÉGÉ
+   99 (SPEED_MAX), a többié a Rating-plafonhoz kötött. A családtag-szerkesztő
+   ezt eddig teljesen megkerülte: egy mezőnyjátékos Védése lemehetett 0-ra
+   (a motor sehol máshol nem enged 40 alá), a Sebessége pedig a 99-es kemény
+   plafon FÖLÉ, amit a fejlődési rendszer sosem engedne. Mostantól ugyanazok a
+   határok érvényesek rá is. A pontkeret (350-427) bőven elbírja az 5x40-es
+   padlót (200). */
+const FAMILY_ATTR_MIN=40;
+function familyAttrHi(k){
+  const c=attrCapFor(k);
+  return (c===Infinity||!isFinite(c))?999:c;}
+/* Egy kívánt alakzatot úgy önt formába, hogy MINDEN attribútum a
+   [40, plafon] sávban maradjon, és az összeg PONTOSAN a keret legyen. */
+function familyClampSplit(desired,total){
+  const out={};
+  ATTR_KEYS.forEach(k=>{
+    out[k]=Math.max(FAMILY_ATTR_MIN,Math.min(familyAttrHi(k),Math.round(desired[k]||0)));});
+  let diff=total-ATTR_KEYS.reduce((s,k)=>s+out[k],0);
+  let guard=0;
+  while(diff!==0&&guard++<20000){
+    const step=diff>0?1:-1;
+    /* hozzáadásnál a legtávolabb lévőt emeljük a plafonjától, elvételnél a
+       padlójától — így az arányok a lehető legkevésbé torzulnak */
+    const order=ATTR_KEYS.slice().sort((a,b)=>step>0
+      ? (familyAttrHi(b)-out[b])-(familyAttrHi(a)-out[a])
+      : (out[b]-FAMILY_ATTR_MIN)-(out[a]-FAMILY_ATTR_MIN));
+    let moved=false;
+    for(const k of order){
+      const nv=out[k]+step;
+      if(nv>=FAMILY_ATTR_MIN&&nv<=familyAttrHi(k)){out[k]=nv;diff-=step;moved=true;break;}}
+    if(!moved)break;   /* a keret nem osztható szét a határok közt — marad, ami van */
+  }
+  return out;}
 function familyRecommendedAttrs(pos,total){
   const prof=ATTR_PROFILE[pos]||ATTR_PROFILE.KKP;
   const sumProf=ATTR_KEYS.reduce((s,k)=>s+(prof[k]||0),0);
   const R=(total-sumProf)/5;
-  const raw=ATTR_KEYS.map(k=>Math.max(0,R+(prof[k]||0)));
-  const floors=raw.map(Math.floor);
-  const given=floors.reduce((s,v)=>s+v,0);
-  const remainder=total-given;
-  const order=raw.map((v,i)=>({i,frac:v-floors[i]})).sort((a,b)=>b.frac-a.frac);
-  const out={};
-  ATTR_KEYS.forEach((k,i)=>out[k]=floors[i]);
-  for(let k=0;k<Math.max(0,remainder);k++)out[ATTR_KEYS[order[k%order.length].i]]++;
-  return out;}
+  const desired={};
+  ATTR_KEYS.forEach(k=>{desired[k]=R+(prof[k]||0);});
+  return familyClampSplit(desired,total);}
 /* A családtag Ratingje a POSZT FŐ ATTRIBÚTUMÁBÓL jön — ugyanaz a horgony,
    amit a posEffectiveRating is használ. Így ha valaki a fő attribútumra
    koncentrál, az a Ratingjében is meglátszik, és nem kell külön szabály. */
@@ -7157,16 +7187,19 @@ function familyPickAttrs(){
   familyState.attrs=familyRecommendedAttrs(familyState.pos,familyState.total);
   renderFamilyAttrs();}
 function familyEqualSplit(){
-  const n=ATTR_KEYS.length,base=Math.floor(familyState.total/n),rem=familyState.total-base*n;
-  ATTR_KEYS.forEach((k,idx)=>{familyState.attrs[k]=base+(idx<rem?1:0);});
+  const n=ATTR_KEYS.length,base=familyState.total/n;
+  const desired={};ATTR_KEYS.forEach(k=>{desired[k]=base;});
+  familyState.attrs=familyClampSplit(desired,familyState.total);
   renderFamilyAttrs();}
 function familyRecommendedSplit(){
   familyState.attrs=familyRecommendedAttrs(familyState.pos,familyState.total);
   renderFamilyAttrs();}
 function familyAdjust(key,delta){
   if(delta>0&&familyRemaining()<=0)return;
-  if(delta<0&&familyState.attrs[key]<=0)return;
-  familyState.attrs[key]+=delta;
+  /* a kézi állítás sem viheti a motor határain kívülre */
+  const nv=(familyState.attrs[key]||0)+delta;
+  if(nv<FAMILY_ATTR_MIN||nv>familyAttrHi(key))return;
+  familyState.attrs[key]=nv;
   renderFamilyAttrs();}
 function renderFamilyAttrs(){
   /* A várható Rating élőben látszik: a poszt FŐ attribútumából jön, tehát a
@@ -7178,10 +7211,17 @@ function renderFamilyAttrs(){
   const list=document.createElement("div");
   ATTR_KEYS.forEach(k=>{
     const row=document.createElement("div");row.className="famrow";
+    const atMin=familyState.attrs[k]<=FAMILY_ATTR_MIN;
+    const atMax=familyState.attrs[k]>=familyAttrHi(k);
     const dec=document.createElement("button");dec.textContent="−";dec.onclick=()=>familyAdjust(k,-1);
     const inc=document.createElement("button");inc.textContent="+";inc.onclick=()=>familyAdjust(k,1);
+    /* a határon lévő gomb láthatóan tompul — így nem "elromlottnak" tűnik */
+    if(atMin){dec.disabled=true;dec.style.opacity=".35";}
+    if(atMax||familyRemaining()<=0){inc.disabled=true;inc.style.opacity=".35";}
     const lbl=document.createElement("span");lbl.className="famlbl";
-    lbl.innerHTML=(k===mainKey?"★ ":"")+ATTR_LABELS[k];
+    lbl.innerHTML=(k===mainKey?"★ ":"")+ATTR_LABELS[k]
+      +(atMin?' <span style="font-size:10px;color:var(--dim2)">min 40</span>'
+       :atMax?` <span style="font-size:10px;color:var(--dim2)">max ${familyAttrHi(k)}</span>`:"");
     if(k===mainKey)lbl.style.color="var(--gold)";
     const val=document.createElement("span");val.className="famval";val.textContent=familyState.attrs[k];
     row.appendChild(lbl);row.appendChild(dec);row.appendChild(val);row.appendChild(inc);
@@ -10475,6 +10515,49 @@ async function mpPollDecision(){
     try{saveGame();}catch(e){}
     return true;}
   return false;}
+/* ================= MP — A NEHÉZSÉGI SZINT A HÁZIGAZDA KEZÉBEN =================
+   Közös világ = közös mezőny. Ha a két menedzser külön szinten játszana, a
+   szezonjuk nem lenne összemérhető, és a párharc verdiktje (ki nyerte a
+   szezont) értelmét vesztené — ráadásul a nehézség maga válna a győzelem
+   olcsó eszközévé.
+   Ezért a szintet KIZÁRÓLAG a házigazda állítja, a vendég kliense pedig
+   átveszi. Az átvitel azért működik pontosan, mert az ellenféltábla seedelt:
+   a buildOpponents a "s<szezon>:opponents:<célerő>" nevesített folyamból
+   dolgozik, tehát azonos értékkel mindkét kliens bitre ugyanazt a 15 csapatot
+   kapja. Így elég a SZÁMOT átküldeni, a tábla magától egyezik. */
+const MP_LEVEL_KEY="level";
+function mpLevelLocked(){return !!(MP.active&&MP.role!=="host");}
+async function mpPushLevel(){
+  if(!MP.active||MP.role!=="host"||!MP.activeRoom)return;
+  try{await mpNetInit();}catch(e){}
+  try{await mpBk().h2hPut(MP.activeRoom,MP_LEVEL_KEY,"value",
+    {v:oppTargetRating,season:(S.seasonNumber||1),at:Date.now()});}catch(e){}}
+let _mpLevelPullAt=0;
+/* A vendég átveszi a házigazda szintjét. Csak akkor csinál bármit, ha
+   TÉNYLEGESEN más — így nyugodtan hívható gyakran is. */
+async function mpPullLevel(force){
+  if(!MP.active||MP.role==="host"||!MP.activeRoom)return false;
+  const now=Date.now();
+  if(!force&&now-_mpLevelPullAt<4000)return false;
+  _mpLevelPullAt=now;
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,MP_LEVEL_KEY);}catch(e){return false;}
+  const v=node&&node.value&&node.value.v;
+  if(typeof v!=="number"||!isFinite(v)||v===oppTargetRating)return false;
+  const before=oppTargetRating;
+  oppTargetRating=v;careerBaseRating=v;
+  /* ugyanaz a piac-frissítés, amit a házigazda is lefuttat — különben a
+     vendég a régi, gyengébb poolból vásárolna */
+  if(gameMode==="career"&&careerPool)Object.values(careerPool).forEach(entry=>{
+    if(drafted.has(entry.n))return;
+    applyMarketShift(entry);
+    entry.startRating=Math.round(ratingAtAge(entry.peak,entry.age));
+    if(scout)entry.estimatedTSI=estimateTSI(entry.tsi,scout.stars);});
+  SEASON_OPPS=buildOpponents(15,oppTargetRating);
+  if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
+  addLine(`✦ A házigazda átállította a közös mezőnyt: ${before} → ${v} · ${diffTierLabel(v)}. A ti világotok közös, ezért a te mezőnyöd is ezzel megy tovább.`,"m life");
+  try{saveGame();}catch(e){}
+  return true;}
 /* ---- A KÖZÖS ELŐZMÉNY ----
    Szezononként egy sor mindkét menedzserről. Ebből áll össze a befejezéskori
    összesítés — enélkül csak az utolsó szezont tudnánk mutatni. */
@@ -14186,12 +14269,21 @@ function showLevelChangePicker(direction){
     SEASON_OPPS=buildOpponents(15,oppTargetRating);
     S.consecutiveTitles=0;S.consecutiveBadSeasons=0;
     addLine(`✦ Új nehézségi szint! A mezőny a következő szezontól: ${oppTargetRating} · ${diffTierLabel(oppTargetRating)} — a scout mostantól a ~${ragSzam(signingTargetOvr())} szint körül keres igazolásokat.`,"m life");
+    /* MP: a házigazda döntése a KÖZÖS világra szól — azonnal kiküldjük. */
+    if(MP.active&&MP.role==="host"){
+      mpPushLevel();
+      addLine("✦ A társad mezőnye is ezzel a szinttel megy tovább — a világotok közös.","m life");}
     csReturnToHub();};
   const backBtn=document.createElement("button");backBtn.className="btn-s stepbtn";backBtn.style.marginTop="6px";
   backBtn.textContent="Mégsem, maradok a jelenlegi szinten";
   backBtn.onclick=()=>csReturnToHub();
   $("twActions").innerHTML="";$("twActions").appendChild(confirmBtn);$("twActions").appendChild(backBtn);}
 $("hubLevelBtn").onclick=()=>{
+  /* MP-vendég: a közös mezőnyt a házigazda állítja — lásd mpLevelLocked(). */
+  if(mpLevelLocked()){
+    addLine("✦ A közös mezőny szintjét a házigazda állítja. Nálad ez csak kijelző — ha változtatna, a te világod is automatikusan követi.","m life");
+    mpPullLevel(true).then(ok=>{if(ok){renderHub();}});
+    return;}
   /* Szezon közben a gomb csak kijelző — a mezőny átállítása a szezonhatárhoz
      kötött marad. */
   if(hubMidSeasonMode){
@@ -15467,7 +15559,11 @@ function renderHub(){
   if(gameMode==="career"){
     lvlBtn.classList.remove("hide");
     const euroLock=euroLocksLevel();
-    const canChange=!hubMidSeasonMode&&!euroLock;
+    const mpLock=mpLevelLocked();      /* MP-vendég: a szint a házigazdáé */
+    const canChange=!hubMidSeasonMode&&!euroLock&&!mpLock;
+    /* a vendég kliense a HUB minden megnyitásakor ránéz, változott-e a
+       közös szint — így a házigazda döntése magától megérkezik */
+    if(mpLock)mpPullLevel().then(ok=>{if(ok)renderHub();});
     const w=levelWarnState();
     lvlBtn.classList.toggle("warn",canChange&&w.lvl>=2);
     lvlBtn.classList.toggle("readonly",!canChange);
@@ -15480,7 +15576,9 @@ function renderHub(){
     lvlBtn.innerHTML=(canChange?(w.lvl>=2?"⚠️ ":"✦ "):"✦ ")+`Nehézségi szint — ${oppTargetRating}`
       +`<small>${S.autoLevel?"🔄 auto szintkövetés BE · ":""}${state} · meccs-erőd ${teamMatchStrength().toFixed(1)} (${g>=0?"+":""}${Math.round(g)})`
       +(uLbl?` · <b style="color:var(--grass)">⚡ ${uLbl}: +${Math.round(u*50)}% fejlődés</b>`:"")
-      +(canChange?"":(euroLock
+      +(canChange?"":(mpLock
+        ? " · <b>a közös mezőnyt a házigazda állítja</b>"
+        : euroLock
         ? ` · <b>zárolva: előbb a(z) ${(euroPendingComp()&&euroPendingComp().short)||"kupa"} — a kupa után állítható</b>`
         : " · <b>átállítani két szezon között lehet</b>"))+`</small>`;
   }else lvlBtn.classList.add("hide");
@@ -16312,14 +16410,21 @@ function startNextCareerSeason(){
      FONTOS a sorrend: ez MÉG a szezonszám növelése és a statisztika-nullázás
      ELŐTT fut, hogy a napló-üzenet a lezáruló szezonhoz tartozzon, és a
      levelGap() a most kialakult (öregített, igazolt) kerettel számoljon. */
-  if(gameMode==="career"&&S.autoLevel){
+  /* MP-VENDÉG: az auto szintkövetés NEM futhat le nála. A két kereten külön
+     nőne a mezőny (a saját meccs-erejük szerint), és a közös világ némán
+     kettéválna. A vendég szintjét kizárólag a házigazda értéke határozza meg —
+     nála a követés is a házigazda oldalán dől el. */
+  if(gameMode==="career"&&S.autoLevel&&!mpLevelLocked()){
     const before=oppTargetRating;
     let guard=0;
     while(levelGap()>AUTO_LEVEL_MAX_GAP&&oppTargetRating<maxOppRating()&&guard++<80)
       oppTargetRating++;
     if(oppTargetRating!==before){
       addLine(`✦ Auto szintkövetés: a mezőny ${before} → ${oppTargetRating}, mert a csapatod meccs-ereje (${teamMatchStrength().toFixed(1)}) kinőtte a régi szintet.`,"m life");
-      updateOppRatingBadge();}}
+      updateOppRatingBadge();
+      if(MP.active&&MP.role==="host")mpPushLevel();}}
+  /* a vendég a szezonfordulón mindenképp ránéz a közös szintre */
+  if(mpLevelLocked())mpPullLevel(true);
   S.seasonNumber=(S.seasonNumber||1)+1;
   /* Az indulás mostantól MÉG a megszerzése szezonjában lefut (a szezonzárás
      részeként), ezért új szezon indulásakor nincs futó kampány. Ez az ág már
