@@ -1133,7 +1133,11 @@ button:disabled{opacity:.35;cursor:default}
     <div id="verdictStats"></div>
     <button id="hubGoBtn" class="btn-y stepbtn hide">Tovább a HUB-ba →</button>
     <button id="shareBtn" class="btn-s" style="margin-top:14px">Eredmény másolása</button>
-    <button id="againBtn" class="btn-p" style="margin-top:8px">Újra</button>
+    <!-- Az "Újra" gomb (mentés törlése + újratöltés) a karrier előtti időkből
+         maradt itt, és mostanra értelmét vesztette: a szezonzárás után a HUB
+         viszi tovább a karriert, új játékot pedig a kezdőlapról lehet indítani.
+         Egy verdiktnél kiszúrt piros-zöld "Újra" csak véletlen adatvesztésre
+         adott alkalmat. -->
   </div>
 </section>
 
@@ -1307,7 +1311,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.08";
+const APP_VERSION="2.5.09";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -6227,12 +6231,40 @@ const FAMILY_ATTR_MIN=40;
 function familyAttrHi(k){
   const c=attrCapFor(k);
   return (c===Infinity||!isFinite(c))?999:c;}
+/* ---- POSZTSPECIFIKUS PADLÓ ----
+   A 40-es padló önmagában kevés volt: kiadott egy olyan csatárt, akinek MINDEN
+   attribútuma 40-en állt, és csak a gólszerzés meg a passz volt felhúzva. A
+   motorban ilyen játékos nem születik — a valódi mezőnyben minden poszthoz
+   tartozik egy elvárt alapszint minden attribútumból.
+
+   A padlót ezért NEM külön táblából vesszük, hanem ugyanabból az ATTR_PROFILE-ból,
+   amit a motor a poszt "tipikus" alakjának tart: az ajánlott érték adott hányada.
+   Így három dolog jön ingyen:
+     · posztHŰ — a csatárnak sebességből és passzból magas a padlója, kapusból
+       marad a 40 (a kapusképesség neki érdemben irreleváns);
+     · a kerettel EGYÜTT mozog — nagyobb pontkeretnél arányosan nő;
+     · nincs karbantartandó második tábla, ami elcsúszhatna a profiltól.
+
+   A hányad úgy van megválasztva, hogy a padlók összege a keret ~70%-a legyen:
+   marad bőven szabad pont a specializálódásra (egy csatár gólszerzését továbbra
+   is fel lehet vinni a plafonig), de a "mindenhol 40" alak megszűnik. */
+const FAMILY_FLOOR_RATIO=0.70;
+function familyAttrLo(pos,k,total){
+  const prof=ATTR_PROFILE[pos]||ATTR_PROFILE.KKP;
+  const sumProf=ATTR_KEYS.reduce((s,x)=>s+(prof[x]||0),0);
+  /* ugyanaz az R, mint az ajánlott elosztásban — de NEM azt hívjuk meg, mert az
+     maga is a padlóval dolgozik (körkörös hivatkozás lenne) */
+  const R=(total-sumProf)/ATTR_KEYS.length;
+  const rec=R+(prof[k]||0);
+  return Math.max(FAMILY_ATTR_MIN,
+    Math.min(familyAttrHi(k),Math.round(rec*FAMILY_FLOOR_RATIO)));}
 /* Egy kívánt alakzatot úgy önt formába, hogy MINDEN attribútum a
-   [40, plafon] sávban maradjon, és az összeg PONTOSAN a keret legyen. */
-function familyClampSplit(desired,total){
+   [posztpadló, plafon] sávban maradjon, és az összeg PONTOSAN a keret legyen. */
+function familyClampSplit(desired,total,pos){
+  const lo={};ATTR_KEYS.forEach(k=>{lo[k]=familyAttrLo(pos,k,total);});
   const out={};
   ATTR_KEYS.forEach(k=>{
-    out[k]=Math.max(FAMILY_ATTR_MIN,Math.min(familyAttrHi(k),Math.round(desired[k]||0)));});
+    out[k]=Math.max(lo[k],Math.min(familyAttrHi(k),Math.round(desired[k]||0)));});
   let diff=total-ATTR_KEYS.reduce((s,k)=>s+out[k],0);
   let guard=0;
   while(diff!==0&&guard++<20000){
@@ -6241,11 +6273,11 @@ function familyClampSplit(desired,total){
        padlójától — így az arányok a lehető legkevésbé torzulnak */
     const order=ATTR_KEYS.slice().sort((a,b)=>step>0
       ? (familyAttrHi(b)-out[b])-(familyAttrHi(a)-out[a])
-      : (out[b]-FAMILY_ATTR_MIN)-(out[a]-FAMILY_ATTR_MIN));
+      : (out[b]-lo[b])-(out[a]-lo[a]));
     let moved=false;
     for(const k of order){
       const nv=out[k]+step;
-      if(nv>=FAMILY_ATTR_MIN&&nv<=familyAttrHi(k)){out[k]=nv;diff-=step;moved=true;break;}}
+      if(nv>=lo[k]&&nv<=familyAttrHi(k)){out[k]=nv;diff-=step;moved=true;break;}}
     if(!moved)break;   /* a keret nem osztható szét a határok közt — marad, ami van */
   }
   return out;}
@@ -6255,7 +6287,7 @@ function familyRecommendedAttrs(pos,total){
   const R=(total-sumProf)/5;
   const desired={};
   ATTR_KEYS.forEach(k=>{desired[k]=R+(prof[k]||0);});
-  return familyClampSplit(desired,total);}
+  return familyClampSplit(desired,total,pos);}
 /* A családtag Ratingje a POSZT FŐ ATTRIBÚTUMÁBÓL jön — ugyanaz a horgony,
    amit a posEffectiveRating is használ. Így ha valaki a fő attribútumra
    koncentrál, az a Ratingjében is meglátszik, és nem kell külön szabály. */
@@ -6929,6 +6961,15 @@ function beginNewGame(){
      a draft során minden felhasználásnál csökken — a szezonindításkor már csak
      a maradékot látnánk, és a Run-pont magától kúszna felfelé. */
   runInit().rerollsChosen=rerolls;
+  /* A BEÁLLÍTÓ FELÜLET LEZÁRÁSA — minden új játék EZEN a ponton megy át.
+     HIBA, amit ez javít: a közös karrierben a VENDÉG kliense sosem járta végig a
+     módválasztót (a házigazda beállításai érkeztek a szobából, és rögtön ide
+     ugrottunk). A módválasztó kártyát viszont az indulás már felfedte a
+     multiplayer-overlay ALATT — így amikor az overlay eltűnt, a "Válassz módot"
+     (vagy a mentés-folytató sáv) ottmaradt a pálya fölött. Itt zárjuk le, mert
+     ez a közös belépési pont: házigazda, vendég és egyjátékos is erre jön. */
+  $("scModeSelect").classList.add("hide");
+  $("resumeBanner").classList.add("hide");
   $("scFormation").classList.add("hide");
   if(gameMode==="career"){
     $("scScout").classList.remove("hide");
@@ -7241,16 +7282,17 @@ function familyPickAttrs(){
 function familyEqualSplit(){
   const n=ATTR_KEYS.length,base=familyState.total/n;
   const desired={};ATTR_KEYS.forEach(k=>{desired[k]=base;});
-  familyState.attrs=familyClampSplit(desired,familyState.total);
+  familyState.attrs=familyClampSplit(desired,familyState.total,familyState.pos);
   renderFamilyAttrs();}
 function familyRecommendedSplit(){
   familyState.attrs=familyRecommendedAttrs(familyState.pos,familyState.total);
   renderFamilyAttrs();}
 function familyAdjust(key,delta){
   if(delta>0&&familyRemaining()<=0)return;
-  /* a kézi állítás sem viheti a motor határain kívülre */
+  /* a kézi állítás sem viheti a motor határain — és a poszt elvárt
+     alapszintjén — kívülre */
   const nv=(familyState.attrs[key]||0)+delta;
-  if(nv<FAMILY_ATTR_MIN||nv>familyAttrHi(key))return;
+  if(nv<familyAttrLo(familyState.pos,key,familyState.total)||nv>familyAttrHi(key))return;
   familyState.attrs[key]=nv;
   renderFamilyAttrs();}
 function renderFamilyAttrs(){
@@ -7259,11 +7301,12 @@ function renderFamilyAttrs(){
   const mainKey=attrTrainedBy(familyState.pos);
   $("familyBody").innerHTML=`<div style="font-size:13px;color:var(--dim);margin-bottom:2px">${esc(familyState.name)} — ${familyState.age} év · ${familyState.pos} poszt · <b>${familyState.total}</b> pont osztható szét</div>
     <div id="familyRemaining">Hátralévő pont: ${familyRemaining()}</div>
-    <div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px;line-height:1.45">Ezek a VALÓDI attribútumok — ugyanazok, amikkel minden más játékos is játszik. A poszt kulcsattribútuma most a <b style="color:var(--gold)">${ATTR_LABELS[mainKey]}</b>; a várható Rating ebből számol: <b style="color:var(--gold)">${familyStartRating(familyState.pos,familyState.attrs)}</b></div>`;
+    <div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px;line-height:1.45">Ezek a VALÓDI attribútumok — ugyanazok, amikkel minden más játékos is játszik. A poszt kulcsattribútuma most a <b style="color:var(--gold)">${ATTR_LABELS[mainKey]}</b>; a várható Rating ebből számol: <b style="color:var(--gold)">${familyStartRating(familyState.pos,familyState.attrs)}</b>. Minden attribútumnak van a <b>${familyState.pos}</b> poszthoz tartozó alsó határa — a motorban sem születik olyan játékos, aki a saját posztján mindenből a padlón áll.</div>`;
   const list=document.createElement("div");
   ATTR_KEYS.forEach(k=>{
     const row=document.createElement("div");row.className="famrow";
-    const atMin=familyState.attrs[k]<=FAMILY_ATTR_MIN;
+    const lo=familyAttrLo(familyState.pos,k,familyState.total);
+    const atMin=familyState.attrs[k]<=lo;
     const atMax=familyState.attrs[k]>=familyAttrHi(k);
     const dec=document.createElement("button");dec.textContent="−";dec.onclick=()=>familyAdjust(k,-1);
     const inc=document.createElement("button");inc.textContent="+";inc.onclick=()=>familyAdjust(k,1);
@@ -7271,8 +7314,10 @@ function renderFamilyAttrs(){
     if(atMin){dec.disabled=true;dec.style.opacity=".35";}
     if(atMax||familyRemaining()<=0){inc.disabled=true;inc.style.opacity=".35";}
     const lbl=document.createElement("span");lbl.className="famlbl";
+    /* a padló POSZTFÜGGŐ, ezért ki is írjuk a valódi értéket — különben úgy
+       tűnne, hogy a gomb "elromlott" egy 40-nél magasabb határnál */
     lbl.innerHTML=(k===mainKey?"★ ":"")+ATTR_LABELS[k]
-      +(atMin?' <span style="font-size:10px;color:var(--dim2)">min 40</span>'
+      +(atMin?` <span style="font-size:10px;color:var(--dim2)">min ${lo} · ${familyState.pos} poszt</span>`
        :atMax?` <span style="font-size:10px;color:var(--dim2)">max ${familyAttrHi(k)}</span>`:"");
     if(k===mainKey)lbl.style.color="var(--gold)";
     const val=document.createElement("span");val.className="famval";val.textContent=familyState.attrs[k];
@@ -13485,7 +13530,6 @@ function finish(){
      párharc-szekció gombjait is most kell élesíteni. */
   mpBindVerdict();
   $("scVerdict").scrollIntoView({behavior:"smooth"});}
-$("againBtn").onclick=()=>{clearSave();location.reload();};
 /* ================= KARRIER MÓD — HUB ================= */
 $("hubGoBtn").onclick=()=>{
   phase="hub";
