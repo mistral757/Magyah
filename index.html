@@ -915,6 +915,12 @@ button:disabled{opacity:.35;cursor:default}
       <button data-al="off">Kézi nehézség<small>te döntöd el, mikor lépsz szintet</small></button>
       <button data-al="on" class="sel">Auto szintkövetés<small>ajánlott — a mezőny magától lép, ha kinőtted</small></button>
     </div>
+    <!-- A cél-sáv: mekkora fölényt tartson a mezőny fölött az automatika.
+         Csak akkor látszik, ha a követés be van kapcsolva. -->
+    <div id="autoAimSetup" style="margin-top:8px">
+      <div style="font-size:11.5px;color:var(--dim2);margin-bottom:5px">Cél-sáv — mekkora fölényt tartson a kereted a mezőny fölött:</div>
+      <div class="optgrid two" id="autoAimGrid"></div>
+    </div>
     <div id="autoLevelWarn" class="hide" style="margin-top:7px;padding:8px 10px;border-radius:8px;
       background:color-mix(in srgb,var(--gold) 12%,transparent);border:1px solid var(--gold);
       font-size:12px;line-height:1.5;color:var(--ink)">
@@ -1325,7 +1331,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.13";
+const APP_VERSION="2.5.14";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -6242,9 +6248,36 @@ function familyPointBudget(age){
    határok érvényesek rá is. A pontkeret (350-427) bőven elbírja az 5x40-es
    padlót (200). */
 const FAMILY_ATTR_MIN=40;
-function familyAttrHi(k){
+/* ---- KORFÜGGŐ PLAFON A POSZT FŐ ATTRIBÚTUMÁN ----
+   Ez a legfontosabb korlát az egész családtag-szerkesztőn. A poszt KULCS-
+   attribútuma (attrTrainedBy) határozza meg a kezdő Ratinget is, tehát ha az
+   szabadon felvihető, a családtag életkortól függetlenül kész sztárként lép be
+   — és az felborítja a karrier ívét: egy 15 éves csodagyerek azonnal a keret
+   legjobbja lenne, egy 38 évesnek pedig semmi ára nem volna.
+
+   A görbe a valódi pályaív alakját követi: kamaszként még nincs kész, 27
+   környékén a csúcs, utána lassú visszaesés.
+     15 év → 82      27 év → 99      35+ év → 93
+     20 év → 92      32 év → 95
+   A pontok között lineárisan interpolálunk. A TÖBBI attribútumot ez nem
+   érinti: egy 15 éves lehet villámgyors, csak épp nem lehet kész gólvágó. */
+const FAMILY_MAIN_CAP=[[15,82],[20,92],[27,99],[32,95],[35,93]];
+function familyMainCapFor(age){
+  const a=Math.max(FAMILY_AGE_MIN,Math.min(FAMILY_AGE_MAX,age!=null?age:FAMILY_AGE_MIN));
+  const P=FAMILY_MAIN_CAP;
+  if(a<=P[0][0])return P[0][1];
+  for(let i=1;i<P.length;i++){
+    if(a<=P[i][0]){
+      const x0=P[i-1][0],y0=P[i-1][1],x1=P[i][0],y1=P[i][1];
+      return Math.round(y0+(y1-y0)*(a-x0)/(x1-x0));}}
+  return P[P.length-1][1];}
+/* A plafon: a motor általános attribútum-határa, a FŐ attribútumon ezen felül
+   a korfüggő sapka. A pos/age elhagyható — ilyenkor csak a motor-határ él. */
+function familyAttrHi(k,pos,age){
   const c=attrCapFor(k);
-  return (c===Infinity||!isFinite(c))?999:c;}
+  let hi=(c===Infinity||!isFinite(c))?999:c;
+  if(pos&&attrTrainedBy(pos)===k)hi=Math.min(hi,familyMainCapFor(age));
+  return hi;}
 /* ---- POSZTSPECIFIKUS PADLÓ ----
    A 40-es padló önmagában kevés volt: kiadott egy olyan csatárt, akinek MINDEN
    attribútuma 40-en állt, és csak a gólszerzés meg a passz volt felhúzva. A
@@ -6263,45 +6296,54 @@ function familyAttrHi(k){
    marad bőven szabad pont a specializálódásra (egy csatár gólszerzését továbbra
    is fel lehet vinni a plafonig), de a "mindenhol 40" alak megszűnik. */
 const FAMILY_FLOOR_RATIO=0.70;
-function familyAttrLo(pos,k,total){
+function familyAttrLo(pos,k,total,age){
   const prof=ATTR_PROFILE[pos]||ATTR_PROFILE.KKP;
   const sumProf=ATTR_KEYS.reduce((s,x)=>s+(prof[x]||0),0);
   /* ugyanaz az R, mint az ajánlott elosztásban — de NEM azt hívjuk meg, mert az
      maga is a padlóval dolgozik (körkörös hivatkozás lenne) */
   const R=(total-sumProf)/ATTR_KEYS.length;
   const rec=R+(prof[k]||0);
+  /* a padló SOHA nem lehet a plafon fölött — fiatal korban a fő attribútum
+     sapkája alacsonyabb lehet, mint a profil szerinti ajánlott 70%-a */
   return Math.max(FAMILY_ATTR_MIN,
-    Math.min(familyAttrHi(k),Math.round(rec*FAMILY_FLOOR_RATIO)));}
+    Math.min(familyAttrHi(k,pos,age),Math.round(rec*FAMILY_FLOOR_RATIO)));}
 /* Egy kívánt alakzatot úgy önt formába, hogy MINDEN attribútum a
    [posztpadló, plafon] sávban maradjon, és az összeg PONTOSAN a keret legyen. */
-function familyClampSplit(desired,total,pos){
-  const lo={};ATTR_KEYS.forEach(k=>{lo[k]=familyAttrLo(pos,k,total);});
+function familyClampSplit(desired,total,pos,age){
+  const prof=ATTR_PROFILE[pos]||ATTR_PROFILE.KKP;
+  const lo={},hi={};
+  ATTR_KEYS.forEach(k=>{lo[k]=familyAttrLo(pos,k,total,age);hi[k]=familyAttrHi(k,pos,age);});
   const out={};
   ATTR_KEYS.forEach(k=>{
-    out[k]=Math.max(lo[k],Math.min(familyAttrHi(k),Math.round(desired[k]||0)));});
+    out[k]=Math.max(lo[k],Math.min(hi[k],Math.round(desired[k]||0)));});
   let diff=total-ATTR_KEYS.reduce((s,k)=>s+out[k],0);
   let guard=0;
   while(diff!==0&&guard++<20000){
     const step=diff>0?1:-1;
-    /* hozzáadásnál a legtávolabb lévőt emeljük a plafonjától, elvételnél a
-       padlójától — így az arányok a lehető legkevésbé torzulnak */
+    /* HOZZÁADÁSNÁL a poszthoz leginkább illő attribútumot emeljük először
+       (a profil szerinti sorrendben). Ez akkor számít, amikor a fő attribútum
+       a korfüggő sapkába ütközik, és a maradékot valahova el kell helyezni:
+       enélkül a "legtávolabb a plafonjától" szabály a poszt szempontjából
+       ÉRTÉKTELEN attribútumba (mezőnyjátékosnál a kapusképességbe) tolta a
+       fölösleget. Elvételnél marad a padlótól legtávolabbi — ott az a helyes,
+       hogy a legnagyobb tartalékkal rendelkező adjon le. */
     const order=ATTR_KEYS.slice().sort((a,b)=>step>0
-      ? (familyAttrHi(b)-out[b])-(familyAttrHi(a)-out[a])
+      ? ((prof[b]||0)-(prof[a]||0))||((hi[b]-out[b])-(hi[a]-out[a]))
       : (out[b]-lo[b])-(out[a]-lo[a]));
     let moved=false;
     for(const k of order){
       const nv=out[k]+step;
-      if(nv>=lo[k]&&nv<=familyAttrHi(k)){out[k]=nv;diff-=step;moved=true;break;}}
+      if(nv>=lo[k]&&nv<=hi[k]){out[k]=nv;diff-=step;moved=true;break;}}
     if(!moved)break;   /* a keret nem osztható szét a határok közt — marad, ami van */
   }
   return out;}
-function familyRecommendedAttrs(pos,total){
+function familyRecommendedAttrs(pos,total,age){
   const prof=ATTR_PROFILE[pos]||ATTR_PROFILE.KKP;
   const sumProf=ATTR_KEYS.reduce((s,k)=>s+(prof[k]||0),0);
   const R=(total-sumProf)/5;
   const desired={};
   ATTR_KEYS.forEach(k=>{desired[k]=R+(prof[k]||0);});
-  return familyClampSplit(desired,total,pos);}
+  return familyClampSplit(desired,total,pos,age);}
 /* A családtag Ratingje a POSZT FŐ ATTRIBÚTUMÁBÓL jön — ugyanaz a horgony,
    amit a posEffectiveRating is használ. Így ha valaki a fő attribútumra
    koncentrál, az a Ratingjében is meglátszik, és nem kell külön szabály. */
@@ -6899,6 +6941,26 @@ document.querySelectorAll("#wcToggleGrid button").forEach(b=>b.onclick=()=>{
    válik formalitássá. Egyetlen szám: ha keményebbet akarsz, vedd 4-re (~10-33%
    bajnoki esély), ha megengedőbbet, 6-ra (~33-78%). */
 const AUTO_LEVEL_MAX_GAP=5;
+/* ---- AZ AUTOMATIKA CÉL-SÁVJA (aggresszivitás) ----
+   Egyetlen felső küszöb helyett SÁV. Két okból:
+     · a felső határ eddig is létezett (AUTO_LEVEL_MAX_GAP), de fixen 5 volt —
+       aki keményebb vagy megengedőbb ívet akart, annak kézire kellett váltania,
+       és onnantól semmi nem követte a keretét;
+     · az ALSÓ határ eddig hiányzott: az automatika kizárólag fölfelé lépett,
+       így ha a kereted meggyengült (öregedés, eladás, sérüléshullám), a mezőny
+       ott maradt fölötted, és a szezon indulásból reménytelen volt.
+   A sáv mindkét irányban tart: fölé nőttél → a mezőny lép fölfelé, alá estél →
+   lefelé. Mindkettő KIZÁRÓLAG szezonhatáron, ahogy eddig.
+   A számok a mért bajnoki esélyhez vannak kötve (lásd a levelWarnState fölötti
+   kalibrációt): gap 0 → 0%, +2 → 5%, +4 → 33%, +6 → 78%, +8 → 97%. */
+const AUTO_LEVEL_AIMS=[
+  {id:"brutal",  n:"Kegyetlen",       lo:-1,hi:2, d:"a cím ritka ünnep — sokszor a dobogó is siker"},
+  {id:"strict",  n:"Szigorú",         lo:1, hi:4, d:"minden bajnoki címért meg kell szenvedni"},
+  {id:"balanced",n:"Kiegyensúlyozott",lo:3, hi:5, d:"ajánlott — igazi esélyes vagy, de semmi sem jár ingyen"},
+  {id:"soft",    n:"Megengedő",       lo:5, hi:8, d:"kényelmes fölény, a cím többnyire megvan"}];
+function autoLevelAim(){
+  const id=(S&&S.autoLevelAim)||"balanced";
+  return AUTO_LEVEL_AIMS.find(a=>a.id===id)||AUTO_LEVEL_AIMS[2];}
 /* ================= UNDERDOG-FAKTOR =================
    Egyetlen 0..1 szám arról, mennyire nehéz körülmények között dolgozol. Eddig
    a nehéz run gyakorlatilag NEM volt jutalmazva: a skill-jutalom, a kémia és a
@@ -6938,12 +7000,32 @@ function underdogLabel(u,gap){
   if(behind<1)return u>=0.25?"magasan játszol":"";
   return u>=0.75?"hősies alávállalás":u>=0.5?"komoly kihívás"
     :u>=0.25?"felfelé nyújtózol":"enyhe hátrány";}
+/* A kezdőképernyő cél-sáv választója. Ugyanaz a lista, mint a HUB-ban — egy
+   forrásból (AUTO_LEVEL_AIMS), hogy a kettő ne csúszhasson szét. */
+function renderAutoAimSetup(){
+  const box=$("autoAimSetup"),grid=$("autoAimGrid");
+  if(!box||!grid)return;
+  box.classList.toggle("hide",!S.autoLevel);
+  grid.innerHTML="";
+  const cur=autoLevelAim();
+  AUTO_LEVEL_AIMS.forEach(a=>{
+    const b=document.createElement("button");
+    if(a.id===cur.id)b.classList.add("sel");
+    b.innerHTML=`${a.n}<small>${a.lo>=0?"+":""}${a.lo} … ${a.hi>=0?"+":""}${a.hi} — ${a.d}</small>`;
+    b.onclick=()=>{S.autoLevelAim=a.id;renderAutoAimSetup();};
+    grid.appendChild(b);});}
 document.querySelectorAll("#autoLevelGrid button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#autoLevelGrid button").forEach(x=>x.classList.remove("sel"));
   b.classList.add("sel");S.autoLevel=b.dataset.al==="on";
   /* A figyelmeztetés CSAK kézire váltáskor jelenik meg — nem blokkol, csak
      elmondja, mit veszít vele a felhasználó. Auto-ra visszalépve eltűnik. */
-  const w=$("autoLevelWarn");if(w)w.classList.toggle("hide",S.autoLevel);});
+  const w=$("autoLevelWarn");if(w)w.classList.toggle("hide",S.autoLevel);
+  renderAutoAimSetup();});
+/* FIGYELEM: itt NINCS azonnali renderAutoAimSetup() hívás. Ez a blokk a
+   szkript korai szakaszában fut, az S állapotobjektum deklarációja ELŐTT —
+   egy itteni S-olvasás TDZ-hibával megállítaná a teljes szkriptet (és a játék
+   el sem indulna). A beállító képernyő a módválasztáskor rajzolódik meg, ott
+   már minden létezik. */
 $("diffSlider").oninput=()=>{
   oppTargetRating=parseInt($("diffSlider").value,10);
   careerBaseRating=oppTargetRating;   /* innen mérjük a piac emelkedését */
@@ -7292,22 +7374,23 @@ function familyRemaining(){
   const used=Object.values(familyState.attrs).reduce((s,v)=>s+v,0);
   return familyState.total-used;}
 function familyPickAttrs(){
-  familyState.attrs=familyRecommendedAttrs(familyState.pos,familyState.total);
+  familyState.attrs=familyRecommendedAttrs(familyState.pos,familyState.total,familyState.age);
   renderFamilyAttrs();}
 function familyEqualSplit(){
   const n=ATTR_KEYS.length,base=familyState.total/n;
   const desired={};ATTR_KEYS.forEach(k=>{desired[k]=base;});
-  familyState.attrs=familyClampSplit(desired,familyState.total,familyState.pos);
+  familyState.attrs=familyClampSplit(desired,familyState.total,familyState.pos,familyState.age);
   renderFamilyAttrs();}
 function familyRecommendedSplit(){
-  familyState.attrs=familyRecommendedAttrs(familyState.pos,familyState.total);
+  familyState.attrs=familyRecommendedAttrs(familyState.pos,familyState.total,familyState.age);
   renderFamilyAttrs();}
 function familyAdjust(key,delta){
   if(delta>0&&familyRemaining()<=0)return;
-  /* a kézi állítás sem viheti a motor határain — és a poszt elvárt
-     alapszintjén — kívülre */
+  /* a kézi állítás sem viheti a motor határain — a poszt elvárt alapszintjén,
+     illetve a fő attribútum korfüggő sapkáján — kívülre */
   const nv=(familyState.attrs[key]||0)+delta;
-  if(nv<familyAttrLo(familyState.pos,key,familyState.total)||nv>familyAttrHi(key))return;
+  if(nv<familyAttrLo(familyState.pos,key,familyState.total,familyState.age)
+   ||nv>familyAttrHi(key,familyState.pos,familyState.age))return;
   familyState.attrs[key]=nv;
   renderFamilyAttrs();}
 function renderFamilyAttrs(){
@@ -7316,13 +7399,14 @@ function renderFamilyAttrs(){
   const mainKey=attrTrainedBy(familyState.pos);
   $("familyBody").innerHTML=`<div style="font-size:13px;color:var(--dim);margin-bottom:2px">${esc(familyState.name)} — ${familyState.age} év · ${familyState.pos} poszt · <b>${familyState.total}</b> pont osztható szét</div>
     <div id="familyRemaining">Hátralévő pont: ${familyRemaining()}</div>
-    <div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px;line-height:1.45">Ezek a VALÓDI attribútumok — ugyanazok, amikkel minden más játékos is játszik. A poszt kulcsattribútuma most a <b style="color:var(--gold)">${ATTR_LABELS[mainKey]}</b>; a várható Rating ebből számol: <b style="color:var(--gold)">${familyStartRating(familyState.pos,familyState.attrs)}</b>. Minden attribútumnak van a <b>${familyState.pos}</b> poszthoz tartozó alsó határa — a motorban sem születik olyan játékos, aki a saját posztján mindenből a padlón áll.</div>`;
+    <div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px;line-height:1.45">Ezek a VALÓDI attribútumok — ugyanazok, amikkel minden más játékos is játszik. A poszt kulcsattribútuma most a <b style="color:var(--gold)">${ATTR_LABELS[mainKey]}</b>; a várható Rating ebből számol: <b style="color:var(--gold)">${familyStartRating(familyState.pos,familyState.attrs)}</b>. Minden attribútumnak van a <b>${familyState.pos}</b> poszthoz tartozó alsó határa — a motorban sem születik olyan játékos, aki a saját posztján mindenből a padlón áll. A kulcsattribútum felső határa az <b>életkortól</b> függ (${familyState.age} évesen <b style="color:var(--gold)">${familyMainCapFor(familyState.age)}</b>): 15 évesen 82, a csúcs 27 évesen 99, onnan lassan visszaesik.</div>`;
   const list=document.createElement("div");
   ATTR_KEYS.forEach(k=>{
     const row=document.createElement("div");row.className="famrow";
-    const lo=familyAttrLo(familyState.pos,k,familyState.total);
+    const lo=familyAttrLo(familyState.pos,k,familyState.total,familyState.age);
+    const hi=familyAttrHi(k,familyState.pos,familyState.age);
     const atMin=familyState.attrs[k]<=lo;
-    const atMax=familyState.attrs[k]>=familyAttrHi(k);
+    const atMax=familyState.attrs[k]>=hi;
     const dec=document.createElement("button");dec.textContent="−";dec.onclick=()=>familyAdjust(k,-1);
     const inc=document.createElement("button");inc.textContent="+";inc.onclick=()=>familyAdjust(k,1);
     /* a határon lévő gomb láthatóan tompul — így nem "elromlottnak" tűnik */
@@ -7333,7 +7417,7 @@ function renderFamilyAttrs(){
        tűnne, hogy a gomb "elromlott" egy 40-nél magasabb határnál */
     lbl.innerHTML=(k===mainKey?"★ ":"")+ATTR_LABELS[k]
       +(atMin?` <span style="font-size:10px;color:var(--dim2)">min ${lo} · ${familyState.pos} poszt</span>`
-       :atMax?` <span style="font-size:10px;color:var(--dim2)">max ${familyAttrHi(k)}</span>`:"");
+       :atMax?` <span style="font-size:10px;color:var(--dim2)">max ${hi}${k===mainKey?` · ${familyState.age} évesen`:""}</span>`:"");
     if(k===mainKey)lbl.style.color="var(--gold)";
     const val=document.createElement("span");val.className="famval";val.textContent=familyState.attrs[k];
     row.appendChild(lbl);row.appendChild(dec);row.appendChild(val);row.appendChild(inc);
@@ -9307,7 +9391,7 @@ const S={idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,capMod:0,eventMod:0
      beállító képernyőjén is az "on" gomb a kiválasztott (autoLevelGrid), a
      kettőnek EGYÜTT kell mozognia. Betöltött mentés a saját beállítását
      hozza (applySavedGame), ezt az alapérték nem írja felül. */
-  autoLevel:true,
+  autoLevel:true,autoLevelAim:"balanced",   /* a követés cél-sávja, lásd AUTO_LEVEL_AIMS */
   transferLog:{sells:[]},
   /* CHALLENGE-rendszer: activeChallenges = elvállalt, folyamatban lévő kihívások.
      challengeOffered* = melyik ponton ajánlottunk már, hogy ne ismételjük.
@@ -14429,9 +14513,10 @@ function showLevelChangePicker(direction){
     <div id="autoLevelRow" style="margin-top:11px;padding:8px 10px;background:var(--panel2);border-radius:7px;
          display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer">
       <span style="font-size:12.5px;line-height:1.45">🔄 <b>Auto szintkövetés</b><br>
-        <small style="color:var(--dim2)">a mezőny magától lép fölfelé, ha a meccs-erőd több mint ${AUTO_LEVEL_MAX_GAP} Ratinggel kinőtte — mindig csak két szezon között</small></span>
+        <small style="color:var(--dim2)">a mezőny magától követi a kereted — mindkét irányban, mindig csak két szezon között</small></span>
       <b id="autoLevelState" style="white-space:nowrap;color:${S.autoLevel?"var(--grass)":"var(--dim)"}">${S.autoLevel?"BE":"KI"}</b>
-    </div>`;
+    </div>
+    <div id="autoAimBox"></div>`;
   const signHint=()=>{
     const t=Math.max(45,Math.min(97,state.value+SIGNING_OFFSET));
     const gap=levelGap(state.value);
@@ -14446,12 +14531,32 @@ function showLevelChangePicker(direction){
   signHint();
   /* Az auto szintkövetés itt is kapcsolható — a kezdőképernyőn választott
      beállítás nem végleges, a karrier bármely szezonhatárán átbillenthető. */
+  /* ---- A CÉL-SÁV VÁLASZTÓJA ----
+     Csak akkor van értelme, ha a követés BE van kapcsolva, ezért együtt
+     jelenik meg vele. Minden sávhoz kiírjuk, hol tart most a te gapod: így
+     látszik, melyik választás lépteti majd a mezőnyt. */
+  function renderAutoAim(){
+    const box=$("autoAimBox");if(!box)return;
+    if(!S.autoLevel){box.innerHTML="";return;}
+    const cur=autoLevelAim(),g=levelGap();
+    box.innerHTML=`<div style="margin-top:7px;font-size:11.5px;color:var(--dim2)">Cél-sáv — mekkora fölényt tartson a mezőny fölött:</div>`;
+    const grid=document.createElement("div");grid.className="hubGrid";grid.style.marginTop="5px";
+    AUTO_LEVEL_AIMS.forEach(a=>{
+      const b=document.createElement("button");
+      b.className="btn-s"+(a.id===cur.id?" sel":"");
+      const hol=g>a.hi?"a mezőny lépne fölfelé":g<a.lo?"a mezőny lépne lefelé":"most beleesel ✓";
+      b.innerHTML=`${a.n} <small>${a.lo>=0?"+":""}${a.lo} … ${a.hi>=0?"+":""}${a.hi} · ${a.d}<br><span style="color:${a.id===cur.id?"var(--gold)":"var(--dim2)"}">${hol}</span></small>`;
+      b.onclick=()=>{S.autoLevelAim=a.id;saveGame();renderAutoAim();};
+      grid.appendChild(b);});
+    box.appendChild(grid);}
   const alRow=$("autoLevelRow");
   if(alRow)alRow.onclick=()=>{
     S.autoLevel=!S.autoLevel;
     const st=$("autoLevelState");
     if(st){st.textContent=S.autoLevel?"BE":"KI";st.style.color=S.autoLevel?"var(--grass)":"var(--dim)";}
+    renderAutoAim();
     saveGame();};
+  renderAutoAim();
   $("levelUpSlider").oninput=()=>{
     state.value=parseInt($("levelUpSlider").value,10);
     $("levelUpSliderVal").textContent=`${state.value} · ${diffTierLabel(state.value)}`;
@@ -16649,12 +16754,20 @@ function startNextCareerSeason(){
      kettéválna. A vendég szintjét kizárólag a házigazda értéke határozza meg —
      nála a követés is a házigazda oldalán dől el. */
   if(gameMode==="career"&&S.autoLevel&&!mpLevelLocked()){
-    const before=oppTargetRating;
+    const before=oppTargetRating,aim=autoLevelAim();
     let guard=0;
-    while(levelGap()>AUTO_LEVEL_MAX_GAP&&oppTargetRating<maxOppRating()&&guard++<80)
+    /* FÖLFELÉ: kinőtted a sáv tetejét */
+    while(levelGap()>aim.hi&&oppTargetRating<maxOppRating()&&guard++<80)
       oppTargetRating++;
+    /* LEFELÉ: a sáv alá estél (öregedés, eladás, gyengült keret). Ez az ág ÚJ:
+       korábban az automatika csak fölfelé lépett, így egy meggyengült kerettel
+       a mezőny ott maradt fölötted, és a szezon indulásból reménytelen volt.
+       A 70-es padló alá nem megyünk (a csúszka alsó vége). */
+    while(levelGap()<aim.lo&&oppTargetRating>70&&guard++<160)
+      oppTargetRating--;
     if(oppTargetRating!==before){
-      addLine(`✦ Auto szintkövetés: a mezőny ${before} → ${oppTargetRating}, mert a csapatod meccs-ereje (${teamMatchStrength().toFixed(1)}) kinőtte a régi szintet.`,"m life");
+      const fel=oppTargetRating>before;
+      addLine(`✦ Auto szintkövetés (${aim.n}): a mezőny ${before} → ${oppTargetRating}, mert a csapatod meccs-ereje (${teamMatchStrength().toFixed(1)}) ${fel?"kinőtte a régi szintet":"a cél-sáv alá esett"}.`,"m life");
       updateOppRatingBadge();
       if(MP.active&&MP.role==="host")mpPushLevel();}}
   /* a vendég a szezonfordulón mindenképp ránéz a közös szintre */
@@ -16838,7 +16951,7 @@ function saveGame(){
         scorers:S.scorers,assists:S.assists,mvps:S.mvps,goodForm:S.goodForm,badForm:S.badForm,careerStats:S.careerStats,clubScoutSpinsUsed:S.clubScoutSpinsUsed,consecutiveTitles:S.consecutiveTitles,consecutiveBadSeasons:S.consecutiveBadSeasons,seasonSaves:S.seasonSaves,seasonCleanSheets:S.seasonCleanSheets,seasonMatches:S.seasonMatches,seasonNumber:S.seasonNumber,seasonHistory:S.seasonHistory,
         tactics:S.tactics,tacticPrompt:S.tacticPrompt,
         euroEntry:S.euroEntry,euroCurrent:S.euroCurrent,euroOptOut:S.euroOptOut,championCards:S.championCards,
-        euro:S.euro,seasonEuro:S.seasonEuro,_posLearnLastCost:S._posLearnLastCost,autoLevel:S.autoLevel,transferLog:S.transferLog,
+        euro:S.euro,seasonEuro:S.seasonEuro,_posLearnLastCost:S._posLearnLastCost,autoLevel:S.autoLevel,autoLevelAim:S.autoLevelAim,transferLog:S.transferLog,
         playerReds:S.playerReds,playerInjuries:S.playerInjuries,
         grudge:[...S.grudge],
         fixtures:S.fixtures,fixtureResults:S.fixtureResults,
@@ -17000,6 +17113,8 @@ function applySavedGame(d){
   S.euroEntry=d.S.euroEntry||null;
   S.euroCurrent=d.S.euroCurrent||null;
   S.autoLevel=!!d.S.autoLevel;
+  /* régi mentésben nincs → a mostani viselkedéshez legközelebbi sáv */
+  S.autoLevelAim=d.S.autoLevelAim||"balanced";
   S._posLearnLastCost=d.S._posLearnLastCost||0;
   S.euro=d.S.euro||null;
   S.seasonEuro=d.S.seasonEuro||null;
@@ -17184,6 +17299,7 @@ $("modeClassicBtn").onclick=()=>{
   $("modeGrid").classList.remove("hide");   /* klasszikusban van értelme a vak módnak */
   $("scModeSelect").classList.add("hide");
   $("scFormation").classList.remove("hide");
+  renderAutoAimSetup();   /* a cél-sáv választója itt jelenik meg először */
   $("scFormation").scrollIntoView({behavior:"smooth"});};
 $("modeCareerBtn").onclick=()=>{
   gameMode="career";
@@ -17198,6 +17314,7 @@ $("modeCareerBtn").onclick=()=>{
   updateFamilySetupVisibility();
   $("scModeSelect").classList.add("hide");
   $("scFormation").classList.remove("hide");
+  renderAutoAimSetup();   /* a cél-sáv választója itt jelenik meg először */
   $("scFormation").scrollIntoView({behavior:"smooth"});};
 /* ================= MULTIPLAYER — HÁLÓZAT + SZOBÁK (F2) =================
    Két CSERESZABATOS backend, azonos async API-val:
@@ -17396,7 +17513,7 @@ function mpCollectSettings(){
     wcEnabled,familyEnabled,familyNameMode,
     familyCustomNames:(familyCustomNames||[]).slice(),
     slotRoles:JSON.parse(JSON.stringify(slotRoles||{})),
-    autoLevel:!!S.autoLevel};}
+    autoLevel:!!S.autoLevel,autoLevelAim:S.autoLevelAim||"balanced"};}
 function mpApplySettings(s){
   if(!s)return;
   gameMode="career";
@@ -17411,6 +17528,7 @@ function mpApplySettings(s){
   familyCustomNames=Array.isArray(s.familyCustomNames)?s.familyCustomNames.slice():[];
   slotRoles=s.slotRoles?JSON.parse(JSON.stringify(s.slotRoles)):{};
   S.autoLevel=!!s.autoLevel;
+  S.autoLevelAim=s.autoLevelAim||"balanced";
   updateOppRatingBadge&&updateOppRatingBadge();}
 /* A házigazda publikálja az indulást. A seedet a SZOBA adja (a létrehozáskor
    született), nem a helyi seed-teszt — így garantáltan ugyanaz a két kliensen. */
