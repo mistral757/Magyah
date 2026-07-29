@@ -1394,7 +1394,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.20";
+const APP_VERSION="2.5.21";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8175,7 +8175,7 @@ function championBoost(n){const c=S.championCards&&S.championCards[n];return c?c
    A pOvr és a pOvrDisplay is tartalmazza, tehát a MECCS és a KIJELZÉS is
    ugyanazt látja — nincs rejtett handicap. */
 function mpBalanceOffset(){return (S.mpBalance||0);}
-function pOvrDisplay(p){return p.ovr+sumSkillEffect(p.n,"rating")+((S.ratingAdj&&S.ratingAdj[p.n])||0)+championBoost(p.n)+mpBalanceOffset();}
+function pOvrDisplay(p){return p.ovr+sumSkillEffect(p.n,"rating")+((S.ratingAdj&&S.ratingAdj[p.n])||0)+championBoost(p.n)+mpBalanceOffset()+nextMatchOvrOf(p.n);}
 function effOvr(slot){return slot&&slot.player?pOvrDisplay(slot.player)*(slot.fit||1):0;}
 /* Egy JELÖLT effektív ratingje egy adott slotban — a HUB poszt-cserénél
    mutatjuk meg előre, hogy a user lássa, mennyit veszít/nyer a mozgatással. */
@@ -9260,6 +9260,12 @@ function activePunishmentsHtml(){
   const blocked=Object.keys(S.tsiBlocked||{});
   if(blocked.length)bits.push(`⚠ Befagyott fejlődés: ${blocked.map(n=>shortName(n)).join(", ")}`);
   if(S.frozenAcademySeasons>0)bits.push(`⚠ Ifi-akadémia befagyva: ${S.frozenAcademySeasons} szezon`);
+  /* A mérföldkövekből származó IDEIGLENES hatások — hogy a kommentár ígérete
+     ne maradjon láthatatlan: a HUB-ban is nyoma legyen, amíg tart. */
+  const tm=S.teamMomentum;
+  if(tm&&tm.matches>0)bits.push(`${tm.amt>=0?"↗":"↘"} Csapatlendület: ${tm.amt>0?"+":""}${tm.amt} csapaterő, még ${tm.matches} meccs`);
+  Object.entries(S.nextMatchOvr||{}).forEach(([n,e])=>{
+    if(e&&e.matches>0)bits.push(`${e.amt>=0?"↗":"↘"} ${esc(shortName(n))}: ${e.amt>0?"+":""}${e.amt} Rating, még ${e.matches} meccs`);});
   if(!bits.length)return "";
   return `<div class="chPenBox">${bits.map(b=>`<div class="chPenRow">${b}</div>`).join("")}</div>`;}
 function renderChallengePanel(){
@@ -9547,6 +9553,19 @@ const S={idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,capMod:0,eventMod:0
      frozenAcademy / teamFormMalus / tsiBlocked = büntetés-állapotok. */
   activeChallenges:[],resolvedChallenges:[],academy:[],challengeLastOfferRound:-1,challengeLastOfferSeason:0,
   frozenAcademySeasons:0,teamFormMalus:0,tsiBlocked:{},
+  /* ---- KARRIER-MÉRFÖLDKÖVEK (bemutatkozás, áttörés, ifi, kapus-hullám) ----
+     foundingSquad : az ALAPÍTÓ keret nevei. Ez a bemutatkozás-rendszer egyetlen
+       horgonya: aki nincs benne, az később érkezett (vétel, scout, akadémia,
+       ikon, esemény, család) — nem kell minden szerzési utat külön jelölni.
+       Egyszer, a karrier első kezdőrúgásánál rögzül, és szezonokon átível.
+     debutWatch    : n → hány meccset játszott a mérföldkő-ablakban. A bejegyzés
+       LÉTE jelenti, hogy még figyeljük; a történet lezárultakor töröljük.
+     youthMilestone: n → true, ha az akadémista első eredményessége elhangzott.
+     gkDrySpell    : n → hány meccs óta nincs tiszta lapja (kezdő kapusként).
+     nextMatchOvr  : n → {amt,matches} ideiglenes, meccsre szóló Rating-eltolás.
+     teamMomentum  : {amt,matches} ideiglenes csapaterő-eltolás. */
+  foundingSquad:[],debutWatch:{},youthMilestone:{},gkDrySpell:{},
+  nextMatchOvr:{},teamMomentum:null,
   /* szezonzárás / HUB — hogy a két szezon közti szakasz is menthető és
      újratölthető legyen, dupla-számolás nélkül */
   finalTable:null,seasonClosed:false,hubReportHtml:null};
@@ -9822,11 +9841,36 @@ function cardGoodFormWeight(name){
   if(t==="mythic")return 3.2;
   if(t==="stellar")return 2.5;
   return 1;}
+/* ---- IDEIGLENES (MECCSRE SZÓLÓ) MÓDOSÍTÓK ----
+   A ratingAdj SZEZONRA szól, a mérföldkövek viszont egy-két meccsre adnak
+   lökést vagy visszaesést. Ezért külön tár, saját lejárattal — a meccs végén
+   fogy, és a szezonváltás nullázza.
+   FIGYELEM: a csapaterő-eltolást KÉT helyre kell bekötni (buildMatchSnapshot és
+   hiddenMatchBonus), mert azok egymás tükrei — a nehézségkövetés a másodikból
+   dolgozik, és ha a kettő szétcsúszik, a szintkövetés rossz erőt mér. */
+function nextMatchOvrOf(name){
+  const e=S.nextMatchOvr&&S.nextMatchOvr[name];
+  return (e&&e.matches>0)?e.amt:0;}
+function teamMomentumAdj(){
+  const t=S.teamMomentum;
+  return (t&&t.matches>0)?t.amt:0;}
+/* Beállít egy ideiglenes játékos-bónuszt. Ha már van érvényben, a NAGYOBB
+   abszolút értékű marad — két mérföldkő ne adódjon össze korlátlanul. */
+function setNextMatchOvr(name,amt,matches){
+  if(!S.nextMatchOvr)S.nextMatchOvr={};
+  const cur=S.nextMatchOvr[name];
+  if(cur&&cur.matches>0&&Math.abs(cur.amt)>=Math.abs(amt)){cur.matches=Math.max(cur.matches,matches);return;}
+  S.nextMatchOvr[name]={amt,matches};}
+function setTeamMomentum(amt,matches){
+  const cur=S.teamMomentum;
+  /* ellentétes előjelű lökés KIOLTJA a meglévőt, nem sorban áll mögé */
+  if(cur&&cur.matches>0&&Math.sign(cur.amt)!==Math.sign(amt)){S.teamMomentum=null;return;}
+  S.teamMomentum={amt,matches};}
 /* JAVÍTVA: a Champion-kártya (kupagyőztes kezdő 11, +2/+3/+4 Rating) bónusza
    eddig CSAK a pOvrDisplay-ben szerepelt — vagyis látszott a felületen, de a
    meccs-szimulációra semmilyen hatása nem volt: a jutalom néma díszlet maradt.
    Mostantól a pOvr is tartalmazza, tehát tényleg erősít a pályán is. */
-function pOvr(p){return p.ovr+(S.grudge.has(p.n)?2:0)+sumSkillEffect(p.n,"rating")+(S.ratingAdj[p.n]||0)+((S.discWatch[p.n]||0)>0?-2:0)+championBoost(p.n)+mpBalanceOffset();}
+function pOvr(p){return p.ovr+(S.grudge.has(p.n)?2:0)+sumSkillEffect(p.n,"rating")+(S.ratingAdj[p.n]||0)+((S.discWatch[p.n]||0)>0?-2:0)+championBoost(p.n)+mpBalanceOffset()+nextMatchOvrOf(p.n);}
 $("simGo").onclick=()=>{
   /* RUN: az indulási állapot (kezdő 11 ereje, elméleti maximum, nehézség)
      EGYSZER, a draft lezárásakor rögzül — később már a fejlődést mérjük. */
@@ -9877,6 +9921,14 @@ function buildSeasonFixtures(){
       {duel:true,round:r,home:false,o:{n:"⚔ A társad",ovr:0}}));}
 function startFirstSeason(){
   phase="season";
+  /* ---- AZ ALAPÍTÓ KERET RÖGZÍTÉSE ----
+     Itt van készen a keret (draft lezárva, kapitány megvan), és ez a karrier
+     EGYETLEN első kezdőrúgása — a további szezonokat a startNextCareerSeason
+     viszi, az nem nyúl ehhez. Aki innentől kerül a klubhoz, annak jár majd a
+     bemutatkozás-történet. A padot és a tartalékot is beleszámoljuk: ők is a
+     kezdő kerettel érkeztek, nem "új igazolások". */
+  if(gameMode==="career"&&!(S.foundingSquad||[]).length)
+    S.foundingSquad=fullCareerRoster().filter(Boolean).map(p=>p.n);
   $("scPitch").classList.remove("hide");   /* a kihívás-képernyő elrejtette */
   $("simGo").classList.add("hide");$("capMsg").classList.add("hide");
   if(gameMode==="career")$("matchHubBtn").classList.remove("hide");
@@ -10314,7 +10366,9 @@ function buildMatchSnapshot(){
   if(famSp==="tank")defMult*=0.92;
   const capExp=(capPlaying&&captainIdx>=0&&slots[captainIdx].player)?captainAgeExpBonus(slots[captainIdx].player.age)*0.15:0;
   const chFormMalus=(S.teamFormMalus>0)?-2.2:0;
-  const ovr=sum/11+S.capMod+S.eventMod+coach.ovrMod+moraleMod+auraBonus+capExp+chFormMalus;
+  /* mérföldkő-lendület (áttörés utáni ellazulás / edzői fejmosás) — a párja a
+     hiddenMatchBonus-ban áll, a kettőnek együtt kell mozognia */
+  const ovr=sum/11+S.capMod+S.eventMod+coach.ovrMod+moraleMod+auraBonus+capExp+chFormMalus+teamMomentumAdj();
   const tacStyle=(S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)>=85)?TACTICS[S.tactics.active].style:null;
   const activeNames=new Set(active.map(a=>a.p.n));
   const chemPairs=completeChemPairsOnPitch(activeNames);
@@ -11100,6 +11154,206 @@ function mpDecisionLoop(){
     try{got=await mpPollDecision();}catch(e){}
     if(got){mpVerdictRefresh();return;}
     mpDecisionLoop();},3000);}
+/* ================= KARRIER-MÉRFÖLDKÖVEK =================
+   A klubhoz KÉSŐBB érkező játékosoknak saját kis története van: a
+   bemutatkozás, a nehéz kezdet utáni áttörés, az akadémista első nagy
+   pillanata — és a kapus rossz sorozata. Ezek tisztán ELBESZÉLŐ események,
+   de nem díszletek: mindegyikhez tartozik egy kicsi, kimondott mechanikai
+   következmény (morál, ideiglenes Rating, csapatlendület).
+
+   MIÉRT EGY MODUL: a négy történet ugyanazt a három kérdést teszi fel —
+   ki ez a játékos, hányadik meccsénél tart, és most "eredményes" volt-e? —
+   csak más választ vár rá. Külön-külön bekötve ugyanaz a feltétel négyszer
+   szerepelne a meccs-ciklusban, és a következő flavor-ötletnél ötödször.
+
+   AZ EREDMÉNYESSÉG POSZTFÜGGŐ: a támadó és a középpályás gólt vagy gólpasszt
+   ad, a védő és a kapus tiszta lapot hoz. A gól/gólpassz viszont MINDEN
+   poszton számít — egy védő bemutatkozó gólja nyilvánvalóan történet, kár
+   lenne a poszt miatt elnémítani.
+
+   HORGONY: az S.foundingSquad. Aki nincs benne, az később érkezett — mindegy,
+   hogy vétel, scout, akadémia, ikon, esemény vagy család hozta. Ezért nem kell
+   egyetlen szerzési utat sem megjelölni, és a jövőbeli utak is maguktól
+   beleesnek. Üres alapítókeretnél (régi mentés) az egész modul alszik. */
+const MILE_QUIET_UNTIL=5;      /* a 2-5. meccs szándékosan néma */
+const MILE_DEBUT_BOOST=1.5;    /* a debütáns gól/gólpassz-súlyának szorzója */
+const MILE_GK_DRY_LIMIT=5;     /* ennyi tiszta lap nélküli meccs után jön a fejmosás */
+const MILE_JUBILEES=[50,100,150,200,250,300];
+const MILE_TXT={
+  debutGoal:[
+    (n)=>`És ${n} máris betalál! Az első meccsén rögtön megmutatja, mennyire megérte őt leigazolni!`,
+    (n)=>`BEMUTATKOZÓ GÓL! ${n} nem várt a bemelegítéssel — az első mérkőzésén azonnal a hálóba talált!`,
+    (n)=>`Hát ez nem semmi! ${n} első meccse a csapatban, és máris beírta magát a góllövőlistára!`],
+  debutAssist:[
+    (n)=>`És ${n} máris előkészít egy gólt! Az első meccsén rögtön megmutatja, mennyire megérte őt leigazolni!`,
+    (n)=>`Micsoda bemutatkozás! ${n} első mérkőzésén azonnal gólpasszt jegyez — mintha évek óta itt játszana.`,
+    (n)=>`${n} az első meccsén tálalja a gólt a társának. Ez már most ígéretesen fest!`],
+  debutYouth:[
+    `Az ifjú tehetség nem lacafacázik, rögtön az első meccsén bizonyítani akar!`,
+    `Az akadémiáról jött, és az első meccsén máris azt csinálja, amiért felhozták — nem fél a nagy pályától!`],
+  debutCleanGk:[
+    (n)=>`A bemutatkozó meccsén nem kapott gólt! ${n} első fellépése a klubban makulátlan — ilyen kezdésről álmodik minden kapus.`,
+    (n)=>`Tiszta lap a debütáláson! ${n} idegekkel bírta a nagy pillanatot, és a kapuja érintetlen maradt.`],
+  debutGkDouble:[
+    `És nem is akárhogy: két nagy bravúrral tartotta a nullát a bemutatkozó meccsén. Ezt a kapust nem viseli meg a nyomás.`,
+    `Ráadásul kétszer is bravúrral mentett — a bemutatkozásán. A szurkolók már most a nevét skandálják.`],
+  debutCleanDef:[
+    (n)=>`Bemutatkozó meccs, kapott gól nélkül! ${n} úgy áll a védelemben, mintha mindig is ott lett volna.`,
+    (n)=>`${n} első mérkőzése a csapatban, és a védelem nem engedett át semmit. Nyugodt, magabiztos bemutatkozás.`],
+  breakthrough:[
+    (n)=>`Nehéz kezdet volt ez, de csak átszakadt a gát! Innen már gyerekjáték, menni fog ez, ${n}, ne add fel kicsi!`,
+    (n)=>`Na végre! ${n} régóta várt erre a pillanatra — hetek óta dolgozott érte, és most beérett a munka.`,
+    (n)=>`Sokáig nem akart összejönni ${huDativ(n)}, de a kitartás meghozta a gyümölcsét. Ez felszabadíthatja!`],
+  youthFirst:[
+    (n)=>`Micsoda tehetség! Vajon meddig menetel majd az ifjú ${n}? Ez alapján jó esélyei vannak a kezdőben maradásra!`,
+    (n)=>`Az akadémia újabb gyöngyszemet adott: ${n} megmutatta, hogy nem véletlenül van itt. Erre lehet építeni!`,
+    (n)=>`Jegyezzék meg ezt a nevet: ${n}. Ha így folytatja, hosszú évekig a csapat oszlopos tagja lesz.`],
+  gkScold:[
+    (n)=>`Ajj, ${n}, de küzdelmes időszakod van… Hűha! Az edző feszülten kiabál be a kispadról. Nagy fejmosás lesz ma! Szedd össze magad, ${n}, ha a kezdőben akarsz maradni!`,
+    (n)=>`Megint bevette… ${n} hetek óta nem tud tiszta lapot hozni, és ez most már látszik rajta. A kispadról érkezik a figyelmeztetés.`],
+  debutRed:[
+    (n)=>`Óóó, ne! ${n} a BEMUTATKOZÓ meccsén kapja a piros lapot — nem így képzelte el az első napját a csapatnál.`,
+    (n)=>`Micsoda bemutatkozás… csak épp rossz értelemben. ${n} első meccse idő előtt véget ért.`],
+  generation:[
+    (y,o)=>`Generációk találkozása: a rutinos ${o} indította a fiatal ${y}-t. A régi és az új iskola egy pillanatban.`,
+    (y,o)=>`A veterán ${o} pontosan tudta, hova kell tenni — a fiatal ${y} pedig ott volt. Gyönyörű futball.`]};
+function milePick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+/* A modul csak KARRIERBEN és csak rögzített alapítókerettel él. */
+function milestoneActive(){
+  return gameMode==="career"&&!!careerPool&&!!(S.foundingSquad&&S.foundingSquad.length);}
+function mileIsFounder(n){return (S.foundingSquad||[]).indexOf(n)>=0;}
+function mileIsYouth(n){
+  const e=careerPool&&careerPool[n];
+  return !!(e&&isYouthProspect(e));}
+function mileMatches(n){const c=S.careerStats&&S.careerStats[n];return (c&&c.matches)||0;}
+/* A meccs indulásakor felmért állapot. A `matches` a meccs ELŐTTI érték, mert a
+   careerStats csak a lefújásnál nő — a bemutatkozás tehát matches===0. */
+function mileBegin(active){
+  const M={on:milestoneActive(),debutants:new Set(),gkDry:null,pending:[],
+           gkScolded:false,jubilee:[]};
+  if(!M.on)return M;
+  active.forEach(a=>{
+    const n=a.p.n,played=mileMatches(n);
+    if(!mileIsFounder(n)&&played===0){
+      M.debutants.add(n);
+      S.debutWatch[n]=0;}
+    /* meccs-jubileum: a MOSTANI meccs a kerek sokadik */
+    if(MILE_JUBILEES.indexOf(played+1)>=0)M.jubilee.push({n,no:played+1});});
+  const gk=active.find(a=>slots[a.idx]&&slots[a.idx].pos==="KP");
+  if(gk&&(S.gkDrySpell[gk.p.n]||0)>=MILE_GK_DRY_LIMIT)M.gkDry=gk.p.n;
+  return M;}
+/* A debütáns gól- és gólpassz-súlyának szorzója. Az egyetlen mechanikai
+   beavatkozás a meccs KÖZBEN — hogy a bemutatkozás-történetnek valódi esélye
+   legyen megtörténni, ne csak elméletben létezzen. */
+function mileWeight(M,name){return (M&&M.on&&M.debutants.has(name))?MILE_DEBUT_BOOST:1;}
+/* Egy játékos "eredményes volt" — gól, gólpassz vagy tiszta lap.
+   A sorrend fontos: a bemutatkozás és a késői áttörés KIZÁRJA egymást (mindkettő
+   a debutWatch bejegyzését fogyasztja el), az ifi-mérföldkő pedig csak akkor
+   szólal meg külön, ha a másik kettő nem vitte el a pillanatot. */
+function mileEffective(M,name,how,minTxt,ctx){
+  if(!M||!M.on||!name)return;
+  const watching=Object.prototype.hasOwnProperty.call(S.debutWatch,name);
+  const nm=esc(shortName(name));
+  const youth=mileIsYouth(name);
+  /* CSAK a bemutatkozás-ág mondja el maga az ifi-jegyzetet (debutYouth). Az
+     áttörés-ág nem — ott az akadémista mérföldköve KÜLÖN sorként esedékes,
+     mert a spec szerint az ifi első eredményessége mindig kap saját szöveget,
+     akárhányadik meccsen jön. Ezért a jelző nem "elhangzott valami", hanem
+     kifejezetten "az ifi-jegyzet elhangzott". */
+  let youthNoted=false;
+  if(watching&&M.debutants.has(name)){
+    /* --- 1. BEMUTATKOZÁS --- */
+    if(how==="clean"){
+      const isGk=ctx&&ctx.role==="KAPUS";
+      addLine(`${minTxt}⭐ ${milePick(isGk?MILE_TXT.debutCleanGk:MILE_TXT.debutCleanDef)(nm)}`,"m mvp");
+      /* a kapus külön elismerést kap, ha a nullát bravúrokkal tartotta meg */
+      if(isGk&&ctx&&ctx.saves>=2)addLine(`→ ${milePick(MILE_TXT.debutGkDouble)}`,"m skillnote");
+      if(youth){addLine(`→ ${milePick(MILE_TXT.debutYouth)}`,"m skillnote");youthNoted=true;}
+      delete S.debutWatch[name];M.debutants.delete(name);
+      M.pending.push({kind:"debut",name,morale:3});
+    }else{
+      addLine(`${minTxt}⭐ ${milePick(how==="goal"?MILE_TXT.debutGoal:MILE_TXT.debutAssist)(nm)}`,"m mvp");
+      if(youth){addLine(`→ ${milePick(MILE_TXT.debutYouth)}`,"m skillnote");youthNoted=true;}
+      delete S.debutWatch[name];M.debutants.delete(name);
+      M.pending.push({kind:"debut",name,morale:3});}
+  }else if(watching&&(S.debutWatch[name]||0)>=MILE_QUIET_UNTIL){
+    /* --- 2. KÉSŐI ÁTTÖRÉS (6+ meccs) --- */
+    addLine(`${minTxt}⭐ ${milePick(MILE_TXT.breakthrough)(nm)}`,"m mvp");
+    delete S.debutWatch[name];
+    M.pending.push({kind:"break",name,morale:2,team:-1});
+  }else if(watching){
+    /* --- a néma ablak (2-5. meccs): a történet lezárul, de szó nélkül --- */
+    delete S.debutWatch[name];}
+  /* --- 3. AZ AKADÉMISTA ELSŐ NAGY PILLANATA --- */
+  if(youth&&!S.youthMilestone[name]){
+    S.youthMilestone[name]=true;
+    if(!youthNoted)addLine(`${minTxt}🌱 ${milePick(MILE_TXT.youthFirst)(nm)}`,"m mvp");}}
+/* A kapus rossz sorozata: a fejmosás a MECCS ELSŐ kapott góljánál szólal meg. */
+function mileGkConceded(M,minTxt){
+  if(!M||!M.on||!M.gkDry||M.gkScolded)return;
+  M.gkScolded=true;
+  addLine(`${minTxt}😖 ${milePick(MILE_TXT.gkScold)(esc(shortName(M.gkDry)))}`,"m inj");
+  /* a fejmosás felrázza a kapust, de a csapat hangulatát megviseli */
+  M.pending.push({kind:"gkscold",name:M.gkDry,morale:-2,team:1,ovr:2,ovrMatches:1});}
+/* A bemutatkozás sötét oldala: piros lap az első meccsen. */
+function mileRed(M,name,minTxt){
+  if(!M||!M.on||!M.debutants.has(name))return;
+  addLine(`${minTxt}💔 ${milePick(MILE_TXT.debutRed)(esc(shortName(name)))}`,"m rc");
+  delete S.debutWatch[name];M.debutants.delete(name);
+  M.pending.push({kind:"debutred",name,morale:-2});}
+/* Lefújás: a tiszta lapos mérföldkövek, a jubileum, majd a hatások kiosztása
+   és a számlálók léptetése. `saves` a kapus bravúrjainak száma EZEN a meccsen. */
+function mileFullTime(M,active,cleanSheet,saves){
+  if(!M||!M.on)return;
+  /* A KAPUS ÉS A VÉDŐ "eredményessége" a tiszta lap — ez csak lefújáskor derül
+     ki. Ugyanazon a döntési ágon megy át, mint a gól és a gólpassz, ezért a
+     késői áttörés és az ifi-mérföldkő is működik rájuk: egy nyolc meccse
+     nullát nem hozó újonc védő a 8. meccsen ugyanúgy megkapja az áttörés-sort,
+     mint egy csatár az első góljánál. */
+  if(cleanSheet)active.forEach(a=>{
+    const pos=slots[a.idx]&&slots[a.idx].pos;
+    if(!pos)return;
+    const role=roleInFormation(pos);
+    if(role!=="KAPUS"&&role!=="VEDO")return;
+    mileEffective(M,a.p.n,"clean","",{role,saves});});
+  M.jubilee.forEach(j=>{
+    addLine(`🎖 ${esc(shortName(j.n))} ma játszotta a ${j.no}. meccsét a klub színeiben. A szurkolók felállva tapsolják meg.`,"m mvp");
+    M.pending.push({kind:"jubilee",name:j.n,morale:1});});
+  /* ---- A HATÁSOK KIOSZTÁSA (lila életsorok) ---- */
+  M.pending.forEach(p=>{
+    const nm=esc(shortName(p.name));
+    const bits=[];
+    if(p.morale){
+      S.morale=Math.max(0,Math.min(100,S.morale+p.morale));
+      bits.push(`morál ${p.morale>0?"+":""}${p.morale}`);}
+    if(p.team){setTeamMomentum(p.team,1);bits.push(`csapaterő ${p.team>0?"+":""}${p.team} a következő meccsen`);}
+    if(p.ovr){setNextMatchOvr(p.name,p.ovr,p.ovrMatches||1);bits.push(`${nm} +${p.ovr} Rating a következő meccsen`);}
+    const head=p.kind==="debut"?`✨ Bemutatkozás: ${nm} emlékezetes első meccset játszott`
+      :p.kind==="break"?`✨ Áttörés: ${nm} végre eredményes volt — a csapat vele együtt lélegzik fel, de kicsit el is lazul`
+      :p.kind==="gkscold"?`🗣 Fejmosás a kapusnak: ${nm} felrázva jön ki a következő meccsre, az öltöző hangulata viszont feszült`
+      :p.kind==="debutred"?`💔 Rossz bemutatkozás: ${nm} pirosat kapott az első meccsén`
+      :`🎖 Jubileum: ${nm} kerek meccsszámhoz ért`;
+    addLine(`${head}${bits.length?` — ${bits.join(", ")}`:""}`,"m life");});
+  /* ---- SZÁMLÁLÓK LÉPTETÉSE ---- */
+  /* a még figyelt (eredménytelen) újoncok meccsszáma nő */
+  active.forEach(a=>{
+    const n=a.p.n;
+    if(Object.prototype.hasOwnProperty.call(S.debutWatch,n))S.debutWatch[n]=(S.debutWatch[n]||0)+1;});
+  /* a kezdő kapus szárazsága: tiszta lapnál nulla, egyébként nő */
+  const gk=active.find(a=>slots[a.idx]&&slots[a.idx].pos==="KP");
+  if(gk){
+    if(cleanSheet)S.gkDrySpell[gk.p.n]=0;
+    else S.gkDrySpell[gk.p.n]=(S.gkDrySpell[gk.p.n]||0)+1;}
+  /* az ideiglenes hatások fogyasztása — EGY meccs telt el */
+  Object.keys(S.nextMatchOvr||{}).forEach(n=>{
+    const e=S.nextMatchOvr[n];
+    if(!e){delete S.nextMatchOvr[n];return;}
+    /* a MOST kiosztott bónusz a KÖVETKEZŐ meccsre szól, azt még nem fogyasztjuk */
+    if(M.pending.some(p=>p.ovr&&p.name===n))return;
+    e.matches--;if(e.matches<=0)delete S.nextMatchOvr[n];});
+  if(S.teamMomentum&&!M.pending.some(p=>p.team)){
+    S.teamMomentum.matches--;
+    if(S.teamMomentum.matches<=0)S.teamMomentum=null;}}
 function playMatch(){
   /* F4/4: a párharc szkriptje EGYSZER használatos — itt vesszük át és
      nullázzuk, hogy a meccs végén már ne lógjon be a következő fordulóba. */
@@ -11139,6 +11393,10 @@ function playMatch(){
      lett általános, hogy a H2H-hoz egy MÁSIK pillanatkép is beadható legyen. */
   const MS=buildMatchSnapshot();
   const active=MS.active;
+  /* KARRIER-MÉRFÖLDKÖVEK: a meccs ELŐTTI felmérés (ki debütál, melyik kapus van
+     rossz sorozatban, kinek kerek ez a meccse). A careerStats csak a lefújásnál
+     nő, ezért itt még a meccs előtti számok állnak — pont ez kell. */
+  const MILE=mileBegin(active);
   const capPlaying=MS.capPlaying;
   const famSp=MS.famSp;
   const gi=MS.gi,bi=MS.bi;
@@ -11206,7 +11464,7 @@ function playMatch(){
   const onPitch=()=>active.filter((a,i)=>i!==redIdx);
   const notRed=(x,idx)=>idx!==redIdx;
   S._goldQuotesThisMatch=0;   /* BL díj-kommentárok meccsenkénti korlátja */
-  let min=0,gf=0,ga=0,redIdx=-1,saveCount=0,maxDeficit=0,maxLead=0,specialEventHappened=false,skillFlavorShown=false,paceFlavorShown=false,supersubStruck=false,tierQuoteShown=false,tacGoalFlavorShown=false,tacRawShown=false;
+  let min=0,gf=0,ga=0,redIdx=-1,saveCount=0,maxDeficit=0,maxLead=0,specialEventHappened=false,skillFlavorShown=false,paceFlavorShown=false,supersubStruck=false,tierQuoteShown=false,tacGoalFlavorShown=false,tacRawShown=false,genGoalShown=false;
   _lastGoalMin=0;updateTTBoard(fx,0,0,0);
   const discWatchAtStart=new Set(Object.keys(S.discWatch)),hotStreakAtStart=new Set(Object.keys(S.hotStreak));
   const mScore={},mAssist={};
@@ -11257,6 +11515,7 @@ function playMatch(){
         const oppScorer=pickOpponentScorer(fx.o);
         updateTTBoard(fx,gf,ga,Math.min(90,min));
         addLine(`${gmin(min)}'  Tizenegyesgól: ${esc(oppScorer)} (${fx.o.n})  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+        mileGkConceded(MILE,`${gmin(min)}'  `);
       }else addLine(`${gmin(min)}'  Tizenegyes ellenünk — de kimarad, megmenekültünk!`,"m ev");
     }else if(evType==="owngoal_for"){
       gf++;
@@ -11267,6 +11526,7 @@ function playMatch(){
       const culprit=pick(onPitch().filter(a=>!a.p.family));
       updateTTBoard(fx,gf,ga,Math.min(90,min));
       addLine(`${gmin(min)}'  ÖNGÓL! ${esc(shortName(culprit.p.n))} saját kapujába talál  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+      mileGkConceded(MILE,`${gmin(min)}'  `);
       applyDisciplineDip(culprit.p.n);
     }else if(evType==="fight"){
       const op=onPitch();const p1=pick(op),others=op.filter(a=>a!==p1),p2=pick(others);
@@ -11275,6 +11535,7 @@ function playMatch(){
         const victim=Math.random()<0.5?p1:p2;
         redIdx=active.indexOf(victim);S.reds++;
         addLine(`${gmin(min)}'  🟥 PIROS LAP a dulakodás után! Emberhátrány!`,"m rc");
+        mileRed(MILE,victim.p.n,`${gmin(min)}'  `);
         diff-=SIM.REDMATCH;lf=lam(diff);la=lam(-diff)*defenseMult();}
     }else if(evType==="var_overturn"){
       const nearScorer=pick(onPitch());
@@ -11323,7 +11584,8 @@ function playMatch(){
         ga++;
         const dramaOppScorer=pickOpponentScorer(fx.o);
         updateTTBoard(fx,gf,ga,90);
-        addLine(`90+  DRÁMA A HOSSZABBÍTÁSBAN! ${esc(dramaOppScorer)} (${fx.o.n}) az utolsó pillanatokban rontja el az ünnepet  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");}
+        addLine(`90+  DRÁMA A HOSSZABBÍTÁSBAN! ${esc(dramaOppScorer)} (${fx.o.n}) az utolsó pillanatokban rontja el az ünnepet  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+        mileGkConceded(MILE,"90+  ");}
       maxDeficit=Math.max(maxDeficit,ga-gf);maxLead=Math.max(maxLead,gf-ga);
       pendingDrama=null;}
     /* PÁRHARCBAN a vödör góljai a KÖZÖS listából jönnek; egyébként poisson. */
@@ -11331,7 +11593,7 @@ function playMatch(){
     let g=DUEL?duelMine.length:poisson(lf/18);
     for(let k=0;k<g;k++){
       gf++;
-      let si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*(S.subs[x.idx]&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_supersub")?3.5:1));
+      let si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*(S.subs[x.idx]&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_supersub")?3.5:1)*mileWeight(MILE,x.p.n));
       /* Párharcban a gólszerzőt a közös lista dönti el (a súlyozást a saját
          kliensed már a pillanatkép küldésekor elvégezte). A fenti súlyozott
          választás csak TARTALÉK marad: ha a név bármiért nem található a
@@ -11353,7 +11615,7 @@ function playMatch(){
       let atxt="",asstSk=null,asstName=null;
       /* Párharcban a gólpassz ténye és adója is a közös listából jön. */
       if(duelGoal?!!duelGoal.assist:Math.random()<0.75){
-        let ai;do{ai=weightedPick(active,(x,idx)=>idx===redIdx?0:(ASSTW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"assistw")*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1));}while(ai===si);
+        let ai;do{ai=weightedPick(active,(x,idx)=>idx===redIdx?0:(ASSTW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"assistw")*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*mileWeight(MILE,x.p.n));}while(ai===si);
         if(duelGoal){const _a=active.findIndex(a=>a.p.n===duelGoal.assist);if(_a>=0&&_a!==si)ai=_a;}
         const asst=active[ai].p;
         mAssist[asst.n]=(mAssist[asst.n]||0)+1;recordAssist(asst.n);
@@ -11361,6 +11623,19 @@ function playMatch(){
         asstSk=playerSkills(asst.n).find(i=>i.skill.type==="assistw");}
       updateTTBoard(fx,gf,ga,Math.min(90,min));
       addLine(`${goalMin}'  GÓL! ${esc(shortName(scorer.n))}${atxt}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+      /* KARRIER-MÉRFÖLDKÖVEK a gólnál. A gólszerző ELŐBB: ha ugyanaz a történet
+         (pl. ifi-mérföldkő) mindkettőre állna, a gólé az elsőbbség. */
+      mileEffective(MILE,scorer.n,"goal",`${goalMin}'  `);
+      if(asstName)mileEffective(MILE,asstName,"assist",`${goalMin}'  `);
+      /* GENERÁCIÓS GÓL: fiatal fejezi be, amit egy veterán indított (vagy
+         fordítva). Tisztán íz, meccsenként legfeljebb egyszer. */
+      if(asstName&&!genGoalShown){
+        const sa=scorer.age,aa=(active.find(a=>a.p.n===asstName)||{p:{}}).p.age;
+        if(sa!=null&&aa!=null){
+          const young=sa<=20&&aa>=32,old=aa<=20&&sa>=32;
+          if(young||old){genGoalShown=true;
+            const y=esc(shortName(young?scorer.n:asstName)),o=esc(shortName(young?asstName:scorer.n));
+            addLine(`→ ${milePick(MILE_TXT.generation)(y,o)}`,"m skillnote",true);}}}
       /* BL ARANY-DÍJAK: a gólszerző aranycipője, illetve a gólpasszt adó
          Aranypasszok-birtokos kap ünneplő kommentárt. Meccsenként legfeljebb
          kettőt engedünk, hogy ne váljon zajjá. */
@@ -11450,7 +11725,9 @@ function playMatch(){
       const oppTxt=(dOpp&&dOpp.assist)
         ?`${esc(oppScorer)} — gólpassz: ${esc(shortName(dOpp.assist))} (${fx.o.n})`
         :`${esc(oppScorer)} (${fx.o.n})`;
-      addLine(`${oppMin}'  Gól: ${oppTxt}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");}
+      addLine(`${oppMin}'  Gól: ${oppTxt}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+      /* a rossz sorozatban lévő kapus fejmosása — a meccs ELSŐ kapott góljánál */
+      mileGkConceded(MILE,`${oppMin}'  `);}
       /* F5: begyakorlatlan (78 alatti) aktív taktika bizonytalansága — a
          kapott gól után szólal meg, meccsenként legfeljebb egyszer */
       if(!tacRawShown&&S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)<78&&Math.random()<fp(0.28)){
@@ -11468,6 +11745,7 @@ function playMatch(){
       redIdx=weightedPick(active,x=>[0.2,0.5,1,2,3][x.p.aggroI!==undefined?x.p.aggroI:2]*multSkillEffect(x.p.n,"discipline")*(x.p.family&&(x.p.familySpecialty==="kutya"||x.p.familySpecialty==="tank")?1.4:1));
       S.reds++;
       addLine(`${gmin(min)}'  🟥 PIROS LAP! ${esc(shortName(active[redIdx].p.n))} kiállítva — mehet zuhanyozni, emberhátrányba kerülünk!`,"m rc");
+      mileRed(MILE,active[redIdx].p.n,`${gmin(min)}'  `);
       diff-=SIM.REDMATCH;lf=lam(diff);la=lam(-diff)*defenseMult();
       applyDisciplineDip(active[redIdx].p.n);}
     /* ---- SZÍNES SKILL-KÖZVETÍTÉS ----
@@ -11532,6 +11810,7 @@ function playMatch(){
           ga++;
           updateTTBoard(fx,gf,ga,Math.min(90,min));
           addLine(`${gmin(min)}'  Potyagól! ${esc(shortName(gk.p.n))} nagyot hibázik, könnyű gólt kap  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+          mileGkConceded(MILE,`${gmin(min)}'  `);
         }else addLine(`${gmin(min)}'  ${esc(shortName(gk.p.n))} magabiztosan tartja a kaput`,"m ev");
         runPendingDrama();
         return;}
@@ -11604,7 +11883,26 @@ function playMatch(){
         if(g||as){cs.g+=g;cs.a+=as;}});
       const gkForCs=active.find(a=>slots[a.idx].pos==="KP")||active[0];
       if(ga===0){const cs=S.careerStats[gkForCs.p.n]=S.careerStats[gkForCs.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};cs.cs++;S.seasonCleanSheets[gkForCs.p.n]=(S.seasonCleanSheets[gkForCs.p.n]||0)+1;}
+      /* ---- A VÉDŐK TISZTA LAPJA IS SZÁMÍT ----
+         Eddig csak a kapus kapta meg, pedig a nullát a védelem hozza vele
+         együtt. A karrier-statisztikába (careerStats.cs) tehát a kezdő védők is
+         bekerülnek, és a statisztika-tábla "tiszta lap" oszlopa értelmet nyer
+         rájuk is.
+         SZÁNDÉKOSAN NEM megy az S.seasonCleanSheets-be: az KIZÁRÓLAG a
+         szezonvégi kártyaszint-meghatározás bemenete (gkImpact = saves*0.6 +
+         cs*2.2), ahol a 14/21/26 tiszta lap mitikus/vandál/godlike szintet ér.
+         Egy jó védelemben minden hátvéd 15+ nullát hoz egy szezonban, vagyis a
+         teljes védősor automatikusan csúcskártyát kapna — az szétverné a
+         kártyarendszer egyensúlyát. A statisztika tehát bővül, a jutalmazás nem. */
+      if(ga===0)active.forEach(a=>{
+        const pos=slots[a.idx]&&slots[a.idx].pos;
+        if(!pos||pos==="KP"||roleInFormation(pos)!=="VEDO")return;
+        const cs=S.careerStats[a.p.n]=S.careerStats[a.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};
+        cs.cs++;});
     }
+    /* KARRIER-MÉRFÖLDKÖVEK: a tiszta lapos bemutatkozások, a jubileumok, majd a
+       meccs alatt összegyűlt hatások kiosztása és a számlálók léptetése. */
+    mileFullTime(MILE,active,ga===0,saveCount);
     if(cls!=="loss"){
       const gkIdx=active.findIndex(a=>slots[a.idx].pos==="KP");
       active.forEach((a,k)=>{
@@ -14441,6 +14739,7 @@ function hiddenMatchBonus(){
   if(captainIdx>=0&&slots[captainIdx]&&slots[captainIdx].player)
     b+=captainAgeExpBonus(slots[captainIdx].player.age)*0.15;
   if(S.teamFormMalus>0)b-=2.2;
+  b+=teamMomentumAdj();   /* a buildMatchSnapshot chFormMalus utáni tagjának párja */
   b+=tacticEffect();
   /* VÉDEKEZŐ SKILLEK: ezek nem OVR-t adnak, hanem az ELLENFÉL gólesélyét
      SZOROZZÁK (la = lam(-diff) × m). Mivel lam = BASE·e^(K·d), egy m szorzó
@@ -16946,6 +17245,12 @@ function startNextCareerSeason(){
   S.scorers={};S.assists={};S.mvps={};S.goodForm={};S.badForm={};S.playerReds={};S.playerInjuries={};S.seasonSaves={};S.seasonCleanSheets={};S.seasonMatches={};S.tierQuoteCount={};
   S.grudge=new Set();S.fixtures=[];S.playing=false;
   S.discWatch={};S.hotStreak={};S.goallessStreak={};S.unbeatenStreak=0;S.cleanSheetStreak=0;S.ratingAdj={};S.clubScoutSpinsUsed=0;
+  /* Mérföldkövek: az IDEIGLENES hatások és a kapus-szárazság a cleanSheetStreak
+     mellé nullázódnak — új szezon, tiszta lap. A debutWatch, a youthMilestone és
+     a foundingSquad viszont SZÁNDÉKOSAN átível: egy nyáron vett játékos
+     bemutatkozása az új szezonban esedékes, és egy már elhangzott ifi-mérföldkő
+     nem hangozhat el újra. */
+  S.nextMatchOvr={};S.teamMomentum=null;S.gkDrySpell={};
   /* A BEFEKTETÉS HOZAMA és a szezonbüdzsé MÁR A NYÁRON, a szezonjelentés
      elején jóváíródik (lásd hubShowSeasonReport) — itt szándékosan nincs
      pénzmozgás, különben duplán fizetnénk. */
@@ -17128,6 +17433,9 @@ function saveGame(){
         chemPairs:S.chemPairs,chemInProgress:S.chemInProgress,
         activeChallenges:S.activeChallenges,challengeLastOfferRound:S.challengeLastOfferRound,challengeLastOfferSeason:S.challengeLastOfferSeason,startChallengesDone:S.startChallengesDone,
         frozenAcademySeasons:S.frozenAcademySeasons,teamFormMalus:S.teamFormMalus,tsiBlocked:S.tsiBlocked,
+        /* karrier-mérföldkövek */
+        foundingSquad:S.foundingSquad,debutWatch:S.debutWatch,youthMilestone:S.youthMilestone,
+        gkDrySpell:S.gkDrySpell,nextMatchOvr:S.nextMatchOvr,teamMomentum:S.teamMomentum,
         boostTokens:S.boostTokens,freePlayerTokens:S.freePlayerTokens,
         finalTable:S.finalTable,seasonClosed:S.seasonClosed,hubReportHtml:S.hubReportHtml,
         /* F6: a párharc tartós állapota — a kiegyenlítő eltolás, a szezonzáró
@@ -17250,6 +17558,15 @@ function applySavedGame(d){
   S.startChallengesDone=!!d.S.startChallengesDone;
   S.frozenAcademySeasons=d.S.frozenAcademySeasons||0;
   S.teamFormMalus=d.S.teamFormMalus||0;
+  /* Karrier-mérföldkövek. RÉGI MENTÉS: a foundingSquad üresen marad, és ezt
+     szándékosan NEM pótoljuk a jelenlegi keretből — az visszamenőleg
+     "alapítóvá" tenné a már megvett játékosokat is. Üres alapítókeretnél a
+     rendszer csendben alszik (lásd milestoneActive), és a következő karrier
+     indulásakor kapcsol be magától. */
+  S.foundingSquad=d.S.foundingSquad||[];
+  S.debutWatch=d.S.debutWatch||{};S.youthMilestone=d.S.youthMilestone||{};
+  S.gkDrySpell=d.S.gkDrySpell||{};S.nextMatchOvr=d.S.nextMatchOvr||{};
+  S.teamMomentum=d.S.teamMomentum||null;
   S.tsiBlocked=d.S.tsiBlocked||{};
   S.boostTokens=d.S.boostTokens||0;
   S.freePlayerTokens=d.S.freePlayerTokens||0;
