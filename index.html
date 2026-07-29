@@ -307,6 +307,11 @@ button:disabled{opacity:.35;cursor:default}
 .midRoleSeg button.on.s-VKP{background:var(--pos-df)}
 .midRoleSeg button.on.s-KKP{background:var(--pos-mf)}
 .midRoleSeg button.on.s-TKP{background:var(--pos-fw)}
+/* A szélsőre állított középpályás hely KÖZÉPPÁLYÁS marad, ezért a
+   középpályás színt kapja — csak világosabb árnyalatban, hogy a szélső
+   szerep így is elkülönüljön a három középső megbízatástól. */
+.midRoleSeg button.on.s-JSZ,
+.midRoleSeg button.on.s-BSZ{background:var(--pos-mf);box-shadow:inset 0 0 0 2px var(--gold)}
 .btn-mini{padding:7px 8px;border-radius:7px;font-size:11.5px;font-weight:600;
   background:transparent;color:var(--dim);border:1px solid var(--line);cursor:pointer}
 .btn-mini:active{background:var(--panel2)}
@@ -1410,7 +1415,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.26";
+const APP_VERSION="2.5.27";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4446,7 +4451,21 @@ function slotAxisShift(curPos,defPos,key){
    teamAttrStrengths is használ a `form` és a `slots` esetében. Kizárólag
    felhasználói művelet hívja őket, jóval az inicializálás után. */
 const MID_ROLE_CODES=["VKP","KKP","TKP"];
-const MID_ROLE_LABEL={VKP:"védekező",KKP:"klasszikus",TKP:"támadó"};
+const MID_ROLE_LABEL={VKP:"védekező",KKP:"klasszikus",TKP:"támadó",JSZ:"jobbszélső",BSZ:"balszélső"};
+/* ---- SLOTONKÉNTI TÖBBLET-SZEREPEK ----
+   A 3-4-3 négyes középpályasorából a két KÜLSŐ hely (a 4. és a 7. slot, az
+   xy szerint x=85 és x=15) SZÉLSŐRE is állítható. Így a felállás átalakítható
+   a legszélsőségesebb szárnyjátékká: kívül középpályás szélső, elöl támadó
+   szélső — négy szélső egyszerre.
+   FONTOS: az itt beállított JSZ/BSZ KÖZÉPPÁLYÁS marad, nem támadó. A
+   megkülönböztetést a slot ALAPÉRTELMEZETT kódja adja (lásd
+   isAttackingWingSlot) — ugyanaz a kód két különböző helyen két különböző
+   szerep. */
+const SLOT_ROLE_EXTRA={"343":{4:["JSZ"],7:["BSZ"]}};
+function slotRoleOptions(f,i){
+  if(!isMidRoleSlot(f,i))return [];
+  const ex=(SLOT_ROLE_EXTRA[f]&&SLOT_ROLE_EXTRA[f][i])||[];
+  return MID_ROLE_CODES.concat(ex);}
 function isMidRoleSlot(f,i){
   const F=FORMS[f];
   return !!F&&MID_ROLE_CODES.includes(F.slots[i]);}
@@ -4458,7 +4477,7 @@ function effectiveSlotPos(f,i){
   const def=F.slots[i];
   if(!isMidRoleSlot(f,i))return def;
   const ov=slotRoles&&slotRoles[f]&&slotRoles[f][i];
-  return MID_ROLE_CODES.includes(ov)?ov:def;}
+  return slotRoleOptions(f,i).includes(ov)?ov:def;}
 /* A felállás teljes slotlistája, a felülírásokkal együtt. */
 function effectiveSlotList(f){
   const key=FORMS[f]?f:"442";
@@ -4467,7 +4486,7 @@ function effectiveSlotList(f){
    pedig azonos értékkel tároljuk — így az "érintetlen" állapot felismerhető
    marad, és a mentés nem hízik fölöslegesen. */
 function setSlotRole(f,i,code){
-  if(!isMidRoleSlot(f,i)||!MID_ROLE_CODES.includes(code))return false;
+  if(!isMidRoleSlot(f,i)||!slotRoleOptions(f,i).includes(code))return false;
   if(!slotRoles[f])slotRoles[f]={};
   if(code===FORMS[f].slots[i])delete slotRoles[f][i];
   else slotRoles[f][i]=code;
@@ -4476,21 +4495,26 @@ function setSlotRole(f,i,code){
 /* Körbeforgatás: védekező → klasszikus → támadó → védekező. */
 function cycleSlotRole(f,i,dir){
   if(!isMidRoleSlot(f,i))return null;
-  const n=MID_ROLE_CODES.length;
-  const at=MID_ROLE_CODES.indexOf(effectiveSlotPos(f,i));
-  const next=MID_ROLE_CODES[((at+(dir||1))%n+n)%n];
+  const opts=slotRoleOptions(f,i),n=opts.length;
+  const at=opts.indexOf(effectiveSlotPos(f,i));
+  const next=opts[((at+(dir||1))%n+n)%n];
   setSlotRole(f,i,next);
   return next;}
-/* Hány védekező / klasszikus / támadó középpályás van jelenleg beállítva. */
+/* Hány védekező / klasszikus / támadó középpályás van jelenleg beállítva.
+   A szélsőre állított helyek külön számlálón futnak (JSZ/BSZ), hogy a
+   felirat őszintén tudja mondani: "2 klasszikus · 2 szélső". */
 function midRoleCounts(f){
-  const c={VKP:0,KKP:0,TKP:0};
+  const c={VKP:0,KKP:0,TKP:0,JSZ:0,BSZ:0};
   const key=FORMS[f]?f:"442";
-  FORMS[key].slots.forEach((p,i)=>{if(isMidRoleSlot(key,i))c[effectiveSlotPos(key,i)]++;});
+  FORMS[key].slots.forEach((p,i)=>{
+    if(!isMidRoleSlot(key,i))return;
+    const e=effectiveSlotPos(key,i);
+    if(c[e]!==undefined)c[e]++;});
   return c;}
 /* Emberi összefoglaló: "2 védekező · 1 támadó" (a nullákat kihagyja). */
 function midRoleText(f){
   const m=midRoleCounts(f);
-  return MID_ROLE_CODES.filter(c=>m[c]>0).map(c=>`${m[c]} ${MID_ROLE_LABEL[c]}`).join(" · ");}
+  return Object.keys(m).filter(c=>m[c]>0).map(c=>`${m[c]} ${MID_ROLE_LABEL[c]}`).join(" · ");}
 /* ---- SKILL → TENGELY ----
    Melyik skill-típus melyik csapat-attribútumot erősíti. A "szórt" típusok
    (aura, rating, mvp) mind a négyre adnak keveset. A tisztán szervezési
@@ -4529,7 +4553,7 @@ const PACE_FLAVOR={
   sp_flank:{
     scorer:["%N% egyszerűen elhúzott a bekk mellett a szélen, és a kapuba is betette",
             "Fél pálya sprint a vonal mellett, %N% pedig nem lassított a befejezésnél sem",
-            "%N% megcsinálta a szélét: a védője már a felezőnél feladta"],
+            "%N% meghúzta a szélét: a védője már a felezőnél feladta"],
     asst:["%N% az alapvonalig sprintelt, onnan jött a beadás — a sebesség nyitotta meg a teret",
           "%N% egy lépéssel gyorsabb volt a bekknél, és pontosan tálalt középre"]},
   sp_bolt:{
@@ -4621,7 +4645,9 @@ function teamAttrStrengths(){
   const defSlots=(FORMS[form]&&FORMS[form].slots)||null;
   slots.forEach((sl,i)=>{
     if(!sl.player)return;
-    const role=roleInFormation(sl.pos),a=attrsOfPlayer(sl.player),fit=sl.fit||1;
+    /* SLOT-PONTOS szerep: a 3-4-3 középpályasorából szélsőre állított hely
+       középpályásként súlyozódik, nem támadóként. */
+    const role=roleInFormation(sl.pos,form,i),a=attrsOfPlayer(sl.player),fit=sl.fit||1;
     const defPos=(defSlots&&defSlots[i])||sl.pos;
     ATTR_KEYS.forEach(k=>{
       const w=(ROLE_AXIS_W[k]&&ROLE_AXIS_W[k][role])||0;
@@ -4727,7 +4753,7 @@ function tacticFit(key){
 function tacticChemCount(key){
   if(!S.chemPairs)return 0;
   const roleOf={};
-  slots.forEach(sl=>{if(sl.player)roleOf[sl.player.n]=roleInFormation(sl.pos);});
+  slots.forEach((sl,i)=>{if(sl.player)roleOf[sl.player.n]=roleInFormation(sl.pos,form,i);});
   const wanted=TACTICS[key].chemRoles;
   let n=0;
   Object.values(S.chemPairs).forEach(pr=>{
@@ -4912,9 +4938,23 @@ const WINGER_IS_ATTACKING={
    feltöltés, átigazolási kategóriák) MARAD a sima getCategoryFor-on: ott a
    tágabb középpályás-kódlista adja a szélesebb jelölt-poolt egy kiürült
    szélső-slotra. */
-function roleInFormation(pos,f){
+/* Támadó szélső-e az adott SLOT? A megkülönböztetés a slot ALAPÉRTELMEZETT
+   kódjából jön: egy JSZ/BSZ csak akkor támadó szélső, ha a hely eredetileg is
+   az volt. A 3-4-3 középpályasorából szélsőre állított hely tehát
+   KÖZÉPPÁLYÁS marad — ugyanaz a kód, két különböző szerep. */
+function isAttackingWingSlot(f,i){
+  const F=FORMS[f||form];
+  if(!F||i==null)return false;
+  const def=F.slots[i];
+  return (def==="JSZ"||def==="BSZ")&&!!WINGER_IS_ATTACKING[f||form];}
+/* i (slot-index) megadásakor SLOT-PONTOS a válasz; nélküle a régi,
+   felállás-szintű viselkedés marad — így a puszta poszt-kóddal hívó helyek
+   változatlanul működnek. */
+function roleInFormation(pos,f,i){
   f=f||form;
-  if((pos==="JSZ"||pos==="BSZ")&&WINGER_IS_ATTACKING[f])return "CSATAR";
+  if(pos==="JSZ"||pos==="BSZ"){
+    if(i!=null)return isAttackingWingSlot(f,i)?"CSATAR":"KOZEPPALYAS";
+    if(WINGER_IS_ATTACKING[f])return "CSATAR";}
   return getCategoryFor(pos);}
 /* ================= PÉNZNEM: MAGYAR FORINT =================
    A gazdaság BELÜL továbbra is pontban számol — a mentés, az összehasonlítások,
@@ -6749,7 +6789,7 @@ function applyTransfer(type){
         extraRoster.push(repl);markArrived(repl);
         return `${esc(repl.n)} (${repl.ovr}) a tartalékba`;
       }
-      const cat=roleInFormation(slots[idx].pos);
+      const cat=roleInFormation(slots[idx].pos,form,idx);
       const bp=BENCH[cat];
       if(bp){BENCH[cat]=repl;return `${esc(bp.n)} → ${esc(repl.n)} (${repl.ovr}) a padon`;}
       return `${esc(repl.n)} (${repl.ovr}) érkezett, de nem fért be`;});
@@ -6765,7 +6805,7 @@ function applyTransfer(type){
       extraRoster.push(repl);markArrived(repl);
       return `Akadémiai bemutatkozás: ${esc(repl.n)} (${repl.ovr}) csatlakozott a tartalék-kerethez — hosszú távú befektetés.`;
     }
-    const cat=roleInFormation(slots[idx].pos);
+    const cat=roleInFormation(slots[idx].pos,form,idx);
     const bp=BENCH[cat];
     if(bp){BENCH[cat]=repl;return `Akadémiai bemutatkozás: ${esc(repl.n)} (${repl.ovr}) kap helyet a padon ${esc(bp.n)} helyett — hosszú távú befektetés.`;}
     return `Akadémiai bemutatkozás: ${esc(repl.n)} jelentkezett, de nem fért be.`;
@@ -6959,7 +6999,7 @@ function renderFormPreview(f){
   let html='<div class="ln"></div>';
   F.slots.forEach((defPos,i)=>{
     const pos=effectiveSlotPos(f,i);          /* a MEGBÍZATÁS szerinti kód */
-    const role=roleInFormation(pos,f);        /* szerep az ELŐNÉZETT felállásban */
+    const role=roleInFormation(pos,f,i);      /* szerep az ELŐNÉZETT felállásban */
     if(pos!=="KP"&&cnt[role]!==undefined)cnt[role]++;
     const [x,y]=F.xy[i];
     const mid=isMidRoleSlot(f,i);
@@ -6977,7 +7017,7 @@ function renderFormPreview(f){
   const lbl=document.getElementById("formPreviewLbl");
   if(lbl){
     const m=midRoleCounts(f);
-    const midTxt=MID_ROLE_CODES.filter(c=>m[c]>0).map(c=>`${m[c]} ${MID_ROLE_LABEL[c]}`).join(" · ");
+    const midTxt=Object.keys(m).filter(c=>m[c]>0).map(c=>`${m[c]} ${MID_ROLE_LABEL[c]}`).join(" · ");
     lbl.innerHTML=`${FORM_LABELS_SETUP[f]||f} — ${cnt.VEDO} védő · ${cnt.KOZEPPALYAS} középpályás · ${cnt.CSATAR} csatár`
       +`<br>Középpálya: <b>${midTxt}</b>`
       +`<br><span style="font-size:11px;opacity:.72">A szaggatott helyekre koppintva átállíthatod a középpályás szerepét.</span>`;}}
@@ -7106,6 +7146,48 @@ const AUTO_LEVEL_AIMS=[
 function autoLevelAim(){
   const id=(S&&S.autoLevelAim)||"balanced";
   return AUTO_LEVEL_AIMS.find(a=>a.id===id)||AUTO_LEVEL_AIMS[2];}
+/* ---- MILYEN SZINTET ÁLLÍTANA BE MOST AZ AUTOMATIKA? ----
+   TISZTA függvény: nem ír semmit, csak számol. Ugyanezt használja a HUB
+   kijelzése ÉS a tényleges beállítás, így a kettő nem tud elcsúszni egymástól
+   — korábban a szintlépés a szezonindításba volt beégetve, a felület pedig
+   semmit nem tudott róla előre.
+   A levelGap(lvl) opcionális paramétere teszi lehetővé: a próbaszintet át
+   tudjuk adni anélkül, hogy a globális oppTargetRating-et piszkálnánk. */
+function autoLevelTargetNow(){
+  if(gameMode!=="career"||!S.autoLevel)return oppTargetRating;
+  if(typeof h2hRoomActive==="function"&&h2hRoomActive())return oppTargetRating;
+  const aim=autoLevelAim();
+  let lvl=oppTargetRating,guard=0;
+  while(levelGap(lvl)>aim.hi&&lvl<maxOppRating()&&guard++<80)lvl++;
+  while(levelGap(lvl)<aim.lo&&lvl>70&&guard++<160)lvl--;
+  return lvl;}
+/* ---- A SZINT TÉNYLEGES KÖVETÉSE, MÉG A NYÁRON ----
+   Eddig a szintlépés a szezonindításkor futott — azaz MIUTÁN a szezon eleji
+   kihívásokat már felajánlottuk. A kihívás-kalibráció viszont a szint-
+   különbségből dolgozik, így a vállalásaid egy ELAVULT mezőnyszinthez mérve
+   születtek: 74-en kaptad őket, aztán a mezőny felugrott 80-ra.
+   Mostantól a követés a nyáron FOLYAMATOS: minden HUB-rajzolásnál ránézünk,
+   és ha a kereted erősödött (igazolás, fejlődés, boost), a mezőny azonnal
+   lép. Csak akkor csinál bármit, ha TÉNYLEGESEN változna — az applyMarketShift
+   pedig idempotens (a basePeak-ből számol újra), tehát az ismételt hívás nem
+   halmoz semmit. Szezon KÖZBEN nem fut: a mezőny ott továbbra is fix. */
+function autoLevelSync(){
+  if(gameMode!=="career"||!S.autoLevel)return false;
+  if(typeof h2hRoomActive==="function"&&h2hRoomActive())return false;
+  if(typeof hubMidSeasonMode!=="undefined"&&hubMidSeasonMode)return false;
+  const tgt=autoLevelTargetNow();
+  if(tgt===oppTargetRating)return false;
+  const before=oppTargetRating,aim=autoLevelAim();
+  oppTargetRating=tgt;careerBaseRating=tgt;
+  if(careerPool)Object.values(careerPool).forEach(e=>{
+    if(drafted.has(e.n))return;
+    applyMarketShift(e);
+    e.startRating=Math.round(ratingAtAge(e.peak,e.age));
+    if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
+  SEASON_OPPS=buildOpponents(15,oppTargetRating);
+  if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
+  addLine(`✦ Auto szintkövetés (${aim.n}): a mezőny ${before} → ${oppTargetRating}, mert a kereted meccs-ereje ${teamMatchStrength().toFixed(1)}.`,"m life");
+  return true;}
 /* ================= UNDERDOG-FAKTOR =================
    Egyetlen 0..1 szám arról, mennyire nehéz körülmények között dolgozol. Eddig
    a nehéz run gyakorlatilag NEM volt jutalmazva: a skill-jutalom, a kémia és a
@@ -7487,7 +7569,7 @@ function familyPickPosition(){
   slots.forEach((s,i)=>{
     if(s.player)return;
     const row=document.createElement("div");row.className="prow";
-    row.innerHTML=`<span class="pos pc-${roleInFormation(s.pos)}">${s.pos}</span><span class="main"><div class="nm">${i+1}. hely a pályán</div></span>`;
+    row.innerHTML=`<span class="pos pc-${roleInFormation(s.pos,form,i)}">${s.pos}</span><span class="main"><div class="nm">${i+1}. hely a pályán</div></span>`;
     row.onclick=()=>{familyState.slotIdx=i;familyState.pos=s.pos;familyPickAge();};
     box.appendChild(row);});
   $("familyBody").appendChild(box);
@@ -7956,7 +8038,7 @@ function computeChemistry(){
    indul: a legjobb védő ↔ legjobb középpályás, két véletlen középpályás, és a
    második legjobb középpályás ↔ legjobb csatár. */
 function clubStartChemPairs(){
-  const byRole=r=>slots.filter(s=>s.player&&roleInFormation(s.pos)===r)
+  const byRole=r=>slots.filter((s,i)=>s.player&&roleInFormation(s.pos,form,i)===r)
     .map(s=>s.player).sort((a,b)=>pOvr(b)-pOvr(a));
   const def=byRole("VEDO"),mid=byRole("KOZEPPALYAS"),att=byRole("CSATAR");
   const pairs=new Set();
@@ -8132,7 +8214,7 @@ function drawPitch(){
   slots.forEach((s,idx)=>{
    try{
     const d=document.createElement("div");
-    d.className="slot pc-"+roleInFormation(s.pos)+(s.player?" filled":"")+(phase==="captain"?" cap-pick":"")+(idx===pendingCaptainIdx?" cap-chosen":"");
+    d.className="slot pc-"+roleInFormation(s.pos,form,idx)+(s.player?" filled":"")+(phase==="captain"?" cap-pick":"")+(idx===pendingCaptainIdx?" cap-chosen":"");
     d.style.left=s.xy[0]+"%";d.style.top=s.xy[1]+"%";
     /* a pályán az EFFEKTÍV rating látszik (poszt-illeszkedéssel) — ez az,
        amivel a meccsen tényleg számol a szimuláció */
@@ -11931,7 +12013,7 @@ function playMatch(){
   function updateGoallessStreak(name,scored){
     const entry=active.find(a=>a.p.n===name);
     if(!entry)return;
-    if(roleInFormation(slots[entry.idx].pos)!=="CSATAR")return;
+    if(roleInFormation(slots[entry.idx].pos,form,entry.idx)!=="CSATAR")return;
     if(scored){
       const prevStreak=S.goallessStreak[name]||0;
       S.goallessStreak[name]=0;
@@ -12457,7 +12539,7 @@ function playMatch(){
     /* --- gólcsuklás-számláló a CSATAR-poszton nem gólozóknak, és a
        fegyelmi-figyelő / felpörgött-forma számlálók lejáratása --- */
     active.forEach(a=>{
-      if(roleInFormation(slots[a.idx].pos)==="CSATAR"&&!mScore[a.p.n])
+      if(roleInFormation(slots[a.idx].pos,form,a.idx)==="CSATAR"&&!mScore[a.p.n])
         S.goallessStreak[a.p.n]=(S.goallessStreak[a.p.n]||0)+1;});
     Object.keys(S.discWatch).forEach(n=>{if(discWatchAtStart.has(n)){S.discWatch[n]--;if(S.discWatch[n]<=0)delete S.discWatch[n];}});
     Object.keys(S.hotStreak).forEach(n=>{if(hotStreakAtStart.has(n)){S.hotStreak[n]--;if(S.hotStreak[n]<=0)delete S.hotStreak[n];}});
@@ -14320,7 +14402,7 @@ function showSwapPanel(){
        meg (támadó), a 4-4-2 / 4-5-1 szélsője a középpályáséban. */
     /* A padhely SZEREPÉHEZ hasonlítunk (cat.role), nem a kulcsához: a hét
        padhely kulcsai már nem szerepnevek. */
-    const starterIdxs=slots.map((s,i)=>({s,i})).filter(o=>roleInFormation(o.s.pos)===cat.role);
+    const starterIdxs=slots.map((s,i)=>({s,i})).filter(o=>roleInFormation(o.s.pos,form,o.i)===cat.role);
     const row=document.createElement("div");row.className="swaprow";
     row.innerHTML=`<div class="h">${esc(cat.label)}: pad — ${esc(benchP.n)} (${Math.round(pOvr(benchP))})</div>`;
     starterIdxs.forEach(o=>{
@@ -14724,8 +14806,12 @@ function renderMidRoleEditor(){
     +`Jelenleg: <b>${midRoleText(form)}</b>.</p>`;
   idx.forEach((i,n)=>{
     const cur=effectiveSlotPos(form,i);
-    html+=`<div class="midRoleRow"><span class="lbl">Középső ${n+1}</span><span class="midRoleSeg">`
-      +MID_ROLE_CODES.map(c=>`<button data-i="${i}" data-c="${c}" class="${c===cur?`on s-${c}`:""}">${MID_ROLE_LABEL[c]}</button>`).join("")
+    const opts=slotRoleOptions(form,i);
+    /* Ahol szélső is választható (3-4-3 két külső helye), a sor felirata is
+       ezt mondja — különben rejtve maradna, hogy ott több lehetőség van. */
+    const wide=opts.length>MID_ROLE_CODES.length;
+    html+=`<div class="midRoleRow"><span class="lbl">${wide?"Szélső":"Középső"} ${n+1}</span><span class="midRoleSeg">`
+      +opts.map(c=>`<button data-i="${i}" data-c="${c}" class="${c===cur?`on s-${c}`:""}">${MID_ROLE_LABEL[c]}</button>`).join("")
       +`</span></div>`;});
   box.innerHTML=html;
   box.querySelectorAll(".midRoleSeg button").forEach(b=>{
@@ -16628,6 +16714,11 @@ function hubRefreshMenu(){
   if(marks.length){badge.textContent=marks.join(" ");badge.classList.remove("hide");}
   else badge.classList.add("hide");}
 function renderHub(){
+  /* AUTO SZINTKÖVETÉS — a rajzolás LEGELEJÉN, hogy minden alatta következő
+     kijelzés (mezőnyszint, meccs-erő-különbség, kihívás-panel) már a friss
+     szintet lássa. Nyáron fut csak, és csak ha tényleg változna, tehát nem
+     rekurzív és nem költséges. */
+  autoLevelSync();
   renderRunMeter();
 
   /* SZEZON KÖZBEN a HUB bármikor megnyitható, de az átigazolás nem elérhető —
@@ -16826,8 +16917,20 @@ function renderHub(){
         :bid&&bid.value!=null?`🤝 Nehézség-javaslatod — ${bid.value}`
         :"🤝 Nehézség — „nekem mindegy”")
       : null;
+    /* AUTO SZINTKÖVETÉS KIJELZÉSE.
+       Nyáron a követés FOLYAMATOS, tehát a kiírt szint már a friss — ilyenkor
+       elég jelezni, hogy él. Szezon KÖZBEN viszont a mezőny fix, ezért ott azt
+       mutatjuk meg ELŐRE, hova fog lépni a nyáron: enélkül a szintugrás
+       váratlanul érkezett, és a szezon eleji kihívásokat is elavult szinthez
+       mérve kaptad. */
+    const autoOn=S.autoLevel&&!h2hRoomActive()&&gameMode==="career";
+    const autoTgt=autoOn?autoLevelTargetNow():oppTargetRating;
+    const autoTxt=!autoOn?""
+      :(autoTgt!==oppTargetRating
+        ? `🔄 auto: a nyáron <b style="color:var(--gold)">${autoTgt}</b>-re vált (${autoLevelAim().n}) · `
+        : `🔄 auto szintkövetés BE (${autoLevelAim().n}) · `);
     lvlBtn.innerHTML=(mpHead||((canChange?(w.lvl>=2?"⚠️ ":"✦ "):"✦ ")+`Nehézségi szint — ${oppTargetRating}`))
-      +`<small>${(S.autoLevel&&!h2hRoomActive())?"🔄 auto szintkövetés BE · ":""}${state} · meccs-erőd ${teamMatchStrength().toFixed(1)} (${g>=0?"+":""}${Math.round(g)})`
+      +`<small>${autoTxt}${state} · meccs-erőd ${teamMatchStrength().toFixed(1)} (${g>=0?"+":""}${Math.round(g)})`
       +(uLbl?` · <b style="color:var(--grass)">⚡ ${uLbl}: +${Math.round(u*50)}% fejlődés</b>`:"")
       +(h2hRoomActive()&&canChange
         ? ` · <b>a közös szint a te javaslatod és a társadé átlaga lesz (most: ${oppTargetRating})</b>`:"")
@@ -17656,6 +17759,10 @@ function beginNextSeasonWithChallenges(){
      kihívás-felajánlás CSAK utána jön, hogy a vállalásaidat már a megbeszélt
      mezőnyszint ismeretében tehesd meg. */
   mpSeasonGate(()=>{
+    /* A KIHÍVÁSOK ELŐTT rendezzük el a mezőnyszintet. A kihívás-kalibráció a
+       szint-különbségből dolgozik: ha az automatika csak UTÁNA lépne (ahogy
+       korábban), a vállalásaid egy elavult szinthez mérve születnének. */
+    autoLevelSync();
     S._chAnchorPending=true;
     if(gameMode==="career"&&careerPool&&!S.auto){
       showChallengeOffers("long",5,startNextCareerSeason);
@@ -17680,23 +17787,13 @@ function startNextCareerSeason(){
      és a közös világ némán kettéválna. A szintet ott a két menedzser alkuja
      adja (mpSeasonGate), ami már a szezonindításkor lefutott — ezt felülírni
      itt épp azt a megegyezést törölné, amit az imént kötöttek. */
-  if(gameMode==="career"&&S.autoLevel&&!h2hRoomActive()){
-    const before=oppTargetRating,aim=autoLevelAim();
-    let guard=0;
-    /* FÖLFELÉ: kinőtted a sáv tetejét */
-    while(levelGap()>aim.hi&&oppTargetRating<maxOppRating()&&guard++<80)
-      oppTargetRating++;
-    /* LEFELÉ: a sáv alá estél (öregedés, eladás, gyengült keret). Ez az ág ÚJ:
-       korábban az automatika csak fölfelé lépett, így egy meggyengült kerettel
-       a mezőny ott maradt fölötted, és a szezon indulásból reménytelen volt.
-       A 70-es padló alá nem megyünk (a csúszka alsó vége). */
-    while(levelGap()<aim.lo&&oppTargetRating>70&&guard++<160)
-      oppTargetRating--;
-    if(oppTargetRating!==before){
-      const fel=oppTargetRating>before;
-      addLine(`✦ Auto szintkövetés (${aim.n}): a mezőny ${before} → ${oppTargetRating}, mert a csapatod meccs-ereje (${teamMatchStrength().toFixed(1)}) ${fel?"kinőtte a régi szintet":"a cél-sáv alá esett"}.`,"m life");
-      updateOppRatingBadge();
-      if(MP.active&&MP.role==="host")mpPushLevel();}}
+  /* A számítás és a napló mostantól a KÖZÖS autoLevelSync-ben él (ugyanaz,
+     amit a nyári HUB is folyamatosan futtat) — így a szintlépés logikája
+     egyetlen helyen van, és nem tud kettéválni a kijelzéstől.
+     Itt már többnyire nincs mit tenni: a nyáron végig követte a keretet. Ez a
+     hívás az utolsó ellenőrzés, illetve azoké a régi mentéseké, amik még a
+     folyamatos követés előtt keletkeztek. */
+  if(autoLevelSync()&&MP.active&&MP.role==="host")mpPushLevel();
   /* a vendég a szezonfordulón mindenképp ránéz a közös szintre */
   if(mpLevelLocked())mpPullLevel(true);
   S.seasonNumber=(S.seasonNumber||1)+1;
