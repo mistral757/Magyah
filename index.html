@@ -231,6 +231,17 @@ button:disabled{opacity:.35;cursor:default}
 .hubMenuChev{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:12px;opacity:.75}
 .hubMenuBadge{display:inline-block;margin-left:9px;background:var(--gold);color:var(--bg);
   font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px;vertical-align:middle;letter-spacing:.3px}
+/* ---- A FELGÖRGETŐ JELZÉS ----
+   Amíg a menü a saját helyén áll, a gomb a szokásos módon nyit/csuk. Amikor
+   viszont már csak RAGAD (a természetes helye kigörgött a képernyő fölé), a
+   kinyitás láthatatlan lenne: a tartalom a gomb ALATT, vagyis jóval lejjebb
+   jelenne meg. Ilyenkor a gomb felgörgetővé válik — és ezt ki is mondja ez a
+   zöld nyíl, hogy a kattintás előtt látszódjon, mi fog történni. */
+.hubMenuUp{display:inline-block;margin-left:8px;color:var(--grass);font-size:13px;font-weight:800;
+  vertical-align:middle;animation:hubMenuUpPulse 1.6s ease-in-out infinite}
+.hubMenuUp.hide{display:none}
+@keyframes hubMenuUpPulse{0%,100%{opacity:.55;transform:translateY(1px)}50%{opacity:1;transform:translateY(-2px)}}
+.hubMenuBtn.stuck{border-left-color:var(--grass)}
 #hubActions{margin-top:8px;display:flex;flex-direction:column;gap:8px}
 .accHead{cursor:pointer;user-select:none;margin-bottom:0;display:flex;align-items:center;justify-content:space-between}
 .accChev{font-size:10px;opacity:.7;transition:transform .15s ease}
@@ -1275,6 +1286,13 @@ button:disabled{opacity:.35;cursor:default}
          és a figyelmeztető állapota (piros, lüktető) csak akkor ér valamit, ha
          látszik. Egy becsukott almenüben ez elveszett. -->
     <button id="hubLevelBtn" class="lvlBtn hide" style="width:100%;margin:0 0 12px"></button>
+    <!-- A MENÜ HELYE: a nehézségi szint ALATT, a büdzsé FÖLÖTT. Ez a HUB fő
+         műveleti pontja, ezért nem a lap alján a helye. A gombot és a
+         tartalmát (hubActions) egy indulási lépés helyezi ide — lásd
+         relocateHubMenu(). A jelölésben azért maradnak lentebb, mert a
+         hubActions egy hosszú, csoportokra bontott blokk: ott olvasható, itt
+         viszont szétvágná a HUB fejlécének szerkezetét. -->
+    <div id="hubMenuAnchor" style="height:0"></div>
     <div id="hubBudgetChip"></div>
     <div id="hubChallengePanel"></div>
     <div id="hubInvestBox" class="hubGroup hide" style="margin-bottom:12px"></div>
@@ -1283,8 +1301,13 @@ button:disabled{opacity:.35;cursor:default}
       <div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin-bottom:6px">Mindenkori statisztika</div>
       <div id="careerStatsBody"></div>
     </div>
+    <!-- A SENTINEL a ragadás pontos érzékeléséhez kell. A sticky elem
+         getBoundingClientRect-je ragadás közben is 0 közelében van, tehát abból
+         nem derül ki, hogy TÉNYLEG ragad-e. Ez a nulla magas jelölő a menü
+         TERMÉSZETES helyén marad: ha ő kicsúszik a képernyő fölé, a menü ragad. -->
+    <div id="hubMenuSentinel" style="height:0"></div>
     <div class="hubMenuWrap">
-      <button id="hubMenuBtn" class="hubMenuBtn">☰ Menü<span id="hubMenuBadge" class="hubMenuBadge hide"></span><span id="hubMenuChev" class="hubMenuChev">▼</span></button>
+      <button id="hubMenuBtn" class="hubMenuBtn">☰ Menü<span id="hubMenuUp" class="hubMenuUp hide">▲</span><span id="hubMenuBadge" class="hubMenuBadge hide"></span><span id="hubMenuChev" class="hubMenuChev">▼</span></button>
     </div>
     <div id="hubActions" class="hide">
       <div class="hubGroup" data-acc="transfer">
@@ -1430,7 +1453,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.32";
+const APP_VERSION="2.5.33";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16992,7 +17015,70 @@ function hubAccToggle(group){
   if(willOpen){body.classList.remove("hide");group.classList.add("open");}}
 document.querySelectorAll("#hubActions .accHead").forEach(h=>{
   h.onclick=()=>hubAccToggle(h.closest(".hubGroup"));});
-$("hubMenuBtn").onclick=()=>hubMenuToggle();
+/* ================= A MENÜ HELYE ÉS A RAGADÁS =================
+   1) ÁTHELYEZÉS. A menü a nehézségi szint alá, a büdzsé fölé tartozik — ez a
+      HUB fő műveleti pontja. A jelölésben a hubActions lentebb marad (hosszú,
+      csoportokra bontott blokk, ott olvasható), a sorrendet itt állítjuk be
+      egyszer, induláskor. A gomb és a tartalma EGYÜTT mozog: ha a gomb fönt
+      van, a tartalma pedig lent, a kinyitás láthatatlan marad.
+   2) RAGADÁS. A menü a képernyő tetejére ragad, hogy görgetés közben is
+      elérhető legyen. Ragadás közben viszont a kinyitás értelmetlen: a
+      menüpontok a gomb TERMÉSZETES helyén, jóval lejjebb jelennének meg — a
+      felhasználó számára "nem történik semmi". Ilyenkor a gomb FELGÖRGETŐVÉ
+      válik: visszavisz a saját helyére, és onnan a következő kattintás nyit.
+      A zöld nyíl előre jelzi, hogy most ez fog történni. */
+(function relocateHubMenu(){
+  const anchor=$("hubMenuAnchor"),wrap=document.querySelector(".hubMenuWrap"),
+        acts=$("hubActions"),sent=$("hubMenuSentinel");
+  if(!anchor||!anchor.parentNode||!wrap||!acts)return;
+  const p=anchor.parentNode;
+  if(sent)p.insertBefore(sent,anchor);
+  p.insertBefore(wrap,anchor);
+  p.insertBefore(acts,anchor);})();
+/* Ragad-e most a menü? A sentinel a menü természetes helyén áll, nulla
+   magasan: ha a teteje a képernyő fölé csúszott, a sticky gomb ragad. */
+function hubMenuStuck(){
+  const sent=$("hubMenuSentinel"),btn=$("hubMenuBtn");
+  if(!sent||!btn||!btn.offsetParent)return false;
+  return sent.getBoundingClientRect().top<-2;}
+function hubMenuSyncStuck(){
+  const btn=$("hubMenuBtn"),up=$("hubMenuUp");
+  if(!btn||!up)return;
+  const stuck=hubMenuStuck();
+  /* a nyíl csak akkor jelzi a felgörgetést, ha van is mit: nyitott menünél a
+     gomb továbbra is a csukásra való, ott a ragadás nem zavar */
+  const show=stuck&&$("hubActions")&&$("hubActions").classList.contains("hide");
+  up.classList.toggle("hide",!show);
+  btn.classList.toggle("stuck",!!show);}
+let _hubStuckRaf=0;
+function hubMenuStuckOnScroll(){
+  if(_hubStuckRaf)return;
+  _hubStuckRaf=requestAnimationFrame(()=>{_hubStuckRaf=0;hubMenuSyncStuck();});}
+window.addEventListener("scroll",hubMenuStuckOnScroll,{passive:true});
+window.addEventListener("resize",hubMenuStuckOnScroll,{passive:true});
+/* Felgörgetés a menü saját helyére. A finom (smooth) görgetés nem mindenhol
+   fut le — rendszerszintű "csökkentett mozgás", régi böngésző, vagy épp
+   háttérben lévő lap mellett néma marad. Márpedig egy gomb, ami "nem csinál
+   semmit", pontosan az a hiba, amit itt javítunk: ezért utólag MEGNÉZZÜK,
+   mozdult-e a lap, és ha nem, azonnali ugrással visszük oda. */
+function hubMenuScrollToSelf(){
+  const sent=$("hubMenuSentinel");
+  const before=window.scrollY;
+  const target=sent?Math.max(0,sent.getBoundingClientRect().top+window.scrollY):0;
+  try{
+    if(sent&&sent.scrollIntoView)sent.scrollIntoView({behavior:"smooth",block:"start"});
+    else window.scrollTo({top:target,behavior:"smooth"});
+  }catch(e){window.scrollTo(0,target);}
+  setTimeout(()=>{
+    if(Math.abs(window.scrollY-before)<4&&Math.abs(before-target)>4)window.scrollTo(0,target);
+    hubMenuSyncStuck();},350);}
+$("hubMenuBtn").onclick=()=>{
+  /* CSAK RAGADÁSKOR görgetünk: a menü a saját helyén továbbra is simán nyit. */
+  if(hubMenuStuck()&&$("hubActions").classList.contains("hide")){
+    hubMenuScrollToSelf();
+    return;}
+  hubMenuToggle();
+  hubMenuSyncStuck();};
 /* Egy almenü akkor látszik, ha VAN benne látható gomb — így az üres csoportok
    (pl. nincs kihívás-jutalom, nincs elérhető nehézség-váltás) maguktól
    kimaradnak, és nem kell külön szabályt írni rájuk. */
@@ -17015,7 +17101,10 @@ function hubRefreshMenu(){
      &&(!S.training||!((S.training.main&&S.training.main.stat)||(S.training.sec&&S.training.sec.stat))))marks.push("🏋️");
   const badge=$("hubMenuBadge");
   if(marks.length){badge.textContent=marks.join(" ");badge.classList.remove("hide");}
-  else badge.classList.add("hide");}
+  else badge.classList.add("hide");
+  /* a felgörgető-jelzés a HUB minden újrarajzolásánál is igazodjon: a HUB
+     nyitásakor, panelváltásnál és görgetés nélkül is helyes állapotot mutasson */
+  hubMenuSyncStuck();}
 function renderHub(){
   /* AUTO SZINTKÖVETÉS — a rajzolás LEGELEJÉN, hogy minden alatta következő
      kijelzés (mezőnyszint, meccs-erő-különbség, kihívás-panel) már a friss
