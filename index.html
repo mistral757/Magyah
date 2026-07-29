@@ -1331,7 +1331,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.14";
+const APP_VERSION="2.5.15";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7163,7 +7163,7 @@ function showAcademyReveal(prospect,resumeCb,rec,isFinal){
     <div style="text-align:center;font-size:13px;color:var(--dim);margin-top:6px">${prospect.pos.join("/")} · ${e?e.age:prospect.age} év · becsült erő: ~${prospect.estimatedTSI}</div>${body}`;
   const yesBtn=document.createElement("button");yesBtn.className="btn-y stepbtn";yesBtn.textContent="Felveszem a keretbe";
   yesBtn.onclick=()=>{
-    extraRoster.push(prospect);drafted.add(prospect.n);markArrived(prospect);
+    extraRoster.push(prospect);drafted.add(prospect.n);markArrived(prospect,0,true);
     if(rec)S.academy=(S.academy||[]).filter(r=>r.n!==prospect.n);
     $("scUnlock").classList.add("hide");
     addLine(`${rec?"🎓":"🌱"} Akadémia: ${esc(prospect.n)} (${e?e.age:prospect.age} év) csatlakozott a tartalék-kerethez`,"m life");
@@ -7205,12 +7205,12 @@ function tryAcademyOpportunity(cb){
       addLine(`🎓 ${esc(prospect.n)} lejárt akadémiai idővel távozott — nem volt hely a keretben`,"m life");
       cb();return;}
     if(S.auto){cb();return;}
-    showCareerCapReached(cb,()=>{extraRoster.push(prospect);markArrived(prospect);
+    showCareerCapReached(cb,()=>{extraRoster.push(prospect);markArrived(prospect,0,true);
       if(rec)S.academy=(S.academy||[]).filter(r=>r.n!==prospect.n);
       return prospect;});
     return;}
   if(S.auto){
-    extraRoster.push(prospect);markArrived(prospect);
+    extraRoster.push(prospect);markArrived(prospect,0,true);
     if(rec)S.academy=(S.academy||[]).filter(r=>r.n!==prospect.n);
     addLine(`${rec?"🎓":"🌱"} Akadémia: ${esc(prospect.n)} (${prospect.age} év) csatlakozott a tartalék-kerethez`,"m life");
     cb();return;}
@@ -7939,7 +7939,7 @@ function slotStatusBadge(p){
   if(skillCount>0){
     return `<div class="ratebadge">★${skillCount>1?skillCount:""}</div>`;}
   return "";}
-function markArrived(p){
+function markArrived(p,_price,fromAcademy){
   p._arrivedAtIdx=S.idx;
   /* a "drágább igazolás" büntetés egy alkalmat fogyaszt */
   if(S.buySurcharge>0)S.buySurcharge--;
@@ -7949,8 +7949,16 @@ function markArrived(p){
   if(gameMode!=="career")return;
   S.chSignings=(S.chSignings||0)+1;
   const age=p.age!=null?p.age:(careerPool&&careerPool[p.n]?careerPool[p.n].age:null);
+  /* ---- AZ IFI-AKADÉMIÁRÓL ÉRKEZŐK IS FIATAL IGAZOLÁSNAK SZÁMÍTANAK ----
+     A "fiatal igazolások" kihívás szabálya ezt ígéri is, a gyakorlatban mégsem
+     teljesült soha: az akadémia CSAK ACADEMY_GRADUATE_AGE (21) betöltése után
+     kínálja fel a tehetséget, a számláló viszont 20 év ALATTIT keresett — a két
+     feltétel kizárja egymást. Az akadémiáról felhozott játékos innentől a
+     korától függetlenül beleszámít: ő maga AZ utánpótlás, épp ezt jutalmazza a
+     kihívás. (A 25 év alatti számláló marad korfüggő — annak más a szerepe.) */
+  if(fromAcademy)S.chYoungSignings=(S.chYoungSignings||0)+1;
   if(age!=null){
-    if(age<20)S.chYoungSignings=(S.chYoungSignings||0)+1;
+    if(!fromAcademy&&age<20)S.chYoungSignings=(S.chYoungSignings||0)+1;
     if(age<25)S.chBoughtUnder25=(S.chBoughtUnder25||0)+1;}}
 /* ---- JAVÍTVA: A FELÁLLÁS NÉHA ELTŰNT ----
    A régi kód ELŐSZÖR kiürítette a pályát (pit.innerHTML=""), és utána, a
@@ -8622,20 +8630,35 @@ function genChallenge(scope,diff,ctx){
         rule:`A vállalás után, 20 év ALATTI korban igazolt játékosok számítanak. Az ifi-akadémiáról érkezők is beleszámítanak.`};},
     /* --- 6. Fiatalítás a kezdő 11-ben (nehézségfüggő cél: 3 / 4 / 5) --- */
     ()=>{if(short)return null;
-      const target=diff==="hard"?5:diff==="medium"?4:3;
+      /* ÁLLAPOT-KIHÍVÁS: a cél a MOSTANI állapotod fölött kell legyen, különben
+         vagy ingyen jár, vagy (a régi delta-számítással) teljesíthetetlen volt.
+         Ha már 8-an vannak, nincs értelmes cél — a sablon kihagyja magát. */
+      const most=chYoungInXI(24);
+      if(most>=8)return null;
+      const target=Math.max(diff==="hard"?5:diff==="medium"?4:3,most+1);
+      if(target>9)return null;
       return {type:"youthXI",target,
         desc:`A szezon végére legyen ${target} darab 24 év alatti a kezdő 11-edben`,
         rule:`Ez ÁLLAPOT-kihívás, nem gyűjtögetés: a HATÁRIDŐ pillanatában kell ennyi 24 év alattinak lennie a kezdő 11-ben. Közben szabadon változhat.`};},
     /* --- 7. Új taktika felhozatala --- */
     ()=>{if(short)return null;
       const act=S.tactics&&S.tactics.active;
-      const target=Math.max(65,Math.min(85,Math.round(70*Math.sqrt(mult))));
+      /* ÁLLAPOT-KIHÍVÁS: a legjobb NEM aktív taktikád szintje fölé kell célozni */
+      const most=chBestOtherTacticLevel({excludeTactic:act});
+      const target=Math.max(Math.max(65,Math.min(85,Math.round(70*Math.sqrt(mult)))),most+5);
+      if(target>TACTIC_MAX-2)return null;   /* a plafon közelében nincs mit kérni */
       return {type:"tacticLevel",target,excludeTactic:act,
         desc:`Emelj egy ÚJ taktikát ${target} fölötti szintre ${horizon}`,
         rule:`A vállaláskor AKTÍV taktikád nem számít — egy másikat kell felhoznod. A taktika a használatával fejlődik, tehát váltanod kell rá.`};},
     /* --- 8. Taktikai illeszkedés --- */
     ()=>{if(short)return null;
-      const target=Math.max(52,Math.min(70,Math.round(55*Math.sqrt(mult))));
+      /* ÁLLAPOT-KIHÍVÁS: a MOSTANI illeszkedésed fölé kell célozni. Enélkül egy
+         62%-os keretnél az 52%-os cél vagy ingyen jár, vagy — a régi
+         delta-számítással — teljesíthetetlen volt. 80% fölött már nincs reális
+         mozgástér, ott a sablon kihagyja magát. */
+      const most=Math.round((S.tactics&&S.tactics.active?tacticFit(S.tactics.active):0)*100);
+      const target=Math.max(Math.max(52,Math.min(70,Math.round(55*Math.sqrt(mult)))),most+4);
+      if(target>80)return null;
       return {type:"tacticFit",target,
         desc:`Érj el ${target}% fölötti illeszkedést az aktív taktikádnál`,
         rule:`ÁLLAPOT-kihívás: a határidő pillanatában kell ennyinek lennie. Az illeszkedést a keret összetétele adja — igazolással, felállással és taktikaváltással javíthatod.`};},
@@ -8767,18 +8790,76 @@ function buildChallengeOffer(scope,ctx){
   }else{
     deadline={kind:"season",value:(S.seasonNumber||1)+1};
   }
-  return Object.assign({
+  const offer=Object.assign({
     id:"ch"+(++_challengeIdCtr),
     scope,difficulty:diff,
     reward:goal.forceReward?Object.assign({},goal.forceReward,{desc:posLearnRefundDesc()}):genReward(scope,diff,ctx),
     punishment:genPunishment(scope,diff,ctx),
     deadline,
     startProgress:challengeCurrentValue(goal)
-  },goal);}
+  },goal);
+  /* ---- ZÁRÓ TELJESÍTHETŐSÉG-ELLENŐRZÉS ----
+     Az utolsó szűrő, mielőtt egy kihívás a felhasználó elé kerül. Nem a
+     sablonokat helyettesíti (azok maguk is kihagyhatják magukat), hanem
+     hálóként fogja meg azt, amit egyik sem vett észre. Ha itt elakad, a hívó
+     egyszerűen újat sorsol. Két dolgot néz:
+       · van-e ÉRTELMES cél (pozitív, véges),
+       · nem-e ELEVE TELJESÜLT már a vállalás pillanatában (állapot-kihívásnál
+         ez ingyen jutalom lenne, a többinél a delta miatt eleve kizárt). */
+  if(!challengeOfferSane(offer))return null;
+  return offer;}
+/* A szezon kihívás-mérlege a szezonjelentéshez. A resolvedChallenges listát a
+   szezonváltás nullázza, tehát itt még pontosan a most záruló szezoné áll. */
+function seasonChallengeSummaryHtml(){
+  const all=(S.resolvedChallenges||[]);
+  if(!all.length)return "";
+  const done=all.filter(r=>r.met&&!r.voided).length;
+  const failed=all.filter(r=>!r.met&&!r.voided).length;
+  const voided=all.filter(r=>r.voided).length;
+  let h=`<div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin:12px 0 6px">
+    Kihívások mérlege — ${done} teljesítve${failed?` · ${failed} elbukva`:""}${voided?` · ${voided} érvénytelen`:""}</div>`;
+  all.forEach(r=>{
+    const col=r.voided?"var(--dim)":r.met?"var(--grass)":"var(--red)";
+    const ikon=r.voided?"⚪":r.met?"🏆":"❌";
+    const cim=r.voided?"Érvénytelenítve":r.met?"Teljesítve":"Elbukva";
+    const tetel=r.voided?"":`<div style="font-size:12px;margin-top:2px">
+      ${r.met?"Jutalom":"Büntetés"}: <b style="color:${col}">${esc(String(r.outcome||"—"))}</b></div>`;
+    h+=`<div style="border-left:3px solid ${col};background:var(--panel2);border-radius:7px;
+         padding:7px 9px;margin-bottom:5px">
+      <div style="font-size:12.5px;color:var(--ink);line-height:1.4">${esc(r.desc)}</div>
+      <div style="font-size:11.5px;color:${col};font-weight:700;margin-top:2px">${ikon} ${cim}${
+        r.progressText&&r.progressText!=="—"?` <span style="color:var(--dim2);font-weight:400">· végállás: ${esc(r.progressText)}</span>`:""}</div>
+      ${tetel}</div>`;});
+  return h;}
+function challengeOfferSane(ch){
+  if(!ch||!ch.type)return false;
+  const t=ch.target;
+  if(!(typeof t==="number")||!isFinite(t)||t<=0)return false;
+  /* inverz kihívásnál (pl. "kapj legfeljebb X gólt") a 0-s kiindulás normális */
+  if(ch.inverse)return true;
+  try{
+    const probe=Object.assign({},ch);
+    if(CH_ABSOLUTE_TYPES.includes(probe.type)){probe.startProgress=0;probe.bestSinceAccept=0;}
+    else if(CH_STATE_TYPES.includes(probe.type))probe.startProgress=0;
+    else probe.startProgress=challengeRawValue(probe);
+    if(challengeMet(probe))return false;   /* a vállalás pillanatában már kész */
+  }catch(e){return false;}
+  return true;}
 /* A challenge NYERS (halmozott) értéke — az adott stat szezonösszege. */
 /* Az abszolút (max-alapú) kihívás-típusok: a haladást a vállalás óta elért max
    adja, nem a startProgress-tól számított delta. */
 const CH_ABSOLUTE_TYPES=["unbeatenStreak","cleanStreak","bigHaul"];
+/* ---- ÁLLAPOT-KIHÍVÁSOK ----
+   Ezeknél a nyers érték MAGA a haladás — nem a vállalás óta elért NÖVEKMÉNY.
+   A saját szabály-szövegük is ezt mondja ("ÁLLAPOT-kihívás: a határidő
+   pillanatában kell ennyinek lennie"), a haladás-számítás viszont eddig
+   mindenből levonta a vállaláskori értéket, és ez CSENDBEN TELJESÍTHETETLENNÉ
+   tette őket. Példa a valóságból: a taktikai illeszkedésed 62%, a kihívás 52%-ot
+   kér — a vállaláskor a startProgress 62 lett, a haladás pedig 62−62 = 0, és
+   egész szezonban 0-n állt. Ahhoz, hogy "teljesüljön", 114%-os illeszkedés
+   kellett volna. Ugyanez állt a kezdő 11 fiataljaira, az új taktika szintjére
+   és a nehézség-emelésre is. */
+const CH_STATE_TYPES=["tacticFit","youthXI","tacticLevel","diffRaise"];
 function challengeRawValue(ch){
   switch(ch.type){
     case "teamWins":return S.W||0;
@@ -8875,6 +8956,8 @@ function challengeProgress(ch){
      bestSinceAccept-et a meccs-vége könyvelés frissíti, kizárva a vállalás
      előtti teljesítményt. A többi (halmozó) típus a startProgress-tól számol. */
   if(CH_ABSOLUTE_TYPES.includes(ch.type))return ch.bestSinceAccept||0;
+  /* állapot-kihívás: a MOSTANI érték számít, nem a növekmény (lásd CH_STATE_TYPES) */
+  if(CH_STATE_TYPES.includes(ch.type))return challengeRawValue(ch);
   return Math.max(0,challengeRawValue(ch)-(ch.startProgress||0));}
 /* visszafelé kompatibilitás: a régi kód challengeCurrentValue-t hívott */
 function challengeCurrentValue(ch){return challengeRawValue(ch);}
@@ -9079,6 +9162,9 @@ function acceptChallenge(ch){
      szezon-teljesítmény nem számít. A halmozó kihívások DELTA-mértékűek:
      a startProgress a vállaláskori nyers érték, onnan számolunk. */
   if(CH_ABSOLUTE_TYPES.includes(ch.type)){ch.startProgress=0;ch.bestSinceAccept=0;}
+  /* állapot-kihívásnál nincs mit levonni — a startProgress 0 marad, különben a
+     szezonváltáskori újra-horgonyzás visszahozná a régi hibát */
+  else if(CH_STATE_TYPES.includes(ch.type))ch.startProgress=0;
   else ch.startProgress=challengeCurrentValue(ch);
   ch.acceptedSeason=S.seasonNumber||1;   /* az újra-horgonyzáshoz (szezonváltás) */
   /* Csak a KÉT SZEZON KÖZT vállalt kihívás kap horgony-jelölőt: ezek a régi
@@ -16683,6 +16769,14 @@ function hubShowSeasonReport(){
     html+=`<div style="color:var(--purple);font-weight:700;font-size:12px;text-transform:uppercase;margin:8px 0 5px">A család búcsúzik</div>
       <div style="font-size:13px">${esc(report.familyRetired.n)} ${report.familyRetired.age} évesen letette a cipőt. Örökre a csapat része marad — köszönjük, ${esc(report.familyRetired.n)}!</div>`;}
   if(report.scoutImproved)html+=`<div style="font-size:13px;color:var(--gold);margin-top:8px">A scoutod fejlődött — most már ${scoutStarsLabel(scout.stars)}</div>`;
+  /* ---- A SZEZON KIHÍVÁSAINAK MÉRLEGE ----
+     A lezárás eddig egyetlen naplósorban történt, a szezonzárás sűrűjében —
+     könnyű volt átsiklani rajta, pedig ez a kihívás-rendszer FIZETÉSE: itt
+     derül ki, mit nyertél vagy vesztettél egy egész szezonnyi munkával. A
+     jelentésben most külön blokkot kap, egyértelmű ✓/✗ jelzéssel, a konkrét
+     jutalommal vagy büntetéssel (a szöveg a kedvezményezett nevét is
+     tartalmazza, ahol van ilyen), és a végállással. */
+  html+=seasonChallengeSummaryHtml();
   html+=cardResultsHtml(cardResults);
   if(!html)html=`<div style="font-size:13px;color:var(--dim)">Csendes szezonváltás — mindenki maradt, senki sem vonult vissza.</div>`;
   /* FIX: az advanceCareerSeason() visszafordíthatatlanul öregíti a keretet,
@@ -16843,6 +16937,7 @@ function startNextCareerSeason(){
       ch.acceptedSeason=S.seasonNumber;
       delete ch.needsSeasonAnchor;   /* EGYSZER — különben örökre tolódna a határidő */
       if(CH_ABSOLUTE_TYPES.includes(ch.type)){ch.startProgress=0;ch.bestSinceAccept=0;}
+      else if(CH_STATE_TYPES.includes(ch.type))ch.startProgress=0;   /* állapot: nincs mit levonni */
       else ch.startProgress=challengeRawValue(ch);
     }});
   S._chAnchorPending=false;
