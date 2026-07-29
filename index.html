@@ -1410,7 +1410,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.23";
+const APP_VERSION="2.5.24";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8710,7 +8710,7 @@ function genChallenge(scope,diff,ctx){
     ()=>{if(short)return null;const target=Math.max(10,Math.min(24,R(15,15)));
       return {type:"newStarter",target,
         desc:`Tegyél új játékost a kezdő 11-be, és játszasd legalább ${target} meccsen`,
-        rule:`"Új" az, aki a szezon elején még NEM volt kezdő. Elég EGY ilyen ember — a legtöbb meccset lejátszott új kezdőd haladása számít.`};},
+        rule:`"Új" az, aki a TAVALYI szezon végén nem volt a kezdő 11-ben. A nyáron igazolt vagy ifiből felhozott játékos is ilyen, ha beteszed a kezdőbe. Elég EGY ilyen ember — a legtöbb meccset lejátszott új kezdőd haladása számít.`};},
     /* --- 5. Fiatal igazolások --- */
     ()=>{if(short)return null;const target=Math.max(2,R(3,4));
       return {type:"youngSignings",target,
@@ -9012,6 +9012,27 @@ function chBestNewStarterMatches(){
   const m=S.chNewStarterMatches||{};
   let best=0;Object.values(m).forEach(v=>{if(v>best)best=v;});
   return best;}
+/* ---- ÉLŐ VISSZAJELZÉS EGYES KIHÍVÁSOKHOZ ----
+   A haladás-sáv csak egy számot mutat; ahol a szám MÖGÖTT egy konkrét játékos
+   áll, ott a puszta "0/16" nem mond semmit arról, miért nem mozdul. Ez a
+   függvény adja hozzá a hiányzó mondatot. Üres sztringnél nem jelenik meg
+   semmi, tehát minden más kihívás-típus változatlan marad. */
+function challengeLiveNote(ch){
+  if(!ch)return "";
+  if(ch.type==="newStarter"){
+    const m=S.chNewStarterMatches||{};
+    const rows=Object.entries(m).sort((a,b)=>b[1]-a[1]);
+    if(rows.length)
+      return `Jelenleg ${esc(shortName(rows[0][0]))} vezet ${rows[0][1]} meccsel`
+        +(rows.length>1?` (${rows.length} új kezdőd van)`:"")+".";
+    /* Nincs egyetlen új kezdő sem — mondjuk meg, mi hiányzik. */
+    const xi=(typeof slots!=="undefined"?slots:[]).filter(x=>x&&x.player).map(x=>x.player.n);
+    const base=S.chSeasonStartXI||[];
+    const newInXI=xi.filter(n=>base.indexOf(n)<0);
+    if(newInXI.length)
+      return `${newInXI.map(n=>esc(shortName(n))).join(", ")} már új kezdő — a következő fordulótól számol.`;
+    return "Még nincs új kezdőd: tegyél a kezdő 11-be valakit, aki a tavalyi kezdőben nem volt benne.";}
+  return "";}
 /* Hány adott kor alatti van a kezdő 11-ben MOST. */
 function chYoungInXI(maxAge){
   if(typeof slots==="undefined")return 0;
@@ -9966,6 +9987,13 @@ function startFirstSeason(){
      kezdő kerettel érkeztek, nem "új igazolások". */
   if(gameMode==="career"&&!(S.foundingSquad||[]).length)
     S.foundingSquad=fullCareerRoster().filter(Boolean).map(p=>p.n);
+  /* Az ELSŐ szezonban nincs "tavalyi kezdő 11", amihez mérni lehetne — a
+     viszonyítási pont ezért a mostani kezdő. HIBA, amit ez javít: eddig ez a
+     mező az 1. szezonban VÉGIG undefined maradt, és a playMatch számlálója egy
+     `if(S.chSeasonStartXI)` őrön bukott el — vagyis az "új embert a kezdőbe"
+     kihívás az első szezonban egyáltalán nem számlált, 0-n állt a végéig. */
+  if(gameMode==="career"&&!S.chSeasonStartXI)
+    S.chSeasonStartXI=slots.filter(x=>x&&x.player).map(x=>x.player.n);
   $("scPitch").classList.remove("hide");   /* a kihívás-képernyő elrejtette */
   $("simGo").classList.add("hide");$("capMsg").classList.add("hide");
   if(gameMode==="career")$("matchHubBtn").classList.remove("hide");
@@ -13996,6 +14024,7 @@ function renderChallengeModal(){
         <div class="chmProg" style="color:${col}">${met
           ?(ch.inverse?"✓ egyelőre belefér — a határidőnél dől el ("+challengeProgressText(ch)+")":"✓ teljesítve — a jutalom a határidőnél jár")
           :"Haladás: "+challengeProgressText(ch)}</div>
+        ${(()=>{const n=challengeLiveNote(ch);return n?`<div class="chmProg" style="color:var(--dim);font-weight:600">↳ ${n}</div>`:"";})()}
         <div class="chmStake">🏆 <span class="rw">${esc(ch.reward.desc)}</span> &nbsp;·&nbsp; ⚠ <span class="pn">${esc(ch.punishment.desc)}</span></div>
         ${ch.rule?`<div class="chmRule">📋 <b>Mi számít bele:</b> ${esc(ch.rule)}</div>`:""}
       </div>`;});}
@@ -14316,6 +14345,14 @@ function finish(){
       if(yourRank>8)S.consecutiveBadSeasons=(S.consecutiveBadSeasons||0)+1;
       else S.consecutiveBadSeasons=0;
       S.seasonClosed=true;
+      /* ---- "KI SZÁMÍT ÚJ KEZDŐNEK" — A VISZONYÍTÁSI PONT ----
+         Itt, a szezon lezárásakor vesszük fel: ez a lista azokat tartalmazza,
+         akik TAVALY kezdők voltak. A nyáron igazolt (vagy ifiből felhozott)
+         emberre így a következő szezon 1. fordulójától számít a kihívás.
+         Korábban a szezonKEZDÉSKOR készült, vagyis a nyári átalakítás UTÁN —
+         akkor az új ember már benne volt, és sosem számított újnak. */
+      S.chSeasonStartXI=(typeof slots!=="undefined"?slots:[])
+        .filter(x=>x&&x.player).map(x=>x.player.n);
       S.seasonHistory=S.seasonHistory||[];
       S.seasonHistory.push({season:S.seasonNumber||1,oppRating:oppTargetRating,diffLabel:diffTierLabel(oppTargetRating),
         verdict:tier,rank:yourRank,pts,w:S.W,d:S.D,l:S.L,gf:S.GF,ga:S.GA,
@@ -17592,8 +17629,17 @@ function startNextCareerSeason(){
   /* ---- ÚJ, "TRAINING GROUND" JELLEGŰ KIHÍVÁSOK NYOMKÖVETÉSE ----
      Ezek nem meccs-eredményt mérnek, hanem CSAPATÉPÍTÉST: igazolásokat,
      eladásokat, fiatalítást, taktika-fejlesztést. Szezononként nullázódnak. */
-  /* a szezon eleji kezdő 11 — ehhez mérjük, ki számít "új" kezdőnek */
-  S.chSeasonStartXI=(typeof slots!=="undefined"?slots:[]).filter(x=>x&&x.player).map(x=>x.player.n);
+  /* A "ki számít új kezdőnek" viszonyítási pontját NEM itt vesszük fel.
+     HIBA, amit ez javít: ez a pont a NYÁR UTÁN van — mire idáig érünk, a
+     felhasználó már megvette és be is tette a kezdőbe az új emberét, tehát az
+     illető bekerült a pillanatképbe, és onnantól "régi"-nek számított. A
+     kihívás így csendben teljesíthetetlen volt: csak úgy lehetett volna
+     haladni, ha valakit MENET KÖZBEN emel be, és az is még 16 meccset játszik.
+     A pillanatképet ezért a szezon LEZÁRÁSAKOR vesszük fel (lásd finish()) —
+     az a "kik játszottak tavaly" lista, amihez képest a nyári igazolás
+     tényleg új. Itt csak akkor pótoljuk, ha valamiért hiányzik (régi mentés). */
+  if(!S.chSeasonStartXI||!S.chSeasonStartXI.length)
+    S.chSeasonStartXI=(typeof slots!=="undefined"?slots:[]).filter(x=>x&&x.player).map(x=>x.player.n);
   S.chSignings=0;            /* hány új játékost vettél fel a keretbe */
   S.chYoungSignings=0;       /* ebből hány 20 év alatti */
   S.chSalesValue=0;          /* mennyi pont értékben adtál el */
