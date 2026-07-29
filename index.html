@@ -1394,7 +1394,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.21";
+const APP_VERSION="2.5.22";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9566,6 +9566,11 @@ const S={idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,capMod:0,eventMod:0
      teamMomentum  : {amt,matches} ideiglenes csapaterő-eltolás. */
   foundingSquad:[],debutWatch:{},youthMilestone:{},gkDrySpell:{},
   nextMatchOvr:{},teamMomentum:null,
+  /* benchRun      : n → hány meccse maradt ki a kezdőből (visszatérés-flavor).
+     youthMatured  : n → true, ha az akadémista már elérte a kezdő 11 átlagát.
+     lastCaptainSeen: az utoljára látott kapitány neve — ebből derül ki, hogy
+       most először vezeti ki a csapatot valaki. */
+  benchRun:{},youthMatured:{},lastCaptainSeen:null,
   /* szezonzárás / HUB — hogy a két szezon közti szakasz is menthető és
      újratölthető legyen, dupla-számolás nélkül */
   finalTable:null,seasonClosed:false,hubReportHtml:null};
@@ -11178,6 +11183,7 @@ function mpDecisionLoop(){
 const MILE_QUIET_UNTIL=5;      /* a 2-5. meccs szándékosan néma */
 const MILE_DEBUT_BOOST=1.5;    /* a debütáns gól/gólpassz-súlyának szorzója */
 const MILE_GK_DRY_LIMIT=5;     /* ennyi tiszta lap nélküli meccs után jön a fejmosás */
+const MILE_BENCH_RETURN=3;     /* ennyi kihagyott meccs után számít "visszatérésnek" */
 const MILE_JUBILEES=[50,100,150,200,250,300];
 const MILE_TXT={
   debutGoal:[
@@ -11216,7 +11222,48 @@ const MILE_TXT={
     (n)=>`Micsoda bemutatkozás… csak épp rossz értelemben. ${n} első meccse idő előtt véget ért.`],
   generation:[
     (y,o)=>`Generációk találkozása: a rutinos ${o} indította a fiatal ${y}-t. A régi és az új iskola egy pillanatban.`,
-    (y,o)=>`A veterán ${o} pontosan tudta, hova kell tenni — a fiatal ${y} pedig ott volt. Gyönyörű futball.`]};
+    (y,o)=>`A veterán ${o} pontosan tudta, hova kell tenni — a fiatal ${y} pedig ott volt. Gyönyörű futball.`],
+  /* --- a régi klub elleni gól --- */
+  oldClub:[
+    (n,c)=>`${n} nem ünnepel. Csak bocsánatkérően felemeli a kezét — a ${c} az ő klubja volt.`,
+    (n,c)=>`Gól a ${c} ellen… és ${n} mozdulatlanul áll. Tudja, mit jelentett neki az a mez.`,
+    (n,c)=>`${n} betalál a ${c} ellen, de a mosoly elmarad. A lelátó egy része mégis megtapsolja.`],
+  /* --- új kapitány első meccse --- */
+  capFirst:[
+    (n)=>`Ma először van ${n} karján a csapatkapitányi szalag. Az öltöző rá figyel — most kiderül, elbírja-e a súlyát.`,
+    (n)=>`Új kapitány vezeti ki a csapatot: ${n}. Első alkalom — mindenki kíváncsi, milyen hangot üt meg a pályán.`],
+  capFirstWin:[
+    (n)=>`💪 ${n} az első kapitányi meccsén győzelemre vezette a csapatot. Ezt az öltöző megjegyzi.`],
+  capFirstLoss:[
+    (n)=>`😔 Nem indult jól ${n} kapitánysága — vereség az első meccsen. Lesz mit megbeszélni.`],
+  /* --- a visszavonuló veterán utolsó szezonja --- */
+  farewellGoal:[
+    (n)=>`És ${n} megint! Az utolsó szezonjában jár, de ebben a lábban még mindig ott van minden, amiért szerettük.`,
+    (n)=>`${n} búcsúszezonja ez — és még mindig ő az, aki eldönti a nagy pillanatokat. Nehéz lesz pótolni.`,
+    (n)=>`Aki azt hitte, ${n} már csak tiszteletkörökre jár ki: tévedett. Gól, ahogy a régi szép időkben.`],
+  farewell:[
+    (n)=>`👋 ${n} ma játszotta az utolsó bajnoki meccsét a klubnál. A stadion feláll, a társak sorfalat állnak. Köszönünk mindent!`,
+    (n)=>`👋 Vége egy korszaknak: ${n} a szezon végén visszavonul. Az utolsó forduló, az utolsó taps — a lelátó nem akarja abbahagyni.`],
+  /* --- visszatérés a kispadról --- */
+  comeback:[
+    (n,k)=>`${n} ${k} meccs után kapott újra lehetőséget a kezdőben — és rögtön megmutatta, miért érdemelte ki. Ezt hívják válasznak.`,
+    (n,k)=>`${k} meccsnyi várakozás után tért vissza ${n} a kezdőbe, és nem vesztegette az időt. Az edzőnek most van min gondolkodnia.`],
+  /* --- az akadémista beérése --- */
+  matured:[
+    (n)=>`📈 ${n} mostanra a kezdő tizenegy átlaga fölé nőtt. Az akadémiai befektetés beérett — már nem ígéret, hanem kész játékos.`,
+    (n)=>`📈 Emlékeznek, mikor ${n} még csak reményteli tehetség volt? Mára a csapat átlagánál is erősebb. Ezért éri meg nevelni.`]};
+/* ---- NÉV → VALÓS KLUBOK ----
+   Az adatbázisban egy ember több klub-szezonban is szerepelhet. Ebből épül a
+   "régi klub elleni gól": a mezőny flavor-ellenfelei VALÓS klubok, "Klub (szezon)"
+   alakban (lásd buildOpponents), tehát a zárójeles rész levágásával
+   összevethetők. A válogatott-kereteket kihagyjuk — egy ország nem klub. */
+const PLAYER_CLUBS=(function buildPlayerClubs(){
+  const m={};
+  SQUADS.forEach(sq=>{
+    if(sq.wc||sq.league==="Válogatott")return;
+    sq.players.forEach(p=>{(m[p.n]=m[p.n]||new Set()).add(sq.club);});});
+  return m;})();
+function oppClubName(fx){return String((fx&&fx.o&&fx.o.n)||"").replace(/ \([^)]*\)$/,"").trim();}
 function milePick(arr){return arr[Math.floor(Math.random()*arr.length)];}
 /* A modul csak KARRIERBEN és csak rögzített alapítókerettel él. */
 function milestoneActive(){
@@ -11229,19 +11276,47 @@ function mileMatches(n){const c=S.careerStats&&S.careerStats[n];return (c&&c.mat
 /* A meccs indulásakor felmért állapot. A `matches` a meccs ELŐTTI érték, mert a
    careerStats csak a lefújásnál nő — a bemutatkozás tehát matches===0. */
 function mileBegin(active){
-  const M={on:milestoneActive(),debutants:new Set(),gkDry:null,pending:[],
-           gkScolded:false,jubilee:[]};
-  if(!M.on)return M;
+  /* KÉT SZINT.
+       M.on     — a bemutatkozás-rendszer. Rögzített alapítókeretet igényel,
+                  ezért régi mentésen alszik.
+       M.career — minden más karrier-flavor (jubileum, régi klub, kapitány,
+                  búcsúszezon, visszatérés, ifi beérése). Ezeknek nem kell
+                  alapítókeret, tehát a MÁR FUTÓ karriereken is működnek. */
+  const M={on:milestoneActive(),career:gameMode==="career"&&!!careerPool,
+           debutants:new Set(),gkDry:null,pending:[],gkScolded:false,
+           jubilee:[],returnees:{},retiring:new Set(),capFirst:null,
+           oldClubShown:false,vetGoalShown:false};
+  if(M.on){
+    active.forEach(a=>{
+      const n=a.p.n;
+      if(!mileIsFounder(n)&&mileMatches(n)===0){M.debutants.add(n);S.debutWatch[n]=0;}});
+    const gk=active.find(a=>slots[a.idx]&&slots[a.idx].pos==="KP");
+    if(gk&&(S.gkDrySpell[gk.p.n]||0)>=MILE_GK_DRY_LIMIT)M.gkDry=gk.p.n;}
+  if(!M.career)return M;
+  const season=S.seasonNumber||1;
   active.forEach(a=>{
     const n=a.p.n,played=mileMatches(n);
-    if(!mileIsFounder(n)&&played===0){
-      M.debutants.add(n);
-      S.debutWatch[n]=0;}
     /* meccs-jubileum: a MOSTANI meccs a kerek sokadik */
-    if(MILE_JUBILEES.indexOf(played+1)>=0)M.jubilee.push({n,no:played+1});});
-  const gk=active.find(a=>slots[a.idx]&&slots[a.idx].pos==="KP");
-  if(gk&&(S.gkDrySpell[gk.p.n]||0)>=MILE_GK_DRY_LIMIT)M.gkDry=gk.p.n;
+    if(MILE_JUBILEES.indexOf(played+1)>=0)M.jubilee.push({n,no:played+1});
+    /* visszatérés a kispadról — a meccs ELŐTTI kihagyás-sorozat számít */
+    const out=(S.benchRun&&S.benchRun[n])||0;
+    if(out>=MILE_BENCH_RETURN)M.returnees[n]=out;
+    /* búcsúszezon: a retirePlan annak a szezonnak a száma, aminek a VÉGÉN távozik */
+    const e=careerPool[n];
+    if(e&&e.retirePlan&&e.retirePlan===season)M.retiring.add(n);});
+  /* új kapitány első meccse */
+  if(captainIdx>=0&&slots[captainIdx]&&slots[captainIdx].player){
+    const cn=slots[captainIdx].player.n;
+    if(S.lastCaptainSeen!==cn)M.capFirst=cn;}
   return M;}
+/* A kezdőrúgás előtti bejelentések. KÜLÖN függvény, mert a mileBegin még a
+   forduló-fejléc kiírása ELŐTT fut (a pillanatképből dolgozik) — ezek a sorok
+   viszont a fejléc UTÁN valók, különben a naplóban a meccs elé csúsznának. */
+function mileKickoff(M){
+  if(!M||!M.career)return;
+  if(M.capFirst)addLine(`🎗 ${milePick(MILE_TXT.capFirst)(esc(shortName(M.capFirst)))}`,"m ev");
+  M.retiring.forEach(n=>{
+    addLine(`⏳ ${esc(shortName(n))} búcsúszezonját játssza — a szezon végén visszavonul.`,"m ev");});}
 /* A debütáns gól- és gólpassz-súlyának szorzója. Az egyetlen mechanikai
    beavatkozás a meccs KÖZBEN — hogy a bemutatkozás-történetnek valódi esélye
    legyen megtörténni, ne csak elméletben létezzen. */
@@ -11288,6 +11363,28 @@ function mileEffective(M,name,how,minTxt,ctx){
   if(youth&&!S.youthMilestone[name]){
     S.youthMilestone[name]=true;
     if(!youthNoted)addLine(`${minTxt}🌱 ${milePick(MILE_TXT.youthFirst)(nm)}`,"m mvp");}}
+/* A GÓLHOZ KÖTÖTT SZÍNEK — a mérföldkövektől külön, mert ezek nem zárnak le
+   semmilyen történetet, csak megszínezik a pillanatot. Mindegyik meccsenként
+   legfeljebb egyszer szólal meg, hogy a gól ne fulladjon szövegfalba. */
+function mileGoalExtras(M,scorerName,asstName,minTxt,fx){
+  if(!M||!M.career)return;
+  /* --- RÉGI KLUB ELLEN --- */
+  if(!M.oldClubShown){
+    const club=oppClubName(fx);
+    const clubs=PLAYER_CLUBS[scorerName];
+    if(club&&clubs&&clubs.has(club)){
+      M.oldClubShown=true;
+      addLine(`→ ${milePick(MILE_TXT.oldClub)(esc(shortName(scorerName)),esc(club))}`,"m skillnote",true);}}
+  /* --- BÚCSÚSZEZONBAN LÉVŐ VETERÁN --- */
+  if(!M.vetGoalShown&&M.retiring.has(scorerName)){
+    M.vetGoalShown=true;
+    addLine(`→ ${milePick(MILE_TXT.farewellGoal)(esc(shortName(scorerName)))}`,"m skillnote",true);}
+  /* --- VISSZATÉRÉS A KISPADRÓL --- a gólszerző és a gólpasszadó is elsütheti */
+  [scorerName,asstName].forEach(n=>{
+    if(!n||!M.returnees[n])return;
+    const k=M.returnees[n];delete M.returnees[n];
+    addLine(`→ ${milePick(MILE_TXT.comeback)(esc(shortName(n)),k)}`,"m skillnote",true);
+    M.pending.push({kind:"comeback",name:n,morale:1});});}
 /* A kapus rossz sorozata: a fejmosás a MECCS ELSŐ kapott góljánál szólal meg. */
 function mileGkConceded(M,minTxt){
   if(!M||!M.on||!M.gkDry||M.gkScolded)return;
@@ -11303,8 +11400,9 @@ function mileRed(M,name,minTxt){
   M.pending.push({kind:"debutred",name,morale:-2});}
 /* Lefújás: a tiszta lapos mérföldkövek, a jubileum, majd a hatások kiosztása
    és a számlálók léptetése. `saves` a kapus bravúrjainak száma EZEN a meccsen. */
-function mileFullTime(M,active,cleanSheet,saves){
-  if(!M||!M.on)return;
+function mileFullTime(M,active,cleanSheet,saves,result,lastRound){
+  if(!M)return;
+  if(!M.on&&!M.career)return;
   /* A KAPUS ÉS A VÉDŐ "eredményessége" a tiszta lap — ez csak lefújáskor derül
      ki. Ugyanazon a döntési ágon megy át, mint a gól és a gólpassz, ezért a
      késői áttörés és az ifi-mérföldkő is működik rájuk: egy nyolc meccse
@@ -11319,6 +11417,35 @@ function mileFullTime(M,active,cleanSheet,saves){
   M.jubilee.forEach(j=>{
     addLine(`🎖 ${esc(shortName(j.n))} ma játszotta a ${j.no}. meccsét a klub színeiben. A szurkolók felállva tapsolják meg.`,"m mvp");
     M.pending.push({kind:"jubilee",name:j.n,morale:1});});
+  if(M.career){
+    /* ---- AZ ÚJ KAPITÁNY ELSŐ MECCSÉNEK MÉRLEGE ---- */
+    if(M.capFirst){
+      if(result==="win"){
+        addLine(milePick(MILE_TXT.capFirstWin)(esc(shortName(M.capFirst))),"m mvp");
+        M.pending.push({kind:"capfirst",name:M.capFirst,morale:2});
+      }else if(result==="loss"){
+        addLine(milePick(MILE_TXT.capFirstLoss)(esc(shortName(M.capFirst))),"m ev");
+        M.pending.push({kind:"capfirstbad",name:M.capFirst,morale:-1});}
+      S.lastCaptainSeen=M.capFirst;}
+    /* ---- BÚCSÚ AZ UTOLSÓ FORDULÓBAN ----
+       A visszavonulás a szezon VÉGÉN történik, tehát az utolsó bajnoki forduló
+       az utolsó alkalom, hogy a stadion elköszönjön tőle. */
+    if(lastRound)M.retiring.forEach(n=>{
+      addLine(milePick(MILE_TXT.farewell)(esc(shortName(n))),"m mvp");
+      M.pending.push({kind:"farewell",name:n,morale:3});});
+    /* ---- AZ AKADÉMISTA BEÉRÉSE ----
+       Nem az első eredményesség (azt az ifi-mérföldkő méri), hanem az a pont,
+       amikor a Ratingje ELŐSZÖR éri el a kezdő 11 átlagát: ekkor lett belőle a
+       csapat átlagánál is erősebb játékos. Játékosonként egyszer. */
+    const xi=slots.filter(s=>s&&s.player);
+    if(xi.length){
+      const avg=xi.reduce((s,x)=>s+pOvrDisplay(x.player),0)/xi.length;
+      fullCareerRoster().filter(Boolean).forEach(p=>{
+        if(S.youthMatured[p.n]||!mileIsYouth(p.n))return;
+        if(pOvrDisplay(p)<avg)return;
+        S.youthMatured[p.n]=true;
+        addLine(milePick(MILE_TXT.matured)(esc(shortName(p.n))),"m mvp");
+        M.pending.push({kind:"matured",name:p.n,morale:2});});}}
   /* ---- A HATÁSOK KIOSZTÁSA (lila életsorok) ---- */
   M.pending.forEach(p=>{
     const nm=esc(shortName(p.name));
@@ -11332,6 +11459,11 @@ function mileFullTime(M,active,cleanSheet,saves){
       :p.kind==="break"?`✨ Áttörés: ${nm} végre eredményes volt — a csapat vele együtt lélegzik fel, de kicsit el is lazul`
       :p.kind==="gkscold"?`🗣 Fejmosás a kapusnak: ${nm} felrázva jön ki a következő meccsre, az öltöző hangulata viszont feszült`
       :p.kind==="debutred"?`💔 Rossz bemutatkozás: ${nm} pirosat kapott az első meccsén`
+      :p.kind==="comeback"?`🔁 Válasz a kispadról: ${nm} megindokolta, miért kell játszania`
+      :p.kind==="capfirst"?`🎗 Jó kezdet: ${nm} győzelemmel mutatkozott be kapitányként`
+      :p.kind==="capfirstbad"?`🎗 Nehéz kezdet: ${nm} vereséggel indította a kapitányságát`
+      :p.kind==="farewell"?`👋 Búcsú: ${nm} utolsó bajnokija a klubnál`
+      :p.kind==="matured"?`📈 Beérett: ${nm} a kezdő 11 átlaga fölé nőtt`
       :`🎖 Jubileum: ${nm} kerek meccsszámhoz ért`;
     addLine(`${head}${bits.length?` — ${bits.join(", ")}`:""}`,"m life");});
   /* ---- SZÁMLÁLÓK LÉPTETÉSE ---- */
@@ -11339,6 +11471,19 @@ function mileFullTime(M,active,cleanSheet,saves){
   active.forEach(a=>{
     const n=a.p.n;
     if(Object.prototype.hasOwnProperty.call(S.debutWatch,n))S.debutWatch[n]=(S.debutWatch[n]||0)+1;});
+  if(M.career){
+    /* kispad-sorozat: aki játszott, annak nullázódik, aki kimaradt, annak nő.
+       A KERET a kezdő 11 + a pad — a tartalék-keret tagjai nem "maradtak ki",
+       ők nincsenek is versenyben a helyért. */
+    const played=new Set(active.map(a=>a.p.n));
+    S.benchRun=S.benchRun||{};
+    currentRoster().filter(Boolean).forEach(p=>{
+      if(played.has(p.n))S.benchRun[p.n]=0;
+      else S.benchRun[p.n]=(S.benchRun[p.n]||0)+1;});
+    /* Ha a kapitány első meccse nem hozott se győzelmet, se vereséget (döntetlen),
+       a fenti ág nem futott le — a jelzőt akkor is le kell zárni, különben a
+       "első kapitányi meccs" minden döntetlen után újra elsülne. */
+    if(M.capFirst)S.lastCaptainSeen=M.capFirst;}
   /* a kezdő kapus szárazsága: tiszta lapnál nulla, egyébként nő */
   const gk=active.find(a=>slots[a.idx]&&slots[a.idx].pos==="KP");
   if(gk){
@@ -11452,6 +11597,7 @@ function playMatch(){
   if(S.capMod>0)addLine(`A kapitány húzza a csapatot: mindenki +1 erre a meccsre`,"m ev");
   if(S.capMod<0)addLine(`A kapitány formája nyomasztja a csapatot: mindenki −1`,"m ev");
   addLine(`▲ Jó formában: ${esc(shortName(active[gi].p.n))}${hasFormlock(active[gi].p.n)?" (kiszámítható — skill)":""} · ▼ Gyengélkedik: ${esc(shortName(active[bi].p.n))}`,"m ev");
+  mileKickoff(MILE);   /* kezdőrúgás előtti bejelentések (új kapitány, búcsúszezon) */
   S.goodForm[active[gi].p.n]=(S.goodForm[active[gi].p.n]||0)+1;
   S.badForm[active[bi].p.n]=(S.badForm[active[bi].p.n]||0)+1;
   /* ---- KIÁLLÍTOTT JÁTÉKOS KISZŰRÉSE A KOMMENTÁRBÓL ----
@@ -11627,6 +11773,8 @@ function playMatch(){
          (pl. ifi-mérföldkő) mindkettőre állna, a gólé az elsőbbség. */
       mileEffective(MILE,scorer.n,"goal",`${goalMin}'  `);
       if(asstName)mileEffective(MILE,asstName,"assist",`${goalMin}'  `);
+      /* a gólhoz kötött színek: régi klub, búcsúszezon, visszatérés a kispadról */
+      mileGoalExtras(MILE,scorer.n,asstName,`${goalMin}'  `,fx);
       /* GENERÁCIÓS GÓL: fiatal fejezi be, amit egy veterán indított (vagy
          fordítva). Tisztán íz, meccsenként legfeljebb egyszer. */
       if(asstName&&!genGoalShown){
@@ -11902,7 +12050,9 @@ function playMatch(){
     }
     /* KARRIER-MÉRFÖLDKÖVEK: a tiszta lapos bemutatkozások, a jubileumok, majd a
        meccs alatt összegyűlt hatások kiosztása és a számlálók léptetése. */
-    mileFullTime(MILE,active,ga===0,saveCount);
+    /* A búcsúztatás az utolsó BAJNOKI fordulóban esedékes (a kupa nem az). Az
+       S.idx itt még a meccs saját indexén áll — a léptetés csak jóval lejjebb jön. */
+    mileFullTime(MILE,active,ga===0,saveCount,cls,!euroActive()&&(S.idx+1)>=30);
     if(cls!=="loss"){
       const gkIdx=active.findIndex(a=>slots[a.idx].pos==="KP");
       active.forEach((a,k)=>{
@@ -17436,6 +17586,7 @@ function saveGame(){
         /* karrier-mérföldkövek */
         foundingSquad:S.foundingSquad,debutWatch:S.debutWatch,youthMilestone:S.youthMilestone,
         gkDrySpell:S.gkDrySpell,nextMatchOvr:S.nextMatchOvr,teamMomentum:S.teamMomentum,
+        benchRun:S.benchRun,youthMatured:S.youthMatured,lastCaptainSeen:S.lastCaptainSeen,
         boostTokens:S.boostTokens,freePlayerTokens:S.freePlayerTokens,
         finalTable:S.finalTable,seasonClosed:S.seasonClosed,hubReportHtml:S.hubReportHtml,
         /* F6: a párharc tartós állapota — a kiegyenlítő eltolás, a szezonzáró
@@ -17567,6 +17718,12 @@ function applySavedGame(d){
   S.debutWatch=d.S.debutWatch||{};S.youthMilestone=d.S.youthMilestone||{};
   S.gkDrySpell=d.S.gkDrySpell||{};S.nextMatchOvr=d.S.nextMatchOvr||{};
   S.teamMomentum=d.S.teamMomentum||null;
+  S.benchRun=d.S.benchRun||{};S.youthMatured=d.S.youthMatured||{};
+  /* A kapitány-jelző RÉGI MENTÉSNÉL szándékosan a JELENLEGI kapitányra áll, nem
+     null-ra: különben a betöltés után a rég kinevezett kapitány kapná meg az
+     "első meccse" bejelentést. Új kinevezésnél a mező magától eltér. */
+  S.lastCaptainSeen=d.S.lastCaptainSeen!==undefined?d.S.lastCaptainSeen
+    :((captainIdx>=0&&slots[captainIdx]&&slots[captainIdx].player)?slots[captainIdx].player.n:null);
   S.tsiBlocked=d.S.tsiBlocked||{};
   S.boostTokens=d.S.boostTokens||0;
   S.freePlayerTokens=d.S.freePlayerTokens||0;
