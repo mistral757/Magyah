@@ -443,9 +443,9 @@ button:disabled{opacity:.35;cursor:default}
 .prow.dis{opacity:.32;cursor:default}
 .prow .pos{font-size:11px;font-weight:700;letter-spacing:.2px;padding:3px 6px;border-radius:5px;min-width:40px;text-align:center;white-space:nowrap}
 .prow .pos.pc-KAPUS{background:var(--pos-gk);color:#241d06}
-.prow .pos.pc-VEDO{background:var(--pos-df);color:#f2f6fb}
-.prow .pos.pc-KOZEPPALYAS{background:var(--pos-mf);color:#f2faf4}
-.prow .pos.pc-CSATAR{background:var(--pos-fw);color:#fbf1f0}
+.prow .pos.pc-VEDO,.prow .pos.pc-VEDO_SZ{background:var(--pos-df);color:#f2f6fb}
+.prow .pos.pc-KOZEPPALYAS,.prow .pos.pc-KOZEP_SZ{background:var(--pos-mf);color:#f2faf4}
+.prow .pos.pc-CSATAR,.prow .pos.pc-CSATAR_SZ{background:var(--pos-fw);color:#fbf1f0}
 .prow .main{flex:1;min-width:0}
 .prow .nm{font-weight:600;font-size:14.5px}
 .prow .nm small{color:var(--dim);font-weight:400}
@@ -1410,7 +1410,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.24";
+const APP_VERSION="2.5.25";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4817,17 +4817,84 @@ const RIVALS={
  "FC Schalke 04":["Borussia Dortmund"]
 };
 
-/* ================= CSEREPAD ================= */
-const BENCH_CATS=[
- {key:"KAPUS",label:"Kapus csere",codes:["KP"]},
- {key:"VEDO",label:"Védő csere",codes:["JV","BV","KV"]},
- {key:"KOZEPPALYAS",label:"Középpályás csere",codes:["VKP","KKP","TKP","JSZ","BSZ"]},
- {key:"CSATAR",label:"Csatár csere",codes:["CS"]}
+/* ================= SZEREPEK ÉS CSEREPAD =================
+   KÉT KÜLÖN TAXONÓMIA, és ez a különbség lényegi.
+
+   ROLE_CATS — a négy JÁTÉKSZEREP. Ez a tengelyrendszer (ROLE_AXIS_W), a
+   taktika-illeszkedés, a skill-jogosultság és a statisztika nyelve. Ezt a négy
+   kulcsot rengeteg helyen felteszi a motor, ezért ÉRINTETLEN marad.
+
+   BENCH_CATS — a CSEREPAD HELYEI. Korábban ez ugyanaz a tábla volt, ezért a pad
+   is csak négy helyből állt. Most hét: a védő, a középpályás és a csatár
+   posztra is jut egy KÖZÉPSŐ és egy SZÉLSŐ csere. A két tábla szétválasztása
+   nélkül ez nem lett volna megtehető — a getCategoryFor("JV") a szűkített
+   kódlistán már nem talált volna VEDO-t, és némán CSATAR-ra esett volna vissza,
+   szétverve a tengelyszámítást, a taktikát és a skill-kiosztást.
+
+   A NÉGY RÉGI KULCS SZÁNDÉKOSAN MEGMARADT a középső helyeken (VEDO,
+   KOZEPPALYAS, CSATAR): így egy régi mentés padja változtatás nélkül a helyére
+   töltődik, a három új hely pedig üresen indul. */
+const ROLE_CATS=[
+ {key:"KAPUS",codes:["KP"]},
+ {key:"VEDO",codes:["JV","BV","KV"]},
+ {key:"KOZEPPALYAS",codes:["VKP","KKP","TKP","JSZ","BSZ"]},
+ {key:"CSATAR",codes:["CS"]}
 ];
-const BENCH={KAPUS:null,VEDO:null,KOZEPPALYAS:null,CSATAR:null};
+const BENCH_CATS=[
+ {key:"KAPUS",      label:"Kapus csere",             codes:["KP"],              role:"KAPUS"},
+ {key:"VEDO",       label:"Középső védő csere",      codes:["KV"],              role:"VEDO"},
+ {key:"VEDO_SZ",    label:"Szélső védő csere",       codes:["JV","BV"],         role:"VEDO"},
+ {key:"KOZEPPALYAS",label:"Középső középpályás csere",codes:["VKP","KKP","TKP"],role:"KOZEPPALYAS"},
+ {key:"KOZEP_SZ",   label:"Szélső középpályás csere",codes:["JSZ","BSZ"],       role:"KOZEPPALYAS"},
+ {key:"CSATAR",     label:"Középcsatár csere",       codes:["CS"],              role:"CSATAR"},
+ {key:"CSATAR_SZ",  label:"Szélső csatár csere",     codes:["JSZ","BSZ"],       role:"CSATAR"}
+];
+const BENCH={KAPUS:null,VEDO:null,VEDO_SZ:null,KOZEPPALYAS:null,
+             KOZEP_SZ:null,CSATAR:null,CSATAR_SZ:null};
+const BENCH_KEYS=BENCH_CATS.map(c=>c.key);
 function getCategoryFor(pos){
-  for(const c of BENCH_CATS)if(c.codes.includes(pos))return c.key;
+  for(const c of ROLE_CATS)if(c.codes.includes(pos))return c.key;
   return "CSATAR";}
+/* ---- EGYENÉRTÉKŰ POSZTOK ----
+   Ezek a párok a valóságban is egymás tükörképei vagy közvetlen szomszédai: a
+   két szélső védő, a három középső középpályás, a két szélső. Ha KÉNYSZERBŐL
+   (sérülés, eltiltás) áll be valaki a másik oldalra, azt nem büntetjük
+   poszt-idegenségért — egy jobbhátvéd tud balhátvédet játszani.
+   FONTOS: ez KIZÁRÓLAG az automatikus beállásra vonatkozik. Ha te magad teszel
+   valakit szándékosan idegen posztra, a büntetés változatlanul jár. */
+const POS_EQUIV={
+  KP:["KP"],
+  JV:["JV","BV"], BV:["BV","JV"],
+  KV:["KV"],
+  VKP:["VKP","KKP","TKP"], KKP:["KKP","VKP","TKP"], TKP:["TKP","KKP","VKP"],
+  JSZ:["JSZ","BSZ"], BSZ:["BSZ","JSZ"],
+  CS:["CS"]};
+/* Le tudja-e játszani `p` a `pos` posztot BÜNTETÉS NÉLKÜL? */
+function posEquivalent(p,pos){
+  if(!p||!p.pos||!pos)return false;
+  const eq=POS_EQUIV[pos]||[pos];
+  return p.pos.some(pp=>eq.includes(pp));}
+/* Egy SZEREP-kulcs poszt-kódjai. Ahol a kód eddig BENCH_CATS-ből kérte a
+   kódlistát egy getCategoryFor()-ból jövő kulccsal, ott VALÓJÁBAN ezt akarta —
+   a pad szűkebb kódlistái ott hibás szűrést adnának. */
+function roleCodes(key){
+  const c=ROLE_CATS.find(x=>x.key===key);
+  return c?c.codes:ROLE_CATS[3].codes;}
+/* Melyik PADHELYRE való ez a játékos? A saját fő posztja dönt; ha az több
+   helyre is illik (a szélső a középpályás és a csatár szélső helyére is), az
+   ELSŐ ÜRES nyer, különben az első illeszkedő. */
+/* Egy keret-HELY (kezdő slot vagy padhely) elfogadható poszt-kódjai — pótlás
+   kereséséhez. Kezdő slotnál a SZEREP kódjai (tág), padhelynél a padhely saját
+   kódjai (szűk, hiszen a pad épp azért lett hét helyre bontva). */
+function locCodes(loc){
+  if(loc.type==="slot")return roleCodes(getCategoryFor(slots[loc.idx].pos));
+  const c=BENCH_CATS.find(x=>x.key===loc.key);
+  return c?c.codes:roleCodes("CSATAR");}
+function benchSlotFor(p){
+  if(!p||!p.pos||!p.pos.length)return null;
+  const fits=BENCH_CATS.filter(c=>p.pos.some(pp=>c.codes.includes(pp)));
+  if(!fits.length)return null;
+  return (fits.find(c=>!BENCH[c.key])||fits[0]).key;}
 /* Felállás-tudatos szélső-szerep: megadja, hogy az adott felállásban a szélső
    (JSZ/BSZ) a TÁMADÓSOR szárnya-e (true) vagy a KÖZÉPPÁLYA szárnya (false).
    Ez oldja fel a "minden szélső középpályás" túllövést. A besorolás a FORMS
@@ -6175,9 +6242,8 @@ function advanceCareerSeason(){
     const planned=entry.retirePlan&&seasonNow>=entry.retirePlan;
     if(planned||(!entry.retirePlan&&shouldRetire(entry.age,entry.startRating,entry.peak,entry._retireExtendTo))){
       report.retired.push({n:loc.p.n,age:entry.age});
-      const cat=loc.type==="slot"?getCategoryFor(slots[loc.idx].pos):loc.key;
-      const catDef=BENCH_CATS.find(c=>c.key===cat);
-      const repl=Object.values(careerPool).find(e=>!draftedNow.has(e.n)&&e.pos.some(pp=>catDef.codes.includes(pp)));
+      const codes=locCodes(loc);
+      const repl=Object.values(careerPool).find(e=>!draftedNow.has(e.n)&&e.pos.some(pp=>codes.includes(pp)));
       if(repl){
         draftedNow.add(repl.n);drafted.add(repl.n);
         const newP=careerPlayerFromPoolEntry(repl);
@@ -9531,16 +9597,38 @@ function addOrExtendSub(slotIdx,duration,reason,curName){
     S.subs[slotIdx].matchesLeft+=duration;
     addLine(`${esc(shortName(curName))} eltiltása/sérülése meghosszabbodik (+${duration} meccs)`,"m ev");
     return;}
-  /* a beálló a SZEREP szerinti padról jön: 3 támadós felállásban a sérült
-     szélső helyére a csatár-csere áll be, nem a középpályás (ha az a pad üres
-     vagy foglalt, a findSub változatlanul gondoskodik tartalékról) */
-  const cat=roleInFormation(slots[slotIdx].pos);
-  const benchP=BENCH[cat];
-  const benchInUse=benchP&&Object.values(S.subs).some(x=>x.sub.n===benchP.n);
-  let subP=(benchP&&!benchInUse&&benchP.n!==curName)?benchP:null;
-  if(!subP)subP=findSub(slots[slotIdx],{n:curName,ovr:slots[slotIdx].player.ovr});
-  S.subs[slotIdx]={sub:subP,matchesLeft:duration,reason};
-  addLine(`${reason==="injury"?"Sérülés":"Eltiltás"}: ${esc(shortName(curName))} helyett jön ${esc(shortName(subP.n))}`,"m ev");}
+  /* ---- A LEGALKALMASABB CSERE ÁLL BE, A TELJES PADRÓL ----
+     Régen csak a SZEREP szerinti EGYETLEN padhelyet néztük meg; ha az üres volt
+     vagy már be volt hívva, a findSub egy kitalált tartalékot húzott elő, holott
+     a padon ült egy tökéletes ember. Hét padhellyel ez tarthatatlan lett volna,
+     ezért most a teljes pad versenyez, rangsorolva:
+       3 — a slot pontos posztját játssza (p.pos tartalmazza)
+       2 — EGYENÉRTÉKŰ poszt (JV↔BV, VKP/KKP/TKP, JSZ↔BSZ) — ő is büntetlen
+       1 — azonos szerepkör (a felállás szerinti, tehát a 4-3-3 szélsőjére a
+           csatár-csere is jöhet)
+     Azonos szinten a magasabb Rating nyer. */
+  const slot=slots[slotIdx];
+  const role=roleInFormation(slot.pos);
+  const inUse=n=>Object.values(S.subs).some(x=>x.sub&&x.sub.n===n);
+  let bestP=null,bestRank=0,bestOvr=-1;
+  BENCH_CATS.forEach(c=>{
+    const bp=BENCH[c.key];
+    if(!bp||bp.n===curName||inUse(bp.n))return;
+    let rank=0;
+    if(bp.pos&&bp.pos.includes(slot.pos))rank=3;
+    else if(posEquivalent(bp,slot.pos))rank=2;
+    else if(c.role===role)rank=1;
+    if(!rank)return;
+    const o=pOvr(bp);
+    if(rank>bestRank||(rank===bestRank&&o>bestOvr)){bestP=bp;bestRank=rank;bestOvr=o;}});
+  let subP=bestP,freeFit=bestRank>=2;
+  if(!subP){
+    subP=findSub(slot,{n:curName,ovr:slot.player.ovr});
+    /* a behívott tartalék is lehet poszthű vagy egyenértékű */
+    freeFit=!!(subP&&(( subP.pos&&subP.pos.includes(slot.pos))||posEquivalent(subP,slot.pos)));}
+  S.subs[slotIdx]={sub:subP,matchesLeft:duration,reason,freeFit};
+  addLine(`${reason==="injury"?"Sérülés":"Eltiltás"}: ${esc(shortName(curName))} helyett jön ${esc(shortName(subP.n))}`
+    +(freeFit?` — a posztot otthonosan mozogja, nincs illeszkedés-hátrány`:` — idegen poszton, illeszkedés-hátránnyal`),"m ev");}
 /* szezonállapot */
 /* A skillpool súlyozott sorrendben áll össze: az utolsó 8, alacsonyabb hatású
    skill (MAIN_SKILLS[16..23]) 2.5x akkora eséllyel kerül előrébb a sorban, mint a
@@ -10396,9 +10484,13 @@ function updateTTDiff(){
    A mai CPU-meccs a SAJÁT pillanatképét adja át, tehát a viselkedése betűre
    változatlan — csak az útvonal lett általános. */
 function buildMatchSnapshot(){
+  /* A KÉNYSZERBŐL beálló csere illeszkedése: ha a posztot otthonosan mozogja
+     (pontos poszt vagy EGYENÉRTÉKŰ — lásd POS_EQUIV), nincs hátránya. A régi
+     fix 0.93 mindenkire vonatkozott, tehát egy jobbhátvéd a bal oldalon
+     ugyanúgy bűnhődött, mint egy csatár a védelemben. */
   const active=slots.map((s,idx)=>({
     p:S.subs[idx]?S.subs[idx].sub:s.player,
-    fit:S.subs[idx]?0.93:s.fit,idx}));
+    fit:S.subs[idx]?(S.subs[idx].freeFit?1:0.93):s.fit,idx}));
   const capPlaying=!S.subs[captainIdx];
   const fam=active.find(a=>a.p.family);
   const famSp=fam?fam.p.familySpecialty:null;
@@ -13139,10 +13231,13 @@ function twShowPlacement(cand,completeFn){
      volt a "beragadt szezonközi átigazolás". A jelölt SAJÁT posztja mindig
      helyes választ ad, a TW.category már csak tartalék. */
   const catKey=(cand.pos&&cand.pos.length&&getCategoryFor(cand.pos[0]))||TW.category;
-  const catDef=BENCH_CATS.find(c=>c.key===catKey)||BENCH_CATS.find(c=>c.key===TW.category)||BENCH_CATS[2];
+  /* A KEZDŐ helyeket a SZEREP kódlistája adja (egy szélsőt a szélső slotokra is
+     be lehessen tenni), a PADHELYET viszont a jelölt saját posztja dönti el. */
+  const codes=roleCodes(catKey);
+  const benchKey=benchSlotFor(cand)||catKey;
   const opts=[];
-  slots.forEach((s,i)=>{if(catDef.codes.includes(s.pos))opts.push({type:"slot",idx:i,cur:s.player});});
-  if(BENCH[catDef.key])opts.push({type:"bench",cur:BENCH[catDef.key]});
+  slots.forEach((s,i)=>{if(codes.includes(s.pos))opts.push({type:"slot",idx:i,cur:s.player});});
+  if(BENCH[benchKey])opts.push({type:"bench",key:benchKey,cur:BENCH[benchKey]});
   if(freeTok){
     const ft=document.createElement("div");
     ft.style.cssText="margin-top:10px;padding:9px 11px;border-radius:9px;font-size:12.5px;line-height:1.5;background:rgba(46,125,50,.14);border:1px solid #2e7d32;color:var(--ink)";
@@ -13154,10 +13249,10 @@ function twShowPlacement(cand,completeFn){
   const box=document.createElement("div");box.className="plist";
   opts.forEach(o=>{
     const row=document.createElement("div");row.className="prow";
-    row.innerHTML=`<span class="pos pc-${catDef.key}">${o.type==="bench"?"pad":"XI"}</span><span class="main"><div class="nm">${esc(o.cur.n)}${(gameMode==="career"||!blind())?` (${Math.round(pOvr(o.cur))})`:""}</div></span>`;
+    row.innerHTML=`<span class="pos pc-${catKey}">${o.type==="bench"?"pad":"XI"}</span><span class="main"><div class="nm">${esc(o.cur.n)}${(gameMode==="career"||!blind())?` (${Math.round(pOvr(o.cur))})`:""}</div></span>`;
     row.onclick=()=>{
       if(o.type==="slot"){slots[o.idx].player=cand;slots[o.idx].fit=fitFor(cand,slots[o.idx]);slots[o.idx].origin=null;}
-      else BENCH[catDef.key]=cand;
+      else BENCH[o.key]=cand;
       drafted.add(cand.n);markArrived(cand,finalPrice);
       payFor(cand.n);
       drawPitch();updateBar();
@@ -13353,9 +13448,10 @@ function autoPlaceIcon(rawIcon){
     return {title:"✦ IKONIKUS IGAZOLÁS ✦",
       text:`Hihetetlen bejelentés járja be az országot: <b>${esc(icon.n)}</b> csatlakozik a csapathoz — ${esc(replaced.n)} helyére érkezik a tartalék-keretben.`};}
   const cat=getCategoryFor(icon.pos[0]);
-  const catDef=BENCH_CATS.find(c=>c.key===cat);
-  const opts=slots.map((s,i)=>({type:"slot",idx:i})).filter(o=>catDef.codes.includes(slots[o.idx].pos)&&!slots[o.idx].player.family);
-  if(BENCH[cat]&&!BENCH[cat].family)opts.push({type:"bench"});
+  const codes=roleCodes(cat);
+  const benchKey=benchSlotFor(icon)||cat;
+  const opts=slots.map((s,i)=>({type:"slot",idx:i})).filter(o=>codes.includes(slots[o.idx].pos)&&!slots[o.idx].player.family);
+  if(BENCH[benchKey]&&!BENCH[benchKey].family)opts.push({type:"bench",key:benchKey});
   if(!opts.length)return null;
   const o=pick(opts);
   let replaced;
@@ -13363,7 +13459,7 @@ function autoPlaceIcon(rawIcon){
     replaced=slots[o.idx].player;
     slots[o.idx].player=icon;slots[o.idx].fit=fitFor(icon,slots[o.idx]);slots[o.idx].origin=null;
   }else{
-    replaced=BENCH[cat];BENCH[cat]=icon;
+    replaced=BENCH[o.key];BENCH[o.key]=icon;
   }
   drafted.add(icon.n);markArrived(icon);
   return {title:"✦ IKONIKUS IGAZOLÁS ✦",
@@ -13645,9 +13741,8 @@ function releasePlayer(p,sell){
     if(credit)S.transferBudget+=credit;
     pruneChemistry();
     return{ok:true,credit};}
-  const cat=loc.type==="slot"?getCategoryFor(slots[loc.idx].pos):loc.key;
-  const catDef=BENCH_CATS.find(c=>c.key===cat);
-  const replIdx=extraRoster.findIndex(e=>e.pos.some(pp=>catDef.codes.includes(pp)));
+  const codes=locCodes(loc);
+  const replIdx=extraRoster.findIndex(e=>e.pos.some(pp=>codes.includes(pp)));
   if(replIdx<0)return{ok:false,reason:"noreplacement"};
   const repl=extraRoster.splice(replIdx,1)[0];
   markArrived(repl);
@@ -13787,10 +13882,13 @@ function showSkillDraw(skill,reason,stagesNeeded,resumeCb){
     $("scSkill").scrollIntoView({behavior:"smooth"});
   }}
 function eligibleForSkill(skill){
-  const catDef=BENCH_CATS.find(c=>c.key===skill.cat);
+  /* A skillek SZEREPRE szólnak, nem padhelyre — ezért ROLE_CATS. (A pad
+     szétbontása után a BENCH_CATS "KOZEPPALYAS" már nem tartalmazza a
+     szélsőket, és a szélső-skillek némán jogosulatlanná váltak volna.) */
+  const catDef=ROLE_CATS.find(c=>c.key===skill.cat);
   /* cat2 (3. fázis): egyes skillek KÉT posztkategóriának is szólnak — pl. a
      Villámbeck Queen védőnek és középpályásnak egyaránt. */
-  const cat2Def=skill.cat2?BENCH_CATS.find(c=>c.key===skill.cat2):null;
+  const cat2Def=skill.cat2?ROLE_CATS.find(c=>c.key===skill.cat2):null;
   /* excludePos: a kategóriákon BELÜL is kizárhatunk posztokat. Kell, mert a
      KOZEPPALYAS kategória a szélsőket (JSZ/BSZ) is tartalmazza — a
      "Villámbeck Queen" viszont hátvéd-skill, szélsőnek értelmetlen. */
@@ -14220,7 +14318,9 @@ function showSwapPanel(){
        pad-sorba kerül (roleInFormation), nem a fix pozíció-kategóriája szerint.
        Így a 4-3-3 / 3-4-3 / 4-2-3-1 szélsője a CSATÁR-csere sorában jelenik
        meg (támadó), a 4-4-2 / 4-5-1 szélsője a középpályáséban. */
-    const starterIdxs=slots.map((s,i)=>({s,i})).filter(o=>roleInFormation(o.s.pos)===cat.key);
+    /* A padhely SZEREPÉHEZ hasonlítunk (cat.role), nem a kulcsához: a hét
+       padhely kulcsai már nem szerepnevek. */
+    const starterIdxs=slots.map((s,i)=>({s,i})).filter(o=>roleInFormation(o.s.pos)===cat.role);
     const row=document.createElement("div");row.className="swaprow";
     row.innerHTML=`<div class="h">${esc(cat.label)}: pad — ${esc(benchP.n)} (${Math.round(pOvr(benchP))})</div>`;
     starterIdxs.forEach(o=>{
@@ -17764,7 +17864,8 @@ function saveGame(){
       mp:{active:MP.active,room:MP.activeRoom,role:MP.role},
       slotRoles,
       slots:slots.map(s=>({pos:s.pos,xy:s.xy,player:s.player,fit:s.fit,origin:s.origin})),
-      BENCH:{KAPUS:BENCH.KAPUS,VEDO:BENCH.VEDO,KOZEPPALYAS:BENCH.KOZEPPALYAS,CSATAR:BENCH.CSATAR},
+      /* mind a hét padhely — a régi négy kulcs neve szándékosan változatlan */
+      BENCH:BENCH_KEYS.reduce((o,k)=>{o[k]=BENCH[k];return o;},{}),
       extraRoster,
       drafted:[...drafted],
       captainIdx,teamName,coach,
@@ -17866,7 +17967,13 @@ function applySavedGame(d){
   MAX_CAREER_ROSTER=d.MAX_CAREER_ROSTER!=null?d.MAX_CAREER_ROSTER:28;
   updateOppRatingBadge();
   slots=d.slots;
-  Object.assign(BENCH,d.BENCH);
+  /* A BENCH modul-szintű objektum, tehát TÚLÉLI a betöltést: ha csak
+     ráolvasnánk a mentést, egy korábbi játék padján ülő ember ottragadna azokon
+     a helyeken, amiket az új mentés nem említ. Ezért előbb kiürítjük.
+     RÉGI MENTÉS: csak a négy régi kulcsot hozza — a három új padhely üresen
+     indul, és a nyári keret-áttekintőben tölthető fel a tartalék-keretből. */
+  BENCH_KEYS.forEach(k=>{BENCH[k]=null;});
+  Object.assign(BENCH,d.BENCH||{});
   extraRoster=d.extraRoster||[];
   /* Defenzív tisztítás: egy korábbi (mostanra javított) bug undefined játékost
      menthetett a keretbe. A betöltésnél kiszűrjük, hogy a régi törött mentések
