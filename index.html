@@ -1325,7 +1325,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.12";
+const APP_VERSION="2.5.13";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -6967,6 +6967,7 @@ function beginNewGame(){
   worldSeed=null;draftSpinNo=0;_lastCoachOffer=null;
   /* F6: friss karrier — a párharc tartós állapota is nulláról indul, különben
      egy korábbi szoba kiegyenlítése átszivárogna az újba. */
+  S.oppBuffH=null;   /* friss karrier → a rejtett erősítés az 1. szezon elején születik */
   S.mpBalance=0;S.mpDecision=null;S.mpMateFinal=null;S.mpHistory=[];S.mpDuelLog=[];S.mpOrphan=false;
   ensureWorldSeed();
   S.skillPool=weightedShuffleSkills(rngFor("skillpool"));
@@ -9278,6 +9279,7 @@ const S={idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,capMod:0,eventMod:0
   mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
   /* F6: a párharc tartós állapota. A mpBalance a kiegyenlítő rating-eltolás,
      a mpHistory és a mpDuelLog pedig SZEZONOKON ÁTÍVELŐ — nem nullázódik. */
+  oppBuffH:null,   /* a szezonra rögzített rejtett ellenfél-erősítés */
   mpBalance:0,mpDecision:null,mpHistory:[],mpDuelLog:[],mpOrphan:false,
   skillPool:weightedShuffleSkills(),skills:{},ratingAdj:{},winStreak:0,winlessStreak:0,fixtureResults:[],
   discWatch:{},hotStreak:{},goallessStreak:{},transferBudget:0,unbeatenStreak:0,cleanSheetStreak:0,
@@ -9659,6 +9661,8 @@ function startFirstSeason(){
   S.moraleSum=0;S.moraleSamples=0;   /* KAPITÁNY: friss szezon → friss realizált-hatás mintavétel */
   S.transferBudget=gameMode==="career"?computeSeasonBudget():0;
   buildSeasonFixtures();
+  /* a mezőny rejtett erősítése a szezonra rögzül — MÁR a morál beállítása után */
+  freezeSeasonHiddenBonus();
   addLine(`Sorsolás kész. 30 forduló vár rád, ${esc(teamName)}. Edző: ${coach.n}. Sok sikert!`,"m");
   if(h2hRoomActive())
     addLine(`⚔ A ${H2H_ROUNDS.join(". és a ")}. fordulóban a társad ellen játszol — a mezőny többi csapata ellen oda-vissza megy a bajnokság.`,"m ev");
@@ -10915,18 +10919,11 @@ function playMatch(){
      pillanatképből jön — a számítás maga a buildMatchSnapshot-ban él. */
   function defenseMult(){return MS.defMult;}
   let ovr=MS.ovr;
-  /* REJTETT ELLENFÉL-ERŐSÍTÉS (nem látszik a ratingben, csak a szimulációban):
-     ellensúlyozza a kémia/skill/kapitány "rejtett" erőtöbbletet, ami különben
-     ~5 OVR-rel a kijelzett csapaterő fölé viszi a kifejlett kereteket. A
-     nehézséghez kötött: a 84-es ajánlott szinten 0, feljebb fokozatosan nő, így
-     a magasabb szintek kihívást adnak, ahogy a te rejtett bónuszaid fejlődnek. */
-  /* KUPÁBAN a kupa SAJÁT szintjéhez mérjük, nem a bajnokihoz. Enélkül a rejtett
-     erőtöbbleted (kémia, skillek, kapitány — a karrier során ~+2-ről +9 fölé nő)
-     teljesen kompenzálatlan maradt a kupában: méréssel ugyanaz a csapaterő-
-     fölény +2-es rejtett bónusszal 2%, +7-tel 33% BL-győzelmi esélyt adott.
-     A bajnoki viselkedés BETŰRE változatlan. */
+  /* REJTETT ELLENFÉL-ERŐSÍTÉS — lásd oppBuffFor(). Nem látszik a ratingben,
+     csak a szimulációban; azt ellensúlyozza, amit a kijelzett csapaterő kihagy.
+     KUPÁBAN a kupa SAJÁT szintjéhez mérjük, nem a bajnokihoz. */
   const _buffLevel=(euroActive()&&S.euro&&S.euro.target!=null)?S.euro.target:oppTargetRating;
-  const hiddenOppBuff=gameMode==="career"?Math.max(0,(_buffLevel-84)*0.35):0;
+  const hiddenOppBuff=oppBuffFor(_buffLevel,seasonHiddenBonus());
   /* A kupadöntő SEMLEGES pályán megy — sem hazai előny, sem idegenbeli hátrány. */
   /* A gólvárhatóságok a KÖZÖS matchLambdas-ból jönnek: család-specializáció,
      taktika-stílus és párkémia mind ott, változatlan sorrendben. Ugyanezt a
@@ -14115,9 +14112,64 @@ $("hubClubScoutBtn").onclick=()=>startClubScouting();
    erősítés, amit a szimuláció is hozzáad. Enélkül az összehasonlítás
    félrevezető volt: a kereted a boostjaival szerepelt, a mezőny viszont
    csupaszon. */
+/* ================= A REJTETT ELLENFÉL-ERŐSÍTÉS =================
+   MIÉRT VAN: a kijelzett csapaterő szándékosan csak a KERETET méri, a
+   szituatív tagokat (morál, edző, aura-skillek, kapitány-rutin, taktika,
+   védekező skillek) kihagyja — a MECCS viszont mindet beszámítja. Enélkül a
+   kifejlett keret észrevétlenül ~+5-10 OVR-rel játszana a kijelzett értéke
+   fölött, és a szezonok tét nélkülivé válnának.
+
+   MI VOLT A HIBA: a korábbi képlet (szint−84)×0,35 kizárólag a NEHÉZSÉGI
+   SZINTTŐL függött, miközben azt hivatott ellensúlyozni, ami a TE KERETEDBEN
+   van. A kettő független egymástól. 98-as szinten a motor feltételezte, hogy
+   +4,9-et hordasz — ha valójában +1-et hordtál (átlagos morál, 85 alatti
+   taktika), ~3,9 OVR büntetést kaptál olyasmiért, amid nincs. Mérve, 700
+   szimulált szezonon: 103,5-ös kijelzett csapaterővel 98-as szinten a medián
+   helyezés a 7. volt, a szezonok 76%-a 6. hely vagy rosszabb, 0% bajnoki.
+
+   A MEGOLDÁS: a motor MÁR MÉRI ezt a mennyiséget (hiddenMatchBonus) — a
+   tanácsadóhoz és az auto szintkövetéshez. Innentől a buff is a mért értékből
+   dolgozik, de csak RÉSZLEGESEN:
+     · a mért rejtett bónuszod FELE  — így nem büntet nem létező előnyért,
+       viszont a saját munkád (taktika-begyakorlás, kapitány, aura-skillek,
+       morál) továbbra is erősen fizet: a felének megmarad a hatása;
+     · plusz egy kis, szinthez kötött fix rész — ez tartja meg, amiért a
+       mechanika született: a kifejlett keret magas szinten se taroljon
+       automatikusan.
+   A TELJES kompenzáció (buff = a teljes mért bónuszod) szándékosan NEM opció:
+   az pontosan kioltaná a morált, a taktikát, az aurát és a kapitányt, vagyis
+   mechanikailag értelmetlenné tenné őket (mérve: 2,2-2,4. hely, függetlenül
+   attól, mennyit építettél).
+
+   Mérve ezzel a modellel (103,5 csapaterő, 98-as szint, 400 szezon/eset):
+     rejtett +0 → 3,8. hely,  8% bajnok   (a régi képlettel: 6,8. hely, 0%)
+     rejtett +3 → 2,4. hely, 31% bajnok   (a régivel: 3,9. hely,  9%)
+     rejtett +6 → 1,6. hely, 63% bajnok   (a régivel: 1,7. hely, 61%)
+     rejtett +9 → 1,2. hely, 89% bajnok   (a régivel: 1,0. hely, 96%)
+   Vagyis a kifejlett keret ugyanúgy esélyes marad, a fejletlen viszont nem
+   kap láthatatlan pofont. */
+const OPP_BUFF_MEASURED=0.5;   /* a MÉRT rejtett bónuszod ekkora hányadát kapja a mezőny */
+const OPP_BUFF_FIXED=0.12;     /* + szintenkénti kis fix rész a 84 fölött */
+function oppBuffFor(lvl,hidden){
+  if(gameMode!=="career")return 0;
+  return Math.max(0,(lvl-84)*OPP_BUFF_FIXED)+Math.max(0,(hidden||0)*OPP_BUFF_MEASURED);}
+/* A SZEZONRA RÖGZÍTETT rejtett bónusz. Szándékosan nem meccsenként friss: a
+   morál menet közben ±2,5-öt ingadozik, és ha a mezőny ezt követné, minden
+   rossz sorozat után magától könnyebbé válna a bajnokság — gumiszalag-hatás.
+   A szezon elején egyszer rögzítjük, és a szezon végéig az él.
+   Régi mentésben nincs → az első kérésre a mostani állapotból születik meg. */
+function seasonHiddenBonus(){
+  if(S.oppBuffH==null)S.oppBuffH=hiddenMatchBonus();
+  return S.oppBuffH;}
+function freezeSeasonHiddenBonus(){S.oppBuffH=hiddenMatchBonus();}
+/* A mezőny VALÓDI meccs-ereje: a beállított szint + a rejtett erősítés.
+   A TANÁCSADÓ szándékosan a MOSTANI rejtett bónuszoddal számol (nem a szezon
+   elején rögzítettel): a kérdés, amire válaszol, az, hogy "hogyan nézne ki egy
+   szezon a mai kerettel" — ezt a szintválasztásnál és a nyári tervezésnél
+   használod. A futó szezon meccsei a rögzített értéket viszik tovább. */
 function oppMatchStrength(lvl){
   const v=(lvl===undefined?oppTargetRating:lvl);
-  return v+(gameMode==="career"?Math.max(0,(v-84)*0.35):0);}
+  return v+oppBuffFor(v,hiddenMatchBonus());}
 /* ================= REJTETT MECCS-BÓNUSZOK =================
    A KIJELZETT csapaterő (teamStrength) szándékosan csak a KERETET méri: a
    szituatív tagokat — morál, edző, aura-skillek, kapitány-rutin, taktika,
@@ -16682,6 +16734,10 @@ function startNextCareerSeason(){
     }});
   S._chAnchorPending=false;
   buildSeasonFixtures();
+  /* a mezőny rejtett erősítése az ÚJ szezonra rögzül — a nyári igazolások, az
+     öregedés és a friss morál már benne van, az auto szintkövetés viszont MÁR
+     lefutott fölötte (az a mostani kerettel dolgozik, ez a szezonra fagyaszt) */
+  freezeSeasonHiddenBonus();
   $("scHub").classList.add("hide");
   $("scVerdict").classList.add("hide");
   $("scSim").classList.remove("hide");
@@ -16805,6 +16861,8 @@ function saveGame(){
         finalTable:S.finalTable,seasonClosed:S.seasonClosed,hubReportHtml:S.hubReportHtml,
         /* F6: a párharc tartós állapota — a kiegyenlítő eltolás, a szezonzáró
            döntés, a közös előzmény és az egymás elleni napló. */
+        /* a szezonra rögzített rejtett ellenfél-erősítés (lásd seasonHiddenBonus) */
+        oppBuffH:S.oppBuffH,
         mpMateFinal:S.mpMateFinal,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
@@ -16967,6 +17025,10 @@ function applySavedGame(d){
   S.finalTable=d.S.finalTable||null;S.seasonClosed=!!d.S.seasonClosed;S.hubReportHtml=d.S.hubReportHtml||null;
   /* F5: a társ szezonzárása. Régi mentésben nincs — ilyenkor a verdikt előtt
      egyszerűen újra lekérjük a szobából. */
+  /* Régi mentésben nincs → null marad, és a seasonHiddenBonus a FUTÓ szezon
+     közepén, a mostani keretből számolja ki egyszer. A régi (szint−84)×0,35
+     képlethez képest ez azonnali könnyítés a futó karriereknek is. */
+  S.oppBuffH=(d.S.oppBuffH!=null)?d.S.oppBuffH:null;
   S.mpMateFinal=d.S.mpMateFinal||null;
   /* F6: a kiegyenlítő eltolás a keret TARTÓS tulajdonsága — enélkül egy
      újratöltés visszaadná az előnyt/hátrányt. */
