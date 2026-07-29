@@ -1415,7 +1415,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.28";
+const APP_VERSION="2.5.29";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -13501,16 +13501,43 @@ function normalizeIconPlayer(icon){
    húzhat, youthBonus-logikával, hogy a Rating sose essen a jelenlegi erő alá. */
 const ICON_START_TSI=2500;
 function registerIconInPool(icon){
-  if(!careerPool||careerPool[icon.n])return;
-  const tsi=ICON_START_TSI;
-  const age=icon.age!=null?icon.age:26;
-  const rawPeak=tsiToPeakOvr(tsi);
-  /* a peak legalább a jelenlegi ovr, hogy ne essen vissza — a TSI innen fejleszt */
-  const peak=Math.max(icon.ovr,rawPeak);
-  const startRating=icon.ovr;
-  const rawAtAge=ratingAtAge(peak,age);
-  const youthBonus=Math.max(0,startRating-rawAtAge);
+  if(!careerPool)return;
   NAT_BY_NAME[icon.n]=icon.nat;   /* magyar névsorrend a rövidítéshez */
+  /* ---- AZ IKON MÁR LÉTEZŐ POOL-BEJEGYZÉSÉT FEL KELL MINŐSÍTENI ----
+     HIBA, amit ez javít: néhány ikon a VALÓS adatbázisban is szerepel, tehát a
+     careerPool-ban már van bejegyzése — a sajátjával, jóval alacsonyabb
+     erővel. Példa: Király Gábor ikonként 96, a 2016-os EB-keretből viszont 74.
+     A régi sor ilyenkor `careerPool[icon.n]` létezésére NÉMÁN VISSZATÉRT, tehát
+     a 96-os erő csak a keretbe került játékos-objektumban élt, a pool-ban nem.
+     A szezonváltás pedig a POOL-ból írja vissza a keret ratingjeit — így a
+     96-os ikon egyetlen szezonváltás alatt 74-78-ra zuhant.
+     A felminősítés MINDIG FELFELÉ hat (Math.max mindenütt): egy erősebb
+     meglévő bejegyzést nem ront le, csak az ikon-szintre emel. */
+  const cur=careerPool[icon.n];
+  const tsi=Math.max(ICON_START_TSI,(cur&&cur.tsi)||0);
+  /* A KORT a meglévő bejegyzésből visszük tovább, ha van: az a személy kora
+     EBBEN a karrierben, és a mentés máshol is erre épül (nyugdíj-terv,
+     öregedés). Csak ha nincs bejegyzés, esik vissza a 26-os alapértékre. */
+  const age=(cur&&cur.age!=null)?cur.age:(icon.age!=null?icon.age:26);
+  /* a peak legalább a jelenlegi ovr, hogy ne essen vissza — a TSI innen fejleszt */
+  const peak=Math.max(icon.ovr,tsiToPeakOvr(tsi),(cur&&cur.peak)||0);
+  const startRating=Math.max(icon.ovr,(cur&&cur.startRating)||0);
+  const youthBonus=Math.max(0,startRating-ratingAtAge(peak,age));
+  if(cur){
+    cur.tsi=tsi;cur.peak=peak;cur.startRating=startRating;
+    cur.youthBonus=youthBonus;cur.youthBonusStartAge=age;
+    /* a basePeak/baseTsi a piaci eltolás és az Infinity-visszaállítás horgonya —
+       ezeket is fel kell emelni, különben a következő szezonváltás a RÉGI,
+       alacsony csúcsból számolna újra */
+    cur.basePeak=Math.max(cur.basePeak||0,peak);
+    cur.baseTsi=Math.max(cur.baseTsi||0,tsi);
+    cur.estimatedTSI=estimateTSI(tsi,scout?scout.stars:2.5);
+    cur.isIcon=true;
+    /* az attribútumok a RÉGI, alacsony ratinghez voltak kalibrálva — a
+       Rating-emelést 1:1-ben át kell vezetni, különben a poszt-effektív
+       ratingje (és a taktika-illeszkedése) a régi szinten maradna */
+    syncAttrsToRating(cur);
+    return;}
   careerPool[icon.n]={n:icon.n,pos:icon.pos,nat:icon.nat,conf:icon.conf,
     tsi,peak,age,startRating,youthBonus,youthBonusStartAge:age,
     estimatedTSI:estimateTSI(tsi,scout?scout.stars:2.5),
@@ -15869,7 +15896,8 @@ $("hubInfinityBtn").onclick=()=>infinityConfirm("∞ Infinity mód",
   INFINITY_PRICE,()=>{
     infinityMode=true;
     /* RUN: a futás sebességét ez a szezonszám dönti el (2.0 súly). */
-    {const R=runInit();if(R.infinitySeason==null)R.infinitySeason=S.seasonNumber||1;}
+    {const R=runInit();if(R.infinitySeason==null)R.infinitySeason=S.seasonNumber||1;
+     runLoyalSnapshot();}   /* RUN: kik voltak végig veled az eredeti kezdőből */
     /* ---- A BEJELENTETT VISSZAVONULÁSOK ÉRVÉNYÜKET VESZTIK ----
        Az Infinity ígérete az, hogy megszűnik a kor miatti hanyatlás, és
        visszavonulni is csak 55 évesen lehet. Ehhez képest képmutató lett volna
@@ -16425,7 +16453,33 @@ function runCaptureStart(){
      valós csapat — ezért a "milyen szerény kerettel vágtál neki" tétel itt
      értelmetlen (se érdem, se vállalás nincs mögötte). A run-pontból ezt a
      komponenst kihagyjuk; a többi súly aránya magától újraosztódik. */
-  R.clubStart=(careerStart==="club");}
+  R.clubStart=(careerStart==="club");
+  /* Az EREDETI kezdő 11 nevei — a kész-klub "együtt nőtt fel a csapattal"
+     faktorához (lásd runLoyalSnapshot). Draftnál is rögzítjük, hogy később
+     bármikor bevezethető legyen ott is. */
+  R.startXI=slots.filter(s=>s&&s.player).map(s=>s.player.n);}
+/* ---- "VÉGIG VELED VOLT" — a kész-klub hűség-faktora ----
+   Az Infinity megnyitásának pillanatában megnézzük, az EREDETI kezdő 11-ből
+   kik vannak még a keretben ÚGY, hogy közben lépést is tartottak a csapattal.
+   A "lépést tartott" határa a keret átlaga MÍNUSZ 10: aki ennél nem esett
+   lejjebb, az együtt fejlődött a csapattal, nem csak elkísérte.
+   A pillanatkép EGYSZER készül, és utána nem változik — az Infinity megnyitása
+   az a mérföldkő, amire a faktor kérdez rá. */
+const RUN_LOYAL_GAP=10;
+function runLoyalSnapshot(){
+  const R=runInit();
+  if(R.loyal)return R.loyal;
+  const start=R.startXI||[];
+  if(!start.length){R.loyal=[];return R.loyal;}
+  const roster=fullCareerRoster().filter(Boolean);
+  const xi=slots.filter(s=>s&&s.player).map(s=>s.player);
+  const avg=xi.length?xi.reduce((a,p)=>a+pOvrDisplay(p),0)/xi.length:0;
+  const floor=avg-RUN_LOYAL_GAP;
+  R.loyal=start.filter(n=>{
+    const p=roster.find(x=>x.n===n);
+    return !!p&&pOvrDisplay(p)>=floor;});
+  R.loyalAvg=Math.round(avg);
+  return R.loyal;}
 /* Helyezés → 0-100. 1. hely 100, dobogó 95, top5 90, onnan lefelé egyenletesen. */
 function runRankScore(rank){
   if(!rank)return 0;
@@ -16442,14 +16496,32 @@ function runRankScore(rank){
 function runSeasonScore(rank,diff,teamAvg){
   const under=Math.max(-15,Math.min(15,(diff||0)-(teamAvg||0)));
   return Math.max(0,Math.min(100,runRankScore(rank)+((diff||84)-84)*0.4+under*0.6));}
-/* Run-sebesség: hány szezon alatt jutottál el az Infinity megnyitásáig.
-   2 szezon a tökéletes 100, onnan szezononként -8. Ha még nincs megnyitva, az
-   ELTELT szezonokból számolunk előrejelzést — ez menet közben csökken, tehát
-   őszintén mutatja, hogy egyre lassabb a futás. */
+/* ---- RUN-SEBESSÉG: A LEGHAMARABB ELÉRHETŐ INFINITY A 100 PONT ----
+   A régi képlet FIX 2 szezont vett tökéletesnek. Ez igazságtalan volt mindkét
+   irányban: egy 95-ös kerettel indulva a 2 szezon szinte adott, egy 74-essel
+   viszont matematikailag elérhetetlen — az Infinityhez a 100-as mezőnyt kell
+   MEGNYERNI, oda pedig egy szerény kerettel évek fejlődése vezet.
+
+   Mostantól a referencia a SAJÁT indulásodból származik: megbecsüljük, mennyi
+   az a legkevesebb szezon, ami alatt a kezdő keretedből egyáltalán fel lehet
+   érni a 100-as szintre, és AZ a 100 pont. Onnantól szezononként -8.
+
+   A becslés egyetlen paramétere, hogy egy jól vitt karrier hozzávetőleg mennyi
+   csapaterőt épít szezononként. Ez szándékosan ONE constant, hogy hangolható
+   legyen — és bőkezű, hogy ne büntesse a gyors futást. */
+const RUN_CLIMB_PER_SEASON=10;
+function runEarliestInfinitySeason(){
+  const R=runInit();
+  /* Ha nincs indulási pillanatkép (régi mentés), a régi fix 2-es referencia. */
+  if(R.startAvg==null)return 2;
+  const gap=Math.max(0,INFINITY_UNLOCK_RATING-R.startAvg);
+  return 1+Math.ceil(gap/RUN_CLIMB_PER_SEASON);}
 function runSpeedScore(){
   const R=runInit();
-  const s=R.infinitySeason||Math.max(2,S.seasonNumber||1);
-  return {score:Math.max(0,Math.min(100,100-(s-2)*8)),seasons:s,done:!!R.infinitySeason};}
+  const s=R.infinitySeason||Math.max(1,S.seasonNumber||1);
+  const ref=runEarliestInfinitySeason();
+  return {score:Math.max(0,Math.min(100,100-Math.max(0,s-ref)*8)),
+          seasons:s,ref,done:!!R.infinitySeason};}
 /* LUSTA MÉRFÖLDKŐ-DETEKTÁLÁS: a játékállapotból olvassuk ki, mi teljesült.
    Egyszer beállítva soha nem vész el (a flag mentődik). Minden mérföldkő
    BÉLYEGET kap a megszerzés körülményeiről (mezőnyszint + csapaterő), hogy a
@@ -16526,7 +16598,18 @@ function runBreakdown(){
   rows.push({k:"speed",n:"Run-sebesség",w:RUN_W.speed,
     s:Math.max(0,Math.min(100,sp.score*spM)),
     d:(sp.done?`Infinity a ${sp.seasons}. szezonban`:`${sp.seasons}. szezon — még nincs Infinity (előrejelzés)`)
+      +` · a kereteddel leghamarabb a ${sp.ref}. szezonban volt elérhető (az a 100 pont)`
       +` · átlagmezőny ${Math.round(avg.diff)} · kihívás ${pct(spM)}`});
+  /* ---- "VÉGIG VELED VOLT" (csak kész klub) ----
+     Játékosonként EGY sor, 0.25 súllyal, 100 ponttal. Csak a MEGFELELŐK
+     kapnak sort — aki elment vagy lemaradt, az nem von le, egyszerűen nincs
+     benne. A faktor tehát tiszta jutalom a folytonosságért: azt méri, hogy a
+     kész klub magját nem lecserélted, hanem felnevelted. */
+  if(R.clubStart&&R.loyal&&R.loyal.length){
+    R.loyal.forEach(n=>{
+      rows.push({k:"loy_"+n,n:`Végig veled volt: ${shortName(n)}`,w:0.25,s:100,
+        d:`az eredeti kezdő 11-ből, és az Infinity megnyitásakor is a kereted tagja${
+          R.loyalAvg?` (a keret átlaga ekkor ${R.loyalAvg}, a határ ${R.loyalAvg-RUN_LOYAL_GAP})`:""}`});});}
   /* 7. Taktikai alaposság: szezononként a rögzített illeszkedés, az ADOTT
      szezon körülményeivel skálázva. */
   (R.seasons||[]).forEach(x=>{
