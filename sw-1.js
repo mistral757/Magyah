@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
   "/icons/site.webmanifest",
   "/icons/favicon.ico",
   "/icons/apple-touch-icon.png",
+  "/icons/kick-line.png",
   "/icons/icon-72x72.png",
   "/icons/icon-96x96.png",
   "/icons/icon-128x128.png",
