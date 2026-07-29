@@ -956,6 +956,13 @@ button:disabled{opacity:.35;cursor:default}
     <button data-wc="off" class="sel">Csak klubcsapatok<small>a klasszikus draft-pool</small></button>
     <button data-wc="on">VB-, EB-győztes és ikonikus válogatottak<small>a világ- és Európa-bajnokok, plusz legendás nemzeti keretek</small></button>
   </div>
+  <!-- A SORSOLÁS RENDJE — globális, minden módra érvényes beállítás.
+       Nem a mentés része (localStorage), tehát bármikor átállítható; a
+       következő szezon sorsolásánál lép életbe. -->
+  <div class="optgrid two" id="schedGrid" style="margin-top:8px">
+    <button data-sch="real" class="sel">Valósághű sorsolás<small>ajánlott — az első félidényben mindenkivel egyszer, utána visszavágók, felváltva hazai/idegen</small></button>
+    <button data-sch="random">Véletlen sorsolás<small>a 30 meccs szabadon összekeverve — jöhet négy hazai egymás után</small></button>
+  </div>
   <div style="margin-top:8px">
     <div style="display:flex;justify-content:space-between;align-items:baseline">
       <label for="diffSlider" style="font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px">Ellenfelek erőssége</label>
@@ -1423,7 +1430,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.31";
+const APP_VERSION="2.5.32";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7114,6 +7121,39 @@ document.querySelectorAll("#wcToggleGrid button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#wcToggleGrid button").forEach(x=>x.classList.remove("sel"));
   b.classList.add("sel");wcEnabled=b.dataset.wc==="on";
   showSquadCount();});
+/* ---- A SORSOLÁS RENDJE: A BEÁLLÍTÁS ÁLLAPOTA ----
+   Szándékosan ITT áll, a kezdőképernyő kezelői KÖZÖTT, nem a sorsoló motor
+   mellett: a választót már a szkript betöltésekor ki kell rajzolni, és ha az
+   állapot lentebb (a motornál) lakna, a rajzolás a `let` inicializálása ELŐTT
+   futna — TDZ-hiba, ami a teljes szkriptet megállítja, és a játék el sem indul.
+   (Pontosan ez történt az auto-szintkövetés cél-sávjánál is.) */
+const SCHED_KEY="harminc_nulla_schedule_v1";
+let _schedMode=null;
+/* A HUB-beli sorsolás-sor újrarajzolója. A HUB-panel állítja be, amikor
+   megnyílik; a kezdőképernyő választója innen frissíti, ha épp nyitva van.
+   Deklarálva, nem implicit globálisként — így nem sérül, ha egyszer strict
+   módba kerül a szkript. */
+let renderHubSchedRow=null;
+function scheduleMode(){
+  if(_schedMode===null){
+    let v=null;try{v=localStorage.getItem(SCHED_KEY);}catch(e){}
+    _schedMode=(v==="random")?"random":"real";}   /* alapértelmezés: valósághű */
+  return _schedMode;}
+function setScheduleMode(v){
+  _schedMode=(v==="random")?"random":"real";
+  try{localStorage.setItem(SCHED_KEY,_schedMode);}catch(e){}}
+/* A választó kijelölését a TÁROLT értékből állítjuk be, nem a jelölés statikus
+   "sel"-jéből — így egy korábbi választás visszatér. Itt nem olvasunk S-t,
+   csak localStorage-t, ezért a hívás biztonságosan futhat már most. */
+function renderSchedGrid(){
+  const cur=scheduleMode();
+  document.querySelectorAll("#schedGrid button").forEach(b=>{
+    b.classList.toggle("sel",b.dataset.sch===cur);});}
+document.querySelectorAll("#schedGrid button").forEach(b=>b.onclick=()=>{
+  setScheduleMode(b.dataset.sch);
+  renderSchedGrid();
+  if(renderHubSchedRow)renderHubSchedRow();});
+renderSchedGrid();
 /* ---- AUTO NEHÉZSÉGI SZINTKÖVETÉS ----
    Bekapcsolva a mezőny magától lép fölfelé, ha a kereted több mint
    AUTO_LEVEL_MAX_GAP Ratinggel a mezőny fölé nőtt. Kizárólag SZEZONOK KÖZÖTT
@@ -10147,14 +10187,47 @@ function mpSkippedOppName(){
 function leagueOpps(){
   const skip=mpSkippedOppName();
   return skip?SEASON_OPPS.filter(o=>o.n!==skip):SEASON_OPPS.slice();}
+/* ================= A SORSOLÁS RENDJE (globális beállítás) =================
+   Eddig egyetlen mód volt: a 30 meccset (15 ellenfél oda-vissza) egyszerűen
+   ÖSSZEKEVERTÜK. Ennek látható következményei voltak — négy hazai meccs
+   egymás után, és olyan ellenfél, akivel mindkét mérkőzésedet lejátszottad a
+   szezon első felében. Ez nem bajnokságra emlékeztet, hanem véletlen
+   meccsfolyamra.
+
+   A "valósághű" rend a rendes bajnoki felépítést követi:
+     · a szezon ELSŐ felében mindenkivel EGYSZER játszol,
+     · a MÁSODIK fele ugyanez, fordított pályaválasztással (visszavágók),
+     · a hazai/idegen meccsek FELVÁLTVA jönnek, amennyire a fordulószám engedi.
+   A pályaválasztás alternálása magától átcsúszik a félidő-határon is: az első
+   fél páros indexeit hazaira állítjuk, a második félben mindet tükrözzük, így a
+   határon nem keletkezik dupla hazai vagy dupla idegenbeli meccs.
+
+   A beállítás GLOBÁLIS és minden módra érvényes (klasszikus, karrier, közös
+   karrier), a téma-választáshoz hasonlóan localStorage-ban él — nem a mentés
+   része, tehát nem kell szezont vagy karriert váltani hozzá. A következő
+   szezon-sorsolásnál lép életbe. */
+/* Oda-visszavágós menetrend alternáló pályaválasztással. */
+function buildRoundRobinFixtures(opps){
+  const order=shuffleArr(opps.slice());   /* az ellenfelek sorrendje szezononként új */
+  const first=order.map((o,i)=>({o,home:i%2===0}));
+  /* a visszavágók UGYANEBBEN a sorrendben, tükrözött pályaválasztással: így
+     minden ellenféllel pontosan félidőnyi szünet van a két meccs között */
+  const second=first.map(f=>({o:f.o,home:!f.home}));
+  return first.concat(second);}
 function buildSeasonFixtures(){
   S.fixtures=[];
-  leagueOpps().forEach(o=>{S.fixtures.push({o,home:true});S.fixtures.push({o,home:false});});
-  S.fixtures.sort(()=>Math.random()-.5);
+  const opps=leagueOpps();
+  if(scheduleMode()==="real"){
+    S.fixtures=buildRoundRobinFixtures(opps);
+  }else{
+    opps.forEach(o=>{S.fixtures.push({o,home:true});S.fixtures.push({o,home:false});});
+    S.fixtures.sort(()=>Math.random()-.5);}
   /* A párharc két HELYE. Maga a meccs nem innen dolgozik (a playMatch a társ
      pillanatképéből épít fixture-t), de a helyfoglalás nélkül elcsúsznának a
      fordulószámok: a 16. forduló a 16. CPU-meccsre mutatna, a végén pedig
-     kifutnánk a listából. */
+     kifutnánk a listából.
+     Valósághű renddel ez pontosan illeszkedik: 14 CPU-ellenfél + 1 párharc = 15
+     forduló az első félben, ugyanennyi a másodikban. */
   if(h2hRoomActive())
     H2H_ROUNDS.forEach(r=>S.fixtures.splice(r-1,0,
       {duel:true,round:r,home:false,o:{n:"⚔ A társad",ovr:0}}));}
@@ -10195,6 +10268,10 @@ function startFirstSeason(){
   /* a mezőny rejtett erősítése a szezonra rögzül — MÁR a morál beállítása után */
   freezeSeasonHiddenBonus();
   addLine(`Sorsolás kész. 30 forduló vár rád, ${esc(teamName)}. Edző: ${coach.n}. Sok sikert!`,"m");
+  /* a menetrend rendje látszódjon: a felhasználó tudja, mire számíthat */
+  addLine(scheduleMode()==="real"
+    ? `📅 Valósághű menetrend: az első félidényben mindenkivel egyszer, a másodikban a visszavágók — hazai és idegenbeli meccsek felváltva.`
+    : `📅 Véletlen menetrend: a 30 meccs szabad sorrendben jön.`,"m ev");
   if(h2hRoomActive())
     addLine(`⚔ A ${H2H_ROUNDS.join(". és a ")}. fordulóban a társad ellen játszol — a mezőny többi csapata ellen oda-vissza megy a bajnokság.`,"m ev");
   updateStanding();updateMorale();
@@ -15665,7 +15742,9 @@ function showLevelChangePicker(direction){
         <small style="color:var(--dim2)">a mezőny magától követi a kereted — mindkét irányban, mindig csak két szezon között</small></span>
       <b id="autoLevelState" style="white-space:nowrap;color:${S.autoLevel?"var(--grass)":"var(--dim)"}">${S.autoLevel?"BE":"KI"}</b>
     </div>
-    <div id="autoAimBox"></div>`;
+    <div id="autoAimBox"></div>
+    <div id="hubSchedRow" style="margin-top:9px;padding:8px 10px;background:var(--panel2);border-radius:7px;
+         display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer"></div>`;
   const signHint=()=>{
     const t=Math.max(45,Math.min(97,state.value+SIGNING_OFFSET));
     const gap=levelGap(state.value);
@@ -15706,6 +15785,24 @@ function showLevelChangePicker(direction){
     renderAutoAim();
     saveGame();};
   renderAutoAim();
+  /* ---- A SORSOLÁS RENDJE, FUTÓ KARRIERBEN IS ----
+     Globális beállítás, ezért a kezdőképernyőn is ott van — de oda csak új
+     játék indításakor jutsz el. Egy futó karrierben is át kell tudni állítani,
+     ezért itt is elérhető. A VÁLTÁS a KÖVETKEZŐ szezon sorsolásánál lép
+     életbe: a futó szezon menetrendjét nem írjuk át a lábad alatt. */
+  renderHubSchedRow=function(){
+    const row=$("hubSchedRow");if(!row)return;
+    const real=scheduleMode()==="real";
+    row.innerHTML=`<span style="font-size:12.5px;line-height:1.45">📅 <b>Sorsolás rendje</b><br>
+      <small style="color:var(--dim2)">${real
+        ? "valósághű — első félidényben mindenkivel egyszer, utána visszavágók, felváltva hazai/idegen"
+        : "véletlen — a 30 meccs szabadon összekeverve"} · a következő szezontól</small></span>
+      <b style="white-space:nowrap;color:${real?"var(--grass)":"var(--dim)"}">${real?"VALÓSÁGHŰ":"VÉLETLEN"}</b>`;};
+  renderHubSchedRow();
+  const schedRow=$("hubSchedRow");
+  if(schedRow)schedRow.onclick=()=>{
+    setScheduleMode(scheduleMode()==="real"?"random":"real");
+    renderHubSchedRow();renderSchedGrid();};
   $("levelUpSlider").oninput=()=>{
     state.value=parseInt($("levelUpSlider").value,10);
     $("levelUpSliderVal").textContent=`${state.value} · ${diffTierLabel(state.value)}`;
