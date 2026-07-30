@@ -1453,7 +1453,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.33";
+const APP_VERSION="2.5.34";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7249,11 +7249,22 @@ function autoLevelSync(){
   const tgt=autoLevelTargetNow();
   if(tgt===oppTargetRating)return false;
   const before=oppTargetRating,aim=autoLevelAim();
-  oppTargetRating=tgt;careerBaseRating=tgt;
+  /* A HORGONYT (careerBaseRating) SZÁNDÉKOSAN NEM ÍRJUK ÁT.
+     Ez volt a piac-skálázás halálos hibája: mindkét szintváltó ráállította a
+     horgonyt az ÚJ szintre, így a marketPeakShift() (= szint − horgony) MINDIG
+     0 lett, és a piac soha nem emelkedett — 121-es mezőnyön is 85-95-ös
+     jelöltek jöttek. A horgony a karrier INDULÁSI szintje, azt egyszer, a
+     beállításnál kapja meg, és onnantól fix. */
+  oppTargetRating=tgt;
   if(careerPool)Object.values(careerPool).forEach(e=>{
     if(drafted.has(e.n))return;
     applyMarketShift(e);
     e.startRating=Math.round(ratingAtAge(e.peak,e.age));
+    /* AZ ATTRIBÚTUMOK IS KÖVETIK. Enélkül a Rating felment, az attribútumok
+       viszont a régi szinten maradtak — és a képesség-keresés (ami kizárólag
+       attribútumot néz) 121-es mezőnyön sem talált 100 fölötti értéket. A
+       szezonváltás ezt már eddig is elvégezte, a szintváltás nem. */
+    syncAttrsToRating(e);
     if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
   SEASON_OPPS=buildOpponents(15,oppTargetRating);
   if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
@@ -11316,13 +11327,17 @@ function mpLevelLocked(){return false;}
    házigazda-átvétel. Korábban mindhárom külön másolta ugyanezt a hat sort, és
    egy piac-frissítés már ki is maradt belőle. */
 function applyOppLevel(v){
-  oppTargetRating=v;careerBaseRating=v;
+  /* A HORGONY itt sem íródik át — lásd az autoLevelSync-nél írt indoklást.
+     A careerBaseRating a karrier indulási mezőnyszintje; ha a szintváltás
+     magával vinné, a piac-emelkedés (marketPeakShift) örökre 0 maradna. */
+  oppTargetRating=v;
   /* A piac AZONNAL felzárkózik — különben a szintlépés utáni nyári vásárlás
      még a régi, gyengébb poolból merítene. */
   if(gameMode==="career"&&careerPool)Object.values(careerPool).forEach(entry=>{
     if(drafted.has(entry.n))return;
     applyMarketShift(entry);
     entry.startRating=Math.round(ratingAtAge(entry.peak,entry.age));
+    syncAttrsToRating(entry);   /* az attribútumok is követik — lásd autoLevelSync */
     if(scout)entry.estimatedTSI=estimateTSI(entry.tsi,scout.stars);});
   SEASON_OPPS=buildOpponents(15,oppTargetRating);
   if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();}
@@ -13989,8 +14004,20 @@ function generateAcademyPlayer(forcePos){
      pluszpontnak csak 25%-a esélye a folytatásra), így a kiugróan magas
      kezdő Ratingű akadémisták ritkák, de nem lehetetlenek. */
   let tailBonus=0;while(tailBonus<5&&Math.random()<0.25)tailBonus++;
-  let rating=Math.min(77,Math.max(59,Math.min(72,Math.round(59+q*13+(Math.random()-0.5)*4)))+tailBonus);
-  let tsi=Math.max(1600,Math.min(5500,Math.round((1600+q*3900)*(0.9+Math.random()*0.25))));
+  /* ---- AZ AKADÉMIA IS KÖVETI A MEZŐNYT (100 alatt enyhén) ----
+     A sáv eddig kizárólag a KERETED erejéből (teamOVRbase) jött, és fixen 77-nél
+     állt meg. Egy 121-es mezőnyön ez azt jelentette, hogy a friss tehetség
+     születése pillanatában elavult: a mezőny elszáguldott mellette, és sosem
+     lett belőle kezdő. Mostantól a mezőny emelkedésének (marketPeakShift) a
+     FELÉVEL kúszik a sáv is — enyhén, mert egy 15-18 évesnek reális felső
+     határa van. Infinityben (100 fölött) a lenti ág írja felül, ott a saját,
+     meredekebb skálázása él. A karrier elején az eltolás 0, tehát a megszokott
+     akadémia viselkedése változatlan. */
+  const acShift=Math.round(marketPeakShift()*0.5);
+  let rating=Math.min(77+acShift,Math.max(59,Math.min(72,Math.round(59+q*13+(Math.random()-0.5)*4)))+tailBonus+acShift);
+  let tsi=Math.max(1600,Math.round((1600+q*3900)*(0.9+Math.random()*0.25)));
+  if(acShift>0)tsi=Math.max(tsi,Math.round(peakToTsi(rating+8)*1.05));
+  else tsi=Math.min(5500,tsi);
   /* Infinityben az akadémia 85-95-ös Ratinggel ad tehetségeket. A TSI-t is
      felhúzzuk, hogy a peak (a tsiToPeakOvr képlete maximum 96-ot ad) illjen
      hozzá — enélkül egy 95-ös Ratingű 16 éves 70-es peakkel születne, és a
@@ -18629,6 +18656,29 @@ function applySavedGame(d){
   /* RUN: a mérő állapota. Régi mentésnél üresen indul, és a lusta
      mérföldkő-detektálás a meglévő előzményekből visszamenőleg feltölti. */
   S.run=d.S.run||null;S.runOpen=!!d.S.runOpen;S.runGuideOpen=!!d.S.runGuideOpen;runInit();
+  /* ---- A PIAC-HORGONY HELYREÁLLÍTÁSA (futó karrierekhez) ----
+     A korábbi verziókban mindkét szintváltó ráállította a careerBaseRating-et
+     az ÚJ mezőnyszintre, így a piac-emelkedés (marketPeakShift = szint −
+     horgony) örökre 0 maradt: 121-es mezőnyön is 85-95-ös jelöltek jöttek, és
+     az attribútum-keresés sem talált 100 fölötti értéket, mert a poolban nem is
+     létezett ilyen.
+     Az EREDETI horgonyt szerencsére megőrizte a Run-mérő: a runCaptureStart a
+     draft lezárásakor EGYSZER elteszi (R.baseDiff), még bármelyik szintváltás
+     előtt. Ha a mentett horgony ennél magasabb, akkor elromlott — visszaírjuk.
+     Ép mentésnél ez semmit nem tesz. */
+  if(gameMode==="career"&&S.run&&S.run.baseDiff!=null&&careerBaseRating>S.run.baseDiff){
+    const romlott=careerBaseRating;
+    careerBaseRating=S.run.baseDiff;
+    /* a pool AZONNAL zárkózzon fel — különben csak a következő szezonváltásnál
+       jelenne meg a hatás. A drafted már be van töltve, tehát a KERETEDET nem
+       piszkáljuk: csak a le nem igazolt játékosokat emeljük. */
+    if(careerPool)Object.values(careerPool).forEach(e=>{
+      if(drafted.has(e.n))return;
+      applyMarketShift(e);
+      e.startRating=Math.round(ratingAtAge(e.peak,e.age));
+      syncAttrsToRating(e);
+      if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
+    addLine(`✦ Piac-helyreállítás: a piac horgonya ${romlott} → ${careerBaseRating}, ezért az igazolható játékosok szintje mostantól a ${oppTargetRating}-es mezőnyhöz mérten emelkedik.`,"m life");}
   S.fixtureResults=d.S.fixtureResults||[];
   S.resumeCb=null;
   S.grudge=new Set(d.S.grudge);
