@@ -1460,7 +1460,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.37";
+const APP_VERSION="2.5.38";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10117,6 +10117,22 @@ function hasFormlock(name){return playerSkills(name).some(i=>i.skill.type==="for
    jelentéktelenné vált — pár szezon alatt a csúcsra lehetett érni.
    Egy helyen, hogy könnyen hangolható legyen. */
 const CARD_BUMP={godlike:8,vandal:6,killer:5,mythic:4,stellar:3,diamond:2,gold:1,silver:1};
+/* ---- A TISZTA LAP KÜSZÖBEI (kapus ÉS védő) ----
+   Egy helyen, mert két csoport osztozik rajta, és így egyszerre hangolható.
+   A régi (csak kapusra érvényes) értékek: 2/5/8/11/14/17/21/26. Mostantól a
+   védők is kapnak tiszta lapot, ezért mindkét csoportnak TÖBB kell — a
+   küszöbök kb. 20-25%-kal feljebb kerültek. A 30 fordulós szezonhoz mérve:
+   a Diamond (10) egy jó védelemnek reális, a csúcsszintek viszont valóban
+   kivételes idényt kérnek. */
+const CARD_CS={silver:3,gold:7,diamond:10,stellar:13,mythic:16,killer:20,vandal:24,godlike:28};
+/* A tiszta lap SÚLYA a kártya-rangsorban. A kapusnál nagyobb: a védés egyéni
+   teljesítmény, a tiszta lap viszont öt ember közös munkája — ha a védők a
+   kapussal azonos súlyt kapnának, a védősor egyszerűen kiszorítaná a
+   támadókat a szezononként egy-egy csúcskártyáról. A KÜSZÖBÖK ettől
+   függetlenül azonosak mindkét csoportra. */
+function cardCsWeight(p){
+  const first=(p&&p.pos&&p.pos[0])||"KKP";
+  return first==="KP"?2.2:1.3;}
 function cardTierRank(t){
   return t==="godlike"?8:t==="vandal"?7:t==="killer"?6:t==="mythic"?5:t==="stellar"?4:t==="diamond"?3:t==="gold"?2:t==="silver"?1:0;}
 function playerCardTier(name){
@@ -12674,22 +12690,28 @@ function playMatch(){
         if(g||as){cs.g+=g;cs.a+=as;}});
       const gkForCs=active.find(a=>slots[a.idx].pos==="KP")||active[0];
       if(ga===0){const cs=S.careerStats[gkForCs.p.n]=S.careerStats[gkForCs.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};cs.cs++;S.seasonCleanSheets[gkForCs.p.n]=(S.seasonCleanSheets[gkForCs.p.n]||0)+1;}
-      /* ---- A VÉDŐK TISZTA LAPJA IS SZÁMÍT ----
-         Eddig csak a kapus kapta meg, pedig a nullát a védelem hozza vele
-         együtt. A karrier-statisztikába (careerStats.cs) tehát a kezdő védők is
-         bekerülnek, és a statisztika-tábla "tiszta lap" oszlopa értelmet nyer
-         rájuk is.
-         SZÁNDÉKOSAN NEM megy az S.seasonCleanSheets-be: az KIZÁRÓLAG a
-         szezonvégi kártyaszint-meghatározás bemenete (gkImpact = saves*0.6 +
-         cs*2.2), ahol a 14/21/26 tiszta lap mitikus/vandál/godlike szintet ér.
-         Egy jó védelemben minden hátvéd 15+ nullát hoz egy szezonban, vagyis a
-         teljes védősor automatikusan csúcskártyát kapna — az szétverné a
-         kártyarendszer egyensúlyát. A statisztika tehát bővül, a jutalmazás nem. */
+      /* ---- A VÉDŐK TISZTA LAPJA IS SZÁMÍT — A KÁRTYÁKBAN IS ----
+         A nullát a védelem hozza a kapussal együtt, ezért a kezdő védők is
+         megkapják — MOSTANTÓL a szezonos vödörbe (S.seasonCleanSheets) is, nem
+         csak a karrier-statisztikába. Ez a szezonvégi kártyaszint bemenete,
+         vagyis innentől a védők is kaphatnak szezonkártyát a teljesítményükért.
+         A korábbi kizárás indoka valós volt: egy jó védelemben mind a négy
+         hátvéd ugyanannyi nullát hoz, tehát együtt lépnék át bármilyen
+         küszöböt. Ezt két dolog fogja meg:
+           · a tiszta lap KÜSZÖBEI feljebb kerültek (CARD_CS) — kapusra is,
+             védőre is, ahogy kérted;
+           · a csúcsszintek eleve szezononként EGY játékosnak jutnak
+             (godlike/vandal/killer/mythic), a Stellar kettőnek — a védősor
+             többi tagja tehát a Diamond alatti szintekre esik, ahol a
+             feljavítás mértéke +2/+1.
+         A KAPUS súlya a rangsorban nagyobb marad: a védés egyéni teljesítmény,
+         a tiszta lap ötük közös munkája (lásd cardCsWeight). */
       if(ga===0)active.forEach(a=>{
         const pos=slots[a.idx]&&slots[a.idx].pos;
         if(!pos||pos==="KP"||roleInFormation(pos)!=="VEDO")return;
         const cs=S.careerStats[a.p.n]=S.careerStats[a.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};
-        cs.cs++;});
+        cs.cs++;
+        S.seasonCleanSheets[a.p.n]=(S.seasonCleanSheets[a.p.n]||0)+1;});
     }
     /* KARRIER-MÉRFÖLDKÖVEK: a tiszta lapos bemutatkozások, a jubileumok, majd a
        meccs alatt összegyűlt hatások kiosztása és a számlálók léptetése. */
@@ -17607,7 +17629,7 @@ function determineSeasonCards(){
   const roster=currentRoster();
   const perf=roster.map(p=>({p,g:S.scorers[p.n]||0,a:S.assists[p.n]||0,mvp:S.mvps[p.n]||0,
     saves:S.seasonSaves[p.n]||0,cs:S.seasonCleanSheets[p.n]||0}))
-    .map(r=>({...r,combo:r.g+r.a,gkImpact:r.saves*0.6+r.cs*2.2}));
+    .map(r=>({...r,combo:r.g+r.a,gkImpact:r.saves*0.6+r.cs*cardCsWeight(r.p)}));
   perf.sort((x,y)=>(y.combo+y.gkImpact)-(x.combo+x.gkImpact));
   /* a "legjobb teljesítők" pozíciót (Diamond feltétele) a top-3, még Diamond
      alatt álló játékos közül nézzük — nem csak a legeslegjobbét — így
@@ -17628,14 +17650,14 @@ function determineSeasonCards(){
        áll, a Gyilkos mvp>=30 küszöbe tehát már azt jelenti, hogy MINDEN meccsen
        te voltál a legjobb. Efölé nincs hova lépni, ezért a Vadista szandál és a
        GODLIKE csak gól+assziszt, védés és kapott gól nélküli meccs alapján jár. */
-    if(!godlikeGiven&&(row.combo>=68||row.saves>=55||row.cs>=26)){newTier="godlike";godlikeGiven=true;}
-    else if(!vandalGiven&&(row.combo>=52||row.saves>=42||row.cs>=21)){newTier="vandal";vandalGiven=true;}
-    else if(!killerGiven&&(row.combo>=40||row.mvp>=30||row.saves>=32||row.cs>=17)){newTier="killer";killerGiven=true;}
-    else if(!mythicGiven&&(row.combo>=32||row.mvp>=24||row.saves>=26||row.cs>=14)){newTier="mythic";mythicGiven=true;}
-    else if(stellarCount<2&&(row.combo>=25||row.mvp>=18||row.saves>=20||row.cs>=11)){newTier="stellar";stellarCount++;}
-    else if((topBelowDiamondNames.has(row.p.n)&&row.combo>=18)||row.mvp>=12||row.saves>=15||row.cs>=8){newTier="diamond";}
-    else if(row.combo>=10||row.mvp>=6||row.saves>=9||row.cs>=5){newTier="gold";}
-    else if(row.combo>=4||row.mvp>=3||row.saves>=4||row.cs>=2){newTier="silver";}
+    if(!godlikeGiven&&(row.combo>=68||row.saves>=55||row.cs>=CARD_CS.godlike)){newTier="godlike";godlikeGiven=true;}
+    else if(!vandalGiven&&(row.combo>=52||row.saves>=42||row.cs>=CARD_CS.vandal)){newTier="vandal";vandalGiven=true;}
+    else if(!killerGiven&&(row.combo>=40||row.mvp>=30||row.saves>=32||row.cs>=CARD_CS.killer)){newTier="killer";killerGiven=true;}
+    else if(!mythicGiven&&(row.combo>=32||row.mvp>=24||row.saves>=26||row.cs>=CARD_CS.mythic)){newTier="mythic";mythicGiven=true;}
+    else if(stellarCount<2&&(row.combo>=25||row.mvp>=18||row.saves>=20||row.cs>=CARD_CS.stellar)){newTier="stellar";stellarCount++;}
+    else if((topBelowDiamondNames.has(row.p.n)&&row.combo>=18)||row.mvp>=12||row.saves>=15||row.cs>=CARD_CS.diamond){newTier="diamond";}
+    else if(row.combo>=10||row.mvp>=6||row.saves>=9||row.cs>=CARD_CS.gold){newTier="gold";}
+    else if(row.combo>=4||row.mvp>=3||row.saves>=4||row.cs>=CARD_CS.silver){newTier="silver";}
     if(newTier&&cardTierRank(newTier)>curRank){
       entry.cardTier=newTier;
       const bump=CARD_BUMP[newTier]||1;
@@ -17650,8 +17672,12 @@ function cardResultsHtml(cardResults){
   if(!cardResults.length)return"";
   let html=`<div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin:8px 0 5px">Szezon kártyák</div>`;
   cardResults.forEach(r=>{
-    const statTxt=(r.saves||r.cs)
+    /* A védőnek nincs bravúrja — nála a "0 bravúr" félrevezető lenne, ezért a
+       szöveg csak azt sorolja fel, amiben tényleg teljesített. */
+    const statTxt=r.saves
       ?`${r.saves} bravúr, ${r.cs} tiszta lap${r.g||r.a?`, ${r.g} gól, ${r.a} gólpassz`:""}`
+      :r.cs
+      ?`${r.cs} tiszta lap${r.g||r.a?`, ${r.g} gól, ${r.a} gólpassz`:""}${r.mvp?`, ${r.mvp} meccsembersége`:""}`
       :`${r.g} gól, ${r.a} gólpassz, ${r.mvp} meccsembersége`;
     html+=`<div style="font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:6px">
       <span style="${cardTierBadgeStyle(r.tier)};font-weight:700;font-size:10.5px;padding:2px 7px;border-radius:10px;letter-spacing:.5px;text-transform:uppercase">${cardTierLabel(r.tier)}</span>
