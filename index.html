@@ -1453,7 +1453,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.34";
+const APP_VERSION="2.5.35";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4916,6 +4916,34 @@ const BENCH_CATS=[
 const BENCH={KAPUS:null,VEDO:null,VEDO_SZ:null,KOZEPPALYAS:null,
              KOZEP_SZ:null,CSATAR:null,CSATAR_SZ:null};
 const BENCH_KEYS=BENCH_CATS.map(c=>c.key);
+/* ---- A DRAFT CSEREPAD-KÖRE: NÉGY ÁLTALÁNOS HELY ----
+   A cserepad hét helyre bővült (középső és szélső védő, középső és szélső
+   középpályás, középcsatár és szélső csatár külön), a draft viszont a lista
+   ELSŐ NÉGY elemén ment végig — azok pedig véletlenül a kapus, a középső védő,
+   a SZÉLSŐ védő és a középső középpályás. Így draftoltál kapust, kétféle védőt
+   és egy középpályást, csatárt viszont soha.
+   A draft mostantól nem a hét szűk helyet nézi, hanem NÉGY ÁLTALÁNOS helyet,
+   posztkategóriánként egyet — ahogy régen: 1 kapus, 1 védő (szélső vagy középső),
+   1 középpályás, 1 csatár. A hét hely megmarad (a HUB-ban feltölthető), csak a
+   draft nem próbálja mindet betölteni. */
+const DRAFT_BENCH_CATS=[
+ {key:"KAPUS",      label:"Kapus csere",       role:"KAPUS"},
+ {key:"VEDO",       label:"Védő csere",        role:"VEDO"},
+ {key:"KOZEPPALYAS",label:"Középpályás csere", role:"KOZEPPALYAS"},
+ {key:"CSATAR",     label:"Csatár csere",      role:"CSATAR"}
+];
+function draftBenchCat(){
+  return DRAFT_BENCH_CATS[Math.max(0,Math.min(DRAFT_BENCH_CATS.length-1,benchCatIndex))];}
+/* Az általános hely azt fogadja el, amit a SAJÁT kategóriájának bármelyik
+   pad-helye elfogadna — így a védő-helyre szélső védő is jó, a csatár-helyre
+   pedig szélső csatár is. */
+function draftBenchCodes(){
+  const role=draftBenchCat().role,out=new Set();
+  BENCH_CATS.forEach(c=>{if(c.role===role)c.codes.forEach(x=>out.add(x));});
+  return out;}
+function draftBenchEligible(p){
+  const codes=draftBenchCodes();
+  return p.pos.some(pp=>codes.has(pp));}
 function getCategoryFor(pos){
   for(const c of ROLE_CATS)if(c.codes.includes(pos))return c.key;
   return "CSATAR";}
@@ -7572,8 +7600,8 @@ function updateRound(){
     const filled=slots.filter(s=>s.player).length;
     $("roundInfo").textContent=`${filled+1}. draftkör / 11 · pörgess egy klubért`;
   }else{
-    const cat=BENCH_CATS[benchCatIndex];
-    $("roundInfo").textContent=`Cserepad: ${cat.label} (${benchCatIndex+1}/4) · pörgess egy klubért`;
+    const cat=draftBenchCat();
+    $("roundInfo").textContent=`Cserepad: ${cat.label} (${benchCatIndex+1}/${DRAFT_BENCH_CATS.length}) · pörgess egy klubért`;
   }}
 /* ---- pörgetés ---- */
 $("spinBtn").onclick=()=>spin(false);
@@ -7581,7 +7609,7 @@ $("rerollSlider").oninput=()=>{$("rerollSliderVal").textContent=$("rerollSlider"
 $("rerollBtn").onclick=()=>{if(rerolls>0){rerolls--;spin(true);}};
 function playerUsable(p){
   if(draftStage==="main")return !drafted.has(p.n)&&eligibleSlots(p).length>0;
-  return !drafted.has(p.n)&&p.pos.some(pp=>BENCH_CATS[benchCatIndex].codes.includes(pp));}
+  return !drafted.has(p.n)&&draftBenchEligible(p);}
 function squadHasUsablePlayer(squad){
   if(gameMode==="career")return careerCandidatesFromSquad(squad,careerPool).map(careerPlayerFromPoolEntry).some(playerUsable);
   return squad.players.some(playerUsable);}
@@ -7856,7 +7884,7 @@ function renderSquad(){
       const elig=isDup?[]:eligibleSlots(p);clickable=elig.length>0;
       var eligRef=elig;
     }else{
-      clickable=!isDup&&p.pos.some(pp=>BENCH_CATS[benchCatIndex].codes.includes(pp));
+      clickable=!isDup&&draftBenchEligible(p);
     }
     const row=document.createElement("div");row.className="prow"+(clickable?"":" dis");
     /* ---- MEGERŐSÍTŐ LÉPÉS A DRAFTBAN ----
@@ -7906,7 +7934,7 @@ function renderSquad(){
         ? (eligRef.length===1
             ? `Egy szabad poszt illik hozzá: <b>${eligRef[0].pos}</b> — rögtön oda kerül.`
             : `<b>${eligRef.length}</b> szabad poszt illik hozzá: <b>${eligRef.map(s=>s.pos).join(", ")}</b>. A választás után koppints a villogó posztra a pályán.`)
-        : `A(z) <b>${BENCH_CATS[benchCatIndex].label}</b> helyére kerül a padra.`;
+        : `A(z) <b>${draftBenchCat().label}</b> helyére kerül a padra.`;
       const info=document.createElement("div");
       info.style.cssText="font-size:12px;color:var(--dim);line-height:1.5;margin-bottom:7px";
       info.innerHTML=posTxt;
@@ -7945,10 +7973,10 @@ function place(p,slot){
   }else{setDraftStatus("");updateRound();}
   saveGame();}
 function placeBench(p){
-  BENCH[BENCH_CATS[benchCatIndex].key]=p;drafted.add(p.n);
+  BENCH[draftBenchCat().key]=p;drafted.add(p.n);
   $("squadList").innerHTML="";$("spinBtn").disabled=false;$("rerollBtn").classList.add("hide");
   benchCatIndex++;
-  if(benchCatIndex<4){updateRound();}
+  if(benchCatIndex<DRAFT_BENCH_CATS.length){updateRound();}
   else{
     $("scDraft").classList.add("hide");
     phase="chem";
@@ -14100,6 +14128,24 @@ function releasePlayer(p,sell){
     if(credit)S.transferBudget+=credit;
     pruneChemistry();
     return{ok:true,credit};}
+  /* ---- A CSEREPAD HÉT HELYE: LEHETŐSÉG, NEM KÖTELEZETTSÉG ----
+     A pad hét helyre bővült, a szabály viszont a régi maradt: minden pad-helyre
+     PÓTLÁS kellett, különben nem lehetett eladni. Így egy hét fős paddal a
+     tartalék-keret kiürülése után semmit nem tudtál eladni — a fölösleg
+     kényszerből ott ült.
+     A KÖTELEZETTSÉG mostantól posztkategóriánként EGY ember: amíg a kapus, a
+     védő, a középpályás és a csatár kategóriában marad valaki a padon, a
+     többi pad-hely szabadon üríthető. A kezdő 11-re ez NEM vonatkozik — az
+     továbbra is hiánytalan kell legyen, ott marad a pótlás-kényszer. */
+  if(loc.type==="bench"){
+    const cat=BENCH_CATS.find(c=>c.key===loc.key);
+    const role=cat&&cat.role;
+    const marad=BENCH_CATS.some(c=>c.role===role&&c.key!==loc.key&&BENCH[c.key]);
+    if(marad){
+      BENCH[loc.key]=null;
+      if(credit)S.transferBudget+=credit;
+      pruneChemistry();
+      return{ok:true,credit};}}
   const codes=locCodes(loc);
   const replIdx=extraRoster.findIndex(e=>e.pos.some(pp=>codes.includes(pp)));
   if(replIdx<0)return{ok:false,reason:"noreplacement"};
@@ -16547,7 +16593,9 @@ function buildHubDetail(loc){
       askSellConfirm(p,()=>{
         const res=releasePlayer(p,true);
         if(!res.ok){
-          setDraftStatus(res.reason==="noreplacement"?"Nincs pótlás a tartalék-keretedben erre a posztra — előbb helyezz be valakit onnan.":"Nem sikerült eladni.");
+          setDraftStatus(res.reason==="noreplacement"
+            ?"Ő az utolsó embered ebben a posztkategóriában — legalább egy kapusnak, védőnek, középpályásnak és csatárnak maradnia kell. Előbb hozz valakit a tartalék-keretből vagy a piacról."
+            :"Nem sikerült eladni.");
           return;}
         addLine(`💰 Eladtad ${esc(p.n)}-t ${fmtFt(res.credit)}-ért — a büdzséd most ${fmtFt(S.transferBudget)}.`,"m life");
         $("hubPositionPicker").classList.add("hide");   /* az eladás azonnal bezárja a nyitott csere-panelt */
@@ -16628,7 +16676,20 @@ function hubLocRef(loc){
    A 6-os komponens szándékosan csak akkor kerül be, ha teljesült: a meg nem
    szerzett trófea nem húz le, a megszerzett viszont 100-assal emel. Így a
    mérföldkövek tiszta jutalmak. */
-const RUN_W={start:1.0, diff:1.0, first:1.0, season:0.25, speed:2.0, tactic:0.25, reroll:0.333};
+const RUN_W={start:1.0, diff:1.0, first:1.0, season:0.25, speed:2.0, tactic:0.25, reroll:0.333, aim:0.25};
+/* ---- A NEHÉZSÉG-BELÖVÉS PONTOZÁSA (csak draftos karrier) ----
+   A draft ELŐTT beállítod, milyen erős legyen a mezőny — utána viszont a
+   draft-szerencse és a döntéseid döntik el, milyen keretet hozol össze. Ez a
+   tétel azt méri, mennyire jól TALÁLTAD EL magadat: a szezonindításkor a nyers
+   csapaterőd mennyire esik egybe a vállalt mezőnyszinttel.
+   Telitalálat = 100 pont. Fölé lőni kisebb hiba (könnyebb szezon, de a keret
+   megvan), alá lőni nagyobb (a szezon indulásból reménytelen) — ezért
+   aszimmetrikus a levonás: fölé −5/pont, alá −10/pont. */
+const RUN_AIM_OVER=5, RUN_AIM_UNDER=10;
+function runAimScore(teamAvg,baseDiff){
+  const d=Math.round(teamAvg)-Math.round(baseDiff);
+  const pen=d>=0?d*RUN_AIM_OVER:-d*RUN_AIM_UNDER;
+  return {d,score:Math.max(0,Math.min(100,100-pen))};}
 /* Mérföldkövek: kulcs → {címke, súly}. A detektálás nagyrészt LUSTA (a
    játékállapotból olvassuk ki), így nem kell minden mutációs pontra hookolni;
    csak a kupa-királyokat kell menteni, mert a kampány-objektum eldobódik. */
@@ -16842,6 +16903,14 @@ function runBreakdown(){
     rows.push({k:"diff",n:"Kezdő nehézség",w:RUN_W.diff,
       s:Math.max(0,Math.min(100,R.baseDiff)),
       d:`${R.baseDiff} · ${diffTierLabel(R.baseDiff)}`});
+  /* 2a. Nehézség-belövés: a vállalt mezőnyszint és a szezonindításkori NYERS
+     csapaterő egybeesése. Csak DRAFTOS karrierben van értelme — kész klubnál a
+     keret nem a te döntésed volt, ott nem lehet "eltalálni". */
+  if(R.startAvg!=null&&R.baseDiff!=null&&!R.clubStart){
+    const aim=runAimScore(R.startAvg,R.baseDiff);
+    const irany=aim.d===0?"telitalálat":aim.d>0?`${aim.d}-tal fölé`:`${-aim.d}-tal alá`;
+    rows.push({k:"aim",n:"Nehézség-belövés",w:RUN_W.aim,s:aim.score,
+      d:`vállalt mezőny ${Math.round(R.baseDiff)} · induló nyers csapaterő ${R.startAvg.toFixed(1)} — ${irany}`});}
   /* 2b. Újrapörgetések: 0 választás = 100 pont, 5 = 50 pont (darabonként −10).
      A kezdő nehézséghez hasonlóan ez is ELŐRE beállított kézikapcsoló, nem
      menet közbeni teljesítmény, ezért — szándékosan — NEM kap kihívás-szorzót. */
@@ -16955,6 +17024,11 @@ function runGuideHtml(){
 
     <div style="margin-bottom:7px"><b>🎰 Újrapörgetések · ×${RUN_W.reroll}</b><br>
       Nulla újrapörgetés = 100 pont, minden egyes választás <b>−10</b>. A tiszta draft önmagában is érték.</div>
+
+    <div style="margin-bottom:7px"><b>🎯 Nehézség-belövés · ×${RUN_W.aim}</b> <span style="color:var(--dim2)">(csak draftos indulásnál)</span><br>
+      A draft előtt vállalt mezőnyszint és a szezonindításkori <b>nyers csapaterőd</b> egybeesése.
+      Telitalálat = 100 pont. Fölé lőni kisebb hiba (<b>−${RUN_AIM_OVER}</b>/pont), alá lőni nagyobb
+      (<b>−${RUN_AIM_UNDER}</b>/pont) — egy indulásból reménytelen szezon többe kerül, mint egy kényelmesebb.</div>
 
     <div style="margin-bottom:7px"><b>⚙️ Taktika-illeszkedés · ×${RUN_W.tactic}/szezon</b><br>
       Szezononként rögzül, mennyire illett az aktív taktikád a kerethez. A keretedhez válaszd a rendszert, ne fordítva.</div>
