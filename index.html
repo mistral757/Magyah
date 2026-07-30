@@ -723,9 +723,22 @@ button:disabled{opacity:.35;cursor:default}
    A 15. és 30. forduló előtt a két kliens kicseréli a meccs-pillanatképét.
    Ez a réteg nem csak tájékoztat: MEGFOGJA a felületet, mert a pillanatkép
    ezen a ponton már elment — a keretet innentől nem lehet átrendezni. */
-#h2hWait{position:fixed;inset:0;z-index:420;background:rgba(20,18,15,.95);
+#h2hWait,#absPanel{position:fixed;inset:0;z-index:420;background:rgba(20,18,15,.95);
   display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box}
-#h2hWait.hide{display:none}
+#h2hWait.hide,#absPanel.hide{display:none}
+/* a hiányzók panelje hosszabb lehet (több hiányzó × több jelölt) → görgethető */
+#absPanel .h2hBox{max-height:100%;overflow-y:auto}
+.absRow{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+  border-radius:9px;padding:9px 11px;margin-bottom:8px}
+.absWho{font-size:13.5px;font-weight:700;color:#f3f2f2;margin-bottom:2px}
+.absMeta{font-size:11.5px;color:#b9b4ab;margin-bottom:7px}
+.absOpts{display:flex;flex-wrap:wrap;gap:6px}
+.absOpt{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);
+  color:#f3f2f2;border-radius:7px;padding:6px 9px;font-size:12px;cursor:pointer;
+  font-family:inherit;line-height:1.25;text-align:left}
+.absOpt:hover{background:rgba(255,255,255,.14)}
+.absOpt.sel{background:rgba(225,173,102,.22);border-color:#e1ad66;color:#ffe6bd;font-weight:700}
+.absOpt small{display:block;font-size:10px;opacity:.75;font-weight:400}
 .h2hBox{width:100%;max-width:420px;color:#f3f2f2}
 .h2hKick{font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:#e1ad66;text-align:center}
 .h2hRound{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:40px;
@@ -852,6 +865,19 @@ button:disabled{opacity:.35;cursor:default}
       <button class="mpBtn gold hide" id="h2hWaitOrphanBtn">🎮 Egyedül folytatom ezt a karriert</button>
       <button class="mpBtn" id="h2hWaitHomeBtn">Vissza a kezdőlapra — a szoba megmarad</button>
       <button class="mpBtn danger" id="h2hWaitCancelBtn">✕ Most nem játszom le</button>
+    </div>
+  </div>
+</div>
+<!-- HIÁNYZÓK ÉS PÓTLÁSOK — a kezdőrúgás előtt, ha a kezdő 11-ben van eltiltott
+     vagy sérült. A h2hWait rétegét használja újra (ugyanaz a doboz-stílus). -->
+<div id="absPanel" class="hide">
+  <div class="h2hBox">
+    <div class="h2hKick">Hiányzók és pótlások</div>
+    <div class="h2hRound" id="absRound">15. FORDULÓ</div>
+    <p class="mpP" style="text-align:center" id="absMsg">…</p>
+    <div id="absBody"></div>
+    <div class="mpBtns" style="margin-top:4px">
+      <button class="mpBtn gold" id="absGoBtn">Kezdőrúgás →</button>
     </div>
   </div>
 </div>
@@ -1460,7 +1486,7 @@ button:disabled{opacity:.35;cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.38";
+const APP_VERSION="2.5.39";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8340,8 +8366,11 @@ function drawPitch(){
     const tier=s.player&&gameMode==="career"?playerCardTier(s.player.n):null;
     const champ=s.player&&S.championCards?S.championCards[s.player.n]:null;
     const dotStyle=(tier||champ)?` style="${cardTierDotStyle(tier,champ)}"`:"";
-    const sub=S.subs[idx];
-    const statusPic=sub?`<div class="statusbadge" title="${sub.reason==="injury"?"Sérült":"Eltiltva"}">${sub.reason==="injury"?"⚕":"🟥"}</div>`:"";
+    /* A jelvény a JÁTÉKOS állapotát mutatja, nem a slotét — így akárhova
+       mozgatod a keretben, vele marad, és betöltés után is azonnal látszik
+       (a meccsenkénti S.subs csak a kezdőrúgásnál épül fel). */
+    const unav=s.player&&S.unavailable?S.unavailable[s.player.n]:null;
+    const statusPic=unav?`<div class="statusbadge" title="${unav.reason==="injury"?"Sérült":"Eltiltva"} — még ${unav.matchesLeft} meccs">${unav.reason==="injury"?"⚕":"🟥"}</div>`:"";
     d.innerHTML=`<div class="dot"${dotStyle}>${dotTxt}${idx===captainIdx?'<span class="cband">C</span>':""}</div>
       <div class="lbl">${s.player?esc(shortName(s.player.n)):""}</div>${statusBadge}${statusPic}`;
     d.onclick=()=>{
@@ -9790,29 +9819,65 @@ function findSub(slot,victim){
     if(drafted.has(p.n)||p.n===victim.n||p.ovr>=victim.ovr)return;
     if(p.pos.includes(slot.pos)||p.pos.some(pp=>RELATED[pp].includes(slot.pos)))pool.push(p);}));
   return pool.length?pick(pool):{n:"Ifista a kispadról",ovr:Math.max(55,victim.ovr-7),pos:[slot.pos],aggroI:2};}
-function addOrExtendSub(slotIdx,duration,reason,curName){
-  curName=curName||slots[slotIdx].player.n;
-  if(S.subs[slotIdx]){
-    S.subs[slotIdx].matchesLeft+=duration;
-    addLine(`${esc(shortName(curName))} eltiltása/sérülése meghosszabbodik (+${duration} meccs)`,"m ev");
+/* ================= HIÁNYZÁS: A JÁTÉKOSHOZ KÖTVE =================
+   HIBA, amit ez javít: az eltiltás/sérülés eddig a SLOT indexén élt
+   (S.subs[slotIdx]), tehát a POSZTRA ragadt, nem az emberre. Ha az eltiltott
+   játékost kicserélted, a tiltás a helyére lépőn jelent meg — a jelvény
+   (drawPitch) és a "Visszatér a csapatba" sor is a slotban ÉPP álló nevet
+   olvasta ki.
+
+   Mostantól két réteg van:
+     S.unavailable[név]      — TARTÓS állapot: {reason, matchesLeft}. Ez követi
+                               az embert, akárhova teszed a keretben.
+     S.replacementChoice[név]— a TE döntésed, ki álljon be helyette (opcionális).
+     S.subs[slotIdx]         — CSAK az adott meccsre felépített feloldás. A
+                               meccsmotor változatlanul ezt olvassa, tehát a
+                               szimuláció egyetlen sora sem változott.
+   Az automatikus választás megmarad — de már csak tartaléknak. */
+function addOrExtendUnavailable(playerName,duration,reason){
+  if(!playerName)return;
+  const cur=S.unavailable[playerName];
+  if(cur){
+    cur.matchesLeft+=duration;
+    /* a frissebb ok érvényes: egy sérülés közbeni piros lap eltiltás is */
+    cur.reason=reason;
+    addLine(`${esc(shortName(playerName))} kihagyása meghosszabbodik (+${duration} meccs)`,"m ev");
     return;}
-  /* ---- A LEGALKALMASABB CSERE ÁLL BE, A TELJES PADRÓL ----
-     Régen csak a SZEREP szerinti EGYETLEN padhelyet néztük meg; ha az üres volt
-     vagy már be volt hívva, a findSub egy kitalált tartalékot húzott elő, holott
-     a padon ült egy tökéletes ember. Hét padhellyel ez tarthatatlan lett volna,
-     ezért most a teljes pad versenyez, rangsorolva:
-       3 — a slot pontos posztját játssza (p.pos tartalmazza)
-       2 — EGYENÉRTÉKŰ poszt (JV↔BV, VKP/KKP/TKP, JSZ↔BSZ) — ő is büntetlen
-       1 — azonos szerepkör (a felállás szerinti, tehát a 4-3-3 szélsőjére a
-           csatár-csere is jöhet)
-     Azonos szinten a magasabb Rating nyer. */
-  const slot=slots[slotIdx];
+  S.unavailable[playerName]={reason,matchesLeft:duration};
+  /* új hiányzáshoz új döntés jár — a régi választás nem élhet tovább */
+  delete S.replacementChoice[playerName];
+  addLine(`${reason==="injury"?"⚕ Sérülés":"🟥 Eltiltás"}: ${esc(shortName(playerName))} ${duration} meccset kihagy`,
+    reason==="injury"?"m inj":"m rc");}
+function playerUnavailable(name){return !!(name&&S.unavailable&&S.unavailable[name]);}
+/* A keretben (kezdő 11 + pad + tartalék) megkeressük a nevet. */
+function findRosterPlayerByName(name){
+  if(!name)return null;
+  return fullCareerRoster().find(p=>p&&p.n===name)||null;}
+/* Beállhat-e ez a jelölt a hiányzó helyére? */
+function canReplaceAbsent(cand,absentName,used){
+  if(!cand||!cand.n)return false;
+  if(cand.n===absentName)return false;
+  if(playerUnavailable(cand.n))return false;   /* ő maga is hiányzik */
+  if(used.has(cand.n))return false;            /* már behívtuk máshova */
+  /* aki a KEZDŐBEN van, nem hívható be egy másik kezdő helyére — az új lyukat ütne */
+  if(slots.some(s=>s&&s.player&&s.player.n===cand.n))return false;
+  return true;}
+/* ---- AZ AUTOMATIKUS VÁLASZTÁS (tartalék) ----
+   A teljes pad versenyez, rangsorolva:
+     3 — a slot pontos posztját játssza
+     2 — EGYENÉRTÉKŰ poszt (JV↔BV, VKP/KKP/TKP, JSZ↔BSZ) — ő is büntetlen
+     1 — azonos szerepkör
+   Azonos szinten a magasabb Rating nyer.
+   FONTOS: a szerepet a PADHELY c.role-jából vesszük, NEM a játékos saját
+   posztjából. A roleInFormation() slot-pozíciót ÉS felállást vár; egy
+   argumentummal hívva a szélsőket mindig középpályásnak sorolná, 4-3-3-ban is,
+   ahol a slot szerepe csatár. */
+function autoReplacementFor(slot,absentName,used){
   const role=roleInFormation(slot.pos);
-  const inUse=n=>Object.values(S.subs).some(x=>x.sub&&x.sub.n===n);
   let bestP=null,bestRank=0,bestOvr=-1;
   BENCH_CATS.forEach(c=>{
     const bp=BENCH[c.key];
-    if(!bp||bp.n===curName||inUse(bp.n))return;
+    if(!canReplaceAbsent(bp,absentName,used))return;
     let rank=0;
     if(bp.pos&&bp.pos.includes(slot.pos))rank=3;
     else if(posEquivalent(bp,slot.pos))rank=2;
@@ -9820,14 +9885,30 @@ function addOrExtendSub(slotIdx,duration,reason,curName){
     if(!rank)return;
     const o=pOvr(bp);
     if(rank>bestRank||(rank===bestRank&&o>bestOvr)){bestP=bp;bestRank=rank;bestOvr=o;}});
-  let subP=bestP,freeFit=bestRank>=2;
-  if(!subP){
-    subP=findSub(slot,{n:curName,ovr:slot.player.ovr});
-    /* a behívott tartalék is lehet poszthű vagy egyenértékű */
-    freeFit=!!(subP&&(( subP.pos&&subP.pos.includes(slot.pos))||posEquivalent(subP,slot.pos)));}
-  S.subs[slotIdx]={sub:subP,matchesLeft:duration,reason,freeFit};
-  addLine(`${reason==="injury"?"Sérülés":"Eltiltás"}: ${esc(shortName(curName))} helyett jön ${esc(shortName(subP.n))}`
-    +(freeFit?` — a posztot otthonosan mozogja, nincs illeszkedés-hátrány`:` — idegen poszton, illeszkedés-hátránnyal`),"m ev");}
+  if(bestP)return bestP;
+  /* a padon nincs használható ember → a régi háló: tartalék-keret vagy pool */
+  return findSub(slot,{n:absentName,ovr:(slot.player&&slot.player.ovr)||70});}
+/* Büntetésmentes-e a beállás? (Lásd POS_EQUIV — kényszerből a tükör-poszt is az.) */
+function subFreeFit(sub,slot){
+  return !!(sub&&((sub.pos&&sub.pos.includes(slot.pos))||posEquivalent(sub,slot.pos)));}
+/* ---- A MECCS PÓTLÁSI RÉTEGE ----
+   Minden meccs előtt NULLÁRÓL épül fel a kezdő 11 és a tartós hiányzások
+   alapján. Ezért nem tud "poszton ragadni" semmi. */
+function buildMatchSubs(){
+  S.subs={};
+  const used=new Set();
+  slots.forEach((slot,idx)=>{
+    const absent=slot&&slot.player;
+    if(!absent||!playerUnavailable(absent.n))return;
+    const chosen=findRosterPlayerByName(S.replacementChoice[absent.n]);
+    const sub=canReplaceAbsent(chosen,absent.n,used)
+      ? chosen
+      : autoReplacementFor(slot,absent.n,used);
+    if(!sub)return;
+    used.add(sub.n);
+    S.subs[idx]={sub,reason:S.unavailable[absent.n].reason,
+      freeFit:subFreeFit(sub,slot),absentName:absent.n,
+      chosen:!!(chosen&&sub.n===chosen.n)};});}
 /* szezonállapot */
 /* A skillpool súlyozott sorrendben áll össze: az utolsó 8, alacsonyabb hatású
    skill (MAIN_SKILLS[16..23]) 2.5x akkora eséllyel kerül előrébb a sorban, mint a
@@ -9846,6 +9927,13 @@ function weightedShuffleSkills(rnd){
     result.push(pool[i].sk);pool.splice(i,1);}
   return result;}
 const S={idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,capMod:0,eventMod:0,subs:{},resumeCb:null,
+  /* ---- HIÁNYZÁS ----
+     unavailable[név]       = {reason,matchesLeft} — TARTÓS, a játékoshoz kötve.
+     replacementChoice[név] = a te választott pótlásod neve (opcionális).
+     subs[slotIdx]          = CSAK az adott meccsre felépített feloldás; a
+                              buildMatchSubs minden kezdőrúgás előtt újraírja,
+                              ezért nem is mentjük. */
+  unavailable:{},replacementChoice:{},
   morale:50,moraleTarget:50,moraleSum:0,moraleSamples:0,scorers:{},assists:{},mvps:{},goodForm:{},badForm:{},playerReds:{},playerInjuries:{},careerStats:{},clubScoutSpinsUsed:0,consecutiveTitles:0,consecutiveBadSeasons:0,seasonSaves:{},seasonCleanSheets:{},seasonMatches:{},seasonNumber:1,seasonHistory:[],
   grudge:new Set(),fixtures:[],playing:false,auto:false,
   mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
@@ -11011,7 +11099,92 @@ let h2hScript=null;
 let _h2hPoll=null,_h2hBusy=false;
 /* A forduló indítása. Egyjátékosban ez BETŰRE a régi playMatch(); a közös
    karrier párharc-fordulóiban viszont előbb a csere fut le. */
+/* ================= HIÁNYZÓK PANEL =================
+   Csak akkor van dolga, ha a KEZDŐ 11-ben van hiányzó. A padon ülő eltiltott
+   nem gond: nem kell pótolni. */
+function unavailableStarters(){
+  if(typeof slots==="undefined"||!slots.length)return [];
+  return slots.map((slot,idx)=>({slot,idx}))
+    .filter(o=>o.slot&&o.slot.player&&playerUnavailable(o.slot.player.n));}
+/* A választható jelöltek egy hiányzóhoz: a pad és a tartalék-keret. A kezdőben
+   állókat kizárjuk (áthozni őket csak új lyukat ütne), és a többi hiányzóhoz
+   már kijelölt embert is. */
+function absCandidates(absentName,idx){
+  const used=new Set();
+  Object.entries(S.replacementChoice||{}).forEach(([who,pick])=>{
+    if(who!==absentName&&pick)used.add(pick);});
+  const slot=slots[idx];
+  const out=[];
+  BENCH_CATS.forEach(c=>{const p=BENCH[c.key];
+    if(canReplaceAbsent(p,absentName,used))out.push({p,where:"pad"});});
+  extraRoster.forEach(p=>{
+    if(canReplaceAbsent(p,absentName,used))out.push({p,where:"tartalék"});});
+  /* a poszthűség szerint rendezzük, hogy a legjobb ajánlat legyen elöl */
+  const rank=p=>(p.pos&&p.pos.includes(slot.pos))?3:(posEquivalent(p,slot.pos)?2:1);
+  out.sort((a,b)=>rank(b.p)-rank(a.p)||pOvr(b.p)-pOvr(a.p));
+  return out;}
+let _absDone=null;
+function openAbsencePanel(onDone){
+  _absDone=onDone;
+  $("absRound").textContent=`${Math.min(30,(S.idx||0)+1)}. FORDULÓ`;
+  $("absPanel").classList.remove("hide");
+  renderAbsencePanel();}
+function renderAbsencePanel(){
+  const list=unavailableStarters();
+  if(!list.length){closeAbsencePanel();return;}
+  $("absMsg").innerHTML=`A kezdő tizenegyedben <b>${list.length}</b> ember nem játszhat. `
+    +`Kiválaszthatod, ki álljon be helyettük — vagy hagyd az automatikus választást.`;
+  const box=$("absBody");box.innerHTML="";
+  list.forEach(({slot,idx})=>{
+    const absent=slot.player,info=S.unavailable[absent.n];
+    const row=document.createElement("div");row.className="absRow";
+    const head=document.createElement("div");head.className="absWho";
+    head.innerHTML=`${info.reason==="injury"?"⚕":"🟥"} ${esc(shortName(absent.n))} `
+      +`<span style="font-weight:400;opacity:.8">— ${slot.pos}</span>`;
+    const meta=document.createElement("div");meta.className="absMeta";
+    meta.textContent=`${info.reason==="injury"?"sérült":"eltiltva"}, még ${info.matchesLeft} meccs`;
+    const opts=document.createElement("div");opts.className="absOpts";
+    const cands=absCandidates(absent.n,idx);
+    /* AUTOMATIKUS — mindig az első, és ez az alapállapot */
+    const auto=document.createElement("button");
+    auto.className="absOpt"+(S.replacementChoice[absent.n]?"":" sel");
+    const autoPick=autoReplacementFor(slot,absent.n,new Set());
+    auto.innerHTML=`⚙ Automatikus<small>most: ${autoPick?esc(shortName(autoPick.n)):"—"}</small>`;
+    auto.onclick=()=>{delete S.replacementChoice[absent.n];renderAbsencePanel();};
+    opts.appendChild(auto);
+    cands.forEach(({p,where})=>{
+      const b=document.createElement("button");
+      const sel=S.replacementChoice[absent.n]===p.n;
+      b.className="absOpt"+(sel?" sel":"");
+      const free=subFreeFit(p,slot);
+      b.innerHTML=`${esc(shortName(p.n))} · ${Math.round(pOvrDisplay(p))}`
+        +`<small>${where}${free?" · poszthű":" · idegen poszt (−)"}</small>`;
+      b.onclick=()=>{S.replacementChoice[absent.n]=p.n;renderAbsencePanel();};
+      opts.appendChild(b);});
+    if(!cands.length){
+      const w=document.createElement("div");w.className="absMeta";
+      w.style.marginTop="4px";
+      w.textContent="Nincs bevethető pótlás a padon és a tartalékban — a rendszer hoz be valakit.";
+      row.appendChild(w);}
+    row.appendChild(head);row.appendChild(meta);row.appendChild(opts);
+    box.appendChild(row);});}
+function closeAbsencePanel(){
+  $("absPanel").classList.add("hide");
+  const cb=_absDone;_absDone=null;
+  try{saveGame();}catch(e){}
+  if(cb)cb();}
+$("absGoBtn")&&($("absGoBtn").onclick=()=>closeAbsencePanel());
 function startRound(){
+  /* ---- HIÁNYZÓK PANEL: A TE DÖNTÉSED, KI ÁLL BE ----
+     A kapu itt van, mert ez a forduló EGYETLEN belépési pontja — a párharc és a
+     sima bajnoki is erre jön. A panel a párharc-várakozás ELŐTT jön fel: a
+     pótlás a te oldalad dolga, azt előbb el kell dönteni, mint hogy a társadra
+     várnánk. AUTO MÓDBAN kimarad, különben megállítaná a végigjátszást. */
+  if(!S.auto&&unavailableStarters().length){
+    openAbsencePanel(()=>startRoundNow());
+    return;}
+  startRoundNow();}
+function startRoundNow(){
   if(h2hIsDuelRound()&&!h2hScript){h2hBeginDuel();return;}
   playMatch();}
 function h2hWaitHide(){$("h2hWait").classList.add("hide");}
@@ -12190,6 +12363,9 @@ function playMatch(){
   /* F4/2: a csapat-oldali számítás egyetlen pillanatképbe került. A mai
      CPU-meccs a SAJÁTJÁT adja át — a viselkedés változatlan, csak az útvonal
      lett általános, hogy a H2H-hoz egy MÁSIK pillanatkép is beadható legyen. */
+  /* A PÓTLÁSI RÉTEG FELÉPÍTÉSE — kötelezően a pillanatkép ELŐTT, mert a
+     buildMatchSnapshot az S.subs-ból olvassa ki, ki van a pályán. */
+  buildMatchSubs();
   const MS=buildMatchSnapshot();
   const active=MS.active;
   /* KARRIER-MÉRFÖLDKÖVEK: a meccs ELŐTTI felmérés (ki debütál, melyik kapus van
@@ -12247,7 +12423,10 @@ function playMatch(){
   Object.keys(S.subs).forEach(k=>{
     const info=S.subs[k];
     const isInj=info.reason==="injury";
-    addLine(`${isInj?"⚕ SÉRÜLT":"🟥 ELTILTVA"}: ${esc(shortName(slots[k].player.n))} — helyette ${esc(shortName(info.sub.n))}`,isInj?"m inj":"m rc");});
+    /* a hiányzó nevét a pótlás-rekord ŐRZI (absentName) — nem a slotból olvassuk */
+    const who=info.absentName||(slots[k].player&&slots[k].player.n)||"";
+    addLine(`${isInj?"⚕ SÉRÜLT":"🟥 ELTILTVA"}: ${esc(shortName(who))} — helyette ${esc(shortName(info.sub.n))}`
+      +(info.chosen?" (a te választásod)":""),isInj?"m inj":"m rc");});
   if(S.capMod>0)addLine(`A kapitány húzza a csapatot: mindenki +1 erre a meccsre`,"m ev");
   if(S.capMod<0)addLine(`A kapitány formája nyomasztja a csapatot: mindenki −1`,"m ev");
   addLine(`▲ Jó formában: ${esc(shortName(active[gi].p.n))}${hasFormlock(active[gi].p.n)?" (kiszámítható — skill)":""} · ▼ Gyengélkedik: ${esc(shortName(active[bi].p.n))}`,"m ev");
@@ -12848,18 +13027,27 @@ function playMatch(){
       if(bi===captainIdx||redIdx===captainIdx)nc-=1;}
     S.capMod=nc;
     if(S.teamFormMalus>0)S.teamFormMalus--;   /* challenge forma-malus lejár meccsenként */
-    /* --- lejáró eltiltások/sérülések feloldása --- */
-    Object.keys(S.subs).forEach(k=>{
-      S.subs[k].matchesLeft--;
-      if(S.subs[k].matchesLeft<=0){
-        addLine(`Visszatér a csapatba: ${esc(shortName(slots[k].player.n))}`,"m ev");
-        delete S.subs[k];}});
+    /* --- lejáró eltiltások/sérülések feloldása ---
+       A JÁTÉKOS állapota fogy, nem a sloté — ezért a visszatérés mindig annak a
+       nevére szól, aki tényleg hiányzott. FONTOS, hogy ez az ÚJ piros lapok és
+       sérülések kiosztása ELŐTT fusson: a most kapott eltiltás így valóban a
+       KÖVETKEZŐ meccsre marad meg. */
+    Object.keys(S.unavailable).forEach(n=>{
+      const info=S.unavailable[n];
+      info.matchesLeft--;
+      if(info.matchesLeft<=0){
+        addLine(`Visszatér a csapatba: ${esc(shortName(n))}`,"m ev");
+        delete S.unavailable[n];
+        delete S.replacementChoice[n];}});
+    /* a meccsre összeállított pótlási réteg elfogyott — a következő meccs
+       előtt a buildMatchSubs újra felépíti a friss állapotból */
+    S.subs={};
     /* --- új piroslap --- */
     if(redIdx>=0){
       const rn=active[redIdx].p.n;
       S.playerReds[rn]=(S.playerReds[rn]||0)+1;
       if(gameMode==="career"){const cs=S.careerStats[rn]=S.careerStats[rn]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};cs.rc++;}
-      addOrExtendSub(active[redIdx].idx,1,"suspension",rn);
+      addOrExtendUnavailable(rn,1,"suspension");
     }
     /* --- sérülés-kockázat --- */
     let injuredThisMatchName=null;
@@ -12877,7 +13065,7 @@ function playMatch(){
         `⚕ SÉRÜLÉS! Rossz mozdulat — ${esc(shortName(inm))} a combjához kap, hordágy jön be`,
         `⚕ SÉRÜLÉS! ${esc(shortName(inm))} egy ütközés után nem tud lábra állni — le kell cserélni`];
       addLine(`${gmin(min)}'  ${pick(injTexts)} (${dur} forduló)`,"m inj");
-      addOrExtendSub(active[ai].idx,dur,"injury",inm);
+      addOrExtendUnavailable(inm,dur,"injury");
       injuredThisMatchName=inm;
     }
     if(gameMode==="career"){processCareerDevelopment(active,mScore,mAssist,gi,bi,best,redIdx,injuredThisMatchName,ga);processBenchDevelopment();processAcademyDevelopment();
@@ -17519,9 +17707,20 @@ function renderHub(){
     /* a pályán lévő szélső színkódja felállás-tudatos: 433/343-ban támadó
        (CSATAR szín), nem középpályás — a pad/tartalék marad a semleges kategórián */
     const posColorKey=(loc.type==="slot")?roleInFormation(posTxt):getCategoryFor(posTxt);
+    /* HIÁNYZÁS-JELÖLÉS: pont itt rendezed át a csapatot, tehát itt a legfájóbb,
+       ha nem tudod, kire nem számíthatsz. Az állapot a JÁTÉKOSHOZ tartozik,
+       ezért akárhova mozgatod, vele jön. */
+    const unav=S.unavailable&&S.unavailable[p.n];
+    const unavBadge=unav
+      ?` <span style="background:${unav.reason==="injury"?"#e8892b":"var(--red)"};color:#fff;font-weight:700;font-size:9.5px;padding:1px 6px;border-radius:8px;letter-spacing:.4px;text-transform:uppercase">${unav.reason==="injury"?"⚕ sérült":"🟥 eltiltva"} · ${unav.matchesLeft}</span>`
+      :"";
+    const unavNote=unav
+      ?`<div class="trait" style="color:${unav.reason==="injury"?"#e8892b":"var(--red)"}">Nem játszhat még ${unav.matchesLeft} meccsen${
+          S.replacementChoice[p.n]?` — helyette te ${esc(shortName(S.replacementChoice[p.n]))}-t jelölted ki`:" — a pótlást a kezdőrúgás előtt választhatod ki"}</div>`
+      :"";
     row.innerHTML=`<span class="pos pc-${posColorKey}">${posTxt}</span>
-      <span class="main"><div class="nm">${esc(p.n)}${tag}${cardBadge}${retireBadge(p.n)}</div>
-      <div class="trait">${ageTxt} · ${ratingTxt}</div></span>
+      <span class="main"><div class="nm">${esc(p.n)}${tag}${cardBadge}${unavBadge}${retireBadge(p.n)}</div>
+      <div class="trait">${ageTxt} · ${ratingTxt}</div>${unavNote}</span>
       <span class="ovr">${ovrShown}</span>`;
     row.style.display="flex";row.style.alignItems="center";
     /* Az ELADÁS-gomb korábban itt, a sorban ült, minden játékos neve mellett.
@@ -18359,6 +18558,9 @@ function startNextCareerSeason(){
      SZÁNDÉKOSAN marad: azok a párharc egészét ívelik át. */
   S.mpMateFinal=null;S.mpDecision=null;
   S.idx=0;S.W=0;S.D=0;S.L=0;S.GF=0;S.GA=0;S.pts=0;S.reds=0;S.injuries=0;S.capMod=0;S.eventMod=0;S.subs={};
+  /* Új szezon: a tartós hiányzások is lezárulnak (a nyár elmossa a sárga/piros
+     lapos eltiltást és a szezon közbeni sérüléseket). */
+  S.unavailable={};S.replacementChoice={};
   S.scorers={};S.assists={};S.mvps={};S.goodForm={};S.badForm={};S.playerReds={};S.playerInjuries={};S.seasonSaves={};S.seasonCleanSheets={};S.seasonMatches={};S.tierQuoteCount={};
   S.grudge=new Set();S.fixtures=[];S.playing=false;
   S.discWatch={};S.hotStreak={};S.goallessStreak={};S.unbeatenStreak=0;S.cleanSheetStreak=0;S.ratingAdj={};S.clubScoutSpinsUsed=0;
@@ -18526,7 +18728,12 @@ function saveGame(){
       SEASON_OPPS,
       S:{
         idx:S.idx,W:S.W,D:S.D,L:S.L,GF:S.GF,GA:S.GA,pts:S.pts,reds:S.reds,injuries:S.injuries,
-        capMod:S.capMod,eventMod:S.eventMod,subs:S.subs,
+        capMod:S.capMod,eventMod:S.eventMod,
+        /* Az S.subs SZÁNDÉKOSAN NEM megy a mentésbe: az csak az adott meccsre
+           összeállított réteg, és a buildMatchSubs minden kezdőrúgás előtt
+           újraírja. Ha mentenénk, a betöltés utáni pályarajz egy elavult
+           pótlást mutatna. A TARTÓS állapot a két alatta lévő mező. */
+        unavailable:S.unavailable,replacementChoice:S.replacementChoice,
         morale:S.morale,moraleTarget:S.moraleTarget,moraleSum:S.moraleSum,moraleSamples:S.moraleSamples,
         summerLooks:S.summerLooks,training:S.training,trainingChangeUsed:S.trainingChangeUsed,
         /* kihívás-rendszer tartós hatásai és nyomkövetése */
@@ -18716,6 +18923,24 @@ function applySavedGame(d){
   S.teamMomentum=d.S.teamMomentum||null;
   S.benchRun=d.S.benchRun||{};S.youthMatured=d.S.youthMatured||{};
   S.youthStalled=d.S.youthStalled||{};S.capDrySpell=d.S.capDrySpell||0;
+  /* ---- HIÁNYZÁS: BETÖLTÉS ÉS EGYSZERI MIGRÁCIÓ ----
+     A régi mentésekben az állapot a SLOT indexén élt (S.subs[slotIdx]). Ezt
+     átvezetjük a játékosra: a slotban álló ember lesz a hiányzó.
+     A pótlást SZÁNDÉKOSAN NEM tesszük át a replacementChoice-ba: az az
+     AUTOMATA választása volt, nem a felhasználóé. Ha döntésként rögzítenénk,
+     kőbe válna — akkor is, ha az az ember közben megsérül vagy elmegy. Így az
+     automatika marad felelős, és te bármikor felülbírálhatod.
+     A slot-alapú mentés természeténél fogva nem tudja, KI volt eredetileg
+     eltiltva, ha közben cseréltél — de innentől minden új eset helyes. */
+  S.unavailable=d.S.unavailable||{};
+  S.replacementChoice=d.S.replacementChoice||{};
+  if(!d.S.unavailable&&d.S.subs){
+    Object.entries(d.S.subs).forEach(([k,info])=>{
+      const p=slots[Number(k)]&&slots[Number(k)].player;
+      if(!p||!info)return;
+      S.unavailable[p.n]={reason:info.reason||"injury",
+        matchesLeft:Math.max(1,info.matchesLeft||1)};});}
+  S.subs={};   /* a pótlási réteg a következő kezdőrúgás előtt épül fel */
   S.mpLevelBid=d.S.mpLevelBid||null;
   /* A kapitány-jelző RÉGI MENTÉSNÉL szándékosan a JELENLEGI kapitányra áll, nem
      null-ra: különben a betöltés után a rég kinevezett kapitány kapná meg az
