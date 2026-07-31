@@ -1614,7 +1614,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.48";
+const APP_VERSION="2.5.49";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4538,7 +4538,17 @@ function recordAssist(name){
      legs[1] = a MÁSODIK meccs B pályáján (B rúgott bh-t, A bg-t)
    A csoportgyőztesek a MÁSODIK meccset játsszák hazai pályán, ezért ők a "b". */
 const EURO_ROUNDS=["r16","qf","sf","final"];
-const EURO_ROUND_NAMES={r16:"Nyolcaddöntő",qf:"Negyeddöntő",sf:"Elődöntő",final:"Döntő"};
+/* ---- A HAZAI KUPA SZERKEZETE ----
+   A Magyar Kupában NINCS csoportkör: a 32-es mezőny egyenes kieséssel megy
+   végig, 4 oda-visszavágós körben, majd egymeccses döntővel. A 32 csapat épp
+   ezt adja ki (32 → 16 → 8 → 4 → 2 → döntő), tehát a meglévő párharc-motor
+   változtatás nélkül lefuttatja. */
+const MK_ROUNDS=["mk1","mk2","mk3","mk4","final"];
+function compRounds(comp){
+  return (EURO_COMPS[comp]&&EURO_COMPS[comp].domestic)?MK_ROUNDS:EURO_ROUNDS;}
+function compHasGroup(comp){return !(EURO_COMPS[comp]&&EURO_COMPS[comp].domestic);}
+const EURO_ROUND_NAMES={r16:"Nyolcaddöntő",qf:"Negyeddöntő",sf:"Elődöntő",final:"Döntő",
+  mk1:"Főtábla · 32 között",mk2:"Nyolcaddöntő",mk3:"Negyeddöntő",mk4:"Elődöntő"};
 /* A legs elemei SZEREP szerint tárolnak: [A gólja, B gólja] — nem a
    pályaválasztó szerint. Így a semleges pályán játszott döntő sem cseréli fel
    az oldalakat. Az idegenben lőtt gól: A a 2. meccsen idegenben (legs[1][0]),
@@ -18519,7 +18529,10 @@ function euroResolveRound(){
   const winners=E.ties.map(t=>t.winner);
   if(!userWon){euroEliminated(round,winners);return;}
   if(round==="final"){euroCampaignEnd("win");return;}
-  euroStartRound(EURO_ROUNDS[EURO_ROUNDS.indexOf(round)+1],winners);
+  /* a következő kör a SOROZAT saját menetrendjéből jön: a hazai kupa 4 körös
+     egyenes kiesés, az európaiak a csoportkör utáni három kör + döntő */
+  const RS=compRounds(E.comp);
+  euroStartRound(RS[RS.indexOf(round)+1],winners);
   showEuroScreen();}
 /* A user kiesett: a sorozat a háttérben VÉGIGFUT a döntőig — a VALÓS
    formátumban (oda-visszavágós körök, egymeccses döntő), hogy a statisztikák
@@ -18545,10 +18558,13 @@ function euroEliminated(round,winners){
 function euroCampaignEnd(kind){
   const E=S.euro,c=EURO_COMPS[E.comp];
   E.stage="done";E.result=kind;
+  /* Az elődöntő SOROZATONKÉNT más kulcs (európai: "sf", hazai kupa: "mk4"),
+     ezért nem nevet hasonlítunk, hanem a menetrend utolsó előtti körét. */
+  const RS=compRounds(E.comp),semiKey=RS[RS.length-2];
   let mult=0,place="";
   if(kind==="win"){mult=c.prize.win;place="győztes";}
-  else if(E.outAt==="final"){mult=c.prize.final;place="döntős";}
-  else if(E.outAt==="sf"){mult=c.prize.semi;place="elődöntős";}
+  else if(E.outAt==="final"){mult=c.prize.final;place="ezüstérmes";}
+  else if(E.outAt===semiKey){mult=c.prize.semi;place="elődöntős";}
   E.prize=mult>0?Math.round(computeSeasonBudget()*mult):0;
   if(E.prize>0){
     S.transferBudget=(S.transferBudget||0)+E.prize;
@@ -18613,8 +18629,8 @@ function euroCampaignEnd(kind){
   if(S.seasonHistory&&S.seasonHistory.length){
     const reached=kind==="win"?"win":(E.outAt||E.stage);
     const reachedLabel=kind==="win"?"győztes"
-      :E.outAt==="final"?"döntős"
-      :E.outAt==="sf"?"elődöntős"
+      :E.outAt==="final"?"ezüstérmes"
+      :E.outAt===semiKey?"elődöntős"
       :E.outAt==="group"?"csoportkör"
       :(EURO_ROUND_NAMES[E.outAt]||E.outAt||"");
     S.seasonHistory[S.seasonHistory.length-1].euro={
@@ -18622,8 +18638,21 @@ function euroCampaignEnd(kind){
       /* RUN: saját játékos királyi címei ebben a sorozatban (mérföldkő-forrás) */
       kings:E.ownKings||[]};}
   showEuroScreen();}
-/* A kampány lezárása → tovább a szezonzáró jelentésre. */
+/* A kampány lezárása → tovább a szezonzáró jelentésre.
+   KIVÉTEL: a 86-90-es sávban (NB II) a MEGNYERT hazai kupa Konferencia-liga
+   indulást ér, és azt MÉG UGYANEBBEN a szezonzárásban le is játsszuk — nem
+   csúszik át a következő idényre. A lánc egyszer süthet el (mkToKL jelző),
+   különben egy megnyert KL újabb sorozatot indítana a végtelenségig. */
 function endEuroCampaign(){
+  const E=S.euro;
+  const wonMK=E&&E.comp==="MK"&&E.result==="win";
+  const tier=cupTierFor();
+  if(wonMK&&tier.mkWinsKL&&!S.mkToKLDone){
+    S.mkToKLDone=true;
+    S.euro=null;S.euroCurrent="KL";S.euroCurrentQual=false;S.euroOptOut=false;
+    $("scEuro").classList.add("hide");
+    addLine(`🎫 A Magyar Kupa megnyerésével kiharcoltátok a Konferencia-liga indulást — a sorozat MOST következik!`,"m life");
+    startEuroCampaign();saveGame();return;}
   S.euro=null;S.euroCurrent=null;
   $("scEuro").classList.add("hide");
   saveGame();hubShowSeasonReport();}
@@ -18634,9 +18663,14 @@ function startEuroCampaign(){
     userIdx:f.userIdx,userG:f.userG,userSlot:f.userSlot,target:f.target,
     stats:{scorers:{},assists:{},cleanSheets:{}},fixtures:[],
     path:[],pathOpen:false};   /* a menetelés naplója — lásd euroPathPush */
-  S.euro.fixtures=buildEuroUserFixtures();
   euroLastLogHtml="";euroLastLogTitle="";   /* új kampány — nincs korábbi meccs-napló */
-  addLine(`🏆 Kezdődik a(z) ${EURO_COMPS[comp].n}! A csoportban ${S.euro.groups[S.euro.userG].filter(i=>i!==S.euro.userIdx).map(i=>S.euro.teams[i].n).join(", ")} vár rátok.`,"m life");
+  if(compHasGroup(comp)){
+    S.euro.fixtures=buildEuroUserFixtures();
+    addLine(`🏆 Kezdődik a(z) ${EURO_COMPS[comp].n}! A csoportban ${S.euro.groups[S.euro.userG].filter(i=>i!==S.euro.userIdx).map(i=>S.euro.teams[i].n).join(", ")} vár rátok.`,"m life");
+  }else{
+    /* HAZAI KUPA: egyből a főtábla első köre, a teljes 32-es mezőnyre sorsolva. */
+    addLine(`🏆 Kezdődik a(z) ${EURO_COMPS[comp].n}! Egyenes kiesés, oda-visszavágós körökkel — a 32 csapatból kell a döntőig menetelni.`,"m life");
+    euroStartRound(MK_ROUNDS[0],S.euro.teams.map((t,i)=>i));}
   $("scHub").classList.add("hide");
   showEuroScreen();saveGame();}
 function showEuroScreen(){
@@ -18728,7 +18762,7 @@ function renderEuroPath(){
     grp.forEach(r=>{h+=line(`${r.md!=null?`${r.md+1}. f. `:""}${venue(r)} ${esc(r.opp)}`,sc(r.mine,r.theirs));});
     if(gEnd)h+=`<div style="font-size:12px;color:${gEnd.advanced?"var(--grass)":"var(--red)"};margin-top:3px">`
       +`${gEnd.rank}. hely${gEnd.pts!=null?` · ${gEnd.pts} pont · ${gEnd.gf}:${gEnd.ga}`:""} — ${gEnd.advanced?"továbbjutás":"kiesés"}</div>`;}
-  EURO_ROUNDS.forEach(rd=>{
+  compRounds(E.comp).forEach(rd=>{
     const legs=P.filter(x=>x.k==="ko"&&x.round===rd),tie=P.find(x=>x.k==="tie"&&x.round===rd);
     if(!legs.length&&!tie)return;
     h+=hdr(EURO_ROUND_NAMES[rd]);
@@ -19120,6 +19154,7 @@ function startNextCareerSeason(){
     S.euroCurrent=S.euroEntry.comp;S.euroOptOut=false;}
   else S.euroCurrent=null;
   S.finalTable=null;S.seasonClosed=false;S.hubReportHtml=null;S.fixtureResults=[];
+  S.mkToKLDone=false;   /* a hazai kupa → KL lánc szezononként egyszer süthet el */
   /* F5/F6: a társ szezonzárása és a szezonzáró döntés szezononként új — a
      régit nem szabad átvinni. A mpBalance, mpHistory és mpDuelLog viszont
      SZÁNDÉKOSAN marad: azok a párharc egészét ívelik át. */
@@ -19314,7 +19349,7 @@ function saveGame(){
         chPosLearnStarted:S.chPosLearnStarted,chSeasonStartXI:S.chSeasonStartXI,pendingRewardSkills:S.pendingRewardSkills,
         scorers:S.scorers,assists:S.assists,mvps:S.mvps,goodForm:S.goodForm,badForm:S.badForm,careerStats:S.careerStats,clubScoutSpinsUsed:S.clubScoutSpinsUsed,consecutiveTitles:S.consecutiveTitles,consecutiveBadSeasons:S.consecutiveBadSeasons,seasonSaves:S.seasonSaves,seasonCleanSheets:S.seasonCleanSheets,seasonMatches:S.seasonMatches,seasonNumber:S.seasonNumber,seasonHistory:S.seasonHistory,
         tactics:S.tactics,tacticPrompt:S.tacticPrompt,
-        euroEntry:S.euroEntry,euroCurrent:S.euroCurrent,euroOptOut:S.euroOptOut,championCards:S.championCards,
+        euroEntry:S.euroEntry,euroCurrent:S.euroCurrent,euroCurrentQual:S.euroCurrentQual,euroOptOut:S.euroOptOut,mkToKLDone:S.mkToKLDone,championCards:S.championCards,
         euro:S.euro,seasonEuro:S.seasonEuro,_posLearnLastCost:S._posLearnLastCost,autoLevel:S.autoLevel,autoLevelAim:S.autoLevelAim,transferLog:S.transferLog,
         playerReds:S.playerReds,playerInjuries:S.playerInjuries,
         grudge:[...S.grudge],
@@ -19534,6 +19569,8 @@ function applySavedGame(d){
      opt-in módon indul, az első kvalifikációt a következő szezonzárás adja. */
   S.euroEntry=d.S.euroEntry||null;
   S.euroCurrent=d.S.euroCurrent||null;
+  S.euroCurrentQual=!!d.S.euroCurrentQual;
+  S.mkToKLDone=!!d.S.mkToKLDone;
   S.autoLevel=!!d.S.autoLevel;
   /* régi mentésben nincs → a mostani viselkedéshez legközelebbi sáv */
   S.autoLevelAim=d.S.autoLevelAim||"balanced";
