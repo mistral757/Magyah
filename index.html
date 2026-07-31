@@ -1614,7 +1614,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.45";
+const APP_VERSION="2.5.46";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4215,14 +4215,60 @@ const TACTIC_START_LIKED=[80,76,70],TACTIC_START_OTHER=60,TACTIC_MIN=50,TACTIC_M
    40k/30k/15k arányokat (2 : 1.5 : 0.75) pontosan megőrizve. */
 /* Az oppDelta a KUPA KÖZÉPÉRTÉKÉHEZ képest értendő (lásd euroMidRating), nem a
    bajnoki szinthez. A sávot teljes kampány-szimulációval hangoltuk — lásd ott. */
+/* A sorozatok. A col a TÉMASZÍN (fejlécek, jelvények, útvonal-napló), a winCol
+   pedig a GYŐZELEM színe: a trófeás állapot mindenhol ezt kapja, hogy a
+   "megnyertük" egy pillantásra elváljon a "benne vagyunk"-tól. */
 const EURO_COMPS={
-  BL:{n:"Bajnokok Ligája",short:"BL",col:"#3b82f6",oppDelta:1,
+  BL:{n:"Bajnokok Ligája",short:"BL",col:"#3b82f6",winCol:"#a8c8ff",oppDelta:1,
       champBoost:4,tacticBoost:3,prize:{win:2.0,final:1.0,semi:0.5}},
-  EL:{n:"Európa-liga",short:"EL",col:"#2ecc71",oppDelta:-1,
+  EL:{n:"Európa-liga",short:"EL",col:"#2ecc71",winCol:"#9df5bd",oppDelta:-1,
       champBoost:3,tacticBoost:2,prize:{win:1.5,final:0.75,semi:0.375}},
-  KL:{n:"Konferencia-liga",short:"KL",col:"#cd7f32",oppDelta:-3,
-      champBoost:2,tacticBoost:1,prize:{win:0.75,final:0.375,semi:0.1875}}
+  KL:{n:"Konferencia-liga",short:"KL",col:"#cd7f32",winCol:"#f3ca9a",oppDelta:-3,
+      champBoost:2,tacticBoost:1,prize:{win:0.75,final:0.375,semi:0.1875}},
+  /* A hazai kupa: az alsóbb szinteken ez az EGYETLEN sorozat, ezért a mezőnye
+     szándékosan gyengébb (oppDelta −4) és a díjazása is szerényebb, mint a
+     legkisebb európai kupáé. A színe a magyar piros. */
+  MK:{n:"Magyar Kupa",short:"MK",col:"#d92b3a",winCol:"#ff9aa2",oppDelta:-4,
+      domestic:true,
+      champBoost:1,tacticBoost:1,prize:{win:0.5,final:0.25,semi:0.125}}
 };
+/* ================= NEHÉZSÉGI SÁV → LIGANÉV + KUPAJOGOSULTSÁG =================
+   EGY táblázat mondja meg, hogy egy adott mezőnyszinten hogy hívják a
+   bajnokságot, és mire elég benne a helyezés. Így a sávnév és a kvalifikáció
+   sosem csúszhat el egymástól.
+
+     entries — FENTRŐL LEFELÉ olvasva, az első találat nyer: a max a helyezés
+       felső határa. Pl. a 96-99-es sávban {BL,2},{EL,4},{KL,6} azt jelenti,
+       hogy 1-2. hely BL, 3-4. EL, 5-6. KL.
+     qual   — ezen a szinten SELEJTEZŐN át vezet az út a főtáblára.
+     mkWinsKL — a Magyar Kupa megnyerése KL-indulást ér (86-90).
+
+   A 100 fölötti szint a régi felosztást viszi tovább, selejtező nélkül. */
+const CUP_TIERS=[
+  {max:75, league:"Megye II", entries:[]},
+  {max:80, league:"Megye I", entries:[{comp:"MK",max:3}]},
+  {max:85, league:"NB III – Keleti csoport", entries:[{comp:"MK",max:4}]},
+  {max:90, league:"NB II – Keleti csoport", entries:[{comp:"MK",max:7}], mkWinsKL:true},
+  {max:95, league:"NB I", qual:true,
+   entries:[{comp:"BL",max:1},{comp:"EL",max:2},{comp:"KL",max:3}]},
+  {max:99, league:"Biszem-baszom másodosztály", qual:true,
+   entries:[{comp:"BL",max:2},{comp:"EL",max:4},{comp:"KL",max:6}]},
+  {max:Infinity, league:"Biszem-baszom premier líg",
+   entries:[{comp:"BL",max:1},{comp:"EL",max:3},{comp:"KL",max:5}]}
+];
+function cupTierFor(level){
+  /* a typeof-őr kell: ez a fájlban KORÁBBAN áll, mint az oppTargetRating
+     deklarációja, és egy korai hívás különben TDZ-hibával döntené a szkriptet */
+  const r=level!=null?level:(typeof oppTargetRating!=="undefined"?oppTargetRating:84);
+  return CUP_TIERS.find(t=>r<=t.max)||CUP_TIERS[CUP_TIERS.length-1];}
+/* A megszerzett indulás: {comp, qual} vagy null. A qual azt jelzi, hogy a
+   sorozat SELEJTEZŐVEL kezdődik — a főtáblára még ki kell harcolni a helyet. */
+function cupEntryFor(rank,level){
+  const t=cupTierFor(level);
+  const e=t.entries.find(x=>rank<=x.max);
+  return e?{comp:e.comp,qual:!!t.qual}:null;}
+/* Visszafelé kompatibilis alak: a régi hívók a puszta sorozatkódot várják. */
+function euroQualifyFor(rank,level){const e=cupEntryFor(rank,level);return e?e.comp:null;}
 /* ---- A KUPA-MEZŐNY KÖZÉPÉRTÉKE ----
    A kupa erőssége eddig KIZÁRÓLAG a bajnoki nehézségi szintet követte. Emiatt
    két baj volt, mindkettő teljes kampány-szimulációval mérve (csoportkör + 3
@@ -4242,8 +4288,9 @@ function euroMidRating(){
   const base=oppTargetRating||84;
   const ts=(typeof teamStrength==="function")?teamStrength():0;
   return Math.max(base,ts>=base+1?Math.round(ts-1):base);}
-/* Kvalifikáció a 16 csapatos bajnokság végeredménye alapján. */
-function euroQualifyFor(rank){return rank===1?"BL":rank<=3?"EL":rank<=5?"KL":null;}
+/* (A kvalifikáció a CUP_TIERS-ből jön — lásd cupEntryFor/euroQualifyFor fent.
+   A régi, szintfüggetlen 1→BL / 2-3→EL / 4-5→KL szabály megszűnt: ma ez már
+   csak a 100 fölötti sáv viselkedése.) */
 /* KÉT KÜLÖN MEZŐ, szándékosan:
      S.euroEntry   = a most MEGSZERZETT kvalifikáció (a KÖVETKEZŐ szezonra),
      S.euroCurrent = a FUTÓ szezon végén lejátszandó kampány.
@@ -7110,21 +7157,20 @@ let slotRoles={};
    (egy valós klub teljes keretével kezdesz — FIFA-s karrier érzet). */
 let careerStart="draft";
 function diffTierLabel(r){
-  /* Infinity-tartomány: a 100 fölötti mezőnyt is meg kell tudni nevezni,
-     különben minden 100-tól 300-ig egyformán "Isteni" lenne. */
+  /* ---- A SÁVOK A MAGYAR LIGAPIRAMIST KÖVETIK ----
+     A régi absztrakt nevek (Könnyű … Isteni) semmit nem árultak el arról, hogy
+     egy adott szinten MIRE ELÉG a helyezésed. A ligacímkék viszont magukban
+     hordozzák a tétet: megyei szinten nincs kupa, NB I-ben selejtezőn át vezet
+     az út Európába. A kupajogosultságot ugyanezek a sávok adják — lásd
+     CUP_TIERS, ott EGY helyen van a névsor és a kvalifikáció is.
+     115 FÖLÖTT visszaveszi a szót az Infinity-létra: azt a tartományt már nem
+     lehet ligával megnevezni, és a régi skála a végtelen mód saját identitása. */
   if(r>=250)return "∞ VÉGTELEN";
   if(r>=200)return "Elképzelhetetlen";
   if(r>=160)return "Embertelen";
   if(r>=130)return "Kozmikus";
   if(r>=115)return "Transzcendens";
-  if(r>=101)return "Isteni+";
-  if(r>=100)return "Isteni";
-  if(r>=96)return "Halálos";
-  if(r>=90)return "Túlvilági";
-  if(r>=85)return "Professzionális";
-  if(r>=80)return "Nehéz";
-  if(r>=75)return "Normál";
-  return "Könnyű";}
+  return cupTierFor(r).league;}
 /* A nehézségi szint színe — ugyanazokban a sávokban, mint a diffTierLabel, a
    kártyaszínek szellemében egyre intenzívebbre váltva: hűvös/halvány alul
    (szürke, zöld), forró/telített felül (narancs, vörös, pink, arany). A magas
@@ -15452,13 +15498,17 @@ function finish(){
   if(S.W===30){tier="30–0 · A TÖKÉLETES SZEZON";note="Játszott 30, nyert 30. Halhatatlan.";}
   else if(yourRank===1&&S.L===0){tier="Veretlen bajnok";note="Aranyérem vereség nélkül — csak a döntetlenek fájnak.";}
   else if(yourRank===1){tier="Bajnok";note="NB I-aranyérem. A 30-0 még várat magára.";}
-  else if(yourRank<=3){tier="Dobogós";note="Éremmel zárt szezon — jön az Európa-liga.";}
+  else if(yourRank<=3){tier="Dobogós";note="Éremmel zárt szezon.";}
   /* A cím a TÉNYLEGES kvalifikációból származik (euroQualifyFor), nem külön
      leírt helyezés-sávokból — korábban a kettő szétcsúszott: a 4-6. helyre
      "EL-selejtezős hely" jelent meg, holott a 4-5. hely Konferencia-ligát ad,
      a 6. pedig semmit. A jegyzet is elavult volt ("Nyáron jöhet Európa"),
      mert a sorozat MÁR ennek a szezonzárásnak a részeként lefut. */
-  else if(euroQualifyFor(yourRank)==="KL"){tier="Konferencia-ligás hely";note="Európai indulás — a sorozat még most következik.";}
+  else if(cupEntryFor(yourRank)){
+    const ce=cupEntryFor(yourRank),cc=EURO_COMPS[ce.comp];
+    tier=`${cc.short}-indulást érő hely`;
+    note=ce.qual?`${cc.n} — előbb a selejtezőt kell átvinni. A sorozat még most következik.`
+                :`${cc.n} — a sorozat még most következik.`;}
   else if(yourRank<=10){tier="Középmezőny";note="Se fent, se lent.";}
   else if(yourRank<=13){tier="Alsóház";note="Nehéz tavasz volt.";}
   else{tier="A kiesés széle";note="Jövőre újra kell építkezni.";}
@@ -15502,10 +15552,13 @@ function finish(){
          lenne — a társad nem játszik benne, viszont hetekre szétvinné a két
          karrier ütemét, és a párharc helyett egy párhuzamos tétet nyitna. Az
          átigazolás, a kihívások és a pénzek természetesen maradnak. */
-      const qual=h2hRoomActive()?null:euroQualifyFor(yourRank);
-      S.euroEntry=qual?{comp:qual,forSeason:(S.seasonNumber||1)}:null;
-      if(qual){S.euroCurrent=qual;S.euroOptOut=false;}
-      else S.euroCurrent=null;
+      /* A kvalifikáció a NEHÉZSÉGI SÁVBÓL jön (CUP_TIERS): alacsonyabb szinten a
+         hazai kupa a tét, magasabban selejtezőn át vezet az út Európába. A
+         selejtező tényét is elmentjük, mert a kampány szerkezetét az dönti el. */
+      const ce=h2hRoomActive()?null:cupEntryFor(yourRank);
+      S.euroEntry=ce?{comp:ce.comp,qual:ce.qual,forSeason:(S.seasonNumber||1)}:null;
+      if(ce){S.euroCurrent=ce.comp;S.euroCurrentQual=ce.qual;S.euroOptOut=false;}
+      else{S.euroCurrent=null;S.euroCurrentQual=false;}
     }
     phase="verdict";S.playing=false;S.auto=false;
     saveGame();
@@ -15548,10 +15601,20 @@ function finish(){
   if(gameMode==="career"&&h2hRoomActive()){
     st+=vsec("Európai kupa",`<div class="vplain">A közös karrierben nincs európai sorozat — egyetlen tét van, a párharc. Az átigazolás, a kihívások és a büdzsé változatlanul mennek tovább.</div>`);
   }else if(gameMode==="career"){
-    const q=S.euroEntry&&S.euroEntry.forSeason===(S.seasonNumber||1)?EURO_COMPS[S.euroEntry.comp]:null;
-    st+=vsec("Európai kvalifikáció",q
-      ?`<div class="vplain"><b style="color:${q.col}">${q.n}</b> — a ${yourRank}. hellyel kiharcoltátok az indulást. A sorozat MOST következik, még ennek a szezonzárásnak a részeként.</div>`
-      :`<div class="vplain" style="color:var(--dim)">A ${yourRank}. hely nem ért európai indulást — az első öt helyezett jut ki (1. Bajnokok Ligája, 2-3. Európa-liga, 4-5. Konferencia-liga).</div>`);}
+    /* A szöveg a SÁV saját szabályát mondja fel, nem egy bedrótozott
+       "első öt helyezett"-et: ugyanez a jelentés jelenik meg megyei szinten
+       (ahol a hazai kupa a tét) és a premier lígben is. */
+    const E=S.euroEntry&&S.euroEntry.forSeason===(S.seasonNumber||1)?S.euroEntry:null;
+    const q=E?EURO_COMPS[E.comp]:null;
+    const tier=cupTierFor();
+    const rule=tier.entries.length
+      ? tier.entries.map((x,i)=>{
+          const lo=i===0?1:tier.entries[i-1].max+1;
+          return `${lo===x.max?`${lo}.`:`${lo}-${x.max}.`} ${EURO_COMPS[x.comp].n}`;}).join(", ")
+      : "ezen a szinten nincs kupasorozat";
+    st+=vsec("Kupakvalifikáció",q
+      ?`<div class="vplain"><b style="color:${q.col}">${q.n}</b> — a ${yourRank}. hellyel kiharcoltátok az indulást${E.qual?", de előbb a <b>selejtezőn</b> kell átjutni":""}. A sorozat MOST következik, még ennek a szezonzárásnak a részeként.</div>`
+      :`<div class="vplain" style="color:var(--dim)">A ${yourRank}. hely nem ért kupaindulást. <b>${esc(tier.league)}</b> szinten a szabály: ${esc(rule)}.</div>`);}
   st+=vsec("Házi góllövőlista",vlist(topS));
   st+=vsec("Gólpasszok",vlist(topA));
   st+=vsec("Legtöbbször a meccs embere",vlist(topM));
@@ -18375,7 +18438,7 @@ function euroResolveRound(){
     E.lastTie={round,mine,theirs,how:ut.how,opp:E.teams[meIsA?ut.b:ut.a].n,won:userWon};
     euroPathPush({k:"tie",round,mine,theirs,how:ut.how,won:userWon,
       opp:E.teams[meIsA?ut.b:ut.a].n});
-    addLine(`${userWon?"✅":"❌"} ${EURO_ROUND_NAMES[round]} — ${round==="final"?"":"összesítés "}${mine}:${theirs}, ${ut.how}. ${userWon?(round==="final"?"MEGNYERTÉTEK A SOROZATOT!":"Tovább!"):"Kiestetek."}`,"m life");}
+    addLine(`${userWon?"✅":(round==="final"?"🥈":"❌")} ${EURO_ROUND_NAMES[round]} — ${round==="final"?"":"összesítés "}${mine}:${theirs}, ${ut.how}. ${userWon?(round==="final"?"MEGNYERTÉTEK A SOROZATOT!":"Tovább!"):(round==="final"?"Vesztettetek a döntőben — ezüstérmesek lettetek.":"Kiestetek.")}`,"m life");}
   const winners=E.ties.map(t=>t.winner);
   if(!userWon){euroEliminated(round,winners);return;}
   if(round==="final"){euroCampaignEnd("win");return;}
@@ -18593,9 +18656,9 @@ function renderEuroPath(){
     if(!legs.length&&!tie)return;
     h+=hdr(EURO_ROUND_NAMES[rd]);
     legs.forEach(r=>{h+=line(`${r.leg!=null&&rd!=="final"?`${r.leg+1}. mérk. `:""}${venue(r)} ${esc(r.opp)}`,sc(r.mine,r.theirs));});
-    if(tie)h+=`<div style="font-size:12px;color:${tie.won?"var(--grass)":"var(--red)"};margin-top:1px">`
+    if(tie)h+=`<div style="font-size:12px;color:${tie.won?"var(--grass)":(rd==="final"?"var(--gold)":"var(--red)")};margin-top:1px">`
       +`${rd==="final"?"":"Összesítés "}${tie.mine}:${tie.theirs} · ${esc(tie.how)} — `
-      +`${tie.won?(rd==="final"?"GYŐZELEM 🏆":"továbbjutás"):"kiesés"}</div>`;});
+      +`${tie.won?(rd==="final"?"GYŐZELEM 🏆":"továbbjutás"):(rd==="final"?"ezüstérem 🥈":"kiesés")}</div>`;});
   box.innerHTML=h;}
 $("euroPathBtn")&&($("euroPathBtn").onclick=()=>{
   if(!S.euro)return;
@@ -18635,9 +18698,14 @@ function renderEuroScreen(){
       if(E.tacticBoosted)
         h+=`<div style="font-size:13px;margin-top:5px">⚙️ ${esc(TACTICS[E.tacticBoosted.k].n)}: ${E.tacticBoosted.from} → <b>${E.tacticBoosted.to}</b></div>`;
     }else{
-      const where=E.outAt==="group"?`a csoportkörben (${E.groupRank}. hely)`
-        :E.outAt==="final"?"a döntőben":`a(z) ${EURO_ROUND_NAMES[E.outAt]||E.outAt} során`;
-      h=`<div style="font-size:15px;font-weight:700">A menetelés ${where} ért véget.</div>`;
+      /* A DÖNTŐ NEM KIESÉS. Aki a döntőig eljut és ott veszít, ezüstérmes —
+         a "kiestünk a döntőben" mind tényszerűen, mind érzelmileg hamis volt. */
+      if(E.outAt==="final"){
+        h=`<div style="font-size:15px;font-weight:700;color:${c.winCol||c.col}">🥈 Vesztettetek a döntőben — ezüstérmesek lettetek.</div>`;
+      }else{
+        const where=E.outAt==="group"?`a csoportkörben (${E.groupRank}. hely)`
+          :`a(z) ${EURO_ROUND_NAMES[E.outAt]||E.outAt} során`;
+        h=`<div style="font-size:15px;font-weight:700">A menetelés ${where} ért véget.</div>`;}
       /* MI ALAPJÁN dőlt el a búcsú? (összesítés / idegenben lőtt gól / büntetők) */
       if(E.lastTie&&!E.lastTie.won&&E.outAt!=="group")
         h+=`<div style="font-size:12.5px;margin-top:3px">${esc(E.lastTie.opp)} ellen ${E.lastTie.mine}:${E.lastTie.theirs} — <b>${esc(E.lastTie.how)}</b> dőlt el.</div>`;
