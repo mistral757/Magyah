@@ -687,9 +687,12 @@ button.infPanel:disabled{cursor:default}
 /* a lapot félbevágó tengelyvonal — ettől lesz "fordítós" és nem csak doboz */
 .sbFlip::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;
   margin-top:-1px;background:rgba(0,0,0,.7)}
-/* a nagy pontszám-lapoknál a tengely fémcsapja is kilóg oldalt, mint a mintán */
+/* a nagy pontszám-lapoknál a tengely fémcsapja is kilóg oldalt, mint a mintán.
+   A csap VÉKONY: a 9 px-es változat a 40 px-es számjegy derekát takarta, és a
+   8-as, 9-es, 6-os egyszerűen nem volt kiolvasható tőle. 4 px-en a fémhatás
+   megmarad, a szám viszont végig látszik. */
 .sbFlip.big::before{content:"";position:absolute;top:50%;left:-5px;right:-5px;
-  height:9px;margin-top:-4px;border-radius:3px;z-index:2;
+  height:4px;margin-top:-2px;border-radius:2px;z-index:2;
   background:linear-gradient(180deg,#f0f0f0,#8b8b8b 55%,#d5d5d5)}
 #sbClockRow{text-align:center}
 .sbLbl{font-family:var(--font-body);font-size:9px;font-weight:700;letter-spacing:3.5px;
@@ -702,8 +705,14 @@ button.infPanel:disabled{cursor:default}
 /* ---- névsor + állás ---- */
 #sbMain{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
   gap:8px;margin:11px 0 10px}
+/* A név SOSEM törik szó közben (ezért nincs overflow-wrap:anywhere): vagy
+   kifér teljes egészében — szóközöknél tördelve —, vagy a sbFitTeams() a 3
+   betűs kódra cseréli. A min-width:0 azért kell, mert egy grid 1fr oszlop
+   alapból nem mehet a min-content (= a leghosszabb szó) alá: enélkül a hosszú
+   név nem túlcsordulna, hanem szétfeszítené a táblát, és a mérés is hazudna. */
 .sbTeam{font-family:var(--font-disp);font-size:15.5px;line-height:1.15;letter-spacing:.8px;
-  text-transform:uppercase;color:#ece6d4;text-align:center;overflow-wrap:anywhere;
+  text-transform:uppercase;color:#ece6d4;text-align:center;
+  min-width:0;overflow-wrap:normal;word-break:normal;overflow:hidden;
   text-shadow:0 1px 2px rgba(0,0,0,.6)}
 .sbTeam .sbSide{display:block;font-family:var(--font-body);font-size:8.5px;font-weight:700;
   letter-spacing:2.5px;color:#7fae92;margin-bottom:3px}
@@ -1721,7 +1730,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.58";
+const APP_VERSION="2.5.59";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -11605,28 +11614,27 @@ function myTeamAbbr(){
    egyszer készülnek el, utána csak annak a számjegynek a textContent-je
    változik, ami tényleg más lett. Auto módban (szezon végigjátszása) az óra el
    sem indul: ott nem közvetítést nézel, és ott számít a sebesség. */
-let SB={on:false,done:false,usIsHome:true,us:0,them:0,ev:[],
+let SB={on:false,done:false,usIsHome:true,us:0,them:0,ev:[],teams:null,
         t0:0,tickMs:330,iv:null,clockEls:null,scoreEls:null};
 /* A klubnév évszám-utótagja ("(2015/16)") a táblán csak zajt vinne — a tábla a
    MECCSRŐL szól, nem a keret évjáratáról. */
-/* ---- KÖZEPESEN RÖVIDÍTETT CSAPATNÉV AZ EREDMÉNYJELZŐRE ----
-   A tábla két névmezője fix szélességű; a hosszú, több tagú nevek
-   ("Nyíregyháza Spartacus FC", "Borussia Mönchengladbach") szétcsúsztatták a
-   fejlécet. A 3 betűs kód viszont túl rideg lenne ide.
-   A szabály: legfeljebb 3 tag, tagonként legfeljebb 6 karakter. A töltelék-
-   tagokat (FC, SE, SC…) eldobjuk, mert nem hordoznak információt; ha a
-   levágás miatt egy tag csonkul, pont jelzi. */
-const SB_FILLER=/^(FC|AFC|AS|AC|SL|SV|SC|CF|SK|JK|BC|CP|SSC|VfB|RB|CR|OSC|SE|SZ|VSC|MTK|TSV|BSC|CFR|FK|NK|HNK|GNK|KSC|MSV|USM|PFC)$/i;
-function sbShortName(n){
-  const base=String(n||"").replace(/\s*\([^)]*\)\s*$/,"").trim();
-  if(!base)return "";
-  let words=base.split(/[\s.\-–]+/).filter(Boolean);
-  /* a töltelékeket csak akkor dobjuk, ha marad utánuk valami */
-  const kept=words.filter(w=>!SB_FILLER.test(w));
-  if(kept.length)words=kept;
-  words=words.slice(0,3).map(w=>w.length>6?w.slice(0,6)+".":w);
-  return words.join(" ");}
-function sbClubLabel(n){return sbShortName(n);}
+/* ---- CSAPATNÉV AZ EREDMÉNYJELZŐN: TELJES NÉV VAGY 3 BETŰS KÓD ----
+   A korábbi "közepes" rövidítés (tagonként 6 karakter, "Nyíreg. Sparta. FC")
+   a két rossz megoldás közti senkiföldje volt: se nem olvasható, se nem tömör.
+   Az új szabály MÉRÉSEN alapul, nem karakterszámláláson:
+     · ha a teljes név kifér a névmezőbe ANÉLKÜL, hogy egy szót ketté kéne
+       vágni (szóközöknél tördelve tehát több sorba is folyhat), a teljes név
+       megy ki — mindkét oldalon, a sajátodnál és az ellenfélnél is;
+     · ha nem fér ki, a klub 3 betűs kódja (CLUB_ABBR / makeClubAbbr) áll ott.
+   A mérés csak akkor ad helyes eredményt, ha a tábla LÁTHATÓ, ezért a nevek
+   felfestése (sbPaintTeams) csak eltárolja a két változatot, a döntést pedig a
+   sbFitTeams() hozza meg — azt a wrap megjelenítése UTÁN hívjuk, és átméretezéskor
+   újra, mert a mezőszélességgel a döntés is változhat. */
+function sbCleanClub(n){return String(n||"").replace(/\s*\([^)]*\)\s*$/,"").trim();}
+function sbClubAbbr(n,mine){
+  const c=sbCleanClub(n);
+  if(mine&&typeof myTeamAbbr==="function"&&c===teamName)return myTeamAbbr();
+  return (typeof clubAbbr==="function")?clubAbbr(c):c.slice(0,3).toUpperCase();}
 /* Egy lapsor felépítése. A visszaadott tömb a számjegy-elemeké, hogy utána
    pontonként lehessen frissíteni (lásd a teljesítmény-megjegyzést fent). */
 function sbBuildFlips(box,count,cls){
@@ -11647,14 +11655,44 @@ function sbColon(){const c=document.createElement("span");c.className="sbColon";
    látszódjon, melyik oldal vagy — idegenbeli meccsen ez a jobb oldal. */
 function sbPaintTeams(fx){
   SB.usIsHome=!!fx.home;
-  const me=`<span class="sbSide">hazai</span>`,gu=`<span class="sbSide">vendég</span>`;
-  const meTxt=esc(sbClubLabel(teamName)),opTxt=esc(sbClubLabel(fx.o&&fx.o.n));
+  const mine={full:sbCleanClub(teamName),abbr:sbClubAbbr(teamName,true)};
+  const opp={full:sbCleanClub(fx.o&&fx.o.n),abbr:sbClubAbbr(fx.o&&fx.o.n,false)};
+  SB.teams={home:Object.assign({side:"hazai"},SB.usIsHome?mine:opp),
+            away:Object.assign({side:"vendég"},SB.usIsHome?opp:mine)};
   const H=$("sbHomeName"),A=$("sbAwayName");
   if(!H||!A)return;
-  H.innerHTML=me+(SB.usIsHome?meTxt:opTxt);
-  A.innerHTML=gu+(SB.usIsHome?opTxt:meTxt);
   H.classList.toggle("me",SB.usIsHome);
-  A.classList.toggle("me",!SB.usIsHome);}
+  A.classList.toggle("me",!SB.usIsHome);
+  sbFitTeams();}
+/* A döntés: kifér-e a teljes név szó-vágás nélkül?
+   NEM a scrollWidth-tel mérünk. Középre igazított szövegnél a túl hosszú szó
+   MINDKÉT oldalon kilóg, a scrollWidth viszont csak a jobb oldali túlnyúlást
+   számolja — egy 15 karakteres szó is "kiférőnek" látszott a 137 px-es mezőben.
+   Helyette azt mérjük meg, ami a törést valóban eldönti: a LEGHOSSZABB SZÓ
+   szélességét. A mérő span a mezőn belül él, tehát örökli a betűtípust, a
+   betűközt és a nagybetűsítést; kikerül a normál folyamból, hogy ne rajzoljon.
+   A kötőjeles nevek (Paris Saint-Germain) a kötőjel UTÁN törhetnek, ezért ott
+   is darabolunk — különben fölöslegesen esnénk vissza a 3 betűs kódra. */
+function sbNameFits(el,full){
+  const w=el.clientWidth;
+  if(!w)return true;   /* rejtett tábla: a megjelenítés utáni hívás dönt */
+  const probe=document.createElement("span");
+  probe.style.cssText="white-space:pre;display:inline-block;position:absolute;visibility:hidden;left:-9999px;top:0";
+  el.appendChild(probe);
+  let max=0;
+  full.replace(/-/g,"- ").split(/\s+/).filter(Boolean).forEach(word=>{
+    probe.textContent=word;
+    max=Math.max(max,probe.getBoundingClientRect().width);});
+  probe.remove();
+  return max<=w;}
+function sbFitTeams(){
+  if(!SB.teams)return;
+  [["sbHomeName","home"],["sbAwayName","away"]].forEach(([id,k])=>{
+    const el=$(id),t=SB.teams[k];
+    if(!el||!t)return;
+    el.innerHTML=`<span class="sbSide">${t.side}</span>`
+      +esc(sbNameFits(el,t.full)?t.full:t.abbr);});}
+window.addEventListener("resize",()=>{if(SB.teams)sbFitTeams();});
 function sbSetScore(gf,ga){
   SB.us=gf;SB.them=ga;
   const box=$("sbScore");if(!box)return;
@@ -11756,6 +11794,7 @@ function sbStart(fx,tickMs,auto){
   $("sbClockLbl").textContent="idő";
   sbPaintTeams(fx);sbSetScore(0,0);sbSetClock(0);sbRenderEvents();
   wrap.classList.remove("hide");
+  sbFitTeams();   /* csak a megjelenítés után mérhető a névmező szélessége */
   if(auto){sbClockStop();return;}
   sbClockStart(tickMs);
   sbLockView();}
@@ -11777,7 +11816,8 @@ function sbSync(){
   SB.ev=[];SB.scoreEls=null;SB.clockEls=null;
   sbApplyCompTheme();   /* az előnézet is a soron következő sorozat színét viszi */
   sbPaintTeams(fx);sbSetScore(0,0);sbSetClock(0);sbRenderEvents();
-  wrap.classList.remove("hide");}
+  wrap.classList.remove("hide");
+  sbFitTeams();}
 /* ---- A "DŐLJ HÁTRA" NÉZET ----
    Kezdőrúgáskor a tábla a képernyő tetejére áll, a napló pedig pont a maradék
    helyet kapja meg. Innen a meccs végignézhető anélkül, hogy hozzá kéne nyúlni
