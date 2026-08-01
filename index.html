@@ -1614,7 +1614,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.49";
+const APP_VERSION="2.5.50";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4299,9 +4299,11 @@ const EURO_COMPS={
    A 100 fölötti szint a régi felosztást viszi tovább, selejtező nélkül. */
 const CUP_TIERS=[
   {max:75, league:"Megye II", entries:[]},
-  {max:80, league:"Megye I", entries:[{comp:"MK",max:3}]},
-  {max:85, league:"NB III – Keleti csoport", entries:[{comp:"MK",max:4}]},
-  {max:90, league:"NB II – Keleti csoport", entries:[{comp:"MK",max:7}], mkWinsKL:true},
+  /* A hazai kupa is SELEJTEZŐVEL kezdődik: 4 párharc (8 meccs) a főtábláért,
+     onnan további 4 párharc (8 meccs) + döntő — összesen 17 mérkőzés. */
+  {max:80, league:"Megye I", qual:true, entries:[{comp:"MK",max:3}]},
+  {max:85, league:"NB III – Keleti csoport", qual:true, entries:[{comp:"MK",max:4}]},
+  {max:90, league:"NB II – Keleti csoport", qual:true, entries:[{comp:"MK",max:7}], mkWinsKL:true},
   {max:95, league:"NB I", qual:true,
    entries:[{comp:"BL",max:1},{comp:"EL",max:2},{comp:"KL",max:3}]},
   {max:99, league:"Biszem-baszom másodosztály", qual:true,
@@ -4491,7 +4493,11 @@ function euroFrozen(){return euroActive();}
    taktika. Így a kupa nem "ingyen szezon", de nem is áll meg tőle a fejlődés.
    A liga-statisztikák továbbra is teljesen külön vödörben maradnak. */
 const EURO_TEMPO=0.5;
-function euroTempo(){return euroActive()?EURO_TEMPO:1;}
+/* A SELEJTEZŐBEN viszont NULLA a tempó: az még nem a kupa, csak a belépő érte,
+   és a specifikáció szerint ott semmilyen fejlődés nem történik. */
+function euroTempo(){
+  if(!euroActive())return 1;
+  return (S.euro&&S.euro.stage==="qual")?0:EURO_TEMPO;}
 /* ---- KUPA-STATISZTIKA KULCSA: KLUB + NÉV ----
    A kampány a te kereted MELLETT 31 AI-csapatot is könyvel, és a névkészletek
    átfedhetnek: két különböző csapatban ülhet azonos nevű játékos. Amíg a
@@ -4548,7 +4554,8 @@ function compRounds(comp){
   return (EURO_COMPS[comp]&&EURO_COMPS[comp].domestic)?MK_ROUNDS:EURO_ROUNDS;}
 function compHasGroup(comp){return !(EURO_COMPS[comp]&&EURO_COMPS[comp].domestic);}
 const EURO_ROUND_NAMES={r16:"Nyolcaddöntő",qf:"Negyeddöntő",sf:"Elődöntő",final:"Döntő",
-  mk1:"Főtábla · 32 között",mk2:"Nyolcaddöntő",mk3:"Negyeddöntő",mk4:"Elődöntő"};
+  mk1:"Főtábla · 32 között",mk2:"Nyolcaddöntő",mk3:"Negyeddöntő",mk4:"Elődöntő",
+  qual:"Selejtező"};
 /* A legs elemei SZEREP szerint tárolnak: [A gólja, B gólja] — nem a
    pályaválasztó szerint. Így a semleges pályán játszott döntő sem cseréli fel
    az oldalakat. Az idegenben lőtt gól: A a 2. meccsen idegenben (legs[1][0]),
@@ -4601,6 +4608,88 @@ function euroStartRound(round,pool){
     if(round==="final")E.fixtures=[{o,home:false,neutral:true,oi}];
     else E.fixtures=[{o,home:meIsA,oi},{o,home:!meIsA,oi}];}
   addLine(`🏆 ${EURO_ROUND_NAMES[round]}${E.userTie>=0?` — az ellenfél: ${esc(E.teams[E.ties[E.userTie].a===E.userIdx?E.ties[E.userTie].b:E.ties[E.userTie].a].n)}`:""}`,"m life");}
+/* ================= SELEJTEZŐ =================
+   A főtábla előtt 4 egymás utáni, oda-visszavágós párharc (8 meccs). Nem
+   bracket, hanem "kapuk sora": csak a TE utad számít, a többi selejtezős
+   csapat sorsa a főtábla szempontjából érdektelen (a 32-es mezőny adott).
+   Ezért nincs háttér-szimuláció sem — az a főtáblán kezdődik.
+
+   BUKÁSNÁL LECSÚSZOL EGY SZINTTEL: a BL selejtezőjéből az EL, az EL-éből a KL
+   FŐTÁBLÁJÁRA kerülsz (ott már nincs újabb selejtező, ahogy a valóságban sem),
+   a KL és a hazai kupa selejtezőjének bukása viszont teljes kiesés — alattuk
+   nincs sorozat.
+
+   A selejtezőben SEMMI nem fejlődik (lásd euroTempo): ez még nem a kupa, csak
+   a belépő érte, és a specifikáció szerint itt a fejlődés nulla. */
+const EURO_QUAL_ROUNDS=4;
+const EURO_DROP={BL:"EL",EL:"KL",KL:null,MK:null};
+function euroQualLabel(r){return `Selejtező ${r}/${EURO_QUAL_ROUNDS}. kör`;}
+function euroStartQual(){
+  const E=S.euro;
+  E.stage="qual";E.idx=0;E.qRound=(E.qRound||0)+1;E.qLegs=[null,null];
+  /* az ellenfél a mezőnyből jön (a szintje tehát már stimmel), de sem te, sem
+     az előző kör ellenfele nem sorsolható újra */
+  const pool=E.teams.map((t,i)=>i).filter(i=>i!==E.userIdx&&i!==E.qOppIdx);
+  E.qOppIdx=pool[Math.floor(Math.random()*pool.length)];
+  const o=E.teams[E.qOppIdx];
+  /* első meccs idegenben, visszavágó otthon — a klasszikus selejtező-sorrend */
+  E.fixtures=[{o:{n:o.n,ovr:o.ovr},home:false,oi:E.qOppIdx},
+              {o:{n:o.n,ovr:o.ovr},home:true,oi:E.qOppIdx}];
+  addLine(`🎫 ${euroQualLabel(E.qRound)} — az ellenfél: ${esc(o.n)}`,"m life");}
+function euroResolveQual(){
+  const E=S.euro,L=E.qLegs;
+  const mine=(L[0]?L[0][0]:0)+(L[1]?L[1][0]:0);
+  const theirs=(L[0]?L[0][1]:0)+(L[1]?L[1][1]:0);
+  let won,how;
+  if(mine>theirs){won=true;how="összesítésben";}
+  else if(theirs>mine){won=false;how="összesítésben";}
+  else{
+    /* idegenben lőtt gól: a MIÉNK az 1. meccsen (ott játszottunk idegenben),
+       az ÖVÉK a visszavágón */
+    const myAway=L[0]?L[0][0]:0,theirAway=L[1]?L[1][1]:0;
+    if(myAway>theirAway){won=true;how="idegenben lőtt góllal";}
+    else if(theirAway>myAway){won=false;how="idegenben lőtt góllal";}
+    else{won=euroPens(teamOVRbase(),E.teams[E.qOppIdx].ovr);how="büntetőkkel";}}
+  E.lastTie={round:"qual",mine,theirs,how,opp:E.teams[E.qOppIdx].n,won};
+  euroPathPush({k:"qtie",round:"qual",qRound:E.qRound,mine,theirs,how,won,
+    opp:E.teams[E.qOppIdx].n});
+  addLine(`${won?"✅":"❌"} ${euroQualLabel(E.qRound)} — összesítés ${mine}:${theirs}, ${how}. ${won?"Tovább!":"Elbuktátok a selejtezőt."}`,"m life");
+  if(!won){euroQualFailed();return;}
+  if(E.qRound>=EURO_QUAL_ROUNDS){euroEnterMain();return;}
+  euroStartQual();showEuroScreen();}
+function euroQualFailed(){
+  const E=S.euro,next=EURO_DROP[E.comp];
+  if(!next){
+    /* Nincs hova lecsúszni — a sorozat a háttérben mégis végigfut, hogy legyen
+       győztese és teljes statisztikája (ugyanaz az elv, mint az euroEliminated
+       esetében). A teljes 32-es mezőnyt futtatjuk: kettőhatvány, tehát a
+       párosítás sosem marad páratlanul. */
+    E.outAt="qual";
+    let pool=E.teams.map((t,i)=>i);
+    while(pool&&pool.length>1){
+      const isFinal=pool.length===2,nx=[],sh=shuffleArr(pool);
+      for(let i=0;i<sh.length;i+=2)
+        nx.push(isFinal?euroSimSingle(sh[i],sh[i+1]):euroSimTieFull(sh[i],sh[i+1]));
+      pool=nx;}
+    E.champion=pool&&pool.length?pool[0]:null;
+    euroCampaignEnd("out");return;}
+  /* A menetelés-napló és a statisztika ÁTJÖN az új sorozatba: a selejtező is
+     része az idénynek, kár lenne elveszíteni a lejátszott meccseket. */
+  addLine(`⤵️ A(z) ${EURO_COMPS[E.comp].n} selejtezőjéből kiesve a(z) ${EURO_COMPS[next].n} főtábláján folytatjátok.`,"m life");
+  S.euroCurrent=next;
+  startEuroCampaign({skipQual:true,path:E.path,stats:E.stats,droppedFrom:E.comp});}
+/* A selejtező végén (vagy selejtező nélkül) a sorozat rendes szerkezete indul. */
+function euroEnterMain(){
+  const E=S.euro;
+  if(compHasGroup(E.comp)){
+    E.stage="group";E.md=0;E.idx=0;
+    E.fixtures=buildEuroUserFixtures();
+    addLine(`🏆 Bejutottatok a főtáblára! A csoportban ${E.groups[E.userG].filter(i=>i!==E.userIdx).map(i=>E.teams[i].n).join(", ")} vár rátok.`,"m life");
+    showEuroScreen();
+  }else{
+    addLine(`🏆 Bejutottatok a főtáblára! Innen egyenes kiesés a döntőig.`,"m life");
+    euroStartRound(MK_ROUNDS[0],E.teams.map((t,i)=>i));
+    showEuroScreen();}}
 /* A user párharcán KÍVÜLI meccsek szimulálása az adott meccsnapon. */
 function euroSimKnockoutLeg(leg){
   const E=S.euro;
@@ -10873,7 +10962,9 @@ let euroLogMark=0,euroLastLogHtml="",euroLastLogTitle="";
 function euroMatchTitleFor(E){
   if(!E||!E.fixtures||!E.fixtures[E.idx])return "";
   const fx=E.fixtures[E.idx];
-  const stage=E.stage==="group"
+  const stage=E.stage==="qual"
+    ? `${euroQualLabel(E.qRound)} · ${E.idx+1}. mérkőzés`
+    : E.stage==="group"
     ? `Csoportkör · ${Math.min(E.md+1,EURO_SCHEDULE.length)}. forduló`
     : (EURO_ROUND_NAMES[E.stage]||"")+(E.stage!=="final"?` · ${E.idx+1}. mérkőzés`:"");
   const where=fx.neutral?"semleges pályán":(fx.home?"hazai pályán":"idegenben");
@@ -10918,7 +11009,8 @@ function updateStanding(){
   if(euroActive()){
     const c=EURO_COMPS[S.euro.comp],E=S.euro;
     let txt;
-    if(E.stage==="group")txt=`csoportkör · ${Math.min(E.md+1,EURO_SCHEDULE.length)}/${EURO_SCHEDULE.length}. forduló`;
+    if(E.stage==="qual")txt=`${euroQualLabel(E.qRound).toLowerCase()} · ${Math.min(E.idx+1,2)}/2. mérkőzés`;
+    else if(E.stage==="group")txt=`csoportkör · ${Math.min(E.md+1,EURO_SCHEDULE.length)}/${EURO_SCHEDULE.length}. forduló`;
     else if(E.stage==="final")txt=`döntő · semleges pálya`;
     else txt=`${EURO_ROUND_NAMES[E.stage]||E.stage} · ${Math.min(E.idx+1,2)}/2. mérkőzés`;
     $("standing").textContent=`${c.short} · ${txt}`;
@@ -12918,7 +13010,8 @@ function playMatch(){
   if(euroActive()){
     const ec=EURO_COMPS[S.euro.comp],E=S.euro;
     let stg;
-    if(E.stage==="group")stg=`CSOPORTKÖR · ${Math.min(E.md+1,EURO_SCHEDULE.length)}. FORDULÓ`;
+    if(E.stage==="qual")stg=`${euroQualLabel(E.qRound).toUpperCase()} · ${Math.min(E.idx+1,2)}/2. MÉRKŐZÉS`;
+    else if(E.stage==="group")stg=`CSOPORTKÖR · ${Math.min(E.md+1,EURO_SCHEDULE.length)}. FORDULÓ`;
     else if(E.stage==="final")stg="DÖNTŐ";
     else stg=`${(EURO_ROUND_NAMES[E.stage]||E.stage).toUpperCase()} · ${Math.min(E.idx+1,2)}/2. MÉRKŐZÉS`;
     addLine(`— ${ec.n.toUpperCase()} · ${stg} · ${title} —`,"mt");
@@ -18460,7 +18553,10 @@ function euroGK(){const g=slots.find(x=>x.pos==="KP"&&x.player);return g?g.playe
    (a saját góllövőinket a playMatch már a kupa-vödörbe írta). */
 function euroFinishUserMatch(gf,ga){
   const E=S.euro,fx=E.fixtures[E.idx],ui=E.userIdx,oi=fx.oi;
-  if(E.stage==="group"){
+  if(E.stage==="qual"){
+    /* selejtező: nincs csoporttabella és nincs bracket — csak a saját párharc */
+    E.qLegs[E.idx]=[gf,ga];
+  }else if(E.stage==="group"){
     const hi=fx.home?ui:oi,ai=fx.home?oi:ui;
     euroApplyResult(hi,ai,fx.home?gf:ga,fx.home?ga:gf);
   }else{
@@ -18469,7 +18565,8 @@ function euroFinishUserMatch(gf,ga){
     t.legs[E.idx]=meIsA?[gf,ga]:[ga,gf];}
   /* A megtett út naplózása — MÉG a szakasz-léptetés előtt, ezért az E.idx és
      az E.md itt pontosan a most lejátszott mérkőzésre mutat. */
-  euroPathPush({k:E.stage==="group"?"g":"ko",round:E.stage,
+  euroPathPush({k:E.stage==="qual"?"q":(E.stage==="group"?"g":"ko"),round:E.stage,
+    qRound:E.stage==="qual"?E.qRound:null,
     md:E.stage==="group"?E.md:null,leg:E.stage==="group"?null:E.idx,
     opp:fx.o.n,home:!!fx.home,neutral:!!fx.neutral,mine:gf,theirs:ga});
   euroRecordStats(E.teams[oi],ga,gf);
@@ -18489,6 +18586,9 @@ function euroAfterUserMatch(){
   euroLastLogTitle=euroMatchTitleFor(E);
   /* a meccs-index ITT lép (nem a meccs végén) — a szakasz-léptetéssel együtt */
   E.idx++;
+  if(E.stage==="qual"){
+    if(E.idx<2){showEuroScreen();saveGame();return;}
+    euroResolveQual();saveGame();return;}
   if(E.stage==="group"){
     euroSimMatchday(E.md);E.md++;
     if(E.md>=EURO_SCHEDULE.length){euroFinishGroupStage();saveGame();return;}
@@ -18656,15 +18756,24 @@ function endEuroCampaign(){
   S.euro=null;S.euroCurrent=null;
   $("scEuro").classList.add("hide");
   saveGame();hubShowSeasonReport();}
-function startEuroCampaign(){
+/* opt.skipQual — a selejtezőt átugorjuk (lecsúszásnál, illetve a hazai kupa
+     megnyeréséért járó KL-indulásnál: azt nem kell újra kiharcolni);
+   opt.path / opt.stats — lecsúszásnál átemelt menetelés-napló és statisztika. */
+function startEuroCampaign(opt){
+  opt=opt||{};
   const comp=S.euroCurrent;if(!comp||!EURO_COMPS[comp]){hubShowSeasonReport();return;}
   const f=buildEuroField(comp);
   S.euro={comp,stage:"group",md:0,idx:0,teams:f.teams,groups:f.groups,table:f.table,
     userIdx:f.userIdx,userG:f.userG,userSlot:f.userSlot,target:f.target,
-    stats:{scorers:{},assists:{},cleanSheets:{}},fixtures:[],
-    path:[],pathOpen:false};   /* a menetelés naplója — lásd euroPathPush */
+    stats:opt.stats||{scorers:{},assists:{},cleanSheets:{}},fixtures:[],
+    qRound:0,qOppIdx:null,qLegs:[null,null],droppedFrom:opt.droppedFrom||null,
+    path:opt.path||[],pathOpen:false};   /* a menetelés naplója — lásd euroPathPush */
   euroLastLogHtml="";euroLastLogTitle="";   /* új kampány — nincs korábbi meccs-napló */
-  if(compHasGroup(comp)){
+  const needQual=!opt.skipQual&&!!S.euroCurrentQual;
+  if(needQual){
+    addLine(`🎫 Kezdődik a(z) ${EURO_COMPS[comp].n} SELEJTEZŐJE — ${EURO_QUAL_ROUNDS} oda-visszavágós párharc a főtáblára jutásért. Itt még semmi nem fejlődik.`,"m life");
+    euroStartQual();
+  }else if(compHasGroup(comp)){
     S.euro.fixtures=buildEuroUserFixtures();
     addLine(`🏆 Kezdődik a(z) ${EURO_COMPS[comp].n}! A csoportban ${S.euro.groups[S.euro.userG].filter(i=>i!==S.euro.userIdx).map(i=>S.euro.teams[i].n).join(", ")} vár rátok.`,"m life");
   }else{
@@ -18756,9 +18865,18 @@ function renderEuroPath(){
     <span style="color:var(--dim)">${left}</span>${right}</div>`;
   const hdr=t=>`<div style="font-size:11px;letter-spacing:1px;color:var(--gold);text-transform:uppercase;margin:8px 0 3px">${t}</div>`;
   let h="";
+  /* SELEJTEZŐ — körönként külön blokk, a csoportkör/főtábla ELŐTT. Lecsúszásnál
+     is megmarad (a path átjön az új sorozatba), tehát látszik a teljes út. */
+  for(let q=1;q<=EURO_QUAL_ROUNDS;q++){
+    const legs=P.filter(x=>x.k==="q"&&x.qRound===q),tie=P.find(x=>x.k==="qtie"&&x.qRound===q);
+    if(!legs.length&&!tie)continue;
+    h+=hdr(euroQualLabel(q)).replace(q===1?"margin:8px":" ","margin:0px");
+    legs.forEach(r=>{h+=line(`${r.leg!=null?`${r.leg+1}. mérk. `:""}${venue(r)} ${esc(r.opp)}`,sc(r.mine,r.theirs));});
+    if(tie)h+=`<div style="font-size:12px;color:${tie.won?"var(--grass)":"var(--red)"};margin-top:1px">`
+      +`Összesítés ${tie.mine}:${tie.theirs} · ${esc(tie.how)} — ${tie.won?"tovább":"elbukva"}</div>`;}
   const grp=P.filter(x=>x.k==="g"),gEnd=P.find(x=>x.k==="gEnd");
   if(grp.length){
-    h+=hdr("Csoportkör").replace("margin:8px","margin:0px");
+    h+=hdr("Csoportkör").replace(h?" ":"margin:8px","margin:0px");
     grp.forEach(r=>{h+=line(`${r.md!=null?`${r.md+1}. f. `:""}${venue(r)} ${esc(r.opp)}`,sc(r.mine,r.theirs));});
     if(gEnd)h+=`<div style="font-size:12px;color:${gEnd.advanced?"var(--grass)":"var(--red)"};margin-top:3px">`
       +`${gEnd.rank}. hely${gEnd.pts!=null?` · ${gEnd.pts} pont · ${gEnd.gf}:${gEnd.ga}`:""} — ${gEnd.advanced?"továbbjutás":"kiesés"}</div>`;}
@@ -18777,7 +18895,8 @@ $("euroPathBtn")&&($("euroPathBtn").onclick=()=>{
   renderEuroPath();saveGame();});
 function renderEuroScreen(){
   const E=S.euro;if(!E)return;
-  const c=EURO_COMPS[E.comp],done=E.stage==="done",ko=E.stage!=="group"&&!done;
+  const c=EURO_COMPS[E.comp],done=E.stage==="done",qual=E.stage==="qual";
+  const ko=E.stage!=="group"&&!qual&&!done;
   /* AZ ELŐZŐ MÉRKŐZÉS KÖZVETÍTÉS-NAPLÓJA — a felhasználó jelzésére: a kupa-
      nézetre olyan gyorsan váltunk, hogy a végeredmény sokszor észrevétlen
      maradt. A napló a lejátszott meccs teljes szövegét hozza, fölötte a
@@ -18791,6 +18910,7 @@ function renderEuroScreen(){
       const ft=$("euroLogFoot");if(ft)ft.innerHTML=euroLogFooterHtml();
     }else logCard.classList.add("hide");}
   const stageTxt=done?"A sorozat véget ért"
+    :qual?`${euroQualLabel(E.qRound)} · ${E.idx+1}/2. mérkőzés — a főtáblára jutásért`
     :ko?`${EURO_ROUND_NAMES[E.stage]} · ${E.stage==="final"?"egy mérkőzés semleges pályán":`${E.idx+1}/2. mérkőzés`}`
        :`Csoportkör · ${E.md+1}/${EURO_SCHEDULE.length}. forduló`;
   $("euroHead").innerHTML=`<div style="font-family:var(--font-disp);font-size:20px;color:${c.col}">${c.n}</div>`
@@ -18813,6 +18933,8 @@ function renderEuroScreen(){
          a "kiestünk a döntőben" mind tényszerűen, mind érzelmileg hamis volt. */
       if(E.outAt==="final"){
         h=`<div style="font-size:15px;font-weight:700;color:${c.winCol||c.col}">🥈 Vesztettetek a döntőben — ezüstérmesek lettetek.</div>`;
+      }else if(E.outAt==="qual"){
+        h=`<div style="font-size:15px;font-weight:700">A selejtezőn elakadtatok — a főtábla ezúttal kimaradt.</div>`;
       }else{
         const where=E.outAt==="group"?`a csoportkörben (${E.groupRank}. hely)`
           :`a(z) ${EURO_ROUND_NAMES[E.outAt]||E.outAt} során`;
@@ -18840,14 +18962,25 @@ function renderEuroScreen(){
       const t=E.ties[E.userTie],meIsA=t.a===E.userIdx,L=t.legs[0];
       if(L){const mine=meIsA?L[0]:L[1],theirs=meIsA?L[1]:L[0];
         extra=`<div style="font-size:12.5px;margin-top:4px">Első mérkőzés: <b>${mine}:${theirs}</b> — ${mine>theirs?"előnyben vagytok":mine<theirs?"hátrányban vagytok":"döntetlen után"}. <span style="color:var(--dim)">Egyenlőségnél az idegenben lőtt gól dönt.</span></div>`;}}
+    if(qual){
+      const L=E.qLegs&&E.qLegs[0];
+      if(E.idx===1&&L)
+        extra=`<div style="font-size:12.5px;margin-top:4px">Első mérkőzés: <b>${L[0]}:${L[1]}</b> — ${L[0]>L[1]?"előnyben vagytok":L[0]<L[1]?"hátrányban vagytok":"döntetlen után"}. <span style="color:var(--dim)">Egyenlőségnél az idegenben lőtt gól dönt.</span></div>`;
+      extra+=`<div style="font-size:12px;color:var(--gold);margin-top:5px">🎫 Selejtező — a főtáblára jutásért. ${EURO_DROP[E.comp]?`Bukásnál a(z) ${EURO_COMPS[EURO_DROP[E.comp]].n} főtábláján folytatjátok.`:"Bukásnál nincs kupa ebben a szezonban."} <span style="color:var(--dim2)">Itt semmilyen fejlődés nem történik.</span></div>`;}
     nx.innerHTML=`<div style="font-size:13px;color:var(--dim)">Következő mérkőzés</div>
       <div style="font-size:15px;font-weight:700;margin-top:2px">${fx.neutral?"⚖️ Semleges pálya":fx.home?"🏠 Hazai pálya":"✈️ Idegenben"} — ${esc(fx.o.n)}</div>
       <div style="font-size:12px;color:var(--dim);margin-top:2px">Ellenfél ereje: ${Math.round(fx.o.ovr)} · a ti csapaterőtök: ${teamStrength().toFixed(1)}</div>${extra}`;
     $("euroKickBtn").classList.remove("hide");$("euroDoneBtn").classList.add("hide");
     if($("euroHubBtn"))$("euroHubBtn").classList.toggle("hide",gameMode!=="career");
   }
+  /* SELEJTEZŐ: se csoporttabella, se bracket — csak a saját párharc számít,
+     azt pedig a "következő mérkőzés" doboz már kiírja. A táblát kiürítjük,
+     nehogy az előző szakasz állása maradjon benne. */
+  if(qual){
+    const box=$("euroTable");if(box)box.innerHTML="";
+    const lbl=$("euroTableLbl");if(lbl)lbl.textContent=euroQualLabel(E.qRound);}
   /* KIESÉSES SZAKASZ: a párharcok állása a csoporttabella helyett */
-  if(E.stage!=="group"&&E.ties){
+  else if(E.stage!=="group"&&E.ties){
     const box=$("euroTable");
     /* a kampány végén a stage már "done", ezért az UTOLSÓ lejátszott kör nevét
        használjuk — így nem "Párharcok"/"Csoport" marad a fejlécben */
