@@ -1746,7 +1746,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.71";
+const APP_VERSION="2.5.72";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10645,6 +10645,14 @@ function renderChallengeOffers(scope,resumeCb,opening){
   done.className="btn-s stepbtn";done.style.marginTop="4px";
   done.textContent="Kész — tovább";
   done.onclick=()=>{
+    /* A HUB-kitérő átállította a "Irány a pályára" gombot a kihívásokhoz
+       visszavivő műveletre. Ha innen továbbmegyünk, a kitérőnek vége —
+       különben a HUB-ban egy "← Vissza a kihívásokhoz" gomb maradna, ami már
+       egy lezárt felajánlást nyitna újra. */
+    const nb=$("hubNextSeasonBtn");
+    if(nb&&nb.onclick===reopenChallengeOffers){
+      nb.textContent="Irány a pályára →";
+      nb.onclick=beginNextSeasonWithChallenges;}
     $("scWindow").classList.add("hide");
     if(resumeCb)resumeCb();else csReturnToHub();};
   $("twActions").appendChild(done);}
@@ -12981,18 +12989,32 @@ function applyOppLevel(v){
     if(scout)entry.estimatedTSI=estimateTSI(entry.tsi,scout.stars);});
   SEASON_OPPS=buildOpponents(15,oppTargetRating);
   if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();}
+/* ---- A KÖVETKEZŐ SZEZON SORSZÁMA ----
+   HIBA, amit ez javít: a szezonindító kapu (mpSeasonGate) a KÖVETKEZŐ szezonról
+   szól, az S.seasonNumber viszont ilyenkor még az ÉPP LEZÁRTAT tartja — a
+   léptetés a kapu UTÁN, a startNextCareerSeason()-ben történik. Emiatt a draft
+   végi kapu és a MÁSODIK szezon kapuja ugyanazt a szobakulcsot használta
+   ("s1start"). A második szezonnál tehát a kliens a szobában megtalálta az
+   ELSŐ szezonhoz tartozó, MÁR TELJES rekordpárt: nem volt várószoba (mindkét
+   oldal "megérkezettnek" látszott), és a mezőnyszintet a tavalyi javaslatokból
+   számolta ki — vagyis a szezon a régi szinten, egyoldalúan indult el.
+   A helyes horgony a LEZÁRT SZEZONOK SZÁMA + 1: a drafnál 1, a második szezon
+   kapujánál 2, és így tovább. Szezon KÖZBEN ez pontosan az S.seasonNumber,
+   tehát a menet közbeni viselkedés változatlan. */
+function mpUpcomingSeason(){
+  return ((S.seasonHistory&&S.seasonHistory.length)||0)+1;}
 /* ---- A SAJÁT JAVASLAT ----
-   Szezononként egy. A tárolt szezonszám miatt a tavalyi javaslat nem szivárog
-   át az ideire — minden idényt újra kell megbeszélni. */
+   Szezononként egy, a KÖVETKEZŐ szezonra címezve. Így a draftnál megadott
+   javaslat nem számít "már megadottnak" a második szezon kapujában sem. */
 function mpMyBid(){
   const b=S.mpLevelBid;
-  return (b&&b.season===(S.seasonNumber||1))?b:null;}
+  return (b&&b.season===mpUpcomingSeason())?b:null;}
 /* Megadta-e már valamilyen formában? (A "nekem mindegy" is megadás: value=null.) */
 function mpBidGiven(){return !!mpMyBid();}
 function mpSetBid(value){
-  S.mpLevelBid={season:(S.seasonNumber||1),value:(value==null?null:Math.round(value))};
+  S.mpLevelBid={season:mpUpcomingSeason(),value:(value==null?null:Math.round(value))};
   try{saveGame();}catch(e){}}
-function mpSeasonStartKey(){return "s"+(S.seasonNumber||1)+"start";}
+function mpSeasonStartKey(){return "s"+mpUpcomingSeason()+"start";}
 /* A két javaslatból a végleges szint.
      · mindkettő megadta      → a számtani közép, egészre kerekítve
      · csak az egyik adta meg → az az érték
@@ -13037,11 +13059,14 @@ async function mpPullLevel(force){
    ÚJRAINDÍTHATÓ, mint a párharc: a pillanatkép a szobában marad, a képernyő
    bármikor elhagyható, és visszatérve onnan folytatódik. Időkorlát nincs. */
 let _mpStartPoll=null,_mpStartBusy=false;
+/* Ennyi várakozás után kínáljuk fel az egyedüli indulást (lásd mpStartTick). */
+const MP_START_FORCE_MS=45000;
+let _mpStartWaitStart=0;
 /* Amíg a "nem adsz meg szintet?" kérdés áll a képernyőn, még nincs csere —
    de a kilépő gombnak akkor is tudnia kell, hogy MI nyitottuk meg a réteget. */
 let _mpStartPending=null;
 function mpStartAbort(){
-  _mpStartBusy=false;_mpStartPending=null;
+  _mpStartBusy=false;_mpStartPending=null;_mpStartWaitStart=0;
   if(_mpStartPoll){clearTimeout(_mpStartPoll);_mpStartPoll=null;}
   h2hWaitHide();}
 const MP_WAIT_START={mine:"A te indításod",opp:"A társad indítása",
@@ -13080,7 +13105,7 @@ function mpAskNoBid(onReady){
   $("h2hWaitCancelBtn").textContent="↩ Beállítom a nehézséget";}
 /* A tényleges csere: felküldjük a sajátunkat, megvárjuk a társét. */
 async function mpStartExchange(onReady){
-  _mpStartBusy=true;
+  _mpStartBusy=true;_mpStartWaitStart=0;   /* új csere → új várakozás-óra */
   const key=mpSeasonStartKey(),myField=MP.role==="host"?"host":"guest";
   const oppField=myField==="host"?"guest":"host";
   h2hWaitShow("SZEZONINDÍTÁS","Kapcsolódás a szobához…",false,false,MP_WAIT_START);
@@ -13094,11 +13119,20 @@ async function mpStartExchange(onReady){
   let node=null;
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
   if(!_mpStartBusy)return;
-  if(!node||!node[myField]){
+  if(!mpStartRecOk(node&&node[myField])){
     try{await mpBk().h2hPut(MP.activeRoom,key,myField,
-      {lvl:(bid&&bid.value!=null)?bid.value:null,str:Math.round(teamStrength()),at:Date.now()});}
+      {lvl:(bid&&bid.value!=null)?bid.value:null,str:Math.round(teamStrength()),
+       season:mpUpcomingSeason(),at:Date.now()});}
     catch(e){$("h2hWaitErr").textContent="A javaslatot nem sikerült elküldeni — újrapróbáljuk.";}}
   mpStartTick(key,myField,oppField,onReady);}
+/* ---- VÉDŐHÁLÓ A RÉGI REKORDOK ELLEN ----
+   A rekord magában hordja, MELYIK szezonra szól. Ha egy jövőbeli hiba miatt
+   mégis egy másik szezon rekordja kerülne elénk, azt NEM létezőnek tekintjük —
+   inkább várunk a társra, mint hogy egy tavalyi alkuból induljon a szezon.
+   A season nélküli rekord régi kliensé: azt elfogadjuk (a kulcs úgyis egyedi). */
+function mpStartRecOk(rec){
+  if(!rec)return false;
+  return rec.season==null||rec.season===mpUpcomingSeason();}
 async function mpStartTick(key,myField,oppField,onReady){
   if(!_mpStartBusy)return;
   if(_mpStartPoll){clearTimeout(_mpStartPoll);_mpStartPoll=null;}
@@ -13106,7 +13140,23 @@ async function mpStartTick(key,myField,oppField,onReady){
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}
   catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
   if(!_mpStartBusy)return;
-  const mine=node&&node[myField],mate=node&&node[oppField];
+  const _m=node&&node[myField],_o=node&&node[oppField];
+  const mine=mpStartRecOk(_m)?_m:null,mate=mpStartRecOk(_o)?_o:null;
+  /* ---- MÁR ELDŐLT SZINT ----
+     Ha az egyik oldal egyedül indult el (lásd a kényszerindítást lent), a
+     döntést BEÍRJA a szobába. A másik kliens ezt veszi át, nem számol újra —
+     így a kényszerindítás sem tudja kettéválasztani a két világot. */
+  if(node&&node.final&&mpStartRecOk(node.final)){
+    const v=node.final.v;
+    if(typeof v==="number"){
+      const before=oppTargetRating;
+      applyOppLevel(v);
+      S.consecutiveTitles=0;S.consecutiveBadSeasons=0;
+      mpStartAbort();
+      addLine(`🤝 A közös mezőny ${v} · ${diffTierLabel(v)} — a társad már elindította a szezont ezzel a szinttel.`,"m life");
+      if(before!==v)addLine(`✦ A mezőny újrasorsolva: ${before} → ${v}.`,"m life");
+      try{saveGame();}catch(e){}
+      onReady();return;}}
   if(mine&&mate){
     /* MINDKÉT KLIENS UGYANEZT SZÁMOLJA ki ugyanabból a két rekordból — ezért
        nincs szükség "döntőbíró" oldalra, és nem is csúszhat szét. */
@@ -13132,6 +13182,34 @@ async function mpStartTick(key,myField,oppField,onReady){
       mate?"a társad is kész, számolunk…":"várunk a társadra. Nyugodtan lépj ki, a döntésed megmarad."}
      <br><small style="color:var(--dim2)">A te javaslatod: <b>${(bid&&bid.value!=null)?bid.value+" · "+diffTierLabel(bid.value):"nem adtál meg szintet"}</b></small>`,
     !!mine,!!mate,MP_WAIT_START);
+  /* ---- KIÚT, HA A TÁRS NEM ÉRKEZIK ----
+     Eddig a kapunál csak várni lehetett. Ha a társ oldalán bármi elakadt (régi
+     verzió, elhagyott szoba, vagy épp az a hiba, ami ezt a javítást kiváltotta:
+     ő már elindult, tehát sosem fog jelentkezni), a szezon örökre a
+     várószobában maradt. Hosszabb várakozás után ezért felkínálunk egy egyedüli
+     indulást — a SAJÁT javaslatoddal. A döntést BEÍRJUK a szobába (node.final),
+     így a társ kliense nem újraszámol, hanem ezt veszi át: a két világ akkor is
+     egy szinten marad, ha nem egyszerre indultatok. */
+  _mpStartWaitStart=_mpStartWaitStart||Date.now();
+  const waited=Date.now()-_mpStartWaitStart;
+  const ob=$("h2hWaitOrphanBtn");
+  if(ob&&!mate&&waited>=MP_START_FORCE_MS){
+    ob.classList.remove("hide");
+    ob.disabled=false;
+    ob.textContent="A társad nem jelentkezik — indulok a saját javaslatommal";
+    ob.onclick=async()=>{
+      ob.disabled=true;
+      const r=mpResolveLevel(mine||{lvl:(bid&&bid.value!=null)?bid.value:null,str:Math.round(teamStrength())},null);
+      try{await mpBk().h2hPut(MP.activeRoom,key,"final",
+        {v:r.v,season:mpUpcomingSeason(),at:Date.now()});}catch(e){}
+      const before=oppTargetRating;
+      applyOppLevel(r.v);
+      S.consecutiveTitles=0;S.consecutiveBadSeasons=0;
+      mpStartAbort();
+      addLine(`🤝 Egyedül indultál el: a közös mezőny a te javaslatod szerint ${r.v} · ${diffTierLabel(r.v)}. A társad kliense ezt veszi át, amikor ő is elindítja a szezont.`,"m life");
+      if(before!==r.v)addLine(`✦ A mezőny újrasorsolva: ${before} → ${r.v}.`,"m life");
+      try{saveGame();}catch(e){}
+      onReady();};}
   _mpStartPoll=setTimeout(()=>mpStartTick(key,myField,oppField,onReady),2000);}
 /* ---- A KÖZÖS ELŐZMÉNY ----
    Szezononként egy sor mindkét menedzserről. Ebből áll össze a befejezéskori
