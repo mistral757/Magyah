@@ -641,8 +641,12 @@ button.infPanel:disabled{cursor:default}
   background:linear-gradient(180deg,#efe9d8,#dcd5c1)}
 .sbEv{display:flex;align-items:baseline;gap:5px;font-family:var(--font-body);
   font-size:11px;font-weight:700;line-height:1.55;color:#221f19}
-.sbEv .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sbEv .mn{color:#6d6656;font-variant-numeric:tabular-nums;flex:none}
+.sbEv .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none}
+/* A perc-felsorolás TÖRDELHET: egy mesterhármas (vagy több) percei így több
+   sorba folynak a név mellett, ahelyett hogy levágódnának. Ezért kapott a név
+   flex:none-t — a maradék helyet a percek kapják. */
+.sbEv .mn{color:#6d6656;font-variant-numeric:tabular-nums;flex:1 1 auto;
+  white-space:normal;word-break:keep-all}
 .sbEv .ic{flex:none;font-size:10px}
 .sbEv.red{color:#a2222a}
 .sbEv.inj{color:#ad5c15}
@@ -1314,7 +1318,12 @@ button.infPanel:disabled{cursor:default}
       </div>
     </div>
     <div id="ttxt">
-      <div class="tt-head"><span id="ttDiff"></span><span id="ttTeam">NB I KÖZVETÍTÉS</span><span id="ttClock"></span></div>
+      <!-- A feed FEJLÉCE törölve: minden információja (állás, perc, csapatok,
+           nehézség, taktika) ott van fölötte az eredményjelzőn, tehát csak
+           ismételte magát és helyet vett el. A hivatkozott elemek rejtve
+           megmaradnak, mert a motor több pontról frissíti őket — így nem kell
+           13 helyen null-ellenőrzést szórni. -->
+      <div class="tt-head hide"><span id="ttDiff"></span><span id="ttTeam"></span><span id="ttClock"></span></div>
       <div id="ttLines"></div>
       <!-- KÖZVETÍTÉS-TEMPÓ: közvetlenül a feed alatt, ahol nézés közben kézre
            esik. A régi háromállású gombot váltja (1× / 0.5× / 0.25×), mert az
@@ -1635,7 +1644,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.52";
+const APP_VERSION="2.5.53";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7622,10 +7631,10 @@ let renderHubSchedRow=null;
 
    AMI SZÁNDÉKOSAN KIMARAD: az öregedési/hanyatlási görbe. Azt lassítani
    KÖNNYÍTÉS volna — a lényeg épp az, hogy a fejlődés lassul, miközben az idő
-   ugyanúgy telik, tehát kevesebb szezonod van kihozni valakiből a maximumot. */
+   ugyanúgy telik, tehát kevesebb szezonod van kihozni valakiből a maximumot.
 
-   Nem a mentés része (localStorage), tehát futó karrierben is átállítható, és
-   azonnal hat — nem kell hozzá új szezon. */
+   A beállítás NEM a mentés része (külön localStorage-kulcson él), tehát futó
+   karrierben is átállítható, és azonnal hat — nem kell hozzá új szezon. */
 const TEMPO_KEY="harminc_nulla_tempo_v1";
 const GAME_TEMPO={
   normal:{k:1,   n:"Alap tempó"},
@@ -11295,13 +11304,36 @@ function pickTierQuote(active,min,redIdx){
    Így a néző számára minden 1-perc pontos, a motor alatt viszont semmi sem
    változott — nulla plusz számítás, nulla lassulás. */
 let _lastGoalMin=0;
+/* ---- HOSSZABBÍTÁS PERCE (90+N) ----
+   Eddig minden 90 utáni esemény csak "90+" volt. A valódi közvetítésben ott is
+   konkrét perc szerepel, és épp az a drámai, hogy a 90+7 lényegesen több, mint
+   a 90+1. A súlyok a valóságot követik: a ráadás többnyire 1-4 perc, az 5+ már
+   ritka, a 10. perc pedig legenda — kb. fél százalék. */
+const STOPPAGE_W=[26,24,20,14,8,4,2,1,0.5,0.5];   /* 1..10 perc */
+function stoppageMin(){
+  const tot=STOPPAGE_W.reduce((a,b)=>a+b,0);
+  let r=Math.random()*tot;
+  for(let i=0;i<STOPPAGE_W.length;i++){r-=STOPPAGE_W[i];if(r<=0)return i+1;}
+  return 1;}
+/* Egységes perc-felirat: 90 fölött "90+N", alatta "N'". Minden kijelzés ezt
+   használja (eredményjelző, óra, napló), így nem tud kettéválni. */
+function sbMinTxt(m){return m>90?`90+${Math.min(10,m-90)}`:`${m}'`;}
+/* A NAPLÓSOROK perc-előtagja. Egyben húz percet (gmin) és formáz (sbMinTxt),
+   hogy a 23 közvetítés-sor ne külön-külön döntse el, mi a helyes alak. */
+function gminTxt(bucket){return sbMinTxt(gmin(bucket));}
 function gmin(bucket){
   /* egy 5-perces bucketből (pl. 50) ad egy 1-perc pontos, hihető percet a
      [bucket-4 .. bucket] sávban, monoton növekvő sorrendben az előző gólhoz
      képest, hogy ne "ugorjon vissza" az idő két gól között */
+  /* 90 FÖLÖTT a ráadás saját eloszlásából húzunk (lásd stoppageMin), nem a
+     rácsból — így a "90+N" hiteles: általában 1-4, ritkán tovább. */
+  if(bucket>90){
+    let s=90+stoppageMin();
+    if(s<=_lastGoalMin)s=Math.min(100,_lastGoalMin+1);
+    _lastGoalMin=s;return s;}
   let m=bucket-4+Math.floor(Math.random()*5);
   if(m<=_lastGoalMin)m=Math.min(bucket,_lastGoalMin+1);
-  m=Math.max(1,Math.min(bucket>90?bucket:90,m));
+  m=Math.max(1,Math.min(90,m));
   _lastGoalMin=m;return m;}
 function ttScore(fx,gf,ga){return fx.home?`${gf}:${ga}`:`${ga}:${gf}`;}
 function myTeamAbbr(){
@@ -11329,7 +11361,24 @@ let SB={on:false,done:false,usIsHome:true,us:0,them:0,ev:[],
         t0:0,tickMs:330,iv:null,clockEls:null,scoreEls:null};
 /* A klubnév évszám-utótagja ("(2015/16)") a táblán csak zajt vinne — a tábla a
    MECCSRŐL szól, nem a keret évjáratáról. */
-function sbClubLabel(n){return String(n||"").replace(/\s*\([^)]*\)\s*$/,"").trim();}
+/* ---- KÖZEPESEN RÖVIDÍTETT CSAPATNÉV AZ EREDMÉNYJELZŐRE ----
+   A tábla két névmezője fix szélességű; a hosszú, több tagú nevek
+   ("Nyíregyháza Spartacus FC", "Borussia Mönchengladbach") szétcsúsztatták a
+   fejlécet. A 3 betűs kód viszont túl rideg lenne ide.
+   A szabály: legfeljebb 3 tag, tagonként legfeljebb 6 karakter. A töltelék-
+   tagokat (FC, SE, SC…) eldobjuk, mert nem hordoznak információt; ha a
+   levágás miatt egy tag csonkul, pont jelzi. */
+const SB_FILLER=/^(FC|AFC|AS|AC|SL|SV|SC|CF|SK|JK|BC|CP|SSC|VfB|RB|CR|OSC|SE|SZ|VSC|MTK|TSV|BSC|CFR|FK|NK|HNK|GNK|KSC|MSV|USM|PFC)$/i;
+function sbShortName(n){
+  const base=String(n||"").replace(/\s*\([^)]*\)\s*$/,"").trim();
+  if(!base)return "";
+  let words=base.split(/[\s.\-–]+/).filter(Boolean);
+  /* a töltelékeket csak akkor dobjuk, ha marad utánuk valami */
+  const kept=words.filter(w=>!SB_FILLER.test(w));
+  if(kept.length)words=kept;
+  words=words.slice(0,3).map(w=>w.length>6?w.slice(0,6)+".":w);
+  return words.join(" ");}
+function sbClubLabel(n){return sbShortName(n);}
 /* Egy lapsor felépítése. A visszaadott tömb a számjegy-elemeké, hogy utána
    pontonként lehessen frissíteni (lásd a teljesítmény-megjegyzést fent). */
 function sbBuildFlips(box,count,cls){
@@ -11397,13 +11446,31 @@ function sbRenderEvents(){
   const L=$("sbEvHome"),R=$("sbEvAway");if(!L||!R)return;
   const left=[],right=[];
   SB.ev.forEach(e=>{((e.side==="us")===SB.usIsHome?left:right).push(e);});
-  const row=e=>{
-    const ic=e.kind==="goal"?"⚽":e.kind==="red"?"🟥":"⚕";
-    const nm=e.name?esc(shortName(e.name)):"";
-    return `<div class="sbEv ${e.kind}"><span class="ic">${ic}</span>`
-      +`<span class="nm">${nm}</span><span class="mn">${e.min>90?"90+":e.min+"'"}</span></div>`;};
-  L.innerHTML=left.length?left.map(row).join(""):`<div class="sbEv none">—</div>`;
-  R.innerHTML=right.length?right.map(row).join(""):`<div class="sbEv none">—</div>`;}
+  /* ---- EGY JÁTÉKOS = EGY SOR ----
+     Aki többször talál be, eddig annyiszor szerepelt a táblán, ahány gólt lőtt
+     — egy mesterhármas három sort evett el a krónika-sávból. A valódi
+     eredményjelzők is a nevet írják ki egyszer, és mellé sorolják a perceket.
+     A percek a sor végén tördelődnek, tehát sok gólnál több sorba folynak.
+     A piros lap és a sérülés NEM vonódik össze: azokból egy emberre legfeljebb
+     egy jut, és külön esemény. */
+  const build=list=>{
+    const out=[],idx={};
+    list.forEach(e=>{
+      const key=e.kind==="goal"?("g|"+e.name):null;
+      if(key&&idx[key]!==undefined){out[idx[key]].mins.push(e.min);return;}
+      const rec={kind:e.kind,name:e.name,mins:[e.min]};
+      if(key)idx[key]=out.length;
+      out.push(rec);});
+    return out;};
+  const row=r=>{
+    const ic=r.kind==="goal"?"⚽":r.kind==="red"?"🟥":"⚕";
+    const nm=r.name?esc(shortName(r.name)):"";
+    const mins=r.mins.slice().sort((a,b)=>a-b).map(m=>sbMinTxt(m)).join(", ");
+    return `<div class="sbEv ${r.kind}"><span class="ic">${ic}</span>`
+      +`<span class="nm">${nm}</span><span class="mn">${mins}</span></div>`;};
+  const lb=build(left),rb=build(right);
+  L.innerHTML=lb.length?lb.map(row).join(""):`<div class="sbEv none">—</div>`;
+  R.innerHTML=rb.length?rb.map(row).join(""):`<div class="sbEv none">—</div>`;}
 /* ---- ÓRA ----
    A megjelenített idő NEM külön számláló, hanem a valós eltelt időből számolt
    arány: egy tick 5 meccspercet ér, tehát elteltTick × 5 perc. Így ha a böngésző
@@ -11483,17 +11550,30 @@ function sbLockView(){
   sbSizeFeed();
   /* A sticky elemre hívott scrollIntoView félrevihet (kitapadva a saját
      pozícióját 0-nak méri), ezért kézzel számoljuk a céloldalt. */
-  const y=window.scrollY+wrap.getBoundingClientRect().top;
-  try{window.scrollTo({top:Math.max(0,Math.round(y)),behavior:"smooth"});}
-  catch(e){window.scrollTo(0,Math.max(0,Math.round(y)));}
-  if(feed)feed.scrollTop=feed.scrollHeight;}
+  const goTo=()=>{
+    const y=window.scrollY+wrap.getBoundingClientRect().top;
+    const top=Math.max(0,Math.round(y));
+    try{window.scrollTo({top,behavior:"smooth"});}
+    catch(e){window.scrollTo(0,top);}
+    if(feed)feed.scrollTop=feed.scrollHeight;};
+  /* HÁROM ÜTEMBEN. Ha a felhasználó a feed aljára görgetett, a kezdőrúgás
+     pillanatában a lap sokkal lejjebb áll, és a cél-pozíció még mozog: a
+     sbSizeFeed épp most állítja a feed magasságát, a közvetítés első sorai
+     pedig azonnal érkeznek. Egyetlen scrollTo ilyenkor egy ELAVULT
+     koordinátára visz, és a nézet a meccs alatt lent ragad.
+     Ezért egyszer azonnal ugrunk, egyszer a következő képkockán (amikor a
+     méretezés már lefutott), és egyszer röviddel utána — az utolsó kettő
+     korrigálja az elcsúszást. */
+  goTo();
+  if(typeof requestAnimationFrame==="function")requestAnimationFrame(goTo);
+  setTimeout(goTo,120);}
 window.addEventListener("resize",sbSizeFeed);
 function updateTTBoard(fx,gf,ga,dispMin){
   /* az eredményjelző ugyanebből az egy pontból frissül: a szimuláció MINDEN
      góleseménye átfut rajta, tehát az állás sosem csúszhat el a naplótól */
   sbSetScore(gf,ga);
   /* a fejléc két szélső mezője lesz az élő tábla: bal = eredmény, jobb = perc */
-  const el=$("ttClock");if(el)el.textContent=(dispMin>90?"90+":dispMin+"'");
+  const el=$("ttClock");if(el)el.textContent=sbMinTxt(dispMin);
   const sc=$("ttTeam");if(sc)sc.textContent=`${fx.home?myTeamAbbr():clubAbbr(fx.o.n)} ${ttScore(fx,gf,ga)} ${fx.home?clubAbbr(fx.o.n):myTeamAbbr()}`;}
 /* A fejléc bal mezője a NEHÉZSÉGI SZINTET mutatja (a régi statikus "P591"
    helyén), a szint saját színével — ugyanabban a sávrendszerben, mint a
@@ -12978,6 +13058,13 @@ function mileFullTime(M,active,cleanSheet,saves,result,lastRound,ctx){
     S.benchRun=S.benchRun||{};
     currentRoster().filter(Boolean).forEach(p=>{
       if(played.has(p.n)){S.benchRun[p.n]=0;return;}
+      /* A SÉRÜLT (vagy eltiltott) játékos kihagyása NEM kiszorulás: nem az
+         edző döntött róla, hanem a teste. Korábban az ő kihagyása is ezt a
+         számlálót hizlalta, ezért a sérülés után megkapta a "kiszorult a
+         kezdőből" üzenetet — ami se nem igaz, se nem méltányos. Az ilyen
+         meccsek egyszerűen nem számítanak bele; a sorozat a helyén marad,
+         és a felépülés után onnan folytatódik. */
+      if(playerUnavailable(p.n))return;
       S.benchRun[p.n]=(S.benchRun[p.n]||0)+1;
       if(S.benchRun[p.n]!==MILE_BENCH_RETURN)return;
       if(mileMatches(p.n)<MILE_FAV_MATCHES)return;
@@ -13193,45 +13280,45 @@ function playMatch(){
       if(Math.random()<0.78){
         gf++;mScore[taker.n]=(mScore[taker.n]||0)+1;recordScorer(taker.n);
         updateTTBoard(fx,gf,ga,Math.min(90,min));
-        addLine(`${gmin(min)}'  TIZENEGYES! ${esc(shortName(taker.n))} magabiztosan értékesíti  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+        addLine(`${gminTxt(min)}  TIZENEGYES! ${esc(shortName(taker.n))} magabiztosan értékesíti  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
         sbEv("us","goal",taker.n);
         updateGoallessStreak(taker.n,true);
-      }else addLine(`${gmin(min)}'  Tizenegyes! ${esc(shortName(taker.n))} kihagyja — a kapufát találja el`,"m ev");
+      }else addLine(`${gminTxt(min)}  Tizenegyes! ${esc(shortName(taker.n))} kihagyja — a kapufát találja el`,"m ev");
     }else if(evType==="penalty_against"){
       if(Math.random()<0.78){
         ga++;
         const oppScorer=pickOpponentScorer(fx.o);
         updateTTBoard(fx,gf,ga,Math.min(90,min));
-        addLine(`${gmin(min)}'  Tizenegyesgól: ${esc(oppScorer)} (${fx.o.n})  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+        addLine(`${gminTxt(min)}  Tizenegyesgól: ${esc(oppScorer)} (${fx.o.n})  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
         sbEv("them","goal",oppScorer);
-        mileGkConceded(MILE,`${gmin(min)}'  `);
-      }else addLine(`${gmin(min)}'  Tizenegyes ellenünk — de kimarad, megmenekültünk!`,"m ev");
+        mileGkConceded(MILE,`${gminTxt(min)}  `);
+      }else addLine(`${gminTxt(min)}  Tizenegyes ellenünk — de kimarad, megmenekültünk!`,"m ev");
     }else if(evType==="owngoal_for"){
       gf++;
       updateTTBoard(fx,gf,ga,Math.min(90,min));
-      addLine(`${gmin(min)}'  ÖNGÓL! Az ellenfél védője a saját kapujába lövi  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+      addLine(`${gminTxt(min)}  ÖNGÓL! Az ellenfél védője a saját kapujába lövi  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
       sbEv("us","goal","öngól");
     }else if(evType==="owngoal_against"){
       ga++;
       const culprit=pick(onPitch().filter(a=>!a.p.family));
       updateTTBoard(fx,gf,ga,Math.min(90,min));
-      addLine(`${gmin(min)}'  ÖNGÓL! ${esc(shortName(culprit.p.n))} saját kapujába talál  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+      addLine(`${gminTxt(min)}  ÖNGÓL! ${esc(shortName(culprit.p.n))} saját kapujába talál  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
       sbEv("them","goal",culprit.p.n);
-      mileGkConceded(MILE,`${gmin(min)}'  `);
+      mileGkConceded(MILE,`${gminTxt(min)}  `);
       applyDisciplineDip(culprit.p.n);
     }else if(evType==="fight"){
       const op=onPitch();const p1=pick(op),others=op.filter(a=>a!==p1),p2=pick(others);
-      addLine(`${gmin(min)}'  Összecsapás a pályán: ${esc(shortName(p1.p.n))} és ${esc(shortName(p2.p.n))} között — a játékvezető szétválasztja őket`,"m ev");
+      addLine(`${gminTxt(min)}  Összecsapás a pályán: ${esc(shortName(p1.p.n))} és ${esc(shortName(p2.p.n))} között — a játékvezető szétválasztja őket`,"m ev");
       if(redIdx<0&&Math.random()<0.3){
         const victim=Math.random()<0.5?p1:p2;
         redIdx=active.indexOf(victim);S.reds++;
-        addLine(`${gmin(min)}'  🟥 PIROS LAP a dulakodás után! Emberhátrány!`,"m rc");
+        addLine(`${gminTxt(min)}  🟥 PIROS LAP a dulakodás után! Emberhátrány!`,"m rc");
         sbEv("us","red",victim.p.n);
-        mileRed(MILE,victim.p.n,`${gmin(min)}'  `);
+        mileRed(MILE,victim.p.n,`${gminTxt(min)}  `);
         diff-=SIM.REDMATCH;lf=lam(diff);la=lam(-diff)*defenseMult();}
     }else if(evType==="var_overturn"){
       const nearScorer=pick(onPitch());
-      addLine(`${gmin(min)}'  VAR-ellenőrzés... a gólt nem adják meg! ${esc(shortName(nearScorer.p.n))} csalódottan a fejéhez kap`,"m ev");
+      addLine(`${gminTxt(min)}  VAR-ellenőrzés... a gólt nem adják meg! ${esc(shortName(nearScorer.p.n))} csalódottan a fejéhez kap`,"m ev");
     }else if(evType==="free_kick_goal"){
       const si=weightedPick(active,(x,idx)=>{
         if(idx===redIdx)return 0;
@@ -13242,10 +13329,10 @@ function playMatch(){
         gf++;mScore[taker.n]=(mScore[taker.n]||0)+1;recordScorer(taker.n);
         const fkSk=playerSkills(taker.n).find(i=>i.skill.id==="mf_fk");
         updateTTBoard(fx,gf,ga,Math.min(90,min));
-        addLine(`${gmin(min)}'  SZABADRÚGÁSGÓL! ${esc(shortName(taker.n))} a sorfal fölött a kapuba csavarja${fkSk?` — ${esc(fkSk.skill.name)}${skillProgressSuffix(fkSk)} is közrejátszott`:""}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+        addLine(`${gminTxt(min)}  SZABADRÚGÁSGÓL! ${esc(shortName(taker.n))} a sorfal fölött a kapuba csavarja${fkSk?` — ${esc(fkSk.skill.name)}${skillProgressSuffix(fkSk)} is közrejátszott`:""}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
         sbEv("us","goal",taker.n);
         updateGoallessStreak(taker.n,true);
-      }else addLine(`${gmin(min)}'  Szabadrúgás — ${esc(shortName(taker.n))} próbálkozik, de a sorfalon landol a labda`,"m ev");
+      }else addLine(`${gminTxt(min)}  Szabadrúgás — ${esc(shortName(taker.n))} próbálkozik, de a sorfalon landol a labda`,"m ev");
     }}
   const iv=setInterval(()=>{
     min+=5;
@@ -13264,7 +13351,10 @@ function playMatch(){
       pendingDrama=Math.random()<0.5?"us":"them";}
     function runPendingDrama(){
       if(!pendingDrama)return;
-      _lastGoalMin=91;
+      /* a ráadás konkrét perce — a dráma sokat nyer azzal, hogy látszik,
+         a 90+2-ben vagy a 90+8-ban esett-e */
+      const dMin=90+stoppageMin();
+      _lastGoalMin=dMin;
       if(pendingDrama==="us"){
         gf++;
         const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*(S.subs[x.idx]&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_supersub")?3.5:1));
@@ -13272,15 +13362,15 @@ function playMatch(){
         mScore[dramaScorer.n]=(mScore[dramaScorer.n]||0)+1;recordScorer(dramaScorer.n);
         updateGoallessStreak(dramaScorer.n,true);
         updateTTBoard(fx,gf,ga,90);
-        addLine(`90+  DRÁMA A HOSSZABBÍTÁSBAN! ${esc(shortName(dramaScorer.n))} az utolsó pillanatokban dönt  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
-        sbEv("us","goal",dramaScorer.n,91);
+        addLine(`${sbMinTxt(dMin)}  DRÁMA A HOSSZABBÍTÁSBAN! ${esc(shortName(dramaScorer.n))} az utolsó pillanatokban dönt  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+        sbEv("us","goal",dramaScorer.n,dMin);
       }else{
         ga++;
         const dramaOppScorer=pickOpponentScorer(fx.o);
         updateTTBoard(fx,gf,ga,90);
-        addLine(`90+  DRÁMA A HOSSZABBÍTÁSBAN! ${esc(dramaOppScorer)} (${fx.o.n}) az utolsó pillanatokban rontja el az ünnepet  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
-        sbEv("them","goal",dramaOppScorer,91);
-        mileGkConceded(MILE,"90+  ");}
+        addLine(`${sbMinTxt(dMin)}  DRÁMA A HOSSZABBÍTÁSBAN! ${esc(dramaOppScorer)} (${fx.o.n}) az utolsó pillanatokban rontja el az ünnepet  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+        sbEv("them","goal",dramaOppScorer,dMin);
+        mileGkConceded(MILE,`${sbMinTxt(dMin)}  `);}
       maxDeficit=Math.max(maxDeficit,ga-gf);maxLead=Math.max(maxLead,gf-ga);
       pendingDrama=null;}
     /* PÁRHARCBAN a vödör góljai a KÖZÖS listából jönnek; egyébként poisson. */
@@ -13317,16 +13407,16 @@ function playMatch(){
         atxt=` (${esc(shortName(asst.n))})`;asstName=asst.n;
         asstSk=playerSkills(asst.n).find(i=>i.skill.type==="assistw");}
       updateTTBoard(fx,gf,ga,Math.min(90,min));
-      addLine(`${goalMin}'  GÓL! ${esc(shortName(scorer.n))}${atxt}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+      addLine(`${sbMinTxt(goalMin)}  GÓL! ${esc(shortName(scorer.n))}${atxt}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
       /* a táblára SZÁNDÉKOSAN csak a gólszerző kerül fel — a gólpasszt a valódi
          eredményjelzők sem vezették, és itt is csak zsúfolttá tenné a sávot */
       sbEv("us","goal",scorer.n,goalMin);
       /* KARRIER-MÉRFÖLDKÖVEK a gólnál. A gólszerző ELŐBB: ha ugyanaz a történet
          (pl. ifi-mérföldkő) mindkettőre állna, a gólé az elsőbbség. */
-      mileEffective(MILE,scorer.n,"goal",`${goalMin}'  `);
-      if(asstName)mileEffective(MILE,asstName,"assist",`${goalMin}'  `);
+      mileEffective(MILE,scorer.n,"goal",`${sbMinTxt(goalMin)}  `);
+      if(asstName)mileEffective(MILE,asstName,"assist",`${sbMinTxt(goalMin)}  `);
       /* a gólhoz kötött színek: régi klub, búcsúszezon, visszatérés a kispadról */
-      mileGoalExtras(MILE,scorer.n,asstName,`${goalMin}'  `,fx);
+      mileGoalExtras(MILE,scorer.n,asstName,`${sbMinTxt(goalMin)}  `,fx);
       /* GENERÁCIÓS GÓL: fiatal fejezi be, amit egy veterán indított (vagy
          fordítva). Tisztán íz, meccsenként legfeljebb egyszer. */
       if(asstName&&!genGoalShown){
@@ -13425,10 +13515,10 @@ function playMatch(){
       const oppTxt=(dOpp&&dOpp.assist)
         ?`${esc(oppScorer)} — gólpassz: ${esc(shortName(dOpp.assist))} (${fx.o.n})`
         :`${esc(oppScorer)} (${fx.o.n})`;
-      addLine(`${oppMin}'  Gól: ${oppTxt}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+      addLine(`${sbMinTxt(oppMin)}  Gól: ${oppTxt}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
       sbEv("them","goal",oppScorer,oppMin);
       /* a rossz sorozatban lévő kapus fejmosása — a meccs ELSŐ kapott góljánál */
-      mileGkConceded(MILE,`${oppMin}'  `);}
+      mileGkConceded(MILE,`${sbMinTxt(oppMin)}  `);}
       /* F5: begyakorlatlan (78 alatti) aktív taktika bizonytalansága — a
          kapott gól után szólal meg, meccsenként legfeljebb egyszer */
       if(!tacRawShown&&S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)<78&&Math.random()<fp(0.28)){
@@ -13445,9 +13535,9 @@ function playMatch(){
     if(redIdx<0&&Math.random()<SIM.REDP/18){
       redIdx=weightedPick(active,x=>[0.2,0.5,1,2,3][x.p.aggroI!==undefined?x.p.aggroI:2]*multSkillEffect(x.p.n,"discipline")*(x.p.family&&(x.p.familySpecialty==="kutya"||x.p.familySpecialty==="tank")?1.4:1));
       S.reds++;
-      addLine(`${gmin(min)}'  🟥 PIROS LAP! ${esc(shortName(active[redIdx].p.n))} kiállítva — mehet zuhanyozni, emberhátrányba kerülünk!`,"m rc");
+      addLine(`${gminTxt(min)}  🟥 PIROS LAP! ${esc(shortName(active[redIdx].p.n))} kiállítva — mehet zuhanyozni, emberhátrányba kerülünk!`,"m rc");
       sbEv("us","red",active[redIdx].p.n);
-      mileRed(MILE,active[redIdx].p.n,`${gmin(min)}'  `);
+      mileRed(MILE,active[redIdx].p.n,`${gminTxt(min)}  `);
       diff-=SIM.REDMATCH;lf=lam(diff);la=lam(-diff)*defenseMult();
       applyDisciplineDip(active[redIdx].p.n);}
     /* ---- SZÍNES SKILL-KÖZVETÍTÉS ----
@@ -13492,7 +13582,7 @@ function playMatch(){
         updateGoallessStreak(sc.n,true);
         const inst=playerSkills(sc.n).find(i=>i.skill.id==="fw_supersub");
         updateTTBoard(fx,gf,ga,Math.min(90,min));
-        addLine(`${gmin(min)}'  🔥 A PADRÓL! ${esc(shortName(sc.n))} beugrik a semmiből és betalál — csereként is halálos!  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+        addLine(`${gminTxt(min)}  🔥 A PADRÓL! ${esc(shortName(sc.n))} beugrik a semmiből és betalál — csereként is halálos!  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
         sbEv("us","goal",sc.n);
         if(inst)addLine(`→ ${esc(inst.skill.name)}${skillProgressSuffix(inst)} — pont ezért ül a padon`,"m skillnote");
         maxDeficit=Math.max(maxDeficit,ga-gf);maxLead=Math.max(maxLead,gf-ga);}}
@@ -13509,7 +13599,7 @@ function playMatch(){
         if(r<0.68){
           saveCount++;S.careerStats[gk.p.n]=S.careerStats[gk.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};S.careerStats[gk.p.n].saves++;
           S.seasonSaves[gk.p.n]=(S.seasonSaves[gk.p.n]||0)+1;
-          addLine(`${gmin(min)}'  BRAVÚR! ${esc(shortName(gk.p.n))} hihetetlen vetődéssel fogja a labdát — ${esc(grasshopperSk.skill.name)}${skillProgressSuffix(grasshopperSk)}`,"m ev");
+          addLine(`${gminTxt(min)}  BRAVÚR! ${esc(shortName(gk.p.n))} hihetetlen vetődéssel fogja a labdát — ${esc(grasshopperSk.skill.name)}${skillProgressSuffix(grasshopperSk)}`,"m ev");
         /* PÁRHARCBAN a potyagól kimarad: KAPOTT GÓLT írna helyben, az állást
            viszont a közös lista adja. A bravúr és a magabiztos ág marad — a
            kapus-skill tehát a párharcban is megszólal, csak nem az eredményt
@@ -13517,10 +13607,10 @@ function playMatch(){
         }else if(!DUEL&&r<0.75){   /* 0.68..0.75 = 7% potyagól (volt 15%) */
           ga++;
           updateTTBoard(fx,gf,ga,Math.min(90,min));
-          addLine(`${gmin(min)}'  Potyagól! ${esc(shortName(gk.p.n))} nagyot hibázik, könnyű gólt kap  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+          addLine(`${gminTxt(min)}  Potyagól! ${esc(shortName(gk.p.n))} nagyot hibázik, könnyű gólt kap  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
           sbEv("them","goal","potyagól");
-          mileGkConceded(MILE,`${gmin(min)}'  `);
-        }else addLine(`${gmin(min)}'  ${esc(shortName(gk.p.n))} magabiztosan tartja a kaput`,"m ev");
+          mileGkConceded(MILE,`${gminTxt(min)}  `);
+        }else addLine(`${gminTxt(min)}  ${esc(shortName(gk.p.n))} magabiztosan tartja a kaput`,"m ev");
         runPendingDrama();
         return;}
       const defHolder=active.find(a=>playerSkills(a.p.n).some(i=>i.skill.type==="defense"));
@@ -13532,7 +13622,7 @@ function playMatch(){
         fl.push(`Falazás: a védelem sziklaszilárd — ${esc(shortName(defHolder.p.n))} (${esc(dsk.skill.name)}${skillProgressSuffix(dsk)}) állja a sarat`);}
       const fi=Math.floor(Math.random()*fl.length);
       if(fi===1){saveCount++;S.careerStats[gk.p.n]=S.careerStats[gk.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};S.careerStats[gk.p.n].saves++;S.seasonSaves[gk.p.n]=(S.seasonSaves[gk.p.n]||0)+1;}
-      addLine(`${gmin(min)}'  ${fl[fi]}`,"m ev");
+      addLine(`${gminTxt(min)}  ${fl[fi]}`,"m ev");
       /* BL ARANYKESZTYŰ: bravúrvédésnél szólal meg a kapus díj-kommentárja. */
       if(fi===1&&(S._goldQuotesThisMatch||0)<2){
         const kq=goldQuoteFor(gk.p.n,"bl_golden_gloves");
@@ -13788,7 +13878,7 @@ function playMatch(){
         `⚕ SÉRÜLÉS! ${esc(shortName(inm))} megfeszül és sántikálva jelzi, hogy nem tudja folytatni`,
         `⚕ SÉRÜLÉS! Rossz mozdulat — ${esc(shortName(inm))} a combjához kap, hordágy jön be`,
         `⚕ SÉRÜLÉS! ${esc(shortName(inm))} egy ütközés után nem tud lábra állni — le kell cserélni`];
-      addLine(`${gmin(min)}'  ${pick(injTexts)} (${dur} forduló)`,"m inj");
+      addLine(`${gminTxt(min)}  ${pick(injTexts)} (${dur} forduló)`,"m inj");
       sbEv("us","inj",inm);
       addOrExtendUnavailable(inm,dur,"injury");
       injuredThisMatchName=inm;
