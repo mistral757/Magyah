@@ -429,6 +429,24 @@ button.infPanel:disabled{cursor:default}
 .hdA.trMain{border-color:color-mix(in srgb,var(--grass) 55%,var(--line))}
 .hdA.trSec{border-color:color-mix(in srgb,var(--gold) 45%,var(--line))}
 .hdA.trSlow{opacity:.62}
+/* ---- STATZONE a játékos-részletekben ----
+   A gyűjtött statisztika mindig KÉT szám: a nagy a mindenkori (karrier), a
+   kicsi alatta az EBBEN a szezonban gyűjtött rész. Így egy pillantásra látszik,
+   mit hozott eddig valaki, és hogy éppen most is hozza-e. A doboz akkor is ott
+   van, ha még nulla — üres keretnél ez maga az információ. */
+.hdStat{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:2px 0 8px}
+.hdStat>div{background:var(--bg);border:1px solid var(--line);border-radius:8px;
+  padding:5px 4px;text-align:center}
+.hdStat .k{font-size:9.5px;color:var(--dim2);text-transform:uppercase;letter-spacing:.4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdStat .v{font-family:var(--font-disp);font-size:16px;color:var(--ink);line-height:1.15}
+.hdStat .s{font-size:9.5px;color:var(--dim2);min-height:12px}
+.hdStat .s.now{color:var(--grass)}
+.hdStat>div.zero{opacity:.45}
+.hdStat>div.gk{border-color:color-mix(in srgb,var(--sky,#4aa8ff) 40%,var(--line))}
+.hdTrophy{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 8px}
+.hdTrophy span{font-size:10.5px;border:1px solid var(--gold);color:var(--gold);
+  border-radius:999px;padding:2px 8px;white-space:nowrap}
 .specPanel{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin:10px 0 8px}
 .specTitle{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim2);margin-bottom:7px}
 .specRow{display:flex;align-items:center;gap:8px;margin-bottom:5px}
@@ -1703,7 +1721,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.57";
+const APP_VERSION="2.5.58";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8957,8 +8975,7 @@ function natOfName(n){
   const e=(typeof careerPool!=="undefined"&&careerPool)?careerPool[n]:null;
   if(e&&e.nat){NAT_BY_NAME[n]=e.nat;return e.nat;}
   return null;}
-function shortName(n){
-  if(SHORTNAME_OVERRIDE[n])return SHORTNAME_OVERRIDE[n];
+function baseShortName(n){
   if(n.includes(","))return n.split(",")[0];
   const parts=n.trim().split(" ");
   if(parts.length===1)return parts[0];
@@ -8966,6 +8983,42 @@ function shortName(n){
   let cut=parts.length-1;
   for(let i=1;i<parts.length-1;i++){if(NAME_PARTICLES.has(parts[i].toLowerCase())){cut=i;break;}}
   return parts.slice(cut).join(" ");}
+/* Ha két KÜLÖNBÖZŐ teljes névből ugyanaz a rövid alak jön ki, a közvetítésben
+   és a meccsnézetben nem lehet szétválasztani őket (Cristiano Ronaldo és a
+   brazil Ronaldo, Szalai Ádám és Szalai Attila, Sergio és Gonçalo Ramos…).
+   Ilyenkor keresztnév-kezdőbetűt teszünk elé: "C. Ronaldo", magyar sorrendnél
+   mögé: "Szalai Á.". KIVÉTEL az egyszavas név — az marad, ahogy van, így a
+   brazil Ronaldo Ronaldo is marad. Ha a kezdőbetű is ütközne (Ashley és Andy
+   Cole), annál a kettőnél a teljes név megy ki. A tábla egyszer épül fel az
+   adatbázisból, tehát ugyanaz a játékos mindenhol ugyanúgy néz ki. */
+const HU_DIGRAPHS=["Zs","Cs","Gy","Sz","Ny","Ty","Ly","Dz"];
+const SHORTNAME_DISAMBIG={};
+function givenInitial(given,hu){
+  if(hu){const d=HU_DIGRAPHS.find(x=>given.startsWith(x));if(d)return d;}
+  return given.slice(0,1);}
+function buildShortNameDisambig(){
+  const nevek=new Set();
+  ALL_PLAYERS.forEach(p=>nevek.add(p.n));ICON_PLAYERS.forEach(p=>nevek.add(p.n));
+  const csoport={};
+  nevek.forEach(n=>{
+    if(SHORTNAME_OVERRIDE[n])return;
+    const s=baseShortName(n);(csoport[s]=csoport[s]||[]).push(n);});
+  Object.values(csoport).forEach(lista=>{
+    if(lista.length<2)return;
+    const jelolt={};
+    lista.forEach(n=>{
+      const parts=n.trim().split(" ");
+      if(parts.length===1){jelolt[n]=n;return;}
+      const hu=natOfName(n)==="Magyarország";
+      jelolt[n]=hu?parts[0]+" "+givenInitial(parts[1],true)+"."
+                  :givenInitial(parts[0],false)+". "+baseShortName(n);});
+    const db={};Object.values(jelolt).forEach(v=>{db[v]=(db[v]||0)+1;});
+    Object.entries(jelolt).forEach(([n,v])=>{SHORTNAME_DISAMBIG[n]=db[v]>1?n:v;});});}
+buildShortNameDisambig();
+function shortName(n){
+  if(SHORTNAME_OVERRIDE[n])return SHORTNAME_OVERRIDE[n];
+  if(SHORTNAME_DISAMBIG[n])return SHORTNAME_DISAMBIG[n];
+  return baseShortName(n);}
 let pendingCaptainIdx=-1;
 function captainReason(p){
   const bits=[];
@@ -17855,6 +17908,71 @@ function renderSpecPanel(){
     <div class="specHint">${onMain}/${active.length} játékos a fő posztján. A szám azt mutatja, átlagosan mennyit nyer/veszít a kezdő 11 a Ratingjéhez képest a mostani felállással — a poszthű összeállítás és a poszthoz illő attribútumok viszik fel. Ez hat a meccseken.</div>
     ${offHtml}
   </div>`;}
+/* ---- STATZONE: a játékos összegyűjtött statisztikája ----
+   Eddig a keret-statisztika csak a külön statisztika-táblákban élt (szezon- és
+   mindenkori tábla), a HUB-ban viszont pont ott hiányzott, ahol a játékosról
+   döntesz: eladjam-e, kezdő legyen-e, megéri-e még. Ezért minden dobozban KÉT
+   szám áll: a nagy a MINDENKORI (karrier) érték, alatta kicsiben az EBBEN a
+   szezonban gyűjtött rész. Így egy pillantás elárulja, mit hozott eddig valaki,
+   és hogy éppen most is hozza-e.
+
+   A szezon-oszlop a bajnokságot ÉS a kupát együtt mutatja (S.scorers +
+   S.seasonEuro.scorers), ahogy a szezon-tábla is — a mindenkori (S.careerStats)
+   eleve együtt gyűjti a kettőt.
+
+   A bravúr és a tiszta lap csak kapusnál (vagy ha valakinek mégis van belőle)
+   jelenik meg: mezőnyjátékosnál a garantált nulla csak zajt csinálna. A
+   mesterhármasnak nincs szezon-vödre, ott a mindenkori szám áll magában.
+   A statzone családtagnál és careerPool nélküli játékosnál is működik, mert
+   minden vödör NÉV szerint tárol. */
+function hubStatCell(k,kar,sez,cls){
+  const sub=sez==null?`<span class="s">mindenkori</span>`
+    :sez>0?`<span class="s now">idén +${sez}</span>`
+    :`<span class="s">idén 0</span>`;
+  return `<div class="${(kar?"":"zero")+(cls?" "+cls:"")}">
+    <div class="k">${k}</div><div class="v">${kar}</div>${sub}</div>`;}
+function hubStatZoneHtml(p){
+  const n=p.n;
+  const C=(S.careerStats&&S.careerStats[n])||{};
+  const _eb=S.seasonEuro||{};
+  const _b=(m,x)=>((m&&m[x])||0);
+  const sez={m:_b(S.seasonMatches,n),
+    g:_b(S.scorers,n)+_b(_eb.scorers,n),
+    a:_b(S.assists,n)+_b(_eb.assists,n),
+    mvp:_b(S.mvps,n)+_b(_eb.mvps,n),
+    saves:_b(S.seasonSaves,n),cs:_b(S.seasonCleanSheets,n),
+    rc:_b(S.playerReds,n),inj:_b(S.playerInjuries,n)};
+  const kar={m:C.matches||0,g:C.g||0,a:C.a||0,mvp:C.mvp||0,ht:C.hattricks||0,
+    saves:C.saves||0,cs:C.cs||0,rc:C.rc||0,inj:C.inj||0};
+  const gk=!!(p.pos&&p.pos[0]==="KP");
+  let cells=hubStatCell("Meccs",kar.m,sez.m)
+    +hubStatCell("Gól",kar.g,sez.g)
+    +hubStatCell("Gólpassz",kar.a,sez.a)
+    +hubStatCell("MVP",kar.mvp,sez.mvp)
+    +hubStatCell("Mesterhármas",kar.ht,null);
+  if(gk||kar.saves||kar.cs){
+    cells+=hubStatCell("Bravúr",kar.saves,sez.saves,"gk")
+      +hubStatCell("Tiszta lap",kar.cs,sez.cs,"gk");}
+  cells+=hubStatCell("Piros lap",kar.rc,sez.rc)
+    +hubStatCell("Sérülés",kar.inj,sez.inj);
+  /* Díjak — ezek nem számlálók, hanem állapotok, ezért külön sorban, jelvényként. */
+  const dij=[];
+  const bh=(S.ballonHistory||[]).filter(x=>x.own&&x.name===n).length;
+  if(bh)dij.push(`⚽ Aranylabda${bh>1?" ×"+bh:""}`);
+  const aw=(typeof awardCount==="function")?awardCount(n):0;
+  if(aw){const b=awardBoost(n);
+    dij.push(`🥇 BL egyéni díj${aw>1?" ×"+aw:""}${b?` (+${b} Rating)`:""}`);}
+  const ch=S.championCards&&S.championCards[n];
+  if(ch)dij.push(`🎖️ Champion-kártya ${EURO_COMPS[ch.comp]?EURO_COMPS[ch.comp].short:ch.comp} (+${ch.boost} Rating)`);
+  const dijHtml=dij.length?`<div class="hdTrophy">${dij.map(x=>`<span>${x}</span>`).join("")}</div>`:"";
+  /* Egy mondatos összegzés: a puszta számok mellé a hozam ARÁNYA is kell —
+     eladás előtt ez a legbeszédesebb mutató. */
+  let sum;
+  if(kar.m)sum=`<div class="hdRow">📈 <b>${kar.m}</b> lejátszott meccs · gól+gólpassz meccsenként <b>${((kar.g+kar.a)/kar.m).toFixed(2)}</b>${
+    gk&&kar.m?` · tiszta lap az esetek <b>${Math.round(kar.cs/kar.m*100)}%</b>-ában`:""}.</div>`;
+  else sum=`<div class="hdRow" style="color:var(--dim2)">📈 Még nem lépett pályára — a statisztika a lefújásoknál gyűlik.</div>`;
+  return `<div class="hdRow" style="margin-bottom:4px"><b>📊 Statzone</b> <span style="color:var(--dim2)">— nagy szám: mindenkori, alatta az idei</span></div>
+    <div class="hdStat">${cells}</div>${dijHtml}${sum}`;}
 function buildHubDetail(loc){
   const p=loc.p,e=careerPool&&careerPool[p.n];
   const d=document.createElement("div");d.className="hubDetail";
@@ -17878,18 +17996,11 @@ function buildHubDetail(loc){
         :isSlow?'<span class="hdTr dn">▼</span>':"";
       const cls="hdA"+(k===keyHere?" pri":"")+(isMain?" trMain":isSec?" trSec":isSlow?" trSlow":"");
       return `<div class="${cls}"><span class="l">${ATTR_LABELS[k]}${mark}</span><span class="v">${e.attrs[k]}</span></div>`;}).join("")+`</div>`;
-    if(_tr){
-      const bits=[];
-      if(_tr.main)bits.push(`<b style="color:var(--grass)">${ATTR_LABELS[_tr.main]}</b> — gyorsabban fejlődik <span style="color:var(--grass)">(fő edzés, ▲▲)</span>`);
-      if(_tr.sec) bits.push(`<b style="color:var(--gold)">${ATTR_LABELS[_tr.sec]}</b> — szintén gyorsabban, feleakkora ütemben <span style="color:var(--gold)">(mellék, ▲)</span>`);
-      bits.push(`<span style="color:var(--dim2)">${_tr.slow.map(k=>ATTR_LABELS[k]).join(" és ")} — cserébe ${Math.round(TRAIN_SLOW*100)}%-kal lassabban (▼)</span>`);
-      html+=`<div class="hdRow" style="background:color-mix(in srgb,var(--grass) 9%,transparent);border-radius:7px;padding:7px 9px">
-        <b>🏋️ Edzésterv hatása</b><br>${bits.join("<br>")}
-        <div style="margin-top:5px;color:var(--dim2)">Az edzés a <b>specializációt</b> mozgatja: azt, hogy a játékos a posztjához képest miben erősebb vagy gyengébb az átlagnál. A Rating-fejlődését nem érinti — edzéstől senki nem lesz gyengébb, csak máshova fejlődik.</div></div>`;
-      html+=trainBalanceHtml(e);
-    }else if(gameMode==="career"&&careerPool){
-      html+=`<div class="hdRow" style="color:var(--dim2)">🏋️ Nem érinti edzésterv — az attribútumai a szokásos tempóban mozognak: a posztján való játék, a gólok, gólpasszok és tiszta lapok szerint.</div>`;
-      html+=trainBalanceHtml(e);}
+    /* Az edzésterv HATÁSÁT a fenti ▲▲/▲/▼ jelölés már elmondja az attribútum
+       dobozain — a hozzá írt szöveges blokk csak ismételte, és túl hosszúra
+       nyújtotta a lenyílót. A mérleg (mennyit MOZDULT eddig az edzéstől) marad,
+       mert az mért adat, nem magyarázat. */
+    html+=trainBalanceHtml(e);
     html+=`<div class="hdRow">Induló Rating: <b>${Math.round(e.draftRating)}</b> → jelenlegi: <b>${Math.round(pOvr(p))}</b> · ${e.age} év · posztok: ${e.pos.join("/")}</div>`;
     /* --- ÁTLÁTHATÓ POSZT-ÉRTÉKELÉS: mennyit ér EZEN a poszton és MIÉRT --- */
     if(loc.type==="slot"&&slots[loc.idx]){
@@ -17914,6 +18025,8 @@ function buildHubDetail(loc){
   }else if(p.family){
     html+=`<div class="hdRow">Családtag — az ő útja a tiéddel együtt íródik. · posztok: ${(p.pos||[]).join("/")}</div>`;
   }
+  /* ---- STATZONE — mindenkinél, karrier módban ---- */
+  if(gameMode==="career")html+=hubStatZoneHtml(p);
   /* ---- SKILLEK ----
      Eddig a skillek csak a keret-áttekintőben (playerInfoModal) látszottak, ott is
      puszta névfelsorolásként — pedig a HUB az a hely, ahol a játékos a keretét
