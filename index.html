@@ -930,11 +930,11 @@ button.infPanel:disabled{cursor:default}
    A 15. és 30. forduló előtt a két kliens kicseréli a meccs-pillanatképét.
    Ez a réteg nem csak tájékoztat: MEGFOGJA a felületet, mert a pillanatkép
    ezen a ponton már elment — a keretet innentől nem lehet átrendezni. */
-#h2hWait,#absPanel{position:fixed;inset:0;z-index:420;background:rgba(20,18,15,.95);
+#h2hWait,#absPanel,#htSubPanel{position:fixed;inset:0;z-index:420;background:rgba(20,18,15,.95);
   display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box}
-#h2hWait.hide,#absPanel.hide{display:none}
+#h2hWait.hide,#absPanel.hide,#htSubPanel.hide{display:none}
 /* a hiányzók panelje hosszabb lehet (több hiányzó × több jelölt) → görgethető */
-#absPanel .h2hBox{max-height:100%;overflow-y:auto}
+#absPanel .h2hBox,#htSubPanel .h2hBox{max-height:100%;overflow-y:auto}
 .absRow{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
   border-radius:9px;padding:9px 11px;margin-bottom:8px}
 .absWho{font-size:13.5px;font-weight:700;color:#f3f2f2;margin-bottom:2px}
@@ -1077,6 +1077,19 @@ button.infPanel:disabled{cursor:default}
 </div>
 <!-- HIÁNYZÓK ÉS PÓTLÁSOK — a kezdőrúgás előtt, ha a kezdő 11-ben van eltiltott
      vagy sérült. A h2hWait rétegét használja újra (ugyanaz a doboz-stílus). -->
+<!-- FÉLIDEI CSERE: a meccs félidőben megáll, és legfeljebb 3 cserét tehetsz.
+     Ugyanaz a teljes képernyős réteg, mint a hiányzók-panelé. -->
+<div id="htSubPanel" class="hide">
+  <div class="h2hBox">
+    <div class="h2hKick">Félidő — cserék</div>
+    <div class="h2hRound" id="htSubRound">0:0</div>
+    <p class="mpP" style="text-align:center" id="htSubMsg">…</p>
+    <div id="htSubBody"></div>
+    <div class="mpBtns" style="margin-top:4px">
+      <button class="mpBtn gold" id="htSubGoBtn">Második félidő →</button>
+    </div>
+  </div>
+</div>
 <div id="absPanel" class="hide">
   <div class="h2hBox">
     <div class="h2hKick">Hiányzók és pótlások</div>
@@ -1606,6 +1619,9 @@ button.infPanel:disabled{cursor:default}
             <button id="hubCaptainBtn" class="hubCard"><span class="ic">👑</span><span class="tx"><span class="tt">Kapitányváltás</span><span class="ds">A karszalag új gazdája — hatással van a csapatmorálra</span></span></button>
             <button id="hubScoutUpgradeBtn" class="hubCard"><span class="ic">🔎</span><span class="tx"><span class="tt">Scout fejlesztése</span><span class="ds">Pontosabb felderítés és erősebb igazolási ajánlatok</span></span></button>
             <button id="hubRosterExpandBtn" class="hubCard"><span class="ic">👥</span><span class="tx"><span class="tt">Keretbővítés</span><span class="ds">Több hely a tartalékoknak és a fiataloknak</span></span></button>
+            <!-- FÉLIDEI CSERE: kapcsoló, nem művelet — a felirata a renderHub-ban
+                 frissül az aktuális állapotra. -->
+            <button id="hubHalftimeSubsBtn" class="hubCard"><span class="ic">🔁</span><span class="tx"><span class="tt">Félidei csere</span><span class="ds" id="hubHalftimeSubsDs">—</span></span></button>
           </div>
         </div>
       </div>
@@ -1730,7 +1746,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.68";
+const APP_VERSION="2.5.70";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -6479,7 +6495,15 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
     /* challenge-büntetés: TSI-blokk — a játékos Ratingje nem NŐHET a blokk
        szezonjában (a negatív fejlődés viszont működik). */
     const tsiBlockedNow=S.tsiBlocked[p.n]&&(S.seasonNumber||1)<=S.tsiBlocked[p.n];
-    let delta=0.3;
+    /* ---- RÉSZESEDÉS (share) ----
+       Aki csak fél meccset játszott (félidei csere), annak a RÉSZVÉTELI
+       fejlődése feleződik: az alap-delta, a tisztalap-bónusz, az edzéspontok,
+       a passzív sebesség és a poszt-tanulási lépés. Az ESEMÉNY-jutalmakat
+       (gól, gólpassz, meccsember, piros, sérülés) NEM skálázzuk — egy gól
+       akkor is gól, ha a 44. percben esett. Csere nélkül a share 1, tehát a
+       viselkedés betűre változatlan. */
+    const share=(a.share==null?1:a.share);
+    let delta=0.3*share;
     if(mScore[p.n])delta+=1.5*mScore[p.n];
     if(mAssist[p.n])delta+=0.8*mAssist[p.n];
     if(k===bestIdx)delta+=2;
@@ -6488,7 +6512,7 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
     if(k===redIdx)delta-=1.5;
     if(p.n===injuredName)delta-=1;
     const pos=slots[a.idx]?slots[a.idx].pos:null;
-    if(ga===0&&DEF_POS.includes(pos))delta+=1.3;
+    if(ga===0&&DEF_POS.includes(pos))delta+=1.3*share;
     const age=entry.age;
     if(age<21)delta=delta>0?delta*2.0:delta*0.4;
     else if(age<25)delta=delta>0?delta*1.6:delta*0.5;
@@ -6527,14 +6551,14 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
       if(isTrain)_tlog.pts[key]+=val;
       ap[key]=(ap[key]||0)+val;};
     if(_tr){
-      if(_tr.main)addA(_tr.main,TRAIN_MAIN_PTS,true);
-      if(_tr.sec) addA(_tr.sec, TRAIN_SEC_PTS,true);}
-    addA(pri,0.3);                                    /* részvétel a poszt fő attribútumát edzi */
+      if(_tr.main)addA(_tr.main,TRAIN_MAIN_PTS*share,true);
+      if(_tr.sec) addA(_tr.sec, TRAIN_SEC_PTS*share,true);}
+    addA(pri,0.3*share);                              /* részvétel a poszt fő attribútumát edzi */
     /* PASSZÍV SEBESSÉG: a puszta játék is gyorsít valamennyit, a poszt
        sprint-igénye szerint (ROLE_AXIS_W.seb: csatár 1.0 … kapus 0.10).
        A másodlagos +15%-os plafont az addPassiveSpeed őrzi. */
     {const _sw=(ROLE_AXIS_W.seb&&ROLE_AXIS_W.seb[getCategoryFor(pos||(p.pos&&p.pos[0])||"KKP")])||0;
-     if(_sw>0)addPassiveSpeed(entry,ageScaleAttr(entry.age,SPEED_PASSIVE_RATE*_sw)*devTempo());}
+     if(_sw>0)addPassiveSpeed(entry,ageScaleAttr(entry.age,SPEED_PASSIVE_RATE*_sw*share)*devTempo());}
     if(mScore[p.n])addA("gol",1.5*mScore[p.n]);
     if(mAssist[p.n])addA("passz",0.8*mAssist[p.n]);
     if(k===bestIdx)addA(pri,2);
@@ -6542,7 +6566,7 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
     if(k===bi)addA(pri,-0.5);
     if(k===redIdx)addA(pri,-1.5);
     if(p.n===injuredName)addA(pri,-1);
-    if(ga===0){if(pos==="KP")addA("kapus",1.3);else if(DEF_POS.includes(pos))addA("ved",1.3);}
+    if(ga===0){if(pos==="KP")addA("kapus",1.3*share);else if(DEF_POS.includes(pos))addA("ved",1.3*share);}
     if(tsiBlockedNow)ATTR_KEYS.forEach(k2=>{if(ap[k2]>0)ap[k2]=0;});
     ATTR_KEYS.forEach(k2=>{
       while(ap[k2]>=CAREER_DEV_THRESHOLD){ap[k2]-=CAREER_DEV_THRESHOLD;bumpAttr(entry,k2,1);}
@@ -6555,7 +6579,7 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
       if(mAssist[p.n])perf+=0.3*mAssist[p.n];
       if(k===bestIdx)perf+=0.6;
       if(ga===0&&(pos==="KP"||DEF_POS.includes(pos)))perf+=0.3;
-      stepPosLearning(entry,Math.min(1.5,perf));}});}
+      stepPosLearning(entry,Math.min(1.5,perf)*share);}});}
 /* A cserepadon ülők és a tartalék-keret sem áll meg — kisebb, de valódi
    "edzés-alapú" fejlődést kapnak minden meccs után, teljesítmény-bónuszok
    nélkül (hiszen nem játszottak), ugyanazzal a kor-görbével súlyozva. Így
@@ -7374,16 +7398,80 @@ function computeDreamCandidate(){
   const repl=findReplacement([slots[idx].pos],reqOpts);
   if(!repl)return null;
   return {idx,cur,repl};}
+/* ================= ELVÁGYÓDÁS: MEGTARTÁSI ALKU =================
+   Régen az elvágyódás egyszerűen ELVETTE a játékost: felugrott egy szöveg, és
+   a kezdő 11-edben már egy gyengébb ember állt. Semmi beleszólás.
+   Mostantól ez egy ALKU. A játékos maradásáért a vételára 25-90%-át kéri a
+   csapat (az arány esetenként sorsolt) — és háromféleképp lehet reagálni:
+     · azonnali fizetés a büdzséből,
+     · HALASZTÁS a szezon végére: most nem fizetsz semmit, a játékos marad, és
+       az összeget a szezonzáráskor vonjuk le. Ha akkorra nincs meg a pénz,
+       ELMEGY — de csak akkor, nem előbb;
+     · elengedés (a régi kimenet: érkezik helyette egy gyengébb ember).
+   A halasztás azért van, mert a régi rendszerben egy üres büdzsé automatikusan
+   a játékos elvesztését jelentette. Így a pénzhiány nem büntetés, hanem
+   határidő: a szezon hátralévő részében össze lehet szedni. */
+const LEAVE_FEE_MIN=0.25, LEAVE_FEE_MAX=0.90;
+function computeLeaveCandidate(){
+  if(typeof slots==="undefined"||!slots.length)return null;
+  const weights=slots.map((s,i)=>
+    (i===captainIdx||!s.player||s.player.family)?0
+      :Math.max(0.3,4-(s.player.coopI!=null?s.player.coopI:2.5)));
+  if(!weights.some(w=>w>0))return null;
+  const idx=weightedIndex(weights);
+  if(idx<0||!slots[idx]||!slots[idx].player)return null;
+  const leaver=slots[idx].player;
+  const e=(gameMode==="career"&&careerPool)?careerPool[leaver.n]:null;
+  const base=e?buyPrice(e):0;
+  const pct=LEAVE_FEE_MIN+Math.random()*(LEAVE_FEE_MAX-LEAVE_FEE_MIN);
+  return {idx,leaver,base,pct,fee:Math.max(1,Math.round(base*pct))};}
+/* A távozás végrehajtása — ez a régi viselkedés, változatlanul. */
+function applyLeaveDeparture(cand){
+  const idx=cand.idx,leaver=cand.leaver;
+  if(!slots[idx]||slots[idx].player!==leaver)return `${esc(leaver.n)} elköszönt a csapattól.`;
+  const repl=findReplacement([slots[idx].pos],{requireWorseThan:leaver.ovr+1})||synthWeak(leaver.ovr,slots[idx].pos);
+  drafted.add(repl.n);
+  slots[idx].player=repl;slots[idx].fit=fitFor(repl,slots[idx]);slots[idx].origin=null;
+  pruneChemistry();
+  return `${esc(leaver.n)} elköszönt a csapattól (elégedetlen volt a szerepével). Érkezett: ${esc(repl.n)} (${repl.ovr}).`;}
+/* A halasztott megállapodások: {name,amount,season}. A szezonzárás rendezi. */
+function leaveDealFor(name){
+  return (S.leaveDeals||[]).find(d=>d&&d.name===name&&d.season===(S.seasonNumber||1))||null;}
+function addLeaveDeal(name,amount){
+  S.leaveDeals=S.leaveDeals||[];
+  const cur=leaveDealFor(name);
+  if(cur){cur.amount=Math.max(cur.amount,amount);return cur;}
+  const d={name,amount,season:(S.seasonNumber||1)};
+  S.leaveDeals.push(d);return d;}
+/* SZEZONZÁRÓ RENDEZÉS. A nyári büdzsé megérkezése ELŐTT fut: a megállapodás
+   arról szólt, hogy a SZEZON alatt szeded össze a pénzt, nem arról, hogy a
+   következő évi keretből fizetsz. Akire nincs meg, az most távozik. */
+function settleLeaveDeals(){
+  if(gameMode!=="career")return;
+  const season=S.seasonNumber||1;
+  const due=(S.leaveDeals||[]).filter(d=>d&&d.season===season);
+  if(!due.length){S.leaveDeals=(S.leaveDeals||[]).filter(d=>d&&d.season>season);return;}
+  due.forEach(d=>{
+    const p=findRosterPlayerByName(d.name);
+    if(!p){addLine(`📄 A(z) ${esc(shortName(d.name))} megtartási megállapodása tárgytalan — már nincs a keretben.`,"m ev");return;}
+    if((S.transferBudget||0)>=d.amount){
+      S.transferBudget-=d.amount;
+      addLine(`📄 Megtartási díj kifizetve: ${esc(shortName(d.name))} marad (−${fmtFt(d.amount)}).`,"m life");
+    }else{
+      const loc=findPlayerLocation(p);
+      const idx=(loc&&loc.type==="slot")?loc.idx:-1;
+      /* Kezdőből: érkezik helyette valaki (a régi elvágyódás-kimenet).
+         Padról/tartalékból: csak kikerül — ott nincs betöltendő lyuk. */
+      const how=idx>=0?applyLeaveDeparture({idx,leaver:p})
+        :(releasePlayer(p,false),pruneChemistry(),`${esc(shortName(d.name))} kikerült a keretből.`);
+      addLine(`💔 A megtartási díj (${fmtFt(d.amount)}) nem jött össze a szezon végére. ${how}`,"m ev");}});
+  S.leaveDeals=(S.leaveDeals||[]).filter(d=>d&&d.season>season);}
 function applyTransfer(type){
   if(type.key==="quiet")return "Nem történt átigazolás, marad a megszokott keret.";
   if(type.key==="leave"){
-    const weights=slots.map((s,i)=>(i===captainIdx||s.player.family)?0:Math.max(0.3,4-(s.player.coopI!=null?s.player.coopI:2.5)));
-    const idx=weightedIndex(weights);
-    const leaver=slots[idx].player;
-    const repl=findReplacement([slots[idx].pos],{requireWorseThan:leaver.ovr+1})||synthWeak(leaver.ovr,slots[idx].pos);
-    drafted.add(repl.n);
-    slots[idx].player=repl;slots[idx].fit=fitFor(repl,slots[idx]);slots[idx].origin=null;
-    return `${esc(leaver.n)} elköszönt a csapattól (elégedetlen volt a szerepével). Érkezett: ${esc(repl.n)} (${repl.ovr}).`;
+    const cand=computeLeaveCandidate();
+    if(!cand)return "Nem történt átigazolás, marad a megszokott keret.";
+    return applyLeaveDeparture(cand);
   }
   if(type.key==="dream"){
     const cand=computeDreamCandidate();
@@ -10760,6 +10848,8 @@ const S={idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,capMod:0,eventMod:0
   grudge:new Set(),fixtures:[],playing:false,auto:false,
   mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
   mpMateHalf:null,    /* a társ féltávi mérlege a párharc pillanatképéből */
+  leaveDeals:[],      /* halasztott megtartási díjak: {name,amount,season} */
+  halftimeSubs:false, /* félidei csere-szünet (HUB-kapcsoló) */
   /* F6: a párharc tartós állapota. A mpBalance a kiegyenlítő rating-eltolás,
      a mpHistory és a mpDuelLog pedig SZEZONOKON ÁTÍVELŐ — nem nullázódik. */
   oppBuffH:null,   /* a szezonra rögzített rejtett ellenfél-erősítés */
@@ -11841,6 +11931,18 @@ function sbClockStart(tickMs){
   SB.tickMs=tickMs||330;
   SB.iv=setInterval(sbClockPaint,100);
   sbClockPaint();}
+/* ---- SZÜNET ÉS FOLYTATÁS (félidei csere) ----
+   A sbClockStart() ÚJRA nullázná a t0-t, vagyis a második félidő 00:00-ról
+   indulna. Ezért a szünet hosszát hozzáadjuk a t0-hoz: az óra pontosan onnan
+   megy tovább, ahol megállt, akármeddig tart a cseredöntés. */
+let _sbPauseAt=0;
+function sbNow(){return (typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();}
+function sbClockPause(){_sbPauseAt=sbNow();sbClockStop();}
+function sbClockResume(){
+  if(!_sbPauseAt)return;
+  SB.t0+=sbNow()-_sbPauseAt;_sbPauseAt=0;
+  SB.iv=setInterval(sbClockPaint,100);
+  sbClockPaint();}
 function sbClockPaint(){
   const now=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
   sbSetClock((now-SB.t0)/SB.tickMs*5*60);}
@@ -12349,6 +12451,75 @@ function renderAbsencePanel(){
       row.appendChild(w);}
     row.appendChild(head);row.appendChild(meta);row.appendChild(opts);
     box.appendChild(row);});}
+/* ================= FÉLIDEI CSERE =================
+   Kapcsolható (HUB → Csapatépítés → Félidei csere). Ha be van kapcsolva, a
+   meccs FÉLIDŐBEN megáll, és legfeljebb HÁROM cserét tehetsz a padról.
+
+   FEJLŐDÉS — a kérdés, amit tisztázni kellett: mennyit fejlődik az, aki csak
+   fél meccset játszott? A válasz a RÉSZESEDÉS (share): aki lecserélődik és aki
+   beáll, egyaránt 0.5 részesedést kap, és a fejlődés minden RÉSZVÉTELI eleme
+   (alap-delta, edzéspontok, poszt-tanulási lépés, passzív sebesség) ezzel
+   szorzódik. Az ESEMÉNY-alapú jutalmak NEM: aki gólt lőtt az első félidőben,
+   azért teljes bónuszt kap — egy gól akkor is gól, ha a 44. percben esett.
+   Így a csere nem fejlődés-vesztés, hanem elosztás: két ember kap fél-fél
+   meccsnyi tapasztalatot a teljes helyett, plusz a saját érdemeit.
+
+   A padon ülő, be NEM állt játékos változatlanul a pad-ütemet kapja
+   (BENCH_TRAINING_RATE) — az nem itt dől el.
+
+   Auto-módban (szezon végigjátszása) és PÁRHARCBAN kimarad: az előbbi nem
+   állhat meg, az utóbbinál a közös eseménylista rögzített, egy helyi
+   csapaterő-változás szétvinné a két kliens állását. */
+const HALFTIME_SUB_MAX=3;
+function halftimeSubsOn(){return gameMode==="career"&&!!S.halftimeSubs;}
+let _htDone=null;
+function openHalftimeSubs(ctx,onDone){
+  _htDone=onDone;
+  $("htSubPanel").classList.remove("hide");
+  renderHalftimeSubs(ctx);}
+function renderHalftimeSubs(ctx){
+  const box=$("htSubBody");if(!box)return;
+  $("htSubRound").textContent=ctx.scoreTxt();
+  const left=HALFTIME_SUB_MAX-ctx.used.length;
+  $("htSubMsg").innerHTML=left>0
+    ?`Legfeljebb <b>${HALFTIME_SUB_MAX}</b> cserét tehetsz — még <b>${left}</b> maradt.<br>
+       <span style="font-size:11.5px;color:#b9b4ab">A lecserélt és a beálló játékos is fél meccsnyi fejlődést kap; a gólokért járó jutalom a szerzőé marad.</span>`
+    :`Elfogyott a három cserelehetőség.`;
+  box.innerHTML="";
+  if(ctx.used.length){
+    const d=document.createElement("div");d.className="absMeta";
+    d.style.marginBottom="8px";
+    d.innerHTML="Megtörtént cserék: "+ctx.used.map(u=>`${esc(shortName(u.out))} → <b>${esc(shortName(u.in))}</b>`).join(" · ");
+    box.appendChild(d);}
+  if(left<=0)return;
+  ctx.active.forEach((a,k)=>{
+    if(ctx.usedIdx.has(k))return;                 /* egy sloton egy csere */
+    if(k===ctx.redIdx())return;                   /* a kiállítottat nem lehet cserélni */
+    const slot=slots[a.idx];if(!slot)return;
+    const cands=ctx.bench().filter(b=>!ctx.usedIn.has(b.n));
+    if(!cands.length)return;
+    const row=document.createElement("div");row.className="absRow";
+    const who=document.createElement("div");who.className="absWho";
+    who.textContent=`${slot.pos} · ${shortName(a.p.n)} (${Math.round(pOvrDisplay(a.p))})`;
+    const meta=document.createElement("div");meta.className="absMeta";
+    meta.textContent="Kire cseréled?";
+    const opts=document.createElement("div");opts.className="absOpts";
+    cands.forEach(b=>{
+      const btn=document.createElement("button");btn.className="absOpt";
+      const free=subFreeFit(b,slot);
+      btn.innerHTML=`${esc(shortName(b.n))} · ${Math.round(pOvrDisplay(b))}<small>${free?"poszthű":"idegen poszt (−)"}</small>`;
+      btn.onclick=()=>{ctx.doSub(k,b);renderHalftimeSubs(ctx);};
+      opts.appendChild(btn);});
+    row.appendChild(who);row.appendChild(meta);row.appendChild(opts);
+    box.appendChild(row);});
+  if(!box.children.length||(!ctx.bench().filter(b=>!ctx.usedIn.has(b.n)).length)){
+    const w=document.createElement("div");w.className="absMeta";
+    w.textContent="Nincs bevethető játékos a padon.";
+    box.appendChild(w);}}
+function closeHalftimeSubs(){
+  $("htSubPanel").classList.add("hide");
+  const cb=_htDone;_htDone=null;if(cb)cb();}
+$("htSubGoBtn")&&($("htSubGoBtn").onclick=()=>closeHalftimeSubs());
 function closeAbsencePanel(){
   $("absPanel").classList.add("hide");
   const cb=_absDone;_absDone=null;
@@ -13737,7 +13908,13 @@ function playMatch(){
         updateGoallessStreak(taker.n,true);
       }else addLine(`${gminTxt(min)}  Szabadrúgás — ${esc(shortName(taker.n))} próbálkozik, de a sorfalon landol a labda`,"m ev");
     }}
-  const iv=setInterval(()=>{
+  /* A tick-függvényt NÉV szerint tartjuk, mert a félidei csere megállítja és
+     újraindítja az órát — a ciklus tartalma ettől betűre változatlan. */
+  const halfSubs={used:[],usedIdx:new Set(),usedIn:new Set()};
+  /* a félidőben LECSERÉLT játékosok — a lefújásnál ők is fejlődnek, fél meccsre */
+  const halfOut=[];
+  let iv=null;
+  const tickFn=()=>{
     min+=5;
     /* az óra a fejlécben az aktuális 5-perces bucketet mutatja (a gólok saját,
        1-perc pontos bélyeget kapnak a gmin()-től) */
@@ -14034,7 +14211,53 @@ function playMatch(){
     /* A késleltetett 90+ dráma MOST fut le — a bucket összes rendes (85-90
        perces) eseménye után, így mindig időrendben, utolsóként jelenik meg. */
     runPendingDrama();
-  },tickMs);
+    /* ---- FÉLIDŐ: CSERESZÜNET ----
+       A bucket VÉGÉN állunk meg, hogy az 50. percig tartó események még
+       kimenjenek a naplóba. A párharc és az auto-mód kimarad (lásd a
+       félidei csere fejlécét). */
+    if(min===50&&halftimeSubsOn()&&!S.auto&&!DUEL&&iv){
+      clearInterval(iv);iv=null;
+      sbClockPause();
+      openHalftimeSubs(halftimeCtx(),()=>{sbClockResume();iv=setInterval(tickFn,tickMs);});
+      return;}
+  };
+  iv=setInterval(tickFn,tickMs);
+  /* A csereszünet felülete ebből a környezetből olvassa ki, mi történik a
+     pályán, és ide is ír vissza — így a motor állapota egy helyen marad. */
+  function halftimeCtx(){
+    return {
+      active,
+      used:halfSubs.used,usedIdx:halfSubs.usedIdx,usedIn:halfSubs.usedIn,
+      redIdx:()=>redIdx,
+      scoreTxt:()=>fx.home?`${gf}:${ga}`:`${ga}:${gf}`,
+      /* A padról csak az állhat be, aki nem hiányzik és nem áll a pályán. */
+      bench:()=>{
+        const on=new Set(active.map(a=>a.p.n));
+        const out=[];
+        BENCH_CATS.forEach(c=>{const b=BENCH[c.key];
+          if(b&&!on.has(b.n)&&!playerUnavailable(b.n))out.push(b);});
+        return out;},
+      doSub:(k,inP)=>{
+        const a=active[k],slot=slots[a.idx];
+        if(!a||!slot)return;
+        const outP=a.p;
+        const inFit=subFreeFit(inP,slot)?1:0.93;
+        /* A csapaterő KÖVETI a cserét: a pillanatkép ovr-je a 11 hozzájárulás
+           átlaga, tehát egy csere pontosan a különbség tizenegyede — és a
+           gólvárhatóságokat is ÚJRA kell számolni, különben a csere csak a
+           névsort írná át, a szimulációt nem. */
+        ovr+=(pOvrDisplay(inP)*inFit-pOvrDisplay(outP)*(a.fit||1))/11;
+        {const _L2=matchLambdas(Object.assign({},MS,{ovr}),fx.o.ovr+hiddenOppBuff,
+           fx.neutral?0:(fx.home?SIM.HOME:SIM.AWAY));
+         diff=_L2.diff;lf=_L2.lf;la=_L2.la;}
+        /* FEJLŐDÉS: mindkettőnek fél meccs. A lecserélt külön bejegyzésként
+           marad meg, hogy a lefújásnál ő is fejlődjön. */
+        a.share=0.5;
+        halfOut.push({p:outP,fit:a.fit,idx:a.idx,share:0.5});
+        a.p=inP;a.fit=inFit;
+        halfSubs.used.push({out:outP.n,in:inP.n});
+        halfSubs.usedIdx.add(k);halfSubs.usedIn.add(inP.n);
+        addLine(`🔁 Csere a félidőben: ${esc(shortName(outP.n))} → <b>${esc(shortName(inP.n))}</b>`,"m ev");}};}
   function weightedPick(arr,wfn,rnd){
     const w=arr.map(wfn),tw=w.reduce((s,x)=>s+x,0);
     let r=(rnd||Math.random)()*tw,i=0;
@@ -14369,7 +14592,10 @@ function playMatch(){
       addOrExtendUnavailable(inm,dur,"injury");
       injuredThisMatchName=inm;
     }
-    if(gameMode==="career"){processCareerDevelopment(active,mScore,mAssist,gi,bi,best,redIdx,injuredThisMatchName,ga);processBenchDevelopment();processAcademyDevelopment();
+    /* A félidőben lecserélt játékosok a lista VÉGÉRE kerülnek: a gi/bi/best/
+       redIdx indexek így érvényben maradnak az első 11-re, a hozzáfűzöttek
+       pedig egyikkel sem eshetnek egybe. Mindkét fél 0.5 részesedést visz. */
+    if(gameMode==="career"){processCareerDevelopment(halfOut.length?active.concat(halfOut):active,mScore,mAssist,gi,bi,best,redIdx,injuredThisMatchName,ga);processBenchDevelopment();processAcademyDevelopment();
       /* POSZT-TANULÁS kész-értesítés: ha valakinek e meccsen ért véget a tanulása */
       Object.values(careerPool).forEach(e=>{if(e&&e.posLearnDone){
         addLine(`🎓 Poszt-tanulás kész! ${esc(shortName(e.n))} mostantól otthon van a(z) ${e.posLearnDone} poszton — teljes értékű ott, és a specializáció is jutalmazza.`,"m life");
@@ -15224,6 +15450,7 @@ function twStartPhase2(){
         if(icon){showIconOffer(icon);return;}
       }
       const result=twResolvePhase2();
+      if(result.title==="__LEAVE_PENDING__"&&result.cand){showLeaveOffer(result.cand);return;}
       if(result.title==="__DREAM_PENDING__"){
         const cand=computeDreamCandidate();
         if(cand){showDreamOffer(cand);return;}
@@ -15244,6 +15471,54 @@ function twStartPhase2(){
       sb.onclick=()=>twNextCycleOrFinish();
       $("twActions").innerHTML="";$("twActions").appendChild(sb);}
   }}
+/* ---- ELVÁGYÓDÁS-KÉPERNYŐ: HÁROM VÁLASZ ---- */
+function showLeaveOffer(cand){
+  const p=cand.leaver,e=careerPool&&careerPool[p.n];
+  const budget=S.transferBudget||0;
+  const canPayNow=budget>=cand.fee;
+  $("twTitle").textContent="Elvágyódás";
+  $("twBody").innerHTML=`<div class="h" style="color:var(--red)">💔 ${esc(shortName(p.n))} el akar menni</div>
+    <p style="font-size:13px;margin-top:5px;line-height:1.55">
+      ${esc(p.n)}${e?` (${e.pos.join("/")}, ${e.age} év, Rating ${Math.round(pOvr(p))})`:""} elégedetlen a szerepével, és távozna.
+      A maradásáért a menedzsmentje a vételára <b>${Math.round(cand.pct*100)}%-át</b> kéri:
+      <b style="color:var(--gold)">${fmtFt(cand.fee)}</b>.
+      <span style="color:var(--dim2)">(A teljes vételára ${fmtFt(cand.base)} lenne.)</span><br><br>
+      Egyenleged: <b>${fmtFt(budget)}</b>.</p>`;
+  $("twActions").innerHTML="";
+  const mk=(cls,html,fn,dis)=>{
+    const b=document.createElement("button");b.className=cls+" stepbtn";b.style.marginTop="6px";
+    b.innerHTML=html;b.disabled=!!dis;if(dis)b.style.opacity=".45";
+    b.onclick=fn;$("twActions").appendChild(b);return b;};
+  const finish=(head,body)=>{
+    $("twBody").innerHTML=`<div class="h">${head}</div><p style="font-size:13px;margin-top:5px;line-height:1.55">${body}</p>`;
+    $("twActions").innerHTML="";
+    const ok=document.createElement("button");ok.className="btn-p stepbtn";ok.textContent="Tovább";
+    ok.onclick=()=>twNextCycleOrFinish();
+    $("twActions").appendChild(ok);
+    drawPitch();updateBar();};
+  mk("btn-y",`💰 Kifizetem most<small>${fmtFt(cand.fee)} · marad az egyenlegedből ${fmtFt(Math.max(0,budget-cand.fee))}</small>`,
+    ()=>{
+      if((S.transferBudget||0)<cand.fee)return;
+      S.transferBudget-=cand.fee;
+      addLine(`📄 Megtartási díj: ${esc(shortName(p.n))} marad a csapatban (−${fmtFt(cand.fee)}).`,"m life");
+      finish(`<span style="color:var(--grass)">✓ Marad</span>`,
+        `${esc(shortName(p.n))} aláírt — a csapat kifizette a ${fmtFt(cand.fee)} megtartási díjat.`);},
+    !canPayNow);
+  /* A HALASZTÁS MINDIG elérhető, üres büdzsével is — ez a lényege. */
+  mk("btn-p",`🗓 Szezon végén fizetem<small>most nem vonunk le semmit · ${fmtFt(cand.fee)} a szezonzáráskor</small>`,
+    ()=>{
+      addLeaveDeal(p.n,cand.fee);
+      addLine(`🗓 Megtartási megállapodás: ${esc(shortName(p.n))} marad, a ${fmtFt(cand.fee)} a szezon végén esedékes.`,"m life");
+      finish(`<span style="color:var(--gold)">🗓 Megállapodás</span>`,
+        `${esc(shortName(p.n))} marad. A <b>${fmtFt(cand.fee)}</b> a szezonzáráskor jön le a büdzsédből — a nyári pénz megérkezése <b>előtt</b>.
+         Ha addigra nem jön össze, akkor távozik. A megállapodás a játékos lenyíló panelján is látszik.`);},
+    false);
+  mk("btn-s",`💔 Elengedem<small>helyette egy gyengébb játékos érkezik</small>`,
+    ()=>{
+      const txt=applyLeaveDeparture(cand);
+      addLine(`💔 ${txt}`,"m ev");
+      finish(`<span style="color:var(--red)">💔 Elment</span>`,txt);},
+    false);}
 /* Az álomigazolás is csak felkínált lehetőség — el lehet fogadni vagy
    elutasítani, és elfogadás után is szabadon választható, hogy konkrétan
    kit vált le, vagy inkább a tartalékba kerüljön az érkező. */
@@ -15406,6 +15681,11 @@ function twResolvePhase2(){
   const leaveW=0.04*riskFactor,peakFormW=0.20,lockerW=0.25;
   let t=leaveW;
   if(roll<t){
+    /* KARRIERBEN ALKU, nem közlemény: a felajánlást a képernyő kezeli.
+       Klasszikus módban (nincs careerPool, nincs büdzsé) marad a régi kimenet. */
+    if(gameMode==="career"&&careerPool){
+      const cand=computeLeaveCandidate();
+      if(cand&&cand.fee>0)return {title:"__LEAVE_PENDING__",cand};}
     const type=TRANSFER_TYPES.find(t=>t.key==="leave");
     return {title:"Elvágyódás",text:applyTransfer(type)};}
   t+=peakFormW;
@@ -15430,6 +15710,9 @@ function twResolvePhase2(){
     return {title:"Nyugodt öltöző",text:"Az öltözőben csendes, kiegyensúlyozott a hangulat — nincs említésre méltó esemény."};}
   const type=weightedPickArr(TRANSFER_TYPES.map(x=>x.key==="leave"?{...x,weight:x.weight*riskFactor}:x));
   if(type.key==="dream")return {title:"__DREAM_PENDING__"};
+  if(type.key==="leave"&&gameMode==="career"&&careerPool){
+    const cand=computeLeaveCandidate();
+    if(cand&&cand.fee>0)return {title:"__LEAVE_PENDING__",cand};}
   return {title:type.label,text:applyTransfer(type)};}
 let extraRoster=[]; /* karrier módban a 15 aktív fölötti, MAX_CAREER_ROSTER-ig terjedő tartalék-keret — nem játszik meccset, csak a HUB-ban kezelhető */
 /* ---- FELÁLLÁSVÁLTÁS a HUB-ban ----
@@ -16375,6 +16658,16 @@ function autoResolveCheckpoint(round){
       if(icon){const r=autoPlaceIcon(icon);if(r)return r;}
     }
     const result=twResolvePhase2();
+    /* AUTO-MÓD: nincs kinek felajánlani az alkut. Ha most kifizethető, kifizetjük
+       (a keret megtartása ér annyit); ha nem, halasztunk a szezon végére —
+       ugyanaz a kimenet, amit egy elfogadó menedzser választana. */
+    if(result.title==="__LEAVE_PENDING__"&&result.cand){
+      const c=result.cand;
+      if((S.transferBudget||0)>=c.fee){
+        S.transferBudget-=c.fee;
+        return {title:"Elvágyódás",text:`${esc(shortName(c.leaver.n))} maradt — a csapat kifizette a ${fmtFt(c.fee)} megtartási díjat.`};}
+      addLeaveDeal(c.leaver.n,c.fee);
+      return {title:"Elvágyódás",text:`${esc(shortName(c.leaver.n))} marad, de a ${fmtFt(c.fee)} megtartási díj a szezon végén esedékes.`};}
     if(result.title==="__DREAM_PENDING__"){
       const cand=computeDreamCandidate();
       if(!cand)return {title:"Álomigazolás",text:"Próbálkoztunk egy nagy dobással, de az igazolás végül meghiúsult."};
@@ -17011,6 +17304,24 @@ function rosterExpandPrice(cur){
      — mindez a −75%-os korrekcióval: 5000 / 7500 / ... / 27500 */
   const step=Math.round((cur-28)/2);
   return Math.round((20000+step*10000)*ROSTER_EXPAND_PRICE_MULT/500)*500;}
+/* ---- FÉLIDEI CSERE: KAPCSOLÓ ----
+   Nem művelet, hanem beállítás: bekapcsolva minden (nem auto, nem párharc)
+   meccs félidőben megáll, és három cserét tehetsz. A felirat mindig a
+   TÉNYLEGES állapotot mondja, hogy egy pillantásból látszódjon, be van-e. */
+function renderHalftimeSubsBtn(){
+  const b=$("hubHalftimeSubsBtn"),ds=$("hubHalftimeSubsDs");
+  if(!b)return;
+  b.classList.toggle("hide",gameMode!=="career");
+  if(!ds)return;
+  ds.innerHTML=S.halftimeSubs
+    ?`<b style="color:var(--grass)">BE</b> — a meccs félidőben megáll, ${HALFTIME_SUB_MAX} cserét tehetsz`
+    :`<b style="color:var(--dim2)">KI</b> — a meccs megállás nélkül végigmegy`;}
+$("hubHalftimeSubsBtn")&&($("hubHalftimeSubsBtn").onclick=()=>{
+  S.halftimeSubs=!S.halftimeSubs;
+  addLine(S.halftimeSubs
+    ?`🔁 Félidei csere BEKAPCSOLVA — mostantól minden meccs félidőben megáll, és ${HALFTIME_SUB_MAX} cserét tehetsz.`
+    :`🔁 Félidei csere kikapcsolva — a meccsek megállás nélkül mennek végig.`,"m life");
+  renderHalftimeSubsBtn();saveGame();});
 $("hubRosterExpandBtn").onclick=()=>{
   $("scHub").classList.add("hide");
   $("scWindow").classList.remove("hide");
@@ -18284,6 +18595,13 @@ function buildHubDetail(loc){
   }else if(p.family){
     html+=`<div class="hdRow">Családtag — az ő útja a tiéddel együtt íródik. · posztok: ${(p.pos||[]).join("/")}</div>`;
   }
+  /* ---- HALASZTOTT MEGTARTÁSI DÍJ ----
+     Egy szezon hosszú: ha nem látszik, hogy tartozol érte, a szezonzáráskor
+     ért meglepetés lenne, hogy elment. Ezért itt, a játékos panelján áll. */
+  {const _ld=(gameMode==="career"&&typeof leaveDealFor==="function")?leaveDealFor(p.n):null;
+   if(_ld)html+=`<div class="hdRow" style="color:var(--gold);border:1px dashed var(--gold);border-radius:7px;padding:6px 9px">
+     🗓 <b>Megtartási megállapodás:</b> ${fmtFt(_ld.amount)} a szezon végén esedékes.
+     Ha addigra nincs meg a büdzsédben, ${esc(shortName(p.n))} távozik.</div>`;}
   /* ---- STATZONE — mindenkinél, karrier módban ---- */
   if(gameMode==="career")html+=hubStatZoneHtml(p);
   /* ---- SKILLEK ----
@@ -19035,6 +19353,7 @@ function renderHub(){
      rekurzív és nem költséges. */
   autoLevelSync();
   renderRunMeter();
+  renderHalftimeSubsBtn();   /* a félidei csere kapcsoló felirata az állapotot mondja */
 
   /* SZEZON KÖZBEN a HUB bármikor megnyitható, de az átigazolás nem elérhető —
      az a nyári ablak dolga. Ugyanez áll a LEGELSŐ szezon előtti keret-
@@ -20129,6 +20448,11 @@ function hubShowSeasonReport(){
      újranyílik, a már kiosztott díjat nem osztjuk ki még egyszer. */
   if(gameMode==="career"&&!(S.ballonDor&&S.ballonDor.season===(S.seasonNumber||1)))
     awardBallonDor();
+  /* ---- MEGTARTÁSI MEGÁLLAPODÁSOK RENDEZÉSE ----
+     A nyári büdzsé jóváírása ELŐTT: az alku arról szólt, hogy a SZEZON alatt
+     szeded össze a pénzt, nem arról, hogy a következő évi keretből fizetsz.
+     Akire nem jött össze, az itt távozik. */
+  if(gameMode==="career")settleLeaveDeals();
   if(gameMode==="career"){
     evaluateDueChallenges("round",Infinity);   /* minden nyitott rövidet lezár */
     /* KRITIKUS JAVÍTÁS: a hosszú kihívás határideje seasonNumber+1 értékű
@@ -20540,7 +20864,7 @@ function saveGame(){
            döntés, a közös előzmény és az egymás elleni napló. */
         /* a szezonra rögzített rejtett ellenfél-erősítés (lásd seasonHiddenBonus) */
         oppBuffH:S.oppBuffH,
-        mpMateFinal:S.mpMateFinal,mpMateHalf:S.mpMateHalf,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
+        mpMateFinal:S.mpMateFinal,mpMateHalf:S.mpMateHalf,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
@@ -20767,6 +21091,8 @@ function applySavedGame(d){
   S.oppBuffH=(d.S.oppBuffH!=null)?d.S.oppBuffH:null;
   S.mpMateFinal=d.S.mpMateFinal||null;
   S.mpMateHalf=d.S.mpMateHalf||null;
+  S.leaveDeals=d.S.leaveDeals||[];
+  S.halftimeSubs=!!d.S.halftimeSubs;
   /* F6: a kiegyenlítő eltolás a keret TARTÓS tulajdonsága — enélkül egy
      újratöltés visszaadná az előnyt/hátrányt. */
   S.mpBalance=d.S.mpBalance||0;
