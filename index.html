@@ -1121,7 +1121,7 @@ button.infPanel:disabled{cursor:default}
        átállítható, és azonnal hat. A nehézségi csúszkától FÜGGETLEN tengely:
        az a mezőny erejét mondja meg, ez azt, milyen gyorsan nősz hozzá. -->
   <div class="optgrid" id="tempoGrid" style="margin-top:8px">
-    <button data-tempo="normal" class="sel">Alap tempó<small>a megszokott ütem — fejlődés, skillek, scout és ikonok változatlanul</small></button>
+    <button data-tempo="normal" class="sel">Alap tempó<small>a megszokott ütem — fejlődés, skillek, scout, ikonok, büdzsé, kártyák és akadémia változatlanul</small></button>
     <button data-tempo="komotos">Komótos fejlődés<small>−10% mindenre, ami előre visz — hosszabb karrier, lassabb szintlépés</small></button>
     <button data-tempo="csiga">Csigatempó<small>−25% mindenre — minden megszerzett Rating megszenvedett</small></button>
   </div>
@@ -1635,7 +1635,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.51";
+const APP_VERSION="2.5.52";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7615,6 +7615,14 @@ let renderHubSchedRow=null;
      · skill-osztás üteme (türelem-számláló + szezonpadló)
      · a scout által talált játékosok szintje           → scoutQuality()
      · az ikon-igazolások esélye                        → scoutIconChance()
+     · az átigazolási büdzsé                            → computeSeasonBudget()
+     · a szezonkártyák küszöbe                          → determineSeasonCards()
+     · az ifi-akadémia gyakorisága és szintje           → tryAcademyOpportunity()
+                                                          + generateAcademyPlayer()
+
+   AMI SZÁNDÉKOSAN KIMARAD: az öregedési/hanyatlási görbe. Azt lassítani
+   KÖNNYÍTÉS volna — a lényeg épp az, hogy a fejlődés lassul, miközben az idő
+   ugyanúgy telik, tehát kevesebb szezonod van kihozni valakiből a maximumot. */
 
    Nem a mentés része (localStorage), tehát futó karrierben is átállítható, és
    azonnal hat — nem kell hozzá új szezon. */
@@ -7985,6 +7993,11 @@ function showAcademyReveal(prospect,resumeCb,rec,isFinal){
 function tryAcademyOpportunity(cb){
   if(gameMode!=="career"||!careerPool||S.idx%4!==0){cb();return;}
   if(S.frozenAcademySeasons>0){cb();return;}   /* challenge-büntetés: befagyott akadémia */
+  /* GLOBÁLIS TEMPÓ: a 4 fordulós ütem marad, de a lehetőségek egy része némán
+     kimarad — Komótosnál 10%, Csigatempónál 25%. Azért esély-kapu és nem
+     ritkított ütem, mert a 4-es osztó egész számokra kerekedne, és a -10% el is
+     tűnne benne. A BALLAGÁS nem eshet ki: az utolsó ajánlat garantált marad. */
+  if(!academyGraduates().length&&Math.random()>tempoMult()){cb();return;}
   /* Egyre nagyobb eséllyel egy KORÁBBAN az akadémián hagyott tehetség tér
      vissza (az esély a mentettek számával nő, de marad hely új felfedezésnek). */
   let prospect=null,rec=null,isFinal=false;
@@ -9058,6 +9071,10 @@ function computeSeasonBudget(){
   if(teamR>90)budget+=(teamR-90)*700;
   /* KIHÍVÁS-HATÁS: edzői fizetésemelés (+) vagy megsapkázás (−). */
   if(S.salaryMod)budget*=(1+S.salaryMod);
+  /* GLOBÁLIS TEMPÓ: a piac a lassabb fejlődés legkézenfekvőbb megkerülése —
+     ha nem tudod kinevelni, megveszed. Ezért a büdzsé is a szorzóra ül,
+     különben a Komótos/Csiga csak más útvonalra terelne, nem lassítana. */
+  budget*=tempoMult();
   return Math.round(budget);}   /* egész pont — lásd a buyPrice indoklását */
 function updateBar(){
   const f=slots.filter(s=>s.player).length;
@@ -14961,7 +14978,10 @@ function generateAcademyPlayer(forcePos){
   const POS_POOL=["KP","JV","BV","KV","VKP","KKP","TKP","JSZ","BSZ","CS"];
   const teamR=teamOVRbase();
   const quality=Math.max(0,Math.min(1,(teamR-65)/(88-65)))+(Math.random()-0.5)*0.25;
-  const q=Math.max(0,Math.min(1,quality));
+  /* GLOBÁLIS TEMPÓ: a minőség-tényező viszi a kezdő Ratinget ÉS a TSI-t is,
+     ezért itt egyetlen szorzás lejjebb húzza az akadémia teljes kimenetét —
+     gyengébb tehetségek, kisebb potenciállal. */
+  const q=Math.max(0,Math.min(1,quality))*tempoMult();
   /* A Rating mostantól szélesebb sávban (59-77) mozog — a 72 fölötti értékek
      egy geometriailag gyorsan ritkuló "farokban" fordulnak elő (minden
      pluszpontnak csak 25%-a esélye a folytatásra), így a kiugróan magas
@@ -18611,14 +18631,20 @@ function determineSeasonCards(){
        áll, a Gyilkos mvp>=30 küszöbe tehát már azt jelenti, hogy MINDEN meccsen
        te voltál a legjobb. Efölé nincs hova lépni, ezért a Vadista szandál és a
        GODLIKE csak gól+assziszt, védés és kapott gól nélküli meccs alapján jár. */
-    if(!godlikeGiven&&(row.combo>=68||row.saves>=55||row.cs>=CARD_CS.godlike)){newTier="godlike";godlikeGiven=true;}
-    else if(!vandalGiven&&(row.combo>=52||row.saves>=42||row.cs>=CARD_CS.vandal)){newTier="vandal";vandalGiven=true;}
-    else if(!killerGiven&&(row.combo>=40||row.mvp>=30||row.saves>=32||row.cs>=CARD_CS.killer)){newTier="killer";killerGiven=true;}
-    else if(!mythicGiven&&(row.combo>=32||row.mvp>=24||row.saves>=26||row.cs>=CARD_CS.mythic)){newTier="mythic";mythicGiven=true;}
-    else if(stellarCount<2&&(row.combo>=25||row.mvp>=18||row.saves>=20||row.cs>=CARD_CS.stellar)){newTier="stellar";stellarCount++;}
-    else if((topBelowDiamondNames.has(row.p.n)&&row.combo>=18)||row.mvp>=12||row.saves>=15||row.cs>=CARD_CS.diamond){newTier="diamond";}
-    else if(row.combo>=10||row.mvp>=6||row.saves>=9||row.cs>=CARD_CS.gold){newTier="gold";}
-    else if(row.combo>=4||row.mvp>=3||row.saves>=4||row.cs>=CARD_CS.silver){newTier="silver";}
+    /* GLOBÁLIS TEMPÓ: a küszöbök helyett a TELJESÍTMÉNYT skálázzuk le — a kettő
+       matematikailag azonos (x >= k/m  <=>  x*m >= k), de így egy helyen van, és
+       a küszöb-számok maradnak olvashatók. Komótosnál kb. +11%, Csigatempónál
+       kb. +33% teljesítmény kell ugyanahhoz a kártyához. */
+    const _k=tempoMult();
+    const combo=row.combo*_k,mvp=row.mvp*_k,saves=row.saves*_k,cs=row.cs*_k;
+    if(!godlikeGiven&&(combo>=68||saves>=55||cs>=CARD_CS.godlike)){newTier="godlike";godlikeGiven=true;}
+    else if(!vandalGiven&&(combo>=52||saves>=42||cs>=CARD_CS.vandal)){newTier="vandal";vandalGiven=true;}
+    else if(!killerGiven&&(combo>=40||mvp>=30||saves>=32||cs>=CARD_CS.killer)){newTier="killer";killerGiven=true;}
+    else if(!mythicGiven&&(combo>=32||mvp>=24||saves>=26||cs>=CARD_CS.mythic)){newTier="mythic";mythicGiven=true;}
+    else if(stellarCount<2&&(combo>=25||mvp>=18||saves>=20||cs>=CARD_CS.stellar)){newTier="stellar";stellarCount++;}
+    else if((topBelowDiamondNames.has(row.p.n)&&combo>=18)||mvp>=12||saves>=15||cs>=CARD_CS.diamond){newTier="diamond";}
+    else if(combo>=10||mvp>=6||saves>=9||cs>=CARD_CS.gold){newTier="gold";}
+    else if(combo>=4||mvp>=3||saves>=4||cs>=CARD_CS.silver){newTier="silver";}
     if(newTier&&cardTierRank(newTier)>curRank){
       entry.cardTier=newTier;
       const bump=CARD_BUMP[newTier]||1;
