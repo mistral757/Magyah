@@ -1730,7 +1730,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.60";
+const APP_VERSION="2.5.63";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4753,7 +4753,11 @@ function euroStartRound(round,pool){
 
    A selejtezőben SEMMI nem fejlődik (lásd euroTempo): ez még nem a kupa, csak
    a belépő érte, és a specifikáció szerint itt a fejlődés nulla. */
-const EURO_QUAL_ROUNDS=4;
+/* A selejtező KÉT oda-visszavágós párharc (2×2 meccs). Korábban négy kör volt,
+   ami nyolc meccs — a főtáblára jutás hosszabb volt, mint maga a csoportkör,
+   miközben itt semmi nem fejlődik. Két kör megtartja a tétet anélkül, hogy
+   elnyújtaná a szezonzárást. */
+const EURO_QUAL_ROUNDS=2;
 const EURO_DROP={BL:"EL",EL:"KL",KL:null,MK:null};
 function euroQualLabel(r){return `Selejtező ${r}/${EURO_QUAL_ROUNDS}. kör`;}
 function euroStartQual(){
@@ -5240,7 +5244,16 @@ function teamAttrStrengths(){
    "tiszta" eltolás +4.95, a maradék szórása 2.1 körül állandó. */
 const AXIS_OFFSET={ved:0.20, kapus:1.96, passz:1.44, gol:-1.64, seb:4.95};
 const AXIS_SCALE ={ved:1.58, kapus:3.78, passz:1.29, gol:1.65, seb:2.10};
-const TACTIC_FIT_C=0.13;   /* a szórás tágassága — méréssel hangolva */
+/* A z-pontszám → százalék átváltó meredeksége: fit = 0.5 + z × TACTIC_FIT_C.
+   0.13-ról 0.20-ra emelve, mert a 70% fölötti illeszkedés gyakorlatilag
+   elérhetetlen volt. A z a taktika tengelyeinek SÚLYOZOTT ÁTLAGOS eltérése a
+   keret saját szintjétől — vagyis nem az erőt méri, hanem a FORMÁT. Régen 70%
+   z=1.54-et kívánt (a keretnek minden fontos tengelyén másfél szórással a
+   saját szintje fölött kellett állnia, ami egy kiegyensúlyozott kereten
+   matematikailag alig lehetséges), most z=1.0 elég. A 100% továbbra sem
+   ajándék: ahhoz z=2.5 kell. A vágás (0..1) változatlan, tehát rossz
+   összeállításnál a 0% is ugyanúgy megvan. */
+const TACTIC_FIT_C=0.20;
 /* Egy tengely VÁRT szintje a keret általános szintjéhez (a horgonyhoz) képest.
    JAVÍTVA — a sebesség szerkezeti hátránya:
    a ved/passz/gol tengelyek a Ratinggel együtt 154-ig nőhetnek, a SEBESSÉG
@@ -7305,8 +7318,15 @@ function twAttrSearchesForScout(){
   if(st<TW_ATTR_MIN_STARS)return 0;
   const base=st>=10?4:st>=8?3:st>=5?2:1;
   return base*TW_ATTR_MULT;}
-function twAttrTarget(){
-  return Math.max(45,Math.min(SPEED_MAX+20,(oppTargetRating||84)+TW_ATTR_TARGET_BONUS));}
+/* A keresés célértéke. A SEBESSÉG kivétel: annak 99 a kemény plafonja
+   (SPEED_MAX), tehát 99-es mezőnyszinttől fölfelé nincs mit keresni — a
+   célérték ott megáll. Enélkül egy 100+ szintű keretnél a scout 101-102-es
+   sebességet keresett, amilyen játékos nem létezik: a szűrő (célérték −
+   tolerancia) mindenkit kidobott, és a sebesség-keresés üresen tért vissza.
+   A többi tengelynek nincs plafonja, azok változatlanul mennek. */
+function twAttrTarget(aKey){
+  const cap=(aKey==="seb")?SPEED_MAX:SPEED_MAX+20;
+  return Math.max(45,Math.min(cap,(oppTargetRating||84)+TW_ATTR_TARGET_BONUS));}
 /* Elfogyott-e az attribútum-keresési keret ebben az ablakban? */
 function twAttrLeft(){
   const sess=twSession();
@@ -9138,16 +9158,23 @@ function ballonRival(){
     .map(s=>s.players.filter(p=>p.ovr>=84&&p.pos&&/CS|SZ|TKP/.test(p.pos[0]))).flat();
   const name=pool.length?pool[Math.floor(r()*pool.length)].n:"egy ismeretlen világsztár";
   return {name,g,a,cs,score:ballonScoreOf(100,g,a,cs,1.3)};}
-/* A te legjobb embered az idényből. */
+/* A te legjobb embered az idényből — BAJNOKI ÉS KUPA EGYÜTT.
+   A kupában szerzett gól ugyanúgy gól: a díjat a szezon TELJES produkciója
+   dönti el, nem csak a bajnoki. (A két vödör az adatban külön él: a bajnoki a
+   S.scorers/S.assists/S.seasonCleanSheets, a kupa a S.seasonEuro-ban — itt
+   csak összeadjuk őket, ahogy a szezonzáró listák is teszik.) Ezért kerül a
+   kihirdetés is a kupasorozat UTÁNRA, lásd awardBallonDor hívási helye. */
 function ballonBestOwn(){
   if(gameMode!=="career")return null;
   const roster=(typeof fullCareerRoster==="function")?fullCareerRoster():[];
+  const eb=S.seasonEuro||{};
+  const _b=(m,x)=>((m&&m[x])||0);
   let best=null;
   roster.forEach(p=>{
     if(!p)return;
-    const g=(S.scorers&&S.scorers[p.n])||0;
-    const a=(S.assists&&S.assists[p.n])||0;
-    const cs=(S.seasonCleanSheets&&S.seasonCleanSheets[p.n])||0;
+    const g=_b(S.scorers,p.n)+_b(eb.scorers,p.n);
+    const a=_b(S.assists,p.n)+_b(eb.assists,p.n);
+    const cs=_b(S.seasonCleanSheets,p.n)+_b(eb.cleanSheets,p.n);
     if(!g&&!a&&!cs)return;
     const sc=ballonScoreOf(pOvrDisplay(p),g,a,cs,
       (typeof cardCsWeight==="function")?cardCsWeight(p):1.3);
@@ -12086,9 +12113,10 @@ function h2hSimulate(home,away){
   return {events:ev,hg,ag,lam:{home:lamHome,away:lamAway}};}
 /* Az eseménylista LEJÁTSZÁSA. Mindkét kliens ugyanazt a listát kapja, de a
    saját nézőpontjából mutatja: a "mi" oldalunk gólja ünnep, a másiké kapott gól.
-   A tempó fixen 0,25× (a specifikáció szerint), hogy a H2H olvasható legyen —
-   ez a meccs a karrier csúcspontja, nem átfutandó forduló. */
-const H2H_TICK_MS=Math.round(330/0.25);
+   A tempó fixen 0,1× — ez a meccs a karrier csúcspontja, nem átfutandó forduló,
+   és a felhasználó kérésére a korábbi 0,25×-nél is lassabban pereg, hogy minden
+   esemény kiélvezhető legyen. */
+const H2H_TICK_MS=Math.round(330/0.1);
 function h2hPlayback(sim,iAmHome,onDone){
   const ev=sim.events.slice();
   const meName=iAmHome?ev[0].home:ev[0].away;
@@ -13604,7 +13632,7 @@ function playMatch(){
         ga++;
         const oppScorer=pickOpponentScorer(fx.o);
         updateTTBoard(fx,gf,ga,Math.min(90,min));
-        addLine(`${gminTxt(min)}  Tizenegyesgól: ${esc(oppScorer)} (${fx.o.n})  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+        addLine(`${gminTxt(min)}  Tizenegyesgól: ${esc(oppScorer)}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
         sbEv("them","goal",oppScorer);
         mileGkConceded(MILE,`${gminTxt(min)}  `);
       }else addLine(`${gminTxt(min)}  Tizenegyes ellenünk — de kimarad, megmenekültünk!`,"m ev");
@@ -13683,7 +13711,7 @@ function playMatch(){
         ga++;
         const dramaOppScorer=pickOpponentScorer(fx.o);
         updateTTBoard(fx,gf,ga,90);
-        addLine(`${sbMinTxt(dMin)}  DRÁMA A RÁADÁSBAN! ${esc(dramaOppScorer)} (${fx.o.n}) az utolsó pillanatokban rontja el az ünnepet  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+        addLine(`${sbMinTxt(dMin)}  DRÁMA A RÁADÁSBAN! ${esc(dramaOppScorer)} az utolsó pillanatokban rontja el az ünnepet  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
         sbEv("them","goal",dramaOppScorer,dMin);
         mileGkConceded(MILE,`${sbMinTxt(dMin)}  `);}
       maxDeficit=Math.max(maxDeficit,ga-gf);maxLead=Math.max(maxLead,gf-ga);
@@ -13825,11 +13853,12 @@ function playMatch(){
       const oppScorer=dOpp?shortName(dOpp.scorer):pickOpponentScorer(fx.o);
       const oppMin=dOpp?duelGmin(dOpp.min):gmin(min);
       updateTTBoard(fx,gf,ga,Math.min(90,min));
-      /* Párharcban a gólpassz is látszik — de NEM a klubnév melletti második
-         zárójelben (az összemosódott volna vele), hanem külön megnevezve. */
+      /* A klubnév KIKERÜLT a gólszerző mellől: a fejlécen és az eredményjelzőn
+         ott áll, melyik meccs megy, tehát a zárójel csak zajt vitt a sorba.
+         A gólpassz párharcban külön megnevezve marad. */
       const oppTxt=(dOpp&&dOpp.assist)
-        ?`${esc(oppScorer)} — gólpassz: ${esc(shortName(dOpp.assist))} (${fx.o.n})`
-        :`${esc(oppScorer)} (${fx.o.n})`;
+        ?`${esc(oppScorer)} — gólpassz: ${esc(shortName(dOpp.assist))}`
+        :`${esc(oppScorer)}`;
       addLine(`${sbMinTxt(oppMin)}  Gól: ${oppTxt}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
       sbEv("them","goal",oppScorer,oppMin);
       /* a rossz sorozatban lévő kapus fejmosása — a meccs ELSŐ kapott góljánál */
@@ -13985,7 +14014,7 @@ function playMatch(){
       for(let k=0;k<og;k++){
         ga++;const on=pickOpponentScorer(fx.o);
         updateTTBoard(fx,gf,ga,emin);
-        addLine(`${emin}'  Gól a hosszabbításban: ${esc(on)} (${esc(fx.o.n)})  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+        addLine(`${emin}'  Gól a hosszabbításban: ${esc(on)}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
         sbEv("them","goal",on,emin,`${emin}'`);}
       if(et===3)addLine(`HOSSZABBÍTÁS — FÉLIDŐ  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m draw");
     },tickMs);}
@@ -14017,7 +14046,7 @@ function playMatch(){
         const oppTaker=pickOpponentScorer(fx.o);
         const hitThem=penHit(oppOvr,myKeeper);
         if(hitThem)them++;
-        addLine(`${r+1}. rúgás — ${esc(oppTaker)} (${esc(fx.o.n)}): ${hitThem?"gól":"HIBÁZOTT!"}  ${us}:${them}`,hitThem?"m oppgoal":"m ev");
+        addLine(`${r+1}. rúgás — ${esc(oppTaker)}: ${hitThem?"gól":"HIBÁZOTT!"}  ${us}:${them}`,hitThem?"m oppgoal":"m ev");
         r++;
         if(r>=5&&us!==them){finishPens();return;}
         if(r>=5&&us===them)addLine("Hirtelen halál!","m ev");
@@ -14613,7 +14642,9 @@ function twShowAttrPicker(){
   const grid=document.createElement("div");grid.className="optgrid two";grid.style.marginTop="9px";
   ATTR_KEYS.forEach(k=>{
     const b=document.createElement("button");
-    b.innerHTML=`${ATTR_LABELS[k]}<small>cél: ${ragSzam(t)} fölött</small>`;
+    /* a sebesség célértéke a 99-es plafonon megáll — a gombon is ez látszik */
+    const tk=twAttrTarget(k);
+    b.innerHTML=`${ATTR_LABELS[k]}<small>${k==="seb"&&tk>=SPEED_MAX?`plafon: ${SPEED_MAX}`:`cél: ${ragSzam(tk)} fölött`}</small>`;
     b.onclick=()=>{
       const sess=twSession();
       twAttrLeft();                 /* biztosítja, hogy a számláló létezik */
@@ -14724,7 +14755,8 @@ function rollSigningTarget(){
    A fiatalok itt is nagyobb súlyt kapnak. */
 function pickForAttrTarget(list,key){
   if(!list.length)return null;
-  const t=twAttrTarget()+Math.random()*6;   /* célérték + 0…6 felfelé */
+  const t=Math.min((key==="seb")?SPEED_MAX:Infinity,
+    twAttrTarget(key)+Math.random()*6);   /* célérték + 0…6 felfelé, a plafon alatt */
   const sorted=list.slice().sort((a,b)=>{
     const av=(a.attrs&&a.attrs[key])||0, bv=(b.attrs&&b.attrs[key])||0;
     return Math.abs(av-t)-Math.abs(bv-t);});
@@ -14753,7 +14785,7 @@ function twScout(){
     if(attrMode){
       /* A KERESETT ATTRIBÚTUM legyen kiemelkedő: a célérték a mezőny szintje
          FÖLÖTT van, és csak a közelébe eső jelöltek kerülnek be. */
-      const t=twAttrTarget();
+      const t=twAttrTarget(aKey);
       poolCands=poolCands.filter(e=>{
         if(!e.attrs)initPlayerAttrs(e);
         return (e.attrs[aKey]||0)>=t-TW_ATTR_TOLERANCE;});}
@@ -14790,7 +14822,8 @@ function twScout(){
     return;}
   $("twBody").innerHTML=(attrMode
       ? `<div class="h" style="color:var(--gold);font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px">🎯 ${cands.length} találat — ${ATTR_LABELS[aKey]}</div>`
-        +(gameMode==="career"?`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A ${ragSzam(oppTargetRating)} mezőnyhöz mérten a <b>${ragSzam(twAttrTarget())} ${ATTR_LABELS[aKey]}</b> körül vagy fölött keresett — poszttól függetlenül.</div>`:"")
+        +(gameMode==="career"?`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A ${ragSzam(oppTargetRating)} mezőnyhöz mérten a <b>${ragSzam(twAttrTarget(aKey))} ${ATTR_LABELS[aKey]}</b> körül vagy fölött keresett — poszttól függetlenül.${
+            aKey==="seb"&&twAttrTarget("seb")>=SPEED_MAX?` A sebesség plafonja ${SPEED_MAX}, feljebb nincs mit keresni.`:""}</div>`:"")
       : `<div class="h" style="color:var(--gold);font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px">A scout ${cands.length} lehetőséget talált (${twCatLabel(TW.category)})</div>`
         +(gameMode==="career"?`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A ${ragSzam(oppTargetRating)} mezőnyhöz mérten a ~${ragSzam(signingTargetOvr())} szint körül keresett.</div>`:""));
   const box=document.createElement("div");box.className="plist";
@@ -15875,7 +15908,8 @@ function renderChemPick(){
   const box=$("skillAssignList");box.innerHTML="";
   if(chemPickFirst){
     const info=document.createElement("div");info.style.cssText="font-size:12px;color:#cfd6ff;margin-bottom:5px";
-    info.textContent=`Első játékos: ${shortName(chemPickFirst)} — válaszd ki a párját:`;
+    const _fa=careerPool&&careerPool[chemPickFirst]?careerPool[chemPickFirst].age:null;
+    info.textContent=`Első játékos: ${shortName(chemPickFirst)}${_fa!=null?` (${_fa} év)`:""} — válaszd ki a párját:`;
     box.appendChild(info);}
   roster.forEach(p=>{
     if(!p)return;
@@ -15883,7 +15917,12 @@ function renderChemPick(){
     if(chemPickFirst&&chemPairComplete(chemPickFirst,p.n))return;
     const row=document.createElement("div");row.className="prow";
     const existing=chemPickFirst?chemStages(chemPickFirst,p.n):0;
-    row.innerHTML=`<span class="pos pc-${getCategoryFor(p.pos[0])}">${p.pos.join("/")}</span><span class="main"><div class="nm">${esc(shortName(p.n))}${existing?` <small>(már ${existing}/${CHEM_PAIR_NEED})</small>`:""}</div></span>`;
+    /* ÉLETKOR a névsorban: a kémia 5 fázison át épül, vagyis több szezonos
+       befektetés — egy 34 éves párost hiába kötsz össze, mire kész, elmegy.
+       A döntéshez tehát az életkor legalább annyira kell, mint a poszt. */
+    const _age=p.age!=null?p.age:(careerPool&&careerPool[p.n]?careerPool[p.n].age:null);
+    const _ageTxt=_age!=null?` <small style="color:var(--dim2)">· ${_age} év</small>`:"";
+    row.innerHTML=`<span class="pos pc-${getCategoryFor(p.pos[0])}">${p.pos.join("/")}</span><span class="main"><div class="nm">${esc(shortName(p.n))}${_ageTxt}${existing?` <small>(már ${existing}/${CHEM_PAIR_NEED})</small>`:""}</div></span>`;
     row.onclick=()=>{
       if(!chemPickFirst){chemPickFirst=p.n;renderChemPick();return;}
       const pr=addChemPair(chemPickFirst,p.n,Math.max(1,chemStages(chemPickFirst,p.n)+1));
@@ -16311,7 +16350,11 @@ function finish(){
         teamAvg:runCurrentXIAvg(),
         /* KAPITÁNY: a szezonban TÉNYLEGESEN realizált átlagos morál-hatás */
         captain:captainName,captainEffect:captainRealizedEffect()});
-      awardBallonDor();   /* az év játékosa — lásd a függvény fejlécét */
+      /* ARANYLABDA: NEM itt hirdetjük ki. A szezonzárás pillanatában a
+         kupasorozat még hátravan (közvetlenül ezután indul), és a kupában
+         szerzett gólok is beleszámítanak a díjba — ha itt döntenénk, a
+         kupamenetelés semmit nem érne. A kihirdetés a hubShowSeasonReport()
+         elején van, ami MINDKÉT ágon a kupa lezárása után fut. */
       /* a naplóban is jelezzük a kapitány tényleges mérlegét */
       {const ce=captainRealizedEffect();
        if(ce!=null&&captainName)
@@ -16393,8 +16436,14 @@ function finish(){
     st+=vsec("Kupakvalifikáció",q
       ?`<div class="vplain"><b style="color:${q.col}">${q.n}</b> — a ${yourRank}. hellyel kiharcoltátok az indulást${E.qual?", de előbb a <b>selejtezőn</b> kell átjutni":""}. A sorozat MOST következik, még ennek a szezonzárásnak a részeként.</div>`
       :`<div class="vplain" style="color:var(--dim)">A ${yourRank}. hely nem ért kupaindulást. <b>${esc(tier.league)}</b> szinten a szabály: ${esc(rule)}.</div>`);}
-  /* ARANYLABDA — a szezon egyéni csúcsdíja, a képzelt 100-as mezőnyhöz mérve */
-  if(gameMode==="career"&&S.ballonDor){
+  /* ARANYLABDA — a szezon egyéni csúcsdíja, a képzelt 100-as mezőnyhöz mérve.
+     A díj a KUPA UTÁN dől el (a kupagólok is számítanak), ezért itt, a bajnoki
+     verdiktnél még csak jelezzük, hogy hátravan; a tényleges kihirdetés a
+     szezonjelentésben van. Az S.ballonDor ilyenkor még a TAVALYI díjat
+     tartalmazza, ezért a szezonszámot is ellenőrizzük. */
+  if(gameMode==="career"&&!(S.ballonDor&&S.ballonDor.season===(S.seasonNumber||1))){
+    st+=vsec("Aranylabda",`<div class="vplain" style="color:var(--dim)">⚽🏆 Az év játékosát a <b>kupasorozat után</b> hirdetik ki — a kupában szerzett gólok is beleszámítanak. A díj a szezonjelentésben lesz.</div>`);
+  }else if(gameMode==="career"&&S.ballonDor){
     const B=S.ballonDor;
     st+=vsec("Aranylabda",
       `<div class="vplain">⚽🏆 <b style="color:${B.own?"var(--gold)":"var(--ink)"}">${esc(shortName(B.name))}</b>`
@@ -19870,6 +19919,14 @@ function hubShowSeasonReport(){
         nem — így egy 24-30 közötti határidejű rövid kihívás korábban beragadt.
         A szezon végén minden lelógó rövid kihívás kiértékelődik (teljesült-e).
      2) majd a szezon végén lejáró HOSSZÚ kihívások. */
+  /* ---- ARANYLABDA: ITT A KIHIRDETÉS ----
+     Ez a pont MINDKÉT ágon a kupasorozat után fut (kupa nélkül a szezonzárásból,
+     kupával az endEuroCampaign()-ből), és még az advanceCareerSeason() ELŐTT
+     van, ami nullázza a szezonstatisztikákat. Vagyis pontosan itt teljes a
+     szezon produkciója: bajnoki + kupa együtt. Idempotens — ha a jelentés
+     újranyílik, a már kiosztott díjat nem osztjuk ki még egyszer. */
+  if(gameMode==="career"&&!(S.ballonDor&&S.ballonDor.season===(S.seasonNumber||1)))
+    awardBallonDor();
   if(gameMode==="career"){
     evaluateDueChallenges("round",Infinity);   /* minden nyitott rövidet lezár */
     /* KRITIKUS JAVÍTÁS: a hosszú kihívás határideje seasonNumber+1 értékű
@@ -19913,6 +19970,18 @@ function hubShowSeasonReport(){
         S.investReturn=0;}}}
   const cardResults=determineSeasonCards();
   let html="";
+  /* ---- ARANYLABDA — a szezon egyéni csúcsdíja ----
+     A verdiktben már nem szerepel (ott még hátravolt a kupa), itt viszont
+     teljes a kép: a kiírt gól/gólpassz/tiszta lap a bajnokit ÉS a kupát is
+     tartalmazza. Ez a jelentés első blokkja, mert ez a szezon fő elismerése. */
+  if(gameMode==="career"&&S.ballonDor&&S.ballonDor.season===(S.seasonNumber||1)){
+    const B=S.ballonDor;
+    html+=`<div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin-bottom:5px">⚽🏆 Aranylabda</div>
+      <div style="font-size:13px;line-height:1.55;margin-bottom:4px">
+        <b style="color:${B.own?"var(--gold)":"var(--ink)"}">${esc(shortName(B.name))}</b>${
+          B.own?' <b style="color:var(--gold)">— a te játékosod!</b>':' <span style="color:var(--dim)">— a 100-as mezőny mércéje</span>'}<br>
+        <span style="color:var(--dim);font-size:12.5px">${B.g} gól, ${B.a} gólpassz${B.cs?`, ${B.cs} tiszta lap`:""} · ${B.score} pont — bajnoki és kupa együtt.</span></div>
+      <div style="height:8px"></div>`;}
   /* NYUGDÍJ-ELŐREJELZÉS: kik jelentették be, hogy 1-2 szezon múlva
      abbahagyják. A figyelmeztetés szezonjában még biztosan játszanak. */
   if(report.retirePlans&&report.retirePlans.length){
