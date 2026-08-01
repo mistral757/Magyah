@@ -1730,7 +1730,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.63";
+const APP_VERSION="2.5.66";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10418,8 +10418,11 @@ function renderChallengePanel(){
 /* A felajánló-képernyő: évszakváltásnál 3 rövid, szezon elején 5 hosszú.
    A twPanel-t hasznosítja újra; a kártyák téma-változókkal rajzolódnak. */
 let _challengeOffers=[];
-function showChallengeOffers(scope,count,resumeCb,opening){
+/* A felajánlás körülményei — a HUB-kitérő után ebből áll helyre a képernyő. */
+let _chOfferCtx=null;
+function showChallengeOffers(scope,count,resumeCb,opening,opts){
   const ctx=challengeContext();
+  _chOfferCtx={scope,resumeCb,opening,hubBack:!!(opts&&opts.hubBack)};
   _challengeOffers=[];
   /* VÁLTOZATOSSÁG: a felajánlott csomagban minden kihívás MÁS TÍPUSÚ legyen.
      Korábban csak a leírás egyezését szűrtük, így simán kaphattál három
@@ -10468,9 +10471,37 @@ function renderChallengeOffers(scope,resumeCb,opening){
       const ch=_challengeOffers[i];
       if(!ch||ch._taken)return;
       if(!canAcceptMore(scope)){btn.textContent="Betelt a keret";btn.disabled=true;return;}
-      acceptChallenge(ch);ch._taken=true;
-      addLine(`🎯 Kihívás elvállalva: ${ch.desc}`,"m life");
-      renderChallengeOffers(scope,resumeCb,opening);};});
+      /* A vállalás VISSZAVONHATATLAN: a büntetés a szezon végén akkor is
+         lecsap, ha közben meggondolod magad. Egy koppintás tehát nem elég. */
+      askConfirm({title:"Elvállalod ezt a kihívást?",yes:"Igen, elvállalom",
+        html:`<div style="font-size:13.5px;line-height:1.5">${esc(ch.desc)}</div>
+          ${ch.rule?`<div style="font-size:12px;color:var(--dim);margin-top:6px">📋 ${esc(ch.rule)}</div>`:""}
+          <div style="font-size:12.5px;margin-top:9px;line-height:1.55">
+            🏆 <b style="color:var(--grass)">${esc(ch.reward.desc)}</b><br>
+            ⚠ <b style="color:var(--red)">${esc(ch.punishment.desc)}</b></div>
+          <div style="font-size:12px;color:var(--dim2);margin-top:8px">A vállalás nem vonható vissza — ${challengeDeadlineText(ch)}.</div>`,
+        onYes:()=>{
+          if(!ch||ch._taken||!canAcceptMore(scope))return;
+          acceptChallenge(ch);ch._taken=true;
+          addLine(`🎯 Kihívás elvállalva: ${ch.desc}`,"m life");
+          renderChallengeOffers(scope,resumeCb,opening);}});};});
+  /* ---- KITÉRŐ A HUB-BA ----
+     Nagy tétű, egész szezonra szóló vállalásokról a keret ismerete nélkül nem
+     lehet dönteni: ki maradt, ki öregedett, mennyi a büdzsé. Ezért a szezon
+     eleji felajánlásnál át lehet ugrani a HUB-ba, és onnan pontosan ide,
+     ugyanerre a listára lehet visszatérni — a már elvállaltak megmaradnak. */
+  if(_chOfferCtx&&_chOfferCtx.hubBack){
+    const hub=document.createElement("button");
+    hub.className="btn-s stepbtn";hub.style.marginTop="4px";
+    hub.innerHTML=`🏠 Megnézem a keretet a HUB-ban<small>ide térsz vissza, az elvállaltak megmaradnak</small>`;
+    hub.onclick=()=>{
+      $("scWindow").classList.add("hide");
+      $("scHub").classList.remove("hide");
+      const nb=$("hubNextSeasonBtn");
+      if(nb){nb.textContent="← Vissza a kihívásokhoz";nb.onclick=reopenChallengeOffers;}
+      renderHub();
+      $("scHub").scrollIntoView({behavior:"smooth"});};
+    $("twActions").appendChild(hub);}
   const done=document.createElement("button");
   done.className="btn-s stepbtn";done.style.marginTop="4px";
   done.textContent="Kész — tovább";
@@ -10478,6 +10509,15 @@ function renderChallengeOffers(scope,resumeCb,opening){
     $("scWindow").classList.add("hide");
     if(resumeCb)resumeCb();else csReturnToHub();};
   $("twActions").appendChild(done);}
+function reopenChallengeOffers(){
+  const c=_chOfferCtx;
+  if(!c){csReturnToHub();return;}
+  $("scHub").classList.add("hide");
+  $("scWindow").classList.remove("hide");
+  $("swapPanelWrap").classList.add("hide");
+  $("twPanel").classList.remove("hide");
+  renderChallengeOffers(c.scope,c.resumeCb,c.opening);
+  $("scWindow").scrollIntoView({behavior:"smooth"});}
 /* Haladás szöveg a HUB-panelhez (pl. "3/5") — a vállalástól számított delta. */
 function challengeProgressText(ch){
   const prog=challengeProgress(ch);
@@ -16578,11 +16618,23 @@ $("hubScoutUpgradeBtn").onclick=()=>{
    Ezért az eladáshoz hasonlóan előbb rákérdezünk, mielőtt alkalmazzuk. */
 let _hubTacticPending=null;
 function askHubTacticConfirm(bodyHtml,onYes){
-  const box=$("hubTacticConfirmBody");
-  if(!box||!$("hubTacticConfirmModal")){onYes();return;}   /* biztonsági tartalék */
-  _hubTacticPending=onYes;
-  box.innerHTML=bodyHtml;
-  $("hubTacticConfirmModal").classList.remove("hide");}
+  return askConfirm({html:bodyHtml,onYes});}
+/* ---- ÁLTALÁNOS MEGERŐSÍTŐ ----
+   Ugyanaz a modális, csak a fejléc és az igen-gomb felirata is állítható. Így
+   MINDEN visszafordíthatatlan vagy pénzbe kerülő HUB-művelet ugyanazt a
+   párbeszédet kapja — poszt-tanulás, ifi/öreg-boost, scout-fejlesztés,
+   befektetés, kihívás elvállalása —, nem csak a felállásváltás és az eladás.
+   Egy koppintás nem költhet el több milliárdot és nem vállalhat be egy egész
+   szezonra szóló kötelezettséget megkérdezés nélkül. */
+function askConfirm(o){
+  const box=$("hubTacticConfirmBody"),modal=$("hubTacticConfirmModal");
+  if(!box||!modal){if(o&&o.onYes)o.onYes();return;}
+  const t=$("hubTacticConfirmTitle"),y=$("hubTacticConfirmYes");
+  if(t)t.textContent=o.title||"Biztosan módosítod?";
+  if(y)y.textContent=o.yes||"Igen, módosítom";
+  _hubTacticPending=o.onYes;
+  box.innerHTML=o.html||"";
+  modal.classList.remove("hide");}
 $("hubTacticConfirmYes")&&($("hubTacticConfirmYes").onclick=()=>{
   $("hubTacticConfirmModal").classList.add("hide");
   const cb=_hubTacticPending;_hubTacticPending=null;if(cb)cb();});
@@ -16856,12 +16908,17 @@ function renderScoutUpgradePanel(){
     const buy=document.createElement("button");buy.className="btn-y stepbtn";buy.textContent=`Fejlesztés megvásárlása (${fmtFtShort(price)})`;
     buy.onclick=()=>{
       if(S.transferBudget<price||scout.stars>=SCOUT_MAX_STARS)return;
-      S.transferBudget-=price;
-      scout.stars=Math.min(SCOUT_MAX_STARS,scout.stars+0.5);
-      /* a már meglévő pool-becslések frissülnek az új, pontosabb scouttal */
-      Object.values(careerPool).forEach(e=>{if(!drafted.has(e.n))e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
-      addLine(`🔎 Scout fejlesztve — most már ${scoutStarsLabel(scout.stars)}`,"m life");
-      renderScoutUpgradePanel();};
+      askConfirm({title:"Megveszed a fejlesztést?",yes:"Igen, megveszem",
+        html:`<div style="font-size:13px;line-height:1.55">🔎 Scout <b>${scout.stars}★ → ${nextStars}★</b> — a tévedés ${curPct}% → <b>${nextPct}%</b>.<br><br>
+          Ára <b style="color:var(--gold)">${fmtFt(price)}</b>, az egyenleged ${fmtFt(S.transferBudget)} → <b>${fmtFt(S.transferBudget-price)}</b>.</div>`,
+        onYes:()=>{
+          if(S.transferBudget<price||scout.stars>=SCOUT_MAX_STARS)return;
+          S.transferBudget-=price;
+          scout.stars=Math.min(SCOUT_MAX_STARS,scout.stars+0.5);
+          /* a már meglévő pool-becslések frissülnek az új, pontosabb scouttal */
+          Object.values(careerPool).forEach(e=>{if(!drafted.has(e.n))e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
+          addLine(`🔎 Scout fejlesztve — most már ${scoutStarsLabel(scout.stars)}`,"m life");
+          renderScoutUpgradePanel();}});};
     $("twActions").appendChild(buy);
   }
   const back=document.createElement("button");back.className="btn-s stepbtn";back.style.marginTop="6px";back.textContent="Vissza a HUB-ba";
@@ -17822,6 +17879,13 @@ $("hubYouthBoostBtn").onclick=()=>{
     b.innerHTML=`<b>${esc(shortName(p.n))}</b> <span style="color:var(--dim2)">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · TSI ${e.tsi}</span>`;
     b.onclick=()=>{
       if(S.transferBudget<price)return;
+      askConfirm({title:"Elindítod az ifi-boostot?",yes:"Igen, berobbantom",
+        html:`<div style="font-size:15px;font-weight:700">⚡ ${esc(shortName(p.n))}</div>
+          <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · TSI ${e.tsi}</div>
+          <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(price)}</b> — az egyenleged ${fmtFt(S.transferBudget)} → <b>${fmtFt(S.transferBudget-price)}</b>.
+            A boost egyszeri és visszavonhatatlan, és csak EZT a játékost érinti.</div>`,
+        onYes:()=>{
+      if(S.transferBudget<price)return;
       S.transferBudget-=price;
       const res=applyYouthBoost(e);
       const pl=currentRoster().find(x=>x.n===p.n)||extraRoster.find(x=>x.n===p.n);
@@ -17831,7 +17895,7 @@ $("hubYouthBoostBtn").onclick=()=>{
       $("twActions").innerHTML="";
       const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";
       ok.onclick=()=>csReturnToHub();$("twActions").appendChild(ok);
-      drawPitch();updateBar();saveGame();};
+      drawPitch();updateBar();saveGame();}});};
     $("twActions").appendChild(b);});
   const cancel=document.createElement("button");cancel.className="btn-s stepbtn";cancel.style.marginTop="10px";cancel.textContent="Mégsem";
   cancel.onclick=()=>csReturnToHub();$("twActions").appendChild(cancel);
@@ -17859,6 +17923,13 @@ $("hubOldBoostBtn").onclick=()=>{
     b.innerHTML=`<b>${esc(shortName(p.n))}</b> <span style="color:var(--dim2)">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · TSI ${e.tsi}</span>`;
     b.onclick=()=>{
       if(S.transferBudget<price||!isVeteranBoostable(e))return;
+      askConfirm({title:"Marasztalod a vén rókát?",yes:"Igen, maradjon",
+        html:`<div style="font-size:15px;font-weight:700">🎩 ${esc(shortName(p.n))}</div>
+          <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · TSI ${e.tsi}</div>
+          <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(price)}</b> — az egyenleged ${fmtFt(S.transferBudget)} → <b>${fmtFt(S.transferBudget-price)}</b>.
+            Egy játékoson csak EGYSZER süthető el, és ${OLD_BOOST_RETIRE_AGE} éves koráig a pályán tartja.</div>`,
+        onYes:()=>{
+      if(S.transferBudget<price||!isVeteranBoostable(e))return;
       S.transferBudget-=price;
       const res=applyOldBoost(e);
       const pl=currentRoster().find(x=>x.n===p.n)||extraRoster.find(x=>x.n===p.n);
@@ -17868,7 +17939,7 @@ $("hubOldBoostBtn").onclick=()=>{
       $("twActions").innerHTML="";
       const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";
       ok.onclick=()=>csReturnToHub();$("twActions").appendChild(ok);
-      drawPitch();updateBar();saveGame();};
+      drawPitch();updateBar();saveGame();}});};
     $("twActions").appendChild(b);});
   const cancelO=document.createElement("button");cancelO.className="btn-s stepbtn";cancelO.style.marginTop="10px";cancelO.textContent="Mégsem";
   cancelO.onclick=()=>csReturnToHub();$("twActions").appendChild(cancelO);
@@ -17991,7 +18062,10 @@ function renderSpecPanel(){
     netDelta+=eff-e.startRating;
     const fit=attrPosFit(e,pos);
     if(fit>=1)onMain++;
-    else if(fit<0.6)offPos.push({n:a.p.n,pos,eff,raw:Math.round(pOvr(a.p))});});
+    /* AKI MÁR TANULJA EZT A POSZTOT, azt nem soroljuk a "rossz poszton" közé —
+       a felszólítás ("taníttasd meg neki") pont azt kérné, ami fut. */
+    else if(fit<0.6&&!(e.posLearning&&e.posLearning.target===pos))
+      offPos.push({n:a.p.n,pos,eff,raw:Math.round(pOvr(a.p))});});
   const avgDelta=netDelta/active.length;
   const col=avgDelta>=0?"var(--grass)":"var(--red)";
   const pct=Math.min(50,Math.abs(avgDelta)/8*50);
@@ -18114,8 +18188,18 @@ function buildHubDetail(loc){
       html+=`<div class="hdRow">Ezen a poszton (${slotPos}): <b style="color:${col}">${effR}</b> értékű${effR!==rawR?` (a ${rawR} helyett)`:""}. A poszt kulcsattribútuma a <b>${ATTR_LABELS[keyHere]}</b> (${keyVal}), és ${fitLabel} játszik.</div>`;
       /* konkrét, cselekvő tanács */
       let tip="";
-      if(fit<0.6&&!e.posLearning)tip=`💡 Tedd a fő posztjára (${e.pos[0]}), vagy taníttasd meg vele ezt a posztot — akkor teljes értékű lesz itt.`;
-      else if(fit<1&&!e.posLearning)tip=`💡 A rokon/másodlagos poszt kis hátrány. A fő posztján (${e.pos[0]}) a legjobb, vagy taníttasd meg neki ezt a posztot.`;
+      /* ---- MÁR TANUL: NINCS TÖBB "TANÍTTASD MEG NEKI" ----
+         Ha elindult a poszt-tanulás, a felszólítás értelmetlen és zavaró — a
+         játékos épp azt csinálja. Ilyenkor a haladás a mondanivaló. (Korábban
+         a két ág csak `!e.posLearning`-gel volt kizárva, ezért a tanuló
+         játékos átcsúszott a "✓ Jó helyen van" ágra — épp az ellenkezőjét
+         állítva annak, ami igaz.) */
+      if(e.posLearning){
+        tip=e.posLearning.target===slotPos
+          ?`🎓 Épp ezt a posztot tanulja — ha végez, teljes értékű lesz itt. A haladás lent.`
+          :`🎓 Most a(z) <b>${e.posLearning.target}</b> posztot tanulja; amíg tart, másikat nem kezdhet el.`;}
+      else if(fit<0.6)tip=`💡 Tedd a fő posztjára (${e.pos[0]}), vagy taníttasd meg vele ezt a posztot — akkor teljes értékű lesz itt.`;
+      else if(fit<1)tip=`💡 A rokon/másodlagos poszt kis hátrány. A fő posztján (${e.pos[0]}) a legjobb, vagy taníttasd meg neki ezt a posztot.`;
       else if(keyVal<Math.round(pOvr(p))-2)tip=`💡 A ${ATTR_LABELS[keyHere]} attribútuma elmarad — ha ezen a poszton játszik és jól teljesít (gól/gólpassz/tiszta lap), fejlődik ez az attribútum, és nő az itteni értéke.`;
       else tip=`✓ Jó helyen van, és az attribútumai illenek a poszthoz.`;
       html+=`<div class="hdRow" style="color:var(--dim2)">${tip}</div>`;
@@ -18223,6 +18307,14 @@ function openPosLearnPicker(loc){
   S._posLearnLastCost=cost;
   const ALL_POS=["KP","JV","BV","KV","VKP","KKP","TKP","JSZ","BSZ","CS"];
   const learnable=ALL_POS.filter(pos=>!e.pos.includes(pos));
+  /* ---- AJÁNLOTT POSZT ----
+     A leggyakoribb eset messze az, hogy a játékos MÁR OTT ÁLL egy poszton,
+     amit nem ismer — épp ezért veszít Ratinget rajta, és épp ezért nyitod meg
+     ezt a képernyőt. Azt a posztot tehát felkínáljuk elsőként, kiemelve; a
+     többi ugyanúgy választható alatta. Ha a játékos a saját posztján áll,
+     nincs ajánlat, és a lista a régi módon jön. */
+  const herePos=hubLocPosTxt(loc);
+  const suggested=learnable.includes(herePos)?herePos:null;
   $("scHub").classList.add("hide");
   $("scWindow").classList.remove("hide");
   $("swapPanelWrap").classList.add("hide");
@@ -18236,22 +18328,43 @@ function openPosLearnPicker(loc){
     const warn=document.createElement("div");warn.style.cssText="font-size:12px;color:var(--red);margin-bottom:8px";
     warn.textContent="Nincs elég büdzséd ehhez a tanuláshoz.";
     $("twActions").appendChild(warn);}
-  learnable.forEach(pos=>{
-    const b=document.createElement("button");b.className="btn-s stepbtn";b.style.marginTop="6px";b.style.textAlign="left";
-    b.innerHTML=`<b>${pos}</b>`;
+  /* A tanulás elindítása pénzbe kerül és egy egész szezonra elkötelez, ezért
+     megerősítés nélkül nem indul el (lásd askConfirm). */
+  const start=pos=>{
+    if((S.transferBudget||0)<cost)return;
+    askConfirm({title:"Elindítod a poszt-tanulást?",yes:"Igen, indulhat",
+      html:`<div style="font-size:15px;font-weight:700">${esc(shortName(p.n))} → <span style="color:var(--gold)">${pos}</span></div>
+        <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))}</div>
+        <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(cost)}</b>, ami azonnal levonódik — az egyenleged ${fmtFt(S.transferBudget||0)} → <b>${fmtFt((S.transferBudget||0)-cost)}</b>.
+          A tanulás kb. <b>${needed}</b> lejátszott meccsig tart, és közben egy másik posztot nem tanulhat.</div>`,
+      onYes:()=>{
+        if((S.transferBudget||0)<cost)return;
+        S.transferBudget-=cost;
+        e.posLearning={target:pos,needed:posLearnMatchesNeeded(e),progress:0,startedSeason:S.seasonNumber||1};
+        S.chPosLearnStarted=(S.chPosLearnStarted||0)+1;   /* kihívás-könyvelés */
+        addLine(`🎓 Poszt-tanulás elindítva: ${esc(shortName(p.n))} elkezdte a(z) ${pos} poszt tanulását (−${fmtFt(cost)}).`,"m life");
+        $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">🎓 Elindítva!</div><p style="font-size:13px;margin-top:5px">${esc(shortName(p.n))} mostantól a(z) <b>${pos}</b> posztot tanulja. A haladást a lenyíló játékos-panelen követheted. Szólunk, ha kész!</p>`;
+        $("twActions").innerHTML="";
+        const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";ok.onclick=()=>csReturnToHub();
+        $("twActions").appendChild(ok);
+        updateBar();saveGame();}});};
+  const mkBtn=(pos,rec)=>{
+    const b=document.createElement("button");
+    b.className=rec?"btn-y stepbtn":"btn-s stepbtn";
+    b.style.marginTop="6px";b.style.textAlign="left";
+    b.innerHTML=rec
+      ?`<b>${pos}</b> — ajánlott<small>itt játszik most, és ezt a posztot még nem ismeri</small>`
+      :`<b>${pos}</b>`;
     b.disabled=(S.transferBudget||0)<cost;
-    b.onclick=()=>{
-      if((S.transferBudget||0)<cost)return;
-      S.transferBudget-=cost;
-      e.posLearning={target:pos,needed:posLearnMatchesNeeded(e),progress:0,startedSeason:S.seasonNumber||1};
-      S.chPosLearnStarted=(S.chPosLearnStarted||0)+1;   /* kihívás-könyvelés */
-      addLine(`🎓 Poszt-tanulás elindítva: ${esc(shortName(p.n))} elkezdte a(z) ${pos} poszt tanulását (−${fmtFt(cost)}).`,"m life");
-      $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">🎓 Elindítva!</div><p style="font-size:13px;margin-top:5px">${esc(shortName(p.n))} mostantól a(z) <b>${pos}</b> posztot tanulja. A haladást a lenyíló játékos-panelen követheted. Szólunk, ha kész!</p>`;
-      $("twActions").innerHTML="";
-      const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";ok.onclick=()=>csReturnToHub();
-      $("twActions").appendChild(ok);
-      updateBar();saveGame();};
-    $("twActions").appendChild(b);});
+    b.onclick=()=>start(pos);
+    $("twActions").appendChild(b);};
+  if(suggested){
+    mkBtn(suggested,true);
+    const sep=document.createElement("div");
+    sep.style.cssText="font-size:11px;color:var(--dim2);margin:10px 0 2px;text-transform:uppercase;letter-spacing:1px";
+    sep.textContent="Vagy egy másik poszt";
+    $("twActions").appendChild(sep);}
+  learnable.forEach(pos=>{if(pos!==suggested)mkBtn(pos,false);});
   const cancel=document.createElement("button");cancel.className="btn-s stepbtn";cancel.style.marginTop="10px";cancel.textContent="Mégsem";
   cancel.onclick=()=>csReturnToHub();$("twActions").appendChild(cancel);
   $("scWindow").scrollIntoView({behavior:"smooth"});}
@@ -19895,11 +20008,17 @@ function renderInvestOffer(){
     const b=document.createElement("button");b.className="btn-s";
     b.innerHTML=`${fmtFtShort(v)}<small>vissza: ${fmtFtShort(v*2)}</small>`;
     b.onclick=()=>{
-      S.transferBudget=Math.max(0,(S.transferBudget||0)-v);
-      S.investReturn=(S.investReturn||0)+v*2;
-      S.investPending=false;
-      addLine(`💼 Befektettél ${fmtFt(v)} — a következő szezon elején ${fmtFt(v*2)} jön vissza.`,"m life");
-      renderHub();saveGame();};
+      askConfirm({title:"Beteszed ezt az összeget?",yes:"Igen, befektetem",
+        html:`<div style="font-size:13px;line-height:1.55">💼 <b style="color:var(--gold)">${fmtFt(v)}</b> most levonódik a büdzsédből
+            (${fmtFt(S.transferBudget||0)} → <b>${fmtFt(Math.max(0,(S.transferBudget||0)-v))}</b>),
+            és a <b>következő szezon elején</b> ${fmtFt(v*2)} jön vissza.<br><br>
+            Ebben a szezonban tehát ennyivel kevesebből igazolsz — a lehetőség egyszeri.</div>`,
+        onYes:()=>{
+          S.transferBudget=Math.max(0,(S.transferBudget||0)-v);
+          S.investReturn=(S.investReturn||0)+v*2;
+          S.investPending=false;
+          addLine(`💼 Befektettél ${fmtFt(v)} — a következő szezon elején ${fmtFt(v*2)} jön vissza.`,"m life");
+          renderHub();saveGame();}});};
     grid.appendChild(b);});
   const skip=document.createElement("button");skip.className="btn-s";
   skip.textContent="Kihagyom";
@@ -20068,7 +20187,10 @@ function beginNextSeasonWithChallenges(){
     autoLevelSync();
     S._chAnchorPending=true;
     if(gameMode==="career"&&careerPool&&!S.auto){
-      showChallengeOffers("long",5,startNextCareerSeason);
+      /* hubBack: a szezon eleji nagy vállalásoknál át lehet ugrani a HUB-ba
+         megnézni a keretet, és onnan vissza ide. Az első szezon nyitó
+         kihívásainál (a draft után) ez nincs — ott még nincs mit megnézni. */
+      showChallengeOffers("long",5,startNextCareerSeason,false,{hubBack:true});
     }else{
       if(gameMode==="career"&&careerPool)autoHandleChallengeOffers("long",5);
       startNextCareerSeason();
