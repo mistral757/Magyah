@@ -1730,7 +1730,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.66";
+const APP_VERSION="2.5.68";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10759,6 +10759,7 @@ const S={idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,capMod:0,eventMod:0
   morale:50,moraleTarget:50,moraleSum:0,moraleSamples:0,scorers:{},assists:{},mvps:{},goodForm:{},badForm:{},playerReds:{},playerInjuries:{},careerStats:{},clubScoutSpinsUsed:0,consecutiveTitles:0,consecutiveBadSeasons:0,seasonSaves:{},seasonCleanSheets:{},seasonMatches:{},seasonNumber:1,seasonHistory:[],
   grudge:new Set(),fixtures:[],playing:false,auto:false,
   mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
+  mpMateHalf:null,    /* a társ féltávi mérlege a párharc pillanatképéből */
   /* F6: a párharc tartós állapota. A mpBalance a kiegyenlítő rating-eltolás,
      a mpHistory és a mpDuelLog pedig SZEZONOKON ÁTÍVELŐ — nem nullázódik. */
   oppBuffH:null,   /* a szezonra rögzített rejtett ellenfél-erősítés */
@@ -12098,7 +12099,21 @@ function h2hWireSnapshot(){
            *chemGoalMultForPlayer(a.p.n,MS.activeNames),
         aw:(ASSTW[pos]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"assistw")};}),
     formName:(MS.active[MS.gi]&&MS.active[MS.gi].p.n)||null,
-    weakName:(MS.active[MS.bi]&&MS.active[MS.bi].p.n)||null};}
+    weakName:(MS.active[MS.bi]&&MS.active[MS.bi].p.n)||null,
+    /* ---- FÉLTÁVI TABELLÁHOZ: A MÉRLEG IS ÁTUTAZIK ----
+       A párharc épp a 15. fordulóban megy, vagyis pontosan a féltávnál, és ez
+       az EGYETLEN pont a szezon közepén, ahol a két kliens amúgy is beszél
+       egymással. Ezért a keret mellé a saját bajnoki mérlegünk és a CPU-k
+       elleni eredményeink is felmennek — így a féltávi tabellában a társ sora
+       és a CPU-k meccsszáma is pontos lesz, új hálózati protokoll nélkül.
+       (A pillanatkép a párharc ELŐTT készül, tehát 14 meccsnyi adat; a hiányzó
+       15. meccs maga a párharc, azt a tabella-építő a saját eredményéből
+       tükrözi — lásd buildFinalTable half ága.) */
+    standing:{pts:S.pts,w:S.W,d:S.D,l:S.L,gf:S.GF,ga:S.GA,idx:S.idx,
+      ovr:teamOVRbase(),
+      results:(S.fixtureResults||[]).filter(fr=>!fr.duel).map(fr=>{
+        const n=(fr.o&&fr.o.n!==undefined)?String(fr.o.n):String(fr.o||"");
+        return {i:SEASON_OPPS.findIndex(o=>o.n===n),n,gf:fr.gf,ga:fr.ga};})}};}
 /* Súlyozott választás egy pillanatkép játékosai közül. */
 function h2hPick(players,key){
   let tot=0;players.forEach(p=>{tot+=Math.max(0,p[key]||0);});
@@ -12501,6 +12516,11 @@ function h2hStart(node,sim,round){
      innerHTML-be írja a fixture-ellenfél nevét (fejléc, meccs-cím). Ezért itt,
      EGYETLEN ponton tisztítjuk, hogy semmi jelölés ne juthasson át. */
   const cleanTeam=String(oppSnap.teamName||"").replace(/[<>&]/g,"").trim().slice(0,40);
+  /* A társ bajnoki mérlege — ebből áll össze a féltávi tabella MP-ben is.
+     A párharc előtti állapot; a párharc eredményét a tabella-építő teszi hozzá. */
+  if(oppSnap.standing)
+    S.mpMateHalf={season:(S.seasonNumber||1),
+      rep:Object.assign({teamName:cleanTeam||"A társad"},oppSnap.standing)};
   h2hScript={sim,round,iAmHome:h2hIAmHome(),
     oppName:cleanTeam||"A társad",
     oppOvr:(oppSnap.dispOvr!=null?oppSnap.dispOvr:(oppSnap.ovr||0))};
@@ -14617,12 +14637,35 @@ function handleCheckpoint(round,resumeCb){
     }
     return;}
   continueCheckpoint(round,resumeCb);}
+/* ---- FÉLTÁVI TABELLA-KÉPERNYŐ ----
+   A 15. forduló után, a téli átigazolás ELŐTT: itt derül ki, mire ment ki az
+   első félszezon, és ez az az információ, ami alapján el lehet dönteni, kell-e
+   erősíteni. Közös karrierben a társ sora is itt van (a párharc pillanatképéből).
+   Az onDone a téli ablakot indítja. */
+function showHalfSeasonTable(onDone){
+  const teams=buildFinalTable({half:true});
+  const me=teams.findIndex(t=>t.you)+1;
+  $("twTitle").textContent="📊 Féltáv — így álltok";
+  $("twBody").innerHTML=`<p style="font-size:12.5px;color:var(--dim);line-height:1.55">
+      A szezon fele lement. A tabella a te valós mérlegedből és a mezőny egymás elleni
+      meccseiből áll össze — mindenki <b>15</b> meccsnél tart.
+      Jelenlegi helyezésed: <b style="color:var(--gold)">${me}.</b></p>
+    <div style="margin-top:9px">${renderFinalTable(teams)}</div>`;
+  $("twActions").innerHTML="";
+  const go=document.createElement("button");
+  go.className="btn-y stepbtn";go.textContent="Tovább a téli átigazolásra →";
+  go.onclick=()=>onDone();
+  $("twActions").appendChild(go);
+  $("scWindow").scrollIntoView({behavior:"smooth"});}
 function continueCheckpoint(round,resumeCb){
   S.resumeCb=resumeCb;
   $("scWindow").classList.remove("hide");
   $("swapPanelWrap").classList.add("hide");
   if(round===15){
     $("twPanel").classList.remove("hide");
+    /* Féltáv: előbb a tabella, utána a téli ablak. Auto-módban kimarad, hogy a
+       végigjátszás ne álljon meg. */
+    if(!S.auto){showHalfSeasonTable(()=>startTransferWindow(TW_CYCLES,"Téli átigazolási időszak"));return;}
     startTransferWindow(TW_CYCLES,"Téli átigazolási időszak");
   }else if(gameMode==="career"&&careerPool){
     $("twPanel").classList.remove("hide");
@@ -16105,7 +16148,18 @@ function renderStatsTable(targetId){
    (amiket a valódi szezon sosem játszott le) gyorsan, a motor saját gólvárhatóság-
    képletével szimuláljuk, hogy egy belsőleg konzisztens, valódi 16-csapatos
    tabella jöjjön ki — a te eredményeid a ténylegesen lejátszott meccsekből. ---- */
-function buildFinalTable(){
+/* ---- FÉLTÁVI TABELLA ----
+   Ugyanez a gépezet a szezon FELÉNÉL is: a te sorod a valós mérlegedből, a
+   CPU-k egymás elleni meccseiből viszont csak EGY kör fut le (páronként egy
+   meccs, 14 forduló), nem a teljes oda-visszavágó. Így mindenkinek 15
+   lejátszott meccse lesz, épp mint neked — a tabella belsőleg konzisztens.
+   A társ sora közös karrierben a párharc pillanatképéből jön (lásd
+   h2hWireSnapshot standing mezője), ezért MP-ben is teljes a kép. */
+function mpMateHalf(){
+  const m=S.mpMateHalf;
+  return (m&&m.season===(S.seasonNumber||1))?m.rep:null;}
+function buildFinalTable(opts){
+  const half=!!(opts&&opts.half);
   const lamFn=d=>Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)));
   /* ---- F5: KÖZÖS TABELLA ----
      Közös karrierben KÉT menedzser-sor van, és eggyel kevesebb CPU (a 15. és
@@ -16116,12 +16170,24 @@ function buildFinalTable(){
      A társ sorát a szezonzárás-cseréből kapjuk; ha (még) nincs meg, egyjátékos
      alakban áll össze a tabella — a finish() eleve megvárja, ezért ide már
      jellemzően kész adattal érkezünk. */
-  const mateRep=h2hRoomActive()?mpMateFinal():null;
+  const mateRep=h2hRoomActive()?(half?mpMateHalf():mpMateFinal()):null;
   const oppList=h2hRoomActive()?leagueOpps():SEASON_OPPS;
   const teams=[{n:teamName,you:true,player:true,ovr:teamOVRbase(),pts:S.pts,gf:S.GF,ga:S.GA,w:S.W,d:S.D,l:S.L}];
-  if(mateRep)teams.push({n:String(mateRep.teamName||"A társad"),you:false,player:true,mate:true,
-    ovr:mateRep.ovr||0,pts:mateRep.pts||0,gf:mateRep.gf||0,ga:mateRep.ga||0,
-    w:mateRep.w||0,d:mateRep.d||0,l:mateRep.l||0});
+  if(mateRep){
+    const mt={n:String(mateRep.teamName||"A társad"),you:false,player:true,mate:true,
+      ovr:mateRep.ovr||0,pts:mateRep.pts||0,gf:mateRep.gf||0,ga:mateRep.ga||0,
+      w:mateRep.w||0,d:mateRep.d||0,l:mateRep.l||0};
+    /* FÉLTÁV: a társ pillanatképe a párharc ELŐTT készült, tehát egy meccsel le
+       van maradva. A hiányzó meccs maga a párharc — annak eredményét a SAJÁT
+       sorunkból tükrözzük rá, így mindkét menedzser-sor 15 meccsen áll. */
+    if(half){
+      const duel=(S.fixtureResults||[]).filter(fr=>fr.duel).pop();
+      if(duel){
+        mt.gf+=duel.ga;mt.ga+=duel.gf;
+        if(duel.ga>duel.gf){mt.w++;mt.pts+=3;}
+        else if(duel.ga<duel.gf)mt.l++;
+        else{mt.d++;mt.pts++;}}}
+    teams.push(mt);}
   oppList.forEach(o=>teams.push({n:o.n,you:false,player:false,ovr:o.ovr,pts:0,gf:0,ga:0,w:0,d:0,l:0}));
   /* Egy menedzser-eredmény TÜKRE a CPU sorába.
      FONTOS: a párosítás a NÉV alapján megy (fr.o.n === x.n), NEM objektum-
@@ -16197,12 +16263,20 @@ function buildFinalTable(){
      szimulációt: a ciklus sorrendje és a csapaterők is közösek, tehát mindkét
      képernyőn betűre ugyanaz a tabella áll össze.
      Egyjátékosban marad a Math.random (a poisson alapértelmezése). */
-  const tblRnd=h2hRoomActive()?rngFor("s"+(S.seasonNumber||1)+":table"):null;
+  /* A FÉLTÁVI tabella MINDIG seedelt — egyjátékosban is. Ezt a táblát a
+     felhasználó többször is megnyithatja, és egy Math.random-alapú változat
+     minden megnyitásnál más állást mutatna, ami hiteltelen. A seed a szezonhoz
+     kötött, tehát ugyanaz a féltáv mindig ugyanazt a tabellát adja — és MP-ben
+     a két kliensen is ugyanazt. */
+  const tblRnd=half?rngFor("s"+(S.seasonNumber||1)+":halftable")
+    :(h2hRoomActive()?rngFor("s"+(S.seasonNumber||1)+":table"):null);
   /* a CPU-csapatok egymás elleni, sosem lejátszott meccseit a széthúzott
      tabella-erővel szimuláljuk; a semleges AI-vs-AI meccsen nincs hazai előny.
      A menedzser-sorok ebből KIMARADNAK: az ő 30 meccsük mind valós. */
+  /* FÉLTÁVNÁL páronként EGY meccs (j>i), teljes szezonnál oda-vissza (j!==i) —
+     így a CPU-k lejátszott meccsszáma pontosan követi a tiédet. */
   for(let i=0;i<opps.length;i++){
-    for(let j=0;j<opps.length;j++){
+    for(let j=half?i+1:0;j<opps.length;j++){
       if(i===j)continue;
       const diff=opps[i].tovr-opps[j].tovr;
       const gf=poisson(lamFn(diff),tblRnd),ga=poisson(lamFn(-diff),tblRnd);
@@ -19938,11 +20012,20 @@ function renderEuroScreen(){
     +lst(E.stats.assists,"a","Gólpasszok")
     +lst(E.stats.cleanSheets,"c","Kapott gól nélkül");
   renderEuroPath();}
+/* ---- KUPÁBAN IS TE DÖNTÖD EL, KI ÁLL BE ----
+   A bajnoki kezdőrúgás a startRound()-on megy át, ami sérülés/eltiltás esetén
+   felhozza a hiányzók-panelt. A kupa viszont közvetlenül a playMatch()-et
+   hívta, tehát ott a pótlást mindig az automatika választotta — pont a
+   legnagyobb tétű meccseken nem volt beleszólásod. Ugyanaz a kapu kerül ide:
+   ha van hiányzó a kezdő 11-ben (és nem auto-mód megy), előbb a panel jön. */
 $("euroKickBtn")&&($("euroKickBtn").onclick=()=>{
-  $("scEuro").classList.add("hide");
-  $("scSim").classList.remove("hide");
-  $("scSim").scrollIntoView({behavior:"smooth"});
-  playMatch();});
+  const go=()=>{
+    $("scEuro").classList.add("hide");
+    $("scSim").classList.remove("hide");
+    $("scSim").scrollIntoView({behavior:"smooth"});
+    playMatch();};
+  if(!S.auto&&unavailableStarters().length){openAbsencePanel(go);return;}
+  go();});
 $("euroDoneBtn")&&($("euroDoneBtn").onclick=endEuroCampaign);
 $("euroHubBtn")&&($("euroHubBtn").onclick=openHubMidSeason);
 
@@ -20457,7 +20540,7 @@ function saveGame(){
            döntés, a közös előzmény és az egymás elleni napló. */
         /* a szezonra rögzített rejtett ellenfél-erősítés (lásd seasonHiddenBonus) */
         oppBuffH:S.oppBuffH,
-        mpMateFinal:S.mpMateFinal,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
+        mpMateFinal:S.mpMateFinal,mpMateHalf:S.mpMateHalf,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
@@ -20683,6 +20766,7 @@ function applySavedGame(d){
      képlethez képest ez azonnali könnyítés a futó karriereknek is. */
   S.oppBuffH=(d.S.oppBuffH!=null)?d.S.oppBuffH:null;
   S.mpMateFinal=d.S.mpMateFinal||null;
+  S.mpMateHalf=d.S.mpMateHalf||null;
   /* F6: a kiegyenlítő eltolás a keret TARTÓS tulajdonsága — enélkül egy
      újratöltés visszaadná az előnyt/hátrányt. */
   S.mpBalance=d.S.mpBalance||0;
