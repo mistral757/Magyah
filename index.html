@@ -1070,6 +1070,11 @@ button.infPanel:disabled{cursor:default}
       <!-- F7: csak akkor jelenik meg, ha a szoba tényleg megszűnt — ez a kiút
            az egyébként örökre megálló karrierből. -->
       <button class="mpBtn gold hide" id="h2hWaitOrphanBtn">🎮 Egyedül folytatom ezt a karriert</button>
+      <!-- A KERET VISSZAVONÁSA. Amíg a társad nem érkezett meg, a felküldött
+           pillanatkép visszahívható, és újra átrendezheted a csapatot. Amint a
+           mérkőzés lefutott, ez a gomb eltűnik — az eredményt nem lehet
+           visszavonni. -->
+      <button class="mpBtn danger hide" id="h2hWaitUnreadyBtn">↩ Mégsem — még változtatnom kell a kereten</button>
       <button class="mpBtn" id="h2hWaitHomeBtn">Vissza a kezdőlapra — a szoba megmarad</button>
       <button class="mpBtn danger" id="h2hWaitCancelBtn">✕ Most nem játszom le</button>
     </div>
@@ -1746,7 +1751,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.82";
+const APP_VERSION="2.5.83";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -13245,6 +13250,8 @@ function h2hWaitShow(round,msg,mine,opp,what){
   const W=what||{mine:"A te kereted",opp:"A társad kerete",cancel:"✕ Most nem játszom le"};
   $("h2hWait").classList.remove("hide");
   $("h2hWaitOrphanBtn").classList.add("hide");   /* csak a szoba-eltűnés mutatja */
+  const ub=$("h2hWaitUnreadyBtn");
+  if(ub){ub.classList.add("hide");ub.disabled=false;}   /* csak a párharc-várakozás mutatja */
   $("h2hWaitRound").textContent=typeof round==="number"?`${round}. FORDULÓ`:String(round);
   $("h2hWaitMsg").innerHTML=msg;
   $("h2hWaitCancelBtn").textContent=W.cancel;
@@ -13410,8 +13417,38 @@ async function h2hTick(key,myField,oppField,round){
     +`<br><small style="color:#b9b4ab">Te: <b>${MP.role==="host"?"házigazda":"vendég"}</b> · `
     +`a te rekeszed: ${mine?"kész":"üres"} · a társadé: ${opp?"kész":"üres"}`
     +(mine&&!opp?` — ha nála is „kész / üres” áll, mindketten ugyanabba a rekeszbe írtok; a program a következő körben magától átrendezi.`:"")
+    +(mine?`<br><small style="color:#8fae7f">A kereted MENTVE van a szobában: nyugodtan kiléphetsz, a mérkőzés akkor is lefut, és visszatéréskor végignézheted.</small>`:"")
     +`</small>`,
     mine,opp);
+  /* ---- A FELKÜLDÖTT KERET VISSZAHÍVÁSA ----
+     A pillanatkép feltöltése maga a „készen állok”: onnantól hivatalos, és a
+     szobában marad akkor is, ha kilépsz. Amíg viszont a MÉRKŐZÉS nem futott le,
+     ennek visszavonhatónak kell lennie — különben egy elkapkodott kezdőrúgás
+     véglegesen befagyasztaná a keretedet. A gomb ezért csak addig látszik, amíg
+     a saját rekeszem tele van ÉS nincs még eredmény. */
+  {const ub=$("h2hWaitUnreadyBtn");
+   if(ub){
+     ub.classList.toggle("hide",!mine);
+     ub.onclick=async()=>{
+       ub.disabled=true;
+       if(_h2hPoll){clearTimeout(_h2hPoll);_h2hPoll=null;}
+       /* Újraolvasunk: ha közben lefutott a meccs, a visszavonás már késő. */
+       let fresh=null;
+       try{fresh=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+       if(fresh&&fresh.sim){
+         $("h2hWaitErr").textContent="A mérkőzés időközben lefutott — az eredményt nem lehet visszavonni.";
+         ub.classList.add("hide");
+         h2hTick(key,myField,oppField,round);return;}
+       try{await mpBk().h2hPut(MP.activeRoom,key,myField,null);}
+       catch(e){
+         $("h2hWaitErr").textContent="A visszavonás nem sikerült — próbáld újra.";
+         ub.disabled=false;h2hTick(key,myField,oppField,round);return;}
+       /* Vissza a HUB-hoz: a keret újra átrendezhető, a kezdőrúgás újra él. */
+       _h2hBusy=false;
+       h2hWaitHide();
+       $("kickBtn").disabled=false;
+       $("kickBtn").textContent=kickBtnLabel();
+       addLine(`↩ Visszahívtad a keretedet a párharcból — átrendezheted, és újra elindíthatod a fordulót.`,"m ev");};}}
   _h2hPoll=setTimeout(()=>h2hTick(key,myField,oppField,round),2000);}
 /* A meccs indítása a kész eseménylistával. */
 function h2hStart(node,sim,round){
@@ -14540,8 +14577,10 @@ function playMatch(){
   /* A kézi közvetítés tempóját a matchSpeed szorzó állítja (1× / 0.5× / 0.25×).
      Auto módban (szezon végigjátszása) marad a villámgyors 18 ms — ott nem a
      közvetítést nézed. A 0.25× így meccsenként életszerűbb, olvasható ütemet ad. */
-  /* PÁRHARCBAN fix 0,25× (a specifikáció szerint): ez a meccs a karrier
-     csúcspontja, nem átfutandó forduló — a sebességváltó nem hat rá. */
+  /* PÁRHARCBAN fix 0,1× (H2H_TICK_MS): ez a meccs a karrier csúcspontja, nem
+     átfutandó forduló — a tempó-csúszka nem hat rá. Ez az, ami miatt a
+     KÉSLELTETETT visszanézés is lassan pereg: aki nem volt jelen az élő
+     lefutásnál, visszatéréskor ugyanezt a 0,1×-es közvetítést kapja. */
   const tickMs=DUEL?H2H_TICK_MS:(S.auto?18:Math.round(330/matchSpeed));
   /* F4/2: a csapat-oldali számítás egyetlen pillanatképbe került. A mai
      CPU-meccs a SAJÁTJÁT adja át — a viselkedés változatlan, csak az útvonal
