@@ -1746,7 +1746,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.77";
+const APP_VERSION="2.5.78";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4471,10 +4471,68 @@ function euroQualifyFor(rank,level){const e=cupEntryFor(rank,level);return e?e.c
    meccs-erő: méréssel a meccs-erőre horgonyzott változat MINDEN sorozatban 0%
    győzelmi esélyt adott, mert egy 10 meccses kampányt nem lehet végigvinni
    saját szintű ellenfelek ellen. */
+/* ---- MENNYIRE URALTAD EZT A SZEZONT? (0..1) ----
+   A kupamezőny nem egyetlen számból áll be. Három, egymástól független jel:
+     d1 — MILYEN FÖLÉNNYEL INDULTÁL: a szezonkezdő csapaterő a választott
+          mezőnyszint fölött. Ez a vállalás: aki a szint fölé építkezett, az
+          eleve favoritnak indult.
+     d2 — MIT HOZTÁL KI BELŐLE: a bajnoki helyezés és a szezonzáró fölény
+          együtt. Ez a bizonyíték, nem az ígéret.
+     d3 — HOL TARTASZ ABSZOLÚT ÉRTELEMBEN: a csapaterő a teljes skálán —
+          Infinity előtt a 100-ason, utána a megvett tierek szerint tágult
+          skálán (maxOppRating). A skála alsó 60%-a nem számít bele: ott még
+          nem világklasszis a keret, akármit is mutat a bajnoki szint.
+   A súlyozás a bizonyítéknak ad a legtöbbet (0.45), a vállalásnak és az
+   abszolút szintnek kevesebbet. */
+function euroDominance(){
+  const base=oppTargetRating||84;
+  const ts=(typeof teamStrength==="function")?teamStrength():0;
+  const cl=x=>Math.max(0,Math.min(1,x));
+  const ts0=S.seasonStartStrength||ts;
+  const last=(S.seasonHistory&&S.seasonHistory.length)?S.seasonHistory[S.seasonHistory.length-1]:null;
+  const rank=(last&&last.rank)||8;
+  /* A d3 VISZONYÍTÁSI SKÁLÁJA fixen 100 / Infinityben 200 — SZÁNDÉKOSAN nem a
+     maxOppRating(), ami a megvett tierekkel tovább nő. Azzal ugyanis minden
+     megvásárolt tier LERONTOTTA volna a saját abszolút pontszámodat: egy
+     164-es keret 300-as plafonnal 0.55-ön állt (nulla pont), 200-as skálán
+     viszont 0.82-n — vagyis pont a legerősebb kereteket büntette. */
+  const scale=infinityMode?INFINITY_BASE_MAX:100;
+  const d1=cl((ts0-base)/10);
+  const d2=cl(((16-rank)/15)*0.5+cl((ts-base)/10)*0.5);
+  const d3=cl((ts/scale-0.6)/0.4);
+  return cl(0.30*d1+0.45*d2+0.25*d3);}
+/* ---- A KUPAMEZŐNY KÖZÉPÉRTÉKE ----
+   MÉRVE (4000 teljes BL-kampány értékenként: 4-es csoport oda-vissza + három
+   kétmeccses párharc + döntő), a BL-győzelem esélye a TÉNYLEGES fölény
+   függvényében: +0 → 3%, +2 → 13%, +4 → 30%, +6 → 52%, +8 → 73%, +10 → 86%.
+   Vagyis a 13 meccses menetelést azonos szintű mezőnyben gyakorlatilag nem
+   lehet megnyerni — a régi képlet pedig pontosan ezt csinálta: a középérték a
+   csapaterődre állt (ts−1), tehát a fölényed nulla volt.
+   Ráadásul a kupában a mezőny megkapja az oppBuffFor() rejtett erősítését is,
+   aminek a FIX része (0.12/szint a 84 fölött) 110-es szinten már +3.1 —
+   vagyis a "azonos szintű" mezőny valójában ERŐSEBB volt nálad.
+
+   Az új képlet három lépésből áll:
+     1) a növekedésedet a mezőny csak RÉSZBEN követi (EURO_GROWTH_SHARE),
+     2) a dominancia pontokban mért kedvezményt ad (EURO_DOM_DISCOUNT),
+     3) a rejtett erősítés FIX részét visszaadjuk, hogy a kiírt szám azt
+        jelentse, amivel ténylegesen szembekerülsz. (A MÉRT rész marad: az a
+        te rejtett előnyöd fele, annak van dolga a mezőnyben.)
+   A bajnoki szint így már nem alsó korlát — egy tarolással záruló szezon után
+   a kupamezőny alá is mehet. Aki viszont épphogy bekerült, annak marad a
+   régi, kőkemény menetelés. */
+const EURO_GROWTH_SHARE=0.15;   /* ennyivel kevésbé követi a mezőny a növekedésedet */
+const EURO_DOM_DISCOUNT=5;      /* teljes dominanciánál ennyi Rating-pont kedvezmény */
 function euroMidRating(){
   const base=oppTargetRating||84;
   const ts=(typeof teamStrength==="function")?teamStrength():0;
-  return Math.max(base,ts>=base+1?Math.round(ts-1):base);}
+  const dom=euroDominance();
+  const grown=Math.max(0,ts-base);
+  let mid=base+grown*(1-EURO_GROWTH_SHARE*dom)-EURO_DOM_DISCOUNT*dom;
+  /* a rejtett erősítés fix, szint-arányos része — ezt a mezőny a meccsen úgyis
+     megkapja, tehát a kiírt középértékből levonjuk */
+  mid-=Math.max(0,(base-84)*OPP_BUFF_FIXED);
+  return Math.max(50,Math.round(mid));}
 /* (A kvalifikáció a CUP_TIERS-ből jön — lásd cupEntryFor/euroQualifyFor fent.
    A régi, szintfüggetlen 1→BL / 2-3→EL / 4-5→KL szabály megszűnt: ma ez már
    csak a 100 fölötti sáv viselkedése.) */
@@ -4634,14 +4692,21 @@ function mpResolveCup(mine,mate){
 /* Eldőlt-e már a nevezés erre a szezonra? (A comp:null is döntés: egyikőtök
    sem kvalifikált, tehát idén nincs kupa.) */
 function mpCupSettled(){return !!(S.mpCup&&S.mpCup.season===(S.seasonNumber||1));}
-/* A közös mezőny-célérték a két csapaterőből. Az euroMidRating logikája, de az
-   ERŐSEBB keretre horgonyozva: a bajnoki szint az alsó korlát, és ha a jobbik
-   keret legalább 1-gyel fölé nőtt, ahhoz igazodik (−1). Tiszta függvény —
-   mindkét kliens ugyanabból a két számból ugyanazt kapja. */
-function mpCupSharedMid(a,b){
+/* A közös mezőny-célérték a két csapaterőből és a két dominanciából. Ugyanaz a
+   képlet, mint az euroMidRating-ben — csak az ERŐSEBB keretre horgonyozva, és
+   a két dominancia ÁTLAGÁVAL. Tiszta függvény: mindkét kliens ugyanabból a
+   négy számból ugyanazt kapja, tehát a mezőny bitre azonos.
+   (Régi mentés/kliens dominancia nélkül: 0-val számol, azaz a régi,
+   kedvezmény nélküli viselkedést kapja — nem törik el semmi.) */
+function mpCupSharedMid(a,b,domA,domB){
   const base=oppTargetRating||84;
   const ts=Math.max((typeof a==="number"?a:0),(typeof b==="number"?b:0));
-  return Math.max(base,ts>=base+1?Math.round(ts-1):base);}
+  const dom=Math.max(0,Math.min(1,
+    ((typeof domA==="number"?domA:0)+(typeof domB==="number"?domB:0))/2));
+  const grown=Math.max(0,ts-base);
+  let mid=base+grown*(1-EURO_GROWTH_SHARE*dom)-EURO_DOM_DISCOUNT*dom;
+  mid-=Math.max(0,(base-84)*OPP_BUFF_FIXED);
+  return Math.max(50,Math.round(mid));}
 let _mpCupBusy=false,_mpCupPoll=null;
 const MP_WAIT_CUP={mine:"A te nevezésed",opp:"A társad nevezése",
   cancel:"✕ Még maradok a HUB-ban"};
@@ -4678,6 +4743,12 @@ async function mpCupGate(onReady){
          teamStrength()-edből dolgozik, ami kliensenként más — abból a két
          oldal más mezőnyt építene. A közös célértéket a két számból számoljuk. */
       str:Math.round(teamStrength()),
+      /* A DOMINANCIA is átutazik: a kupamezőny kedvezménye ebből jön
+         (euroDominance), és kliensenként más — a helyezésed, a szezonkezdő
+         csapaterőd és az abszolút szinted a te karriered adata. A közös
+         mezőny a KETTŐTÖK átlagából épül, hogy egyikőtöknek se legyen
+         sétagalopp, se reménytelen menetelés. */
+      dom:Math.round(euroDominance()*1000)/1000,
       at:Date.now()});}
     catch(e){$("h2hWaitErr").textContent="A nevezést nem sikerült elküldeni — újrapróbáljuk.";}}
   mpCupTick(key,myField,oppField,onReady);}
@@ -4699,7 +4770,7 @@ async function mpCupTick(key,myField,oppField,onReady){
       /* A KÖZÖS mezőny-célérték: ugyanaz a képlet, mint az euroMidRating-ben,
          de az ERŐSEBB keretre horgonyozva. Így a két kliens azonos mezőnyt
          épít, és a sorozat egyikőtöknek sem lesz sétagalopp. */
-      mid:mpCupSharedMid(mine.str,mate.str),
+      mid:mpCupSharedMid(mine.str,mate.str,mine.dom,mate.dom),
       how:r?r.how:null,mineComp:r?r.mineComp:null,mateComp:r?r.mateComp:null};
     if(r){
       /* A közös sorozat FELÜLÍRJA a saját kvalifikációdat — ez a lényeg:
@@ -7403,7 +7474,11 @@ function advanceCareerSeason(){
       report.familyRetired={n:famP.n,age:famP.age};
     }}
   pruneChemistry();
-  if(S.frozenAcademySeasons>0)S.frozenAcademySeasons--;   /* akadémia-befagyás lejár */
+  /* AZ AKADÉMIA-BEFAGYÁS LEJÁRATA NEM ITT VAN — lásd hubShowSeasonReport().
+     Itt egy frissen kiszabott büntetést ütött volna agyon: a szezonzáró
+     kihívás-kiértékelés (ami a befagyást kiosztja) néhány sorral EZELŐTT fut,
+     ugyanabban a függvényben, tehát a most kapott 1 szezon azonnal 0-ra
+     csökkent, és a büntetés soha nem lépett életbe. */
   /* lejárt TSI-blokkok törlése */
   Object.keys(S.tsiBlocked||{}).forEach(n=>{if((S.seasonNumber||1)>S.tsiBlocked[n])delete S.tsiBlocked[n];});
   /* ATTRIBÚTUM-SZINKRON: az öregedési görbe fenti Rating-változásait minden
@@ -9660,7 +9735,21 @@ function confirmCaptain(){
   saveGame();
   initialSkillDraw();}
 $("capConfirmBtn").onclick=confirmCaptain;
+/* ---- A KEZDŐ SKILL EGYSZER JÁR ----
+   A kapitány megerősítése indította a nyitó skill-sorsolást. A legelső szezon
+   előtt viszont a kapitány AKÁRHÁNYSZOR átállítható ugyanazon a képernyőn — és
+   minden megerősítés újra lepörgette a sorsolást, vagyis korlátlanul lehetett
+   skillt osztogatni a rajt előtt. A jelző a karrierhez kötődik (a mentés
+   része), tehát egy újratöltés sem nyit új kört. A további kapitányváltás
+   ettől még szabad, csak skillt nem ad. */
 function initialSkillDraw(){
+  if(S.initialSkillDone){
+    /* a kapitány megvan, a folyamat innen ugyanoda vezet, csak sorsolás nélkül */
+    $("simGo").classList.remove("hide");
+    if(gameMode==="career")openPreSeasonHub();
+    $("scPitch").scrollIntoView({behavior:"smooth"});
+    saveGame();return;}
+  S.initialSkillDone=true;
   if(!S.skillPool.length)S.skillPool=weightedShuffleSkills();
   const skill=S.skillPool.shift();
   showSkillDraw(skill,"start",1,()=>{
@@ -10309,10 +10398,22 @@ function genChallenge(scope,diff,ctx){
         desc:`Szerezz ${target} gólt EGYETLEN meccsen ${horizon}`,
         rule:`Egyetlen mérkőzésen belül kell összejönnie — a több meccsen szerzett gólok nem adódnak össze. A vállalás utáni legjobb meccsed számít.`};},
     /* --- ÚJ CSALÁD: KI szerzi a gólokat (a keret mélysége és a kapus) --- */
-    ()=>{const target=short?R(2,3):R(6,10);
-      return {type:"subGoals",target,
+    /* ---- CSEREEMBEREK GÓLJAI ----
+       A FÉLIDEI CSERE megváltoztatta ennek a kihívásnak a természetét. Amíg
+       csak kényszerpótlás (sérülés/eltiltás) létezett, a cserepados gól ritka,
+       félig véletlen esemény volt — innen a 6-10-es szezoncél. Bekapcsolt
+       félidei cserével viszont MINDEN meccsen be lehet hozni a legjobb
+       csatárt 45 percre, és a gólja már cserególnak számít: a régi cél
+       gyakorlatilag ingyen teljesült. Ezért a cél a kapcsoló állásához
+       igazodik (SUBGOAL_HT_MULT). Ha menet közben kapcsolod BE, az aktív
+       kihívás célja is ugyanígy megemelkedik — lásd hubHalftimeSubsBtn —,
+       különben a könnyű célt lehetne utólag "megvenni". */
+    ()=>{const base=short?R(2,3):R(6,10);
+      const target=Math.round(base*(halftimeSubsOn()?SUBGOAL_HT_MULT:1));
+      return {type:"subGoals",target,htSubs:halftimeSubsOn(),
         desc:`A CSEREEMBEREID szerezzenek ${target} gólt ${horizon}`,
-        rule:`Csak az számít, ha a gólszerző NEM volt kezdő azon a meccsen. Ez a keret mélységét méri — érdemes erős padot építeni.`};},
+        rule:`Csak az számít, ha a gólszerző NEM volt kezdő azon a meccsen — a félidőben beálló játékos gólja is ilyen. Ez a keret mélységét méri.${
+          halftimeSubsOn()?" A cél magasabb, mert be van kapcsolva a félidei csere.":""}`};},
     /* BRAVÚR-CÉL, MÉRÉSHEZ HANGOLVA. A bravúr ritka esemény: csak gólmentes
        tickben, 5% eséllyel jön flavor-esemény, és annak is csak harmada-negyede
        bravúr. 300 szimulált szezonon mérve a termés ~7,8/szezon (~0,26/meccs),
@@ -10402,8 +10503,15 @@ function genChallenge(scope,diff,ctx){
       return {type:"tacticFit",target,
         desc:`Érj el ${target}% fölötti illeszkedést az aktív taktikádnál`,
         rule:`ÁLLAPOT-kihívás: a határidő pillanatában kell ennyinek lennie. Az illeszkedést a keret összetétele adja — igazolással, felállással és taktikaváltással javíthatod.`};},
-    /* --- 9. Nehézségi szint emelése (2 szezonos) --- */
+    /* --- 9. Nehézségi szint emelése (2 szezonos) ---
+       NEM AJÁNLJUK FEL, ha a plafon miatt teljesíthetetlen: a mezőnyszintet a
+       maxOppRating() vágja (Infinity nélkül 100, Infinityben a megvett tierek
+       szerint), tehát 96-tól fölfelé a "+5" egyszerűen nem állítható be. A
+       kihívás ilyenkor a haladás-sávon örökre 0-n állt — ez volt a "néha nem
+       jól mér" egyik fele. */
     ()=>{if(short)return null;
+      const cap=(typeof maxOppRating==="function")?maxOppRating():100;
+      if((oppTargetRating||84)+5>cap)return null;
       return {type:"diffRaise",target:5,seasonSpan:2,baseDiff:oppTargetRating||84,
         desc:`Emeld a nehézségi szintet 5-tel 2 szezonon belül`,
         rule:`A mezőny erősségét a HUB "Nehézségi szint" gombjánál állíthatod, két szezon között. A vállaláskori szintedhez képest kell +5. Auto szintkövetéssel is teljesülhet.`};},
@@ -10926,6 +11034,14 @@ function acceptChallenge(ch){
   /* állapot-kihívásnál nincs mit levonni — a startProgress 0 marad, különben a
      szezonváltáskori újra-horgonyzás visszahozná a régi hibát */
   else if(CH_STATE_TYPES.includes(ch.type))ch.startProgress=0;
+  /* ---- A NEHÉZSÉG-EMELÉS HORGONYA A VÁLLALÁSKOR RÖGZÜL ----
+     A baseDiff eddig az AJÁNLAT SZÜLETÉSEKOR került bele. Az öt ajánlat egyben
+     készül, a felhasználó viszont később dönt — és közben a szint mozdulhat:
+     az auto szintkövetés a renderHub() elején fut (a kihívás-képernyőről a
+     HUB-ba kitérve is), MP-ben pedig az alku állítja be. Így egy tavalyi
+     horgonnyal a kihívás vagy azonnal félig kész volt, vagy tartósan 0-n állt.
+     A vállalás pillanata az egyetlen olyan pont, amit a felhasználó lát is. */
+  if(ch.type==="diffRaise")ch.baseDiff=oppTargetRating||ch.baseDiff||84;
   else ch.startProgress=challengeCurrentValue(ch);
   ch.acceptedSeason=S.seasonNumber||1;   /* az újra-horgonyzáshoz (szezonváltás) */
   /* Csak a KÉT SZEZON KÖZT vállalt kihívás kap horgony-jelölőt: ezek a régi
@@ -11373,6 +11489,8 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   chemPairs:{},chemInProgress:null,
   /* SKILL-PADLÓ: türelem-számláló + szezonos kvóták + az első kémia jelzője */
   matchesSinceSkill:0,seasonNewSkills:0,seasonSkillCont:0,firstChemDone:false,
+  initialSkillDone:false,   /* a kapitány-megerősítéskor járó NYITÓ skill egyszer jár */
+  seasonStartStrength:0,    /* a szezonkezdő csapaterő — a kupamezőny horgonya */
   /* TAKTIKA (F1): levels = a 6 taktika szintje (50-99), active = az aktív
      taktika kulcsa vagy null (nincs taktika — semleges; a régi mentések és a
      rendszer bekapcsolása előtti állapot). */
@@ -11876,6 +11994,10 @@ function startFirstSeason(){
   buildSeasonFixtures();
   /* a mezőny rejtett erősítése a szezonra rögzül — MÁR a morál beállítása után */
   freezeSeasonHiddenBonus();
+  /* A SZEZONKEZDŐ CSAPATERŐ — a kupamezőny egyik horgonya (euroDominance):
+     ebből derül ki, mekkora fölénnyel INDULTÁL neki az idénynek, nem csak
+     hova értél a végére. */
+  S.seasonStartStrength=teamStrength();
   addLine(`Sorsolás kész. 30 forduló vár rád, ${esc(teamName)}. Edző: ${coach.n}. Sok sikert!`,"m");
   /* a menetrend rendje látszódjon: a felhasználó tudja, mire számíthat */
   addLine(scheduleMode()==="real"
@@ -13008,6 +13130,10 @@ function renderAbsencePanel(){
    állhat meg, az utóbbinál a közös eseménylista rögzített, egy helyi
    csapaterő-változás szétvinné a két kliens állását. */
 const HALFTIME_SUB_MAX=3;
+/* Mennyivel nehezebb a "cserepados gól" kihívás bekapcsolt félidei cserével.
+   Lásd a subGoals sablon indoklását: a becserélt csatár gólja cserególnak
+   számít, tehát a régi cél magától teljesült volna. */
+const SUBGOAL_HT_MULT=2.2;
 function halftimeSubsOn(){return gameMode==="career"&&!!S.halftimeSubs;}
 let _htDone=null;
 function openHalftimeSubs(ctx,onDone){
@@ -14353,6 +14479,15 @@ function playMatch(){
   buildMatchSubs();
   const MS=buildMatchSnapshot();
   const active=MS.active;
+  /* ---- KIK KEZDTEK EZEN A MECCSEN ----
+     A "cserepadról szerzett gól" kihívás eddig az active tömbből olvasta ki a
+     kezdőket — a lefújáskor. A félidei csere óta viszont az active már a
+     BEÁLLÓ embert tartalmazza, tehát a mérés megfordult: a becserélt játékos
+     "kezdőnek" számított, a lecserélt viszont "cserének", és az ő első félidei
+     góljai kerültek a kihívásba. A kezdő névsort ezért itt, a kezdőrúgásnál
+     rögzítjük — a kényszerpótlással (sérült/eltiltott helyett beálló) érkezők
+     változatlanul cserének számítanak. */
+  const startedNames=new Set(active.filter(a=>!S.subs[a.idx]).map(a=>a.p.n));
   /* KARRIER-MÉRFÖLDKÖVEK: a meccs ELŐTTI felmérés (ki debütál, melyik kapus van
      rossz sorozatban, kinek kerek ez a meccse). A careerStats csak a lefújásnál
      nő, ezért itt még a meccs előtti számok állnak — pont ez kell. */
@@ -15143,9 +15278,11 @@ function playMatch(){
       if(cls!=="loss"&&maxDeficit>=1&&gf>ga)S.chSeasonComebacks=(S.chSeasonComebacks||0)+1;
       S.chSeasonBestHaul=Math.max(S.chSeasonBestHaul||0,gf);
       if(ga===0)S.chSeasonCleanSheets=(S.chSeasonCleanSheets||0)+1;
-      /* csere-gól: gólt szerző, aki NEM volt kezdő ezen a meccsen */
-      const starterNames=new Set(active.filter((a)=>!S.subs[a.idx]).map(a=>a.p.n));
-      Object.keys(mScore).forEach(n=>{if(!starterNames.has(n))S.chSeasonSubGoals=(S.chSeasonSubGoals||0)+mScore[n];});
+      /* csere-gól: gólt szerző, aki NEM volt kezdő ezen a meccsen. A kezdő
+         névsor a KEZDŐRÚGÁSKOR rögzült (startedNames), nem a lefújáskori
+         összeállításból — így a félidőben beálló ember gólja számít bele, a
+         lecserélt kezdőé viszont nem. */
+      Object.keys(mScore).forEach(n=>{if(!startedNames.has(n))S.chSeasonSubGoals=(S.chSeasonSubGoals||0)+mScore[n];});
       /* ABSZOLÚT KIHÍVÁSOK (sorozat, gólzápor): a VÁLLALÁS ÓTA elért maxot
          mérjük, nem a szezon-szintűt — így a vállalás előtti teljesítmény nem
          számít bele. Minden aktív abszolút kihívásnál e meccs értékével
@@ -16487,6 +16624,16 @@ function findPlayerLocation(p){
   for(const key of Object.keys(BENCH))if(BENCH[key]===p)return{type:"bench",key};
   for(let i=0;i<extraRoster.length;i++)if(extraRoster[i]===p)return{type:"extra",idx:i};
   return null;}
+/* ---- CSEREZÁR (kihívás-büntetés) ----
+   Egy kijelölt játékos egy szezonon át nem mozdítható. A tiltás EDDIG csak a
+   játékos SAJÁT paneljén létezett (ott szürke volt a posztcsere-gomb), a
+   csere viszont a MÁSIK oldalról is indítható: bárki mást megnyitva a zárolt
+   ember ott állt a partnerlistán, és simán elmozdult. Ezért a szabály innentől
+   EGY helyen él, és a csere VÉGREHAJTÓJA is ellenőrzi — így felület-független.
+   (A pótlás nem csere: sérülés/eltiltás esetén a rendszer változatlanul beállít
+   valakit a helyére, azt ez nem érinti.) */
+function isBenchLocked(name){
+  return !!(name&&S.benchLockName===name&&S.benchLockSeason===(S.seasonNumber||1));}
 function swapPlayerLocations(loc1,loc2){
   const get=loc=>loc.type==="slot"?(slots[loc.idx]&&slots[loc.idx].player):loc.type==="bench"?BENCH[loc.key]:extraRoster[loc.idx];
   const set=(loc,player)=>{
@@ -16498,6 +16645,11 @@ function swapPlayerLocations(loc1,loc2){
      eladás átrendezte a tömböket), a csere megszakad — sosem kerülhet
      undefined a keretbe. */
   if(!p1||!p2)return false;
+  /* A zár BÁRMELYIK oldalról érkezik a csere — a zárolt ember nem mozdul. */
+  if(isBenchLocked(p1.n)||isBenchLocked(p2.n)){
+    const who=isBenchLocked(p1.n)?p1.n:p2.n;
+    setDraftStatus&&setDraftStatus(`🔒 ${shortName(who)} egy szezonon át nem cserélhető (kihívás-büntetés).`);
+    return false;}
   set(loc1,p2);set(loc2,p1);
   return true;}
 /* Csak a HUB-hoz: az aktív 15 + a tartalék-keret együtt. A meccs-releváns
@@ -18010,6 +18162,19 @@ $("hubHalftimeSubsBtn")&&($("hubHalftimeSubsBtn").onclick=()=>{
     ?`🔁 Félidei csere BEKAPCSOLVA — mostantól minden meccs félidőben megáll, és ${HALFTIME_SUB_MAX} cserét tehetsz.`
       +(h2hRoomActive()?` A párharc-fordulók kivételek: ott nincs csereszünet.`:"")
     :`🔁 Félidei csere kikapcsolva — a meccsek megállás nélkül mennek végig.`,"m life");
+  /* ---- A FUTÓ CSEREGÓL-KIHÍVÁS UTÓLAG IS IGAZODIK ----
+     Enélkül a kapcsolót ki lehetne kapcsolva hagyni a vállalásig (alacsony
+     cél), majd rögtön utána bekapcsolni (könnyű teljesítés). A már megemelt
+     célt nem emeljük újra, és kikapcsolásnál nem visszük vissza — egy vállalás
+     feltételei nem romolhatnak a hátad mögött. */
+  if(S.halftimeSubs){
+    (S.activeChallenges||[]).forEach(ch=>{
+      if(ch.type!=="subGoals"||ch.htSubs)return;
+      const before=ch.target;
+      ch.target=Math.round(ch.target*SUBGOAL_HT_MULT);
+      ch.htSubs=true;
+      ch.desc=ch.desc.replace(String(before),String(ch.target));
+      addLine(`🎯 A cseregól-kihívás célja ${before} → ${ch.target} lett: félidei cserével sokkal könnyebb cserepadról betalálni.`,"m life");});}
   renderHalftimeSubsBtn();saveGame();});
 $("hubRosterExpandBtn").onclick=()=>{
   $("scHub").classList.add("hide");
@@ -19347,8 +19512,9 @@ function buildHubDetail(loc){
   d.appendChild(info);
   const swapBtn=document.createElement("button");
   swapBtn.className="btn-p stepbtn";swapBtn.textContent="↔ Posztcsere — válassz partnert";
-  /* KIHÍVÁS-BÜNTETÉS: egy kijelölt játékos egy szezonon át nem mozdítható. */
-  if(S.benchLockName&&loc&&loc.p&&loc.p.n===S.benchLockName&&S.benchLockSeason===(S.seasonNumber||1)){
+  /* KIHÍVÁS-BÜNTETÉS: egy kijelölt játékos egy szezonon át nem mozdítható.
+     Ugyanazt a predikátumot használja, mint a partnerlista és a csere maga. */
+  if(loc&&loc.p&&isBenchLocked(loc.p.n)){
     swapBtn.disabled=true;swapBtn.style.opacity=".45";
     swapBtn.textContent="🔒 Egy szezonon át nem cserélhető (kihívás-büntetés)";}
   swapBtn.onclick=(ev)=>{if(ev&&ev.stopPropagation)ev.stopPropagation();openHubPositionPicker(loc);};
@@ -20411,9 +20577,16 @@ function openHubPositionPicker(loc){
       const now=Math.round(effOvrIfPlaced(other.p,srcSlot)),then=Math.round(effOvrIfPlaced(other.p,tgtSlot));
       const off=!other.p.pos.includes(tgtSlot.pos);
       prev=`<div style="font-size:11px;color:var(--dim);margin-top:1px">itt: <b style="color:${then<now?"var(--red)":then>now?"var(--grass)":"var(--ink)"}">${then}</b>${then!==now?` (most ${now})`:""}${off?' · <span style="color:var(--red)">idegen poszt</span>':""}</div>`;}
+    /* CSEREZÁR: a zárolt ember a partnerlistán is zárolt — látszik, miért nem
+       választható, nem pedig némán nem történik semmi. */
+    const locked=isBenchLocked(other.p.n);
+    if(locked){
+      row.style.opacity=".45";
+      prev=`<div style="font-size:11px;color:var(--red);margin-top:1px">🔒 egy szezonon át nem cserélhető (kihívás-büntetés)</div>`;}
     row.innerHTML=`<span class="pos pc-${getCategoryFor(posTxt)}">${posTxt}</span>
       <span class="main"><div class="nm">${esc(other.p.n)}${tag}</div>${prev}</span>`;
     row.onclick=()=>{
+      if(locked)return;
       if(fillEmptyBench){
         /* mozgatás, nem csere: a tartalékból a pad üres helyére */
         const i=extraRoster.indexOf(other.p);
@@ -21212,6 +21385,15 @@ function hubShowSeasonReport(){
      pontja. Innentől megint átállíthatod a tervet (akár most, a HUB-ban, akár
      majd menet közben a szezonban). */
   S.trainingChangeUsed=false;
+  /* ---- AZ AKADÉMIA-BEFAGYÁS LEJÁRATA ----
+     A LEZÁRULÓ szezonra szólt, tehát itt jár le — és KIFEJEZETTEN a
+     kihívás-kiértékelés ELŐTT. Korábban ez az advanceCareerSeason()-ben ült,
+     ami ugyanennek a függvénynek a KÉSŐBBI lépése: a szezonzárón kiszabott
+     friss befagyást (1 szezon) néhány sorral később azonnal 0-ra csökkentette,
+     így a büntetés a szezon-hatókörű kihívásoknál soha nem lépett életbe.
+     (A szezon KÖZBEN bukott rövid kihívások befagyása működött — innen a
+     "néha nem fagy be".) */
+  if(gameMode==="career"&&S.frozenAcademySeasons>0)S.frozenAcademySeasons--;
   /* CHALLENGE — SZEZONZÁRÓ KIÉRTÉKELÉS (a jelentés elején, a statok nullázása
      és a keret öregítése ELŐTT, hogy a záruló szezon utolsó meccséhez kötődjön
      és a naplóban rögtön látsszon):
@@ -21512,6 +21694,10 @@ function startNextCareerSeason(){
      öregedés és a friss morál már benne van, az auto szintkövetés viszont MÁR
      lefutott fölötte (az a mostani kerettel dolgozik, ez a szezonra fagyaszt) */
   freezeSeasonHiddenBonus();
+  /* A SZEZONKEZDŐ CSAPATERŐ — a kupamezőny egyik horgonya (euroDominance):
+     ebből derül ki, mekkora fölénnyel INDULTÁL neki az idénynek, nem csak
+     hova értél a végére. */
+  S.seasonStartStrength=teamStrength();
   $("scHub").classList.add("hide");
   $("scVerdict").classList.add("hide");
   $("scSim").classList.remove("hide");
@@ -21633,7 +21819,8 @@ function saveGame(){
         formationChangesThisSeason:S.formationChangesThisSeason,
         /* skill-padló: türelem-számláló, szezonos kvóták, első kémia megvolt-e */
         matchesSinceSkill:S.matchesSinceSkill,seasonNewSkills:S.seasonNewSkills,
-        seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,
+        seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
+        seasonStartStrength:S.seasonStartStrength,
         chemPairs:S.chemPairs,chemInProgress:S.chemInProgress,
         activeChallenges:S.activeChallenges,challengeLastOfferRound:S.challengeLastOfferRound,challengeLastOfferSeason:S.challengeLastOfferSeason,startChallengesDone:S.startChallengesDone,
         frozenAcademySeasons:S.frozenAcademySeasons,teamFormMalus:S.teamFormMalus,tsiBlocked:S.tsiBlocked,
@@ -21867,6 +22054,10 @@ function applySavedGame(d){
   S.seasonNewSkills=d.S.seasonNewSkills||0;
   S.seasonSkillCont=d.S.seasonSkillCont||0;
   S.firstChemDone=!!d.S.firstChemDone;
+  /* Régi mentés: ha már fut a szezon, a nyitó skill nyilván megvolt — így egy
+     betöltés után sem nyílik újra a sorsolás egy kapitányváltással. */
+  S.initialSkillDone=d.S.initialSkillDone!=null?!!d.S.initialSkillDone:(d.phase!=="draft");
+  S.seasonStartStrength=d.S.seasonStartStrength||0;
   S.finalTable=d.S.finalTable||null;S.seasonClosed=!!d.S.seasonClosed;S.hubReportHtml=d.S.hubReportHtml||null;
   /* F5: a társ szezonzárása. Régi mentésben nincs — ilyenkor a verdikt előtt
      egyszerűen újra lekérjük a szobából. */
