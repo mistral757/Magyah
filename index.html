@@ -1746,7 +1746,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.78";
+const APP_VERSION="2.5.79";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -12833,6 +12833,9 @@ function h2hWireSnapshot(){
         aw:(ASSTW[pos]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"assistw")};}),
     formName:(MS.active[MS.gi]&&MS.active[MS.gi].p.n)||null,
     weakName:(MS.active[MS.bi]&&MS.active[MS.bi].p.n)||null,
+    /* KI ÍRTA — ebből derül ki, ha a két kliens ugyanabba a mezőbe ír (szerep-
+       ütközés). A h2hTick ezt látva magától átvált a másik mezőre. */
+    by:mpMyId(),
     /* ---- FÉLTÁVI TABELLÁHOZ: A MÉRLEG IS ÁTUTAZIK ----
        A párharc épp a 15. fordulóban megy, vagyis pontosan a féltávnál, és ez
        az EGYETLEN pont a szezon közepén, ahol a két kliens amúgy is beszél
@@ -13289,8 +13292,21 @@ async function h2hBeginDuel(){
   let room=null;
   try{room=await mpBk().get(MP.activeRoom);}catch(e){}
   if(!_h2hBusy)return;
-  const me=room&&room.players&&room.players[mpMyId()];
-  if(me&&me.role)MP.role=me.role;
+  /* A szerep a SZOBÁBÓL jön, ütközés-feloldással (lásd mpSyncRole). Korábban
+     csak akkor frissült, ha az azonosítóm szerepelt a szobában — egy elveszett
+     session után viszont a mentés régi szerepe maradt érvényben, és így
+     állhatott elő a "két vendég, nulla házigazda" holtpont. */
+  if(room){
+    const before=MP.role;
+    mpSyncRole(room);
+    mpRememberMyId();
+    /* A helyreállított szerepet VISSZAÍRJUK a szobába (és ha az azonosítóm nem
+       szerepelt benne, ezzel be is regisztrálom magam) — különben a következő
+       fordulóban ugyanez a holtpont jönne elő újra. */
+    const me=room.players&&room.players[mpMyId()];
+    if(MP.role!==before||!me||me.role!==MP.role){
+      try{if(mpBk().setRole)await mpBk().setRole(MP.activeRoom,MP.role);}catch(e){}
+      if(!_h2hBusy)return;}}
   /* A szoba eltűnt (a társad véglegesen kilépett, vagy nincs kapcsolat). A
      párharcot nem lehet lejátszani — de nem is ragasztjuk oda a felhasználót:
      megmondjuk, mi történt, és a képernyő elhagyható. */
@@ -13318,6 +13334,22 @@ async function h2hTick(key,myField,oppField,round){
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}
   catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
   if(!_h2hBusy)return;
+  /* ---- SZEREP-ÜTKÖZÉS FELISMERÉSE ÉS FELOLDÁSA ----
+     Ha a saját mezőmben NEM az én pillanatképem van (by ≠ az azonosítóm),
+     akkor mindketten ugyanabba a mezőbe írunk: a szoba két azonos szerepű
+     játékost tart nyilván. Ilyenkor a NAGYOBB azonosítójú kliens vált át a
+     másik mezőre — determinisztikusan, tehát a két oldal nem cserélget
+     oda-vissza, és egyetlen körben helyreáll a kézfogás. Ez a régi, elrontott
+     szobákat is meggyógyítja, nem csak az újakat véd. */
+  const myRec=node&&node[myField];
+  if(myRec&&myRec.by&&myRec.by!==mpMyId()&&mpMyId()>myRec.by){
+    MP.role=(myField==="host")?"guest":"host";
+    const nf=(myField==="host")?"guest":"host";
+    try{await mpBk().h2hPut(MP.activeRoom,key,nf,h2hWireSnapshot());}catch(e){}
+    try{await mpBk().setRole&&mpBk().setRole(MP.activeRoom,MP.role);}catch(e){}
+    try{saveGame();}catch(e){}
+    if(!_h2hBusy)return;
+    h2hTick(key,nf,myField,round);return;}
   const mine=!!(node&&node[myField]),opp=!!(node&&node[oppField]);
   /* 1) Kész szimuláció van → mindkét kliens ugyanazt játssza le. */
   if(node&&node.sim){h2hStart(node,node.sim,round);return;}
@@ -13335,10 +13367,17 @@ async function h2hTick(key,myField,oppField,round){
     catch(e){$("h2hWaitErr").textContent="Az eredményt nem sikerült elküldeni — a társad később kapja meg.";}
     if(!_h2hBusy)return;
     h2hStart(node,sim,round);return;}
-  /* 3) Várakozás. Nincs időkorlát, és a képernyő nyugodtan elhagyható. */
+  /* 3) Várakozás. Nincs időkorlát, és a képernyő nyugodtan elhagyható.
+     A DIAGNÓZIS is kiíródik: melyik szerepben vagy, és melyik rekesz üres.
+     Enélkül egy elakadás néma volt — a felhasználó annyit látott, hogy ő kész,
+     a társa meg nem, miközben a másik gépen ugyanez állt fordítva. */
   h2hWaitShow(round,
-    opp?`<span class="h2hDot"></span>A társad kerete megérkezett — a házigazda most vezeti le a mérkőzést.`
-       :`<span class="h2hDot"></span>A kereted elment a társadnak. Amint ő is elindítja ezt a fordulót, lejátszódik a párharc.`,
+    (opp?`<span class="h2hDot"></span>A társad kerete megérkezett — a házigazda most vezeti le a mérkőzést.`
+        :`<span class="h2hDot"></span>A kereted elment a társadnak. Amint ő is elindítja ezt a fordulót, lejátszódik a párharc.`)
+    +`<br><small style="color:#b9b4ab">Te: <b>${MP.role==="host"?"házigazda":"vendég"}</b> · `
+    +`a te rekeszed: ${mine?"kész":"üres"} · a társadé: ${opp?"kész":"üres"}`
+    +(mine&&!opp?` — ha nála is „kész / üres” áll, mindketten ugyanabba a rekeszbe írtok; a program a következő körben magától átrendezi.`:"")
+    +`</small>`,
     mine,opp);
   _h2hPoll=setTimeout(()=>h2hTick(key,myField,oppField,round),2000);}
 /* A meccs indítása a kész eseménylistával. */
@@ -21765,7 +21804,9 @@ function saveGame(){
       worldSeed,draftSpinNo,
       /* MULTIPLAYER: a szoba-hovatartozás a mentés része, hogy egy újratöltés
          után a futó közös karrier ne váljon némán egyjátékossá. */
-      mp:{active:MP.active,room:MP.activeRoom,role:MP.role},
+      /* A myId a szoba-mentés része: egy bezárt fül után is ugyanazzal az
+         azonosítóval térünk vissza, tehát a szerepünk sem vész el. */
+      mp:{active:MP.active,room:MP.activeRoom,role:MP.role,myId:MP.myId||mpMyId()},
       slotRoles,
       slots:slots.map(s=>({pos:s.pos,xy:s.xy,player:s.player,fit:s.fit,origin:s.origin})),
       /* mind a hét padhely — a régi négy kulcs neve szándékosan változatlan */
@@ -21860,7 +21901,12 @@ function applySavedGame(d){
      mentésben nincs — ott marad null, és az első rngFor-hívás új véletlen
      seedet ad (a régi világ már úgyis legenerálódott). */
   worldSeed=d.worldSeed||null;
-  if(d.mp){MP.active=!!d.mp.active;MP.activeRoom=d.mp.room||null;MP.role=d.mp.role||null;MP.started=!!d.mp.active;}
+  if(d.mp){MP.active=!!d.mp.active;MP.activeRoom=d.mp.room||null;MP.role=d.mp.role||null;MP.started=!!d.mp.active;
+    /* A mentett azonosítót ÁTVESSZÜK: enélkül egy új fül új azonosítót kapna,
+       a szobában viszont a régihez tartozna a szerepünk — és a join() minden
+       újonnan érkezőt vendégként regisztrál, amiből "két vendég, nulla
+       házigazda" holtpont lett a párharcnál. */
+    if(d.mp.myId)mpAdoptSavedId(d.mp.myId);}
   draftSpinNo=d.draftSpinNo||0;
   /* A szerep-felülírások: régi mentésben nincs meg → üres, vagyis minden
      felállás az alapértelmezésén áll, és a tengelyréteg 0-t ad. A futó karrier
@@ -22317,7 +22363,9 @@ const MP_FB_CONFIG={
   databaseURL:"https://magyahok-default-rtdb.europe-west1.firebasedatabase.app",
   appId:"1:606841822455:web:4d31d71ddbcf17468347f2"};
 const MP_FB_VER="10.12.2";
-const MP={active:false,activeRoom:null,role:null,started:false};
+const MP={active:false,activeRoom:null,role:null,started:false,
+  /* a szobában használt játékos-azonosítóm — a mentés része, lásd mpAdoptSavedId */
+  myId:null};
 /* ================= F7 — KONTEXTUSVÁLTÁS (egyjátékos ↔ szobák) =================
    Minden szoba SAJÁT mentési helyen él, az egyjátékos a magáén. A váltás
    viszont nem csak fájl-váltás: a teljes játékállapot több száz globálisban
@@ -22355,6 +22403,43 @@ function mpMyId(){
   if(!id){id="p"+Math.random().toString(36).slice(2,10);
     try{sessionStorage.setItem(MP_TAB_KEY,id);}catch(e){}}
   return id;}
+/* ---- A SZEMÉLYAZONOSSÁG TÚLÉLI A FÜL BEZÁRÁSÁT ----
+   A játékos-azonosító sessionStorage-ban él, hogy egy gépen két FÜL két külön
+   játékos lehessen. Csakhogy a sessionStorage a fül bezárásával meghal: aki
+   kilépett és később visszatért, ÚJ azonosítót kapott, a szobában viszont a
+   RÉGI azonosítójához tartozott a szerepe. A join() pedig mindenkit
+   "guest"-ként regisztrál — így egy visszatérő HÁZIGAZDÁBÓL vendég lett, és a
+   szobában KÉT VENDÉG maradt, házigazda nélkül. Innen a beragadás: mindkét
+   kliens a "guest" mezőbe írt, és mindkettő a soha meg nem íródó "host"
+   mezőre várt — vagyis mindenki késznek látta magát és hiányzónak a másikat.
+   Ezért a szoba-mentés MEGŐRZI az azonosítót, és visszatéréskor átvesszük. */
+function mpAdoptSavedId(id){
+  if(!id||typeof id!=="string")return;
+  try{sessionStorage.setItem(MP_TAB_KEY,id);}catch(e){}
+  MP.myId=id;}
+function mpRememberMyId(){
+  MP.myId=mpMyId();
+  return MP.myId;}
+/* ---- SZEREP A SZOBÁBÓL, ÜTKÖZÉS-FELOLDÁSSAL ----
+   Egyetlen igazságforrás a szoba. Három eset:
+     · szerepelek a szobában és egyedül vagyok ebben a szerepben → az az enyém;
+     · szerepelek, de a MÁSIK játékosnak is ugyanez a szerepe (a fenti hiba
+       öröksége) → determinisztikusan oldjuk fel: a kisebb azonosító marad,
+       a nagyobb átvált. Mindkét kliens ugyanezt számolja, tehát nem oszcillál;
+     · nem szerepelek (elveszett azonosító) → a SZABAD szerepet foglalom el,
+       nem automatikusan a vendéget. */
+function mpSyncRole(room){
+  if(!room||!room.players)return MP.role;
+  const meId=mpMyId(),me=room.players[meId];
+  const others=Object.entries(room.players).filter(([id])=>id!==meId);
+  if(me&&me.role){
+    const clash=others.find(([,p])=>p&&p.role===me.role);
+    if(clash&&meId>clash[0])MP.role=(me.role==="host")?"guest":"host";
+    else MP.role=me.role;
+  }else{
+    const taken=others.map(([,p])=>p&&p.role);
+    MP.role=taken.includes("host")?"guest":"host";}
+  return MP.role;}
 /* A saját szobakódjaim (helyben jegyezve): a "Szobáid" chipekhez — így az
    RTDB-t nem kell tagság szerint lekérdezni, elég a jegyzett kódokat nézni. */
 function mpMyCodes(){
@@ -22397,6 +22482,17 @@ const mpBackendLocal={
     const rooms=mpLRooms(),room=rooms[code];
     if(!room||!room.players[mpMyId()])return;
     room.players[mpMyId()].ready=!!flag;
+    mpLSave(rooms);this._notify();},
+  /* A szerep visszaírása a szobába — az ütközés-feloldás (mpSyncRole,
+     h2hTick) ezzel teszi tartóssá a javítást. Ha nem vagyok regisztrálva
+     (elveszett azonosító), most beregisztrálom magam a helyes szereppel. */
+  async setRole(code,role){
+    const rooms=mpLRooms(),room=rooms[code];
+    if(!room)return;
+    room.players=room.players||{};
+    const cur=room.players[mpMyId()]||{ready:false};
+    cur.role=(role==="host")?"host":"guest";
+    room.players[mpMyId()]=cur;
     mpLSave(rooms);this._notify();},
   async leave(code){
     const rooms=mpLRooms();
@@ -22447,6 +22543,11 @@ const mpBackendFb={
   async setReady(code,flag){
     const F=mpNet.fns;
     await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId()+"/ready"),!!flag);},
+  /* lásd a helyi backend setRole-jánál írt indoklást */
+  async setRole(code,role){
+    const F=mpNet.fns;
+    await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId()+"/role"),
+      (role==="host")?"host":"guest");},
   async leave(code){
     const F=mpNet.fns;
     await F.remove(F.ref(mpNet.db,"mp/rooms/"+code));},
@@ -22751,7 +22852,7 @@ $("mpCreateBtn").onclick=()=>mpBusy($("mpCreateBtn"),"Szoba készül…",async()
   await mpNetInit();
   const res=await mpBk().create();
   if(!res.ok){$("mpJoinErr").textContent=res.err||"Nem sikerült létrehozni a szobát.";return;}
-  MP.activeRoom=res.code;mpRememberCode(res.code);
+  MP.activeRoom=res.code;mpRememberCode(res.code);mpRememberMyId();
   mpShow("mpViewLobby");});
 $("mpJoinBtn").onclick=()=>mpBusy($("mpJoinBtn"),"Csatlakozás…",async()=>{
   const code=($("mpJoinCode").value||"").trim().toUpperCase();
@@ -22759,7 +22860,7 @@ $("mpJoinBtn").onclick=()=>mpBusy($("mpJoinBtn"),"Csatlakozás…",async()=>{
   await mpNetInit();
   const res=await mpBk().join(code);
   if(!res.ok){$("mpJoinErr").textContent=res.err;return;}
-  MP.activeRoom=res.code;mpRememberCode(res.code);
+  MP.activeRoom=res.code;mpRememberCode(res.code);mpRememberMyId();
   $("mpJoinErr").textContent="";$("mpJoinCode").value="";
   mpShow("mpViewLobby");});
 $("mpJoinCode").addEventListener("keydown",e=>{if(e.key==="Enter")$("mpJoinBtn").click();});
@@ -22866,7 +22967,7 @@ window.addEventListener("storage",e=>{
   if(invite){
     mpShow("mpViewRoom");
     const res=await mpBk().join(invite);
-    if(res.ok){MP.activeRoom=res.code;mpRememberCode(res.code);mpShow("mpViewLobby");}
+    if(res.ok){MP.activeRoom=res.code;mpRememberCode(res.code);mpRememberMyId();mpShow("mpViewLobby");}
     else{$("mpJoinErr").textContent=res.err;$("mpJoinCode").value=invite;}
     return;}
   await mpRenderHomeRooms();
