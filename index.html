@@ -1746,7 +1746,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.74";
+const APP_VERSION="2.5.75";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7350,7 +7350,9 @@ function twAttrSearchesForScout(){
    A többi tengelynek nincs plafonja, azok változatlanul mennek. */
 function twAttrTarget(aKey){
   const cap=(aKey==="seb")?SPEED_MAX:SPEED_MAX+20;
-  return Math.max(45,Math.min(cap,(oppTargetRating||84)+TW_ATTR_TARGET_BONUS));}
+  /* MP-nyáron a referencia a két keret közös szintje, nem a tavalyi nehézség —
+     lásd mpSummerRefRating a signingTargetOvr mellett */
+  return Math.max(45,Math.min(cap,(transferRefRating()||84)+TW_ATTR_TARGET_BONUS));}
 /* Elfogyott-e az attribútum-keresési keret ebben az ablakban? */
 function twAttrLeft(){
   const sess=twSession();
@@ -8152,7 +8154,7 @@ function beginNewGame(){
   /* F6: friss karrier — a párharc tartós állapota is nulláról indul, különben
      egy korábbi szoba kiegyenlítése átszivárogna az újba. */
   S.oppBuffH=null;   /* friss karrier → a rejtett erősítés az 1. szezon elején születik */
-  S.mpBalance=0;S.mpDecision=null;S.mpMateFinal=null;S.mpHistory=[];S.mpDuelLog=[];S.mpOrphan=false;
+  S.mpBalance=0;S.mpDecision=null;S.mpMateFinal=null;S.mpSummerRef=null;S.mpHistory=[];S.mpDuelLog=[];S.mpOrphan=false;
   ensureWorldSeed();
   S.skillPool=weightedShuffleSkills(rngFor("skillpool"));
   slots=FORMS[form].slots.map((p,i)=>({pos:effectiveSlotPos(form,i),xy:FORMS[form].xy[i],player:null,fit:1,origin:null}));
@@ -10912,6 +10914,9 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   morale:50,moraleTarget:50,moraleSum:0,moraleSamples:0,scorers:{},assists:{},mvps:{},goodForm:{},badForm:{},playerReds:{},playerInjuries:{},careerStats:{},clubScoutSpinsUsed:0,consecutiveTitles:0,consecutiveBadSeasons:0,seasonSaves:{},seasonCleanSheets:{},seasonMatches:{},seasonNumber:1,seasonHistory:[],
   grudge:new Set(),fixtures:[],playing:false,auto:false,
   mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
+  /* A nyári igazolások referencia-szintje, a szezonzáráskor befagyasztva —
+     {season,value}. Lásd mpSummerRefRating. */
+  mpSummerRef:null,
   mpMateHalf:null,    /* a társ féltávi mérlege a párharc pillanatképéből */
   leaveDeals:[],      /* halasztott megtartási díjak: {name,amount,season} */
   halftimeSubs:false, /* félidei csere-szünet (HUB-kapcsoló) */
@@ -12837,6 +12842,12 @@ async function mpSyncSeasonEnd(){
   if(node&&node[oppField]){
     S.mpMateFinal={season:(S.seasonNumber||1),rep:node[oppField]};
     mpRecordHistory(node[oppField]);   /* F6: a közös előzmény sora */
+    /* A NYÁRI IGAZOLÁSI REFERENCIA — pontosan itt a helye: ez az egyetlen
+       pillanat, amikor mindkét csapaterő ismert ÉS még egyik sem mozdult el a
+       nyári átalakítástól. Lásd mpSummerRefRating. */
+    mpFreezeSummerRef();
+    if(S.mpSummerRef&&S.mpSummerRef.season===(S.seasonNumber||1))
+      addLine(`🛒 A nyári igazolások referenciája: ${S.mpSummerRef.value} — a két keretetek csapaterejének átlaga +1, a tavalyi nehézségtől függetlenül. A scout ehhez mérten keres, amíg el nem indul az új szezon.`,"m life");
     try{saveGame();}catch(e){}
     return true;}
   return false;}
@@ -15095,7 +15106,7 @@ function twShowAttrPicker(){
   $("twTitle").textContent="🎯 Képesség-keresés";
   $("twBody").innerHTML=`<p style="font-size:13px;color:var(--dim);line-height:1.55">
     Melyik képességre keressen a scout? A találatok <b>poszttól függetlenül</b> jönnek, és a
-    megnevezett képességük <b>${ragSzam(t)} körül vagy afölött</b> lesz — a ${ragSzam(oppTargetRating)} mezőnyhöz mérten.
+    megnevezett képességük <b>${ragSzam(t)} körül vagy afölött</b> lesz — ${transferRefLabel()}.
     ${TW_ATTR_RESULTS} jelöltet hoz egyszerre.</p>
     <p style="font-size:11.5px;color:var(--dim2);margin-top:5px">A keresés a <b>${twAttrLeft()}</b> maradék alkalmadból egyet elhasznál.</p>`;
   const grid=document.createElement("div");grid.className="optgrid two";grid.style.marginTop="9px";
@@ -15185,10 +15196,59 @@ const SIGNING_DUD_SPAN=[4,16];  /* a gyenge ajánlat ennyivel a célszint alatt 
 const SIGNING_NEAREST_N=9;      /* a sorsolt célértékhez ennyi legközelebbi közül húz */
 const SIGNING_YOUNG_AGE=25;     /* a fiatalok enyhe előnyt kapnak */
 const SIGNING_YOUNG_WEIGHT=2.2;
+/* ---- KÖZÖS KARRIER, NYÁRI ABLAK: A REFERENCIA NEM A TAVALYI NEHÉZSÉG ----
+   A szezonzárás utáni nyáron az oppTargetRating még az ELŐZŐ szezon kialkudott
+   szintjén áll — az új szint csak a szezonindítási alkunál (mpSeasonGate) dől
+   el, vagyis a nyári vásárlás végig a TAVALYI nehézséghez mérne. Ezért a
+   nyári ablakban a referencia a nehézségtől FÜGGETLEN középérték: a két keret
+   csapaterejének átlaga +1 — ugyanaz a képlet, amit a szintalku is használ,
+   ha egyik fél sem ad javaslatot (mpResolveLevel "auto" ága).
+
+   BEFAGYASZTVA, és ez a lényeg: a mpMyStrength() ÉLŐ érték, tehát ha minden
+   hívásnál újraszámolnánk, a nyári vásárlás önmagát hizlalná — veszel egy
+   erősebb embert, a csapaterőd nő, a referencia utána megy, a scout még jobbat
+   kínál, és a kör újraindul. Ezért a két számot EGYSZER, a szezonzáráskor
+   rögzítjük (mpFreezeSummerRef), és a nyár hátralévő része végig ezzel dolgozik.
+
+   A két kliens ugyanazt kapja: a képlet szimmetrikus (a saját és a társ száma
+   felcserélve is ugyanaz az átlag). A kiegyenlítés (mpApplyBalance) sem rontja
+   el, ha az a rögzítés UTÁN fut: a hangolás a két erőt a közös középérték köré
+   húzza szét ±0.5-re, tehát az ÁTLAGUK változatlan marad.
+
+   A KULCS az S.seasonNumber — ugyanaz, amire a mpMateFinal is jár, és a kettő
+   együtt nullázódik a startNextCareerSeason-ben. (A mpUpcomingSeason itt
+   szándékosan NEM jó: az már a KÖVETKEZŐ idényt címzi, ez a rekord viszont a
+   most lezárt szezon nyarához tartozik.) */
+function mpFreezeSummerRef(){
+  const season=(S.seasonNumber||1);
+  if(S.mpSummerRef&&S.mpSummerRef.season===season)return;   /* szezononként egyszer */
+  const mate=mpMateStrength();
+  if(mate==null)return;   /* árva szoba: nincs társ-adat → marad a nehézség */
+  S.mpSummerRef={season,value:Math.round((Math.round(mpMyStrength())+Math.round(mate))/2)+1};}
+function mpSummerRefRating(){
+  if(gameMode!=="career")return null;
+  if(typeof h2hRoomActive!=="function"||!h2hRoomActive()||!S.seasonClosed)return null;
+  const season=(S.seasonNumber||1);
+  /* Régi mentés, vagy olyan betöltés, ahol a szezonzárás rögzítése kimaradt:
+     itt pótoljuk. A nyár első igazolása előtt fut le, tehát még torzítatlan. */
+  if(!(S.mpSummerRef&&S.mpSummerRef.season===season))mpFreezeSummerRef();
+  return (S.mpSummerRef&&S.mpSummerRef.season===season)?S.mpSummerRef.value:null;}
+/* Az igazolási számítások KÖZÖS kiindulópontja: MP-nyáron a középérték,
+   minden más helyzetben a mezőny szintje. */
+function transferRefRating(){
+  const v=mpSummerRefRating();
+  return v!=null?v:oppTargetRating;}
+/* A kijelző szövegek címkéje — hogy a felület ne "mezőnyhöz mérten"-t írjon,
+   amikor valójában a két keret közös szintjéhez mérünk. */
+function transferRefLabel(){
+  const v=mpSummerRefRating();
+  return v!=null
+    ?`a két keretetek közös szintjéhez (${v}) mérten`
+    :`a ${ragSzam(oppTargetRating)} mezőnyhöz mérten`;}
 function signingTargetOvr(){
   /* a felső korlát a Rating-plafon, nem egy fix 97 — különben Infinityben,
      200-as mezőnyön is 97-es játékosokat keresne a scout */
-  return Math.max(45,Math.min(ratingCap(),oppTargetRating+SIGNING_OFFSET));}
+  return Math.max(45,Math.min(ratingCap(),transferRefRating()+SIGNING_OFFSET));}
 /* Minden jelölthöz KÜLÖN sorsolunk célszintet — nincs többé közös, hard sáv.
    A régi megoldás (±3-as sáv + 1/(1+távolság) súlyozás) 6-20 fős jelöltmezőt
    hagyott, amiből a legközelebbiek uralkodtak: 88-as mezőnyön mérve 30% eséllyel
@@ -15281,10 +15341,10 @@ function twScout(){
     return;}
   $("twBody").innerHTML=(attrMode
       ? `<div class="h" style="color:var(--gold);font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px">🎯 ${cands.length} találat — ${ATTR_LABELS[aKey]}</div>`
-        +(gameMode==="career"?`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A ${ragSzam(oppTargetRating)} mezőnyhöz mérten a <b>${ragSzam(twAttrTarget(aKey))} ${ATTR_LABELS[aKey]}</b> körül vagy fölött keresett — poszttól függetlenül.${
+        +(gameMode==="career"?`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A scout ${transferRefLabel()} a <b>${ragSzam(twAttrTarget(aKey))} ${ATTR_LABELS[aKey]}</b> körül vagy fölött keresett — poszttól függetlenül.${
             aKey==="seb"&&twAttrTarget("seb")>=SPEED_MAX?` A sebesség plafonja ${SPEED_MAX}, feljebb nincs mit keresni.`:""}</div>`:"")
       : `<div class="h" style="color:var(--gold);font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px">A scout ${cands.length} lehetőséget talált (${twCatLabel(TW.category)})</div>`
-        +(gameMode==="career"?`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A ${ragSzam(oppTargetRating)} mezőnyhöz mérten a ~${ragSzam(signingTargetOvr())} szint körül keresett.</div>`:""));
+        +(gameMode==="career"?`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A scout ${transferRefLabel()} a ~${ragSzam(signingTargetOvr())} szint körül keresett.</div>`:""));
   const box=document.createElement("div");box.className="plist";
   const revealedNames=new Set();
   const budget={remaining:gameMode==="career"?computeRevealBudget(cands.length,scout):0};
@@ -17979,7 +18039,11 @@ function showLevelChangePicker(direction){
       :'<span style="color:var(--red)">nagyon kemény</span>';
     $("levelUpSignHint").innerHTML=`Ezzel a beállítással a szezon: ${verdict} (a meccs-erőd ${gap>=0?"+":""}${Math.round(gap)} a mezőnyhöz képest).`
       +`<br><span style="font-size:11px;color:var(--dim2)">A meccs-erő a kereten felül a morált, az edzőt, a taktikát, az aura- és védekező skilleket meg a kapitány rutinját is tartalmazza — ezek a meccsen mind hatnak, de a kijelzett csapaterőben nincsenek benne.</span>`
-      +`<br>A scout ezután a ~${ragSzam(t)} szint körül keres majd igazolásokat (jelenleg ~${signingTargetOvr()}).`;};
+      +(mpSummerRefRating()!=null
+        /* MP-nyáron a javaslat NEM mozdítja a scoutot: az igazolások referenciája
+           a két keret közös szintje, a javaslat csak az új szezon mezőnyét formálja */
+        ?`<br>Közös karrierben a nyári igazolások referenciája a két keretetek közös szintje — a scout most a ~${ragSzam(signingTargetOvr())} szint körül keres, a javaslatod pedig az új szezon mezőnyére hat.`
+        :`<br>A scout ezután a ~${ragSzam(t)} szint körül keres majd igazolásokat (jelenleg ~${signingTargetOvr()}).`);};
   signHint();
   /* Az auto szintkövetés itt is kapcsolható — a kezdőképernyőn választott
      beállítás nem végleges, a karrier bármely szezonhatárán átbillenthető. */
@@ -20802,6 +20866,9 @@ function startNextCareerSeason(){
      régit nem szabad átvinni. A mpBalance, mpHistory és mpDuelLog viszont
      SZÁNDÉKOSAN marad: azok a párharc egészét ívelik át. */
   S.mpMateFinal=null;S.mpDecision=null;
+  /* A nyári igazolási referencia is a lezárt szezonhoz tartozott — az új
+     szezon mezőnyét már a szintalku adja, tehát itt el kell engedni. */
+  S.mpSummerRef=null;
   S.idx=0;S.W=0;S.D=0;S.L=0;S.GF=0;S.GA=0;S.pts=0;S.reds=0;S.injuries=0;S.capMod=0;S.eventMod=0;S.subs={};
   /* Új szezon: a tartós hiányzások is lezárulnak (a nyár elmossa a sárga/piros
      lapos eltiltást és a szezon közbeni sérüléseket). */
@@ -21024,7 +21091,7 @@ function saveGame(){
            döntés, a közös előzmény és az egymás elleni napló. */
         /* a szezonra rögzített rejtett ellenfél-erősítés (lásd seasonHiddenBonus) */
         oppBuffH:S.oppBuffH,
-        mpMateFinal:S.mpMateFinal,mpMateHalf:S.mpMateHalf,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
+        mpMateFinal:S.mpMateFinal,mpSummerRef:S.mpSummerRef,mpMateHalf:S.mpMateHalf,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
@@ -21250,6 +21317,9 @@ function applySavedGame(d){
      képlethez képest ez azonnali könnyítés a futó karriereknek is. */
   S.oppBuffH=(d.S.oppBuffH!=null)?d.S.oppBuffH:null;
   S.mpMateFinal=d.S.mpMateFinal||null;
+  /* A nyári igazolási referencia befagyasztott értéke. Régi mentésben nincs —
+     ott a mpSummerRefRating első hívása pótolja (lásd ott). */
+  S.mpSummerRef=d.S.mpSummerRef||null;
   S.mpMateHalf=d.S.mpMateHalf||null;
   S.leaveDeals=d.S.leaveDeals||[];
   S.halftimeSubs=!!d.S.halftimeSubs;
