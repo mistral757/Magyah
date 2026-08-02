@@ -1746,7 +1746,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.81";
+const APP_VERSION="2.5.82";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -22485,6 +22485,59 @@ function mpRememberMyId(){
        a nagyobb átvált. Mindkét kliens ugyanezt számolja, tehát nem oszcillál;
      · nem szerepelek (elveszett azonosító) → a SZABAD szerepet foglalom el,
        nem automatikusan a vendéget. */
+/* ================= A SZOBA KÉT ÜLÉSE =================
+   A szoba adatmodellje AZONOSÍTÓ szerint tárol (players[id]), a valóságban
+   viszont pontosan KÉT hely van: házigazda és vendég. A kettő addig esett
+   egybe, amíg egy játékos azonosítója állandó volt — de a sessionStorage-os
+   azonosító a fül bezárásával meghal, és a visszatérő új azonosítót kap.
+   A setRole/setReady pedig REGISZTRÁLATLAN azonosítót is létrehoz (Firebase-en
+   egy gyerek-út írása magától megszüli a szülőt), miközben a régi bejegyzést
+   senki nem takarítja. Így gyűlt össze három (vagy több) sor a lobbiban, és
+   egyiken sem volt "(te)".
+
+   Ez a függvény a nyers listát pontosan két ülésre képezi le. Determinisztikus,
+   tehát mindkét kliens ugyanazt látja:
+     1. az ÉN azonosítóm mindig kap helyet (élő vagyok), a saját szerepemben;
+     2. a maradék helyre a legvalószínűbb társ jön: azonos szerepű jelöltek
+        közül előbb a KÉSZ, holtversenyben a kisebb azonosító;
+     3. ami kimarad, az árva — a mpPruneRoom takarítja ki a tárolt adatból. */
+function mpSeats(room){
+  const players=(room&&room.players)||{};
+  const meId=mpMyId();
+  const list=Object.entries(players).map(([id,p])=>({id,p:p||{}}));
+  const seats={host:null,guest:null};
+  const mine=list.find(x=>x.id===meId);
+  if(mine){
+    const r=(mine.p.role==="host")?"host":"guest";
+    seats[r]={id:mine.id,p:mine.p,me:true};}
+  ["host","guest"].forEach(role=>{
+    if(seats[role])return;
+    const used=new Set(Object.values(seats).filter(Boolean).map(s=>s.id));
+    const cands=list.filter(x=>x.id!==meId&&!used.has(x.id)&&((x.p.role==="host"?"host":"guest")===role));
+    cands.sort((a,b)=>(b.p.ready?1:0)-(a.p.ready?1:0)||(a.id<b.id?-1:1));
+    if(cands[0])seats[role]={id:cands[0].id,p:cands[0].p,me:false};});
+  return seats;}
+/* Az üléseken kívül rekedt (árva) azonosítók. */
+function mpOrphanIds(room){
+  const seats=mpSeats(room);
+  const keep=new Set(Object.values(seats).filter(Boolean).map(s=>s.id));
+  return Object.keys((room&&room.players)||{}).filter(id=>!keep.has(id));}
+/* A tárolt szoba takarítása. Csak akkor fut, ha ÉN ülök az egyik helyen —
+   különben egy kívülről érkező kliens törölhetné ki a bent lévőket. Egyszerre
+   legfeljebb egy takarítás fut (a jelző), hogy a feliratkozás-visszhang ne
+   indítson végtelen kört. */
+let _mpPruning=false;
+async function mpPruneRoom(room){
+  if(_mpPruning||!room||!MP.activeRoom)return;
+  const seats=mpSeats(room);
+  const iSit=Object.values(seats).some(s=>s&&s.me);
+  if(!iSit)return;
+  const orphans=mpOrphanIds(room);
+  if(!orphans.length||!mpBk().removePlayer)return;
+  _mpPruning=true;
+  try{for(const id of orphans)await mpBk().removePlayer(MP.activeRoom,id);}
+  catch(e){}
+  finally{_mpPruning=false;}}
 function mpSyncRole(room){
   if(!room||!room.players)return MP.role;
   const meId=mpMyId(),me=room.players[meId];
@@ -22535,10 +22588,22 @@ const mpBackendLocal={
     if(Object.keys(room.players).length>=2)return {ok:false,err:"Ez a szoba már betelt."};
     room.players[mpMyId()]={role:"guest",ready:false};
     mpLSave(rooms);this._notify();return {ok:true,code};},
+  /* ÖNREGISZTRÁLÓ. Ha az azonosítóm nincs a szobában (elveszett fül, új
+     azonosító), a régi változat NÉMÁN nem csinált semmit: a "Készen állok"
+     gombra látszólag nem történt semmi, és a játékos beragadt. Most a helyes
+     szereppel be is regisztrálom magam. */
   async setReady(code,flag){
     const rooms=mpLRooms(),room=rooms[code];
-    if(!room||!room.players[mpMyId()])return;
-    room.players[mpMyId()].ready=!!flag;
+    if(!room)return;
+    room.players=room.players||{};
+    const cur=room.players[mpMyId()]||{role:(MP.role==="host")?"host":"guest"};
+    cur.ready=!!flag;
+    room.players[mpMyId()]=cur;
+    mpLSave(rooms);this._notify();},
+  async removePlayer(code,id){
+    const rooms=mpLRooms(),room=rooms[code];
+    if(!room||!room.players||!room.players[id])return;
+    delete room.players[id];
     mpLSave(rooms);this._notify();},
   /* A szerep visszaírása a szobába — az ütközés-feloldás (mpSyncRole,
      h2hTick) ezzel teszi tartóssá a javítást. Ha nem vagyok regisztrálva
@@ -22597,9 +22662,19 @@ const mpBackendFb={
     if(room.players&&Object.keys(room.players).length>=2)return {ok:false,err:"Ez a szoba már betelt."};
     await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId()),{role:"guest",ready:false});
     return {ok:true,code};},
+  /* ÖNREGISZTRÁLÓ, és a SZEREPET IS kiírja — lásd a helyi backend indoklását.
+     A régi változat csak a ready mezőt írta: Firebase-en egy gyerek-út írása
+     magától megszüli a szülőt, tehát egy szerep NÉLKÜLI játékos-bejegyzés
+     született, ami a lobbiban harmadik sorként jelent meg. */
   async setReady(code,flag){
     const F=mpNet.fns;
-    await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId()+"/ready"),!!flag);},
+    /* A TELJES bejegyzést írjuk (set), nem csak a ready mezőt: a játékos-node
+       csak ebből a két mezőből áll, így egy lépésben normalizálódik is. */
+    await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId()),
+      {ready:!!flag,role:(MP.role==="host")?"host":"guest"});},
+  async removePlayer(code,id){
+    const F=mpNet.fns;
+    await F.remove(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+id));},
   /* lásd a helyi backend setRole-jánál írt indoklást */
   async setRole(code,role){
     const F=mpNet.fns;
@@ -22777,7 +22852,7 @@ async function mpRenderHomeRooms(){
       ?`<span style="color:#e6c98a;font-size:12px">⚠ a szoba megszűnt — ${sn}. szezon folytatható</span>`
       :(sv
         ?`<span style="color:#8fd99a;font-size:12px">▶ ${sn}. szezon — folytatható</span>`
-        :`<span style="color:rgba(243,242,242,.55);font-size:12px">${Object.keys((room&&room.players)||{}).length}/2 játékos</span>`);
+        :`<span style="color:rgba(243,242,242,.55);font-size:12px">${Object.values(mpSeats(room)).filter(Boolean).length}/2 játékos</span>`);
     b.innerHTML=`<span>${gone?"⚠":"🏆"} ${esc(code)}</span>${jobb}`;
     /* megszűnt szobánál nincs mit lobbyzni — egyenesen a karrierbe visz */
     b.onclick=()=>{
@@ -22825,26 +22900,36 @@ function mpRenderLobby(){
     return;}
   $("mpReadyBtn").disabled=false;
   $("mpLobbyCode").textContent=String(room.code||MP.activeRoom).split("").join(" ");
+  /* A lobbi PONTOSAN két helyet mutat (lásd mpSeats). A nyers players-lista
+     elárvult azonosítókat is tartalmazhat — azokat itt nem rajzoljuk ki, és a
+     háttérben ki is takarítjuk a tárolt szobából. */
+  const seats=mpSeats(room);
   const players=room.players||{};
-  const ids=Object.keys(players);
+  const occupied=Object.values(seats).filter(Boolean);
+  const ids=occupied.map(s=>s.id);
   const me=players[mpMyId()];
+  mpPruneRoom(room);
   $("mpLobbyHint").textContent=ids.length<2
     ?(mpNet.mode==="fb"
       ?"Add meg ezt a kódot a társadnak — bárhonnan csatlakozhat."
       :"Add meg ezt a kódot a társadnak (helyi módban: egy másik böngészőfülben).")
     :"Mindketten a szobában vagytok.";
+  /* Mindig a két hely jelenik meg, fix sorrendben (házigazda, vendég) — az üres
+     hely látszik üresként. Így egy pillantásból leolvasható, ki hiányzik, és
+     sosem születhet harmadik sor. */
   const box=$("mpLobbyPlayers");box.innerHTML="";
-  ids.forEach(id=>{
-    const p=players[id];
+  [["host","👑 Házigazda"],["guest","🤝 Vendég"]].forEach(([role,label])=>{
+    const s=seats[role];
     const row=document.createElement("div");
+    if(!s){
+      row.className="mpPl";row.style.opacity=".5";
+      row.innerHTML=`<span>${label}</span><span class="st wait">üres — várunk rá…</span>`;
+      box.appendChild(row);return;}
+    const p=s.p;
     row.className="mpPl"+(p.ready?" rdy":"");
-    row.innerHTML=`<span>${p.role==="host"?"👑 Házigazda":"🤝 Vendég"}${id===mpMyId()?" <b style='color:#e1ad66'>(te)</b>":""}</span>
+    row.innerHTML=`<span>${label}${s.me?" <b style='color:#e1ad66'>(te)</b>":""}</span>
       <span class="st ${p.ready?"":"wait"}">${p.ready?"KÉSZ ✓":"várakozik…"}</span>`;
     box.appendChild(row);});
-  if(ids.length<2){
-    const row=document.createElement("div");row.className="mpPl";row.style.opacity=".5";
-    row.innerHTML=`<span>· · ·</span><span class="st wait">várunk a társadra…</span>`;
-    box.appendChild(row);}
   /* ---- F7: FUT-E MÁR KARRIER EBBEN A SZOBÁBAN? ----
      Ha igen, a folytatás a fő művelet: a ready/indulás elrejtve, hogy egy
      félreütés ne indítson új világot a meglévő fölé. */
