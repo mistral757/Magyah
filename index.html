@@ -1746,7 +1746,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.75";
+const APP_VERSION="2.5.76";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4509,9 +4509,18 @@ const EURO_SCHEDULE=[
   [[1,0],[3,2]],[[2,0],[1,3]],[[3,0],[2,1]]
 ];
 function euroLam(d){return Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)));}
-function euroSimResult(hOvr,aOvr){
+/* ---- KÖZÖS KUPA: SEEDELT HÁTTÉR-SZIMULÁCIÓ ----
+   MP-ben a két kliens ugyanazt a tornát futtatja, ezért a HÁTTÉRMECCSEK
+   eredménye sem lehet kliensenként más — különben a két játékos más csapatot
+   látna kupagyőztesnek, és az ág is szétcsúszna. Minden szimulált meccs saját
+   nevesített folyamot kap (a címke a szakasz + a párharc + a meccs sorszáma),
+   így a sorrendtől függetlenül ugyanaz jön ki mindkét oldalon.
+   Egyjátékosban a tag nélküli hívás a RÉGI, véletlen viselkedést adja. */
+function cupSimRng(tag){return mpCupActive()?mpCupRng("sim:"+tag):null;}
+function euroSimResult(hOvr,aOvr,tag){
   const d=hOvr-aOvr+SIM.HOME;
-  return {h:poisson(euroLam(d)),a:poisson(euroLam(-d))};}
+  const r=cupSimRng(tag);
+  return {h:poisson(euroLam(d),r||undefined),a:poisson(euroLam(-d),r||undefined)};}
 /* Súlyozott játékosválasztás egy klub keretéből (a meglévő GOALW poszt-súlyok
    alapján) — így a szimulált góllövőlistán VALÓDI játékosnevek szerepelnek. */
 function euroPickPlayer(team,weightFn){
@@ -4571,25 +4580,350 @@ function euroGroupTable(g){
   return S.euro.groups[g].map(i=>({i,t:S.euro.teams[i],r:S.euro.table[i]}))
     .sort((a,b)=>b.r.pts-a.r.pts||(b.r.gf-b.r.ga)-(a.r.gf-a.r.ga)||b.r.gf-a.r.gf
       ||String(a.t.n).localeCompare(String(b.t.n)));}
-/* A MEZŐNY felépítése: 31 klub + a user, kalapos sorsolással 8 csoportba. */
+/* ================= KÖZÖS KUPA (MP) =================
+   Közös karrierben a nyári kupasorozatot MINDKÉT menedzser ugyanabban a
+   sorozatban játssza, ugyanabban a 32-es mezőnyben — és a kieséses ágon
+   össze is kerülhetnek.
+
+   MIÉRT MŰKÖDIK EGYÁLTALÁN: a világ-seed a szoba sajátja, tehát a két kliens
+   ugyanabból a nevesített folyamból (rngFor) BITRE azonos mezőnyt, kalapokat
+   és ágat épít. Enélkül a két kupa két külön világ lenne. A kupa-generálás
+   ezért MP-ben seedelt folyamból megy, nem Math.random-ból.
+
+   A HÁROM SZABÁLY, ami a felhasználói specifikációból jön:
+     1. Mindketten UGYANABBA a sorozatba nevezünk. Ha eltér a kvalifikációtok,
+        a JOBBIK számít (BL > EL > KL > MK), és aki nem kvalifikált, azt a
+        társa jogán visszük magunkkal — így a közös kupa minden szezonban megvan.
+     2. A SELEJTEZŐBEN és a CSOPORTBAN sosem kerülhettek össze: a selejtező
+        ellenfél-sorsolása kizárja a társat, a csoportbeosztás pedig külön
+        csoportba tesz titeket.
+     3. Találkozni CSAK a kieséses ágon lehet — és simán előfordulhat, hogy
+        egyikőtök előbb kiesik, mint hogy odáig eljutnátok.
+
+   A VÁRAKOZÁS EGYETLEN PONTJA a találkozás köre. Addig minden ellenfeled olyan
+   ág-félből jön, amiben a társad NINCS benne, tehát végig seedelten,
+   kliensfüggetlenül szimulálható. A társ ágát csak akkor kell megismerni,
+   amikor az a tiéddel összeér — ezért nem kell körönként egymásra várni. */
+const MP_CUP_RANK={BL:4,EL:3,KL:2,MK:1};
+/* A közös kupa állapota erre a szezonra, vagy null. */
+function mpCup(){
+  const c=S.mpCup;
+  return (c&&c.season===(S.seasonNumber||1)&&c.comp)?c:null;}
+/* Fut-e ÉPP közös kupa (a mezőnyben ott ül a társ csapata)? */
+function mpCupActive(){
+  return !!(mpCup()&&S.euro&&S.euro.mateIdx!=null);}
+function mpCupKey(){return "s"+(S.seasonNumber||1)+"cup";}
+/* Szakasz-kulcs a saját párharcom eredményének közzétételéhez. */
+function mpCupStageKey(stage){return "s"+(S.seasonNumber||1)+"cup"+stage;}
+/* A kupa nevesített véletlen-folyama. MINDEN MP-kupa sorsolás ezen megy át,
+   hogy a két kliens ugyanazt a mezőnyt és ágat kapja. */
+function mpCupRng(tag){
+  return rngFor("s"+(S.seasonNumber||1)+":cup:"+((mpCup()&&mpCup().comp)||"x")+":"+tag);}
+/* A KÖZÖS SOROZAT a két kvalifikációból: a jobbik nyer, és aki nem
+   kvalifikált (null), azt a társa viszi magával. A számítás TISZTA FÜGGVÉNY —
+   mindkét kliens ugyanabból a két rekordból ugyanazt kapja, ezért nincs
+   szükség "döntőbíró" oldalra (ugyanaz az elv, mint a mpResolveLevel-nél). */
+function mpResolveCup(mine,mate){
+  const ca=(mine&&mine.comp)||null,cb=(mate&&mate.comp)||null;
+  if(!ca&&!cb)return null;
+  const ra=ca?(MP_CUP_RANK[ca]||0):0,rb=cb?(MP_CUP_RANK[cb]||0):0;
+  const win=ra>=rb?mine:mate;
+  return {comp:win.comp,qual:!!win.qual,
+    how:(ca&&cb)?(ra===rb?"same":"better"):"carried",
+    mineComp:ca,mateComp:cb};}
+/* Eldőlt-e már a nevezés erre a szezonra? (A comp:null is döntés: egyikőtök
+   sem kvalifikált, tehát idén nincs kupa.) */
+function mpCupSettled(){return !!(S.mpCup&&S.mpCup.season===(S.seasonNumber||1));}
+/* A közös mezőny-célérték a két csapaterőből. Az euroMidRating logikája, de az
+   ERŐSEBB keretre horgonyozva: a bajnoki szint az alsó korlát, és ha a jobbik
+   keret legalább 1-gyel fölé nőtt, ahhoz igazodik (−1). Tiszta függvény —
+   mindkét kliens ugyanabból a két számból ugyanazt kapja. */
+function mpCupSharedMid(a,b){
+  const base=oppTargetRating||84;
+  const ts=Math.max((typeof a==="number"?a:0),(typeof b==="number"?b:0));
+  return Math.max(base,ts>=base+1?Math.round(ts-1):base);}
+let _mpCupBusy=false,_mpCupPoll=null;
+const MP_WAIT_CUP={mine:"A te nevezésed",opp:"A társad nevezése",
+  cancel:"✕ Még maradok a HUB-ban"};
+function mpCupAbort(){
+  _mpCupBusy=false;
+  if(_mpCupPoll){clearTimeout(_mpCupPoll);_mpCupPoll=null;}
+  h2hWaitHide();}
+/* ---- A NEVEZÉS KAPUJA ----
+   A kupa nem indulhat egyoldalúan: mindkét menedzser felteszi a saját
+   kvalifikációját, és a JOBBIK lesz a közös sorozat. Ugyanaz a minta, mint a
+   szezonindítási alkunál (mpSeasonGate): újraindítható, a képernyő elhagyható,
+   időkorlát nincs. */
+async function mpCupGate(onReady){
+  if(!h2hRoomActive()){onReady();return;}
+  if(mpCupSettled()){onReady();return;}
+  if(_mpCupBusy)return;
+  _mpCupBusy=true;
+  const key=mpCupKey(),myField=MP.role==="host"?"host":"guest";
+  const oppField=myField==="host"?"guest":"host";
+  h2hWaitShow("KUPANEVEZÉS","Kapcsolódás a szobához…",false,false,MP_WAIT_CUP);
+  $("h2hWaitErr").textContent="";
+  try{await mpNetInit();}catch(e){}
+  if(!_mpCupBusy)return;
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+  if(!_mpCupBusy)return;
+  /* A saját nevezés egyszer megy fel, és onnantól az a hivatalos. */
+  if(!node||!node[myField]){
+    try{await mpBk().h2hPut(MP.activeRoom,key,myField,{
+      comp:S.euroCurrent||null,qual:!!S.euroCurrentQual,
+      teamName:String(teamName||"A társad").slice(0,40),
+      ovr:Math.round(teamOVRbase()),
+      /* A mezőny erősségéhez KELL a csapaterő is: az euroMidRating a SAJÁT
+         teamStrength()-edből dolgozik, ami kliensenként más — abból a két
+         oldal más mezőnyt építene. A közös célértéket a két számból számoljuk. */
+      str:Math.round(teamStrength()),
+      at:Date.now()});}
+    catch(e){$("h2hWaitErr").textContent="A nevezést nem sikerült elküldeni — újrapróbáljuk.";}}
+  mpCupTick(key,myField,oppField,onReady);}
+async function mpCupTick(key,myField,oppField,onReady){
+  if(!_mpCupBusy)return;
+  if(_mpCupPoll){clearTimeout(_mpCupPoll);_mpCupPoll=null;}
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,key);}
+  catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
+  if(!_mpCupBusy)return;
+  const mine=node&&node[myField],mate=node&&node[oppField];
+  if(mine&&mate){
+    const r=mpResolveCup(mine,mate);
+    mpCupAbort();
+    S.mpCup={season:(S.seasonNumber||1),
+      comp:r?r.comp:null,qual:r?r.qual:false,
+      mateName:String(mate.teamName||"A társad").replace(/[<>&]/g,"").slice(0,40),
+      mateOvr:(typeof mate.ovr==="number")?mate.ovr:null,
+      /* A KÖZÖS mezőny-célérték: ugyanaz a képlet, mint az euroMidRating-ben,
+         de az ERŐSEBB keretre horgonyozva. Így a két kliens azonos mezőnyt
+         épít, és a sorozat egyikőtöknek sem lesz sétagalopp. */
+      mid:mpCupSharedMid(mine.str,mate.str),
+      how:r?r.how:null,mineComp:r?r.mineComp:null,mateComp:r?r.mateComp:null};
+    if(r){
+      /* A közös sorozat FELÜLÍRJA a saját kvalifikációdat — ez a lényeg:
+         mindketten ugyanabba a kupába nevezünk. */
+      S.euroCurrent=r.comp;S.euroCurrentQual=r.qual;S.euroOptOut=false;
+      const cn=EURO_COMPS[r.comp].n;
+      addLine(r.how==="carried"
+        ?`🤝 Közös kupanevezés: egyikőtök kvalifikációja visz be mindkettőtöket — idén a(z) ${cn} következik.`
+        :r.how==="same"
+        ?`🤝 Közös kupanevezés: mindketten a(z) ${cn} sorozatba jutottatok.`
+        :`🤝 Közös kupanevezés: a jobbik kvalifikáció számít — idén mindketten a(z) ${cn} sorozatot játsszátok.`,
+        "m life");
+      addLine(`⚔ A társad (${esc(S.mpCup.mateName)}) ugyanebben a mezőnyben indul. A selejtezőben és a csoportban nem kerülhettek össze — találkozni csak a kieséses ágon lehet.`,"m life");
+    }else{
+      S.euroCurrent=null;S.euroCurrentQual=false;
+      addLine("🚫 Idén egyikőtök sem kvalifikált kupába — nyári sorozat nélkül megy tovább a karrier.","m life");}
+    try{saveGame();}catch(e){}
+    onReady();return;}
+  h2hWaitShow("KUPANEVEZÉS",
+    `<span class="h2hDot"></span>${mine?"A nevezésed elment":"Küldés…"} — ${
+      mate?"a társadé is megvan, számolunk…":"várunk a társadra. Nyugodtan lépj ki, a nevezésed megmarad."}
+     <br><small style="color:var(--dim2)">A te kvalifikációd: <b>${S.euroCurrent?EURO_COMPS[S.euroCurrent].n:"nem kvalifikáltál"}</b></small>`,
+    !!mine,!!mate,MP_WAIT_CUP);
+  _mpCupPoll=setTimeout(()=>mpCupTick(key,myField,oppField,onReady),2000);}
+/* ---- CSOPORTTÁBLA-CSERE ----
+   A csoportkör végén a te csoportod tábláját ÉLŐBEN játszottad ki, a társadét
+   viszont a te klienseden csak szimuláltuk (és fordítva) — a két oldal képe
+   tehát eltér. Az ágrajzhoz viszont közös igazság kell, ezért a csoportkör
+   végén kicseréljük a saját csoportunk négy sorát, és mindkét kliens ADOPTÁLJA
+   a másikét. Ez a torna természetes sorsolási pillanata is: a nyolcaddöntő
+   párosítása a valóságban is minden csoport lezárása után dől el. */
+let _mpGroupBusy=false,_mpGroupPoll=null;
+const MP_WAIT_GROUP={mine:"A te csoportod",opp:"A társad csoportja",
+  cancel:"✕ Most nem folytatom"};
+function mpCupGroupAbort(){
+  _mpGroupBusy=false;
+  if(_mpGroupPoll){clearTimeout(_mpGroupPoll);_mpGroupPoll=null;}
+  h2hWaitHide();}
+function mpCupMyGroupRows(){
+  const E=S.euro;
+  return (E.groups[E.userG]||[]).map(i=>Object.assign({i},E.table[i]));}
+async function mpCupGroupSync(onReady){
+  const E=S.euro;
+  if(!mpCupActive()||E.mateG==null||E.mateG===E.userG){onReady();return;}
+  if(_mpGroupBusy)return;
+  _mpGroupBusy=true;
+  const key=mpCupStageKey("grp"),myField=MP.role==="host"?"host":"guest";
+  const oppField=myField==="host"?"guest":"host";
+  h2hWaitShow("SORSOLÁS","A csoportok lezárása…",false,false,MP_WAIT_GROUP);
+  $("h2hWaitErr").textContent="";
+  try{await mpNetInit();}catch(e){}
+  if(!_mpGroupBusy)return;
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+  if(!_mpGroupBusy)return;
+  if(!node||!node[myField]){
+    try{await mpBk().h2hPut(MP.activeRoom,key,myField,{rows:mpCupMyGroupRows()});}
+    catch(e){$("h2hWaitErr").textContent="A csoportod tábláját nem sikerült elküldeni — újrapróbáljuk.";}}
+  mpCupGroupTick(key,myField,oppField,onReady);}
+async function mpCupGroupTick(key,myField,oppField,onReady){
+  if(!_mpGroupBusy)return;
+  if(_mpGroupPoll){clearTimeout(_mpGroupPoll);_mpGroupPoll=null;}
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,key);}
+  catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
+  if(!_mpGroupBusy)return;
+  const mine=node&&node[myField],mate=node&&node[oppField];
+  if(mine&&mate&&mate.rows){
+    /* A társ csoportjának NÉGY sorát átvesszük — ettől lesz a két kliens
+       nyolcaddöntő-sorsolása azonos. A csapatindexek egyeznek, mert a mezőnyt
+       ugyanabból a seedből építettük. */
+    mate.rows.forEach(r=>{
+      if(r&&typeof r.i==="number"&&S.euro.table[r.i])
+        S.euro.table[r.i]={w:r.w|0,d:r.d|0,l:r.l|0,gf:r.gf|0,ga:r.ga|0,pts:r.pts|0};});
+    mpCupGroupAbort();
+    try{saveGame();}catch(e){}
+    onReady();return;}
+  h2hWaitShow("SORSOLÁS",
+    `<span class="h2hDot"></span>${mine?"A csoportod lezárva":"Küldés…"} — ${
+      mate?"a társadé is megvan, jöhet a sorsolás…":"várunk a társadra, hogy ő is végigjátssza a csoportkörét."}
+     <br><small style="color:var(--dim2)">A nyolcaddöntő párosításához mindkét csoportnak le kell zárulnia.</small>`,
+    !!mine,!!(mate&&mate.rows),MP_WAIT_GROUP);
+  _mpGroupPoll=setTimeout(()=>mpCupGroupTick(key,myField,oppField,onReady),2500);}
+/* ---- A TÁRS SORSA A KIESÉSES ÁGON ----
+   A társ párharcát a te klienseden csak SZIMULÁLNÁNK (AI-ként), a valóságban
+   viszont ő élőben játssza — a két oldal képe tehát elcsúszna, és a végén más
+   csapat állna az ágon. Ezért minden kieséses kör után kicseréljük az EGYETLEN
+   lényeges bitet: továbbjutott-e a társad.
+
+   Amint kiesik, a szinkron VÉGLEG megszűnik (E.mateOut): onnantól a legyőzője
+   egy sima AI, akinek az útja seedelt, tehát mindkét kliensen azonos.
+   Ha pedig ÉPP a társad az ellenfeled, nincs mit cserélni — a párharc
+   eredménye maga a közös igazság. */
+function mpCupMateTie(){
+  const E=S.euro;
+  if(!mpCupActive()||E.mateIdx==null||!E.ties)return -1;
+  return E.ties.findIndex(t=>t&&(t.a===E.mateIdx||t.b===E.mateIdx));}
+let _mpTieBusy=false,_mpTiePoll=null;
+const MP_WAIT_TIE={mine:"A te párharcod",opp:"A társad párharca",
+  cancel:"✕ Most nem folytatom"};
+function mpCupTieAbort(){
+  _mpTieBusy=false;
+  if(_mpTiePoll){clearTimeout(_mpTiePoll);_mpTiePoll=null;}
+  h2hWaitHide();}
+/* Kell-e egyáltalán cserélni ebben a körben? */
+function mpCupNeedTieSync(){
+  const E=S.euro;
+  if(!mpCupActive()||E.mateOut)return false;
+  const mt=mpCupMateTie();
+  return mt>=0&&mt!==E.userTie;}
+async function mpCupTieSync(round,onReady){
+  if(!mpCupNeedTieSync()){onReady();return;}
+  if(_mpTieBusy)return;
+  _mpTieBusy=true;
+  const key=mpCupStageKey("ko"+round),myField=MP.role==="host"?"host":"guest";
+  const oppField=myField==="host"?"guest":"host";
+  const E=S.euro;
+  const ut=E.userTie>=0?E.ties[E.userTie]:null;
+  const iWon=!!(ut&&ut.winner===E.userIdx);
+  h2hWaitShow(EURO_ROUND_NAMES[round]||"KUPAKÖR","A kör lezárása…",false,false,MP_WAIT_TIE);
+  $("h2hWaitErr").textContent="";
+  try{await mpNetInit();}catch(e){}
+  if(!_mpTieBusy)return;
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+  if(!_mpTieBusy)return;
+  if(!node||!node[myField]){
+    try{await mpBk().h2hPut(MP.activeRoom,key,myField,{won:iWon,at:Date.now()});}
+    catch(e){$("h2hWaitErr").textContent="Az eredményt nem sikerült elküldeni — újrapróbáljuk.";}}
+  mpCupTieTick(key,myField,oppField,round,onReady);}
+async function mpCupTieTick(key,myField,oppField,round,onReady){
+  if(!_mpTieBusy)return;
+  if(_mpTiePoll){clearTimeout(_mpTiePoll);_mpTiePoll=null;}
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,key);}
+  catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
+  if(!_mpTieBusy)return;
+  const mine=node&&node[myField],mate=node&&node[oppField];
+  if(mine&&mate){
+    const E=S.euro,mt=mpCupMateTie();
+    if(mt>=0){
+      const t=E.ties[mt];
+      /* A társ párharcának VALÓDI kimenetele felülírja a helyi szimulációt. */
+      t.winner=mate.won?E.mateIdx:(t.a===E.mateIdx?t.b:t.a);
+      if(!mate.won){
+        E.mateOut=round;
+        addLine(`⚔ A társad (${esc((mpCup()&&mpCup().mateName)||"a társad")}) kiesett a(z) ${EURO_ROUND_NAMES[round]||round} során — nem találkoztok idén.`,"m life");}}
+    mpCupTieAbort();
+    try{saveGame();}catch(e){}
+    onReady();return;}
+  h2hWaitShow(EURO_ROUND_NAMES[round]||"KUPAKÖR",
+    `<span class="h2hDot"></span>${mine?"A párharcod lezárva":"Küldés…"} — ${
+      mate?"a társadé is megvan…":"várunk a társadra, hogy ő is lejátssza ezt a kört."}
+     <br><small style="color:var(--dim2)">Amíg mindketten versenyben vagytok, a kör végén meg kell várni egymást — így nem csúszhat szét az ág.</small>`,
+    !!mine,!!mate,MP_WAIT_TIE);
+  _mpTiePoll=setTimeout(()=>mpCupTieTick(key,myField,oppField,round,onReady),2500);}
+/* A MEZŐNY felépítése: 31 klub + a user, kalapos sorsolással 8 csoportba.
+   KÖZÖS KUPÁBAN 30 klub + a user + a TÁRS — a mezőny mérete változatlan 32,
+   csak az egyik AI-hely a társé. A sorsolás ilyenkor SEEDELT folyamból megy,
+   hogy a két kliens azonos mezőnyt kapjon (lásd a KÖZÖS KUPA blokkot). */
 function buildEuroField(comp){
   const c=EURO_COMPS[comp];
-  const target=euroMidRating()+c.oppDelta;
+  /* MP: minden sorsolási lépés a szoba seedjéből — különben a két kliens
+     más mezőnyt építene, és a közös kupa értelmét vesztené. A CÉLÉRTÉK is
+     közös (mpCupSharedMid), mert az euroMidRating a saját csapaterődből
+     dolgozik, ami a két oldalon eltér. */
+  const M=mpCup();
+  const target=((M&&M.mid!=null)?M.mid:euroMidRating())+c.oppDelta;
   const cap=infinityMode?Infinity:RATING_CAP;
+  const rnd=M?mpCupRng("field"):null;
+  const rr=rnd||Math.random;
+  const shuf=a=>shuffleArr(a,rnd||undefined);
   /* csak klubcsapat, és a bajnoki ellenfelek sem térnek vissza */
   const used=new Set((typeof SEASON_OPPS!=="undefined"?SEASON_OPPS:[]).map(o=>o.n));
   const pool=SQUADS.map((sq,i)=>({sq,i,n:`${sq.club} (${sq.season})`,avg:squadAvgOvr(sq)}))
     .filter(x=>!x.sq.wc&&!used.has(x.n));
   const ranked=pool.slice().sort((a,b)=>Math.abs(a.avg-target)-Math.abs(b.avg-target));
-  const picks=shuffleArr(ranked.slice(0,Math.max(31,Math.min(ranked.length,46)))).slice(0,31);
+  const nAI=M?30:31;   /* közös kupában egy hely a társé */
+  const picks=shuf(ranked.slice(0,Math.max(31,Math.min(ranked.length,46)))).slice(0,nAI);
   const teams=picks.map(x=>({n:x.n,sq:x.i,you:false,
-    ovr:Math.max(50,Math.min(cap,target+(Math.random()*2-1)*2.5))}));
+    ovr:Math.max(50,Math.min(cap,target+(rr()*2-1)*2.5))}));
   teams.push({n:teamName,you:true,sq:null,ovr:teamOVRbase()});
+  /* A TÁRS csapata valódi résztvevő: a saját nevével és a szezonzáró
+     csapaterejével kerül a mezőnybe, nem AI-ként. */
+  if(M)teams.push({n:M.mateName||"A társad",mate:true,you:false,sq:null,
+    ovr:Math.max(50,Math.min(cap,M.mateOvr||target))});
   /* KALAPOS beosztás: erősség szerint 4 kalap, minden csoportba kalaponként
      egy csapat — így minden négyesben van erős és gyengébb ellenfél is. */
-  const byOvr=teams.slice().sort((a,b)=>b.ovr-a.ovr);
-  const pots=[0,1,2,3].map(k=>shuffleArr(byOvr.slice(k*EURO_GROUPS,(k+1)*EURO_GROUPS)));
+  /* MP: a kalapsorrendnek DÖNTETLENNÉL is kliensfüggetlennek kell lennie.
+     A te csapatod és a társadé azonos csapaterővel is előfordul (mérve: 300
+     sorsolásból 24-szer) — ilyenkor a puszta ovr-rendezés a tömb sorrendjére
+     esik vissza, az pedig a két oldalon fordított (nálad te vagy elöl, nála ő).
+     A név szerinti másodlagos kulcs ezt véglegesen kizárja. localeCompare
+     helyett nyers összehasonlítás: a locale kliensenként eltérhet. */
+  const byOvr=teams.slice().sort((a,b)=>
+    (b.ovr-a.ovr)||(M?(String(a.n)<String(b.n)?-1:String(a.n)>String(b.n)?1:0):0));
+  const pots=[0,1,2,3].map(k=>shuf(byOvr.slice(k*EURO_GROUPS,(k+1)*EURO_GROUPS)));
   const groups=[];for(let g=0;g<EURO_GROUPS;g++)groups.push(pots.map(pt=>pt[g]));
+  /* ---- SPEC 2: A CSOPORTBAN SOSEM KERÜLHETTEK ÖSSZE ----
+     Ha a kalapsorsolás egy csoportba tett titeket, a társat átcseréljük egy
+     másik csoport AZONOS KALAPBÓL való csapatával. Az azonos kalap fontos: a
+     kalapos szerkezet (minden négyesben egy erős és egy gyengébb) így sértetlen
+     marad. A csereparter a seedelt folyamból jön, tehát mindkét kliensen
+     ugyanaz. Csoport nélküli sorozatnál (Magyar Kupa) nincs mit tenni: ott az
+     egész mezőny egyenes kiesés, a találkozás pedig épp azon az ágon legális. */
+  if(M&&compHasGroup(comp)){
+    let a=null,b=null;
+    groups.forEach((gr,gi)=>gr.forEach((t,pi)=>{
+      if(t.you)a={g:gi,pot:pi,t};
+      if(t.mate)b={g:gi,pot:pi,t};}));
+    if(a&&b&&a.g===b.g){
+      /* ---- MELYIKŐTÖK KÖLTÖZIK? A GYENGÉBB ----
+         Ez a döntés nem lehet "a társam költözik": a két kliensen a TÁRS más
+         csapat, tehát mindkettő mást mozdítana, és a két mezőny szétválna.
+         (Mérve is: emiatt került ugyanaz a csapat az egyik oldalon az 1., a
+         másikon a 2. csoportba.) A csapaterő — döntetlennél a névsor — viszont
+         kliensfüggetlen tulajdonság, ezért mindkét oldal UGYANAZT a csapatot
+         költözteti, ugyanabba a csoportba. */
+      const mv=(a.t.ovr<b.t.ovr||(a.t.ovr===b.t.ovr&&String(a.t.n)<String(b.t.n)))?a:b;
+      const alt=[];for(let g=0;g<EURO_GROUPS;g++)if(g!==mv.g)alt.push(g);
+      const g2=shuf(alt)[0];
+      const tmp=groups[g2][mv.pot];
+      groups[g2][mv.pot]=groups[mv.g][mv.pot];
+      groups[mv.g][mv.pot]=tmp;}}
   /* a teams tömb a végleges sorrend: csoportonként egymás után */
   const flat=[];groups.forEach((gr,gi)=>gr.forEach(t=>{t.g=gi;flat.push(t);}));
   const gIdx=groups.map((gr,gi)=>gr.map(t=>flat.indexOf(t)));
@@ -4597,9 +4931,12 @@ function buildEuroField(comp){
   const userIdx=flat.findIndex(t=>t.you);
   const userG=flat[userIdx].g;
   const userSlot=gIdx[userG].indexOf(userIdx);
+  const mateIdx=M?flat.findIndex(t=>t.mate):-1;
   /* A kupa SZINTJÉT eltesszük: ebből számoljuk a kupameccsek rejtett
      ellenfél-erősítését (lásd hiddenOppBuff), és a felület is ezt mutatja. */
-  return {teams:flat,groups:gIdx,table,userIdx,userG,userSlot,target};}
+  return {teams:flat,groups:gIdx,table,userIdx,userG,userSlot,target,
+    mateIdx:mateIdx>=0?mateIdx:null,
+    mateG:mateIdx>=0?flat[mateIdx].g:null};}
 /* A user 6 csoportmeccse a sorsolási tábla alapján. A fixture ALAKJA azonos a
    bajnokival ({o:{n,ovr},home}), hogy a meccs-motor változatlanul fogadja. */
 function buildEuroUserFixtures(){
@@ -4705,8 +5042,9 @@ function euroTieAggregate(t){
   const aAway=L[1]?L[1][0]:0, bAway=L[0]?L[0][1]:0;
   return {aTot,bTot,aAway,bAway};}
 /* Büntetőpárbaj: alapvetően kiegyenlített, a jobb csapat felé enyhén billen. */
-function euroPens(ovrA,ovrB){
-  return Math.random()<Math.max(0.25,Math.min(0.75,0.5+(ovrA-ovrB)*0.012));}
+function euroPens(ovrA,ovrB,tag){
+  const r=cupSimRng(tag)||Math.random;
+  return r()<Math.max(0.25,Math.min(0.75,0.5+(ovrA-ovrB)*0.012));}
 function euroResolveTie(t){
   const E=S.euro,ag=euroTieAggregate(t);
   let win,how="";
@@ -4731,18 +5069,42 @@ function euroResolveTie(t){
    NEM azonos csoportból; a további körökben szabad sorsolás. */
 function euroDrawRound(round,pool){
   const E=S.euro,ties=[];
+  /* ---- KÖZÖS KUPA: FIX ÁG ----
+     MP-ben a fa a kupa elején eldől, és onnantól SORRENDTARTÓ a párosítás:
+     a pool[0] a pool[1]-gyel, a [2] a [3]-mal, és így tovább. Mivel a
+     winners tömb a ties SORRENDJÉBEN áll elő (lásd euroResolveRound), ez
+     magától kiadja a klasszikus ágrajzot — újrasorsolás nélkül.
+     Ettől lesz előre kiszámítható, melyik körben találkozhattok, és ettől
+     nem kell körönként egymásra várni: a te ellenfeleid a találkozás köréig
+     mind olyan ág-félből jönnek, amiben a társad nincs benne. */
+  const mpFixed=mpCupActive();
   if(round==="r16"){
     const winners=[],runners=[];
     for(let g=0;g<EURO_GROUPS;g++){const t=euroGroupTable(g);winners.push(t[0].i);runners.push(t[1].i);}
-    let rs=shuffleArr(runners),ok=false;
-    for(let tries=0;tries<200&&!ok;tries++){
-      rs=shuffleArr(runners);
-      ok=winners.every((w,i)=>E.teams[w].g!==E.teams[rs[i]].g);}
-    winners.forEach((w,i)=>ties.push({a:rs[i],b:w,legs:[null,null],winner:null}));
+    if(mpFixed&&E.rmap){
+      /* A párosítás a kupa elején rögzített rmap-ből jön: az i. csoport
+         győztese az rmap[i]. csoport másodikjával játszik. Mindkét kliens
+         ugyanezt a leképezést kapta a szoba seedjéből. */
+      E.rmap.forEach((src,i)=>ties.push({a:runners[src],b:winners[i],legs:[null,null],winner:null}));
+    }else{
+      let rs=shuffleArr(runners),ok=false;
+      for(let tries=0;tries<200&&!ok;tries++){
+        rs=shuffleArr(runners);
+        ok=winners.every((w,i)=>E.teams[w].g!==E.teams[rs[i]].g);}
+      winners.forEach((w,i)=>ties.push({a:rs[i],b:w,legs:[null,null],winner:null}));}
   }else{
-    const sh=shuffleArr(pool);
+    const sh=mpFixed?pool.slice():shuffleArr(pool);
     for(let i=0;i<sh.length;i+=2)ties.push({a:sh[i],b:sh[i+1],legs:[null,null],winner:null});}
   return ties;}
+/* ---- HOL TALÁLKOZHATTOK ----
+   Két ág-pozícióból (az első kieséses kör párharc-indexei) kiszámolja, hányadik
+   körben érhettek össze: a bináris fában az a szint, ahol a két index közös
+   ősre kerül. 0 = mindjárt az első körben, a legnagyobb érték = a döntő. */
+function mpCupMeetLevel(iA,iB){
+  if(iA==null||iB==null)return null;
+  let a=iA,b=iB,k=0;
+  while(a!==b&&k<8){a=Math.floor(a/2);b=Math.floor(b/2);k++;}
+  return a===b?k:null;}
 /* Egy kieséses kör indítása: sorsolás + a user meccseinek felépítése. */
 function euroStartRound(round,pool){
   const E=S.euro;
@@ -4780,9 +5142,15 @@ function euroStartQual(){
   const E=S.euro;
   E.stage="qual";E.idx=0;E.qRound=(E.qRound||0)+1;E.qLegs=[null,null];
   /* az ellenfél a mezőnyből jön (a szintje tehát már stimmel), de sem te, sem
-     az előző kör ellenfele nem sorsolható újra */
-  const pool=E.teams.map((t,i)=>i).filter(i=>i!==E.userIdx&&i!==E.qOppIdx);
-  E.qOppIdx=pool[Math.floor(Math.random()*pool.length)];
+     az előző kör ellenfele nem sorsolható újra.
+     SPEC 2 — KÖZÖS KUPA: a TÁRSAD sem. A selejtezőben sosem kerülhettek össze;
+     találkozni csak a kieséses ágon lehet. A sorsolás ilyenkor seedelt, hogy a
+     két kliens selejtezője se váljon szét. */
+  const M=mpCupActive();
+  const pool=E.teams.map((t,i)=>i)
+    .filter(i=>i!==E.userIdx&&i!==E.qOppIdx&&!(M&&i===E.mateIdx));
+  const qr=M?mpCupRng("qual"+E.qRound):null;
+  E.qOppIdx=pool[Math.floor((qr?qr():Math.random())*pool.length)];
   const o=E.teams[E.qOppIdx];
   /* első meccs idegenben, visszavágó otthon — a klasszikus selejtező-sorrend */
   E.fixtures=[{o:{n:o.n,ovr:o.ovr},home:false,oi:E.qOppIdx},
@@ -4822,11 +5190,14 @@ function euroQualFailed(){
        párosítás sosem marad páratlanul. */
     E.outAt="qual";
     let pool=E.teams.map((t,i)=>i);
+    const mpFixed=mpCupActive();
+    let depth=0;
     while(pool&&pool.length>1){
-      const isFinal=pool.length===2,nx=[],sh=shuffleArr(pool);
+      const isFinal=pool.length===2,nx=[],sh=mpFixed?pool.slice():shuffleArr(pool);
       for(let i=0;i<sh.length;i+=2)
-        nx.push(isFinal?euroSimSingle(sh[i],sh[i+1]):euroSimTieFull(sh[i],sh[i+1]));
-      pool=nx;}
+        nx.push(isFinal?euroSimSingle(sh[i],sh[i+1],`qbg${depth}:${i}`)
+                       :euroSimTieFull(sh[i],sh[i+1],`qbg${depth}:${i}`));
+      pool=nx;depth++;}
     E.champion=pool&&pool.length?pool[0]:null;
     euroCampaignEnd("out");return;}
   /* A menetelés-napló és a statisztika ÁTJÖN az új sorozatba: a selejtező is
@@ -4852,34 +5223,36 @@ function euroSimKnockoutLeg(leg){
   E.ties.forEach((t,i)=>{
     if(i===E.userTie)return;
     const homeIdx=leg===0?t.a:t.b,awayIdx=leg===0?t.b:t.a;
-    const r=euroSimResult(E.teams[homeIdx].ovr,E.teams[awayIdx].ovr);
+    const r=euroSimResult(E.teams[homeIdx].ovr,E.teams[awayIdx].ovr,`${E.stage}:${i}:${leg}`);
     /* szerep szerinti tárolás: [A gólja, B gólja] */
     t.legs[leg]=leg===0?[r.h,r.a]:[r.a,r.h];
     euroRecordStats(E.teams[homeIdx],r.h,r.a);
     euroRecordStats(E.teams[awayIdx],r.a,r.h);});}
 /* Egy döntetlen nélküli, egymeccses szimuláció (a háttér-döntőhöz). */
-function euroSimSingle(ai,bi){
+function euroSimSingle(ai,bi,tag){
   const E=S.euro;
-  const r=euroSimResult(E.teams[ai].ovr,E.teams[bi].ovr);
+  const t=tag||`single:${ai}-${bi}`;
+  const r=euroSimResult(E.teams[ai].ovr,E.teams[bi].ovr,t);
   euroRecordStats(E.teams[ai],r.h,r.a);euroRecordStats(E.teams[bi],r.a,r.h);
   if(r.h!==r.a)return r.h>r.a?ai:bi;
-  return euroPens(E.teams[ai].ovr,E.teams[bi].ovr)?ai:bi;}
+  return euroPens(E.teams[ai].ovr,E.teams[bi].ovr,t+":p")?ai:bi;}
 /* TELJES ÉRTÉKŰ háttér-párharc: ODA-VISSZAVÁGÓ, a valós szabályok szerint
    (összesítés → idegenben lőtt gól → büntetők). MINDKÉT meccs statisztikája
    rögzül, ezért a góllövő-/gólpassz-/kapuslista és az egyéni arany-díjak a
    TELJES tornát tükrözik akkor is, ha a user korán kiesett. A tárolás itt is
    szerep-alapú (A gólja / B gólja), nem pályaválasztó szerinti. */
-function euroSimTieFull(ai,bi){
+function euroSimTieFull(ai,bi,tag){
   const E=S.euro;
-  const r1=euroSimResult(E.teams[ai].ovr,E.teams[bi].ovr);   /* 1. meccs: A otthon */
+  const t=tag||`tie:${ai}-${bi}`;
+  const r1=euroSimResult(E.teams[ai].ovr,E.teams[bi].ovr,t+":1");   /* 1. meccs: A otthon */
   euroRecordStats(E.teams[ai],r1.h,r1.a);euroRecordStats(E.teams[bi],r1.a,r1.h);
-  const r2=euroSimResult(E.teams[bi].ovr,E.teams[ai].ovr);   /* 2. meccs: B otthon */
+  const r2=euroSimResult(E.teams[bi].ovr,E.teams[ai].ovr,t+":2");   /* 2. meccs: B otthon */
   euroRecordStats(E.teams[bi],r2.h,r2.a);euroRecordStats(E.teams[ai],r2.a,r2.h);
   const aTot=r1.h+r2.a,bTot=r1.a+r2.h;      /* összesítés szerep szerint */
   const aAway=r2.a,bAway=r1.a;              /* idegenben lőtt gólok */
   if(aTot!==bTot)return aTot>bTot?ai:bi;
   if(aAway!==bAway)return aAway>bAway?ai:bi;
-  return euroPens(E.teams[ai].ovr,E.teams[bi].ovr)?ai:bi;}
+  return euroPens(E.teams[ai].ovr,E.teams[bi].ovr,t+":p")?ai:bi;}
 function euroSimMatchday(md){
   const E=S.euro;
   EURO_SCHEDULE[md].forEach(([h,a])=>{
@@ -4887,7 +5260,7 @@ function euroSimMatchday(md){
       const gi=E.groups[g];
       if(g===E.userG&&(h===E.userSlot||a===E.userSlot))continue;   /* ezt a user játssza */
       const hi=gi[h],ai=gi[a];
-      const r=euroSimResult(E.teams[hi].ovr,E.teams[ai].ovr);
+      const r=euroSimResult(E.teams[hi].ovr,E.teams[ai].ovr,`g${md}:${g}:${h}-${a}`);
       euroApplyResult(hi,ai,r.h,r.a);
       euroRecordStats(E.teams[hi],r.h,r.a);
       euroRecordStats(E.teams[ai],r.a,r.h);}});}
@@ -8154,7 +8527,7 @@ function beginNewGame(){
   /* F6: friss karrier — a párharc tartós állapota is nulláról indul, különben
      egy korábbi szoba kiegyenlítése átszivárogna az újba. */
   S.oppBuffH=null;   /* friss karrier → a rejtett erősítés az 1. szezon elején születik */
-  S.mpBalance=0;S.mpDecision=null;S.mpMateFinal=null;S.mpSummerRef=null;S.mpHistory=[];S.mpDuelLog=[];S.mpOrphan=false;
+  S.mpBalance=0;S.mpDecision=null;S.mpMateFinal=null;S.mpSummerRef=null;S.mpCup=null;S.mpHistory=[];S.mpDuelLog=[];S.mpOrphan=false;
   ensureWorldSeed();
   S.skillPool=weightedShuffleSkills(rngFor("skillpool"));
   slots=FORMS[form].slots.map((p,i)=>({pos:effectiveSlotPos(form,i),xy:FORMS[form].xy[i],player:null,fit:1,origin:null}));
@@ -10918,6 +11291,9 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      {season,value}. Lásd mpSummerRefRating. */
   mpSummerRef:null,
   mpMateHalf:null,    /* a társ féltávi mérlege a párharc pillanatképéből */
+  /* KÖZÖS KUPA: a szezonra kialkudott nyári sorozat — {season,comp,qual,
+     mateName,mateOvr,how}. A comp:null is érvényes döntés (idén nincs kupa). */
+  mpCup:null,
   leaveDeals:[],      /* halasztott megtartási díjak: {name,amount,season} */
   halftimeSubs:false, /* félidei csere-szünet (HUB-kapcsoló) */
   /* F6: a párharc tartós állapota. A mpBalance a kiegyenlítő rating-eltolás,
@@ -12400,14 +12776,38 @@ const H2H_ROUNDS=[15,30];
 function h2hRoomActive(){return !!(MP.active&&MP.activeRoom&&gameMode==="career"&&!S.mpOrphan);}
 /* A SORON KÖVETKEZŐ forduló párharc-e? S.idx 0-alapú, a forduló 1-alapú.
    A kupa kizárva: ott a bajnoki forduló-index nem mozdul. */
+/* Épp a TÁRSAD ellen jön a kupameccs? Ez a kieséses ág találkozása — a spec
+   szerint az egyetlen hely, ahol összekerülhettek. */
+function mpCupDuelNow(){
+  const E=S.euro;
+  if(!mpCupActive()||!E||E.mateIdx==null)return false;
+  if(E.stage==="qual"||E.stage==="group"||E.stage==="done")return false;
+  const t=(E.userTie!=null&&E.userTie>=0)?E.ties[E.userTie]:null;
+  if(!t)return false;
+  return t.a===E.mateIdx||t.b===E.mateIdx;}
 function h2hIsDuelRound(){
+  /* KUPA-PÁRHARC: a kupában is élő párharcot játszotok, nem AI ellen. */
+  if(mpCupDuelNow())return true;
   return h2hRoomActive()&&!euroActive()&&H2H_ROUNDS.includes((S.idx||0)+1);}
 /* A csere-csatorna kulcsa. A SZEZONSZÁM benne van: a 3. szezon 15. fordulója
    más ág, mint az 1.-é — egy régi párharc adata sosem szivárog át. */
-function h2hKey(){return "s"+(S.seasonNumber||1)+"r"+((S.idx||0)+1);}
+function h2hKey(){
+  /* Kupa-párharcnál a szakasz és a meccs sorszáma a kulcs (oda-visszavágó =
+     két külön csere), különben a bajnoki forduló. */
+  if(mpCupDuelNow())
+    return "s"+(S.seasonNumber||1)+"cupd"+S.euro.stage+"l"+(S.euro.idx||0);
+  return "s"+(S.seasonNumber||1)+"r"+((S.idx||0)+1);}
 /* Ki a hazai? A 15. fordulóban a HÁZIGAZDA, a 30.-ban a VENDÉG — így a két
    párharcból mindkettőnek jut egy hazai pálya, és a hazai előny kiegyenlítődik. */
 function h2hIAmHome(){
+  /* KUPÁBAN a pályaválasztó a párharc SZEREPEIBŐL jön, nem a host/vendég
+     viszonyból: az 1. meccs az "a" oldal otthonában megy, a visszavágó a "b"
+     oldalén. A döntő semleges pályán, tehát ott senki nem hazai. */
+  if(mpCupDuelNow()){
+    const E=S.euro,t=E.ties[E.userTie];
+    if(E.stage==="final")return false;
+    const meIsA=t.a===E.userIdx;
+    return (E.idx||0)===0?meIsA:!meIsA;}
   const hostHome=((S.idx||0)+1)===H2H_ROUNDS[0];
   return (MP.role==="host")===hostHome;}
 /* A Kezdőrúgás gomb felirata. Párharc előtt más a szöveg — a felhasználó
@@ -12736,7 +13136,9 @@ async function h2hTick(key,myField,oppField,round){
   /* 2) Megvan mindkét pillanatkép, és ÉN vagyok a házigazda → én futtatom.
         (A vendég sosem szimulál — így nem születhet két különböző eredmény.) */
   if(mine&&opp&&MP.role==="host"){
-    const hostHome=round===H2H_ROUNDS[0];
+    /* Kupában a pályaválasztót a párharc szerepei döntik (h2hIAmHome ezen az
+       ágon a HOST hazai-státuszát adja vissza), bajnokiban a forduló. */
+    const hostHome=mpCupDuelNow()?h2hIAmHome():(round===H2H_ROUNDS[0]);
     const home=hostHome?node.host:node.guest;
     const away=hostHome?node.guest:node.host;
     h2hWaitShow(round,"Mindkét keret megérkezett — a mérkőzés lejátszása…",true,true);
@@ -20130,6 +20532,15 @@ function euroFinishGroupStage(){
      pts:me?me.r.pts:null,w:me?me.r.w:null,d:me?me.r.d:null,l:me?me.r.l:null,
      gf:me?me.r.gf:null,ga:me?me.r.ga:null});}
   addLine(`📋 Csoportkör vége: a ${E.groupRank}. hely — ${E.advanced?"továbbjutottatok!":"búcsú a sorozattól."}`,"m life");
+  /* KÖZÖS KUPA: a nyolcaddöntő sorsolásához mindkét csoportnak le kell
+     zárulnia, ezért itt kicseréljük a két csoport tábláját. A KIESŐ oldal is
+     felteszi a sajátját (a társadnak szüksége van rá) — csak ő nem vár rá. */
+  if(mpCupActive()&&compHasGroup(E.comp)){
+    if(!E.advanced){
+      mpCupGroupSync(()=>{euroEliminated("group",null);saveGame();});
+      return;}
+    mpCupGroupSync(()=>{euroStartRound("r16",null);showEuroScreen();saveGame();});
+    return;}
   if(!E.advanced){euroEliminated("group",null);return;}
   euroStartRound("r16",null);
   showEuroScreen();}
@@ -20137,6 +20548,14 @@ function euroFinishGroupStage(){
 function euroResolveRound(){
   const E=S.euro,round=E.stage;
   E.ties.forEach(t=>euroResolveTie(t));
+  /* KÖZÖS KUPA: a társ párharcának valódi kimenetele felülírja a helyi
+     szimulációt, mielőtt a győztesekből felállna a következő kör. */
+  if(mpCupNeedTieSync()){
+    mpCupTieSync(round,()=>euroResolveRoundAfterSync(round));
+    return;}
+  euroResolveRoundAfterSync(round);}
+function euroResolveRoundAfterSync(round){
+  const E=S.euro;
   const ut=E.userTie>=0?E.ties[E.userTie]:null;
   const userWon=!!ut&&ut.winner===E.userIdx;
   if(ut){
@@ -20147,6 +20566,11 @@ function euroResolveRound(){
     E.lastTie={round,mine,theirs,how:ut.how,opp:E.teams[meIsA?ut.b:ut.a].n,won:userWon};
     euroPathPush({k:"tie",round,mine,theirs,how:ut.how,won:userWon,
       opp:E.teams[meIsA?ut.b:ut.a].n});
+    /* Ha ÉPP a társaddal csaptatok össze, a párharc dönti el az ő sorsát is —
+       nincs mit külön szinkronizálni, csak könyvelni. */
+    if(mpCupActive()&&E.mateIdx!=null&&(ut.a===E.mateIdx||ut.b===E.mateIdx)){
+      if(userWon)E.mateOut=round;
+      addLine(`⚔ A KIESÉSES ÁG ÖSSZEHOZOTT TITEKET — ${EURO_ROUND_NAMES[round]}: ${userWon?"te jutottál tovább!":"a társad jutott tovább."}`,"m life");}
     addLine(`${userWon?"✅":(round==="final"?"🥈":"❌")} ${EURO_ROUND_NAMES[round]} — ${round==="final"?"":"összesítés "}${mine}:${theirs}, ${ut.how}. ${userWon?(round==="final"?"MEGNYERTÉTEK A SOROZATOT!":"Tovább!"):(round==="final"?"Vesztettetek a döntőben — ezüstérmesek lettetek.":"Kiestetek.")}`,"m life");}
   const winners=E.ties.map(t=>t.winner);
   if(!userWon){euroEliminated(round,winners);return;}
@@ -20166,12 +20590,17 @@ function euroEliminated(round,winners){
   let pool=winners;
   if(round==="group"){
     pool=[];for(let g=0;g<EURO_GROUPS;g++){const t=euroGroupTable(g);pool.push(t[0].i,t[1].i);}}
+  /* KÖZÖS KUPA: a háttérben végigfuttatott torna is FIX ágon és seedelt
+     eredményekkel megy, különben a két kliens más kupagyőztest hirdetne. */
+  const mpFixed=mpCupActive();
+  let depth=0;
   while(pool&&pool.length>1){
     const isFinalRound=pool.length===2;   /* az utolsó pár = a döntő: egy meccs */
-    const nx=[],sh=shuffleArr(pool);
+    const nx=[],sh=mpFixed?pool.slice():shuffleArr(pool);
     for(let i=0;i<sh.length;i+=2)
-      nx.push(isFinalRound?euroSimSingle(sh[i],sh[i+1]):euroSimTieFull(sh[i],sh[i+1]));
-    pool=nx;}
+      nx.push(isFinalRound?euroSimSingle(sh[i],sh[i+1],`bg${depth}:${i}`)
+                          :euroSimTieFull(sh[i],sh[i+1],`bg${depth}:${i}`));
+    pool=nx;depth++;}
   E.champion=pool&&pool.length?pool[0]:null;
   euroCampaignEnd(round==="final"?"final":"out");}
 /* A kampány EREDMÉNYE és a jutalmak. Pénz: a szezonbüdzsé szorzója (a
@@ -20298,7 +20727,23 @@ function startEuroCampaign(opt){
     userIdx:f.userIdx,userG:f.userG,userSlot:f.userSlot,target:f.target,
     stats:opt.stats||{scorers:{},assists:{},cleanSheets:{}},fixtures:[],
     qRound:0,qOppIdx:null,qLegs:[null,null],droppedFrom:opt.droppedFrom||null,
+    /* KÖZÖS KUPA: a társ helye a mezőnyben, és a fix ág leképezése */
+    mateIdx:f.mateIdx,mateG:f.mateG,mateOut:null,rmap:null,
     path:opt.path||[],pathOpen:false};   /* a menetelés naplója — lásd euroPathPush */
+  /* ---- A FIX ÁG LEKÉPEZÉSE (rmap) ----
+     Az i. csoport győztese az rmap[i]. csoport másodikjával játszik a
+     nyolcaddöntőben. Kikötés: rmap[i] !== i (senki nem játszhat a saját
+     csoporttársával), és a leképezés a szoba seedjéből jön, tehát mindkét
+     kliensen azonos. Már a kupa ELEJÉN eldől, ezért a felület előre meg tudja
+     mondani, melyik körben találkozhattok. */
+  if(f.mateIdx!=null&&compHasGroup(comp)){
+    const r=mpCupRng("bracket");
+    let m=null;
+    for(let tries=0;tries<300&&!m;tries++){
+      const cand=shuffleArr([0,1,2,3,4,5,6,7],r);
+      if(cand.every((v,i)=>v!==i))m=cand;}
+    /* tartalék: garantáltan derangement, ha a sorsolás nem hozta össze */
+    S.euro.rmap=m||[1,2,3,4,5,6,7,0];}
   euroLastLogHtml="";euroLastLogTitle="";   /* új kampány — nincs korábbi meccs-napló */
   const needQual=!opt.skipQual&&!!S.euroCurrentQual;
   if(needQual){
@@ -20424,6 +20869,31 @@ $("euroPathBtn")&&($("euroPathBtn").onclick=()=>{
   if(!S.euro)return;
   S.euro.pathOpen=!S.euro.pathOpen;
   renderEuroPath();saveGame();});
+/* ---- KÖZÖS KUPA SÁV a kupa-fejlécben ----
+   Megmondja, hogy a társad ugyanebben a mezőnyben van, és — ha már áll az ág —
+   hányadik körben érhettek össze. A találkozás köre a FIX ágból jön, tehát
+   előre kiszámítható; amíg a csoportkör tart, csak a tényt írjuk ki. */
+function mpCupHeadHtml(){
+  const E=S.euro,M=mpCup();
+  if(!E||!M||E.mateIdx==null)return "";
+  const name=esc(M.mateName||"A társad");
+  if(E.mateOut)
+    return `<div style="font-size:11.5px;margin-top:5px;padding:6px 9px;border-radius:7px;background:var(--panel2);color:var(--dim)">
+      ⚔ <b>${name}</b> már kiesett a sorozatból (${EURO_ROUND_NAMES[E.mateOut]||E.mateOut}) — idén nem találkoztok.</div>`;
+  let where="";
+  const mt=mpCupMateTie();
+  if(mt>=0&&E.userTie!=null&&E.userTie>=0){
+    if(mt===E.userTie)where=" — <b>most ellene játszotok!</b>";
+    else{
+      const lvl=mpCupMeetLevel(E.userTie,mt);
+      const RS=compRounds(E.comp);
+      const base=RS.indexOf(E.stage);
+      const nm=(lvl!=null&&base>=0&&RS[base+lvl])?EURO_ROUND_NAMES[RS[base+lvl]]:null;
+      if(nm)where=` — ha mindketten továbbmentek, a(z) <b>${nm}</b> hozhat össze titeket.`;}}
+  else if(E.stage==="group"&&E.mateG!=null)
+    where=` — a(z) <b>${String.fromCharCode(65+E.mateG)}</b> csoportban játszik, tehát a csoportkörben nem kerülhettek össze.`;
+  return `<div style="font-size:11.5px;margin-top:5px;padding:6px 9px;border-radius:7px;background:color-mix(in srgb,var(--gold) 12%,transparent);color:var(--ink)">
+    ⚔ <b>Közös kupa:</b> ${name} ugyanebben a mezőnyben indul${where}</div>`;}
 function renderEuroScreen(){
   const E=S.euro;if(!E)return;
   const c=EURO_COMPS[E.comp],done=E.stage==="done",qual=E.stage==="qual";
@@ -20446,7 +20916,8 @@ function renderEuroScreen(){
        :`Csoportkör · ${E.md+1}/${EURO_SCHEDULE.length}. forduló`;
   $("euroHead").innerHTML=`<div style="font-family:var(--font-disp);font-size:20px;color:${c.col}">${c.n}</div>`
     +`<div style="font-size:12px;color:var(--dim);margin-top:2px">${stageTxt} · a keret és a taktika a szezonzáró állapoton fagyva</div>`
-    +(E.target!=null?`<div style="font-size:11.5px;color:var(--dim2);margin-top:3px">A sorozat mezőnye: <b style="color:${c.col}">${Math.round(E.target)}</b> — a bajnoki szinted (${oppTargetRating}) és a csapaterőd (${teamStrength().toFixed(1)}) közül a magasabbhoz igazítva, ${c.short}-szinttel.</div>`:"");
+    +(E.target!=null?`<div style="font-size:11.5px;color:var(--dim2);margin-top:3px">A sorozat mezőnye: <b style="color:${c.col}">${Math.round(E.target)}</b> — a bajnoki szinted (${oppTargetRating}) és a csapaterőd (${teamStrength().toFixed(1)}) közül a magasabbhoz igazítva, ${c.short}-szinttel.</div>`:"")
+    +mpCupHeadHtml();
   const nx=$("euroNext");
   if(done){
     let h="";
@@ -20566,6 +21037,9 @@ $("euroKickBtn")&&($("euroKickBtn").onclick=()=>{
     $("scEuro").classList.add("hide");
     $("scSim").classList.remove("hide");
     $("scSim").scrollIntoView({behavior:"smooth"});
+    /* KUPA-PÁRHARC: ha a társad az ellenfél, nem AI-t szimulálunk, hanem
+       ugyanaz a keretcsere fut le, mint a bajnoki párharcnál. */
+    if(mpCupDuelNow()&&!h2hScript){h2hBeginDuel();return;}
     playMatch();};
   if(!S.auto&&unavailableStarters().length){openAbsencePanel(go);return;}
   go();});
@@ -20578,6 +21052,11 @@ $("euroHubBtn")&&($("euroHubBtn").onclick=openHubMidSeason);
    E1: a kupa-motor még nem létezik, ezért egyelőre mindig átenged — a kapu
    maga viszont már a helyén van és mérhető. */
 function hubNextSeasonFlow(){
+  /* KÖZÖS KUPA: a nevezés kialkudása MEGELŐZI a sorozat indítását — és akkor is
+     lefut, ha én magam nem kvalifikáltam, mert a társam jogán bekerülhetek.
+     A kapu egyszer fut le szezononként (mpCupSettled), utána visszatér ide. */
+  if(h2hRoomActive()&&gameMode==="career"&&!S.euroOptOut&&!mpCupSettled()){
+    mpCupGate(()=>hubNextSeasonFlow());return;}
   if(euroPending()&&!S.euroOptOut&&typeof startEuroCampaign==="function"){
     startEuroCampaign();return;}
   hubShowSeasonReport();}
@@ -20869,6 +21348,8 @@ function startNextCareerSeason(){
   /* A nyári igazolási referencia is a lezárt szezonhoz tartozott — az új
      szezon mezőnyét már a szintalku adja, tehát itt el kell engedni. */
   S.mpSummerRef=null;
+  /* A közös kupanevezés szezononként új: a következő nyáron újra kell alkudni. */
+  S.mpCup=null;
   S.idx=0;S.W=0;S.D=0;S.L=0;S.GF=0;S.GA=0;S.pts=0;S.reds=0;S.injuries=0;S.capMod=0;S.eventMod=0;S.subs={};
   /* Új szezon: a tartós hiányzások is lezárulnak (a nyár elmossa a sárga/piros
      lapos eltiltást és a szezon közbeni sérüléseket). */
@@ -21091,7 +21572,7 @@ function saveGame(){
            döntés, a közös előzmény és az egymás elleni napló. */
         /* a szezonra rögzített rejtett ellenfél-erősítés (lásd seasonHiddenBonus) */
         oppBuffH:S.oppBuffH,
-        mpMateFinal:S.mpMateFinal,mpSummerRef:S.mpSummerRef,mpMateHalf:S.mpMateHalf,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
+        mpMateFinal:S.mpMateFinal,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
@@ -21320,6 +21801,8 @@ function applySavedGame(d){
   /* A nyári igazolási referencia befagyasztott értéke. Régi mentésben nincs —
      ott a mpSummerRefRating első hívása pótolja (lásd ott). */
   S.mpSummerRef=d.S.mpSummerRef||null;
+  /* A közös kupanevezés. Régi mentésben nincs → a nyári kapu kialkudja. */
+  S.mpCup=d.S.mpCup||null;
   S.mpMateHalf=d.S.mpMateHalf||null;
   S.leaveDeals=d.S.leaveDeals||[];
   S.halftimeSubs=!!d.S.halftimeSubs;
