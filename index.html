@@ -1746,7 +1746,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.79";
+const APP_VERSION="2.5.80";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4512,27 +4512,55 @@ function euroDominance(){
    aminek a FIX része (0.12/szint a 84 fölött) 110-es szinten már +3.1 —
    vagyis a "azonos szintű" mezőny valójában ERŐSEBB volt nálad.
 
-   Az új képlet három lépésből áll:
-     1) a növekedésedet a mezőny csak RÉSZBEN követi (EURO_GROWTH_SHARE),
-     2) a dominancia pontokban mért kedvezményt ad (EURO_DOM_DISCOUNT),
-     3) a rejtett erősítés FIX részét visszaadjuk, hogy a kiírt szám azt
-        jelentse, amivel ténylegesen szembekerülsz. (A MÉRT rész marad: az a
-        te rejtett előnyöd fele, annak van dolga a mezőnyben.)
-   A bajnoki szint így már nem alsó korlát — egy tarolással záruló szezon után
-   a kupamezőny alá is mehet. Aki viszont épphogy bekerült, annak marad a
-   régi, kőkemény menetelés. */
-const EURO_GROWTH_SHARE=0.15;   /* ennyivel kevésbé követi a mezőny a növekedésedet */
-const EURO_DOM_DISCOUNT=5;      /* teljes dominanciánál ennyi Rating-pont kedvezmény */
-function euroMidRating(){
+   Ezért NEM a mezőny szintjét találgatjuk, hanem megmondjuk, mekkora TÉNYLEGES
+   fölényt akarunk adni, és abból oldjuk vissza a mezőnyt. A fölény két részből
+   áll: egy mindenkinek járó alapból és a dominancia szerinti többletből — a
+   sorozat padlójáig (EURO_EDGE). Így a kiírt szám azt jelenti, amivel valóban
+   szembekerülsz, és semekkora dominancia nem tudja sétagaloppá tenni a kupát. */
+/* ---- KIHÍVÁSI PADLÓ SOROZATONKÉNT ----
+   A dominancia-kedvezmény a TROFEÁT tette elérhetővé, de a MECCSEKET nem
+   szabad elengednie: egy 110-es kerettel a 104-es BL-mezőny 6-0-s sétákat
+   termelt. Ezért minden sorozatnak van egy padlója — legfeljebb ENNYIVEL
+   lehetsz a mezőny fölött. A számok a sorozat rangját követik: a BL a
+   legszorosabb, a hazai kupa a legengedékenyebb.
+   Az érték a TÉNYLEGESEN kiírt mezőnyre (mid + oppDelta) értendő, ezért az
+   oppDelta is beleszámít a padló számításába. */
+/* ---- SOROZATONKÉNTI KIHÍVÁSI PADLÓ ----
+   add = mennyivel enged többet a sorozat eleve (a rangsor: a BL a legszorosabb),
+   cap = a MAXIMÁLIS tényleges fölény, akármekkora a dominanciád. Ez a padló:
+   ettől nem lehet 6-0-kkal letarolni egy mezőnyt.
+   Az add veszi át azt a szerepet, amit korábban az oppDelta játszott — a
+   középérték ugyanis pontosan a kívánt mezőnyre old meg, tehát az oppDelta
+   kiesne a képletből (lásd euroMidRating). */
+const EURO_EDGE={BL:{add:0,cap:4.5},EL:{add:1,cap:6},
+                 KL:{add:2,cap:7.5},MK:{add:3,cap:9}};
+function euroEdgeFor(comp,dom){
+  const e=EURO_EDGE[comp]||EURO_EDGE.BL;
+  return Math.min(EURO_BASE_EDGE+EURO_DOM_EDGE*dom+e.add,e.cap);}
+/* Mindenki kap egy alap-fölényt (különben a 13 meccses menetelés reménytelen),
+   a dominancia pedig efölé tesz — a sorozat padlójáig. */
+const EURO_BASE_EDGE=1.2, EURO_DOM_EDGE=3.5;
+/* ---- A MEZŐNY A TÉNYLEGES FÖLÉNYBŐL SZÁMOLÓDIK VISSZA ----
+   Nem a mezőny szintjét találgatjuk, hanem megmondjuk, MEKKORA FÖLÉNYT
+   akarunk adni, és abból oldjuk meg a mezőnyt. Így a kiírt szám pontosan azt
+   jelenti, amivel szembekerülsz — a rejtett erősítés MÉRT részét is beleértve:
+     a te meccs-erőd     = ts + hid
+     az ellenfél ereje   = f  + hid·M          (a fix rész a kupában kimarad)
+     fölény              = ts + hid·(1−M) − f
+   ebből f = ts + hid·(1−M) − fölény.
+   A HORGONY a csapaterőd, de nem eshet a bajnoki szint alá: enélkül egy
+   szándékosan gyengén kiállított kezdő 11-gyel (a mezőny a kampány indulásakor
+   épül fel) olcsó trófeát lehetne szerezni. */
+function euroMidRating(comp){
   const base=oppTargetRating||84;
   const ts=(typeof teamStrength==="function")?teamStrength():0;
-  const dom=euroDominance();
-  const grown=Math.max(0,ts-base);
-  let mid=base+grown*(1-EURO_GROWTH_SHARE*dom)-EURO_DOM_DISCOUNT*dom;
-  /* a rejtett erősítés fix, szint-arányos része — ezt a mezőny a meccsen úgyis
-     megkapja, tehát a kiírt középértékből levonjuk */
-  mid-=Math.max(0,(base-84)*OPP_BUFF_FIXED);
-  return Math.max(50,Math.round(mid));}
+  if(!(ts>0))return Math.max(50,Math.round(base));
+  const anchor=Math.max(ts,base);
+  const hid=(typeof seasonHiddenBonus==="function")?seasonHiddenBonus():0;
+  const edge=euroEdgeFor(comp||"BL",euroDominance());
+  const f=anchor+hid*(1-OPP_BUFF_MEASURED)-edge;
+  const d=(EURO_COMPS[comp]&&EURO_COMPS[comp].oppDelta)||0;
+  return Math.max(50,Math.round(f-d));}
 /* (A kvalifikáció a CUP_TIERS-ből jön — lásd cupEntryFor/euroQualifyFor fent.
    A régi, szintfüggetlen 1→BL / 2-3→EL / 4-5→KL szabály megszűnt: ma ez már
    csak a 100 fölötti sáv viselkedése.) */
@@ -4698,15 +4726,20 @@ function mpCupSettled(){return !!(S.mpCup&&S.mpCup.season===(S.seasonNumber||1))
    négy számból ugyanazt kapja, tehát a mezőny bitre azonos.
    (Régi mentés/kliens dominancia nélkül: 0-val számol, azaz a régi,
    kedvezmény nélküli viselkedést kapja — nem törik el semmi.) */
-function mpCupSharedMid(a,b,domA,domB){
+function mpCupSharedMid(a,b,domA,domB,comp){
   const base=oppTargetRating||84;
   const ts=Math.max((typeof a==="number"?a:0),(typeof b==="number"?b:0));
+  if(!(ts>0))return Math.max(50,Math.round(base));
   const dom=Math.max(0,Math.min(1,
     ((typeof domA==="number"?domA:0)+(typeof domB==="number"?domB:0))/2));
-  const grown=Math.max(0,ts-base);
-  let mid=base+grown*(1-EURO_GROWTH_SHARE*dom)-EURO_DOM_DISCOUNT*dom;
-  mid-=Math.max(0,(base-84)*OPP_BUFF_FIXED);
-  return Math.max(50,Math.round(mid));}
+  /* Ugyanaz a képlet, mint egyjátékosban (euroMidRating), az ERŐSEBB kerethez
+     horgonyozva és a két dominancia átlagával — így a sorozat egyikőtöknek sem
+     lesz sétagalopp. A rejtett bónusz kliensenként más, ezért a KÖZÖS
+     számításból kimarad: a mezőnynek bitre azonosnak kell lennie a két
+     képernyőn. */
+  const edge=euroEdgeFor(comp||"BL",dom);
+  const d=(EURO_COMPS[comp]&&EURO_COMPS[comp].oppDelta)||0;
+  return Math.max(50,Math.round(Math.max(ts,base)-edge-d));}
 let _mpCupBusy=false,_mpCupPoll=null;
 const MP_WAIT_CUP={mine:"A te nevezésed",opp:"A társad nevezése",
   cancel:"✕ Még maradok a HUB-ban"};
@@ -4770,7 +4803,7 @@ async function mpCupTick(key,myField,oppField,onReady){
       /* A KÖZÖS mezőny-célérték: ugyanaz a képlet, mint az euroMidRating-ben,
          de az ERŐSEBB keretre horgonyozva. Így a két kliens azonos mezőnyt
          épít, és a sorozat egyikőtöknek sem lesz sétagalopp. */
-      mid:mpCupSharedMid(mine.str,mate.str,mine.dom,mate.dom),
+      mid:mpCupSharedMid(mine.str,mate.str,mine.dom,mate.dom,r?r.comp:null),
       how:r?r.how:null,mineComp:r?r.mineComp:null,mateComp:r?r.mateComp:null};
     if(r){
       /* A közös sorozat FELÜLÍRJA a saját kvalifikációdat — ez a lényeg:
@@ -4938,7 +4971,7 @@ function buildEuroField(comp){
      közös (mpCupSharedMid), mert az euroMidRating a saját csapaterődből
      dolgozik, ami a két oldalon eltér. */
   const M=mpCup();
-  const target=((M&&M.mid!=null)?M.mid:euroMidRating())+c.oppDelta;
+  const target=((M&&M.mid!=null)?M.mid:euroMidRating(comp))+c.oppDelta;
   const cap=infinityMode?Infinity:RATING_CAP;
   const rnd=M?mpCupRng("field"):null;
   const rr=rnd||Math.random;
@@ -14547,8 +14580,18 @@ function playMatch(){
   /* REJTETT ELLENFÉL-ERŐSÍTÉS — lásd oppBuffFor(). Nem látszik a ratingben,
      csak a szimulációban; azt ellensúlyozza, amit a kijelzett csapaterő kihagy.
      KUPÁBAN a kupa SAJÁT szintjéhez mérjük, nem a bajnokihoz. */
-  const _buffLevel=(euroActive()&&S.euro&&S.euro.target!=null)?S.euro.target:oppTargetRating;
-  const hiddenOppBuff=oppBuffFor(_buffLevel,seasonHiddenBonus());
+  /* KUPÁBAN a SZINT-ARÁNYOS fix rész KIMARAD. A bajnokságban azért van, mert
+     ott az ellenfél egy csupasz szám, a te oldaladon viszont ott a sok rejtett
+     bónusz — a fix rész ezt a szint emelkedésével arányosan pótolja.
+     A kupamezőny viszont MÁR a te erődhöz van szabva (euroMidRating a tényleges
+     fölényre old meg), tehát ott ez dupla teher lenne: 150-es szinten +9-et
+     tett az ellenfélre, amitől a BL matematikailag megnyerhetetlenné vált — és
+     a kiírt mezőnyszám sem azt jelentette, amivel valóban szembekerültél.
+     A MÉRT rész (a rejtett előnyöd fele) marad: annak a kupában is van dolga. */
+  const _cup=euroActive()&&S.euro&&S.euro.target!=null;
+  const hiddenOppBuff=_cup
+    ?Math.max(0,seasonHiddenBonus()*OPP_BUFF_MEASURED)
+    :oppBuffFor(oppTargetRating,seasonHiddenBonus());
   /* A kupadöntő SEMLEGES pályán megy — sem hazai előny, sem idegenbeli hátrány. */
   /* A gólvárhatóságok a KÖZÖS matchLambdas-ból jönnek: család-specializáció,
      taktika-stílus és párkémia mind ott, változatlan sorrendben. Ugyanezt a
