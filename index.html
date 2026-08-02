@@ -1746,7 +1746,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.73";
+const APP_VERSION="2.5.74";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -12313,7 +12313,6 @@ function h2hSimulate(home,away){
   ev.push({min:0,type:"start",home:home.teamName,away:away.teamName});
   for(let t=1;t<=18;t++){
     const min=t*5;
-    if(min===50)ev.push({min:45,type:"half",hg,ag});
     const side=(who,lamTot,isHome)=>{
       const g=poisson(lamTot/18);
       for(let k=0;k<g;k++){
@@ -12326,10 +12325,15 @@ function h2hSimulate(home,away){
         ev.push({min:Math.max(1,min-Math.floor(Math.random()*5)),type:"goal",
           side:isHome?"home":"away",scorer:sc.n,assist:as?as.n:null,hg,ag});}};
     side(home,lamHome,true);
-    side(away,lamAway,false);}
+    side(away,lamAway,false);
+    /* A félidő a 9. tick VÉGÉN: ekkor van kész az 1-45. perc. */
+    if(min===45)ev.push({min:45,type:"half",hg,ag});}
   ev.push({min:90,type:"end",hg,ag});
-  /* a gólok percét utólag rendezzük, hogy az idővonal monoton legyen */
-  ev.sort((a,b)=>a.min-b.min||(a.type==="start"?-1:b.type==="start"?1:0));
+  /* A gólok percét utólag rendezzük, hogy az idővonal monoton legyen. Az azonos
+     percre eső eseményeknél a TÍPUS dönt: kezdőrúgás → gól → félidő → vége.
+     Enélkül egy pontosan 45. perces gól a FÉLIDŐ-sor UTÁN jelenhetne meg. */
+  const ord=e=>e.type==="start"?0:e.type==="goal"?1:e.type==="half"?2:3;
+  ev.sort((a,b)=>a.min-b.min||ord(a)-ord(b));
   /* az állást újraszámoljuk a rendezett sorrendben */
   let h=0,a2=0;
   ev.forEach(e=>{if(e.type==="goal"){if(e.side==="home")h++;else a2++;e.hg=h;e.ag=a2;}});
@@ -14055,7 +14059,8 @@ function playMatch(){
     /* az óra a fejlécben az aktuális 5-perces bucketet mutatja (a gólok saját,
        1-perc pontos bélyeget kapnak a gmin()-től) */
     updateTTBoard(fx,gf,ga,Math.min(90,min));
-    if(min===50)addLine(`FÉLIDŐ  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m draw");
+    /* (A FÉLIDŐ-sor a tick VÉGÉN áll, a 45. percnél — lásd ott. Itt, a tick
+       elején még a most következő vödör góljai hiányoznának alóla.) */
     if(min>90){clearInterval(iv);fullTime();return;}
     /* A 90+ hosszabbítási dráma eldől itt, de CSAK a bucket legvégén hajtjuk
        végre — különben a bucketben utána következő rendes (85-90 perces) gólok
@@ -14347,11 +14352,15 @@ function playMatch(){
     /* A késleltetett 90+ dráma MOST fut le — a bucket összes rendes (85-90
        perces) eseménye után, így mindig időrendben, utolsóként jelenik meg. */
     runPendingDrama();
-    /* ---- FÉLIDŐ: CSERESZÜNET ----
-       A bucket VÉGÉN állunk meg, hogy az 50. percig tartó események még
-       kimenjenek a naplóba. A párharc és az auto-mód kimarad (lásd a
-       félidei csere fejlécét). */
-    if(min===50&&halftimeSubsOn()&&!S.auto&&!DUEL&&iv){
+    /* ---- FÉLIDŐ A 45. PERCBEN ----
+       A motor 18 tickje 5 perces vödrökre oszlik, és a tick ELEJÉN a min már a
+       most következő vödörre mutat. A félidő tehát a 9. tick VÉGE: ekkor van
+       kész az 1-45. perc, és az óra is pontosan 45:00-t mutat. (Korábban a
+       félidő-sor a 10. tick elején állt — ugyanaz a pillanat, de az óra addigra
+       már 50:00-ra ugrott, ezért tűnt 50. percesnek.)
+       A sor és a csereszünet EGYÜTT áll itt, hogy a kettő ne csúszhasson szét. */
+    if(min===45)addLine(`FÉLIDŐ  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m draw");
+    if(min===45&&halftimeSubsOn()&&!S.auto&&!DUEL&&iv){
       clearInterval(iv);iv=null;
       sbClockPause();
       openHalftimeSubs(halftimeCtx(),()=>{sbClockResume();iv=setInterval(tickFn,tickMs);});
@@ -14359,7 +14368,7 @@ function playMatch(){
     /* PÁRHARCBAN a csereszünet elmarad — de ha a kapcsoló BE van kapcsolva, a
        felhasználó joggal várná. Ezért itt kimondjuk, miért nem jön: néma
        kimaradásból ugyanis hibára gyanakodna. */
-    if(min===50&&halftimeSubsOn()&&!S.auto&&DUEL)
+    if(min===45&&halftimeSubsOn()&&!S.auto&&DUEL)
       addLine(`⚔ A párharcban nincs csereszünet — a mérkőzés eseményei mindkét kliensen a KÖZÖS listából futnak, egy félidei csere nem tudná mozgatni az eredményt.`,"m ev");
   };
   iv=setInterval(tickFn,tickMs);
