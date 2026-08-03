@@ -1506,7 +1506,10 @@ button.infPanel:disabled{cursor:default}
 <!-- DIAGNOSZTIKA — a multi kezdőlap kémcső-gombjáról. Kigyűjti a hibakereséshez
      szükséges MP-állapotot MINDEN mentésből, vágólapra teszi, és kijelölhetően
      ki is írja (ha a vágólap-írás nem engedélyezett, kézzel másolható). -->
-<div class="hide" id="diagModal" style="position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:70;display:flex;align-items:center;justify-content:center;padding:14px">
+<!-- z-index 500: a kezdőlap (#mpEntry) 400-on ül, tehát 70-nel MÖGÉ került volna
+     — a felhasználó úgy látta, hogy "az SP-be nyílik", mert csak a kezdőlap
+     elhagyása után bukkant elő. -->
+<div class="hide" id="diagModal" style="position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:500;display:flex;align-items:center;justify-content:center;padding:14px">
   <div class="card" style="max-width:520px;width:100%;max-height:88vh;display:flex;flex-direction:column">
     <div class="steplbl" style="color:var(--gold)">🧪 Diagnosztika</div>
     <p style="font-size:12px;color:var(--dim);margin-top:2px">A közös kupa és a mentések állapota — ezt küldd el, ha valami beragadt.</p>
@@ -1777,7 +1780,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.98";
+const APP_VERSION="2.5.99";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -19731,8 +19734,11 @@ function infinityMainBody(){
     <div class="infWarn">⚠ <b>Vigyázat: nincs visszaút.</b> Az Infinity mód <b>végleges</b> — megnyitás után semmilyen módon nem kapcsolható vissza, és a karrier egyensúlya tartósan megváltozik.</div>
     <div class="infSub" style="margin-top:9px">Büdzséd: <b>${fmtFt(S.transferBudget)}</b></div>
   </div>`;}
-function infinityBuyMain(){infinityConfirm("∞ Infinity mód",infinityMainBody(),
-  INFINITY_PRICE,()=>{
+/* A MEGNYITÁS TÖRZSE. Külön függvény, mert KÉT útról hívjuk: az egyjátékos
+   vásárlásból és a közös karrier kézfogásából (mindkét fél befizetett). Így a
+   két ág bitre ugyanazt csinálja — egy MP-specifikus másolat előbb-utóbb
+   szétcsúszna az eredetitől. */
+function infinityApplyUnlock(){
     infinityMode=true;
     /* ---- A MEGLÉVŐ KERET HORGONYA ----
        A szint-követés (applyOwnedShift) attól a szinttől számol, ahol a
@@ -19792,7 +19798,86 @@ function infinityBuyMain(){infinityConfirm("∞ Infinity mód",infinityMainBody(
     updateOppRatingBadge();saveGame();
     /* A KARRIER VISSZATEKINTÉSE — ez a futás legfontosabb határköve, ezért
        teljes képernyős összegzést kap, nem csak egy napló-sort. */
-    showInfinityReport();});}
+    showInfinityReport();}
+/* ================= INFINITY KÖZÖS KARRIERBEN =================
+   Egyjátékosban az Infinity a te döntésed, és azonnal megnyílik. Közös
+   karrierben viszont a mezőny, a kupák és a párharcok is KÖZÖSEK — ha az egyik
+   fél egyedül oldaná fel a plafont, a másik ugyanabban a világban maradna
+   plafonnal, és a két keret menthetetlenül szétnőne. Ezért itt MINDKETTŐTÖKNEK
+   be kell fizetnie a teljes árat, és a mód csak akkor nyílik meg, amikor a
+   második befizetés is megérkezett.
+   A kézfogás ugyanazon a csatornán megy, mint a párharc-pillanatképek: a szoba
+   "infinity" rekesze alatt egy host és egy guest mező. A befizetés AZONNAL
+   levonódik és felmegy — onnantól a te oldaladon nincs mit visszavonni, tehát
+   a megerősítő ezt ki is mondja. */
+function mpInfinityKey(){return "infinity";}
+let _mpInfBusy=false,_mpInfPoll=null;
+function mpInfinityAbort(){
+  _mpInfBusy=false;
+  if(_mpInfPoll){clearTimeout(_mpInfPoll);_mpInfPoll=null;}
+  h2hWaitHide();}
+const MP_WAIT_INF={mine:"A te befizetésed",opp:"A társad befizetése",
+  cancel:"✕ Most nem várom meg"};
+async function mpInfinityBegin(){
+  if(_mpInfBusy)return;
+  _mpInfBusy=true;
+  const key=mpInfinityKey(),myField=MP.role==="host"?"host":"guest";
+  const oppField=myField==="host"?"guest":"host";
+  h2hWaitShow("INFINITY","Kapcsolódás a szobához…",false,false,MP_WAIT_INF);
+  $("h2hWaitErr").textContent="";
+  try{await mpNetInit();}catch(e){}
+  if(!_mpInfBusy)return;
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+  if(!_mpInfBusy)return;
+  /* A LEVONÁS NEM ITT TÖRTÉNIK: azt az infinityConfirm végzi el, mielőtt
+     idehív (S.transferBudget-=price). Ha itt is levonnánk, a közös karrier
+     KÉTSZER fizettetne. Itt már csak a befizetés TÉNYE megy fel a szobába. */
+  if(!node||!node[myField]){
+    addLine(`∞ Befizettél ${fmtFt(INFINITY_PRICE)}-ot az Infinity megnyitására — most a társadra vár.`,"m life");
+    try{saveGame();}catch(e){}
+    try{await mpBk().h2hPut(MP.activeRoom,key,myField,{paid:true,at:Date.now()});}
+    catch(e){$("h2hWaitErr").textContent="A befizetést nem sikerült elküldeni — újrapróbáljuk.";}}
+  if(!_mpInfBusy)return;
+  mpInfinityTick(key,myField,oppField);}
+async function mpInfinityTick(key,myField,oppField){
+  if(!_mpInfBusy)return;
+  if(_mpInfPoll){clearTimeout(_mpInfPoll);_mpInfPoll=null;}
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,key);}
+  catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
+  if(!_mpInfBusy)return;
+  /* elhasalt feltöltés pótlása — ugyanaz az elv, mint a kupa-kézfogásnál */
+  if(!(node&&node[myField])){
+    try{await mpBk().h2hPut(MP.activeRoom,key,myField,{paid:true,at:Date.now()});}catch(e){}
+    try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+    if(!_mpInfBusy)return;}
+  const mine=!!(node&&node[myField]),opp=!!(node&&node[oppField]);
+  if(mine&&opp){
+    mpInfinityAbort();
+    addLine(`∞ A társad is befizetett — az Infinity MINDKETTŐTÖKNEK megnyílik!`,"m life");
+    infinityApplyUnlock();
+    return;}
+  h2hWaitShow("INFINITY",
+    `<span class="h2hDot"></span>Befizetted a(z) ${fmtFt(INFINITY_PRICE)}-ot — `
+    +`${opp?"a társadé is megvan…":"most a társadra várunk, hogy ő is befizesse a maga részét."}`
+    +`<br><small style="color:var(--dim2)">A befizetésed a szobában marad: nyugodtan kiléphetsz, és amikor ő is fizet, nálad is megnyílik.</small>`,
+    mine,opp,MP_WAIT_INF);
+  _mpInfPoll=setTimeout(()=>mpInfinityTick(key,myField,oppField),2500);}
+$("h2hWaitCancelBtn")&&(function(){
+  /* a párharc- és a szezonzáró-kiút mellé az Infinity-várakozásé is */
+  const prev=$("h2hWaitCancelBtn").onclick;
+  $("h2hWaitCancelBtn").onclick=()=>{if(_mpInfBusy){mpInfinityAbort();return;}if(prev)prev();};})();
+function infinityBuyMain(){
+  /* KÖZÖS KARRIERBEN a megerősítő mást ígér, és más útra visz. */
+  if(typeof h2hRoomActive==="function"&&h2hRoomActive()){
+    infinityConfirm("∞ Infinity mód — közösen",
+      infinityMainBody()
+      +`<div class="infWarn">🤝 <b>Közös karrier:</b> az Infinity csak akkor nyílik meg, ha <b>MINDKETTEN</b> befizetitek a(z) ${fmtFt(INFINITY_PRICE)}-ot. A te részed azonnal levonódik és felmegy a szobába — <b>visszavonni nem lehet</b>. Ha a társad nem fizet be, a mód nem nyílik meg.</div>`,
+      INFINITY_PRICE,()=>{mpInfinityBegin();});
+    return;}
+  infinityConfirm("∞ Infinity mód",infinityMainBody(),
+    INFINITY_PRICE,()=>{infinityApplyUnlock();});}
 function infinityBuyTier(){infinityConfirm("∞ További szintek",
   `<div class="infPanel on">
     <div class="infHead"><span class="infTitle">∞ +${INFINITY_TIER_STEP} SZINT</span>
