@@ -1777,7 +1777,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.95";
+const APP_VERSION="2.5.96";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -11310,14 +11310,19 @@ function applyChallengeReward(rw){
     case "rosterUp":
       MAX_CAREER_ROSTER=Math.min(ROSTER_EXPAND_MAX,MAX_CAREER_ROSTER+2);
       return `keretméret most ${MAX_CAREER_ROSTER}`;
+    /* ---- KÁRTYA-FEJLESZTÉS ----
+       A SZEZONZÁRÓ kiértékelésnél NEM itt hajtjuk végre, hanem eltesszük: a
+       szezonkártyák ugyanennek a jelentésnek egy KÉSŐBBI lépésében születnek
+       (determineSeasonCards), és a fejlesztés csak utána értelmes. Enélkül
+       ugyanis a jutalom egy kártya nélküli játékost ezüstre emelt, akit pár
+       sorral később a szezonkártya amúgy is diamondra tett — a jutalom
+       nyomtalanul elveszett. Szezon KÖZBEN (rövid kihívás) marad az azonnali
+       végrehajtás: ott nincs mire várni. */
     case "cardUp":{
-      const cands=roster.filter(p=>careerPool&&careerPool[p.n]);
-      if(!cands.length)return "kártya-fejlesztés";
-      const p=pick(cands),e=careerPool[p.n];
-      const order=["silver","gold","diamond","stellar","mythic","killer","vandal","godlike"];
-      const cur=e.cardTier?order.indexOf(e.cardTier):-1;
-      e.cardTier=order[Math.min(order.length-1,cur+1)];
-      return `${shortName(p.n)} kártyája: ${cardTierLabel(e.cardTier)}`;}
+      if(_cardUpDefer){
+        S.pendingCardUps=(S.pendingCardUps||0)+1;
+        return "kártya-fejlesztés — a szezonkártyák kiosztása után";}
+      return applyOneCardUp()||"kártya-fejlesztés";}
     case "boostToken":
       S.boostTokens=(S.boostTokens||0)+1;
       return "1 ingyen boost-token";
@@ -11326,6 +11331,41 @@ function applyChallengeReward(rw){
       return "a következő igazolásod INGYEN (bármilyen típusú)";
   }
   return rw.desc||"";}
+/* Igaz, amíg a SZEZONZÁRÓ kihívás-kiértékelés fut — ilyenkor a
+   kártya-fejlesztés nem azonnal hajtódik végre, lásd a "cardUp" ágat. */
+let _cardUpDefer=false;
+const CARD_ORDER=["silver","gold","diamond","stellar","mythic","killer","vandal","godlike"];
+/* EGY kártya-fejlesztés végrehajtása. A jutalom neve azt ígéri, hogy FEJLESZT,
+   ezért elsősorban olyanra keresünk, akinek MÁR VAN kártyája — az idei
+   szezonkártyásokat előnyben részesítve (rájuk jön rá a +1). Kártya nélküli
+   játékos csak akkor kap, ha senkinek nincs — akkor viszont az ezüst is
+   nyereség. */
+function applyOneCardUp(preferNames){
+  const roster=(typeof fullCareerRoster==="function")?fullCareerRoster().filter(Boolean):[];
+  const withEntry=roster.filter(p=>careerPool&&careerPool[p.n]);
+  if(!withEntry.length)return "";
+  const hasCard=p=>!!(careerPool[p.n]&&careerPool[p.n].cardTier);
+  const fresh=preferNames?withEntry.filter(p=>preferNames.has(p.n)):[];
+  const carded=withEntry.filter(hasCard);
+  const pool=fresh.length?fresh:(carded.length?carded:withEntry);
+  const p=pick(pool),e=careerPool[p.n];
+  const before=e.cardTier||null;
+  const cur=before?CARD_ORDER.indexOf(before):-1;
+  e.cardTier=CARD_ORDER[Math.min(CARD_ORDER.length-1,cur+1)];
+  if(e.cardTier===before)return `${shortName(p.n)} kártyája már a csúcson van (${cardTierLabel(before)})`;
+  return `${shortName(p.n)} kártyája: ${before?cardTierLabel(before)+" → ":""}${cardTierLabel(e.cardTier)}`;}
+/* A szezonkártyák UTÁN esedékes fejlesztések beváltása. */
+function drainPendingCardUps(cardResults){
+  const n=S.pendingCardUps||0;
+  if(!n)return [];
+  S.pendingCardUps=0;
+  const fresh=new Set((cardResults||[]).map(r=>r.n));
+  const out=[];
+  for(let i=0;i<n;i++){
+    const txt=applyOneCardUp(fresh);
+    if(txt)out.push(txt);}
+  out.forEach(t=>addLine(`🃏 Kihívás-jutalom: ${t}`,"m life"));
+  return out;}
 /* ---- PUNISHMENT végrehajtás ---- */
 function applyChallengePunishment(pn){
   if(!pn)return "";
@@ -11876,6 +11916,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   grudge:new Set(),fixtures:[],playing:false,auto:false,
   mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
   mpMyFinal:null,     /* a SAJÁT záró csapaterő — a végső ítélet ebből dolgozik */
+  pendingCardUps:0,   /* kihívásból járó kártya-fejlesztés, a szezonkártyák utánra */
   /* A nyári igazolások referencia-szintje, a szezonzáráskor befagyasztva —
      {season,value}. Lásd mpSummerRefRating. */
   mpSummerRef:null,
@@ -22178,7 +22219,12 @@ function hubShowSeasonReport(){
        A +1 átadásával a kihívás PONTOSAN a saját szezonja végén, még ÉLŐ
        statisztikákkal zárul. A több szezonos (seasonSpan:2, érték N+2)
        kihívások nem záródnak korán: N+2 > N+1. */
-    evaluateDueChallenges("season",(S.seasonNumber||1)+1);
+    /* A kártya-fejlesztés jutalma ilyenkor NEM azonnal hajtódik végre — a
+       szezonkártyák pár lépéssel lentebb születnek, és a fejlesztésnek utánuk
+       van értelme (lásd a "cardUp" ágat és a drainPendingCardUps-t). */
+    _cardUpDefer=true;
+    try{evaluateDueChallenges("season",(S.seasonNumber||1)+1);}
+    finally{_cardUpDefer=false;}
     settleSkillFloor();   /* a szezonos skill-padló beváltása, ha maradt hiány */
   }
   const report=advanceCareerSeason();
@@ -22208,6 +22254,9 @@ function hubShowSeasonReport(){
         addLine(`💼 A befektetésed megtérült: +${fmtFt(S.investReturn)}.`,"m life");
         S.investReturn=0;}}}
   const cardResults=determineSeasonCards();
+  /* A kihívásból járó kártya-fejlesztés MOST fut le: a szezonkártyák már
+     kiosztódtak, tehát a +1 az idei kártyára jön rá, nem helyette. */
+  const cardUps=drainPendingCardUps(cardResults);
   let html="";
   /* ---- ARANYLABDA — a szezon egyéni csúcsdíja ----
      A verdiktben már nem szerepel (ott még hátravolt a kupa), itt viszont
@@ -22251,6 +22300,9 @@ function hubShowSeasonReport(){
      tartalmazza, ahol van ilyen), és a végállással. */
   html+=seasonChallengeSummaryHtml();
   html+=cardResultsHtml(cardResults);
+  if(cardUps.length)
+    html+=`<div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin:8px 0 5px">🃏 Kihívás-jutalom: kártya-fejlesztés</div>`
+      +cardUps.map(t=>`<div style="font-size:13px;margin-bottom:4px">${esc(t)}</div>`).join("");
   if(!html)html=`<div style="font-size:13px;color:var(--dim)">Csendes szezonváltás — mindenki maradt, senki sem vonult vissza.</div>`;
   /* FIX: az advanceCareerSeason() visszafordíthatatlanul öregíti a keretet,
      ezért a jelentés szövegét eltároljuk és MENTJÜK — újratöltéskor a
@@ -22590,7 +22642,7 @@ function saveGame(){
            döntés, a közös előzmény és az egymás elleni napló. */
         /* a szezonra rögzített rejtett ellenfél-erősítés (lásd seasonHiddenBonus) */
         oppBuffH:S.oppBuffH,
-        mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
+        mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,pendingCardUps:S.pendingCardUps,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
@@ -22832,6 +22884,7 @@ function applySavedGame(d){
   S.oppBuffH=(d.S.oppBuffH!=null)?d.S.oppBuffH:null;
   S.mpMateFinal=d.S.mpMateFinal||null;
   S.mpMyFinal=d.S.mpMyFinal||null;
+  S.pendingCardUps=d.S.pendingCardUps||0;
   /* A nyári igazolási referencia befagyasztott értéke. Régi mentésben nincs —
      ott a mpSummerRefRating első hívása pótolja (lásd ott). */
   S.mpSummerRef=d.S.mpSummerRef||null;
