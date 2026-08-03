@@ -1777,7 +1777,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.91";
+const APP_VERSION="2.5.92";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -21410,7 +21410,47 @@ function startEuroCampaign(opt){
     euroStartRound(MK_ROUNDS[0],S.euro.teams.map((t,i)=>i));}
   $("scHub").classList.add("hide");
   showEuroScreen();saveGame();}
+/* ================= FÉLBEHAGYOTT KÖR-LEZÁRÁS ÖNGYÓGYÍTÁSA =================
+   HIBA, amit ez javít — bejelentve a v2.5.91 diagnosztikából:
+   a kieséses kör lezárása (euroResolveRound) közös kupában megáll a beváró
+   képernyőn, és a továbblépést a mpCupTieSync onReady-je végzi. A képernyőt
+   viszont EL LEHET HAGYNI ("✕ Most nem folytatom" / "Vissza a kezdőlapra"),
+   és a h2hWaitLeave csak a mpCupTieAbort-ot hívja — az onReady SOSEM fut le.
+   Ilyenkor a kampány beragad: a párharc mindkét meccse le van játszva
+   (E.idx === legs), a győztes megvan, de a szakasz nem lép tovább. A kupa-
+   képernyőn ez "3/2. mérkőzés"-ként látszott, a Kezdőrúgás pedig egy nem
+   létező E.fixtures[2]-re mutatott.
+
+   A gyógyítás a kupa-képernyő MINDEN megnyitásakor lefut, ezért nemcsak ezt az
+   egy kiutat fedi le, hanem minden jövőbelit is: újratöltést, összeomlást,
+   megszakított hálózatot. A már beragadt mentések is meggyógyulnak tőle.
+
+   ŐRÖK: lezárt kampányon (stage "done", result vagy outAt) nem futhat, mert ott
+   az E.idx természetesen a legs fölött áll — enélkül végtelen ciklus lenne. */
+let _euroHealing=false;
+function euroHealPendingResolve(){
+  const E=S.euro;
+  if(!E||!E.stage)return false;
+  if(E.stage==="done"||E.result||E.outAt)return false;
+  if(E.stage==="qual"){
+    if((E.idx||0)<2)return false;
+    euroResolveQual();try{saveGame();}catch(e){}return true;}
+  if(E.stage==="group"){
+    if((E.md||0)<EURO_SCHEDULE.length)return false;
+    euroFinishGroupStage();try{saveGame();}catch(e){}return true;}
+  /* csak VALÓDI kieséses kör — ismeretlen szakaszra nem nyúlunk */
+  const RS=compRounds(E.comp)||[];
+  if(RS.indexOf(E.stage)<0)return false;
+  const legs=E.stage==="final"?1:2;
+  if((E.idx||0)<legs)return false;
+  euroResolveRound();try{saveGame();}catch(e){}return true;}
 function showEuroScreen(){
+  /* a gyógyítás elindíthat egy új beváró képernyőt vagy továbbléptethet — a
+     kupa-nézetet utána is felrajzoljuk, hogy sose maradjon félkész */
+  if(!_euroHealing){
+    _euroHealing=true;
+    try{euroHealPendingResolve();}catch(e){}
+    _euroHealing=false;}
   $("scSim").classList.add("hide");
   $("scEuro").classList.remove("hide");
   renderEuroScreen();
@@ -21611,6 +21651,23 @@ function renderEuroScreen(){
     if($("euroHubBtn"))$("euroHubBtn").classList.add("hide");
   }else{
     const fx=E.fixtures[E.idx];
+    /* ---- VÉDŐHÁLÓ: NINCS SORON KÖVETKEZŐ MÉRKŐZÉS ----
+       Ha a szakasz lezárása félbemaradt, az E.idx a fixture-lista VÉGÉN túlra
+       mutat. A régi kód ilyenkor a `fx.neutral`-on TypeError-t dobott, a render
+       félbeszakadt, és a képernyőn egy előző rajzolásból ottragadt Kezdőrúgás
+       gomb maradt — ez volt a bejelentett "beragadt a kupasorozat
+       kezdőrúgásánál". A gyógyítás (euroHealPendingResolve) ezt már a megnyitás
+       előtt rendezi; ez a háló arra az esetre van, ha mégis idáig jutnánk. */
+    if(!fx){
+      nx.innerHTML=`<div style="font-size:13px;color:var(--gold)">A kör lezárása félbemaradt</div>
+        <div style="font-size:12.5px;color:var(--dim);margin-top:4px;line-height:1.5">
+          Ennek a körnek minden mérkőzését lejátszottad, de a lezárás nem futott le végig.
+          Koppints a gombra, és a sorozat onnan folytatódik, ahol abbamaradt.</div>`;
+      $("euroKickBtn").classList.remove("hide");$("euroDoneBtn").classList.add("hide");
+      $("euroKickBtn").textContent="A kör lezárása →";
+      if($("euroHubBtn"))$("euroHubBtn").classList.toggle("hide",gameMode!=="career");
+      return;}
+    $("euroKickBtn").textContent="Kezdőrúgás";
     let extra="";
     if(ko&&E.idx===1){
       const t=E.ties[E.userTie],meIsA=t.a===E.userIdx,L=t.legs[0];
@@ -21685,6 +21742,12 @@ function renderEuroScreen(){
    legnagyobb tétű meccseken nem volt beleszólásod. Ugyanaz a kapu kerül ide:
    ha van hiányzó a kezdő 11-ben (és nem auto-mód megy), előbb a panel jön. */
 $("euroKickBtn")&&($("euroKickBtn").onclick=()=>{
+  /* FÉLBEMARADT KÖR-LEZÁRÁS: ilyenkor nincs mit lejátszani — a gomb a lezárást
+     futtatja le, nem egy nem létező mérkőzést. (A gomb felirata is ezt mondja,
+     lásd renderEuroScreen.) */
+  if(S.euro&&!(S.euro.fixtures||[])[S.euro.idx]){
+    if(euroHealPendingResolve())renderEuroScreen();
+    return;}
   const go=()=>{
     $("scEuro").classList.add("hide");
     $("scSim").classList.remove("hide");
