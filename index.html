@@ -1777,7 +1777,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.92";
+const APP_VERSION="2.5.93";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4732,6 +4732,76 @@ function mpCupActive(){
 function mpCupKey(){return "s"+(S.seasonNumber||1)+"cup";}
 /* Szakasz-kulcs a saját párharcom eredményének közzétételéhez. */
 function mpCupStageKey(stage){return "s"+(S.seasonNumber||1)+"cup"+stage;}
+/* ================= KÖZÖS KUPA: EGYÉNI STATISZTIKÁK =================
+   HIBA, amit ez javít: az E.stats a 32 csapatos mezőny statisztikája, DE a két
+   menedzser saját játékosai közül CSAK a sajátjai kerülnek bele (a
+   recordScorer/recordAssist a helyi kereten fut). A társ játékosai tehát
+   sosem jelentek meg a listán — és mivel a gólkirályt is ebből a táblából
+   választjuk, MINDKÉT kliens a saját legjobbját koronázta meg. Így lett két
+   aranycipős 14 és 21 góllal.
+
+   A MEGOLDÁS NEM ÚJ KÉZFOGÁS. Az imént javított beragadás pont abból jött,
+   hogy egy hálózati várakozás megszakítható volt — nem akarunk még egyet.
+   Ehelyett a saját soraink RÁÜLNEK a MÁR MEGLÉVŐ csere-pontokra (a csoportkör
+   és minden kieséses kör szinkronjára), amiket a két kliens amúgy is elvégez.
+   Így a kampány végére a társ adatai már ott vannak, hálózati többletlépés
+   nélkül. A legutolsó kör góljaihoz jön egy KEMÉNY IDŐKORLÁTOS kapu, ami
+   sikertelen hálózat esetén is TOVÁBBENGED (lásd mpCupStatsGate). */
+function mpCupOwnStatRows(){
+  const E=S.euro;if(!E||!E.stats)return [];
+  const out=[],seen={};
+  ["scorers","assists","cleanSheets"].forEach(kind=>{
+    Object.values(E.stats[kind]||{}).forEach(r=>{
+      if(!r||!r.own)return;
+      const k=euroStatKey(r.club,r.n);
+      if(seen[k])return;
+      seen[k]=true;
+      out.push({n:r.n,club:r.club,g:r.g||0,a:r.a||0,c:r.c||0});});});
+  return out;}
+/* A társ sorainak beolvasztása. A sorok ABSZOLÚT összegek, ezért felülírunk,
+   nem hozzáadunk — így egy kétszer megérkező rekord sem duplázza a gólokat.
+   own:false marad: a társ játékosa NEM szerezheti meg neked az arany-skillt. */
+function mpCupMergeMateStats(rows){
+  const E=S.euro;
+  if(!E||!E.stats||!Array.isArray(rows)||!rows.length)return 0;
+  let n=0;
+  rows.forEach(r=>{
+    if(!r||!r.n)return;
+    const club=String(r.club||"A társad").slice(0,40);
+    const name=String(r.n).slice(0,60);
+    const k=euroStatKey(club,name);
+    [["scorers","g"],["assists","a"],["cleanSheets","c"]].forEach(([kind,key])=>{
+      const v=Math.max(0,parseInt(r[key],10)||0);
+      const m=E.stats[kind]=E.stats[kind]||{};
+      if(!v){if(m[k]&&m[k].mate)delete m[k];return;}
+      m[k]={n:name,club,own:false,mate:true,g:0,a:0,c:0,...(m[k]&&m[k].mate?m[k]:{})};
+      m[k].n=name;m[k].club=club;m[k].own=false;m[k].mate=true;
+      m[k][key]=v;});
+    n++;});
+  return n;}
+/* ---- A ZÁRÓ EGYEZTETÉS, KEMÉNY IDŐKORLÁTTAL ----
+   A legutolsó kör eseményei még nincsenek kicserélve, ezért a kampány lezárása
+   ELŐTT egyszer megpróbáljuk. A kapu MINDIG továbbenged: siker esetén azonnal,
+   hálózati hiba vagy lassú válasz esetén az időkorlátnál. Beragadni tehát nem
+   tud — ez a tanulság a kupa-beváró hibájából. */
+const MP_CUP_STATS_MS=6000;
+function mpCupStatsGate(onReady){
+  if(!mpCupActive()||!MP.activeRoom){onReady();return;}
+  let done=false;
+  const finish=()=>{if(done)return;done=true;try{saveGame();}catch(e){}onReady();};
+  const timer=setTimeout(finish,MP_CUP_STATS_MS);
+  (async()=>{
+    try{
+      await mpNetInit();
+      const key=mpCupStageKey("stats"),myField=MP.role==="host"?"host":"guest";
+      const oppField=myField==="host"?"guest":"host";
+      let node=null;
+      try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+      await mpBk().h2hPut(MP.activeRoom,key,myField,{rows:mpCupOwnStatRows(),at:Date.now()});
+      try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+      if(node&&node[oppField]&&node[oppField].rows)mpCupMergeMateStats(node[oppField].rows);
+    }catch(e){}
+    clearTimeout(timer);finish();})();}
 /* A kupa nevesített véletlen-folyama. MINDEN MP-kupa sorsolás ezen megy át,
    hogy a két kliens ugyanazt a mezőnyt és ágat kapja. */
 function mpCupRng(tag){
@@ -4896,7 +4966,8 @@ async function mpCupGroupSync(onReady){
   let node=null;
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
   if(!_mpGroupBusy)return;
-  const myRows={rows:mpCupMyGroupRows()};
+  /* az egyéni statisztikák ide is ráülnek — lásd mpCupOwnStatRows */
+  const myRows={rows:mpCupMyGroupRows(),st:mpCupOwnStatRows()};
   await mpReput(key,myField,node,myRows);
   if(!_mpGroupBusy)return;
   mpCupGroupTick(key,myField,oppField,onReady,myRows);}
@@ -4914,6 +4985,7 @@ async function mpCupGroupTick(key,myField,oppField,onReady,myRows){
     try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
     if(!_mpGroupBusy)return;}
   const mine=node&&node[myField],mate=node&&node[oppField];
+  if(mate&&mate.st)mpCupMergeMateStats(mate.st);
   if(mine&&mate&&mate.rows){
     /* A társ csoportjának NÉGY sorát átvesszük — ettől lesz a két kliens
        nyolcaddöntő-sorsolása azonos. A csapatindexek egyeznek, mert a mezőnyt
@@ -5044,7 +5116,9 @@ async function mpCupTieSync(round,onReady){
   if(!_mpTieBusy)return;
   /* A saját rekord a HALADÁST is viszi: ebből derül ki a másik oldalon, hogy
      ELŐBBRE tartok-e — enélkül egy elcsúszott ág örök várakozás. */
-  const myRec={won:iWon,at:Date.now(),round,ri:mpCupRoundIdx(round)};
+  /* Az EGYÉNI STATISZTIKÁK ráülnek erre a már meglévő cserére — nem kell értük
+     külön kézfogás, és a kampány végére a társ adatai már megvannak. */
+  const myRec={won:iWon,at:Date.now(),round,ri:mpCupRoundIdx(round),st:mpCupOwnStatRows()};
   await mpReput(key,myField,node,myRec);
   if(!_mpTieBusy)return;
   mpCupTieTick(key,myField,oppField,round,onReady,myRec);}
@@ -5062,6 +5136,8 @@ async function mpCupTieTick(key,myField,oppField,round,onReady,myRec){
     try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
     if(!_mpTieBusy)return;}
   const mine=node&&node[myField],mate=node&&node[oppField];
+  /* a társ egyéni statisztikái — akkor is átvesszük, ha még várunk rá valamiért */
+  if(mate&&mate.st)mpCupMergeMateStats(mate.st);
   if(mine&&mate){
     const E=S.euro,mt=mpCupMateTie();
     if(mt>=0){
@@ -21258,7 +21334,23 @@ function euroEliminated(round,winners){
 /* A kampány EREDMÉNYE és a jutalmak. Pénz: a szezonbüdzsé szorzója (a
    felhasználó 40k/30k/15k arányai megőrizve). Champion-kártya és taktika-
    bónusz KIZÁRÓLAG a sorozatgyőztesnek. Az alsóbb szakaszok nem díjazottak. */
+/* A kampány lezárása KÖZÖS KUPÁBAN egy rövid, kemény időkorlátos egyeztetésen
+   megy át: az utolsó kör góljai még nincsenek kicserélve, azok nélkül viszont
+   rossz gólkirályt hirdetnénk. A kapu MINDIG továbbenged (lásd mpCupStatsGate),
+   tehát hálózathiba esetén sem tud beragadni — csak a társ utolsó köre marad ki
+   a listából. Az _euroEnding jelző kizárja a kétszeres lezárást. */
+let _euroEnding=false;
 function euroCampaignEnd(kind){
+  if(_euroEnding)return;
+  if(mpCupActive()&&!S.euro._statsSynced){
+    _euroEnding=true;
+    mpCupStatsGate(()=>{
+      _euroEnding=false;
+      if(S.euro)S.euro._statsSynced=true;
+      euroCampaignEnd(kind);});
+    return;}
+  euroCampaignEndNow(kind);}
+function euroCampaignEndNow(kind){
   const E=S.euro,c=EURO_COMPS[E.comp];
   E.stage="done";E.result=kind;
   /* Az elődöntő SOROZATONKÉNT más kulcs (európai: "sf", hazai kupa: "mk4"),
