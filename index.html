@@ -1777,7 +1777,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.94";
+const APP_VERSION="2.5.95";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4747,17 +4747,25 @@ function mpCupStageKey(stage){return "s"+(S.seasonNumber||1)+"cup"+stage;}
    Így a kampány végére a társ adatai már ott vannak, hálózati többletlépés
    nélkül. A legutolsó kör góljaihoz jön egy KEMÉNY IDŐKORLÁTOS kapu, ami
    sikertelen hálózat esetén is TOVÁBBENGED (lásd mpCupStatsGate). */
+/* HIBA, amit ez javít: a három statisztika HÁROM KÜLÖN térképen él
+   (stats.scorers / stats.assists / stats.cleanSheets), és mindegyikben SAJÁT
+   rekord tartozik a játékoshoz, amiben csak a saját számlálója van kitöltve —
+   egy 5 gólos, 3 gólpasszos játékosnál a scorers-rekord {g:5,a:0,c:0}, az
+   assists-rekord {g:0,a:3,c:0}.
+   A régi kód a scorers-ből vette ki a sort (a:0-val!), a `seen` őrrel pedig
+   KIHAGYTA ugyanannak a játékosnak az assists-rekordját. Így a gólok átmentek,
+   a gólpasszok és a tiszta lapok viszont nullaként utaztak — pontosan ezért
+   dőlt el helyesen az aranycipő, és rosszul az aranypasszok meg az
+   aranykesztyű. A sort ezért mind a három térképből ÖSSZERAKJUK. */
 function mpCupOwnStatRows(){
   const E=S.euro;if(!E||!E.stats)return [];
-  const out=[],seen={};
-  ["scorers","assists","cleanSheets"].forEach(kind=>{
-    Object.values(E.stats[kind]||{}).forEach(r=>{
+  const acc={};
+  [["scorers","g"],["assists","a"],["cleanSheets","c"]].forEach(([kind,key])=>{
+    Object.entries(E.stats[kind]||{}).forEach(([k,r])=>{
       if(!r||!r.own)return;
-      const k=euroStatKey(r.club,r.n);
-      if(seen[k])return;
-      seen[k]=true;
-      out.push({n:r.n,club:r.club,g:r.g||0,a:r.a||0,c:r.c||0});});});
-  return out;}
+      const row=acc[k]=acc[k]||{n:r.n,club:r.club,g:0,a:0,c:0};
+      row[key]=r[key]||0;});});
+  return Object.values(acc);}
 /* A társ sorainak beolvasztása. A sorok ABSZOLÚT összegek, ezért felülírunk,
    nem hozzáadunk — így egy kétszer megérkező rekord sem duplázza a gólokat.
    own:false marad: a társ játékosa NEM szerezheti meg neked az arany-skillt. */
@@ -4907,6 +4915,9 @@ async function mpCupTick(key,myField,oppField,onReady,myEntry){
       comp:r?r.comp:null,qual:r?r.qual:false,
       mateName:String(mate.teamName||"A társad").replace(/[<>&]/g,"").slice(0,40),
       mateOvr:(typeof mate.ovr==="number")?mate.ovr:null,
+      /* a KIJELZETT (boostos) csapaterő — a nevezés amúgy is átküldi (str),
+         eddig csak a közös mezőny számításához használtuk */
+      mateStr:(typeof mate.str==="number")?mate.str:null,
       /* A KÖZÖS mezőny-célérték: ugyanaz a képlet, mint az euroMidRating-ben,
          de az ERŐSEBB keretre horgonyozva. Így a két kliens azonos mezőnyt
          épít, és a sorozat egyikőtöknek sem lesz sétagalopp. */
@@ -5233,8 +5244,14 @@ function buildEuroField(comp){
   teams.push({n:teamName,you:true,sq:null,ovr:teamOVRbase()});
   /* A TÁRS csapata valódi résztvevő: a saját nevével és a szezonzáró
      csapaterejével kerül a mezőnybe, nem AI-ként. */
+  /* Az ovr a NYERS (csontváz) erő — ez a szimuláció közös skálája, ezen mérik
+     magukat az AI-k is, ezért ezt NEM változtatjuk. A KIJELZÉSHEZ viszont a
+     boostokkal számolt csapaterő kell (dispOvr): a "következő mérkőzés" doboz
+     a saját oldaladon teamStrength()-et ír, tehát a társad nyers száma mellette
+     rendszeresen gyengébbnek mutatta őt a valóságosnál. */
   if(M)teams.push({n:M.mateName||"A társad",mate:true,you:false,sq:null,
-    ovr:Math.max(50,Math.min(cap,M.mateOvr||target))});
+    ovr:Math.max(50,Math.min(cap,M.mateOvr||target)),
+    dispOvr:(typeof M.mateStr==="number")?M.mateStr:null});
   /* KALAPOS beosztás: erősség szerint 4 kalap, minden csoportba kalaponként
      egy csapat — így minden négyesben van erős és gyengébb ellenfél is. */
   /* MP: a kalapsorrendnek DÖNTETLENNÉL is kliensfüggetlennek kell lennie.
@@ -5908,7 +5925,15 @@ function emitMeasure(kind,name,val,minTxt){
   const txt=(kind==="sprint"?SPRINT_TXT:SHOT_TXT);
   const unit=kind==="sprint"?"km/h végsebesség":"km/h lövéserő";
   const r=recordMeasure(kind==="sprint"?"topSpeed":"topShot",name,val);
+  /* A REKORD-SOR CSAK A MÉRÉS UTÁN. A szenzor-sor budgetelt, a rekord-sor nem
+     volt az — így megeshetett, hogy a "ÚJ EGYÉNI REKORD! …35,8 km/h" ott állt
+     a naplóban, miközben a mérésről szóló sort a keret elnyelte, és semmi nem
+     magyarázta, honnan jött a szám. A rekordot ezért csak akkor írjuk ki, ha a
+     mérés maga is kifért. (A rekord MAGA természetesen akkor is rögzül, ha a
+     sor nem fért ki — a recordMeasure fentebb már elmentette.) */
+  const shown=goalNoteLeft>0;
   addLine(`${minTxt}📡 ${txt[Math.floor(Math.random()*txt.length)](nm,val)}`,"m skillnote",true);
+  if(!shown)return;
   if(r.best&&r.prev>0)
     addLine(`→ 🏅 ÚJ EGYÉNI REKORD! ${nm} eddigi csúcsa ${r.prev} volt — ez ${val} ${unit}.`,"m mvp");
   else if(r.best)
@@ -11850,6 +11875,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   morale:50,moraleTarget:50,moraleSum:0,moraleSamples:0,scorers:{},assists:{},mvps:{},goodForm:{},badForm:{},playerReds:{},playerInjuries:{},careerStats:{},clubScoutSpinsUsed:0,consecutiveTitles:0,consecutiveBadSeasons:0,seasonSaves:{},seasonCleanSheets:{},seasonMatches:{},seasonNumber:1,seasonHistory:[],
   grudge:new Set(),fixtures:[],playing:false,auto:false,
   mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
+  mpMyFinal:null,     /* a SAJÁT záró csapaterő — a végső ítélet ebből dolgozik */
   /* A nyári igazolások referencia-szintje, a szezonzáráskor befagyasztva —
      {season,value}. Lásd mpSummerRefRating. */
   mpSummerRef:null,
@@ -12545,7 +12571,7 @@ updateMatchSpeedUI();
    elveszett a szövegfalban. A budgeted=true jelzővel érkező sorok ebből a
    keretből fogyasztanak; ami nem fér bele, némán kimarad. A sorrend adja a
    rangsort: ami előbb próbál megszólalni, az kap helyet. */
-const GOAL_NOTE_BUDGET=2;
+const GOAL_NOTE_BUDGET=3;
 /* F7: A PÁRHARC BŐKEZŰBB KÖZVETÍTÉST KAP.
    Ez a szezon két csúcspontja, fix 0,25-ös tempóval — ott van idő olvasni, és
    ott számít a hangulat. A gólonkénti ízesítő-keret tágabb, a hangulat-sorok
@@ -13921,9 +13947,14 @@ async function mpSyncSeasonEnd(){
   try{await mpNetInit();}catch(e){}
   let node=null;
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){return false;}
-  /* A sajátunkat egyszer tesszük fel — a szezon már lezárult, nem változhat. */
+  /* A sajátunkat egyszer tesszük fel — a szezon már lezárult, nem változhat.
+     A SAJÁT ZÁRÓ CSAPATERŐT is eltesszük: a végső ítélet ebből dolgozik, nem az
+     élő teamStrength()-ből (lásd mpMyFinalStrength). */
   if(!node||!node[myField]){
-    try{await mpBk().h2hPut(MP.activeRoom,key,myField,mpSeasonReport());}catch(e){}
+    const rep=mpSeasonReport();
+    S.mpMyFinal={season:(S.seasonNumber||1),
+      strength:(rep&&rep.stats&&rep.stats.strength)||teamStrength()};
+    try{await mpBk().h2hPut(MP.activeRoom,key,myField,rep);}catch(e){}
     try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}}
   if(node&&node[oppField]){
     S.mpMateFinal={season:(S.seasonNumber||1),rep:node[oppField]};
@@ -13979,9 +14010,24 @@ function mpMyStrength(){return teamStrength();}
 function mpMateStrength(){
   const r=mpMateFinal();
   return (r&&r.stats&&typeof r.stats.strength==="number")?r.stats.strength:null;}
+/* ---- A SAJÁT ZÁRÓ CSAPATERŐ ----
+   HIBA, amit ez javít: az ítélet a SAJÁT oldalon ÉLŐ teamStrength()-et
+   hasonlította a társ BEFAGYOTT, szezonzáráskori számához. A végső összesítő
+   viszont a szezonjelentés UTÁN jelenik meg, amikor az advanceCareerSeason()
+   már megöregítette a keretet (és a visszavonulók is kiestek) — vagyis a
+   MINDKÉT oldalon lecsökkent élő érték állt szemben a másik régi, magasabb
+   számával. Mindkét kliens ugyanarra jutott: "a társad nyerte a párharcot".
+   Ezért mindketten vesztesek lettek.
+   Mostantól a saját oldalon is a ZÁRÓ érték számít — ugyanaz a két szám a két
+   képernyőn, tehát az ítélet szimmetrikus. Ha nincs eltéve (régi mentés), az
+   élő érték a tartalék. */
+function mpMyFinalStrength(){
+  const m=S.mpMyFinal;
+  return (m&&m.season===(S.seasonNumber||1)&&typeof m.strength==="number")
+    ?m.strength:teamStrength();}
 /* A párharc állása a csapaterők alapján. */
 function mpDuelStanding(){
-  const mine=mpMyStrength(),mate=mpMateStrength();
+  const mine=mpMyFinalStrength(),mate=mpMateStrength();
   if(mate==null)return null;
   const gap=mine-mate;
   return {mine,mate,gap,
@@ -15265,6 +15311,16 @@ function playMatch(){
       /* a táblára SZÁNDÉKOSAN csak a gólszerző kerül fel — a gólpasszt a valódi
          eredményjelzők sem vezették, és itt is csak zsúfolttá tenné a sávot */
       sbEv("us","goal",scorer.n,goalMin);
+      /* ---- A MŰSZEREK — A GÓL-BLOKK ELEJÉN ----
+         Saját, ritka eséllyel szólalnak meg (SPEED_MEAS_CHANCE), és a gólonkénti
+         ízesítő-keretből fogyasztanak. A blokk VÉGÉN álltak, és mivel épp az a
+         játékos váltja ki őket, aki a saját skilljéről szóló sorokat is elsüti
+         (Szitálós, Ágyúgolyó, goalw-skill), a keret rendre elfogyott előlük:
+         200 000 dobáson mérve a mérések 51-88%-a némán kimaradt — kész
+         párkémiás csatárnál a tervezett 10% helyett 1,2% jutott ki.
+         Elöl a ritka, konkrét szám kap elsőbbséget a rutin-mondatok előtt. */
+      trySprintMeasure(scorer.n,asstName,`${goalMin}'  `);
+      tryShotMeasure(scorer.n,`${goalMin}'  `);
       /* KARRIER-MÉRFÖLDKÖVEK a gólnál. A gólszerző ELŐBB: ha ugyanaz a történet
          (pl. ifi-mérföldkő) mindkettőre állna, a gólé az elsőbbség. */
       mileEffective(MILE,scorer.n,"goal",`${sbMinTxt(goalMin)}  `);
@@ -15365,12 +15421,7 @@ function playMatch(){
       if(!paceFlavorShown){
         const paceLine=pickPaceFlavor(scorer.n,asstName);
         if(paceLine){paceFlavorShown=true;addLine(`→ ${paceLine}`,"m skillnote",true);}}
-      /* ---- A MŰSZEREK ----
-         A hangulat-sortól FÜGGETLENÜL, saját eséllyel: a gyorsaság-skillnél a
-         mért végsebesség, a lövéserő-skilleknél a lövés sebessége. A kettő
-         közül meccsenként is jöhet mindkettő — más játékosról szólnak. */
-      trySprintMeasure(scorer.n,asstName,`${goalMin}'  `);
-      tryShotMeasure(scorer.n,`${goalMin}'  `);}
+}
     /* PÁRHARCBAN a kapott gólok is a közös listából jönnek — és a gólszerző a
        társad VALÓDI játékosa, nem egy hangulatnév. */
     const duelOpp=DUEL?(duelBkt.opp[min/5]||[]):null;
@@ -21893,7 +21944,9 @@ function renderEuroScreen(){
       extra+=`<div style="font-size:12px;color:var(--gold);margin-top:5px">🎫 Selejtező — a főtáblára jutásért. ${EURO_DROP[E.comp]?`Bukásnál a(z) ${EURO_COMPS[EURO_DROP[E.comp]].n} főtábláján folytatjátok.`:"Bukásnál nincs kupa ebben a szezonban."} <span style="color:var(--dim2)">Itt semmilyen fejlődés nem történik.</span></div>`;}
     nx.innerHTML=`<div style="font-size:13px;color:var(--dim)">Következő mérkőzés</div>
       <div style="font-size:15px;font-weight:700;margin-top:2px">${fx.neutral?"⚖️ Semleges pálya":fx.home?"🏠 Hazai pálya":"✈️ Idegenben"} — ${esc(fx.o.n)}</div>
-      <div style="font-size:12px;color:var(--dim);margin-top:2px">Ellenfél ereje: ${Math.round(fx.o.ovr)} · a ti csapaterőtök: ${teamStrength().toFixed(1)}</div>${extra}`;
+      <div style="font-size:12px;color:var(--dim);margin-top:2px">Ellenfél ereje: ${
+        (fx.o&&typeof fx.o.dispOvr==="number")?fx.o.dispOvr.toFixed(1):Math.round(fx.o.ovr)
+      } · a ti csapaterőtök: ${teamStrength().toFixed(1)}</div>${extra}`;
     $("euroKickBtn").classList.remove("hide");$("euroDoneBtn").classList.add("hide");
     if($("euroHubBtn"))$("euroHubBtn").classList.toggle("hide",gameMode!=="career");
   }
@@ -22537,7 +22590,7 @@ function saveGame(){
            döntés, a közös előzmény és az egymás elleni napló. */
         /* a szezonra rögzített rejtett ellenfél-erősítés (lásd seasonHiddenBonus) */
         oppBuffH:S.oppBuffH,
-        mpMateFinal:S.mpMateFinal,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
+        mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
@@ -22778,6 +22831,7 @@ function applySavedGame(d){
      képlethez képest ez azonnali könnyítés a futó karriereknek is. */
   S.oppBuffH=(d.S.oppBuffH!=null)?d.S.oppBuffH:null;
   S.mpMateFinal=d.S.mpMateFinal||null;
+  S.mpMyFinal=d.S.mpMyFinal||null;
   /* A nyári igazolási referencia befagyasztott értéke. Régi mentésben nincs —
      ott a mpSummerRefRating első hívása pótolja (lásd ott). */
   S.mpSummerRef=d.S.mpSummerRef||null;
