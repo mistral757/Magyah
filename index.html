@@ -1751,7 +1751,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.88";
+const APP_VERSION="2.5.89";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4941,8 +4941,24 @@ function mpCupMateTie(){
 let _mpTieBusy=false,_mpTiePoll=null;
 const MP_WAIT_TIE={mine:"A te párharcod",opp:"A társad párharca",
   cancel:"✕ Most nem folytatom"};
+/* Ennyi várakozás után ajánljuk fel a kézi továbblépést. Nem rövid: amíg a
+   hálózat él, az automatikus felismerés úgyis előbb megoldja — ez a végső
+   háló arra az esetre, amikor semmi nem válaszol. */
+const MP_TIE_FORCE_MS=45000;
+let _mpTieWaitStart=0;
+/* ---- DIAGNOSZTIKA A BEVÁRÓ KÉPERNYŐN ----
+   A beragadás eddig NÉMA volt: a felhasználó annyit látott, hogy vár. Ez a sor
+   kiírja azt a néhány adatot, amiből utólag rekonstruálható, hol csúszott szét
+   a két ág — és ugyanez olvasható ki a mentésből is (S.euro + S.mpCup). */
+function mpCupDiagText(round,mine,mate){
+  const E=S.euro||{},C=S.mpCup||{};
+  const mt=(typeof mpCupMateTie==="function")?mpCupMateTie():-1;
+  return `szerep ${MP.role||"?"} · szoba ${MP.activeRoom||"?"} · ${C.comp||"?"} `
+    +`· kör ${round} (${E.stage||"?"}) · a te párharcod #${E.userTie} · a társé #${mt}`
+    +` · társ-index ${E.mateIdx==null?"nincs":E.mateIdx}${E.mateOut?" · társ kiesett: "+E.mateOut:""}`
+    +` · rekesz: te ${mine?"kész":"üres"} / ő ${mate?"kész":"üres"}`;}
 function mpCupTieAbort(){
-  _mpTieBusy=false;
+  _mpTieBusy=false;_mpTieWaitStart=0;
   if(_mpTiePoll){clearTimeout(_mpTiePoll);_mpTiePoll=null;}
   h2hWaitHide();}
 /* Kell-e egyáltalán cserélni ebben a körben? */
@@ -5025,11 +5041,34 @@ async function mpCupTieTick(key,myField,oppField,round,onReady,myRec){
       mpCupTieAbort();
       try{saveGame();}catch(e){}
       onReady();return;}}
+  /* ---- HÁLÓZATFÜGGETLEN KIÚT ----
+     A fenti "a társ már előrébb tart" felismerés HÁLÓZATI OLVASÁSRA épül: a
+     későbbi körök rekeszeit kérdezi le. Épp akkor nem működik, amikor a
+     legnagyobb szükség lenne rá — tartós hálózathibánál minden olvasás elhasal,
+     az `ahead` null marad, és a képernyő megint örökre áll. Ezért a várakozás
+     egy ideje után a felhasználó KÉZZEL is továbbléphet: a döntés az övé, és
+     semmilyen hálózatot nem igényel. A sorozat ilyenkor a helyi (seedelt) ágon
+     megy tovább, a társ sorsát az viszi — ugyanaz, mint az automatikus kiútnál. */
+  _mpTieWaitStart=_mpTieWaitStart||Date.now();
+  const waited=Date.now()-_mpTieWaitStart;
   h2hWaitShow(EURO_ROUND_NAMES[round]||"KUPAKÖR",
     `<span class="h2hDot"></span>${mine?"A párharcod lezárva":"Küldés…"} — ${
       mate?"a társadé is megvan…":"várunk a társadra, hogy ő is lejátssza ezt a kört."}
-     <br><small style="color:var(--dim2)">Amíg mindketten versenyben vagytok, a kör végén meg kell várni egymást — így nem csúszhat szét az ág.</small>`,
+     <br><small style="color:var(--dim2)">Amíg mindketten versenyben vagytok, a kör végén meg kell várni egymást — így nem csúszhat szét az ág.</small>
+     <br><small style="color:var(--dim2);opacity:.8">${esc(mpCupDiagText(round,!!mine,!!mate))}</small>`,
     !!mine,!!mate,MP_WAIT_TIE);
+  {const ob=$("h2hWaitOrphanBtn");
+   if(ob&&waited>=MP_TIE_FORCE_MS){
+     ob.classList.remove("hide");ob.disabled=false;
+     ob.textContent="⏭ Nem várok tovább — folytatom egyedül";
+     ob.onclick=()=>{
+       ob.disabled=true;
+       const E=S.euro;
+       if(E)E.mateOut=round;
+       addLine(`⚔ Nem vártad meg a társadat a(z) ${EURO_ROUND_NAMES[round]||round} körben — a sorozatod innentől külön megy tovább, a társad sorsát a helyi ág viszi.`,"m life");
+       mpCupTieAbort();
+       try{saveGame();}catch(e){}
+       onReady();};}}
   _mpTiePoll=setTimeout(()=>mpCupTieTick(key,myField,oppField,round,onReady,myRec),2500);}
 /* A MEZŐNY felépítése: 31 klub + a user, kalapos sorsolással 8 csoportba.
    KÖZÖS KUPÁBAN 30 klub + a user + a TÁRS — a mezőny mérete változatlan 32,
