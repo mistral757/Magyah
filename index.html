@@ -1751,7 +1751,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.87";
+const APP_VERSION="2.5.88";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4772,8 +4772,7 @@ async function mpCupGate(onReady){
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
   if(!_mpCupBusy)return;
   /* A saját nevezés egyszer megy fel, és onnantól az a hivatalos. */
-  if(!node||!node[myField]){
-    try{await mpBk().h2hPut(MP.activeRoom,key,myField,{
+  const myEntry={
       comp:S.euroCurrent||null,qual:!!S.euroCurrentQual,
       teamName:String(teamName||"A társad").slice(0,40),
       ovr:Math.round(teamOVRbase()),
@@ -4787,16 +4786,23 @@ async function mpCupGate(onReady){
          mezőny a KETTŐTÖK átlagából épül, hogy egyikőtöknek se legyen
          sétagalopp, se reménytelen menetelés. */
       dom:Math.round(euroDominance()*1000)/1000,
-      at:Date.now()});}
-    catch(e){$("h2hWaitErr").textContent="A nevezést nem sikerült elküldeni — újrapróbáljuk.";}}
-  mpCupTick(key,myField,oppField,onReady);}
-async function mpCupTick(key,myField,oppField,onReady){
+      at:Date.now()};
+  await mpReput(key,myField,node,myEntry);
+  if(!_mpCupBusy)return;
+  mpCupTick(key,myField,oppField,onReady,myEntry);}
+async function mpCupTick(key,myField,oppField,onReady,myEntry){
   if(!_mpCupBusy)return;
   if(_mpCupPoll){clearTimeout(_mpCupPoll);_mpCupPoll=null;}
   let node=null;
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}
   catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
   if(!_mpCupBusy)return;
+  /* elhasalt feltöltés pótlása — lásd mpReput */
+  if(myEntry&&!(node&&node[myField])){
+    await mpReput(key,myField,node,myEntry);
+    if(!_mpCupBusy)return;
+    try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+    if(!_mpCupBusy)return;}
   const mine=node&&node[myField],mate=node&&node[oppField];
   if(mine&&mate){
     const r=mpResolveCup(mine,mate);
@@ -4832,7 +4838,7 @@ async function mpCupTick(key,myField,oppField,onReady){
       mate?"a társadé is megvan, számolunk…":"várunk a társadra. Nyugodtan lépj ki, a nevezésed megmarad."}
      <br><small style="color:var(--dim2)">A te kvalifikációd: <b>${S.euroCurrent?EURO_COMPS[S.euroCurrent].n:"nem kvalifikáltál"}</b></small>`,
     !!mine,!!mate,MP_WAIT_CUP);
-  _mpCupPoll=setTimeout(()=>mpCupTick(key,myField,oppField,onReady),2000);}
+  _mpCupPoll=setTimeout(()=>mpCupTick(key,myField,oppField,onReady,myEntry),2000);}
 /* ---- CSOPORTTÁBLA-CSERE ----
    A csoportkör végén a te csoportod tábláját ÉLŐBEN játszottad ki, a társadét
    viszont a te klienseden csak szimuláltuk (és fordítva) — a két oldal képe
@@ -4864,17 +4870,23 @@ async function mpCupGroupSync(onReady){
   let node=null;
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
   if(!_mpGroupBusy)return;
-  if(!node||!node[myField]){
-    try{await mpBk().h2hPut(MP.activeRoom,key,myField,{rows:mpCupMyGroupRows()});}
-    catch(e){$("h2hWaitErr").textContent="A csoportod tábláját nem sikerült elküldeni — újrapróbáljuk.";}}
-  mpCupGroupTick(key,myField,oppField,onReady);}
-async function mpCupGroupTick(key,myField,oppField,onReady){
+  const myRows={rows:mpCupMyGroupRows()};
+  await mpReput(key,myField,node,myRows);
+  if(!_mpGroupBusy)return;
+  mpCupGroupTick(key,myField,oppField,onReady,myRows);}
+async function mpCupGroupTick(key,myField,oppField,onReady,myRows){
   if(!_mpGroupBusy)return;
   if(_mpGroupPoll){clearTimeout(_mpGroupPoll);_mpGroupPoll=null;}
   let node=null;
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}
   catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
   if(!_mpGroupBusy)return;
+  /* elhasalt feltöltés pótlása — lásd mpReput */
+  if(myRows&&!(node&&node[myField])){
+    await mpReput(key,myField,node,myRows);
+    if(!_mpGroupBusy)return;
+    try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+    if(!_mpGroupBusy)return;}
   const mine=node&&node[myField],mate=node&&node[oppField];
   if(mine&&mate&&mate.rows){
     /* A társ csoportjának NÉGY sorát átvesszük — ettől lesz a két kliens
@@ -4891,7 +4903,7 @@ async function mpCupGroupTick(key,myField,oppField,onReady){
       mate?"a társadé is megvan, jöhet a sorsolás…":"várunk a társadra, hogy ő is végigjátssza a csoportkörét."}
      <br><small style="color:var(--dim2)">A nyolcaddöntő párosításához mindkét csoportnak le kell zárulnia.</small>`,
     !!mine,!!(mate&&mate.rows),MP_WAIT_GROUP);
-  _mpGroupPoll=setTimeout(()=>mpCupGroupTick(key,myField,oppField,onReady),2500);}
+  _mpGroupPoll=setTimeout(()=>mpCupGroupTick(key,myField,oppField,onReady,myRows),2500);}
 /* ---- A TÁRS SORSA A KIESÉSES ÁGON ----
    A társ párharcát a te klienseden csak SZIMULÁLNÁNK (AI-ként), a valóságban
    viszont ő élőben játssza — a két oldal képe tehát elcsúszna, és a végén más
@@ -4902,6 +4914,26 @@ async function mpCupGroupTick(key,myField,oppField,onReady){
    egy sima AI, akinek az útja seedelt, tehát mindkét kliensen azonos.
    Ha pedig ÉPP a társad az ellenfeled, nincs mit cserélni — a párharc
    eredménye maga a közös igazság. */
+/* ---- ELHASALT FELTÖLTÉS ÚJRAPRÓBÁLÁSA ----
+   HIBA, amit ez javít: a kupa mindhárom kézfogásában (nevezés, csoport-zárás,
+   kieséses kör) a saját rekord EGYETLEN egyszer ment fel, a figyelő ciklus
+   pedig ezután CSAK OLVASOTT. Ha a feltöltés elhasalt — egy pillanatnyi
+   hálózathiba bőven elég hozzá —, a rekord soha többé nem került fel: a kliens
+   a végtelenségig várt egy olyan adatra, amit ő maga nem tett le. A hibaüzenet
+   ott állt a képernyőn, de magától semmi nem történt.
+   Mostantól minden körben ránézünk: ha a saját rekeszem üres, újra felteszem. */
+async function mpReput(key,myField,node,payload,errEl){
+  if(node&&node[myField])return true;
+  try{await mpBk().h2hPut(MP.activeRoom,key,myField,payload);return true;}
+  catch(e){
+    const el=$(errEl||"h2hWaitErr");
+    if(el)el.textContent="A saját adatod feltöltése nem sikerült — újrapróbáljuk.";
+    return false;}}
+/* A kieséses körök sorrendje — ebből derül ki, hogy a társ ELŐBBRE tart-e. */
+function mpCupRoundIdx(round){
+  const E=S.euro;if(!E)return -1;
+  const RS=compRounds(E.comp)||[];
+  return RS.indexOf(round);}
 function mpCupMateTie(){
   const E=S.euro;
   if(!mpCupActive()||E.mateIdx==null||!E.ties)return -1;
@@ -4935,17 +4967,25 @@ async function mpCupTieSync(round,onReady){
   let node=null;
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
   if(!_mpTieBusy)return;
-  if(!node||!node[myField]){
-    try{await mpBk().h2hPut(MP.activeRoom,key,myField,{won:iWon,at:Date.now()});}
-    catch(e){$("h2hWaitErr").textContent="Az eredményt nem sikerült elküldeni — újrapróbáljuk.";}}
-  mpCupTieTick(key,myField,oppField,round,onReady);}
-async function mpCupTieTick(key,myField,oppField,round,onReady){
+  /* A saját rekord a HALADÁST is viszi: ebből derül ki a másik oldalon, hogy
+     ELŐBBRE tartok-e — enélkül egy elcsúszott ág örök várakozás. */
+  const myRec={won:iWon,at:Date.now(),round,ri:mpCupRoundIdx(round)};
+  await mpReput(key,myField,node,myRec);
+  if(!_mpTieBusy)return;
+  mpCupTieTick(key,myField,oppField,round,onReady,myRec);}
+async function mpCupTieTick(key,myField,oppField,round,onReady,myRec){
   if(!_mpTieBusy)return;
   if(_mpTiePoll){clearTimeout(_mpTiePoll);_mpTiePoll=null;}
   let node=null;
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}
   catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
   if(!_mpTieBusy)return;
+  /* elhasalt feltöltés pótlása — lásd mpReput */
+  if(myRec&&!(node&&node[myField])){
+    await mpReput(key,myField,node,myRec);
+    if(!_mpTieBusy)return;
+    try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+    if(!_mpTieBusy)return;}
   const mine=node&&node[myField],mate=node&&node[oppField];
   if(mine&&mate){
     const E=S.euro,mt=mpCupMateTie();
@@ -4959,12 +4999,38 @@ async function mpCupTieTick(key,myField,oppField,round,onReady){
     mpCupTieAbort();
     try{saveGame();}catch(e){}
     onReady();return;}
+  /* ---- HA A TÁRS MÁR TOVÁBBMENT, NE VÁRJUNK RÁ ÖRÖKKÉ ----
+     A "kell-e várni" döntést mindkét kliens a SAJÁT ágából vezeti le
+     (mpCupNeedTieSync). Ha a két ág bármiért elcsúszik — elhasalt feltöltés,
+     megszakított várakozás, egy kör, amit az egyik oldal a helyi
+     szimulációval zárt le —, akkor az egyik fél úgy dönt, hogy nincs kit
+     megvárnia, és végigmegy a sorozaton, a másik meg örökre a beváró
+     képernyőn ül. Semmi nem jelezte, és nem is volt belőle kiút.
+     Ezért megnézzük a KÉSŐBBI körök rekeszeit is: ha a társ már egy
+     előrébb lévő körnél tart, a szinkronnak vége — a sorsát innen a helyi
+     (seedelt) ág viszi tovább, és mi is haladunk. */
+  if(!mate&&mine){
+    const RS=compRounds(S.euro&&S.euro.comp)||[];
+    const here=mpCupRoundIdx(round);
+    let ahead=null;
+    for(let i=here+1;i<RS.length&&ahead===null;i++){
+      let n2=null;
+      try{n2=await mpBk().h2hGet(MP.activeRoom,mpCupStageKey("ko"+RS[i]));}catch(e){}
+      if(n2&&n2[oppField])ahead=RS[i];}
+    if(!_mpTieBusy)return;
+    if(ahead){
+      const E=S.euro;
+      E.mateOut=round;   /* innentől nincs mit szinkronizálni */
+      addLine(`⚔ A társad már a(z) ${EURO_ROUND_NAMES[ahead]||ahead} körnél tart — a ti ágatok elcsúszott egymástól, ezért innentől külön megy tovább. A sorozatod folytatódik.`,"m life");
+      mpCupTieAbort();
+      try{saveGame();}catch(e){}
+      onReady();return;}}
   h2hWaitShow(EURO_ROUND_NAMES[round]||"KUPAKÖR",
     `<span class="h2hDot"></span>${mine?"A párharcod lezárva":"Küldés…"} — ${
       mate?"a társadé is megvan…":"várunk a társadra, hogy ő is lejátssza ezt a kört."}
      <br><small style="color:var(--dim2)">Amíg mindketten versenyben vagytok, a kör végén meg kell várni egymást — így nem csúszhat szét az ág.</small>`,
     !!mine,!!mate,MP_WAIT_TIE);
-  _mpTiePoll=setTimeout(()=>mpCupTieTick(key,myField,oppField,round,onReady),2500);}
+  _mpTiePoll=setTimeout(()=>mpCupTieTick(key,myField,oppField,round,onReady,myRec),2500);}
 /* A MEZŐNY felépítése: 31 klub + a user, kalapos sorsolással 8 csoportba.
    KÖZÖS KUPÁBAN 30 klub + a user + a TÁRS — a mezőny mérete változatlan 32,
    csak az egyik AI-hely a társé. A sorsolás ilyenkor SEEDELT folyamból megy,
@@ -13892,12 +13958,11 @@ async function mpStartExchange(onReady){
   let node=null;
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
   if(!_mpStartBusy)return;
-  if(!mpStartRecOk(node&&node[myField])){
-    try{await mpBk().h2hPut(MP.activeRoom,key,myField,
-      {lvl:(bid&&bid.value!=null)?bid.value:null,str:Math.round(teamStrength()),
-       season:mpUpcomingSeason(),at:Date.now()});}
-    catch(e){$("h2hWaitErr").textContent="A javaslatot nem sikerült elküldeni — újrapróbáljuk.";}}
-  mpStartTick(key,myField,oppField,onReady);}
+  const myBidRec={lvl:(bid&&bid.value!=null)?bid.value:null,str:Math.round(teamStrength()),
+    season:mpUpcomingSeason(),at:Date.now()};
+  if(!mpStartRecOk(node&&node[myField]))await mpReput(key,myField,null,myBidRec);
+  if(!_mpStartBusy)return;
+  mpStartTick(key,myField,oppField,onReady,myBidRec);}
 /* ---- VÉDŐHÁLÓ A RÉGI REKORDOK ELLEN ----
    A rekord magában hordja, MELYIK szezonra szól. Ha egy jövőbeli hiba miatt
    mégis egy másik szezon rekordja kerülne elénk, azt NEM létezőnek tekintjük —
@@ -13906,13 +13971,19 @@ async function mpStartExchange(onReady){
 function mpStartRecOk(rec){
   if(!rec)return false;
   return rec.season==null||rec.season===mpUpcomingSeason();}
-async function mpStartTick(key,myField,oppField,onReady){
+async function mpStartTick(key,myField,oppField,onReady,myBidRec){
   if(!_mpStartBusy)return;
   if(_mpStartPoll){clearTimeout(_mpStartPoll);_mpStartPoll=null;}
   let node=null;
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}
   catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
   if(!_mpStartBusy)return;
+  /* elhasalt feltöltés pótlása — lásd mpReput */
+  if(myBidRec&&!mpStartRecOk(node&&node[myField])){
+    await mpReput(key,myField,null,myBidRec);
+    if(!_mpStartBusy)return;
+    try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+    if(!_mpStartBusy)return;}
   const _m=node&&node[myField],_o=node&&node[oppField];
   const mine=mpStartRecOk(_m)?_m:null,mate=mpStartRecOk(_o)?_o:null;
   /* ---- MÁR ELDŐLT SZINT ----
@@ -13983,7 +14054,7 @@ async function mpStartTick(key,myField,oppField,onReady){
       if(before!==r.v)addLine(`✦ A mezőny újrasorsolva: ${before} → ${r.v}.`,"m life");
       try{saveGame();}catch(e){}
       onReady();};}
-  _mpStartPoll=setTimeout(()=>mpStartTick(key,myField,oppField,onReady),2000);}
+  _mpStartPoll=setTimeout(()=>mpStartTick(key,myField,oppField,onReady,myBidRec),2000);}
 /* ---- A KÖZÖS ELŐZMÉNY ----
    Szezononként egy sor mindkét menedzserről. Ebből áll össze a befejezéskori
    összesítés — enélkül csak az utolsó szezont tudnánk mutatni. */
