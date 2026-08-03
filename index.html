@@ -1490,6 +1490,20 @@ button.infPanel:disabled{cursor:default}
     <div class="steplbl" style="color:var(--gold)">🎨 Megjelenés</div>
     <p style="font-size:12px;color:var(--dim);margin-top:2px">Válassz témát — a mintasáv mutatja az alapot, a panelt, az arany kiemelést és a szöveget.</p>
     <div id="themeModalBody" style="margin-top:10px"></div>
+    <!-- DIAGNOSZTIKA. Mobilon nincs böngésző-konzol (a Chromium az omniboxba
+         írt javascript: URL-t blokkolja), távoli hibakereséshez meg gép kell.
+         Ez a gomb kigyűjti a hibakereséshez szükséges MP-állapotot MINDEN
+         mentésből, vágólapra teszi, és ki is írja kijelölhetően — így egy
+         beragadt állás elemezhető anélkül, hogy fejlesztői eszköz kellene. -->
+    <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px">
+      <div style="font-size:11px;letter-spacing:1px;color:var(--dim);text-transform:uppercase">Hibakeresés</div>
+      <button id="diagCopyBtn" class="btn-s stepbtn" style="margin-top:6px">🧪 Diagnosztika másolása</button>
+      <textarea id="diagOut" class="hide" readonly
+        style="width:100%;box-sizing:border-box;margin-top:8px;height:150px;font-size:10.5px;
+               font-family:ui-monospace,monospace;background:var(--bg);color:var(--ink);
+               border:1px solid var(--line);border-radius:8px;padding:8px"></textarea>
+      <div id="diagMsg" style="font-size:11.5px;color:var(--dim);margin-top:4px"></div>
+    </div>
     <button id="themeCloseBtn" class="btn-s stepbtn">Bezár</button>
   </div>
 </div>
@@ -1751,7 +1765,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.89";
+const APP_VERSION="2.5.90";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -4957,6 +4971,38 @@ function mpCupDiagText(round,mine,mate){
     +`· kör ${round} (${E.stage||"?"}) · a te párharcod #${E.userTie} · a társé #${mt}`
     +` · társ-index ${E.mateIdx==null?"nincs":E.mateIdx}${E.mateOut?" · társ kiesett: "+E.mateOut:""}`
     +` · rekesz: te ${mine?"kész":"üres"} / ő ${mate?"kész":"üres"}`;}
+/* ---- DIAGNOSZTIKA-KIGYŰJTÉS MINDEN MENTÉSBŐL ----
+   Mobilon nincs böngésző-konzol, ezért a hibakereséshez szükséges állapotot a
+   játéknak magának kell kiadnia. Végigmegy a localStorage összes mentésén (az
+   egyjátékoson és minden szoba-mentésen), és kiszedi azt a néhány mezőt, ami a
+   közös kupa szétcsúszását elárulja. SZÁNDÉKOSAN csak ezeket: a teljes mentés
+   megabájtos és olvashatatlan volna. */
+function mpDiagCollect(){
+  const L=[];
+  L.push("MAGYAH diagnosztika · v"+APP_VERSION+" · "+new Date().toISOString());
+  let keys=[];
+  try{keys=Object.keys(localStorage).filter(k=>k.indexOf(SAVE_KEY)===0||k.indexOf(SAVE_KEY_MP_PREFIX)===0);}
+  catch(e){L.push("localStorage nem olvasható: "+e.message);return L.join("\n");}
+  if(!keys.length)L.push("(nincs mentés)");
+  keys.forEach(k=>{
+    L.push("");L.push("── "+k);
+    let d=null;
+    try{d=JSON.parse(localStorage.getItem(k));}catch(e){L.push("  olvashatatlan: "+e.message);return;}
+    const S2=(d&&d.S)||{};
+    L.push(`  csapat: ${d&&d.teamName} · mód: ${d&&d.gameMode} · szezon ${S2.seasonNumber} · forduló ${S2.idx}`);
+    L.push(`  szint: ${d&&d.oppTargetRating} · fázis: ${d&&d.phase}`);
+    const C=S2.mpCup;
+    L.push("  mpCup: "+(C?JSON.stringify(C):"nincs"));
+    const E=S2.euro;
+    if(!E){L.push("  euro: nincs futó kupa");return;}
+    L.push(`  euro: ${E.comp} · szakasz ${E.stage} · idx ${E.idx} · md ${E.md}`);
+    L.push(`    userIdx ${E.userIdx} · userTie ${E.userTie} · mateIdx ${E.mateIdx} · mateOut ${E.mateOut||"-"}`);
+    L.push(`    qRound ${E.qRound} · droppedFrom ${E.droppedFrom||"-"} · result ${E.result||"-"} · outAt ${E.outAt||"-"}`);
+    if(Array.isArray(E.ties))
+      L.push("    ties: "+E.ties.map((t,i)=>`#${i} ${t.a}v${t.b}${t.winner!=null?"→"+t.winner:""}`).join(" "));
+    if(Array.isArray(E.path))
+      L.push("    path("+E.path.length+"): "+E.path.map(p=>p.k+(p.round?":"+p.round:"")+(p.mine!=null?` ${p.mine}:${p.theirs}`:"")).join(" | "));});
+  return L.join("\n");}
 function mpCupTieAbort(){
   _mpTieBusy=false;_mpTieWaitStart=0;
   if(_mpTiePoll){clearTimeout(_mpTiePoll);_mpTiePoll=null;}
@@ -23516,6 +23562,17 @@ function renderSquadModal(){
     _squadFilter="all";
     if($("squadSearch"))$("squadSearch").value="";
     renderSquadModal();$("squadModal").classList.remove("hide");};
+  const dg=$("diagCopyBtn");
+  if(dg)dg.onclick=async()=>{
+    const txt=mpDiagCollect();
+    const out=$("diagOut"),msg=$("diagMsg");
+    if(out){out.classList.remove("hide");out.value=txt;out.select();}
+    let ok=false;
+    try{await navigator.clipboard.writeText(txt);ok=true;}
+    catch(e){try{ok=document.execCommand("copy");}catch(_){}}
+    if(msg)msg.textContent=ok
+      ?"Vágólapra másolva — beillesztheted a beszélgetésbe."
+      :"A másolás nem ment: jelöld ki a fenti szöveget és másold kézzel.";};
   const tc=$("themeCloseBtn");if(tc)tc.onclick=()=>$("themeModal").classList.add("hide");
   const sc=$("squadCloseBtn");if(sc)sc.onclick=()=>$("squadModal").classList.add("hide");
   const ss=$("squadSearch");if(ss)ss.addEventListener("input",renderSquadModal);
