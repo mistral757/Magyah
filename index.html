@@ -1810,7 +1810,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.009";
+const APP_VERSION="2.6.010";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9632,8 +9632,11 @@ function autoLevelTargetNow(){
   if(typeof h2hRoomActive==="function"&&h2hRoomActive())return oppTargetRating;
   const aim=autoLevelAim();
   let lvl=oppTargetRating,guard=0;
-  while(levelGap(lvl)>aim.hi&&lvl<maxOppRating()&&guard++<80)lvl++;
-  while(levelGap(lvl)<aim.lo&&lvl>70&&guard++<160)lvl--;
+  /* autoLevelGap, NEM levelGap: Infinityben a szintlépés a saját keretedet is
+     emeli, és azt az automatika nem tekintheti a saját erősödésednek — lásd az
+     ownedLiftAvgXI fölötti indoklást. Normál módban a kettő azonos. */
+  while(autoLevelGap(lvl)>aim.hi&&lvl<maxOppRating()&&guard++<80)lvl++;
+  while(autoLevelGap(lvl)<aim.lo&&lvl>70&&guard++<160)lvl--;
   return lvl;}
 /* ---- A SZINT TÉNYLEGES KÖVETÉSE, MÉG A NYÁRON ----
    Eddig a szintlépés a szezonindításkor futott — azaz MIUTÁN a szezon eleji
@@ -20294,6 +20297,41 @@ function hiddenMatchBonus(){
    nehézség-tanácsadó és az auto szintkövetés alapja. */
 function teamMatchStrength(){return teamStrength()+hiddenMatchBonus();}
 function levelGap(lvl){return teamMatchStrength()-oppMatchStrength(lvl);}
+/* ================= INFINITY: AZ AUTOMATIKA NE A SAJÁT AJÁNDÉKÁT MÉRJE =========
+   A HIBA, amit ez javít. Infinityben a szintlépés a SAJÁT keretedet is emeli
+   (applyOwnedShift → ownedPeakLift: peak = basePeak + (szint − joinLevel)), a
+   mezőny effektív ereje viszont csak 1,12-szeres ütemben nő (OPP_BUFF_FIXED).
+   Az auto szintkövetés a megemelt keretet ÚJ erősödésnek látta, ezért újra
+   lépett — a mezőny és a kereted együtt szaladt el, miközben a TÉNYLEGES
+   nehézség szintenként alig 0,12-t mozdult. A HUB minden újrarajzolása (és
+   minden kézi "Megerősítem" is, mert az applyOppLevel ugyanígy emel) adott egy
+   újabb lökést, tehát a felhasználó szemszögéből egyszerűen nem állt meg.
+
+   MÉRVE a javítás előtt (120-as keret, 100-as szintről, 25 HUB-rajzolás):
+     szint  100 → 206, csapaterő 120 → 226, a rés közben 18,0 → 5,3
+   vagyis a rendszer önmagát hajtotta, és a cél-sávot így sem érte el.
+
+   A JAVÍTÁS: az automatika levonja a MÁR MEGKAPOTT liftet, tehát a KIÉRDEMELT
+   erőt méri. A lift a szintlépés ajándéka (azért van, hogy a kereted ne rohadjon
+   el a vele együtt emelkedő piac alatt), nem a te fejlődésed. A VALÓDI növekedés
+   — meccsről meccsre fejlődés, igazolás, ifi-/öreg-boost — a basePeak-ben él, azt
+   nem vonjuk le, tehát az automatika arra továbbra is lép.
+
+   NORMÁL MÓDBAN AZ ownedPeakLift ELEVE 0, tehát ott bitre semmi nem változik.
+
+   A KIJELZETT rés (levelGap) szándékosan VÁLTOZATLAN marad: a pályán a
+   játékosaid tényleg annyit érnek, a nehézség-tanácsadónak azt kell mondania. */
+function ownedLiftAvgXI(){
+  if(gameMode!=="career"||!infinityMode)return 0;
+  if(typeof careerPool==="undefined"||!careerPool)return 0;
+  let sum=0,n=0;
+  slots.forEach(s=>{
+    if(!s||!s.player)return;
+    n++;
+    const e=careerPool[s.player.n];
+    if(e)sum+=ownedPeakLift(e);});
+  return n?sum/n:0;}
+function autoLevelGap(lvl){return levelGap(lvl)-ownedLiftAvgXI();}
 /* ---- A NEHÉZSÉG-SÁVOK, A MÉRT BAJNOKI ESÉLYHEZ KALIBRÁLVA ----
    A küszöbök nem hasraütésre vannak: a motor saját konstansaival (K=0.09,
    BASE=1.3, HOME/AWAY, a 15 ellenfél aszimmetrikus tabella-profilja) 1500-3000
@@ -20528,7 +20566,10 @@ function showLevelChangePicker(direction){
   function renderAutoAim(){
     const box=$("autoAimBox");if(!box)return;
     if(!S.autoLevel){box.innerHTML="";return;}
-    const cur=autoLevelAim(),g=levelGap();
+    /* A sáv-jelzés ("most beleesel" / "lépne fölfelé") azt mondja meg, mit
+       CSINÁLNA az automatika — ezért ugyanazzal a mértékkel kell számolnia,
+       mint amivel az dönt (Infinityben a lift levonva). */
+    const cur=autoLevelAim(),g=autoLevelGap();
     box.innerHTML=`<div style="margin-top:7px;font-size:11.5px;color:var(--dim2)">Cél-sáv — mekkora fölényt tartson a mezőny fölött:</div>`;
     const grid=document.createElement("div");grid.className="hubGrid";grid.style.marginTop="5px";
     AUTO_LEVEL_AIMS.forEach(a=>{
