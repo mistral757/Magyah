@@ -1780,7 +1780,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.102";
+const APP_VERSION="2.5.103";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -15286,9 +15286,46 @@ function playMatch(){
     }}
   /* A tick-függvényt NÉV szerint tartjuk, mert a félidei csere megállítja és
      újraindítja az órát — a ciklus tartalma ettől betűre változatlan. */
-  const halfSubs={used:[],usedIdx:new Set(),usedIn:new Set()};
+  /* onOwnPos: a beállók közül azok, akik a SAJÁT (vagy azzal egyenértékű)
+     posztjukra jöttek be — a subFreeFit már eldönti ezt a csere pillanatában,
+     itt csak megjegyezzük. Ebből tud a kommentár különbséget tenni a
+     "beállt és betalált" és a "beállt a saját posztjára, és ott volt eredményes"
+     eset között. */
+  const halfSubs={used:[],usedIdx:new Set(),usedIn:new Set(),onOwnPos:new Set()};
   /* a félidőben LECSERÉLT játékosok — a lefújásnál ők is fejlődnek, fél meccsre */
   const halfOut=[];
+  /* ---- A FÉLIDEI BEÁLLÓ KOMMENTÁRJA ----
+     Eddig a csereként beállt játékos semmilyen külön jelölést nem kapott, amikor
+     eredményes lett: a gól ugyanúgy nézett ki, mintha végig a pályán lett volna.
+     Pedig épp ez a csereszünet tétje — a döntésed vissza is igazolódhat. A
+     halfSubs.usedIn adja a beállók nevét, az onOwnPos pedig azt, hogy a saját
+     posztjukra jöttek-e: a "saját posztján eredményes" eset kap külön mondatot.
+     Ízesítő sor, tehát a gólonkénti keretből fogyaszt — de a gól-blokk ELEJÉN
+     kérdezzük meg, mert ritka és konkrét, így nem szorul ki a rutin-mondatok
+     mögött (ugyanaz az elv, mint a műszereknél). */
+  /* Meccsenként legfeljebb kétszer — egy mesterhármast szerző beálló különben
+     háromszor kapná ugyanazt a mondatot. (Ugyanaz a korlát, mint a BL
+     arany-díjaknál.) */
+  let halfSubNotesShown=0;
+  function halfSubGoalNote(scorerN,asstN){
+    if(!halfSubs.usedIn.size||halfSubNotesShown>=2)return;
+    const scIn=!!(scorerN&&halfSubs.usedIn.has(scorerN));
+    const asIn=!!(asstN&&halfSubs.usedIn.has(asstN));
+    if(!scIn&&!asIn)return;
+    const nm=n=>esc(shortName(n));
+    let txt;
+    if(scIn&&asIn)
+      txt=`Mindkettő a padról jött: ${nm(asstN)} indította, ${nm(scorerN)} fejezte be — a félidei csere döntött.`;
+    else if(scIn)
+      txt=halfSubs.onOwnPos.has(scorerN)
+        ?`${nm(scorerN)} a szünetben állt be a saját posztjára — és ott rögtön eredményes.`
+        :`${nm(scorerN)} a szünetben állt be, idegen poszton — és mégis betalál.`;
+    else
+      txt=halfSubs.onOwnPos.has(asstN)
+        ?`${nm(asstN)} a szünetben állt be a saját posztjára — és máris gólpasszt ad onnan.`
+        :`${nm(asstN)} a szünetben állt be, és máris gólpasszt ad.`;
+    halfSubNotesShown++;
+    addLine(`→ 🔁 ${txt}`,"m skillnote",true);}
   let iv=null;
   const tickFn=()=>{
     min+=5;
@@ -15376,6 +15413,9 @@ function playMatch(){
          200 000 dobáson mérve a mérések 51-88%-a némán kimaradt — kész
          párkémiás csatárnál a tervezett 10% helyett 1,2% jutott ki.
          Elöl a ritka, konkrét szám kap elsőbbséget a rutin-mondatok előtt. */
+      /* A félidei beálló jelzése a műszerek ELŐTT: még ritkább esemény, és
+         közvetlenül a te csereszünetbeli döntésedről szól. */
+      halfSubGoalNote(scorer.n,asstName);
       trySprintMeasure(scorer.n,asstName,`${goalMin}'  `);
       tryShotMeasure(scorer.n,`${goalMin}'  `);
       /* KARRIER-MÉRFÖLDKÖVEK a gólnál. A gólszerző ELŐBB: ha ugyanaz a történet
@@ -15675,6 +15715,7 @@ function playMatch(){
         a.p=inP;a.fit=inFit;
         halfSubs.used.push({out:outP.n,in:inP.n});
         halfSubs.usedIdx.add(k);halfSubs.usedIn.add(inP.n);
+        if(inFit===1)halfSubs.onOwnPos.add(inP.n);
         addLine(`🔁 Csere a félidőben: ${esc(shortName(outP.n))} → <b>${esc(shortName(inP.n))}</b>`,"m ev");}};}
   function weightedPick(arr,wfn,rnd){
     const w=arr.map(wfn),tw=w.reduce((s,x)=>s+x,0);
@@ -15832,6 +15873,20 @@ function playMatch(){
         const cs=S.careerStats[a.p.n]=S.careerStats[a.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};
         cs.cs++;
         S.seasonCleanSheets[a.p.n]=(S.seasonCleanSheets[a.p.n]||0)+1;});
+      /* ---- TISZTA LAP A FÉLIDEI BEÁLLÓVAL ----
+         A nullát a kapus és a védelem közösen hozza; ha valamelyikük a
+         szünetben állt be, akkor a csereszünetbeli döntésed is benne van — a
+         gólnál és a gólpassznál ugyanezt mondjuk el, itt a harmadik eset. */
+      if(ga===0&&halfSubs.usedIn.size){
+        const csSubs=active.filter(a=>{
+          const pos=slots[a.idx]&&slots[a.idx].pos;
+          if(!pos||(pos!=="KP"&&roleInFormation(pos)!=="VEDO"))return false;
+          return halfSubs.usedIn.has(a.p.n);});
+        if(csSubs.length){
+          const names=csSubs.map(a=>esc(shortName(a.p.n))).join(", ");
+          const allOwn=csSubs.every(a=>halfSubs.onOwnPos.has(a.p.n));
+          addLine(`→ 🔁 Tiszta lap a félidei beállóval: ${names}${
+            allOwn?` — a saját posztján állt be, és onnan tartotta a nullát`:""}.`,"m skillnote");}}
     }
     /* KARRIER-MÉRFÖLDKÖVEK: a tiszta lapos bemutatkozások, a jubileumok, majd a
        meccs alatt összegyűlt hatások kiosztása és a számlálók léptetése. */
