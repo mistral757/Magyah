@@ -1780,7 +1780,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.5.103";
+const APP_VERSION="2.5.104";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -6463,7 +6463,7 @@ const SKILLS=[
  {id:"fw_poacher",cat:"CSATAR",name:"Gólzsák",desc:"Jóval nagyobb eséllyel ő a gólszerző.",type:"goalw",val:4},
  {id:"fw_dribble",cat:"CSATAR",name:"Tessék, Zolika!",desc:"Csatárként is jóval nagyobb eséllyel oszt gólpasszt.",type:"assistw",val:3},
  {id:"fw_cannon",cat:"CSATAR",name:"Szitálós",desc:"A lövése ereje állandó rating-bónuszt ad.",type:"rating",val:4},
- {id:"fw_clutch",cat:"CSATAR",name:"ICE COLD",desc:"A nagy pillanatokban jóval nagyobb eséllyel lesz a meccs embere.",type:"mvp",val:2.5},
+ {id:"fw_clutch",cat:"CSATAR",name:"ICE COLD",desc:"Ő áll a tizenegyes mögé, és szinte mindig értékesíti (95%) — ha pedig egyenlíteni vagy fordítani kell, gyakorlatilag sosem hibázik. A nagy pillanatokban jóval nagyobb eséllyel lesz a meccs embere.",type:"mvp",val:2.5},
  {id:"gk_calm_hands",cat:"KAPUS",name:"Kistigris",desc:"Amíg pályán van, kicsit csökken az ellenfél gólesélye.",type:"defense",val:0.95},
  {id:"gk_calm_kick",cat:"KAPUS",name:"Ízi",desc:"Amíg pályán van, apró csapaterő-bónuszt ad.",type:"aura",val:0.8},
  {id:"df_steady_press",cat:"VEDO",name:"Sepregető",desc:"Kicsit ritkábban kap piros lapot.",type:"discipline",val:0.6},
@@ -6475,7 +6475,7 @@ const SKILLS=[
  {id:"mf_spacefind",cat:"KOZEPPALYAS",name:"Klasszik 10-es",desc:"Kicsit nagyobb eséllyel talál be középpályásként.",type:"goalw",val:1.6},
  {id:"mf_quietleader",cat:"KOZEPPALYAS",name:"Szemed a pályán",desc:"Amíg pályán van, apró csapaterő-bónuszt ad.",type:"aura",val:1.0},
  {id:"fw_firsttouch",cat:"CSATAR",name:"Gyere kicsibe!",desc:"Kicsit nagyobb eséllyel oszt gólpasszt csatárként.",type:"assistw",val:1.8},
- {id:"fw_coolclose",cat:"CSATAR",name:"COOL",desc:"Kicsit nagyobb eséllyel lesz a meccs embere nagy pillanatokban.",type:"mvp",val:1.2},
+ {id:"fw_coolclose",cat:"CSATAR",name:"COOL",desc:"Nagyobb eséllyel ő rúgja a tizenegyest, és biztos kézzel értékesíti (90%). Kicsit nagyobb eséllyel lesz a meccs embere nagy pillanatokban.",type:"mvp",val:1.2},
  {id:"gk_grasshopper",cat:"KAPUS",name:"A szöcske!",desc:"Nagyobb eséllyel hajt végre bravúros védést, de benne van a pakliban, hogy potyagólt kap.",type:"gkwild",val:1},
  {id:"df_scissors",cat:"VEDO",name:"Ollóra!",desc:"Felmegy támadni szögleteknél, és nagy eséllyel fejel gólt.",type:"goalw",val:2.2},
  {id:"mf_elastico",cat:"KOZEPPALYAS",name:"Elastico!",desc:"Nem lehet elvenni tőle a labdát: növeli a gólpassz-, gólszerzési és MVP-esélyt is egy kicsit.",type:"combo",combo:[{type:"assistw",val:1.3},{type:"goalw",val:1.3},{type:"mvp",val:1.3}]},
@@ -12214,6 +12214,38 @@ function multSkillEffect(name,type){
   return playerSkills(name).filter(i=>i.skill.type===type||(i.skill.combo&&i.skill.combo.some(c=>c.type===type)))
     .reduce((m,i)=>m*(i.skill.type===type?skillEffVal(i):comboEffFor(i,type)),1);}
 function hasFormlock(name){return playerSkills(name).some(i=>i.skill.type==="formlock");}
+/* ================= TIZENEGYES-SPECIALISTÁK: ICE COLD és COOL =================
+   A két skill eddig TISZTÁN MVP-szorzó volt (type:"mvp"), vagyis a nevük és a
+   leírásuk ("a nagy pillanatokban") sokkal többet ígért, mint amit csináltak: a
+   meccs legnagyobb pillanatában, a tizenegyesnél semmi szerepük nem volt. A
+   büntető rúgóját a puszta gólszerzési súly választotta, és mindenki ugyanazt a
+   fix 78%-ot hozta.
+   Mostantól három dolgot adnak, a skill-ID-ra ismerve rá — ugyanaz a minta, mint
+   a szabadrúgásnál (mf_fk / df_cannon):
+     · RÚGÓ-ELSŐBBSÉG: a súlyuk megemeli az esélyt, hogy ők álljanak a labda mögé;
+     · ÉRTÉKESÍTÉS: ICE COLD 95%, COOL 90% a 78% helyett;
+     · FORDÍTÁS-BÓNUSZ (csak ICE COLD): ha a tizenegyes egyenlítene vagy fordítana
+       (nem vezetünk), gyakorlatilag nem hibázik — ettől "ice cold".
+   A hatás a skill KÉSZÜLTSÉGÉVEL arányos (skillFraction), ahogy minden más
+   skillnél: egy féligkész ICE COLD nem a teljes 95%-ot hozza, hanem a 78% és a
+   95% között arányosan áll. Az MVP-szorzójuk változatlanul megmarad. */
+const PEN_BASE_HIT=0.78;
+const PEN_SPECIALISTS={
+  fw_clutch:{w:9,hit:0.95,comeback:0.99},
+  fw_coolclose:{w:4,hit:0.90,comeback:0.90}};
+/* A pályán lévő játékos tizenegyes-profilja, vagy null. `comeback` = igaz, ha az
+   állás szerint a büntető egyenlítene vagy fordítana. */
+function penSpecFor(name,comeback){
+  let best=null;
+  playerSkills(name).forEach(inst=>{
+    const s=PEN_SPECIALISTS[inst.skill.id];
+    if(!s)return;
+    const frac=skillFraction(inst);
+    const target=comeback?Math.max(s.hit,s.comeback):s.hit;
+    const cand={inst,w:1+(s.w-1)*frac,hit:PEN_BASE_HIT+(target-PEN_BASE_HIT)*frac};
+    if(!best||cand.hit>best.hit||(cand.hit===best.hit&&cand.w>best.w))best=cand;});
+  return best;}
+function penTakerWeight(name){const s=penSpecFor(name,false);return s?s.w:1;}
 /* ================= KARRIER MÓD — SZEZONVÉGI KÁRTYÁK =================
    Gold / Diamond / Stellar: kiemelkedő szezonteljesítményért járó, ÁLLANDÓ
    (soha nem fakuló) játékos-feljavítás — nem skill, hanem a pool-bejegyzés
@@ -15220,13 +15252,26 @@ function playMatch(){
   function trySpecialEvent(){
     const evType=["penalty_for","penalty_against","owngoal_for","owngoal_against","fight","var_overturn","free_kick_goal"][weightedIndex([22,18,10,8,17,25,15])];
     if(evType==="penalty_for"){
-      const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58));
+      /* RÚGÓ-ELSŐBBSÉG: az ICE COLD / COOL súlya megemeli az esélyt, hogy ő
+         álljon a labda mögé — a gólszerzési súly mellett, nem helyette. */
+      const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*penTakerWeight(x.p.n));
       const taker=active[si].p;
-      if(Math.random()<0.78){
+      /* FORDÍTÁS: a büntető egyenlítene vagy fordítana — ez a "nagy pillanat",
+         amiről a két skill leírása szól. */
+      const comeback=gf<=ga;
+      const spec=penSpecFor(taker.n,comeback);
+      const hit=spec?spec.hit:PEN_BASE_HIT;
+      const specTxt=spec?` — ${esc(spec.inst.skill.name)}${skillProgressSuffix(spec.inst)}`:"";
+      if(Math.random()<hit){
         gf++;mScore[taker.n]=(mScore[taker.n]||0)+1;recordScorer(taker.n);
         updateTTBoard(fx,gf,ga,Math.min(90,min));
         addLine(`${gminTxt(min)}  TIZENEGYES! ${esc(shortName(taker.n))} magabiztosan értékesíti  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
         sbEv("us","goal",taker.n);
+        /* A skill csak akkor szólal meg, ha tényleg ő állt a labda mögé — és a
+           fordítás-helyzetet külön kimondjuk, mert az ICE COLD ott a legerősebb. */
+        if(spec)addLine(`→ ${comeback&&spec.inst.skill.id==="fw_clutch"
+          ?`Jéghideg a legnagyobb pillanatban${specTxt}`
+          :`Meg sem rezzent a keze${specTxt}`}`,"m skillnote");
         updateGoallessStreak(taker.n,true);
       }else addLine(`${gminTxt(min)}  Tizenegyes! ${esc(shortName(taker.n))} kihagyja — a kapufát találja el`,"m ev");
     }else if(evType==="penalty_against"){
