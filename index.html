@@ -1810,7 +1810,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.008";
+const APP_VERSION="2.6.009";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -11001,6 +11001,60 @@ function ballonCsWeight(p){
 const BALLON_W_ASSIST=0.7;
 function ballonScoreOf(rating,g,a,cs,csW){
   return (g+BALLON_W_ASSIST*a+(csW==null?1.3:csW)*cs)*(Math.max(40,rating)/100);}
+/* ================= A TROFEÁK IS SZÁMÍTANAK =================
+   A nyers produkció (gól/gólpassz/tiszta lap) önmagában nem Aranylabda: a
+   valóságban a díjat az dönti el, ki mit NYERT. Két új szorzó ül a pontszámon,
+   mindkettő SZÁZALÉKOS, hogy minden mezőnyszinten ugyanúgy hasson:
+
+     1) EGYÉNI DÍJAK — a szezonban szerzett kupa-arany (Aranycipő /
+        Aranypasszok / Aranykesztyű) díjanként +8%. Legfeljebb három jöhet
+        össze, tehát a plafon +26% (1,08³).
+
+     2) A CSAPAT KUPA-MENETELÉSE — meddig jutott a csapata a sorozatban.
+        Győzelem +20%, döntő +12%, elődöntő +7%, negyeddöntő +4%,
+        nyolcaddöntő +2%. Ezt a SOROZAT RANGJA skálázza (BL 1,0 · EL 0,7 ·
+        KL 0,5 · Magyar Kupa 0,35), mert egy megnyert Konferencia-liga nem
+        ugyanaz, mint egy BL-cím. Aki nem jutott ki Európába, itt 1,0-t kap.
+
+   A KÉPZELT VILÁGELSŐ IS KAP TROFEÁT, különben a díj egyszerűen könnyebb lenne
+   a változtatástól. Ő a leírása szerint egy mezőnyt ledaráló gépezet legjobbja:
+   BL-döntőt játszó csapat + egy egyéni díj = 1,12 × 1,08 ≈ 1,21. Vagyis aki
+   MEGNYERI a BL-t és visz egy aranyat (1,20 × 1,08 ≈ 1,30), az előnybe kerül;
+   aki csoportkörben kiesik és díj nélkül marad, annak ~21%-kal több produkció
+   kell. Pontosan ez volt a kérés: a trófea számítson. */
+const BALLON_AWARD_MULT=0.08;
+const BALLON_CUP_MULT={win:0.20,final:0.12,sf:0.07,qf:0.04,r16:0.02};
+const BALLON_COMP_W={BL:1,EL:0.7,KL:0.5,MK:0.35};
+const BALLON_RIVAL_TROPHY=(1+BALLON_CUP_MULT.final)*(1+BALLON_AWARD_MULT);
+/* Az ÉPP LEZÁRULÓ szezon kupa-bejegyzése. A kampány-objektum (S.euro) ekkor
+   már null — a szezon-történet sora viszont áll, és a kupa lezárása épp oda
+   írta be az eredményt. A szezonszám-ellenőrzés azért kell, hogy egy tavalyi
+   menetelés ne szivárogjon be egy kupa nélküli évbe. */
+function ballonSeasonCup(){
+  const h=(S.seasonHistory&&S.seasonHistory.length)?S.seasonHistory[S.seasonHistory.length-1]:null;
+  if(!h||h.season!==(S.seasonNumber||1))return null;
+  return h.euro||null;}
+/* A hazai kupa körnevei (mk1…mk4) ugyanazokra a szintekre képződnek le. */
+function ballonRoundKey(r){
+  if(r==="final")return "final";
+  if(r==="sf"||r==="mk4")return "sf";
+  if(r==="qf"||r==="mk3")return "qf";
+  if(r==="r16"||r==="mk2")return "r16";
+  return "";}
+function ballonCupMult(){
+  const e=ballonSeasonCup();
+  if(!e)return 1;
+  const compW=(BALLON_COMP_W[e.comp]!=null)?BALLON_COMP_W[e.comp]:0.5;
+  const base=BALLON_CUP_MULT[e.won?"win":ballonRoundKey(e.reached)]||0;
+  return 1+base*compW;}
+/* Hány SAJÁT egyéni díjat vitt el ez a játékos az idényben. Régi mentésben az
+   awards mező még nincs meg — ott 0, tehát a régi viselkedés marad. */
+function ballonAwardsOf(name){
+  const e=ballonSeasonCup();
+  if(!e||!Array.isArray(e.awards))return [];
+  return e.awards.filter(a=>a&&a.name===name);}
+function ballonAwardMult(name){
+  return Math.pow(1+BALLON_AWARD_MULT,ballonAwardsOf(name).length);}
 /* A képzelt 100-as mezőny legjobbja: {name,score,g,a,cs}. */
 function ballonRival(){
   const r=(typeof rngFor==="function")?rngFor("ballon:"+(S.seasonNumber||1)):Math.random;
@@ -11021,7 +11075,10 @@ function ballonRival(){
     .filter(s=>s&&!s.wc&&s.players&&s.players.length)
     .map(s=>s.players.filter(p=>p.ovr>=84&&p.pos&&/CS|SZ|TKP/.test(p.pos[0]))).flat();
   const name=pool.length?pool[Math.floor(r()*pool.length)].n:"egy ismeretlen világsztár";
-  return {name,g,a,cs,score:ballonScoreOf(100,g,a,cs,1.3)};}
+  /* A trófea-szorzó nála FIX (BL-döntő + egy egyéni díj) — lásd a
+     BALLON_RIVAL_TROPHY indoklását. */
+  return {name,g,a,cs,trophy:BALLON_RIVAL_TROPHY,
+    score:ballonScoreOf(100,g,a,cs,1.3)*BALLON_RIVAL_TROPHY};}
 /* A te legjobb embered az idényből — BAJNOKI ÉS KUPA EGYÜTT.
    A kupában szerzett gól ugyanúgy gól: a díjat a szezon TELJES produkciója
    dönti el, nem csak a bajnoki. (A két vödör az adatban külön él: a bajnoki a
@@ -11033,6 +11090,8 @@ function ballonBestOwn(){
   const roster=(typeof fullCareerRoster==="function")?fullCareerRoster():[];
   const eb=S.seasonEuro||{};
   const _b=(m,x)=>((m&&m[x])||0);
+  /* A kupa-menetelés a CSAPATÉ, tehát mindenkire ugyanaz — egyszer számoljuk. */
+  const cupM=ballonCupMult();
   let best=null;
   roster.forEach(p=>{
     if(!p)return;
@@ -11040,8 +11099,12 @@ function ballonBestOwn(){
     const a=_b(S.assists,p.n)+_b(eb.assists,p.n);
     const cs=_b(S.seasonCleanSheets,p.n)+_b(eb.cleanSheets,p.n);
     if(!g&&!a&&!cs)return;
-    const sc=ballonScoreOf(pOvrDisplay(p),g,a,cs,ballonCsWeight(p));
-    if(!best||sc>best.score)best={name:p.n,g,a,cs,score:sc};});
+    const awM=ballonAwardMult(p.n);
+    const raw=ballonScoreOf(pOvrDisplay(p),g,a,cs,ballonCsWeight(p));
+    const sc=raw*awM*cupM;
+    if(!best||sc>best.score)
+      best={name:p.n,g,a,cs,score:sc,raw,awards:ballonAwardsOf(p.n).length,
+        awardMult:awM,cupMult:cupM,trophy:awM*cupM};});
   return best;}
 /* ---- SZINT-KÜSZÖB: 90 ALATT NINCS SAJÁT ARANYLABDÁS ----
    A pontszám önmagában szintfüggő (a Rating súlyozza), de nem elég meredeken:
@@ -11069,6 +11132,20 @@ function awardBallonDor(){
   const line=`⚽🏆 ARANYLABDA — ${esc(shortName(win.name))}${iWin?" (a TE játékosod!)":""}: `
     +`${win.g} gól, ${win.a} gólpassz${win.cs?`, ${win.cs} tiszta lap`:""}.`;
   addLine(line,"m life");
+  /* ---- A TROFEÁK MÉRLEGE, KIMONDVA ----
+     A két szorzó (egyéni díjak + kupa-menetelés) érdemben eldöntheti a
+     szavazást, ezért nem maradhat rejtve: a felhasználó lássa, mennyit
+     nyomott a serpenyőben. Csak akkor írjuk ki, ha van saját jelöltünk. */
+  if(mine){
+    const e=ballonSeasonCup();
+    const cupTxt=e
+      ? `${EURO_COMPS[e.comp]?EURO_COMPS[e.comp].short:e.comp}-${e.won?"győzelem":(e.reachedLabel||"szereplés")}`
+      : "nem volt kupaszereplés";
+    const pct=m=>`${m>=1?"+":""}${Math.round((m-1)*100)}%`;
+    addLine(`🗳️ A szavazás mérlege — ${esc(shortName(mine.name))}: nyers produkció ${Math.round(mine.raw*10)/10} pont`
+      +`, egyéni díjak ${mine.awards} db (${pct(mine.awardMult)})`
+      +`, kupa: ${cupTxt} (${pct(mine.cupMult)}) → ${Math.round(mine.score*10)/10} pont. `
+      +`A világelső mércéje ${Math.round(rival.score*10)/10} (BL-döntő + egy egyéni díj beszámítva).`,"m life");}
   /* Ha CSAK a szint-kapun bukott el, azt külön kimondjuk: a felhasználó látja a
      saját fölényben lévő pontszámát, és jogosan hibára gyanakodna, ha némán
      mégis a vetélytárs vinné el a díjat. */
@@ -12887,12 +12964,60 @@ function paceSkillBias(){
   const fit=(typeof tacticFit==="function")?tacticFit(act):0;
   if(fit<=0.5)return 0;
   return Math.min(PACE_BIAS_MAX,((fit-0.5)/0.5)*PACE_BIAS_MAX);}
-/* Egy új skill kihúzása a poolból, a sebesség-torzítással. */
+/* ---- GÓLSZERZÉSRE ÉPÜLŐ RENDSZER → GÓLSZERZÉSI SKILLEK ----
+   A sebesség-torzítás tükörképe a másik tengelyre. A "gólszerzésre épülő
+   taktika" nem kézzel felsorolt lista, hanem magából az adatból jön: a rendszer
+   attrProfile.gol súlya mondja meg, mennyire épül a Gólszerzésre. Így ha egy
+   taktika profilja valaha hangolódik, ez a szabály magától követi.
+     Hosszú labdák .43 → szinte teljes torzítás
+     Gyors kontra  .32 → mérsékelt
+     Széljáték     .27 → enyhe        (ő a sebesség-ágon amúgy is kap)
+     Totális       .26 → épphogy
+     Labdatartás   .19 / Park the bus .18 → semmi
+   A begyakorlottsági kapu ugyanaz, mint a sebesség-ágon: 0,5 illeszkedés alatt
+   nincs bónusz — egy be nem gyakorolt rendszer nem irányítja a fejlődést.
+
+   A HÁROM SEBESSÉGMÉRŐS SKILL KÜLÖN ELŐNYT KAP a torzításon BELÜL: ezek azok,
+   amelyek a "labdába épített sebességmérő" kommentárt hozzák be (fw_cannon,
+   mf_fk, df_cannon — lásd SHOT_SKILL_IDS). Ha a torzítás elsül, először közülük
+   keresünk; csak ha egyik sincs a poolban, jön bármelyik másik gólszerzési
+   skill. FIGYELEM: a fw_cannon (Szitálós) type-ja "rating", nem "goalw" —
+   ezért kell a külön azonosító-lista, a goalw-szűrő önmagában kihagyná. */
+const GOAL_BIAS_MAX=0.75;
+const GOAL_TACTIC_MIN_W=0.25;   /* ez alatti gol-súlynál nem "gólszerzésre épülő" */
+const GOAL_TACTIC_FULL_W=0.45;  /* ennél a súlynál teljes a torzítás */
+const SHOT_METER_PREF=0.6;      /* a torzításon belül ekkora eséllyel a három sebességmérős */
+function isGoalSkill(sk){
+  if(!sk)return false;
+  const types=[sk.type].concat(sk.combo?sk.combo.map(c=>c.type):[]);
+  return types.indexOf("goalw")>=0;}
+function isShotMeterSkill(sk){return !!sk&&SHOT_SKILL_IDS.indexOf(sk.id)>=0;}
+function goalSkillBias(){
+  const act=S.tactics&&S.tactics.active;
+  const t=act&&TACTICS[act];
+  if(!t||!t.attrProfile)return 0;
+  const w=t.attrProfile.gol||0;
+  if(w<GOAL_TACTIC_MIN_W)return 0;
+  const fit=(typeof tacticFit==="function")?tacticFit(act):0;
+  if(fit<=0.5)return 0;
+  const wScale=Math.min(1,(w-GOAL_TACTIC_MIN_W)/(GOAL_TACTIC_FULL_W-GOAL_TACTIC_MIN_W));
+  return Math.min(GOAL_BIAS_MAX,((fit-0.5)/0.5)*GOAL_BIAS_MAX*wScale);}
+/* Egy új skill kihúzása a poolból, a sebesség- és a gól-torzítással.
+   A SORREND SZÁNDÉKOS: előbb a sebesség-ág fut (változatlan viselkedés), és
+   csak ha az nem sült el, jön a gól-ág. Így a két tengelyen egyaránt erős
+   rendszereknél (kontra, széljáték) a régi egyensúly marad az uralkodó. */
 function drawSkillFromPool(){
   if(!S.skillPool.length)S.skillPool=weightedShuffleSkills();
   const b=paceSkillBias();
   if(b>0&&Math.random()<b){
     const i=S.skillPool.findIndex(isPaceSkill);
+    if(i>=0)return S.skillPool.splice(i,1)[0];}
+  const g=goalSkillBias();
+  if(g>0&&Math.random()<g){
+    if(Math.random()<SHOT_METER_PREF){
+      const j=S.skillPool.findIndex(isShotMeterSkill);
+      if(j>=0)return S.skillPool.splice(j,1)[0];}
+    const i=S.skillPool.findIndex(isGoalSkill);
     if(i>=0)return S.skillPool.splice(i,1)[0];}
   return S.skillPool.shift();}
 /* ---- A PADLÓ BEVÁLTÁSA A SZEZON VÉGÉN ----
@@ -22823,7 +22948,11 @@ function euroCampaignEndNow(kind){
     S.seasonHistory[S.seasonHistory.length-1].euro={
       comp:E.comp,won:kind==="win",reached,reachedLabel,prize:E.prize||0,
       /* RUN: saját játékos királyi címei ebben a sorozatban (mérföldkő-forrás) */
-      kings:E.ownKings||[]};}
+      kings:E.ownKings||[],
+      /* ARANYLABDA: a SAJÁT egyéni díjasok NÉVVEL. A kings csak a díj FAJTÁJÁT
+         őrzi, a szavazáshoz viszont tudni kell, KI kapta — a kampány-objektum
+         (és vele E.goldenAwards) pedig az endEuroCampaign-ben eldobódik. */
+      awards:(E.goldenAwards||[]).filter(a=>a&&a.isOwn).map(a=>({name:a.name,label:a.label}))};}
   showEuroScreen();}
 /* A kampány lezárása → tovább a szezonzáró jelentésre.
    KIVÉTEL: a 86-90-es sávban (NB II) a MEGNYERT hazai kupa Konferencia-liga
