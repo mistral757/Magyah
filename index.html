@@ -2103,7 +2103,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.035";
+const APP_VERSION="2.6.036";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10741,41 +10741,27 @@ function autoLevelTargetNow(){
    lép. Csak akkor csinál bármit, ha TÉNYLEGESEN változna — az applyMarketShift
    pedig idempotens (a basePeak-ből számol újra), tehát az ismételt hívás nem
    halmoz semmit. Szezon KÖZBEN nem fut: a mezőny ott továbbra is fix. */
-function autoLevelSync(){
+function autoLevelSync(atBoundary){
   if(gameMode!=="career"||!S.autoLevel)return false;
   if(typeof h2hRoomActive==="function"&&h2hRoomActive())return false;
-  if(typeof hubMidSeasonMode!=="undefined"&&hubMidSeasonMode)return false;
+  /* ---- UGYANAZ A ZÁR, MINT A KÉZI ÁTÁLLÍTÁSNÁL ----
+     HIBA, amit ez javít: itt korábban CSAK a hubMidSeasonMode jelző védett —
+     ugyanaz a hiányos feltétel, ami a kézi úton is lyukas volt. A 8./15./23.
+     forduló átigazolási ablaka viszont a HUB-ba visz, és ott ez a jelző
+     SZÁNDÉKOSAN hamis; a renderHub pedig minden rajzoláskor meghívja ezt a
+     függvényt. Így az auto szintkövetés SZEZON KÖZBEN is lépett, és mivel az
+     alábbi törzs a saját másolatát futtatta az applyOppLevel-ből, a 2.6.033-as
+     védőhálót teljesen megkerülte: a mezőny újraépült a menetrend alatt.
+     Mostantól egyetlen implementáció van, egyetlen zárral. */
+  if(!atBoundary&&levelChangeLockReason())return false;
   const tgt=autoLevelTargetNow();
   if(tgt===oppTargetRating)return false;
   const before=oppTargetRating,aim=autoLevelAim();
-  /* A HORGONYT (careerBaseRating) SZÁNDÉKOSAN NEM ÍRJUK ÁT.
-     Ez volt a piac-skálázás halálos hibája: mindkét szintváltó ráállította a
-     horgonyt az ÚJ szintre, így a marketPeakShift() (= szint − horgony) MINDIG
-     0 lett, és a piac soha nem emelkedett — 121-es mezőnyön is 85-95-ös
-     jelöltek jöttek. A horgony a karrier INDULÁSI szintje, azt egyszer, a
-     beállításnál kapja meg, és onnantól fix. */
-  oppTargetRating=tgt;
-  if(careerPool)Object.values(careerPool).forEach(e=>{
-    if(drafted.has(e.n)){
-      /* A SAJÁT KERETEDHEZ A SZINTVÁLTÁS NEM NYÚL — ez a 2.6.023 lényege.
-         A régi sor egy Math.max-os RACSNI volt (startRating = max(régi,
-         korgörbe(peak))): a megemelt peakből azonnal Ratinget csinált, lefelé
-         viszont sosem vette vissza. Emiatt a nehézség-gomb föl-le nyomogatása
-         korlátlanul növelte a kezdő 11 erejét. A könyvelés (joinLevel,
-         basePeak) marad, hatása nincs. */
-      applyOwnedShift(e);
-      return;}
-    applyMarketShift(e);
-    normalizeMarketAge(e);   /* 100 fölött a piac a csúcskorú neveket mutatja */
-    e.startRating=Math.round(ratingAtAge(e.peak,e.age));
-    /* AZ ATTRIBÚTUMOK IS KÖVETIK. Enélkül a Rating felment, az attribútumok
-       viszont a régi szinten maradtak — és a képesség-keresés (ami kizárólag
-       attribútumot néz) 121-es mezőnyön sem talált 100 fölötti értéket. A
-       szezonváltás ezt már eddig is elvégezte, a szintváltás nem. */
-    syncAttrsToRating(e);
-    if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
-  SEASON_OPPS=buildOpponents(15,oppTargetRating);
-  if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
+  /* A HORGONYT (careerBaseRating) az applyOppLevel SZÁNDÉKOSAN nem írja át —
+     a piac-emelkedés (marketPeakShift = szint − horgony) különben örökre 0
+     maradna. A teljes szint-átvezetés (piac, attribútumok, ellenféltábla) is
+     ott, EGY helyen él. */
+  if(!applyOppLevel(tgt,atBoundary))return false;
   addLine(`✦ Auto szintkövetés (${aim.n}): a mezőny ${before} → ${oppTargetRating}, mert a kereted meccs-ereje ${teamMatchStrength().toFixed(1)}.`,"m life");
   guideFire("ev:autolevel");   /* GUIDE: amikor a mezőny ELŐSZÖR lép magától */
   return true;}
@@ -14675,6 +14661,10 @@ function buildSeasonFixtures(){
      kezdési időpontja (lásd assignFixtureDates). Innentől a menetrend és az
      öltözői jelentés is dátumban tud beszélni, nem csak sorszámban. */
   assignFixtureDates();
+  /* A SZEZON SZINTJE — ehhez a mezőnyhöz épült a menetrend. Rögzítjük, hogy
+     ha bármi mégis elmozdítaná menet közben, a helyreállítás vissza tudja
+     tenni a kijelzett szintet is, ne csak a csapatlistát. */
+  S.seasonOppLevel=oppTargetRating;
   /* A SZEZON RIVÁLISAI a kész menetrend után sorsolódnak: a mezőny ekkor már
      végleges (MP-ben eggyel kevesebb csapat). Szezononként új sorsolás. */
   pickSeasonRivals();
@@ -16498,11 +16488,15 @@ function levelChangeLockReason(){
   if(h2hRoomActive()&&!S.euroOptOut&&!mpCupSettled()&&(phase==="verdict"||phase==="hub"))
     return "Előbb a közös kupanevezés dől el — utána adhatod meg a következő szezonra a javaslatodat.";
   return "";}
-function applyOppLevel(v){
+/* `atBoundary` — a SZEZONHATÁR az egyetlen jogos pillanat, amikor a mezőny
+   akkor is mozdulhat, ha a `phase` már "season": a startNextCareerSeason
+   legelső sora állítja át a fázist, a menetrend viszont csak jóval később
+   épül fel. Kizárólag a szezonindító lánc adja át — a felületről sosem. */
+function applyOppLevel(v,atBoundary){
   /* VÉDŐHÁLÓ: futó szezonban SOSEM nyúlunk a mezőnyhöz, jöjjön a hívás
      bárhonnan. Ez a szabály utolsó bástyája — a felület már korábban tilt, de
      egy jövőbeli hívási hely sem tudja véletlenül szétverni a bajnokságot. */
-  if(seasonInProgress()){
+  if(!atBoundary&&seasonInProgress()){
     addLine("✦ A mezőny erőssége a szezon alatt nem változtatható — a menetrend és a tabella erre a mezőnyre épül.","m ev");
     return false;}
   /* A HORGONY itt sem íródik át — lásd az autoLevelSync-nél írt indoklást.
@@ -26573,7 +26567,7 @@ function beginNextSeasonWithChallenges(){
     /* A KIHÍVÁSOK ELŐTT rendezzük el a mezőnyszintet. A kihívás-kalibráció a
        szint-különbségből dolgozik: ha az automatika csak UTÁNA lépne (ahogy
        korábban), a vállalásaid egy elavult szinthez mérve születnének. */
-    autoLevelSync();
+    autoLevelSync(true);   /* SZEZONHATÁR: itt jogos a lépés */
     S._chAnchorPending=true;
     if(gameMode==="career"&&careerPool&&!S.auto){
       /* hubBack: a szezon eleji nagy vállalásoknál át lehet ugrani a HUB-ba
@@ -26607,7 +26601,7 @@ function startNextCareerSeason(){
      Itt már többnyire nincs mit tenni: a nyáron végig követte a keretet. Ez a
      hívás az utolsó ellenőrzés, illetve azoké a régi mentéseké, amik még a
      folyamatos követés előtt keletkeztek. */
-  if(autoLevelSync()&&MP.active&&MP.role==="host")mpPushLevel();
+  if(autoLevelSync(true)&&MP.active&&MP.role==="host")mpPushLevel();
   /* a vendég a szezonfordulón mindenképp ránéz a közös szintre */
   if(mpLevelLocked())mpPullLevel(true);
   S.seasonNumber=(S.seasonNumber||1)+1;
@@ -26866,6 +26860,7 @@ function saveGame(){
         finalTable:S.finalTable,seasonClosed:S.seasonClosed,hubReportHtml:S.hubReportHtml,
         /* rivális-rendszer és bajnoki narratíva (szezononként új) */
         rivals:S.rivals,seasonNews:S.seasonNews,titleWonSeason:S.titleWonSeason,
+        seasonOppLevel:S.seasonOppLevel,   /* a szint, amire a menetrend épült */
         infLiftRetired:S.infLiftRetired,
         _titleChanceThisMatch:S._titleChanceThisMatch,_wasLeader:S._wasLeader,
         /* F6: a párharc tartós állapota — a kiegyenlítő eltolás, a szezonzáró
@@ -26990,8 +26985,19 @@ function applySavedGame(d){
       const known=new Set((SEASON_OPPS||[]).map(o=>o&&o.n));
       if(fixOpps.length&&fixOpps.some(o=>!known.has(o.n))){
         SEASON_OPPS=fixOpps;
+        /* A KIJELZETT SZINT is hazudott: azt a szintet mutatta, amire menet
+           közben elugrott, nem azt, amin a szezon tényleg megy. Ha tudjuk,
+           mire épült a menetrend, visszatesszük. */
+        if(S.seasonOppLevel!=null){
+          oppTargetRating=S.seasonOppLevel;
+          if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();}
         _aiSchedCache=null;liveTableInvalidate();
-        addLine("✦ Helyreállítás: a mezőny és a menetrend szétcsúszott (a szint menet közben állítódott át). A tabella mostantól újra a menetrendedhez tartozó csapatokat mutatja — a szint a szezon végén állítható át.","m ev");}}
+        addLine("✦ Helyreállítás: a mezőny és a menetrend szétcsúszott (a szint menet közben állítódott át). A tabella mostantól újra a menetrendedhez tartozó csapatokat mutatja — a szint a szezon végén állítható át.","m ev");
+      }else if(S.seasonOppLevel==null){
+        /* ÉP a szezon, csak még nincs feljegyezve, milyen szinten épült (a
+           mező most született). Rögzítjük — így ez a mentés is védett lesz,
+           anélkül hogy meg kellene várni a következő szezont. */
+        S.seasonOppLevel=oppTargetRating;}}
   }catch(e){}
   /* a mezőny saját menetrendje és az élő tabella a betöltött állapotból épül újra */
   _aiSchedCache=null;liveTableInvalidate();
