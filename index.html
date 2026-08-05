@@ -2057,7 +2057,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.029";
+const APP_VERSION="2.6.030";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10858,6 +10858,23 @@ function resetGameState(){
   slots.length=0;
   SEASON_OPPS.length=0;
   curSquad=null;pendingPlayer=null;
+  /* ---- A DRAFT SAJÁT ÁLLAPOTGÉPE ----
+     HIBA, amit ez javít: a draftStage és a benchCatIndex ebből a törlésből
+     kimaradt. Egy LEZAJLOTT draft után mindkettő a végállapotában maradt
+     (stage "bench", index 4 = a négy pad-helyen TÚL), és az új játék pontosan
+     onnan indult: a képernyő "Cserepad: Csatár csere (5/4)"-et kért, a kezdő
+     11 viszont 0/11-en állt, és nem is lehetett feltölteni — a draft
+     zsákutcába futott, ahonnan nem volt kiút.
+     A családtag-kör ugyanígy: a -2 azt jelenti, hogy "már megvolt", tehát egy
+     új karrierben némán elmaradt volna a családtag. */
+  draftStage="main";benchCatIndex=0;
+  familyRound=-1;familyState=null;
+  /* ---- SZEREP-FELÜLÍRÁSOK ----
+     A megbízások (középpályás szerepek, árnyékék) a KERETHEZ tartoznak, nem a
+     felhasználóhoz — egy új karriernek a felállás alapbeállításáról kell
+     indulnia. Enélkül az előző karrier középpálya-beosztása átszivárgott: a
+     4-3-3 alap VKP/KKP/TKP helyett KKP/TKP/TKP jelent meg a friss drafton. */
+  slotRoles={};
   /* --- csapat-azonosság --- */
   captainIdx=-1;captainName=null;pendingCaptainIdx=-1;
   teamName="30-0 XI";coach=null;
@@ -10873,10 +10890,36 @@ function resetGameState(){
      visszaállította, de ezek nem az S-en élnek) */
   _aiSchedCache=null;liveTableInvalidate();
   phase="draft";}
+/* ---- A FUTÓ JÁTÉK KÉPERNYŐINEK LEBONTÁSA ----
+   Az ÁLLAPOT törlése (resetGameState) nem elég: a DOM-ban ott maradnak a
+   korábbi karrier megnyitott képernyői. A multiplayer-indulás ugyanis nem
+   tölti újra a lapot — csak elrejti a kezdőlap-réteget (mpEntry) —, tehát
+   ami alatta volt, az egyszerűen előbukkan.
+   Ez volt a bejelentett tünet másik fele: a friss MP-draft alatt végig ott
+   állt az előző egyjátékos karrier pályaképe, a meccsnaplója és a
+   tabellája. Innentől minden új játék tiszta vászonról indul — a hívó
+   ezután nyitja ki azt az EGY képernyőt, amire szüksége van. */
+const GAME_SCREEN_IDS=["scFormation","scScout","scOpponents","scClubPick","scDraft",
+  "scPitch","scSkill","scSim","scWindow","scVerdict","scHub","hubFormationPicker",
+  "scEuro","scInfReport","scUnlock"];
+const GAME_OVERLAY_IDS=["sellConfirmModal","hubTacticConfirmModal","lockerModal",
+  "squadModal","challengeModal","scheduleModal","championModal","guideTip","guideDim"];
+function teardownGameScreens(){
+  GAME_SCREEN_IDS.concat(GAME_OVERLAY_IDS).forEach(id=>{
+    const el=$(id);if(el)el.classList.add("hide");});
+  /* A meccsnapló és a tabella TARTALMA is a régi játéké — ha bennmarad, az új
+     karrier első kezdőrúgása egy idegen szezon sorai alá írna. */
+  ["ttLines","standing","euroLog","hubRoster","squadList"].forEach(id=>{
+    const el=$(id);if(el)el.innerHTML="";});
+  /* futó guide-buborék horgonya nem maradhat a törölt képernyőn */
+  try{if(typeof guideClearAnchor==="function")guideClearAnchor();}catch(e){}
+  _guideQ=[];_guideCur=null;}
 function beginNewGame(){
   /* MINDEN új játék — egyjátékos, MP-házigazda, MP-vendég — ezen a ponton megy
-     át, ezért itt a helye a teljes törlésnek. */
+     át, ezért itt a helye a teljes törlésnek: előbb az ÁLLAPOT, aztán a
+     KÉPERNYŐK. A kettő külön lépés, mert két külön szivárgási út volt. */
   resetGameState();
+  teardownGameScreens();
   /* GUIDE MÓD: a beállító képernyő választása itt kerül az állapotba — a
      resetGameState UTÁN, különben a friss S felülírná. Csak karrierben. */
   S.guideOn=(gameMode==="career")&&!!guideWanted;
@@ -26593,6 +26636,19 @@ function applySavedGame(d){
   CHEM={total:d.CHEM.total,notes:d.CHEM.notes,goodPairs:new Set(d.CHEM.goodPairs||[])};
   phase=d.phase;draftStage=d.draftStage;benchCatIndex=d.benchCatIndex;
   familyRound=d.familyRound;familyState=d.familyState;
+  /* ---- ÖNJAVÍTÁS: BERAGADT DRAFT ----
+     A cserepad-körbe CSAK teli kezdő 11-gyel lehet eljutni (lásd place() és a
+     családtag-ág: mindkettő a `slots.every(s=>s.player)` feltételhez köti).
+     Ezért a "bench" szakasz ÜRES hellyel definíció szerint sérült állapot —
+     azt a korábbi, hiányos állapot-törlés hagyta hátra, amikor egy futó
+     karrier draft-állapotgépe átszivárgott egy friss játékba. A tünet
+     zsákutca volt: "Csatár csere (5/4)", 0/11 poszt, és semmi nem tölthető.
+     Itt csendben visszaállunk a fő körre — a már megkezdett draft folytatható,
+     nem kell új karriert kezdeni. Ép mentésen ez az ág sosem fut le. */
+  if(draftStage==="bench"&&slots.some(s=>!s||!s.player)){
+    draftStage="main";benchCatIndex=0;}
+  /* A pad-index a négy általános helyre mutat; bármi más elavult mentés. */
+  if(!(benchCatIndex>=0&&benchCatIndex<DRAFT_BENCH_CATS.length))benchCatIndex=0;
   /* Régi mentésben ezek nincsenek meg — ilyenkor a korábbi viselkedést tartjuk:
      a családtag-kör BE volt kapcsolva, a beépített névlistával. Így egy futó
      draft nem veszíti el a családtagját az új alapérték (ki) miatt. */
