@@ -2103,7 +2103,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.031";
+const APP_VERSION="2.6.032";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -19320,8 +19320,27 @@ function twFinalizeSigning(cand,note,overridePrice,completeFn){
   if(overridePrice!=null)cand._negotiatedPrice=overridePrice;
   $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">Megegyeztünk!</div><p style="font-size:13px;margin-top:5px">${note}</p>`;
   twShowPlacement(cand,completeFn);}
-function twShowPlacement(cand,completeFn){
+/* ================= AZ IGAZOLÁS ELHELYEZÉSE =================
+   Régen minden aláírás után feljött egy választó: "kit vált le az újonc?" —
+   a kezdő 11 és a cserepad minden szóba jöhető helye, plusz egy "tartalékba
+   teszem" gomb. Egy átigazolási ablakban ez öt-hat alkalommal is megállította
+   a folyamatot, holott a válasz szinte mindig ugyanaz volt: tartalékba.
+   A keret rendezése amúgy is a HUB dolga, ott sokkal jobb felülettel.
+
+   MOSTANTÓL: karrier módban MINDEN igazolás egyenesen a TARTALÉK-KERETBE megy,
+   kérdés nélkül. Onnan a HUB keretlistájában egyetlen posztcserével kerül a
+   helyére, amikor és ahogy te akarod.
+
+   EGYETLEN KIVÉTEL az ÁLOMIGAZOLÁS. Az az ajánlat természeténél fogva EGY
+   KONKRÉT emberre szól ("nála jobb és ígéretesebb érkezne"), ezért ott nincs
+   mit kérdezni: akinek a helyére jön, azt a klub elengedi, az újonc pedig
+   pontosan az ő helyére áll be. Lásd cfg.replaceSlotIdx.
+
+   KLASSZIKUS MÓDBAN nincs tartalék-keret (az a karrier fogalma), ezért ott
+   marad a régi választó — különben az igazolásnak nem lenne hova érkeznie. */
+function twShowPlacement(cand,completeFn,cfg){
   completeFn=completeFn||twCycleComplete;
+  cfg=cfg||{};
   const rawPrice=cand._negotiatedPrice!=null?cand._negotiatedPrice:(gameMode==="career"?buyPrice(cand):0);
   /* ---- INGYEN IGAZOLÁS TOKEN ----
      A token korábban három akadémistát kínált fel — vagyis épp a leggyengébb
@@ -19339,6 +19358,57 @@ function twShowPlacement(cand,completeFn){
   /* A GOMBOK LETAKARÍTÁSA — enélkül a "Magasabb árat kérnek" igen/nem gombjai
      ottragadtak a #twActions-ben a "Megegyeztünk!" alatt. */
   $("twActions").innerHTML="";
+  /* Közös lezárás: egyetlen "Tovább" gomb, ami a folyamatot viszi. */
+  const finish=()=>{
+    drawPitch();updateBar();
+    const b=document.createElement("button");b.className="btn-p stepbtn";b.textContent="Tovább";
+    b.onclick=()=>completeFn();
+    $("twActions").innerHTML="";$("twActions").appendChild(b);};
+  /* ---- KIVÉTEL: AZ ÁLOMIGAZOLÁS EGY KONKRÉT EMBER HELYÉRE JÖN ---- */
+  if(cfg.replaceSlotIdx!=null&&slots[cfg.replaceSlotIdx]){
+    const sl=slots[cfg.replaceSlotIdx];
+    const out=sl.player;
+    sl.player=cand;sl.fit=fitFor(cand,sl);sl.origin=null;
+    drafted.add(cand.n);markArrived(cand,finalPrice);
+    payFor(cand.n);
+    /* A távozó ember kötései is vele mennek — enélkül a párkémiája egy már
+       nem létező kerettagra mutatna. */
+    if(out){
+      if(S.unavailable)delete S.unavailable[out.n];
+      try{pruneChemistry();}catch(e){}
+      addLine(`🔄 ${esc(shortName(out.n))} helyére ${esc(shortName(cand.n))} érkezett — a klub elengedte a régi emberét.`,"m life");}
+    try{ensureCaptainValid();}catch(e){}
+    $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">Megvan az álomigazolás!</div>
+      <p style="font-size:13px;margin-top:5px;line-height:1.55">
+        <b>${esc(cand.n)}</b> beállt a kezdő tizenegybe${out?`, <b>${esc(out.n)}</b> helyére — őt a klub elengedte`:""}.
+        ${finalPrice>0?`<br>Az igazolás ára: <b>${fmtFt(finalPrice)}</b>.`:""}
+      </p>`;
+    finish();return;}
+  /* ---- KARRIER: MINDEN MÁS IGAZOLÁS EGYENESEN A TARTALÉK-KERETBE ---- */
+  if(gameMode==="career"){
+    if(fullCareerRoster().length>=MAX_CAREER_ROSTER){
+      /* Nincs hova tenni, és a kezdő 11-hez a rendszer magától NEM nyúl —
+         az a te döntésed. Ilyenkor az igazolás nem jön létre, és nem is
+         fizetsz érte semmit. */
+      $("twBody").innerHTML=`<div class="h" style="color:var(--red)">Tele a keret</div>
+        <p style="font-size:13px;margin-top:5px;line-height:1.55">
+          <b>${esc(cand.n)}</b> szívesen jött volna, de a kereted megtelt
+          (${MAX_CAREER_ROSTER}/${MAX_CAREER_ROSTER}) — az új emberek a tartalék-keretbe érkeznek,
+          ott viszont nincs több hely. <span style="color:var(--dim)">A HUB-ban adhatsz el valakit,
+          vagy bővítheted a keretet; addig az igazolás elmarad, és nem fizettél érte semmit.</span></p>`;
+      finish();return;}
+    extraRoster.push(cand);
+    drafted.add(cand.n);markArrived(cand,finalPrice);
+    payFor(cand.n);
+    $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">Aláírt!</div>
+      <p style="font-size:13px;margin-top:5px;line-height:1.55">
+        <b>${esc(cand.n)}</b>${cand.pos?` (${cand.pos.join("/")}${cand.age!=null?`, ${cand.age} év`:""}, Rating ${Math.round(pOvr(cand))})`:""}
+        a <b>tartalék-keretbe</b> érkezett.
+        ${freeTok?`<br>🎁 Ingyen igazolás-token beváltva — ${fmtFt(rawPrice)} megspórolva.`
+                 :(finalPrice>0?`<br>Ár: <b>${fmtFt(finalPrice)}</b> · egyenleg: ${fmtFt(S.transferBudget||0)}`:"")}
+        <br><span style="color:var(--dim)">A HUB keretlistájában egyetlen posztcserével teheted a kezdőbe vagy a padra.</span></p>`;
+    finish();return;}
+  /* ---- KLASSZIKUS MÓD: marad a régi választó (nincs tartalék-keret) ---- */
   /* A KATEGÓRIA A JELÖLTBŐL — nem a TW.category-ból.
      FIX: az attribútum-kereső átigazolásnál a találat BÁRMILYEN posztú lehet,
      ezért a TW.category vagy üres, vagy nem illik a játékoshoz. A régi kód
@@ -19376,24 +19446,6 @@ function twShowPlacement(cand,completeFn){
     box.appendChild(row);});
   $("twBody").appendChild(box);
   $("twActions").innerHTML="";
-  if(gameMode==="career"){
-    const reserveBtn=document.createElement("button");
-    reserveBtn.className="btn-s stepbtn";reserveBtn.style.marginTop="8px";
-    if(fullCareerRoster().length>=MAX_CAREER_ROSTER){
-      reserveBtn.textContent=`Tartalékba teszem (tele van a keret — ${MAX_CAREER_ROSTER}/${MAX_CAREER_ROSTER})`;
-      reserveBtn.disabled=true;
-    }else{
-      reserveBtn.textContent=freeTok
-        ?`Tartalékba teszem (🎁 INGYEN — token) — nem cserél le senkit`
-        :`Tartalékba teszem (ár: ${fmtFtShort(finalPrice)}) — nem cserél le senkit`;
-      reserveBtn.onclick=()=>{
-        extraRoster.push(cand);
-        drafted.add(cand.n);markArrived(cand,finalPrice);
-        payFor(cand.n);
-        drawPitch();updateBar();
-        completeFn();};
-    }
-    $("twActions").appendChild(reserveBtn);}
   const cancelBtn=document.createElement("button");
   cancelBtn.className="btn-s stepbtn";cancelBtn.style.marginTop="8px";
   cancelBtn.textContent="Mégsem, nem igazolom le";
@@ -19523,8 +19575,10 @@ function showDreamOffer(cand){
     drafted.add(cand.repl.n);
     cand.repl._negotiatedPrice=0;
     TW.category=getCategoryFor(cand.repl.pos[0]);
-    $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">Megegyeztünk!</div><p style="font-size:13px;margin-top:5px">${esc(cand.repl.n)} csatlakozik a csapathoz.</p>`;
-    twShowPlacement(cand.repl,twNextCycleOrFinish);};
+    /* AZ ÁLOMIGAZOLÁS AZ EGYETLEN, AMI NEM A TARTALÉKBA JÖN. Az ajánlat maga
+       egy KONKRÉT emberre szólt ("nála jobb és ígéretesebb"), ezért nincs mit
+       kérdezni: ő megy, az újonc pedig pontosan az ő helyére áll be. */
+    twShowPlacement(cand.repl,twNextCycleOrFinish,{replaceSlotIdx:cand.idx});};
   const noBtn=document.createElement("button");noBtn.className="btn-s stepbtn";noBtn.style.marginTop="6px";noBtn.textContent="Nem, elutasítom";
   noBtn.onclick=()=>{
     $("twBody").innerHTML=`<div class="h" style="color:var(--dim)">Elutasítva</div><p style="font-size:13px;margin-top:5px">Az álomigazolást (${esc(cand.repl.n)}) udvariasan elutasítottátok.</p>`;
@@ -19532,10 +19586,9 @@ function showDreamOffer(cand){
     btn.onclick=()=>twNextCycleOrFinish();
     $("twActions").innerHTML="";$("twActions").appendChild(btn);};
   $("twActions").innerHTML="";$("twActions").appendChild(yesBtn);$("twActions").appendChild(noBtn);}
-/* Az ikonikus ajánlat mostantól sosem ír felül automatikusan senkit: el kell
-   fogadni, és elfogadás után is TE választod ki, hogy a tartalékba kerüljön,
-   vagy valamelyik konkrét kezdő/cserepados helyére — ugyanaz a rugalmas
-   elhelyezés-választó, mint egy rendes átigazolásnál. */
+/* Az ikonikus ajánlat sosem ír felül automatikusan senkit: el kell fogadni,
+   és elfogadás után a tartalék-keretbe érkezik, mint minden más igazolás —
+   onnan a HUB-ban teszed a helyére. */
 function showIconOffer(rawIcon){
   const icon=normalizeIconPlayer(rawIcon);
   $("twBody").innerHTML=`<div class="h" style="color:var(--gold)">✦ IKONIKUS AJÁNLAT ✦</div><p style="font-size:13px;margin-top:5px">Hihetetlen bejelentés járja be az országot: <b>${esc(icon.n)}</b> csatlakozna a csapathoz! Elfogadod az ajánlatot?</p>`;
