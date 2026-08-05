@@ -1993,7 +1993,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.022";
+const APP_VERSION="2.6.023";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7475,7 +7475,25 @@ function maxOppRating(){return infinityMode?INFINITY_BASE_MAX+infinityTiers*INFI
    lépsz szintet. A játékosok EGYMÁSHOZ mért sorrendje sérthetetlen: Messi
    marad a legjobb, csak az egész piac emelkedik veled együtt. */
 let careerBaseRating=80;   /* a karrier indulási mezőnyszintje — ehhez képest mozog a piac */
-function marketPeakShift(){return Math.max(0,oppTargetRating-careerBaseRating);}
+/* ---- A PIAC 100 FÖLÖTT LASSABBAN NŐ ----
+   100 alatt az eltolás 1:1 marad (ott a te kereted és a piac ugyanabban a
+   sávban mozog, nincs mit tompítani). A 100 FÖLÖTTI részt viszont csak
+   részlegesen adjuk oda: a mezőny továbbra is teljes ütemben emelkedik (azt a
+   nehézség adja), a MEGVÁSÁROLHATÓ és a SCOUT ÁLTAL TALÁLT játékosok viszont
+   nem szaladnak el a saját, kézzel felnevelt kereted elől.
+   Ez váltja fel a régi "a te kereted is együtt nő a szinttel" liftet: nem a
+   sajátodat emeljük a piachoz, hanem a piacot fogjuk vissza hozzád.
+   Mérve egy 80-ról indult karrierben: 150-es mezőnyön az eltolás 70 helyett
+   47,5 — egy 95-ös alap-peakű valós sztár tehát ~142-t hoz, nem 165-öt. */
+const MARKET_INF_SCALE=0.55;
+function marketPeakShift(){
+  const raw=Math.max(0,(oppTargetRating||0)-careerBaseRating);
+  if(raw<=0)return 0;
+  /* hány pont esik a 100-as küszöb ALÁ a karrier indulószintjéhez képest */
+  const belowSpan=Math.max(0,INFINITY_UNLOCK_RATING-careerBaseRating);
+  const below=Math.min(raw,belowSpan);
+  const above=raw-below;
+  return below+above*MARKET_INF_SCALE;}
 /* Az Infinity-akadémia SAJÁT, külön eltolást használ — NEM a fenti
    marketPeakShift()-et. Az volt a hiba: marketPeakShift() a karrier
    TELJES indulási nehézségéhez viszonyít (pl. 80-tól), ami sok szintlépés
@@ -7586,52 +7604,104 @@ function applyMarketShift(entry){
   const shift=marketPeakShift();
   entry.peak=Math.min(ratingCap(),entry.basePeak+shift);
   entry.tsi=shift>0?Math.max(entry.baseTsi,peakToTsi(entry.peak)):entry.baseTsi;}
-/* ================= INFINITY: A SAJÁT KERET IS LÉPÉST TART =================
-   A PANASZ, amit ez orvosol: Infinity megnyitása után a piac egy-két szint
-   alatt lecserélte a teljes keretet, és emiatt értelmetlenné vált a kitolt
-   életkorhatár — hiába játszhat valaki 55 éves koráig, ha 3 szint múlva
-   menthetetlenül gyenge.
+/* ================= INFINITY: A SZINTLÉPÉS MÁR NEM EMELI A KERETEDET =========
+   ELŐZMÉNY. Volt itt egy "szint-követés": Infinityben a keretedben lévő játékos
+   peakje is együtt emelkedett a mezőnnyel, attól a szinttől kezdve, ahol hozzád
+   került (peak = basePeak + (szint − joinLevel)). A szándék jó volt — hogy a
+   sztárjaid ne rohadjanak el a veled együtt emelkedő piac alatt —, a
+   MELLÉKHATÁSA viszont vállalhatatlan lett.
 
-   A KIVÁLTÓ OK strukturális, nem hangolási: a két oldal MÁS TÖRVÉNY szerint nő.
-     · piaci játékos : peak = basePeak + (szint − karrier indulószintje)
-                       — vagyis 1:1 együtt emelkedik a mezőnnyel, ingyen;
-     · a te játékosod: peak += túlteljesítés × 0,3 — évi pár pont, és csak ha
-                       felül tudja múlni a saját korgörbéjét.
-   A piac tehát lineáris, a kereted teljesítmény-alapú. Néhány szintlépés után
-   a szakadék behozhatatlan, és a "fejleszd a sztárodat" játékstílus meghal.
+   A HIBA, amit ez a változat megszüntet. A szintváltó két útja (kézi
+   applyOppLevel és autoLevelSync) a lift után ezt csinálta:
+       entry.startRating = MAX(entry.startRating, ratingAtAge(entry.peak, age))
+   A Math.max RACSNI: fölfelé enged, lefelé soha. Vagyis
+       szint föl → peak föl → startRating föl (véglegesen)
+       szint le  → peak vissza, startRating MARAD fent
+   — és a kör újrakezdhető. A HUB-ban a nehézség-gombot nyomogatva a kezdő 11
+   ereje korlátlanul növelhető volt. Ez nem hangolási kérdés volt, hanem
+   szerkezeti: a szint egyszerre volt nehézség-szabályzó ÉS erőforrás.
 
-   A JAVÍTÁS: Infinityben a KERETEDBEN lévő játékos is megkapja ugyanazt a
-   szint-emelést — de csak attól a szinttől kezdve, AHOL HOZZÁD KERÜLT
-   (entry.joinLevel). Ez a különbség a lényeg:
-     · a nálad felnevelt/megtartott sztár nem rohad el a szint alatt,
-     · a frissen vett játékos viszont NEM kap visszamenőleges ajándékot —
-       ő a saját basePeak-jével érkezik, tehát a vásárlás továbbra is valódi
-       minőségi ugrást jelent, nem automatikus fölényt.
-   Mivel a régi játékosod mindezen felül hozza a skilljeit, a párkémiáját, a
-   Champion-kártyáit és a taktikai illeszkedését, a MEGTARTÁS+FEJLESZTÉS lesz
-   a jobb üzlet — a piac pedig marad az, aminek lennie kell: alapminőség-
-   ugrás lehetősége, nem kényszerű körforgás.
+   A DÖNTÉS: a szintlépés 100 fölött MOSTANTÓL PONTOSAN UGYANAZ, mint 100 alatt
+   — a mezőnyt állítja, a te keretedhez nem nyúl. Ez a függvény ezért fixen 0-t
+   ad; megmarad, mert több hívó is kérdezi (szezonváltás, auto-szintkövetés),
+   és mert így a "mennyi volt a lift" kérdés egyetlen helyen dől el.
 
-   NORMÁL MÓDBAN EZ A FÜGGVÉNY NEM CSINÁL SEMMIT — a 119-es plafon alatt a
-   piac és a keret együtt mozog, ott nincs mit orvosolni. */
-function ownedPeakLift(entry){
-  if(!infinityMode||!entry)return 0;
-  if(entry.joinLevel==null)return 0;
-  return Math.max(0,(oppTargetRating||0)-entry.joinLevel);}
-/* A keretedben lévő játékos szint-követése. Ugyanaz a szerep, mint a piacnál
-   az applyMarketShift-é. A basePeak marad a KIÉRDEMELT csúcs (azt a szezonvégi
-   fejlődés írja), a lift pedig mindig ÚJRASZÁMÍTÓDIK belőle — így nem
-   halmozódik, és egy szintcsökkentés is visszaveszi. */
+   AMI HELYETTE VÉD az elavulástól, két irányból:
+     · a piac 100 fölött LASSABBAN nő (MARKET_INF_SCALE) — az igazolások és a
+       scout-találatok nem szaladnak el a saját kereted elől;
+     · az Infinity megnyitásának pillanatában MINDEN saját játékosod egyszeri
+       TSI-boostot kap (infinityOwnedTsiBoost) — vagyis magasabb PLAFONT, amibe
+       játékkal bele lehet nőni, nem ingyen Ratinget. */
+function ownedPeakLift(entry){void entry;return 0;}
+/* ---- AZ INFINITY NYITÓ AJÁNDÉKA: TSI MINDENKINEK, AKI A TIÉD ----
+   A megszűnt lift helyett ez tartja versenyben a saját keretedet — de
+   MÁSKÉPP. A lift Ratinget adott, minden szintlépésnél újra; ez PLAFONT ad,
+   egyetlen egyszer. A különbség lényegi: a TSI a játékos potenciálja, amiből a
+   peak (és így a fejlődési plafon, peak+3) származik. A magasabb plafonba
+   BELE KELL NŐNI — meccsekkel, formával, edzéssel. Ingyen Rating nincs benne.
+
+   MINDENKI megkapja, aki a megnyitás pillanatában a tiéd: kezdő 11, cserepad
+   és tartalék-keret egyaránt — nem csak a pályán lévők. Aki KÉSŐBB érkezik, az
+   már nem: ő a piac saját (100 fölött visszafogott) szintjén jön.
+
+   Mérve: egy 100-as peakű játékosnál +6-7 peak, egy 85-ösnél +4-5. */
+const INFINITY_OWNED_TSI_MULT=1.5;
+function infinityOwnedTsiBoost(){
+  if(gameMode!=="career"||!careerPool)return [];
+  const out=[];
+  const roster=new Set();
+  ((typeof fullCareerRoster==="function")?fullCareerRoster():[]).forEach(p=>{if(p)roster.add(p.n);});
+  /* Védőháló: ha a keret-lekérdezés bármiért hiányos, a `drafted` halmaz a
+     második forrás — az minden hozzád került játékost tartalmaz. */
+  drafted.forEach(n=>roster.add(n));
+  roster.forEach(n=>{
+    const e=careerPool[n];
+    if(!e||e._infTsiBoosted)return;
+    e._infTsiBoosted=true;
+    const beforeTsi=e.tsi||0,beforePeak=e.peak||0;
+    e.tsi=Math.min(200000,Math.round(beforeTsi*INFINITY_OWNED_TSI_MULT));
+    e.peak=Math.min(ratingCap(),Math.max(e.peak||0,tsiToPeakOvr(e.tsi)));
+    e.basePeak=Math.max(e.basePeak||0,e.peak);
+    if(e.baseTsi!=null)e.baseTsi=Math.max(e.baseTsi,e.tsi);
+    if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);
+    if(e.peak>beforePeak)out.push({n,dPeak:Math.round(e.peak-beforePeak),dTsi:e.tsi-beforeTsi});});
+  out.sort((a,b)=>b.dPeak-a.dPeak);
+  return out;}
+/* ---- EGYSZERI MIGRÁCIÓ: A MÁR MEGKAPOTT LIFT BEÉPÍTÉSE ----
+   Egy futó Infinity-karrierben a keret peakje már tartalmazza a régi liftet.
+   Ha csak úgy kikapcsolnánk, a következő szezonváltás (ami a peaket a
+   basePeak-ből számolja újra) csendben visszavenné — a fejlődési plafon
+   leesne, és a játékos évekig nem tudna fejlődni.
+   AMIT MÁR MEGKAPTÁL, AZ A TIÉD: a liftet egyszer beépítjük a basePeak-be
+   (vagyis kiérdemelt csúccsá minősítjük), és onnantól a szintlépés nem ad
+   többet. Új karrierben nincs mit migrálni. */
+function retireInfinityLift(){
+  if(S.infLiftRetired)return;
+  S.infLiftRetired=true;
+  if(gameMode!=="career"||!careerPool)return;
+  /* LIFT KIZÁRÓLAG INFINITYBEN LÉTEZETT (a régi ownedPeakLift 0-t adott
+     normál módban). A joinLevel viszont normál módban is beállt, ezért enélkül
+     egy 100 alatti karrier olyan erőt kapna, amit sosem kapott meg. */
+  if(!infinityMode)return;
+  let n=0,sum=0;
+  Object.values(careerPool).forEach(e=>{
+    if(!e||!drafted.has(e.n)||e.joinLevel==null)return;
+    const lift=Math.max(0,(oppTargetRating||0)-e.joinLevel);
+    if(lift<=0)return;
+    const base=(e.basePeak!=null?e.basePeak:e.peak)||0;
+    e.basePeak=Math.min(ratingCap(),base+lift);
+    e.peak=Math.min(ratingCap(),Math.max(e.peak||0,e.basePeak));
+    n++;sum+=lift;});
+  if(n)addLine(`∞ A szintlépés mostantól nem emeli a keretedet — a már megkapott erő viszont a tiéd marad: ${n} játékosnál beépítettük a kiérdemelt csúcsba (átlag +${(sum/n).toFixed(1)} peak).`,"m life");}
+/* A keretedben lévő játékos szint-lépése. A peakhez MÁR NEM NYÚL — csak a két
+   könyvelési horgonyt állítja be, ha még hiányoznak:
+     joinLevel : melyik mezőnyszinten került hozzád (a migrációnak és a
+                 jövőbeli statisztikáknak kell, hatása nincs),
+     basePeak  : a KIÉRDEMELT csúcs, amit a szezonvégi fejlődés ír. */
 function applyOwnedShift(entry){
   if(!entry)return;
-  /* Az első találkozáskor rögzítjük, milyen mezőnyszinten került hozzád.
-     Régi mentésben és a draftolt kereten ez most áll be: visszamenőleges
-     ugrást szándékosan nem adunk, csak innentől tart lépést. */
   if(entry.joinLevel==null)entry.joinLevel=oppTargetRating||0;
-  if(entry.basePeak==null)entry.basePeak=entry.peak;
-  if(!infinityMode)return;
-  entry.peak=Math.min(ratingCap(),entry.basePeak+ownedPeakLift(entry));
-  entry.tsi=Math.max(entry.tsi||0,peakToTsi(entry.peak));}
+  if(entry.basePeak==null)entry.basePeak=entry.peak;}
 function tsiToPeakOvr(tsi){
   const normalized=Math.pow(Math.max(0,(tsi-150))/5500,1/2.5);
   /* Normál módban a görbe 96-nál telítődik — ez a valós keretek felső sávja.
@@ -9563,7 +9633,7 @@ const GLOSSARY={
   oregedes:{title:"Öregedés és visszavonulás",text:"A játékosaid minden szezonváltáskor öregszenek, és a fejlődésük korfüggő: 21 év alatt a pozitív lépések duplán számítanak, 25 alatt 1,6-szorosan, 30 alatt már csak 0,8-szorosan, afölött 0,4-szeresen — a hanyatlás viszont pont fordítva gyorsul. 31 éves kortól évente nő a visszavonulás esélye, és a csúcsához képest sokat vesztett játékosnál még inkább. A távozás SOSEM ér váratlanul: a játékos előre bejelenti a szándékát, a figyelmeztetés szezonjában biztosan végigjátssza az idényt, és a rákövetkező egy vagy két szezon végén vonul vissza — van tehát időd utánpótlást igazolni vagy poszt-tanulást indítani. Az „öreg csirkefogó\" boost 41 éves korig kitolja a nyugdíjat. Infinity módban nincs Rating-hanyatlás, és a határ 55 év."},
   fejlodes:{title:"Folyamatos fejlődés",text:"A játékosaid nem csak szezonváltáskor fejlődnek — minden meccs, amin játszanak (különösen ha jól teljesítenek), apránként hozzáad a fejlődésükhöz. Egy kiugró szezon tartósan feljebb tolhatja egy fiatal játékos hosszú távú pályáját."},
   csaladtag:{title:"Családtag",text:"Karrier mód elején egy családtagod is bekerülhet a keretbe, saját specialitással (pl. gyors reflexek, kőkemény játékos, 200 IQ). Ő sosem cserélhető le automatikusan, és ha kiemelkedő pillanata van egy meccsen, a csapat morálja jobban felnagyítva reagál rá."},
-  infinity:{title:"Infinity mód",text:"A 100-as szint elérése után feloldható a végtelen mód: eltűnik a 119-es Rating-plafon, a játékosok 55 éves korig játszhatnak, az akadémia és a piac a mezőnyszinthez skálázódik, a nehézség pedig 200-ig (majd további szintekkel még feljebb) tolható. Itt már nincs Rating-hanyatlás, csak a fejlődés és a végtelen kihívás."},
+  infinity:{title:"Infinity mód",text:"A 100-as szint elérése után feloldható a végtelen mód: eltűnik a 119-es Rating-plafon, a játékosok 55 éves korig játszhatnak, az akadémia a mezőnyszinthez skálázódik, a nehézség pedig 200-ig (majd további szintekkel még feljebb) tolható. Itt már nincs Rating-hanyatlás, csak a fejlődés és a végtelen kihívás. A MEGNYITÁS PILLANATÁBAN a teljes kereted — kezdő 11, cserepad és tartalék egyaránt — egyszeri TSI-boostot kap: magasabb lesz a fejlődési plafonjuk, amibe játékkal lehet belenőni. A SZINTLÉPÉS 100 FÖLÖTT PONTOSAN UGYANAZ, mint alatta: a mezőnyt állítja, a te keretedhez nem nyúl. Ami megvéd az elavulástól, az a piac: 100 fölött a megvásárolható és a scout által talált játékosok jóval lassabban erősödnek, mint a mezőny — így a saját, felnevelt kereted marad a karriered gerince, nem a folyamatos vásárlás."},
   ifiboost:{title:"Ifi-boost",text:"A HUB-ban egy topjátékos áráért berobbanthatod egy saját akadémistád fejlődését: azonnal +6-12 Rating és jelentős TSI-ugrás, ami a hosszú távú fejlődését is felgyorsítja. Magasabb mezőnyszinten arányosan drágább, de erősebb is. Így egy ígéretes tehetség pár szezon alatt sztárrá érlelhető."},
   statisztika:{title:"Statisztika",text:"A karrier során vezetjük minden játékos mindenkori teljesítményét: meccsek, gólok, gólpasszok, mesterhármasok (MH), MVP-k, bravúrok, tiszta lapok. A kártyaszintű játékosok neve a saját színükkel jelenik meg a táblázatban. A karrier lezárásakor egy összefoglaló .txt is letölthető."},
   ikonok:{title:"Ikonok",text:"Ritka, ikonikus ajánlatként legendás játékosok (pl. Puskás, Szoboszlai) csatlakozhatnak a csapatodhoz. Ők a jelenlegi erejükről indulnak, de innentől ők is fejlődnek és kaphatnak kártyaszintet — akár GODLIKE-ig. Egy ikon hosszú távon a keret meghatározó alakjává válhat."},
@@ -10216,10 +10286,13 @@ function autoLevelSync(){
   oppTargetRating=tgt;
   if(careerPool)Object.values(careerPool).forEach(e=>{
     if(drafted.has(e.n)){
-      /* INFINITY: a SAJÁT kereted is követi a szintet — lásd applyOwnedShift */
+      /* A SAJÁT KERETEDHEZ A SZINTVÁLTÁS NEM NYÚL — ez a 2.6.023 lényege.
+         A régi sor egy Math.max-os RACSNI volt (startRating = max(régi,
+         korgörbe(peak))): a megemelt peakből azonnal Ratinget csinált, lefelé
+         viszont sosem vette vissza. Emiatt a nehézség-gomb föl-le nyomogatása
+         korlátlanul növelte a kezdő 11 erejét. A könyvelés (joinLevel,
+         basePeak) marad, hatása nincs. */
       applyOwnedShift(e);
-      e.startRating=Math.max(e.startRating||0,Math.round(ratingAtAge(e.peak,e.age)));
-      syncAttrsToRating(e);
       return;}
     applyMarketShift(e);
     normalizeMarketAge(e);   /* 100 fölött a piac a csúcskorú neveket mutatja */
@@ -13504,6 +13577,10 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      _wasLeader    : az előző forduló után éllovas voltál-e (a "visszavettétek a
        vezetést" hírhez). */
   rivals:null,seasonNews:{},titleWonSeason:null,_titleChanceThisMatch:false,_wasLeader:null,
+  /* Az Infinity szint-követő liftjének kivezetése (2.6.023). Friss karrierben
+     nincs mit migrálni, ezért itt eleve true — a RÉGI mentésekben hiányzik a
+     mező, és az applySavedGame kifejezetten false-ra állítja, hogy lefusson. */
+  infLiftRetired:true,
   finalTable:null,seasonClosed:false,hubReportHtml:null};}
 const S=freshS();
 /* Egy játékos több skillt is birtokolhat; mindegyik lehet "félkész" (fél
@@ -15833,10 +15910,10 @@ function applyOppLevel(v){
      még a régi, gyengébb poolból merítene. */
   if(gameMode==="career"&&careerPool)Object.values(careerPool).forEach(entry=>{
     if(drafted.has(entry.n)){
-      /* INFINITY: a SAJÁT kereted is követi a szintet — lásd applyOwnedShift */
+      /* A SAJÁT KERETEDHEZ A SZINTVÁLTÁS NEM NYÚL — lásd az autoLevelSync
+         azonos ágán írt indoklást (a régi Math.max-os racsni volt a korlátlan
+         erő-farmolás forrása). */
       applyOwnedShift(entry);
-      entry.startRating=Math.max(entry.startRating||0,Math.round(ratingAtAge(entry.peak,entry.age)));
-      syncAttrsToRating(entry);
       return;}
     applyMarketShift(entry);
     normalizeMarketAge(entry);   /* 100 fölött a piac a csúcskorú neveket mutatja */
@@ -21979,40 +22056,22 @@ function hiddenMatchBonus(){
    nehézség-tanácsadó és az auto szintkövetés alapja. */
 function teamMatchStrength(){return teamStrength()+hiddenMatchBonus();}
 function levelGap(lvl){return teamMatchStrength()-oppMatchStrength(lvl);}
-/* ================= INFINITY: AZ AUTOMATIKA NE A SAJÁT AJÁNDÉKÁT MÉRJE =========
-   A HIBA, amit ez javít. Infinityben a szintlépés a SAJÁT keretedet is emeli
-   (applyOwnedShift → ownedPeakLift: peak = basePeak + (szint − joinLevel)), a
-   mezőny effektív ereje viszont csak 1,12-szeres ütemben nő (OPP_BUFF_FIXED).
-   Az auto szintkövetés a megemelt keretet ÚJ erősödésnek látta, ezért újra
-   lépett — a mezőny és a kereted együtt szaladt el, miközben a TÉNYLEGES
-   nehézség szintenként alig 0,12-t mozdult. A HUB minden újrarajzolása (és
-   minden kézi "Megerősítem" is, mert az applyOppLevel ugyanígy emel) adott egy
-   újabb lökést, tehát a felhasználó szemszögéből egyszerűen nem állt meg.
+/* ================= AZ AUTOMATIKA A KIÉRDEMELT ERŐT MÉRI =====================
+   TÖRTÉNET. Amíg a szintlépés Infinityben a SAJÁT keretedet is emelte
+   (a megszűnt ownedPeakLift), az auto szintkövetés a megemelt keretet ÚJ
+   erősödésnek látta, ezért újra lépett — a mezőny és a kereted együtt szaladt
+   el, miközben a tényleges nehézség alig mozdult. Mérve akkor (120-as keret,
+   100-as szintről, 25 HUB-rajzolás): szint 100 → 206, csapaterő 120 → 226, a
+   rés közben 18,0 → 5,3. A rendszer önmagát hajtotta.
 
-   MÉRVE a javítás előtt (120-as keret, 100-as szintről, 25 HUB-rajzolás):
-     szint  100 → 206, csapaterő 120 → 226, a rés közben 18,0 → 5,3
-   vagyis a rendszer önmagát hajtotta, és a cél-sávot így sem érte el.
+   Ezt a visszacsatolást a 2.6.023 a GYÖKERÉNÉL vágta el: a szintlépés többé nem
+   nyúl a keretedhez, tehát nincs "ajándék", amit le kellene vonni. Az
+   ownedLiftAvgXI ezért mostantól mindig 0, és az autoLevelGap pontosan a
+   levelGap — vagyis az automatika a VALÓDI, kiérdemelt erőt méri.
 
-   A JAVÍTÁS: az automatika levonja a MÁR MEGKAPOTT liftet, tehát a KIÉRDEMELT
-   erőt méri. A lift a szintlépés ajándéka (azért van, hogy a kereted ne rohadjon
-   el a vele együtt emelkedő piac alatt), nem a te fejlődésed. A VALÓDI növekedés
-   — meccsről meccsre fejlődés, igazolás, ifi-/öreg-boost — a basePeak-ben él, azt
-   nem vonjuk le, tehát az automatika arra továbbra is lép.
-
-   NORMÁL MÓDBAN AZ ownedPeakLift ELEVE 0, tehát ott bitre semmi nem változik.
-
-   A KIJELZETT rés (levelGap) szándékosan VÁLTOZATLAN marad: a pályán a
-   játékosaid tényleg annyit érnek, a nehézség-tanácsadónak azt kell mondania. */
-function ownedLiftAvgXI(){
-  if(gameMode!=="career"||!infinityMode)return 0;
-  if(typeof careerPool==="undefined"||!careerPool)return 0;
-  let sum=0,n=0;
-  slots.forEach(s=>{
-    if(!s||!s.player)return;
-    n++;
-    const e=careerPool[s.player.n];
-    if(e)sum+=ownedPeakLift(e);});
-  return n?sum/n:0;}
+   A két függvény megmarad: több hívó kérdezi őket, és ha valaha visszatérne egy
+   hasonló, szinthez kötött keret-bónusz, ez marad a helye. */
+function ownedLiftAvgXI(){return 0;}
 function autoLevelGap(lvl){return levelGap(lvl)-ownedLiftAvgXI();}
 /* ---- A NEHÉZSÉG-SÁVOK, A MÉRT BAJNOKI ESÉLYHEZ KALIBRÁLVA ----
    A küszöbök nem hasraütésre vannak: a motor saját konstansaival (K=0.09,
@@ -22626,6 +22685,8 @@ function infinityMainBody(){
       · <b>Semmilyen</b> kor miatti Rating-csökkenés nincs többé — a csúcs <b>${INFINITY_PEAK_END}</b> éves korig tart<br>
       · Visszavonulás csak <b>${INFINITY_RETIRE_AGE}</b> éves kortól<br>
       · Az akadémia <b>${INFINITY_ACADEMY_MIN}-${INFINITY_ACADEMY_MAX}</b>-ös Ratinggel ad tehetségeket<br>
+      · <b>A teljes kereted TSI-boostot kap</b> (×${INFINITY_OWNED_TSI_MULT}) — kezdő 11, pad és tartalék is<br>
+      · 100 fölött a <b>piac lassabban erősödik</b>, mint a mezőny — a saját játékosaid maradnak a gerinc<br>
       · A mezőny <b>${INFINITY_BASE_MAX}-ig</b> tolható (utána tierenként +${INFINITY_TIER_STEP})
     </div>
     <div class="infWarn">⚠ <b>Vigyázat: nincs visszaút.</b> Az Infinity mód <b>végleges</b> — megnyitás után semmilyen módon nem kapcsolható vissza, és a karrier egyensúlya tartósan megváltozik.</div>
@@ -22638,15 +22699,15 @@ function infinityMainBody(){
 function infinityApplyUnlock(){
     infinityMode=true;
     /* ---- A MEGLÉVŐ KERET HORGONYA ----
-       A szint-követés (applyOwnedShift) attól a szinttől számol, ahol a
-       játékos hozzád került. Az Infinity megnyitásának pillanatában lévő
-       keretnek ez a MOSTANI szint: visszamenőleges ajándékot nem adunk, de
-       innentől a sztárjaid sem maradnak le a mezőnytől. Enélkül a horgony csak
-       az első szintlépéskor állna be, és pont azt a lépcsőt veszítenék el,
-       ahol a szakadék nyílni kezd. */
+       Csak könyvelés: melyik mezőnyszinten volt nálad a játékos a megnyitáskor.
+       Hatása nincs (a szintlépés 2.6.023 óta nem emeli a keretedet), de a
+       migráció és a későbbi statisztikák ebből dolgoznak. */
     {const lvl=oppTargetRating||0;
      Object.values(careerPool||{}).forEach(e=>{
        if(drafted.has(e.n)&&e.joinLevel==null)e.joinLevel=lvl;});}
+    /* Egy futó karrierben már nincs mit migrálni: itt nyílik meg az Infinity,
+       tehát lift sosem volt. A jelzőt kitesszük, hogy a betöltés se keressen. */
+    S.infLiftRetired=true;
     /* RUN: a futás sebességét ez a szezonszám dönti el (2.0 súly). */
     {const R=runInit();if(R.infinitySeason==null)R.infinitySeason=S.seasonNumber||1;
      runLoyalSnapshot();}   /* RUN: kik voltak végig veled az eredeti kezdőből */
@@ -22691,6 +22752,14 @@ function infinityApplyUnlock(){
       entry.basePeak=trueTop;
       if(drafted.has(name))applyOwnedShift(entry);
       else applyMarketShift(entry);});
+    /* ---- A NYITÓ AJÁNDÉK: TSI MINDENKINEK, AKI MOST A TIÉD ----
+       Ez váltja a régi, szintenként ismétlődő "keret-liftet": egyszeri,
+       mindenkire szól (kezdő 11 + pad + tartalék), és PLAFONT ad, nem
+       Ratinget — a magasabb potenciálba játékkal kell belenőni. */
+    {const boosted=infinityOwnedTsiBoost();
+     if(boosted.length){
+       const top=boosted.slice(0,4).map(b=>`${esc(shortName(b.n))} +${b.dPeak}`).join(", ");
+       addLine(`∞ A teljes kereted TSI-boostot kapott (${boosted.length} játékos, ×${INFINITY_OWNED_TSI_MULT} TSI) — magasabb lett a fejlődési plafonjuk. A legnagyobb ugrások: ${top}.`,"m life");}}
     addLine(`∞ INFINITY MÓD MEGNYITVA — nincs több Rating-plafon, nincs hanyatlás, a mezőny ${maxOppRating()}-ig tolható. A sztárok fejlődése feloldva a 119-es plafon alól.`,"m life");
     updateOppRatingBadge();saveGame();
     /* A KARRIER VISSZATEKINTÉSE — ez a futás legfontosabb határköve, ezért
@@ -25749,6 +25818,7 @@ function saveGame(){
         finalTable:S.finalTable,seasonClosed:S.seasonClosed,hubReportHtml:S.hubReportHtml,
         /* rivális-rendszer és bajnoki narratíva (szezononként új) */
         rivals:S.rivals,seasonNews:S.seasonNews,titleWonSeason:S.titleWonSeason,
+        infLiftRetired:S.infLiftRetired,
         _titleChanceThisMatch:S._titleChanceThisMatch,_wasLeader:S._wasLeader,
         /* F6: a párharc tartós állapota — a kiegyenlítő eltolás, a szezonzáró
            döntés, a közös előzmény és az egymás elleni napló. */
@@ -25846,6 +25916,10 @@ function applySavedGame(d){
   /* a mezőny saját menetrendje és az élő tabella a betöltött állapotból épül újra */
   _aiSchedCache=null;liveTableInvalidate();
   S.seasonNews=d.S.seasonNews||{};
+  /* KIFEJEZETTEN a mentésből: az Object.assign csak a MEGLÉVŐ kulcsokat írja
+     felül, egy régi mentés tehát a freshS true-ját örökölné, és a migráció
+     némán kimaradna. */
+  S.infLiftRetired=!!d.S.infLiftRetired;
   S.discWatch=d.S.discWatch||{};S.hotStreak=d.S.hotStreak||{};S.goallessStreak=d.S.goallessStreak||{};
   S.chemPairs=d.S.chemPairs||{};S.chemInProgress=d.S.chemInProgress||null;
   /* CHALLENGE-állapot visszatöltése — régi mentéseknél (a rendszer előttről)
@@ -26081,7 +26155,11 @@ function applySavedGame(d){
   pendingPlayer=null;pendingCaptainIdx=-1;rerolls=d.rerolls!==undefined?d.rerolls:1;
   slots.forEach(s=>{if(s.player&&!(s.player.n in NAT_BY_NAME))NAT_BY_NAME[s.player.n]=s.player.nat;});
   Object.values(BENCH).forEach(p=>{if(p&&!(p.n in NAT_BY_NAME))NAT_BY_NAME[p.n]=p.nat;});
-  extraRoster.forEach(p=>{if(p&&!(p.n in NAT_BY_NAME))NAT_BY_NAME[p.n]=p.nat;});}
+  extraRoster.forEach(p=>{if(p&&!(p.n in NAT_BY_NAME))NAT_BY_NAME[p.n]=p.nat;});
+  /* EGYSZERI MIGRÁCIÓ a régi, Infinity-lifttel készült mentésekhez. Itt a
+     helye: a careerPool, a drafted, az oppTargetRating és az infinityMode
+     ekkorra már mind a mentésből áll. */
+  try{retireInfinityLift();}catch(e){}}
 function resumeUIFromSave(){
   /* A BEÁLLÍTÓ FELÜLET LEZÁRÁSA — ugyanaz az elv, mint a beginNewGame-ben, csak
      a MENTÉSBŐL VISSZALÉPÉS közös belépési pontján. A "Válassz módot" kártya a
