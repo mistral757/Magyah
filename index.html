@@ -2103,7 +2103,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.032";
+const APP_VERSION="2.6.033";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16427,7 +16427,42 @@ function mpLevelLocked(){return false;}
    Három hívó van: a kézi szintváltás, a szezon eleji alku és a régi
    házigazda-átvétel. Korábban mindhárom külön másolta ugyanezt a hat sort, és
    egy piac-frissítés már ki is maradt belőle. */
+/* ---- FUT-E ÉPP EGY SZEZON? ----
+   A mezőny (SEASON_OPPS) a szezon KEZDETÉN épül fel, és a menetrend (S.fixtures)
+   EZEKRE az ellenfél-objektumokra hivatkozik. Ha a szint menet közben változik,
+   a SEASON_OPPS újraépül — a menetrend viszont a RÉGI csapatokra mutat tovább.
+   Innentől a tabella és a menetrend két különböző bajnokságról beszél: ez volt
+   a bejelentett "full bebugolt" állapot.
+   Ezért egyetlen kérdés dönt mindenhol: fut-e szezon. */
+function seasonInProgress(){
+  return phase==="season"&&!S.seasonClosed;}
+/* ---- MIÉRT NEM ÁLLÍTHATÓ MOST A SZINT? ----
+   EGY predikátum, amit a HUB gombja (megjelenés) ÉS a kattintás (tiltás) is
+   ugyanígy kérdez — így a kettő nem tud elcsúszni egymástól. Üres válasz =
+   szabadon állítható. */
+function levelChangeLockReason(){
+  if(gameMode!=="career")return "";
+  /* 1) FUTÓ SZEZON — beleértve a 8./15./23. forduló átigazolási ablakát is.
+     Az a checkpoint a HUB-ba visz, és ott a hubMidSeasonMode SZÁNDÉKOSAN
+     hamis (hogy az átigazolás elérhető legyen) — a szint viszont ettől még
+     nem mozdulhat, mert a bajnokság már fut. */
+  if(hubMidSeasonMode||twWindowOpen()||seasonInProgress())
+    return "A mezőny erőssége a szezon alatt fix — a menetrend és a tabella erre a mezőnyre épül. Két szezon között állíthatod át.";
+  /* 2) FÜGGŐ EURÓPAI KUPA: a sorozat mezőnye a mostani szintből épül. */
+  if(euroLocksLevel()){
+    const c=euroPendingComp();
+    return `A nehézségi szint zárolva: még hátravan a(z) ${(c&&c.n)||"európai kupa"}. A sorozat mezőnye a mostani szintedből épül, ezért csak a kupa UTÁN, a nyári ablakban állítható át.`;}
+  /* 3) KÖZÖS KARRIER: a kupanevezési kézfogás előtt még nincs mit javasolni. */
+  if(h2hRoomActive()&&!S.euroOptOut&&!mpCupSettled()&&(phase==="verdict"||phase==="hub"))
+    return "Előbb a közös kupanevezés dől el — utána adhatod meg a következő szezonra a javaslatodat.";
+  return "";}
 function applyOppLevel(v){
+  /* VÉDŐHÁLÓ: futó szezonban SOSEM nyúlunk a mezőnyhöz, jöjjön a hívás
+     bárhonnan. Ez a szabály utolsó bástyája — a felület már korábban tilt, de
+     egy jövőbeli hívási hely sem tudja véletlenül szétverni a bajnokságot. */
+  if(seasonInProgress()){
+    addLine("✦ A mezőny erőssége a szezon alatt nem változtatható — a menetrend és a tabella erre a mezőnyre épül.","m ev");
+    return false;}
   /* A HORGONY itt sem íródik át — lásd az autoLevelSync-nél írt indoklást.
      A careerBaseRating a karrier indulási mezőnyszintje; ha a szintváltás
      magával vinné, a piac-emelkedés (marketPeakShift) örökre 0 maradna. */
@@ -16447,7 +16482,8 @@ function applyOppLevel(v){
     syncAttrsToRating(entry);   /* az attribútumok is követik — lásd autoLevelSync */
     if(scout)entry.estimatedTSI=estimateTSI(entry.tsi,scout.stars);});
   SEASON_OPPS=buildOpponents(15,oppTargetRating);
-  if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();}
+  if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
+  return true;}
 /* ---- A KÖVETKEZŐ SZEZON SORSZÁMA ----
    HIBA, amit ez javít: a szezonindító kapu (mpSeasonGate) a KÖVETKEZŐ szezonról
    szól, az S.seasonNumber viszont ilyenkor még az ÉPP LEZÁRTAT tartja — a
@@ -23244,17 +23280,13 @@ function showLevelChangePicker(direction){
   backBtn.onclick=()=>csReturnToHub();
   $("twActions").innerHTML="";$("twActions").appendChild(confirmBtn);$("twActions").appendChild(backBtn);}
 $("hubLevelBtn").onclick=()=>{
-  /* Szezon közben a gomb csak kijelző — a mezőny átállítása a szezonhatárhoz
-     kötött marad. */
-  if(hubMidSeasonMode){
-    addLine("✦ A nehézségi szintet két szezon között lehet átállítani — most csak tájékoztató.","m life");
-    return;}
-  /* A kupa-mezőny a szezonzáráskor épül a mostani szintből — amíg a sorozat le
-     nincs játszva, a szint nem mozdítható (különben olcsó trófeát adna). */
-  if(euroLocksLevel()){
-    const c=euroPendingComp();
-    addLine(`✦ A nehézségi szint zárolva: még hátravan a(z) ${(c&&c.n)||"európai kupa"}. A sorozat mezőnye a mostani szintedből épül, ezért csak a kupa UTÁN, a nyári ablakban állítható át.`,"m life");
-    return;}
+  /* EGYETLEN predikátum dönt — ugyanaz, amiből a gomb kinézete is születik
+     (lásd levelChangeLockReason). Így a gomb sosem mondhat mást, mint amit a
+     kattintás tesz: korábban a "readonly" megjelenés és a tényleges tiltás
+     két különböző feltételen állt, és a szezon közbeni átigazolási ablakban
+     a szint mégis szerkeszthető maradt. */
+  const lock=levelChangeLockReason();
+  if(lock){addLine("✦ "+lock,"m life");return;}
   startLevelChange(null);};
 /* ================= KARRIER MÓD — KARRIER LEZÁRÁSA =================
    Hosszú, olvasható szöveges összegzés a teljes karrierről: szezonról
@@ -25112,20 +25144,11 @@ function renderHub(){
   const lvlBtn=$("hubLevelBtn");
   if(gameMode==="career"){
     lvlBtn.classList.remove("hide");
-    const euroLock=euroLocksLevel();
-    /* ---- MP: A KUPANEVEZÉS ELŐTT MÉG NINCS MIT ÁLLÍTANI ----
-       Egyjátékosban a szezonzárás azonnal beírja a megszerzett sorozatot
-       (S.euroCurrent), ezért az euroLocksLevel() rögtön zárol: a szint a kupa
-       után állítható. KÖZÖS karrierben viszont a sorozatot a NEVEZÉSI KÉZFOGÁS
-       dönti el (a jobbik kvalifikáció lesz a közösé), tehát addig az
-       S.euroCurrent üres — a zár nem lépett életbe, a gomb szerkeszthető
-       maradt, és ráadásul pirosan villogott, hogy adj már meg egy javaslatot.
-       Pedig az a javaslat a KÖVETKEZŐ szezonról szól, ami a kupa UTÁN jön.
-       Ezért a szezonzárás és a nevezés közti ablakban ugyanúgy zárva van, mint
-       egyjátékosban. */
-    const mpCupPending=h2hRoomActive()&&!S.euroOptOut&&!mpCupSettled()
-      &&(phase==="verdict"||phase==="hub");
-    const canChange=!hubMidSeasonMode&&!euroLock&&!mpCupPending;
+    /* A zárat EGY helyen mondjuk ki (levelChangeLockReason): futó szezon,
+       függő európai kupa, illetve közös karrierben a kupanevezés előtti
+       ablak. A gomb kinézete és a kattintás ugyanabból dolgozik. */
+    const lockReason=levelChangeLockReason();
+    const canChange=!lockReason;
     /* ---- MP: A JAVASLAT SÜRGETÉSE ----
        A közös szint a két javaslat átlaga, tehát a hallgatás is döntés — csak
        épp olyan, amiről a felhasználó nem tud. Ezért amíg a szezon előtti
@@ -25166,9 +25189,7 @@ function renderHub(){
       +(uLbl?` · <b style="color:var(--grass)">⚡ ${uLbl}: +${Math.round(u*50)}% fejlődés</b>`:"")
       +(h2hRoomActive()&&canChange
         ? ` · <b>a közös szint a te javaslatod és a társadé átlaga lesz (most: ${oppTargetRating})</b>`:"")
-      +(canChange?"":(euroLock
-        ? ` · <b>zárolva: előbb a(z) ${(euroPendingComp()&&euroPendingComp().short)||"kupa"} — a kupa után állítható</b>`
-        : " · <b>átállítani két szezon között lehet</b>"))+`</small>`;
+      +(canChange?"":` · <b>🔒 ${esc(lockReason)}</b>`)+`</small>`;
   }else lvlBtn.classList.add("hide");
   /* Challenge-jutalom tokenek: a gombok csak akkor látszanak, ha van token */
   const nBoost=S.boostTokens||0,nFree=S.freePlayerTokens||0;
@@ -26870,6 +26891,25 @@ function applySavedGame(d){
   familyCustomNames=Array.isArray(d.familyCustomNames)?d.familyCustomNames:[];
   SEASON_OPPS=d.SEASON_OPPS;
   Object.assign(S,d.S);
+  /* ---- ÖNJAVÍTÁS: SZÉTCSÚSZOTT MEZŐNY ÉS MENETREND ----
+     Egy korábbi hiba miatt a nehézségi szint FUTÓ SZEZONBAN is átállítható
+     volt (a 8./15./23. forduló átigazolási ablakában). Ilyenkor a SEASON_OPPS
+     újraépült, a menetrend viszont a RÉGI ellenfelekre mutatott tovább — a
+     tabella és a menetrend két különböző bajnokságról beszélt.
+     A MENETREND A SZEZON IGAZSÁGA: azt már játszottad, azok az eredmények
+     valódiak. Ezért a mezőnyt állítjuk vissza belőle, nem fordítva. */
+  try{
+    if(phase==="season"&&Array.isArray(S.fixtures)&&S.fixtures.length){
+      const fixOpps=[];const seen=new Set();
+      S.fixtures.forEach(fx=>{
+        if(!fx||fx.duel||!fx.o||!fx.o.n||seen.has(fx.o.n))return;
+        seen.add(fx.o.n);fixOpps.push(fx.o);});
+      const known=new Set((SEASON_OPPS||[]).map(o=>o&&o.n));
+      if(fixOpps.length&&fixOpps.some(o=>!known.has(o.n))){
+        SEASON_OPPS=fixOpps;
+        _aiSchedCache=null;liveTableInvalidate();
+        addLine("✦ Helyreállítás: a mezőny és a menetrend szétcsúszott (a szint menet közben állítódott át). A tabella mostantól újra a menetrendedhez tartozó csapatokat mutatja — a szint a szezon végén állítható át.","m ev");}}
+  }catch(e){}
   /* a mezőny saját menetrendje és az élő tabella a betöltött állapotból épül újra */
   _aiSchedCache=null;liveTableInvalidate();
   S.seasonNews=d.S.seasonNews||{};
