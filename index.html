@@ -872,6 +872,17 @@ button.infPanel:disabled{cursor:default}
 #simBtns button{flex:1}
 #standing{font-size:15px;font-weight:700;color:var(--ink);text-align:center;margin-top:9px}
 #moraleLine{font-size:12.5px;color:var(--dim);text-align:center;margin-top:2px}
+/* ---- ÉLŐ MECCS-NÉZET ----
+   Amíg megy a mérkőzés, a gombsor NEM használható (a kezdőrúgás tiltva van, a
+   HUB/öltöző pedig meccs közben nem nyitható), viszont a képernyő alsó harmadát
+   elvette — a napló emiatt öt sorra szorult össze. Élő meccs alatt tehát a
+   gombsor eltűnik: marad a tábla fölül, a napló középen ekkora helyen, ahogy
+   csak elfér, és legalul az állás + morál sávja. Lefújás után az osztály
+   lekerül, a gombok visszajönnek, és a napló újra a rájuk maradt helyet kapja
+   (lásd sbApplyLiveLayout / sbSizeFeed). */
+#scSim.matchLive #matchCtl{display:none}
+#scSim.matchLive #standing{font-size:13.5px;margin-top:7px}
+#scSim.matchLive #moraleLine{font-size:11.5px}
 .moralebar{height:5px;border-radius:3px;background:var(--line);margin-top:6px;overflow:hidden}
 .moralebar i{display:block;height:100%;background:linear-gradient(90deg,var(--red),var(--gold),var(--grass));transition:width .4s}
 
@@ -2127,7 +2138,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.039";
+const APP_VERSION="2.6.040";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -14928,6 +14939,10 @@ function addLine(html,cls,budgeted){
   const d=document.createElement("div");d.className=cls;d.innerHTML=html;
   lines().appendChild(d);lines().scrollTop=lines().scrollHeight;}
 function updateStanding(){
+  /* ÖNGYÓGYÍTÁS: ez a függvény minden meccs után és a képernyő minden
+     újrarajzolásakor lefut — ha egy megszakadt mérkőzés után bent ragadt volna
+     az élő (gombsor nélküli) elrendezés, itt biztosan lekerül. */
+  if(typeof sbApplyLiveLayout==="function")sbApplyLiveLayout();
   /* A kupában a bajnoki mérleg helyett a sorozat állása látszik — a VALÓS
      szakasszal (korábban mindig "csoportkör" volt kiírva, a kieséses körökben is). */
   if(euroActive()){
@@ -15170,7 +15185,7 @@ function myTeamAbbr(){
    egyszer készülnek el, utána csak annak a számjegynek a textContent-je
    változik, ami tényleg más lett. Auto módban (szezon végigjátszása) az óra el
    sem indul: ott nem közvetítést nézel, és ott számít a sebesség. */
-let SB={on:false,done:false,usIsHome:true,us:0,them:0,ev:[],teams:null,
+let SB={on:false,done:false,live:false,usIsHome:true,us:0,them:0,ev:[],teams:null,
         t0:0,tickMs:330,iv:null,clockEls:null,scoreEls:null};
 /* A klubnév évszám-utótagja ("(2015/16)") a táblán csak zajt vinne — a tábla a
    MECCSRŐL szól, nem a keret évjáratáról. */
@@ -15363,22 +15378,36 @@ function sbApplyCompTheme(){
   if(comp&&EURO_COMPS[comp])b.classList.add("comp-"+comp);}
 function sbStart(fx,tickMs,auto){
   const wrap=$("sbWrap");if(!wrap||!fx||!fx.o)return;
-  SB.on=true;SB.done=false;SB.ev=[];SB.scoreEls=null;SB.clockEls=null;
+  SB.on=true;SB.done=false;SB.live=!auto;SB.ev=[];SB.scoreEls=null;SB.clockEls=null;
   $("sbBoard").classList.remove("fin");
   sbApplyCompTheme();
   $("sbClockLbl").textContent="idő";
   sbPaintTeams(fx);sbSetScore(0,0);sbSetClock(0);sbRenderEvents();
   wrap.classList.remove("hide");
   sbFitTeams();   /* csak a megjelenítés után mérhető a névmező szélessége */
-  if(auto){sbClockStop();return;}
+  if(auto){sbApplyLiveLayout();sbClockStop();return;}
   sbClockStart(tickMs);
-  sbLockView();}
+  sbLockView();}   /* ez már az élő elrendezéssel méri ki a napló helyét */
 function sbFinish(){
   sbClockStop();
-  SB.on=false;SB.done=true;
+  SB.on=false;SB.done=true;SB.live=false;
   sbSetClock(90*60);
   const b=$("sbBoard");if(b)b.classList.add("fin");
-  const l=$("sbClockLbl");if(l)l.textContent="vége";}
+  const l=$("sbClockLbl");if(l)l.textContent="vége";
+  /* LEFÚJÁS: a gombsor visszajön, a napló pedig ÚJRA a maradék helyet kapja —
+     különben a meccs alatti (nagyobb) magasságával lógna rá a gombokra. */
+  sbSizeFeed();
+  sbEnsureCtlVisible();}
+/* A gombsor visszatértekor a kártya alja kicsúszhat a képernyő alá, ha a lap
+   közben elgörgött. Csak akkor nyúlunk a görgetéshez, ha tényleg kilóg —
+   egyébként a nézet marad ott, ahol a meccs alatt állt. */
+function sbEnsureCtlVisible(){
+  const wrap=$("sbWrap"),card=wrap&&wrap.parentElement;if(!card)return;
+  const over=card.getBoundingClientRect().bottom-sbViewportH()+SB_BOTTOM_GAP;
+  if(!isFinite(over)||over<=1)return;
+  const top=Math.max(0,Math.round(window.scrollY+over));
+  try{window.scrollTo({top,behavior:"smooth"});}
+  catch(e){window.scrollTo(0,top);}}
 /* Meccsen kívül: a KÖVETKEZŐ mérkőzés előnézete (0:0, 00:00). Csak akkor fut,
    ha a tábla épp rejtve van — egy lefújt meccs végeredményét sosem írja felül. */
 function sbSync(){
@@ -15409,7 +15438,24 @@ const SB_BOTTOM_GAP=12;
 function sbViewportH(){
   /* mobilon a visualViewport tud a böngésző címsávjáról — az innerHeight nem */
   return (window.visualViewport&&window.visualViewport.height)||window.innerHeight;}
+/* ---- MECCS ALATT: CSAK A KÖZVETÍTÉS ----
+   Az elrendezés két állapot között vált, és MINDIG az SB-ből vezetjük le, nem
+   külön kapcsolóból — így egy félbemaradt meccs vagy egy váratlan képernyőváltás
+   után sem ragadhat bent az élő nézet.
+     · élő meccs (SB.on és nem auto-mód): a gombsor rejtve, tábla fölül, alul az
+       állás/morál sáv, közte a napló kapja az egész maradékot;
+     · lefújás után (SB.done) és meccsen kívül: a megszokott nézet, a gombokkal.
+   Auto módban (szezon végigjátszása) SOSEM kapcsol be: ott a "Megállítás" gomb
+   kell kéznél legyen. */
+function sbApplyLiveLayout(){
+  const sec=$("scSim");if(!sec)return;
+  /* Az S.playing a motor saját "épp megy a meccs" jelzője. Azért van itt is:
+     minden helyreállító ág (új játék, megszakadt szezon kigyógyítása) nullázza,
+     tehát ha az SB valamiért nyitva maradna, a gombsor akkor is visszajön. */
+  const playing=(typeof S==="undefined"||!S)?true:S.playing!==false;
+  sec.classList.toggle("matchLive",!!(SB.on&&SB.live&&playing));}
 function sbSizeFeed(){
+  sbApplyLiveLayout();   /* előbb az elrendezés, csak utána mérünk */
   const wrap=$("sbWrap"),feed=$("ttLines");
   if(!wrap||!feed)return;
   if(!SB.on&&!SB.done){feed.style.maxHeight="";return;}
