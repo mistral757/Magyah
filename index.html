@@ -2103,7 +2103,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.037";
+const APP_VERSION="2.6.038";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -14697,6 +14697,9 @@ function startFirstSeason(){
   $("preSeasonHubNote").classList.add("hide");
   $("scHub").classList.add("hide");
   $("hubNextSeasonBtn").classList.remove("hide");
+  /* A gomb a SZEZONHOZ tartozó szerepét kapja meg — enélkül a betöltéskori
+     alapértelmezett (nyárzáró) kezelő maradt volna rajta. */
+  setHubNextSeasonBtn();
   $("scSim").classList.remove("hide");
   $("ttTeam").textContent=teamName.toUpperCase().slice(0,16);
   $("ttClock").textContent=new Date().toLocaleTimeString("hu-HU",{hour:"2-digit",minute:"2-digit"});
@@ -16195,11 +16198,26 @@ async function h2hTick(key,myField,oppField,round){
        catch(e){
          $("h2hWaitErr").textContent="A visszavonás nem sikerült — próbáld újra.";
          ub.disabled=false;h2hTick(key,myField,oppField,round);return;}
-       /* Vissza a HUB-hoz: a keret újra átrendezhető, a kezdőrúgás újra él. */
+       /* ---- VISSZA ODA, AHONNAN A PÁRHARC INDULT ----
+          BEJELENTETT HIBA: kupa-párharcból visszahívva a képernyő a BAJNOKI
+          kezdőrúgás gombot élesítette, "⚔ PÁRHARC — 30. forduló" felirattal.
+          Csakhogy a bajnokság ilyenkor már rég lefutott (a kupa a szezonzárás
+          része), tehát az a gomb nem indíthatott semmit — a felhasználó
+          véglegesen beragadt.
+          Az ok: a kupa-párharc a kupaképernyőről indul, de a h2hBeginDuel a
+          közvetítés-képernyőre vált; a visszahívás pedig ezt nem tudta, és
+          mindig a bajnoki gombot állította vissza. Mostantól a párharc
+          FAJTÁJA dönti el, hova térünk vissza. */
        _h2hBusy=false;
        h2hWaitHide();
-       $("kickBtn").disabled=false;
-       $("kickBtn").textContent=kickBtnLabel();
+       if(typeof mpCupDuelNow==="function"&&mpCupDuelNow()){
+         $("scSim").classList.add("hide");
+         $("scEuro").classList.remove("hide");
+         showEuroScreen();   /* ez élesíti újra a kupa Kezdőrúgás gombját */
+         $("scEuro").scrollIntoView({behavior:"smooth"});
+       }else{
+         $("kickBtn").disabled=false;
+         $("kickBtn").textContent=kickBtnLabel();}
        addLine(`↩ Visszahívtad a keretedet a párharcból — átrendezheted, és újra elindíthatod a fordulót.`,"m ev");};}}
   _h2hPoll=setTimeout(()=>h2hTick(key,myField,oppField,round),2000);}
 /* A meccs indítása a kész eseménylistával. */
@@ -25065,8 +25083,12 @@ function renderHub(){
      korábbi szövegre szűrő feltétel épp a beragadt "Irány a pályára →" gombot
      hagyta életben szezon közben. A pre-season áttekintőben a gomb rejtve van,
      ott nincs mit állítani. */
-  if(!preSeasonHubMode&&$("hubNextSeasonBtn")&&!$("hubNextSeasonBtn").classList.contains("hide"))
-    setHubNextSeasonBtn();
+  /* A REJTETT gombot IS frissítjük. A régi feltétel csak a láthatóra futott,
+     így egy rejtve maradt gomb megőrizhette a szkript-betöltéskori
+     alapértelmezett kezelőt (hubNextSeasonFlow = szezonzárás) — és amelyik
+     képernyő utána pusztán felfedte, az egy élesített nyárzáró gombot mutatott
+     a szezon közepén. Rejtett gombon a beállítás ártalmatlan. */
+  if(!preSeasonHubMode&&$("hubNextSeasonBtn"))setHubNextSeasonBtn();
   /* ---- NYITOTT CHECKPOINT-ABLAK: a továbblépő gomb ZÁRJA LE az ablakot ----
      Ez a szezonközi átigazolás kilépőpontja: utána futnak a véletlen
      események, és folytatódik a szezon. Felülírja a setHubNextSeasonBtn-t. */
@@ -26327,6 +26349,22 @@ $("euroHubBtn")&&($("euroHubBtn").onclick=openHubMidSeason);
    E1: a kupa-motor még nem létezik, ezért egyelőre mindig átenged — a kapu
    maga viszont már a helyén van és mérhető. */
 function hubNextSeasonFlow(){
+  /* ---- VÉDŐHÁLÓ: FUTÓ SZEZONBAN EZ A FOLYAM SOSEM INDULHAT EL ----
+     BEJELENTETT HIBA: a 2. szezon 8. fordulója után a HUB-ból "egyszer csak"
+     véget ért a szezon, és minden futó kihívás egyszerre elbukott.
+     Ez a folyam zárja le a szezont (szezonjelentés → öregedés → új idény).
+     A gombot több képernyő is felfedheti anélkül, hogy a kezelőjét frissítené
+     (lásd setHubNextSeasonBtn) — és a szkript-betöltéskor beállított
+     alapértelmezett kezelő PONTOSAN ez a függvény. Elég volt egyetlen olyan
+     út, ahol a gomb láthatóvá vált friss beállítás nélkül, és a szezon
+     közepén elindult a nyárzárás.
+     A felület javítása mellé ezért ide is kerül egy zár: a FÁZIS a megbízható
+     jel — amíg "season", addig egy szezon fut, és nincs mit lezárni. Ugyanaz
+     az elv, mint a nehézségi szintnél (lásd applyOppLevel). */
+  if(phase==="season"||twWindowOpen()){
+    addLine("✦ Még fut a szezon — a nyárzárás csak a 30. forduló után jön. (Ha az átigazolási ablakban vagy, előbb zárd le azt.)","m ev");
+    setHubNextSeasonBtn();   /* a gomb kapja vissza a helyes szerepét */
+    return;}
   /* KÖZÖS KUPA: a nevezés kialkudása MEGELŐZI a sorozat indítását — és akkor is
      lefut, ha én magam nem kvalifikáltam, mert a társam jogán bekerülhetek.
      A kapu egyszer fut le szezononként (mpCupSettled), utána visszatér ide. */
