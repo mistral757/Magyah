@@ -2194,7 +2194,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.043";
+const APP_VERSION="2.6.044";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -24804,6 +24804,23 @@ function hubLocPosTxt(loc){
   if(loc.type==="slot")return slots[loc.idx].pos;
   if(loc.type==="bench")return BENCH_CATS.find(c=>c.key===loc.key).codes[0];
   return loc.p.pos[0];}
+/* ---- A JELVÉNY FELIRATA: A JÁTÉKOS POSZTJA, NEM A TÁROLÓÉ ----
+   A pad-soron a jelvény eddig a PADHELY kódját írta ki — a "Középcsatár csere"
+   helyen mindig CS-t, akárki ült benne. Így a csapatképből nem derült ki, hogy
+   az ott ülő ember valójában KV, és fejből kellett tudni, ki milyen poszton jó.
+   Mostantól a SZÍN marad a padhelyé (piros = támadó pad — ott áll be), a
+   FELIRAT viszont a játékos SAJÁT posztlistája, familiaritás szerinti
+   sorrendben: a pos[0] a fő posztja (teljes értékű), utána a többi ismert
+   poszt. A tartalék-sor is a teljes listát kapja, nem csak az elsőt.
+   A pályán állónál marad a slot posztja: ott az a kérdés, HOL játszik — a
+   saját posztját a sor alatti trait-sor mondja meg, ha eltér. */
+const HUB_POS_LABEL_MAX=2;   /* ennyi poszt fér el olvashatóan a jelvényen */
+function hubLocPosLabel(loc){
+  if(loc.type==="slot")return slots[loc.idx].pos;
+  const p=loc.p;
+  if(!p||!p.pos||!p.pos.length)return hubLocPosTxt(loc);
+  const shown=p.pos.slice(0,HUB_POS_LABEL_MAX).join("/");
+  return p.pos.length>HUB_POS_LABEL_MAX?`${shown}+${p.pos.length-HUB_POS_LABEL_MAX}`:shown;}
 function hubLocRef(loc){
   if(loc.type==="slot")return{type:"slot",idx:loc.idx};
   if(loc.type==="bench")return{type:"bench",key:loc.key};
@@ -25707,7 +25724,8 @@ function renderHub(){
       return;}
     const p=loc.p;
     const row=document.createElement("div");row.className="prow";
-    const posTxt=hubLocPosTxt(loc);
+    const posTxt=hubLocPosTxt(loc);         /* a HELY kódja — ez adja a színt */
+    const posLabel=hubLocPosLabel(loc);     /* a JÁTÉKOS posztjai — ez a felirat */
     const ageTxt=p.family?(p.age?`${p.age} év`:"családtag"):(p.age!==undefined?`${p.age} év`:"—");
     const tag=loc.type==="bench"?" <small>(pad)</small>":loc.type==="extra"?" <small>(tartalék)</small>":"";
     const tier=playerCardTier(p.n);
@@ -25739,9 +25757,14 @@ function renderHub(){
       ?`<div class="trait" style="color:${unav.reason==="injury"?"#e8892b":"var(--red)"}">Nem játszhat még ${unav.matchesLeft} meccsen${
           S.replacementChoice[p.n]?` — helyette te ${esc(shortName(S.replacementChoice[p.n]))}-t jelölted ki`:" — a pótlást a kezdőrúgás előtt választhatod ki"}</div>`
       :"";
-    row.innerHTML=`<span class="pos pc-${posColorKey}">${posTxt}</span>
+    /* SAJÁT POSZT a pályán állónál: ha nem azon a poszton áll, amit ismer, a
+       trait-sor kimondja, hol van otthon — így a HUB-ban végig látszik, ki hol
+       lenne igazán a helyén. */
+    const ownPosNote=(loc.type==="slot"&&p.pos&&p.pos.length&&!p.pos.includes(posTxt))
+      ?` · saját poszt: ${p.pos.join("/")}`:"";
+    row.innerHTML=`<span class="pos pc-${posColorKey}">${posLabel}</span>
       <span class="main"><div class="nm">${esc(p.n)}${tag}${cardBadge}${unavBadge}${retireBadge(p.n)}</div>
-      <div class="trait">${ageTxt} · ${ratingTxt}</div>${unavNote}</span>
+      <div class="trait">${ageTxt} · ${ratingTxt}${ownPosNote}</div>${unavNote}</span>
       <span class="ovr">${ovrShown}</span>`;
     row.style.display="flex";row.style.alignItems="center";
     /* Az ELADÁS-gomb korábban itt, a sorban ült, minden játékos neve mellett.
@@ -25814,7 +25837,8 @@ function openHubPositionPicker(loc){
        a swapPlayerLocations újraszámolja), és ez azonnal látszik is az
        effektív ratingjén — így a döntés a felhasználóé, nem a rendszeré. */
     const row=document.createElement("div");row.className="prow";
-    const posTxt=hubLocPosTxt(other);
+    const posTxt=hubLocPosTxt(other);         /* a hely kódja — a szín ebből jön */
+    const posLabel=hubLocPosLabel(other);     /* a jelölt saját posztjai */
     const tag=other.type==="bench"?" <small>(pad)</small>":other.type==="extra"?" <small>(tartalék)</small>":"";
     /* Előnézet: mennyit érne a jelölt A MI helyünkön, és mennyit érne a mi
        emberünk az övén — a csere teljes mérlege egy pillantásra. */
@@ -25831,7 +25855,7 @@ function openHubPositionPicker(loc){
     if(locked){
       row.style.opacity=".45";
       prev=`<div style="font-size:11px;color:var(--red);margin-top:1px">🔒 egy szezonon át nem cserélhető (kihívás-büntetés)</div>`;}
-    row.innerHTML=`<span class="pos pc-${getCategoryFor(posTxt)}">${posTxt}</span>
+    row.innerHTML=`<span class="pos pc-${getCategoryFor(posTxt)}">${posLabel}</span>
       <span class="main"><div class="nm">${esc(other.p.n)}${tag}</div>${prev}</span>`;
     row.onclick=()=>{
       if(locked)return;
