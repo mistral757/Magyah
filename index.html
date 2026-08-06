@@ -2194,7 +2194,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.044";
+const APP_VERSION="2.6.045";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -12441,6 +12441,16 @@ function effOvr(slot){return slot&&slot.player?pOvrDisplay(slot.player)*(slot.fi
 /* Egy JELÖLT effektív ratingje egy adott slotban — a HUB poszt-cserénél
    mutatjuk meg előre, hogy a user lássa, mennyit veszít/nyer a mozgatással. */
 function effOvrIfPlaced(p,slot){return slot?pOvrDisplay(p)*fitFor(p,slot):pOvrDisplay(p);}
+/* ---- POSZTLISTA EGY JELVÉNYRE ----
+   A játékos SAJÁT posztjai, familiaritás szerinti sorrendben: a pos[0] a fő
+   posztja (teljes értékű), utána a többi ismert. Kettőnél több már nem fér el
+   olvashatóan egy jelvényen, ezért a maradékot +n jelzi. A HUB keretlistája, a
+   poszt-választó és a meccs közbeni csere-panel ugyanezt használja. */
+const POS_LABEL_MAX=2;
+function posListLabel(pos){
+  if(!pos||!pos.length)return "—";
+  const shown=pos.slice(0,POS_LABEL_MAX).join("/");
+  return pos.length>POS_LABEL_MAX?`${shown}+${pos.length-POS_LABEL_MAX}`:shown;}
 function teamOVRboosted(){
   const f=slots.filter(s=>s.player);if(!f.length)return 0;
   return f.reduce((a,s)=>a+effOvr(s),0)/f.length;}
@@ -16123,10 +16133,31 @@ function openHalftimeSubs(ctx,onDone,opts){
    négy szín, mint a HUB-listán és a pályarajzon. */
 function htsColorKey(pos,slotIdx){
   return slotIdx==null?getCategoryFor(pos):roleInFormation(pos,form,slotIdx);}
+/* ---- MENNYIT ÉRNE EZEN A POSZTON? ----
+   A csere-panel eddig a NYERS Ratinget írta ki (pOvrDisplay), és szövegben
+   annyit mondott, hogy „poszthű” vagy „idegen poszt” — épp azt nem, amit a
+   döntéshez tudni kell: hogy a padon ülő 78-as MENNYIT ÉR azon a helyen, ahova
+   beállna. Ezért fordulhatott elő, hogy egy idegen posztról érkező valójában
+   jobb volt ott, mint a poszthű társa, csak ez sehol nem látszott.
+   A számoló a HUB-bal KÖZÖS: az attribútum-alapú posEffectiveRating (ugyanaz,
+   ami a keretlistán a „Rating: 78 → 74 a KV poszton” sort adja), a rá rakódó
+   élő módosítókkal együtt. Ha nincs attribútum-bejegyzés (MP, régi mentés), a
+   sima illeszkedés-szorzós becslésre esünk vissza. */
+function htsEffOvr(p,slot){
+  if(!slot)return Math.round(pOvrDisplay(p));
+  const e=careerPool&&careerPool[p.n];
+  if(e&&e.attrs)return Math.round(posEffectiveRating(e,slot.pos)+(pOvrDisplay(p)-p.ovr));
+  return Math.round(effOvrIfPlaced(p,slot));}
+/* A változás iránya színnel: zöld, ha nyer a helyen, piros, ha veszít. */
+function htsDeltaHtml(from,to){
+  if(to===from)return `<b>${to}</b>`;
+  return `<b style="color:${to>from?"#9fd6b3":"#e0a06b"}">${to}</b>`;}
 function htsRow(o){
   const row=document.createElement("div");
   row.className="htsRow"+(o.cls?" "+o.cls:"");
-  row.innerHTML=`<span class="pcTag pc-${posCssKey(htsColorKey(o.pos,o.slotIdx))}">${esc(o.pos)}</span>`
+  /* A SZÍN mindig a HELY szerepéből jön (o.pos), a FELIRAT viszont lehet a
+     játékos saját posztlistája (o.posLabel) — a padon ez a kettő eltér. */
+  row.innerHTML=`<span class="pcTag pc-${posCssKey(htsColorKey(o.pos,o.slotIdx))}">${esc(o.posLabel||o.pos)}</span>`
     +`<span class="nm">${o.name}${o.sub?`<small>${o.sub}</small>`:""}</span>`
     +`<span class="ovr">${o.ovr}</span>`;
   if(o.onX){
@@ -16165,16 +16196,21 @@ function renderHalftimeSubs(){
   ctx.active.forEach((a,k)=>{
     const slot=slots[a.idx];if(!slot)return;
     const plan=htsPlanFor(k),done=ctx.usedIdx.has(k),out=k===red;
-    const base={pos:slot.pos,slotIdx:a.idx,ovr:Math.round(pOvrDisplay(a.p))};
+    /* a pályán álló számát is A SAJÁT HELYÉN mérjük — csak így összevethető
+       azzal, amit a padról érkező érne ugyanott */
+    const base={pos:slot.pos,slotIdx:a.idx,ovr:htsEffOvr(a.p,slot)};
     if(out){
       l1.appendChild(htsRow(Object.assign({},base,{cls:"dis",
         name:esc(shortName(a.p.n)),sub:"🟥 kiállítva — nem cserélhető"})));return;}
     if(plan){
       const fit=subFreeFit(plan.in,slot);
+      /* a betervezett csere mérlege EZEN A HELYEN: a lejövő és a beálló
+         effektív értéke ugyanarra a posztra vetítve */
+      const outEff=htsEffOvr(a.p,slot),inEff=htsEffOvr(plan.in,slot);
       l1.appendChild(htsRow(Object.assign({},base,{cls:"plan",
-        ovr:Math.round(pOvrDisplay(plan.in)),
+        ovr:inEff,
         name:`<span class="out">${esc(shortName(a.p.n))}</span> → <span class="in">${esc(shortName(plan.in.n))}</span>`,
-        sub:`<span class="${fit?"fitok":"fitno"}">${fit?"poszthű beállás":"idegen poszt — gyengébben teljesít"}</span> · ${Math.round(pOvrDisplay(a.p))} → ${Math.round(pOvrDisplay(plan.in))}`,
+        sub:`<span class="${fit?"fitok":"fitno"}">${fit?"poszthű beállás":"idegen poszt — gyengébben teljesít"}</span> · a ${slot.pos} helyen: ${outEff} → ${htsDeltaHtml(outEff,inEff)}`,
         onX:()=>{HTS.plan=HTS.plan.filter(p=>p.k!==k);HTS.sel=null;renderHalftimeSubs();}})));return;}
     if(done){
       l1.appendChild(htsRow(Object.assign({},base,{cls:"dis",
@@ -16209,14 +16245,25 @@ function renderHalftimeSubs(){
     bench.forEach(b=>{
       const busy=htsBenchBusy(b.n);
       const own=(b.pos||[]).join(" / ")||"—";
-      let sub=own;
+      const raw=Math.round(pOvrDisplay(b));
+      let sub=own,shownOvr=raw;
       if(busy)sub=ctx.usedIn.has(b.n)?"már beállt":"be van tervezve";
       else if(target){
         const fit=subFreeFit(b,target);
-        sub=`${own} · <span class="${fit?"fitok":"fitno"}">${fit?"poszthű a "+target.pos+" helyre":"idegen poszt a "+target.pos+" helyen"}</span>`;}
+        /* ITT a válasz a felhasználó kérdésére: mennyit érne EZEN a poszton.
+           A jobb oldali szám is erre vált, hogy a padot végig lehessen
+           olvasni, és rögtön kiderüljön, ha egy idegen posztról jövő többet
+           ér a helyen, mint a poszthű társa. */
+        const eff=htsEffOvr(b,target);
+        shownOvr=eff;
+        sub=`${own} · <span class="${fit?"fitok":"fitno"}">${fit?"poszthű a "+target.pos+" helyre":"idegen poszt a "+target.pos+" helyen"}</span>`
+          +` · a ${target.pos} helyen: ${htsDeltaHtml(raw,eff)}${eff!==raw?` (most ${raw})`:""}`;}
       l2.appendChild(htsRow({
+        /* a szín a saját fő posztja szerinti kategória, a felirat a teljes
+           posztlistája — mint a HUB keretlistáján */
         pos:(b.pos&&b.pos[0])||"—",
-        ovr:Math.round(pOvrDisplay(b)),
+        posLabel:posListLabel(b.pos),
+        ovr:shownOvr,
         cls:busy?"dis":(selBench===b.n?"sel":""),
         name:esc(shortName(b.n)),sub,
         onTap:busy?null:()=>htsTap({t:"bench",n:b.n})}));});
@@ -24814,13 +24861,11 @@ function hubLocPosTxt(loc){
    poszt. A tartalék-sor is a teljes listát kapja, nem csak az elsőt.
    A pályán állónál marad a slot posztja: ott az a kérdés, HOL játszik — a
    saját posztját a sor alatti trait-sor mondja meg, ha eltér. */
-const HUB_POS_LABEL_MAX=2;   /* ennyi poszt fér el olvashatóan a jelvényen */
 function hubLocPosLabel(loc){
   if(loc.type==="slot")return slots[loc.idx].pos;
   const p=loc.p;
   if(!p||!p.pos||!p.pos.length)return hubLocPosTxt(loc);
-  const shown=p.pos.slice(0,HUB_POS_LABEL_MAX).join("/");
-  return p.pos.length>HUB_POS_LABEL_MAX?`${shown}+${p.pos.length-HUB_POS_LABEL_MAX}`:shown;}
+  return posListLabel(p.pos);}
 function hubLocRef(loc){
   if(loc.type==="slot")return{type:"slot",idx:loc.idx};
   if(loc.type==="bench")return{type:"bench",key:loc.key};
