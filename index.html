@@ -2194,7 +2194,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.041";
+const APP_VERSION="2.6.042";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -13398,6 +13398,21 @@ function challengeCurrentValue(ch){return challengeRawValue(ch);}
 function challengeMet(ch){
   const prog=challengeProgress(ch);
   return ch.inverse?prog<=ch.target:prog>=ch.target;}
+/* TELJESÜLÉS-RETESZ: ha egy kihívás egyszer már teljesült, azt a későbbi
+   események nem vehetik el. A reteszt a meccs-végi könyvelés teszi fel
+   (ch.metLatched) — így a cél elérése után a haladás visszaesése (a célszemély
+   eladása, egy szezonváltás-nullázás, egy elvesztett játékos) sem tudja
+   "nem teljesültre" fordítani a kihívást. Inverz kihívás nem reteszelhető:
+   ott a "még belefér" állapot a határidőig bármikor elromolhat, a szám csak
+   a lejáratkor mond ítéletet. */
+function challengeSatisfied(ch){return !!ch.metLatched||challengeMet(ch);}
+/* A retesz felrakása. Állapot-kihívásnál (pl. "álljon a taktikád 3. szinten")
+   a MOSTANI állapot a lényeg, nem az, hogy egyszer igaz volt — ezért azokat
+   sem reteszeljük. */
+function latchChallengeIfMet(ch){
+  if(!ch||ch.metLatched||ch.inverse)return;
+  if(CH_STATE_TYPES.includes(ch.type))return;
+  if(challengeMet(ch))ch.metLatched=true;}
 /* ---- REWARD végrehajtás ---- */
 /* A poszt-tanulási visszatérítés LEÍRÁSA az ajánlatkor. A konkrét ár csak
    akkor derül ki, amikor a felhasználó kiválasztja, KI tanul új posztot —
@@ -13583,11 +13598,18 @@ function applyChallengePunishment(pn){
   return pn.desc||"";}
 /* Egy challenge lezárása: teljesült → reward, bukott → punishment. */
 function resolveChallenge(ch){
+  /* ELŐSZÖR A TELJESÜLÉS. A méltányossági érvénytelenítés (lásd lentebb) eddig
+     ELŐBB futott, mint a teljesülés vizsgálata — így az a kihívás is
+     érvénytelenítve lett, amit a játékos MÁR TELJESÍTETT, mielőtt eladtad
+     volna. A megérdemelt jutalom nem veszhet el: a sorrend megfordult, és a
+     meccs-végi retesz (metLatched) is beszámít. */
+  const met=challengeSatisfied(ch);
   /* MÉLTÁNYOSSÁGI VÉDELEM: ha egy játékos-célú kihívás (gól/gólpassz)
      célszemélye már nincs a keretben (eladtad, vagy egy büntetés/esemény
      elvitte), a kihívás teljesíthetetlen — ilyenkor büntetés NÉLKÜL
-     érvénytelenítjük, nem "elbukottként" kezeljük. */
-  if(ch.playerName){
+     érvénytelenítjük, nem "elbukottként" kezeljük. Csak akkor, ha a cél a
+     távozásáig NEM jött össze; a kész teljesítést a távozás nem írja felül. */
+  if(ch.playerName&&!met){
     const roster=(typeof fullCareerRoster==="function")?fullCareerRoster().filter(Boolean):[];
     if(!roster.some(p=>p.n===ch.playerName)){
       if(!S.resolvedChallenges)S.resolvedChallenges=[];
@@ -13596,7 +13618,6 @@ function resolveChallenge(ch){
         reward:ch.reward.desc,punishment:ch.punishment.desc,voided:true});
       addLine(`⚪ KIHÍVÁS ÉRVÉNYTELENÍTVE: „${ch.desc}” — ${shortName(ch.playerName)} már nincs a keretben, ezért büntetés nélkül lezárult.`,"m life");
       return false;}}
-  const met=challengeMet(ch);
   /* KEGYELMI HÁLÓ: ha egy szezon-határidős kihívás bármilyen úton átcsúszott
      a saját szezonja végén (a szabályos lezárásnál a seasonNumber még a
      határidő-érték ALATT van), a statisztikái már nullázódtak — ilyenkor
@@ -13693,9 +13714,9 @@ function renderChallengePanel(){
     html+=`<div class="chActivePanel"><div class="chActTitle">Aktív kihívások (${list.length})</div>`;
     list.forEach(ch=>{
       /* haladás 0..1: a vállalástól számított delta a célhoz viszonyítva */
-      const prog=challengeProgress(ch);
+      const met=challengeSatisfied(ch);
+      const prog=met&&!ch.inverse?Math.max(challengeProgress(ch),ch.target):challengeProgress(ch);
       const frac=Math.max(0,Math.min(1,prog/Math.max(1,ch.target)));
-      const met=challengeMet(ch);
       const col=challengeDiffColor(ch.difficulty);
       html+=`<div class="chActiveRow">
         <span class="chProg" style="color:${met?"var(--grass)":"var(--gold)"}">${met?"✓":challengeProgressText(ch)}</span>
@@ -13828,7 +13849,9 @@ function reopenChallengeOffers(){
   $("scWindow").scrollIntoView({behavior:"smooth"});}
 /* Haladás szöveg a HUB-panelhez (pl. "3/5") — a vállalástól számított delta. */
 function challengeProgressText(ch){
-  const prog=challengeProgress(ch);
+  /* Reteszelt kihívásnál a szám nem eshet vissza a cél alá: a "3/3" ott marad,
+     akkor is, ha a nyers érték közben elveszett (eladott játékos, nullázás). */
+  const prog=ch.metLatched?Math.max(challengeProgress(ch),ch.target):challengeProgress(ch);
   /* PÉNZBEN mért kihívásnál (money:true) a haladás is FORINTBAN megy. A leírás
      már eddig is fmtFt-tel készült ("Adj el játékosokat 16 Mrd Ft értékben"),
      a haladás viszont a nyers pontértéket mutatta ("1854/8000") — így a kettő
@@ -18844,7 +18867,12 @@ function playMatch(){
         if(ch.type==="bigHaul")matchVal=gf;
         else if(ch.type==="unbeatenStreak")matchVal=S.unbeatenStreak;
         else if(ch.type==="cleanStreak")matchVal=S.cleanSheetStreak;
-        if(matchVal!==null)ch.bestSinceAccept=Math.max(ch.bestSinceAccept||0,matchVal);});}
+        if(matchVal!==null)ch.bestSinceAccept=Math.max(ch.bestSinceAccept||0,matchVal);});
+      /* TELJESÜLÉS-RETESZ a meccs-végi könyvelésben: amint egy kihívás célja
+         összejött, azt a későbbi események nem vehetik el (lásd
+         latchChallengeIfMet). A könyvelés ITT, a statisztikák frissítése után
+         fut, hogy az épp most szerzett gól/gólpassz is beleszámítson. */
+      (S.activeChallenges||[]).forEach(latchChallengeIfMet);}
     /* --- tiszta lap sorozat: egymást követő gól nélküli meccsek a
        védelemnek/kapusnak növekvő önbizalmat, kis csapatszintű bónuszt adnak --- */
     if(ga===0){
@@ -21016,9 +21044,9 @@ function renderChallengeModal(){
   if(active.length){
     html+=`<div class="chmSection">Aktív kihívások (${active.length})</div>`;
     active.forEach(ch=>{
-      const prog=challengeProgress(ch);
+      const met=challengeSatisfied(ch);
+      const prog=met&&!ch.inverse?Math.max(challengeProgress(ch),ch.target):challengeProgress(ch);
       const frac=Math.max(0,Math.min(1,prog/Math.max(1,ch.target)));
-      const met=challengeMet(ch);
       /* Inverz kihívásnál a "nem teljesült" azt jelenti, hogy TÚLLÉPTED a
          keretet — az már visszafordíthatatlan, ezért piros, nem arany. */
       const col=met?"var(--grass)":(ch.inverse?"var(--red)":"var(--gold)");
