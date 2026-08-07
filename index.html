@@ -2226,7 +2226,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.057";
+const APP_VERSION="2.6.058";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10657,7 +10657,14 @@ function twResumeAfterWindow(){
     .some(id=>{const el=$(id);return el&&!el.classList.contains("hide");});
   if(!alive){
     if(cbErr)addLine(`⚠️ Az átigazolási ablak lezárása után a folytatás elakadt — visszatérünk a HUB-ba. (${esc(String(cbErr&&cbErr.message||cbErr))})`,"m ev");
-    if(gameMode==="career"&&typeof csReturnToHub==="function"&&(S.idx||0)<30)csReturnToHub();
+    /* A HUB-ba esve a szezon-módot IS vissza kell kapcsolni: enélkül a HUB azt
+       hiszi, nyár van — rossz "Tovább" gombot mutat, és a fenti kapu sem
+       fogna, ha csak a jelzőre támaszkodna. */
+    if(gameMode==="career"&&typeof csReturnToHub==="function"&&(S.idx||0)<30){
+      if(seasonInProgress())hubMidSeasonMode=true;
+      csReturnToHub();
+      try{setHubNextSeasonBtn();}catch(e){}
+      try{renderHub();}catch(e){}}
     else{$("scSim").classList.remove("hide");$("scSim").scrollIntoView({behavior:"smooth"});}}}
 function twResetSessionLooks(mult){
   const L=twLooksForScout(mult);
@@ -17796,6 +17803,31 @@ function mpLevelLocked(){return false;}
    Ezért egyetlen kérdés dönt mindenhol: fut-e szezon. */
 function seasonInProgress(){
   return phase==="season"&&!S.seasonClosed;}
+/* ---- SZEZON KÖZBEN ZÁRVA AZ ÁTIGAZOLÁS ----
+   EGY predikátum a négy átigazolási művelethez (vásárlás, klub-szemle,
+   képesség-keresés, esemény). Üres/false = szabad.
+
+   JELENTETT HIBA, AMIT EZ JAVÍT: a rövid átigazolási időszak lezárása után a
+   játék visszadobott a HUB-ba, és ott +2 ÁTIGAZOLÁSI ESEMÉNY jelent meg a
+   semmiből — a NYÁRI keret, a szezon kellős közepén.
+
+   AZ OK: a kapu eddig kizárólag a hubMidSeasonMode UI-jelzőn állt. Csakhogy a
+   checkpoint-ablak megnyitása SZÁNDÉKOSAN hamisra állítja (twEnterHubWindow),
+   hogy az ablakban egyáltalán lehessen igazolni. Ha a lezárás után a
+   folytatás nem talál vissza a szezonhoz — mert a resumeCb egy újratöltés
+   után már null (függvényt nem lehet menteni), vagy kivételt dobott —, akkor a
+   zsákutca-védelem a HUB-ba tesz, ahol:
+     · twWindowOpen() már hamis (az ablak lezárult),
+     · hubMidSeasonMode is hamis (az ablak állította be),
+   tehát a kapu SEHOL nem fog, és a twEventLeft() a nyári keretet adja vissza.
+
+   A JAVÍTÁS: a jelző mellé bekerül a seasonInProgress(), ami a VALÓDI
+   állapotot nézi (fut-e a szezon), nem egy képernyő-módot. Ha nincs nyitott
+   ablak és közben fut a szezon, az átigazolás zárva — bármelyik úton jutottál
+   is a HUB-ba. */
+function twClosedNow(){
+  if(twWindowOpen())return false;               /* nyitott ablakban minden szabad */
+  return !!hubMidSeasonMode||seasonInProgress();}
 /* ---- MIÉRT NEM ÁLLÍTHATÓ MOST A SZINT? ----
    EGY predikátum, amit a HUB gombja (megjelenés) ÉS a kattintás (tiltás) is
    ugyanígy kérdez — így a kettő nem tud elcsúszni egymástól. Üres válasz =
@@ -23716,7 +23748,7 @@ $("hubBuyBtn").onclick=()=>{
    twSession-keretet használja, mint a másik kettő, és ugyanúgy csak a nyári
    ablakban érhető el. */
 $("hubAttrSearchBtn")&&($("hubAttrSearchBtn").onclick=()=>{
-  if((hubMidSeasonMode&&!twWindowOpen())||!twAttrSearchesForScout()||twAttrLeft()<=0)return;
+  if(twClosedNow()||!twAttrSearchesForScout()||twAttrLeft()<=0)return;
   if(!twWindowOpen())S.transfersLockedUntilSummer=false;   /* a nyár feloldja a zárat */
   TW=twHubTW("Képesség-keresés");
   $("scHub").classList.add("hide");
@@ -23731,7 +23763,7 @@ $("hubAttrSearchBtn")&&($("hubAttrSearchBtn").onclick=()=>{
    HUB-ba kerülsz, nem a szezonba. */
 $("hubTransferEventBtn")&&($("hubTransferEventBtn").onclick=()=>{
   if(gameMode!=="career")return;
-  if(hubMidSeasonMode&&!twWindowOpen())return;   /* szezon közben csak nyitott ablakban */
+  if(twClosedNow())return;   /* szezon közben csak nyitott ablakban */
   if(preSeasonHubMode)return;
   if(twEventLeft()<=0)return;
   twSpendEvent();
@@ -27061,7 +27093,7 @@ function renderHub(){
      használhatók. */
   /* NYITOTT CHECKPOINT-ABLAK: ilyenkor a szezon közben IS lehet igazolni — épp
      ez a lényege, hogy a scoutolás a HUB-ba költözött. */
-  const twBlocked=(!!hubMidSeasonMode&&!twWindowOpen())||!!preSeasonHubMode;
+  const twBlocked=twClosedNow()||!!preSeasonHubMode;
   const twBlockMsg=hubMidSeasonMode?"Átigazolni csak a nyári ablakban lehet"
     :"Az első szezon előtt még nincs átigazolási büdzsé — a nyári ablakban nyílik meg";
   /* A továbblépő gomb MINDIG az állapotból frissül (setHubNextSeasonBtn) — a
@@ -27120,7 +27152,7 @@ function renderHub(){
      const maxA=twAttrMax();
      const leftA=(gateA&&okNow)?twAttrLeft():0;
      let sub,dis=true;
-     if(hubMidSeasonMode&&!twWindowOpen())sub="átigazolni csak a nyári ablakban lehet";
+     if(twClosedNow())sub="átigazolni csak a nyári ablakban lehet";
      else if(preSeasonHubMode)sub="az első szezon előtt még nem — a nyári ablakban nyílik";
      else if(!okNow)sub="csak két szezon között, a nyári ablakban";
      else if(!gateA)sub=`${TW_ATTR_MIN_STARS}★-os scout kell hozzá — a tiéd ${scout?scout.stars:0}★`;
@@ -27135,7 +27167,7 @@ function renderHub(){
    if(eb&&gameMode==="career"){
      const maxE=twEventMax(),leftE=twBlocked?0:twEventLeft();
      let sub,dis=true;
-     if(hubMidSeasonMode&&!twWindowOpen())sub="csak nyitott átigazolási időszakban";
+     if(twClosedNow())sub="csak nyitott átigazolási időszakban";
      else if(preSeasonHubMode)sub="az első szezon előtt még nem — a nyári ablakban nyílik";
      else if(twBlocked)sub="csak két szezon között, a nyári ablakban";
      else if(leftE<=0)sub=`elfogyott ${twWindowOpen()?"ebben az időszakban":"ebben a nyárban"} (${maxE}/${maxE} felhasználva)`;
