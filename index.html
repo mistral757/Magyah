@@ -2034,6 +2034,11 @@ button.infPanel:disabled{cursor:default}
     <div id="hubChallengePanel"></div>
     <div id="hubInvestBox" class="hubGroup hide" style="margin-bottom:12px"></div>
     <div id="hubSeasonReport" class="hide" style="margin-top:12px;background:var(--bg);border:1px solid var(--gold);border-radius:8px;padding:11px 13px"></div>
+    <!-- SZEMÉLYI EDZŐ: a visszavonult legendák felajánlása. SZÁNDÉKOSAN nem a
+         hubSeasonReport-on belül van: az a jelentés HTML-jét szövegként menti
+         (S.hubReportHtml), tehát az ott lévő gombok egy újratöltés után halottak
+         lennének. Ez a doboz élőben, a S.pendingCoachOffers állapotból épül. -->
+    <div id="hubStaffOffer" class="hide" style="margin-top:12px"></div>
     <div id="careerStatsPanel" class="hide" style="margin-top:12px">
       <div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin-bottom:6px">Mindenkori statisztika</div>
       <div id="careerStatsBody"></div>
@@ -2220,7 +2225,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.048";
+const APP_VERSION="2.6.049";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9330,7 +9335,7 @@ function advanceCareerSeason(){
     const seasonNow=S.seasonNumber||1;
     const planned=entry.retirePlan&&seasonNow>=entry.retirePlan;
     if(planned||(!entry.retirePlan&&shouldRetire(entry.age,entry.startRating,entry.peak,entry._retireExtendTo))){
-      report.retired.push({n:loc.p.n,age:entry.age});
+      report.retired.push({n:loc.p.n,age:entry.age,coachFp:offerCoachIfEligible(entry)});
       const codes=locCodes(loc);
       const repl=Object.values(careerPool).find(e=>!draftedNow.has(e.n)&&e.pos.some(pp=>codes.includes(pp)));
       if(repl){
@@ -9360,7 +9365,7 @@ function advanceCareerSeason(){
     const seasonNow2=S.seasonNumber||1;
     const planned2=entry.retirePlan&&seasonNow2>=entry.retirePlan;
     if(planned2||(!entry.retirePlan&&shouldRetire(entry.age,entry.startRating,entry.peak,entry._retireExtendTo))){
-      report.retired.push({n:p.n,age:entry.age});
+      report.retired.push({n:p.n,age:entry.age,coachFp:offerCoachIfEligible(entry)});
       extraRoster.splice(i,1);
     }else{
       p.ovr=entry.startRating;p.age=entry.age;p.tsi=entry.tsi;
@@ -9412,6 +9417,278 @@ function advanceCareerSeason(){
      játékos attribútumaira 1:1-ben átvezetjük (a padon ülőkére is). */
   Object.values(careerPool).forEach(e=>syncAttrsToRating(e));
   return report;}
+
+/* ================= SZEMÉLYI EDZŐK — ADATRÉTEG (F1) =================
+   AZ ÖREG JÁTÉKOSOK MÁSODIK ÉLETE. Eddig a visszavonulás zsákutca volt: a
+   legendádat vagy eladtad időben, vagy egy naplósorral eltűnt. Mostantól
+   ÁTLÉPHET A STÁBBA, és a pályafutása számokban rögzített öröksége dönti el,
+   mennyire lesz jó edző — és miben.
+
+   EZ A FÁZIS SZÁNDÉKOSAN HATÁSTALAN. Itt csak az adat születik meg: a
+   pályafutás-lenyomat, a Szakértelem képlete, a stáb tárolása és a felvétel.
+   A tényleges játékhatásokat (attribútum-fejlődés, morál, kémia, forma,
+   sérülés, skill-hagyaték) a következő fázisok kötik be a MEGLÉVŐ motorokba.
+   Így ez a lépés önmagában nem tud balanszot törni, viszont a legfontosabb,
+   pótolhatatlan adatgyűjtés (noteSkillEver) azonnal elindul.
+
+   A teljes terv: docs/szemelyi-edzo-rendszer.md */
+const COACH_SLOTS_BASE=3, COACH_SLOTS_MAX=6;
+const COACH_MIN_AGE=32;        /* ennyi kortól lehet valakiből edző */
+const COACH_MIN_MATCHES=40;    /* ...és csak ennyi KÖZÖS meccs után */
+/* MIÉRT VAN MECCS-KÜSZÖB: enélkül a rendszer egy második átigazolási piac
+   lenne — vennél egy 34 éves legendát, és másnap a stábba raknád. A 40 meccs
+   (≈ egy szezon) megköveteli, hogy a klub tényleg ismerje az embert. Így az
+   edzőminőség nem vásárolható, csak kinevelhető. */
+const COACH_SZ_MIN=20, COACH_SZ_MAX=99;
+const COACH_SPEC_WEIGHT=55;    /* a típus-specifikus rész max pontszáma */
+const COACH_RETIRE_FROM=66;    /* az edző maga is kiöregszik — de csak sokára */
+
+/* A slot-ár: 20 Mrd Ft = 10 000 pont (HUF_PER_POINT=2e6). SZUPERLINEÁRIS,
+   szemben a keretbővítés lineáris árával: a 6. edző ugyanolyan erős, mint az
+   1., tehát a hatás multiplikatív, és lineáris ár mellett a teljes kiépítés
+   túl olcsó lenne. 3→4: 20 Mrd, 4→5: 35 Mrd, 5→6: 61,25 Mrd. */
+function coachSlotPrice(cur){
+  const step=Math.max(0,(cur||COACH_SLOTS_BASE)-COACH_SLOTS_BASE);
+  return Math.round(10000*Math.pow(1.75,step));}
+function coachSlots(){return S.coachSlots||COACH_SLOTS_BASE;}
+function staff(){return S.staff||(S.staff=[]);}
+function staffFull(){return staff().length>=coachSlots();}
+
+/* ---- PÁLYAFUTÁS-LENYOMAT ----
+   A minőség a BELÉPÉS pillanatában dől el, véglegesen. Ekkor le kell fagyasztani
+   mindent, amiből számolunk: a careerStats a visszavonulás után már nem frissül,
+   a S.skills bejegyzései elévülnek, a pool-beli attribútumok pedig a keretből
+   kikerülve értelmüket vesztik.
+   A lenyomat a kártyán is látszik majd ("284 meccs · 96 gól · 2 sérülés") —
+   ez a rendszer érzelmi hozadéka: a szám mögött ott a közös múlt. */
+function careerFingerprint(entry){
+  if(!entry)return null;
+  const cs=(S.careerStats&&S.careerStats[entry.n])||{};
+  return {
+    n:entry.n, age:entry.age||COACH_MIN_AGE,
+    matches:cs.matches||0, goals:cs.g||0, assists:cs.a||0,
+    saves:cs.saves||0, cleans:cs.cs||0, mvp:cs.mvp||0,
+    inj:cs.inj||0, reds:cs.rc||0,
+    leadI:entry.leadI!=null?entry.leadI:2,
+    coopI:entry.coopI!=null?entry.coopI:2.5,
+    aggroI:entry.aggroI!=null?entry.aggroI:2,
+    attrs:Object.assign({},entry.attrs||{}),
+    /* A SZÜLETÉSI sebesség kell a Sprintmesterhez: nem az számít, milyen gyors
+       volt, hanem mennyit DOLGOZOTT rajta. Régi mentésben nincs sebBase — ott
+       a jelenlegit vesszük, tehát a növekmény 0 (semleges, nem büntet). */
+    sebBase:(entry.sebBase!=null?entry.sebBase:((entry.attrs&&entry.attrs.seb)||0)),
+    peak:entry.peak||entry.startRating||70,
+    pos:(entry.pos||["KKP"]).slice(),
+    skillsEver:(entry.skillsEver||[]).slice(),
+    /* A ±3 induló zaj EGYSZER sorsolódik, és a lenyomat része — így a
+       típusválasztóban MUTATOTT érték pontosan az lesz, amit a felvétel után
+       kapsz. Ha a zaj a számításban ülne, az előnézet hazudna. */
+    noise:Math.round((Math.random()*2-1)*3)};}
+
+const cfNorm=(v,lo,hi)=>Math.max(0,Math.min(1,(v-lo)/(hi-lo)));
+const cfPerM=(fp,v)=>(v||0)/Math.max(1,fp.matches);
+/* ---- A NORMÁLÁSI SÁVOK A MOTOR TÉNYLEGES ESEMÉNYRÁTÁIBÓL JÖNNEK ----
+   A szabály: a sáv teteje ≈ a populáció átlagának KÉTSZERESE, hogy az átlagos
+   pályafutás a skála közepére essen. Így a mutató tényleg megkülönböztet.
+   MÉRVE a motor konstansaiból:
+     · sérülés: 0.035/meccs az egész csapatra (lásd a sérülés-kockázat ágat),
+       11 játékosra osztva 0.00318/játékos/meccs  → sáv 0…0.0065
+     · piros lap: SIM.REDP=0.06/meccs, 11 játékosra 0.00545/játékos/meccs
+       → sáv 0…0.011
+     · meccs embere: meccsenként pontosan 1 a 11-ből → 0.0909 → sáv 0…0.20
+   TANULSÁG, amiért ez külön blokk: az első kalibráció "kényelmes" kerek
+   számokat használt (0.055 a sérülésre, 0.06 a pirosra), ami 10-17-SZERESE a
+   valódi rátának — vagyis gyakorlatilag MINDENKI maximumot kapott ezekre a
+   tagokra, és a típusok közti különbség eltűnt. Ha a motor rátái változnak,
+   ezeket a számokat is újra kell húzni. */
+const CF_BAND_INJ=0.0065, CF_BAND_RED=0.011, CF_BAND_MVP=0.20;
+/* A TEMPERAMENTUM nem lineáris: a forma kézben tartásához a KÖZÉP a legjobb
+   (Kiegyensúlyozott). A jámbor nem tud tüzet gyújtani, a lobbanékony felégeti
+   az öltözőt. Fordított V-görbe a Hattrick-skála 0-4 tartományán. */
+const cfTemp=a=>1-Math.abs(a-2)/2;
+/* Az attribútum felső határa a Ratinghez kötött (attrHardCap), ezért Infinityben
+   egy 130-as játékos gól-attribútuma 155 is lehet. Fix 99-es normálás mellett
+   ott MINDENKI kimaxolna — a peak+25 tartja értelmesen a skálát. */
+const cfAttr=(fp,k)=>cfNorm((fp.attrs&&fp.attrs[k])||0,55,fp.peak+25);
+
+/* ALAP — típustól FÜGGETLEN. Ez a két tag mindig számít. */
+function coachAgePts(age){return Math.max(0,Math.min(14,(age-31)*1.75));}
+/* A csökkenő hozam (^0.75) azért kell, hogy egy 500 meccses vasember ne legyen
+   KÉTSZER olyan jó edző, mint egy 250 meccses — csak érezhetően jobb. */
+function coachRoutinePts(m){return Math.min(20,20*Math.pow(Math.min(1,(m||0)/420),0.75));}
+
+/* ---- A TÍZ TÍPUS ----
+   Az "attribútumedző" nem egy típus, hanem ÖT — egy-egy a meglévő ATTR_KEYS-hez.
+   Ez azért helyes, mert így az edző hatása később egyenesen beleírható a már
+   működő fejlődés-csatornába (addA), új mechanika nélkül.
+   gate: mely posztokról indulhat. A sebesség szándékosan nyitott — az az
+   egyetlen attribútum, aminek nincs Rating-hatása, tehát bármely poszton
+   lehetett valaki gyors. */
+const COACH_TYPES=[
+ {key:"attr:gol",attrKey:"gol",ic:"🎯",n:"Gólvágó-mentor",
+  d:"A befejezés iskolája — a tanítványai gólszerzése gyorsabban érik.",
+  gate:["CS",SHADOW_POS,"JSZ","BSZ","TKP"],
+  score:fp=>0.60*cfAttr(fp,"gol")+0.40*cfNorm(cfPerM(fp,fp.goals),0,0.65),
+  why:fp=>cfPerM(fp,fp.goals)>=0.4?`${fp.goals} gól ${fp.matches} meccsen — a befejezés nála ösztön volt.`
+        :`Kimagasló gólszerzés-érzék (${Math.round(fp.attrs.gol||0)}).`},
+ {key:"attr:passz",attrKey:"passz",ic:"🎩",n:"Játékmester",
+  d:"A passzjáték és a kreativitás átadása.",
+  gate:["VKP","KKP","TKP","JSZ","BSZ",SHADOW_POS],
+  score:fp=>0.60*cfAttr(fp,"passz")+0.40*cfNorm(cfPerM(fp,fp.assists),0,0.45),
+  why:fp=>cfPerM(fp,fp.assists)>=0.28?`${fp.assists} gólpassz — látta a pályát, mielőtt a többiek felnéztek volna.`
+        :`Mesteri passzbiztonság (${Math.round(fp.attrs.passz||0)}).`},
+ {key:"attr:ved",attrKey:"ved",ic:"🛡",n:"Bástya",
+  d:"A védekező munka rendje és fegyelme.",
+  gate:["JV","BV","KV","VKP"],
+  score:fp=>0.60*cfAttr(fp,"ved")+0.40*cfNorm(cfPerM(fp,fp.cleans),0,0.40),
+  why:fp=>cfPerM(fp,fp.cleans)>=0.25?`${fp.cleans} kapott gól nélküli meccs — mögötte fal volt.`
+        :`Kivételes védekező tudás (${Math.round(fp.attrs.ved||0)}).`},
+ {key:"attr:kapus",attrKey:"kapus",ic:"🧤",n:"Kesztyűs mester",
+  d:"Kapusiskola — a védés kézműves tudása.",
+  gate:["KP"],
+  score:fp=>0.60*cfAttr(fp,"kapus")+0.40*cfNorm(cfPerM(fp,fp.saves),0,3.2),
+  why:fp=>cfPerM(fp,fp.saves)>=2?`${fp.saves} védés — a hálóőrzés nála szakma volt.`
+        :`Kiváló kapusképességek (${Math.round(fp.attrs.kapus||0)}).`},
+ {key:"attr:seb",attrKey:"seb",ic:"⚡",n:"Sprintmester",
+  d:"Erőnlét és robbanékonyság — a leglassabban formálható képesség.",
+  gate:null,
+  /* A MÁSODIK TAG NEM A MECCSSZÁM. Az már az ALAP-ban (rutinPont) is benne van,
+     tehát duplán számítva minden hosszú pályafutású játékosból automatikusan
+     csúcs-Sprintmester lett volna — mérve ez a típus MINDEN más elé került.
+     Helyette a sebesség NÖVEKMÉNYE dönt: a passzív csatorna a születési érték
+     +15%-áig visz (SPEED_PASSIVE_CAP_PCT), azon túl CSAK célzott edzéssel lehet
+     eljutni. Aki tehát 12+ pontot tett hozzá, az tényleg dolgozott érte — és
+     pont ezt a tudást tudja átadni. */
+  score:fp=>0.60*cfNorm((fp.attrs&&fp.attrs.seb)||0,55,99)
+           +0.40*cfNorm(((fp.attrs&&fp.attrs.seb)||0)-(fp.sebBase||0),0,12),
+  why:fp=>{const g=Math.round(((fp.attrs&&fp.attrs.seb)||0)-(fp.sebBase||0));
+    return g>=6?`A sebességén ${g} pontot dolgozott — tudja, mibe kerül a robbanékonyság.`
+               :`Villámgyors játékos volt (sebesség ${Math.round(fp.attrs.seb||0)}).`;}},
+ {key:"skill",ic:"🎓",n:"Iskolateremtő",
+  d:"Képességeket tanít — és a SAJÁT skilljeit adja tovább a tanítványainak.",
+  gate:null,
+  score:fp=>0.65*cfNorm((fp.skillsEver||[]).length,0,6)+0.35*cfNorm(cfPerM(fp,fp.mvp),0,CF_BAND_MVP),
+  why:fp=>(fp.skillsEver||[]).length?`${fp.skillsEver.length} képességet szerzett a pályafutása során — ezt a hagyatékot adhatja tovább.`
+        :`${fp.mvp} alkalommal volt a meccs embere.`},
+ {key:"morale",ic:"🔥",n:"Lélekemelő",
+  d:"A csapatmorál emelése — az öltöző hangulatának mestere.",
+  gate:null,
+  score:fp=>0.70*cfNorm(fp.leadI,0,4)+0.30*cfNorm(fp.peak,60,110),
+  why:fp=>`${LEAD_LEVELS[Math.round(fp.leadI)]||"Jó"} vezetői képesség — a szava sokat nyomott az öltözőben.`},
+ {key:"chem",ic:"🤝",n:"Csapatkovács",
+  d:"Kapcsolatépítés — a keret belső kémiáját erősíti.",
+  gate:null,
+  score:fp=>0.75*cfNorm(fp.coopI,0,5)+0.25*cfNorm(fp.leadI,0,4),
+  why:fp=>`${COOP_LEVELS[Math.round(fp.coopI)]||"Kedves"} természet — mindenkivel megtalálta a hangot.`},
+ {key:"form",ic:"📈",n:"Ritmusmester",
+  d:"Formakezelés — kisebb hullámvölgyek, kiszámíthatóbb teljesítmény.",
+  gate:null,
+  /* A temperamentum súlya SZÁNDÉKOSAN mérsékelt (0.50): a Kiegyensúlyozott a
+     leggyakoribb érték (AGGROW szerint 36%), tehát önmagában nem lehet elég egy
+     csúcs-formaedzőhöz — kellenek mellé valódi nagy meccsek is. */
+  score:fp=>0.50*cfTemp(fp.aggroI)+0.35*cfNorm(cfPerM(fp,fp.mvp),0,CF_BAND_MVP)
+           +0.15*(1-cfNorm(cfPerM(fp,fp.reds),0,CF_BAND_RED)),
+  why:fp=>`${AGGRO_LEVELS[Math.round(fp.aggroI)]||"Kiegyensúlyozott"} temperamentum — sosem esett szét egy rossz hét alatt.`},
+ {key:"medic",ic:"⚕",n:"Gyógyító kéz",
+  d:"Sportorvoslás — kevesebb sérülés, rövidebb lábadozás.",
+  gate:null,
+  /* A "sosem sérült meg" ÖNMAGÁBAN félrevezető: egy 45 meccset játszott, ép
+     ember 100%-ot kapna. A 25%-os rutin-tag megköveteli, hogy a sérülés-
+     mentesség HOSSZÚ karrieren át igazolódjon. */
+  score:fp=>0.75*(1-cfNorm(cfPerM(fp,fp.inj),0,CF_BAND_INJ))+0.25*cfNorm(fp.matches,0,420),
+  why:fp=>fp.inj===0?`${fp.matches} meccs egyetlen sérülés nélkül — tudja, hogyan kell vigyázni a testre.`
+        :`${fp.matches} meccs, mindössze ${fp.inj} sérülés.`}
+];
+function coachTypeByKey(k){return COACH_TYPES.find(t=>t.key===k)||null;}
+function coachTypeAllowed(t,fp){
+  if(!t||!fp)return false;
+  if(!t.gate)return true;
+  return (fp.pos||[]).some(p=>t.gate.indexOf(p)>=0);}
+
+/* A Szakértelem: ALAP (0-34) + SZAK (0-55) + zaj, 20-99 közé vágva. */
+function coachSzFor(typeKey,fp){
+  const t=coachTypeByKey(typeKey);
+  if(!t||!fp)return COACH_SZ_MIN;
+  const base=coachAgePts(fp.age)+coachRoutinePts(fp.matches);
+  const spec=Math.max(0,Math.min(1,t.score(fp)))*COACH_SPEC_WEIGHT;
+  return Math.round(Math.max(COACH_SZ_MIN,Math.min(COACH_SZ_MAX,base+spec+(fp.noise||0))));}
+/* Minden jogosult típus, a legjobbtól lefelé. EGY EDZŐ EGY TÍPUS: a választás
+   végleges, ezért kell látni az egész mezőnyt. Ugyanabból a legendából így két
+   különböző karrierben két különböző klub épülhet. */
+function coachCandidates(fp){
+  if(!fp)return [];
+  return COACH_TYPES.filter(t=>coachTypeAllowed(t,fp))
+    .map(t=>({type:t,sz:coachSzFor(t.key,fp)}))
+    .sort((a,b)=>b.sz-a.sz);}
+
+const COACH_TIERS=[
+  {min:87,s:"★★★★★⁺",l:"Legenda a kispad mögött"},
+  {min:74,s:"★★★★★", l:"Iskolateremtő tekintély"},
+  {min:61,s:"★★★★☆", l:"Mestere a szakmának"},
+  {min:48,s:"★★★☆☆", l:"Elismert szakember"},
+  {min:35,s:"★★☆☆☆", l:"Megbízható segéd"},
+  {min:0, s:"★☆☆☆☆", l:"Kezdő stábtag"}];
+function coachTier(sz){return COACH_TIERS.find(t=>sz>=t.min)||COACH_TIERS[COACH_TIERS.length-1];}
+function coachStars(sz){return coachTier(sz).s;}
+function coachStarsLabel(sz){const t=coachTier(sz);return `${t.s} ${t.l}`;}
+
+/* Jogosult-e a keretben lévő játékos arra, hogy edző legyen belőle? */
+function coachEligible(entry){
+  if(gameMode!=="career"||!entry)return false;
+  if((entry.age||0)<COACH_MIN_AGE)return false;
+  const cs=(S.careerStats&&S.careerStats[entry.n])||{};
+  return (cs.matches||0)>=COACH_MIN_MATCHES;}
+
+function makeCoach(fp,typeKey,seasonNow){
+  const t=coachTypeByKey(typeKey);
+  if(!t||!fp)return null;
+  const sz=coachSzFor(typeKey,fp);
+  return {n:fp.n,type:t.key,attrKey:t.attrKey||null,
+    sz,szBase:sz,age:fp.age,xp:0,since:seasonNow||S.seasonNumber||1,fp,
+    /* Alapból a teljes keretre figyel — a legártalmatlanabb kiindulás. A
+       fókusz-rendszer az F2 fázisban kap felületet. */
+    focus:{mode:"team",group:null,names:[]},
+    /* HAGYATÉK (F3): mennyit adott már át, és skillenként hányszor. Itt csak
+       megszületik a mező, hogy a mentés-formátum ne változzon később. */
+    legacySpent:0,legacyOut:{}};}
+function hireCoach(c){
+  if(!c||staffFull())return false;
+  staff().push(c);
+  addLine(`🎓 <b>ÚJ A STÁBBAN</b> — ${esc(shortName(c.n))} mostantól ${esc(coachTypeByKey(c.type).n)} (${coachStars(c.sz)} Sz ${c.sz}).`,"m life");
+  return true;}
+/* Az elküldött edző nem tűnik el: a Stáb-csarnok a klub emlékezete. Nulla
+   játékhatás, de ez adja meg a rendszer súlyát egy 20 szezonos karrierben. */
+function retireCoach(idx,reason){
+  const arr=staff(),c=arr[idx];
+  if(!c)return null;
+  arr.splice(idx,1);
+  S.staffHall=S.staffHall||[];
+  S.staffHall.push({n:c.n,type:c.type,sz:c.sz,from:c.since,
+    to:S.seasonNumber||1,age:c.age,reason:reason||"dismissed"});
+  return c;}
+
+/* ---- FELAJÁNLÁS-SOR ----
+   A visszavonuló legendákat nem lehet azonnal, a szezonváltás sűrűjében
+   elintézni: a felhasználónak látnia kell a lenyomatot és a típusokat, mielőtt
+   dönt. Ezért sorba állnak, és a HUB-ban élőben rendereljük őket. A sor a
+   mentés része, tehát egy újratöltés nem veszíti el a döntést. */
+function queueCoachOffer(fp){
+  if(!fp)return;
+  S.pendingCoachOffers=S.pendingCoachOffers||[];
+  if(S.pendingCoachOffers.some(o=>o&&o.n===fp.n))return;
+  S.pendingCoachOffers.push(fp);}
+function dropCoachOffer(name){
+  S.pendingCoachOffers=(S.pendingCoachOffers||[]).filter(o=>o&&o.n!==name);}
+/* A visszavonulás pillanatában hívjuk, MIELŐTT a játékos kikerül a keretből.
+   Ez az EGYETLEN hely, ahol a lenyomat még hiánytalanul összeáll — később a
+   careerStats már nem a régi emberhez tartozik, a keret-objektum pedig eltűnt.
+   Visszaadja a lenyomatot (a szezonjelentés ebből ír), vagy null-t, ha az
+   illető nem jogosult. */
+function offerCoachIfEligible(entry){
+  if(!coachEligible(entry))return null;
+  const fp=careerFingerprint(entry);
+  queueCoachOffer(fp);
+  return fp;}
 
 /* ================= IKONIKUS JÁTÉKOSOK =================
    Ritka, különleges átigazolási esemény tartalék-kerete: a magyar Aranycsapat
@@ -14251,6 +14528,12 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      SZÁNDÉKOSAN nem nullázódik szezonváltáskor: a jelentés a mostani idényt
      mutatja, de a keret előélete attól még a keret előélete. */
   lockerLog:[],
+  /* SZEMÉLYI EDZŐK. A stáb szándékosan NEM nullázódik szezonváltáskor: az
+     egész rendszer lényege, hogy a legendáid évtizedekig a klubnál maradnak.
+     A staffHall a kiöregedett/elküldött edzők emléke — nulla játékhatás. */
+  staff:[],coachSlots:COACH_SLOTS_BASE,staffHall:[],
+  pendingCoachOffers:[],       /* visszavonult legendák, akik döntésre várnak */
+  coachFocusChangeUsed:false,  /* a fókusz is ciklusonként egyszer váltható */
   halftimeSubs:false, /* félidei csere-szünet (HUB-kapcsoló) */
   /* GUIDE MÓD: karrierenként választható, és a látott tippek is a mentés
      részei — egy újratöltés nem kezdi elölről a bevezetőt. */
@@ -14500,6 +14783,23 @@ function settleSkillFloor(){
   if(before)updateSkillsLine();}
 function rollStagesNeeded(){return [2,3,4][weightedIndex([40,35,25])];}
 function skillComplete(inst){return inst.stagesCompleted>=inst.stagesNeeded;}
+/* ---- SKILL-ÉLETRAJZ: MIT TUDOTT VALAHA ----
+   A S.skills[név] csak az AKTUÁLIS állapotot tárolja, és a visszavonuláskor
+   elévül — a skill-vesztés büntetés (loseSkill) pedig menet közben is kivesz
+   belőle. A személyi edző rendszer viszont azt kérdezi, MELY skilljei voltak
+   VALAHA a játékosnak: ebből lesz az Iskolateremtő minősége, és ezt a hagyatékot
+   adja majd tovább a tanítványainak.
+   Ezért a careerPool-bejegyzésben vezetünk egy MONOTON, egyedi listát: ide csak
+   hozzáadunk, sosem veszünk el belőle. A careerPool a mentés része, tehát ez
+   magától átjön a következő indításra.
+   FONTOS: ez az egyetlen visszamenőleg pótolhatatlan adat az egész rendszerben —
+   amit ma nem jegyzünk fel, azt később semmiből nem lehet kikövetkeztetni. */
+function noteSkillEver(name,skillId){
+  if(!name||!skillId||typeof careerPool==="undefined"||!careerPool)return;
+  const e=careerPool[name];
+  if(!e)return;
+  if(!e.skillsEver)e.skillsEver=[];
+  if(e.skillsEver.indexOf(skillId)<0)e.skillsEver.push(skillId);}
 function skillFraction(inst){return Math.min(1,inst.stagesCompleted/inst.stagesNeeded);}
 /* ================= SKILL-CSILLAGOK =================
    Egy skill KÉSZ állapota eddig a plafon volt: aki újra kiérdemelte ugyanazt a
@@ -20893,6 +21193,7 @@ function renderSkillAssign(skill,stagesNeeded){
     row.onclick=()=>{
       if(!S.skills[p.n])S.skills[p.n]=[];
       S.skills[p.n].push({skill,stagesNeeded,stagesCompleted:1});updateSkillsLine();
+      noteSkillEver(p.n,skill.id);
       $("scSkill").classList.add("hide");
       const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();};
     box.appendChild(row);});}
@@ -20919,6 +21220,7 @@ function autoAssignSkill(skill,stagesNeeded){
   const p=pick_.p;
   if(!S.skills[p.n])S.skills[p.n]=[];
   S.skills[p.n].push({skill,stagesNeeded,stagesCompleted:1});updateSkillsLine();
+  noteSkillEver(p.n,skill.id);
   addLine(`🎖 Skill: ${esc(p.n)} megkapta a(z) "${esc(skill.name)}" képességet (1/${stagesNeeded} fázis)`,"m life");}
 function showSkillCompletion(resumeCb){
   const cands=findIncompleteSkills();
@@ -22234,6 +22536,7 @@ function clutchAward(playerName,skillId,why){
   if(!inst){
     const need=rollStagesNeeded();
     arr.push({skill,stagesNeeded:need,stagesCompleted:1,stars:0});
+    noteSkillEver(playerName,skill.id);
     addLine(`🏅 <b>KIÉRDEMELT KÉPESSÉG</b> — ${nm}: „${esc(skill.name)}” (1/${need} fázis)`,"m mvp");
     addLine(`→ ${esc(why)}`,"m skillnote");
   }else if(!skillComplete(inst)){
@@ -23228,6 +23531,94 @@ $("hubEuroBtn")&&($("hubEuroBtn").onclick=()=>{
     ?`🚫 A csapat nem indul a(z) ${q.n} sorozatban ebben a szezonban.`
     :`🏆 A csapat indul a(z) ${q.n} sorozatban — a kupa a szezon végén kerül sorra.`,"m life");
   renderHub();saveGame();});
+/* ---- SZEMÉLYI EDZŐ: A BÚCSÚ-KÁRTYA (F1) ----
+   Amikor egy jogosult legenda visszavonul, itt dől el, mi lesz belőle. A panel
+   ÉLŐBEN épül a S.pendingCoachOffers sorból, nem a szezonjelentés mentett
+   HTML-jéből — így egy újratöltés után is működnek a gombok.
+   Egyszerre EGY felajánlást mutatunk (a sor elejét): a típusválasztás súlyos,
+   végleges döntés, nem szabad három legendát egymás mellé tenni. */
+let _coachOfferPick=null;    /* a most kiválasztott típus kulcsa */
+let _coachOfferAll=false;    /* ki van-e nyitva a teljes típuslista */
+function renderCoachOffer(){
+  const box=$("hubStaffOffer");
+  if(!box)return;
+  const q=(gameMode==="career"&&S.pendingCoachOffers)||[];
+  const fp=q[0];
+  if(!fp){box.classList.add("hide");box.innerHTML="";_coachOfferPick=null;_coachOfferAll=false;return;}
+  const cands=coachCandidates(fp);
+  if(!cands.length){dropCoachOffer(fp.n);return renderCoachOffer();}
+  if(!_coachOfferPick||!cands.some(c=>c.type.key===_coachOfferPick))_coachOfferPick=cands[0].type.key;
+  const shown=_coachOfferAll?cands:cands.slice(0,3);
+  const full=staffFull();
+  /* A pályafutás számokban — ez a kártya érzelmi magja: a Szakértelem mögött
+     ott a közös múlt. Csak a beszédes mezőket írjuk ki (egy kapusnál a gól,
+     egy csatárnál a védés csak zaj lenne). */
+  const bits=[`${fp.matches} meccs`];
+  if(fp.goals)bits.push(`${fp.goals} gól`);
+  if(fp.assists)bits.push(`${fp.assists} gólpassz`);
+  if(fp.saves)bits.push(`${fp.saves} védés`);
+  if(fp.cleans)bits.push(`${fp.cleans} tiszta lap`);
+  if(fp.mvp)bits.push(`${fp.mvp}× a meccs embere`);
+  bits.push(fp.inj?`${fp.inj} sérülés`:"egyetlen sérülés nélkül");
+  if((fp.skillsEver||[]).length)bits.push(`${fp.skillsEver.length} képesség`);
+  let h=`<div style="background:var(--bg);border:1px solid var(--gold);border-radius:8px;padding:11px 13px">
+    <div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin-bottom:5px">🎓 Egy pályafutás véget ért</div>
+    <div style="font-size:14px;font-weight:700;margin-bottom:2px">${esc(fp.n)} <span style="color:var(--dim2);font-weight:400;font-size:12.5px">${fp.age} év · ${esc((fp.pos||[]).join("/"))}</span></div>
+    <div style="font-size:12.5px;color:var(--dim);line-height:1.5;margin-bottom:3px">${esc(bits.join(" · "))}</div>
+    <div style="font-size:12px;color:var(--dim2);margin-bottom:9px">${esc(`V·${LEAD_LEVELS[Math.round(fp.leadI)]||"—"} · E·${COOP_LEVELS[Math.round(fp.coopI)]||"—"} · T·${AGGRO_LEVELS[Math.round(fp.aggroI)]||"—"}`)}</div>
+    <div style="font-size:12.5px;margin-bottom:6px">Milyen edző legyen belőle? <span style="color:var(--dim2)">A választás <b>végleges</b>.</span></div>`;
+  shown.forEach(c=>{
+    const sel=c.type.key===_coachOfferPick;
+    h+=`<div class="coachOpt" data-k="${esc(c.type.key)}" style="border:1px solid ${sel?"var(--gold)":"var(--line)"};background:${sel?"rgba(255,210,74,.08)":"transparent"};border-radius:7px;padding:7px 9px;margin-bottom:5px;cursor:pointer">
+      <div style="font-size:13px;font-weight:700">${c.type.ic} ${esc(c.type.n)} <span style="color:var(--gold);font-weight:400">${coachStars(c.sz)} Sz ${c.sz}</span></div>
+      <div style="font-size:11.5px;color:var(--dim);line-height:1.45;margin-top:2px">${esc(c.type.d)}</div>
+      ${sel?`<div style="font-size:11.5px;color:var(--dim2);line-height:1.45;margin-top:3px">„${esc(c.type.why(fp))}”</div>`:""}
+    </div>`;});
+  if(cands.length>3)
+    h+=`<div id="coachOfferMore" style="font-size:12px;color:var(--dim2);cursor:pointer;margin-bottom:7px">${_coachOfferAll?"▴ Kevesebb":`▾ További ${cands.length-3} lehetőség`}</div>`;
+  if(full)
+    h+=`<div style="font-size:12px;color:var(--red);line-height:1.45;margin:6px 0">Nincs szabad hely a stábban (${staff().length}/${coachSlots()}). A döntést el is halaszthatod — a felajánlás megvár.</div>`;
+  h+=`<div style="display:flex;gap:6px;margin-top:8px">
+      <button id="coachOfferYes" class="btn-y" style="flex:1${full?";opacity:.45":""}"${full?" disabled":""}>Bevesszük a stábba</button>
+      <button id="coachOfferNo" class="btn-s" style="flex:1">${full?"Később döntök":"Elbúcsúzunk"}</button>
+    </div>`;
+  if(full)h+=`<button id="coachOfferBye" class="btn-s" style="width:100%;margin-top:6px;opacity:.75">Mégis elbúcsúzunk tőle</button>`;
+  if(q.length>1)h+=`<div style="font-size:11.5px;color:var(--dim2);margin-top:6px">További ${q.length-1} legenda vár döntésre.</div>`;
+  h+=`</div>`;
+  box.innerHTML=h;box.classList.remove("hide");
+  box.querySelectorAll(".coachOpt").forEach(el=>{
+    el.onclick=()=>{_coachOfferPick=el.getAttribute("data-k");renderCoachOffer();};});
+  const more=$("coachOfferMore");
+  if(more)more.onclick=()=>{_coachOfferAll=!_coachOfferAll;renderCoachOffer();};
+  const yes=$("coachOfferYes");
+  if(yes&&!full)yes.onclick=()=>{
+    const t=coachTypeByKey(_coachOfferPick);
+    if(!t)return;
+    askConfirm({title:"Bevegyük a stábba?",yes:"Igen, marad a klubnál",
+      html:`<div style="font-size:13px;line-height:1.55">${t.ic} <b>${esc(shortName(fp.n))}</b> mostantól <b>${esc(t.n)}</b> (${coachStars(coachSzFor(t.key,fp))} Sz ${coachSzFor(t.key,fp)}).<br><br>
+        <span style="color:var(--dim)">A típus <b>nem módosítható</b> később. A stáb helye: ${staff().length+1}/${coachSlots()}.</span></div>`,
+      onYes:()=>{
+        if(staffFull())return;
+        const c=makeCoach(fp,t.key,S.seasonNumber||1);
+        if(!c||!hireCoach(c))return;
+        dropCoachOffer(fp.n);_coachOfferPick=null;_coachOfferAll=false;
+        renderCoachOffer();saveGame();}});};
+  const no=$("coachOfferNo");
+  if(no)no.onclick=()=>{
+    /* Tele stábnál a "Később döntök" csak elrejt: a felajánlás a sorban marad,
+       és a slot-bővítés (F2) után újra elő fog jönni. */
+    if(full){box.classList.add("hide");return;}
+    coachOfferFarewell(fp);};
+  const bye=$("coachOfferBye");
+  if(bye)bye.onclick=()=>coachOfferFarewell(fp);}
+function coachOfferFarewell(fp){
+  askConfirm({title:"Elbúcsúzunk tőle?",yes:"Igen, elbúcsúzunk",
+    html:`<div style="font-size:13px;line-height:1.55"><b>${esc(shortName(fp.n))}</b> végleg elhagyja a klubot.<br><br>
+      <span style="color:var(--dim)">A tudása <b>elvész</b> — edzőt később nem lehet visszahívni, és vásárolni sem lehet.</span></div>`,
+    onYes:()=>{
+      dropCoachOffer(fp.n);_coachOfferPick=null;_coachOfferAll=false;
+      addLine(`👋 ${esc(shortName(fp.n))} elbúcsúzott a klubtól.`,"m life");
+      renderCoachOffer();saveGame();}});}
 function renderScoutUpgradePanel(){
   $("twTitle").textContent="🔎 Scout fejlesztése";
   const atMax=scout.stars>=SCOUT_MAX_STARS;
@@ -25651,6 +26042,7 @@ function renderHub(){
   autoLevelSync();
   renderRunMeter();
   renderHalftimeSubsBtn();   /* a félidei csere kapcsoló felirata az állapotot mondja */
+  renderCoachOffer();        /* döntésre váró visszavonult legendák (személyi edzők) */
 
   /* SZEZON KÖZBEN a HUB bármikor megnyitható, de az átigazolás nem elérhető —
      az a nyári ablak dolga. Ugyanez áll a LEGELSŐ szezon előtti keret-
@@ -26455,6 +26847,7 @@ function euroCampaignEndNow(kind){
           /* ne duplázzuk, ha már megvan (pl. korábbi BL) */
           if(!S.skills[winner.n].some(i=>i.skill&&i.skill.id===aw.skillId))
             S.skills[winner.n].push({skill,stagesNeeded:1,stagesCompleted:1});
+          noteSkillEver(winner.n,aw.skillId);
           addLine(`🥇 ${aw.label}! ${esc(shortName(winner.n))} a BL ${aw.stat==="scorers"?"gólkirálya":aw.stat==="assists"?"gólpassz-királya":"kapus-királya"} (${winner[aw.key]} ${aw.unit}) — megkapja a(z) ${aw.label} special skillt!`,"m life");}
         /* HALMOZÓDÁS: a 2. díjtól a skill már megvan, onnantól tartós +3 Rating
            jár, és megjelenik a kék színátmenetes karika. */
@@ -27079,6 +27472,11 @@ function hubShowSeasonReport(){
      pontja. Innentől megint átállíthatod a tervet (akár most, a HUB-ban, akár
      majd menet közben a szezonban). */
   S.trainingChangeUsed=false;
+  /* A személyi edzők FÓKUSZA ugyanezen a cikluson él: a nyár vége újítja meg
+     a módosítási lehetőséget. Így az edző-beállítás valódi döntés marad, nem
+     meccsről meccsre optimalizálható csúszka. (A felület az F2 fázisban jön;
+     a számláló már most helyesen ketyeg.) */
+  S.coachFocusChangeUsed=false;
   /* ---- AZ AKADÉMIA-BEFAGYÁS LEJÁRATA ----
      A LEZÁRULÓ szezonra szólt, tehát itt jár le — és KIFEJEZETTEN a
      kihívás-kiértékelés ELŐTT. Korábban ez az advanceCareerSeason()-ben ült,
@@ -27188,7 +27586,12 @@ function hubShowSeasonReport(){
     html+=`<div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin-bottom:5px">Visszavonulások</div>`;
     report.retired.forEach(r=>{
       const signing=report.newSignings.find(s=>s.out===r.n);
-      html+=`<div style="font-size:13px;margin-bottom:3px">${esc(r.n)} (${r.age} évesen) visszavonult${signing?` — helyette <b>${esc(signing.in)}</b> csatlakozott`:""}.</div>`;});}
+      html+=`<div style="font-size:13px;margin-bottom:3px">${esc(r.n)} (${r.age} évesen) visszavonult${signing?` — helyette <b>${esc(signing.in)}</b> csatlakozott`:""}.`
+        /* A DÖNTÉS MAGA NEM ITT VAN: a jelentés HTML-je mentésre kerül, tehát
+           az itteni gombok egy újratöltés után halottak lennének. Itt csak
+           jelezzük, hogy van mit eldönteni — a kártya alatta, élőben jön. */
+        +(r.coachFp?` <span style="color:var(--gold)">Felajánlotta, hogy a klubnál marad edzőnek.</span>`:"")
+        +`</div>`;});}
   if(report.familyRetired){
     html+=`<div style="color:var(--purple);font-weight:700;font-size:12px;text-transform:uppercase;margin:8px 0 5px">A család búcsúzik</div>
       <div style="font-size:13px">${esc(report.familyRetired.n)} ${report.familyRetired.age} évesen letette a cipőt. Örökre a csapat része marad — köszönjük, ${esc(report.familyRetired.n)}!</div>`;}
@@ -27649,6 +28052,11 @@ function saveGame(){
         playerReds:S.playerReds,playerInjuries:S.playerInjuries,
         grudge:[...S.grudge],
         lockerLog:S.lockerLog,   /* öltözői napló — szezonokon átívelő, korlátos hosszú */
+        /* SZEMÉLYI EDZŐK: a stáb, a megvett slotok, a csarnok és a döntésre
+           váró felajánlások. ~350 bájt edzőnként, max 6 edző — a localStorage
+           5 MB-os korlátja szempontjából elhanyagolható. */
+        staff:S.staff,coachSlots:S.coachSlots,staffHall:S.staffHall,
+        pendingCoachOffers:S.pendingCoachOffers,coachFocusChangeUsed:S.coachFocusChangeUsed,
         fixtures:S.fixtures,fixtureResults:S.fixtureResults,
         playing:false,auto:S.auto,
         skillPool:S.skillPool.map(sk=>sk.id),
@@ -27920,6 +28328,17 @@ function applySavedGame(d){
   S.freePlayerTokens=d.S.freePlayerTokens||0;
   S.transferBudget=d.S.transferBudget!==undefined?d.S.transferBudget:(gameMode==="career"?computeSeasonBudget():0);
   S.careerStats=d.S.careerStats||{};
+  /* ---- SZEMÉLYI EDZŐK — MIGRÁCIÓ ----
+     Régi mentésben egyik mező sem létezik: üres stábbal, alap slotszámmal
+     indulunk. A rendszer opt-in, tehát egy futó karrier semmit nem vesz észre,
+     amíg a következő visszavonulás el nem jön. */
+  S.staff=d.S.staff||[];
+  S.coachSlots=d.S.coachSlots||COACH_SLOTS_BASE;
+  S.staffHall=d.S.staffHall||[];
+  S.pendingCoachOffers=d.S.pendingCoachOffers||[];
+  S.coachFocusChangeUsed=!!d.S.coachFocusChangeUsed;
+  /* (A skillsEver visszamenőleges pótlása NEM itt van: az a S.skills
+     visszaállítása UTÁN fut, különben üres listából dolgozna. Lásd lentebb.) */
   S.clubScoutSpinsUsed=d.S.clubScoutSpinsUsed||0;
   S.twEventUsed=d.S.twEventUsed||0;   /* régi mentésben nincs — a nyári esemény-keret teljes */
   S.twWindow=d.S.twWindow||null;
@@ -28063,6 +28482,16 @@ function applySavedGame(d){
       /* régi mentésben nincs csillag — ott 0, tehát minden pontosan úgy hat,
          ahogy eddig */
       stars:x.stars||0})).filter(x=>x.skill);});
+  /* ---- SKILL-ÉLETRAJZ VISSZAMENŐLEGES PÓTLÁSA (személyi edzők) ----
+     A skillsEver csak mostantól gyűlik, tehát egy futó karrierben a korábbi
+     skill-történelem nincs meg. A jelenleg BIRTOKOLT skillek az alsó becslés —
+     ennél többet semmiből nem lehet kikövetkeztetni.
+     A HELY KRITIKUS: közvetlenül a S.skills visszaállítása után kell futnia,
+     mert abból dolgozik. Csak egyszer fut le: ha a mező már létezik (mert az
+     adott karrier már az új verzióval gyűjt), nem írjuk felül. */
+  if(careerPool)Object.values(careerPool).forEach(e=>{
+    if(e&&e.skillsEver===undefined)
+      e.skillsEver=((S.skills&&S.skills[e.n])||[]).map(i=>i.skill&&i.skill.id).filter(Boolean);});
   S.playing=false;
   pendingPlayer=null;pendingCaptainIdx=-1;rerolls=d.rerolls!==undefined?d.rerolls:1;
   slots.forEach(s=>{if(s.player&&!(s.player.n in NAT_BY_NAME))NAT_BY_NAME[s.player.n]=s.player.nat;});

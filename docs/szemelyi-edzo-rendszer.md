@@ -95,25 +95,38 @@ function careerFingerprint(entry){
 
 ### 1.4 Új, apró könyvelés, amit MOST kell bevezetni
 
-A skill-edző minősége azon múlik, hány skillje volt valaha. Ezt ma senki nem
-tárolja: a `S.skills[név]` csak az **aktuális** állapot, és a visszavonuláskor
-elvész.
+A skill-edző minősége azon múlik, mely skilljei voltak valaha — és a
+hagyaték-mechanika (lásd 6.2b) miatt **nem elég a darabszám: az azonosítók
+kellenek**. Ezt ma senki nem tárolja: a `S.skills[név]` csak az **aktuális**
+állapot, és a visszavonuláskor elvész.
+
+> ⚠️ Ez a rendszer egyetlen visszamenőleg pótolhatatlan eleme. A könyvelést
+> **az összes többi fázis előtt** be kell vezetni, különben minden most futó
+> karrier skill-történelme véglegesen elvész.
 
 **Megoldás:** egy sorral bővül minden skill-kiosztási pont
 (`renderSkillAssign` `index.html:20894`, `autoAssignSkill` `index.html:20920`,
-`index.html:22231`, a BL-díjaknál `index.html:26456`):
+`clutchAward` `index.html:22231`, a BL-díjaknál `index.html:26456`):
 
 ```js
-const _e = careerPool[p.n];
-if(_e) _e.skillsEverCount = (_e.skillsEverCount||0) + 1;
+noteSkillEver(p.n, skill.id);
+```
+```js
+/* MONOTON, EGYEDI lista a careerPool-ban: a mentés automatikusan viszi, és a
+   skill-vesztés (index.html:13709) sem csökkenti — a VALAHA megszerzett
+   skillek halmazát méri. */
+function noteSkillEver(name,skillId){
+  const e = careerPool && careerPool[name];
+  if(!e || !skillId) return;
+  if(!e.skillsEver) e.skillsEver = [];
+  if(e.skillsEver.indexOf(skillId) < 0) e.skillsEver.push(skillId);
+}
 ```
 
-Ez egy monoton számláló a `careerPool`-ban, tehát a mentés automatikusan viszi,
-és a skill-vesztés (`index.html:13709`) sem csökkenti — a *valaha megszerzett*
-skillek számát méri, ami pont a helyes mérce egy leendő skill-edzőnél.
-
-**Migráció régi mentésre:** ha `skillsEverCount === undefined`, a betöltéskor
-`= (S.skills[n]||[]).length` (a jelenlegi skillek száma az alsó becslés).
+**Migráció régi mentésre:** ha `skillsEver === undefined`, a betöltéskor
+`= (S.skills[n]||[]).map(i=>i.skill.id)` — a jelenleg birtokolt skillek az alsó
+becslés. Ami korábban elveszett, az elveszett; ennél többet nem lehet
+rekonstruálni.
 
 ---
 
@@ -163,10 +176,10 @@ Jelölés: `perM(x) = x / max(1, matches)` — meccsenkénti átlag.
 |---|---|
 | **Lélekemelő** (morál) | `0.70·norm(leadI,0,4) + 0.30·norm(peak,60,110)` |
 | **Csapatkovács** (kohézió) | `0.75·norm(coopI,0,5) + 0.25·norm(leadI,0,4)` |
-| **Ritmusmester** (forma) | `0.60·tempScore(aggroI) + 0.25·norm(perM(mvp),0,0.22) + 0.15·(1−norm(perM(reds),0,0.06))` |
-| **Gyógyító kéz** (sportorvos) | `0.75·(1 − norm(perM(inj), 0, 0.055)) + 0.25·norm(matches,0,420)` |
+| **Ritmusmester** (forma) | `0.50·tempScore(aggroI) + 0.35·norm(perM(mvp),0,BAND_MVP) + 0.15·(1−norm(perM(reds),0,BAND_RED))` |
+| **Gyógyító kéz** (sportorvos) | `0.75·(1 − norm(perM(inj),0,BAND_INJ)) + 0.25·norm(matches,0,420)` |
 | **Attribútum-mester** | típusonként külön, lásd 2.3 |
-| **Iskolateremtő** (skill) | `0.65·norm(skillsEver,0,6) + 0.35·norm(perM(mvp),0,0.22)` |
+| **Iskolateremtő** (skill) | `0.65·norm(skillsEver.length,0,6) + 0.35·norm(perM(mvp),0,BAND_MVP)` |
 
 ahol
 ```js
@@ -177,12 +190,34 @@ const norm=(v,lo,hi)=>Math.max(0,Math.min(1,(v-lo)/(hi-lo)));
 const tempScore=a=>1-Math.abs(a-2)/2;   // 0:0.0  1:0.5  2:1.0  3:0.5  4:0.0
 ```
 
+#### ⚠ A normálási sávokat a motor tényleges rátáiból kell húzni
+
+Az első kalibráció itt melléfogott, és a mérés kapta el. „Kényelmes" kerek
+sávokat használt (0.055 a sérülésre, 0.06 a pirosra), amelyek a **valódi ráta
+10–17-szeresei** — vagyis gyakorlatilag minden játékos maximumot kapott ezekre
+a tagokra, és a típusok közti különbség eltűnt. A Gyógyító kéz mérve **minden
+profilon 88-at adott**, sérüléstől függetlenül.
+
+A szabály: **a sáv teteje ≈ a populáció átlagának kétszerese**, hogy az átlagos
+pályafutás a skála közepére essen.
+
+| Sáv | Motor-konstans | Átlag / játékos-meccs | Sáv |
+|---|---|---|---|
+| `BAND_INJ` | sérülés-esély 0.035/meccs, 11 játékosra | 0.00318 | **0…0.0065** |
+| `BAND_RED` | `SIM.REDP = 0.06`/meccs, 11 játékosra | 0.00545 | **0…0.011** |
+| `BAND_MVP` | meccsenként pontosan 1 a 11-ből | 0.0909 | **0…0.20** |
+
+Ha a motor rátái változnak, **ezeket újra kell húzni** — a kódban külön
+konstansblokk jelöli őket.
+
 **A sportorvos képlete a legszebb a felvetésben** — „ha sosem sérült meg, jó
 sportorvos lesz" —, de ki kell egészíteni: a `matches` nélkül egy 45 meccset
 játszott, soha nem sérült ember 100%-ot kapna. A 25%-os rutin-tag megköveteli,
-hogy a sérülésmentesség **hosszú karrieren át** igazolódjon. Egy 400 meccses,
-2 sérüléses vasember: `0.75·(1−norm(0.005,0,0.055)) + 0.25·0.95 = 0.92` → 50.6
-SZAK pont. Egy 90 meccses, 5 sérüléses üvegember: `0.75·0 + 0.25·0.21 = 0.05`.
+hogy a sérülésmentesség **hosszú karrieren át** igazolódjon.
+
+**A Ritmusmester temperamentum-súlya 0.50** (nem 0.60): a Kiegyensúlyozott a
+leggyakoribb érték (`AGGROW` szerint 36%), tehát önmagában nem lehet elég egy
+csúcs-formaedzőhöz — a nagy meccsek (MVP) súlya ezért 0.35.
 
 ### 2.3 Attribútum-mesterek — öt alfaj
 
@@ -200,12 +235,22 @@ Mindegyik nyers pontszáma ugyanaz a kétrészes szerkezet:
 | **Játékmester** (`passz`) | `norm(attrs.passz, 55, peak+25)` | `norm(perM(assists), 0, 0.45)` |
 | **Bástya** (`ved`) | `norm(attrs.ved, 55, peak+25)` | `norm(perM(cleans), 0, 0.40)` |
 | **Kesztyűs mester** (`kapus`) | `norm(attrs.kapus, 55, peak+25)` | `norm(perM(saves), 0, 3.2)` |
-| **Sprintmester** (`seb`) | `norm(attrs.seb, 55, 99)` | `norm(matches, 0, 420)` |
+| **Sprintmester** (`seb`) | `norm(attrs.seb, 55, 99)` | `norm(attrs.seb − sebBase, 0, 12)` |
 
 A `peak+25` felső határ azért kell, mert az attribútum-plafon a Ratinghez
 kötött (`attrHardCap()`, `index.html:8480`) — Infinity módban egy 130-as
 játékos `gol` attribútuma 155 is lehet, és egy fix 99-es normálás mindenkit
 kimaxolna.
+
+**A Sprintmester teljesítmény-tagja NEM a meccsszám** — az már az ALAP-ban
+(`rutinPont`) is benne van, és a duplázás mérve **minden más típus elé tolta**
+ezt az egyet: bármely hosszú pályafutású, tisztességesen gyors játékosból
+automatikusan csúcs-sprintedző lett. Helyette a **sebesség növekménye** dönt:
+a passzív csatorna a születési értéket csak +15%-ig viszi
+(`SPEED_PASSIVE_CAP_PCT`), azon túl **kizárólag célzott edzéssel** lehet
+haladni. Aki tehát 12+ pontot tett hozzá, az tényleg dolgozott érte — és
+pontosan ezt a tudást tudja átadni. Ehhez a lenyomatnak a **születési
+sebességet** (`sebBase`) is őriznie kell.
 
 **Poszt-kapu:** egy kapus nem lehet Gólvágó-mentor. A jelölhető alfajokat a
 poszt szűri:
@@ -434,7 +479,8 @@ Az edző azt gyorsítja, ahogy a plafonhoz érsz — nem magát a plafont mozdí
 
 ### 6.2 Iskolateremtő (skill) → `index.html:20894`, `20920`, `13441`
 
-Két csatornán hat, mindkettő a meglévő skill-rendszerben:
+Ez a leggazdagabb típus: **négy** csatornán hat, és egyedül neki van saját,
+kimerülő erőforrása.
 
 **a) Kiosztási súly.** Az `autoAssignSkill` ma a potenciál szerint súlyoz.
 A fókuszált játékos súlya megszorzódik:
@@ -445,7 +491,9 @@ weight *= 1 + 1.8 * coachPower(skillCoach, p.n);
 Egy ★★★★ Iskolateremtő 1 emberre állítva ~2.3x eséllyel viszi rá a következő
 skillt. Ez **nem garancia** — a skill továbbra is a meccsen dől el.
 
-**b) Szakaszolt skillek gyorsítása.** A `stagesNeeded`/`stagesCompleted`
+**b) A HAGYATÉK — a saját skilljeit adja tovább.** Lásd 6.2.1, külön alfejezet.
+
+**c) Szakaszolt skillek gyorsítása.** A `stagesNeeded`/`stagesCompleted`
 rendszerben (`index.html:20895`) a fókuszált játékos szakaszai gyorsabban
 telnek:
 
@@ -453,9 +501,138 @@ telnek:
 if(Math.random() < 0.45 * coachPower(c, name)) inst.stagesCompleted += 1;  // +1 bónusz lépcső
 ```
 
-**c) Skill-vesztés elleni védelem.** A `index.html:13709` büntető-esemény
+**d) Skill-vesztés elleni védelem.** A `index.html:13709` büntető-esemény
 (véletlen skill elvesztése) a fókuszált játékosnál `coachPower`-rel arányosan
 elhárul — max 60%-ban. Ez adja a „mentorált játékos" érzetet.
+
+---
+
+### 6.2.1 A Hagyaték: „amit én tudtam, azt tanítom"
+
+Az Iskolateremtő nem általános skilleket oszt, hanem **a sajátjait**. Az
+`fp.skillsEver` lista az öröksége: amit a pályán megtanult, azt tudja átadni.
+Ez az egész rendszer érzelmi csúcspontja — a „Gólzsák" nem egy absztrakt jutalom
+lesz, hanem *Kovács Bence gólzsákja*, amit ő maga adott tovább a 19 éves
+tehetségnek.
+
+#### A kompromisszum
+
+Két, egymással ellentétesen mozgó mennyiség — ez adja a harmóniát:
+
+```js
+const LEGACY_RATE0 = 0.10;      /* alap-esély meccsenként */
+
+/* ÜTEM: milyen sűrűn ad át egy skillt. A szűk fókusz gyorsabb. */
+function legacyRate(coach){
+  const n = focusTargets(coach).length;
+  const q = (coach.sz - 20) / 79;
+  return LEGACY_RATE0 * (0.35 + 0.65*q) * Math.pow(n, -0.35);
+}
+
+/* KÉSZLET: hány átadásra futja összesen. A széles fókusz többre. */
+function legacyBudget(coach){
+  const L = (coach.fp.skillsEver || []).length;
+  const n = focusTargets(coach).length;
+  return Math.ceil(L * Math.pow(n, 0.45));
+}
+
+/* Ami még hátravan. A SPENT átvihető — a budget nem. Lásd alább. */
+function legacyLeft(coach){
+  return Math.max(0, legacyBudget(coach) - (coach.legacySpent||0));
+}
+```
+
+A `-0.35` és a `+0.45` kitevő együtt azt adja, hogy a **kitartás** ≈ `n^0.80`
+szerint nő. Egy ★★★★ (Sz 68) Iskolateremtő, 4 skilles hagyatékkal, 30 meccses
+szezonban:
+
+| Fókusz | n | Átadás/szezon | Készlet | Kitart |
+|---|---|---|---|---|
+| Egy tehetség | 1 | 2.23 | 4 | **1,8 szezon** |
+| Csatárok | 3 | 1.52 | 7 | **4,6 szezon** |
+| Védők | 6 | 1.19 | 9 | **7,5 szezon** |
+| Egész keret | 22 | 0.76 | 17 | **22,4 szezon** |
+
+*(Számolt értékek, nem becslés — a képletek önálló újrapéldányán mérve.)*
+
+Ez pontosan a kért viselkedés: a célzott tanítás **két szezon alatt négy
+skillt zúdít egyetlen kiválasztottra**, aztán a mester kiürül; a szétosztott
+tanítás **több mint húsz szezonon át tizenhét skillt** csordogál a keretbe.
+Egyik sem jobb — más a játékstílus mögöttük.
+
+#### Harmonikus eloszlás
+
+A készlet **közös**, nem skillenkénti — így megy át egy skill több emberre.
+Hogy ne fajuljon „ugyanaz a skill tizenhatszor"-rá, két szabály tartja egyben:
+
+```js
+/* 1) SKILLENKÉNTI PLAFON: a készletet egyenletesen kell elosztani a
+      hagyaték skilljei között, felfelé kerekítve — így marad „harmonikus". */
+const perSkillCap = Math.ceil(legacyBudget(coach) / L);
+//  n=1  → ceil(4/4)  = 1  → mindegyik skill pontosan egyszer
+//  n=22 → ceil(17/4) = 5  → mindegyik skill legfeljebb ötször
+
+/* 2) A LEGKEVESEBBET ÁTADOTT ELŐNYE: a sorsolás a ritkábban átadott skillt
+      súlyozza, nem uniform. */
+weight(skillId) = 1 / (1 + 2*handedOut[skillId]);
+```
+
+A célpont kiválasztása:
+- **`players` mód (1-2 fő):** a megnevezett játékos kapja. Determinisztikus —
+  ez a „célzott tanítás".
+- **`group` / `team` mód:** véletlen a fókuszcsoportból, a meglévő
+  `playerPotential()` szerint súlyozva (`index.html:12611`) — vagyis a
+  tehetségesebb fiatal nagyobb eséllyel kapja. Ez a felhasználó által vállalt
+  „rábízzuk a randomra".
+
+Minden átadás előtt lefut a **meglévő két szűrő**, változtatás nélkül:
+- `eligibleForSkill(skill)` (`index.html:20855`) — poszt-alkalmasság
+- a „már megvan" ellenőrzés (`index.html:20862`)
+
+Ha nincs érvényes (skill, játékos) pár, az esemény **elmarad, és nem fogyaszt
+készletet**. Ez fontos: egy kapus-hagyatékú Iskolateremtő a csatárokra állítva
+nem üríti ki magát a semmibe, csak nem csinál semmit — a felhasználó pedig a
+UI-ban látja, hogy 0 érvényes párja van.
+
+#### A fókuszváltás nem exploit
+
+Ha a készletet felvételkor rögzítenénk, a nyerő stratégia ez lenne: állítsd
+keretre (készlet 16), majd válts egy emberre, és zúdítsd rá mind a 16-ot.
+
+**Megoldás:** a készlet **mindig az AKTUÁLIS fókuszból számolódik újra**, és
+csak az elköltött darabszám (`legacySpent`) marad meg:
+
+```js
+legacyLeft = max(0, legacyBudget(jelenlegi fókusz) - legacySpent)
+```
+
+- Keret (16) → elköltött 6 → váltás egy emberre: `max(0, 4-6) = 0`. **A
+  hagyaték elfogyott.** A szűk fókusz nem bír el annyit.
+- Egy ember (4) → elköltött 3 → váltás keretre: `16-3 = 13`. Ez megengedett és
+  szép: a gyors indítás után szélesre nyitod a tanítást. Nem exploit, mert a
+  fókuszváltás amúgy is ciklusonként egyszer engedélyezett (5.2).
+
+A UI-nak ezt **a váltás előtt** ki kell írnia — a hagyaték-számláló ott van a
+fókuszgombok mellett, és élőben mutatja, mi lesz a váltás után:
+
+```
+Hagyaték: ●●●●●●●●●●●○○○○○○  11 / 17 hátra
+⚠ Egy játékosra váltva a készlet 4-re szűkül — a 6 elköltött után 0 marad.
+```
+
+#### Kimerülés után
+
+A hagyaték elfogyása **nem teszi haszontalanná** az edzőt: az a), c) és d)
+csatorna (kiosztási súly, szakasz-gyorsítás, vesztés-védelem) tovább működik.
+A kártyáján megjelenik a `🕯 A hagyaték elfogyott — a mester már csak nevel`
+sor. Így az Iskolateremtő két életszakaszra bomlik, ami önmagában is szép ív.
+
+#### Naplósor
+
+```
+🎓 HAGYATÉK — Kovács Bence átadta a „Gólzsák" képességet Nagy Áronnak.
+   „Ezt tőle tanultam." (a mester hagyatékából még 3 átadás van hátra)
+```
 
 ### 6.3 Lélekemelő (morál) → `index.html:14054` (`computeMoraleTarget`)
 
@@ -616,7 +793,12 @@ S.pendingCoachOffer = null;  /* a szezonzáró búcsú-kártya vár rá */
   xp:      6,                  // ledolgozott szezonok
   since:   12,                 // melyik szezonban lépett be
   fp:      { /* careerFingerprint — a kártyán mutatjuk, és ebből számol az Sz */ },
-  focus:   { mode:"players", group:null, names:["Nagy Áron"] }
+  focus:   { mode:"players", group:null, names:["Nagy Áron"] },
+
+  /* --- csak Iskolateremtőnél (6.2.1) --- */
+  legacySpent: 0,              // hány skillt adott már át összesen
+  legacyOut:  { fw_poacher:2 } // skillenkénti darabszám (a perSkillCap és a
+                               // súlyozott sorsolás alapja)
 }
 ```
 
@@ -774,6 +956,9 @@ mintája szerint, `index.html:12845`), de a tervezett korlátok:
 | Sérülés-kihagyások száma sportorvossal / nélküle | −20 … −30% |
 | 20 szezonos karrier: stáb nélkül vs. maximális stábbal elért csapaterő | +6 … +10% |
 | Skill-szerzési ütem Iskolateremtővel | +40 … +70% a fókuszált játékoson |
+| Hagyaték: 1 fős fókusz kitartása | 1,5 – 2,5 szezon |
+| Hagyaték: keret-fókusz kitartása | 15 – 25 szezon |
+| Hagyaték: elmaradt (érvényes pár nélküli) átadások aránya keret-fókuszon | < 25% |
 
 Ha a teljes stáb hatása +4 OVR fölé megy, a `COACH_ATTR_PTS` és a
 `moraleCoachBonus` szorzóit kell visszavenni — a slot-árat **nem**, mert az a
@@ -786,10 +971,13 @@ progresszió tempóját szabja, nem a végállapot erejét.
 Négy, egymásra épülő, önmagában is szállítható fázis.
 
 **F1 — Adatréteg és belépés** (nincs játékhatás, mérhető, kockázatmentes)
-- `skillsEverCount` könyvelés + migráció (1.4)
+- `skillsEver` könyvelés + migráció (1.4) — **ez a sürgős elem**, minden nap
+  késés véglegesen elveszett skill-történelem
 - `careerFingerprint()`, az Sz-képletek mind a 10 típusra (2. fejezet)
 - `S.staff` / `S.coachSlots` / `S.staffHall` + mentés-betöltés (7.)
 - Búcsú-kártya a szezonzáró jelentésben, típusválasztóval (8.3)
+- A hagyaték-mezők (`legacySpent`, `legacyOut`) létrejönnek, de még üresen
+  állnak — a mechanika F3-ban kapcsol be
 - **Ellenőrizhető:** edzőt lehet felvenni, a stáb megmarad újratöltés után,
   de még semmit nem csinál.
 
