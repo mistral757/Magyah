@@ -285,6 +285,10 @@ button.infPanel:disabled{cursor:default}
 .trBtn.scout{background:linear-gradient(135deg,#1e3a8a,#2563eb 65%,#60a5fa);color:#f0f6ff;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
 .trBtn.attr{background:linear-gradient(135deg,#5b21b6,#7c3aed 60%,#c084fc);color:#f6f0ff}
+/* Az esemény a másik háromtól ELTÉR: nem te keresel, hanem a piac mozdul —
+   ezért kapja a borostyán/arany sávot, a szerencse színét. */
+.trBtn.event{background:linear-gradient(135deg,#7c4a06,#c2831a 62%,#f0c05a);color:#2b1a02;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
 /* A nyitott szezonközi ablak fejléce az Átigazolás csoport címe alatt. */
 .twLeftNote{margin-top:6px;padding:6px 9px;border-radius:8px;
   background:color-mix(in srgb,var(--gold) 14%,transparent);
@@ -2049,6 +2053,9 @@ button.infPanel:disabled{cursor:default}
           <button id="hubBuyBtn" class="trBtn buy">🛒 Vásárlás<small>a scout posztokra keres jelölteket</small></button>
           <button id="hubClubScoutBtn" class="trBtn scout">🔍 Klub-szemle<small>egy konkrét klub teljes keretét nézed át</small></button>
           <button id="hubAttrSearchBtn" class="trBtn attr">🎯 Képesség-keresés<small>poszttól függetlenül, egy konkrét képességre</small></button>
+          <!-- A NEGYEDIK ÁTIGAZOLÁS-FAJTA. Régen ez az "időszak lezárása"
+               gombra volt kötve, ezért az nem azt csinálta, amit ígért. -->
+          <button id="hubTransferEventBtn" class="trBtn event">🎲 Átigazolási esemény<small id="hubTransferEventDs">váratlan fordulat a piacon — elvágyódás, álomigazolás, ikon</small></button>
         </div>
       </div>
       <div class="hubGroup" data-acc="build">
@@ -2213,7 +2220,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.047";
+const APP_VERSION="2.6.048";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9845,13 +9852,35 @@ function twSession(){
 
    A KVÓTÁK checkpointonként külön élnek (S.twWindow), tehát a HUB-ból
    ki-be lépkedés nem tölti újra őket, és egy újratöltés sem veszíti el. */
-const TW_CP_ROUNDS={8:{label:"Rövid átigazolási időszak",buyMult:1},
-                    15:{label:"Téli átigazolási időszak",buyMult:2},
-                    23:{label:"Rövid átigazolási időszak",buyMult:1}};
+const TW_CP_ROUNDS={8:{label:"Rövid átigazolási időszak",buyMult:1,events:1},
+                    15:{label:"Téli átigazolási időszak",buyMult:2,events:2},
+                    23:{label:"Rövid átigazolási időszak",buyMult:1,events:1}};
 /* Klub-szemle és képesség-keresés a scout csillagai szerint: 1 / 2 / 3. */
 function twCpExtraQuota(){
   const st=(scout&&scout.stars)||0;
   return st>=10?3:st>5?2:1;}
+/* ---- ÁTIGAZOLÁSI ESEMÉNY: A NEGYEDIK ÁTIGAZOLÁS-FAJTA ----
+   BEJELENTETT HIBA: az "időszak lezárása" gomb ELSŐ megnyomásra nem zárt le
+   semmit, hanem behozta a véletlen esemény kipörgetését — a lezárás csak az
+   esemény után következett be. A gomb tehát mást csinált, mint amit mondott,
+   és az eseményt nem lehetett akkor futtatni, amikor te akartad.
+   Mostantól az esemény a saját gombja a másik három átigazolás-fajta alatt,
+   saját, korlátozott kerettel — a lezárás pedig tényleg lezár.
+   A keret: rövid ablak 1, téli 2, nyár 2 (10 csillagos scouttól 3). */
+function twSummerEventMax(){
+  if(gameMode!=="career")return 0;
+  return ((scout&&scout.stars)||0)>=10?3:2;}
+function twEventMax(){
+  return twWindowOpen()?(S.twWindow.eventMax||0):twSummerEventMax();}
+/* A nyári keret SZEZONOS (S.twEventUsed), a checkpoint-ablaké az ablaké
+   (S.twWindow.eventLeft) — ugyanaz a kettéválasztás, mint a klub-szemlénél,
+   különben a szezonközi pörgetés a nyári keretet fogyasztaná. */
+function twEventLeft(){
+  return twWindowOpen()?Math.max(0,S.twWindow.eventLeft||0)
+    :Math.max(0,twSummerEventMax()-(S.twEventUsed||0));}
+function twSpendEvent(){
+  if(twWindowOpen())S.twWindow.eventLeft=Math.max(0,(S.twWindow.eventLeft||0)-1);
+  else S.twEventUsed=(S.twEventUsed||0)+1;}
 function twWindowOpen(){return !!(S.twWindow&&S.twWindow.round);}
 function twWindowLabel(){return (S.twWindow&&S.twWindow.label)||"Átigazolási időszak";}
 /* Hány lehetőség maradt — ezt írja ki a HUB az Átigazolás menü fölé. */
@@ -9861,13 +9890,15 @@ function twWindowLeftText(){
   if(w.left!==undefined&&w.left!==Infinity)bits.push(`${Math.max(0,w.left)} felderítés`);
   if(twAttrSearchesForScout()>0)bits.push(`${Math.max(0,w.attrLeft||0)} képesség-keresés`);
   bits.push(`${Math.max(0,w.clubLeft||0)} klub-szemle`);
+  bits.push(`${Math.max(0,w.eventLeft||0)} esemény`);
   return bits.join(" · ");}
 function twOpenCheckpointWindow(round,resumeCb){
   const cfg=TW_CP_ROUNDS[round]||TW_CP_ROUNDS[8];
   const q=twCpExtraQuota();
   const L=twLooksForScout(cfg.buyMult);
+  const ev=cfg.events||1;
   S.twWindow={round,label:cfg.label,max:L,left:L,pos:{},
-    clubMax:q,clubLeft:q,attrMax:q,attrLeft:q};
+    clubMax:q,clubLeft:q,attrMax:q,attrLeft:q,eventMax:ev,eventLeft:ev};
   S.resumeCb=resumeCb;
   addLine(`💼 ${cfg.label} — a HUB-ban intézed. Ha végeztél, zárd le, és folytatódik a szezon.`,"m life");
   twEnterHubWindow();}
@@ -9886,19 +9917,39 @@ function twEnterHubWindow(){
   if(g){g.classList.add("open");const b=g.querySelector(".accBody");if(b)b.classList.remove("hide");}
   renderHub();
   $("scHub").scrollIntoView({behavior:"smooth"});}
-/* A lezárás: lefut a megszokott 1-2 véletlen esemény, majd folytatódik a szezon. */
+/* ---- A LEZÁRÁS MOSTANTÓL TÉNYLEG LEZÁR ----
+   Régen ez a gomb a véletlen esemény kipörgetését indította el, és a szezon
+   csak AZUTÁN folytatódott — vagyis első megnyomásra nem azt csinálta, amit a
+   felirata ígért. Az esemény átkerült a saját gombjára (hubTransferEventBtn),
+   saját kerettel; itt már csak a tényleges zárás marad: minden átigazolási
+   lehetőség bezárul, és folytatódik a szezon. */
 function twCloseCheckpointWindow(){
   const w=S.twWindow;if(!w)return;
-  const cycles=(w.round===15?TW_CYCLES:1);
-  S.twWindow=null;
-  /* A véletlen események a saját képernyőjükön futnak — onnan a resumeCb visz
-     vissza a meccsbe, pontosan úgy, ahogy eddig. */
-  TW={cycle:cycles,category:null,candidates:[],retries:0,maxCycles:cycles,
-      label:w.label,fromCheckpoint:false,isHubPurchase:false};
+  const evLeft=Math.max(0,w.eventLeft||0);
+  S.twWindow=null;TW=null;
+  addLine(`🔒 ${w.label} lezárva${evLeft?` — ${evLeft} kihasználatlan átigazolási esemény maradt`:""}. Folytatódik a szezon.`,"m life");
+  twResumeAfterWindow();}
+/* A checkpoint folytatása: elrejti az átigazolási felületeket és visszaadja a
+   vezérlést a szezonnak. A twNextCycleOrFinish farkából emelve ide, mert most
+   már két hívója van (a lezárás és az utolsó esemény-kör vége). */
+function twResumeAfterWindow(){
+  $("twPanel").classList.add("hide");
   $("scHub").classList.add("hide");
-  $("scWindow").classList.remove("hide");$("twPanel").classList.remove("hide");
-  $("scWindow").scrollIntoView({behavior:"smooth"});
-  twStartPhase2();}
+  $("scWindow").classList.add("hide");$("swapPanelWrap").classList.add("hide");
+  const cb=S.resumeCb;S.resumeCb=null;
+  /* ---- ZSÁKUTCA-VÉDELEM ----
+     A folytatás nem bízható teljesen a visszahívásra: újratöltés után az
+     S.resumeCb már null (függvényt nem lehet menteni), és egy kivétel is
+     gomb nélkül hagyhatná a képernyőt. Ha a hívás után egyetlen fő képernyő
+     sem látszik, van hova esni. */
+  let cbErr=null;
+  if(cb){try{cb();}catch(e){cbErr=e;}}
+  const alive=["scSim","scHub","scWindow","scEuro","scVerdict","scSkill","scUnlock"]
+    .some(id=>{const el=$(id);return el&&!el.classList.contains("hide");});
+  if(!alive){
+    if(cbErr)addLine(`⚠️ Az átigazolási ablak lezárása után a folytatás elakadt — visszatérünk a HUB-ba. (${esc(String(cbErr&&cbErr.message||cbErr))})`,"m ev");
+    if(gameMode==="career"&&typeof csReturnToHub==="function"&&(S.idx||0)<30)csReturnToHub();
+    else{$("scSim").classList.remove("hide");$("scSim").scrollIntoView({behavior:"smooth"});}}}
 function twResetSessionLooks(mult){
   const L=twLooksForScout(mult);
   TW.max=L;TW.left=L;TW.pos={};}
@@ -9955,8 +10006,25 @@ function twAttrTarget(aKey){
   /* MP-nyáron a referencia a két keret közös szintje, nem a tavalyi nehézség —
      lásd mpSummerRefRating a signingTargetOvr mellett */
   return Math.max(45,Math.min(cap,(transferRefRating()||84)+TW_ATTR_TARGET_BONUS));}
-/* Elfogyott-e az attribútum-keresési keret ebben az ablakban? */
+/* Elfogyott-e az attribútum-keresési keret ebben az ablakban?
+   NYITOTT CHECKPOINT-ABLAKBAN közvetlenül az ablak kvótájára megyünk, NEM a
+   twSession()-ön keresztül. A twSession a TW-től függ, az viszont a HUB
+   RAJZOLÁSAKOR még az ELŐZŐ átigazolás állapota — ugyanaz a csapda, amit a
+   renderHub megjegyzése a twAttrAvailableNow-nál leír, csak ez a fele kimaradt
+   a javításból. Mérve két módon hazudott:
+     · nyári vásárlás után a szezonközi ablak a NYÁRI keretet mutatta
+       ("maradt 1/6"), pedig az ablaké 2/2 volt;
+     · újratöltés után (TW===null) nullát adott, és a gomb TILTVA maradt —
+       vagyis az ablakban egyáltalán nem lehetett képességre keresni.
+   A kettéválasztás így ugyanaz, mint a klub-szemlénél (csSpinsMax/csSpinsLeft). */
+function twAttrMax(){
+  if(twWindowOpen())return S.twWindow.attrMax||0;
+  return twAttrSearchesForScout()+(S.attrSpinBonus||0);}
 function twAttrLeft(){
+  if(twWindowOpen()){
+    const w=S.twWindow;
+    if(w.attrMax===undefined){w.attrMax=twAttrSearchesForScout()+(S.attrSpinBonus||0);w.attrLeft=w.attrMax;}
+    return Math.max(0,w.attrLeft||0);}
   const sess=twSession();
   /* Nyitott átigazolási ablak nélkül (pl. a szezon előtti keret-áttekintőben)
      a TW még null — ilyenkor nincs mit elkölteni, és nem is szabad elszállni. */
@@ -14166,7 +14234,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      ezért a kvótái is itt: {round,label,max,left,pos,clubMax,clubLeft,
      attrMax,attrLeft}. Null = nincs nyitott ablak. */
   twWindow:null,
-  morale:50,moraleTarget:50,moraleSum:0,moraleSamples:0,scorers:{},assists:{},mvps:{},goodForm:{},badForm:{},playerReds:{},playerInjuries:{},careerStats:{},clubScoutSpinsUsed:0,consecutiveTitles:0,consecutiveBadSeasons:0,seasonSaves:{},seasonCleanSheets:{},seasonMatches:{},seasonNumber:1,seasonHistory:[],
+  morale:50,moraleTarget:50,moraleSum:0,moraleSamples:0,scorers:{},assists:{},mvps:{},goodForm:{},badForm:{},playerReds:{},playerInjuries:{},careerStats:{},clubScoutSpinsUsed:0,twEventUsed:0,consecutiveTitles:0,consecutiveBadSeasons:0,seasonSaves:{},seasonCleanSheets:{},seasonMatches:{},seasonNumber:1,seasonHistory:[],
   grudge:new Set(),fixtures:[],playing:false,auto:false,
   mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
   mpMyFinal:null,     /* a SAJÁT záró csapaterő — a végső ítélet ebből dolgozik */
@@ -20648,6 +20716,11 @@ function twNextCycleOrFinish(){
      az S.resumeCb már null volt, és a "Tovább" mindent elrejtett. */
   twClearAnim();   /* a kör lezárása leállítja a futó animációt is */
   if(TW&&TW.isHubPurchase){csReturnToHub();return;}
+  /* ---- A HUB-BÓL INDÍTOTT ÁTIGAZOLÁSI ESEMÉNY ----
+     Egy pörgetés, aztán vissza a HUB-ba: az időszak NEM zárul le tőle, a
+     lezárás továbbra is a te döntésed. (A régi viselkedésben ez a pont zárta
+     le az ablakot, ezért tűnt úgy, hogy a lezáró gomb az eseményt hozza be.) */
+  if(TW&&TW.isHubEvent){csReturnToHub();return;}
   if(TW.cycle<TW.maxCycles){
     TW.cycle++;TW.category=null;TW.candidates=[];TW.retries=0;
     /* A téli ablak 2 KÖRE két külön session: a felderítési keret újratöltődik. */
@@ -20655,28 +20728,10 @@ function twNextCycleOrFinish(){
     twShowCategoryPicker();
   }else{
     /* Az átigazolási ablak vége: a felállás-csere a HUB-ba került, ezért itt
-       már nincs swap-panel — a checkpoint közvetlenül folytatódik. */
-    $("twPanel").classList.add("hide");
-    const cb=S.resumeCb;S.resumeCb=null;
-    $("scWindow").classList.add("hide");$("swapPanelWrap").classList.add("hide");
-    /* ---- ZSÁKUTCA-VÉDELEM ----
-       BEJELENTETT HIBA: az elvágyódás-esemény után a képernyőn CSAK a felállás
-       maradt, gomb nélkül — a szezon csak újratöltés után folytatódott.
-       Az ok szerkezeti: ez a pont a folytatást TELJESEN a visszahívásra bízta.
-       Ha az elhasalt (kivétel), vagy lefutott ugyan, de egyetlen fő képernyőt
-       sem nyitott ki, akkor semmi nem következett — a felállás pedig azért
-       látszott, mert a finish() drawPitch()-e már kirajzolta.
-       Mostantól a visszahívás védve fut, és UTÁNA ellenőrizzük, hogy tényleg
-       látszik-e valami. Ha nem, van hova esni: szezon közben a HUB, egyébként
-       a meccsképernyő. Így ez a lépés nem tud többé némán zsákutcába futni. */
-    let cbErr=null;
-    if(cb){try{cb();}catch(e){cbErr=e;}}
-    const alive=["scSim","scHub","scWindow","scEuro","scVerdict","scSkill","scUnlock"]
-      .some(id=>{const el=$(id);return el&&!el.classList.contains("hide");});
-    if(!alive){
-      if(cbErr)addLine(`⚠️ Az átigazolási ablak lezárása után a folytatás elakadt — visszatérünk a HUB-ba. (${esc(String(cbErr&&cbErr.message||cbErr))})`,"m ev");
-      if(gameMode==="career"&&typeof csReturnToHub==="function"&&(S.idx||0)<30)csReturnToHub();
-      else{$("scSim").classList.remove("hide");$("scSim").scrollIntoView({behavior:"smooth"});}}
+       már nincs swap-panel — a checkpoint közvetlenül folytatódik. A zsákutca-
+       védelemmel együtt a twResumeAfterWindow() intézi (BEJELENTETT HIBA volt,
+       hogy az elvágyódás-esemény után gomb nélkül maradt a képernyő). */
+    twResumeAfterWindow();
   }}
 /* ---- auto mód: mindkét fázis végigfut kattintás nélkül, log-üzenetekkel ---- */
 function autoRunPhase1(cycleNo){
@@ -22748,6 +22803,27 @@ $("hubAttrSearchBtn")&&($("hubAttrSearchBtn").onclick=()=>{
   $("twPanel").classList.remove("hide");
   $("swapPanelWrap").classList.add("hide");
   twShowAttrPicker();
+  $("scWindow").scrollIntoView({behavior:"smooth"});});
+/* ---- ÁTIGAZOLÁSI ESEMÉNY A HUB-BÓL ----
+   Egy pörgetés a saját keretéből (twEventLeft). Ugyanaz a 2. fázis fut le,
+   mint eddig a lezáráskor — csak most TE döntöd el, mikor, és utána vissza a
+   HUB-ba kerülsz, nem a szezonba. */
+$("hubTransferEventBtn")&&($("hubTransferEventBtn").onclick=()=>{
+  if(gameMode!=="career")return;
+  if(hubMidSeasonMode&&!twWindowOpen())return;   /* szezon közben csak nyitott ablakban */
+  if(preSeasonHubMode)return;
+  if(twEventLeft()<=0)return;
+  twSpendEvent();
+  TW=twWindowOpen()
+    ? {cycle:1,category:null,candidates:[],retries:0,maxCycles:1,
+       label:twWindowLabel(),fromCheckpoint:true,isHubEvent:true}
+    : {cycle:1,category:null,candidates:[],retries:0,maxCycles:1,
+       label:"Nyári átigazolási esemény",isHubEvent:true};
+  $("scHub").classList.add("hide");
+  $("scWindow").classList.remove("hide");
+  $("twPanel").classList.remove("hide");
+  $("swapPanelWrap").classList.add("hide");
+  twStartPhase2();
   $("scWindow").scrollIntoView({behavior:"smooth"});});
 /* ================= KARRIER MÓD — NYÁRI KLUB-SZEMLE =================
    A draft-élmény visszatér a HUB-ban: kipörgetsz egy valós klub-szezont,
@@ -25634,18 +25710,38 @@ function renderHub(){
         RAJZOLÁSAKOR még az ELŐZŐ átigazolás állapota — ezért itt nem használ-
         ható. A HUB-gomb maga a nyári belépő, így az elérhetőséget egyszerűen
         a szezon-fázis dönti el, ugyanúgy, mint a másik két gombnál. */
-     const maxA=twAttrSearchesForScout(),okNow=!twBlocked;
-     const leftA=(maxA&&okNow)?twAttrLeft():0;
+     /* A SCOUT-KAPU és a KIÍRT KERET két külön szám: az elérhetőséget a
+        csillagszám dönti el (twAttrSearchesForScout), a "maradt x/y" viszont
+        annak az ablaknak a kvótája, amiben épp vagy (twAttrMax) — szezonközi
+        ablakban ez a twCpExtraQuota, nyáron a scout-keret. Eddig mindkettőre a
+        nyári szám ment, ezért a szezonközi ablak hibás maximumot írt ki. */
+     const gateA=twAttrSearchesForScout(),okNow=!twBlocked;
+     const maxA=twAttrMax();
+     const leftA=(gateA&&okNow)?twAttrLeft():0;
      let sub,dis=true;
-     if(hubMidSeasonMode)sub="átigazolni csak a nyári ablakban lehet";
+     if(hubMidSeasonMode&&!twWindowOpen())sub="átigazolni csak a nyári ablakban lehet";
      else if(preSeasonHubMode)sub="az első szezon előtt még nem — a nyári ablakban nyílik";
      else if(!okNow)sub="csak két szezon között, a nyári ablakban";
-     else if(!maxA)sub=`${TW_ATTR_MIN_STARS}★-os scout kell hozzá — a tiéd ${scout?scout.stars:0}★`;
-     else if(leftA<=0)sub=`elfogyott ebben a nyárban (${maxA}/${maxA} felhasználva)`;
+     else if(!gateA)sub=`${TW_ATTR_MIN_STARS}★-os scout kell hozzá — a tiéd ${scout?scout.stars:0}★`;
+     else if(leftA<=0)sub=`elfogyott ${twWindowOpen()?"ebben az időszakban":"ebben a nyárban"} (${maxA}/${maxA} felhasználva)`;
      else{sub=`poszttól függetlenül, ${TW_ATTR_RESULTS} találat · maradt ${leftA}/${maxA}`;dis=false;}
      ab.innerHTML=`🎯 Képesség-keresés<small>${sub}</small>`;
      ab.disabled=dis;ab.style.opacity=dis?".45":"";
    }else if(ab)ab.classList.add("hide");}
+  /* ÁTIGAZOLÁSI ESEMÉNY: ugyanaz a szezon-zár, mint a másik háromnál, plusz a
+     saját, korlátozott kerete. A felirat itt is megmondja, miért nem elérhető. */
+  {const eb=$("hubTransferEventBtn");
+   if(eb&&gameMode==="career"){
+     const maxE=twEventMax(),leftE=twBlocked?0:twEventLeft();
+     let sub,dis=true;
+     if(hubMidSeasonMode&&!twWindowOpen())sub="csak nyitott átigazolási időszakban";
+     else if(preSeasonHubMode)sub="az első szezon előtt még nem — a nyári ablakban nyílik";
+     else if(twBlocked)sub="csak két szezon között, a nyári ablakban";
+     else if(leftE<=0)sub=`elfogyott ${twWindowOpen()?"ebben az időszakban":"ebben a nyárban"} (${maxE}/${maxE} felhasználva)`;
+     else{sub=`váratlan fordulat a piacon — maradt ${leftE}/${maxE}`;dis=false;}
+     eb.innerHTML=`🎲 Átigazolási esemény<small>${sub}</small>`;
+     eb.disabled=dis;eb.style.opacity=dis?".45":"";
+   }else if(eb)eb.classList.add("hide");}
   /* A karszalag helyreállítása: ha az előző művelet (csere, eladás,
      felállásváltás) kimozdította a kapitányt a kezdő 11-ből, a karszalag
      automatikusan a legalkalmasabbra száll át — nem ragad egy véletlen
@@ -27224,7 +27320,7 @@ function startNextCareerSeason(){
   S.unavailable={};S.replacementChoice={};
   S.scorers={};S.assists={};S.mvps={};S.goodForm={};S.badForm={};S.playerReds={};S.playerInjuries={};S.seasonSaves={};S.seasonCleanSheets={};S.seasonMatches={};S.tierQuoteCount={};
   S.grudge=new Set();S.fixtures=[];S.playing=false;
-  S.discWatch={};S.hotStreak={};S.goallessStreak={};S.unbeatenStreak=0;S.cleanSheetStreak=0;S.ratingAdj={};S.clubScoutSpinsUsed=0;
+  S.discWatch={};S.hotStreak={};S.goallessStreak={};S.unbeatenStreak=0;S.cleanSheetStreak=0;S.ratingAdj={};S.clubScoutSpinsUsed=0;S.twEventUsed=0;   /* a nyári esemény-keret is szezononként töltődik */
   /* RIVÁLISOK ÉS BAJNOKI NARRATÍVA: minden szezon tiszta lappal indul — új
      riválisok (a buildSeasonFixtures sorsolja), üres hírnapló, nem avatott
      bajnok. Az _aiSchedCache azért is dől, mert a menetrend teljesen új. */
@@ -27544,7 +27640,7 @@ function saveGame(){
         chRatingUpNames:S.chRatingUpNames,chNewStarterMatches:S.chNewStarterMatches,
         chSoldOver32:S.chSoldOver32,chBoughtUnder25:S.chBoughtUnder25,
         chPosLearnStarted:S.chPosLearnStarted,chSeasonStartXI:S.chSeasonStartXI,pendingRewardSkills:S.pendingRewardSkills,
-        scorers:S.scorers,assists:S.assists,mvps:S.mvps,goodForm:S.goodForm,badForm:S.badForm,careerStats:S.careerStats,clubScoutSpinsUsed:S.clubScoutSpinsUsed,consecutiveTitles:S.consecutiveTitles,consecutiveBadSeasons:S.consecutiveBadSeasons,seasonSaves:S.seasonSaves,seasonCleanSheets:S.seasonCleanSheets,seasonMatches:S.seasonMatches,seasonNumber:S.seasonNumber,seasonHistory:S.seasonHistory,
+        scorers:S.scorers,assists:S.assists,mvps:S.mvps,goodForm:S.goodForm,badForm:S.badForm,careerStats:S.careerStats,clubScoutSpinsUsed:S.clubScoutSpinsUsed,twEventUsed:S.twEventUsed,consecutiveTitles:S.consecutiveTitles,consecutiveBadSeasons:S.consecutiveBadSeasons,seasonSaves:S.seasonSaves,seasonCleanSheets:S.seasonCleanSheets,seasonMatches:S.seasonMatches,seasonNumber:S.seasonNumber,seasonHistory:S.seasonHistory,
         tactics:S.tactics,tacticPrompt:S.tacticPrompt,
         euroEntry:S.euroEntry,euroCurrent:S.euroCurrent,euroCurrentQual:S.euroCurrentQual,euroOptOut:S.euroOptOut,mkToKLDone:S.mkToKLDone,championCards:S.championCards,goldenAwardCount:S.goldenAwardCount,ballonDor:S.ballonDor,ballonHistory:S.ballonHistory,
         topSpeed:S.topSpeed,topShot:S.topShot,   /* mért egyéni csúcsok (km/h) */
@@ -27825,6 +27921,7 @@ function applySavedGame(d){
   S.transferBudget=d.S.transferBudget!==undefined?d.S.transferBudget:(gameMode==="career"?computeSeasonBudget():0);
   S.careerStats=d.S.careerStats||{};
   S.clubScoutSpinsUsed=d.S.clubScoutSpinsUsed||0;
+  S.twEventUsed=d.S.twEventUsed||0;   /* régi mentésben nincs — a nyári esemény-keret teljes */
   S.twWindow=d.S.twWindow||null;
   S.consecutiveTitles=d.S.consecutiveTitles||0;
   S.consecutiveBadSeasons=d.S.consecutiveBadSeasons||0;
@@ -28063,6 +28160,17 @@ function resumeUIFromSave(){
     $("kickBtn").disabled=false;
     $("kickBtn").textContent=S.idx>=30?"Szezon vége":kickBtnLabel();
     $("autoBtn").textContent=S.auto?"Megállítás":"Szezon végigjátszása";
+    /* ---- NYITOTT ÁTIGAZOLÁSI ABLAK: A HUB-BA, NEM A PÁLYÁRA ----
+       BEJELENTETT HIBA: ha az átigazolási időszak közben frissítettél vagy
+       kiléptél, a betöltés a MECCS-képernyőre dobott, élesített kezdőrúgás-
+       gombbal — mintha az ablak már le lett volna zárva. Az ablak állapota
+       közben végig megvolt (S.twWindow mentődik), csak az útválasztó nem nézte:
+       a fázis "season", tehát a pályára vitt. Egy koppintás a kezdőrúgáson, és
+       a még nyitott időszak a hátad mögött ugrott át.
+       A meccsképernyő állapotát fentebb így is felépítjük (oda kell térni, ha
+       az ablakot lezárod) — csak nem azt MUTATJUK. Az időszakot ezután is TE
+       zárod le, szándékosan. */
+    if(twWindowOpen()){twEnterHubWindow();return;}
     $("scSim").scrollIntoView({behavior:"smooth"});
     if(S.auto&&!S.playing&&S.idx<30)startRound();}}
 function initSaveSystem(){
