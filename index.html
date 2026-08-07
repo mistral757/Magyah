@@ -2225,7 +2225,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.049";
+const APP_VERSION="2.6.050";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16206,10 +16206,13 @@ function h2hPick(players,key,rnd){
    A hívási SORREND része a szerződésnek — ha valaha új véletlen-fogyasztó kerül
    ide, azt a lista végére kell tenni, különben a régi mentések eredménye
    elcsúszna. Paraméter nélkül a régi (Math.random) viselkedés marad. */
-function h2hSimulate(home,away,rnd){
+function h2hSimulate(home,away,rnd,neutral){
   const R=rnd||Math.random;
-  const Lh=matchLambdas(home,away.ovr,SIM.HOME);
-  const La=matchLambdas(away,home.ovr,SIM.AWAY);
+  /* SEMLEGES PÁLYÁN (kupadöntő) egyik oldal sem kap pályaválasztói módosítót.
+     Korábban a döntőben a h2hIAmHome() false-a miatt a VENDÉG került a hazai
+     szerepbe, tehát a semlegesnek szánt meccsen ő kapta a hazai előnyt. */
+  const Lh=matchLambdas(home,away.ovr,neutral?0:SIM.HOME);
+  const La=matchLambdas(away,home.ovr,neutral?0:SIM.AWAY);
   /* ---- KÉT NÉZET ÁTLAGA ----
      A CPU-meccsen az ellenfél egyetlen szám, ezért elég a saját lf. H2H-ban
      viszont MINDKÉT oldal gazdag, és ugyanarra a mennyiségre két becslés van:
@@ -16332,17 +16335,42 @@ function h2hKey(){
   return "s"+(S.seasonNumber||1)+"r"+((S.idx||0)+1);}
 /* Ki a hazai? A 15. fordulóban a HÁZIGAZDA, a 30.-ban a VENDÉG — így a két
    párharcból mindkettőnek jut egy hazai pálya, és a hazai előny kiegyenlítődik. */
-function h2hIAmHome(){
-  /* KUPÁBAN a pályaválasztó a párharc SZEREPEIBŐL jön, nem a host/vendég
-     viszonyból: az 1. meccs az "a" oldal otthonában megy, a visszavágó a "b"
-     oldalén. A döntő semleges pályán, tehát ott senki nem hazai. */
+/* ---- KI A "HAZAI" OLDAL A KÖZÖS SZIMULÁCIÓBAN? ----
+   Ez a függvény KLIENSFÜGGETLEN: mindkét gépen ugyanazt adja, mert a HÁZIGAZDA
+   oldalára kérdez rá, nem az "énre". A közös eseménylista home/away oldalait
+   ebből KELL felépíteni — ha a két kliens a saját nézőpontjából számolná,
+   felcserélt szereposztással szimulálnának, és két különböző meccs születne. */
+function h2hHostIsSimHome(round){
   if(mpCupDuelNow()){
-    const E=S.euro,t=E.ties[E.userTie];
-    if(E.stage==="final")return false;
-    const meIsA=t.a===E.userIdx;
-    return (E.idx||0)===0?meIsA:!meIsA;}
-  const hostHome=((S.idx||0)+1)===H2H_ROUNDS[0];
-  return (MP.role==="host")===hostHome;}
+    const E=S.euro,t=(E.userTie!=null&&E.userTie>=0)?E.ties[E.userTie]:null;
+    const meIsA=!!(t&&t.a===E.userIdx);
+    /* A párharc-szerepet HOST-RELATÍVVÁ alakítjuk: a vendég gépe is a
+       házigazda oldalát kapja meg, nem a sajátját. */
+    const hostIsA=(MP.role==="host")?meIsA:!meIsA;
+    /* Döntő: egyetlen meccs, semleges pályán (lásd h2hNeutralVenue). A "hazai"
+       oldal itt már CSAK a nézőpont kiosztására szolgál, előnyt nem ad. */
+    if(E.stage==="final")return hostIsA;
+    return (E.idx||0)===0?hostIsA:!hostIsA;}
+  const r=(round!=null)?round:((S.idx||0)+1);
+  return r===H2H_ROUNDS[0];}
+/* SEMLEGES PÁLYA: a kupadöntő egyetlen mérkőzése. Nincs pályaválasztói előny,
+   és a közvetítés sem beszél hazai pályáról. */
+function h2hNeutralVenue(){
+  return !!(mpCupDuelNow()&&S.euro&&S.euro.stage==="final");}
+/* Én vagyok-e a közös szimuláció "hazai" oldala? EZ A NÉZŐPONT: ebből dől el,
+   melyik gól az enyém és melyik az ellenfélé (lásd duelBkt a playMatch-ben).
+   EZÉRT MINDIG ASZIMMETRIKUS — pontosan az egyik kliensen igaz.
+
+   HIBA, AMIT EZ JAVÍT (jelentett): a döntő ága korábban MINDKÉT gépen false-t
+   adott, azzal az indokkal, hogy "semleges pályán senki nem hazai". A nézőpont
+   így egybeesett a két kliensen: mindkettő UGYANAZT a csapatot könyvelte el
+   ellenfélként, és mindkét menedzser azt látta, hogy 2-0-ra kikapott — pedig
+   az egyikük nyert. A vesztes oldal ráadásul a saját játékosait látta az
+   ellenfél góllövőiként.
+   A pályaválasztói előny hiánya innentől külön jelzés (h2hNeutralVenue), a
+   nézőpont pedig sosem eshet egybe a két kliensen. */
+function h2hIAmHome(){
+  return (MP.role==="host")===h2hHostIsSimHome();}
 /* A Kezdőrúgás gomb felirata. Párharc előtt más a szöveg — a felhasználó
    MÁR A GOMBON lássa, hogy most nem egy sokadik bajnoki jön. */
 function kickBtnLabel(){
@@ -16932,15 +16960,18 @@ async function h2hTick(key,myField,oppField,round){
         folyamból áll elő (szobakód + forduló), tehát a két kliens ugyanazt
         számolja ki; aki előbb ideér, az írja be, a másik ugyanazt kapja. */
   if(mine&&opp){
-    /* Kupában a pályaválasztót a párharc szerepei döntik (h2hIAmHome ezen az
-       ágon a HOST hazai-státuszát adja vissza), bajnokiban a forduló. */
-    const hostHome=mpCupDuelNow()?h2hIAmHome():(round===H2H_ROUNDS[0]);
+    /* KLIENSFÜGGETLEN szereposztás. Korábban itt h2hIAmHome() állt, ami az
+       "én" nézőpontom — a vendég gépén tehát a saját státusza került a
+       hostHome-ba, vagyis a két kliens FELCSERÉLT hazai/vendég oldallal
+       szimulált. Ha mindketten ugyanabban a körben értek ide, mindkettő a
+       SAJÁT listáját játszotta le, és a góllövők eltértek a két képernyőn. */
+    const hostHome=h2hHostIsSimHome(round);
     const home=hostHome?node.host:node.guest;
     const away=hostHome?node.guest:node.host;
     h2hWaitShow(round,"Mindkét keret megérkezett — a mérkőzés lejátszása…",true,true);
     /* A MAG a szobakódból és a fordulóból jön, tehát mindkét kliensen azonos —
        és a világ-seedből, tehát két különböző szoba nem kap azonos meccset. */
-    const sim=h2hSimulate(home,away,rngFor("h2hduel:"+(MP.activeRoom||"")+":"+round));
+    const sim=h2hSimulate(home,away,rngFor("h2hduel:"+(MP.activeRoom||"")+":"+round),h2hNeutralVenue());
     try{await mpBk().h2hPut(MP.activeRoom,key,"sim",sim);}
     catch(e){$("h2hWaitErr").textContent="Az eredményt nem sikerült elküldeni — a társad később kapja meg.";}
     if(!_h2hBusy)return;
@@ -17019,7 +17050,7 @@ function h2hStart(node,sim,round){
   if(oppSnap.standing)
     S.mpMateHalf={season:(S.seasonNumber||1),
       rep:Object.assign({teamName:cleanTeam||"A társad"},oppSnap.standing)};
-  h2hScript={sim,round,iAmHome:h2hIAmHome(),
+  h2hScript={sim,round,iAmHome:h2hIAmHome(),neutral:h2hNeutralVenue(),
     oppName:cleanTeam||"A társad",
     oppOvr:(oppSnap.dispOvr!=null?oppSnap.dispOvr:(oppSnap.ovr||0))};
   playMatch();}
@@ -18186,7 +18217,7 @@ function playMatch(){
      változtatás nélkül fut rá. A fordulóra kisorsolt CPU-ellenfél ilyenkor
      kimarad — a tabella-könyvelése az F5 dolga. */
   const fx=DUEL
-    ?{o:{n:DUEL.oppName,ovr:DUEL.oppOvr},home:!!DUEL.iAmHome,duel:true}
+    ?{o:{n:DUEL.oppName,ovr:DUEL.oppOvr},home:!DUEL.neutral&&!!DUEL.iAmHome,duel:true}
     :(euroActive()?S.euro.fixtures[S.euro.idx]:S.fixtures[S.idx]);
   /* VÉDŐHÁLÓ: ha a kupa-meccs bármiért hiányzik (elcsúszott állapot), ne dobjunk
      kivételt a meccs közepén — inkább visszatérünk a kupa-képernyőre. */
@@ -18307,7 +18338,7 @@ function playMatch(){
     addLine(`— ${ec.n.toUpperCase()} · ${stg} · ${title} —`,"mt");
   }else if(DUEL){
     addLine(`— ${S.idx+1}. FORDULÓ · ⚔ PÁRHARC · ${title} —`,"mt");
-    addLine(`A társad csapata felsorakozik: ${esc(String(DUEL.oppName))} — csapaterő ${DUEL.oppOvr.toFixed(1)}. ${DUEL.iAmHome?"Hazai pályán fogadod.":"Idegenben, az ő közönsége előtt."}`,"m ev");
+    addLine(`A társad csapata felsorakozik: ${esc(String(DUEL.oppName))} — csapaterő ${DUEL.oppOvr.toFixed(1)}. ${DUEL.neutral?"Semleges pályán, a döntőben.":DUEL.iAmHome?"Hazai pályán fogadod.":"Idegenben, az ő közönsége előtt."}`,"m ev");
   }else{
     /* A fejléc maga jelöli a rangadót és a bajnoki tétmeccset — a napló
        tetején így azonnal látszik, hogy ez nem átlagos forduló. */
