@@ -2226,7 +2226,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.056";
+const APP_VERSION="2.6.057";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -5661,7 +5661,29 @@ function euroLam(d){return Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d))
    nevesített folyamot kap (a címke a szakasz + a párharc + a meccs sorszáma),
    így a sorrendtől függetlenül ugyanaz jön ki mindkét oldalon.
    Egyjátékosban a tag nélküli hívás a RÉGI, véletlen viselkedést adja. */
-function cupSimRng(tag){return mpCupActive()?mpCupRng("sim:"+tag):null;}
+/* ================= A KÖZÖS KUPA DETERMINIZMUS-HORGONYA =================
+   HIBA, AMIT EZ JAVÍT (jelentett): a host kilépett és visszalépett a kieséses
+   szakasz előtt, mire a két ág SZÉTCSÚSZOTT — nem voltak benne egymás
+   sorozatában, és a végén két külön döntő futott le, mindkettő AI ellen.
+
+   AZ OK SZERKEZETI. A közös kupa teljes determinizmusa egyetlen ILLÉKONY,
+   minden hívásnál újraszámolt feltételen állt: mpCupActive(). Ez három külön
+   állapotmezőt olvas össze (S.mpCup megvan-e, a SZEZONSZÁMA egyezik-e, és
+   S.euro.mateIdx nem null-e). Ha bármelyik egy pillanatra nem áll — mert egy
+   újratöltés még nem rakta össze mindet, vagy a szezonszám elcsúszott —, akkor:
+     · a cupSimRng NULL-t adott, a poisson pedig NULL RNG-vel Math.random-ra
+       esik vissza → a hat AI-csoport EGÉSZ más eredménnyel fut le,
+     · az euroDrawRound VÉLETLEN keverésre váltott a fix ág helyett,
+     · a mpCupGroupSync KIHAGYTA a csoportcserét, és úgy sorsolt.
+   Mindez NÉMÁN: se hiba, se figyelmeztetés. A két kliens ettől kezdve két
+   külön tornát játszott, és ez csak a döntőnél derült ki.
+
+   A JAVÍTÁS: a determinizmus a KAMPÁNY tulajdonsága legyen, ne egy
+   újraszámolt predikátumé. Az induláskor eldől, hogy ez közös kupa-e
+   (E.mpSeeded), és a magkulcs is akkor fagy be (E.mpSeed) — mindkettő az
+   S.euro része, tehát MENTŐDIK, és menet közben nem tud hamisra fordulni. */
+function mpCupSeeded(){return !!(S.euro&&S.euro.mpSeeded);}
+function cupSimRng(tag){return mpCupSeeded()?mpCupRng("sim:"+tag):null;}
 function euroSimResult(hOvr,aOvr,tag){
   const d=hOvr-aOvr+SIM.HOME;
   const r=cupSimRng(tag);
@@ -5840,8 +5862,16 @@ function mpCupStatsGate(onReady){
     clearTimeout(timer);finish();})();}
 /* A kupa nevesített véletlen-folyama. MINDEN MP-kupa sorsolás ezen megy át,
    hogy a két kliens ugyanazt a mezőnyt és ágat kapja. */
-function mpCupRng(tag){
-  return rngFor("s"+(S.seasonNumber||1)+":cup:"+((mpCup()&&mpCup().comp)||"x")+":"+tag);}
+/* A MAGKULCS BEFAGYASZTVA. A régi változat a mpCup()-ból olvasta a sorozat
+   betűjelét; ha az egy pillanatra null volt, a label "x"-re váltott, vagyis
+   MÁSIK véletlen-folyamra — ugyanaz a néma szétcsúszás, más úton.
+   A tartalék pontosan a régi kulcsot állítja elő, tehát a már futó kampányok
+   folyama bitre változatlan. */
+function mpCupSeedKey(){
+  const E=S.euro;
+  if(E&&E.mpSeed)return E.mpSeed;
+  return "s"+(S.seasonNumber||1)+":cup:"+((mpCup()&&mpCup().comp)||"x");}
+function mpCupRng(tag){return rngFor(mpCupSeedKey()+":"+tag);}
 /* A KÖZÖS SOROZAT a két kvalifikációból: a jobbik nyer, és aki nem
    kvalifikált (null), azt a társa viszi magával. A számítás TISZTA FÜGGVÉNY —
    mindkét kliens ugyanabból a két rekordból ugyanazt kapja, ezért nincs
@@ -5991,9 +6021,31 @@ function mpCupGroupAbort(){
 function mpCupMyGroupRows(){
   const E=S.euro;
   return (E.groups[E.userG]||[]).map(i=>Object.assign({i},E.table[i]));}
+/* ---- SZÉTCSÚSZÁS-ÉRZÉKELŐ ----
+   A hat "senkiföldje" csoportot (amit egyikőtök sem játszik) MINDKÉT kliens
+   ugyanabból a seedelt folyamból szimulálja — ha jól működik a determinizmus,
+   bitre azonosak. Ezekből képzett ujjlenyomatot cserélünk a csoportzárásnál.
+   Ha eltér, az azt jelenti, hogy a két torna MÁR szétcsúszott, és a
+   nyolcaddöntő sorsolása is más lesz. Eddig ez némán történt, és csak a
+   végén derült ki, hogy két külön döntő futott. Mostantól kimondjuk. */
+function mpCupAiGroupsFingerprint(){
+  const E=S.euro;
+  if(!E||!E.groups)return "";
+  let key="";
+  for(let g=0;g<EURO_GROUPS;g++){
+    if(g===E.userG||g===E.mateG)continue;
+    (E.groups[g]||[]).forEach(i=>{
+      const r=E.table[i]||{};
+      key+=`${i}:${r.pts|0},${r.gf|0},${r.ga|0};`;});}
+  let h=0;
+  for(let i=0;i<key.length;i++)h=(h*31+key.charCodeAt(i))>>>0;
+  return String(h);}
 async function mpCupGroupSync(onReady){
   const E=S.euro;
-  if(!mpCupActive()||E.mateG==null||E.mateG===E.userG){onReady();return;}
+  /* A HORGONYRA kérdezünk, nem az illékony mpCupActive()-ra: enélkül egy
+     félig visszaállt állapot csendben átugorja a csoportcserét, és a kliens a
+     TÁRS VALÓDI eredménye NÉLKÜL sorsolja meg a nyolcaddöntőt. */
+  if(!mpCupSeeded()||E.mateG==null||E.mateG===E.userG){onReady();return;}
   if(_mpGroupBusy)return;
   _mpGroupBusy=true;
   const key=mpCupStageKey("grp"),myField=MP.role==="host"?"host":"guest";
@@ -6006,7 +6058,7 @@ async function mpCupGroupSync(onReady){
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
   if(!_mpGroupBusy)return;
   /* az egyéni statisztikák ide is ráülnek — lásd mpCupOwnStatRows */
-  const myRows={rows:mpCupMyGroupRows(),st:mpCupOwnStatRows()};
+  const myRows={rows:mpCupMyGroupRows(),st:mpCupOwnStatRows(),bf:mpCupAiGroupsFingerprint()};
   await mpReput(key,myField,node,myRows);
   if(!_mpGroupBusy)return;
   mpCupGroupTick(key,myField,oppField,onReady,myRows);}
@@ -6029,6 +6081,11 @@ async function mpCupGroupTick(key,myField,oppField,onReady,myRows){
     /* A társ csoportjának NÉGY sorát átvesszük — ettől lesz a két kliens
        nyolcaddöntő-sorsolása azonos. A csapatindexek egyeznek, mert a mezőnyt
        ugyanabból a seedből építettük. */
+    /* MIELŐTT bármit átvennénk: egyeznek-e a közös, AI-vezérelt csoportok?
+       Ha nem, a két torna már más — a sorsolás is más lesz, tehát nem
+       fogtok találkozni. Ezt KI KELL MONDANI, mert magától nem derül ki. */
+    if(mate.bf&&myRows&&myRows.bf&&mate.bf!==myRows.bf)
+      addLine(`⚠️ <b>A közös kupa két oldala szétcsúszott.</b> A semleges csoportok eredményei eltérnek a két gépen, ezért a kieséses ág is más lesz — könnyen lehet, hogy nem kerültök össze. (Diagnosztika: ${esc(myRows.bf)} ≠ ${esc(mate.bf)})`,"m rc");
     mate.rows.forEach(r=>{
       if(r&&typeof r.i==="number"&&S.euro.table[r.i])
         S.euro.table[r.i]={w:r.w|0,d:r.d|0,l:r.l|0,gf:r.gf|0,ga:r.ga|0,pts:r.pts|0};});
@@ -6478,7 +6535,7 @@ function euroDrawRound(round,pool){
      Ettől lesz előre kiszámítható, melyik körben találkozhattok, és ettől
      nem kell körönként egymásra várni: a te ellenfeleid a találkozás köréig
      mind olyan ág-félből jönnek, amiben a társad nincs benne. */
-  const mpFixed=mpCupActive();
+  const mpFixed=mpCupSeeded();
   if(round==="r16"){
     const winners=[],runners=[];
     for(let g=0;g<EURO_GROUPS;g++){const t=euroGroupTable(g);winners.push(t[0].i);runners.push(t[1].i);}
@@ -27598,7 +27655,7 @@ function euroEliminated(round,winners){
     pool=[];for(let g=0;g<EURO_GROUPS;g++){const t=euroGroupTable(g);pool.push(t[0].i,t[1].i);}}
   /* KÖZÖS KUPA: a háttérben végigfuttatott torna is FIX ágon és seedelt
      eredményekkel megy, különben a két kliens más kupagyőztest hirdetne. */
-  const mpFixed=mpCupActive();
+  const mpFixed=mpCupSeeded();
   let depth=0;
   while(pool&&pool.length>1){
     const isFinalRound=pool.length===2;   /* az utolsó pár = a döntő: egy meccs */
@@ -27797,6 +27854,10 @@ function startEuroCampaign(opt){
     qRound:0,qOppIdx:null,qLegs:[null,null],droppedFrom:opt.droppedFrom||null,
     /* KÖZÖS KUPA: a társ helye a mezőnyben, és a fix ág leképezése */
     mateIdx:f.mateIdx,mateG:f.mateG,mateOut:null,rmap:null,
+    /* A DETERMINIZMUS-HORGONY (lásd mpCupSeeded). Itt dől el, egyszer és
+       véglegesen, hogy ez a kampány közös kupa-e, és melyik magfolyamon fut. */
+    mpSeeded:!!(mpCup()&&f.mateIdx!=null),
+    mpSeed:"s"+(S.seasonNumber||1)+":cup:"+comp,
     path:opt.path||[],pathOpen:false};   /* a menetelés naplója — lásd euroPathPush */
   /* ---- A FIX ÁG LEKÉPEZÉSE (rmap) ----
      Az i. csoport győztese az rmap[i]. csoport másodikjával játszik a
@@ -29272,6 +29333,16 @@ function applySavedGame(d){
   S.mpSummerRef=d.S.mpSummerRef||null;
   /* A közös kupanevezés. Régi mentésben nincs → a nyári kapu kialkudja. */
   S.mpCup=d.S.mpCup||null;
+  /* ---- MIGRÁCIÓ: a MÁR FUTÓ közös kupa-kampányok horgonya ----
+     A régi mentésekben nincs mpSeeded/mpSeed, mert a determinizmus akkor még
+     az illékony mpCupActive()-ból jött. Itt visszamenőleg megállapítjuk, és a
+     magkulcsot is pontosan a régi label-lel állítjuk elő — így egy futó kupa
+     folyama bitre változatlan marad, csak többé nem tud elveszni.
+     A SORREND KÖTÖTT: az S.euro (feljebb) és az S.mpCup (közvetlenül fentebb)
+     már betöltődött, mindkettőre szükség van. */
+  if(S.euro&&S.euro.mpSeeded===undefined){
+    S.euro.mpSeeded=!!(S.mpCup&&S.mpCup.comp&&S.euro.mateIdx!=null);
+    S.euro.mpSeed="s"+(S.seasonNumber||1)+":cup:"+((S.mpCup&&S.mpCup.comp)||"x");}
   S.mpMateHalf=d.S.mpMateHalf||null;
   S.leaveDeals=d.S.leaveDeals||[];
   S.halftimeSubs=!!d.S.halftimeSubs;
