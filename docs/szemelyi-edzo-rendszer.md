@@ -1,6 +1,14 @@
 # SZEMÉLYI EDZŐ RENDSZER — teljes felépítés
 
-**Állapot:** tervezet (implementáció előtti specifikáció)
+**Állapot:** F1 és F2 elkészült (v2.6.051) · F3–F4 hátravan
+
+| Fázis | Tartalom | Állapot |
+|---|---|---|
+| F1 | adatréteg, `skillsEver` könyvelés, Sz-képletek, belépés | ✅ kész (v2.6.049) |
+| F2 | stáb-nézet, fókusz-rendszer, slot-bővítés | ✅ kész (v2.6.051) |
+| F3 | a hatások bekötése a meglévő motorokba | ⬜ hátravan |
+| F4 | edzői fejlődés, kiöregedés, hangulati réteg | ⬜ hátravan |
+
 **Cél:** a 32 év fölötti, kiöregedő játékosoknak legyen második életük — ne csak
 eladni vagy elengedni lehessen őket, hanem a klub tudásává átalakítani.
 
@@ -86,9 +94,14 @@ function careerFingerprint(entry){
     attrs:    {...(entry.attrs||{})},
     peak:     entry.peak || entry.startRating || 70,
     pos:      (entry.pos||["KKP"]).slice(),
-    /* A skill-történet NEM olvasható ki visszamenőleg — külön kell gyűjteni,
-       lásd 1.4. */
-    skillsEver: entry.skillsEverCount || 0
+    /* A SZÜLETÉSI sebesség — a Sprintmester ebből számol növekményt (2.3). */
+    sebBase:  entry.sebBase != null ? entry.sebBase : (entry.attrs||{}).seb,
+    /* A skill-történet NEM olvasható ki visszamenőleg — külön kell gyűjteni.
+       AZONOSÍTÓK, nem darabszám: a hagyaték ezeket adja tovább (6.2.1). */
+    skillsEver: (entry.skillsEver || []).slice(),
+    /* A ±3 zaj EGYSZER sorsolódik, és a lenyomat része — így a típusválasztóban
+       MUTATOTT érték pontosan az, amit a felvétel után kapsz. */
+    noise:    Math.round((Math.random()*2-1)*3)
   };
 }
 ```
@@ -414,9 +427,15 @@ nélkül használható.
   korlátot.
 - Fókuszt váltani **ugyanaz a szabály szerint lehet, mint edzéstervet**:
   ciklusonként egyszer, a HUB „Ugrás a nyár végére" újítja
-  (`trainingChangeAllowed`, `index.html:8830`). Külön számláló:
-  `S.coachFocusChangeUsed`. Így az edző-beállítás valódi döntés, nem
-  meccsről meccsre optimalizálható csúszka.
+  (`trainingChangeAllowed`, `index.html:8830`). Így az edző-beállítás valódi
+  döntés, nem meccsről meccsre optimalizálható csúszka.
+  **Megvalósítás: EDZŐNKÉNT egy módosítás** (`coach.focusUsed`), nem a teljes
+  stábra összesen egy. Hat edzővel a globális korlát gyakorlatilag befagyasztaná
+  a stábot; a cél az volt, hogy ne lehessen meccsről meccsre optimalizálni, nem
+  az, hogy a nyári újratervezés lehetetlen legyen.
+- **A csoport- és játékos-kijelölés finomhangolása szabadon megy** a módváltáson
+  belül (melyik posztcsoport, mely két ember) — a ciklus-korlát a MÓD váltására
+  szól. Enélkül egy elgépelt kijelölés egy egész szezonra beragadna.
 - A `players` módban megnevezett játékos **visszavonulásakor / eladásakor** a
   fókusz automatikusan `team`-re esik vissza, naplósorral.
 

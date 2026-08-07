@@ -2078,6 +2078,7 @@ button.infPanel:disabled{cursor:default}
             <button id="hubCaptainBtn" class="hubCard"><span class="ic">👑</span><span class="tx"><span class="tt">Kapitányváltás</span><span class="ds">A karszalag új gazdája — hatással van a csapatmorálra</span></span></button>
             <button id="hubScoutUpgradeBtn" class="hubCard"><span class="ic">🔎</span><span class="tx"><span class="tt">Scout fejlesztése</span><span class="ds">Pontosabb felderítés és erősebb igazolási ajánlatok</span></span></button>
             <button id="hubRosterExpandBtn" class="hubCard"><span class="ic">👥</span><span class="tx"><span class="tt">Keretbővítés</span><span class="ds">Több hely a tartalékoknak és a fiataloknak</span></span></button>
+            <button id="hubStaffBtn" class="hubCard hide"><span class="ic">🎓</span><span class="tx"><span class="tt">Szakmai stáb</span><span class="ds" id="hubStaffDs">Személyi edzők — a visszavonult legendáid tudása</span></span></button>
             <!-- FÉLIDEI CSERE: kapcsoló, nem művelet — a felirata a renderHub-ban
                  frissül az aktuális állapotra. -->
             <button id="hubHalftimeSubsBtn" class="hubCard"><span class="ic">🔁</span><span class="tx"><span class="tt">Cserék a meccs alatt</span><span class="ds" id="hubHalftimeSubsDs">—</span></span></button>
@@ -2225,7 +2226,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.050";
+const APP_VERSION="2.6.051";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9689,6 +9690,92 @@ function offerCoachIfEligible(entry){
   const fp=careerFingerprint(entry);
   queueCoachOffer(fp);
   return fp;}
+
+/* ================= SZEMÉLYI EDZŐK — FÓKUSZ-RENDSZER (F2) =================
+   A RENDSZER SZÍVE. Minden edzőnek FIX, 100 egységnyi figyelme van, amit
+   szétoszt azok között, akikre rá van állítva. Aki kevesebb emberrel
+   foglalkozik, az mindenkire többet tud fordítani.
+
+   MIÉRT NEM TISZTA 1/n AZ OSZTÁS: úgy az egy fős fókusz 22-szer erősebb lenne
+   a teljes keretnél, ami minden más beállítást azonnal értelmetlenné tenne.
+   A ^0.72 kitevő mellett a szorzó 9,6× — a szűkítés érezhetően megéri, de a
+   csapat-szintű fókusz is életképes stratégia marad.
+
+   A KOMPROMISSZUM KÉT OLDALA:
+     · fejenkénti figyelem — a SZŰK fókusz nyer (100 vs 10,4)
+     · összesített figyelem — a SZÉLES fókusz nyer (229 vs 100)
+   Egy szupertehetség felnevelése egy fős fókusz; a teljes keret morálja
+   csapat-fókusz. Nincs domináns választás. */
+const FOCUS_BUDGET=100;
+const FOCUS_EXP=0.72;
+const COACH_FOCUS_MAX_PLAYERS=2;   /* "egy adott ember vagy ember-páros" */
+function focusShare(n){return n>0?FOCUS_BUDGET/Math.pow(n,FOCUS_EXP):0;}
+/* Kire figyel ténylegesen ez az edző? MINDIG a JELENLEGI keretből dolgozunk:
+   egy eladott vagy visszavonult játékos neve nem tarthatja fogva a fókuszt. */
+function focusTargets(c){
+  if(!c||gameMode!=="career")return [];
+  const roster=(typeof fullCareerRoster==="function"?fullCareerRoster():[]).filter(Boolean);
+  const f=c.focus||{mode:"team"};
+  if(f.mode==="players"){
+    const want=new Set(f.names||[]);
+    return roster.filter(p=>want.has(p.n)).map(p=>p.n);}
+  if(f.mode==="group"&&f.group)
+    return roster.filter(p=>getCategoryFor((p.pos&&p.pos[0])||"KKP")===f.group).map(p=>p.n);
+  return roster.map(p=>p.n);}
+/* HALMOZÁSI KORLÁT: ugyanabból a típusból egyszerre CSAK EGY edző aktív.
+   Enélkül a 6 slot triviálisan "3× ugyanaz a legerősebb típus" lenne, és a
+   portfólió-építés eltűnne a rendszerből. A felvételt nem tiltjuk — csak a
+   sorban HÁTRÉBB álló ül inaktívan, amíg az elsőt el nem küldöd. Így egy
+   legenda nem vész el azért, mert rossz sorrendben vonult vissza. */
+function coachIsActive(c){
+  const arr=staff(),i=arr.indexOf(c);
+  return i>=0&&arr.findIndex(x=>x&&x.type===c.type)===i;}
+/* Az edző hatás-együtthatója egy adott játékosra: 0.035 … 1.00.
+   A 0.35+0.65*q tag azt jelenti, hogy MÉG A LEGGYENGÉBB EDZŐ IS ad valamit (a
+   teljes hatás 35%-át), de a legjobb közel háromszor annyit. Enélkül egy 22-es
+   Szakértelmű stábtag puszta teher lenne, és a rendszer csak akkor indulna be,
+   ha véletlenül kiváló statisztikájú legendád akad. */
+function coachPower(c,playerName){
+  if(!c||!coachIsActive(c))return 0;
+  const t=focusTargets(c);
+  if(!t.length)return 0;
+  if(playerName&&t.indexOf(playerName)<0)return 0;
+  const share=focusShare(t.length)/FOCUS_BUDGET;
+  const q=Math.max(0,Math.min(1,(c.sz-COACH_SZ_MIN)/(COACH_SZ_MAX-COACH_SZ_MIN)));
+  return share*(0.35+0.65*q);}
+/* Az aktív, adott típusú edzők — a hatás-bekötések (F3) ezen keresztül kérdezik
+   le, ki figyel egy játékosra. */
+function coachesFor(typeKey,playerName){
+  return staff().filter(c=>c&&c.type===typeKey&&coachPower(c,playerName)>0);}
+function attrCoachesFor(playerName){
+  return staff().filter(c=>c&&c.attrKey&&coachPower(c,playerName)>0);}
+
+/* ---- HAGYATÉK (az Iskolateremtő saját skilljei) ----
+   A képletek MÁR MOST kellenek, mert a fókusz-előnézetnek meg kell mutatnia,
+   mit ér a döntés. Maga az átadás az F3 fázisban kapcsol be.
+   A két mennyiség SZÁNDÉKOSAN ellentétesen mozog:
+     ütem  ∝ n^-0.35  — a szűk fókusz gyorsabban tanít
+     kész. ∝ n^+0.45  — a széles fókusz többre futja
+   A kitartás így ≈ n^0.80 szerint nő: egy tehetségre 4 skill ~1,8 szezon
+   alatt, az egész keretre 17 skill ~22 szezon alatt. */
+const LEGACY_RATE0=0.10;
+function legacyRate(c){
+  if(!c||c.type!=="skill")return 0;
+  const n=focusTargets(c).length;
+  if(!n)return 0;
+  const q=Math.max(0,Math.min(1,(c.sz-COACH_SZ_MIN)/(COACH_SZ_MAX-COACH_SZ_MIN)));
+  return LEGACY_RATE0*(0.35+0.65*q)*Math.pow(n,-0.35);}
+function legacyBudget(c){
+  if(!c||c.type!=="skill")return 0;
+  const L=((c.fp&&c.fp.skillsEver)||[]).length,n=focusTargets(c).length;
+  if(!L||!n)return 0;
+  return Math.ceil(L*Math.pow(n,0.45));}
+/* A KÉSZLET MINDIG AZ AKTUÁLIS FÓKUSZBÓL SZÁMOLÓDIK ÚJRA — csak az elköltött
+   darabszám marad meg. Enélkül a nyerő stratégia ez lenne: állítsd a teljes
+   keretre (készlet 17), majd válts egy emberre, és zúdítsd rá mind a 17-et.
+   Így viszont a szűkítés ELÉGETI a maradékot (max(0, 4−6)=0), a szélesítés
+   pedig megengedett és értelmes marad. */
+function legacyLeft(c){return Math.max(0,legacyBudget(c)-((c&&c.legacySpent)||0));}
 
 /* ================= IKONIKUS JÁTÉKOSOK =================
    Ritka, különleges átigazolási esemény tartalék-kerete: a magyar Aranycsapat
@@ -23204,6 +23291,15 @@ function startClubScouting(){
   showClubScoutIntro();
   $("scWindow").scrollIntoView({behavior:"smooth"});}
 /* ---- Scout-fejlesztő képernyő ---- */
+$("hubStaffBtn")&&($("hubStaffBtn").onclick=()=>{
+  if(gameMode!=="career")return;
+  _staffFocusEdit=null;
+  $("scHub").classList.add("hide");
+  $("scWindow").classList.remove("hide");
+  $("swapPanelWrap").classList.add("hide");
+  $("twPanel").classList.remove("hide");
+  renderStaffPanel();
+  $("scWindow").scrollIntoView({behavior:"smooth"});});
 $("hubScoutUpgradeBtn").onclick=()=>{
   if(!scout)return;
   $("scHub").classList.add("hide");
@@ -23650,6 +23746,234 @@ function coachOfferFarewell(fp){
       dropCoachOffer(fp.n);_coachOfferPick=null;_coachOfferAll=false;
       addLine(`👋 ${esc(shortName(fp.n))} elbúcsúzott a klubtól.`,"m life");
       renderCoachOffer();saveGame();}});}
+/* ================= SZAKMAI STÁB — A NÉZET (F2) =================
+   A scWindow panelt használja (mint a scout-fejlesztés), tehát nulla új
+   képernyő-infrastruktúra kell hozzá.
+
+   A "HATÁS" SOR KÖTELEZŐ ELEM. A felhasználónak nem szabad találgatnia, mit ér
+   egy fókuszváltás: a gombok ÉLŐBEN újraszámolják a hatást, még kattintás
+   előtt. Ugyanaz az elv, mint a kapitány-előrejelzésnél (moraleTargetIfCaptain)
+   és az edzés-mérlegnél (trainBalanceHtml). */
+/* A hatás-konstansok EGY helyen élnek, mert a hatás-bekötések (F3) ugyanezeket
+   fogják használni — így az előnézet és a valóság nem tud szétcsúszni. */
+const COACH_ATTR_PTS=0.55;   /* pont/meccs, a fő edzésterv 0.8-ához mérve */
+const COACH_MORALE_PER=9, COACH_MORALE_MAX=14;
+const COACH_CHEM_MAX=6;
+const COACH_FORM_W=1.5;      /* forma-sorsolás súlyszorzó */
+const COACH_MEDIC_W=0.65;    /* sérülés-jelölt súlycsökkentés */
+const COACH_SKILL_W=1.8;     /* skill-kiosztási súlyszorzó */
+const COACH_SEASON_MATCHES=30;   /* egy szezon nagyságrendje az előnézethez */
+let _staffFocusEdit=null;    /* melyik edző fókuszát szerkesztjük épp (index) */
+
+/* A fókusz épségben tartása: eladott/visszavonult játékos neve nem tarthatja
+   fogva a fókuszt. Üresre fogyott ember-fókusz visszaesik a teljes keretre. */
+function coachFocusSanity(){
+  let note=false;
+  staff().forEach(c=>{
+    if(!c)return;
+    if(!c.focus)c.focus={mode:"team",group:null,names:[]};
+    if(c.focus.mode!=="players")return;
+    /* AZ ÜRES kijelölés NEM hiba, hanem a szerkesztés kiindulópontja: amikor
+       ember-fókuszra váltasz, még nincs kiválasztva senki. Ha ilyenkor
+       visszaállítanánk a keretre, a mód sosem lenne beállítható — a panel
+       azonnal visszaugrana. Csak az ELÁRVULT fókuszt igazítjuk: ahol VOLT
+       kijelölés, de a nevek közül már egyik sincs a klubnál. */
+    if(!(c.focus.names||[]).length)return;
+    const alive=focusTargets(c);
+    if(!alive.length){
+      c.focus={mode:"team",group:null,names:[]};
+      addLine(`🎓 ${esc(shortName(c.n))} fókusza a teljes keretre állt vissza — akire figyelt, már nincs a klubnál.`,"m life");
+      note=true;
+    }else if(alive.length!==(c.focus.names||[]).length)c.focus.names=alive;});
+  return note;}
+function coachFocusLabel(c){
+  const f=c.focus||{mode:"team"};
+  if(f.mode==="players")return (f.names||[]).map(n=>shortName(n)).join(" + ")||"—";
+  if(f.mode==="group")return (TRAIN_GROUPS.find(g=>g.k===f.group)||{}).n||"—";
+  return "Az egész keret";}
+/* AZ ELŐNÉZET: típusonként a KONKRÉT, számolt hatás — nem címke, hanem szám. */
+function coachEffectLines(c){
+  const t=focusTargets(c),n=t.length;
+  if(!coachIsActive(c))
+    return [`<span style="color:var(--red)">Inaktív — már van ${esc(coachTypeByKey(c.type).n)} a stábban. Csak egy dolgozhat egyszerre.</span>`];
+  if(!n)return [`<span style="color:var(--red)">Nincs kire figyelnie.</span>`];
+  const pw=coachPower(c,t[0]),L=[];
+  const hu=x=>String(x).replace(".",",");
+  L.push(`<span style="color:var(--dim2)">Fejenkénti figyelem: <b>${hu(focusShare(n).toFixed(1))}</b> · ${n} játékos</span>`);
+  if(c.attrKey){
+    const pts=COACH_ATTR_PTS*pw;
+    const steps=pts*COACH_SEASON_MATCHES/CAREER_DEV_THRESHOLD;
+    L.push(`<b>+${hu(pts.toFixed(2))}</b> ${esc(ATTR_LABELS[c.attrKey])}-pont/meccs — ≈ <b>${hu(steps.toFixed(1))}</b> lépés/szezon, fejenként`);
+  }else if(c.type==="skill"){
+    L.push(`Skill-esély a fókuszáltakon: <b>×${hu((1+COACH_SKILL_W*pw).toFixed(2))}</b>`);
+    const bud=legacyBudget(c),left=legacyLeft(c),rate=legacyRate(c)*COACH_SEASON_MATCHES;
+    if(bud)L.push(`Hagyaték: <b>${left}/${bud}</b> átadás ennél a fókusznál · ≈ ${hu(rate.toFixed(2))}/szezon`
+      +(rate>0?` — kitart <b>${hu((left/rate).toFixed(1))}</b> szezonig`:""));
+    else L.push(`<span style="color:var(--dim2)">Nincs átadható hagyatéka — nem szerzett skillt a pályafutása során.</span>`);
+  }else if(c.type==="morale"){
+    /* A morál csapat-jellegű: az 1-2 fős fókusz itt SZÁNDÉKOSAN veszteséges. */
+    const b=Math.min(COACH_MORALE_MAX,COACH_MORALE_PER*pw*Math.min(1,n/3));
+    L.push(`Csapatmorál: <b>+${hu(b.toFixed(1))}</b> — ≈ <b>+${hu(moraleToOvr(50+b).toFixed(2))}</b> csapat-OVR minden meccsen`);
+    if(n<3)L.push(`<span style="color:var(--red)">Szűk fókusszal a hatás töredéke — a morál az egész öltözőé.</span>`);
+  }else if(c.type==="chem"){
+    const b=Math.min(COACH_CHEM_MAX,COACH_CHEM_MAX*pw*Math.min(1,n/3));
+    L.push(`Öltözői kémia: <b>+${hu(b.toFixed(1))}</b> — a kémia ×1,2-vel megy a morálba, és TARTÓS`);
+  }else if(c.type==="form"){
+    L.push(`Jó forma esélye: <b>+${Math.round(COACH_FORM_W*pw*100)}%</b> súly · rossz forma: <b>−${Math.round(Math.min(75,COACH_FORM_W*pw*100))}%</b>`);
+    L.push(`<span style="color:var(--dim2)">A rossz formát sosem zárja ki teljesen — az az Iránytű skill kiváltsága.</span>`);
+  }else if(c.type==="medic"){
+    L.push(`Sérülés-kockázat a fókuszáltakon: <b>−${Math.round(Math.min(65,COACH_MEDIC_W*pw*100))}%</b>`);
+    L.push(`Lábadozás: átlagosan <b>−${hu((pw+Math.max(0,pw-0.75)).toFixed(1))}</b> forduló`);
+    if(c.focus&&c.focus.mode==="team")
+      L.push(`<span style="color:var(--grass)">Teljes keretre állítva a csapat ALAP sérülés-esélye is csökken (−${Math.round(30*pw)}%).</span>`);}
+  return L;}
+function coachFocusChangeAllowed(c){return !(c&&c.focusUsed);}
+/* A HUB-gomb: csak karrierben látszik, és a felirata megmondja az állapotot —
+   így a menüből is látod, van-e szabad helyed vagy döntésre váró legendád,
+   anélkül hogy be kellene lépned. */
+function renderStaffBtn(){
+  const b=$("hubStaffBtn");if(!b)return;
+  const on=(gameMode==="career"&&!!careerPool);
+  b.classList.toggle("hide",!on);
+  if(!on)return;
+  const d=$("hubStaffDs");if(!d)return;
+  const n=staff().length,max=coachSlots(),pend=(S.pendingCoachOffers||[]).length;
+  d.textContent=pend
+    ? `${pend} visszavonult legenda vár döntésre — ${n}/${max} hely`
+    : n ? `${n}/${max} személyi edző · ${staff().map(c=>(coachTypeByKey(c.type)||{}).n).filter(Boolean).join(", ")}`
+        : `Még nincs edződ — a visszavonuló legendáidból lesz`;}
+function renderStaffPanel(){
+  coachFocusSanity();
+  const arr=staff(),max=coachSlots();
+  $("twTitle").textContent=`🎓 Szakmai stáb — ${arr.length}/${max}`;
+  let h=`<div style="font-size:11.5px;color:var(--dim2);line-height:1.5;border:1px dashed var(--line);border-radius:7px;padding:7px 9px;margin-bottom:9px">
+    ⚙️ A stáb <b>hatásai a következő frissítésben kapcsolnak be</b>. Most a felvétel, a fókusz és az előrejelzés készült el — a lentebbi számok azt mutatják, mit fog érni a beállításod.</div>`;
+  if(!arr.length)
+    h+=`<div style="font-size:12.5px;color:var(--dim);line-height:1.6;margin-bottom:10px">
+      Még nincs személyi edződ. Amikor egy legalább ${COACH_MIN_AGE} éves, nálad legalább ${COACH_MIN_MATCHES} meccset lejátszott játékosod visszavonul, felajánlja, hogy a klubnál marad edzőnek.<br>
+      <span style="color:var(--dim2)">Edzőt nem lehet vásárolni — csak kinevelni.</span></div>`;
+  arr.forEach((c,i)=>{
+    const t=coachTypeByKey(c.type),act=coachIsActive(c),tg=focusTargets(c);
+    const fp=c.fp||{};
+    const bits=[`${fp.matches||0} meccs`];
+    if(fp.goals)bits.push(`${fp.goals} gól`);
+    if(fp.saves)bits.push(`${fp.saves} védés`);
+    if(fp.cleans)bits.push(`${fp.cleans} tiszta lap`);
+    bits.push(fp.inj?`${fp.inj} sérülés`:"sérülés nélkül");
+    h+=`<div style="border:1px solid ${act?"var(--gold)":"var(--line)"};border-radius:8px;padding:9px 11px;margin-bottom:9px;${act?"":"opacity:.7"}">
+      <div style="font-size:13.5px;font-weight:700">${t.ic} ${esc(shortName(c.n))}
+        <span style="color:var(--gold);font-weight:400">${coachStars(c.sz)} Sz ${c.sz}</span></div>
+      <div style="font-size:12px;color:var(--dim);margin:1px 0 2px">${esc(t.n)} · ${c.age} év · ${Math.max(1,(S.seasonNumber||1)-c.since+1)}. szezonja a stábban</div>
+      <div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">${esc(bits.join(" · "))}</div>
+      <div style="display:flex;gap:5px;margin-bottom:6px">
+        ${["team","group","players"].map(m=>{
+          const on=(c.focus&&c.focus.mode)===m;
+          const lbl=m==="team"?"Keret":m==="group"?"Poszt":"Ember";
+          return `<button class="stFocus" data-i="${i}" data-m="${m}" style="flex:1;font-size:12px;padding:5px 0;border-radius:6px;border:1px solid ${on?"var(--gold)":"var(--line)"};background:${on?"rgba(255,210,74,.12)":"transparent"};color:var(--ink);cursor:pointer">${lbl}</button>`;}).join("")}
+      </div>
+      <div style="font-size:12.5px;margin-bottom:5px">Fókusz: <b>${esc(coachFocusLabel(c))}</b>
+        <span style="color:var(--dim2)">(${tg.length} játékos)</span></div>`;
+    /* --- a fókusz FINOMHANGOLÓJA, ha épp ezt az edzőt szerkesztjük --- */
+    if(_staffFocusEdit===i&&c.focus&&c.focus.mode==="group")
+      h+=`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">`
+        +TRAIN_GROUPS.map(g=>`<button class="stGroup" data-i="${i}" data-g="${g.k}" style="font-size:11.5px;padding:4px 8px;border-radius:6px;border:1px solid ${c.focus.group===g.k?"var(--gold)":"var(--line)"};background:transparent;color:var(--ink);cursor:pointer">${esc(g.n)}</button>`).join("")
+        +`</div>`;
+    if(_staffFocusEdit===i&&c.focus&&c.focus.mode==="players"){
+      const roster=(fullCareerRoster()||[]).filter(Boolean);
+      const sel=new Set(c.focus.names||[]);
+      h+=`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:4px">Legfeljebb ${COACH_FOCUS_MAX_PLAYERS} játékos.</div>
+        <div style="max-height:190px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:4px;margin-bottom:6px">`
+        +roster.map(p=>`<button class="stPlayer" data-i="${i}" data-n="${esc(p.n)}" style="display:block;width:100%;text-align:left;font-size:12px;padding:4px 6px;border:none;border-radius:5px;background:${sel.has(p.n)?"rgba(255,210,74,.15)":"transparent"};color:var(--ink);cursor:pointer">${sel.has(p.n)?"✓ ":""}${esc(shortName(p.n))} <span style="color:var(--dim2)">${esc((p.pos||[]).join("/"))}${p.age?" · "+p.age+" év":""}</span></button>`).join("")
+        +`</div>`;}
+    h+=`<div style="border-top:1px dashed var(--line);padding-top:5px;font-size:12.5px;line-height:1.55">`
+      +coachEffectLines(c).map(x=>`<div>${x}</div>`).join("")+`</div>`;
+    if(!coachFocusChangeAllowed(c))
+      h+=`<div style="font-size:11.5px;color:var(--dim2);margin-top:5px">A fókuszt ebben a ciklusban már módosítottad — a nyár vége újítja meg.</div>`;
+    h+=`<button class="stFire" data-i="${i}" style="margin-top:7px;width:100%;font-size:11.5px;padding:5px 0;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer">Elküldés a stábból</button>
+    </div>`;});
+  /* --- slot-bővítés --- */
+  const atMax=max>=COACH_SLOTS_MAX,price=atMax?0:coachSlotPrice(max);
+  h+=`<div style="border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-bottom:9px">
+    <div style="font-size:12.5px;line-height:1.55">Stáb-helyek: <b style="color:var(--gold)">${arr.length}/${max}</b> (max ${COACH_SLOTS_MAX}).<br>`
+    +(atMax?`<span style="color:var(--grass)">A stábod elérte a maximumot.</span>`
+      :`Bővítés <b>${max} → ${max+1}</b>: <b style="color:#ffd24a">${fmtFt(price)}</b>.`
+       +(S.transferBudget>=price?"":`<br><span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget||0)}).</span>`))
+    +`</div></div>`;
+  const hall=S.staffHall||[];
+  if(hall.length)
+    h+=`<div style="font-size:11.5px;color:var(--dim2);line-height:1.5">🕯 Stáb-csarnok: `
+      +hall.slice(-6).map(x=>esc(shortName(x.n))).join(" · ")
+      +(hall.length>6?` <span>(+${hall.length-6})</span>`:"")+`</div>`;
+  $("twBody").innerHTML=h;
+  $("twActions").innerHTML="";
+  /* --- események --- */
+  const rerender=()=>renderStaffPanel();
+  $("twBody").querySelectorAll(".stFocus").forEach(btn=>btn.onclick=()=>{
+    const i=+btn.getAttribute("data-i"),m=btn.getAttribute("data-m"),c=staff()[i];
+    if(!c)return;
+    _staffFocusEdit=i;
+    if((c.focus&&c.focus.mode)===m){rerender();return;}   /* csak kinyitja a szerkesztőt */
+    if(!coachFocusChangeAllowed(c)){rerender();return;}
+    /* A VÁLTÁS KÖVETKEZMÉNYÉT KIMONDJUK — a hagyatéknál ez nem kozmetika:
+       szűkítéskor a már elköltött darabok elégethetik a maradékot. */
+    const before=c.focus?Object.assign({},c.focus):{mode:"team"};
+    const trial={mode:m,group:m==="group"?(TRAIN_GROUPS[0].k):null,names:[]};
+    let warn="";
+    if(c.type==="skill"&&(c.legacySpent||0)>0){
+      const probe=Object.assign({},c,{focus:trial});
+      /* ember-fókusznál a készlet a legkisebb: a próbához 1 célpontot veszünk */
+      const after=m==="players"?Math.ceil(((c.fp.skillsEver||[]).length)*1):legacyBudget(probe);
+      if(after-(c.legacySpent||0)<=0)
+        warn=`<br><br><span style="color:var(--red)">⚠ A hagyaték-készlet ennél a fókusznál ${after}, és már ${c.legacySpent} átadást elköltöttél — nem marad belőle semmi.</span>`;}
+    askConfirm({title:"Módosítod a fókuszt?",yes:"Igen, módosítom",
+      html:`<div style="font-size:13px;line-height:1.55">${esc(shortName(c.n))} fókusza: <b>${esc(coachFocusLabel(c))}</b> → <b>${m==="team"?"az egész keret":m==="group"?"posztcsoport":"kijelölt játékosok"}</b>.<br><br>
+        <span style="color:var(--dim)">Ciklusonként EGY módosítás jár edzőnként; a nyár vége újítja meg.</span>${warn}</div>`,
+      onYes:()=>{
+        c.focus=trial;c.focusUsed=true;_staffFocusEdit=i;
+        rerender();saveGame();}});});
+  $("twBody").querySelectorAll(".stGroup").forEach(btn=>btn.onclick=()=>{
+    const c=staff()[+btn.getAttribute("data-i")];
+    if(!c||!c.focus)return;
+    c.focus.group=btn.getAttribute("data-g");rerender();saveGame();});
+  $("twBody").querySelectorAll(".stPlayer").forEach(btn=>btn.onclick=()=>{
+    const c=staff()[+btn.getAttribute("data-i")],n=btn.getAttribute("data-n");
+    if(!c||!c.focus)return;
+    const names=c.focus.names||[];
+    const at=names.indexOf(n);
+    if(at>=0)names.splice(at,1);
+    else{if(names.length>=COACH_FOCUS_MAX_PLAYERS)names.shift();names.push(n);}
+    c.focus.names=names;rerender();saveGame();});
+  $("twBody").querySelectorAll(".stFire").forEach(btn=>btn.onclick=()=>{
+    const i=+btn.getAttribute("data-i"),c=staff()[i];
+    if(!c)return;
+    askConfirm({title:"Elküldöd a stábból?",yes:"Igen, elküldöm",
+      html:`<div style="font-size:13px;line-height:1.55"><b>${esc(shortName(c.n))}</b> (${esc(coachTypeByKey(c.type).n)}) távozik.<br><br>
+        <span style="color:var(--dim)">A helye felszabadul, ő pedig a Stáb-csarnokba kerül. <b>Visszahívni nem lehet.</b></span></div>`,
+      onYes:()=>{
+        retireCoach(i,"dismissed");
+        addLine(`🎓 ${esc(shortName(c.n))} távozott a stábból.`,"m life");
+        _staffFocusEdit=null;rerender();saveGame();}});});
+  if(!atMax){
+    const buy=document.createElement("button");
+    buy.className="btn-y stepbtn";
+    buy.textContent=`Stáb-hely vásárlása (${fmtFtShort(price)})`;
+    if((S.transferBudget||0)<price){buy.disabled=true;buy.style.opacity=".45";}
+    buy.onclick=()=>{
+      if((S.transferBudget||0)<price||coachSlots()>=COACH_SLOTS_MAX)return;
+      askConfirm({title:"Megveszed a stáb-helyet?",yes:"Igen, megveszem",
+        html:`<div style="font-size:13px;line-height:1.55">🎓 Stáb-helyek <b>${max} → ${max+1}</b>.<br><br>
+          Ára <b style="color:var(--gold)">${fmtFt(price)}</b>, az egyenleged ${fmtFt(S.transferBudget||0)} → <b>${fmtFt((S.transferBudget||0)-price)}</b>.</div>`,
+        onYes:()=>{
+          if((S.transferBudget||0)<price||coachSlots()>=COACH_SLOTS_MAX)return;
+          S.transferBudget-=price;
+          S.coachSlots=Math.min(COACH_SLOTS_MAX,coachSlots()+1);
+          addLine(`🎓 Stáb-bővítés — mostantól ${coachSlots()} személyi edződ lehet.`,"m life");
+          rerender();saveGame();}});};
+    $("twActions").appendChild(buy);}
+  const back=document.createElement("button");
+  back.className="btn-s stepbtn";back.style.marginTop="6px";back.textContent="Vissza a HUB-ba";
+  back.onclick=()=>{_staffFocusEdit=null;csReturnToHub();};
+  $("twActions").appendChild(back);}
 function renderScoutUpgradePanel(){
   $("twTitle").textContent="🔎 Scout fejlesztése";
   const atMax=scout.stars>=SCOUT_MAX_STARS;
@@ -26074,6 +26398,7 @@ function renderHub(){
   renderRunMeter();
   renderHalftimeSubsBtn();   /* a félidei csere kapcsoló felirata az állapotot mondja */
   renderCoachOffer();        /* döntésre váró visszavonult legendák (személyi edzők) */
+  renderStaffBtn();          /* a Szakmai stáb gomb csak karrierben, állapotfelirattal */
 
   /* SZEZON KÖZBEN a HUB bármikor megnyitható, de az átigazolás nem elérhető —
      az a nyári ablak dolga. Ugyanez áll a LEGELSŐ szezon előtti keret-
@@ -27508,6 +27833,7 @@ function hubShowSeasonReport(){
      meccsről meccsre optimalizálható csúszka. (A felület az F2 fázisban jön;
      a számláló már most helyesen ketyeg.) */
   S.coachFocusChangeUsed=false;
+  staff().forEach(c=>{if(c)c.focusUsed=false;});
   /* ---- AZ AKADÉMIA-BEFAGYÁS LEJÁRATA ----
      A LEZÁRULÓ szezonra szólt, tehát itt jár le — és KIFEJEZETTEN a
      kihívás-kiértékelés ELŐTT. Korábban ez az advanceCareerSeason()-ben ült,
