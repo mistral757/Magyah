@@ -1031,7 +1031,34 @@ Az indoklás-mondat generált, a legerősebb bemeneti tagból (pl. `leadI` 4 →
 „Remek vezetői képessége…"). Ez teszi olvashatóvá a képletet anélkül, hogy
 számokat kellene magyarázni.
 
-### 8.4 Játékos-panel jelölés
+### 8.4 A felvétel utáni bevezető (v2.6.056)
+
+**A probléma:** a felvétel után a felhasználó visszakerült a HUB-ba, az új edző
+pedig egy menü mélyén ült, **alapértelmezett fókusszal**. Könnyű volt szem elől
+téveszteni, hogy egyáltalán be kell állítani — a rendszer legfontosabb döntése
+maradt érintetlenül.
+
+**Megoldás, két rétegben:**
+
+1. **Minden felvételnél**: a megerősítés után azonnal megnyílik a stáb-panel, és
+   a képernyő az új edző kártyájára görget.
+2. **Az ELSŐ edzőnél** (karrierenként egyszer, `S.staffIntroDone`): egy
+   háromlépéses, kiemeléssel vezetett bevezető fut le a kártyán:
+
+   | Lépés | Kiemelve | Miről szól |
+   |---|---|---|
+   | 1/3 | a fejléc (`staffHead`) | mi az a Szakértelem, honnan jön, hogy nőhet |
+   | 2/3 | a fókuszgombok (`staffFocusRow`) | a három mód, a szűk/széles kompromisszum, és hogy a morál/kémia-edzőt ne szűkítsd |
+   | 3/3 | a hatás-sorok (`staffEffect`) | hogy a szám élőben újraszámol, és a ciklus-korlát |
+
+**Miért nem a guide-motoron megy:** a guide kikapcsolható („Ne mutass több
+tippet"), és a felhasználó ilyenkor pont a lényegről maradna le. Ez a bevezető
+a beállító felület **részeként**, a kártyán belül jelenik meg — így nem takarja
+el azt, amit épp magyaráz, nem csúszhat el a tartalomtól, és a `guideHi`
+kiemelő gyűrűt használva mégis ugyanaz a vizuális nyelv. Bármelyik lépésnél
+kihagyható, és utána a felvétel már csak odagörget.
+
+### 8.5 Játékos-panel jelölés
 
 A HUB keret-listáján a fókuszált játékos neve mellé egy apró jelvény kerül
 (`🎯` + az edző típus-ikonja), a meglévő `statusbadge` mintájára

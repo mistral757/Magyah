@@ -2226,7 +2226,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.055";
+const APP_VERSION="2.6.056";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9676,7 +9676,6 @@ function makeCoach(fp,typeKey,seasonNow){
 function hireCoach(c){
   if(!c||staffFull())return false;
   staff().push(c);
-  if(typeof guideEnabled==="function"&&guideEnabled())guideFire("ev:coachhired");
   addLine(`🎓 <b>ÚJ A STÁBBAN</b> — ${esc(shortName(c.n))} mostantól ${esc(coachTypeByKey(c.type).n)} (${coachStars(c.sz)} Sz ${c.sz}).`,"m life");
   return true;}
 /* Az elküldött edző nem tűnik el: a Stáb-csarnok a klub emlékezete. Nulla
@@ -11028,9 +11027,6 @@ const GUIDE_TIPS={
   "ev:coachoffer":{t:"Egy legenda a klubnál maradna",
     x:"A visszavonuló játékosod felajánlotta, hogy edzőként marad. Amiben JÓ VOLT, abban lesz jó edző is: a gólvágóból gólszerzés-mester, a vezéregyéniségből Lélekemelő, a sosem sérült vasemberből sportorvos, a sok képességet gyűjtőből Iskolateremtő — aki a SAJÁT skilljeit adja tovább. A típusválasztás VÉGLEGES, ezért nézd meg mind, ne csak a legmagasabb számot. Ha elbúcsúztatod, a tudása elvész: edzőt később nem lehet visszahívni, és vásárolni sem.",
     g:"szemelyiedzo"},
-  "ev:coachhired":{t:"Állítsd rá valakire",
-    x:"Az edződ alapból az egész keretre figyel. A Menü → Klub → Szakmai stáb panelen szűkítheted egy posztcsoportra vagy legfeljebb két emberre — és a panel ÉLŐBEN kiírja, mennyit ér a beállítás, még mielőtt döntenél. Szűk fókusz: sokat egy embernek. Széles fókusz: keveset mindenkinek, de összesen többet. Kivétel a morál- és a kémia-edző: az ő munkájuk az egész öltözőé, őket ne szűkítsd.",
-    a:"hubStaffBtn",g:"szemelyiedzo"},
   "ev:absence":{t:"Valaki kidőlt — te döntesz a pótlásról",
     x:"Sérülés és eltiltás a KEZDŐ 11-ből kiveszi az embert, és ez a panel kérdezi meg, ki álljon a helyére. Az „Automatikus” mindig kiírja, kit hozna; mellette a padod és a tartalék-kereted jelöltjei állnak, jelezve, melyik poszthű és melyik jár illeszkedés-hátránnyal. A hiányzás a JÁTÉKOSHOZ tartozik, nem a poszthoz: hiába rakod máshova, vele megy.",
     g:"serules"},
@@ -14889,7 +14885,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   /* SZEMÉLYI EDZŐK. A stáb szándékosan NEM nullázódik szezonváltáskor: az
      egész rendszer lényege, hogy a legendáid évtizedekig a klubnál maradnak.
      A staffHall a kiöregedett/elküldött edzők emléke — nulla játékhatás. */
-  staff:[],coachSlots:COACH_SLOTS_BASE,staffHall:[],
+  staff:[],coachSlots:COACH_SLOTS_BASE,staffHall:[],staffIntroDone:false,
   pendingCoachOffers:[],       /* visszavonult legendák, akik döntésre várnak */
   coachFocusChangeUsed:false,  /* a fókusz is ciklusonként egyszer váltható */
   halftimeSubs:false, /* félidei csere-szünet (HUB-kapcsoló) */
@@ -23631,15 +23627,21 @@ function startClubScouting(){
   showClubScoutIntro();
   $("scWindow").scrollIntoView({behavior:"smooth"});}
 /* ---- Scout-fejlesztő képernyő ---- */
-$("hubStaffBtn")&&($("hubStaffBtn").onclick=()=>{
+/* A stáb-panel megnyitása. introFor: ha meg van adva ÉS ez az első edződ,
+   elindul a lépésenkénti bevezető az adott edző kártyáján. */
+function openStaffPanel(introFor){
   if(gameMode!=="career")return;
   _staffFocusEdit=null;
+  _staffIntro=(introFor&&!S.staffIntroDone)?{name:introFor,step:0}:null;
   $("scHub").classList.add("hide");
   $("scWindow").classList.remove("hide");
   $("swapPanelWrap").classList.add("hide");
   $("twPanel").classList.remove("hide");
   renderStaffPanel();
-  $("scWindow").scrollIntoView({behavior:"smooth"});});
+  /* Ha fut a bevezető, a renderStaffPanel MÁR a kiemelt részre görget — akkor
+     ne rángassuk el onnan a panel tetejére. */
+  if(!_staffIntro)$("scWindow").scrollIntoView({behavior:"smooth"});}
+$("hubStaffBtn")&&($("hubStaffBtn").onclick=()=>openStaffPanel());
 $("hubScoutUpgradeBtn").onclick=()=>{
   if(!scout)return;
   $("scHub").classList.add("hide");
@@ -24070,7 +24072,12 @@ function renderCoachOffer(){
         const c=makeCoach(fp,t.key,S.seasonNumber||1);
         if(!c||!hireCoach(c))return;
         dropCoachOffer(fp.n);_coachOfferPick=null;_coachOfferAll=false;
-        renderCoachOffer();saveGame();}});};
+        renderCoachOffer();saveGame();
+        /* A FELVÉTEL UTÁN AZONNAL A BEÁLLÍTÁSHOZ VISZÜNK. Eddig a felhasználó
+           visszakerült a HUB-ba, az új edző pedig egy menü mélyén ült,
+           alapértelmezett fókusszal — könnyű volt elfelejteni, hogy be kell
+           állítani. Az első edzőnél végig is vezetjük a beállításon. */
+        openStaffPanel(c.n);}});};
   const no=$("coachOfferNo");
   if(no)no.onclick=()=>{
     /* Tele stábnál a "Később döntök" csak elrejt: a felajánlás a sorban marad,
@@ -24106,6 +24113,25 @@ const COACH_SKILL_W=1.8;     /* skill-kiosztási súlyszorzó */
 const COACH_SEASON_MATCHES=30;   /* egy szezon nagyságrendje az előnézethez */
 let _staffFocusEdit=null;    /* melyik edző fókuszát szerkesztjük épp (index) */
 let _staffHallOpen=false;    /* ki van-e nyitva a Stáb-csarnok */
+/* ---- AZ ELSŐ EDZŐ BEVEZETŐJE ----
+   A felvétel után a felhasználó eddig visszakerült a HUB-ba, és a frissen
+   szerződtetett edző ott ült valahol egy menü mélyén, alapértelmezett
+   fókusszal — könnyű volt szem elől téveszteni, hogy egyáltalán be kell
+   állítani. Mostantól a felvétel UTÁN azonnal a stáb-panel nyílik meg, a
+   kártyájára görgetve, és — az első edzőnél — egy háromlépéses, kiemeléssel
+   vezetett bevezető magyaráz végig a beállításon.
+   SZÁNDÉKOSAN NEM a guide-motoron megy: az kikapcsolható ("Ne mutass több
+   tippet"), és a felhasználó ilyenkor pont a lényegről maradna le. Ez viszont
+   karrierenként EGYSZER jön elő, bármikor kihagyható, és utána a felvétel már
+   csak odagörget. */
+let _staffIntro=null;   /* {name, step} — épp melyik edző bevezetőjén állunk */
+const STAFF_INTRO_STEPS=[
+  {anchor:"head", t:"Megvan az első személyi edződ",
+   x:"A <b>Szakértelem</b> a pályafutásából jön: a kora, a nálad lejátszott meccsei, és az, amiben kimagasló volt. A típusa végleges — a szakértelme viszont a munkával még nőhet, két szezononként egy ponttal."},
+  {anchor:"focus", t:"Először is: kire figyeljen?",
+   x:"Három mód közül választhatsz: az <b>egész keret</b>, egy <b>posztcsoport</b>, vagy legfeljebb <b>két ember</b>. A figyelme fix mennyiség — minél szűkebb a fókusz, annál többet kap fejenként, de annál kevesebbet termel összesen.<br><br>Egy kivétel: a <b>Lélekemelőt és a Csapatkovácsot ne szűkítsd</b>, az ő munkájuk az egész öltözőé."},
+  {anchor:"effect", t:"A hatás élőben számol",
+   x:"Itt mindig a <b>konkrét</b> hatás áll, nem címke. Váltogasd a fókuszt, és nézd, hogyan mozdul a szám — nem kell találgatnod, mit ér a döntés.<br><br>A fókuszt edzőnként <b>ciklusonként egyszer</b> módosíthatod; a nyár vége újítja meg."}];
 
 /* A fókusz épségben tartása: eladott/visszavonult játékos neve nem tarthatja
    fogva a fókuszt. Üresre fogyott ember-fókusz visszaesik a teljes keretre. */
@@ -24221,12 +24247,15 @@ function renderStaffPanel(){
     if(fp.saves)bits.push(`${fp.saves} védés`);
     if(fp.cleans)bits.push(`${fp.cleans} tiszta lap`);
     bits.push(fp.inj?`${fp.inj} sérülés`:"sérülés nélkül");
-    h+=`<div style="border:1px solid ${act?"var(--gold)":"var(--line)"};border-radius:8px;padding:9px 11px;margin-bottom:9px;${act?"":"opacity:.7"}">
-      <div style="font-size:13.5px;font-weight:700">${t.ic} ${esc(shortName(c.n))}
+    /* A bevezető a KIEMELÉST ezekre a horgonyokra teszi — ezért kapnak azonosítót. */
+    const intro=(_staffIntro&&_staffIntro.name===c.n)?_staffIntro:null;
+    const hi=k=>(intro&&STAFF_INTRO_STEPS[intro.step]&&STAFF_INTRO_STEPS[intro.step].anchor===k)?" guideHi":"";
+    h+=`<div id="staffCard${i}" style="border:1px solid ${act?"var(--gold)":"var(--line)"};border-radius:8px;padding:9px 11px;margin-bottom:9px;${act?"":"opacity:.7"}">
+      <div id="staffHead${i}" class="${hi("head").trim()}" style="font-size:13.5px;font-weight:700">${t.ic} ${esc(shortName(c.n))}
         <span style="color:var(--gold);font-weight:400">${coachStars(c.sz)} Sz ${c.sz}</span></div>
       <div style="font-size:12px;color:var(--dim);margin:1px 0 2px">${esc(t.n)} · ${c.age} év · ${Math.max(1,(S.seasonNumber||1)-c.since+1)}. szezonja a stábban</div>
       <div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">${esc(bits.join(" · "))}</div>
-      <div style="display:flex;gap:5px;margin-bottom:6px">
+      <div id="staffFocusRow${i}" class="${hi("focus").trim()}" style="display:flex;gap:5px;margin-bottom:6px">
         ${["team","group","players"].map(m=>{
           const on=(c.focus&&c.focus.mode)===m;
           const lbl=m==="team"?"Keret":m==="group"?"Poszt":"Ember";
@@ -24246,8 +24275,21 @@ function renderStaffPanel(){
         <div style="max-height:190px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:4px;margin-bottom:6px">`
         +roster.map(p=>`<button class="stPlayer" data-i="${i}" data-n="${esc(p.n)}" style="display:block;width:100%;text-align:left;font-size:12px;padding:4px 6px;border:none;border-radius:5px;background:${sel.has(p.n)?"rgba(255,210,74,.15)":"transparent"};color:var(--ink);cursor:pointer">${sel.has(p.n)?"✓ ":""}${esc(shortName(p.n))} <span style="color:var(--dim2)">${esc((p.pos||[]).join("/"))}${p.age?" · "+p.age+" év":""}</span></button>`).join("")
         +`</div>`;}
-    h+=`<div style="border-top:1px dashed var(--line);padding-top:5px;font-size:12.5px;line-height:1.55">`
+    h+=`<div id="staffEffect${i}" class="${hi("effect").trim()}" style="border-top:1px dashed var(--line);padding-top:5px;font-size:12.5px;line-height:1.55">`
       +coachEffectLines(c).map(x=>`<div>${x}</div>`).join("")+`</div>`;
+    /* A vezetett bevezető doboza a kártyán BELÜL ül: így sosem csúszhat el a
+       tartalomtól, és nem takar el semmit, amit épp elmagyaráz. */
+    if(intro){
+      const st=STAFF_INTRO_STEPS[intro.step];
+      h+=`<div style="margin-top:8px;border:1px solid var(--gold);border-radius:8px;padding:9px 11px;background:rgba(255,210,74,.07)">
+        <div style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:3px">
+          Bevezető · ${intro.step+1}/${STAFF_INTRO_STEPS.length}</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:3px">${st.t}</div>
+        <div style="font-size:12.5px;line-height:1.55;color:var(--ink)">${st.x}</div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button id="staffIntroNext" class="btn-y" style="flex:1;font-size:12.5px;padding:6px 0">${intro.step+1<STAFF_INTRO_STEPS.length?"Tovább":"Kész, értem"}</button>
+          ${intro.step+1<STAFF_INTRO_STEPS.length?`<button id="staffIntroSkip" class="btn-s" style="flex:1;font-size:12.5px;padding:6px 0">Kihagyom</button>`:""}
+        </div></div>`;}
     if(!coachFocusChangeAllowed(c))
       h+=`<div style="font-size:11.5px;color:var(--dim2);margin-top:5px">A fókuszt ebben a ciklusban már módosítottad — a nyár vége újítja meg.</div>`;
     h+=`<button class="stFire" data-i="${i}" style="margin-top:7px;width:100%;font-size:11.5px;padding:5px 0;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer">Elküldés a stábból</button>
@@ -24282,6 +24324,20 @@ function renderStaffPanel(){
   /* --- események --- */
   const rerender=()=>renderStaffPanel();
   {const hh=$("staffHallHead");if(hh)hh.onclick=()=>{_staffHallOpen=!_staffHallOpen;rerender();};}
+  /* ---- A BEVEZETŐ LÉPTETÉSE ÉS A GÖRGETÉS ---- */
+  if(_staffIntro){
+    const close=()=>{_staffIntro=null;S.staffIntroDone=true;try{saveGame();}catch(e){}rerender();};
+    const nx=$("staffIntroNext");
+    if(nx)nx.onclick=()=>{
+      if(_staffIntro.step+1<STAFF_INTRO_STEPS.length){_staffIntro.step++;rerender();}
+      else close();};
+    const sk=$("staffIntroSkip");
+    if(sk)sk.onclick=close;
+    /* A KIEMELT részre görgetünk, nem a panel tetejére: a felhasználó pontosan
+       azt látja, amiről a buborék épp beszél. */
+    setTimeout(()=>{
+      const el=$("twBody").querySelector(".guideHi");
+      if(el&&el.scrollIntoView)el.scrollIntoView({behavior:"smooth",block:"center"});},60);}
   $("twBody").querySelectorAll(".stFocus").forEach(btn=>btn.onclick=()=>{
     const i=+btn.getAttribute("data-i"),m=btn.getAttribute("data-m"),c=staff()[i];
     if(!c)return;
@@ -28858,7 +28914,7 @@ function saveGame(){
         /* SZEMÉLYI EDZŐK: a stáb, a megvett slotok, a csarnok és a döntésre
            váró felajánlások. ~350 bájt edzőnként, max 6 edző — a localStorage
            5 MB-os korlátja szempontjából elhanyagolható. */
-        staff:S.staff,coachSlots:S.coachSlots,staffHall:S.staffHall,
+        staff:S.staff,coachSlots:S.coachSlots,staffHall:S.staffHall,staffIntroDone:S.staffIntroDone,
         pendingCoachOffers:S.pendingCoachOffers,coachFocusChangeUsed:S.coachFocusChangeUsed,
         fixtures:S.fixtures,fixtureResults:S.fixtureResults,
         playing:false,auto:S.auto,
@@ -29140,6 +29196,7 @@ function applySavedGame(d){
   S.staffHall=d.S.staffHall||[];
   S.pendingCoachOffers=d.S.pendingCoachOffers||[];
   S.coachFocusChangeUsed=!!d.S.coachFocusChangeUsed;
+  S.staffIntroDone=!!d.S.staffIntroDone;
   /* (A skillsEver visszamenőleges pótlása NEM itt van: az a S.skills
      visszaállítása UTÁN fut, különben üres listából dolgozna. Lásd lentebb.) */
   S.clubScoutSpinsUsed=d.S.clubScoutSpinsUsed||0;
