@@ -2226,7 +2226,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.054";
+const APP_VERSION="2.6.055";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -20595,7 +20595,7 @@ function twSigningResult(cand,outcome,completeFn,retryFn,opts){
   const noRetry=!!(opts&&opts.noRetry), onLost=opts&&opts.onLost;
   if(outcome==="clean"){
     $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">Leigazoltuk!</div><p style="font-size:13px;margin-top:5px">${esc(cand.n)} simán aláírt, nincs itt semmi vita.</p>`;
-    twShowPlacement(cand,completeFn);return;}
+    twShowPlacement(cand,completeFn,{onLost:opts&&opts.onLost});return;}
   if(outcome==="premium"){twShowPremiumOffer(cand,completeFn,opts);return;}
   if(outcome==="retry"){
     /* a klub-szemlén a "nem jött össze" azonnal végleges — nincs újraküldés */
@@ -20629,7 +20629,10 @@ function twShowPremiumOffer(cand,completeFn,opts){
 function twFinalizeSigning(cand,note,overridePrice,completeFn){
   if(overridePrice!=null)cand._negotiatedPrice=overridePrice;
   $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">Megegyeztünk!</div><p style="font-size:13px;margin-top:5px">${note}</p>`;
-  twShowPlacement(cand,completeFn);}
+  /* confirmed:true — a "Magasabb árat kérnek" képernyő MÁR kimondta az árat és
+     megkérdezte, megéri-e. Egy második megerősítés itt csak dupla kattintás
+     lenne ugyanarra a döntésre. */
+  twShowPlacement(cand,completeFn,{confirmed:true});}
 /* ================= AZ IGAZOLÁS ELHELYEZÉSE =================
    Régen minden aláírás után feljött egy választó: "kit vált le az újonc?" —
    a kezdő 11 és a cserepad minden szóba jöhető helye, plusz egy "tartalékba
@@ -20668,6 +20671,55 @@ function twShowPlacement(cand,completeFn,cfg){
   /* A GOMBOK LETAKARÍTÁSA — enélkül a "Magasabb árat kérnek" igen/nem gombjai
      ottragadtak a #twActions-ben a "Megegyeztünk!" alatt. */
   $("twActions").innerHTML="";
+  /* ================= VÉGSŐ MEGERŐSÍTÉS =================
+     HIBA, AMIT EZ JAVÍT: amióta a karrier-igazolások egyenesen a tartalék-
+     keretbe mennek, a régi elhelyezés-választó eltűnt — és vele az utolsó
+     pont, ahol még vissza lehetett lépni. A "sima aláírás" ágon így a scout
+     jelentésétől a levont pénzig EGYETLEN kattintás vezetett, visszaút nélkül.
+     Mostantól itt, közvetlenül a visszafordíthatatlan lépés előtt megáll:
+     látod a nevet, a posztot, a Ratinget, az ÁRAT, az egyenleged előtte-utána
+     állását, és hogy hova érkezik.
+     A prémium, az álom- és az ikonikus ajánlatnak saját igen/nem képernyője
+     van (confirmed:true) — ott nem kérdezünk kétszer. */
+  if(gameMode==="career"&&!cfg.confirmed){
+    const rosterNow=fullCareerRoster().length;
+    const full=cfg.replaceSlotIdx==null&&rosterNow>=MAX_CAREER_ROSTER;
+    const out=(cfg.replaceSlotIdx!=null&&slots[cfg.replaceSlotIdx])?slots[cfg.replaceSlotIdx].player:null;
+    const hova=cfg.replaceSlotIdx!=null
+      ? `a <b>kezdő tizenegybe</b>${out?`, <b>${esc(shortName(out.n))}</b> helyére — őt a klub elengedi`:""}`
+      : `a <b>tartalék-keretbe</b> <span style="color:var(--dim2)">(${rosterNow}/${MAX_CAREER_ROSTER})</span>`;
+    $("twBody").innerHTML=`<div class="h" style="color:var(--gold)">Aláírjuk a szerződést?</div>
+      <p style="font-size:13px;margin-top:6px;line-height:1.6">
+        <b>${esc(cand.n)}</b>${cand.pos?` <span style="color:var(--dim)">(${esc(cand.pos.join("/"))}${cand.age!=null?`, ${cand.age} év`:""}, Rating ${Math.round(pOvr(cand))})</span>`:""}<br>
+        ${freeTok
+          ? `🎁 <b>Ingyen igazolás-token</b> fedezi — nem kerül semmibe <span style="color:var(--dim2)">(${fmtFt(rawPrice)} megspórolva)</span>.`
+          : finalPrice>0
+            ? `Ár: <b style="color:var(--gold)">${fmtFt(finalPrice)}</b><br>
+               Egyenleged: ${fmtFt(S.transferBudget||0)} → <b>${fmtFt(Math.max(0,(S.transferBudget||0)-finalPrice))}</b>`
+            : `<span style="color:var(--dim)">Ingyenes igazolás.</span>`}<br>
+        Ide érkezik: ${hova}.
+        ${full?`<br><span style="color:var(--red)">⚠ A kereted megtelt — így az igazolás elmaradna, és nem fizetnél érte semmit.</span>`:""}
+        <br><span style="color:var(--dim2)">Ha most elállsz, ebben a körben már nem tudod leigazolni.</span>
+      </p>`;
+    const yes=document.createElement("button");
+    yes.className="btn-y stepbtn";
+    yes.textContent=freeTok?"Igen, aláírjuk (ingyen)":(finalPrice>0?`Igen, aláírjuk (${fmtFtShort(finalPrice)})`:"Igen, aláírjuk");
+    yes.onclick=()=>twShowPlacement(cand,completeFn,Object.assign({},cfg,{confirmed:true}));
+    const no=document.createElement("button");
+    no.className="btn-s stepbtn";no.style.marginTop="6px";
+    no.textContent="Mégsem, elállunk";
+    no.onclick=()=>{
+      /* Az elállás UGYANÚGY elveszíti a játékost, mint a prémium ár
+         visszautasítása. Enélkül a "Mégsem" ingyenes újrasorsolás lenne: addig
+         állnál el és küldenéd újra a scoutot, amíg jobb kimenetel nem jön. */
+      if(cfg.onLost)cfg.onLost();
+      $("twBody").innerHTML=`<div class="h" style="color:var(--dim)">Elálltunk</div>
+        <p style="font-size:13px;margin-top:5px;line-height:1.55">${esc(cand.n)} igazolása nem jött létre — nem fizettél érte semmit.</p>`;
+      const b=document.createElement("button");b.className="btn-p stepbtn";b.textContent="Tovább";
+      b.onclick=()=>completeFn();
+      $("twActions").innerHTML="";$("twActions").appendChild(b);};
+    $("twActions").appendChild(yes);$("twActions").appendChild(no);
+    return;}
   /* Közös lezárás: egyetlen "Tovább" gomb, ami a folyamatot viszi. */
   const finish=()=>{
     drawPitch();updateBar();
@@ -20888,7 +20940,7 @@ function showDreamOffer(cand){
     /* AZ ÁLOMIGAZOLÁS AZ EGYETLEN, AMI NEM A TARTALÉKBA JÖN. Az ajánlat maga
        egy KONKRÉT emberre szólt ("nála jobb és ígéretesebb"), ezért nincs mit
        kérdezni: ő megy, az újonc pedig pontosan az ő helyére áll be. */
-    twShowPlacement(cand.repl,twNextCycleOrFinish,{replaceSlotIdx:cand.idx});};
+    twShowPlacement(cand.repl,twNextCycleOrFinish,{replaceSlotIdx:cand.idx,confirmed:true});};
   const noBtn=document.createElement("button");noBtn.className="btn-s stepbtn";noBtn.style.marginTop="6px";noBtn.textContent="Nem, elutasítom";
   noBtn.onclick=()=>{
     $("twBody").innerHTML=`<div class="h" style="color:var(--dim)">Elutasítva</div><p style="font-size:13px;margin-top:5px">Az álomigazolást (${esc(cand.repl.n)}) udvariasan elutasítottátok.</p>`;
@@ -20908,7 +20960,7 @@ function showIconOffer(rawIcon){
     registerIconInPool(icon);
     TW.category=getCategoryFor(icon.pos[0]);
     $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">Megegyeztünk!</div><p style="font-size:13px;margin-top:5px">${esc(icon.n)} csatlakozik a csapathoz.</p>`;
-    twShowPlacement(icon,twNextCycleOrFinish);};
+    twShowPlacement(icon,twNextCycleOrFinish,{confirmed:true});};
   const noBtn=document.createElement("button");noBtn.className="btn-s stepbtn";noBtn.style.marginTop="6px";noBtn.textContent="Nem, elutasítom";
   noBtn.onclick=()=>{
     $("twBody").innerHTML=`<div class="h" style="color:var(--dim)">Elutasítva</div><p style="font-size:13px;margin-top:5px">${esc(icon.n)} ajánlatát udvariasan elutasítottátok.</p>`;
