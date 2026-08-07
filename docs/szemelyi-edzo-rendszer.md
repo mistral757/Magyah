@@ -59,15 +59,48 @@ szezonzáró jelentésben megjelenik egy **búcsú-kártya**:
 Ha bevesszük, a keret-slotja normálisan felszabadul (a meglévő pótlás-logika
 változatlanul lefut), a játékos viszont átkerül a `S.staff` tömbbe.
 
-**B) Korai visszavonultatás (opcionális út).**
-A HUB játékos-paneljén 32 év fölött megjelenik egy „🎓 Edzői pályára küldés"
-gomb. A játékos azonnal visszavonul (kikerül a keretből), és edző lesz. Ez a
-tudatos döntés útja: egy 33 éves, még játszó, de már romló vezérből most
-csinálsz **Lélekemelőt**, ahelyett hogy megvárnád a 38-at.
+**B) Edzői állás felajánlása — FIZETŐS (v2.6.054).**
+A HUB játékos-lapján 32 év fölött megjelenik egy „🎓 Edzői állás felajánlása"
+gomb. A játékos azonnal befejezi a pályafutását, és edző lesz. Ez a tudatos
+döntés útja: egy 33 éves, még játszó, de már romló vezérből most csinálsz
+**Lélekemelőt**, ahelyett hogy megvárnád a 38-at.
+
+**A KÉT ÚT KÖZTI KÜLÖNBSÉG A PÉNZ.** Az A út ingyen van — már úgyis befejezte,
+csak igent mond. A B úton viszont **kártalanítanod kell** a félbehagyott
+pályafutásáért: az **igazolási ára 40–60%-át**, és az arány a hátralévő
+pályafutással skálázódik, mert minél fiatalabb, annál többet veszel el tőle.
+
+```js
+const COACH_OFFER_PCT_MAX=0.60, COACH_OFFER_PCT_MIN=0.40;
+function coachOfferPct(age){
+  return clamp(0.40, 0.60, 0.60 - (age-32)*0.0333);
+}
+function coachOfferPrice(entry){ return round(buyPrice(entry) * coachOfferPct(entry.age)); }
+```
+
+| Kor | 32 | 33 | 34 | 36 | 38+ |
+|---|---|---|---|---|---|
+| kártalanítás | 60% | 57% | 53% | 47% | 40% |
+
+Az alap a **`buyPrice`** (amennyiért ma megvennéd), nem a `sellValue`: azt
+fizeted, amennyit a piacon ér — nem azt, amennyit te kapnál érte.
+
+**Mérve** ugyanarra a 95-ös csúcsú játékosra, három korban:
+
+| Kor | Rating | igazolási ár | ajánlat |
+|---|---|---|---|
+| 32 | 93 | 29,9 Mrd Ft | **17,9 Mrd Ft** |
+| 35 | 91 | 19,5 Mrd Ft | **9,8 Mrd Ft** |
+| 38 | 86 | 9,8 Mrd Ft | **3,9 Mrd Ft** |
+
+Vagyis ugyanaz az ember **4,6-szer drágább 32 évesen, mint 38-an** — a türelem
+tehát nemcsak jobb edzőt ad, hanem sokkal olcsóbbat is. Ez az ár a
+türelmetlenség ára, és pontosan ettől marad az A út a fő út.
 
 **Miért kell mindkettő:** az A út a jutalom (kitartottál mellette), a B út a
-döntés (feláldozod a maradék 3 szezonját a stábért). A B úthoz **megerősítés
-kell**, mert visszafordíthatatlan.
+döntés (pénzzel megveszed a maradék szezonjait). A B úthoz **megerősítés
+kell**, mert visszafordíthatatlan — és a megerősítő kimondja, hogy kivárással
+ingyen, jobb edzőként kaptad volna meg.
 
 ### 1.3 Amit a belépéskor lefagyasztunk
 
@@ -152,7 +185,7 @@ Sz = clamp(20, 99, ALAP + SZAK)
 
 ALAP = korPont + rutinPont          →  0 … 34   (típustól FÜGGETLEN)
 SZAK = típusPont                    →  0 … 55   (típus-specifikus)
-+ induló zaj: ±3
++ induló zaj: ±3 (a NÉVBŐL hash-elve — determinisztikus, lásd 2.5)
 ```
 
 ### 2.1 ALAP — ami mindig számít
@@ -291,7 +324,23 @@ képességű, 300 meccses, 120 gólos csatár lehet **Lélekemelő 71** vagy
 **Gólvágó-mentor 68** — de nem mindkettő. Így ugyanaz a játékos két különböző
 karrierben két különböző klubot épít.
 
-### 2.5 Sz → csillagok (kijelzés)
+### 2.5 A ±3 zaj determinisztikus
+
+A zaj **a személy tulajdonsága, nem a pillanaté**: a játékos nevéből hash-elve
+áll elő (`coachNoiseFor`), ugyanazzal az elvvel, mint a `chBuyDiscountHits` —
+csak a szezont *nem* vesszük bele, mert az edzői adottság nem változhat évről
+évre.
+
+> **Hiba, amit ez javított:** a zaj eredetileg a lenyomat készítésekor
+> sorsolódott `Math.random`-mal. A visszavonulási úton ez még jó volt (a
+> lenyomat egyszer születik), de az „edzői állás felajánlása" gomb **minden
+> újrarajzoláskor friss lenyomatot** készít az előnézethez — mérve ugyanaz a
+> játékos hol ★★★★☆-ot, hol ★★★★★-ot mutatott, és a felvétel után megint
+> mást kaptál volna. Mérve a javítás után: 50 egymás utáni számítás **ugyanazt
+> az Sz-t** adja, nyolc különböző név zaja pedig 0/−1/2/−2/1/−3/0/2 — tehát
+> stabil és mégis szór.
+
+### 2.6 Sz → csillagok (kijelzés)
 
 A számot a felhasználó **csillagban** látja, a scout mintájára
 (`scoutStarsLabel`, `index.html:23235`), de a tooltip mutatja a nyers Sz-t.
@@ -1116,7 +1165,7 @@ ajánlásom.
    belőle**. Külön kód nem kellett hozzá: a `rutinPont` és a `korPont` magától
    jutalmazza.
 
-4. **A családtag** (`p.family`) lehet-e edző? **Egyelőre NEM** — a „B" út
+4. **A családtag** (`p.family`) lehet-e edző? **Egyelőre NEM**  <!-- még nyitott --> — a „B" út
    gombja kizárja (`!p.family`), ahogy az eladás is. Nyitva hagytam: a
    +5 Sz bónuszos változat bármikor bekapcsolható, de egy visszafordíthatatlan
    döntést a családtagon nem akartam megkérdezés nélkül élesíteni.
