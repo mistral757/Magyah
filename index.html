@@ -5176,6 +5176,10 @@ const DIFFS_LEGACY={easy:75,medium:80,hard:85,veryhard:90,legend:95};
    adatbázis, annál gazdagabb a mezőny minden fokozaton — és a legmagasabb,
    "Nagyon nehéz" fokozat gyakorlatilag csak az igazi történelmi óriáscsapatokból
    (Barca, Real, Bayern, Man City, PSG, Liverpool, Juve stb.) válogat. */
+/* "Klub (szezon)" → "Klub". A mezőny minden csapatneve ebben az alakban áll
+   elő, tehát a zárójeles rész levágása adja a KLUB azonosságát — ezen múlik,
+   hogy ugyanaz a klub ne jöhessen szembe kétféle szezonnal. */
+function clubOfTeamName(n){return String(n||"").replace(/ \([^)]*\)$/,"").trim();}
 function buildOpponents(n,targetMean){
   /* F1 — az ellenféltábla a világ része, szezononkénti nevesített folyammal.
      A címkében a szezonszám ÉS a célerő is benne van: szintváltás után újra
@@ -5186,7 +5190,21 @@ function buildOpponents(n,targetMean){
   const MAXDIST=6,CLOSEST_M=20;
   const ranked=activeSquads().map(sq=>({sq,avg:squadAvgOvr(sq)}))
     .sort((a,b)=>Math.abs(a.avg-targetMean)-Math.abs(b.avg-targetMean));
-  const eligible=ranked.slice(0,CLOSEST_M).filter(x=>Math.abs(x.avg-targetMean)<=MAXDIST);
+  /* ---- EGY KLUB CSAK EGYSZER A MEZŐNYBEN ----
+     Az adatbázis egy klubot több szezonnal is ismer (Barcelona 2009, Barcelona
+     2011), és a merítés eddig KLUB-SZEZONOKAT sorsolt: ugyanaz a klub kétszer
+     is bekerülhetett a 15 ellenfél közé, két különböző évszámmal. A tabellán ez
+     két "Barcelona" sorként jelent meg — a mezőny elvesztette a hitelességét.
+     Mostantól a rangsorból KLUBONKÉNT csak a célerőhöz LEGKÖZELEBBI szezon
+     versenyez. A dedup a szűrések ELŐTT fut, hogy a merítés továbbra is
+     CLOSEST_M darab valódi jelöltet kínáljon — így a mezőny mérete nem szűkül
+     attól, hogy immár csupa különböző klub. */
+  const _seenClub=new Set(),byClub=[];
+  ranked.forEach(x=>{
+    const c=x.sq.club;
+    if(_seenClub.has(c))return;
+    _seenClub.add(c);byClub.push(x);});
+  const eligible=byClub.slice(0,CLOSEST_M).filter(x=>Math.abs(x.avg-targetMean)<=MAXDIST);
   const real=shuffleArr(eligible,_r).slice(0,n).map(x=>({n:`${x.sq.club} (${x.sq.season})`,ovr:x.avg}));
   /* FIX — nehézségi "holt zóna" ~88-92 között. A legerősebb valós keret is csak
      ~88-as, de a MAXDIST=6 tolerancia miatt 90-es célnál még a 84-es keretek is
@@ -5221,7 +5239,7 @@ function buildOpponents(n,targetMean){
        A klubokat a mezőnytől való távolság szerint keverve választjuk, hogy
        változatos, de ne mindig ugyanaz a 15 csapat legyen. */
     const usedNames=new Set(real.map(r=>r.n));
-    const usedClubs=new Set(real.map(r=>r.n.replace(/ \([^)]*\)$/,"")));
+    const usedClubs=new Set(real.map(r=>clubOfTeamName(r.n)));
     const pool=shuffleArr(activeSquads().map(sq=>({sq,avg:squadAvgOvr(sq)})),_r);
     const flavor=[];
     for(const x of pool){
@@ -5232,9 +5250,14 @@ function buildOpponents(n,targetMean){
       /* a valós klub neve marad, de a rating a mezőnyszintre húzva (±4 szórással) */
       flavor.push({n:nm,ovr:Math.max(50,Math.min(flavorCap,targetMean+(_r()*2-1)*4)),scaled:true});}
     /* ha kevés a valós klub (nem fordulhat elő 76 klubbal, de biztonságból),
-       a maradékot a helyi nevekkel töltjük fel */
+       a maradékot a helyi nevekkel töltjük fel — ezek sem ismétlődhetnek. Ha a
+       helyi névlista is elfogyna, sorszámmal különböztetjük meg őket: két
+       azonos nevű csapat a tabellán rosszabb, mint egy "II." toldalék. */
+    let _dup=1;
     while(flavor.length<need){
-      const nm=pick(OPPONENTS,_r);
+      const free=OPPONENTS.filter(x=>!usedNames.has(x));
+      const nm=free.length?pick(free,_r):`${pick(OPPONENTS,_r)} ${++_dup}.`;
+      usedNames.add(nm);
       flavor.push({n:nm,ovr:Math.max(50,Math.min(flavorCap,targetMean+(_r()*2-1)*4))});}
     return shuffleArr(real.concat(flavor),_r);
   }
@@ -6267,13 +6290,25 @@ function buildEuroField(comp){
   const rnd=M?mpCupRng("field"):null;
   const rr=rnd||Math.random;
   const shuf=a=>shuffleArr(a,rnd||undefined);
-  /* csak klubcsapat, és a bajnoki ellenfelek sem térnek vissza */
-  const used=new Set((typeof SEASON_OPPS!=="undefined"?SEASON_OPPS:[]).map(o=>o.n));
+  /* csak klubcsapat, és a bajnoki ellenfelek sem térnek vissza.
+     A kizárás KLUB-szintű: ha a bajnokságban a Barcelona (2011) az ellenfeled,
+     a kupamezőnybe a Barcelona (2009) sem kerülhet be — az ugyanaz a csapatnév
+     lenne két sorozatban. */
+  const usedClubs=new Set((typeof SEASON_OPPS!=="undefined"?SEASON_OPPS:[])
+    .map(o=>clubOfTeamName(o&&o.n)).filter(Boolean));
   const pool=SQUADS.map((sq,i)=>({sq,i,n:`${sq.club} (${sq.season})`,avg:squadAvgOvr(sq)}))
-    .filter(x=>!x.sq.wc&&!used.has(x.n));
+    .filter(x=>!x.sq.wc&&!usedClubs.has(x.sq.club));
   const ranked=pool.slice().sort((a,b)=>Math.abs(a.avg-target)-Math.abs(b.avg-target));
+  /* EGY KLUB CSAK EGYSZER: a 32-es mezőnyben sem állhat két azonos nevű csapat
+     (Real Madrid 2017 és Real Madrid 2002 egy csoportban értelmezhetetlen).
+     Klubonként a kupa CÉLÉRTÉKÉHEZ legközelebbi szezon versenyez — a dedup a
+     merítés szűkítése ELŐTT fut, hogy továbbra is legyen miből keverni. */
+  const _seenClub=new Set(),rankedClubs=[];
+  ranked.forEach(x=>{
+    if(_seenClub.has(x.sq.club))return;
+    _seenClub.add(x.sq.club);rankedClubs.push(x);});
   const nAI=M?30:31;   /* közös kupában egy hely a társé */
-  const picks=shuf(ranked.slice(0,Math.max(31,Math.min(ranked.length,46)))).slice(0,nAI);
+  const picks=shuf(rankedClubs.slice(0,Math.max(31,Math.min(rankedClubs.length,46)))).slice(0,nAI);
   const teams=picks.map(x=>({n:x.n,sq:x.i,you:false,
     ovr:Math.max(50,Math.min(cap,target+(rr()*2-1)*2.5))}));
   teams.push({n:teamName,you:true,sq:null,ovr:teamOVRbase()});
@@ -6971,7 +7006,11 @@ const SKILL_AXIS={
   defense:"ved", cleanStreak:"ved", discipline:"ved",
   gkwild:"kapus",
   assistw:"passz", playerAssists:"passz",
+  /* A supersub azóta tartozik ide, hogy nem csak ritka esemény: a becserélt
+     játékos gólesélyét emeli, tehát ugyanúgy a Gólszerzés-tengelyt tolja meg,
+     mint a lateclutch. */
   goalw:"gol", playerGoals:"gol", bigHaul:"gol", subGoals:"gol", lateclutch:"gol",
+  supersub:"gol",
   /* 3. FÁZIS: a sebesség-skillek tengelye. A "pace" típusnak nincs önálló
      numerikus hatása a meccsben (nem olvassa sumSkillEffect/multSkillEffect) —
      a hatása a SEBESSÉG-TENGELYEN át érkezik, és onnan a taktika-
@@ -7660,7 +7699,11 @@ const SKILLS=[
  {id:"mf_elastico",cat:"KOZEPPALYAS",name:"Elastico!",desc:"Nem lehet elvenni tőle a labdát: növeli a gólpassz-, gólszerzési és MVP-esélyt is egy kicsit.",type:"combo",combo:[{type:"assistw",val:1.3},{type:"goalw",val:1.3},{type:"mvp",val:1.3}]},
  {id:"fw_kanestyle",cat:"CSATAR",name:"Kane style is ON",desc:"Visszajön védekezni: 5%-kal csökkenti a kapott gólok esélyét.",type:"defense",val:0.95},
  {id:"fw_lateshow",cat:"CSATAR",name:"Utolsó pillanatos gól",desc:"A meccs hajrájában (85. perc után) jóval nagyobb eséllyel talál be.",type:"lateclutch",val:3.5},
- {id:"fw_supersub",cat:"CSATAR",name:"Csereként bejön gólt lőni",desc:"Ha csereként áll be, jóval nagyobb eséllyel talál be a pályán töltött idő alatt.",type:"supersub",val:3.5},
+ /* KÉT ÚTON HAT (lásd supersubGoalMult): erősítőként azon, akit CSERÉNEK
+    hozol be (kézi csere a meccs közben, vagy hiányzó helyére beálló pótlás),
+    és megmarad a régi, ritka esemény is, amikor a PADON ÜLVE ugrik be egy
+    gólért. A val a becserélt játékos gólszerzési súlyának szorzója. */
+ {id:"fw_supersub",cat:"CSATAR",name:"Csereként bejön gólt lőni",desc:"Ha csereként áll be a pályára, jóval nagyobb eséllyel ő a gólszerző, amíg a pályán van. Ráadásul a padon ülve is beugorhat egy gólért.",type:"supersub",val:3.5},
  /* ===== BL EGYÉNI ARANY-DÍJAK (a Bajnokok Ligája gólkirálya / gólpassz-
     királya / kapus-királya kapja; erős, tartós special skillek) ===== */
  {id:"bl_golden_boot",cat:"CSATAR",name:"🥇 Aranycipő",desc:"A BL gólkirályának járó díj: kimagasló gólszerzési esély és állandó rating-bónusz.",type:"combo",combo:[{type:"goalw",val:6},{type:"rating",val:5}]},
@@ -12455,16 +12498,22 @@ function clubFillYouth(originClub){
     const pos=c.codes[Math.floor(Math.random()*c.codes.length)];
     BENCH[c.key]=generateAcademyPlayer(pos);n++;});
   return n;}
+/* A SAJÁT KLUB nem lehet a saját ellenfele. A kizárás KLUB-szintű: nem csak a
+   pontosan azt a szezont játszó önmagunkat cseréljük le, hanem a klub BÁRMELY
+   másik évjáratát is — a "Real Madrid CF (2017)" ellen kiálló "Real Madrid CF
+   (2002)" ugyanúgy két azonos nevű csapat lenne a tabellán. A pótló csapat
+   klubja is új: sem a mezőnyben már szereplő klubok, sem a sajátunk nem jöhet. */
 function clubExcludeSelfFromOpponents(sq){
   if(!Array.isArray(SEASON_OPPS))return;
-  const self=`${sq.club} (${sq.season})`;
-  const used=new Set(SEASON_OPPS.map(o=>o.n));
+  const selfClub=sq.club;
+  const usedClubs=new Set(SEASON_OPPS.map(o=>clubOfTeamName(o&&o.n)).filter(Boolean));
+  usedClubs.add(selfClub);
   SEASON_OPPS.forEach(o=>{
-    if(o.n!==self)return;
+    if(clubOfTeamName(o.n)!==selfClub)return;
     const alt=activeSquads().map(x=>({sq:x,avg:squadAvgOvr(x)}))
-      .filter(x=>{const nm=`${x.sq.club} (${x.sq.season})`;return nm!==self&&!used.has(nm);})
+      .filter(x=>!usedClubs.has(x.sq.club))
       .sort((a,b)=>Math.abs(a.avg-o.ovr)-Math.abs(b.avg-o.ovr))[0];
-    if(alt){o.n=`${alt.sq.club} (${alt.sq.season})`;used.add(o.n);}});}
+    if(alt){o.n=`${alt.sq.club} (${alt.sq.season})`;usedClubs.add(alt.sq.club);}});}
 function startClubCareer(sq){
   const roster=[];
   sq.players.forEach(sp=>{
@@ -15253,6 +15302,30 @@ function multSkillEffect(name,type){
   return playerSkills(name).filter(i=>i.skill.type===type||(i.skill.combo&&i.skill.combo.some(c=>c.type===type)))
     .reduce((m,i)=>m*(i.skill.type===type?skillEffVal(i):comboEffFor(i,type)),1);}
 function hasFormlock(name){return playerSkills(name).some(i=>i.skill.type==="formlock");}
+/* ================= CSEREKÉNT BEJÖN GÓLT LŐNI (fw_supersub) =================
+   A skill mostantól KÉT úton él, és a kettő nem zárja ki egymást:
+
+     · A RÉGI ESEMÉNY marad: a padon ÜLŐ (be nem állt) csatár a második
+       félidőben kis eséllyel beugrik és betalál — fizikai csere nélkül.
+       Lásd a playMatch supersub-ágát.
+     · ÚJ: ERŐSÍTŐ SKILL annak, aki tényleg PÁLYÁRA KERÜL csereként — akár a te
+       kézi cseréddel a meccs közben (félidei vagy percre pontos csere), akár a
+       hiányzó (sérült/eltiltott) helyére felépített pótlásként. Amíg a pályán
+       van, jóval nagyobb eséllyel ő a gólszerző.
+
+   Így a skill nem csak véletlen ajándék: a TE csere-döntésedet jutalmazza.
+
+   A szorzó a skill KÉSZÜLTSÉGÉVEL és csillagaival arányos, ahogy minden más
+   skillnél — a bónusz RÉSZE skálázódik, tehát a teljes skill pontosan a régi
+   3,5×-öt adja, egy féligkész arányosan kevesebbet, de sosem kevesebbet 1-nél
+   (a skill nem ronthat). Korábban ez a szorzó a készültségtől függetlenül
+   fix 3,5 volt — az egyetlen ilyen kivétel a rendszerben. */
+function supersubInst(name){
+  return playerSkills(name).find(i=>i.skill&&i.skill.id==="fw_supersub")||null;}
+function supersubGoalMult(name,cameOnAsSub){
+  if(!cameOnAsSub)return 1;
+  const inst=supersubInst(name);
+  return inst?1+(inst.skill.val-1)*skillPower(inst):1;}
 /* ================= TIZENEGYES-SPECIALISTÁK: ICE COLD és COOL =================
    A két skill eddig TISZTÁN MVP-szorzó volt (type:"mvp"), vagyis a nevük és a
    leírásuk ("a nagy pillanatokban") sokkal többet ígért, mint amit csináltak: a
@@ -17026,6 +17099,13 @@ function renderHalftimeSubs(){
         shownOvr=eff;
         sub=`${own} · <span class="${fit?"fitok":"fitno"}">${fit?"poszthű a "+target.pos+" helyre":"idegen poszt a "+target.pos+" helyen"}</span>`
           +` · a ${target.pos} helyen: ${htsDeltaHtml(raw,eff)}${eff!==raw?` (most ${raw})`:""}`;}
+      /* ---- "CSEREKÉNT BEJÖN GÓLT LŐNI" A DÖNTÉS HELYÉN ----
+         A skill épp erről a pillanatról szól: ha behozod, megnő a gólesélye.
+         Eddig sehol nem látszott a csere-panelen, tehát a döntéshez a
+         legfontosabb információ hiányzott. */
+      const ssInst=supersubInst(b.n);
+      if(ssInst&&!busy)
+        sub=`<span style="color:#e1ad66">🔥 ${esc(ssInst.skill.name)}${esc(skillProgressSuffix(ssInst))} — becserélve megnő a gólesélye</span> · ${sub}`;
       l2.appendChild(htsRow({
         /* a szín a saját fő posztja szerinti kategória, a felirat a teljes
            posztlistája — mint a HUB keretlistáján */
@@ -18217,7 +18297,7 @@ const PLAYER_CLUBS=(function buildPlayerClubs(){
     if(sq.wc||sq.league==="Válogatott")return;
     sq.players.forEach(p=>{(m[p.n]=m[p.n]||new Set()).add(sq.club);});});
   return m;})();
-function oppClubName(fx){return String((fx&&fx.o&&fx.o.n)||"").replace(/ \([^)]*\)$/,"").trim();}
+function oppClubName(fx){return clubOfTeamName((fx&&fx.o&&fx.o.n)||"");}
 function milePick(arr){return arr[Math.floor(Math.random()*arr.length)];}
 /* A modul csak KARRIERBEN és csak rögzített alapítókerettel él. */
 function milestoneActive(){
@@ -18864,6 +18944,15 @@ function playMatch(){
      "beállt és betalált" és a "beállt a saját posztjára, és ott volt eredményes"
      eset között. */
   const halfSubs={used:[],usedIdx:new Set(),usedIn:new Set(),onOwnPos:new Set()};
+  /* ---- KI SZÁMÍT CSERÉNEK EBBEN A PILLANATBAN ----
+     Két úton kerülhet valaki csereként a pályára:
+       · S.subs[idx] — a meccs ELŐTT felépített pótlás (hiányzó helyére állt be),
+       · halfSubs.usedIn — a TE kézi cseréd a mérkőzés közben.
+     A "Csereként bejön gólt lőni" skill mindkettőre él (lásd supersubGoalMult).
+     A halfSubs.usedIn a doSub pillanatában bővül, tehát a beálló csak a
+     BEÁLLÁSA UTÁNI vödrökben kap bónuszt — pontosan a "pályán töltött idő
+     alatt" ígéret. */
+  const cameOnAsSub=x=>!!(S.subs[x.idx]||halfSubs.usedIn.has(x.p.n));
   /* a félidőben LECSERÉLT játékosok — a lefújásnál ők is fejlődnek, fél meccsre */
   const halfOut=[];
   /* ---- A FÉLIDEI BEÁLLÓ KOMMENTÁRJA ----
@@ -18898,6 +18987,18 @@ function playMatch(){
         :`${nm(asstN)} a szünetben állt be, és máris gólpasszt ad.`;
     halfSubNotesShown++;
     addLine(`→ 🔁 ${txt}`,"m skillnote",true);}
+  /* ---- A BECSERÉLT SUPERSUB GÓLJA ----
+     Ha a gólszerző csereként került a pályára ÉS nála van a "Csereként bejön
+     gólt lőni", akkor épp az történt, amiért a skill létezik — ezt ki is
+     mondjuk, hogy a bónusz ne csak egy láthatatlan szorzó legyen a súlyozásban.
+     Meccsenként egyszer: a szám ugyanaz maradna, a mondat viszont elkopna. */
+  let supersubNoteShown=false;
+  function supersubGoalNote(scorerN,fromSub){
+    if(supersubNoteShown||!fromSub)return;
+    const inst=supersubInst(scorerN);
+    if(!inst)return;
+    supersubNoteShown=true;
+    addLine(`→ 🔥 ${esc(shortName(scorerN))} csereként jött be — és betalált. ${esc(inst.skill.name)}${skillProgressSuffix(inst)}: pontosan ezért hoztad be.`,"m skillnote",true);}
   let iv=null;
   const tickFn=()=>{
     min+=5;
@@ -18925,7 +19026,7 @@ function playMatch(){
       _lastGoalMin=dMin;
       if(pendingDrama==="us"){
         gf++;
-        const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*(S.subs[x.idx]&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_supersub")?3.5:1)*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga));
+        const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga));
         const dramaScorer=active[si].p;
         mScore[dramaScorer.n]=(mScore[dramaScorer.n]||0)+1;recordScorer(dramaScorer.n);
         updateGoallessStreak(dramaScorer.n,true);
@@ -18946,7 +19047,7 @@ function playMatch(){
     let g=DUEL?duelMine.length:poisson(lf*clutchAttackMult(active,min,gf,ga)/18);
     for(let k=0;k<g;k++){
       gf++;
-      let si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*(S.subs[x.idx]&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_supersub")?3.5:1)*mileWeight(MILE,x.p.n)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga));
+      let si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga));
       /* Párharcban a gólszerzőt a közös lista dönti el (a súlyozást a saját
          kliensed már a pillanatkép küldésekor elvégezte). A fenti súlyozott
          választás csak TARTALÉK marad: ha a név bármiért nem található a
@@ -18990,6 +19091,7 @@ function playMatch(){
       /* A félidei beálló jelzése a műszerek ELŐTT: még ritkább esemény, és
          közvetlenül a te csereszünetbeli döntésedről szól. */
       halfSubGoalNote(scorer.n,asstName);
+      supersubGoalNote(scorer.n,cameOnAsSub(active[si]));
       trySprintMeasure(scorer.n,asstName,`${goalMin}'  `);
       tryShotMeasure(scorer.n,`${goalMin}'  `);
       /* KARRIER-MÉRFÖLDKÖVEK a gólnál. A gólszerző ELŐBB: ha ugyanaz a történet
@@ -19250,18 +19352,23 @@ function playMatch(){
           const d=document.createElement("div");d.className=tq.cls;d.innerHTML=tq.txt;
           if(tq.col)d.style.color=tq.col;
           lines().appendChild(d);lines().scrollTop=lines().scrollHeight;}}}
-    /* ---- CSEREKÉNT BEJÖN GÓLT LŐNI (supersub) ----
+    /* ---- CSEREKÉNT BEJÖN GÓLT LŐNI (supersub) — A RÉGI ESEMÉNY ----
        A padon ülő, fw_supersub skilles csatár a 2. félidőben kis eséllyel
        góllövőként bukkan fel — FIZIKAI CSERE NÉLKÜL, nem válik kezdővé. Csak az
        az esemény történik meg, hogy "beugrik és betalál". A gól rendesen számít
        (eredmény, góllövőlista, forma), de a keret felállása változatlan marad.
-       Csak akkor sülhet el, ha a pados játékost NEM cserélted be máshova. */
+       Ez az ág az, ami akkor is ad valamit, ha NEM hozod be a játékost.
+       Csak akkor sülhet el, ha a pados játékos tényleg a PADON ÜL: aki már a
+       pályán van (kézi cserével behoztad, vagy a hiányzó helyére állt be), az a
+       skill ERŐSÍTŐ ágán kap gólesélyt (supersubGoalMult) — a kettő együtt
+       dupla jutalom lenne, ráadásul a napló "a padról" ugrasztaná be azt, aki
+       épp a pályán játszik. */
     /* PÁRHARCBAN a supersub nem süthet el: GÓLT adna hozzá helyben, az állást
        viszont a közös eseménylista adja — a két képernyőn más eredmény állna.
        (Ugyanaz az elv, mint a tizenegyesnél és a 90+ drámánál.) */
     if(!DUEL&&min>=50&&!supersubStruck){
       const sc=BENCH.CSATAR;
-      const scInUse=sc&&Object.values(S.subs).some(x=>x.sub&&x.sub.n===sc.n);
+      const scInUse=sc&&active.some(a=>a.p.n===sc.n);
       if(sc&&!scInUse&&playerSkills(sc.n).some(i=>i.skill.id==="fw_supersub")&&Math.random()<0.05/18*(min>=75?1.8:1)){
         supersubStruck=true;gf++;
         mScore[sc.n]=(mScore[sc.n]||0)+1;recordScorer(sc.n);
