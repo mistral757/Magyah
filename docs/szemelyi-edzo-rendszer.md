@@ -1,12 +1,12 @@
 # SZEMÉLYI EDZŐ RENDSZER — teljes felépítés
 
-**Állapot:** F1 és F2 elkészült (v2.6.051) · F3–F4 hátravan
+**Állapot:** F1–F3 elkészült (v2.6.052) — a rendszer él · F4 hátravan
 
 | Fázis | Tartalom | Állapot |
 |---|---|---|
 | F1 | adatréteg, `skillsEver` könyvelés, Sz-képletek, belépés | ✅ kész (v2.6.049) |
 | F2 | stáb-nézet, fókusz-rendszer, slot-bővítés | ✅ kész (v2.6.051) |
-| F3 | a hatások bekötése a meglévő motorokba | ⬜ hátravan |
+| F3 | a hatások bekötése a meglévő motorokba | ✅ kész (v2.6.052) |
 | F4 | edzői fejlődés, kiöregedés, hangulati réteg | ⬜ hátravan |
 
 **Cél:** a 32 év fölötti, kiöregedő játékosoknak legyen második életük — ne csak
@@ -608,6 +608,17 @@ Minden átadás előtt lefut a **meglévő két szűrő**, változtatás nélkü
 - `eligibleForSkill(skill)` (`index.html:20855`) — poszt-alkalmasság
 - a „már megvan" ellenőrzés (`index.html:20862`)
 
+#### A készlet nem az egyetlen korlát
+
+Mérve: egy **csupa csatár-skillt** hozó mester a teljes keretre állítva 17-es
+készlettel is csak **16 átadásig** jut — négy csatárod van, mindegyik megkaphatja
+mind a négy skillt, és ott a pool kifogy. Ugyanez **vegyes hagyatékkal** szintén
+16 átadás, de **16 különböző játékosnak**. A készlet ilyenkor sosem fogy el, a
+dobások eredménytelenül futnak — ami nem hiba, de a becslést hazuggá tenné.
+
+Ezért a panel **kiírja az érvényes párok számát**, és a „kitart N szezonig"
+becslés `min(készlet, érvényes párok)`-ból számol.
+
 Ha nincs érvényes (skill, játékos) pár, az esemény **elmarad, és nem fogyaszt
 készletet**. Ez fontos: egy kapus-hagyatékú Iskolateremtő a csatárokra állítva
 nem üríti ki magát a semmibe, csak nem csinál semmit — a felhasználó pedig a
@@ -665,18 +676,40 @@ bejön egy új tag:
 ahol
 ```js
 function moraleCoachBonus(){
-  /* Csapat-fókuszú Lélekemelő: közvetlen morál-emelés.
-     Játékos-fókuszú Lélekemelő: az adott játékos leadI/coopI súlya nő a
-     squadScore-ban (mintha kapitány lenne) — vagyis egy csendes vezért
-     hangossá lehet nevelni. */
   let b = 0;
-  staffOfType("morale").forEach(c=>{
-    const t = focusTargets(c);
-    b += 9 * coachPower(c, t[0]) * Math.min(1, t.length/3);
-  });
+  staff().forEach(c=>{ if(c.type==="morale") b += 9 * coachTeamScope(c); });
   return Math.min(14, b);
 }
 ```
+
+#### ⚠ A csapat-szintű hatások NEM a `coachPower`-ből jönnek
+
+A második hiba, amit a mérés kapott el. Az eredeti terv itt
+`coachPower(c, t[0]) * Math.min(1, n/3)`-at írt — ez **kétszer büntetett**:
+a `coachPower` a `focusShare` miatt 22-vel osztott a teljes keretnél, a
+`min(1, n/3)` tag pedig a szűk fókuszt büntette. Mérve: egy csúcs-Lélekemelő a
+teljes keretre állítva **+0,8 morált** adott a szándékolt +7 helyett — a típus
+gyakorlatilag nem működött.
+
+A per-fős hatásoknál (attribútum-fejlődés, sérülés-jelöltválasztás) a figyelem
+elosztása helyes: egy emberrel foglalkozva többet adsz neki. A **csapat-szintű
+mennyiségek** (csapatmorál, öltözői kémia, a csapat alap sérülés-esélye) viszont
+egyetlen számok — ott a fejenkénti osztásnak nincs értelme. Ezért külön
+mérőszámuk van:
+
+```js
+/* MINŐSÉG × LEFEDETTSÉG — nem per-fő osztás. */
+function coachTeamScope(c){
+  const t = focusTargets(c);            if(!t.length) return 0;
+  const q = (c.sz - 20) / 79;
+  const cover = Math.min(1, t.length / Math.max(11, rosterSize()));
+  return (0.35 + 0.65*q) * cover;
+}
+```
+
+Így a széles fókusz a teljes hatást hozza, a szűk arányosan keveset — a szándék
+szerint, dupla büntetés nélkül. **Mérve:** teljes keretre állított
+csúcs-Lélekemelő **+7,7 morál**, egy fős fókusszal **+0,3**.
 
 A `×9` és a 14-es plafon a meglévő nagyságrendekhez igazodik: a `clubBonus`
 +10, a `hodaBonus` +14, egy `coach.moraleBase` −3…+6. Az edző tehát **erős, de
@@ -694,10 +727,15 @@ A morál-edző alfaja, ahogy a felvetés mondja („együttműködéssel kapcsol
 a morálon belül"), de **más csatornán hat**: a kémián, nem a morálon.
 
 ```js
-CHEM.total += chemCoachBonus();     // max +6
-/* továbbá: a pruneChemistry (index.html:14602) által elvesztett
-   goodPairs-ek 50%-a megmarad, ha van aktív Csapatkovács */
+CHEM.total += chemCoachBonus();     // max +6, coachTeamScope alapon
 ```
+
+> **Elvetve az implementáció során:** a terv eredetileg azt is ígérte, hogy a
+> `pruneChemistry` által elvesztett `goodPairs`-ek fele megmarad. A kódot
+> elolvasva ez értelmetlen: a `pruneChemistry` pontosan azokat a párokat törli,
+> ahol az egyik játékos **már nincs a klubnál** — megtartani őket azt jelentené,
+> hogy a keret kémiája egy távozott emberrel számol. A Csapatkovácsnak marad a
+> valódi, mérhető hatása: **+5,4 kémia** teljes keretre, csúcsedzővel.
 
 A kémia `×1.2` szorzóval megy a morálba (`index.html:14054`), tehát +6 kémia
 ≈ +7.2 morál — **kevesebb, mint a Lélekemelő**, viszont a kémia **tartós**
@@ -968,16 +1006,22 @@ mintája szerint, `index.html:12845`), de a tervezett korlátok:
 
 ### 9.1 Amit mérni kell implementáció után
 
-| Mérés | Elvárás |
-|---|---|
-| Egy 1 fős fókuszú ★★★★ attr-mester szezonhozama | 0.7–1.0 attr-lépés |
-| Teljes 6 edzős stáb csapat-OVR hatása | +1.5 … +2.5 OVR |
-| Sérülés-kihagyások száma sportorvossal / nélküle | −20 … −30% |
-| 20 szezonos karrier: stáb nélkül vs. maximális stábbal elért csapaterő | +6 … +10% |
-| Skill-szerzési ütem Iskolateremtővel | +40 … +70% a fókuszált játékoson |
-| Hagyaték: 1 fős fókusz kitartása | 1,5 – 2,5 szezon |
-| Hagyaték: keret-fókusz kitartása | 15 – 25 szezon |
-| Hagyaték: elmaradt (érvényes pár nélküli) átadások aránya keret-fókuszon | < 25% |
+| Mérés | Elvárás | **Mért (v2.6.052)** |
+|---|---|---|
+| 1 fős fókuszú attr-mester szezonhozama | 0,7–1,0 attr-lépés | **0,86** ✅ |
+| ...ugyanő teljes keretre, fejenként | — | 0,09 |
+| Lélekemelő + Csapatkovács együtt, csapat-OVR | — | **+0,7 OVR** |
+| Lélekemelő teljes keretre / 1 főre | — | +7,7 / +0,3 morál |
+| Lábadozás ★★★★ sportorvossal (fókuszált játékos) | −20…−30% | **−25%** ✅ |
+| ...közel maximális (Sz 86) sportorvossal | — | −33% |
+| Alap sérülés-esély teljes keretre állított sportorvossal | max −30% | **−27%** ✅ |
+| Hagyaték: 1 fős fókusz | 1,5–2,5 szezon | **4 skill / 1,8 szezon** ✅ |
+| Hagyaték: keret-fókusz | 15–25 szezon | **16 skill / 23,4 szezon** ✅ |
+| Hagyaték: hány külön játékos kap (vegyes / csatár-hagyaték) | — | 16 / 4 |
+| VÉDŐHÁLÓ: az edző át tudja-e lökni a spec. plafont | soha | **nem** ✅ |
+
+*A teljes 6 edzős stáb OVR-hatását és a 20 szezonos összehasonlítást F4 után
+érdemes mérni, amikor az edzői fejlődés is működik.*
 
 Ha a teljes stáb hatása +4 OVR fölé megy, a `COACH_ATTR_PTS` és a
 `moraleCoachBonus` szorzóit kell visszavenni — a slot-árat **nem**, mert az a

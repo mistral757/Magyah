@@ -2226,7 +2226,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.051";
+const APP_VERSION="2.6.052";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8973,6 +8973,16 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
     if(_tr){
       if(_tr.main)addA(_tr.main,TRAIN_MAIN_PTS*share,true);
       if(_tr.sec) addA(_tr.sec, TRAIN_SEC_PTS*share,true);}
+    /* ---- SZEMÉLYI EDZŐ: AZ ATTRIBÚTUM-MESTEREK ----
+       UGYANABBA a csatornába folynak, mint az edzésterv pontjai, tehát a
+       kor-görbe (ageScaleAttr), az underdog-szorzó, a globális tempó és az
+       edzés-lassítás MIND ugyanúgy hat rájuk. Nincs külön szabály.
+       KÖVETKEZMÉNY, ami szándékos: a kor-görbe 30 év fölött ×0.4, tehát a
+       személyi edző a FIATALOKON hat igazán. Ez zárja be a kört — az öreg
+       játékosból lett edző a fiatalokat neveli.
+       A plafont NEM mozdítja: az ATTR_SPEC_CEIL sáv kemény határ marad, az
+       edző csak az odáig vezető utat rövidíti. */
+    attrCoachesFor(p.n).forEach(_c=>addA(_c.attrKey,COACH_ATTR_PTS*coachPower(_c,p.n)*share,false));
     addA(pri,0.3*share);                              /* részvétel a poszt fő attribútumát edzi */
     /* PASSZÍV SEBESSÉG: a puszta játék is gyorsít valamennyit, a poszt
        sprint-igénye szerint (ROLE_AXIS_W.seb: csatár 1.0 … kapus 0.10).
@@ -9776,6 +9786,167 @@ function legacyBudget(c){
    Így viszont a szűkítés ELÉGETI a maradékot (max(0, 4−6)=0), a szélesítés
    pedig megengedett és értelmes marad. */
 function legacyLeft(c){return Math.max(0,legacyBudget(c)-((c&&c.legacySpent)||0));}
+
+/* ================= SZEMÉLYI EDZŐK — A HATÁSOK (F3) =================
+   Minden hatás MEGLÉVŐ motorba köt be; egyetlen új meccsmotor-ág sincs.
+   A lekérdezők egységesen 0-t adnak, ha nincs ilyen típusú aktív edző, tehát
+   a hívási helyek büntetlenül hívhatók akkor is, ha nincs stábod. */
+function coachTypePower(typeKey,playerName){
+  let best=0;
+  staff().forEach(c=>{if(c&&c.type===typeKey)best=Math.max(best,coachPower(c,playerName));});
+  return best;}
+/* ---- CSAPAT-SZINTŰ ERŐ ----
+   NEM ugyanaz, mint a coachPower! A per-fős hatásoknál (attribútum-fejlődés,
+   sérülés-jelöltválasztás) helyes a figyelmet elosztani a fókusz mérete
+   szerint — egy emberrel foglalkozva többet adsz neki.
+   A CSAPAT-SZINTŰ mennyiségek (csapatmorál, öltözői kémia, a csapat alap
+   sérülés-esélye) viszont EGYETLEN számok: ott a fejenkénti osztásnak nincs
+   értelme.
+   MÉRVE, MIÉRT SZÁMÍT: a coachPower-rel számolva egy csúcs-Lélekemelő a teljes
+   keretre állítva +0,8 morált adott (a szándékolt +7 helyett), mert a
+   focusShare 22-vel osztott — miközben a min(1,n/3) tag a SZŰK fókuszt is
+   büntette. Mindkét irányban büntetve a típus gyakorlatilag nem működött.
+   Helyette: MINŐSÉG × LEFEDETTSÉG. A minőség a szokásos 0.35+0.65q, a
+   lefedettség pedig az, hogy a keret hányad részével dolgozik. Így a széles
+   fókusz a teljes hatást hozza, a szűk pedig arányosan keveset — pontosan a
+   szándék szerint, dupla büntetés nélkül. */
+function coachTeamScope(c){
+  if(!c||!coachIsActive(c))return 0;
+  const t=focusTargets(c);
+  if(!t.length)return 0;
+  const roster=(typeof fullCareerRoster==="function"?fullCareerRoster():[]).filter(Boolean).length;
+  const q=Math.max(0,Math.min(1,(c.sz-COACH_SZ_MIN)/(COACH_SZ_MAX-COACH_SZ_MIN)));
+  const cover=Math.min(1,t.length/Math.max(11,roster));
+  return (0.35+0.65*q)*cover;}
+function coachTeamPower(typeKey){
+  let best=0;
+  staff().forEach(c=>{if(c&&c.type===typeKey)best=Math.max(best,coachTeamScope(c));});
+  return best;}
+/* ---- LÉLEKEMELŐ: a kezdő csapatmorál ----
+   A min(1,n/3) tag miatt a SZŰK fókusz itt veszteséges — a csapatmorál
+   csapat-jellegű dolog. Ez tudatos típus-karakterizálás, nem hiba. */
+function moraleCoachBonus(){
+  if(gameMode!=="career")return 0;
+  let b=0;
+  staff().forEach(c=>{if(c&&c.type==="morale")b+=COACH_MORALE_PER*coachTeamScope(c);});
+  return Math.min(COACH_MORALE_MAX,b);}
+/* ---- CSAPATKOVÁCS: az öltözői kémia ----
+   Kevesebbet ad, mint a Lélekemelő, DE a kémia tartós (nem szezononként
+   nulláról számolt), és a párok védelme átível a keretváltozásokon. Más
+   játékstílust jutalmaz: a Lélekemelő a gyorsan cserélt keretet menti, a
+   Csapatkovács a hosszan együtt tartott keretet hizlalja. */
+function chemCoachBonus(){
+  if(gameMode!=="career")return 0;
+  let b=0;
+  staff().forEach(c=>{if(c&&c.type==="chem")b+=COACH_CHEM_MAX*coachTeamScope(c);});
+  return Math.min(COACH_CHEM_MAX,b);}
+
+/* ---- ISKOLATEREMTŐ: A HAGYATÉK ÁTADÁSA ----
+   A mester a SAJÁT skilljeit tanítja. Meccsenként EGY dobás edzőnként; ha
+   bejön, egy érvényes (skill, tanítvány) párt sorsolunk.
+   HA NINCS ÉRVÉNYES PÁR, AZ ESEMÉNY ELMARAD ÉS NEM FOGYASZT KÉSZLETET — egy
+   kapus-hagyatékú mester a csatárokra állítva nem üríti ki magát a semmibe. */
+function processLegacyTeaching(){
+  if(gameMode!=="career")return;
+  staff().forEach(c=>{
+    if(!c||c.type!=="skill"||!coachIsActive(c))return;
+    const rate=legacyRate(c);
+    if(rate<=0||legacyLeft(c)<=0)return;
+    if(Math.random()>=rate)return;
+    grantLegacySkill(c);});}
+/* Hány ÉRVÉNYES (skill, tanítvány) pár van most? Ez a hagyaték valódi, gyakran
+   szűkebb korlátja: a készlet lehet 17, de ha a mester csupa csatár-skillt
+   hoz és négy csatárod van, a gyakorlati plafon 16 — utána a dobások
+   eredménytelenül futnak, és a készlet sosem fogy el. */
+function legacyValidPairs(c){
+  if(!c||c.type!=="skill")return 0;
+  const L=(c.fp&&c.fp.skillsEver)||[];
+  if(!L.length)return 0;
+  const perCap=Math.max(1,Math.ceil(legacyBudget(c)/L.length));
+  const targets=new Set(focusTargets(c));
+  let n=0;
+  L.forEach(id=>{
+    if(((c.legacyOut||{})[id]||0)>=perCap)return;
+    const skill=SKILLS.find(s=>s.id===id);
+    if(!skill)return;
+    eligibleForSkill(skill).forEach(p=>{if(targets.has(p.n))n++;});});
+  return n;}
+function grantLegacySkill(c){
+  const L=(c.fp&&c.fp.skillsEver)||[];
+  if(!L.length)return;
+  /* SKILLENKÉNTI PLAFON: a készletet egyenletesen kell elosztani a hagyaték
+     skilljei között — enélkül "ugyanaz a skill tizenhétszer" lenne belőle. */
+  const perCap=Math.max(1,Math.ceil(legacyBudget(c)/L.length));
+  c.legacyOut=c.legacyOut||{};
+  const targets=new Set(focusTargets(c));
+  const opts=[];
+  L.forEach(id=>{
+    if((c.legacyOut[id]||0)>=perCap)return;
+    const skill=SKILLS.find(s=>s.id===id);
+    if(!skill)return;
+    /* A MEGLÉVŐ két szűrő fut, változtatás nélkül: eligibleForSkill adja a
+       poszt-alkalmasságot ÉS zárja ki azt, akinek már megvan a képesség. */
+    eligibleForSkill(skill).forEach(p=>{if(targets.has(p.n))opts.push({skill,p});});});
+  if(!opts.length)return;
+  const single=!!(c.focus&&c.focus.mode==="players");
+  const w=opts.map(o=>{
+    /* A ritkábban átadott skill előnyt kap — ez tartja "harmonikusan" elosztva. */
+    const rare=1/(1+2*(c.legacyOut[o.skill.id]||0));
+    if(single)return rare;
+    /* Széles fókusznál a felhasználó a VÉLETLENRE bízta a címzettet — de a
+       tehetségesebb fiatal nagyobb eséllyel kapja (ugyanaz a mérce, mint az
+       automata skill-kiosztásnál). */
+    const e=(careerPool&&careerPool[o.p.n])||o.p;
+    return rare*Math.max(1,playerPotential(e));});
+  const tw=w.reduce((a,b)=>a+b,0);
+  let r=Math.random()*tw,pickI=0;
+  for(let i=0;i<w.length;i++){if(r<w[i]){pickI=i;break;}r-=w[i];}
+  const o=opts[pickI],need=rollStagesNeeded();
+  S.skills[o.p.n]=S.skills[o.p.n]||[];
+  S.skills[o.p.n].push({skill:o.skill,stagesNeeded:need,stagesCompleted:1});
+  noteSkillEver(o.p.n,o.skill.id);
+  if(typeof updateSkillsLine==="function")updateSkillsLine();
+  c.legacyOut[o.skill.id]=(c.legacyOut[o.skill.id]||0)+1;
+  c.legacySpent=(c.legacySpent||0)+1;
+  const left=legacyLeft(c);
+  addLine(`🎓 <b>HAGYATÉK</b> — ${esc(shortName(c.n))} átadta a(z) „${esc(o.skill.name)}” képességet ${esc(shortName(o.p.n))}nak (1/${need} fázis).`,"m life");
+  addLine(`→ „Ezt tőle tanultam.” ${left?`A mester hagyatékából még ${left} átadás van hátra.`:"Ezzel a mester hagyatéka elfogyott — innentől már csak nevel."}`,"m skillnote");}
+/* ---- ISKOLATEREMTŐ: a szakaszolt skillek gyorsítása ----
+   Meccsenként EGY dobás edzőnként, egy véletlen befejezetlen skillre a
+   fókuszáltak közül. Skillenkénti dobás abszurd tempót adna: egy fókuszált
+   játékos három félkész skilljével szezononként tucatnyi fázis jönne. */
+const COACH_STAGE_P=0.08;
+function processCoachSkillStages(){
+  if(gameMode!=="career")return;
+  staff().forEach(c=>{
+    if(!c||c.type!=="skill"||!coachIsActive(c))return;
+    const t=new Set(focusTargets(c));
+    if(!t.size)return;
+    const cands=findIncompleteSkills().filter(x=>t.has(x.name));
+    if(!cands.length)return;
+    const x=pick(cands);
+    if(Math.random()>=COACH_STAGE_P*coachPower(c,x.name))return;
+    x.inst.stagesCompleted++;
+    if(typeof updateSkillsLine==="function")updateSkillsLine();
+    addLine(skillComplete(x.inst)
+      ? `🎓 ${esc(shortName(c.n))} keze alatt ${esc(shortName(x.name))} „${esc(x.inst.skill.name)}” képessége teljes erejű lett.`
+      : `🎓 ${esc(shortName(c.n))} csiszolta ${esc(shortName(x.name))} „${esc(x.inst.skill.name)}” képességét (${x.inst.stagesCompleted}/${x.inst.stagesNeeded} fázis).`,
+      "m life");});}
+/* A meccs utáni edzői kör — a fejlődés-motor mellett fut. */
+function processCoachMatchEffects(){
+  processLegacyTeaching();
+  processCoachSkillStages();}
+/* ---- GYÓGYÍTÓ KÉZ: lábadozás-rövidítés ----
+   A sérülés alaphossza 2-4 forduló, tehát egy csúcs-sportorvos átlagosan ~1,2
+   fordulóval rövidít: a kulcsjátékosod 4 meccs helyett 2-t hagy ki. Ez a
+   leginkább ÉREZHETŐ hatás a rendszerben — ezért van szigorú képlet mögötte. */
+function medicHealCut(playerName,dur){
+  const pw=coachTypePower("medic",playerName);
+  if(pw<=0)return dur;
+  let d=dur;
+  if(Math.random()<pw)d=Math.max(1,d-1);
+  if(pw>0.75&&Math.random()<pw-0.75)d=Math.max(1,d-1);
+  return d;}
 
 /* ================= IKONIKUS JÁTÉKOSOK =================
    Ritka, különleges átigazolási esemény tartalék-kerete: a magyar Aranycsapat
@@ -12313,6 +12484,11 @@ function computeChemistry(){
       goodPairs.add([leader.player.n,mentee.player.n].sort().join("|"));
     }
   }
+  /* SZEMÉLYI EDZŐ (Csapatkovács): az öltöző belső kohéziója. A kémia ×1,2-vel
+     megy tovább a morálba, tehát +6 kémia ≈ +7,2 morál — kevesebb, mint a
+     Lélekemelő, viszont TARTÓS. */
+  {const _cb=chemCoachBonus();
+   if(_cb>0){total+=_cb;notes.push(`A Csapatkovács munkája összekovácsolja az öltözőt (+${_cb.toFixed(1)})`);}}
   return {total,notes,goodPairs};}
 /* KÉSZ KLUB indulás: a keret egy valós csapatból jön, ezért a "közös klub"
    szabály mindenkit mindenkivel összekötne. Helyette pontosan HÁROM kötés
@@ -14070,7 +14246,13 @@ function applyChallengePunishment(pn){
     case "loseSkill":{
       const cands=roster.filter(p=>(S.skills[p.n]||[]).length>0);
       if(!cands.length)return "skill-vesztés (nincs skill)";
-      const p=pick(cands);const lost=S.skills[p.n].pop();
+      const p=pick(cands);
+      /* SZEMÉLYI EDZŐ (Iskolateremtő): a mentorált képességét megvédheti —
+         legfeljebb 60%-ban. Ez adja a "mentorált játékos" érzetet. */
+      const _guard=Math.min(0.6,coachTypePower("skill",p.n));
+      if(_guard>0&&Math.random()<_guard)
+        return `${shortName(p.n)} képességét az Iskolateremtő megvédte`;
+      const lost=S.skills[p.n].pop();
       return `${shortName(p.n)} elvesztette: ${lost.skill.name}`;}
     case "freezeAcademy":
       S.frozenAcademySeasons=Math.max(S.frozenAcademySeasons||0,1);
@@ -14415,7 +14597,11 @@ function computeMoraleTarget(){
   /* KÉSZ KLUB indulás: a keret már együtt játszik egy csapatban — ez fix +10
      morált ad a draftolt, egymást még nem ismerő kerethez képest. */
   const clubBonus=(gameMode==="career"&&careerStart==="club")?10:0;
-  let t=50+CHEM.total*1.2+squadScore*7+(coach?coach.moraleBase:0)+hodaBonus+capExpBonus+clubBonus;
+  /* SZEMÉLYI EDZŐ (Lélekemelő): a meglévő tagok mellé jön be. A +14-es plafon
+     a szomszédos nagyságrendekhez igazodik (clubBonus +10, hodaBonus +14,
+     coach.moraleBase −3…+6) — erős, de nem uralkodó hatás. */
+  let t=50+CHEM.total*1.2+squadScore*7+(coach?coach.moraleBase:0)+hodaBonus+capExpBonus+clubBonus
+        +moraleCoachBonus();
   return Math.max(10,Math.min(92,Math.round(t)));}
 /* ================= KAPITÁNY-HATÁS ELŐREJELZÉS =================
    A kapitány NEM közvetlenül hat a meccsre: a computeMoraleTarget()-en
@@ -14490,6 +14676,9 @@ function findSub(slot,victim){
    Az automatikus választás megmarad — de már csak tartaléknak. */
 function addOrExtendUnavailable(playerName,duration,reason){
   if(!playerName)return;
+  /* SZEMÉLYI EDZŐ (Gyógyító kéz): a lábadozás rövidül. CSAK sérülésre — egy
+     eltiltást nem lehet gyógytornával leülni. */
+  if(reason==="injury")duration=medicHealCut(playerName,duration);
   const cur=S.unavailable[playerName];
   if(cur){
     cur.matchesLeft+=duration;
@@ -16159,9 +16348,14 @@ function buildMatchSnapshot(){
   const capPlaying=!S.subs[captainIdx];
   const fam=active.find(a=>a.p.family);
   const famSp=fam?fam.p.familySpecialty:null;
-  const goodW=active.map(a=>(hasFormlock(a.p.n)?3:1)*cardGoodFormWeight(a.p.n));
+  /* SZEMÉLYI EDZŐ (Ritmusmester): VALÓSZÍNŰSÉGET tol, nem garantál. A rossz
+     formát sosem zárja ki teljesen (0.25-ös padló) — az a formlock skill
+     (Iránytű) kiváltsága marad, különben a ritka jutalom értéktelenné válna. */
+  const goodW=active.map(a=>(hasFormlock(a.p.n)?3:1)*cardGoodFormWeight(a.p.n)
+    *(1+COACH_FORM_W*coachTypePower("form",a.p.n)));
   const gi=weightedIndex(goodW);
-  const badW=active.map((a,i)=>i===gi?0:((hasFormlock(a.p.n)||cardBadFormImmune(a.p.n))?0:1));
+  const badW=active.map((a,i)=>i===gi?0:((hasFormlock(a.p.n)||cardBadFormImmune(a.p.n))?0
+    :Math.max(0.25,1-COACH_FORM_W*coachTypePower("form",a.p.n))));
   const bi=weightedIndex(badW);
   const moraleMod=(S.morale-50)/50*2.5;
   let sum=0,auraBonus=0;
@@ -19513,9 +19707,14 @@ function playMatch(){
     }
     /* --- sérülés-kockázat --- */
     let injuredThisMatchName=null;
-    if(Math.random()<0.035+(famSp==="tank"?0.015:0)){
+    /* SZEMÉLYI EDZŐ (Gyógyító kéz): a TELJES keretre állított sportorvos a
+       csapat ALAP sérülés-esélyét is csökkenti (max −30%). Szűkebb fókusszal
+       az össz-sérülésszám nem változik, csak a jelöltválasztás tolódik el —
+       ezért van a lábadozás-rövidítés is (medicHealCut). */
+    if(Math.random()<(0.035+(famSp==="tank"?0.015:0))*(1-0.30*coachTeamPower("medic"))){
       let cand=[...Array(11).keys()];if(redIdx>=0)cand=cand.filter(i=>i!==redIdx);
-      const w=cand.map(i=>cardInjuryMult(active[i].p.n));
+      const w=cand.map(i=>cardInjuryMult(active[i].p.n)
+        *Math.max(0.35,1-COACH_MEDIC_W*coachTypePower("medic",active[i].p.n)));
       const tw=w.reduce((s,x)=>s+x,0);
       let r=Math.random()*tw,wi=0;while(r>w[wi]){r-=w[wi];wi++;}
       const ai=cand[wi],dur=2+Math.floor(Math.random()*3),inm=active[ai].p.n;
@@ -19534,7 +19733,7 @@ function playMatch(){
     /* A félidőben lecserélt játékosok a lista VÉGÉRE kerülnek: a gi/bi/best/
        redIdx indexek így érvényben maradnak az első 11-re, a hozzáfűzöttek
        pedig egyikkel sem eshetnek egybe. Mindkét fél 0.5 részesedést visz. */
-    if(gameMode==="career"){processCareerDevelopment(halfOut.length?active.concat(halfOut):active,mScore,mAssist,gi,bi,best,redIdx,injuredThisMatchName,ga);processBenchDevelopment();processAcademyDevelopment();
+    if(gameMode==="career"){processCareerDevelopment(halfOut.length?active.concat(halfOut):active,mScore,mAssist,gi,bi,best,redIdx,injuredThisMatchName,ga);processBenchDevelopment();processAcademyDevelopment();processCoachMatchEffects();
       /* POSZT-TANULÁS kész-értesítés: ha valakinek e meccsen ért véget a tanulása */
       Object.values(careerPool).forEach(e=>{if(e&&e.posLearnDone){
         addLine(`🎓 Poszt-tanulás kész! ${esc(shortName(e.n))} mostantól otthon van a(z) ${e.posLearnDone} poszton — teljes értékű ott, és a specializáció is jutalmazza.`,"m life");
@@ -19591,7 +19790,11 @@ function playMatch(){
         S.morale=Math.max(0,Math.min(100,S.morale-kick));
         addLine(`${cls==="loss"?"Egyre nyomasztóbb a sorozat":"Nem akar jönni a győzelem"} — ${S.winlessStreak}. meccs győzelem nélkül. Morál −${kick}`,"m life");}
     }
-    S.morale=Math.max(0,Math.min(100,S.morale+(S.moraleTarget-S.morale)*0.15));
+    /* SZEMÉLYI EDZŐ (Ritmusmester) második hatása: gyorsabban húz vissza a
+       célértékhez, tehát KISEBB a hullámvölgy. Ez a típus igazi karaktere —
+       nem magasabb csúcs, hanem kiszámíthatóbb szezon. */
+    S.morale=Math.max(0,Math.min(100,
+      S.morale+(S.moraleTarget-S.morale)*0.15*(1+0.5*coachTeamPower("form"))));
     /* --- jutalom-skillek: minden teljesült feltétel csak esélyt ad, nem
        biztos jutalmat (REWARD_CHANCE), és minden egyes beváltott alkalom
        vagy egy meglévő félkész skillt fejleszt ki teljesre (ha van ilyen,
@@ -21329,7 +21532,10 @@ function autoAssignSkill(skill,stagesNeeded){
   const inXI=new Set(slots.filter(s=>s.player).map(s=>s.player.n));
   const scored=roster.map(p=>{
     const e=(careerPool&&careerPool[p.n])||p;
-    return {p,score:playerPotential(e)+(inXI.has(p.n)?60:0)};})
+    /* SZEMÉLYI EDZŐ (Iskolateremtő): a mentorált nagyobb eséllyel kapja a
+       következő képességet. NEM garancia — a skill továbbra is a meccsen dől el. */
+    return {p,score:(playerPotential(e)+(inXI.has(p.n)?60:0))
+      *(1+COACH_SKILL_W*coachTypePower("skill",p.n))};})
     .sort((a,b)=>b.score-a.score);
   const top=scored.slice(0,Math.max(1,Math.min(3,scored.length)));
   const tw=top.reduce((s,x)=>s+x.score,0)||1;
@@ -23807,16 +24013,26 @@ function coachEffectLines(c){
   }else if(c.type==="skill"){
     L.push(`Skill-esély a fókuszáltakon: <b>×${hu((1+COACH_SKILL_W*pw).toFixed(2))}</b>`);
     const bud=legacyBudget(c),left=legacyLeft(c),rate=legacyRate(c)*COACH_SEASON_MATCHES;
-    if(bud)L.push(`Hagyaték: <b>${left}/${bud}</b> átadás ennél a fókusznál · ≈ ${hu(rate.toFixed(2))}/szezon`
-      +(rate>0?` — kitart <b>${hu((left/rate).toFixed(1))}</b> szezonig`:""));
+    if(bud){
+      /* A KÉSZLET NEM AZ EGYETLEN KORLÁT: a mester csak olyan skillt adhat át,
+         amire a tanítvány posztja alkalmas, és amit még nem birtokol. Egy
+         csupa-csatár hagyatékú Iskolateremtő a védőkre állítva 0 érvényes
+         párral áll — a készlet ilyenkor sosem fogy el. Ezt KI KELL ÍRNI,
+         különben a "kitart N szezonig" becslés hazudik. */
+      const pairs=legacyValidPairs(c);
+      L.push(`Hagyaték: <b>${left}/${bud}</b> átadás ennél a fókusznál · ≈ ${hu(rate.toFixed(2))}/szezon`
+        +(rate>0&&pairs?` — kitart <b>${hu((Math.min(left,pairs)/rate).toFixed(1))}</b> szezonig`:""));
+      L.push(pairs
+        ? `<span style="color:var(--dim2)">Most <b>${pairs}</b> érvényes átadási pár van (poszt szerint alkalmas, még nem birtokolja).</span>`
+        : `<span style="color:var(--red)">Jelenleg nincs érvényes átadási pár — a fókuszáltak posztja nem illik a hagyatékához, vagy már mindet megkapták.</span>`);}
     else L.push(`<span style="color:var(--dim2)">Nincs átadható hagyatéka — nem szerzett skillt a pályafutása során.</span>`);
   }else if(c.type==="morale"){
     /* A morál csapat-jellegű: az 1-2 fős fókusz itt SZÁNDÉKOSAN veszteséges. */
-    const b=Math.min(COACH_MORALE_MAX,COACH_MORALE_PER*pw*Math.min(1,n/3));
+    const b=Math.min(COACH_MORALE_MAX,COACH_MORALE_PER*coachTeamScope(c));
     L.push(`Csapatmorál: <b>+${hu(b.toFixed(1))}</b> — ≈ <b>+${hu(moraleToOvr(50+b).toFixed(2))}</b> csapat-OVR minden meccsen`);
-    if(n<3)L.push(`<span style="color:var(--red)">Szűk fókusszal a hatás töredéke — a morál az egész öltözőé.</span>`);
+    if(n<11)L.push(`<span style="color:var(--red)">Szűk fókusszal a hatás töredéke — a morál az egész öltözőé.</span>`);
   }else if(c.type==="chem"){
-    const b=Math.min(COACH_CHEM_MAX,COACH_CHEM_MAX*pw*Math.min(1,n/3));
+    const b=Math.min(COACH_CHEM_MAX,COACH_CHEM_MAX*coachTeamScope(c));
     L.push(`Öltözői kémia: <b>+${hu(b.toFixed(1))}</b> — a kémia ×1,2-vel megy a morálba, és TARTÓS`);
   }else if(c.type==="form"){
     L.push(`Jó forma esélye: <b>+${Math.round(COACH_FORM_W*pw*100)}%</b> súly · rossz forma: <b>−${Math.round(Math.min(75,COACH_FORM_W*pw*100))}%</b>`);
@@ -23846,8 +24062,7 @@ function renderStaffPanel(){
   coachFocusSanity();
   const arr=staff(),max=coachSlots();
   $("twTitle").textContent=`🎓 Szakmai stáb — ${arr.length}/${max}`;
-  let h=`<div style="font-size:11.5px;color:var(--dim2);line-height:1.5;border:1px dashed var(--line);border-radius:7px;padding:7px 9px;margin-bottom:9px">
-    ⚙️ A stáb <b>hatásai a következő frissítésben kapcsolnak be</b>. Most a felvétel, a fókusz és az előrejelzés készült el — a lentebbi számok azt mutatják, mit fog érni a beállításod.</div>`;
+  let h="";
   if(!arr.length)
     h+=`<div style="font-size:12.5px;color:var(--dim);line-height:1.6;margin-bottom:10px">
       Még nincs személyi edződ. Amikor egy legalább ${COACH_MIN_AGE} éves, nálad legalább ${COACH_MIN_MATCHES} meccset lejátszott játékosod visszavonul, felajánlja, hogy a klubnál marad edzőnek.<br>
