@@ -1,13 +1,13 @@
 # SZEMÉLYI EDZŐ RENDSZER — teljes felépítés
 
-**Állapot:** F1–F3 elkészült (v2.6.052) — a rendszer él · F4 hátravan
+**Állapot:** ✅ **Teljes — mind a négy fázis kész** (v2.6.053)
 
 | Fázis | Tartalom | Állapot |
 |---|---|---|
 | F1 | adatréteg, `skillsEver` könyvelés, Sz-képletek, belépés | ✅ kész (v2.6.049) |
 | F2 | stáb-nézet, fókusz-rendszer, slot-bővítés | ✅ kész (v2.6.051) |
 | F3 | a hatások bekötése a meglévő motorokba | ✅ kész (v2.6.052) |
-| F4 | edzői fejlődés, kiöregedés, hangulati réteg | ⬜ hátravan |
+| F4 | edzői fejlődés, kiöregedés, Stáb-csarnok, „B" belépési út, súgó | ✅ kész (v2.6.053) |
 
 **Cél:** a 32 év fölötti, kiöregedő játékosoknak legyen második életük — ne csak
 eladni vagy elengedni lehessen őket, hanem a klub tudásává átalakítani.
@@ -324,6 +324,11 @@ Egy 55-tel induló edző 24 szezon alatt kúszik 67-ig. Lassú, de érezhető: a
 **stáb is épül**, nem csak a keret. Aki 15 szezonja ugyanannál a klubnál
 dolgozik, az másképp néz ki, mint az újonc.
 
+**Mérve (v2.6.053):** egy Sz 70-nel belépő edző a 2. szezonban 71, a 8.-ban 74,
+a 16.-ban 78, a **24.-ben eléri a 82-es plafont** (`szBase+12`), utána már nem
+nő. Az **inaktív** edző (akit a halmozási korlát leültetett) 10 szezon alatt
+**0 tapasztalatot** gyűjt — plusz ok arra, hogy ne halmozz azonos típusúakat.
+
 ### 3.2 Kiöregedés
 
 ```js
@@ -334,6 +339,9 @@ coachRetireChance(age) = age < 66 ? 0 : Math.min(0.9, (age-66)*0.18);
 A 66 azért van ilyen magasan, hogy egy 34 évesen belépő edző **~30 szezonig**
 maradhasson — vagyis egy normál karrier alatt gyakorlatilag végig. A rendszer
 nem arról szól, hogy edzőket cserélgess; arról, hogy a legendáid ott maradjanak.
+
+**Mérve (400 lefutás):** 34 évesen belépve **34,7 szezon**, átlagosan 68,7
+évesen távozik. 40 évesen belépve 28,6 szezon.
 Infinity módban a `INFINITY_RETIRE_AGE` logikájához igazodva a küszöb `+20`.
 
 Kiöregedéskor **búcsú-sor a naplóban**, és a slot felszabadul. A visszavonult
@@ -1020,8 +1028,31 @@ mintája szerint, `index.html:12845`), de a tervezett korlátok:
 | Hagyaték: hány külön játékos kap (vegyes / csatár-hagyaték) | — | 16 / 4 |
 | VÉDŐHÁLÓ: az edző át tudja-e lökni a spec. plafont | soha | **nem** ✅ |
 
-*A teljes 6 edzős stáb OVR-hatását és a 20 szezonos összehasonlítást F4 után
-érdemes mérni, amikor az edzői fejlődés is működik.*
+### A „teljes stáb +1,5…+2,5 OVR" elvárás HIBÁS VOLT
+
+Ezt a saját tervem mondta ki, és **ellentmond a saját 2. védőhálójának**. A
+balansz-szabály szerint az edzők *„nem termelnek Ratinget közvetlenül… nem
+inflálják a csapaterőt, csak a profilt élesítik"* — az attribútum-mesterek
+szándékosan a specializációs csatornába írnak, nem a Rating-horgonyba. Vagyis a
+tíz típusból **csak kettő mozdítja egyáltalán a csapat-OVR-t**: a Lélekemelő és
+a Csapatkovács, mindkettő plafonos.
+
+A maximum tehát matematikailag adott:
+`moraleToOvr(50 + 14 + 6×1,2) = **+1,06 OVR**` — ennél többet a teljes stáb
+sem tud, és nem is szabad tudnia.
+
+**Mérve, hat csúcsedzővel, mind a teljes keretre állítva:** +7,7 morál és
++5,4 kémia → **+0,7 csapat-OVR**, plusz −27% alap sérülés-esély. A többi hatás
+(attribútum-specializáció, forma-stabilitás, skillek, hagyaték) **nem OVR-ben
+jelentkezik**, hanem szezonokon át halmozódva a keret profilját és
+rendelkezésre állását formálja — ezért nincs is egyetlen számba sűrítve.
+
+| A teljes stáb hatása | Mért |
+|---|---|
+| közvetlen csapat-OVR (morál + kémia) | **+0,7** (elméleti max +1,06) |
+| alap sérülés-esély | **−27%** |
+| jó forma súlya a célzott játékoson | ×2,20 |
+| attribútum-lépés/szezon a célzott játékoson | 0,86 |
 
 Ha a teljes stáb hatása +4 OVR fölé megy, a `COACH_ATTR_PTS` és a
 `moraleCoachBonus` szorzóit kell visszavenni — a slot-árat **nem**, mert az a
@@ -1070,25 +1101,25 @@ Négy, egymásra épülő, önmagában is szállítható fázis.
 Ezekre az implementáció előtt kell válasz — mindegyiknél megjelölve az
 ajánlásom.
 
-1. **Legyen-e az edzőnek szezonális fizetése?**
+1. **MÉG NYITOTT — legyen-e az edzőnek szezonális fizetése?**
    *Ajánlás: igen, de szelíden* — `Sz × 40 pont/szezon` (egy ★★★★ edző ≈ 2,7
    Mrd Ft/szezon), levonva a `computeSeasonBudget`-ből. Ez ad súlyt a
    6 slotos kiépítésnek: nemcsak megvenni kell, fenntartani is. **Külön
    konstanssal kapcsolható ki** (`COACH_SALARY_PER_SZ = 0`), ha méréskor
    kiderül, hogy csak nyűg.
 
-2. **Elküldhető-e egy edző?** *Ajánlás: igen*, megerősítéssel, és a Stáb-csarnokba
-   kerül. Enélkül egy rossz típusválasztás 30 szezonra befagyaszt egy slotot.
+2. ~~**Elküldhető-e egy edző?**~~ **ELDÖNTVE (F2): igen**, megerősítéssel, és a
+   Stáb-csarnokba kerül.
 
-3. **Az „Öreg csirkefogó" boost** (`index.html:8020`) kitolja a visszavonulást.
-   Ütközik-e a rendszerrel? *Ajánlás: nem* — sőt, kiegészíti: a boosttal
-   tovább játszik → több meccs → **jobb edző lesz belőle**. Ez egy váratlan,
-   kellemes szinergia, érdemes a boost leírásában meg is említeni.
+3. ~~**Az „Öreg csirkefogó" boost ütközik-e?**~~ **ELDÖNTVE: nem, kiegészíti.**
+   A boosttal tovább játszik → több meccs és magasabb kor → **jobb edző lesz
+   belőle**. Külön kód nem kellett hozzá: a `rutinPont` és a `korPont` magától
+   jutalmazza.
 
-4. **A családtag** (`p.family`) lehet-e edző? *Ajánlás: igen, és külön
-   +5 Sz bónusszal* — a családtag amúgy sem vonulhat vissza
-   (`_retireExtendTo:9999`), tehát csak a B úton (korai visszavonultatás)
-   érhető el. Ez egy erős, tudatos áldozat, amit meg kell jutalmazni.
+4. **A családtag** (`p.family`) lehet-e edző? **Egyelőre NEM** — a „B" út
+   gombja kizárja (`!p.family`), ahogy az eladás is. Nyitva hagytam: a
+   +5 Sz bónuszos változat bármikor bekapcsolható, de egy visszafordíthatatlan
+   döntést a családtagon nem akartam megkérdezés nélkül élesíteni.
 
 5. **Klasszikus (nem karrier) módban** legyen-e? *Ajánlás: nem.* A
    `careerStats.matches` ott sosem nő (`index.html:18379`), tehát a teljes

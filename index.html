@@ -2226,7 +2226,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.052";
+const APP_VERSION="2.6.053";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9665,6 +9665,7 @@ function makeCoach(fp,typeKey,seasonNow){
 function hireCoach(c){
   if(!c||staffFull())return false;
   staff().push(c);
+  if(typeof guideEnabled==="function"&&guideEnabled())guideFire("ev:coachhired");
   addLine(`🎓 <b>ÚJ A STÁBBAN</b> — ${esc(shortName(c.n))} mostantól ${esc(coachTypeByKey(c.type).n)} (${coachStars(c.sz)} Sz ${c.sz}).`,"m life");
   return true;}
 /* Az elküldött edző nem tűnik el: a Stáb-csarnok a klub emlékezete. Nulla
@@ -9940,6 +9941,47 @@ function processCoachMatchEffects(){
    A sérülés alaphossza 2-4 forduló, tehát egy csúcs-sportorvos átlagosan ~1,2
    fordulóval rövidít: a kulcsjátékosod 4 meccs helyett 2-t hagy ki. Ez a
    leginkább ÉREZHETŐ hatás a rendszerben — ezért van szigorú képlet mögötte. */
+/* ================= SZEMÉLYI EDZŐK — ÉLETTARTAM (F4) =================
+   Az edző nem statikus tárgy: dolgozik, tapasztalatot gyűjt, jobb lesz — majd
+   egyszer ő is elmegy. Enélkül a rendszer egyetlen döntés lenne, és a stáb
+   húsz szezon múlva ugyanúgy nézne ki, mint felvételkor. */
+const COACH_XP_PER_STEP=2;   /* ennyi ledolgozott szezon ad +1 Szakértelmet */
+const COACH_SZ_GROWTH=12;    /* ennyivel nőhet a belépéskori szint fölé */
+function coachSzCap(c){return Math.min(COACH_SZ_MAX,(c.szBase||c.sz)+COACH_SZ_GROWTH);}
+/* Az edző kiöregedése. A 66 SZÁNDÉKOSAN magas: egy 34 évesen belépő edző így
+   ~30 szezonig maradhat, vagyis egy normál karrier alatt gyakorlatilag végig.
+   A rendszer nem arról szól, hogy edzőket cserélgess — arról, hogy a legendáid
+   ott maradjanak. Infinityben a küszöb együtt mozog a játékosokéval. */
+function coachRetireFrom(){
+  return infinityMode?COACH_RETIRE_FROM+(INFINITY_RETIRE_AGE-32):COACH_RETIRE_FROM;}
+function coachRetireChance(age){
+  const from=coachRetireFrom();
+  return age<from?0:Math.min(0.9,(age-from)*0.18);}
+/* A stáb szezonváltása: öregedés, tapasztalat, fejlődés, búcsúzás.
+   A szezonjelentésbe visszaadott sorokból lesz a felhasználói visszajelzés. */
+function advanceCoachSeason(){
+  const rep={grew:[],retired:[]};
+  if(gameMode!=="career")return rep;
+  const arr=staff();
+  for(let i=arr.length-1;i>=0;i--){
+    const c=arr[i];
+    if(!c)continue;
+    c.age=(c.age||COACH_MIN_AGE)+1;
+    /* KIÖREGEDÉS — egyetlen dobás, a kor szerint. */
+    if(Math.random()<coachRetireChance(c.age)){
+      retireCoach(i,"aged");
+      rep.retired.push({n:c.n,age:c.age,type:c.type,
+        seasons:Math.max(1,(S.seasonNumber||1)-c.since+1)});
+      continue;}
+    /* TAPASZTALAT: csak az AKTÍV, valóban dolgozó edző gyűjt. Aki a halmozási
+       korlát miatt inaktívan ül a stábban, az nem fejlődik — ez plusz ok arra,
+       hogy ne gyűjts három azonos típusút. */
+    if(!coachIsActive(c)||!focusTargets(c).length)continue;
+    c.xp=(c.xp||0)+1;
+    const cap=coachSzCap(c);
+    const want=Math.min(cap,(c.szBase||c.sz)+Math.floor(c.xp/COACH_XP_PER_STEP));
+    if(want>c.sz){c.sz=want;rep.grew.push({n:c.n,sz:c.sz,type:c.type});}}
+  return rep;}
 function medicHealCut(playerName,dur){
   const pw=coachTypePower("medic",playerName);
   if(pw<=0)return dur;
@@ -10816,6 +10858,7 @@ const GLOSSARY={
   arnyekek:{title:"Árnyékék",text:"A második csatár: az a támadó, aki nem a kapu előtt áll, hanem egy sorral hátrébb, a védők és a középpálya közti sávban. A pályaképen is ott látod — az árnyékékre állított hely pontja hátracsúszik. Kevesebb gólt szerez, mint egy középcsatár (gólsúly 3,5 az 5,0 helyett), cserébe övé a JÁTÉK LEGNAGYOBB GÓLPASSZ-SÚLYA (5,0, a támadó középpályás 4,5-e fölött) — vagyis nem ő fejezi be a támadást, hanem ő hozza létre. A csapat tengelyein a Gólszerzésből vesz el 4 pontot és a Passzhoz teszi hozzá: ettől a Labdatartás és a Totális futball illeszkedése nő, a Hosszú labdáké, a Gyors kontráé és a Széljátéké csökken. TÁMADÓ marad minden más szempontból: a csatár-tengelyeken súlyozódik, csatár-skilleket kaphat, és a csatár-cserehelyre ülhet. HOGYAN JÁTSSZ VELE: az árnyékék nem felállás, hanem MEGBÍZÁS — bármelyik TÁMADÓ helyet átállíthatod rá a keretlistában, az ott álló játékos lapján, ingyen és bármikor. Két csatáros felállásban (4-4-2, 3-5-2, 5-3-2) az egyik vagy mindkét csatár, egy csatárosban a magányos támadó is hátrahúzódhat: az a hamis kilences. A 4-3-3, a 4-2-3-1 és a 3-4-3 TÁMADÓ SZÉLSŐI ugyanígy behúzódhatnak a belső sávba — ilyenkor a csapat elveszíti a szélességet azon az oldalon, cserébe egy plusz emberrel játszik középen. A 4-4-2, a 3-5-2, az 5-3-2 és a 4-5-1 szélsői NEM: azok középpályásként súlyozódnak, és az átállításuk már a felállás dolga lenne, nem a megbízásé. KI TUDJA: natívan azok, akik az adatbázisban támadó középpályát ÉS csatárt is játszottak — Hidegkuti, Maradona, Cruyff, Di Stéfano, Bergkamp, Baggio, Del Piero, Litmanen, Müller, Firmino, Messi, Rooney és társaik; közülük tizennyolcnak ez a FŐ posztja. Mindenki más megtanulhatja poszt-tanulással, vagy addig rokonposztként áll ott, kisebb hátránnyal."},
   megbizas:{title:"Középpályás megbízás",text:"A felállás megadja, HÁNY középpályással játszol — a megbízás azt, hogy ezek közül ki MIT csinál. A kezdő 11 középső középpályás helyei háromféle megbízást kaphatnak: VÉDEKEZŐ (a védelem előtt szerez labdát és rendez), KLASSZIKUS (kétirányú motor) és TÁMADÓ (a támadók mögött készít elő). A 3-4-3 négyes sorának két külső helye ezen felül SZÉLSŐRE is állítható — az a hely attól még középpályás marad, nem lesz belőle támadó szélső. UGYANEZ A GOMB A TÁMADÓKNÁL mást kérdez: a középcsatár álljon-e legelöl és a támadó szélső maradjon-e kint, vagy ÁRNYÉKÉK húzódjon be mögéjük (lásd a saját bejegyzését). A megbízást a HUB keretlistájában állítod: koppints a középpályásra, és a lapján ott a Megbízás módosítása gomb a posztcsere és a poszt-tanulás mellett. Ingyenes, bármikor átállítható, és SENKI nem mozdul tőle a helyéről — csak a hely poszt-kódja és az illeszkedés változik, a kézzel összerakott csapatod a helyén marad. Hatása a csapat tengelyein érződik, mindig a felállás saját alapbeállításához képest: a védekező megbízás 3 attribútumpontot tesz a Védekezés-tengelyre a Gólszerzés rovására, a támadó pontosan fordítva, a klasszikus semleges. Ez a taktikád illeszkedésén is látszik — a Park the bus a Védekezésre épül, a Hosszú labdák a Gólszerzésre —, de szándékosan gyengébb eszköz, mint maga a rendszerválasztás: hangolni lehet vele, felülírni nem."},
   kemia:{title:"Csapatkémia",text:"A 11. játékos beérkezése után lefut egy elemzés. Azonos klubból jött társak dupla pluszt kapnak, azonos nemzetiségűek egyszereset. Történelmi rivális klubokból jövők között 25% eséllyel jó, 75%-ban feszült a viszony — ez egy állandó Rating-módosítót ad a teljes szezonra."},
+  szemelyiedzo:{title:"Személyi edzők (szakmai stáb)",text:"A visszavonuló legendáid nem tűnnek el: átléphetnek a stábba. Jogosult, aki legalább 32 éves ÉS legalább 40 meccset játszott NÁLAD — edzőt tehát nem lehet vásárolni, csak kinevelni. A minőségét egyetlen szám adja, a SZAKÉRTELEM (20–99): ebbe a kora és a lejátszott meccsei mindig beleszámítanak, mellé pedig típusonként más. TÍZ TÍPUS van. Öt attribútum-mester (Gólvágó-mentor, Játékmester, Bástya, Kesztyűs mester, Sprintmester) — ezek a poszt szerint korlátozottak, és a hozzájuk tartozó attribútum fejlődését gyorsítják. A Lélekemelő a csapatmorált emeli (a vezetői képességéből), a Csapatkovács az öltözői kémiát (az együttműködéséből), a Ritmusmester a formaingadozást szelídíti (a temperamentumából — a kiegyensúlyozott a legjobb), a Gyógyító kéz pedig kevesebb és rövidebb sérülést hoz (ő az, aki maga sosem sérült meg). Az Iskolateremtő a képességeket tanítja — és a SAJÁT skilljeit adja tovább a tanítványainak. EGY EDZŐ EGY TÍPUS, a választás végleges: ugyanabból a legendából két karrierben két különböző klub épülhet. FÓKUSZ: minden edzőnek fix, 100 egységnyi figyelme van, amit szétoszt azok között, akikre ráállítod — az egész keretre, egy posztcsoportra, vagy legfeljebb két emberre. Minél szűkebb a fókusz, annál többet kap fejenként (100 vs 10,8), de annál kevesebbet termel összesen (100 vs 238) — nincs domináns választás. A morál- és a kémia-edzőnél viszont fordítva: az ő munkájuk az egész öltözőé, ott a szűk fókusz veszteséges. A fókuszt edzőnként ciklusonként egyszer válthatod (a nyár vége újítja meg). HAGYATÉK: az Iskolateremtő készlete a saját skilljeiből áll. Egy tehetségre állítva gyorsan tanít, de hamar kimerül (kb. 4 skill 2 szezon alatt); az egész keretre osztva lassabban, viszont sokkal tovább és több embernek (kb. 16 skill 23 szezon alatt) — egy skillt többen is megkaphatnak. A készlet mindig az AKTUÁLIS fókuszból számolódik, ezért a szűkítés elégetheti a maradékot. Alapból 3 stáb-helyed van, 6-ig bővíthető (20 / 35 / 61 milliárd Ft). Egy típusból egyszerre csak egy edző dolgozik. Az edzők maguk is öregszenek: minden ledolgozott szezonnal tapasztalatot gyűjtenek (két szezononként +1 Szakértelem, a belépési szintjük fölé legfeljebb +12-vel), 66 éves koruktól pedig ők is visszavonulnak — a Stáb-csarnokba. FONTOS: az edző nem tud plafont mozdítani, csak az odáig vezető utat rövidíti; és mivel a fejlődés kor-görbéje 30 fölött a negyedére esik, a személyi edző a FIATALOKON hat igazán. Az öreg játékosodból lett edző a fiatalokat neveli."},
   edzo:{title:"Edző",text:"Csapatnév-adás után egy valós, ismert edzőt sorsolsz — mindegyiknek van állandó Rating-hatása és egy saját 'hajlama', ami befolyásolja, milyen típusú események történnek gyakrabban a szezon során."},
   kapitany:{title:"Kapitány",text:"A vezetői és együttműködési tulajdonsága számít legtöbbet a szezon-kezdő csapatmorál kialakításában (a temperamentuma kicsit lehúzza). Ha a kapitány jó formában van vagy gólt szerez, az egész csapat kap egy kis löketet a meccsen; ha kiállítják vagy gyengélkedik, fordítva."},
   moral:{title:"Csapatmorál",text:"A morál (0–100) a kapitány + a kémia + az edző alapján kap egy célértéket a szezon elején, és minden meccs után finoman e felé mozdul. Menet közben a meccs-kimenetel (fordítás, elveszett előny, veretlenségi sorozat vége, bosszú, óriásölés) és a köztes események is lökdösik. A BAJNOKI CÍM külön eset: a megnyerése egyszeri, nagy lökést ad, és a CÉLÉRTÉKET is felhúzza legalább 60-ra, hogy a hátralévő fordulókra meg is maradjon — a lökés mérete a pillanatnyi hangulattól függ (egy nyomott öltözőnek sokkal többet jelent: 20 körüli morálnál +40…60, 50 fölött +10…20), és a végeredmény sosem kevesebb 60-nál. A felhúzott célérték a következő szezonkezdéskor magától újraszámolódik. Ténylegesen befolyásolja a csapat teljesítményét minden meccsen."},
@@ -10949,6 +10992,12 @@ const GUIDE_TIPS={
      megtörténik. Két okból jobb ez a lineáris folyamnál: pontosan akkor tanít,
      amikor a felhasználó épp értetlenül nézi a képernyőt, és magától korlátozza
      magát — akinél sosem sérül meg senki, az sosem kapja meg a sérülés-tippet. */
+  "ev:coachoffer":{t:"Egy legenda a klubnál maradna",
+    x:"A visszavonuló játékosod felajánlotta, hogy edzőként marad. Amiben JÓ VOLT, abban lesz jó edző is: a gólvágóból gólszerzés-mester, a vezéregyéniségből Lélekemelő, a sosem sérült vasemberből sportorvos, a sok képességet gyűjtőből Iskolateremtő — aki a SAJÁT skilljeit adja tovább. A típusválasztás VÉGLEGES, ezért nézd meg mind, ne csak a legmagasabb számot. Ha elbúcsúztatod, a tudása elvész: edzőt később nem lehet visszahívni, és vásárolni sem.",
+    g:"szemelyiedzo"},
+  "ev:coachhired":{t:"Állítsd rá valakire",
+    x:"Az edződ alapból az egész keretre figyel. A Menü → Klub → Szakmai stáb panelen szűkítheted egy posztcsoportra vagy legfeljebb két emberre — és a panel ÉLŐBEN kiírja, mennyit ér a beállítás, még mielőtt döntenél. Szűk fókusz: sokat egy embernek. Széles fókusz: keveset mindenkinek, de összesen többet. Kivétel a morál- és a kémia-edző: az ő munkájuk az egész öltözőé, őket ne szűkítsd.",
+    a:"hubStaffBtn",g:"szemelyiedzo"},
   "ev:absence":{t:"Valaki kidőlt — te döntesz a pótlásról",
     x:"Sérülés és eltiltás a KEZDŐ 11-ből kiveszi az embert, és ez a panel kérdezi meg, ki álljon a helyére. Az „Automatikus” mindig kiírja, kit hozna; mellette a padod és a tartalék-kereted jelöltjei állnak, jelezve, melyik poszthű és melyik jár illeszkedés-hátránnyal. A hiányzás a JÁTÉKOSHOZ tartozik, nem a poszthoz: hiába rakod máshova, vele megy.",
     g:"serules"},
@@ -23877,6 +23926,7 @@ function renderCoachOffer(){
   if(!box)return;
   const q=(gameMode==="career"&&S.pendingCoachOffers)||[];
   const fp=q[0];
+  if(fp&&guideEnabled())guideFire("ev:coachoffer");
   if(!fp){box.classList.add("hide");box.innerHTML="";_coachOfferPick=null;_coachOfferAll=false;return;}
   const cands=coachCandidates(fp);
   if(!cands.length){dropCoachOffer(fp.n);return renderCoachOffer();}
@@ -23970,6 +24020,7 @@ const COACH_MEDIC_W=0.65;    /* sérülés-jelölt súlycsökkentés */
 const COACH_SKILL_W=1.8;     /* skill-kiosztási súlyszorzó */
 const COACH_SEASON_MATCHES=30;   /* egy szezon nagyságrendje az előnézethez */
 let _staffFocusEdit=null;    /* melyik edző fókuszát szerkesztjük épp (index) */
+let _staffHallOpen=false;    /* ki van-e nyitva a Stáb-csarnok */
 
 /* A fókusz épségben tartása: eladott/visszavonult játékos neve nem tarthatja
    fogva a fókuszt. Üresre fogyott ember-fókusz visszaesik a teljes keretre. */
@@ -24044,6 +24095,16 @@ function coachEffectLines(c){
       L.push(`<span style="color:var(--grass)">Teljes keretre állítva a csapat ALAP sérülés-esélye is csökken (−${Math.round(30*pw)}%).</span>`);}
   return L;}
 function coachFocusChangeAllowed(c){return !(c&&c.focusUsed);}
+/* Kire figyel épp személyi edző? A HUB keretlistáján egy apró jelvény mondja
+   meg — így a keretet nézve is látod, hova megy a figyelem, anélkül hogy a
+   stáb-panelt kellene nyitogatni. */
+function coachFocusBadge(playerName){
+  if(gameMode!=="career")return "";
+  const on=staff().filter(c=>c&&coachPower(c,playerName)>0);
+  if(!on.length)return "";
+  const ics=on.map(c=>(coachTypeByKey(c.type)||{}).ic||"🎓").join("");
+  const names=on.map(c=>`${(coachTypeByKey(c.type)||{}).n||"edző"}: ${shortName(c.n)}`).join(" · ");
+  return ` <span title="${esc(names)}" style="background:rgba(255,210,74,.16);border:1px solid var(--gold);color:var(--gold);font-weight:700;font-size:9.5px;padding:1px 5px;border-radius:8px">🎯${esc(ics)}</span>`;}
 /* A HUB-gomb: csak karrierben látszik, és a felirata megmondja az állapotot —
    így a menüből is látod, van-e szabad helyed vagy döntésre váró legendád,
    anélkül hogy be kellene lépned. */
@@ -24114,15 +24175,28 @@ function renderStaffPanel(){
       :`Bővítés <b>${max} → ${max+1}</b>: <b style="color:#ffd24a">${fmtFt(price)}</b>.`
        +(S.transferBudget>=price?"":`<br><span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget||0)}).</span>`))
     +`</div></div>`;
+  /* ---- STÁB-CSARNOK ----
+     A kiöregedett és elküldött edzők névsora. NULLA játékhatás — tisztán a klub
+     emlékezete. Pont ez adja meg a rendszer súlyát egy 20 szezonos karrierben:
+     itt látod egyben, hány legendádból lett a klub tudása. */
   const hall=S.staffHall||[];
-  if(hall.length)
-    h+=`<div style="font-size:11.5px;color:var(--dim2);line-height:1.5">🕯 Stáb-csarnok: `
-      +hall.slice(-6).map(x=>esc(shortName(x.n))).join(" · ")
-      +(hall.length>6?` <span>(+${hall.length-6})</span>`:"")+`</div>`;
+  if(hall.length){
+    h+=`<div style="border:1px solid var(--line);border-radius:8px;padding:9px 11px">
+      <div id="staffHallHead" style="font-size:12.5px;font-weight:700;cursor:pointer">🕯 Stáb-csarnok <span style="color:var(--dim2);font-weight:400">— ${hall.length} korábbi edző</span> <span style="color:var(--dim2)">${_staffHallOpen?"▴":"▾"}</span></div>`;
+    if(_staffHallOpen)
+      h+=`<div style="margin-top:6px">`+hall.slice().reverse().map(x=>{
+        const t=coachTypeByKey(x.type)||{n:"edző",ic:"🎓"};
+        const yrs=Math.max(1,(x.to||0)-(x.from||0)+1);
+        return `<div style="font-size:12px;line-height:1.5;padding:3px 0;border-top:1px dashed var(--line)">
+          ${t.ic} <b>${esc(shortName(x.n))}</b> <span style="color:var(--dim2)">${esc(t.n)} · Sz ${x.sz}</span><br>
+          <span style="color:var(--dim2)">${x.from}–${x.to}. szezon (${yrs}) · ${x.reason==="aged"?`${x.age} évesen visszavonult`:"elküldve"}</span></div>`;}).join("")
+        +`</div>`;
+    h+=`</div>`;}
   $("twBody").innerHTML=h;
   $("twActions").innerHTML="";
   /* --- események --- */
   const rerender=()=>renderStaffPanel();
+  {const hh=$("staffHallHead");if(hh)hh.onclick=()=>{_staffHallOpen=!_staffHallOpen;rerender();};}
   $("twBody").querySelectorAll(".stFocus").forEach(btn=>btn.onclick=()=>{
     const i=+btn.getAttribute("data-i"),m=btn.getAttribute("data-m"),c=staff()[i];
     if(!c)return;
@@ -24185,6 +24259,10 @@ function renderStaffPanel(){
           addLine(`🎓 Stáb-bővítés — mostantól ${coachSlots()} személyi edződ lehet.`,"m life");
           rerender();saveGame();}});};
     $("twActions").appendChild(buy);}
+  const help=document.createElement("button");
+  help.className="btn-s stepbtn";help.style.marginTop="6px";help.textContent="📖 Hogyan működik a stáb?";
+  help.onclick=()=>showGlossary("szemelyiedzo");
+  $("twActions").appendChild(help);
   const back=document.createElement("button");
   back.className="btn-s stepbtn";back.style.marginTop="6px";back.textContent="Vissza a HUB-ba";
   back.onclick=()=>{_staffFocusEdit=null;csReturnToHub();};
@@ -25894,6 +25972,42 @@ function buildHubDetail(loc){
         hubExpandedKey=null;                            /* az eladott játékos részletei bezáródnak */
         renderHub();drawPitch();updateBar();saveGame();});};
     d.appendChild(sellBtn);}
+  /* ---- ÖTÖDIK MŰVELET: EDZŐI PÁLYÁRA KÜLDÉS (a "B" belépési út) ----
+     A rendszer fő útja a bejelentett visszavonulás: kitartottál mellette, és a
+     végén felajánlja, hogy marad. Ez itt a MÁSIK út, a tudatos döntésé: egy
+     33 éves, még játszó, de már romló vezérből MOST csinálsz Lélekemelőt,
+     ahelyett hogy megvárnád a 38-at — feláldozva a maradék szezonjait.
+     Visszafordíthatatlan, ezért megerősítés jár hozzá, és a szöveg kimondja,
+     mit veszítesz: a fiatalabb belépő kevesebb kort és meccset hoz, tehát
+     GYENGÉBB edző lesz. */
+  {const _e=(careerPool&&careerPool[p.n])||null;
+   if(_e&&coachEligible(_e)&&!p.family){
+    const cands=coachCandidates(careerFingerprint(_e));
+    const best=cands[0];
+    const cBtn=document.createElement("button");
+    cBtn.className="btn-s stepbtn";cBtn.style.marginTop="6px";
+    cBtn.style.color="#67e8f9";cBtn.style.borderColor="#0ea5a4";
+    cBtn.textContent=best?`🎓 Edzői pályára küldés — ${best.type.n} ${coachStars(best.sz)}`:"🎓 Edzői pályára küldés";
+    cBtn.onclick=(ev)=>{
+      if(ev&&ev.stopPropagation)ev.stopPropagation();
+      if(staffFull()){setDraftStatus(`A stábod tele van (${staff().length}/${coachSlots()}) — előbb bővíts helyet vagy küldj el valakit.`);return;}
+      askConfirm({title:"Edzői pályára küldöd?",yes:"Igen, befejezi a pályafutását",
+        html:`<div style="font-size:13px;line-height:1.55"><b>${esc(shortName(p.n))}</b> (${_e.age} éves) <b>azonnal visszavonul</b>, és a stábba lép.<br><br>
+          ${best?`A legjobb szakterülete: <b>${esc(best.type.n)}</b> — ${coachStars(best.sz)} Sz ${best.sz}. A típust a következő lépésben választod ki.<br><br>`:""}
+          <span style="color:var(--red)">Ez visszafordíthatatlan: a hátralévő játékos-szezonjai elvesznek.</span>
+          <span style="color:var(--dim)"> Ha megvárnád a természetes visszavonulását, több meccsel és magasabb korral — tehát JOBB edzőként — lépne be.</span></div>`,
+        onYes:()=>{
+          const fp=careerFingerprint(_e);
+          const res=releasePlayer(p,false);
+          if(!res||!res.ok){
+            setDraftStatus("Ő az utolsó embered ebben a posztkategóriában — előbb hozz valakit a helyére.");
+            return;}
+          queueCoachOffer(fp);
+          addLine(`🎓 ${esc(shortName(p.n))} ${_e.age} évesen befejezte a pályafutását, és a szakmai stábba lép.`,"m life");
+          $("hubPositionPicker").classList.add("hide");
+          hubExpandedKey=null;
+          renderHub();drawPitch();updateBar();saveGame();}});};
+    d.appendChild(cBtn);}}
   return d;}
 /* A poszt-tanulás poszt-választója: azok a posztok, amiket a játékos MÉG nem
    tud (nem szerepel a pos-listájában), az árral; a büdzséből fizetsz. */
@@ -26955,7 +27069,7 @@ function renderHub(){
     const ownPosNote=(loc.type==="slot"&&p.pos&&p.pos.length&&!p.pos.includes(posTxt))
       ?` · saját poszt: ${p.pos.join("/")}`:"";
     row.innerHTML=`<span class="pos pc-${posColorKey}">${posLabel}</span>
-      <span class="main"><div class="nm">${esc(p.n)}${tag}${cardBadge}${unavBadge}${retireBadge(p.n)}</div>
+      <span class="main"><div class="nm">${esc(p.n)}${tag}${cardBadge}${unavBadge}${retireBadge(p.n)}${coachFocusBadge(p.n)}</div>
       <div class="trait">${ageTxt} · ${ratingTxt}${ownPosNote}</div>${unavNote}</span>
       <span class="ovr">${ovrShown}</span>`;
     row.style.display="flex";row.style.alignItems="center";
@@ -28100,6 +28214,10 @@ function hubShowSeasonReport(){
     settleSkillFloor();   /* a szezonos skill-padló beváltása, ha maradt hiány */
   }
   const report=advanceCareerSeason();
+  /* A STÁB IS ÖREGSZIK. Szándékosan az advanceCareerSeason UTÁN: az edzői
+     felajánlások (offerCoachIfEligible) ott kerülnek a sorba, és egy frissen
+     felvett edző nem öregedhet ugyanabban a szezonváltásban, amikor belépett. */
+  const coachRep=advanceCoachSeason();
   /* ================= A NYÁRI PÉNZ ITT ÉRKEZIK =================
      Korábban a szezonbüdzsé és a befektetés hozama a startNextCareerSeason()-ben
      íródott jóvá — vagyis AZUTÁN, hogy a felhasználó a HUB-ból kilépett a
@@ -28164,6 +28282,15 @@ function hubShowSeasonReport(){
            jelezzük, hogy van mit eldönteni — a kártya alatta, élőben jön. */
         +(r.coachFp?` <span style="color:var(--gold)">Felajánlotta, hogy a klubnál marad edzőnek.</span>`:"")
         +`</div>`;});}
+  if(coachRep&&(coachRep.grew.length||coachRep.retired.length)){
+    html+=`<div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin:8px 0 5px">🎓 A szakmai stáb</div>`;
+    coachRep.grew.forEach(g=>{
+      const t=coachTypeByKey(g.type)||{n:"edző",ic:"🎓"};
+      html+=`<div style="font-size:12.5px;margin-bottom:3px">${t.ic} <b>${esc(shortName(g.n))}</b> fejlődött — ${esc(t.n)}, Szakértelem <b style="color:var(--gold)">${g.sz}</b>.</div>`;});
+    coachRep.retired.forEach(x=>{
+      const t=coachTypeByKey(x.type)||{n:"edző",ic:"🎓"};
+      html+=`<div style="font-size:12.5px;margin-bottom:3px">🕯 ${t.ic} <b>${esc(shortName(x.n))}</b> ${x.age} évesen visszavonult a kispad mögül — ${x.seasons} szezont töltött a stábban ${esc(t.n)}ként. Felszabadult egy hely.</div>`;});
+    html+=`<div style="height:8px"></div>`;}
   if(report.familyRetired){
     html+=`<div style="color:var(--purple);font-weight:700;font-size:12px;text-transform:uppercase;margin:8px 0 5px">A család búcsúzik</div>
       <div style="font-size:13px">${esc(report.familyRetired.n)} ${report.familyRetired.age} évesen letette a cipőt. Örökre a csapat része marad — köszönjük, ${esc(report.familyRetired.n)}!</div>`;}
