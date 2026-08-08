@@ -2233,7 +2233,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.064";
+const APP_VERSION="2.6.065";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -25591,12 +25591,36 @@ function startEndCareer(){
   $("twBody").innerHTML=room
     ? `<p style="font-size:13px;color:var(--dim)">Biztosan lezárod a <b>közös karriereteket</b> a(z) <b>${esc(room)}</b> szobában? Ez <b>végleges</b>: a szoba megszűnik, a társad sem tudja folytatni, és ennek a szobának a mentése törlődik.<br><br>Az <b>egyjátékos karriered NEM sérül</b> — ahhoz ez a gomb nem nyúl. Előtte letöltheted a teljes karrier-összegzést szöveges fájlként.</p>`
     : `<p style="font-size:13px;color:var(--dim)">Biztosan lezárod ezt a karriert? Ez <b>végleges</b> — a mentés törlődik. Előtte letöltheted a teljes karrier-összegzést szöveges fájlként (szezonok, végső felállás, mindenkori statisztika mindenkiről, aki valaha játszott nálad).</p>`;
+  /* A ranglista ITT a legbeszédesebb: a lezárás pillanatában látod, hova
+     kerülsz — és ha nem nyitottad meg az Infinityt, azt is, hogy miért nem. */
+  {const bd=runBreakdown();
+   const list=runBoardLoad(),id=runBoardCareerId();
+   const prev=list.find(x=>x.id===id)||null;
+   $("twBody").innerHTML+=`<div style="border:1px solid var(--panel2);border-radius:9px;padding:10px 12px;margin-top:10px">
+     <div style="font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--gold);font-weight:700;margin-bottom:5px">🏅 Helyi Run-ranglista</div>
+     <div style="font-size:12.5px;line-height:1.6;margin-bottom:6px">A karriered záró Run-szintje: <b style="color:${runColor(bd.total)}">${(Math.round(bd.total*10)/10).toString().replace(".",",")}</b>`
+     +(prev
+        ? ` — a listán jelenleg <b>${String(prev.run).replace(".",",")}</b> áll. `
+          +(bd.total>prev.run
+             ? `<span style="color:var(--grass)">A lezárás ezt felülírja.</span>`
+             : `<span style="color:var(--dim2)">A lezárás nem rontja el: a magasabb szám marad.</span>`)
+        : ` <span style="color:var(--dim2)">— ez a karrier nem kerül a listára, mert nem nyitottad meg az Infinityt.</span>`)
+     +`</div>`+runBoardHtml()+`</div>`;}
   const dlBtn=document.createElement("button");dlBtn.className="btn-y stepbtn";dlBtn.textContent="Összegzés letöltése (.txt)";
   dlBtn.onclick=()=>{downloadTextFile(`${teamName.replace(/[^a-zA-Z0-9áéíóöőúüűÁÉÍÓÖŐÚÜŰ]/g,"_")}_karrier_osszegzes.txt`,generateCareerLegacyText());};
   const endBtn=document.createElement("button");endBtn.className="btn-s stepbtn";endBtn.style.cssText="margin-top:6px;color:var(--red);border-color:var(--red)";
   endBtn.textContent=room?"Véglegesen lezárom ezt a karriert és megszüntetem a szobát":"Végleg lezárom a karriert";
   endBtn.onclick=async()=>{
     endBtn.disabled=true;
+    /* HELYI RUN-RANGLISTA: a lezárás az EGYETLEN pont, ahol a szám frissülhet —
+       és csak akkor, ha javult. A törlés ELŐTT kell futnia, amíg az állapot még
+       megvan. A ranglista külön localStorage-kulcson él, tehát a clearSave nem
+       viszi magával. */
+    try{
+      const _rb=runBoardOnClose();
+      if(_rb&&_rb.improved)
+        addLine(`🏅 Run-ranglista frissítve: ${String(_rb.from).replace(".",",")} → <b>${String(_rb.to).replace(".",",")}</b>.`,"m life");
+    }catch(e){}
     if(room){
       /* a szoba megszűnik, hogy a társ se ragadjon benne egy halott karrierben */
       try{await mpBk().leave(room);}catch(e){}
@@ -25830,6 +25854,12 @@ function infinityApplyUnlock(){
     /* RUN: a futás sebességét ez a szezonszám dönti el (2.0 súly). */
     {const R=runInit();if(R.infinitySeason==null)R.infinitySeason=S.seasonNumber||1;
      runLoyalSnapshot();}   /* RUN: kik voltak végig veled az eredeti kezdőből */
+    /* ---- HELYI RUN-RANGLISTA: ITT KERÜL FEL A KARRIER ----
+       Az Infinity megnyitása a belépő: ide a 100-as mezőny megnyerése kell,
+       tehát csak végigvitt futás kerül a listára. A szám innentől már csak a
+       karrier LEZÁRÁSAKOR változhat, és csak felfelé (runBoardOnClose). */
+    {const _rb=runBoardOnInfinity();
+     if(_rb)addLine(`🏅 Felkerültél a helyi Run-ranglistára: <b>${String(_rb.run).replace(".",",")}</b> Run-szinttel. A karrier lezárásakor még javíthatsz rajta.`,"m life");}
     /* ---- A BEJELENTETT VISSZAVONULÁSOK ÉRVÉNYÜKET VESZTIK ----
        Az Infinity ígérete az, hogy megszűnik a kor miatti hanyatlás, és
        visszavonulni is csak 55 évesen lehet. Ehhez képest képmutató lett volna
@@ -27155,6 +27185,120 @@ function runBreakdown(){
   const total=den?Math.max(0,Math.min(100,num/den)):0;
   return {rows,total,missing:Object.keys(RUN_MILESTONES).filter(k=>!R.ms[k])};}
 function runScore(){return runBreakdown().total;}
+/* ================= HELYI RUN-RANGLISTA =================
+   A karriereid legjobb futásai, EGY HELYEN, a böngésződben.
+
+   MIÉRT AZ INFINITY A BELÉPŐ: a ranglistára csak olyan karrier kerül, ami
+   tényleg végigvitt valamit — az Infinity megnyitásához meg kell nyerni a
+   100-as mezőnyt. Így egy három szezon után elhagyott próbálkozás nem
+   szemeteli tele a listát, és a felkerülés maga is elismerés.
+
+   A FRISSÍTÉS SZABÁLYA (a projektgazda döntése): a bejegyzés a megnyitáskori
+   Run-szinttel születik, és KIZÁRÓLAG a karrier LEZÁRÁSAKOR frissül — akkor is
+   csak ha a záró Run MAGASABB. Aki tehát az Infinity után elrontja a futást,
+   nem veszít a listán; aki javít rajta, azzal kerül fel a végleges száma.
+
+   MIÉRT NEM A MENTÉS RÉSZE: a ranglista a KARRIEREKEN ÁTÍVELŐ eredménylista.
+   Ha a mentésben élne, egy karrier lezárása (ami törli a mentést) magával
+   vinné az egész listát. Ezért saját localStorage-kulcson él — ugyanaz az elv,
+   mint a téma-választásnál vagy a globális fejlődési tempónál.
+
+   HELYI: a localStorage böngészőnként és eszközönként külön él, tehát telefonon
+   és gépen két külön lista. Ezt a nézet ki is mondja. */
+const RUNBOARD_KEY="30-0-runboard-v1";
+const RUNBOARD_MAX=25;
+function runBoardLoad(){
+  let raw=null;
+  try{raw=localStorage.getItem(RUNBOARD_KEY);}catch(e){return [];}
+  if(!raw)return [];
+  let a=null;try{a=JSON.parse(raw);}catch(e){return [];}
+  return Array.isArray(a)?a.filter(x=>x&&typeof x.run==="number"):[];}
+function runBoardSave(list){
+  /* Run szerint csökkenő, és csak a legjobb RUNBOARD_MAX marad meg. */
+  const sorted=list.slice().sort((a,b)=>b.run-a.run||(b.seasons||0)-(a.seasons||0));
+  try{localStorage.setItem(RUNBOARD_KEY,JSON.stringify(sorted.slice(0,RUNBOARD_MAX)));}catch(e){}
+  return sorted;}
+/* A most futó karrier azonosítója. Nem a csapatnév (átnevezhető) és nem a
+   mentés-kulcs (a szobák külön élnek) — a karrier INDULÁSÁHOZ kötött, stabil
+   jel kell, hogy a lezárás ugyanazt a bejegyzést találja meg, amit a megnyitás
+   létrehozott. A világ-seed pontosan ilyen: karrierenként egyszer születik. */
+function runBoardCareerId(){
+  const seed=(typeof worldSeed!=="undefined"&&worldSeed)?String(worldSeed):"nincs";
+  return seed+"|"+(MP&&MP.active&&MP.activeRoom?MP.activeRoom:"sp");}
+function runBoardRow(){
+  const bd=runBreakdown();
+  return {id:runBoardCareerId(),
+    run:Math.round(bd.total*10)/10,
+    team:String(teamName||"—").slice(0,40),
+    seasons:S.seasonNumber||1,
+    level:Math.round(oppTargetRating||0),
+    inf:!!infinityMode,
+    mp:!!(MP&&MP.active&&MP.activeRoom),
+    /* a felkerülés (Infinity) és a lezárás dátuma külön — a lista mindkettőt
+       meg tudja mutatni, és látszik, mennyi idő telt el közben */
+    at:Date.now(),closedAt:null,
+    /* pár beszédes mérföldkő az összegzőből — tisztán dísz, nulla játékhatás */
+    titles:(S.seasonHistory||[]).filter(h=>h&&h.rank===1).length,
+    ballons:(S.ballonHistory||[]).filter(b=>b&&b.own).length};}
+/* AZ INFINITY MEGNYITÁSA — itt születik a bejegyzés. */
+function runBoardOnInfinity(){
+  if(gameMode!=="career")return null;
+  const row=runBoardRow();
+  const list=runBoardLoad();
+  const at=list.findIndex(x=>x.id===row.id);
+  /* Ha valamiért már van bejegyzés erre a karrierre (pl. újra lefutó
+     megnyitás), nem duplázunk — a magasabb Run marad. */
+  if(at>=0){if(row.run>list[at].run){list[at]=Object.assign({},list[at],{run:row.run});}}
+  else list.push(row);
+  runBoardSave(list);
+  return row;}
+/* A KARRIER LEZÁRÁSA — csak FELFELÉ frissít, és csak ha van már bejegyzés
+   (vagyis megnyitottad az Infinityt). */
+function runBoardOnClose(){
+  if(gameMode!=="career")return null;
+  const list=runBoardLoad();
+  const id=runBoardCareerId();
+  const at=list.findIndex(x=>x.id===id);
+  if(at<0)return null;                      /* nem nyitotta meg az Infinityt — nem kerül fel */
+  const now=runBoardRow();
+  const prev=list[at];
+  const improved=now.run>prev.run;
+  list[at]=Object.assign({},prev,{
+    closedAt:Date.now(),
+    /* A záró adatok akkor is frissülnek, ha a Run nem javult — a SZÁM viszont
+       csak felfelé mozdul, ahogy kérted. */
+    seasons:now.seasons,level:now.level,titles:now.titles,ballons:now.ballons,
+    team:now.team,
+    run:improved?now.run:prev.run});
+  runBoardSave(list);
+  return {improved,from:prev.run,to:list[at].run};}
+/* ---- A NÉZET ---- */
+function runBoardHtml(){
+  const list=runBoardLoad();
+  if(!list.length)
+    return `<div style="font-size:12.5px;color:var(--dim);line-height:1.6">
+      Még nincs bejegyzés. Egy karrier akkor kerül fel, amikor <b>megnyitod az Infinityt</b> —
+      addig nem, mert oda a 100-as mezőny megnyerése kell.
+      <br><span style="color:var(--dim2)">A szám ezután már csak a karrier lezárásakor változhat, és csak felfelé.</span></div>`;
+  const d=t=>{if(!t)return "—";const x=new Date(t);
+    return `${x.getFullYear()}.${String(x.getMonth()+1).padStart(2,"0")}.${String(x.getDate()).padStart(2,"0")}`;};
+  let h=`<div style="font-size:11.5px;color:var(--dim2);line-height:1.45;margin-bottom:7px">
+    A felkerülés az Infinity megnyitásakor történik; a szám a karrier lezárásakor frissül, de <b>csak felfelé</b>.
+    A lista <b>ebben a böngészőben</b> él — másik eszközön külön lista van.</div>`;
+  list.forEach((x,i)=>{
+    const lezart=!!x.closedAt;
+    h+=`<div style="display:flex;align-items:center;gap:9px;border-top:1px solid var(--line);padding:6px 0">
+      <b style="min-width:22px;text-align:right;color:var(--dim2);font-size:12px">${i+1}.</b>
+      <b style="min-width:46px;font-size:15px;color:${runColor(x.run)}">${String(x.run).replace(".",",")}</b>
+      <span style="flex:1;min-width:0">
+        <span style="font-size:12.5px;font-weight:700">${esc(x.team)}</span>
+        ${x.mp?`<span style="font-size:10px;color:var(--purple)"> ⚔ közös</span>`:""}
+        ${lezart?"":`<span style="font-size:10px;color:var(--gold)"> ● fut</span>`}
+        <br><span style="font-size:11px;color:var(--dim2)">${x.seasons} szezon · mezőny ${x.level}${
+          x.titles?` · ${x.titles} bajnoki`:""}${x.ballons?` · ${x.ballons} Aranylabda`:""}
+          · ∞ ${d(x.at)}${lezart?` → lezárva ${d(x.closedAt)}`:""}</span>
+      </span></div>`;});
+  return h;}
 /* A Run-szám színe — ugyanaz a logika, mint a nehézség-sávoknál. */
 function runColor(v){
   return v>=85?"#ffd700":v>=70?"#2ecc71":v>=55?"#67e8f9":v>=40?"#f0bc42":"#e07a5f";}
@@ -27263,6 +27407,16 @@ function renderRunMeter(){
       display:flex;justify-content:space-between;align-items:center">
       <span>📖 Hogyan lesz magas a Run szinted?</span><span>${S.runGuideOpen?"▲":"▼"}</span></div>`;
     if(S.runGuideOpen)html+=runGuideHtml();
+    /* HELYI RUN-RANGLISTA — ugyanitt, mert ugyanarról a számról szól. A
+       localStorage-ban él, tehát a nyitott/csukott állapotát is ott tartjuk:
+       az S-ben tárolva egy karrier lezárása elvinné. */
+    {const rbOpen=(function(){try{return localStorage.getItem("30-0-runboard-open")==="1";}catch(e){return false;}})();
+     const _n=runBoardLoad().length;
+     html+=`<div id="runBoardToggle" style="cursor:pointer;font-size:12.5px;color:var(--gold);
+       padding:7px 9px;background:var(--panel2);border-radius:7px;margin-bottom:10px;
+       display:flex;justify-content:space-between;align-items:center">
+       <span>🏅 Helyi Run-ranglista${_n?` <span style="color:var(--dim2)">(${_n})</span>`:""}</span><span>${rbOpen?"▲":"▼"}</span></div>`;
+     if(rbOpen)html+=`<div style="margin-bottom:10px">${runBoardHtml()}</div>`;}
     html+=`<div style="font-size:11.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">A pontszámod összetevői</div>`;
     B.rows.forEach(r=>{
       const rc=runColor(r.s);
@@ -27283,7 +27437,14 @@ function renderRunMeter(){
   const head=$("runHead");
   if(head)head.onclick=()=>{S.runOpen=!S.runOpen;renderRunMeter();};
   const gt=$("runGuideToggle");
-  if(gt)gt.onclick=(ev)=>{ev.stopPropagation();S.runGuideOpen=!S.runGuideOpen;renderRunMeter();saveGame();};}
+  if(gt)gt.onclick=(ev)=>{ev.stopPropagation();S.runGuideOpen=!S.runGuideOpen;renderRunMeter();saveGame();};
+  /* A ranglista nyitott állapota a localStorage-ban él, nem az S-ben: a lista
+     karriereken átívelő, és egy karrier lezárása nem vihet el vele semmit. */
+  const rb=$("runBoardToggle");
+  if(rb)rb.onclick=(ev)=>{ev.stopPropagation();
+    let cur=false;try{cur=localStorage.getItem("30-0-runboard-open")==="1";}catch(e){}
+    try{localStorage.setItem("30-0-runboard-open",cur?"0":"1");}catch(e){}
+    renderRunMeter();};}
 /* ================= HUB MENÜ + HARMONIKA =================
    A menü csak egy BURKOLAT a meglévő gombok köré: egyetlen kattintás-kezelőt
    és egyetlen láthatóság-szabályt sem írtunk át. A renderHub() sosem építi újra
