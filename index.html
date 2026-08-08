@@ -2284,7 +2284,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.072";
+const APP_VERSION="2.6.073";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -15262,6 +15262,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      {season,value}. Lásd mpSummerRefRating. */
   mpSummerRef:null,
   mpMateHalf:null,    /* a társ féltávi mérlege a párharc pillanatképéből */
+  mpTable:null,       /* a HOST által összeállított közös tabella (15./30. forduló) */
   /* KÖZÖS KUPA: a szezonra kialkudott nyári sorozat — {season,comp,qual,
      mateName,mateOvr,how}. A comp:null is érvényes döntés (idén nincs kupa). */
   mpCup:null,
@@ -20819,12 +20820,18 @@ function handleCheckpoint(round,resumeCb){
    erősíteni. Közös karrierben a társ sora is itt van (a párharc pillanatképéből).
    Az onDone a téli ablakot indítja. */
 function showHalfSeasonTable(onDone){
-  const teams=buildFinalTable({half:true});
+  /* KÖZÖS KARRIERBEN a tabellát a host számolja, és onnan érkezik — lásd
+     mpTableSync. Amíg nincs meg, nem rajzolunk hamis állást. */
+  if(h2hRoomActive()&&!(mpTableNow()&&mpTableNow().upto>=15)){
+    mpTableSync(15,()=>showHalfSeasonTable(onDone));return;}
+  const shared=h2hRoomActive()?mpTableNow():null;
+  const teams=(shared&&shared.upto>=15)?shared.teams.slice():buildFinalTable({half:true});
   const me=teams.findIndex(t=>t.you)+1;
   $("twTitle").textContent="📊 Féltáv — így álltok";
   $("twBody").innerHTML=`<p style="font-size:12.5px;color:var(--dim);line-height:1.55">
       A szezon fele lement. A tabella a te valós mérlegedből és a mezőny egymás elleni
       meccseiből áll össze — mindenki <b>15</b> meccsnél tart.
+      ${shared?`<br>🤝 Közös karrier: ez az állás a <b>host</b> oldalán állt össze mindkettőtök eredményéből, tehát mindkét képernyőn ugyanez látszik.`:""}
       Jelenlegi helyezésed: <b style="color:var(--gold)">${me}.</b></p>
     <div style="margin-top:9px">${renderFinalTable(teams)}</div>`;
   $("twActions").innerHTML="";
@@ -22903,6 +22910,103 @@ function buildFinalTable(opts){
   const half=!!(opts&&opts.half);
   return buildLeagueTable(half?15:30,
     {half,mate:h2hRoomActive()?(half?mpMateHalf():mpMateFinal()):null});}
+/* ================= KÖZÖS KARRIER: A TABELLÁT A HOST SZÁMOLJA =================
+   MIÉRT NEM ELÉG A KÖZÖS SEED. A CPU-k egymás elleni meccseit seedelt folyam
+   szimulálja (rngFor "…:table"), tehát a VÉLETLEN közös. A PÁROSÍTÁSOK viszont
+   nem: az aiLeagueSchedule a SAJÁT menetrendedből fejti vissza, melyik
+   körmódszeres helyen ül melyik csapat — a menetrend sorsolása pedig
+   kliensenként külön fut (shuffleArr, helyi véletlen). Ugyanaz a seedelt
+   számfolyam így MÁS párosításokra, MÁS sorrendben csapódik le, és a két
+   képernyőn más CPU-sorok állnak elő. Ez nem a féltávra korlátozódott: a
+   VÉGTABELLA is szétcsúszott, csak ott a menedzser-sorok egyezése elfedte.
+
+   A MEGOLDÁS: a tabellát EGYSZER, EGY helyen számoljuk ki — a hostnál —, és a
+   kész állást tesszük fel a szobába. A guest nem számol, hanem beolvassa. Így
+   a párosítások kérdése egyszerűen megszűnik: nincs két számítás, amit
+   egyeztetni kellene.
+
+   MIKOR: pontosan kétszer, a 15. és a 30. forduló után — vagyis a két
+   párharcnál, amikor a két kliens amúgy is beszél egymással, és amikor a másik
+   oldal eredményei (a párharc-pillanatkép, illetve a szezonzárás-csere)
+   frissen megérkeztek. Menet közben NINCS tabella: az menthetetlenül hiányos
+   lenne (a társad meccsei csak ezeken a pontokon érkeznek meg), és épp ez a
+   hiányos állás okozta a bejelentett eltérést. */
+function mpTableKey(){return "table";}
+function mpTableField(round){return "r"+round;}
+/* A tárolt pillanatkép: csak a megjelenítéshez kellő mezők, hogy a szoba-
+   rekesz kicsi maradjon (16 sor × 8 szám). */
+function mpTableTrim(teams){
+  return (teams||[]).map(t=>({n:String(t.n),you:!!t.you,mate:!!t.mate,
+    player:!!t.player,pts:t.pts|0,gf:t.gf|0,ga:t.ga|0,w:t.w|0,d:t.d|0,l:t.l|0}));}
+/* A KI-VAGYOK-ÉN a két oldalon más: a host tabellájában a host sora a "you".
+   A guestnél ezt meg kell fordítani, különben a saját sorát a társáénak látná.
+   A párosítás névvel megy (a csapatnevek egyediek és átutaznak a szobán). */
+function mpTableForMe(teams){
+  return (teams||[]).map(t=>{
+    const mine=t.n===teamName;
+    return Object.assign({},t,{you:mine,mate:!mine&&!!t.player});});}
+function mpTableStore(round,teams){
+  S.mpTable={season:S.seasonNumber||1,upto:round,teams:mpTableForMe(teams),at:Date.now()};
+  try{saveGame();}catch(e){}}
+/* A most érvényes közös tabella, vagy null. A szezonszám védi attól, hogy egy
+   tavalyi állás átcsússzon az új idénybe. */
+function mpTableNow(){
+  const t=S.mpTable;
+  return (t&&t.season===(S.seasonNumber||1)&&Array.isArray(t.teams)&&t.teams.length)?t:null;}
+/* ---- A KÉZFOGÁS ----
+   HOST: kiszámolja és felteszi. GUEST: megvárja és beolvassa.
+   A host oldalán ez azonnal kész (nincs mire várni), a guestnél a szokásos
+   várakozó ablak fut, ugyanazzal a kiúttal, mint a párharcnál.
+   Ha bármi elakad (nincs kapcsolat), a guest NEM esik vissza helyi számításra:
+   inkább ne legyen tabella, mint két különböző. */
+const MP_WAIT_TABLE={mine:"A te oldalad",opp:"A közös tabella",
+  cancel:"✕ Most nem várom meg"};
+let _mpTblBusy=false,_mpTblPoll=null;
+function mpTableStop(){
+  _mpTblBusy=false;
+  if(_mpTblPoll){clearTimeout(_mpTblPoll);_mpTblPoll=null;}}
+async function mpTableSync(round,onDone){
+  if(!h2hRoomActive()){onDone&&onDone();return;}
+  const cur=mpTableNow();
+  if(cur&&cur.upto>=round){onDone&&onDone();return;}
+  const key=mpTableKey(),field=mpTableField(round);
+  if(MP.role==="host"){
+    /* A HOST SZÁMOL. A mate-adat ilyenkor már megvan: a 15. fordulónál a
+       párharc-pillanatképből (mpMateHalf), a 30.-nál a szezonzárás-cseréből
+       (mpMateFinal) — mindkettőt a hívó várja meg. */
+    const teams=buildFinalTable({half:round<30});
+    mpTableStore(round,teams);
+    try{await mpNetInit();
+      await mpBk().h2hPut(MP.activeRoom,key,field,
+        {season:S.seasonNumber||1,upto:round,teams:mpTableTrim(teams),at:Date.now()});}
+    catch(e){}
+    onDone&&onDone();return;}
+  /* GUEST: megvárja a host tabelláját. */
+  if(_mpTblBusy)return;
+  _mpTblBusy=true;
+  h2hWaitShow("TABELLA","A közös tabella a host oldalán készül…",true,false,MP_WAIT_TABLE);
+  $("h2hWaitErr").textContent="";
+  const tick=async()=>{
+    if(!_mpTblBusy)return;
+    let node=null;
+    try{await mpNetInit();node=await mpBk().h2hGet(MP.activeRoom,key);}
+    catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
+    if(!_mpTblBusy)return;
+    const rec=node&&node[field];
+    if(rec&&rec.season===(S.seasonNumber||1)&&Array.isArray(rec.teams)&&rec.teams.length){
+      mpTableStop();h2hWaitHide();
+      mpTableStore(round,rec.teams);
+      onDone&&onDone();return;}
+    h2hWaitShow("TABELLA",
+      `<span class="h2hDot"></span>A közös tabellát a host állítja össze — a te eredményeid már nála vannak.`
+      +`<br><small style="color:var(--dim2)">Amint a társad is idáig ért, megjelenik az állás.</small>`,
+      true,false,MP_WAIT_TABLE);
+    _mpTblPoll=setTimeout(tick,2500);};
+  tick();}
+$("h2hWaitCancelBtn")&&(function(){
+  /* a párharc-, szezonzáró- és Infinity-kiút mellé a tabelláé is */
+  const prev=$("h2hWaitCancelBtn").onclick;
+  $("h2hWaitCancelBtn").onclick=()=>{if(_mpTblBusy){mpTableStop();h2hWaitHide();return;}if(prev)prev();};})();
 /* upto = hányadik forduló UTÁNI állást kérjük (0-30). A tabella a te valós
    eredményeidből + a mezőny saját, seedelt menetrendjéből épül. */
 function buildLeagueTable(upto,opts){
@@ -23531,7 +23635,9 @@ function applyTitleMorale(){
   return Math.round(S.morale);}
 /* A bajnokavatás képernyője. A `how` mondja el, hol dőlt el a cím. */
 function showChampionScreen(how,teams){
-  const t=teams||liveLeagueTable();
+  /* MP-ben a közös állás az igazság, nem a helyi élő tabella (lásd mpTableSync). */
+  const _sh=h2hRoomActive()?mpTableNow():null;
+  const t=teams||(_sh?_sh.teams:liveLeagueTable());
   const me=t.find(x=>x.you);
   showTrophyScreen({theme:"LEAGUE",
     sub:`<b>${esc(teamName)}</b> — ${esc(pickLineNoRepeat(CHAMPION_SUB,"champSub"))}`,
@@ -23912,6 +24018,28 @@ function renderScheduleModal(){
       +`<span class="schS ${scls}">${score}</span></div>`;});
   $("scheduleBody").innerHTML=html||'<div class="note">Még nincs kisorsolva a menetrend.</div>';
   /* élő tabella + a bajnoki helyzet szöveges összefoglalója */
+  /* ---- KÖZÖS KARRIER: MENET KÖZBEN NINCS TABELLA ----
+     Az élő tabella a SAJÁT eredményeidből és egy helyben szimulált CPU-mezőnyből
+     állt össze. A társad 28 meccse nincs benne, a CPU-k egymás elleni
+     párosításai pedig kliensenként mások (lásd mpTableSync) — vagyis a két
+     képernyőn KÉT KÜLÖNBÖZŐ tabella állt, és egyik sem volt igaz. Egy hamis
+     állás rosszabb, mint semmi: erre lehetett átigazolást és taktikát alapozni.
+     Mostantól MP-ben csak a HOST által összeállított, közös állás látszik — az
+     pedig a 15. és a 30. forduló után születik. */
+  if(h2hRoomActive()){
+    const shared=mpTableNow();
+    if(shared){
+      $("scheduleTableBody").innerHTML=renderFinalTable(shared.teams.slice());
+      const meRow=shared.teams.findIndex(t=>t.you)+1;
+      $("scheduleRaceNote").innerHTML=
+        `🤝 <b>Közös állás a ${shared.upto}. forduló után</b> — a host állította össze mindkettőtök eredményéből, tehát a társad képernyőjén betűre ugyanez van. Helyezésed: <b>${meRow}.</b>`
+        +(shared.upto<30?`<br><span style="color:var(--dim2)">A következő közös állás a 30. forduló (a visszavágó párharc) után jön.</span>`:"");
+    }else{
+      $("scheduleTableBody").innerHTML="";
+      $("scheduleRaceNote").innerHTML=
+        `🤝 <b>Közös karrierben a tabella a párharcoknál áll össze.</b> A társad 28 bajnoki meccsének eredménye a <b>15.</b> és a <b>30.</b> fordulóban érkezik meg — akkor a host egyben kiszámolja a közös állást, és mindkettőtök képernyőjén ugyanaz jelenik meg.`
+        +`<br><span style="color:var(--dim2)">Addig szándékosan nem mutatunk tabellát: a féloldalas állás mindkettőtöknél mást mondana.</span>`;}
+    return;}
   if(snap){
     $("scheduleTableBody").innerHTML=renderFinalTable(snap.teams.slice());
     const need=Math.max(0,snap.chaserMax-snap.myPts+1);
@@ -24066,8 +24194,23 @@ function finish(){
     try{saveGame();}catch(e){}
     mpFinalWait(()=>finish());
     return;}
+  /* ---- A VÉGTABELLÁT IS A HOST SZÁMOLJA ----
+     A társad zárása fentebb már megérkezett, tehát a hostnál minden adat együtt
+     van. Ha helyben számolnánk, a CPU-sorok a két oldalon eltérnének (lásd
+     mpTableSync indoklását) — és a HELYEZÉS-ből jön a szezontörténet, az
+     európai kvalifikáció és a párharc-ítélet is, tehát ez nem kozmetika.
+     A hívás a hostnál azonnal visszatér; a guest megvárja a host tábláját. */
+  if(gameMode==="career"&&h2hRoomActive()&&!S.finalTable
+     &&!(mpTableNow()&&mpTableNow().upto>=30)){
+    phase="verdict";
+    $("scSim").classList.add("hide");
+    try{saveGame();}catch(e){}
+    mpTableSync(30,()=>finish());
+    return;}
   const pts=S.pts;
-  const finalTeams=S.finalTable||buildFinalTable();
+  const _mpT=(gameMode==="career"&&h2hRoomActive())?mpTableNow():null;
+  const finalTeams=S.finalTable
+    ||((_mpT&&_mpT.upto>=30)?_mpT.teams.slice():buildFinalTable());
   const yourRank=finalTeams.findIndex(t=>t.you)+1;
   let tier,note="";
   if(S.W===30){tier="30–0 · A TÖKÉLETES SZEZON";note="Játszott 30, nyert 30. Halhatatlan.";}
@@ -30276,7 +30419,7 @@ function saveGame(){
            döntés, a közös előzmény és az egymás elleni napló. */
         /* a szezonra rögzített rejtett ellenfél-erősítés (lásd seasonHiddenBonus) */
         oppBuffH:S.oppBuffH,
-        mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,pendingCardUps:S.pendingCardUps,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
+        mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,pendingCardUps:S.pendingCardUps,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,mpTable:S.mpTable,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
@@ -30616,6 +30759,7 @@ function applySavedGame(d){
     S.euro.mpSeeded=!!(S.mpCup&&S.mpCup.comp&&S.euro.mateIdx!=null);
     S.euro.mpSeed="s"+(S.seasonNumber||1)+":cup:"+((S.mpCup&&S.mpCup.comp)||"x");}
   S.mpMateHalf=d.S.mpMateHalf||null;
+  S.mpTable=d.S.mpTable||null;
   S.leaveDeals=d.S.leaveDeals||[];
   S.halftimeSubs=!!d.S.halftimeSubs;
   /* F6: a kiegyenlítő eltolás a keret TARTÓS tulajdonsága — enélkül egy
