@@ -2284,7 +2284,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.068";
+const APP_VERSION="2.6.069";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -26158,6 +26158,18 @@ function mpInfinityKey(){return "infinity";}
 function mpInfPartnerOpened(){
   if(!(typeof h2hRoomActive==="function"&&h2hRoomActive()))return false;
   return (S.mpMateChampLvl||0)>=INFINITY_UNLOCK_RATING||!!S.mpInfMatePaid;}
+/* Megvan-e NEKED a belépő: valaha bajnok a 100-as (vagy magasabb) mezőnyön.
+   Régen ez a renderHub-ban élt helyi függvényként; azóta a szoba-figyelő is
+   használja (ő hirdeti meg a társadnak), ezért kikerült ide. */
+function infWonAtGate(){
+  return (S.seasonHistory||[]).some(h=>h&&h.rank===1&&(h.oppRating||0)>=INFINITY_UNLOCK_RATING);}
+/* Elért-e valaha a VILÁG a küszöbszintet. A mezőny közös, tehát ez mindkét
+   kliensnél ugyanaz — ez a legolcsóbb kapu ahhoz, hogy egyáltalán érdemes-e
+   belenézni a szobába. (Nem a rangsor számít, csak a szint: a merítés nem
+   évül el, ha később lejjebb tolod a nehézséget.) */
+function infWorldAtGate(){
+  return (oppTargetRating||0)>=INFINITY_UNLOCK_RATING
+    ||(S.seasonHistory||[]).some(h=>h&&(h.oppRating||0)>=INFINITY_UNLOCK_RATING);}
 /* ---- A LEVONÁS ÉS A MEGNYITÁS: EGY HELYEN ----
    Csak akkor fut le, ha MINDKÉT befizetés megvan. Ha időközben elfogyott a
    pénzed (a vállalás óta költöttél), NEM nyitunk meg semmit és nem megyünk
@@ -26179,12 +26191,26 @@ function mpInfSettle(){
   infinityApplyUnlock();
   return true;}
 /* ---- CSENDES FIGYELŐ A HUB-BAN ----
-   A várakozó ablakot nyugodtan bezárhatod: a befizetésed a szobában marad. Ezt
+   A várakozó ablakot nyugodtan bezárhatod: a vállalásod a szobában marad. Ezt
    viszont csak akkor tudjuk BEVÁLTANI, ha valaki megnézi a szobát — ezért a
-   HUB rajzolása ritkán (RITMUS) belenéz. Két dolgot intéz: észreveszi, ha a
-   társad befizetett (ettől nálad is megjelenik a gomb), és ha már mindkét
-   befizetés megvan, elvégzi a levonást és a megnyitást — akkor is, ha épp nem
-   áll nyitva a várakozó ablak. */
+   HUB rajzolása ritkán (RITMUS) belenéz. Három dolgot intéz:
+
+     1. MEGHIRDETI A SAJÁT BAJNOKI CÍMEDET. Ha nálad megvan a belépő (bajnok a
+        100-as mezőnyön), egyszer beírja a szobába (hostChamp / guestChamp).
+        EZ A KAPU RETROAKTÍV FELE: a társad bajnoki címét eddig csak a
+        szezonzáró párharc-szekció könyvelte, tehát egy MÁR FUTÓ karrierben —
+        ahol az a szezon rég lezárult — a nem-bajnok félnél sosem jelent volna
+        meg a gomb, és nem is jelenhetett volna meg soha, mert egy szezonban
+        csak egy bajnok lehet. Így viszont mindkét kliens a következő
+        HUB-rajzolásnál megtudja, hogy a másiknál megvan a belépő — nem kell
+        hozzá új szezon, és nem kell hozzá, hogy bárki pénzt tegyen bele.
+     2. Észreveszi, ha a társad befizetett (ettől is megjelenik nálad a gomb).
+     3. Ha már MINDKÉT befizetés megvan, elvégzi a levonást és a megnyitást —
+        akkor is, ha épp nem áll nyitva a várakozó ablak.
+
+   A mezők SZÁNDÉKOSAN külön nevűek (host / hostChamp): a "befizetett" és a
+   "megvan a belépője" két különböző tény, és a befizetés-figyelő (mpInfinityTick)
+   a puszta host/guest mezőt nézi — egy közös mező összekeverné a kettőt. */
 const MP_INF_PEEK_MS=15000;
 let _mpInfPeekAt=0,_mpInfPeekBusy=false;
 async function mpInfPeek(force){
@@ -26193,13 +26219,24 @@ async function mpInfPeek(force){
   const now=Date.now();
   if(!force&&now-_mpInfPeekAt<MP_INF_PEEK_MS)return;
   _mpInfPeekAt=now;_mpInfPeekBusy=true;
+  const key=mpInfinityKey();
+  const myField=MP.role==="host"?"host":"guest",oppField=myField==="host"?"guest":"host";
+  const myChamp=myField+"Champ",oppChamp=oppField+"Champ";
   let node=null;
-  try{await mpNetInit();node=await mpBk().h2hGet(MP.activeRoom,mpInfinityKey());}catch(e){}
+  try{await mpNetInit();node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+  /* A meghirdetés akkor is kell, ha a rekesz még teljesen üres (node===null):
+     ilyenkor épp a te bejegyzésed hozza létre. */
+  if(infWonAtGate()&&!(node&&node[myChamp])){
+    try{await mpBk().h2hPut(MP.activeRoom,key,myChamp,{champ:true,at:Date.now()});}catch(e){}
+    try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}}
   _mpInfPeekBusy=false;
   if(!node)return;
-  const myField=MP.role==="host"?"host":"guest",oppField=myField==="host"?"guest":"host";
   const mine=!!node[myField],opp=!!node[oppField];
   let changed=false;
+  if(node[oppChamp]&&(S.mpMateChampLvl||0)<INFINITY_UNLOCK_RATING){
+    S.mpMateChampLvl=INFINITY_UNLOCK_RATING;changed=true;
+    if(!infWonAtGate())
+      addLine(`∞ A társad megnyerte a bajnokságot a ${INFINITY_UNLOCK_RATING}-as mezőnyön — az Infinity kapuja nálad is kinyílt. Egy szezonban úgyis csak egy bajnok lehet, a befizetés viszont mindkettőtöké.`,"m life");}
   if(opp&&!S.mpInfMatePaid){S.mpInfMatePaid=true;changed=true;}
   if(mine&&!S.infPledged){S.infPledged=true;changed=true;}
   if(mine&&opp){if(mpInfSettle())return;}
@@ -28077,6 +28114,7 @@ function renderHub(){
      jelenti, hogy nem kell épp 100-on ÁLLNOD a vásárláskor — a megszerzett
      érdem nem évül el. */
   const wonAtLevel=(lvl)=>(S.seasonHistory||[]).some(h=>h&&h.rank===1&&(h.oppRating||0)>=lvl);
+  /* (a küszöbszintre szóló változat globálisan is kell — lásd infWonAtGate) */
   /* ---- KÖZÖS KARRIER: A KAPU KÉTOLDALÚ ----
      Egy szezonban CSAK EGY bajnok lehet, viszont az Infinity mindkettőtök
      világát nyitja ki, és mindkettőtöknek fizetnie kell hozzá. Ha tehát a
@@ -28086,11 +28124,17 @@ function renderHub(){
      hozzájárulni, és a mód sosem nyílt volna meg. */
   const canInfinity=!infinityMode&&(wonAtLevel(INFINITY_UNLOCK_RATING)||mpInfPartnerOpened());
   const canTier=infinityMode&&wonAtLevel(maxOppRating());
-  /* Közös karrierben a szoba állását ritkán megnézzük: ettől jelenik meg a
-     gomb annál, akinél a társ fizetett be elsőként, és ettől nyílik meg a mód
-     akkor is, ha a várakozó ablak épp nincs nyitva. */
-  if(!infinityMode&&typeof h2hRoomActive==="function"&&h2hRoomActive()
-     &&(canInfinity||S.infPledged))
+  /* Közös karrierben a szoba állását ritkán megnézzük: innen tudja meg a nem-
+     bajnok fél, hogy a társánál megvan a belépő (vagy hogy már be is fizetett),
+     és ettől nyílik meg a mód akkor is, ha a várakozó ablak épp nincs nyitva.
+     A KAPU A VILÁG SZINTJE, NEM A SAJÁT JOGOSULTSÁGOD. Ez elsőre apróságnak
+     tűnik, de pont ez a különbség tette volna használhatatlanná az egészet:
+     ha a figyelő a canInfinity mögött állna, a nem-bajnok félnél sosem futna
+     le (nincs jogosultsága), tehát sosem tudná meg, hogy a társánál megvan —
+     vagyis örökre zárva maradna a kapu. Kör-hivatkozás. A mezőnyszint viszont
+     KÖZÖS, tehát mindkét kliensnél ugyanaz, és semmilyen jogosultságtól nem
+     függ. */
+  if(!infinityMode&&typeof h2hRoomActive==="function"&&h2hRoomActive()&&infWorldAtGate())
     try{mpInfPeek();}catch(e){}
   /* ---- A KIEMELT INFINITY-SÁV (közvetlenül a Run-szint alatt) ----
      A gomb korábban a Nehézség-almenüben lapult, becsukva — a karrier
