@@ -2239,7 +2239,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.066";
+const APP_VERSION="2.6.067";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8012,6 +8012,19 @@ const INFINITY_TIER_STEP=100;       /* egy megvásárolt tier ennyivel emeli */
 const INFINITY_PEAK_END=55;         /* eddig tart a csúcs — utána sem esik vissza */
 const INFINITY_RETIRE_AGE=55;       /* visszavonulás csak innentől */
 const INFINITY_ACADEMY_MIN=85, INFINITY_ACADEMY_MAX=95;
+/* ---- KÖZÖS KARRIER: FELE-FELE A SZÁMLA ----
+   Az Infinity közös karrierben csak akkor nyílik meg, ha MINDKETTEN
+   befizetitek a részedet (lásd mpInfinityBegin). A rendszer viszont eddig
+   MINDKETTŐTŐL a TELJES árat kérte, tehát a közös feloldás a kétszeresébe
+   került, mint az egyjátékos — pedig ugyanazt az egy világot nyitja ki.
+   Ezért a közös karrierben a fejenkénti rész a fele: az összeg, ami a
+   feloldáshoz a szobába érkezik, pontosan annyi, mint egyjátékosban.
+   MINDEN kijelzés és a levonás is ezen az egy függvényen megy át, hogy az
+   ígért és a levont összeg soha ne csúszhasson szét. */
+const INFINITY_MP_SHARE=0.5;
+function infinityMyPrice(){
+  return (typeof h2hRoomActive==="function"&&h2hRoomActive())
+    ?Math.round(INFINITY_PRICE*INFINITY_MP_SHARE):INFINITY_PRICE;}
 let infinityMode=false;   /* meg van-e nyitva */
 let infinityTiers=0;      /* hány db +100-as tier van megvéve */
 function ratingCap(){return infinityMode?Infinity:RATING_CAP;}
@@ -8409,6 +8422,78 @@ function estimateTSI(trueTSI,stars,rnd){
 function maybeImproveScout(scout){
   if(scout.stars<SCOUT_MAX_STARS&&Math.random()<0.28)scout.stars=Math.min(SCOUT_MAX_STARS,scout.stars+0.5);
   return scout;}
+/* ================= A SAJÁT JÁTÉKOSOD TSI-JE MINDIG LÁTSZIK =================
+   A scout 👁 megtekintése arra való, hogy a VÁSÁRLÁS ELŐTT mérd fel egy idegen
+   játékost — ott a korlát a játék lényege. De ha egyszer már a tiéd, semmi nem
+   indokolja, hogy a tehetségét ne lássad: hónapokon át együtt edzesz vele.
+   Ezért a saját kereted TSI-je FOLYAMATOSAN látszik, két állapotban:
+
+     · KÖZELÍTŐ, amíg kevesebb, mint TSI_EXACT_MATCHES meccset játszott nálad.
+       Ez pontosan az az érték, amit az átigazoláskor is láttál — a scoutod
+       akkori csillagerejével készült becslés.
+
+     · PONTOS, TSI_EXACT_MATCHES lejátszott meccs után. A mérce a
+       careerStats.matches (mileMatches) — vagyis a NÁLAD játszott meccsek,
+       kupával együtt. Ez a "megismerés" küszöbe: 15 meccs alatt kiderül, mi
+       van a játékosban.
+
+   MIÉRT SZORZÓ, ÉS NEM BEFAGYASZTOTT SZÁM? Az estimatedTSI minden
+   szezonváltáskor ÚJRASORSOLÓDIK (hogy egy időközben fejlődött scout
+   pontossága a pool még fel nem fedezett tagjainál is érvényesüljön). Ha ezt
+   mutatnánk, a saját játékosod becsült TSI-je szezononként ugrálna — pedig
+   nem lett tehetségesebb, csak újra dobtunk. Az ugrálás tehát nem információ,
+   hanem zaj. Ezért az ÉRKEZÉSKORI TÉVEDÉST fagyasztjuk be, arányként:
+   tsiEstMul = akkori becslés / valódi TSI. A kijelzett érték ebből áll elő
+   (tsi × tsiEstMul), aminek két jó következménye van:
+     · az érkezés pillanatában bitre az akkor látott számot adja;
+     · ha a játékos TSI-je KÉSŐBB nő (ifi-boost, öreg-boost, akadémia,
+       kihívás-jutalom, az Infinity ×1,5-e), a becslés VELE MOZDUL — nem kell
+       minden TSI-t növelő helyet külön kézzel javítani, és nem áll elő az a
+       zavaró állapot, hogy a boost-ablak +2500 TSI-t ígér, a kártyán meg
+       ugyanaz a szám marad. A scout tévedése arányos marad, ahogy az
+       estimateTSI hibasávja is arányos (margin = tsi × pct).
+   A tsiEstMul a pool-bejegyzésben él, tehát a mentés magától viszi (a
+   packCareerPool "maradék" mezője gondoskodik róla; nem tesszük a pozíciós
+   számtömbbe, mert 1662 pool-tag közül csak a sajátjaidnak van ilyen mezője).
+
+   Karrier módon kívül nincs TSI (nincs careerPool), ott a függvény null-t ad,
+   és minden kijelzés csendben elmarad. */
+const TSI_EXACT_MATCHES=15;
+function tsiInfo(name){
+  if(gameMode!=="career"||!careerPool)return null;
+  const e=careerPool[name];
+  if(!e||e.tsi==null)return null;
+  const m=mileMatches(name);
+  if(m>=TSI_EXACT_MATCHES)return {exact:true,val:Math.round(e.tsi),matches:m,need:0,entry:e};
+  /* A TÉVEDÉS BEFAGYASZTÁSA: az első alkalommal, amikor a sajátodként
+     kérdezzük, elmentjük az AKKORI becslés arányát — vagyis azt, amit az
+     átigazolás/draft pillanatában is mutattunk. Ha valamiért nincs
+     estimatedTSI (régi mentés), most készítünk egyet a scout aktuális
+     csillagerejével, hogy legyen mit mutatni. */
+  if(e.tsiEstMul==null){
+    let est=e.estimatedTSI;
+    if(est==null)est=scout?estimateTSI(e.tsi,scout.stars):e.tsi;
+    e.tsiEstMul=Math.round((est/Math.max(1,e.tsi))*1e4)/1e4;}
+  return {exact:false,val:Math.max(50,Math.round(e.tsi*e.tsiEstMul/10)*10),matches:m,
+    need:TSI_EXACT_MATCHES-m,entry:e};}
+/* Rövid jelölés a listákhoz: "TSI 4210" vagy "TSI ~3900". A ~ jel önmagában
+   közli, hogy még becslés — a pontos okot a játékos-lap mondja el. */
+function tsiTag(name){
+  const t=tsiInfo(name);
+  if(!t)return "";
+  return `TSI ${t.exact?"":"~"}${t.val}`;}
+/* Egész soros jelölés a játékos-lapra: érték + hogy miért ez a pontossága. */
+function tsiNote(name){
+  const t=tsiInfo(name);
+  if(!t)return "";
+  const col=t.exact?"var(--gold)":"var(--dim)";
+  const head=t.exact
+    ?`TSI: <b style="color:var(--gold)">${t.val}</b>`
+    :`Becsült TSI: <b>~${t.val}</b>`;
+  const why=t.exact
+    ?`<span style="color:var(--dim2)">${t.matches} meccset játszott nálad — ennyi idő után már pontosan tudod, mi van benne.</span>`
+    :`<span style="color:var(--dim2)">a scoutod becslése az érkezésekor · még ${t.need} meccs, és pontosan látod (${t.matches}/${TSI_EXACT_MATCHES})</span>`;
+  return `<div class="hdRow" style="border-left:3px solid ${col};padding-left:8px">${head} · ${why}</div>`;}
 /* A teljes karrier-játékospool: minden valós személy fix életkora, TSI-je,
    csúcsa és kezdő Ratingje EGYSZER generálódik a karrier indításakor — a
    scout becslése is ekkor rögzül mindenkire, nem sorsolódik újra minden
@@ -9484,7 +9569,14 @@ function advanceCareerSeason(){
        fejlődött scout pontossága sosem érvényesülne a már korábban generált,
        de még fel nem fedezett pool-tagoknál, csak az újonnan érkezőknél. A
        valódi TSI (entry.tsi) szándékosan NEM változik — az a játékos tényleges,
-       fix mennyei potenciálja, ami sosem sorsolódik újra. */
+       fix mennyei potenciálja, ami sosem sorsolódik újra.
+       A SAJÁT JÁTÉKOSODNÁL viszont az újrasorsolás zaj lenne: a HUB-ban végig
+       látod a becsült TSI-jét, és az szezononként ugrálna, holott a játékos
+       nem lett tehetségesebb. Ezért itt, MÉG az újradobás előtt befagyasztjuk
+       az érkezéskori tévedés ARÁNYÁT (tsiEstMul) — ez a lazy tsiInfo() párja
+       arra az esetre, ha a kijelzés még egyszer sem futott le az érkezése óta. */
+    if(entry.tsiEstMul==null&&entry.estimatedTSI!=null&&entry.tsi>0)
+      entry.tsiEstMul=Math.round((entry.estimatedTSI/entry.tsi)*1e4)/1e4;
     if(scout)entry.estimatedTSI=estimateTSI(entry.tsi,scout.stars);});
   const rosterSlots=[];
   /* A családtag is szerepel: a Ratingje/kora frissül a pool-bejegyzésből.
@@ -11066,8 +11158,8 @@ const GLOSSARY={
   taktika:{title:"Taktikák",text:"Az edződ 3 kedvelt taktikával érkezik (80/76/70-es szintről indulnak, a többi 60-ról). A HUB Taktika-paneljén aktiválhatsz egyet: 85-ös szint FÖLÖTT előnyt ad és stílust kap a csapat (a busz zárt meccseket, a kontra az erősebb ellenfelek ellen él, a labdatartás elveszi a labdát...), ALATTA még begyakorolatlan és visszahúz. Minden taktika MÁS csapat-attribútumokra épül: a Park the bus a Védekezésre és a Védésre, a Labdatartás a Passzra, a Hosszú labdák a Gólszerzésre, a Széljáték pedig a Sebességre és a Gólszerzésre. A kezdő 11 ÖT tengelyét (Védekezés, Védés, Passz, Gólszerzés, Sebesség) a játékosok attribútumai ÉS a megszerzett skilljeik adják (pl. a BL Aranycipője a Gólszerzés-tengelyt tolja meg). A SEBESSÉG külön eset: nem a Ratingből jön, egyénibb a többinél (a kisorsolása szélesebb sávban szór), 1,5x lassabban edzhető, és 99-nél kemény plafonja van. Maga a JÁTÉK is gyorsít valamennyit — a poszt sprint-igénye szerint (a csatár a legtöbbet, a kapus alig) —, de ez a passzív út a SZÜLETÉSI érték +15%-ánál megáll. Efölé kizárólag célzott edzésterv visz. Vagyis a gyorsaság alapvetően veleszületett adottság: aki lassúnak született, játékkal csak korlátozottan javul — cserébe a Széljáték és a Gyors kontra szinte ezen áll vagy bukik. Az így kapott illeszkedés kétszeresen számít: gyorsítja a begyakorlást, és skálázza a meccs-hatást is — a jól illeszkedő rendszer előnye nagyobb, a rosszul illeszkedő begyakorlatlanságának büntetése mélyebb. A panelen tengelyenként látod, hol állsz, és melyik erősséged emeli vagy melyik gyengeséged húzza vissza az egyes rendszereket. Egy ERŐS keret (85 fölötti csapaterő) gyorsabban vesz fel egy új rendszert: a begyakorlás 90-es szintig fokozatosan gyorsul a csapaterővel, 90 fölött viszont a mesteri csiszolás mindenkinek ugyanannyi munka. Így egy átformálódó nagy csapat gyorsan felhozhat egy másik taktikát."},
   edzesterv:{title:"Edzésterv",text:"A HUB-ban kijelölhetsz egy FŐ és egy MELLÉK edzést. Mindkettőhöz egy attribútumot választasz (Védekezés, Sebesség, Védés, Passz, Gólszerzés) és legfeljebb 2 poszt-csoportot (kapus, védők, középpályások, csatárok), akikre vonatkozik. A fő edzés meccsenként 0,8 pontot ad a választott attribútumra, a mellék a felét (0,4) — cserébe az érintett játékosok NEM edzett attribútumai lassabban gyűlnek. Az edzés tehát nem ingyen gyorsítás, hanem irányválasztás: azt fejleszted, amire a taktikádnak szüksége van. A hatás korfüggő: 21 év alatt kétszeres, 25 alatt 1,6-szoros, 30 alatt 0,8-szoros, afölött 0,4-szeres — fiatalt érdemes képezni. Egy attribútum a poszt-profiljához képest +30-ig specializálható, de a Rating-hozam csökken (a +8 fölötti rész felét, a +16 fölötti a negyedét éri) — a TAKTIKA-illeszkedésben viszont teljes értékkel számít. Így egy 130-as passzú középpályás valódi passzmester lesz a Labdatartáshoz, anélkül hogy a Ratingje elszaladna. A SEBESSÉG külön eset: 1,5x lassabban formálható, és a játék magától csak a születési érték +15%-áig viszi — azon túl KIZÁRÓLAG edzéssel jutsz feljebb, 99-ig."},
   karriermod:{title:"Karrier mód vs. Klasszikus mód",text:"A klasszikus egy szezonos móddal szemben a karrier mód több szezonon át tartó, fejlődő történet: a játékosaid öregednek és fejlődnek, van átigazolási piac, scout, akadémia, és a csapatod hosszú távon formálódik."},
-  tsi:{title:"TSI",text:"A TSI egy rejtett, a Ratingnél sokkal szélesebb skálájú érték, ami egy játékos hosszú távú, valódi potenciálját mutatja. Egy fiatal, alacsony Ratingű, de magas TSI-jű játékos idővel akár sztárrá válhat. A scoutod ereje szabja meg, hány játékos TSI-jét nézheted meg — de azt te választod ki, kikét."},
-  scout:{title:"Scout",text:"A scoutod csillagereje (1-5) szabja meg, hány játékos TSI-jét nézheted meg egy keretből vagy jelöltlistából — és mivel az árak rejtve vannak, a scout-megtekintés az egyetlen módja felmérni egy játékos valódi erejét. A scout a tárgyalások SZÁMÁT is korlátozza egy átigazolási ablakban (a megtekintések számának 2-3-szorosa): egy jobb scout több próbálkozást enged. És azt is a scout szabja meg, HÁNYSZOR küldheted ki egyáltalán posztokat felderíteni: maxos scouttal 8 felderítés jut sessiononként (a téli ablak 2 körből áll, tehát összesen 16; a rövid ablak 1 körből, tehát 8), a nyári vásárlásnál pedig ennek a háromszorosa (24), de az szezononként csak egyszer. Egy adott posztot ugyanabban a sessionben legfeljebb 4-szer nézhetsz meg — érdemes tehát átgondolni, hova küldöd. Idővel fejlődik, és fiatal (25 év alatti) tehetségeket keres előszeretettel."},
+  tsi:{title:"TSI",text:"A TSI egy rejtett, a Ratingnél sokkal szélesebb skálájú érték, ami egy játékos hosszú távú, valódi potenciálját mutatja. Egy fiatal, alacsony Ratingű, de magas TSI-jű játékos idővel akár sztárrá válhat. IDEGEN játékosnál a scoutod ereje szabja meg, hány TSI-t nézhetsz meg — azt viszont te választod ki, kikét. A SAJÁT KERETEDNÉL nincs korlát: minden játékosod TSI-je folyamatosan látszik a HUB-ban. Amíg kevesebb, mint 15 meccset játszott nálad, a scoutod érkezéskori becslése látszik (~ jellel); 15 meccs után a pontos érték — ennyi idő alatt kiderül, mi van benne. A becslés nem sorsolódik újra szezononként: az érkezéskori tévedés aránya fix, tehát ha a játékos TSI-je nő (ifi-boost, akadémia, kihívás-jutalom), a becslés vele mozdul."},
+  scout:{title:"Scout",text:"A scoutod csillagereje (1-5) szabja meg, hány IDEGEN játékos TSI-jét nézheted meg egy keretből vagy jelöltlistából — és mivel az árak rejtve vannak, a scout-megtekintés az egyetlen módja felmérni egy leigazolás előtt álló játékos valódi erejét. (A saját játékosaid TSI-je ingyen, folyamatosan látszik: a scout korlátja a VÁSÁRLÁS előtti felmérésről szól. A scout csillagereje ott is számít, hogy mennyire pontos a becslés, amit a keretedbe került játékosról az első 15 meccsén látsz.) A scout a tárgyalások SZÁMÁT is korlátozza egy átigazolási ablakban (a megtekintések számának 2-3-szorosa): egy jobb scout több próbálkozást enged. És azt is a scout szabja meg, HÁNYSZOR küldheted ki egyáltalán posztokat felderíteni: maxos scouttal 8 felderítés jut sessiononként (a téli ablak 2 körből áll, tehát összesen 16; a rövid ablak 1 körből, tehát 8), a nyári vásárlásnál pedig ennek a háromszorosa (24), de az szezononként csak egyszer. Egy adott posztot ugyanabban a sessionben legfeljebb 4-szer nézhetsz meg — érdemes tehát átgondolni, hova küldöd. Idővel fejlődik, és fiatal (25 év alatti) tehetségeket keres előszeretettel."},
   akademia:{title:"Akadémia",text:"Minden 4. meccs után egy fiatal akadémiai tehetség mutatkozik be — alacsony jelenlegi Ratinggel, de szokatlanul magas TSI-vel. Az akadémia minősége a csapatod aktuális erejéhez igazodik: egy erősebb csapat jobb tehetségeket termel. Ha nincs helyed vagy még korainak érzed, az akadémián is hagyhatod: ott CÉLZOTT képzést kap, ezért gyorsabban fejlődik, mintha a cserepadon ülne — de lassabban, mintha játékperceket kapna a kezdő 11-ben. Kis eséllyel a TSI-je is megugrik. Később egyre nagyobb eséllyel jelentkezik vissza, és látod, mennyit fejlődött közben. Az akadémiai idő 21 évesen lejár: ekkor egy utolsó, „most vagy soha\" ajánlatot kapsz rá."},
   budzse:{title:"Átigazolási büdzsé és árak",text:"Minden szezon elején kapsz egy költségvetést a csapatod erejéhez mérten, és a felhasználatlan rész átvihető a következő szezonra. A vásárlás DRÁGA (a piaci érték fölött, felárral — magasabb mezőnyön még többe kerül), az eladás szerényebb összeget hoz. Ez tudatos: egy nagy játékos beszerzése több szezonnyi spórolás, nem egy szezon pénzéből megvehető. Az árakat a lista nem mutatja — csak amikor rákattintasz a vételi szándékra. A HUB-ban a zöld chip a HALMOZOTT egyenleged, alatta pedig a SZEZONONKÉNTI keret bontása áll: mennyi jön a csapaterődből, és mit tesz hozzá vagy vesz el az edzői fizetésemelés / megsapkázás (kihívás-jutalom, illetve büntetés, ±10% lépésekben) és a választott fejlődési tempó (a Komótos ×0,90, a Csigatempó ×0,75 — a lassabb tempó a piacot is visszafogja, különben csak megkerülnéd a lassítást vásárlással)."},
   elvagyodas:{title:"Elvágyódás és megtartás",text:"Az átigazolási időszakok egyik lehetséges eseménye: valaki a keretedből távozni szeretne. Régen ez egyszerűen ELVETTE a játékost — ma már döntés. Kapsz egy megtartási díjat, és háromfelé mehetsz: kifizeted azonnal (marad), HALASZTOTT megállapodást kötsz (marad, de a díj a szezon végén esedékes), vagy elengeded. A halasztott út a csapda: ha a szezon végére nem jön össze a pénz, a játékos mégis távozik — kezdőemberként érkezik helyette valaki, de nem te választod. A jó csapatkémia és a magas morál csökkenti az elvágyódás esélyét, tehát ez ellen nem csak pénzzel lehet védekezni."},
@@ -25874,7 +25966,7 @@ function infinityReportHtml(){
 function infinityMainBody(){
   return `<div class="infPanel on">
     <div class="infHead"><span class="infTitle">∞ INFINITY MÓD</span>
-      <span class="infPrice">${fmtFtShort(INFINITY_PRICE)}</span></div>
+      <span class="infPrice">${fmtFtShort(infinityMyPrice())}</span></div>
     <div class="infSub">A karrier határainak feloldása. Ami eddig plafon volt, innentől kiindulópont.</div>
     <div class="infList">
       · A <b>Rating-plafon (${RATING_CAP}) megszűnik</b><br>
@@ -25971,9 +26063,11 @@ function infinityApplyUnlock(){
    Egyjátékosban az Infinity a te döntésed, és azonnal megnyílik. Közös
    karrierben viszont a mezőny, a kupák és a párharcok is KÖZÖSEK — ha az egyik
    fél egyedül oldaná fel a plafont, a másik ugyanabban a világban maradna
-   plafonnal, és a két keret menthetetlenül szétnőne. Ezért itt MINDKETTŐTÖKNEK
-   be kell fizetnie a teljes árat, és a mód csak akkor nyílik meg, amikor a
-   második befizetés is megérkezett.
+   plafonnal, és a két keret menthetetlenül szétnőne. Ezért itt MINDKETTŐNEK be
+   kell fizetnie a maga részét — fejenként az ár FELÉT (infinityMyPrice) —, és
+   a mód csak akkor nyílik meg, amikor a második befizetés is megérkezett. A
+   szobába összesen tehát pontosan annyi érkezik, mint egyjátékosban: a közös
+   feloldás nem drágább, csak meg kell osztani.
    A kézfogás ugyanazon a csatornán megy, mint a párharc-pillanatképek: a szoba
    "infinity" rekesze alatt egy host és egy guest mező. A befizetés AZONNAL
    levonódik és felmegy — onnantól a te oldaladon nincs mit visszavonni, tehát
@@ -26002,7 +26096,7 @@ async function mpInfinityBegin(){
      idehív (S.transferBudget-=price). Ha itt is levonnánk, a közös karrier
      KÉTSZER fizettetne. Itt már csak a befizetés TÉNYE megy fel a szobába. */
   if(!node||!node[myField]){
-    addLine(`∞ Befizettél ${fmtFt(INFINITY_PRICE)}-ot az Infinity megnyitására — most a társadra vár.`,"m life");
+    addLine(`∞ Befizetted a részedet (${fmtFt(infinityMyPrice())}) az Infinity megnyitására — most a társadra vár.`,"m life");
     try{saveGame();}catch(e){}
     try{await mpBk().h2hPut(MP.activeRoom,key,myField,{paid:true,at:Date.now()});}
     catch(e){$("h2hWaitErr").textContent="A befizetést nem sikerült elküldeni — újrapróbáljuk.";}}
@@ -26027,7 +26121,7 @@ async function mpInfinityTick(key,myField,oppField){
     infinityApplyUnlock();
     return;}
   h2hWaitShow("INFINITY",
-    `<span class="h2hDot"></span>Befizetted a(z) ${fmtFt(INFINITY_PRICE)}-ot — `
+    `<span class="h2hDot"></span>Befizetted a részedet (${fmtFt(infinityMyPrice())}) — `
     +`${opp?"a társadé is megvan…":"most a társadra várunk, hogy ő is befizesse a maga részét."}`
     +`<br><small style="color:var(--dim2)">A befizetésed a szobában marad: nyugodtan kiléphetsz, és amikor ő is fizet, nálad is megnyílik.</small>`,
     mine,opp,MP_WAIT_INF);
@@ -26041,11 +26135,11 @@ function infinityBuyMain(){
   if(typeof h2hRoomActive==="function"&&h2hRoomActive()){
     infinityConfirm("∞ Infinity mód — közösen",
       infinityMainBody()
-      +`<div class="infWarn">🤝 <b>Közös karrier:</b> az Infinity csak akkor nyílik meg, ha <b>MINDKETTEN</b> befizetitek a(z) ${fmtFt(INFINITY_PRICE)}-ot. A te részed azonnal levonódik és felmegy a szobába — <b>visszavonni nem lehet</b>. Ha a társad nem fizet be, a mód nem nyílik meg.</div>`,
-      INFINITY_PRICE,()=>{mpInfinityBegin();});
+      +`<div class="infWarn">🤝 <b>Közös karrier — fele-fele:</b> a teljes ár ${fmtFt(INFINITY_PRICE)}, ebből a te részed <b>${fmtFt(infinityMyPrice())}</b>, a másik felét a társad fizeti. Az Infinity csak akkor nyílik meg, ha <b>MINDKETTEN</b> befizettetek. A te részed azonnal levonódik és felmegy a szobába — <b>visszavonni nem lehet</b>. A társad is csak akkor tud fizetni, ha ő is megnyerte a bajnokságot ${INFINITY_UNLOCK_RATING}-as mezőnyön; amíg ez nincs meg, a befizetésed a szobában várakozik.</div>`,
+      infinityMyPrice(),()=>{mpInfinityBegin();});
     return;}
   infinityConfirm("∞ Infinity mód",infinityMainBody(),
-    INFINITY_PRICE,()=>{infinityApplyUnlock();});}
+    infinityMyPrice(),()=>{infinityApplyUnlock();});}
 function infinityBuyTier(){infinityConfirm("∞ További szintek",
   `<div class="infPanel on">
     <div class="infHead"><span class="infTitle">∞ +${INFINITY_TIER_STEP} SZINT</span>
@@ -26082,13 +26176,13 @@ $("hubYouthBoostBtn").onclick=()=>{
     /* AKI MÁR KAPOTT, AZON LÁTSZIK — ez a legdrágább HUB-fejlesztés, a
        döntéshez tudni kell, kire mennyit fordítottál eddig. */
     const _bt=youthBoostTag(e);
-    b.innerHTML=`<b>${esc(shortName(p.n))}</b>${_bt?` <span style="color:#00e5ff;font-weight:700">${_bt}</span>`:""} <span style="color:var(--dim2)">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · TSI ${e.tsi}</span>`
+    b.innerHTML=`<b>${esc(shortName(p.n))}</b>${_bt?` <span style="color:#00e5ff;font-weight:700">${_bt}</span>`:""} <span style="color:var(--dim2)">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · ${tsiTag(p.n)||("TSI "+e.tsi)}</span>`
       +((e.youthBoosts||0)?`<br><span style="font-size:11px;color:var(--dim2)">már ${e.youthBoosts}× boostolva · összesen +${e.youthBoostR||0} Rating, +${e.youthBoostT||0} TSI</span>`:"");
     b.onclick=()=>{
       if(S.transferBudget<price)return;
       askConfirm({title:"Elindítod az ifi-boostot?",yes:"Igen, berobbantom",
         html:`<div style="font-size:15px;font-weight:700">⚡ ${esc(shortName(p.n))}</div>
-          <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · TSI ${e.tsi}</div>
+          <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · ${tsiTag(p.n)||("TSI "+e.tsi)}</div>
           ${(e.youthBoosts||0)?`<div style="font-size:12px;color:#00e5ff;margin-top:4px">⚡ Ez már a ${(e.youthBoosts||0)+1}. boostja — eddig +${e.youthBoostR||0} Rating és +${e.youthBoostT||0} TSI jött belőle.</div>`:""}
           <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(price)}</b> — az egyenleged ${fmtFt(S.transferBudget)} → <b>${fmtFt(S.transferBudget-price)}</b>.
             A boost egyszeri és visszavonhatatlan, és csak EZT a játékost érinti.</div>`,
@@ -26128,12 +26222,12 @@ $("hubOldBoostBtn").onclick=()=>{
   if(affordable)vets.forEach(p=>{
     const e=careerPool[p.n];
     const b=document.createElement("button");b.className="btn-s stepbtn";b.style.marginTop="6px";b.style.textAlign="left";
-    b.innerHTML=`<b>${esc(shortName(p.n))}</b> <span style="color:var(--dim2)">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · TSI ${e.tsi}</span>`;
+    b.innerHTML=`<b>${esc(shortName(p.n))}</b> <span style="color:var(--dim2)">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · ${tsiTag(p.n)||("TSI "+e.tsi)}</span>`;
     b.onclick=()=>{
       if(S.transferBudget<price||!isVeteranBoostable(e))return;
       askConfirm({title:"Marasztalod a vén rókát?",yes:"Igen, maradjon",
         html:`<div style="font-size:15px;font-weight:700">🎩 ${esc(shortName(p.n))}</div>
-          <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · TSI ${e.tsi}</div>
+          <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · ${tsiTag(p.n)||("TSI "+e.tsi)}</div>
           <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(price)}</b> — az egyenleged ${fmtFt(S.transferBudget)} → <b>${fmtFt(S.transferBudget-price)}</b>.
             Egy játékoson csak EGYSZER süthető el, és ${OLD_BOOST_RETIRE_AGE} éves koráig a pályán tartja.</div>`,
         onYes:()=>{
@@ -26574,6 +26668,9 @@ function buildHubDetail(loc){
     /* IFI-BOOST TÖRTÉNET: ki mennyi boostot kapott. A legdrágább HUB-fejlesztés
        nyoma eddig nem látszott sehol — a hatás beépült, a tény eltűnt. */
     html+=youthBoostNote(e);
+    /* TSI: a saját játékosodnál mindig látszik. 15 nálad játszott meccs alatt a
+       scout érkezéskori becslése, utána a pontos érték — lásd tsiInfo(). */
+    html+=tsiNote(p.n);
     html+=`<div class="hdRow">Induló Rating: <b>${Math.round(e.draftRating)}</b> → jelenlegi: <b>${Math.round(pOvr(p))}</b> · ${e.age} év</div>`;
     /* a posztok innentől jelvényként, familiaritás szerinti sorrendben */
     html+=posFamiliarityHtml(e,p);
@@ -27389,7 +27486,8 @@ function runIntroHtml(){
     ${done?"":`<div style="font-size:12.5px;margin-top:6px">
       <div>1. Told fel a mezőnyt a <b>100-as nehézségig</b> <span style="color:var(--dim2)">(most: ${oppTargetRating})</span></div>
       <div>2. <b>Nyerd meg a bajnokságot</b></div>
-      <div>3. Gyűjts össze <b>${fmtFt(INFINITY_PRICE)}</b> <span style="color:var(--dim2)">(most: ${fmtFt(S.transferBudget||0)})</span></div>
+      <div>3. Gyűjts össze <b>${fmtFt(infinityMyPrice())}</b> <span style="color:var(--dim2)">(most: ${fmtFt(S.transferBudget||0)})${
+        infinityMyPrice()<INFINITY_PRICE?` · közös karrierben ez a te feled, a másikat a társad állja`:""}</span></div>
       <div>4. <b>Oldd fel az Infinityt</b> — és mindezt minél kevesebb szezon alatt</div>
     </div>`}
     <div style="font-size:11.5px;color:var(--dim2);margin-top:8px">
@@ -27791,7 +27889,7 @@ function renderHub(){
     slot.classList.toggle("hide",!showInf);
     if(canInfinity||canTier){
       const tier=canTier&&!canInfinity;
-      const price=tier?INFINITY_TIER_PRICE:INFINITY_PRICE;
+      const price=tier?INFINITY_TIER_PRICE:infinityMyPrice();
       const ok=(S.transferBudget||0)>=price;
       const miss=Math.max(0,price-(S.transferBudget||0));
       slot.innerHTML=
@@ -27802,7 +27900,8 @@ function renderHub(){
           </div>
           <div class="infSub">${tier
             ? `A mezőny további ${INFINITY_TIER_STEP} szinttel tolható feljebb.`
-            : "Nincs többé Rating-plafon, nincs hanyatlás, a mezőny 200-ig tolható."}</div>
+            : "Nincs többé Rating-plafon, nincs hanyatlás, a mezőny 200-ig tolható."}${
+            (!tier&&price<INFINITY_PRICE)?`<br>🤝 Közös karrier: ez a te feled a(z) ${fmtFtShort(INFINITY_PRICE)}-ból.`:""}</div>
           <div class="infSub" style="font-weight:700;color:${ok?"#b9ffcb":"#ffd9a0"}">
             ${ok?"✓ Megvan rá a kereted — koppints!":`Még ${fmtFt(miss)} hiányzik`}
           </div>
@@ -27979,11 +28078,17 @@ function renderHub(){
        lenne igazán a helyén. */
     const ownPosNote=(loc.type==="slot"&&p.pos&&p.pos.length&&!p.pos.includes(posTxt))
       ?` · saját poszt: ${p.pos.join("/")}`:"";
+    /* A SAJÁT JÁTÉKOS TSI-JE A SORBAN IS LÁTSZIK — a scout 👁 megtekintése a
+       vásárlás előtti felmérésről szól, a saját keretedről nincs mit eltitkolni.
+       A ~ jel közli, hogy még a becslés fut (15 nálad játszott meccs alatt);
+       a pontos állást és az okot a lenyitott játékos-lap mondja el. */
+    const _tsi=(()=>{const t=tsiInfo(p.n);if(!t)return "";
+      return ` · <span title="${t.exact?"Pontos érték — "+t.matches+" meccset játszott nálad":"A scoutod becslése az érkezésekor · még "+t.need+" meccs a pontos értékig"}" style="color:${t.exact?"var(--gold)":"var(--dim2)"}">TSI ${t.exact?"":"~"}${t.val}</span>`;})();
     row.innerHTML=`<span class="pos pc-${posColorKey}">${posLabel}</span>
       <span class="main"><div class="nm">${esc(p.n)}${tag}${cardBadge}${unavBadge}${retireBadge(p.n)}${coachFocusBadge(p.n)}${
         (()=>{const _e=careerPool&&careerPool[p.n];const _t=_e?youthBoostTag(_e):"";
           return _t?` <span title="Ifi-boostot kapott" style="color:#00e5ff;font-weight:700;font-size:11px">${_t}</span>`:"";})()}</div>
-      <div class="trait">${ageTxt} · ${ratingTxt}${ownPosNote}</div>${unavNote}</span>
+      <div class="trait">${ageTxt} · ${ratingTxt}${_tsi}${ownPosNote}</div>${unavNote}</span>
       <span class="ovr">${ovrShown}</span>`;
     row.style.display="flex";row.style.alignItems="center";
     /* Az ELADÁS-gomb korábban itt, a sorban ült, minden játékos neve mellett.
