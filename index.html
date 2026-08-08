@@ -2284,7 +2284,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.070";
+const APP_VERSION="2.6.071";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8269,8 +8269,21 @@ function youthBoostNote(entry){
    Az ifi-boost tükörképe idős játékosokra: egy 30 fölötti öregedő játékos
    TSI-jét dobja meg (+1200-3000) és kitolja a nyugdíjba vonulását 41 éves
    korra. Ugyanaz az ára, mint az ifi-boostnak (párhuzamosan drágulnak).
-   Egy játékost csak EGYSZER lehet így boostolni (_oldBoosted jelző). */
+   Egy játékost csak EGYSZER lehet így boostolni (_oldBoosted jelző).
+
+   RATINGET IS AD — UGYANÚGY, MINT AZ IFI-BOOST. Eddig csak a TSI-t emelte, a
+   Ratinget pedig mindössze a kor-görbére húzta fel (max a régi és a
+   ratingAtAge közül). Egy 33 évesnél a görbe már LEFELÉ tart, tehát ez a
+   gyakorlatban nulla volt: ugyanazért az árért az ifi +6-12 Ratinget kapott
+   azonnal, a veterán semmit — pedig épp a veteránnál a legrövidebb az idő,
+   ami alatt a magasabb potenciál Ratinggé válhatna. A tartomány szándékosan
+   PONTOSAN az ifi-boosté: ugyanaz az ár, ugyanaz a hatás, csak a másik
+   irányból (az ifinél a jövő, itt a jelen a nyereség).
+   A NYERESÉG MEGMARAD: a szezonváltó a régi Ratinget viszi tovább a természetes
+   kor-hanyatlással csökkentve (nem esik vissza a görbére), a többlet 30%-a
+   pedig VÉGLEG beépül a peakbe — a boost tehát nem egy szezonra szól. */
 const OLD_BOOST_TSI=[1200,3000];
+const OLD_BOOST_RATING=YOUTH_BOOST_RATING;   /* szándékosan azonos: +6-12 */
 const OLD_BOOST_RETIRE_AGE=41;
 function oldBoostPrice(){return youthBoostPrice();}   /* párhuzamosan drágul az ifi-boosttal */
 function isVeteranBoostable(entry){
@@ -8278,15 +8291,36 @@ function isVeteranBoostable(entry){
 function applyOldBoost(entry){
   const sc=youthBoostScale();
   const tBoost=Math.round((OLD_BOOST_TSI[0]+Math.random()*(OLD_BOOST_TSI[1]-OLD_BOOST_TSI[0]))*sc);
+  const rBoost=Math.round((OLD_BOOST_RATING[0]+Math.random()*(OLD_BOOST_RATING[1]-OLD_BOOST_RATING[0]))*sc);
+  const tsiBefore=entry.tsi,ratBefore=entry.startRating;
   entry.tsi=Math.min(tsiCapFor(entry),entry.tsi+tBoost);
   entry.peak=Math.min(ratingCap(),Math.max(entry.peak,tsiToPeakOvr(entry.tsi)));
+  /* előbb a kor-görbe (ez volt eddig is), UTÁNA a tényleges emelés */
   entry.startRating=Math.min(ratingCap(),Math.max(entry.startRating,Math.round(ratingAtAge(entry.peak,entry.age))));
+  entry.startRating=Math.min(ratingCap(),entry.startRating+rBoost);
+  /* A peak kövesse a boostolt Ratinget — ugyanaz az indok, mint az ifi-boostnál:
+     különben a többlet "peak fölötti" maradna, és a fejlődés azonnal falba
+     ütközne (a fejlődési plafon a peak alá esne). */
+  entry.peak=Math.min(ratingCap(),Math.max(entry.peak,entry.startRating));
   if(entry.basePeak!=null)entry.basePeak=Math.max(entry.basePeak,entry.peak);
   if(entry.baseTsi!=null)entry.baseTsi=Math.max(entry.baseTsi,entry.tsi);
   entry._retireExtendTo=OLD_BOOST_RETIRE_AGE;   /* nem vonul vissza 41 éves koráig */
   entry._oldBoosted=true;                        /* egyszeri — nem boostolható újra */
   if(scout)entry.estimatedTSI=estimateTSI(entry.tsi,scout.stars);
-  return {tBoost};}
+  /* KÖNYVELÉS a tényleges nyereségről — ugyanaz az elv, mint az ifi-boostnál:
+     a napló és a játékos-lap nem ígérhet többet, mint ami megérkezett. */
+  const tGot=entry.tsi-tsiBefore,rGot=entry.startRating-ratBefore;
+  entry.oldBoostR=rGot;entry.oldBoostT=tGot;entry.oldBoostSeason=S.seasonNumber||1;
+  return {tBoost:tGot,rBoost:rGot};}
+/* Rövid jelölés a listákhoz — az ifi ⚡ párja. */
+function oldBoostTag(entry){return (entry&&entry._oldBoosted)?"🎩":"";}
+/* Egész soros jelölés a játékos-lapra. */
+function oldBoostNote(entry){
+  if(!entry||!entry._oldBoosted)return "";
+  return `<div class="hdRow" style="border:1px dashed #a67c4a;border-radius:7px;padding:6px 9px;color:#d9b98a">
+    🎩 <b>Öreg csirkefogó</b> <span style="color:var(--dim2)">+${entry.oldBoostR||0} Rating és +${entry.oldBoostT||0} TSI`
+    +(entry.oldBoostSeason?` · a ${entry.oldBoostSeason}. szezonban`:"")
+    +` · ${OLD_BOOST_RETIRE_AGE} éves koráig marad</span></div>`;}
 /* 100 fölött a piac nem tarthat 24 évesnél fiatalabb (a kor-görbén erősen
    levágott) játékost — lásd a szezonváltó kor-sorsolás indoklását. Ez a
    normalizáló a SZINTVÁLTÓ és BETÖLTŐ utakon fut, ahol nincs teljes újra-
@@ -26429,9 +26463,10 @@ $("hubOldBoostBtn").onclick=()=>{
   $("twTitle").textContent="🎩 Öreg csirkefogó — a rutin nem öregszik";
   const sc=youthBoostScale();
   const tLo=Math.round(OLD_BOOST_TSI[0]*sc),tHi=Math.round(OLD_BOOST_TSI[1]*sc);
+  const rLo=Math.round(OLD_BOOST_RATING[0]*sc),rHi=Math.round(OLD_BOOST_RATING[1]*sc);
   const affordable=S.transferBudget>=price;
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
-    Ára <b style="color:#a67c4a">${fmtFt(price)}</b> · hatása: <b>+${tLo}-${tHi} TSI</b>, és a játékos <b>${OLD_BOOST_RETIRE_AGE} éves koráig</b> nem vonul vissza. Csak 30 fölötti játékosra, és mindenkire csak egyszer.<br>
+    Ára <b style="color:#a67c4a">${fmtFt(price)}</b> · hatása: <b>+${rLo}-${rHi} Rating</b> (aki a saját potenciálja alatt állt, még többet kap) és <b>+${tLo}-${tHi} TSI</b>, és a játékos <b>${OLD_BOOST_RETIRE_AGE} éves koráig</b> nem vonul vissza. Csak 30 fölötti játékosra, és mindenkire csak egyszer.<br>
     ${affordable?"Válaszd ki az öreg rókát:":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget)}).</span>`}</p>`;
   $("twActions").innerHTML="";
   if(affordable)vets.forEach(p=>{
@@ -26444,15 +26479,19 @@ $("hubOldBoostBtn").onclick=()=>{
         html:`<div style="font-size:15px;font-weight:700">🎩 ${esc(shortName(p.n))}</div>
           <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · ${tsiTag(p.n)||("TSI "+e.tsi)}</div>
           <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(price)}</b> — az egyenleged ${fmtFt(S.transferBudget)} → <b>${fmtFt(S.transferBudget-price)}</b>.
-            Egy játékoson csak EGYSZER süthető el, és ${OLD_BOOST_RETIRE_AGE} éves koráig a pályán tartja.</div>`,
+            Hatása <b>+${rLo}-${rHi} Rating</b> és <b>+${tLo}-${tHi} TSI</b>. Egy játékoson csak EGYSZER süthető el, és ${OLD_BOOST_RETIRE_AGE} éves koráig a pályán tartja.</div>`,
         onYes:()=>{
       if(S.transferBudget<price||!isVeteranBoostable(e))return;
       S.transferBudget-=price;
       const res=applyOldBoost(e);
       const pl=currentRoster().find(x=>x.n===p.n)||extraRoster.find(x=>x.n===p.n);
-      if(pl){pl.tsi=e.tsi;}
-      addLine(`🎩 Öreg csirkefogó: ${esc(shortName(p.n))} nem adja fel — +${res.tBoost} TSI, és ${OLD_BOOST_RETIRE_AGE} éves koráig marad a pályán!`,"m life");
-      $("twBody").innerHTML=`<div class="h" style="color:#a67c4a">🎩 A vén róka marad!</div><p style="font-size:13px;margin-top:5px">${esc(shortName(p.n))} TSI-je most <b>${e.tsi}</b>, és <b>${OLD_BOOST_RETIRE_AGE}</b> éves koráig nem vonul vissza. A rutin pótolhatatlan.</p>`;
+      /* A KERET-OBJEKTUM RATINGJÉT IS ÁT KELL VEZETNI (pl.ovr), különben a
+         megvett Rating-többlet csak a pool-bejegyzésben állna, a pályán és a
+         HUB-ban pedig a régi érték látszana — ugyanaz a lépés, mint az
+         ifi-boostnál. Eddig azért hiányzott, mert nem volt Rating-hatás. */
+      if(pl){pl.tsi=e.tsi;pl.ovr=e.startRating;}
+      addLine(`🎩 Öreg csirkefogó: ${esc(shortName(p.n))} nem adja fel — +${res.rBoost} Rating és +${res.tBoost} TSI, és ${OLD_BOOST_RETIRE_AGE} éves koráig marad a pályán!`,"m life");
+      $("twBody").innerHTML=`<div class="h" style="color:#a67c4a">🎩 A vén róka marad!</div><p style="font-size:13px;margin-top:5px">${esc(shortName(p.n))} Ratingje <b>+${res.rBoost}</b>-tel <b>${Math.round(e.startRating)}</b>-re nőtt, a TSI-je most <b>${e.tsi}</b>, és <b>${OLD_BOOST_RETIRE_AGE}</b> éves koráig nem vonul vissza. A rutin pótolhatatlan.</p>`;
       $("twActions").innerHTML="";
       const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";
       ok.onclick=()=>csReturnToHub();$("twActions").appendChild(ok);
@@ -26493,8 +26532,9 @@ $("hubBoostTokenBtn").onclick=()=>{
       let msg;
       if(kind==="youth"){const res=applyYouthBoost(e);const pl=currentRoster().find(x=>x.n===p.n)||extraRoster.find(x=>x.n===p.n);if(pl)pl.ovr=e.startRating;
         msg=`⚡ Ingyen ifi-boost: ${esc(shortName(p.n))} +${res.rBoost} Rating és +${res.tBoost} TSI!`;}
-      else{const res=applyOldBoost(e);const pl=currentRoster().find(x=>x.n===p.n)||extraRoster.find(x=>x.n===p.n);if(pl)pl.tsi=e.tsi;
-        msg=`🎩 Ingyen öreg csirkefogó: ${esc(shortName(p.n))} +${res.tBoost} TSI, és tovább marad a pályán!`;}
+      else{const res=applyOldBoost(e);const pl=currentRoster().find(x=>x.n===p.n)||extraRoster.find(x=>x.n===p.n);
+        if(pl){pl.tsi=e.tsi;pl.ovr=e.startRating;}
+        msg=`🎩 Ingyen öreg csirkefogó: ${esc(shortName(p.n))} +${res.rBoost} Rating és +${res.tBoost} TSI, és tovább marad a pályán!`;}
       addLine(msg,"m life");
       $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">🎁 Beváltva!</div><p style="font-size:13px;margin-top:5px">${esc(msg)}</p>`;
       $("twActions").innerHTML="";
@@ -26883,6 +26923,8 @@ function buildHubDetail(loc){
     /* IFI-BOOST TÖRTÉNET: ki mennyi boostot kapott. A legdrágább HUB-fejlesztés
        nyoma eddig nem látszott sehol — a hatás beépült, a tény eltűnt. */
     html+=youthBoostNote(e);
+    /* ÖREG CSIRKEFOGÓ: az ifi-boost tükörképe, ugyanígy nyoma marad. */
+    html+=oldBoostNote(e);
     /* TSI: a saját játékosodnál mindig látszik. 15 nálad játszott meccs alatt a
        scout érkezéskori becslése, utána a pontos érték — lásd tsiInfo(). */
     html+=tsiNote(p.n);
@@ -28388,7 +28430,9 @@ function renderHub(){
     row.innerHTML=`<span class="pos pc-${posColorKey}">${posLabel}</span>
       <span class="main"><div class="nm">${esc(p.n)}${tag}${cardBadge}${unavBadge}${retireBadge(p.n)}${coachFocusBadge(p.n)}${
         (()=>{const _e=careerPool&&careerPool[p.n];const _t=_e?youthBoostTag(_e):"";
-          return _t?` <span title="Ifi-boostot kapott" style="color:#00e5ff;font-weight:700;font-size:11px">${_t}</span>`:"";})()}</div>
+          return _t?` <span title="Ifi-boostot kapott" style="color:#00e5ff;font-weight:700;font-size:11px">${_t}</span>`:"";})()}${
+        (()=>{const _e=careerPool&&careerPool[p.n];const _t=_e?oldBoostTag(_e):"";
+          return _t?` <span title="Öreg csirkefogó — Rating- és TSI-boostot kapott" style="font-size:11px">${_t}</span>`:"";})()}</div>
       <div class="trait">${ageTxt} · ${ratingTxt}${_tsi}${ownPosNote}</div>${unavNote}</span>
       <span class="ovr">${ovrShown}</span>`;
     row.style.display="flex";row.style.alignItems="center";
