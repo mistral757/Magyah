@@ -2284,7 +2284,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.073";
+const APP_VERSION="2.6.074";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -15263,6 +15263,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   mpSummerRef:null,
   mpMateHalf:null,    /* a társ féltávi mérlege a párharc pillanatképéből */
   mpTable:null,       /* a HOST által összeállított közös tabella (15./30. forduló) */
+  seasonDrama:null,   /* a meccsértékelések szezonos gyűjtése (izgalom-átlag) */
   /* KÖZÖS KUPA: a szezonra kialkudott nyári sorozat — {season,comp,qual,
      mateName,mateOvr,how}. A comp:null is érvényes döntés (idén nincs kupa). */
   mpCup:null,
@@ -16578,6 +16579,255 @@ function lateGoalDeepPrefix(dMin,rival){
   return pick(rival
     ? ["A RANGADÓ UTOLSÓ MÁSODPERCEIBEN — ","A BÍRÓ MÁR AZ ÓRÁJÁT NÉZTE — ","A LEFÚJÁS ELŐTTI UTOLSÓ TÁMADÁSBÓL — "]
     : ["A RÁADÁS LEGVÉGÉN — ","A BÍRÓ MÁR AZ ÓRÁJÁT NÉZTE — ","AZ UTOLSÓ TÁMADÁSBÓL — "]);}
+/* ================= MECCSÉRTÉKELÉS — A LEFÚJÁS UTÁNI MÉRLEG (F1) =============
+   A meccs végén eddig egyetlen sor állt: "VÉGE — 3:1". Ugyanaz a 3:1 viszont
+   lehet unalmas darálás és lehet életre szóló hajrá is; a különbséget eddig
+   semmi nem mondta ki. Ez a réteg megnézi, MI TÖRTÉNT a 90 perc alatt, és
+   kimondja egy mondatban.
+
+   HONNAN JÖN AZ ADAT: a clutchLog-ból, ami a meccs MINDEN gólját sorrendben
+   tartalmazza (side, név, perc). Ez azért fontos, mert a motorban tizenhárom
+   különböző helyen nő a gólszám (tizenegyes, öngól, szabadrúgás, csere-gól,
+   90+ dráma, hosszabbítás…) — ha külön-külön kellene mindegyiket
+   megjelölni, előbb-utóbb kimaradna egy. A napló EGY közös csatorna (sbEv →
+   clutchNoteGoal), tehát ide biztosan minden gól beérkezik.
+
+   KÉT KIMENET:
+     · KATEGÓRIA — ebből lesz a szöveg. A sorrend a ritkaságot követi: a
+       kifejezetten emlékezetes forgatókönyv (utolsó pillanat, nagy fordulat)
+       megelőzi a nagyarányú eredményt, az meg a langyos győzelmet.
+     · IZGALOM 0-100 — egyetlen szám, ami MÉRI, mennyire volt látványos a
+       mérkőzés. Az F1-ben ez tisztán kijelzés; a szurkolói bevétel (F2) ezt
+       fogja bemenetnek használni, ezért már most gyűjtjük szezonszinten.
+   A SZÁMOKRA NINCS HATÁSA: sem az eredményre, sem a morálra, sem a pénzre. */
+/* A meccs íve a gólnaplóból. */
+function matchSwings(log){
+  let us=0,them=0,leadChanges=0,equalisers=0,lastSign=0,cls=0,decisiveMin=0,lastMin=0;
+  (log||[]).forEach(e=>{
+    const before=us-them;
+    if(e.side==="us")us++;else them++;
+    const after=us-them;
+    lastMin=Math.max(lastMin,e.min|0);
+    /* VEZETÉSVÁLTÁS: egy gól egyszerre csak 1-et mozdít, tehát a vezetés
+       mindig a döntetlenen KERESZTÜL cserél gazdát — ezért az utolsó nem
+       nulla előjelhez mérünk, nem a közvetlen előzőhöz. */
+    const sAfter=after>0?1:after<0?-1:0;
+    if(sAfter!==0){
+      if(lastSign!==0&&sAfter!==lastSign)leadChanges++;
+      lastSign=sAfter;}
+    if(before!==0&&after===0)equalisers++;
+    /* A DÖNTŐ GÓL: az utolsó olyan találat, ami a végeredmény OSZTÁLYÁT
+       (győzelem / döntetlen / vereség) megváltoztatta. Ennek a perce mondja
+       meg, hogy a mérkőzés az utolsó pillanatban dőlt-e el. */
+    if(sAfter!==cls){cls=sAfter;decisiveMin=e.min|0;}});
+  return {leadChanges,equalisers,decisiveMin,lastMin,goals:us+them};}
+/* ---- AZ IZGALOM MÉRŐSZÁMA ----
+   Öt komponens, mind a mérkőzés MEGÉLT feszültségét méri, nem az eredményt:
+   a fordulatosság a legnagyobb súlyú (ez a legritkább és a legemlékezetesebb),
+   utána a hajrá-dráma, a gólok, a tét és a szorosság. Az unalmas meccs külön
+   levonást kap — enélkül egy 0:0 is 10 pont körül landolna a "szoros" tételen,
+   holott épp az ellenkezője igaz. */
+const EXC_MAX={swing:40,drama:25,goals:20,stake:15,close:10,rout:8};
+function matchExcitement(c){
+  const diff=Math.abs(c.diff||0);
+  const swing=Math.min(EXC_MAX.swing,
+    (c.leadChanges||0)*14+(c.equalisers||0)*7+Math.max(0,(c.comeback||0)-1)*6);
+  let drama=c.decisiveMin>=90?25:c.decisiveMin>=85?18:c.decisiveMin>=75?10:0;
+  /* Egy 5:1-nél a 88. perces gól nem dráma, csak statisztika — a hajrá csak
+     ott ér valamit, ahol a meccs tétje még élt. */
+  if(diff>2)drama=Math.round(drama*0.4);
+  const goals=Math.min(EXC_MAX.goals,(c.goals||0)*3.5);
+  let stake=0;
+  if(c.rival)stake+=8;
+  if(c.cup)stake+=6;
+  if(c.duel)stake+=8;
+  if(c.title)stake+=7;
+  stake=Math.min(EXC_MAX.stake,stake);
+  const close=diff<=1?10:diff===2?5:0;
+  /* ---- A GÓLZÁPOR IS ÉLMÉNY ----
+     MÉRVE, és látszott is egy éles meccsen: egy 4:0-s rangadó-demonstráció
+     22 pontot kapott, vagyis "visszafogott" — miközben a kommentár (joggal)
+     azt mondta, hogy ezt évekig emlegetni fogják. Az ellentmondás oka, hogy a
+     mutató addig csak a FESZÜLTSÉGET mérte, márpedig egy egyoldalú diadal nem
+     feszült — viszont a saját közönséged nagyon is élvezi. Ezért a
+     nagyarányú GYŐZELEM külön tételt kap. Vereségre szándékosan nem jár: a
+     kikapást a saját szurkolód nem élvezi. Ezzel a mutató pontosan azt méri,
+     amire az F2-ben szükség lesz: mennyire élvezte a TE közönséged. */
+  const rout=(c.diff>=3)?Math.min(EXC_MAX.rout,4+(c.diff-3)*2):0;
+  let s=swing+drama+goals+stake+close+rout;
+  if((c.goals||0)<=1&&!c.leadChanges&&!c.equalisers)s-=12;
+  return {score:Math.max(0,Math.min(100,Math.round(s))),
+    swing:Math.round(swing),drama:Math.round(drama),goals:Math.round(goals),stake,close,rout};}
+/* ---- A KATEGÓRIA ----
+   A sorrend a ritkaságot követi: ami ritkább, az az érdekesebb sztori, tehát az
+   kapja a mondatot. Az "unalmas" azért áll legelöl, mert csak nagyon szűk
+   feltétellel igaz (max 1 gól, semmi mozgás, és a meccs nem a hajrában dőlt el)
+   — így nem tud véletlenül elsülni egy izgalmas 1:0-ra. */
+function matchVerdictKey(c){
+  const diff=c.diff,adiff=Math.abs(diff);
+  const res=diff>0?"w":diff<0?"l":"d";
+  /* ---- A KEVÉS ESEMÉNYŰ MECCS HÁROM ARCA ----
+     MÉRVE: élethű góleloszlás mellett a mérkőzések ~22%-a esik ide (max 1 gól,
+     nulla mozgás, korán eldőlt) — ez reális, a valódi bajnokságokban is ennyi
+     a 0:0 és az 1:0. A hibám az volt, hogy MINDHÁRMAT "unalmasnak" neveztem.
+     Egy 1:0-s győzelem nem unalom, hanem MUNKAGYŐZELEM: csúnya, de három pont,
+     és a menedzser büszke rá. Csak a gól nélküli döntetlen az igazi
+     eseménytelenség. A vereség megint más: ott a fakóság a bosszantó. */
+  if((c.goals||0)<=1&&!c.leadChanges&&!c.equalisers&&c.decisiveMin<75)
+    return diff>0?"munkagyozelem":diff<0?"fakovereseg":"unalmas";
+  if(c.decisiveMin>=85&&adiff<=1)return "hajra_"+res;
+  if((c.leadChanges||0)>=3||((c.leadChanges||0)>=2&&(c.equalisers||0)>=2)
+     ||((c.comeback||0)>=3&&diff>=0))return "nagyon_"+res;
+  if(adiff>=3){
+    if(res==="l")return "nagyvereseg";
+    if(c.rival)return "nagygyozelem_rival";
+    if(Math.abs(c.ovrGap||0)<=3)return "nagygyozelem_hasonlo";
+    return "nagygyozelem";}
+  if((c.leadChanges||0)>=2||((c.leadChanges||0)>=1&&(c.equalisers||0)>=1))return "kozepes_"+res;
+  if((c.leadChanges||0)>=1||(c.equalisers||0)>=1)return "kicsi_"+res;
+  return "sima_"+res;}
+/* ---- A SZÖVEG ----
+   Kategóriánként négy változat. A behelyettesíthető részek: O = az ellenfél
+   neve, S = a végeredmény a te szemszögedből. */
+function matchVerdictTxt(key,c){
+  const O=c.opp,S=c.score,R=a=>pick(a);
+  const B={
+  unalmas:[
+    `Ezt a mérkőzést senki nem fogja emlékkönyvbe írni. ${S} — kevés helyzet, semmi ritmus, a lelátó a második félidőben már a kijáratot nézte.`,
+    `Kimért, eseménytelen 90 perc ${O} ellen. A ${S} pontosan annyit mond el, amennyi történt.`,
+    `Taktikai patthelyzet: két csapat, amelyik jobban félt a hibától, mint amennyire a gólt akarta. ${S}.`,
+    `${S} — a szurkolók a jegyáron gondolkodtak hazafelé. Az ilyen meccsek is kellenek, de nem ezekért jár ki az ember.`],
+  munkagyozelem:[
+    `Csúnya, de hatékony: ${S} ${O} ellen. Nem volt szép, viszont a három pont ugyanannyit ér.`,
+    `${S}. Egy gól, egy nulla, semmi felesleges kockázat — ilyen a menedzser-futball.`,
+    `Munkagyőzelem ${O} ellen. ${S} — a bajnokságokat pontosan az ilyen napok nyerik meg.`,
+    `${S}. A látvány elmaradt, a fegyelem nem: megvédtétek a saját tizenhatosotokat és az eredményt.`],
+  fakovereseg:[
+    `Fakó mérkőzés, fájó eredmény: ${S} ${O} ellen. Egyetlen gól döntött, és az nem a tiétek volt.`,
+    `${S}. Nem volt benne se ritmus, se helyzet — csak az a gól, amit kaptatok.`,
+    `Kevés esemény, rossz vég. ${S} ${O} ellen: az ilyen vereség a legbosszantóbb.`,
+    `${S} — a mérkőzés nagy részében nem történt semmi, aztán történt egy gól. A rossz oldalon.`],
+  hajra_w:[
+    `A LEFÚJÁS ELŐTTI PILLANATOKBAN dőlt el — ${S} ${O} ellen. A kispad a pályán, a lelátó a levegőben.`,
+    `Ilyenért jár ki az ember a stadionba: a mérkőzés a hajrában fordult a javatokra. ${S}.`,
+    `Idegtépő végjáték, és a végén ti örülhettetek. ${S} — ezt a három pontot a legutolsó percekben szereztétek meg.`,
+    `${S}. Egy mérkőzés, ami a 90. percig nyitott volt, és a legjobbkor billent el.`],
+  hajra_l:[
+    `A hajrában bukott el — ${S} ${O} ellen. Ennél kegyetlenebbül nehéz pontot veszíteni.`,
+    `Végig ott volt a kezetekben, aztán az utolsó percekben elfolyt. ${S}.`,
+    `${S}. A mérkőzés a legrosszabb pillanatban dőlt el; erről napokig fog beszélni az öltöző.`,
+    `Egy pillanatnyi kihagyás a végjátékban, és odalett minden. ${S} — az ilyen vereség sokáig fáj.`],
+  hajra_d:[
+    `A legutolsó percekben lett döntetlen — ${S} ${O} ellen. Két csapat, amelyik az utolsó másodpercig hajtott.`,
+    `${S}. A hajrában rendeződött a mérkőzés sorsa; egy pont, ami lehetett volna három is, meg nulla is.`,
+    `Igazi hullámvasút-végjáték, a végén osztozkodtatok. ${S}.`,
+    `A lefújás előtt még minden nyitva volt. ${S} — igazságos, ha nem is megnyugtató.`],
+  nagyon_w:[
+    `EZ VOLT AZ A MECCS. Oda-vissza hullámzó 90 perc, és a végén ti álltok fölül: ${S} ${O} ellen.`,
+    `Hihetetlen forgatókönyv — többször cserélt gazdát a vezetés, és a végén nálatok maradt. ${S}.`,
+    `${S}. Ilyet évente egyszer lát az ember: egy mérkőzés, ami mindkét irányba eldőlhetett volna.`,
+    `A szurkolók kimerülten mennek haza, de boldogan. ${S} egy őrült meccsen.`],
+  nagyon_l:[
+    `Őrült mérkőzés, rossz véggel — ${S} ${O} ellen. Oda-vissza ment, és a végén ti maradtatok alul.`,
+    `${S}. Ebből a meccsből minden kijött, csak a pont nem: többször is vezettetek, mégsem elég.`,
+    `Hullámvasút, ami a rossz oldalon állt meg. ${S} — ezt nehéz lesz megemészteni.`,
+    `Nagy meccs volt, nagy vereség lett. ${S} ${O} ellen.`],
+  nagyon_d:[
+    `Oda-vissza hullámzó, gólgazdag mérkőzés, a végén igazságos osztozkodás: ${S} ${O} ellen.`,
+    `${S}. Kétszer is fordult a meccs — ilyenkor a döntetlen szinte kötelező.`,
+    `Ezt a mérkőzést mindkét tábor élvezte. ${S}, és senki nem érdemelte volna a vereséget.`,
+    `Vad, nyitott, gólos meccs, ${S}-es végeredménnyel. A pontosztozkodás mellett a látvány maradt.`],
+  nagygyozelem_rival:[
+    `RANGADÓ-DEMONSTRÁCIÓ! ${S} ${O} ellen — ezt a napot a szurkolók évekig emlegetni fogják.`,
+    `${S} a riválison. Nem meccs volt, hanem üzenet: ebben a városban ti vagytok az elsők.`,
+    `A rangadó egyoldalúra sikeredett — a ti oldalatokra. ${S}, és a lelátó végig énekelt.`,
+    `${O} otthonában is, idegenben is fájni fog ez a ${S}. A rangadót nem megnyertétek, hanem lezártátok.`],
+  nagygyozelem_hasonlo:[
+    `Papíron kiélezett meccs volt — a pályán szó sem volt róla. ${S} egy hasonló erejű ${O} ellen.`,
+    `${S}. Egyenrangú ellenfél, mégis egyoldalú mérkőzés: ma minden összeállt.`,
+    `Ezt a ${S}-t senki nem várta egy ilyen ellenféltől. A csapat a legjobb arcát mutatta.`,
+    `Az erőviszonyok kiegyensúlyozottak voltak, az eredmény nem: ${S} ${O} ellen.`],
+  nagygyozelem:[
+    `Magabiztos, nagyarányú siker: ${S} ${O} ellen. A feladatot elvégeztétek.`,
+    `${S}. A papírforma érvényesült, méghozzá kíméletlenül.`,
+    `Gólzáporos győzelem ${O} ellen — ${S}. Ilyenkor jó a gólkülönbséget nézegetni.`,
+    `${S}, és a meccs jóval a lefújás előtt eldőlt. Rutinos, fegyelmezett munka.`],
+  nagyvereseg:[
+    `Kemény lecke: ${S} ${O} ellen. Ezt gyorsan el kell felejteni — és tanulni belőle.`,
+    `${S}. Ma semmi nem működött; az ilyen napokat is le kell játszani.`,
+    `Nagyarányú vereség ${O} ellen. A csapat a lefújás után a lelátó felé indult bocsánatot kérni.`,
+    `${S} — az eredmény önmagáért beszél. Jövő héten új meccs.`],
+  kozepes_w:[
+    `Fordulatos mérkőzés, a végén a ti javatokra: ${S} ${O} ellen.`,
+    `${S}. Volt benne fordulat, volt benne izgalom — és a három pont maradt a lényeg.`,
+    `Nem volt egyszerű, de a csapat átfordította a maga javára. ${S}.`,
+    `${S} egy meccsen, ami többször is más irányba indult. Jó karakterpróba volt.`],
+  kozepes_l:[
+    `Fordulatos meccs, rossz véggel — ${S} ${O} ellen.`,
+    `${S}. Volt itt minden, csak pont nem: a fordulatokból az utolsó ellenetek szólt.`,
+    `Kellemetlen vereség egy nyitott mérkőzésen. ${S}.`,
+    `${S} — a meccs többször is elmozdult, és végül nem a jó irányba.`],
+  kozepes_d:[
+    `Mozgalmas mérkőzés, igazságos osztozkodás: ${S} ${O} ellen.`,
+    `${S}. Fordulatos meccs, amiben egyik csapat sem tudott elszakadni.`,
+    `Egy pont egy nyitott, izgalmas mérkőzésen. ${S}.`,
+    `${S} — volt benne fordulat bőven, csak győztes nem.`],
+  kicsi_w:[
+    `Szolid, de megérdemelt siker: ${S} ${O} ellen.`,
+    `${S}. Nem volt látványos, de a csapat elvégezte a dolgát.`,
+    `Egy pillanatra megingott a meccs, aztán rendeződött. ${S}.`,
+    `${S} ${O} ellen — a fontos az, hogy a három pont megvan.`],
+  kicsi_l:[
+    `Szoros meccs, ami nem jött össze: ${S} ${O} ellen.`,
+    `${S}. Kevesen múlt, de a kevés is elég a vereséghez.`,
+    `Volt esélyetek rá, mégis ${S} lett a vége.`,
+    `${S} — bosszantó vereség egy egyébként kiegyenlített mérkőzésen.`],
+  kicsi_d:[
+    `Kiegyenlített mérkőzés, megérdemelt pontosztozkodás: ${S} ${O} ellen.`,
+    `${S}. Két hasonló csapat, egy hasonló teljesítmény.`,
+    `Egy pont ${O} ellen — ${S}. Elfogadható, ha nem is ünneplendő.`,
+    `${S} egy mérkőzésen, amiben egyik oldal sem tudott dönteni.`],
+  sima_w:[
+    `Fegyelmezett, magabiztos győzelem: ${S} ${O} ellen.`,
+    `${S}. Kontroll volt a meccsen az első perctől.`,
+    `A csapat kézben tartotta a mérkőzést. ${S}.`,
+    `${S} ${O} ellen — pontosan olyan meccs, amilyet a menedzserek szeretnek.`],
+  sima_l:[
+    `Sima vereség: ${S} ${O} ellen. Ma az ellenfél volt a jobb.`,
+    `${S}. Nem volt benne fordulat, és nem is volt esélyetek rá.`,
+    `${O} magabiztosan hozta a mérkőzést. ${S}.`,
+    `${S} — kevés emlékezetes pillanat, annál több tanulság.`],
+  sima_d:[
+    `Eseménytelenebb, de rendezett döntetlen: ${S} ${O} ellen.`,
+    `${S}. Két fegyelmezett csapat, kevés kockázat.`,
+    `Egy pont ${O} ellen, ${S}-es végeredménnyel.`,
+    `${S} — a mérkőzés nagy részében megvolt az egyensúly.`]};
+  return R(B[key]||B.sima_d);}
+/* Az izgalom sávos jelölése — a szám mellé egy szó, hogy ne kelljen fejben
+   skálázni. */
+/* A SÁVOK MÉRÉSBŐL JÖNNEK, nem érzésből: 40 000 élethű meccsen (a motor saját
+   Poisson-eloszlásával) az izgalom mediánja 24, a p75 38, a p90 53, a p97 68.
+   Az első hangolásom 80/62/42/25-öt használt — azon a skálán a mérkőzések
+   háromnegyede "álmosító" lett volna, köztük egy 2:1 is. A mostani küszöbök a
+   mért kvantilisekre ülnek: emlékezetes ≈ a felső 3%, izgalmas ≈ a felső 12%,
+   élvezhető ≈ a felső harmad, álmosító ≈ az alsó ötöd. A mért címke-eloszlás:
+   álmosító 22% · visszafogott 42% · élvezhető 20% · izgalmas 11% · emlékezetes 5%. */
+function excitementLabel(v){
+  return v>=65?"emlékezetes":v>=48?"izgalmas":v>=30?"élvezhető":v>=10?"visszafogott":"álmosító";}
+/* ---- SZEZONOS GYŰJTÉS ----
+   Az F1-ben ez még nem hat semmire; a szurkolói bevétel (F2) ebből fog
+   dolgozni. Négy szám és egy név, tehát a mentésben elhanyagolható. */
+function dramaRecord(v,txtKey,opp){
+  const sn=S.seasonNumber||1;
+  let d=S.seasonDrama;
+  if(!d||d.season!==sn)d=S.seasonDrama={season:sn,n:0,sum:0,best:0,bestOpp:"",worst:100};
+  d.n++;d.sum+=v;
+  if(v>d.best){d.best=v;d.bestOpp=String(opp||"");}
+  if(v<d.worst)d.worst=v;
+  return d;}
+function dramaAvg(){
+  const d=S.seasonDrama;
+  return (d&&d.season===(S.seasonNumber||1)&&d.n)?Math.round(d.sum/d.n):null;}
 function ttScore(fx,gf,ga){return fx.home?`${gf}:${ga}`:`${ga}:${gf}`;}
 function myTeamAbbr(){
   const words=teamName.replace(/[^\p{L}\p{N}\s]/gu,"").split(/\s+/).filter(Boolean);
@@ -20266,6 +20516,29 @@ function playMatch(){
           S.mpDuelLog.push({season:sn,round:rnd,gf,ga,home:!!fx.home});}}
     addLine(`VÉGE  ${title}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m "+cls);
     if(DUEL)addLine(`⚔ A párharc lezárult: ${cls==="win"?`LEGYŐZTED ${esc(String(DUEL.oppName))} csapatát!`:cls==="loss"?`${esc(String(DUEL.oppName))} vitte el a három pontot.`:"osztozkodtatok — döntetlen."} ${S.idx+1===H2H_ROUNDS[0]?"A visszavágó a 30. fordulóban jön.":"Ez volt a szezon utolsó összecsapásotok."}`,"m "+cls);
+    /* ---- A MECCS MÉRLEGE (F1) ----
+       Egy mondat arról, MILYEN meccs volt — nem arról, mi lett az eredménye.
+       A gólnaplóból dolgozik (clutchLog), tehát minden gól-ág benne van, és a
+       számokhoz nem nyúl: sem eredmény, sem morál, sem pénz nem függ tőle. */
+    try{
+      const _sw=matchSwings(clutchLog);
+      const _ctx={diff:gf-ga,goals:_sw.goals,
+        leadChanges:_sw.leadChanges,equalisers:_sw.equalisers,
+        decisiveMin:_sw.decisiveMin,comeback:maxDeficit,
+        rival:!!RIVAL_MOOD,cup:euroActive(),duel:!!DUEL,
+        /* A _TITLE a meccs ELEJÉN készült pillanatkép (lásd _titleHdr) — a tét
+           akkor volt igaz, amikor kifutottatok, nem a lefújás után. */
+        title:!!(_TITLE&&isTitleDecider(_TITLE)),
+        ovrGap:(fx.o&&fx.o.ovr!=null)?(fx.o.ovr-teamStrength()):0,
+        opp:esc(String(DUEL?DUEL.oppName:((fx.o&&fx.o.n)||"az ellenfél"))),
+        score:`${gf}:${ga}`};
+      const _ex=matchExcitement(_ctx);
+      const _key=matchVerdictKey(_ctx);
+      addLine(`🎙 <b>A meccs mérlege:</b> ${matchVerdictTxt(_key,_ctx)}`,"m ev");
+      addLine(`📊 Izgalom: <b>${_ex.score}/100</b> — ${excitementLabel(_ex.score)} `
+        +`<span style="color:var(--dim2)">(fordulatosság ${_ex.swing} · hajrá ${_ex.drama} · gólok ${_ex.goals} · tét ${_ex.stake} · szorosság ${_ex.close}${_ex.rout?` · gólzápor ${_ex.rout}`:""})</span>`,"m ev");
+      if(gameMode==="career")dramaRecord(_ex.score,_key,_ctx.opp);
+    }catch(e){}
     /* a fejléc a végeredményen áll meg, az óra "VÉGE" — a következő meccs
        kezdetén az updateTTBoard(...,0) újrainicializálja */
     updateTTBoard(fx,gf,ga,90);
@@ -29956,6 +30229,18 @@ function hubShowSeasonReport(){
        +`<span style="color:var(--dim)">Kapott gól nélkül:</span> ${top(eb.cleanSheets)}`
        +`</div>`
        +`<div style="font-size:11px;color:var(--dim2);margin-top:4px">Ezek a számok a szezon-statisztikában és a mindenkori statisztikában is benne vannak.</div>`;}}
+  /* ---- AZ IDÉNY IZGALMA ----
+     A meccsenkénti értékelések (matchExcitement) szezonátlaga. Egyelőre tisztán
+     visszajelzés: megmutatja, milyen mérkőzéseket adott a csapatod. */
+  {const _d=S.seasonDrama,_a=dramaAvg();
+   if(_d&&_a!=null&&_d.n>=3){
+     html+=`<div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin:12px 0 5px">Az idény izgalma</div>`
+       +`<div style="font-size:12.5px;line-height:1.6">`
+       +`Átlag: <b>${_a}/100</b> (${esc(excitementLabel(_a))}) · ${_d.n} mérkőzésen mérve<br>`
+       +`<span style="color:var(--dim)">A legemlékezetesebb:</span> <b>${_d.best}/100</b>${_d.bestOpp?` — ${esc(_d.bestOpp)} ellen`:""}`
+       +` · <span style="color:var(--dim)">a leghalványabb:</span> ${_d.worst}/100`
+       +`</div>`
+       +`<div style="font-size:11px;color:var(--dim2);margin-top:4px">Minden mérkőzés kap egy izgalom-pontszámot a fordulatosságból, a hajrából, a gólokból, a tétből és a szorosságból — a lefújás után a naplóban is látod.</div>`;}}
   $("hubSeasonReport").innerHTML=html;
   $("hubSeasonReport").classList.remove("hide");
   $("hubNextSeasonBtn").textContent="Irány a pályára →";
@@ -30419,7 +30704,7 @@ function saveGame(){
            döntés, a közös előzmény és az egymás elleni napló. */
         /* a szezonra rögzített rejtett ellenfél-erősítés (lásd seasonHiddenBonus) */
         oppBuffH:S.oppBuffH,
-        mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,pendingCardUps:S.pendingCardUps,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,mpTable:S.mpTable,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
+        mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,pendingCardUps:S.pendingCardUps,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,mpTable:S.mpTable,seasonDrama:S.seasonDrama,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
@@ -30760,6 +31045,7 @@ function applySavedGame(d){
     S.euro.mpSeed="s"+(S.seasonNumber||1)+":cup:"+((S.mpCup&&S.mpCup.comp)||"x");}
   S.mpMateHalf=d.S.mpMateHalf||null;
   S.mpTable=d.S.mpTable||null;
+  S.seasonDrama=d.S.seasonDrama||null;
   S.leaveDeals=d.S.leaveDeals||[];
   S.halftimeSubs=!!d.S.halftimeSubs;
   /* F6: a kiegyenlítő eltolás a keret TARTÓS tulajdonsága — enélkül egy
