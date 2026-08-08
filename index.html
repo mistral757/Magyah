@@ -2284,7 +2284,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.076";
+const APP_VERSION="2.6.077";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -12145,6 +12145,8 @@ function beginNewGame(){
      KÉPERNYŐK. A kettő külön lépés, mert két külön szivárgási út volt. */
   resetGameState();
   teardownGameScreens();
+  /* AZ ÚJ JÁTÉK a MOSTANI helyet foglalja el — innentől oda és csak oda ment. */
+  saveLockAdopt();
   /* GUIDE MÓD: a beállító képernyő választása itt kerül az állapotba — a
      resetGameState UTÁN, különben a friss S felülírná. Csak karrierben. */
   S.guideOn=(gameMode==="career")&&!!guideWanted;
@@ -30714,10 +30716,36 @@ function saveWrite(key,json){
       try{localStorage.setItem(key,json);saveOkNotice();return true;}
       catch(e2){saveFailNotice(e2);return false;}}
     saveFailNotice(e);return false;}}
+/* ================= A MENTÉSI HELY ZÁRJA =================
+   A mentés helyét egyetlen mező dönti el (MP.activeRoom → saveKey). Ha ez a
+   mező úgy változik meg, hogy közben a MEMÓRIÁBAN egy másik karrier van, a
+   következő mentés némán FELÜLÍR egy idegen mentést — és az adatvesztés
+   visszafordíthatatlan. Pontosan ez történt egyszer: egy szoba-chip előbb
+   állította át a szobát, mint hogy a kontextusváltás elmentette volna a futó
+   játékot, és egy négy szezonos karrier helyére egy másik szoba karriere
+   került.
+
+   A hívási sorrendet ott javítottuk, de a szabály maga túl törékeny ahhoz, hogy
+   egyetlen javításban bízzunk: BÁRMELYIK jövőbeli kódút, ami hozzányúl a
+   MP.activeRoom-hoz, ugyanezt tudná okozni. Ezért a mentés ZÁRAT kap.
+
+   A zár azt jegyzi meg, MELYIK HELYRŐL érkezett (vagy hol született) a most
+   futó játék. Ha a mentés pillanatában a cél ettől eltér, NEM ÍRUNK — inkább
+   ne mentsünk egy fordulót, mint hogy megsemmisítsünk egy másik karriert. Az
+   eltérés a naplóba is bekerül, hogy kiderüljön, ha valahol mégis előfordul. */
+let _saveLock=null;   /* a betöltött/elindított játék mentési kulcsa */
+function saveLockSet(k){_saveLock=k||null;}
+function saveLockAdopt(){_saveLock=saveKey();}
 function saveGame(){
   /* A kezdőképernyőn nincs mit menteni — és ha mégis írnánk, a következő
      indulást rontanánk el vele. */
   if(!hasLiveGame())return;
+  {const k=saveKey();
+   if(_saveLock&&k!==_saveLock){
+     /* Nem dobunk hibát és nem állítjuk meg a játékot — csak nem írunk. */
+     try{addLine(`⛔ Mentés elhalasztva: a játék a(z) ${esc(_saveLock)} helyről való, a cél viszont ${esc(k)} lenne. Az idegen mentést nem írjuk felül.`,"m ev");}catch(e){}
+     return;}
+   if(!_saveLock)_saveLock=k;}
   try{
     const data={
       v:1,
@@ -30833,7 +30861,11 @@ function loadSavedGame(key){
     if(!raw)return null;
     return JSON.parse(raw);
   }catch(e){return null;}}
-function clearSave(key){try{localStorage.removeItem(key||saveKey());}catch(e){}}
+function clearSave(key){
+  const k=key||saveKey();
+  try{localStorage.removeItem(k);}catch(e){}
+  /* A törölt hely zára is oldódik: a következő új játék szabadon foglalhat. */
+  if(_saveLock===k)saveLockSet(null);}
 function applySavedGame(d){
   gameMode=d.gameMode||"classic";careerStart=d.careerStart||"draft";scout=d.scout||null;
   /* A pool tömörítve van a mentésben (lásd packCareerPool); a régi, nyers
@@ -31361,6 +31393,7 @@ function initSaveSystem(){
     if(d){
       applySavedGame(d);
       MP.active=true;MP.activeRoom=code;MP.started=true;   /* a mentés felülírhatta */
+      saveLockSet(mpSaveKeyFor(code));   /* innen jött — ide is ment vissza */
       _mpBootedIntoGame=true;
       $("mpEntry").classList.add("hide");
       resumeUIFromSave();
@@ -31392,6 +31425,7 @@ function initSaveSystem(){
     : `${saved.teamName||"Csapatod"} — a csapatépítés közben hagytad abba`;
   $("resumeYesBtn").onclick=()=>{
     applySavedGame(saved);
+    saveLockSet(SAVE_KEY);
     $("resumeBanner").classList.add("hide");
     resumeUIFromSave();};
   $("resumeNoBtn").onclick=()=>{
@@ -31957,11 +31991,19 @@ function mpDrawRoomChips(rooms){
         ?`<span style="color:#8fd99a;font-size:12px">▶ ${sn}. szezon — folytatható</span>`
         :`<span style="color:rgba(243,242,242,.55);font-size:12px">${Object.values(mpSeats(room)).filter(Boolean).length}/2 játékos</span>`);
     b.innerHTML=`<span>${gone?"⚠":"🏆"} ${esc(code)}${tn?` <span style="opacity:.7;font-weight:400">· ${esc(tn)}</span>`:""}</span>${jobb}`;
-    /* megszűnt szobánál nincs mit lobbyzni — egyenesen a karrierbe visz */
+    /* ---- A SORREND ITT ÉLET-HALÁL KÉRDÉSE ----
+       ADATVESZTÉST OKOZÓ HIBA, amit ez javít: a régi sor ELSŐKÉNT beállította a
+       MP.activeRoom-ot, és csak UTÁNA váltott kontextust. Csakhogy a mentés
+       helyét ez az egy mező dönti el (saveKey), a kontextusváltás pedig azzal
+       KEZDŐDIK, hogy elmenti az épp futó játékot — vagyis a betöltve lévő
+       karrier a MÁSIK szoba helyére íródott. Egy négy szezonos közös karriert
+       némán felülírt egy másik szoba egy szezonos karriere.
+       Mostantól a MP.activeRoom-hoz csak akkor nyúlunk, ha már ott is vagyunk;
+       minden más esetben a mpSwitchContext dolgozik — az a saját, helyes
+       kulcsán ment, és csak az újratöltés után áll be az új szobára. */
     b.onclick=()=>{
-      MP.activeRoom=code;
-      if(gone)mpSwitchContext({room:code});
-      else mpShow("mpViewLobby");};
+      if(mpCtxKey()==="room:"+code){MP.activeRoom=code;mpShow("mpViewLobby");return;}
+      mpSwitchContext({room:code});};
     box.appendChild(b);});}
 /* Belépés a lobbyba: feliratkozunk a szoba élő állapotára. A backend minden
    változásnál visszahív (Firebase: onValue; helyi mód: storage-esemény). */
