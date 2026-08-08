@@ -2039,6 +2039,13 @@ button.infPanel:disabled{cursor:default}
          (S.hubReportHtml), tehát az ott lévő gombok egy újratöltés után halottak
          lennének. Ez a doboz élőben, a S.pendingCoachOffers állapotból épül. -->
     <div id="hubStaffOffer" class="hide" style="margin-top:12px"></div>
+    <!-- KÖZÖS KARRIER: a párharc mérlege és a folytatás/befejezés döntése a
+         KUPA UTÁN is. A szezonzáró verdikt a kupasorozat ELŐTT fut le, tehát
+         ott a kupa eredménye még nem látszik — itt viszont már igen, és
+         lezárni is csak itt lehet a teljes kép ismeretében.
+         ÉLŐ doboz, nem a mentett jelentés-HTML része: ott a gombok egy
+         újratöltés után halottak lennének. -->
+    <div id="hubMpDuelBox" class="hide" style="margin-top:12px"></div>
     <div id="careerStatsPanel" class="hide" style="margin-top:12px">
       <div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin-bottom:6px">Mindenkori statisztika</div>
       <div id="careerStatsBody"></div>
@@ -2226,7 +2233,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.060";
+const APP_VERSION="2.6.061";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -17705,6 +17712,13 @@ function mpFinalWait(onReady){
        ehhez MINDKÉT játékos beleegyezése kell.
    A csapaterő mércéje a KIJELZETT teamStrength: azt látja a felhasználó a
    pályán, és a hangolás is ezen a skálán mozog. */
+/* A GYŐZELEMHEZ KÉT DOLOG KELL, nem egy:
+     · legalább MP_DUEL_WIN_GAP csapaterő-fölény, ÉS
+     · JOBB BAJNOKI HELYEZÉS.
+   Enélkül a párharcot meg lehetett nyerni úgy, hogy a bajnokságban mögötte
+   végeztél — a keret nyers ereje döntött, nem az, mit hoztál ki belőle. Két
+   mérce együtt: az egyik azt méri, mit ÉPÍTETTÉL, a másik azt, mit
+   TELJESÍTETTÉL vele. */
 const MP_DUEL_WIN_GAP=2;     /* ekkora fölény dönti el a párharcot */
 const MP_BALANCE_GAP=1;      /* ekkorára hangolunk folytatáskor */
 function mpMyStrength(){return teamStrength();}
@@ -17726,14 +17740,26 @@ function mpMyFinalStrength(){
   const m=S.mpMyFinal;
   return (m&&m.season===(S.seasonNumber||1)&&typeof m.strength==="number")
     ?m.strength:teamStrength();}
-/* A párharc állása a csapaterők alapján. */
+/* A két bajnoki helyezés. A verdikt-szekció írja be, amikor a közös
+   végtabella összeáll — azért MENTVE, mert a szezonjelentés (a kupa UTÁN) is
+   ebből dolgozik, és egy újratöltés után a képernyő-kontextus már nincs meg. */
+function mpDuelRanks(){
+  const r=S.mpRanks;
+  return (r&&r.season===(S.seasonNumber||1)&&r.mine>0&&r.mate>0)?r:null;}
+/* A párharc állása: csapaterő ÉS bajnoki helyezés együtt. */
 function mpDuelStanding(){
   const mine=mpMyFinalStrength(),mate=mpMateStrength();
   if(mate==null)return null;
-  const gap=mine-mate;
-  return {mine,mate,gap,
-    decided:Math.abs(gap)>=MP_DUEL_WIN_GAP,
-    iLead:gap>0};}
+  const gap=mine-mate,iLead=gap>0;
+  const gapOk=Math.abs(gap)>=MP_DUEL_WIN_GAP;
+  const r=mpDuelRanks();
+  /* A JOBB helyezés a KISEBB szám. Ha a helyezések (még) nem ismertek — régi
+     mentés, vagy a közös végtabella még nem állt össze —, a régi viselkedésre
+     esünk vissza: ilyenkor a fölény egyedül dönt. Nem akarunk egy hiányzó adat
+     miatt örökre eldöntetlenné tenni egy lezárt párharcot. */
+  const rankOk=r?(iLead?r.mine<r.mate:r.mate<r.mine):true;
+  return {mine,mate,gap,iLead,gapOk,rankOk,ranks:r,
+    decided:gapOk&&rankOk};}
 /* A HANGOLÁS. A két keretet egymás felé mozgatjuk, amíg a különbség 1 alá nem
    kerül: mindkét oldal a távolság felét teszi meg. Mindkét kliens UGYANEZT a
    számítást futtatja a saját oldalára, ugyanabból a két számból — tehát az
@@ -18159,8 +18185,13 @@ function mpVerdictSection(yourRank,finalTeams){
   const rep=mpMateFinal();
   if(!rep)return "";
   mpMaybeApplyBalance();   /* ha most állt össze a kölcsönös igen, itt hangolunk */
+  let mateRank=(finalTeams||[]).findIndex(t=>t.mate)+1;
+  /* A helyezéseket ELTESSZÜK: a szezonjelentés (a kupa után) és egy újratöltés
+     is ebből dolgozik. Ha most nincs meg (a hívó nem adott végtabellát), a
+     korábban eltett értéket használjuk. */
+  if(yourRank>0&&mateRank>0)S.mpRanks={season:S.seasonNumber||1,mine:yourRank,mate:mateRank};
+  else{const _r=mpDuelRanks();if(_r){yourRank=_r.mine;mateRank=_r.mate;}}
   const st=mpDuelStanding();
-  const mateRank=(finalTeams||[]).findIndex(t=>t.mate)+1;
   const num=(v,dec)=>(typeof v==="number"?v.toFixed(dec||0):"—");
   const rows=[];
   /* a "lead" jelöli, melyik oldal áll jobban az adott sorban */
@@ -18192,12 +18223,17 @@ function mpVerdictSection(yourRank,finalTeams){
   /* a párharc állása csapaterőben */
   if(st){
     const g=Math.abs(st.gap);
-    box+=`<div class="vsVerdict">${
-      st.decided
-        ?(st.iLead
-          ?`⚔ <b>Te vezetsz a párharcban:</b> a kereted ${g.toFixed(1)} OVR-rel erősebb. Ha most befejezitek, tiéd a győzelem.`
-          :`⚔ <b>A társad vezet:</b> az ő kerete ${g.toFixed(1)} OVR-rel erősebb. Ha most befejezitek, övé a győzelem.`)
-        :`⚔ <b>Döntetlen közelben:</b> a két keret között ${g.toFixed(1)} OVR a különbség — a párharc eldöntéséhez ${MP_DUEL_WIN_GAP} OVR fölény kell.`}</div>`;}
+    const rk=st.ranks?` (${st.ranks.mine}. vs ${st.ranks.mate}.)`:"";
+    let vtxt;
+    if(st.decided)
+      vtxt=st.iLead
+        ?`⚔ <b>Te vezetsz a párharcban:</b> a kereted ${g.toFixed(1)} OVR-rel erősebb, <b>és előrébb is végeztél</b> a bajnokságban${rk}. Ha most befejezitek, tiéd a győzelem.`
+        :`⚔ <b>A társad vezet:</b> az ő kerete ${g.toFixed(1)} OVR-rel erősebb, és előrébb is végzett${rk}. Ha most befejezitek, övé a győzelem.`;
+    else if(st.gapOk&&!st.rankOk)
+      vtxt=`⚔ <b>Megvan a fölény, de nem a helyezés.</b> ${st.iLead?"A kereted":"A társad kerete"} ${g.toFixed(1)} OVR-rel erősebb, viszont a bajnokságban ${st.iLead?"a társad":"te"} végzett${st.iLead?"":"él"} előrébb${rk} — a győzelemhez <b>mindkettő</b> kell.`;
+    else
+      vtxt=`⚔ <b>Döntetlen közelben:</b> a két keret között ${g.toFixed(1)} OVR a különbség — a párharc eldöntéséhez <b>${MP_DUEL_WIN_GAP} OVR fölény ÉS jobb bajnoki helyezés</b> kell.`;
+    box+=`<div class="vsVerdict">${vtxt}</div>`;}
   box+=mpDecisionBox();
   return `<div class="vsec" id="mpVerdictSec"><span class="h">A párharc mérlege</span>${box}</div>`;}
 /* A hangolás EGYSZER fut le szezononként, a kölcsönös igen pillanatában. Az
@@ -18252,9 +18288,11 @@ function mpFinalSummaryBox(){
   let verdict;
   if(!st)verdict="A végső mérleghez a társad zárása kell.";
   else if(st.decided)verdict=st.iLead
-    ?`🏆 <b>Megnyerted a párharcot.</b> A kereted ${Math.abs(st.gap).toFixed(1)} OVR-rel erősebb — ez ${MP_DUEL_WIN_GAP} OVR fölött van, tehát a hajsza a tiéd.`
-    :`🏁 <b>A társad nyerte a párharcot.</b> Az ő kerete ${Math.abs(st.gap).toFixed(1)} OVR-rel erősebb.`;
-  else verdict=`🤝 <b>Döntetlen.</b> A két keret között csak ${Math.abs(st.gap).toFixed(1)} OVR a különbség — ${MP_DUEL_WIN_GAP} OVR fölény kellett volna a győzelemhez. Ezt a hajszát senki nem nyerte meg.`;
+    ?`🏆 <b>Megnyerted a párharcot.</b> A kereted ${Math.abs(st.gap).toFixed(1)} OVR-rel erősebb, és a bajnokságban is előrébb végeztél${st.ranks?` (${st.ranks.mine}. vs ${st.ranks.mate}.)`:""} — a hajsza a tiéd.`
+    :`🏁 <b>A társad nyerte a párharcot.</b> Az ő kerete ${Math.abs(st.gap).toFixed(1)} OVR-rel erősebb, és előrébb is végzett${st.ranks?` (${st.ranks.mate}. vs ${st.ranks.mine}.)`:""}.`;
+  else if(st.gapOk&&!st.rankOk)
+    verdict=`🤝 <b>Döntetlen.</b> ${st.iLead?"A te kereted":"A társad kerete"} ${Math.abs(st.gap).toFixed(1)} OVR-rel erősebb volt, de a bajnokságban ${st.iLead?"a társad":"te"} végzett${st.iLead?"":"él"} előrébb${st.ranks?` (${Math.min(st.ranks.mine,st.ranks.mate)}. vs ${Math.max(st.ranks.mine,st.ranks.mate)}.)`:""} — a győzelemhez mindkettő kellett volna. Ezt a hajszát senki nem nyerte meg.`;
+  else verdict=`🤝 <b>Döntetlen.</b> A két keret között csak ${Math.abs(st.gap).toFixed(1)} OVR a különbség — ${MP_DUEL_WIN_GAP} OVR fölény ÉS jobb bajnoki helyezés kellett volna. Ezt a hajszát senki nem nyerte meg.`;
   const mine=mpMyDecision(),mate=mpMateDecision();
   const who=(mine==="stop"&&mate==="stop")?"Mindketten a befejezést választottátok."
     :(mine==="stop"?"Te választottad a befejezést.":"A társad a befejezést választotta.");
@@ -18266,6 +18304,27 @@ function mpFinalSummaryBox(){
     <div class="vsWait">${who} A karriered megmarad — a szobát a kezdőlapról hagyhatod el.</div>`;}
 /* ---- A VERDIKT ÉLŐ RÉSZE: gombok, figyelő, HUB-kapu ---- */
 let _mpVerdictCtx=null;   /* {rank,teams} — a szekció újrarajzolásához */
+/* ---- A PÁRHARC MÉRLEGE A KUPA UTÁN IS ----
+   A szezonzáró verdikt (scVerdict) a kupasorozat ELŐTT fut le: ott a kupa
+   eredménye még nem látszik, a csapaterő pedig még a kupa előtti. Aki a teljes
+   kép ismeretében akart dönteni a folytatásról, annak eddig nem volt hol.
+   Ez ugyanaz a szekció, ugyanazokkal a gombokkal, a szezonjelentés alatt —
+   vagyis a kupa UTÁN. A helyezéseket a mentett S.mpRanks adja, mert a
+   végtabella-kontextus (_mpVerdictCtx) egy újratöltést nem él túl. */
+function renderHubMpDuel(){
+  const box=$("hubMpDuelBox");
+  if(!box)return;
+  const on=(gameMode==="career"&&h2hRoomActive()&&phase==="hubreport"&&!!mpMateFinal());
+  /* Ha a verdikt-képernyő épp látszik, ott már ott a szekció — ne legyen
+     kétszer ugyanaz a gomb-azonosító a lapon. */
+  const verdictVisible=(()=>{const v=$("scVerdict");return !!(v&&!v.classList.contains("hide"));})();
+  if(!on||verdictVisible){box.classList.add("hide");box.innerHTML="";return;}
+  const r=mpDuelRanks();
+  box.innerHTML=`<div style="font-size:11.5px;color:var(--dim2);line-height:1.45;margin-bottom:6px">
+      A kupasorozat is lezárult — innen már a teljes szezon ismeretében dönthettek.</div>`
+    +mpVerdictSection(r?r.mine:0,null);
+  box.classList.remove("hide");
+  try{mpBindVerdict();}catch(e){}}
 function mpVerdictRefresh(){
   const el=$("mpVerdictSec");
   if(!el||!_mpVerdictCtx)return;
@@ -27247,6 +27306,7 @@ function renderHub(){
   renderHalftimeSubsBtn();   /* a félidei csere kapcsoló felirata az állapotot mondja */
   renderCoachOffer();        /* döntésre váró visszavonult legendák (személyi edzők) */
   renderStaffBtn();          /* a Szakmai stáb gomb csak karrierben, állapotfelirattal */
+  renderHubMpDuel();         /* közös karrier: a párharc mérlege a kupa után is */
 
   /* SZEZON KÖZBEN a HUB bármikor megnyitható, de az átigazolás nem elérhető —
      az a nyári ablak dolga. Ugyanez áll a LEGELSŐ szezon előtti keret-
@@ -29268,7 +29328,7 @@ function saveGame(){
         chPosLearnStarted:S.chPosLearnStarted,chSeasonStartXI:S.chSeasonStartXI,pendingRewardSkills:S.pendingRewardSkills,
         scorers:S.scorers,assists:S.assists,mvps:S.mvps,goodForm:S.goodForm,badForm:S.badForm,careerStats:S.careerStats,clubScoutSpinsUsed:S.clubScoutSpinsUsed,twEventUsed:S.twEventUsed,consecutiveTitles:S.consecutiveTitles,consecutiveBadSeasons:S.consecutiveBadSeasons,seasonSaves:S.seasonSaves,seasonCleanSheets:S.seasonCleanSheets,seasonMatches:S.seasonMatches,seasonNumber:S.seasonNumber,seasonHistory:S.seasonHistory,
         tactics:S.tactics,tacticPrompt:S.tacticPrompt,
-        euroEntry:S.euroEntry,euroCurrent:S.euroCurrent,euroCurrentQual:S.euroCurrentQual,euroOptOut:S.euroOptOut,mkToKLDone:S.mkToKLDone,championCards:S.championCards,goldenAwardCount:S.goldenAwardCount,ballonDor:S.ballonDor,ballonHistory:S.ballonHistory,
+        mpRanks:S.mpRanks,euroEntry:S.euroEntry,euroCurrent:S.euroCurrent,euroCurrentQual:S.euroCurrentQual,euroOptOut:S.euroOptOut,mkToKLDone:S.mkToKLDone,championCards:S.championCards,goldenAwardCount:S.goldenAwardCount,ballonDor:S.ballonDor,ballonHistory:S.ballonHistory,
         topSpeed:S.topSpeed,topShot:S.topShot,   /* mért egyéni csúcsok (km/h) */
         twWindow:S.twWindow,   /* nyitott szezonközi átigazolási ablak + kvótái */
         euro:S.euro,seasonEuro:S.seasonEuro,_posLearnLastCost:S._posLearnLastCost,autoLevel:S.autoLevel,autoLevelAim:S.autoLevelAim,transferLog:S.transferLog,
@@ -29636,6 +29696,7 @@ function applySavedGame(d){
   S.mpSummerRef=d.S.mpSummerRef||null;
   /* A közös kupanevezés. Régi mentésben nincs → a nyári kapu kialkudja. */
   S.mpCup=d.S.mpCup||null;
+  S.mpRanks=d.S.mpRanks||null;
   /* ---- MIGRÁCIÓ: a MÁR FUTÓ közös kupa-kampányok horgonya ----
      A régi mentésekben nincs mpSeeded/mpSeed, mert a determinizmus akkor még
      az illékony mpCupActive()-ból jött. Itt visszamenőleg megállapítjuk, és a
