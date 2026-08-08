@@ -2233,7 +2233,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.062";
+const APP_VERSION="2.6.063";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -22025,6 +22025,26 @@ function showChemBuild(resumeCb){
     row.innerHTML=`<span class="pos pc-cs">${inProg.stages}/${CHEM_PAIR_NEED}</span><span class="main"><div class="nm">${esc(shortName(inProg.a))} & ${esc(shortName(inProg.b))}</div><div class="trait">koppints a továbblépéshez</div></span>`;
     row.onclick=()=>{advanceChemInProgressManual();};
     box.appendChild(row);
+    /* ---- KIÚT: MÁSIK PÁROSRA VÁLTÁS ----
+       Eddig a folyamatban lévő építés ZSÁKUTCA volt: ha rossz emberre
+       nyomtál, a következő jutalom is ugyanazt a párost vitte tovább, és nem
+       volt hova lépni. Mostantól bármikor átállhatsz — a MÁR MEGSZERZETT
+       fázisok NEM vesznek el: a páros ott marad, ahol tartott, és később a
+       választóból ("már 3/5") bármikor folytatható. */
+    const sw=document.createElement("button");
+    sw.className="btn-s stepbtn";sw.style.marginTop="8px";
+    sw.textContent="↩ Mégis másik párost építek";
+    sw.onclick=()=>{
+      askConfirm({title:"Másik párosra váltasz?",yes:"Igen, másikat választok",
+        html:`<div style="font-size:13px;line-height:1.55">
+          <b>${esc(shortName(inProg.a))} & ${esc(shortName(inProg.b))}</b> építése félbemarad
+          <b>${inProg.stages}/${CHEM_PAIR_NEED}</b> fázisnál.<br><br>
+          <span style="color:var(--grass)">A megszerzett fázisok megmaradnak</span> — ez a páros később, a választóból bármikor folytatható.</div>`,
+        onYes:()=>{
+          S.chemInProgress=null;chemPickFirst=null;
+          try{saveGame();}catch(e){}
+          showChemBuild(skillResumeCb);}});};
+    box.appendChild(sw);
     $("scSkill").scrollIntoView({behavior:"smooth"});
     return;}
   $("skillTitle").textContent="Kémia-építés — válassz párost!";
@@ -22048,7 +22068,14 @@ function renderChemPick(){
     const info=document.createElement("div");info.style.cssText="font-size:12px;color:#cfd6ff;margin-bottom:5px";
     const _fa=careerPool&&careerPool[chemPickFirst]?careerPool[chemPickFirst].age:null;
     info.textContent=`Első játékos: ${shortName(chemPickFirst)}${_fa!=null?` (${_fa} év)`:""} — válaszd ki a párját:`;
-    box.appendChild(info);}
+    box.appendChild(info);
+    /* Az ELSŐ választás önmagában még nem köt semmit, de eddig nem lehetett
+       visszalépni belőle — rossz emberre koppintva ott ragadtál. */
+    const back=document.createElement("button");
+    back.className="btn-s";back.style.cssText="width:100%;font-size:12px;padding:5px 0;margin-bottom:7px";
+    back.textContent="↩ Mégis mást választok elsőnek";
+    back.onclick=()=>{chemPickFirst=null;renderChemPick();};
+    box.appendChild(back);}
   roster.forEach(p=>{
     if(!p)return;
     if(chemPickFirst&&p.n===chemPickFirst)return;
@@ -22063,12 +22090,31 @@ function renderChemPick(){
     row.innerHTML=`<span class="pos pc-${getCategoryFor(p.pos[0])}">${p.pos.join("/")}</span><span class="main"><div class="nm">${esc(shortName(p.n))}${_ageTxt}${existing?` <small>(már ${existing}/${CHEM_PAIR_NEED})</small>`:""}</div></span>`;
     row.onclick=()=>{
       if(!chemPickFirst){chemPickFirst=p.n;renderChemPick();return;}
-      const pr=addChemPair(chemPickFirst,p.n,Math.max(1,chemStages(chemPickFirst,p.n)+1));
-      S.chemInProgress=pr.stages>=CHEM_PAIR_NEED?null:chemKey(chemPickFirst,p.n);
-      if(pr.stages>=CHEM_PAIR_NEED)addLine(`🤝 Kémia kész: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} — együtt veszélyesek!`,"m life");
-      else addLine(`🤝 Új kémia-építés indul: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} (${pr.stages}/${CHEM_PAIR_NEED} fázis)`,"m life");
-      $("scSkill").classList.add("hide");
-      const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();};
+      /* ---- MEGERŐSÍTÉS ----
+         Ez a koppintás KÖT: elindítja (vagy tovább viszi) a párost, és
+         elhasználja a jutalmat. Eddig azonnal, visszaút nélkül futott le —
+         egy félrekoppintás öt fázisnyi, több szezonos befektetést vitt rossz
+         irányba. A megerősítő kiírja a két nevet, a korukat (a kémia több
+         szezonos beruházás) és azt, hol fog tartani a páros. */
+      const _mate=p.n,_first=chemPickFirst;
+      const _cur=chemStages(_first,_mate);
+      const _next=Math.min(CHEM_PAIR_NEED,Math.max(1,_cur+1));
+      const _ageOf=n=>{const e=careerPool&&careerPool[n];const a=e?e.age:null;
+        return a!=null?` <span style="color:var(--dim2)">(${a} év)</span>`:"";};
+      askConfirm({title:_cur?"Tovább építed ezt a párost?":"Elindítod ezt a párost?",
+        yes:_cur?"Igen, tovább építem":"Igen, ezt a párost építem",
+        html:`<div style="font-size:13px;line-height:1.6">
+          <b>${esc(shortName(_first))}</b>${_ageOf(_first)} &amp; <b>${esc(shortName(_mate))}</b>${_ageOf(_mate)}<br>
+          Készültség: <b>${_cur}/${CHEM_PAIR_NEED}</b> → <b style="color:var(--gold)">${_next}/${CHEM_PAIR_NEED}</b><br><br>
+          <span style="color:var(--dim)">A hatás csak a teljes ${CHEM_PAIR_NEED}/${CHEM_PAIR_NEED}-nél lép életbe — ez több szezonos befektetés, ezért számít a koruk. A megkezdett párosról később válthatsz, a fázisok nem vesznek el.</span></div>`,
+        onYes:()=>{
+          const pr=addChemPair(_first,_mate,Math.max(1,chemStages(_first,_mate)+1));
+          S.chemInProgress=pr.stages>=CHEM_PAIR_NEED?null:chemKey(_first,_mate);
+          if(pr.stages>=CHEM_PAIR_NEED)addLine(`🤝 Kémia kész: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} — együtt veszélyesek!`,"m life");
+          else addLine(`🤝 ${_cur?"Kémia épül":"Új kémia-építés indul"}: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} (${pr.stages}/${CHEM_PAIR_NEED} fázis)`,"m life");
+          chemPickFirst=null;
+          $("scSkill").classList.add("hide");
+          const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();}});};
     box.appendChild(row);});}
 function isVisible(id){return !$(id).classList.contains("hide");}
 /* ================= MI ÚJSÁG AZ ÖLTÖZŐBEN? =================
