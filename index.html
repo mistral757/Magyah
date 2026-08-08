@@ -2284,7 +2284,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.074";
+const APP_VERSION="2.6.075";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -31756,42 +31756,93 @@ function mpShow(id){
   if(id==="mpViewHome")mpRenderHomeRooms();
   if(id==="mpViewLobby")mpEnterLobby();
   $("mpEntry").scrollTop=0;}
-/* A "Szobáid" chipek: a helyben jegyzett kódokat kérdezzük le a backendtől.
-   A már nem létező szobák kódját elfelejtjük — így a lista magától takarít.
+/* ================= A "SZOBÁID" CHIPEK =================
+   A LISTA FORRÁSA A MENTÉS IS, NEM CSAK A KÓDJEGYZÉK.
 
-   F7 — DE CSAK AKKOR, HA NINCS OTT KARRIER. Korábban egy megszűnt szoba kódja
-   azonnal kikerült a listából, és vele együtt a hozzá tartozó, HELYBEN MENTETT
-   karrier is elérhetetlenné vált: a mentés megvolt a localStorage-ban, de nem
-   vezetett hozzá egyetlen gomb sem. Ha van mentés, a chip marad — külön
-   jelöléssel, hogy a szoba már nincs meg, a karriered viszont folytatható. */
+   BEJELENTETT HIBA: két futó közös karrier ott volt a tárhelyen (a diagnosztika
+   fel is sorolta őket), a kezdőlap mégsem ajánlotta fel egyiket sem — vagyis
+   nem lehetett visszalépni beléjük. Három, egymástól független lyuk okozta,
+   és mindhárom ugyanoda vezetett: a mentés megvan, de nem mutat rá gomb.
+
+     1. A JÁTÉKOS-AZONOSÍTÓ FÜLENKÉNTI (sessionStorage). Új fülön / új
+        böngésző-munkamenetben más az azonosítód, tehát az `r.players[mpMyId()]`
+        vizsgálat MEGBUKIK egy létező szobára is — a chip nem jelent meg. És
+        mivel az `r` nem volt null, a takarító ág sem futott le: a kód bent
+        maradt a jegyzékben, csak épp láthatatlanul. A szobába való
+        visszalépés egyébként megoldott (a backend join-ja önregisztrál), csak
+        a kezdőlap nem engedett odáig.
+     2. A HÁLÓZAT MÉG NEM ÁLLT FEL. A takarító ág feltétele `mpNet.mode` volt,
+        ami induláskor null — ilyenkor a szoba sem megjelenni, sem eltűnni nem
+        tudott. A lekérdezés előtt ezért most megvárjuk a hálózat felállását,
+        és offline állapotban NEM felejtünk kódot.
+     3. A MENTÉS NEM VOLT FORRÁS. A lista kizárólag a helyi kódjegyzékből
+        (MP_MYCODES_KEY) épült. Ha az bármiért elveszett vagy megsérült, a
+        mellette békésen meglévő 400 kB-os karrier elérhetetlenné vált.
+   Mostantól a kódok a JEGYZÉK és a MENTÉSEK UNIÓJÁBÓL jönnek — a mentés
+   kulcsa (30-0-save-mp-KÓD-v1) magában hordozza a szobakódot —, és amelyik
+   szobához van mentés, az MINDIG kap chipet, bármit mond a backend. */
+function mpSavedRoomCodes(){
+  let keys=[];
+  try{keys=Object.keys(localStorage);}catch(e){return [];}
+  return keys.filter(k=>k.indexOf(SAVE_KEY_MP_PREFIX)===0&&/-v1$/.test(k))
+    .map(k=>k.slice(SAVE_KEY_MP_PREFIX.length).replace(/-v1$/,""))
+    .filter(Boolean);}
 async function mpRenderHomeRooms(){
   const box=$("mpHomeRooms");if(!box)return;
-  const codes=mpMyCodes();
+  /* A JEGYZÉK ÉS A MENTÉSEK UNIÓJA. A mentésből előkerült kódot vissza is
+     írjuk a jegyzékbe, hogy legközelebb már onnan is meglegyen. */
+  const codes=mpMyCodes().slice();
+  mpSavedRoomCodes().forEach(c=>{if(!codes.includes(c)){codes.push(c);mpRememberCode(c);}});
   if(!codes.length){box.classList.add("hide");box.innerHTML="";return;}
+  /* Megvárjuk a hálózatot: enélkül a mpNet.mode null, és sem megjeleníteni,
+     sem takarítani nem tudunk megbízhatóan. Ha nem áll fel, offline megyünk
+     tovább — a mentéssel rendelkező szobák akkor is előjönnek. */
+  /* AZONNALI ELSŐ RAJZOLÁS a mentésekből. A hálózat felállása akár 7 másodperc
+     is lehet (a Firebase-próbának időkorlátja van) — ha addig üres a sáv, a
+     felhasználó joggal hiszi, hogy nincs hova visszalépnie. A mentés helyben
+     van, azonnal olvasható: a folytatható szobák tehát KÉSLELTETÉS NÉLKÜL
+     megjelennek, és a hálózati válasz csak pontosít rajtuk. */
+  mpDrawRoomChips(codes.filter(c=>mpRoomSave(c))
+    .map(c=>({code:c,room:null,gone:true,offline:true})));
+  try{await mpNetInit();}catch(e){}
+  const online=!!mpNet.mode;
   const bk=mpBk();
   const rooms=[];
   for(const c of codes){
-    let r=null;
-    try{r=await bk.get(c);}catch(e){}
-    if(r&&r.players&&r.players[mpMyId()])rooms.push({code:c,room:r,gone:false});
-    else if(r===null&&mpNet.mode){
-      if(mpRoomSave(c))rooms.push({code:c,room:null,gone:true});
-      else mpForgetCode(c);}}
+    let r=null,hiba=false;
+    try{r=await bk.get(c);}catch(e){hiba=true;}
+    const sv=mpRoomSave(c);
+    if(r){
+      /* LÉTEZŐ SZOBA. Akkor is felkínáljuk, ha a mostani fül azonosítója nincs
+         benne a játékoslistában — a belépés önregisztrál, tehát a visszatérés
+         egy koppintás. Ez volt az 1. lyuk. */
+      rooms.push({code:c,room:r,gone:false});
+    }else if(sv){
+      /* NINCS (vagy nem érhető el) A SZOBA, DE VAN KARRIER — a chip marad. */
+      rooms.push({code:c,room:null,gone:true,offline:hiba||!online});
+    }else if(online&&!hiba){
+      /* Se szoba, se mentés, és tényleg megkérdeztük: ezt el lehet felejteni. */
+      mpForgetCode(c);}}
+  mpDrawRoomChips(rooms);}
+function mpDrawRoomChips(rooms){
+  const box=$("mpHomeRooms");if(!box)return;
   box.classList.toggle("hide",!rooms.length);
   if(!rooms.length){box.innerHTML="";return;}
   box.innerHTML=`<div class="lbl">Szobáid</div>`;
-  rooms.forEach(({code,room,gone})=>{
+  rooms.forEach(({code,room,gone,offline})=>{
     const b=document.createElement("button");b.className="mpRoomChip";
     /* F7: látszik, hol fut már karrier — így a chip nem csak szoba, hanem
-       "folytatható játék" is. */
+       "folytatható játék" is. A csapatnevet is kiírjuk: két párhuzamos közös
+       karriernél a puszta szobakódból nem derül ki, melyik melyik. */
     const sv=mpRoomSave(code);
     const sn=sv?String((sv.S&&sv.S.seasonNumber)||1):null;
+    const tn=sv&&sv.teamName?String(sv.teamName):null;
     const jobb=gone
-      ?`<span style="color:#e6c98a;font-size:12px">⚠ a szoba megszűnt — ${sn}. szezon folytatható</span>`
+      ?`<span style="color:#e6c98a;font-size:12px">${offline?"⚠ a szoba nem érhető el":"⚠ a szoba megszűnt"} — ${sn}. szezon folytatható</span>`
       :(sv
         ?`<span style="color:#8fd99a;font-size:12px">▶ ${sn}. szezon — folytatható</span>`
         :`<span style="color:rgba(243,242,242,.55);font-size:12px">${Object.values(mpSeats(room)).filter(Boolean).length}/2 játékos</span>`);
-    b.innerHTML=`<span>${gone?"⚠":"🏆"} ${esc(code)}</span>${jobb}`;
+    b.innerHTML=`<span>${gone?"⚠":"🏆"} ${esc(code)}${tn?` <span style="opacity:.7;font-weight:400">· ${esc(tn)}</span>`:""}</span>${jobb}`;
     /* megszűnt szobánál nincs mit lobbyzni — egyenesen a karrierbe visz */
     b.onclick=()=>{
       MP.activeRoom=code;
