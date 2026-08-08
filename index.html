@@ -2284,7 +2284,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.069";
+const APP_VERSION="2.6.070";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8197,11 +8197,39 @@ function youthBoostPrice(){
    (Régi mentés nem szivároghat át: a felminősítő ág előtt az ikon egyáltalán
    nem kapott pool-bejegyzést, a létrehozó ág pedig kezdettől isIcon-t ír.) */
 function isYouthProspect(entry){return entry&&(entry.youthBonus||0)>0&&!entry.isIcon;}
+function inAcademy(name){return (S.academy||[]).some(r=>r&&r.n===name);}
+/* ================= A TSI PLAFONJA =================
+   Két plafon van. A HARD_CAP a játék abszolút korlátja — ez sosem tágul. A
+   SOFT_CAP az Infinity előtti, felnőtt mezőnyre szabott határ: a valós
+   adatbázis felső sávja nagyjából itt ér véget, és a tsiToPeakOvr görbéje is
+   ide van hangolva.
+
+   AZ IFISEKRE A SOFT_CAP NEM VONATKOZIK. A 9000 náluk nem határt szabott,
+   hanem CSENDBEN ELDOBOTT befektetést: egy 8600-as TSI-jű tehetségnek vettél
+   egy ifi-boostot +2500 TSI-vel, amiből 400 érkezett meg — a maradék 2100-ért
+   fizettél, de sehol nem jelent meg. Ugyanez történt az akadémia saját,
+   véletlen TSI-ugrásaival. És mivel a tsiToPeakOvr Infinity ELŐTT úgyis 96-nál
+   telítődik, a magasabb TSI a felnyitás előtt semmilyen erőt nem ad — tehát
+   nincs mit védeni tőle: a plafon nem az egyensúlyt őrizte, csak a felhalmozott
+   POTENCIÁLT vágta le, pont azt, amiért az akadémia egyáltalán létezik. Az
+   Infinity megnyitásakor pedig hirtelen ott a fejtér, amibe belenőhetnek.
+   Ifisnek az számít, aki még hordoz ifi-bónuszt (isYouthProspect) vagy épp az
+   akadémián nevelődik — ikonok nem, öreg csirkefogók nem. */
+const TSI_HARD_CAP=200000;
+const TSI_SOFT_CAP=9000;
+function tsiCapFor(entry){
+  if(infinityMode)return TSI_HARD_CAP;
+  if(entry&&(isYouthProspect(entry)||inAcademy(entry.n)))return TSI_HARD_CAP;
+  return TSI_SOFT_CAP;}
 function applyYouthBoost(entry){
   const sc=youthBoostScale();
   const rBoost=Math.round((YOUTH_BOOST_RATING[0]+Math.random()*(YOUTH_BOOST_RATING[1]-YOUTH_BOOST_RATING[0]))*sc);
   const tBoost=Math.round((YOUTH_BOOST_TSI[0]+Math.random()*(YOUTH_BOOST_TSI[1]-YOUTH_BOOST_TSI[0]))*sc);
-  entry.tsi=Math.min(infinityMode?200000:9000,entry.tsi+tBoost);
+  /* A KÖNYVELÉS A TÉNYLEGES NYERESÉGET ŐRZI, nem a sorsolt szándékot: ha a
+     plafon (Rating: ratingCap) mégis lecsípne valamit, a napló és a
+     boost-történet se ígérhet többet, mint ami megérkezett. */
+  const tsiBefore=entry.tsi,ratBefore=entry.startRating;
+  entry.tsi=Math.min(tsiCapFor(entry),entry.tsi+tBoost);
   entry.peak=Math.min(ratingCap(),Math.max(entry.peak,tsiToPeakOvr(entry.tsi)));
   entry.startRating=Math.min(ratingCap(),entry.startRating+rBoost);
   /* A peak kövesse a boostolt Ratinget: ha a boost a peak fölé emelte a
@@ -8220,11 +8248,12 @@ function applyYouthBoost(entry){
      szezonos akadémián így nem lehetett tudni, kire fordítottál már
      milliárdokat — pedig ez a legdrágább HUB-fejlesztés.
      A careerPool-bejegyzésben él, tehát a mentés automatikusan viszi. */
+  const tGot=entry.tsi-tsiBefore,rGot=entry.startRating-ratBefore;
   entry.youthBoosts=(entry.youthBoosts||0)+1;
-  entry.youthBoostR=(entry.youthBoostR||0)+rBoost;
-  entry.youthBoostT=(entry.youthBoostT||0)+tBoost;
+  entry.youthBoostR=(entry.youthBoostR||0)+rGot;
+  entry.youthBoostT=(entry.youthBoostT||0)+tGot;
   entry.youthBoostLast=S.seasonNumber||1;
-  return {rBoost,tBoost};}
+  return {rBoost:rGot,tBoost:tGot};}
 /* Rövid jelölés a listákhoz: ⚡ vagy ⚡×3. Üres, ha soha nem kapott boostot. */
 function youthBoostTag(entry){
   const n=(entry&&entry.youthBoosts)||0;
@@ -8249,7 +8278,7 @@ function isVeteranBoostable(entry){
 function applyOldBoost(entry){
   const sc=youthBoostScale();
   const tBoost=Math.round((OLD_BOOST_TSI[0]+Math.random()*(OLD_BOOST_TSI[1]-OLD_BOOST_TSI[0]))*sc);
-  entry.tsi=Math.min(infinityMode?200000:9000,entry.tsi+tBoost);
+  entry.tsi=Math.min(tsiCapFor(entry),entry.tsi+tBoost);
   entry.peak=Math.min(ratingCap(),Math.max(entry.peak,tsiToPeakOvr(entry.tsi)));
   entry.startRating=Math.min(ratingCap(),Math.max(entry.startRating,Math.round(ratingAtAge(entry.peak,entry.age))));
   if(entry.basePeak!=null)entry.basePeak=Math.max(entry.basePeak,entry.peak);
@@ -8326,7 +8355,7 @@ function infinityOwnedTsiBoost(){
     if(!e||e._infTsiBoosted)return;
     e._infTsiBoosted=true;
     const beforeTsi=e.tsi||0,beforePeak=e.peak||0;
-    e.tsi=Math.min(200000,Math.round(beforeTsi*INFINITY_OWNED_TSI_MULT));
+    e.tsi=Math.min(TSI_HARD_CAP,Math.round(beforeTsi*INFINITY_OWNED_TSI_MULT));
     e.peak=Math.min(ratingCap(),Math.max(e.peak||0,tsiToPeakOvr(e.tsi)));
     e.basePeak=Math.max(e.basePeak||0,e.peak);
     if(e.baseTsi!=null)e.baseTsi=Math.max(e.baseTsi,e.tsi);
@@ -9349,7 +9378,7 @@ function processAcademyDevelopment(){
     /* kis eséllyel az akadémia kihoz belőle többet, mint amire számítottunk */
     if(Math.random()<ACADEMY_TSI_CHANCE){
       const gain=Math.round(200+Math.random()*600);
-      entry.tsi=Math.min(infinityMode?200000:9000,(entry.tsi||2000)+gain);
+      entry.tsi=Math.min(tsiCapFor(entry),(entry.tsi||2000)+gain);
       entry.peak=Math.min(ratingCap(),Math.max(entry.peak,tsiToPeakOvr(entry.tsi)));}});}
 /* Egy tehetség az akadémián marad: eltároljuk, hogy később visszatérhessen. */
 function academyKeep(prospect,rec){
@@ -14532,7 +14561,7 @@ function applyChallengeReward(rw){
     case "tsi":{
       if(!roster.length)return "TSI-boost (nincs játékos)";
       const p=pick(roster),e=careerPool&&careerPool[p.n];
-      if(e){e.tsi=Math.min(infinityMode?200000:9000,e.tsi+rw.amount);
+      if(e){e.tsi=Math.min(tsiCapFor(e),e.tsi+rw.amount);
         e.peak=Math.min(ratingCap(),Math.max(e.peak,tsiToPeakOvr(e.tsi)));
         p.tsi=e.tsi;}
       return `${shortName(p.n)} +${rw.amount} TSI`;}
