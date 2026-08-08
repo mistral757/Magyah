@@ -1633,6 +1633,13 @@ button.infPanel:disabled{cursor:default}
     <button data-tempo="komotos">Komótos fejlődés<small>−10% mindenre, ami előre visz — hosszabb karrier, lassabb szintlépés</small></button>
     <button data-tempo="csiga">Csigatempó<small>−25% mindenre — minden megszerzett Rating megszenvedett</small></button>
   </div>
+  <!-- MP: a sorsolás rendje és a fejlődési tempó VILÁG-tulajdonság, tehát a
+       házigazda választása a vendégre is érvényes lesz. A saját, tárolt
+       preferenciátokat egyik kliens sem írja felül — a rögzítés csak erre a
+       közös karrierre szól. -->
+  <div id="mpWorldNote" class="hide" style="font-size:11.5px;line-height:1.5;margin-top:7px;padding:7px 9px;border-radius:7px;background:color-mix(in srgb,var(--gold) 12%,transparent);color:var(--ink)">
+    🤝 <b>Közös karrier:</b> a <b>sorsolás rendje</b> és a <b>fejlődési tempó</b> a közös világ része — amit itt beállítasz, <b>a társadra is érvényes</b>. Mindkettőtöknél rögzül a karrier indulásakor, és menet közben már nem változtatható; a saját alapbeállításotok érintetlen marad.
+  </div>
   <div style="margin-top:8px">
     <div style="display:flex;justify-content:space-between;align-items:baseline">
       <label for="diffSlider" style="font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px">Ellenfelek erőssége</label>
@@ -2284,7 +2291,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.078";
+const APP_VERSION="2.6.079";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -11769,6 +11776,52 @@ document.querySelectorAll("#wcToggleGrid button").forEach(b=>b.onclick=()=>{
    (Pontosan ez történt az auto-szintkövetés cél-sávjánál is.) */
 const SCHED_KEY="harminc_nulla_schedule_v1";
 let _schedMode=null;
+/* ================= A KÖZÖS VILÁG RÖGZÍTETT BEÁLLÍTÁSAI =================
+   HIBA, AMIT EZ JAVÍT: a sorsolás rendje és a fejlődési tempó GLOBÁLIS, gépenkénti
+   localStorage-beállítás volt — a szoba nem vitte át őket. Közös karrierben ez két
+   külön világot eredményezett:
+     · SORSOLÁS: a menetrendet mindkét kliens MAGÁNAK építi (buildSeasonFixtures).
+       Ha a házigazda valósághű, a vendég véletlen rendet állított, a két bajnokság
+       fordulói elcsúsztak — a HOST által számolt tabella (v2.6.073) pedig olyan
+       sorrendhez tartozott, amit a vendég sosem játszott le. Ráadásul a véletlen
+       rend `Math.random()`-mal kever, tehát NEM is seedelt: két azonos beállítású
+       kliens is szétcsúszott volna.
+     · TEMPÓ: a −10% / −25% szorzó a fejlődésre, a skillekre, a scoutra, a büdzsére,
+       a kártyákra és az akadémiára is hat. Ha a két menedzser máson állt, ugyanaz a
+       szezon két eltérő erejű keretet adott — a párharc (és az Infinity-befizetés)
+       tétje ezzel elveszett. A tempó ráadásul MENET KÖZBEN is átkapcsolható, tehát
+       nem is csak indulási eltérés volt: bármikor lehetett vele "előrébb ugrani".
+
+   A MEGOLDÁS ugyanaz a minta, mint a Rating-alapnál: a HÁZIGAZDA választása utazik
+   a szobában, és a KARRIER INDULÁSAKOR rögzül (lockMpWorldSettings). A rögzített
+   érték a mentés része, tehát egy újratöltést is túlél.
+
+   A GLOBÁLIS (localStorage) beállítást SEHOL NEM ÍRJUK FELÜL: az a te egyjátékos
+   preferenciád marad. Ezért van két olvasó minden tengelyhez:
+     · schedulePref() / gameTempoPref() → a nyers, tárolt preferencia. A beállító
+       képernyő választói ezt mutatják, hiszen azok a KÖVETKEZŐ játékot állítják.
+     · scheduleMode() / gameTempo()     → az ÉPP FUTÓ játékra érvényes érték: közös
+       karrierben a szoba rögzített értéke, egyébként a preferencia. A motor és a
+       HUB ezt olvassa. */
+let mpWorldSched=null;   /* "real" | "random" — csak futó közös karrierben */
+let mpWorldTempo=null;   /* GAME_TEMPO kulcs — csak futó közös karrierben */
+let _pendingMpWorld=null;   /* a szobából érkezett csomag, EGY indulásra */
+/* A karrier INDULÁSAKOR rögzítjük a világ két globális tengelyét — pontosan ott és
+   úgy, ahogy a Rating-alapot (lockCareerRatingBasis), a beginNewGame-ből hívva.
+     · VENDÉG: a szobából érkezett csomagból (_pendingMpWorld).
+     · HÁZIGAZDA: a saját, ÉPP KIPUBLIKÁLT beállításából — ő a beállító képernyőn
+       jött végig, tehát a preferenciája maga a szoba igazsága.
+     · EGYJÁTÉKOS: nincs rögzítés, a preferencia él tovább (menet közben is állítható).
+   RÉGI SZOBA, amiben még nincs meg a két mező: az alapértelmezés (valósághű /
+   alap tempó) lép be — ugyanaz a visszamenőleges szabály, mint a Rating-alapnál. */
+function lockMpWorldSettings(){
+  const p=_pendingMpWorld;_pendingMpWorld=null;
+  /* ELŐBB feloldunk: az alatta lévő olvasás így a SAJÁT preferenciát adja, nem egy
+     korábbi közös karrier beragadt értékét. */
+  mpWorldSched=null;mpWorldTempo=null;
+  if(!(typeof MP!=="undefined"&&MP&&MP.active))return;
+  mpWorldSched=p?((p.sched==="random")?"random":"real"):schedulePref();
+  mpWorldTempo=p?(GAME_TEMPO[p.tempo]?p.tempo:"normal"):gameTempoPref();}
 /* A HUB-beli sorsolás-sor újrarajzolója. A HUB-panel állítja be, amikor
    megnyílik; a kezdőképernyő választója innen frissíti, ha épp nyitva van.
    Deklarálva, nem implicit globálisként — így nem sérül, ha egyszer strict
@@ -11802,28 +11855,34 @@ const GAME_TEMPO={
   komotos:{k:0.90,n:"Komótos fejlődés"},
   csiga:{k:0.75, n:"Csigatempó"}};
 let _gameTempo=null;
-function gameTempo(){
+/* a NYERS preferencia (localStorage) — a beállító képernyő választója ezt mutatja */
+function gameTempoPref(){
   if(_gameTempo===null){
     let v=null;try{v=localStorage.getItem(TEMPO_KEY);}catch(e){}
     _gameTempo=GAME_TEMPO[v]?v:"normal";}
   return _gameTempo;}
+/* az ÉPP FUTÓ játékra érvényes tempó — közös karrierben a szoba rögzített értéke */
+function gameTempo(){return mpWorldTempo||gameTempoPref();}
 function setGameTempo(v){
   _gameTempo=GAME_TEMPO[v]?v:"normal";
   try{localStorage.setItem(TEMPO_KEY,_gameTempo);}catch(e){}}
 function tempoMult(){return GAME_TEMPO[gameTempo()].k;}
 function tempoLabel(){return GAME_TEMPO[gameTempo()].n;}
 function renderTempoGrid(){
-  const cur=gameTempo();
+  const cur=gameTempoPref();
   document.querySelectorAll("#tempoGrid button").forEach(b=>{
     b.classList.toggle("sel",b.dataset.tempo===cur);});}
 document.querySelectorAll("#tempoGrid button").forEach(b=>b.onclick=()=>{
   setGameTempo(b.dataset.tempo);renderTempoGrid();});
 renderTempoGrid();
-function scheduleMode(){
+/* a NYERS preferencia (localStorage) — a beállító képernyő választója ezt mutatja */
+function schedulePref(){
   if(_schedMode===null){
     let v=null;try{v=localStorage.getItem(SCHED_KEY);}catch(e){}
     _schedMode=(v==="random")?"random":"real";}   /* alapértelmezés: valósághű */
   return _schedMode;}
+/* az ÉPP FUTÓ játékra érvényes rend — közös karrierben a szoba rögzített értéke */
+function scheduleMode(){return mpWorldSched||schedulePref();}
 function setScheduleMode(v){
   _schedMode=(v==="random")?"random":"real";
   try{localStorage.setItem(SCHED_KEY,_schedMode);}catch(e){}}
@@ -11831,7 +11890,7 @@ function setScheduleMode(v){
    "sel"-jéből — így egy korábbi választás visszatér. Itt nem olvasunk S-t,
    csak localStorage-t, ezért a hívás biztonságosan futhat már most. */
 function renderSchedGrid(){
-  const cur=scheduleMode();
+  const cur=schedulePref();
   document.querySelectorAll("#schedGrid button").forEach(b=>{
     b.classList.toggle("sel",b.dataset.sch===cur);});}
 document.querySelectorAll("#schedGrid button").forEach(b=>b.onclick=()=>{
@@ -12004,6 +12063,8 @@ function renderAutoAimSetup(){
   const note=$("mpDiffNote"),alg=$("autoLevelGrid");
   if(note)note.classList.toggle("hide",!mp);
   if(alg)alg.classList.toggle("hide",mp);
+  /* a világ-tulajdonságok figyelmeztetője (sorsolás, tempó) — csak MP-ben */
+  {const wn=$("mpWorldNote");if(wn)wn.classList.toggle("hide",!mp);}
   if(mp)S.autoLevel=false;
   const box=$("autoAimSetup"),grid=$("autoAimGrid");
   if(!box||!grid)return;
@@ -12154,6 +12215,9 @@ function beginNewGame(){
   /* A Rating alapja a karrier INDULÁSAKOR rögzül: draftnál a globális
      kapcsolóból, kész klubnál kötelezően szezon-alapra. */
   lockCareerRatingBasis();
+  /* A közös világ két globális tengelye (sorsolás rendje, fejlődési tempó) is itt
+     rögzül — enélkül a két kliens a SAJÁT localStorage-beállításával játszott. */
+  lockMpWorldSettings();
   worldSeed=null;draftSpinNo=0;_lastCoachOffer=null;
   /* F6: friss karrier — a párharc tartós állapota is nulláról indul, különben
      egy korábbi szoba kiegyenlítése átszivárogna az újba. */
@@ -16073,8 +16137,8 @@ function leagueOpps(){
    része, tehát nem kell szezont vagy karriert váltani hozzá. A következő
    szezon-sorsolásnál lép életbe. */
 /* Oda-visszavágós menetrend alternáló pályaválasztással. */
-function buildRoundRobinFixtures(opps){
-  const order=shuffleArr(opps.slice());   /* az ellenfelek sorrendje szezononként új */
+function buildRoundRobinFixtures(opps,rnd){
+  const order=shuffleArr(opps.slice(),rnd);   /* az ellenfelek sorrendje szezononként új */
   const first=order.map((o,i)=>({o,home:i%2===0}));
   /* a visszavágók UGYANEBBEN a sorrendben, tükrözött pályaválasztással: így
      minden ellenféllel pontosan félidőnyi szünet van a két meccs között */
@@ -16083,11 +16147,21 @@ function buildRoundRobinFixtures(opps){
 function buildSeasonFixtures(){
   S.fixtures=[];
   const opps=leagueOpps();
+  /* ---- A MENETREND IS A KÖZÖS VILÁG RÉSZE ----
+     HIBA, AMIT EZ JAVÍT: a sorrend eddig `Math.random()`-ból jött (a valósághű
+     ágon a shuffleArr alapértelmezett folyamából, a véletlen ágon egy
+     sort-komparátorból). Vagyis közös karrierben MÉG AZONOS BEÁLLÍTÁS MELLETT IS
+     más fordulóbeosztást kapott a két kliens: azonos ellenfél-mezőny, de eltérő
+     sorrendben és eltérő pályaválasztással. A `rngFor` nevesített, szezonhoz kötött
+     folyama viszont ugyanabból a szoba-seedből dolgozik mindkét gépen — a menetrend
+     így pontosan annyira lesz közös, mint a draft vagy az ellenféltábla.
+     Egyjátékosban semmit nem változtat: a seed ott is szezononként új sorrendet ad. */
+  const rnd=rngFor("s"+(S.seasonNumber||1)+":fixtures");
   if(scheduleMode()==="real"){
-    S.fixtures=buildRoundRobinFixtures(opps);
+    S.fixtures=buildRoundRobinFixtures(opps,rnd);
   }else{
     opps.forEach(o=>{S.fixtures.push({o,home:true});S.fixtures.push({o,home:false});});
-    S.fixtures.sort(()=>Math.random()-.5);}
+    S.fixtures=shuffleArr(S.fixtures,rnd);}
   /* A párharc két HELYE. Maga a meccs nem innen dolgozik (a playMatch a társ
      pillanatképéből épít fixture-t), de a helyfoglalás nélkül elcsúsznának a
      fordulószámok: a 16. forduló a 16. CPU-meccsre mutatna, a végén pedig
@@ -26442,17 +26516,26 @@ function showLevelChangePicker(direction){
      játék indításakor jutsz el. Egy futó karrierben is át kell tudni állítani,
      ezért itt is elérhető. A VÁLTÁS a KÖVETKEZŐ szezon sorsolásánál lép
      életbe: a futó szezon menetrendjét nem írjuk át a lábad alatt. */
+  /* KÖZÖS KARRIERBEN viszont NEM állítható: a menetrend rendje a szoba világához
+     tartozik (a házigazda állította be, és a tabellát is ő számolja). Ha itt
+     átkapcsolhatnád, a következő szezontól más fordulókat játszanál, mint a
+     társad. Ilyenkor a sor csak MUTATJA az érvényes rendet. */
   renderHubSchedRow=function(){
     const row=$("hubSchedRow");if(!row)return;
     const real=scheduleMode()==="real";
+    const locked=!!mpWorldSched;
+    row.style.cursor=locked?"default":"";
     row.innerHTML=`<span style="font-size:12.5px;line-height:1.45">📅 <b>Sorsolás rendje</b><br>
       <small style="color:var(--dim2)">${real
         ? "valósághű — első félidényben mindenkivel egyszer, utána visszavágók, felváltva hazai/idegen"
-        : "véletlen — a 30 meccs szabadon összekeverve"} · a következő szezontól</small></span>
+        : "véletlen — a 30 meccs szabadon összekeverve"}${locked
+        ? " · 🤝 a közös világ része, a házigazda állította be"
+        : " · a következő szezontól"}</small></span>
       <b style="white-space:nowrap;color:${real?"var(--grass)":"var(--dim)"}">${real?"VALÓSÁGHŰ":"VÉLETLEN"}</b>`;};
   renderHubSchedRow();
   const schedRow=$("hubSchedRow");
   if(schedRow)schedRow.onclick=()=>{
+    if(mpWorldSched)return;
     setScheduleMode(scheduleMode()==="real"?"random":"real");
     renderHubSchedRow();renderSchedGrid();};
   $("levelUpSlider").oninput=()=>{
@@ -30909,6 +30992,10 @@ function saveGame(){
       /* A myId a szoba-mentés része: egy bezárt fül után is ugyanazzal az
          azonosítóval térünk vissza, tehát a szerepünk sem vész el. */
       mp:{active:MP.active,room:MP.activeRoom,role:MP.role,myId:MP.myId||mpMyId()},
+      /* A közös világ rögzített tengelyei. Enélkül egy újratöltés visszaejtette
+         volna a karriert a helyi localStorage-beállításra — épp azt a szétcsúszást
+         hozva vissza, amit a rögzítés megszüntet. */
+      mpWorldSched,mpWorldTempo,
       slotRoles,
       slots:slots.map(s=>({pos:s.pos,xy:s.xy,player:s.player,fit:s.fit,origin:s.origin})),
       /* mind a hét padhely — a régi négy kulcs neve szándékosan változatlan */
@@ -31044,6 +31131,11 @@ function applySavedGame(d){
        újonnan érkezőt vendégként regisztrál, amiből "két vendég, nulla
        házigazda" holtpont lett a párharcnál. */
     if(d.mp.myId)mpAdoptSavedId(d.mp.myId);}
+  /* A közös világ rögzített tengelyei. RÉGI MENTÉSBEN nincsenek meg — ott null
+     marad mindkettő, vagyis a karrier a helyi preferenciával fut tovább, pontosan
+     úgy, ahogy eddig. Egy futó karriert nem írunk át visszamenőleg. */
+  mpWorldSched=(d.mpWorldSched==="random"||d.mpWorldSched==="real")?d.mpWorldSched:null;
+  mpWorldTempo=(d.mpWorldTempo&&GAME_TEMPO[d.mpWorldTempo])?d.mpWorldTempo:null;
   draftSpinNo=d.draftSpinNo||0;
   /* A szerep-felülírások: régi mentésben nincs meg → üres, vagyis minden
      felállás az alapértelmezésén áll, és a tengelyréteg 0-t ad. A futó karrier
@@ -31941,6 +32033,13 @@ function mpCollectSettings(){
        ugyanazokat a kezdő kereteket kell hogy lássa, ezért a házigazda
        választása utazik (a globális kapcsolóját a vendég nem írja felül). */
     ratingBasis:ratingBasis(),
+    /* A SORSOLÁS RENDJE és a FEJLŐDÉSI TEMPÓ is VILÁG-tulajdonság, nem ízlés kérdése:
+       az egyik a menetrendet (és vele a HOST-nál futó tabellát), a másik a fejlődés,
+       a scout, a büdzsé és az akadémia ütemét szabja. Ha nem utaznának, a két
+       menedzser más bajnokságot játszana, más tempóban — a párharcnak nem volna
+       tétje. A nyers preferenciát küldjük (schedulePref/gameTempoPref): a házigazda
+       ekkor még a beállító képernyőn áll, tehát nála ez az érvényes választás. */
+    sched:schedulePref(),tempo:gameTempoPref(),
     oppTargetRating,careerBaseRating,rerolls,
     wcEnabled,familyEnabled,familyNameMode,
     familyCustomNames:(familyCustomNames||[]).slice(),
@@ -31954,6 +32053,10 @@ function mpApplySettings(s){
      saját, tárolt beállítását nem írjuk felül. Régi szobában nincs mező:
      ott a csúcsforma az alap, ahogy eddig is. */
   _pendingRatingBasis=(s.ratingBasis==="season")?"season":"peak";
+  /* Ugyanez a minta a sorsolás rendjére és a tempóra: EGY indulásra vesszük át, a
+     saját globális preferenciádat nem írjuk felül. A tényleges rögzítés a
+     beginNewGame-ben, a lockMpWorldSettings-ben történik. */
+  _pendingMpWorld={sched:s.sched,tempo:s.tempo};
   /* ---- A FELÁLLÁS NEM A KÖZÖS VILÁG RÉSZE ----
      A szoba-beállítások azt írják le, milyen VILÁGBAN játszotok: mekkora a
      mezőny, milyen a sorsolás, van-e családtag, hány újrapörgetés jár. A
@@ -31965,6 +32068,10 @@ function mpApplySettings(s){
      felállásával indul, és azt bármikor átállíthatja a HUB-ban.
      (A mpCollectSettings továbbra is elküldi őket — régebbi kliensnek nem árt,
      és a szoba-rekord alakja sem változik.) */
+  /* A VAK MÓD nem "elveszett" beállítás, hanem karrierben eleve nem létezik: a
+     modeCareerBtn elrejti a választót és classic-ra állít (a scout amúgy is
+     betekintést ad a draftba). A közös karrier mindig karrier, ezért itt is
+     classic — a csomagban utazó `mode` mező csak a régi kliensek kedvéért maradt. */
   mode="classic";
   oppTargetRating=s.oppTargetRating||84;
   careerBaseRating=s.careerBaseRating!=null?s.careerBaseRating:oppTargetRating;
