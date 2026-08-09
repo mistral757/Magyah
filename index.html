@@ -655,6 +655,26 @@ button.infPanel:disabled{cursor:default}
 #pitch{position:relative;width:100%;aspect-ratio:3/3.6;border:2px solid rgba(255,255,255,.4);border-radius:6px}
 #pitch::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:2px solid rgba(255,255,255,.32)}
 #pitch::after{content:"";position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px 0 0 -40px;border:2px solid rgba(255,255,255,.32);border-radius:50%}
+/* ---- KÉMIA-KÖTÉSEK A PÁLYÁN ----
+   SVG-réteg a korongok ALATT (z-index 1, a .slot 2-es fölötte marad), így a
+   vonal sosem takarja a Ratinget vagy a nevet. A viewBox 0..100 és a
+   preserveAspectRatio="none" miatt a végpontok pontosan a slot százalékos
+   koordinátái lehetnek — ugyanaz a szám, amit a .slot left/top-ja használ,
+   tehát a vonal akkor is a korong közepén marad, ha a felállás változik.
+   A vonalvastagságot a nyújtás torzítaná, ezért non-scaling-stroke.
+   A kötés HALVÁNY: háttér-információ, nem díszítés — a pálya olvashatósága
+   fontosabb, mint a kapcsolatok hangsúlyozása. */
+/* A KORONG KÖZEPE NEM A HELY HORGONYPONTJA. A .slot a korongot ÉS az alatta
+   lévő névcímkét együtt centrálja (translate -50%,-50%), tehát a korong közepe
+   pontosan (slot-magasság − korong-átmérő)/2 pixellel FÖLÖTTE van a left/top
+   koordinátának — mérve 8-9 px. Ez KONSTANS pixelérték (nem függ a pálya
+   méretétől), ezért pont ennyivel toljuk fel a vonalréteget: így a vonalvégek
+   a korongok mértani közepére futnak be, minden képernyőméreten. */
+#pitchBonds{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:visible;
+  transform:translateY(-8px)}
+#pitchBonds line{vector-effect:non-scaling-stroke;stroke-linecap:round}
+#pitchBonds line.done{stroke:rgba(255,255,255,.34);stroke-width:1.6}
+#pitchBonds line.wip{stroke:rgba(201,162,51,.42);stroke-width:1.4;stroke-dasharray:3 3}
 .slot{position:absolute;transform:translate(-50%,-50%);width:74px;text-align:center;z-index:2}
 .slot .dot{width:42px;height:42px;margin:0 auto;border-radius:50%;background:rgba(0,0,0,.28);
   border:2px dashed rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;
@@ -2299,7 +2319,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.7.00";
+const APP_VERSION="2.7.01";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -13385,7 +13405,51 @@ function drawPitch(){
     d.innerHTML=`<div class="dot">${esc(s.pos)}</div><div class="lbl">${s.player?esc(shortName(s.player.n)):""}</div>`;
     frag.appendChild(d);s.el=d;}});
   /* csak a KÉSZ képet tesszük ki — így sosem marad üresen a pálya */
-  pit.innerHTML="";pit.appendChild(frag);}
+  pit.innerHTML="";
+  {const bonds=buildPitchBonds();if(bonds)pit.appendChild(bonds);}
+  pit.appendChild(frag);}
+/* ---- A KÉMIA-KÖTÉSEK RÉTEGE ----
+   MIÉRT KELL: a párkémia eddig SEHOL nem látszott. Épült, hatott (a kész páros
+   gólsúlya ~10%-kal nő, és ha mindketten pályán vannak, a csapat gólmennyisége
+   is), a felhasználó viszont csak annyit tapasztalt, hogy "történik valami".
+   Egy összeszokott hármas vagy egy magányos csatár így nem volt látható — pedig
+   pont ez az az információ, ami a felállás-rakosgatást értelmessé teszi.
+
+   MIT RAJZOLUNK: a KEZDŐ 11 között húzódó párkémiákat, az S.chemPairs élő
+   modelljéből (nem a CHEM.goodPairs indulási pillanatképéből — az csak az
+   alapkémia magja, és nem követi a keret változásait).
+     · folytonos, fehér  — KÉSZ kötés (5/5): ez az, ami ténylegesen hat
+     · szaggatott, arany — épülő kötés: látszik, min dolgozik a csapat
+   Csak akkor rajzolunk, ha MINDKÉT végpont a pályán van: a padon ülő társsal
+   meglévő kötésnek nincs mit összekötnie a pályaképen (azt a játékos lapja
+   mondja el). */
+function buildPitchBonds(){
+  if(gameMode!=="career"||!S||!S.chemPairs)return null;
+  /* név → a pályán elfoglalt hely koordinátája */
+  const pos={};
+  slots.forEach(s=>{if(s&&s.player&&s.xy)pos[s.player.n]=s.xy;});
+  const lines=[];
+  Object.values(S.chemPairs).forEach(pr=>{
+    if(!pr)return;
+    const A=pos[pr.a],B=pos[pr.b];
+    if(!A||!B)return;                       /* legalább az egyikük nincs a pályán */
+    const done=(pr.stages||0)>=CHEM_PAIR_NEED;
+    if(!done&&!(pr.stages>0))return;        /* a 0 fázisú kötés még nem kötés */
+    lines.push({A,B,done});});
+  if(!lines.length)return null;
+  const NS="http://www.w3.org/2000/svg";
+  const svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("id","pitchBonds");
+  svg.setAttribute("viewBox","0 0 100 100");
+  svg.setAttribute("preserveAspectRatio","none");
+  svg.setAttribute("aria-hidden","true");
+  lines.forEach(({A,B,done})=>{
+    const ln=document.createElementNS(NS,"line");
+    ln.setAttribute("x1",A[0]);ln.setAttribute("y1",A[1]);
+    ln.setAttribute("x2",B[0]);ln.setAttribute("y2",B[1]);
+    ln.setAttribute("class",done?"done":"wip");
+    svg.appendChild(ln);});
+  return svg;}
 const NAT_BY_NAME={};ALL_PLAYERS.forEach(p=>{if(!(p.n in NAT_BY_NAME))NAT_BY_NAME[p.n]=p.nat;});
 ICON_PLAYERS.forEach(p=>{if(!(p.n in NAT_BY_NAME))NAT_BY_NAME[p.n]=p.nat;});
 const NAME_PARTICLES=new Set(["de","da","do","dos","das","van","von","der","den","di","dí","le","la","el","al","bin","ibn"]);
@@ -15953,10 +16017,29 @@ function completeChemPairsOnPitch(activeNames){
   Object.values(S.chemPairs).forEach(pr=>{
     if(pr.stages>=CHEM_PAIR_NEED&&activeNames.has(pr.a)&&activeNames.has(pr.b))n++;});
   return n;}
+/* ---- A PÁLYAKÉP KÖVESSE A KÉMIÁT ----
+   A kötés-vonalakat a drawPitch rajzolja, az viszont nem fut le magától egy
+   kémia-lépés után — a friss kötés csak a következő véletlen újrarajzolásnál
+   jelent volna meg. A frissítést ezért ODA tesszük, ahol az állapot változik,
+   nem a hívási helyekre: így egy jövőbeli, új kémia-út sem maradhat le róla.
+   Az ütemezés halasztott ÉS összevont: a keret megalakulásakor a
+   seedBaseChemistry egyetlen ciklusban tucatnyi párt vesz fel, abból így is
+   csak egy rajzolás lesz. */
+let _bondsPending=null;
+function refreshPitchBonds(){
+  if(_bondsPending)return;
+  _bondsPending=setTimeout(()=>{
+    _bondsPending=null;
+    try{
+      if(document.getElementById("pitch")&&typeof slots!=="undefined"
+         &&slots&&slots.some(s=>s&&s.player))drawPitch();
+    }catch(e){}
+  },0);}
 function addChemPair(a,b,stages){
   const k=chemKey(a,b);
   if(!S.chemPairs[k])S.chemPairs[k]={a:[a,b].sort()[0],b:[a,b].sort()[1],stages:stages||0,need:CHEM_PAIR_NEED};
   else S.chemPairs[k].stages=Math.max(S.chemPairs[k].stages,stages||0);
+  refreshPitchBonds();
   return S.chemPairs[k];}
 /* A keret megalakulásakor: a meglévő kémia goodPairs-éből (közös klub/nemzet/
    rivális-jóra-fordult/vezetői) minden párost eleve KÉSZ (5/5) párkémiaként
@@ -15978,7 +16061,8 @@ function pruneChemistry(){
     const pr=S.chemPairs[k];
     if(!inRoster.has(pr.a)||!inRoster.has(pr.b)){
       delete S.chemPairs[k];
-      if(S.chemInProgress===k)S.chemInProgress=null;}
+      if(S.chemInProgress===k)S.chemInProgress=null;
+      refreshPitchBonds();}   /* a megszűnt kötés vonala is tűnjön el */
   });}
 /* Kombó-skill támogatás (pl. Elastico!): egy skillnek lehet `combo` tömbje,
    ami több effekt-típusra (pl. assistw+goalw+mvp) is ad egyszerre egy kisebb
@@ -23186,7 +23270,8 @@ function advanceChemInProgressManual(){
     if(pr.stages>=CHEM_PAIR_NEED){
       addLine(`🤝 Kémia kész: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} — összeszokott páros, most már együtt veszélyesek!`,"m life");
       S.chemInProgress=null;
-    }else addLine(`🤝 Kémia épül: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} (${pr.stages}/${CHEM_PAIR_NEED} fázis)`,"m life");}
+    }else addLine(`🤝 Kémia épül: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} (${pr.stages}/${CHEM_PAIR_NEED} fázis)`,"m life");
+    refreshPitchBonds();}   /* itt a fázis KÖZVETLENÜL változik, nem addChemPair-en át */
   $("scSkill").classList.add("hide");
   const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();}
 function renderChemPick(){
@@ -28025,6 +28110,47 @@ function buildHubDetail(loc){
         kesz<sk.length?` (${kesz} kész, ${sk.length-kesz} épülőben)`:""}</b>${rows}</div>`;
     }else{
       html+=`<div class="hdRow" style="color:var(--dim2)">🎖 Még nincs skillje. A skillek meccsteljesítményért járnak — mesterhármas, nagyarányú győzelem, harmadik meccsemberség, dupla bravúr, kettős gólpassz —, és több fázisban épülnek ki: a hatásuk addig csak arányosan él.</div>`;
+    }
+  }
+  /* ---- KÉMIA-KAPCSOLATOK — KIVEL VAN KÖTÉSE ----
+     A párkémia eddig sehol nem volt visszanézhető: a pályán nem látszott, a
+     játékos lapján nem szerepelt, tehát a felhasználó nem tudta, kik tartoznak
+     össze a keretében — pedig a kész kötés valódi hatással jár (a páros
+     gólsúlya ~10%-kal nő, és ha mindketten pályán vannak, a csapat
+     gólmennyisége is enyhén). Itt, a skillek mellett a helye: mindkettő a
+     játékos "mit ad a csapatnak" oldala.
+     A KÉSZ és az ÉPÜLŐ kötés külön sorban, a fázisszámmal — ugyanaz a bontás,
+     amit a skilleknél is használunk. A partner mellett kiírjuk, hol van
+     (pályán / padon / tartalék), mert a kész kötés hatása CSAK akkor él, ha
+     mindketten pályán vannak. */
+  if(gameMode==="career"&&S&&S.chemPairs){
+    const onPitch=new Set(slots.filter(s=>s&&s.player).map(s=>s.player.n));
+    const benchNames=new Set();
+    try{BENCH_KEYS.forEach(k=>{if(BENCH[k])benchNames.add(BENCH[k].n);});}catch(_){}
+    const mine=[];
+    Object.values(S.chemPairs).forEach(pr=>{
+      if(!pr)return;
+      const other=pr.a===p.n?pr.b:(pr.b===p.n?pr.a:null);
+      if(!other||!(pr.stages>0))return;
+      mine.push({other,stages:pr.stages||0,done:(pr.stages||0)>=CHEM_PAIR_NEED});});
+    mine.sort((x,y)=>(y.done-x.done)||(y.stages-x.stages));
+    if(mine.length){
+      const kesz=mine.filter(x=>x.done).length;
+      const rows=mine.map(x=>{
+        const hol=onPitch.has(x.other)?`<span style="color:var(--grass)">pályán</span>`
+          :benchNames.has(x.other)?`<span style="color:var(--dim2)">cserepad</span>`
+          :`<span style="color:var(--dim2)">tartalék</span>`;
+        const st=x.done
+          ? `<span class="st">kész · ${hol}</span>`
+          : `<span class="st wip">${x.stages}/${CHEM_PAIR_NEED} fázis · ${hol}</span>`;
+        const bar=x.done?"":`<div class="hdSkBar"><i style="width:${Math.round(x.stages/CHEM_PAIR_NEED*100)}%"></i></div>`;
+        return `<div class="hdSk${x.done?" done":""}" style="border-left-color:var(--grass)">
+          <div class="nm">🔗 ${esc(shortName(x.other))}${st}</div>${bar}</div>`;}).join("");
+      html+=`<div class="hdRow" style="margin-bottom:8px"><b>🔗 Kémia — ${mine.length} kapcsolat${
+        kesz<mine.length?` (${kesz} kész, ${mine.length-kesz} épülőben)`:""}</b>${rows}
+        <div style="margin-top:5px">A kész kötés akkor hat, ha mindketten pályán vannak: a párosnak nő a gólszerzési súlya, és a csapat gólmennyisége is enyhén. A pályaképen halvány vonal köti össze őket.</div></div>`;
+    }else{
+      html+=`<div class="hdRow" style="color:var(--dim2)">🔗 Még nincs kémia-kapcsolata. Az alapkémia (közös klub, közös nemzetiség, vezetői felkarolás) a keret megalakulásakor jön létre, újakat pedig a HUB kémiaépítésével lehet felhúzni.</div>`;
     }
   }
   const lead=p.lead||(e&&typeof LEAD_LEVELS!=="undefined"?LEAD_LEVELS[e.leadI]:null);
