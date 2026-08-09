@@ -2299,7 +2299,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.6.081";
+const APP_VERSION="2.6.082";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -31151,16 +31151,59 @@ function saveWrite(key,json){
 let _saveLock=null;   /* a betöltött/elindított játék mentési kulcsa */
 function saveLockSet(k){_saveLock=k||null;}
 function saveLockAdopt(){_saveLock=saveKey();}
+/* ---- A FÉLBEMARADT BETÖLTÉS MÉRGEZŐ ÁLLAPOT ----
+   MÉRVE, ÉLES ADATVESZTÉS: ha az applySavedGame BÁRMIÉRT kivételt dob (csonka
+   mentés egy kvóta miatt megszakadt írásból, sérült sor, régebbi/újabb séma),
+   a betöltés a felénél állt meg. Az eredmény a lehető legrosszabb kombináció
+   volt: a szoba karrierjének egy DARABJA már a memóriában ült (a csapatnév is
+   átvett), de a `MP.active` visszaesett hamisra (az applySavedGame a `d.mp`
+   hiányában törli), a mentési zár pedig sosem került fel — a saveKey() így az
+   EGYJÁTÉKOS helyre mutatott. A következő mentés a szoba fél-karrierét írta a
+   hetedik szezonos egyjátékos karrier helyére. Teszttel reprodukálva:
+   "Egyjatekos FC/7" → "Szoba Ketto/5".
+
+   Három egymást fedő védelem lép a helyére:
+     1. A ZÁR A BETÖLTÉS ELŐTT kerül fel (loadIntoGame). Ha bármi elszáll, a
+        cél-hely akkor is ismert, tehát idegen helyre nem írhatunk.
+     2. A HIBA MÉRGEZ: `_saveBroken` beáll, és a saveGame onnantól NEM ÍR. Egy
+        fél-állapot sosem kerülhet lemezre — se ide, se máshova.
+     3. A saveGame többé nem "veszi fel" a zárat, ha az üres (lásd ott). */
+let _saveBroken=false;
+function loadIntoGame(d,key){
+  saveLockSet(key);              /* 1. — MÉG a betöltés előtt */
+  try{
+    applySavedGame(d);
+    _saveBroken=false;
+    return true;
+  }catch(e){
+    _saveBroken=true;            /* 2. — innentől nem írunk sehova */
+    try{console.warn("MAGYAH: a mentés betöltése elszállt —",e&&e.message);}catch(_){}
+    return false;}}
 function saveGame(){
   /* A kezdőképernyőn nincs mit menteni — és ha mégis írnánk, a következő
      indulást rontanánk el vele. */
   if(!hasLiveGame())return;
+  /* FÉLBEMARADT BETÖLTÉS UTÁN SOSEM ÍRUNK: a memóriában lévő állapot töredékes,
+     lemezre kerülve viszont teljes értékű mentésnek látszana — és felülírná az
+     épet. Amíg a felhasználó nem indít új játékot vagy nem tölt be sikeresen
+     egy másikat, ez a hely érintetlen marad. */
+  if(_saveBroken)return;
   {const k=saveKey();
    if(_saveLock&&k!==_saveLock){
      /* Nem dobunk hibát és nem állítjuk meg a játékot — csak nem írunk. */
      try{addLine(`⛔ Mentés elhalasztva: a játék a(z) ${esc(_saveLock)} helyről való, a cél viszont ${esc(k)} lenne. Az idegen mentést nem írjuk felül.`,"m ev");}catch(e){}
      return;}
-   if(!_saveLock)_saveLock=k;}
+   /* 3. A ZÁR NEM VEHETŐ FEL MENET KÖZBEN.
+      Eddig itt egy `if(!_saveLock)_saveLock=k;` állt: üres zár esetén a mentés
+      egyszerűen ELFOGADTA a pillanatnyi célt sajátjának. Pontosan ez volt az a
+      lyuk, amin a fenti adatvesztés átfért — egy félbemaradt betöltés után a
+      zár üres volt, a cél pedig az egyjátékos hely, tehát a szoba-karrier
+      "jogosan" írt oda. Zárat mostantól KIZÁRÓLAG két hely tesz fel: a sikeres
+      betöltés (loadIntoGame) és az új játék (saveLockAdopt) — mindkettő tudja
+      is, hova tartozik a játék. Ha itt mégis üres, az hiba: nem írunk. */
+   if(!_saveLock){
+     try{console.warn("MAGYAH: nincs mentési zár — a mentés kimarad.");}catch(e){}
+     return;}}
   try{
     const data={
       v:1,
@@ -31805,6 +31848,39 @@ function resumeUIFromSave(){
     if(twWindowOpen()){twEnterHubWindow();return;}
     $("scSim").scrollIntoView({behavior:"smooth"});
     if(S.auto&&!S.playing&&S.idx<30)startRound();}}
+/* ---- A BETÖLTÉS ELSZÁLLÁSA NEM MARADHAT NÉMA ----
+   Ha egy mentés nem tölthető be, a felhasználó eddig egy fél-állapotban maradt,
+   mindenféle jelzés nélkül. Mostantól visszavisszük a kezdőlapra, és
+   MEGMONDJUK, mi történt — beleértve azt is, hogy a mentéshez NEM nyúltunk
+   hozzá (a _saveBroken zárolja az írást), tehát egy későbbi verzió vagy egy
+   diagnosztika még kimentheti belőle az adatot. Törölni SEMMIT nem törlünk:
+   egy meg nem nyíló mentés is többet ér, mint a semmi. */
+/* A hiba RAGADÓS: egy modulszintű jelzőben él, nem a DOM-ban. Enélkül az
+   indulás második fele (mpBoot → mpRenderHomeRooms) egyszerűen felülrajzolta
+   volna a chipekkel, és a felhasználó megint csak némán állt volna egy üres
+   kezdőlapon. Így a sáv minden újrarajzolást túlél. */
+let _loadFailure=null;
+function mpShowLoadFailure(code){
+  _loadFailure={code:code||null};
+  try{
+    $("mpEntry").classList.remove("hide");
+    mpShow("mpViewHome");
+    mpDrawRoomChips([]);       /* azonnal látszódjon; a chipek később pontosítanak */
+    mpRenderHomeRooms();
+  }catch(e){}
+  try{window.scrollTo(0,0);}catch(e){}}
+function mpLoadFailureHtml(){
+  if(!_loadFailure)return "";
+  const hol=_loadFailure.code?`a(z) ${_loadFailure.code} szoba karrierje`:"az egyjátékos karriered";
+  return `<div class="lbl" style="color:#e0754a">Hiba</div>
+    <div class="mpRoomChip" style="display:block;text-align:left;border-color:#e0754a;margin-bottom:10px">
+      <div style="color:#e0754a;font-weight:700;font-size:13px">⚠ Nem sikerült betölteni: ${esc(hol)}</div>
+      <div style="font-size:11.5px;color:rgba(243,242,242,.75);line-height:1.5;margin-top:4px">
+        A mentés a helyén maradt — NEM írtuk felül és nem is töröltük, és amíg ez a
+        hiba áll, a játék semmit nem ment. A többi karriered érintetlen. A 🧪
+        diagnosztikával a tartalma kinyerhető.
+      </div>
+    </div>`;}
 function initSaveSystem(){
   /* ---- F7: SZOBÁBA TÖLTÉS ----
      Ha a kezdőlapról egy szoba folytatását kértük, ide egyenesen az adott szoba
@@ -31815,9 +31891,13 @@ function initSaveSystem(){
     MP.active=true;MP.activeRoom=code;MP.started=true;
     const d=mpRoomSave(code);   /* üres mentés nem számít folytathatónak */
     if(d){
-      applySavedGame(d);
+      /* A zár MÉG a betöltés előtt felkerül (loadIntoGame): ha az applySavedGame
+         elszáll, a szoba fél-karriere akkor sem írhatja felül az egyjátékos
+         helyet — ott sosem járt volna, és most már a zár is ezt mondja. */
+      if(!loadIntoGame(d,mpSaveKeyFor(code))){
+        mpShowLoadFailure(code);
+        return;}
       MP.active=true;MP.activeRoom=code;MP.started=true;   /* a mentés felülírhatta */
-      saveLockSet(mpSaveKeyFor(code));   /* innen jött — ide is ment vissza */
       _mpBootedIntoGame=true;
       $("mpEntry").classList.add("hide");
       resumeUIFromSave();
@@ -31848,14 +31928,32 @@ function initSaveSystem(){
     : ph==="hubreport" ? `${saved.teamName} — szezonváltás megtörtént, indulhat az új idény`
     : `${saved.teamName||"Csapatod"} — a csapatépítés közben hagytad abba`;
   $("resumeYesBtn").onclick=()=>{
-    applySavedGame(saved);
-    saveLockSet(SAVE_KEY);
+    if(!loadIntoGame(saved,SAVE_KEY)){mpShowLoadFailure(null);return;}
     $("resumeBanner").classList.add("hide");
     resumeUIFromSave();};
-  $("resumeNoBtn").onclick=()=>{
-    clearSave(SAVE_KEY);   /* kifejezetten az EGYJÁTÉKOS helyet dobja el */
-    $("resumeBanner").classList.add("hide");
-    $("scModeSelect").classList.remove("hide");};}
+  /* ---- AZ EGYETLEN GOMB, AMI VALÓDI MENTÉST TÖRÖL ----
+     Eddig EGY koppintás véglegesen eldobott egy akár sokszezonos karriert, a
+     "Folytatom" gomb közvetlen szomszédjából, mindenféle visszakérdezés nélkül.
+     Ez volt a rendszer legélesebb éle: pont az a fajta gomb, ami miatt félni
+     kell megnyomni bármit.
+     Mostantól KÉTLÉPCSŐS, és a megerősítés MEGNEVEZI, mi vész el (csapatnév,
+     szezon) — a szoba elhagyásánál már bevált mintát követve. 4 másodperc után
+     magától visszaáll, tehát egy véletlen első koppintás nyomtalan marad. */
+  const noBtn=$("resumeNoBtn"),noLabel="Új játék elölről";
+  let noArm=null;
+  noBtn.textContent=noLabel;
+  noBtn.onclick=()=>{
+    if(noArm){
+      clearTimeout(noArm);noArm=null;
+      noBtn.textContent=noLabel;
+      clearSave(SAVE_KEY);   /* kifejezetten az EGYJÁTÉKOS helyet dobja el */
+      $("resumeBanner").classList.add("hide");
+      $("scModeSelect").classList.remove("hide");
+      return;}
+    const sn=(saved.S&&saved.S.seasonNumber)||1;
+    const who=saved.teamName?`${saved.teamName} (${sn}. szezon)`:`a ${sn}. szezonos karriered`;
+    noBtn.textContent=`Biztos? ${who} véglegesen törlődik — koppints még egyszer`;
+    noArm=setTimeout(()=>{noArm=null;noBtn.textContent=noLabel;},4000);};}
 let gameMode="classic",scout=null,careerPool=null;
 $("modeClassicBtn").onclick=()=>{
   gameMode="classic";
@@ -31929,13 +32027,32 @@ try{const _r=sessionStorage.getItem(MP_BOOT_KEY);
     _mpBootIntent=_r?JSON.parse(_r):null;}catch(e){_mpBootIntent=null;}
 let _mpBootedIntoGame=false;   /* igaz, ha induláskor egyenesen játékba töltöttünk */
 function mpCtxKey(){return (MP.active&&MP.activeRoom)?("room:"+MP.activeRoom):"solo";}
+/* ---- ÚJRATÖLTÉS EGY SZÁNDÉKKAL — A KONTEXTUSVÁLTÁS EGYETLEN ÚTJA ----
+   A szándék a sessionStorage-ban utazik át az újratöltésen; az indulás
+   (initSaveSystem + mpBoot) ebből tudja, hova kell megérkezni.
+
+   A MEGHÍVÓ-PARAMÉTERT LE KELL VÁGNI. A `location.reload()` megtartja a teljes
+   URL-t, tehát a ?room=KÓD-dal érkezett felhasználónál MINDEN újratöltés újra
+   végigvitte volna a csatlakozást — a 🏠 gomb sosem a kezdőlapon kötött volna
+   ki, hanem újra és újra annak a szobának a lobbyjában. Ezért a paramétert
+   kivesszük az URL-ből, és a tiszta címre navigálunk. */
+function mpReloadWithIntent(intent){
+  try{sessionStorage.setItem(MP_BOOT_KEY,JSON.stringify(intent||{solo:true}));}catch(e){}
+  try{
+    const q=new URLSearchParams(location.search);
+    if(q.has("room")){
+      q.delete("room");
+      const s=q.toString();
+      location.replace(location.pathname+(s?"?"+s:"")+location.hash);
+      return;}
+  }catch(e){}
+  location.reload();}
 function mpSwitchContext(intent){
   const want=intent&&intent.room?("room:"+intent.room):"solo";
   /* meccs közben sosem mentünk (a mentés szabálya: csak lezárt pillanatokban) */
   try{if(!S.playing)saveGame();}catch(e){}
   if(mpCtxKey()===want){$("mpEntry").classList.add("hide");return;}
-  try{sessionStorage.setItem(MP_BOOT_KEY,JSON.stringify(intent||{solo:true}));}catch(e){}
-  location.reload();}
+  mpReloadWithIntent(intent||{solo:true});}
 /* Van-e félbehagyott karrier ebben a szobában? Az ÜRES mentés (lásd
    saveHasGame) nem számít annak: különben a "Szobáid" chip folytathatót
    ígérne, a folytatás pedig üres draftba vinne. */
@@ -32380,7 +32497,9 @@ async function mpRenderHomeRooms(){
      írjuk a jegyzékbe, hogy legközelebb már onnan is meglegyen. */
   const codes=mpMyCodes().slice();
   mpSavedRoomCodes().forEach(c=>{if(!codes.includes(c)){codes.push(c);mpRememberCode(c);}});
-  if(!codes.length){box.classList.add("hide");box.innerHTML="";return;}
+  /* Szoba nélkül sincs vége: az egyjátékos karrier chipje ilyenkor is kell,
+     ezért a rajzolót akkor is meghívjuk, csak üres szobalistával. */
+  if(!codes.length){mpDrawRoomChips([]);return;}
   /* Megvárjuk a hálózatot: enélkül a mpNet.mode null, és sem megjeleníteni,
      sem takarítani nem tudunk megbízhatóan. Ha nem áll fel, offline megyünk
      tovább — a mentéssel rendelkező szobák akkor is előjönnek. */
@@ -32411,11 +32530,35 @@ async function mpRenderHomeRooms(){
       /* Se szoba, se mentés, és tényleg megkérdeztük: ezt el lehet felejteni. */
       mpForgetCode(c);}}
   mpDrawRoomChips(rooms);}
+/* ---- AZ EGYJÁTÉKOS KARRIER CHIPJE ----
+   A kezdőlap eddig ASZIMMETRIKUS volt: a szobák kiírták a csapatnevet és azt,
+   hányadik szezonnál tartanak, az egyjátékos karrierről viszont SEMMIT nem
+   mondott — az "Egyedül játszom" gomb ugyanúgy nézett ki üres állapotban és egy
+   hetedik szezonos karrier fölött. Így a felhasználó nem látta, hogy egyáltalán
+   van-e mit folytatnia, és nem lehetett biztos benne, hogy egy szobába lépés nem
+   nyúl-e hozzá. Pedig a két hely fizikailag külön kulcson él (SAVE_KEY vs.
+   szobánkénti kulcs), és soha nem ütköznek — ezt most a felület is kimondja.
+   A chip ugyanabba a dobozba kerül, mint a szobák, és ugyanúgy viselkedik. */
+function mpSoloChipHtml(){
+  const d=loadSavedGame(SAVE_KEY);
+  if(!saveHasGame(d))return "";
+  const sn=(d.S&&d.S.seasonNumber)||1;
+  const tn=d.teamName?` <span style="opacity:.7;font-weight:400">· ${esc(String(d.teamName))}</span>`:"";
+  const mode=d.gameMode==="career"?`▶ ${sn}. szezon — folytatható`:"▶ folytatható";
+  return `<div class="lbl">Egyjátékos karriered</div>
+    <button class="mpRoomChip" id="mpSoloChip">
+      <span>🏠 Egyedül${tn}</span>
+      <span style="color:#8fd99a;font-size:12px">${mode}</span>
+    </button>`;}
 function mpDrawRoomChips(rooms){
   const box=$("mpHomeRooms");if(!box)return;
-  box.classList.toggle("hide",!rooms.length);
-  if(!rooms.length){box.innerHTML="";return;}
-  box.innerHTML=`<div class="lbl">Szobáid</div>`;
+  const fail=mpLoadFailureHtml();
+  const solo=mpSoloChipHtml();
+  box.classList.toggle("hide",!rooms.length&&!solo&&!fail);
+  if(!rooms.length&&!solo&&!fail){box.innerHTML="";return;}
+  box.innerHTML=fail+solo+(rooms.length?`<div class="lbl"${(solo||fail)?' style="margin-top:10px"':""}>Szobáid</div>`:"");
+  {const sc=$("mpSoloChip");
+   if(sc)sc.onclick=()=>mpSwitchContext({solo:true});}
   rooms.forEach(({code,room,gone,offline})=>{
     const b=document.createElement("button");b.className="mpRoomChip";
     /* F7: látszik, hol fut már karrier — így a chip nem csak szoba, hanem
@@ -32554,16 +32697,51 @@ $("mpResumeBtn")&&($("mpResumeBtn").onclick=()=>{
   if(!MP.activeRoom)return;
   mpSwitchContext({room:MP.activeRoom});});
 /* ---- VISSZA A KEZDŐLAPRA (fejléc-gomb, minden játékképernyőről) ----
-   A kezdőlap egy teljes képernyős réteg (#mpEntry), tehát a visszatérés nem
-   navigáció, csak a réteg visszamutatása — a futó játék állapota a memóriában
-   marad, és a mentés is a helyén van. Meccs KÖZBEN nem mentünk (a mentés
-   szabálya: csak lezárt pillanatokban), de a réteget akkor is visszahozzuk. */
+   A 🏠 MOSTANTÓL MINDIG ÚJRATÖLTI AZ OLDALT — ez a rendszer legfontosabb
+   szabálya, nem kényelmi kérdés.
+
+   MI VOLT A BAJ: a kezdőlap egy teljes képernyős réteg (#mpEntry), és a
+   visszatérés eddig CSAK a réteg visszamutatása volt. A futó karrier teljes
+   állapota — a keret, a tartalék, a `drafted` névhalmaz, a büdzsé, a skillek, a
+   MP.active/activeRoom és a mentési zár — ottmaradt a memóriában. Innentől
+   minden további lépés (új játék, szoba létrehozása, csatlakozás, kontextus-
+   váltás) egy "félig kilépett" állapotból indult, és MINDEGYIKNEK külön-külön
+   emlékeznie kellett rá, hogy takarítson. Egyszer már pontosan ebből lett hiba:
+   egy futó egyjátékos karrier átszivárgott az új multiplayer draftba (lásd a
+   beginNewGame teljes állapot-törlését, ami azt foltozta be).
+
+   AZ ÚJRATÖLTÉS EZT A HIBAOSZTÁLYT SZÜNTETI MEG: a kezdőlap KEMÉNY HATÁR. Ami
+   utána történik, az mindig tiszta lapról indul, ugyanazon az egy úton
+   (initSaveSystem + mpBoot), amin a hidegindítás is. A "melyik állapotból
+   jöttem?" kérdés megszűnik létezni.
+
+   A MENTÉS AZ ÚJRATÖLTÉS ELŐTT megtörténik (szinkron localStorage-írás, tehát
+   biztosan lefut). Meccs KÖZBEN nem mentünk — a mentés szabálya változatlanul
+   az, hogy csak lezárt pillanatokban írunk.
+
+   A szándékot ugyanaz a boot-csatorna viszi át, amit a kontextusváltás is
+   használ (mpSwitchContext); a {home:true} se szobát, se egyjátékost nem kér,
+   tehát az indulás a kezdőlapon áll meg — pontosan úgy, mint egy hidegindítás. */
 function goHomeScreen(){
   try{if(!S.playing)saveGame();}catch(e){}
-  mpShow("mpViewHome");
-  $("mpEntry").classList.remove("hide");
-  window.scrollTo(0,0);}
-$("homeBtn")&&($("homeBtn").onclick=goHomeScreen);
+  mpReloadWithIntent({home:true});}
+/* ---- MECCS KÖZBEN A 🏠 VISSZAKÉRDEZ ----
+   A meccs alatt nem mentünk (csak lezárt pillanatokban írunk), az újratöltés
+   viszont eldobja a memóriában futó szimulációt — a forduló az utolsó mentett
+   állapotról indulna újra. Korábban ez nem számított, mert a 🏠 csak egy réteget
+   mutatott vissza, és a meccs a memóriában életben maradt; az újratöltéssel
+   viszont valódi veszteség lenne, ezért kimondjuk, mielőtt megtörténik.
+   Meccsen kívül semmi nem vész el, ott a gomb egy koppintás marad. */
+let _homeArm=null;
+function homeBtnReset(){
+  const b=$("homeBtn");if(b)b.textContent="🏠";
+  if(_homeArm){clearTimeout(_homeArm);_homeArm=null;}}
+$("homeBtn")&&($("homeBtn").onclick=()=>{
+  const b=$("homeBtn");
+  if(!S.playing){goHomeScreen();return;}
+  if(_homeArm){homeBtnReset();goHomeScreen();return;}
+  b.textContent="🏠 A futó meccs elveszik — mégis?";
+  _homeArm=setTimeout(homeBtnReset,4000);});
 /* Az MP-ágba lépéskor indul a hálózat — az SP-játékos soha nem tölt Firebase-t. */
 $("mpDuelBtn").onclick=()=>{mpShow("mpViewMode");mpNetInit();};
 $("mpModeHajsza").onclick=()=>mpShow("mpViewRoom");
@@ -32627,18 +32805,34 @@ $("mpLobbyHomeBtn").onclick=()=>mpShow("mpViewHome");
 let _mpLeaveArm=null;
 $("mpLobbyLeaveBtn").onclick=async()=>{
   const btn=$("mpLobbyLeaveBtn");
+  const label="✕ Végleg elhagyom a szobát";
+  /* ---- A SZOBA BEZÁRÁSA NEM A KARRIER TÖRLÉSE ----
+     HIBA, AMIT EZ JAVÍT: a gomb a hálózati szobát bontotta le, ÉS kifelejtette
+     a kódot a helyi jegyzékből — a szobában futó, akár sokszezonos karrier
+     mentése viszont a helyén maradt. Az eredmény a legrosszabb fajta veszteség:
+     az adat megvolt, csak épp semmi nem vezetett hozzá többé. A "végleg
+     bezárul" felirat ráadásul azt sugallta, hogy ez rendben is van így.
+     Mostantól: ha a szobához VAN valódi mentés, a kódot MEGTARTJUK a
+     jegyzékben. A hálózati szoba lebomlik (a társ nem ragad benne), a chip
+     viszont ottmarad a kezdőlapon "a szoba megszűnt — folytatható" állapotban,
+     és a karrier egy koppintásra elérhető. A megerősítő szöveg is ezt mondja,
+     nem mást. */
   if(_mpLeaveArm){
     clearTimeout(_mpLeaveArm);_mpLeaveArm=null;
-    btn.textContent="✕ Végleg elhagyom a szobát";
+    btn.textContent=label;
     const code=MP.activeRoom;
+    const hasCareer=!!mpRoomSave(code);
     mpBk().unsubscribe();
     try{await mpBk().leave(code);}catch(e){}
-    mpForgetCode(code);MP.activeRoom=null;mpRoomCache=null;
+    if(!hasCareer)mpForgetCode(code);   /* karrier nélkül nincs mit őrizni */
+    MP.activeRoom=null;mpRoomCache=null;
     mpShow("mpViewHome");
+    mpRenderHomeRooms();   /* a chip azonnal a helyére kerül */
     return;}
-  btn.textContent="Biztos? A szoba végleg bezárul — kattints még egyszer";
-  _mpLeaveArm=setTimeout(()=>{_mpLeaveArm=null;
-    btn.textContent="✕ Végleg elhagyom a szobát";},3000);};
+  btn.textContent=mpRoomSave(MP.activeRoom)
+    ? "Biztos? A szoba bezárul, de a karriered MEGMARAD — koppints még egyszer"
+    : "Biztos? A szoba véglegesen bezárul — koppints még egyszer";
+  _mpLeaveArm=setTimeout(()=>{_mpLeaveArm=null;btn.textContent=label;},3000);};
 /* ---- IDEIGLENES (F1): SEED-TESZT ----
    A világ ujjlenyomata: a seedelt generálási pontok kimenetének hash-e. Két
    azonos-seedű run azonos ujjlenyomatot AD KÖTELEZŐEN — ezt méri a teszt.
@@ -32743,26 +32937,52 @@ window.addEventListener("storage",e=>{
   /* F7: ha az indulás egyenesen egy futó karrierbe töltött (egyjátékos vagy
      szoba), a kezdőlap-útvonalnak nincs dolga — nem navigálunk el a játékból. */
   if(_mpBootedIntoGame)return;
+  /* ---- ELSZÁLLT BETÖLTÉS: MARADUNK A KEZDŐLAPON ----
+     Enélkül a szoba-szándék ága alább átvitt volna ANNAK a szobának a
+     lobbyjába — épp amelyiknek a mentése nem tölthető be. Ott a "Folytatom
+     egyedül" gomb újra ugyanazt a sérült mentést próbálta volna megnyitni,
+     vagyis a felhasználó körbe-körbe járt volna, miközben a valódi üzenet (a
+     kezdőlapon) sosem látszik. A hibasáv a kezdőlapon áll, tehát ott is
+     maradunk — a többi karrier egy koppintásra elérhető marad. */
+  /* AZ ELLENŐRZÉST MINDEN `await` UTÁN MEG KELL ISMÉTELNI. Ez a függvény egy
+     IIFE, ami a szkript közepén indul — a szinkron eleje tehát MÉG az
+     initSaveSystem() ELŐTT lefut (az a szkript legvégén hívódik). Az első
+     await-nél viszont felfüggesztődik, és épp ekkor fut le a betöltés, ami a
+     jelzőket beállítja. Mérve: enélkül a "maradunk a kezdőlapon" ág sosem
+     fogott, mert az ellenőrzés pillanatában a hiba még nem is létezett — a
+     folytatás pedig vidáman megnyitotta a sérült szoba lobbyját. */
+  const megall=()=>_mpBootedIntoGame||!!_loadFailure;
+  if(megall()){await mpRenderHomeRooms();return;}
   let invite=null;
   try{invite=(new URLSearchParams(location.search).get("room")||"").trim().toUpperCase()||null;}catch(e){}
   /* F7: szoba-szándék mentés nélkül → nyissuk meg annak a szobának a lobbyját */
   if(_mpBootIntent&&_mpBootIntent.room){
     await mpNetInit();
+    if(megall()){await mpRenderHomeRooms();return;}
     MP.activeRoom=_mpBootIntent.room;
     mpShow("mpViewLobby");
     return;}
   const codes=mpMyCodes();
   if(!invite&&!codes.length)return;
   await mpNetInit();
+  if(megall()){await mpRenderHomeRooms();return;}
   if(invite){
     mpShow("mpViewRoom");
     const res=await mpBk().join(invite);
     if(res.ok){MP.activeRoom=res.code;mpRememberCode(res.code);mpRememberMyId();mpShow("mpViewLobby");}
     else{$("mpJoinErr").textContent=res.err;$("mpJoinCode").value=invite;}
     return;}
-  await mpRenderHomeRooms();
-  const still=mpMyCodes();
-  if(still.length===1){MP.activeRoom=still[0];mpShow("mpViewLobby");}})();
+  /* ---- A KEZDŐLAP MINDIG A KEZDŐLAP ----
+     Itt korábban egy automatikus ugrás állt: pontosan EGY jegyzett szoba esetén
+     az indulás egyenest annak a lobbyjába vitt, a kezdőlapot átugorva. Két baja
+     volt. Egyrészt így egyetlen szobával NEM LEHETETT a kezdőlapon maradni — a
+     szoba elrabolta a belépési pontot. Másrészt amióta a 🏠 gomb újratöltéssel
+     jár, ez egyenesen elrontaná: a kezdőlapra lépés visszapattant volna a
+     lobbyba, vagyis a gomb használhatatlan lett volna.
+     A szoba egy koppintásra van a chipeken (amik a csapatnevet és a szezont is
+     kiírják), tehát semmi nem veszett el — csak a döntés került vissza oda,
+     ahova való: a felhasználóhoz. */
+  await mpRenderHomeRooms();})();
 $("versionBadge").textContent="v"+APP_VERSION;
 /* A kezdőlap láblécében is ott a verzió — a fejléc badge-e a játékon belül
    látszik, a nyitóképernyőn viszont eddig sehol nem volt. */
