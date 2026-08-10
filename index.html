@@ -8149,10 +8149,15 @@ const SPEED_SOFTCAP_K=2.5;
 function axisExpected(k,T){
   const base=T+(AXIS_OFFSET[k]||0);
   if(k!=="seb")return base;
-  const d=(SPEED_MAX-base)/SPEED_SOFTCAP_K;
+  /* INFINITY: ha a plafon feloldódott, nincs mihez telítődni — az elvárás a
+     nyers alap. (Ez a képlet határértéke is: cap→∞ mellett a softplus a
+     base-hez tart, tehát a viselkedés folytonos.) */
+  const cap=speedCap();
+  if(!isFinite(cap))return base;
+  const d=(cap-base)/SPEED_SOFTCAP_K;
   /* numerikusan stabil softplus: nagy d-nél ln(1+e^d) ≈ d */
   const sp=d>30?d:Math.log(1+Math.exp(d));
-  return SPEED_MAX-SPEED_SOFTCAP_K*sp;}
+  return cap-SPEED_SOFTCAP_K*sp;}
 function tacticFit(key){
   const A=teamAttrStrengths(),w=TACTICS[key].attrProfile;
   /* a mezőny szintje a horgony (a kapus szándékosan kimarad belőle) */
@@ -9617,8 +9622,37 @@ function commitSeasonBasis(p){
      · edzeni 1.5x lassabban lehet (SPEED_TRAIN_DIV) */
 const ATTR_KEYS=["ved","kapus","passz","gol","seb"];
 const ATTR_LABELS={ved:"Védekezés",kapus:"Védés",passz:"Passz",gol:"Gólszerzés",seb:"Sebesség"};
-const SPEED_MAX=99;          /* a sebesség kemény plafonja */
+const SPEED_MAX=99;          /* a sebesség kemény plafonja — NORMÁL módban */
 const SPEED_TRAIN_DIV=1.5;   /* ennyivel lassabban edzhető, mint a többi */
+/* ================= INFINITY: A 99-ES SEBESSÉG-PLAFON KINYÍLIK =================
+   A 99 minden más tengelynél elmozdult már az Infinityben — a sebességnél nem,
+   és ez egy valódi zsákutcát csinált belőle. Egy 110-es keretnél a Védekezés,
+   a Passz és a Gólszerzés 120 fölött járt, a Sebesség viszont mindenkinél
+   pontosan 99-en állt: a leggyorsabb és a leglassabb embered között NULLA
+   különbség maradt, a sebességre épülő taktikák (Széljáték, Gyors kontra)
+   pedig megkülönböztethetetlenné váltak — épp ott, ahol a játék a legfinomabb
+   döntéseket kérné.
+
+   Az Infinity megnyitása tehát a sebesség plafonját is felviszi (az általános
+   attribútum-plafonra, azaz korlátlanra). A gyorsaság viszont NEM válik olcsó
+   tengellyé: 99 FÖLÖTT a fejlődése a többi attribútum NEGYEDÉRE lassul.
+   Ez a szám tudatos. A 99 alatti 1/1.5-es tempó a "veleszületett adottság"
+   szabálya; e fölött már nem tehetségről van szó, hanem arról, hogy valaki
+   a fizika határát tolja — az minden megtett ponttal drágább. A negyed tempó
+   mellett egy csúcsjátékos évek alatt nyer pár pontot, nem szezonok alatt
+   húszat: a 99 fölötti sebesség RITKA és beszédes marad.
+
+   A PASSZÍV csatorna szabálya változatlan (születési érték +15%): a plafon
+   megnyílása nem ad ingyen gyorsaságot, csak megengedi, hogy a CÉLZOTT EDZÉS
+   följebb vigyen. */
+const INFINITY_SPEED_TRAIN_DIV=4;   /* 99 fölött: 0,25x a többi attribútumhoz képest */
+function speedCap(){return infinityMode?attrHardCap():SPEED_MAX;}
+/* A sebesség edzés-osztója. A 99 FÖLÖTTI szakaszon vált negyedelőre — vagyis
+   ugyanaz a játékos a 99-ig a régi tempóval halad, és csak azon túl lassul. */
+function speedTrainDiv(entry){
+  if(!infinityMode)return SPEED_TRAIN_DIV;
+  const cur=(entry&&entry.attrs&&entry.attrs.seb)||0;
+  return cur>=SPEED_MAX?INFINITY_SPEED_TRAIN_DIV:SPEED_TRAIN_DIV;}
 /* ---- PASSZÍV SEBESSÉG-CSATORNA ----
    A pályán töltött idő magától is formálja a gyorsaságot, poszt szerinti
    mértékben (a csatár sprintel a legtöbbet, a kapus alig). DE: ennek a
@@ -9638,7 +9672,7 @@ const SPEED_PASSIVE_RATE=0.60;   /* poszt-súllyal szorozva (csatár 1.0 … kap
 const SPEED_ROLL_SPREAD=8;   /* a kezdő kisorsolás szórása (± ennyi) */
 /* Egy attribútum plafonja. A sebesség sosem mehet 99 fölé, akkor sem, ha a
    Rating (Infinityben) elszáll. */
-function attrCapFor(key){return key==="seb"?SPEED_MAX:attrHardCap();}
+function attrCapFor(key){return key==="seb"?speedCap():attrHardCap();}
 /* Üres attribútum-számláló — MINDIG az ATTR_KEYS-ből épül, hogy egy új
    attribútum (mint a sebesség) sehol ne maradjon ki a nullázásokból. */
 function zeroAttrs(){const o={};ATTR_KEYS.forEach(k=>o[k]=0);return o;}
@@ -9776,11 +9810,14 @@ function bumpAttr(entry,key,dir){
   const floor=Math.max(40,base+(prof[key]||0)-ATTR_SPEC_FLOOR);
   entry.attrs[key]=Math.max(floor,Math.min(ceil,entry.attrs[key]+dir));}
 /* A passzív csatorna másodlagos plafonja: a születési sebesség +15%-a (de a
-   99-es kemény plafont sosem lépi át). Ha nincs rögzített születési érték
-   (régi mentés), a jelenlegit vesszük alapnak — így a migráció nem büntet. */
+   kemény plafont sosem lépi át). Ha nincs rögzített születési érték
+   (régi mentés), a jelenlegit vesszük alapnak — így a migráció nem büntet.
+   INFINITYBEN a kemény plafon feloldódik, a +15%-os szabály viszont NEM: a
+   megnyílt tér kizárólag célzott edzéssel járható be, magától senki nem
+   gyorsul a 99 fölé. */
 function speedPassiveCeil(entry){
   const base=(entry.sebBase!=null)?entry.sebBase:((entry.attrs&&entry.attrs.seb)||0);
-  return Math.min(SPEED_MAX,Math.round(base*(1+SPEED_PASSIVE_CAP_PCT)));}
+  return Math.min(speedCap(),Math.round(base*(1+SPEED_PASSIVE_CAP_PCT)));}
 /* Passzív sebesség-pont jóváírása. KÜLÖN számlálón gyűlik (sebPassivePts),
    nem az attrPoints-ban — így a másodlagos plafont az edzéssel szerzett
    pontoktól függetlenül tudjuk érvényesíteni. A plafonon álló játékosnál a
@@ -9960,7 +9997,7 @@ const TRAIN_SLOW=0.12;       /* a két nem edzett attribútum ennyivel lassabban
 const TRAIN_GROUP_MAX=2;     /* hány poszt-csoport választható edzésenként */
 const TRAIN_STATS=[
   {k:"ved",  n:"Védekezés",  d:"a védekező munka minősége"},
-  {k:"seb",  n:"Sebesség",   d:"1,5x lassabban formálható; a játék magától csak a születési érték +15%-áig viszi — azon túl CSAK edzéssel, 99-ig"},
+  {k:"seb",  n:"Sebesség",   d:"1,5x lassabban formálható; a játék magától csak a születési érték +15%-áig viszi — azon túl CSAK edzéssel, 99-ig (Infinityben a plafon megnyílik, de fölötte negyed tempóval halad)"},
   {k:"kapus",n:"Védés",      d:"kizárólag a kapusnak van értelme",gkOnly:true},
   {k:"passz",n:"Passz",      d:"a labdatartás és a kreativitás alapja"},
   {k:"gol",  n:"Gólszerzés", d:"a befejezés minősége"}];
@@ -10142,8 +10179,9 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
     const _slow=_tr?new Set(_tr.slow):null;
     const _tlog=trainLogFor(entry);
     const addA=(key,v,isTrain)=>{
-      /* A SEBESSÉG lassabban formálható, mint a képességek. */
-      if(key==="seb")v=v/SPEED_TRAIN_DIV;
+      /* A SEBESSÉG lassabban formálható, mint a képességek — Infinityben a
+         99 fölötti szakaszon pedig már csak negyed tempóval. */
+      if(key==="seb")v=v/speedTrainDiv(entry);
       /* UNDERDOG: a nehezebb mezőnyben szerzett tapasztalat többet ér — a
          POZITÍV fejlődés akár 1.5x-re gyorsul. A büntetéseket (negatív v)
          szándékosan NEM skálázzuk: a küzdelem tanít, nem büntet jobban. */
@@ -10290,7 +10328,7 @@ function processBenchDevelopment(){
       const ap=entry.attrPoints;
       const tl=trainLogFor(entry);
       const add=(key,v)=>{
-        if(key==="seb")v=v/SPEED_TRAIN_DIV;   /* a sebesség lassabban formálható */
+        if(key==="seb")v=v/speedTrainDiv(entry);   /* a sebesség lassabban formálható */
         const val=ageScaleAttr(entry.age,v)*mult*devTempo();
         tl.pts[key]+=val;ap[key]=(ap[key]||0)+val;};
       if(tr.main)add(tr.main,TRAIN_MAIN_PTS);
@@ -11868,12 +11906,14 @@ function twAttrSearchesForScout(){
   if(st<TW_ATTR_MIN_STARS)return 0;
   const base=st>=10?4:st>=8?3:st>=5?2:1;
   return base*TW_ATTR_MULT;}
-/* A keresés célértéke. A SEBESSÉG kivétel: annak 99 a kemény plafonja
+/* A keresés célértéke. A SEBESSÉG kivétel: NORMÁL módban 99 a kemény plafonja
    (SPEED_MAX), tehát 99-es mezőnyszinttől fölfelé nincs mit keresni — a
    célérték ott megáll. Enélkül egy 100+ szintű keretnél a scout 101-102-es
    sebességet keresett, amilyen játékos nem létezik: a szűrő (célérték −
    tolerancia) mindenkit kidobott, és a sebesség-keresés üresen tért vissza.
-   A többi tengelynek nincs plafonja, azok változatlanul mennek. */
+   A többi tengelynek nincs plafonja, azok változatlanul mennek.
+   INFINITYBEN a sebesség plafonja is feloldódik (speedCap), ezért a megállás
+   magától elmarad — a célérték itt az attrCapFor-t olvassa, nem a konstanst. */
 function twAttrTarget(aKey){
   /* HIBA, AMIT EZ JAVÍT: a nem-sebesség tengelyek plafonja SPEED_MAX+20 = 119
      volt — vagyis pontosan a NEM-Infinity Rating-plafon, bedrótozva. Emiatt a
@@ -11881,7 +11921,8 @@ function twAttrTarget(aKey){
      136-os mezőnynél is 119-es gólszerzést keresett, ami ott már a keret alsó
      harmada. A tengelyeknek Infinityben nincs 119-es plafonjuk (attrHardCap =
      ratingCap+35, Infinityben végtelen), tehát a keresésnek sincs miért lennie.
-     A sebesség marad az EGYETLEN kivétel: annak a 99 valódi, kemény határ. */
+     A sebesség marad az egyetlen kivétel — de csak az Infinity megnyitásáig:
+     azon túl neki sincs 99-es határa, csak negyed tempóval fejlődik. */
   const cap=attrCapFor(aKey);
   /* MP-nyáron a referencia a két keret közös szintje, nem a tavalyi nehézség —
      lásd mpSummerRefRating a signingTargetOvr mellett */
@@ -12173,8 +12214,8 @@ const GLOSSARY={
   ratingalap:{title:"A Rating alapja (könnyű / közepes / nehéz)",text:"Draftos karrier-indulásnál választható, HÁROM fokozatú beállítás. Nem a mezőny erejét állítja (azt a nehézségi csúszka teszi), hanem azt, MENNYIRE MEGBÍZHATÓ, amit a draftban látsz. KÖNNYŰ — Rating a csúcson: minden játékos a saját, adatbázisbeli LEGJOBB megjelenéséből indul, és egy seedhez pontosan egy Messi tartozik: mindegy, melyik klub keretéből nyitod ki, ugyanazt az embert kapod. A kor sorsolt, de minél jobb valaki, annál nagyobb eséllyel érkezik a 20-27-es sávban — vagyis a top játékos használható állapotban van. KÖZEPES — Rating a szezonban: a játékos pontosan azt tudja, amit ABBAN a klub-szezonban tudott, és a kora is a kártya idényéhez igazodik (a csúcsidényét 27 évesen érte el). A tehetség-plafonja sosem kevesebb, mint amit épp tud: a kártya megmondja, mit tud MOST, a scout 👁 becslése pedig azt, mennyi van még benne. NEHÉZ — kártyánkénti lutri: itt megszűnik a kanonikus személy. Minden klub-szezon kártya SAJÁT kort és SAJÁT TSI-t sorsol, egymástól függetlenül — ugyanaz a név két klubból két különböző ember. A TSI középpontja marad a kártya Ratingje (tehát a jobb klub még mindig jobb esély), de a szórás drasztikus, és nincs alsó padló: egy csúcsformájú kártya kaphat 2000 körüli TSI-t és 34 évet (a játékos el van rontva), egy 84-es öregedő védő pedig 6000 fölöttit és 23 évet (top player lesz belőle). Amit itt a draftban látsz, az MÁR a sorsolás eredménye — a scout becslése az egyetlen fogódzód. MINDHÁROM FOKOZAT CSAK A KEZDŐ KERETRE hat: az átigazolási piac, a scout ajánlatai, az ikonok és az akadémia a karrier további részében ugyanúgy a csúcsforma-referenciájú kínálattal dolgoznak. Kész klubbal indulva nincs választás: ott mindig a szezon-alap fut."},
   nehezseg:{title:"Ellenfelek erőssége",text:"Csúszkával, szabadon választod ki az ellenfél-mezőny célerejét 70-től felfelé. A magas szinteknek saját nevük van (Túlvilági, Halálos, Isteni...). A szintet KÉT SZEZON KÖZÖTT BÁRMIKOR átállíthatod, fel és le is — nincs hozzá feltétel. Ez fontos, mert a csapatod folyamatosan fejlődik, a mezőny viszont nem: ha a kereted messze a mezőny fölé nő, a szezonok tét nélkülivé válnak, ráadásul a sok gól miatt a fejlődésed is felgyorsul, így a különbség magától tovább tágul. A HUB Nehézség-gombja ezért mutatja, hány ponttal vagy a mezőny fölött vagy alatt: ha jóval fölé kerülsz, a gomb színt vált és figyelmeztet. A csúszka mozgatásakor élőben látod, milyen lesz a szezon a beállított értékkel (kiegyensúlyozott, kihívást jelentő, tét nélküli...). A szint állításakor a piac azonnal felzárkózik: a scout onnantól az új szinthez mérten keres igazolásokat."},
   kihivasok:{title:"Kihívások",text:"Vállalható célok, amiket a játék felajánl — elvállalni SOHA nem kötelező, de amit elvállaltál, annak a büntetése akkor is lecsap, ha közben meggondolod magad. Két fajta van: az ÉVSZAK-kihívás egy 8 meccses ablakra szól, a SZEZON-kihívás egy teljes idényre (némelyik anyagi cél többre is). Mindkettőből egyszerre legfeljebb 2 lehet aktív — DE a 15. fordulótól kapsz +1 helyet, ha a helyeid beteltek, és a bennük ülő kihívások közül legalább egy MÁR BIZTOSAN MEGLESZ (a célt elérted, és a teljesülés-retesz miatt többé nem is veszíthető el). Egy teljesített kihívás ugyanis a határidejéig a helyén marad, korán beváltani nem lehet — enélkül egy jól sikerült első félidény elvenné a lehetőséget, hogy a szezon második felére újat vállalj. A bónusz legfeljebb +1, és nem jár a fordított („ne csináld”) vagy állapot-alapú kihívásokra, mert azok vissza tudnak fordulni. A nehézség nem képletből jön, hanem MÉRÉSBŐL: vállaláskor a játék lefuttat 300 szezont a te aktuális szintkülönbségeddel a meccsmotor saját gólmodelljével, és a célszámot arra a percentilisre teszi, ahol a kívánt teljesítési arány kijön — a Könnyű kb. 72%, a Közepes 48%, a Nehéz 26%. Ezért egy „Nehéz\" nagyjából ugyanolyan nehéz sereghajtóként és bajnokesélyesként is. A jutalom lehet egyszeri (pénz, morál, TSI, skill, scout-csillag, keretméret, kártya-fejlesztés) vagy TARTÓS, ami a karriered ívét alakítja (olcsóbb boostok, kedvezményes igazolások, edzői fizetésemelés, ingyen igazolás, befektetés). A büntetés ritkán csonkítja a keretet — inkább a mozgásteret szűkíti: zárt átigazolási ablak, drágább vásárlás, gyengébb scout, befagyott akadémia, cserezár egy játékosra. A legkeményebbek (skill-vesztés, távozó játékos) csak a hosszú, nehéz kihívásoknál jönnek elő. A haladást a HUB kihívás-paneljén bármikor visszanézheted."},
-  taktika:{title:"Taktikák",text:"Az edződ 3 kedvelt taktikával érkezik (80/76/70-es szintről indulnak, a többi 60-ról). A HUB Taktika-paneljén aktiválhatsz egyet: 85-ös szint FÖLÖTT előnyt ad és stílust kap a csapat (a busz zárt meccseket, a kontra az erősebb ellenfelek ellen él, a labdatartás elveszi a labdát...), ALATTA még begyakorolatlan és visszahúz. Minden taktika MÁS csapat-attribútumokra épül: a Park the bus a Védekezésre és a Védésre, a Labdatartás a Passzra, a Hosszú labdák a Gólszerzésre, a Széljáték pedig a Sebességre és a Gólszerzésre. A kezdő 11 ÖT tengelyét (Védekezés, Védés, Passz, Gólszerzés, Sebesség) a játékosok attribútumai ÉS a megszerzett skilljeik adják (pl. a BL Aranycipője a Gólszerzés-tengelyt tolja meg). A SEBESSÉG külön eset: nem a Ratingből jön, egyénibb a többinél (a kisorsolása szélesebb sávban szór), 1,5x lassabban edzhető, és 99-nél kemény plafonja van. Maga a JÁTÉK is gyorsít valamennyit — a poszt sprint-igénye szerint (a csatár a legtöbbet, a kapus alig) —, de ez a passzív út a SZÜLETÉSI érték +15%-ánál megáll. Efölé kizárólag célzott edzésterv visz. Vagyis a gyorsaság alapvetően veleszületett adottság: aki lassúnak született, játékkal csak korlátozottan javul — cserébe a Széljáték és a Gyors kontra szinte ezen áll vagy bukik. Az így kapott illeszkedés kétszeresen számít: gyorsítja a begyakorlást, és skálázza a meccs-hatást is — a jól illeszkedő rendszer előnye nagyobb, a rosszul illeszkedő begyakorlatlanságának büntetése mélyebb. A panelen tengelyenként látod, hol állsz, és melyik erősséged emeli vagy melyik gyengeséged húzza vissza az egyes rendszereket. Egy ERŐS keret (85 fölötti csapaterő) gyorsabban vesz fel egy új rendszert: a begyakorlás 90-es szintig fokozatosan gyorsul a csapaterővel, 90 fölött viszont a mesteri csiszolás mindenkinek ugyanannyi munka. Így egy átformálódó nagy csapat gyorsan felhozhat egy másik taktikát."},
-  edzesterv:{title:"Edzésterv",text:"A HUB-ban kijelölhetsz egy FŐ és egy MELLÉK edzést. Mindkettőhöz egy attribútumot választasz (Védekezés, Sebesség, Védés, Passz, Gólszerzés) és legfeljebb 2 poszt-csoportot (kapus, védők, középpályások, csatárok), akikre vonatkozik. A fő edzés meccsenként 0,8 pontot ad a választott attribútumra, a mellék a felét (0,4) — cserébe az érintett játékosok NEM edzett attribútumai lassabban gyűlnek. Az edzés tehát nem ingyen gyorsítás, hanem irányválasztás: azt fejleszted, amire a taktikádnak szüksége van. A hatás korfüggő: 21 év alatt kétszeres, 25 alatt 1,6-szoros, 30 alatt 0,8-szoros, afölött 0,4-szeres — fiatalt érdemes képezni. Egy attribútum a poszt-profiljához képest +30-ig specializálható, de a Rating-hozam csökken (a +8 fölötti rész felét, a +16 fölötti a negyedét éri) — a TAKTIKA-illeszkedésben viszont teljes értékkel számít. Így egy 130-as passzú középpályás valódi passzmester lesz a Labdatartáshoz, anélkül hogy a Ratingje elszaladna. A SEBESSÉG külön eset: 1,5x lassabban formálható, és a játék magától csak a születési érték +15%-áig viszi — azon túl KIZÁRÓLAG edzéssel jutsz feljebb, 99-ig."},
+  taktika:{title:"Taktikák",text:"Az edződ 3 kedvelt taktikával érkezik (80/76/70-es szintről indulnak, a többi 60-ról). A HUB Taktika-paneljén aktiválhatsz egyet: 85-ös szint FÖLÖTT előnyt ad és stílust kap a csapat (a busz zárt meccseket, a kontra az erősebb ellenfelek ellen él, a labdatartás elveszi a labdát...), ALATTA még begyakorolatlan és visszahúz. Minden taktika MÁS csapat-attribútumokra épül: a Park the bus a Védekezésre és a Védésre, a Labdatartás a Passzra, a Hosszú labdák a Gólszerzésre, a Széljáték pedig a Sebességre és a Gólszerzésre. A kezdő 11 ÖT tengelyét (Védekezés, Védés, Passz, Gólszerzés, Sebesség) a játékosok attribútumai ÉS a megszerzett skilljeik adják (pl. a BL Aranycipője a Gólszerzés-tengelyt tolja meg). A SEBESSÉG külön eset: nem a Ratingből jön, egyénibb a többinél (a kisorsolása szélesebb sávban szór), 1,5x lassabban edzhető, és 99-nél kemény plafonja van — ez a plafon az Infinity megnyitásakor feloldódik, de fölötte a fejlődés a többi attribútum negyedére lassul. Maga a JÁTÉK is gyorsít valamennyit — a poszt sprint-igénye szerint (a csatár a legtöbbet, a kapus alig) —, de ez a passzív út a SZÜLETÉSI érték +15%-ánál megáll. Efölé kizárólag célzott edzésterv visz. Vagyis a gyorsaság alapvetően veleszületett adottság: aki lassúnak született, játékkal csak korlátozottan javul — cserébe a Széljáték és a Gyors kontra szinte ezen áll vagy bukik. Az így kapott illeszkedés kétszeresen számít: gyorsítja a begyakorlást, és skálázza a meccs-hatást is — a jól illeszkedő rendszer előnye nagyobb, a rosszul illeszkedő begyakorlatlanságának büntetése mélyebb. A panelen tengelyenként látod, hol állsz, és melyik erősséged emeli vagy melyik gyengeséged húzza vissza az egyes rendszereket. Egy ERŐS keret (85 fölötti csapaterő) gyorsabban vesz fel egy új rendszert: a begyakorlás 90-es szintig fokozatosan gyorsul a csapaterővel, 90 fölött viszont a mesteri csiszolás mindenkinek ugyanannyi munka. Így egy átformálódó nagy csapat gyorsan felhozhat egy másik taktikát."},
+  edzesterv:{title:"Edzésterv",text:"A HUB-ban kijelölhetsz egy FŐ és egy MELLÉK edzést. Mindkettőhöz egy attribútumot választasz (Védekezés, Sebesség, Védés, Passz, Gólszerzés) és legfeljebb 2 poszt-csoportot (kapus, védők, középpályások, csatárok), akikre vonatkozik. A fő edzés meccsenként 0,8 pontot ad a választott attribútumra, a mellék a felét (0,4) — cserébe az érintett játékosok NEM edzett attribútumai lassabban gyűlnek. Az edzés tehát nem ingyen gyorsítás, hanem irányválasztás: azt fejleszted, amire a taktikádnak szüksége van. A hatás korfüggő: 21 év alatt kétszeres, 25 alatt 1,6-szoros, 30 alatt 0,8-szoros, afölött 0,4-szeres — fiatalt érdemes képezni. Egy attribútum a poszt-profiljához képest +30-ig specializálható, de a Rating-hozam csökken (a +8 fölötti rész felét, a +16 fölötti a negyedét éri) — a TAKTIKA-illeszkedésben viszont teljes értékkel számít. Így egy 130-as passzú középpályás valódi passzmester lesz a Labdatartáshoz, anélkül hogy a Ratingje elszaladna. A SEBESSÉG külön eset: 1,5x lassabban formálható, és a játék magától csak a születési érték +15%-áig viszi — azon túl KIZÁRÓLAG edzéssel jutsz feljebb, 99-ig. Infinityben a 99 is feloldódik, de fölötte a sebesség már csak negyed tempóval épül."},
   karriermod:{title:"Karrier mód vs. Klasszikus mód",text:"A klasszikus egy szezonos móddal szemben a karrier mód több szezonon át tartó, fejlődő történet: a játékosaid öregednek és fejlődnek, van átigazolási piac, scout, akadémia, és a csapatod hosszú távon formálódik."},
   tsi:{title:"TSI",text:"A TSI egy rejtett, a Ratingnél sokkal szélesebb skálájú érték, ami egy játékos hosszú távú, valódi potenciálját mutatja. Egy fiatal, alacsony Ratingű, de magas TSI-jű játékos idővel akár sztárrá válhat. IDEGEN játékosnál a scoutod ereje szabja meg, hány TSI-t nézhetsz meg — azt viszont te választod ki, kikét. A SAJÁT KERETEDNÉL nincs korlát: minden játékosod TSI-je folyamatosan látszik a HUB-ban. Amíg kevesebb, mint 15 meccset játszott nálad, a scoutod érkezéskori becslése látszik (~ jellel); 15 meccs után a pontos érték — ennyi idő alatt kiderül, mi van benne. A becslés nem sorsolódik újra szezononként: az érkezéskori tévedés aránya fix, tehát ha a játékos TSI-je nő (ifi-boost, akadémia, kihívás-jutalom), a becslés vele mozdul."},
   scout:{title:"Scout",text:"A scoutod csillagereje (1-5) szabja meg, hány IDEGEN játékos TSI-jét nézheted meg egy keretből vagy jelöltlistából — és mivel az árak rejtve vannak, a scout-megtekintés az egyetlen módja felmérni egy leigazolás előtt álló játékos valódi erejét. (A saját játékosaid TSI-je ingyen, folyamatosan látszik: a scout korlátja a VÁSÁRLÁS előtti felmérésről szól. A scout csillagereje ott is számít, hogy mennyire pontos a becslés, amit a keretedbe került játékosról az első 15 meccsén látsz.) A scout a tárgyalások SZÁMÁT is korlátozza egy átigazolási ablakban (a megtekintések számának 2-3-szorosa): egy jobb scout több próbálkozást enged. És azt is a scout szabja meg, HÁNYSZOR küldheted ki egyáltalán posztokat felderíteni: maxos scouttal 8 felderítés jut sessiononként (a téli ablak 2 körből áll, tehát összesen 16; a rövid ablak 1 körből, tehát 8), a nyári vásárlásnál pedig ennek a háromszorosa (24), de az szezononként csak egyszer. Egy adott posztot ugyanabban a sessionben legfeljebb 4-szer nézhetsz meg — érdemes tehát átgondolni, hova küldöd. Idővel fejlődik, és fiatal (25 év alatti) tehetségeket keres előszeretettel."},
@@ -22481,7 +22522,7 @@ function twShowAttrPicker(){
     const tk=twAttrTarget(k);
     b.innerHTML=`<span class="palIc">${TW_ATTR_ICON[k]||"🎯"}</span>`
       +`<span class="palTx"><b>${ATTR_LABELS[k]}</b>`
-      +`<small>${k==="seb"&&tk>=SPEED_MAX?`plafon: ${SPEED_MAX}`:`cél: ${ragSzam(tk)} fölött`}</small></span>`;
+      +`<small>${k==="seb"&&isFinite(speedCap())&&tk>=speedCap()?`plafon: ${speedCap()}`:`cél: ${ragSzam(tk)} fölött`}</small></span>`;
     b.onclick=()=>{
       const sess=twSession();
       twAttrLeft();                 /* biztosítja, hogy a számláló létezik */
@@ -22645,7 +22686,7 @@ function rollSigningTarget(){
    A fiatalok itt is nagyobb súlyt kapnak. */
 function pickForAttrTarget(list,key){
   if(!list.length)return null;
-  const t=Math.min((key==="seb")?SPEED_MAX:Infinity,
+  const t=Math.min((key==="seb")?speedCap():Infinity,
     twAttrTarget(key)+Math.random()*6);   /* célérték + 0…6 felfelé, a plafon alatt */
   const sorted=list.slice().sort((a,b)=>{
     const av=(a.attrs&&a.attrs[key])||0, bv=(b.attrs&&b.attrs[key])||0;
@@ -22713,7 +22754,7 @@ function twScout(){
   $("twBody").innerHTML=(attrMode
       ? `<div class="h" style="color:var(--gold);font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px">🎯 ${cands.length} találat — ${ATTR_LABELS[aKey]}</div>`
         +(gameMode==="career"?`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A scout ${transferRefLabel()} a <b>${ragSzam(twAttrTarget(aKey))} ${ATTR_LABELS[aKey]}</b> körül vagy fölött keresett — poszttól függetlenül.${
-            aKey==="seb"&&twAttrTarget("seb")>=SPEED_MAX?` A sebesség plafonja ${SPEED_MAX}, feljebb nincs mit keresni.`:""}</div>`:"")
+            aKey==="seb"&&isFinite(speedCap())&&twAttrTarget("seb")>=speedCap()?` A sebesség plafonja ${speedCap()}, feljebb nincs mit keresni.`:""}</div>`:"")
       : `<div class="h" style="color:var(--gold);font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px">A scout ${cands.length} lehetőséget talált (${twCatLabel(TW.category)})</div>`
         +(gameMode==="career"?`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A scout ${transferRefLabel()} a ~${ragSzam(signingTargetOvr())} szint körül keresett.</div>`:""));
   const box=document.createElement("div");box.className="plist";
@@ -23710,9 +23751,79 @@ const SELL_DISCOUNT=0.5; /* eladáskor a piaci érték 50%-át kapod vissza. Kor
    termelt — nagyobb bevétel, mint egy sztár igazolásának ára. Az 50% (a megemelt vételár
    melletti) fenntartja a "vegyél drágán, adj el olcsón" dinamikát, és az ifi-eladást
    kényelmes kiegészítővé fokozza le, nem pénznyomdává. */
+/* ================= AZ ÉLETMŰ IS ÁR: STATOK ÉS SKILLEK AZ ELADÁSBAN =================
+   HIBA, amit ez javít: az eladási ár KIZÁRÓLAG a piaci értékből (TSI, kor)
+   jött, vagyis egy frissen vett, nálad egy percet sem játszó 84-es pontosan
+   annyit ért, mint az a 84-es, aki hat szezonon át 140 gólt rúgott neked és
+   közben négy kiépített képességet szerzett. A játék minden más pontján
+   számít, mit ÉPÍTETTÉL egy emberből — az árában viszont nem látszott, így a
+   fejlesztés gazdaságilag büntetve volt: olcsóbb volt sosem játszatni.
+
+   Mostantól a piaci érték egy ÉLETMŰ-SZORZÓT kap. Két forrása van, és
+   mindkettő kizárólag NÁLAD szerzett érdem:
+     · a KARRIER-STATOK — de MECCSRE VETÍTVE, nem nyersen. A darabszám a
+       játékidőt méri, az átlag a minőséget; a nyers összeg egy sokat játszó
+       átlagembert díjazna. Kapusnál a bravúr és a tiszta lap veszi át a
+       gól/gólpassz helyét. Kevés meccs alatt (MERIT_MIN_MATCHES) egy átlag még
+       nem mond semmit, ott nincs bónusz.
+     · a SKILLEK — a félkész képesség arányosan számít (ugyanaz az elv, mint a
+       hatásánál), a csillag pedig külön fölé jön.
+   Egy hűség-tag zárja a sort: aki száz meccset lehúzott nálad, annak a
+   klubtörténete önmagában is ár.
+
+   A PLAFON tudatos. A SELL_DISCOUNT 0.5-je azért van, hogy az eladás ne legyen
+   pénznyomda; ha az életmű-szorzó korlátlan volna, egy kinevelt legenda
+   eladása visszahozná a régi egyensúlytalanságot. MERIT_CAP=1.7 mellett a
+   lehető legjobb életmű 0,5 → 0,85 piaci értékre tolja a kifizetést: érezhető,
+   megérdemelt, de a "vegyél drágán, adj el olcsón" iránya megmarad. */
+const MERIT_MIN_MATCHES=5;   /* ennyi meccs alatt az átlag még zaj */
+const MERIT_CAP=1.7;         /* az életmű-szorzó felső határa */
+const MERIT_LOYAL_MATCHES=150;   /* ennyi meccsnél teljes a hűség-tag */
+function saleMeritParts(p){
+  const n=p&&p.n;
+  const cs=(n&&S.careerStats&&S.careerStats[n])||null;
+  const m=(cs&&cs.matches)||0;
+  const isGK=!!(p&&p.pos&&p.pos[0]==="KP");
+  let stat=0;
+  if(cs&&m>=MERIT_MIN_MATCHES){
+    if(isGK){
+      /* a kapus mérlege: a bravúr a teljesítmény, a tiszta lap az eredmény */
+      stat+=Math.min(0.20,((cs.saves||0)/m)/1.2*0.20);
+      stat+=Math.min(0.16,((cs.cs||0)/m)/0.45*0.16);
+    }else{
+      /* gól+gólpassz meccsenként: 1.0-nál teljes a tag (az a világklasszis sáv) */
+      stat+=Math.min(0.26,(((cs.g||0)+(cs.a||0))/m)/1.0*0.26);
+      /* a tiszta lap a mezőnyjátékosnak is érdem, csak jóval kisebb súllyal */
+      stat+=Math.min(0.06,((cs.cs||0)/m)/0.45*0.06);}
+    /* meccsemberség: a "meghatározó ember" jele, poszttól függetlenül */
+    stat+=Math.min(0.12,(((cs.mvp||0)/m)/0.25)*0.12);}
+  /* HŰSÉG: a nálad lejátszott meccsek száma, a minőségtől függetlenül. */
+  const loyal=Math.min(0.10,(m/MERIT_LOYAL_MATCHES)*0.10);
+  /* SKILLEK: a félkész arányosan, a csillag fölé. */
+  let skill=0;
+  ((n&&S.skills&&S.skills[n])||[]).forEach(i=>{
+    if(!i||!i.skill)return;
+    const need=i.stagesNeeded||1;
+    const ratio=Math.max(0,Math.min(1,(i.stagesCompleted||0)/need));
+    skill+=0.045*ratio+0.02*(i.stars||0);});
+  skill=Math.min(0.34,skill);
+  const mult=Math.min(MERIT_CAP,1+stat+loyal+skill);
+  return {matches:m,isGK,stat,loyal,skill,mult};}
+function saleMerit(p){return saleMeritParts(p).mult;}
+/* Egy mondat az eladás-megerősítőbe: MIÉRT annyi az ár. A felár nem lehet néma
+   — különben a felhasználó csak annyit lát, hogy két egyforma Ratingű emberért
+   más összeg jár, és találgat. Csak akkor beszélünk, ha van miről. */
+function saleMeritNote(p){
+  const m=saleMeritParts(p);
+  if(m.mult<=1.005)return "";
+  const why=[];
+  if(m.stat>0.02)why.push(m.isGK?"a kapuban nyújtott mérlege":"a gól- és gólpassz-termése");
+  if(m.skill>0.02)why.push("a megszerzett képességei");
+  if(m.loyal>0.02)why.push(`${m.matches} meccs a klubnál`);
+  return ` Ebben <b style="color:var(--grass)">+${Math.round((m.mult-1)*100)}%</b> az életműve nálad${why.length?` (${why.join(", ")})`:""}.`;}
 function sellValue(p){
   if(!p.tsi||!p.age)return 0;
-  return Math.round(marketValue(p)*SELL_DISCOUNT);}
+  return Math.round(marketValue(p)*SELL_DISCOUNT*saleMerit(p));}
 function releasePlayer(p,sell){
   const loc=findPlayerLocation(p);
   if(!loc)return{ok:false,reason:"notfound"};
@@ -27995,6 +28106,7 @@ function infinityMainBody(){
       · Az akadémia <b>${INFINITY_ACADEMY_MIN}-${INFINITY_ACADEMY_MAX}</b>-ös Ratinggel ad tehetségeket<br>
       · <b>A teljes kereted TSI-boostot kap</b> (×${INFINITY_OWNED_TSI_MULT}) — kezdő 11, pad és tartalék is<br>
       · 100 fölött a <b>piac lassabban erősödik</b>, mint a mezőny — a saját játékosaid maradnak a gerinc<br>
+      · A <b>sebesség ${SPEED_MAX}-es plafonja is megnyílik</b> — fölötte negyed tempóval, de fejleszthető tovább<br>
       · A mezőny <b>${INFINITY_BASE_MAX}-ig</b> tolható (utána tierenként +${INFINITY_TIER_STEP})
     </div>
     <div class="infWarn">⚠ <b>Vigyázat: nincs visszaút.</b> Az Infinity mód <b>végleges</b> — megnyitás után semmilyen módon nem kapcsolható vissza, és a karrier egyensúlya tartósan megváltozik.</div>
@@ -30513,7 +30625,7 @@ function askSellConfirm(p,onYes){
   box.innerHTML=`<div style="font-size:15px;font-weight:700">${esc(p.n)}</div>
     <div style="font-size:12.5px;color:var(--dim);margin-top:3px">
       ${p.pos.join("/")}${e?` · ${e.age} év`:""} · Rating ${Math.round(pOvr(p))}${skills?` · ${skills} skill`:""}${tier?` · ${esc(String(tier).toUpperCase())}`:""}</div>
-    <div style="font-size:13px;margin-top:9px;line-height:1.5">Eladási ár: <b style="color:var(--gold)">${fmtFt(sellValue(p))}</b>.
+    <div style="font-size:13px;margin-top:9px;line-height:1.5">Eladási ár: <b style="color:var(--gold)">${fmtFt(sellValue(p))}</b>.${saleMeritNote(p)}
       A játékos véglegesen kikerül a keretedből — a skilljei és a felépített kémiája is elvész vele.</div>`;
   $("sellConfirmModal").classList.remove("hide");}
 $("sellConfirmYes")&&($("sellConfirmYes").onclick=()=>{
