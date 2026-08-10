@@ -2331,7 +2331,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="2.7.08";
+const APP_VERSION="2.7.09";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8844,7 +8844,34 @@ let careerBaseRating=80;   /* a karrier indulási mezőnyszintje — ehhez képe
    sajátodat emeljük a piachoz, hanem a piacot fogjuk vissza hozzád.
    Mérve egy 80-ról indult karrierben: 150-es mezőnyön az eltolás 70 helyett
    47,5 — egy 95-ös alap-peakű valós sztár tehát ~142-t hoz, nem 165-öt. */
-const MARKET_INF_SCALE=0.55;
+const MARKET_INF_SCALE=0.75;   /* 0.55 volt — lásd a marketPeakShift indoklását */
+/* ---- A PIAC SOSEM SZÁRADHAT KI ----
+   MÉRVE, BEJELENTETT HIBA: 136-os mezőnyön NULLA olyan igazolható játékos volt,
+   aki egyáltalán eléri a mezőny szintjét (a legjobb 132), és 2291-ből mindössze
+   86 esett 10 ponton belülre. 160-on és fölötte már 10-en belül sem volt egy
+   sem. Vagyis az igazolás megszűnt eszköznek lenni, és a karrier kizárólag a
+   saját keret nevelésére szűkült.
+
+   AZ OK SZERKEZETI, nem hangolási: a piac teteje egy FIX pool-maximumhoz kötött
+   (a basePeak a tsiToPeakOvr telítése miatt ~96-nál megáll), a mezőny viszont
+   korlátlanul nő. Bármilyen 1 alatti szorzóval a kettő előbb-utóbb szétnyílik —
+   csak az a kérdés, melyik szinten.
+
+   KÉT LÉPÉS:
+     1. A csillapítás 0.55 → 0.75. Mérve 136-on: a legjobb 132 → 139, és a
+        mezőnyszintet elérők száma 0 → 29, a 10 ponton belülieké 86 → 554.
+     2. PADLÓ a lemaradásra: a piac teteje SOSEM marad több mint
+        MARKET_INF_MAX_LAG ponttal a mezőny mögött. Ez az, ami garantálja, hogy
+        200-as vagy 300-as szinten se ürüljön ki — a csillapítás addig dolgozik,
+        amíg van mit csillapítani, onnantól a padló tartja a piacot használható
+        távolságban.
+
+   AMI VÁLTOZATLAN: a 100 alatti rész továbbra is 1:1, és az eredeti szándék is
+   áll — a piac nem szalad el a saját, felnevelt kereted ELŐL, csak nem is marad
+   le tőle reménytelenül. A padló miatt a legjobb megvásárolható játékos tartósan
+   pár ponttal a mezőny alatt ül, tehát erősítésnek jó, azonnali felülírásnak nem. */
+const MARKET_INF_MAX_LAG=8;      /* a piac teteje ennyivel maradhat a mezőny mögött */
+const MARKET_TOP_BASEPEAK=96;    /* a pool legjobb basePeak-je (a tsiToPeakOvr telítése) */
 function marketPeakShift(){
   const raw=Math.max(0,(oppTargetRating||0)-careerBaseRating);
   if(raw<=0)return 0;
@@ -8852,7 +8879,10 @@ function marketPeakShift(){
   const belowSpan=Math.max(0,INFINITY_UNLOCK_RATING-careerBaseRating);
   const below=Math.min(raw,belowSpan);
   const above=raw-below;
-  return below+above*MARKET_INF_SCALE;}
+  const damped=below+above*MARKET_INF_SCALE;
+  if(above<=0)return damped;      /* 100 alatt semmi nem változik */
+  const floor=((oppTargetRating||0)-MARKET_INF_MAX_LAG)-MARKET_TOP_BASEPEAK;
+  return Math.max(damped,floor);}
 /* Az Infinity-akadémia SAJÁT, külön eltolást használ — NEM a fenti
    marketPeakShift()-et. Az volt a hiba: marketPeakShift() a karrier
    TELJES indulási nehézségéhez viszonyít (pl. 80-tól), ami sok szintlépés
@@ -11845,7 +11875,14 @@ function twAttrSearchesForScout(){
    tolerancia) mindenkit kidobott, és a sebesség-keresés üresen tért vissza.
    A többi tengelynek nincs plafonja, azok változatlanul mennek. */
 function twAttrTarget(aKey){
-  const cap=(aKey==="seb")?SPEED_MAX:SPEED_MAX+20;
+  /* HIBA, AMIT EZ JAVÍT: a nem-sebesség tengelyek plafonja SPEED_MAX+20 = 119
+     volt — vagyis pontosan a NEM-Infinity Rating-plafon, bedrótozva. Emiatt a
+     képesség-keresés célértéke 117-es mezőnyszint fölött BEFAGYOTT 119-en:
+     136-os mezőnynél is 119-es gólszerzést keresett, ami ott már a keret alsó
+     harmada. A tengelyeknek Infinityben nincs 119-es plafonjuk (attrHardCap =
+     ratingCap+35, Infinityben végtelen), tehát a keresésnek sincs miért lennie.
+     A sebesség marad az EGYETLEN kivétel: annak a 99 valódi, kemény határ. */
+  const cap=attrCapFor(aKey);
   /* MP-nyáron a referencia a két keret közös szintje, nem a tavalyi nehézség —
      lásd mpSummerRefRating a signingTargetOvr mellett */
   return Math.max(45,Math.min(cap,(transferRefRating()||84)+TW_ATTR_TARGET_BONUS));}
@@ -29615,10 +29652,25 @@ function runBoardRow(){
     /* pár beszédes mérföldkő az összegzőből — tisztán dísz, nulla játékhatás */
     titles:(S.seasonHistory||[]).filter(h=>h&&h.rank===1).length,
     ballons:(S.ballonHistory||[]).filter(b=>b&&b.own).length};}
+/* ---- KÉT PILLANATKÉP EGY BEJEGYZÉSEN ----
+   A lista eddig EGY számot vitt karrierenként, és a lezárás FELÜLÍRTA a mezőny
+   szintjét — vagyis az a szám, hogy MILYEN NEHÉZSÉGEN nyitottad meg az
+   Infinityt, végleg elveszett. Pedig épp az a két adat a beszédes:
+     · hol tartottál, amikor MEGNYITOTTAD az Infinityt (infRun / infLevel)
+     · hol tartottál, amikor LEZÁRTAD a karriert (closeRun / closeLevel)
+   Mostantól mindkettő külön mezőben él, és a nézet két külön ranglistát rajzol.
+   A `run` mező megmarad a KETTŐ KÖZÜL A JOBBNAK — arra épül a rendezés és a
+   lezáró párbeszéd "csak felfelé" ígérete, tehát a régi bejegyzések is
+   értelmesek maradnak (azoknál az infRun hiányzik, oda a `run` lép be). */
+function runBoardInfRun(x){return x&&x.infRun!=null?x.infRun:(x?x.run:0);}
+function runBoardInfLevel(x){return x&&x.infLevel!=null?x.infLevel:(x?x.level:0);}
 /* AZ INFINITY MEGNYITÁSA — itt születik a bejegyzés. */
 function runBoardOnInfinity(){
   if(gameMode!=="career")return null;
   const row=runBoardRow();
+  /* a megnyitás pillanatképe, VÉGLEGES — a szezonszám is, mert az Infinity-listán
+     épp az a kérdés, milyen GYORSAN jutottál el a végjátékig */
+  row.infRun=row.run;row.infLevel=row.level;row.infSeasons=row.seasons;
   const list=runBoardLoad();
   const at=list.findIndex(x=>x.id===row.id);
   /* Ha valamiért már van bejegyzés erre a karrierre (pl. újra lefutó
@@ -29644,6 +29696,16 @@ function runBoardOnClose(){
        csak felfelé mozdul, ahogy kérted. */
     seasons:now.seasons,level:now.level,titles:now.titles,ballons:now.ballons,
     team:now.team,
+    /* A LEZÁRÁS SAJÁT PILLANATKÉPE. Külön mezőben, mert a megnyitáskori
+       (infRun/infLevel) nem veszhet el — a két ranglista abból él. Ez a szám
+       a VALÓDI záró érték, akkor is, ha nem javult: a "csak felfelé" szabály a
+       közös `run` mezőre vonatkozik, nem erre. */
+    closeRun:now.run,closeLevel:now.level,
+    /* Régi bejegyzésnél nincs infRun — a meglévő `run` a megnyitáskori érték,
+       tehát azt mentjük át, MIELŐTT a lentebbi sor esetleg felülírná. */
+    infRun:prev.infRun!=null?prev.infRun:prev.run,
+    infLevel:prev.infLevel!=null?prev.infLevel:prev.level,
+    infSeasons:prev.infSeasons!=null?prev.infSeasons:prev.seasons,
     run:improved?now.run:prev.run});
   runBoardSave(list);
   return {improved,from:prev.run,to:list[at].run};}
@@ -29657,22 +29719,39 @@ function runBoardHtml(){
       <br><span style="color:var(--dim2)">A szám ezután már csak a karrier lezárásakor változhat, és csak felfelé.</span></div>`;
   const d=t=>{if(!t)return "—";const x=new Date(t);
     return `${x.getFullYear()}.${String(x.getMonth()+1).padStart(2,"0")}.${String(x.getDate()).padStart(2,"0")}`;};
-  let h=`<div style="font-size:11.5px;color:var(--dim2);line-height:1.45;margin-bottom:7px">
-    A felkerülés az Infinity megnyitásakor történik; a szám a karrier lezárásakor frissül, de <b>csak felfelé</b>.
-    A lista <b>ebben a böngészőben</b> él — másik eszközön külön lista van.</div>`;
-  list.forEach((x,i)=>{
-    const lezart=!!x.closedAt;
-    h+=`<div style="display:flex;align-items:center;gap:9px;border-top:1px solid var(--line);padding:6px 0">
+  /* ---- KÉT RANGLISTA ----
+     A két szám két KÜLÖNBÖZŐ teljesítményt mér, ezért nem szabad egy listába
+     keverni őket: az Infinity-lista azt mondja meg, MILYEN GYORSAN és milyen
+     mezőnyön jutottál el a végjátékig, a lezárási lista pedig azt, MEDDIG
+     vitted onnan. Ugyanaz a karrier mindkettőn szerepelhet, más számmal és más
+     nehézségi szinttel. */
+  const sor=(x,i,run,level,datum,fut,seasons)=>
+    `<div style="display:flex;align-items:center;gap:9px;border-top:1px solid var(--line);padding:6px 0">
       <b style="min-width:22px;text-align:right;color:var(--dim2);font-size:12px">${i+1}.</b>
-      <b style="min-width:46px;font-size:15px;color:${runColor(x.run)}">${String(x.run).replace(".",",")}</b>
+      <b style="min-width:46px;font-size:15px;color:${runColor(run)}">${String(run).replace(".",",")}</b>
       <span style="flex:1;min-width:0">
         <span style="font-size:12.5px;font-weight:700">${esc(x.team)}</span>
         ${x.mp?`<span style="font-size:10px;color:var(--purple)"> ⚔ közös</span>`:""}
-        ${lezart?"":`<span style="font-size:10px;color:var(--gold)"> ● fut</span>`}
-        <br><span style="font-size:11px;color:var(--dim2)">${x.seasons} szezon · mezőny ${x.level}${
-          x.titles?` · ${x.titles} bajnoki`:""}${x.ballons?` · ${x.ballons} Aranylabda`:""}
-          · ∞ ${d(x.at)}${lezart?` → lezárva ${d(x.closedAt)}`:""}</span>
-      </span></div>`;});
+        ${fut?`<span style="font-size:10px;color:var(--gold)"> ● fut</span>`:""}
+        <br><span style="font-size:11px;color:var(--dim2)">mezőny <b style="color:var(--gold)">${level}</b> · ${seasons} szezon${
+          x.titles?` · ${x.titles} bajnoki`:""}${x.ballons?` · ${x.ballons} Aranylabda`:""} · ${datum}</span>
+      </span></div>`;
+  const infList=list.slice().sort((a,b)=>runBoardInfRun(b)-runBoardInfRun(a));
+  const closed=list.filter(x=>x.closedAt)
+    .sort((a,b)=>(b.closeRun!=null?b.closeRun:b.run)-(a.closeRun!=null?a.closeRun:a.run));
+  let h=`<div style="font-size:11.5px;color:var(--dim2);line-height:1.45;margin-bottom:7px">
+    A lista <b>ebben a böngészőben</b> él — másik eszközön külön lista van.</div>`;
+  h+=`<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin:10px 0 2px">∞ Az Infinity megnyitásakor</div>
+    <div style="font-size:11px;color:var(--dim2);line-height:1.45;margin-bottom:3px">Milyen Run-szinten és milyen mezőnyön jutottál el a végjátékig.</div>`;
+  infList.forEach((x,i)=>h+=sor(x,i,runBoardInfRun(x),runBoardInfLevel(x),"∞ "+d(x.at),!x.closedAt,
+    x.infSeasons!=null?x.infSeasons:x.seasons));
+  h+=`<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--grass);margin:14px 0 2px">🏁 A karrier lezárásakor</div>`;
+  if(!closed.length)
+    h+=`<div style="font-size:11.5px;color:var(--dim);line-height:1.5">Még nincs lezárt karriered. A záró Run-szint és az akkori mezőny ide kerül.</div>`;
+  else{
+    h+=`<div style="font-size:11px;color:var(--dim2);line-height:1.45;margin-bottom:3px">Meddig vitted onnan — a záró Run-szint és az akkori nehézség.</div>`;
+    closed.forEach((x,i)=>h+=sor(x,i,(x.closeRun!=null?x.closeRun:x.run),
+      (x.closeLevel!=null?x.closeLevel:x.level),"🏁 "+d(x.closedAt),false,x.seasons));}
   return h;}
 /* A Run-szám színe — ugyanaz a logika, mint a nehézség-sávoknál. */
 function runColor(v){
