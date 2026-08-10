@@ -400,10 +400,14 @@ igényel új szimulációs ágat.
   piroslap-, sérülés-esély, morál-padló, edzői tapasztalat, skill-sorsolás,
   kémia-tempó, sebesség-plafon és edzés-osztó, passzív sebesség-plafon, bolti
   ár). Minden trait ezekbe köt be — egyetlen új meccsmotor-ág sincs.
-* **A „csillagozható" traitek kimaradtak.** A csillag-rendszer ma kizárólag a
-  két sorsdöntő hős-skillé; egy harmadik csillagozható skill bevezetése önálló
-  fejlesztés, nem trait-mellékhatás. Helyettük mindkét stílus egy második,
-  közvetlen hatású II. szintű traitet kapott.
+* **A „csillagozható" traitek kimaradtak a trait-listából** — de az akadály
+  azóta elhárult. Az F3 idején a csillag-rendszer még kizárólag a két
+  sorsdöntő hős-skillé volt, ezért egy „csillagozható védő-skill" trait önálló
+  skill-ágat igényelt volna. A **3.0.06 óta a csillagozás általános**: minden
+  kiépült képesség csillagozható, és a stílus-traiteknek van rá kész
+  csatornájuk (`starOffer`, a csillag-felajánlás esélyét emeli). Egy ilyen
+  trait felvétele mostantól egyetlen sor. A jelenlegi hat trait stílusonként
+  változatlan — a bővítés külön döntés.
 * **A „Sztárom a párom" III. traitje a tervezett szimmetriával került be:** ha a
   sztár a kezdőben van, +3 csapaterő; ha nincs, −3. Ez az egyetlen trait a
   játékban, ami büntetni is tud — tudatosan, mert e nélkül a stílus dominánsan
