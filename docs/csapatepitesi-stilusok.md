@@ -331,14 +331,38 @@ szerezhető meg, hat kategóriára osztva.
 
 **De nem ingyen.** A stíluspontos mérföldkövek **kategóriánként zárva
 indulnak**, és pénzért kell megnyitni őket (`MS_STYLE_CATS`). Amíg egy
-kategória zárva van, a benne lévő mérföldkövek **nem gyűlnek**; ami közben
-teljesül, az a megnyitáskor „lemaradt"-ként, **pont nélkül** zárul le. Ez az
+kategória zárva van, a benne lévő mérföldkövek **nem gyűlnek**. Ez az
 ellensúly a rendszerben: a pénzjutalmas mérföldkövek nem tiszta nyereséget
 adnak, hanem **befektethető tőkét** — vagy a klubra költöd, vagy a
 csapatstílus-fejlődésre.
 
+**A zárás alatti idő (3.1.02-től).** Ami a zárás alatt teljesült, az többé nem
+vész el. A megnyitáskor **beragad** (`S.ms.pend`): a jutalom ott áll, és
+kifizetésre vár. Kiengedni nem idővel, hanem **munkával** lehet:
+
+- **Ugyanazon a sávon egy új fokozat.** Egy lépcsős mérföldkő-családnál (pl.
+  „Vagyon", kilenc küszöbbel) az számít, sikerül-e a megnyitás UTÁN egy új
+  fokozatot elérni. Amint sikerül, az új fokozat **és alatta minden beragadt
+  fokozat** jutalma egyszerre folyik be (`msReleaseAfter`).
+- **Kimaxolt sáv.** Ahol a megnyitáskor már nincs mit elérni (rég teljesült
+  önálló mérföldkő, vagy egy család mind a kilenc fokozatával), ott új fokozat
+  sosem lesz — az ilyen sávot a kategória **bármely másik** teljesítése
+  kiengedi, teljes értéken.
+- **Az egyetlen veszteség.** Ha a megnyitás pillanatában a kategórián belül
+  **minden** sáv kimaxolt, semmi nem tudná kiengedni a jutalmat. Ilyenkor a
+  megnyitás azonnal fizet, de sávonként csak a **legmagasabb fokozatért**; a
+  többi fokozat pont nélkül zárul (`msSweepDead`, `S.ms.missed`).
+
+A 3.1.02 előtti mentések „lemaradt" bejegyzései a betöltéskor átkerülnek a
+beragadt állapotba (`msMigrateMissed`), és ahol a történetből látszik, hogy a
+feltétel azóta teljesült, ott azonnal ki is fizetődnek.
+
 Az árazás a jutalmakkal azonos idiómát követi (a mindenkori éves büdzsé
-százaléka), így a klub növekedésével együtt mozog:
+százaléka), **szorozva az edzői fizetéssel** (`msCatSalaryMult` =
+`1 + S.salaryMod`, padlózva 0,5-nél). A fizetésemelés tehát kétszer számít: a
+büdzsében is, meg a program árában is — ez a fenti engedmény (a beragadt
+jutalom kiengedhető) ellensúlya. Az alábbi szorzók a fizetésemelés nélküli
+alapesetre vonatkoznak:
 
 | Kategória | Ár | Mérföldkő | Stíluspont |
 |---|---|---|---|
