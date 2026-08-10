@@ -322,9 +322,33 @@ szünteti meg a bajt, csak a következményét tompítja.
 ### 4.1 A stíluspont
 
 **Már ma is gyűlik** — a mérföldkő-rendszer stíluspont-jutalmai (`S.ms.sp`) ezt
-a valutát termelik. Egy tipikus 10 szezonos karrier az általános
-mérföldkövekből nagyságrendileg **80-140 pontot** hoz be, amihez a stílus SAJÁT
-mérföldkövei jönnek hozzá.
+a valutát termelik. Az általános mérföldkövekből összesen **329 pont**
+szerezhető meg, hat kategóriára osztva.
+
+**De nem ingyen.** A stíluspontos mérföldkövek **kategóriánként zárva
+indulnak**, és pénzért kell megnyitni őket (`MS_STYLE_CATS`). Amíg egy
+kategória zárva van, a benne lévő mérföldkövek **nem gyűlnek**; ami közben
+teljesül, az a megnyitáskor „lemaradt"-ként, **pont nélkül** zárul le. Ez az
+ellensúly a rendszerben: a pénzjutalmas mérföldkövek nem tiszta nyereséget
+adnak, hanem **befektethető tőkét** — vagy a klubra költöd, vagy a
+csapatstílus-fejlődésre.
+
+Az árazás a jutalmakkal azonos idiómát követi (a mindenkori éves büdzsé
+százaléka), így a klub növekedésével együtt mozog:
+
+| Kategória | Ár | Mérföldkő | Stíluspont |
+|---|---|---|---|
+| Vagyon | 0,5× éves keret | 6 | 52 |
+| Transzferpiac | 0,7× | 12 | 69 |
+| Utánpótlás és stáb | 0,7× | 7 | 54 |
+| Trófeák | 1,0× | 6 | 74 |
+| Bajnoki fölény | 0,9× | 5 | 50 |
+| A nagy ugrás | 1,2× | 2 | 30 |
+| **összesen** | **5,0×** | **38** | **329** |
+
+Mérve: a pénzjutalmas mérföldkövek összesen **9,22× éves keretet** hoznak be,
+tehát mind a hat kategória megnyitása a mérföldkő-kereset **54%-át** viszi el.
+Meghatározó tétel, de nem kizárólagos: marad pénz a klubra is.
 
 Javasolt trait-árazás: **I. szint 8-12 pont · II. szint 20-30 · III. szint
 50-70**. Így egy karrier alatt a hat traitből reálisan **három-négy** szerezhető

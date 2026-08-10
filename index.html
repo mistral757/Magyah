@@ -238,6 +238,15 @@ button:disabled{opacity:.35;cursor:default}
 .msList{display:flex;flex-direction:column;gap:7px;margin:7px 0 2px}
 .msItem{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
 .msItem.done{opacity:.72;border-color:color-mix(in srgb,var(--grass) 45%,var(--line))}
+/* Zárt stílus-kategória: látszik, de láthatóan nem él. */
+.msItem.msCatLocked{border-style:dashed;opacity:.9}
+/* Lemaradt: a zárás alatt teljesült, ezért pont nélkül lezárt mérföldkő. */
+.msItem.msMissed{opacity:.6;border-color:color-mix(in srgb,var(--red) 45%,var(--line))}
+.msItem.msMissed .msRew{color:var(--dim2)}
+.msWarn{margin-top:6px;padding:6px 8px;border-radius:6px;font-size:11.5px;line-height:1.45;
+  background:color-mix(in srgb,var(--red) 14%,transparent);
+  border:1px solid color-mix(in srgb,var(--red) 35%,var(--line));color:var(--ink)}
+.msGrp.msCatHead{border-left:3px solid var(--gold)}
 .msItem.done.fresh{opacity:1;border-color:var(--gold);box-shadow:0 0 10px rgba(0,0,0,.2)}
 .msTop{display:flex;align-items:baseline;gap:9px;justify-content:space-between}
 .msTop b{font-size:13.5px}
@@ -2394,7 +2403,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.0.00";
+const APP_VERSION="3.0.01";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -32688,11 +32697,15 @@ function msCashReward(pct){
   try{base=computeSeasonBudget();}catch(e){base=0;}
   return Math.max(1,Math.round(base*p));}
 function msState(){
-  if(!S.ms)S.ms={done:{},seen:{},sp:0,spEarned:0,cash:0,log:[],t:{}};
+  if(!S.ms)S.ms={done:{},seen:{},sp:0,spEarned:0,cash:0,log:[],t:{},cats:{},missed:{}};
   if(!S.ms.t)S.ms.t={};
   if(!S.ms.done)S.ms.done={};
   if(!S.ms.seen)S.ms.seen={};
   if(!S.ms.log)S.ms.log=[];
+  /* cats  = megnyitott stílus-kategóriák (kulcs → {season,price})
+     missed = a zárás alatt teljesült, ezért PONT NÉLKÜL lezárt mérföldkövek */
+  if(!S.ms.cats)S.ms.cats={};
+  if(!S.ms.missed)S.ms.missed={};
   return S.ms;}
 function msT(){return msState().t;}
 function msDone(id){return !!msState().done[id];}
@@ -32798,18 +32811,99 @@ function msMaxCareerMatches(){
   Object.values(S.careerStats||{}).forEach(c=>{if(c&&c.matches>m)m=c.matches;});
   return m;}
 
+/* ================= A STÍLUS-KATEGÓRIÁK: A PÉNZ ÚTJA A STÍLUSPONTBA =================
+   ELLENSÚLY. A pénzjutalmas mérföldkövek szabadon gyűlnek — azok a KERESET. A
+   csapatstílus-pontos mérföldkövek viszont KATEGÓRIÁNKÉNT ZÁRVA indulnak, és
+   pénzért kell megnyitni őket. Enélkül a két valuta párhuzamosan, ingyen
+   csordogált volna: a mérföldkő-rendszer csak adott, sosem kért.
+
+   Így viszont valódi döntés lesz belőle. A pénzjutalom nem tiszta nyereség,
+   hanem BEFEKTETHETŐ tőke: elköltheted a klubra (igazolás, stáb, felállás),
+   vagy megnyithatsz vele egy stílus-kategóriát, és onnantól az a terület
+   stíluspontot termel. A csapatstílus-fejlődés ára tehát a klub fejlődésének
+   lassítása — pontosan úgy, ahogy egy valódi klubnál egy hosszú távú program
+   elveszi a pénzt a mai keret elől.
+
+   A SZABÁLY, AMI MIATT NEM ÉRDEMES VÁRNI: amíg egy kategória zárva van, a
+   benne lévő mérföldkövek NEM GYŰLNEK. Ami a zárás alatt teljesült, az a
+   megnyitáskor LEMARADTKÉNT zárul le — pont nem jár érte. A késlekedés tehát
+   valódi veszteség, nem csak halasztás; a panel a megnyitás ELŐTT pontosan
+   megmondja, hány mérföldkövet buknál el most.
+
+   AZ ÁR a mindenkori éves büdzsé százaléka, ugyanaz az idióma, mint a
+   jutalmaké. Így egy erős klubnak arányosan többe kerül, és a várakozás nem
+   teszi olcsóbbá — csak veszteségessé. A hat kategória együtt kb. 5 évnyi
+   büdzsé, vagyis nagyjából annyi, amennyit a pénzjutalmas mérföldkövek egy
+   hosszú karrier alatt behoznak: aki mindent meg akar nyitni, annak a teljes
+   mérföldkő-keresetét ide kell forgatnia. */
+const MS_STYLE_CATS=[
+  {key:"vagyon", n:"Vagyon", pct:0.5,
+   d:"A felhalmozott büdzsé mérföldkövei — a klub pénzügyi ereje önmagában is teljesítmény."},
+  {key:"piac", n:"Transzferpiac", pct:0.7,
+   d:"Eladások, igazolások, a problémás ember kiadása, a magyar ikon hazahozatala."},
+  {key:"utanpotlas", n:"Utánpótlás és stáb", pct:0.7,
+   d:"Berobbantott tehetségek, saját nevelésű sztár, teljes szakmai stáb."},
+  {key:"trofeak", n:"Trófeák", pct:1.0,
+   d:"A megnyert sorozatok — bajnokság, hazai kupa és a három európai kupa."},
+  {key:"folenny", n:"Bajnoki fölény", pct:0.9,
+   d:"A cím korai bebiztosítása: minél több forduló van még hátra, annál többet ér."},
+  {key:"ugras", n:"A nagy ugrás", pct:1.2,
+   d:"A karrier két nagy határköve: az Infinity megnyitása és a tizedik lezárt szezon."}];
+function msCatByKey(k){return MS_STYLE_CATS.find(c=>c.key===k)||null;}
+function msCatUnlocked(k){
+  if(!k)return true;                  /* kategória nélküli (pénzjutalmas) mérföldkő */
+  const M=msState();
+  return !!(M.cats&&M.cats[k]);}
+/* Az ÁR — a mindenkori éves büdzsé arányában. A jutalmakkal azonos idióma,
+   tehát a klub növekedésével együtt mozog. */
+function msCatPrice(k){
+  const c=msCatByKey(k);
+  if(!c)return 0;
+  let base=0;
+  try{base=computeSeasonBudget();}catch(e){base=0;}
+  return Math.max(1,Math.round(base*c.pct));}
+function msCatList(k){return MILESTONES.filter(d=>d.cat===k);}
+/* Hány mérföldkövet BUKNÁL EL, ha most nyitnád meg? Ezt a számot a felület a
+   megnyitás előtt kiírja — a szabály nem érhet meglepetésként senkit. */
+function msCatWouldMiss(k){
+  const M=msState();
+  return msCatList(k).filter(d=>{
+    if(M.done[d.id]||M.missed[d.id])return false;
+    let v=0;try{v=d.p()||0;}catch(e){return false;}
+    return v>=d.n;});}
+/* A megnyitás. A pénz levonása után minden MÁR TELJESÜLT mérföldkő
+   "lemaradt"-ként zárul — nem fizet, és később sem fizethet. */
+function msUnlockCat(k){
+  const c=msCatByKey(k);
+  if(!c)return {ok:false,reason:"Nincs ilyen kategória."};
+  if(msCatUnlocked(k))return {ok:false,reason:"Ez a kategória már nyitva van."};
+  const price=msCatPrice(k);
+  if((S.transferBudget||0)<price)
+    return {ok:false,reason:`Nincs elég büdzséd — ${fmtFt(price)} kellene.`};
+  const M=msState();
+  const missed=msCatWouldMiss(k);
+  S.transferBudget-=price;
+  M.cats=M.cats||{};
+  M.cats[k]={season:S.seasonNumber||1,price};
+  missed.forEach(d=>{M.missed[d.id]=true;});
+  try{
+    addLine(`🔓 <b>MEGNYITVA — ${esc(c.n)}</b> · ${fmtFt(price)}. Innentől ez a terület csapatstílus-pontot termel.`,"m life");
+    if(missed.length)
+      addLine(`→ ${missed.length} mérföldkő már a zárás alatt teljesült — azokért nem jár pont. Aki hamarabb nyit, kevesebbet hagy az asztalon.`,"m skillnote");
+  }catch(e){}
+  return {ok:true,price,missed:missed.length};}
 /* ================= A MÉRFÖLDKÖVEK TÁBLÁJA =================
-   Egy bejegyzés: {id, grp, t (cím), d (leírás), kind, val, p (haladás), n (cél)}
-     kind "cash" → val = a százalék (5-30% között)
-     kind "sp"   → val = a csapatstílus-pont
+   Egy bejegyzés: {id, grp, t (cím), d (leírás), kind, val, p (haladás), n (cél), cat}
+     kind "cash" → val = a százalék (5-30% között), cat NINCS (mindig aktív)
+     kind "sp"   → val = a csapatstílus-pont, cat = a megnyitandó kategória
    A p() mindig SZÁMOT ad, az n a küszöb: a kettő hányadosa a haladásjelző. A
    logikai mérföldköveknél p() 0 vagy 1, n = 1. */
 const MILESTONES=[];
-function msDef(id,grp,t,d,kind,val,p,n){
-  MILESTONES.push({id,grp,t,d,kind,val,p,n:n||1});}
+function msDef(id,grp,t,d,kind,val,p,n,cat){
+  MILESTONES.push({id,grp,t,d,kind,val,p,n:n||1,cat:cat||null});}
 /* Lépcsős mérföldkő-család egy sorban: ugyanaz a mérce, több küszöbbel. */
-function msTiers(base,grp,tFn,dFn,kind,vals,tiers,p){
-  tiers.forEach((th,i)=>msDef(`${base}_${th}`,grp,tFn(th),dFn(th),kind,vals[i],p,th));}
+function msTiers(base,grp,tFn,dFn,kind,vals,tiers,p,cat){
+  tiers.forEach((th,i)=>msDef(`${base}_${th}`,grp,tFn(th),dFn(th),kind,vals[i],p,th,cat));}
 /* Milliárd forint → belső pont. A mérföldkövek célszámai forintban vannak
    megfogalmazva, a gazdaság viszont pontban számol. */
 function msMrd(n){return Math.round(n*1e9/HUF_PER_POINT);}
@@ -32857,7 +32951,7 @@ msDef("staff_3","Stáb",
   "cash",0.10,()=>msStaff().length,3);
 msDef("staff_full","Stáb",
   "Teljes stáb","Töltsd fel mind a 6 stáb-helyet.",
-  "sp",8,()=>msStaff().length,6);
+  "sp",8,()=>msStaff().length,6,"utanpotlas");
 /* Típusonként EGY mérföldkő: az első ilyen edző megnyitása jár, a második
    ugyanolyan már nem. A nyomkövető (t.staffTypes) őrzi, mi volt már. */
 try{
@@ -32920,20 +33014,20 @@ msTiers("cup_cb","Kupa",
   "cash",[0.10,0.15,0.20,0.26,0.30],[1,2,3,4,5],()=>msT().cupCb||0);
 msDef("cup_cb_legend","Kupa",
   "Amit még sosem láttak","Fordíts meg egy kupa-párharcot ötgólos összesített hátrányból. Ilyen a futball történetében nem történt.",
-  "sp",40,()=>msT().cupCb||0,5);
+  "sp",40,()=>msT().cupCb||0,5,"trofeak");
 
 /* ---------- TRÓFEÁK ---------- */
-msDef("win_league","Trófeák","Bajnok","Nyerd meg a bajnokságot.","sp",4,msLeagueTitles,1);
-msDef("win_mk","Trófeák","Magyar Kupa-győztes","Nyerd meg a Magyar Kupát.","sp",4,()=>msCupWins("MK"),1);
-msDef("win_kl","Trófeák","Konferencia-liga-győztes","Nyerd meg a Konferencia-ligát.","sp",6,()=>msCupWins("KL"),1);
-msDef("win_el","Trófeák","Európa-liga-győztes","Nyerd meg az Európa-ligát.","sp",8,()=>msCupWins("EL"),1);
-msDef("win_bl","Trófeák","Bajnokok Ligája-győztes","Nyerd meg a Bajnokok Ligáját.","sp",12,()=>msCupWins("BL"),1);
+msDef("win_league","Trófeák","Bajnok","Nyerd meg a bajnokságot.","sp",4,msLeagueTitles,1,"trofeak");
+msDef("win_mk","Trófeák","Magyar Kupa-győztes","Nyerd meg a Magyar Kupát.","sp",4,()=>msCupWins("MK"),1,"trofeak");
+msDef("win_kl","Trófeák","Konferencia-liga-győztes","Nyerd meg a Konferencia-ligát.","sp",6,()=>msCupWins("KL"),1,"trofeak");
+msDef("win_el","Trófeák","Európa-liga-győztes","Nyerd meg az Európa-ligát.","sp",8,()=>msCupWins("EL"),1,"trofeak");
+msDef("win_bl","Trófeák","Bajnokok Ligája-győztes","Nyerd meg a Bajnokok Ligáját.","sp",12,()=>msCupWins("BL"),1,"trofeak");
 msDef("treble","Trófeák","Tripla","Nyerd meg egy szezonban a bajnokságot és egy nemzetközi kupát.","cash",0.30,msTrebleSeasons,1);
 /* A cím korai bebiztosítása — exponenciálisan növekvő jutalom. */
 msTiers("clinch","Trófeák",
   th=>`Bajnok ${th}${th>=5?"+":""} fordulóval a vége előtt`,
   th=>`Biztosítsd be a bajnoki címet úgy, hogy még ${th}${th>=5?" vagy több":""} forduló hátravan a szezonból.`,
-  "sp",[3,5,8,13,21],[1,2,3,4,5],()=>msT().clinchRem||0);
+  "sp",[3,5,8,13,21],[1,2,3,4,5],()=>msT().clinchRem||0,"folenny");
 
 /* ---------- GAZDASÁG ---------- */
 msTiers("wealth","Gazdaság",
@@ -32942,32 +33036,32 @@ msTiers("wealth","Gazdaság",
   "sp",[2,3,4,6,12,25],[50,100,150,200,500,1000],
   ()=>{const b=S.transferBudget||0;
        /* a küszöbök milliárdban vannak — a haladást is oda váltjuk */
-       return Math.floor(b*HUF_PER_POINT/1e9);});
+       return Math.floor(b*HUF_PER_POINT/1e9);},"vagyon");
 msTiers("sale","Gazdaság",
   th=>`Eladás ${th} Mrd Ft-ért`,
   th=>`Adj el egy játékost legalább ${th} milliárd forintért. Az árba a nálad nyújtott teljesítménye és a megszerzett képességei is beleszámítanak.`,
   "sp",[2,3,4,6,10],[10,15,20,30,50],
-  ()=>Math.floor(msBestSale()*HUF_PER_POINT/1e9));
+  ()=>Math.floor(msBestSale()*HUF_PER_POINT/1e9),"piac");
 msTiers("buy","Gazdaság",
   th=>`Igazolás ${th} Mrd Ft-ért`,
   th=>`Igazolj le egy játékost legalább ${th} milliárd forintért.`,
   "sp",[2,3,5,8,15],[30,50,75,100,200],
-  ()=>Math.floor((msT().maxBuy||0)*HUF_PER_POINT/1e9));
+  ()=>Math.floor((msT().maxBuy||0)*HUF_PER_POINT/1e9),"piac");
 msDef("sell_problem","Gazdaság",
   "Megszabadultál a gondtól","Add el azt a játékosodat, akivel a legtöbb gond van — a haragosok, a kiállítások és a temperamentum együtt döntik el, ki az.",
-  "sp",5,()=>msT().soldProblem?1:0,1);
+  "sp",5,()=>msT().soldProblem?1:0,1,"piac");
 msDef("hun_icon","Gazdaság",
   "Hazatért a legenda","Igazolj le egy MAGYAR ikont.",
-  "sp",6,()=>msHasHungarianIcon()?1:0,1);
+  "sp",6,()=>msHasHungarianIcon()?1:0,1,"piac");
 msDef("infinity","Gazdaság",
   "∞ Feloldva","Nyisd meg az Infinity módot.","sp",20,
-  ()=>(typeof infinityMode!=="undefined"&&infinityMode)?1:0,1);
+  ()=>(typeof infinityMode!=="undefined"&&infinityMode)?1:0,1,"ugras");
 
 /* ---------- ÉPÍTKEZÉS ---------- */
 msTiers("boost","Építkezés",
   th=>`${th} berobbantott tehetség`,
   th=>`Használj ${th} alkalommal ifi-boostot vagy „öreg csirkefogó” fejlesztést.`,
-  "sp",[2,4,6,10,18],[1,3,5,10,20],()=>msT().boosts||0);
+  "sp",[2,4,6,10,18],[1,3,5,10,20],()=>msT().boosts||0,"utanpotlas");
 msDef("academy_star","Építkezés",
   "Saját nevelés","Érje el az egyik akadémistád a 90-es Ratinget.","sp",6,()=>{
     let m=0;
@@ -32975,7 +33069,7 @@ msDef("academy_star","Építkezés",
       const e=msEntry(p.n);
       if(!e||!(typeof isYouthProspect==="function"&&isYouthProspect(e)))return;
       m=Math.max(m,pOvr(p));});
-    return Math.round(m);},90);
+    return Math.round(m);},90,"utanpotlas");
 msDef("perfect_xi","Építkezés",
   "Tökéletes tizenegy","Álljon a kezdő 11-edben mind a 11 helyen legalább 90-es Ratingű játékos.",
   "cash",0.20,()=>{
@@ -32986,7 +33080,7 @@ msDef("centurion","Építkezés",
   "Klublegenda","Játsszon egy játékosod 200 mérkőzést a klubodnál.",
   "cash",0.15,msMaxCareerMatches,200);
 msDef("season10","Építkezés",
-  "Egy évtized","Zárj le 10 szezont ugyanabban a karrierben.","sp",10,msSeasonsPlayed,10);
+  "Egy évtized","Zárj le 10 szezont ugyanabban a karrierben.","sp",10,msSeasonsPlayed,10,"ugras");
 
 /* ---------- SZEZON ---------- */
 msDef("unbeaten","Szezon",
@@ -33025,7 +33119,10 @@ function msScan(){
   }catch(e){}
   const earned=[];
   MILESTONES.forEach(def=>{
-    if(M.done[def.id])return;
+    if(M.done[def.id]||M.missed[def.id])return;
+    /* ZÁRT STÍLUS-KATEGÓRIA: a benne lévő mérföldkövek nem gyűlnek. Nem is
+       nézzük meg őket — a megnyitás pillanata dönti el, mi számít. */
+    if(def.cat&&!msCatUnlocked(def.cat))return;
     let v=0;
     try{v=def.p()||0;}catch(e){return;}
     if(!(v>=def.n))return;
@@ -33169,6 +33266,70 @@ function msRewardLabel(d){
 function msProgressOf(d){
   let v=0;try{v=d.p()||0;}catch(e){v=0;}
   return {v,pct:Math.max(0,Math.min(1,d.n?v/d.n:0))};}
+/* ---- A STÍLUS-KATEGÓRIÁK BOLTJA ----
+   A panel tetején, közvetlenül a mérleg alatt: ez a rendszer legfontosabb
+   döntése. Zárt kategóriánál KIÍRJUK, hány mérföldkövet buknál el most —
+   a "lemaradt" szabály sosem érhet meglepetésként senkit. */
+let _msCatOpen=false;
+function msCatShopHtml(){
+  const M=msState();
+  const openCnt=MS_STYLE_CATS.filter(c=>msCatUnlocked(c.key)).length;
+  const bud=S.transferBudget||0;
+  let h=`<button class="msGrp msCatHead${_msCatOpen?" open":""}" id="msCatToggle">`
+    +`<span class="msGrpN">🔓 Stílus-kategóriák megnyitása</span>`
+    +`<span class="msGrpC">${openCnt}/${MS_STYLE_CATS.length}</span>`
+    +`<span class="msChev">${_msCatOpen?"▲":"▼"}</span></button>`;
+  if(!_msCatOpen)return h;
+  h+=`<div class="msNote" style="margin:7px 0 2px">A csapatstílus-pontos mérföldkövek `
+    +`<b>zárva indulnak</b>. Amíg egy kategória zárva van, a benne lévő mérföldkövek `
+    +`<b>nem gyűlnek</b> — ami közben teljesül, az a megnyitáskor pont nélkül zárul le. `
+    +`Ide folyik vissza a pénzjutalom: a klub fejlesztése és a csapatstílus-fejlődés `
+    +`ugyanabból a kasszából megy.</div><div class="msList">`;
+  MS_STYLE_CATS.forEach(c=>{
+    const list=msCatList(c.key);
+    const dn=list.filter(d=>M.done[d.id]).length;
+    const ms=list.filter(d=>M.missed[d.id]).length;
+    if(msCatUnlocked(c.key)){
+      const info=M.cats[c.key]||{};
+      h+=`<div class="msItem done">`
+        +`<div class="msTop"><b>✓ ${esc(c.n)}</b>`
+        +`<span class="msRew">${dn}/${list.length} kész</span></div>`
+        +`<div class="msDesc">Megnyitva a(z) ${info.season||"?"}. szezonban`
+        +(info.price?` · ${fmtFt(info.price)}`:"")
+        +(ms?` · <b style="color:var(--red)">${ms} lemaradt</b>`:"")+`</div></div>`;
+      return;}
+    const price=msCatPrice(c.key);
+    const afford=bud>=price;
+    const miss=msCatWouldMiss(c.key).length;
+    h+=`<div class="msItem msCatLocked">`
+      +`<div class="msTop"><b>🔒 ${esc(c.n)}</b>`
+      +`<span class="msRew" style="color:${afford?"var(--grass)":"var(--red)"}">${fmtFt(price)}</span></div>`
+      +`<div class="msDesc">${esc(c.d)} <span style="color:var(--dim2)">(${list.length} mérföldkő, `
+      +`${list.reduce((a,d)=>a+d.val,0)} stíluspont)</span></div>`
+      +(miss?`<div class="msWarn">⚠ Ebből <b>${miss}</b> már most teljesülne — ha csak később nyitod meg, `
+             +`ezekért <b>nem jár pont</b>.</div>`:"")
+      +`<button class="btn-${afford?"y":"s"} stepbtn" data-mscat="${c.key}"${afford?"":" disabled"} style="margin-top:8px;padding:9px">`
+      +(afford?`🔓 Megnyitom — ${fmtFt(price)}`:`Nincs elég büdzséd (${fmtFtShort(bud)})`)
+      +`</button></div>`;});
+  return h+`</div>`;}
+function msCatShopBind(box){
+  const t=$("msCatToggle");
+  if(t)t.onclick=()=>{_msCatOpen=!_msCatOpen;renderMilestones();};
+  box.querySelectorAll("[data-mscat]").forEach(b=>{
+    b.onclick=()=>{
+      const k=b.getAttribute("data-mscat"),c=msCatByKey(k);
+      const price=msCatPrice(k),miss=msCatWouldMiss(k).length;
+      askConfirm({html:`<div style="font-size:13px;line-height:1.5">`
+        +`Megnyitod a(z) <b>${esc(c.n)}</b> kategóriát <b style="color:var(--gold)">${fmtFt(price)}</b>-ért?<br>`
+        +`Innentől a benne lévő ${msCatList(k).length} mérföldkő csapatstílus-pontot termel.`
+        +(miss?`<br><br><b style="color:var(--red)">Figyelem:</b> ${miss} mérföldkő már most teljesül — `
+               +`azok a megnyitáskor <b>pont nélkül</b> zárulnak le. Ez a késlekedés ára.`:"")
+        +`</div>`,
+        onYes:()=>{
+          const r=msUnlockCat(k);
+          if(!r.ok){addLine(`⛔ ${r.reason}`,"m ev");renderMilestones();return;}
+          msScan();renderMilestones();
+          try{renderHubInfo();renderHub();saveGame();}catch(e){}}});};});}
 function renderMilestones(){
   const box=$("hubMilestonesPanel");
   if(!box)return;
@@ -33191,6 +33352,7 @@ function renderMilestones(){
     +`tehát egy erős klubnál arányosan többet ér. A csapatstílus-pont a következő `
     +`fejlesztés, a csapatépítési stílusok valutája — addig gyűlik.</div>`;
   if(unseen)h+=`<button class="btn-s" id="msSeenAll" style="width:100%;margin:2px 0 4px;padding:8px">Mind megnézve (${unseen})</button>`;
+  h+=msCatShopHtml();
   msGroups().forEach(grp=>{
     const list=MILESTONES.filter(d=>d.grp===grp);
     const dn=list.filter(d=>M.done[d.id]).length;
@@ -33203,17 +33365,24 @@ function renderMilestones(){
     if(!isOpen)return;
     /* A még nyitott mérföldkövek a haladásuk szerint, a legközelebbi elöl —
        a teljesítettek a lista végén. */
-    const open=list.filter(d=>!M.done[d.id])
+    const open=list.filter(d=>!M.done[d.id]&&!M.missed[d.id])
       .map(d=>({d,pr:msProgressOf(d)}))
       .sort((a,b)=>b.pr.pct-a.pr.pct);
     const fin=list.filter(d=>M.done[d.id]);
+    const lost=list.filter(d=>M.missed[d.id]);
     h+=`<div class="msList">`;
     open.forEach(o=>{
       const d=o.d,pr=o.pr;
-      const showBar=d.n>1;
-      h+=`<div class="msItem">`
-        +`<div class="msTop"><b>${esc(d.t)}</b><span class="msRew">${msRewardLabel(d)}</span></div>`
+      /* ZÁRT KATEGÓRIA: a haladás nem gyűlik, tehát nem is mutatunk sávot —
+         az félrevezető volna. Helyette megmondjuk, mitől nyílna meg. */
+      const locked=d.cat&&!msCatUnlocked(d.cat);
+      const showBar=d.n>1&&!locked;
+      h+=`<div class="msItem${locked?" msCatLocked":""}">`
+        +`<div class="msTop"><b>${locked?"🔒 ":""}${esc(d.t)}</b><span class="msRew">${msRewardLabel(d)}</span></div>`
         +`<div class="msDesc">${esc(d.d)}</div>`
+        +(locked
+          ?`<div class="msWarn">Zárva — a(z) <b>${esc((msCatByKey(d.cat)||{}).n||d.cat)}</b> kategória megnyitásáig nem gyűlik.</div>`
+          :"")
         +(showBar
           ?`<div class="msBar"><i style="width:${Math.round(pr.pct*100)}%"></i></div>`
            +`<div class="msNum">${Math.round(pr.v)} / ${d.n}</div>`
@@ -33224,6 +33393,13 @@ function renderMilestones(){
       h+=`<div class="msItem done${isNew?" fresh":""}">`
         +`<div class="msTop"><b>✓ ${esc(d.t)}</b><span class="msRew">${msRewardLabel(d)}</span></div>`
         +`<div class="msDesc">${esc(d.d)}</div></div>`;});
+    /* LEMARADT: a zárás alatt teljesült, ezért pont nélkül lezárt mérföldkövek.
+       Nem tüntetjük el őket — a rendszer legyen őszinte arról, mit vesztettél. */
+    lost.forEach(d=>{
+      h+=`<div class="msItem msMissed">`
+        +`<div class="msTop"><b>✗ ${esc(d.t)}</b><span class="msRew">nem járt pont</span></div>`
+        +`<div class="msDesc">Már teljesült, mielőtt megnyitottad volna a(z) `
+        +`<b>${esc((msCatByKey(d.cat)||{}).n||d.cat)}</b> kategóriát.</div></div>`;});
     h+=`</div>`;});
   box.innerHTML=h;
   box.classList.remove("hide");
@@ -33231,6 +33407,7 @@ function renderMilestones(){
    if(sa)sa.onclick=()=>{
      msMarkSeen();renderMilestones();
      try{renderHubInfo();saveGame();}catch(e){}};}
+  msCatShopBind(box);
   box.querySelectorAll("[data-msgrp]").forEach(b=>{
     b.onclick=()=>{
       const g=b.getAttribute("data-msgrp");
