@@ -396,6 +396,13 @@ igényel új szimulációs ágat.
 * **A mérföldkövek száma stílusonként 11–15**, nem pontosan a tervezett lista.
   Ahol egy tervezett mérce nem volt megbízhatóan mérhető (pl. „gólok az első 10
   percben"), ott helyette olyan került be, ami a motorból tisztán kiolvasható.
+* **Minden képességnek HÁROM SZINTJE van** (a terv egylépcsős traiteket írt le).
+  A szintek egyre drágábbak és egyre erősebbek; az ársávot a képesség „rangja"
+  adja: I. sáv 14/24/38 · II. sáv 26/45/70 · III. sáv 40/68/108 pont. Egy
+  stílus teljes fája **866 pont**, ami tudatosan több, mint amennyi egy
+  karrierbe belefér — a stíluson belül is dönteni kell, nem lehet kimaxolni.
+  A felület minden képességnél kiírja, mit ad MOST és mit adna a KÖVETKEZŐ
+  szint, hogy a vásárlás ne találgatás legyen.
 * **A traitek hatása 12 csatornán fut** (csapaterő, támadó és védekező gólráta,
   piroslap-, sérülés-esély, morál-padló, edzői tapasztalat, skill-sorsolás,
   kémia-tempó, sebesség-plafon és edzés-osztó, passzív sebesség-plafon, bolti
