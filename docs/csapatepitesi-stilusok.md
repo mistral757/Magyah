@@ -465,6 +465,15 @@ igényel új szimulációs ágat.
   egy szűk körre, a Béke és harmónia 10/17/22%-ot MINDENRE (szélesség mélység
   helyett), a Sztárom a párom pedig a kijelölt sztár posztkategóriájára — az a
   kedvezmény menet közben követi, kire építetted a klubot.
+* **Egy csillag maga is 2-4 fázisból épül fel** (3.1.04). A jog megnyitása után
+  a csillag nem egy kattintás: ugyanúgy `rollStagesNeeded()` dönti el, hány
+  fázisból áll, mint a képességnél — és a szám akkor sorsolódik ki, **amikor
+  elindítod**, nem előbb. Az állapot az instance-en él (`starNeed` / `starDone`),
+  a mentés része, és a félkész csillag semmit nem ér, amíg össze nem áll
+  (`skillPower` csak a KÉSZ csillagokkal szoroz). Egy megkezdett csillag
+  ugyanúgy „félbehagyott munka", mint egy félkész képesség, ezért mindig ott a
+  jutalom-sor jelöltjei között — a `SKILL_STAR_OFFER` ritkítás csak ÚJ csillag
+  elkezdésére vonatkozik.
 * **A „csillagozható" traitek kimaradtak a trait-listából** — de az akadály
   azóta elhárult. Az F3 idején a csillag-rendszer még kizárólag a két
   sorsdöntő hős-skillé volt, ezért egy „csillagozható védő-skill" trait önálló
