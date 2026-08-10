@@ -2419,7 +2419,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.0.03";
+const APP_VERSION="3.0.04";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -22397,7 +22397,12 @@ function playMatch(){
        ugyanaz, mint megfordítani. */
     if(gameMode==="career")
       msNoteMatch({goalsFor:gf,saves:saveCount,
-        comeback:gf>ga?maxDeficit:0,winStreak:S.winStreak||0});
+        comeback:gf>ga?maxDeficit:0,winStreak:S.winStreak||0,
+        /* a stílus-mérföldkövekhez: morál-padló, piros lap melletti győzelem,
+           sérült emberrel aratott győzelem — egyik sem kereshető vissza utólag */
+        morale:S.morale,
+        redWin:(gf>ga&&redIdx>=0),
+        injWin:(gf>ga&&Object.keys(S.unavailable||{}).length>0)});
     /* SZEMÉLYI EDZŐ (Ritmusmester) második hatása: gyorsabban húz vissza a
        célértékhez, tehát KISEBB a hullámvölgy. Ez a típus igazi karaktere —
        nem magasabb csúcs, hanem kiszámíthatóbb szezon. */
@@ -22483,6 +22488,7 @@ function playMatch(){
        szezonlejátszásnál (S.auto) a HUB egyáltalán nem rajzolódik, tehát
        enélkül egy egész idény teljesítései csak a szezon végén jönnének meg. */
     try{msScan();}catch(e){}
+    try{styleScan();}catch(e){}
     function proceedAfterMatch(){
       if(euroActive()){euroAfterUserMatch();return;}
       if(S.idx>=30){$("kickBtn").textContent="Szezon vége";finish();return;}
@@ -30877,6 +30883,7 @@ function renderHub(){
      állapotból olvasható, tehát egy elmaradt esemény-hívás sem tud
      mérföldkövet elnyelni. */
   msScan();
+  styleScan();               /* a stílus SAJÁT mérföldkövei — ugyanaz a ritmus */
   renderMilestones();
   renderStylePanel();        /* a csapatstílus sávja: választható-e, mi lett belőle */
   renderHubInfo();           /* az Infó fül: látszik-e, mi van benne, nyitva van-e */
@@ -32703,6 +32710,7 @@ function startNextCareerSeason(){
      néhány sorral lejjebb már nem lennének visszakereshetők. */
   msNoteSeasonClose();
   msScan();
+  styleScan();
   S.idx=0;S.W=0;S.D=0;S.L=0;S.GF=0;S.GA=0;S.pts=0;S.reds=0;S.injuries=0;S.capMod=0;S.eventMod=0;S.subs={};
   /* Új szezon: a tartós hiányzások is lezárulnak (a nyár elmossa a sárga/piros
      lapos eltiltást és a szezon közbeni sérüléseket). */
@@ -33362,6 +33370,12 @@ function msNoteMatch(o){
     if(o.saves!=null)t.savesMax=Math.max(t.savesMax||0,o.saves);
     if(o.comeback!=null)t.mCbMax=Math.max(t.mCbMax||0,o.comeback);
     if(o.winStreak!=null)t.winStreakMax=Math.max(t.winStreakMax||0,o.winStreak);
+    /* SZEZONOS morál-padló: a legalacsonyabb érték, amit az idényben elért. A
+       szezonzáráskor kerül át a mindenkori legjobb padlóba (msNoteSeasonClose). */
+    if(o.morale!=null)
+      t.seasonMoraleMin=(t.seasonMoraleMin==null)?o.morale:Math.min(t.seasonMoraleMin,o.morale);
+    if(o.redWin)t.redWins=(t.redWins||0)+1;
+    if(o.injWin)t.injWins=(t.injWins||0)+1;
   }catch(e){}}
 /* Egyéni díj — a sorozat rangja szerinti súllyal. */
 const MS_AWARD_W={BL:3,EL:2,KL:1.5,MK:1};
@@ -33409,6 +33423,17 @@ function msNoteSeasonClose(){
     t.csSeasonMax=Math.max(t.csSeasonMax||0,S.chSeasonCleanSheets||0);
     let g=0;Object.values(S.scorers||{}).forEach(v=>{if(v>g)g=v;});
     t.bestSeasonGoals=Math.max(t.bestSeasonGoals||0,g);
+    /* A LEGJOBB MORÁL-PADLÓ: a legmagasabb érték, ami alá egy TELJES idényben
+       nem esett a csapatmorál. Csak a lezáruló szezonból mentjük át, mert
+       menet közben még romolhatna. */
+    if(t.seasonMoraleMin!=null)
+      t.bestMoraleFloor=Math.max(t.bestMoraleFloor||0,t.seasonMoraleMin);
+    t.seasonMoraleMin=null;
+    /* Piros lapok egy idényben — a legtöbb, amit valaha összeszedtél. */
+    t.maxSeasonReds=Math.max(t.maxSeasonReds||0,S.reds||0);
+    /* A legkevesebb kapott gól egy lezárt idényben. */
+    if((S.seasonMatches&&Object.keys(S.seasonMatches).length)||S.idx>=25)
+      t.minSeasonGA=(t.minSeasonGA==null)?(S.GA||0):Math.min(t.minSeasonGA,S.GA||0);
   }catch(e){}}
 
 /* ================= A MÉRFÖLDKŐ-PANEL =================
@@ -33709,7 +33734,10 @@ function renderStylePanel(){
   const st=styleState(),def=styleDef();
   /* A JELVÉNY csak akkor kiabál, ha VAN eldöntetlen, egyszeri döntésed. */
   {const b=$("hubStyleBadge"),kell=styleCanChoose();
-   if(b){b.textContent=kell?"dönts!":"";b.classList.toggle("hide",!kell);}}
+   const uj=styleMsUnseen();
+   if(b){
+     b.textContent=kell?"dönts!":(uj?String(uj):"");
+     b.classList.toggle("hide",!kell&&!uj);}}
   $("hubStyleSub").textContent=def
     ? `${def.ic} ${def.n}${st.star?` · ${shortName(st.star)}`:""}`
     : (styleCanChoose()?"válaszd ki a klub filozófiáját"
@@ -33784,11 +33812,14 @@ function styleDashboardHtml(st,def){
     h+=`<div class="msItem" style="margin-top:9px"><div class="msTop"><b>⭐ A klub sztárja</b>`
       +`<span class="msRew">${esc(shortName(st.star))}</span></div>`
       +`<div class="msDesc">A stílus mérföldkövei róla szólnak.</div></div>`;
-  h+=`<div class="msNote" style="margin-top:9px">A stílus-mérföldkövek és a hozzájuk tartozó `
-    +`képességek a következő fejlesztésben nyílnak meg. A csapatstílus-pontod addig gyűlik — `
-    +`nem vész el.</div></div>`;
-  return h;}
+  h+=`<div class="msNote" style="margin-top:9px">A stílushoz tartozó KÉPESSÉGEK `
+    +`(traitek) a következő fejlesztésben nyílnak meg — a pontjaid addig gyűlnek.</div></div>`;
+  return h+styleMsHtml();}
 function styleBindPanel(body){
+  {const sm=$("styleMsSeen");
+   if(sm)sm.onclick=()=>{
+     styleMsMarkSeen();renderStylePanel();
+     try{saveGame();}catch(e){}};}
   body.querySelectorAll("[data-style]").forEach(b=>{
     b.onclick=()=>{
       const k=b.getAttribute("data-style"),sd=styleByKey(k);
@@ -33831,6 +33862,422 @@ function styleConfirm(k,starName){
       renderStylePanel();
       try{renderHub();saveGame();}catch(e){}}});}
 $("hubStyleBtn")&&($("hubStyleBtn").onclick=()=>hubStyleToggle());
+/* ================= STÍLUS-MÉRFÖLDKÖVEK (F2) =================
+   Az általános mérföldkövek MINDENKINEK ugyanazok. Ezek nem: a stílusod
+   dönti el, mit mér a rendszer rólad. Egy Beton védelem-klub tiszta lapokat
+   gyűjt, egy Bombázók-klub gólzáport, a Sztárom a párom egyetlen ember
+   pályafutását — ugyanazok a mérkőzések, három különböző karrier.
+
+   MIND CSAPATSTÍLUS-PONTOT FIZET, ugyanabba a tárcába, mint az általánosak
+   (msState().sp): a pont a pont, csak a megszerzés útja más. Ezek viszont NEM
+   kapuzottak — a kategória-megnyitás az általános mérföldkövek ellensúlya
+   volt; itt maga a stílusválasztás a belépő.
+
+   A TÁBLA SZERKEZETE azonos az általánosakéval ({id,t,d,val,p,n}), csak
+   stílusonként külön tömbben, és a saját állapotában (S.style.ms) él — így
+   egy karrier stílusa és az általános haladása sosem keveredhet.
+
+   MÉRÉS: ahol lehet, ÁLLAPOTBÓL (a keret, a történet megnézésével); nyomkövető
+   csak ott, ahol az esemény utólag visszakereshetetlen (egy idény morál-padlója,
+   egy piros lap melletti győzelem). Ez ugyanaz az elv, mint az általánosaknál. */
+
+/* ---- SEGÉDEK A STÍLUS-FELTÉTELEKHEZ ----
+   Mind olcsó és hibatűrő: a styleScan mindet végigfuttatja, és egy félkész
+   állapotban (draft, betöltés közben) sem dobhat kivételt. */
+function stXI(){
+  const out=[];
+  (typeof slots!=="undefined"?slots:[]).forEach((sl,i)=>{
+    if(sl&&sl.player)out.push({sl,i});});
+  return out;}
+function stRoleOf(o){
+  try{return roleInFormation(o.sl.pos,form,o.i);}catch(e){return null;}}
+function stEffOvr(o){
+  try{
+    const e=msEntry(o.sl.player.n);
+    return (e&&typeof posEffectiveRating==="function")
+      ? posEffectiveRating(e,o.sl.pos) : pOvr(o.sl.player);
+  }catch(e){return 0;}}
+/* Egy posztcsoport átlagos effektív ereje a KEZDŐ 11-ben. */
+function stRoleAvg(role){
+  let sum=0,n=0;
+  stXI().forEach(o=>{if(stRoleOf(o)!==role)return;sum+=stEffOvr(o);n++;});
+  return n?sum/n:0;}
+/* A VÉDELEM (vagy a támadósor) a legerősebb sor-e? A kapust szándékosan
+   kihagyjuk az összevetésből: egyetlen ember átlaga nem sor-átlag. */
+function stLineIsTop(role){
+  const mine=stRoleAvg(role);
+  if(!mine)return 0;
+  const others=["VEDO","KOZEPPALYAS","CSATAR"].filter(r=>r!==role).map(stRoleAvg);
+  return others.every(v=>mine>=v)?1:0;}
+/* A klub legmagasabb Ratingű játékosa ebbe a posztcsoportba tartozik-e? */
+function stTopPlayerRole(){
+  const R=msRoster();
+  if(!R.length)return null;
+  let best=null,bv=-1;
+  R.forEach(p=>{const v=pOvr(p);if(v>bv){bv=v;best=p;}});
+  if(!best)return null;
+  try{return getCategoryFor(best.pos&&best.pos[0]);}catch(e){return null;}}
+function stCaptainRole(){
+  try{
+    if(captainIdx==null||captainIdx<0)return null;
+    const sl=slots[captainIdx];
+    if(!sl||!sl.player)return null;
+    return roleInFormation(sl.pos,form,captainIdx);
+  }catch(e){return null;}}
+/* Hány KIÉPÍTETT képesség ül a kereten egy adott posztkategóriában? A félkész
+   arányosan számít — ugyanaz az elv, mint mindenhol máshol. */
+function stSkillCount(cats){
+  const want=Array.isArray(cats)?cats:[cats];
+  let n=0;
+  msRoster().forEach(p=>{
+    ((S.skills&&S.skills[p.n])||[]).forEach(i=>{
+      if(!i||!i.skill||want.indexOf(i.skill.cat)<0)return;
+      n+=(typeof skillFraction==="function")?skillFraction(i):1;});});
+  return n;}
+/* A kezdő 11 leggyengébb és legerősebb embere közti effektív különbség. */
+function stXISpread(){
+  const v=stXI().map(stEffOvr).filter(x=>x>0);
+  if(v.length<11)return 999;
+  return Math.max.apply(null,v)-Math.min.apply(null,v);}
+/* A négy csapat-tengely közül a LEGGYENGÉBB (a kapust is beleértve). */
+function stWeakestAxis(){
+  try{
+    const A=teamAttrStrengths();
+    return Math.min(A.ved,A.kapus,A.passz,A.gol);
+  }catch(e){return 0;}}
+function stXISpeedAvg(){
+  const v=stXI().map(o=>{
+    const a=attrsOfPlayer(o.sl.player);
+    return (a&&a.seb)||0;}).filter(x=>x>0);
+  return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;}
+function stMaxSpeed(){
+  let m=0;msRoster().forEach(p=>{
+    const a=attrsOfPlayer(p);if(a&&a.seb>m)m=a.seb;});
+  return m;}
+function stRecord(kind){
+  const t=(kind==="speed"?S.topSpeed:S.topShot)||{};
+  let m=0;Object.keys(t).forEach(k=>{if(t[k]>m)m=t[k];});
+  return m;}
+/* Hány SZÉLSŐ áll egyszerre a kezdő 11-ben (középpályás és támadó egyaránt)? */
+function stWingerCount(){
+  let n=0;
+  stXI().forEach(o=>{
+    const c=effectiveSlotPos(form,o.i);
+    if(c==="JSZ"||c==="BSZ")n++;});
+  return n;}
+/* Hány lobbanékony (aggroI>=3) ember van a keretben? */
+function stHotHeads(){
+  let n=0;
+  msRoster().forEach(p=>{
+    const e=msEntry(p.n);
+    if(e&&(e.aggroI||0)>=3)n++;});
+  return n;}
+function stChemDone(){
+  let n=0;
+  Object.values(S.chemPairs||{}).forEach(pr=>{
+    if(pr&&(pr.stages||0)>=CHEM_PAIR_NEED)n++;});
+  return n;}
+/* A legjobb (legmagasabb) taktika-illeszkedés a stílus OTTHONOS rendszerei
+   közül — nem akármelyiké. Ez teszi a mérföldkövet stílus-specifikussá. */
+function stHomeTacticFit(){
+  const def=styleDef();
+  const keys=(def&&def.tactics&&def.tactics.length)?def.tactics:Object.keys(TACTICS);
+  let m=0;
+  keys.forEach(k=>{try{m=Math.max(m,tacticFit(k));}catch(e){}});
+  return Math.round(m*100);}
+/* A kijelölt sztár — objektum és bejegyzés. */
+function stStar(){
+  const st=styleState();
+  if(!st||!st.star)return null;
+  return msRoster().find(p=>p.n===st.star)||null;}
+function stStarOvr(){const p=stStar();return p?Math.round(pOvr(p)):0;}
+function stStarLead(){
+  const p=stStar();
+  if(!p)return 0;
+  const xi=stXI().map(stEffOvr).filter(x=>x>0);
+  if(!xi.length)return 0;
+  const avg=xi.reduce((a,b)=>a+b,0)/xi.length;
+  return Math.round(pOvr(p)-avg);}
+function stStarSkills(){
+  const st=styleState();
+  if(!st||!st.star)return 0;
+  return ((S.skills&&S.skills[st.star])||[]).filter(i=>i&&i.skill).length;}
+function stStarMatches(){
+  const st=styleState();
+  if(!st||!st.star)return 0;
+  const c=(S.careerStats&&S.careerStats[st.star])||null;
+  return (c&&c.matches)||0;}
+function stStarAwards(){
+  const st=styleState();
+  if(!st||!st.star)return 0;
+  return (S.goldenAwardCount&&S.goldenAwardCount[st.star])||0;}
+/* Aranylabdás a SAJÁT klubodból, adott posztcsoportból. */
+function stBallonRole(roles){
+  const want=Array.isArray(roles)?roles:[roles];
+  return (S.ballonHistory||[]).some(b=>{
+    if(!b||!b.own)return false;
+    const e=msEntry(b.name);
+    if(!e||!e.pos)return false;
+    try{return want.indexOf(getCategoryFor(e.pos[0]))>=0;}catch(err){return false;}});}
+/* Nyert-e a klub adott fajta BL arany-díjat (a szezontörténetből)? */
+function stWonKing(msKey){
+  return msHistory().some(h=>h&&h.euro&&(h.euro.kings||[]).indexOf(msKey)>=0);}
+
+/* ================= A STÍLUSONKÉNTI TÁBLÁK ================= */
+const STYLE_MILESTONES={};
+function stDef(styleK,id,t,d,val,p,n){
+  (STYLE_MILESTONES[styleK]=STYLE_MILESTONES[styleK]||[])
+    .push({id,t,d,val,p,n:n||1});}
+function stTiers(styleK,base,tFn,dFn,vals,tiers,p){
+  tiers.forEach((th,i)=>stDef(styleK,`${base}_${th}`,tFn(th),dFn(th),vals[i],p,th));}
+
+/* ---------- 🧱 BETON VÉDELEM ---------- */
+stDef("beton","bt_line","A hátsó sor a legerősebb",
+  "A védelem Rating-átlaga legyen a legmagasabb a három mezőnysor közül.",
+  6,()=>stLineIsTop("VEDO"),1);
+stDef("beton","bt_gk","A kapus az első ember",
+  "A kapusod legyen a klub legmagasabb Ratingű játékosa.",
+  8,()=>stTopPlayerRole()==="KAPUS"?1:0,1);
+stDef("beton","bt_cap","Karszalag hátul",
+  "Védő vagy kapus viselje a csapatkapitányi karszalagot.",
+  4,()=>{const r=stCaptainRole();return (r==="VEDO"||r==="KAPUS")?1:0;},1);
+stTiers("beton","bt_cs",th=>`${th} tiszta lap egy idényben`,
+  th=>`Tarts ${th} tiszta lapot egyetlen szezonban.`,
+  [4,7,11],[5,10,15],
+  ()=>Math.max(S.chSeasonCleanSheets||0,msT().csSeasonMax||0));
+stTiers("beton","bt_ga",th=>`Kevesebb mint ${th} kapott gól`,
+  th=>`Zárj le egy bajnoki idényt ${th}-nál kevesebb kapott góllal.`,
+  [6,10,16],[25,20,15],
+  ()=>{const m=msT().minSeasonGA;return m==null?0:Math.max(0,26-m);});
+stTiers("beton","bt_skill",th=>`${th} védekező képesség`,
+  th=>`Legyen ${th} kiépített védő- vagy kapus-képesség a keretedben.`,
+  [4,7,11],[3,6,10],()=>stSkillCount(["VEDO","KAPUS"]));
+stDef("beton","bt_ballon","Aranylabdás a hátsó sorból",
+  "Nyerje meg az Aranylabdát a te védőd vagy kapusod.",
+  14,()=>stBallonRole(["VEDO","KAPUS"])?1:0,1);
+stDef("beton","bt_glove","Aranykesztyű",
+  "Legyen a kapusod a Bajnokok Ligája kapus-királya.",
+  12,()=>stWonKing("gloves")?1:0,1);
+
+/* ---------- ⚽ BOMBÁZÓK ---------- */
+stDef("bombazok","bz_line","A támadósor a legerősebb",
+  "A támadósor Rating-átlaga legyen a legmagasabb a három mezőnysor közül.",
+  6,()=>stLineIsTop("CSATAR"),1);
+stDef("bombazok","bz_top","A gólgép",
+  "A klub legmagasabb Ratingű játékosa legyen csatár.",
+  8,()=>stTopPlayerRole()==="CSATAR"?1:0,1);
+stDef("bombazok","bz_cap","Karszalag elöl",
+  "Csatár viselje a csapatkapitányi karszalagot.",
+  4,()=>stCaptainRole()==="CSATAR"?1:0,1);
+stTiers("bombazok","bz_gf",th=>`${th} gól egy idényben`,
+  th=>`Rúgj ${th} gólt egyetlen bajnoki szezonban.`,
+  [5,9,14],[80,100,120],
+  ()=>Math.max(S.GF||0,...msHistory().map(h=>(h&&h.gf)||0)));
+stTiers("bombazok","bz_solo",th=>`${th} gól egy játékostól`,
+  th=>`Szerezzen egy csatárod ${th} gólt egyetlen szezonban.`,
+  [5,9,14],[30,40,50],
+  ()=>{let m=msT().bestSeasonGoals||0;
+       Object.values(S.scorers||{}).forEach(v=>{if(v>m)m=v;});
+       return m;});
+stTiers("bombazok","bz_skill",th=>`${th} befejező képesség`,
+  th=>`Legyen ${th} kiépített csatár-képesség a keretedben.`,
+  [4,7,11],[3,6,10],()=>stSkillCount("CSATAR"));
+stDef("bombazok","bz_ballon","Aranylabdás csatár",
+  "Nyerje meg az Aranylabdát a te csatárod.",
+  14,()=>stBallonRole("CSATAR")?1:0,1);
+stDef("bombazok","bz_boot","Aranycipő",
+  "Legyen a csatárod a Bajnokok Ligája gólkirálya.",
+  12,()=>stWonKing("boot")?1:0,1);
+
+/* ---------- ☯️ BÉKE ÉS HARMÓNIA ---------- */
+stTiers("harmonia","hm_spread",th=>`Kiegyenlített kezdő 11 (±${th})`,
+  th=>`A kezdő 11 legerősebb és leggyengébb embere közti effektív különbség maradjon ${th} alatt.`,
+  [6,10,16],[8,5,3],
+  /* fordított mérce: minél kisebb a szórás, annál nagyobb a "haladás" */
+  ()=>{const s=stXISpread();return s>=999?0:Math.max(0,20-s);});
+stTiers("harmonia","hm_chem",th=>`${th} kész párkémia`,
+  th=>`Legyen egyszerre ${th} teljesen kiépített párkémia a klubnál.`,
+  [5,8,12],[6,10,15],stChemDone);
+stDef("harmonia","hm_morale","Nyugodt öltöző",
+  "Zárj le egy teljes szezont úgy, hogy a csapatmorál végig 60 fölött maradt.",
+  10,()=>msT().bestMoraleFloor||0,60);
+stDef("harmonia","hm_axes","Négy tengely, egy szint",
+  "Mind a négy csapat-attribútum (Védekezés, Védés, Passz, Gólszerzés) érje el a 85-öt.",
+  12,()=>Math.round(stWeakestAxis()),85);
+stDef("harmonia","hm_skills","Mindenki tud valamit",
+  "Legyen a kezdő 11 minden tagjának legalább egy megkezdett képessége.",
+  10,()=>{
+    const xi=stXI();
+    if(xi.length<11)return 0;
+    return xi.every(o=>(((S.skills&&S.skills[o.sl.player.n])||[]).length>0))?1:0;},1);
+stDef("harmonia","hm_balance","Mesteri egyensúly",
+  "Érje el a csapategyensúly-mérőd a 85 pontot.",
+  12,()=>{const b=teamBalance();return b.ok?Math.round(b.score*100):0;},85);
+stDef("harmonia","hm_fit","A rendszer működik",
+  "Érd el a 90%-os illeszkedést a stílusod otthonos taktikájában (Labdatartás vagy Totális futball).",
+  10,stHomeTacticFit,90);
+
+/* ---------- ⭐ SZTÁROM A PÁROM ---------- */
+stTiers("sztar","sz_lead",th=>`A sztár ${th} Ratinggel emelkedik ki`,
+  th=>`A kijelölt sztárod Ratingje legyen ${th} ponttal a kezdő 11 átlaga fölött.`,
+  [5,9,14],[8,12,15],stStarLead);
+stTiers("sztar","sz_ovr",th=>`A sztár eléri a ${th}-öt`,
+  th=>`Vidd fel a kijelölt sztárod Ratingjét ${th}-re.`,
+  [6,10,16],[95,99,105],stStarOvr);
+stTiers("sztar","sz_skill",th=>`A sztár ${th} képessége`,
+  th=>`Legyen a sztárodnak ${th} megszerzett képessége.`,
+  [5,9,14],[3,5,8],stStarSkills);
+stTiers("sztar","sz_award",th=>`${th} egyéni díj`,
+  th=>`Nyerjen a sztárod ${th} egyéni arany-díjat.`,
+  [6,10,16],[2,4,6],stStarAwards);
+stDef("sztar","sz_ballon","Aranylabda",
+  "Nyerje meg a sztárod az Aranylabdát.",
+  16,()=>{
+    const st=styleState();
+    if(!st||!st.star)return 0;
+    return (S.ballonHistory||[]).some(b=>b&&b.own&&b.name===st.star)?1:0;},1);
+stTiers("sztar","sz_loyal",th=>`${th} meccs a klubnál`,
+  th=>`Játsszon a sztárod ${th} mérkőzést a klubodnál.`,
+  [7,12],[150,250],stStarMatches);
+
+/* ---------- ⚡ HOL JÖN A MENNYDÖRGÉS? ---------- */
+stTiers("villam","vl_avg",th=>`${th}-ös sebesség-átlag`,
+  th=>`A kezdő 11 Sebesség-átlaga érje el a ${th}-öt.`,
+  [6,10,16],[85,90,95],()=>Math.round(stXISpeedAvg()));
+stDef("villam","vl_max","A leggyorsabb ember",
+  "Legyen egy 99-es Sebességű játékosod.",
+  10,()=>Math.round(stMaxSpeed()),99);
+stTiers("villam","vl_rec",th=>`${th} km/h-s klubrekord`,
+  th=>`Dönts meg egy ${th} km/h-s végsebesség-rekordot a klubnál.`,
+  [6,10,14],[36,38,40],()=>stRecord("speed"));
+stDef("villam","vl_wings","Négy szélső",
+  "Álljon egyszerre 4 szélső a kezdő 11-edben.",
+  10,stWingerCount,4);
+stDef("villam","vl_fit","Szárnyra kapva",
+  "Érd el a 90%-os illeszkedést a stílusod otthonos taktikájában (Széljáték vagy Gyors kontra).",
+  10,stHomeTacticFit,90);
+stTiers("villam","vl_skill",th=>`${th} sebesség-alapú képesség`,
+  th=>`Legyen ${th} kiépített szélső- vagy csatár-képesség a keretedben.`,
+  [5,9],[3,6],()=>stSkillCount("CSATAR"));
+stDef("villam","vl_bal","Gyors ÉS kiegyensúlyozott",
+  "Érd el a 80-as csapategyensúlyt úgy, hogy a sebesség-átlagod is 88 fölött van.",
+  14,()=>{
+    const b=teamBalance();
+    if(!b.ok||stXISpeedAvg()<88)return 0;
+    return Math.round(b.score*100);},80);
+
+/* ---------- 🛡️ PANZERKAMPFWAGEN ---------- */
+stTiers("panzer","pz_hot",th=>`${th} lobbanékony ember`,
+  th=>`Legyen ${th} magas temperamentumú játékos a keretedben.`,
+  [5,9,14],[4,6,8],stHotHeads);
+stDef("panzer","pz_morale","Nem törünk meg",
+  "Zárj le egy teljes szezont úgy, hogy a csapatmorál végig 70 fölött maradt.",
+  12,()=>msT().bestMoraleFloor||0,70);
+stDef("panzer","pz_reds","Kemény kéz",
+  "Szedj össze legalább 3 piros lapot egyetlen idényben — a keménységnek ára van.",
+  6,()=>Math.max(S.reds||0,msT().maxSeasonReds||0),3);
+stTiers("panzer","pz_shot",th=>`${th} km/h-s lövés`,
+  th=>`Dönts meg egy ${th} km/h-s lövéserő-rekordot a klubnál.`,
+  [6,10],[110,120],()=>stRecord("shot"));
+stDef("panzer","pz_redwin","Emberhátrányban is",
+  "Nyerj meg egy mérkőzést úgy, hogy piros lapot kaptatok.",
+  8,()=>msT().redWins||0,1);
+stTiers("panzer","pz_injwin",th=>`${th} győzelem sérülttel`,
+  th=>`Nyerj meg ${th} mérkőzést úgy, hogy volt sérült emberetek.`,
+  [6,12],[3,8],()=>msT().injWins||0);
+stTiers("panzer","pz_skill",th=>`${th} kemény képesség`,
+  th=>`Legyen ${th} kiépített védő- vagy csatár-képesség a keretedben.`,
+  [5,9],[3,6],()=>stSkillCount(["VEDO","CSATAR"]));
+
+/* ================= A STÍLUS-KIÉRTÉKELŐ =================
+   Ugyanaz a minta, mint a msScan: minden nem teljesített mérföldkövet
+   végigfuttat, saját try-ban, és a jutalmat ugyanabba a stíluspont-tárcába
+   fizeti. Csak akkor csinál bármit, ha van választott stílus. */
+function styleMsList(){
+  const k=styleKey();
+  return (k&&STYLE_MILESTONES[k])||[];}
+function styleMsState(){
+  const st=styleState();
+  if(!st)return null;
+  if(!st.ms)st.ms={done:{},seen:{},t:{}};
+  if(!st.ms.done)st.ms.done={};
+  if(!st.ms.seen)st.ms.seen={};
+  if(!st.ms.t)st.ms.t={};
+  return st.ms;}
+function styleScan(){
+  if(gameMode!=="career")return;
+  if(typeof phase!=="undefined"&&phase==="draft")return;
+  const M=styleMsState();
+  if(!M)return;
+  const earned=[];
+  styleMsList().forEach(def=>{
+    if(M.done[def.id])return;
+    let v=0;
+    try{v=def.p()||0;}catch(e){return;}
+    if(!(v>=def.n))return;
+    M.done[def.id]={season:S.seasonNumber||1};
+    earned.push(def);});
+  if(!earned.length)return;
+  const sd=styleDef();
+  earned.forEach(def=>{
+    const W=msState();
+    W.sp=(W.sp||0)+def.val;
+    W.spEarned=(W.spEarned||0)+def.val;
+    W.log.unshift({id:def.id,t:def.t,grp:sd?sd.n:"Stílus",kind:"sp",
+      txt:`+${def.val} csapatstílus-pont`,season:S.seasonNumber||1});
+    if(W.log.length>MS_LOG_MAX)W.log.length=MS_LOG_MAX;
+    try{
+      addLine(`${sd?sd.ic:"🎯"} <b>STÍLUS-MÉRFÖLDKŐ — ${esc(def.t)}</b> · +${def.val} csapatstílus-pont`,"m mvp");
+      addLine(`→ ${esc(def.d)}`,"m skillnote");
+    }catch(e){}});
+  try{renderStylePanel();}catch(e){}}
+function styleMsUnseen(){
+  const M=styleMsState();
+  if(!M)return 0;
+  let n=0;
+  Object.keys(M.done).forEach(id=>{if(!M.seen[id])n++;});
+  return n;}
+function styleMsMarkSeen(){
+  const M=styleMsState();
+  if(!M)return;
+  Object.keys(M.done).forEach(id=>{M.seen[id]=true;});}
+/* A stílus-mérföldkövek listája a műszerfalon. Ugyanaz a vizuális nyelv, mint
+   az általános mérföldköveknél — a felhasználónak ne kelljen új felületet
+   tanulnia ahhoz, hogy ugyanazt a dolgot lássa. */
+function styleMsHtml(){
+  const M=styleMsState(),list=styleMsList();
+  if(!M||!list.length)return "";
+  const done=list.filter(d=>M.done[d.id]).length;
+  const unseen=styleMsUnseen();
+  let h=`<div class="infoCard" style="margin-top:12px">`
+    +`<div class="infoCardH">Stílus-mérföldkövek`
+    +(unseen?` <span class="msBadge">${unseen} új</span>`:"")+`</div>`
+    +`<div class="msNote">Ezek CSAK a te stílusodra szólnak, és mind `
+    +`csapatstílus-pontot fizetnek. A megnyitás-kapu rájuk nem vonatkozik — `
+    +`itt maga a stílusválasztás a belépő.</div>`
+    +`<div class="msSummary"><div class="msSum"><b>${done}</b><span>/${list.length} teljesítve</span></div>`
+    +`<div class="msSum"><b>${list.reduce((a,d)=>a+d.val,0)}</b><span>összesen szerezhető</span></div>`
+    +`<div class="msSum"><b>${msStylePoints()}</b><span>jelenlegi egyenleg</span></div></div>`;
+  if(unseen)h+=`<button class="btn-s" id="styleMsSeen" style="width:100%;margin:2px 0 6px;padding:8px">Mind megnézve (${unseen})</button>`;
+  const open=list.filter(d=>!M.done[d.id])
+    .map(d=>{let v=0;try{v=d.p()||0;}catch(e){}
+             return {d,v,pct:Math.max(0,Math.min(1,d.n?v/d.n:0))};})
+    .sort((a,b)=>b.pct-a.pct);
+  const fin=list.filter(d=>M.done[d.id]);
+  h+=`<div class="msList">`;
+  open.forEach(o=>{
+    const showBar=o.d.n>1;
+    h+=`<div class="msItem">`
+      +`<div class="msTop"><b>${esc(o.d.t)}</b><span class="msRew">${o.d.val} stíluspont</span></div>`
+      +`<div class="msDesc">${esc(o.d.d)}</div>`
+      +(showBar?`<div class="msBar"><i style="width:${Math.round(o.pct*100)}%"></i></div>`
+                +`<div class="msNum">${Math.round(o.v)} / ${o.d.n}</div>`:"")
+      +`</div>`;});
+  fin.forEach(d=>{
+    h+=`<div class="msItem done${M.seen[d.id]?"":" fresh"}">`
+      +`<div class="msTop"><b>✓ ${esc(d.t)}</b><span class="msRew">${d.val} stíluspont</span></div>`
+      +`<div class="msDesc">${esc(d.d)}</div></div>`;});
+  return h+`</div></div>`;}
 /* ================= MENTÉS / BETÖLTÉS (localStorage) =================
    Mivel a játék mostantól önálló weboldalként fut (nem Claude-artifactként),
    a böngésző localStorage-a rendesen működik. Csak stabil, "lezárt" pillanatokban
