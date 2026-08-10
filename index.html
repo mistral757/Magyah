@@ -321,16 +321,29 @@ button:disabled{opacity:.35;cursor:default}
 /* A HUB-on KÍVÜLI képernyők is eltűnnek: a jutalom-skill választója, a
    szezonzáró verdikt és a többi szakasz néha egyszerre látszik a HUB-bal, és
    „csak a menüt látod" csak akkor igaz, ha rájuk is vonatkozik. A fejléc marad:
-   az nem a HUB része, hanem a keret. */
-body.hubMenuMode>section:not(#scHub){display:none}
+   az nem a HUB része, hanem a keret.
+   A KÉT KIVÉTEL a menü saját aloldal-gazdája: a nagy felületek (vásárlás,
+   klub-szemle, edzésterv, stáb) a scWindow-ban, a felállásváltó a saját
+   szakaszában lakik — azok nem „más képernyők", hanem a menü mélyebb szintjei. */
+body.inHubMenu>section:not(#scHub):not(#scWindow):not(#hubFormationPicker){display:none}
 #scHub.menuMode>.card.hubMainCard>*{display:none}
 #scHub.menuMode>.card.hubMainCard>.hubMenuWrap,
 #scHub.menuMode>.card.hubMainCard>#hubActions{display:block}
-/* A HUB-on belüli többi kártya (taktika-, kapitány-, posztválasztó) menü-módban
-   nem látszhat: azokat úgyis a menüből nyitod, és a nyitásuk kilép a módból.
-   Az Infópult lebegő ikonja szintén: „csak a menüt látod". */
+/* A HUB-on belüli többi kártya (taktika-, kapitány-, posztválasztó) a menülista
+   mellett nem látszhat, az Infópult lebegő ikonja sem: „csak a menüt látod". */
 #scHub.menuMode>.card:not(.hubMainCard),
 #scHub.menuMode>#hubInfoFab{display:none}
+/* ---- ALOLDAL A MENÜN BELÜL ----
+   Ha a menüből megnyitsz egy aloldalt (Taktika, Kapitányváltás, posztcsere), az
+   NEM a HUB alján nyílik ki, hanem ÁTVESZI a menülista helyét — egy szinttel
+   beljebb lépsz, ahogy egy menüben szokás. A menülista eltűnik, az aloldal a
+   lap tetején kezdődik, és a tetején ott a „← Vissza a menübe" sáv. */
+#scHub.menuMode.subOpen>.card.hubMainCard{display:none}
+#scHub.menuMode.subOpen>.card:not(.hubMainCard){display:block}
+/* A „vissza a menübe" sáv csak akkor létezik, ha tényleg a menüben vagy: ha
+   ugyanezt a kártyát a keretlistából nyitottad meg, nincs hova visszamenni. */
+.hubSubBack{display:none;position:sticky;top:0;z-index:41;margin:0 0 11px}
+body.inHubMenu .hubSubBack{display:block}
 /* A VISSZA-GOMB. Minden almenü alján ott áll, és a menü fejlécében is — ez az
    egyetlen módja a kilépésnek, ezért soha nem lehet messze. */
 .hubBackBtn{width:100%;margin:10px 0 0;padding:12px 14px;border-radius:10px;cursor:pointer;
@@ -2377,7 +2390,7 @@ button.infPanel:disabled{cursor:default}
             <button id="hubStaffBtn" class="hubCard hide"><span class="ic">🎓</span><span class="tx"><span class="tt">Szakmai stáb</span><span class="ds" id="hubStaffDs">Személyi edzők — a visszavonult legendáid tudása</span></span></button>
             <!-- FÉLIDEI CSERE: kapcsoló, nem művelet — a felirata a renderHub-ban
                  frissül az aktuális állapotra. -->
-            <button id="hubHalftimeSubsBtn" class="hubCard" data-keep="1"><span class="ic">🔁</span><span class="tx"><span class="tt">Cserék a meccs alatt</span><span class="ds" id="hubHalftimeSubsDs">—</span></span></button>
+            <button id="hubHalftimeSubsBtn" class="hubCard"><span class="ic">🔁</span><span class="tx"><span class="tt">Cserék a meccs alatt</span><span class="ds" id="hubHalftimeSubsDs">—</span></span></button>
           </div>
         </div>
       </div>
@@ -2553,7 +2566,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.00";
+const APP_VERSION="3.1.01";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -31076,40 +31089,107 @@ function renderRunMeter(){
              tippjei a HUB más elemeire horgonyoznak, azokat nem rejthetjük el)
              és az átigazolási ablak (ott a lezáró gomb a lapon van, nem a
              menüben). A FELHASZNÁLÓ kattintása mindig teljes menü-módot nyit. */
+/* ---- „A MENÜBEN VAGYOK" ----
+   A menü nem egy kinyitott fiók, hanem egy HELY, ahol a felhasználó tartózkodik.
+   Ezt EGYETLEN állapot mondja meg, és túléli az aloldalakat: a Taktikát, az
+   Edzéstervet, a felállásváltót, a szakmai stábot. Amíg igaz, minden ilyen
+   aloldal a menü aloldala — és ha bezárul, a MENÜBE érkezünk vissza, nem a HUB
+   közepére. Ez volt a régi viselkedés fő hibája: minden menüpont kidobott. */
+let _inHubMenu=false,_hubMenuApplying=false,_hubSubWas=false;
+/* A HUB-on belüli aloldal-kártyák: a taktika-, kapitány-, poszt- és
+   megbízás-választó. A fő kártya (hubMainCard) nem tartozik ide. */
+function hubSubCards(){
+  return [...document.querySelectorAll("#scHub>.card:not(.hubMainCard)")];}
+function hubOpenSubCard(){
+  return hubSubCards().find(c=>!c.classList.contains("hide"))||null;}
+/* A HUB-on KÍVÜLI aloldal-gazdák. A játék minden menüből nyíló nagy felülete
+   (vásárlás, klub-szemle, edzésterv, stáb) ebben a két szakaszban lakik —
+   ezért ha valamelyik látszik, még mindig a menüben vagyunk. */
+function hubMenuOutsidePage(){
+  return ["scWindow","hubFormationPicker"].some(id=>{
+    const e=$(id);return e&&!e.classList.contains("hide");});}
+/* A menü-állapot RÁVETÍTÉSE a felületre. Egy helyen dől el minden:
+     · látszik-e a menü-mód (csak a HUB-on, aloldalon nem — ott az aloldal az úr),
+     · nyitva van-e egy aloldal-kártya (ilyenkor a menülista adja át neki a helyet),
+     · és hogy elhagytuk-e végleg a menüt (a HUB-ról olyan helyre mentünk, ami
+       nem a menü aloldala — pl. karrier lezárása, szezonzáró verdikt). */
+function hubMenuApply(){
+  if(_hubMenuApplying)return;
+  _hubMenuApplying=true;
+  try{
+    const sc=$("scHub"),acts=$("hubActions");
+    if(!sc||!acts)return;
+    const onHub=!sc.classList.contains("hide");
+    /* Elhagytuk a HUB-ot olyasmiért, ami NEM a menü aloldala (szezonzárás,
+       meccs, karrier lezárása) — a menüt ilyenkor elfelejtjük, és a listáját is
+       becsukjuk: aki később visszatér a HUB-ra, tiszta lapot kapjon. */
+    if(_inHubMenu&&!onHub&&!hubMenuOutsidePage()){
+      _inHubMenu=false;
+      acts.classList.add("hide");
+      $("hubMenuBtn").classList.remove("open");
+      $("hubMenuChev").textContent="▼";}
+    const active=_inHubMenu&&onHub;
+    sc.classList.toggle("menuMode",active);
+    /* A MENÜBEN-LÉT a HUB-on KÍVÜLI aloldalakra is átnyúlik: a „vissza a
+       menübe" sávok és az idegen szakaszok elrejtése ott is kell, ezért ezt a
+       jelzőt nem az `active`, hanem maga a menüben-lét kapcsolja. */
+    document.body.classList.toggle("inHubMenu",_inHubMenu);
+    const sub=active?hubOpenSubCard():null;
+    sc.classList.toggle("subOpen",!!sub);
+    /* Visszatérés egy aloldalról: a menülista nyíljon ki magától, különben a
+       felhasználó egy csukott menü-gombra érkezne vissza. */
+    if(active&&!sub&&acts.classList.contains("hide")){
+      acts.classList.remove("hide");
+      $("hubMenuBtn").classList.add("open");
+      $("hubMenuChev").textContent="▲";}
+    /* Az aloldal MEGNYÍLÁSAKOR a lap tetejére visszük a nézetet: a menülista
+       épp eltűnt alóla, tehát a régi görgetési pozíció már semmit nem jelent. */
+    if(!!sub&&!_hubSubWas)setTimeout(()=>window.scrollTo({top:0,behavior:"smooth"}),0);
+    _hubSubWas=!!sub;
+  }finally{_hubMenuApplying=false;}}
 function hubMenuToggle(open,noScroll,noMode){
-  const box=$("hubActions"),btn=$("hubMenuBtn"),sc=$("scHub");
+  const box=$("hubActions"),btn=$("hubMenuBtn");
   const willOpen=open!==undefined?open:box.classList.contains("hide");
   box.classList.toggle("hide",!willOpen);
   btn.classList.toggle("open",willOpen);
   $("hubMenuChev").textContent=willOpen?"▲":"▼";
-  /* MENÜ-MÓD: nyitáskor a HUB minden más eleme eltűnik, mintha tényleg
-     belépnél egy menübe. Csukáskor mindig kikapcsol — akkor is, ha a nyitás
-     történetesen noMode-dal történt. */
-  const mode=willOpen&&!noMode;
-  if(sc)sc.classList.toggle("menuMode",mode);
-  document.body.classList.toggle("hubMenuMode",mode);
+  _inHubMenu=willOpen&&!noMode;
+  hubMenuApply();
   /* Megnyitáskor ODAGÖRGETÜNK a menüpontokhoz: a HUB hosszú, és a menü-gomb
      gyakran a képernyő alján van — kinyitás után a felhasználó nem látta,
      hogy egyáltalán történt-e valami. A gombot visszük a nézet tetejére, hogy
      alatta rögtön látszódjanak a menüpontok. */
   if(willOpen&&!noScroll)setTimeout(()=>{
     if(btn&&btn.scrollIntoView)btn.scrollIntoView({behavior:"smooth",block:"start"});},60);}
-/* KILÉPÉS A MENÜBŐL. Ez az egyetlen út vissza: becsukja a menüt, kikapcsolja a
-   menü-módot, és visszaadja a HUB minden más elemének a láthatóságát. A menü
-   fejlécének és minden almenü aljának a vissza-gombja ezt hívja. */
+/* KILÉPÉS A MENÜBŐL, vissza a HUB-ra. A menü fejlécének és minden almenü
+   aljának a „← Vissza a HUB-ba" gombja ezt hívja. */
 function hubMenuExit(){
-  if($("hubActions")&&$("hubActions").classList.contains("hide")){
-    const sc=$("scHub");if(sc)sc.classList.remove("menuMode");
-    document.body.classList.remove("hubMenuMode");
-    return;}
+  _inHubMenu=false;
   hubMenuToggle(false,true);
   hubMenuSyncStuck();
   /* A menü a lap közepén ül; kilépés után a HUB tetejére visszük a nézetet,
      különben a felhasználó a keretlista közepén találná magát. */
   const sc=$("scHub");
   if(sc&&sc.scrollIntoView)sc.scrollIntoView({behavior:"smooth",block:"start"});}
-/* VISSZA-GOMB MINDEN ALMENÜ ALJÁRA. Nem a jelölésbe írjuk be egyesével: így
-   egy később felvett menüpont is megkapja, és nem lehet elfelejteni. */
+/* VISSZA EGY ALOLDALRÓL A MENÜLISTÁBA. Ugyanazt az utat járja, amit a játék
+   saját „Vissza a HUB-ba" gombjai — csak itt a menü fogad, nem a HUB. */
+function hubReturnToMenu(){
+  try{if(typeof twClearAnim==="function")twClearAnim();}catch(e){}
+  hubSubCards().forEach(c=>c.classList.add("hide"));
+  ["scWindow","twPanel","swapPanelWrap","hubFormationPicker"].forEach(id=>{
+    const e=$(id);if(e)e.classList.add("hide");});
+  $("scHub").classList.remove("hide");
+  _inHubMenu=true;
+  try{renderHub();}catch(e){}
+  hubMenuApply();
+  const sc=$("scHub");
+  if(sc&&sc.scrollIntoView)sc.scrollIntoView({behavior:"smooth",block:"start"});}
+/* VISSZA-GOMBOK. Nem a jelölésbe írjuk be egyesével: így egy később felvett
+   menüpont vagy aloldal is megkapja, és nem lehet elfelejteni.
+     · minden almenü alján  → „← Vissza a HUB-ba" (kilép a menüből)
+     · minden aloldal tetején → „← Vissza a menübe" (egy szintet vissza)
+   Az aloldal-sáv RAGAD a lap tetejére: az aloldalak hosszúak, és egy vissza-út,
+   amiért görgetni kell, nem vissza-út. */
 (function hubAddBackButtons(){
   document.querySelectorAll("#hubActions .hubGroup .accBody").forEach(b=>{
     const back=document.createElement("button");
@@ -31118,27 +31198,29 @@ function hubMenuExit(){
     back.textContent="← Vissza a HUB-ba";
     b.appendChild(back);});
   document.querySelectorAll("#hubActions [data-hubback]").forEach(b=>{
-    b.onclick=(ev)=>{ev.stopPropagation();hubMenuExit();};});})();
-/* A MENÜ MAGÁTÓL BEZÁRUL, ha valódi műveletet indítasz. Egyetlen, elfogó
-   fázisú figyelő intézi az összes menüpontot: enélkül minden gomb saját
-   kezelőjébe kellene beleírni ugyanezt, és az első elfelejtett helyen a
-   felhasználó egy üres menü-képernyőn ragadna — a művelet elvinné a HUB-ról,
-   ő meg egy magára maradt menüre térne vissza.
-   KIVÉTEL a `data-keep`: a Csapatstílus almenüje (ott a gombok a menün BELÜL
-   dolgoznak) és a félidei csere kapcsolója (az állapotot billenti, nem visz
-   sehova) — mindkettőnél a bezárás félbehagyás lenne.
-   A tényleges zárás egy nulla késleltetésű időzítőben fut, hogy a gomb SAJÁT
-   kezelője még a megszokott, teljes DOM-on dolgozhasson. */
-document.addEventListener("click",(ev)=>{
-  const acts=$("hubActions");
-  if(!acts||acts.classList.contains("hide"))return;
-  const t=ev.target&&ev.target.closest?ev.target.closest("#hubActions .accBody button"):null;
-  if(!t)return;
-  if(t.hasAttribute("data-hubback"))return;   /* saját kezelője van */
-  if(t.closest("[data-keep]"))return;         /* a menün belül marad */
-  setTimeout(()=>{
-    hubMenuToggle(false,true);
-    hubMenuSyncStuck();},0);},true);
+    b.onclick=(ev)=>{ev.stopPropagation();hubMenuExit();};});
+  const mkSub=()=>{
+    const b=document.createElement("button");
+    b.className="hubBackBtn hubSubBack";
+    b.textContent="← Vissza a menübe";
+    b.onclick=(ev)=>{ev.stopPropagation();hubReturnToMenu();};
+    return b;};
+  hubSubCards().forEach(c=>c.insertBefore(mkSub(),c.firstChild));
+  ["scWindow","hubFormationPicker"].forEach(id=>{
+    const s=$(id);if(s)s.insertBefore(mkSub(),s.firstChild);});})();
+/* A FIGYELŐ. A menüpontok kezelőit NEM írjuk át: mindegyik ugyanúgy elrejti a
+   HUB-ot vagy felfed egy kártyát, ahogy eddig. Csak megfigyeljük, mi történt,
+   és ahhoz igazítjuk a menü-állapotot — így egy jövőbeli menüpont is magától
+   helyesen viselkedik, anélkül hogy tudna a menüről. */
+(function hubMenuWatch(){
+  const sc=$("scHub");
+  if(!sc||typeof MutationObserver==="undefined")return;
+  const ob=new MutationObserver(()=>hubMenuApply());
+  const opt={attributes:true,attributeFilter:["class"]};
+  ob.observe(sc,opt);
+  hubSubCards().forEach(c=>ob.observe(c,opt));
+  ["scWindow","hubFormationPicker"].forEach(id=>{
+    const e=$(id);if(e)ob.observe(e,opt);});})();
 function hubAccToggle(group){
   const body=group.querySelector(".accBody");
   if(!body)return;
@@ -31349,7 +31431,10 @@ function hubRefreshMenu(){
   else badge.classList.add("hide");
   /* a felgörgető-jelzés a HUB minden újrarajzolásánál is igazodjon: a HUB
      nyitásakor, panelváltásnál és görgetés nélkül is helyes állapotot mutasson */
-  hubMenuSyncStuck();}
+  hubMenuSyncStuck();
+  /* A menü-állapot is: van olyan visszaút a HUB-ra, ami nem osztályt cserél a
+     scHub-on (tehát a figyelő nem látja), csak újrarajzol. */
+  hubMenuApply();}
 function renderHub(){
   /* AUTO SZINTKÖVETÉS — a rajzolás LEGELEJÉN, hogy minden alatta következő
      kijelzés (mezőnyszint, meccs-erő-különbség, kihívás-panel) már a friss
