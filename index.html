@@ -2277,6 +2277,11 @@ button.infPanel:disabled{cursor:default}
   <div class="steplbl">Felállás módosítása</div>
   <p id="hubFormationHint" style="font-size:12.5px;color:var(--dim);margin:2px 0 4px;line-height:1.5"></p>
   <div id="hubFormationBody" class="hubGrid" style="grid-template-columns:1fr 1fr 1fr"></div>
+  <!-- FELÁLLÁS-BOLT és SAJÁT FELÁLLÁS — a választható alakok ALATT, mert ez már
+       nem választás, hanem beszerzés. Mindkettő a renderFormationPicker-ből
+       rajzolódik (renderFormationShop / renderFormBuilder). -->
+  <div id="hubFormationShop"></div>
+  <div id="hubFormBuilder" class="hide"></div>
   <button id="hubFormationCancel" class="btn-s stepbtn">Mégse</button>
 </section>
 
@@ -6092,7 +6097,17 @@ const FORMS={
  "532":{slots:["KP","JV","KV","KV","KV","BV","VKP","KKP","TKP","CS","CS"],
   xy:[[50,93],[86,74],[68,78],[50,80],[32,78],[14,74],[62,58],[50,46],[38,58],[38,20],[62,20]]},
  "451":{slots:["KP","JV","KV","KV","BV","VKP","JSZ","KKP","TKP","BSZ","CS"],
-  xy:[[50,93],[82,74],[62,78],[38,78],[18,74],[50,62],[84,40],[62,46],[38,46],[16,40],[50,18]]}};
+  xy:[[50,93],[82,74],[62,78],[38,78],[18,74],[50,62],[84,40],[62,46],[38,46],[16,40],[50,18]]},
+ /* ---- 4-2-4 · TOTÁLIS FUTBALL ----
+    NEM alapfelállás: külön meg kell venni (lásd FORM_SHOP). Azért van mégis
+    itt, a többi mellett, mert a FORMS a felállások futásidejű REGISZTERE — a
+    slot-kódokat, a koordinátákat és a szerep-logikát mindenkinek innen kell
+    olvasnia, akkor is, ha a felállás épp nem választható. A KAPU (mit lehet
+    választani) külön kérdés, azt a formAvailable dönti el.
+    Két középpályással a labda mindig kevesebb kézen megy át, elöl viszont
+    négyen állnak: ez a felállás nem véd, hanem MEGELŐZ. */
+ "424":{slots:["KP","JV","KV","KV","BV","KKP","KKP","JSZ","CS","CS","BSZ"],
+  xy:[[50,93],[82,74],[62,78],[38,78],[18,74],[62,54],[38,54],[84,26],[60,15],[40,15],[16,26]]}};
 /* K — A RATING-KÜLÖNBSÉG MEREDEKSÉGE (a motor legfontosabb egyetlen száma).
    Méréssel csökkentve 0.115 → 0.09. A régi értéknél 1 OVR ≈ 5.4 szezonpontot
    ért, és a "nyílt meccs" sávja csak ±3.5 OVR volt: 84-es mezőnyön a 82-es
@@ -8401,7 +8416,8 @@ function benchSlotFor(p){
    442/451 → középpálya-szárny; 352/532 → nincs kezdő szélső. */
 const WINGER_IS_ATTACKING={
   "442":false, "433":true, "4231":true, "352":false,
-  "343":true, "532":false, "451":false
+  "343":true, "532":false, "451":false,
+  "424":true   /* a négyes támadósor két szélén valódi támadó szélső áll */
 };
 /* A játékos PILLANATNYI szerepe az adott felállásban (NEM a keret-kategóriája).
    SZEREP-ÉRZÉKENY helyek (ezt használják): gólcsuklás-figyelés, skill-sorsolás,
@@ -13097,6 +13113,13 @@ function resetGameState(){
      KIVÉTEL: a beállító képernyő két mezője (auto szintkövetés és a cél-sávja)
      már az S-en él, és a felhasználó ÉPP MOST állította be — azt átmentjük. */
   const keepAutoLevel=S.autoLevel,keepAutoAim=S.autoLevelAim;
+  /* A SAJÁT FELÁLLÁSOK KITAKARÍTÁSA a globális regiszterből. A FORMS,
+     a FORM_LABELS és a szerep-táblák modul-szintűek, tehát TÚLÉLIK az új
+     játékot — az előző karrierben tervezett felállások enélkül ingyen
+     megjelennének a következőben is. */
+  Object.keys(S.customForms||{}).forEach(k=>{
+    delete FORMS[k];delete FORM_LABELS[k];
+    delete WINGER_IS_ATTACKING[k];delete SLOT_ROLE_EXTRA[k];});
   const f=freshS();
   Object.keys(S).forEach(k=>{delete S[k];});
   Object.assign(S,f);
@@ -16538,6 +16561,11 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      challengeOffered* = melyik ponton ajánlottunk már, hogy ne ismételjük.
      frozenAcademy / teamFormMalus / tsiBlocked = büntetés-állapotok. */
   activeChallenges:[],resolvedChallenges:[],academy:[],challengeLastOfferRound:-1,challengeLastOfferSeason:0,
+  /* FELÁLLÁS-BOLT: customForms = a saját tervek (kulcs → {d,m,f,label,slots,xy}),
+     formsBought = a megvett bolti tételek (pl. a 4-2-4). Mindkettő a karrier
+     tartós vagyona, ezért a mentés része — betöltéskor a registerCustomForms
+     írja vissza őket a FORMS regiszterbe. */
+  customForms:{},formsBought:{},
   frozenAcademySeasons:0,teamFormMalus:0,tsiBlocked:{},
   /* ---- KARRIER-MÉRFÖLDKÖVEK (bemutatkozás, áttörés, ifi, kapus-hullám) ----
      foundingSquad : az ALAPÍTÓ keret nevei. Ez a bemutatkozás-rendszer egyetlen
@@ -23540,6 +23568,179 @@ let extraRoster=[]; /* karrier módban a 15 aktív fölötti, MAX_CAREER_ROSTER-
 const FORMATION_CHANGE_COST=Math.round(10000*FORMATION_PRICE_MULT);
 function formationChangeCost(){
   return (S.formationChangesThisSeason||0)<1?0:FORMATION_CHANGE_COST;}
+/* ================= FELÁLLÁS-BOLT ÉS SAJÁT FELÁLLÁSOK =================
+   A hét alap-felállás eddig a teljes kínálat volt, és a felállás így egy
+   ELŐRE MEGÍRT lista volt, nem építkezés: a keretedet a meglévő alakokhoz
+   kellett igazítani, sosem fordítva. A HUB többi ága (stáb, taktika, kémia)
+   mind a "vedd meg, aztán fejleszd" ívén megy — a felállásból ez hiányzott.
+
+   Két új út nyílik, és a kettő szándékosan MÁS:
+     · A BOLT egyetlen, névvel és jellemmel bíró rendszert árul (4-2-4 —
+       totális futball). Ez nem alak-kérdés: azért drágább (75 Mrd), mert egy
+       kész, szélsőséges filozófiát kapsz vele.
+     · A SAJÁT FELÁLLÁS (50 Mrd) olcsóbb, de neked kell megtervezned: te adod
+       meg a sorok létszámát, a játék pedig felépíti belőle a poszt-kiosztást
+       és a pályaképet.
+
+   A FORMS a felállások futásidejű REGISZTERE — minden felállás benne van, a
+   meg nem vett és a saját is. Hogy MI VÁLASZTHATÓ, azt külön a formAvailable
+   dönti el. Ez a szétválasztás fontos: egy régi mentés betöltésekor a
+   pillanatnyi felállás akkor is felismerhető marad, ha a kapu épp zárva
+   volna. */
+const CUSTOM_FORM_PRICE=Math.round(50e9/HUF_PER_POINT);   /* 50 Mrd Ft */
+const FORM_SHOP={
+  "424":{price:Math.round(75e9/HUF_PER_POINT),   /* 75 Mrd Ft */
+    name:"Totális futball",
+    desc:"Négy védő, mindössze KÉT középpályás és NÉGY támadó. A labda kevesebb kézen megy át, cserébe elöl állandó a túlerő — ez a felállás nem véd, hanem megelőz. A két középpályásra óriási teher hárul."}};
+const STOCK_FORMS=["442","433","4231","352","343","532","451"];
+/* A felállások SOR-LÉTSZÁMA (védő-középpályás-csatár), ahogy a nevük mondja.
+   Ebből dől el, hogy egy tervezett saját alak ütközik-e egy meglévővel. A
+   4-2-3-1 itt 4-5-1, mert a sorai összeadva azt adják — a megkülönböztetése
+   a belső elrendezés, nem a létszám. */
+const FORM_SHAPE={"442":[4,4,2],"433":[4,3,3],"4231":[4,5,1],"352":[3,5,2],
+  "343":[3,4,3],"532":[5,3,2],"451":[4,5,1],"424":[4,2,4]};
+function formBought(k){return !!(S.formsBought&&S.formsBought[k]);}
+function formIsCustom(k){return !!(S.customForms&&S.customForms[k]);}
+function formAvailable(k){
+  if(STOCK_FORMS.indexOf(k)>=0)return true;
+  if(FORM_SHOP[k])return formBought(k);
+  return formIsCustom(k)&&!!FORMS[k];}
+/* A VÁLASZTHATÓ felállások, a felület sorrendjében: alapok, megvett bolti
+   tételek, végül a saját tervek. */
+function availableFormKeys(){
+  const out=STOCK_FORMS.slice();
+  Object.keys(FORM_SHOP).forEach(k=>{if(formBought(k))out.push(k);});
+  Object.keys(S.customForms||{}).forEach(k=>{if(FORMS[k])out.push(k);});
+  return out;}
+/* ---- A SAJÁT FELÁLLÁS SZABÁLYAI ----
+   Három kötött szabály van, és mindhárom a játszhatóságot védi: legalább
+   3 védő (kevesebbel a védelem-tengely összeomlik), legalább 1 csatár
+   (gólsúly nélküli felállás nem tud gólt szerezni), és legfeljebb 5
+   középpályás (fölötte a támadósor kiürül). A felső/alsó korlátok
+   (dMax/fMax/mMin) nem a specifikációból jönnek, hanem a motorból: 7 védővel
+   vagy középpályás nélkül a poszt-kiosztás értelmezhetetlen alakot adna. */
+const CUSTOM_FORM_RULES={dMin:3,dMax:6,mMin:1,mMax:5,fMin:1,fMax:5,outfield:10};
+/* Egy SOR vízszintes elosztása, JOBBRÓL BALRA — ugyanaz a sorrend, amit az
+   alap-felállások slot-listái követnek (a 0. hely a jobbhátvéd). */
+const FORM_LINE_X={1:[50],2:[62,38],3:[68,50,32],4:[82,62,38,18],
+  5:[86,68,50,32,14],6:[88,72,58,42,28,12]};
+/* A sor mélysége. A szélek mindenhol egy kicsit "kilógnak" a sorból — hátul
+   előrébb (a szélsővédő feljebb jár), elöl hátrébb (a szélső szélesebben és
+   mélyebbről indul) —, a páratlan sorok közepe pedig kiemelt szerepet kap:
+   hátul söprögető, középen tartó ember, elöl az ék. Ugyanaz a nyelv, amit az
+   alap-felállások koordinátái is beszélnek. */
+function formLineY(kind,i,n){
+  const edge=n>=3&&(i===0||i===n-1);
+  const mid=n%2===1&&i===(n-1)/2;
+  if(kind==="d")return edge?(n>=4?74:76):(mid?79:78);
+  if(kind==="m")return edge?46:(mid&&n>=3?56:50);
+  return edge?24:(mid?15:20);}
+/* A sor poszt-kódjai. A KÖZÉPPÁLYA szélei attól függnek, hány támadó áll
+   elöl — pontosan úgy, ahogy az alap-felállásoknál:
+     · 3+ támadónál a szélső TÁMADÓ (JSZ/BSZ elöl), a szélső középpályás pedig
+       KKP marad, és csak MEGBÍZÁSKÉNT állítható szélsőre (mint a 3-4-3-nál).
+       Enélkül egy felállásban két helyen is "szélső" lenne, és az
+       isAttackingWingSlot felállás-szintű kapcsolója összekeverné a kettőt.
+     · 2 vagy kevesebb támadónál a szélső a KÖZÉPPÁLYÁN van (mint a 4-4-2-ben). */
+function formLineCodes(kind,n,fwCount){
+  const fill=(a,c,k)=>{for(let i=0;i<k;i++)a.push(c);return a;};
+  if(kind==="d"){
+    if(n<=3)return fill([],"KV",n);
+    return fill(["JV"],"KV",n-2).concat(["BV"]);}
+  if(kind==="f"){
+    if(n<=2)return fill([],"CS",n);
+    return fill(["JSZ"],"CS",n-2).concat(["BSZ"]);}
+  const wR=fwCount>=3?"KKP":"JSZ",wL=fwCount>=3?"KKP":"BSZ";
+  if(n===1)return ["VKP"];
+  if(n===2)return ["KKP","KKP"];
+  if(n===3)return ["KKP","VKP","KKP"];
+  if(n===4)return [wR,"KKP","KKP",wL];
+  return [wR,"KKP","VKP","KKP",wL];}
+function customFormKey(d,m,f){return `cf${d}${m}${f}`;}
+function customFormLabel(d,m,f){return `${d}-${m}-${f}`;}
+/* A teljes felállás-leírás egy alakból: slot-kódok + koordináták, ugyanabban
+   a szerkezetben, amit a FORMS statikus bejegyzései használnak. */
+function buildCustomForm(d,m,f){
+  const slots=["KP"],xy=[[50,93]];
+  [["d",d],["m",m],["f",f]].forEach(pair=>{
+    const kind=pair[0],n=pair[1];
+    if(!n)return;
+    const codes=formLineCodes(kind,n,f),xs=FORM_LINE_X[n]||FORM_LINE_X[3];
+    codes.forEach((c,i)=>{slots.push(c);xy.push([xs[i],formLineY(kind,i,n)]);});});
+  return {slots,xy};}
+/* Foglalt-e már ez az alak? Az összes VÁLASZTHATÓ felállás és a bolt kínálata
+   is számít: a bolti 4-2-4-et nem lehet 50 milliárdért "megtervezni". */
+function formShapeTaken(d,m,f){
+  const hit=k=>{const s=FORM_SHAPE[k];return s&&s[0]===d&&s[1]===m&&s[2]===f;};
+  if(STOCK_FORMS.some(hit))return true;
+  if(Object.keys(FORM_SHOP).some(hit))return true;
+  return Object.keys(S.customForms||{}).some(k=>{
+    const c=S.customForms[k];
+    return c&&c.d===d&&c.m===m&&c.f===f;});}
+/* Az EGYETLEN érvényesítő. Null = rendben; különben a hiba emberi mondatban,
+   mert ezt a szöveget a felület közvetlenül kiírja. */
+function customFormError(d,m,f){
+  const R=CUSTOM_FORM_RULES,sum=d+m+f;
+  if(sum!==R.outfield)
+    return `A mezőnyjátékosok száma pontosan ${R.outfield} — most ${sum}.`;
+  if(d<R.dMin)return `Kötelező legalább ${R.dMin} védő.`;
+  if(d>R.dMax)return `Legfeljebb ${R.dMax} védő állhat a sorban.`;
+  if(f<R.fMin)return `Kötelező legalább ${R.fMin} csatár.`;
+  if(f>R.fMax)return `Legfeljebb ${R.fMax} csatár állhat elöl.`;
+  if(m>R.mMax)return `Legfeljebb ${R.mMax} középpályás lehet.`;
+  if(m<R.mMin)return `Középpályás nélkül nem lehet felállást építeni.`;
+  if(formShapeTaken(d,m,f))return `Ilyen alakú felállás már van a kínálatodban.`;
+  return null;}
+/* ---- A REGISZTERBE ÍRÁS ----
+   Egy saját felállás négy helyre kerül be: a FORMS-ba (kódok + koordináták), a
+   FORM_LABELS-be (a felület felirata), a WINGER_IS_ATTACKING-be (szélső-szerep)
+   és — ha van négyes vagy ötös középpálya három támadó mellett — a
+   SLOT_ROLE_EXTRA-ba, hogy a két külső középpályás szélsőre is állítható
+   legyen (ugyanaz a szabadság, amit a 3-4-3 ad).
+   IDEMPOTENS: a betöltés és a létrehozás ugyanezt hívja, tetszőleges sokszor. */
+function registerCustomForm(k,c){
+  if(!c)return;
+  const built=(c.slots&&c.xy)?{slots:c.slots,xy:c.xy}:buildCustomForm(c.d,c.m,c.f);
+  FORMS[k]={slots:built.slots.slice(),xy:built.xy.map(p=>p.slice())};
+  if(typeof FORM_LABELS!=="undefined")FORM_LABELS[k]=c.label||customFormLabel(c.d,c.m,c.f);
+  WINGER_IS_ATTACKING[k]=c.f>=3;
+  if(c.f>=3&&c.m>=4){
+    /* a középpálya két SZÉLE kaphat szélső-megbízást — a slot-indexek a
+       kapus (0) és a védősor (c.d) után kezdődnek */
+    const first=1+c.d,last=first+c.m-1;
+    SLOT_ROLE_EXTRA[k]={[first]:["JSZ"],[last]:["BSZ"]};}
+  else delete SLOT_ROLE_EXTRA[k];}
+/* Betöltés után EGYSZER: minden mentett saját felállás visszakerül a
+   regiszterbe. Enélkül a mentésben álló `form` egy nem létező kulcsra
+   mutatna, és a keret az alapértelmezett 4-4-2-re esne vissza. */
+function registerCustomForms(){
+  const CF=S.customForms||{};
+  Object.keys(CF).forEach(k=>{try{registerCustomForm(k,CF[k]);}catch(e){}});}
+/* A létrehozás. A pénzt CSAK sikeres érvényesítés után vonjuk le, és a
+   felállást azonnal be is állítjuk — aki 50 milliárdot költ egy rendszerre,
+   az látni akarja a pályán. */
+function createCustomForm(d,m,f){
+  const err=customFormError(d,m,f);
+  if(err)return {ok:false,reason:err};
+  if((S.transferBudget||0)<CUSTOM_FORM_PRICE)
+    return {ok:false,reason:`Nincs elég büdzséd — ${fmtFt(CUSTOM_FORM_PRICE)} kellene.`};
+  const k=customFormKey(d,m,f);
+  const built=buildCustomForm(d,m,f);
+  S.customForms=S.customForms||{};
+  S.customForms[k]={d,m,f,label:customFormLabel(d,m,f),slots:built.slots,xy:built.xy};
+  registerCustomForm(k,S.customForms[k]);
+  S.transferBudget-=CUSTOM_FORM_PRICE;
+  return {ok:true,key:k,label:customFormLabel(d,m,f)};}
+function buyShopForm(k){
+  const it=FORM_SHOP[k];
+  if(!it)return {ok:false,reason:"Ilyen felállás nincs a kínálatban."};
+  if(formBought(k))return {ok:false,reason:"Ez a felállás már a tiéd."};
+  if((S.transferBudget||0)<it.price)
+    return {ok:false,reason:`Nincs elég büdzséd — ${fmtFt(it.price)} kellene.`};
+  S.formsBought=S.formsBought||{};
+  S.formsBought[k]=true;
+  S.transferBudget-=it.price;
+  return {ok:true,key:k};}
 /* ---- MEGBÍZATÁS-VÁLTÁS: A KERET MARAD A HELYÉN ----
    A felállásváltás (4-4-2 → 4-3-3) jogosan rendezi újra a kezdő 11-et: ott
    MÁSOK a helyek. A megbízatás-váltásnál viszont a slot-SZERKEZET változatlan —
@@ -26350,7 +26551,9 @@ $("hubTacticConfirmNo")&&($("hubTacticConfirmNo").onclick=()=>{
 $("hubTacticConfirmModal")&&($("hubTacticConfirmModal").onclick=(ev)=>{
   if(ev.target.id==="hubTacticConfirmModal"){$("hubTacticConfirmModal").classList.add("hide");_hubTacticPending=null;}});
 /* ---- FELÁLLÁSVÁLTÓ képernyő ---- */
-const FORM_LABELS={"442":"4-4-2","433":"4-3-3","4231":"4-2-3-1","352":"3-5-2","343":"3-4-3","532":"5-3-2","451":"4-5-1"};
+/* A felület feliratai. A saját felállások MENET KÖZBEN kerülnek bele
+   (registerCustomForm) — ezért nem const-literál a teljes kínálat. */
+const FORM_LABELS={"442":"4-4-2","433":"4-3-3","4231":"4-2-3-1","352":"3-5-2","343":"3-4-3","532":"5-3-2","451":"4-5-1","424":"4-2-4"};
 $("hubFormationBtn")&&($("hubFormationBtn").onclick=()=>{
   $("scHub").classList.add("hide");
   $("hubPositionPicker").classList.add("hide");
@@ -26370,7 +26573,9 @@ function renderFormationPicker(){
     `<br><span style="color:var(--dim2)">A megbízásokat a keretlistában, az adott játékos lapján állítod.`
     +` Középpálya: <b>${midRoleText(form)}</b> · támadósor: <b>${atkRoleText(form)}</b>.</span>`;
   const body=$("hubFormationBody");body.innerHTML="";
-  Object.keys(FORM_LABELS).forEach(f=>{
+  /* CSAK A VÁLASZTHATÓ felállások — a bolti tétel megvételig, a saját tervek
+     a létrehozásukig nincsenek a listában (lásd availableFormKeys). */
+  availableFormKeys().forEach(f=>{
     const b=document.createElement("button");
     const isCurrent=f===form;
     b.className=isCurrent?"btn-y":"btn-s";
@@ -26398,7 +26603,116 @@ function renderFormationPicker(){
           refreshSquadViews();
           renderHub();saveGame();
           $("scHub").scrollIntoView({behavior:"smooth"});});};
-    body.appendChild(b);});}
+    body.appendChild(b);});
+  renderFormationShop();
+  renderFormBuilder();}
+/* ---- A BOLT ÉS A TERVEZŐ BEJÁRATA ----
+   A választható alakok ALATT, mert ez már nem választás, hanem beszerzés. A
+   megvett bolti tételek eltűnnek innen: onnantól a fenti rácsban a helyük. */
+function renderFormationShop(){
+  const box=$("hubFormationShop");if(!box)return;
+  const bud=S.transferBudget||0;
+  let h="";
+  Object.keys(FORM_SHOP).forEach(k=>{
+    if(formBought(k))return;
+    const it=FORM_SHOP[k],afford=bud>=it.price;
+    h+=`<div class="hubDetail" style="margin-top:10px">`
+      +`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">`
+      +`<b style="font-size:14px;color:var(--gold)">${esc(FORM_LABELS[k]||k)} · ${esc(it.name)}</b>`
+      +`<span style="font-size:12px;white-space:nowrap;color:${afford?"var(--grass)":"var(--red)"}">${fmtFt(it.price)}</span></div>`
+      +`<div style="font-size:12px;color:var(--dim);margin-top:5px;line-height:1.5">${esc(it.desc)}</div>`
+      +`<button class="btn-${afford?"y":"s"} stepbtn" data-buyform="${k}"${afford?"":" disabled"} style="margin-top:8px">`
+      +(afford?`🛒 Megveszem — ${fmtFt(it.price)}`:`Nincs elég büdzséd (${fmtFt(bud)})`)+`</button></div>`;});
+  /* A tervező bejárata csak akkor, ha van még megépíthető alak egyáltalán. */
+  const canAfford=bud>=CUSTOM_FORM_PRICE;
+  h+=`<div class="hubDetail" style="margin-top:10px">`
+    +`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">`
+    +`<b style="font-size:14px;color:var(--gold)">Saját felállás tervezése</b>`
+    +`<span style="font-size:12px;white-space:nowrap;color:${canAfford?"var(--grass)":"var(--red)"}">${fmtFt(CUSTOM_FORM_PRICE)}</span></div>`
+    +`<div style="font-size:12px;color:var(--dim);margin-top:5px;line-height:1.5">`
+    +`Te adod meg a sorok létszámát, a rendszer felépíti belőle a poszt-kiosztást és a pályaképet. `
+    +`Kötelező legalább <b>${CUSTOM_FORM_RULES.dMin} védő</b> és <b>${CUSTOM_FORM_RULES.fMin} csatár</b>, `
+    +`és legfeljebb <b>${CUSTOM_FORM_RULES.mMax} középpályás</b> állhat a pályán.</div>`
+    +`<button class="btn-s stepbtn" id="hubFormBuilderOpen" style="margin-top:8px">📐 Tervezőasztal</button></div>`;
+  box.innerHTML=h;
+  box.querySelectorAll("[data-buyform]").forEach(b=>{
+    b.onclick=()=>{
+      const k=b.getAttribute("data-buyform"),it=FORM_SHOP[k];
+      askConfirm({html:`<div style="font-size:13px;line-height:1.5">`
+        +`Megveszed a(z) <b>${esc(FORM_LABELS[k]||k)}</b> felállást (<b>${esc(it.name)}</b>)?<br>`
+        +`Ára: <b style="color:var(--gold)">${fmtFt(it.price)}</b>. Utána bármikor választhatod — a váltás a szokásos szabályok szerint megy.</div>`,
+        onYes:()=>{
+          const r=buyShopForm(k);
+          if(!r.ok){addLine(`⛔ ${r.reason}`,"m ev");renderFormationPicker();return;}
+          addLine(`📐 Új felállás a kínálatodban: ${FORM_LABELS[k]||k} — ${it.name} (−${fmtFt(it.price)})`,"m life");
+          renderFormationPicker();renderHub();saveGame();}});};});
+  const open=$("hubFormBuilderOpen");
+  if(open)open.onclick=()=>{
+    const b=$("hubFormBuilder");
+    if(!b)return;
+    b.classList.toggle("hide");
+    if(!b.classList.contains("hide")){renderFormBuilder();b.scrollIntoView({behavior:"smooth",block:"nearest"});}};}
+/* ---- A TERVEZŐASZTAL ----
+   Három léptető (védő / középpályás / csatár), élő érvényesítéssel. A hibát
+   MINDIG kiírjuk, és a létrehozás gombja csak akkor él, ha az alak érvényes —
+   így a szabályokat nem kell fejben tartani, a felület mondja meg őket. */
+/* A tervezőasztal kiinduló alakja. SZÁNDÉKOSAN egy még szabad forma (az
+   5-2-3), hogy a panel ne hibaüzenettel nyíljon meg. */
+let FB={d:5,m:2,f:3};
+function renderFormBuilder(){
+  const box=$("hubFormBuilder");if(!box||box.classList.contains("hide"))return;
+  const R=CUSTOM_FORM_RULES;
+  const err=customFormError(FB.d,FB.m,FB.f);
+  const bud=S.transferBudget||0,afford=bud>=CUSTOM_FORM_PRICE;
+  const row=(key,label)=>`<div style="display:flex;align-items:center;gap:8px;margin-top:7px">`
+    +`<span style="flex:1;font-size:13px">${label}</span>`
+    +`<button class="btn-s" data-fb="${key}:-1" style="padding:6px 13px">−</button>`
+    +`<b style="min-width:22px;text-align:center;font-family:var(--font-disp);font-size:17px;color:var(--gold)">${FB[key]}</b>`
+    +`<button class="btn-s" data-fb="${key}:1" style="padding:6px 13px">+</button></div>`;
+  box.innerHTML=`<div class="hubDetail" style="margin-top:10px">`
+    +`<div style="font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--gold);font-weight:700">Tervezőasztal</div>`
+    +row("d","Védők")+row("m","Középpályások")+row("f","Csatárok")
+    +`<div style="margin-top:9px;font-size:12.5px;line-height:1.5;color:${err?"var(--red)":"var(--grass)"}">`
+    +(err?esc(err)
+        :`<b>${esc(customFormLabel(FB.d,FB.m,FB.f))}</b> — érvényes alak. `
+         +`Szélső: ${FB.f>=3?"a támadósor két szélén (a külső középpályások megbízásként állíthatók szélsőre)":"a középpálya két szélén"}.`)
+    +`</div>`
+    +`<button class="btn-${!err&&afford?"y":"s"} stepbtn" id="hubFormCreate"${!err&&afford?"":" disabled"} style="margin-top:9px">`
+    +(err?"Előbb javítsd az alakot"
+        :afford?`📐 Létrehozom — ${fmtFt(CUSTOM_FORM_PRICE)}`
+               :`Nincs elég büdzséd (${fmtFt(bud)})`)+`</button>`
+    +`<div style="font-size:11.5px;color:var(--dim2);margin-top:6px;line-height:1.45">`
+    +`A kapussal együtt 11 ember: ${R.outfield} mezőnyjátékost oszthatsz szét. A létrehozott felállás azonnal életbe is lép.</div></div>`;
+  box.querySelectorAll("[data-fb]").forEach(b=>{
+    b.onclick=()=>{
+      const parts=b.getAttribute("data-fb").split(":");
+      const k=parts[0],dir=parseInt(parts[1],10);
+      /* A léptető a SAJÁT sávján belül mozog; az összeg-szabályt az
+         érvényesítő mondja ki, nem a gomb tiltja — így látszik, MIÉRT rossz. */
+      const lo={d:R.dMin,m:R.mMin,f:R.fMin}[k],hi={d:R.dMax,m:R.mMax,f:R.fMax}[k];
+      FB[k]=Math.max(lo,Math.min(hi,FB[k]+dir));
+      renderFormBuilder();};});
+  const cr=$("hubFormCreate");
+  if(cr)cr.onclick=()=>{
+    const label=customFormLabel(FB.d,FB.m,FB.f);
+    askConfirm({html:`<div style="font-size:13px;line-height:1.5">`
+      +`Létrehozod a(z) <b>${esc(label)}</b> felállást <b style="color:var(--gold)">${fmtFt(CUSTOM_FORM_PRICE)}</b>-ért?<br>`
+      +`Azonnal életbe lép: a kezdő 11 újrarendeződik az új posztokra, a kiszorulók a padra/tartalékba kerülnek.</div>`,
+      onYes:()=>{
+        const r=createCustomForm(FB.d,FB.m,FB.f);
+        if(!r.ok){addLine(`⛔ ${r.reason}`,"m ev");renderFormationPicker();return;}
+        /* A létrehozás ÁRÁN FELÜL nincs váltási díj — de váltásnak SZÁMÍT:
+           enélkül a tervezés ingyen megkerülné a szezononkénti első ingyenes
+           váltás korlátját. */
+        S.formationChangesThisSeason=(S.formationChangesThisSeason||0)+1;
+        applyFormationChange(r.key);
+        addLine(`📐 Megszületett a saját felállásod: ${r.label} (−${fmtFt(CUSTOM_FORM_PRICE)}) — a kezdő 11 újrarendezve.`,"m life");
+        $("hubFormBuilder").classList.add("hide");
+        $("hubFormationPicker").classList.add("hide");
+        $("scHub").classList.remove("hide");
+        refreshSquadViews();
+        renderHub();saveGame();
+        $("scHub").scrollIntoView({behavior:"smooth"});}});};}
 /* ---- MEGBÍZÁS MÓDOSÍTÁSA — A JÁTÉKOS LAPJÁRÓL ----
    A felállás ALAKJA (hány védő / középpályás / csatár) pénzbe kerül és
    szezononként korlátos. A MEGBÍZÁS viszont taktikai utasítás, nem
@@ -32509,6 +32823,7 @@ function saveGame(){
         chSeasonMaxUnbeaten:S.chSeasonMaxUnbeaten,chSeasonMaxCleanStreak:S.chSeasonMaxCleanStreak,chSeasonComebacks:S.chSeasonComebacks,chSeasonBestHaul:S.chSeasonBestHaul,chSeasonCleanSheets:S.chSeasonCleanSheets,chSeasonSubGoals:S.chSeasonSubGoals,
         resolvedChallenges:S.resolvedChallenges,academy:S.academy,
         formationChangesThisSeason:S.formationChangesThisSeason,
+        customForms:S.customForms,formsBought:S.formsBought,
         /* skill-padló: türelem-számláló, szezonos kvóták, első kémia megvolt-e */
         matchesSinceSkill:S.matchesSinceSkill,seasonNewSkills:S.seasonNewSkills,
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
@@ -32564,6 +32879,19 @@ function applySavedGame(d){
      visszamenőleg NEM kapcsolódik be: a keret már régen összeállt. */
   careerRatingBasis=normRatingBasis(d.careerRatingBasis);
   ensureAllAttrs();   /* régi mentések migrációja: hiányzó attribútumok pótlása */
+  /* ---- A SAJÁT FELÁLLÁSOK VISSZAÍRÁSA A REGISZTERBE ----
+     MÉG a `form` átvétele ELŐTT kell megtörténnie: ha a mentés egy saját
+     felállásra áll, a FORMS-nak MÁR ismernie kell azt a kulcsot, mire a
+     slotok újraépülnek — különben a keret némán visszaesne a 4-4-2-re, és a
+     megvásárolt felállás egy újratöltéssel elveszne. A bolti tételek nem
+     igényelnek regisztrációt (statikusan a FORMS-ban vannak), csak a kaput
+     (formsBought) kell átvenni. */
+  Object.keys(S.customForms||{}).forEach(k=>{   /* az ELŐZŐ karrier tervei */
+    delete FORMS[k];delete FORM_LABELS[k];
+    delete WINGER_IS_ATTACKING[k];delete SLOT_ROLE_EXTRA[k];});
+  S.customForms=(d.S&&d.S.customForms)||{};
+  S.formsBought=(d.S&&d.S.formsBought)||{};
+  registerCustomForms();
   form=d.form;mode=d.mode;
   /* F1 — a világ-seed a mentés része: betöltés után a szezononkénti
      újragenerálás (ellenféltábla) ugyanabból a folyamból megy tovább. Régi
