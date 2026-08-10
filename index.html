@@ -902,6 +902,19 @@ button.infPanel:disabled{cursor:default}
 #sbScore{display:flex;align-items:center;gap:4px;padding:0 3px}
 #sbScore .sbFlip{font-size:40px;width:.66em;padding:8px 0}
 #sbScore .sbColon{color:#ffd27a;font-size:26px;font-weight:700;padding:0 3px}
+/* ---- A PÁRHARC ÖSSZESÍTÉSE ----
+   Egy visszavágón a pillanatnyi állás ÖNMAGÁBAN félrevezető: 1:0-ra vezetni és
+   közben kiesni ugyanolyan gyakori, mint 0:1-re veszíteni és továbbjutni. Ez a
+   sáv mondja meg, mi a tét — az összesítést és azt, KI ÁLL épp továbbjutásra.
+   A színe magával a verdikttel változik, hogy egy pillantás elég legyen. */
+#sbAgg{margin:7px 0 0;padding:5px 9px;border-radius:6px;text-align:center;
+  font-family:var(--font-body);font-size:9.5px;font-weight:700;letter-spacing:1.7px;
+  text-transform:uppercase;line-height:1.6;
+  background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.10);color:#cfc6ae}
+#sbAgg b{font-family:var(--font-disp);font-size:13.5px;letter-spacing:.6px}
+#sbAgg .aggUs{color:#8ff0b0}
+#sbAgg .aggThem{color:#ff9b9b}
+#sbAgg .aggLevel{color:#ffd27a}
 /* ---- alsó krónika-sáv (a minta 0123456789 csíkjának helyén) ---- */
 #sbEvents{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;
   margin:0 -12px;padding:7px 12px 8px;min-height:32px;
@@ -1862,6 +1875,11 @@ button.infPanel:disabled{cursor:default}
           <div id="sbScore"></div>
           <div class="sbTeam" id="sbAwayName"></div>
         </div>
+        <!-- A PÁRHARC ÉLŐ ÖSSZESÍTÉSE — csak oda-visszavágós visszavágón látszik
+             (lásd euroLiveTie/sbSyncAggregate). A helye tudatosan az állás ALATT
+             és a gólkrónika FÖLÖTT van: az összesítés az állás olvasata, nem
+             önálló eredmény. -->
+        <div id="sbAgg" class="hide"></div>
         <div id="sbEvents">
           <div id="sbEvHome"></div>
           <div id="sbEvAway"></div>
@@ -18238,6 +18256,51 @@ function sbFitTeams(){
     el.innerHTML=`<span class="sbSide">${t.side}</span>`
       +esc(sbNameFits(el,t.full)?t.full:t.abbr);});}
 window.addEventListener("resize",()=>{if(SB.teams)sbFitTeams();});
+/* ---- AZ ÖSSZESÍTÉS-SÁV RAJZOLÁSA ----
+   Egyetlen forrásból (euroLiveTie) dolgozik, és magától eltűnik ott, ahol nincs
+   párharc — így soha nem kell a hívási helyeken feltételt írni. */
+const SB_AGG_VERDICT={us:"továbbjutásra álltok",them:"az ellenfél jut tovább",
+  level:"döntetlen — jöhet a hosszabbítás"};
+function sbSyncAggregate(gf,ga){
+  const box=$("sbAgg");if(!box)return;
+  let ag=null;
+  try{ag=euroLiveTie(gf,ga);}catch(e){}
+  if(!ag){box.classList.add("hide");box.innerHTML="";return;}
+  const cls=ag.lead==="us"?"aggUs":(ag.lead==="them"?"aggThem":"aggLevel");
+  box.innerHTML=`összesítés <b class="${cls}">${ag.mine}:${ag.theirs}</b>`
+    +` · <span class="${cls}">${SB_AGG_VERDICT[ag.lead]}</span>`;
+  box.classList.remove("hide");}
+/* ---- A KOMMENTÁTOR REAGÁL AZ ÖSSZESÍTÉS ÁTFORDULÁSÁRA ----
+   A gólok KÖZÖS csatornájáról (sbEv) hívjuk, a gól napló-sora UTÁN — így a
+   mondat ott áll, ahol a dráma történik. Az előző állapotot nem tároljuk: a
+   gól oldalából visszafejthető, mi volt EGY GÓLLAL EZELŐTT, és a két
+   pillanatkép összehasonlítása pontosan azt a pillanatot fogja meg, amikor a
+   továbbjutás gazdát cserél. Állapotmentes, tehát egy újratöltés, egy
+   félbehagyott meccs vagy az automatikus lejátszás sem tudja elrontani. */
+function sbAggGoalNote(side){
+  const now=euroLiveTie(SB.us,SB.them);
+  if(!now)return;
+  const before=euroLiveTie(side==="us"?SB.us-1:SB.us,
+                           side==="us"?SB.them:SB.them-1);
+  if(!before||before.lead===now.lead)return;
+  const sc=`${now.mine}:${now.theirs}`;
+  let txt=null,cls="m life";
+  if(now.lead==="us"){
+    cls="m goal";
+    txt=before.lead==="them"
+      ?`🔥  MEGFORDÍTOTTÁTOK A PÁRHARCOT! Összesítésben ${sc} — innen TI juttok tovább!`
+      :`🔥  Ez a gól az összesítésben is átbillenti a mérleget: ${sc} — most ti álltok továbbjutásra!`;
+  }else if(now.lead==="them"){
+    cls="m oppgoal";
+    txt=before.lead==="us"
+      ?`💔  Az ellenfél fordított a párharcban — összesítésben ${sc}, innen ők mennének tovább.`
+      :`⚠️  Ez a találat az összesítésben is előnyt ad nekik: ${sc}.`;
+  }else{
+    cls="m draw";
+    txt=before.lead==="them"
+      ?`⚖️  Egyenlítés az összesítésben is — ${sc}. Ha így marad, hosszabbítás dönt.`
+      :`⚖️  Kiegyenlítettek összesítésben — ${sc}. A párharc a hosszabbítás felé tart.`;}
+  addLine(txt,cls);}
 function sbSetScore(gf,ga){
   SB.us=gf;SB.them=ga;
   const box=$("sbScore");if(!box)return;
@@ -18276,6 +18339,9 @@ function sbEv(side,kind,name,min,txt){
      látszik. */
   if(kind==="goal"){
     clutchNoteGoal(side,name,min||_lastGoalMin||0);
+    /* PÁRHARC: gazdát cserélt-e a továbbjutás ezzel a góllal? A lelátó ELŐTT
+       szólal meg — ez a fontosabb hír a kettő közül. */
+    try{sbAggGoalNote(side);}catch(e){}
     /* ---- A LELÁTÓ (F3) ----
        SZÁNDÉKOSAN ITT, a gólok KÖZÖS csatornáján: a motorban tizenhárom helyen
        nő a gólszám, és egy lelátó-sor sem maradhat ki csak azért, mert épp
@@ -18369,7 +18435,7 @@ function sbStart(fx,tickMs,auto){
   $("sbBoard").classList.remove("fin");
   sbApplyCompTheme();
   $("sbClockLbl").textContent="idő";
-  sbPaintTeams(fx);sbSetScore(0,0);sbSetClock(0);sbRenderEvents();
+  sbPaintTeams(fx);sbSetScore(0,0);sbSetClock(0);sbRenderEvents();sbSyncAggregate(0,0);
   wrap.classList.remove("hide");
   sbFitTeams();   /* csak a megjelenítés után mérhető a névmező szélessége */
   if(auto){sbApplyLiveLayout();sbClockStop();return;}
@@ -18406,7 +18472,7 @@ function sbSync(){
   if(!fx||!fx.o)return;
   SB.ev=[];SB.scoreEls=null;SB.clockEls=null;
   sbApplyCompTheme();   /* az előnézet is a soron következő sorozat színét viszi */
-  sbPaintTeams(fx);sbSetScore(0,0);sbSetClock(0);sbRenderEvents();
+  sbPaintTeams(fx);sbSetScore(0,0);sbSetClock(0);sbRenderEvents();sbSyncAggregate(0,0);
   wrap.classList.remove("hide");
   sbFitTeams();}
 /* ---- A "DŐLJ HÁTRA" NÉZET ----
@@ -18495,6 +18561,8 @@ function updateTTBoard(fx,gf,ga,dispMin){
   /* az eredményjelző ugyanebből az egy pontból frissül: a szimuláció MINDEN
      góleseménye átfut rajta, tehát az állás sosem csúszhat el a naplótól */
   sbSetScore(gf,ga);
+  /* …és vele az összesítés-sáv is, hogy a párharc állása se csúszhasson el */
+  sbSyncAggregate(gf,ga);
   /* a fejléc két szélső mezője lesz az élő tábla: bal = eredmény, jobb = perc */
   const el=$("ttClock");if(el)el.textContent=sbMinTxt(dispMin);
   const sc=$("ttTeam");if(sc)sc.textContent=`${fx.home?myTeamAbbr():clubAbbr(fx.o.n)} ${ttScore(fx,gf,ga)} ${fx.home?clubAbbr(fx.o.n):myTeamAbbr()}`;}
@@ -30813,6 +30881,42 @@ function euroDecidingLeg(){
   if(E.stage==="final")return true;              /* a döntő egyetlen meccs */
   if(E.stage==="group")return false;             /* csoportban nincs hosszabbítás */
   return E.idx===1;}                             /* kieséses párharc visszavágója */
+/* ================= A PÁRHARC ÉLŐ ÖSSZESÍTÉSE =================
+   Eddig a párharc állását CSAK a meccs után, a szezonösszegzőben lehetett
+   megnézni — közben a felhasználó a puszta állást látta, ami egy visszavágón
+   önmagában félrevezető: az 1:0 lehet kiesés, a 0:1 lehet továbbjutás. Ez a
+   függvény adja meg egyetlen helyen, hogy a MOSTANI gf:ga mellett hogyan áll
+   az összesítés, és ki jutna tovább — ebből él az eredményjelző sávja és a
+   kommentátor is.
+
+   Csak ott felel, ahol tényleg van összesítés: oda-visszavágós párharc MÁSODIK
+   mérkőzésén (a selejtezőben és a kieséses szakaszban egyaránt). A csoportkör,
+   az első mérkőzés és az egymeccses döntő null-t kap — ott nincs mit mondani.
+   A hosszabbítás is idetartozik: az E.idx a lefújásig 1-en áll, tehát a
+   ráadásban esett gól ugyanígy beleszámít.
+
+   A "lead" a TOVÁBBJUTÁS állapota, nem a gólkülönbségé: egyenlőségnél
+   "level" — onnan hosszabbítás dönt, nem az idegenben lőtt gól (az a szabály
+   megszűnt, lásd euroResolveTie). */
+function euroLiveTie(gf,ga){
+  if(typeof euroActive!=="function"||!euroActive())return null;
+  const E=S.euro;if(!E)return null;
+  if(E.stage==="group"||E.stage==="final"||E.stage==="done")return null;
+  if((E.idx||0)!==1)return null;   /* csak a visszavágón van mit összesíteni */
+  let pm,pt;
+  if(E.stage==="qual"){
+    const L=E.qLegs&&E.qLegs[0];
+    if(!L)return null;
+    pm=L[0];pt=L[1];
+  }else{
+    if(E.userTie==null||E.userTie<0||!E.ties)return null;
+    const t=E.ties[E.userTie];
+    if(!t||!t.legs||!t.legs[0])return null;
+    const meIsA=t.a===E.userIdx,L=t.legs[0];
+    pm=meIsA?L[0]:L[1];pt=meIsA?L[1]:L[0];}
+  const mine=pm+(gf||0),theirs=pt+(ga||0);
+  return {prevMine:pm,prevTheirs:pt,mine,theirs,
+          lead:mine>theirs?"us":(mine<theirs?"them":"level")};}
 /* Döntetlen-e a párharc, ha a MOSTANI meccs gf:ga-val zárul? */
 function euroTieStillLevel(gf,ga){
   const E=S.euro;if(!E||!euroDecidingLeg())return false;
@@ -31273,7 +31377,7 @@ function euroLogFooterHtml(){
       +(mine>theirs?'<b style="color:var(--grass)">előnyben vagytok</b>'
        :mine<theirs?'<b style="color:var(--red)">hátrányban vagytok</b>':"döntetlen")+".");
     if(nx)h+=row(`Visszavágó: <b>${nx.home?"🏠 hazai pályán":"✈️ idegenben"}</b>, ${esc(nx.o.n)} ellen.`);
-    h+=row("Egyenlőségnél az idegenben lőtt gól dönt, utána büntetők.","var(--dim2)");
+    h+=row("Ha az összesítés döntetlen, hosszabbítás dönt — és csak utána büntetők.","var(--dim2)");
   }else if(m.k==="g"&&E.stage==="group"){
     const tbl=euroGroupTable(E.userG),pos=tbl.findIndex(r=>r.t.you)+1,me=tbl.find(r=>r.t.you);
     const left=EURO_SCHEDULE.length-E.md;
@@ -31459,11 +31563,11 @@ function renderEuroScreen(){
     if(ko&&E.idx===1){
       const t=E.ties[E.userTie],meIsA=t.a===E.userIdx,L=t.legs[0];
       if(L){const mine=meIsA?L[0]:L[1],theirs=meIsA?L[1]:L[0];
-        extra=`<div style="font-size:12.5px;margin-top:4px">Első mérkőzés: <b>${mine}:${theirs}</b> — ${mine>theirs?"előnyben vagytok":mine<theirs?"hátrányban vagytok":"döntetlen után"}. <span style="color:var(--dim)">Egyenlőségnél az idegenben lőtt gól dönt.</span></div>`;}}
+        extra=`<div style="font-size:12.5px;margin-top:4px">Első mérkőzés: <b>${mine}:${theirs}</b> — ${mine>theirs?"előnyben vagytok":mine<theirs?"hátrányban vagytok":"döntetlen után"}. <span style="color:var(--dim)">Döntetlen összesítésnél hosszabbítás dönt.</span></div>`;}}
     if(qual){
       const L=E.qLegs&&E.qLegs[0];
       if(E.idx===1&&L)
-        extra=`<div style="font-size:12.5px;margin-top:4px">Első mérkőzés: <b>${L[0]}:${L[1]}</b> — ${L[0]>L[1]?"előnyben vagytok":L[0]<L[1]?"hátrányban vagytok":"döntetlen után"}. <span style="color:var(--dim)">Egyenlőségnél az idegenben lőtt gól dönt.</span></div>`;
+        extra=`<div style="font-size:12.5px;margin-top:4px">Első mérkőzés: <b>${L[0]}:${L[1]}</b> — ${L[0]>L[1]?"előnyben vagytok":L[0]<L[1]?"hátrányban vagytok":"döntetlen után"}. <span style="color:var(--dim)">Döntetlen összesítésnél hosszabbítás dönt.</span></div>`;
       extra+=`<div style="font-size:12px;color:var(--gold);margin-top:5px">🎫 Selejtező — a főtáblára jutásért. ${EURO_DROP[E.comp]?`Bukásnál a(z) ${EURO_COMPS[EURO_DROP[E.comp]].n} főtábláján folytatjátok.`:"Bukásnál nincs kupa ebben a szezonban."} <span style="color:var(--dim2)">Itt semmilyen fejlődés nem történik.</span></div>`;}
     nx.innerHTML=`<div style="font-size:13px;color:var(--dim)">Következő mérkőzés</div>
       <div style="font-size:15px;font-weight:700;margin-top:2px">${fx.neutral?"⚖️ Semleges pálya":fx.home?"🏠 Hazai pálya":"✈️ Idegenben"} — ${esc(fx.o.n)}</div>
