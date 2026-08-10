@@ -2428,7 +2428,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.0.10";
+const APP_VERSION="3.0.11";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7016,7 +7016,10 @@ const MP_WAIT_TIE={mine:"A te párharcod",opp:"A társad párharca",
 /* Ennyi várakozás után ajánljuk fel a kézi továbblépést. Nem rövid: amíg a
    hálózat él, az automatikus felismerés úgyis előbb megoldja — ez a végső
    háló arra az esetre, amikor semmi nem válaszol. */
-const MP_TIE_FORCE_MS=45000;
+/* 45 mp-ről 20-ra: élesben ennyi is örökkévalóságnak tűnik egy olyan
+   képernyőn, ahol semmi nem mozog — és a kiút amúgy is biztonságos (a
+   sorozat a seedelt helyi ágon megy tovább). */
+const MP_TIE_FORCE_MS=20000;
 let _mpTieWaitStart=0;
 /* ---- DIAGNOSZTIKA A BEVÁRÓ KÉPERNYŐN ----
    A beragadás eddig NÉMA volt: a felhasználó annyit látott, hogy vár. Ez a sor
@@ -7073,12 +7076,51 @@ function mpCupTieAbort(){
   _mpTieBusy=false;_mpTieWaitStart=0;
   if(_mpTiePoll){clearTimeout(_mpTiePoll);_mpTiePoll=null;}
   h2hWaitHide();}
-/* Kell-e egyáltalán cserélni ebben a körben? */
+/* Kell-e egyáltalán VÁRNUNK a társra ebben a körben?
+   Csak akkor, ha a társ párharca KÜLÖN áll a miénktől — ha épp egymás ellen
+   játszunk, a párharc eredménye maga a közös igazság. */
 function mpCupNeedTieSync(){
   const E=S.euro;
   if(!mpCupActive()||E.mateOut)return false;
   const mt=mpCupMateTie();
   return mt>=0&&mt!==E.userTie;}
+/* ---- MINDIG PUBLIKÁLUNK, AKKOR IS, HA NEKÜNK NINCS MIRE VÁRNUNK ----
+   HIBA, AMIT EZ JAVÍT (élesben megfigyelve): az egyik fél a nyolcaddöntőnél
+   beragadt a beváró képernyőn, a másik közben végigment a döntőig — abban a
+   hitben, hogy a társa kiesett a nyolcaddöntőben. Pedig nem esett ki.
+
+   Az ok a kézfogás EGYOLDALÚSÁGA volt: a rekordot CSAK az a kliens tette fel,
+   amelyiknek magának is kellett várnia (mpCupNeedTieSync). Ha a két kliens
+   ágrajza bármiért elcsúszott — és elég hozzá, hogy az egyik oldalon épp
+   EGYMÁS ELLEN sorsolt a fa, a másikon meg nem —, akkor az egyik fél
+   "nincs kire várnom" alapon átlépte a kört és soha nem tett fel semmit, a
+   másik pedig egy olyan rekeszre várt, amit senki nem fog kitölteni.
+
+   A javítás elve: a PUBLIKÁLÁS és a VÁRAKOZÁS két külön dolog. Az eredményemet
+   MINDIG felteszem, amíg a társ versenyben van — akkor is, ha nekem nincs mire
+   várnom. Várni továbbra is csak akkor várok, ha tényleg kell. Így a beváró
+   képernyő nem tud olyan adatra várni, amit senki nem tesz le.
+   Tűz-és-felejt: nem blokkol, és a hibája sem állíthatja meg a szezont. */
+function mpCupTiePublish(round){
+  try{
+    const E=S.euro;
+    if(!mpCupActive()||!E||E.mateOut)return;
+    const ut=E.userTie>=0?E.ties[E.userTie]:null;
+    if(!ut)return;                       /* nem játszottunk ebben a körben */
+    const key=mpCupStageKey("ko"+round);
+    const myField=MP.role==="host"?"host":"guest";
+    const rec={won:ut.winner===E.userIdx,at:Date.now(),round,
+               ri:mpCupRoundIdx(round),st:mpCupOwnStatRows()};
+    (async()=>{
+      try{
+        await mpNetInit();
+        let node=null;
+        try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+        if(node&&node[myField])return;    /* már fent van — ne írjuk felül */
+        await mpBk().h2hPut(MP.activeRoom,key,myField,rec);
+      }catch(e){}
+    })();
+  }catch(e){}}
 async function mpCupTieSync(round,onReady){
   if(!mpCupNeedTieSync()){onReady();return;}
   if(_mpTieBusy)return;
@@ -31849,6 +31891,9 @@ function euroResolveRound(){
   if(mpCupNeedTieSync()){
     mpCupTieSync(round,()=>euroResolveRoundAfterSync(round));
     return;}
+  /* Nincs mire várnunk — de az eredményünket akkor is fel kell tenni, hogy a
+     társ ne egy örökre üres rekeszre várjon (lásd mpCupTiePublish). */
+  mpCupTiePublish(round);
   euroResolveRoundAfterSync(round);}
 function euroResolveRoundAfterSync(round){
   const E=S.euro;
@@ -32113,6 +32158,20 @@ function startEuroCampaign(opt){
       if(cand.every((v,i)=>v!==i))m=cand;}
     /* tartalék: garantáltan derangement, ha a sorsolás nem hozta össze */
     S.euro.rmap=m||[1,2,3,4,5,6,7,0];}
+  /* ---- ŐRSZEM: KÖZÖS KUPA SEEDELT ÁG NÉLKÜL NEM MŰKÖDHET ----
+     A közös kupa EGYETLEN garanciája, hogy a két kliens BITRE azonos ágrajzot
+     épít (mpSeeded → rögzített rmap + seedelt szimuláció). Ha ez bármiért nem
+     áll — a nevezés nem dőlt el időben, a társ nem került be a mezőnybe, vagy
+     a sorozat közben szétvált —, akkor a két fa MÁS lesz: az egyik oldalon
+     egymás ellen sorsol, a másikon nem, és onnantól a kézfogás értelmezhetetlen.
+     Ilyenkor NEM teszünk úgy, mintha közös kupa volna: kimondjuk, és külön
+     ágon futunk tovább. Ez sokkal jobb, mint egy néma szétcsúszás — abból lett
+     az a hiba, ahol az egyik fél beragadt, a másik meg "kiesettnek" hitte. */
+  if(mpCup()&&mpCup().comp===comp&&!mpCup().droppedApart&&!S.euro.mpSeeded){
+    mpCup().droppedApart=true;
+    S.euro.mateIdx=null;
+    addLine("⚠ A közös kupa-ág nem tudott felállni (a társad nevezése nem ért ide időben) — "
+      +"idén KÜLÖN sorozatot játszotok. Nem fogtok találkozni, és nem kell egymásra várni.","m ev");}
   euroLastLogHtml="";euroLastLogTitle="";   /* új kampány — nincs korábbi meccs-napló */
   const needQual=!opt.skipQual&&!!S.euroCurrentQual;
   if(needQual){
@@ -33075,13 +33134,30 @@ const MS_LOG_MAX=40;
 /* A pénzjutalom a MINDENKORI éves büdzséből számolódik — lásd a fenti
    indoklást. A sávot itt vágjuk le, hogy egy elgépelt százalék se tudjon
    kilógni belőle. */
+/* ---- A KORAI FOKOZATOK KÜLÖN FÉKE ----
+   MÉRVE: az első szezon pénzözönének nem a NAGY célok az okai (azok évekig
+   tartanak), hanem a sok APRÓ bevezető fokozat, ami szinte azonnal teljesül —
+   a taktika-illeszkedés első lépcsői, az első stábtag-típusok, az első
+   kapcsolatok. Egyenként keveset adnak, együtt viszont egy szezon alatt
+   többet, mint egy BL-győzelem.
+
+   Ezért a jutalom-százalék egy LEJTŐN megy át: minél kisebb (korábbi) egy
+   fokozat, annál nagyobbat vágunk rajta. A sáv alján (5%) −40%, a tetején
+   (30%) érintetlen. A nagy célok értéke tehát nem csökken — csak a korai
+   csordogálás lassul le.
+     5%  →  ×0,60      15% →  ×0,76
+    10%  →  ×0,68      20% →  ×0,84      30% → ×1,00                       */
+const MS_EARLY_FLOOR=0.60;   /* ennyi marad a legkisebb fokozatból */
+function msEarlyScale(pct){
+  const t=Math.max(0,Math.min(1,(pct-MS_PCT_MIN)/(MS_PCT_MAX-MS_PCT_MIN)));
+  return MS_EARLY_FLOOR+(1-MS_EARLY_FLOOR)*t;}
 function msCashReward(pct){
   const p=Math.max(MS_PCT_MIN,Math.min(MS_PCT_MAX,pct||MS_PCT_BASE));
   let base=0;
   try{base=computeSeasonBudget();}catch(e){base=0;}
-  /* A mérföldkövek SAJÁT féke a globális bevétel-vágáson FELÜL — lásd
-     MS_CASH_TRIM. Ez a legbővebb új pénzcsatorna, ezért kap külön korlátot. */
-  return Math.max(1,Math.round(base*p*MS_CASH_TRIM));}
+  /* A mérföldkövek SAJÁT féke a globális bevétel-vágáson FELÜL (MS_CASH_TRIM),
+     plusz a korai fokozatok lejtője (msEarlyScale). */
+  return Math.max(1,Math.round(base*p*MS_CASH_TRIM*msEarlyScale(p)));}
 function msState(){
   if(!S.ms)S.ms={done:{},seen:{},sp:0,spEarned:0,cash:0,log:[],t:{},cats:{},missed:{}};
   if(!S.ms.t)S.ms.t={};
