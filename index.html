@@ -2403,7 +2403,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.0.01";
+const APP_VERSION="3.0.02";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16603,6 +16603,11 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   chemPairs:{},chemInProgress:null,
   /* SKILL-PADLÓ: türelem-számláló + szezonos kvóták + az első kémia jelzője */
   matchesSinceSkill:0,seasonNewSkills:0,seasonSkillCont:0,firstChemDone:false,
+  /* CSAPATEGYENSÚLY → INGYEN KÉPESSÉG: balSkillMatches a szezonban
+     ledolgozott mérkőzés-egyenérték (kupában fél), balSkillsSeason a már
+     kiosztott darabszám. Mindkettő szezononként nullázódik, de a MENTÉS
+     RÉSZE — egy újratöltés nem indíthatja újra a beosztást nulláról. */
+  balSkillMatches:0,balSkillsSeason:0,
   initialSkillDone:false,   /* a kapitány-megerősítéskor járó NYITÓ skill egyszer jár */
   seasonStartStrength:0,    /* a szezonkezdő csapaterő — a kupamezőny horgonya */
   /* MELYIK LEZÁRT SZEZON UTÁN FIZETTÜK KI a nyári keretet. A dupla jóváírás
@@ -22397,6 +22402,13 @@ function playMatch(){
     }
     /* KUPÁBAN FELE TEMPÓ: a skill-szerzés is feleannyi eséllyel indul be. */
     if(euroActive())skillReasons=skillReasons.filter(()=>Math.random()<EURO_TEMPO);
+    /* ---- CSAPATEGYENSÚLY: A TELJESÍTMÉNY-JUTALMAKON FELÜL ----
+       SZÁNDÉKOSAN a kupa-szűrő UTÁN: ez a hozam nem meccsteljesítményből jön,
+       hanem a keret felépítéséből, ezért nem is szabad kiszűrni (a kupa fele
+       tempóját maga a gyűjtő kezeli, lásd balanceSkillTick). A sor ELEJÉRE
+       kerül, hogy a felhasználó ezt lássa először — ez a magyarázata annak,
+       miért kapott most "csak úgy" képességet. */
+    if(gameMode==="career"&&balanceSkillTick())skillReasons.unshift("balance");
     /* ---- TÜRELEM-SZÁMLÁLÓ (skill-padló) ----
        Ha ezen a meccsen semmilyen teljesítmény-jutalom nem indult be, nő a
        számláló; SKILL_PITY_MATCHES után a gép magától bedob egyet. Így egy
@@ -24343,7 +24355,7 @@ function currentRoster(){
   return r;}
 /* ---- jutalom-skill sorsolás és kiosztás ---- */
 let skillResumeCb=null;
-const SKILL_REASON_TXT={start:"Csapat kész — jutalom-skill!",hattrick:"Mesterhármas — jutalom-skill!",bigwin:"Nagyarányú győzelem — jutalom-skill!",mvp3:"Harmadik meccsembersége — jutalom-skill!",doublesave:"Két bravúr egy meccsen — jutalom-skill!",bigassist:"Kettős gólpassz — jutalom-skill!",challenge:"Kihívás teljesítve — válaszd ki, ki kapja!",pity:"Kemény menetelés — az edzőtábor meghozta a gyümölcsét!"};
+const SKILL_REASON_TXT={start:"Csapat kész — jutalom-skill!",hattrick:"Mesterhármas — jutalom-skill!",bigwin:"Nagyarányú győzelem — jutalom-skill!",mvp3:"Harmadik meccsembersége — jutalom-skill!",doublesave:"Két bravúr egy meccsen — jutalom-skill!",bigassist:"Kettős gólpassz — jutalom-skill!",challenge:"Kihívás teljesítve — válaszd ki, ki kapja!",pity:"Kemény menetelés — az edzőtábor meghozta a gyümölcsét!",balance:"⚖️ Kiegyensúlyozott keret — az összeszokott csapat magától fejlődik!"};
 function findIncompleteSkills(){
   const out=[];
   const rosterNames=new Set((gameMode==="career"?fullCareerRoster():currentRoster()).map(p=>p.n));
@@ -29199,11 +29211,128 @@ function teamBalance(){
 function teamBalanceBonus(){
   const b=teamBalance();
   return b.ok?b.bonus:0;}
+/* ================= AZ EGYENSÚLY MÁSODIK HOZAMA: INGYEN KÉPESSÉGEK =================
+   A csapaterő-bónusz (+2 OVR) eddig az EGYETLEN dolog volt, amit az egyensúly
+   fizetett. Mérve ez kevés: két OVR nem éri meg azt a lemondást, hogy ne rakd
+   minden skilledet egy emberre — a "sztár-stratégia" továbbra is nyert, csak
+   egy hajszállal kevesebbel.
+
+   Az egyensúly mostantól KÉPESSÉGET is termel. Egy összeszokott, egyenletesen
+   terhelt keret magától is fejlődik: a mérkőzés-jutalmakon FELÜL, csak úgy,
+   szezononként több skill is beesik. Ez az a hozam, ami tényleg vetekszik a
+   fókuszált építkezéssel — és pontosan azt a viselkedést fizeti meg, amit a
+   mérőszám mér.
+
+   KÉT LÉPCSŐ egymásra épül:
+     · az ÖSSZEGYENSÚLY adja az alapot (65 fölött 1, 70-től 2, 80-tól 3,
+       90-től 4, 95 fölött 5),
+     · a SKILL-ELOSZLÁS ezt egészíti ki (50 fölött +1, 75 fölött +2, 90 fölött
+       +3, 95 fölött +4).
+   A kiegészítés CSAK akkor jár, ha az alap is megvan — ezért „ezen belül": a
+   skill-eloszlás önmagában nem nyit kaput, csak felerősíti a széles alapot.
+
+   MIÉRT NEM VÉLETLEN. A kvóta nem esély, hanem BEOSZTÁS: a szezon során
+   egyenletesen érkeznek meg, és a végére hiánytalanul megvannak. Aki végig
+   80-as egyensúlyon áll, az tényleg megkapja azt a hármat — nem 30%-os
+   eséllyel egyet. A kvótát MINDEN mérkőzésen újraszámoljuk az AKTUÁLIS
+   egyensúlyból, tehát a menet közbeni romlás azonnal lassít, a javulás
+   azonnal gyorsít.
+
+   MIÉRT MECCSEKET SZÁMOLUNK, NEM TÖRTRÉSZT. Az első változat mérkőzésenként
+   kvóta/30-ot adott egy 0..1 gyűjtőhöz, és 1-nél osztott. Mérve ez
+   MEGBÍZHATATLAN volt: 1/30 harmincszor összeadva 0,9999999999999999, tehát a
+   kvóta UTOLSÓ képessége rendszeresen elveszett (1-ből 0, 5-ből 4, 9-ből 8).
+   Klasszikus lebegőpontos csúszás. Mostantól a szezonban ledolgozott
+   MÉRKŐZÉSEKET gyűjtjük, és abból számoljuk, hánynak KELLETT VOLNA már
+   megérkeznie: floor(meccsek × kvóta / 30). Ez egész számokból dolgozik,
+   tehát nem csúszhat el, és menet közbeni kvóta-változásnál is helyesen
+   viselkedik.
+
+   A kupában — mint minden hosszú távú építkezés — feleannyi tempóval halad:
+   ott a mérkőzés fél mérkőzésnek számít. */
+const BAL_SKILL_SEASON_MATCHES=30;   /* egy szezon hossza — a gyűjtő nevezője */
+function balSkillBaseTier(score){
+  if(score>95)return 5;
+  if(score>=90)return 4;
+  if(score>=80)return 3;
+  if(score>=70)return 2;
+  if(score>65)return 1;
+  return 0;}
+function balSkillDistTier(sk){
+  if(sk>95)return 4;
+  if(sk>90)return 3;
+  if(sk>75)return 2;
+  if(sk>50)return 1;
+  return 0;}
+/* A szezonos kvóta és a hozzá tartozó nyers számok — a HUB-panel ugyanezt
+   írja ki, tehát a kijelzés és a hatás sosem tud elcsúszni. */
+function balanceSkillQuota(){
+  const out={ok:false,score:0,skill:0,base:0,dist:0,total:0};
+  if(gameMode!=="career")return out;
+  const b=teamBalance();
+  if(!b.ok)return out;
+  out.ok=true;
+  out.score=b.score*100;
+  out.skill=(b.skill==null?0:b.skill)*100;
+  out.base=balSkillBaseTier(out.score);
+  /* „ezen belül" — a skill-eloszlás csak a meglévő alapot egészíti ki */
+  out.dist=out.base>0?balSkillDistTier(out.skill):0;
+  out.total=out.base+out.dist;
+  return out;}
+/* Egy lejátszott mérkőzés könyvelése. Igazat ad vissza, ha MOST érett be egy
+   képesség — a hívó ilyenkor beteszi a jutalom-sorba. A számláló a mentés
+   része, tehát egy újratöltés nem indíthatja újra a beosztást nulláról. */
+function balanceSkillTick(){
+  if(gameMode!=="career")return false;
+  const q=balanceSkillQuota();
+  /* A LEDOLGOZOTT MECCS AKKOR IS SZÁMÍT, ha épp nem jár kvóta: az egyensúly
+     menet közben javulhat, és akkor a már mögötted lévő idény is beszámít. */
+  const cup=(typeof euroActive==="function"&&euroActive());
+  S.balSkillMatches=(S.balSkillMatches||0)+(cup?EURO_TEMPO:1);
+  if(!q.ok||q.total<=0)return false;
+  /* Hánynak KELLETT VOLNA már megérkeznie? Egész számokból, tehát nem csúszik. */
+  const should=Math.min(q.total,
+    Math.floor(S.balSkillMatches*q.total/BAL_SKILL_SEASON_MATCHES));
+  if(should<=(S.balSkillsSeason||0))return false;
+  S.balSkillsSeason=(S.balSkillsSeason||0)+1;
+  return true;}
+/* Hány mérkőzés múlva jön a következő? A panel írja ki — a beosztás legyen
+   látható, ne kelljen kitalálni. null = már mind megvan (vagy nem jár). */
+function balanceSkillNextIn(q){
+  if(!q||!q.ok||q.total<=0)return null;
+  const got=S.balSkillsSeason||0;
+  if(got>=q.total)return null;
+  /* a (got+1). képességhez ennyi meccs-egyenérték kell összesen */
+  const need=(got+1)*BAL_SKILL_SEASON_MATCHES/q.total;
+  return Math.max(1,Math.ceil(need-(S.balSkillMatches||0)));}
 /* ---- A HUB-PANEL ----
    A szám önmagában semmit nem ér, ha nem derül ki, MIÉRT annyi. Ezért minden
    összetevő kiírja a saját nyers mérését is (hány emberre oszlik a teher, hány
    emberen ülnek a skillek, mekkora a szórás), és a legnagyobb terhet viselő
    játékos részesedését is — mert általában az az egy szám mondja el a lényeget. */
+/* Az egyensúly MÁSODIK hozama a panelen. Kimondja a kvótát, a bontását és azt
+   is, hol tartasz benne — enélkül a "csak úgy" érkező képesség
+   megmagyarázhatatlan volna. Ha még nem éred el a küszöböt, azt mondjuk meg,
+   mennyi hiányzik: a mérőszám így céllá válik, nem csak visszajelzéssé. */
+function balanceSkillHtml(){
+  const q=balanceSkillQuota();
+  if(!q.ok)return "";
+  const got=S.balSkillsSeason||0;
+  if(q.total<=0){
+    const kell=Math.max(0,Math.ceil(65.5-q.score));
+    return `<div style="font-size:12px;color:var(--dim2);margin:0 0 7px;line-height:1.45">`
+      +`⚡ Ingyen képesség: <b>még nem jár</b> — `
+      +(kell>0?`${kell} ponttal magasabb összegyensúly kell (65 fölött indul).`
+             :`az összegyensúlynak 65 fölé kell érnie.`)+`</div>`;}
+  const nextIn=balanceSkillNextIn(q);
+  const reszek=[`alap <b>${q.base}</b> (összegyensúly ${Math.round(q.score)})`]
+    .concat(q.dist>0?[`eloszlás <b>+${q.dist}</b> (skill-eloszlás ${Math.round(q.skill)})`]:[]);
+  return `<div style="font-size:12px;margin:0 0 7px;line-height:1.45">`
+    +`⚡ Ingyen képesség: <b style="color:var(--grass)">${q.total}</b>/szezon `
+    +`<span style="color:var(--dim2)">— ${reszek.join(" · ")}</span><br>`
+    +`<span style="color:var(--dim2)">Ebből az idén megérkezett: <b>${got}</b>`
+    +(nextIn!=null?` · a következő ${nextIn} meccs múlva`:got>=q.total?` — az idei mind megvan`:"")
+    +`</span></div>`;}
 function teamBalanceHtml(){
   const b=teamBalance();
   if(!b.ok)return "";
@@ -29235,6 +29364,7 @@ function teamBalanceHtml(){
     <div style="font-size:12.5px;margin:4px 0 7px">
       Meccsenkénti csapaterő-bónusz: <b style="color:var(--grass)">+${hu(b.bonus.toFixed(2))}</b>
       <span style="color:var(--dim2)">(legfeljebb +${hu(BALANCE_MAX_OVR.toFixed(2))})</span></div>
+    ${balanceSkillHtml()}
     ${sor("Teher","load" in b?b.load:0,`${pct(BAL_W_LOAD)}%`,teherReszlet,"teher")}
     ${sor("Skill-eloszlás",b.skill,`${pct(BAL_W_SKILL)}%`,skillReszlet,"skill")}
     ${sor("Rating-eloszlás",b.rating,`${pct(BAL_W_RATING)}%`,ratingReszlet,"rating")}
@@ -32593,6 +32723,10 @@ function startNextCareerSeason(){
   /* SKILL-PADLÓ: a szezonos kvóták nullázódnak, a türelem-számláló viszont
      ÁTVISZÜNK — különben a szezonforduló ingyen nullázná a várakozást. */
   S.seasonNewSkills=0;S.seasonSkillCont=0;
+  /* Az egyensúly-kvóta szezononként újraindul: az új idényben az akkori
+     egyensúlyod szerint jár újra. A meccs-számlálót NEM visszük át — a
+     lezárt idény ledolgozott meccsei nem tartoznak az újba. */
+  S.balSkillMatches=0;S.balSkillsSeason=0;
   S.resolvedChallenges=[];
   S.formationChangesThisSeason=0;
   S.moraleTarget=computeMoraleTarget();S.morale=S.moraleTarget;
@@ -33739,6 +33873,7 @@ function saveGame(){
         ms:S.ms,   /* mérföldkövek: teljesítések, jutalom-mérleg, nyomkövetők */
         /* skill-padló: türelem-számláló, szezonos kvóták, első kémia megvolt-e */
         matchesSinceSkill:S.matchesSinceSkill,seasonNewSkills:S.seasonNewSkills,
+        balSkillMatches:S.balSkillMatches,balSkillsSeason:S.balSkillsSeason,
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
         guideOn:S.guideOn,guideSeen:S.guideSeen,
         seasonStartStrength:S.seasonStartStrength,summerPaidAfterSeason:S.summerPaidAfterSeason,
@@ -34090,6 +34225,10 @@ function applySavedGame(d){
   /* SKILL-PADLÓ (régi mentésben nincs — nulláról indul, ami helyes: a padló
      a betöltés utáni szezontól kezd el számolni) */
   S.matchesSinceSkill=d.S.matchesSinceSkill||0;
+  /* Régi mentésben nincsenek — nulláról indulnak, ami helyes: a gyűjtés a
+     betöltés utáni mérkőzésektől kezd számolni. */
+  S.balSkillMatches=d.S.balSkillMatches||0;
+  S.balSkillsSeason=d.S.balSkillsSeason||0;
   S.seasonNewSkills=d.S.seasonNewSkills||0;
   S.seasonSkillCont=d.S.seasonSkillCont||0;
   S.firstChemDone=!!d.S.firstChemDone;
