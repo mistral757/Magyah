@@ -2428,7 +2428,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.0.07";
+const APP_VERSION="3.0.08";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7356,6 +7356,9 @@ function seasonEuroBucket(){
   if(!S.seasonEuro)S.seasonEuro={scorers:{},assists:{},mvps:{},cleanSheets:{},W:0,D:0,L:0,GF:0,GA:0,matches:0};
   return S.seasonEuro;}
 function recordScorer(name){
+  /* MÉRFÖLDKŐ: a régi csapat elleni gól. A gólszerzés KÖZÖS csatornája —
+     minden találat átfut rajta, a tizenegyestől a hosszabbításig. */
+  try{msNoteGoal(name);}catch(e){}
   if(euroActive()){euroAddStat("scorers",name,teamName,true);
     const b=seasonEuroBucket();b.scorers[name]=(b.scorers[name]||0)+1;}
   else S.scorers[name]=(S.scorers[name]||0)+1;}
@@ -11838,6 +11841,10 @@ function assignFixtureDates(){
    fordulónként 0-2 esemény, tehát a keret bőven kitart több idényen át. */
 const LOCKER_LOG_MAX=180;
 function lockerLogPush(rec){
+  /* MÉRFÖLDKŐ: a kétszereplős POZITÍV események barátságot szőnek. Ez a
+     napló KÖZÖS csatornája, tehát minden öltözői esemény átfut rajta —
+     nem kell a kiváltó helyeken külön könyvelni. */
+  try{msNoteLockerBond(rec);}catch(e){}
   if(!Array.isArray(S.lockerLog))S.lockerLog=[];
   S.lockerLog.push(rec);
   if(S.lockerLog.length>LOCKER_LOG_MAX)
@@ -33152,6 +33159,167 @@ function msMaxCareerMatches(){
   Object.values(S.careerStats||{}).forEach(c=>{if(c&&c.matches>m)m=c.matches;});
   return m;}
 
+/* ================= „EGYMÁSRA TALÁLVA" — A KAPCSOLATOK MÉRFÖLDKÖVEI =========
+   A többi mérföldkő TELJESÍTMÉNYT mér: gólt, trófeát, ratinget, vagyont. Ez a
+   csoport mást: azt, hogy a keretedben lévő emberek MIT JELENTENEK EGYMÁSNAK.
+   Egy öltözőben született barátság, két rég szétvált csapattárs újra egy
+   csapatban, két örök rivális, aki végül összeszokott, egy öreg róka és egy
+   kölyök — és a legszebb futball-klisé: a gól a régi csapat ellen.
+
+   Ezek nem a csapaterődet mérik, hanem a KLUB TÖRTÉNETÉT. Ezért is pénzt
+   fizetnek: ez az a fajta munka, amit egy klubvezetés valóban megfizet.
+
+   AZ ADAT MÁR MIND MEGVAN a játékban, csak eddig senki nem olvasta össze:
+     · az öltözői napló (lockerLogPush) rögzíti, KIK között történt pozitív
+       esemény — a kétszereplős pozitív események a barátságok;
+     · a játékos-adatbázis (SQUADS) megmondja, ki melyik VALÓS klubban játszott
+       — ebből jön a "régi csapattárs" és a "gól a régi csapat ellen";
+     · a RIVALS tábla megmondja, mely klubok riválisok;
+     · a careerPool tudja mindenki korát a mester-tanítvány pároshoz. */
+
+/* ---- NÉV → VALÓS KLUBOK ----
+   Egy játékos több szezon-keretben is szerepelhet (pl. ugyanaz a klub két
+   évadában, vagy két különböző klubban). A halmaz MINDET tartalmazza: aki
+   valaha viselte azt a mezt, annak az a klubja. EGYSZER épül fel, a
+   betöltéskor — 3700 sornyi adatbázison ez egy pillanat, és utána minden
+   lekérdezés konstans idejű. */
+const CLUBS_BY_NAME=(function(){
+  const m={};
+  try{
+    (typeof SQUADS!=="undefined"?SQUADS:[]).forEach(sq=>{
+      if(!sq||!sq.club||!sq.players)return;
+      sq.players.forEach(p=>{
+        if(!p||!p.n)return;
+        (m[p.n]=m[p.n]||[]).indexOf(sq.club)<0&&m[p.n].push(sq.club);});});
+  }catch(e){}
+  return m;})();
+function msClubsOf(name){return CLUBS_BY_NAME[name]||[];}
+/* Volt-e a két játékos VALAHA csapattárs (közös valós klub)? */
+function msWereTeammates(a,b){
+  const ca=msClubsOf(a);
+  if(!ca.length)return null;
+  const cb=msClubsOf(b);
+  for(let i=0;i<ca.length;i++)if(cb.indexOf(ca[i])>=0)return ca[i];
+  return null;}
+/* Riválisok-e a két játékos klubjai? Visszaadja a két klubot, ha igen. */
+function msAreRivals(a,b){
+  const ca=msClubsOf(a),cb=msClubsOf(b);
+  for(let i=0;i<ca.length;i++){
+    const r=RIVALS[ca[i]]||[];
+    for(let j=0;j<cb.length;j++)if(r.indexOf(cb[j])>=0)return [ca[i],cb[j]];}
+  return null;}
+/* Egy pár kanonikus kulcsa — ugyanaz a rendezés, amit a párkémia használ. */
+function msPairKey(a,b){return [a,b].sort().join("|");}
+
+/* ---- BARÁTI KAPCSOLATOK ----
+   Az öltözői napló KÖZÖS csatornáján (lockerLogPush) figyelünk: minden
+   POZITÍV, KÉTSZEREPLŐS esemény egy születő kötődés. EGYEDI PÁROKAT
+   gyűjtünk, nem eseményeket: ugyanaz a két ember többször is összemelegedhet,
+   de az egy barátság. Így a szám tényleg azt mondja, hány kapcsolat szövődött
+   a klubodnál. */
+function msNoteLockerBond(rec){
+  try{
+    if(gameMode!=="career"||!rec||!rec.pos)return;
+    const w=rec.who||[];
+    if(w.length!==2)return;
+    const t=msT();
+    t.bonds=t.bonds||[];
+    const k=msPairKey(w[0],w[1]);
+    if(t.bonds.indexOf(k)<0)t.bonds.push(k);
+  }catch(e){}}
+function msBondCount(){return ((msT().bonds)||[]).length;}
+
+/* ---- RÉGI CSAPATTÁRSAK ÚJRA EGYÜTT ----
+   A kezdő keret alap-találkozásai NEM számítanak: azokat a draft hozta össze,
+   nem te. Csak az a páros ér, ahol LEGALÁBB AZ EGYIK ember ÁTIGAZOLÁSSAL
+   érkezett — vagyis nincs benne az alapító keretben (S.foundingSquad). Ez a
+   különbségtétel a mérföldkő lényege: nem a véletlent jutalmazza, hanem a
+   szándékos újraegyesítést. */
+function msReunitedPairs(){
+  const R=msRoster().map(p=>p.n);
+  const founding=new Set(S.foundingSquad||[]);
+  const out=[];
+  for(let i=0;i<R.length;i++)for(let j=i+1;j<R.length;j++){
+    if(founding.has(R[i])&&founding.has(R[j]))continue;   /* mindkettő alapító */
+    const club=msWereTeammates(R[i],R[j]);
+    if(club)out.push({a:R[i],b:R[j],club});}
+  return out;}
+
+/* ---- KÉSZ KÉMIA KÜLÖNLEGES PÁROK KÖZÖTT ----
+   Mindkettő a MEGÉPÜLT párkémiákat nézi (nem a puszta együttlétet): a
+   mérföldkő az ÉPÍTÉST jutalmazza. */
+function msChemPairsDone(){
+  const out=[];
+  Object.values(S.chemPairs||{}).forEach(pr=>{
+    if(pr&&(pr.stages||0)>=CHEM_PAIR_NEED)out.push(pr);});
+  return out;}
+/* Rivális klubokból való párosok, akik között KÉSZ a kémia. */
+function msRivalChemCount(){
+  let n=0;
+  msChemPairsDone().forEach(pr=>{if(msAreRivals(pr.a,pr.b))n++;});
+  return n;}
+/* Mester-tanítvány: 25 év ALATTI és 32 év FÖLÖTTI ember kész kémiája. */
+function msMentorChemCount(){
+  let n=0;
+  msChemPairsDone().forEach(pr=>{
+    const ea=msEntry(pr.a),eb=msEntry(pr.b);
+    if(!ea||!eb||ea.age==null||eb.age==null)return;
+    const lo=Math.min(ea.age,eb.age),hi=Math.max(ea.age,eb.age);
+    if(lo<25&&hi>32)n++;});
+  return n;}
+/* ---- SEGÍTSÉG A FELHASZNÁLÓNAK ----
+   A rivális- és a mester-tanítvány párosokat nem tisztességes találgatásra
+   bízni: az adat a játékban van, csak eddig nem látszott. Ez a két függvény
+   kigyűjti a keretedből a MÉG MEG NEM ÉPÍTETT lehetőségeket, és a
+   mérföldkő-panel ki is írja őket. */
+function msRivalCandidates(){
+  const R=msRoster().map(p=>p.n),done=new Set();
+  msChemPairsDone().forEach(pr=>done.add(msPairKey(pr.a,pr.b)));
+  const out=[];
+  for(let i=0;i<R.length;i++)for(let j=i+1;j<R.length;j++){
+    const k=msPairKey(R[i],R[j]);
+    if(done.has(k))continue;
+    const rv=msAreRivals(R[i],R[j]);
+    if(rv)out.push({a:R[i],b:R[j],clubs:rv});}
+  return out;}
+function msMentorCandidates(){
+  const R=msRoster(),done=new Set();
+  msChemPairsDone().forEach(pr=>done.add(msPairKey(pr.a,pr.b)));
+  const young=[],old=[];
+  R.forEach(p=>{const e=msEntry(p.n);if(!e||e.age==null)return;
+    if(e.age<25)young.push({n:p.n,age:e.age});
+    else if(e.age>32)old.push({n:p.n,age:e.age});});
+  const out=[];
+  young.forEach(y=>old.forEach(o=>{
+    if(!done.has(msPairKey(y.n,o.n)))out.push({a:y.n,b:o.n,ages:[y.age,o.age]});}));
+  return out;}
+
+/* ---- GÓL A RÉGI CSAPAT ELLEN ----
+   A futball egyik legszebb klisséje. Az ellenfél neve "Klub (szezon)"
+   alakú, ezért a klubnevet le kell választani róla; a gólszerző valós
+   klubjai a CLUBS_BY_NAME-ből jönnek. A számláló ESEMÉNYT számol, nem
+   egyedi embert: aki háromszor lő a régi csapatának, az háromszor tette meg. */
+function msOppClubName(){
+  try{
+    const fx=(typeof euroActive==="function"&&euroActive())
+      ? (S.euro&&S.euro.fixtures&&S.euro.fixtures[S.euro.idx])
+      : (S.fixtures&&S.fixtures[S.idx]);
+    const n=fx&&fx.o&&fx.o.n;
+    if(!n)return null;
+    const m=String(n).match(/^(.+?)\s*\([^)]*\)\s*$/);
+    return m?m[1]:String(n);
+  }catch(e){return null;}}
+function msNoteGoal(name){
+  try{
+    if(gameMode!=="career"||!name)return;
+    const opp=msOppClubName();
+    if(!opp)return;
+    if(msClubsOf(name).indexOf(opp)<0)return;
+    const t=msT();
+    t.exClubGoals=(t.exClubGoals||0)+1;
+    addLine(`💙 ${esc(shortName(name))} a RÉGI CSAPATA ellen talált be — ${esc(opp)}. `
+      +`Nem ünnepel.`,"m skillnote");
+  }catch(e){}}
 /* ================= A STÍLUS-KATEGÓRIÁK: A PÉNZ ÚTJA A STÍLUSPONTBA =================
    ELLENSÚLY. A pénzjutalmas mérföldkövek szabadon gyűlnek — azok a KERESET. A
    csapatstílus-pontos mérföldkövek viszont KATEGÓRIÁNKÉNT ZÁRVA indulnak, és
@@ -33351,6 +33519,32 @@ msDef("ballon","Egyéni díjak",
   "Aranylabdás a klubodnál","Nyerje meg valamelyik játékosod az Aranylabdát.",
   "cash",0.26,()=>((S.ballonHistory||[]).length?1:0),1);
 
+/* ---------- EGYMÁSRA TALÁLVA ----------
+   A klub emberi története. Mind pénzt fizet: ez az a fajta munka, amit egy
+   klubvezetés valóban megfizet. */
+msTiers("bond","Egymásra találva",
+  th=>`${th} baráti kapcsolat`,
+  th=>`Szövődjön ${th} barátság a keretedben. Az öltözői események kétszereplős, pozitív fordulatai számítanak — párosonként egyszer, tehát ez tényleg ${th} különböző kapcsolat.`,
+  "cash",[0.05,0.07,0.09,0.12,0.16,0.22,0.30],[5,10,15,20,30,50,100],msBondCount);
+msTiers("reunite","Egymásra találva",
+  th=>`${th} régi csapattárs újra együtt`,
+  th=>`Hozz össze ${th} olyan párost, akik VALAHA egy klubban játszottak. A kezdő kereted alap-találkozásai nem számítanak: legalább az egyiküknek átigazolással kell érkeznie.`,
+  "cash",[0.08,0.11,0.14,0.18,0.24,0.30],[1,2,3,5,7,10],
+  ()=>msReunitedPairs().length);
+msTiers("rivalchem","Egymásra találva",
+  th=>`${th} kibékült rivális`,
+  th=>`Építs KÉSZ párkémiát ${th} olyan páros között, akiknek a klubjai örök riválisok. A panel megmutatja, kik jöhetnek szóba a keretedből.`,
+  "cash",[0.10,0.14,0.18,0.24,0.30],[1,2,3,4,5],msRivalChemCount);
+msTiers("mentor","Egymásra találva",
+  th=>`${th} mester-tanítvány páros`,
+  th=>`Építs KÉSZ párkémiát ${th} olyan páros között, ahol az egyik 25 év alatti, a másik 32 fölötti. A panel megmutatja, kik jöhetnek szóba.`,
+  "cash",[0.09,0.12,0.16,0.21,0.28],[1,2,3,4,5],msMentorChemCount);
+msTiers("exclub","Egymásra találva",
+  th=>`${th} gól a régi csapat ellen`,
+  th=>`Szerezzen a játékosod ${th} gólt olyan csapat ellen, amelyben valaha játszott. A futball legszebb klisséje.`,
+  "cash",[0.06,0.09,0.12,0.17,0.23,0.30],[1,3,5,10,20,50],
+  ()=>msT().exClubGoals||0);
+
 /* ---------- KUPA-FORDÍTÁS ----------
    A visszavágón behozott hátrány. Az ötgólos fordítás a játék legritkább
    teljesítménye — a valóságban sincs rá példa —, ezért kapja a maximumot ÉS
@@ -33487,7 +33681,7 @@ function msPayout(def){
     const amt=msCashReward(def.val);
     S.transferBudget=(S.transferBudget||0)+amt;
     M.cash=(M.cash||0)+amt;
-    txt=`+${fmtFt(amt)} (az éves kereted ${Math.round(def.val*100)}%-a)`;
+    txt=`+${fmtFt(amt)}`;
   }else{
     M.sp=(M.sp||0)+def.val;
     M.spEarned=(M.spEarned||0)+def.val;
@@ -33623,9 +33817,12 @@ function msGroups(){
   const g=[];
   MILESTONES.forEach(d=>{if(g.indexOf(d.grp)<0)g.push(d.grp);});
   return g;}
+/* A jutalom felirata. A PÉNZ konkrét összegben áll ott, nem képletként: a
+   felhasználót az érdekli, mennyit kap, nem az, hogyan számoltuk. (A szám a
+   MOSTANI kereteddel számol, tehát a klub növekedésével együtt nő.) */
 function msRewardLabel(d){
   return d.kind==="cash"
-    ? `${Math.round(d.val*100)}% éves keret`
+    ? fmtFtShort(msCashReward(d.val))
     : `${d.val} stíluspont`;}
 function msProgressOf(d){
   let v=0;try{v=d.p()||0;}catch(e){v=0;}
@@ -33712,6 +33909,25 @@ function msCatShopBind(box){
   /* a zárt mérföldkövek "kattints ide" sora ugyanoda visz */
   box.querySelectorAll("[data-mslock]").forEach(b=>{
     b.onclick=()=>msCatUnlockPrompt(b.getAttribute("data-mslock"));});}
+/* A jelölt-lista: kikkel lehetne rivális- vagy mester-tanítvány kémiát
+   építeni. Csak a MÉG NEM KÉSZ párosokat mutatja — ami már megvan, az a
+   haladásjelzőn látszik. */
+function msPairHintHtml(){
+  let rv=[],mt=[];
+  try{rv=msRivalCandidates();mt=msMentorCandidates();}catch(e){}
+  if(!rv.length&&!mt.length)return "";
+  const row=(cim,list,fmt)=>{
+    if(!list.length)return `<div class="msDesc"><b>${cim}:</b> a keretedben most nincs ilyen páros.</div>`;
+    const show=list.slice(0,6).map(fmt).join(" · ");
+    return `<div class="msDesc"><b>${cim}:</b> ${show}`
+      +(list.length>6?` <span style="color:var(--dim2)">…és még ${list.length-6}</span>`:"")+`</div>`;};
+  return `<div class="msItem" style="border-style:dashed">`
+    +`<div class="msTop"><b>💡 Kikkel lehetne?</b><span class="msRew">a keretedből</span></div>`
+    +row("Kibékíthető riválisok",rv,
+        o=>`${esc(shortName(o.a))} & ${esc(shortName(o.b))} <span style="color:var(--dim2)">(${esc(o.clubs[0])} ↔ ${esc(o.clubs[1])})</span>`)
+    +row("Mester-tanítvány",mt,
+        o=>`${esc(shortName(o.a))} (${o.ages[0]}) & ${esc(shortName(o.b))} (${o.ages[1]})`)
+    +`<div class="msDesc" style="color:var(--dim2)">A kémiát a szokásos módon építed — a jutalom-sor kémia-ágán.</div></div>`;}
 function renderMilestones(){
   const box=$("hubMilestonesPanel");
   if(!box)return;
@@ -33730,9 +33946,9 @@ function renderMilestones(){
     +`<div class="msSum"><b>${done}</b><span>/${total} teljesítve</span></div>`
     +`<div class="msSum"><b>${M.sp||0}</b><span>csapatstílus-pont</span></div>`
     +`<div class="msSum"><b>${fmtFtShort(M.cash||0)}</b><span>eddigi pénzjutalom</span></div></div>`;
-  h+=`<div class="msNote">A pénzjutalom mindig a MINDENKORI éves kereted százaléka, `
-    +`tehát egy erős klubnál arányosan többet ér. A csapatstílus-pont a következő `
-    +`fejlesztés, a csapatépítési stílusok valutája — addig gyűlik.</div>`;
+  h+=`<div class="msNote">A kiírt pénzjutalom a MOSTANI klubodra érvényes összeg — `
+    +`ahogy a klub nő, úgy nőnek a jutalmak is. A csapatstílus-pont a saját `
+    +`stílusod képességeire költhető.</div>`;
   if(unseen)h+=`<button class="btn-s" id="msSeenAll" style="width:100%;margin:2px 0 4px;padding:8px">Mind megnézve (${unseen})</button>`;
   h+=msCatShopHtml();
   msGroups().forEach(grp=>{
@@ -33776,6 +33992,10 @@ function renderMilestones(){
       h+=`<div class="msItem done${isNew?" fresh":""}">`
         +`<div class="msTop"><b>✓ ${esc(d.t)}</b><span class="msRew">${msRewardLabel(d)}</span></div>`
         +`<div class="msDesc">${esc(d.d)}</div></div>`;});
+    /* SEGÍTSÉG: a rivális- és mester-tanítvány párosokat nem tisztességes
+       találgatásra bízni — az adat a játékban van, csak eddig nem látszott.
+       A csoport alján kiírjuk a keretedből a MÉG MEG NEM ÉPÍTETT jelölteket. */
+    if(grp==="Egymásra találva")h+=msPairHintHtml();
     /* LEMARADT: a zárás alatt teljesült, ezért pont nélkül lezárt mérföldkövek.
        Nem tüntetjük el őket — a rendszer legyen őszinte arról, mit vesztettél. */
     lost.forEach(d=>{
@@ -34400,6 +34620,117 @@ stTiers("panzer","pz_injwin",th=>`${th} győzelem sérülttel`,
 stTiers("panzer","pz_skill",th=>`${th} kemény képesség`,
   th=>`Legyen ${th} kiépített védő- vagy csatár-képesség a keretedben.`,
   [5,9],[3,6],()=>stSkillCount(["VEDO","CSATAR"]));
+
+/* ================= APRÓ STÍLUS-MÉRFÖLDKÖVEK =================
+   A nagy célok (Aranylabda, 120 gól, 99-es sebesség) egy hosszú karrier
+   végén jönnek. Közben a stílus-pálya néma maradt: hónapokig nem történt
+   semmi, ami visszaigazolta volna, hogy jó irányba mész.
+
+   Ez a réteg tölti ki a hézagot. Mind KIS jutalom (3-6 pont), mind rövid
+   távon elérhető, és mind a stílus SAJÁT nyelvén beszél — az első
+   visszaigazolások, amikből kiderül, hogy a filozófia működik. */
+/* Segédek: a szezon-statisztikák csúcsai. */
+function stSeasonMax(obj){
+  let m=0;Object.values(obj||{}).forEach(v=>{if(v>m)m=v;});return m;}
+function stDistinctScorers(){return Object.keys(S.scorers||{}).length;}
+function stStarSeason(what){
+  const st=styleState();
+  if(!st||!st.star)return 0;
+  return ((S[what]||{})[st.star])||0;}
+function stStarHasChem(){
+  const st=styleState();
+  if(!st||!st.star)return 0;
+  return msChemPairsDone().some(pr=>pr.a===st.star||pr.b===st.star)?1:0;}
+
+/* ---- 🧱 Beton védelem ---- */
+stDef("beton","bt_s_streak","Három meccs érintetlenül",
+  "Tarts 3 tiszta lapot egymás után.",3,
+  ()=>Math.max(S.cleanSheetStreak||0,S.chSeasonMaxCleanStreak||0),3);
+stDef("beton","bt_s_saves","Dolgos kapus",
+  "Mutasson be a kapusod 20 bravúrt egy szezonban.",4,
+  ()=>stSeasonMax(S.seasonSaves),20);
+stDef("beton","bt_s_unb","Öt meccs vereség nélkül",
+  "Maradj veretlen 5 mérkőzésen át.",3,
+  ()=>Math.max(S.unbeatenStreak||0,S.chSeasonMaxUnbeaten||0),5);
+stDef("beton","bt_s_avg","Erős hátsó sor",
+  "A védelmed Rating-átlaga érje el a 85-öt.",4,
+  ()=>Math.round(stRoleAvg("VEDO")),85);
+stDef("beton","bt_s_gk","Megbízható kapus",
+  "Legyen a kapusod legalább 88-as Ratingű.",4,()=>{
+    let m=0;stXI().forEach(o=>{if(stRoleOf(o)==="KAPUS")m=Math.max(m,stEffOvr(o));});
+    return Math.round(m);},88);
+
+/* ---- ⚽ Bombázók ---- */
+stDef("bombazok","bz_s_haul","Ötgólos meccs",
+  "Rúgj 5 gólt egyetlen mérkőzésen.",3,()=>msT().haulMax||0,5);
+stDef("bombazok","bz_s_solo","Tizenöt gól egy idényben",
+  "Szerezzen egy játékosod 15 gólt egy szezonban.",3,
+  ()=>Math.max(stSeasonMax(S.scorers),msT().bestSeasonGoals||0),15);
+stDef("bombazok","bz_s_assist","Húsz gólpassz",
+  "Adjon egy játékosod 20 gólpasszt egy szezonban.",4,
+  ()=>stSeasonMax(S.assists),20);
+stDef("bombazok","bz_s_avg","Erős támadósor",
+  "A támadósorod Rating-átlaga érje el a 85-öt.",4,
+  ()=>Math.round(stRoleAvg("CSATAR")),85);
+stDef("bombazok","bz_s_gf","Ötven gól egy idényben",
+  "Rúgj 50 gólt egy bajnoki szezonban.",3,
+  ()=>Math.max(S.GF||0,...msHistory().map(h=>(h&&h.gf)||0)),50);
+
+/* ---- ☯️ Béke és harmónia ---- */
+stDef("harmonia","hm_s_chem","Első kötések",
+  "Legyen 3 kész párkémia a klubnál.",3,stChemDone,3);
+stDef("harmonia","hm_s_morale","Jó a hangulat",
+  "Érje el a csapatmorál a 75-öt.",3,()=>Math.round(S.morale||0),75);
+stDef("harmonia","hm_s_spread","Kiegyenlítődő keret",
+  "A kezdő 11 legerősebb és leggyengébb embere közti különbség menjen 10 alá.",4,
+  ()=>{const v=stXISpread();return v>=999?0:Math.max(0,20-v);},10);
+stDef("harmonia","hm_s_scorers","Sokan találnak be",
+  "Legyen 6 különböző gólszerződ egy szezonban.",4,stDistinctScorers,6);
+stDef("harmonia","hm_s_axes","Egyenletes tengelyek",
+  "Mind a négy csapat-attribútum érje el a 75-öt.",4,
+  ()=>Math.round(stWeakestAxis()),75);
+
+/* ---- ⭐ Sztárom a párom ---- */
+stDef("sztar","sz_s_prod","A sztár termel",
+  "Szerezzen a sztárod 10 gólt vagy gólpasszt egy szezonban.",3,
+  ()=>stStarSeason("scorers")+stStarSeason("assists"),10);
+stDef("sztar","sz_s_mvp","A meccs embere",
+  "Legyen a sztárod 3-szor a mérkőzés embere egy szezonban.",3,
+  ()=>stStarSeason("mvps"),3);
+stDef("sztar","sz_s_matches","Ötven meccs",
+  "Játsszon a sztárod 50 mérkőzést a klubodnál.",3,stStarMatches,50);
+stDef("sztar","sz_s_lead","Kiemelkedik",
+  "Legyen a sztárod 5 Ratinggel a kezdő 11 átlaga fölött.",4,stStarLead,5);
+stDef("sztar","sz_s_chem","Nincs egyedül",
+  "Legyen a sztárodnak legalább egy kész párkémiája.",4,stStarHasChem,1);
+
+/* ---- ⚡ Hol jön a mennydörgés? ---- */
+stDef("villam","vl_s_avg","Gyorsuló keret",
+  "A kezdő 11 Sebesség-átlaga érje el a 80-at.",3,
+  ()=>Math.round(stXISpeedAvg()),80);
+stDef("villam","vl_s_max","Villámláb",
+  "Legyen egy 95-ös Sebességű játékosod.",3,()=>Math.round(stMaxSpeed()),95);
+stDef("villam","vl_s_wings","Két szélső",
+  "Álljon egyszerre 2 szélső a kezdő 11-edben.",3,stWingerCount,2);
+stDef("villam","vl_s_rec","Első mérés",
+  "Dönts meg egy 34 km/h-s végsebesség-rekordot.",4,()=>stRecord("speed"),34);
+stDef("villam","vl_s_fit","Kezd összeállni",
+  "Érd el a 70%-os illeszkedést a stílusod otthonos taktikájában.",4,stHomeTacticFit,70);
+
+/* ---- 🛡️ Panzerkampfwagen ---- */
+stDef("panzer","pz_s_hot","Első bajkeverők",
+  "Legyen 2 magas temperamentumú játékos a keretedben.",3,stHotHeads,2);
+stDef("panzer","pz_s_morale","Nem inogunk",
+  "Zárj le egy szezont úgy, hogy a morál végig 55 fölött maradt.",4,
+  ()=>msT().bestMoraleFloor||0,55);
+stDef("panzer","pz_s_red","Az első piros",
+  "Szedj össze egy piros lapot egy idényben — ez a stílus ára.",3,
+  ()=>Math.max(S.reds||0,msT().maxSeasonReds||0),1);
+stDef("panzer","pz_s_shot","Ágyúláb",
+  "Dönts meg egy 100 km/h-s lövéserő-rekordot.",4,()=>stRecord("shot"),100);
+stDef("panzer","pz_s_inj","Összezárás",
+  "Nyerj meg egy mérkőzést úgy, hogy volt sérült emberetek.",3,
+  ()=>msT().injWins||0,1);
 
 /* ================= A STÍLUS-KIÉRTÉKELŐ =================
    Ugyanaz a minta, mint a msScan: minden nem teljesített mérföldkövet
