@@ -382,6 +382,32 @@ Javasolt trait-árazás: **I. szint 8-12 pont · II. szint 20-30 · III. szint
 50-70**. Így egy karrier alatt a hat traitből reálisan **három-négy** szerezhető
 meg — a stíluson belül is döntést kell hozni, nem lehet mindent kimaxolni.
 
+### 4.1b A stíluspont mérlege (3.1.03)
+
+A stílus SAJÁT mérföldkövei (`STYLE_MILESTONES`) a második, jóval bővebb
+forrás. A 3.1.03-ig stílusonként 119-172 pontot adtak — a kiadás ezt
+**628-697**-re emelte, mert a KIADÁSI oldal ennél nagyságrenddel nagyobb:
+
+| Tétel | Pont |
+|---|---|
+| Általános mérföldkövek (kategóriák megnyitása után) | 329 |
+| A választott stílus saját mérföldkövei | 628-697 |
+| **bevétel egy karrier alatt** | **~960-1030** |
+| Egy stílus TELJES trait-fája (7 trait × 3 szint) | 1007 |
+| Csillagozási jogok (képességenként 25-60 pont) | ezen felül |
+
+Vagyis a teljes bevételből épphogy kijönne a trait-fa — ha a csillagozásra
+egyetlen pontot sem költenél. A döntés így valódi marad.
+
+A hat stílus lépcsői ugyanazt a négy értékgörbét használják (`ST_L9`, `ST_L6`,
+`ST_L3`, `ST_CARD`, `ST_PEAK`), hogy a lépték stílusfüggetlen legyen: egy
+karrier-hosszú számláló 102 pont, egy mérés-lépcső 43, egy idényen belüli
+bravúr 35, a szezonkártya-lépcső (Gyilkos → Vadista szandál → GODLIKE) 64, a
+csúcs-lépcső pedig 265 — az utóbbi tetején a fokozatok már-már elérhetetlenek,
+és onnantól minden új rekord ugyanazt a teljes (32 pontos) jutalmat fizeti.
+Az Aranylabda és a GODLIKE-kártya egyaránt **32 pont**: a karrier két egyéni
+csúcsa azonos súlyú.
+
 ### 4.2 Mit NEM csinál a rendszer
 
 - **Nem tilt.** Egyetlen stílus sem zár ki felállást, taktikát vagy igazolást.

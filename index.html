@@ -2617,7 +2617,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.02";
+const APP_VERSION="3.1.03";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -34405,8 +34405,15 @@ function msNoteStaffType(type){
   }catch(e){}}
 /* Sorsdöntő meccsen kiérdemelt hős-skill. */
 function msNoteClutchSkill(){try{if(gameMode==="career")msT().clutchSkill=true;}catch(e){}}
-/* Megdőlt sebesség-/lövéserő-rekord (csak ha volt mit megdönteni). */
-function msNoteRecordBreak(){try{if(gameMode==="career")msT().recBreak=true;}catch(e){}}
+/* Megdőlt sebesség-/lövéserő-rekord (csak ha volt mit megdönteni).
+   A `recBreak` a régi, logikai bélyeg (egy általános mérföldkő olvassa), a
+   `recBreaks` pedig SZÁMLÁL — arra épül a stílus-mérföldkövek mérés-lépcsője. */
+function msNoteRecordBreak(){try{
+  if(gameMode!=="career")return;
+  const t=msT();
+  t.recBreak=true;
+  t.recBreaks=(t.recBreaks||0)+1;
+}catch(e){}}
 /* Egy lejátszott mérkőzés maradandó számai. */
 function msNoteMatch(o){
   try{
@@ -35286,10 +35293,133 @@ function stWonKing(msKey){
 /* ================= A STÍLUSONKÉNTI TÁBLÁK ================= */
 const STYLE_MILESTONES={};
 function stDef(styleK,id,t,d,val,p,n){
-  (STYLE_MILESTONES[styleK]=STYLE_MILESTONES[styleK]||[])
-    .push({id,t,d,val,p,n:n||1});}
-function stTiers(styleK,base,tFn,dFn,vals,tiers,p){
-  tiers.forEach((th,i)=>stDef(styleK,`${base}_${th}`,tFn(th),dFn(th),vals[i],p,th));}
+  const L=(STYLE_MILESTONES[styleK]=STYLE_MILESTONES[styleK]||[]);
+  L.push({id,t,d,val,p,n:n||1});
+  return L[L.length-1];}
+/* ---- A LÉPCSŐS SOROK CSALÁDNEVE ----
+   Ugyanaz a szerep, mint az általános mérföldköveknél az MS_FAM_T: a panelen
+   a kilenc fokozat EGY sorrá olvad, és annak a sornak kell egy neve. A fázis
+   címéből nem vezethető le (a küszöb hol elöl van, hol hátul), ezért itt áll. */
+const ST_FAM_T={
+  bt_cs:"Tiszta lapok egy idényben", bt_ga:"Kapott gólok egy idényben",
+  bt_skill:"Védekező képességek", bt_card:"A kapus szezonkártyája",
+  bt_csall:"Tiszta lapok a klub történetében", bt_saveseason:"Bravúrok egy idényben",
+  bt_unb:"Veretlenségi sorozat", bt_wall:"A bevehetetlen idény",
+  bz_gf:"Gólok egy idényben", bz_solo:"Egy játékos góljai egy idényben",
+  bz_skill:"Befejező képességek", bz_card:"A gólgép szezonkártyája",
+  bz_htall:"Mesterhármasok a klubnál", bz_assist2:"Gólpasszok egy idényben",
+  bz_haulm:"Gólzápor egy meccsen", bz_gfmax:"A gólrekord-idény",
+  hm_spread:"A kezdő 11 szórása", hm_chem:"Kész párkémiák",
+  hm_card:"Kiemelkedő emberek egyszerre", hm_contrib:"Akik beszálltak a termelésbe",
+  hm_scorersN:"Különböző gólszerzők egy idényben", hm_axisN:"A leggyengébb tengely",
+  hm_balN:"A csapategyensúly",
+  sz_lead:"A sztár kiemelkedése", sz_ovr:"A sztár Ratingje",
+  sz_skill:"A sztár képességei", sz_award:"A sztár egyéni díjai",
+  sz_loyal:"A sztár hűsége", sz_card:"A sztár szezonkártyája",
+  sz_ht:"A sztár mesterhármasai", sz_assist:"A sztár gólpasszai egy idényben",
+  sz_rec:"Megdöntött klubrekordok", sz_haul:"Gólzápor egy meccsen",
+  vl_avg:"A kezdő 11 sebesség-átlaga", vl_rec:"Végsebesség-klubrekord",
+  vl_skill:"Sebesség-alapú képességek", vl_card:"A leggyorsabb ember szezonkártyája",
+  vl_fast:"Villámgyors emberek a keretben", vl_streak:"Győzelmi sorozat",
+  vl_recN:"Megdöntött klubrekordok", vl_avgmax:"A repülő kezdő 11",
+  pz_hot:"Lobbanékony emberek", pz_shot:"Lövéserő-klubrekord",
+  pz_injwin:"Győzelmek sérülttel", pz_skill:"Kemény képességek",
+  pz_card:"A klub legjobb szezonkártyája", pz_redall:"Piros lapok a klub történetében",
+  pz_redseason:"Piros lapok egy idényben", pz_injwin2:"Győzelmek sérülttel",
+  pz_shotmax:"Az ágyúgolyó"};
+/* `nOf`: a KÜSZÖBÖK, ha eltérnek a címben szereplő számtól. Enélkül a fordított
+   mércéjű családoknál (ahol a KISEBB szám a jobb: kapott gól, szórás) a
+   címke és a valódi feltétel elcsúszik egymástól — a fokozatok sorrendje
+   megfordul, és a panel lépcsője is hazudik. */
+function stTiers(styleK,base,tFn,dFn,vals,tiers,p,nOf){
+  tiers.forEach((th,i)=>{
+    const d=stDef(styleK,`${base}_${th}`,tFn(th),dFn(th),vals[i],p,(nOf?nOf[i]:th));
+    d.fam=base;d.famT=ST_FAM_T[base]||tFn(th);d.famI=i;d.famN=tiers.length;});}
+/* ================= A STÍLUS-LÉPCSŐK ÉRTÉKGÖRBÉI =================
+   Négy visszatérő görbe, hogy a hat stílus ugyanazt a léptéket beszélje. A
+   szám nem az elért érték nagyságából jön, hanem abból, mennyi MUNKA van
+   mögötte: a felső fokozatok egy egész karrier céljai.
+     L9   — hosszú, karrieren átívelő számláló (kilenc fokozat)
+     L6   — mérés-lépcső: ugyanaz a rekord, egyre feljebb tolva
+     L3   — egyetlen idényen belül teljesítendő bravúr
+     CARD — szezonkártya: Gyilkos → Vadista szandál → GODLIKE
+     PEAK — a csúcs-lépcső: a tetején a fokozatok már-már elérhetetlenek, és
+            onnantól minden új rekord ugyanazt a teljes jutalmat fizeti */
+const ST_L9=[2,2,3,5,8,10,20,20,32];
+const ST_L6=[2,2,5,8,10,16];
+const ST_L3=[5,10,20];
+const ST_CARD=[12,20,32];
+const ST_CARD_TH=[6,7,8];
+const ST_CARD_N={6:"Gyilkos",7:"Vadista szandál",8:"GODLIKE"};
+const ST_PEAK=[2,5,10,16,20,24,28,32,32,32,32,32];
+/* A KÁRTYA-LÉPCSŐ mércéje nem mennyiség, hanem RANGSOR: a „0 / 7" haladásjelző
+   itt semmit nem mond (a 7 a Vadista szandál sorszáma). Ezek a sorok ezért sáv
+   nélkül állnak — a fázis-csík úgyis megmutatja, hol tartanak. */
+function stCardLadder(styleK,base,tFn,dFn,p){
+  stTiers(styleK,base,tFn,dFn,ST_CARD,ST_CARD_TH,p);
+  (STYLE_MILESTONES[styleK]||[]).forEach(d=>{if(d.fam===base)d.bar=false;});}
+/* ---- SEGÉDEK AZ ÚJ LÉPCSŐKHÖZ ---- */
+function stCardRankOf(name){
+  try{return name?cardTierRank(playerCardTier(name)):0;}catch(e){return 0;}}
+/* A legmagasabb szezonkártya-szint a keretben — posztcsoportra szűkíthető. */
+function stTopCardRank(role){
+  let m=0;
+  msRoster().forEach(p=>{
+    if(role){
+      let c=null;try{c=getCategoryFor(p.pos&&p.pos[0]);}catch(e){}
+      if(c!==role)return;}
+    m=Math.max(m,stCardRankOf(p.n));});
+  return m;}
+/* Hány emberednek van legalább `minRank` szintű kártyája? */
+function stCardCount(minRank){
+  let n=0;
+  msRoster().forEach(p=>{if(stCardRankOf(p.n)>=minRank)n++;});
+  return n;}
+function stStarCardRank(){
+  const st=styleState();
+  return (st&&st.star)?stCardRankOf(st.star):0;}
+/* A keret leggyorsabb embere (a sebesség-attribútum szerint). */
+function stFastestName(){
+  let b=null,m=-1;
+  msRoster().forEach(p=>{
+    const a=attrsOfPlayer(p);const v=(a&&a.seb)||0;
+    if(v>m){m=v;b=p.n;}});
+  return b;}
+function stFastCount(th){
+  let n=0;
+  msRoster().forEach(p=>{const a=attrsOfPlayer(p);if(a&&(a.seb||0)>=th)n++;});
+  return n;}
+/* Mindenkori klub-összeg egy karrier-statisztika mezőjéből. */
+function stCareerSum(field){
+  let n=0;
+  Object.values(S.careerStats||{}).forEach(c=>{n+=(c&&c[field])||0;});
+  return n;}
+function stStarCareer(field){
+  const st=styleState();
+  if(!st||!st.star)return 0;
+  const c=(S.careerStats&&S.careerStats[st.star])||null;
+  return (c&&c[field])||0;}
+/* Egy ember gólpasszai a FUTÓ szezonban — bajnoki és kupa együtt. */
+function stSeasonAssists(name){
+  if(!name)return 0;
+  const eb=S.seasonEuro||{};
+  return ((S.assists||{})[name]||0)+(((eb.assists)||{})[name]||0);}
+function stStarSeasonAssists(){
+  const st=styleState();
+  return (st&&st.star)?stSeasonAssists(st.star):0;}
+/* Hány EMBERED szállt be valaha a termelésbe (gól vagy gólpassz)? */
+function stContributors(){
+  let n=0;
+  Object.values(S.careerStats||{}).forEach(c=>{if(c&&((c.g||0)+(c.a||0))>0)n++;});
+  return n;}
+/* A legtöbb gól, amit egyetlen bajnoki idényben rúgtatok. */
+function stBestSeasonGF(){
+  let m=S.GF||0;
+  msHistory().forEach(h=>{if(h&&(h.gf||0)>m)m=h.gf;});
+  return m;}
+/* A legtöbb tiszta lap egyetlen idényben. */
+function stBestSeasonCS(){
+  return Math.max(S.chSeasonCleanSheets||0,msT().csSeasonMax||0);}
 
 /* ---------- 🧱 BETON VÉDELEM ---------- */
 stDef("beton","bt_line","A hátsó sor a legerősebb",
@@ -35305,19 +35435,41 @@ stTiers("beton","bt_cs",th=>`${th} tiszta lap egy idényben`,
   th=>`Tarts ${th} tiszta lapot egyetlen szezonban.`,
   [4,7,11],[5,10,15],
   ()=>Math.max(S.chSeasonCleanSheets||0,msT().csSeasonMax||0));
+/* FORDÍTOTT MÉRCE. A haladás „26 mínusz a kapott gól", a küszöb viszont a
+   CÍMBEN szereplő gólszám volt — így a fokozatok megfordultak: a „25-nél
+   kevesebb" fokozat egy góllal kapott idényt kért, a „15-nél kevesebb" pedig
+   tizenegyet. Az `nOf` mostantól kimondja a valódi küszöböt (27−cím). */
 stTiers("beton","bt_ga",th=>`Kevesebb mint ${th} kapott gól`,
   th=>`Zárj le egy bajnoki idényt ${th}-nál kevesebb kapott góllal.`,
   [6,10,16],[25,20,15],
-  ()=>{const m=msT().minSeasonGA;return m==null?0:Math.max(0,26-m);});
+  ()=>{const m=msT().minSeasonGA;return m==null?0:Math.max(0,26-m);},
+  [2,7,12]);
 stTiers("beton","bt_skill",th=>`${th} védekező képesség`,
   th=>`Legyen ${th} kiépített védő- vagy kapus-képesség a keretedben.`,
   [4,7,11],[3,6,10],()=>stSkillCount(["VEDO","KAPUS"]));
 stDef("beton","bt_ballon","Aranylabdás a hátsó sorból",
   "Nyerje meg az Aranylabdát a te védőd vagy kapusod.",
-  14,()=>stBallonRole(["VEDO","KAPUS"])?1:0,1);
+  32,()=>stBallonRole(["VEDO","KAPUS"])?1:0,1);
 stDef("beton","bt_glove","Aranykesztyű",
   "Legyen a kapusod a Bajnokok Ligája kapus-királya.",
   12,()=>stWonKing("gloves")?1:0,1);
+stCardLadder("beton","bt_card",th=>`A kapus kártyája: ${ST_CARD_N[th]}`,
+  th=>`Érje el a kapusod a(z) ${ST_CARD_N[th]} szezonkártya-szintet.`,
+  ()=>stTopCardRank("KAPUS"));
+stTiers("beton","bt_csall",th=>`${th} tiszta lap a klubnál`,
+  th=>`Gyűjtsenek a kapusaid összesen ${th} tiszta lapot a karrier során.`,
+  ST_L9,[5,15,30,50,75,100,150,200,300],()=>stCareerSum("cs"));
+stTiers("beton","bt_saveseason",th=>`${th} bravúr egy idényben`,
+  th=>`Mutasson be a kapusod ${th} bravúrt egyetlen szezonban.`,
+  ST_L3,[25,35,50],()=>stSeasonMax(S.seasonSaves));
+stTiers("beton","bt_unb",th=>`${th} meccs veretlenül`,
+  th=>`Maradj veretlen ${th} mérkőzésen át.`,
+  ST_L6,[6,9,12,16,20,25],
+  ()=>Math.max(S.unbeatenStreak||0,S.chSeasonMaxUnbeaten||0));
+stTiers("beton","bt_wall",th=>`${th} tiszta lap egyetlen idényben`,
+  th=>`Tarts ${th} tiszta lapot egyetlen szezonban. A felső fokozatok már `
+     +`majdnem hibátlan idényt kérnek — és onnantól minden új rekord ugyanannyit fizet.`,
+  ST_PEAK,[12,14,16,18,20,22,24,25,26,27,28,30],stBestSeasonCS);
 
 /* ---------- ⚽ BOMBÁZÓK ---------- */
 stDef("bombazok","bz_line","A támadósor a legerősebb",
@@ -35344,17 +35496,37 @@ stTiers("bombazok","bz_skill",th=>`${th} befejező képesség`,
   [4,7,11],[3,6,10],()=>stSkillCount("CSATAR"));
 stDef("bombazok","bz_ballon","Aranylabdás csatár",
   "Nyerje meg az Aranylabdát a te csatárod.",
-  14,()=>stBallonRole("CSATAR")?1:0,1);
+  32,()=>stBallonRole("CSATAR")?1:0,1);
 stDef("bombazok","bz_boot","Aranycipő",
   "Legyen a csatárod a Bajnokok Ligája gólkirálya.",
   12,()=>stWonKing("boot")?1:0,1);
+stCardLadder("bombazok","bz_card",th=>`A gólgép kártyája: ${ST_CARD_N[th]}`,
+  th=>`Érje el az egyik csatárod a(z) ${ST_CARD_N[th]} szezonkártya-szintet.`,
+  ()=>stTopCardRank("CSATAR"));
+stTiers("bombazok","bz_htall",th=>`${th} mesterhármas a klubnál`,
+  th=>`Szerezzenek a játékosaid összesen ${th} mesterhármast.`,
+  ST_L9,[1,3,5,10,15,20,30,50,100],()=>stCareerSum("hattricks"));
+stTiers("bombazok","bz_assist2",th=>`${th} gólpassz egy idényben`,
+  th=>`Adjon egy játékosod ${th} gólpasszt egyetlen szezonban.`,
+  ST_L3,[10,15,25],()=>stSeasonMax(S.assists));
+stTiers("bombazok","bz_haulm",th=>`${th} gól egy meccsen`,
+  th=>`Rúgjatok ${th} gólt egyetlen mérkőzésen.`,
+  ST_L6,[6,7,8,9,10,12],()=>msT().haulMax||0);
+stTiers("bombazok","bz_gfmax",th=>`${th} gól egy idényben`,
+  th=>`Rúgj ${th} gólt egyetlen bajnoki szezonban. A felső fokozatok már `
+     +`gólrekord-idényt kérnek — és onnantól minden új rekord ugyanannyit fizet.`,
+  ST_PEAK,[85,95,105,115,125,135,145,155,165,175,185,200],stBestSeasonGF);
 
 /* ---------- ☯️ BÉKE ÉS HARMÓNIA ---------- */
+/* FORDÍTOTT MÉRCE — ugyanaz a hiba, mint a bt_ga-nál: a haladás „20 mínusz a
+   szórás", a küszöb viszont maga a szórás volt, tehát a fokozatok megfordultak
+   (a ±3 fokozat 17-es szórással is teljesült). A valódi küszöb: 20−cím. */
 stTiers("harmonia","hm_spread",th=>`Kiegyenlített kezdő 11 (±${th})`,
   th=>`A kezdő 11 legerősebb és leggyengébb embere közti effektív különbség maradjon ${th} alatt.`,
   [6,10,16],[8,5,3],
   /* fordított mérce: minél kisebb a szórás, annál nagyobb a "haladás" */
-  ()=>{const s=stXISpread();return s>=999?0:Math.max(0,20-s);});
+  ()=>{const s=stXISpread();return s>=999?0:Math.max(0,20-s);},
+  [12,15,17]);
 stTiers("harmonia","hm_chem",th=>`${th} kész párkémia`,
   th=>`Legyen egyszerre ${th} teljesen kiépített párkémia a klubnál.`,
   [5,8,12],[6,10,15],stChemDone);
@@ -35376,6 +35548,25 @@ stDef("harmonia","hm_balance","Mesteri egyensúly",
 stDef("harmonia","hm_fit","A rendszer működik",
   "Érd el a 90%-os illeszkedést a stílusod otthonos taktikájában (Labdatartás vagy Totális futball).",
   10,stHomeTacticFit,90);
+/* A HARMÓNIA KÁRTYA-LÉPCSŐJE szándékosan NEM egyetlen emberről szól: itt nem
+   egy sztár emelkedik ki, hanem sokan érnek fel ugyanoda. */
+stTiers("harmonia","hm_card",th=>`${th} kiemelkedő ember egyszerre`,
+  th=>`Legyen egyszerre ${th} játékosod Gyilkos vagy magasabb szezonkártyával.`,
+  ST_CARD,[1,3,5],()=>stCardCount(6));
+stTiers("harmonia","hm_contrib",th=>`${th} ember szállt be`,
+  th=>`Szerezzen ${th} különböző játékosod gólt vagy gólpasszt a klubodnál.`,
+  ST_L9,[5,10,15,20,25,30,40,50,70],stContributors);
+stTiers("harmonia","hm_scorersN",th=>`${th} különböző gólszerző`,
+  th=>`Találjon be ${th} különböző játékosod egyetlen szezonban.`,
+  ST_L3,[8,10,12],stDistinctScorers);
+stTiers("harmonia","hm_axisN",th=>`A leggyengébb tengely: ${th}`,
+  th=>`Érje el mind a négy csapat-attribútum a ${th}-öt.`,
+  ST_L6,[70,75,80,85,90,95],()=>Math.round(stWeakestAxis()));
+stTiers("harmonia","hm_balN",th=>`${th} pontos csapategyensúly`,
+  th=>`Érje el a csapategyensúly-mérőd a ${th} pontot. A felső fokozatok már `
+     +`szinte tökéletes elrendezést kérnek — és onnantól minden új rekord ugyanannyit fizet.`,
+  ST_PEAK,[60,65,70,75,80,85,88,91,94,96,98,99],
+  ()=>{const b=teamBalance();return b.ok?Math.round(b.score*100):0;});
 
 /* ---------- ⭐ SZTÁROM A PÁROM ---------- */
 stTiers("sztar","sz_lead",th=>`A sztár ${th} Ratinggel emelkedik ki`,
@@ -35390,15 +35581,38 @@ stTiers("sztar","sz_skill",th=>`A sztár ${th} képessége`,
 stTiers("sztar","sz_award",th=>`${th} egyéni díj`,
   th=>`Nyerjen a sztárod ${th} egyéni arany-díjat.`,
   [6,10,16],[2,4,6],stStarAwards);
+/* AZ ARANYLABDA a karrier egyetlen igazi egyéni csúcsa — 32 pont, ugyanannyi,
+   mint a GODLIKE-kártya. A kettő együtt a stílus két végpontja. */
 stDef("sztar","sz_ballon","Aranylabda",
   "Nyerje meg a sztárod az Aranylabdát.",
-  16,()=>{
+  32,()=>{
     const st=styleState();
     if(!st||!st.star)return 0;
     return (S.ballonHistory||[]).some(b=>b&&b.own&&b.name===st.star)?1:0;},1);
 stTiers("sztar","sz_loyal",th=>`${th} meccs a klubnál`,
   th=>`Játsszon a sztárod ${th} mérkőzést a klubodnál.`,
   [7,12],[150,250],stStarMatches);
+stCardLadder("sztar","sz_card",th=>`A sztár kártyája: ${ST_CARD_N[th]}`,
+  th=>`Érje el a kijelölt sztárod a(z) ${ST_CARD_N[th]} szezonkártya-szintet.`,
+  stStarCardRank);
+stTiers("sztar","sz_ht",th=>`${th} mesterhármas`,
+  th=>`Szerezzen a sztárod ${th} mesterhármast a klubodnál.`,
+  ST_L9,[1,3,5,10,15,20,30,50,100],()=>stStarCareer("hattricks"));
+stTiers("sztar","sz_assist",th=>`${th} gólpassz egy idényben`,
+  th=>`Adjon a sztárod ${th} gólpasszt egyetlen szezonban — bajnoki és kupa együtt. `
+     +`A fokozat EGY idényen belül teljesítendő, de elég egyszer sikerülnie.`,
+  ST_L3,[5,10,20],stStarSeasonAssists);
+stTiers("sztar","sz_rec",th=>`${th}. megdöntött klubrekord`,
+  th=>`Dönts meg ${th} klubrekordot a mérési kategóriákban (végsebesség vagy lövéserő).`,
+  ST_L6,[1,2,3,5,10,20],()=>msT().recBreaks||0);
+/* A GÓLZÁPOR-LÉPCSŐ. A felső fokozatok (12 gól fölött) szándékosan a
+   képtelenség határán állnak, és mindegyik UGYANANNYIT fizet: a kérés az volt,
+   hogy 12 gól fölött MINDEN új rekord teljes jutalmat érjen. Egy végtelen sor
+   nem fér el a mérföldkő-táblán, ezért 15-ig megyünk — annyi gólt egyetlen
+   mérkőzésen a játék teljes története alatt sem szokott látni senki. */
+stTiers("sztar","sz_haul",th=>`${th} gól egy meccsen`,
+  th=>`Rúgjatok ${th} gólt egyetlen mérkőzésen.`,
+  ST_PEAK,[4,5,6,7,8,9,10,11,12,13,14,15],()=>msT().haulMax||0);
 
 /* ---------- ⚡ HOL JÖN A MENNYDÖRGÉS? ---------- */
 stTiers("villam","vl_avg",th=>`${th}-ös sebesség-átlag`,
@@ -35407,9 +35621,12 @@ stTiers("villam","vl_avg",th=>`${th}-ös sebesség-átlag`,
 stDef("villam","vl_max","A leggyorsabb ember",
   "Legyen egy 99-es Sebességű játékosod.",
   10,()=>Math.round(stMaxSpeed()),99);
+/* A 40 km/h ELÉRHETETLEN volt: a mérés kemény plafonja SPRINT_CAP = 38,5 —
+   vagyis a család legfelső, 14 pontos fokozata halott tartalom volt. A lépcső
+   most a valódi sávban áll. */
 stTiers("villam","vl_rec",th=>`${th} km/h-s klubrekord`,
   th=>`Dönts meg egy ${th} km/h-s végsebesség-rekordot a klubnál.`,
-  [6,10,14],[36,38,40],()=>stRecord("speed"));
+  [6,10,14],[36,37,38],()=>stRecord("speed"));
 stDef("villam","vl_wings","Négy szélső",
   "Álljon egyszerre 4 szélső a kezdő 11-edben.",
   10,stWingerCount,4);
@@ -35425,6 +35642,22 @@ stDef("villam","vl_bal","Gyors ÉS kiegyensúlyozott",
     const b=teamBalance();
     if(!b.ok||stXISpeedAvg()<88)return 0;
     return Math.round(b.score*100);},80);
+stCardLadder("villam","vl_card",th=>`A leggyorsabb kártyája: ${ST_CARD_N[th]}`,
+  th=>`Érje el a keret leggyorsabb embere a(z) ${ST_CARD_N[th]} szezonkártya-szintet.`,
+  ()=>stCardRankOf(stFastestName()));
+stTiers("villam","vl_fast",th=>`${th} villámgyors ember`,
+  th=>`Legyen ${th} játékosod 88-as vagy jobb Sebességgel.`,
+  ST_L9,[1,2,3,4,5,6,7,9,11],()=>stFastCount(88));
+stTiers("villam","vl_streak",th=>`${th} győzelem zsinórban`,
+  th=>`Nyerj meg ${th} mérkőzést egymás után.`,
+  ST_L3,[8,12,16],()=>msT().winStreakMax||0);
+stTiers("villam","vl_recN",th=>`${th}. megdöntött klubrekord`,
+  th=>`Dönts meg ${th} klubrekordot a mérési kategóriákban (végsebesség vagy lövéserő).`,
+  ST_L6,[1,2,3,5,10,20],()=>msT().recBreaks||0);
+stTiers("villam","vl_avgmax",th=>`${th}-ös sebesség-átlag`,
+  th=>`A kezdő 11 Sebesség-átlaga érje el a ${th}-öt. A 99 fölötti fokozatok `
+     +`csak az Infinityben nyílnak meg — és onnantól minden új rekord ugyanannyit fizet.`,
+  ST_PEAK,[82,85,88,90,92,94,96,98,99,104,109,114],()=>Math.round(stXISpeedAvg()));
 
 /* ---------- 🛡️ PANZERKAMPFWAGEN ---------- */
 stTiers("panzer","pz_hot",th=>`${th} lobbanékony ember`,
@@ -35448,6 +35681,25 @@ stTiers("panzer","pz_injwin",th=>`${th} győzelem sérülttel`,
 stTiers("panzer","pz_skill",th=>`${th} kemény képesség`,
   th=>`Legyen ${th} kiépített védő- vagy csatár-képesség a keretedben.`,
   [5,9],[3,6],()=>stSkillCount(["VEDO","CSATAR"]));
+stCardLadder("panzer","pz_card",th=>`A klub kártyája: ${ST_CARD_N[th]}`,
+  th=>`Érje el a keret bármelyik embere a(z) ${ST_CARD_N[th]} szezonkártya-szintet.`,
+  ()=>stTopCardRank(null));
+/* A PIROS LAP EBBEN A STÍLUSBAN NEM BÜNTETÉS, HANEM MÉRCE: a Panzer az
+   egyetlen filozófia, ahol a keménység ára maga a bizonyíték. */
+stTiers("panzer","pz_redall",th=>`${th} piros lap a klub történetében`,
+  th=>`Szedjetek össze összesen ${th} piros lapot a karrier során.`,
+  ST_L9,[1,3,5,8,12,16,20,25,30],()=>stCareerSum("rc"));
+stTiers("panzer","pz_redseason",th=>`${th} piros lap egy idényben`,
+  th=>`Szedjetek össze ${th} piros lapot egyetlen szezonban.`,
+  ST_L3,[3,5,7],()=>Math.max(S.reds||0,msT().maxSeasonReds||0));
+stTiers("panzer","pz_injwin2",th=>`${th} győzelem sérülttel`,
+  th=>`Nyerj meg ${th} mérkőzést úgy, hogy volt sérült emberetek.`,
+  ST_L6,[3,5,8,12,20,30],()=>msT().injWins||0);
+stTiers("panzer","pz_shotmax",th=>`${th} km/h-s lövés`,
+  th=>`Dönts meg egy ${th} km/h-s lövéserő-rekordot a klubnál. A felső fokozatok `
+     +`a mérés kemény plafonját (165 km/h) súrolják — és onnantól minden új rekord `
+     +`ugyanannyit fizet.`,
+  ST_PEAK,[120,125,130,135,140,145,150,155,158,160,162,164],()=>stRecord("shot"));
 
 /* ================= APRÓ STÍLUS-MÉRFÖLDKÖVEK =================
    A nagy célok (Aranylabda, 120 gól, 99-es sebesség) egy hosszú karrier
@@ -35615,9 +35867,19 @@ function styleMsMarkSeen(){
 /* A stílus-mérföldkövek listája a műszerfalon. Ugyanaz a vizuális nyelv, mint
    az általános mérföldköveknél — a felhasználónak ne kelljen új felületet
    tanulnia ahhoz, hogy ugyanazt a dolgot lássa. */
+/* A LÉPCSŐS SOROK ITT IS ÖSSZEOLVADNAK. A stílus-tábla ugyanolyan hosszú
+   lépcsőkből épül, mint az általános (egy sáv akár tizenkét fokozat), és
+   fokozatonként egy-egy doboz ugyanúgy zajjá tenné a listát, mint ott. Ezért
+   a MEGJELENÍTÉS ugyanazt a három építőelemet használja, amit az Infópult
+   mérföldkő-panelje: msRowsOf (sorokká olvasztás), msFamState (a sáv állapota)
+   és msPhaseHtml (a fázis-csík). A belső bejegyzések érintetlenek.
+   A stílus-mérföldköveknél nincs kategória-zár, tehát „beragadt" és „pont
+   nélkül zárult" állapot sem — a közös segédek ezt üres táblákkal kapják meg. */
+function styleMsShim(M){return {done:M.done,pend:{},missed:{}};}
 function styleMsHtml(){
   const M=styleMsState(),list=styleMsList();
   if(!M||!list.length)return "";
+  const W=styleMsShim(M);
   const done=list.filter(d=>M.done[d.id]).length;
   const unseen=styleMsUnseen();
   let h=`<div class="infoCard" style="margin-top:12px">`
@@ -35625,29 +35887,48 @@ function styleMsHtml(){
     +(unseen?` <span class="msBadge">${unseen} új</span>`:"")+`</div>`
     +`<div class="msNote">Ezek CSAK a te stílusodra szólnak, és mind `
     +`csapatstílus-pontot fizetnek. A megnyitás-kapu rájuk nem vonatkozik — `
-    +`itt maga a stílusválasztás a belépő.</div>`
+    +`itt maga a stílusválasztás a belépő. A több fokozatú célok EGY sorban `
+    +`állnak, fázisjelzővel — ahogy az Infópult mérföldkő-listájában.</div>`
     +`<div class="msSummary"><div class="msSum"><b>${done}</b><span>/${list.length} teljesítve</span></div>`
     +`<div class="msSum"><b>${list.reduce((a,d)=>a+d.val,0)}</b><span>összesen szerezhető</span></div>`
     +`<div class="msSum"><b>${msStylePoints()}</b><span>jelenlegi egyenleg</span></div></div>`;
   if(unseen)h+=`<button class="btn-s" id="styleMsSeen" style="width:100%;margin:2px 0 6px;padding:8px">Mind megnézve (${unseen})</button>`;
-  const open=list.filter(d=>!M.done[d.id])
-    .map(d=>{let v=0;try{v=d.p()||0;}catch(e){}
-             return {d,v,pct:Math.max(0,Math.min(1,d.n?v/d.n:0))};})
+  const rows=msRowsOf(list);
+  const open=rows.filter(r=>r.d?!M.done[r.d.id]:!!msFamState(r,W).next)
+    .map(r=>({r,pct:msRowProgress(r,W)}))
     .sort((a,b)=>b.pct-a.pct);
-  const fin=list.filter(d=>M.done[d.id]);
+  const fin=rows.filter(r=>r.d?!!M.done[r.d.id]:!msFamState(r,W).next);
   h+=`<div class="msList">`;
   open.forEach(o=>{
-    const showBar=o.d.n>1;
+    const r=o.r;
+    const st=r.d?null:msFamState(r,W);
+    /* A CSALÁDNÁL a SOROS fokozat adja a címet, a leírást, a jutalmat és a
+       haladást — az a következő lépés. A többi fokozat a csíkon látszik. */
+    const d=r.d||st.next;
+    let v=0;try{v=d.p()||0;}catch(e){}
+    const pct=Math.max(0,Math.min(1,d.n?v/d.n:0));
     h+=`<div class="msItem">`
-      +`<div class="msTop"><b>${esc(o.d.t)}</b><span class="msRew">${o.d.val} stíluspont</span></div>`
-      +`<div class="msDesc">${esc(o.d.d)}</div>`
-      +(showBar?`<div class="msBar"><i style="width:${Math.round(o.pct*100)}%"></i></div>`
-                +`<div class="msNum">${Math.round(o.v)} / ${o.d.n}</div>`:"")
+      +`<div class="msTop"><b>${esc(st?r.famT:d.t)}</b>`
+      +`<span class="msRew">${d.val} stíluspont</span></div>`
+      +`<div class="msDesc">${esc(d.d)}</div>`
+      +(d.n>1&&d.bar!==false
+        ?`<div class="msBar"><i style="width:${Math.round(pct*100)}%"></i></div>`
+         +`<div class="msNum">${Math.round(v)} / ${d.n}</div>`:"")
+      +(st?msPhaseHtml(st,W)
+           +`<div class="msPhaseN"><span>${st.done}/${st.total} fokozat kész</span>`
+           +`<span>${st.list.indexOf(d)+1}. fokozat: ${esc(d.t)}</span></div>`
+         :"")
       +`</div>`;});
-  fin.forEach(d=>{
-    h+=`<div class="msItem done${M.seen[d.id]?"":" fresh"}">`
-      +`<div class="msTop"><b>✓ ${esc(d.t)}</b><span class="msRew">${d.val} stíluspont</span></div>`
-      +`<div class="msDesc">${esc(d.d)}</div></div>`;});
+  fin.forEach(r=>{
+    const st=r.d?null:msFamState(r,W);
+    const L=st?st.list:[r.d];
+    const isNew=L.some(d=>M.done[d.id]&&!M.seen[d.id]);
+    const last=L[L.length-1];
+    h+=`<div class="msItem done${isNew?" fresh":""}">`
+      +`<div class="msTop"><b>✓ ${esc(st?r.famT:r.d.t)}</b>`
+      +`<span class="msRew">${st?`mind a ${st.total} fokozat`:`${r.d.val} stíluspont`}</span></div>`
+      +`<div class="msDesc">${esc(st?`A legmagasabb fokozat is megvan: ${last.t}.`:r.d.d)}</div>`
+      +(st?msPhaseHtml(st,W):"")+`</div>`;});
   return h+`</div></div>`;}
 /* ================= STÍLUS-KÉPESSÉGEK (F3: a trait-bolt és a hatások) =========
    A stílus eddig CÍMKE volt: eldöntötte, mit mérünk rólad, de nem változtatott
