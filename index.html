@@ -2419,7 +2419,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.0.04";
+const APP_VERSION="3.0.05";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9769,13 +9769,23 @@ const SPEED_TRAIN_DIV=1.5;   /* ennyivel lassabban edzhető, mint a többi */
    megnyílása nem ad ingyen gyorsaságot, csak megengedi, hogy a CÉLZOTT EDZÉS
    följebb vigyen. */
 const INFINITY_SPEED_TRAIN_DIV=4;   /* 99 fölött: 0,25x a többi attribútumhoz képest */
-function speedCap(){return infinityMode?attrHardCap():SPEED_MAX;}
+function speedCap(){
+  /* CSAPATÉPÍTÉSI STÍLUS ("Korai plafon-nyitás"): a villám-stílus a plafont
+     már az Infinity ELŐTT megnyithatja. A 99 fölötti negyed tempó ugyanúgy
+     érvényes rá — a trait a kaput nyitja ki, nem a fejlődést gyorsítja. */
+  if(infinityMode)return attrHardCap();
+  if(typeof styleSpeedEarly==="function"&&styleSpeedEarly())return attrHardCap();
+  return SPEED_MAX;}
 /* A sebesség edzés-osztója. A 99 FÖLÖTTI szakaszon vált negyedelőre — vagyis
    ugyanaz a játékos a 99-ig a régi tempóval halad, és csak azon túl lassul. */
 function speedTrainDiv(entry){
-  if(!infinityMode)return SPEED_TRAIN_DIV;
+  /* A 99 FÖLÖTTI szakasz mindig negyed tempó — akkor is, ha a plafont nem az
+     Infinity, hanem a stílus-trait nyitotta ki. */
   const cur=(entry&&entry.attrs&&entry.attrs.seb)||0;
-  return cur>=SPEED_MAX?INFINITY_SPEED_TRAIN_DIV:SPEED_TRAIN_DIV;}
+  if(cur>=SPEED_MAX&&speedCap()>SPEED_MAX)return INFINITY_SPEED_TRAIN_DIV;
+  /* CSAPATÉPÍTÉSI STÍLUS ("Gyorsabb izomzat"): a 99 ALATTI lassítás enyhül. */
+  const ov=(typeof styleSpeedDiv==="function")?styleSpeedDiv():null;
+  return ov!=null?ov:SPEED_TRAIN_DIV;}
 /* ---- PASSZÍV SEBESSÉG-CSATORNA ----
    A pályán töltött idő magától is formálja a gyorsaságot, poszt szerinti
    mértékben (a csatár sprintel a legtöbbet, a kapus alig). DE: ennek a
@@ -9940,7 +9950,9 @@ function bumpAttr(entry,key,dir){
    gyorsul a 99 fölé. */
 function speedPassiveCeil(entry){
   const base=(entry.sebBase!=null)?entry.sebBase:((entry.attrs&&entry.attrs.seb)||0);
-  return Math.min(speedCap(),Math.round(base*(1+SPEED_PASSIVE_CAP_PCT)));}
+  /* CSAPATÉPÍTÉSI STÍLUS ("Szélesebb passzív út"): a +15% tágulhat. */
+  const pct=(typeof stylePassiveSpeedPct==="function")?stylePassiveSpeedPct():null;
+  return Math.min(speedCap(),Math.round(base*(1+(pct!=null?pct:SPEED_PASSIVE_CAP_PCT))));}
 /* Passzív sebesség-pont jóváírása. KÜLÖN számlálón gyűlik (sebPassivePts),
    nem az attrPoints-ban — így a másodlagos plafont az edzéssel szerzett
    pontoktól függetlenül tudjuk érvényesíteni. A plafonon álló játékosnál a
@@ -11404,7 +11416,8 @@ function advanceCoachSeason(){
        korlát miatt inaktívan ül a stábban, az nem fejlődik — ez plusz ok arra,
        hogy ne gyűjts három azonos típusút. */
     if(!coachIsActive(c)||!focusTargets(c).length)continue;
-    c.xp=(c.xp||0)+1;
+    /* CSAPATÉPÍTÉSI STÍLUS: a stílushoz illő edzőtípusok gyorsabban érnek. */
+    c.xp=(c.xp||0)+1+styleCoachXp(c.type);
     const cap=coachSzCap(c);
     const want=Math.min(cap,(c.szBase||c.sz)+Math.floor(c.xp/COACH_XP_PER_STEP));
     if(want>c.sz){c.sz=want;rep.grew.push({n:c.n,sz:c.sz,type:c.type});}}
@@ -16833,6 +16846,13 @@ function drawSkillFromPool(){
   if(b>0&&Math.random()<b){
     const i=S.skillPool.findIndex(isPaceSkill);
     if(i>=0)return S.skillPool.splice(i,1)[0];}
+  /* CSAPATÉPÍTÉSI STÍLUS: a filozófiához illő kategória felé tolt sorsolás.
+     A taktikai torzítások (pace/goal) ELŐTT fut, mert a stílus a hosszú távú
+     identitás — de ez sem determinisztikus, csak esély. */
+  {const sb=(typeof styleSkillBias==="function")?styleSkillBias():null;
+   if(sb&&Math.random()<sb.p){
+     const i=S.skillPool.findIndex(sk=>sk&&sb.cats.indexOf(sk.cat)>=0);
+     if(i>=0)return S.skillPool.splice(i,1)[0];}}
   const g=goalSkillBias();
   if(g>0&&Math.random()<g){
     if(Math.random()<SHOT_METER_PREF){
@@ -18791,7 +18811,12 @@ function buildMatchSnapshot(){
   /* CSAPATEGYENSÚLY: a szélesen elosztott erő fizetsége. SOSEM negatív — a
      sztárt nem bünteti, csak a kiegyensúlyozott keretet jutalmazza. */
   const balBonus=teamBalanceBonus();
-  const ovr=sum/11+S.capMod+S.eventMod+coach.ovrMod+moraleMod+auraBonus+capExp+chFormMalus+teamMomentumAdj()+balBonus;
+  /* CSAPATÉPÍTÉSI STÍLUS: a megvett III. szintű traitek feltételes
+     csapaterő-bónusza (és a "Nélküle nem megy" büntetése). Egyetlen helyen
+     ül, a többi rejtett módosító mellett — így ugyanazokon a korlátokon megy
+     át, mint minden más hatás. */
+  const styleBonus=(typeof styleOvrBonus==="function")?styleOvrBonus():0;
+  const ovr=sum/11+S.capMod+S.eventMod+coach.ovrMod+moraleMod+auraBonus+capExp+chFormMalus+teamMomentumAdj()+balBonus+styleBonus;
   const tacStyle=(S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)>=85)?TACTICS[S.tactics.active].style:null;
   const activeNames=new Set(active.map(a=>a.p.n));
   const chemPairs=completeChemPairsOnPitch(activeNames);
@@ -18808,7 +18833,9 @@ function buildMatchSnapshot(){
 function matchLambdas(mine,oppOvr,venueAdj){
   const lam=d=>Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)));
   const diff=mine.ovr-oppOvr+mine.tacticEffect+venueAdj;
-  let lf=lam(diff),la=lam(-diff)*mine.defMult;
+  /* CSAPATÉPÍTÉSI STÍLUS: a támadó és védekező filozófia szorzói. A semleges
+     érték 1, tehát stílus (vagy trait) nélkül a képlet BITRE változatlan. */
+  let lf=lam(diff)*styleOwnGoalMult(),la=lam(-diff)*mine.defMult*styleOppGoalMult();
   if(mine.famSp==="gol")lf=Math.min(4.5,lf*1.09);
   if(mine.famSp==="testver"){lf=Math.max(.15,lf*0.82);la=Math.max(.15,la*0.82);}
   if(mine.famSp==="psycho"){
@@ -21716,7 +21743,7 @@ function playMatch(){
       const _wallF=clutchWallFactor(active);
       const _w=_wBase.map((v,k)=>clutchIsBackline(active,k)?v*_wallF:v);
       const _t0=_wBase.reduce((a,b)=>a+b,0),_t1=_w.reduce((a,b)=>a+b,0);
-      const _pRed=SIM.REDP*(RIVAL_MOOD?1.6:1)/18*(_t0>0?_t1/_t0:1);
+      const _pRed=SIM.REDP*(RIVAL_MOOD?1.6:1)/18*(_t0>0?_t1/_t0:1)*styleRedMult();
       if(Math.random()<_pRed){
       redIdx=weightedIndex(_w);
       S.reds++;
@@ -22311,7 +22338,7 @@ function playMatch(){
        csapat ALAP sérülés-esélyét is csökkenti (max −30%). Szűkebb fókusszal
        az össz-sérülésszám nem változik, csak a jelöltválasztás tolódik el —
        ezért van a lábadozás-rövidítés is (medicHealCut). */
-    if(Math.random()<(0.035+(famSp==="tank"?0.015:0))*(1-0.30*coachTeamPower("medic"))){
+    if(Math.random()<(0.035+(famSp==="tank"?0.015:0))*(1-0.30*coachTeamPower("medic"))*styleInjMult()){
       let cand=[...Array(11).keys()];if(redIdx>=0)cand=cand.filter(i=>i!==redIdx);
       const w=cand.map(i=>cardInjuryMult(active[i].p.n)
         *Math.max(0.35,1-COACH_MEDIC_W*coachTypePower("medic",active[i].p.n)));
@@ -22408,6 +22435,10 @@ function playMatch(){
        nem magasabb csúcs, hanem kiszámíthatóbb szezon. */
     S.morale=Math.max(0,Math.min(100,
       S.morale+(S.moraleTarget-S.morale)*0.15*(1+0.5*coachTeamPower("form"))));
+    /* CSAPATÉPÍTÉSI STÍLUS: a morál-padló traitek. A padló a KIÉRTÉKELÉS
+       UTÁN emel vissza — a romlás megtörténik, csak nem tud mélyre vinni. */
+    {const fl=styleMoraleFloor();
+     if(fl>0&&S.morale<fl)S.morale=fl;}
     /* --- jutalom-skillek: minden teljesült feltétel csak esélyt ad, nem
        biztos jutalmat (REWARD_CHANCE), és minden egyes beváltott alkalom
        vagy egy meglévő félkész skillt fejleszt ki teljesre (ha van ilyen,
@@ -22537,6 +22568,9 @@ function playMatch(){
       const pr=S.chemPairs[S.chemInProgress];
       if(!pr){S.chemInProgress=null;return null;}
       pr.stages=Math.min(CHEM_PAIR_NEED,pr.stages+1);
+      /* CSAPATÉPÍTÉSI STÍLUS ("Csapatkovács-műhely"): esély egy EXTRA fázisra. */
+      if(pr.stages<CHEM_PAIR_NEED&&Math.random()<styleChemSpeed())
+        pr.stages=Math.min(CHEM_PAIR_NEED,pr.stages+1);
       if(pr.stages>=CHEM_PAIR_NEED){
         addLine(`🤝 Kémia kész: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} — összeszokott páros, most már együtt veszélyesek!`,"m life");
         S.chemInProgress=null;
@@ -23872,12 +23906,14 @@ function buyShopForm(k){
   const it=FORM_SHOP[k];
   if(!it)return {ok:false,reason:"Ilyen felállás nincs a kínálatban."};
   if(formBought(k))return {ok:false,reason:"Ez a felállás már a tiéd."};
-  if((S.transferBudget||0)<it.price)
-    return {ok:false,reason:`Nincs elég büdzséd — ${fmtFt(it.price)} kellene.`};
+  /* Az ÁR a stílus-kedvezményt is tartalmazza (lásd shopFormPrice). */
+  const price=shopFormPrice(k);
+  if((S.transferBudget||0)<price)
+    return {ok:false,reason:`Nincs elég büdzséd — ${fmtFt(price)} kellene.`};
   S.formsBought=S.formsBought||{};
   S.formsBought[k]=true;
-  S.transferBudget-=it.price;
-  return {ok:true,key:k};}
+  S.transferBudget-=price;
+  return {ok:true,key:k,price};}
 /* ---- MEGBÍZATÁS-VÁLTÁS: A KERET MARAD A HELYÉN ----
    A felállásváltás (4-4-2 → 4-3-3) jogosan rendezi újra a kezdő 11-et: ott
    MÁSOK a helyek. A megbízatás-váltásnál viszont a slot-SZERKEZET változatlan —
@@ -26766,14 +26802,16 @@ function renderFormationShop(){
   let h="";
   Object.keys(FORM_SHOP).forEach(k=>{
     if(formBought(k))return;
-    const it=FORM_SHOP[k],afford=bud>=it.price;
+    const it=FORM_SHOP[k],price=shopFormPrice(k),afford=bud>=price;
+    const disc=price<it.price;
     h+=`<div class="hubDetail" style="margin-top:10px">`
       +`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">`
       +`<b style="font-size:14px;color:var(--gold)">${esc(FORM_LABELS[k]||k)} · ${esc(it.name)}</b>`
-      +`<span style="font-size:12px;white-space:nowrap;color:${afford?"var(--grass)":"var(--red)"}">${fmtFt(it.price)}</span></div>`
+      +`<span style="font-size:12px;white-space:nowrap;color:${afford?"var(--grass)":"var(--red)"}">${fmtFt(price)}</span></div>`
       +`<div style="font-size:12px;color:var(--dim);margin-top:5px;line-height:1.5">${esc(it.desc)}</div>`
+      +(disc?`<div style="font-size:11.5px;color:var(--grass);margin-top:4px">A csapatstílusod kedvezménye benne van (eredetileg ${fmtFt(it.price)}).</div>`:"")
       +`<button class="btn-${afford?"y":"s"} stepbtn" data-buyform="${k}"${afford?"":" disabled"} style="margin-top:8px">`
-      +(afford?`🛒 Megveszem — ${fmtFt(it.price)}`:`Nincs elég büdzséd (${fmtFt(bud)})`)+`</button></div>`;});
+      +(afford?`🛒 Megveszem — ${fmtFt(price)}`:`Nincs elég büdzséd (${fmtFt(bud)})`)+`</button></div>`;});
   /* A tervező bejárata csak akkor, ha van még megépíthető alak egyáltalán. */
   const canAfford=bud>=CUSTOM_FORM_PRICE;
   h+=`<div class="hubDetail" style="margin-top:10px">`
@@ -26791,11 +26829,11 @@ function renderFormationShop(){
       const k=b.getAttribute("data-buyform"),it=FORM_SHOP[k];
       askConfirm({html:`<div style="font-size:13px;line-height:1.5">`
         +`Megveszed a(z) <b>${esc(FORM_LABELS[k]||k)}</b> felállást (<b>${esc(it.name)}</b>)?<br>`
-        +`Ára: <b style="color:var(--gold)">${fmtFt(it.price)}</b>. Utána bármikor választhatod — a váltás a szokásos szabályok szerint megy.</div>`,
+        +`Ára: <b style="color:var(--gold)">${fmtFt(shopFormPrice(k))}</b>. Utána bármikor választhatod — a váltás a szokásos szabályok szerint megy.</div>`,
         onYes:()=>{
           const r=buyShopForm(k);
           if(!r.ok){addLine(`⛔ ${r.reason}`,"m ev");renderFormationPicker();return;}
-          addLine(`📐 Új felállás a kínálatodban: ${FORM_LABELS[k]||k} — ${it.name} (−${fmtFt(it.price)})`,"m life");
+          addLine(`📐 Új felállás a kínálatodban: ${FORM_LABELS[k]||k} — ${it.name} (−${fmtFt(r.price)})`,"m life");
           renderFormationPicker();renderHub();saveGame();}});};});
   const open=$("hubFormBuilderOpen");
   if(open)open.onclick=()=>{
@@ -33019,6 +33057,12 @@ const MS_STYLE_CATS=[
    d:"A cím korai bebiztosítása: minél több forduló van még hátra, annál többet ér."},
   {key:"ugras", n:"A nagy ugrás", pct:1.2,
    d:"A karrier két nagy határköve: az Infinity megnyitása és a tizedik lezárt szezon."}];
+/* CSAPATÉPÍTÉSI STÍLUS ("Olcsó totális futball"): a bolti felállás ára. */
+function shopFormPrice(k){
+  const it=FORM_SHOP[k];
+  if(!it)return 0;
+  const d=(typeof styleFormDiscount==="function")?styleFormDiscount():1;
+  return Math.max(1,Math.round(it.price*d));}
 function msCatByKey(k){return MS_STYLE_CATS.find(c=>c.key===k)||null;}
 function msCatUnlocked(k){
   if(!k)return true;                  /* kategória nélküli (pénzjutalmas) mérföldkő */
@@ -33814,8 +33858,21 @@ function styleDashboardHtml(st,def){
       +`<div class="msDesc">A stílus mérföldkövei róla szólnak.</div></div>`;
   h+=`<div class="msNote" style="margin-top:9px">A stílushoz tartozó KÉPESSÉGEK `
     +`(traitek) a következő fejlesztésben nyílnak meg — a pontjaid addig gyűlnek.</div></div>`;
-  return h+styleMsHtml();}
+  return h+styleTraitsHtml()+styleMsHtml();}
 function styleBindPanel(body){
+  body.querySelectorAll("[data-trait]").forEach(b=>{
+    b.onclick=()=>{
+      const k=b.getAttribute("data-trait"),t=styleTraitByKey(k);
+      if(!t)return;
+      askConfirm({html:`<div style="font-size:13px;line-height:1.5">`
+        +`Megnyitod a(z) <b>${esc(t.n)}</b> képességet <b style="color:var(--gold)">${t.price} csapatstílus-pontért</b>?<br>`
+        +`${esc(t.d)}<br><br><span style="color:var(--dim2)">A pont elköltése végleges — `
+        +`egy karrier alatt nem fér bele minden képesség.</span></div>`,
+        onYes:()=>{
+          const r=styleBuyTrait(k);
+          if(!r.ok){addLine(`⛔ ${r.reason}`,"m ev");renderStylePanel();return;}
+          renderStylePanel();
+          try{renderHub();refreshSquadViews();saveGame();}catch(e){}}});};});
   {const sm=$("styleMsSeen");
    if(sm)sm.onclick=()=>{
      styleMsMarkSeen();renderStylePanel();
@@ -34277,6 +34334,272 @@ function styleMsHtml(){
     h+=`<div class="msItem done${M.seen[d.id]?"":" fresh"}">`
       +`<div class="msTop"><b>✓ ${esc(d.t)}</b><span class="msRew">${d.val} stíluspont</span></div>`
       +`<div class="msDesc">${esc(d.d)}</div></div>`;});
+  return h+`</div></div>`;}
+/* ================= STÍLUS-KÉPESSÉGEK (F3: a trait-bolt és a hatások) =========
+   A stílus eddig CÍMKE volt: eldöntötte, mit mérünk rólad, de nem változtatott
+   semmin a pályán. A traitek zárják be a kört — a stílus-mérföldkövekért kapott
+   csapatstílus-pontot ITT lehet elkölteni, és innentől a filozófia a
+   szimulációban is látszik.
+
+   HÁROM SZINT, egyre drágábban és egyre erősebben. Egy karrier alatt reálisan
+   HÁROM-NÉGY trait szerezhető meg a hatból — a stíluson belül is dönteni kell,
+   nem lehet mindent kimaxolni. Ez tudatos: ha minden megvehető volna, a stílus
+   megint csak egy lineáris görbe lenne.
+
+   A HATÁSOK A MEGLÉVŐ MOTOROKBA KÖTNEK BE. Egyetlen új meccsmotor-ág sincs:
+   minden trait egy már létező szám mellé teszi a magáét (csapaterő, gólráta,
+   piroslap-esély, sérülés-esély, morál, edzői tapasztalat, skill-sorsolás,
+   kémia-tempó, sebesség-plafon, bolti ár). Ezért egy trait sem tud
+   "elszabadulni": ugyanazokon a korlátokon megy át, mint minden más hatás.
+
+   AZ ÁRAK: I. szint 8-12 · II. szint 22-30 · III. szint 55-70 pont. */
+const STYLE_TRAITS={};
+function stTrait(styleK,key,tier,price,n,d,fx){
+  (STYLE_TRAITS[styleK]=STYLE_TRAITS[styleK]||[]).push({key,tier,price,n,d,fx:fx||{}});}
+
+/* ---------- 🧱 BETON VÉDELEM ---------- */
+stTrait("beton","edzett_szemek",1,10,"Edzett szemek",
+  "A képesség-sorsolás 40%-kal nagyobb eséllyel hoz VÉDŐ- vagy KAPUS-kategóriájú képességet.",
+  {skillCat:{cats:["VEDO","KAPUS"],p:0.40}});
+stTrait("beton","bastya_muhely",1,10,"Bástya-műhely",
+  "A védekezést támogató stábtagjaid (Bástya, Kesztyűs mester) kétszeres tempóval gyűjtenek tapasztalatot.",
+  {coachXp:1,coachXpTypes:["attr:ved","attr:kapus"]});
+stTrait("beton","zart_kapu",2,26,"Zárt kapu",
+  "Az ellenfél gólesélye minden mérkőzésen 8%-kal csökken.",
+  {oppGoalMult:0.92});
+stTrait("beton","vashideg",2,24,"Vashideg fegyelem",
+  "A védőid és a kapusod fele annyi eséllyel kapnak piros lapot.",
+  {redMult:0.55});
+stTrait("beton","tizenegyedik",3,62,"A tizenegyedik ember",
+  "Ha a kapusod a klub legmagasabb Ratingű játékosa, az egész csapat +2,5 csapaterőt kap.",
+  {ovrTeam:()=>stTopPlayerRole()==="KAPUS"?2.5:0});
+stTrait("beton","kifulladas",3,58,"Kifulladás",
+  "Az ellenfél további 10%-kal ritkábban talál be — a te embereid bírják tovább.",
+  {oppGoalMult:0.90});
+
+/* ---------- ⚽ BOMBÁZÓK ---------- */
+stTrait("bombazok","befejezes_iskola",1,10,"Befejezés-iskola",
+  "A képesség-sorsolás 40%-kal nagyobb eséllyel hoz CSATÁR-kategóriájú képességet.",
+  {skillCat:{cats:["CSATAR"],p:0.40}});
+stTrait("bombazok","golvago_muhely",1,10,"Gólvágó-műhely",
+  "A Gólvágó-mentor stábtagod kétszeres tempóval gyűjt tapasztalatot.",
+  {coachXp:1,coachXpTypes:["attr:gol"]});
+stTrait("bombazok","gepezet",2,26,"A gépezet beindul",
+  "A csapatod gólesélye minden mérkőzésen 8%-kal nő.",
+  {ownGoalMult:1.08});
+stTrait("bombazok","nyomas",2,24,"Állandó nyomás",
+  "További 6% gólesély — a támadósor sosem áll le.",
+  {ownGoalMult:1.06});
+stTrait("bombazok","kettos_veszely",3,62,"Kettős veszély",
+  "Ha a támadósorod a legerősebb sorod, a csapat +2,5 csapaterőt kap.",
+  {ovrTeam:()=>stLineIsTop("CSATAR")?2.5:0});
+stTrait("bombazok","nincs_kegyelem",3,58,"Nincs kegyelem",
+  "További 10% gólesély — vezetve sem álltok le.",
+  {ownGoalMult:1.10});
+
+/* ---------- ☯️ BÉKE ÉS HARMÓNIA ---------- */
+stTrait("harmonia","csapatkovacs",1,10,"Csapatkovács-műhely",
+  "A párkémia érezhetően gyorsabban épül: minden fázisnál 35% esély egy extra lépésre.",
+  {chemSpeed:0.35});
+stTrait("harmonia","egyenletes_edzes",1,12,"Egyenletes edzés",
+  "A Csapatkovács és a Lélekemelő stábtagjaid kétszeres tempóval fejlődnek.",
+  {coachXp:1,coachXpTypes:["chem","morale"]});
+stTrait("harmonia","oltozoi_beke",2,26,"Öltözői béke",
+  "A csapatmorál sosem esik 45 alá — a rossz sorozat sem tudja szétverni az öltözőt.",
+  {moraleFloor:45});
+stTrait("harmonia","serulesmentes",2,24,"Gondos felkészülés",
+  "A sérülések esélye 30%-kal csökken az egész keretben.",
+  {injMult:0.70});
+stTrait("harmonia","gepezet_mukodik",3,64,"A gépezet",
+  "Ha a kezdő 11 legerősebb és leggyengébb embere közti különbség 5 alatt van, a csapat +3 csapaterőt kap.",
+  {ovrTeam:()=>stXISpread()<5?3:0});
+stTrait("harmonia","nincs_gyenge",3,56,"Nincs gyenge láncszem",
+  "Ha a csapategyensúlyod 80 fölött áll, a csapat +2 csapaterőt kap — a bónusz a meglévő egyensúly-jutalom FÖLÉ jön.",
+  {ovrTeam:()=>{const b=teamBalance();return (b.ok&&b.score*100>=80)?2:0;}});
+
+/* ---------- ⭐ SZTÁROM A PÁROM ---------- */
+stTrait("sztar","testorseg",1,12,"Testőrség",
+  "A sérülések esélye 35%-kal csökken — a sztárt óvni kell, és ez az egész keretnek jó.",
+  {injMult:0.65});
+stTrait("sztar","biro_is_ember",1,10,"A bíró is ember",
+  "A piros lap esélye 40%-kal csökken.",
+  {redMult:0.60});
+stTrait("sztar","kiszolgalas",2,28,"Kiszolgálás",
+  "A csapat gólesélye 10%-kal nő — mindenki a sztárt játssza meg.",
+  {ownGoalMult:1.10});
+stTrait("sztar","reflektorfeny",2,24,"Reflektorfény",
+  "A Gólvágó-mentor és a Játékmester stábtagjaid kétszeres tempóval fejlődnek.",
+  {coachXp:1,coachXpTypes:["attr:gol","attr:passz"]});
+stTrait("sztar","a_rendszer_o",3,66,"A rendszer ő",
+  "Ha a sztárod legalább 10 Ratinggel a kezdő 11 átlaga fölött van, a csapat +3,5 csapaterőt kap.",
+  {ovrTeam:()=>stStarLead()>=10?3.5:0});
+stTrait("sztar","nelkule_nem_megy",3,55,"Nélküle nem megy",
+  "Ha a sztárod a kezdő 11-ben van, a csapat +3 csapaterőt kap — ha NINCS, −3-at veszít. A filozófia ára.",
+  {ovrTeam:()=>{
+    const st=styleState();
+    if(!st||!st.star)return 0;
+    return stXI().some(o=>o.sl.player.n===st.star)?3:-3;}});
+
+/* ---------- ⚡ HOL JÖN A MENNYDÖRGÉS? ---------- */
+stTrait("villam","korai_plafon",1,12,"Korai plafon-nyitás",
+  "A sebesség 99-es plafonja már az Infinity ELŐTT megnyílik. Fölötte a fejlődés negyed tempóval halad, ugyanúgy, mint Infinityben.",
+  {speedEarly:true});
+stTrait("villam","sprintmester",1,10,"Sprintmester-műhely",
+  "A Sprintmester stábtagod kétszeres tempóval gyűjt tapasztalatot.",
+  {coachXp:1,coachXpTypes:["attr:seb"]});
+stTrait("villam","gyorsabb_izomzat",2,28,"Gyorsabb izomzat",
+  "A sebesség edzés-lassítása 1,5-ről 1,2-re csökken — a gyorsaság nálad tanulható.",
+  {speedDiv:1.2});
+stTrait("villam","szelesebb_ut",2,24,"Szélesebb passzív út",
+  "A passzív sebesség-plafon a születési érték +15%-a helyett +25%.",
+  {passiveSpeedPct:0.25});
+stTrait("villam","olcso_totalis",2,22,"Olcsó totális futball",
+  "A 4-2-4 felállás fele áron megvehető.",
+  {formDiscount:0.5});
+stTrait("villam","utolerhetetlen",3,60,"Utolérhetetlen",
+  "Ha a kezdő 11 Sebesség-átlaga eléri a 90-et, a csapat +3 csapaterőt kap.",
+  {ovrTeam:()=>stXISpeedAvg()>=90?3:0});
+
+/* ---------- 🛡️ PANZERKAMPFWAGEN ---------- */
+stTrait("panzer","vasfegyelem",1,12,"Vasfegyelem",
+  "A csapatmorál sosem esik 60 alá. Cserébe a keménység ára megmarad: a lapokat továbbra is összeszeditek.",
+  {moraleFloor:60});
+stTrait("panzer","kemeny_belepok",1,10,"Kemény belépők",
+  "A képesség-sorsolás 40%-kal nagyobb eséllyel hoz VÉDŐ- vagy CSATÁR-kategóriájú képességet.",
+  {skillCat:{cats:["VEDO","CSATAR"],p:0.40}});
+stTrait("panzer","piros_utan",2,26,"Piros után dühösebben",
+  "A csapatmorál padlója 70-re emelkedik — titeket nem lehet megtörni.",
+  {moraleFloor:70});
+stTrait("panzer","osszezarnak",2,26,"Összezárnak",
+  "Az ellenfél gólesélye 7%-kal csökken, a tiétek 5%-kal nő — a harag mindkét irányban dolgozik.",
+  {oppGoalMult:0.93,ownGoalMult:1.05});
+stTrait("panzer","falka",3,60,"Falka",
+  "Ha legalább 5 lobbanékony ember van a keretedben, a csapat +3 csapaterőt kap.",
+  {ovrTeam:()=>stHotHeads()>=5?3:0});
+stTrait("panzer","nem_adjuk_meg",3,58,"Nem adjuk meg magunkat",
+  "A csapat gólesélye 12%-kal nő — hátrányban sem hátráltok meg.",
+  {ownGoalMult:1.12});
+
+/* ================= A HATÁS-CSATORNÁK =================
+   EGYETLEN belépési pont csatornánként, hogy a motor és a felület ugyanabból
+   a számból dolgozzon. Mind hibatűrő: stílus nélkül a semleges értéket adja,
+   tehát a hívási helyeken nem kell feltételt írni. */
+function styleTraitList(k){return STYLE_TRAITS[k||styleKey()]||[];}
+function styleOwnedTraits(){
+  const st=styleState();
+  if(!st)return [];
+  return styleTraitList(st.key).filter(t=>st.traits&&st.traits[t.key]);}
+function styleTraitByKey(key){
+  return styleTraitList().find(t=>t.key===key)||null;}
+/* SZORZÓS csatorna: a traitek hatása összeszorzódik. */
+function styleFxMul(ch){
+  let m=1;
+  styleOwnedTraits().forEach(t=>{if(t.fx&&t.fx[ch]!=null)m*=t.fx[ch];});
+  return m;}
+/* ÖSSZEADÓDÓ csatorna. Az érték lehet függvény is — a feltételes traitek
+   (pl. "ha a kapusod a legjobb") így tudják menet közben eldönteni magukat. */
+function styleFxAdd(ch){
+  let a=0;
+  styleOwnedTraits().forEach(t=>{
+    if(!t.fx||t.fx[ch]==null)return;
+    const v=t.fx[ch];
+    try{a+=(typeof v==="function")?(v()||0):v;}catch(e){}});
+  return a;}
+/* PADLÓ-csatorna: a legmagasabb megvett padló él. */
+function styleFxMax(ch){
+  let m=0;
+  styleOwnedTraits().forEach(t=>{if(t.fx&&t.fx[ch]>m)m=t.fx[ch];});
+  return m;}
+function styleFxOn(ch){
+  return styleOwnedTraits().some(t=>t.fx&&t.fx[ch]);}
+/* A KONKRÉT csatornák — ezeket hívja a motor. */
+function styleOvrBonus(){return styleFxAdd("ovrTeam");}
+function styleOppGoalMult(){return styleFxMul("oppGoalMult");}
+function styleOwnGoalMult(){return styleFxMul("ownGoalMult");}
+function styleRedMult(){return styleFxMul("redMult");}
+function styleInjMult(){return styleFxMul("injMult");}
+function styleMoraleFloor(){return styleFxMax("moraleFloor");}
+function styleChemSpeed(){return styleFxAdd("chemSpeed");}
+function styleSpeedEarly(){return styleFxOn("speedEarly");}
+function styleFormDiscount(){return styleFxMul("formDiscount");}
+/* Felülíró csatornák: a LEGKEDVEZŐBB megvett érték él (null = nincs ilyen). */
+function styleSpeedDiv(){
+  let v=null;
+  styleOwnedTraits().forEach(t=>{
+    if(t.fx&&t.fx.speedDiv!=null&&(v==null||t.fx.speedDiv<v))v=t.fx.speedDiv;});
+  return v;}
+function stylePassiveSpeedPct(){
+  let v=null;
+  styleOwnedTraits().forEach(t=>{
+    if(t.fx&&t.fx.passiveSpeedPct!=null&&(v==null||t.fx.passiveSpeedPct>v))v=t.fx.passiveSpeedPct;});
+  return v;}
+/* Extra edzői tapasztalat egy KONKRÉT típusra. */
+function styleCoachXp(type){
+  let a=0;
+  styleOwnedTraits().forEach(t=>{
+    if(!t.fx||!t.fx.coachXp)return;
+    const types=t.fx.coachXpTypes;
+    if(types&&types.indexOf(type)<0)return;
+    a+=t.fx.coachXp;});
+  return a;}
+/* A skill-sorsolás eltolása. {cats,p} vagy null. Több trait esetén az
+   esélyek NEM adódnak össze korlátlanul — a legerősebb él, hogy a
+   kategória-torzítás sose váljon determinisztikussá. */
+function styleSkillBias(){
+  let best=null;
+  styleOwnedTraits().forEach(t=>{
+    const b=t.fx&&t.fx.skillCat;
+    if(b&&(!best||b.p>best.p))best=b;});
+  return best;}
+
+/* ---- A VÁSÁRLÁS ---- */
+function styleBuyTrait(key){
+  const st=styleState();
+  if(!st)return {ok:false,reason:"Előbb válassz csapatépítési stílust."};
+  const t=styleTraitByKey(key);
+  if(!t)return {ok:false,reason:"Ilyen képesség nincs ebben a stílusban."};
+  if(st.traits&&st.traits[key])return {ok:false,reason:"Ez a képesség már a tiéd."};
+  const W=msState();
+  if((W.sp||0)<t.price)
+    return {ok:false,reason:`Nincs elég csapatstílus-pontod — ${t.price} kellene, van ${W.sp||0}.`};
+  W.sp-=t.price;
+  st.traits=st.traits||{};
+  st.traits[key]=true;
+  const sd=styleDef();
+  try{
+    addLine(`${sd?sd.ic:"🎯"} <b>ÚJ STÍLUS-KÉPESSÉG — ${esc(t.n)}</b> · −${t.price} csapatstílus-pont`,"m mvp");
+    addLine(`→ ${esc(t.d)}`,"m skillnote");
+  }catch(e){}
+  return {ok:true};}
+/* ---- A BOLT ---- */
+const STYLE_TIER_LABEL={1:"I. szint",2:"II. szint",3:"III. szint"};
+function styleTraitsHtml(){
+  const st=styleState();
+  if(!st)return "";
+  const list=styleTraitList(st.key);
+  if(!list.length)return "";
+  const sp=msStylePoints();
+  const own=list.filter(t=>st.traits&&st.traits[t.key]).length;
+  let h=`<div class="infoCard" style="margin-top:12px">`
+    +`<div class="infoCardH">Stílus-képességek</div>`
+    +`<div class="msNote">A stílus-mérföldkövekért kapott pontokat itt költöd el. `
+    +`Egy karrier alatt reálisan három-négy szerezhető meg a hatból — a stíluson `
+    +`belül is dönteni kell.</div>`
+    +`<div class="msSummary"><div class="msSum"><b>${sp}</b><span>elkölthető pont</span></div>`
+    +`<div class="msSum"><b>${own}</b><span>/${list.length} megnyitva</span></div>`
+    +`<div class="msSum"><b>${list.reduce((a,t)=>a+t.price,0)}</b><span>mind ennyi volna</span></div></div>`
+    +`<div class="msList">`;
+  [1,2,3].forEach(tier=>{
+    list.filter(t=>t.tier===tier).forEach(t=>{
+      const have=!!(st.traits&&st.traits[t.key]);
+      const afford=sp>=t.price;
+      h+=`<div class="msItem${have?" done":""}">`
+        +`<div class="msTop"><b>${have?"✓ ":""}${esc(t.n)}</b>`
+        +`<span class="msRew">${STYLE_TIER_LABEL[tier]} · ${t.price} pont</span></div>`
+        +`<div class="msDesc">${esc(t.d)}</div>`
+        +(have?"":`<button class="btn-${afford?"y":"s"} stepbtn" data-trait="${t.key}"${afford?"":" disabled"} style="margin-top:8px;padding:9px">`
+                 +(afford?`Megnyitom — ${t.price} pont`:`Még ${t.price-sp} pont kell`)+`</button>`)
+        +`</div>`;});});
   return h+`</div></div>`;}
 /* ================= MENTÉS / BETÖLTÉS (localStorage) =================
    Mivel a játék mostantól önálló weboldalként fut (nem Claude-artifactként),

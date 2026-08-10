@@ -1,6 +1,10 @@
 # CSAPATÉPÍTÉSI STÍLUSOK — tervezet
 
-**Állapot:** 📐 **Terv — kód még nincs hozzá** (v3.0 előkészítés)
+**Állapot:** ✅ **Megvalósítva — mind a három fázis kész** (v3.0.05)
+
+> Ez a dokumentum eredetileg TERVNEK készült, és a megvalósítás nagyrészt
+> követte. Ahol a kód eltér tőle, azt a 3.1 szakasz sorolja fel — a terv
+> szövegét szándékosan nem írtuk át utólag, hogy a döntések nyoma megmaradjon.
 
 Ez a dokumentum a 3.0 nagy rendszerének, a **csapatépítési stílusnak** a
 kidolgozott terve. A mérföldkő-rendszer (✅ kész) és a stílus-rendszer (📐 terv)
@@ -11,10 +15,10 @@ a **csapatstílus-pontot** —, amiből ez a rendszer majd költeni fog.
 |---|---|---|
 | Általános mérföldkövek | 96 karrier-cél, pénz- és stíluspont-jutalommal | ✅ kész |
 | Csapatstílus-pont mint valuta | gyűjtés, mérleg, mentés | ✅ kész |
-| Stílusválasztás az 1. szezon után | — | 📐 terv (ez a dokumentum) |
-| Stílus-specifikus mérföldkövek | — | 📐 terv |
-| Trait-bolt stíluspontért | — | 📐 terv |
-| Saját HUB menüpont | — | 📐 terv |
+| Stílusválasztás az 1. szezon után | F1 | ✅ kész (v3.0.03) |
+| Saját HUB menüpont | F1 | ✅ kész (v3.0.03) |
+| Stílus-specifikus mérföldkövek | F2 — 78 db | ✅ kész (v3.0.04) |
+| Trait-bolt és a hatások bekötése | F3 — 36 trait | ✅ kész (v3.0.05) |
 
 ---
 
@@ -382,6 +386,31 @@ A stílus-mérföldkövek a meglévő `MILESTONES` táblával **azonos szerkezet
 (`id / grp / t / d / kind / val / p / n`), csak külön tömbben élnek, és a
 kiértékelőjük ugyanaz a `msScan`-minta: állapotból mérünk, ahol lehet, és csak
 ott tartunk nyomkövetőt, ahol az esemény utólag visszakereshetetlen.
+
+### 3.1 Eltérések a tervtől (a megvalósításban)
+
+A fenti stílus-leírások a TERVET tükrözik. A kód néhány ponton eltér, mindig
+ugyanazért: olyan mércét kerestünk, ami a MEGLÉVŐ motorokból olvasható, és nem
+igényel új szimulációs ágat.
+
+* **A mérföldkövek száma stílusonként 11–15**, nem pontosan a tervezett lista.
+  Ahol egy tervezett mérce nem volt megbízhatóan mérhető (pl. „gólok az első 10
+  percben"), ott helyette olyan került be, ami a motorból tisztán kiolvasható.
+* **A traitek hatása 12 csatornán fut** (csapaterő, támadó és védekező gólráta,
+  piroslap-, sérülés-esély, morál-padló, edzői tapasztalat, skill-sorsolás,
+  kémia-tempó, sebesség-plafon és edzés-osztó, passzív sebesség-plafon, bolti
+  ár). Minden trait ezekbe köt be — egyetlen új meccsmotor-ág sincs.
+* **A „csillagozható" traitek kimaradtak.** A csillag-rendszer ma kizárólag a
+  két sorsdöntő hős-skillé; egy harmadik csillagozható skill bevezetése önálló
+  fejlesztés, nem trait-mellékhatás. Helyettük mindkét stílus egy második,
+  közvetlen hatású II. szintű traitet kapott.
+* **A „Sztárom a párom" III. traitje a tervezett szimmetriával került be:** ha a
+  sztár a kezdőben van, +3 csapaterő; ha nincs, −3. Ez az egyetlen trait a
+  játékban, ami büntetni is tud — tudatosan, mert e nélkül a stílus dominánsan
+  a legjobb választás lenne.
+* **A Panzerkampfwagen „Vasfegyelme" nem kapcsolja ki a morál-rendszert**, csak
+  padlót tesz alá (60, a II. szinttel 70). A romlás megtörténik, csak nem tud
+  mélyre vinni.
 
 ### 4.4 Nyitott kérdések
 
