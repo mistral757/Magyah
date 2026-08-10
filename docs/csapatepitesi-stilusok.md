@@ -407,6 +407,14 @@ igényel új szimulációs ágat.
   piroslap-, sérülés-esély, morál-padló, edzői tapasztalat, skill-sorsolás,
   kémia-tempó, sebesség-plafon és edzés-osztó, passzív sebesség-plafon, bolti
   ár). Minden trait ezekbe köt be — egyetlen új meccsmotor-ág sincs.
+* **A CSILLAGOZÁS JOGA képességenként vásárolható** (3.0.09). Alapból egyetlen
+  képesség sem csillagozható; a jogot csapatstílus-pontból kell megnyitni
+  (25-60 pont, a képesség erejéhez igazodva), és a megnyitás a KÉPESSÉGRE szól,
+  nem a játékosra. Ehhez mind a hat stílus kapott egy hetedik képességet, ami a
+  SAJÁT területén olcsóbbá teszi a feloldást: a fókuszált stílusok 15/25/33%-ot
+  egy szűk körre, a Béke és harmónia 10/17/22%-ot MINDENRE (szélesség mélység
+  helyett), a Sztárom a párom pedig a kijelölt sztár posztkategóriájára — az a
+  kedvezmény menet közben követi, kire építetted a klubot.
 * **A „csillagozható" traitek kimaradtak a trait-listából** — de az akadály
   azóta elhárult. Az F3 idején a csillag-rendszer még kizárólag a két
   sorsdöntő hős-skillé volt, ezért egy „csillagozható védő-skill" trait önálló

@@ -2428,7 +2428,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.0.08";
+const APP_VERSION="3.0.09";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16701,6 +16701,9 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   /* CSAPATÉPÍTÉSI STÍLUS — {key,chosenSeason,traits,ms,star}. A null maga is
      információ: "még nincs eldöntve". Új karrier mindig innen indul. */
   style:null,
+  /* CSILLAGOZÁS JOGA képességenként (skillId → true). Alapból üres: egyetlen
+     képesség sem csillagozható, amíg meg nem veszed rá a jogot. */
+  starUnlocked:{},
   frozenAcademySeasons:0,teamFormMalus:0,tsiBlocked:{},
   /* ---- KARRIER-MÉRFÖLDKÖVEK (bemutatkozás, áttörés, ifi, kapus-hullám) ----
      foundingSquad : az ALAPÍTÓ keret nevei. Ez a bemutatkozás-rendszer egyetlen
@@ -24675,6 +24678,11 @@ function findStarrableSkills(){
       if(!inst||!inst.skill)return;
       if(!skillComplete(inst))return;
       if(skillStars(inst)>=SKILL_MAX_STARS)return;
+      /* ---- A CSILLAGOZÁS JOGA KÉPESSÉGENKÉNT VÁSÁROLHATÓ ----
+         Alapból egyik képesség sem csillagozható; a jogot csapatstílus-pontból
+         kell megnyitni (starUnlockBuy). Amíg nincs meg, a képesség egyszerűen
+         nem jelölt — a jutalom-sor a folytatás-ágra megy tovább. */
+      if(!starUnlocked(inst.skill.id))return;
       out.push({name,inst});});});
   return out;}
 /* A fejlesztés-jutalom TELJES jelöltlistája, a fenti aránnyal. A hívók ezt
@@ -34228,8 +34236,23 @@ function styleDashboardHtml(st,def){
       +`<div class="msDesc">A stílus mérföldkövei róla szólnak.</div></div>`;
   h+=`<div class="msNote" style="margin-top:9px">A stílushoz tartozó KÉPESSÉGEK `
     +`(traitek) a következő fejlesztésben nyílnak meg — a pontjaid addig gyűlnek.</div></div>`;
-  return h+styleTraitsHtml()+styleMsHtml();}
+  return h+styleTraitsHtml()+starUnlockHtml()+styleMsHtml();}
 function styleBindPanel(body){
+  body.querySelectorAll("[data-starunlock]").forEach(b=>{
+    b.onclick=()=>{
+      const id=b.getAttribute("data-starunlock");
+      const sk=SKILLS.find(x=>x.id===id);
+      if(!sk)return;
+      askConfirm({html:`<div style="font-size:13px;line-height:1.5">`
+        +`Feloldod a(z) <b>${esc(sk.name)}</b> csillagozását `
+        +`<b style="color:var(--gold)">${starUnlockPrice(sk)} csapatstílus-pontért</b>?<br><br>`
+        +`A feloldás <b>végleges</b> és a KÉPESSÉGRE szól, nem a játékosra: onnantól `
+        +`minden emberednél csillagozható, aki valaha kiépíti.</div>`,
+        onYes:()=>{
+          const r=starUnlockBuy(id);
+          if(!r.ok){addLine(`⛔ ${r.reason}`,"m ev");renderStylePanel();return;}
+          renderStylePanel();
+          try{renderHub();saveGame();}catch(e){}}});};});
   body.querySelectorAll("[data-trait]").forEach(b=>{
     b.onclick=()=>{
       const k=b.getAttribute("data-trait"),t=styleTraitByKey(k);
@@ -35050,6 +35073,43 @@ stTrait("panzer","nem_adjuk_meg",3,"Nem adjuk meg magunkat",
   {fx:{ownGoalMult:1.10},note:"+10%"},
   {fx:{ownGoalMult:1.14},note:"+14%"}]);
 
+/* ---------- ⭐ CSILLAGOZÁS-KEDVEZMÉNY — MINDEN STÍLUSNAK A SAJÁTJA ----------
+   A csillagozás joga képességenként vásárolható (starUnlockBuy), és ez a
+   karrier egyik legnagyobb stíluspont-nyelője. Ezért mindegyik stílus kap egy
+   képességet, ami a SAJÁT területén olcsóbbá teszi — a filozófiád nemcsak
+   azt szabja meg, mit érdemes csillagozni, hanem azt is, mi éri meg.
+
+   A FÓKUSZÁLT stílusok mélyebb kedvezményt kapnak (15/25/33%) egy SZŰK körre;
+   a Béke és harmónia cserébe MINDENRE kap, de sekélyebbet (10/17/22%) — ez a
+   stílus természete: szélesség mélység helyett. A Sztárom a párom
+   kedvezménye a KIJELÖLT SZTÁR posztkategóriájára szól, tehát menet közben
+   az követi, kire építetted a klubot. */
+const STAR_DISC_DEEP=[0.15,0.25,0.33],STAR_DISC_WIDE=[0.10,0.17,0.22];
+function stStarDiscLevels(sel,vals){
+  return (vals||STAR_DISC_DEEP).map((p,i)=>({
+    fx:{starDisc:{p,sel}},
+    note:`−${Math.round(p*100)}% a feloldási áron`}));}
+stTrait("beton","pajzs_iskola",2,"Pajzs-iskola",
+  "A VÉDŐ- és KAPUS-képességek csillagozásának feloldása olcsóbb.",
+  stStarDiscLevels(sk=>sk&&(sk.cat==="VEDO"||sk.cat==="KAPUS")));
+stTrait("bombazok","gol_iskola",2,"Gólvágó-iskola",
+  "A CSATÁR-képességek csillagozásának feloldása olcsóbb.",
+  stStarDiscLevels(sk=>sk&&sk.cat==="CSATAR"));
+stTrait("harmonia","sokoldalu_muhely",2,"Sokoldalú műhely",
+  "MINDEN képesség csillagozásának feloldása olcsóbb — szerényebben, de kivétel nélkül.",
+  stStarDiscLevels(()=>true,STAR_DISC_WIDE));
+stTrait("sztar","sztar_iskola",2,"A sztár iskolája",
+  "A kijelölt sztárod posztkategóriájába tartozó képességek feloldása olcsóbb — a kedvezmény követi, kire építetted a klubot.",
+  stStarDiscLevels(sk=>{
+    const c=styleStarCat();
+    return !!(c&&sk&&sk.cat===c);}));
+stTrait("villam","sprint_iskola",2,"Sprint-iskola",
+  "A SEBESSÉG-alapú képességek csillagozásának feloldása olcsóbb.",
+  stStarDiscLevels(sk=>(typeof isPaceSkill==="function")&&isPaceSkill(sk)));
+stTrait("panzer","kemeny_iskola",2,"Kőkemény iskola-műhely",
+  "A VÉDŐ- és CSATÁR-képességek csillagozásának feloldása olcsóbb.",
+  stStarDiscLevels(sk=>sk&&(sk.cat==="VEDO"||sk.cat==="CSATAR")));
+
 /* ================= A HATÁS-CSATORNÁK =================
    EGYETLEN belépési pont csatornánként, hogy a motor és a felület ugyanabból
    a számból dolgozzon. Mind hibatűrő: stílus nélkül a semleges értéket adja,
@@ -35105,6 +35165,26 @@ function styleMoraleFloor(){return styleFxMax("moraleFloor");}
 function styleChemSpeed(){return styleFxAdd("chemSpeed");}
 function styleSpeedEarly(){return styleFxOn("speedEarly");}
 function styleFormDiscount(){return styleFxMul("formDiscount");}
+/* A kijelölt sztár posztkategóriája — "A sztár iskolája" kedvezmény ebből
+   dolgozik. Null, ha nincs sztár vagy nincs a keretben. */
+function styleStarCat(){
+  const st=styleState();
+  if(!st||!st.star)return null;
+  const e=msEntry(st.star);
+  if(!e||!e.pos||!e.pos[0])return null;
+  try{return getCategoryFor(e.pos[0]);}catch(err){return null;}}
+/* A csillagozás-feloldás kedvezménye egy KONKRÉT képességre. A megvett
+   kedvezmények közül a legnagyobb ÉRVÉNYES él (nem adódnak össze — egy
+   képességre egy kedvezmény jár). */
+function styleStarDiscount(sk){
+  let best=0;
+  styleActiveFx().forEach(f=>{
+    const d=f.starDisc;
+    if(!d||typeof d.sel!=="function")return;
+    let hit=false;
+    try{hit=!!d.sel(sk);}catch(e){}
+    if(hit&&d.p>best)best=d.p;});
+  return best;}
 /* Pályán van-e a kijelölt sztár? A "Nélküle nem megy" kérdezi. */
 function styleStarOnPitch(){
   const st=styleState();
@@ -35139,6 +35219,145 @@ function styleSkillBias(){
     if(b&&(!best||b.p>best.p))best=b;});
   return best;}
 
+/* ================= A CSILLAGOZÁS JOGA: KÉPESSÉGENKÉNT MEGNYITVA =============
+   A 3.0.06 megnyitotta a csillagozást, de INGYEN: minden kiépült képesség
+   automatikusan csillagozhatóvá vált. Így a csillag nem volt döntés, csak egy
+   újabb automatikus hozam.
+
+   Mostantól ALAPBÓL EGYIK KÉPESSÉG SEM csillagozható. A jogot KÉPESSÉGENKÉNT
+   kell megnyitni, csapatstílus-pontért. A megnyitás VÉGLEGES és a KÉPESSÉGRE
+   szól, nem a játékosra: ha a „Betonfal" jogát megnyitottad, onnantól minden
+   emberednél csillagozható, aki valaha kiépíti — a mai kapusodnál és a tíz év
+   múlva érkezőnél is.
+
+   AZ ÁR A KÉPESSÉG EREJÉHEZ IGAZODIK (25-60 pont). Nem érzésre: minden
+   képesség hatásából egy összehasonlítható ERŐSSÉG-SZÁM készül (starPower), a
+   képességek e szerint sorba állnak, és a sorrend feszül ki a 25-60-as sávra.
+   A többhatású (combo) képességek — a BL arany-díjai, a hős-skillek — így
+   maguktól a lista tetejére kerülnek, a szerény egyhatásúak az aljára.
+
+   MIÉRT NEM ÉRINTI A HŐS-SKILLEKET. A két sorsdöntő hős-skill csillagát nem
+   venni kell, hanem KIÉRDEMELNI: azt az kapja, aki még egyszer megcsinálja
+   ugyanazt a hőstettet (clutchAward). Az egy másik csatorna, egy másik
+   ígéret — azt nem zárjuk el pénzfal mögé. */
+const STAR_PRICE_MIN=25, STAR_PRICE_MAX=60;
+/* Egy képesség nyers ereje. A hatás-típusonként MÁS a mértékegység (a
+   „defense" 0,88-a −12%-ot jelent, a „goalw" 4-e +4 gólsúlyt), ezért
+   típusonként külön váltjuk össze egy közös skálára. A combo a részeinek
+   összege — épp ezért kerülnek a lista tetejére a többhatású képességek. */
+function starPowerOfEffect(type,val){
+  const v=(val==null)?1:val;
+  switch(type){
+    case "defense":   return Math.max(0,(1-v)*100);        /* 0.88 → 12 */
+    case "discipline":return Math.max(0,v*12);             /* 0.3  → 3.6 */
+    case "aura":      return Math.max(0,v*6);              /* 1.5  → 9 */
+    case "goalw":
+    case "assistw":   return Math.max(0,v*2.5);            /* 4    → 10 */
+    case "pace":
+    case "shot":      return Math.max(0,v*3);
+    case "rating":    return Math.max(0,v*2.2);
+    case "mvp":       return Math.max(0,v*5);
+    /* A különleges, nem számszerűsíthető hatások fix, közepes súlyt kapnak. */
+    default:          return 11;}}
+function starPower(sk){
+  if(!sk)return 0;
+  if(sk.type==="combo"&&Array.isArray(sk.combo))
+    return sk.combo.reduce((a,c)=>a+starPowerOfEffect(c.type,c.val),0);
+  return starPowerOfEffect(sk.type,sk.val);}
+/* A teljes árlista EGYSZER épül fel: a képességek erősség szerint sorba
+   állnak, és a sorrend feszül ki a 25-60-as sávra. Így az ár mindig
+   ÖSSZEHASONLÍTÓ — nem az abszolút szám számít, hanem hogy a mezőnyben hol
+   áll a képesség. */
+const STAR_PRICES=(function(){
+  const out={};
+  try{
+    const rows=SKILLS.map(sk=>({id:sk.id,pw:starPower(sk)}))
+      .sort((a,b)=>a.pw-b.pw);
+    const n=rows.length;
+    rows.forEach((r,i)=>{
+      const t=n>1?i/(n-1):0;
+      out[r.id]=Math.round(STAR_PRICE_MIN+t*(STAR_PRICE_MAX-STAR_PRICE_MIN));});
+  }catch(e){}
+  return out;})();
+function starUnlockBasePrice(sk){
+  const id=sk&&sk.id;
+  return (id&&STAR_PRICES[id])||STAR_PRICE_MIN;}
+/* A tényleges ár — a csapatstílusod kedvezményével együtt (lásd starDisc). */
+function starUnlockPrice(sk){
+  const base=starUnlockBasePrice(sk);
+  const d=(typeof styleStarDiscount==="function")?styleStarDiscount(sk):0;
+  return Math.max(1,Math.round(base*(1-d)));}
+function starUnlocked(id){
+  return !!(S.starUnlocked&&S.starUnlocked[id]);}
+function starUnlockBuy(id){
+  const sk=SKILLS.find(x=>x.id===id);
+  if(!sk)return {ok:false,reason:"Ilyen képesség nincs."};
+  if(starUnlocked(id))return {ok:false,reason:"Ennek a képességnek a csillagozása már nyitva van."};
+  const price=starUnlockPrice(sk);
+  const W=msState();
+  if((W.sp||0)<price)
+    return {ok:false,reason:`Nincs elég csapatstílus-pontod — ${price} kellene, van ${W.sp||0}.`};
+  W.sp-=price;
+  S.starUnlocked=S.starUnlocked||{};
+  S.starUnlocked[id]=true;
+  try{
+    addLine(`⭐ <b>CSILLAGOZÁS FELOLDVA — ${esc(sk.name)}</b> · −${price} csapatstílus-pont`,"m mvp");
+    addLine(`→ Mostantól minden emberednél csillagozható, aki kiépíti.`,"m skillnote");
+  }catch(e){}
+  return {ok:true,price};}
+/* A keretedben MEGLÉVŐ, kiépült képességek, amiknek a csillagozása még zárva
+   van — ezek a bolt kínálata. Csak azt ajánljuk, ami nálad tényleg létezik:
+   a 39 képesség teljes listája használhatatlan katalógus volna. */
+function starLockedInSquad(){
+  const seen={},out=[];
+  try{
+    const roster=new Set((gameMode==="career"?fullCareerRoster():currentRoster()).map(p=>p.n));
+    Object.entries(S.skills||{}).forEach(([name,arr])=>{
+      if(!roster.has(name))return;
+      (arr||[]).forEach(inst=>{
+        if(!inst||!inst.skill||!skillComplete(inst))return;
+        const id=inst.skill.id;
+        if(starUnlocked(id))return;
+        if(seen[id]){seen[id].holders.push(name);return;}
+        seen[id]={skill:inst.skill,holders:[name]};
+        out.push(seen[id]);});});
+  }catch(e){}
+  out.sort((a,b)=>starUnlockPrice(b.skill)-starUnlockPrice(a.skill));
+  return out;}
+/* A bolt HTML-je — a csapatstílus műszerfalán él, mert stíluspontból megy. */
+function starUnlockHtml(){
+  if(gameMode!=="career")return "";
+  const list=starLockedInSquad();
+  const sp=msStylePoints();
+  const openCnt=Object.keys(S.starUnlocked||{}).length;
+  let h=`<div class="infoCard" style="margin-top:12px">`
+    +`<div class="infoCardH">Csillagozás feloldása</div>`
+    +`<div class="msNote">Alapból egyetlen képesség sem csillagozható. A jogot `
+    +`<b>képességenként</b> kell megnyitni, és a megnyitás <b>végleges</b>: onnantól `
+    +`minden emberednél csillagozható, aki valaha kiépíti. Az ár a képesség erejéhez `
+    +`igazodik (${STAR_PRICE_MIN}-${STAR_PRICE_MAX} pont) — a többet adó képességek drágábbak.`
+    +`<br><br>Itt csak azok szerepelnek, amik a keretedben MÁR kiépültek — a `
+    +`csillagozásnak addig úgysem volna mit kezdenie velük.</div>`
+    +`<div class="msSummary"><div class="msSum"><b>${sp}</b><span>elkölthető pont</span></div>`
+    +`<div class="msSum"><b>${openCnt}</b><span>feloldva</span></div>`
+    +`<div class="msSum"><b>${list.length}</b><span>feloldható most</span></div></div>`;
+  if(!list.length)
+    return h+`<div class="msDesc" style="margin-top:8px">A keretedben most nincs olyan `
+      +`KIÉPÜLT képesség, aminek a csillagozása zárva volna. Ha egy képesség eléri a `
+      +`teljes erejét, itt jelenik meg.</div></div>`;
+  h+=`<div class="msList">`;
+  list.forEach(o=>{
+    const base=starUnlockBasePrice(o.skill),price=starUnlockPrice(o.skill);
+    const disc=price<base,afford=sp>=price;
+    h+=`<div class="msItem">`
+      +`<div class="msTop"><b>${esc(o.skill.name)}</b>`
+      +`<span class="msRew">${price} pont${disc?` <s style="opacity:.6">${base}</s>`:""}</span></div>`
+      +`<div class="msDesc">${esc(o.skill.desc||"")}</div>`
+      +`<div class="msDesc" style="color:var(--dim2)">Nálad: ${o.holders.map(n=>esc(shortName(n))).join(", ")}`
+      +(disc?` · <span style="color:var(--grass)">a csapatstílusod kedvezménye benne van</span>`:"")+`</div>`
+      +`<button class="btn-${afford?"y":"s"} stepbtn" data-starunlock="${esc(o.skill.id)}"${afford?"":" disabled"} style="margin-top:8px;padding:9px">`
+      +(afford?`⭐ Feloldom — ${price} pont`:`Még ${price-sp} pont kell`)+`</button></div>`;});
+  return h+`</div></div>`;}
 /* ---- A VÁSÁRLÁS: A KÖVETKEZŐ SZINT ---- */
 function styleTraitNextPrice(t){
   const lv=styleTraitLevel(t.key);
@@ -35525,6 +35744,7 @@ function saveGame(){
         customForms:S.customForms,formsBought:S.formsBought,
         ms:S.ms,   /* mérföldkövek: teljesítések, jutalom-mérleg, nyomkövetők */
         style:S.style,   /* csapatépítési stílus: a választás, a traitek, a sztár */
+        starUnlocked:S.starUnlocked,   /* mely képességek csillagozása van megnyitva */
         /* skill-padló: türelem-számláló, szezonos kvóták, első kémia megvolt-e */
         matchesSinceSkill:S.matchesSinceSkill,seasonNewSkills:S.seasonNewSkills,
         balSkillMatches:S.balSkillMatches,balSkillsSeason:S.balSkillsSeason,
@@ -35880,6 +36100,10 @@ function applySavedGame(d){
      karrier a választás előtti állapotban folytatódik, és a sáv felajánlja a
      döntést (ha már van lezárt szezonja). */
   S.style=(d.S&&d.S.style)||null;
+  /* Régi mentésben nincs — ott üresen indul. A 3.0.06-3.0.08 közti karriereknél
+     ez azt jelenti, hogy az addig ingyen járó csillagozás bezárul; cserébe a
+     megszerzett CSILLAGOK megmaradnak, csak újat venni kell hozzá. */
+  S.starUnlocked=(d.S&&d.S.starUnlocked)||{};
   /* SKILL-PADLÓ (régi mentésben nincs — nulláról indul, ami helyes: a padló
      a betöltés utáni szezontól kezd el számolni) */
   S.matchesSinceSkill=d.S.matchesSinceSkill||0;
