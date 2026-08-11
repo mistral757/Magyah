@@ -243,6 +243,16 @@ button:disabled{opacity:.35;cursor:default}
 /* Pont nélkül zárult: a beragadt jutalmat semmi nem tudta volna kiengedni. */
 .msItem.msMissed{opacity:.6;border-color:color-mix(in srgb,var(--red) 45%,var(--line))}
 .msItem.msMissed .msRew{color:var(--dim2)}
+/* ÉLŐ ÁLLAPOT-SÁV: egy feltételes stílus-képesség hatása MOST. Három arca van
+   — él (zöld), nem él (semleges), büntet (piros) —, és mindhárom ugyanabból a
+   mérésből jön, amit a meccs is használ. */
+.msLive{margin-top:6px;padding:6px 8px;border-radius:6px;font-size:11.5px;line-height:1.45;
+  border:1px solid var(--line);background:var(--panel2);color:var(--ink)}
+.msLive.on{background:color-mix(in srgb,var(--grass) 15%,transparent);
+  border-color:color-mix(in srgb,var(--grass) 45%,var(--line))}
+.msLive.bad{background:color-mix(in srgb,var(--red) 14%,transparent);
+  border-color:color-mix(in srgb,var(--red) 45%,var(--line))}
+.msLive.off{color:var(--dim)}
 /* BERAGADT JUTALOM: teljesült, de még nem fizetett. Nem veszteség (nem piros)
    és nem is kész (nem zöld) — arany várakozás, mert még be fog folyni. */
 .msHold{margin-top:6px;padding:6px 8px;border-radius:6px;font-size:11.5px;line-height:1.45;
@@ -2617,7 +2627,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.04";
+const APP_VERSION="3.1.05";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16138,6 +16148,27 @@ function latchChallengeIfMet(ch){
   if(!ch||ch.metLatched||ch.inverse)return;
   if(CH_STATE_TYPES.includes(ch.type))return;
   if(challengeMet(ch))ch.metLatched=true;}
+/* ---- A MECCS UTÁNI KIHÍVÁS-KÖNYVELÉS, EGY HELYEN ----
+   Két dolgot csinál, és MINDKETTŐ csak akkor helyes, ha a mérkőzés MINDEN
+   következménye már le van könyvelve — a forduló léptetése, a tabella, a
+   sorozatok, a lapok:
+     1. az ABSZOLÚT kihívások (sorozat, gólzápor) „vállalás óta elért max"-a,
+     2. a TELJESÜLÉS-RETESZ: amint egy kihívás célja összejött, azt a későbbi
+        események nem vehetik el.
+   Idempotens, tehát nyugodtan hívható többször egy meccsen belül — a jutalom-
+   lánc (skill, kémia, új játékos) UTÁN is, mert az is mozgathat célszámot
+   (chemPairsDone, skillsComplete). */
+function chAfterMatchBook(matchGf){
+  if(gameMode!=="career")return;
+  const list=S.activeChallenges||[];
+  if(!list.length)return;
+  list.forEach(ch=>{
+    let v=null;
+    if(ch.type==="bigHaul")v=(matchGf==null?null:matchGf);
+    else if(ch.type==="unbeatenStreak")v=S.unbeatenStreak||0;
+    else if(ch.type==="cleanStreak")v=S.cleanSheetStreak||0;
+    if(v!==null)ch.bestSinceAccept=Math.max(ch.bestSinceAccept||0,v);});
+  list.forEach(latchChallengeIfMet);}
 /* ---- REWARD végrehajtás ---- */
 /* A poszt-tanulási visszatérítés LEÍRÁSA az ajánlatkor. A konkrét ár csak
    akkor derül ki, amikor a felhasználó kiválasztja, KI tanul új posztot —
@@ -22666,22 +22697,12 @@ function playMatch(){
          névsor a KEZDŐRÚGÁSKOR rögzült (startedNames), nem a lefújáskori
          összeállításból — így a félidőben beálló ember gólja számít bele, a
          lecserélt kezdőé viszont nem. */
-      Object.keys(mScore).forEach(n=>{if(!startedNames.has(n))S.chSeasonSubGoals=(S.chSeasonSubGoals||0)+mScore[n];});
-      /* ABSZOLÚT KIHÍVÁSOK (sorozat, gólzápor): a VÁLLALÁS ÓTA elért maxot
-         mérjük, nem a szezon-szintűt — így a vállalás előtti teljesítmény nem
-         számít bele. Minden aktív abszolút kihívásnál e meccs értékével
-         frissítjük a bestSinceAccept-et. */
-      (S.activeChallenges||[]).forEach(ch=>{
-        let matchVal=null;
-        if(ch.type==="bigHaul")matchVal=gf;
-        else if(ch.type==="unbeatenStreak")matchVal=S.unbeatenStreak;
-        else if(ch.type==="cleanStreak")matchVal=S.cleanSheetStreak;
-        if(matchVal!==null)ch.bestSinceAccept=Math.max(ch.bestSinceAccept||0,matchVal);});
-      /* TELJESÜLÉS-RETESZ a meccs-végi könyvelésben: amint egy kihívás célja
-         összejött, azt a későbbi események nem vehetik el (lásd
-         latchChallengeIfMet). A könyvelés ITT, a statisztikák frissítése után
-         fut, hogy az épp most szerzett gól/gólpassz is beleszámítson. */
-      (S.activeChallenges||[]).forEach(latchChallengeIfMet);}
+      Object.keys(mScore).forEach(n=>{if(!startedNames.has(n))S.chSeasonSubGoals=(S.chSeasonSubGoals||0)+mScore[n];});}
+      /* A KIHÍVÁS-KÖNYVELÉS (bestSinceAccept + teljesülés-retesz) SZÁNDÉKOSAN
+         NEM ITT áll, hanem lejjebb, a tabella lezárása UTÁN — lásd
+         chAfterMatchBook(). Itt még nem nőtt a S.idx, nem futott az
+         updateStanding, és a tiszta lap sorozat sem lépett: az innen olvasott
+         S.W / S.pts / S.GF / S.cleanSheetStreak mind az ELŐZŐ meccs értéke. */
     /* --- tiszta lap sorozat: egymást követő gól nélküli meccsek a
        védelemnek/kapusnak növekvő önbizalmat, kis csapatszintű bónuszt adnak --- */
     if(ga===0){
@@ -22904,6 +22925,15 @@ function playMatch(){
          tehát az élő tabella a friss állást mutatja — innen jön a rangadó utáni
          kommentár, a bajnokavatás és a dinamikus szezonhír. */
       try{afterLeagueRound(fx,gf,ga);}catch(e){}}
+    /* ---- KIHÍVÁS-KÖNYVELÉS: A TABELLA LEZÁRÁSA UTÁN ----
+       BEJELENTETT HIBA: „néhány kihívás teljesítéskövetése egy meccscsel
+       eltolódva regisztrálódik." Az ok pontosan ez a sorrend volt: a
+       teljesülés-retesz a meccs-végi blokk KÖZEPÉN futott, jóval a
+       S.idx++ / updateStanding() / cleanSheetStreak++ ELŐTT. Ilyenkor a
+       challengeRawValue még az ELŐZŐ meccs tabellájából olvasott (S.W, S.pts,
+       S.GF, S.GA, S.reds, chSeasonMaxCleanStreak) — vagyis az a győzelem, ami
+       épp most teljesítette a célt, csak a KÖVETKEZŐ meccsen került be. */
+    chAfterMatchBook(gf);
     /* CHALLENGE FIX: a lejárt rövid (round) kihívásokat MINDEN meccs után
        kiértékeljük — nem csak a checkpointoknál. A deadline tetszőleges
        meccsszám lehet (felvétel + 8), ami nem esik checkpointra, ezért
@@ -22923,6 +22953,20 @@ function playMatch(){
     try{msScan();}catch(e){}
     try{styleScan();}catch(e){}
     function proceedAfterMatch(){
+      /* ---- A MÁSODIK SZÍVVERÉS: A JUTALOM-LÁNC UTÁN ----
+         BEJELENTETT HIBA: „a mérföldkövek is sokszor egy meccsel eltolódva
+         lesznek regisztrálva." Az ok a SORREND: a fenti msScan a lefújás után
+         azonnal fut, a meccs jutalmai viszont CSAK EZUTÁN dőlnek el — a
+         jutalom-skill, a párkémia fázisa, az új felfedezett játékos, az
+         akadémia. Márpedig épp ezek mérföldkövei (kiépített képességek, kész
+         párkémiák, keretméret) csúsztak egy meccset: a lefújáskori szkennelés
+         még a régi állapotot látta, a friss teljesítés pedig csak a KÖVETKEZŐ
+         szkennelésen — vagyis a következő meccs után — jött meg.
+         Ez a hívás zárja be a kört. Mindhárom művelet idempotens, tehát a
+         kettős futás nem fizet kétszer és nem ír felül semmit. */
+      try{chAfterMatchBook(null);}catch(e){}
+      try{msScan();}catch(e){}
+      try{styleScan();}catch(e){}
       if(euroActive()){euroAfterUserMatch();return;}
       if(S.idx>=30){$("kickBtn").textContent="Szezon vége";finish();return;}
       if(CHECKPOINTS.includes(S.idx)){
@@ -36046,10 +36090,17 @@ const STYLE_TRAIT_PRICE={1:[14,24,38],2:[26,45,70],3:[40,68,108]};
 /* Egy képesség: kulcs, rang, név, leírás, és HÁROM szint. Minden szint saját
    hatás-objektumot és saját egymondatos jellemzőt kap — így a felület meg
    tudja mutatni, mit nyersz a következő lépéssel. */
-function stTrait(styleK,key,tier,n,d,levels){
+/* `cond`: a FELTÉTELES képességek élő mérése. Néhány III. szintű trait hatása
+   feltételhez kötött (a sztár 10 Ratinggel kiemelkedik, a kapus a legjobb
+   ember, a kezdő 11 szórása 5 alatt van…). A kártya eddig csak a POTENCIÁLT
+   írta ki — „+2 csapaterő" —, de hogy a feltétel ÉPP teljesül-e, sehol nem
+   látszott. Egy hatás, amiről nem tudod, él-e, használhatatlan: nem tudsz rá
+   építeni, és nem tudod eldönteni, megérte-e megvenni.
+   A függvény egy rövid, MÉRT mondatot ad vissza a mostani állapotról. */
+function stTrait(styleK,key,tier,n,d,levels,cond){
   const price=STYLE_TRAIT_PRICE[tier]||STYLE_TRAIT_PRICE[1];
   (STYLE_TRAITS[styleK]=STYLE_TRAITS[styleK]||[]).push({
-    key,tier,n,d,
+    key,tier,n,d,cond:cond||null,
     lv:levels.map((L,i)=>({price:price[i],fx:L.fx||{},note:L.note||""}))});}
 
 /* ---------- 🧱 BETON VÉDELEM ---------- */
@@ -36082,7 +36133,8 @@ stTrait("beton","tizenegyedik",3,"A tizenegyedik ember",
   "Ha a kapusod a klub legmagasabb Ratingű játékosa, az egész csapat csapaterőt kap.",[
   {fx:{ovrTeam:()=>stTopPlayerRole()==="KAPUS"?1.5:0},note:"+1,5 csapaterő"},
   {fx:{ovrTeam:()=>stTopPlayerRole()==="KAPUS"?2.5:0},note:"+2,5"},
-  {fx:{ovrTeam:()=>stTopPlayerRole()==="KAPUS"?3.5:0},note:"+3,5"}]);
+  {fx:{ovrTeam:()=>stTopPlayerRole()==="KAPUS"?3.5:0},note:"+3,5"}],
+  ()=>`a klub legmagasabb Ratingű embere most ${stTopPlayerRole()==="KAPUS"?"a KAPUSOD":"NEM a kapusod"}`);
 
 /* ---------- ⚽ BOMBÁZÓK ---------- */
 stTrait("bombazok","befejezes_iskola",1,"Befejezés-iskola",
@@ -36114,7 +36166,8 @@ stTrait("bombazok","kettos_veszely",3,"Kettős veszély",
   "Ha a támadósorod a legerősebb sorod, a csapat csapaterőt kap.",[
   {fx:{ovrTeam:()=>stLineIsTop("CSATAR")?1.5:0},note:"+1,5 csapaterő"},
   {fx:{ovrTeam:()=>stLineIsTop("CSATAR")?2.5:0},note:"+2,5"},
-  {fx:{ovrTeam:()=>stLineIsTop("CSATAR")?3.5:0},note:"+3,5"}]);
+  {fx:{ovrTeam:()=>stLineIsTop("CSATAR")?3.5:0},note:"+3,5"}],
+  ()=>`a támadósor most ${stLineIsTop("CSATAR")?"A LEGERŐSEBB sor":"nem a legerősebb sor"}`);
 
 /* ---------- ☯️ BÉKE ÉS HARMÓNIA ---------- */
 stTrait("harmonia","csapatkovacs",1,"Csapatkovács-műhely",
@@ -36141,12 +36194,18 @@ stTrait("harmonia","gepezet_mukodik",3,"A gépezet",
   "Ha a kezdő 11 legerősebb és leggyengébb embere közti különbség 5 alatt van, a csapat csapaterőt kap.",[
   {fx:{ovrTeam:()=>stXISpread()<5?1.5:0},note:"+1,5 csapaterő"},
   {fx:{ovrTeam:()=>stXISpread()<5?2.5:0},note:"+2,5"},
-  {fx:{ovrTeam:()=>stXISpread()<5?3.5:0},note:"+3,5"}]);
+  {fx:{ovrTeam:()=>stXISpread()<5?3.5:0},note:"+3,5"}],
+  ()=>{const s=stXISpread();
+    return s>=999?"a kezdő 11 még nincs feltöltve — nincs mit mérni"
+                 :`a kezdő 11 szórása most ${s} — 5 alatt kell lennie`;});
 stTrait("harmonia","nincs_gyenge",3,"Nincs gyenge láncszem",
   "Ha a csapategyensúlyod 80 fölött áll, a csapat csapaterőt kap — a meglévő egyensúly-jutalom FÖLÉ.",[
   {fx:{ovrTeam:()=>{const b=teamBalance();return (b.ok&&b.score*100>=80)?1:0;}},note:"+1 csapaterő"},
   {fx:{ovrTeam:()=>{const b=teamBalance();return (b.ok&&b.score*100>=80)?2:0;}},note:"+2"},
-  {fx:{ovrTeam:()=>{const b=teamBalance();return (b.ok&&b.score*100>=80)?3:0;}},note:"+3"}]);
+  {fx:{ovrTeam:()=>{const b=teamBalance();return (b.ok&&b.score*100>=80)?3:0;}},note:"+3"}],
+  ()=>{const b=teamBalance();
+    return b.ok?`a csapategyensúlyod most ${Math.round(b.score*100)} — 80 kell`
+               :"az egyensúly-mérő most nem mér (hiányos kezdő 11)";});
 
 /* ---------- ⭐ SZTÁROM A PÁROM ---------- */
 stTrait("sztar","testorseg",1,"Testőrség",
@@ -36173,12 +36232,19 @@ stTrait("sztar","a_rendszer_o",3,"A rendszer ő",
   "Ha a sztárod legalább 10 Ratinggel a kezdő 11 átlaga fölött van, a csapat csapaterőt kap.",[
   {fx:{ovrTeam:()=>stStarLead()>=10?2:0},note:"+2 csapaterő"},
   {fx:{ovrTeam:()=>stStarLead()>=10?3.5:0},note:"+3,5"},
-  {fx:{ovrTeam:()=>stStarLead()>=10?5:0},note:"+5"}]);
+  {fx:{ovrTeam:()=>stStarLead()>=10?5:0},note:"+5"}],
+  ()=>{const st=styleState();
+    if(!st||!st.star)return "nincs kijelölt sztárod";
+    if(!stStar())return `${shortName(st.star)} most nincs a keretben`;
+    return `${shortName(st.star)} most ${stStarLead()} Ratinggel emelkedik ki a kezdő 11 átlaga fölé — 10 kell`;});
 stTrait("sztar","nelkule_nem_megy",3,"Nélküle nem megy",
   "Ha a sztárod a kezdő 11-ben van, a csapat csapaterőt kap — ha NINCS, ugyanannyit veszít. A filozófia ára.",[
   {fx:{ovrTeam:()=>styleStarOnPitch()?2:-2},note:"±2 csapaterő"},
   {fx:{ovrTeam:()=>styleStarOnPitch()?3:-3},note:"±3"},
-  {fx:{ovrTeam:()=>styleStarOnPitch()?4:-4},note:"±4"}]);
+  {fx:{ovrTeam:()=>styleStarOnPitch()?4:-4},note:"±4"}],
+  ()=>{const st=styleState();
+    if(!st||!st.star)return "nincs kijelölt sztárod";
+    return `${shortName(st.star)} most ${styleStarOnPitch()?"OTT VAN":"NINCS OTT"} a kezdő 11-ben`;});
 
 /* ---------- ⚡ HOL JÖN A MENNYDÖRGÉS? ---------- */
 stTrait("villam","korai_plafon",1,"Korai plafon-nyitás",
@@ -36205,7 +36271,8 @@ stTrait("villam","utolerhetetlen",3,"Utolérhetetlen",
   "Ha a kezdő 11 Sebesség-átlaga eléri a 90-et, a csapat csapaterőt kap.",[
   {fx:{ovrTeam:()=>stXISpeedAvg()>=90?1.5:0},note:"+1,5 csapaterő"},
   {fx:{ovrTeam:()=>stXISpeedAvg()>=90?2.5:0},note:"+2,5"},
-  {fx:{ovrTeam:()=>stXISpeedAvg()>=90?3.5:0},note:"+3,5"}]);
+  {fx:{ovrTeam:()=>stXISpeedAvg()>=90?3.5:0},note:"+3,5"}],
+  ()=>`a kezdő 11 Sebesség-átlaga most ${Math.round(stXISpeedAvg())} — 90 kell`);
 stTrait("villam","villamkontra",3,"Villámkontra",
   "A csapat gólesélye nő — az átmenet a ti fegyveretek.",[
   {fx:{ownGoalMult:1.05},note:"+5% gólesély"},
@@ -36237,7 +36304,8 @@ stTrait("panzer","falka",3,"Falka",
   "Ha legalább 5 lobbanékony ember van a keretedben, a csapat csapaterőt kap.",[
   {fx:{ovrTeam:()=>stHotHeads()>=5?1.5:0},note:"+1,5 csapaterő"},
   {fx:{ovrTeam:()=>stHotHeads()>=5?2.5:0},note:"+2,5"},
-  {fx:{ovrTeam:()=>stHotHeads()>=5?3.5:0},note:"+3,5"}]);
+  {fx:{ovrTeam:()=>stHotHeads()>=5?3.5:0},note:"+3,5"}],
+  ()=>`most ${stHotHeads()} lobbanékony embered van a keretben — 5 kell`);
 stTrait("panzer","nem_adjuk_meg",3,"Nem adjuk meg magunkat",
   "A csapat gólesélye nő — hátrányban sem hátráltok meg.",[
   {fx:{ownGoalMult:1.06},note:"+6% gólesély"},
@@ -36555,6 +36623,34 @@ function styleBuyTrait(key){
   return {ok:true,level:lv+1};}
 /* ---- A BOLT ---- */
 const STYLE_TIER_LABEL={1:"I. sáv",2:"II. sáv",3:"III. sáv"};
+/* ---- „ÉL-E MOST?" — A FELTÉTELES KÉPESSÉGEK ÉLŐ ÁLLAPOTA ----
+   A feltételes traitek hatása (ovrTeam) minden csapaterő-számításnál újra
+   kiértékelődik, tehát MOST is megmondható, mennyit ad. Kiszámoljuk, és
+   kimondjuk — a megvett szintre azt, ami tényleg jár, a még meg nem vettre
+   azt, ami járna, ha most megvennéd.
+   A számot ugyanaz a függvény adja, amit a meccs is használ (a szint saját
+   fx.ovrTeam-je), tehát a kiírás nem MODELLEZI a hatást, hanem MÉRI. */
+function styleTraitLiveVal(t,lv){
+  const L=t.lv[Math.max(0,lv-1)];
+  const f=L&&L.fx&&L.fx.ovrTeam;
+  if(typeof f!=="function")return null;
+  try{const v=f();return (typeof v==="number"&&isFinite(v))?v:null;}catch(e){return null;}}
+/* Tizedes vessző és tipográfiai mínusz — a játék többi számával egy nyelven. */
+function stNum(v){return String(Math.round(v*10)/10).replace(".",",").replace("-","−");}
+function styleTraitLiveHtml(t,lv){
+  const v=styleTraitLiveVal(t,lv);
+  if(v==null)return "";
+  let mert="";
+  if(typeof t.cond==="function"){try{mert=t.cond()||"";}catch(e){mert="";}}
+  const cls=v>0?"on":(v<0?"bad":"off");
+  const fej=lv
+    ? (v>0?`✅ <b>MOST ÉL: +${stNum(v)} csapaterő</b>`
+         : v<0?`⚠ <b>MOST BÜNTET: ${stNum(v)} csapaterő</b>`
+             : `⏸ <b>MOST NEM ÉL</b> — a feltétel nem teljesül`)
+    : (v>0?`✅ A feltétel MOST teljesülne: +${stNum(v)} csapaterő`
+         : v<0?`⚠ A feltétel most NEM teljesül — megvéve ${stNum(v)} csapaterő járna`
+             : `⏸ A feltétel most nem teljesül — megvéve 0 csapaterőt adna`);
+  return `<div class="msLive ${cls}">${fej}${mert?` · ${esc(mert)}`:""}</div>`;}
 function styleTraitsHtml(){
   const st=styleState();
   if(!st)return "";
@@ -36590,6 +36686,7 @@ function styleTraitsHtml(){
         +`<div class="msDesc">${esc(t.d)}</div>`
         +`<div class="msDesc" style="color:var(--gold)">Most: <b>${lv?esc(t.lv[lv-1].note):"nincs megnyitva"}</b>`
         +(maxed?"":` · Következő: <b>${esc(t.lv[lv].note)}</b>`)+`</div>`
+        +styleTraitLiveHtml(t,lv)
         +(maxed?""
           :`<button class="btn-${afford?"y":"s"} stepbtn" data-trait="${t.key}"${afford?"":" disabled"} style="margin-top:8px;padding:9px">`
            +(afford?`${lv?`${lv+1}. szint`:"Megnyitom"} — ${price} pont`:`Még ${price-sp} pont kell`)+`</button>`)
