@@ -2680,7 +2680,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.13";
+const APP_VERSION="3.1.14";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8767,13 +8767,33 @@ function axisExpected(k,T){
   /* numerikusan stabil softplus: nagy d-nél ln(1+e^d) ≈ d */
   const sp=d>30?d:Math.log(1+Math.exp(d));
   return cap-SPEED_SOFTCAP_K*sp;}
-function tacticFit(key){
-  const A=teamAttrStrengths(),w=TACTICS[key].attrProfile;
+/* ---- AZ ILLESZKEDÉS TENGELYENKÉNTI BONTÁSA ----
+   A HUB taktika-panelje EDDIG SAJÁT, MÁSIK képlettel magyarázta a százalékot:
+   a nyers (A[tengely] − az öt tengely átlaga) × súly szorzatot nézte, offset és
+   szórás nélkül. A szám viszont a lenti, normalizált z-pontszámból jött. Két
+   képlet ugyanarra a fogalomra = a magyarázat és a szám előbb-utóbb mást mond.
+
+   MÉRVE, a bejelentett kereten (Véd 126 · Kap 116 · Pas 124 · Gól 130 · Seb 126,
+   Gyors kontra): a fit 39.9% lett, és ebből a SEBESSÉG vitt el −16.0
+   százalékpontot — miközben a panel a Sebességet ERŐSSÉGNEK mutatta (zölden,
+   mert 126 > az öt tengely 124.4-es átlaga), a magyarázó mondat a Gólszerzést
+   dicsérte, a tanács-sor pedig kiírta, hogy „✓ A kereted jól illik ehhez a
+   rendszerhez". Vagyis a panel három helyen is azt állította, hogy nincs mit
+   javítani — egy 39%-os illeszkedés mellett.
+
+   Ez a függvény ezért EGY forrás: a fit is ebből összegez, a panel is ebből
+   magyaráz. A `d` mezője a tengely hozzájárulása a z-hez; százalékpontban
+   d × TACTIC_FIT_C × 100 (tehát d=0.15 ≈ 3 pp illeszkedés). */
+function tacticFitParts(key,A0){
+  const A=A0||teamAttrStrengths(),w=TACTICS[key].attrProfile;
   /* a mezőny szintje a horgony (a kapus szándékosan kimarad belőle) */
   const T=(A.ved+A.passz+A.gol)/3;
+  return ATTR_KEYS.map(k=>{
+    const ww=w[k]||0,z=(A[k]-axisExpected(k,T))/(AXIS_SCALE[k]||1);
+    return {key:k,w:ww,z,d:ww*z};});}
+function tacticFit(key,A0){
   let z=0;
-  ATTR_KEYS.forEach(k=>{
-    z+=(w[k]||0)*((A[k]-axisExpected(k,T))/(AXIS_SCALE[k]||1));});
+  tacticFitParts(key,A0).forEach(p=>{z+=p.d;});
   return Math.max(0,Math.min(1,0.5+z*TACTIC_FIT_C));}
 /* Hány KÉSZ (5/5) párkémia gyorsítja a taktikát: a pár mindkét tagja a kezdő
    11-ben van, és a szerep-párjuk (roleInFormation, sorrendfüggetlenül)
@@ -28148,25 +28168,33 @@ function renderHubTacticsPanel(){
     A taktika <b>85-ös szinttől ad előnyt</b>, és minden meccsel fejlődik (a győzelmek sokkal többet adnak). <b>Váltani bármikor lehet.</b></div>`;
   const body=$("hubTacticsBody");body.innerHTML="";
   const liked=(coach&&coach.tactics)||[];
-  const overall=ATTR_KEYS.reduce((s,k)=>s+A[k],0)/ATTR_KEYS.length;
   /* illeszkedés szerint rendezve — elöl a kerethez legjobban illő rendszer */
-  const keys=Object.keys(TACTICS).slice().sort((a,b)=>tacticFit(b)-tacticFit(a));
+  const keys=Object.keys(TACTICS).slice().sort((a,b)=>tacticFit(b,A)-tacticFit(a,A));
   keys.forEach(k=>{
-    const lvl=tacticLevel(k),fit=tacticFit(k),chem=tacticChemCount(k);
+    const lvl=tacticLevel(k),chem=tacticChemCount(k);
+    /* A PANEL MINDEN ÁLLÍTÁSA UGYANEBBŐL A BONTÁSBÓL jön, amiből maga a
+       százalék is — a zöld súly-sávok, a magyarázó mondat és a tanács-sor
+       egyaránt. Korábban mindhárom a nyers "tengely − az öt tengely átlaga"
+       különbséget nézte, ezért egy 39%-os illeszkedés mellett is azt írta ki,
+       hogy nincs mit javítani. */
+    const parts=tacticFitParts(k,A);
+    const pByKey={};parts.forEach(p=>{pByKey[p.key]=p;});
+    const fit=Math.max(0,Math.min(1,0.5+parts.reduce((s,p)=>s+p.d,0)*TACTIC_FIT_C));
     const isActive=S.tactics&&S.tactics.active===k;
     const stars=fit>=0.62?"★★★":fit>=0.52?"★★":"★";
     const pct=Math.round((lvl-TACTIC_MIN)/(TACTIC_MAX-TACTIC_MIN)*100);
     const th=Math.round((85-TACTIC_MIN)/(TACTIC_MAX-TACTIC_MIN)*100);
     const w=TACTICS[k].attrProfile;
-    /* súlyprofil mini-sávok: melyik tengelyre mennyire épül ez a taktika */
+    /* súlyprofil mini-sávok: melyik tengelyre mennyire épül ez a taktika.
+       ZÖLD = ezen a tengelyen az ELVÁRÁS FÖLÖTT állsz (z≥0), tehát tényleg
+       hoz neked illeszkedést — nem az, hogy a szám nagyobb a saját átlagodnál. */
     const wBars=ATTR_KEYS.map(key=>{
       const ww=w[key]||0;if(ww<=0)return "";
-      const strong=A[key]>=overall;
+      const strong=(pByKey[key]||{z:0}).z>=0;
       return `<span style="display:inline-block;margin-right:7px;font-size:10.5px;color:${strong?"var(--grass)":"var(--dim2)"}">
         ${ATTR_SHORT[key]} ${Math.round(ww*100)}%</span>`;}).join("");
     /* magyarázó mondat: melyik tengely húzza fel és melyik le ezt a rendszert */
-    const contrib=ATTR_KEYS.filter(key=>(w[key]||0)>=0.15)
-      .map(key=>({key,d:(A[key]-overall)*(w[key]||0)})).sort((x,y)=>y.d-x.d);
+    const contrib=parts.filter(p=>p.w>=0.15).sort((x,y)=>y.d-x.d);
     let why="";
     if(contrib.length){
       const best=contrib[0],worst=contrib[contrib.length-1];
@@ -28182,16 +28210,16 @@ function renderHubTacticsPanel(){
       const col=eff>=0?"var(--grass)":"var(--red)";
       effLine=`<div style="font-size:11px;margin-top:3px">Meccs-hatás: <b style="color:${col}">${eff>=0?"+":""}${eff.toFixed(2)} OVR</b>
         <span style="color:var(--dim2)">(szint ${Math.round(lvl)} × illeszkedés ${Math.round(fit*100)}%)</span></div>`;
-      /* MIT TEGYÉK a jobb illeszkedésért: a taktika legnagyobb súlyú tengelye,
-         ahol a keret a leggyengébb — ott van a legtöbb nyerhető illeszkedés. */
-      const gaps=ATTR_KEYS.map(key=>({key,w:w[key]||0,gap:overall-A[key]}))
-        .filter(x=>x.w>=0.15).sort((a,b)=>(b.w*b.gap)-(a.w*a.gap));
-      const worst=gaps[0];
-      if(worst&&worst.gap>0.3){
+      /* MIT TEGYÉK a jobb illeszkedésért: az a fontos tengely, amelyik a
+         LEGTÖBB illeszkedést viszi el — vagyis a legnegatívabb hozzájárulás.
+         A küszöb is ebben az egységben van: d = −0.15 pontosan 3 százalékpont
+         elveszett illeszkedés (d × TACTIC_FIT_C × 100). */
+      const worst=contrib.length?contrib[contrib.length-1]:null;
+      if(worst&&worst.d<-0.15){
         const roles=axisRoleHint(worst.key);
         const roleTxt=roles.length?roles.join(" vagy "):"a kulcsposztok";
         effLine+=`<div style="font-size:11px;color:var(--gold);margin-top:3px;line-height:1.45">
-          💡 Jobb illeszkedés: ez a rendszer a <b>${ATTR_LABELS[worst.key]}</b>-re épít (súly ${Math.round(worst.w*100)}%), de ott gyengébb a kereted. Erősítsd ${roleTxt} sorát, vagy szerezz ${ATTR_LABELS[worst.key]}-növelő skilleket.</div>`;
+          💡 Jobb illeszkedés: ez a rendszer a <b>${ATTR_LABELS[worst.key]}</b>-re épít (súly ${Math.round(worst.w*100)}%), és EZ visz el a legtöbbet — <b>${Math.abs(worst.d*TACTIC_FIT_C*100).toFixed(0)} százalékpont</b> illeszkedést. Erősítsd ${roleTxt} sorát, vagy szerezz ${ATTR_LABELS[worst.key]}-növelő skilleket.</div>`;
       }else{
         effLine+=`<div style="font-size:11px;color:var(--grass);margin-top:3px">✓ A kereted jól illik ehhez a rendszerhez — a fő tengelyein erős vagy.</div>`;}}
     const row=document.createElement("div");row.className="prow";
