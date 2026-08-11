@@ -2677,7 +2677,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.09";
+const APP_VERSION="3.1.10";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7049,6 +7049,7 @@ function mpCupAbort(){
 async function mpCupGate(onReady){
   if(!h2hRoomActive()){onReady();return;}
   if(mpCupSettled()){onReady();return;}
+  if(mpWaitStuck(_mpCupBusy,_mpCupPoll))mpCupAbort();   /* beragadt jelző feloldása */
   if(_mpCupBusy)return;
   _mpCupBusy=true;
   const key=mpCupKey(),myField=MP.role==="host"?"host":"guest";
@@ -7079,7 +7080,10 @@ async function mpCupGate(onReady){
   await mpReput(key,myField,node,myEntry);
   if(!_mpCupBusy)return;
   mpCupTick(key,myField,oppField,onReady,myEntry);}
-async function mpCupTick(key,myField,oppField,onReady,myEntry){
+function mpCupTick(key,myField,oppField,onReady,myEntry){
+  const again=()=>{if(_mpCupBusy)_mpCupPoll=setTimeout(()=>mpCupTick(key,myField,oppField,onReady,myEntry),2500);};
+  return mpTickWrap(()=>mpCupTickRun(key,myField,oppField,onReady,myEntry),again,"kupanevezés");}
+async function mpCupTickRun(key,myField,oppField,onReady,myEntry){
   if(!_mpCupBusy)return;
   if(_mpCupPoll){clearTimeout(_mpCupPoll);_mpCupPoll=null;}
   let node=null;
@@ -7173,6 +7177,7 @@ async function mpCupGroupSync(onReady){
      félig visszaállt állapot csendben átugorja a csoportcserét, és a kliens a
      TÁRS VALÓDI eredménye NÉLKÜL sorsolja meg a nyolcaddöntőt. */
   if(!mpCupSeeded()||E.mateG==null||E.mateG===E.userG){onReady();return;}
+  if(mpWaitStuck(_mpGroupBusy,_mpGroupPoll))mpCupGroupAbort();
   if(_mpGroupBusy)return;
   _mpGroupBusy=true;
   const key=mpCupStageKey("grp"),myField=MP.role==="host"?"host":"guest";
@@ -7189,7 +7194,10 @@ async function mpCupGroupSync(onReady){
   await mpReput(key,myField,node,myRows);
   if(!_mpGroupBusy)return;
   mpCupGroupTick(key,myField,oppField,onReady,myRows);}
-async function mpCupGroupTick(key,myField,oppField,onReady,myRows){
+function mpCupGroupTick(key,myField,oppField,onReady,myRows){
+  const again=()=>{if(_mpGroupBusy)_mpGroupPoll=setTimeout(()=>mpCupGroupTick(key,myField,oppField,onReady,myRows),3000);};
+  return mpTickWrap(()=>mpCupGroupTickRun(key,myField,oppField,onReady,myRows),again,"csoport-szinkron");}
+async function mpCupGroupTickRun(key,myField,oppField,onReady,myRows){
   if(!_mpGroupBusy)return;
   if(_mpGroupPoll){clearTimeout(_mpGroupPoll);_mpGroupPoll=null;}
   let node=null;
@@ -7330,6 +7338,45 @@ function mpDiagCollect(){
     if(Array.isArray(E.path))
       L.push("    path("+E.path.length+"): "+E.path.map(p=>p.k+(p.round?":"+p.round:"")+(p.mine!=null?` ${p.mine}:${p.theirs}`:"")).join(" | "));});
   return L.join("\n");}
+/* ================= A BEVÁRÓ HURKOK STABILIZÁLÁSA =================
+   BEJELENTETT HIBA: PvP kupasorozat közben — sok ki-be lépés, a másik oldal
+   ready-figyelése, hálózati bizonytalanság — a beváró képernyő „befagyott": a
+   kör lezárása nézeten ragadt, és EGYETLEN gomb sem működött, a kezdőlapra
+   vivő házikó sem.
+
+   AZ OK EGY KÖZÖS MINTA HIÁNYZÓ VÉDELME. Mind az öt beváró folyamat (kupa-
+   nevezés, csoport-szinkron, kör lezárása, szezonindítás, szezonzárás, párharc)
+   ugyanúgy épül: egy `busy` jelző + egy async „tick", ami a végén ÚJRAÜTEMEZI
+   önmagát. Ha a tick közben BÁRHOL kivétel keletkezik — egy hiányzó mező a
+   szoba-rekordban, egy félbeszakadt hálózati hívás, egy DOM-elem, ami épp nincs
+   ott —, akkor az újraütemezés ELMARAD, a `busy` jelző viszont IGAZ MARAD.
+   Ez a legrosszabb kombináció:
+     · a képernyő áll (nincs több kör, ami frissítené),
+     · a folyamat „fut" (a jelző igaz), tehát minden újraindítási kísérlet az
+       `if(busy)return;` őrön lepattan — és a hívó `onReady`-je sosem fut le,
+     · a kiút-gombok pedig azért tűnnek halottnak, mert a h2hWaitLeave az ELSŐ
+       igaznak látszó jelzőhöz tartozó abortot hívta meg — ami épp NEM a beragadt
+       folyamaté volt.
+
+   HÁROM VÉDELEM, mind ugyanabból az elvből: egy hiba legfeljebb egy kör
+   kihagyása lehet, sosem holtpont.
+     1. mpTickWrap — a tick kivétele nem öli meg a kört: elkapjuk, kiírjuk, és
+        újraütemezzük.
+     2. mpWaitStuck — ha a jelző igaz, de a köre már nem él, az BERAGADT
+        állapot: a következő indítás feloldja, nem pattan le róla.
+     3. mpAbortAllWaits — a kiút MINDEN folyamatot leállít, nem csak az elsőt,
+        és minden lépése külön try-ban fut. */
+function mpWaitErr(txt){
+  try{const e=$("h2hWaitErr");if(e)e.textContent=txt;}catch(_){}}
+/* Igaz, ha a jelző szerint fut a folyamat, de nincs élő köre — beragadt. */
+function mpWaitStuck(busy,poll){return !!busy&&!poll;}
+/* A tick burkolója. `again` a saját újraütemezője (a hívó adja meg), hogy a
+   kivétel után is legyen következő kör. */
+function mpTickWrap(run,again,label){
+  return Promise.resolve().then(run).catch(err=>{
+    try{console&&console.warn&&console.warn("[mp-wait] "+label,err);}catch(_){}
+    mpWaitErr("Hiba a várakozás közben — újrapróbáljuk. Ha nem mozdul, a Vissza a kezdőlapra gomb mindig kivisz.");
+    try{again&&again();}catch(_){}});}
 function mpCupTieAbort(){
   _mpTieBusy=false;_mpTieWaitStart=0;_mpTieStale=false;
   if(_mpTiePoll){clearTimeout(_mpTiePoll);_mpTiePoll=null;}
@@ -7381,6 +7428,9 @@ function mpCupTiePublish(round){
   }catch(e){}}
 async function mpCupTieSync(round,onReady){
   if(!mpCupNeedTieSync()){onReady();return;}
+  /* BERAGADT JELZŐ: ha „fut", de nincs élő köre, egy megszakadt korábbi futás
+     maradéka — feloldjuk, különben ez a return örökre elnyeli az onReady-t. */
+  if(mpWaitStuck(_mpTieBusy,_mpTiePoll))mpCupTieAbort();
   if(_mpTieBusy)return;
   _mpTieBusy=true;
   const key=mpCupStageKey("ko"+round),myField=MP.role==="host"?"host":"guest";
@@ -7403,7 +7453,10 @@ async function mpCupTieSync(round,onReady){
   await mpReput(key,myField,node,myRec);
   if(!_mpTieBusy)return;
   mpCupTieTick(key,myField,oppField,round,onReady,myRec);}
-async function mpCupTieTick(key,myField,oppField,round,onReady,myRec){
+function mpCupTieTick(key,myField,oppField,round,onReady,myRec){
+  const again=()=>{if(_mpTieBusy)_mpTiePoll=setTimeout(()=>mpCupTieTick(key,myField,oppField,round,onReady,myRec),3000);};
+  return mpTickWrap(()=>mpCupTieTickRun(key,myField,oppField,round,onReady,myRec),again,"kör lezárása");}
+async function mpCupTieTickRun(key,myField,oppField,round,onReady,myRec){
   if(!_mpTieBusy)return;
   if(_mpTiePoll){clearTimeout(_mpTiePoll);_mpTiePoll=null;}
   let node=null;
@@ -20059,10 +20112,46 @@ function startRound(){
 function startRoundNow(){
   if(h2hIsDuelRound()&&!h2hScript){h2hBeginDuel();return;}
   playMatch();}
-function h2hWaitHide(){$("h2hWait").classList.add("hide");}
+function h2hWaitHide(){_h2hWaitAt=0;$("h2hWait").classList.add("hide");}
+/* ================= A KIÚT ŐRE =================
+   Az utolsó védelmi vonal. Bármi történjék a beváró folyamatok alatt, EZ a két
+   dolog mindig igaz kell legyen:
+     · a kezdőlap-gomb látszik és kattintható,
+     · ha a réteg megállt (nincs mögötte élő folyamat, vagy van, de már régen
+       nem frissült), azt KIMONDJUK — a néma állókép a legrosszabb, mert a
+       felhasználó nem tudja, vár-e még valamire.
+   Az őr magától SEMMIT nem szakít félbe: nem zárja be a réteget egy lassú
+   hálózat miatt. Csak a kiutat tartja nyitva, és beszél. */
+const MP_WAIT_STALL_MS=25000;
+function mpWaitWatchdog(){
+  try{
+    const w=$("h2hWait");
+    if(!w||w.classList.contains("hide"))return;
+    /* 1) A KIÚT MINDIG ÉLŐ. Egy félbemaradt folyamat letilthatta a gombot —
+       az őr visszaadja. A „most nem játszom le" rejtett állapotához nem
+       nyúlunk: azt az elkötelezett párharc szándékosan veszi le. */
+    {const hb=$("h2hWaitHomeBtn");
+     if(hb){hb.classList.remove("hide");hb.disabled=false;}}
+    {const cb=$("h2hWaitCancelBtn");if(cb)cb.disabled=false;}
+    /* 2) MEGÁLLT-E? */
+    const idle=_h2hWaitAt?(Date.now()-_h2hWaitAt):0;
+    if(idle<MP_WAIT_STALL_MS)return;
+    let live=false;
+    try{live=MP_WAIT_FLOWS.some(f=>{try{return !!f.busy();}catch(e){return false;}});}catch(e){}
+    const err=$("h2hWaitErr");
+    if(!err)return;
+    err.textContent=live
+      ? "A várakozás régóta nem mozdult — a kapcsolat akadozhat. Nyugodtan lépj vissza a kezdőlapra: a szoba és a karriered megmarad, és később pontosan innen folytatódik."
+      : "Ez a képernyő megállt — nincs mögötte futó folyamat. Lépj vissza a kezdőlapra; a szobád és a karriered sértetlen.";
+  }catch(e){}}
+setInterval(mpWaitWatchdog,3000);
 /* A várakozó réteg. A "what" a két sor megnevezése — a párharcnál a keret, a
    szezonzárásnál a zárójelentés vár egymásra. */
+/* Mikor frissült utoljára a beváró réteg? Az őr (mpWaitWatchdog) ebből tudja
+   meg, hogy a mögötte lévő folyamat ÉL-e még, vagy csak egy állókép maradt. */
+let _h2hWaitAt=0;
 function h2hWaitShow(round,msg,mine,opp,what){
+  _h2hWaitAt=Date.now();
   const W=what||{mine:"A te kereted",opp:"A társad kerete",cancel:"✕ Most nem játszom le"};
   $("h2hWait").classList.remove("hide");
   $("h2hWaitOrphanBtn").classList.add("hide");   /* csak a szoba-eltűnés mutatja */
@@ -20108,15 +20197,51 @@ function h2hAbortWait(){
    másodperc múlva visszahozta — a felhasználó nem tudott kilépni belőle, csak
    újratöltéssel. Mindegyik ághoz a SAJÁT leállítója tartozik; a végén a
    párharc az alapértelmezés. */
+/* A HAT BEVÁRÓ FOLYAMAT EGY HELYEN. Eddig a kiút az ELSŐ igaznak látszó
+   jelzőhöz tartozó abortot hívta meg, és visszatért — ha viszont egy KORÁBBI
+   folyamat jelzője ragadt be (mert a köre kivétellel elhalt), akkor az árnyékolta
+   a ténylegesen futót: a felhasználó a „rossz" folyamatot állította le, a
+   sajátja meg 2,5 másodperc múlva visszahozta a réteget. Kívülről ez pontosan
+   úgy néz ki, mintha a gomb nem működne.
+   Mostantól a kiút MINDEGYIKET leállítja, és minden lépés külön try-ban fut —
+   egy hibás abort nem akadályozhatja meg a többit, és főleg nem a kilépést. */
+const MP_WAIT_FLOWS=[
+  {n:"kupanevezés",     busy:()=>_mpCupBusy,     stop:()=>mpCupAbort()},
+  {n:"csoport-szinkron",busy:()=>_mpGroupBusy,   stop:()=>mpCupGroupAbort()},
+  {n:"kör lezárása",    busy:()=>_mpTieBusy,     stop:()=>mpCupTieAbort()},
+  {n:"szezonindítás",   busy:()=>(_mpStartBusy||!!_mpStartPending),
+                        stop:()=>{mpStartAbort();_mpStartPending=null;}},
+  {n:"szezonzárás",     busy:()=>_mpFinalBusy,   stop:()=>{mpFinalWaitStop();h2hWaitHide();}},
+  {n:"párharc",         busy:()=>_h2hBusy,       stop:()=>h2hAbortWait()}];
+function mpAbortAllWaits(){
+  let n=0;
+  MP_WAIT_FLOWS.forEach(f=>{
+    let on=false;
+    try{on=!!f.busy();}catch(e){}
+    if(!on)return;
+    n++;
+    try{f.stop();}catch(e){}});
+  return n;}
 function h2hWaitLeave(){
-  if(_mpCupBusy){mpCupAbort();return;}
-  if(_mpGroupBusy){mpCupGroupAbort();return;}
-  if(_mpTieBusy){mpCupTieAbort();return;}
-  if(_mpStartBusy||_mpStartPending){mpStartAbort();_mpStartPending=null;return;}
-  if(_mpFinalBusy){mpFinalWaitStop();h2hWaitHide();return;}
-  h2hAbortWait();}
-$("h2hWaitCancelBtn")&&($("h2hWaitCancelBtn").onclick=h2hWaitLeave);
-$("h2hWaitHomeBtn")&&($("h2hWaitHomeBtn").onclick=()=>{h2hWaitLeave();goHomeScreen();});
+  /* Ha egyik jelző sem áll, akkor is takarítunk: a réteg lehet „árva" (egy
+     megszakadt folyamat maradéka), és a felhasználónak akkor is ki kell tudnia
+     lépni belőle. */
+  if(!mpAbortAllWaits()){try{h2hAbortWait();}catch(e){}}
+  try{h2hWaitHide();}catch(e){}}
+$("h2hWaitCancelBtn")&&($("h2hWaitCancelBtn").onclick=()=>{try{h2hWaitLeave();}catch(e){h2hWaitHide();}});
+/* A KEZDŐLAP-GOMB A VÉGSŐ KIÚT — sosem bukhat el.
+   Régen: `h2hWaitLeave(); goHomeScreen();`. Ha a leave BÁRHOL kivételt dobott
+   (egy abort egy hiányzó állapotra futott), a goHomeScreen SOHA nem futott le,
+   és a gomb némán nem csinált semmit. Pontosan ez volt a „még a házikó sem
+   működik" élmény. Mostantól a leave hibája nem állhat a kilépés útjába, és ha
+   maga a kilépés is elhasal, marad a nyers újratöltés. */
+$("h2hWaitHomeBtn")&&($("h2hWaitHomeBtn").onclick=()=>{
+  try{h2hWaitLeave();}catch(e){}
+  try{goHomeScreen();}
+  catch(e){try{location.reload();}catch(e2){}}
+  /* Védőháló: ha másfél másodperc múlva még mindig itt vagyunk (a mentés vagy
+     az újratöltés valahol elakadt), kényszerítjük az újratöltést. */
+  setTimeout(()=>{try{location.reload();}catch(e){}},1500);});
 /* F7: a szoba megszűnt — megmutatjuk a kiutat. NEM automatikus: a karrier
    egyjátékosra fordítása visszafordíthatatlan, ezért a felhasználó dönt.
    Egy pillanatnyi hálózati hiba se rántsa el a döntést — ezért mondjuk ki, hogy
@@ -20162,6 +20287,7 @@ function h2hResumeForced(){
 /* A csere levezénylése. Minden lépés ÚJRAINDÍTHATÓ: ha a böngésző félúton
    újratölt, a szobában lévő állapotból pontosan ott folytatódik. */
 async function h2hBeginDuel(){
+  if(mpWaitStuck(_h2hBusy,_h2hPoll))h2hAbortWait();
   if(_h2hBusy)return;
   _h2hBusy=true;
   const round=(S.idx||0)+1,key=h2hKey();
@@ -20216,7 +20342,10 @@ async function h2hBeginDuel(){
      hoz vissza, és a keret nem tud elcsúszni a felküldött pillanatkép alól. */
   h2hPendingSet(key,round);
   h2hTick(key,myField,oppField,round);}
-async function h2hTick(key,myField,oppField,round){
+function h2hTick(key,myField,oppField,round){
+  const again=()=>{if(_h2hBusy)_h2hPoll=setTimeout(()=>h2hTick(key,myField,oppField,round),2500);};
+  return mpTickWrap(()=>h2hTickRun(key,myField,oppField,round),again,"párharc");}
+async function h2hTickRun(key,myField,oppField,round){
   if(!_h2hBusy)return;
   if(_h2hPoll){clearTimeout(_h2hPoll);_h2hPoll=null;}
   let node=null;
@@ -20454,9 +20583,12 @@ function mpFinalWaitStop(){
 /* A verdikt előtti várakozás. Ugyanaz a réteg, mint a párharcnál — ugyanaz a
    két kiút is: kezdőlap (a szoba és a karrier megmarad) vagy megszakítás. */
 function mpFinalWait(onReady){
+  /* BERAGADT JELZŐ FELOLDÁSA: ha a jelző igaz, de a köre már nem él, az egy
+     megszakadt korábbi futás maradéka — nem szabad rajta lepattanni. */
+  if(mpWaitStuck(_mpFinalBusy,_mpFinalPoll))mpFinalWaitStop();
   if(_mpFinalBusy)return;
   _mpFinalBusy=true;
-  const tick=async()=>{
+  const tickRun=async()=>{
     if(!_mpFinalBusy)return;
     let ok=false;
     try{ok=await mpSyncSeasonEnd();}catch(e){}
@@ -20474,6 +20606,9 @@ function mpFinalWait(onReady){
       `<span class="h2hDot"></span>A szezonod lezárult. A közös tabellához a társad zárása is kell — amint ő is végigjátssza a 30. fordulót, összeáll a végeredmény.`,
       true,false,H2H_WAIT_FINAL);
     _mpFinalPoll=setTimeout(tick,3000);};
+  /* A kör kivétele nem ölheti meg a folyamatot — újraütemezünk (lásd mpTickWrap). */
+  const tick=()=>mpTickWrap(tickRun,
+    ()=>{if(_mpFinalBusy)_mpFinalPoll=setTimeout(tick,3500);},"szezonzárás");
   h2hWaitShow("SZEZONZÁRÁS","Szezonzárás egyeztetése…",true,false,H2H_WAIT_FINAL);
   tick();}
 /* ================= F6 — A PÁRHARC MÉRLEGE ÉS A FOLYTATÁS =================
