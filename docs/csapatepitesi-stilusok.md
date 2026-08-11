@@ -326,7 +326,7 @@ szünteti meg a bajt, csak a következményét tompítja.
 ### 4.1 A stíluspont
 
 **Már ma is gyűlik** — a mérföldkő-rendszer stíluspont-jutalmai (`S.ms.sp`) ezt
-a valutát termelik. Az általános mérföldkövekből összesen **329 pont**
+a valutát termelik. Az általános mérföldkövekből összesen **490 pont**
 szerezhető meg, hat kategóriára osztva.
 
 **De nem ingyen.** A stíluspontos mérföldkövek **kategóriánként zárva
@@ -369,10 +369,16 @@ alapesetre vonatkoznak:
 | Vagyon | 0,5× éves keret | 6 | 52 |
 | Transzferpiac | 0,7× | 12 | 69 |
 | Utánpótlás és stáb | 0,7× | 7 | 54 |
-| Trófeák | 1,0× | 6 | 74 |
+| Trófeák | 1,0× | 16 | 235 |
 | Bajnoki fölény | 0,9× | 5 | 50 |
 | A nagy ugrás | 1,2× | 2 | 30 |
-| **összesen** | **5,0×** | **38** | **329** |
+| **összesen** | **5,0×** | **48** | **490** |
+
+A **Trófeák** kategória a 3.1.09-ben nőtt meg (74 → 235): oda került a bajnoki
+cím és a BL-győzelem NEHÉZSÉGI LÉPCSŐJE. A mérce a mezőnyszint mínusz a nyers
+csapaterőd (`teamOVRbase`), öt fokozattal: −2 · 0 · +2 · +5 · +10. Ugyanaz a
+trófea így nagyon mást ér attól függően, milyen mezőnyben szerezted meg — és a
+BL végig magasabban fizet, mint a bajnokság.
 
 Mérve: a pénzjutalmas mérföldkövek összesen **9,22× éves keretet** hoznak be,
 tehát mind a hat kategória megnyitása a mérföldkő-kereset **54%-át** viszi el.
@@ -390,9 +396,9 @@ forrás. A 3.1.03-ig stílusonként 119-172 pontot adtak — a kiadás ezt
 
 | Tétel | Pont |
 |---|---|
-| Általános mérföldkövek (kategóriák megnyitása után) | 329 |
+| Általános mérföldkövek (kategóriák megnyitása után) | 490 |
 | A választott stílus saját mérföldkövei | 628-697 |
-| **bevétel egy karrier alatt** | **~960-1030** |
+| **bevétel egy karrier alatt** | **~1120-1190** |
 | Egy stílus TELJES trait-fája (7 trait × 3 szint) | 1007 |
 | Csillagozási jogok (képességenként 25-60 pont) | ezen felül |
 

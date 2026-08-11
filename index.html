@@ -2677,7 +2677,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.08";
+const APP_VERSION="3.1.09";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -18503,7 +18503,14 @@ function matchSwings(log){
    utána a hajrá-dráma, a gólok, a tét és a szorosság. Az unalmas meccs külön
    levonást kap — enélkül egy 0:0 is 10 pont körül landolna a "szoros" tételen,
    holott épp az ellenkezője igaz. */
-const EXC_MAX={swing:40,drama:25,goals:20,stake:15,close:10,rout:8};
+/* AZ ÖSSZESÍTÉS (agg) a kupa-visszavágók sajátja. Egy oda-visszavágós párharc
+   második mérkőzése SOSEM ugyanaz, mint egy magányos meccs: ott a 0:0 is
+   idegtépő lehet, ha az összesítés egy gólon áll. A régi mutató ezt nem
+   ismerte — a visszavágót pontosan ugyanúgy mérte, mint egy csoportmeccset.
+   Három tétel: a visszavágó MAGA egy magasabb kiindulópont, a szoros
+   ÖSSZESÍTÉS feszültsége, és a továbbjutás FORDULÁSA (aki az első meccs után
+   hátrányban volt, most viszont továbbjutásra áll — vagy fordítva). */
+const EXC_MAX={swing:40,drama:25,goals:20,stake:15,close:10,rout:8,agg:18};
 function matchExcitement(c){
   const diff=Math.abs(c.diff||0);
   const swing=Math.min(EXC_MAX.swing,
@@ -18530,10 +18537,21 @@ function matchExcitement(c){
      kikapást a saját szurkolód nem élvezi. Ezzel a mutató pontosan azt méri,
      amire az F2-ben szükség lesz: mennyire élvezte a TE közönséged. */
   const rout=(c.diff>=3)?Math.min(EXC_MAX.rout,4+(c.diff-3)*2):0;
-  let s=swing+drama+goals+stake+close+rout;
-  if((c.goals||0)<=1&&!c.leadChanges&&!c.equalisers)s-=12;
+  /* ---- AZ ÖSSZESÍTÉS ---- */
+  let agg=0;
+  if(c.agg){
+    const A=c.agg;
+    agg+=6;                                  /* a visszavágó eleve magasabbról indul */
+    const d=Math.abs((A.mine||0)-(A.theirs||0));
+    agg+=d===0?8:d===1?6:d===2?3:0;          /* szoros összesítés */
+    const before=(A.prevMine||0)-(A.prevTheirs||0), after=(A.mine||0)-(A.theirs||0);
+    if(before<0&&after>=0)agg+=8;            /* hátrányból továbbjutásra fordult */
+    else if(before>0&&after<=0)agg+=6;       /* elveszett előny */
+    agg=Math.min(EXC_MAX.agg,agg);}
+  let s=swing+drama+goals+stake+close+rout+agg;
+  if((c.goals||0)<=1&&!c.leadChanges&&!c.equalisers&&!agg)s-=12;
   return {score:Math.max(0,Math.min(100,Math.round(s))),
-    swing:Math.round(swing),drama:Math.round(drama),goals:Math.round(goals),stake,close,rout};}
+    swing:Math.round(swing),drama:Math.round(drama),goals:Math.round(goals),stake,close,rout,agg};}
 /* ---- A KATEGÓRIA ----
    A sorrend a ritkaságot követi: ami ritkább, az az érdekesebb sztori, tehát az
    kapja a mondatot. Az "unalmas" azért áll legelöl, mert csak nagyon szűk
@@ -22658,13 +22676,16 @@ function playMatch(){
            akkor volt igaz, amikor kifutottatok, nem a lefújás után. */
         title:!!(_TITLE&&isTitleDecider(_TITLE)),
         ovrGap:(fx.o&&fx.o.ovr!=null)?(fx.o.ovr-teamStrength()):0,
+        /* KUPA-VISSZAVÁGÓ: az ÖSSZESÍTÉS állása a lefújás pillanatában. Csak
+           oda-visszavágós párharc második mérkőzésén ad vissza bármit. */
+        agg:(typeof euroLiveTie==="function")?euroLiveTie(gf,ga):null,
         opp:esc(String(DUEL?DUEL.oppName:((fx.o&&fx.o.n)||"az ellenfél"))),
         score:`${gf}:${ga}`};
       const _ex=matchExcitement(_ctx);
       const _key=matchVerdictKey(_ctx);
       addLine(`🎙 <b>A meccs mérlege:</b> ${matchVerdictTxt(_key,_ctx)}`,"m ev");
       addLine(`📊 Izgalom: <b>${_ex.score}/100</b> — ${excitementLabel(_ex.score)} `
-        +`<span style="color:var(--dim2)">(fordulatosság ${_ex.swing} · hajrá ${_ex.drama} · gólok ${_ex.goals} · tét ${_ex.stake} · szorosság ${_ex.close}${_ex.rout?` · gólzápor ${_ex.rout}`:""})</span>`,"m ev");
+        +`<span style="color:var(--dim2)">(fordulatosság ${_ex.swing} · hajrá ${_ex.drama} · gólok ${_ex.goals} · tét ${_ex.stake} · szorosság ${_ex.close}${_ex.rout?` · gólzápor ${_ex.rout}`:""}${_ex.agg?` · összesítés ${_ex.agg}`:""})</span>`,"m ev");
       if(gameMode==="career"){
         dramaRecord(_ex.score,_key,_ctx.opp);
         /* MÉRFÖLDKŐ: a meccs izgalma sehol máshol nem marad meg mérhető
@@ -22811,7 +22832,10 @@ function playMatch(){
     /* --- óriásölés: ha jelentősen erősebb ellenfelet győzünk le, a
        morál-jutalom aránytalanul nagyobb, mint egy szoros meccsért --- */
     const ovrGap=fx.o.ovr-teamOVRbase();
-    if(ovrGap>=8&&gf>ga){
+    /* MÉRFÖLDKŐ: az óriásölés darabszáma és a valaha legyőzött legnagyobb
+       papírforma-hátrány. A küszöb ugyanaz, ami a morál-jutalomé. */
+    if(gf>ga){try{msNoteGiantKill(ovrGap);}catch(e){}}
+    if(ovrGap>=MS_GIANT_GAP&&gf>ga){
       const bonus=Math.min(18,Math.round(ovrGap*1.3));
       S.morale=Math.max(0,Math.min(100,S.morale+bonus));
       addLine(`⚡ Óriásölés! ${fx.o.n} (jóval erősebb papíron) legyőzve — a csapat morálja az egekben (+${bonus})`,"m life");
@@ -26571,6 +26595,9 @@ function afterLeagueRound(fx,gf,ga){
     /* MÉRFÖLDKŐ: hány forduló volt még hátra, amikor bebiztosítottad? Ez a
        szám csak EBBEN a pillanatban létezik — utána a szezon lejátszódik. */
     msNoteClinch(snap.myRem);
+    /* MÉRFÖLDKŐ: MILYEN mezőnyben lett meg a cím? A nyers csapaterődhöz mért
+       különbség csak MOST mérhető — a nyáron már más lesz a keret is, a mezőny is. */
+    try{msNoteTitleGap();}catch(e){}
     addLine(`🏆🏆🏆  <b>BAJNOKOK!</b>  A ${snap.played}. forduló után matematikailag utolérhetetlenek vagytok — a bajnoki cím a tiétek!`,"m win");
     addLine(`🎙 „${pickLineNoRepeat(CHAMPION_SUB,"champLine")}”`,"m win");
     showChampionScreen(`A cím a ${snap.played}. fordulóban dőlt el, ${snap.myRem} forduló volt még hátra.`);
@@ -27097,6 +27124,7 @@ function finish(){
      után se induljon újra a konfetti. */
   if(yourRank===1&&S.titleWonSeason!==(S.seasonNumber||1)){
     S.titleWonSeason=S.seasonNumber||1;
+    try{msNoteTitleGap();}catch(e){}
     addLine(`🏆🏆🏆  <b>BAJNOKOK!</b>  ${esc(teamName)} a ${S.seasonNumber||1}. szezon bajnoka!`,"m win");
     /* UGYANAZ A LÖKÉS ITT IS. Korábban ez az ág egyáltalán nem nyúlt a
        morálhoz — pedig ugyanaz a cím, csak az utolsó fordulóban dőlt el. A
@@ -32710,6 +32738,8 @@ function euroCampaignEndNow(kind){
       :E.outAt===semiKey?"elődöntős"
       :E.outAt==="group"?"csoportkör"
       :(EURO_ROUND_NAMES[E.outAt]||E.outAt||"");
+    /* MÉRFÖLDKŐ: milyen mezőnyben nyerted a sorozatot? (Sorozatonként külön.) */
+    if(kind==="win"){try{msNoteCupGap(E.comp);}catch(e){}}
     S.seasonHistory[S.seasonHistory.length-1].euro={
       comp:E.comp,won:kind==="win",reached,reachedLabel,prize:E.prize||0,
       /* RUN: saját játékos királyi címei ebben a sorozatban (mérföldkő-forrás) */
@@ -33791,6 +33821,15 @@ function startNextCareerSeason(){
    visszavágón behozott hátrány, egy megnyert egyéni díj. */
 const MS_PCT_MIN=0.05,MS_PCT_BASE=0.10,MS_PCT_MAX=0.30;
 const MS_LOG_MAX=40;
+/* Az „emlékezetes" izgalom-sáv alja — ugyanaz a szám, amit az excitementLabel
+   használ. Egy helyen áll, hogy a címke és a mérföldkő ne csúszhasson szét. */
+const MS_MEMORABLE=65;
+/* ÓRIÁSÖLÉS: ekkora papírforma-hátrányból nyert mérkőzés számít annak. Ugyanaz
+   a küszöb, ami a morál-jutalmat is kiváltja. */
+const MS_GIANT_GAP=8;
+/* „Még sosem nyertem ilyet" — a nehézség-lépcsők alapállása. Elég mélyen van
+   ahhoz, hogy a legalacsonyabb fokozat (−2) se teljesüljön magától. */
+const MS_GAP_NONE=-999;
 /* A pénzjutalom a MINDENKORI éves büdzséből számolódik — lásd a fenti
    indoklást. A sávot itt vágjuk le, hogy egy elgépelt százalék se tudjon
    kilógni belőle. */
@@ -34343,7 +34382,11 @@ function msUnlockCat(k){
    logikai mérföldköveknél p() 0 vagy 1, n = 1. */
 const MILESTONES=[];
 function msDef(id,grp,t,d,kind,val,p,n,cat){
-  MILESTONES.push({id,grp,t,d,kind,val,p,n:n||1,cat:cat||null});
+  /* A KÜSZÖB LEHET 0 (sőt negatív) is: a nehézség-lépcsők a mezőnyszint és a
+     nyers csapaterő KÜLÖNBSÉGÉT mérik, ott a 0 valódi, értelmes küszöb. A régi
+     `n||1` ezt némán 1-re rontotta — vagyis a „mezőny = csapaterő" fokozat
+     valójában „+1"-et kért. */
+  MILESTONES.push({id,grp,t,d,kind,val,p,n:(n==null?1:n),cat:cat||null});
   return MILESTONES[MILESTONES.length-1];}
 /* ---- MÉRFÖLDKŐ-CSALÁDOK: EGY SOR, TÖBB FÁZIS ----
    A lépcsős mérföldkövek (ugyanaz a mérce, kilenc küszöbbel) belül külön
@@ -34362,7 +34405,11 @@ const MS_FAM_T={
   exclub:"Gólok a régi csapat ellen", cup_cb:"Kupa-fordítás hátrányból",
   clinch:"Korán bebiztosított bajnoki cím", wealth:"Vagyon",
   sale:"A legdrágább eladásod", buy:"A legdrágább igazolásod",
-  boost:"Berobbantott tehetségek"};
+  boost:"Berobbantott tehetségek",
+  titlelvl:"Bajnoki cím a mezőny szintjéhez mérve",
+  bllvl:"BL-győzelem a mezőny szintjéhez mérve",
+  excite:"A legizgalmasabb meccsed", memo:"Emlékezetes meccsek",
+  giant:"Óriásölések", giantgap:"A legnagyobb legyőzött hátrány"};
 /* Lépcsős mérföldkő-család egy sorban: ugyanaz a mérce, több küszöbbel. */
 function msTiers(base,grp,tFn,dFn,kind,vals,tiers,p,cat){
   tiers.forEach((th,i)=>{
@@ -34439,9 +34486,33 @@ msDef("clutch_skill","A meccsen",
 msDef("record_break","A meccsen",
   "Megdőlt a rekord","Döntsön meg egy ÚJ játékosod egy korábbi sebesség- vagy lövéserő-rekordot a klubnál.",
   "cash",0.12,()=>msT().recBreak?1:0,1);
-msDef("excite90","A meccsen",
-  "Amiről évekig beszélnek","Játssz egy 90 fölötti izgalom-pontszámú mérkőzést.",
-  "cash",0.30,()=>msT().exciteMax||0,90);
+/* ---- AZ IZGALOM: A LEGJOBB MECCSED, ÉS HOGY HÁNY ILYEN VOLT ----
+   Két külön mérce, mert két külön dolgot mondanak. A CSÚCS azt, hogy volt egy
+   estéd, amit évekig emlegetni fognak; a DARABSZÁM azt, hogy nem véletlen volt.
+   A régi „excite90" egyetlen, magányos bejegyzés volt — most a 80/90/95/100-as
+   lépcső egyik fokozata, tehát a panelen egy sorban áll a többivel.
+   A 100 gyakorlatilag elérhetetlen: minden összetevőnek egyszerre kell
+   maximumon állnia. Ezért fizet a legtöbbet. */
+msTiers("excite","A meccsen",
+  th=>`${th}-as izgalom egy meccsen`,
+  th=>th>=100?`Játssz egy 100 pontos izgalom-pontszámú mérkőzést. Ehhez minden összetevőnek egyszerre kell a csúcson állnia — vezetésváltások, hajrá-dráma, gólzápor és tét egy meccsen.`
+             :`Játssz egy ${th} pontos vagy izgalmasabb mérkőzést.`,
+  "cash",[0.12,0.18,0.24,0.30],[80,90,95,100],()=>msT().exciteMax||0);
+msTiers("memo","A meccsen",
+  th=>th===1?`Az első emlékezetes meccs`:`${th} emlékezetes meccs`,
+  th=>`Játssz ${th===1?"egy":th} olyan mérkőzést, aminek az izgalom-pontszáma eléri a ${MS_MEMORABLE}-öt („emlékezetes").`,
+  "cash",[0.08,0.13,0.22],[1,3,10],()=>msT().memorable||0);
+/* ---- ÓRIÁSÖLÉS ----
+   Papíron jóval erősebb ellenfél legyőzése. Két lépcső: hányszor csináltad meg,
+   és mekkora volt a legnagyobb legyőzött papírforma-hátrány. */
+msTiers("giant","A meccsen",
+  th=>th===1?`Az első óriásölés`:`${th} óriásölés`,
+  th=>`Nyerj meg ${th===1?"egy":th} olyan mérkőzést, ahol az ellenfél legalább ${MS_GIANT_GAP} Ratinggel erősebb volt a nyers csapaterődnél.`,
+  "cash",[0.07,0.11,0.15,0.20,0.26,0.30],[1,3,5,10,20,40],()=>msT().giantKills||0);
+msTiers("giantgap","A meccsen",
+  th=>`Óriásölés ${th} Rating hátrányból`,
+  th=>`Győzz le egy olyan ellenfelet, aki legalább ${th} Ratinggel erősebb a nyers csapaterődnél.`,
+  "cash",[0.09,0.14,0.20,0.26,0.30],[10,14,18,22,26],()=>msT().giantMax||0);
 msTiers("haul","A meccsen",
   th=>`${th}${th>=10?"+":""} gól egy meccsen`,
   th=>`Rúgj legalább ${th} gólt egyetlen mérkőzésen.`,
@@ -34513,6 +34584,30 @@ msDef("win_kl","Trófeák","Konferencia-liga-győztes","Nyerd meg a Konferencia-
 msDef("win_el","Trófeák","Európa-liga-győztes","Nyerd meg az Európa-ligát.","sp",8,()=>msCupWins("EL"),1,"trofeak");
 msDef("win_bl","Trófeák","Bajnokok Ligája-győztes","Nyerd meg a Bajnokok Ligáját.","sp",12,()=>msCupWins("BL"),1,"trofeak");
 msDef("treble","Trófeák","Tripla","Nyerd meg egy szezonban a bajnokságot és egy nemzetközi kupát.","cash",0.30,msTrebleSeasons,1);
+/* ---- A CÍM ÁRA: MILYEN MEZŐNYBEN LETT MEG? ----
+   A puszta „bajnok" nem mond semmit a teljesítményről: egy 95-ös kerettel egy
+   78-as mezőnyben a cím elkerülhetetlen. A mérce ezért a mezőnyszint mínusz a
+   NYERS csapaterőd — ugyanaz a szám, amiből a büdzsé is dolgozik. A −2-es
+   fokozat még kényelmes fölényt jelent, a +10 viszont azt, hogy a mezőny
+   minden csapata papíron erősebb nálad, és mégis te lettél az első.
+   A LEGNAGYOBB elért különbséget tartjuk nyilván: egy későbbi, könnyebb cím
+   nem ronthatja el, amit egyszer már megcsináltál. */
+msTiers("titlelvl","Trófeák",
+  th=>`Bajnok ${th>0?`+${th}`:th}-es mezőnyben`,
+  th=>th<0?`Nyerd meg a bajnokságot úgy, hogy a mezőny szintje legfeljebb ${-th} Ratinggel van a nyers csapaterőd ALATT.`
+          :th===0?`Nyerd meg a bajnokságot úgy, hogy a mezőny szintje eléri a nyers csapaterődet.`
+                 :`Nyerd meg a bajnokságot úgy, hogy a mezőny szintje ${th} Ratinggel a nyers csapaterőd FÖLÖTT van.`,
+  "sp",[5,8,12,16,22],[-2,0,2,5,10],msTitleGap,"trofeak");
+/* Ugyanez a lépcső a BAJNOKOK LIGÁJÁRA — a karrier legrangosabb sorozata,
+   ezért végig magasabb fizetéssel. A +10-es fokozat a játék egyik legnehezebb
+   teljesítménye: európai kupagyőzelem egy nálad tíz Ratinggel erősebb
+   mezőnyben. */
+msTiers("bllvl","Trófeák",
+  th=>`BL-győztes ${th>0?`+${th}`:th}-es mezőnyben`,
+  th=>th<0?`Nyerd meg a Bajnokok Ligáját úgy, hogy a mezőny szintje legfeljebb ${-th} Ratinggel van a nyers csapaterőd ALATT.`
+          :th===0?`Nyerd meg a Bajnokok Ligáját úgy, hogy a mezőny szintje eléri a nyers csapaterődet.`
+                 :`Nyerd meg a Bajnokok Ligáját úgy, hogy a mezőny szintje ${th} Ratinggel a nyers csapaterőd FÖLÖTT van.`,
+  "sp",[8,13,18,25,34],[-2,0,2,5,10],()=>msCupGap("BL"),"trofeak");
 /* A cím korai bebiztosítása — exponenciálisan növekvő jutalom. */
 msTiers("clinch","Trófeák",
   th=>`Bajnok ${th}${th>=5?"+":""} fordulóval a vége előtt`,
@@ -34695,12 +34790,66 @@ function msNoteRecordBreak(){try{
   t.recBreak=true;
   t.recBreaks=(t.recBreaks||0)+1;
 }catch(e){}}
+/* ================= NEHÉZSÉGI SZINT A NYERS CSAPATERŐHÖZ MÉRVE =================
+   „Bajnok lettem" önmagában keveset mond: egy 95-ös kerettel egy 78-as mezőnyben
+   a cím elkerülhetetlen, ugyanaz a cím tíz Ratinggel a kereted FÖLÖTT álló
+   mezőnyben viszont a karrier csúcsa. A mérce ezért a KÜLÖNBSÉG: a mezőny
+   szintje mínusz a NYERS csapaterőd (teamOVRbase — boostok nélküli „csontváz"
+   erő, ugyanaz, amiből a büdzsé is dolgozik).
+   A trófeákhoz a LEGNAGYOBB ilyen különbséget tesszük el: egy későbbi, könnyebb
+   cím nem ronthatja el, amit egyszer már megcsináltál. */
+function msDiffGapNow(){
+  try{
+    const mine=teamOVRbase();
+    if(!(mine>0))return null;
+    return Math.round((oppTargetRating-mine)*10)/10;
+  }catch(e){return null;}}
+function msNoteTitleGap(){
+  try{
+    if(gameMode!=="career")return;
+    const g=msDiffGapNow();
+    if(g==null)return;
+    const t=msT();
+    t.titleGap=(t.titleGap==null)?g:Math.max(t.titleGap,g);
+  }catch(e){}}
+/* Kupagyőzelem — sorozatonként külön mérce. A BL a legrangosabb, ezért a saját
+   lépcsője a legtöbbet fizeti. */
+function msNoteCupGap(comp){
+  try{
+    if(gameMode!=="career"||!comp)return;
+    const g=msDiffGapNow();
+    if(g==null)return;
+    const t=msT();
+    t.cupGap=t.cupGap||{};
+    t.cupGap[comp]=(t.cupGap[comp]==null)?g:Math.max(t.cupGap[comp],g);
+  }catch(e){}}
+function msCupGap(comp){
+  const g=msT().cupGap;
+  const v=g&&g[comp];
+  return (v==null)?MS_GAP_NONE:v;}
+function msTitleGap(){
+  const v=msT().titleGap;
+  return (v==null)?MS_GAP_NONE:v;}
+/* ÓRIÁSÖLÉS: papíron jóval erősebb ellenfél legyőzése. Ugyanaz a küszöb, amit a
+   morál-jutalom is használ (MS_GIANT_GAP) — egy fogalom, egy szám. */
+function msNoteGiantKill(gap){
+  try{
+    if(gameMode!=="career"||!(gap>=MS_GIANT_GAP))return;
+    const t=msT();
+    t.giantKills=(t.giantKills||0)+1;
+    t.giantMax=Math.max(t.giantMax||0,Math.round(gap*10)/10);
+  }catch(e){}}
 /* Egy lejátszott mérkőzés maradandó számai. */
 function msNoteMatch(o){
   try{
     if(gameMode!=="career"||!o)return;
     const t=msT();
-    if(o.excitement!=null)t.exciteMax=Math.max(t.exciteMax||0,o.excitement);
+    if(o.excitement!=null){
+      t.exciteMax=Math.max(t.exciteMax||0,o.excitement);
+      /* EMLÉKEZETES MECCS: az „emlékezetes" sáv alja (excitementLabel) — a mért
+         eloszlásban a felső ~3%. A DARABSZÁM külön mérce a csúcs mellett: egy
+         emlékezetes meccs szerencse, tíz már stílus. */
+      if(o.excitement>=MS_MEMORABLE)t.memorable=(t.memorable||0)+1;}
     if(o.goalsFor!=null)t.haulMax=Math.max(t.haulMax||0,o.goalsFor);
     if(o.saves!=null)t.savesMax=Math.max(t.savesMax||0,o.saves);
     if(o.comeback!=null)t.mCbMax=Math.max(t.mCbMax||0,o.comeback);
@@ -35630,7 +35779,7 @@ function stWonKing(msKey){
 const STYLE_MILESTONES={};
 function stDef(styleK,id,t,d,val,p,n){
   const L=(STYLE_MILESTONES[styleK]=STYLE_MILESTONES[styleK]||[]);
-  L.push({id,t,d,val,p,n:n||1});
+  L.push({id,t,d,val,p,n:(n==null?1:n)});
   return L[L.length-1];}
 /* ---- A LÉPCSŐS SOROK CSALÁDNEVE ----
    Ugyanaz a szerep, mint az általános mérföldköveknél az MS_FAM_T: a panelen
