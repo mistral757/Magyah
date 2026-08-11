@@ -2680,7 +2680,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.12";
+const APP_VERSION="3.1.13";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -24440,13 +24440,47 @@ function showIconOffer(rawIcon){
    az esemény ígér. (A piaci játékosokat az applyMarketShift már követte, az
    ikonok viszont sosem mentek át rajta: nem a SQUADS-ból jönnek.)
 
-   A skála 1:1-ben követi a 100 FÖLÖTTI részt — ugyanaz a horgony, amit az
-   Infinity-akadémia is használ (infinityAcademyShift): nem a karrier teljes
-   történetéhez mérünk, hanem az Infinity-küszöbhöz. Így a megszokott 92-110-es
-   sáv 130-as mezőnyön 122-140 lesz. 100 alatt az eltolás 0, tehát ott betűre
-   minden változatlan marad. */
+   AZ ELSŐ JAVÍTÁS ROSSZ HORGONYT VÁLASZTOTT. Az Infinity-küszöbhöz (100) mértünk,
+   ugyanahhoz, amit az infinityAcademyShift használ. Az akadémiánál ez helyes: egy
+   16 éves tehetségnek tényleg nem a karrier egész története a mércéje. Az ikonnál
+   viszont NEM — mert az ikon nem a mezőnnyel, hanem a PIACCAL áll versenyben: a
+   játékos azt érzékeli, hogy a "legendás ajánlat" jobb-e annál, amit a scoutja
+   amúgy is talál. A piac pedig MÁSIK horgonyt használ (marketPeakShift: a karrier
+   INDULÁSI szintjéhez mér, 0.75-ös csillapítással a 100 fölötti részen).
+
+   KÉT KÜLÖNBÖZŐ HORGONY = A SORREND FELBORUL. Mérve, egy 79-ről indult karrierben,
+   113-as mezőnyön: a piaci eltolás +30.75, az ikoné +13. Vagyis a scout által
+   talált Ronaldinho (93-as alap-peak) 124-en jött, a HIDEGKUTI-ikonnyitás (102-es
+   ikonérték) viszont csak 115-ön — a ritka, ünnepélyes esemény gyengébbet adott,
+   mint egy hétköznapi scout-találat. Ez volt a bejelentett hiba.
+
+   A JAVÍTÁS: EGY HORGONY. Az ikon PONTOSAN annyit tolódik, amennyit a piac —
+   marketPeakShift(). Ez azért a helyes reláció, mert így az ikon és a piac
+   TÁVOLSÁGA skálafüggetlen: az ikon-sáv (92-110) és a pool teteje
+   (MARKET_TOP_BASEPEAK=96) közti viszony minden szinten ugyanaz marad, mint
+   0 eltolásnál volt — a legerősebb ikon +14-gyel a legjobb megvásárolható
+   játékos fölött, a leggyengébb ikon 4-gyel alatta. Ugyanaz a fenti 113-as
+   mezőny: az ikon-sáv 123-141, Hidegkuti 133, a piac teteje 127.
+
+   A KÉT HORGONY KÖZÜL A NAGYOBB NYER, két okból:
+     · KLASSZIKUS MÓDBAN NINCS PIAC, amihez mérni lehetne (a careerPool
+       karrier-módú), ott tehát a mezőny marad a mérce — és mivel klasszikusban
+       a nehézség 100-ig megy, a régi képlet ott végig 0-t ad. Így a klasszikus
+       játék betűre változatlan.
+     · NAGYON MAGAS SZINTEN a piaci eltolást a MARKET_INF_MAX_LAG padló fogja
+       meg (200-as mezőnyön +96), a mezőny-horgony viszont +100-at adna. A max()
+       miatt egy ikon SOHA nem lesz gyengébb, mint a javítás előtt volt.
+
+   AMI VÁLTOZATLAN: ha a saját, ajánlott szinteden játszol, mindkét horgony 0-t
+   ad, tehát az ikon betűre a bedrótozott 92-110-es sávban marad. A régi "100
+   alatt mindig 0" ígéretet viszont szándékosan ejtjük KARRIERBEN: 100 ALATT IS a
+   piac volt a mérce, csak ott nem tűnt fel. Egy 79-ről indult, 99-es mezőnyön
+   játszó karrierben a piac teteje már 116 volt — az ikon-sáv teteje 110 —,
+   vagyis a hiba ott is fennállt, csak kisebb mértékben. */
 function iconFieldShift(){
-  return Math.max(0,Math.round((oppTargetRating||0)-INFINITY_UNLOCK_RATING));}
+  const field=(oppTargetRating||0)-INFINITY_UNLOCK_RATING;
+  const market=(gameMode==="career"&&careerPool)?marketPeakShift():0;
+  return Math.max(0,Math.round(Math.max(field,market)));}
 function twIconSigning(){
   const pool=ICON_PLAYERS.filter(p=>!drafted.has(p.n));
   if(!pool.length)return null;
@@ -24492,13 +24526,24 @@ function registerIconInPool(icon){
      A felminősítés MINDIG FELFELÉ hat (Math.max mindenütt): egy erősebb
      meglévő bejegyzést nem ront le, csak az ikon-szintre emel. */
   const cur=careerPool[icon.n];
-  const tsi=Math.max(ICON_START_TSI,(cur&&cur.tsi)||0);
+  let tsi=Math.max(ICON_START_TSI,(cur&&cur.tsi)||0);
   /* A KORT a meglévő bejegyzésből visszük tovább, ha van: az a személy kora
      EBBEN a karrierben, és a mentés máshol is erre épül (nyugdíj-terv,
      öregedés). Csak ha nincs bejegyzés, esik vissza a 26-os alapértékre. */
   const age=(cur&&cur.age!=null)?cur.age:(icon.age!=null?icon.age:26);
   /* a peak legalább a jelenlegi ovr, hogy ne essen vissza — a TSI innen fejleszt */
   const peak=Math.max(icon.ovr,tsiToPeakOvr(tsi),(cur&&cur.peak)||0);
+  /* ---- A TSI-NEK KÖVETNIE KELL A PEAKET ----
+     HIBA, amit ez javít: a peak fölemelkedett az ikon-szintre, a TSI viszont a
+     RÉGI, piaci értékén maradt (Hidegkutinál az 1954-es kártyájából örökölt
+     ~3000-en, miközben a peakje 115 lett). A TSI két dolog forrása: a 👁 becslés,
+     amit a játékos-lap MUTAT, és a szezonvégi újraszámolás, ami a fejlődési
+     plafont ADJA. Egy 3000-es TSI mellett álló 115-ös peak tehát egyszerre
+     hazudott a lapon és húzta vissza az ikont a következő szezonváltásnál.
+     A lépés PONTOSAN ugyanaz, amit az applyMarketShift tesz a piaci
+     játékosoknál (tsi = max(baseTsi, peakToTsi(peak))) — csak most az ikon is
+     átmegy rajta. Fölfelé hat: egy amúgy is magasabb TSI-t nem ront le. */
+  tsi=Math.max(tsi,Math.min(TSI_HARD_CAP,peakToTsi(peak)));
   const startRating=Math.max(icon.ovr,(cur&&cur.startRating)||0);
   const youthBonus=Math.max(0,startRating-ratingAtAge(peak,age));
   if(cur){
@@ -24511,6 +24556,14 @@ function registerIconInPool(icon){
     cur.baseTsi=Math.max(cur.baseTsi||0,tsi);
     cur.estimatedTSI=estimateTSI(tsi,scout?scout.stars:2.5);
     cur.isIcon=true;
+    /* ---- AZ "INDULÓ RATING" AZ ÉRKEZÉS PILLANATA LEGYEN ----
+       A draftRating egyszer rögzül, és ha az ikon NEVE már szerepelt a
+       careerPool-ban (mert a valós adatbázisban is benne van), akkor a lap-
+       megnyitáskor már beírt piaci értékén ragadt. Így a játékos-lap az
+       "Induló Rating: 86 → jelenlegi: 115" képtelenséget mutatta: a 86 abból az
+       időből származott, amikor Hidegkuti még sima igazolható név volt a piacon.
+       Az ikonnyitás VALÓDI kezdőpont — innentől ez az induló érték. */
+    cur.draftRating=startRating;
     /* az attribútumok a RÉGI, alacsony ratinghez voltak kalibrálva — a
        Rating-emelést 1:1-ben át kell vezetni, különben a poszt-effektív
        ratingje (és a taktika-illeszkedése) a régi szinten maradna */
