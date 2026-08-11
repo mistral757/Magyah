@@ -405,6 +405,13 @@ forrás. A 3.1.03-ig stílusonként 119-172 pontot adtak — a kiadás ezt
 Vagyis a teljes bevételből épphogy kijönne a trait-fa — ha a csillagozásra
 egyetlen pontot sem költenél. A döntés így valódi marad.
 
+**A fenti számok az ALAP tempóra érvényesek.** A 3.1.11-től a csapatstílus-pont
+is a globális fejlődési tempó alatt van (`msSpReward`): Komótoson ×0,90,
+Csigán ×0,75, Gleccseren ×0,60 — a kiírt szám mindenhol a tényleges. A
+pénzjutalom eddig is követte a tempót, csak közvetve, a szezonos büdzsén
+keresztül. Így a lassított karrier a stílus-fát is arányosan lassabban építi;
+a trait-árak nem változnak, tehát a vállalás valódi.
+
 A hat stílus lépcsői ugyanazt a négy értékgörbét használják (`ST_L9`, `ST_L6`,
 `ST_L3`, `ST_CARD`, `ST_PEAK`), hogy a lépték stílusfüggetlen legyen: egy
 karrier-hosszú számláló 102 pont, egy mérés-lépcső 43, egy idényen belüli
