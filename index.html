@@ -2680,7 +2680,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.14";
+const APP_VERSION="3.1.15";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8795,6 +8795,88 @@ function tacticFit(key,A0){
   let z=0;
   tacticFitParts(key,A0).forEach(p=>{z+=p.d;});
   return Math.max(0,Math.min(1,0.5+z*TACTIC_FIT_C));}
+/* ================= TENGELY-MÉRŐ (kalibrációs napló) =================
+   MIÉRT VAN RÁ SZÜKSÉG. Az AXIS_OFFSET/AXIS_SCALE konstansok mind MÉRÉSBŐL
+   születtek — de a méréseket a 99-es sebesség-plafon idején, 70-120-as
+   Rating-sávban, FRISSEN KISORSOLT keretekre futtattuk. Infinityben mindkét
+   feltétel megdől:
+     · a 99-es plafon feloldódik, DE a fék nem tűnik el, csak alakot vált: a
+       sebesség 99 fölött NEGYED TEMPÓVAL halad (speedTrainDiv), miközben a
+       véd/passz/gól tengely teljes tempóval nő tovább;
+     · egy érett Infinity-keret nem frissen sorsolt: évek edzése és igazolásai
+       formálták, tehát a tengelyek egymáshoz mért helyzete elcsúszhat.
+   Ennek a következménye a bejelentett hiba: egy kereten a Védekezés és a
+   Sebesség UGYANAZON a 126-os értéken állt, mégis a Védekezés z=−0.55-öt, a
+   Sebesség z=−2.67-et kapott — mert a sebességtől a képlet +4.95-öt vár a
+   horgony fölött, a védekezéstől +0.20-at.
+
+   MIT MÉR. Meccsenként EGY mintát: a kezdő 11 öt tengelyének eltérését a
+   horgonytól (T = a véd/passz/gól átlaga) — vagyis PONTOSAN azt a mennyiséget,
+   aminek az átlaga az AXIS_OFFSET és a szórása az AXIS_SCALE. A mintákat a
+   horgony 5 pontos sávjaiba gyűjti, külön az Infinity előtti és utáni
+   szakaszra, így az is látszik, hogy az eltolás VÁLTOZIK-E a szinttel.
+
+   AMIT NEM CSINÁL: semmit. Ez tisztán megfigyelés — egyetlen játékbeli számot
+   sem módosít, és a konstansokhoz sem nyúl. A leolvasott értékek alapján a
+   konstansok átállítása KÜLÖN, tudatos lépés lesz.
+
+   A TÁROLÁS futó összeg (n, Σr, Σr²), nem nyers mintalista: így a mentés akkor
+   sem hízik, ha több száz meccs gyűlik össze, és az átlag + szórás pontosan
+   kijön belőle. (A szórás így SZÓRÁS, nem a konstansok eredeti MAD-alapú
+   robusztus mércéje — a kettő normális eloszlásnál közel áll egymáshoz, de a
+   leolvasásnál ezt fejben kell tartani.) */
+const AXIS_PROBE_BIN=5;         /* a horgony ilyen széles sávokba kerül */
+const AXIS_PROBE_MAX_BINS=60;   /* felső korlát: a mentés mérete így korlátos */
+function axisProbeBinKey(T){
+  return (infinityMode?"i":"n")+String(Math.round(T/AXIS_PROBE_BIN)*AXIS_PROBE_BIN);}
+/* EGY MINTA = EGY LEJÁTSZOTT MECCS, azzal a kezdő 11-gyel, ami tényleg pályára
+   lépett. Ugyanaz a populáció, amiből az eredeti konstansok is származtak. */
+function axisProbeSample(){
+  if(gameMode!=="career"||typeof teamAttrStrengths!=="function")return;
+  let A;
+  try{A=teamAttrStrengths();}catch(e){return;}
+  if(!A)return;
+  const T=(A.ved+A.passz+A.gol)/3;
+  if(!isFinite(T)||T<=0)return;
+  if(!S.axisProbe||S.axisProbe.v!==1)S.axisProbe={v:1,bins:{}};
+  const bins=S.axisProbe.bins,key=axisProbeBinKey(T);
+  if(!bins[key]){
+    if(Object.keys(bins).length>=AXIS_PROBE_MAX_BINS)return;
+    bins[key]={n:0};}
+  const b=bins[key];
+  b.n++;
+  ATTR_KEYS.forEach(k=>{
+    const r=A[k]-T;
+    if(!isFinite(r))return;
+    const c=b[k]||(b[k]=[0,0]);
+    c[0]+=r;c[1]+=r*r;});}
+/* A mérés kiolvasása: tengelyenként a MÉRT eltolás és szórás, a jelenleg
+   használt konstansok mellé téve, plusz a sávonkénti bontás (ebből derül ki,
+   hogy az eltolás vándorol-e a csapatszinttel). */
+function axisProbeReport(){
+  const P=S&&S.axisProbe;
+  if(!P||!P.bins)return null;
+  const tot={};ATTR_KEYS.forEach(k=>{tot[k]=[0,0];});
+  const rows=[];let n=0,lo=Infinity,hi=-Infinity;
+  Object.keys(P.bins).forEach(key=>{
+    const b=P.bins[key];
+    if(!b||!b.n)return;
+    const T=parseInt(key.slice(1),10);
+    if(!isFinite(T))return;
+    n+=b.n;lo=Math.min(lo,T);hi=Math.max(hi,T);
+    const m={};
+    ATTR_KEYS.forEach(k=>{
+      const c=b[k]||[0,0];
+      tot[k][0]+=c[0];tot[k][1]+=c[1];
+      m[k]=c[0]/b.n;});
+    rows.push({key,T,inf:key.charAt(0)==="i",n:b.n,m});});
+  if(!n)return null;
+  rows.sort((a,b)=>(a.inf?1:0)-(b.inf?1:0)||a.T-b.T);
+  const axes=ATTR_KEYS.map(k=>{
+    const mean=tot[k][0]/n,varr=Math.max(0,tot[k][1]/n-mean*mean);
+    return {key:k,mean,sd:Math.sqrt(varr),
+      off:AXIS_OFFSET[k]||0,scale:AXIS_SCALE[k]||1};});
+  return {n,lo,hi,axes,rows};}
 /* Hány KÉSZ (5/5) párkémia gyorsítja a taktikát: a pár mindkét tagja a kezdő
    11-ben van, és a szerep-párjuk (roleInFormation, sorrendfüggetlenül)
    szerepel a taktika chemRoles listájában. */
@@ -8850,6 +8932,11 @@ function tacticTeamMult(lvl){
   const window=lvl>=90?0:(lvl<=80?1:(90-lvl)/10);  /* 80-ig teljes, 90-ig lecseng */
   return 1+0.5*strength*window;}
 function tacticTrainAfterMatch(gf,ga){
+  /* A TENGELY-MÉRŐ mintavétele. SZÁNDÉKOSAN a korai return ELŐTT áll: a mérés
+     akkor is érdekes, ha épp nincs aktív taktika — a tengelyek helyzete
+     ettől független. Ez a hely azért jó, mert meccsenként PONTOSAN egyszer
+     fut le, azzal a kezdő 11-gyel, amelyik tényleg pályára lépett. */
+  axisProbeSample();
   if(!S.tactics||!S.tactics.active)return;
   const k=S.tactics.active;
   const lvl=S.tactics.levels[k]||TACTIC_START_OTHER;
@@ -28245,7 +28332,51 @@ function renderHubTacticsPanel(){
       /* a pálya alatti taktika-sáv és a közvetítés-fejléc chipje AZONNAL kövesse */
       refreshSquadViews();
       renderHubTacticsPanel();saveGame();};
-    row.appendChild(btn);body.appendChild(row);});}
+    row.appendChild(btn);body.appendChild(row);});
+  renderAxisProbeBlock(body);}
+/* ---- A TENGELY-MÉRŐ LEOLVASÓJA ----
+   A taktika-panel aljára kerül, mert itt lakik a kérdés, amit mérünk: az
+   illeszkedés-százalék ITT jelenik meg, és a mérő azt a konstans-készletet
+   hitelesíti, amiből az a szám születik.
+   Csak KARRIER módban és csak akkor jelenik meg, ha már van adat — üresen nem
+   foglal helyet. A számok szándékosan nyersek és kimásolhatók: ez egy
+   kalibrációs napló, nem játékos-tájékoztató. */
+function renderAxisProbeBlock(body){
+  if(gameMode!=="career")return;
+  const R=axisProbeReport();
+  const box=document.createElement("div");
+  box.style.cssText="margin-top:12px;padding:8px 10px;background:var(--panel2);border:1px dashed var(--line);border-radius:7px";
+  if(!R){
+    box.innerHTML=`<div style="font-size:11.5px;color:var(--dim2);line-height:1.5">
+      🔬 <b>Tengely-mérő</b> — bekapcsolva, még nincs mintája. Meccsenként egy mintát vesz a kezdő 11 öt tengelyéről; az eredmény itt jelenik meg. A játékra nincs hatása.</div>`;
+    body.appendChild(box);return;}
+  /* MENNYI ELÉG? A konstansok szórása 1.3-3.8 pont; ahhoz, hogy az ÁTLAG
+     hibája 0.5 pont alá menjen (vagyis érdemben pontosabb legyen, mint amit
+     javítani akarunk), tengelyenként nagyságrendileg 50-60 minta kell. */
+  const enough=R.n>=50;
+  const rowsHtml=R.axes.map(a=>{
+    const diff=a.mean-a.off;
+    const col=Math.abs(diff)>=1?"var(--gold)":"var(--dim2)";
+    return `<tr>
+      <td style="padding:1px 8px 1px 0;white-space:nowrap">${ATTR_LABELS[a.key]}</td>
+      <td style="padding:1px 8px 1px 0;text-align:right;white-space:nowrap">${a.mean>=0?"+":""}${a.mean.toFixed(2)}</td>
+      <td style="padding:1px 8px 1px 0;text-align:right;white-space:nowrap;color:var(--dim2)">±${a.sd.toFixed(2)}</td>
+      <td style="padding:1px 8px 1px 0;text-align:right;white-space:nowrap;color:var(--dim2)">${a.off>=0?"+":""}${a.off.toFixed(2)} / ${a.scale.toFixed(2)}</td>
+      <td style="padding:1px 0;text-align:right;white-space:nowrap;color:${col}"><b>${diff>=0?"+":""}${diff.toFixed(2)}</b></td>
+    </tr>`;}).join("");
+  const binsHtml=R.rows.map(r=>
+    `<span style="display:inline-block;margin-right:9px;white-space:nowrap">${r.inf?"∞":""}${r.T}<span style="color:var(--dim2)">·${r.n}db·seb </span>${r.m.seb>=0?"+":""}${r.m.seb.toFixed(1)}</span>`).join("");
+  box.innerHTML=`<div style="font-size:12px;font-weight:700;margin-bottom:2px">🔬 Tengely-mérő <span style="color:${enough?"var(--grass)":"var(--gold)"};font-weight:400">· ${R.n} meccs · horgony ${R.lo}–${R.hi}${enough?"":" · még kevés a következtetéshez (50-től)"}</span></div>
+    <div style="font-size:10.5px;color:var(--dim2);margin-bottom:5px;line-height:1.45">Meccsenként egy minta: mennyivel áll a tengely a horgony (véd+passz+gól átlaga) fölött. Az „eltérés" azt mutatja, mennyivel téved a jelenlegi konstans. A játékra nincs hatása.</div>
+    <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse">
+      <tr style="color:var(--dim2);font-size:10px;text-transform:uppercase;letter-spacing:.5px">
+        <td style="padding-right:8px">tengely</td><td style="padding-right:8px;text-align:right">mért</td>
+        <td style="padding-right:8px;text-align:right">szórás</td><td style="padding-right:8px;text-align:right">konstans/skála</td>
+        <td style="text-align:right">eltérés</td></tr>
+      ${rowsHtml}
+    </table></div>
+    <div style="font-size:10.5px;color:var(--dim);margin-top:5px;line-height:1.6">Horgony-sávok (∞ = Infinity), sávonként a <b>Sebesség</b> eltolása:<br>${binsHtml}</div>`;
+  body.appendChild(box);}
 $("hubTacticsCancel")&&($("hubTacticsCancel").onclick=()=>{
   $("hubTacticsPicker").classList.add("hide");});
 /* A nemzetközi kupasorozatról LE lehet mondani — a 13 meccs nem mindenkinek
@@ -37734,6 +37865,10 @@ function saveGame(){
         chPosLearnStarted:S.chPosLearnStarted,chSeasonStartXI:S.chSeasonStartXI,pendingRewardSkills:S.pendingRewardSkills,
         scorers:S.scorers,assists:S.assists,mvps:S.mvps,goodForm:S.goodForm,badForm:S.badForm,careerStats:S.careerStats,clubScoutSpinsUsed:S.clubScoutSpinsUsed,twEventUsed:S.twEventUsed,consecutiveTitles:S.consecutiveTitles,consecutiveBadSeasons:S.consecutiveBadSeasons,seasonSaves:S.seasonSaves,seasonCleanSheets:S.seasonCleanSheets,seasonMatches:S.seasonMatches,seasonNumber:S.seasonNumber,seasonHistory:S.seasonHistory,
         tactics:S.tactics,tacticPrompt:S.tacticPrompt,
+        /* TENGELY-MÉRŐ: karrieren átívelő kalibrációs napló, ezért a mentés
+           része. Futó összegeket tárol (n, Σr, Σr²), nem mintalistát — a
+           mérete akkor sem nő, ha több száz meccs gyűlik össze. */
+        axisProbe:S.axisProbe,
         mpRanks:S.mpRanks,
         /* KÖZÖS INFINITY: a társ legmagasabb bajnoki mezőnyszintje (a kapu
            másik fele), a saját vállalásod és a társ befizetése. Mindhárom
@@ -38111,6 +38246,10 @@ function applySavedGame(d){
     (coach&&coach.tactics||[]).forEach((k,i)=>{if(lv[k]!==undefined)lv[k]=TACTIC_START_LIKED[i]!==undefined?TACTIC_START_LIKED[i]:TACTIC_START_OTHER;});
     S.tactics={levels:lv,active:null};}
   S.seasonHistory=d.S.seasonHistory||[];
+  /* A tengely-mérő naplója. Régi mentésben nincs — ott nullról indul, és a
+     következő meccstől gyűlik. A séma-verzió eltérése is nullázza (az
+     axisProbeSample ellenőrzi), hogy egy régi alakú napló ne keveredjen. */
+  S.axisProbe=(d.S.axisProbe&&d.S.axisProbe.v===1)?d.S.axisProbe:null;
   S.unbeatenStreak=d.S.unbeatenStreak||0;S.cleanSheetStreak=d.S.cleanSheetStreak||0;
   S.chSeasonMaxUnbeaten=d.S.chSeasonMaxUnbeaten||0;S.chSeasonMaxCleanStreak=d.S.chSeasonMaxCleanStreak||0;S.chSeasonComebacks=d.S.chSeasonComebacks||0;S.chSeasonBestHaul=d.S.chSeasonBestHaul||0;S.chSeasonCleanSheets=d.S.chSeasonCleanSheets||0;S.chSeasonSubGoals=d.S.chSeasonSubGoals||0;
   S.resolvedChallenges=d.S.resolvedChallenges||[];
