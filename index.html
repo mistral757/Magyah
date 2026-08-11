@@ -2677,7 +2677,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.07";
+const APP_VERSION="3.1.08";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -17071,6 +17071,8 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   /* CSILLAGOZÁS JOGA képességenként (skillId → true). Alapból üres: egyetlen
      képesség sem csillagozható, amíg meg nem veszed rá a jogot. */
   starUnlocked:{},starUnlockNew:{},
+  /* PÁRHARC: melyik fordulóra ment már fel a keretem (lásd h2hPendingSet) */
+  h2hPending:null,
   frozenAcademySeasons:0,teamFormMalus:0,tsiBlocked:{},
   /* ---- KARRIER-MÉRFÖLDKÖVEK (bemutatkozás, áttörés, ifi, kapus-hullám) ----
      foundingSquad : az ALAPÍTÓ keret nevei. Ez a bemutatkozás-rendszer egyetlen
@@ -19626,6 +19628,50 @@ function mpOrphanCareer(){
    átveszi és kinullázza, hogy ne lóghasson be a következő fordulóba. */
 let h2hScript=null;
 let _h2hPoll=null,_h2hBusy=false;
+/* ================= A FELKÜLDÖTT KERET = ELKÖTELEZŐDÉS =================
+   A párharc pillanatképe a szobában marad akkor is, ha kilépsz — ez a rendszer
+   lelke: a társad akkor is le tudja játszani a mérkőzést, ha te épp nem vagy
+   gépnél, és visszatérve te is végignézheted.
+
+   BEJELENTETT HIBA: a kezdőlapra lépés után ez elveszett. Két lyuk volt benne:
+     1. A FELTÖLTÉS UTÁN NEM MENTETTÜNK. A pillanatkép felment a szobába, de a
+        helyi mentés nem tudott róla semmit — egy összeomlás vagy egy nem várt
+        útvonal után a kliens úgy tért vissza, mintha sosem indította volna el a
+        fordulót, és a Kezdőrúgás gomb megint ott állt élesen.
+     2. VISSZATÉRÉSKOR NEM FOLYTATÓDOTT. A betöltés a meccsképernyőre dobott, a
+        párharcot pedig újra el kellett indítani kézzel — közben viszont a HUB is
+        nyitva állt, tehát a keret még változhatott a felküldött pillanatkép
+        alatt. Pontosan ez a "szétcsúszás".
+
+   A JAVÍTÁS: az elköteleződés a MENTÉS RÉSZE (S.h2hPending). Amíg él, a
+   visszatérés AZONNAL a párharcba visz — nincs Kezdőrúgás, nincs HUB, nincs
+   „most nem játszom le". Kiszállni egyetlen módon lehet: a keret KIFEJEZETT
+   visszahívásával (h2hWaitUnreadyBtn), ami a szobából is törli a pillanatképet.
+   A kezdőlapra lépés természetesen továbbra is szabad — az nem szakítja meg az
+   elköteleződést, épp ez a lényege. */
+let _h2hForced=false;
+function h2hPendingSet(key,round){
+  S.h2hPending={key,round,at:Date.now()};
+  try{saveGame();}catch(e){}}
+function h2hPendingClear(){
+  if(!S.h2hPending)return;
+  S.h2hPending=null;
+  try{saveGame();}catch(e){}}
+/* Van-e ÉLŐ elköteleződés pontosan erre a fordulóra? A kulcs egyezése a
+   biztosíték: egy régi szezon vagy egy másik forduló bejegyzése sosem tud
+   belerángatni egy nem oda tartozó párharcba. */
+function h2hDuelPendingNow(){
+  try{
+    if(!h2hRoomActive()||!S.h2hPending)return false;
+    if(!h2hIsDuelRound())return false;
+    return S.h2hPending.key===h2hKey();
+  }catch(e){return false;}}
+/* Az elköteleződés feloldása: a képernyő visszakapja a rendes kiútjait. */
+function h2hForcedEnd(){
+  if(!_h2hForced)return;
+  _h2hForced=false;
+  const b=$("matchHubBtn");
+  if(b&&gameMode==="career")b.classList.remove("hide");}
 /* A forduló indítása. Egyjátékosban ez BETŰRE a régi playMatch(); a közös
    karrier párharc-fordulóiban viszont előbb a csere fut le. */
 /* ================= HIÁNYZÓK PANEL =================
@@ -20007,6 +20053,11 @@ function h2hWaitShow(round,msg,mine,opp,what){
   $("h2hWaitRound").textContent=typeof round==="number"?`${round}. FORDULÓ`:String(round);
   $("h2hWaitMsg").innerHTML=msg;
   $("h2hWaitCancelBtn").textContent=W.cancel;
+  /* ELKÖTELEZŐDÉS ALATT nincs „most nem játszom le": az a Kezdőrúgás-képernyőre
+     tenne vissza, ahonnan a HUB is nyitva állna — és a keret még változhatna a
+     már felküldött pillanatkép alatt. A kiút a kezdőlap (a szoba megmarad) vagy
+     a keret KIFEJEZETT visszahívása. */
+  $("h2hWaitCancelBtn").classList.toggle("hide",!!_h2hForced);
   const box=$("h2hWaitPlayers");box.innerHTML="";
   const row=(txt,ok)=>{
     const d=document.createElement("div");
@@ -20023,6 +20074,7 @@ const H2H_WAIT_FINAL={mine:"A te szezonzárásod",opp:"A társad szezonzárása"
 function h2hAbortWait(){
   _h2hBusy=false;
   if(_h2hPoll){clearTimeout(_h2hPoll);_h2hPoll=null;}
+  h2hForcedEnd();
   h2hWaitHide();
   $("kickBtn").disabled=false;
   $("kickBtn").textContent=kickBtnLabel();}
@@ -20073,11 +20125,22 @@ function mpShowOrphanExit(round,why){
     _h2hBusy=false;
     if(_h2hPoll){clearTimeout(_h2hPoll);_h2hPoll=null;}
     mpOrphanCareer();
+    h2hPendingClear();
+    h2hForcedEnd();
     h2hWaitHide();
     /* onnantól minden a megszokott egyjátékos úton megy tovább */
     if((S.idx||0)>=30){finish();return;}
     $("kickBtn").disabled=false;
     $("kickBtn").textContent=kickBtnLabel();};}
+/* ---- VISSZATÉRÉS ELKÖTELEZETT PÁRHARCBA ----
+   Nincs döntés: a párharc azonnal folytatódik. A HUB-gomb eltűnik a meccs-
+   képernyőről, a várakozóból pedig kimarad a „most nem játszom le" kiút — a
+   keret már fent van a szobában, alatta nem változhat semmi. */
+function h2hResumeForced(){
+  _h2hForced=true;
+  {const b=$("matchHubBtn");if(b)b.classList.add("hide");}
+  {const b=$("kickBtn");if(b){b.disabled=true;b.textContent="⚔ Párharc — a kereted fent van";}}
+  h2hBeginDuel();}
 /* A csere levezénylése. Minden lépés ÚJRAINDÍTHATÓ: ha a böngésző félúton
    újratölt, a szobában lévő állapotból pontosan ott folytatódik. */
 async function h2hBeginDuel(){
@@ -20130,6 +20193,10 @@ async function h2hBeginDuel(){
     try{await mpBk().h2hPut(MP.activeRoom,key,myField,h2hWireSnapshot());}
     catch(e){
       $("h2hWaitErr").textContent="A pillanatképet nem sikerült elküldeni — újrapróbáljuk.";}}
+  /* AZ ELKÖTELEZŐDÉS RÖGZÍTÉSE A MENTÉSBE. Innentől bármi történik — kilépsz a
+     kezdőlapra, összeomlik a fül, elmegy a net —, a visszatérés egyenesen ide
+     hoz vissza, és a keret nem tud elcsúszni a felküldött pillanatkép alól. */
+  h2hPendingSet(key,round);
   h2hTick(key,myField,oppField,round);}
 async function h2hTick(key,myField,oppField,round){
   if(!_h2hBusy)return;
@@ -20154,9 +20221,19 @@ async function h2hTick(key,myField,oppField,round){
     try{saveGame();}catch(e){}
     if(!_h2hBusy)return;
     h2hTick(key,nf,myField,round);return;}
-  const mine=!!(node&&node[myField]),opp=!!(node&&node[oppField]);
+  let mine=!!(node&&node[myField]);
+  const opp=!!(node&&node[oppField]);
   /* 1) Kész szimuláció van → mindkét kliens ugyanazt játssza le. */
   if(node&&node.sim){h2hStart(node,node.sim,round);return;}
+  /* ---- A FELTÖLTÉS ÖNGYÓGYÍTÁSA ----
+     Ha a rekeszem üres, de az elköteleződés áll (S.h2hPending), akkor az első
+     feltöltés elhasalt — hálózati hiba, félbeszakadt kérés. Régen ez néma
+     holtpont volt: a figyelő csak OLVASOTT, tehát a rekesz örökre üres maradt,
+     és a társ hiába várt. Most minden körben újrapróbáljuk. */
+  if(!mine&&S.h2hPending&&S.h2hPending.key===key){
+    try{await mpBk().h2hPut(MP.activeRoom,key,myField,h2hWireSnapshot());mine=true;}
+    catch(e){$("h2hWaitErr").textContent="A pillanatképet nem sikerült elküldeni — újrapróbáljuk.";}
+    if(!_h2hBusy)return;}
   /* 2) Megvan mindkét pillanatkép → BÁRMELYIK oldal lefuttathatja.
         Korábban csak a házigazda szimulált, hogy ne születhessen két különböző
         eredmény — az ára viszont az volt, hogy ha a házigazda kilépett, a
@@ -20190,7 +20267,10 @@ async function h2hTick(key,myField,oppField,round){
     +`<br><small style="color:#b9b4ab">Te: <b>${MP.role==="host"?"házigazda":"vendég"}</b> · `
     +`a te rekeszed: ${mine?"kész":"üres"} · a társadé: ${opp?"kész":"üres"}`
     +(mine&&!opp?` — ha nála is „kész / üres” áll, mindketten ugyanabba a rekeszbe írtok; a program a következő körben magától átrendezi.`:"")
-    +(mine?`<br><small style="color:#8fae7f">A kereted MENTVE van a szobában: nyugodtan kiléphetsz, a mérkőzés akkor is lefut, és visszatéréskor végignézheted.</small>`:"")
+    +(mine?`<br><small style="color:#8fae7f">A kereted MENTVE van a szobában: nyugodtan kiléphetsz a kezdőlapra, `
+          +`a mérkőzés akkor is lefut, és visszatéréskor végignézheted. A visszatérés egyenesen ide hoz — `
+          +`a keret addig nem változtatható, hogy a két oldalon ugyanaz a csapat játsszon. `
+          +`Ha mégis változtatnál rajta, előbb hívd vissza a keretet.</small>`:"")
     +`</small>`,
     mine,opp);
   /* ---- A FELKÜLDÖTT KERET VISSZAHÍVÁSA ----
@@ -20216,6 +20296,10 @@ async function h2hTick(key,myField,oppField,round){
        catch(e){
          $("h2hWaitErr").textContent="A visszavonás nem sikerült — próbáld újra.";
          ub.disabled=false;h2hTick(key,myField,oppField,round);return;}
+       /* A KERET VISSZAHÍVÁSA az elköteleződést is feloldja: innentől a
+          Kezdőrúgás és a HUB újra a tiéd, és a visszatérés sem ránt be. */
+       h2hPendingClear();
+       h2hForcedEnd();
        /* ---- VISSZA ODA, AHONNAN A PÁRHARC INDULT ----
           BEJELENTETT HIBA: kupa-párharcból visszahívva a képernyő a BAJNOKI
           kezdőrúgás gombot élesítette, "⚔ PÁRHARC — 30. forduló" felirattal.
@@ -20242,6 +20326,9 @@ async function h2hTick(key,myField,oppField,round){
 function h2hStart(node,sim,round){
   _h2hBusy=false;
   if(_h2hPoll){clearTimeout(_h2hPoll);_h2hPoll=null;}
+  /* A mérkőzés elindult: az elköteleződés betöltötte a szerepét. */
+  h2hPendingClear();
+  h2hForcedEnd();
   h2hWaitHide();
   const oppField=MP.role==="host"?"guest":"host";
   const oppSnap=(node&&node[oppField])||{};
@@ -37155,6 +37242,9 @@ function saveGame(){
         formationChangesThisSeason:S.formationChangesThisSeason,
         customForms:S.customForms,formsBought:S.formsBought,
         ms:S.ms,   /* mérföldkövek: teljesítések, jutalom-mérleg, nyomkövetők */
+        /* PÁRHARC-ELKÖTELEZŐDÉS: melyik fordulóra ment fel már a keretem. Ettől
+           tud a visszatérés egyenesen a párharcba vinni (lásd h2hDuelPendingNow). */
+        h2hPending:S.h2hPending||null,
         style:S.style,   /* csapatépítési stílus: a választás, a traitek, a sztár */
         starUnlocked:S.starUnlocked,   /* mely képességek csillagozása van megnyitva */
         starUnlockNew:S.starUnlockNew, /* … és melyiknek nem indult még el az első csillaga */
@@ -37487,6 +37577,8 @@ function applySavedGame(d){
   S._posLearnLastCost=d.S._posLearnLastCost||0;
   S.euro=d.S.euro||null;
   S.seasonEuro=d.S.seasonEuro||null;
+  /* régi mentésben nincs — ott nincs elköteleződés, minden a megszokott úton megy */
+  S.h2hPending=d.S.h2hPending||null;
   S.transferLog=d.S.transferLog||{sells:[]};   /* félbehagyott kupa teljes állapota */
   S.euroOptOut=!!d.S.euroOptOut;
   S.championCards=d.S.championCards||{};
@@ -37706,7 +37798,11 @@ function resumeUIFromSave(){
      pontosan ott folytatódik, ahol abbamaradt. */
   if(S.euro){
     $("scVerdict").classList.add("hide");$("scHub").classList.add("hide");
-    showEuroScreen();return;}
+    showEuroScreen();
+    /* ELKÖTELEZETT KUPA-PÁRHARC: a kereted már fent van a szobában, tehát nincs
+       mit mérlegelni — a mérkőzés folytatódik. */
+    if(h2hDuelPendingNow())h2hResumeForced();
+    return;}
   if(phase==="verdict"){finish();return;}
   if(phase==="hub"||phase==="hubreport"){
     $("scVerdict").classList.add("hide");
@@ -37759,6 +37855,13 @@ function resumeUIFromSave(){
        az ablakot lezárod) — csak nem azt MUTATJUK. Az időszakot ezután is TE
        zárod le, szándékosan. */
     if(twWindowOpen()){twEnterHubWindow();return;}
+    /* ---- ELKÖTELEZETT PÁRHARC: NINCS VÁLASZTÁS ----
+       Ha a kereted már fent van a szobában erre a fordulóra, a visszatérés
+       EGYENESEN a párharcba visz: se Kezdőrúgás, se HUB. Enélkül a felhasználó
+       a meccsképernyőn kötött ki, onnan bemehetett a HUB-ba, és a keret
+       elcsúszhatott a felküldött pillanatkép alól — miközben a társa oldalán a
+       mérkőzés a RÉGI kerettel futott volna le. */
+    if(h2hDuelPendingNow()){h2hResumeForced();return;}
     $("scSim").scrollIntoView({behavior:"smooth"});
     if(S.auto&&!S.playing&&S.idx<30)startRound();}}
 /* ---- A BETÖLTÉS ELSZÁLLÁSA NEM MARADHAT NÉMA ----
