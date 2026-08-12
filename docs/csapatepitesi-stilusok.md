@@ -478,7 +478,8 @@ igényel új szimulációs ágat.
   A szintek egyre drágábbak és egyre erősebbek; az ársávot a képesség „rangja"
   adja: I. sáv 14/24/38 · II. sáv 26/45/70 · III. sáv 40/68/108 pont. Egy
   stílus teljes fája **1007 pont** (a Béke és harmónia a négy
-  egyensúly-képességgel 1975), ami tudatosan több, mint amennyi egy
+  egyensúly-képességgel 1975, a Panzerkampfwagen a Megfélemlítéssel 1223), ami
+  tudatosan több, mint amennyi egy
   karrierbe belefér — a stíluson belül is dönteni kell, nem lehet kimaxolni.
   A felület minden képességnél kiírja, mit ad MOST és mit adna a KÖVETKEZŐ
   szint, hogy a vásárlás ne találgatás legyen.
@@ -580,6 +581,52 @@ igényel új szimulációs ágat.
     csak kitolt plafonnal, közel tökéletes teher-, skill- ÉS keret-eloszlással
     érhető el. A 100 fölötti fokozatok leírása ki is mondja, hogy a „Nincs
     plafon" nélkül elérhetetlenek.
+
+* **A Panzerkampfwagen két személyiség-lépcsőt és a Megfélemlítést kapta
+  (3.1.33).** A stílus mérföldkövei eddig EREDMÉNYT mértek (piros lap, sérült
+  emberrel nyert meccs, lövéserő-rekord), a filozófia lényegét — hogy MILYEN
+  EMBEREKET gyűjtesz — nem. Ez a két lépcső ezt pótolja. Kemény tulajdonságnak
+  négy személyiség-fokozat számít, KÉT külön tengelyről: a társas
+  tulajdonságból a **bajkeverő** (coopI 0) és az **öntörvényű** (1), a
+  temperamentumból a **temperamentumos** (aggroI 3) és a **lobbanékony** (4).
+  Mivel két tengelyről jönnek, egy ember kettőt is adhat — a bajkeverő
+  lobbanékony a stílus őstípusa. Ugyanez a két tengely a játék MINDEN más
+  rendszerében büntetés (a `captainSuitability` levonja, a piroslap-súly
+  egyenesen az aggroI-ból jön); a Panzer az egyetlen filozófia, ahol érték.
+
+  | Lépcső | Mérce | Fokozatok |
+  |---|---|---|
+  | **Az összes keményfiú** | hány kemény tulajdonság fordult meg a klubodnál (`stToughCareer`) | 5→2 · 10→3 · 15→5 · 20→8 · 25→10 · 30→14 · 50→22 · 100→32 pont |
+  | **A kőkemény vezető** | a csapatkapitány vezetői fokozata + kemény vonásai (`stCaptainHardRank`) | Megfelelő+1→3 · Megfelelő+2→5 · Jó+1→8 · Jó+2→12 · Remek+1→16 · Remek+2→24 pont |
+
+  Két megvalósítási döntés érdemel külön szót:
+
+  * **A keményfiú-számláló a klub TÖRTÉNETÉT nézi, nem a pillanatnyi keretet.**
+    A keret 48 főnél elfogy (`ROSTER_EXPAND_MAX`), egy ember legfeljebb kettőt
+    ad — vagyis egy pillanatkép-számláló abszolút plafonja 96 lenne, és ahhoz
+    MINDEN játékosnak egyszerre kellene bajkeverőnek/öntörvényűnek ÉS
+    temperamentumosnak/lobbanékonynak lennie. A 100-as fokozat így halott
+    tartalom volna. A számláló ezért névre menő regiszterben gyűjt
+    (`S.toughSeen`): mindenki pontosan egyszer számít, az eladás nem vesz el
+    belőle, a visszavásárlás nem ad hozzá újra. A felvétel öngyógyító — a
+    keretet minden méréskor végigolvassuk —, ezért egyetlen érkezési utat sem
+    kell külön bekötni, és a jövőbeliek is maguktól beleesnek.
+  * **A kapitány-lépcső EGYETLEN monoton rangszámon áll**, nem hat külön
+    feltételen: `(vezetői fokozat − 2) × 2 + kemény vonások`. Ettől a fokozatok
+    átugorhatók és minden alattuk lévő magától feloldódik — aki rögtön a
+    tökéletes embert találja meg (Remek vezető két kemény vonással), mind a
+    hatot egyszerre kapja meg.
+
+  **A Megfélemlítés (III. sáv, 40/68/108 pont)** a stílus első képessége, ami a
+  PIROS LAPRA fizet: a kiállítástól a lefújásig az ellenfél gólesélye
+  50% / 75% / 90%-kal esik (`redOppGoalMult` csatorna, a meglévő
+  emberhátrány-újraszámoláson). A hatás azért lehet ekkora, mert a kapuja szűk:
+  csak abban a mérkőzésben él, amelyikben tényleg kiállítottak valakit
+  (alaphelyzetben ~6% meccsenként, rangadón több), és azt nem lehet előidézni.
+  Az emberhátrány minden más következménye megmarad — tízen maradtok, a saját
+  gólesélyetek ugyanúgy esik, a kiállított ember nem lő gólt és nem oszt
+  gólpasszt. A közvetítés a kiállítás sora után külön kimondja, hogy a
+  képesség dolgozik: egy némán ható szorzó használhatatlan visszajelzés.
 
 ### 4.4 Nyitott kérdések
 

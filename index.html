@@ -2708,7 +2708,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.32";
+const APP_VERSION="3.1.33";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -18307,6 +18307,9 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      A szezon első felében ez tartja életben a teher-mérőt (lásd balLoadCarry);
      a balLoadHandover az átbillenés egyszeri bejelentésének jelzője. */
   balLoadPrev:null,balLoadHandover:null,
+  /* PANZER — a klub történetének kemény vonásai: {név: 0|1|2}. Mindenki
+     egyszer kerül bele, és bent is marad (lásd stToughRecord). */
+  toughSeen:{},
   balSkillMatches:0,balSkillsSeason:0,
   initialSkillDone:false,   /* a kapitány-megerősítéskor járó NYITÓ skill egyszer jár */
   seasonStartStrength:0,    /* a szezonkezdő csapaterő — a kupamezőny horgonya */
@@ -23467,7 +23470,8 @@ function playMatch(){
         addLine(`${gminTxt(min)}  🟥 PIROS LAP a dulakodás után! Emberhátrány!`,"m rc");
         sbEv("us","red",victim.p.n);
         mileRed(MILE,victim.p.n,`${gminTxt(min)}  `);
-        diff-=SIM.REDMATCH;lf=lam(diff);la=lam(-diff)*defenseMult();}
+        diff-=SIM.REDMATCH;lf=lam(diff);la=lam(-diff)*defenseMult()*styleRedOppGoalMult();
+        intimidationNote(min);}
     }else if(evType==="var_overturn"){
       const nearScorer=pick(onPitch());
       addLine(`${gminTxt(min)}  VAR-ellenőrzés... a gólt nem adják meg! ${esc(shortName(nearScorer.p.n))} csalódottan a fejéhez kap`,"m ev");
@@ -23928,7 +23932,8 @@ function playMatch(){
       addLine(`${gminTxt(min)}  🟥 PIROS LAP! ${esc(shortName(active[redIdx].p.n))} kiállítva — mehet zuhanyozni, emberhátrányba kerülünk!`,"m rc");
       sbEv("us","red",active[redIdx].p.n);
       mileRed(MILE,active[redIdx].p.n,`${gminTxt(min)}  `);
-      diff-=SIM.REDMATCH;lf=lam(diff);la=lam(-diff)*defenseMult();
+      diff-=SIM.REDMATCH;lf=lam(diff);la=lam(-diff)*defenseMult()*styleRedOppGoalMult();
+      intimidationNote(min);
       rivalTune();   /* a rangadó-torzítás az emberhátrány újraszámolása után is él */
       applyDisciplineDip(active[redIdx].p.n);}}
     /* ---- SZÍNES SKILL-KÖZVETÍTÉS ----
@@ -38065,6 +38070,83 @@ function stHotHeads(){
     const e=msEntry(p.n);
     if(e&&(e.aggroI||0)>=3)n++;});
   return n;}
+/* ================= A KEMÉNY TULAJDONSÁGOK =================
+   Négy személyiség-fokozat számít keménynek, és KÉT KÜLÖN TENGELYRŐL jönnek:
+     · társas (coopI):        Bajkeverő (0), Öntörvényű (1)
+     · temperamentum (aggroI): Temperamentumos (3), Lobbanékony (4)
+   Ezért adhat EGY ember KETTŐT is — a bajkeverő lobbanékony a Panzer
+   őstípusa, és a mérce pontosan őt jutalmazza a legjobban.
+
+   FONTOS, hogy ez a két tengely a JÁTÉK TÖBBI RÉSZÉBEN BÜNTETÉS: a
+   captainSuitability erősen levonja a rossz társas tulajdonságot és a magas
+   temperamentumot, a piroslap-súly pedig egyenesen az aggroI-ból jön. A Panzer
+   az egyetlen filozófia, ahol ugyanez a két tengely ÉRTÉK — ezt fizetik meg az
+   alábbi mérföldkövek. */
+function stToughOf(e){
+  if(!e)return 0;
+  let n=0;
+  if((e.coopI!=null?e.coopI:2)<=1)n++;      /* Bajkeverő / Öntörvényű */
+  if((e.aggroI!=null?e.aggroI:2)>=3)n++;    /* Temperamentumos / Lobbanékony */
+  return n;}
+/* ---- A KLUB TÖRTÉNETÉNEK KEMÉNY VONÁSAI ----
+   A mérce SZÁNDÉKOSAN nem a pillanatnyi keret: a keret 48 főnél elfogy, tehát
+   egy pillanatkép-számláló néhány tucatnál megállna, és a lépcső felső
+   fokozatai halott tartalommá válnának. Ez a számláló ehelyett a klub
+   TÖRTÉNETÉT nézi — ugyanaz a szemlélet, mint a „piros lapok a klub
+   történetében" lépcsőnél: minden kemény vonás beleszámít, ami valaha
+   megfordult nálad.
+
+   A regiszter NÉVRE megy (S.toughSeen), ezért mindenki pontosan EGYSZER
+   számít: az eladás nem vesz el belőle, a visszavásárlás nem ad hozzá újra.
+
+   ÖNGYÓGYÍTÓ FELVÉTEL: a keretet minden méréskor végigolvassuk, és aki még
+   nincs a regiszterben, most kerül bele. Így nem kell minden érkezési utat
+   (draft, vétel, scout, akadémia, ikon, esemény, család) külön bekötni, és a
+   jövőbeli utak is maguktól beleesnek.
+   RÉGI MENTÉS: a regiszter üresen indul, tehát a MOSTANI kereted számít bele
+   elsőként — a korábban eladott emberek nem. Ez tudatos: visszamenőleg nincs
+   miből előállítani őket. */
+function stToughRecord(){
+  const seen=(S.toughSeen=S.toughSeen||{});
+  msRoster().forEach(p=>{
+    if(!p||!p.n||seen[p.n]!=null)return;
+    seen[p.n]=stToughOf(msEntry(p.n)||p);});}
+function stToughCareer(){
+  if(gameMode!=="career")return 0;
+  try{stToughRecord();}catch(e){}
+  let n=0;
+  Object.keys(S.toughSeen||{}).forEach(k=>{n+=S.toughSeen[k]||0;});
+  return n;}
+/* ---- A CSAPATKAPITÁNY KŐKEMÉNYSÉGE ----
+   Egyetlen, MONOTON rangszám a vezetői fokozatból és a kemény tulajdonságok
+   számából — így a hat fokozat egyetlen lépcsőre fér fel, és a "ki lehet
+   hagyni közte, minden feloldódik alatta" szabály magától teljesül: egy Remek
+   vezető két kemény vonással 6-ot ad, ami az összes alatta lévő fokozatot is
+   megnyitja.
+     Megfelelő (2) + 1 vonás → 1      Jó (3) + 1 → 3      Remek (4) + 1 → 5
+     Megfelelő     + 2 vonás → 2      Jó     + 2 → 4      Remek     + 2 → 6
+   0 = nincs kapitány, nem éri el a Megfelelő vezetői szintet, vagy egyetlen
+   kemény vonása sincs. A karszalag ITT nem a legalkalmasabb emberé: a Panzer
+   szándékosan azt fizeti meg, akit a játék minden más rendszere lebeszélne. */
+function stCaptainHardRank(){
+  const p=(captainIdx>=0&&slots[captainIdx])?slots[captainIdx].player:null;
+  if(!p)return 0;
+  const e=msEntry(p.n)||p;
+  const lead=Math.round(e.leadI!=null?e.leadI:(p.leadI!=null?p.leadI:0));
+  const hard=Math.min(2,stToughOf(e));
+  if(lead<2||hard<1)return 0;
+  return (Math.min(4,lead)-2)*2+hard;}
+const ST_CAPT_HARD_T={1:"Megfelelő vezető, 1 kemény vonás",
+  2:"Megfelelő vezető, 2 kemény vonás",
+  3:"Jó vezető, 1 kemény vonás",   4:"Jó vezető, 2 kemény vonás",
+  5:"Remek vezető, 1 kemény vonás",6:"Remek vezető, 2 kemény vonás"};
+const ST_CAPT_HARD_D={
+  1:"Legyen a csapatkapitányod legalább MEGFELELŐ vezető, és legyen legalább 1 kemény tulajdonsága.",
+  2:"Legyen a csapatkapitányod legalább MEGFELELŐ vezető 2 kemény tulajdonsággal — vagyis egyszerre bajkeverő vagy öntörvényű ÉS temperamentumos vagy lobbanékony.",
+  3:"Legyen a csapatkapitányod legalább JÓ vezető, legalább 1 kemény tulajdonsággal.",
+  4:"Legyen a csapatkapitányod legalább JÓ vezető 2 kemény tulajdonsággal.",
+  5:"Legyen a csapatkapitányod REMEK vezető, legalább 1 kemény tulajdonsággal.",
+  6:"Legyen a csapatkapitányod REMEK vezető 2 kemény tulajdonsággal — a filozófia tökéletes embere, akit a játék minden más rendszere lebeszélne rólad."};
 function stChemDone(){
   let n=0;
   Object.values(S.chemPairs||{}).forEach(pr=>{
@@ -38152,7 +38234,8 @@ const ST_FAM_T={
   pz_injwin:"Győzelmek sérülttel", pz_skill:"Kemény képességek",
   pz_card:"A klub legjobb szezonkártyája", pz_redall:"Piros lapok a klub történetében",
   pz_redseason:"Piros lapok egy idényben", pz_injwin2:"Győzelmek sérülttel",
-  pz_shotmax:"Az ágyúgolyó"};
+  pz_shotmax:"Az ágyúgolyó",
+  pz_tough:"Az összes keményfiú", pz_capt:"A kőkemény vezető"};
 /* `nOf`: a KÜSZÖBÖK, ha eltérnek a címben szereplő számtól. Enélkül a fordított
    mércéjű családoknál (ahol a KISEBB szám a jobb: kapott gól, szórás) a
    címke és a valódi feltétel elcsúszik egymástól — a fokozatok sorrendje
@@ -38539,6 +38622,31 @@ stTiers("panzer","pz_shotmax",th=>`${th} km/h-s lövés`,
      +`a mérés kemény plafonját (165 km/h) súrolják — és onnantól minden új rekord `
      +`ugyanannyit fizet.`,
   ST_PEAK,[120,125,130,135,140,145,150,155,158,160,162,164],()=>stRecord("shot"));
+/* ---- AZ ÖSSZES KEMÉNYFIÚ ----
+   A Panzer legsajátabb számlálója: nem gólt, nem lapot mér, hanem
+   SZEMÉLYISÉGET. Négy fokozat számít keménynek két külön tengelyről
+   (bajkeverő/öntörvényű + temperamentumos/lobbanékony), és EGY ember kettőt is
+   adhat — a bajkeverő lobbanékony egymaga két lépést ér.
+   A felső fokozatok egy egész karrier gyűjtőmunkája: véletlen kereteknél egy
+   emberre átlagosan 0,47 kemény vonás jut, tehát a 100-hoz nagyjából kétszáz
+   megfordult játékos KELL — vagy fele annyi, ha tudatosan válogatsz. */
+stTiers("panzer","pz_tough",th=>`${th} kemény tulajdonság`,
+  th=>`Forduljon meg ${th} kemény tulajdonság a klubodnál. Kemény a BAJKEVERŐ, `
+     +`az ÖNTÖRVÉNYŰ, a TEMPERAMENTUMOS és a LOBBANÉKONY — és mivel a társas `
+     +`tulajdonság meg a temperamentum két külön tengely, egy ember kettőt is adhat. `
+     +`Mindenki egyszer számít, az eladás nem vesz el belőle.`,
+  [2,3,5,8,10,14,22,32],[5,10,15,20,25,30,50,100],stToughCareer);
+/* ---- A KŐKEMÉNY VEZETŐ ----
+   A karszalag a Panzerben MÁS embert kér, mint bárhol máshol: a játék
+   kapitány-ajánlója (captainSuitability) egyenesen levonja a rossz társas
+   tulajdonságot és a magas temperamentumot. Ez a lépcső azt fizeti meg, ha
+   szembemész vele — és a legfelső fokozat, a Remek vezető KÉT kemény vonással,
+   egy ritka, tudatosan felépített döntés.
+   EGYETLEN monoton rangszámon áll (stCaptainHardRank), ezért a fokozatok
+   átugorhatók: aki rögtön a tökéletes embert találja meg, mind a hatot
+   egyszerre kapja meg. */
+stTiers("panzer","pz_capt",th=>ST_CAPT_HARD_T[th],th=>ST_CAPT_HARD_D[th],
+  [3,5,8,12,16,24],[1,2,3,4,5,6],stCaptainHardRank);
 
 /* ================= APRÓ STÍLUS-MÉRFÖLDKÖVEK =================
    A nagy célok (Aranylabda, 120 gól, 99-es sebesség) egy hosszú karrier
@@ -39077,6 +39185,27 @@ stTrait("panzer","nem_adjuk_meg",3,"Nem adjuk meg magunkat",
   {fx:{ownGoalMult:1.06},note:"+6% gólesély"},
   {fx:{ownGoalMult:1.10},note:"+10%"},
   {fx:{ownGoalMult:1.14},note:"+14%"}]);
+/* ---- MEGFÉLEMLÍTÉS ----
+   A játék MINDEN más rendszerében a piros lap büntetés: elveszíted az embert,
+   és a gólvárhatóság a SIM.REDMATCH-csel az ellenfél javára billen. A Panzer
+   az egyetlen filozófia, ahol a keménység ára maga a bizonyíték — itt a
+   kiállítás nem összeomlás, hanem üzenet: a maradék tíz ember összezár, és az
+   ellenfél nem meri megbüntetni.
+
+   A HATÁS SZÁNDÉKOSAN NAGY, mert a KAPUJA is szűk: csak abban a mérkőzésben
+   él, amelyikben tényleg kiállítottak valakit (alaphelyzetben ~6% meccsenként,
+   rangadón több) — és azt nem lehet előidézni. Az emberhátrány minden más
+   következménye megmarad: tízen maradtok, a saját gólesélyetek ugyanúgy esik,
+   a kiállított ember nem lő gólt és nem oszt gólpasszt.
+
+   A III. ársáv (40/68/108 pont) a teljes kiépítésért 216 stíluspontot kér —
+   egy egész karrier egyik nagy döntése. */
+stTrait("panzer","megfelemlites",3,"Megfélemlítés",
+  "Piros lap után az ellenfél gólesélye a lefújásig zuhan. Emberhátrányban a Panzer nem behúzódik, hanem megfélemlít.",[
+  {fx:{redOppGoalMult:0.50},note:"−50% ellenfél-gólesély a kiállítástól"},
+  {fx:{redOppGoalMult:0.25},note:"−75%"},
+  {fx:{redOppGoalMult:0.10},note:"−90%"}],
+  ()=>`csak kiállítás után él — eddig ${S.reds||0} piros lapotok van ebben az idényben`);
 
 /* ---------- ⭐ CSILLAGOZÁS-KEDVEZMÉNY — MINDEN STÍLUSNAK A SAJÁTJA ----------
    A csillagozás joga képességenként vásárolható (starUnlockBuy), és ez a
@@ -39165,6 +39294,17 @@ function styleOvrBonus(){return styleFxAdd("ovrTeam");}
 function styleOppGoalMult(){return styleFxMul("oppGoalMult");}
 function styleOwnGoalMult(){return styleFxMul("ownGoalMult");}
 function styleRedMult(){return styleFxMul("redMult");}
+/* MEGFÉLEMLÍTÉS: az ellenfél gólesélyének szorzója a KIÁLLÍTÁS UTÁNI percekre.
+   1 = nincs megvéve (a motor így feltétel nélkül szorozhat vele). */
+function styleRedOppGoalMult(){return styleFxMul("redOppGoalMult");}
+/* A megfélemlítés SAJÁT pillanata a közvetítésben. Egy némán ható szorzó
+   használhatatlan visszajelzés: a felhasználónak látnia kell, hogy a piros lap
+   ebben a filozófiában fordít egyet a mérkőzésen. A kiállítás sora után jön,
+   közvetlenül — és csak akkor, ha a képesség tényleg meg van véve. */
+function intimidationNote(min){
+  const m=styleRedOppGoalMult();
+  if(m>=1)return;
+  addLine(`${gminTxt(min)}  😤 MEGFÉLEMLÍTÉS! Tízen maradtatok — és pont ettől lett félelmetes ez a csapat: az ellenfél gólesélye <b>${Math.round((1-m)*100)}%-kal</b> zuhan a lefújásig.`,"m rc");}
 function styleInjMult(){return styleFxMul("injMult");}
 function styleMoraleFloor(){return styleFxMax("moraleFloor");}
 function styleChemSpeed(){return styleFxAdd("chemSpeed");}
@@ -39827,6 +39967,7 @@ function saveGame(){
         matchesSinceSkill:S.matchesSinceSkill,seasonNewSkills:S.seasonNewSkills,
         balSkillMatches:S.balSkillMatches,balSkillsSeason:S.balSkillsSeason,
         balLoadPrev:S.balLoadPrev,balLoadHandover:S.balLoadHandover,
+        toughSeen:S.toughSeen,
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
         guideOn:S.guideOn,guideSeen:S.guideSeen,
         seasonStartStrength:S.seasonStartStrength,summerPaidAfterSeason:S.summerPaidAfterSeason,
@@ -40202,6 +40343,9 @@ function applySavedGame(d){
      módon, az idei szezon adataiból dolgozik (a szezon elején semlegesen). */
   S.balLoadPrev=d.S.balLoadPrev||null;
   S.balLoadHandover=d.S.balLoadHandover||null;
+  /* PANZER kemény-vonás regiszter. Régi mentésben nincs — üresen indul, és az
+     első mérésnél a MOSTANI keret kerül bele (lásd stToughRecord). */
+  S.toughSeen=d.S.toughSeen||{};
   S.seasonNewSkills=d.S.seasonNewSkills||0;
   S.seasonSkillCont=d.S.seasonSkillCont||0;
   S.firstChemDone=!!d.S.firstChemDone;
