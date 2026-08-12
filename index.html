@@ -2680,7 +2680,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.29";
+const APP_VERSION="3.1.30";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7757,6 +7757,12 @@ async function mpCupGate(onReady){
          mezőny a KETTŐTÖK átlagából épül, hogy egyikőtöknek se legyen
          sétagalopp, se reménytelen menetelés. */
       dom:Math.round(euroDominance()*1000)/1000,
+      /* A VERZIÓ is átutazik. A közös kupa MINDEN garanciája azon áll, hogy a
+         két gép ugyanazt a kódot futtatja: azonos mezőny-építés, azonos
+         szimuláció, azonos ágrajz. Egy nyitva felejtett, régi verziójú lap
+         csendben más tornát épít — és ez eddig csak a szétcsúszásból derült
+         ki, utólag. Itt, a nevezésnél viszont még idejében ki lehet mondani. */
+      v:APP_VERSION,
       at:Date.now()};
   await mpReput(key,myField,node,myEntry);
   if(!_mpCupBusy)return;
@@ -7792,7 +7798,16 @@ async function mpCupTickRun(key,myField,oppField,onReady,myEntry){
          de az ERŐSEBB keretre horgonyozva. Így a két kliens azonos mezőnyt
          épít, és a sorozat egyikőtöknek sem lesz sétagalopp. */
       mid:mpCupSharedMid(mine.str,mate.str,mine.dom,mate.dom,r?r.comp:null),
-      how:r?r.how:null,mineComp:r?r.mineComp:null,mateComp:r?r.mateComp:null};
+      how:r?r.how:null,mineComp:r?r.mineComp:null,mateComp:r?r.mateComp:null,
+      mateVer:mate.v?String(mate.v).slice(0,16):null};
+    /* ---- VERZIÓ-ELTÉRÉS: AZONNAL KIMONDJUK ----
+       Nem tiltjuk le a közös kupát — lehet, hogy a két verzió között semmi
+       olyasmi nem változott, ami a tornát érinti. De ha később mégis
+       szétcsúsztok, ez a sor már ott lesz a naplóban, és megmondja az okát. */
+    if(mate.v&&mate.v!==APP_VERSION)
+      addLine(`⚠️ <b>Eltérő játékverzió.</b> Nálad v${APP_VERSION}, a társadnál v${esc(String(mate.v))}. `
+        +`A közös kupa csak akkor tud bitre azonos tornát építeni, ha mindketten ugyanazt a kódot futtatjátok — `
+        +`töltsétek újra az oldalt (a régi lap a memóriájában tartja a régi verziót).`,"m rc");
     if(r){
       /* A közös sorozat FELÜLÍRJA a saját kvalifikációdat — ez a lényeg:
          mindketten ugyanabba a kupába nevezünk. */
@@ -7840,6 +7855,10 @@ function mpCupMyGroupRows(){
    Ha eltér, az azt jelenti, hogy a két torna MÁR szétcsúszott, és a
    nyolcaddöntő sorsolása is más lesz. Eddig ez némán történt, és csak a
    végén derült ki, hogy két külön döntő futott. Mostantól kimondjuk. */
+function mpStrHash(s){
+  let h=0;
+  for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;
+  return String(h);}
 function mpCupAiGroupsFingerprint(){
   const E=S.euro;
   if(!E||!E.groups)return "";
@@ -7849,9 +7868,56 @@ function mpCupAiGroupsFingerprint(){
     (E.groups[g]||[]).forEach(i=>{
       const r=E.table[i]||{};
       key+=`${i}:${r.pts|0},${r.gf|0},${r.ga|0};`;});}
-  let h=0;
-  for(let i=0;i<key.length;i++)h=(h*31+key.charCodeAt(i))>>>0;
-  return String(h);}
+  return mpStrHash(key);}
+/* ---- A MEZŐNY UJJLENYOMATA ----
+   Az eredmény-ujjlenyomat csak azt mondja meg, hogy szétcsúsztatok; ez azt is,
+   hogy MIÉRT. Ha a MEZŐNY is eltér, akkor már a felállításkor más tornát
+   épített a két gép (más verzió, más célérték, más merítés); ha a mezőny
+   azonos, de az eredmények nem, akkor a szimuláció csúszott el. A kettő
+   különböző javítást kíván, ezért érdemes külön mérni. */
+function mpCupFieldFingerprint(){
+  const E=S.euro;
+  if(!E||!E.teams)return "";
+  let key="";
+  E.teams.forEach((t,i)=>{key+=`${i}:${t&&t.n}:${Math.round((t&&t.ovr||0)*10)};`;});
+  (E.groups||[]).forEach((g,gi)=>{key+=`g${gi}:${(g||[]).join(",")};`;});
+  return mpStrHash(key);}
+/* ---- A KÖZÖS ÁG SZÉTVÁLASZTÁSA ----
+   Ha kiderül, hogy a két kliens MÁS tornát játszik, a legrosszabb, amit
+   tehetünk, az a további egymásra várás: a másik oldal olyan rekeszt sosem
+   fog kitölteni, amit a mi águnk vár, és a beváró képernyő holtpont lesz.
+   Ilyenkor tiszta vágás: a párosítás megszűnik (a társ innentől a helyi,
+   seedelt ágon él tovább, mint bármelyik AI-csapat), és MINDKÉT játékos
+   végig tudja játszani a saját sorozatát. Ez visszafordíthatatlan, és jól is
+   van így — a közös ágat már nem lehet összeragasztani. */
+/* ---- A TÁRS CSOPORT-SORAINAK ÁTVÉTELE, ŐRIZETTEN ----
+   Csak azokat a sorokat fogadjuk el, amik a TÁRS CSOPORTJÁHOZ tartoznak NÁLUNK
+   is — és a saját csapatunk sorához soha nem nyúlunk. Enélkül egy elcsúszott
+   mezőnyben a társ csapatindexei nálunk MÁS csapatokat jelentenek: idegen
+   eredmények kerülnének a saját csoportjaink (akár a saját csapatunk) sorába.
+   Pontosan ebből lett az a hiba, hogy valaki megnyerte a csoportját, mégis
+   kimaradt a nyolcaddöntőből — és ott ragadt egy mérkőzés nélküli képernyőn.
+   Visszaadja, hány sort hagytunk ki. */
+function mpCupAdoptMateRows(rows){
+  const E=S.euro;
+  if(!E||!Array.isArray(rows))return 0;
+  const allowed=new Set((E.groups&&E.groups[E.mateG])||[]);
+  let skipped=0;
+  rows.forEach(r=>{
+    if(!r||typeof r.i!=="number"||!E.table[r.i]){skipped++;return;}
+    if(!allowed.has(r.i)||r.i===E.userIdx){skipped++;return;}
+    E.table[r.i]={w:r.w|0,d:r.d|0,l:r.l|0,gf:r.gf|0,ga:r.ga|0,pts:r.pts|0};});
+  return skipped;}
+function mpCupSplitApart(round,why){
+  const E=S.euro,C=S.mpCup;
+  if(C)C.droppedApart=true;
+  if(E){E.mateIdx=null;E.mateOut=round||E.stage||"group";}
+  try{
+    addLine(`⚔ <b>A közös kupa-ág szétvált.</b> ${why?esc(why)+" ":""}`
+      +`Innentől mindketten a SAJÁT sorozatotokat játsszátok végig — nem kell egymásra várni, `
+      +`és nem is fogtok találkozni. A bajnokság és minden más közös rész változatlanul közös marad.`,"m ev");
+  }catch(e){}
+  try{saveGame();}catch(e){}}
 async function mpCupGroupSync(onReady){
   const E=S.euro;
   /* A HORGONYRA kérdezünk, nem az illékony mpCupActive()-ra: enélkül egy
@@ -7871,7 +7937,8 @@ async function mpCupGroupSync(onReady){
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
   if(!_mpGroupBusy)return;
   /* az egyéni statisztikák ide is ráülnek — lásd mpCupOwnStatRows */
-  const myRows={rows:mpCupMyGroupRows(),st:mpCupOwnStatRows(),bf:mpCupAiGroupsFingerprint()};
+  const myRows={rows:mpCupMyGroupRows(),st:mpCupOwnStatRows(),bf:mpCupAiGroupsFingerprint(),
+                ff:mpCupFieldFingerprint(),v:APP_VERSION};
   await mpReput(key,myField,node,myRows);
   if(!_mpGroupBusy)return;
   mpCupGroupTick(key,myField,oppField,onReady,myRows);}
@@ -7898,13 +7965,38 @@ async function mpCupGroupTickRun(key,myField,oppField,onReady,myRows){
        nyolcaddöntő-sorsolása azonos. A csapatindexek egyeznek, mert a mezőnyt
        ugyanabból a seedből építettük. */
     /* MIELŐTT bármit átvennénk: egyeznek-e a közös, AI-vezérelt csoportok?
-       Ha nem, a két torna már más — a sorsolás is más lesz, tehát nem
-       fogtok találkozni. Ezt KI KELL MONDANI, mert magától nem derül ki. */
-    if(mate.bf&&myRows&&myRows.bf&&mate.bf!==myRows.bf)
-      addLine(`⚠️ <b>A közös kupa két oldala szétcsúszott.</b> A semleges csoportok eredményei eltérnek a két gépen, ezért a kieséses ág is más lesz — könnyen lehet, hogy nem kerültök össze. (Diagnosztika: ${esc(myRows.bf)} ≠ ${esc(mate.bf)})`,"m rc");
-    mate.rows.forEach(r=>{
-      if(r&&typeof r.i==="number"&&S.euro.table[r.i])
-        S.euro.table[r.i]={w:r.w|0,d:r.d|0,l:r.l|0,gf:r.gf|0,ga:r.ga|0,pts:r.pts|0};});
+       Ha nem, a két torna már más — és ilyenkor a társ sorai NEM A MI
+       MEZŐNYÜNKRŐL szólnak. Átvenni őket a legrosszabb, amit tehetünk: a
+       csapatindexek nála MÁS csapatokat jelentenek, tehát idegen eredményeket
+       írnánk a saját csoportjaink (akár a SAJÁT csapatunk) sorába — így lehet
+       valakiből "nem továbbjutó" úgy, hogy megnyerte a csoportját, és így lehet
+       a nyolcaddöntőből kimaradt kliens, aminek nincs is mérkőzése.
+       Ezért: szétcsúszásnál NEM adoptálunk, hanem tiszta vágással szétválunk. */
+    const desync=!!(mate.bf&&myRows&&myRows.bf&&mate.bf!==myRows.bf);
+    if(desync){
+      const verEl=!!(mate.v&&mate.v!==APP_VERSION);
+      const fieldEl=!!(mate.ff&&myRows.ff&&mate.ff!==myRows.ff);
+      const ok=verEl
+        ? `A két gép NEM ugyanazt a verziót futtatja (nálad v${APP_VERSION}, nála v${esc(String(mate.v))}) — töltsétek újra mindketten az oldalt.`
+        : fieldEl
+          ? `Már a mezőny is eltér a két gépen (nem csak az eredmények).`
+          : `A mezőny azonos, de a háttérmeccsek eredményei eltérnek.`;
+      addLine(`⚠️ <b>A közös kupa két oldala szétcsúszott.</b> ${ok} `
+        +`(Diagnosztika: eredmény ${esc(myRows.bf)} ≠ ${esc(mate.bf)}`
+        +(myRows.ff||mate.ff?` · mezőny ${esc(myRows.ff||"-")} ${fieldEl?"≠":"="} ${esc(mate.ff||"-")}`:"")
+        +(mate.v?` · verzió ${APP_VERSION} ${verEl?"≠":"="} ${esc(String(mate.v))}`:"")+`)`,"m rc");
+      mpCupSplitApart("group","A két gép más tornát épített, ezért a társad eredményeit nem vettük át.");
+      mpCupGroupAbort();
+      try{saveGame();}catch(e){}
+      onReady();return;}
+    /* ---- AZ ÁTVÉTEL ŐRE ----
+       Csak azokat a sorokat fogadjuk el, amik a TÁRS CSOPORTJÁHOZ tartoznak
+       nálunk is — és a saját csapatunk sorához soha nem nyúlunk. Egy hibás
+       vagy elavult rekord így legfeljebb kimarad, de nem tud idegen eredményt
+       írni a mi tabellánkba. */
+    {const skipped=mpCupAdoptMateRows(mate.rows);
+     if(skipped)
+       addLine(`⚠️ A társad csoportjából ${skipped} sor nem illett a te mezőnyödhöz — azokat kihagytuk (a saját eredményeidhez nem nyúltunk).`,"m ev");}
     mpCupGroupAbort();
     try{saveGame();}catch(e){}
     onReady();return;}
@@ -8262,7 +8354,22 @@ function buildEuroField(comp){
   const picks=shuf(rankedClubs.slice(0,Math.max(31,Math.min(rankedClubs.length,46)))).slice(0,nAI);
   const teams=picks.map(x=>({n:x.n,sq:x.i,you:false,
     ovr:Math.max(50,Math.min(cap,target+(rr()*2-1)*2.5))}));
-  teams.push({n:teamName,you:true,sq:null,ovr:teamOVRbase()});
+  /* ---- KÖZÖS KUPA: A SAJÁT ERŐD IS KEREKÍTVE MEGY A MEZŐNYBE ----
+     BEJELENTETT HIBA (a szétcsúszás gyökere): a saját csapatod ÉLŐ, tört
+     értékkel került a mezőnybe (95,37), a társadé viszont a nevezéskor küldött
+     KEREKÍTETT pillanatképpel (91) — nála pedig fordítva. A két kliens tehát
+     ugyanarról a két csapatról MÁS számot ismert.
+     A kalapos beosztás `byOvr` sorrendből dolgozik, és elég, ha egyetlen
+     AI-csapat ereje a kerekített és a valódi érték közé esik: a sorrend egy
+     hellyel elcsúszik. A kalapokat viszont Fisher–Yates keveri ugyanabból a
+     seedből — egyetlen elcsúszott pozíció az EGÉSZ kalapot átrendezi, tehát
+     minden csapat más csoportba kerül. Innen jött a "semleges csoportok
+     eredményei eltérnek" riasztás, tökéletesen stabil kapcsolat mellett is.
+     A javítás: közös kupában pontosan azt az értéket használjuk magunkról,
+     amit a társ gépe is lát rólunk. (Mérve: kerekítés nélkül a két oldal
+     mezőnye eltért, kerekítéssel bitre azonos.) */
+  teams.push({n:teamName,you:true,sq:null,
+    ovr:M?Math.round(teamOVRbase()):teamOVRbase()});
   /* A TÁRS csapata valódi résztvevő: a saját nevével és a szezonzáró
      csapaterejével kerül a mezőnybe, nem AI-ként. */
   /* Az ovr a NYERS (csontváz) erő — ez a szimuláció közös skálája, ezen mérik
@@ -34512,6 +34619,62 @@ function euroHealPendingResolve(){
   euroResolveRound();try{saveGame();}catch(e){}
   _mpTieStale=_mpTieBusy&&_mpTieStale;   /* csak amíg tényleg várunk */
   return true;}
+/* ================= ZSÁKUTCA-VÉDELEM A KUPAKÉPERNYŐN =================
+   BEJELENTETT HIBA: a guest a „A kör lezárása félbemaradt" képernyőn ragadt,
+   és a gomb SEMMIT nem csinált. Az ok: a gomb az euroHealPendingResolve()-ot
+   futtatja, az viszont HAMISSAL tér vissza, ha a szakasz maga inkonzisztens —
+   például ha a körben nincs is párharcod (E.userTie < 0), mert a bracket
+   szétcsúszott alattad. Ilyenkor a kezelő szó nélkül visszatért: se lépés, se
+   üzenet, se kiút.
+
+   Ez a javítás azt mondja ki, hogy a kupaképernyőnek NINCS olyan állapota,
+   amiből ne lehetne továbblépni. Három eset, mind visz valahova:
+     1. a lezárás futtatható        → lefuttatjuk (a régi út),
+     2. van párharcod, csak a mérkőzés-listád hiányzik → újraépítjük belőle,
+     3. nincs párharcod ebben a körben → a menetelésed itt véget ért; a torna
+        a háttérben végigfut, a szezon pedig folytatódhat.
+   Mindhárom mond is valamit a naplóban — néma javítás nincs. */
+function euroRepairStuck(){
+  const E=S.euro;
+  if(!E||!E.stage)return false;
+  if(euroHealPendingResolve())return true;
+  const RS=compRounds(E.comp)||[];
+  const roundName=EURO_ROUND_NAMES[E.stage]||E.stage;
+  if(RS.indexOf(E.stage)>=0&&E.ties){
+    /* 2) A párharc megvan — csak a mérkőzéseid vesztek el mellőle. */
+    if(E.userTie>=0&&E.ties[E.userTie]&&E.teams){
+      const t=E.ties[E.userTie],meIsA=t.a===E.userIdx,oi=meIsA?t.b:t.a;
+      if(E.teams[oi]){
+        const o={n:E.teams[oi].n,ovr:E.teams[oi].ovr};
+        E.fixtures=(E.stage==="final")?[{o,home:false,neutral:true,oi}]
+                                      :[{o,home:meIsA,oi},{o,home:!meIsA,oi}];
+        const done=(t.legs||[]).filter(x=>x).length;
+        E.idx=Math.max(0,Math.min(E.fixtures.length-1,done));
+        addLine(`🔧 A(z) ${esc(roundName)} mérkőzés-listád hiányzott — helyreállítottuk (${esc(E.teams[oi].n)} ellen, ${E.idx+1}/${E.fixtures.length}. mérkőzés).`,"m ev");
+        try{saveGame();}catch(e){}
+        return true;}}
+    /* 3) Nincs párharcod ebben a körben — a bracket alattad csúszott el. */
+    addLine(`🔧 A(z) ${esc(roundName)} körben nincs párharcod — a kieséses ág elcsúszott alattad, `
+      +`ezért a menetelésed itt lezárul. A sorozat a háttérben végigfut, a szezon folytatódik.`,"m ev");
+    /* A kör párharcait előbb eldöntjük — enélkül a háttérben végigfutó torna
+       üres mezőnnyel indulna, és nem lenne kupagyőztes sem. */
+    let winners=null;
+    try{
+      (E.ties||[]).forEach(t=>{if(t&&t.winner==null)euroResolveTie(t);});
+      winners=(E.ties||[]).map(t=>t&&t.winner).filter(x=>x!=null);
+    }catch(e){winners=null;}
+    _mpTieStale=true;                       /* ne kezdjen új húszmásodperces várakozást */
+    euroEliminated(E.stage,(winners&&winners.length>1)?winners:null);
+    try{saveGame();}catch(e){}
+    return true;}
+  /* 4) Ismeretlen/sérült szakasz: a kampányt tisztán lezárjuk, hogy a szezon
+     mindenképpen folytatható legyen. */
+  addLine(`🔧 A kupasorozat állapota sérült (szakasz: ${esc(String(E.stage))}) — lezárjuk, hogy a szezon folytatódhasson.`,"m ev");
+  E.outAt=E.outAt||E.stage||"group";
+  try{euroCampaignEnd("out");}catch(e){
+    E.stage="done";E.result=E.result||"out";
+    try{saveGame();}catch(_){}}
+  return true;}
 function showEuroScreen(){
   /* a gyógyítás elindíthat egy új beváró képernyőt vagy továbbléptethet — a
      kupa-nézetet utána is felrajzoljuk, hogy sose maradjon félkész */
@@ -34740,7 +34903,10 @@ function renderEuroScreen(){
       nx.innerHTML=`<div style="font-size:13px;color:var(--gold)">A kör lezárása félbemaradt</div>
         <div style="font-size:12.5px;color:var(--dim);margin-top:4px;line-height:1.5">
           Ennek a körnek minden mérkőzését lejátszottad, de a lezárás nem futott le végig.
-          Koppints a gombra, és a sorozat onnan folytatódik, ahol abbamaradt.</div>`;
+          Koppints a gombra, és a sorozat onnan folytatódik, ahol abbamaradt.
+          <br><span style="color:var(--dim2)">Ha a lezárás nem futtatható (mert a kieséses ág elcsúszott),
+          a gomb akkor is továbbvisz: helyreállítja a hiányzó mérkőzéseket, vagy lezárja a menetelést —
+          a szezon mindenképpen folytatható marad.</span></div>`;
       $("euroKickBtn").classList.remove("hide");$("euroDoneBtn").classList.add("hide");
       showEuroSpeedRow(false);   /* ez a gomb lezárást futtat, nem mérkőzést */
       $("euroKickBtn").textContent="A kör lezárása →";
@@ -34829,7 +34995,15 @@ $("euroKickBtn")&&($("euroKickBtn").onclick=()=>{
      futtatja le, nem egy nem létező mérkőzést. (A gomb felirata is ezt mondja,
      lásd renderEuroScreen.) */
   if(S.euro&&!(S.euro.fixtures||[])[S.euro.idx]){
-    if(euroHealPendingResolve())renderEuroScreen();
+    /* A GOMB SOSEM LEHET HALOTT: ha a szokásos lezárás nem futtatható, a
+       javító veszi át (euroRepairStuck) — az minden állapotból visz valahova,
+       és mindig mond is valamit a naplóban. */
+    let moved=false;
+    try{moved=euroRepairStuck();}catch(e){
+      try{addLine(`⚠️ A kör lezárása hibára futott (${esc(String(e&&e.message||e))}) — a kupát lezárjuk, hogy a szezon folytatódhasson.`,"m ev");}catch(_){}
+      try{S.euro.stage="done";S.euro.result=S.euro.result||"out";saveGame();}catch(_){}
+      moved=true;}
+    if(moved)renderEuroScreen();
     return;}
   const go=()=>{
     $("scEuro").classList.add("hide");
