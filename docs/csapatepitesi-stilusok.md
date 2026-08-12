@@ -477,7 +477,8 @@ igényel új szimulációs ágat.
 * **Minden képességnek HÁROM SZINTJE van** (a terv egylépcsős traiteket írt le).
   A szintek egyre drágábbak és egyre erősebbek; az ársávot a képesség „rangja"
   adja: I. sáv 14/24/38 · II. sáv 26/45/70 · III. sáv 40/68/108 pont. Egy
-  stílus teljes fája **866 pont**, ami tudatosan több, mint amennyi egy
+  stílus teljes fája **1007 pont** (a Béke és harmónia a négy
+  egyensúly-képességgel 1796), ami tudatosan több, mint amennyi egy
   karrierbe belefér — a stíluson belül is dönteni kell, nem lehet kimaxolni.
   A felület minden képességnél kiírja, mit ad MOST és mit adna a KÖVETKEZŐ
   szint, hogy a vásárlás ne találgatás legyen.
@@ -517,6 +518,38 @@ igényel új szimulációs ágat.
 * **A Panzerkampfwagen „Vasfegyelme" nem kapcsolja ki a morál-rendszert**, csak
   padlót tesz alá (60, a II. szinttel 70). A romlás megtörténik, csak nem tud
   mélyre vinni.
+* **A Béke és harmónia négy EGYENSÚLY-KÉPESSÉGET kapott (3.1.26).** A stílus
+  mérőszáma a CSAPATEGYENSÚLY, a képességei mégis alig nyúltak hozzá: a
+  filozófia mérte magát, de nem fizette meg — a Sztárom a párom fájához képest
+  érezhetően gyengébb volt. Mind a négy a MEGLÉVŐ egyensúly-motorba köt be
+  (`teamBalance`, `balanceSkillQuota`), új szimulációs ág nélkül:
+
+  | Szint | Képesség | Hatás (I / II / III) |
+  |---|---|---|
+  | II | **Természetes összhang** | a mérő feltételei 15% / 25% / 30%-kal könnyítve: a teljes ponthoz kevesebb effektív gól/gólpassz-adó (6 → 5,25 / 4,5) és kevesebb skill-birtokos (5 → 4,4 / 3,8) is elég, a kezdő 11 szórás-tűrése pedig 0,18-ról 0,21 / 0,26-ra tágul |
+  | III | **Egymástól tanulnak** | a csapategyensúlyból járó ingyen képességek szezonos kvótája +1 / +2 / +3. A kapu marad: ha az alap nem jár (65 alatti összegyensúly), ez sem nyit kaput |
+  | III | **Nincs plafon** | a mérő 100-as plafonja 125 / 150 / 200-ra tolódik: a részpontok a cél FÖLÖTT is számítanak tovább, és velük nő a csapaterő-bónusz (max +2 → +2,5 / +3 / +4) és a kvóta sávtáblája is (100 fölött minden további 20 pont +1 képesség) |
+  | III | **Add tovább!** | az ELADOTT vagy a STÁBBA felvett játékosod továbbadja a képességeit — skillenként külön sorsolás 20% / 30% / 50%-kal, a címzettet te választod ki |
+
+  Két megvalósítási döntés érdemel külön szót:
+
+  * **A rating-rész fejtere a KERETBŐL jön.** A kezdő 11-nél a nulla szórás a
+    matematikai határ — ott a 100% fölé nincs hova menni. A 100 fölötti sávban
+    ezért a TELJES keret egyenletessége viszi tovább a rating-részt, két
+    kapun át: a kezdő 11-nek előbb 80% fölé kell érnie (a kapu ott nulláról
+    nyílik, tehát a mérő sehol nem ugrik meg), és onnan a keret szórása
+    szabja meg, mennyi jár. A kitolt plafon így nem ajándék, hanem cél.
+  * **Az örökség a MEGLÉVŐ jutalom-soron megy** (`S.pendingRewardSkills`),
+    ezért a mentés része, és ugyanaz a választó-képernyő osztja ki, mint a
+    kihívás-jutalmakat. A képesség azzal a KÉSZÜLTSÉGGEL érkezik meg, ahogy a
+    távozónál állt (egy kész 4/4 teljes erővel, egy félkész félkészen) — a
+    csillagozás viszont nem száll át, az a kiépítés jutalma. A sorsolás a két
+    közös belépési ponton fut (`releasePlayer` eladáskor, `hireCoach` a stábba
+    lépéskor), tehát minden út lefedve; az Iskolateremtő évekig csepegtető
+    hagyatékától független, egyszeri hatás.
+
+  A stílus fája ezzel 1007-ről **1796 pontra** nőtt — vagyis a választási
+  kényszer nem csökkent, hanem nőtt: még kevesebb fér belőle egy karrierbe.
 
 ### 4.4 Nyitott kérdések
 

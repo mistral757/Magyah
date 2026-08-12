@@ -2680,7 +2680,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.25";
+const APP_VERSION="3.1.26";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -12324,6 +12324,11 @@ function hireCoach(c){
   staff().push(c);
   msNoteStaffType(c.type);   /* mérföldkő: ez a TÍPUS most nyílt-e meg először */
   addLine(`🎓 <b>ÚJ A STÁBBAN</b> — ${esc(shortName(c.n))} mostantól ${esc(coachTypeByKey(c.type).n)} (${coachStars(c.sz)} Sz ${c.sz}).`,"m life");
+  /* ÖRÖKSÉG (Béke és harmónia): aki a stábba lép, a JÁTÉKOS-képességeit is
+     itt hagyhatja. A sorsolás itt fut le, a kiosztás a hívó felület
+     rendbetétele után (lásd styleInheritDrainNow). Ez FÜGGETLEN az
+     Iskolateremtő hagyatékától: az évekig, cseppenként tanít, ez egyszeri. */
+  try{styleInheritFrom(c.n,"staff");}catch(e){}
   return true;}
 /* Az elküldött edző nem tűnik el: a Stáb-csarnok a klub emlékezete. Nulla
    játékhatás, de ez adja meg a rendszer súlyát egy 20 szezonos karrierben. */
@@ -26289,7 +26294,7 @@ function currentRoster(){
   return r;}
 /* ---- jutalom-skill sorsolás és kiosztás ---- */
 let skillResumeCb=null;
-const SKILL_REASON_TXT={start:"Csapat kész — jutalom-skill!",hattrick:"Mesterhármas — jutalom-skill!",bigwin:"Nagyarányú győzelem — jutalom-skill!",mvp3:"Harmadik meccsembersége — jutalom-skill!",doublesave:"Két bravúr egy meccsen — jutalom-skill!",bigassist:"Kettős gólpassz — jutalom-skill!",challenge:"Kihívás teljesítve — válaszd ki, ki kapja!",pity:"Kemény menetelés — az edzőtábor meghozta a gyümölcsét!",balance:"⚖️ Kiegyensúlyozott keret — az összeszokott csapat magától fejlődik!"};
+const SKILL_REASON_TXT={orokseg:"🎁 Örökség — válaszd ki, ki viszi tovább!",start:"Csapat kész — jutalom-skill!",hattrick:"Mesterhármas — jutalom-skill!",bigwin:"Nagyarányú győzelem — jutalom-skill!",mvp3:"Harmadik meccsembersége — jutalom-skill!",doublesave:"Két bravúr egy meccsen — jutalom-skill!",bigassist:"Kettős gólpassz — jutalom-skill!",challenge:"Kihívás teljesítve — válaszd ki, ki kapja!",pity:"Kemény menetelés — az edzőtábor meghozta a gyümölcsét!",balance:"⚖️ Kiegyensúlyozott keret — az összeszokott csapat magától fejlődik!"};
 function findIncompleteSkills(){
   const out=[];
   const rosterNames=new Set((gameMode==="career"?fullCareerRoster():currentRoster()).map(p=>p.n));
@@ -26297,6 +26302,80 @@ function findIncompleteSkills(){
     if(!rosterNames.has(name))return;
     arr.forEach(inst=>{if(!skillComplete(inst))out.push({name,inst});});});
   return out;}
+/* ================= ÖRÖKSÉG — A TÁVOZÓ TUDÁSA ITT MARADHAT =================
+   A Béke és harmónia „Add tovább!" képessége. Eddig egy eladott vagy edzővé
+   tett játékossal a képességei is elvesztek: a HUB eladás-megerősítője ki is
+   mondja („a skilljei és a felépített kémiája is elvész vele"). Ez a filozófia
+   ezt fordítja meg — a klub tudása nem egy emberé.
+
+   A SORSOLÁS KÉPESSÉGENKÉNT KÜLÖN megy, tehát nem „minden vagy semmi": egy
+   négyskilles veterántól 30%-on átlagosan egy-kettő marad meg. A megmaradók a
+   MEGLÉVŐ jutalom-sorba (S.pendingRewardSkills) kerülnek, ezért a mentés
+   része, és ugyanaz a választó-képernyő osztja ki őket, amit a kihívás-
+   jutalmak használnak — a címzettet TE választod ki.
+
+   A KÉSZÜLTSÉG ÁTSZÁLL: egy teljesen kiépült (4/4) képesség teljes erővel
+   érkezik meg az örököshöz, egy félkész félkészen. A csillagozás nem száll át
+   — az a képesség KIÉPÍTÉSÉNEK jutalma, nem a képességé. */
+function styleInheritChance(){
+  try{return gameMode==="career"?(styleInheritP()||0):0;}catch(e){return 0;}}
+/* A távozó skilljeiből sorsol, és a nyerteseket a jutalom-sorba teszi.
+   Visszaadja, hány képesség él tovább. */
+let _styleInheritLast=0;   /* a legutóbbi sorsolás eredménye — a hívók ebből tudják, van-e mit kiosztani */
+function styleInheritFrom(name,how){
+  _styleInheritLast=0;
+  const p=styleInheritChance();
+  if(p<=0||!name||gameMode!=="career")return 0;
+  const arr=((S.skills&&S.skills[name])||[]).filter(i=>i&&i.skill);
+  if(!arr.length)return 0;
+  const kept=[];
+  arr.forEach(inst=>{
+    if(Math.random()>=p)return;
+    const need=inst.stagesNeeded||1;
+    const done=Math.max(1,Math.min(need,
+      inst.stagesCompleted!==undefined?inst.stagesCompleted:need));
+    kept.push({skillId:inst.skill.id,stagesNeeded:need,stagesCompleted:done,
+               reason:"orokseg",from:name});});
+  const tavozas=how==="staff"?"a stábba lépett":"távozott";
+  if(!kept.length){
+    addLine(`🎁 <b>ÖRÖKSÉG</b> — ${esc(shortName(name))} ${tavozas}, de a tudásából semmi nem maradt itt `
+      +`(${arr.length} képesség, egyenként ${Math.round(p*100)}% esély).`,"m skillnote");
+    return 0;}
+  S.pendingRewardSkills=S.pendingRewardSkills||[];
+  kept.forEach(k=>S.pendingRewardSkills.push(k));
+  addLine(`🎁 <b>ÖRÖKSÉG</b> — ${esc(shortName(name))} ${tavozas}, és ${kept.length} képessége `
+    +`a klubnál marad (${arr.length}-ből, egyenként ${Math.round(p*100)}% eséllyel). Te választod ki, ki viszi tovább.`,"m mvp");
+  _styleInheritLast=kept.length;
+  return kept.length;}
+/* A kiosztás AZONNAL jön, nem a következő meccs után: az eladás és az edzővé
+   avatás a HUB-ban történik, ott van értelme dönteni róla. A HUB-ot (vagy az
+   átigazolási ablakot) elrejtjük a választó idejére, és utána visszahozzuk —
+   a sor maga a mentés része, tehát egy közbejövő újratöltés sem nyeli el. */
+function styleInheritDrainNow(after){
+  const q=S.pendingRewardSkills;
+  if(!q||!q.length){if(typeof after==="function")after();return;}
+  if(S.auto){
+    drainRewardSkills(()=>{try{saveGame();}catch(e){}
+      if(typeof after==="function")after();});
+    return;}
+  const hubWas=$("scHub")&&!$("scHub").classList.contains("hide");
+  const winWas=$("scWindow")&&!$("scWindow").classList.contains("hide");
+  if(hubWas)$("scHub").classList.add("hide");
+  if(winWas)$("scWindow").classList.add("hide");
+  drainRewardSkills(()=>{
+    $("scSkill").classList.add("hide");
+    /* A hívó folytatása ELŐBBRE VALÓ a visszaállításnál: az edzővé avatásnál
+       a kiosztás után egyenesen az edző beállítója következik. */
+    if(typeof after==="function"){try{after();}catch(e){}}
+    else if(winWas){
+      $("scWindow").classList.remove("hide");
+      $("scWindow").scrollIntoView({behavior:"smooth"});}
+    else if(hubWas&&typeof csReturnToHub==="function")csReturnToHub();
+    try{updateBar();}catch(e){}
+    try{saveGame();}catch(e){}});}
+/* A két belépési pont közös vége: sorsol, és ha lett örökség, ki is osztatja. */
+function styleInheritHandle(name,how){
+  if(styleInheritFrom(name,how)>0)styleInheritDrainNow();}
 /* A kihívásokért járó, még ki nem osztott skillek sorának kiürítése: minden
    elemnél megjelenik a választó-képernyő, ahol TE döntöd el a címzettet.
    Auto-módban a szokásos automata kiosztás fut, hogy ne akadjon meg a szezon. */
@@ -26306,12 +26385,18 @@ function drainRewardSkills(cb){
   const item=q.shift();
   const skill=SKILLS.find(s=>s.id===item.skillId);
   if(!skill){drainRewardSkills(cb);return;}
-  if(S.auto){autoAssignSkill(skill,item.stagesNeeded);drainRewardSkills(cb);return;}
-  showSkillDraw(skill,"challenge",item.stagesNeeded,()=>drainRewardSkills(cb));}
-function showSkillDraw(skill,reason,stagesNeeded,resumeCb){
+  /* A SOR ELEMEI HOZZÁK A SAJÁT CÍMÜKET ÉS KÉSZÜLTSÉGÜKET. A kihívás-jutalom
+     változatlanul 1/N fázisról indul; az ÖRÖKSÉG (Béke és harmónia) viszont
+     azzal a készültséggel érkezik, ahogy a távozónál állt. */
+  const done=Math.max(1,Math.min(item.stagesNeeded||1,item.stagesCompleted||1));
+  if(S.auto){autoAssignSkill(skill,item.stagesNeeded,done);drainRewardSkills(cb);return;}
+  showSkillDraw(skill,item.reason||"challenge",item.stagesNeeded,()=>drainRewardSkills(cb),done,item.from);}
+function showSkillDraw(skill,reason,stagesNeeded,resumeCb,stagesDone,fromName){
   skillResumeCb=resumeCb;
+  const done=Math.max(1,Math.min(stagesNeeded||1,stagesDone||1));
   $("scSkill").classList.remove("hide");
-  $("skillTitle").textContent=(SKILL_REASON_TXT[reason]||"Jutalom-skill!")+` (1/${stagesNeeded} fázis)`;
+  $("skillTitle").textContent=(SKILL_REASON_TXT[reason]||"Jutalom-skill!")
+    +(fromName?` — ${shortName(fromName)}`:"")+` (${done}/${stagesNeeded} fázis)`;
   $("skillAssignWrap").classList.add("hide");
   $("skillDesc").textContent="";
   $("skillSpinBtn").classList.remove("hide");
@@ -26321,10 +26406,15 @@ function showSkillDraw(skill,reason,stagesNeeded,resumeCb){
     if(t>=spinLen(700)){clearInterval(iv);land();}
   },70);
   function land(){
-    $("skillSpinName").textContent=skill.name+` (1/${stagesNeeded})`;
-    $("skillDesc").textContent=skill.desc+` Most csak az első fázisát kapja meg a játékos (1/${stagesNeeded}) — későbbi jutalmaknál fejleszthető tovább, a végén válik teljes erejűvé.`;
+    $("skillSpinName").textContent=skill.name+` (${done}/${stagesNeeded})`;
+    $("skillDesc").textContent=skill.desc+(
+      done>=stagesNeeded
+        ? ` Ez a képesség KÉSZEN érkezik (${done}/${stagesNeeded}) — teljes erővel.`
+        : done>1
+          ? ` A képesség ${done}/${stagesNeeded} fázison érkezik — későbbi jutalmaknál fejleszthető tovább.`
+          : ` Most csak az első fázisát kapja meg a játékos (1/${stagesNeeded}) — későbbi jutalmaknál fejleszthető tovább, a végén válik teljes erejűvé.`);
     $("skillSpinBtn").classList.add("hide");
-    renderSkillAssign(skill,stagesNeeded);
+    renderSkillAssign(skill,stagesNeeded,done);
     $("skillAssignWrap").classList.remove("hide");
     $("scSkill").scrollIntoView({behavior:"smooth"});
   }}
@@ -26357,7 +26447,8 @@ function eligibleForSkill(skill){
       const onPitch=slots.some(s=>s.player&&s.player.n===p.n);
       if(onPitch&&(WINGER_IS_ATTACKING[form]))return true;}
     return false;});}
-function renderSkillAssign(skill,stagesNeeded){
+function renderSkillAssign(skill,stagesNeeded,stagesDone){
+  const done=Math.max(1,Math.min(stagesNeeded||1,stagesDone||1));
   const roster=eligibleForSkill(skill);
   const box=$("skillAssignList");box.innerHTML="";
   if(!roster.length){
@@ -26382,12 +26473,13 @@ function renderSkillAssign(skill,stagesNeeded){
     row.innerHTML=`<span class="pos pc-${skill.cat}">${p.pos.join("/")}</span><span class="main"><div class="nm">${esc(p.n)}${ageTxt}${already?` <small>(már ${already} skillje van)</small>`:""}</div></span>`;
     row.onclick=()=>{
       if(!S.skills[p.n])S.skills[p.n]=[];
-      S.skills[p.n].push({skill,stagesNeeded,stagesCompleted:1});updateSkillsLine();
+      S.skills[p.n].push({skill,stagesNeeded,stagesCompleted:done});updateSkillsLine();
       noteSkillEver(p.n,skill.id);
       $("scSkill").classList.add("hide");
       const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();};
     box.appendChild(row);});}
-function autoAssignSkill(skill,stagesNeeded){
+function autoAssignSkill(skill,stagesNeeded,stagesDone){
+  const done=Math.max(1,Math.min(stagesNeeded||1,stagesDone||1));
   const roster=eligibleForSkill(skill);
   if(!roster.length)return;
   /* ---- AUTO-KIOSZTÁS: A LEGTÖBBET ÍGÉRŐ KEZDŐNEK ----
@@ -26412,9 +26504,9 @@ function autoAssignSkill(skill,stagesNeeded){
   for(const x of top){r-=x.score;if(r<=0){pick_=x;break;}}
   const p=pick_.p;
   if(!S.skills[p.n])S.skills[p.n]=[];
-  S.skills[p.n].push({skill,stagesNeeded,stagesCompleted:1});updateSkillsLine();
+  S.skills[p.n].push({skill,stagesNeeded,stagesCompleted:done});updateSkillsLine();
   noteSkillEver(p.n,skill.id);
-  addLine(`🎖 Skill: ${esc(p.n)} megkapta a(z) "${esc(skill.name)}" képességet (1/${stagesNeeded} fázis)`,"m life");}
+  addLine(`🎖 Skill: ${esc(p.n)} megkapta a(z) "${esc(skill.name)}" képességet (${done}/${stagesNeeded} fázis)`,"m life");}
 function showSkillCompletion(resumeCb,cands){
   cands=cands||buildUpgradeCands();
   skillResumeCb=resumeCb;
@@ -29290,13 +29382,20 @@ function renderCoachOffer(){
     if(!t)return;
     askConfirm({title:"Bevegyük a stábba?",yes:"Igen, marad a klubnál",
       html:`<div style="font-size:13px;line-height:1.55">${t.ic} <b>${esc(shortName(fp.n))}</b> mostantól <b>${esc(t.n)}</b> (${coachStars(coachSzFor(t.key,fp))} Sz ${coachSzFor(t.key,fp)}).<br><br>
-        <span style="color:var(--dim)">A típus <b>nem módosítható</b> később. A stáb helye: ${staff().length+1}/${coachSlots()}.</span></div>`,
+        <span style="color:var(--dim)">A típus <b>nem módosítható</b> később. A stáb helye: ${staff().length+1}/${coachSlots()}.</span>${
+        (styleInheritChance()>0&&((S.skills&&S.skills[fp.n])||[]).length)
+          ?`<br><br><span style="color:var(--grass)">🎁 <b>Add tovább!</b> — játékos-képességei egyenként ${Math.round(styleInheritChance()*100)}% eséllyel a keretben maradnak.</span>`:""}</div>`,
       onYes:()=>{
         if(staffFull())return;
         const c=makeCoach(fp,t.key,S.seasonNumber||1);
         if(!c||!hireCoach(c))return;
         dropCoachOffer(fp.n);_coachOfferPick=null;_coachOfferAll=false;
         renderCoachOffer();saveGame();
+        /* ÖRÖKSÉG: ha a stábba lépő játékos képességei itt maradtak (a
+           hireCoach sorsolta ki), ELŐBB osszuk ki őket — az edző beállítója
+           csak utána jön, hogy ne két képernyő versenyezzen egymással. */
+        if(_styleInheritLast>0){
+          styleInheritDrainNow(()=>openStaffPanel(c.n));return;}
         /* A FELVÉTEL UTÁN AZONNAL A BEÁLLÍTÁSHOZ VISZÜNK. Eddig a felhasználó
            visszakerült a HUB-ba, az új edző pedig egy menü mélyén ült,
            alapértelmezett fókusszal — könnyű volt elfelejteni, hogy be kell
@@ -31265,6 +31364,7 @@ const BAL_TARGET_LOAD=6;    /* ennyi effektív gól/gólpassz-adó = teljes pont
 const BAL_TARGET_SKILL=5;   /* ennyi effektív skill-birtokos = teljes pont */
 const BAL_RATING_CV=0.18;   /* ekkora relatív szórás fölött már nulla a pont */
 const BALANCE_MAX_OVR=2.0;  /* a tökéletes egyensúly ennyi csapat-OVR-t ér */
+const BAL_EXT_GATE=0.80;    /* a rating-rész 100 FÖLÖTTI sávjának nyitó kapuja */
 /* Effektív hozzájárulók száma egy súly-tömbből (1/HHI). Üres/nulla összegnél
    null — a hívó dönti el, mit jelent az (általában: még nincs mit mérni). */
 function balEffectiveN(weights){
@@ -31273,19 +31373,58 @@ function balEffectiveN(weights){
   if(!tot||!w.length)return null;
   const hhi=w.reduce((a,b)=>a+(b/tot)*(b/tot),0);
   return hhi>0?1/hhi:null;}
-/* effN → 0..1 pont a célszám felé. 1 hozzájáruló = 0 pont, a cél = teljes. */
-function balScoreFromN(effN,target){
+/* effN → 0..1 pont a célszám felé. 1 hozzájáruló = 0 pont, a cél = teljes.
+   `cap` a felső korlát: alapból 1 (100%), a Béke és harmónia „Nincs plafon"
+   képességével 1,25 / 1,5 / 2 — ilyenkor a célszám FÖLÖTTI szélesség is
+   számít tovább, ugyanazon a meredekségen. */
+function balScoreFromN(effN,target,cap){
   if(effN==null)return null;
-  return Math.max(0,Math.min(1,(effN-1)/Math.max(1,target-1)));}
+  return Math.max(0,Math.min(cap||1,(effN-1)/Math.max(1,target-1)));}
+/* ---- A STÍLUS KÉT KAPCSOLÓJA AZ EGYENSÚLY-MÉRŐN ----
+   Mindkettő a Béke és harmónia képességfájából jön, és mindkettő hibatűrő:
+   stílus nélkül (vagy a szkript-betöltés korai szakaszában) a semleges
+   értéket adja, tehát a mérő pontosan úgy viselkedik, mint eddig.
+     · KÖNNYÍTÉS (balEase) — a célszámok közelebb jönnek, a szórás-tűrés tágul.
+       A „nehezebb fele" rövidül meg: a cél FÖLÖTTI távolság nem mozdul.
+     · PLAFON (balCap) — a részpontok és velük az összpontszám 100% fölé
+       mehetnek. */
+function balEase(){
+  try{const e=styleBalEase();return (e>0&&e<0.9)?e:0;}catch(err){return 0;}}
+function balCap(){
+  try{return Math.max(1,styleBalCap()||1);}catch(err){return 1;}}
+function balTargetLoad(){return 1+(BAL_TARGET_LOAD-1)*(1-balEase());}
+function balTargetSkill(){return 1+(BAL_TARGET_SKILL-1)*(1-balEase());}
+function balRatingCvMax(){return BAL_RATING_CV/(1-balEase());}
+/* A TELJES KERET rating-szórása (variációs együttható). A 100 FÖLÖTTI sávban
+   ez adja a rating-rész fejterét: a kezdő 11-nél egyenletesebb már nem lehet
+   valaki (a nulla szórás a matematikai határ), a KERET egyenletessége viszont
+   valódi, nehezen elérhető cél — és pontosan az, amiről ez a filozófia szól.
+   Enélkül a rating-rész 100%-on beragadna, és a kitolt plafont sosem lehetne
+   kitölteni. */
+function balRosterCv(){
+  if(gameMode!=="career")return null;
+  const r=(typeof fullCareerRoster==="function"?fullCareerRoster():[]).filter(Boolean);
+  if(r.length<8)return null;
+  const vals=r.map(p=>pOvr(p)).filter(v=>v>0);
+  if(vals.length<8)return null;
+  const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
+  if(mean<=0)return null;
+  const varc=vals.reduce((a,b)=>a+(b-mean)*(b-mean),0)/vals.length;
+  return Math.sqrt(varc)/mean;}
 /* A TELJES mérőszám. Minden részt visszaad, mert a HUB-panel ugyanezekből a
    számokból írja le, HOGYAN jött ki — nem másolja le a képletet. */
 function teamBalance(){
   const out={ok:false,load:null,skill:null,rating:null,score:0,bonus:0,
-             loadN:null,skillN:null,cv:null,loadTop:null,neutral:[]};
+             loadN:null,skillN:null,cv:null,loadTop:null,neutral:[],
+             cap:1,ease:0,rosterCv:null};
   if(gameMode!=="career"||!careerPool)return out;
   const roster=(typeof fullCareerRoster==="function"?fullCareerRoster():[]).filter(Boolean);
   if(!roster.length)return out;
   out.ok=true;
+  /* A stílus két kapcsolója. MINDKETTŐ a mérésbe épül, nem utólagos szorzó:
+     így a HUB-panel, a meccsmotor és a mérföldkövek ugyanazt a számot látják. */
+  const cap=balCap(),tgtLoad=balTargetLoad(),tgtSkill=balTargetSkill(),cvMax=balRatingCvMax();
+  out.cap=cap;out.ease=balEase();
   /* ---- 1) TEHER: gól + gólpassz eloszlása ---- */
   {const names=roster.map(p=>p.n);
    const w=names.map(n=>((S.scorers&&S.scorers[n])||0)+((S.assists&&S.assists[n])||0));
@@ -31293,7 +31432,7 @@ function teamBalance(){
    if(tot<6){out.load=0.5;out.neutral.push("teher");}   /* még kevés a minta */
    else{
      out.loadN=balEffectiveN(w);
-     out.load=balScoreFromN(out.loadN,BAL_TARGET_LOAD);
+     out.load=balScoreFromN(out.loadN,tgtLoad,cap);
      /* a legnagyobb teher aránya — ezt írja ki a panel emberi nyelven */
      const mx=Math.max.apply(null,w);
      const mi=w.indexOf(mx);
@@ -31307,7 +31446,7 @@ function teamBalance(){
    const tot=w.reduce((a,b)=>a+b,0);
    if(tot<2){out.skill=0.5;out.neutral.push("skill");}
    else{out.skillN=balEffectiveN(w);
-        out.skill=balScoreFromN(out.skillN,BAL_TARGET_SKILL);}}
+        out.skill=balScoreFromN(out.skillN,tgtSkill,cap);}}
   /* ---- 3) RATING: a kezdő 11 effektív erejének egyenletessége ---- */
   {const vals=slots.map(sl=>{
      if(!sl||!sl.player)return null;
@@ -31319,7 +31458,20 @@ function teamBalance(){
      const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
      const varc=vals.reduce((a,b)=>a+(b-mean)*(b-mean),0)/vals.length;
      out.cv=mean>0?Math.sqrt(varc)/mean:0;
-     out.rating=Math.max(0,Math.min(1,1-out.cv/BAL_RATING_CV));}}
+     let r=Math.max(0,Math.min(1,1-out.cv/cvMax));
+     /* A 100 FÖLÖTTI SÁV: a kezdő 11-nél a nulla szórás a matematikai határ —
+        ott nincs mit javítani. A TELJES KERET egyenletessége viszont valódi
+        fejtér, és pontosan az, amiről ez a filozófia szól. A pótlék KÉT kaput
+        vesz: a kezdő 11-nek már a 80% fölötti sávban kell járnia (a kapu ott
+        nulláról nyílik, tehát a mérő nem ugrik meg sehol), és a pótlék mértéke
+        a keret egyenletességéből jön. cap=1-nél az egész ág néma. */
+     if(cap>1&&r>BAL_EXT_GATE){
+       out.rosterCv=balRosterCv();
+       if(out.rosterCv!=null){
+         const kapu=(r-BAL_EXT_GATE)/(1-BAL_EXT_GATE);            /* 0…1 */
+         const keret=Math.max(0,Math.min(1,1-out.rosterCv/cvMax)); /* 0…1 */
+         r+=kapu*keret*(cap-1);}}
+     out.rating=Math.max(0,Math.min(cap,r));}}
   out.score=BAL_W_LOAD*out.load+BAL_W_SKILL*out.skill+BAL_W_RATING*out.rating;
   out.bonus=BALANCE_MAX_OVR*out.score;
   return out;}
@@ -31368,7 +31520,11 @@ function teamBalanceBonus(){
    A kupában — mint minden hosszú távú építkezés — feleannyi tempóval halad:
    ott a mérkőzés fél mérkőzésnek számít. */
 const BAL_SKILL_SEASON_MATCHES=30;   /* egy szezon hossza — a gyűjtő nevezője */
+/* A 100 FÖLÖTTI SÁVOK (csak a kitolt plafonnal érhetők el): minden további 20
+   pont egy újabb képességet ér. A tábla így nem áll meg ott, ahol a régi
+   plafon volt — különben a kitolás a kvótán semmit nem érne. */
 function balSkillBaseTier(score){
+  if(score>100)return 5+Math.floor((score-100)/20);
   if(score>95)return 5;
   if(score>=90)return 4;
   if(score>=80)return 3;
@@ -31376,6 +31532,7 @@ function balSkillBaseTier(score){
   if(score>65)return 1;
   return 0;}
 function balSkillDistTier(sk){
+  if(sk>100)return 4+Math.floor((sk-100)/30);
   if(sk>95)return 4;
   if(sk>90)return 3;
   if(sk>75)return 2;
@@ -31384,7 +31541,7 @@ function balSkillDistTier(sk){
 /* A szezonos kvóta és a hozzá tartozó nyers számok — a HUB-panel ugyanezt
    írja ki, tehát a kijelzés és a hatás sosem tud elcsúszni. */
 function balanceSkillQuota(){
-  const out={ok:false,score:0,skill:0,base:0,dist:0,total:0};
+  const out={ok:false,score:0,skill:0,base:0,dist:0,style:0,total:0};
   if(gameMode!=="career")return out;
   const b=teamBalance();
   if(!b.ok)return out;
@@ -31394,8 +31551,15 @@ function balanceSkillQuota(){
   out.base=balSkillBaseTier(out.score);
   /* „ezen belül" — a skill-eloszlás csak a meglévő alapot egészíti ki */
   out.dist=out.base>0?balSkillDistTier(out.skill):0;
-  out.total=out.base+out.dist;
+  /* A STÍLUS RÁTESZ (Béke és harmónia — „Egymástól tanulnak"): minden sáv
+     ennyivel többet terem. A kapu ugyanaz, mint a kiegészítésnél: ha az alap
+     nem jár, a stílus sem nyit kaput — csak felerősíti, ami már megvan. */
+  out.style=out.base>0?balStyleSkillBonus():0;
+  out.total=out.base+out.dist+out.style;
   return out;}
+/* A stílus kvóta-pótléka. Hibatűrő: stílus nélkül 0. */
+function balStyleSkillBonus(){
+  try{return Math.max(0,styleBalSkillBonus()||0);}catch(e){return 0;}}
 /* Egy lejátszott mérkőzés könyvelése. Igazat ad vissza, ha MOST érett be egy
    képesség — a hívó ilyenkor beteszi a jutalom-sorba. A számláló a mentés
    része, tehát egy újratöltés nem indíthatja újra a beosztást nulláról. */
@@ -31443,7 +31607,8 @@ function balanceSkillHtml(){
              :`az összegyensúlynak 65 fölé kell érnie.`)+`</div>`;}
   const nextIn=balanceSkillNextIn(q);
   const reszek=[`alap <b>${q.base}</b> (összegyensúly ${Math.round(q.score)})`]
-    .concat(q.dist>0?[`eloszlás <b>+${q.dist}</b> (skill-eloszlás ${Math.round(q.skill)})`]:[]);
+    .concat(q.dist>0?[`eloszlás <b>+${q.dist}</b> (skill-eloszlás ${Math.round(q.skill)})`]:[])
+    .concat(q.style>0?[`filozófia <b>+${q.style}</b>`]:[]);
   return `<div style="font-size:12px;margin:0 0 7px;line-height:1.45">`
     +`⚡ Ingyen képesség: <b style="color:var(--grass)">${q.total}</b>/szezon `
     +`<span style="color:var(--dim2)">— ${reszek.join(" · ")}</span><br>`
@@ -31455,9 +31620,14 @@ function teamBalanceHtml(){
   if(!b.ok)return "";
   const hu=x=>String(x).replace(".",",");
   const pct=x=>Math.round(x*100);
-  const col=v=>v>=0.75?"var(--grass)":v>=0.45?"var(--gold)":"var(--red)";
+  /* A SZÍN ÉS A CSÍK A PLAFONHOZ MÉRVE. Kitolt plafonnál a 100% már nem a
+     teljesítmény teteje, hanem félút — ha a csík ott kifutna, a mérő azt
+     hazudná, hogy készen vagy. */
+  const cap=b.cap||1;
+  const rel=v=>Math.max(0,Math.min(1,(v||0)/cap));
+  const col=v=>rel(v)>=0.75?"var(--grass)":rel(v)>=0.45?"var(--gold)":"var(--red)";
   const bar=(v)=>`<span style="display:inline-block;width:52px;height:6px;border-radius:3px;background:var(--panel2);vertical-align:middle;overflow:hidden">
-    <span style="display:block;height:6px;width:${Math.round(v*100)}%;background:${col(v)}"></span></span>`;
+    <span style="display:block;height:6px;width:${Math.round(rel(v)*100)}%;background:${col(v)}"></span></span>`;
   const semleges=k=>b.neutral.indexOf(k)>=0
     ? ` <span style="color:var(--dim2)">(még kevés az adat — semleges 50%)</span>`:"";
   const sor=(cim,v,suly,reszlet,kulcs)=>`<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;font-size:12px">
@@ -31476,18 +31646,22 @@ function teamBalanceHtml(){
   return `<div id="hubBalanceBox" style="background:var(--bg);border:1px solid var(--panel2);border-radius:9px;padding:10px 12px;margin:0 0 12px">
     <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
       <b style="font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--gold)">⚖️ Csapategyensúly</b>
-      <span style="font-size:15px;font-weight:800;color:${col(b.score)}">${pct(b.score)}<span style="font-size:11px;font-weight:400;color:var(--dim2)">/100</span></span>
+      <span style="font-size:15px;font-weight:800;color:${col(b.score)}">${pct(b.score)}<span style="font-size:11px;font-weight:400;color:var(--dim2)">/${pct(cap)}</span></span>
     </div>
     <div style="font-size:12.5px;margin:4px 0 7px">
       Meccsenkénti csapaterő-bónusz: <b style="color:var(--grass)">+${hu(b.bonus.toFixed(2))}</b>
-      <span style="color:var(--dim2)">(legfeljebb +${hu(BALANCE_MAX_OVR.toFixed(2))})</span></div>
+      <span style="color:var(--dim2)">(legfeljebb +${hu((BALANCE_MAX_OVR*cap).toFixed(2))})</span></div>
+    ${(cap>1||b.ease>0)?`<div style="font-size:11.5px;color:var(--grass);margin:0 0 7px;line-height:1.45">☯️ A filozófiád dolgozik a mérőn:${
+        b.ease>0?` a célszámok <b>${Math.round(b.ease*100)}%-kal</b> könnyítve (${hu(balTargetLoad().toFixed(1))} teher- és ${hu(balTargetSkill().toFixed(1))} skill-adó a teljes ponthoz)`:""}${
+        (cap>1&&b.ease>0)?" ·":""}${
+        cap>1?` a plafon <b>${pct(cap)}</b>${b.rosterCv!=null?` — a 100 fölötti sávban a TELJES keret szórása számít (most ${hu((b.rosterCv*100).toFixed(1))}%)`:` — a 100 fölötti sávhoz a kezdő 11-nek ${pct(BAL_EXT_GATE)}% fölé kell érnie, onnan a teljes keret egyenletessége viszi tovább`}`:""}</div>`:""}
     ${balanceSkillHtml()}
     ${sor("Teher","load" in b?b.load:0,`${pct(BAL_W_LOAD)}%`,teherReszlet,"teher")}
     ${sor("Skill-eloszlás",b.skill,`${pct(BAL_W_SKILL)}%`,skillReszlet,"skill")}
     ${sor("Rating-eloszlás",b.rating,`${pct(BAL_W_RATING)}%`,ratingReszlet,"rating")}
     <div style="font-size:11px;color:var(--dim2);line-height:1.45;margin-top:6px;border-top:1px dashed var(--line);padding-top:5px">
       A teher és a skill az <b>effektív hozzájárulók számából</b> jön (1/Herfindahl): ha három ember hozza egyenlő arányban a termést, az effektív szám 3 — ha egy ember mindent, akkor 1.
-      Teljes pont ${BAL_TARGET_LOAD} effektív gól/gólpassz-adónál és ${BAL_TARGET_SKILL} effektív skill-birtokosnál.
+      Teljes pont ${hu(balTargetLoad().toFixed(1))} effektív gól/gólpassz-adónál és ${hu(balTargetSkill().toFixed(1))} effektív skill-birtokosnál.
       A bónusz <b>sosem negatív</b>: egy sztárt nem büntet, csak a szélesen elosztott erőt fizeti meg.
       <span style="color:var(--dim)">Koppints a részletekért.</span></div>
   </div>`;}
@@ -31927,7 +32101,11 @@ function buildHubDetail(loc){
         addLine(`💰 Eladtad ${esc(p.n)}-t ${fmtFt(res.credit)}-ért — a büdzséd most ${fmtFt(S.transferBudget)}.`,"m life");
         $("hubPositionPicker").classList.add("hide");   /* az eladás azonnal bezárja a nyitott csere-panelt */
         hubExpandedKey=null;                            /* az eladott játékos részletei bezáródnak */
-        renderHub();drawPitch();updateBar();saveGame();});};
+        renderHub();drawPitch();updateBar();saveGame();
+        /* ÖRÖKSÉG (Béke és harmónia): a távozó képességei nem biztos, hogy
+           vele mennek. A HUB frissítése UTÁN jön, hogy a választó-képernyő egy
+           már rendbe tett HUB elé álljon. */
+        styleInheritHandle(p.n,"sale");});};
     d.appendChild(sellBtn);}
   /* ---- ÖTÖDIK MŰVELET: EDZŐI PÁLYÁRA KÜLDÉS (a "B" belépési út) ----
      A rendszer fő útja a bejelentett visszavonulás: kitartottál mellette, és a
@@ -33580,7 +33758,8 @@ function askSellConfirm(p,onYes){
     <div style="font-size:12.5px;color:var(--dim);margin-top:3px">
       ${p.pos.join("/")}${e?` · ${e.age} év`:""} · Rating ${Math.round(pOvr(p))}${skills?` · ${skills} skill`:""}${tier?` · ${esc(String(tier).toUpperCase())}`:""}</div>
     <div style="font-size:13px;margin-top:9px;line-height:1.5">Eladási ár: <b style="color:var(--gold)">${fmtFt(sellValue(p))}</b>.${saleMeritNote(p)}
-      A játékos véglegesen kikerül a keretedből — a skilljei és a felépített kémiája is elvész vele.</div>`;
+      A játékos véglegesen kikerül a keretedből — a skilljei és a felépített kémiája is elvész vele.</div>
+    ${(skills&&styleInheritChance()>0)?`<div style="font-size:12.5px;margin-top:7px;line-height:1.5;color:var(--grass)">🎁 <b>Add tovább!</b> — a ${skills} képessége egyenként <b>${Math.round(styleInheritChance()*100)}%</b> eséllyel a klubnál marad, és te választod ki, ki viszi tovább.</div>`:""}`;
   $("sellConfirmModal").classList.remove("hide");}
 $("sellConfirmYes")&&($("sellConfirmYes").onclick=()=>{
   $("sellConfirmModal").classList.add("hide");
@@ -37847,10 +38026,12 @@ function styleMsHtml(){
    "elszabadulni": ugyanazokon a korlátokon megy át, mint minden más hatás.
 
    AZ ÁRAK: minden képességnek HÁROM SZINTJE van, egyre drágábban és egyre
-   erősebben (lásd STYLE_TRAIT_PRICE). Egy stílus teljes fája 866 pont — a
-   stílus-mérföldkövei ennek nagyjából a hatodát adják, a többi az általános
-   mérföldkövek stíluspontjából jön. Vagyis a fát KIMAXOLNI nem lehet: egy
-   hosszú karrier alatt a felénél is kevesebb fér bele, és ez a lényeg. */
+   erősebben (lásd STYLE_TRAIT_PRICE). Egy stílus fája nagyságrendileg ezer
+   pont (a Béke és harmónia a négy egyensúly-képességgel jóval több) — a
+   stílus-mérföldkövei ennek töredékét adják, a többi az általános mérföldkövek
+   stíluspontjából jön. Vagyis a fát KIMAXOLNI nem lehet: egy hosszú karrier
+   alatt a felénél is kevesebb fér bele, és ez a lényeg. A felület mindig a
+   TÉNYLEGES összeget írja ki (styleTraitsHtml), nem ezt a becslést. */
 const STYLE_TRAITS={};
 /* A szintek ára TIER szerint. A képesség „rangja" (I/II/III) innentől
    ársávot jelent: mennyibe kerül belépni, és milyen meredeken drágul.
@@ -37968,6 +38149,37 @@ stTrait("harmonia","gepezet_mukodik",3,"A gépezet",
   ()=>{const s=stXISpread();
     return s>=999?"a kezdő 11 még nincs feltöltve — nincs mit mérni"
                  :`a kezdő 11 szórása most ${s} — 5 alatt kell lennie`;});
+/* ---- A NÉGY EGYENSÚLY-KÉPESSÉG ----
+   A Béke és harmónia mérőszáma a CSAPATEGYENSÚLY, a stílus képességei viszont
+   sokáig alig nyúltak hozzá: a filozófia mérte magát, de nem fizette meg. Ez a
+   négy trait a saját mérőszámán erősíti — könnyebben épül, magasabbra ér,
+   többet terem, és a távozó tudása is itt marad. Mind a MEGLÉVŐ motorokba köt
+   be (teamBalance, balanceSkillQuota, a jutalom-skill sor), új meccsmotor-ág
+   nélkül. */
+stTrait("harmonia","termeszetes_osszhang",2,"Természetes összhang",
+  "A csapategyensúly könnyebben épül: kevesebb gól/gólpassz-adó és kevesebb skill-birtokos is elég a teljes ponthoz, és a kezdő 11 szórás-tűrése is tágul.",[
+  {fx:{balEase:0.15},note:"15%-kal könnyített feltételek"},
+  {fx:{balEase:0.25},note:"25%-kal könnyített"},
+  {fx:{balEase:0.30},note:"30%-kal könnyített"}]);
+stTrait("harmonia","egymastol_tanulnak",3,"Egymástól tanulnak",
+  "A csapategyensúlyból járó ingyen képességek száma nő — minden sáv ennyivel többet terem. (A kapu marad: ha az alap nem jár, ez sem nyit kaput.)",[
+  {fx:{balSkill:1},note:"+1 ingyen képesség / szezon"},
+  {fx:{balSkill:2},note:"+2 / szezon"},
+  {fx:{balSkill:3},note:"+3 / szezon"}]);
+stTrait("harmonia","nincs_plafon",3,"Nincs plafon",
+  "A csapategyensúly-mérő 100-as plafonja kitolódik: a cél FÖLÖTTI szélesség is számít tovább, és vele nő a csapaterő-bónusz meg az ingyen képességek kvótája is. A 100 fölötti sávban a TELJES keret egyenletessége viszi tovább a rating-részt.",[
+  {fx:{balCap:1.25},note:"a plafon 125"},
+  {fx:{balCap:1.50},note:"a plafon 150"},
+  {fx:{balCap:2.00},note:"a plafon 200"}],
+  ()=>{const b=teamBalance();
+    if(!b.ok)return "az egyensúly-mérő most nem mér (hiányos kezdő 11)";
+    const r=b.rosterCv!=null?` · a teljes keret szórása ${String((b.rosterCv*100).toFixed(1)).replace(".",",")}%`:"";
+    return `a csapategyensúlyod most ${Math.round(b.score*100)}/${Math.round((b.cap||1)*100)}${r}`;});
+stTrait("harmonia","add_tovabb",3,"Add tovább!",
+  "Az ELADOTT vagy a STÁBBA felvett játékosod továbbadja a képességeit: skillenként külön sorsolás, és a címzettet te választod ki. A képesség azzal a készültséggel érkezik meg, ahogy nála állt.",[
+  {fx:{inheritP:0.20},note:"20% esély képességenként"},
+  {fx:{inheritP:0.30},note:"30% esély"},
+  {fx:{inheritP:0.50},note:"50% esély"}]);
 stTrait("harmonia","nincs_gyenge",3,"Nincs gyenge láncszem",
   "Ha a csapategyensúlyod 80 fölött áll, a csapat csapaterőt kap — a meglévő egyensúly-jutalom FÖLÉ.",[
   {fx:{ovrTeam:()=>{const b=teamBalance();return (b.ok&&b.score*100>=80)?1:0;}},note:"+1 csapaterő"},
@@ -38174,6 +38386,19 @@ function styleMoraleFloor(){return styleFxMax("moraleFloor");}
 function styleChemSpeed(){return styleFxAdd("chemSpeed");}
 function styleSpeedEarly(){return styleFxOn("speedEarly");}
 function styleFormDiscount(){return styleFxMul("formDiscount");}
+/* ---- A CSAPATEGYENSÚLY HÁROM CSATORNÁJA (Béke és harmónia) ----
+   Mind a három a MEGLÉVŐ egyensúly-mérőbe köt be (teamBalance,
+   balanceSkillQuota), új motor-ág nélkül:
+     · balSkill — hány képességgel többet terem egy sáv,
+     · balEase  — mennyivel könnyebb feltételekkel épül a mérőszám,
+     · balCap   — meddig mehet fel a mérő (1 = a régi 100-as plafon).
+   A „legmagasabb megvett szint él" szabály (styleFxMax) itt természetes: egy
+   képességnek egyszerre csak egy szintje aktív. */
+function styleBalSkillBonus(){return styleFxAdd("balSkill");}
+function styleBalEase(){return styleFxMax("balEase");}
+function styleBalCap(){return Math.max(1,styleFxMax("balCap"));}
+/* Az ÖRÖKSÉG esélye skillenként (0 = nincs megvéve). */
+function styleInheritP(){return styleFxMax("inheritP");}
 /* A kijelölt sztár posztkategóriája — "A sztár iskolája" kedvezmény ebből
    dolgozik. Null, ha nincs sztár vagy nincs a keretben. */
 function styleStarCat(){
@@ -38423,9 +38648,15 @@ function styleTraitLiveVal(t,lv){
 function stNum(v){return String(Math.round(v*10)/10).replace(".",",").replace("-","−");}
 function styleTraitLiveHtml(t,lv){
   const v=styleTraitLiveVal(t,lv);
-  if(v==null)return "";
   let mert="";
   if(typeof t.cond==="function"){try{mert=t.cond()||"";}catch(e){mert="";}}
+  /* ---- MÉRÉS CSAPATERŐ-HATÁS NÉLKÜL ----
+     A feltételes csapaterő-traitek fölött ott a „most él / most nem él" sor.
+     Van viszont képesség, aminek nincs ovrTeam-hatása, MÉRHETŐ állapota
+     viszont igen (pl. „Nincs plafon": hol tart a csapategyensúlyod a kitolt
+     plafonhoz képest). Enélkül a kártyája néma maradna — pont az a szám
+     hiányozna róla, amiért megveszed. */
+  if(v==null)return mert?`<div class="msLive off">📏 ${esc(mert)}</div>`:"";
   const cls=v>0?"on":(v<0?"bad":"off");
   const fej=lv
     ? (v>0?`✅ <b>MOST ÉL: +${stNum(v)} csapaterő</b>`
