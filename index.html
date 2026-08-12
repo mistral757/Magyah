@@ -2680,7 +2680,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.28";
+const APP_VERSION="3.1.29";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9108,7 +9108,7 @@ function emitMeasure(kind,name,val,minTxt){
     const tbl=(kind==="sprint"?S.topSpeed:S.topShot)||{};
     let holder=null,best=0;
     Object.keys(tbl).forEach(k=>{if(tbl[k]>best){best=tbl[k];holder=k;}});
-    if(holder&&holder!==name&&val>best)msNoteRecordBreak();
+    if(holder&&holder!==name&&val>best)msNoteRecordBreak(name,kind);
   }catch(e){}
   const r=recordMeasure(kind==="sprint"?"topSpeed":"topShot",name,val);
   /* A REKORD-SOR CSAK A MÉRÉS UTÁN. A szenzor-sor budgetelt, a rekord-sor nem
@@ -15677,7 +15677,7 @@ function markArrived(p,_price,fromAcademy){
   /* MÉRFÖLDKŐ: a legdrágább igazolásod. Az árat csak a VALÓDI vásárlási utak
      adják át (a szabadon érkezők, az ikonok és az akadémisták nem) — épp ezt
      akarjuk mérni. */
-  msNoteBuy(_price);
+  msNoteBuy(_price,p&&p.n);
   S.chSignings=(S.chSignings||0)+1;
   /* ---- A KÉSZ SKILLEK ÁTADÁSA ----
      A jelölt ajándék-skilljei (giftSkillsFor) itt költöznek be a S.skills-be,
@@ -28164,7 +28164,7 @@ function clutchAward(playerName,skillId,why){
   if(!playerName)return;
   const skill=SKILLS.find(s=>s.id===skillId);
   if(!skill)return;
-  msNoteClutchSkill();   /* mérföldkő: sorsdöntő meccsen szerzett hős-skill */
+  msNoteClutchSkill(playerName);   /* mérföldkő: sorsdöntő meccsen szerzett hős-skill */
   const arr=S.skills[playerName]=S.skills[playerName]||[];
   const inst=arr.find(i=>i.skill&&i.skill.id===skillId);
   const nm=esc(shortName(playerName));
@@ -34308,7 +34308,7 @@ function euroCampaignEndNow(kind){
       /* MÉRFÖLDKŐ: minden SAJÁT egyéni díj beleszámít a gyűjteménybe — a
          sorozat rangja szerinti súllyal (BL 3 … MK 1). Így a hazai kupa díja
          is számít, csak nem ugyanannyit. */
-      if(isOwn)msNoteAward(E.comp);
+      if(isOwn)msNoteAward(E.comp,winner.n);
       if(isOwn&&E.comp==="BL"){
         const skill=SKILLS.find(s=>s.id===aw.skillId);
         if(skill){
@@ -35802,6 +35802,7 @@ function msNoteGoal(name){
     if(msClubsOf(name).indexOf(opp)<0)return;
     const t=msT();
     t.exClubGoals=(t.exClubGoals||0)+1;
+    t.exClubWho=name;t.exClubOpp=opp;
     addLine(`💙 ${esc(shortName(name))} a RÉGI CSAPATA ellen talált be — ${esc(opp)}. `
       +`Nem ünnepel.`,"m skillnote");
   }catch(e){}}
@@ -36375,6 +36376,164 @@ function msScan(){
   earned.forEach(def=>{msPayout(def);try{msReleaseAfter(def);}catch(e){}});
   /* Egy rajzolás a végén — nem mérföldkövenként. */
   try{renderMilestones();renderHubInfo();}catch(e){}}
+/* ================= KI VOLT AZ? — A MÉRFÖLDKÖVEK SZEREPLŐI =================
+   Egy mérföldkő fele annyit ér, ha nem derül ki, KI csinálta. „A csapat szíve"
+   önmagában egy cím; „A csapat szíve — Cannavaro, 3 kész kötés: Nesta,
+   Maldini, Pirlo" már történet. Ez a tábla mondja meg mérföldkövenként, kit
+   kell megnevezni; a kiírás (msPayout és styleScan) egyetlen extra sorként
+   teszi a hír alá, a napló nyelvén.
+
+   MINDEN FÜGGVÉNY AZ ÁLLAPOTBÓL OLVAS, a teljesítés pillanatában — nincs új
+   nyilvántartás. Ahol a szereplő utólag tényleg nem lenne visszakereshető
+   (rekorddöntés, hős-skill, egyéni díj, legdrágább igazolás, a problémás
+   ember eladása, gól a régi csapat ellen), ott a MEGLÉVŐ nyomkövető jegyzi fel
+   a nevet is — ezek a `*Who` mezők.
+
+   MIND HIBATŰRŐ: ha egy függvény elszáll vagy üresen tér vissza, a mérföldkő
+   pontosan úgy jelenik meg, ahogy eddig. Csapatteljesítménynél (izgalom,
+   óriásölés, gólzápor, trófeák) szándékosan NINCS bejegyzés — ott nem egy
+   ember a hős, és egy odabiggyesztett név hazugság volna. */
+function msWhoName(n){
+  try{return esc(shortName(n));}catch(e){return esc(String(n||""));}}
+/* Felsorolás korláttal: a napló egy sorába három szereplő fér el olvashatóan. */
+function msWhoJoin(list,max){
+  const L=(list||[]).filter(Boolean),m=max||3;
+  if(!L.length)return "";
+  return L.length>m?`${L.slice(0,m).join(" · ")} · +${L.length-m} további`:L.join(" · ");}
+function msWhoPair(a,b,tail){
+  return `${msWhoName(a)} és ${msWhoName(b)}${tail?` — ${tail}`:""}`;}
+/* Az adott ID-hez tartozó szereplő-szöveg. A lépcsős mérföldkövek a CSALÁD
+   nevén szerepelnek (fam), a magányosak a saját ID-jükön. */
+const MS_WHO={
+  chem_top2:()=>{
+    const k=msT().chemTop;if(!k)return "";
+    const pr=String(k).split("|");
+    return pr.length===2?msWhoPair(pr[0],pr[1],"a két legtermékenyebb embered"):"";},
+  chem_hub:()=>{
+    const cnt={},part={};
+    Object.values(S.chemPairs||{}).forEach(pr=>{
+      if(!pr||(pr.stages||0)<CHEM_PAIR_NEED)return;
+      cnt[pr.a]=(cnt[pr.a]||0)+1;cnt[pr.b]=(cnt[pr.b]||0)+1;
+      (part[pr.a]=part[pr.a]||[]).push(pr.b);(part[pr.b]=part[pr.b]||[]).push(pr.a);});
+    let best=null;Object.keys(cnt).forEach(k=>{if(!best||cnt[k]>cnt[best])best=k;});
+    if(!best)return "";
+    return `${msWhoName(best)} — ${cnt[best]} kész kötés: ${msWhoJoin((part[best]||[]).map(msWhoName),4)}`;},
+  chem_web:()=>msWhoJoin(msChemPairsDone().map(pr=>`${msWhoName(pr.a)}–${msWhoName(pr.b)}`),4),
+  ballon:()=>{
+    const H=S.ballonHistory||[],last=H[H.length-1];
+    return (last&&last.name)?`${msWhoName(last.name)} — Aranylabda`:"";},
+  sell_problem:()=>{
+    const w=msT().soldProblemWho;
+    return w?`${msWhoName(w)} — tőle váltál meg`:"";},
+  hun_icon:()=>{
+    const p=msRoster().find(x=>{
+      const e=msEntry(x.n);
+      return !!(e&&e.isIcon&&((e.nat||x.nat)==="Magyarország"));});
+    return p?`${msWhoName(p.n)} — hazatért`:"";},
+  clutch_skill:()=>{
+    const w=msT().clutchWho;
+    return w?`${msWhoName(w)} — az ő estéje volt`:"";},
+  record_break:()=>{
+    const w=msT().recBreakWho;
+    if(!w)return "";
+    const k=msT().recBreakKind;
+    return `${msWhoName(w)} — ${k==="shot"?"lövéserő":k==="sprint"?"végsebesség":"klub"}-rekord`;},
+  academy_star:()=>{
+    let best=null,m=0;
+    msRoster().forEach(p=>{
+      const e=msEntry(p.n);
+      if(!e||!(typeof isYouthProspect==="function"&&isYouthProspect(e)))return;
+      const v=pOvr(p);if(v>m){m=v;best=p.n;}});
+    return best?`${msWhoName(best)} — ${Math.round(m)} Rating, saját nevelés`:"";},
+  centurion:(def)=>{
+    let best=null,m=0;
+    Object.keys(S.careerStats||{}).forEach(n=>{
+      const c=S.careerStats[n];
+      if(c&&(c.matches||0)>m){m=c.matches;best=n;}});
+    return (best&&m>=(def?def.n:0))?`${msWhoName(best)} — ${m} meccs a klubnál`:"";},
+  player40:(def)=>{
+    let best=null,m=0;
+    Object.keys(S.scorers||{}).forEach(n=>{if(S.scorers[n]>m){m=S.scorers[n];best=n;}});
+    return (best&&m>=(def?def.n:0))?`${msWhoName(best)} — ${m} gól az idényben`:"";}
+};
+const MS_WHO_FAM={
+  bond:()=>{
+    const B=msT().bonds||[],last=B[B.length-1];
+    if(!last)return "";
+    const pr=String(last).split("|");
+    return pr.length===2?msWhoPair(pr[0],pr[1],"a legutóbbi barátság"):"";},
+  /* A mérce az ÉRKEZŐKET számolja, ezért a felsorolás is érkező-központú:
+     „X → Y" azt jelenti, hogy X jött, és Y-ra talált rá. Így egy kölcsönös
+     páros két külön sorként is értelmes marad (két érkező, két teljesítés). */
+  reunite:()=>msWhoJoin(msReunitedPairs()
+    .map(x=>`${msWhoName(x.a)} → ${msWhoName(x.b)}${x.club?` (${esc(x.club)})`:""}`),3),
+  rivalchem:()=>msWhoJoin(msChemPairsDone()
+    .filter(pr=>{try{return msAreRivals(pr.a,pr.b);}catch(e){return false;}})
+    .map(pr=>`${msWhoName(pr.a)}–${msWhoName(pr.b)}`),3),
+  mentor:()=>msWhoJoin(msChemPairsDone().filter(pr=>{
+      const ea=msEntry(pr.a),eb=msEntry(pr.b);
+      if(!ea||!eb||ea.age==null||eb.age==null)return false;
+      return Math.min(ea.age,eb.age)<25&&Math.max(ea.age,eb.age)>32;})
+    .map(pr=>{
+      const ea=msEntry(pr.a),eb=msEntry(pr.b);
+      const fiatal=ea.age<eb.age?pr.a:pr.b, oreg=ea.age<eb.age?pr.b:pr.a;
+      return `${msWhoName(oreg)} → ${msWhoName(fiatal)}`;}),3),
+  exclub:()=>{
+    const t=msT();
+    return t.exClubWho?`${msWhoName(t.exClubWho)}${t.exClubOpp?` — a(z) ${esc(t.exClubOpp)} ellen`:""}`:"";},
+  sale:()=>{
+    const L=(S.transferLog&&S.transferLog.sells)||[];
+    let b=null;L.forEach(s=>{if(s&&(!b||s.credit>b.credit))b=s;});
+    return b?`${msWhoName(b.n)} — ${fmtFt(b.credit)}`:"";},
+  buy:()=>{
+    const t=msT();
+    return t.maxBuyWho?`${msWhoName(t.maxBuyWho)} — ${fmtFt(t.maxBuy||0)}`:"";},
+  award:()=>{
+    const t=msT();
+    return t.awardWho?`${msWhoName(t.awardWho)} — a legutóbbi díj${t.awardWhoComp?` (${esc(t.awardWhoComp)})`:""}`:"";},
+  /* ---- STÍLUS-MÉRFÖLDKÖVEK, ahol egy konkrét emberé az érdem ---- */
+  bz_solo:()=>msWhoTop(S.scorers,"gól az idényben"),
+  bz_assist2:()=>msWhoTop(S.assists,"gólpassz az idényben"),
+  bt_saveseason:()=>msWhoTop(S.seasonSaves,"bravúr az idényben"),
+  vl_rec:()=>msWhoTop(S.topSpeed,"km/h — klubrekord"),
+  vl_recN:()=>msWhoTop(S.topSpeed,"km/h — klubrekord"),
+  vl_fast:()=>{
+    const n=(typeof stFastestName==="function")?stFastestName():null;
+    return n?`${msWhoName(n)} — a keret leggyorsabbja`:"";},
+  pz_shot:()=>msWhoTop(S.topShot,"km/h-s lövés — klubrekord"),
+  pz_shotmax:()=>msWhoTop(S.topShot,"km/h-s lövés — klubrekord"),
+  hm_card:()=>{
+    const L=[];
+    try{msRoster().forEach(p=>{if(stCardRankOf(p.n)>=6)L.push(msWhoName(p.n));});}catch(e){}
+    return msWhoJoin(L,4);}
+};
+/* „Kinél a legnagyobb szám?" — a gólok, gólpasszok, bravúrok és klubrekordok
+   mind név→érték táblák, tehát egyetlen segéd kiszolgálja mindet. */
+function msWhoTop(obj,suffix){
+  let best=null,m=0;
+  Object.keys(obj||{}).forEach(n=>{const v=obj[n];if(typeof v==="number"&&v>m){m=v;best=n;}});
+  if(!best)return "";
+  const num=Math.round(m*10)/10;
+  return `${msWhoName(best)} — ${String(num).replace(".",",")}${suffix?` ${suffix}`:""}`;}
+/* A STÍLUS-MÉRFÖLDKÖVEK ID-ELŐTAGRA is illeszkedhetnek: a „Sztárom a párom"
+   minden mérföldköve ugyanarról az emberről szól, ezért ott nem kell
+   huszonöt külön bejegyzés — a kijelölt sztár neve mindegyikre jó. */
+const MS_WHO_PREFIX=[
+  {p:"sz_",f:()=>{
+    const st=(typeof styleState==="function")?styleState():null;
+    return (st&&st.star)?`${msWhoName(st.star)} — a klub sztárja`:"";}}
+];
+function msWhoText(def){
+  if(!def)return "";
+  let f=MS_WHO[def.id]||(def.fam?MS_WHO_FAM[def.fam]:null);
+  if(!f){
+    const pre=MS_WHO_PREFIX.find(x=>String(def.id||"").indexOf(x.p)===0);
+    if(pre)f=pre.f;}
+  if(!f)return "";
+  try{
+    const s=f(def);
+    return (typeof s==="string"&&s.trim())?s.trim():"";
+  }catch(e){return "";}}
 /* A jutalom kifizetése és a hír kimondása.
    `how`: undefined = most teljesítetted · "held" = a zárás alatt beragadt
    jutalom szabadult fel · "top" = halott kategória legmagasabb fokozata. */
@@ -36391,12 +36550,16 @@ function msPayout(def,how){
     M.sp=(M.sp||0)+sp;
     M.spEarned=(M.spEarned||0)+sp;
     txt=`+${sp} csapatstílus-pont`;}
-  M.log.unshift({id:def.id,t:def.t,grp:def.grp,kind:def.kind,txt,
+  const who=msWhoText(def);
+  M.log.unshift({id:def.id,t:def.t,grp:def.grp,kind:def.kind,txt,who:who||null,
     season:S.seasonNumber||1,held:how?1:0});
   if(M.log.length>MS_LOG_MAX)M.log.length=MS_LOG_MAX;
   try{
     if(how)addLine(`💰 <b>BERAGADT JUTALOM KIFIZETVE — ${esc(def.t)}</b> · ${txt}`,"m mvp");
     else addLine(`🏁 <b>MÉRFÖLDKŐ — ${esc(def.t)}</b> · ${txt}`,"m mvp");
+    /* A SZEREPLŐ a hír UTÁN, a magyarázat ELŐTT: előbb a hír, aztán hogy ki
+       csinálta, és csak utána a szabály. */
+    if(who)addLine(`👤 ${who}`,"m life");
     addLine(`→ ${esc(def.d)}`,"m skillnote");
   }catch(e){}}
 /* Hány teljesítést nem nézett még meg a felhasználó? Ez a szám ül ki az Infó
@@ -36434,15 +36597,20 @@ function msNoteStaffType(type){
     t.staffTypes[type]=true;
   }catch(e){}}
 /* Sorsdöntő meccsen kiérdemelt hős-skill. */
-function msNoteClutchSkill(){try{if(gameMode==="career")msT().clutchSkill=true;}catch(e){}}
+function msNoteClutchSkill(name){try{
+  if(gameMode!=="career")return;
+  msT().clutchSkill=true;
+  if(name)msT().clutchWho=name;
+}catch(e){}}
 /* Megdőlt sebesség-/lövéserő-rekord (csak ha volt mit megdönteni).
    A `recBreak` a régi, logikai bélyeg (egy általános mérföldkő olvassa), a
    `recBreaks` pedig SZÁMLÁL — arra épül a stílus-mérföldkövek mérés-lépcsője. */
-function msNoteRecordBreak(){try{
+function msNoteRecordBreak(name,kind){try{
   if(gameMode!=="career")return;
   const t=msT();
   t.recBreak=true;
   t.recBreaks=(t.recBreaks||0)+1;
+  if(name){t.recBreakWho=name;t.recBreakKind=kind||null;}
 }catch(e){}}
 /* ================= NEHÉZSÉGI SZINT A NYERS CSAPATERŐHÖZ MÉRVE =================
    „Bajnok lettem" önmagában keveset mond: egy 95-ös kerettel egy 78-as mezőnyben
@@ -36517,11 +36685,12 @@ function msNoteMatch(o){
   }catch(e){}}
 /* Egyéni díj — a sorozat rangja szerinti súllyal. */
 const MS_AWARD_W={BL:3,EL:2,KL:1.5,MK:1};
-function msNoteAward(comp){
+function msNoteAward(comp,name){
   try{
     if(gameMode!=="career")return;
     const t=msT();
     t.awardPts=(t.awardPts||0)+(MS_AWARD_W[comp]||1);
+    if(name){t.awardWho=name;t.awardWhoComp=comp||null;}
   }catch(e){}}
 /* Kupa-párharc megfordítása: mekkora ÖSSZESÍTETT hátrányt hoztál be? */
 function msNoteCupComeback(deficit){
@@ -36536,10 +36705,14 @@ function msNoteClinch(rem){
     msT().clinchRem=Math.max(msT().clinchRem||0,rem);
   }catch(e){}}
 /* Igazolás ára — a legdrágább számít. */
-function msNoteBuy(price){
+function msNoteBuy(price,name){
   try{
     if(gameMode!=="career"||!(price>0))return;
-    msT().maxBuy=Math.max(msT().maxBuy||0,price);
+    const t=msT();
+    /* A NÉV IS KELL: a mérföldkő kiírása megnevezi, kiért fizetted. Csak ÚJ
+       csúcsnál cseréljük, hogy a rekord és a hozzá tartozó ember ne
+       csússzon szét. */
+    if(price>(t.maxBuy||0)){t.maxBuy=price;t.maxBuyWho=name||null;}
   }catch(e){}}
 /* Ifi-/öreg-boost. */
 function msNoteBoost(){
@@ -36550,7 +36723,7 @@ function msNoteSale(p){
   try{
     if(gameMode!=="career"||!p||msDone("sell_problem"))return;
     const w=msWorstTroublemaker();
-    if(w&&w.p&&w.p.n===p.n)msT().soldProblem=true;
+    if(w&&w.p&&w.p.n===p.n){msT().soldProblem=true;msT().soldProblemWho=p.n;}
   }catch(e){}}
 /* Szezonzárás: a szezonhoz kötött csúcsokat át kell menteni, mert a
    nullázás után már nem lennének visszakereshetők. */
@@ -38025,11 +38198,13 @@ function styleScan(){
     const sp=msSpReward(def.val);
     W.sp=(W.sp||0)+sp;
     W.spEarned=(W.spEarned||0)+sp;
-    W.log.unshift({id:def.id,t:def.t,grp:sd?sd.n:"Stílus",kind:"sp",
+    const who=msWhoText(def);
+    W.log.unshift({id:def.id,t:def.t,grp:sd?sd.n:"Stílus",kind:"sp",who:who||null,
       txt:`+${sp} csapatstílus-pont`,season:S.seasonNumber||1});
     if(W.log.length>MS_LOG_MAX)W.log.length=MS_LOG_MAX;
     try{
       addLine(`${sd?sd.ic:"🎯"} <b>STÍLUS-MÉRFÖLDKŐ — ${esc(def.t)}</b> · +${sp} csapatstílus-pont`,"m mvp");
+      if(who)addLine(`👤 ${who}`,"m life");
       addLine(`→ ${esc(def.d)}`,"m skillnote");
     }catch(e){}});
   try{renderStylePanel();}catch(e){}}
