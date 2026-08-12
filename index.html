@@ -2708,7 +2708,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.31";
+const APP_VERSION="3.1.32";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -18303,6 +18303,10 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      ledolgozott mérkőzés-egyenérték (kupában fél), balSkillsSeason a már
      kiosztott darabszám. Mindkettő szezononként nullázódik, de a MENTÉS
      RÉSZE — egy újratöltés nem indíthatja újra a beosztást nulláról. */
+  /* CSAPATEGYENSÚLY — a tavalyi teher-minta: {season, w:{név:gól+gólpassz}}.
+     A szezon első felében ez tartja életben a teher-mérőt (lásd balLoadCarry);
+     a balLoadHandover az átbillenés egyszeri bejelentésének jelzője. */
+  balLoadPrev:null,balLoadHandover:null,
   balSkillMatches:0,balSkillsSeason:0,
   initialSkillDone:false,   /* a kapitány-megerősítéskor járó NYITÓ skill egyszer jár */
   seasonStartStrength:0,    /* a szezonkezdő csapaterő — a kupamezőny horgonya */
@@ -24686,7 +24690,10 @@ function playMatch(){
       /* RIVÁLIS + BAJNOKI NARRATÍVA: a fordulót MÁR lekönyveltük (S.idx nőtt),
          tehát az élő tabella a friss állást mutatja — innen jön a rangadó utáni
          kommentár, a bajnokavatás és a dinamikus szezonhír. */
-      try{afterLeagueRound(fx,gf,ga);}catch(e){}}
+      try{afterLeagueRound(fx,gf,ga);}catch(e){}
+      /* CSAPATEGYENSÚLY: a szezon első felének letelte átbillenti a
+         teher-mérőt a tavalyi mintáról az ideire — a forduló MÁR lekönyvelve. */
+      try{balLoadHandoverNote();}catch(e){}}
     /* ---- KIHÍVÁS-KÖNYVELÉS: A TABELLA LEZÁRÁSA UTÁN ----
        BEJELENTETT HIBA: „néhány kihívás teljesítéskövetése egy meccscsel
        eltolódva regisztrálódik." Az ok pontosan ez a sorrend volt: a
@@ -31847,12 +31854,67 @@ function balRosterCv(){
   if(mean<=0)return null;
   const varc=vals.reduce((a,b)=>a+(b-mean)*(b-mean),0)/vals.length;
   return Math.sqrt(varc)/mean;}
+/* ---- A TEHER NEM NULLÁZÓDIK A SZEZONHATÁRON ----
+   HIBA, amit ez javít: a teher-rész (a mérő LEGNAGYOBB súlyú darabja, 45%) a
+   FUTÓ szezon gól- és gólpassz-eloszlásából dolgozik, azt viszont a
+   szezonváltás nullázza. Az új idény első mérkőzésein tehát nem volt mit
+   mérni, és a rész a semleges 50%-ra esett vissza. Egy végig 90%-os teherrel
+   épített keret így MINDEN nyáron elvesztette a munkája legnagyobb részét, és
+   heteken át fizetett érte a csapaterejéből — miközben a kereten semmi nem
+   változott. A mérő ilyenkor nem a csapatról mondott igazat, hanem arról,
+   hogy épp hány meccs telt el.
+
+   AMIT HELYETTE CSINÁLUNK, két szakaszban:
+     · a szezon ELSŐ FELÉBEN (1–15. forduló) a mérés úgy fut tovább, MINTHA az
+       előző idény folytatása lenne: a tavalyi és az idei gólok/gólpasszok
+       EGYÜTT adják a súlyokat. Az új szezon így fokozatosan, ugrás nélkül
+       veszi át a szót — minél több meccs telik el, annál kisebb a tavalyi
+       minta súlya;
+     · a 15. forduló UTÁN a tavalyi minta lekerül, és a teher az IDEI szezon
+       első 15 fordulójából áll elő. Onnantól ez a hivatalos új teher, és
+       innen él tovább a megszokott módon.
+   A váltás pillanatában a szám ugorhat — ezt a napló ki is mondja
+   (balLoadHandoverNote), mert egy magától megváltozó csapaterő-bónusz
+   magyarázat nélkül megmagyarázhatatlan volna.
+
+   A SÚLYOK a MOSTANI keretre képződnek le, pontosan úgy, ahogy szezonon belül
+   is: akit eladtál, annak a tavalyi termése sem számít bele. */
+const BAL_LOAD_CARRY_ROUNDS=15;
+/* Él-e még a tavalyi minta? null = nem (egyjátékos, első szezon, régi mentés,
+   vagy már letelt a szezon első fele). */
+function balLoadCarry(){
+  if(gameMode!=="career")return null;
+  const c=S.balLoadPrev;
+  if(!c||!c.w||c.season!==(S.seasonNumber||1))return null;
+  if((S.idx||0)>=BAL_LOAD_CARRY_ROUNDS)return null;
+  return c;}
+/* A lezáruló szezon terhelés-mintája. A szezonváltó hívja, MÉG a statisztikák
+   nullázása előtt; a `forSeason` az a szezon, AMELYIKBEN majd élni fog. */
+function balLoadFreeze(forSeason){
+  const w={};
+  const add=o=>{Object.keys(o||{}).forEach(n=>{w[n]=(w[n]||0)+(o[n]||0);});};
+  add(S.scorers);add(S.assists);
+  let tot=0;Object.keys(w).forEach(n=>{tot+=w[n];});
+  S.balLoadPrev=tot>0?{season:forSeason,w}:null;
+  S.balLoadHandover=null;}
+/* A 15. forduló utáni átvétel EGYSZERI bejelentése. A meccs utáni könyvelés
+   hívja, közvetlenül a forduló léptetése után. */
+function balLoadHandoverNote(){
+  if(gameMode!=="career")return;
+  const c=S.balLoadPrev;
+  if(!c||c.season!==(S.seasonNumber||1))return;
+  if((S.idx||0)<BAL_LOAD_CARRY_ROUNDS)return;
+  if(S.balLoadHandover===c.season)return;
+  S.balLoadHandover=c.season;
+  const b=teamBalance();
+  if(!b.ok)return;
+  addLine(`⚖️ Letelt a szezon első fele: a csapategyensúly teher-mérője a tavalyi mintáról az IDEI ${BAL_LOAD_CARRY_ROUNDS} forduló eloszlására állt át. Teher: <b>${Math.round((b.load||0)*100)}%</b> · meccsenkénti csapaterő-bónusz: <b>+${b.bonus.toFixed(2)}</b>.`,"m life");}
 /* A TELJES mérőszám. Minden részt visszaad, mert a HUB-panel ugyanezekből a
    számokból írja le, HOGYAN jött ki — nem másolja le a képletet. */
 function teamBalance(){
   const out={ok:false,load:null,skill:null,rating:null,score:0,bonus:0,
              loadN:null,skillN:null,cv:null,loadTop:null,neutral:[],
-             cap:1,ease:0,rosterCv:null};
+             cap:1,ease:0,rosterCv:null,loadCarry:false,loadCarryLeft:0};
   if(gameMode!=="career"||!careerPool)return out;
   const roster=(typeof fullCareerRoster==="function"?fullCareerRoster():[]).filter(Boolean);
   if(!roster.length)return out;
@@ -31863,7 +31925,13 @@ function teamBalance(){
   out.cap=cap;out.ease=balEase();
   /* ---- 1) TEHER: gól + gólpassz eloszlása ---- */
   {const names=roster.map(p=>p.n);
-   const w=names.map(n=>((S.scorers&&S.scorers[n])||0)+((S.assists&&S.assists[n])||0));
+   const cur=names.map(n=>((S.scorers&&S.scorers[n])||0)+((S.assists&&S.assists[n])||0));
+   /* SZEZONHATÁR: a szezon első felében a tavalyi minta is beleszámít — lásd
+      a balLoadCarry fölötti indoklást. */
+   const carry=balLoadCarry();
+   const w=carry?cur.map((v,i)=>v+(carry.w[names[i]]||0)):cur;
+   out.loadCarry=!!carry;
+   out.loadCarryLeft=carry?Math.max(0,BAL_LOAD_CARRY_ROUNDS-(S.idx||0)):0;
    const tot=w.reduce((a,b)=>a+b,0);
    if(tot<6){out.load=0.5;out.neutral.push("teher");}   /* még kevés a minta */
    else{
@@ -32072,6 +32140,10 @@ function teamBalanceHtml(){
   const teherReszlet=b.loadN!=null
     ? `a gólok és gólpasszok <b>${hu(b.loadN.toFixed(1))}</b> emberre oszlanak`
       +(b.loadTop?`, a legterheltebb <b>${esc(shortName(b.loadTop.n))}</b> (${pct(b.loadTop.share)}%)`:"")
+      /* SZEZONHATÁR: mondjuk ki, hogy még a tavalyi minta is benne van, és
+         mikor veszi át a szót az idei — enélkül a 15. forduló utáni ugrás
+         magyarázat nélkül maradna. */
+      +(b.loadCarry?` <span style="color:var(--dim2)">— a tavalyi szezon eloszlása is beleszámít még ${b.loadCarryLeft} fordulón át, utána az idei ${BAL_LOAD_CARRY_ROUNDS} forduló veszi át</span>`:"")
     : `még nincs elég gól/gólpassz a szezonban`;
   const skillReszlet=b.skillN!=null
     ? `a képességek <b>${hu(b.skillN.toFixed(1))}</b> emberen ülnek`
@@ -35723,6 +35795,11 @@ function startNextCareerSeason(){
   /* Új szezon: a tartós hiányzások is lezárulnak (a nyár elmossa a sárga/piros
      lapos eltiltást és a szezon közbeni sérüléseket). */
   S.unavailable={};S.replacementChoice={};
+  /* CSAPATEGYENSÚLY — A TEHER ÁTMENTÉSE. MÉG a nullázás ELŐTT: az imént
+     lezárult idény gól/gólpassz-eloszlása a következő szezon első felében
+     tovább él, hogy a mérő ne essen vissza a semleges 50%-ra. Lásd a
+     balLoadCarry fölötti indoklást. */
+  balLoadFreeze(S.seasonNumber);
   S.scorers={};S.assists={};S.mvps={};S.goodForm={};S.badForm={};S.playerReds={};S.playerInjuries={};S.seasonSaves={};S.seasonCleanSheets={};S.seasonMatches={};S.tierQuoteCount={};
   S.grudge=new Set();S.fixtures=[];S.playing=false;
   S.discWatch={};S.hotStreak={};S.goallessStreak={};S.unbeatenStreak=0;S.cleanSheetStreak=0;S.ratingAdj={};S.clubScoutSpinsUsed=0;S.twEventUsed=0;   /* a nyári esemény-keret is szezononként töltődik */
@@ -39749,6 +39826,7 @@ function saveGame(){
         /* skill-padló: türelem-számláló, szezonos kvóták, első kémia megvolt-e */
         matchesSinceSkill:S.matchesSinceSkill,seasonNewSkills:S.seasonNewSkills,
         balSkillMatches:S.balSkillMatches,balSkillsSeason:S.balSkillsSeason,
+        balLoadPrev:S.balLoadPrev,balLoadHandover:S.balLoadHandover,
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
         guideOn:S.guideOn,guideSeen:S.guideSeen,
         seasonStartStrength:S.seasonStartStrength,summerPaidAfterSeason:S.summerPaidAfterSeason,
@@ -40120,6 +40198,10 @@ function applySavedGame(d){
      betöltés utáni mérkőzésektől kezd számolni. */
   S.balSkillMatches=d.S.balSkillMatches||0;
   S.balSkillsSeason=d.S.balSkillsSeason||0;
+  /* A tavalyi teher-minta. Régi mentésben nincs — ott a mérő a megszokott
+     módon, az idei szezon adataiból dolgozik (a szezon elején semlegesen). */
+  S.balLoadPrev=d.S.balLoadPrev||null;
+  S.balLoadHandover=d.S.balLoadHandover||null;
   S.seasonNewSkills=d.S.seasonNewSkills||0;
   S.seasonSkillCont=d.S.seasonSkillCont||0;
   S.firstChemDone=!!d.S.firstChemDone;
