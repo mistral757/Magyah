@@ -62,6 +62,21 @@ Miért nem a draftnál? Mert a draft előtt még nem tudod, milyen kereted lett.
 Egy szezon leforgatása után viszont már látod, kik a te embereid — a
 stílusválasztás így **felismerés**, nem vakon fogadás.
 
+**A szezonjelentés gombja viszi oda (v3.1.25).** A jelentés alatti továbblépő
+gomb felirata ilyenkor nem „Irány a pályára →", hanem **„🎯 Mehet a
+csapatstílus választás!"**, és a Csapatstílus almenüt nyitja ki teljes
+menü-módban — nem a következő idény kihívásait. A HUB többi doboza (és vele a
+továbblépő gomb) ilyenkor eltűnik, tehát a döntést nem lehet véletlenül
+átugrani. Amint megvan a filozófia, ugyanaz a gomb visszakapja a szokásos
+szerepét a szokásos helyén: „Irány a pályára →" → szezon eleji kihívások →
+kezdőrúgás.
+
+**A nyitás időzítése.** A „legalább egy lezárt szezon" feltétel a
+`seasonClosed` jelzőből dolgozik (a 30. forduló lezárásakor áll be), nem a
+szezonszámból: az csak a következő idény indításakor lép, vagyis a verdikt és
+a szezonjelentés közti teljes szakaszban még nem engedte volna a választást —
+pont ott, ahol a döntés helye van.
+
 ### 2.2 Megváltoztatható-e
 
 **Alapszabály: nem.** A stílus a klub identitása, és a mérföldköveinek java
