@@ -2680,7 +2680,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.21";
+const APP_VERSION="3.1.22";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9108,8 +9108,7 @@ function skillAxisBonus(){
     playerSkills(sl.player.n).forEach(inst=>{
       const sk=inst.skill;if(!sk)return;
       /* félkész (több lépcsős) skill arányosan kevesebbet ad */
-      const need=inst.stagesNeeded||1;
-      const prog=Math.max(0,Math.min(1,(inst.stagesCompleted!==undefined?inst.stagesCompleted:need)/need));
+      const prog=skillProgOf(inst);
       const types=[sk.type].concat(sk.combo?sk.combo.map(c=>c.type):[]);
       types.forEach(t=>{
         if(SKILL_AXIS[t])b[SKILL_AXIS[t]]+=SKILL_AXIS_UNIT*prog;
@@ -9765,6 +9764,17 @@ const SKILLS=[
     hozol be (kézi csere a meccs közben, vagy hiányzó helyére beálló pótlás),
     és megmarad a régi, ritka esemény is, amikor a PADON ÜLVE ugrik be egy
     gólért. A val a becserélt játékos gólszerzési súlyának szorzója. */
+ /* ---- KÉT PASSZOS SKILL ----
+    Mindkettő KÖZÉPPÁLYÁS-skill, és mindkettő az assistw típusra ül — ezért a
+    SKILL_AXIS-on keresztül automatikusan a PASSZ-tengelyt tolja meg, vagyis
+    javítja a passz-súlyú taktikák illeszkedését (Labdatartás, Totális futball).
+    A saját, egyedi hatásukat a mellettük álló extra mező hordozza. */
+ {id:"mf_forcer",cat:"KOZEPPALYAS",name:"Kényszerítő",
+  desc:"A falazásból élő játék mestere: megemeli a csapat Passz-tengelyét (jobb taktika-illeszkedés), és a SAJÁT Passz-attribútuma az edzéstervnél is gyorsabban fejlődik.",
+  type:"assistw",val:2.2,attrTrain:{key:"passz",val:1.5}},
+ {id:"mf_cross",cat:"KOZEPPALYAS",name:"A tökéletes beadás",
+  desc:"A beadásai megtalálják a középcsatárt és a felfutó középső védőt — az ő gólesélyük jelentősen nő —, és a csapat gólpassz-esélye is enyhén emelkedik.",
+  type:"assistw",val:2.0,crossMaster:true},
  {id:"fw_supersub",cat:"CSATAR",name:"Csereként bejön gólt lőni",desc:"Ha csereként áll be a pályára, jóval nagyobb eséllyel ő a gólszerző, amíg a pályán van. Ráadásul a padon ülve is beugorhat egy gólért.",type:"supersub",val:3.5},
  /* ===== BL EGYÉNI ARANY-DÍJAK (a Bajnokok Ligája gólkirálya / gólpassz-
     királya / kapus-királya kapja; erős, tartós special skillek) ===== */
@@ -11113,8 +11123,13 @@ function bumpAttr(entry,key,dir){
   if(!entry.attrs)initPlayerAttrs(entry);
   const prof=ATTR_PROFILE[(entry.pos&&entry.pos[0])||"KKP"]||ATTR_PROFILE.KKP;
   const base=entry.startRating||70;
-  const ceil=Math.min(attrCapFor(key),base+(prof[key]||0)+ATTR_SPEC_CEIL);
-  const floor=Math.max(40,base+(prof[key]||0)-ATTR_SPEC_FLOOR);
+  /* A SÁV IS SKÁLÁZÓDIK (lásd a trainScale indoklását): egy abszolút ±30/12-es
+     tér a 130-as Ratingű játékosnál arányosan feleakkora, mint a 65-ösnél —
+     ettől halványul el az edzés. A kemény attribútum-plafon (attrCapFor)
+     változatlanul fölötte áll, tehát a sáv nem tud kitörni belőle. */
+  const _ts=trainScale(entry);
+  const ceil=Math.min(attrCapFor(key),base+(prof[key]||0)+ATTR_SPEC_CEIL*_ts);
+  const floor=Math.max(40,base+(prof[key]||0)-ATTR_SPEC_FLOOR*_ts);
   entry.attrs[key]=Math.max(floor,Math.min(ceil,entry.attrs[key]+dir));}
 /* A passzív csatorna másodlagos plafonja: a születési sebesség +15%-a (de a
    kemény plafont sosem lépi át). Ha nincs rögzített születési érték
@@ -11303,6 +11318,37 @@ function devCeiling(entry){
 const TRAIN_MAIN_PTS=0.8;    /* fő edzés: pont/meccs a választott attribútumra */
 const TRAIN_SEC_PTS=0.4;     /* mellék edzés: a fő fele */
 const TRAIN_SLOW=0.12;       /* a két nem edzett attribútum ennyivel lassabban gyűlik */
+/* ================= AZ EDZÉS EREJE KÖVESSE A CSAPAT SZINTJÉT =================
+   BEJELENTETT PANASZ: "az edzés jelentősége elhalványul, ahogy fejlődik a
+   csapat. Egy szezon alatt akár 15 attribútumszint fejlődés is lehet, erre ha
+   rájön az edzés 1-2 szintje, az nevetséges."
+
+   A PANASZ JOGOS, ÉS A SZERKEZETBŐL KÖVETKEZIK. Két csatorna mozgatja az
+   attribútumokat, és csak az egyik skálázódik:
+     · a RATING-HORGONY (syncAttrsToRating) 1:1-ben viszi MIND az ötöt a
+       Ratinggel. Infinityben a Rating szezononként 10-15-öt is nőhet, tehát ez
+       a csatorna együtt nő a játékkal;
+     · az EDZÉS a poszt-profiltól való ELTÉRÉST építi, egy ABSZOLÚT
+       ±ATTR_SPEC_CEIL/FLOOR sávon belül, meccsenként fix 0.8 ponttal.
+   A 15-ös lépésköz és a ±30/12-es sáv a 60-99-es Rating-világhoz készült. Egy
+   65-ös játékosnál a +30-as specializációs tér a Ratingje 46%-a; egy 130-asnál
+   már csak 23%. Ugyanaz a szezonnyi edzés tehát évről évre kisebb ARÁNYT
+   mozdít — pontosan ezt érezni.
+
+   A JAVÍTÁS: mindkettő skálázódjon a játékos szintjével, azonos szorzóval.
+   A horgony a TRAIN_SCALE_REF (80-as Rating): ott a szorzó pontosan 1.0, tehát
+   a klasszikus, 100 alatti játék betűre változatlan. Fölötte lineárisan nő, egy
+   plafonnal, hogy az endgame se szaladjon el.
+   Mérve, 40 meccses szezonra: 80-as Ratingnél 32 pont (≈2.1 lépés) — mint eddig;
+   130-asnál 52 pont (≈3.5 lépés), és a specializációs tér is +49-re tágul,
+   vagyis az edzés ugyanazt az ARÁNYT mozdítja, mint 80-on.
+   AMIT NEM CSINÁL: nem gyorsítja a Rating-fejlődést, és nem tágítja a kemény
+   attribútum-plafont (attrCapFor). Csak a specializáció marad arányos. */
+const TRAIN_SCALE_REF=80;    /* ezen a Ratingen a szorzó pontosan 1.0 */
+const TRAIN_SCALE_MAX=2.2;   /* és efölé nem megy, hogy az endgame se szaladjon el */
+function trainScale(entry){
+  const r=(entry&&(entry.startRating||entry.peak))||TRAIN_SCALE_REF;
+  return Math.max(1,Math.min(TRAIN_SCALE_MAX,r/TRAIN_SCALE_REF));}
 const TRAIN_GROUP_MAX=2;     /* hány poszt-csoport választható edzésenként */
 const TRAIN_STATS=[
   {k:"ved",  n:"Védekezés",  d:"a védekező munka minősége"},
@@ -11502,8 +11548,20 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
       if(isTrain)_tlog.pts[key]+=val;
       ap[key]=(ap[key]||0)+val;};
     if(_tr){
-      if(_tr.main)addA(_tr.main,TRAIN_MAIN_PTS*share,true);
-      if(_tr.sec) addA(_tr.sec, TRAIN_SEC_PTS*share,true);}
+      const _ts=trainScale(entry);   /* az edzés ereje a játékos szintjével nő */
+      if(_tr.main)addA(_tr.main,TRAIN_MAIN_PTS*_ts*share,true);
+      if(_tr.sec) addA(_tr.sec, TRAIN_SEC_PTS*_ts*share,true);}
+    /* ---- ATTRIBÚTUM-FEJLESZTŐ SKILL (Kényszerítő) ----
+       UGYANABBA a csatornába folyik, mint az edzésterv és a személyi edző:
+       ugyanaz a kor-görbe, underdog-szorzó és globális tempó hat rá, és a
+       trainScale-lel EGYÜTT nő — így a skill sem halványul el a szinttel.
+       Az érték szándékosan a fő edzés (0.8) FÖLÖTT van: a leírás azt ígéri,
+       hogy "az edzéstervnél is gyorsabban", és ezt tartani kell. A mérlegbe
+       (isTrain=true) beleszámít, tehát a játékos-lapon látszik, mit hozott. */
+    playerSkills(p.n).forEach(_i=>{
+      const _at=_i.skill&&_i.skill.attrTrain;
+      if(!_at)return;
+      addA(_at.key,_at.val*skillProgOf(_i)*trainScale(entry)*share,true);});
     /* ---- SZEMÉLYI EDZŐ: AZ ATTRIBÚTUM-MESTEREK ----
        UGYANABBA a csatornába folynak, mint az edzésterv pontjai, tehát a
        kor-görbe (ageScaleAttr), az underdog-szorzó, a globális tempó és az
@@ -18367,6 +18425,39 @@ function comboEffFor(inst,type){
   if(type==="goalw"||type==="assistw")return 1+(sub.val-1)*pw;
   if(type==="formlock")return sub.val;
   return sub.val*pw;}
+/* Egy skill-példány KÉSZÜLTSÉGE 0..1 között (a többlépcsős skillek arányosan
+   kevesebbet adnak). Eddig ez a számítás a skillAxisBonus-ban élt beágyazva;
+   kiemelve azért, hogy az attribútum-fejlesztő skillek is ugyanazt használják. */
+function skillProgOf(inst){
+  if(!inst)return 0;
+  const need=inst.stagesNeeded||1;
+  const done=inst.stagesCompleted!==undefined?inst.stagesCompleted:need;
+  return Math.max(0,Math.min(1,done/need));}
+/* ================= A TÖKÉLETES BEADÁS (mf_cross) =================
+   A többi passzos skill azt szabja, KI adja a gólpasszt (assistw). Ez az
+   egyetlen, ami azt szabja, KIHEZ ér oda a labda: a klasszikus beadás két
+   címzettje a középcsatár és a szögletnél felfutó középső védő. Ezért NEM a
+   gólpassz-súlyt emeli — az az adó oldala —, hanem a GÓLSZERZŐ-súlyt a CS és
+   a KV poszton, a pályán lévő skill-tulajok készültségével arányosan.
+   MIÉRT NAGYOBB A KV SZORZÓJA: a GOALW alapsúly a középcsatárnál 5, a középső
+   védőnél 0.5 — tízszeres különbség. Azonos szorzóval a védőnél gyakorlatilag
+   semmi nem látszana, ezért kap többet; így MINDKÉT címzettnél érezhető, de a
+   csatár marad a fő cél. */
+function crossMasterPower(){
+  let n=0;
+  slots.forEach(sl=>{if(!sl.player)return;
+    playerSkills(sl.player.n).forEach(i=>{if(i.skill&&i.skill.crossMaster)n+=skillProgOf(i);});});
+  return n;}
+function crossTargetMult(pos){
+  const n=crossMasterPower();
+  if(!n)return 1;
+  if(pos==="CS")return 1+0.45*n;
+  if(pos==="KV")return 1+1.20*n;
+  return 1;}
+/* Az "általános gólpassz-esély is enyhén nő": a gólok 75%-ához jár gólpassz,
+   ezt tolja fölfelé, kemény plafonnal (0.90) — gólpassz nélküli gól maradjon. */
+function crossAssistChance(base){
+  return Math.min(0.90,base+0.04*crossMasterPower());}
 function sumSkillEffect(name,type){
   return playerSkills(name).filter(i=>i.skill.type===type||(i.skill.combo&&i.skill.combo.some(c=>c.type===type)))
     .reduce((s,i)=>s+(i.skill.type===type?skillEffVal(i):comboEffFor(i,type)),0);}
@@ -22989,7 +23080,7 @@ function playMatch(){
       const beforeDiff=gf-ga;
       if(side==="us"){
         gf++;
-        const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga));
+        const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*crossTargetMult(slots[x.idx].pos)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga));
         const dramaScorer=active[si].p;
         mScore[dramaScorer.n]=(mScore[dramaScorer.n]||0)+1;recordScorer(dramaScorer.n);
         updateGoallessStreak(dramaScorer.n,true);
@@ -23040,7 +23131,7 @@ function playMatch(){
       updateGoallessStreak(scorer.n,true);
       let atxt="",asstSk=null,asstName=null;
       /* Párharcban a gólpassz ténye és adója is a közös listából jön. */
-      if(duelGoal?!!duelGoal.assist:Math.random()<0.75){
+      if(duelGoal?!!duelGoal.assist:Math.random()<crossAssistChance(0.75)){
         let ai;do{ai=weightedPick(active,(x,idx)=>idx===redIdx?0:(ASSTW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"assistw")*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*mileWeight(MILE,x.p.n));}while(ai===si);
         if(duelGoal){const _a=active.findIndex(a=>a.p.n===duelGoal.assist);if(_a>=0&&_a!==si)ai=_a;}
         const asst=active[ai].p;
