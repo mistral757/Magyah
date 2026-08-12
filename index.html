@@ -2708,7 +2708,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.33";
+const APP_VERSION="3.1.34";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8529,10 +8529,12 @@ function recordScorer(name){
      minden találat átfut rajta, a tizenegyestől a hosszabbításig. */
   try{msNoteGoal(name);}catch(e){}
   if(euroActive()){euroAddStat("scorers",name,teamName,true);
+    try{euroChalMark(name);}catch(e){}
     const b=seasonEuroBucket();b.scorers[name]=(b.scorers[name]||0)+1;}
   else S.scorers[name]=(S.scorers[name]||0)+1;}
 function recordAssist(name){
   if(euroActive()){euroAddStat("assists",name,teamName,true);
+    try{euroChalMark(name);}catch(e){}
     const b=seasonEuroBucket();b.assists[name]=(b.assists[name]||0)+1;}
   else S.assists[name]=(S.assists[name]||0)+1;}
 /* ---- E3: EGYENES KIESÉSES SZAKASZ ----
@@ -8765,11 +8767,12 @@ function euroEnterMain(){
     E.stage="group";E.md=0;E.idx=0;
     E.fixtures=buildEuroUserFixtures();
     addLine(`🏆 Bejutottatok a főtáblára! A csoportban ${E.groups[E.userG].filter(i=>i!==E.userIdx).map(i=>E.teams[i].n).join(", ")} vár rátok.`,"m life");
-    showEuroScreen();
   }else{
     addLine(`🏆 Bejutottatok a főtáblára! Innen egyenes kiesés a döntőig.`,"m life");
-    euroStartRound(MK_ROUNDS[0],E.teams.map((t,i)=>i));
-    showEuroScreen();}}
+    euroStartRound(MK_ROUNDS[0],E.teams.map((t,i)=>i));}
+  /* KUPA-KIHÍVÁSOK: a FŐTÁBLA indulásakor — a selejtező nem része a
+     sorozatnak, ezért a kihívások csak most érkeznek. */
+  cupChallengeOffer(()=>{showEuroScreen();try{saveGame();}catch(e){}});}
 /* A user párharcán KÍVÜLI meccsek szimulálása az adott meccsnapon. */
 function euroSimKnockoutLeg(leg){
   const E=S.euro;
@@ -16870,6 +16873,9 @@ function chCalibratedTarget(type,diff,rounds,inverse){
     if(err<bestErr-1e-9){bestErr=err;best=t;}}
   return best==null?null:Math.max(floor,best);}
 function genChallenge(scope,diff,ctx){
+  /* KUPASOROZAT: saját katalógus, saját mérce — a bajnoki sablonoknak (bajnoki
+     forduló, szezonhatár) itt semmi értelme nem volna. */
+  if(scope==="cup")return genCupChallenge(diff,ctx);
   const mult=challengeDiffMult(diff);
   const short=scope==="short";
   /* A rövid kihívás határideje KONKRÉT meccsszám (a felvételtől számítva), nem
@@ -17195,7 +17201,10 @@ function genChallenge(scope,diff,ctx){
    legdurvább büntetések (játékos-vesztés) csak a hosszú+nehéz challenge-eknél. */
 function genReward(scope,diff,ctx){
   const mult=challengeDiffMult(diff);
-  const money=Math.round(challengeMoneyScale(ctx)*mult*(scope==="long"?1.5:1)/500)*500;
+  /* A KUPA a hosszú és a rövid között áll: egyetlen sorozat, de nagy tét —
+     ezért a hosszú kihívás jutalom-készletét kapja, valamivel szerényebb
+     pénzzel. */
+  const money=Math.round(challengeMoneyScale(ctx)*mult*(scope==="long"?1.5:scope==="cup"?1.35:1)/500)*500;
   const pool=[
     {kind:"money",amount:money,desc:`+${fmtFt(money)}`},
     {kind:"morale",amount:Math.round(10*mult),desc:`+${Math.round(10*mult)} morál`},
@@ -17212,7 +17221,7 @@ function genReward(scope,diff,ctx){
   pool.push({kind:"attrSpin",desc:"+1 ingyen képesség-keresés a nyáron"});
   pool.push({kind:"boostDiscount",desc:"az ifi- és öreg-boost 10%-kal olcsóbb (tartós)"});
   pool.push({kind:"buyDiscount",desc:"igazolásoknál kis eséllyel 25% kedvezmény (tartós)"});
-  if(scope==="long"){
+  if(scope==="long"||scope==="cup"){
     pool.push({kind:"freePlayer",desc:"a következő igazolásod INGYEN"});
     pool.push({kind:"salaryUp",desc:"edzői fizetésemelés: +10% szezonos büdzsé (tartós)"});
     pool.push({kind:"invest",desc:"befektetés: most beteszel egy összeget, jövőre duplán kapod vissza"});}
@@ -17220,7 +17229,7 @@ function genReward(scope,diff,ctx){
 function genPunishment(scope,diff,ctx){
   const mult=challengeDiffMult(diff);
   const money=Math.round(challengeMoneyScale(ctx)*mult*0.8/500)*500;
-  const fm=scope==="long"?5:3;
+  const fm=scope==="long"?5:scope==="cup"?4:3;
   const pool=[
     {kind:"money",amount:money,desc:`−${fmtFt(money)}`},
     {kind:"morale",amount:Math.round(12*mult),desc:`−${Math.round(12*mult)} morál`},
@@ -17232,12 +17241,14 @@ function genPunishment(scope,diff,ctx){
   pool.push({kind:"lockTransfers",desc:"a szezon közbeni átigazolások zárva — legközelebb nyáron"});
   pool.push({kind:"benchLock",desc:"egy játékosodat egy szezonon át nem cserélheted le"});
   pool.push({kind:"buySurcharge",desc:"a következő 3 igazolásod 10%-kal drágább"});
-  if(scope==="long"){
+  if(scope==="long"||scope==="cup"){
     pool.push({kind:"loseSkill",desc:"egy játékos elveszít egy skillt"});
     pool.push({kind:"freezeAcademy",desc:"az ifi-akadémia befagy 1 szezonra"});
     pool.push({kind:"scoutDown",desc:"a scoutod veszít egy csillagot"});
     pool.push({kind:"salaryCut",desc:"fizetés-megsapkázás: −10% szezonos büdzsé"});
-    if(diff==="hard")pool.push({kind:"losePlayer",desc:"egy játékos távozik a keretből"});}
+    /* A KERET CSONKÍTÁSA a szezon léptékű büntetés marad: egyetlen elbukott
+       kupasorozatért nem veszíthetsz embert. */
+    if(diff==="hard"&&scope==="long")pool.push({kind:"losePlayer",desc:"egy játékos távozik a keretből"});}
   return pick(pool);}
 /* Egy teljes felajánlott challenge összeállítása. */
 let _challengeIdCtr=0;
@@ -17257,6 +17268,10 @@ function buildChallengeOffer(scope,ctx){
   let deadline;
   if(goal.seasonSpan){
     deadline={kind:"season",value:(S.seasonNumber||1)+goal.seasonSpan};
+  }else if(scope==="cup"){
+    /* A KUPA-KIHÍVÁS HATÁRIDEJE MAGA A SOROZAT: a most futó kampány sorszámára
+       jár le, és a kampány lezárásakor értékelődik ki (cupChallengeResolve). */
+    deadline={kind:"cup",value:S.cupRunNo||0};
   }else if(scope==="short"){
     /* a rövid határidő sosem lóg túl a szezon végén (30. forduló) — így a
        késői felvételű kihívás is legkésőbb a szezonzárón kiértékelődik */
@@ -17333,7 +17348,13 @@ const CH_ABSOLUTE_TYPES=["unbeatenStreak","cleanStreak","bigHaul"];
    egész szezonban 0-n állt. Ahhoz, hogy "teljesüljön", 114%-os illeszkedés
    kellett volna. Ugyanez állt a kezdő 11 fiataljaira, az új taktika szintjére
    és a nehézség-emelésre is. */
-const CH_STATE_TYPES=["tacticFit","youthXI","tacticLevel","diffRaise"];
+/* A KUPA-KIHÍVÁSOK mind ÁLLAPOT-jellegűek: a mérték a FUTÓ kampány saját
+   mérlege, a kampány pedig pontosan a vállaláskor kezdődik — nincs mit
+   levonni belőle (lásd a kupa-kihívás modult). */
+const CH_CUP_TYPES=["cupWin","cupDepth","cupGroupWin","cupGroupLoss","cupLoss",
+  "cupComeback","cupKing","cupAllMatch","cupScalps","cupAwayHaul","cupHomeHaul",
+  "cupAgg","cupCleanSheets","cupConceded","cupPlayerGoals"];
+const CH_STATE_TYPES=["tacticFit","youthXI","tacticLevel","diffRaise"].concat(CH_CUP_TYPES);
 function challengeRawValue(ch){
   switch(ch.type){
     case "teamWins":return S.W||0;
@@ -17371,6 +17392,9 @@ function challengeRawValue(ch){
     case "chemPairsDone":return chCompleteChemPairs();
     case "skillsComplete":return chCompleteSkills();
   }
+  /* KUPA-KIHÍVÁSOK: a futó kampány menetelés-naplójából (lásd cupChalValue). */
+  if(CH_CUP_TYPES.indexOf(ch.type)>=0){
+    try{return cupChalValue(ch);}catch(e){return 0;}}
   return 0;}
 /* Hány lejátszott bajnoki meccs felel meg a feltételnek ebben a szezonban. */
 function chCountFixtures(fn){
@@ -17405,6 +17429,16 @@ function chBestNewStarterMatches(){
    semmi, tehát minden más kihívás-típus változatlan marad. */
 function challengeLiveNote(ch){
   if(!ch)return "";
+  /* KUPA: a "mindegyik meccsen eredményes" haladása 0/1-en áll a sorozat
+     végéig — a puszta szám semmit nem mondana arról, ki van még versenyben. */
+  if(ch.type==="cupAllMatch"){
+    const st=(typeof cupChalStat==="function")?cupChalStat():null;
+    if(!st||!st.n)return "Még nincs lejátszott kupameccsetek.";
+    const c=(S.euro&&S.euro.chal&&S.euro.chal.contrib)||{};
+    const all=Object.keys(c).filter(n=>c[n]>=st.n);
+    if(!all.length)return `${st.n} kupameccs után már senki nem eredményes mindegyiken — ez a kihívás elveszett.`;
+    return `${all.map(n=>esc(shortName(n))).join(", ")} eddig mind a(z) ${st.n} meccsen eredményes volt`
+      +(st.n<CUP_ALLMATCH_MIN?` (legalább ${CUP_ALLMATCH_MIN} meccs kell)`:"")+".";}
   if(ch.type==="newStarter"){
     const m=S.chNewStarterMatches||{};
     const rows=Object.entries(m).sort((a,b)=>b[1]-a[1]);
@@ -17766,7 +17800,8 @@ function activeChallengeCount(scope){return (S.activeChallenges||[]).filter(c=>c
    A BÓNUSZ LEGFELJEBB +1, akkor is, ha mindkét helyen teljesített kihívás ül —
    a cél a megrekedés feloldása, nem a kihívás-halmozás. */
 const CH_BONUS_SLOT_ROUND=15;
-function challengeSlotBase(scope){return scope==="short"?CH_MAX_SHORT:CH_MAX_LONG;}
+function challengeSlotBase(scope){
+  return scope==="short"?CH_MAX_SHORT:scope==="cup"?CH_MAX_CUP:CH_MAX_LONG;}
 function challengeSlotBonus(scope){
   if((S.idx||0)<CH_BONUS_SLOT_ROUND)return 0;
   const list=(S.activeChallenges||[]).filter(c=>c.scope===scope);
@@ -17808,6 +17843,7 @@ function acceptChallenge(ch){
    határidővel, nehézség-színnel; téma-változókkal, üresen elrejtve. */
 function challengeDeadlineText(ch){
   if(!ch.deadline)return "";
+  if(ch.deadline.kind==="cup")return "a sorozat végéig";
   if(ch.deadline.kind==="round"){
     const left=ch.deadline.value-(S.idx||0);
     if(left<=0)return "lejárt";
@@ -17849,7 +17885,7 @@ function renderChallengePanel(){
         <span class="chProg" style="color:${met?"var(--grass)":"var(--gold)"}">${met?"✓":challengeProgressText(ch)}</span>
         <span class="chInfo">
           <span class="d">${esc(ch.desc)}</span>
-          <span class="m"><span style="color:${col}">${challengeDiffLabel(ch.difficulty)}</span> · ${ch.scope==="short"?"évszak":"szezon"} · ${challengeDeadlineText(ch)} · 🏆 ${esc(ch.reward.desc)} / ⚠ ${esc(ch.punishment.desc)}</span>
+          <span class="m"><span style="color:${col}">${challengeDiffLabel(ch.difficulty)}</span> · ${ch.scope==="short"?"évszak":ch.scope==="cup"?"kupa":"szezon"} · ${challengeDeadlineText(ch)} · 🏆 ${esc(ch.reward.desc)} / ⚠ ${esc(ch.punishment.desc)}</span>
           <span class="chBar"><span style="width:${Math.round(frac*100)}%;background:${met?"var(--grass)":"var(--gold)"}"></span></span>
         </span>
       </div>`;});
@@ -17901,7 +17937,9 @@ function showChallengeOffers(scope,count,resumeCb,opening,opts){
   $("scWindow").scrollIntoView({behavior:"smooth"});
   guideFire("challenge:first");}
 function renderChallengeOffers(scope,resumeCb,opening){
-  $("twTitle").textContent=scope==="short"?"🎯 Évszak-kihívások":(opening?"🎯 Kezdő kihívások":"🎯 Szezon-kihívások");
+  const cupNev=(scope==="cup"&&S.euro&&EURO_COMPS[S.euro.comp])?EURO_COMPS[S.euro.comp].n:"kupasorozat";
+  $("twTitle").textContent=scope==="cup"?`🏆 ${cupNev} — kupa-kihívások`
+    :scope==="short"?"🎯 Évszak-kihívások":(opening?"🎯 Kezdő kihívások":"🎯 Szezon-kihívások");
   const bonus=challengeSlotBonus(scope);
   const limit=challengeSlotLimit(scope);
   const taken=activeChallengeCount(scope);
@@ -17910,12 +17948,14 @@ function renderChallengeOffers(scope,resumeCb,opening){
   const doneNames=bonus
     ? (S.activeChallenges||[]).filter(c=>c.scope===scope&&c.metLatched).map(c=>c.desc)
     : [];
-  let html=`<div class="chOfferIntro">${scope==="short"
+  let html=`<div class="chOfferIntro">${scope==="cup"
+    ? `Most indul a(z) <b>${esc(cupNev)}</b>. Ezek a kihívások CSAK erre a sorozatra szólnak, és a sorozat lezárásakor dőlnek el — elvállalni nem kötelező.`
+    : scope==="short"
     ? "Rövid, kisebb tétű kihívások az évszakra. Elvállalni nem kötelező."
     : (opening
         ? "A legelső szezonod előtt állsz. Ezek hosszú, nagy tétű kihívások az egész szezonra — elvállalni nem kötelező."
         : "Hosszú, nagy tétű kihívások a szezonra. Elvállalni nem kötelező.")}<br>
-    Egyszerre <b>${limit}</b> ${scope==="short"?"rövid":"hosszú"} kihívás lehet aktív (most ${taken}/${limit}).</div>
+    Egyszerre <b>${limit}</b> ${scope==="short"?"rövid":scope==="cup"?"kupa-":"hosszú"} kihívás lehet aktív (most ${taken}/${limit}).</div>
     ${bonus?`<div class="chOfferIntro" style="border-left:3px solid var(--grass);padding-left:8px">
       ✅ <b>+1 bónusz hely.</b> A helyeid beteltek, de <b>„${esc(doneNames[0])}”</b> már biztosan meglesz — a célt elérted, és többé nem veszíthető el. A határidejéig ottmarad a helyén, ezért erre az évszakra kapsz egy plusz helyet.</div>`:""}`;
   _challengeOffers.forEach((ch,i)=>{
@@ -18307,6 +18347,10 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      A szezon első felében ez tartja életben a teher-mérőt (lásd balLoadCarry);
      a balLoadHandover az átbillenés egyszeri bejelentésének jelzője. */
   balLoadPrev:null,balLoadHandover:null,
+  /* KUPA-KIHÍVÁSOK: a lejátszott kupasorozatok sorszáma. A kupa-kihívás
+     határideje ez a szám, ezért a MENTÉS RÉSZE — enélkül egy újratöltés után
+     a futó sorozat kihívásai azonnal lejárnának. */
+  cupRunNo:0,
   /* PANZER — a klub történetének kemény vonásai: {név: 0|1|2}. Mindenki
      egyszer kerül bele, és bent is marad (lásd stToughRecord). */
   toughSeen:{},
@@ -34533,7 +34577,14 @@ function euroFinishUserMatch(gf,ga){
   euroPathPush({k:E.stage==="qual"?"q":(E.stage==="group"?"g":"ko"),round:E.stage,
     qRound:E.stage==="qual"?E.qRound:null,
     md:E.stage==="group"?E.md:null,leg:E.stage==="group"?null:E.idx,
-    opp:fx.o.n,home:!!fx.home,neutral:!!fx.neutral,mine:gf,theirs:ga});
+    opp:fx.o.n,home:!!fx.home,neutral:!!fx.neutral,mine:gf,theirs:ga,
+    /* KUPA-KIHÍVÁS: a két csapaterő a mérkőzés pillanatában — ugyanaz a két
+       szám, amit a kupaképernyő a kezdőrúgás előtt kiírt. Ebből dől el, mi
+       számít "nálad erősebb" ellenfélnek (lásd cupChalStat). */
+    oovr:(fx.o&&typeof fx.o.dispOvr==="number")?fx.o.dispOvr:((fx.o&&fx.o.ovr)||0),
+    movr:teamStrength()});
+  /* KUPA-KIHÍVÁS: a lefújás könyveli, ki volt EZEN a meccsen eredményes. */
+  try{euroChalMatchDone();}catch(e){}
   euroRecordStats(E.teams[oi],ga,gf);
   if(ga===0){const gk=euroGK();if(gk)euroAddStat("cleanSheets",gk.n,teamName,true);}
   /* a saját szezon-szintű kupamérleg (a jelentéshez) */
@@ -34768,6 +34819,9 @@ function euroCampaignEndNow(kind){
          őrzi, a szavazáshoz viszont tudni kell, KI kapta — a kampány-objektum
          (és vele E.goldenAwards) pedig az endEuroCampaign-ben eldobódik. */
       awards:(E.goldenAwards||[]).filter(a=>a&&a.isOwn).map(a=>({name:a.name,label:a.label}))};}
+  /* KUPA-KIHÍVÁSOK: a sorozat lezárult, minden szükséges adat megvan (eredmény,
+     kiesés helye, egyéni királyi címek) — MÉG az S.euro eldobása előtt. */
+  try{cupChallengeResolve();}catch(e){}
   showEuroScreen();}
 /* Áll-e a hazai kupa → Konferencia-liga lánc ÉPP MOST? Egy helyen felelünk rá,
    mert három dolog függ tőle: a záró gomb felirata, az ünneplő képernyő
@@ -34809,6 +34863,289 @@ function euroMaybeCelebrate(){
       : "",
     meta:bits.join("<br>"),
     btn:chain?"Kezdhetjük a Konferencia-ligát! →":"Ünneplés vége →"});}
+/* ================= KUPA-KIHÍVÁSOK =================
+   A kihívás-rendszer eddig KIZÁRÓLAG a bajnokságról szólt: a célok a bajnoki
+   fordulókból számoltak (S.W, S.GF, S.scorers), a határidő meccsszám vagy
+   szezonszám volt. A kupasorozat — a szezon leglátványosabb, legnagyobb tétű
+   része — némán futott mellette: se vállalás, se tét, se jutalom.
+
+   Ez a réteg pótolja. A kihívások AKKOR érkeznek, amikor rányomsz, hogy
+   indulhat a sorozat (MK, KL, EL, BL), és PONTOSAN ADDIG élnek: a kampány
+   lezárásakor kiértékelődnek. Egy sorozat 9-13 mérkőzés, tehát a tét sűrűbb,
+   mint egy szezonos kihívásé, és minden fordulóban érezhető.
+
+   HÁROM DÖNTÉS, ami az egészet egyszerűvé teszi:
+
+   1. A MÉRÉS A MENETELÉS-NAPLÓBÓL (E.path) JÖN, nem külön számlálókból. A
+      napló minden mérkőzésedet rögzíti (hol, ki ellen, mennyi lett), és a
+      párharcok lezárását is. Ebből a győzelem, a vereség, a hazai/idegenbeli
+      gólzápor, a tiszta lap, az összesítés és a fordítás mind KISZÁMÍTHATÓ —
+      nincs mit elrontani, és egy régi mentés is helyesen mér. Egyetlen dolog
+      nem vezethető le belőle (ki volt eredményes MELYIK meccsen), annak van
+      saját, apró nyilvántartása (E.chal.contrib).
+
+   2. MIND ÁLLAPOT-KIHÍVÁS (CH_STATE_TYPES). A kupacél nem a vállalás óta
+      elért NÖVEKMÉNY, hanem a kampány saját mérlege — a kampány pedig
+      pontosan a vállaláskor kezdődik. Így a haladás mindig a valódi állást
+      mutatja, és nem kell startProgress-t levonni.
+
+   3. A SELEJTEZŐ NEM SZÁMÍT BELE. A kihívások a FŐTÁBLA indulásakor érkeznek:
+      ha van selejtező, előbb azt kell kiharcolni, és a felajánlás csak utána
+      jön (euroEnterMain). Aki a selejtezőn elakad és lecsúszik egy gyengébb
+      sorozatba, a MÁSIK sorozat főtábláján kap friss kihívásokat — nem az
+      vész el, amit el sem kezdett. */
+const CH_MAX_CUP=2;            /* egyszerre ennyi kupa-kihívás lehet aktív */
+const CH_CUP_OFFERS=3;         /* ennyit ajánlunk fel sorozatonként */
+const CUP_ALLMATCH_MIN=4;      /* ennyi meccs alatt nincs értelme a "mindegyiken eredményes"-nek */
+/* A körök MÉRETE (hány csapat van még versenyben) — ebből lesz a "legjobb 8"
+   fokozat sorozatfüggetlen. A hazai kupa 32-vel indul, az európaiak a
+   csoportkör után 16-tal. */
+const CUP_ROUND_SIZE={mk1:32,r16:16,mk2:16,qf:8,mk3:8,sf:4,mk4:4,final:2};
+/* Hány kört kell megjárni ADDIG a körig, amíg `size` csapat marad? A cél
+   sorozatonként más szám, a KÉRDÉS viszont ugyanaz ("juss be a legjobb 8
+   közé"), ezért a fokozatot innen fordítjuk le. 0 = ilyen kör nincs. */
+function cupDepthFor(comp,size){
+  const RS=(typeof compRounds==="function"?compRounds(comp):null)||[];
+  for(let i=0;i<RS.length;i++)if(CUP_ROUND_SIZE[RS[i]]===size)return i+1;
+  return 0;}
+/* Meddig jutottál: hányadik kieséses kört JÁTSZOTTAD MEG (1 = az első kör),
+   a győzelem eggyel a döntő fölött. Élőben is helyes, nem csak a végén. */
+function cupDepthNow(E){
+  if(!E)return 0;
+  const RS=(typeof compRounds==="function"?compRounds(E.comp):null)||[];
+  let deep=0;
+  (E.path||[]).forEach(r=>{
+    if(r.k!=="ko"&&r.k!=="tie")return;
+    const i=RS.indexOf(r.round);
+    if(i>=0&&i+1>deep)deep=i+1;});
+  if(E.result==="win")deep=RS.length+1;
+  return deep;}
+/* ---- A KAMPÁNY MÉRLEGE EGYETLEN OBJEKTUMBAN ----
+   Minden kupa-kihívás ebből olvas. A napló kétféle sorát használja: a
+   mérkőzéseket (k="g" csoportmeccs, k="ko" kieséses meccs) és a párharcok
+   lezárását (k="tie"). A selejtező sorai (k="q") SEHOL nem számítanak. */
+function cupChalStat(){
+  const out={n:0,wins:0,losses:0,gf:0,ga:0,cs:0,gPlayed:0,gLosses:0,
+    homeMax:0,awayMax:0,scalps:0,aggMax:0,comeback:0,
+    depth:0,groupRank:0,won:0,bestContrib:0,allMatch:0};
+  const E=S.euro;
+  if(!E)return out;
+  const path=E.path||[];
+  path.forEach((r,i)=>{
+    if(r.k==="g"||r.k==="ko"){
+      const mine=r.mine||0,th=r.theirs||0;
+      out.n++;out.gf+=mine;out.ga+=th;
+      if(th===0)out.cs++;
+      if(mine>th)out.wins++;else if(mine<th)out.losses++;
+      if(r.k==="g"){out.gPlayed++;if(mine<th)out.gLosses++;}
+      /* A semleges pálya (döntő) a HAZAI oldalra számít: nem idegenbeli. */
+      if(r.home||r.neutral){if(mine>out.homeMax)out.homeMax=mine;}
+      else if(mine>out.awayMax)out.awayMax=mine;
+      /* SKALP: a meccs pillanatában mért két erő — pontosan az a két szám,
+         amit a kupaképernyő is kiírt a kezdőrúgás előtt. */
+      if(mine>th&&typeof r.oovr==="number"&&typeof r.movr==="number"&&r.oovr>r.movr)out.scalps++;
+      return;}
+    if(r.k==="tie"&&r.won){
+      const d=(r.mine||0)-(r.theirs||0);
+      if(d>out.aggMax)out.aggMax=d;
+      /* FORDÍTÁS: az első mérkőzést elveszítetted, a párharcot mégis vitted.
+         A döntő kimarad — ott nincs második mérkőzés, amin fordítani lehetne. */
+      if(r.round!=="final"){
+        for(let j=i-1;j>=0;j--){
+          const p=path[j];
+          if(p.k==="tie")break;
+          if(p.k==="ko"&&p.leg===0){
+            if((p.mine||0)<(p.theirs||0))out.comeback++;
+            break;}}}}});
+  out.groupRank=E.groupRank||0;
+  out.won=E.result==="win"?1:0;
+  out.depth=cupDepthNow(E);
+  const c=(E.chal&&E.chal.contrib)||{};
+  Object.keys(c).forEach(k=>{if(c[k]>out.bestContrib)out.bestContrib=c[k];});
+  out.allMatch=(out.n>=CUP_ALLMATCH_MIN&&out.bestContrib>=out.n)?1:0;
+  return out;}
+/* Ki a sorozat gólkirálya / gólpassz-királya / kapus-királya MOST — és a
+   tiéd-e? Ugyanaz a "legnagyobb érték nyer" szabály, amit a kampányzáró
+   arany-díjak is használnak, tehát a kettő sosem mondhat mást. */
+function cupKingIsMine(kind){
+  const E=S.euro;
+  if(!E||!E.stats)return 0;
+  const map=E.stats[kind==="boot"?"scorers":kind==="pass"?"assists":"cleanSheets"];
+  const key=kind==="boot"?"g":kind==="pass"?"a":"c";
+  let best=null;
+  Object.keys(map||{}).forEach(k=>{
+    const r=map[k];
+    if(!best||(r[key]||0)>(best[key]||0))best=r;});
+  return (best&&(best[key]||0)>0&&best.own)?1:0;}
+/* Egy saját játékos gólja a FUTÓ sorozatban. */
+function cupPlayerGoalsOf(name){
+  const E=S.euro;
+  if(!E||!E.stats||!E.stats.scorers||!name)return 0;
+  const r=E.stats.scorers[euroStatKey(teamName,name)];
+  return (r&&r.g)||0;}
+/* ---- KI VOLT EREDMÉNYES, MELYIK MECCSEN ----
+   Az EGYETLEN dolog, ami a menetelés-naplóból nem vezethető le. A gól és a
+   gólpassz közös csatornáin (recordScorer / recordAssist) jelöljük a futó
+   mérkőzés hozzájárulóit, és a lefújásnál egyszer könyveljük őket — így a
+   mesterhármas is egy meccsnek számít, ahogy kell. */
+function euroChalBucket(){
+  const E=S.euro;
+  if(!E)return null;
+  if(!E.chal)E.chal={cur:{},contrib:{}};
+  if(!E.chal.cur)E.chal.cur={};
+  if(!E.chal.contrib)E.chal.contrib={};
+  return E.chal;}
+function euroChalMark(name){
+  const E=S.euro;
+  if(!E||!name||E.stage==="qual")return;
+  const b=euroChalBucket();
+  if(b)b.cur[name]=1;}
+function euroChalMatchDone(){
+  const E=S.euro;
+  if(!E||E.stage==="qual")return;
+  const b=euroChalBucket();
+  if(!b)return;
+  Object.keys(b.cur).forEach(n=>{b.contrib[n]=(b.contrib[n]||0)+1;});
+  b.cur={};}
+/* ---- A HALADÁS MÉRÉSE ---- */
+function cupChalValue(ch){
+  const st=cupChalStat();
+  switch(ch.type){
+    case "cupWin":        return st.won;
+    case "cupDepth":      return st.depth;
+    case "cupGroupWin":   return st.groupRank===1?1:0;
+    case "cupGroupLoss":  return st.gLosses;            /* inverz */
+    case "cupLoss":       return st.losses;             /* inverz */
+    case "cupComeback":   return st.comeback;
+    case "cupKing":       return cupKingIsMine(ch.king);
+    case "cupAllMatch":   return st.allMatch;
+    case "cupScalps":     return st.scalps;
+    case "cupAwayHaul":   return st.awayMax;
+    case "cupHomeHaul":   return st.homeMax;
+    case "cupAgg":        return st.aggMax;
+    case "cupCleanSheets":return st.cs;
+    case "cupConceded":   return st.ga;                 /* inverz */
+    case "cupPlayerGoals":return cupPlayerGoalsOf(ch.playerName);}
+  return 0;}
+/* ---- A SABLONOK ----
+   Mindegyik a FUTÓ sorozathoz igazodik: a sorozat neve, a körei és a hossza
+   is beleszámít a célba és a szövegbe. Ami az adott sorozatban értelmetlen
+   (csoportkör a hazai kupában), az kihagyja magát. */
+function genCupChallenge(diff,ctx){
+  const E=S.euro;
+  if(!E)return null;
+  const comp=E.comp,c=EURO_COMPS[comp]||{n:"kupa",short:"kupa"};
+  const hasGroup=(typeof compHasGroup==="function")&&compHasGroup(comp);
+  /* A sorozat hossza: csoportos kupa 6 csoportmeccs + 7 kieséses, hazai kupa 9. */
+  const maxM=hasGroup?13:9;
+  const T=(e,m,h)=>diff==="hard"?h:diff==="medium"?m:e;
+  const templates=[
+    /* 1. A TRÓFEA. Mindig NEHÉZ besorolású — ennél nagyobb tét nincs. */
+    ()=>({type:"cupWin",target:1,forceDiff:"hard",
+      desc:`Nyerd meg a(z) ${c.n}-t`,
+      rule:`A sorozat megnyerése számít, semmi más. A döntőben elvesztett mérkőzés (ezüstérem) nem teljesíti.`}),
+    /* 2. MEDDIG JUTSZ. A fokozat sorozatfüggetlen: a "legjobb 8" a hazai
+       kupában a negyeddöntő, az európaiakban is — csak más nevű kör. */
+    ()=>{const size=T(8,4,2);
+      const target=cupDepthFor(comp,size);
+      if(!target)return null;
+      const nev=size===2?"a döntőbe":`a legjobb ${size} közé`;
+      return {type:"cupDepth",target,size,
+        desc:`Juss be ${nev} a sorozatban`,
+        rule:`Elég ELJUTNI oda: ha ${size===2?"a döntőt":`a legjobb ${size} közti kört`} megjátszod, a kihívás teljesül akkor is, ha ott kiestek.`};},
+    /* 3. A CSOPORT MEGNYERÉSE — csak csoportos sorozatban. */
+    ()=>{if(!hasGroup)return null;
+      return {type:"cupGroupWin",target:1,
+        desc:`Nyerd meg a csoportodat`,
+        rule:`A csoportkör végén az ELSŐ helyen kell állnod. A továbbjutás második helyről nem elég.`};},
+    /* 4. VERETLENÜL A CSOPORTBÓL — csak csoportos sorozatban. */
+    ()=>{if(!hasGroup)return null;
+      return {type:"cupGroupLoss",target:0,inverse:true,
+        desc:`Ne veszíts mérkőzést a csoportkörben`,
+        rule:`Fordított kihívás: a hat csoportmeccs egyikét sem szabad elveszíteni. A döntetlen belefér.`};},
+    /* 5. VERETLENÜL A TELJES SOROZATBAN. */
+    ()=>({type:"cupLoss",target:0,inverse:true,
+      desc:`Ne veszíts mérkőzést a teljes sorozatban`,
+      rule:`Fordított kihívás: a főtábla EGYETLEN mérkőzését sem szabad elveszíteni — a döntetlen belefér, és a büntetőkkel elvesztett párharc sem vereség, ha a mérkőzés döntetlen lett. A selejtező nem számít bele.`}),
+    /* 6. FORDÍTÁS A VISSZAVÁGÓN. */
+    ()=>{const target=T(1,1,2);
+      return {type:"cupComeback",target,
+        desc:`Fordíts ${target>1?`${target} párharcot`:"egy párharcot"} a visszavágón`,
+        rule:`Akkor számít, ha az ELSŐ mérkőzést elveszítetted, a párharcot mégis megnyerted. A döntő nem játszik: ott nincs visszavágó.`};},
+    /* 7. EGYÉNI KIRÁLYI CÍM a sorozat TELJES mezőnyében. */
+    ()=>{const k=pick(["boot","pass","glove"]);
+      const nev=k==="boot"?"gólkirálya":k==="pass"?"gólpassz-királya":"kapus-királya";
+      const mit=k==="boot"?"legtöbb gólt":k==="pass"?"legtöbb gólpasszt":"legtöbb kapott gól nélküli mérkőzést";
+      return {type:"cupKing",target:1,king:k,
+        desc:`Legyen a tiéd a sorozat ${nev}`,
+        rule:`A sorozat TELJES mezőnyét nézzük (mind a 32 csapatot): a te játékosodnak kell a ${mit} összegyűjtenie. Holtversenynél a korábban elért érték nyer.`};},
+    /* 8. AKI MINDEN MECCSEN EREDMÉNYES. */
+    ()=>({type:"cupAllMatch",target:1,
+      desc:`Legyen olyan játékosod, aki MINDEN kupameccseden eredményes`,
+      rule:`Gól VAGY gólpassz mindegyik mérkőzésen, amit a főtáblán játszotok — egyetlen kihagyott meccs elrontja. Legalább ${CUP_ALLMATCH_MIN} lejátszott mérkőzés kell hozzá, tehát a korai kiesés magától bukás.`}),
+    /* 9. NÁLAD ERŐSEBBEK LEGYŐZÉSE. */
+    ()=>{const target=T(1,2,3);
+      return {type:"cupScalps",target,
+        desc:`Győzz le ${target} nálad erősebb csapatot a sorozatban`,
+        rule:`Akkor számít, ha a legyőzött ellenfél ereje MAGASABB volt a csapaterődnél a mérkőzés pillanatában — pontosan az a két szám, amit a kupaképernyő a kezdőrúgás előtt kiír.`};},
+    /* 10. IDEGENBELI GÓLZÁPOR. */
+    ()=>{const target=T(3,4,5);
+      return {type:"cupAwayHaul",target,
+        desc:`Rúgj ${target} gólt egyetlen IDEGENBELI kupameccsen`,
+        rule:`Egyetlen idegenbeli mérkőzésen belül kell összejönnie. A semleges pályán játszott döntő nem idegenbeli.`};},
+    /* 11. HAZAI GÓLZÁPOR. */
+    ()=>{const target=T(4,5,6);
+      return {type:"cupHomeHaul",target,
+        desc:`Rúgj ${target} gólt egyetlen HAZAI kupameccsen`,
+        rule:`Egyetlen hazai mérkőzésen belül kell összejönnie. A semleges pályán játszott döntő is ide számít.`};},
+    /* 12. ÖSSZESÍTÉSBELI FÖLÉNY. */
+    ()=>{const target=T(6,8,10);
+      return {type:"cupAgg",target,
+        desc:`Nyerj meg egy párharcot ${target} gólos összesítéssel`,
+        rule:`A két mérkőzés összesített gólkülönbsége számít (pl. 4:0 és 3:1 = ${"+"}6). A döntő egyetlen mérkőzése is párharcnak számít.`};},
+    /* 13. TISZTA LAPOK A SOROZATBAN. */
+    ()=>{const target=T(2,3,Math.max(4,Math.round(maxM*0.4)));
+      return {type:"cupCleanSheets",target,
+        desc:`Zárj ${target} kupameccset kapott gól nélkül`,
+        rule:`A főtábla összes mérkőzése számít, nem kell egymás után lenniük.`};},
+    /* 14. MEGŐRZŐ: kevés kapott gól az egész sorozatban. */
+    ()=>{const target=T(Math.round(maxM*0.75),Math.round(maxM*0.55),Math.round(maxM*0.4));
+      return {type:"cupConceded",target,inverse:true,
+        desc:`Kapj LEGFELJEBB ${target} gólt a teljes sorozatban`,
+        rule:`Fordított kihívás: ennyi vagy ennél kevesebb kapott gólnál teljesül. Minél tovább jutsz, annál több mérkőzésen kell osztoznia — ez a kihívás a menetelést is megdrágítja.`};},
+    /* 15. EGY EMBER A SOROZATBAN. */
+    ()=>{const fwd=(ctx.starters||[]).filter(s=>["CS","ÁÉ","JSZ","BSZ","TKP"].includes(s.pos));
+      if(!fwd.length)return null;
+      const s=pick(fwd);
+      const target=T(3,4,6);
+      return {type:"cupPlayerGoals",playerName:s.p.n,target,
+        desc:`${shortName(s.p.n)} szerezzen ${target} gólt a sorozatban`,
+        rule:`Csak ${shortName(s.p.n)} saját, ebben a sorozatban szerzett góljai számítanak. Ha eladod őt, a kihívás büntetés nélkül érvénytelenné válik.`};}];
+  for(let tries=0;tries<24;tries++){
+    const t=pick(templates)();
+    if(t&&t.target!=null&&isFinite(t.target))return t;}
+  return null;}
+/* ---- A FELAJÁNLÁS ----
+   A főtábla indulásakor, EGYSZER kampányonként. Auto-végigjátszásnál kimarad
+   (ugyanaz az elv, mint a bajnoki kihívásoknál: a gép nem vállal helyetted). */
+function cupChallengeOffer(cb){
+  const done=()=>{try{if(cb)cb();}catch(e){}};
+  if(gameMode!=="career"||!careerPool||!S.euro||S.auto){done();return;}
+  if(S.euro._chalOffered){done();return;}
+  S.euro._chalOffered=true;
+  /* Az előző sorozat kihívásai már nem élhetnek — védőháló, ha egy kampány
+     lezárása bármiért kimaradt volna. */
+  try{cupChallengeResolve();}catch(e){}
+  S.cupRunNo=(S.cupRunNo||0)+1;
+  try{showChallengeOffers("cup",CH_CUP_OFFERS,done,false,{});}
+  catch(e){done();}}
+/* ---- A LEZÁRÁS ----
+   A kampány végén MINDEN futó kupa-kihívás kiértékelődik. A határidő a
+   sorozat sorszáma (S.cupRunNo), tehát egy korábbi sorozatból ittragadt
+   kihívást is elsöpör. */
+function cupChallengeResolve(){
+  if(!(S.activeChallenges||[]).some(c=>c&&c.scope==="cup"))return;
+  evaluateDueChallenges("cup",S.cupRunNo||0);}
 /* A kampány lezárása → tovább a szezonzáró jelentésre.
    KIVÉTEL: a 86-90-es sávban (NB II) a MEGNYERT hazai kupa Konferencia-liga
    indulást ér, és azt MÉG UGYANEBBEN a szezonzárásban le is játsszuk — nem
@@ -34890,7 +35227,10 @@ function startEuroCampaign(opt){
     addLine(`🏆 Kezdődik a(z) ${EURO_COMPS[comp].n}! Egyenes kiesés, oda-visszavágós körökkel — a 32 csapatból kell a döntőig menetelni.`,"m life");
     euroStartRound(MK_ROUNDS[0],S.euro.teams.map((t,i)=>i));}
   $("scHub").classList.add("hide");
-  showEuroScreen();saveGame();}
+  /* KUPA-KIHÍVÁSOK: ha nincs selejtező, a sorozat MOST indul — itt a helyük.
+     Selejtezővel a főtáblára jutáskor jönnek (euroEnterMain). */
+  if(needQual){showEuroScreen();saveGame();return;}
+  cupChallengeOffer(()=>{showEuroScreen();try{saveGame();}catch(e){}});}
 /* ================= FÉLBEHAGYOTT KÖR-LEZÁRÁS ÖNGYÓGYÍTÁSA =================
    HIBA, amit ez javít — bejelentve a v2.5.91 diagnosztikából:
    a kieséses kör lezárása (euroResolveRound) közös kupában megáll a beváró
@@ -35789,6 +36129,10 @@ function startNextCareerSeason(){
   S.mpSummerRef=null;
   /* A közös kupanevezés szezononként új: a következő nyáron újra kell alkudni. */
   S.mpCup=null;
+  /* KUPA-KIHÍVÁSOK: normál úton a kampány lezárása értékeli ki őket. Ez a
+     söprés arra az esetre van, ha egy sorozat lezárása bármiért kimaradt —
+     egy kupa-kihívás nem lóghat át a következő idénybe. */
+  try{cupChallengeResolve();}catch(e){}
   /* ---- MÉRFÖLDKÖVEK: A LEZÁRULÓ SZEZON CSÚCSAI ----
      A szezonhoz kötött értékeket (tiszta lapok, egyéni gólrekord, bajnoki
      gólszám) MINDEN nullázás ELŐTT el kell tenni és ki kell értékelni —
@@ -39966,7 +40310,7 @@ function saveGame(){
         /* skill-padló: türelem-számláló, szezonos kvóták, első kémia megvolt-e */
         matchesSinceSkill:S.matchesSinceSkill,seasonNewSkills:S.seasonNewSkills,
         balSkillMatches:S.balSkillMatches,balSkillsSeason:S.balSkillsSeason,
-        balLoadPrev:S.balLoadPrev,balLoadHandover:S.balLoadHandover,
+        balLoadPrev:S.balLoadPrev,balLoadHandover:S.balLoadHandover,cupRunNo:S.cupRunNo,
         toughSeen:S.toughSeen,
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
         guideOn:S.guideOn,guideSeen:S.guideSeen,
@@ -40343,6 +40687,9 @@ function applySavedGame(d){
      módon, az idei szezon adataiból dolgozik (a szezon elején semlegesen). */
   S.balLoadPrev=d.S.balLoadPrev||null;
   S.balLoadHandover=d.S.balLoadHandover||null;
+  /* A kupasorozatok sorszáma. Régi mentésben nincs — 0-ról indul, és az első
+     sorozat indulásakor lép egyet (cupChallengeOffer). */
+  S.cupRunNo=d.S.cupRunNo||0;
   /* PANZER kemény-vonás regiszter. Régi mentésben nincs — üresen indul, és az
      első mérésnél a MOSTANI keret kerül bele (lásd stToughRecord). */
   S.toughSeen=d.S.toughSeen||{};
