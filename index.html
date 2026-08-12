@@ -2680,7 +2680,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.22";
+const APP_VERSION="3.1.23";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -15517,6 +15517,55 @@ function slotStatusBadge(p){
   if(skillCount>0){
     return `<div class="ratebadge">★${skillCount>1?skillCount:""}</div>`;}
   return "";}
+/* ================= KÉMIA-HAZATALÁLÁS =================
+   Ha az igazolt játékos KORÁBBAN EGY CSAPATBAN JÁTSZOTT valakivel, aki már a
+   keretedben van, eséllyel azonnal KÉSZ (5/5) párkémia születik köztük — nem
+   kell összeszokniuk, hiszen már összeszoktak.
+
+   MI SZÁMÍT "egy csapatnak": ugyanaz az adatbázis-KÁRTYA (klub-szezon vagy
+   válogatott-keret). Ez pontosan az az információ, ami az adatbázisban amúgy is
+   benne van — nem kell hozzá semmi új adat.
+
+   AZ ESÉLY két dologból jön, ahogy kérted:
+     · CSAPATMORÁL — egy jó hangulatú öltözőbe könnyebb visszatalálni;
+     · a már MŰKÖDŐ kész párkémiák száma — ahol már van összeszokott mag, oda
+       gyorsabban kapcsolódik az új ember.
+
+   EGYSZERRE CSAK EGY ÉPÍTÉS: ha az érintettek bármelyike épp egy FOLYAMATBAN
+   lévő kémiában van (S.chemInProgress), vagy már van köztük egy félkész kötés,
+   a hazatalálás KIMARAD. A kész pár ajándék, nem előzheti meg a munkát. */
+const CHEM_HOME_BASE=0.10;
+const CHEM_HOME_MAX=0.42;
+function chemHomeChance(){
+  const mor=(S.morale!=null?S.morale:50);
+  let done=0;
+  Object.values(S.chemPairs||{}).forEach(pr=>{if(pr&&pr.stages>=CHEM_PAIR_NEED)done++;});
+  const p=CHEM_HOME_BASE+((mor-50)/50)*0.20+Math.min(done,6)/6*0.15;
+  return Math.max(0,Math.min(CHEM_HOME_MAX,p));}
+/* Kikkel szerepelt közös kártyán — egyszer épül fel, a SQUADS-ból. */
+const CARD_MATES=(function(){
+  const m={};
+  SQUADS.forEach(sq=>{
+    const ns=sq.players.map(x=>x.n);
+    ns.forEach(a=>{const set=m[a]||(m[a]=new Set());ns.forEach(b=>{if(b!==a)set.add(b);});});});
+  return m;})();
+function chemHomecoming(name){
+  if(gameMode!=="career"||!S.chemPairs)return null;
+  const mates=CARD_MATES[name];
+  if(!mates||!mates.size)return null;
+  /* EGYSZERRE CSAK EGY ÉPÍTÉS — ha az új ember épp épülő kötésben van, kilépünk */
+  const prog=S.chemInProgress?S.chemPairs[S.chemInProgress]:null;
+  if(prog&&(prog.a===name||prog.b===name))return null;
+  const roster=fullCareerRoster().map(x=>x&&x.n).filter(Boolean);
+  const cands=roster.filter(n=>n!==name&&mates.has(n)
+    &&!chemPairComplete(name,n)
+    &&chemStages(name,n)===0                       /* félkész kötést nem ugrunk át */
+    &&!(prog&&(prog.a===n||prog.b===n)));          /* a társ se legyen épülőben */
+  if(!cands.length)return null;
+  if(Math.random()>=chemHomeChance())return null;
+  const mate=pick(cands);
+  addChemPair(name,mate,CHEM_PAIR_NEED);
+  return mate;}
 function markArrived(p,_price,fromAcademy){
   p._arrivedAtIdx=S.idx;
   /* ---- INFINITY SZINT-KÖVETÉS HORGONYA ----
@@ -15538,6 +15587,28 @@ function markArrived(p,_price,fromAcademy){
      akarjuk mérni. */
   msNoteBuy(_price);
   S.chSignings=(S.chSignings||0)+1;
+  /* ---- A KÉSZ SKILLEK ÁTADÁSA ----
+     A jelölt ajándék-skilljei (giftSkillsFor) itt költöznek be a S.skills-be,
+     KÉSZEN (stagesCompleted === stagesNeeded), mert ezekért fizettél az árban.
+     A markArrived MINDEN igazolási úton lefut, ezért ez a megbízható pont.
+     Amit már tud (pl. mert korábban nálad volt), azt nem duplázzuk. */
+  {const _e=(careerPool&&careerPool[p.n])||null;
+   const _gift=_e?giftSkillsFor(_e):[];
+   if(_gift.length){
+     if(!S.skills[p.n])S.skills[p.n]=[];
+     const _got=[];
+     _gift.forEach(id=>{
+       const sk=SKILLS.find(x=>x.id===id);
+       if(!sk)return;
+       if(S.skills[p.n].some(i=>i.skill&&i.skill.id===id))return;
+       S.skills[p.n].push({skill:sk,stagesNeeded:1,stagesCompleted:1});
+       noteSkillEver(p.n,id);
+       _got.push(sk.name);});
+     if(_got.length)addLine(`★ ${esc(shortName(p.n))} kész képességgel érkezett: ${esc(_got.join(", "))}.`,"m life");
+     if(typeof updateSkillsLine==="function")updateSkillsLine();}}
+  /* ---- KÉMIA-HAZATALÁLÁS ---- */
+  {const _mate=chemHomecoming(p.n);
+   if(_mate)addLine(`🤝 Hazatalált! ${esc(shortName(p.n))} és ${esc(shortName(_mate))} játszottak már együtt — a párkémiájuk AZONNAL kész (${CHEM_PAIR_NEED}/${CHEM_PAIR_NEED}).`,"m life");}
   const age=p.age!=null?p.age:(careerPool&&careerPool[p.n]?careerPool[p.n].age:null);
   /* ---- AZ IFI-AKADÉMIÁRÓL ÉRKEZŐK IS FIATAL IGAZOLÁSNAK SZÁMÍTANAK ----
      A "fiatal igazolások" kihívás szabálya ezt ígéri is, a gyakorlatban mégsem
@@ -16139,6 +16210,53 @@ function marketValue(entry){
    A BUY_MARKUP a szinttel enyhén nő (magasabb mezőnyön a piac is drágább). */
 const BUY_MARKUP_BASE=1.6;    /* a vásárlási ár a piaci érték ennyiszerese (alap) */
 function buyMarkup(){return BUY_MARKUP_BASE+Math.max(0,(oppTargetRating-80)/100);}
+/* ================= SKILLES IGAZOLÁSOK =================
+   Ritkán a piacon olyan játékos bukkan fel, aki KÉSZ skillel érkezik. Az esély
+   a PIAC horgonyához kötött (marketPeakShift) — ugyanahhoz, amiből a piaci
+   játékosok ereje is származik. Ez tudatos döntés: az ikonoknál pont az okozta
+   a 3.1.13-as hibát, hogy más horgonyt kapott, mint a piac. Itt tehát a kettő
+   együtt mozog, és a kiindulás SZÁNDÉKOSAN alacsony.
+
+   A skillek POSZTHOZ ILLŐK: a jelölt kategóriájából (KAPUS/VEDO/KOZEPPALYAS/
+   CSATAR) sorsolunk, tehát egy védő sosem kap csatár-skillt. Egy játékosnak
+   több is lehet, de a második-harmadik jóval ritkább.
+
+   DETERMINIZMUS: a sorsolás a névből ÉS a szezonszámból seedelt folyamból jön,
+   ezért a listában látott ★ pontosan azt jelenti, amit leigazoláskor kapsz —
+   és két megjelenítés közt sem változik. Szezononként újrasorsolódik, ugyanúgy,
+   ahogy a piac a korokat is újrasorsolja. */
+const SKILLED_SIGN_BASE=0.02;    /* a karrier saját szintjén: 2% */
+const SKILLED_SIGN_PER_PT=0.005; /* a piaci eltolás minden pontja ennyit tesz rá */
+const SKILLED_SIGN_MAX=0.25;     /* és eddig, nem tovább */
+function skilledSignChance(){
+  const shift=(gameMode==="career"&&careerPool&&typeof marketPeakShift==="function")?marketPeakShift():0;
+  return Math.max(0,Math.min(SKILLED_SIGN_MAX,SKILLED_SIGN_BASE+shift*SKILLED_SIGN_PER_PT));}
+/* Egy jelölt ajándék-skilljei. Üres tömb a normális eset. */
+function giftSkillsFor(entry){
+  if(!entry||gameMode!=="career")return [];
+  const sn=S.seasonNumber||1;
+  if(entry._giftSkills&&entry._giftSeason===sn)return entry._giftSkills;
+  const r=rngFor("giftskill:"+entry.n+"|"+sn);
+  const out=[];
+  if(r()<skilledSignChance()){
+    const cat=getCategoryFor((entry.pos&&entry.pos[0])||"KKP");
+    const pool=SKILLS.filter(sk=>sk.cat===cat);
+    if(pool.length){
+      /* 1 skill az alap; a 2. és 3. a piaci eltolással arányosan, de ritkán */
+      const extra=skilledSignChance();
+      let n=1;
+      if(r()<extra)n=2;
+      if(n===2&&r()<extra*0.5)n=3;
+      const picked=new Set();
+      while(picked.size<Math.min(n,pool.length)){
+        picked.add(pool[Math.floor(r()*pool.length)].id);}
+      picked.forEach(id=>out.push(id));}}
+  entry._giftSkills=out;entry._giftSeason=sn;
+  return out;}
+/* Az ÁR-FELÁR: skillenként +35%, mert a kész skill valódi, azonnali érték —
+   a saját nevelésű skillre meccsek tucatjait kell várni. */
+function giftSkillPriceMult(entry){
+  return 1+0.35*giftSkillsFor(entry).length;}
 function buyPrice(entry){
   let p=marketValue(entry)*buyMarkup();
   /* KIHÍVÁS-HATÁSOK az árban: a "drágább igazolás" büntetés felárat tesz rá,
@@ -16147,6 +16265,7 @@ function buyPrice(entry){
      kiírt ár és a ténylegesen fizetett összeg egyezzen. */
   if(S.buySurcharge>0)p*=1.10;
   if(S.buyDiscountChance>0&&entry&&chBuyDiscountHits(entry.n))p*=0.75;
+  p*=giftSkillPriceMult(entry);   /* a kész skillekért fizetni kell */
   /* EGÉSZ pontra kerekítünk (korábban 100-ra): forintban a 100 pontos lépcső
      200 M Ft-os ugrás lenne, és minden ár "…00 M Ft"-ra végződne. Így az
      összegek élethűen egyenetlenek, az érték viszont <0,5%-ot mozdul. */
@@ -29725,7 +29844,12 @@ function showCsSquad(sq){
          láthatóan elhalványítva és kattinthatatlanul. Némán eltüntetni
          zavaró lenne: a játékos nem értené, hova lett a keretből valaki. */
       const refused=csRefused.has(p.n);
-      row.innerHTML=`<span class="pos pc-${getCategoryFor(p.pos[0])}">${p.pos.join("/")}</span><span class="main"><div class="nm">${esc(p.n)}</div><div class="trait">${refused?"✕ nemet mondott — ezen a nyáron már nem elérhető":`${p.age} év`}</div></span>`;
+      /* ★ = KÉSZ SKILLEL érkezik (lásd giftSkillsFor). A tooltip megnevezi
+         őket, hogy a felár indoka is látszódjon, ne csak a magasabb ár. */
+      const _gs=(gameMode==="career"&&careerPool&&careerPool[p.n])?giftSkillsFor(careerPool[p.n]):[];
+      const _gsNames=_gs.map(id=>{const sk=SKILLS.find(x=>x.id===id);return sk?sk.name:id;});
+      const _star=_gs.length?` <span style="color:var(--gold)" title="Kész képességgel érkezik: ${esc(_gsNames.join(", "))}">${"★".repeat(_gs.length)}</span>`:"";
+      row.innerHTML=`<span class="pos pc-${getCategoryFor(p.pos[0])}">${p.pos.join("/")}</span><span class="main"><div class="nm">${esc(p.n)}${_star}</div><div class="trait">${refused?"✕ nemet mondott — ezen a nyáron már nem elérhető":`${p.age} év${_gs.length?" · "+esc(_gsNames.join(", ")):""}`}</div></span>`;
       if(refused){row.style.opacity=".42";row.style.cursor="default";}
       const ovrSpan=document.createElement("span");ovrSpan.className="ovr";ovrSpan.style.fontSize="14px";
       function updateOvrDisplay(){
