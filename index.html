@@ -1017,6 +1017,27 @@ button.infPanel:disabled{cursor:default}
 #teamBar{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:12.5px;color:var(--dim)}
 #teamOVR{font-family:'Archivo Black';font-size:19px;color:var(--gold)}
 
+/* ---- AZ ELLENFÉL BEFAGYASZTOTT PÁLYAKÉPE (közös karrier) ----
+   NEM a saját pálya átfestése, hanem egy MÁSODIK pályakép ugyanabban a
+   kártyában. Így a drawPitch()-hez egyetlen sort sem kell hozzányúlni: a saját
+   felállás rajzolása, a kattintható helyek és a kémia-vonalak pontosan úgy
+   működnek, mint eddig — a kapcsoló csak azt dönti el, melyik réteg LÁTSZIK.
+   A gyep szándékosan HIDEGEBB (kékes-szürke): egy pillantásra elválik, hogy
+   ez nem a te csapatod, hanem egy régi mérkőzésről őrzött megfigyelés. */
+#oppPitchWrap{background:linear-gradient(180deg,#3a4658 0%,#20262f 100%);border-radius:12px;padding:10px;position:relative}
+#oppPitch{position:relative;width:100%;aspect-ratio:3/3.6;border:2px solid rgba(255,255,255,.34);border-radius:6px}
+#oppPitch::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:2px solid rgba(255,255,255,.26)}
+#oppPitch::after{content:"";position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px 0 0 -40px;border:2px solid rgba(255,255,255,.26);border-radius:50%}
+#oppPitch .slot .dot{cursor:default}
+#pitchSideSwitch{display:flex;gap:6px;margin-top:9px}
+#pitchSideSwitch button{flex:1;font-size:12px;padding:7px 4px;border-radius:8px;line-height:1.25}
+#pitchSideSwitch button.on{background:var(--gold);color:#241d06;border-color:var(--gold);font-weight:700}
+#oppTeamBar{margin-top:9px;font-size:12px;color:var(--dim);line-height:1.5;
+  border-top:1px solid var(--line);padding-top:7px}
+#oppTeamBar .oppName{color:var(--ink);font-weight:700}
+#oppTeamBar .oppNum{font-family:'Archivo Black';color:var(--gold)}
+#oppTeamBar .oppFrozen{color:var(--dim2);font-size:11.5px;margin-top:4px}
+
 /* ---- name / chem / coach / captain boxes ---- */
 #capMsg,#nameBox{font-size:13px;color:var(--ink);margin-top:9px;text-align:center;line-height:1.5}
 #nameBox input{width:100%;margin-top:7px;padding:11px;border-radius:8px;border:1px solid var(--line);
@@ -2086,11 +2107,18 @@ button.infPanel:disabled{cursor:default}
 <section id="scPitch" class="hide">
   <div class="card" style="padding:10px">
     <div id="pitchWrap"><div id="pitch"></div></div>
+    <!-- A társad felállása a legutóbbi párharcról (lásd mpOppViewSync) -->
+    <div id="oppPitchWrap" class="hide"><div id="oppPitch"></div></div>
+    <div id="pitchSideSwitch" class="hide">
+      <button id="pitchSideMine" class="btn-s on" type="button">A te felállásod</button>
+      <button id="pitchSideOpp" class="btn-s" type="button">⚔ Az ellenfeled</button>
+    </div>
     <div id="teamBar">
       <span id="slotCount"></span>
       <span>Csapaterő: <span id="teamOVR">–</span></span>
     </div>
     <div id="tacticBar" style="display:none;font-size:12px;text-align:center;padding:5px 4px 1px;border-top:1px solid var(--line);margin-top:5px"></div>
+    <div id="oppTeamBar" class="hide"></div>
 
     <div id="chemBox" class="hide">
       <div class="h">Csapatkémia</div>
@@ -2680,7 +2708,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.30";
+const APP_VERSION="3.1.31";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -14770,6 +14798,7 @@ function beginNewGame(){
      egy korábbi szoba kiegyenlítése átszivárogna az újba. */
   S.oppBuffH=null;   /* friss karrier → a rejtett erősítés az 1. szezon elején születik */
   S.mpBalance=0;S.mpDecision=null;S.mpMateFinal=null;S.mpSummerRef=null;S.mpCup=null;S.mpHistory=[];S.mpDuelLog=[];S.mpOrphan=false;
+  S.mpOppStart=null;S.mpOppSnap=null;   /* az ellenfél csapatlapja és befagyasztott felállása */
   ensureWorldSeed();
   S.skillPool=weightedShuffleSkills(rngFor("skillpool"));
   slots=FORMS[form].slots.map((p,i)=>({pos:effectiveSlotPos(form,i),xy:slotXY(form,i),player:null,fit:1,origin:null}));
@@ -16638,7 +16667,11 @@ function updateBar(){
       tb.style.display="block";
       tb.innerHTML=`<span style="color:var(--dim)">Taktika:</span> <b>${esc(TACTICS[S.tactics.active].n)}</b> <b style="color:${col}">${lvl}</b>`
         +(lvl<85?` <span style="color:var(--dim2)">· begyakorlás alatt (85-től ad előnyt)</span>`:"");
-    }else{tb.style.display="none";tb.innerHTML="";}}}
+    }else{tb.style.display="none";tb.innerHTML="";}}
+  /* KÖZÖS KARRIER: a pálya alatti oldalváltó. Itt a helye, mert a drawPitch()
+     és az updateBar() gyakorlatilag mindenhol párban futnak — így a kapcsoló
+     állapota sosem tud elcsúszni attól, amit a pálya épp mutat. */
+  try{mpOppViewSync();}catch(e){}}
 /* ---- A FELÁLLÁS-NÉZET TELJES FRISSÍTÉSE ----
    Három külön dolog rajzolja ki, mi a csapat aktuális állapota:
      · drawPitch()    — maga a pályakép (ki hol áll),
@@ -18251,6 +18284,10 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      a mpHistory és a mpDuelLog pedig SZEZONOKON ÁTÍVELŐ — nem nullázódik. */
   oppBuffH:null,   /* a szezonra rögzített rejtett ellenfél-erősítés */
   mpBalance:0,mpDecision:null,mpHistory:[],mpDuelLog:[],mpOrphan:false,
+  /* Az ellenfél csapatlapja: a szezonindulói összefoglaló (mpOppStart) és a
+     párharcon befagyasztott kezdő tizenegy (mpOppSnap). Az utóbbi SZÁNDÉKOSAN
+     túléli a szezonváltást — a következő párharcig az a kép marad. */
+  mpOppStart:null,mpOppSnap:null,
   skillPool:weightedShuffleSkills(),skills:{},ratingAdj:{},winStreak:0,winlessStreak:0,fixtureResults:[],
   discWatch:{},hotStreak:{},goallessStreak:{},transferBudget:0,unbeatenStreak:0,cleanSheetStreak:0,
   /* PÁRKÉMIA-rendszer: chemPairs[kulcs] = {a,b,stages,need} — két játékos közti,
@@ -19186,6 +19223,7 @@ function startFirstSeason(){
     : `📅 Véletlen menetrend: a 30 meccs szabad sorrendben jön.`,"m ev");
   if(h2hRoomActive())
     addLine(`⚔ A ${H2H_ROUNDS.join(". és a ")}. fordulóban a társad ellen játszol — a mezőny többi csapata ellen oda-vissza megy a bajnokság.`,"m ev");
+  announceMpOpponent();
   announceSeasonRivals();
   updateStanding();updateMorale();
   $("scSim").scrollIntoView({behavior:"smooth"});
@@ -20646,10 +20684,179 @@ function matchLambdas(mine,oppOvr,venueAdj){
    fogadó kliensnek nincs meg a másik keretének careerPool-ja, skilljei vagy
    párkémiája, tehát nem tudná újraszámolni. A gól- és gólpassz-súlyokat ezért
    a TULAJDONOS kliense számolja ki (ahol minden adat megvan), és készen küldi. */
+/* ================= AZ ELLENFÉL CSAPATLAPJA (közös karrier) =================
+   A közös karrierben eddig SZÁMOK jöttek a társadról: egy csapaterő a
+   párharc fejlécében, egy sor a tabellában. Azt sosem lehetett megnézni, MILYEN
+   csapat az — milyen felállásban, milyen taktikával, kivel a karszalaggal.
+
+   Két helyen nyílik ki ez a kép, és a kettő szándékosan MÁS mélységű:
+
+     · SZEZONINDULÁSKOR egy összefoglaló megy a naplóba — csapatnév, kezdő nyers
+       csapaterő, taktika, felállás, kapitány, legerősebb ember. Ennyit egy
+       menedzser a szezon előtt is tud a szomszédjáról: a kereten belülre nem
+       lát, de a csapat körvonalát ismeri.
+
+     · A PÁRHARC PILLANATÁBAN a TELJES kezdő tizenegy befagy — nevekkel,
+       posztokkal, a pályán elfoglalt hellyel. Ez az, amit tényleg MEGFIGYELTÉL:
+       játszottál ellene, láttad, ki hol állt. Ez a pillanatkép a KÖVETKEZŐ
+       párharcig marad, akkor pedig a friss váltja — pontosan úgy, ahogy a
+       valóságban is a legutóbbi találkozó emléke él.
+
+   A kártya SOROSÍTHATÓ (csupa szám és rövid szöveg), tehát ugyanazon a
+   csatornán utazik, amin a nehézség-javaslat és a meccs-pillanatkép. */
+function mpTeamCard(active){
+  /* `active` a buildMatchSnapshot listája: a KEZDŐRÚGÁSKOR ténylegesen pályára
+     lépő tizenegy (a kényszercserékkel együtt). Nélküle a névleges kezdő. */
+  const rows=(active&&active.length)
+    ? active.map(a=>({p:a.p,s:slots[a.idx],idx:a.idx}))
+    : slots.map((s,idx)=>({p:s&&s.player,s,idx}));
+  const capName=(captainIdx>=0&&slots[captainIdx]&&slots[captainIdx].player)
+    ?slots[captainIdx].player.n:"";
+  const players=rows.filter(r=>r.p&&r.s).map(r=>{
+    const pos=r.s.pos,xy=r.s.xy||[50,50];
+    return {n:String(r.p.n||""),pos:String(pos||""),
+      r:Math.round(playerStrength(r.p,pos)*10)/10,
+      xy:[xy[0],xy[1]],
+      cap:!!(capName&&r.p.n===capName)};});
+  const top=players.slice().sort((a,b)=>b.r-a.r)[0]||null;
+  const tk=(S.tactics&&S.tactics.active)||null;
+  return {
+    team:String(teamName||""),
+    /* NYERS csapaterő: a "csontváz" (teamOVRbase), boostok nélkül — ez az,
+       amit a szezon előtti összevetés értelmesen mér. A kijelzett (str) is
+       megy vele, mert a befagyasztott pályakép ratingjei azon a skálán állnak. */
+    ovr:Math.round(teamOVRbase()*10)/10,
+    str:Math.round(teamStrength()*10)/10,
+    formLabel:(typeof FORM_LABELS!=="undefined"&&FORM_LABELS[form])||String(form||""),
+    tactic:tk&&TACTICS[tk]?{n:TACTICS[tk].n,lvl:Math.round(tacticLevel(tk))}:null,
+    captain:String(capName||""),
+    top:top?{n:top.n,pos:top.pos,r:top.r}:null,
+    players};}
+/* ---- A HÁLÓZATRÓL ÉRKEZŐ KÁRTYA MEGTISZTÍTÁSA ----
+   A kártya a társ gépéről jön, tehát ELLENŐRIZETLEN adat: minden szöveget
+   hosszra vágunk és jelölés-mentesítünk, minden számot értelmes sávba
+   szorítunk. A kirajzoláskor az esc() a második védvonal. */
+function mpCardClean(c){
+  if(!c||typeof c!=="object")return null;
+  const txt=(v,n)=>String(v==null?"":v).replace(/[<>&]/g,"").trim().slice(0,n);
+  const num=(v,lo,hi)=>{const x=Number(v);return isFinite(x)?Math.max(lo,Math.min(hi,x)):0;};
+  const ps=(Array.isArray(c.players)?c.players:[]).slice(0,11)
+    .map(p=>({n:txt(p&&p.n,28),pos:txt(p&&p.pos,6)||"KKP",
+      r:num(p&&p.r,0,120),
+      xy:[num(p&&p.xy&&p.xy[0],0,100),num(p&&p.xy&&p.xy[1],0,100)],
+      cap:!!(p&&p.cap)}))
+    .filter(p=>p.n);
+  return {
+    team:txt(c.team,40)||"A társad",
+    ovr:num(c.ovr,0,120),str:num(c.str,0,120),
+    formLabel:txt(c.formLabel,12),
+    tactic:(c.tactic&&typeof c.tactic==="object")
+      ?{n:txt(c.tactic.n,28),lvl:num(c.tactic.lvl,0,99)}:null,
+    captain:txt(c.captain,28),
+    top:(c.top&&typeof c.top==="object")
+      ?{n:txt(c.top.n,28),pos:txt(c.top.pos,6),r:num(c.top.r,0,120)}:null,
+    players:ps};}
+/* ---- SZEZONINDULÓ ÖSSZEFOGLALÓ A NAPLÓBAN ----
+   A szezonindító alkunál (mpStartTick) tesszük el, itt írjuk ki. Az időzítés
+   szándékos: a napló ELSŐ sorai közt áll, tehát a szezon nyitóképe egyszerre
+   mondja el, kivel és mi ellen indulsz neki az idénynek. */
+function mpStoreOppStart(rec){
+  const c=rec&&mpCardClean(rec.card);
+  if(!c)return false;
+  S.mpOppStart={season:mpUpcomingSeason(),card:c};
+  return true;}
+function announceMpOpponent(){
+  if(!h2hRoomActive())return;
+  const o=S.mpOppStart;
+  if(!o||o.season!==(S.seasonNumber||1)||!o.card)return;
+  const c=o.card;
+  addLine(`⚔ <b>Az ellenfeled ebben a szezonban:</b> <b style="color:var(--gold)">${esc(c.team)}</b>`,"m ev");
+  addLine(`&nbsp;&nbsp;• Kezdő nyers csapaterő: <b>${c.ovr.toFixed(1)}</b>`
+    +(c.formLabel?` &nbsp;• Felállás: <b>${esc(c.formLabel)}</b>`:""),"m ev");
+  if(c.tactic&&c.tactic.n)
+    addLine(`&nbsp;&nbsp;• Taktika: <b>${esc(c.tactic.n)}</b> <b style="color:${c.tactic.lvl>=85?"var(--grass)":"var(--gold)"}">${Math.round(c.tactic.lvl)}</b>`
+      +(c.tactic.lvl<85?` <span style="color:var(--dim2)">(még begyakorlás alatt)</span>`:""),"m ev");
+  if(c.captain)addLine(`&nbsp;&nbsp;• Csapatkapitány: <b>${esc(c.captain)}</b>`,"m ev");
+  if(c.top&&c.top.n)
+    addLine(`&nbsp;&nbsp;• Legerősebb embere a kezdőben: <b>${esc(c.top.n)}</b>${c.top.pos?` (${esc(c.top.pos)})`:""} — <b>${c.top.r.toFixed(1)}</b>`,"m ev");
+  addLine(`Ennyit tudsz róla a kezdőrúgás előtt. A teljes felállását akkor látod meg, amikor lejátsszátok az első párharcot — onnantól a pálya alatti kapcsolóval bármikor visszanézheted.`,"m ev");}
+/* ---- A BEFAGYASZTOTT PÁLYAKÉP ----
+   A párharc indulásakor (h2hStart) tesszük el a társ kezdő tizenegyét, és a
+   következő párharcig ez marad. SZÁNDÉKOSAN túléli a szezonváltást is: amit
+   egyszer láttál, azt nem felejted el attól, hogy új idény kezdődik. */
+function mpFreezeOppSnap(card,round,cup){
+  const c=mpCardClean(card);
+  if(!c||!c.players.length)return false;
+  S.mpOppSnap={season:(S.seasonNumber||1),round:round,cup:!!cup,at:Date.now(),card:c};
+  return true;}
+function mpOppSnapNow(){
+  const s=S&&S.mpOppSnap;
+  return (s&&s.card&&s.card.players&&s.card.players.length)?s:null;}
+/* Mikor van egyáltalán mit mutatni? Közös karrier + legalább egy lejátszott
+   párharc. Egyjátékosban a kapcsoló SOSEM jelenik meg. */
+function mpOppViewAvail(){
+  return gameMode==="career"&&h2hRoomActive()&&!!mpOppSnapNow();}
+let mpOppViewOn=false;
+/* A "mikor rögzült" felirat. A kupa-párharcnak nincs bajnoki fordulószáma. */
+function mpOppSnapWhen(s){
+  const sn=s.season||1;
+  const where=s.cup?"kupa-párharc":((s.round?s.round+". forduló":"párharc"));
+  const res=s.res
+    ? ` · ${s.res.gf}:${s.res.ga} ${s.res.gf>s.res.ga?"(győzelem)":s.res.gf<s.res.ga?"(vereség)":"(döntetlen)"}`
+    : "";
+  return `${sn}. szezon · ${where}${res}`;}
+function drawOppPitch(){
+  const pit=$("oppPitch");
+  const s=mpOppSnapNow();
+  if(!pit||!s)return;
+  const frag=document.createDocumentFragment();
+  s.card.players.forEach(p=>{
+    const d=document.createElement("div");
+    d.className="slot filled pc-"+getCategoryFor(p.pos);
+    d.style.left=p.xy[0]+"%";d.style.top=p.xy[1]+"%";
+    d.innerHTML=`<div class="dot">${Math.round(p.r)}${p.cap?'<span class="cband">C</span>':""}</div>
+      <div class="lbl">${esc(shortName(p.n))}</div>`;
+    frag.appendChild(d);});
+  pit.innerHTML="";
+  pit.appendChild(frag);
+  const bar=$("oppTeamBar");
+  if(bar){
+    const c=s.card;
+    bar.innerHTML=`<div><span class="oppName">${esc(c.team)}</span>`
+      +(c.formLabel?` · Felállás: <b>${esc(c.formLabel)}</b>`:"")
+      +(c.tactic&&c.tactic.n?` · Taktika: <b>${esc(c.tactic.n)}</b> ${Math.round(c.tactic.lvl)}`:"")
+      +`</div>
+      <div>Csapaterő: <span class="oppNum">${c.str.toFixed(1)}</span> <span style="color:var(--dim2)">(nyers ${c.ovr.toFixed(1)})</span>`
+      +(c.captain?` · Kapitány: <b>${esc(c.captain)}</b>`:"")+`</div>
+      <div class="oppFrozen">❄ Befagyasztva: ${esc(mpOppSnapWhen(s))} — a következő párharcig ez a kép marad.</div>`;}}
+/* A KAPCSOLÓ. Nem rajzol semmit a saját pályaképbe: csak azt dönti el, melyik
+   réteg látszik. Ezért a drawPitch/updateBar viselkedése betűre változatlan. */
+function mpOppViewSync(){
+  const sw=$("pitchSideSwitch");
+  if(!sw)return;
+  const avail=mpOppViewAvail();
+  /* Ha épp interakciót vár a saját pálya (kapitányválasztás, játékos-lerakás),
+     a saját nézet visszakapja a szót — különben a felhasználó egy nem
+     kattintható képre koppintgatna. */
+  if(!avail||phase==="captain"||pendingPlayer)mpOppViewOn=false;
+  sw.classList.toggle("hide",!avail);
+  const mb=$("pitchSideMine"),ob=$("pitchSideOpp");
+  if(mb){mb.classList.toggle("on",!mpOppViewOn);mb.onclick=()=>{mpOppViewOn=false;mpOppViewSync();};}
+  if(ob){ob.classList.toggle("on",mpOppViewOn);ob.onclick=()=>{mpOppViewOn=true;mpOppViewSync();};}
+  $("pitchWrap").classList.toggle("hide",mpOppViewOn);
+  $("oppPitchWrap").classList.toggle("hide",!mpOppViewOn);
+  $("teamBar").classList.toggle("hide",mpOppViewOn);
+  const tb=$("tacticBar");
+  if(tb)tb.style.display=mpOppViewOn?"none":(tb.innerHTML?"block":"none");
+  $("oppTeamBar").classList.toggle("hide",!mpOppViewOn);
+  if(mpOppViewOn)drawOppPitch();}
 function h2hWireSnapshot(){
   const MS=buildMatchSnapshot();
   return {
     teamName:teamName,
+    /* A TELJES CSAPATLAP: ebből fagy be a társ gépén a te kezdő tizenegyed
+       (lásd mpTeamCard). A szimulációra semmilyen hatása nincs. */
+    card:mpTeamCard(MS.active),
     ovr:MS.ovr,defMult:MS.defMult,famSp:MS.famSp,
     /* A KIJELZETT csapaterő. Az ovr fölötte a szimuláció belső száma (rejtett
        módosítókkal), ami nem összemérhető a CPU-ellenfelek ratingjével. A
@@ -21715,6 +21922,16 @@ function h2hStart(node,sim,round){
   if(oppSnap.standing)
     S.mpMateHalf={season:(S.seasonNumber||1),
       rep:Object.assign({teamName:cleanTeam||"A társad"},oppSnap.standing)};
+  /* ---- A TÁRS KEZDŐ TIZENEGYE BEFAGY ----
+     EZ AZ A PILLANAT, amikor tényleg megfigyelheted: pályára lépett ellened.
+     A kép a következő párharcig marad, és a pálya alatti kapcsolóval bármikor
+     előhívható. Régi kliens (nincs card a pillanatképben) esetén nem történik
+     semmi — a párharc ugyanúgy lefut. */
+  try{
+    if(mpFreezeOppSnap(oppSnap.card,round,mpCupDuelNow())){
+      if(cleanTeam)S.mpOppSnap.card.team=cleanTeam;
+      try{saveGame();}catch(e){}}
+  }catch(e){}
   h2hScript={sim,round,iAmHome:h2hIAmHome(),neutral:h2hNeutralVenue(),
     oppName:cleanTeam||"A társad",
     oppOvr:(oppSnap.dispOvr!=null?oppSnap.dispOvr:(oppSnap.ovr||0))};
@@ -22197,7 +22414,11 @@ async function mpStartExchange(onReady){
   let node=null;
   try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
   if(!_mpStartBusy)return;
+  /* A CSAPATLAP a javaslat mellé ül: ez az EGYETLEN pillanat a szezon előtt,
+     amikor a két kliens amúgy is beszél egymással — így új hálózati csatorna
+     nélkül tudja meg mindkettő, kivel indul neki az idénynek. */
   const myBidRec={lvl:(bid&&bid.value!=null)?bid.value:null,str:Math.round(teamStrength()),
+    card:mpTeamCard(),
     season:mpUpcomingSeason(),at:Date.now()};
   if(!mpStartRecOk(node&&node[myField]))await mpReput(key,myField,null,myBidRec);
   if(!_mpStartBusy)return;
@@ -22225,6 +22446,10 @@ async function mpStartTick(key,myField,oppField,onReady,myBidRec){
     if(!_mpStartBusy)return;}
   const _m=node&&node[myField],_o=node&&node[oppField];
   const mine=mpStartRecOk(_m)?_m:null,mate=mpStartRecOk(_o)?_o:null;
+  /* A TÁRS CSAPATLAPJA. Mindig eltesszük, amint látszik — a kényszerindítás
+     (node.final) ágán is, mert ott a társ rekordja már fent lehet. A napló-
+     összefoglalót a szezonindítás írja ki belőle (announceMpOpponent). */
+  try{if(mate)mpStoreOppStart(mate);}catch(e){}
   /* ---- MÁR ELDŐLT SZINT ----
      Ha az egyik oldal egyedül indult el (lásd a kényszerindítást lent), a
      döntést BEÍRJA a szobába. A másik kliens ezt veszi át, nem számol újra —
@@ -24023,6 +24248,15 @@ function playMatch(){
         if(!S.mpDuelLog.some(m=>m.season===sn&&m.round===rnd))
           S.mpDuelLog.push({season:sn,round:rnd,gf,ga,home:!!fx.home});}}
     addLine(`VÉGE  ${title}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m "+cls);
+    /* ---- A MEGFIGYELÉS EREDMÉNYE ----
+       A társ felállása már a kezdőrúgáskor befagyott (h2hStart); itt kap
+       eredményt is, hogy a visszanézéskor lásd, MELYIK meccsről szól a kép. */
+    if(DUEL)try{
+      const _os=S.mpOppSnap;
+      if(_os&&_os.season===(S.seasonNumber||1)&&_os.round===S.idx+1){
+        _os.res={gf,ga};
+        addLine(`🔍 Játszottál ellene, tehát meg is figyelhetted: <b>${esc(String(_os.card&&_os.card.team||DUEL.oppName))}</b> felállása befagyott. A pálya alatti kapcsolóval a következő párharcig bármikor visszanézheted.`,"m ev");}
+    }catch(e){}
     if(DUEL)addLine(`⚔ A párharc lezárult: ${cls==="win"?`LEGYŐZTED ${esc(String(DUEL.oppName))} csapatát!`:cls==="loss"?`${esc(String(DUEL.oppName))} vitte el a három pontot.`:"osztozkodtatok — döntetlen."} ${S.idx+1===H2H_ROUNDS[0]?"A visszavágó a 30. fordulóban jön.":"Ez volt a szezon utolsó összecsapásotok."}`,"m "+cls);
     /* ---- A MECCS MÉRLEGE (F1) ----
        Egy mondat arról, MILYEN meccs volt — nem arról, mi lett az eredménye.
@@ -35593,6 +35827,9 @@ function startNextCareerSeason(){
   $("ttLines").innerHTML="";
   $("ttTeam").textContent=teamName.toUpperCase().slice(0,16);
   addLine(`Új szezon kezdődik, ${esc(teamName)}! Edző: ${coach.n}. Sok sikert!`,"m");
+  if(h2hRoomActive())
+    addLine(`⚔ A ${H2H_ROUNDS.join(". és a ")}. fordulóban a társad ellen játszol.`,"m ev");
+  announceMpOpponent();
   announceSeasonRivals();
   updateStanding();updateMorale();updateSkillsLine();
   $("kickBtn").disabled=false;$("kickBtn").textContent=kickBtnLabel();
@@ -39537,6 +39774,7 @@ function saveGame(){
         oppBuffH:S.oppBuffH,
         mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,pendingCardUps:S.pendingCardUps,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,mpTable:S.mpTable,seasonDrama:S.seasonDrama,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
+        mpOppStart:S.mpOppStart,mpOppSnap:S.mpOppSnap,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
       }
     };
@@ -39935,6 +40173,11 @@ function applySavedGame(d){
   S.mpDecision=d.S.mpDecision||null;
   S.mpHistory=d.S.mpHistory||[];
   S.mpDuelLog=d.S.mpDuelLog||[];
+  /* Az ellenfél csapatlapja. Régi mentésben nincs — a szezonindulói
+     összefoglaló a következő szezonkezdésnél, a befagyasztott felállás a
+     következő párharcnál jön meg magától. */
+  S.mpOppStart=d.S.mpOppStart||null;
+  S.mpOppSnap=d.S.mpOppSnap||null;
   /* F7: az elárvult (egyjátékosra fordított) szoba-karrier jelzője */
   S.mpOrphan=!!d.S.mpOrphan;
   /* RUN: a mérő állapota. Régi mentésnél üresen indul, és a lusta
