@@ -2680,7 +2680,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.27";
+const APP_VERSION="3.1.28";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -13163,14 +13163,14 @@ function twLooksForScout(mult){
 function twSession(){
   /* A CHECKPOINT-ABLAK a HUB-ban él, ezért a keretének is az S-ben kell laknia:
      a HUB-ból ki-be lépkedve (vagy újratöltés után) különben újratöltődne. */
-  if(TW&&TW.fromCheckpoint&&S.twWindow)return S.twWindow;
+  if(TW&&TW.fromCheckpoint&&S.twWindow)return twSessionFix(S.twWindow,1);
   if(TW&&TW.isHubPurchase){
     const sn=S.seasonNumber||1;
     if(!S.summerLooks||S.summerLooks.season!==sn){
       const L=twLooksForScout(TW_LOOKS_SUMMER_MULT);
       S.summerLooks={season:sn,max:L,left:L,pos:{}};}
-    return S.summerLooks;}
-  return TW;}
+    return twSessionFix(S.summerLooks,TW_LOOKS_SUMMER_MULT);}
+  return twSessionFix(TW,1);}
 /* ================= SZEZONKÖZI ÁTIGAZOLÁS A HUB-BAN =================
    Régen a 8./15./23. forduló után egy külön képernyő (#scWindow) állította meg
    a szezont, és ott futott a scoutolás. Mostantól a checkpoint a HUB-ba
@@ -13299,6 +13299,46 @@ function twResetSessionLooks(mult){
 /* Elfogyott-e a keret (a végtelen = klasszikus mód sosem fogy el). */
 function twLooksSpent(sess){return sess.left!==undefined&&sess.left<=0;}
 function twPosSpent(sess,key){return (sess.pos&&sess.pos[key]||0)>=TW_LOOKS_PER_POS;}
+/* ---- ÖNJAVÍTÁS: A FELDERÍTÉSI KERET SOSEM LEHET NEGATÍV ----
+   BEJELENTETT HIBA: a nyári vásárlásban egy posztra koppintva a felderítés
+   LEVONÓDOTT, de a találati lista nem jött be. A választó ilyenkor nem
+   rajzolódott újra, tehát a gombjai a RÉGI állapotukban maradtak kattinthatók
+   — sem az „elfogyott a keret", sem a „posztonként max 4×" zár nem lépett
+   közbe. Minden újabb koppintás megint levont egyet, így lett a 6-os keretből
+   −13/6.
+   A gyökeret a hívási oldalon zárjuk le (a keret csak SIKERES felderítésért
+   fogyhat, lásd twSpendLook), ez itt a MÁR ELROMLOTT állapot helyreállítása:
+   ha a számláló olyan helyre került, ahova szabályos úton nem juthatott
+   (negatív maradék, vagy több elhasznált felderítés, mint a keret), a session
+   tiszta lappal indul újra. Idempotens: a javítás után a feltétel hamis. */
+function twSessionFix(s,mult){
+  if(!s||typeof s!=="object")return s;
+  if(!s.pos||typeof s.pos!=="object")s.pos={};
+  if(s.left===undefined)return s;                    /* korlátlan keret (klasszikus mód) */
+  const used=Object.keys(s.pos).reduce((a,k)=>a+(s.pos[k]||0),0);
+  const max=(typeof s.max==="number"&&isFinite(s.max)&&s.max>0)?s.max:twLooksForScout(mult||1);
+  const romlott=(typeof s.left!=="number")||!isFinite(s.left)||s.left<0||s.left>max||used>max;
+  if(romlott){
+    s.max=max;s.left=max;s.pos={};
+    try{addLine(`🔧 A scout felderítési kerete hibás állapotban volt (egy korábbi hiba nyoma) — visszaállítva: ${max}/${max}.`,"m ev");}catch(e){}}
+  return s;}
+/* Egy felderítés LEKÖNYVELÉSE. A keret akkor és csak akkor fogy, ha a
+   felderítés tényleg lefutott: a hívó előbb levon, és ha a scoutolás bármiért
+   elszáll, a `twRefundLook` visszaadja. A visszalépés a jelöltlistáról
+   továbbra sem jár vissza — az a korlát megkerülése lenne. */
+function twSpendLook(sess,key){
+  if(!sess||sess.left===undefined)return null;
+  const before={left:sess.left,used:(sess.pos&&sess.pos[key])||0};
+  sess.pos=sess.pos||{};
+  sess.left=Math.max(0,sess.left-1);
+  sess.pos[key]=before.used+1;
+  return before;}
+function twRefundLook(sess,key,before){
+  if(!sess||!before)return;
+  sess.left=before.left;
+  if(!sess.pos)return;
+  if(before.used)sess.pos[key]=before.used;
+  else delete sess.pos[key];}   /* nulla használat ne hagyjon maga után nyomot */
 /* ================= ATTRIBÚTUM-KERESÉS (4. fázis) =================
    A pozíciós felderítés mellett egy MÁSIK keresési mód: nem posztra, hanem
    egy konkrét KÉPESSÉGRE keresel, poszttól függetlenül. A találatok között a
@@ -24621,7 +24661,10 @@ function twShowAttrPicker(){
       if((sess.attrLeft||0)<=0){twShowCategoryPicker();return;}
       sess.attrLeft--;
       TW.searchMode="attr";TW.searchAttr=k;TW.category=null;TW.retries=0;
-      twScout();};
+      /* ugyanaz a zár, mint a poszt-keresésnél: elszállt keresésért nem
+         fogyhat a keresési alkalom */
+      try{twScout();}
+      catch(err){sess.attrLeft++;twScoutFailed(err,null);}};
     grid.appendChild(b);});
   $("twBody").appendChild(grid);
   const back=document.createElement("button");back.className="btn-s stepbtn";back.style.marginTop="10px";
@@ -24655,11 +24698,25 @@ function twShowCategoryPicker(){
       +`<span class="palTx"><b>${twCatLabel(c.key)}</b>${sub?`<small>${sub}</small>`:""}</span>`;
     if(off){btn.disabled=true;}
     else btn.onclick=()=>{
+      /* ---- ELAVULT GOMB ELLENI ZÁR ----
+         A gombok állapota a RAJZOLÁSKOR dől el. Ha a keret azóta elfogyott
+         (vagy ez a poszt kimerült), a régi gomb nem vonhat le még egyet:
+         inkább újrarajzoljuk a választót, hogy a felhasználó a valós
+         állapotot lássa. */
+      if(limited&&(twLooksSpent(sess)||twPosSpent(sess,c.key))){twShowCategoryPicker();return;}
       /* A felderítés a POSZT KIVÁLASZTÁSAKOR fogy — a jelöltlistáról
-         visszalépve nem jár vissza, különben a korlát megkerülhető lenne. */
-      if(limited){sess.left--;sess.pos[c.key]=(sess.pos[c.key]||0)+1;}
+         visszalépve nem jár vissza, különben a korlát megkerülhető lenne.
+         DE: csak akkor, ha a felderítés tényleg le is fut. Ha a scoutolás
+         bármiért elszáll, a keret visszakapja a levont felderítést, és a
+         választó újrarajzolódik a hibaüzenettel — enélkül a képernyő némán
+         ugyanaz maradt, a keret meg fogyott (ez volt a −13/6 forrása). */
+      const before=limited?twSpendLook(sess,c.key):null;
       TW.searchMode="pos";TW.searchAttr=null;
-      TW.category=c.key;TW.retries=0;twScout();};
+      TW.category=c.key;TW.retries=0;
+      try{twScout();}
+      catch(err){
+        if(limited)twRefundLook(sess,c.key,before);
+        twScoutFailed(err,c.key);}};
     grid.appendChild(btn);});
   $("twBody").appendChild(grid);
   /* Az ATTRIBÚTUM-KERESÉS innen ÁTKERÜLT a HUB-ba (harmadik átigazolás-fajta
@@ -24671,6 +24728,20 @@ function twShowCategoryPicker(){
   skipBtn.onclick=()=>twNextCycleOrFinish();
   $("twBody").appendChild(skipBtn);
   $("twActions").innerHTML="";}
+/* ---- HA A FELDERÍTÉS ELSZÁLL ----
+   Nem hallgatunk róla, és nem is hagyjuk a felhasználót egy néma képernyőn:
+   visszatérünk a poszt-választóhoz, kiírjuk, hogy a keret NEM fogyott, és
+   megmutatjuk a hiba szövegét is — ha újra előjön, ez az egy sor megmondja,
+   hol keressük. */
+function twScoutFailed(err,catKey){
+  const msg=String((err&&err.message)||err||"ismeretlen hiba");
+  try{addLine(`⚠️ A scout felderítése elakadt${catKey?` (${twCatLabel(catKey)})`:""} — a felderítési kereted megmaradt. (${esc(msg)})`,"m ev");}catch(e){}
+  try{twShowCategoryPicker();}catch(e){return;}
+  const w=document.createElement("div");
+  w.style.cssText="margin-top:9px;padding:9px 11px;border-radius:9px;font-size:12.5px;line-height:1.5;background:rgba(198,40,40,.12);border:1px solid var(--red);color:var(--ink)";
+  w.innerHTML=`⚠️ <b>A felderítés nem indult el</b>${catKey?` (${esc(twCatLabel(catKey))})`:""} — a <b>felderítési kereted megmaradt</b>, próbálj másik posztot.`
+    +`<div style="font-size:11px;color:var(--dim2);margin-top:4px">${esc(msg)}</div>`;
+  $("twBody").appendChild(w);}
 /* ================= IGAZOLÁSI SZINT — A MEZŐNYHÖZ KÖTVE =================
    A scout ajánlatai NEM a teljes poolból sorsolódnak, hanem a választott
    ellenfél-erősség (oppTargetRating) köré, kicsivel az alá hangolva. Mivel
@@ -24798,11 +24869,20 @@ function twScout(){
   const attrMode=TW.searchMode==="attr";
   const aKey=TW.searchAttr;
   const catDef=attrMode?null:BENCH_CATS.find(c=>c.key===TW.category);
+  /* A posztkategória ISMERETLEN — ez csak akkor fordulhat elő, ha a TW.category
+     nem a választóból jött. Némán elszállni a legrosszabb kimenet (a keret
+     fogy, a képernyő marad), ezért nevesített hibát dobunk: a hívó
+     visszaadja a felderítést, és ki is írja, mi történt. */
+  if(!attrMode&&!catDef)
+    throw new Error(`Ismeretlen posztkategória: ${TW.category}`);
   const want=attrMode?TW_ATTR_RESULTS:3;
   const cands=[],usedNames=new Set();
   let guard=0,budgetBlocked=false;
   if(gameMode==="career"&&careerPool){
     let poolCands=Object.values(careerPool).filter(e=>{
+      /* HIÁNYOS POOL-BEJEGYZÉS: egyetlen sérült sor sem viheti el az egész
+         felderítést — inkább kimarad a keresésből. */
+      if(!e||!e.n||!Array.isArray(e.pos))return false;
       if(drafted.has(e.n))return false;
       return attrMode?true:e.pos.some(pp=>catDef.codes.includes(pp));});
     if(attrMode){
@@ -24812,7 +24892,12 @@ function twScout(){
       poolCands=poolCands.filter(e=>{
         if(!e.attrs)initPlayerAttrs(e);
         return (e.attrs[aKey]||0)>=t-TW_ATTR_TOLERANCE;});}
-    const affordable=poolCands.filter(e=>buyPrice(e)<=S.transferBudget);
+    /* Az ÁR kiszámítása sem borulhat fel egy sérült bejegyzésen: aminek nincs
+       értelmezhető ára, az egyszerűen nem jelölt. */
+    const affordable=poolCands.filter(e=>{
+      let pr=Infinity;
+      try{pr=buyPrice(e);}catch(err){return false;}
+      return (typeof pr==="number"&&isFinite(pr))?pr<=S.transferBudget:false;});
     if(poolCands.length&&!affordable.length)budgetBlocked=true;
     poolCands=affordable;
     while(cands.length<want&&cands.length<poolCands.length&&guard<400){
