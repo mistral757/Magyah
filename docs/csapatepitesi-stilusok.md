@@ -478,7 +478,7 @@ igényel új szimulációs ágat.
   A szintek egyre drágábbak és egyre erősebbek; az ársávot a képesség „rangja"
   adja: I. sáv 14/24/38 · II. sáv 26/45/70 · III. sáv 40/68/108 pont. Egy
   stílus teljes fája **1007 pont** (a Béke és harmónia a négy
-  egyensúly-képességgel 1796), ami tudatosan több, mint amennyi egy
+  egyensúly-képességgel 1975), ami tudatosan több, mint amennyi egy
   karrierbe belefér — a stíluson belül is dönteni kell, nem lehet kimaxolni.
   A felület minden képességnél kiírja, mit ad MOST és mit adna a KÖVETKEZŐ
   szint, hogy a vásárlás ne találgatás legyen.
@@ -526,7 +526,7 @@ igényel új szimulációs ágat.
 
   | Szint | Képesség | Hatás (I / II / III) |
   |---|---|---|
-  | II | **Természetes összhang** | a mérő feltételei 15% / 25% / 30%-kal könnyítve: a teljes ponthoz kevesebb effektív gól/gólpassz-adó (6 → 5,25 / 4,5) és kevesebb skill-birtokos (5 → 4,4 / 3,8) is elég, a kezdő 11 szórás-tűrése pedig 0,18-ról 0,21 / 0,26-ra tágul |
+  | II | **Természetes összhang** | a mérő feltételei 15% / 25% / 30%-kal könnyítve: a teljes ponthoz kevesebb effektív gól/gólpassz-adó (7,5 → 6,5 / 5,9 / 5,6) és kevesebb skill-birtokos (6,25 → 5,5 / 4,9 / 4,7) is elég, a kezdő 11 szórás-tűrése pedig 0,18-ról 0,21 / 0,24 / 0,26-ra tágul |
   | III | **Egymástól tanulnak** | a csapategyensúlyból járó ingyen képességek szezonos kvótája +1 / +2 / +3. A kapu marad: ha az alap nem jár (65 alatti összegyensúly), ez sem nyit kaput |
   | III | **Nincs plafon** | a mérő 100-as plafonja 125 / 150 / 200-ra tolódik: a részpontok a cél FÖLÖTT is számítanak tovább, és velük nő a csapaterő-bónusz (max +2 → +2,5 / +3 / +4) és a kvóta sávtáblája is (100 fölött minden további 20 pont +1 képesség) |
   | III | **Add tovább!** | az ELADOTT vagy a STÁBBA felvett játékosod továbbadja a képességeit — skillenként külön sorsolás 20% / 30% / 50%-kal, a címzettet te választod ki |
@@ -548,8 +548,38 @@ igényel új szimulációs ágat.
     lépéskor), tehát minden út lefedve; az Iskolateremtő évekig csepegtető
     hagyatékától független, egyszeri hatás.
 
-  A stílus fája ezzel 1007-ről **1796 pontra** nőtt — vagyis a választási
+  A stílus fája ezzel 1007-ről **1975 pontra** nőtt — vagyis a választási
   kényszer nem csökkent, hanem nőtt: még kevesebb fér belőle egy karrierbe.
+
+* **A mérő és az árak utánhangolása (3.1.27).** Az első játékmenet kimutatta,
+  hogy a mérő két legnagyobb súlyú része alapjáraton is túl könnyen
+  kimaxolódott, a két mérő-mozdító képesség pedig alulárazott volt: egyetlen
+  megnyitott szint a könnyítésből és egy a plafonból 92-ről 110-re lökte a
+  csapategyensúlyt, ami mérföldkő- és vele stíluspont-lavinát indított.
+
+  * **A célszámok 25%-kal feljebb.** Effektív gól/gólpassz-adó a teljes
+    ponthoz: 6 → **7,5**; effektív skill-birtokos: 5 → **6,25**. A 45%+30%
+    súlyú teher- és skill-rész így nem áll be magától 100%-ra, és a
+    csapategyensúly nem szűkül a rating-eloszlásra. A stílus könnyítése
+    változatlan arányokkal dolgozik — csak most van min könnyíteni.
+  * **A két mérő-mozdító képesség ára másfélszeres.** „Természetes összhang"
+    39/68/105, „Nincs plafon" 60/102/162 pont (`STYLE_BAL_PRICE_MULT`). Nem a
+    hatásukat vágtuk vissza — a filozófia LEGYEN erős —, csak megkérjük az
+    árát: ezek nem egy szeletet erősítenek, hanem magát a MÉRCÉT mozdítják, és
+    a csapategyensúly nemcsak csapaterőt ad, hanem ingyen képességeket és
+    mérföldköveket (azaz újabb stíluspontot) is. Az ársávot nem emeltük — a
+    rang a hatás jellegét mondja meg, nem az árát —, a szorzó egy új,
+    képességenkénti paraméter (`stTrait(...,mult)`).
+  * **A csapategyensúly mérföldkő-lépcsője a 200-as plafonhoz igazodik.** A
+    régi tábla 60-nál indult és 99-nél állt meg, vagyis a kitolt mérő nehezebb
+    fele jutalom nélkül maradt. Az új skála **75-nél indul és 200-ig visz**,
+    tizenöt fokozattal: 75→2 · 80→3 · 85→4 · 90→6 · 95→9 · **100→12** ·
+    110→15 · 120→18 · 130→21 · 140→24 · **150→28** · 160→30 · **175→32** ·
+    185→38 · **200→48** stíluspont (összesen 290). A görbe a tetején
+    szándékosan meredek: a 175 fölötti két fokozat egy egész karrier célja, és
+    csak kitolt plafonnal, közel tökéletes teher-, skill- ÉS keret-eloszlással
+    érhető el. A 100 fölötti fokozatok leírása ki is mondja, hogy a „Nincs
+    plafon" nélkül elérhetetlenek.
 
 ### 4.4 Nyitott kérdések
 

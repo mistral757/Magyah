@@ -2680,7 +2680,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.26";
+const APP_VERSION="3.1.27";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -31360,8 +31360,18 @@ function retireBadge(name){
    góllövő közül kilenc egyetlen góllal nem tesz kiegyensúlyozottá egy csapatot.
    A harmadik a relatív szórásból dolgozik (szórás/átlag). */
 const BAL_W_LOAD=0.45, BAL_W_SKILL=0.30, BAL_W_RATING=0.25;
-const BAL_TARGET_LOAD=6;    /* ennyi effektív gól/gólpassz-adó = teljes pont */
-const BAL_TARGET_SKILL=5;   /* ennyi effektív skill-birtokos = teljes pont */
+/* ---- A CÉLSZÁMOK 25%-KAL FELJEBB (3.1.27) ----
+   MÉRVE: a teher és a skill-eloszlás ALAPJÁRATON is túl könnyen kimaxolódott.
+   Egy szélesen játszó keret 6 effektív gól/gólpassz-adót és 5 effektív
+   skill-birtokost szinte magától összehoz — vagyis a mérő két legnagyobb
+   súlyú része (45% + 30% = 75%) rendszeresen 100%-on állt, és a
+   csapategyensúly gyakorlatilag a rating-eloszlásra szűkült. Onnan pedig
+   egyetlen megnyitott stílus-szint (könnyítés + plafon) 92-ről 110-re lökte a
+   mérőt, ami mérföldkő-lavinát és vele stíluspont-lavinát indított.
+   A célszámok ezért 25%-kal feljebb kerülnek. A stílus KÖNNYÍTÉSE változatlan
+   arányokkal dolgozik, csak most van min könnyíteni. */
+const BAL_TARGET_LOAD=7.5;  /* ennyi effektív gól/gólpassz-adó = teljes pont */
+const BAL_TARGET_SKILL=6.25;/* ennyi effektív skill-birtokos = teljes pont */
 const BAL_RATING_CV=0.18;   /* ekkora relatív szórás fölött már nulla a pont */
 const BALANCE_MAX_OVR=2.0;  /* a tökéletes egyensúly ennyi csapat-OVR-t ér */
 const BAL_EXT_GATE=0.80;    /* a rating-rész 100 FÖLÖTTI sávjának nyitó kapuja */
@@ -37632,10 +37642,23 @@ stTiers("harmonia","hm_scorersN",th=>`${th} különböző gólszerző`,
 stTiers("harmonia","hm_axisN",th=>`A leggyengébb tengely: ${th}`,
   th=>`Érje el mind a négy csapat-attribútum a ${th}-öt.`,
   ST_L6,[70,75,80,85,90,95],()=>Math.round(stWeakestAxis()));
+/* ---- A CSAPATEGYENSÚLY LÉPCSŐJE A KITOLT PLAFONHOZ IGAZÍTVA (3.1.27) ----
+   A lépcső a 100-as plafon idejéből való: 60-nál indult, és a felső fokozatai
+   (96/98/99) a régi mérő utolsó hajszálain osztoztak. A „Nincs plafon" óta a
+   mérő 200-ig mehet, tehát a régi tábla a felénél elfogyott — a nehezebb fele
+   jutalom nélkül maradt volna.
+   AZ ÚJ SKÁLA 75-NÉL INDUL (a régi alsó fokozatok az új célszámokkal amúgy is
+   komoly keretet kérnek), és 200-ig visz. A jutalomgörbe szándékosan
+   MEREDEKEBB a tetején: 100-ig szerény, 150-ig egyenletesen nő, a 175 fölötti
+   két fokozat pedig egy egész karrier célja — oda csak kitolt plafonnal, közel
+   tökéletes teher-, skill- ÉS keret-eloszlással lehet eljutni. */
+const ST_BAL=[2,3,4,6,9,12,15,18,21,24,28,30,32,38,48];
+const ST_BAL_TH=[75,80,85,90,95,100,110,120,130,140,150,160,175,185,200];
 stTiers("harmonia","hm_balN",th=>`${th} pontos csapategyensúly`,
-  th=>`Érje el a csapategyensúly-mérőd a ${th} pontot. A felső fokozatok már `
-     +`szinte tökéletes elrendezést kérnek — és onnantól minden új rekord ugyanannyit fizet.`,
-  ST_PEAK,[60,65,70,75,80,85,88,91,94,96,98,99],
+  th=>`Érje el a csapategyensúly-mérőd a ${th} pontot.`
+     +(th>100?` A 100 fölötti sáv csak kitolt plafonnal (a „Nincs plafon" képességgel) érhető el.`
+             :` A felső fokozatok szinte tökéletes elrendezést kérnek.`),
+  ST_BAL,ST_BAL_TH,
   ()=>{const b=teamBalance();return b.ok?Math.round(b.score*100):0;});
 
 /* ---------- ⭐ SZTÁROM A PÁROM ---------- */
@@ -38048,11 +38071,16 @@ const STYLE_TRAIT_PRICE={1:[14,24,38],2:[26,45,70],3:[40,68,108]};
    látszott. Egy hatás, amiről nem tudod, él-e, használhatatlan: nem tudsz rá
    építeni, és nem tudod eldönteni, megérte-e megvenni.
    A függvény egy rövid, MÉRT mondatot ad vissza a mostani állapotról. */
-function stTrait(styleK,key,tier,n,d,levels,cond){
+/* `mult`: ÁRSZORZÓ az ársávon felül. Ritka, és mindig ugyanazért kerül elő: ha
+   egy képesség a saját sávjához képest aránytalanul sokat ad. A sávot nem
+   emeljük miatta (a rang a hatás JELLEGÉT mondja meg, nem az árát), csak
+   megdrágítjuk azt az egy képességet. */
+function stTrait(styleK,key,tier,n,d,levels,cond,mult){
   const price=STYLE_TRAIT_PRICE[tier]||STYLE_TRAIT_PRICE[1];
+  const m=mult&&mult>0?mult:1;
   (STYLE_TRAITS[styleK]=STYLE_TRAITS[styleK]||[]).push({
     key,tier,n,d,cond:cond||null,
-    lv:levels.map((L,i)=>({price:price[i],fx:L.fx||{},note:L.note||""}))});}
+    lv:levels.map((L,i)=>({price:Math.round(price[i]*m),fx:L.fx||{},note:L.note||""}))});}
 
 /* ---------- 🧱 BETON VÉDELEM ---------- */
 stTrait("beton","edzett_szemek",1,"Edzett szemek",
@@ -38156,11 +38184,18 @@ stTrait("harmonia","gepezet_mukodik",3,"A gépezet",
    többet terem, és a távozó tudása is itt marad. Mind a MEGLÉVŐ motorokba köt
    be (teamBalance, balanceSkillQuota, a jutalom-skill sor), új meccsmotor-ág
    nélkül. */
+/* A KÉT MÉRŐ-MOZDÍTÓ ÁRA MÁSFÉLSZERES (3.1.27). Ezek nem egy szeletet
+   erősítenek, hanem magát a MÉRCÉT mozdítják — és a csapategyensúly nemcsak
+   csapaterőt ad, hanem ingyen képességeket és mérföldköveket (azaz újabb
+   stíluspontot) is. Egyetlen megnyitott szint önmagában 92-ről 110-re lökte a
+   mérőt, ami az egész stíluspont-gazdaságot megpörgette. A hatásukat nem
+   vágjuk vissza — a filozófia LEGYEN erős —, csak megkérjük az árát. */
+const STYLE_BAL_PRICE_MULT=1.5;
 stTrait("harmonia","termeszetes_osszhang",2,"Természetes összhang",
   "A csapategyensúly könnyebben épül: kevesebb gól/gólpassz-adó és kevesebb skill-birtokos is elég a teljes ponthoz, és a kezdő 11 szórás-tűrése is tágul.",[
   {fx:{balEase:0.15},note:"15%-kal könnyített feltételek"},
   {fx:{balEase:0.25},note:"25%-kal könnyített"},
-  {fx:{balEase:0.30},note:"30%-kal könnyített"}]);
+  {fx:{balEase:0.30},note:"30%-kal könnyített"}],null,STYLE_BAL_PRICE_MULT);
 stTrait("harmonia","egymastol_tanulnak",3,"Egymástól tanulnak",
   "A csapategyensúlyból járó ingyen képességek száma nő — minden sáv ennyivel többet terem. (A kapu marad: ha az alap nem jár, ez sem nyit kaput.)",[
   {fx:{balSkill:1},note:"+1 ingyen képesség / szezon"},
@@ -38174,7 +38209,8 @@ stTrait("harmonia","nincs_plafon",3,"Nincs plafon",
   ()=>{const b=teamBalance();
     if(!b.ok)return "az egyensúly-mérő most nem mér (hiányos kezdő 11)";
     const r=b.rosterCv!=null?` · a teljes keret szórása ${String((b.rosterCv*100).toFixed(1)).replace(".",",")}%`:"";
-    return `a csapategyensúlyod most ${Math.round(b.score*100)}/${Math.round((b.cap||1)*100)}${r}`;});
+    return `a csapategyensúlyod most ${Math.round(b.score*100)}/${Math.round((b.cap||1)*100)}${r}`;},
+  STYLE_BAL_PRICE_MULT);
 stTrait("harmonia","add_tovabb",3,"Add tovább!",
   "Az ELADOTT vagy a STÁBBA felvett játékosod továbbadja a képességeit: skillenként külön sorsolás, és a címzettet te választod ki. A képesség azzal a készültséggel érkezik meg, ahogy nála állt.",[
   {fx:{inheritP:0.20},note:"20% esély képességenként"},
