@@ -2708,7 +2708,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.41";
+const APP_VERSION="3.1.42";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10583,14 +10583,14 @@ function applyYouthBoost(entry){
      plafon (Rating: ratingCap) mégis lecsípne valamit, a napló és a
      boost-történet se ígérhet többet, mint ami megérkezett. */
   const tsiBefore=entry.tsi,ratBefore=entry.startRating;
-  entry.tsi=Math.min(tsiCapFor(entry),entry.tsi+tBoost);
-  entry.peak=Math.min(ratingCap(),Math.max(entry.peak,tsiToPeakOvr(entry.tsi)));
-  entry.startRating=Math.min(ratingCap(),entry.startRating+rBoost);
+  entry.tsi=boostRaise(entry.tsi,tBoost,tsiCapFor(entry));
+  entry.peak=boostLift(entry.peak,tsiToPeakOvr(entry.tsi),ratingCap());
+  entry.startRating=boostRaise(entry.startRating,rBoost,ratingCap());
   /* A peak kövesse a boostolt Ratinget: ha a boost a peak fölé emelte a
      Ratinget (a tsiToPeakOvr önmagában max ~96-ot ad), a peak-et is húzzuk
      fel, hogy a játékosnak legyen fejlődési fejtere és a fejlődési plafon
      konzisztens legyen — különben a boostolt többlet "peak fölötti" maradna. */
-  entry.peak=Math.min(ratingCap(),Math.max(entry.peak,entry.startRating));
+  entry.peak=boostLift(entry.peak,entry.startRating,ratingCap());
   if(entry.basePeak!=null)entry.basePeak=Math.max(entry.basePeak,entry.peak);
   if(entry.baseTsi!=null)entry.baseTsi=Math.max(entry.baseTsi,entry.tsi);
   const raw=ratingAtAge(entry.peak,entry.age);
@@ -10636,6 +10636,57 @@ function youthBoostNote(entry){
    A NYERESÉG MEGMARAD: a szezonváltó a régi Ratinget viszi tovább a természetes
    kor-hanyatlással csökkentve (nem esik vissza a görbére), a többlet 30%-a
    pedig VÉGLEG beépül a peakbe — a boost tehát nem egy szezonra szól. */
+/* ================= EGY BOOST SOSEM VEHET EL =================
+   BEJELENTETT HIBA: az „Öreg csirkefogó" a klub legjobb emberétől ELVETT
+   8000 TSI-t. Az ok egyetlen zárójelben állt: a plafonra vágás LEFELÉ is
+   hatott. A képlet `min(plafon, mostani + ajándék)` volt — aki viszont már a
+   plafon FÖLÖTT állt (ikon, Infinity-boostolt keret: a TSI lágy plafonja
+   9000, a hard cap 200 000), annál ez nem hozzáadott, hanem VISSZAVÁGTA a
+   TSI-t a plafonra. Ugyanez fenyegetett a Ratingnél, a peaknél és az
+   akadémiai TSI-ugrásnál is.
+
+   A SZABÁLY MOSTANTÓL KIMONDOTT: egy ajándék legrosszabb esetben sem csinál
+   semmit. Minden plafonos emelés a RÉGI ÉRTÉKET tekinti padlónak — ha a
+   plafon a mostani érték alatt van, az érték egyszerűen marad. */
+function boostRaise(cur,add,cap){
+  const c=cur||0;
+  return Math.max(c,Math.min(cap,c+(add||0)));}
+/* Ugyanez cél-értékre (nem növekményre): sosem visz lejjebb a mostaninál. */
+function boostLift(cur,target,cap){
+  const c=cur||0;
+  return Math.max(c,Math.min(cap,target));}
+/* ---- A MÁR MEGTÖRTÉNT KÁR HELYREÁLLÍTÁSA ----
+   A hiba a boost KÖNYVELÉSÉBEN is nyomot hagyott: a naplózott nyereség
+   (oldBoostT / youthBoostT / oldBoostR / youthBoostR) NEGATÍV lett, mert a
+   tényleges változásból számoltuk. Ez pontosan megmondja, mennyit vett el —
+   tehát vissza is tudjuk adni, találgatás nélkül. Betöltéskor egyszer fut le
+   az egész kereten; ahol nincs mit javítani, ott nem csinál semmit. */
+function repairBoostLosses(){
+  if(!careerPool)return 0;
+  let fixed=0;
+  Object.values(careerPool).forEach(e=>{
+    if(!e)return;
+    const back=(k,to)=>{
+      const v=e[k];
+      if(typeof v!=="number"||v>=0)return 0;
+      e[to]=(e[to]||0)-v;   /* negatívat kivonni = visszaadni */
+      e[k]=0;
+      return -v;};
+    let got=0;
+    got+=back("oldBoostT","tsi");
+    got+=back("youthBoostT","tsi");
+    got+=back("oldBoostR","startRating");
+    got+=back("youthBoostR","startRating");
+    if(!got)return;
+    fixed++;
+    /* a származtatott értékek kövessék a visszaadott TSI-t */
+    e.peak=Math.max(e.peak||0,Math.min(ratingCap(),tsiToPeakOvr(e.tsi)));
+    e.peak=Math.max(e.peak||0,Math.min(ratingCap(),e.startRating||0));
+    if(e.basePeak!=null)e.basePeak=Math.max(e.basePeak,e.peak);
+    if(e.baseTsi!=null)e.baseTsi=Math.max(e.baseTsi,e.tsi);
+    try{if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);}catch(err){}
+    try{syncAttrsToRating(e);}catch(err){}});
+  return fixed;}
 const OLD_BOOST_TSI=[1200,3000];
 const OLD_BOOST_RATING=YOUTH_BOOST_RATING;   /* szándékosan azonos: +6-12 */
 const OLD_BOOST_RETIRE_AGE=41;
@@ -10648,15 +10699,15 @@ function applyOldBoost(entry){
   const tBoost=Math.round((OLD_BOOST_TSI[0]+Math.random()*(OLD_BOOST_TSI[1]-OLD_BOOST_TSI[0]))*sc);
   const rBoost=Math.round((OLD_BOOST_RATING[0]+Math.random()*(OLD_BOOST_RATING[1]-OLD_BOOST_RATING[0]))*sc);
   const tsiBefore=entry.tsi,ratBefore=entry.startRating;
-  entry.tsi=Math.min(tsiCapFor(entry),entry.tsi+tBoost);
-  entry.peak=Math.min(ratingCap(),Math.max(entry.peak,tsiToPeakOvr(entry.tsi)));
+  entry.tsi=boostRaise(entry.tsi,tBoost,tsiCapFor(entry));
+  entry.peak=boostLift(entry.peak,tsiToPeakOvr(entry.tsi),ratingCap());
   /* előbb a kor-görbe (ez volt eddig is), UTÁNA a tényleges emelés */
-  entry.startRating=Math.min(ratingCap(),Math.max(entry.startRating,Math.round(ratingAtAge(entry.peak,entry.age))));
-  entry.startRating=Math.min(ratingCap(),entry.startRating+rBoost);
+  entry.startRating=boostLift(entry.startRating,Math.round(ratingAtAge(entry.peak,entry.age)),ratingCap());
+  entry.startRating=boostRaise(entry.startRating,rBoost,ratingCap());
   /* A peak kövesse a boostolt Ratinget — ugyanaz az indok, mint az ifi-boostnál:
      különben a többlet "peak fölötti" maradna, és a fejlődés azonnal falba
      ütközne (a fejlődési plafon a peak alá esne). */
-  entry.peak=Math.min(ratingCap(),Math.max(entry.peak,entry.startRating));
+  entry.peak=boostLift(entry.peak,entry.startRating,ratingCap());
   if(entry.basePeak!=null)entry.basePeak=Math.max(entry.basePeak,entry.peak);
   if(entry.baseTsi!=null)entry.baseTsi=Math.max(entry.baseTsi,entry.tsi);
   entry._retireExtendTo=OLD_BOOST_RETIRE_AGE;   /* nem vonul vissza 41 éves koráig */
@@ -12012,8 +12063,8 @@ function processAcademyDevelopment(){
     /* kis eséllyel az akadémia kihoz belőle többet, mint amire számítottunk */
     if(Math.random()<ACADEMY_TSI_CHANCE){
       const gain=Math.round(200+Math.random()*600);
-      entry.tsi=Math.min(tsiCapFor(entry),(entry.tsi||2000)+gain);
-      entry.peak=Math.min(ratingCap(),Math.max(entry.peak,tsiToPeakOvr(entry.tsi)));}});}
+      entry.tsi=boostRaise(entry.tsi||2000,gain,tsiCapFor(entry));
+      entry.peak=boostLift(entry.peak,tsiToPeakOvr(entry.tsi),ratingCap());}});}
 /* Egy tehetség az akadémián marad: eltároljuk, hogy később visszatérhessen. */
 function academyKeep(prospect,rec){
   if(!S.academy)S.academy=[];
@@ -40970,6 +41021,14 @@ function applySavedGame(d){
      visszamenőleg NEM kapcsolódik be: a keret már régen összeállt. */
   careerRatingBasis=normRatingBasis(d.careerRatingBasis);
   ensureAllAttrs();   /* régi mentések migrációja: hiányzó attribútumok pótlása */
+  /* ---- A BOOST-HIBA HELYREÁLLÍTÁSA ----
+     A plafonra vágás korábban LEFELÉ is hatott (lásd boostRaise): a plafon
+     fölött álló játékosoktól az „ajándék" elvett. A könyvelt negatív nyereség
+     megmondja, mennyit — itt adjuk vissza, egyszer, a betöltéskor. */
+  try{
+    const _fix=repairBoostLosses();
+    if(_fix)addLine(`🛠 Javítva: ${_fix} játékosnál a boost tévedésből elvett a TSI-ből/Ratingből — visszakapták.`,"m life");
+  }catch(e){}
   /* ---- A SAJÁT FELÁLLÁSOK VISSZAÍRÁSA A REGISZTERBE ----
      MÉG a `form` átvétele ELŐTT kell megtörténnie: ha a mentés egy saját
      felállásra áll, a FORMS-nak MÁR ismernie kell azt a kulcsot, mire a
