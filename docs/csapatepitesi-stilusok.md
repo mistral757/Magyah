@@ -733,6 +733,33 @@ igényel új szimulációs ágat.
   magától visszaesik (5. húzás 30%, 8. húzás 5%) — a torzítás nem tudja
   újratölteni, amit már kihúzott. Alapérték (képesség nélkül) 11%.
 
+* **Vérükben a rendszer (3.1.44).** A stílus két saját rendszere — Széljáték,
+  Gyors kontra — egyszerre kap gyorsítást a MEGISMERÉSRE (a meccsenkénti
+  begyakorlás) és az ILLESZKEDÉSRE.
+
+  | Szint | Képesség | Hatás (I / II / III) |
+  |---|---|---|
+  | I | **Vérükben a rendszer** | a Széljáték és a Gyors kontra begyakorlása és illeszkedése +2,5% / +5% / +7,5% |
+
+  Az illeszkedés-bónusz a `tacticFit()`-ben, a fit EGYETLEN forrásában ül, és
+  nem a hívási helyeken. Ez fontos: a fit-et hat különböző rendszer olvassa
+  (meccs-hatás, begyakorlás, a sebesség-sorsolás kapuja, a taktika-panel, a
+  tanács-sorok) — ha csak egy részük tudna a bónuszról, a panel megint mást
+  állítana, mint a motor (pontosan az a hiba, ami a 4.3-as bekezdésben már
+  egyszer előjött a fit-magyarázatnál). Emiatt a panel is átállt: a kiírt
+  százalék már nem újraszámolt képletből jön, hanem magából a `tacticFit`-ből,
+  és a sor végén ⚡-jelöléssel ki is írja a bónuszt.
+
+  **A két fél egymásba ér, és ez szándékos.** Az illeszkedés a `fitMult`-on át a
+  begyakorlás sebességét is emeli, tehát a képesség kétszer fog: mérve (80-ról
+  induló Széljáték, 30 meccs szolid győzelmekkel) egy szezon haladása +2,73 →
+  +2,96, vagyis a III. szint nettó ~9%-kal gyorsabb megismerés — a nyers +7,5%
+  fölött. A képesség ígérete pont ez: a két dolog EGYSZERRE mozdul.
+
+  A fit szorzós, nem összeadós, és 100%-nál plafonos. Így a képesség annak ér a
+  legtöbbet, akinek a kerete már valamennyire illik a rendszerhez — nulla
+  illeszkedést nem varázsol elő.
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
