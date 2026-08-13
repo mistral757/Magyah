@@ -2708,7 +2708,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.40";
+const APP_VERSION="3.1.41";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9000,7 +9000,8 @@ function slotAxisShift(curPos,defPos,key){
    felhasználói művelet hívja őket, jóval az inicializálás után. */
 const MID_ROLE_CODES=["VKP","KKP","TKP"];
 const MID_ROLE_LABEL={VKP:"védekező",KKP:"klasszikus",TKP:"támadó",
-  JSZ:"jobbszélső",BSZ:"balszélső",CS:"középcsatár","ÁÉ":"árnyékék"};
+  JSZ:"jobbszélső",BSZ:"balszélső",CS:"középcsatár","ÁÉ":"árnyékék",
+  KV:"középhátvéd",JV:"jobb szélsővédő",BV:"bal szélsővédő"};
 /* ---- SLOTONKÉNTI TÖBBLET-SZEREPEK ----
    A középpálya KÉT LEGKÜLSŐ helye SZÉLSŐRE is állítható — MINDEN felállásban.
 
@@ -9033,6 +9034,15 @@ const SLOT_ROLE_EXTRA={};
    szélsőnek tett középpályásokkal együtt), hogy két helyet ki lehessen küldeni
    a szélre. Kettőnél a sor teljesen kiürülne — ott nincs megbízás. */
 const WING_ROLE_MIN_MID=3;
+/* ---- A HÁRMAS VÉDELEM KÉT SZÉLE ----
+   Ugyanaz a gondolat egy sorral hátrébb: a három középhátvédből a két külső
+   SZÉLSŐVÉDŐI megbízást kaphat, és ettől lesz a 3-5-2-ből 5-3-2-szerű
+   szárnyvédős rendszer — anélkül, hogy felállást kellene váltani.
+   CSAK ott ajánljuk fel, ahol a védősor CSUPA középhátvédből áll: ahol a
+   felállás eleve adott szélsővédőt (négyes/ötös védelem), ott nincs mit
+   kiküldeni. A megbízott hely VÉDŐ marad — a szerep-kategóriát a
+   getCategoryFor adja, az pedig a JV/BV-t is védőnek sorolja. */
+const DEF_ROLE_CODES=["KV"];
 function buildSlotRoleExtra(f){
   delete SLOT_ROLE_EXTRA[f];
   const F=f&&FORMS[f];
@@ -9041,28 +9051,48 @@ function buildSlotRoleExtra(f){
      felállás által TÁMADÓNAK súlyozott szélső (4-3-3, 3-4-3, 4-2-4) nem
      számít bele, a középpályásként súlyozott (4-4-2, 3-5-2, 4-5-1) igen. */
   let line=0;
-  const mids=[];
+  const mids=[],defs=[];
+  let defLine=0,defWide=0;
   F.slots.forEach((p,i)=>{
-    if(roleInFormation(p,f,i)==="KOZEPPALYAS")line++;
-    if(MID_ROLE_CODES.indexOf(p)<0)return;
     const x=(F.xy&&F.xy[i]&&F.xy[i][0]!=null)?F.xy[i][0]:50;
-    mids.push({i,x});});
-  if(line<WING_ROLE_MIN_MID||mids.length<2)return;
-  mids.sort((a,b)=>b.x-a.x||a.i-b.i);
-  const right=mids[0].i,left=mids[mids.length-1].i;
-  if(right===left)return;
-  SLOT_ROLE_EXTRA[f]={[right]:["JSZ"],[left]:["BSZ"]};}
+    if(roleInFormation(p,f,i)==="KOZEPPALYAS")line++;
+    if(getCategoryFor(p)==="VEDO"){
+      defLine++;
+      if(p==="JV"||p==="BV")defWide++;
+      if(DEF_ROLE_CODES.indexOf(p)>=0)defs.push({i,x});}
+    if(MID_ROLE_CODES.indexOf(p)>=0)mids.push({i,x});});
+  const ex={};
+  if(line>=WING_ROLE_MIN_MID&&mids.length>=2){
+    mids.sort((a,b)=>b.x-a.x||a.i-b.i);
+    const right=mids[0].i,left=mids[mids.length-1].i;
+    if(right!==left){ex[right]=["JSZ"];ex[left]=["BSZ"];}}
+  /* HÁRMAS (vagy csupa középhátvédes) VÉDELEM: a két külső kaphat
+     szélsővédői megbízást. Ha marad legalább egy középen — háromnál
+     kevesebb középhátvédnél nincs mit kiküldeni. */
+  if(!defWide&&defs.length>=3){
+    defs.sort((a,b)=>b.x-a.x||a.i-b.i);
+    const dr=defs[0].i,dl=defs[defs.length-1].i;
+    if(dr!==dl){ex[dr]=(ex[dr]||[]).concat(["JV"]);ex[dl]=(ex[dl]||[]).concat(["BV"]);}}
+  if(Object.keys(ex).length)SLOT_ROLE_EXTRA[f]=ex;}
 function slotRoleOptions(f,i){
   /* TÁMADÓ HELY: a saját alapkódja ⇄ árnyékék. A középcsatárnak a CS, a
      támadó szélsőnek a JSZ/BSZ marad a "maradj, ahol vagy" opciója — egy
      szélsőt nem lehet középcsatárrá tenni, mert az már alakzat-kérdés. */
   if(isAtkRoleSlot(f,i))return [FORMS[f].slots[i],SHADOW_POS];
-  if(!isMidRoleSlot(f,i))return [];
   const ex=(SLOT_ROLE_EXTRA[f]&&SLOT_ROLE_EXTRA[f][i])||[];
+  if(isDefRoleSlot(f,i))return DEF_ROLE_CODES.concat(ex);
+  if(!isMidRoleSlot(f,i))return [];
   return MID_ROLE_CODES.concat(ex);}
 function isMidRoleSlot(f,i){
   const F=FORMS[f];
   return !!F&&MID_ROLE_CODES.includes(F.slots[i]);}
+/* Védő-hely, amit szélsővédőre lehet állítani: középhátvéd, ami kapott
+   JV/BV többlet-opciót (lásd buildSlotRoleExtra). */
+function isDefRoleSlot(f,i){
+  const F=FORMS[f];
+  if(!F||!DEF_ROLE_CODES.includes(F.slots[i]))return false;
+  const ex=(SLOT_ROLE_EXTRA[f]&&SLOT_ROLE_EXTRA[f][i])||[];
+  return ex.indexOf("JV")>=0||ex.indexOf("BV")>=0;}
 /* Támadó hely: középcsatár-hely, VAGY olyan szélső hely, amit a felállás
    eleve támadóként súlyoz (isAttackingWingSlot). A középpályás szélsők
    (4-4-2, 3-5-2, 5-3-2, 4-5-1) tudatosan kimaradnak — lásd a fenti blokkot. */
@@ -9072,7 +9102,7 @@ function isAtkRoleSlot(f,i){
   return F.slots[i]==="CS"||isAttackingWingSlot(f,i);}
 /* Bármelyik átállítható hely — ezt kérdezi a felület, amikor azt dönti el,
    megjelenjen-e a megbízás-gomb. */
-function isRoleSlot(f,i){return isMidRoleSlot(f,i)||isAtkRoleSlot(f,i);}
+function isRoleSlot(f,i){return isMidRoleSlot(f,i)||isAtkRoleSlot(f,i)||isDefRoleSlot(f,i);}
 /* Egy slot ÉRVÉNYES kódja: a játékos felülírása, ha van és megengedett;
    különben a felállás alapértelmezése. */
 function effectiveSlotPos(f,i){
@@ -9082,6 +9112,79 @@ function effectiveSlotPos(f,i){
   if(!isRoleSlot(f,i))return def;
   const ov=slotRoles&&slotRoles[f]&&slotRoles[f][i];
   return slotRoleOptions(f,i).includes(ov)?ov:def;}
+/* ================= AZ ALAKZAT ÁRA =================
+   A megbízások eddig INGYEN voltak. Kiküldhettél két középpályást a szélre és
+   két középhátvédet a szárnyra, és a motor csak a jó oldalukat látta: a
+   kirakott ember gólsúlya (1,6 → 3,0) és gólpassz-súlya (2,5 → 4,0) megnőtt,
+   a poszt-illeszkedés pedig a saját dolga. A pálya KÖZEPE viszont közben
+   kiürült, és ezért semmit nem fizettél.
+
+   MOSTANTÓL VAN ÁRA, és pontosan ott, ahol a valóságban is: HÁTUL. Egy üres
+   középpálya-közép és egy egyszemélyes védőközép nem a saját támadásodat
+   rontja el — azon ÁTJÁTSZANAK. A mérő ezért az ELLENFÉL gólesélyét emeli, és
+   nem a te csapaterődet csökkenti: így a szélesítés valódi CSERE marad (több
+   szélesség elöl, több rés középen), nem pedig büntetés.
+
+   HOGYAN MÉRÜNK: soronként (védelem, középpálya) megnézzük, hányan maradtak
+   KÖZÉPEN a felállás alapállásához képest. Aki megbízásból kiment a szélre, az
+   hiányzik középről. Az ELSŐ kiküldött ember olcsó, a MÁSODIK drága — a
+   háromfős sorból egy középen maradó ember a tábla legdrágább fokozata.
+
+   A CSATÁRSOR SZÁNDÉKOSAN KIMARAD: ott az egyetlen megbízás az árnyékék, az
+   pedig BEFELÉ húz, nem kifelé — a közepet nem üríti, hanem tölti. Annak
+   megvan a maga cseréje a gól- és gólpassz-súlyban.
+
+   A SZÁM AZ ELLENFÉL GÓLESÉLYÉNEK SZORZÓJA. A nagyságrend a stílus-képességek
+   sávja (azok −5…−14%-ot adnak): egy teljesen szélesre húzott alakzat +29%-ot
+   ér az ellenfélnek, ami érezhető, de nem játszhatatlan. */
+const SHAPE_COST_MID=[0,0.05,0.13];
+const SHAPE_COST_DEF=[0,0.06,0.16];
+/* Egy sor mérlege: hányan vannak a sorban, hányan voltak eredetileg középen,
+   hányan maradtak, és ez mennyibe kerül. */
+function shapeLine(f,kind){
+  const F=FORMS[f]||FORMS["442"];
+  const key=FORMS[f]?f:"442";
+  const out={line:0,base:0,now:0,out:0,cost:0};
+  F.slots.forEach((def,i)=>{
+    const mine=(kind==="def")
+      ? getCategoryFor(def)==="VEDO"
+      : roleInFormation(def,key,i)==="KOZEPPALYAS";
+    if(!mine)return;
+    out.line++;
+    const central=(c)=>(kind==="def")?(c==="KV"):(MID_ROLE_CODES.indexOf(c)>=0);
+    if(central(def))out.base++;
+    if(central(effectiveSlotPos(key,i)))out.now++;});
+  out.out=Math.max(0,out.base-out.now);
+  const tbl=(kind==="def")?SHAPE_COST_DEF:SHAPE_COST_MID;
+  out.cost=tbl[Math.min(tbl.length-1,out.out)];
+  return out;}
+function teamShape(f){
+  const key=(f||form);
+  const def=shapeLine(key,"def"),mid=shapeLine(key,"mid");
+  const mult=1+def.cost+mid.cost;
+  return {def,mid,mult,pct:Math.round((mult-1)*100)};}
+/* A motor EGYETLEN belépési pontja — a panel és a szimuláció ugyanabból a
+   számból dolgozik, tehát nem tud elcsúszni. */
+function shapeOppMult(){
+  try{return teamShape().mult;}catch(e){return 1;}}
+/* ---- AZ ÁR KÖVETHETŐ ----
+   Egy szorzó önmagában elvont. A meccs gólvárhatóságából viszont KI LEHET
+   SZÁMOLNI, hány kapott gólt ér ténylegesen: a szélesítéssel az ellenfél λ-ja
+   la, nélküle la/mult volna — a kettő különbsége az az extra gól, amit az
+   alakzatért fizetsz. Ezt gyűjtjük idényenként, és a HUB kiírja.
+   VÁRHATÓ ÉRTÉK, nem könyvelés: nem azt mondja, melyik gól "miatta" esett,
+   hanem azt, mennyit KÉR összesen a döntésed. */
+function shapeNoteMatch(la){
+  if(gameMode!=="career")return;
+  const m=shapeOppMult();
+  const sn=S.seasonNumber||1;
+  let t=S.shapeStat;
+  if(!t||t.season!==sn)t=S.shapeStat={season:sn,matches:0,sumMult:0,xga:0};
+  t.matches++;t.sumMult+=m;
+  if(m>1&&isFinite(la))t.xga+=Math.max(0,la*(1-1/m));}
+function shapeStatNow(){
+  const t=S.shapeStat;
+  return (t&&t.season===(S.seasonNumber||1)&&t.matches>0)?t:null;}
 /* ---- A PÁLYAKÉP KÖVESSE A MEGBÍZÁST ----
    Az árnyékék attól árnyékék, hogy HÁTRÁBB van. Ha a pontja ott maradna, ahol
    a középcsatáré, a pályarajz hazudna arról, amit épp beállítottál — ezért az
@@ -9091,10 +9194,17 @@ function effectiveSlotPos(f,i){
    Kizárólag MEGJELENÍTÉS: a motor a poszt-kódból dolgozik, nem a
    koordinátából. */
 const SHADOW_Y_DROP=11, SHADOW_X_PULL=0.45;
+/* A SZÉLSŐVÉDŐI MEGBÍZÁS is látszik: a hely kijjebb és kicsit előrébb csúszik,
+   ahogy egy szárnyvédő tényleg áll. Kizárólag megjelenítés. */
+const WB_X_PUSH=0.55, WB_Y_LIFT=5;
 function slotXY(f,i){
   const F=FORMS[f];
   if(!F||!F.xy[i])return [50,50];
   const xy=F.xy[i];
+  {const eff=effectiveSlotPos(f,i);
+   if((eff==="JV"||eff==="BV")&&F.slots[i]==="KV")
+     return [Math.round(xy[0]+((eff==="JV"?92:8)-xy[0])*WB_X_PUSH),
+             Math.max(4,xy[1]-WB_Y_LIFT)];}
   if(effectiveSlotPos(f,i)!==SHADOW_POS)return xy.slice();
   const def=F.slots[i];
   const wide=(def==="JSZ"||def==="BSZ");
@@ -18419,6 +18529,8 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   /* PANZER — a kemény emberek közt megkötött barátságok (párkémia-kulcsra),
      és az összegyűjtött szerelés-kommentárok száma. Mindkettő karrier-szintű. */
   buddySeen:{},hardTackleNotes:0,
+  /* AZ ALAKZAT ÁRA: idényenkénti gyűjtő {season,matches,sumMult,xga} */
+  shapeStat:null,
   balSkillMatches:0,balSkillsSeason:0,
   initialSkillDone:false,   /* a kapitány-megerősítéskor járó NYITÓ skill egyszer jár */
   seasonStartStrength:0,    /* a szezonkezdő csapaterő — a kupamezőny horgonya */
@@ -20843,6 +20955,12 @@ function buildMatchSnapshot(){
   defMult=Math.max(DEF_MULT_FLOOR,defMult);
   if(famSp==="200iq")defMult*=0.97;
   if(famSp==="tank")defMult*=0.92;
+  /* AZ ALAKZAT ÁRA: a kiürített közép az ELLENFÉL gólesélyét emeli. A
+     defMult-on megy, mert az a "mennyi gólt kapunk" közös csatornája — így a
+     párharc pillanatképében is magától átutazik a társ gépére, és a
+     képlet-sorrendbe (matchLambdas) sem kell hozzányúlni. A PADLÓ UTÁN áll,
+     hogy a védekező skillek plafonja ne nyelje el. */
+  defMult*=shapeOppMult();
   const capExp=(capPlaying&&captainIdx>=0&&slots[captainIdx].player)?captainAgeExpBonus(slots[captainIdx].player.age)*0.15:0;
   const chFormMalus=(S.teamFormMalus>0)?-2.2:0;
   /* mérföldkő-lendület (áttörés utáni ellazulás / edzői fejmosás) — a párja a
@@ -23567,6 +23685,8 @@ function playMatch(){
      függvényt hívja majd a H2H is, csak ott a másik oldal is pillanatkép. */
   function lam(d){return Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)))}
   const _L=matchLambdas(MS,fx.o.ovr+hiddenOppBuff,fx.neutral?0:(fx.home?SIM.HOME:SIM.AWAY));
+  /* AZ ALAKZAT ÁRA: a mostani mérkőzésre eső extra kapott gól várható értéke */
+  try{shapeNoteMatch(_L.la);}catch(e){}
   let diff=_L.diff,lf=_L.lf,la=_L.la;
   /* ---- RIVÁLIS RANGADÓ ÉS BAJNOKI TÉT ----
      _TITLE  : a bajnoki helyzet pillanatképe a mérkőzés ELŐTT (a meccs közbeni
@@ -29618,6 +29738,24 @@ $("hubFormationBtn")&&($("hubFormationBtn").onclick=()=>{
   $("hubFormationPicker").classList.remove("hide");
   renderFormationPicker();
   $("hubFormationPicker").scrollIntoView({behavior:"smooth"});});
+/* ---- AZ ALAKZAT ÁRÁNAK KIJELZÉSE ----
+   Kimondja, hányan maradtak középen soronként, mennyibe kerül ez az ellenfél
+   gólesélyében, és — ha már van mérés — hány kapott gólt kért eddig az idényben.
+   Ha az alakzat érintetlen, egyetlen nyugtató sor marad. */
+function shapeCostHtml(){
+  let sh;try{sh=teamShape();}catch(e){return "";}
+  if(!sh)return "";
+  const st=shapeStatNow();
+  const sor=(cim,L)=>`${cim}: <b>${L.now}/${L.base}</b> középen${L.out?` <span style="color:var(--red)">(−${L.out})</span>`:""}`;
+  const free=(sh.pct<=0);
+  return `<div style="margin-top:8px;border-top:1px dashed var(--line);padding-top:6px;font-size:11.5px;line-height:1.5;color:var(--dim2)">
+    <b style="color:${free?"var(--grass)":"var(--gold)"}">📐 Az alakzat ára:</b>
+    ${free?`<span style="color:var(--grass)">nincs</span> — a közép betöltve.`
+          :`<b style="color:var(--red)">+${sh.pct}%</b> az ellenfél gólesélyére.`}
+    <br>${sor("Védelem",sh.def)} · ${sor("Középpálya",sh.mid)}
+    ${st?`<br>Az idényben eddig <b>${st.xga.toFixed(1).replace(".",",")}</b> kapott gólt kért ez a döntés (${st.matches} mérkőzésen, átlagos ár +${Math.round((st.sumMult/st.matches-1)*100)}%).`:""}
+    <br><span style="color:var(--dim)">Aki megbízásból a szélre megy, hiányzik középről: az ellenfél könnyebben játszik át rajta. A támadósor nem számít bele — az árnyékék befelé húz, nem kifelé.</span>
+  </div>`;}
 function renderFormationPicker(){
   const cost=formationChangeCost();
   const free=cost===0;
@@ -29629,7 +29767,8 @@ function renderFormationPicker(){
        csatár vagy árnyékék álljon — az adott JÁTÉKOS lapján dőlnek el a
        keretlistában; ezért mutatunk rá innen is. */
     `<br><span style="color:var(--dim2)">A megbízásokat a keretlistában, az adott játékos lapján állítod.`
-    +` Középpálya: <b>${midRoleText(form)}</b> · támadósor: <b>${atkRoleText(form)}</b>.</span>`;
+    +` Középpálya: <b>${midRoleText(form)}</b> · támadósor: <b>${atkRoleText(form)}</b>.</span>`
+    +shapeCostHtml();
   const body=$("hubFormationBody");body.innerHTML="";
   /* CSAK A VÁLASZTHATÓ felállások — a bolti tétel megvételig, a saját tervek
      a létrehozásukig nincsenek a listában (lásd availableFormKeys). */
@@ -29788,11 +29927,16 @@ function renderFormBuilder(){
    adja, nem megbízás kérdése. */
 const MID_ROLE_FULL={VKP:"Védekező középpályás",KKP:"Klasszikus középpályás",
   TKP:"Támadó középpályás",JSZ:"Jobbszélső",BSZ:"Balszélső",
-  CS:"Középcsatár","ÁÉ":"Árnyékék"};
+  CS:"Középcsatár","ÁÉ":"Árnyékék",
+  KV:"Középhátvéd",JV:"Jobb szélsővédő",BV:"Bal szélsővédő"};
 const MID_ROLE_COLOR={VKP:"var(--pos-df)",KKP:"var(--pos-mf)",TKP:"var(--pos-fw)",
   JSZ:"var(--pos-mf)",BSZ:"var(--pos-mf)",
-  CS:"var(--pos-fw)","ÁÉ":"var(--pos-fw)"};
+  CS:"var(--pos-fw)","ÁÉ":"var(--pos-fw)",
+  KV:"var(--pos-df)",JV:"var(--pos-df)",BV:"var(--pos-df)"};
 const MID_ROLE_DESC={
+  KV:"Marad a védelem közepén, ahogy a felállás tervezte. A hármas védelem így valóban hármas: nehéz átjátszani rajta.",
+  JV:"Kihúzódik a jobb szélre szélsővédőnek: szélességet ad hátulról, és feljebb tud kapcsolódni a támadásba. A hely VÉDŐ marad — cserébe a védelem közepén eggyel kevesebben lesztek, és azon az ellenfél könnyebben játszik át.",
+  BV:"Kihúzódik a bal szélre szélsővédőnek: szélességet ad hátulról, és feljebb tud kapcsolódni a támadásba. A hely VÉDŐ marad — cserébe a védelem közepén eggyel kevesebben lesztek, és azon az ellenfél könnyebben játszik át.",
   VKP:"A védelem előtt dolgozik: labdát szerez és rendez. A csapat Védekezés-tengelyét emeli, a Gólszerzését ugyanannyival csökkenti — a zárt, kontrázó rendszereknek kedvez.",
   KKP:"Az egyensúly: a középpálya motorja, aki mindkét irányban dolgozik. Egyik tengelyt sem tolja el.",
   TKP:"A támadók mögött játszik, a befejezésre készít elő. A Gólszerzés-tengelyt emeli a Védekezés rovására — a támadó, gólra menő rendszereknek kedvez.",
@@ -29838,14 +29982,18 @@ function renderHubMidRolePicker(){
   const atk=isAtkRoleSlot(form,i);
   const wing=atk&&(def==="JSZ"||def==="BSZ");
   hint.innerHTML=(p?`<b>${esc(shortName(p.n))}</b> most <b>${MID_ROLE_LABEL[cur]}</b> megbízást kap ezen a helyen. `
-                   :`Ezen a ${wing?"szélső támadó":atk?"csatár":"középpályás"}helyen most <b>${MID_ROLE_LABEL[cur]}</b> a megbízás. `)
+                   :`Ezen a ${wing?"szélső támadó":atk?"csatár":isDefRoleSlot(form,i)?"védő":"középpályás"}helyen most <b>${MID_ROLE_LABEL[cur]}</b> a megbízás. `)
     +`A felállás alakja NEM változik, és <b style="color:var(--grass)">ingyenes</b>: csak azt állítod, `
     +(wing?`hogy kint tartsa-e a szélességet, vagy behúzódjon a belső sávba árnyékéknek. `
         :atk?`hogy ez az ember legelöl támadjon, vagy egy sorral hátrébb húzódva játssza helyzetbe a többieket. `
+            :isDefRoleSlot(form,i)?`hogy a védelem közepén maradjon, vagy szélsővédőként kihúzódjon a szárnyra. `
             :`mit kérsz innen a középpályán. `)
     +`Senki nem mozdul a helyéről — a hely poszt-kódja és az illeszkedés változik.`
     +`<br>${atk?`A támadósor jelenleg: <b>${atkRoleText(form)}</b>.`
-                :`A középpálya jelenleg: <b>${midRoleText(form)}</b>.`}`;
+                :`A középpálya jelenleg: <b>${midRoleText(form)}</b>.`}`
+    /* AZ ALAKZAT ÁRA ITT A LEGFONTOSABB: ezen a képernyőn hozod meg a döntést,
+       tehát itt kell látnod, mennyibe kerül a kiürített közép. */
+    +(atk?"":shapeCostHtml());
   box.innerHTML="";
   const sgn=v=>(v>0?`+${v}`:`${v}`);
   slotRoleOptions(form,i).forEach(c=>{
@@ -40767,7 +40915,7 @@ function saveGame(){
         matchesSinceSkill:S.matchesSinceSkill,seasonNewSkills:S.seasonNewSkills,
         balSkillMatches:S.balSkillMatches,balSkillsSeason:S.balSkillsSeason,
         balLoadPrev:S.balLoadPrev,balLoadHandover:S.balLoadHandover,cupRunNo:S.cupRunNo,
-        toughSeen:S.toughSeen,buddySeen:S.buddySeen,hardTackleNotes:S.hardTackleNotes,
+        toughSeen:S.toughSeen,buddySeen:S.buddySeen,hardTackleNotes:S.hardTackleNotes,shapeStat:S.shapeStat,
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
         guideOn:S.guideOn,guideSeen:S.guideSeen,
         seasonStartStrength:S.seasonStartStrength,summerPaidAfterSeason:S.summerPaidAfterSeason,
@@ -41151,6 +41299,7 @@ function applySavedGame(d){
   S.toughSeen=d.S.toughSeen||{};
   S.buddySeen=d.S.buddySeen||{};
   S.hardTackleNotes=d.S.hardTackleNotes||0;
+  S.shapeStat=d.S.shapeStat||null;
   S.seasonNewSkills=d.S.seasonNewSkills||0;
   S.seasonSkillCont=d.S.seasonSkillCont||0;
   S.firstChemDone=!!d.S.firstChemDone;
