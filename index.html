@@ -2710,7 +2710,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.46";
+const APP_VERSION="3.1.47";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10661,7 +10661,7 @@ function applyYouthBoost(entry){
      plafon (Rating: ratingCap) mégis lecsípne valamit, a napló és a
      boost-történet se ígérhet többet, mint ami megérkezett. */
   const tsiBefore=entry.tsi,ratBefore=entry.startRating;
-  entry.tsi=boostRaise(entry.tsi,tBoost,tsiCapFor(entry));
+  entry.tsi=boostGiftTsi(entry.tsi,tBoost);
   entry.peak=boostLift(entry.peak,tsiToPeakOvr(entry.tsi),ratingCap());
   entry.startRating=boostRaise(entry.startRating,rBoost,ratingCap());
   /* A peak kövesse a boostolt Ratinget: ha a boost a peak fölé emelte a
@@ -10733,6 +10733,23 @@ function boostRaise(cur,add,cap){
 function boostLift(cur,target,cap){
   const c=cur||0;
   return Math.max(c,Math.min(cap,target));}
+/* ================= A BOOST TSI-AJÁNDÉKA MINDIG MEGÉRKEZIK =================
+   BEJELENTETT HIBA (a 3.1.42 folytatása): az „elvett TSI" megszűnt, de a helyén
+   NULLA maradt — aki a lágy plafon (TSI_SOFT_CAP = 9000) fölött állt, annak a
+   boost semmit sem adott. A javítás megállította a kárt, de nem adta vissza az
+   ajándékot; a felhasználó fizetett a boostért, és nem kapott érte TSI-t.
+
+   A LÁGY PLAFON NEM A BOOSTNAK SZÓL. A 9000 a PIACI/fejlődési pálya korlátja:
+   azt szabályozza, meddig nőhet egy játékos értéke magától. A boost viszont
+   megvásárolt, egyszeri, szándékos ajándék — ha ezt is a piaci plafon fogná
+   meg, a HUB legdrágább fejlesztése pont a legjobb emberednél érne semmit.
+   Ezért a TSI-ajándékot CSAK az abszolút mennyezet (TSI_HARD_CAP) fogja.
+
+   MIÉRT NEM CSAK A PLAFON FÖLÖTTIEKNEK: mert abból szakadék lenne. 8500-nál
+   500-at kapnál, 9500-nál a teljes 3000-et. Az ajándék MINDENKINEK teljes. */
+function boostGiftTsi(cur,add){
+  const c=cur||0;
+  return Math.max(c,Math.min(TSI_HARD_CAP,c+(add||0)));}
 /* ---- A MÁR MEGTÖRTÉNT KÁR HELYREÁLLÍTÁSA ----
    A hiba a boost KÖNYVELÉSÉBEN is nyomot hagyott: a naplózott nyereség
    (oldBoostT / youthBoostT / oldBoostR / youthBoostR) NEGATÍV lett, mert a
@@ -10755,6 +10772,26 @@ function repairBoostLosses(){
     got+=back("youthBoostT","tsi");
     got+=back("oldBoostR","startRating");
     got+=back("youthBoostR","startRating");
+    /* ---- A LENYELT (NULLÁRA VÁGOTT) AJÁNDÉK ----
+       A 3.1.42 és a 3.1.47 közti mentésekben a plafon fölött álló játékos
+       boostja már nem VETT EL, de nem is ADOTT: a könyvelésben pontosan 0 áll,
+       miközben a boost meg van véve és nem ismételhető. A kifizetetlen
+       0 EGYÉRTELMŰ JELÖLŐ — természetes úton nem állhat elő, mert a sorsolt
+       sáv legalja is 1200 (öreg) / 800 (ifi).
+       AMIT NEM TUDUNK: a kisorsolt konkrét szám nem lett elmentve. Ezért a sáv
+       KÖZEPÉT adjuk, a boost szezonjának megfelelő skálázással — ez a
+       becslés, nem rekonstrukció, és így is mondjuk ki. */
+    const paid=(k,band)=>{
+      if(e[k]!==0)return 0;
+      let sc=1;
+      try{const v=youthBoostScale();if(isFinite(v)&&v>1)sc=v;}catch(err){}
+      const add=Math.round((band[0]+band[1])/2*sc);
+      const before=e.tsi||0;
+      e.tsi=boostGiftTsi(e.tsi,add);
+      e[k]=e.tsi-before;
+      return e[k];};
+    if(e._oldBoosted)got+=paid("oldBoostT",OLD_BOOST_TSI);
+    if(e.youthBoostR!=null||e.youthBoostT!=null)got+=paid("youthBoostT",YOUTH_BOOST_TSI);
     if(!got)return;
     fixed++;
     /* a származtatott értékek kövessék a visszaadott TSI-t */
@@ -10777,7 +10814,7 @@ function applyOldBoost(entry){
   const tBoost=Math.round((OLD_BOOST_TSI[0]+Math.random()*(OLD_BOOST_TSI[1]-OLD_BOOST_TSI[0]))*sc);
   const rBoost=Math.round((OLD_BOOST_RATING[0]+Math.random()*(OLD_BOOST_RATING[1]-OLD_BOOST_RATING[0]))*sc);
   const tsiBefore=entry.tsi,ratBefore=entry.startRating;
-  entry.tsi=boostRaise(entry.tsi,tBoost,tsiCapFor(entry));
+  entry.tsi=boostGiftTsi(entry.tsi,tBoost);
   entry.peak=boostLift(entry.peak,tsiToPeakOvr(entry.tsi),ratingCap());
   /* előbb a kor-görbe (ez volt eddig is), UTÁNA a tényleges emelés */
   entry.startRating=boostLift(entry.startRating,Math.round(ratingAtAge(entry.peak,entry.age)),ratingCap());
@@ -18596,7 +18633,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      ezért a kvótái is itt: {round,label,max,left,pos,clubMax,clubLeft,
      attrMax,attrLeft}. Null = nincs nyitott ablak. */
   twWindow:null,
-  morale:50,moraleTarget:50,moraleSum:0,moraleSamples:0,scorers:{},assists:{},mvps:{},goodForm:{},badForm:{},playerReds:{},playerInjuries:{},careerStats:{},clubScoutSpinsUsed:0,twEventUsed:0,consecutiveTitles:0,consecutiveBadSeasons:0,seasonSaves:{},seasonCleanSheets:{},seasonMatches:{},seasonNumber:1,seasonHistory:[],
+  morale:50,moraleTarget:50,moraleSum:0,moraleSamples:0,scorers:{},assists:{},mvps:{},goodForm:{},badForm:{},playerReds:{},playerInjuries:{},careerStats:{},clubScoutSpinsUsed:0,twEventUsed:0,consecutiveTitles:0,consecutiveBadSeasons:0,seasonSaves:{},seasonCleanSheets:{},seasonMatches:{},seasonNumber:1,seasonHistory:[],iconSeason:0,
   grudge:new Set(),fixtures:[],playing:false,auto:false,
   mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
   mpMyFinal:null,     /* a SAJÁT záró csapaterő — a végső ítélet ebből dolgozik */
@@ -26306,7 +26343,7 @@ function twStartPhase2(){
        marad egy "Tovább" gomb, ami továbbviszi a folyamatot. Ez zárja le
        VÉGLEG a "Valami történik az öltözőben…" beakadást. */
     try{
-      if(Math.random()<scoutIconChance()){
+      if(iconEventOK()&&Math.random()<scoutIconChance()){
         const icon=twIconSigning();
         if(icon){showIconOffer(icon);return;}
       }
@@ -26480,6 +26517,25 @@ function iconFieldShift(){
   const field=(oppTargetRating||0)-INFINITY_UNLOCK_RATING;
   const market=(gameMode==="career"&&careerPool)?marketPeakShift():0;
   return Math.max(0,Math.round(Math.max(field,market)));}
+/* ================= SZEZONONKÉNT EGY IKON-IGAZOLÁS =================
+   BEJELENTETT ARÁNY: 3 szezon alatt 4 ikon. Az esély önmagában nem volt magas
+   (scoutIconChance: 16-26%), de az átigazolási események SZÁMA sok — szezononként
+   6 esemény, és a dobás eseményenként megismétlődött. Az ikonnyitás így
+   hétköznapivá vált, pedig épp az a lényege, hogy ritka.
+
+   AMIHEZ NEM NYÚLUNK: maga az esély (scoutIconChance) változatlan, ahogy az
+   akadémiai ikonok és a draft sem. Csak egy PADLÓ kerül rá: az átigazolási
+   eseményekből szezononként legfeljebb EGY ikon jöhet. A második dobás
+   szezononként egyszerűen nem indul el — az esemény a szokásos kimenetei közül
+   választ helyette.
+
+   A SZÁMLÁLÓ AZ IGAZOLÁSHOZ KÖTŐDIK, NEM A DOBÁSHOZ: a bélyegző a
+   registerIconInPool-ban ül, amin MINDEN valódi ikon-igazolás átmegy (az
+   elfogadott ajánlat és az auto-mód is). Egy ELUTASÍTOTT ajánlat tehát nem
+   használja el a szezont — nem igazoltál senkit. */
+function iconEventOK(){
+  return (S.iconSeason||0)!==(S.seasonNumber||1);}
+function noteIconSigned(){S.iconSeason=S.seasonNumber||1;}
 function twIconSigning(){
   const pool=ICON_PLAYERS.filter(p=>!drafted.has(p.n));
   if(!pool.length)return null;
@@ -26512,6 +26568,10 @@ function normalizeIconPlayer(icon){
    húzhat, youthBonus-logikával, hogy a Rating sose essen a jelenlegi erő alá. */
 const ICON_START_TSI=2500;
 function registerIconInPool(icon){
+  /* A SZEZON BÉLYEGZŐJE. Szándékosan a careerPool-őr ELŐTT: klasszikus módban
+     is elhasználja a szezont, és ez az egyetlen pont, amin minden valódi
+     ikon-igazolás átmegy. */
+  noteIconSigned();
   if(!careerPool)return;
   NAT_BY_NAME[icon.n]=icon.nat;   /* magyar névsorrend a rövidítéshez */
   /* ---- AZ IKON MÁR LÉTEZŐ POOL-BEJEGYZÉSÉT FEL KELL MINŐSÍTENI ----
@@ -26617,9 +26677,16 @@ function chemMoraleRiskFactor(){
   const moraleNorm=(S.morale-50)/50;
   return Math.max(0.4,Math.min(1.6,1-0.3*chemNorm-0.3*moraleNorm));}
 function twResolvePhase2(){
-  if(Math.random()<scoutIconChance()){
-    const iconResult=twIconSigning();
-    if(iconResult)return iconResult;
+  /* AZ ÁG EDDIG NÉMÁN ELTÖRT: a twIconSigning egy JÁTÉKOST ad vissza
+     ({n,pos,ovr,nat,conf}), nem eseménykimenetet — a hívó viszont
+     {title,text}-et vár, tehát a képernyőre „undefined" került, és az ikon SEM
+     igazolódott le. Az autoResolveCheckpoint ugyanezt a párost már helyesen
+     köti össze (twIconSigning → autoPlaceIcon); itt is az kell. A szezon-padló
+     miatt ez most számít is: enélkül egy elromlott dobás elhasználná a
+     szezon egyetlen ikonját anélkül, hogy bárki megérkezne. */
+  if(iconEventOK()&&Math.random()<scoutIconChance()){
+    const icon=twIconSigning();
+    if(icon){const r=autoPlaceIcon(icon);if(r)return r;}
   }
   const roll=Math.random();
   const roster=currentRoster();
@@ -29423,7 +29490,7 @@ function autoResolveCheckpoint(round){
     evaluateDueChallenges("round",round);
     autoHandleChallengeOffers("short",3);}
   function resolveOneEvent(){
-    if(Math.random()<0.16){
+    if(iconEventOK()&&Math.random()<0.16){
       const icon=twIconSigning();
       if(icon){const r=autoPlaceIcon(icon);if(r)return r;}
     }
@@ -41202,7 +41269,7 @@ function saveGame(){
         chRatingUpNames:S.chRatingUpNames,chNewStarterMatches:S.chNewStarterMatches,
         chSoldOver32:S.chSoldOver32,chBoughtUnder25:S.chBoughtUnder25,
         chPosLearnStarted:S.chPosLearnStarted,chSeasonStartXI:S.chSeasonStartXI,pendingRewardSkills:S.pendingRewardSkills,
-        scorers:S.scorers,assists:S.assists,mvps:S.mvps,goodForm:S.goodForm,badForm:S.badForm,careerStats:S.careerStats,clubScoutSpinsUsed:S.clubScoutSpinsUsed,twEventUsed:S.twEventUsed,consecutiveTitles:S.consecutiveTitles,consecutiveBadSeasons:S.consecutiveBadSeasons,seasonSaves:S.seasonSaves,seasonCleanSheets:S.seasonCleanSheets,seasonMatches:S.seasonMatches,seasonNumber:S.seasonNumber,seasonHistory:S.seasonHistory,
+        scorers:S.scorers,assists:S.assists,mvps:S.mvps,goodForm:S.goodForm,badForm:S.badForm,careerStats:S.careerStats,clubScoutSpinsUsed:S.clubScoutSpinsUsed,twEventUsed:S.twEventUsed,consecutiveTitles:S.consecutiveTitles,consecutiveBadSeasons:S.consecutiveBadSeasons,seasonSaves:S.seasonSaves,seasonCleanSheets:S.seasonCleanSheets,seasonMatches:S.seasonMatches,seasonNumber:S.seasonNumber,seasonHistory:S.seasonHistory,iconSeason:S.iconSeason,
         tactics:S.tactics,tacticPrompt:S.tacticPrompt,
         /* TENGELY-MÉRŐ: karrieren átívelő kalibrációs napló, ezért a mentés
            része. Futó összegeket tárol (n, Σr, Σr²), nem mintalistát — a
@@ -41567,6 +41634,10 @@ function applySavedGame(d){
   S.seasonCleanSheets=d.S.seasonCleanSheets||{};
   S.seasonMatches=d.S.seasonMatches||{};
   S.seasonNumber=d.S.seasonNumber||1;
+  /* Szezononként egy ikon-igazolás. Régi mentésben nincs — a 0 azt jelenti,
+     hogy ebben a szezonban még nem jött ikon, tehát a folyó szezon nem
+     „veszít" semmit a szabály bevezetésével. */
+  S.iconSeason=d.S.iconSeason||0;
   /* TAKTIKA-migráció (F1): régi mentésben nincs S.tactics — a szintek az
      edző kedveltjei szerint inicializálódnak, de active:null (a rendszer
      opt-in: a futó játék nem kap kéretlen taktika-állapotot). */
