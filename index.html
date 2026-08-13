@@ -2708,7 +2708,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.39";
+const APP_VERSION="3.1.40";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9002,15 +9002,56 @@ const MID_ROLE_CODES=["VKP","KKP","TKP"];
 const MID_ROLE_LABEL={VKP:"védekező",KKP:"klasszikus",TKP:"támadó",
   JSZ:"jobbszélső",BSZ:"balszélső",CS:"középcsatár","ÁÉ":"árnyékék"};
 /* ---- SLOTONKÉNTI TÖBBLET-SZEREPEK ----
-   A 3-4-3 négyes középpályasorából a két KÜLSŐ hely (a 4. és a 7. slot, az
-   xy szerint x=85 és x=15) SZÉLSŐRE is állítható. Így a felállás átalakítható
-   a legszélsőségesebb szárnyjátékká: kívül középpályás szélső, elöl támadó
-   szélső — négy szélső egyszerre.
+   A középpálya KÉT LEGKÜLSŐ helye SZÉLSŐRE is állítható — MINDEN felállásban.
+
+   Régen ez a 3-4-3 kiváltsága volt (a négyes sor két széle), pedig a kérdés
+   ugyanaz mindenhol: ki akarod-e küldeni a szélre azt a középpályást, akit a
+   felállás középre tett. A 4-4-2-ben ettől akár négy széles középpályás is
+   lehet (a két alapértelmezett szélső mellé a két belső), a 4-3-3-ban a
+   hármas sor két széle húzódik ki — a felállás ALAKJA nem változik, csak a
+   megbízás.
+
+   KIVÉTEL a KÉTFŐS KÖZÉPPÁLYA (a 4-2-4 és a vele azonos alakú saját tervek):
+   ott mindössze két középpályás van, és ha mindkettőt kiküldenéd a szélre, a
+   középpálya teljesen kiürülne. A szabály ezért nem NÉVRE szól, hanem a
+   sor méretére — így minden jövőbeli alak magától a helyes oldalra kerül.
+   (A 4-4-2-nél a két belső kiküldése után is négy középpályás marad a sorban,
+   csak mind a négy kint; az a te döntésed.)
+
    FONTOS: az itt beállított JSZ/BSZ KÖZÉPPÁLYÁS marad, nem támadó. A
    megkülönböztetést a slot ALAPÉRTELMEZETT kódja adja (lásd
    isAttackingWingSlot) — ugyanaz a kód két különböző helyen két különböző
-   szerep. */
-const SLOT_ROLE_EXTRA={"343":{4:["JSZ"],7:["BSZ"]}};
+   szerep. Ára is van: a középre tervezett ember a szélső helyen poszt-
+   idegenné válhat (fit), a gólsúlya viszont 1,6-ról 3-ra, a gólpassz-súlya
+   2,5-ről 4-re nő. Nem ingyen jár, csak választható.
+
+   SZÁMOLT, NEM BEDRÓTOZOTT: a két hely a MID_ROLE_CODES-os slotok közül a
+   legjobb és a legbal szélső (x-koordináta szerint). Így a saját tervezésű
+   felállások és minden jövőbeli alak magától jó értéket kap. */
+const SLOT_ROLE_EXTRA={};
+/* Ennyi embernek KELL lennie a középpálya-sorban (a felállás által eleve
+   szélsőnek tett középpályásokkal együtt), hogy két helyet ki lehessen küldeni
+   a szélre. Kettőnél a sor teljesen kiürülne — ott nincs megbízás. */
+const WING_ROLE_MIN_MID=3;
+function buildSlotRoleExtra(f){
+  delete SLOT_ROLE_EXTRA[f];
+  const F=f&&FORMS[f];
+  if(!F||!F.slots)return;
+  /* a KÖZÉPPÁLYA-SOR: a szerep-kategória dönt, nem a puszta kód — így a
+     felállás által TÁMADÓNAK súlyozott szélső (4-3-3, 3-4-3, 4-2-4) nem
+     számít bele, a középpályásként súlyozott (4-4-2, 3-5-2, 4-5-1) igen. */
+  let line=0;
+  const mids=[];
+  F.slots.forEach((p,i)=>{
+    if(roleInFormation(p,f,i)==="KOZEPPALYAS")line++;
+    if(MID_ROLE_CODES.indexOf(p)<0)return;
+    const x=(F.xy&&F.xy[i]&&F.xy[i][0]!=null)?F.xy[i][0]:50;
+    mids.push({i,x});});
+  if(line<WING_ROLE_MIN_MID||mids.length<2)return;
+  mids.sort((a,b)=>b.x-a.x||a.i-b.i);
+  const right=mids[0].i,left=mids[mids.length-1].i;
+  if(right===left)return;
+  SLOT_ROLE_EXTRA[f]={[right]:["JSZ"],[left]:["BSZ"]};}
 function slotRoleOptions(f,i){
   /* TÁMADÓ HELY: a saját alapkódja ⇄ árnyékék. A középcsatárnak a CS, a
      támadó szélsőnek a JSZ/BSZ marad a "maradj, ahol vagy" opciója — egy
@@ -9802,6 +9843,10 @@ const WINGER_IS_ATTACKING={
   "343":true, "532":false, "451":false,
   "424":true   /* a négyes támadósor két szélén valódi támadó szélső áll */
 };
+/* A szélső-megbízások feltöltése MINDEN alap-felálláshoz. Itt, és nem a
+   buildSlotRoleExtra mellett: a számítás a WINGER_IS_ATTACKING-et olvassa
+   (a középpálya-sor méretéhez), az pedig ezen a soron fölött születik meg. */
+Object.keys(FORMS).forEach(buildSlotRoleExtra);
 /* A játékos PILLANATNYI szerepe az adott felállásban (NEM a keret-kategóriája).
    SZEREP-ÉRZÉKENY helyek (ezt használják): gólcsuklás-figyelés, skill-sorsolás,
    pálya-színkód, a csere-panel csoportosítása és a sérülés/eltiltás miatti
@@ -26483,9 +26528,9 @@ function customFormError(d,m,f){
 /* ---- A REGISZTERBE ÍRÁS ----
    Egy saját felállás négy helyre kerül be: a FORMS-ba (kódok + koordináták), a
    FORM_LABELS-be (a felület felirata), a WINGER_IS_ATTACKING-be (szélső-szerep)
-   és — ha van négyes vagy ötös középpálya három támadó mellett — a
-   SLOT_ROLE_EXTRA-ba, hogy a két külső középpályás szélsőre is állítható
-   legyen (ugyanaz a szabadság, amit a 3-4-3 ad).
+   és a SLOT_ROLE_EXTRA-ba, hogy a középpálya két legkülső helye szélsőre is
+   állítható legyen — ugyanazzal a közös szabállyal (buildSlotRoleExtra), amit
+   az alap-felállások is kapnak.
    IDEMPOTENS: a betöltés és a létrehozás ugyanezt hívja, tetszőleges sokszor. */
 function registerCustomForm(k,c){
   if(!c)return;
@@ -26493,12 +26538,9 @@ function registerCustomForm(k,c){
   FORMS[k]={slots:built.slots.slice(),xy:built.xy.map(p=>p.slice())};
   if(typeof FORM_LABELS!=="undefined")FORM_LABELS[k]=c.label||customFormLabel(c.d,c.m,c.f);
   WINGER_IS_ATTACKING[k]=c.f>=3;
-  if(c.f>=3&&c.m>=4){
-    /* a középpálya két SZÉLE kaphat szélső-megbízást — a slot-indexek a
-       kapus (0) és a védősor (c.d) után kezdődnek */
-    const first=1+c.d,last=first+c.m-1;
-    SLOT_ROLE_EXTRA[k]={[first]:["JSZ"],[last]:["BSZ"]};}
-  else delete SLOT_ROLE_EXTRA[k];}
+  /* A szélső-megbízás ugyanazon a KÖZÖS szabályon megy, mint az alap-
+     felállásoknál: a középpálya két legkülső helye. */
+  buildSlotRoleExtra(k);}
 /* Betöltés után EGYSZER: minden mentett saját felállás visszakerül a
    regiszterbe. Enélkül a mentésben álló `form` egy nem létező kulcsra
    mutatna, és a keret az alapértelmezett 4-4-2-re esne vissza. */
@@ -29760,9 +29802,10 @@ const MID_ROLE_DESC={
   "ÁÉ":"A második csatár, aki a védők és a középpálya közti sávban él — a pályaképen is hátrébb húzódik. Kevesebb gólt szerez (3,5 az 5,0 helyett), cserébe övé a játék legnagyobb gólpassz-súlya (5,0). Támadó marad: a csatár-tengelyeken és a csatár-skilleken számít."};
 /* ---- A SZÉLSŐ HELY SAJÁT SZÖVEGEI ----
    Ugyanaz a JSZ/BSZ kód két különböző helyen két különböző dolgot jelent: a
-   3-4-3 középpályasorában szélsőre húzódó KÖZÉPPÁLYÁST, a 4-3-3 elején viszont
-   TÁMADÓ szélsőt. A fenti MID_ROLE_DESC az elsőt írja le; a támadó helyen ez
-   félrevezető lenne, ezért ott ez a tábla szólal meg. */
+   KÖZÉPPÁLYA-SORBÓL szélsőre húzódó középpályást (minden felállásban, ahol a
+   sor legalább háromfős), a 4-3-3 elején viszont TÁMADÓ szélsőt. A fenti
+   MID_ROLE_DESC az elsőt írja le; a támadó helyen ez félrevezető lenne, ezért
+   ott ez a tábla szólal meg. */
 const ATK_WING_DESC={
   JSZ:"Marad a jobb szélen, támadó szélsőként: szélességet ad, kifelé húzza az ellenfél védelmét, és onnan tör be a kapu felé.",
   BSZ:"Marad a bal szélen, támadó szélsőként: szélességet ad, kifelé húzza az ellenfél védelmét, és onnan tör be a kapu felé."};
