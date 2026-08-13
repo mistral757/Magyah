@@ -2708,7 +2708,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.35";
+const APP_VERSION="3.1.36";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9236,7 +9236,7 @@ const SHOT_TXT=[
   (n,v)=>`Ez nem lövés volt, hanem lövedék! <b>${v} km/h</b> — ${n} úgy találta el, hogy a háló is megremegett.`,
   (n,v)=>`A műszerek szerint <b>${v} km/h</b>-val érkezett ${n} lövése. Ilyet ritkán lát az ember.`];
 /* A közös kiírás: egy sor a méréssel, és rekordnál egy második, kiemelt sor. */
-function emitMeasure(kind,name,val,minTxt){
+function emitMeasure(kind,name,val,minTxt,always){
   const nm=esc(shortName(name));
   const txt=(kind==="sprint"?SPRINT_TXT:SHOT_TXT);
   const unit=kind==="sprint"?"km/h végsebesség":"km/h lövéserő";
@@ -9255,8 +9255,8 @@ function emitMeasure(kind,name,val,minTxt){
      magyarázta, honnan jött a szám. A rekordot ezért csak akkor írjuk ki, ha a
      mérés maga is kifért. (A rekord MAGA természetesen akkor is rögzül, ha a
      sor nem fért ki — a recordMeasure fentebb már elmentette.) */
-  const shown=goalNoteLeft>0;
-  addLine(`${minTxt}📡 ${txt[Math.floor(Math.random()*txt.length)](nm,val)}`,"m skillnote",true);
+  const shown=always||goalNoteLeft>0;
+  addLine(`${minTxt}📡 ${txt[Math.floor(Math.random()*txt.length)](nm,val)}`,"m skillnote",!always);
   if(!shown)return;
   if(r.best&&r.prev>0)
     addLine(`→ 🏅 ÚJ EGYÉNI REKORD! ${nm} eddigi csúcsa ${r.prev} volt — ez ${val} ${unit}.`,"m mvp");
@@ -9278,10 +9278,16 @@ function trySprintMeasure(scorerName,asstName,minTxt){
   emitMeasure("sprint",who,measureSprint(who),minTxt);
   return true;}
 function tryShotMeasure(scorerName,minTxt){
-  if(Math.random()>=SPEED_MEAS_CHANCE)return false;
   const sk=scorerName?firstSkillOf(scorerName,SHOT_SKILL_IDS):null;
   if(!sk)return false;
-  emitMeasure("shot",scorerName,measureShot(scorerName,sk),minTxt);
+  /* ÁGYÚGOLYÓ: VÉDŐ-skill, tehát maga a gól is ritka esemény — mérve egy
+     hátvéd néhány találatot szerez egy egész szezonban. A 17,5%-os
+     mérés-esély mellett így megeshetett, hogy egy teljes karrier alatt
+     egyszer sem hallottuk, milyen erővel lő. Az Ágyúgolyó góljánál ezért
+     MINDIG megszólal a műszer — és a gólonkénti ízesítő-keret sem nyelheti el. */
+  const always=(sk==="df_cannon");
+  if(!always&&Math.random()>=SPEED_MEAS_CHANCE)return false;
+  emitMeasure("shot",scorerName,measureShot(scorerName,sk),minTxt,always);
   return true;}
 /* Egy kész skill ennyit ad a tengelyére; a sapka azért kell, hogy a skillek
    KIEGÉSZÍTSÉK, ne elnyomják az attribútumokat. */
@@ -9931,6 +9937,16 @@ const SKILLS=[
  {id:"gk_calm_hands",cat:"KAPUS",name:"Kistigris",desc:"Amíg pályán van, kicsit csökken az ellenfél gólesélye.",type:"defense",val:0.95},
  {id:"gk_calm_kick",cat:"KAPUS",name:"Ízi",desc:"Amíg pályán van, apró csapaterő-bónuszt ad.",type:"aura",val:0.8},
  {id:"df_steady_press",cat:"VEDO",name:"Sepregető",desc:"Kicsit ritkábban kap piros lapot.",type:"discipline",val:0.6},
+ /* ---- TORGHELLE-ISKOLA ----
+    A készlet ELSŐ skillje, ami TUDATOSAN kockázatot vesz: az ellenfél
+    gólesélyét érdemben (7,5%) csökkenti, cserébe viszont a birtokosa jóval
+    nagyobb eséllyel kapja a kiállítást, és nagyobb eséllyel ő sérül meg.
+    Mindkét ár a SAJÁT fejére száll — a csapat piroslap- és sérülés-esélyét
+    nem emeli (azt a Panzer "Vadhajtások" képessége teszi), csak azon belül
+    tolja őrá a valószínűséget. */
+ {id:"df_torghelle",cat:"VEDO",name:"Torghelle Sanyitól tanultam tisztán szerelni",
+  desc:"Kőkemény, de a szabályok határán belüli szerelés: amíg pályán van, 7,5%-kal csökken az ellenfél gólesélye. Az ára az övé — jóval nagyobb eséllyel kapja ő a piros lapot, és nagyobb eséllyel ő sérül meg.",
+  type:"combo",combo:[{type:"defense",val:0.925},{type:"discipline",val:1.9},{type:"injrisk",val:1.8}]},
  /* KIZÁRÓLAG VÉDŐ kaphatja. A goalw egy hátvédnél sokkal többet ér, mint egy
     csatárnál (a GOALW poszt-súlya nála töredék), ezért az érték magasabb —
     a szabadrúgásoknál pedig külön nagy súlyt kap (lásd free_kick_goal). */
@@ -18354,6 +18370,9 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   /* PANZER — a klub történetének kemény vonásai: {név: 0|1|2}. Mindenki
      egyszer kerül bele, és bent is marad (lásd stToughRecord). */
   toughSeen:{},
+  /* PANZER — a kemény emberek közt megkötött barátságok (párkémia-kulcsra),
+     és az összegyűjtött szerelés-kommentárok száma. Mindkettő karrier-szintű. */
+  buddySeen:{},hardTackleNotes:0,
   balSkillMatches:0,balSkillsSeason:0,
   initialSkillDone:false,   /* a kapitány-megerősítéskor járó NYITÓ skill egyszer jár */
   seasonStartStrength:0,    /* a szezonkezdő csapaterő — a kupamezőny horgonya */
@@ -18740,7 +18759,7 @@ function skillEffVal(inst){
   /* A "bónusz rész" szorzója: készültség × csillag. Csillag nélkül a teljes
      skillnél pontosan 1, tehát a régi értékek betűre változatlanok. */
   const pw=skillPower(inst);
-  if(t==="defense"||t==="discipline")return Math.max(0.05,1-(1-inst.skill.val)*pw);
+  if(t==="defense"||t==="discipline"||t==="injrisk")return Math.max(0.05,1-(1-inst.skill.val)*pw);
   if(t==="goalw")return 1+(scaledGoalwVal(inst.skill.val)-1)*pw;
   if(t==="assistw")return 1+(inst.skill.val-1)*pw;
   if(t==="formlock")return inst.skill.val;
@@ -18827,7 +18846,7 @@ function comboEffFor(inst,type){
   if(!sub)return null;
   /* ugyanaz a készültség × csillag szorzó, mint a sima skilleknél */
   const pw=skillPower(inst);
-  if(type==="defense"||type==="discipline")return Math.max(0.05,1-(1-sub.val)*pw);
+  if(type==="defense"||type==="discipline"||type==="injrisk")return Math.max(0.05,1-(1-sub.val)*pw);
   if(type==="goalw"||type==="assistw")return 1+(sub.val-1)*pw;
   if(type==="formlock")return sub.val;
   return sub.val*pw;}
@@ -19588,6 +19607,7 @@ const SKILL_FLAVOR={
   /* védő — szerelés/fegyelem/kiállás */
   df_clean:n=>`kőkemény, de tiszta szerelés — ${n} - de azért a támadó lába is megérezte...`,
   df_steady_press:n=>`${n} fegyelmezetten tereli szélre a támadót`,
+  df_torghelle:n=>`${n} tisztán, de kőkeményen szedi le a támadót — a bíró int, lapot nem húz. Torghelle-iskola.`,
   df_cannon:n=>`${n} harminc méterről eleresztett egy lövést — épp csak fölé szállt, de a lelátó felmorajlott`,
   gk_disc:n=>`${n} szembenéz a támadóval, ahogyan ajtó-ablak helyzetben ráront, de hibátlan ütemben mozdul ki, nincs gól!`,
   df_launch:n=>`${n} egy tiszta szerelés után máris indítja a kontrát`,
@@ -19607,6 +19627,55 @@ const SKILL_FLAVOR={
   df_air:n=>`${n} a szögletnél mindenkinél magasabbra emelkedik`,
   df_scissors:n=>`${n} felmegy a szöglethez, veszélyes a levegőben`,
   gk_assist:n=>`${n} egyetlen hatalmas kirúgással indít kontrát a felezővonalon túlra`};
+/* ================= KŐKEMÉNY BELÉPŐ =================
+   Három képesség beszél ugyanarról: a tiszta, de kemény szerelésről. A
+   Panzer mérföldköve ezeket a kommentár-pillanatokat GYŰJTI, ezért saját,
+   sűrűbb csatornát kapnak — az általános skill-íz (meccsenként legfeljebb egy
+   sor, az ÖSSZES pályán lévő képesség közül sorsolva) ehhez túl ritkán
+   szólalna meg: egy-egy szereléshez évekbe telne összegyűjteni ötven sort.
+   A csatorna KIZÁRÓLAG ízesítés — a szerelésnek magának nincs mechanikai
+   következménye, azt a skillek hatása (piroslap-súly, gólesély) adja. */
+const HARD_TACKLE_SKILLS=["df_clean","df_steady_press","df_torghelle"];
+const HARD_TACKLE_TXT={
+  df_clean:[
+    n=>`${n} elé kerül a labda — és csak a labdát viszi el! Kőkemény, de makulátlan szerelés.`,
+    n=>`Ez az! ${n} pont a jó pillanatban nyúlt be, a támadó meg a fűben ült. Labda vót spori!`,
+    n=>`A bíró felé fordulnának, de nincs mit reklamálni: ${n} tisztán szerelt, a lába csak utána ért oda.`,
+    n=>`${n} becsúszik, felpattan, és már viszi is előre a labdát. Ilyet ma kevesen mernek.`,
+    n=>`Sarok, csúszás, labda — ${n} egyetlen mozdulattal állította meg a támadást. A támadó lába azért megérezte…`],
+  df_steady_press:[
+    n=>`${n} nem kapkod: kitartja a testét, és szép csendben kiszorítja a szélre a támadót.`,
+    n=>`Sehol egy felesleges mozdulat — ${n} lépésben tartja a támadót, aztán elveszi tőle a labdát.`,
+    n=>`${n} úgy tereli a kaputól, hogy a támadó észre sem veszi, mikor veszítette el a helyzetet.`,
+    n=>`Türelem, türelem, és most! ${n} pont akkor nyúlt be, amikor a támadó rossz lábra érkezett.`,
+    n=>`${n} olvasta a mozdulatot, mielőtt megtörtént volna. Söprögető munka a javából.`],
+  df_torghelle:[
+    n=>`${n} beleszáll, a lelátó feláll — de a labda az övé lett! Torghelle Sanyi is megtapsolná.`,
+    n=>`Rettenetesen nézett ki, mégis szabályos: ${n} a labdát érte el, a támadó csak utána jött.`,
+    n=>`Ezt a becsúszást évekig emlegetni fogják. ${n} tisztán szerelt — de tisztán is fájt.`,
+    n=>`A bíró a sípjához nyúl… aztán leengedi a kezét. ${n} elsőre a labdát találta el.`,
+    n=>`${n} nem hátrál meg egy párharcból sem. A támadó feláll, leporolja magát, és többet nem arra megy.`,
+    n=>`Csont csontnak — és ${n} jött ki belőle labdával. Ez az a keménység, amiért ezt a csapatot nem szeretik.`]};
+/* Az ÖSSZEGYŰJTÖTT szerelések száma — a Panzer "Kőkemény belépő" lépcsőjének
+   mércéje. A mentés része, mert karrieren átívelő gyűjtés. */
+function msNoteHardTackle(){
+  if(gameMode!=="career")return;
+  S.hardTackleNotes=(S.hardTackleNotes||0)+1;}
+/* A pályán lévő, kemény-belépős képességek közül sorsol egyet. */
+function pickHardTackleFlavor(active,min){
+  const opts=[];
+  active.forEach(a=>{
+    playerSkills(a.p.n).forEach(inst=>{
+      const id=inst.skill&&inst.skill.id;
+      if(HARD_TACKLE_SKILLS.indexOf(id)<0)return;
+      if(!HARD_TACKLE_TXT[id])return;
+      opts.push({name:a.p.n,inst,id});});});
+  if(!opts.length)return null;
+  const o=opts[Math.floor(Math.random()*opts.length)];
+  const list=HARD_TACKLE_TXT[o.id];
+  const txt=list[Math.floor(Math.random()*list.length)](esc(shortName(o.name)));
+  return {txt:`${min}'  🦵 ${txt} — ${esc(o.inst.skill.name)}${skillProgressSuffix(o.inst)}`,
+    name:o.name,inst:o.inst};}
 const SKILL_FLAVOR_CLS={gk_wall:"m ev",df_wall:"m ev",gk_calm_hands:"m ev",fw_kanestyle:"m ev",
   gk_aura:"m skillnote",gk_calm_kick:"m skillnote",mf_engine:"m skillnote",mf_quietleader:"m skillnote",
   mf_compass:"m skillnote",df_calm_buildup:"m skillnote"};
@@ -23480,7 +23549,7 @@ function playMatch(){
   const onPitch=()=>active.filter((a,i)=>i!==redIdx);
   const notRed=(x,idx)=>idx!==redIdx;
   S._goldQuotesThisMatch=0;   /* BL díj-kommentárok meccsenkénti korlátja */
-  let min=0,gf=0,ga=0,redIdx=-1,saveCount=0,maxDeficit=0,maxLead=0,specialEventHappened=false,specialEventCount=0,titleLiveNotes=0,skillFlavorShown=false,paceFlavorShown=false,supersubStruck=false,tierQuoteShown=false,tacGoalFlavorShown=false,tacRawShown=false,genGoalShown=false;
+  let min=0,gf=0,ga=0,redIdx=-1,saveCount=0,maxDeficit=0,maxLead=0,specialEventHappened=false,specialEventCount=0,titleLiveNotes=0,skillFlavorShown=false,paceFlavorShown=false,supersubStruck=false,tierQuoteShown=false,tacGoalFlavorShown=false,tacRawShown=false,genGoalShown=false,styleLineShown=false,hardTackleShown=false,clutchWallShown=false,clutchHeroShown=false;
   /* az eredményjelző MÉG az első kiírás előtt áll fel: onnantól a
      updateTTBoard minden hívása őt is frissíti */
   sbStart(fx,tickMs,!!S.auto);
@@ -23970,6 +24039,13 @@ function playMatch(){
       if(!paceFlavorShown){
         const paceLine=pickPaceFlavor(scorer.n,asstName);
         if(paceLine){paceFlavorShown=true;addLine(`→ ${paceLine}`,"m skillnote",true);}}
+      /* „A győzelemnek csekély az esélye. Mire várunk még?” — a skill a hajrában
+         és nagy hátrányban dolgozik, ezért a hangja is OTT szólal meg, ahol a
+         hatása: késői vagy fordító gólnál. Meccsenként egyszer. */
+      if(!clutchHeroShown&&clutchPower(scorer.n,CLUTCH_HERO_ID)>0
+         &&(min>=CLUTCH_LATE_MIN||clutchComebackOn(min,gf,ga))){
+        clutchHeroShown=true;
+        addLine(`→ 🍺 ${CLUTCH_HERO_TXT[Math.floor(Math.random()*CLUTCH_HERO_TXT.length)](esc(shortName(scorer.n)))}`,"m mvp");}
 }
     /* PÁRHARCBAN a kapott gólok is a közös listából jönnek — és a gólszerző a
        társad VALÓDI játékosa, nem egy hangulatnév. */
@@ -24050,6 +24126,22 @@ function playMatch(){
        szerelés, aura, fegyelem, forma, szabadrúgás mind némán, statisztikaként
        futott. Ez ad nekik saját, felismerhető pillanatot a közvetítésben, hatás
        nélkül (tisztán íz), hogy ne borítsa a balanszot. */
+    /* KŐKEMÉNY BELÉPŐ: saját, sűrűbb csatorna (lásd HARD_TACKLE_TXT). A
+       Panzer mérföldköve ezeket a pillanatokat gyűjti, ezért nem fér el az
+       általános skill-íz egyetlen meccsenkénti helyén. */
+    if(g===0&&og===0&&!hardTackleShown&&Math.random()<fp(0.30)/18){
+      const ht=pickHardTackleFlavor(active,min);
+      if(ht){
+        hardTackleShown=true;
+        addLine(ht.txt,"m ev");
+        try{msNoteHardTackle();}catch(e){}
+        /* védekező villanás a hátsó alakzatból — a "Fogd meg a söröm!" ezt is számolja */
+        const _k=active.findIndex(a=>a.p.n===ht.name);
+        if(_k>=0&&clutchIsBackline(active,_k))clutchNoteDefUse(ht.name);}}
+    /* A CSAPATSTÍLUS HANGJA — meccsenként egyszer. */
+    if(g===0&&og===0&&!styleLineShown&&Math.random()<fp(0.14)/18){
+      const sl=pickStyleMatchLine();
+      if(sl){styleLineShown=true;addLine(`${gminTxt(min)}  ${sl}`,"m ev");}}
     if(g===0&&og===0&&!skillFlavorShown&&Math.random()<fp(0.12)/18){
       const line=pickSkillFlavor(active,min,slots);
       if(line){
@@ -24146,7 +24238,11 @@ function playMatch(){
         const dsk=playerSkills(defHolder.p.n).find(i=>i.skill.type==="defense");
         fl.push(`Falazás: a védelem sziklaszilárd — ${esc(shortName(defHolder.p.n))} (${esc(dsk.skill.name)}${skillProgressSuffix(dsk)}) állja a sarat`);}
       const fi=Math.floor(Math.random()*fl.length);
-      if(fi===1){saveCount++;S.careerStats[gk.p.n]=S.careerStats[gk.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};S.careerStats[gk.p.n].saves++;S.seasonSaves[gk.p.n]=(S.seasonSaves[gk.p.n]||0)+1;clutchNoteSave(gk.p.n);}
+      if(fi===1){saveCount++;S.careerStats[gk.p.n]=S.careerStats[gk.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};S.careerStats[gk.p.n].saves++;S.seasonSaves[gk.p.n]=(S.seasonSaves[gk.p.n]||0)+1;clutchNoteSave(gk.p.n);
+        /* „Fogd meg a söröm!” — a fal a saját bravúrjánál szólal meg. */
+        if(!clutchWallShown&&clutchPower(gk.p.n,CLUTCH_WALL_ID)>0){
+          clutchWallShown=true;
+          addLine(`→ 🍺 ${CLUTCH_WALL_TXT[Math.floor(Math.random()*CLUTCH_WALL_TXT.length)](esc(shortName(gk.p.n)))}`,"m mvp");}}
       /* a "Falazás" a védekező skill LÁTHATÓ villanása — ez az, amit a
          "kétszer használ védői skillt" feltétel mér */
       if(fi===3&&defHolder)clutchNoteDefUse(defHolder.p.n);
@@ -24626,7 +24722,7 @@ function playMatch(){
       const rn=active[redIdx].p.n;
       S.playerReds[rn]=(S.playerReds[rn]||0)+1;
       if(gameMode==="career"){const cs=S.careerStats[rn]=S.careerStats[rn]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};cs.rc++;}
-      addOrExtendUnavailable(rn,1,"suspension");
+      if(!styleToughOnRoll(rn,"suspension"))addOrExtendUnavailable(rn,1,"suspension");
     }
     /* --- sérülés-kockázat --- */
     let injuredThisMatchName=null;
@@ -24637,6 +24733,10 @@ function playMatch(){
     if(Math.random()<(0.035+(famSp==="tank"?0.015:0))*(1-0.30*coachTeamPower("medic"))*styleInjMult()){
       let cand=[...Array(11).keys()];if(redIdx>=0)cand=cand.filter(i=>i!==redIdx);
       const w=cand.map(i=>cardInjuryMult(active[i].p.n)
+        /* SKILL-KOCKÁZAT (injrisk): aki a szabályok határán szerel, nagyobb
+           eséllyel ő bánja. A csapat sérülés-ESÉLYÉT nem emeli, csak azon
+           belül tolja el, KI sérül meg. */
+        *multSkillEffect(active[i].p.n,"injrisk")
         *Math.max(0.35,1-COACH_MEDIC_W*coachTypePower("medic",active[i].p.n)));
       const tw=w.reduce((s,x)=>s+x,0);
       let r=Math.random()*tw,wi=0;while(r>w[wi]){r-=w[wi];wi++;}
@@ -24650,7 +24750,7 @@ function playMatch(){
         `⚕ SÉRÜLÉS! ${esc(shortName(inm))} egy ütközés után nem tud lábra állni — le kell cserélni`];
       addLine(`${gminTxt(min)}  ${pick(injTexts)} (${dur} forduló)`,"m inj");
       sbEv("us","inj",inm);
-      addOrExtendUnavailable(inm,dur,"injury");
+      if(!styleToughOnRoll(inm,"injury"))addOrExtendUnavailable(inm,dur,"injury");
       injuredThisMatchName=inm;
     }
     /* A félidőben lecserélt játékosok a lista VÉGÉRE kerülnek: a gi/bi/best/
@@ -38525,6 +38625,75 @@ function stToughCareer(){
   let n=0;
   Object.keys(S.toughSeen||{}).forEach(k=>{n+=S.toughSeen[k]||0;});
   return n;}
+/* ================= A CSAPATSTÍLUS HANGJA =================
+   A hat filozófia eddig NÉMA volt a közvetítésben: mértük, fizettük,
+   képességeket adtunk hozzá — de a kommentátor egyetlen szóval sem árulta el,
+   hogy ez a csapat MÁS, mint a többi. Pedig a stílus a karrier legnagyobb
+   ívű döntése; ha semmi nem szól róla a pályán, csak egy táblázat marad.
+
+   Meccsenként EGYSZER szólal meg, gólmentes percben — ugyanabban a sávban,
+   ahol a skill- és taktika-ízek. Tisztán ízesítés: egyetlen számot sem mozdít. */
+const STYLE_MATCH_LINES={
+  bombazok:[
+    "És nem állnak le! Újra és újra és újra jönnek, maximális erőbedobással. Csak a gólra hajtanak. De jó nézni az ilyen focit!",
+    "Megint elöl a labda. Ez a csapat nem ismeri a szót, hogy „elég” — amíg van idő, addig támadnak."],
+  beton:[
+    "Itt! Úgyse jössz! Ááát! Ezen a védelmen tényleg nincs esély átjutni! Teljesen elveszik a kedvét a másik csapatnak.",
+    "Négyen állnak a labda útjában, és mind a négyen pontosan tudják, hol a helyük. Ezt a falat nem véletlenül építették."],
+  villam:[
+    "Mert hol jön a mennydörgés? Mindig a villám után! Náluk pedig nem egy villámlábú bekkqueen száguldozik a szélen! Nem lennék az ellenfél védői helyében...",
+    "Egy indítás, és már el is húztak mellette. Ez a csapat nem cselez — egyszerűen lehagy."],
+  sztar:[
+    "Ez hihetetlen volt, de élmény! Ezek a sztárok már csak ilyenek, teljesen zavarba hoznak minket, de úgy látom ezúttal még az ellenfelet is. Mintha bársonyszőnyegen kínálnák neki a gólhelyzeteket.",
+    "Van a pályán valaki, akire tíz ember figyel — és pont ezért van kilenc, akire senki."],
+  harmonia:[
+    "Peace on you, brother! A béke már a nyakatokon srácok, össze kéne szedni magatokat, mert a végén megfojt titeket ez a kiegyensúlyozott gárda. Úgy fociznak, hogy semmi helye negatív gondolatoknak, a pozitívak viszont csak az ő győzelmükről szólnak.",
+    "Nézzék, hogy segítik egymást. Itt nincs sztár és nincs statiszta — tizenegy ember ugyanazt a meccset játssza."],
+  panzer:[
+    "Egy eredeti panzerkampfwagen vier! Tigris! Komótosan, de megállíthatatlanul tapossa el ellenfelét. Kíméletlen!",
+    "Nem szépek, nem kedvesek, és nem is akarnak azok lenni. Csak jönnek előre, és ami az útjukba kerül, az ott is marad."]};
+function pickStyleMatchLine(){
+  const k=styleKey();
+  const list=k&&STYLE_MATCH_LINES[k];
+  if(!list||!list.length)return null;
+  const sd=styleDef();
+  return `${sd&&sd.ic?sd.ic+" ":"🎙 "}${list[Math.floor(Math.random()*list.length)]}`;}
+/* ================= A KÉT SORSDÖNTŐ KÉPESSÉG HANGJA =================
+   A "Fogd meg a söröm!" és "A győzelemnek csekély az esélye. Mire várunk még?"
+   a karrier legnehezebben megszerezhető skilljei — sorsdöntő mérkőzésen kell
+   kiérdemelni őket. Eddig némán hatottak; mostantól a saját pillanatukban meg
+   is szólalnak: a fal a bravúrjánál, a hős a góljánál. Meccsenként egyszer. */
+const CLUTCH_WALL_TXT=[
+  n=>`Nem mered! A csapattársak már csak ennyit kell mondjanak ${huDativ(n)}. Ő azonnal ugrik és meghúzza a váratlant. Na ő nem maradt hang...`,
+  n=>`„Fogd meg a söröm!” — ${n} nem méricskél, egyszerűen odaveti magát. Ebből lett volna gól, ha ő nincs ott.`,
+  n=>`Mindenki más leállt volna. ${n} nem. Ezért van most is 0 a másik oldalon.`];
+const CLUTCH_HERO_TXT=[
+  n=>`Sokszoros túlerővel szemben is beveti magát ${n}. Ez a gól is mutatja, neki nincs olyan meccs, ami elveszett.`,
+  n=>`Mindenki a lefújást várta — ${n} kivételével. Ő pontosan tudta, hogy még van egy gól ebben a meccsben.`,
+  n=>`Amikor a matematika már nem az övék, ${n} akkor kezd el igazán focizni.`];
+/* ---- BAJTÁRSAK ----
+   Kész (5/5) párkémia KÉT kemény ember között. A mérce KARRIER-számláló, nem
+   pillanatkép: a párkémiák a keret méretével elfogynak (a mérőszám-lépcső
+   máshol 15-nél tetőzik), és aki távozik, azzal a kötés is törlődik
+   (pruneChemistry) — egy pillanatkép-számláló így néhány tucatnál megállna.
+   A regiszter a PÁROS kulcsára megy, tehát minden barátság pontosan egyszer
+   számít, és az eladás nem veszi el.
+   ÖNGYÓGYÍTÓ: minden méréskor végigolvassuk a kész párokat, ezért nem kell a
+   kémiaépítés egyetlen útját sem külön bekötni. */
+function stBuddyRecord(){
+  const seen=(S.buddySeen=S.buddySeen||{});
+  const pairs=S.chemPairs||{};
+  Object.keys(pairs).forEach(k=>{
+    if(seen[k])return;
+    const pr=pairs[k];
+    if(!pr||(pr.stages||0)<CHEM_PAIR_NEED)return;
+    if(stToughOf(msEntry(pr.a))>0&&stToughOf(msEntry(pr.b))>0)seen[k]=1;});}
+function stBuddyCount(){
+  if(gameMode!=="career")return 0;
+  try{stBuddyRecord();}catch(e){}
+  return Object.keys(S.buddySeen||{}).length;}
+/* ---- KŐKEMÉNY BELÉPŐ ---- a összegyűjtött szerelés-kommentárok száma. */
+function stHardTackleCount(){return (gameMode==="career")?(S.hardTackleNotes||0):0;}
 /* ---- A CSAPATKAPITÁNY KŐKEMÉNYSÉGE ----
    Egyetlen, MONOTON rangszám a vezetői fokozatból és a kemény tulajdonságok
    számából — így a hat fokozat egyetlen lépcsőre fér fel, és a "ki lehet
@@ -38643,7 +38812,8 @@ const ST_FAM_T={
   pz_card:"A klub legjobb szezonkártyája", pz_redall:"Piros lapok a klub történetében",
   pz_redseason:"Piros lapok egy idényben", pz_injwin2:"Győzelmek sérülttel",
   pz_shotmax:"Az ágyúgolyó",
-  pz_tough:"Az összes keményfiú", pz_capt:"A kőkemény vezető"};
+  pz_tough:"Az összes keményfiú", pz_capt:"A kőkemény vezető",
+  pz_buddy:"Bajtársak", pz_tackle:"Kőkemény belépő"};
 /* `nOf`: a KÜSZÖBÖK, ha eltérnek a címben szereplő számtól. Enélkül a fordított
    mércéjű családoknál (ahol a KISEBB szám a jobb: kapott gól, szórás) a
    címke és a valódi feltétel elcsúszik egymástól — a fokozatok sorrendje
@@ -39044,6 +39214,28 @@ stTiers("panzer","pz_tough",th=>`${th} kemény tulajdonság`,
      +`tulajdonság meg a temperamentum két külön tengely, egy ember kettőt is adhat. `
      +`Mindenki egyszer számít, az eladás nem vesz el belőle.`,
   [2,3,5,8,10,14,22,32],[5,10,15,20,25,30,50,100],stToughCareer);
+/* ---- BAJTÁRSAK ----
+   A stílus két mércéje eddig KÜLÖN nézte az embereket (hány kemény vonás) és a
+   teljesítményt (piros lap, sérülttel nyert meccs). Ez a lépcső a kettő közé
+   áll: nem elég összegyűjteni a keményfiúkat, össze is kell szoktatni őket.
+   A párkémia amúgy is a leglassabban épülő rendszer — a felső fokozatok ezért
+   egy egész karrier munkái. */
+stTiers("panzer","pz_buddy",th=>`${th} bajtársi kötés`,
+  th=>`Építs ${th} kész párkémiát KÉT kemény ember között. Mindkét játékosnak kell legalább egy kemény tulajdonság `
+     +`(bajkeverő, öntörvényű, temperamentumos vagy lobbanékony), és a kötésnek teljesen (5/5) ki kell épülnie. `
+     +`Minden barátság egyszer számít, az eladás nem vesz el belőle.`,
+  ST_L9,[1,2,3,5,10,15,20,30,50],stBuddyCount);
+/* ---- KŐKEMÉNY BELÉPŐ ----
+   A három szerelés-képesség (Labda vót spori!, Sepregető, Torghelle-iskola)
+   kommentár-pillanatait gyűjti. Nem a szerelések SZÁMÁT méri — azt a motor nem
+   ismeri —, hanem azt, hányszor kapott hangot a stílus legjellemzőbb
+   mozdulata. Ezért van a három képességnek saját, sűrűbb közvetítés-csatornája
+   (lásd HARD_TACKLE_TXT): enélkül az ötven sor évtizedekbe telne. */
+stTiers("panzer","pz_tackle",th=>`${th} kőkemény belépő`,
+  th=>`Gyűjts össze ${th} szerelés-kommentárt a Labda vót spori!, a Sepregető és a `
+     +`Torghelle Sanyitól tanultam tisztán szerelni képességektől. Minél többen viselik `
+     +`őket a kezdőben, annál sűrűbben szólal meg a kommentátor.`,
+  ST_L9,[1,2,3,5,10,15,20,30,50],stHardTackleCount);
 /* ---- A KŐKEMÉNY VEZETŐ ----
    A karszalag a Panzerben MÁS embert kér, mint bárhol máshol: a játék
    kapitány-ajánlója (captainSuitability) egyenesen levonja a rossz társas
@@ -39593,6 +39785,30 @@ stTrait("panzer","nem_adjuk_meg",3,"Nem adjuk meg magunkat",
   {fx:{ownGoalMult:1.06},note:"+6% gólesély"},
   {fx:{ownGoalMult:1.10},note:"+10%"},
   {fx:{ownGoalMult:1.14},note:"+14%"}]);
+/* ---- VADHAJTÁSOK ----
+   A készlet EGYETLEN képessége, ami tudatosan ROSSZABBÁ teszi a csapat
+   helyzetét: több piros lap, több sérülés. Máshol ez tiszta büntetés volna —
+   a Panzerben viszont pontosan ez a nyersanyag. A stílus mérföldkövei a
+   piros lapokat és a sérülttel nyert meccseket számolják, a Megfélemlítés
+   pedig egyenesen a kiállításból él. Ez a képesség az, ami ezt a kört
+   beindítja: I. ársávban áll, mert önmagában nem ad erőt — csak a fa többi
+   ágának ad munkát. */
+stTrait("panzer","vadhajtasok",1,"Vadhajtások",
+  "Keményebben mentek bele: a csapat piroslap- és sérülés-esélye nő. Ebben a filozófiában ez nem büntetés, hanem nyersanyag — a mérföldkövek és a Megfélemlítés ebből élnek.",[
+  {fx:{redMult:1.5,injMult:1.3},note:"+50% piroslap-, +30% sérülés-esély"},
+  {fx:{redMult:2.0,injMult:1.6},note:"+100% / +60%"},
+  {fx:{redMult:2.6,injMult:2.0},note:"+160% / +100%"}],
+  ()=>`ebben az idényben eddig ${S.reds||0} piros lap és ${S.injuries||0} sérülés`);
+/* ---- FÁJHAT, DE JÁTSZIK ----
+   A Vadhajtások párja: ha már több lap és több sérülés jön, legyen esély rá,
+   hogy a következő fordulót mégsem kell nélküle kezdeni. A dobás az INCIDENS
+   pillanatában dől el (a meccs végi könyvelésben), tehát a felhasználó rögtön
+   tudja, számíthat-e rá — nem a következő kezdőrúgásnál derül ki. */
+stTrait("panzer","fajhat_de_jatszik",2,"Fájhat, de játszik",
+  "Akit egy mérkőzésen kiállítottak vagy lesérült, eséllyel MÉGIS pályára léphet a következő fordulóban.",[
+  {fx:{toughOn:0.25},note:"25% esély"},
+  {fx:{toughOn:0.40},note:"40%"},
+  {fx:{toughOn:0.60},note:"60%"}]);
 /* ---- MEGFÉLEMLÍTÉS ----
    A játék MINDEN más rendszerében a piros lap büntetés: elveszíted az embert,
    és a gólvárhatóság a SIM.REDMATCH-csel az ellenfél javára billen. A Panzer
@@ -39705,6 +39921,18 @@ function styleRedMult(){return styleFxMul("redMult");}
 /* MEGFÉLEMLÍTÉS: az ellenfél gólesélyének szorzója a KIÁLLÍTÁS UTÁNI percekre.
    1 = nincs megvéve (a motor így feltétel nélkül szorozhat vele). */
 function styleRedOppGoalMult(){return styleFxMul("redOppGoalMult");}
+/* FÁJHAT, DE JÁTSZIK: a kihagyás elmaradásának esélye. 0 = nincs megvéve. */
+function styleToughOn(){return styleFxMax("toughOn");}
+/* A dobás. Igazzal tér vissza, ha a kihagyás ELMARAD — a hívó ilyenkor be sem
+   jegyzi a hiányzást. A sor mindig megszólal, mert egy némán elmaradó eltiltás
+   megmagyarázhatatlan volna a keretlistán. */
+function styleToughOnRoll(name,reason){
+  const p=styleToughOn();
+  if(!(p>0)||!name||Math.random()>=p)return false;
+  addLine(reason==="injury"
+    ? `🦾 <b>Fájhat, de játszik.</b> ${esc(shortName(name))} összeszorítja a fogát: bekötik, és a következő fordulóban ott lesz a kezdőben.`
+    : `🦾 <b>Fájhat, de játszik.</b> A klub azonnal fellebbez ${esc(shortName(name))} kiállítása ellen — az eltiltás elmarad, játszhat a következő fordulóban.`,"m life");
+  return true;}
 /* A megfélemlítés SAJÁT pillanata a közvetítésben. Egy némán ható szorzó
    használhatatlan visszajelzés: a felhasználónak látnia kell, hogy a piros lap
    ebben a filozófiában fordít egyet a mérkőzésen. A kiállítás sora után jön,
@@ -40375,7 +40603,7 @@ function saveGame(){
         matchesSinceSkill:S.matchesSinceSkill,seasonNewSkills:S.seasonNewSkills,
         balSkillMatches:S.balSkillMatches,balSkillsSeason:S.balSkillsSeason,
         balLoadPrev:S.balLoadPrev,balLoadHandover:S.balLoadHandover,cupRunNo:S.cupRunNo,
-        toughSeen:S.toughSeen,
+        toughSeen:S.toughSeen,buddySeen:S.buddySeen,hardTackleNotes:S.hardTackleNotes,
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
         guideOn:S.guideOn,guideSeen:S.guideSeen,
         seasonStartStrength:S.seasonStartStrength,summerPaidAfterSeason:S.summerPaidAfterSeason,
@@ -40757,6 +40985,8 @@ function applySavedGame(d){
   /* PANZER kemény-vonás regiszter. Régi mentésben nincs — üresen indul, és az
      első mérésnél a MOSTANI keret kerül bele (lásd stToughRecord). */
   S.toughSeen=d.S.toughSeen||{};
+  S.buddySeen=d.S.buddySeen||{};
+  S.hardTackleNotes=d.S.hardTackleNotes||0;
   S.seasonNewSkills=d.S.seasonNewSkills||0;
   S.seasonSkillCont=d.S.seasonSkillCont||0;
   S.firstChemDone=!!d.S.firstChemDone;

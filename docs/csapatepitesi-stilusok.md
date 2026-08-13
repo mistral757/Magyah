@@ -628,6 +628,52 @@ igényel új szimulációs ágat.
   gólpasszt. A közvetítés a kiállítás sora után külön kimondja, hogy a
   képesség dolgozik: egy némán ható szorzó használhatatlan visszajelzés.
 
+* **A Panzerkampfwagen kockázat-köre, két lépcső és a stílusok hangja
+  (3.1.36).** A filozófia eddig csak ELVISELTE a piros lapot és a sérülést; a
+  3.1.33 Megfélemlítése után viszont már fizet is értük. Ez a kör most bezárul:
+
+  | Szint | Képesség | Hatás (I / II / III) |
+  |---|---|---|
+  | I | **Vadhajtások** | a csapat piroslap-esélye +50% / +100% / +160%, a sérülés-esélye +30% / +60% / +100% |
+  | II | **Fájhat, de játszik** | akit egy mérkőzésen kiállítottak vagy lesérült, 25% / 40% / 60% eséllyel MÉGIS pályára léphet a következő fordulóban |
+
+  A Vadhajtások a készlet egyetlen képessége, ami tudatosan ROSSZABBÁ teszi a
+  csapat helyzetét — máshol tiszta büntetés volna, itt nyersanyag: a
+  `pz_redall`, a `pz_redseason` és a `pz_injwin` lépcsők ebből élnek, a
+  Megfélemlítés pedig egyenesen a kiállításból. Ezért áll az I. ársávban:
+  önmagában nem ad erőt, csak a fa többi ágának ad munkát. A Fájhat, de
+  játszik a párja, és a dobás az INCIDENS pillanatában dől el (a meccs végi
+  könyvelésben), tehát rögtön tudod, számíthatsz-e rá.
+
+  **Új képesség a készletben: „Torghelle Sanyitól tanultam tisztán szerelni"**
+  (VÉDŐ). Az első skill, ami tudatosan kockázatot vesz: −7,5% ellenfél-gólesély,
+  cserébe a birtokosa jóval nagyobb eséllyel kapja a kiállítást (`discipline`
+  1,9×) és nagyobb eséllyel ő sérül meg (új `injrisk` csatorna, 1,8×). Mindkét
+  ár a SAJÁT fejére száll: a csapat piroslap- és sérülés-ESÉLYÉT nem emeli,
+  csak azon belül tolja rá a valószínűséget — a csapatszintű emelés a
+  Vadhajtások dolga.
+
+  **Két új lépcső**, mindkettő kilenc fokozattal (1/2/3/5/10/15/20/30/50, a
+  szokásos `ST_L9` görbén):
+
+  * **Bajtársak** — kész (5/5) párkémia KÉT kemény ember között. Karrier-
+    számláló (`S.buddySeen`, a páros kulcsára), nem pillanatkép: a párkémiák a
+    keret méretével elfogynak, és a távozóval a kötés is törlődik
+    (`pruneChemistry`) — egy pillanatkép-számláló néhány tucatnál megállna.
+  * **Kőkemény belépő** — a három szerelés-képesség (Labda vót spori!,
+    Sepregető, Torghelle-iskola) kommentár-pillanatait gyűjti. Ezek saját,
+    sűrűbb közvetítés-csatornát kaptak (16 szövegváltozat), mert az általános
+    skill-íz meccsenkénti EGY helyén ötven sor évtizedekbe telne.
+
+  **És végre megszólal a filozófia.** A hat stílus eddig néma volt a
+  közvetítésben: mértük, fizettük, képességeket adtunk hozzá, de a kommentátor
+  egy szóval sem árulta el, hogy ez a csapat MÁS. Mindegyik kapott saját
+  szövegeket (`STYLE_MATCH_LINES`), meccsenként egyszer, gólmentes percben —
+  tisztán ízesítés, egyetlen számot sem mozdít. Ugyanígy megszólal a két
+  sorsdöntő képesség is a saját pillanatában: a „Fogd meg a söröm!" a
+  bravúrnál, „A győzelemnek csekély az esélye. Mire várunk még?" pedig a késői
+  vagy fordító gólnál.
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
