@@ -780,6 +780,101 @@ igényel új szimulációs ágat.
   bosszantó volna, ha minden kattintás visszacsukná. A nyitás/csukás megőrzi a
   görgetést: a megnyomott fejléc a képernyőn a helyén marad.
 
+* **Szezon-szerepek — Bombázók és Beton (3.2.00).** A két „szélső" filozófia
+  kap egy döntést, amit a többi nem: **minden idényben három embert jelöl ki
+  három feladatra**. A szerep nem képesség és nem poszt — csak a mérkőzés egy
+  adott SZAKASZÁBAN él, ettől lesz taktikai döntés, nem puszta számnövelés.
+
+  | Stílus | Szerep | Mikor él | Mit csinál |
+  |---|---|---|---|
+  | ⚽ | **Nyitó** | amíg 0:0 | gólsúly ×1,25 → ×3,7 |
+  | ⚽ | **Befejező** | 60. perctől, 1-2 gólos vezetésnél | gólsúly ×1,25 → ×3,7 |
+  | ⚽ | **Tálaló** | végig | gólpassz-súly ×1,2 → ×3,6, és külön ×1,15 → ×2,0, ha épp a Nyitónak vagy a Befejezőnek tálal |
+  | 🧱 | **Fal** | 75. perctől, amíg pályán van | ellenfél-gólesély −2,5% → −10% |
+  | 🧱 | **Árok** | az első 25 percben, amíg az ellenfél még nem szerzett gólt | ellenfél-gólesély −3% → −11% |
+  | 🧱 | **Kereszttűz** | 35-60. perc, amíg pályán van | ellenfél-gólesély −2,5% → −10%; cserébe piros/sérülés-súlya ×1,15 → ×1,75, és enyhe gólpassz-előnye van |
+
+  **Egy képesség emeli mind a hármat**, stílusonként egy („Kiosztott
+  szerepek", III. sáv). A szerepek képesség NÉLKÜL is hatnak, csak aprón; a
+  3. szinten mindegyik nagyjából egy klasszikus erős skill szintjén áll
+  (Gólzsák ×3,7 gólsúly, Sebészi passz ×4 gólpassz-súly, Betonfal −10%
+  ellenfél-gólesély). A szakaszosság miatt a CSÚCSSZORZÓ lehet nagyobb, mint
+  egy egész meccsen ható skillé — a nettó hatás így jön ki hasonlóra.
+
+  A Kereszttűz kockázata KÉT szinten hat: a súlyszorzó azt dönti el, KI kapja
+  a lapot vagy a sérülést (ő), a csapat ÖSSZ-esélyét pedig a többletsúly
+  tizenegyed része emeli (3. szinten +6,8%) — egy ember a tizenegyből, ennyi a
+  becsületes szám.
+
+  A kiosztás a szezonhoz kötődik: `roleState()` a szezonszám elmozdulásánál
+  üres táblát ad, tehát nem „felejt", hanem lejár. Egy ember egyszerre egy
+  szerepet visel.
+
+* **Nulla a tábla — Beton (3.2.00).** A kihívás-rendszer a stílus nyelvén
+  szólal meg: gyakrabban jön kapott gól nélküli kihívás (35/50/65% eséllyel),
+  KÖNNYEBB céllal és NAGYOBB jutalomért. Szándékosan ellentmondásos párosítás —
+  aki így épít csapatot, annak a tiszta lap nem bravúr, hanem a napi munkája.
+
+  A könnyítés a KALIBRÁCIÓ teljesítési arányán megy (`_chCleanEase`), nem a
+  kész célt vágja vissza utólag. Ez azért fontos, mert a kihívás leírása a
+  célszámot beleírja a szövegbe: ha utólag nyírnánk, a panel mást állítana,
+  mint a feltétel. Mérve (jó védelmű keret, 30 forduló): a nehéz „X meccs
+  kapott gól nélkül" 13-ról 9-re, a „legfeljebb X kapott gól" 26-ról 31-re
+  könnyül. A jutalom egyszerűen egy-két nehézségi sávval feljebbről sorsolódik;
+  a BÜNTETÉS a valódi sávon marad.
+
+* **Gólzápor-ünnep és izgalom-mérföldkövek — Bombázók (3.2.00).** A szurkolói
+  bevétel három lába közül az egyik az IZGALOM (20% súly), és az izgalom-mutató
+  alapból a FESZÜLTSÉGET méri. A Bombázók szurkolója viszont nem feszültségért
+  jár ki, hanem gólokért. A képesség két küszöböt jutalmaz: 5+ gólnál +20/+35/+50
+  izgalom, 10+ gólnál padló 80/90/100.
+
+  **Következmény, amit vállalunk:** a 3. szinten egy átlagos ötgólos meccs
+  (~54) is 100-ra fut, tehát a felső sáv gyakorlatilag telítődik. Ez a kért
+  viselkedés — a stílus szurkolója így éli meg —, de érdemes tudni, hogy
+  ilyenkor az izgalom-mutató a Bombázóknál már nem különbözteti meg az ötgólos
+  meccset a tízgólostól.
+
+  Mellé két új lépcső, mert a stílus minden addigi mérföldköve gólt vagy
+  gólpasszt számolt, a MŰSORT egyik sem: `bz_fest` (gólzáporok — mindkét oldal
+  góljai együtt, 5+) és `bz_memo` (emlékezetes mérkőzések, ≥85 izgalom).
+  Mindkettő karrier-számláló.
+
+* **Az Infinity kinyitja a stílus-lépcsőket (3.2.00).** A stílus-mérföldkövek a
+  100-as mezőny idejéből valók. Infinityben a mezőny 200 felé megy, ott a teljes
+  fa egy-két idény alatt kimerül, és a filozófia attól kezdve NEM FIZET SEMMIT.
+  (Ugyanez a hiba jött elő a `hm_balN`-nél, csak ott kézzel írtuk át.)
+
+  Mostantól minden alkalmas család **hat új fokozattal folytatódik**
+  (`stExtendForInfinity`, 294 új fokozat a hat stíluson): a Rating-jellegű
+  mércéknél egyenletesen a 200-as plafonig, a számlálóknál a mostani tetejük
+  1,8-szereséig. A szövegeket ugyanaz a `tFn`/`dFn` írja, ami az eredetieket.
+  A jutalom minden fokozaton nő, de **laposodó görbén**: +35%, +25%, +18%,
+  +12%, +8%, +5% a család addigi tetejéhez képest.
+
+  **Nem hosszabbítjuk** a fordított mércéjű családokat (ott „felfelé" a
+  könnyebbség iránya volna), a rangsor-lépcsőket (szezonkártya: a GODLIKE
+  fölött nincs szint) és a lépés-számlálókat (kapitányi fokozatok). A
+  hosszabbítás idempotens, és a betöltéskor is lefut — a `STYLE_MILESTONES` a
+  lap betöltésekor épül, amikor még nem tudjuk, hogy a mentett karrier
+  Infinityben jár-e.
+
+* **A Villám sorsolás-képessége szorzóvá vált (3.2.00).** A „Sebességre hangolt
+  sorsolás" eddig saját, önálló esélyt adott (30/45/60%), és a taktikáéval a
+  nagyobb élt — ettől a képesség taktikától függetlenül ugyanazt adta, jól
+  begyakorolt széljátéknál pedig egyáltalán nem is látszott (a taktika 75%-a
+  mindig nagyobb volt).
+
+  Mostantól a MEGLÉVŐ esélyt szorozza. A számolás a tényleges esélyen megy, nem
+  a torzításon: `p0 = torzítás + (1−torzítás) × a pool nyers pace-aránya`,
+  `p1 = min(0,85, p0 × (1+szint))`, és ebből fejtjük vissza a szükséges
+  torzítást. Mérve (6000 húzás szintenként): sebesség-taktika nélkül 11% →
+  12/15/17%, részben begyakorolt széljátéknál 38% → 47/54/58%.
+
+  A 0,85-ös MENNYEZET nem a képesség ellen szól: egy tökéletesen begyakorolt
+  széljátéknál (78% × 1,6) 100%-ra futna, és onnantól a keret semmi mást nem
+  tanulna.
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
