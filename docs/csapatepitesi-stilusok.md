@@ -708,6 +708,31 @@ igényel új szimulációs ágat.
   kiválasztásnál a sebesség-képesség mindig elsőbbséget élvez: a stílus a saját
   területét fizeti meg.
 
+* **A Villám sorsolás-torzítása (3.1.44).** A Villám volt az egyetlen stílus,
+  amelynek nem volt képessége a képesség-SORSOLÁS eltolására. A hiánynak
+  szerkezeti oka volt: a többi stílus a `skillCat` csatornán szűr, vagyis
+  POSZTKATEGÓRIÁRA (VEDO, KAPUS, CSATAR) — a sebesség-képességek viszont nem
+  egy kategóriában ülnek, hanem szétszórva (VEDO, KOZEPPALYAS, CSATAR), a közös
+  nevezőjük a HATÁS, nem a poszt. Ezért a Villám saját csatornát kapott
+  (`skillPace`), ami az `isPaceSkill`-lel szűr.
+
+  | Szint | Képesség | Hatás (I / II / III) |
+  |---|---|---|
+  | I | **Sebességre hangolt sorsolás** | 30% / 45% / 60% esély, hogy a húzás sebesség-alapú képességet hoz fel |
+
+  **A taktikai sebesség-torzítással NEM adódik össze, hanem a NAGYOBB él.** A
+  `paceSkillBias()` (széljáték / gyors kontra, 0,5 fölötti illeszkedésnél)
+  önmagában 75%-ig visz; ha a kettő összeadódna, a jól begyakorlott
+  sebesség-taktika + megvett képesség gyakorlatilag determinisztikussá tenné a
+  sorsolást, és a keret minden más képességtől elzárulna. Így viszont a
+  képesség pont annak ér a legtöbbet, aki NEM sebesség-taktikát játszik: a
+  szélessége máshonnan jön, a fejlődése mégis a stílus felé húz.
+
+  A hatás ÖNMAGÁT KORLÁTOZZA: a poolban ma három sebesség-képesség van, ezért
+  III. szinten az első három húzás ~61-64%-ban sebességes, utána a részesedés
+  magától visszaesik (5. húzás 30%, 8. húzás 5%) — a torzítás nem tudja
+  újratölteni, amit már kihúzott. Alapérték (képesség nélkül) 11%.
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
