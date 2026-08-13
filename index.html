@@ -235,6 +235,8 @@ button:disabled{opacity:.35;cursor:default}
 .msChev{font-size:10px;opacity:.7;flex:none}
 .msDot{display:inline-block;width:7px;height:7px;border-radius:50%;
   background:var(--gold);vertical-align:middle;margin-left:3px}
+/* Nyitható kategória-fejléc alatt a doboz szorosan követi a fejlécet. */
+.msGrp+.infoCard{margin-top:5px}
 .msList{display:flex;flex-direction:column;gap:7px;margin:7px 0 2px}
 .msItem{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
 .msItem.done{opacity:.72;border-color:color-mix(in srgb,var(--grass) 45%,var(--line))}
@@ -2708,7 +2710,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.45";
+const APP_VERSION="3.1.46";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -38782,10 +38784,83 @@ function styleStarPickerHtml(){
     +(_styleStarPick?`Megerősítem — ${esc(shortName(_styleStarPick))}`:"Előbb válassz valakit")+`</button>`
     +`<button class="btn-s stepbtn" id="styleStarCancel" style="margin-top:6px">Mégse</button></div>`;
   return h;}
+/* ---- A MŰSZERFAL FŐ KATEGÓRIÁI: NYITHATÓ-CSUKHATÓ ----
+   MÉRVE: a kiépült stílus-műszerfal EGYETLEN, végtelen görgetéssé nőtt —
+   filozófia + 8-9 képesség három-három szinttel + a csillagozás-bolt + a
+   mérföldkövek. Aki a mérföldköveit akarta megnézni, annak előbb végig kellett
+   görgetnie a teljes képességfán. A négy fő kategória ezért ugyanazt a
+   nyitható-csukható csoportfejlécet kapja, amit az Infópult mérföldkő-listája
+   már használ (.msGrp) — a menü két nyelvet nem beszél.
+
+   A ZÁRT KATEGÓRIA NEM RENDERELŐDIK: a törzs csak akkor épül fel, ha nyitva
+   van. A fejlécen viszont ott a SZÁMLÁLÓ (hány szint van meg, hány mérföldkő
+   teljesült), tehát csukott állapotban is látod, hol tartasz — a becsukás nem
+   rejt el információt, csak a részleteket.
+
+   Az állapot szándékosan NEM megy a mentésbe: felületi állapot, nem a karrier
+   része. A munkameneten belül viszont megmarad, mert a panel sokszor rajzol
+   újra (vásárlás, mérföldkő-teljesülés), és bosszantó volna, ha minden
+   kattintás után visszacsukódna, ami nyitva volt. */
+const _styleSecOpen={};
+/* A GÖRGETŐ KONTÉNER. A stílus-panel több rétegnyi mélyen ül (menü → hubGroup →
+   accBody), és hogy melyik réteg görget, az a felület felépítésétől függ —
+   ezért nem nevesítjük, hanem megkeressük: az első olyan felmenő, ami tényleg
+   túlcsordul. Enélkül egy kategória becsukása kirántja a felületet a kéz alól,
+   mert a görgetés a régi, hosszabb tartalomhoz tartozik. */
+function styleScrollerOf(el){
+  let n=el&&el.parentElement;
+  while(n&&n!==document.body){
+    const ov=getComputedStyle(n).overflowY;
+    if((ov==="auto"||ov==="scroll")&&n.scrollHeight>n.clientHeight+2)return n;
+    n=n.parentElement;}
+  return null;}
+function styleSecIsOpen(key,defOpen){
+  const v=_styleSecOpen[key];
+  return v===undefined?!!defOpen:!!v;}
+function styleSecHtml(key,title,count,badge,build,defOpen){
+  const open=styleSecIsOpen(key,defOpen);
+  return `<button class="msGrp${open?" open":""}" data-stylesec="${key}">`
+    +`<span class="msGrpN">${title}${badge?` <span class="msBadge">${esc(badge)}</span>`:""}</span>`
+    +`<span class="msGrpC">${esc(count)}</span>`
+    +`<span class="msChev">${open?"▲":"▼"}</span></button>`
+    +(open?build():"");}
 /* ---- A MŰSZERFAL (a választás után) ----
    F1-ben még csak a filozófia összefoglalója és a stíluspont-mérleg; a
    mérföldkövek (F2) és a trait-bolt (F3) ide fog beépülni. */
 function styleDashboardHtml(st,def){
+  const sp=msStylePoints();
+  const tl=styleTraitList(st.key);
+  const steps=tl.reduce((a,t)=>a+t.lv.length,0);
+  const owned=tl.reduce((a,t)=>a+styleTraitLevel(t.key),0);
+  const msL=styleMsList()||[],M=styleMsState();
+  const msDone=M?msL.filter(d=>M.done[d.id]).length:0;
+  const unseen=styleMsUnseen();
+  let starN=0;
+  if(gameMode==="career"){try{starN=starLockedInSquad().length;}catch(e){}}
+  /* Frissen választott filozófia a szezonjelentésen: a felhasználó a menü
+     belsejében áll, a szezonindító gomb pedig a HUB-on van — mondjuk meg, hol
+     folytatódik, különben úgy tűnhet, hogy zsákutcába ért. A KATEGÓRIÁKON KÍVÜL
+     áll, mert cselekvésre hív: egy becsukott kategória nem nyelheti el. */
+  let h="";
+  if(typeof phase!=="undefined"&&phase==="hubreport")
+    h+=`<div class="msWarn" style="margin-top:12px">Megvan a filozófia — nyomd meg a `
+      +`<b>„← Vissza a HUB-ba"</b> gombot, és ott vár az <b>„Irány a pályára →"</b>: `
+      +`jöhetnek a szezon eleji kihívások és a következő idény.</div>`;
+  /* A kategória-fejléc ikonja SZÁNDÉKOSAN nem a stílusé (def.ic): az közvetlenül
+     alatta, a kártya fejlécében amúgy is ott áll — kétszer egymás alatt zaj. */
+  h+=styleSecHtml("fil","🏛 A klub filozófiája",`${sp} pont`,"",
+    ()=>styleHeadHtml(st,def),true);
+  if(tl.length)
+    h+=styleSecHtml("trait","🧩 Stílus-képességek",`${owned}/${steps} szint`,"",
+      ()=>styleTraitsHtml(true),false);
+  if(gameMode==="career")
+    h+=styleSecHtml("star","⭐ Csillagozás feloldása",`${starN} nyitható`,"",
+      ()=>starUnlockHtml(true),false);
+  if(msL.length)
+    h+=styleSecHtml("ms","🏅 Stílus-mérföldkövek",`${msDone}/${msL.length}`,
+      unseen?`${unseen} új`:"",()=>styleMsHtml(true),unseen>0);
+  return h;}
+function styleHeadHtml(st,def){
   const forms=(def.forms||[]).map(f=>(typeof FORM_LABELS!=="undefined"&&FORM_LABELS[f])||f).join(" · ");
   const tacs=(def.tactics||[]).map(t=>(TACTICS[t]&&TACTICS[t].n)||t).join(" · ");
   const sp=msStylePoints();
@@ -38803,18 +38878,28 @@ function styleDashboardHtml(st,def){
     h+=`<div class="msItem" style="margin-top:9px"><div class="msTop"><b>⭐ A klub sztárja</b>`
       +`<span class="msRew">${esc(shortName(st.star))}</span></div>`
       +`<div class="msDesc">A stílus mérföldkövei róla szólnak.</div></div>`;
-  h+=`<div class="msNote" style="margin-top:9px">A stílushoz tartozó KÉPESSÉGEK `
-    +`(traitek) a következő fejlesztésben nyílnak meg — a pontjaid addig gyűlnek.</div>`;
-  /* Frissen választott filozófia a szezonjelentésen: a felhasználó a menü
-     belsejében áll, a szezonindító gomb pedig a HUB-on van — mondjuk meg, hol
-     folytatódik, különben úgy tűnhet, hogy zsákutcába ért. */
-  if(typeof phase!=="undefined"&&phase==="hubreport")
-    h+=`<div class="msWarn" style="margin-top:9px">Megvan a filozófia — nyomd meg a `
-      +`<b>„← Vissza a HUB-ba"</b> gombot, és ott vár az <b>„Irány a pályára →"</b>: `
-      +`jöhetnek a szezon eleji kihívások és a következő idény.</div>`;
-  h+=`</div>`;
-  return h+styleTraitsHtml()+starUnlockHtml()+styleMsHtml();}
+  /* A régi szöveg még azt ígérte, hogy a képességek „a következő fejlesztésben
+     nyílnak meg" — azóta megnyíltak, ott állnak alatta. */
+  h+=`<div class="msNote" style="margin-top:9px">A csapatstílus-pontot alul, a `
+    +`<b>Stílus-képességek</b> és a <b>Csillagozás feloldása</b> kategóriában költheted el; `
+    +`a pontot a <b>Stílus-mérföldkövek</b> termelik. Minden kategória külön nyitható-csukható.</div>`;
+  return h+`</div>`;}
 function styleBindPanel(body){
+  /* A FŐ KATEGÓRIÁK nyitása-csukása. A gomb a fejléc maga — a törzs csak nyitva
+     épül fel, ezért a kattintás után újra kell rajzolni a panelt. A görgetést
+     megőrizzük: a becsukott kategória fölött álló doboz a helyén marad, nem
+     ugrik el a felület a kezed alól. */
+  body.querySelectorAll("[data-stylesec]").forEach(b=>{
+    b.onclick=()=>{
+      const k=b.getAttribute("data-stylesec");
+      const sc=styleScrollerOf(b);
+      /* a fejléc képernyő-pozíciója a kattintás pillanatában */
+      const y0=b.getBoundingClientRect().top;
+      _styleSecOpen[k]=!b.classList.contains("open");
+      renderStylePanel();
+      if(!sc)return;
+      const nb=document.querySelector(`[data-stylesec="${k}"]`);
+      if(nb)sc.scrollTop+=nb.getBoundingClientRect().top-y0;};});
   body.querySelectorAll("[data-starunlock]").forEach(b=>{
     b.onclick=()=>{
       const id=b.getAttribute("data-starunlock");
@@ -39918,15 +40003,15 @@ function styleMsMarkSeen(){
    A stílus-mérföldköveknél nincs kategória-zár, tehát „beragadt" és „pont
    nélkül zárult" állapot sem — a közös segédek ezt üres táblákkal kapják meg. */
 function styleMsShim(M){return {done:M.done,pend:{},missed:{}};}
-function styleMsHtml(){
+function styleMsHtml(noHead){
   const M=styleMsState(),list=styleMsList();
   if(!M||!list.length)return "";
   const W=styleMsShim(M);
   const done=list.filter(d=>M.done[d.id]).length;
   const unseen=styleMsUnseen();
   let h=`<div class="infoCard" style="margin-top:12px">`
-    +`<div class="infoCardH">Stílus-mérföldkövek`
-    +(unseen?` <span class="msBadge">${unseen} új</span>`:"")+`</div>`
+    +(noHead?"":`<div class="infoCardH">Stílus-mérföldkövek`
+      +(unseen?` <span class="msBadge">${unseen} új</span>`:"")+`</div>`)
     +`<div class="msNote">Ezek CSAK a te stílusodra szólnak, és mind `
     +`csapatstílus-pontot fizetnek. A megnyitás-kapu rájuk nem vonatkozik — `
     +`itt maga a stílusválasztás a belépő. A több fokozatú célok EGY sorban `
@@ -40693,13 +40778,13 @@ function starLockedInSquad(){
   out.sort((a,b)=>starUnlockPrice(b.skill)-starUnlockPrice(a.skill));
   return out;}
 /* A bolt HTML-je — a csapatstílus műszerfalán él, mert stíluspontból megy. */
-function starUnlockHtml(){
+function starUnlockHtml(noHead){
   if(gameMode!=="career")return "";
   const list=starLockedInSquad();
   const sp=msStylePoints();
   const openCnt=Object.keys(S.starUnlocked||{}).length;
   let h=`<div class="infoCard" style="margin-top:12px">`
-    +`<div class="infoCardH">Csillagozás feloldása</div>`
+    +(noHead?"":`<div class="infoCardH">Csillagozás feloldása</div>`)
     +`<div class="msNote">Alapból egyetlen képesség sem csillagozható. A jogot `
     +`<b>képességenként</b> kell megnyitni, és a megnyitás <b>végleges</b>: onnantól `
     +`minden emberednél csillagozható, aki valaha kiépíti. Az ár a képesség erejéhez `
@@ -40786,7 +40871,9 @@ function styleTraitLiveHtml(t,lv){
          : v<0?`⚠ A feltétel most NEM teljesül — megvéve ${stNum(v)} csapaterő járna`
              : `⏸ A feltétel most nem teljesül — megvéve 0 csapaterőt adna`);
   return `<div class="msLive ${cls}">${fej}${mert?` · ${esc(mert)}`:""}</div>`;}
-function styleTraitsHtml(){
+/* noHead: a saját fejlécet elhagyja — a nyitható kategória-fejléc (styleSecHtml)
+   már kimondta a doboz nevét, kétszer kiírni zaj volna. */
+function styleTraitsHtml(noHead){
   const st=styleState();
   if(!st)return "";
   const list=styleTraitList(st.key);
@@ -40796,7 +40883,7 @@ function styleTraitsHtml(){
   const owned=list.reduce((a,t)=>a+styleTraitLevel(t.key),0);
   const full=list.reduce((a,t)=>a+t.lv.reduce((b,L)=>b+L.price,0),0);
   let h=`<div class="infoCard" style="margin-top:12px">`
-    +`<div class="infoCardH">Stílus-képességek</div>`
+    +(noHead?"":`<div class="infoCardH">Stílus-képességek</div>`)
     +`<div class="msNote">Minden képességnek <b>három szintje</b> van, egyre drágábban és `
     +`egyre erősebben. A teljes fa <b>${full} pont</b> — kimaxolni nem lehet, egy hosszú `
     +`karrier alatt a felénél is kevesebb fér bele. Ez a lényeg: a stíluson belül is dönteni kell.</div>`

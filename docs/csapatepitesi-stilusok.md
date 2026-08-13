@@ -760,6 +760,26 @@ igényel új szimulációs ágat.
   legtöbbet, akinek a kerete már valamennyire illik a rendszerhez — nulla
   illeszkedést nem varázsol elő.
 
+* **A műszerfal nyitható-csukható (3.1.45).** A panel négy fő kategóriája — *A
+  klub filozófiája*, *Stílus-képességek*, *Csillagozás feloldása*,
+  *Stílus-mérföldkövek* — külön nyitható. Mérve: a kiépült műszerfal HTML-je
+  22 441 karakterre nőtt (8-9 képesség három-három szinttel, a csillagozás-bolt
+  és 76 mérföldkő), vagyis aki a mérföldköveit akarta megnézni, annak előbb
+  végig kellett görgetnie az egész képességfát. Csukott állapotban ugyanez
+  1 720 karakter: a menü egy képernyőre fér.
+
+  A megoldás a már meglévő `.msGrp` csoportfejlécet használja, amit az Infópult
+  mérföldkő-listája is — a menü nem beszél két nyelvet. **A zárt kategória nem
+  renderelődik**, de a fejlécén ott a számláló (6/33 szint, 0/76 mérföldkő,
+  hány csillagozás nyitható) és a mérföldköveknél az „új" jelvény, tehát a
+  becsukás nem rejt el információt, csak részletet. A mérföldkő-kategória
+  magától nyitva indul, ha van megnézetlen teljesülés.
+
+  Az állapot NEM megy a mentésbe (felületi állapot), de a munkameneten belül
+  megmarad — a panel vásárláskor és mérföldkő-teljesüléskor újrarajzol, és
+  bosszantó volna, ha minden kattintás visszacsukná. A nyitás/csukás megőrzi a
+  görgetést: a megnyomott fejléc a képernyőn a helyén marad.
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
