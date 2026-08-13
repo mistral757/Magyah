@@ -17189,11 +17189,20 @@ const CH_SIM_STAT={
 /* A cél beállítása a kívánt teljesítési arányra. Inverz típusnál (pl. "ennél
    kevesebb gólt kapj") a teljesítés azt jelenti, hogy ALATTA maradsz, ezért a
    percentilis a másik oldalról jön. */
+/* ---- A BETON KÖNNYÍTÉSE ITT ÜL, ÉS EZ SZÁNDÉKOS ----
+   Nem a kész célt vágjuk vissza utólag, mert a kihívás LEÍRÁSA (és a kalibrált
+   teljesítési aránya) már a régi számot mondaná — a panel mást állítana, mint
+   a feltétel. Ehelyett a kalibráció KÉRT TELJESÍTÉSI ARÁNYÁT emeljük: a cél
+   ugyanazon a mérésen születik, csak könnyebbre. A leírás és a valóság így
+   egyetlen forrásból jön, ahogy eddig is. */
+let _chCleanEase=0;
 function chCalibratedTarget(type,diff,rounds,inverse){
   const fn=CH_SIM_STAT[type];if(!fn)return null;
   const gap=chLevelGap(),vals=[];
   for(let i=0;i<CH_SIM_N;i++)vals.push(fn(chSimOne(gap,rounds)));
-  const p=CH_PASS_TARGET[diff]||0.5;
+  let p=CH_PASS_TARGET[diff]||0.5;
+  if(_chCleanEase>0&&CH_CLEAN_TYPES.indexOf(type)>=0)
+    p=Math.min(0.95,p+(1-p)*_chCleanEase);
   /* NEM egyszerű percentilist veszünk. A mutatók egy része KIS EGÉSZ SZÁM
      (a legjobb gólzápor tipikusan 2-5, a tiszta lapos sorozat 0-4), és ilyenkor
      a percentilis nagyot téved: egyetlen egész lépés akár 30 százalékpontot is
@@ -17594,9 +17603,44 @@ function genPunishment(scope,diff,ctx){
   return pick(pool);}
 /* Egy teljes felajánlott challenge összeállítása. */
 let _challengeIdCtr=0;
+/* ================= A BETON KIHÍVÁS-KÉPESSÉGE (3.2.00) =================
+   „Nulla a tábla": a stílus a saját nyelvén kap kihívásokat. Három dolgot
+   csinál egyszerre, és mind a három a filozófiából következik:
+     · GYAKRABBAN jön kapott gól nélküli kihívás (a felsorolt típusokból),
+     · KÖNNYEBB a cél (a védekező kihívás a Betonnak nem bravúr, hanem a napi
+       munkája — a cél ehhez igazodik),
+     · NAGYOBB a jutalom (a jutalom a NEHÉZSÉGI sávból jön, ezért egyszerűen
+       egy-két sávval feljebb sorsolunk hozzá).
+   A könnyebb cél + nagyobb jutalom szándékosan ellentmondásos párosítás: pont
+   ez a stílus fizetsége. Aki Betont épít, annak a tiszta lap ingyen van. */
+const CH_CLEAN_TYPES=["cleanStreak","teamCleanSheets","zeroHeroWins","teamConceded"];
+function styleCleanChal(){
+  let best=null;
+  try{styleActiveFx().forEach(f=>{
+    const c=f.cleanChal;
+    if(c&&(!best||c.p>best.p))best=c;});}catch(e){}
+  return best;}
+function chalDiffUp(diff,steps){
+  const i=CHALLENGE_DIFFS.indexOf(diff);
+  return CHALLENGE_DIFFS[Math.min(CHALLENGE_DIFFS.length-1,Math.max(0,i)+(steps||0))];}
 function buildChallengeOffer(scope,ctx){
   let diff=pick(CHALLENGE_DIFFS);
-  const goal=genChallenge(scope,diff,ctx);
+  /* A KAPU: a bajnoki kihívásokra szól (a kupának saját katalógusa van). Ha a
+     dobás elsül, addig sorsolunk, amíg tiszta lapos típus jön — de csak
+     korlátozott számban, hogy egy szűk keretnél se akadjon meg a felajánlás.
+     A könnyítés a sorsolás IDEJÉRE kapcsol be, hogy a cél már könnyítve
+     szülessen (lásd _chCleanEase). */
+  const CC=(scope!=="cup")?styleCleanChal():null;
+  let goal=null,cleanBoost=false;
+  if(CC&&Math.random()<CC.p){
+    _chCleanEase=CC.ease;
+    try{
+      for(let i=0;i<14&&!goal;i++){
+        const g2=genChallenge(scope,diff,ctx);
+        if(g2&&CH_CLEAN_TYPES.indexOf(g2.type)>=0&&!g2.forceDiff&&!g2.forceReward)goal=g2;}
+    }finally{_chCleanEase=0;}
+    if(goal){cleanBoost=true;goal.styleClean=true;}}
+  if(!goal)goal=genChallenge(scope,diff,ctx);
   if(!goal)return null;
   /* Egyes kihívásoknak RÖGZÍTETT a besorolása és/vagy a jutalma (pl. a
      poszt-tanulás mindig könnyű, és mindig a betanítási ár felét adja
@@ -17621,10 +17665,15 @@ function buildChallengeOffer(scope,ctx){
   }else{
     deadline={kind:"season",value:(S.seasonNumber||1)+1};
   }
+  /* A JUTALOM SÁVJA. A genReward a nehézségből skálázza a pénzt és a
+     készletet — a Beton-bónuszt ezért nem utólag szorozzuk rá (abból hazug
+     leírás lenne), hanem egyszerűen feljebb sorsoljuk. A BÜNTETÉS a VALÓDI,
+     könnyített nehézségen marad: a stílus a jutalmat emeli, nem a tétet. */
+  const rewDiff=cleanBoost?chalDiffUp(diff,CC.rew):diff;
   const offer=Object.assign({
     id:"ch"+(++_challengeIdCtr),
     scope,difficulty:diff,
-    reward:goal.forceReward?Object.assign({},goal.forceReward,{desc:posLearnRefundDesc()}):genReward(scope,diff,ctx),
+    reward:goal.forceReward?Object.assign({},goal.forceReward,{desc:posLearnRefundDesc()}):genReward(scope,rewDiff,ctx),
     punishment:genPunishment(scope,diff,ctx),
     deadline,
     startProgress:challengeCurrentValue(goal)
@@ -18890,6 +18939,42 @@ function paceSkillBias(){
   const fit=(typeof tacticFit==="function")?tacticFit(act):0;
   if(fit<=0.5)return 0;
   return Math.min(PACE_BIAS_MAX,((fit-0.5)/0.5)*PACE_BIAS_MAX);}
+/* ---- A VILLÁM KÉPESSÉGE MOSTANTÓL SZORZÓ, NEM PADLÓ (3.2.00) ----
+   A „Sebességre hangolt sorsolás" eddig SAJÁT, önálló esélyt adott (30/45/60%),
+   és a taktikáéval a nagyobb élt. Ez két baj forrása volt: a képesség
+   taktikától függetlenül ugyanazt adta, és jól begyakorlott széljátéknál
+   egyáltalán nem is látszott (a taktika 75%-a mindig nagyobb volt).
+
+   MOSTANTÓL A MEGLÉVŐ ESÉLYT SZOROZZA. A kért olvasat: ha egy skill esélye
+   alapból 5%, a taktikától 7,5%, akkor a képesség I. szintje (+30%) ezt
+   9,75%-ra emeli. A számolás a TÉNYLEGES esélyen megy, nem a torzításon:
+     p0 = torzítás + (1−torzítás) × a pool nyers pace-aránya
+     p1 = min(1, p0 × (1+szint))
+   és ebből visszafejtjük, mekkora torzítás adná ki p1-et. Így a kiírt szorzó
+   tényleg az, ami a sorsolásban megjelenik — nem egy közelítés.
+
+   A POOL NYERS ARÁNYÁT MÉRJÜK, nem konstansot írunk be: a pool fogy húzásról
+   húzásra, és ha a sebesség-képességek már elkeltek, a szorzónak sincs mit
+   szoroznia. Ez így őszinte marad. */
+function paceSkillBase(){
+  const pool=S.skillPool||[];
+  if(!pool.length)return 0;
+  return pool.filter(isPaceSkill).length/pool.length;}
+/* A tényleges esély MENNYEZETE. Nem a képesség ellen szól: a szorzó egy
+   tökéletesen begyakorlott széljátéknál (78% → ×1,6) 100%-ra futna, és onnantól
+   a keret SEMMI mást nem tanulna. 85% fölött már úgyis "majdnem mindig
+   sebességes"; a maradék ablak azt őrzi, hogy a stílus ne zárja el magát a
+   játék többi részétől. */
+const PACE_TOTAL_MAX=0.85;
+function paceBiasTotal(){
+  const t=paceSkillBias();
+  const m=(typeof styleSkillPaceBias==="function")?styleSkillPaceBias():0;
+  if(m<=0)return t;
+  const base=paceSkillBase();
+  if(base<=0||base>=1)return t;
+  const p0=t+(1-t)*base;
+  const p1=Math.min(PACE_TOTAL_MAX,p0*(1+m));
+  return Math.max(t,Math.min(1,(p1-base)/(1-base)));}
 /* ---- GÓLSZERZÉSRE ÉPÜLŐ RENDSZER → GÓLSZERZÉSI SKILLEK ----
    A sebesség-torzítás tükörképe a másik tengelyre. A "gólszerzésre épülő
    taktika" nem kézzel felsorolt lista, hanem magából az adatból jön: a rendszer
@@ -18934,12 +19019,9 @@ function goalSkillBias(){
    rendszereknél (kontra, széljáték) a régi egyensúly marad az uralkodó. */
 function drawSkillFromPool(){
   if(!S.skillPool.length)S.skillPool=weightedShuffleSkills();
-  /* A sebesség-ág KÉT forrásból kaphat torzítást: a taktikából (paceSkillBias)
-     és a Villám „Sebességre hangolt sorsolás" képességéből. A NAGYOBB él, nem
-     adódnak össze — különben a jól begyakorlott széljáték + megvett képesség
-     együtt közel 100%-ra vinné, és a keret minden más képességtől elzárulna. */
-  const b=Math.max(paceSkillBias(),
-    (typeof styleSkillPaceBias==="function")?styleSkillPaceBias():0);
+  /* A sebesség-ág: a taktika adja az esélyt, a Villám képessége pedig SZOROZZA
+     (lásd paceBiasTotal). */
+  const b=paceBiasTotal();
   if(b>0&&Math.random()<b){
     const i=S.skillPool.findIndex(isPaceSkill);
     if(i>=0)return S.skillPool.splice(i,1)[0];}
@@ -20374,6 +20456,16 @@ function matchExcitement(c){
     agg=Math.min(EXC_MAX.agg,agg);}
   let s=swing+drama+goals+stake+close+rout+agg+open+burst+late;
   if((c.goals||0)<=1&&!c.leadChanges&&!c.equalisers&&!agg)s-=12;
+  /* ---- BOMBÁZÓK: A GÓLZÁPOR A SZURKOLÓNAK ÜNNEP (3.2.00) ----
+     A mutató a FESZÜLTSÉGET méri, és ez általában helyes — de a Bombázók
+     szurkolója nem feszültségért jár ki, hanem gólokért. A képesség ezért nem
+     az egész görbét tolja el, csak a gólszám két küszöbét jutalmazza. A
+     10+ gólos meccs padlót kap, nem növekményt: ott már nincs mit mérlegelni.
+     Az izgalom a szezonos szurkolói bevételbe is beleszámít (20% súllyal),
+     tehát a képesség tényleg pénzt ér, nem csak feliratot. */
+  const _bz=(typeof styleExciteBoost==="function")?styleExciteBoost():null;
+  if(_bz&&gn>=5)s+=_bz.add;
+  if(_bz&&gn>=10)s=Math.max(s,_bz.floor);
   return {score:Math.max(0,Math.min(100,Math.round(s))),
     swing:Math.round(swing),drama:Math.round(drama),goals:Math.round(goals),stake,close,rout,agg,
     open:Math.round(open),burst:Math.round(burst),late:Math.round(late)};}
@@ -24900,7 +24992,7 @@ function playMatch(){
         dramaRecord(_ex.score,_key,_ctx.opp);
         /* MÉRFÖLDKŐ: a meccs izgalma sehol máshol nem marad meg mérhető
            alakban (a szezonátlag felülírja), ezért a csúcsot itt jegyezzük. */
-        msNoteMatch({excitement:_ex.score});}
+        msNoteMatch({excitement:_ex.score,allGoals:_ctx.goals});}
     }catch(e){}
     /* a fejléc a végeredményen áll meg, az óra "VÉGE" — a következő meccs
        kezdetén az updateTTBoard(...,0) újrainicializálja */
@@ -32063,6 +32155,10 @@ function infinityApplyUnlock(){
        const top=boosted.slice(0,4).map(b=>`${esc(shortName(b.n))} +${b.dPeak}`).join(", ");
        addLine(`∞ A teljes kereted TSI-boostot kapott (${boosted.length} játékos, ×${INFINITY_OWNED_TSI_MULT} TSI) — magasabb lett a fejlődési plafonjuk. A legnagyobb ugrások: ${top}.`,"m life");}}
     addLine(`∞ INFINITY MÓD MEGNYITVA — nincs több Rating-plafon, nincs hanyatlás, a mezőny ${maxOppRating()}-ig tolható. A sztárok fejlődése feloldva a 119-es plafon alól.`,"m life");
+    /* A STÍLUS-LÉPCSŐK IS KINYÍLNAK. Enélkül a filozófia pont ott hallgatna el,
+       ahol a karrier igazán kezdődik. */
+    try{const _n=stExtendForInfinity();
+      if(_n)addLine(`∞ A csapatstílusod mérföldkövei is kinyíltak: ${_n} új fokozat nyílt a 200-as szint felé — a jutalmak laposodó görbén nőnek.`,"m life");}catch(e){}
     updateOppRatingBadge();saveGame();
     /* A KARRIER VISSZATEKINTÉSE — ez a futás legfontosabb határköve, ezért
        teljes képernyős összegzést kap, nem csak egy napló-sort. */
@@ -38170,6 +38266,9 @@ function msNoteMatch(o){
   try{
     if(gameMode!=="career"||!o)return;
     const t=msT();
+    /* BOMBÁZÓK: gólzápor-meccsek darabszáma (össz-gól ≥ 5, mindkét oldalról).
+       A stílus mérföldkövei ezt olvassák. */
+    if(o.allGoals!=null&&o.allGoals>=5)t.goalFests=(t.goalFests||0)+1;
     if(o.excitement!=null){
       t.exciteMax=Math.max(t.exciteMax||0,o.excitement);
       /* EMLÉKEZETES MECCS: az „emlékezetes" sáv alja (excitementLabel) — a mért
@@ -39409,6 +39508,7 @@ const ST_FAM_T={
   bz_skill:"Befejező képességek", bz_card:"A gólgép szezonkártyája",
   bz_htall:"Mesterhármasok a klubnál", bz_assist2:"Gólpasszok egy idényben",
   bz_haulm:"Gólzápor egy meccsen", bz_gfmax:"A gólrekord-idény",
+  bz_fest:"Gólzáporok a klubnál", bz_memo:"Emlékezetes mérkőzések",
   hm_spread:"A kezdő 11 szórása", hm_chem:"Kész párkémiák",
   hm_card:"Kiemelkedő emberek egyszerre", hm_contrib:"Akik beszálltak a termelésbe",
   hm_scorersN:"Különböző gólszerzők egy idényben", hm_axisN:"A leggyengébb tengely",
@@ -39438,7 +39538,13 @@ const ST_FAM_T={
 function stTiers(styleK,base,tFn,dFn,vals,tiers,p,nOf){
   tiers.forEach((th,i)=>{
     const d=stDef(styleK,`${base}_${th}`,tFn(th),dFn(th),vals[i],p,(nOf?nOf[i]:th));
-    d.fam=base;d.famT=ST_FAM_T[base]||tFn(th);d.famI=i;d.famN=tiers.length;});}
+    d.fam=base;d.famT=ST_FAM_T[base]||tFn(th);d.famI=i;d.famN=tiers.length;
+    /* A CÍM- ÉS LEÍRÁS-KÉSZÍTŐT ELTESSZÜK. Enélkül az Infinity-hosszabbítás
+       (stExtendForInfinity) nem tudná ugyanazon a nyelven megfogalmazni az új
+       fokozatokat, és kézzel írt szövegeket kellene duplikálni 45 családhoz.
+       Az `inv` a fordított mércét jelöli (kevesebb a jobb) — azt nem
+       hosszabbítjuk, mert ott „felfelé" a könnyebbség irányába mennénk. */
+    d.tFn=tFn;d.dFn=dFn;d.inv=!!nOf;});}
 /* ================= A STÍLUS-LÉPCSŐK ÉRTÉKGÖRBÉI =================
    Négy visszatérő görbe, hogy a hat stílus ugyanazt a léptéket beszélje. A
    szám nem az elért érték nagyságából jön, hanem abból, mennyi MUNKA van
@@ -39620,6 +39726,21 @@ stTiers("bombazok","bz_gfmax",th=>`${th} gól egy idényben`,
   th=>`Rúgj ${th} gólt egyetlen bajnoki szezonban. A felső fokozatok már `
      +`gólrekord-idényt kérnek — és onnantól minden új rekord ugyanannyit fizet.`,
   ST_PEAK,[85,95,105,115,125,135,145,155,165,175,185,200],stBestSeasonGF);
+/* ---- AZ IZGALOM MINT SAJÁT MÉRCE (3.2.00) ----
+   A Bombázók filozófiája nem az eredmény, hanem a MŰSOR. Ez eddig sehol nem
+   volt megfizetve: a stílus minden mérföldköve gólt vagy gólpasszt számolt.
+   Két új lépcső méri, amit a szurkoló tényleg átél — a gólzáport (mindkét
+   oldal góljai együtt) és az emlékezetes mérkőzést (a mért eloszlás felső
+   ~3%-a, lásd MS_MEMORABLE). Mindkettő KARRIER-számláló: egy gólzápor
+   véletlen, húsz már identitás. */
+stTiers("bombazok","bz_fest",th=>`${th} gólzápor a klubnál`,
+  th=>`Játssz ${th} olyan mérkőzést, ahol összesen legalább 5 gól esett — `
+     +`a te gólod és a kapott is számít. A Bombázóknál a műsor a lényeg.`,
+  ST_L6,[5,12,25,45,75,120],()=>msT().goalFests||0);
+stTiers("bombazok","bz_memo",th=>`${th} emlékezetes mérkőzés`,
+  th=>`Zárj ${th} mérkőzést legalább ${MS_MEMORABLE}-ös izgalom-pontszámmal. `
+     +`Ez a mért eloszlás felső néhány százaléka — amit évekig emlegetnek.`,
+  ST_L6,[2,5,10,18,30,50],()=>msT().memorable||0);
 
 /* ---------- ☯️ BÉKE ÉS HARMÓNIA ---------- */
 /* FORDÍTOTT MÉRCE — ugyanaz a hiba, mint a bt_ga-nál: a haladás „20 mínusz a
@@ -40007,6 +40128,81 @@ stDef("panzer","pz_s_inj","Összezárás",
    Ugyanaz a minta, mint a msScan: minden nem teljesített mérföldkövet
    végigfuttat, saját try-ban, és a jutalmat ugyanabba a stíluspont-tárcába
    fizeti. Csak akkor csinál bármit, ha van választott stílus. */
+/* ================= AZ INFINITY KINYITJA A STÍLUS-LÉPCSŐKET (3.2.00) =========
+   A PROBLÉMA, amit megold. A stílus-mérföldkövek a 100-as mezőny idejéből
+   valók: a sztár 99-es Ratingje, a 25 tiszta lapos idény, a 200 gólos szezon
+   mind a régi plafonhoz mértek. Infinityben viszont a mezőny 200 felé megy —
+   ott a teljes stílus-fa egy-két idény alatt kimerül, és a filozófia
+   ATTÓL KEZDVE NEM FIZET SEMMIT. Ugyanez a hiba jött elő a csapategyensúly-
+   lépcsőnél (hm_balN), csak ott kézzel írtuk át.
+
+   MOSTANTÓL MINDEN CSALÁD MAGÁTÓL FOLYTATÓDIK. Hat új fokozat nyílik, a
+   család SAJÁT lépésmintáját folytatva — a Rating-jellegű mércéknél lineárisan
+   a 200-as plafonig, a számlálóknál a legutolsó lépés arányát ismételve.
+   A szövegeket ugyanaz a tFn/dFn írja, ami az eredetieket, tehát az új
+   fokozatok pontosan úgy beszélnek, mint a régiek.
+
+   A JUTALOMGÖRBE LAPOSODIK. Minden új fokozat többet fizet az előzőnél, de
+   egyre kisebb lépésekben (+35%, +25%, +18%, +12%, +8%, +5% a család
+   tetejéhez képest). Így a hosszabbítás valódi cél marad, de nem borítja fel
+   a stíluspont-gazdaságot: a hat új fokozat együtt sem ér többet, mint a
+   család addigi teteje kétszer.
+
+   AMIT KIHAGYUNK: a fordított mércéjű családok (ott „felfelé" a könnyebbség
+   iránya volna), a rangsor-lépcsők (szezonkártya: a GODLIKE fölött nincs
+   szint) és a lépés-számlálók (kapitányi fokozatok). */
+const ST_INF_TIERS=6;
+const ST_INF_VAL_ADD=[0.35,0.25,0.18,0.12,0.08,0.05];
+/* Rating-jellegű mércék: a plafon maga a 200-as szint, nem egy arány. */
+const ST_INF_RATING=["sz_ovr","vl_avg","vl_avgmax","hm_axisN","vl_rec",
+  "pz_shot","pz_shotmax","hm_balN"];
+/* Rangsor- és lépés-lépcsők: nincs értelmes folytatásuk. */
+const ST_INF_SKIP=["pz_capt","hm_card"];
+let _stInfExtended=false;
+function stExtendForInfinity(){
+  if(_stInfExtended||!infinityMode)return 0;
+  _stInfExtended=true;
+  let added=0;
+  Object.keys(STYLE_MILESTONES).forEach(k=>{
+    const L=STYLE_MILESTONES[k];
+    const fams={};
+    L.forEach(d=>{if(d.fam){(fams[d.fam]=fams[d.fam]||[]).push(d);}});
+    Object.keys(fams).forEach(fam=>{
+      if(ST_INF_SKIP.indexOf(fam)>=0)return;
+      const list=fams[fam];
+      const last=list[list.length-1],prev=list[list.length-2];
+      if(!last||!last.tFn||last.inv||last.bar===false)return;
+      const lastN=last.n,prevN=prev?prev.n:null;
+      if(!(typeof lastN==="number")||!isFinite(lastN)||lastN<=0)return;
+      const ratingLike=ST_INF_RATING.indexOf(fam)>=0;
+      /* A TETŐ. Rating-jellegű mércénél maga a 200-as szint; a számlálóknál a
+         család mostani teteje ×1,8. SZÁNDÉKOSAN NEM a lépcső saját arányát
+         folytatjuk hatványozva: a gólzápor-lépcső utolsó lépése 1,6-szoros, és
+         hatszor egymás után az 120-ból 2013-at csinálna. Egyenletes osztás egy
+         korlátos tetőig — ez marad értelmezhető minden családnál. */
+      const top=ratingLike?200:Math.round(lastN*1.8);
+      if(top<=lastN)return;
+      const topVal=last.val||1;
+      const news=[];
+      for(let i=0;i<ST_INF_TIERS;i++){
+        let th=Math.round(lastN+(top-lastN)*(i+1)/ST_INF_TIERS);
+        /* szigorúan növekvő, és sose ütközzön meglévő azonosítóval */
+        const prevTh=news.length?news[news.length-1].th:lastN;
+        if(th<=prevTh)th=prevTh+1;
+        /* A jutalom SZIGORÚAN nő, csak egyre kisebb lépésekben — a kerekítés
+           különben a felső két fokozatot azonos értékre vinné. */
+        const prevVal=news.length?news[news.length-1].val:topVal;
+        news.push({th,val:Math.max(prevVal+1,Math.round(topVal*(1+ST_INF_VAL_ADD
+          .slice(0,i+1).reduce((a,b)=>a+b,0))))});}
+      if(!news.length)return;
+      const total=list.length+news.length;
+      list.forEach(d=>{d.famN=total;});
+      news.forEach((o,i)=>{
+        const d=stDef(k,`${fam}_${o.th}`,last.tFn(o.th),last.dFn(o.th),o.val,last.p,o.th);
+        d.fam=fam;d.famT=last.famT;d.famI=list.length+i;d.famN=total;
+        d.tFn=last.tFn;d.dFn=last.dFn;d.inv=false;d.infExt=true;
+        added++;});});});
+  return added;}
 function styleMsList(){
   const k=styleKey();
   return (k&&STYLE_MILESTONES[k])||[];}
@@ -40241,6 +40437,18 @@ stTrait("bombazok","csillagozhato_oszton",3,"Csillagozható ösztön",
   {fx:{starOffer:0.12},note:"+12 százalékpont csillag-esély"},
   {fx:{starOffer:0.22},note:"+22 pp"},
   {fx:{starOffer:0.32},note:"+32 pp"}]);
+/* ---- GÓLZÁPOR-ÜNNEP ----
+   A szurkolói bevétel három lába közül az egyik az IZGALOM (20% súly), és az
+   izgalom-mutató alapból a feszültséget méri. A Bombázók szurkolója viszont
+   nem feszültségért jár ki, hanem gólokért — ez a képesség ezt a különbséget
+   fizeti meg. Nem az egész görbét tolja el, csak két küszöböt jutalmaz. */
+stTrait("bombazok","golzapor_unnep",2,"Gólzápor-ünnep",
+  "A sok gólos mérkőzés izgalom-pontszáma megugrik — a 10+ gólos meccs pedig padlót kap. Az izgalom a szezonos szurkolói bevételbe is beleszámít.",[
+  {fx:{exciteGoals:{add:20,floor:80}},note:"5+ gólnál +20 izgalom · 10+ gólnál legalább 80"},
+  {fx:{exciteGoals:{add:35,floor:90}},note:"+35 · legalább 90"},
+  {fx:{exciteGoals:{add:50,floor:100}},note:"+50 · a 10+ gólos meccs MINDIG 100"}],
+  ()=>{const e=styleExciteBoost();
+    return e?`most: 5+ gól → +${e.add} · 10+ gól → legalább ${e.floor}`:"";});
 stTrait("bombazok","kettos_veszely",3,"Kettős veszély",
   "Ha a támadósorod a legerősebb sorod, a csapat csapaterőt kap.",[
   {fx:{ovrTeam:()=>stLineIsTop("CSATAR")?1.5:0},note:"+1,5 csapaterő"},
@@ -40380,14 +40588,16 @@ stTrait("sztar","nelkule_nem_megy",3,"Nélküle nem megy",
    sebesség-taktikát játszik: a szélessége máshonnan jön, a fejlődése mégis a
    stílus felé húz. */
 stTrait("villam","sebesseg_sorsolas",1,"Sebességre hangolt sorsolás",
-  "A képesség-sorsolás a SEBESSÉG-alapú képességek felé tolódik — posztkategóriától függetlenül, mindegyik olyan képesség számít, ami a sebességre hat.",[
-  {fx:{skillPace:0.30},note:"30% esély sebesség-képességre"},
-  {fx:{skillPace:0.45},note:"45% esély"},
-  {fx:{skillPace:0.60},note:"60% esély"}],
+  "A sebesség-képesség kihúzásának esélyét MEGSZOROZZA — posztkategóriától függetlenül, mindegyik olyan képesség számít, ami a sebességre hat. Amit a taktikád ad, azt viszi tovább.",[
+  {fx:{skillPace:0.30},note:"a meglévő esély ×1,30"},
+  {fx:{skillPace:0.45},note:"×1,45"},
+  {fx:{skillPace:0.60},note:"×1,60"}],
   ()=>{try{
-    const tb=paceSkillBias(),sb=styleSkillPaceBias();
-    if(tb>sb)return `most a taktikád ${Math.round(tb*100)}%-ot ad — az a nagyobb, az él`;
-    return `most ez él: ${Math.round(sb*100)}% (a taktikád ${Math.round(tb*100)}%-ot adna)`;
+    const base=paceSkillBase();
+    if(base<=0)return "a poolban most nincs sebesség-képesség — nincs mit szorozni";
+    const t=paceSkillBias(),tot=paceBiasTotal();
+    const p=x=>Math.round((x+(1-x)*base)*1000)/10;
+    return `most ${String(p(t)).replace(".",",")}% → ${String(p(tot)).replace(".",",")}% esély sebesség-képességre`;
   }catch(e){return "";}});
 /* ---- VÉRÜKBEN A RENDSZER ----
    A stílus két saját rendszere (Széljáték, Gyors kontra) EGYSZERRE kap
@@ -40533,6 +40743,20 @@ function stStarDiscLevels(sel,vals){
   return (vals||STAR_DISC_DEEP).map((p,i)=>({
     fx:{starDisc:{p,sel}},
     note:`−${Math.round(p*100)}% a feloldási áron`}));}
+/* ---- NULLA A TÁBLA ----
+   A kihívás-rendszer a stílus nyelvén szólal meg. Könnyebb cél NAGYOBB
+   jutalomért — szándékosan ellentmondásos párosítás, és pont ez a Beton
+   fizetsége: aki így épít csapatot, annak a tiszta lap nem bravúr, hanem a napi
+   munkája. A könnyítés a kalibráció teljesítési arányán megy (a cél már
+   könnyítve születik, tehát a leírás is igazat mond), a jutalom pedig egyszerűen
+   feljebb sorsolt nehézségi sávból jön. A BÜNTETÉS a valódi sávon marad. */
+stTrait("beton","nulla_a_tabla",2,"Nulla a tábla",
+  "Gyakrabban érkezik kapott gól nélküli kihívás, KÖNNYEBB céllal és NAGYOBB jutalomért.",[
+  {fx:{cleanChal:{p:0.35,ease:0.25,rew:1}},note:"35% esély · könnyebb cél · egy sávval nagyobb jutalom"},
+  {fx:{cleanChal:{p:0.50,ease:0.40,rew:1}},note:"50% · érezhetően könnyebb"},
+  {fx:{cleanChal:{p:0.65,ease:0.55,rew:2}},note:"65% · a legkönnyebb cél · két sávval nagyobb jutalom"}],
+  ()=>{const c=styleCleanChal();
+    return c?`most ${Math.round(c.p*100)}% eséllyel jön tiszta lapos kihívás`:"";});
 stTrait("beton","pajzs_iskola",2,"Pajzs-iskola",
   "A VÉDŐ- és KAPUS-képességek csillagozásának feloldása olcsóbb.",
   stStarDiscLevels(sk=>sk&&(sk.cat==="VEDO"||sk.cat==="KAPUS")));
@@ -40724,6 +40948,13 @@ function styleSkillBias(){
    kategóriástól, mert a pace-skillek minden posztkategóriában ott vannak —
    lásd a „Sebességre hangolt sorsolás" képességnél. 0 = nincs megvéve. */
 function styleSkillPaceBias(){return styleFxMax("skillPace");}
+/* BOMBÁZÓK: a gólzápor izgalom-jutalma. {add,floor} vagy null. */
+function styleExciteBoost(){
+  let best=null;
+  try{styleActiveFx().forEach(f=>{
+    const e=f.exciteGoals;
+    if(e&&(!best||e.add>best.add))best=e;});}catch(e){}
+  return best;}
 
 /* ================= A CSILLAGOZÁS JOGA: KÉPESSÉGENKÉNT MEGNYITVA =============
    A 3.0.06 megnyitotta a csillagozást, de INGYEN: minden kiépült képesség
@@ -41426,6 +41657,10 @@ function applySavedGame(d){
      (ahol ez a mező nincs) helyesen false/0-val indulnak. */
   infinityMode=!!d.infinityMode;
   infinityTiers=d.infinityTiers||0;
+  /* A stílus-lépcsők hosszabbítása a BETÖLTÉSKOR is meg kell hogy történjen —
+     a STYLE_MILESTONES a lap betöltésekor épül fel, amikor még nem tudjuk, hogy
+     a mentett karrier Infinityben jár-e. Idempotens. */
+  try{stExtendForInfinity();}catch(e){}
   /* Régi mentésnél a horgony a JELENLEGI szint → az eltolás 0, a futó karrier
      piaca nem ugrik meg hirtelen a betöltéskor. */
   careerBaseRating=d.careerBaseRating!=null?d.careerBaseRating:oppTargetRating;
