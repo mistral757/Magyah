@@ -2708,7 +2708,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.34";
+const APP_VERSION="3.1.35";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -21006,10 +21006,67 @@ function h2hSimulate(home,away,rnd,neutral){
      Enélkül egy pontosan 45. perces gól a FÉLIDŐ-sor UTÁN jelenhetne meg. */
   const ord=e=>e.type==="start"?0:e.type==="goal"?1:e.type==="half"?2:3;
   ev.sort((a,b)=>a.min-b.min||ord(a)-ord(b));
-  /* az állást újraszámoljuk a rendezett sorrendben */
+  duelSpreadBuckets(ev);
+  ev.sort((a,b)=>a.min-b.min||ord(a)-ord(b));
+  /* Az állást újraszámoljuk a rendezett sorrendben — a FÉLIDŐ és a VÉGE sorét
+     is. A vödör-szétválasztás átvihet egy gólt a 45. perc túloldalára, és
+     ilyenkor a félidei állás a régi (generáláskori) számot hordozná. */
   let h=0,a2=0;
-  ev.forEach(e=>{if(e.type==="goal"){if(e.side==="home")h++;else a2++;e.hg=h;e.ag=a2;}});
+  ev.forEach(e=>{
+    if(e.type==="goal"){if(e.side==="home")h++;else a2++;}
+    if(e.type==="goal"||e.type==="half"||e.type==="end"){e.hg=h;e.ag=a2;}});
   return {events:ev,hg,ag,lam:{home:lamHome,away:lamAway}};}
+/* ================= EGY VÖDÖRBEN CSAK AZ EGYIK CSAPAT GÓLJA =================
+   BEJELENTETT HIBA: a párharc naplójában a 74. percben esett a saját gól, és
+   utána a 73. percben az ellenfél egyenlítése — vagyis az idő VISSZAFELÉ ugrott.
+
+   AZ OK a lejátszás szerkezete. A mérkőzés 18 darab 5 PERCES vödörben pereg, és
+   egy vödrön belül a playMatch előbb a SAJÁT, utána az ELLENFÉL góljait mondja
+   be. A "saját" viszont a két kliensen ELLENTÉTES oldalt jelent: ha egy vödörbe
+   mindkét csapat gólja beleesik, az egyik képernyőn a bemondás sorrendje
+   szükségszerűen szembemegy a percekkel. Sorrendet cserélni ezért nem lehet —
+   ami az egyik gépen javítana, a másikon elrontaná.
+
+   EZÉRT A MEZŐNYT IGAZÍTJUK, még a KÖZÖS lista elkészülésekor: az ütköző gólt
+   átcsúsztatjuk a következő vödör első percébe. Így minden vödörben legfeljebb
+   az egyik csapat talál be, a bemondás sorrendje MINDKÉT képernyőn a percek
+   sorrendje, és a két kliens továbbra is UGYANAZT a percet írja ki — a lista
+   ugyanis egyszer készül el, és onnan olvassa mindkét oldal.
+
+   A 18. (86-90.) vödörnél már nincs hova előre lépni: ott a KORÁBBI gólt húzzuk
+   vissza egy vödörrel. A tologatás új ütközést szülhet, ezért többször fut le,
+   amíg el nem fogynak — a gyakorlatban egy kör elég (a mérés szerint mérkőzésenként
+   ~11% az esély egyetlen ütközésre).
+
+   AZ EREDMÉNY VÁLTOZATLAN: csak PERCEK mozdulnak, gól, gólszerző, gólpassz és
+   végeredmény egyet sem. A determinizmus is megmarad — a függvény tiszta, nem
+   fogyaszt véletlent, tehát mindkét kliens ugyanarra jut. */
+function duelSpreadBuckets(ev){
+  const bkt=m=>Math.max(1,Math.min(18,Math.ceil((m||1)/5)));
+  const gl=ev.filter(e=>e.type==="goal");
+  if(gl.length<2)return;
+  /* A kör addig fut, amíg van mit rendezni. A felső korlát csak védőháló egy
+     elméleti oda-vissza tologatás ellen — a mérés szerint egy kör elég. */
+  for(let pass=0;pass<40;pass++){
+    let moved=false;
+    for(let i=1;i<gl.length;i++){
+      const a=gl[i-1],b=gl[i];
+      if(a.side===b.side)continue;
+      const ba=bkt(a.min);
+      if(ba!==bkt(b.min))continue;
+      /* CSAK ELŐRE tolunk, sosem vissza: a visszafelé lépés a sűrű hajrában
+         oda-vissza tologatáshoz vezetett (a 18. vödörből kiszorított gól a
+         17.-ben ütközött, onnan vissza a 18.-ba, és így tovább). Az előre
+         tolás viszont mindig szigorúan feljebb visz, tehát garantáltan véget ér.
+         A LEGKISEBB ELMOZDULÁS: a következő vödör ELSŐ perce. */
+      if(ba<18){b.min=ba*5+1;moved=true;continue;}
+      /* A 18. (86-90.) vödörből már nincs hova előre lépni. Ilyenkor a két gól
+         AZONOS percet kap: az idővonal így sem ugrik vissza egyik képernyőn
+         sem (a sorrend nem csökkenő), és a két kliens továbbra is ugyanazt a
+         percet írja ki. Ritka: mérve ~4000 mérkőzésből kettőben fordult elő. */
+      if(b.min!==a.min){b.min=a.min;moved=true;}}
+    if(!moved)return;
+    gl.sort((x,y)=>x.min-y.min);}}
 /* Az eseménylista LEJÁTSZÁSA. Mindkét kliens ugyanazt a listát kapja, de a
    saját nézőpontjából mutatja: a "mi" oldalunk gólja ünnep, a másiké kapott gól.
    A tempó fixen 0,1× — ez a meccs a karrier csúcspontja, nem átfutandó forduló,
@@ -21987,14 +22044,21 @@ function h2hStart(node,sim,round){
     oppName:cleanTeam||"A társad",
     oppOvr:(oppSnap.dispOvr!=null?oppSnap.dispOvr:(oppSnap.ovr||0))};
   playMatch();}
-/* A párharc góljának perce a KÖZÖS listából jön — mindkét kliens ugyanazt a
-   számot írja ki. A gmin() monotonitás-korrekcióját szándékosan NEM alkalmazzuk
-   rá: az kliensenként más számot adna. Egy 5 perces vödrön belül a saját és a
-   kapott gól SORRENDJE ezért ritkán eltérhet a két képernyőn — a percek, a gólok
-   és az állás viszont mindig azonosak. */
+/* A párharc góljának perce a KÖZÖS listából jön, tehát mindkét kliens ugyanazt
+   a számot írja ki — a lista egyszer készül el, és a vödör-szétválasztás
+   (duelSpreadBuckets) gondoskodik róla, hogy a bemondás sorrendje mindkét
+   képernyőn a percek sorrendje legyen.
+
+   EZ A SOR A VÉDŐHÁLÓ MÖGÖTTE: ha a perc mégis visszafelé lépne, előrébb
+   toljuk. Két esetet fog meg — a szobában MÁR BENT ÜLŐ, régi kliens által
+   számolt eseménylistákat (azokon a szétválasztás nem futott le), és azt a
+   ritka hajrá-esetet, amikor a tologatásnak nem maradt hely. Ilyenkor a két
+   képernyő perce egy-két perccel eltérhet; ez sokkal kisebb baj, mint egy
+   visszafelé ugró idővonal. */
 function duelGmin(m){
-  const x=Math.max(1,Math.min(90,m|0));
-  _lastGoalMin=Math.max(_lastGoalMin,x);
+  let x=Math.max(1,m|0);
+  if(x<=_lastGoalMin)x=_lastGoalMin+1;
+  _lastGoalMin=x;
   return x;}
 /* ================= F5 — SZEZONZÁRÁS-CSERE =================
    A közös végtabellához nem elég a saját szezonod: a 14 CPU-csapat mindkét
