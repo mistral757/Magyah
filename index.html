@@ -2708,7 +2708,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.1.42";
+const APP_VERSION="3.1.43";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8999,6 +8999,9 @@ function slotAxisShift(curPos,defPos,key){
    teamAttrStrengths is használ a `form` és a `slots` esetében. Kizárólag
    felhasználói művelet hívja őket, jóval az inicializálás után. */
 const MID_ROLE_CODES=["VKP","KKP","TKP"];
+/* A SZÉLSŐ poszt-kódok mind a három sorból — a Villám poszt-tanulás
+   mérföldköve ezeket gyűjti. */
+const WING_POS_CODES=["JV","BV","JSZ","BSZ"];
 const MID_ROLE_LABEL={VKP:"védekező",KKP:"klasszikus",TKP:"támadó",
   JSZ:"jobbszélső",BSZ:"balszélső",CS:"középcsatár","ÁÉ":"árnyékék",
   KV:"középhátvéd",JV:"jobb szélsővédő",BV:"bal szélsővédő"};
@@ -9158,11 +9161,18 @@ function shapeLine(f,kind){
   const tbl=(kind==="def")?SHAPE_COST_DEF:SHAPE_COST_MID;
   out.cost=tbl[Math.min(tbl.length-1,out.out)];
   return out;}
+/* A VILLÁM „Szárnyakon kifutva" képessége ezt a büntetést enyhíti: a stílus
+   egész lényege a szélesség, tehát épp azt ne fizettesse meg vele a játék,
+   amiért a filozófiát választotta. 0 = nincs megvéve. */
+function styleShapeEase(){
+  try{return Math.max(0,Math.min(0.95,styleFxMax("shapeEase")));}catch(e){return 0;}}
 function teamShape(f){
   const key=(f||form);
   const def=shapeLine(key,"def"),mid=shapeLine(key,"mid");
+  const ease=styleShapeEase();
+  if(ease>0){def.cost*=(1-ease);mid.cost*=(1-ease);}
   const mult=1+def.cost+mid.cost;
-  return {def,mid,mult,pct:Math.round((mult-1)*100)};}
+  return {def,mid,ease,mult,pct:Math.round((mult-1)*100)};}
 /* A motor EGYETLEN belépési pontja — a panel és a szimuláció ugyanabból a
    számból dolgozik, tehát nem tud elcsúszni. */
 function shapeOppMult(){
@@ -9420,6 +9430,54 @@ const SHOT_SKILL_IDS=["fw_cannon","mf_fk","df_cannon"];
 function firstSkillOf(name,ids){
   const inst=playerSkills(name).find(i=>i.skill&&ids.indexOf(i.skill.id)>=0);
   return inst?inst.skill.id:null;}
+/* ================= VILLÁM: A SEBESSÉG SAJÁT KÖNYVELÉSE =================
+   A gyorsasági képességekkel szerzett gólok eddig sehol nem különültek el a
+   többitől: a gólnapló csak azt tudta, KI lőtte, azt nem, MIVEL. A stílus
+   mérföldkövei viszont pontosan ezt kérdezik — hány gól született a
+   sebességből, összesen és egyetlen mérkőzésen.
+   A jelölés a gól KÖZÖS csatornáján megy (a gólblokkban, közvetlenül a
+   recordScorer mellett), tehát minden gól-ág (szabadrúgás, tizenegyes,
+   csere-gól, hajrá) magától beleesik. */
+function isPaceGoal(name){
+  try{return !!firstSkillOf(name,PACE_SKILL_IDS);}catch(e){return false;}}
+function notePaceGoal(name){
+  if(gameMode!=="career"||!isPaceGoal(name))return false;
+  S.paceGoals=(S.paceGoals||0)+1;
+  return true;}
+/* ---- A MESTERHÁRMAS MINT CSILLAG-KULCS ----
+   A csillagozás joga a karrier legdrágább stíluspont-nyelője. A Villám
+   képessége egy MÁSIK utat nyit rá: aki mesterhármast lő, annak a képességénél
+   ingyen megnyílik — és a felső szinteken azonnal el is indul az első csillag.
+   A SEBESSÉG-SKILL ELSŐBBSÉGET ÉLVEZ a kiválasztásnál: a stílus a saját
+   területét jutalmazza, nem akármelyik képességet. */
+function styleHatStar(){return styleFxMax("hatStar");}
+function villamHatTrickStar(active,mScore){
+  const lvl=styleHatStar();
+  if(!lvl||gameMode!=="career"||!active)return;
+  active.forEach(a=>{
+    const n=a&&a.p&&a.p.n;
+    if(!n||((mScore&&mScore[n])||0)<3)return;
+    const pace=isPaceGoal(n);
+    /* I. szinten CSAK a sebesség-skilles ember mesterhármasa nyit kaput. */
+    if(lvl<2&&!pace)return;
+    const cands=playerSkills(n).filter(i=>i&&i.skill&&skillComplete(i)&&!starUnlocked(i.skill.id));
+    if(!cands.length)return;
+    cands.sort((x,y)=>(PACE_SKILL_IDS.indexOf(y.skill.id)>=0?1:0)-(PACE_SKILL_IDS.indexOf(x.skill.id)>=0?1:0));
+    const inst=cands[0];
+    S.starUnlocked=S.starUnlocked||{};S.starUnlocked[inst.skill.id]=true;
+    S.starUnlockNew=S.starUnlockNew||{};S.starUnlockNew[inst.skill.id]=true;
+    try{addLine(`⚡⭐ <b>MESTERHÁRMAS — CSILLAGOZÁS FELOLDVA:</b> ${esc(shortName(n))} három gólja megnyitotta a(z) <b>${esc(inst.skill.name)}</b> csillagozását. Ingyen, az egész keretedre.`,"m mvp");}catch(e){}
+    /* AZONNALI INDULÁS: III. szinten minden mesterhármasnál, II. szinten (és
+       I.-en, ahol csak az jöhet szóba) a sebesség-skilles emberénél. */
+    if(lvl>=3||pace){
+      try{
+        const r=skillStarAdvance(inst);
+        if(r&&!r.full){
+          starUnlockFreshClear(inst.skill.id);
+          addLine(r.done
+            ?`⚡ …és rögtön meg is van az első csillag: ${esc(shortName(n))} — ${esc(inst.skill.name)} ★`
+            :`⚡ …és az első csillag azonnal el is indult: ${r.got}/${r.need} fázis.`,"m skillnote");}
+      }catch(e){}}});}
 function trySprintMeasure(scorerName,asstName,minTxt){
   if(Math.random()>=SPEED_MEAS_CHANCE)return false;
   /* a gólszerző és a gólpasszadó is jogosult — ha mindkettő, véletlen */
@@ -11853,6 +11911,10 @@ function stepPosLearning(entry,perfBoost){
       specializáció-számítás konzisztens legyen — a szintet nem visszük el */
       entry._attrAnchor=entry.startRating;}
     entry.posLearnDone=L.target;   /* jelző az értesítéshez */
+    /* VILLÁM: a megtanult SZÉLSŐ posztok külön számlálón futnak — a stílus
+       mérföldköve ezt gyűjti. Négy kód számít, mind a három sorból: JV/BV a
+       védelemben, JSZ/BSZ a középpályán és a támadósorban. */
+    if(WING_POS_CODES.indexOf(L.target)>=0)S.wingPosLearned=(S.wingPosLearned||0)+1;
     delete entry.posLearning;
     /* A megtanult poszt átvezetése a PÁLYÁN/PADON lévő objektumokra is. */
     syncLearnedPositions(entry.n);}}
@@ -18580,6 +18642,9 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   /* PANZER — a kemény emberek közt megkötött barátságok (párkémia-kulcsra),
      és az összegyűjtött szerelés-kommentárok száma. Mindkettő karrier-szintű. */
   buddySeen:{},hardTackleNotes:0,
+  /* VILLÁM: sebesség-képességgel szerzett gólok a klub történetében, és a
+     befejezett SZÉLSŐ poszt-tanulások száma. Mindkettő karrier-szintű. */
+  paceGoals:0,wingPosLearned:0,
   /* AZ ALAKZAT ÁRA: idényenkénti gyűjtő {season,matches,sumMult,xga} */
   shapeStat:null,
   balSkillMatches:0,balSkillsSeason:0,
@@ -23819,7 +23884,7 @@ function playMatch(){
   const onPitch=()=>active.filter((a,i)=>i!==redIdx);
   const notRed=(x,idx)=>idx!==redIdx;
   S._goldQuotesThisMatch=0;   /* BL díj-kommentárok meccsenkénti korlátja */
-  let min=0,gf=0,ga=0,redIdx=-1,saveCount=0,maxDeficit=0,maxLead=0,specialEventHappened=false,specialEventCount=0,titleLiveNotes=0,skillFlavorShown=false,paceFlavorShown=false,supersubStruck=false,tierQuoteShown=false,tacGoalFlavorShown=false,tacRawShown=false,genGoalShown=false,styleLineShown=false,hardTackleShown=false,clutchWallShown=false,clutchHeroShown=false;
+  let min=0,gf=0,ga=0,redIdx=-1,saveCount=0,maxDeficit=0,maxLead=0,specialEventHappened=false,specialEventCount=0,titleLiveNotes=0,skillFlavorShown=false,paceFlavorShown=false,supersubStruck=false,tierQuoteShown=false,tacGoalFlavorShown=false,tacRawShown=false,genGoalShown=false,styleLineShown=false,hardTackleShown=false,clutchWallShown=false,clutchHeroShown=false,paceGoalsThisMatch=0;
   /* az eredményjelző MÉG az első kiírás előtt áll fel: onnantól a
      updateTTBoard minden hívása őt is frissíti */
   sbStart(fx,tickMs,!!S.auto);
@@ -24126,6 +24191,8 @@ function playMatch(){
          rangsorolást: ami előbb próbál megszólalni, az kap helyet. */
       goalNoteLeft=DUEL?DUEL_GOAL_NOTE_BUDGET:GOAL_NOTE_BUDGET;
       mScore[scorer.n]=(mScore[scorer.n]||0)+1;recordScorer(scorer.n);
+      /* VILLÁM: sebesség-skilles gól? (összesen + ezen a meccsen) */
+      try{if(notePaceGoal(scorer.n))paceGoalsThisMatch++;}catch(e){}
       updateGoallessStreak(scorer.n,true);
       let atxt="",asstSk=null,asstName=null;
       /* Párharcban a gólpassz ténye és adója is a közös listából jön. */
@@ -25097,7 +25164,11 @@ function playMatch(){
            sérült emberrel aratott győzelem — egyik sem kereshető vissza utólag */
         morale:S.morale,
         redWin:(gf>ga&&redIdx>=0),
+        /* VILLÁM: hány gól esett sebesség-képességgel EZEN a mérkőzésen */
+        paceGoals:paceGoalsThisMatch,
         injWin:(gf>ga&&Object.keys(S.unavailable||{}).length>0)});
+    /* VILLÁM: a mesterhármas megnyithatja a csillagozást (lásd villamHatTrickStar) */
+    try{villamHatTrickStar(active,mScore);}catch(e){}
     /* SZEMÉLYI EDZŐ (Ritmusmester) második hatása: gyorsabban húz vissza a
        célértékhez, tehát KISEBB a hullámvölgy. Ez a típus igazi karaktere —
        nem magasabb csúcs, hanem kiszámíthatóbb szezon. */
@@ -29803,6 +29874,7 @@ function shapeCostHtml(){
     <b style="color:${free?"var(--grass)":"var(--gold)"}">📐 Az alakzat ára:</b>
     ${free?`<span style="color:var(--grass)">nincs</span> — a közép betöltve.`
           :`<b style="color:var(--red)">+${sh.pct}%</b> az ellenfél gólesélyére.`}
+    ${sh.ease>0?`<br><span style="color:var(--grass)">⚡ A filozófiád <b>${Math.round(sh.ease*100)}%-kal</b> enyhíti ezt az árat.</span>`:""}
     <br>${sor("Védelem",sh.def)} · ${sor("Középpálya",sh.mid)}
     ${st?`<br>Az idényben eddig <b>${st.xga.toFixed(1).replace(".",",")}</b> kapott gólt kért ez a döntés (${st.matches} mérkőzésen, átlagos ár +${Math.round((st.sumMult/st.matches-1)*100)}%).`:""}
     <br><span style="color:var(--dim)">Aki megbízásból a szélre megy, hiányzik középről: az ellenfél könnyebben játszik át rajta. A támadósor nem számít bele — az árnyékék befelé húz, nem kifelé.</span>
@@ -38010,6 +38082,8 @@ function msNoteMatch(o){
          emlékezetes meccs szerencse, tíz már stílus. */
       if(o.excitement>=MS_MEMORABLE)t.memorable=(t.memorable||0)+1;}
     if(o.goalsFor!=null)t.haulMax=Math.max(t.haulMax||0,o.goalsFor);
+    /* VILLÁM: a sebesség-gólok egy mérkőzésen elért csúcsa */
+    if(o.paceGoals!=null)t.paceHaulMax=Math.max(t.paceHaulMax||0,o.paceGoals);
     if(o.saves!=null)t.savesMax=Math.max(t.savesMax||0,o.saves);
     if(o.comeback!=null)t.mCbMax=Math.max(t.mCbMax||0,o.comeback);
     if(o.winStreak!=null)t.winStreakMax=Math.max(t.winStreakMax||0,o.winStreak);
@@ -39170,6 +39244,8 @@ const ST_FAM_T={
   vl_skill:"Sebesség-alapú képességek", vl_card:"A leggyorsabb ember szezonkártyája",
   vl_fast:"Villámgyors emberek a keretben", vl_streak:"Győzelmi sorozat",
   vl_recN:"Megdöntött klubrekordok", vl_avgmax:"A repülő kezdő 11",
+  vl_pace:"Gólok sebességgel", vl_paceM:"Sebességgólok egy meccsen",
+  vl_wing:"Megtanult szélső posztok",
   pz_hot:"Lobbanékony emberek", pz_shot:"Lövéserő-klubrekord",
   pz_injwin:"Győzelmek sérülttel", pz_skill:"Kemény képességek",
   pz_card:"A klub legjobb szezonkártyája", pz_redall:"Piros lapok a klub történetében",
@@ -39517,6 +39593,33 @@ stTiers("villam","vl_streak",th=>`${th} győzelem zsinórban`,
 stTiers("villam","vl_recN",th=>`${th}. megdöntött klubrekord`,
   th=>`Dönts meg ${th} klubrekordot a mérési kategóriákban (végsebesség vagy lövéserő).`,
   ST_L6,[1,2,3,5,10,20],()=>msT().recBreaks||0);
+/* ---- A SEBESSÉG TERMÉSE ----
+   A stílus eddig ÁLLAPOTOT mért (sebesség-átlag, rekordok, hány gyors embered
+   van) — azt nem, hogy a sebesség mit HOZOTT. Ez a két lépcső a tényleges
+   termést gyűjti: hány gól született gyorsasági képességgel a klub
+   történetében, és mennyi fért bele EGYETLEN mérkőzésbe. A meccs-lépcső felső
+   fokozatai szándékosan a képtelenség határán állnak — tíz sebességgól egy
+   meccsen egy egész karrier csúcspontja. */
+stTiers("villam","vl_pace",th=>`${th} gól sebességgel`,
+  th=>`Szerezz ${th} gólt olyan játékossal, akinek van gyorsasági képessége `
+     +`(Villámbeck Queen, Húzd meg a szélét!, Usain Bolt). A klub teljes története számít.`,
+  ST_L6,[10,20,30,50,100,200],()=>S.paceGoals||0);
+const ST_VL10=[2,3,5,8,10,14,18,22,26,32];
+stTiers("villam","vl_paceM",th=>`${th} sebességgól egy meccsen`,
+  th=>`Essen ${th} gól EGYETLEN mérkőzésen gyorsasági képességgel bíró emberektől. `
+     +`Nem kell ugyanannak lőnie mindet — a csapat egy meccsen belüli termése számít.`,
+  ST_VL10,[1,2,3,4,5,6,7,8,9,10],()=>msT().paceHaulMax||0);
+/* ---- A SZÉLSŐ POSZTOK ISKOLÁJA ----
+   A poszt-tanulás a játék egyik legdrágább és leglassabb fejlesztése, és eddig
+   egyetlen mérföldkő sem jutalmazta. A Villámnál ez a legtermészetesebb hely:
+   a stílus szélsőkből él, tehát azt fizeti meg, ha szélsőket KÉPZEL ki. Mind a
+   négy szélső poszt-kód számít (JV, BV, JSZ, BSZ), vagyis a védelemben, a
+   középpályán és a támadósorban tanult szélső is. */
+stTiers("villam","vl_wing",th=>`${th} megtanult szélső poszt`,
+  th=>`Taníttass be ${th} SZÉLSŐ posztot a keretedben — jobb- vagy balhátvédet, `
+     +`illetve jobb- vagy balszélsőt. A poszt-tanulást a játékos lapján indítod, `
+     +`és minden befejezett tanulás egyszer számít.`,
+  ST_VL10,[1,2,3,4,5,6,7,8,9,10],()=>S.wingPosLearned||0);
 stTiers("villam","vl_avgmax",th=>`${th}-ös sebesség-átlag`,
   th=>`A kezdő 11 Sebesség-átlaga érje el a ${th}-öt. A 99 fölötti fokozatok `
      +`csak az Infinityben nyílnak meg — és onnantól minden új rekord ugyanannyit fizet.`,
@@ -40224,6 +40327,28 @@ stTrait("sztar","sztar_iskola",2,"A sztár iskolája",
   stStarDiscLevels(sk=>{
     const c=styleStarCat();
     return !!(c&&sk&&sk.cat===c);}));
+/* ---- SZÁRNYAKON KIFUTVA ----
+   Az alakzat ára (lásd teamShape) a kiürített közepet bünteti — a Villám
+   viszont pontosan attól Villám, hogy szélességben játszik. Ez a képesség
+   ezért nem a hatást kapcsolja ki, csak ENYHÍTI: a stílus vállalja a
+   kockázatot, de olcsóbban. */
+stTrait("villam","szarnyakon",2,"Szárnyakon kifutva",
+  "A kiürített közép ára (az ellenfél megemelt gólesélye) kisebb — a szélesség ebben a filozófiában nem hiba, hanem terv.",[
+  {fx:{shapeEase:0.30},note:"−30% az alakzat árából"},
+  {fx:{shapeEase:0.55},note:"−55%"},
+  {fx:{shapeEase:0.80},note:"−80%"}],
+  ()=>{try{const sh=teamShape();return sh.pct>0?`most +${sh.pct}% az ár (enyhítés nélkül +${Math.round((sh.def.cost+sh.mid.cost)/(1-styleShapeEase())*100)}%)`:"most nincs mit enyhíteni — a közép betöltve";}catch(e){return "";}});
+/* ---- MESTERHÁRMAS-CSILLAG ----
+   A csillagozás joga a karrier legnagyobb stíluspont-nyelője. Ez a képesség egy
+   MÁSIK utat nyit rá: a pályán kell kiérdemelni, mesterhármassal. A sebesség-
+   képesség elsőbbséget élvez a kiválasztásnál — a stílus a saját területét
+   fizeti meg. */
+stTrait("villam","mesterharmas_csillag",3,"Mesterhármas-csillag",
+  "A mesterhármas INGYEN megnyitja a gólszerző egyik kiépült képességének csillagozását — az egész keretedre. A felső szinteken az első csillag azonnal el is indul.",[
+  {fx:{hatStar:1},note:"a SEBESSÉG-képes ember mesterhármasa nyit — és rögtön indul"},
+  {fx:{hatStar:2},note:"bármelyik mesterhármas nyit (indulás továbbra is a sebességesnél)"},
+  {fx:{hatStar:3},note:"bármelyik mesterhármas nyit ÉS azonnal el is indul"}],
+  ()=>`a sebesség-képesség mindig elsőbbséget élvez a kiválasztásnál`);
 stTrait("villam","sprint_iskola",2,"Sprint-iskola",
   "A SEBESSÉG-alapú képességek csillagozásának feloldása olcsóbb.",
   stStarDiscLevels(sk=>(typeof isPaceSkill==="function")&&isPaceSkill(sk)));
@@ -40967,6 +41092,7 @@ function saveGame(){
         balSkillMatches:S.balSkillMatches,balSkillsSeason:S.balSkillsSeason,
         balLoadPrev:S.balLoadPrev,balLoadHandover:S.balLoadHandover,cupRunNo:S.cupRunNo,
         toughSeen:S.toughSeen,buddySeen:S.buddySeen,hardTackleNotes:S.hardTackleNotes,shapeStat:S.shapeStat,
+        paceGoals:S.paceGoals,wingPosLearned:S.wingPosLearned,
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
         guideOn:S.guideOn,guideSeen:S.guideSeen,
         seasonStartStrength:S.seasonStartStrength,summerPaidAfterSeason:S.summerPaidAfterSeason,
@@ -41359,6 +41485,8 @@ function applySavedGame(d){
   S.buddySeen=d.S.buddySeen||{};
   S.hardTackleNotes=d.S.hardTackleNotes||0;
   S.shapeStat=d.S.shapeStat||null;
+  S.paceGoals=d.S.paceGoals||0;
+  S.wingPosLearned=d.S.wingPosLearned||0;
   S.seasonNewSkills=d.S.seasonNewSkills||0;
   S.seasonSkillCont=d.S.seasonSkillCont||0;
   S.firstChemDone=!!d.S.firstChemDone;

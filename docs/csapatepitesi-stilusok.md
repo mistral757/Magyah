@@ -674,6 +674,40 @@ igényel új szimulációs ágat.
   bravúrnál, „A győzelemnek csekély az esélye. Mire várunk még?" pedig a késői
   vagy fordító gólnál.
 
+* **A Villám (Hol jön a mennydörgés?) megkapta a saját termését és két
+  képességet (3.1.43).** A stílus eddig ÁLLAPOTOT mért — sebesség-átlag,
+  klubrekordok, hány gyors embered van —, azt viszont nem, hogy a sebesség mit
+  HOZOTT. Három új lépcső ezt pótolja, és két képesség fizeti meg a filozófia
+  két természetes fájdalmát.
+
+  | Lépcső | Mérce | Fokozatok |
+  |---|---|---|
+  | **Gólok sebességgel** | gól olyan embertől, akinek van gyorsasági képessége (`S.paceGoals`, karrier-számláló) | 10 · 20 · 30 · 50 · 100 · 200 |
+  | **Sebességgólok egy meccsen** | ugyanez EGY mérkőzésen belül, csapatszinten (`msT().paceHaulMax`) | 1 … 10 |
+  | **Megtanult szélső posztok** | befejezett poszt-tanulás JV / BV / JSZ / BSZ kódra (`S.wingPosLearned`) | 1 … 10 |
+
+  A sebesség-gól jelölése a gól KÖZÖS csatornáján megy (a gólblokkban, a
+  `recordScorer` mellett), ezért minden gól-ág — szabadrúgás, tizenegyes,
+  csere-gól, hajrá — magától beleesik.
+
+  | Szint | Képesség | Hatás (I / II / III) |
+  |---|---|---|
+  | II | **Szárnyakon kifutva** | az alakzat ára (a kiürített közép miatt megemelt ellenfél-gólesély) −30% / −55% / −80% |
+  | III | **Mesterhármas-csillag** | a mesterhármas INGYEN megnyitja a gólszerző egyik kiépült képességének csillagozását, az egész keretre |
+
+  A **Szárnyakon kifutva** a 3.1.41-ben bevezetett alakzat-árat enyhíti. Nem
+  kapcsolja ki: a stílus vállalja a kockázatot, csak olcsóbban — a Villám
+  lényege a szélesség, tehát épp azt ne fizettesse meg vele a játék, amiért a
+  filozófiát választotta. (Maxra húzott 3-5-2-nél +29% → +6%.)
+
+  A **Mesterhármas-csillag** a karrier legnagyobb stíluspont-nyelőjére, a
+  csillagozás jogára nyit MÁSIK utat: a pályán kell kiérdemelni. A szintek
+  külön mozgatják a két felét — I. szinten csak a SEBESSÉG-képes ember
+  mesterhármasa nyit (és rögtön indul is az első csillag), II. szinten
+  bármelyik mesterhármas nyit, III. szinten bármelyik nyit ÉS azonnal indul. A
+  kiválasztásnál a sebesség-képesség mindig elsőbbséget élvez: a stílus a saját
+  területét fizeti meg.
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
