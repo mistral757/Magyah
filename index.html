@@ -2590,7 +2590,7 @@ button.infPanel:disabled{cursor:default}
           <div class="hubGridMini">
             <button id="hubFormationBtn" class="hubCard"><span class="ic">📋</span><span class="tx"><span class="tt">Felállás módosítása</span><span class="ds">A kezdő tizenegy alakzata — a rendszer poszthűen újrarendezi a keretet</span></span></button>
             <button id="hubCaptainBtn" class="hubCard"><span class="ic">👑</span><span class="tx"><span class="tt">Kapitányváltás</span><span class="ds">A karszalag új gazdája — hatással van a csapatmorálra</span></span></button>
-            <button id="hubScoutUpgradeBtn" class="hubCard"><span class="ic">🔎</span><span class="tx"><span class="tt">Scout fejlesztése</span><span class="ds">Pontosabb felderítés és erősebb igazolási ajánlatok</span></span></button>
+            <button id="hubScoutUpgradeBtn" class="hubCard"><span class="ic">🤝</span><span class="tx"><span class="tt">Ügynökség fejlesztése</span><span class="ds" id="hubScoutUpgradeDs">Scout és átigazolási ügynökség — felmérés és üzletkötés</span></span></button>
             <button id="hubRosterExpandBtn" class="hubCard"><span class="ic">👥</span><span class="tx"><span class="tt">Keretbővítés</span><span class="ds">Több hely a tartalékoknak és a fiataloknak</span></span></button>
             <button id="hubStaffBtn" class="hubCard hide"><span class="ic">🎓</span><span class="tx"><span class="tt">Szakmai stáb</span><span class="ds" id="hubStaffDs">Személyi edzők — a visszavonult legendáid tudása</span></span></button>
             <!-- FÉLIDEI CSERE: kapcsoló, nem művelet — a felirata a renderHub-ban
@@ -2771,7 +2771,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.2.02";
+const APP_VERSION="3.3.00";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -11325,6 +11325,141 @@ function estimateTSI(trueTSI,stars,rnd){
 function maybeImproveScout(scout){
   if(scout.stars<SCOUT_MAX_STARS&&Math.random()<0.28)scout.stars=Math.min(SCOUT_MAX_STARS,scout.stars+0.5);
   return scout;}
+/* ================= ÁTIGAZOLÁSI ÜGYNÖKSÉG =================
+   A scout és az ügynökség KÉT KÜLÖN SZAKMA, és eddig egy emberben ültek. A
+   scout FELMÉR: megnézi a játékost, megbecsüli a tehetségét, kihordja az
+   akadémiát, és rátalál a hálózatán keresztül a nagy nevekre. Az ÜGYNÖKSÉG
+   ÜZLETET KÖT: ő szervezi a tárgyalásokat, ő küldi ki a felderítéseket, ő
+   viszi a klub-szemlét, és ő az, aki egy piacra bocsátott játékosból ki tudja
+   hozni a maximumot. Mostantól az átigazolás — vétel ÉS eladás — az övé.
+
+   NINCS SORSOLÁS. A scoutot a karrier elején kisorsolod (1-5 csillag közt), az
+   ügynökséget viszont TE építed a nulláról: minden karrier egy csillaggal
+   indul, és nincs felső határa sem.
+
+   HOGY FEJLŐDIK. Két úton, ugyanazon a létrán: PONTOKKAL (magától, a
+   megkötött üzletekből) és PÉNZBŐL (a HUB-ban megvásárolva). Egy szint fél
+   csillag. A szintek pontigénye: 3, 5, 10, 20, 35, 50, 75, 100, 150, 200,
+   250, 300, azon túl százasával.
+
+   HONNAN JÖN A PONT. Nem a darabszám számít, hanem a NAGYSÁGREND — egy üzlet
+   annyit ér, amennyire nagy a klub mostani mércéjéhez képest:
+     · VÉTEL:            1 × (1 + vételár ÷ a kereted legdrágábban eladható
+                         emberének eladási ára)
+     · GYORS ELADÁS:     ugyanez a képlet
+     · PIACI ELADÁS:     2 × (1 + eladási ár ÷ a kereted legdrágább emberének
+                         VÉTELÁRA)
+   A piaci eladás kétszeres bázissal indul (az a nehezebb, türelmesebb munka),
+   viszont nagyobb nevezőhöz méri magát — a két hatás részben kioltja egymást,
+   és a piaci út marad az értékesebb.
+   A MÉRCÉBŐL AZ ÉRINTETT JÁTÉKOS KIMARAD: ha a legjobb emberedet adod el,
+   a viszonyítás a MÁSODIK legjobb — különben a saját eladása mindig 1,0-s
+   arányt adna, és pont a legnagyobb üzlet érne a legkevesebbet. */
+const AGENCY_START_STARS=1;
+const AGENCY_LEVEL_PTS=[3,5,10,20,35,50,75,100,150,200,250,300];
+const AGENCY_LEVEL_PTS_STEP=100;   /* a táblázat után ennyivel nő szintenként */
+function agencyState(){
+  if(!agency||agency.v!==1)agency={v:1,stars:AGENCY_START_STARS,lvl:0,pts:0,
+    deals:0,buys:0,sells:0,marketSells:0};
+  return agency;}
+function agencyStars(){const a=agencyState();return AGENCY_START_STARS+(a.lvl||0)*0.5;}
+/* Hány pont kell a KÖVETKEZŐ szinthez. A táblázat után százasával nő. */
+function agencyNextPts(lvl){
+  const i=Math.max(0,lvl||0);
+  if(i<AGENCY_LEVEL_PTS.length)return AGENCY_LEVEL_PTS[i];
+  return AGENCY_LEVEL_PTS[AGENCY_LEVEL_PTS.length-1]+(i-AGENCY_LEVEL_PTS.length+1)*AGENCY_LEVEL_PTS_STEP;}
+/* A VISZONYÍTÁSI MÉRCE. Az `except` a most mozgó játékos: őt kihagyjuk. */
+function agencyTopSellValue(except){
+  let m=0;
+  try{fullCareerRoster().forEach(p=>{
+    if(!p||(except&&p.n===except))return;
+    const v=sellValue(p)||0;if(v>m)m=v;});}catch(e){}
+  return Math.max(1,m);}
+function agencyTopBuyPrice(except){
+  let m=0;
+  try{fullCareerRoster().forEach(p=>{
+    if(!p||(except&&p.n===except))return;
+    const e=(careerPool&&careerPool[p.n])||p;
+    let v=0;try{v=buyPrice(e)||0;}catch(err){v=0;}
+    if(v>m)m=v;});}catch(e){}
+  return Math.max(1,m);}
+/* A pontjóváírás EGY kapuja. `kind`: "buy" | "sell" | "market". */
+function agencyAward(kind,amount,playerName){
+  if(gameMode!=="career"||!careerPool)return 0;
+  const a=agencyState();
+  const amt=Math.max(0,amount||0);
+  if(!amt)return 0;
+  const market=kind==="market";
+  const denom=market?agencyTopBuyPrice(playerName):agencyTopSellValue(playerName);
+  const pts=(market?2:1)*(1+amt/denom);
+  a.pts=(a.pts||0)+pts;
+  a.deals=(a.deals||0)+1;
+  if(kind==="buy")a.buys=(a.buys||0)+1;
+  else if(market)a.marketSells=(a.marketSells||0)+1;
+  else a.sells=(a.sells||0)+1;
+  let up=0;
+  while((a.pts||0)>=agencyNextPts(a.lvl||0)){
+    a.pts-=agencyNextPts(a.lvl||0);
+    a.lvl=(a.lvl||0)+1;up++;}
+  a.stars=agencyStars();
+  try{
+    /* NEM „budgeted": az átigazolás nem meccs közbeni jegyzet, a meccsenkénti
+       jegyzet-keret (goalNoteLeft) itt épp nulla lehet, és a sor elveszne. */
+    addLine(`🤝 Az ügynökség <b>+${pts.toFixed(1)} pontot</b> kapott ${kind==="buy"?"az igazolásért":"az eladásért"}`
+      +` — ${a.pts.toFixed(1)}/${agencyNextPts(a.lvl||0)} a következő szintig.`,"m skillnote");
+    if(up)addLine(`🤝 <b>AZ ÜGYNÖKSÉG FEJLŐDÖTT</b> — ${agencyStarsLabel()}. ${agencyLevelPerk()}`,"m mvp");
+  }catch(e){}
+  return pts;}
+function agencyStarsLabel(){
+  const s=agencyStars(),full=Math.floor(s),half=(s-full)>=0.5;
+  return "★".repeat(Math.min(12,full))+(half?"½":"")+(full>12?`+${full-12}`:"")+` (${s.toFixed(1)}★)`;}
+/* Mit nyitott meg az új szint — egy mondatban, a napló számára. */
+function agencyLevelPerk(){
+  return `Egyszerre ${agencyMaxListings()} játékos állhat a piacon · a licitek csúcsa a kikiáltási ár ${Math.round(agencyBidMode(0)*100)}%-ánál.`;}
+/* ---- 1. CSILLAG-HATÁS: HÁNY JÁTÉKOS ÁLLHAT EGYSZERRE A PIACON ---- */
+function agencyMaxListings(starsOverride){
+  const s=(starsOverride!=null&&isFinite(starsOverride))?starsOverride:agencyStars();
+  return s>=10?5:s>=5?4:s>=3?3:2;}
+/* ---- 2. CSILLAG-HATÁS: A RÉGI SCOUT-KÉPESSÉGEK ÁTVEZETVE ----
+   Az átigazolás-lebonyolítás (tárgyalások száma, felderítési keret, klub-szemle,
+   képesség-keresés, piaci esemény) eddig a scout csillagain állt. Ugyanazok a
+   képletek maradnak, csak MÁS csillagot olvasnak: az 1 csillagos ügynökség
+   pontosan annyit tud, amennyit egy 2,5 csillagos scout tudott, és onnantól
+   együtt lépkednek — minden ügynökség-csillag egy scout-csillag. */
+const AGENCY_SCOUT_OFFSET=1.5;
+function agencyScoutEquiv(){return agencyStars()+AGENCY_SCOUT_OFFSET;}
+/* Scout-alakú objektum azoknak a képleteknek, amik egy scoutot várnak. */
+function agencySc(){return {stars:agencyScoutEquiv()};}
+/* ---- 3. CSILLAG-HATÁS: A PIACI LICITEK KÚPJÁNAK CSÚCSA ----
+   A sáv VÉGIG 60-125% marad — az ügynökség nem a határokat mozgatja, hanem azt,
+   hova sűrűsödik a valószínűség a sávon belül. A csúcs:
+     ·  1★ →  65%,   5★ → 80%   (lineárisan)
+     ·  5★ →  80%,  10★ → 100%  (lineárisan)
+     · 10★ fölött csillagonként +1%
+   Ehhez jön az ELUTASÍTÁSOK hatása: minden visszautasított licit tovább tolja a
+   csúcsot (a régi „a sáv alja kúszik feljebb" helyett — a felhasználó kérése az
+   volt, hogy a sáv maradjon 60-125, és az ESÉLY tolódjon). A negyedik
+   elutasítás után a tolás megáll. */
+const AGENCY_REJECT_MODE_STEP=0.05, AGENCY_REJECT_MODE_MAX=4;
+function agencyBidMode(rejects,starsOverride){
+  const s=(starsOverride!=null&&isFinite(starsOverride))?starsOverride:agencyStars();
+  let m;
+  if(s<=5)m=0.65+(Math.max(1,s)-1)/4*(0.80-0.65);
+  else if(s<=10)m=0.80+(s-5)/5*(1.00-0.80);
+  else m=1.00+(s-10)*0.01;
+  m+=AGENCY_REJECT_MODE_STEP*Math.min(AGENCY_REJECT_MODE_MAX,Math.max(0,rejects||0));
+  return Math.max(SALE_BID_LO,Math.min(SALE_BID_HI,m));}
+/* ---- FEJLESZTÉS PÉNZBŐL ----
+   Ugyanaz a létra, mint a pontoké: egy vásárlás egy szint (fél csillag). Az ár
+   a scout-fejlesztés KÉTSZERESE az azonos csillagszinten — az ügynökséget
+   megvenni drágább, mint kivárni. A pontok NEM vesznek el: a megvásárolt szint
+   után a meglévő pontok a KÖVETKEZŐ szint felé számítanak tovább. */
+function agencyUpgradePrice(){
+  return Math.round(scoutUpgradePrice(agencyStars())*2/500)*500;}
+function agencyBuyLevel(){
+  const a=agencyState();
+  a.lvl=(a.lvl||0)+1;a.stars=agencyStars();
+  return a.stars;}
 /* ================= A SAJÁT JÁTÉKOSOD TSI-JE MINDIG LÁTSZIK =================
    A scout 👁 megtekintése arra való, hogy a VÁSÁRLÁS ELŐTT mérd fel egy idegen
    játékost — ott a korlát a játék lényege. De ha egyszer már a tiéd, semmi nem
@@ -13933,9 +14068,12 @@ const TW_CYCLES=2; /* hány scout→véletlen-esemény kör fut le a téli átig
    hanem abban is, hány posztot tudsz egyáltalán körbenézni. Klasszikus módban
    (nincs scout) nincs korlát. */
 const TW_LOOKS_MAX=8, TW_LOOKS_SUMMER_MULT=3, TW_LOOKS_PER_POS=4;
+/* AZ ÜGYNÖKSÉG KERETE, nem a scouté. A felderítés kiküldése átigazolási
+   művelet — a képlet betűre a régi, csak az ügynökség scout-egyenértékét
+   olvassa (1★ ügynökség = 2,5★ scout). */
 function twLooksForScout(mult){
-  if(gameMode!=="career"||!scout)return Infinity;
-  const st=Math.max(1,Math.min(SCOUT_MAX_STARS,scout.stars||1));
+  if(gameMode!=="career"||!careerPool)return Infinity;
+  const st=Math.max(1,Math.min(SCOUT_MAX_STARS,agencyScoutEquiv()));
   return Math.max(2,Math.round((st/SCOUT_MAX_STARS)*TW_LOOKS_MAX))*(mult||1);}
 /* A most futó session számlálója. A NYÁRI ablaké az S-ben él és a szezonhoz
    kötődik — különben a HUB-ból ki-be lépkedve újratöltődne a keret. A rövid és
@@ -13966,7 +14104,7 @@ const TW_CP_ROUNDS={8:{label:"Rövid átigazolási időszak",buyMult:1,events:1}
                     23:{label:"Rövid átigazolási időszak",buyMult:1,events:1}};
 /* Klub-szemle és képesség-keresés a scout csillagai szerint: 1 / 2 / 3. */
 function twCpExtraQuota(){
-  const st=(scout&&scout.stars)||0;
+  const st=(gameMode==="career"&&careerPool)?agencyScoutEquiv():0;
   return st>=10?3:st>5?2:1;}
 /* ---- ÁTIGAZOLÁSI ESEMÉNY: A NEGYEDIK ÁTIGAZOLÁS-FAJTA ----
    BEJELENTETT HIBA: az "időszak lezárása" gomb ELSŐ megnyomásra nem zárt le
@@ -13978,7 +14116,7 @@ function twCpExtraQuota(){
    A keret: rövid ablak 1, téli 2, nyár 2 (10 csillagos scouttól 3). */
 function twSummerEventMax(){
   if(gameMode!=="career")return 0;
-  return ((scout&&scout.stars)||0)>=10?3:2;}
+  return agencyScoutEquiv()>=10?3:2;}
 function twEventMax(){
   return twWindowOpen()?(S.twWindow.eventMax||0):twSummerEventMax();}
 /* A nyári keret SZEZONOS (S.twEventUsed), a checkpoint-ablaké az ablaké
@@ -14152,9 +14290,11 @@ const TW_POS_ICON={KAPUS:"🧤",VEDO:"🛡️",VEDO_SZ:"↔️",
   KOZEPPALYAS:"🎽",KOZEP_SZ:"🏃",CSATAR:"⚽",CSATAR_SZ:"💨"};
 const TW_ATTR_COLOR={ved:"#3a5f85",kapus:"#7d5a0e",passz:"#3d6b4a",gol:"#a03e34",seb:"#2a9d8f"};
 const TW_ATTR_ICON={ved:"🛡️",kapus:"🧤",passz:"🎯",gol:"⚽",seb:"💨"};
+/* AZ ÜGYNÖKSÉG KERETE. A képesség-keresés átigazolási művelet, a képlet
+   változatlan — csak az ügynökség scout-egyenértékét olvassa. */
 function twAttrSearchesForScout(){
-  if(gameMode!=="career"||!scout)return 0;
-  const st=scout.stars||0;
+  if(gameMode!=="career"||!careerPool)return 0;
+  const st=agencyScoutEquiv();
   if(st<TW_ATTR_MIN_STARS)return 0;
   const base=st>=10?4:st>=8?3:st>=5?2:1;
   return base*TW_ATTR_MULT;}
@@ -14481,9 +14621,10 @@ const GLOSSARY={
   edzesterv:{title:"Edzésterv",text:"A HUB-ban kijelölhetsz egy FŐ és egy MELLÉK edzést. Mindkettőhöz egy attribútumot választasz (Védekezés, Sebesség, Védés, Passz, Gólszerzés) és legfeljebb 2 poszt-csoportot (kapus, védők, középpályások, csatárok), akikre vonatkozik. A fő edzés meccsenként 0,8 pontot ad a választott attribútumra, a mellék a felét (0,4) — cserébe az érintett játékosok NEM edzett attribútumai lassabban gyűlnek. Az edzés tehát nem ingyen gyorsítás, hanem irányválasztás: azt fejleszted, amire a taktikádnak szüksége van. A hatás korfüggő: 21 év alatt kétszeres, 25 alatt 1,6-szoros, 30 alatt 0,8-szoros, afölött 0,4-szeres — fiatalt érdemes képezni. Egy attribútum a poszt-profiljához képest +30-ig specializálható, de a Rating-hozam csökken (a +8 fölötti rész felét, a +16 fölötti a negyedét éri) — a TAKTIKA-illeszkedésben viszont teljes értékkel számít. Így egy 130-as passzú középpályás valódi passzmester lesz a Labdatartáshoz, anélkül hogy a Ratingje elszaladna. A SEBESSÉG külön eset: 1,5x lassabban formálható, és a játék magától csak a születési érték +15%-áig viszi — azon túl KIZÁRÓLAG edzéssel jutsz feljebb, 99-ig. Infinityben a 99 is feloldódik, de fölötte a sebesség már csak negyed tempóval épül."},
   karriermod:{title:"Karrier mód vs. Klasszikus mód",text:"A klasszikus egy szezonos móddal szemben a karrier mód több szezonon át tartó, fejlődő történet: a játékosaid öregednek és fejlődnek, van átigazolási piac, scout, akadémia, és a csapatod hosszú távon formálódik."},
   tsi:{title:"TSI",text:"A TSI egy rejtett, a Ratingnél sokkal szélesebb skálájú érték, ami egy játékos hosszú távú, valódi potenciálját mutatja. Egy fiatal, alacsony Ratingű, de magas TSI-jű játékos idővel akár sztárrá válhat. IDEGEN játékosnál a scoutod ereje szabja meg, hány TSI-t nézhetsz meg — azt viszont te választod ki, kikét. A SAJÁT KERETEDNÉL nincs korlát: minden játékosod TSI-je folyamatosan látszik a HUB-ban. Amíg kevesebb, mint 15 meccset játszott nálad, a scoutod érkezéskori becslése látszik (~ jellel); 15 meccs után a pontos érték — ennyi idő alatt kiderül, mi van benne. A becslés nem sorsolódik újra szezononként: az érkezéskori tévedés aránya fix, tehát ha a játékos TSI-je nő (ifi-boost, akadémia, kihívás-jutalom), a becslés vele mozdul."},
-  scout:{title:"Scout",text:"A scoutod csillagereje (1-5) szabja meg, hány IDEGEN játékos TSI-jét nézheted meg egy keretből vagy jelöltlistából — és mivel az árak rejtve vannak, a scout-megtekintés az egyetlen módja felmérni egy leigazolás előtt álló játékos valódi erejét. (A saját játékosaid TSI-je ingyen, folyamatosan látszik: a scout korlátja a VÁSÁRLÁS előtti felmérésről szól. A scout csillagereje ott is számít, hogy mennyire pontos a becslés, amit a keretedbe került játékosról az első 15 meccsén látsz.) A scout a tárgyalások SZÁMÁT is korlátozza egy átigazolási ablakban (a megtekintések számának 2-3-szorosa): egy jobb scout több próbálkozást enged. És azt is a scout szabja meg, HÁNYSZOR küldheted ki egyáltalán posztokat felderíteni: maxos scouttal 8 felderítés jut sessiononként (a téli ablak 2 körből áll, tehát összesen 16; a rövid ablak 1 körből, tehát 8), a nyári vásárlásnál pedig ennek a háromszorosa (24), de az szezononként csak egyszer. Egy adott posztot ugyanabban a sessionben legfeljebb 4-szer nézhetsz meg — érdemes tehát átgondolni, hova küldöd. Idővel fejlődik, és fiatal (25 év alatti) tehetségeket keres előszeretettel. MILYEN SZINTEN KERES: nem egyetlen szám körül, hanem egy SÁVBAN, amit három érték feszít ki — a MEZŐNY szintje (a scout szokásos 2 pontos visszafogásával), a KERETED nyers ereje (a kezdő 11 Rating-átlaga, poszt-illeszkedés nélkül) és a LEGJOBB JÁTÉKOSOD nyers ereje. A három közül a legkisebb adja a sáv alját, a legnagyobb a tetejét, a számtani közepük pedig a legvalószínűbb találatot; alul-felül 5% ráhagyás van, és a sávon belül kúp alakú a valószínűség — a közepe felé sűrűsödik, a széleken ritkul. Ebből következik, hogy a klub MÉRETE is számít, nem csak a liga: ugyanazon a mezőnyön egy 125-ös sztárt foglalkoztató csapatnak szélesebb a sávja (fentről is jön ajánlat), egy újjáépülő keretnek pedig lejjebb csúszik, hiába erős a liga. A piac ezt követi: ha a kereted kinövi a mezőnyt, a kínálat teteje is feljebb kúszik, hogy a sáv felső vége ne legyen üres."},
+  scout:{title:"Scout",text:"A scout dolga a FELMÉRÉS. A csillagereje szabja meg, hány IDEGEN játékos TSI-jét nézheted meg egy keretből vagy jelöltlistából — és mivel az árak rejtve vannak, a scout-megtekintés az egyetlen módja felmérni egy leigazolás előtt álló játékos valódi erejét. (A saját játékosaid TSI-je ingyen, folyamatosan látszik: a scout korlátja a VÁSÁRLÁS előtti felmérésről szól. A csillagereje ott is számít, hogy mennyire pontos a becslés, amit a keretedbe került játékosról az első 15 meccsén látsz.) Övé az AKADÉMIA és a hálózatán keresztül felfedezett nagy nevek esélye is. AMI MÁR NEM AZ ÖVÉ: az átigazolások lebonyolítása. A tárgyalások száma, a felderítési keret, a klub-szemle, a képesség-keresés és a piaci esemény átkerült az ÁTIGAZOLÁSI ÜGYNÖKSÉGHEZ — lásd a saját bejegyzését. A scoutot a karrier elején sorsolod (1-5 csillag), idővel magától is fejlődik, és fiatal (25 év alatti) tehetségeket keres előszeretettel. Fejleszteni a HUB Csapatépítés menüjében, az Ügynökség fejlesztése pont alatt lehet."},
+  ugynokseg:{title:"Átigazolási ügynökség",text:"A scout párja: a scout FELMÉR, az ügynökség ÜZLETET KÖT. Minden átigazolás — vétel ÉS eladás — az ő keze alatt megy át. Nincs kisorsolva: minden karrier EGY CSILLAGGAL indul, és nincs felső határa. HOGY FEJLŐDIK: két úton, ugyanazon a létrán. PONTOKKAL, magától, a megkötött üzletekből — és PÉNZBŐL, a HUB-ban megvásárolva (a scout-fejlesztés kétszereséért). Egy szint fél csillag; a szintek pontigénye 3, 5, 10, 20, 35, 50, 75, 100, 150, 200, 250, 300, azon túl százasával. A megvásárolt szint nem égeti el a pontjaidat: azok a következő szint felé számítanak tovább. HONNAN JÖN A PONT: nem a darabszám számít, hanem a NAGYSÁGREND — egy üzlet annyit ér, amennyire nagy a klub mostani mércéjéhez képest. VÉTELNÉL és GYORS ELADÁSNÁL 1 × (1 + az összeg ÷ a kereted legdrágábban eladható emberének eladási ára); PIACI ELADÁSNÁL 2 × (1 + az összeg ÷ a kereted legdrágább emberének vételára). Vagyis ha a legjobb emberedért 50 milliárdot kapnál, egy 75 milliárdos igazolás 2,5 pontot ér, egy 10 milliárdos 1,2-t. A mércéből az éppen mozgó játékos KIMARAD: ha a legjobbadat adod el, a viszonyítás a második legjobb. MIT ADNAK A CSILLAGOK? (1) EGYSZERRE PIACON TARTHATÓ JÁTÉKOSOK: 3 csillag alatt 2, 3-5 közt 3, 5-10 közt 4, 10 fölött 5. (2) AZ ÁTIGAZOLÁS LEBONYOLÍTÁSA: a tárgyalások száma, a felderítési keret, a klub-szemle, a képesség-keresés és a piaci esemény — ezek mind a régi scout-képletekkel mennek tovább, csak az ügynökség csillagaira. Az 1 csillagos ügynökség pontosan annyit tud, amennyit egy 2,5 csillagos scout tudott, és onnantól együtt lépkednek. (3) A PIACI ELADÁS SIKERE: a licitek sávja végig a kikiáltási ár 60-125%-a, de a valószínűség KÚP alakú a sávon belül, és a csúcsát az ügynökség tolja feljebb — 1 csillagnál 65%, 5-nél 80%, 10-nél 100%, azon túl csillagonként további 1%. Ehhez jön az elutasítások hatása: minden visszautasított licit tovább tolja a csúcsot, a negyedikig. Egy erős ügynökségnél tehát nem a lehetséges ár nő, hanem az ESÉLY, hogy tényleg a sáv teteje felé kapod meg."},
   akademia:{title:"Akadémia",text:"Minden 4. meccs után egy fiatal akadémiai tehetség mutatkozik be — alacsony jelenlegi Ratinggel, de szokatlanul magas TSI-vel. Az akadémia minősége a csapatod aktuális erejéhez igazodik: egy erősebb csapat jobb tehetségeket termel. Ha nincs helyed vagy még korainak érzed, az akadémián is hagyhatod: ott CÉLZOTT képzést kap, ezért gyorsabban fejlődik, mintha a cserepadon ülne — de lassabban, mintha játékperceket kapna a kezdő 11-ben. Kis eséllyel a TSI-je is megugrik. Később egyre nagyobb eséllyel jelentkezik vissza, és látod, mennyit fejlődött közben. Az akadémiai idő 21 évesen lejár: ekkor egy utolsó, „most vagy soha\" ajánlatot kapsz rá."},
-  budzse:{title:"Átigazolási büdzsé és árak",text:"Minden szezon elején kapsz egy költségvetést a csapatod erejéhez mérten, és a felhasználatlan rész átvihető a következő szezonra. A vásárlás DRÁGA (a piaci érték fölött, felárral — magasabb mezőnyön még többe kerül), az eladás szerényebb összeget hoz. AZ ÉRTÉK NEM LINEÁRIS: egy bizonyos szint fölött (TSI 6000, nagyjából a természetes fejlődési pálya csúcsa) az ár meredekebben nő, mert a világklasszisból nincs másik — egy kinevelt legenda így nagyságrenddel többet ér, mint két jó kerettag. AZ ELADÁSNAK KÉT ÚTJA VAN. Az „Eladás most\" azonnal fizet, de lowball: a játékos KIKIÁLTÁSI ÁRÁNAK (a nyers piaci értéke ÉS a nálad felépített életműve) pontosan a fele. A PIACRA BOCSÁTÁS a türelmes út: a játékos marad a keretben és játszik tovább, 5-15 fordulón belül érkezik rá az első ajánlat, és azt az átigazolási időszakban kapod kézhez, a vásárlások mellett. A licit a kikiáltási ár 60-125%-a, vagyis a gyors eladás 1,2-2,5-szerese. Elutasíthatod: akkor jön a következő ajánlat — nyáron azonnal, ugyanabban az ablakban, legfeljebb három körön át, szezon közben pedig garantáltan a következő átigazolási időszakban. Minden elutasítás feljebb tolja az alsó határt (60 → 67,5 → 75 → 82,5 → 90%), a felső végig 125% marad: a kivárás tehát tényleg fizet, csak időbe kerül. Piacra csak olyan játékost vihetsz, aki legalább 20 mérkőzést játszott nálad — egy frissen igazolt embert nem lehet azonnal továbbadni, és mivel az életmű-szorzója még 1,0, a licitje amúgy is jóval az alatt maradna, amit érte fizettél. Ez tudatos: egy nagy játékos beszerzése több szezonnyi spórolás, nem egy szezon pénzéből megvehető. Az árakat a lista nem mutatja — csak amikor rákattintasz a vételi szándékra. A HUB-ban a zöld chip a HALMOZOTT egyenleged, alatta pedig a SZEZONONKÉNTI keret bontása áll: mennyi jön a csapaterődből, és mit tesz hozzá vagy vesz el az edzői fizetésemelés / megsapkázás (kihívás-jutalom, illetve büntetés, ±10% lépésekben) és a választott fejlődési tempó (a Komótos ×0,90, a Csigatempó ×0,75, a Gleccser ×0,60 — a lassabb tempó a piacot is visszafogja, különben csak megkerülnéd a lassítást vásárlással). Ugyanez a szorzó ül a MÉRFÖLDKŐ-JUTALMAKON is: a pénzjutalom a büdzsén keresztül, a csapatstílus-pont pedig közvetlenül — a lassított karrier tehát a stílus-fát is arányosan lassabban építi."},
+  budzse:{title:"Átigazolási büdzsé és árak",text:"Minden szezon elején kapsz egy költségvetést a csapatod erejéhez mérten, és a felhasználatlan rész átvihető a következő szezonra. A vásárlás DRÁGA (a piaci érték fölött, felárral — magasabb mezőnyön még többe kerül), az eladás szerényebb összeget hoz. AZ ÉRTÉK NEM LINEÁRIS: egy bizonyos szint fölött (TSI 6000, nagyjából a természetes fejlődési pálya csúcsa) az ár meredekebben nő, mert a világklasszisból nincs másik — egy kinevelt legenda így nagyságrenddel többet ér, mint két jó kerettag. AZ ELADÁSNAK KÉT ÚTJA VAN. Az „Eladás most\" azonnal fizet, de lowball: a játékos KIKIÁLTÁSI ÁRÁNAK (a nyers piaci értéke ÉS a nálad felépített életműve) pontosan a fele. A PIACRA BOCSÁTÁS a türelmes út: a játékos marad a keretben és játszik tovább, 5-15 fordulón belül érkezik rá az első ajánlat, és azt az átigazolási időszakban kapod kézhez, a vásárlások mellett. A licit a kikiáltási ár 60-125%-a, vagyis a gyors eladás 1,2-2,5-szerese. Elutasíthatod: akkor jön a következő ajánlat — nyáron azonnal, ugyanabban az ablakban, legfeljebb három körön át, szezon közben pedig garantáltan a következő átigazolási időszakban. A sáv MINDIG 60-125% marad, de a valószínűség kúp alakú a sávon belül, és a csúcsát az ÁTIGAZOLÁSI ÜGYNÖKSÉGED tolja feljebb (lásd a saját bejegyzését); minden elutasítás tovább tolja, a negyedikig. A kivárás tehát tényleg fizet, csak időbe kerül. Piacra csak olyan játékost vihetsz, aki legalább 20 mérkőzést játszott nálad — egy frissen igazolt embert nem lehet azonnal továbbadni, és mivel az életmű-szorzója még 1,0, a licitje amúgy is jóval az alatt maradna, amit érte fizettél. Ez tudatos: egy nagy játékos beszerzése több szezonnyi spórolás, nem egy szezon pénzéből megvehető. Az árakat a lista nem mutatja — csak amikor rákattintasz a vételi szándékra. A HUB-ban a zöld chip a HALMOZOTT egyenleged, alatta pedig a SZEZONONKÉNTI keret bontása áll: mennyi jön a csapaterődből, és mit tesz hozzá vagy vesz el az edzői fizetésemelés / megsapkázás (kihívás-jutalom, illetve büntetés, ±10% lépésekben) és a választott fejlődési tempó (a Komótos ×0,90, a Csigatempó ×0,75, a Gleccser ×0,60 — a lassabb tempó a piacot is visszafogja, különben csak megkerülnéd a lassítást vásárlással). Ugyanez a szorzó ül a MÉRFÖLDKŐ-JUTALMAKON is: a pénzjutalom a büdzsén keresztül, a csapatstílus-pont pedig közvetlenül — a lassított karrier tehát a stílus-fát is arányosan lassabban építi."},
   elvagyodas:{title:"Elvágyódás és megtartás",text:"Az átigazolási időszakok egyik lehetséges eseménye: valaki a keretedből távozni szeretne. Régen ez egyszerűen ELVETTE a játékost — ma már döntés. Kapsz egy megtartási díjat, és háromfelé mehetsz: kifizeted azonnal (marad), HALASZTOTT megállapodást kötsz (marad, de a díj a szezon végén esedékes), vagy elengeded. A halasztott út a csapda: ha a szezon végére nem jön össze a pénz, a játékos mégis távozik — kezdőemberként érkezik helyette valaki, de nem te választod. A jó csapatkémia és a magas morál csökkenti az elvágyódás esélyét, tehát ez ellen nem csak pénzzel lehet védekezni."},
   oregedes:{title:"Öregedés és visszavonulás",text:"A játékosaid minden szezonváltáskor öregszenek, és a fejlődésük korfüggő: 21 év alatt a pozitív lépések duplán számítanak, 25 alatt 1,6-szorosan, 30 alatt már csak 0,8-szorosan, afölött 0,4-szeresen — a hanyatlás viszont pont fordítva gyorsul. 31 éves kortól évente nő a visszavonulás esélye, és a csúcsához képest sokat vesztett játékosnál még inkább. A távozás SOSEM ér váratlanul: a játékos előre bejelenti a szándékát, a figyelmeztetés szezonjában biztosan végigjátssza az idényt, és a rákövetkező egy vagy két szezon végén vonul vissza — van tehát időd utánpótlást igazolni vagy poszt-tanulást indítani. Az „öreg csirkefogó\" boost 41 éves korig kitolja a nyugdíjat. Infinity módban nincs Rating-hanyatlás, és a határ 55 év."},
   fejlodes:{title:"Folyamatos fejlődés",text:"A játékosaid nem csak szezonváltáskor fejlődnek — minden meccs, amin játszanak (különösen ha jól teljesítenek), apránként hozzáad a fejlődésükhöz. Egy kiugró szezon tartósan feljebb tolhatja egy fiatal játékos hosszú távú pályáját."},
@@ -15396,6 +15537,9 @@ function resetGameState(){
   captainIdx=-1;captainName=null;pendingCaptainIdx=-1;
   teamName="30-0 XI";coach=null;
   scout=null;careerPool=null;
+  /* Az ÜGYNÖKSÉG is nullázódik: minden karrier egy csillagon, nulla ponttal
+     indul — ez a rendszer lényege, nincs benne sorsolás és nincs örökség. */
+  agency=null;
   CHEM={total:0,notes:[],goodPairs:new Set()};
   /* --- vásárolt/kiérdemelt bővítések --- */
   MAX_CAREER_ROSTER=MAX_CAREER_ROSTER_BASE;
@@ -26335,13 +26479,8 @@ function signingBandLabel(refOverride){
    PONTOSAN ugyanaz a 3 jött ki a scout újraküldésekor. A kúp ezt megtartja:
    minden húzás önálló, és a sáv szélei is elérhetők. */
 function rollSigningTarget(){
-  const b=signingBand(),lo=b.lo,hi=b.hi,m=b.mid;
-  if(!(hi>lo))return m;
-  /* háromszög-eloszlás inverz transzformációval: a csúcs m-nél van */
-  const u=Math.random(),c=(m-lo)/(hi-lo);
-  return (u<c)
-    ? lo+Math.sqrt(u*(hi-lo)*(m-lo))
-    : hi-Math.sqrt((1-u)*(hi-lo)*(hi-m));}
+  const b=signingBand();
+  return (b.hi>b.lo)?triangularRoll(b.lo,b.hi,b.mid):b.mid;}
 /* A sorsolt célértékhez a legközelebbi néhány közül húz — NEM mindig a
    legközelebbit. Ez a második fele az ismétlődés megszüntetésének: enélkül
    ugyanaz a célérték mindig ugyanazt a játékost adná vissza. */
@@ -26450,12 +26589,13 @@ function twScout(){
   const box=document.createElement("div");box.className="plist";
   const revealedNames=new Set();
   const budget={remaining:gameMode==="career"?computeRevealBudget(cands.length,scout):0};
-  /* ÁTIGAZOLÁSI PRÓBÁLKOZÁS-LIMIT — scout-függő. A scout ennyi tárgyalást tud
-     megszervezni ebben a körben, mielőtt kifullad. A limit a TSI-megtekintések
-     számának 2-3×-osa (random), tehát egy jobb scout több próbálkozást is enged.
-     Így a scout nemcsak a felmérésben, hanem a tárgyalások számában is számít. */
+  /* ÁTIGAZOLÁSI PRÓBÁLKOZÁS-LIMIT — az ÜGYNÖKSÉGTŐL függ. Ennyi tárgyalást tud
+     megszervezni ebben a körben, mielőtt kifullad. */
   if(gameMode==="career"&&TW&&TW.attemptsLeft==null){
-    const views=computeRevealBudget(cands.length,scout);
+    /* A TÁRGYALÁSOK SZÁMA AZ ÜGYNÖKSÉGÉ. A képlet a régi (a megtekintési
+       keret 2-3-szorosa), de az ügynökség scout-egyenértékére fut — a scout
+       csillagai már csak azt szabják meg, HÁNY jelölt TSI-jét látod. */
+    const views=computeRevealBudget(cands.length,agencySc());
     TW.attemptsLeft=Math.max(1,Math.round(views*(2+Math.random())));
     TW.attemptsMax=TW.attemptsLeft;}
   const info=document.createElement("div");
@@ -26507,14 +26647,14 @@ function twScout(){
 /* Az ÁR csak itt, a vásárlási szándék megerősítésekor derül ki — a listában
    rejtve van, hogy a szám ne árulja el a játékos erejét. Így a scout-megtekintés
    (TSI) az egyetlen mód a felmérésre, a vételár pedig valódi döntés. */
-/* Ha a scout kifogyott a tárgyalási kapacitásból (attemptsLeft elfogyott),
-   erre a körre lezárul a vásárlás — realisztikus korlát, ami a scout minőségén
-   múlik. Egy jobb scout több próbálkozást enged. */
+/* Ha az ÜGYNÖKSÉG kifogyott a tárgyalási kapacitásból (attemptsLeft elfogyott),
+   erre a körre lezárul a vásárlás — realisztikus korlát, ami az ügynökség
+   fejlettségén múlik. Egy erősebb ügynökség több próbálkozást enged. */
 function twScoutExhausted(){
   if(TW)TW.busy=false;
-  $("twTitle").textContent="A scout kifulladt";
+  $("twTitle").textContent="Az ügynökség kifulladt";
   $("twBody").innerHTML=`<div class="h" style="color:var(--red)">Elfogytak a tárgyalások</div>
-    <p style="font-size:13px;margin-top:5px">A scout ${TW&&TW.attemptsMax?`ebben az ablakban ${TW.attemptsMax} tárgyalást`:"a tárgyalásokat"} tudott megszervezni — mára ennyi fért bele. Egy jobb scout többet is engedne.</p>`;
+    <p style="font-size:13px;margin-top:5px">Az ügynökséged (${agencyStarsLabel()}) ${TW&&TW.attemptsMax?`ebben az ablakban ${TW.attemptsMax} tárgyalást`:"a tárgyalásokat"} tudta megszervezni — mára ennyi fért bele. Egy fejlettebb ügynökség többet is engedne.</p>`;
   $("twActions").innerHTML="";
   const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Rendben";
   ok.onclick=()=>{if(TW&&TW.isHubPurchase)csReturnToHub();else twNextCycleOrFinish();};
@@ -26704,7 +26844,12 @@ function twShowPlacement(cand,completeFn,cfg){
     if(freeTok){
       S.freePlayerTokens=Math.max(0,(S.freePlayerTokens||0)-1);
       addLine(`🎁 Ingyen igazolás-token beváltva: ${esc(shortName(name))} nem került semmibe (${fmtFt(rawPrice)} megspórolva).`,"m life");
-    }else if(gameMode==="career")S.transferBudget=Math.max(0,S.transferBudget-finalPrice);};
+    }else if(gameMode==="career")S.transferBudget=Math.max(0,S.transferBudget-finalPrice);
+    /* ÜGYNÖKSÉG-PONT. A TOKENES igazolás is számít: a munkát akkor is az
+       ügynökség végezte el, csak nem a te pénzedből — a pont alapja ezért a
+       nyers ár, nem a ténylegesen kifizetett összeg. Minden vásárlási útvonal
+       ezen az egy tölcséren megy át, tehát elég itt jóváírni. */
+    try{if(gameMode==="career")agencyAward("buy",rawPrice,name);}catch(e){}};
   /* A GOMBOK LETAKARÍTÁSA — enélkül a "Magasabb árat kérnek" igen/nem gombjai
      ottragadtak a #twActions-ben a "Megegyeztünk!" alatt. */
   $("twActions").innerHTML="";
@@ -27892,8 +28037,6 @@ function sellValue(p){
 const SALE_LIST_MIN_MATCHES=20;  /* ennyi meccs nálad kell, hogy piacra vihesd */
 const SALE_OFFER_MIN_ROUNDS=5, SALE_OFFER_MAX_ROUNDS=15;
 const SALE_BID_LO=0.60;          /* a licit alsó határa, elutasítás nélkül */
-const SALE_BID_LO_STEP=0.075;    /* minden elutasítás ennyivel emeli az alsót */
-const SALE_BID_LO_MAX=0.90;      /* a 4. elutasítás után idáig, tovább nem */
 const SALE_BID_HI=1.25;          /* a felső határ végig ennyi */
 const SALE_SUMMER_ROUNDS=3;      /* nyáron ennyi licit-kör fér egy ablakba */
 /* A karrier folyamatos forduló-számlálója: a szezonok közt is nő, tehát a
@@ -27922,6 +28065,8 @@ function saleIsListed(name){return !!saleListingOf(name);}
 function saleCanList(p){
   if(gameMode!=="career"||!careerPool||!p||p.family)return false;
   if(saleIsListed(p.n))return false;
+  /* AZ ÜGYNÖKSÉG KAPACITÁSA: egyszerre ennyi ügyet tud vinni. */
+  if(saleMarketState().list.length>=agencyMaxListings())return false;
   const cs=(S.careerStats&&S.careerStats[p.n])||null;
   return ((cs&&cs.matches)||0)>=SALE_LIST_MIN_MATCHES;}
 function saleListPlayer(p){
@@ -27952,10 +28097,20 @@ function salePrune(){
   st.list=st.list.filter(x=>x&&have.has(x.n));}
 function saleRosterPlayer(name){
   try{return fullCareerRoster().find(p=>p&&p.n===name)||null;}catch(e){return null;}}
-/* A licit sávja: az alsó határ az elutasítások számával kúszik, a felső fix. */
-function saleBidBand(rejects){
-  const lo=Math.min(SALE_BID_LO_MAX,SALE_BID_LO+SALE_BID_LO_STEP*Math.max(0,rejects||0));
-  return {lo,hi:SALE_BID_HI};}
+/* A licit sávja MOSTANTÓL FIX: mindig 60-125%. Korábban az elutasítások az
+   alsó határt tolták feljebb; azóta az ügynökség vette át a szerepet, és a
+   kérés az volt, hogy a sáv maradjon a helyén — az ESÉLY tolódjon a sávon
+   belül. A tolást ezért a kúp csúcsa viszi (agencyBidMode), nem a sáv alja:
+   így egy gyenge ügynökségnél a 125% is elérhető marad (csak ritka), egy
+   erősnél pedig a 60% is (csak ritka). */
+function saleBidBand(){return {lo:SALE_BID_LO,hi:SALE_BID_HI};}
+/* Háromszög- (kúp-) eloszlás inverz transzformációval — ugyanaz a sampler,
+   amit az igazolási sáv is használ. */
+function triangularRoll(lo,hi,mode){
+  if(!(hi>lo))return lo;
+  const m=Math.max(lo,Math.min(hi,mode));
+  const u=Math.random(),c=(m-lo)/(hi-lo);
+  return (u<c)?lo+Math.sqrt(u*(hi-lo)*(m-lo)):hi-Math.sqrt((1-u)*(hi-lo)*(hi-m));}
 /* Egy konkrét licit összege. A `base` a KIKIÁLTÁSI ár, a `buy` csak
    viszonyításnak kerül bele (azt kéri a kiírás). */
 function saleRollOffer(rec){
@@ -27963,8 +28118,10 @@ function saleRollOffer(rec){
   if(!p)return null;
   const base=saleAskPrice(p);
   if(!(base>0))return null;
+  /* KÚP-ELOSZLÁS a rögzített 60-125%-os sávon belül: a csúcs helyét az
+     ÜGYNÖKSÉG adja (agencyBidMode), az elutasítások pedig tovább tolják. */
   const band=saleBidBand(rec.rejects);
-  const pct=band.lo+Math.random()*(band.hi-band.lo);
+  const pct=triangularRoll(band.lo,band.hi,agencyBidMode(rec.rejects));
   const e=(careerPool&&careerPool[p.n])||p;
   let buy=0;try{buy=buyPrice(e);}catch(err){buy=0;}
   const amount=Math.max(1,Math.round(base*pct));
@@ -28128,7 +28285,8 @@ function autoRunPhase1(cycleNo){
     if(r<0.38){
       {const _pp=gameMode==="career"?buyPrice(cand):0;
        autoPlacePlayer(catDef.key,cand,_pp);
-       if(gameMode==="career")S.transferBudget=Math.max(0,S.transferBudget-_pp);}
+       if(gameMode==="career"){S.transferBudget=Math.max(0,S.transferBudget-_pp);
+         try{agencyAward("buy",_pp,cand.n);}catch(e){}}}
       addLine(`TÉL (${cycleNo}. kör): leigazoltuk ${esc(cand.n)}-t (${twCatLabel(catDef.key)})`,"m life");
       return;}
     if(r<0.62){
@@ -28138,7 +28296,8 @@ function autoRunPhase1(cycleNo){
         addLine(`TÉL (${cycleNo}. kör): ${esc(cand.n)} magasabb árat kért (${fmtFt(premiumPrice)}), de nem fértünk bele a büdzsébe — elálltunk.`,"m life");
         return;}
       autoPlacePlayer(catDef.key,cand);
-      if(gameMode==="career")S.transferBudget=Math.max(0,S.transferBudget-premiumPrice);
+      if(gameMode==="career"){S.transferBudget=Math.max(0,S.transferBudget-premiumPrice);
+        try{agencyAward("buy",premiumPrice,cand.n);}catch(e){}}
       addLine(`TÉL (${cycleNo}. kör): magasabb árat fizetve leigazoltuk ${esc(cand.n)}-t (${twCatLabel(catDef.key)})`,"m life");
       return;}
     if(r<0.83)continue;
@@ -30620,7 +30779,7 @@ $("hubTransferEventBtn")&&($("hubTransferEventBtn").onclick=()=>{
    a scout csillagerejétől függ — ugyanaz a tárgyalás/árprémium/elhelyezés
    lánc fut le, mint bármelyik más átigazolásnál. */
 function computeClubScoutSpins(sc){
-  return Math.max(2,Math.round(sc.stars));}
+  return Math.max(2,Math.round((sc&&sc.stars)||0));}
 /* A scout fejlettsége mostantól MÁS mechanikákat is befolyásol (nem csak a
    TSI-becslést): a jutalom-nyitások esélyét, a vásárlási sikerességet és a
    klub-szemle újrapörgetéseket is. A 0..1 közötti "minőség" a csillagokból. */
@@ -30674,13 +30833,88 @@ function openStaffPanel(introFor){
      ne rángassuk el onnan a panel tetejére. */
   if(!_staffIntro)$("scWindow").scrollIntoView({behavior:"smooth"});}
 $("hubStaffBtn")&&($("hubStaffBtn").onclick=()=>openStaffPanel());
+/* ---- ÜGYNÖKSÉG FEJLESZTÉSE: EGY GOMB, KÉT SZAKMA ----
+   A scout és az átigazolási ügynökség két külön ember, de ugyanaz a döntés
+   („mibe fektetek"), ezért egy belépési pont mögött ülnek. A választó
+   mindkettőről kiírja, HOL tart és MIT ad a következő lépés — a menüből nem
+   kell találgatva belépni. */
+function renderAgencyHubPanel(){
+  $("twTitle").textContent="🤝 Ügynökség fejlesztése";
+  const a=agencyState();
+  const need=agencyNextPts(a.lvl||0),have=a.pts||0;
+  const aPrice=agencyUpgradePrice();
+  $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.6;color:var(--dim2)">
+    Két szakma, két külön létra. A <b>scout</b> FELMÉR: megbecsüli a tehetséget, kihordja az akadémiát, és rátalál a nagy nevekre.
+    Az <b>átigazolási ügynökség</b> ÜZLETET KÖT: ő szervezi a tárgyalásokat, a felderítéseket, a klub-szemlét, és ő hozza ki a maximumot egy piacra bocsátott játékosból.</p>
+    <div style="margin-top:10px;padding:9px 11px;border-radius:9px;background:var(--panel2);border:1px solid var(--line)">
+      <div style="font-size:13.5px;font-weight:700">🔎 Scout <span style="color:var(--gold)">${scout?scoutStarsLabel(scout.stars):"—"}</span></div>
+      <div style="font-size:11.5px;color:var(--dim2);margin-top:3px;line-height:1.45">TSI-becslés pontossága · akadémia · a hálózat felfedezettjei${scout&&scout.stars<SCOUT_MAX_STARS?` · a következő fél csillag ${fmtFt(scoutUpgradePrice(scout.stars))}`:` · maximumon (${SCOUT_MAX_STARS}★)`}</div>
+    </div>
+    <div style="margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--panel2);border:1px solid var(--line)">
+      <div style="font-size:13.5px;font-weight:700">🤝 Átigazolási ügynökség <span style="color:var(--gold)">${agencyStarsLabel()}</span></div>
+      <div style="font-size:11.5px;color:var(--dim2);margin-top:3px;line-height:1.45">
+        Pontok: <b style="color:var(--ink)">${have.toFixed(1)} / ${need}</b> a következő fél csillagig · ${a.deals||0} lezárt üzlet<br>
+        Egyszerre ${agencyMaxListings()} játékos a piacon · a licit-kúp csúcsa ${Math.round(agencyBidMode(0)*100)}% · a következő fél csillag ${fmtFt(aPrice)}</div>
+      <div style="position:relative;height:6px;background:var(--panel);border-radius:3px;margin-top:6px">
+        <span style="position:absolute;left:0;top:0;height:6px;border-radius:3px;background:var(--gold);width:${Math.max(0,Math.min(100,have/need*100)).toFixed(1)}%"></span>
+      </div>
+    </div>`;
+  const act=$("twActions");act.innerHTML="";
+  const mk=(label,cls,fn)=>{const b2=document.createElement("button");b2.className=cls+" stepbtn";b2.style.marginTop="7px";b2.textContent=label;b2.onclick=fn;act.appendChild(b2);return b2;};
+  if(scout)mk("🔎 Scout fejlesztése","btn-s",()=>renderScoutUpgradePanel());
+  mk("🤝 Ügynökség fejlesztése","btn-s",()=>renderAgencyUpgradePanel());
+  mk("Vissza a HUB-ba","btn-y",()=>csReturnToHub());}
+/* Az ügynökség PÉNZES fejlesztése. Egy vásárlás egy szint (fél csillag), az ár
+   a scout-fejlesztés kétszerese ugyanazon a csillagszinten. A pontok NEM
+   vesznek el: a megvásárolt szint után a meglévő pontok a KÖVETKEZŐ szint felé
+   számítanak tovább — a pénz nem kiváltja a munkát, csak megelőzi. */
+function renderAgencyUpgradePanel(){
+  $("twTitle").textContent="🤝 Ügynökség fejlesztése";
+  const a=agencyState();
+  const price=agencyUpgradePrice();
+  const affordable=(S.transferBudget||0)>=price;
+  const cur=agencyStars(),next=cur+0.5;
+  const curList=agencyMaxListings(),curMode=Math.round(agencyBidMode(0)*100);
+  /* ELŐNÉZET a KÖVETKEZŐ szintről — a csillagszámot paraméterként adjuk át, nem
+     az állapot ideiglenes átírásával: egy félbeszakadt render így sem hagyhat
+     megemelt szintet maga után. */
+  const nList=agencyMaxListings(next),nMode=Math.round(agencyBidMode(0,next)*100),
+        nEquiv=next+AGENCY_SCOUT_OFFSET;
+  $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.6;color:var(--dim2)">
+    Jelenlegi ügynökség: <b style="color:var(--gold)">${agencyStarsLabel()}</b> · pontok <b>${(a.pts||0).toFixed(1)} / ${agencyNextPts(a.lvl||0)}</b><br>
+    Az ügynökség magától is fejlődik a megkötött üzletekből — ez a gomb csak MEGELŐZI a pontokat, nem váltja ki őket: a meglévő pontjaid megmaradnak, és a következő szint felé számítanak tovább.<br><br>
+    Fejlesztés <b>${cur.toFixed(1)}★ → ${next.toFixed(1)}★</b>:<br>
+    · egyszerre piacon tartható játékos: <b>${curList} → ${nList}</b><br>
+    · a licit-kúp csúcsa: <b>${curMode}% → ${nMode}%</b> (a sáv marad ${Math.round(SALE_BID_LO*100)}-${Math.round(SALE_BID_HI*100)}%)<br>
+    · tárgyalások, felderítés, klub-szemle: <b>${nEquiv.toFixed(1)}★</b> scout-egyenérték<br>
+    Ára: <b style="color:#ffd24a">${fmtFt(price)}</b> (a scout-fejlesztés kétszerese).<br>
+    ${affordable?"":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget||0)}).</span>`}</p>`;
+  const act=$("twActions");act.innerHTML="";
+  if(affordable){
+    const buy=document.createElement("button");buy.className="btn-y stepbtn";
+    buy.textContent=`Fejlesztés megvásárlása (${fmtFtShort(price)})`;
+    buy.onclick=()=>{
+      if((S.transferBudget||0)<price)return;
+      askConfirm({title:"Megveszed a fejlesztést?",yes:"Igen, megveszem",
+        html:`<div style="font-size:13px;line-height:1.55">🤝 Ügynökség <b>${cur.toFixed(1)}★ → ${next.toFixed(1)}★</b>.<br><br>
+          Ára <b style="color:var(--gold)">${fmtFt(price)}</b>, az egyenleged ${fmtFt(S.transferBudget||0)} → <b>${fmtFt((S.transferBudget||0)-price)}</b>.<br>
+          <span style="color:var(--dim2)">A pontjaid megmaradnak, és a következő szint felé számítanak tovább.</span></div>`,
+        onYes:()=>{
+          if((S.transferBudget||0)<price)return;
+          S.transferBudget-=price;
+          agencyBuyLevel();
+          addLine(`🤝 Az ügynökség fejlesztve — most ${agencyStarsLabel()}. ${agencyLevelPerk()}`,"m life");
+          saveGame();renderAgencyUpgradePanel();}});};
+    act.appendChild(buy);}
+  const back=document.createElement("button");back.className="btn-s stepbtn";back.style.marginTop="6px";
+  back.textContent="Vissza";back.onclick=()=>renderAgencyHubPanel();
+  act.appendChild(back);}
 $("hubScoutUpgradeBtn").onclick=()=>{
-  if(!scout)return;
   $("scHub").classList.add("hide");
   $("scWindow").classList.remove("hide");
   $("swapPanelWrap").classList.add("hide");
   $("twPanel").classList.remove("hide");
-  renderScoutUpgradePanel();
+  renderAgencyHubPanel();
   $("scWindow").scrollIntoView({behavior:"smooth"});};
 /* ---- FELÁLLÁS/MEGBÍZATÁS-VÁLTÁS MEGERŐSÍTÉSE ----
    Mindkét művelet (felállásváltás és középpályás-megbízatás váltás)
@@ -31721,7 +31955,7 @@ function renderScoutUpgradePanel(){
   const nextPct=Math.round(scoutErrorPct(nextStars)*100);
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.6;color:var(--dim2)">
     Jelenlegi scout: <b style="color:var(--gold)">${scoutStarsLabel(scout.stars)}</b><br>
-    A scout fejlettsége nemcsak a TSI-becslés pontosságát adja, hanem a jutalom-nyitások esélyét, a vásárlási sikerességet és a klub-szemle újrapörgetéseit is javítja.<br><br>
+    A scout dolga a FELMÉRÉS: a TSI-becslés pontossága, az akadémia és a hálózatán keresztül felfedezett nagy nevek esélye. Az átigazolások lebonyolítása (tárgyalások, felderítés, klub-szemle) átkerült az <b>ügynökséghez</b>.<br><br>
     ${atMax
       ? `<span style="color:var(--grass)">A scoutod elérte a maximumot (${SCOUT_MAX_STARS}★) — pontosabb már nem lehet.</span>`
       : `Fejlesztés <b>${scout.stars}★ → ${nextStars}★</b>: a tévedés <b>${curPct}% → ${nextPct}%</b>-ra csökken.<br>
@@ -31746,8 +31980,8 @@ function renderScoutUpgradePanel(){
           renderScoutUpgradePanel();}});};
     $("twActions").appendChild(buy);
   }
-  const back=document.createElement("button");back.className="btn-s stepbtn";back.style.marginTop="6px";back.textContent="Vissza a HUB-ba";
-  back.onclick=()=>csReturnToHub();
+  const back=document.createElement("button");back.className="btn-s stepbtn";back.style.marginTop="6px";back.textContent="Vissza";
+  back.onclick=()=>renderAgencyHubPanel();
   $("twActions").appendChild(back);}
 function csReturnToHub(){
   twClearAnim();
@@ -31843,9 +32077,9 @@ function renderRosterExpandPanel(){
    ablakban viszont az ablak saját kvótája: 1 / 2 / 3 a scout csillagai szerint
    (twCpExtraQuota). A két számlálót nem szabad összekeverni, különben a
    szezonközi pörgetés a nyári keretet fogyasztaná. */
-function csSpinsMax(){return twWindowOpen()?(S.twWindow.clubMax||0):computeClubScoutSpins(scout);}
+function csSpinsMax(){return twWindowOpen()?(S.twWindow.clubMax||0):computeClubScoutSpins(agencySc());}
 function csSpinsLeft(){return twWindowOpen()?Math.max(0,S.twWindow.clubLeft||0)
-  :Math.max(0,computeClubScoutSpins(scout)-(S.clubScoutSpinsUsed||0));}
+  :Math.max(0,computeClubScoutSpins(agencySc())-(S.clubScoutSpinsUsed||0));}
 function csSpendSpin(){
   if(twWindowOpen())S.twWindow.clubLeft=Math.max(0,(S.twWindow.clubLeft||0)-1);
   else S.clubScoutSpinsUsed++;}
@@ -33205,7 +33439,7 @@ function renderSaleOffersPanel(){
   const open=saleWindowOpen(),summer=saleIsSummerWindow();
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
     A licit a játékos <b>kikiáltási árának</b> százaléka — annak az összegnek, amit a piac ma kérne érte (a nyers értéke ÉS a nálad felépített életműve). Az azonnali eladás ugyanennek pontosan a fele, tehát a piac mindig <b>1,2-2,5-szeresét</b> adja a gyors eladásnak.
-    Minden elutasítás feljebb tolja az alsó határt (${Math.round(SALE_BID_LO*100)}% → ${Math.round(SALE_BID_LO_MAX*100)}%), a felső végig ${Math.round(SALE_BID_HI*100)}%.
+    A sáv <b>${Math.round(SALE_BID_LO*100)}-${Math.round(SALE_BID_HI*100)}%</b>, és ez nem mozdul — a valószínűség viszont KÚP alakú a sávon belül, és a csúcsát az <b>ügynökséged</b> tolja feljebb (most ${Math.round(agencyBidMode(0)*100)}%). Minden elutasítás tovább tolja a csúcsot, a negyedikig.
     ${open?(summer
         ?`Nyáron elutasítás után <b>azonnal</b> jön a következő ajánlat, ablakonként legfeljebb ${SALE_SUMMER_ROUNDS} körben.`
         :`Ebben az időszakban emberenként egy licit fér el — elutasítás után a következő <b>garantáltan</b> megérkezik a következő átigazolási időszakban.`)
@@ -33245,7 +33479,7 @@ function renderSaleOffersPanel(){
       +` <span style="color:var(--dim2)">— a ${fmtFt(rec.offer.base)}-os kikiáltási ára <b>${pct.toFixed(0)}%</b>-a`
       +(buyPct?` · a vételára <b>${buyPct.toFixed(0)}%</b>-a`:"")+`</span>`
       +`<br><span style="font-size:11.5px;color:${better?"var(--grass)":"var(--red)"}">Azonnali eladás most ${fmtFt(now)} — ez az ajánlat ${better?`${fmtFt(rec.offer.amount-now)}-tel több`:`${fmtFt(now-rec.offer.amount)}-tel kevesebb`}.</span>`
-      +`<br><span style="font-size:11px;color:var(--dim2)">${rec.rejects?`${rec.rejects} elutasítás után · `:""}a mostani sáv ${Math.round(band.lo*100)}-${Math.round(band.hi*100)}%</span></div>`;
+      +`<br><span style="font-size:11px;color:var(--dim2)">${rec.rejects?`${rec.rejects} elutasítás után · `:""}sáv ${Math.round(band.lo*100)}-${Math.round(band.hi*100)}% · a kúp csúcsa ${Math.round(agencyBidMode(rec.rejects)*100)}%</span></div>`;
     const yes=document.createElement("button");
     yes.className="btn-y stepbtn";yes.style.marginTop="7px";
     yes.textContent=`✅ Elfogadom — ${fmtFt(rec.offer.amount)}`;
@@ -33270,6 +33504,7 @@ function renderSaleOffersPanel(){
             :"Nem sikerült lezárni az üzletet."}</p>`;
           return;}
         addLine(`📈 Eladva: ${esc(p.n)} elment ${fmtFt(res.credit)}-ért — a büdzséd most ${fmtFt(S.transferBudget)}.`,"m life");
+        try{agencyAward("market",res.credit,p.n);}catch(e){}
         hubExpandedKey=null;
         drawPitch();updateBar();saveGame();
         styleInheritHandle(p.n,"sale");
@@ -34235,6 +34470,7 @@ function buildHubDetail(loc){
             :"Nem sikerült eladni.");
           return;}
         addLine(`💰 Eladtad ${esc(p.n)}-t ${fmtFt(res.credit)}-ért — a büdzséd most ${fmtFt(S.transferBudget)}.`,"m life");
+        try{agencyAward("sell",res.credit,p.n);}catch(e){}
         $("hubPositionPicker").classList.add("hide");   /* az eladás azonnal bezárja a nyitott csere-panelt */
         hubExpandedKey=null;                            /* az eladott játékos részletei bezáródnak */
         renderHub();drawPitch();updateBar();saveGame();
@@ -34269,7 +34505,9 @@ function buildHubDetail(loc){
         mBtn.onclick=(ev)=>{
           if(ev&&ev.stopPropagation)ev.stopPropagation();
           if(!saleCanList(p)){
-            setDraftStatus(`Piacra csak olyan játékost vihetsz, aki legalább ${SALE_LIST_MIN_MATCHES} meccset játszott nálad — ${esc(shortName(p.n))} eddig ${m}-t.`);
+            setDraftStatus(saleMarketState().list.length>=agencyMaxListings()
+              ?`Az ügynökséged egyszerre ${agencyMaxListings()} játékost tud piacon tartani (${agencyStarsLabel()}) — előbb zárj le egy ügyet, vagy fejleszd az ügynökséget.`
+              :`Piacra csak olyan játékost vihetsz, aki legalább ${SALE_LIST_MIN_MATCHES} meccset játszott nálad — ${esc(shortName(p.n))} eddig ${m}-t.`);
             return;}
           const band=saleBidBand(0);
           const ask=saleAskPrice(p);
@@ -34278,7 +34516,8 @@ function buildHubDetail(loc){
               <div style="font-size:13px;margin-top:8px;line-height:1.55">A játékos <b>marad a keretedben</b> és játszik tovább — csak kikerül a kirakatba.
                 <b>${SALE_OFFER_MIN_ROUNDS}-${SALE_OFFER_MAX_ROUNDS} fordulón belül</b> érkezik rá az első ajánlat, amit a következő átigazolási időszakban kapsz kézhez, a vásárlások mellett.<br><br>
                 A kikiáltási ára <b>${fmtFt(ask)}</b>, a licit ennek a <b>${Math.round(band.lo*100)}-${Math.round(band.hi*100)}%</b>-a — vagyis <b>${fmtFt(Math.round(ask*band.lo))}</b> és <b>${fmtFt(Math.round(ask*band.hi))}</b> között.
-                Elutasíthatod: akkor jön a következő ajánlat, és minden elutasítással feljebb kúszik az alsó határ — a negyedik után ${Math.round(SALE_BID_LO_MAX*100)}%-nál.<br><br>
+                A valószínűség a sávon belül kúp alakú: a csúcsa most a <b>${Math.round(agencyBidMode(0)*100)}%</b>-nál van, és az ügynökséged fejlődésével tolódik feljebb.
+                Elutasíthatod: akkor jön a következő ajánlat, és minden elutasítás tovább tolja a csúcsot (a negyedikig).<br><br>
                 Összehasonlításul az <b>azonnali</b> eladás most <b style="color:var(--gold)">${fmtFt(sellValue(p))}</b> — az biztos, ez több lehet.<br>
                 <span style="color:var(--dim2)">Bármikor levehetők a piacról, amíg nem fogadtál el ajánlatot.</span></div>`,
             onYes:()=>{
@@ -34291,7 +34530,7 @@ function buildHubDetail(loc){
         note.style.cssText="font-size:11px;color:var(--dim2);margin-top:3px;line-height:1.45";
         note.innerHTML=listed.offer
           ? `📬 <b style="color:var(--gold)">Ajánlat vár döntésre</b> — ${fmtFt(listed.offer.amount)}. Az Átigazolás menü „Eladási ajánlatok" pontjában intézed.`
-          : `⏳ A kirakatban áll · ${listed.rejects?`${listed.rejects} elutasított ajánlat · a sáv most ${Math.round(saleBidBand(listed.rejects).lo*100)}-${Math.round(SALE_BID_HI*100)}%`:`az első ajánlat a ${Math.max(0,listed.due-saleCareerRound())}. forduló múlva esedékes`}`;
+          : `⏳ A kirakatban áll · ${listed.rejects?`${listed.rejects} elutasított ajánlat · a licit-csúcs most ${Math.round(agencyBidMode(listed.rejects)*100)}%`:`az első ajánlat a ${Math.max(0,listed.due-saleCareerRound())}. forduló múlva esedékes`}`;
         d.appendChild(note);}}}
   /* ---- ÖTÖDIK MŰVELET: EDZŐI PÁLYÁRA KÜLDÉS (a "B" belépési út) ----
      A rendszer fő útja a bejelentett visszavonulás: kitartottál mellette, és a
@@ -35641,6 +35880,13 @@ function renderHub(){
        sb.disabled=false;
        sb.style.opacity=dim?".7":"";}
    }else if(sb)sb.classList.add("hide");}
+  /* ÜGYNÖKSÉG-FEJLESZTÉS GOMB: a menüből látszódjon, hol tart mindkét szakma —
+     enélkül minden döntéshez be kellene lépni. */
+  {const ds=$("hubScoutUpgradeDs");
+   if(ds&&gameMode==="career"&&careerPool){
+     const a2=agencyState();
+     ds.textContent=`Scout ${scout?scout.stars.toFixed(1):"—"}★ · ügynökség ${agencyStars().toFixed(1)}★`
+       +` (${(a2.pts||0).toFixed(1)}/${agencyNextPts(a2.lvl||0)} pont a következő fél csillagig)`;}}
   /* A karszalag helyreállítása: ha az előző művelet (csere, eladás,
      felállásváltás) kimozdította a kapitányt a kezdő 11-ből, a karszalag
      automatikusan a legalkalmasabbra száll át — nem ragad egy véletlen
@@ -42582,7 +42828,7 @@ function saveGame(){
   try{
     const data={
       v:1,
-      gameMode,scout,careerPool:packCareerPool(careerPool),careerStart,careerRatingBasis,
+      gameMode,scout,agency,careerPool:packCareerPool(careerPool),careerStart,careerRatingBasis,
       form,mode,oppTargetRating,rerolls,infinityMode,infinityTiers,careerBaseRating,MAX_CAREER_ROSTER,
       worldSeed,draftSpinNo,
       /* MULTIPLAYER: a szoba-hovatartozás a mentés része, hogy egy újratöltés
@@ -42731,6 +42977,11 @@ function clearSave(key){
   if(_saveLock===k)saveLockSet(null);}
 function applySavedGame(d){
   gameMode=d.gameMode||"classic";careerStart=d.careerStart||"draft";scout=d.scout||null;
+  /* AZ ÜGYNÖKSÉG. Régi mentésben nincs — ott a karrier egy csillagon,
+     nulla ponttal veszi fel a fonalat: a már megkötött üzletek nem
+     számolhatók vissza, és a visszamenőleges jóváírás sokkal nagyobb
+     hazugság volna, mint a tiszta lap. */
+  agency=(d.agency&&d.agency.v===1)?d.agency:null;
   /* A pool tömörítve van a mentésben (lásd packCareerPool); a régi, nyers
      alakot az unpack változatlanul átengedi. */
   careerPool=unpackCareerPool(d.careerPool)||null;
@@ -43452,7 +43703,9 @@ function initSaveSystem(){
     const who=saved.teamName?`${saved.teamName} (${sn}. szezon)`:`a ${sn}. szezonos karriered`;
     noBtn.textContent=`Biztos? ${who} véglegesen törlődik — koppints még egyszer`;
     noArm=setTimeout(()=>{noArm=null;noBtn.textContent=noLabel;},4000);};}
-let gameMode="classic",scout=null,careerPool=null;
+/* Az ÜGYNÖKSÉG a scout párja: a scout felmér, az ügynökség üzletet köt. Nincs
+   kisorsolva — minden karrier egy csillagon indul, és onnan te építed. */
+let gameMode="classic",scout=null,careerPool=null,agency=null;
 $("modeClassicBtn").onclick=()=>{
   gameMode="classic";
   careerStart="draft";
