@@ -2767,7 +2767,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.2.00";
+const APP_VERSION="3.2.01";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9420,6 +9420,39 @@ function pickPaceFlavor(scorerName,asstName){
 const SPEED_MEAS_CHANCE=0.175;
 const SPRINT_MIN=29,SPRINT_SPAN=7.5,SPRINT_CAP=38.5,SPRINT_NOISE=1.2;
 const SHOT_MIN=98,SHOT_SPAN=40,SHOT_CAP=165,SHOT_NOISE=6;
+/* ---- A MŰSZEREK PLAFONJA INFINITYBEN KITOLÓDIK (3.2.01) ----
+   A fenti számok a VALÓS futball határaihoz vannak kalibrálva: 38,5 km/h
+   végsebesség (a világ legjobbjai), 165 km/h lövéserő. Amíg a mezőny 100-ig
+   megy, ez pontosan helyes.
+
+   INFINITYBEN VISZONT MÁR NEM VALÓS JÁTÉKOSOK VANNAK. A mezőny 200-ig tolható,
+   a keret Ratingje és attribútumai vele mennek — a műszer viszont ott ragadt a
+   valóság határán, és egy idő után MINDENKI ugyanazt a plafonszámot mérte.
+   Épp a leglátványosabb elem vált némává: a rekordot nem lehetett többé
+   megdönteni.
+
+   MOSTANTÓL A SÁV A MEZŐNNYEL EGYÜTT NŐ. Nem ugrik: a mezőny 100 fölötti
+   része arányosan tolja ki, a teljes (200-as) mezőnyön éri el a maximumot.
+     végsebesség  38,5 → 45,5 km/h
+     lövéserő      165 → 210 km/h
+   A HORGONY IS VELE MEGY (`anchor`): eddig a 99-es attribútum jelentette a
+   „csúcsembert", és minden fölötte lévő érték ugyanoda futott. Most a horgony
+   99 + a mezőny többlete, tehát a 150-es sebességű legenda tényleg gyorsabbat
+   fut, mint a 120-as — nem ugyanazt a számot kapja.
+
+   NEM-INFINITYBEN BETŰRE A RÉGI VISELKEDÉS: a többlet 0, a horgony 99, a
+   szórás és a plafon változatlan. */
+const SPRINT_INF_SPAN=7.0;    /* +7 km/h a teljes, 200-as mezőnyön */
+const SHOT_INF_SPAN=45;       /* +45 km/h ugyanott */
+function infFieldOver(){
+  try{return infinityMode?Math.max(0,Math.min(100,(oppTargetRating||0)-INFINITY_UNLOCK_RATING)):0;}
+  catch(e){return 0;}}
+function sprintCapNow(){return SPRINT_CAP+SPRINT_INF_SPAN*(infFieldOver()/100);}
+function shotCapNow(){return SHOT_CAP+SHOT_INF_SPAN*(infFieldOver()/100);}
+/* A VÉGSŐ plafon — a mérföldkő-lépcsők ehhez mérik magukat, nem a pillanatnyi
+   mezőnyhöz: egy mérföldkő hosszú távú cél, nem a mai állapot tükre. */
+function sprintCapMax(){return SPRINT_CAP+SPRINT_INF_SPAN;}
+function shotCapMax(){return SHOT_CAP+SHOT_INF_SPAN;}
 /* a lövéserő-skillek külön ráadást kapnak — tőlük tényleg keményebb a lövés */
 const SHOT_SKILL_BONUS={fw_cannon:8,df_cannon:6,mf_fk:4};
 /* háromszög-eloszlású zaj: két véletlen átlaga, [-n, +n] között */
@@ -9430,15 +9463,34 @@ function attrOf(name,key){
   return 60;   /* klasszikus mód: nincs attribútum-réteg, közepes alap */
 }
 /* A mért végsebesség km/h-ban, egy tizedesre. */
+/* A GÖRBE ALSÓ FELE SOSEM MOZDUL. A kitolás CSAK a 99 fölötti sávban dolgozik.
+   Az első próbálkozásom a horgonyt tolta el (99 → 99+mezőnytöbblet), és ettől
+   UGYANAZ a 99-es játékos LASSABBAT futott, ahogy a mezőny fejlődött — a
+   műszer nem mondhat ilyet, egy ember végsebessége nem csökken attól, hogy
+   mások gyorsabbak lettek. Ezért szakaszos: 99-ig betűre a régi képlet,
+   fölötte lineárisan a kitolt plafonig. */
 function measureSprint(name){
-  const seb=Math.max(40,Math.min(120,attrOf(name,"seb")));
-  const base=SPRINT_MIN+(seb-40)/59*SPRINT_SPAN;
-  return Math.round(Math.max(24,Math.min(SPRINT_CAP,base+measNoise(SPRINT_NOISE)))*10)/10;}
+  const cap=sprintCapNow();
+  const seb=Math.max(40,attrOf(name,"seb"));
+  const knee=SPRINT_MIN+SPRINT_SPAN;            /* a 99-es attribútum értéke */
+  let base;
+  if(seb<=99)base=SPRINT_MIN+(seb-40)/59*SPRINT_SPAN;
+  else{
+    const topAttr=120+infFieldOver();
+    base=knee+(Math.min(topAttr,seb)-99)/(topAttr-99)*(cap-knee);}
+  return Math.round(Math.max(24,Math.min(cap,base+measNoise(SPRINT_NOISE)))*10)/10;}
 /* A mért lövéserő km/h-ban, egészre. `skillId` a lövés mögötti skill. */
 function measureShot(name,skillId){
-  const gol=Math.max(40,Math.min(140,attrOf(name,"gol")));
-  const base=SHOT_MIN+(gol-40)/59*SHOT_SPAN+(SHOT_SKILL_BONUS[skillId]||0);
-  return Math.round(Math.max(80,Math.min(SHOT_CAP,base+measNoise(SHOT_NOISE))));}
+  const cap=shotCapNow();
+  const gol=Math.max(40,attrOf(name,"gol"));
+  const knee=SHOT_MIN+SHOT_SPAN;
+  let base;
+  if(gol<=99)base=SHOT_MIN+(gol-40)/59*SHOT_SPAN;
+  else{
+    const topAttr=140+infFieldOver();
+    base=knee+(Math.min(topAttr,gol)-99)/(topAttr-99)*(cap-knee);}
+  base+=(SHOT_SKILL_BONUS[skillId]||0);
+  return Math.round(Math.max(80,Math.min(cap,base+measNoise(SHOT_NOISE))));}
 /* Rögzítés + rekord-vizsgálat. Visszaadja, hogy egyéni csúcs-e. */
 function recordMeasure(store,name,val){
   S[store]=S[store]||{};
@@ -19074,28 +19126,71 @@ function goalSkillBias(){
    A SORREND SZÁNDÉKOS: előbb a sebesség-ág fut (változatlan viselkedés), és
    csak ha az nem sült el, jön a gól-ág. Így a két tengelyen egyaránt erős
    rendszereknél (kontra, széljáték) a régi egyensúly marad az uralkodó. */
+/* ================= A PAKLI FOGYÁSA (3.2.01) =================
+   BEJELENTETT TÜNET: a képesség-panel azt írta, hogy „a poolban most nincs
+   sebesség-képesség — nincs mit szorozni". Nem hiba volt, hanem a pakli
+   szerkezetének a következménye, és a következménye rossz volt.
+
+   A pool EGYETLEN, teljes pakli (MAIN_SKILLS megkeverve), amiből húzunk, és
+   csak akkor keverünk újat, amikor TELJESEN elfogy. Egy skill tehát a pakli
+   egy körén belül PONTOSAN egyszer jöhet elő — a három sebesség-képesség
+   kihúzása után ~35 további húzáson át egyetlen sebesség-skill sincs a
+   paklidban. Egy karrierben ez több szezon.
+
+   MIÉRT ROSSZ. A skill nem fogyóeszköz: az eligibleForSkill amúgy is kizárja
+   azt, aki már bírja, tehát UGYANAZT a képességet nyugodtan megkaphatná egy
+   MÁSIK játékos. A pakli viszont ezt megakadályozta — pont a
+   legjellegzetesebb, kevés példányos képességeknél (sebesség) fájt a
+   legjobban, és pont a rájuk épülő stílust bénította meg.
+
+   A JAVÍTÁS: a pakli nem kifogy, hanem UTÁNTÖLTŐDIK. Ha SKILL_POOL_MIN alá
+   csökken, egy friss, újrakevert pakli kerül MÖGÉ. Ettől:
+     · a sorrend-alapú (súlyozott) húzás pontosan ugyanúgy működik, mint eddig
+       — a pakli eleje ugyanaz a megkevert sorrend,
+     · a CÉLZOTT húzások (sebesség-, gól-, kategória-torzítás) viszont a teljes
+       poolban keresnek, tehát mindig találnak — a stílus nem tud kiszáradni,
+     · és egy képesség újra kiosztható, csak más embernek. */
+const SKILL_POOL_MIN=12;
+/* CÉLZOTT HÚZÁS. A torzítások (sebesség, gól, kategória) a TELJES poolban
+   keresnek — és ha az adott fajtából épp egy sincs benne, MÖGÉ fűzünk egy friss
+   paklit, és újra megnézzük. Enélkül a torzítás némán elsülne: a felhasználó
+   megvenné a képességet, a panel meg azt írná, hogy „nincs mit szorozni".
+   A pakli-utántöltés (SKILL_POOL_MIN) önmagában nem elég erre — egy vékony
+   pool véletlenül is maradhat sebesség-képesség nélkül. */
+function poolTake(pred){
+  const i=S.skillPool.findIndex(pred);
+  if(i>=0)return S.skillPool.splice(i,1)[0];
+  /* NINCS ILYEN A PAKLIBAN. Ilyenkor EGY friss példányt veszünk a teljes
+     készletből, és a paklihoz hozzá sem nyúlunk. Az első megoldásom egy egész
+     paklit fűzött mögé, és mivel a sebesség-ág gyakran sül el, de paklinként
+     csak három sebesség-képesség van, a pool 600 húzás alatt 3877 elemre
+     hízott. Egy példány kell, nem egy pakli. */
+  const c=MAIN_SKILLS.filter(pred);
+  return c.length?c[Math.floor(Math.random()*c.length)]:null;}
 function drawSkillFromPool(){
-  if(!S.skillPool.length)S.skillPool=weightedShuffleSkills();
+  if(!S.skillPool)S.skillPool=[];
+  if(S.skillPool.length<SKILL_POOL_MIN)
+    S.skillPool=S.skillPool.concat(weightedShuffleSkills());
   /* A sebesség-ág: a taktika adja az esélyt, a Villám képessége pedig SZOROZZA
      (lásd paceBiasTotal). */
   const b=paceBiasTotal();
   if(b>0&&Math.random()<b){
-    const i=S.skillPool.findIndex(isPaceSkill);
-    if(i>=0)return S.skillPool.splice(i,1)[0];}
+    const sk=poolTake(isPaceSkill);
+    if(sk)return sk;}
   /* CSAPATÉPÍTÉSI STÍLUS: a filozófiához illő kategória felé tolt sorsolás.
      A taktikai torzítások (pace/goal) ELŐTT fut, mert a stílus a hosszú távú
      identitás — de ez sem determinisztikus, csak esély. */
   {const sb=(typeof styleSkillBias==="function")?styleSkillBias():null;
    if(sb&&Math.random()<sb.p){
-     const i=S.skillPool.findIndex(sk=>sk&&sb.cats.indexOf(sk.cat)>=0);
-     if(i>=0)return S.skillPool.splice(i,1)[0];}}
+     const sk=poolTake(x=>x&&sb.cats.indexOf(x.cat)>=0);
+     if(sk)return sk;}}
   const g=goalSkillBias();
   if(g>0&&Math.random()<g){
     if(Math.random()<SHOT_METER_PREF){
-      const j=S.skillPool.findIndex(isShotMeterSkill);
-      if(j>=0)return S.skillPool.splice(j,1)[0];}
-    const i=S.skillPool.findIndex(isGoalSkill);
-    if(i>=0)return S.skillPool.splice(i,1)[0];}
+      const sk=poolTake(isShotMeterSkill);
+      if(sk)return sk;}
+    const sk2=poolTake(isGoalSkill);
+    if(sk2)return sk2;}
   return S.skillPool.shift();}
 /* ---- A PADLÓ BEVÁLTÁSA A SZEZON VÉGÉN ----
    A türelem-számláló 30 fordulón át bőven kitermeli a 3+3-at, de a padló
@@ -40219,8 +40314,8 @@ stTiers("panzer","pz_injwin2",th=>`${th} győzelem sérülttel`,
   ST_L6,[3,5,8,12,20,30],()=>msT().injWins||0);
 stTiers("panzer","pz_shotmax",th=>`${th} km/h-s lövés`,
   th=>`Dönts meg egy ${th} km/h-s lövéserő-rekordot a klubnál. A felső fokozatok `
-     +`a mérés kemény plafonját (165 km/h) súrolják — és onnantól minden új rekord `
-     +`ugyanannyit fizet.`,
+     +`a mérés plafonját súrolják — és onnantól minden új rekord ugyanannyit fizet. `
+     +`(A plafon Infinityben kitolódik: ott már nem valós játékosok vannak, hanem legendák.)`,
   ST_PEAK,[120,125,130,135,140,145,150,155,158,160,162,164],()=>stRecord("shot"));
 /* ---- AZ ÖSSZES KEMÉNYFIÚ ----
    A Panzer legsajátabb számlálója: nem gólt, nem lapot mér, hanem
@@ -40410,9 +40505,19 @@ stDef("panzer","pz_s_inj","Összezárás",
    szint) és a lépés-számlálók (kapitányi fokozatok). */
 const ST_INF_TIERS=6;
 const ST_INF_VAL_ADD=[0.35,0.25,0.18,0.12,0.08,0.05];
-/* Rating-jellegű mércék: a plafon maga a 200-as szint, nem egy arány. */
-const ST_INF_RATING=["sz_ovr","vl_avg","vl_avgmax","hm_axisN","vl_rec",
-  "pz_shot","pz_shotmax","hm_balN"];
+/* ---- CSALÁD-SPECIFIKUS TETŐK ----
+   A 3.2.00 hibája: a km/h-ban mérő családok (végsebesség-rekord, lövéserő-
+   rekord) is a „Rating-jellegű" listára kerültek, tehát 200-ig hosszabbodtak
+   volna — egy 200 km/h-s VÉGSEBESSÉG viszont nem legendás, hanem értelmetlen.
+   Mostantól minden ilyen családnak SAJÁT tetője van, és a műszerek valódi,
+   Infinityben kitolt plafonjához igazodik (sprintCapMax / shotCapMax).
+   A tető a VÉGSŐ plafon, nem a pillanatnyi: a mérföldkő hosszú távú cél. */
+const ST_INF_TOP={
+  sz_ovr:()=>200, vl_avg:()=>200, vl_avgmax:()=>200,
+  hm_axisN:()=>200, hm_balN:()=>200,
+  vl_rec:()=>Math.floor(sprintCapMax()),
+  pz_shot:()=>Math.round(shotCapMax()),
+  pz_shotmax:()=>Math.round(shotCapMax())};
 /* Rangsor- és lépés-lépcsők: nincs értelmes folytatásuk. */
 const ST_INF_SKIP=["pz_capt","hm_card"];
 let _stInfExtended=false;
@@ -40431,13 +40536,12 @@ function stExtendForInfinity(){
       if(!last||!last.tFn||last.inv||last.bar===false)return;
       const lastN=last.n,prevN=prev?prev.n:null;
       if(!(typeof lastN==="number")||!isFinite(lastN)||lastN<=0)return;
-      const ratingLike=ST_INF_RATING.indexOf(fam)>=0;
-      /* A TETŐ. Rating-jellegű mércénél maga a 200-as szint; a számlálóknál a
-         család mostani teteje ×1,8. SZÁNDÉKOSAN NEM a lépcső saját arányát
-         folytatjuk hatványozva: a gólzápor-lépcső utolsó lépése 1,6-szoros, és
-         hatszor egymás után az 120-ból 2013-at csinálna. Egyenletes osztás egy
-         korlátos tetőig — ez marad értelmezhető minden családnál. */
-      const top=ratingLike?200:Math.round(lastN*1.8);
+      /* A TETŐ. Ahol a mérce SAJÁT skálája ismert (Rating: 200; műszerek: a
+         kitolt km/h-plafon), ott az; máshol a család mostani teteje ×1,8.
+         SZÁNDÉKOSAN NEM a lépcső saját arányát folytatjuk hatványozva: a
+         gólzápor-lépcső utolsó lépése 1,6-szoros, és hatszor egymás után a
+         120-ból 2013-at csinálna. */
+      const top=ST_INF_TOP[fam]?ST_INF_TOP[fam]():Math.round(lastN*1.8);
       if(top<=lastN)return;
       const topVal=last.val||1;
       const news=[];

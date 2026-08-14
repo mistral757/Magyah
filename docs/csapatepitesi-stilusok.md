@@ -875,6 +875,53 @@ igényel új szimulációs ágat.
   széljátéknál (78% × 1,6) 100%-ra futna, és onnantól a keret semmi mást nem
   tanulna.
 
+* **A pakli nem fogy ki többé (3.2.01).** A képesség-panel azt írta, hogy „a
+  poolban most nincs sebesség-képesség — nincs mit szorozni". Nem hiba volt,
+  hanem a pakli szerkezete: a `S.skillPool` egyetlen, teljes, megkevert pakli,
+  amiből húzunk, és csak akkor keverünk újat, amikor TELJESEN elfogy. Egy skill
+  tehát egy körön belül pontosan egyszer jöhet elő — a három sebesség-képesség
+  kihúzása után ~35 húzáson át egy sem volt a paklidban. Egy karrierben ez több
+  szezon, és pont a rájuk épülő stílust bénította meg.
+
+  A skill nem fogyóeszköz: az `eligibleForSkill` amúgy is kizárja azt, aki már
+  bírja, tehát ugyanazt a képességet nyugodtan megkaphatja egy MÁSIK játékos.
+  Két javítás:
+  1. a pakli **utántöltődik**, ha 12 alá csökken (friss, kevert pakli kerül mögé),
+  2. a **célzott** húzások (sebesség-, gól-, kategória-torzítás) ha nem
+     találnak, egy friss példányt vesznek a teljes készletből.
+
+  A második lépés fontos: az első próbálkozásom egy egész paklit fűzött mögé,
+  és mivel a sebesség-ág gyakran sül el, de paklinként csak három
+  sebesség-képesség van, a pool 600 húzás alatt **3877 elemre hízott**. Egy
+  példány kell, nem egy pakli. Mérve a javítás után: a pool 12 és 47 között
+  marad, erős sebesség-torzításnál a húzások 47,5%-a sebesség-képesség és a
+  leghosszabb szünet 10 húzás; torzítás nélkül 200 húzásból 37 különböző skill,
+  a leggyakoribb 6-szor — természetes ismétlődés.
+
+* **A műszerek plafonja Infinityben kitolódik (3.2.01).** A végsebesség- és
+  lövéserő-mérés a VALÓS futball határaihoz volt kalibrálva (38,5 km/h, 165
+  km/h). Infinityben viszont már nem valós játékosok vannak: a mezőny 200-ig
+  tolható, a műszer viszont ott ragadt, és egy idő után mindenki ugyanazt a
+  plafonszámot mérte — a rekordot nem lehetett többé megdönteni.
+
+  A sáv mostantól a mezőnnyel együtt nő, arányosan (a teljes, 200-as mezőnyön
+  éri el a maximumot): **végsebesség 38,5 → 45,5 km/h**, **lövéserő 165 → 210
+  km/h**.
+
+  **A görbe alsó fele sosem mozdul.** Az első próbálkozásom a horgonyt tolta el
+  (99 → 99 + mezőnytöbblet), és ettől ugyanaz a 99-es játékos LASSABBAT futott,
+  ahogy a mezőny fejlődött — a műszer nem mondhat ilyet. Ezért szakaszos: 99-ig
+  betűre a régi képlet, fölötte lineárisan a kitolt plafonig. Mérve: egy
+  99-es sebességű ember 37,6-37,7 km/h-t fut a mezőny minden szintjén.
+
+  **Ehhez tartozik egy 3.2.00-s hibám javítása:** a km/h-ban mérő
+  mérföldkő-családok (`vl_rec` végsebesség-rekord, `pz_shot`/`pz_shotmax`
+  lövéserő-rekord) is a „Rating-jellegű" listára kerültek, tehát a 200-as
+  szintig hosszabbodtak volna — egy 200 km/h-s VÉGSEBESSÉG viszont nem legendás,
+  hanem értelmetlen. Mostantól minden ilyen családnak saját tetője van
+  (`ST_INF_TOP`), a műszerek valódi, kitolt plafonjához igazítva: a
+  végsebesség-lépcső 38 → 45 km/h-ig, a lövéserő 164 → 210 km/h-ig nyílik.
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
