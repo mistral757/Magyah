@@ -2771,7 +2771,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.05";
+const APP_VERSION="3.3.06";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10852,7 +10852,16 @@ function maxOppRating(){return infinityMode?INFINITY_BASE_MAX+infinityTiers*INFI
    elején (és a drafton) az eltolás pontosan 0 — semmi nem változik, amíg nem
    lépsz szintet. A játékosok EGYMÁSHOZ mért sorrendje sérthetetlen: Messi
    marad a legjobb, csak az egész piac emelkedik veled együtt. */
-let careerBaseRating=80;   /* a karrier indulási mezőnyszintje — ehhez képest mozog a piac */
+/* A karrier indulási mezőnyszintje — ehhez képest mozog a piac.
+   AZ ALAPÉRTÉK 80 VOLT, MIKÖZBEN a csúszka alapértéke (oppTargetRating) 84:
+   aki nem nyúlt a csúszkához és nem kattintott a kezdésmód-választóra (mert
+   mindkettőn eleve a neki való érték állt), az 84-es mezőnnyel indult, de a
+   horgony 80 maradt. Ettől (a) a Run "Kezdő nehézség" sora 80-at írt ki 84
+   helyett, és (b) a piac már a karrier legelső percében 4 ponttal feljebb
+   tolódott, holott az indulásnál az eltolásnak PONTOSAN nullának kell lennie.
+   A két alapérték ezért mostantól egyezik, a tényleges szinkront pedig a
+   beginNewGame végzi el — az az egy pont, amin minden karrierindítás átmegy. */
+let careerBaseRating=84;
 /* ---- A PIAC 100 FÖLÖTT LASSABBAN NŐ ----
    100 alatt az eltolás 1:1 marad (ott a te kereted és a piac ugyanabban a
    sávban mozog, nincs mit tompítani). A 100 FÖLÖTTI részt viszont csak
@@ -15765,6 +15774,13 @@ function beginNewGame(){
   /* A közös világ két globális tengelye (sorsolás rendje, fejlődési tempó) is itt
      rögzül — enélkül a két kliens a SAJÁT localStorage-beállításával játszott. */
   lockMpWorldSettings();
+  /* A PIAC HORGONYA = AZ INDULÁSI MEZŐNYSZINT — egy helyen, mindenkire.
+     Eddig két külön esemény állította be (a nehézség-csúszka mozgatása és a
+     kezdésmód-választó kattintása), tehát aki egyiket sem érintette, annál a
+     horgony a modul alapértékén maradt, és elcsúszott a valódi szinttől. Itt
+     már a végleges szint áll a kezünkben — egyjátékosban a csúszkáé, MP-ben a
+     házigazdától érkezett érték —, ezért ez a szinkron helye. */
+  careerBaseRating=oppTargetRating;
   worldSeed=null;draftSpinNo=0;_lastCoachOffer=null;
   /* F6: friss karrier — a párharc tartós állapota is nulláról indul, különben
      egy korábbi szoba kiegyenlítése átszivárogna az újba. */
@@ -16269,6 +16285,11 @@ function renderSquad(){
     /* Szezon-alapon a kártya értékeivel (Rating, kor, TSI-becslés) mutatjuk a
        jelöltet — pontosan azzal, amit leigazolva kapsz. */
     const p=gameMode==="career"?careerDraftPlayer(rawP,curSquad):rawP;
+    /* RUN: minden ELÉD ÁLLT jelölt beleszámít a draftod felső korlátjába — ez
+       lesz a „Kezdő nehézség" sor viszonyítási pontja (runNoteDraftCandidate).
+       Itt a helye, mert pontosan azzal a Ratinggel látjuk, amivel a lista is
+       kiírja — a szezon-alap és a lutri már bele van számolva. */
+    try{runNoteDraftCandidate(p);}catch(e){}
     const isDup=drafted.has(p.n);
     let clickable;
     if(draftStage==="main"){
@@ -35315,7 +35336,8 @@ function hubLocRef(loc){
    akárhány mérföldkövet gyűjtesz.
 
      1. Kezdő csapaterő      KIVEZETVE — a kiindulási keret ereje nem számít
-     2. Kezdő nehézség       súly 1.0    (egyszer)
+     2. Kezdő nehézség       súly 1.0    (egyszer, RELATÍV: a draftod csúcsához)
+     2a. Nehézség-belövés    súly 0.25   (egyszer, csak draftos indulásnál)
      3. Első szezon          súly 1.0    (egyszer)
      4. További szezonok     súly 0.25   (szezononként)
      5. Run-sebesség         súly 2.0    (egyszer, a legnagyobb súly)
@@ -35326,9 +35348,9 @@ function hubLocRef(loc){
    A 6-os és a 8-as komponens szándékosan csak akkor kerül be, ha teljesült: a
    meg nem szerzett trófea (és a nem vállalt megkötés) nem húz le, a megszerzett
    viszont 100-assal emel. Így ezek tiszta jutalmak. */
-/* A `start` (kezdő csapaterő) és az `aim` (nehézség-belövés) KIVEZETETT
-   tételek — a kulcsuk csak a régi mentések bontásának olvasásához maradt itt,
-   új sort egyikük sem termel. */
+/* A `start` (kezdő csapaterő) KIVEZETETT tétel — a kulcsa csak a régi mentések
+   bontásának olvasásához maradt itt, új sort nem termel. Az `aim`
+   (nehézség-belövés) a 3.3.06-ban VISSZAKERÜLT, lásd a runBreakdown 2a. ágát. */
 const RUN_W={start:0, diff:1.0, first:1.0, season:0.25, speed:2.0, tactic:0.25, reroll:0.333, aim:0.25, basis:0.25};
 /* A NEHÉZ (kártyánkénti) Rating-alap súly-szorzója a `basis` tételen — a közepes
    1×, a nehéz ennyiszer annyit ér. Lásd a runBreakdown basis-ágát. */
@@ -35363,24 +35385,101 @@ const RUN_MILESTONES={
   kl_win:    {n:"Első KL-győzelem",           w:0.05},
   vandal:    {n:"Első Vadista szandál kártya",w:0.05}
 };
-/* Az elméleti LEGERŐSEBB kezdő 11, ami a draft-poolból egyáltalán
-   összerakható — ez a 100 pont referenciája az 1. komponensnél. Posztonként a
-   legjobb, még fel nem használt játékost választjuk (mohó, de a valós draftban
-   sem lehet ennél jobbat összerakni, mert minden poszt külön slot). */
-function runMaxStartXI(){
-  const pool=[];
-  activeSquads().forEach(sq=>(sq.players||[]).forEach(p=>pool.push(p)));
-  if(!pool.length)return 0;
-  const posList=effectiveSlotList(form);
-  const used=new Set();let sum=0;
-  posList.forEach(pos=>{
-    let best=null;
-    pool.forEach(p=>{
-      if(used.has(p.n)||!p.pos.includes(pos))return;
-      if(!best||p.ovr>best.ovr)best=p;});
-    if(!best)pool.forEach(p=>{if(used.has(p.n))return;if(!best||p.ovr>best.ovr)best=p;});
-    if(best){used.add(best.n);sum+=best.ovr;}});
-  return sum/posList.length;}
+/* ================= A DRAFTBÓL KIHOZHATÓ LEGJOBB 11 =================
+   Ez a szám a „Kezdő nehézség" tétel VISZONYÍTÁSI PONTJA (lásd ott): nem a
+   puszta nehézségi szám a pontszám, hanem az, hogy mekkora mezőnyt vállaltál
+   ahhoz képest, amekkora keretet a SAJÁT draftodból egyáltalán ki lehetett
+   volna hozni. 84-es mezőny egy 93-as csúcsú draftból más vállalás, mint egy
+   87-esből — az előbbi kényelmesebb, az utóbbi merészebb.
+
+   MI A REFERENCIA: a draft során ELÉD ÁLLT játékosok közül a 11 legjobb nyers
+   Ratingjének átlaga. POSZTRA VALÓ TEKINTET NÉLKÜL — lehet köztük hét csatár
+   és három középpályás. Itt nem egy felállítható csapatot keresünk (azt a
+   valóságban a posztok szétosztása úgyis szétvágja), hanem a draft-szerencse
+   FELSŐ KORLÁTJÁT: ennél jobb 11 nevet ebből a draftból nem lehetett volna
+   kiválasztani.
+
+   MIÉRT AZ ELÉD ÁLLT KERETEK, ÉS NEM A TELJES ADATBÁZIS: a te draftodban ~15
+   kör + az újrapörgetések fordultak meg, a többi klub sosem került eléd. A
+   régi számítás az EGÉSZ adatbázis legjobbjait vette alapul (posztonként
+   mohón), ami se nem a te draftod, se nem elérhető — a világ legjobb 11-éhez
+   mérni minden karriert értelmetlen viszonyítás volt.
+
+   A GYŰJTÉS FUTÓ RANGLISTA: minden eléd került jelölt átfut egy rövid,
+   csökkenő listán, tehát a mentésben pár tucat szám áll, nem a teljes pool.
+   MIÉRT 24 HOSSZÚ, HA 11 KELL: ugyanaz a NÉV két klub-szezonból is eléd
+   állhat, és szezon-alapon más-más Ratinggel — leigazolni viszont csak
+   egyszer lehetne. A névre szűrés csak azokat fogja meg, akik még a listán
+   vannak, ezért tartunk tartalékot a 11 alatt: így a kiesett-majd-visszatérő
+   név is felismerhető marad, és a legjobb 11 nem tartalmazhatja kétszer
+   ugyanazt az embert. */
+const RUN_TOP11_BUF=24;
+/* A viszonyítási pont definíciójának verziója — lásd runCaptureStart. */
+const RUN_REF_V=2;
+function runNoteDraftCandidate(p){
+  if(gameMode!=="career"||!p||!p.n||!isFinite(p.ovr))return;
+  const R=runInit();
+  if(R.startAvg!=null)return;              /* a draft lezárult, a referencia rögzült */
+  const t=R.top11=R.top11||[];
+  const o=Math.round(p.ovr*10)/10;
+  const old=t.find(x=>x&&x.n===p.n);
+  if(old){if(o<=old.o)return;old.o=o;}     /* ugyanaz a név: a jobbik kártyája számít */
+  else t.push({n:p.n,o});
+  t.sort((a,b)=>b.o-a.o);
+  if(t.length>RUN_TOP11_BUF)t.length=RUN_TOP11_BUF;}
+/* A referencia-átlag. Draftnál a fenti gyűjtésből; KÉSZ KLUBNÁL a kapott keret
+   11 legjobbja (ott a „draft" maga a klub, amit választottál). Ha egyik sem áll
+   rendelkezésre (pl. a mérő előtti mentés), 0-t adunk — a Kezdő nehézség sor
+   ilyenkor a régi, abszolút pontozásra esik vissza. */
+function runRefTop11(){
+  const t=((S.run&&S.run.top11)||[]).slice().sort((a,b)=>b.o-a.o).slice(0,11);
+  if(t.length>=11)return t.reduce((s,x)=>s+x.o,0)/t.length;
+  let ovr=[];
+  try{ovr=fullCareerRoster().map(p=>p&&p.ovr).filter(v=>isFinite(v));}catch(e){ovr=[];}
+  if(ovr.length<11)return 0;
+  ovr.sort((a,b)=>b-a);
+  return ovr.slice(0,11).reduce((s,v)=>s+v,0)/11;}
+/* ---- MÁR FUTÓ KARRIEREK: A DRAFT VISSZAJÁTSZÁSA ----
+   A fenti gyűjtés csak az új draftokban fut. A régebbi karriereknél viszont a
+   draft VISSZAJÁTSZHATÓ: a landolások sorrendje determinisztikusan következik a
+   világ-seedből (rngFor("draft:spin:"+n)), a landolások SZÁMÁT pedig mentjük
+   (draftSpinNo). Ugyanaz a keret-sorozat áll össze, ami annak idején eléd
+   került — az ingyen újrapörgetéssel járó landolások is, mert azok is növelték
+   a számlálót.
+   PONTOSSÁG: a saját, azóta fejlődött játékosaid a MAI Ratingjükkel kerülnek a
+   listába, tehát a referencia egy hajszállal magasabb lehet a hajdaninál. Ez
+   szigorúbb, nem engedékenyebb — a Kezdő nehézség pontja ettől legfeljebb
+   kicsit alacsonyabb lesz, felfelé nem torzít.
+   Egyszer fut: ha sikerül, a lista rögzül, és többé nem nyúlunk hozzá. */
+function runRebuildDraftTop11(){
+  if(gameMode!=="career"||!careerPool)return false;
+  const R=runInit();
+  if(R.startAvg==null)return false;                       /* a draft még tart — a gyűjtés él */
+  if(R.clubStart)return false;                            /* kész klubnál nincs mit visszajátszani */
+  if(R.top11&&R.top11.length>=11)return false;            /* már van referencia */
+  if(!worldSeed||!draftSpinNo)return false;
+  const pool=draftPool();
+  if(!pool.length)return false;
+  const seen=new Map(),t=[];
+  for(let i=1;i<=draftSpinNo;i++){
+    const sq=pool[Math.floor(rngFor("draft:spin:"+i)()*pool.length)];
+    if(!sq)continue;
+    careerCandidatesFromSquad(sq,careerPool).forEach(e=>{
+      if(!e)return;
+      let o=null;
+      try{const p=careerDraftPlayer(e,sq);if(p&&isFinite(p.ovr))o=p.ovr;}catch(err){}
+      if(o==null&&isFinite(e.startRating))o=e.startRating;
+      if(o==null)return;
+      o=Math.round(o*10)/10;
+      /* ugyanaz a név több klub-szezonból: a jobbik kártyája számít, de EGYSZER */
+      const prev=seen.get(e.n);
+      if(prev){if(o>prev.o)prev.o=o;return;}
+      const rec={n:e.n,o};seen.set(e.n,rec);t.push(rec);});}
+  if(t.length<11)return false;
+  t.sort((a,b)=>b.o-a.o);
+  R.top11=t.slice(0,RUN_TOP11_BUF);
+  R.maxAvg=runRefTop11();R.refV=RUN_REF_V;
+  return true;}
 /* A jelenlegi kezdő 11 nyers átlaga (modifikátorok nélkül) — ugyanaz a mérték,
    amit a meccs-szimuláció is használ kiindulásként. */
 function runCurrentXIAvg(){
@@ -35429,7 +35528,13 @@ function runCaptureStart(){
   const R=runInit();
   if(R.startAvg!=null)return;
   R.startAvg=runCurrentXIAvg();
-  R.maxAvg=runMaxStartXI();
+  /* A VISZONYÍTÁSI PONT: a draftodból kihozható legjobb 11 átlaga. Ehhez méri
+     a „Kezdő nehézség" sor a vállalt mezőnyt. A refV bélyeg mondja meg, hogy a
+     szám EBBŐL a definícióból származik: a 3.3.06 előtt ugyanebben a mezőben az
+     EGÉSZ adatbázis legjobb 11-e ült (posztonként mohón), ami se nem a te
+     draftod, se nem elérhető — azt a régi számot nem szabad viszonyításnak
+     használni, inkább maradjon az abszolút pontozás. */
+  R.maxAvg=runRefTop11();R.refV=RUN_REF_V;
   R.baseDiff=careerBaseRating;
   /* KÉSZ KLUB indulás: a kezdő keret NEM a te döntésed volt, hanem egy kész
      valós csapat — ezért a "milyen szerény kerettel vágtál neki" tétel itt
@@ -35580,24 +35685,40 @@ function runBreakdown(){
      A sor ezért megszűnt: a kiindulási keret ereje többé SEMMILYEN hatással
      nincs a Run-szintre. Az R.startAvg/maxAvg mezők megmaradnak (a
      kihívás-szorzó és a régi mentések bontása még olvassa őket). */
-  /* 2. Kezdő nehézség: maga a beállított szám a pontszám. */
-  if(R.baseDiff!=null)
+  /* 2. KEZDŐ NEHÉZSÉG — RELATÍV, NEM ABSZOLÚT.
+     Korábban maga a beállított szám volt a pontszám (84 → 84 pont). Ez azt
+     állította, hogy a 84 mindenkinek ugyanannyit ér — pedig nem: aki egy
+     93-as csúcsú draftból vállal 84-et, kényelmesen van; aki egy 86-osból,
+     az a plafonján játszik. A pontszám ezért a vállalt mezőny és a
+     DRAFTODBÓL KIHOZHATÓ LEGJOBB 11 (R.maxAvg, lásd runRefTop11) aránya:
+       84-es mezőny 93-as csúcsú draftból → 84/93 = 90,3 pont
+     A 100 pont tehát az, ha a mezőnyszint eléri a saját felső korlátodat
+     (fölötte 100-ra vágjuk: annál merészebbet nem lehet vállalni).
+     Ha nincs referencia (a mérő előtti mentés, vagy visszajátszhatatlan
+     draft), marad a régi, abszolút pontozás — egy régi run így sem veszít. */
+  if(R.baseDiff!=null){
+    const ref=(R.refV===RUN_REF_V&&R.maxAvg>0)?R.maxAvg:null;
     rows.push({k:"diff",n:"Kezdő nehézség",w:RUN_W.diff,
-      s:Math.max(0,Math.min(100,R.baseDiff)),
-      d:`${R.baseDiff} · ${diffTierLabel(R.baseDiff)}`});
-  /* 2a. NEHÉZSÉG-BELÖVÉS — KIVEZETVE (3.1.11).
-     Ez a tétel a vállalt mezőnyszint és a szezonindításkori nyers csapaterő
-     EGYBEESÉSÉT pontozta, és mindkét irányban levont: a jól sikerült draftért
-     ugyanúgy, mint a rosszul sikerültért.
-     Miért rossz ez? Mert a draft kimenetele SZERENCSE és JÁTÉKOSISMERET
-     együtt — a játék egyik alap-tengelye. Ha jól sikerül, az önmagában előny;
-     azt nem a Run dolga „ellensúlyozni". A rosszul sikerült draftot pedig már
-     eleve bünteti maga a szezon, ráadásul a kihívás-szorzó (runChallengeMult)
-     jutalmazza is a gyengébb kerettel vállalt magas mezőnyt — vagyis a
-     körülmény már mindenhol benne van, ezen a soron keresztül másodszor is.
-     A sor ezért megszűnt: a kiindulási Rating többé nem von le Run-pontot.
-     A runAimScore / RUN_AIM_* megmarad — régi mentések bontásában még
-     előfordulhat a "aim" kulcs, és a függvény ártalmatlan. */
+      s:Math.max(0,Math.min(100,ref?(R.baseDiff/ref*100):R.baseDiff)),
+      d:`${R.baseDiff} · ${diffTierLabel(R.baseDiff)}`
+        +(ref?` — a ${R.clubStart?"klubod":"draftod"} legjobb 11-e ${ref.toFixed(1)} (az a 100 pont)`:"")});}
+  /* 2a. NEHÉZSÉG-BELÖVÉS — VISSZAÁLLÍTVA (3.3.06).
+     A tétel azt méri, mennyire TALÁLTAD EL magadat: a draft ELŐTT bevállalt
+     mezőnyszint mennyire esik egybe azzal a nyers csapaterővel, amit a végén
+     tényleg össze tudtál rakni. Telitalálat = 100 pont, fölé lőni −5/pont,
+     alá lőni −10/pont (alálőni nagyobb hiba: a szezon indulásból reménytelen).
+     A 3.1.11-ben kivezettük, mert „a jól sikerült draftot is bünteti" — de a
+     tétel nem a draft minőségét pontozza, hanem a TIPPEDET róla: a vállalás a
+     draft előtt születik, tehát az önismeretet méri, nem a szerencsét. A
+     projektgazda kérésére visszakerült, változatlan képlettel és a legkisebb
+     súlyok egyikén (×${RUN_W.aim}).
+     Csak DRAFTOS karrierben van értelme: kész klubnál a keret nem a te
+     döntésed volt, ott nem lehet „eltalálni". */
+  if(R.startAvg!=null&&R.baseDiff!=null&&!R.clubStart){
+    const aim=runAimScore(R.startAvg,R.baseDiff);
+    const irany=aim.d===0?"telitalálat":aim.d>0?`${aim.d}-tal fölé`:`${-aim.d}-tal alá`;
+    rows.push({k:"aim",n:"Nehézség-belövés",w:RUN_W.aim,s:aim.score,
+      d:`vállalt mezőny ${Math.round(R.baseDiff)} · induló nyers csapaterő ${R.startAvg.toFixed(1)} — ${irany}`});}
   /* 2b. Újrapörgetések: 0 választás = 100 pont, 5 = 50 pont (darabonként −10).
      A kezdő nehézséghez hasonlóan ez is ELŐRE beállított kézikapcsoló, nem
      menet közbeni teljesítmény, ezért — szándékosan — NEM kap kihívás-szorzót. */
@@ -35898,7 +36019,7 @@ function runGuideHtml(){
       Ez a tétel azt pontozta, mennyivel maradt a draftolt kereted a lehetséges maximum alatt. Kivezettük: a draft kimenetele szerencse és játékosismeret együtt, a szerényebb kerettel vállalt magas mezőnyt pedig a <b>kihívás-szorzó</b> már MINDEN másik tételen jutalmazza — ez a sor másodszor mérte ugyanazt, csak levonásként. <b>A kiindulási keret ereje többé semmilyen hatással nincs a Run-szintre.</b></div>
 
     <div style="margin-bottom:7px"><b>📈 Kezdő nehézség · ×${RUN_W.diff}</b><br>
-      A beállított mezőnyszint maga a pontszám: 84-gyel indulva 84 pont, 95-tel indulva 95. <b>Magasabbról indulni azonnal többet ér</b>, mint később felkapaszkodni.</div>
+      Nem a puszta szám számít, hanem hogy mekkora mezőnyt vállaltál ahhoz képest, amekkora keretet a <b>saját draftodból</b> egyáltalán ki lehetett hozni. A viszonyítás a draftban eléd került játékosok <b>legjobb 11-ének</b> Rating-átlaga (posztra való tekintet nélkül — ez a draft-szerencse felső korlátja). Egy 93-as csúcsú draftból vállalt 84-es mezőny <b>84/93 = 90,3 pont</b>; ugyanaz a 84 egy 86-os draftból már 97,7. <b>Magasabbról indulni azonnal többet ér</b>, mint később felkapaszkodni.</div>
 
     <div style="margin-bottom:7px"><b>🥇 Első szezon · ×${RUN_W.first}</b> <span style="color:var(--dim2)">(a többi szezon csak ×${RUN_W.season})</span><br>
       Az első szezon helyezése annyit nyom, mint az egész kezdő felállásod. Egy azonnali bajnoki cím óriási előny.</div>
@@ -35906,12 +36027,8 @@ function runGuideHtml(){
     <div style="margin-bottom:7px"><b>🎰 Újrapörgetések · ×${RUN_W.reroll}</b><br>
       Nulla újrapörgetés = 100 pont, minden egyes választás <b>−10</b>. A tiszta draft önmagában is érték.</div>
 
-    <div style="margin-bottom:7px;color:var(--dim)"><b>🎯 Nehézség-belövés — megszűnt</b><br>
-      Ez a tétel a vállalt mezőnyszint és az induló nyers csapaterőd egybeesését pontozta, és a
-      <b>jól sikerült draftért is levont</b>. A draft kimenetele szerencse és játékosismeret együtt —
-      a játék egyik alap-tengelye. Ha jól sikerül, az önmagában előny; nem a Run dolga ellensúlyozni.
-      A körülményt egyébként is méri a <b>kihívás-szorzó</b>: a gyengébb kerettel vállalt magas mezőny
-      minden más soron többet ér.</div>
+    <div style="margin-bottom:7px"><b>🎯 Nehézség-belövés · ×${RUN_W.aim}</b> <span style="color:var(--dim2)">(csak draftos indulásnál)</span><br>
+      A draft ELŐTT bevállalod a mezőny szintjét — ez a tétel azt méri, mennyire találtad el vele magad: mennyire jött ki a végén ugyanaz a nyers csapaterő. <b>Telitalálat 100 pont</b>, fölé lőni −${RUN_AIM_OVER}/pont, alá lőni −${RUN_AIM_UNDER}/pont (alálőni nagyobb hiba: a szezon indulásból reménytelen). Nem a draft szerencséjét pontozza, hanem a <b>tippedet</b> róla.</div>
 
     <div style="margin-bottom:7px"><b>📅 Nem csúcsforma-alapú Rating · ×${RUN_W.basis} / ×${(RUN_W.basis*RUN_BASIS_WILD_MULT).toFixed(3).replace(/0+$/,"").replace(/\.$/,"")}</b> <span style="color:var(--dim2)">(csak draftos indulásnál)</span><br>
       Ha a karriert a <b>közepes</b> („Rating a szezonban") vagy a <b>nehéz</b> („kártyánkénti lutri") fokozaton indítottad, teli <b>100 pont</b> jár érte. A NEHÉZ ugyanezt a 100 pontot <b>${RUN_BASIS_WILD_MULT}× akkora súllyal</b> viszi — nagyobb vállalás, tehát többet is húz a végeredményen. Közepesen a draftolt játékos pontosan azt tudja, amit abban a klub-szezonban tudott; nehézen a kora és a TSI-je is kártyánként sorsolódik, a Ratingjétől függetlenül. Egyik sem szerezhető meg utólag: a karrier indulásakor rögzül.
@@ -44057,6 +44174,26 @@ function applySavedGame(d){
   /* RUN: a mérő állapota. Régi mentésnél üresen indul, és a lusta
      mérföldkő-detektálás a meglévő előzményekből visszamenőleg feltölti. */
   S.run=d.S.run||null;S.runOpen=!!d.S.runOpen;S.runGuideOpen=!!d.S.runGuideOpen;runInit();
+  /* ---- A NEM SZINKRONIZÁLT INDULÓ HORGONY HELYREÁLLÍTÁSA ----
+     A hiba: a horgony (careerBaseRating) modul-alapértéke 80 volt, a
+     nehézség-csúszkáé 84, és a kettőt CSAK a csúszka mozgatása vagy a
+     kezdésmód-választó kattintása kötötte össze. Aki egyiket sem érintette —
+     mert mindkettőn eleve a neki való érték állt —, az 84-es mezőnnyel indult
+     80-as horgonnyal: a Run „Kezdő nehézség" sora 80-at írt, a piac pedig már
+     a legelső percben 4 ponttal feljebb tolódott.
+     A JAVÍTÁS SZŰK, hogy ép mentéshez hozzá ne nyúljon: csak ott lép be, ahol
+     a horgony PONTOSAN a régi alapérték (80), a Run is ezt jegyezte fel, és a
+     szezon-1 tényleges mezőnyszintje ettől eltér. Egy valóban 80-ról indult
+     karrierben a két szám egyezik, tehát nem történik semmi. */
+  if(gameMode==="career"&&S.run&&S.run.baseDiff===80&&careerBaseRating===80){
+    const h0=(S.seasonHistory&&S.seasonHistory[0]&&S.seasonHistory[0].oppRating)||null;
+    const start0=(h0!=null)?h0:((((S.seasonNumber||1)===1)&&!(S.seasonHistory||[]).length)?oppTargetRating:null);
+    if(start0!=null&&start0!==80){
+      S.run.baseDiff=start0;careerBaseRating=start0;
+      addLine(`✦ Javítás: a karriered ${start0}-es mezőnnyel indult, de a piac horgonya (és vele a Run „Kezdő nehézség" sora) 80-on ragadt — mindkettő ${start0}-re állt.`,"m life");}}
+  /* A Kezdő nehézség sor viszonyítási pontja (a draftodból kihozható legjobb 11)
+     a régi karrierekben még nincs eltéve — a draft visszajátszásával pótoljuk. */
+  if(gameMode==="career"){try{runRebuildDraftTop11();}catch(e){}}
   /* ---- A PIAC-HORGONY HELYREÁLLÍTÁSA (futó karrierekhez) ----
      A korábbi verziókban mindkét szintváltó ráállította a careerBaseRating-et
      az ÚJ mezőnyszintre, így a piac-emelkedés (marketPeakShift = szint −
