@@ -9759,34 +9759,61 @@ const TACTIC_FIT_C=0.20;
    MINDEN taktikát lehúzott: 105-ös csapaterőnél a Széljáték −11.8pp-t, 115-nél
    már −46.7pp-t veszített pusztán a plafon miatt — pontosan ez okozta, hogy a
    panelen minden rendszernél a "Sebesség húzza vissza" jelent meg.
-   A megoldás: a VÁRT szint is tiszteletben tartja a tengely plafonját. Ha a
-   keret általános szintje 99 fölé ér, a sebességtől sem várunk többet 99-nél —
-   így a plafonon álló játékos pontosan "elvárás szerinti" (z=0), nem büntetett.
-   99 alatt a viselkedés BETŰRE változatlan. */
-/* A korábbi megoldás egy KEMÉNY min(99, T+offset) volt. Ez csak akkor kapcsolt
-   be, amikor a horgony már 99 fölé ért — a mérés viszont azt mutatta, hogy a
-   sebesség ennél SOKKAL hamarabb, fokozatosan telítődik: a plafon közelében a
-   ±8-as kisorsolás és a poszt-profil miatt a keret átlaga már 95 körül lelassul,
-   és csak aszimptotikusan kúszik a 99-hez. Emiatt egy 100-as csapat sebessége
-   90-95 közt áll, miközben a többi tengelye 100 fölött — a merev elvárás pedig
-   MINDEN taktikát lehúzott ("a Sebesség húzza vissza" minden rendszernél).
-   Mostantól az elvárás ugyanazt a SIMA telítődési görbét követi, amit mértünk
-   (softplus-alapú lágy minimum, k=2.5). Így a plafonhoz szorult keret pontosan
-   elvárás szerinti (z≈0), nem büntetett — a sebesség viszont a plafon ALATT
-   továbbra is teljes értékű, megkülönböztető tengely marad. */
-const SPEED_SOFTCAP_K=2.5;
+   AZ ELSŐ MEGOLDÁS a tengely PLAFONJÁHOZ kötötte az elvárást: 99 fölött a
+   sebességtől sem vártunk többet 99-nél. Ez a fenti tünetet enyhítette, de a
+   plafon feloldásakor (Infinity) szakadást csinált — lásd a lenti, MÉRT
+   újrakalibrálást, ami a plafon-hivatkozást teljesen leváltotta. */
+/* ---- A SEBESSÉG-ELVÁRÁS ÚJRAKALIBRÁLVA A TENGELY-MÉRŐ ADATÁBÓL ----
+   BEJELENTETT HIBA: "100 szint fölött szétesik a taktika-illeszkedés." A
+   Tengely-mérő 173 meccs után pontosan megmutatta, miért. A sebesség eltolása
+   a horgonyhoz képest NEM állandó és NEM a 99-es plafonnál törik meg — végig,
+   egyenletesen csúszik lefelé, ahogy a keret nő (a mért sávok):
+
+     horgony  80    85    90    95   100   105   110   115   120   ∞120
+     seb−T   +6.5  +4.6  +3.4  +1.5  −1.5  −4.7  −6.9 −11.9 −13.1  −13.8
+
+   Két dolog derül ki ebből, és mindkettő ellentmond a korábbi képletnek:
+     1) A CSÚSZÁS MÁR 80-NÁL TART, nem a plafon közelében indul. A sebesség
+        1,5x lassabban edzhető, a passzív útja a születési érték +15%-ánál
+        megáll — ez a fék a plafontól függetlenül, minden szinten dolgozik.
+     2) AZ INFINITY-HATÁRON NINCS UGRÁS (120: −13.1, ∞120: −13.8). A régi
+        képlet viszont pont ott ugrott akkorát, amekkorát: a `speedCap()`
+        feloldásával az elvárás visszaugrott a nyers T+4.95-re, miközben a
+        valóság −13 körül állt. Ez adta a z≈−8.9-et, és ez tüntette el a
+        Széljáték illeszkedését 0%-ra egy olyan kereten, amelynek a sebessége
+        a szintjéhez képest valójában ÁTLAG FÖLÖTT volt.
+   Mostantól az elvárás EGYETLEN, folytonos telítődési görbe (softplus-lágyított
+   meredekség-törés), és NEM hivatkozik a plafonra — így az Infinity megnyitása
+   semmit nem billent. A görbe a fenti mérésre van illesztve: a maradék hiba
+   sávonként 1.7 ponton belül van, a tengely 2.10-es skálájának jóval alatta.
+   A régi konstansok (lapos +4.95, majd 99-es kemény telítődés) frissen sorsolt,
+   szintetikus kereteken születtek — a mostani szám VALÓS, végigjátszott
+   karrierből jön, tehát az az igazodási pont. */
+const SPEED_EXP_OFF=8.96;    /* a seb eltolása a horgony fölött, a fék előtt */
+const SPEED_EXP_KNEE=85.9;   /* ennél a horgony-szintnél kapcsol be a fék */
+const SPEED_EXP_LOSS=0.65;   /* ennyit veszít a meredekségből (1 → 0.35) */
+const SPEED_EXP_SOFT=9.6;    /* a törés lágysága: ekkora sávon megy át */
 function axisExpected(k,T){
   const base=T+(AXIS_OFFSET[k]||0);
   if(k!=="seb")return base;
-  /* INFINITY: ha a plafon feloldódott, nincs mihez telítődni — az elvárás a
-     nyers alap. (Ez a képlet határértéke is: cap→∞ mellett a softplus a
-     base-hez tart, tehát a viselkedés folytonos.) */
-  const cap=speedCap();
-  if(!isFinite(cap))return base;
-  const d=(cap-base)/SPEED_SOFTCAP_K;
+  const d=(T-SPEED_EXP_KNEE)/SPEED_EXP_SOFT;
   /* numerikusan stabil softplus: nagy d-nél ln(1+e^d) ≈ d */
   const sp=d>30?d:Math.log(1+Math.exp(d));
-  return cap-SPEED_SOFTCAP_K*sp;}
+  return T+SPEED_EXP_OFF-SPEED_EXP_LOSS*SPEED_EXP_SOFT*sp;}
+/* ---- EGYETLEN TENGELY SEM VIHETI EL AZ EGÉSZ ILLESZKEDÉST ----
+   A fenti javítás a MOSTANI hibát orvosolja. Ez a lágy vágás azt akadályozza
+   meg, hogy egy jövőbeli kalibrációs elcsúszás megint 0%-ra vagy 100%-ra
+   ránthasson egy egész rendszert: a mostani hibában a sebesség z=−8.9-et vitt,
+   ami önmagában −73 százalékpont illeszkedés — több, mint amennyi az egész
+   skála. Egy tengely eltérése FIZIKAILAG nem lehet ekkora jelzés.
+   A vágás tanh-alapú, tehát SIMA: a normál sávban (|z| < 1) a hatása 3% alatti,
+   vagyis a megszokott illeszkedések betűre a régiek maradnak; a szélsőségeket
+   viszont 3 szórásnál megfogja. Így egy tengely legfeljebb ±3×súly×20 pontot
+   mozdít, és a javulás a vágás fölött is mindig látszik (nem plató). */
+const AXIS_Z_SOFT=3.0;
+function axisZSoft(z){
+  if(!isFinite(z))return 0;
+  return AXIS_Z_SOFT*Math.tanh(z/AXIS_Z_SOFT);}
 /* ---- AZ ILLESZKEDÉS TENGELYENKÉNTI BONTÁSA ----
    A HUB taktika-panelje EDDIG SAJÁT, MÁSIK képlettel magyarázta a százalékot:
    a nyers (A[tengely] − az öt tengely átlaga) × súly szorzatot nézte, offset és
@@ -9809,8 +9836,10 @@ function tacticFitParts(key,A0){
   /* a mezőny szintje a horgony (a kapus szándékosan kimarad belőle) */
   const T=(A.ved+A.passz+A.gol)/3;
   return ATTR_KEYS.map(k=>{
-    const ww=w[k]||0,z=(A[k]-axisExpected(k,T))/(AXIS_SCALE[k]||1);
-    return {key:k,w:ww,z,d:ww*z};});}
+    const ww=w[k]||0,z0=(A[k]-axisExpected(k,T))/(AXIS_SCALE[k]||1),z=axisZSoft(z0);
+    /* z0 = a nyers eltérés (a mérőnek és a hibakeresésnek), z = a lágyan
+       vágott, amiből a fit és a panel minden állítása dolgozik. */
+    return {key:k,w:ww,z0,z,d:ww*z};});}
 /* A KÉT SEBESSÉG-RENDSZER. Egy helyen felsorolva, mert három különböző szabály
    hivatkozik rá: a sebesség-skillek sorsolása (PACE_TACTICS), a Villám
    „Vérükben a rendszer" képessége, és a taktika-panel jelölése. */
@@ -9883,13 +9912,19 @@ function axisProbeSample(){
     if(!isFinite(r))return;
     const c=b[k]||(b[k]=[0,0]);
     c[0]+=r;c[1]+=r*r;});}
-/* A mérés kiolvasása: tengelyenként a MÉRT eltolás és szórás, a jelenleg
-   használt konstansok mellé téve, plusz a sávonkénti bontás (ebből derül ki,
-   hogy az eltolás vándorol-e a csapatszinttel). */
+/* A mérés kiolvasása: tengelyenként a MÉRT eltolás és szórás, a MODELL által
+   várt eltolás mellé téve, plusz a sávonkénti bontás (ebből derül ki, hogy az
+   eltolás vándorol-e a csapatszinttel).
+   MIÉRT A MODELL ÉS NEM A NYERS KONSTANS a mérce: a sebesség elvárása immár
+   SZINTFÜGGŐ (axisExpected), tehát egy lapos konstanshoz hasonlítani félrevezet
+   — a mérő pont azt a hibát mutatná hibaként, amit a görbe már megold. Ezért
+   minden sávban a SAJÁT horgonyához tartozó elvárást vetjük össze a mérttel, és
+   a maradékokat súlyozzuk össze. A többi tengelynél a modell egy állandó, tehát
+   ez a szám betűre az, ami eddig is volt. */
 function axisProbeReport(){
   const P=S&&S.axisProbe;
   if(!P||!P.bins)return null;
-  const tot={};ATTR_KEYS.forEach(k=>{tot[k]=[0,0];});
+  const tot={},mod={};ATTR_KEYS.forEach(k=>{tot[k]=[0,0];mod[k]=0;});
   const rows=[];let n=0,lo=Infinity,hi=-Infinity;
   Object.keys(P.bins).forEach(key=>{
     const b=P.bins[key];
@@ -9897,18 +9932,20 @@ function axisProbeReport(){
     const T=parseInt(key.slice(1),10);
     if(!isFinite(T))return;
     n+=b.n;lo=Math.min(lo,T);hi=Math.max(hi,T);
-    const m={};
+    const m={},e={};
     ATTR_KEYS.forEach(k=>{
       const c=b[k]||[0,0];
       tot[k][0]+=c[0];tot[k][1]+=c[1];
-      m[k]=c[0]/b.n;});
-    rows.push({key,T,inf:key.charAt(0)==="i",n:b.n,m});});
+      m[k]=c[0]/b.n;
+      e[k]=axisExpected(k,T)-T;
+      mod[k]+=e[k]*b.n;});
+    rows.push({key,T,inf:key.charAt(0)==="i",n:b.n,m,e});});
   if(!n)return null;
   rows.sort((a,b)=>(a.inf?1:0)-(b.inf?1:0)||a.T-b.T);
   const axes=ATTR_KEYS.map(k=>{
     const mean=tot[k][0]/n,varr=Math.max(0,tot[k][1]/n-mean*mean);
     return {key:k,mean,sd:Math.sqrt(varr),
-      off:AXIS_OFFSET[k]||0,scale:AXIS_SCALE[k]||1};});
+      model:mod[k]/n,scale:AXIS_SCALE[k]||1};});
   return {n,lo,hi,axes,rows};}
 /* Hány KÉSZ (5/5) párkémia gyorsítja a taktikát: a pár mindkét tagja a kezdő
    11-ben van, és a szerep-párjuk (roleInFormation, sorrendfüggetlenül)
@@ -10327,7 +10364,17 @@ const SKILLS=[
     Mindhárom megtolja a csapat Sebesség-tengelyét (pace → seb), és mindhárom
     kap egy közvetlen meccs-hatást is. A cat2 mező ÚJ: két posztkategória is
     jogosult rá (lásd eligibleForSkill). */
- {id:"sp_queen",cat:"VEDO",cat2:"KOZEPPALYAS",excludePos:["JSZ","BSZ"],name:"Villámbeck Queen",desc:"Villámgyors felfutásaival hátulról nyitja meg a védelmeket: jóval nagyobb gólpassz-esély, és megtolja a csapat Sebesség-tengelyét.",type:"combo",combo:[{type:"pace",val:1},{type:"assistw",val:2.5}]},
+ /* KIZÁRÓLAG VÉDŐ-SKILL. A képesség egész képe a HÁTULRÓL induló felfutás —
+    "hátulról nyitja meg a védelmeket" —, ez egy középpályásnál értelmét veszti:
+    ő eleve elöl van, nincs honnan felfutnia. Ezért a KOZEPPALYAS másodkategória
+    (cat2) lekerült róla. Három úton lehet valaki jogosult, és mindhárom azt
+    jelenti, hogy tényleg hátvéd: NATÍVAN védő, MEGTANULTA a védő posztot
+    (a poszt-tanulás a p.pos-ba írja, tehát ugyanaz az ág), vagy ÉPPEN védő
+    helyen áll a pályán a kiosztás pillanatában (onPitchCat) — az utolsó a
+    kényszerből hátrahúzott középpályás esete, aki a kiosztás percében valóban
+    hátvédet játszik. Az excludePos így fölöslegessé vált: a VEDO kódjai közt
+    (JV/BV/KV) eleve nincs szélső. */
+ {id:"sp_queen",cat:"VEDO",onPitchCat:"VEDO",name:"Villámbeck Queen",desc:"Villámgyors felfutásaival hátulról nyitja meg a védelmeket: jóval nagyobb gólpassz-esély, és megtolja a csapat Sebesség-tengelyét. Csak védő kaphatja meg — natívan, tanult poszton, vagy aki épp védő helyen áll a pályán.",type:"combo",combo:[{type:"pace",val:1},{type:"assistw",val:2.5}]},
  {id:"sp_flank",cat:"KOZEPPALYAS",cat2:"CSATAR",name:"Húzd meg a szélét!",desc:"A szélen egyszerűen elhúz a védője mellett: nagyobb gól- és gólpassz-esély, és megtolja a csapat Sebesség-tengelyét.",type:"combo",combo:[{type:"pace",val:1},{type:"goalw",val:1.55},{type:"assistw",val:1.55}]},
  {id:"sp_bolt",cat:"CSATAR",cat2:"KOZEPPALYAS",name:"Usain Bolt",desc:"Tiszta sprint: a leshatáron elindulva senki sem éri utol. Kimagasló gólszerzési esély, és megtolja a csapat Sebesség-tengelyét.",type:"combo",combo:[{type:"pace",val:1},{type:"goalw",val:3.3}]},
  {id:"bl_golden_gloves",cat:"KAPUS",name:"🥇 Aranykesztyű",desc:"A BL kapus-királyának járó díj: erősen csökkenti az ellenfél gólesélyét, és állandó csapaterő-bónuszt ad.",type:"combo",combo:[{type:"defense",val:0.82},{type:"aura",val:2.5}]},
@@ -10837,7 +10884,8 @@ function youthBoostNote(entry){
    Az ifi-boost tükörképe idős játékosokra: egy 30 fölötti öregedő játékos
    TSI-jét dobja meg (+1200-3000) és kitolja a nyugdíjba vonulását 41 éves
    korra. Ugyanaz az ára, mint az ifi-boostnak (párhuzamosan drágulnak).
-   Egy játékost csak EGYSZER lehet így boostolni (_oldBoosted jelző).
+   ISMÉTELHETŐ — ugyanazon az emberen viszont lépcsőzetesen drágul; a
+   részleteket lásd az OLD_BOOST_SURCHARGE-nál.
 
    RATINGET IS AD — UGYANÚGY, MINT AZ IFI-BOOST. Eddig csak a TSI-t emelte, a
    Ratinget pedig mindössze a kor-görbére húzta fel (max a régi és a
@@ -10942,8 +10990,29 @@ const OLD_BOOST_TSI=[1200,3000];
 const OLD_BOOST_RATING=YOUTH_BOOST_RATING;   /* szándékosan azonos: +6-12 */
 const OLD_BOOST_RETIRE_AGE=41;
 function oldBoostPrice(){return youthBoostPrice();}   /* párhuzamosan drágul az ifi-boosttal */
+/* ================= AZ ÖREG-BOOST MOSTANTÓL ISMÉTELHETŐ =================
+   Eddig egy játékoson EGYSZER sült el (_oldBoosted). Az ifi-boost közben
+   korlátlanul ismételhető volt (youthBoosts számlál), és nem volt jó indok a
+   különbségre — a veteránnál pont az a szűk erőforrás, amiért fizetsz: a
+   hátralévő évek száma.
+   A FÉK NEM A TILTÁS, HANEM AZ ÁR. Ugyanazon az emberen minden újabb boost
+   drágább: a 2. +25%, a 3. +33%, a 4. +50%, a 5. +75%, a 6. és utána +100%.
+   Így egyetlen kedvencet is fel lehet tornászni, de az ára meredeken nő —
+   MÁSIK veteránra rakva viszont mindig az alapár érvényes, tehát a keret
+   szélesítése marad az olcsóbb út. */
+const OLD_BOOST_SURCHARGE=[0.25,0.33,0.50,0.75,1.00];
+function oldBoostCount(entry){
+  if(!entry)return 0;
+  /* a régi mentések csak a logikai jelzőt ismerik — az egy darab boostot ér */
+  return entry.oldBoosts||(entry._oldBoosted?1:0);}
+/* Hányadik boost következik ezen az emberen (1-től), és mennyibe kerül. */
+function oldBoostPriceFor(entry){
+  const n=oldBoostCount(entry);
+  if(n<=0)return oldBoostPrice();
+  const s=OLD_BOOST_SURCHARGE[Math.min(n,OLD_BOOST_SURCHARGE.length)-1];
+  return Math.round(oldBoostPrice()*(1+s));}
 function isVeteranBoostable(entry){
-  return entry&&entry.age!=null&&entry.age>30&&!entry._oldBoosted;}
+  return !!(entry&&entry.age!=null&&entry.age>30);}
 function applyOldBoost(entry){
   msNoteBoost();   /* mérföldkő: berobbantott tehetségek darabszáma */
   const sc=youthBoostScale();
@@ -10961,22 +11030,30 @@ function applyOldBoost(entry){
   entry.peak=boostLift(entry.peak,entry.startRating,ratingCap());
   if(entry.basePeak!=null)entry.basePeak=Math.max(entry.basePeak,entry.peak);
   if(entry.baseTsi!=null)entry.baseTsi=Math.max(entry.baseTsi,entry.tsi);
-  entry._retireExtendTo=OLD_BOOST_RETIRE_AGE;   /* nem vonul vissza 41 éves koráig */
-  entry._oldBoosted=true;                        /* egyszeri — nem boostolható újra */
+  /* a nyugdíj-halasztás sosem rövidülhet egy újabb boosttól */
+  entry._retireExtendTo=Math.max(entry._retireExtendTo||0,OLD_BOOST_RETIRE_AGE);
+  entry._oldBoosted=true;                        /* a régi mentések jelzője marad */
   if(scout)entry.estimatedTSI=estimateTSI(entry.tsi,scout.stars);
   /* KÖNYVELÉS a tényleges nyereségről — ugyanaz az elv, mint az ifi-boostnál:
-     a napló és a játékos-lap nem ígérhet többet, mint ami megérkezett. */
+     a napló és a játékos-lap nem ígérhet többet, mint ami megérkezett.
+     Az ismételhetőség óta ÖSSZEGZŐ, nem felülíró (az ifi-boost mintájára). */
   const tGot=entry.tsi-tsiBefore,rGot=entry.startRating-ratBefore;
-  entry.oldBoostR=rGot;entry.oldBoostT=tGot;entry.oldBoostSeason=S.seasonNumber||1;
+  entry.oldBoosts=oldBoostCount(entry)+1;
+  entry.oldBoostR=(entry.oldBoostR||0)+rGot;
+  entry.oldBoostT=(entry.oldBoostT||0)+tGot;
+  entry.oldBoostSeason=S.seasonNumber||1;
   return {tBoost:tGot,rBoost:rGot};}
 /* Rövid jelölés a listákhoz — az ifi ⚡ párja. */
-function oldBoostTag(entry){return (entry&&entry._oldBoosted)?"🎩":"";}
+function oldBoostTag(entry){
+  const n=oldBoostCount(entry);
+  return n?`🎩${n>1?"×"+n:""}`:"";}
 /* Egész soros jelölés a játékos-lapra. */
 function oldBoostNote(entry){
-  if(!entry||!entry._oldBoosted)return "";
+  const n=oldBoostCount(entry);
+  if(!n)return "";
   return `<div class="hdRow" style="border:1px dashed #a67c4a;border-radius:7px;padding:6px 9px;color:#d9b98a">
-    🎩 <b>Öreg csirkefogó</b> <span style="color:var(--dim2)">+${entry.oldBoostR||0} Rating és +${entry.oldBoostT||0} TSI`
-    +(entry.oldBoostSeason?` · a ${entry.oldBoostSeason}. szezonban`:"")
+    🎩 <b>Öreg csirkefogó${n>1?`: ${n}×`:""}</b> <span style="color:var(--dim2)">${n>1?"összesen ":""}+${entry.oldBoostR||0} Rating és +${entry.oldBoostT||0} TSI`
+    +(entry.oldBoostSeason?` · ${n>1?"utoljára a":"a"} ${entry.oldBoostSeason}. szezonban`:"")
     +` · ${OLD_BOOST_RETIRE_AGE} éves koráig marad</span></div>`;}
 /* 100 fölött a piac nem tarthat 24 évesnél fiatalabb (a kor-görbén erősen
    levágott) játékost — lásd a szezonváltó kor-sorsolás indoklását. Ez a
@@ -27536,12 +27613,32 @@ const SELL_DISCOUNT=0.5; /* eladáskor a piaci érték 50%-át kapod vissza. Kor
 
    A PLAFON tudatos. A SELL_DISCOUNT 0.5-je azért van, hogy az eladás ne legyen
    pénznyomda; ha az életmű-szorzó korlátlan volna, egy kinevelt legenda
-   eladása visszahozná a régi egyensúlytalanságot. MERIT_CAP=1.7 mellett a
-   lehető legjobb életmű 0,5 → 0,85 piaci értékre tolja a kifizetést: érezhető,
-   megérdemelt, de a "vegyél drágán, adj el olcsón" iránya megmarad. */
+   eladása visszahozná a régi egyensúlytalanságot.
+
+   ---- A NAGY JÁTÉKOSOK ÁTÁRAZÁSA ----
+   A régi MERIT_CAP=1.7 (max 0,85 piaci érték) mellett a klub NAGY EMBERE — hat
+   szezon, 200 meccs, kétszáz gól és gólpassz, négy kiépült képesség — még
+   mindig a piaci ÉRTÉKE ALATT ment el. Egy ilyen embert a valóságban nem
+   diszkonttal adnak el: érte licitálnak. A mostani számok ezt fordítják meg.
+   NÉGY TAG ÉPÍTI, és mind a négy kizárólag NÁLAD szerzett érdem:
+     · TELJESÍTMÉNY (meccsre vetítve) — a "magas gólarány" tagja, ez a
+       legnagyobb egyetlen tétel;
+     · HŰSÉG — a nálad lejátszott meccsek, a "Klublegenda" mérföldkő 200-as
+       küszöbénél teljes;
+     · KÉPESSÉGEK — a félkész arányosan, a csillag fölé;
+     · ÉLETMŰ-VOLUMEN (ÚJ) — a NYERS össztermés, nem az átlag. Ez különbözteti
+       meg a klub nagy játékosát a rövid ideig ragyogó igazolástól: az arányt a
+       teljesítmény-tag már megfizette, a MENNYISÉGET viszont eddig semmi.
+   A HATÁR MOST IS OTT VAN, AHOL AZ EXPLOIT KEZDŐDNE: MERIT_CAP=2.8 mellett a
+   legjobb életmű 0,5 → 1,4 piaci értékre tolja a kifizetést, ami még mindig a
+   VÉTELI felár (BUY_MARKUP_BASE=1.6) alatt van — vagyis venni-eladni továbbra
+   sem lehet nyereséggel, a felárat KIZÁRÓLAG a nálad eltöltött évek termelik.
+   Frissen vett játékosnál a szorzó pontosan 1.0, betűre mint eddig. */
 const MERIT_MIN_MATCHES=5;   /* ennyi meccs alatt az átlag még zaj */
-const MERIT_CAP=1.7;         /* az életmű-szorzó felső határa */
-const MERIT_LOYAL_MATCHES=150;   /* ennyi meccsnél teljes a hűség-tag */
+const MERIT_CAP=2.8;         /* az életmű-szorzó felső határa */
+const MERIT_LOYAL_MATCHES=200;   /* ennyi meccsnél teljes a hűség-tag (Klublegenda) */
+const MERIT_LEGEND_GA=150;       /* ennyi gól+gólpassz a klubnál = teljes életmű-tag */
+const MERIT_LEGEND_CS=60;        /* kapusnál ennyi tiszta lap ér ugyanennyit */
 function saleMeritParts(p){
   const n=p&&p.n;
   const cs=(n&&S.careerStats&&S.careerStats[n])||null;
@@ -27551,27 +27648,34 @@ function saleMeritParts(p){
   if(cs&&m>=MERIT_MIN_MATCHES){
     if(isGK){
       /* a kapus mérlege: a bravúr a teljesítmény, a tiszta lap az eredmény */
-      stat+=Math.min(0.20,((cs.saves||0)/m)/1.2*0.20);
-      stat+=Math.min(0.16,((cs.cs||0)/m)/0.45*0.16);
+      stat+=Math.min(0.34,((cs.saves||0)/m)/1.2*0.34);
+      stat+=Math.min(0.28,((cs.cs||0)/m)/0.45*0.28);
     }else{
       /* gól+gólpassz meccsenként: 1.0-nál teljes a tag (az a világklasszis sáv) */
-      stat+=Math.min(0.26,(((cs.g||0)+(cs.a||0))/m)/1.0*0.26);
+      stat+=Math.min(0.55,(((cs.g||0)+(cs.a||0))/m)/1.0*0.55);
       /* a tiszta lap a mezőnyjátékosnak is érdem, csak jóval kisebb súllyal */
-      stat+=Math.min(0.06,((cs.cs||0)/m)/0.45*0.06);}
+      stat+=Math.min(0.08,((cs.cs||0)/m)/0.45*0.08);}
     /* meccsemberség: a "meghatározó ember" jele, poszttól függetlenül */
-    stat+=Math.min(0.12,(((cs.mvp||0)/m)/0.25)*0.12);}
+    stat+=Math.min(0.20,(((cs.mvp||0)/m)/0.25)*0.20);}
   /* HŰSÉG: a nálad lejátszott meccsek száma, a minőségtől függetlenül. */
-  const loyal=Math.min(0.10,(m/MERIT_LOYAL_MATCHES)*0.10);
+  const loyal=Math.min(0.30,(m/MERIT_LOYAL_MATCHES)*0.30);
+  /* ÉLETMŰ-VOLUMEN: a nyers össztermés a klubnál. Az átlagtól függetlenül
+     fizet, mert egy 200 gólos klubtörténet önmagában is ár. */
+  const legend=cs
+    ? (isGK
+        ? Math.min(0.25,((cs.cs||0)/MERIT_LEGEND_CS)*0.25)
+        : Math.min(0.25,(((cs.g||0)+(cs.a||0))/MERIT_LEGEND_GA)*0.25))
+    : 0;
   /* SKILLEK: a félkész arányosan, a csillag fölé. */
   let skill=0;
   ((n&&S.skills&&S.skills[n])||[]).forEach(i=>{
     if(!i||!i.skill)return;
     const need=i.stagesNeeded||1;
     const ratio=Math.max(0,Math.min(1,(i.stagesCompleted||0)/need));
-    skill+=0.045*ratio+0.02*(i.stars||0);});
-  skill=Math.min(0.34,skill);
-  const mult=Math.min(MERIT_CAP,1+stat+loyal+skill);
-  return {matches:m,isGK,stat,loyal,skill,mult};}
+    skill+=0.07*ratio+0.05*(i.stars||0);});
+  skill=Math.min(0.60,skill);
+  const mult=Math.min(MERIT_CAP,1+stat+loyal+legend+skill);
+  return {matches:m,isGK,stat,loyal,legend,skill,mult};}
 function saleMerit(p){return saleMeritParts(p).mult;}
 /* Egy mondat az eladás-megerősítőbe: MIÉRT annyi az ár. A felár nem lehet néma
    — különben a felhasználó csak annyit lát, hogy két egyforma Ratingű emberért
@@ -27583,7 +27687,12 @@ function saleMeritNote(p){
   if(m.stat>0.02)why.push(m.isGK?"a kapuban nyújtott mérlege":"a gól- és gólpassz-termése");
   if(m.skill>0.02)why.push("a megszerzett képességei");
   if(m.loyal>0.02)why.push(`${m.matches} meccs a klubnál`);
-  return ` Ebben <b style="color:var(--grass)">+${Math.round((m.mult-1)*100)}%</b> az életműve nálad${why.length?` (${why.join(", ")})`:""}.`;}
+  if(m.legend>0.02)why.push("a klubnál összegyűjtött életműve");
+  /* A PLAFONT KIMONDJUK: aki elérte, annál a további érdem már nem emel — ezt
+     jobb tudni ELADÁS ELŐTT, mint utána visszafejteni. */
+  const capped=m.mult>=MERIT_CAP-0.001;
+  return ` Ebben <b style="color:var(--grass)">+${Math.round((m.mult-1)*100)}%</b> az életműve nálad${why.length?` (${why.join(", ")})`:""}.`
+    +(capped?` <b style="color:var(--gold)">A klub nagy játékosa — az életmű-felár a maximumon.</b>`:"");}
 function sellValue(p){
   if(!p.tsi||!p.age)return 0;
   return Math.round(marketValue(p)*SELL_DISCOUNT*saleMerit(p));}
@@ -27859,13 +27968,17 @@ function eligibleForSkill(skill){
      szétbontása után a BENCH_CATS "KOZEPPALYAS" már nem tartalmazza a
      szélsőket, és a szélső-skillek némán jogosulatlanná váltak volna.) */
   const catDef=ROLE_CATS.find(c=>c.key===skill.cat);
-  /* cat2 (3. fázis): egyes skillek KÉT posztkategóriának is szólnak — pl. a
-     Villámbeck Queen védőnek és középpályásnak egyaránt. */
+  /* cat2 (3. fázis): egyes skillek KÉT posztkategóriának is szólnak. */
   const cat2Def=skill.cat2?ROLE_CATS.find(c=>c.key===skill.cat2):null;
   /* excludePos: a kategóriákon BELÜL is kizárhatunk posztokat. Kell, mert a
-     KOZEPPALYAS kategória a szélsőket (JSZ/BSZ) is tartalmazza — a
-     "Villámbeck Queen" viszont hátvéd-skill, szélsőnek értelmetlen. */
+     KOZEPPALYAS kategória a szélsőket (JSZ/BSZ) is tartalmazza. */
   const excl=skill.excludePos||null;
+  /* onPitchCat: A PILLANATNYI HELY is jogosít. Nem a keret-posztot nézi, hanem
+     azt, hogy a játékos ÉPPEN milyen kódú helyen áll a kezdő 11-ben — ezért
+     szigorúbb, mint egy másodkategória (aki nincs pályán, azt nem érinti), és
+     tisztességesebb, mint a merev poszt-szűrés (a hátrahúzott középpályás
+     tényleg védőt játszik). A "Villámbeck Queen" használja. */
+  const onPitchDef=skill.onPitchCat?ROLE_CATS.find(c=>c.key===skill.onPitchCat):null;
   /* A keret-kategória az alap. Kiegészítés: egy pályán lévő szélső, aki az
      aktuális felállásban TÁMADÓ szerepű (pl. 4-3-3 szárny), a CSATAR-skillekre
      is jogosult — a szerepe szerinti skillt kaphatja, ne csak középpályásat. */
@@ -27876,6 +27989,11 @@ function eligibleForSkill(skill){
        skilltől. A szűrés ITT van, a közös forrásnál, ezért a kézi kiosztásra
        (renderSkillAssign) és az automatikusra (autoAssignSkill) egyaránt áll. */
     if((S.skills[p.n]||[]).some(i=>i.skill&&i.skill.id===skill.id))return false;
+    /* a pillanatnyi hely ELŐBB dönt, mint a poszt-kizárás: aki most tényleg
+       ott áll, azt nem a keretlapja zárhatja ki */
+    if(onPitchDef){
+      const sl=slots.find(s=>s.player&&s.player.n===p.n);
+      if(sl&&onPitchDef.codes.includes(sl.pos))return true;}
     if(excl&&p.pos.every(pp=>excl.includes(pp)))return false;
     if(p.pos.some(pp=>catDef.codes.includes(pp)&&!(excl&&excl.includes(pp))))return true;
     if(cat2Def&&p.pos.some(pp=>cat2Def.codes.includes(pp)&&!(excl&&excl.includes(pp))))return true;
@@ -30751,27 +30869,44 @@ function renderAxisProbeBlock(body){
      javítani akarunk), tengelyenként nagyságrendileg 50-60 minta kell. */
   const enough=R.n>=50;
   const rowsHtml=R.axes.map(a=>{
-    const diff=a.mean-a.off;
+    const diff=a.mean-a.model;
     const col=Math.abs(diff)>=1?"var(--gold)":"var(--dim2)";
     return `<tr>
       <td style="padding:1px 8px 1px 0;white-space:nowrap">${ATTR_LABELS[a.key]}</td>
       <td style="padding:1px 8px 1px 0;text-align:right;white-space:nowrap">${a.mean>=0?"+":""}${a.mean.toFixed(2)}</td>
       <td style="padding:1px 8px 1px 0;text-align:right;white-space:nowrap;color:var(--dim2)">±${a.sd.toFixed(2)}</td>
-      <td style="padding:1px 8px 1px 0;text-align:right;white-space:nowrap;color:var(--dim2)">${a.off>=0?"+":""}${a.off.toFixed(2)} / ${a.scale.toFixed(2)}</td>
+      <td style="padding:1px 8px 1px 0;text-align:right;white-space:nowrap;color:var(--dim2)">${a.model>=0?"+":""}${a.model.toFixed(2)} / ${a.scale.toFixed(2)}</td>
       <td style="padding:1px 0;text-align:right;white-space:nowrap;color:${col}"><b>${diff>=0?"+":""}${diff.toFixed(2)}</b></td>
     </tr>`;}).join("");
-  const binsHtml=R.rows.map(r=>
-    `<span style="display:inline-block;margin-right:9px;white-space:nowrap">${r.inf?"∞":""}${r.T}<span style="color:var(--dim2)">·${r.n}db·seb </span>${r.m.seb>=0?"+":""}${r.m.seb.toFixed(1)}</span>`).join("");
+  /* SÁVONKÉNTI BONTÁS MIND AZ ÖT TENGELYRE. Eddig csak a Sebesség látszott —
+     pont az a tengely, aminek a szintfüggő csúszását már megjavítottuk. A
+     KÖVETKEZŐ kalibrációhoz viszont a másik négyről is kell az adat (a mérő
+     mindig is gyűjtötte, csak nem írta ki), különben megint egy összevont
+     átlagból kellene következtetni arra, ami valójában szintfüggő. A Sebesség
+     sorában zárójelben ott a MODELL várt értéke is — így egy pillantással
+     látszik, hogy a görbe követi-e a valóságot. */
+  const binRows=R.rows.map(r=>
+    `<tr><td style="padding:1px 8px 1px 0;white-space:nowrap"><b>${r.inf?"∞":""}${r.T}</b><span style="color:var(--dim2)"> ·${r.n}db</span></td>`
+    +ATTR_KEYS.map(k=>{
+      const v=r.m[k];
+      const extra=k==="seb"?`<span style="color:var(--dim2)"> (${r.e[k]>=0?"+":""}${r.e[k].toFixed(1)})</span>`:"";
+      return `<td style="padding:1px 8px 1px 0;text-align:right;white-space:nowrap">${v>=0?"+":""}${v.toFixed(1)}${extra}</td>`;}).join("")
+    +`</tr>`).join("");
   box.innerHTML=`<div style="font-size:12px;font-weight:700;margin-bottom:2px">🔬 Tengely-mérő <span style="color:${enough?"var(--grass)":"var(--gold)"};font-weight:400">· ${R.n} meccs · horgony ${R.lo}–${R.hi}${enough?"":" · még kevés a következtetéshez (50-től)"}</span></div>
-    <div style="font-size:10.5px;color:var(--dim2);margin-bottom:5px;line-height:1.45">Meccsenként egy minta: mennyivel áll a tengely a horgony (véd+passz+gól átlaga) fölött. Az „eltérés" azt mutatja, mennyivel téved a jelenlegi konstans. A játékra nincs hatása.</div>
+    <div style="font-size:10.5px;color:var(--dim2);margin-bottom:5px;line-height:1.45">Meccsenként egy minta: mennyivel áll a tengely a horgony (véd+passz+gól átlaga) fölött. Az „eltérés" azt mutatja, mennyivel téved a jelenlegi elvárás (a Sebességé szintfüggő, ezért sávonként számoljuk). A játékra nincs hatása.</div>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse">
       <tr style="color:var(--dim2);font-size:10px;text-transform:uppercase;letter-spacing:.5px">
         <td style="padding-right:8px">tengely</td><td style="padding-right:8px;text-align:right">mért</td>
-        <td style="padding-right:8px;text-align:right">szórás</td><td style="padding-right:8px;text-align:right">konstans/skála</td>
+        <td style="padding-right:8px;text-align:right">szórás</td><td style="padding-right:8px;text-align:right">elvárt/skála</td>
         <td style="text-align:right">eltérés</td></tr>
       ${rowsHtml}
     </table></div>
-    <div style="font-size:10.5px;color:var(--dim);margin-top:5px;line-height:1.6">Horgony-sávok (∞ = Infinity), sávonként a <b>Sebesség</b> eltolása:<br>${binsHtml}</div>`;
+    <div style="font-size:10.5px;color:var(--dim);margin-top:6px;line-height:1.45">Horgony-sávok (∞ = Infinity), sávonként tengelyenkénti eltolás — a Sebességnél zárójelben a modell várt értéke:</div>
+    <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;margin-top:2px">
+      <tr style="color:var(--dim2);font-size:10px;text-transform:uppercase;letter-spacing:.5px">
+        <td style="padding-right:8px">sáv</td>${ATTR_KEYS.map(k=>`<td style="padding-right:8px;text-align:right">${ATTR_SHORT[k]}</td>`).join("")}</tr>
+      ${binRows}
+    </table></div>`;
   body.appendChild(box);}
 $("hubTacticsCancel")&&($("hubTacticsCancel").onclick=()=>{
   $("hubTacticsPicker").classList.add("hide");});
@@ -32658,7 +32793,7 @@ $("hubYouthBoostBtn").onclick=()=>{
   $("scWindow").scrollIntoView({behavior:"smooth"});};
 /* ---- "Öreg csirkefogó" választóképernyő ---- */
 $("hubOldBoostBtn").onclick=()=>{
-  const price=oldBoostPrice();
+  const price=oldBoostPrice();   /* az ALAPÁR — a tényleges ár játékosonként nő */
   const vets=fullCareerRoster().filter(p=>isVeteranBoostable(careerPool[p.n]));
   if(!vets.length)return;
   $("scHub").classList.add("hide");
@@ -32669,25 +32804,36 @@ $("hubOldBoostBtn").onclick=()=>{
   const sc=youthBoostScale();
   const tLo=Math.round(OLD_BOOST_TSI[0]*sc),tHi=Math.round(OLD_BOOST_TSI[1]*sc);
   const rLo=Math.round(OLD_BOOST_RATING[0]*sc),rHi=Math.round(OLD_BOOST_RATING[1]*sc);
-  const affordable=S.transferBudget>=price;
+  /* ISMÉTELHETŐ BOOST: az ár JÁTÉKOSONKÉNT más, ezért a "megengedheted-e"
+     kérdés is ott dől el, soronként — a panel akkor is nyílik, ha csak a
+     legolcsóbb jelöltre futja. */
+  const cheapest=Math.min(...vets.map(p=>oldBoostPriceFor(careerPool[p.n])));
+  const affordable=S.transferBudget>=cheapest;
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
-    Ára <b style="color:#a67c4a">${fmtFt(price)}</b> · hatása: <b>+${rLo}-${rHi} Rating</b> (aki a saját potenciálja alatt állt, még többet kap) és <b>+${tLo}-${tHi} TSI</b>, és a játékos <b>${OLD_BOOST_RETIRE_AGE} éves koráig</b> nem vonul vissza. Csak 30 fölötti játékosra, és mindenkire csak egyszer.<br>
-    ${affordable?"Válaszd ki az öreg rókát:":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget)}).</span>`}</p>`;
+    Alapára <b style="color:#a67c4a">${fmtFt(price)}</b> · hatása: <b>+${rLo}-${rHi} Rating</b> (aki a saját potenciálja alatt állt, még többet kap) és <b>+${tLo}-${tHi} TSI</b>, és a játékos <b>${OLD_BOOST_RETIRE_AGE} éves koráig</b> nem vonul vissza. Csak 30 fölötti játékosra.<br>
+    <b>Ismételhető</b> — de UGYANAZON az emberen minden újabb boost drágább: +25%, +33%, +50%, +75%, majd +100%. Másik veteránnál mindig az alapár él.<br>
+    ${affordable?"Válaszd ki az öreg rókát:":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget)}) a legolcsóbb boostra sem (${fmtFt(cheapest)}).</span>`}</p>`;
   $("twActions").innerHTML="";
   if(affordable)vets.forEach(p=>{
     const e=careerPool[p.n];
+    const pr=oldBoostPriceFor(e),cnt=oldBoostCount(e);
+    const canPay=S.transferBudget>=pr;
     const b=document.createElement("button");b.className="btn-s stepbtn";b.style.marginTop="6px";b.style.textAlign="left";
-    b.innerHTML=`<b>${esc(shortName(p.n))}</b> <span style="color:var(--dim2)">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · ${tsiTag(p.n)||("TSI "+e.tsi)}</span>`;
+    if(!canPay)b.style.opacity=".5";
+    const _ot=oldBoostTag(e);
+    b.innerHTML=`<b>${esc(shortName(p.n))}</b>${_ot?` <span style="color:#d9b98a;font-weight:700">${_ot}</span>`:""} <span style="color:var(--dim2)">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · ${tsiTag(p.n)||("TSI "+e.tsi)}</span>`
+      +`<br><span style="font-size:11px;color:${canPay?"#d9b98a":"var(--red)"}">${fmtFt(pr)}${cnt?` · ez a ${cnt+1}. boostja (+${Math.round((pr/price-1)*100)}%) · eddig +${e.oldBoostR||0} Rating, +${e.oldBoostT||0} TSI`:""}</span>`;
     b.onclick=()=>{
-      if(S.transferBudget<price||!isVeteranBoostable(e))return;
+      if(S.transferBudget<pr||!isVeteranBoostable(e))return;
       askConfirm({title:"Marasztalod a vén rókát?",yes:"Igen, maradjon",
         html:`<div style="font-size:15px;font-weight:700">🎩 ${esc(shortName(p.n))}</div>
           <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · ${tsiTag(p.n)||("TSI "+e.tsi)}</div>
-          <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(price)}</b> — az egyenleged ${fmtFt(S.transferBudget)} → <b>${fmtFt(S.transferBudget-price)}</b>.
-            Hatása <b>+${rLo}-${rHi} Rating</b> és <b>+${tLo}-${tHi} TSI</b>. Egy játékoson csak EGYSZER süthető el, és ${OLD_BOOST_RETIRE_AGE} éves koráig a pályán tartja.</div>`,
+          ${cnt?`<div style="font-size:12px;color:#d9b98a;margin-top:4px">🎩 Ez már a ${cnt+1}. boostja — eddig +${e.oldBoostR||0} Rating és +${e.oldBoostT||0} TSI jött belőle, ezért az ára ${Math.round((pr/price-1)*100)}%-kal magasabb az alapárnál (${fmtFt(price)}).</div>`:""}
+          <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(pr)}</b> — az egyenleged ${fmtFt(S.transferBudget)} → <b>${fmtFt(S.transferBudget-pr)}</b>.
+            Hatása <b>+${rLo}-${rHi} Rating</b> és <b>+${tLo}-${tHi} TSI</b>, és ${OLD_BOOST_RETIRE_AGE} éves koráig a pályán tartja.</div>`,
         onYes:()=>{
-      if(S.transferBudget<price||!isVeteranBoostable(e))return;
-      S.transferBudget-=price;
+      if(S.transferBudget<pr||!isVeteranBoostable(e))return;
+      S.transferBudget-=pr;
       const res=applyOldBoost(e);
       const pl=currentRoster().find(x=>x.n===p.n)||extraRoster.find(x=>x.n===p.n);
       /* A KERET-OBJEKTUM RATINGJÉT IS ÁT KELL VEZETNI (pl.ovr), különben a
@@ -35115,13 +35261,15 @@ function renderHub(){
     const price=youthBoostPrice(),ok=S.transferBudget>=price;
     $("hubYouthBoostBtn").textContent=`⚡ Ifi-boost — ${fmtFtShort(price)}`;
     $("hubYouthBoostBtn").style.opacity=ok?"1":".55";}
-  /* Az "öreg csirkefogó" gomb akkor jelenik meg, ha van boostolható veterán
-     (30+ éves, még nem boostolt) a keretben. */
-  const hasVeteran=fullCareerRoster().some(p=>isVeteranBoostable(careerPool[p.n]));
-  $("hubOldBoostBtn").classList.toggle("hide",!hasVeteran);
-  if(hasVeteran){
-    const price=oldBoostPrice(),ok=S.transferBudget>=price;
-    $("hubOldBoostBtn").textContent=`🎩 Öreg csirkefogó — ${fmtFtShort(price)}`;
+  /* Az "öreg csirkefogó" gomb akkor jelenik meg, ha van 30+ éves a keretben.
+     Az ár ismételhető boost mellett játékosonként más, ezért a gombon a
+     LEGOLCSÓBB elérhető ár áll — az, ami után a panel egyáltalán nyílik. */
+  const vetsB=fullCareerRoster().filter(p=>isVeteranBoostable(careerPool[p.n]));
+  $("hubOldBoostBtn").classList.toggle("hide",!vetsB.length);
+  if(vetsB.length){
+    const prices=vetsB.map(p=>oldBoostPriceFor(careerPool[p.n]));
+    const price=Math.min(...prices),ok=S.transferBudget>=price;
+    $("hubOldBoostBtn").textContent=`🎩 Öreg csirkefogó — ${fmtFtShort(price)}${prices.some(x=>x>price)?"-tól":""}`;
     $("hubOldBoostBtn").style.opacity=ok?"1":".55";}
   /* ---- SZINTLÉPÉS: SZABADON, KÉT SZEZON KÖZÖTT ----
      Nincs többé cím- vagy kudarc-feltétel. Szezon KÖZBEN viszont rejtve marad
@@ -38233,11 +38381,14 @@ function msScan(){
    ember a hős, és egy odabiggyesztett név hazugság volna. */
 function msWhoName(n){
   try{return esc(shortName(n));}catch(e){return esc(String(n||""));}}
-/* Felsorolás korláttal: a napló egy sorába három szereplő fér el olvashatóan. */
+/* Felsorolás korláttal: a napló egy sorába három szereplő fér el olvashatóan.
+   max<=0 = NINCS korlát, mindenki kiírva. Ott kell, ahol maga a névsor a
+   jutalom (kibékült riválisok, mester-tanítvány párosok): egy "+15 további"
+   pont azt az információt nyeli el, amiért a mérföldkövet megcsináltad. */
 function msWhoJoin(list,max){
-  const L=(list||[]).filter(Boolean),m=max||3;
+  const L=(list||[]).filter(Boolean),m=(max==null)?3:max;
   if(!L.length)return "";
-  return L.length>m?`${L.slice(0,m).join(" · ")} · +${L.length-m} további`:L.join(" · ");}
+  return (m>0&&L.length>m)?`${L.slice(0,m).join(" · ")} · +${L.length-m} további`:L.join(" · ");}
 function msWhoPair(a,b,tail){
   return `${msWhoName(a)} és ${msWhoName(b)}${tail?` — ${tail}`:""}`;}
 /* Az adott ID-hez tartozó szereplő-szöveg. A lépcsős mérföldkövek a CSALÁD
@@ -38305,9 +38456,10 @@ const MS_WHO_FAM={
      páros két külön sorként is értelmes marad (két érkező, két teljesítés). */
   reunite:()=>msWhoJoin(msReunitedPairs()
     .map(x=>`${msWhoName(x.a)} → ${msWhoName(x.b)}${x.club?` (${esc(x.club)})`:""}`),3),
+  /* MIND, korlát nélkül (max=0): ezeknél a névsor MAGA az eredmény. */
   rivalchem:()=>msWhoJoin(msChemPairsDone()
     .filter(pr=>{try{return msAreRivals(pr.a,pr.b);}catch(e){return false;}})
-    .map(pr=>`${msWhoName(pr.a)}–${msWhoName(pr.b)}`),3),
+    .map(pr=>`${msWhoName(pr.a)}–${msWhoName(pr.b)}`),0),
   mentor:()=>msWhoJoin(msChemPairsDone().filter(pr=>{
       const ea=msEntry(pr.a),eb=msEntry(pr.b);
       if(!ea||!eb||ea.age==null||eb.age==null)return false;
@@ -38315,7 +38467,7 @@ const MS_WHO_FAM={
     .map(pr=>{
       const ea=msEntry(pr.a),eb=msEntry(pr.b);
       const fiatal=ea.age<eb.age?pr.a:pr.b, oreg=ea.age<eb.age?pr.b:pr.a;
-      return `${msWhoName(oreg)} → ${msWhoName(fiatal)}`;}),3),
+      return `${msWhoName(oreg)} → ${msWhoName(fiatal)}`;}),0),
   exclub:()=>{
     const t=msT();
     return t.exClubWho?`${msWhoName(t.exClubWho)}${t.exClubOpp?` — a(z) ${esc(t.exClubOpp)} ellen`:""}`:"";},
@@ -38726,11 +38878,16 @@ function msPairHintHtml(){
   let rv=[],mt=[];
   try{rv=msRivalCandidates();mt=msMentorCandidates();}catch(e){}
   if(!rv.length&&!mt.length)return "";
+  /* MINDEN JELÖLT KIÍRVA. Eddig hat páros után "…és még 15" állt itt — vagyis
+     pont az a lista maradt rejtve, amiért a panel egyáltalán létezik: a
+     felhasználó nem tudta, KIKET kellene összeszoktatnia, és a hiányzó
+     tizenötben ott lehetett az egyetlen elérhető páros is. A sor tördelve
+     folytatódik; hosszú listánál ez néhány sornyi szöveg, de olvasható és
+     használható — a csonkolás nem volt az. */
   const row=(cim,list,fmt)=>{
     if(!list.length)return `<div class="msDesc"><b>${cim}:</b> a keretedben most nincs ilyen páros.</div>`;
-    const show=list.slice(0,6).map(fmt).join(" · ");
-    return `<div class="msDesc"><b>${cim}:</b> ${show}`
-      +(list.length>6?` <span style="color:var(--dim2)">…és még ${list.length-6}</span>`:"")+`</div>`;};
+    return `<div class="msDesc" style="line-height:1.6"><b>${cim}</b>`
+      +`<span style="color:var(--dim2)"> (${list.length} lehetőség):</span> ${list.map(fmt).join(" · ")}</div>`;};
   return `<div class="msItem" style="border-style:dashed">`
     +`<div class="msTop"><b>💡 Kikkel lehetne?</b><span class="msRew">a keretedből</span></div>`
     +row("Kibékíthető riválisok",rv,
