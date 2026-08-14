@@ -2019,7 +2019,7 @@ button.infPanel:disabled{cursor:default}
     <div style="font-size:11.5px;color:var(--dim2);margin-bottom:5px">A Rating alapja — mennyire megbízható, amit a draftban látsz:</div>
     <!-- egy fokozat egy sor: a leírások túl hosszúak a három hasábos alaphoz -->
     <div class="optgrid" id="ratingBasisGrid" style="grid-template-columns:1fr;margin-top:0">
-      <button data-rb="peak" class="sel">🟢 Könnyű — Rating a csúcson<small>mindenki a pályafutása LEGJOBB megjelenéséből indul, és egy seedhez egyetlen Messi tartozik: mindegy, melyik klubból nyitod ki. A kor sorsolt, de a top játékosok többnyire 20-27 évesen érkeznek</small></button>
+      <button data-rb="peak" class="sel">🟢 Könnyű — Rating a csúcson<small>mindenki a pályafutása LEGJOBB idényének kártyájával érkezik — a Ratingje és a kora is abból az idényből való. Mindegy, melyik klubból nyitod ki: ugyanazt a csúcsformájú embert kapod. (A 30 fölötti kort visszahúzzuk, hogy a legenda használható maradjon.)</small></button>
       <button data-rb="season">🟡 Közepes — Rating a szezonban<small>a játékos pontosan azt tudja, amit ABBAN az idényben tudott, és a kora is a klub-szezonhoz igazodik</small></button>
       <button data-rb="wild">🔴 Nehéz — Kártyánkénti lutri<small>minden klub-szezon kártya saját kort ÉS TSI-t sorsol, a Ratingtől függetlenül. Ugyanaz a név két klubból két különböző ember: kifoghatsz elrontott csúcs-Messit és top playerré érő öreg védőt is</small></button>
     </div>
@@ -2767,7 +2767,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.2.01";
+const APP_VERSION="3.2.02";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10453,6 +10453,33 @@ const CAREER_PLAYERS=(function buildCareerRegistry(){
    kulcsolt tartalék. */
 const CAREER_REF_BY_NAME=(function(){
   const m={};CAREER_PLAYERS.forEach(p=>{m[p.n]=p;});return m;})();
+/* ---- A LEGJOBB KÁRTYA, KERETESTŐL (3.2.02) ----
+   A CAREER_PLAYERS csak a legjobb megjelenés SZÁMÁT (refOvr) tartja meg, a
+   kártyát magát nem — pedig a „Rating a csúcson" módnak épp arra van szüksége:
+   a legjobb idényt ugyanazon a szezon-alapú úton kell átvinni, mint bármelyik
+   másikat (kártya-Rating, valós életkor a születési évből, kártya-TSI). Ezért
+   itt a kártya-objektumot ÉS a keretét is eltesszük.
+   HOLTVERSENYNÉL a korábbi idény nyer: ha valaki két szezonban is ugyanazt a
+   csúcsértéket hozta, a fiatalabb önmagát adjuk — az a hosszabb karrier. */
+const CAREER_BEST_CARD=(function(){
+  const m={};
+  const jobb=(a,b)=>!b||a.sp.ovr>b.sp.ovr
+    ||(a.sp.ovr===b.sp.ovr&&(a.sp._year||9999)<(b.sp._year||9999));
+  SQUADS.forEach(sq=>sq.players.forEach(p=>{
+    const c={sp:p,squad:sq};
+    const cur=m[p.n]||(m[p.n]={any:null,club:null});
+    if(jobb(c,cur.any))cur.any=c;
+    /* KLUB-VÁLTOZAT külön. A válogatott-kártya lehet valakinek a legjobbja
+       (Zidane: Franciaország, 2000 EB), de ha a VB ki van kapcsolva, a
+       válogatott-kártyák sehol máshol sem jönnek elő — akkor a csúcs-alap sem
+       hivatkozhat rájuk, mert a játékos-lapon ott állna a származása. */
+    if(!sq.wc&&jobb(c,cur.club))cur.club=c;}));
+  return m;})();
+/* A csúcs-alaphoz használandó kártya, a VB-kapcsoló figyelembevételével. */
+function careerBestCardFor(name){
+  const e=CAREER_BEST_CARD[name];
+  if(!e)return null;
+  return (wcEnabled?(e.any||e.club):(e.club||e.any))||null;}
 
 /* ================= KARRIER MÓD — TSI ÉS FEJLŐDÉSI GÖRBE =================
    Ez a réteg még nincs bekötve semmilyen UI-ba (az a 3. lépés lesz, a
@@ -11297,13 +11324,18 @@ function careerPlayerFromPoolEntry(entry){
    A három fokozat NEM a mezőny erejét állítja (azt a nehézségi csúszka teszi),
    hanem azt, MENNYIRE MEGBÍZHATÓ, amit a draftban látsz:
 
-     · "peak"   — KÖNNYŰ (csúcsforma). Minden játékos a saját, adatbázisbeli
-       LEGJOBB megjelenéséből indul (CAREER_PLAYERS.refOvr — a buildCareerRegistry
-       névre összevonva a legmagasabb Ratingű kártyát tartja meg). Egy seedhez
-       EGYETLEN Messi tartozik: mindegy, melyik klubból nyitod ki, ugyanazt a
-       max-rating alapú, sorsolt TSI-jű és korú embert kapod. A kor sorsolt, de a
-       magasabb Rating nagyobb eséllyel hoz 20-27 évet (lásd generateStartAge) —
-       tehát a top játékos tényleg használható állapotban érkezik.
+     · "peak"   — KÖNNYŰ (csúcsforma). A SZEZON-ALAP a szülő módja (3.2.02):
+       ugyanaz a seasonBasisFor fut rá, csak nem a felkínáló KLUB kártyájával,
+       hanem a játékos LEGJOBB kártyájával (CAREER_BEST_CARD). A Rating tehát
+       pontosan a legjobb idényének a kártyaértéke, a kor pedig a VALÓS életkora
+       abban az idényben — a 30 fölöttit visszahúzzuk, hogy a legenda
+       használható maradjon. Mindegy, melyik klubból nyitod ki: ugyanazt a
+       kártyát kapod.
+       KORÁBBAN ez NEM így volt, és ez volt a mód régi hibája: a draft a
+       pool-bejegyzést mutatta, annak a startRatingje pedig a SORSOLT TSI-ből
+       számolt csúcson és koron állt — a refOvr csak a TSI-sorsolás közepét
+       adta. A „csúcsforma" helyett egy lutri futott: egy 91-es referenciájú
+       Ronaldo simán kijöhetett 78-on.
 
      · "season" — KÖZEPES (szezon). A játékos pontosan azt tudja, amit ABBAN a
        klub-szezonban tudott: a Ratingje a keret-kártya értéke, a kora pedig —
@@ -11373,8 +11405,10 @@ function lockCareerRatingBasis(){
   return careerRatingBasis;}
 function seasonBasisOn(){return gameMode==="career"&&careerRatingBasis==="season";}
 function wildBasisOn(){return gameMode==="career"&&careerRatingBasis==="wild";}
-/* Van-e egyáltalán KÁRTYÁNKÉNTI alap? (a "peak" az egyetlen, aminél nincs) */
-function cardBasisOn(){return seasonBasisOn()||wildBasisOn();}
+function peakBasisOn(){return gameMode==="career"&&careerRatingBasis==="peak";}
+/* Van-e KÁRTYA-alapú érték a draftban? Mind a háromnál van (3.2.02) — a
+   csúcs-alap a LEGJOBB kártyát használja, lásd peakBasisFor. */
+function cardBasisOn(){return seasonBasisOn()||wildBasisOn()||peakBasisOn();}
 const SEASON_BASIS_PRIME_AGE=27;   /* ennyi évesen van a csúcsidénye a görbe szerint */
 /* ---- A CSÚCSKOR POSZTONKÉNT MÁS ----
    A fix 27 mindenkire ugyanaz volt, pedig egy kapus és egy szélső pályafutása
@@ -11503,12 +11537,53 @@ function wildBasisFor(entry,squadPlayer,squad){
    (_seasonBasis), hogy a tényleges leigazoláskor a pool-bejegyzésbe is
    beírhassuk. A POOL-t itt még NEM írjuk: akit nem draftolsz, az érintetlen,
    Prime-referenciájú marad a piacon. */
+/* ---- A CSÚCS-ALAP: A LEGJOBB IDÉNY, UGYANAZON AZ ÚTON (3.2.02) ----
+   BEJELENTETT HIBA: a „Rating a csúcson" mód 24 éves, 78-as Ronaldo il
+   Fenomenót adott — miközben a mód azt ígéri, hogy mindenki a pályafutása
+   LEGJOBB megjelenéséből indul.
+
+   AZ OK. A csúcs-alapnak eddig egyáltalán NEM volt kártya-alapja: a draft a
+   pool-bejegyzést mutatta, annak a startRatingje pedig `ratingAtAge(peak,age)`
+   volt — ahol a `peak` a SORSOLT TSI-ből jött (`tsiToPeakOvr(generateTSI(...))`),
+   nem a refOvr-ből. A refOvr csak a TSI-sorsolás KÖZÉPPONTJÁT és a kor
+   eltolását adta. Vagyis a „csúcsforma" ígérete helyett egy TSI-lutri futott:
+   egy 95-ös referenciájú játékos simán kijöhetett 78-on.
+
+   A JAVÍTÁS a felhasználó javaslata: a csúcs-alap SZÜLŐ MÓDJA a szezon-alap.
+   Ugyanaz a `seasonBasisFor` fut rá, csak nem a KLUB kártyájával, hanem a
+   játékos LEGJOBB kártyájával (CAREER_BEST_CARD). Ettől:
+     · a Rating pontosan a legjobb idényének a kártyaértéke (Ronaldo 1997/98),
+     · a kor a VALÓS életkora abban az idényben (születési évből),
+     · a TSI és a peak ugyanazon a szabályon, mint a szezon-alapnál,
+     · és tényleg MINDEGY, melyik klubból nyitod ki: a kártya ugyanaz.
+   A mód ígérete így először teljesül szó szerint. */
+function peakBasisFor(entry){
+  const best=careerBestCardFor(entry.n);
+  if(!best)return null;
+  const b=seasonBasisFor(entry,best.sp,best.squad);
+  /* A KOR SÁVJA: a csúcskártya valós életkora néha a pályafutás legvégéről jön
+     (pl. akinek egyetlen, kései csúcsidénye van). A mód ígérete viszont az,
+     hogy a top játékos HASZNÁLHATÓ állapotban érkezik — ezért a 30 fölötti kort
+     a Ratinggel összeférő sáv alsó felébe húzzuk vissza. A Rating maga NEM
+     változik: a csúcsforma marad csúcsforma, csak fiatalabb példányban. */
+  if(b&&b.age>30){
+    const band=seasonBasisAgeBand(b.peak,b.ovr);
+    b.age=Math.max(band.lo,Math.min(30,band.hi));
+    b.from=(best.squad?`${best.squad.club} (${best.squad.season})`:null);}
+  return b;}
 function careerDraftPlayer(entry,squad){
   const p=careerPlayerFromPoolEntry(entry);
-  if(!cardBasisOn()||!squad||!squad.players)return p;
-  const sp=squad.players.find(x=>x.n===entry.n);
-  if(!sp)return p;
-  const b=wildBasisOn()?wildBasisFor(entry,sp,squad):seasonBasisFor(entry,sp,squad);
+  if(!cardBasisOn())return p;
+  let b=null;
+  if(peakBasisOn()){
+    /* A csúcs-alap NEM a felkínáló klub kártyáját nézi — épp ez a lényege. */
+    b=peakBasisFor(entry);
+  }else{
+    if(!squad||!squad.players)return p;
+    const sp=squad.players.find(x=>x.n===entry.n);
+    if(!sp)return p;
+    b=wildBasisOn()?wildBasisFor(entry,sp,squad):seasonBasisFor(entry,sp,squad);}
+  if(!b)return p;
   p.ovr=b.ovr;p.age=b.age;p.peak=b.peak;p.tsi=b.tsi;p.estimatedTSI=b.estimatedTSI;
   p._seasonBasis=b;
   return p;}
