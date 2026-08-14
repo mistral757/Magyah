@@ -922,6 +922,38 @@ igényel új szimulációs ágat.
   (`ST_INF_TOP`), a műszerek valódi, kitolt plafonjához igazítva: a
   végsebesség-lépcső 38 → 45 km/h-ig, a lövéserő 164 → 210 km/h-ig nyílik.
 
+* **Színes paletta és szivárvány — a Béke és harmónia négy új lépcsője
+  (3.3.08).** A stílus eddig azt mérte, hányan találtak be egy IDÉNY alatt
+  (`hm_scorersN`) és hányan szálltak be a klub történetében (`hm_contrib`). Ami
+  hiányzott: az EGY MÉRKŐZÉSEN belüli megosztás — az a kép, amikor egy meccsen
+  három-négy különböző ember nevét írja a jegyzőkönyv. Ez a filozófia
+  legtisztább pillanata, és eddig nyomtalanul elszállt.
+
+  | család | esemény | küszöbök | Infinity |
+  |---|---|---|---|
+  | `hm_paletteN` | **pontosan 3** gólszerző egy meccsen | 1·2·3·5·7·10·15·20·30·50·100 | +50-esével (150…400) |
+  | `hm_rainbowN` | **4 vagy több** gólszerző egy meccsen | 1-10 egyesével, 20-ig kettesével, 50-ig ötösével, 100-ig tízesével | +10-esével (110…160) |
+  | `hm_aPaletteN` | **pontosan 3** gólpasszadó egy meccsen | ugyanaz, mint a paletta | ugyanaz |
+  | `hm_aRainbowN` | **4 vagy több** gólpasszadó egy meccsen | ugyanaz, mint a szivárvány | ugyanaz |
+
+  **A két fokozat kizárja egymást** (`msNoteMatch`): egy meccs pontosan egy
+  vödörbe esik, tehát a szivárvány nem tölti „ingyen" a palettát is — mindkét
+  sor a saját eseményét számolja. A számlálás a mérkőzés lefújásakor történik
+  (`mScore`/`mAssist` kulcsai), mert a `careerStats` csak összegez: utólag
+  visszakereshetetlen, hány KÜLÖNBÖZŐ ember talált be egy adott meccsen. A
+  gyűjtés stílustól függetlenül fut, tehát a később választott filozófia is
+  megkapja a már lejátszott meccseket.
+
+  **Pontérték:** paletta 65, szivárvány 204, a két passz-lépcső ugyanennyi —
+  a stílus táblája 663 → 1201 pontra nőtt (52 → 126 fokozat). Ezzel a Béke és
+  harmónia lett a legbőkezűbb tábla, ami szándékos: a fája a legdrágább is
+  (a négy egyensúly-képességgel jóval 1007 pont fölött), miközben eddig a
+  legszegényebb táblával állt. Kimaxolni továbbra sem lehet.
+
+  **A fázis-csík ezért tördelődik** (`.msPhase{flex-wrap:wrap}`): 26 (Infinity
+  után 32) szem egy sorban kilógna a kártyából, és vízszintes görgetést okozna
+  a telefonon. A rövid családok képe változatlan.
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
