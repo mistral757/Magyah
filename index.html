@@ -2771,7 +2771,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.04";
+const APP_VERSION="3.3.05";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -28522,6 +28522,12 @@ function sellValue(p){
    van egy MÁSIK út: piacra bocsátod az embert, és megvárod, mit kínálnak érte.
 
    HOGY MŰKÖDIK
+     0. KI VIHETŐ PIACRA. Két kapu van, és MINDKETTŐ látszik a gombon (a felirat
+        a hiányzó dolgot mondja, a gomb alatti sor az okát): (a) a játékos
+        legalább SALE_LIST_MIN_MATCHES meccset lejátszott NÁLAD — a piac csak
+        arra licitál, akit már látott a csapatodban —, és (b) az ügynökséged
+        kapacitása (agencyMaxListings) nem telt be. Aki egyszer sem lépett
+        pályára, annak csak a gyors eladás marad; ez szabály, nem hiba.
      1. Piacra bocsátás — a játékos MARAD a keretedben, játszik tovább.
      2. 5-15 fordulón belül megérkezik az első ajánlat. Nem azonnal kapod meg:
         az átigazolási időszakban (a HUB Átigazolás menüjében, a vásárlások
@@ -28577,16 +28583,40 @@ function saleWindowOpen(){
 function saleListingOf(name){
   return saleMarketState().list.find(x=>x&&x.n===name)||null;}
 function saleIsListed(name){return !!saleListingOf(name);}
-/* Piacra vihető-e? Karrier, nem családtag, és MÁR JÁTSZOTT nálad eleget.
-   A meccs-küszöb nem díszlet: enélkül egy frissen vett embert azonnal ki
-   lehetne tenni a kirakatba, és a vétel-eladás körhinta megindulna. */
-function saleCanList(p){
-  if(gameMode!=="career"||!careerPool||!p||p.family)return false;
-  if(saleIsListed(p.n))return false;
-  /* AZ ÜGYNÖKSÉG KAPACITÁSA: egyszerre ennyi ügyet tud vinni. */
-  if(saleMarketState().list.length>=agencyMaxListings())return false;
+/* HÁNY ÜGY FUT MOST. A számlálás ELŐTT takarítunk: egy már eladott,
+   visszavonult vagy edzővé lett ember bejegyzése különben tovább foglalná az
+   ügynökség egyik helyét, és a gomb MINDENKINÉL szürke maradna, holott a
+   kirakat üres. A salePrune eddig csak a licit-ütemezésből futott le, tehát a
+   takarítás egy olyan úthoz volt kötve, ami a gomb rajzolásakor nem jár. */
+function saleListingCount(){
+  try{salePrune();}catch(e){}
+  return saleMarketState().list.length;}
+/* MIÉRT NEM VIHETŐ PIACRA — EGY HELYEN, ADATKÉNT.
+   Piacra vihető: karrier, nem családtag, és MÁR JÁTSZOTT nálad eleget. A
+   meccs-küszöb nem díszlet: enélkül egy frissen vett embert azonnal ki lehetne
+   tenni a kirakatba, és a vétel-eladás körhinta megindulna.
+   A zár OKA azonban ugyanolyan fontos, mint a ténye: a gomb eddig csak
+   elszürkült, az indoklás pedig egy olyan üzenetsávba ment (setDraftStatus),
+   ami a draft-képernyőn ül és a HUB-ban REJTVE van — a koppintás tehát néma
+   maradt, a felhasználó pedig hibát látott ott, ahol szabály volt. Innentől a
+   feltétel-vizsgálat visszaadja az okot is, és a gomb ebből írja ki magáról,
+   mi hiányzik. Visszatérés: null = mehet, különben {kind,...}. */
+function saleListBlock(p){
+  if(gameMode!=="career"||!careerPool||!p)return {kind:"mode"};
+  if(p.family)return {kind:"family"};
+  if(saleIsListed(p.n))return {kind:"listed"};
+  /* A SORREND SZÁNDÉKOS: előbb a JÁTÉKOSRÓL szóló feltétel, utána a globális
+     kapacitás. Fordítva egy pályára sem lépett ember mellett is az „ügynökség
+     tele" üzenet állna, a felhasználó felszabadítana egy helyet, és a gomb
+     ettől még nem nyílna ki — az indoklás mindig ERRŐL az emberről szóljon. */
   const cs=(S.careerStats&&S.careerStats[p.n])||null;
-  return ((cs&&cs.matches)||0)>=SALE_LIST_MIN_MATCHES;}
+  const m=(cs&&cs.matches)||0;
+  if(m<SALE_LIST_MIN_MATCHES)return {kind:"matches",m,need:SALE_LIST_MIN_MATCHES-m};
+  /* AZ ÜGYNÖKSÉG KAPACITÁSA: egyszerre ennyi ügyet tud vinni. */
+  const cap=agencyMaxListings(),cnt=saleListingCount();
+  if(cnt>=cap)return {kind:"cap",cnt,cap};
+  return null;}
+function saleCanList(p){return !saleListBlock(p);}
 function saleListPlayer(p){
   if(!saleCanList(p))return null;
   const wait=SALE_OFFER_MIN_ROUNDS+Math.floor(Math.random()*(SALE_OFFER_MAX_ROUNDS-SALE_OFFER_MIN_ROUNDS+1));
@@ -31386,7 +31416,8 @@ function renderAgencyHubPanel(){
       <div style="font-size:13.5px;font-weight:700">🤝 Átigazolási ügynökség <span style="color:var(--gold)">${agencyStarsLabel()}</span></div>
       <div style="font-size:11.5px;color:var(--dim2);margin-top:3px;line-height:1.45">
         Pontok: <b style="color:var(--ink)">${have.toFixed(1)} / ${need}</b> a következő fél csillagig · ${a.deals||0} lezárt üzlet<br>
-        Egyszerre ${agencyMaxListings()} játékos a piacon · a licit-kúp csúcsa ${Math.round(agencyBidMode(0)*100)}% · a következő fél csillag ${fmtFt(aPrice)}</div>
+        Egyszerre ${agencyMaxListings()} játékos a piacon · a licit-kúp csúcsa ${Math.round(agencyBidMode(0)*100)}% · a következő fél csillag ${fmtFt(aPrice)}<br>
+        Piacra az vihető, aki már ${SALE_LIST_MIN_MATCHES} meccset játszott nálad — a kapacitás csak a felett számít.</div>
       <div style="position:relative;height:6px;background:var(--panel);border-radius:3px;margin-top:6px">
         <span style="position:absolute;left:0;top:0;height:6px;border-radius:3px;background:var(--gold);width:${Math.max(0,Math.min(100,have/need*100)).toFixed(1)}%"></span>
       </div>
@@ -33963,7 +33994,8 @@ function renderSaleOffersPanel(){
   $("twTitle").textContent="📈 Eladási ajánlatok";
   const back=()=>{csReturnToHub();};
   if(!list.length){
-    $("twBody").innerHTML=`<p style="font-size:12.5px;color:var(--dim2);line-height:1.55">Jelenleg senki nem áll a kirakatban. Egy játékost a lapján, az „Eladás" gomb alatt bocsáthatsz piacra — utána ${SALE_OFFER_MIN_ROUNDS}-${SALE_OFFER_MAX_ROUNDS} fordulón belül érkezik rá az első ajánlat.</p>`;
+    $("twBody").innerHTML=`<p style="font-size:12.5px;color:var(--dim2);line-height:1.55">Jelenleg senki nem áll a kirakatban. Egy játékost a lapján, az „Eladás" gomb alatt bocsáthatsz piacra — utána ${SALE_OFFER_MIN_ROUNDS}-${SALE_OFFER_MAX_ROUNDS} fordulón belül érkezik rá az első ajánlat.
+      <br><br>🔒 <b>Két feltétel</b> van, ezért lehet valakinél szürke a gomb: a játékosnak legalább <b>${SALE_LIST_MIN_MATCHES} meccset</b> kell játszania nálad (a piac csak arra licitál, akit már látott a csapatodban — a frissen igazolt embert nem lehet azonnal visszadobni), és az ügynökséged egyszerre <b>${agencyMaxListings()}</b> ügyet visz (${agencyStarsLabel()}). Amelyik hiányzik, azt a gomb felirata is kiírja.</p>`;
     $("twActions").innerHTML="";
     const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";ok.onclick=back;
     $("twActions").appendChild(ok);
@@ -35037,6 +35069,7 @@ function buildHubDetail(loc){
       const mBtn=document.createElement("button");
       mBtn.className="btn-s stepbtn";mBtn.style.marginTop="6px";
       mBtn.style.color="#7dd3fc";mBtn.style.borderColor="#0284c7";
+      let whyEl=null;   /* a zár indoklása; a gomb UTÁN kerül a lapra */
       if(listed){
         mBtn.textContent="📈 Levétel a piacról";
         mBtn.onclick=(ev)=>{
@@ -35045,17 +35078,48 @@ function buildHubDetail(loc){
           addLine(`📈 ${esc(shortName(p.n))} lekerült az eladási piacról — marad a keretben.`,"m life");
           renderHub();saveGame();};
       }else{
-        const cs=(S.careerStats&&S.careerStats[p.n])||null;
-        const m=(cs&&cs.matches)||0;
-        const ok=saleCanList(p);
-        mBtn.textContent="📈 Piacra bocsátás — várd ki a licitet";
-        if(!ok)mBtn.style.opacity=".5";
+        /* A ZÁR OKA A GOMBON ÉS A GOMB ALATT.
+           Egy szürke gomb indoklás nélkül hibának néz ki — pontosan ez a
+           bejelentés. A feltételt ezért nem igen/nem-ként olvassuk, hanem
+           okostul (saleListBlock), és mindkettőt kiírjuk: a feliratba a
+           HIÁNYZÓ dolog rövid alakja, a gomb alá pedig az, hogy MIÉRT van ott
+           a szabály és mit kell tenni érte. A régi setDraftStatus-üzenet a
+           draft-képernyő sávjába ment, ami a HUB-ban rejtve van — ott a
+           koppintás néma maradt. */
+        const blk=saleListBlock(p),ok=!blk;
+        let why=null;
+        if(blk&&blk.kind==="cap"){
+          mBtn.textContent=`📈 Piacra bocsátás — az ügynökség tele (${blk.cnt}/${blk.cap})`;
+          why=`🔒 Az ügynökséged (${agencyStarsLabel()}) egyszerre <b>${blk.cap}</b> ügyet visz, és most ${blk.cnt} áll a kirakatban. Előbb zárj le egyet — fogadj el vagy vegyél le valakit —, vagy fejleszd az ügynökséget.`;
+        }else if(blk&&blk.kind==="matches"){
+          mBtn.textContent=`📈 Piacra bocsátás — még ${blk.need} meccs kell (${blk.m}/${SALE_LIST_MIN_MATCHES})`;
+          why=`🔒 A piac csak olyanra licitál, akit már látott játszani nálad: <b>${SALE_LIST_MIN_MATCHES} meccs</b> kell, ${esc(shortName(p.n))} eddig <b>${blk.m}</b> meccset játszott. `
+            +(blk.m===0?`Amíg egyszer sem lépett pályára, csak az ígéretét lehetne eladni — `:`Adj neki meccseket, és a gomb magától kinyílik — `)
+            +`enélkül a frissen igazolt embert azonnal vissza lehetne dobni a piacra. Addig a <b style="color:var(--gold)">gyors eladás</b> áll nyitva, fix áron.`;
+        }else if(blk){
+          /* Ide nem jutunk el a mai szabályokkal (a családtag és a már kitett
+             játékos külön ágon megy), de ha egy új feltétel születik, akkor is
+             INDOKLÁS jelenjen meg, ne néma szürkeség. */
+          mBtn.textContent="📈 Piacra bocsátás — most nem lehetséges";
+          why=`🔒 Ez a játékos most nem vihető piacra.`;
+        }else{
+          mBtn.textContent="📈 Piacra bocsátás — várd ki a licitet";}
+        if(!ok){mBtn.style.opacity=".5";mBtn.style.color="var(--dim2)";mBtn.style.borderColor="var(--line)";}
+        /* A gomb alatti sor MÁR A KOPPINTÁS ELŐTT ott áll — nem kell hozzáérni
+           ahhoz, hogy kiderüljön, miért nem megy. A koppintás csak felvillantja,
+           hogy a szem odataláljon. */
+        if(why){
+          whyEl=document.createElement("div");
+          whyEl.style.cssText="font-size:11px;color:var(--dim2);margin-top:3px;line-height:1.45";
+          whyEl.innerHTML=why;}
         mBtn.onclick=(ev)=>{
           if(ev&&ev.stopPropagation)ev.stopPropagation();
           if(!saleCanList(p)){
-            setDraftStatus(saleMarketState().list.length>=agencyMaxListings()
-              ?`Az ügynökséged egyszerre ${agencyMaxListings()} játékost tud piacon tartani (${agencyStarsLabel()}) — előbb zárj le egy ügyet, vagy fejleszd az ügynökséget.`
-              :`Piacra csak olyan játékost vihetsz, aki legalább ${SALE_LIST_MIN_MATCHES} meccset játszott nálad — ${esc(shortName(p.n))} eddig ${m}-t.`);
+            if(whyEl){
+              whyEl.style.color="var(--gold)";
+              try{whyEl.scrollIntoView({behavior:"smooth",block:"nearest"});}catch(e){}
+              setTimeout(()=>{try{whyEl.style.color="var(--dim2)";}catch(e){}},1400);}
+            else renderHub();   /* közben változott a helyzet: rajzoljuk újra a lapot */
             return;}
           const band=saleBidBand(0);
           const ask=saleAskPrice(p);
@@ -35075,6 +35139,7 @@ function buildHubDetail(loc){
               addLine(`📈 ${esc(shortName(p.n))} kikerült az eladási piacra — az ajánlatot az átigazolási időszakban kapod meg.`,"m life");
               renderHub();saveGame();}});};}
       d.appendChild(mBtn);
+      if(whyEl)d.appendChild(whyEl);
       if(listed){
         const note=document.createElement("div");
         note.style.cssText="font-size:11px;color:var(--dim2);margin-top:3px;line-height:1.45";
