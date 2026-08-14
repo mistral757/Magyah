@@ -11062,10 +11062,41 @@ function oldBoostNote(entry){
    "remegteti" a piacot. */
 function normalizeMarketAge(entry){
   if(oppTargetRating>100&&entry.age<24)entry.age=24+Math.floor(Math.random()*13);}
+/* ================= A PIAC KÖVETI AZ IGAZOLÁSI SÁVOT =================
+   Az igazolási sáv teteje a KERETEDBŐL is jön (a legjobb játékosod nyers
+   ereje), a piac viszont eddig kizárólag a mezőny szintjéből épült. Ha a kettő
+   szétnyílik, a sáv felső harmada üres levegő: hiába céloz a scout 118-ra, ha a
+   poolban a legjobb 108 — a legközelebbi találat mindig ugyanaz a néhány ember.
+   Ez a tag zárja be a rést: felhúzza a piac tetejét a sáv tetejéig, de
+   legfeljebb MARKET_BAND_LIFT_MAX ponttal.
+
+   MIÉRT KÜLÖN TAG, és miért nem a marketPeakShift-be írjuk bele: azt az
+   akadémia (twYouthTalent), az ikon-sáv (iconFieldShift) és az ajándék-skill
+   esélye (skilledSignChance) is olvassa — ott a MEZŐNY a helyes mérce, nem a
+   kereted ereje. Ez a lift kizárólag a PIACI játékosok peakjére hat.
+
+   NEM SZALAD EL: a sáv összetevői a mezőnyhöz vannak klampolva
+   (SIGNING_BAND_CLAMP), a lift maga is korlátos, és a `top` a lift NÉLKÜLI
+   piactetőből számol — tehát a tag nem tudja önmagát hizlalni.
+
+   A MARKET_INF_MAX_LAG SZABÁLYA ENYHÜL, de csak ott, ahol kell: az a padló azt
+   ígéri, hogy a piac teteje nem marad a mezőny mögött, és hogy a legjobb
+   megvásárolható ember nem írja felül azonnal a keretedet. A lift KIZÁRÓLAG
+   akkor lép be, ha a kereted MÁR a mezőny fölött jár — akkor viszont pont az
+   ígéret második fele volna hamis: ott nem a piac szaladna el előled, hanem te
+   hagytad magad mögött a piacot. */
+const MARKET_BAND_LIFT_MAX=12;
+function marketBandLift(){
+  if(gameMode!=="career"||!careerPool)return 0;
+  let hi=0;
+  try{hi=signingBand().hi;}catch(e){return 0;}
+  if(!isFinite(hi))return 0;
+  const top=MARKET_TOP_BASEPEAK+marketPeakShift();
+  return Math.max(0,Math.min(MARKET_BAND_LIFT_MAX,Math.round(hi-top)));}
 function applyMarketShift(entry){
   if(entry.basePeak==null)entry.basePeak=entry.peak;
   if(entry.baseTsi==null)entry.baseTsi=entry.tsi;
-  const shift=marketPeakShift();
+  const shift=marketPeakShift()+marketBandLift();
   entry.peak=Math.min(ratingCap(),entry.basePeak+shift);
   entry.tsi=shift>0?Math.max(entry.baseTsi,peakToTsi(entry.peak)):entry.baseTsi;}
 /* ================= INFINITY: A SZINTLÉPÉS MÁR NEM EMELI A KERETEDET =========
@@ -14136,9 +14167,20 @@ function twAttrTarget(aKey){
      A sebesség marad az egyetlen kivétel — de csak az Infinity megnyitásáig:
      azon túl neki sincs 99-es határa, csak negyed tempóval fejlődik. */
   const cap=attrCapFor(aKey);
-  /* MP-nyáron a referencia a két keret közös szintje, nem a tavalyi nehézség —
-     lásd mpSummerRefRating a signingTargetOvr mellett */
-  return Math.max(45,Math.min(cap,(transferRefRating()||84)+TW_ATTR_TARGET_BONUS));}
+  /* A KÉT KERESÉSI MÓD UGYANARRÓL A REFERENCIÁRÓL indul. Amióta a poszt-keresés
+     célja az igazolási SÁV közepe (signingBand: mezőny + kereted nyers ereje +
+     a legjobb embered), a képesség-keresésnek is onnan kell néznie — különben
+     egy erős klubnál a poszt-keresés a sáv szerint hozna 110-eseket, a
+     képesség-keresés meg a puszta mezőnyszint szerint 100-asokat, és a két
+     gomb ugyanabban az ablakban mondana mást. (MP-nyáron a referencia a két
+     keret közös szintje — ezt a transferRefRating intézi a sávon belül.)
+     A SIGNING_OFFSET-et visszaadjuk: a sáv közepén rajta ül, a képesség-
+     keresésen viszont sosem volt rajta — így ha a három szám egybeesik (a
+     karrier eleje), a célérték BETŰRE a régi marad. */
+  let base=null;
+  try{base=signingBand().mid-SIGNING_OFFSET;}catch(e){base=null;}
+  if(base==null||!isFinite(base))base=transferRefRating()||84;
+  return Math.max(45,Math.min(cap,Math.round(base)+TW_ATTR_TARGET_BONUS));}
 /* Elfogyott-e az attribútum-keresési keret ebben az ablakban?
    NYITOTT CHECKPOINT-ABLAKBAN közvetlenül az ablak kvótájára megyünk, NEM a
    twSession()-ön keresztül. A twSession a TW-től függ, az viszont a HUB
@@ -14430,7 +14472,7 @@ const GLOSSARY={
   edzesterv:{title:"Edzésterv",text:"A HUB-ban kijelölhetsz egy FŐ és egy MELLÉK edzést. Mindkettőhöz egy attribútumot választasz (Védekezés, Sebesség, Védés, Passz, Gólszerzés) és legfeljebb 2 poszt-csoportot (kapus, védők, középpályások, csatárok), akikre vonatkozik. A fő edzés meccsenként 0,8 pontot ad a választott attribútumra, a mellék a felét (0,4) — cserébe az érintett játékosok NEM edzett attribútumai lassabban gyűlnek. Az edzés tehát nem ingyen gyorsítás, hanem irányválasztás: azt fejleszted, amire a taktikádnak szüksége van. A hatás korfüggő: 21 év alatt kétszeres, 25 alatt 1,6-szoros, 30 alatt 0,8-szoros, afölött 0,4-szeres — fiatalt érdemes képezni. Egy attribútum a poszt-profiljához képest +30-ig specializálható, de a Rating-hozam csökken (a +8 fölötti rész felét, a +16 fölötti a negyedét éri) — a TAKTIKA-illeszkedésben viszont teljes értékkel számít. Így egy 130-as passzú középpályás valódi passzmester lesz a Labdatartáshoz, anélkül hogy a Ratingje elszaladna. A SEBESSÉG külön eset: 1,5x lassabban formálható, és a játék magától csak a születési érték +15%-áig viszi — azon túl KIZÁRÓLAG edzéssel jutsz feljebb, 99-ig. Infinityben a 99 is feloldódik, de fölötte a sebesség már csak negyed tempóval épül."},
   karriermod:{title:"Karrier mód vs. Klasszikus mód",text:"A klasszikus egy szezonos móddal szemben a karrier mód több szezonon át tartó, fejlődő történet: a játékosaid öregednek és fejlődnek, van átigazolási piac, scout, akadémia, és a csapatod hosszú távon formálódik."},
   tsi:{title:"TSI",text:"A TSI egy rejtett, a Ratingnél sokkal szélesebb skálájú érték, ami egy játékos hosszú távú, valódi potenciálját mutatja. Egy fiatal, alacsony Ratingű, de magas TSI-jű játékos idővel akár sztárrá válhat. IDEGEN játékosnál a scoutod ereje szabja meg, hány TSI-t nézhetsz meg — azt viszont te választod ki, kikét. A SAJÁT KERETEDNÉL nincs korlát: minden játékosod TSI-je folyamatosan látszik a HUB-ban. Amíg kevesebb, mint 15 meccset játszott nálad, a scoutod érkezéskori becslése látszik (~ jellel); 15 meccs után a pontos érték — ennyi idő alatt kiderül, mi van benne. A becslés nem sorsolódik újra szezononként: az érkezéskori tévedés aránya fix, tehát ha a játékos TSI-je nő (ifi-boost, akadémia, kihívás-jutalom), a becslés vele mozdul."},
-  scout:{title:"Scout",text:"A scoutod csillagereje (1-5) szabja meg, hány IDEGEN játékos TSI-jét nézheted meg egy keretből vagy jelöltlistából — és mivel az árak rejtve vannak, a scout-megtekintés az egyetlen módja felmérni egy leigazolás előtt álló játékos valódi erejét. (A saját játékosaid TSI-je ingyen, folyamatosan látszik: a scout korlátja a VÁSÁRLÁS előtti felmérésről szól. A scout csillagereje ott is számít, hogy mennyire pontos a becslés, amit a keretedbe került játékosról az első 15 meccsén látsz.) A scout a tárgyalások SZÁMÁT is korlátozza egy átigazolási ablakban (a megtekintések számának 2-3-szorosa): egy jobb scout több próbálkozást enged. És azt is a scout szabja meg, HÁNYSZOR küldheted ki egyáltalán posztokat felderíteni: maxos scouttal 8 felderítés jut sessiononként (a téli ablak 2 körből áll, tehát összesen 16; a rövid ablak 1 körből, tehát 8), a nyári vásárlásnál pedig ennek a háromszorosa (24), de az szezononként csak egyszer. Egy adott posztot ugyanabban a sessionben legfeljebb 4-szer nézhetsz meg — érdemes tehát átgondolni, hova küldöd. Idővel fejlődik, és fiatal (25 év alatti) tehetségeket keres előszeretettel."},
+  scout:{title:"Scout",text:"A scoutod csillagereje (1-5) szabja meg, hány IDEGEN játékos TSI-jét nézheted meg egy keretből vagy jelöltlistából — és mivel az árak rejtve vannak, a scout-megtekintés az egyetlen módja felmérni egy leigazolás előtt álló játékos valódi erejét. (A saját játékosaid TSI-je ingyen, folyamatosan látszik: a scout korlátja a VÁSÁRLÁS előtti felmérésről szól. A scout csillagereje ott is számít, hogy mennyire pontos a becslés, amit a keretedbe került játékosról az első 15 meccsén látsz.) A scout a tárgyalások SZÁMÁT is korlátozza egy átigazolási ablakban (a megtekintések számának 2-3-szorosa): egy jobb scout több próbálkozást enged. És azt is a scout szabja meg, HÁNYSZOR küldheted ki egyáltalán posztokat felderíteni: maxos scouttal 8 felderítés jut sessiononként (a téli ablak 2 körből áll, tehát összesen 16; a rövid ablak 1 körből, tehát 8), a nyári vásárlásnál pedig ennek a háromszorosa (24), de az szezononként csak egyszer. Egy adott posztot ugyanabban a sessionben legfeljebb 4-szer nézhetsz meg — érdemes tehát átgondolni, hova küldöd. Idővel fejlődik, és fiatal (25 év alatti) tehetségeket keres előszeretettel. MILYEN SZINTEN KERES: nem egyetlen szám körül, hanem egy SÁVBAN, amit három érték feszít ki — a MEZŐNY szintje (a scout szokásos 2 pontos visszafogásával), a KERETED nyers ereje (a kezdő 11 Rating-átlaga, poszt-illeszkedés nélkül) és a LEGJOBB JÁTÉKOSOD nyers ereje. A három közül a legkisebb adja a sáv alját, a legnagyobb a tetejét, a számtani közepük pedig a legvalószínűbb találatot; alul-felül 5% ráhagyás van, és a sávon belül kúp alakú a valószínűség — a közepe felé sűrűsödik, a széleken ritkul. Ebből következik, hogy a klub MÉRETE is számít, nem csak a liga: ugyanazon a mezőnyön egy 125-ös sztárt foglalkoztató csapatnak szélesebb a sávja (fentről is jön ajánlat), egy újjáépülő keretnek pedig lejjebb csúszik, hiába erős a liga. A piac ezt követi: ha a kereted kinövi a mezőnyt, a kínálat teteje is feljebb kúszik, hogy a sáv felső vége ne legyen üres."},
   akademia:{title:"Akadémia",text:"Minden 4. meccs után egy fiatal akadémiai tehetség mutatkozik be — alacsony jelenlegi Ratinggel, de szokatlanul magas TSI-vel. Az akadémia minősége a csapatod aktuális erejéhez igazodik: egy erősebb csapat jobb tehetségeket termel. Ha nincs helyed vagy még korainak érzed, az akadémián is hagyhatod: ott CÉLZOTT képzést kap, ezért gyorsabban fejlődik, mintha a cserepadon ülne — de lassabban, mintha játékperceket kapna a kezdő 11-ben. Kis eséllyel a TSI-je is megugrik. Később egyre nagyobb eséllyel jelentkezik vissza, és látod, mennyit fejlődött közben. Az akadémiai idő 21 évesen lejár: ekkor egy utolsó, „most vagy soha\" ajánlatot kapsz rá."},
   budzse:{title:"Átigazolási büdzsé és árak",text:"Minden szezon elején kapsz egy költségvetést a csapatod erejéhez mérten, és a felhasználatlan rész átvihető a következő szezonra. A vásárlás DRÁGA (a piaci érték fölött, felárral — magasabb mezőnyön még többe kerül), az eladás szerényebb összeget hoz. Ez tudatos: egy nagy játékos beszerzése több szezonnyi spórolás, nem egy szezon pénzéből megvehető. Az árakat a lista nem mutatja — csak amikor rákattintasz a vételi szándékra. A HUB-ban a zöld chip a HALMOZOTT egyenleged, alatta pedig a SZEZONONKÉNTI keret bontása áll: mennyi jön a csapaterődből, és mit tesz hozzá vagy vesz el az edzői fizetésemelés / megsapkázás (kihívás-jutalom, illetve büntetés, ±10% lépésekben) és a választott fejlődési tempó (a Komótos ×0,90, a Csigatempó ×0,75, a Gleccser ×0,60 — a lassabb tempó a piacot is visszafogja, különben csak megkerülnéd a lassítást vásárlással). Ugyanez a szorzó ül a MÉRFÖLDKŐ-JUTALMAKON is: a pénzjutalom a büdzsén keresztül, a csapatstílus-pont pedig közvetlenül — a lassított karrier tehát a stílus-fát is arányosan lassabban építi."},
   elvagyodas:{title:"Elvágyódás és megtartás",text:"Az átigazolási időszakok egyik lehetséges eseménye: valaki a keretedből távozni szeretne. Régen ez egyszerűen ELVETTE a játékost — ma már döntés. Kapsz egy megtartási díjat, és háromfelé mehetsz: kifizeted azonnal (marad), HALASZTOTT megállapodást kötsz (marad, de a díj a szezon végén esedékes), vagy elengeded. A halasztott út a csapda: ha a szezon végére nem jön össze a pénz, a játékos mégis távozik — kezdőemberként érkezik helyette valaki, de nem te választod. A jó csapatkémia és a magas morál csökkenti az elvágyódás esélyét, tehát ez ellen nem csak pénzzel lehet védekezni."},
@@ -26105,32 +26147,26 @@ function twScoutFailed(err,catKey){
   w.innerHTML=`⚠️ <b>A felderítés nem indult el</b>${catKey?` (${esc(twCatLabel(catKey))})`:""} — a <b>felderítési kereted megmaradt</b>, próbálj másik posztot.`
     +`<div style="font-size:11px;color:var(--dim2);margin-top:4px">${esc(msg)}</div>`;
   $("twBody").appendChild(w);}
-/* ================= IGAZOLÁSI SZINT — A MEZŐNYHÖZ KÖTVE =================
-   A scout ajánlatai NEM a teljes poolból sorsolódnak, hanem a választott
-   ellenfél-erősség (oppTargetRating) köré, kicsivel az alá hangolva. Mivel
-   minden számítás az élő oppTargetRating-ből indul, a szintlépés azonnal és
-   automatikusan magával húzza az igazolási szintet is — külön nyilvántartás
+/* ================= IGAZOLÁSI SZINT — A MEZŐNY CSAK AZ EGYIK LÁBA =========
+   A scout ajánlatai NEM a teljes poolból sorsolódnak. A referencia sokáig
+   EGYETLEN szám volt: a választott ellenfél-erősség (oppTargetRating), kicsivel
+   az alá hangolva (SIGNING_OFFSET). Ez lett SÁVVÁ — a részleteket lásd a
+   signingBand()-nél; a mezőny szintje ott az egyik a három összetevő közül, és
+   továbbra is ez a horgony, amihez a másik kettő klampolva van. A szintlépés
+   így ugyanúgy azonnal magával húzza az igazolási szintet, külön nyilvántartás
    nélkül, és a mentést is túléli (az oppTargetRating mentődik).
 
-   Példa: 88-ra emelt mezőny → SIGNING_OFFSET −2 → a scout a 86-os szint körül
-   keres, ±SIGNING_BAND sávban.
+   MIÉRT NEM SZŰKÜL BE A JELÖLTMEZŐ: a pool valós játékosokból áll, és fölfelé
+   nagyon ritkul (egy karrierben átlagosan ~79 fő van a 85-89 sávban, de a
+   90-94-ben már csak ~14, a 95+ -ben ~1). Nincs kemény szűrő: a sorsolt
+   célértékhez a SIGNING_NEAREST_N legközelebbi közül húzunk, tehát üres
+   eredmény akkor sem lehet, ha a sáv egy ritka szakaszra esik.
 
-   MIÉRT TÁGUL A SÁV: a pool valós játékosokból áll, és fölfelé nagyon ritkul
-   (egy karrierben átlagosan ~79 fő van a 85-89 sávban, de a 90-94-ben már csak
-   ~14, a 95+ -ben ~1). Ha egy poszton nincs elég jelölt a szűk sávban, a sáv
-   fokozatosan tágul, amíg össze nem jön a szükséges létszám — így SOHA nem
-   fordulhat elő üres eredmény amiatt, hogy túl szűkre húztuk.
-
-   ÉLETKOR: a ≤25 éves szűrő MÁSODLAGOSSÁ vált. Ha a célsávban van elég fiatal,
-   azokat kapod (alacsony/közepes szinten ez a jellemző) — ha nincs, a SZINT
-   győz az életkor felett. 86-os szinten ugyanis a ≤25 éves, 86-os játékos a
-   valóságban is alig létezik: az egész poolban átlagosan ~4 ilyen van. */
+   ÉLETKOR: a ≤25 éves szűrő MÁSODLAGOS. Ha a célsávban van elég fiatal, azokat
+   kapod (alacsony/közepes szinten ez a jellemző) — ha nincs, a SZINT győz az
+   életkor felett. 86-os szinten ugyanis a ≤25 éves, 86-os játékos a valóságban
+   is alig létezik: az egész poolban átlagosan ~4 ilyen van. */
 const SIGNING_OFFSET=-2;        /* ennyivel a mezőny szintje ALATT keres a scout */
-const SIGNING_SIGMA=3.4;        /* a szokásos ajánlatok szórása a célszint körül */
-const SIGNING_GEM_CHANCE=0.18;  /* ekkora eséllyel a célnál JOBB fogás bukkan fel */
-const SIGNING_DUD_CHANCE=0.16;  /* ekkora eséllyel GYENGÉBB ajánlat jön */
-const SIGNING_GEM_SPAN=[3,12];  /* a jó fogás ennyivel a célszint fölött */
-const SIGNING_DUD_SPAN=[4,16];  /* a gyenge ajánlat ennyivel a célszint alatt */
 const SIGNING_NEAREST_N=9;      /* a sorsolt célértékhez ennyi legközelebbi közül húz */
 const SIGNING_YOUNG_AGE=25;     /* a fiatalok enyhe előnyt kapnak */
 const SIGNING_YOUNG_WEIGHT=2.2;
@@ -26183,24 +26219,86 @@ function transferRefLabel(){
   return v!=null
     ?`a két keretetek közös szintjéhez (${v}) mérten`
     :`a ${ragSzam(oppTargetRating)} mezőnyhöz mérten`;}
-function signingTargetOvr(){
-  /* a felső korlát a Rating-plafon, nem egy fix 97 — különben Infinityben,
-     200-as mezőnyön is 97-es játékosokat keresne a scout */
-  return Math.max(45,Math.min(ratingCap(),transferRefRating()+SIGNING_OFFSET));}
-/* Minden jelölthöz KÜLÖN sorsolunk célszintet — nincs többé közös, hard sáv.
-   A régi megoldás (±3-as sáv + 1/(1+távolság) súlyozás) 6-20 fős jelöltmezőt
-   hagyott, amiből a legközelebbiek uralkodtak: 88-as mezőnyön mérve 30% eséllyel
-   PONTOSAN ugyanaz a 3 jött ki a scout újraküldésekor, és 63% eséllyel legalább
-   kettő közös. Mostantól egy scoutolás hozhat egy szint körülit, egy kiugróan
-   jót és egy gyengét is — és két egymás utáni scoutolás sem ugyanazt adja. */
+/* ================= AZ IGAZOLÁSI SÁV: HÁROM SZÁM, EGY KÚP =================
+   A scout referenciája többé nem EGYETLEN szám (a mezőny szintje), hanem egy
+   SÁV, amit három érték feszít ki:
+     · a NEHÉZSÉGI SZINT — a mezőny, amiben játszol (MP-nyáron a két keret
+       közös szintje; a SIGNING_OFFSET továbbra is rajta ül);
+     · a KERETED NYERS EREJE — a kezdő 11 Rating-átlaga, poszt-illeszkedés
+       NÉLKÜL: nem az számít, jól állnak-e a helyükön, hanem hogy kik ők;
+     · a LEGJOBB JÁTÉKOSOD NYERS EREJE — a klub vonzereje egy névhez tapad.
+   A három LEGKISEBBIKE adja a sáv alját, a LEGNAGYOBBIKA a tetejét, a SZÁMTANI
+   KÖZEPÜK a legvalószínűbb találatot. Alul-felül 5% ráhagyás: enélkül a sáv
+   nullára szűkülne, amikor a három szám egybeesik (a karrier elején pontosan ez
+   a helyzet), és a széleken sem maradna esély meglepetésre.
+
+   MIÉRT JOBB EZ EGYETLEN SZÁMNÁL. A mezőny szintje azt mondja meg, MILYEN
+   LIGÁBAN játszol — azt nem, MEKKORA KLUB vagy. Két csapat ugyanazon a 100-as
+   mezőnyön: az egyik tizenegy 98-assal, a másik nyolc 90-essel és egy 125-ös
+   sztárral. A régi képlet mindkettőnek ugyanazt a 98-as célt adta. A sáv az
+   elsőnek szűk és pontos, a másodiknak széles — lentről is, fentről is jöhet
+   ajánlat, mert egy ilyen klub tényleg mindkettőt vonzza.
+
+   A KLAMP KÖTI A MEZŐNYHÖZ: egyik összetevő sem távolodhat a nehézségi szinttől
+   SIGNING_BAND_CLAMP-nál messzebb. Enélkül egyetlen kiugró sztár önmagát
+   erősítő spirálba vinné a sávot (veszel egy jobbat → a legjobbad erősebb → a
+   sáv feljebb csúszik → még jobbat veszel).
+
+   A KÚP: a sávon belül HÁROMSZÖG-eloszlásból húzunk — a csúcs a középértéknél,
+   onnan lineárisan fut ki nullára a két szélén. Ez váltja ki a régi
+   gem/dud-lottót (18% kiugró + 16% gyenge + normális szórás): ott három külön
+   szabály szólt bele ugyanabba a döntésbe, mostantól egy görbe mondja meg
+   mindet — és a "kiugró fogás" nem külön sorsolás, hanem a sáv széle. */
+const SIGNING_BAND_PAD=0.05;     /* alul-felül ennyi ráhagyás a sávon */
+const SIGNING_BAND_CLAMP=15;     /* egy összetevő sem lóghat ennél messzebb a mezőnytől */
+/* A NYERS erő a játékos-lapon látszó Rating (pOvrDisplay): a képességei és a
+   tartós módosítói benne vannak, a poszt-illeszkedés és a taktika NINCS — a
+   piacot az érdekli, ki az ember, nem az, hogy jó helyen áll-e nálad. */
+function bandRawOvr(p){
+  try{return pOvrDisplay(p);}catch(e){return (p&&p.ovr)||0;}}
+function bandTeamRaw(){
+  const f=slots.filter(s=>s.player);
+  if(!f.length)return null;
+  return f.reduce((a,s)=>a+bandRawOvr(s.player),0)/f.length;}
+/* A legjobb játékosod — a padról és a tartalék-keretből is számít. */
+function bandBestRaw(){
+  let R=[];
+  try{R=fullCareerRoster()||[];}catch(e){return null;}
+  let m=null;
+  R.forEach(p=>{if(!p)return;const v=bandRawOvr(p);if(m==null||v>m)m=v;});
+  return m;}
+/* refOverride: egy MÉG NEM ÉRVÉNYES mezőnyszinttel is kiszámolható a sáv — a
+   szintlépés-előnézetnek pontosan erre van szüksége. */
+function signingBand(refOverride){
+  const ref=(refOverride!=null&&isFinite(refOverride))?refOverride:(transferRefRating()||84);
+  const d=Math.max(45,Math.min(ratingCap(),ref+SIGNING_OFFSET));
+  const cl=v=>Math.max(d-SIGNING_BAND_CLAMP,Math.min(d+SIGNING_BAND_CLAMP,v));
+  let team=bandTeamRaw(),best=bandBestRaw();
+  team=(team==null||!isFinite(team))?d:cl(team);
+  best=(best==null||!isFinite(best))?d:cl(best);
+  const lo=Math.max(45,Math.min(d,team,best)*(1-SIGNING_BAND_PAD));
+  const hi=Math.min(ratingCap(),Math.max(lo,Math.max(d,team,best)*(1+SIGNING_BAND_PAD)));
+  const mid=Math.max(lo,Math.min(hi,(d+team+best)/3));
+  return {d,team,best,lo,hi,mid};}
+/* A legvalószínűbb találati szint — ezt írja ki a felület. */
+function signingTargetOvr(){return Math.round(signingBand().mid);}
+/* A sáv egy mondatban, a scout-panelekhez. */
+function signingBandLabel(refOverride){
+  const b=signingBand(refOverride);
+  return `a <b>${Math.round(b.lo)}–${Math.round(b.hi)}</b> sávban, leginkább a ~${ragSzam(b.mid)} szint körül`;}
+/* Minden jelölthöz KÜLÖN sorsolunk célszintet — nincs közös, hard sáv. A régi
+   megoldás (±3-as sáv + 1/(1+távolság) súlyozás) 6-20 fős jelöltmezőt hagyott,
+   amiből a legközelebbiek uralkodtak: 88-as mezőnyön mérve 30% eséllyel
+   PONTOSAN ugyanaz a 3 jött ki a scout újraküldésekor. A kúp ezt megtartja:
+   minden húzás önálló, és a sáv szélei is elérhetők. */
 function rollSigningTarget(){
-  const base=signingTargetOvr(),r=Math.random();
-  if(r<SIGNING_GEM_CHANCE)
-    return base+SIGNING_GEM_SPAN[0]+Math.random()*(SIGNING_GEM_SPAN[1]-SIGNING_GEM_SPAN[0]);
-  if(r<SIGNING_GEM_CHANCE+SIGNING_DUD_CHANCE)
-    return base-SIGNING_DUD_SPAN[0]-Math.random()*(SIGNING_DUD_SPAN[1]-SIGNING_DUD_SPAN[0]);
-  /* három egyenletes átlaga ≈ normális eloszlás, SIGNING_SIGMA szórással */
-  return base+((Math.random()+Math.random()+Math.random())/3-0.5)*6*SIGNING_SIGMA;}
+  const b=signingBand(),lo=b.lo,hi=b.hi,m=b.mid;
+  if(!(hi>lo))return m;
+  /* háromszög-eloszlás inverz transzformációval: a csúcs m-nél van */
+  const u=Math.random(),c=(m-lo)/(hi-lo);
+  return (u<c)
+    ? lo+Math.sqrt(u*(hi-lo)*(m-lo))
+    : hi-Math.sqrt((1-u)*(hi-lo)*(hi-m));}
 /* A sorsolt célértékhez a legközelebbi néhány közül húz — NEM mindig a
    legközelebbit. Ez a második fele az ismétlődés megszüntetésének: enélkül
    ugyanaz a célérték mindig ugyanazt a játékost adná vissza. */
@@ -26296,7 +26394,16 @@ function twScout(){
         +(gameMode==="career"?`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A scout ${transferRefLabel()} a <b>${ragSzam(twAttrTarget(aKey))} ${ATTR_LABELS[aKey]}</b> körül vagy fölött keresett — poszttól függetlenül.${
             aKey==="seb"&&isFinite(speedCap())&&twAttrTarget("seb")>=speedCap()?` A sebesség plafonja ${speedCap()}, feljebb nincs mit keresni.`:""}</div>`:"")
       : `<div class="h" style="color:var(--gold);font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px">A scout ${cands.length} lehetőséget talált (${twCatLabel(TW.category)})</div>`
-        +(gameMode==="career"?`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A scout ${transferRefLabel()} a ~${ragSzam(signingTargetOvr())} szint körül keresett.</div>`:""));
+        +(gameMode==="career"?(()=>{
+            const b=signingBand();
+            /* A sáv HÁROM összetevőjét kiírjuk: enélkül a felhasználó csak egy
+               számpárt lát, és nem érti, miért mozdult el a keresés, amikor a
+               mezőnyhöz hozzá sem nyúlt. Az első tag MP-nyáron a két keret
+               közös szintje — ugyanaz, amit a transferRefLabel is mond. */
+            const lvlN=(typeof mpSummerRefRating==="function"&&mpSummerRefRating()!=null)?"közös szint":"mezőny";
+            return `<div style="font-size:11.5px;color:var(--dim2);margin-bottom:6px">A scout ${signingBandLabel()} keresett.`
+              +`<br><span style="font-size:10.5px">A sávot három szám feszíti ki: ${lvlN} ${Math.round(b.d)} (a scout szokásos ${SIGNING_OFFSET}-jével) · kereted nyers ereje ${Math.round(b.team)} · legjobb embered ${Math.round(b.best)}.</span></div>`;})()
+          :""));
   const box=document.createElement("div");box.className="plist";
   const revealedNames=new Set();
   const budget={remaining:gameMode==="career"?computeRevealBudget(cands.length,scout):0};
@@ -31991,7 +32098,6 @@ function showLevelChangePicker(direction){
     <div id="hubSchedRow" style="margin-top:9px;padding:8px 10px;background:var(--panel2);border-radius:7px;
          display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer"></div>`;
   const signHint=()=>{
-    const t=Math.max(45,Math.min(97,state.value+SIGNING_OFFSET));
     const gap=levelGap(state.value);
     const verdict=gap>=8?'<span style="color:var(--red)">tét nélküli — túl könnyű</span>'
       :gap>=6?'<span style="color:var(--gold)">kényelmes</span>'
@@ -32003,8 +32109,9 @@ function showLevelChangePicker(direction){
       +(mpSummerRefRating()!=null
         /* MP-nyáron a javaslat NEM mozdítja a scoutot: az igazolások referenciája
            a két keret közös szintje, a javaslat csak az új szezon mezőnyét formálja */
-        ?`<br>Közös karrierben a nyári igazolások referenciája a két keretetek közös szintje — a scout most a ~${ragSzam(signingTargetOvr())} szint körül keres, a javaslatod pedig az új szezon mezőnyére hat.`
-        :`<br>A scout ezután a ~${ragSzam(t)} szint körül keres majd igazolásokat (jelenleg ~${signingTargetOvr()}).`);};
+        ?`<br>Közös karrierben a nyári igazolások referenciája a két keretetek közös szintje — a scout most ${signingBandLabel()} keres, a javaslatod pedig az új szezon mezőnyére hat.`
+        :`<br>A scout ezután ${signingBandLabel(state.value)} keres majd igazolásokat (most: ${signingBandLabel()}).`
+          +`<br><span style="font-size:11px;color:var(--dim2)">A sávot három szám adja: a mezőny, a kereted nyers ereje és a legjobb játékosod — ezért mozdul akkor is, ha nem a mezőnyt állítod.</span>`);};
   signHint();
   /* Az auto szintkövetés itt is kapcsolható — a kezdőképernyőn választott
      beállítás nem végleges, a karrier bármely szezonhatárán átbillenthető. */
@@ -32083,7 +32190,7 @@ function showLevelChangePicker(direction){
       renderHub();csReturnToHub();return;}
     applyOppLevel(state.value);
     S.consecutiveTitles=0;S.consecutiveBadSeasons=0;
-    addLine(`✦ Új nehézségi szint! A mezőny a következő szezontól: ${oppTargetRating} · ${diffTierLabel(oppTargetRating)} — a scout mostantól a ~${ragSzam(signingTargetOvr())} szint körül keres igazolásokat.`,"m life");
+    addLine(`✦ Új nehézségi szint! A mezőny a következő szezontól: ${oppTargetRating} · ${diffTierLabel(oppTargetRating)} — a scout mostantól ${signingBandLabel()} keres igazolásokat.`,"m life");
     csReturnToHub();};
   const backBtn=document.createElement("button");backBtn.className="btn-s stepbtn";backBtn.style.marginTop="6px";
   backBtn.textContent="Mégsem, maradok a jelenlegi szinten";
