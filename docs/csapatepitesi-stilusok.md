@@ -954,6 +954,34 @@ igényel új szimulációs ágat.
   után 32) szem egy sorban kilógna a kártyából, és vízszintes görgetést okozna
   a telefonon. A rövid családok képe változatlan.
 
+* **Osztott dicsőség — olcsó képesség a Béke és harmóniának (3.3.10).** A
+  stílus mérőszáma és a mérföldkövei is arról szólnak, hogy SOKAN szálljanak be
+  a termelésbe (különböző gólszerzők egy idényben, akik valaha betaláltak a
+  klubnál, és a színes paletta / szivárvány lépcsők). A meccsmotor viszont
+  ezzel szemben dolgozott: a gólszerző és a gólpasszadó sorsolásának súlya a
+  Ratinggel nő, tehát a legjobb emberek elviszik a termés nagy részét.
+
+  Az új, **1. szintű (olcsó: 14/24/38 pont)** trait a súlyok eloszlását
+  lapítja: minden jelölt súlya **15 / 25 / 50%-ban** közelít a mezőny átlagához
+  (`styleSpreadWeights`, a `weightedPick` új `spreadSkip` paraméterén át). Öt
+  sorsolás kapja meg: büntetőrúgó, rendes gól, 90+ dráma-gól, hosszabbítás-gól
+  és gólpassz.
+
+  Mérve egy tipikus kezdő 11-en (kapus, 4 védő, 4 közép, 2 csatár), a két
+  csatár együttes gólrészesedése: **52,5% → 47,6% (15%) → 44,3% (25%) → 36,2%
+  (50%)**; a védőké fejenként 1,9% → 6%.
+
+  **Amihez nem nyúl:** hogy ESIK-E gól. A sorsolás csak azt dönti el, KI
+  szerzi — a gólok számát a meccsmotor gólrátája adja (ugyanez a megkülönböztetés
+  áll a `GOALW_SCALE` megjegyzésében is). Ezért lehet a legolcsóbb ársávban: nem
+  erősít, csak szétteríti a termést.
+
+  **A kapus kimarad.** Az első változat a teljes mezőnyt lapította, és mérve a
+  3. szinten a csapat góljainak ~5%-át adta volna a kapusnak (a `GOALW.KP` 0,02,
+  tehát az átlagra keverés őt emelte a legtöbbet) — idényenként négy-öt
+  kapusgól. A kapus súlya ezért érintetlen marad, és az átlagba sem számít bele.
+  A nulla súly (kiállított játékos) szintén nulla marad.
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
