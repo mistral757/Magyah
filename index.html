@@ -2785,7 +2785,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.12";
+const APP_VERSION="3.3.13";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -27211,10 +27211,15 @@ function twScout(){
         return (e.attrs[aKey]||0)>=t-TW_ATTR_TOLERANCE;});}
     /* Az ÁR kiszámítása sem borulhat fel egy sérült bejegyzésen: aminek nincs
        értelmezhető ára, az egyszerűen nem jelölt. */
+    /* A TOKEN BIRTOKÁBAN nincs ár-szűrés: a lista a teljes mezőnyt hozza, mert
+       bármelyiküket ki tudod fizetni vele. Enélkül a jutalom sosem juthatna el
+       oda, ahol értelme van. */
+    const tok=buyTokenReady();
     const affordable=poolCands.filter(e=>{
       let pr=Infinity;
       try{pr=buyPrice(e);}catch(err){return false;}
-      return (typeof pr==="number"&&isFinite(pr))?pr<=S.transferBudget:false;});
+      if(!(typeof pr==="number"&&isFinite(pr)))return false;
+      return tok||pr<=S.transferBudget;});
     if(poolCands.length&&!affordable.length)budgetBlocked=true;
     poolCands=affordable;
     while(cands.length<want&&cands.length<poolCands.length&&guard<400){
@@ -27339,7 +27344,8 @@ function twScoutExhausted(){
 function twConfirmBuy(cand,onConfirm,onBack){
   if(TW&&TW.busy)return;
   const price=gameMode==="career"?buyPrice(cand):0;
-  const afford=S.transferBudget>=price;
+  const tokenPays=buyTokenReady()&&price>0;
+  const afford=canAttemptBuy(price);
   $("twTitle").textContent=`${esc(shortName(cand.n))} — ajánlat`;
   const revealed=cand.estimatedTSI!=null&&cand._tsiRevealed;
   $("twBody").innerHTML=`<div style="text-align:center">
@@ -27347,7 +27353,8 @@ function twConfirmBuy(cand,onConfirm,onBack){
     <div style="font-size:12px;color:var(--dim2);margin:3px 0 10px">${cand.pos.join("/")} · ${cand.age} év${revealed?` · ~${cand.estimatedTSI} TSI`:""}</div>
     <div style="font-size:12.5px;color:var(--dim2)">Vételár</div>
     <div style="font-family:'Archivo Black';font-size:26px;color:${afford?"var(--gold)":"var(--red)"}">${fmtFtShort(price)}</div>
-    <div style="font-size:11.5px;color:var(--dim);margin-top:4px">Büdzsé: ${fmtFt(S.transferBudget)}${afford?"":" — nincs elég"}</div></div>`;
+    <div style="font-size:11.5px;color:var(--dim);margin-top:4px">Büdzsé: ${fmtFt(S.transferBudget)}${afford?"":" — nincs elég"}</div>
+    ${tokenPays?`<div style="font-size:12px;color:var(--grass);margin-top:5px;line-height:1.45">🎁 <b>Ingyen igazolás-token</b> van nálad — ha megegyeztek, ez az igazolás <b>semmibe nem kerül</b>${S.transferBudget<price?", a büdzsé tehát nem akadály":""}.</div>`:""}</div>`;
   $("twActions").innerHTML="";
   if(afford){
     const go=document.createElement("button");go.className="btn-y stepbtn";go.style.marginTop="10px";
@@ -27463,8 +27470,10 @@ function twShowPremiumOffer(cand,completeFn,opts){
       ${gameMode==="career"
         ? `Csak drágábban hajlandó jönni: <b style="color:var(--gold)">${fmtFt(premiumPrice)}</b>
            <span style="color:var(--dim2)">(a becsült ár ${fmtFt(basePrice)} lett volna)</span><br>
-           Egyenleged: ${fmtFt(_bud)} → <b>${fmtFt(Math.max(0,_bud-premiumPrice))}</b>${
-             premiumPrice>_bud?`<br><span style="color:var(--red)">⚠ Nincs elég büdzséd — az igazolás elmaradna.</span>`:""}<br>
+           ${buyTokenReady()
+             ? `<span style="color:var(--grass)">🎁 Ingyen igazolás-token van nálad — a megemelt árat is ez fedezi, az egyenleged nem mozdul.</span>`
+             : `Egyenleged: ${fmtFt(_bud)} → <b>${fmtFt(Math.max(0,_bud-premiumPrice))}</b>${
+               premiumPrice>_bud?`<br><span style="color:var(--red)">⚠ Nincs elég büdzséd — az igazolás elmaradna.</span>`:""}`}<br>
            Ide érkezik: a <b>tartalék-keretbe</b>.`
         : `Csak drágábban hajlandó jönni.`}
       <br>Megéri ennyiért?
@@ -27502,6 +27511,22 @@ function twFinalizeSigning(cand,note,overridePrice,completeFn){
 
    KLASSZIKUS MÓDBAN nincs tartalék-keret (az a karrier fogalma), ezért ott
    marad a régi választó — különben az igazolásnak nem lenne hova érkeznie. */
+/* ---- AZ INGYEN IGAZOLÁS-TOKEN NEM ISMER BÜDZSÉ-KAPUT ----
+   A token a KÖVETKEZŐ igazolást fedezi, bármilyen áron — a beváltás a fizetési
+   tölcsérben (twShowPlacement) történik. A büdzsé-kapuk viszont KORÁBBAN
+   álltak: a felderítés csak a megfizethető jelölteket mutatta, az ajánlat-
+   képernyő pedig gomb nélkül hagyta a drágát ("nincs elég"). Így a jutalom épp
+   arra nem volt jó, amiért érdemes: a nagy névre.
+   Amíg a tokened megvan, a következő igazolásnál BÁRKIVEL tárgyalhatsz. */
+function buyTokenReady(){
+  return gameMode==="career"&&(S.freePlayerTokens||0)>0;}
+/* Megpróbálható-e egy ilyen árú igazolás? (A token nulla árnál nem szól bele:
+   ott nincs mit fedezni.) */
+function canAttemptBuy(price){
+  if(gameMode!=="career")return true;
+  if(!(price>0))return true;
+  if(buyTokenReady())return true;
+  return (S.transferBudget||0)>=price;}
 function twShowPlacement(cand,completeFn,cfg){
   completeFn=completeFn||twCycleComplete;
   cfg=cfg||{};
