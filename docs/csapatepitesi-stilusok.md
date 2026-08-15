@@ -1022,6 +1022,89 @@ igényel új szimulációs ágat.
   kapusgól. A kapus súlya ezért érintetlen marad, és az átlagba sem számít bele.
   A nulla súly (kiállított játékos) szintén nulla marad.
 
+### 3.2 A Beton védelem bővítése (3.3.16)
+
+A stílusok mérlegét számba véve a Beton védelem minden mennyiségi mutatóban
+utolsó volt: **88 mérföldkő** (a Harmónia 186-jának a fele), **8 mérföldkő-
+család**, **1968 gyűjthető pont** — 45%-kal kevesebb, mint a Pánzeré —, és
+**144% fedezet**, a legszűkebb az egész játékban. Két szerkezeti oka volt, és
+mindkettő valós: a fordított mércéjű „kapott gól" család Infinityben nem
+hosszabbodik (ott „felfelé" a könnyebbség iránya volna), a védekezésből pedig
+eleve kevesebb dolgot lehet megszámolni, mint a támadásból — a tiszta lap
+meccsenként egy bináris esemény, a gól és a piros lap halmozódik.
+
+A bővítés **négy képességgel és öt mérföldkő-lépcsővel** válaszol erre.
+
+**Az új képességek**
+
+| Rang | Képesség | Hatás (I / II / III) |
+|---|---|---|
+| I | **Ötös bástya** | ha a felállásban legalább ÖT védő áll: −2,5% / −5% / −7,5% ellenfél-gólesély |
+| II | **Tiszta szerelés, hideg sör** | a „Fogd meg a söröm!" a szerelésekért is jár: 10 / 7 / 5 tiszta szerelés egy idényben |
+| II | **Olcsó a jó védő** | −25% / −33% / −40% a védők vételárából |
+| III | **Jöhet a buszsofőr!** | Park the bus mellett a csereszünetben behívható; ellenfél −33% / −50% / −66%, saját −50% / −33% / −25% |
+
+Az **Ötös bástya** az első képesség, ami nem a keretről, hanem a
+FELÁLLÁSRÓL szól. A feltételt maga a szorzó méri (függvény-értékű `fx`, lásd
+`styleFxMul`), tehát felállás-váltáskor magától ki-be kapcsol. Ezért kellett a
+szorzós csatornát is megnyitni a függvény-értékek előtt — eddig csak az
+összeadódó csatorna (`styleFxAdd`) tudott feltételes hatást.
+
+A **Tiszta szerelés, hideg sör** a „Fogd meg a söröm!" MÁSODIK útja. Az elsőt
+(sorsdöntő mérkőzés) a `clutchSettle` intézi; ez a napi műhelymunkát fizeti
+meg. A számláló a kiosztáskor levonódik, nem nullázódik: aki egy idényben
+kétszer összegyűjti a küszöböt, kétszer lép a képességgel — ugyanaz a szabály,
+mint a hőstettnél.
+
+A **buszsofőr** a fa csúcsa, és az egyetlen képesség, amit menet közben kell
+bevetni. Ára egy cserelehetőség és egy középpályás, aki lejön érte. A képesség
+íve nem az, hogy egyre jobban véded, hanem hogy **egyre kevesebbet fizetsz érte
+elöl**: a saját gólesélyed vesztesége 50%-ról 25%-ra csökken a szintekkel.
+
+**A buszsofőr nem személy** — és ez a motorban is szó szerint így van. Az
+`a.bus` jelző egyetlen szabályt mond ki, amiből minden más következik: sosem
+jelölt a gól-, gólpassz-, tizenegyes- és kapufa-sorsolásban (a `weightedPick`
+egyetlen pontján), nem kaphat lapot és nem sérülhet meg, nem nő a meccsszáma,
+nem kerül a karrier-statisztikába, nem lesz a meccs embere, nem fejlődik és nem
+kap bért. A **csapaterő sem változik tőle**: a busz nem a keretedet erősíti,
+hanem a mérkőzést zárja be. A két szorzó a gólsorsolásnál ül, nem a
+λ-képletben — ugyanott, ahol a szezon-szerepeké —, mert a hatás a mérkőzés
+hátralévő részére szól, nem az egészre.
+
+**Az új mérföldkövek**
+
+| Család | Lépcső | Mit mér |
+|---|---|---|
+| **Védekező képességek** (átírva) | 1 / 3 / 5 / 7 / 10 / 12 / 15 / 17 / 20 / 25 / 30 / 40 / 50 | a keret védő- és kapus-képességei |
+| **A legjobb védőd Védekezése** | 85 / 90 / 95 / 100 / 105 / 110 / 115 | a keret bármelyik védőjének attribútuma |
+| **A védősor össz Védekezése** | 400 / 450 / 500 / 550 / 600 / 650 / 700 | a kezdő 11 hátsó sora együtt |
+| **Bravúrok a klub történetében** | 25 / 60 / 120 / 200 / 300 / 450 / 650 / 900 / 1200 | a kapusok életműve |
+| **Tisztalap-sorozat** | 2 / 3 / 4 / 5 / 6 / 8 / 10 / 12 / 15 | egymást követő nullák |
+
+A régi három fokozatos „védekező képességek" (3/6/10) egy-két idény alatt
+kifutott, és utána a stílus legsajátabb gyűjtése nem fizetett többet semmit —
+ezért lett belőle tizenhárom fokozat, az ELSŐ képességtől az ötvenedikig.
+
+A két attribútum-lépcső szándékosan **két külön utat** ír le: aki hatalmas
+egyéniséget nevel, az elsőt viszi; aki mély, egyenletes védősort épít — vagy
+egyszerűen öten áll hátul —, a másodikat. A Védekezés-attribútum a Rating
+skáláján fut, tehát Infinityben ugyanoda tart: kétszázig (`ST_INF_TOP`).
+
+**A mérleg utána** (100-as nehézségi szint, Infinity, alap tempó):
+
+| | előtte | utána |
+|---|--:|--:|
+| Képesség / szint | 9 / 27 | **13 / 39** |
+| A fa teljes ára | 1 364 | **1 992** |
+| Mérföldkő-fokozat | 88 | **154** |
+| Gyűjthető stíluspont | 1 968 | **4 063** |
+| Fedezet | 144% | **204%** |
+
+A Beton ezzel a legtöbbet termelő stílus lett (4 063 pont), a fája pedig a
+második legnagyobb a Harmónia 2 051-e mögött. A „legsivárabb" cím átkerült a
+**Bombázókhoz** (9 képesség, 118 mérföldkő, 2 578 pont) — az a stílus a Beton
+tükörképe, tehát ugyanez a bővítés ott is elvégezhető, csatárokra fordítva.
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
