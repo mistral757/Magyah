@@ -1517,6 +1517,38 @@ button.infPanel:disabled{cursor:default}
 #h2hWait,#absPanel,#htSubPanel{position:fixed;inset:0;z-index:420;background:rgba(20,18,15,.95);
   display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box}
 #h2hWait.hide,#absPanel.hide,#htSubPanel.hide{display:none}
+/* ---- PÁRHARC-CSERETERVEZŐ ----
+   FELSŐBB RÉTEGEN ül, mint a párharc-várakozó: a kezdőrúgás előtt ez az utolsó
+   döntés, és amíg meg nem hoztad, semmi más nem érhető el mögötte. */
+#mpSubPanel{position:fixed;inset:0;z-index:460;background:rgba(16,15,13,.97);
+  display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box}
+#mpSubPanel.hide{display:none}
+#mpSubPanel .h2hBox{max-height:100%;overflow-y:auto;background:#1b1917;
+  border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px 12px}
+#mpSubPanel .mpP{color:#cfcac2}
+#mpSubPanel .h2hRound{font-size:26px;margin:2px 0 8px}
+.mpsRule{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.13);
+  border-radius:10px;padding:9px 10px;margin-bottom:8px}
+.mpsRule.bad{border-color:#9b3b34;background:rgba(155,59,52,.14)}
+.mpsRuleH{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.mpsRuleH b{flex:1;min-width:0;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#e1ad66}
+.mpsMini{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
+  color:#f3f2f2;border-radius:6px;width:26px;height:26px;font-size:13px;cursor:pointer;
+  font-family:inherit;line-height:1;padding:0}
+.mpsMini:hover{background:rgba(255,255,255,.16)}
+.mpsMini:disabled{opacity:.28;cursor:default}
+.mpsMini.x{color:#e39189}
+.mpsF{margin-bottom:6px}
+.mpsF:last-child{margin-bottom:0}
+.mpsF label{display:block;font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:#8d8880;margin-bottom:3px}
+.mpsF .row{display:flex;gap:6px}
+.mpsF select{flex:1;min-width:0;background:#26231f;border:1px solid rgba(255,255,255,.2);
+  color:#f3f2f2;border-radius:7px;padding:7px 8px;font-family:inherit;font-size:12.5px}
+.mpsF select:focus{outline:2px solid #e1ad66;outline-offset:1px}
+.mpsNote{font-size:11.5px;color:#b9b4ab;line-height:1.4;margin:4px 0 10px}
+.mpsNote b{color:#e1ad66}
+.mpsWarn{font-size:11.5px;color:#e39189;margin-top:5px}
 /* a hiányzók panelje hosszabb lehet (több hiányzó × több jelölt) → görgethető */
 #absPanel .h2hBox,#htSubPanel .h2hBox{max-height:100%;overflow-y:auto}
 .absRow{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
@@ -1856,6 +1888,24 @@ button.infPanel:disabled{cursor:default}
     <div class="mpBtns" style="margin-top:4px">
       <button class="mpBtn gold" id="htSubGoBtn">Második félidő →</button>
       <button class="mpBtn danger hide" id="htSubClearBtn">↩ A tervezett cserék elvetése</button>
+    </div>
+  </div>
+</div>
+<!-- PÁRHARC-CSERETERVEZŐ — a kezdőrúgás előtt. A párharcban nincs csereszünet
+     (a gólok a közös listából jönnek), ezért a cseréket ELŐRE kell megtervezni:
+     hányadik perctől, milyen állásnál, ki helyére ki. A terv a pillanatképpel
+     utazik fel, és a közös szimuláció hajtja végre. -->
+<div id="mpSubPanel" class="hide">
+  <div class="h2hBox">
+    <div class="h2hKick">Párharc — cseretervezés</div>
+    <div class="h2hRound" id="mpSubRound">15. FORDULÓ</div>
+    <p class="mpP" style="text-align:center" id="mpSubMsg">…</p>
+    <div id="mpSubBody"></div>
+    <div class="mpBtns" style="margin-top:4px">
+      <button class="mpBtn gold" id="mpSubYesBtn">Igen, tervezek cseréket</button>
+      <button class="mpBtn" id="mpSubAddBtn">+ Újabb csereopció</button>
+      <button class="mpBtn gold hide" id="mpSubGoBtn">Mehet a párharc →</button>
+      <button class="mpBtn danger" id="mpSubNoBtn">Nem, marad a kezdő 11</button>
     </div>
   </div>
 </div>
@@ -19925,6 +19975,9 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      szezonzárás nullázza; a mentés része, mert a „Tiszta szerelés, hideg sör"
      küszöbe egy egész idény gyűjtése. */
   seasonHardTackles:{},
+  /* PÁRHARC-CSERETERV: {key,on,rules[]} — a futó párharchoz tartozó, előre
+     beállított cserék. Null, amíg nem döntöttél róla. */
+  mpSubPlan:null,
   /* VILLÁM: sebesség-képességgel szerzett gólok a klub történetében, és a
      befejezett SZÉLSŐ poszt-tanulások száma. Mindkettő karrier-szintű. */
   paceGoals:0,wingPosLearned:0,
@@ -22713,8 +22766,294 @@ function mpOppViewSync(){
   if(tb)tb.style.display=mpOppViewOn?"none":(tb.innerHTML?"block":"none");
   $("oppTeamBar").classList.toggle("hide",!mpOppViewOn);
   if(mpOppViewOn)drawOppPitch();}
+/* ================= PÁRHARC: ELŐRE BEÁLLÍTOTT CSERÉK =================
+   A párharcban nincs csereszünet, és nem is lehet: a gólok a KÖZÖS
+   eseménylistából jönnek, tehát egy menet közbeni döntés csak úgy TŰNNE, mintha
+   hatna. Cserélni viszont kell tudni — a csereszünet a karrier többi meccsén a
+   keret mélységéről szól, és ezt a párharc nem veheti el.
+
+   A MEGOLDÁS: a cseréket ELŐRE tervezed meg, feltételekkel, és a terv a
+   pillanatképpel EGYÜTT utazik fel a szobába. A szimuláció onnantól maga hajtja
+   végre őket — tehát a csere ott van a KÖZÖS listában, mindkét kliens ugyanazt
+   számolja, és a csere tényleg számít: a beálló ember gólsúlya, a csapaterő
+   változása és (Beton védelemnél) a buszsofőr szorzói mind a szimulációban
+   dolgoznak. A lejátszás pedig ugyanezeket a csere-eseményeket futtatja le a
+   saját tizenegyeden, hogy a könyvelés (meccsszám, statisztika, fejlődés) is
+   pontosan azt kövesse, ami a pályán történt.
+
+   HÁROM VÁLTOZÓ SZABÁLYONKÉNT: hányadik perctől, milyen állásnál, és ki
+   helyére ki. A SORREND a rangsor: ha több szabály is érvényes volna, a
+   listában előrébb álló lép életbe, és a cserekeret (3) is fentről lefelé fogy
+   el — az alsó szabályok akkor egyszerűen nem jutnak szóhoz. */
+/* A cserekeret UGYANAZ, mint a csereszüneté — FÜGGVÉNY, nem konstans: a
+   HALFTIME_SUB_MAX lejjebb születik a fájlban, egy const itt TDZ-hibát adna. */
+function mpSubMax(){return HALFTIME_SUB_MAX;}
+const MP_SUB_CONDS=[
+  {k:"barmi",    n:"bármilyen állásnál",        d:"a perc elérésekor mindenképp"},
+  {k:"vezet",    n:"ha vezetünk",               d:"bármekkora előnynél"},
+  {k:"veszit",   n:"ha vereségre állunk",       d:"bármekkora hátránynál"},
+  {k:"dontetlen",n:"ha döntetlen az állás",     d:"pontosan egyenlő"},
+  {k:"vezet2",   n:"ha 2+ góllal vezetünk",     d:"biztos előny — jöhet a pihentetés"},
+  {k:"veszit2",  n:"ha 2+ góllal vereségre állunk", d:"mindent bele"},
+  {k:"piros",    n:"ha kiállították egy játékosunkat", d:"emberhátrányban"}];
+function mpSubCondLabel(k){
+  const c=MP_SUB_CONDS.find(x=>x.k===k);
+  return c?c.n:MP_SUB_CONDS[0].n;}
+/* A FELTÉTEL KIÉRTÉKELÉSE — a szimuláció és a lejátszás UGYANEZT hívja, tehát
+   nem tudnak elcsúszni. `mine`/`theirs` az adott oldal saját nézőpontja. */
+function mpSubCondOk(k,mine,theirs,redOut){
+  switch(k){
+    case "vezet":     return mine>theirs;
+    case "veszit":    return mine<theirs;
+    case "dontetlen": return mine===theirs;
+    case "vezet2":    return (mine-theirs)>=2;
+    case "veszit2":   return (theirs-mine)>=2;
+    case "piros":     return !!redOut;
+    default:          return true;}}
+/* A FUTÓ PÁRHARC TERVE. A kulcs a h2hKey(): benne a szezon, a forduló (vagy a
+   kupaszakasz), tehát egy régi terv sosem szivárog át egy új párharcra — a
+   mentés viszont megőrzi, hogy egy újratöltés ne dobja el a munkádat. */
+function mpSubPlanFor(key){
+  const P=S.mpSubPlan;
+  if(!P||P.key!==key)return null;
+  return P;}
+function mpSubPlanReset(key){
+  S.mpSubPlan={key,on:false,rules:[]};
+  return S.mpSubPlan;}
+/* A CSEREPAD a párharc-tervezőhöz: aki nem hiányzik és nem áll a kezdőben. */
+function mpSubBench(){
+  const on=new Set(slots.filter(s=>s&&s.player).map(s=>s.player.n));
+  const out=[];
+  BENCH_CATS.forEach(c=>{
+    const b=BENCH[c.key];
+    if(b&&!on.has(b.n)&&!playerUnavailable(b.n))out.push(b);});
+  return out;}
+/* Behívható-e a buszsofőr ezen a párharcon? Ugyanaz a három feltétel, mint a
+   csereszünetben: megvett képesség és aktív Park the bus. (A „középpályás
+   helyére" feltételt a szabály maga őrzi, lásd mpSubRuleValid.) */
+function mpSubBusAvail(){
+  try{return styleBusLevel()>0&&!!(S.tactics&&S.tactics.active==="busz");}
+  catch(e){return false;}}
+/* Egy szabály ÉRVÉNYES-e még? A keret a tervezés óta változhatott (sérülés,
+   eltiltás), ezért minden felhasználás előtt újra megnézzük. */
+function mpSubRuleValid(r){
+  if(!r)return false;
+  const sl=slots[r.outIdx];
+  if(!sl||!sl.player)return false;
+  if(r.inName===BUS_DRIVER_NAME){
+    if(!mpSubBusAvail())return false;
+    return roleInFormation(sl.pos,form,r.outIdx)==="KOZEPPALYAS";}
+  return mpSubBench().some(b=>b.n===r.inName);}
+/* A SZABÁLY DRÓTRA FŰZÖTT ALAKJA. Mindent ELŐRE kiszámolunk, amit a
+   szimulációnak tudnia kell — így a másik kliensnek nem kell ismernie a
+   keretemet, a padomat, sem a stílusomat: elég a néhány szám.
+     gw/aw  — a beálló ember gól- és gólpassz-súlya AZON A HELYEN,
+     dOvr   — mennyivel mozdul a csapaterő (a doSub képlete: a különbség 11-ede),
+     bus    — a buszsofőr jelzője (nála a csapaterő szándékosan nem mozdul). */
+function mpSubWireRule(r,activeNames){
+  const sl=slots[r.outIdx];
+  if(!sl||!sl.player)return null;
+  const outP=sl.player,pos=sl.pos;
+  const base={min:Math.max(1,Math.min(89,r.min|0)),cond:r.cond||"barmi",
+    outN:outP.n,inN:r.inName};
+  if(r.inName===BUS_DRIVER_NAME)
+    return Object.assign(base,{gw:0,aw:0,dOvr:0,bus:styleBusLevel()});
+  const inP=mpSubBench().find(b=>b.n===r.inName);
+  if(!inP)return null;
+  const fit=subFreeFit(inP,sl)?1:0.93;
+  return Object.assign(base,{
+    gw:(GOALW[pos]||1)*Math.max(1,pOvr(inP)-58)*multSkillEffect(inP.n,"goalw")
+       *chemGoalMultForPlayer(inP.n,activeNames),
+    aw:(ASSTW[pos]||1)*Math.max(1,pOvr(inP)-58)*multSkillEffect(inP.n,"assistw"),
+    dOvr:(pOvrDisplay(inP)*fit-pOvrDisplay(outP)*(sl.fit||1))/11,
+    bus:0});}
+/* ---- A PIROS LAP A PÁRHARCBAN IS A KÖZÖS LISTÁBÓL JÖN ----
+   Eddig mindkét kliens SAJÁT kockát dobott rá: láthatatlan, de valódi
+   ellentmondás volt (a két gépen más-más ember kapta a lapot ugyanazon a
+   mérkőzésen). Mostantól a szimuláció dönt — és ez az egyetlen módja annak,
+   hogy a „ha kiállították egy játékosunkat" csere-feltétel egyáltalán
+   értelmezhető legyen: a szimulációnak TUDNIA kell róla.
+   A VALÓSZÍNŰSÉG BETŰRE A RÉGI: ugyanaz a képlet, ugyanazokkal a szorzókkal,
+   csak a dobás helye költözött a közös listába. */
+function mpWireRedWeights(active){
+  const wall=clutchWallFactor(active);
+  return active.map((x,k)=>{
+    const base=[0.2,0.5,1,2,3][x.p.aggroI!==undefined?x.p.aggroI:2]
+      *multSkillEffect(x.p.n,"discipline")
+      *(x.p.family&&(x.p.familySpecialty==="kutya"||x.p.familySpecialty==="tank")?1.4:1)
+      *roleRiskMult(x.p.n);
+    return {base,w:clutchIsBackline(active,k)?base*wall:base};});}
+/* ================= A CSERETERVEZŐ FELÜLETE =================
+   A kezdőrúgás előtt, felsőbb rétegen. Előbb egyetlen kérdés (akarsz-e
+   cserét), és csak igenre nyílik meg a szerkesztő — így aki nem él vele, két
+   koppintással túl van rajta.
+
+   MINDEN SZABÁLY HÁROM VÁLASZTÁS: hányadik perctől, milyen állásnál, és ki
+   helyére ki. A PERC ötösével lépked, mert a mérkőzés is öt perces vödrökben
+   pereg — egy 63. perces beállítás úgyis a 65. percben lépne életbe, és a
+   felület nem ígérhet többet, mint amennyit a motor tud.
+
+   A SORREND A RANGSOR, ezért a nyilakkal átrendezhető: ha több szabály is
+   érvényes volna ugyanabban a pillanatban, a listában előrébb álló lép
+   életbe, és a három cserés keret is fentről lefelé fogy el. */
+const MPS={key:null,done:null};
+const MPS_MINUTES=[5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85];
+function openMpSubPlanner(key,onDone){
+  MPS.key=key;MPS.done=onDone||null;
+  if(!mpSubPlanFor(key))mpSubPlanReset(key);
+  const P=mpSubPlanFor(key);
+  $("mpSubRound").textContent=mpCupDuelNow()
+    ? "KUPA-PÁRHARC"
+    : `${(S.idx||0)+1}. FORDULÓ`;
+  $("mpSubPanel").classList.remove("hide");
+  const box=$("mpSubPanel").querySelector(".h2hBox");if(box)box.scrollTop=0;
+  renderMpSubPlanner();
+  return P;}
+function closeMpSubPlanner(){
+  $("mpSubPanel").classList.add("hide");
+  const cb=MPS.done;MPS.done=null;MPS.key=null;
+  try{saveGame();}catch(e){}
+  if(cb)cb();}
+/* A kezdő 11 a „ki helyére" listához: a pályán álló emberek, poszttal. */
+function mpSubXI(){
+  const out=[];
+  slots.forEach((sl,i)=>{if(sl&&sl.player)out.push({i,sl});});
+  return out;}
+/* Egy legördülő felépítése. A `sel` a jelenlegi érték; ha nincs a listában, az
+   első elem lesz kiválasztva — így egy időközben elkelt játékos nem ragad be. */
+function mpsSelect(opts,sel,onChange){
+  const s=document.createElement("select");
+  opts.forEach(o=>{
+    const op=document.createElement("option");
+    op.value=String(o.v);op.textContent=o.n;
+    if(String(o.v)===String(sel))op.selected=true;
+    s.appendChild(op);});
+  s.onchange=()=>onChange(s.value);
+  return s;}
+function renderMpSubPlanner(){
+  const P=mpSubPlanFor(MPS.key);
+  const body=$("mpSubBody");
+  if(!P||!body)return;
+  const yes=$("mpSubYesBtn"),add=$("mpSubAddBtn"),go=$("mpSubGoBtn"),no=$("mpSubNoBtn");
+  body.innerHTML="";
+  /* ---- 1. KÉPERNYŐ: A KÉRDÉS ---- */
+  if(!P.on){
+    $("mpSubMsg").innerHTML=`A párharcban nincs csereszünet — a mérkőzés megállás nélkül megy végig, `
+      +`mert az eredményt a két keretből előre kiszámolt <b>közös eseménylista</b> adja. `
+      +`Cserélni viszont tudsz: ha most megtervezed őket, a terv a kereteddel együtt megy fel, `
+      +`és a mérkőzés magától végrehajtja.`;
+    yes.classList.remove("hide");add.classList.add("hide");
+    go.classList.add("hide");no.textContent="Nem, marad a kezdő 11";
+    return;}
+  /* ---- 2. KÉPERNYŐ: A SZERKESZTŐ ---- */
+  yes.classList.add("hide");add.classList.remove("hide");
+  go.classList.remove("hide");no.textContent="↩ Mégsem cserélek";
+  const bench=mpSubBench();
+  const busOk=mpSubBusAvail();
+  $("mpSubMsg").innerHTML=`Legfeljebb <b>${mpSubMax()} csere</b> fér bele. A lista SORRENDJE a rangsor: `
+    +`ha egyszerre több szabály is érvényes, a fentebbi lép életbe.`;
+  if(!bench.length&&!busOk){
+    const w=document.createElement("div");w.className="mpsNote";
+    w.innerHTML=`<b>Üres a cserepad.</b> A HUB-ban tölthetsz fel embereket a padra — enélkül nincs mit tervezni.`;
+    body.appendChild(w);}
+  P.rules.forEach((r,ri)=>{
+    const valid=mpSubRuleValid(r);
+    const d=document.createElement("div");
+    d.className="mpsRule"+(valid?"":" bad");
+    const h=document.createElement("div");h.className="mpsRuleH";
+    const b=document.createElement("b");b.textContent=`${ri+1}. csereopció`;
+    h.appendChild(b);
+    const mk=(txt,cls,dis,fn)=>{
+      const x=document.createElement("button");
+      x.type="button";x.className="mpsMini"+(cls?" "+cls:"");
+      x.textContent=txt;x.disabled=!!dis;x.onclick=fn;
+      h.appendChild(x);};
+    mk("↑","",ri===0,()=>{const t=P.rules[ri-1];P.rules[ri-1]=P.rules[ri];P.rules[ri]=t;renderMpSubPlanner();});
+    mk("↓","",ri===P.rules.length-1,()=>{const t=P.rules[ri+1];P.rules[ri+1]=P.rules[ri];P.rules[ri]=t;renderMpSubPlanner();});
+    mk("✕","x",false,()=>{P.rules.splice(ri,1);renderMpSubPlanner();});
+    d.appendChild(h);
+    /* 1. PERC */
+    const f1=document.createElement("div");f1.className="mpsF";
+    f1.innerHTML=`<label>1 · hányadik perctől</label>`;
+    const r1=document.createElement("div");r1.className="row";
+    r1.appendChild(mpsSelect(MPS_MINUTES.map(m=>({v:m,n:`a ${m}. perctől`})),r.min,
+      v=>{r.min=parseInt(v,10)||45;renderMpSubPlanner();}));
+    f1.appendChild(r1);d.appendChild(f1);
+    /* 2. ÁLLÁS */
+    const f2=document.createElement("div");f2.className="mpsF";
+    f2.innerHTML=`<label>2 · milyen az állás</label>`;
+    const r2=document.createElement("div");r2.className="row";
+    r2.appendChild(mpsSelect(MP_SUB_CONDS.map(c=>({v:c.k,n:c.n})),r.cond,
+      v=>{r.cond=v;renderMpSubPlanner();}));
+    f2.appendChild(r2);d.appendChild(f2);
+    /* 3. KI HELYÉRE KIT */
+    const f3=document.createElement("div");f3.className="mpsF";
+    f3.innerHTML=`<label>3 · ki helyére ki</label>`;
+    const r3=document.createElement("div");r3.className="row";
+    r3.appendChild(mpsSelect(mpSubXI().map(o=>({v:o.i,
+      n:`${o.sl.pos} · ${shortName(o.sl.player.n)}`})),r.outIdx,
+      v=>{r.outIdx=parseInt(v,10)||0;renderMpSubPlanner();}));
+    /* A BUSZSOFŐR csak KÖZÉPPÁLYÁS helyére hívható — ugyanaz a szabály, mint a
+       csereszünetben. Ha a kiválasztott hely nem az, a lehetőség eltűnik. */
+    const sl=slots[r.outIdx];
+    const midOut=!!(sl&&sl.player&&roleInFormation(sl.pos,form,r.outIdx)==="KOZEPPALYAS");
+    const inOpts=bench.map(bp=>({v:bp.n,n:`${(bp.pos&&bp.pos[0])||"—"} · ${shortName(bp.n)}`}));
+    if(busOk&&midOut)inOpts.unshift({v:BUS_DRIVER_NAME,n:"🚌 a buszsofőr"});
+    if(!inOpts.length)inOpts.push({v:"",n:"— nincs bevethető ember —"});
+    r3.appendChild(mpsSelect(inOpts,r.inName,v=>{r.inName=v;renderMpSubPlanner();}));
+    f3.appendChild(r3);d.appendChild(f3);
+    if(!valid){
+      const w=document.createElement("div");w.className="mpsWarn";
+      w.textContent="Ez a szabály most nem érvényes — a kezdőrúgáskor kimarad.";
+      d.appendChild(w);}
+    body.appendChild(d);});
+  const note=document.createElement("div");note.className="mpsNote";
+  note.innerHTML=`A csere a megadott perctől az ELSŐ olyan pillanatban lép életbe, amikor az állás `
+    +`stimmel. A mérkőzés öt perces szakaszokban pereg, ezért a perc is ötösével állítható.`
+    +(busOk?`<br>🚌 <b>Jöhet a buszsofőr!</b> — Park the bus van betéve, tehát a buszsofőr is `
+      +`behívható, egy középpályás helyére. Onnantól hatan védekeztek, és a mérkőzés mindkét `
+      +`irányban bezárul.`:"");
+  body.appendChild(note);}
+/* Egy ÚJ szabály alapértéke: a 60. perc, bármilyen állás, az első középpályás
+   helyére az első padon ülő. Így a frissen nyitott opció azonnal értelmes. */
+function mpSubNewRule(){
+  const xi=mpSubXI();
+  const mid=xi.find(o=>roleInFormation(o.sl.pos,form,o.i)==="KOZEPPALYAS")||xi[xi.length-1]||{i:0};
+  const bench=mpSubBench();
+  return {min:60,cond:"barmi",outIdx:mid.i,
+    inName:(bench[0]&&bench[0].n)||(mpSubBusAvail()?BUS_DRIVER_NAME:"")};}
+$("mpSubYesBtn")&&($("mpSubYesBtn").onclick=()=>{
+  const P=mpSubPlanFor(MPS.key);if(!P)return;
+  P.on=true;
+  /* AZ ELSŐ OPCIÓ ELEVE NYITVA: aki igent mond, az cserélni akar — ne kelljen
+     még egy gombot megkeresnie hozzá. */
+  if(!P.rules.length)P.rules.push(mpSubNewRule());
+  renderMpSubPlanner();});
+$("mpSubAddBtn")&&($("mpSubAddBtn").onclick=()=>{
+  const P=mpSubPlanFor(MPS.key);if(!P)return;
+  P.rules.push(mpSubNewRule());
+  renderMpSubPlanner();
+  const box=$("mpSubPanel").querySelector(".h2hBox");
+  if(box)box.scrollTop=box.scrollHeight;});
+$("mpSubGoBtn")&&($("mpSubGoBtn").onclick=()=>closeMpSubPlanner());
+$("mpSubNoBtn")&&($("mpSubNoBtn").onclick=()=>{
+  const P=mpSubPlanFor(MPS.key);
+  if(P&&P.on){P.on=false;P.rules=[];renderMpSubPlanner();return;}
+  if(P)P.on=false;
+  closeMpSubPlanner();});
 function h2hWireSnapshot(){
   const MS=buildMatchSnapshot();
+  /* A piroslap-súlyok és a csapatszintű esély — a képlet BETŰRE ugyanaz, mint a
+     playMatch-ben (rangadó-hangulat nélkül: párharcban az nincs). */
+  const _redW=mpWireRedWeights(MS.active);
+  const _redT0=_redW.reduce((a,x)=>a+x.base,0),_redT1=_redW.reduce((a,x)=>a+x.w,0);
+  /* A CSERETERV drótra fűzött alakja. Csak az ÉRVÉNYES szabályok mennek fel, és
+     legfeljebb annyi, amennyi a cserekeretbe belefér — a sorrend a rangsor. */
+  const _P=mpSubPlanFor(h2hKey());
+  const _wirePlan=(_P&&_P.on?_P.rules:[])
+    .filter(mpSubRuleValid)
+    .map(r=>mpSubWireRule(r,MS.activeNames))
+    .filter(Boolean);
   return {
     teamName:teamName,
     /* A TELJES CSAPATLAP: ebből fagy be a társ gépén a te kezdő tizenegyed
@@ -22728,12 +23067,22 @@ function h2hWireSnapshot(){
        átküldeni a párharc ellenfelének erejét is. */
     dispOvr:teamOVRbase(),
     tacticEffect:MS.tacticEffect,tacticStyle:MS.tacticStyle,chemPairs:MS.chemPairs,
-    players:MS.active.map(a=>{
+    players:MS.active.map((a,k)=>{
       const pos=slots[a.idx]?slots[a.idx].pos:"KKP";
       return {n:a.p.n,pos,
         gw:(GOALW[pos]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"goalw")
            *chemGoalMultForPlayer(a.p.n,MS.activeNames),
-        aw:(ASSTW[pos]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"assistw")};}),
+        aw:(ASSTW[pos]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"assistw"),
+        /* PIROSLAP-SÚLY: a szimuláció ebből választ, ha a lap eldördül. */
+        rw:_redW[k]?_redW[k].w:1};}),
+    /* ---- ELŐRE BEÁLLÍTOTT CSERÉK ÉS A PIROS LAP ----
+       A terv és a piroslap-esély a pillanatképpel utazik, mert a szimulációnak
+       KELL tudnia róluk: a csere megváltoztatja, ki lőhet gólt, a piros lap
+       pedig a „ha kiállították egy játékosunkat" feltétel bemenete. Régi
+       kliensnél mindkettő hiányzik — a szimuláció ilyenkor a régi viselkedést
+       adja (nincs csere, a piros lap marad helyi dobás). */
+    plan:_wirePlan,
+    redP:SIM.REDP/18*(_redT0>0?_redT1/_redT0:1)*styleRedMult()*roleRiskTeamP(MS.active,-1),
     formName:(MS.active[MS.gi]&&MS.active[MS.gi].p.n)||null,
     weakName:(MS.active[MS.bi]&&MS.active[MS.bi].p.n)||null,
     /* KI ÍRTA — ebből derül ki, ha a két kliens ugyanabba a mezőbe ír (szerep-
@@ -22775,11 +23124,23 @@ function h2hPick(players,key,rnd){
    elcsúszna. Paraméter nélkül a régi (Math.random) viselkedés marad. */
 function h2hSimulate(home,away,rnd,neutral){
   const R=rnd||Math.random;
-  /* SEMLEGES PÁLYÁN (kupadöntő) egyik oldal sem kap pályaválasztói módosítót.
-     Korábban a döntőben a h2hIAmHome() false-a miatt a VENDÉG került a hazai
-     szerepbe, tehát a semlegesnek szánt meccsen ő kapta a hazai előnyt. */
-  const Lh=matchLambdas(home,away.ovr,neutral?0:SIM.HOME);
-  const La=matchLambdas(away,home.ovr,neutral?0:SIM.AWAY);
+  const CL=x=>Math.max(.15,Math.min(4.5,x));
+  /* ---- AZ OLDALAK MENET KÖZBEN VÁLTOZÓ ÁLLAPOTA ----
+     A pillanatkép a KEZDŐRÚGÁS képe; innentől a csereterv és a piros lap
+     mozgatja. Csupa sorosítható szám, tehát a két kliens ugyanabból ugyanoda
+     jut — és mivel az elkészült listát a szoba tárolja, a másik oldal amúgy is
+     ugyanazt kapja. */
+  const mkSide=sn=>({
+    players:(sn.players||[]).map(p=>Object.assign({},p)),
+    ovr:sn.ovr||0,subs:0,redName:null,bus:0,
+    plan:(sn.plan||[]).map(r=>Object.assign({},r,{used:false})),
+    /* Régi kliens pillanatképében nincs redP — ilyenkor NEM dobunk, tehát a
+       véletlen-folyam betűre a régi marad, és a piros lap helyben fut tovább. */
+    redP:(typeof sn.redP==="number"&&sn.redP>0)?sn.redP:0});
+  const H=mkSide(home),A=mkSide(away);
+  const busOwn=x=>x.bus?BUS_OWN_MULT[Math.min(3,x.bus)-1]:1;
+  const busOpp=x=>x.bus?BUS_OPP_MULT[Math.min(3,x.bus)-1]:1;
+  let lamHome=0,lamAway=0;
   /* ---- KÉT NÉZET ÁTLAGA ----
      A CPU-meccsen az ellenfél egyetlen szám, ezért elég a saját lf. H2H-ban
      viszont MINDKÉT oldal gazdag, és ugyanarra a mennyiségre két becslés van:
@@ -22789,14 +23150,64 @@ function h2hSimulate(home,away,rnd,neutral){
      és a védekező taktika-stílusa SEMMIT nem érnének a párharcban — pedig a
      karrier egyik fő építőiránya. A kettő számtani átlaga mindkét oldal
      munkáját beszámítja, és szimmetrikus: a hazai támadása és a vendég
-     védekezése egyforma súllyal szól bele. */
-  const CL=x=>Math.max(.15,Math.min(4.5,x));
-  const lamHome=CL((Lh.lf+La.la)/2);
-  const lamAway=CL((La.lf+Lh.la)/2);
+     védekezése egyforma súllyal szól bele.
+     SEMLEGES PÁLYÁN (kupadöntő) egyik oldal sem kap pályaválasztói módosítót.
+     ÚJRASZÁMOLHATÓ: a csere (csapaterő) és a piros lap (−SIM.REDMATCH) menet
+     közben mozdítja a képletet, a buszsofőr pedig a két kész λ-t szorozza —
+     a saját oldalét visszafogja, az ellenfélét bezárja. */
+  function recalc(){
+    const ho=H.ovr-(H.redName?SIM.REDMATCH:0),ao=A.ovr-(A.redName?SIM.REDMATCH:0);
+    const Lh=matchLambdas(Object.assign({},home,{ovr:ho}),ao,neutral?0:SIM.HOME);
+    const La=matchLambdas(Object.assign({},away,{ovr:ao}),ho,neutral?0:SIM.AWAY);
+    lamHome=CL(CL((Lh.lf+La.la)/2)*busOwn(H)*busOpp(A));
+    lamAway=CL(CL((La.lf+Lh.la)/2)*busOwn(A)*busOpp(H));}
+  recalc();
   const ev=[];let hg=0,ag=0;
   ev.push({min:0,type:"start",home:home.teamName,away:away.teamName});
+  /* ---- AZ ELŐRE BEÁLLÍTOTT CSERÉK VÉGREHAJTÁSA ----
+     A SORREND a rangsor: felülről lefelé haladunk, és a cserekeret is így fogy
+     el — ha több szabály is érvényes volna, az alsók egyszerűen nem jutnak
+     szóhoz. NEM fogyaszt véletlent, tehát a régi folyamot nem mozdítja. */
+  function applyPlan(X,sideKey,min,mine,theirs){
+    if(!X.plan.length)return;
+    let changed=false;
+    for(const r of X.plan){
+      if(r.used)continue;
+      if(X.subs>=mpSubMax())break;
+      if(min<r.min)continue;
+      if(!mpSubCondOk(r.cond,mine,theirs,X.redName))continue;
+      const i=X.players.findIndex(p=>p.n===r.outN);
+      /* Aki már lejött, vagy akit kiállítottak, azt nem lehet lecserélni; aki
+         pedig már bent van, azt nem lehet még egyszer behozni. A szabály
+         ilyenkor ELÉG: kihúzzuk, hogy ne blokkolja az alatta lévőket. */
+      if(i<0||X.players[i].n===X.redName||X.players.some(p=>p.n===r.inN)){r.used=true;continue;}
+      X.players[i]={n:r.inN,pos:X.players[i].pos,gw:r.gw||0,aw:r.aw||0,rw:X.players[i].rw};
+      X.ovr+=(r.dOvr||0);
+      if(r.bus>0)X.bus=Math.max(X.bus,Math.min(3,r.bus|0));
+      X.subs++;r.used=true;changed=true;
+      ev.push({min,type:"sub",side:sideKey,out:r.outN,in:r.inN,bus:r.bus>0?(r.bus|0):0});}
+    if(changed)recalc();}
+  /* ---- A PIROS LAP IS A KÖZÖS LISTÁBA KERÜL ----
+     Eddig mindkét kliens saját kockát dobott rá. A valószínűség és a
+     súlyozás BETŰRE a régi (lásd mpWireRedWeights), csak a dobás helye
+     költözött ide — enélkül a „ha kiállították egy játékosunkat" csere-feltétel
+     nem volna értelmezhető, mert a szimuláció nem tudna róla. */
+  function rollRed(X,sideKey,min){
+    if(X.redName||!X.redP)return;
+    if(R()>=X.redP)return;
+    const cand=X.players.filter(p=>(p.rw||0)>0);
+    const who=h2hPick(cand.length?cand:X.players,"rw",R);
+    X.redName=who.n;who.gw=0;who.aw=0;
+    ev.push({min,type:"red",side:sideKey,who:who.n});
+    recalc();}
   for(let t=1;t<=18;t++){
     const min=t*5;
+    /* A tick ELEJÉN dől el, ki van a pályán — utána esnek a gólok. A csere a
+       MOST ÉRVÉNYES állásból dolgozik, tehát az ok-okozat sorrendje helyes. */
+    applyPlan(H,"home",min,hg,ag);
+    applyPlan(A,"away",min,ag,hg);
+    rollRed(H,"home",min);
+    rollRed(A,"away",min);
     const side=(who,lamTot,isHome)=>{
       const g=poisson(lamTot/18,R);
       for(let k=0;k<g;k++){
@@ -22808,15 +23219,17 @@ function h2hSimulate(home,away,rnd,neutral){
         if(isHome)hg++;else ag++;
         ev.push({min:Math.max(1,min-Math.floor(R()*5)),type:"goal",
           side:isHome?"home":"away",scorer:sc.n,assist:as?as.n:null,hg,ag});}};
-    side(home,lamHome,true);
-    side(away,lamAway,false);
+    side(H,lamHome,true);
+    side(A,lamAway,false);
     /* A félidő a 9. tick VÉGÉN: ekkor van kész az 1-45. perc. */
     if(min===45)ev.push({min:45,type:"half",hg,ag});}
   ev.push({min:90,type:"end",hg,ag});
   /* A gólok percét utólag rendezzük, hogy az idővonal monoton legyen. Az azonos
-     percre eső eseményeknél a TÍPUS dönt: kezdőrúgás → gól → félidő → vége.
-     Enélkül egy pontosan 45. perces gól a FÉLIDŐ-sor UTÁN jelenhetne meg. */
-  const ord=e=>e.type==="start"?0:e.type==="goal"?1:e.type==="half"?2:3;
+     percre eső eseményeknél a TÍPUS dönt: kezdőrúgás → csere/lap → gól →
+     félidő → vége. Enélkül egy pontosan 45. perces gól a FÉLIDŐ-sor UTÁN
+     jelenhetne meg. A gól/félidő/vége EGYMÁSHOZ mért sorrendje változatlan. */
+  const ord=e=>e.type==="start"?0:(e.type==="sub"||e.type==="red")?1
+    :e.type==="goal"?2:e.type==="half"?3:4;
   ev.sort((a,b)=>a.min-b.min||ord(a)-ord(b));
   duelSpreadBuckets(ev);
   ev.sort((a,b)=>a.min-b.min||ord(a)-ord(b));
@@ -22827,7 +23240,10 @@ function h2hSimulate(home,away,rnd,neutral){
   ev.forEach(e=>{
     if(e.type==="goal"){if(e.side==="home")h++;else a2++;}
     if(e.type==="goal"||e.type==="half"||e.type==="end"){e.hg=h;e.ag=a2;}});
-  return {events:ev,hg,ag,lam:{home:lamHome,away:lamAway}};}
+  /* A LISTA VERZIÓJA. v>=2 azt jelenti: a cserék és a piros lapok ITT dőlnek
+     el, tehát a lejátszásnak nem szabad saját lapot dobnia. Régi (verzió
+     nélküli) listánál minden marad a régiben. */
+  return {v:2,events:ev,hg,ag,lam:{home:lamHome,away:lamAway}};}
 /* ================= EGY VÖDÖRBEN CSAK AZ EGYIK CSAPAT GÓLJA =================
    BEJELENTETT HIBA: a párharc naplójában a 74. percben esett a saját gól, és
    utána a 73. percben az ellenfél egyenlítése — vagyis az idő VISSZAFELÉ ugrott.
@@ -23689,6 +24105,15 @@ async function h2hBeginDuel(){
   if(_h2hBusy)return;
   _h2hBusy=true;
   const round=(S.idx||0)+1,key=h2hKey();
+  /* ---- ELŐRE BEÁLLÍTOTT CSERÉK ----
+     A tervezőt MINDEN hálózati lépés előtt nyitjuk: a terv a pillanatkép része,
+     tehát ha a keret egyszer felment, már nem tudna beleférni. Csak akkor
+     kérdezünk, ha ehhez a párharchoz még nem döntöttél (a döntés — a „nem" is —
+     a mentés része), és csak akkor, ha a keret még nem ment fel. */
+  if(gameMode==="career"&&!mpSubPlanFor(key)&&!(S.h2hPending&&S.h2hPending.key===key)){
+    _h2hBusy=false;
+    openMpSubPlanner(key,()=>{h2hBeginDuel();});
+    return;}
   /* A végigjátszás megáll: a párharc a karrier csúcspontja, azt nézni kell. */
   if(S.auto){S.auto=false;$("autoBtn").textContent="Szezon végigjátszása";}
   $("kickBtn").disabled=true;
@@ -23842,8 +24267,11 @@ async function h2hTickRun(key,myField,oppField,round){
          $("h2hWaitErr").textContent="A visszavonás nem sikerült — próbáld újra.";
          ub.disabled=false;h2hTick(key,myField,oppField,round);return;}
        /* A KERET VISSZAHÍVÁSA az elköteleződést is feloldja: innentől a
-          Kezdőrúgás és a HUB újra a tiéd, és a visszatérés sem ránt be. */
+          Kezdőrúgás és a HUB újra a tiéd, és a visszatérés sem ránt be.
+          A CSERETERVET is eldobjuk: ha a keretet átrendezed, a rá épülő
+          szabályok is elavulnak — a következő indításkor újra megkérdezzük. */
        h2hPendingClear();
+       S.mpSubPlan=null;
        h2hForcedEnd();
        /* ---- VISSZA ODA, AHONNAN A PÁRHARC INDULT ----
           BEJELENTETT HIBA: kupa-párharcból visszahívva a képernyő a BAJNOKI
@@ -25356,6 +25784,12 @@ function playMatch(){
   }else if(DUEL){
     addLine(`— ${S.idx+1}. FORDULÓ · ⚔ PÁRHARC · ${title} —`,"mt");
     addLine(`A társad csapata felsorakozik: ${esc(String(DUEL.oppName))} — csapaterő ${DUEL.oppOvr.toFixed(1)}. ${DUEL.neutral?"Semleges pályán, a döntőben.":DUEL.iAmHome?"Hazai pályán fogadod.":"Idegenben, az ő közönsége előtt."}`,"m ev");
+    /* A CSERETERV JELZÉSE. Hogy MELYIK szabály sül el, azt nem mondjuk meg
+       előre — az a mérkőzés dolga —, de azt igen, hogy készenlétben áll. */
+    try{const _P=mpSubPlanFor(h2hKey());
+      if(_P&&_P.on&&_P.rules.length)
+        addLine(`🔁 A cseretervednek ${_P.rules.length} opciója áll készenlétben — amelyik feltétel elsőként teljesül, az lép életbe.`,"m ev");
+    }catch(e){}
   }else{
     /* A fejléc maga jelöli a rangadót és a bajnoki tétmeccset — a napló
        tetején így azonnal látszik, hogy ez nem átlagos forduló. */
@@ -25415,11 +25849,49 @@ function playMatch(){
      Csak ízesítésre használjuk — mechanikai valószínűséghez soha. */
   const fp=p=>DUEL?Math.min(0.95,p*DUEL_FLAVOR_MULT):p;
   const duelBkt={mine:{},opp:{}};
+  /* PÁRHARC: az ELŐRE BEÁLLÍTOTT CSERÉK és a piros lap is a közös listából
+     jönnek. A cseréket a saját tizenegyeden itt, lejátszás közben hajtjuk
+     végre — így a könyvelés (meccsszám, statisztika, fejlődés, a meccs embere)
+     pontosan azt követi, ami a pályán történt. A közös listában a MÁSIK oldal
+     cseréi is ott vannak, azokkal viszont nincs dolgunk: az ő keretét nem
+     vezetjük. */
+  const duelSubBkt={},duelRedBkt={};
+  const _duelMine=e=>((e.side==="home")===DUEL.iAmHome);
   if(DUEL)(DUEL.sim.events||[]).forEach(e=>{
-    if(e.type!=="goal")return;
     const b=Math.max(1,Math.min(18,Math.ceil((e.min||1)/5)));
-    const box=((e.side==="home")===DUEL.iAmHome)?duelBkt.mine:duelBkt.opp;
-    (box[b]=box[b]||[]).push(e);});
+    if(e.type==="goal"){
+      const box=_duelMine(e)?duelBkt.mine:duelBkt.opp;
+      (box[b]=box[b]||[]).push(e);return;}
+    if(!_duelMine(e))return;
+    if(e.type==="sub")(duelSubBkt[b]=duelSubBkt[b]||[]).push(e);
+    else if(e.type==="red")(duelRedBkt[b]=duelRedBkt[b]||[]).push(e);});
+  /* A közös lista vezeti a piros lapot? (v>=2). Ha igen, a helyi dobás
+     elmarad — különben kétszer születne kiállítás ugyanazon a mérkőzésen. */
+  const duelRedFromList=!!(DUEL&&(DUEL.sim.v||0)>=2);
+  /* Egy tervezett csere végrehajtása a SAJÁT tizenegyeden. A rendes csere
+     útján megy (doSub): a lecserélt ember a lejátszott perceiért fejlődik, a
+     beálló felkerül a meccs könyvelésébe. A buszsofőrnek saját útja van. */
+  function duelApplySub(e){
+    const k=active.findIndex(a=>!a.bus&&a.p.n===e.out);
+    if(k<0)return;
+    if((e.bus||0)>0){busBringOn(k);return;}
+    const ctx=halftimeCtx();
+    const inP=(ctx.bench()||[]).find(b=>b.n===e.in);
+    if(inP)ctx.doSub(k,inP);}
+  /* A kiállítás a közös listából. A következmények betűre ugyanazok, mint a
+     helyben dobott lapnál — csak az esemény FORRÁSA más. */
+  function duelApplyRed(e){
+    if(redIdx>=0)return;
+    const k=active.findIndex(a=>!a.bus&&a.p.n===e.who);
+    if(k<0)return;
+    redIdx=k;S.reds++;
+    addLine(`${gminTxt(min)}  ${redCardLine(active[redIdx].p.n)}`,"m rc");
+    sbEv("us","red",active[redIdx].p.n);
+    mileRed(MILE,active[redIdx].p.n,`${gminTxt(min)}  `);
+    diff-=SIM.REDMATCH;lf=lam(diff);la=lam(-diff)*defenseMult()*styleRedOppGoalMult();
+    intimidationNote(min);
+    rivalTune();
+    applyDisciplineDip(active[redIdx].p.n);}
   function updateGoallessStreak(name,scored){
     const entry=active.find(a=>a.p.n===name);
     if(!entry)return;
@@ -25616,6 +26088,14 @@ function playMatch(){
     /* (A FÉLIDŐ-sor a tick VÉGÉN áll, a 45. percnél — lásd ott. Itt, a tick
        elején még a most következő vödör góljai hiányoznának alóla.) */
     if(min>90){clearInterval(iv);fullTime();return;}
+    /* ---- PÁRHARC: A TERVEZETT CSERÉK ÉS A KIÁLLÍTÁS ----
+       A tick ELEJÉN, ugyanabban a sorrendben, ahogy a szimuláció is számolta
+       (előbb a csere, utána a lap) — így a pályán ugyanaz a tizenegy áll, mint
+       amivel a közös lista dolgozott. */
+    if(DUEL){
+      const _b=Math.max(1,Math.min(18,Math.ceil(min/5)));
+      (duelSubBkt[_b]||[]).forEach(duelApplySub);
+      (duelRedBkt[_b]||[]).forEach(duelApplyRed);}
     /* A 90+ hosszabbítási dráma eldől itt, de CSAK a bucket legvégén hajtjuk
        végre — különben a bucketben utána következő rendes (85-90 perces) gólok
        a "90+" sor UTÁN, kisebb percszámmal jelentek meg (időrendi hiba). */
@@ -25952,7 +26432,7 @@ function playMatch(){
        forduló piroslap-ESÉLYÉT is ugyanabban az arányban csökkentjük, amennyi
        súly kiesett — így a védősoré tényleg feleannyi lesz, a többieké pedig
        pontosan annyi marad, mint eddig. */
-    if(redIdx<0){
+    if(redIdx<0&&!duelRedFromList){
       const _wBase=active.map(x=>x.bus?0:
         [0.2,0.5,1,2,3][x.p.aggroI!==undefined?x.p.aggroI:2]
         *multSkillEffect(x.p.n,"discipline")
@@ -33095,8 +33575,11 @@ function renderHalftimeSubsBtn(){
      eseménylistából jönnek — egy félidei csere nem tudná befolyásolni az
      eredményt, csak úgy TŰNNE, mintha befolyásolná. Enélkül a felirat azt
      ígérné, ami a párharc-fordulókban nem történik meg. */
-  const duelNote=(S.halftimeSubs&&typeof h2hRoomActive==="function"&&h2hRoomActive())
-    ? `<br><span style="color:var(--gold);font-size:11.5px">⚔ A párharc-fordulókban (${H2H_ROUNDS.join(". és ")}.) nincs csereszünet — ott az eredmény a közös eseménylistából jön.</span>`
+  /* A PÁRHARC KÜLÖN ÚTON JÁR, és ezt ki kell mondani: ott nincs csereszünet
+     (az eredmény a közös eseménylistából jön), CSERE viszont van — a
+     kezdőrúgás előtt megnyíló tervezőben, feltételekhez kötve. */
+  const duelNote=(typeof h2hRoomActive==="function"&&h2hRoomActive())
+    ? `<br><span style="color:var(--gold);font-size:11.5px">⚔ A párharc-fordulókban (${H2H_ROUNDS.join(". és ")}.) nincs csereszünet — ott a cseréket a kezdőrúgás előtt, előre tervezed meg (hányadik perctől, milyen állásnál, ki helyére ki), és a mérkőzés magától végrehajtja őket.</span>`
     : "";
   ds.innerHTML=(S.halftimeSubs
     ?`<b style="color:var(--grass)">BE</b> — ${HALFTIME_SUB_MAX} csere meccsenként: a meccsnézet alján lévő gombbal bármikor, és félidőben magától is megáll`
@@ -33105,7 +33588,7 @@ $("hubHalftimeSubsBtn")&&($("hubHalftimeSubsBtn").onclick=()=>{
   S.halftimeSubs=!S.halftimeSubs;
   addLine(S.halftimeSubs
     ?`🔁 Cserék BEKAPCSOLVA — mérkőzésenként ${HALFTIME_SUB_MAX} csere: a meccsnézet alján lévő gombbal bármelyik percben, ezen felül félidőben a meccs magától is megáll.`
-      +(h2hRoomActive()?` A párharc-fordulók kivételek: ott nincs csere.`:"")
+      +(h2hRoomActive()?` A párharcban ehelyett a kezdőrúgás előtti cseretervező dolgozik.`:"")
     :`🔁 Cserék kikapcsolva — a meccsek megállás nélkül mennek végig.`,"m life");
   /* ---- A FUTÓ CSEREGÓL-KIHÍVÁS UTÓLAG IS IGAZODIK ----
      Enélkül a kapcsolót ki lehetne kapcsolva hagyni a vállalásig (alacsony
@@ -44733,6 +45216,9 @@ function saveGame(){
         balSkillMatches:S.balSkillMatches,balSkillsSeason:S.balSkillsSeason,
         balLoadPrev:S.balLoadPrev,balLoadHandover:S.balLoadHandover,cupRunNo:S.cupRunNo,
         toughSeen:S.toughSeen,buddySeen:S.buddySeen,hardTackleNotes:S.hardTackleNotes,seasonHardTackles:S.seasonHardTackles,shapeStat:S.shapeStat,
+        /* PÁRHARC-CSERETERV: a párharc kulcsához kötve él, tehát egy régi terv
+           sosem szivárog át — a mentés viszont megőrzi az újratöltésen át. */
+        mpSubPlan:S.mpSubPlan,
         paceGoals:S.paceGoals,wingPosLearned:S.wingPosLearned,
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
         guideOn:S.guideOn,guideSeen:S.guideSeen,
@@ -45160,6 +45646,7 @@ function applySavedGame(d){
   S.buddySeen=d.S.buddySeen||{};
   S.hardTackleNotes=d.S.hardTackleNotes||0;
   S.seasonHardTackles=d.S.seasonHardTackles||{};
+  S.mpSubPlan=d.S.mpSubPlan||null;
   S.shapeStat=d.S.shapeStat||null;
   S.paceGoals=d.S.paceGoals||0;
   S.wingPosLearned=d.S.wingPosLearned||0;

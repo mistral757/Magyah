@@ -1105,6 +1105,67 @@ második legnagyobb a Harmónia 2 051-e mögött. A „legsivárabb" cím átker
 **Bombázókhoz** (9 képesség, 118 mérföldkő, 2 578 pont) — az a stílus a Beton
 tükörképe, tehát ugyanez a bővítés ott is elvégezhető, csatárokra fordítva.
 
+### 3.3 Párharc-cseretervező (3.3.17)
+
+A párharcban eddig **nem lehetett cserélni**, és jó okkal: a mérkőzés eredményét
+a két keretből előre kiszámolt **közös eseménylista** adja, tehát egy menet
+közbeni döntés csak úgy TŰNNE, mintha hatna. A csereszünet ezért a párharc-
+fordulókban ki volt kapcsolva — a keret mélysége viszont a karrier egyik fő
+építőiránya, és pont a két legnagyobb tétű meccsen esett ki a képből.
+
+**A megoldás: a cseréket előre tervezed meg, feltételekhez kötve.** A terv a
+pillanatképpel EGYÜTT megy fel a szobába, és onnantól a **szimuláció maga hajtja
+végre** — vagyis a csere ott van a közös listában, mindkét kliens ugyanazt
+számolja, és a csere tényleg számít.
+
+**Három változó szabályonként**
+
+| # | Változó | Értékek |
+|---|---|---|
+| 1 | hányadik perctől | 5-től 85-ig, ötösével (a mérkőzés is öt perces vödrökben pereg) |
+| 2 | milyen az állás | bármilyen · vezetünk · vereségre állunk · döntetlen · 2+ góllal vezetünk · 2+ góllal vereségre állunk · kiállítottak egy játékosunkat |
+| 3 | ki helyére ki | a kezdő 11 bármelyik tagja ← a cserepad bármelyik tagja (Beton védelemnél középpályás helyére a **buszsofőr** is) |
+
+**A SORREND A RANGSOR.** A szimuláció felülről lefelé halad: ha egyszerre több
+szabály is érvényes volna, a listában előrébb álló lép életbe, és a hármas
+cserekeret is fentről lefelé fogy el — az alsó szabályok akkor egyszerűen nem
+jutnak szóhoz. A tervezőben nyilakkal átrendezhető a sorrend.
+
+**Amit a csere ténylegesen mozdít a szimulációban**
+
+* **ki lőhet gólt** — a beálló ember gól- és gólpassz-súlya (`gw`/`aw`) az adott
+  helyre kiszámolva utazik fel, tehát a gólszerző-sorsolás onnantól vele számol;
+* **a csapaterő** — a `doSub` képlete szerint (a különbség tizenegyede), és a
+  λ-k újraszámolódnak;
+* **a buszsofőr két szorzója** — a saját gólesélyed vissza, az ellenfélé le.
+  Ez az egyetlen csere, ami a MÁSIK oldal λ-ját is mozdítja.
+
+**A lejátszás ugyanezt futtatja le a saját tizenegyeden**, a közös lista
+csere-eseményeiből, a rendes csere útján (`doSub`) — így a könyvelés
+(meccsszám, karrier-statisztika, fejlődés, a meccs embere) pontosan azt követi,
+ami a pályán történt. A lecserélt ember a lejátszott perceiért fejlődik.
+
+**A piros lap is a közös listába költözött.** Eddig mindkét kliens SAJÁT kockát
+dobott rá: láthatatlan, de valódi ellentmondás volt (ugyanazon a mérkőzésen a
+két gépen más-más ember kapta a lapot). Ez egyben az egyetlen módja annak, hogy
+a „ha kiállították egy játékosunkat" feltétel értelmezhető legyen — a
+szimulációnak TUDNIA kell róla. **A valószínűség és a súlyozás betűre a régi**
+(`mpWireRedWeights`), csak a dobás HELYE változott; a lejátszás ilyenkor nem dob
+saját lapot. A közös lista `v:2` jelzője mondja meg, hogy a lista vezeti-e a
+lapot — régi (verzió nélküli) listánál minden marad a régiben.
+
+**Visszafelé kompatibilitás.** Ha a pillanatképben nincs `redP` (régi kliens), a
+szimuláció NEM fogyaszt véletlent a lapra, tehát a seedelt folyam betűre a régi
+marad. A csereterv hiánya ugyanígy: terv nélkül a lista pontosan az, ami eddig
+volt.
+
+**Hol nyílik meg.** A kezdőrúgás előtt, minden hálózati lépés előtt — a terv a
+pillanatkép része, tehát ha a keret egyszer felment, már nem tudna beleférni.
+Egyetlen kérdéssel indul („akarsz cserét?"), és csak igenre nyílik meg a
+szerkesztő, az első opcióval eleve nyitva. A döntés — a „nem" is — a mentés
+része, tehát egy újratöltés nem kérdezi meg újra; a keret visszahívása viszont
+eldobja a tervet, mert az átrendezett keretre épülő szabályok elavulnak.
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
