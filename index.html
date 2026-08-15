@@ -1062,6 +1062,10 @@ button.infPanel:disabled{cursor:default}
   background:var(--gold);color:#241d06;font-family:'Archivo Black';font-size:10px;
   display:flex;align-items:center;justify-content:center}
 @keyframes pulse{50%{transform:scale(1.08)}}
+/* A kupa-továbblépő gomb lüktetése: elég erős, hogy a szem odataláljon a
+   lefújás utáni csendben, de nem ugrál — a lefújás pillanata a nézelődésé. */
+@keyframes euroGoPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(201,162,51,.55)}
+  50%{transform:scale(1.025);box-shadow:0 0 0 10px rgba(201,162,51,0)}}
 @media (prefers-reduced-motion:reduce){.slot.open-elig .dot{animation:none}}
 .slot .lbl{font-size:9px;margin-top:3px;color:#f2f2ee;text-shadow:0 1px 2px rgba(0,0,0,.8);font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .slot .lbl b{color:var(--gold);font-weight:800}
@@ -2295,6 +2299,11 @@ button.infPanel:disabled{cursor:default}
            kiemelve — így már a naptárban látszik, melyik meccs különleges. -->
       <button id="scheduleViewBtn" class="btn-s" style="width:100%;margin-top:8px">📅 Menetrend és tabella</button>
       <button id="matchHubBtn" class="btn-s hide" style="width:100%;margin-top:8px">⚙️ Ugrás a HUB-ba</button>
+      <!-- KUPA — LEFÚJÁS UTÁNI TARTÁS. A kupameccs vége eddig azonnal átvitt a
+           sorozat-nézetre, az eredményjelzőt meg sem lehetett nézni. Mostantól
+           a képernyő MARAD, és ez a folyamatosan lüktető gomb visz tovább —
+           magától is, ha 30 másodpercig nem történik semmi. -->
+      <button id="euroContinueBtn" class="btn-y matchWide hide" style="margin-top:8px;animation:euroGoPulse 1.6s ease-in-out infinite"></button>
     </div>
   </div>
 </section>
@@ -2776,7 +2785,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.10";
+const APP_VERSION="3.3.11";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -20882,6 +20891,12 @@ function openPreSeasonHub(){
 let preSeasonHubMode=false;
 let hubMidSeasonMode=false;
 function openHubMidSeason(){
+  /* KUPA-TARTÁS: ha a lefújás utáni nézelődésből lépsz a HUB-ba, ELŐBB a
+     sorozat lépjen tovább. Enélkül a kampány a már lejátszott mérkőzésen
+     állna, és a HUB-ból visszatérve ugyanaz a forduló jönne szembe. A
+     léptetés a kupa-nézetet nyitja meg, amit ez a függvény rögtön utána
+     elrejt — a visszatérés (hubMidSeasonReturn) így oda talál vissza. */
+  try{if(euroHoldActive())euroHoldGo();}catch(e){}
   if(gameMode==="career"&&S.transferBudget==null)S.transferBudget=0;
   hubMidSeasonMode=true;
   /* Szezon közben a PÁLYA és a KÖZVETÍTÉS EGYSZERRE látszik, ezért mindkettő
@@ -26631,7 +26646,15 @@ function playMatch(){
       try{chAfterMatchBook(null);}catch(e){}
       try{msScan();}catch(e){}
       try{styleScan();}catch(e){}
-      if(euroActive()){euroAfterUserMatch();return;}
+      /* KUPA: NEM ugrunk azonnal a sorozat-nézetre. A lefújás pillanata a
+         nézelődésé — az eredményjelző, a napló és a tabella maradjon a
+         képernyőn, amíg a felhasználó tovább nem lép. A továbblépést egy
+         lüktető gomb kínálja, és 30 másodperc TÉTLENSÉG után magától is
+         megtörténik (minden koppintás, görgetés, billentyű újraindítja a
+         visszaszámlálást). Auto módban nincs tartás: ott végig kell futnia. */
+      if(euroActive()){
+        if(S.auto){euroAfterUserMatch();return;}
+        euroHoldStart();return;}
       if(S.idx>=30){$("kickBtn").textContent="Szezon vége";finish();return;}
       if(CHECKPOINTS.includes(S.idx)){
         if(S.auto){
@@ -34387,6 +34410,20 @@ $("hubFreePlayerBtn").onclick=()=>{
    négy pad-tároló mindig látsszon (üresen is, "koppints és tölts ide valakit"
    sorként). A csere-választóban viszont nem kellenek: ott csak valódi
    játékosok lehetnek jelöltek. */
+/* ---- A KERETLISTA HÁROM CSOPORTJA ----
+   A sorrend a pályától a tartalékig halad, ahogy a lista is: aki ma játszik,
+   az van elöl. A kulcsok megegyeznek a hubRosterEntries `type` mezőjével,
+   ezért a besorolás külön leképezés nélkül működik. */
+const HUB_ROSTER_GROUPS=[
+  {k:"slot", ic:"🟢", t:"Kezdő 11"},
+  {k:"bench",ic:"🪑", t:"Cserepad"},
+  {k:"extra",ic:"📋", t:"Tartalék-keret"}];
+/* A nyitva/zárva állapot a mentésben él, tehát túléli az újratöltést is. */
+function hubRosterOpenState(){
+  if(!S.hubRosterOpen||typeof S.hubRosterOpen!=="object")S.hubRosterOpen={};
+  HUB_ROSTER_GROUPS.forEach(g=>{
+    if(typeof S.hubRosterOpen[g.k]!=="boolean")S.hubRosterOpen[g.k]=true;});
+  return S.hubRosterOpen;}
 function hubRosterEntries(includeEmptyBench){
   const out=[];
   slots.forEach((s,i)=>{if(s.player)out.push({type:"slot",idx:i,p:s.player});});
@@ -37075,6 +37112,56 @@ function renderHub(){
      feliratot vagy a műveletet állítja, utána renderHub()-ot hív — ezért ez az
      egy pont elég ahhoz, hogy a két gomb sose csússzon szét. */
   syncHubNextSeasonTwin();
+  /* ================= A KERET HÁROM LENYITHATÓ CSOPORTBAN =================
+     Egy 32 fős keret egyetlen szalagban átláthatatlan: a kezdő 11, a pad és a
+     tartalékok összefolynak, és a görgetés közben elveszik, ki hol van. A
+     lista ezért három csoportra bomlik, mindegyik külön nyitható-zárható, és
+     egy gombbal az egész becsukható vagy kinyitható.
+     Az állapot a MENTÉSBEN él (S.hubRosterOpen), tehát a következő
+     megnyitáskor is úgy találod a listát, ahogy hagytad. */
+  const rgOpen=hubRosterOpenState();
+  const rgBody={};
+  {const all=hubRosterEntries(true);
+   const cnt={slot:0,bench:0,extra:0},cap={slot:0,bench:0,extra:0};
+   all.forEach(l=>{cap[l.type]=(cap[l.type]||0)+1;if(!l.empty)cnt[l.type]=(cnt[l.type]||0)+1;});
+   const anyClosed=HUB_ROSTER_GROUPS.some(g=>!rgOpen[g.k]);
+   const bar=document.createElement("div");
+   bar.style.cssText="display:flex;justify-content:flex-end;margin:2px 0 6px";
+   const allBtn=document.createElement("button");
+   allBtn.className="btn-s";
+   allBtn.style.cssText="font-size:11.5px;padding:5px 10px";
+   allBtn.textContent=anyClosed?"▼ Mindent kinyit":"▲ Mindent bezár";
+   allBtn.onclick=()=>{HUB_ROSTER_GROUPS.forEach(g=>{rgOpen[g.k]=anyClosed;});renderHub();};
+   bar.appendChild(allBtn);
+   box.appendChild(bar);
+   HUB_ROSTER_GROUPS.forEach(g=>{
+     const open=!!rgOpen[g.k];
+     const head=document.createElement("div");
+     head.className="prow";
+     head.style.cssText="display:flex;align-items:center;gap:8px;cursor:pointer;background:var(--panel2)";
+     const sub=g.k==="bench"?`${cnt.bench||0}/${cap.bench||0} hely betöltve`
+       :g.k==="slot"?`${cnt.slot||0}/11 poszt`
+       :`${cnt.extra||0} játékos`;
+     head.innerHTML=`<span style="font-size:15px">${g.ic}</span>
+       <span class="main"><div class="nm">${esc(g.t)} <small style="color:var(--dim2)">${esc(sub)}</small></div></span>
+       <span style="color:var(--gold);font-size:13px">${open?"▲":"▼"}</span>`;
+     head.onclick=()=>{rgOpen[g.k]=!rgOpen[g.k];renderHub();};
+     box.appendChild(head);
+     const body=document.createElement("div");
+     body.style.marginBottom="6px";
+     if(!open)body.classList.add("hide");
+     box.appendChild(body);
+     rgBody[g.k]=body;
+     if(open&&!(cap[g.k]||0)){
+       const note=document.createElement("div");
+       note.style.cssText="font-size:11.5px;color:var(--dim2);padding:4px 2px 6px";
+       note.textContent=g.k==="extra"
+         ? "Üres a tartalék-keret — az igazolt és az akadémiáról felhozott játékosok kerülnek ide."
+         : "Ez a csoport most üres.";
+       body.appendChild(note);}});}
+  /* A sorok a saját csoportjuk testébe kerülnek — a `box` innentől csak a
+     fejléceket tartja. */
+  const rgAdd=(loc,el)=>{(rgBody[loc.type]||box).appendChild(el);};
   hubRosterEntries(true).forEach(loc=>{
     /* ÜRES PAD-HELY: a tároló akkor is látszik, ha nincs benne senki — így nem
        "tűnik el" a pad, és egy koppintással betölthető a tartalék-keretből. */
@@ -37086,7 +37173,7 @@ function renderHub(){
         <span class="main"><div class="nm" style="color:var(--dim)">${esc(cat.label)} — üres <small>(pad)</small></div>
         <div class="trait">Koppints, és beállíthatsz ide valakit a tartalék-keretből</div></span>`;
       row.onclick=()=>openHubPositionPicker(loc);
-      box.appendChild(row);
+      rgAdd(loc,row);
       return;}
     const p=loc.p;
     const row=document.createElement("div");row.className="prow";
@@ -37096,9 +37183,14 @@ function renderHub(){
     const tag=loc.type==="bench"?" <small>(pad)</small>":loc.type==="extra"?" <small>(tartalék)</small>":"";
     const tier=playerCardTier(p.n);
     const cardBadge=tier?` <span style="${cardTierBadgeStyle(tier)};font-weight:700;font-size:9.5px;padding:1px 6px;border-radius:8px;letter-spacing:.5px;text-transform:uppercase">${cardTierLabel(tier)}</span>`:"";
-    /* pályán lévő karrier-játékosnál a poszton érvényes EFFEKTÍV Ratinget is
-       mutatjuk — így a rossz posztra tétel LÁTHATÓ (nem rejtett) hatás */
-    let ratingTxt=`jelenlegi Rating: ${Math.round(pOvr(p))}`;
+    /* A RATING NEM SZEREPEL A SOR ALATT. A szám a sor JOBB SZÉLÉN áll, nagy
+       méretben — ugyanaz az érték a trait-sorban is csak ismételte magát, és
+       elvette a helyet az életkortól meg a TSI-től.
+       EGY KIVÉTEL marad: ha a játékos a mostani posztján MÁST tud, mint amit a
+       Ratingje mutat, akkor a sor kiírja a különbséget (85 → 79 a KV poszton).
+       Azt a nagy szám nem tudja elmondani — ott csak az effektív érték áll —,
+       pedig épp ez az, amiért a felállást át kell rakni. */
+    let ratingTxt="";
     let ovrShown=Math.round(pOvr(p));
     const ent=careerPool&&careerPool[p.n];
     if(ent&&ent.attrs&&loc.type==="slot"&&slots[loc.idx]){
@@ -37140,7 +37232,7 @@ function renderHub(){
           return _t?` <span title="Ifi-boostot kapott" style="color:#00e5ff;font-weight:700;font-size:11px">${_t}</span>`:"";})()}${
         (()=>{const _e=careerPool&&careerPool[p.n];const _t=_e?oldBoostTag(_e):"";
           return _t?` <span title="Öreg csirkefogó — Rating- és TSI-boostot kapott" style="font-size:11px">${_t}</span>`:"";})()}</div>
-      <div class="trait">${ageTxt} · ${ratingTxt}${_tsi}${ownPosNote}</div>${unavNote}</span>
+      <div class="trait">${[ageTxt,ratingTxt].filter(Boolean).join(" · ")}${_tsi}${ownPosNote}</div>${unavNote}</span>
       <span class="ovr">${ovrShown}</span>`;
     row.style.display="flex";row.style.alignItems="center";
     /* Az ELADÁS-gomb korábban itt, a sorban ült, minden játékos neve mellett.
@@ -37152,8 +37244,8 @@ function renderHub(){
       const key=hubLocKey(loc);
       hubExpandedKey=(hubExpandedKey===key)?null:key;
       renderHub();};
-    box.appendChild(row);
-    if(hubExpandedKey===hubLocKey(loc))box.appendChild(buildHubDetail(loc));});
+    rgAdd(loc,row);
+    if(hubExpandedKey===hubLocKey(loc))rgAdd(loc,buildHubDetail(loc));});
   /* FIX: a HUB minden újrarajzolása egyben mentés is — vásárlás, eladás,
      klub-szemle, szintlépés után azonnal maradandó az állapot. */
   if(gameMode==="career")saveGame();
@@ -37459,6 +37551,55 @@ function euroFinishUserMatch(gf,ga){
   b.matches++;b.GF+=gf;b.GA+=ga;
   if(gf>ga)b.W++;else if(gf<ga)b.L++;else b.D++;
   if(ga===0){const gk=euroGK();if(gk)b.cleanSheets[gk.n]=(b.cleanSheets[gk.n]||0)+1;}}
+/* ================= LEFÚJÁS UTÁNI TARTÁS (KUPA) =================
+   A kupameccs vége eddig azonnal átdobott a sorozat-nézetre: a végeredményt, a
+   naplót és a tabellát meg sem lehetett nézni. Mostantól a meccsképernyő
+   MARAD, és a továbblépés a felhasználóé:
+     · egy folyamatosan lüktető gomb a képernyő alján visz a kupa-nézetbe,
+     · 30 másodperc TÉTLENSÉG után magától lép — de minden koppintás,
+       görgetés vagy billentyű újraindítja a visszaszámlálást, tehát aki
+       nézelődik, azt nem rántja el a képernyő.
+   A gomb felirata mutatja a hátralévő időt, hogy a lépés sose legyen
+   meglepetés. Auto módban a tartás kimarad: ott a szezonnak futnia kell. */
+const EURO_HOLD_SEC=30;
+let _euroHoldT=null,_euroHoldLeft=0,_euroHoldBound=false;
+function euroHoldActive(){return !!_euroHoldT;}
+function euroHoldStop(){
+  if(_euroHoldT){clearInterval(_euroHoldT);_euroHoldT=null;}
+  const b=$("euroContinueBtn");
+  if(b)b.classList.add("hide");
+  if(_euroHoldBound){
+    ["pointerdown","keydown","wheel","touchstart","scroll"].forEach(ev=>
+      window.removeEventListener(ev,euroHoldPoke,true));
+    _euroHoldBound=false;}}
+function euroHoldPoke(){_euroHoldLeft=EURO_HOLD_SEC;euroHoldPaint();}
+function euroHoldPaint(){
+  const b=$("euroContinueBtn");
+  if(!b)return;
+  b.textContent=`🏆 Ugrás a kupa HUB-ba — ${_euroHoldLeft} mp`;}
+function euroHoldGo(){
+  euroHoldStop();
+  try{euroAfterUserMatch();}catch(e){
+    /* a tartás sosem lehet zsákutca: ha a léptetés hibára fut, a kupa-nézet
+       akkor is jöjjön elő — onnan minden út járható */
+    try{showEuroScreen();}catch(_){}}}
+function euroHoldStart(){
+  const b=$("euroContinueBtn");
+  if(!b){euroAfterUserMatch();return;}
+  euroHoldStop();
+  _euroHoldLeft=EURO_HOLD_SEC;
+  b.classList.remove("hide");
+  b.onclick=euroHoldGo;
+  euroHoldPaint();
+  ["pointerdown","keydown","wheel","touchstart","scroll"].forEach(ev=>
+    window.addEventListener(ev,euroHoldPoke,true));
+  _euroHoldBound=true;
+  _euroHoldT=setInterval(()=>{
+    _euroHoldLeft--;
+    if(_euroHoldLeft<=0){euroHoldGo();return;}
+    euroHoldPaint();},1000);
+  try{addLine(`⏸️ A mérkőzés véget ért — nézelődhetsz. A kupa-nézetbe az alsó gombbal léphetsz tovább, vagy ${EURO_HOLD_SEC} mp tétlenség után magától.`,"m ev");}catch(e){}
+  try{$("euroContinueBtn").scrollIntoView({behavior:"smooth",block:"nearest"});}catch(e){}}
 /* A user meccse után: lefut a forduló összes többi meccse (a saját csoportban
    a másik párharc + a 7 háttércsoport), majd jöhet a következő forduló. */
 function euroAfterUserMatch(){
@@ -44063,7 +44204,10 @@ function saveGame(){
         mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,pendingCardUps:S.pendingCardUps,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,mpTable:S.mpTable,seasonDrama:S.seasonDrama,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpDecision:S.mpDecision,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
         mpOppStart:S.mpOppStart,mpOppSnap:S.mpOppSnap,
-        run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen
+        run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen,
+        /* a keretlista lenyitott csoportjai — a nézet állapota is a mentés
+           része, hogy ne kelljen minden belépéskor újra becsukni */
+        hubRosterOpen:S.hubRosterOpen
       }
     };
     saveWrite(saveKey(),JSON.stringify(data));
@@ -44525,6 +44669,7 @@ function applySavedGame(d){
   /* RUN: a mérő állapota. Régi mentésnél üresen indul, és a lusta
      mérföldkő-detektálás a meglévő előzményekből visszamenőleg feltölti. */
   S.run=d.S.run||null;S.runOpen=!!d.S.runOpen;S.runGuideOpen=!!d.S.runGuideOpen;runInit();
+  S.hubRosterOpen=(d.S.hubRosterOpen&&typeof d.S.hubRosterOpen==="object")?d.S.hubRosterOpen:null;
   /* ---- A NEM SZINKRONIZÁLT INDULÓ HORGONY HELYREÁLLÍTÁSA ----
      A hiba: a horgony (careerBaseRating) modul-alapértéke 80 volt, a
      nehézség-csúszkáé 84, és a kettőt CSAK a csúszka mozgatása vagy a
