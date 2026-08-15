@@ -954,6 +954,46 @@ igényel új szimulációs ágat.
   után 32) szem egy sorban kilógna a kártyából, és vízszintes görgetést okozna
   a telefonon. A rövid családok képe változatlan.
 
+* **A közös mű — ahányan beszálltak EGY mérkőzésen (`hm_contribM`, 3.3.15).**
+  A paletta és a szivárvány a gólszerzőket és a gólpasszadókat KÜLÖN nézi, a
+  `hm_contrib` pedig a klub egész történetét összegzi. Ami hiányzott: az
+  egyetlen mérkőzésen belüli TELJES megosztás — hány KÜLÖNBÖZŐ ember írta be
+  magát a jegyzőkönyvbe góllal **vagy** gólpasszal. Ez a filozófia legtisztább
+  kérdése: meddig lehet elmenni abban, hogy egy győzelmet sokan csináljanak?
+
+  | | |
+  |---|---|
+  | mérce | `msT().contribMax` — **csúcs**, nem darabszám |
+  | forrás | `mScore` és `mAssist` kulcsainak UNIÓJA a lefújásnál (`msNoteMatch`) |
+  | küszöbök | 3·4·5·6·7·8·9·10·11·12·13·14 (12 fokozat) |
+  | pontérték | 1·1·2·3·5·7·9·12·16·21·27·36 — összesen **140** |
+  | Infinity | **nincs** hosszabbítás (`ST_INF_SKIP`) |
+
+  **Miért csúcs és nem számláló.** A paletta azt jutalmazza, hogy sokszor jön
+  össze; ez azt, hogy meddig jutottál el EGYSZER. A 12. embert nem többször
+  kell összehozni, hanem egyszer — és utána már a 13. a cél. Aki gólt IS és
+  gólpasszt IS adott ugyanazon a meccsen, **egyszer** számít: emberek, nem
+  tételek.
+
+  **A lépcső számtana.** Egy gól legfeljebb KÉT nevet ír be (a szerzőt és a
+  tálalót), tehát az N. fokozathoz durván N/2 gól kell úgy, hogy minden gólnál
+  más-más pár szerepeljen. 3-6 = jó napok; 7-10 = gólzápor megosztott
+  befejezéssel (itt dolgozik érted az „Osztott dicsőség" trait); 11 = a teljes
+  kezdő tizenegy, a kapussal együtt; 12-14 = **csak cserékkel**.
+
+  **A tető 14, és ez nem önkényes.** Egy mérkőzésen ennyi ember tud egyáltalán
+  pályára lépni: 11 kezdő + `HALFTIME_SUB_MAX` (3) csere. A meccs előtti
+  kényszerpótlás (sérült/eltiltott helyett beálló) nem ad plusz embert — ő már
+  a kezdő tizenegy része. A 14 tehát szó szerint azt jelenti, hogy mindenki
+  beírta magát, aki csak a pályán járt. Efölött nincs mit kérni, ezért a
+  család ki van véve az Infinity-hosszabbításból: egy 15-ös fokozat nem nehéz
+  volna, hanem teljesíthetetlen. Ha a cserelimit valaha nő, a lépcső teteje is
+  nőhet vele — a küszöbtömb (`ST_UNITY_TH`) egyetlen sor.
+
+  **A 12 fölötti sáv a „Cserék a meccs alatt" kapcsolót kéri** (HUB → Csapat-
+  építés): kikapcsolt cseréknél a kezdő tizenegy a plafon, tehát a 11 az utolsó
+  elérhető fokozat. A leírás a 12. fokozattól ezt ki is mondja.
+
 * **Osztott dicsőség — olcsó képesség a Béke és harmóniának (3.3.10).** A
   stílus mérőszáma és a mérföldkövei is arról szólnak, hogy SOKAN szálljanak be
   a termelésbe (különböző gólszerzők egy idényben, akik valaha betaláltak a
