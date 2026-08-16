@@ -43,3 +43,18 @@ nem a `globals` csomagból jönnek: így a repónak nincs npm-függősége, és 
 felvett név tudatos döntés. Ha egy új böngésző-API-t kezdünk használni
 (mondjuk `IndexedDB`), azt oda is fel kell venni — különben a `no-undef`
 jogosan tiltakozik.
+
+## firebase-rules.json — az adatbázis szabályai
+
+A Realtime Database (`magyahok`) teljes szabályfája, érvényes JSON-ként. A
+Firebase konzolban a **Realtime Database → Rules** mezőbe illesztendő, majd
+Publish.
+
+**A fájl a TELJES fát felülírja** — ezért van benne a `/mp` ág (a „Gyere 1v1!"
+szobái) is, nem csak a `/lb` (globális ranglista). Ha csak az egyik részt
+illesztenéd be, a másik ág azonnal elnémul.
+
+Mit véd: a gyökér zárva, az `/mp` csak 4 karakteres szobakódra nyílik
+(bejelentkezés nélkül, ahogy az MP-kód dolgozik), a `/lb` pedig bárkinek
+olvasható, de **kizárólag a saját bejegyzését** írhatja mindenki, séma- és
+tartomány-ellenőrzéssel. Részletes magyarázat: `docs/profil-es-ranglista.md`.
