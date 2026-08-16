@@ -19,8 +19,8 @@
 | **F4** — beállítóképernyő | ✅ kész |
 | **F5/A** — csapatépítés (1, 2, 3, 4, 7, 8, 9, 24) | ✅ kész |
 | **F5/B** — piac (5, 6, 13, 14, 15, 16, 17) | ✅ kész |
-| F5/C — hosszú táv | következik |
-| F5/D — meta | — |
+| **F5/C** — hosszú táv (18, 19, 20, 21, 22, 23) | ✅ kész |
+| F5/D — meta (10, 11, 12, 25) | következik |
 | F6–F8 | — |
 
 **Eldöntött kérdések** (a 8. szakasz nyitott kérdéseiből):
@@ -318,7 +318,7 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
 |---|---|---|
 | **A — csapatépítés** ✅ | 1, 2, 3, 4, 7, 8, 9, 24 | a legnagyobb hatás: itt dől el a meccs |
 | **B — piac** ✅ | 5, 13, 14, 15, 16, 17, 6 | lásd a lenti két megjegyzést |
-| **C — hosszú táv** | 18, 19, 20, 21, 22, 23 | java már megvan L1-en, `steps` és `nudge` hiányzik |
+| **C — hosszú táv** ✅ | 18, 19, 20, 21, 22, 23 | lásd a 6. megjegyzést: itt a legtöbb téma helye a TIPP |
 | **D — meta** | 10, 11, 12, 25 | részben megvan, kiegészítés |
 
 * **Kész, ha:** csomagonként végigjátszott 2 szezon, és minden téma legalább
@@ -357,6 +357,24 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
    (`ev:academy`), és nincs `due()`-ja. **Általános szabály:** ami egy modális
    döntés pillanata, az tipp; ami a képernyőn ottmaradó elintézetlenség, az
    jelzés.
+
+**A C csomag két megjegyzése:**
+
+6. **Nem minden témából lesz jelzés — és ez nem hiány.** A hosszú távú témák
+   zöme (TSI, skillek alapjai, szezonkártya) *felismerés*, nem elintézetlenség:
+   nincs mit „megcsinálni" tőlük, tehát nincs mire villogni. Ezek a **tipp**
+   szinten maradtak, ott is vannak jól. A csomagból csak kettőből lett jelzés —
+   a parlagon álló kész párkémiából és a meg nem nyitott Run-mérőből —, mert
+   csak ezeknél van a képernyőn valami, ami elintézésre vár.
+   *A szezonkártyából azért nem lett „közeledsz egy szinthez" jelzés, mert a
+   szintet a szezon végén, az egész keret egymáshoz mért teljesítményéből
+   számolja a `determineSeasonCards` — egy menet közbeni becslés a küszöb-logika
+   megkettőzését kérné, és a megkettőzött szabály előbb-utóbb hazudik.*
+7. **Egy téma, három szint — most már a gyakorlatban is.** A Run szintje volt az
+   első téma, amelyik ugyanazon a kulcson (`ev:run`) kapott tippet, jelzést ÉS
+   vezetést. A tip a `GUIDE_TIPS`-ből jön, a `due()` és a `steps` a
+   `teachExtendTips()`-ből — ez a minta bármelyik meglévő tippre alkalmazható,
+   anélkül hogy a tipp szövege elmozdulna.
 
 ### F6 — A karmester finomhangolása
 
