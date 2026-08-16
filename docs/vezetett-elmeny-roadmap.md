@@ -20,8 +20,10 @@
 | **F5/A** — csapatépítés (1, 2, 3, 4, 7, 8, 9, 24) | ✅ kész |
 | **F5/B** — piac (5, 6, 13, 14, 15, 16, 17) | ✅ kész |
 | **F5/C** — hosszú táv (18, 19, 20, 21, 22, 23) | ✅ kész |
-| F5/D — meta (10, 11, 12, 25) | következik |
-| F6–F8 | — |
+| **F5/D** — meta (10, 11, 12, 25) | ✅ kész |
+| **A huszonöt téma mind megvan** | ✅ |
+| F6 — karmester-finomhangolás | következik |
+| F7 — első futás · F8 — QA és dokumentáció | — |
 
 **Eldöntött kérdések** (a 8. szakasz nyitott kérdéseiből):
 
@@ -319,7 +321,7 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
 | **A — csapatépítés** ✅ | 1, 2, 3, 4, 7, 8, 9, 24 | a legnagyobb hatás: itt dől el a meccs |
 | **B — piac** ✅ | 5, 13, 14, 15, 16, 17, 6 | lásd a lenti két megjegyzést |
 | **C — hosszú táv** ✅ | 18, 19, 20, 21, 22, 23 | lásd a 6. megjegyzést: itt a legtöbb téma helye a TIPP |
-| **D — meta** | 10, 11, 12, 25 | részben megvan, kiegészítés |
+| **D — meta** ✅ | 10, 11, 12, 25 | itt született a CSENDES téma fogalma |
 
 * **Kész, ha:** csomagonként végigjátszott 2 szezon, és minden téma legalább
   egyszer előjött a maga helyén, egyik sem félrehorgonyozva.
@@ -375,6 +377,19 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
    vezetést. A tip a `GUIDE_TIPS`-ből jön, a `due()` és a `steps` a
    `teachExtendTips()`-ből — ez a minta bármelyik meglévő tippre alkalmazható,
    anélkül hogy a tipp szövege elmozdulna.
+
+**A D csomag két megjegyzése:**
+
+8. **CSENDES téma (`quiet`).** Van, amire a játék MÁR ad jelet a maga módján — a
+   meg nem nézett mérföldkövek számát az Infópult ikonja írja ki, aranyban
+   lélegezve. Egy szaggatott keret meg egy pötty ugyanarra csak zaj volna.
+   A csendes téma tehát van a rangsorban, a beállításokban és a vezetésben —
+   csak saját jelzést nem rajzol. Ezt kapta a mérföldkő- és a kihívás-panel.
+9. **Ne írj olyan lépéssort, ami sosem futhat le.** A vezetés csak a HUB-ban
+   indul magától (a meccs képernyője feszes hely), tehát a `scr:"match"` témák
+   lépéssora dead code volna. A rangadó-téma ezért csak jelzést kap, és a
+   mélyebb magyarázatot a „miért?" buborék *Részletek* gombja viszi a
+   fogalomtárba. Ugyanez áll az öltözőre.
 
 ### F6 — A karmester finomhangolása
 
