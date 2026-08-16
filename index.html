@@ -2867,7 +2867,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.19";
+const APP_VERSION="3.3.20";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9123,6 +9123,92 @@ function slotAxisShift(curPos,defPos,key){
   const cur=SLOT_AXIS_BONUS[curPos],def=SLOT_AXIS_BONUS[defPos];
   if(!cur&&!def)return 0;
   return ((cur&&cur[key])||0)-((def&&def[key])||0);}
+/* ================= AZ ALAK MAGA IS TENGELY-ERŐ (3.3.20) =================
+   AMI HIÁNYZOTT. A tengelyek eddig KÉT dologból álltak össze: a pályán lévők
+   attribútumaiból (poszt szerint súlyozva) és a megbízásokból. Maga a FELÁLLÁS
+   viszont csak KÖZVETVE szólt bele — azon keresztül, hogy hány védőt és hány
+   csatárt kell beállítanod. Ugyanazzal a tizenegy emberrel egy 5-4-1 és egy
+   4-3-3 gyakorlatilag ugyanazt a Védekezés-számot adta, holott a kettő nem
+   ugyanaz a rendszer.
+
+   AZ ÚJ RÉTEG a felállás ALAKJÁT teszi mérhetővé, és ugyanazokkal a
+   szerep-súlyokkal (ROLE_AXIS_W), amikkel a tengely maga is számol: egy sor
+   annyit tesz egy tengelyhez, amennyit a benne álló szerepek súlya mond.
+   Vagyis a Védekezés-tömeg = 1,0 × védő + 0,50 × középpályás + 0,15 × csatár
+   (+ a kapus fix 0,30) — a Passz- és a Gólszerzés-tömeg ugyanígy, a saját
+   oszlopából.
+
+   HORGONY a 4-4-2: ahhoz képest mérünk, tehát a legelterjedtebb alap-alak
+   eltolása pontosan 0, és a rendszer nem inflálja a számokat. A kapott
+   eltolások (attribútumpontban, a mostani SHAPE_AXIS_K = 1,5 mellett — mérve,
+   a játék saját FORMS-adataiból):
+
+     felállás   Védekezés   Passz   Gólszerzés
+     5-4-1        +1,28     −0,15     −1,28
+     5-3-2        +0,75     −0,75     −0,53
+     4-5-1        +0,53     +0,60     −0,75
+     4-4-2         0,00      0,00      0,00
+     4-3-3        −0,53     −0,60     +0,75
+     4-2-3-1      −0,53     −0,60     +0,75
+     3-5-2        −0,75     +0,75     +0,53
+     4-2-4        −1,05     −1,20     +1,50
+     3-4-3        −1,28     +0,15     +1,28
+     (saját 3-6-1) −0,23    +1,35     −0,23
+
+   Vagyis EGYAZON kerettel az 5-4-1 és a 4-5-1 tényleg többet véd, mint a 4-3-3
+   vagy a 3-4-3 — pontosan a kért irányban —, a népes középpálya pedig a
+   Passz-tengelyt tolja.
+
+   A MÉRTÉK. A tengely szórása (AXIS_SCALE) és a fit-meredekség (TACTIC_FIT_C)
+   alapján 1 attribútumpont ≈ 12-13 százalékpont a SAJÁT tengelyén, a teljes
+   illeszkedésben pedig a taktika tengely-súlyával szorozva jelenik meg. A
+   fenti ±1,28-as szélső eltérés így egy védekezés-súlyú rendszernél (Park the
+   bus, ved 48%) ~15 pontnyi illeszkedés-különbséget ad a legvédekezőbb és a
+   legtámadóbb alak közt — erősebb, mint a megbízás (8-16pp a saját tengelyén),
+   és a taktikák egymás közti szórásával (12-27pp) egy nagyságrendben van, de
+   nem nyomja el. Ez a szándékolt sorrend: a RENDSZER a legnagyobb döntés, a
+   felállás alakja vele egy súlycsoportban, a megbízás hangol.
+
+   NULLÁHOZ KÖZEL ÖSSZEGZŐDIK: a három tengely eltolása együtt −0,75 és +0,9
+   között marad, tehát az alak ÁTRENDEZ, nem felhizlal — a keret nyers szintje
+   (a fit horgonya, a három tengely átlaga) legfeljebb 0,3 ponttal mozdul.
+
+   AMIT A SZÁM NEM VÉD KI: ha felállást váltasz, a kezdő 11 ÖSSZETÉTELE is
+   változik (más ember lép pályára), és az önmagában nagyobbat mozdíthat a
+   tengelyen, mint az alak eltolása. Ezért van kiírva külön rétegként a
+   taktika-panelen — így látszik, mi jött az alaktól és mi a névsortól.
+
+   A MEGBÍZÁS NEM SZÁMOLÓDIK KÉTSZER: a szerep-kategória (védő/középpályás/
+   csatár) megbízással nem változik — egy szélsőre állított középpályás
+   középpályás marad —, tehát az alak-tömeg csak az ALAKTÓL függ, a megbízás
+   pedig marad a saját rétegében (slotAxisShift). */
+const SHAPE_AXIS_KEYS=["ved","passz","gol"];
+const SHAPE_AXIS_ANCHOR="442";
+const SHAPE_AXIS_K=1.5;    /* attribútumpont egy szerep-súly egységre — EZ AZ EGY HANGOLÓ SZÁM */
+/* Egy felállás „tömege" egy tengelyen: a slotjaiban álló SZEREPEK súlyának
+   összege. Csak az alaktól függ (a megbízás a szerep-kategóriát nem írja át). */
+function formShapeMass(f,k){
+  const key=FORMS[f]?f:SHAPE_AXIS_ANCHOR;
+  const F=FORMS[key];
+  if(!F||!F.slots)return 0;
+  const W=ROLE_AXIS_W[k]||{};
+  let m=0;
+  F.slots.forEach((p,i)=>{m+=W[roleInFormation(p,key,i)]||0;});
+  return m;}
+/* A horgony tömegei egyszer számolódnak — a 4-4-2 nem változik menet közben. */
+let _shapeAnchorMass=null;
+function shapeAnchorMass(k){
+  if(!_shapeAnchorMass){
+    _shapeAnchorMass={};
+    SHAPE_AXIS_KEYS.forEach(x=>{_shapeAnchorMass[x]=formShapeMass(SHAPE_AXIS_ANCHOR,x);});}
+  return _shapeAnchorMass[k]||0;}
+/* A felállás alakjának tengely-eltolása, a 4-4-2-höz képest. */
+function formShapeAxisShift(f){
+  const out={};
+  ATTR_KEYS.forEach(k=>{out[k]=0;});
+  SHAPE_AXIS_KEYS.forEach(k=>{
+    out[k]=SHAPE_AXIS_K*(formShapeMass(f,k)-shapeAnchorMass(k));});
+  return out;}
 /* ---- MELY SLOTOK SZEREPE ÍRHATÓ ÁT ----
    KÉT csoport, két külön kérdéssel:
 
@@ -9816,9 +9902,16 @@ function attrsOfPlayer(p){
    soha nem is várna gyorsaságot — így a valóban gyors kereteket is lehúzta.
    Ezért a sebesség-tengelyt a hat leggyorsabb (súlyozott) emberre számoljuk. */
 const SPEED_CORE_N=6;
+/* A visszaadott objektum NÉGY RÉTEGRE bontva mondja el, honnan jön a szám —
+   pontosan ezt írja ki a taktika-panel is:
+     _base  = a pályán lévők attribútumai, poszt szerint súlyozva (illeszkedéssel)
+     _shape = a FELÁLLÁS ALAKJA (formShapeAxisShift, a 4-4-2-höz mérve)
+     _role  = a MEGBÍZÁSOK (VKP/TKP/árnyékék, a felállás alapjához mérve)
+     _skill = a pályán lévők megszerzett skilljei
+   A négy összege az, ami a taktika-illeszkedésbe megy. */
 function teamAttrStrengths(){
-  const acc={},wsum={};
-  ATTR_KEYS.forEach(k=>{acc[k]=0;wsum[k]=0;});
+  const acc={},accRole={},wsum={};
+  ATTR_KEYS.forEach(k=>{acc[k]=0;accRole[k]=0;wsum[k]=0;});
   const sebPool=[];
   /* A felállás alapértelmezett slotlistája — ehhez képest mérjük a szerep-
      eltolást, hogy érintetlen felállásnál a hatás pontosan 0 legyen. Ha
@@ -9834,17 +9927,20 @@ function teamAttrStrengths(){
     ATTR_KEYS.forEach(k=>{
       const w=(ROLE_AXIS_W[k]&&ROLE_AXIS_W[k][role])||0;
       if(w<=0)return;
-      const v=((a[k]||0)+slotAxisShift(sl.pos,defPos,k))*fit;
-      if(k==="seb"){sebPool.push({v,w});return;}
-      acc[k]+=v*w;wsum[k]+=w;});});
+      const v=(a[k]||0)*fit, r=slotAxisShift(sl.pos,defPos,k)*fit;
+      if(k==="seb"){sebPool.push({v,r,w});return;}
+      acc[k]+=v*w;accRole[k]+=r*w;wsum[k]+=w;});});
   /* a sebesség-mag: a leggyorsabb hat súlyozott átlaga */
-  sebPool.sort((x,y)=>y.v-x.v);
-  sebPool.slice(0,SPEED_CORE_N).forEach(o=>{acc.seb+=o.v*o.w;wsum.seb+=o.w;});
-  const base={},out={};
-  ATTR_KEYS.forEach(k=>{base[k]=wsum[k]?acc[k]/wsum[k]:0;});
+  sebPool.sort((x,y)=>(y.v+y.r)-(x.v+x.r));
+  sebPool.slice(0,SPEED_CORE_N).forEach(o=>{acc.seb+=o.v*o.w;accRole.seb+=o.r*o.w;wsum.seb+=o.w;});
+  const base={},role={},out={};
+  ATTR_KEYS.forEach(k=>{
+    base[k]=wsum[k]?acc[k]/wsum[k]:0;
+    role[k]=wsum[k]?accRole[k]/wsum[k]:0;});
+  const sh=formShapeAxisShift(form);
   const sb=skillAxisBonus();
-  ATTR_KEYS.forEach(k=>{out[k]=base[k]+sb[k];});
-  out._base=base;out._skill=sb;
+  ATTR_KEYS.forEach(k=>{out[k]=base[k]+role[k]+(sh[k]||0)+sb[k];});
+  out._base=base;out._role=role;out._shape=sh;out._skill=sb;
   return out;}
 /* ---- TAKTIKA-ILLESZKEDÉS (mért, normalizált) ----
    A korábbi képlet a négy tengely NYERS nagyságát hasonlította a négy tengely
@@ -15182,7 +15278,7 @@ const GLOSSARY={
   ratingalap:{title:"A Rating alapja (könnyű / közepes / nehéz)",text:"Draftos karrier-indulásnál választható, HÁROM fokozatú beállítás. Nem a mezőny erejét állítja (azt a nehézségi csúszka teszi), hanem azt, MENNYIRE MEGBÍZHATÓ, amit a draftban látsz. KÖNNYŰ — Rating a csúcson: minden játékos a saját, adatbázisbeli LEGJOBB megjelenéséből indul, és egy seedhez pontosan egy Messi tartozik: mindegy, melyik klub keretéből nyitod ki, ugyanazt az embert kapod. A kor sorsolt, de minél jobb valaki, annál nagyobb eséllyel érkezik a 20-27-es sávban — vagyis a top játékos használható állapotban van. KÖZEPES — Rating a szezonban: a játékos pontosan azt tudja, amit ABBAN a klub-szezonban tudott, és a kora is a kártya idényéhez igazodik (a csúcsidényét 27 évesen érte el). A tehetség-plafonja sosem kevesebb, mint amit épp tud: a kártya megmondja, mit tud MOST, a scout 👁 becslése pedig azt, mennyi van még benne. NEHÉZ — kártyánkénti lutri: itt megszűnik a kanonikus személy. Minden klub-szezon kártya SAJÁT kort és SAJÁT TSI-t sorsol, egymástól függetlenül — ugyanaz a név két klubból két különböző ember. A TSI középpontja marad a kártya Ratingje (tehát a jobb klub még mindig jobb esély), de a szórás drasztikus, és nincs alsó padló: egy csúcsformájú kártya kaphat 2000 körüli TSI-t és 34 évet (a játékos el van rontva), egy 84-es öregedő védő pedig 6000 fölöttit és 23 évet (top player lesz belőle). Amit itt a draftban látsz, az MÁR a sorsolás eredménye — a scout becslése az egyetlen fogódzód. MINDHÁROM FOKOZAT CSAK A KEZDŐ KERETRE hat: az átigazolási piac, a scout ajánlatai, az ikonok és az akadémia a karrier további részében ugyanúgy a csúcsforma-referenciájú kínálattal dolgoznak. Kész klubbal indulva nincs választás: ott mindig a szezon-alap fut."},
   nehezseg:{title:"Ellenfelek erőssége",text:"Csúszkával, szabadon választod ki az ellenfél-mezőny célerejét 70-től felfelé. A magas szinteknek saját nevük van (Túlvilági, Halálos, Isteni...). A szintet KÉT SZEZON KÖZÖTT BÁRMIKOR átállíthatod, fel és le is — nincs hozzá feltétel. Ez fontos, mert a csapatod folyamatosan fejlődik, a mezőny viszont nem: ha a kereted messze a mezőny fölé nő, a szezonok tét nélkülivé válnak, ráadásul a sok gól miatt a fejlődésed is felgyorsul, így a különbség magától tovább tágul. A HUB Nehézség-gombja ezért mutatja, hány ponttal vagy a mezőny fölött vagy alatt: ha jóval fölé kerülsz, a gomb színt vált és figyelmeztet. A csúszka mozgatásakor élőben látod, milyen lesz a szezon a beállított értékkel (kiegyensúlyozott, kihívást jelentő, tét nélküli...). A szint állításakor a piac azonnal felzárkózik: a scout onnantól az új szinthez mérten keres igazolásokat."},
   kihivasok:{title:"Kihívások",text:"Vállalható célok, amiket a játék felajánl — elvállalni SOHA nem kötelező, de amit elvállaltál, annak a büntetése akkor is lecsap, ha közben meggondolod magad. Két fajta van: az ÉVSZAK-kihívás egy 8 meccses ablakra szól, a SZEZON-kihívás egy teljes idényre (némelyik anyagi cél többre is). Mindkettőből egyszerre legfeljebb 2 lehet aktív — DE a 15. fordulótól kapsz +1 helyet, ha a helyeid beteltek, és a bennük ülő kihívások közül legalább egy MÁR BIZTOSAN MEGLESZ (a célt elérted, és a teljesülés-retesz miatt többé nem is veszíthető el). Egy teljesített kihívás ugyanis a határidejéig a helyén marad, korán beváltani nem lehet — enélkül egy jól sikerült első félidény elvenné a lehetőséget, hogy a szezon második felére újat vállalj. A bónusz legfeljebb +1, és nem jár a fordított („ne csináld”) vagy állapot-alapú kihívásokra, mert azok vissza tudnak fordulni. A nehézség nem képletből jön, hanem MÉRÉSBŐL: vállaláskor a játék lefuttat 300 szezont a te aktuális szintkülönbségeddel a meccsmotor saját gólmodelljével, és a célszámot arra a percentilisre teszi, ahol a kívánt teljesítési arány kijön — a Könnyű kb. 72%, a Közepes 48%, a Nehéz 26%. Ezért egy „Nehéz\" nagyjából ugyanolyan nehéz sereghajtóként és bajnokesélyesként is. A jutalom lehet egyszeri (pénz, morál, TSI, skill, scout-csillag, keretméret, kártya-fejlesztés, CSAPATSTÍLUS-PONT, SZURKOLÓ a táborba, egy BERAGADT MÉRFÖLDKŐ azonnali kifizetése, vagy egy garantáltan 100%-os LICIT a piacon álló játékosodra) vagy TARTÓS, ami a karriered ívét alakítja (olcsóbb boostok, kedvezményes igazolások, edzői fizetésemelés, ingyen igazolás, befektetés). A büntetés ritkán csonkítja a keretet — inkább a mozgásteret szűkíti: zárt átigazolási ablak, drágább vásárlás, gyengébb scout, befagyott akadémia, cserezár egy játékosra. A legkeményebbek (skill-vesztés, távozó játékos) csak a hosszú, nehéz kihívásoknál jönnek elő. A haladást a HUB kihívás-paneljén bármikor visszanézheted. AZ ÚJ TÉTEK a gazdasági ágakhoz kötnek: jutalomként 8-24 csapatstílus-pont, 5-25 ezer szurkoló, fél vagy egész csillag az ÁTIGAZOLÁSI ÜGYNÖKSÉGNEK; büntetésként 4-16 stíluspont, 3-17 ezer szurkoló, fél csillag ügynökség-veszteség, vagy három olyan licit, ami kisebb eséllyel éri el a 100%-ot. A büntetések tudatosan kisebbek a párjuknál: a rendszer építeni jutalmaz, nem rombolni büntet."},
-  taktika:{title:"Taktikák",text:"Az edződ 3 kedvelt taktikával érkezik (80/76/70-es szintről indulnak, a többi 60-ról). A HUB Taktika-paneljén aktiválhatsz egyet: 85-ös szint FÖLÖTT előnyt ad és stílust kap a csapat (a busz zárt meccseket, a kontra az erősebb ellenfelek ellen él, a labdatartás elveszi a labdát...), ALATTA még begyakorolatlan és visszahúz. Minden taktika MÁS csapat-attribútumokra épül: a Park the bus a Védekezésre és a Védésre, a Labdatartás a Passzra, a Hosszú labdák a Gólszerzésre, a Széljáték pedig a Sebességre és a Gólszerzésre. A kezdő 11 ÖT tengelyét (Védekezés, Védés, Passz, Gólszerzés, Sebesség) a játékosok attribútumai ÉS a megszerzett skilljeik adják (pl. a BL Aranycipője a Gólszerzés-tengelyt tolja meg). A SEBESSÉG külön eset: nem a Ratingből jön, egyénibb a többinél (a kisorsolása szélesebb sávban szór), 1,5x lassabban edzhető, és 99-nél kemény plafonja van — ez a plafon az Infinity megnyitásakor feloldódik, de fölötte a fejlődés a többi attribútum negyedére lassul. Maga a JÁTÉK is gyorsít valamennyit — a poszt sprint-igénye szerint (a csatár a legtöbbet, a kapus alig) —, de ez a passzív út a SZÜLETÉSI érték +15%-ánál megáll. Efölé kizárólag célzott edzésterv visz. Vagyis a gyorsaság alapvetően veleszületett adottság: aki lassúnak született, játékkal csak korlátozottan javul — cserébe a Széljáték és a Gyors kontra szinte ezen áll vagy bukik. Az így kapott illeszkedés kétszeresen számít: gyorsítja a begyakorlást, és skálázza a meccs-hatást is — a jól illeszkedő rendszer előnye nagyobb, a rosszul illeszkedő begyakorlatlanságának büntetése mélyebb. A panelen tengelyenként látod, hol állsz, és melyik erősséged emeli vagy melyik gyengeséged húzza vissza az egyes rendszereket. Egy ERŐS keret (85 fölötti csapaterő) gyorsabban vesz fel egy új rendszert: a begyakorlás 90-es szintig fokozatosan gyorsul a csapaterővel, 90 fölött viszont a mesteri csiszolás mindenkinek ugyanannyi munka. Így egy átformálódó nagy csapat gyorsan felhozhat egy másik taktikát."},
+  taktika:{title:"Taktikák",text:"Az edződ 3 kedvelt taktikával érkezik (80/76/70-es szintről indulnak, a többi 60-ról). A HUB Taktika-paneljén aktiválhatsz egyet: 85-ös szint FÖLÖTT előnyt ad és stílust kap a csapat (a busz zárt meccseket, a kontra az erősebb ellenfelek ellen él, a labdatartás elveszi a labdát...), ALATTA még begyakorolatlan és visszahúz. Minden taktika MÁS csapat-attribútumokra épül: a Park the bus a Védekezésre és a Védésre, a Labdatartás a Passzra, a Hosszú labdák a Gólszerzésre, a Széljáték pedig a Sebességre és a Gólszerzésre. A kezdő 11 ÖT tengelyét (Védekezés, Védés, Passz, Gólszerzés, Sebesség) NÉGY réteg adja össze, és a Taktika-panel mind a négyet külön kiírja: (1) a POSZT — a pályán lévők attribútumai, poszt szerint súlyozva (egy védő sokat tesz a Védekezéshez, keveset a Gólszerzéshez); (2) a FELÁLLÁS ALAKJA — ugyanaz a tizenegy ember más rendszerben mást ér: a 4-4-2-höz mérve az 5-4-1 +1,3 Védekezést és −1,3 Gólszerzést ad, a 4-5-1 +0,5-öt véd és +0,6-ot passzol, a 4-3-3 −0,5 véd / +0,8 gól, a 3-4-3 −1,3 / +1,3, egy saját 3-6-1 pedig +1,4 Passz. A felállás-választóban táblázatban látod, melyik alak mit ad; (3) a MEGBÍZÁSOK — minden védekező középpályás +3 attribútumpontot tesz a Védekezéshez a Gólszerzés rovására, a támadó pontosan fordítva, a klasszikus és a szélső semleges (a hatás a felállás saját alapbeállításához mérten értendő); (4) a SKILLEK — a pályán lévők megszerzett képességei (pl. a BL Aranycipője a Gólszerzés-tengelyt tolja meg). A SEBESSÉG külön eset: nem a Ratingből jön, egyénibb a többinél (a kisorsolása szélesebb sávban szór), 1,5x lassabban edzhető, és 99-nél kemény plafonja van — ez a plafon az Infinity megnyitásakor feloldódik, de fölötte a fejlődés a többi attribútum negyedére lassul. Maga a JÁTÉK is gyorsít valamennyit — a poszt sprint-igénye szerint (a csatár a legtöbbet, a kapus alig) —, de ez a passzív út a SZÜLETÉSI érték +15%-ánál megáll. Efölé kizárólag célzott edzésterv visz. Vagyis a gyorsaság alapvetően veleszületett adottság: aki lassúnak született, játékkal csak korlátozottan javul — cserébe a Széljáték és a Gyors kontra szinte ezen áll vagy bukik. Az így kapott illeszkedés kétszeresen számít: gyorsítja a begyakorlást, és skálázza a meccs-hatást is — a jól illeszkedő rendszer előnye nagyobb, a rosszul illeszkedő begyakorlatlanságának büntetése mélyebb. A panelen tengelyenként látod, hol állsz, és melyik erősséged emeli vagy melyik gyengeséged húzza vissza az egyes rendszereket. Egy ERŐS keret (85 fölötti csapaterő) gyorsabban vesz fel egy új rendszert: a begyakorlás 90-es szintig fokozatosan gyorsul a csapaterővel, 90 fölött viszont a mesteri csiszolás mindenkinek ugyanannyi munka. Így egy átformálódó nagy csapat gyorsan felhozhat egy másik taktikát."},
   edzesterv:{title:"Edzésterv",text:"A HUB-ban kijelölhetsz egy FŐ és egy MELLÉK edzést. Mindkettőhöz egy attribútumot választasz (Védekezés, Sebesség, Védés, Passz, Gólszerzés) és legfeljebb 2 poszt-csoportot (kapus, védők, középpályások, csatárok), akikre vonatkozik. A fő edzés meccsenként 0,8 pontot ad a választott attribútumra, a mellék a felét (0,4) — cserébe az érintett játékosok NEM edzett attribútumai lassabban gyűlnek. Az edzés tehát nem ingyen gyorsítás, hanem irányválasztás: azt fejleszted, amire a taktikádnak szüksége van. A hatás korfüggő: 21 év alatt kétszeres, 25 alatt 1,6-szoros, 30 alatt 0,8-szoros, afölött 0,4-szeres — fiatalt érdemes képezni. Egy attribútum a poszt-profiljához képest +30-ig specializálható, de a Rating-hozam csökken (a +8 fölötti rész felét, a +16 fölötti a negyedét éri) — a TAKTIKA-illeszkedésben viszont teljes értékkel számít. Így egy 130-as passzú középpályás valódi passzmester lesz a Labdatartáshoz, anélkül hogy a Ratingje elszaladna. A SEBESSÉG külön eset: 1,5x lassabban formálható, és a játék magától csak a születési érték +15%-áig viszi — azon túl KIZÁRÓLAG edzéssel jutsz feljebb, 99-ig. Infinityben a 99 is feloldódik, de fölötte a sebesség már csak negyed tempóval épül."},
   karriermod:{title:"Karrier mód vs. Klasszikus mód",text:"A klasszikus egy szezonos móddal szemben a karrier mód több szezonon át tartó, fejlődő történet: a játékosaid öregednek és fejlődnek, van átigazolási piac, scout, akadémia, és a csapatod hosszú távon formálódik."},
   tsi:{title:"TSI",text:"A TSI egy rejtett, a Ratingnél sokkal szélesebb skálájú érték, ami egy játékos hosszú távú, valódi potenciálját mutatja. Egy fiatal, alacsony Ratingű, de magas TSI-jű játékos idővel akár sztárrá válhat. IDEGEN játékosnál a scoutod ereje szabja meg, hány TSI-t nézhetsz meg — azt viszont te választod ki, kikét. A SAJÁT KERETEDNÉL nincs korlát: minden játékosod TSI-je folyamatosan látszik a HUB-ban. Amíg kevesebb, mint 15 meccset játszott nálad, a scoutod érkezéskori becslése látszik (~ jellel); 15 meccs után a pontos érték — ennyi idő alatt kiderül, mi van benne. A becslés nem sorsolódik újra szezononként: az érkezéskori tévedés aránya fix, tehát ha a játékos TSI-je nő (ifi-boost, akadémia, kihívás-jutalom), a becslés vele mozdul."},
@@ -32965,6 +33061,33 @@ function shapeCostHtml(){
     ${st?`<br>Az idényben eddig <b>${st.xga.toFixed(1).replace(".",",")}</b> kapott gólt kért ez a döntés (${st.matches} mérkőzésen, átlagos ár +${Math.round((st.sumMult/st.matches-1)*100)}%).`:""}
     <br><span style="color:var(--dim)">Aki megbízásból a szélre megy, hiányzik középről: az ellenfél könnyebben játszik át rajta. A támadósor nem számít bele — az árnyékék befelé húz, nem kifelé.</span>
   </div>`;}
+/* ---- AZ ALAK MÉRŐJE: MELYIK RENDSZER MIT AD A TENGELYEKEN ----
+   Itt, a felállás-választóban van a helye: ez az a képernyő, ahol a döntés
+   megszületik. A számok UGYANAZOK, amiket a taktika-panel is felsorol
+   (formShapeAxisShift), és mind a 4-4-2-höz mérten értendők — vagyis nem
+   „mennyire jó a kereted", hanem „mit tesz hozzá maga az alak". */
+function formShapeTableHtml(){
+  const keys=availableFormKeys();
+  if(!keys.length)return "";
+  const sgn=v=>(Math.abs(v)<0.05?"0":(v>0?"+":"−")+Math.abs(v).toFixed(1).replace(".",","));
+  const col=v=>Math.abs(v)<0.05?"var(--dim2)":(v>0?"var(--grass)":"var(--red)");
+  /* VÉDEKEZÉS SZERINT RENDEZVE: felül a legzártabb alak, alul a legnyíltabb —
+     így a táblázat egy pillantásra sorrend, nem csak számhalmaz. */
+  keys.sort((a,b)=>formShapeAxisShift(b).ved-formShapeAxisShift(a).ved);
+  const rows=keys.map(f=>{
+    const s=formShapeAxisShift(f),cur=f===form;
+    const cell=k=>`<td style="padding:1px 0 1px 10px;text-align:right;color:${col(s[k])}">${sgn(s[k])}</td>`;
+    return `<tr style="${cur?"font-weight:700":"color:var(--dim)"}">
+      <td style="padding:1px 0;white-space:nowrap">${cur?"▸ ":""}${esc(FORM_LABELS[f]||f)}</td>
+      ${cell("ved")}${cell("passz")}${cell("gol")}</tr>`;}).join("");
+  return `<div style="margin-top:8px;border-top:1px dashed var(--line);padding-top:6px;font-size:11.5px;line-height:1.5;color:var(--dim2)">
+    <b style="color:var(--gold)">📊 Mit ad maga az alak?</b> — ugyanazzal a kerettel, a 4-4-2-höz mérve, attribútumpontban.
+    <div style="overflow-x:auto;margin-top:4px"><table style="font-size:11px;border-collapse:collapse">
+      <tr style="color:var(--dim2);font-size:10px;text-transform:uppercase;letter-spacing:.5px">
+        <td>felállás</td><td style="padding-left:10px;text-align:right">védekezés</td>
+        <td style="padding-left:10px;text-align:right">passz</td><td style="padding-left:10px;text-align:right">gólszerzés</td></tr>
+      ${rows}</table></div>
+    <span style="color:var(--dim)">Az ötös védelem és a népes középpálya véd, a három támadó gólt szerez — ez a szám a tengelyeidre ül rá, a megbízások (védekező/támadó középpályás) pedig tovább hangolják.</span></div>`;}
 function renderFormationPicker(){
   const cost=formationChangeCost();
   const free=cost===0;
@@ -32977,6 +33100,7 @@ function renderFormationPicker(){
        keretlistában; ezért mutatunk rá innen is. */
     `<br><span style="color:var(--dim2)">A megbízásokat a keretlistában, az adott játékos lapján állítod.`
     +` Középpálya: <b>${midRoleText(form)}</b> · támadósor: <b>${atkRoleText(form)}</b>.</span>`
+    +formShapeTableHtml()
     +shapeCostHtml();
   const body=$("hubFormationBody");body.innerHTML="";
   /* CSAK A VÁLASZTHATÓ felállások — a bolti tétel megvételig, a saját tervek
@@ -33362,20 +33486,29 @@ function renderHubTacticsPanel(){
   const srcs=skillAxisSources();
   /* --- fejléc: a kereted öt tengelye, mindegyik LEBONTVA: honnan jön a szám
      (mely posztok), és mely konkrét skillek adják a ✦-bónuszt --- */
+  /* Egy előjeles tized, magyar tizedesjellel — a kis rétegek (alak, megbízás)
+     így olvashatók: "+0,9". */
+  const sgnNum=v=>(v>0?"+":"−")+Math.abs(v).toFixed(1).replace(".",",");
   const axisRow=ATTR_KEYS.map(k=>{
     const tot=Math.round(A[k]),sk=A._skill[k],base=Math.round(A._base[k]);
+    const shp=(A._shape&&A._shape[k])||0, rol=(A._role&&A._role[k])||0;
     const roles=axisRoleHint(k);
     const roleTxt=roles.length?roles.join(" + "):"—";
     const skillList=srcs[k].length
       ? srcs[k].slice(0,4).map(x=>`${esc(shortName(x.player))}: ${esc(x.skill)}`).join(", ")+(srcs[k].length>4?` +${srcs[k].length-4}`:"")
       : "nincs ilyen skilled a pályán";
+    /* A KÉT ÚJ RÉTEG csak akkor jelenik meg, ha tényleg mozdít valamit —
+       érintetlen 4-4-2-nél mindkettő pontosan 0, tehát nem zajosít. */
+    const col=v=>v>0?"var(--grass)":"var(--red)";
+    const shpTxt=Math.abs(shp)>=0.05?` <span style="color:${col(shp)}">${sgnNum(shp)} felállás</span>`:"";
+    const rolTxt=Math.abs(rol)>=0.05?` <span style="color:${col(rol)}">${sgnNum(rol)} megbízás</span>`:"";
     return `<div style="margin:5px 0;padding:5px 7px;background:var(--panel2);border-radius:5px">
       <div><b>${ATTR_LABELS[k]}: <span style="color:var(--gold)">${tot}</span></b>
-        <span style="color:var(--dim2);font-size:11px">= ${base} poszt${sk>=0.5?` + <span style="color:var(--grass)">${sk.toFixed(1)} skill✦</span>`:""}</span></div>
+        <span style="color:var(--dim2);font-size:11px">= ${base} poszt${shpTxt}${rolTxt}${sk>=0.5?` + <span style="color:var(--grass)">${sk.toFixed(1)} skill✦</span>`:""}</span></div>
       <div style="font-size:10.5px;color:var(--dim2);margin-top:1px">Fő forrás: <b>${roleTxt}</b>${sk>=0.5?`<br>Skillek: <span style="color:var(--grass)">${skillList}</span>`:""}</div>
     </div>`;}).join("");
   $("hubTacticsHint").innerHTML=`<div style="font-weight:700;margin-bottom:3px">A kereted öt tengelye</div>
-    <div style="font-size:11px;color:var(--dim2);margin-bottom:5px">Minden tengely a pályán lévő játékosok attribútumaiból áll össze, poszt szerint súlyozva (egy védő sokat ad a Védekezéshez, keveset a Gólszerzéshez). A <span style="color:var(--grass)">skill✦</span> rész a pályán lévők megszerzett skilljeiből jön.</div>
+    <div style="font-size:11px;color:var(--dim2);margin-bottom:5px">Minden tengely a pályán lévő játékosok attribútumaiból áll össze, poszt szerint súlyozva (egy védő sokat ad a Védekezéshez, keveset a Gólszerzéshez). Rá jön a <b>felállás alakja</b> (a 4-4-2-höz mérve: az ötös védelem véd, a hármas támadósor gólt szerez), a <b>megbízások</b> (védekező/támadó középpályás, árnyékék) és a <span style="color:var(--grass)">skill✦</span> rész a pályán lévők megszerzett skilljeiből.</div>
     ${axisRow}
     <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5">Minden taktika MÁS tengelyekre épül (lásd a %-súlyokat a rendszereknél). Az <b>illeszkedés</b> azt méri, mennyire a te erős tengelyeidre épít a taktika — és a meccs-hatást is skálázza: jó illeszkedés erősíti az előnyt, rossz mélyíti a begyakorlatlanság büntetését.<br>
     A taktika <b>85-ös szinttől ad előnyt</b>, és minden meccsel fejlődik (a győzelmek sokkal többet adnak). <b>Váltani bármikor lehet.</b></div>`;
