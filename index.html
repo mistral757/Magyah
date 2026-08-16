@@ -1458,6 +1458,21 @@ button.infPanel:disabled{cursor:default}
   background:none;border:none;color:rgba(32,31,29,.28);font-size:12px;cursor:pointer;
   padding:6px 4px;font-family:inherit;line-height:1}
 .mpFooter #mpDiagBtn:hover{color:rgba(32,31,29,.6)}
+/* ---- PROFIL-GOMB: A KEZDŐLAP JOBB FELSŐ SARKA ----
+   ABSZOLÚT pozíció, és ez nem stílus-kérdés: a .mpView
+   justify-content:space-between, tehát a gyerekek SZÁMÁTÓL függ az elrendezés
+   (lásd a nyitóképernyő HTML-jében a hosszú megjegyzést). Egy harmadik,
+   folyamban lévő gyerek a cím és a gombtömb közé csúsztatta volna a rajzot —
+   az abszolút elem viszont kikerül a flexből, tehát semmit nem mozdít. */
+.mpProfileBtn{position:absolute;top:12px;right:22px;z-index:3;
+  display:flex;align-items:center;gap:6px;max-width:52vw;
+  background:rgba(255,255,255,.72);border:1px solid rgba(32,31,29,.14);
+  border-radius:999px;padding:5px 11px;cursor:pointer;
+  font-family:inherit;font-size:11.5px;line-height:1;color:rgba(32,31,29,.72);
+  animation:magyahFadeUp .7s ease-out 1.25s both}
+.mpProfileBtn:hover{border-color:rgba(32,31,29,.3);color:#201f1d}
+.mpProfileBtn .pfNick{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.mpProfileBtn .pfId{color:rgba(32,31,29,.38);font-size:10px;letter-spacing:.04em}
 /* A gombok ÁTTETSZŐ HÁTTERET kapnak: a rajz mögöttük fut, e nélkül a
    vonalak keresztülvágnának a feliratokon. */
 .mpBtn{font-family:inherit;font-size:17px;padding:15px 22px;width:100%;
@@ -1757,6 +1772,10 @@ button.infPanel:disabled{cursor:default}
     <!-- A rajz DEKORÁCIÓ, ezért alt="" és aria-hidden: a felolvasónak nincs
          mit mondania róla, a cím és a gombok viszik az információt. -->
     <div class="mpArt" aria-hidden="true"><div><img src="icons/kick-line.png" alt=""></div></div>
+    <!-- PROFIL: becenév + a karriereid eredményei. Abszolút pozíciójú, tehát a
+         nyitóképernyő flex-elrendezését nem érinti (lásd a .mpProfileBtn CSS-t). -->
+    <button class="mpProfileBtn" id="mpProfileBtn" title="Profil és eredmények">
+      <span aria-hidden="true">👤</span><span class="pfNick" id="mpProfileNick">Profil</span><span class="pfId" id="mpProfileId"></span></button>
     <div style="position:relative">
       <div class="mpKicker"><img src="icons/icon-96x96.png" alt=""><span>NB I · 30 forduló</span></div>
       <div class="mpRule"></div>
@@ -2429,6 +2448,15 @@ button.infPanel:disabled{cursor:default}
     <button id="themeCloseBtn" class="btn-s stepbtn">Bezár</button>
   </div>
 </div>
+<!-- PROFIL — a kezdőlap jobb felső sarkából. Becenév + a karriereid eredményei.
+     z-index 520: a kezdőlap (#mpEntry) 400-on, a diagnosztika 500-on ül. -->
+<div class="hide" id="profileModal" style="position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:520;display:flex;align-items:center;justify-content:center;padding:14px">
+  <div class="card" style="max-width:480px;width:100%;max-height:88vh;overflow-y:auto">
+    <div class="steplbl" style="color:var(--gold)">👤 Profil</div>
+    <div id="profileBody"></div>
+    <button id="profileCloseBtn" class="btn-s stepbtn" style="margin-top:10px">Bezár</button>
+  </div>
+</div>
 <!-- DIAGNOSZTIKA — a multi kezdőlap kémcső-gombjáról. Kigyűjti a hibakereséshez
      szükséges MP-állapotot MINDEN mentésből, vágólapra teszi, és kijelölhetően
      ki is írja (ha a vágólap-írás nem engedélyezett, kézzel másolható). -->
@@ -2867,7 +2895,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.20";
+const APP_VERSION="3.3.21";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -37589,6 +37617,162 @@ function runBoardHtml(){
     closed.forEach((x,i)=>h+=sor(x,i,(x.closeRun!=null?x.closeRun:x.run),
       (x.closeLevel!=null?x.closeLevel:x.level),"🏁 "+d(x.closedAt),false,x.seasons));}
   return h;}
+/* ================= PROFIL — BECENÉV, AZONOSÍTÓ, EREDMÉNYEK =================
+   MIÉRT KELL. Eddig a játékosnak nem volt SEMMILYEN önazonossága: a mentés a
+   klubnevet ismerte, a többjátékos-szoba egy fülenkénti véletlen azonosítót, a
+   Run-ranglista pedig névtelen sorokból állt. A profil ezt a hiányt tölti be, és
+   egyben ELŐKÉSZÍTI a globális ranglistát: a becenév és az AZONOSÍTÓ ugyanaz
+   lesz ott is, tehát aki most beállítja, később nem veszít semmit.
+
+   NÉV + AZONOSÍTÓ, EGYÜTT. A becenév szándékosan NEM egyedi (a foglalás-rendszer
+   itt csak kényelmetlenség lenne), ezért minden profil kap egy rövid, állandó
+   azonosítót is — a kettő együtt azonosít: „Feri #7f3a". Az azonosító egyszer
+   születik, és soha nem változik; a becenevet bármikor átírhatod.
+
+   HELYI, ESZKÖZÖNKÉNT KÜLÖN. A profil a localStorage-ban él, mint a téma és a
+   Run-ranglista — tehát telefonon és gépen két külön profil. Ezt a felület ki
+   is mondja. (A globális ranglistával ez lesz az egyetlen kapocs a kettő közt:
+   ugyanazt a becenevet beírva ugyanaz a név jelenik meg, de az azonosító más.)
+
+   A MENTÉSTŐL FÜGGETLEN. Egy karrier lezárása a mentést törli — a profilt nem
+   viheti magával, ezért nem a mentésben él. */
+const PROFILE_KEY="30-0-profile-v1";
+const PROFILE_NICK_MAX=20, PROFILE_NICK_MIN=2;
+/* ---- EGYSZERŰ NÉVSZŰRŐ ----
+   Nem tökéletes moderáció, és nem is akar az lenni: a nyilvánvalóan trágár és
+   gyalázkodó neveket fogja ki, mielőtt egy közös listára kerülnének. Ékezet- és
+   írásjel-független (a „k.u.r.v.a" és a „kúrvá" ugyanúgy fennakad), és ha
+   fennakad, a felület kimondja, hogy miért — nem néma elutasítás. */
+const PROFILE_BAD_WORDS=["kurva","geci","fasz","picsa","buzi","kocsog","fing","szar",
+  "anyad","anyadat","bazdmeg","baszd","fuck","shit","bitch","nigg","cunt","dick","rape","hitler","nazi"];
+function profileNormalize(s){
+  return String(s||"").toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")   /* ékezetek le */
+    .replace(/[^a-z0-9]/g,"");}                        /* csak betű és szám marad */
+function profileBadWord(nick){
+  const n=profileNormalize(nick);
+  if(!n)return null;
+  return PROFILE_BAD_WORDS.find(w=>n.indexOf(w)>=0)||null;}
+/* A becenév megtisztítása: vezérlőkarakterek és a jelölésre alkalmas jelek ki,
+   a szóközök összevonva, a hossz vágva. A megjelenítés amúgy is escape-el, ez
+   a réteg a TÁROLT értéket tartja tisztán. */
+function profileCleanNick(s){
+  return String(s||"")
+    .replace(/[\u0000-\u001f\u007f<>]/g," ")
+    .replace(/\s+/g," ").trim().slice(0,PROFILE_NICK_MAX);}
+function profileState(){
+  let p=null;
+  try{const raw=localStorage.getItem(PROFILE_KEY);if(raw)p=JSON.parse(raw);}catch(e){p=null;}
+  if(!p||p.v!==1||!p.uid){
+    p={v:1,uid:"u"+Math.random().toString(36).slice(2,8)+Math.random().toString(36).slice(2,6),
+       nick:"",createdAt:Date.now(),updatedAt:Date.now()};
+    profileSave(p);}
+  return p;}
+function profileSave(p){
+  try{localStorage.setItem(PROFILE_KEY,JSON.stringify(p));}catch(e){}
+  return p;}
+function profileUid(){return profileState().uid;}
+/* A rövid, kiírható azonosító: az uid utolsó négy jele. Csak MEGJELENÍTÉSRE —
+   a tárolt és (később) feltöltött azonosító mindig a teljes uid. */
+function profileShortId(){const u=profileUid();return "#"+u.slice(-4);}
+function profileNick(){return profileState().nick||"";}
+function profileName(){return profileNick()||"Névtelen menedzser";}
+/* Beállítás. Visszaad {ok} vagy {ok:false,reason} — a felület ezt írja ki. */
+function profileSetNick(raw){
+  const nick=profileCleanNick(raw);
+  if(nick.length<PROFILE_NICK_MIN)
+    return {ok:false,reason:`Legalább ${PROFILE_NICK_MIN} karakter kell.`};
+  const bad=profileBadWord(nick);
+  if(bad)return {ok:false,reason:"Ezt a nevet nem vehetjük fel — a ranglista közös felület. Válassz másikat."};
+  const p=profileState();
+  p.nick=nick;p.updatedAt=Date.now();
+  profileSave(p);
+  return {ok:true,nick};}
+/* ---- A KEZDŐLAPI GOMB FELIRATA ---- */
+function renderProfileBtn(){
+  const n=$("mpProfileNick"),i=$("mpProfileId");
+  if(!n||!i)return;
+  const nick=profileNick();
+  n.textContent=nick||"Profil";
+  i.textContent=nick?profileShortId():"";}
+/* ---- A KARRIEREID ÖSSZESÍTVE ----
+   A forrás a helyi Run-ranglista: oda KIZÁRÓLAG az Infinityt megnyitott
+   karrier kerül fel, tehát ez az összegzés is a valódi, végigvitt futásokról
+   szól. Itt gyűlik majd a globális statisztika is — ezért van külön függvényben
+   az összesítés, nem a rajzolásba szőve. */
+function profileTotals(){
+  const list=runBoardLoad();
+  const t={runs:list.length,bestInf:0,bestInfLevel:0,bestInfSeasons:null,
+    bestClose:0,bestCloseLevel:0,closed:0,titles:0,ballons:0,seasons:0};
+  list.forEach(x=>{
+    const ir=runBoardInfRun(x);
+    if(ir>t.bestInf){t.bestInf=ir;t.bestInfLevel=runBoardInfLevel(x);
+      t.bestInfSeasons=(x.infSeasons!=null?x.infSeasons:x.seasons)||null;}
+    if(x.closedAt){
+      t.closed++;
+      const cr=(x.closeRun!=null?x.closeRun:x.run)||0;
+      if(cr>t.bestClose){t.bestClose=cr;t.bestCloseLevel=(x.closeLevel!=null?x.closeLevel:x.level)||0;}}
+    t.titles+=x.titles||0;t.ballons+=x.ballons||0;t.seasons+=x.seasons||0;});
+  return t;}
+function profileStatsHtml(){
+  const t=profileTotals();
+  if(!t.runs)
+    return `<div style="font-size:12.5px;color:var(--dim);line-height:1.6;background:var(--panel2);border-radius:8px;padding:10px">
+      Még nincs mit összegezni. Egy karrier akkor kerül a listádra, amikor <b>megnyitod az Infinityt</b> —
+      addig nem, mert oda a ${INFINITY_UNLOCK_RATING}-as mezőny megnyerése kell.</div>`;
+  const cell=(k,v,sub)=>`<div style="flex:1 1 92px;background:var(--panel2);border-radius:8px;padding:8px 9px">
+    <div style="font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim2)">${k}</div>
+    <div style="font-family:var(--font-disp);font-size:19px;color:var(--gold);line-height:1.15">${v}</div>
+    ${sub?`<div style="font-size:10.5px;color:var(--dim2);margin-top:1px">${sub}</div>`:""}</div>`;
+  const hu=x=>String(x).replace(".",",");
+  return `<div style="display:flex;flex-wrap:wrap;gap:7px">
+    ${cell("Legjobb Run (∞)",hu(t.bestInf.toFixed(1)),
+      `${t.bestInfLevel} mezőny${t.bestInfSeasons?` · ${t.bestInfSeasons}. szezon`:""}`)}
+    ${cell("Legjobb záró Run",t.bestClose?hu(t.bestClose.toFixed(1)):"—",t.bestClose?`${t.bestCloseLevel} mezőny`:"még nincs lezárt")}
+    ${cell("Infinity-futás",t.runs,`${t.closed} lezárva`)}
+    ${cell("Bajnoki cím",t.titles,`${t.seasons} lejátszott szezon`)}
+    ${cell("Aranylabda",t.ballons,"a saját játékosaidnak")}
+  </div>`;}
+/* ---- A PROFIL-ABLAK ---- */
+function renderProfileModal(msg){
+  const box=$("profileBody");if(!box)return;
+  const nick=profileNick();
+  box.innerHTML=`
+    <p style="font-size:12px;color:var(--dim);margin-top:2px;line-height:1.5">
+      A becenév a <b>tiéd</b>, nem kell egyedinek lennie — az azonosító különböztet meg mindenkit.
+      A profil ebben a böngészőben él, mint a téma és a Run-ranglista.</p>
+    <div style="display:flex;gap:7px;align-items:center;margin-top:10px">
+      <input id="profileNickInput" type="text" maxlength="${PROFILE_NICK_MAX}" placeholder="Becenév" value="${esc(nick)}"
+        style="flex:1;min-width:0;box-sizing:border-box;font-family:inherit;font-size:14px;padding:9px 10px;
+               background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px">
+      <button id="profileNickSave" class="btn-y" style="flex:none;padding:9px 14px">Mentés</button>
+    </div>
+    <div id="profileNickMsg" style="font-size:11.5px;margin-top:5px;min-height:16px;color:${msg&&msg.err?"var(--red)":"var(--grass)"}">${msg?esc(msg.text):""}</div>
+    <div style="font-size:11.5px;color:var(--dim2);margin-top:2px">
+      Az azonosítód: <b style="color:var(--ink)">${esc(profileShortId())}</b>
+      <span style="color:var(--dim)">· állandó, nem változik</span></div>
+    <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-top:16px">Az eredményeid</div>
+    <p style="font-size:12px;color:var(--dim);margin-top:2px;line-height:1.45">A végigvitt (Infinityt megnyitott) karriereid összegezve.</p>
+    <div style="margin-top:9px">${profileStatsHtml()}</div>
+    <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-top:16px">🏅 Run-ranglista</div>
+    <div style="margin-top:7px">${runBoardHtml()}</div>
+    <div style="font-size:11.5px;color:var(--dim2);line-height:1.5;margin-top:12px;border-top:1px dashed var(--line);padding-top:8px">
+      <b style="color:var(--dim)">Hamarosan:</b> globális ranglista az <b>Infinity-megnyitáskori</b> Run-szintekből —
+      ez a becenév és ez az azonosító fog rajta megjelenni.</div>`;
+  const inp=$("profileNickInput"),btn=$("profileNickSave");
+  const save=()=>{
+    const r=profileSetNick(inp.value);
+    renderProfileBtn();
+    renderProfileModal(r.ok
+      ? {text:`Mentve — mostantól ${r.nick} ${profileShortId()} vagy.`}
+      : {text:r.reason,err:true});};
+  if(btn)btn.onclick=save;
+  if(inp)inp.onkeydown=(e)=>{if(e.key==="Enter"){e.preventDefault();save();}};}
+function openProfileModal(){
+  renderProfileModal(null);
+  $("profileModal").classList.remove("hide");
+  const inp=$("profileNickInput");
+  if(inp&&!profileNick())try{inp.focus();}catch(e){}}
 /* A Run-szám színe — ugyanaz a logika, mint a nehézség-sávoknál. */
 function runColor(v){
   return v>=85?"#ffd700":v>=70?"#2ecc71":v>=55?"#67e8f9":v>=40?"#f0bc42":"#e07a5f";}
@@ -47889,6 +48073,19 @@ function renderSquadModal(){
         <span style="display:block;font-size:10px;color:var(--dim2)">${s.players.length} fő</span>
       </span>
     </div>`;}).join("");}
+/* ---- PROFIL: a kezdőlapi gomb és az ablak bekötése ----
+   A gomb a nyitóképernyő (#mpEntry) sarkában ül, tehát a saját ablaka 520-as
+   z-indexen nyílik — a kezdőlap 400-on, a diagnosztika 500-on van. */
+(function initProfile(){
+  const b=$("mpProfileBtn");
+  if(b)b.onclick=()=>openProfileModal();
+  const c=$("profileCloseBtn");
+  if(c)c.onclick=()=>$("profileModal").classList.add("hide");
+  const m=$("profileModal");
+  if(m)m.onclick=(ev)=>{if(ev.target.id==="profileModal")m.classList.add("hide");};
+  /* a felirat a mentett becenevet mutatja, már az első képkockán */
+  try{renderProfileBtn();}catch(e){}
+})();
 (function initHomeFooter(){
   const s=$("homeSettingsBtn"),st=$("homeStatsBtn");
   if(s)s.onclick=()=>{renderThemeModal();$("themeModal").classList.remove("hide");};
