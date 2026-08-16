@@ -15,8 +15,8 @@
 | **F0** — alapozás (`S.teach`, migráció, olvasók) | ✅ kész |
 | **F1** — regisztrátum, a mai tippek befűzve | ✅ kész |
 | **F2** — 3. szint: halk jelzések | ✅ kész |
-| F3 — 2. szint: vezetett lépéssor | következik |
-| F4 — beállítóképernyő | — |
+| **F3** — 2. szint: vezetett lépéssor (inline + overlay) | ✅ kész |
+| F4 — beállítóképernyő | következik |
 | F5 — tartalomcsomagok (A–D) | — |
 | F6–F8 | — |
 
@@ -28,8 +28,13 @@
    buborékokat nem. ✅
 3. **Hatókör:** a 3. szint **minden módban** él, nem csak karrierben; a
    karrieren kívüli játék `light` módon indul. ✅
-4. A lépéssor formája, a szezononkénti tanítás-korlát és a meccs közbeni csere
-   tanítása → továbbra is nyitott (F3, F5, F6).
+4. **A lépéssor formája:** **mindkettő** — inline (a stábtag mintájára, a gazda
+   panelbe rajzolva) *és* overlay (horgonyzott lap, sötétítéssel), témánként
+   választva a `form` mezővel. ✅
+5. A szezononkénti tanítás-korlát és a meccs közbeni csere tanítása →
+   továbbra is nyitott (F5, F6). *Ideiglenes szabály F3-ban: **fordulónként egy**
+   automatikusan induló lépéssor — enélkül az első HUB-on egymás után indulna az
+   összes esedékes téma.*
 
 ---
 
