@@ -2867,7 +2867,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.18";
+const APP_VERSION="3.3.19";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9236,18 +9236,46 @@ function buildSlotRoleExtra(f){
     const dr=defs[0].i,dl=defs[defs.length-1].i;
     if(dr!==dl){ex[dr]=(ex[dr]||[]).concat(["JV"]);ex[dl]=(ex[dl]||[]).concat(["BV"]);}}
   if(Object.keys(ex).length)SLOT_ROLE_EXTRA[f]=ex;}
+/* ---- A MEGBÍZÁS MOSTANTÓL KÉTIRÁNYÚ ----
+   AMI FURCSA VOLT. A középpályás helyeket KI lehetett küldeni a szélre, de a
+   felállás által SZÉLRE tett középpályást nem lehetett behúzni középre. Egy
+   saját 5-4-1-ben ezért a négy középpályásból négy szélső lehetett, négy
+   klasszikus/védekező/támadó viszont soha — pedig a kettő ugyanannak a
+   kérdésnek a két fele, és a hely mindkét állásban KÖZÉPPÁLYÁS marad
+   (roleInFormation), tehát a csapat szerep-összetétele egyik irányban sem
+   változik. Ugyanez a védősoron: a középhátvéd kimehetett szélsővédőnek, a
+   szélsővédő viszont nem húzódhatott be középre.
+   MOSTANTÓL mindkét irány nyitva áll. Az ára is szimmetrikus: aki középre
+   tervezett emberrel megy a szélre (vagy fordítva), az poszt-idegenséget és
+   más gól/gólpassz-súlyt kap — az alakzat ára (teamShape) pedig változatlanul
+   csak a KIFELÉ mozdulást fizetteti meg, a befelé húzódást nem jutalmazza. */
 function slotRoleOptions(f,i){
+  const F=FORMS[f];
+  if(!F)return [];
+  const def=F.slots[i];
   /* TÁMADÓ HELY: a saját alapkódja ⇄ árnyékék. A középcsatárnak a CS, a
      támadó szélsőnek a JSZ/BSZ marad a "maradj, ahol vagy" opciója — egy
      szélsőt nem lehet középcsatárrá tenni, mert az már alakzat-kérdés. */
-  if(isAtkRoleSlot(f,i))return [FORMS[f].slots[i],SHADOW_POS];
+  if(isAtkRoleSlot(f,i))return [def,SHADOW_POS];
   const ex=(SLOT_ROLE_EXTRA[f]&&SLOT_ROLE_EXTRA[f][i])||[];
+  if(isMidRoleSlot(f,i))return MID_ROLE_CODES.concat(ex);
+  /* KÖZÉPPÁLYÁS SZÉLSŐ HELY: maradhat kint, vagy behúzódhat a középpálya
+     bármelyik belső szerepébe. */
+  if(isWideMidRoleSlot(f,i))return [def].concat(MID_ROLE_CODES);
   if(isDefRoleSlot(f,i))return DEF_ROLE_CODES.concat(ex);
-  if(!isMidRoleSlot(f,i))return [];
-  return MID_ROLE_CODES.concat(ex);}
+  /* SZÉLSŐVÉDŐ HELY: maradhat a szárnyon, vagy behúzódhat középhátvédnek. */
+  if(isWideDefRoleSlot(f,i))return [def].concat(DEF_ROLE_CODES);
+  return [];}
 function isMidRoleSlot(f,i){
   const F=FORMS[f];
   return !!F&&MID_ROLE_CODES.includes(F.slots[i]);}
+/* Középpályás SZÉLSŐ hely: a kódja JSZ/BSZ, de a felállás NEM támadóként
+   súlyozza (4-4-2, 4-5-1, 5-4-1, 3-5-2 típusú sorok szélei). */
+function isWideMidRoleSlot(f,i){
+  const F=FORMS[f];
+  if(!F)return false;
+  const d=F.slots[i];
+  return (d==="JSZ"||d==="BSZ")&&!isAttackingWingSlot(f,i);}
 /* Védő-hely, amit szélsővédőre lehet állítani: középhátvéd, ami kapott
    JV/BV többlet-opciót (lásd buildSlotRoleExtra). */
 function isDefRoleSlot(f,i){
@@ -9255,6 +9283,12 @@ function isDefRoleSlot(f,i){
   if(!F||!DEF_ROLE_CODES.includes(F.slots[i]))return false;
   const ex=(SLOT_ROLE_EXTRA[f]&&SLOT_ROLE_EXTRA[f][i])||[];
   return ex.indexOf("JV")>=0||ex.indexOf("BV")>=0;}
+/* Szélsővédő-hely: a felállás tette a szárnyra, de behúzható középre. */
+function isWideDefRoleSlot(f,i){
+  const F=FORMS[f];
+  if(!F)return false;
+  const d=F.slots[i];
+  return d==="JV"||d==="BV";}
 /* Támadó hely: középcsatár-hely, VAGY olyan szélső hely, amit a felállás
    eleve támadóként súlyoz (isAttackingWingSlot). A középpályás szélsők
    (4-4-2, 3-5-2, 5-3-2, 4-5-1) tudatosan kimaradnak — lásd a fenti blokkot. */
@@ -9264,7 +9298,8 @@ function isAtkRoleSlot(f,i){
   return F.slots[i]==="CS"||isAttackingWingSlot(f,i);}
 /* Bármelyik átállítható hely — ezt kérdezi a felület, amikor azt dönti el,
    megjelenjen-e a megbízás-gomb. */
-function isRoleSlot(f,i){return isMidRoleSlot(f,i)||isAtkRoleSlot(f,i)||isDefRoleSlot(f,i);}
+function isRoleSlot(f,i){return isMidRoleSlot(f,i)||isAtkRoleSlot(f,i)||isDefRoleSlot(f,i)
+  ||isWideMidRoleSlot(f,i)||isWideDefRoleSlot(f,i);}
 /* Egy slot ÉRVÉNYES kódja: a játékos felülírása, ha van és megengedett;
    különben a felállás alapértelmezése. */
 function effectiveSlotPos(f,i){
@@ -9366,14 +9401,25 @@ const SHADOW_Y_DROP=11, SHADOW_X_PULL=0.45;
 /* A SZÉLSŐVÉDŐI MEGBÍZÁS is látszik: a hely kijjebb és kicsit előrébb csúszik,
    ahogy egy szárnyvédő tényleg áll. Kizárólag megjelenítés. */
 const WB_X_PUSH=0.55, WB_Y_LIFT=5;
+/* ÉS A BEFELÉ HÚZÓDÁS IS: aki a szélről kap belső megbízást, a pályaképen is
+   beljebb kerül (a védő ráadásul egy hajszállal mélyebbre, ahogy egy
+   középhátvéd áll). Kizárólag megjelenítés. */
+const INWARD_X_PULL=0.55, INWARD_Y_DROP=4;
 function slotXY(f,i){
   const F=FORMS[f];
   if(!F||!F.xy[i])return [50,50];
   const xy=F.xy[i];
-  {const eff=effectiveSlotPos(f,i);
-   if((eff==="JV"||eff==="BV")&&F.slots[i]==="KV")
+  {const eff=effectiveSlotPos(f,i),def=F.slots[i];
+   if((eff==="JV"||eff==="BV")&&def==="KV")
      return [Math.round(xy[0]+((eff==="JV"?92:8)-xy[0])*WB_X_PUSH),
-             Math.max(4,xy[1]-WB_Y_LIFT)];}
+             Math.max(4,xy[1]-WB_Y_LIFT)];
+   /* szélsővédő → középhátvéd */
+   if(eff==="KV"&&(def==="JV"||def==="BV"))
+     return [Math.round(xy[0]+(50-xy[0])*INWARD_X_PULL),
+             Math.min(96,xy[1]+INWARD_Y_DROP)];
+   /* középpályás szélső → belső középpályás */
+   if((def==="JSZ"||def==="BSZ")&&MID_ROLE_CODES.indexOf(eff)>=0)
+     return [Math.round(xy[0]+(50-xy[0])*INWARD_X_PULL),xy[1]];}
   if(effectiveSlotPos(f,i)!==SHADOW_POS)return xy.slice();
   const def=F.slots[i];
   const wide=(def==="JSZ"||def==="BSZ");
@@ -9409,7 +9455,9 @@ function midRoleCounts(f){
   const c={VKP:0,KKP:0,TKP:0,JSZ:0,BSZ:0};
   const key=FORMS[f]?f:"442";
   FORMS[key].slots.forEach((p,i)=>{
-    if(!isMidRoleSlot(key,i))return;
+    /* a SZÉLRE tervezett középpályás hely is a középpálya-sor része — enélkül
+       a "középpálya jelenleg" összegzés kihagyná a sor két szélét */
+    if(!isMidRoleSlot(key,i)&&!isWideMidRoleSlot(key,i))return;
     const e=effectiveSlotPos(key,i);
     if(c[e]!==undefined)c[e]++;});
   return c;}
@@ -10297,7 +10345,13 @@ function isAttackingWingSlot(f,i){
   const F=FORMS[f||form];
   if(!F||i==null)return false;
   const def=F.slots[i];
-  return (def==="JSZ"||def==="BSZ")&&!!WINGER_IS_ATTACKING[f||form];}
+  if(def!=="JSZ"&&def!=="BSZ")return false;
+  const w=WINGER_IS_ATTACKING[f||form];
+  /* SAJÁT FELÁLLÁSNÁL a bejegyzés a TÁMADÓ szélső helyek INDEX-listája (lásd
+     registerCustomForm): ott ugyanis a középpálya és a támadósor is lehet
+     egyszerre széles, tehát a kérdés slotonként dől el. Az alap-felállásoknál
+     marad az igaz/hamis. */
+  return Array.isArray(w)?w.indexOf(i)>=0:!!w;}
 /* i (slot-index) megadásakor SLOT-PONTOS a válasz; nélküle a régi,
    felállás-szintű viselkedés marad — így a puszta poszt-kóddal hívó helyek
    változatlanul működnek. */
@@ -15114,7 +15168,7 @@ const GLOSSARY={
   draft:{title:"Draft és posztok",text:"Minden körben egy valós NB I-es klub egy szezonjának keretét pörgeted ki. Egy játékost draftolsz egy nyitott posztra — rokon posztok (pl. szélső védő ⇄ szélső középpályás) is elfogadottak, kényszer-illesztésnél gyengébb hatásfokkal. Ugyanaz a valódi játékos csak egyszer kerülhet be. 11 kezdő + 4 csere (1-1 minden posztra)."},
   posztfit:{title:"Poszt-illeszkedés és poszt-tanulás",text:"Minden játékosnak van egy vagy több natív posztja. A saját posztján teljes értékkel számít, idegen poszton 0,93-as hatásfokkal — a kényszer-illesztés tehát nem tilos, csak folyamatosan fizetsz érte. Egy játékost véglegesen át is képezhetsz: a poszt-tanulás ára a Ratingjétől függ (5 000–10 000 Ft), és MECCSENKÉNT halad, nem naptár szerint. A tempót a kor és a TSI szabja: 21 év alatt kb. 9 meccs, 25 alatt 11, 30 alatt 15, afölött 20 — ebből a magas TSI legfeljebb 3 meccset lefarag. A jó teljesítmény (gól, gólpassz, meccsemberség, tiszta lap a helyén) gyorsítja. Ha kész, az új poszt kerül a lista élére teljes hatásfokkal, a RÉGI POSZTJAIT PEDIG MEGTARTJA — vagyis a tanulás nem cserél, hanem bővít, és ettől lesz igazán értékes egy sokoldalú játékos."},
   arnyekek:{title:"Árnyékék",text:"A második csatár: az a támadó, aki nem a kapu előtt áll, hanem egy sorral hátrébb, a védők és a középpálya közti sávban. A pályaképen is ott látod — az árnyékékre állított hely pontja hátracsúszik. Kevesebb gólt szerez, mint egy középcsatár (gólsúly 3,5 az 5,0 helyett), cserébe övé a JÁTÉK LEGNAGYOBB GÓLPASSZ-SÚLYA (5,0, a támadó középpályás 4,5-e fölött) — vagyis nem ő fejezi be a támadást, hanem ő hozza létre. A csapat tengelyein a Gólszerzésből vesz el 4 pontot és a Passzhoz teszi hozzá: ettől a Labdatartás és a Totális futball illeszkedése nő, a Hosszú labdáké, a Gyors kontráé és a Széljátéké csökken. TÁMADÓ marad minden más szempontból: a csatár-tengelyeken súlyozódik, csatár-skilleket kaphat, és a csatár-cserehelyre ülhet. HOGYAN JÁTSSZ VELE: az árnyékék nem felállás, hanem MEGBÍZÁS — bármelyik TÁMADÓ helyet átállíthatod rá a keretlistában, az ott álló játékos lapján, ingyen és bármikor. Két csatáros felállásban (4-4-2, 3-5-2, 5-3-2) az egyik vagy mindkét csatár, egy csatárosban a magányos támadó is hátrahúzódhat: az a hamis kilences. A 4-3-3, a 4-2-3-1 és a 3-4-3 TÁMADÓ SZÉLSŐI ugyanígy behúzódhatnak a belső sávba — ilyenkor a csapat elveszíti a szélességet azon az oldalon, cserébe egy plusz emberrel játszik középen. A 4-4-2, a 3-5-2, az 5-3-2 és a 4-5-1 szélsői NEM: azok középpályásként súlyozódnak, és az átállításuk már a felállás dolga lenne, nem a megbízásé. KI TUDJA: natívan azok, akik az adatbázisban támadó középpályát ÉS csatárt is játszottak — Hidegkuti, Maradona, Cruyff, Di Stéfano, Bergkamp, Baggio, Del Piero, Litmanen, Müller, Firmino, Messi, Rooney és társaik; közülük tizennyolcnak ez a FŐ posztja. Mindenki más megtanulhatja poszt-tanulással, vagy addig rokonposztként áll ott, kisebb hátránnyal."},
-  megbizas:{title:"Középpályás megbízás",text:"A felállás megadja, HÁNY középpályással játszol — a megbízás azt, hogy ezek közül ki MIT csinál. A kezdő 11 középső középpályás helyei háromféle megbízást kaphatnak: VÉDEKEZŐ (a védelem előtt szerez labdát és rendez), KLASSZIKUS (kétirányú motor) és TÁMADÓ (a támadók mögött készít elő). A 3-4-3 négyes sorának két külső helye ezen felül SZÉLSŐRE is állítható — az a hely attól még középpályás marad, nem lesz belőle támadó szélső. UGYANEZ A GOMB A TÁMADÓKNÁL mást kérdez: a középcsatár álljon-e legelöl és a támadó szélső maradjon-e kint, vagy ÁRNYÉKÉK húzódjon be mögéjük (lásd a saját bejegyzését). A megbízást a HUB keretlistájában állítod: koppints a középpályásra, és a lapján ott a Megbízás módosítása gomb a posztcsere és a poszt-tanulás mellett. Ingyenes, bármikor átállítható, és SENKI nem mozdul tőle a helyéről — csak a hely poszt-kódja és az illeszkedés változik, a kézzel összerakott csapatod a helyén marad. Hatása a csapat tengelyein érződik, mindig a felállás saját alapbeállításához képest: a védekező megbízás 3 attribútumpontot tesz a Védekezés-tengelyre a Gólszerzés rovására, a támadó pontosan fordítva, a klasszikus semleges. Ez a taktikád illeszkedésén is látszik — a Park the bus a Védekezésre épül, a Hosszú labdák a Gólszerzésre —, de szándékosan gyengébb eszköz, mint maga a rendszerválasztás: hangolni lehet vele, felülírni nem."},
+  megbizas:{title:"Középpályás megbízás",text:"A felállás megadja, HÁNY középpályással játszol — a megbízás azt, hogy ezek közül ki MIT csinál. A kezdő 11 középső középpályás helyei háromféle megbízást kaphatnak: VÉDEKEZŐ (a védelem előtt szerez labdát és rendez), KLASSZIKUS (kétirányú motor) és TÁMADÓ (a támadók mögött készít elő). A megbízás MINDKÉT IRÁNYBAN működik: a belső helyek közül a sor két legszélsője SZÉLSŐRE is állítható (a hely attól még középpályás marad, nem lesz belőle támadó szélső), a felállás által eleve SZÉLRE tett középpályás hely pedig BEFELÉ húzható — védekező, klasszikus vagy támadó középpályásnak. Így egy négyes középpályát fel lehet állítani négy szélessel és négy belsővel is, ugyanazon a felálláson belül. Ugyanez áll a védősorra: a középhátvéd kimehet szélsővédőnek, a szélsővédő pedig behúzódhat középhátvédnek. UGYANEZ A GOMB A TÁMADÓKNÁL mást kérdez: a középcsatár álljon-e legelöl és a támadó szélső maradjon-e kint, vagy ÁRNYÉKÉK húzódjon be mögéjük (lásd a saját bejegyzését). A megbízást a HUB keretlistájában állítod: koppints a középpályásra, és a lapján ott a Megbízás módosítása gomb a posztcsere és a poszt-tanulás mellett. Ingyenes, bármikor átállítható, és SENKI nem mozdul tőle a helyéről — csak a hely poszt-kódja és az illeszkedés változik, a kézzel összerakott csapatod a helyén marad. Hatása a csapat tengelyein érződik, mindig a felállás saját alapbeállításához képest: a védekező megbízás 3 attribútumpontot tesz a Védekezés-tengelyre a Gólszerzés rovására, a támadó pontosan fordítva, a klasszikus semleges. Ez a taktikád illeszkedésén is látszik — a Park the bus a Védekezésre épül, a Hosszú labdák a Gólszerzésre —, de szándékosan gyengébb eszköz, mint maga a rendszerválasztás: hangolni lehet vele, felülírni nem."},
   kemia:{title:"Csapatkémia",text:"A 11. játékos beérkezése után lefut egy elemzés. Azonos klubból jött társak dupla pluszt kapnak, azonos nemzetiségűek egyszereset. Történelmi rivális klubokból jövők között 25% eséllyel jó, 75%-ban feszült a viszony — ez egy állandó Rating-módosítót ad a teljes szezonra."},
   egyensuly:{title:"Csapategyensúly",text:"A játék korábban egyértelműen jutalmazta a „rakj mindent egy emberre” stratégiát: a skilleket egyetlen csatárra fókuszálva született egy ember, aki egymaga rúgott 8-10 gólt meccsenként, és a többi tíz statiszta volt. Erős, de törékeny — egy sérülés vagy egy piros lap az egész szezont vitte. A Csapategyensúly ezt fordítja meg: NEM bünteti a sztárt (a bónusz sosem negatív), hanem MEGFIZETI a szélesen elosztott erőt. Aki kiegyensúlyozott keretet épít, ingyen kap csapaterőt; aki egy emberre hagyatkozik, egyszerűen nem kapja meg. HÁROM ÖSSZETEVŐ. A TEHER (45% súly) azt méri, a gólok és gólpasszok hány emberre oszlanak meg — ez a legfontosabb, mert ez írja le a tényleges függőséget. A SKILL-ELOSZLÁS (30%) azt, hogy a megszerzett képességek hány emberen ülnek; a félkész skill arányosan számít. A RATING-ELOSZLÁS (25%) a kezdő 11 effektív erejének egyenletességét nézi, a relatív szórásból (szórás osztva az átlaggal): 18%-os szórás fölött már nulla pont. A MATEMATIKA az első kettőnél az „effektív hozzájárulók száma” (1 osztva a Herfindahl-indexszel, azaz Simpson-féle diverzitás). Ha három ember hozza egyenlő arányban a termést, az effektív szám 3; ha egy ember mindent, akkor 1. Ez azért jobb mérce a puszta darabszámnál, mert a valódi súlyokat nézi: tíz góllövő közül kilenc egyetlen góllal nem tesz kiegyensúlyozottá egy csapatot. Teljes pont 6 effektív gól/gólpassz-adónál és 5 effektív skill-birtokosnál. A három rész súlyozott átlaga adja a 0-100-as pontszámot, ez pedig a csapaterőt legfeljebb +2,00-del tolja meg MINDEN meccsen — nagyjából annyival, amennyit egy telt házas csapatmorál ér. Amíg kevés az adat (6 gól+gólpassz vagy 2 skill alatt), az adott rész semleges 50%-ot ad, hogy a szezon eleje ne büntessen. A HUB-ban végig látod a pontszámot, mindhárom összetevőt a saját nyers mérésével, és azt is, ki a legterheltebb játékosod.",},
   szemelyiedzo:{title:"Személyi edzők (szakmai stáb)",text:"A visszavonuló legendáid nem tűnnek el: átléphetnek a stábba. Jogosult, aki legalább 32 éves ÉS legalább 40 meccset játszott NÁLAD — edzőt tehát nem lehet vásárolni, csak kinevelni. A minőségét egyetlen szám adja, a SZAKÉRTELEM (20–99): ebbe a kora és a lejátszott meccsei mindig beleszámítanak, mellé pedig típusonként más. TÍZ TÍPUS van. Öt attribútum-mester (Gólvágó-mentor, Játékmester, Bástya, Kesztyűs mester, Sprintmester) — ezek a poszt szerint korlátozottak, és a hozzájuk tartozó attribútum fejlődését gyorsítják. A Lélekemelő a csapatmorált emeli (a vezetői képességéből), a Csapatkovács az öltözői kémiát (az együttműködéséből), a Ritmusmester a formaingadozást szelídíti (a temperamentumából — a kiegyensúlyozott a legjobb), a Gyógyító kéz pedig kevesebb és rövidebb sérülést hoz (ő az, aki maga sosem sérült meg). Az Iskolateremtő a képességeket tanítja — és a SAJÁT skilljeit adja tovább a tanítványainak. EGY EDZŐ EGY TÍPUS, a választás végleges: ugyanabból a legendából két karrierben két különböző klub épülhet. FÓKUSZ: minden edzőnek fix, 100 egységnyi figyelme van, amit szétoszt azok között, akikre ráállítod — az egész keretre, egy posztcsoportra, vagy legfeljebb két emberre. Minél szűkebb a fókusz, annál többet kap fejenként (100 vs 10,8), de annál kevesebbet termel összesen (100 vs 238) — nincs domináns választás. A morál- és a kémia-edzőnél viszont fordítva: az ő munkájuk az egész öltözőé, ott a szűk fókusz veszteséges. A fókuszt edzőnként ciklusonként egyszer válthatod (a nyár vége újítja meg). HAGYATÉK: az Iskolateremtő készlete a saját skilljeiből áll. Egy tehetségre állítva gyorsan tanít, de hamar kimerül (kb. 4 skill 2 szezon alatt); az egész keretre osztva lassabban, viszont sokkal tovább és több embernek (kb. 16 skill 23 szezon alatt) — egy skillt többen is megkaphatnak. A készlet mindig az AKTUÁLIS fókuszból számolódik, ezért a szűkítés elégetheti a maradékot. KÉT ÚTON lehet valakiből edző, és a különbség a pénz. Ha KIVÁROD a természetes visszavonulását, INGYEN marad a klubnál — ez a türelem jutalma, és mivel addig több meccset játszik és idősebb lesz, JOBB edző is lesz belőle. Ha viszont TE ajánlod fel neki az edzői állást, amíg még játszik (a keretlistában, a játékos lapján), akkor kártalanítanod kell a félbehagyott pályafutásáért: az igazolási ára 40–60%-át fizeted. Az arány a hátralévő pályafutással skálázódik — 32 évesen 60%, 38 évesen már csak 40%, mert annál fiatalabban többet veszel el tőle. Alapból 3 stáb-helyed van, 6-ig bővíthető (20 / 35 / 61 milliárd Ft). Egy típusból egyszerre csak egy edző dolgozik. Az edzők maguk is öregszenek: minden ledolgozott szezonnal tapasztalatot gyűjtenek (két szezononként +1 Szakértelem, a belépési szintjük fölé legfeljebb +12-vel), 66 éves koruktól pedig ők is visszavonulnak — a Stáb-csarnokba. FONTOS: az edző nem tud plafont mozdítani, csak az odáig vezető utat rövidíti; és mivel a fejlődés kor-görbéje 30 fölött a negyedére esik, a személyi edző a FIATALOKON hat igazán. Az öreg játékosodból lett edző a fiatalokat neveli."},
@@ -29202,11 +29256,42 @@ function availableFormKeys(){
 /* ---- A SAJÁT FELÁLLÁS SZABÁLYAI ----
    Három kötött szabály van, és mindhárom a játszhatóságot védi: legalább
    3 védő (kevesebbel a védelem-tengely összeomlik), legalább 1 csatár
-   (gólsúly nélküli felállás nem tud gólt szerezni), és legfeljebb 5
-   középpályás (fölötte a támadósor kiürül). A felső/alsó korlátok
-   (dMax/fMax/mMin) nem a specifikációból jönnek, hanem a motorból: 7 védővel
-   vagy középpályás nélkül a poszt-kiosztás értelmezhetetlen alakot adna. */
-const CUSTOM_FORM_RULES={dMin:3,dMax:6,mMin:1,mMax:5,fMin:1,fMax:5,outfield:10};
+   (gólsúly nélküli felállás nem tud gólt szerezni), és legfeljebb 6
+   középpályás (a 3-6-1 még valódi alak; hét középpályáshoz már nem maradna
+   se védelem, se támadó). A felső/alsó korlátok (dMax/fMax/mMin) nem a
+   specifikációból jönnek, hanem a motorból: 7 védővel vagy középpályás nélkül
+   a poszt-kiosztás értelmezhetetlen alakot adna. */
+const CUSTOM_FORM_RULES={dMin:3,dMax:6,mMin:1,mMax:6,fMin:1,fMax:5,outfield:10};
+/* ---- ÉS AMI MOSTANTÓL A TERVEZŐ DÖNTÉSE: A SOROK SZÉLESSÉGE ----
+   A sorok létszáma eddig egyben eldöntötte a poszt-kiosztást is: négyes
+   középpálya = KÖTELEZŐEN két szélső, hármas támadósor = KÖTELEZŐEN két
+   szélső. Ez volt a bejelentett furcsaság másik fele: egy saját 5-4-1-ben a
+   négy középpályásból négyet lehetett szélsővé tenni, de négy belső
+   középpályást nem lehetett kérni.
+   MOSTANTÓL soronként megmondod, hogy a sor SZÉLES legyen-e (két szélső a két
+   végén) vagy ZÁRT (mindenki a belső sávban). A szabály csak annyi, hogy egy
+   szélesített sorban maradjon legalább egy belső ember — vagyis háromfős
+   sortól felfelé választható. Az alapértelmezés pontosan a régi viselkedés,
+   így egy meglévő mentés semmit nem vesz észre.
+   A TÁMADÓSOR szélessége egyben azt is eldönti, hogy a felállásnak van-e
+   TÁMADÓ szélsője (WINGER_IS_ATTACKING) — lásd registerCustomForm. */
+const LINE_WIDE_MIN=3;             /* ekkora sortól választható a szélesítés */
+function lineCanBeWide(n){return n>=LINE_WIDE_MIN;}
+/* Az ALAPÉRTELMEZETT szélesség — pontosan a 3.3.17-es viselkedés. */
+function defaultLineWide(kind,d,m,f){
+  if(kind==="d")return d>=4;
+  if(kind==="f")return f>=3;
+  /* a középpálya csak akkor kapott magától szélsőt, ha négyen-öten voltak ÉS
+     elöl nem állt már két támadó szélső */
+  return m>=4&&f<3;}
+function defaultLineWides(d,m,f){
+  return {d:defaultLineWide("d",d,m,f),m:defaultLineWide("m",d,m,f),f:defaultLineWide("f",d,m,f)};}
+/* A ténylegesen érvényes szélesség: a választás, de csak ott, ahol a sor
+   mérete engedi. Egy hiányzó (régi mentésből jövő) w mellett az alapértelmezés. */
+function lineWides(d,m,f,w){
+  const def=defaultLineWides(d,m,f);
+  const pick=(k,n)=>lineCanBeWide(n)&&((w&&w[k]!=null)?!!w[k]:def[k]);
+  return {d:pick("d",d),m:pick("m",m),f:pick("f",f)};}
 /* Egy SOR vízszintes elosztása, JOBBRÓL BALRA — ugyanaz a sorrend, amit az
    alap-felállások slot-listái követnek (a 0. hely a jobbhátvéd). */
 const FORM_LINE_X={1:[50],2:[62,38],3:[68,50,32],4:[82,62,38,18],
@@ -29222,39 +29307,61 @@ function formLineY(kind,i,n){
   if(kind==="d")return edge?(n>=4?74:76):(mid?79:78);
   if(kind==="m")return edge?46:(mid&&n>=3?56:50);
   return edge?24:(mid?15:20);}
-/* A sor poszt-kódjai. A KÖZÉPPÁLYA szélei attól függnek, hány támadó áll
-   elöl — pontosan úgy, ahogy az alap-felállásoknál:
-     · 3+ támadónál a szélső TÁMADÓ (JSZ/BSZ elöl), a szélső középpályás pedig
-       KKP marad, és csak MEGBÍZÁSKÉNT állítható szélsőre (mint a 3-4-3-nál).
-       Enélkül egy felállásban két helyen is "szélső" lenne, és az
-       isAttackingWingSlot felállás-szintű kapcsolója összekeverné a kettőt.
-     · 2 vagy kevesebb támadónál a szélső a KÖZÉPPÁLYÁN van (mint a 4-4-2-ben). */
-function formLineCodes(kind,n,fwCount){
-  const fill=(a,c,k)=>{for(let i=0;i<k;i++)a.push(c);return a;};
-  if(kind==="d"){
-    if(n<=3)return fill([],"KV",n);
-    return fill(["JV"],"KV",n-2).concat(["BV"]);}
-  if(kind==="f"){
-    if(n<=2)return fill([],"CS",n);
-    return fill(["JSZ"],"CS",n-2).concat(["BSZ"]);}
-  const wR=fwCount>=3?"KKP":"JSZ",wL=fwCount>=3?"KKP":"BSZ";
-  if(n===1)return ["VKP"];
-  if(n===2)return ["KKP","KKP"];
-  if(n===3)return ["KKP","VKP","KKP"];
-  if(n===4)return [wR,"KKP","KKP",wL];
-  return [wR,"KKP","VKP","KKP",wL];}
+/* A sor BELSŐ kódjai: a védelemben középhátvéd, elöl középcsatár, középen a
+   klasszikus/védekező osztás. Középen a sor KÖZEPE kap védekező szerepet (a
+   páratlan sor egy embere, a négyes-hatos sor két embere) — ez csak
+   ALAPÉRTELMEZÉS: minden belső középpályás hely megbízással szabadon
+   átállítható VKP/KKP/TKP-ra. */
+function formLineCentralCode(kind,i,c){
+  if(kind==="d")return "KV";
+  if(kind==="f")return "CS";
+  if(c===1)return "VKP";
+  if(c>=4&&(i===c/2-1||i===c/2))return "VKP";      /* páros sor két közepe */
+  if(c%2===1&&i===(c-1)/2)return "VKP";            /* páratlan sor közepe */
+  return "KKP";}
+/* A sor poszt-kódjai. A SZÉLESSÉG mostantól a tervező döntése (`wide`), nem a
+   létszámból következik — de a hívó a defaultLineWide-dal pontosan a régi
+   viselkedést kapja vissza.
+   Szélesíteni csak háromfős sortól lehet (LINE_WIDE_MIN): kettőnél a sor
+   teljesen kiürülne a belső sávban. */
+function formLineCodes(kind,n,wide){
+  const w=(lineCanBeWide(n)&&wide)?2:0;
+  const c=n-w,out=[];
+  if(w)out.push(kind==="d"?"JV":"JSZ");
+  for(let i=0;i<c;i++)out.push(formLineCentralCode(kind,i,c));
+  if(w)out.push(kind==="d"?"BV":"BSZ");
+  return out;}
 function customFormKey(d,m,f){return `cf${d}${m}${f}`;}
 function customFormLabel(d,m,f){return `${d}-${m}-${f}`;}
 /* A teljes felállás-leírás egy alakból: slot-kódok + koordináták, ugyanabban
-   a szerkezetben, amit a FORMS statikus bejegyzései használnak. */
-function buildCustomForm(d,m,f){
+   a szerkezetben, amit a FORMS statikus bejegyzései használnak.
+   A `w` a soronkénti szélesség-választás ({d,m,f} logikai értékek); hiánya =
+   az alapértelmezett (régi) kiosztás. */
+function buildCustomForm(d,m,f,w){
+  const W=lineWides(d,m,f,w);
   const slots=["KP"],xy=[[50,93]];
   [["d",d],["m",m],["f",f]].forEach(pair=>{
     const kind=pair[0],n=pair[1];
     if(!n)return;
-    const codes=formLineCodes(kind,n,f),xs=FORM_LINE_X[n]||FORM_LINE_X[3];
+    const codes=formLineCodes(kind,n,W[kind]),xs=FORM_LINE_X[n]||FORM_LINE_X[3];
     codes.forEach((c,i)=>{slots.push(c);xy.push([xs[i],formLineY(kind,i,n)]);});});
-  return {slots,xy};}
+  return {slots,xy,w:W};}
+/* A TÁMADÓ szélső helyek INDEXEI egy saját felállásban. Erre azért van
+   szükség, mert egy saját tervben MINDKÉT sorban lehet szélső (pl. széles
+   középpálya széles támadósor mellett), a WINGER_IS_ATTACKING régi,
+   felállás-szintű logikája viszont ilyenkor a középpályás szélsőt is támadónak
+   olvasná. A slot-sorrend kötött (kapus, védők, középpálya, támadósor), tehát
+   a támadósor indexei pontosan kiszámolhatók. */
+function customAtkWingIdx(c){
+  if(!c)return false;
+  const d=c.d||0,m=c.m||0,f=c.f||0;
+  const W=lineWides(d,m,f,c.w);
+  if(!W.f)return false;
+  const first=1+d+m;
+  const idx=[];
+  (c.slots||[]).forEach((p,i)=>{
+    if(i>=first&&(p==="JSZ"||p==="BSZ"))idx.push(i);});
+  return idx.length?idx:false;}
 /* Foglalt-e már ez az alak? Az összes VÁLASZTHATÓ felállás és a bolt kínálata
    is számít: a bolti 4-2-4-et nem lehet 50 milliárdért "megtervezni". */
 function formShapeTaken(d,m,f){
@@ -29287,10 +29394,15 @@ function customFormError(d,m,f){
    IDEMPOTENS: a betöltés és a létrehozás ugyanezt hívja, tetszőleges sokszor. */
 function registerCustomForm(k,c){
   if(!c)return;
-  const built=(c.slots&&c.xy)?{slots:c.slots,xy:c.xy}:buildCustomForm(c.d,c.m,c.f);
+  const built=(c.slots&&c.xy)?{slots:c.slots,xy:c.xy}:buildCustomForm(c.d,c.m,c.f,c.w);
   FORMS[k]={slots:built.slots.slice(),xy:built.xy.map(p=>p.slice())};
   if(typeof FORM_LABELS!=="undefined")FORM_LABELS[k]=c.label||customFormLabel(c.d,c.m,c.f);
-  WINGER_IS_ATTACKING[k]=c.f>=3;
+  /* SZÉLSŐ-SZEREP, SLOT-PONTOSAN. A régi, felállás-szintű logika (f>=3) csak
+     azért volt elég, mert a középpálya és a támadósor sosem volt egyszerre
+     széles. Mostantól lehet, ezért a TÁMADÓ szélső helyek indexeit tesszük el:
+     így a középpálya szárnya középpályás marad, az elöl álló szélső pedig
+     támadó. Régi (w nélküli) mentésnél ez pontosan a korábbi eredményt adja. */
+  WINGER_IS_ATTACKING[k]=customAtkWingIdx(Object.assign({},c,{slots:FORMS[k].slots}));
   /* A szélső-megbízás ugyanazon a KÖZÖS szabályon megy, mint az alap-
      felállásoknál: a középpálya két legkülső helye. */
   buildSlotRoleExtra(k);}
@@ -29303,15 +29415,15 @@ function registerCustomForms(){
 /* A létrehozás. A pénzt CSAK sikeres érvényesítés után vonjuk le, és a
    felállást azonnal be is állítjuk — aki 50 milliárdot költ egy rendszerre,
    az látni akarja a pályán. */
-function createCustomForm(d,m,f){
+function createCustomForm(d,m,f,w){
   const err=customFormError(d,m,f);
   if(err)return {ok:false,reason:err};
   if((S.transferBudget||0)<CUSTOM_FORM_PRICE)
     return {ok:false,reason:`Nincs elég büdzséd — ${fmtFt(CUSTOM_FORM_PRICE)} kellene.`};
   const k=customFormKey(d,m,f);
-  const built=buildCustomForm(d,m,f);
+  const built=buildCustomForm(d,m,f,w);
   S.customForms=S.customForms||{};
-  S.customForms[k]={d,m,f,label:customFormLabel(d,m,f),slots:built.slots,xy:built.xy};
+  S.customForms[k]={d,m,f,w:built.w,label:customFormLabel(d,m,f),slots:built.slots,xy:built.xy};
   registerCustomForm(k,S.customForms[k]);
   S.transferBudget-=CUSTOM_FORM_PRICE;
   return {ok:true,key:k,label:customFormLabel(d,m,f)};}
@@ -32926,7 +33038,8 @@ function renderFormationShop(){
     +`<b style="font-size:14px;color:var(--gold)">Saját felállás tervezése</b>`
     +`<span style="font-size:12px;white-space:nowrap;color:${canAfford?"var(--grass)":"var(--red)"}">${fmtFt(CUSTOM_FORM_PRICE)}</span></div>`
     +`<div style="font-size:12px;color:var(--dim);margin-top:5px;line-height:1.5">`
-    +`Te adod meg a sorok létszámát, a rendszer felépíti belőle a poszt-kiosztást és a pályaképet. `
+    +`Te adod meg a sorok létszámát <b>és a szélességüket</b> (szárnyvédőkkel vagy csupa középhátvéddel, szélsőkkel vagy befelé zárva), `
+    +`a rendszer felépíti belőle a poszt-kiosztást és a pályaképet — a poszt-előnézet még fizetés előtt megmutatja. `
     +`Kötelező legalább <b>${CUSTOM_FORM_RULES.dMin} védő</b> és <b>${CUSTOM_FORM_RULES.fMin} csatár</b>, `
     +`és legfeljebb <b>${CUSTOM_FORM_RULES.mMax} középpályás</b> állhat a pályán.</div>`
     +`<button class="btn-s stepbtn" id="hubFormBuilderOpen" style="margin-top:8px">📐 Tervezőasztal</button></div>`;
@@ -32949,36 +33062,64 @@ function renderFormationShop(){
     b.classList.toggle("hide");
     if(!b.classList.contains("hide")){renderFormBuilder();b.scrollIntoView({behavior:"smooth",block:"nearest"});}};}
 /* ---- A TERVEZŐASZTAL ----
-   Három léptető (védő / középpályás / csatár), élő érvényesítéssel. A hibát
-   MINDIG kiírjuk, és a létrehozás gombja csak akkor él, ha az alak érvényes —
-   így a szabályokat nem kell fejben tartani, a felület mondja meg őket. */
+   Három léptető (védő / középpályás / csatár) + SORONKÉNTI SZÉLESSÉG, élő
+   érvényesítéssel. A hibát MINDIG kiírjuk, és a létrehozás gombja csak akkor
+   él, ha az alak érvényes — így a szabályokat nem kell fejben tartani, a
+   felület mondja meg őket.
+
+   A SZÉLESSÉG-KAPCSOLÓK (3.3.19) adják a valódi szabad kezet: eddig a sor
+   létszáma eldöntötte a poszt-kiosztást is (négyes középpálya = kötelezően két
+   szélső). Mostantól soronként te mondod meg, hogy a sor széles legyen-e vagy
+   zárt, és a POSZT-ELŐNÉZET még a fizetés előtt megmutatja, mit kapsz. */
 /* A tervezőasztal kiinduló alakja. SZÁNDÉKOSAN egy még szabad forma (az
-   5-2-3), hogy a panel ne hibaüzenettel nyíljon meg. */
-let FB={d:5,m:2,f:3};
+   5-2-3), hogy a panel ne hibaüzenettel nyíljon meg. A `w` a soronkénti
+   szélesség; null = "az alapértelmezés", amíg hozzá nem nyúlsz. */
+let FB={d:5,m:2,f:3,w:{d:null,m:null,f:null}};
+function fbWides(){return lineWides(FB.d,FB.m,FB.f,FB.w);}
 function renderFormBuilder(){
   const box=$("hubFormBuilder");if(!box||box.classList.contains("hide"))return;
   const R=CUSTOM_FORM_RULES;
   const err=customFormError(FB.d,FB.m,FB.f);
   const bud=S.transferBudget||0,afford=bud>=CUSTOM_FORM_PRICE;
+  const W=fbWides();
   const row=(key,label)=>`<div style="display:flex;align-items:center;gap:8px;margin-top:7px">`
     +`<span style="flex:1;font-size:13px">${label}</span>`
     +`<button class="btn-s" data-fb="${key}:-1" style="padding:6px 13px">−</button>`
     +`<b style="min-width:22px;text-align:center;font-family:var(--font-disp);font-size:17px;color:var(--gold)">${FB[key]}</b>`
     +`<button class="btn-s" data-fb="${key}:1" style="padding:6px 13px">+</button></div>`;
+  /* A szélesség-kapcsoló csak ott jelenik meg, ahol a sor mérete engedi —
+     kétfős sorban nincs mit kiküldeni a szélre. */
+  const wrow=(key,label,n)=>{
+    if(!lineCanBeWide(n))return "";
+    const on=W[key];
+    return `<div style="display:flex;align-items:center;gap:6px;margin-top:5px;padding-left:2px">`
+      +`<span style="flex:1;font-size:11.5px;color:var(--dim2)">${label}</span>`
+      +`<button class="btn-${on?"s":"y"}" data-fbw="${key}:0" style="padding:5px 10px;font-size:11.5px">zárt</button>`
+      +`<button class="btn-${on?"y":"s"}" data-fbw="${key}:1" style="padding:5px 10px;font-size:11.5px">széles</button></div>`;};
+  /* POSZT-ELŐNÉZET: pontosan az a kiosztás, amit a létrehozás ad. */
+  const prev=(()=>{
+    const b=buildCustomForm(FB.d,FB.m,FB.f,FB.w);
+    const s=b.slots;
+    const line=(from,n)=>n?s.slice(from,from+n).join(" "):"—";
+    return `<span style="color:var(--dim2)">KP</span> · <b>${line(1,FB.d)}</b>`
+      +` · <b>${line(1+FB.d,FB.m)}</b> · <b>${line(1+FB.d+FB.m,FB.f)}</b>`;})();
   box.innerHTML=`<div class="hubDetail" style="margin-top:10px">`
     +`<div style="font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--gold);font-weight:700">Tervezőasztal</div>`
-    +row("d","Védők")+row("m","Középpályások")+row("f","Csatárok")
+    +row("d","Védők")+wrow("d","hátul: szárnyvédőkkel vagy csupa középhátvéddel",FB.d)
+    +row("m","Középpályások")+wrow("m","középen: szélsőkkel vagy befelé zárva",FB.m)
+    +row("f","Csatárok")+wrow("f","elöl: szélsőkkel vagy csupa középcsatárral",FB.f)
     +`<div style="margin-top:9px;font-size:12.5px;line-height:1.5;color:${err?"var(--red)":"var(--grass)"}">`
     +(err?esc(err)
-        :`<b>${esc(customFormLabel(FB.d,FB.m,FB.f))}</b> — érvényes alak. `
-         +`Szélső: ${FB.f>=3?"a támadósor két szélén (a külső középpályások megbízásként állíthatók szélsőre)":"a középpálya két szélén"}.`)
+        :`<b>${esc(customFormLabel(FB.d,FB.m,FB.f))}</b> — érvényes alak.`)
     +`</div>`
+    +`<div style="margin-top:5px;font-size:12px;line-height:1.6;color:var(--dim);letter-spacing:.5px">${prev}</div>`
     +`<button class="btn-${!err&&afford?"y":"s"} stepbtn" id="hubFormCreate"${!err&&afford?"":" disabled"} style="margin-top:9px">`
     +(err?"Előbb javítsd az alakot"
         :afford?`📐 Létrehozom — ${fmtFt(CUSTOM_FORM_PRICE)}`
                :`Nincs elég büdzséd (${fmtFt(bud)})`)+`</button>`
     +`<div style="font-size:11.5px;color:var(--dim2);margin-top:6px;line-height:1.45">`
-    +`A kapussal együtt 11 ember: ${R.outfield} mezőnyjátékost oszthatsz szét. A létrehozott felállás azonnal életbe is lép.</div></div>`;
+    +`A kapussal együtt 11 ember: ${R.outfield} mezőnyjátékost oszthatsz szét. A létrehozott felállás azonnal életbe is lép. `
+    +`A poszt-kiosztás nem végleges: minden szélső hely befelé, minden belső hely a szélre állítható MEGBÍZÁSSAL, ingyen.</div></div>`;
   box.querySelectorAll("[data-fb]").forEach(b=>{
     b.onclick=()=>{
       const parts=b.getAttribute("data-fb").split(":");
@@ -32988,14 +33129,20 @@ function renderFormBuilder(){
       const lo={d:R.dMin,m:R.mMin,f:R.fMin}[k],hi={d:R.dMax,m:R.mMax,f:R.fMax}[k];
       FB[k]=Math.max(lo,Math.min(hi,FB[k]+dir));
       renderFormBuilder();};});
+  box.querySelectorAll("[data-fbw]").forEach(b=>{
+    b.onclick=()=>{
+      const parts=b.getAttribute("data-fbw").split(":");
+      FB.w[parts[0]]=parts[1]==="1";
+      renderFormBuilder();};});
   const cr=$("hubFormCreate");
   if(cr)cr.onclick=()=>{
     const label=customFormLabel(FB.d,FB.m,FB.f);
     askConfirm({html:`<div style="font-size:13px;line-height:1.5">`
       +`Létrehozod a(z) <b>${esc(label)}</b> felállást <b style="color:var(--gold)">${fmtFt(CUSTOM_FORM_PRICE)}</b>-ért?<br>`
+      +`<span style="color:var(--dim2);letter-spacing:.5px">${prev}</span><br>`
       +`Azonnal életbe lép: a kezdő 11 újrarendeződik az új posztokra, a kiszorulók a padra/tartalékba kerülnek.</div>`,
       onYes:()=>{
-        const r=createCustomForm(FB.d,FB.m,FB.f);
+        const r=createCustomForm(FB.d,FB.m,FB.f,FB.w);
         if(!r.ok){addLine(`⛔ ${r.reason}`,"m ev");renderFormationPicker();return;}
         /* A létrehozás ÁRÁN FELÜL nincs váltási díj — de váltásnak SZÁMÍT:
            enélkül a tervezés ingyen megkerülné a szezononkénti első ingyenes
@@ -33051,6 +33198,22 @@ const ATK_WING_DESC={
   JSZ:"Marad a jobb szélen, támadó szélsőként: szélességet ad, kifelé húzza az ellenfél védelmét, és onnan tör be a kapu felé.",
   BSZ:"Marad a bal szélen, támadó szélsőként: szélességet ad, kifelé húzza az ellenfél védelmét, és onnan tör be a kapu felé."};
 const ATK_WING_SHADOW_DESC="Behúzódik a szélről a középső sávba, a védők és a középpálya közé — a pályaképen is beljebb és hátrébb kerül. A csapat így elveszíti a szélességet ezen az oldalon, cserébe egy plusz emberrel játszik a belső sávban. Kevesebb gól (3,5 a szélső 3,0-e mellett alig több), viszont a játék legnagyobb gólpassz-súlya (5,0 a 4,0 helyett).";
+/* ---- A SZÉLRE TERVEZETT HELY SZÖVEGEI ----
+   Ugyanaz a kód mást jelent attól függően, hogy a felállás hova TETTE a helyet.
+   Egy JSZ a középpálya-sor szélén "maradj kint" (nem "húzódj ki"), és onnan a
+   VKP/KKP/TKP a BEFELÉ mozdulás. Ezért a szélre tervezett helyeknek saját
+   táblájuk van — enélkül a panel azt írná, hogy "kihúzódik a szélre" arra az
+   emberre, aki már ott áll. */
+const WIDE_SLOT_STAY_DESC={
+  JSZ:"Marad a jobb szélen, a középpálya szárnyán: szélességet ad, és onnan futja a pálya oldalát. A hely KÖZÉPPÁLYÁS marad, nem lesz belőle támadó szélső.",
+  BSZ:"Marad a bal szélen, a középpálya szárnyán: szélességet ad, és onnan futja a pálya oldalát. A hely KÖZÉPPÁLYÁS marad, nem lesz belőle támadó szélső.",
+  JV:"Marad a jobb szárnyon szélsővédőként, ahogy a felállás tervezte: szélességet ad hátulról, és fel tud kapcsolódni a támadásba.",
+  BV:"Marad a bal szárnyon szélsővédőként, ahogy a felállás tervezte: szélességet ad hátulról, és fel tud kapcsolódni a támadásba."};
+const WIDE_SLOT_INWARD_DESC={
+  VKP:"Behúzódik a szélről a védelem elé: labdát szerez és rendez. A középpálya közepe sűrűbb lesz, cserébe ezen az oldalon elveszíted a szélességet. A csapat Védekezés-tengelyét emeli, a Gólszerzését csökkenti.",
+  KKP:"Behúzódik a szélről a középpálya közepére, és mindkét irányban dolgozik. A közép sűrűbb lesz, cserébe ezen az oldalon elveszíted a szélességet. Egyik tengelyt sem tolja el.",
+  TKP:"Behúzódik a szélről a támadók mögé, és a befejezésre készít elő. A közép sűrűbb lesz, cserébe ezen az oldalon elveszíted a szélességet. A Gólszerzés-tengelyt emeli a Védekezés rovására.",
+  KV:"Behúzódik a szárnyról a védelem közepére középhátvédnek: a közép nehezebben átjátszható lesz, cserébe hátulról nem kapsz szélességet ezen az oldalon."};
 /* Melyik kezdő 11-es helyet szerkesztjük épp. Slot-INDEXET tárolunk, nem
    objektumot: a renderHub minden rajzoláskor új sorokat épít, egy elmentett
    loc-referencia tehát elavulhatna. */
@@ -33078,11 +33241,17 @@ function renderHubMidRolePicker(){
      tartsa-e a szélességet, vagy behúzódjon a belső sávba. */
   const atk=isAtkRoleSlot(form,i);
   const wing=atk&&(def==="JSZ"||def==="BSZ");
+  /* A SZÉLRE TERVEZETT (nem támadó) helyek: onnan a belső megbízás a
+     BEFELÉ mozdulás — a bevezetőnek is így kell kérdeznie. */
+  const wideMid=isWideMidRoleSlot(form,i),wideDef=isWideDefRoleSlot(form,i);
+  const wideSlot=wideMid||wideDef;
   hint.innerHTML=(p?`<b>${esc(shortName(p.n))}</b> most <b>${MID_ROLE_LABEL[cur]}</b> megbízást kap ezen a helyen. `
-                   :`Ezen a ${wing?"szélső támadó":atk?"csatár":isDefRoleSlot(form,i)?"védő":"középpályás"}helyen most <b>${MID_ROLE_LABEL[cur]}</b> a megbízás. `)
+                   :`Ezen a ${wing?"szélső támadó":atk?"csatár":(isDefRoleSlot(form,i)||wideDef)?"védő":"középpályás"}helyen most <b>${MID_ROLE_LABEL[cur]}</b> a megbízás. `)
     +`A felállás alakja NEM változik, és <b style="color:var(--grass)">ingyenes</b>: csak azt állítod, `
     +(wing?`hogy kint tartsa-e a szélességet, vagy behúzódjon a belső sávba árnyékéknek. `
         :atk?`hogy ez az ember legelöl támadjon, vagy egy sorral hátrébb húzódva játssza helyzetbe a többieket. `
+          :wideMid?`hogy a szélen tartsa-e a szélességet, vagy behúzódjon a középpálya belsejébe. `
+          :wideDef?`hogy a szárnyon maradjon szélsővédőnek, vagy behúzódjon a védelem közepére. `
             :isDefRoleSlot(form,i)?`hogy a védelem közepén maradjon, vagy szélsővédőként kihúzódjon a szárnyra. `
             :`mit kérsz innen a középpályán. `)
     +`Senki nem mozdul a helyéről — a hely poszt-kódja és az illeszkedés változik.`
@@ -33109,6 +33278,8 @@ function renderHubMidRolePicker(){
     /* A TÁMADÓ szélső helyen a JSZ/BSZ (és maga az árnyékék is) mást jelent,
        mint a 3-4-3 középpályasorában — ott saját szövege van. */
     const ds=wing?(c===SHADOW_POS?ATK_WING_SHADOW_DESC:(ATK_WING_DESC[c]||MID_ROLE_DESC[c]))
+      :wideSlot?(c===def?(WIDE_SLOT_STAY_DESC[c]||MID_ROLE_DESC[c])
+                        :(WIDE_SLOT_INWARD_DESC[c]||MID_ROLE_DESC[c]))
                  :MID_ROLE_DESC[c];
     /* Támadó szélső helyen a JSZ/BSZ CSATÁR-szerep, tehát csatárszínt kap —
        a középpályás zöld ott azt sugallná, hogy középpályásként súlyozódik. */
