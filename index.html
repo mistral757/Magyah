@@ -2867,7 +2867,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.15";
+const APP_VERSION="3.3.18";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10394,9 +10394,20 @@ function budgetBreakdownHtml(){
   /* A BÉR ELŐREJELZÉSE. Nem a múltat mondja, hanem azt, mennyibe kerül a
      MOSTANI kezdő 11 egy meccsen és egy 34 meccses idényen — ez az a szám,
      amit a felhasználó a keret mellé tud tenni, mielőtt igazol. */
-  const wPer=squadMatchWage();
-  if(wPer>0)
+  /* A BÉR MOSTANTÓL A BEVÉTELBŐL SZÁMOL, ezért a bontásban is el kell mondani,
+     MIBŐL: a lelátó fele + a klub-keret negyede, plusz a trófea-béremelés és a
+     top sztárok felára — a végén a plafonnal, ami mindezt visszahúzhatja. */
+  const wBill=(()=>{try{
+    const xi=slots.filter(sl=>sl&&sl.player).map(sl=>sl.player);
+    return xi.length?wageBill(xi):null;}catch(e){return null;}})();
+  const wPer=wBill?wBill.due:0;
+  if(wPer>0){
+    const c=wBill.ctx;
     rows+=`<div class="bbRow"><span>💸 Fizetések (kezdő 11, ${WAGE_SEASON_MATCHES} meccs)</span><b class="down">−${fmtFt(Math.round(wPer*WAGE_SEASON_MATCHES))}</b></div>`;
+    rows+=`<div class="bbRow"><span style="opacity:.75">…ez meccsenként <span style="opacity:.8">(a lelátó ${Math.round(WAGE_FAN_SHARE*100)}%-a + a keret ${Math.round(WAGE_CLUB_SHARE*100)}%-a${c.titles?` + ${c.titles}× trófea-béremelés`:""})</span></span><b class="down">−${fmtFt(Math.round(wPer))}</b></div>`;
+    if(c.stars.size)
+      rows+=`<div class="bbRow"><span style="opacity:.75">…ebből ${c.stars.size} top sztár felára <span style="opacity:.8">(fejenként a lelátó 1/${WAGE_STAR_DIV}-e)</span></span><b class="down">−${fmtFt(Math.round(c.starFee*c.stars.size))}</b></div>`;
+    rows+=`<div class="bbRow"><span style="opacity:.75">…bér/lelátó arány</span><b class="${wPer>c.fanWeek?"down":"up"}">${c.fanWeek>0?Math.round(wPer/c.fanWeek*100):0}% <span style="opacity:.75">(plafon ${Math.round(c.capShare*100)}%${c.success?", sikeres idény":""})</span></b></div>`;}
   return `<div class="budgetBreak" id="budgetBreak">
     <div class="bbHead"><span>Szezononkénti keret</span><b>${fmtFt(p.total)}</b></div>
     ${rows}
@@ -10404,12 +10415,12 @@ function budgetBreakdownHtml(){
     +wageProbeHtml();}
 /* ---- A BÉRMÉRŐ LEOLVASÓJA ----
    Ugyanaz a műfaj, mint a Tengely-mérő: kalibrációs napló, nem játékos-
-   tájékoztató. A számok szándékosan nyersek. A LÉNYEG a jobb szélső blokk:
-   mivel a nyers (skálafüggetlen) bért is naplózzuk, KI TUDJUK ÍRNI, mennyi lett
-   volna a bér más WAGE_SCALE mellett — vagyis egyetlen konstans hangolásához
-   nem kell újrajátszani a karriert. */
+   tájékoztató. A számok szándékosan nyersek. A LÉNYEG a bér/lelátó oszlop: a
+   bér mostantól a bevételből SZÁMOL (lásd a JÁTÉKOS-FIZETÉSEK blokkot), tehát
+   ez az arány magától a plafonok (50% / 125%) közé kell hogy essen. A NYERS
+   oszlop a plafon ELŐTTI bért mutatja — a kettő különbsége az, amit a fegyelem
+   (vagy a túlterhelés) elvitt. */
 const WAGE_SEASON_MATCHES=34;    /* 30 bajnoki + kupa, a becslésekhez */
-const WAGE_SCALE_TRY=[0.25,0.5,0.75,1,1.5];
 function wageProbeHtml(){
   if(gameMode!=="career"||!careerPool)return "";
   const st=(S&&S.wageProbe&&S.wageProbe.v===1)?S.wageProbe:null;
@@ -10437,15 +10448,15 @@ function wageProbeHtml(){
       <td style="padding:1px 8px 1px 0;text-align:right;white-space:nowrap;color:var(--dim2)">${r.apps||0}</td>
       <td style="padding:1px 0;text-align:right;white-space:nowrap;color:var(--dim2)">${r.endBudget!=null?fmtFtShort(r.endBudget):"—"}</td>
     </tr>`;}).join("");
-  const tries=WAGE_SCALE_TRY.map(sc=>{
-    const w=tRaw*sc,share=pct(w,tFan||tIn);
-    const col=share>=95?"var(--red)":share>=45?"var(--gold)":"var(--grass)";
-    return `<span style="display:inline-block;margin-right:10px;white-space:nowrap${sc===WAGE_SCALE?";font-weight:700":""}">`
-      +`${String(sc).replace(".",",")}× <span style="color:${col}">${share}%</span>`
-      +`${sc===WAGE_SCALE?' <span style="color:var(--gold)">← most</span>':""}</span>`;}).join("");
+  const capNow=(()=>{try{const c=wageContext();
+    return `most ${Math.round(c.capShare*100)}% a plafon (${c.success?"sikeres idény után":"siker nélkül"})`
+      +`${c.titles?` · ${c.titles} trófea-béremelés`:""}`
+      +`${c.stars.size?` · ${c.stars.size} top sztár`:""}`;}catch(e){return "";}})();
+  const cut=tRaw>tPaid?`<span style="color:var(--gold)">a plafon eddig ${fmtFtShort(tRaw-tPaid)}-tal húzta vissza a bért</span>`
+    :`<span style="color:var(--grass)">a plafon eddig egyszer sem fogott meg</span>`;
   return `<div style="margin-top:8px;padding:8px 10px;background:var(--panel2);border:1px dashed var(--line);border-radius:7px">
-    <div style="font-size:12px;font-weight:700;margin-bottom:2px">💸 Bérmérő <span style="color:var(--dim2);font-weight:400">· ${rows.length} szezon · skála ${String(WAGE_SCALE).replace(".",",")}×</span></div>
-    <div style="font-size:10.5px;color:var(--dim2);margin-bottom:5px;line-height:1.45">Szezononként: mennyi jött be (ebből mennyi a lelátóról), mennyi ment el bérre, és mennyi maradt az idény végén. A hangolás mércéje a <b>bér/szurkolói</b> arány — a cél ~50% egy sikeres és ~90% egy sikertelen idényben.</div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:2px">💸 Bérmérő <span style="color:var(--dim2);font-weight:400">· ${rows.length} szezon${capNow?" · "+capNow:""}</span></div>
+    <div style="font-size:10.5px;color:var(--dim2);margin-bottom:5px;line-height:1.45">Szezononként: mennyi jött be (ebből mennyi a lelátóról), mennyi ment el bérre, és mennyi maradt az idény végén. A mérce a <b>bér/lelátó</b> arány — sikeres idény után legfeljebb 50%, siker nélkül legfeljebb 125%.</div>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse">
       <tr style="color:var(--dim2);font-size:10px;text-transform:uppercase;letter-spacing:.5px">
         <td style="padding-right:8px">szezon·mezőny</td><td style="padding-right:8px;text-align:right">bevétel</td>
@@ -10464,7 +10475,7 @@ function wageProbeHtml(){
         <td style="padding:3px 8px 0 0;text-align:right;color:var(--dim2)">${tApps}</td>
         <td></td></tr>
     </table></div>
-    <div style="font-size:10.5px;color:var(--dim);margin-top:6px;line-height:1.5">Mi lett volna más skálán (a teljes karrierre, bér/szurkolói bevétel):<br>${tries}</div></div>`;}
+    <div style="font-size:10.5px;color:var(--dim);margin-top:6px;line-height:1.5">Plafon előtti (nyers) bér a teljes karrierre: <b>${fmtFtShort(tRaw)}</b> — ${cut}.</div></div>`;}
 
 /* ================= JÁTÉKOS-FIZETÉSEK =================
    MIÉRT KELLETT. A bevételi oldal két lépésben nagyot nőtt: a nagy játékosok
@@ -10488,51 +10499,209 @@ function wageProbeHtml(){
    konstans átírásával lehessen belőni. A mérő MINDIG a skálafüggetlen (1,0-s)
    béreket is naplózza, tehát bármelyik skála hozadéka visszaolvasható utólag.
 
-   ---- A SKÁLA ÚJRAHANGOLVA A HETI LELÁTÓHOZ (3.3.09) ----
-   A cél mostantól KIMONDOTT: a bér a SZURKOLÓI bevétel ~50%-át vigye el egy
-   sikeres idényben, ~90%-át egy sikertelenben. A szurkolók hetente fizetnek,
-   a bért hetente vonjuk — a kettő ugyanazon a ritmuson áll, tehát az arány
-   közvetlenül értelmezhető.
+   ---- A FIX SKÁLA HELYETT BEVÉTEL-ÉRZÉKENY BÉR (3.3.18) ----
+   AMI ELROMLOTT. A régi képlet EGYETLEN fix konstansra (WAGE_SCALE) épült, a
+   bevétel viszont menet közben lépcsőzetesen ugrik: a liga-sávok szurkolói
+   alapja 12 000 → 30 000 → 50 000 → 150 000 fő, a bér pedig csak a játékosok
+   Ratingjét követte. A kettő nem tudott együtt haladni — mérve a bér a
+   szurkolói bevétel ~50%-át vitte a kezdő szinten, ~38%-át NB I-ben és
+   ~12-13%-át a Premier ligában/Infinityben. Vagyis EGY sikeres idény után a
+   bevétel véglegesen elhúzott a kiadástól, és a pénznek nem maradt tétje.
 
-   MÉRVE (a játék saját képleteivel, 34 mérkőzéses idényre, induló szinten:
-   84-es mezőny, 84-es keret, 13 500 fős tábor):
-     · sikeres idény (20 GY / 6 D / 4 V, 2 rangadó-győzelem, 40-es izgalom,
-       ×1,30 élmény) — 3 290 pont szurkolói bevétel
-     · sikertelen (8/8/14, 28-as izgalom, ×0,85) — 1 993 pont
-   A két végponthoz tartozó skála 0,282 és 0,308; a kettő közötti 0,30
-   MINDKETTŐT eltalálja (52% és 87%). Innen a mostani érték.
+   AZ ÚJ ALAP: A BÉR A BEVÉTELBŐL SZÁMOL, nem egy konstansból. A klub két
+   csatornán keres, és a bér MINDKETTŐRE érzékeny:
+     · a heti LELÁTÓ (fanWeeklyIncome) — ennek a fele,
+     · az EDZŐI FIZETÉS, vagyis a nyári klub-keret (seasonBudgetParts().club)
+       mérkőzésre osztva — ennek a negyede.
+   Ez a két szám adja a keret-bér MECCSENKÉNTI bázisát. Ha nő a tábor vagy jön
+   egy edzői fizetésemelés, a bér magától követi.
 
-   AMIT A MÉRÉS MÉG MUTAT, ÉS AMIT TUDNI KELL: az arány a KARRIER SORÁN
-   CSÚSZIK. A liga-sávok szurkolói alapja lépcsőzetesen ugrik (12 000 → 30 000
-   → 50 000 → 150 000), a bér viszont a Rating exponenciális függvénye — a
-   kettő nem tud együtt haladni. Ugyanezzel a 0,30-as skálával mérve a bér a
-   szurkolói bevétel ~38%-át viszi NB I-ben, ~13%-át a Premier ligában és
-   ~12%-át Infinityben (sikeres idényben). Ha ezt is egyenletessé akarjuk
-   tenni, ahhoz a bérnek a LIGA szintjét is követnie kellene, nem csak a
-   játékos Ratingjét — az viszont már új mechanika, nem hangolás.
+   AMI EBBŐL NEM VESZETT EL: a bér továbbra is a JÁTÉKIDŐHÖZ kötött és
+   RATING-ARÁNYOS. A bázist a régi exponenciális kulcs osztja szét — csak
+   mostantól a MEZŐNY szintjéhez (oppTargetRating) mérten. Egy pont Rating
+   ugyanúgy ugyanannyi százalékkal drágít, de „drága" az, aki a saját ligája
+   fölé nő: egy mezőnyszintű tizenegy pontosan a bázist viszi el, egy hat
+   ponttal erősebb ~27%-kal többet, és a rotáció ára is megmarad (aki pályára
+   lép, azért fizetsz — a 14. beálló ember 14. bért jelent).
+
+   A NAGYÁGYÚK KÜLÖN FIZETÉSE. Legfeljebb HÁROM top sztár kap felárat, fejenként
+   a meccsenkénti szurkolói bevétel 1/12-ét. Top sztár az, aki (a) Ratingben
+   érdemben — legalább WAGE_STAR_RATING_PCT-tel — a keret átlaga fölé nő, vagy
+   (b) a gól/gólpassz/bravúr hozama kiugró a kerethez képest, vagy (c) a
+   szezonkártyája GYILKOS vagy magasabb. A felár csak akkor jelenik meg a
+   számlán, ha az illető tényleg pályára lépett.
+
+   A SIKER BÉREMELÉST HOZ. A bajnoki és kupa-GYŐZELMEKKEL (csak a győzelem
+   számít) beözönlő új szurkolótábor nem marad ingyen: minden megnyert trófea
+   után a bázis megkapja az ÚJ költségvetés szurkolói bevételének 1/9-ét.
+   A legutóbbi idény trófeái számítanak — a béremelést újra és újra ki kell
+   érdemelni.
+
+   A KÉT PLAFON. A teljes meccs-bér nem lebeghet szabadon:
+     · amíg a klub SIKERES — a legutóbbi idényben top 3 bajnoki helyezés, VAGY
+       európai kupa-elődöntő (top 4), VAGY magyar kupa-győzelem —, a bér nem
+       haladhatja meg a szurkolói bevétel FELÉT. Ez a fegyelmezett klub: a
+       lelátó kifizeti a bért, és marad is belőle;
+     · siker nélkül elengedjük a számok kezét: a felépített bér ilyenkor
+       TÚLTERHELI a rendszert, de egy ponton megáll — a szurkolói bevétel
+       125%-a a végső plafon.
+   A plafon a teljes számlára ül, és arányosan húzza vissza minden érintett
+   bérét (a felárakat is) — így a bontás mindig kiadja a végösszeget.
 
    MIT CSINÁL, HA NINCS PÉNZ. A keret nem mehet mínuszba (arra a vásárlási
    kapuk nincsenek felkészítve), ezért a fedezetlen rész NEM tűnik el: a mérő
    külön könyveli, és a napló is kimondja. Így a hiány látszik, de nem tör el
    semmit. */
-const WAGE_SCALE=0.30;           /* AZ EGY HANGOLÓ SZÁM — mindent ez skáláz */
-const WAGE_REF_RATING=99;        /* a bejelentett horgony Ratingje */
-const WAGE_REF_PER_MATCH=25;     /* M Ft egy meccsre, 99-es Ratingnél, 1,0-s skálán */
+const WAGE_REF_RATING=99;        /* a horgony Ratingje — a kulcs viszonyítási pontja */
+const WAGE_REF_PER_MATCH=25;     /* M Ft egy meccsre, 99-es Ratingnél (a kulcs léptéke) */
 const WAGE_K=0.040;              /* Rating-pontonkénti exponenciális meredekség */
-/* Egy játékos MECCS-BÉRE a mostani skálán. */
-function playerMatchWage(p,scale){
+const WAGE_FAN_SHARE=0.50;       /* a heti szurkolói bevétel ENNYI része megy bérre */
+const WAGE_CLUB_SHARE=0.25;      /* az edzői fizetés (klub-keret) meccsre osztott része */
+const WAGE_STAR_DIV=12;          /* egy top sztár a meccsenkénti lelátó 1/12-ét viszi */
+const WAGE_STAR_MAX=3;           /* ennél több top sztárt sosem fizetünk külön */
+const WAGE_TITLE_DIV=9;          /* egy megnyert trófea ennyivel emeli a bázist */
+const WAGE_CAP_OK=0.50;          /* sikeres idény után: a lelátó fele a plafon */
+const WAGE_CAP_FAIL=1.25;        /* siker nélkül: 125% — eddig terhelhető túl a rendszer */
+/* Mitől „top sztár": a keret átlagához mért Rating-többlet, a kerethez mért
+   hozam-arány, vagy a kártyaszint. Bármelyik egymagában elég. */
+const WAGE_STAR_RATING_PCT=0.06; /* a keret átlagánál ennyivel magasabb Rating */
+const WAGE_STAR_CONTRIB=1.6;     /* a saját posztcsoport átlagához mért hozam-arány */
+const WAGE_STAR_MIN_MATCHES=6;   /* ennyi meccs alatt a hozam-arány még nem mond semmit */
+const WAGE_STAR_CARD="killer";   /* ettől a kártyaszinttől felfelé automatikusan sztár */
+/* A RATING-KULCS: a szétosztás súlya. Önmagában nem forint, csak arány — a
+   bázist ennek mentén osztjuk szét. */
+function wageKey(r){
+  if(!isFinite(r)||r<=0)return 0;
+  return WAGE_REF_PER_MATCH*Math.exp(WAGE_K*(r-WAGE_REF_RATING));}
+/* A LEGUTÓBB LEZÁRT IDÉNY. Minden siker-feltétel ebből olvas: a plafon és a
+   trófea-béremelés is a MÚLT idényről szól, nem a futóról. */
+function wageLastSeason(){
+  const H=(S&&S.seasonHistory)||[];
+  return H.length?H[H.length-1]:null;}
+/* SIKERES VOLT-E A LEGUTÓBBI IDÉNY? Három út vezet ide, bármelyik elég:
+   top 3 bajnoki helyezés · európai kupa top 4 (elődöntő) · magyar kupa-győzelem. */
+function wageSuccessSeason(){
+  const h=wageLastSeason();
+  if(!h)return false;
+  if(h.rank&&h.rank<=3)return true;
+  const e=h.euro;
+  if(e&&e.comp){
+    if(e.comp==="MK")return !!e.won;
+    /* a helyezés-lépcső közös a szurkolói jóváírással: 1=győzelem, 2=döntő,
+       3=elődöntő — vagyis a „top 4" pontosan a 3-as fokig tart */
+    try{if(fanCupPlaceOf(e.comp,e.won,e.reached,e.reachedLabel)<=3)return true;}catch(err){}}
+  return false;}
+/* HÁNY TRÓFEÁT NYERTÜNK a legutóbbi idényben? (Csak a GYŐZELEM számít — a
+   döntő és az elődöntő nem hoz béremelést.) */
+function wageTitleCount(){
+  const h=wageLastSeason();
+  if(!h)return 0;
+  let n=0;
+  if(h.rank===1)n++;
+  if(h.euro&&h.euro.won)n++;
+  return n;}
+/* A KLUB SAJÁT BEVÉTELE MECCSRE OSZTVA — ez az „edzői fizetés" ága. */
+function wageClubPerMatch(){
+  try{return (seasonBudgetParts().club||0)/WAGE_SEASON_MATCHES;}catch(e){return 0;}}
+/* ---- KI A TOP SZTÁR? ----
+   A keret egészéhez mérünk (nem a kezdő 11-hez): a sztár a KLUB sztárja, akkor
+   is, ha épp pihen. Legfeljebb hárman lehetnek, és a rangsort egy közös
+   pontszám adja, hogy a három hely mindig a legkiemelkedőbbeké legyen. */
+function wageContribOf(name,gk){
+  const c=(S.careerStats&&S.careerStats[name])||null;
+  if(!c||!c.matches)return {per:0,m:0};
+  const raw=gk?((c.saves||0)+(c.cs||0)+(c.mvp||0))
+              :((c.g||0)+(c.a||0)+(c.mvp||0));
+  return {per:raw/c.matches,m:c.matches};}
+function wageStarNames(){
+  if(gameMode!=="career"||!careerPool)return [];
+  let roster=[];
+  try{roster=fullCareerRoster().filter(p=>p&&p.n);}catch(e){return [];}
+  if(!roster.length)return [];
+  const isGk=p=>!!(p.pos&&p.pos[0]==="KP");
+  const rate=p=>{try{return pOvrDisplay(p);}catch(e){return p.ovr||0;}};
+  const avgR=roster.reduce((s,p)=>s+rate(p),0)/roster.length;
+  /* A hozamot a SAJÁT posztcsoportjához mérjük: egy kapus bravúrjait nincs
+     értelme egy csatár góljaihoz hasonlítani. */
+  const avgOf=gk=>{
+    const g=roster.filter(p=>isGk(p)===gk).map(p=>wageContribOf(p.n,gk)).filter(x=>x.m>=WAGE_STAR_MIN_MATCHES);
+    if(!g.length)return 0;
+    return g.reduce((s,x)=>s+x.per,0)/g.length;};
+  const avgOut=avgOf(false),avgGk=avgOf(true);
+  const scored=[];
+  roster.forEach(p=>{
+    const gk=isGk(p),r=rate(p);
+    const rPct=avgR>0?(r/avgR-1):0;
+    const c=wageContribOf(p.n,gk);
+    const base=gk?avgGk:avgOut;
+    const cRatio=(base>0&&c.m>=WAGE_STAR_MIN_MATCHES)?(c.per/base):0;
+    let cardRank=0;
+    try{const t=playerCardTier(p.n);cardRank=t?cardTierRank(t):0;}catch(e){}
+    const cardMin=cardTierRank(WAGE_STAR_CARD);
+    const byRating=rPct>=WAGE_STAR_RATING_PCT;
+    const byContrib=cRatio>=WAGE_STAR_CONTRIB;
+    const byCard=cardRank>=cardMin;
+    if(!byRating&&!byContrib&&!byCard)return;
+    /* A rangsor-pontszám: a Rating-többlet százalékban, a hozam-többlet
+       súlyozva, a kártyaszint pedig fokonként egy fix lépcső. */
+    const score=rPct*100
+      +(cRatio>1?(cRatio-1)*25:0)
+      +(byCard?(cardRank-cardMin+1)*12:0);
+    scored.push({n:p.n,score});});
+  scored.sort((a,b)=>b.score-a.score);
+  return scored.slice(0,WAGE_STAR_MAX).map(x=>x.n);}
+/* ---- A MECCS BÉR-KÖRNYEZETE ----
+   Egy objektum, amiből MINDEN bér-szám kiszámolható: a bázis, a felárak, a
+   plafon és a szétosztás kulcsa. Azért egy helyen, mert a HUB előrejelzése és
+   a tényleges levonás UGYANEZT kell hogy lássa. */
+function wageContext(){
+  let fanWeek=0;
+  try{fanWeek=fanWeeklyIncome();}catch(e){}
+  const club=wageClubPerMatch();
+  const titles=wageTitleCount();
+  const base=WAGE_FAN_SHARE*fanWeek+WAGE_CLUB_SHARE*club
+    +titles*(fanWeek/WAGE_TITLE_DIV);
+  /* A MEZŐNY szintje a viszonyítás: egy mezőnyszintű tizenegy viszi el a
+     bázist, aki fölé nő, az drágább. A kulcs sosem lehet nulla. */
+  const lvl=(typeof oppTargetRating==="number"&&oppTargetRating>0)?oppTargetRating:84;
+  const unit=base/Math.max(1e-6,11*wageKey(lvl));
+  const ok=wageSuccessSeason();
+  return {fanWeek,club,titles,base,unit,
+          stars:new Set(wageStarNames()),
+          starFee:fanWeek/WAGE_STAR_DIV,
+          success:ok,
+          capShare:ok?WAGE_CAP_OK:WAGE_CAP_FAIL,
+          cap:fanWeek*(ok?WAGE_CAP_OK:WAGE_CAP_FAIL)};}
+/* Egy játékos MECCS-BÉRE a plafon ELŐTT (a felárával együtt). A `ctx` azért
+   paraméter, hogy egy listán végigmenve egyszer épüljön fel. */
+function playerMatchWage(p,ctx){
   if(!p)return 0;
+  const c=ctx||wageContext();
   let r=0;
   try{r=pOvrDisplay(p);}catch(e){r=(p&&p.ovr)||0;}
   if(!isFinite(r)||r<=0)return 0;
-  const sc=(scale!=null)?scale:WAGE_SCALE;
-  return sc*WAGE_REF_PER_MATCH*Math.exp(WAGE_K*(r-WAGE_REF_RATING));}
-/* Egy szezon KERET-BÉRE előrejelzésként: a kezdő 11 egy meccsre. A HUB ezt
-   írja ki, hogy a fizetés ne csak a naplóban jelenjen meg. */
+  return c.unit*wageKey(r)+(c.stars.has(p.n)?c.starFee:0);}
+/* EGY LISTA TELJES BÉRE, A PLAFONNAL EGYÜTT. Ez az egyetlen hely, ahol a
+   plafon érvényesül — a levonás és az előrejelzés is ezen megy át.
+   Visszaad: nyers (plafon előtti) és fizetendő összeg, a visszahúzás szorzója
+   és a plafonhoz tartozó számok. */
+function wageBill(players,ctx){
+  const c=ctx||wageContext();
+  let raw=0,stars=0;
+  (players||[]).forEach(p=>{
+    if(!p)return;
+    raw+=playerMatchWage(p,c);
+    if(c.stars.has(p.n))stars++;});
+  const cap=c.cap;
+  const factor=(cap>0&&raw>cap)?cap/raw:1;
+  return {ctx:c,raw,stars,factor,due:raw*factor,capped:factor<1,cap};}
+/* Egy szezon KERET-BÉRE előrejelzésként: a kezdő 11 egy meccsre, plafonostul.
+   A HUB ezt írja ki, hogy a fizetés ne csak a naplóban jelenjen meg. */
 function squadMatchWage(){
-  let sum=0;
-  try{slots.forEach(sl=>{if(sl&&sl.player)sum+=playerMatchWage(sl.player);});}catch(e){}
-  return sum;}
+  let xi=[];
+  try{xi=slots.filter(sl=>sl&&sl.player).map(sl=>sl.player);}catch(e){}
+  if(!xi.length)return 0;
+  try{return wageBill(xi).due;}catch(e){return 0;}}
 /* ---- A BÉRMÉRŐ ----
    Szezononként egy sor: mennyi jött be, mennyi ment el bérre, hány pályára
    lépés volt, és mekkora volt a tábor. A bért KÉTFÉLEKÉPPEN tároljuk: a
@@ -10567,20 +10736,20 @@ function wageProbeNoteEndBudget(){
    ugyanaz a halmaz, amiből a meccs-statisztika is dolgozik. */
 function chargeMatchWages(players){
   if(gameMode!=="career"||!careerPool||!players||!players.length)return 0;
-  let due=0,raw=0;
-  players.forEach(p=>{
-    if(!p)return;
-    due+=playerMatchWage(p);
-    raw+=playerMatchWage(p,1);});
-  due=Math.round(due);raw=Math.round(raw);
+  const bill=wageBill(players);
+  const due=Math.round(bill.due),raw=Math.round(bill.raw);
   const have=Math.max(0,S.transferBudget||0);
   const paid=Math.min(have,due),unpaid=due-paid;
   S.transferBudget=have-paid;
   const r=wageProbeRow();
   r.paid=(r.paid||0)+paid;r.raw=(r.raw||0)+raw;
   r.unpaid=(r.unpaid||0)+unpaid;r.apps=(r.apps||0)+players.length;
+  r.capped=(r.capped||0)+(bill.capped?1:0);
   try{
-    addLine(`💸 Fizetések: <b>−${fmtFt(paid)}</b> (${players.length} pályára lépés)`
+    addLine(`💸 Fizetések: <b>−${fmtFt(paid)}</b> (${players.length} pályára lépés`
+      +(bill.stars?` · ${bill.stars} top sztár felára`:"")+`)`
+      +(bill.capped?` · <span style="color:var(--gold)">a plafon ${fmtFt(Math.round(raw-due))}-tal visszahúzta`
+        +` (a lelátó ${Math.round(bill.ctx.capShare*100)}%-a${bill.ctx.success?", sikeres idény után":""})</span>`:"")
       +(unpaid?` · <span style="color:var(--red)">${fmtFt(unpaid)} fedezetlen maradt</span>`:"")
       +` — a keret most ${fmtFt(S.transferBudget)}.`,"m skillnote");
   }catch(e){}
@@ -11665,18 +11834,29 @@ function maybeImproveScout(scout){
    arányt adna, és pont a legnagyobb üzlet érne a legkevesebbet. */
 const AGENCY_QUICKSELL_BASE=0.25;   /* az azonnali eladás pont-bázisa */
 const AGENCY_START_STARS=1;
-const AGENCY_LEVEL_PTS=[3,5,10,20,35,50,75,100,150,200,250,300];
-const AGENCY_LEVEL_PTS_STEP=100;   /* a táblázat után ennyivel nő szintenként */
+/* ---- A SZINTLÉPÉS ÁRA: SZÁMTANI SOROZAT ----
+   AMI ELROMLOTT. A régi küszöb-táblázat (3, 5, 10, 20, 35, 50, 75, 100, 150,
+   200, 250, 300, azon túl százasával) EXPONENCIÁLISAN nyílt szét, a bevételi
+   oldal viszont nem: egy üzlet a képlet felső határán is legfeljebb ~3 pontot
+   ér, és ez a karrier előrehaladtával sem változik (a mérce a saját kereted
+   legdrágább embere, tehát együtt nő a klubbal). A kettőből az következett,
+   hogy pár szint után a pontokból SOHA nem lehetett szintet lépni — maradt a
+   pénzből vásárolt fejlesztés, vagyis az ág elvesztette a saját ívét.
+   AZ ÚJ REND egy számtani sorozat: minden szint ugyanannyival kerül többe, mint
+   az előző. A két első küszöb szándékosan a régi (3 és 5), onnan egyenletesen
+   2-vel nő: 3, 5, 7, 9, 11… Így egy szint MINDIG néhány üzlet — a felsőbb
+   szintek is elérhetők maradnak, csak arányosan több munkával. */
+const AGENCY_LEVEL_PTS_FIRST=3;    /* az első szint ára pontban */
+const AGENCY_LEVEL_PTS_STEP=2;     /* és ennyivel kerül többe minden további */
 function agencyState(){
   if(!agency||agency.v!==1)agency={v:1,stars:AGENCY_START_STARS,lvl:0,pts:0,
     deals:0,buys:0,sells:0,marketSells:0};
   return agency;}
 function agencyStars(){const a=agencyState();return AGENCY_START_STARS+(a.lvl||0)*0.5;}
-/* Hány pont kell a KÖVETKEZŐ szinthez. A táblázat után százasával nő. */
+/* Hány pont kell a KÖVETKEZŐ szinthez — számtani sorozat, felső határ nélkül. */
 function agencyNextPts(lvl){
-  const i=Math.max(0,lvl||0);
-  if(i<AGENCY_LEVEL_PTS.length)return AGENCY_LEVEL_PTS[i];
-  return AGENCY_LEVEL_PTS[AGENCY_LEVEL_PTS.length-1]+(i-AGENCY_LEVEL_PTS.length+1)*AGENCY_LEVEL_PTS_STEP;}
+  const i=Math.max(0,Math.round(lvl||0));
+  return AGENCY_LEVEL_PTS_FIRST+i*AGENCY_LEVEL_PTS_STEP;}
 /* A VISZONYÍTÁSI MÉRCE. Az `except` a most mozgó játékos: őt kihagyjuk.
    FIGYELEM, EGY CSATOLÁS: a vétel és a gyors eladás nevezője az „eladás most"
    ára, ami a kikiáltási ár NEGYEDE. Ha ez az arány valaha mozdul, a VÉTELEK
@@ -14807,7 +14987,12 @@ function applyTransfer(type){
       const repl=findReplacement([slots[idx].pos],{})||synthWeak(cur.ovr,slots[idx].pos,3);
       drafted.add(repl.n);
       if(gameMode==="career"&&careerPool){
-        if(fullCareerRoster().length>=MAX_CAREER_ROSTER)return `(${esc(repl.n)} nem fért be — tele a keret)`;
+        if(fullCareerRoster().length>=MAX_CAREER_ROSTER){
+          /* NEM ZSÁKUTCA: várólistára kerül, és a szöveg után egyesével kapja
+             meg a két kiutat (hely a tartalékban vagy keretbővítés). */
+          return queueArrival(repl,`<b>${esc(repl.n)}</b> (${repl.ovr}) kölcsönbe érkezne, de a kereted megtelt.`)
+            ? `(${esc(repl.n)} még helyre vár)`
+            : `(${esc(repl.n)} nem fért be — tele a keret)`;}
         extraRoster.push(repl);markArrived(repl);
         return `${esc(repl.n)} (${repl.ovr}) a tartalékba`;
       }
@@ -14823,7 +15008,10 @@ function applyTransfer(type){
     const repl=findReplacement([slots[idx].pos],{requireWorseThan:cur.ovr-3})||synthWeak(cur.ovr,slots[idx].pos,10);
     drafted.add(repl.n);
     if(gameMode==="career"&&careerPool){
-      if(fullCareerRoster().length>=MAX_CAREER_ROSTER)return `Akadémiai bemutatkozás: ${esc(repl.n)} jelentkezett volna, de tele a keret — nem fért be.`;
+      if(fullCareerRoster().length>=MAX_CAREER_ROSTER)
+        return queueArrival(repl,`Akadémiai bemutatkozás: <b>${esc(repl.n)}</b> (${repl.ovr}) jelentkezett, de a kereted megtelt.`)
+          ? `Akadémiai bemutatkozás: ${esc(repl.n)} jelentkezett — a keret tele van, mindjárt döntesz róla.`
+          : `Akadémiai bemutatkozás: ${esc(repl.n)} jelentkezett volna, de tele a keret — nem fért be.`;
       extraRoster.push(repl);markArrived(repl);
       return `Akadémiai bemutatkozás: ${esc(repl.n)} (${repl.ovr}) csatlakozott a tartalék-kerethez — hosszú távú befektetés.`;
     }
@@ -14945,10 +15133,10 @@ const GLOSSARY={
   karriermod:{title:"Karrier mód vs. Klasszikus mód",text:"A klasszikus egy szezonos móddal szemben a karrier mód több szezonon át tartó, fejlődő történet: a játékosaid öregednek és fejlődnek, van átigazolási piac, scout, akadémia, és a csapatod hosszú távon formálódik."},
   tsi:{title:"TSI",text:"A TSI egy rejtett, a Ratingnél sokkal szélesebb skálájú érték, ami egy játékos hosszú távú, valódi potenciálját mutatja. Egy fiatal, alacsony Ratingű, de magas TSI-jű játékos idővel akár sztárrá válhat. IDEGEN játékosnál a scoutod ereje szabja meg, hány TSI-t nézhetsz meg — azt viszont te választod ki, kikét. A SAJÁT KERETEDNÉL nincs korlát: minden játékosod TSI-je folyamatosan látszik a HUB-ban. Amíg kevesebb, mint 15 meccset játszott nálad, a scoutod érkezéskori becslése látszik (~ jellel); 15 meccs után a pontos érték — ennyi idő alatt kiderül, mi van benne. A becslés nem sorsolódik újra szezononként: az érkezéskori tévedés aránya fix, tehát ha a játékos TSI-je nő (ifi-boost, akadémia, kihívás-jutalom), a becslés vele mozdul."},
   scout:{title:"Scout",text:"A scout dolga a FELMÉRÉS. A csillagereje szabja meg, hány IDEGEN játékos TSI-jét nézheted meg egy keretből vagy jelöltlistából — és mivel az árak rejtve vannak, a scout-megtekintés az egyetlen módja felmérni egy leigazolás előtt álló játékos valódi erejét. (A saját játékosaid TSI-je ingyen, folyamatosan látszik: a scout korlátja a VÁSÁRLÁS előtti felmérésről szól. A csillagereje ott is számít, hogy mennyire pontos a becslés, amit a keretedbe került játékosról az első 15 meccsén látsz.) Övé az AKADÉMIA és a hálózatán keresztül felfedezett nagy nevek esélye is. AMI MÁR NEM AZ ÖVÉ: az átigazolások lebonyolítása. A tárgyalások száma, a felderítési keret, a klub-szemle, a képesség-keresés és a piaci esemény átkerült az ÁTIGAZOLÁSI ÜGYNÖKSÉGHEZ — lásd a saját bejegyzését. A scoutot a karrier elején sorsolod (1-5 csillag), idővel magától is fejlődik, és fiatal (25 év alatti) tehetségeket keres előszeretettel. Fejleszteni a HUB Csapatépítés menüjében, az Ügynökség fejlesztése pont alatt lehet."},
-  fizetesek:{title:"Játékos-fizetések",text:"A pénznek KI is kell folynia valahol, különben a szurkolói bevétel és az eladási piac fölöslegben hagyja a klubot. A fizetés ez a kifolyó, és a JÁTÉKIDŐHÖZ van kötve: minden mérkőzés után azokért fizetsz, akik tényleg pályára léptek — a kezdő 11-ért és a beállt cserékért. A padon ülő és a tartalék-keretben várakozó játékos nem terhel. Így a rotációnak ára van, a mély keretnek viszont nincs büntetése. A BÉR A RATINGGEL EXPONENCIÁLISAN nő: minden Rating-pont ugyanannyi SZÁZALÉKKAL drágít. A HANGOLÁS MÉRCÉJE a szurkolói bevétel: a bér annak nagyjából a FELÉT viszi el egy sikeres idényben, és a KILENCTIZEDÉT egy sikertelenben — a lelátó fizeti a bért, és ha rosszul megy, épp csak kijössz belőle. Ez mérésből jött, nem becslésből: a játék saját képleteivel végigszámolt sikeres (20 győzelem, 2 rangadó-győzelem, magas izgalom) és sikertelen (8 győzelem, 14 vereség, fakó idény) idény adta a két végpontot, és a mostani skála mindkettőt eltalálja. A karrier során az arány CSÚSZIK: a liga-sávok szurkolói alapja lépcsőzetesen ugrik, a bér viszont a Rating exponenciális függvénye — a bér a szurkolói bevétel ~50%-át viszi a kezdő szinten, ~38%-át NB I-ben és ~13%-át a Premier ligában. HA NINCS ELÉG PÉNZ, a keret nem megy mínuszba: a fedezetlen rész elmarad, de a napló kimondja, és a Bérmérő külön könyveli. Az Infópult „Szezon és mérleg” fülén látod a kezdő 11 idényre vetített bérét, alatta pedig a BÉRMÉRŐT: szezononként mennyi jött be (ebből mennyi a lelátóról), mennyi ment el bérre, és mekkora volt az arány."},
-  ugynokseg:{title:"Átigazolási ügynökség",text:"A scout párja: a scout FELMÉR, az ügynökség ÜZLETET KÖT. Minden átigazolás — vétel ÉS eladás — az ő keze alatt megy át. Nincs kisorsolva: minden karrier EGY CSILLAGGAL indul, és nincs felső határa. HOGY FEJLŐDIK: két úton, ugyanazon a létrán. PONTOKKAL, magától, a megkötött üzletekből — és PÉNZBŐL, a HUB-ban megvásárolva (a scout-fejlesztés kétszereséért). Egy szint fél csillag; a szintek pontigénye 3, 5, 10, 20, 35, 50, 75, 100, 150, 200, 250, 300, azon túl százasával. A megvásárolt szint nem égeti el a pontjaidat: azok a következő szint felé számítanak tovább. HONNAN JÖN A PONT: nem a darabszám számít, hanem a NAGYSÁGREND — egy üzlet annyit ér, amennyire nagy a klub mostani mércéjéhez képest. VÉTELNÉL és GYORS ELADÁSNÁL 1 × (1 + az összeg ÷ a kereted legdrágábban eladható emberének eladási ára); PIACI ELADÁSNÁL 2 × (1 + az összeg ÷ a kereted legdrágább emberének vételára). Vagyis ha a legjobb emberedért 50 milliárdot kapnál, egy 75 milliárdos igazolás 2,5 pontot ér, egy 10 milliárdos 1,2-t. A mércéből az éppen mozgó játékos KIMARAD: ha a legjobbadat adod el, a viszonyítás a második legjobb. MIT ADNAK A CSILLAGOK? (1) EGYSZERRE PIACON TARTHATÓ JÁTÉKOSOK: 3 csillag alatt 2, 3-5 közt 3, 5-10 közt 4, 10 fölött 5. (2) AZ ÁTIGAZOLÁS LEBONYOLÍTÁSA: a tárgyalások száma, a felderítési keret, a klub-szemle, a képesség-keresés és a piaci esemény — ezek mind a régi scout-képletekkel mennek tovább, csak az ügynökség csillagaira. Az 1 csillagos ügynökség pontosan annyit tud, amennyit egy 2,5 csillagos scout tudott, és onnantól együtt lépkednek. (3) A PIACI ELADÁS SIKERE: a licitek sávja végig a kikiáltási ár 60-125%-a, de a valószínűség KÚP alakú a sávon belül, és a csúcsát az ügynökség tolja feljebb — 1 csillagnál 65%, 5-nél 80%, 10-nél 100%, azon túl csillagonként további 1%. Ehhez jön az elutasítások hatása: minden visszautasított licit tovább tolja a csúcsot, a negyedikig. Egy erős ügynökségnél tehát nem a lehetséges ár nő, hanem az ESÉLY, hogy tényleg a sáv teteje felé kapod meg."},
+  fizetesek:{title:"Játékos-fizetések",text:"A pénznek KI is kell folynia valahol, különben a szurkolói bevétel és az eladási piac fölöslegben hagyja a klubot. A fizetés ez a kifolyó, és a JÁTÉKIDŐHÖZ van kötve: minden mérkőzés után azokért fizetsz, akik tényleg pályára léptek — a kezdő 11-ért, a beállt cserékért ÉS a lecserélt emberekért is (aki játszott egy félidőt, azért fizetsz). A padon ülő és a tartalék-keretben várakozó játékos nem terhel. Így a rotációnak ára van, a mély keretnek viszont nincs büntetése. A BÉR A BEVÉTELBŐL SZÁMOL, nem egy fix szorzóból: a meccsenkénti keret-bér bázisa a heti SZURKOLÓI bevétel FELE plusz az EDZŐI FIZETÉS (a nyári klub-keret) mérkőzésre osztott NEGYEDE. Ha nő a tábor vagy jön egy fizetésemelés, a bér magától követi — épp ez hiányzott korábban, amitől egy sikeres idény után a bevétel véglegesen elhúzott a kiadástól. A bázist a RATING osztja szét, a MEZŐNY szintjéhez mérten: egy mezőnyszintű tizenegy pontosan a bázist viszi el, aki a ligája fölé nő, az arányosan drágább (minden Rating-pont ugyanannyi SZÁZALÉKKAL drágít). A NAGYÁGYÚK KÜLÖN FIZETÉST KÉRNEK: legfeljebb HÁROM top sztár kap felárat, fejenként a meccsenkénti szurkolói bevétel 1/12-ét. Top sztár az, aki Ratingben érdemben a kereted átlaga fölé nő, VAGY akinek a gól/gólpassz/bravúr hozama kiugró a kerethez képest, VAGY akinek a szezonkártyája GYILKOS vagy magasabb. A SIKER BÉREMELÉST HOZ: minden megnyert trófea (bajnoki cím és kupagyőzelem — csak a GYŐZELEM, a döntő nem) után a bázis megkapja a szurkolói bevétel 1/9-ét, a legutóbbi idény eredménye szerint. KÉT PLAFON ZÁRJA A RENDSZERT. Amíg a klub SIKERES — a legutóbbi idényben top 3 bajnoki helyezés, VAGY európai kupa-elődöntő (top 4), VAGY magyar kupa-győzelem —, a teljes meccs-bér nem haladhatja meg a szurkolói bevétel FELÉT: a lelátó kifizeti a bért, és marad is belőle. Siker nélkül viszont elengedjük a számok kezét: a felépített bér ilyenkor túlterheli a rendszert, egészen a szurkolói bevétel 125%-áig — onnantól ez a végső plafon. A plafon arányosan húzza vissza mindenki bérét, a sztár-felárakat is. HA NINCS ELÉG PÉNZ, a keret nem megy mínuszba: a fedezetlen rész elmarad, de a napló kimondja, és a Bérmérő külön könyveli. Az Infópult „Szezon és mérleg” fülén látod a kezdő 11 bérét meccsre és idényre, a sztár-felárat, a bér/lelátó arányt és a rád vonatkozó plafont, alatta pedig a BÉRMÉRŐT: szezononként mennyi jött be (ebből mennyi a lelátóról), mennyi ment el bérre, és mennyit húzott vissza a plafon."},
+  ugynokseg:{title:"Átigazolási ügynökség",text:"A scout párja: a scout FELMÉR, az ügynökség ÜZLETET KÖT. Minden átigazolás — vétel ÉS eladás — az ő keze alatt megy át. Nincs kisorsolva: minden karrier EGY CSILLAGGAL indul, és nincs felső határa. HOGY FEJLŐDIK: két úton, ugyanazon a létrán. PONTOKKAL, magától, a megkötött üzletekből — és PÉNZBŐL, a HUB-ban megvásárolva (a scout-fejlesztés kétszereséért). Egy szint fél csillag; a szintek pontigénye SZÁMTANI SOROZAT: 3, 5, 7, 9, 11… — minden szint pontosan 2 ponttal kerül többe az előzőnél, felső határ nélkül. Ez azért így van, mert egy üzlet a képlet tetején is legfeljebb ~3 pontot ér, és ez a karrier során sem nő: exponenciálisan nyíló küszöbökkel pár szint után már csak PÉNZBŐL lehetett volna szintet lépni. A megvásárolt szint nem égeti el a pontjaidat: azok a következő szint felé számítanak tovább. HONNAN JÖN A PONT: nem a darabszám számít, hanem a NAGYSÁGREND — egy üzlet annyit ér, amennyire nagy a klub mostani mércéjéhez képest. VÉTELNÉL és GYORS ELADÁSNÁL 1 × (1 + az összeg ÷ a kereted legdrágábban eladható emberének eladási ára); PIACI ELADÁSNÁL 2 × (1 + az összeg ÷ a kereted legdrágább emberének vételára). Vagyis ha a legjobb emberedért 50 milliárdot kapnál, egy 75 milliárdos igazolás 2,5 pontot ér, egy 10 milliárdos 1,2-t. A mércéből az éppen mozgó játékos KIMARAD: ha a legjobbadat adod el, a viszonyítás a második legjobb. MIT ADNAK A CSILLAGOK? (1) EGYSZERRE PIACON TARTHATÓ JÁTÉKOSOK: 3 csillag alatt 2, 3-5 közt 3, 5-10 közt 4, 10 fölött 5. (2) AZ ÁTIGAZOLÁS LEBONYOLÍTÁSA: a tárgyalások száma, a felderítési keret, a klub-szemle, a képesség-keresés és a piaci esemény — ezek mind a régi scout-képletekkel mennek tovább, csak az ügynökség csillagaira. Az 1 csillagos ügynökség pontosan annyit tud, amennyit egy 2,5 csillagos scout tudott, és onnantól együtt lépkednek. (3) A PIACI ELADÁS SIKERE: a licitek sávja végig a kikiáltási ár 60-125%-a, de a valószínűség KÚP alakú a sávon belül, és a csúcsát az ügynökség tolja feljebb — 1 csillagnál 65%, 5-nél 80%, 10-nél 100%, azon túl csillagonként további 1%. Ehhez jön az elutasítások hatása: minden visszautasított licit tovább tolja a csúcsot, a negyedikig. Egy erős ügynökségnél tehát nem a lehetséges ár nő, hanem az ESÉLY, hogy tényleg a sáv teteje felé kapod meg."},
   akademia:{title:"Akadémia",text:"Minden 4. meccs után egy fiatal akadémiai tehetség mutatkozik be — alacsony jelenlegi Ratinggel, de szokatlanul magas TSI-vel. Az akadémia minősége a csapatod aktuális erejéhez igazodik: egy erősebb csapat jobb tehetségeket termel. Ha nincs helyed vagy még korainak érzed, az akadémián is hagyhatod: ott CÉLZOTT képzést kap, ezért gyorsabban fejlődik, mintha a cserepadon ülne — de lassabban, mintha játékperceket kapna a kezdő 11-ben. Kis eséllyel a TSI-je is megugrik. Később egyre nagyobb eséllyel jelentkezik vissza, és látod, mennyit fejlődött közben. Az akadémiai idő 21 évesen lejár: ekkor egy utolsó, „most vagy soha\" ajánlatot kapsz rá."},
-  budzse:{title:"Átigazolási büdzsé és árak",text:"Minden szezon elején kapsz egy költségvetést a csapatod erejéhez mérten, és a felhasználatlan rész átvihető a következő szezonra. A vásárlás DRÁGA (a piaci érték fölött, felárral — magasabb mezőnyön még többe kerül), az eladás szerényebb összeget hoz. AZ ÉRTÉK NEM LINEÁRIS: egy bizonyos szint fölött (TSI 6000, nagyjából a természetes fejlődési pálya csúcsa) az ár meredekebben nő, mert a világklasszisból nincs másik — egy kinevelt legenda így nagyságrenddel többet ér, mint két jó kerettag. MI ADJA AZ ELADÁSI ÁRAT: a TSI egy ÍGÉRET, a nálad lejátszott meccsek pedig BIZONYÍTÉKOK. Egy meccset sem játszott embernél a piac csak az ígéretet látja — ott a TSI-alapú ár él, de 55%-ra csonkítva: a vevő is csak egy ígéretet vesz. Ahogy gyűlnek a meccsek (40-nél teljes a súly), egyre inkább a BIZONYÍTÉK árazza. A SZEZONKÁRTYA végre árat is jelent: a GOLD a semleges pont, az ezüst enyhén büntet, a felső szintek erősen fizetnek (GODLIKE ×5,2) — eddig egyetlen forintot sem ért. A kirívó termés is végre számít: a „meccsenként egy gól+gólpassz\" fölötti rész eddig levágódott, bizonyított klubembernél mostantól a négyszereséig fut, és az életmű-szorzó plafonja is 2,8-ról 6,0-ra nyílik, a képességeké pedig duplájára. A VÉTELI oldalt ez nem érinti: egy idegen klub játékosáról tényleg nincs más információd, mint a TSI, és ha az eladás a Ratingből árazna, a két oldal szétválna és arbitrázs nyílna. AZ ELADÁSNAK KÉT ÚTJA VAN. Az „Eladás most\" azonnal fizet, de lowball: a játékos KIKIÁLTÁSI ÁRÁNAK (a nyers piaci értéke ÉS a nálad felépített életműve) a NEGYEDE — a kényelemnek ára van. A PIACRA BOCSÁTÁS a türelmes út: a játékos marad a keretben és játszik tovább, 5-15 fordulón belül érkezik rá az első ajánlat, és azt az átigazolási időszakban kapod kézhez, a vásárlások mellett. A licit a kikiáltási ár 60-125%-a, vagyis a gyors eladás 2,4-5-szöröse. Elutasíthatod: akkor jön a következő ajánlat — nyáron azonnal, ugyanabban az ablakban, legfeljebb három körön át, szezon közben pedig garantáltan a következő átigazolási időszakban. A sáv MINDIG 60-125% marad, de a valószínűség kúp alakú a sávon belül, és a csúcsát az ÁTIGAZOLÁSI ÜGYNÖKSÉGED tolja feljebb (lásd a saját bejegyzését); minden elutasítás tovább tolja, a negyedikig. A kivárás tehát tényleg fizet, csak időbe kerül. Piacra csak olyan játékost vihetsz, aki legalább 20 mérkőzést játszott nálad — egy frissen igazolt embert nem lehet azonnal továbbadni, és mivel az életmű-szorzója még 1,0, a licitje amúgy is jóval az alatt maradna, amit érte fizettél. Ez tudatos: egy nagy játékos beszerzése több szezonnyi spórolás, nem egy szezon pénzéből megvehető. Az árakat a lista nem mutatja — csak amikor rákattintasz a vételi szándékra. A HUB-ban a zöld chip a HALMOZOTT egyenleged, alatta pedig a SZEZONONKÉNTI keret bontása áll: mennyi jön a csapaterődből, és mit tesz hozzá vagy vesz el az edzői fizetésemelés / megsapkázás (kihívás-jutalom, illetve büntetés, ±10% lépésekben) és a választott fejlődési tempó (a Komótos ×0,90, a Csigatempó ×0,75, a Gleccser ×0,60 — a lassabb tempó a piacot is visszafogja, különben csak megkerülnéd a lassítást vásárlással). Ugyanez a szorzó ül a MÉRFÖLDKŐ-JUTALMAKON is: a pénzjutalom a büdzsén keresztül, a csapatstílus-pont pedig közvetlenül — a lassított karrier tehát a stílus-fát is arányosan lassabban építi."},
+  budzse:{title:"Átigazolási büdzsé és árak",text:"Minden szezon elején kapsz egy költségvetést a csapatod erejéhez mérten, és a felhasználatlan rész átvihető a következő szezonra. A vásárlás DRÁGA (a piaci érték fölött, felárral — magasabb mezőnyön még többe kerül), az eladás szerényebb összeget hoz. AZ ÉRTÉK NEM LINEÁRIS: egy bizonyos szint fölött (TSI 6000, nagyjából a természetes fejlődési pálya csúcsa) az ár meredekebben nő, mert a világklasszisból nincs másik — egy kinevelt legenda így nagyságrenddel többet ér, mint két jó kerettag. MI ADJA AZ ELADÁSI ÁRAT: a TSI egy ÍGÉRET, a nálad lejátszott meccsek pedig BIZONYÍTÉKOK. Egy meccset sem játszott embernél a piac csak az ígéretet látja — ott a TSI-alapú ár él, de 55%-ra csonkítva: a vevő is csak egy ígéretet vesz. Ahogy gyűlnek a meccsek (40-nél teljes a súly), egyre inkább a BIZONYÍTÉK árazza. A SZEZONKÁRTYA végre árat is jelent: a GOLD a semleges pont, az ezüst enyhén büntet, a felső szintek erősen fizetnek (GODLIKE ×5,2) — eddig egyetlen forintot sem ért. A kirívó termés is végre számít: a „meccsenként egy gól+gólpassz\" fölötti rész eddig levágódott, bizonyított klubembernél mostantól a négyszereséig fut, és az életmű-szorzó plafonja is 2,8-ról 6,0-ra nyílik, a képességeké pedig duplájára. A VÉTELI oldalt ez nem érinti: egy idegen klub játékosáról tényleg nincs más információd, mint a TSI, és ha az eladás a Ratingből árazna, a két oldal szétválna és arbitrázs nyílna. AZ ELADÁSNAK KÉT ÚTJA VAN. Az „Eladás most\" azonnal fizet, de lowball: a játékos KIKIÁLTÁSI ÁRÁNAK (a nyers piaci értéke ÉS a nálad felépített életműve) a NEGYEDE — a kényelemnek ára van. A PIACRA BOCSÁTÁS a türelmes út: a játékos marad a keretben és játszik tovább, 5-15 fordulón belül érkezik rá az első ajánlat, és azt az átigazolási időszakban kapod kézhez, a vásárlások mellett. A licit a kikiáltási ár 60-125%-a, vagyis a gyors eladás 2,4-5-szöröse. Elutasíthatod: akkor jön a következő ajánlat — nyáron azonnal, ugyanabban az ablakban, legfeljebb három körön át, szezon közben pedig garantáltan a következő átigazolási időszakban. A sáv MINDIG 60-125% marad, de a valószínűség kúp alakú a sávon belül, és a csúcsát az ÁTIGAZOLÁSI ÜGYNÖKSÉGED tolja feljebb (lásd a saját bejegyzését); minden elutasítás tovább tolja, a negyedikig. A kivárás tehát tényleg fizet, csak időbe kerül. Piacra csak olyan játékost vihetsz, aki legalább 20 mérkőzést játszott nálad — egy frissen igazolt embert nem lehet azonnal továbbadni, és mivel az életmű-szorzója még 1,0, a licitje amúgy is jóval az alatt maradna, amit érte fizettél. Ez tudatos: egy nagy játékos beszerzése több szezonnyi spórolás, nem egy szezon pénzéből megvehető. Az árakat a lista nem mutatja — csak amikor rákattintasz a vételi szándékra. A HUB-ban a zöld chip a HALMOZOTT egyenleged, alatta pedig a SZEZONONKÉNTI keret bontása áll: mennyi jön a csapaterődből, és mit tesz hozzá vagy vesz el az edzői fizetésemelés / megsapkázás (kihívás-jutalom, illetve büntetés, ±10% lépésekben) és a választott fejlődési tempó (a Komótos ×0,90, a Csigatempó ×0,75, a Gleccser ×0,60 — a lassabb tempó a piacot is visszafogja, különben csak megkerülnéd a lassítást vásárlással). Ugyanez a szorzó ül a MÉRFÖLDKŐ-JUTALMAKON is: a pénzjutalom a büdzsén keresztül, a csapatstílus-pont pedig közvetlenül — a lassított karrier tehát a stílus-fát is arányosan lassabban építi. HA TELE A KERET, AZ MÁR NEM ZSÁKUTCA: bármilyen érkezőnél (álomigazolás, ikon, scout-jelölt, klub-szemle, kölcsönjátékos, akadémista) ott, a döntés helyén választhatsz — vagy elengedsz valakit a TARTALÉK-KERETBŐL, és az újonc pontosan az ő helyére jön, vagy megveszed a KERETBŐVÍTÉST (+2 hely, ugyanazon az áron, mint a HUB-ban). Ha egyiket sem választod, az igazolás elmarad, és nem fizetsz érte semmit."},
   elvagyodas:{title:"Elvágyódás és megtartás",text:"Az átigazolási időszakok egyik lehetséges eseménye: valaki a keretedből távozni szeretne. Régen ez egyszerűen ELVETTE a játékost — ma már döntés. Kapsz egy megtartási díjat, és háromfelé mehetsz: kifizeted azonnal (marad), HALASZTOTT megállapodást kötsz (marad, de a díj a szezon végén esedékes), vagy elengeded. A halasztott út a csapda: ha a szezon végére nem jön össze a pénz, a játékos mégis távozik — kezdőemberként érkezik helyette valaki, de nem te választod. A jó csapatkémia és a magas morál csökkenti az elvágyódás esélyét, tehát ez ellen nem csak pénzzel lehet védekezni."},
   oregedes:{title:"Öregedés és visszavonulás",text:"A játékosaid minden szezonváltáskor öregszenek, és a fejlődésük korfüggő: 21 év alatt a pozitív lépések duplán számítanak, 25 alatt 1,6-szorosan, 30 alatt már csak 0,8-szorosan, afölött 0,4-szeresen — a hanyatlás viszont pont fordítva gyorsul. 31 éves kortól évente nő a visszavonulás esélye, és a csúcsához képest sokat vesztett játékosnál még inkább. A távozás SOSEM ér váratlanul: a játékos előre bejelenti a szándékát, a figyelmeztetés szezonjában biztosan végigjátssza az idényt, és a rákövetkező egy vagy két szezon végén vonul vissza — van tehát időd utánpótlást igazolni vagy poszt-tanulást indítani. Az „öreg csirkefogó\" boost 41 éves korig kitolja a nyugdíjat. Infinity módban nincs Rating-hanyatlás, és a határ 55 év."},
   fejlodes:{title:"Folyamatos fejlődés",text:"A játékosaid nem csak szezonváltáskor fejlődnek — minden meccs, amin játszanak (különösen ha jól teljesítenek), apránként hozzáad a fejlődésükhöz. Egy kiugró szezon tartósan feljebb tolhatja egy fiatal játékos hosszú távú pályáját."},
@@ -16021,26 +16209,22 @@ function showCareerUnlockReveal(newP,reason,resumeCb){
   btn.onclick=()=>{$("scUnlock").classList.add("hide");resumeCb();};
   $("unlockActions").innerHTML="";$("unlockActions").appendChild(btn);
   $("scUnlock").scrollIntoView({behavior:"smooth"});}
+/* A FELFEDEZÉS-KÉPERNYŐ keret-kapuja. A két kiút (elengedés vagy keretbővítés)
+   ugyanaz, mint az igazolásoknál — a rosterFullChoice szolgálja ki mindkettőt,
+   csak itt a felfedezés-panel elemeibe rajzol. */
 function showCareerCapReached(resumeCb,generatorFn){
   generatorFn=generatorFn||unlockRandomPlayer;
   $("scUnlock").classList.remove("hide");
   $("unlockTitle").textContent=`Tele a kereted (${MAX_CAREER_ROSTER}/${MAX_CAREER_ROSTER})`;
-  $("unlockBody").innerHTML=`<p style="font-size:13px;line-height:1.5">Egy új tehetség jelentkezne, de nincs hely. Engedj el valakit a tartalék-keretedből, hogy csatlakozhasson — vagy hagyd ki ezt a lehetőséget.</p>`;
-  const list=document.createElement("div");list.className="plist";
-  extraRoster.forEach(p=>{
-    const row=document.createElement("div");row.className="prow";
-    row.innerHTML=`<span class="main"><div class="nm">${esc(p.n)}</div><div class="trait">${p.pos.join("/")} · ${p.age} év · Rating ${Math.round(pOvr(p))}</div></span>`;
-    row.onclick=()=>{
-      releasePlayer(p);
+  rosterFullChoice({
+    body:$("unlockBody"),actions:$("unlockActions"),
+    line:"Egy új tehetség jelentkezne, de nincs hely.",
+    onRoom:()=>{
       $("scUnlock").classList.add("hide");
       const newP=generatorFn();
-      if(newP)addLine(`🔍 ${esc(newP.n)} csatlakozott a keretedhez, miután elengedted ${esc(p.n)}-t.`,"m life");
-      resumeCb();};
-    list.appendChild(row);});
-  $("unlockBody").appendChild(list);
-  const skipBtn=document.createElement("button");skipBtn.className="btn-s stepbtn";skipBtn.textContent="Kihagyom ezt a lehetőséget";
-  skipBtn.onclick=()=>{$("scUnlock").classList.add("hide");resumeCb();};
-  $("unlockActions").innerHTML="";$("unlockActions").appendChild(skipBtn);
+      if(newP)addLine(`🔍 ${esc(newP.n)} csatlakozott a keretedhez.`,"m life");
+      resumeCb();},
+    onSkip:()=>{$("scUnlock").classList.add("hide");resumeCb();}});
   $("scUnlock").scrollIntoView({behavior:"smooth"});}
 function showAcademyReveal(prospect,resumeCb,rec,isFinal){
   const e=careerPool[prospect.n];
@@ -26882,21 +27066,30 @@ function playMatch(){
     /* A BUSZSOFŐR KIMARAD MINDEN SZEMÉLY-CSATORNÁBÓL: nem nő a meccsszáma,
        nem kerül a karrier-statisztikába, nem lesz a meccs embere és nem kap
        bért. (A fejlődésből magától kiesik: nincs pool-bejegyzése.) */
-    active.forEach(a=>{if(a.bus)return;S.seasonMatches[a.p.n]=(S.seasonMatches[a.p.n]||0)+1;});
+    /* ---- AKI PÁLYÁRA LÉPETT: A LEFÚJÁSKOR PÁLYÁN LÉVŐK **ÉS** A LECSERÉLTEK ----
+       HIBA, AMIT EZ JAVÍT: az `active` a lefújás pillanatának tizenegye, tehát
+       akit félidőben (vagy bármelyik percben) lecseréltél, abból kiesett — a
+       Statzone-ban nem nőtt a meccsszáma, a karrier-statisztikájába nem került
+       be a meccs, és bért sem fizettél érte, pedig egy teljes félidőt játszott.
+       A fejlődés már eddig is a `halfOut`-tal EGYÜTT számolt (lásd
+       processCareerDevelopment) — a személyes csatornákból csak ez a fele
+       maradt ki. A két lista uniója az igazság: `active` (a busz nélkül) plusz
+       a `halfOut` lecseréltjei. Egy ember sosem szerepel mindkettőben. */
+    const playedAll=active.filter(a=>!a.bus).map(a=>a.p)
+      .concat(halfOut.map(h=>h&&h.p).filter(Boolean));
+    playedAll.forEach(p=>{S.seasonMatches[p.n]=(S.seasonMatches[p.n]||0)+1;});
     /* KIHÍVÁS: "tegyél új embert a kezdőbe, és játszasd N meccsen".
        A szezon eleji kezdő 11 pillanatképéhez mérünk — aki nem volt benne, de
        most kezd, annak külön számoljuk a meccseit. */
     if(gameMode==="career"&&S.chSeasonStartXI){
       S.chNewStarterMatches=S.chNewStarterMatches||{};
-      active.forEach(a=>{
-        if(a.bus)return;
-        if(S.chSeasonStartXI.indexOf(a.p.n)<0)
-          S.chNewStarterMatches[a.p.n]=(S.chNewStarterMatches[a.p.n]||0)+1;});}
+      playedAll.forEach(p=>{
+        if(S.chSeasonStartXI.indexOf(p.n)<0)
+          S.chNewStarterMatches[p.n]=(S.chNewStarterMatches[p.n]||0)+1;});}
     if(gameMode==="career"){
-      active.forEach(a=>{
-        if(a.bus)return;
-        const g=mScore[a.p.n]||0,as=mAssist[a.p.n]||0;
-        const cs=S.careerStats[a.p.n]=S.careerStats[a.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};
+      playedAll.forEach(p=>{
+        const g=mScore[p.n]||0,as=mAssist[p.n]||0;
+        const cs=S.careerStats[p.n]=S.careerStats[p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};
         cs.matches++;
         if(g||as){cs.g+=g;cs.a+=as;}});
       /* ---- A HÉT ELSZÁMOLÁSA: ELŐBB A LELÁTÓ, AZTÁN A BÉR ----
@@ -26906,9 +27099,10 @@ function playMatch(){
       try{fanMatchTick({win:cls==="win",loss:cls==="loss",
         derby:(typeof isRivalFixture==="function")&&isRivalFixture(fx),
         exc:_excScore});}catch(e){}
-      /* FIZETÉSEK. Ugyanabból a halmazból (`active`), amiből a pályára lépés
-         könyvelődik — egy hely, egy igazság: akinek meccse nőtt, azért fizetsz. */
-      try{chargeMatchWages(active.filter(a=>!a.bus).map(a=>a.p));}catch(e){}
+      /* FIZETÉSEK. Ugyanabból a halmazból (`playedAll`), amiből a pályára lépés
+         könyvelődik — egy hely, egy igazság: akinek meccse nőtt, azért fizetsz.
+         A félidőben lecserélt ember tehát a bérét is megkapja: játszott. */
+      try{chargeMatchWages(playedAll);}catch(e){}
       const gkForCs=active.find(a=>slots[a.idx].pos==="KP")||active[0];
       if(ga===0){const cs=S.careerStats[gkForCs.p.n]=S.careerStats[gkForCs.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};cs.cs++;S.seasonCleanSheets[gkForCs.p.n]=(S.seasonCleanSheets[gkForCs.p.n]||0)+1;}
       /* ---- A VÉDŐK TISZTA LAPJA IS SZÁMÍT — A KÁRTYÁKBAN IS ----
@@ -28235,6 +28429,116 @@ function twFinalizeSigning(cand,note,overridePrice,completeFn){
    Amíg a tokened megvan, a következő igazolásnál BÁRKIVEL tárgyalhatsz. */
 function buyTokenReady(){
   return gameMode==="career"&&(S.freePlayerTokens||0)>0;}
+/* ================= TELE A KERET — MINDIG KÉT KIÚT =================
+   AMI ELROMLOTT. A keret-sapka eddig ZSÁKUTCA volt: ha megtelt a tartalék, az
+   érkező ember egyszerűen nem jött létre. Az álomigazolásnál ez a legfájóbb —
+   ott egy KONKRÉT nagy név mondott volna igent —, de ugyanez történt a
+   klub-szemlés jelölttel, az ikonnal, a kölcsönjátékossal és az akadémistával
+   is. A játékosnak volt megoldása (adj el valakit, vagy bővíts a HUB-ban),
+   csak épp NEM OTT, ahol a döntés van: mire visszaért volna, az ajánlat rég
+   elveszett.
+
+   MOSTANTÓL minden ilyen ponton ugyanaz a két kiút áll a képernyőn:
+     1. ENGEDJ EL VALAKIT A TARTALÉKBÓL — az érkező pontosan az ő helyére jön;
+     2. VEDD MEG A KERETBŐVÍTÉST — a HUB-beli ára, ugyanaz a +2 hely.
+   És persze a harmadik, ami eddig is volt: hagyd ki a lehetőséget.
+
+   Egyetlen függvény szolgálja ki az összes hívási helyet, mert a szabálynak
+   mindenhol ugyanannak kell lennie — a `body`/`actions` elemet a hívó adja
+   (átigazolási panel vagy a felfedezés-képernyő). */
+function rosterExpandStep(){
+  if(gameMode!=="career")return null;
+  if(MAX_CAREER_ROSTER>=ROSTER_EXPAND_MAX)return null;
+  return {price:rosterExpandPrice(MAX_CAREER_ROSTER),
+          from:MAX_CAREER_ROSTER,
+          to:Math.min(ROSTER_EXPAND_MAX,MAX_CAREER_ROSTER+2)};}
+function rosterBuyExpand(){
+  const st=rosterExpandStep();
+  if(!st||(S.transferBudget||0)<st.price)return false;
+  S.transferBudget-=st.price;
+  MAX_CAREER_ROSTER=st.to;
+  addLine(`👥 Keretbővítés — az új keretméret ${MAX_CAREER_ROSTER} (−${fmtFt(st.price)})`,"m life");
+  return true;}
+/* o: {body,actions,name,line,onRoom,onSkip,skipLabel} */
+function rosterFullChoice(o){
+  const body=o.body,act=o.actions;
+  const st=rosterExpandStep();
+  const canBuy=!!st&&(S.transferBudget||0)>=st.price;
+  body.innerHTML=`<div class="h" style="color:var(--gold)">Tele a keret — de van megoldás</div>
+    <p style="font-size:13px;margin-top:5px;line-height:1.55">
+      ${o.line||`<b>${esc(o.name||"Az új ember")}</b> szívesen jönne, de a kereted megtelt.`}
+      <span style="color:var(--dim2)">(${fullCareerRoster().length}/${MAX_CAREER_ROSTER})</span><br>
+      Két utat választhatsz: <b>elengedsz valakit a tartalékból</b>, és az újonc pontosan az ő helyére jön —
+      vagy <b>megveszed a keretbővítést</b>${st?` (${MAX_CAREER_ROSTER} → ${st.to} hely, ${fmtFt(st.price)})`:""}.
+      ${st?"":`<br><span style="color:var(--dim)">A keretméret elérte a maximumot (${ROSTER_EXPAND_MAX}) — csak az első út járható.</span>`}
+    </p>`;
+  const lbl=document.createElement("div");
+  lbl.style.cssText="font-size:12.5px;color:var(--dim);margin-top:10px;margin-bottom:6px";
+  lbl.textContent=extraRoster.length?"Kit engedsz el a tartalék-keretből?":"A tartalék-kereted üres — csak bővítéssel fér be.";
+  body.appendChild(lbl);
+  if(extraRoster.length){
+    const box=document.createElement("div");box.className="plist";
+    /* A gyengébbek elöl: a döntés így egy pillantás, nem böngészés. */
+    extraRoster.slice().sort((a,b)=>(pOvr(a)||0)-(pOvr(b)||0)).forEach(p=>{
+      const row=document.createElement("div");row.className="prow";
+      row.innerHTML=`<span class="main"><div class="nm">${esc(shortName(p.n))}</div>`
+        +`<div class="trait">${(p.pos||[]).join("/")}${p.age!=null?` · ${p.age} év`:""} · Rating ${Math.round(pOvr(p))}${p.tsi!=null?` · TSI ${p.tsi}`:""}</div></span>`;
+      row.onclick=()=>{
+        const r=releasePlayer(p,false);
+        if(!r||!r.ok)return;
+        addLine(`👥 ${esc(shortName(p.n))} kikerült a keretből — helyet csinált az érkezőnek.`,"m life");
+        o.onRoom();};
+      box.appendChild(row);});
+    body.appendChild(box);}
+  act.innerHTML="";
+  if(st){
+    const buy=document.createElement("button");
+    buy.className=canBuy?"btn-y stepbtn":"btn-s stepbtn";
+    buy.style.marginTop="8px";
+    buy.disabled=!canBuy;
+    buy.textContent=`👥 Keretbővítés ${st.from} → ${st.to} (${fmtFtShort(st.price)})`
+      +(canBuy?"":` — nincs elég büdzséd (${fmtFtShort(S.transferBudget||0)})`);
+    if(canBuy)buy.onclick=()=>{if(rosterBuyExpand())o.onRoom();};
+    act.appendChild(buy);}
+  const skip=document.createElement("button");
+  skip.className="btn-s stepbtn";skip.style.marginTop="6px";
+  skip.textContent=o.skipLabel||"Kihagyom ezt a lehetőséget";
+  skip.onclick=()=>o.onSkip();
+  act.appendChild(skip);}
+/* ---- AKI ÍGY SEM FÉRT BE, DE MÉG SORRA KERÜLHET ----
+   A kölcsönjátékos és az akadémiai bemutatkozás egyszerre TÖBB embert is
+   behozhat, és az eredményük egyetlen szövegben landol. Ezért ők várólistára
+   kerülnek, és a szöveg elolvasása UTÁN kapják meg ugyanazt a két kiutat,
+   egyesével. A lista nem mentődik: egy kör végén mindig kiürül. */
+let ARRIVAL_QUEUE=[];
+/* Igazat ad vissza, ha tényleg sorra fog kerülni: auto-módban (szezon
+   végigjátszása) nincs kinek felajánlani a döntést, ott marad a régi kimenet. */
+function queueArrival(p,line){
+  if(gameMode!=="career"||!p||S.auto)return false;
+  ARRIVAL_QUEUE.push({p,line});
+  return true;}
+function flushArrivalQueue(done){
+  done=done||twCycleComplete;
+  if(gameMode!=="career"||S.auto||!ARRIVAL_QUEUE.length){ARRIVAL_QUEUE=[];done();return;}
+  const it=ARRIVAL_QUEUE.shift();
+  const p=it.p;
+  const next=()=>flushArrivalQueue(done);
+  const say=(head,col,txt)=>{
+    $("twBody").innerHTML=`<div class="h" style="color:${col}">${head}</div>
+      <p style="font-size:13px;margin-top:5px;line-height:1.55">${txt}</p>`;
+    const b=document.createElement("button");b.className="btn-p stepbtn";b.textContent="Tovább";
+    b.onclick=next;
+    $("twActions").innerHTML="";$("twActions").appendChild(b);
+    drawPitch();updateBar();};
+  const place=()=>{
+    extraRoster.push(p);drafted.add(p.n);markArrived(p);
+    say("Befér!","var(--grass)",`<b>${esc(p.n)}</b> a tartalék-keretbe érkezett `
+      +`<span style="color:var(--dim2)">(${fullCareerRoster().length}/${MAX_CAREER_ROSTER})</span>.`);};
+  if(fullCareerRoster().length<MAX_CAREER_ROSTER){place();return;}
+  rosterFullChoice({body:$("twBody"),actions:$("twActions"),name:p.n,
+    line:it.line||`<b>${esc(p.n)}</b>${p.pos?` (${p.pos.join("/")}${p.age!=null?`, ${p.age} év`:""}, Rating ${Math.round(pOvr(p))})`:""} még csatlakozna.`,
+    onRoom:place,
+    onSkip:()=>say("Nem fért be","var(--dim)",`${esc(p.n)} végül nem csatlakozott — a keret tele maradt.`)});}
 /* Megpróbálható-e egy ilyen árú igazolás? (A token nulla árnál nem szól bele:
    ott nincs mit fedezni.) */
 function canAttemptBuy(price){
@@ -28294,7 +28598,7 @@ function twShowPlacement(cand,completeFn,cfg){
                Egyenleged: ${fmtFt(S.transferBudget||0)} → <b>${fmtFt(Math.max(0,(S.transferBudget||0)-finalPrice))}</b>`
             : `<span style="color:var(--dim)">Ingyenes igazolás.</span>`}<br>
         Ide érkezik: ${hova}.
-        ${full?`<br><span style="color:var(--red)">⚠ A kereted megtelt — így az igazolás elmaradna, és nem fizetnél érte semmit.</span>`:""}
+        ${full?`<br><span style="color:var(--gold)">⚠ A kereted megtelt — aláírás után választhatsz: elengedsz valakit a tartalékból, vagy megveszed a keretbővítést. Ha egyiket sem, az igazolás elmarad, és nem fizetsz semmit.</span>`:""}
         <br><span style="color:var(--dim2)">Ha most elállsz, ebben a körben már nem tudod leigazolni.</span>
       </p>`;
     const yes=document.createElement("button");
@@ -28344,28 +28648,35 @@ function twShowPlacement(cand,completeFn,cfg){
     finish();return;}
   /* ---- KARRIER: MINDEN MÁS IGAZOLÁS EGYENESEN A TARTALÉK-KERETBE ---- */
   if(gameMode==="career"){
-    if(fullCareerRoster().length>=MAX_CAREER_ROSTER){
-      /* Nincs hova tenni, és a kezdő 11-hez a rendszer magától NEM nyúl —
-         az a te döntésed. Ilyenkor az igazolás nem jön létre, és nem is
-         fizetsz érte semmit. */
-      $("twBody").innerHTML=`<div class="h" style="color:var(--red)">Tele a keret</div>
+    /* A tényleges aláírás — akkor is ez fut, ha előbb helyet kellett csinálni.
+       A FIZETÉS SZÁNDÉKOSAN ITT VAN: aki kihagyja a lehetőséget (nincs hely,
+       és nem enged el senkit), az egy fillért sem fizet. */
+    const sign=()=>{
+      extraRoster.push(cand);
+      drafted.add(cand.n);markArrived(cand,finalPrice);
+      payFor(cand.n);
+      $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">Aláírt!</div>
         <p style="font-size:13px;margin-top:5px;line-height:1.55">
-          <b>${esc(cand.n)}</b> szívesen jött volna, de a kereted megtelt
-          (${MAX_CAREER_ROSTER}/${MAX_CAREER_ROSTER}) — az új emberek a tartalék-keretbe érkeznek,
-          ott viszont nincs több hely. <span style="color:var(--dim)">A HUB-ban adhatsz el valakit,
-          vagy bővítheted a keretet; addig az igazolás elmarad, és nem fizettél érte semmit.</span></p>`;
-      finish();return;}
-    extraRoster.push(cand);
-    drafted.add(cand.n);markArrived(cand,finalPrice);
-    payFor(cand.n);
-    $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">Aláírt!</div>
-      <p style="font-size:13px;margin-top:5px;line-height:1.55">
-        <b>${esc(cand.n)}</b>${cand.pos?` (${cand.pos.join("/")}${cand.age!=null?`, ${cand.age} év`:""}, Rating ${Math.round(pOvr(cand))})`:""}
-        a <b>tartalék-keretbe</b> érkezett.
-        ${freeTok?`<br>🎁 Ingyen igazolás-token beváltva — ${fmtFt(rawPrice)} megspórolva.`
-                 :(finalPrice>0?`<br>Ár: <b>${fmtFt(finalPrice)}</b> · egyenleg: ${fmtFt(S.transferBudget||0)}`:"")}
-        <br><span style="color:var(--dim)">A HUB keretlistájában egyetlen posztcserével teheted a kezdőbe vagy a padra.</span></p>`;
-    finish();return;}
+          <b>${esc(cand.n)}</b>${cand.pos?` (${cand.pos.join("/")}${cand.age!=null?`, ${cand.age} év`:""}, Rating ${Math.round(pOvr(cand))})`:""}
+          a <b>tartalék-keretbe</b> érkezett <span style="color:var(--dim2)">(${fullCareerRoster().length}/${MAX_CAREER_ROSTER})</span>.
+          ${freeTok?`<br>🎁 Ingyen igazolás-token beváltva — ${fmtFt(rawPrice)} megspórolva.`
+                   :(finalPrice>0?`<br>Ár: <b>${fmtFt(finalPrice)}</b> · egyenleg: ${fmtFt(S.transferBudget||0)}`:"")}
+          <br><span style="color:var(--dim)">A HUB keretlistájában egyetlen posztcserével teheted a kezdőbe vagy a padra.</span></p>`;
+      finish();};
+    if(fullCareerRoster().length>=MAX_CAREER_ROSTER){
+      /* A kezdő 11-hez a rendszer magától NEM nyúl — az a te döntésed. De a
+         zsákutca megszűnt: itt, a döntés helyén lehet helyet csinálni. */
+      rosterFullChoice({body:$("twBody"),actions:$("twActions"),name:cand.n,
+        line:`<b>${esc(cand.n)}</b>${cand.pos?` (${cand.pos.join("/")}${cand.age!=null?`, ${cand.age} év`:""}, Rating ${Math.round(pOvr(cand))})`:""} aláírna, de a tartalék-kereted megtelt.`,
+        skipLabel:"Kihagyom — nem igazolom le",
+        onRoom:sign,
+        onSkip:()=>{
+          $("twBody").innerHTML=`<div class="h" style="color:var(--dim)">Elmaradt</div>
+            <p style="font-size:13px;margin-top:5px;line-height:1.55">
+              ${esc(cand.n)} igazolása nem jött létre — nem fizettél érte semmit.</p>`;
+          finish();}});
+      return;}
+    sign();return;}
   /* ---- KLASSZIKUS MÓD: marad a régi választó (nincs tartalék-keret) ---- */
   /* A KATEGÓRIA A JELÖLTBŐL — nem a TW.category-ból.
      FIX: az attribútum-kereső átigazolásnál a találat BÁRMILYEN posztú lehet,
@@ -28466,7 +28777,9 @@ function twStartPhase2(){
       $("twBody").innerHTML=`<div class="h" style="color:var(--purple)">${esc(result.title)}</div><p style="font-size:13px;margin-top:5px">${result.text}</p>`;
       drawPitch();updateBar();
       const btn=document.createElement("button");btn.className="btn-p stepbtn";btn.textContent="Tovább";
-      btn.onclick=()=>twNextCycleOrFinish();
+      /* AKI NEM FÉRT BE, ITT KAPJA MEG A KIUTAT: a várólista (kölcsönjátékos,
+         akadémista) a szöveg elolvasása után, egyesével kerül sorra. */
+      btn.onclick=()=>flushArrivalQueue(twNextCycleOrFinish);
       $("twActions").innerHTML="";$("twActions").appendChild(btn);
     }catch(err){
       /* végső biztonsági háló — a folyamat sosem ragad be */
@@ -33629,12 +33942,9 @@ function renderRosterExpandPanel(){
   $("twActions").innerHTML="";
   if(!atMax&&affordable){
     const buy=document.createElement("button");buy.className="btn-y stepbtn";buy.textContent=`Bővítés megvásárlása (${fmtFtShort(price)})`;
-    buy.onclick=()=>{
-      if(S.transferBudget<price||MAX_CAREER_ROSTER>=ROSTER_EXPAND_MAX)return;
-      S.transferBudget-=price;
-      MAX_CAREER_ROSTER=Math.min(ROSTER_EXPAND_MAX,MAX_CAREER_ROSTER+2);
-      addLine(`👥 Keretbővítés — az új keretméret ${MAX_CAREER_ROSTER}`,"m life");
-      renderRosterExpandPanel();};
+    /* A vásárlás EGY helyen történik (rosterBuyExpand) — ugyanaz a művelet fut,
+       mint amit az érkezőknél felkínált keret-kapu használ. */
+    buy.onclick=()=>{if(rosterBuyExpand())renderRosterExpandPanel();};
     $("twActions").appendChild(buy);
   }
   const back=document.createElement("button");back.className="btn-s stepbtn";back.style.marginTop="6px";back.textContent="Vissza a HUB-ba";

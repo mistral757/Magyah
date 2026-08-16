@@ -73,33 +73,32 @@ származtat (kupapénz, kihívás-jutalom, mérföldkő), a klub léptékét kö
   · BL 200 000 —, és ugyanez a lépcső fokozza le a döntőst (2.), az elődöntőst
   (3.), a negyed- és nyolcaddöntőst (4-5.) és a korábbi kiesést (6.).
 
-## 5. A bér újrahangolása — méréssel
+## 5. A bér — már nem innen hangoljuk
 
-A cél kimondott: **a bér a szurkolói bevétel ~50%-át vigye el egy sikeres
-idényben, ~90%-át egy sikertelenben.** A `WAGE_SCALE` ebből jött, nem
-becslésből — a játék saját képleteivel (`fanMatchDelta`, `playerMatchWage`)
-végigszámolt 34 mérkőzéses idényekből:
+*(3.3.18: ez a szakasz történeti. A `WAGE_SCALE`-t felváltó, bevétel-érzékeny
+bérrendszert a `jatekos-berek.md` írja le.)*
 
-| idény | bevétel | skála 0,30 mellett |
-|---|---|---|
-| sikeres (20 GY / 6 D / 4 V, 2 rangadó-győzelem, 40-es izgalom, ×1,30) | 3 290 pont | **53,2%** |
-| sikertelen (8/8/14, 28-as izgalom, ×0,85) | 1 993 pont | **87,8%** |
+A cél akkor is kimondott volt: **a bér a szurkolói bevétel ~50%-át vigye el egy
+sikeres idényben, ~90%-át egy sikertelenben.** A `WAGE_SCALE = 0,30` ebből jött,
+méréssel (34 mérkőzéses idényekre: sikeres 3 290 pont bevétel → 53,2%,
+sikertelen 1 993 pont → 87,8%).
 
-A két végponthoz külön-külön 0,282 és 0,308 tartozna; a **0,30 mindkettőt
-eltalálja**. (Korábbi érték: 0,5.)
+**Amit a mérés mutatott, és amiért az egész át lett írva:** az arány a karrier
+során csúszott. A liga-sávok szurkolói alapja lépcsőzetesen ugrik (12 000 →
+30 000 → 50 000 → 150 000), a bér viszont csak a Rating exponenciális függvénye
+volt — a kettő nem tudott együtt haladni: ugyanezzel a skálával a bér a
+szurkolói bevétel ~38%-át vitte NB I-ben, ~13%-át a Premier ligában és ~12%-át
+Infinityben. Egy sikeres idény után tehát a bevétel véglegesen elhúzott a
+kiadástól.
 
-**Amit a mérés még mutat, és amit tudni kell:** az arány a karrier során
-csúszik. A liga-sávok szurkolói alapja lépcsőzetesen ugrik (12 000 → 30 000 →
-50 000 → 150 000), a bér viszont a Rating exponenciális függvénye — a kettő nem
-tud együtt haladni. Ugyanezzel a skálával a bér a szurkolói bevétel ~38%-át
-viszi NB I-ben, ~13%-át a Premier ligában, ~12%-át Infinityben (sikeres
-idényben). Ha ezt is egyenletessé akarjuk tenni, a bérnek a **liga szintjét**
-is követnie kellene, nem csak a játékos Ratingjét — az viszont már új
-mechanika, nem hangolás.
+A megoldás pontosan az lett, amit ez a szakasz „új mechanika, nem hangolás"
+címen félretett: **a bér a bevételből számol** (a lelátó fele + a klub-keret
+negyede), és a szétosztása a **liga szintjéhez** mér, nem csak a játékos
+Ratingjéhez. Rajta két plafon: sikeres idény után a lelátó 50%-a, siker nélkül
+125%-a. Részletek: `jatekos-berek.md`.
 
 A **Bérmérő** ehhez kapott új oszlopot: szezononként külön látszik a teljes
-bevétel, abból a lelátóé, a bér, és a `bér/lelátó` arány — ez a hangolás
-mércéje.
+bevétel, abból a lelátóé, a bér, és a `bér/lelátó` arány — ez a mércéje.
 
 ## 6. Kihívás-tétek
 
