@@ -8,6 +8,31 @@
 
 ---
 
+## Állapot
+
+| fázis | állapot |
+|---|---|
+| **F0** — alapozás (`S.teach`, migráció, olvasók) | ✅ kész |
+| **F1** — regisztrátum, a mai tippek befűzve | ✅ kész |
+| **F2** — 3. szint: halk jelzések | ✅ kész |
+| F3 — 2. szint: vezetett lépéssor | következik |
+| F4 — beállítóképernyő | — |
+| F5 — tartalomcsomagok (A–D) | — |
+| F6–F8 | — |
+
+**Eldöntött kérdések** (a 8. szakasz nyitott kérdéseiből):
+
+1. **Alapértelmezés:** hard mód új játékosnál. ✅ *(F7-ből előrehozva: a
+   beállítóképernyőn a „Vezess végig" a kiválasztott gomb, `guideWanted=true`.)*
+2. **Futó karrierek:** `light` módra migrálnak — a halk jelzést megkapják, a
+   buborékokat nem. ✅
+3. **Hatókör:** a 3. szint **minden módban** él, nem csak karrierben; a
+   karrieren kívüli játék `light` módon indul. ✅
+4. A lépéssor formája, a szezononkénti tanítás-korlát és a meccs közbeni csere
+   tanítása → továbbra is nyitott (F3, F5, F6).
+
+---
+
 ## 0. Egy mondatban
 
 Ma két, egymástól független tanító-mechanizmus van a játékban (a kikapcsolható
