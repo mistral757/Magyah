@@ -2218,8 +2218,10 @@ button.infPanel:disabled{cursor:default}
        kezdők túlnyomó része —, az a teljes tanítórétegtől elesett úgy, hogy
        nem is tudott róla, hogy létezik. -->
   <div class="optgrid two hide" id="guideGrid" style="margin-top:8px">
-    <button data-gd="on" class="sel">💡 Vezess végig<small>tippek a döntéseknél és halk jelzés, ha van elintézetlen dolgod — bármikor halkítható</small></button>
-    <button data-gd="off">Csak emlékeztetők<small>nincs buborék: csak egy villogó keret ott, ahol tennivaló van</small></button>
+    <button data-gd="hard" class="sel">🧭 Teljes vezetés<small>bevezető minden fontos rendszerhez, tipp a döntéseknél, jelzés ha van tennivaló</small></button>
+    <button data-gd="guided">💡 Tippek és jelzések<small>bevezető csak a visszafordíthatatlan döntéseknél</small></button>
+    <button data-gd="light">🔔 Csak emlékeztetők<small>magától egy szó sem — csak villogó keret ott, ahol tennivaló van</small></button>
+    <button data-gd="off">⬜ Semmi<small>tiszta felület — a fogalomtár így is elérhető</small></button>
   </div>
   <!-- A RATING ALAPJA — globális beállítás, csak a DRAFTOS karrier-induláshoz.
        HÁROM FOKOZAT: nem a mezőny erejét állítja (azt a nehézségi csúszka teszi),
@@ -2855,6 +2857,16 @@ button.infPanel:disabled{cursor:default}
            visszafordíthatatlan vásárláshoz csak zavart okozott: az egyik
            feltűnő és magyaráz, a másik egy becsukott fiókban lapult. -->
 
+      <!-- VEZETÉS — a tanítóréteg kapcsolói, FUTÓ KARRIERBEN.
+           Miért itt, és nem a ⚙ Beállítások ablakban: az az ablak kizárólag a
+           KEZDŐLAPRÓL nyílik, ahol nincs futó karrier — egy ott állított mód
+           semmire nem hatna, a következő új játék pedig úgyis felülírná a
+           beállító képernyőről. A vezetés a karrier állapota, tehát oda való,
+           ahol a karrier többi kapcsolója is van. -->
+      <div class="hubGroup" data-acc="teach" data-keep="1">
+        <div class="hubGroupTitle accHead"><span class="hgtN">🧭 Vezetés<span class="hgtSub" id="hubTeachSub">mennyit segítsen a játék</span></span><span class="accChev">▸</span></div>
+        <div class="accBody hide"><div id="hubTeachBody"></div></div>
+      </div>
       <div class="hubGroup danger" data-acc="danger">
         <div class="hubGroupTitle accHead"><span class="hgtN">⚠️ Veszélyzóna<span class="hgtSub">a karrier lezárása — nincs visszaút</span></span><span class="accChev">▸</span></div>
         <div class="accBody hide">
@@ -3012,7 +3024,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.24";
+const APP_VERSION="3.3.25";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16194,6 +16206,121 @@ function teachStepsAuto(scr){
        többinél elég a buborék meg a jelzés. HARD módban mind. */
     if(t.mode==="guided"&&!d.crit)continue;
     if(teachStepsStart(k))return;}}
+/* ================= A VEZETÉS BEÁLLÍTÁSAI =================
+   Eddig EGY kapcsoló volt, a karrier indításakor, és a „ne mutass több tippet"
+   után nem volt visszaút. Itt most négy fokozat áll, menet közben váltható,
+   plusz kategóriánkénti és témánkénti finomhangolás.
+
+   A NÉGY FOKOZAT NEM ugyanannak a dolognak a hangereje: mást-mást kapcsol.
+   Ezért van mindegyik mellé kiírva, mit jelent — egy „alacsony/közepes/magas"
+   csúszkából a felhasználó nem tudná, mit veszít. */
+const TEACH_MODE_INFO=[
+  {k:"hard",n:"🧭 Teljes vezetés",
+   d:"Vezetett bevezető minden fontos rendszerhez, tipp a döntések pillanatában, és halk jelzés, ha van elintézetlen dolgod."},
+  {k:"guided",n:"💡 Tippek és jelzések",
+   d:"Bevezető csak a visszafordíthatatlan döntéseknél. Mellette tipp a döntéseknél és halk jelzés."},
+  {k:"light",n:"🔔 Csak emlékeztetők",
+   d:"Magától egy szó sem: csak villogó keret ott, ahol tennivaló van. A „miért?” egy koppintásra elérhető."},
+  {k:"off",n:"⬜ Semmi",
+   d:"Tiszta felület, semmilyen jelzés. A fogalomtár a kezdőképernyő chipjeiről így is elérhető."}];
+const TEACH_GROUPS=[{k:"csapatepites",n:"Csapatépítés"},{k:"piac",n:"Piac és keret"},
+  {k:"hosszutav",n:"Hosszú táv"},{k:"meta",n:"Meta"}];
+function teachModeInfo(k){return TEACH_MODE_INFO.find(m=>m.k===k)||TEACH_MODE_INFO[0];}
+/* A LISTÁZOTT TÉMÁK: amelyeknek van tennivaló-figyelése vagy bevezetője. A 29
+   tiszta tipp NEM kap külön sort — azok egyszeriek, és harminc kapcsoló között
+   pont az veszne el, ami fontos. Ezek egy összevont soron állíthatók. */
+function teachListedTopics(){
+  return Object.keys(TEACH_TOPICS).filter(k=>{
+    const d=TEACH_TOPICS[k];
+    return !!(d&&(typeof d.due==="function"||(d.steps&&d.steps.length)));})
+    .sort((a,b)=>((TEACH_TOPICS[a].prio||50)-(TEACH_TOPICS[b].prio||50)));}
+function teachTopicStateLabel(key){
+  const t=teachStateObj(),d=TEACH_TOPICS[key];
+  const rec=(t&&t.topics[key])||{};
+  if(rec.muted)return {x:"🔕 elnémítva",c:"var(--dim2)"};
+  if(rec.snooze&&rec.snooze>teachNow())return {x:"⏳ elhalasztva",c:"var(--dim2)"};
+  let due=false;
+  try{due=typeof d.due==="function"&&(typeof d.ready!=="function"||d.ready())&&d.due();}catch(e){due=false;}
+  if(due)return {x:"● most esedékes",c:"var(--gold)"};
+  if((rec.st||0)>=2)return {x:"✓ lezárt",c:"var(--grass)"};
+  if((rec.st||0)>=1)return {x:"tanítva",c:"var(--dim)"};
+  return {x:"még nem került elő",c:"var(--dim2)"};}
+/* A HUB-menü „Vezetés" almenüje. A stíluspanel mintájára: a törzsét ez tölti
+   fel, és a renderHub minden rajzolásnál frissíti. */
+function renderTeachPanel(){
+  const box=$("hubTeachBody");if(!box)return;
+  const sub=$("hubTeachSub");
+  const t=teachStateObj();
+  if(!t){box.innerHTML="";return;}
+  if(sub)sub.textContent=teachModeInfo(t.mode).n.replace(/^\S+\s/,"").toLowerCase();
+  let h=`<div style="font-size:12px;color:var(--dim);line-height:1.5;margin-bottom:8px">
+    Ez dönti el, mennyit magyaráz a játék. Bármikor átállítható, és a döntésed a karrieredhez tapad.</div>`;
+  /* ---- a négy fokozat ---- */
+  TEACH_MODE_INFO.forEach(m=>{
+    const on=t.mode===m.k;
+    h+=`<button class="tchMode" data-m="${m.k}" style="display:block;width:100%;text-align:left;margin-bottom:7px;
+      padding:10px 11px;background:var(--panel2);border:1px solid ${on?"var(--gold)":"var(--line)"};
+      border-radius:9px;cursor:pointer;font-family:inherit;color:var(--ink)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;font-weight:700">${esc(m.n)}</span>
+        ${on?'<span style="font-size:11px;color:var(--gold)">✓ ez az aktív</span>':""}</div>
+      <div style="font-size:11.5px;color:var(--dim);margin-top:2px;line-height:1.45">${esc(m.d)}</div></button>`;});
+  if(t.mode!=="off"){
+    /* ---- kategóriák ---- */
+    const used=TEACH_GROUPS.filter(g=>teachListedTopics().some(k=>TEACH_TOPICS[k].grp===g.k));
+    if(used.length){
+      h+=`<div style="font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:var(--gold);
+        font-weight:700;margin:12px 0 5px">Miről tanítson</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">`;
+      used.forEach(g=>{
+        const off=!!(t.grpOff&&t.grpOff[g.k]);
+        h+=`<button class="tchGrp" data-g="${g.k}" style="font-size:11.5px;padding:4px 9px;border-radius:7px;
+          border:1px solid ${off?"var(--line)":"var(--gold)"};background:${off?"transparent":"rgba(255,210,74,.12)"};
+          color:${off?"var(--dim2)":"var(--ink)"};cursor:pointer;font-family:inherit">${off?"○":"●"} ${esc(g.n)}</button>`;});
+      h+=`</div>`;}
+    /* ---- témánként ---- */
+    h+=`<div style="font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:var(--gold);
+      font-weight:700;margin:12px 0 5px">Témák</div>`;
+    teachListedTopics().forEach(k=>{
+      const d=TEACH_TOPICS[k],st=teachTopicStateLabel(k),rec=(t.topics[k]||{});
+      const grpOff=!!(d.grp&&t.grpOff&&t.grpOff[d.grp]);
+      h+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px dashed var(--line);${grpOff?"opacity:.5":""}">
+        <span style="flex:1;min-width:0">
+          <span style="font-size:12.5px;font-weight:600">${esc(d.n||k)}</span><br>
+          <span style="font-size:11px;color:${st.c}">${esc(st.x)}${grpOff?" · a kategória kikapcsolva":""}</span></span>
+        <button class="tchTopic" data-k="${esc(k)}" style="font-size:11px;padding:4px 8px;border-radius:6px;
+          border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;font-family:inherit">
+          ${rec.muted?"Vissza":"Némítás"}</button></div>`;});
+    /* ---- az egyszeri tippek összevonva ---- */
+    const tipIds=Object.keys(GUIDE_TIPS),seen=tipIds.filter(id=>S.guideSeen&&S.guideSeen[id]).length;
+    h+=`<div style="font-size:11.5px;color:var(--dim);line-height:1.5;margin-top:10px;padding-top:7px;border-top:1px dashed var(--line)">
+      Az egyszeri tippekből <b>${seen}/${tipIds.length}</b> került már elő. Ezek a döntések pillanatában szólalnak meg, karrierenként egyszer.</div>`;}
+  h+=`<button id="tchReset" style="width:100%;margin-top:10px;font-size:12px;padding:7px 0;border-radius:8px;
+    border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;font-family:inherit">
+    ↻ Vezess újra végig — minden téma elölről</button>`;
+  box.innerHTML=h;
+  const again=()=>{renderTeachPanel();try{teachNudgeRescan();}catch(e){}};
+  box.querySelectorAll(".tchMode").forEach(b=>b.onclick=()=>{
+    teachSetMode(b.getAttribute("data-m"));again();});
+  box.querySelectorAll(".tchGrp").forEach(b=>b.onclick=()=>{
+    const g=b.getAttribute("data-g");
+    t.grpOff=t.grpOff||{};
+    if(t.grpOff[g])delete t.grpOff[g];else t.grpOff[g]=1;
+    teachSave();again();});
+  box.querySelectorAll(".tchTopic").forEach(b=>b.onclick=()=>{
+    const rec=teachTopicRec(b.getAttribute("data-k"));
+    if(!rec)return;
+    if(rec.muted){delete rec.muted;delete rec.snooze;}else rec.muted=1;
+    teachSave();again();});
+  {const r=$("tchReset");
+   if(r)r.onclick=()=>askConfirm({title:"Kezdjük elölről a vezetést?",yes:"Igen, elölről",
+     html:`<div style="font-size:13px;line-height:1.55">Minden téma visszaáll arra, mintha még sosem találkoztál volna vele: a bevezetők, a tippek és a jelzések újra elő fognak jönni.<br><br>
+       <span style="color:var(--dim)">A némításokat és a halasztásokat is törli.</span></div>`,
+     onYes(){
+       t.topics={};t.grpOff={};delete t.lastSteps;
+       S.guideSeen={};S.staffIntroDone=false;
+       teachSave();again();
+       addLine("🧭 A vezetés elölről kezdődik — minden téma újra elő fog jönni.","m ev");}});}}
 /* ================= KEZDŐLAP-IDÉZET ================= */
 const HU_FOOTBALL_QUOTES=[
  {t:"Kis pénz, kis foci, nagy pénz, nagy foci.",a:"Puskás Ferenc"},
@@ -16358,13 +16485,17 @@ $("familyNameMode")&&($("familyNameMode").onchange=()=>{
   renderFamilyNameInputs();});
 /* GUIDE MÓD kapcsoló. A választás a beginNewGame-ben kerül az S-be — addig egy
    modulszintű változó tartja, mint a többi beállítás.
-   AZ ALAPÉRTÉK IGAZ: a beállító képernyőn a „Vezess végig" a kiválasztott gomb,
-   és ennek a kettőnek egyeznie KELL — különben az érintetlenül hagyott
-   képernyő mást ígér, mint amit a karrier kap. */
-let guideWanted=true;
+   AZ ALAPÉRTÉK A TELJES VEZETÉS: a beállító képernyőn ez a kiválasztott gomb,
+   és a kettőnek egyeznie KELL — különben az érintetlenül hagyott képernyő mást
+   ígér, mint amit a karrier kap.
+   A `guideWanted` a TIPPEK régi, logikai kapcsolója maradt (a beginNewGame az
+   S.guideOn-hoz használja); a négy fokozatot a guideWantedMode tartja. */
+let guideWantedMode="hard",guideWanted=true;
 document.querySelectorAll("#guideGrid button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#guideGrid button").forEach(x=>x.classList.remove("sel"));
-  b.classList.add("sel");guideWanted=b.dataset.gd==="on";});
+  b.classList.add("sel");
+  guideWantedMode=b.dataset.gd;
+  guideWanted=(guideWantedMode==="hard"||guideWantedMode==="guided");});
 document.querySelectorAll("#careerStartGrid button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#careerStartGrid button").forEach(x=>x.classList.remove("sel"));
   b.classList.add("sel");careerStart=b.dataset.cs;
@@ -16891,7 +17022,7 @@ function beginNewGame(){
      ott nem is létezik. A HALK JELZÉS viszont igen: ami ott is értelmes
      (felállás, taktika, csere), azt ugyanúgy jelezheti. */
   S.teach=teachDefaults();
-  S.teach.mode=(gameMode==="career")?(guideWanted?"hard":"light"):"light";
+  S.teach.mode=(gameMode==="career")?guideWantedMode:"light";
   /* A Rating alapja a karrier INDULÁSAKOR rögzül: draftnál a globális
      kapcsolóból, kész klubnál kötelezően szezon-alapra. */
   lockCareerRatingBasis();
@@ -39079,6 +39210,7 @@ function renderHub(){
   styleScan();               /* a stílus SAJÁT mérföldkövei — ugyanaz a ritmus */
   renderMilestones();
   renderStylePanel();        /* a csapatstílus sávja: választható-e, mi lett belőle */
+  renderTeachPanel();        /* a vezetés kapcsolói — futó karrierben is állítható */
   renderHubInfo();           /* az Infó fül: látszik-e, mi van benne, nyitva van-e */
 
   /* SZEZON KÖZBEN a HUB bármikor megnyitható, de az átigazolás nem elérhető —

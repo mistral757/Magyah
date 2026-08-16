@@ -16,8 +16,8 @@
 | **F1** — regisztrátum, a mai tippek befűzve | ✅ kész |
 | **F2** — 3. szint: halk jelzések | ✅ kész |
 | **F3** — 2. szint: vezetett lépéssor (inline + overlay) | ✅ kész |
-| F4 — beállítóképernyő | következik |
-| F5 — tartalomcsomagok (A–D) | — |
+| **F4** — beállítóképernyő | ✅ kész |
+| F5 — tartalomcsomagok (A–D) | következik |
 | F6–F8 | — |
 
 **Eldöntött kérdések** (a 8. szakasz nyitott kérdéseiből):
@@ -291,10 +291,16 @@ nyereség), **C** = optimalizálás.
 
 * A `#guideGrid` kétgombos választója **négygombosra** nő (hard / vezetett /
   csak emlékeztetők / semmi), rövid magyarázattal.
-* **Új: futó karrierben is állítható** — a `#themeModal` beállítóablakba egy
-  „Vezetés" szekció: mód + kategória-kapcsolók + „Elfelejtett témák
-  visszaállítása" + egy lista a 25 témáról (állapot: ismeretlen / tanítva /
-  lezárt, egyenkénti ki-be).
+* **Új: futó karrierben is állítható** — mód + kategória-kapcsolók + „Vezess
+  újra végig" + egy lista a témákról (állapot: még nem került elő / tanítva /
+  lezárt / most esedékes, egyenkénti némítás és visszakapcsolás).
+
+  **Eltérés a tervtől:** ez nem a `#themeModal` beállítóablakba került, hanem a
+  **HUB-menü „🧭 Vezetés" almenüjébe**. Ok: a beállítóablak kizárólag a
+  kezdőlapról nyílik, ahol nincs futó karrier — egy ott állított mód semmire
+  nem hatna, a következő új játék pedig úgyis felülírná a beállító képernyőről.
+  A vezetés a karrier állapota, tehát oda való, ahol a karrier többi kapcsolója
+  van.
 * **Ez pótol egy mai hiányt:** ma a „Ne mutass több tippet" **végleges** — nincs
   visszaút.
 * **Kész, ha:** minden mód menet közben váltható, és azonnal hat.
