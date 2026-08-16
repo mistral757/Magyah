@@ -18,8 +18,9 @@
 | **F3** — 2. szint: vezetett lépéssor (inline + overlay) | ✅ kész |
 | **F4** — beállítóképernyő | ✅ kész |
 | **F5/A** — csapatépítés (1, 2, 3, 4, 7, 8, 9, 24) | ✅ kész |
-| F5/B — piac | következik |
-| F5/C — hosszú táv · F5/D — meta | — |
+| **F5/B** — piac (5, 6, 13, 14, 15, 16, 17) | ✅ kész |
+| F5/C — hosszú táv | következik |
+| F5/D — meta | — |
 | F6–F8 | — |
 
 **Eldöntött kérdések** (a 8. szakasz nyitott kérdéseiből):
@@ -316,7 +317,7 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
 | csomag | témák | megjegyzés |
 |---|---|---|
 | **A — csapatépítés** ✅ | 1, 2, 3, 4, 7, 8, 9, 24 | a legnagyobb hatás: itt dől el a meccs |
-| **B — piac** | 5, 13, 14, 15, 16, 17, 6 | a `due()`-k itt a legdrágábbak, cache kell |
+| **B — piac** ✅ | 5, 13, 14, 15, 16, 17, 6 | lásd a lenti két megjegyzést |
 | **C — hosszú táv** | 18, 19, 20, 21, 22, 23 | java már megvan L1-en, `steps` és `nudge` hiányzik |
 | **D — meta** | 10, 11, 12, 25 | részben megvan, kiegészítés |
 
@@ -336,6 +337,26 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
    a téma sosem kap keretet (a horgony nem látszik), tehát a feladás-számláló
    sem lép — és örökké jelezne. Az A csomagban ezért kapott emojit a felállás,
    a taktika és a cserék.
+
+**A B csomag két megjegyzése:**
+
+3. **A cache nem kellett.** A terv drága `due()`-kat várt a piaci témáktól. A
+   valóságban a legdrágább is egy ~25 fős keret végigjárása (`teachBenchBetter`,
+   `teachMisfit`), rajzolásonként négyszer — ez nagyságrendekkel a mérhetőség
+   alatt van. A 6.2 pont cache-e ezért **nem épült meg**: ha egy későbbi téma
+   tényleg drága predikátumot kér, akkor kerül elő, nem előre.
+4. **Két téma egy pillanatban nem baj, ha két KÜLÖNBÖZŐ kiutat kínál.** Tele
+   kereten a „sale:routes" és a „roster:expand" együtt szólal meg — az egyik
+   eladással, a másik bővítéssel old ugyanazon a szoruláson. Ez nem ütközés,
+   hanem választék; a hármas telítettség-korlát pedig kordában tartja.
+   *Az ütközés az, amikor két téma UGYANARRA a megoldásra mutat* — ezt oldotta
+   fel az A csomagban a `teachMisfit`.
+5. **Az „ifi felvétele vagy akadémián tartása" nem jelzés-téma, hanem tipp.**
+   Egy itt-és-most választás, ami után nem marad tennivaló, amire villogni
+   lehetne. Ezért a döntés pillanatában szólal meg a tipp-motoron
+   (`ev:academy`), és nincs `due()`-ja. **Általános szabály:** ami egy modális
+   döntés pillanata, az tipp; ami a képernyőn ottmaradó elintézetlenség, az
+   jelzés.
 
 ### F6 — A karmester finomhangolása
 
