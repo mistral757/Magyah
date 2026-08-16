@@ -3024,7 +3024,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.25";
+const APP_VERSION="3.3.26";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -15754,6 +15754,11 @@ $("guideTipOff")&&($("guideTipOff").onclick=()=>{
 const TEACH_MODES=["hard","guided","light","off"];
 const TEACH_NUDGE_MAX=3;      /* egyszerre legfeljebb ennyi jelzés egy képernyőn */
 const TEACH_SNOOZE_ROUNDS=3;  /* a „Most nem" ennyi fordulóra hallgattat el */
+/* Ennyi SZEZONON át jelezhet egy téma úgy, hogy nem történik semmi — utána
+   magától elhallgat. A felhasználó nemet mondhat hallgatással is; egy jelzés,
+   amit három éven át figyelmen kívül hagytak, már nem emlékeztet, csak zajong.
+   A beállításokban ettől még bármikor visszakapcsolható. */
+const TEACH_GIVEUP=3;
 /* Egy monoton növő fordulószámláló a türelmi időkhöz. Ugyanaz a képlet, mint a
    piaci ajánlatoknál (saleCareerRound) — nincs értelme két külön időnek. */
 function teachNow(){return (((S&&S.seasonNumber)||1)-1)*30+((S&&S.idx)||0);}
@@ -15868,12 +15873,121 @@ const TEACH_TOPICS={
       {a:"hubTrainingBtn",
        t:"Fiatalon a legolcsóbb",
        x:"A hatás korfüggő: 21 év alatt <b>kétszeres</b>, 25 alatt 1,6-szoros, 30 fölött már csak 0,4-szeres.<br><br>Egy képesség a poszt-profiljához képest +30-ig specializálható. A Rating-hozam közben csökken, a <b>taktika-illeszkedésben viszont teljes értékkel</b> számít — így lesz egy középpályásból igazi passzmester a Labdatartáshoz, anélkül hogy a Ratingje elszaladna."}]},
+  /* ================= A CSAPAT: AMI A MECCSEN FIZET =================
+     Ez a négy téma azért van egy csoportban, mert mind ugyanarra a kérdésre
+     felel: a kereted TUDÁSÁBÓL mennyi jut el a pályára. Egy idegen poszton álló
+     ember, egy alapon hagyott megbízás vagy egy nem illeszkedő taktika mind
+     ugyanazt csinálja — elveszi azt, amiért már fizettél. */
+  "pos:wrong":{n:"Játékos idegen poszton",grp:"csapatepites",scr:"hub",prio:25,
+    a:"hubRoster",g:"posztfit",
+    why:"Van a kezdő tizenegyedben valaki, aki nem a saját posztján áll — és van a keretedben olyan ember, aki oda való.",
+    ready(){return teachInCareer();},
+    due(){const m=teachMisfit();return !!(m&&m.fixable>0);},
+    steps:[
+      {a:"hubRoster",
+       t:"Valaki idegen poszton áll",
+       x:"A saját posztján mindenki <b>teljes értékű</b>; idegen poszton <b>0,93-as</b> hatásfokkal játszik. Ez nem tilos — csak minden meccsen fizetsz érte.<br><br>És most van a keretedben olyan ember, aki oda való: egy csere ingyen visszaadja a különbséget."},
+      {a:"hubRoster",
+       t:"Két megoldás van",
+       x:"<b>Csere:</b> koppints a játékosra a listában, és cseréld a helyét azzal, aki oda való. Ingyenes, azonnali.<br><br><b>Poszt-tanulás:</b> ha valaki tartósan idegen poszton kell hogy játsszon, megtanulhatja azt a posztot. Fizetni előre kell (5–10 ezer Ft), és meccsről meccsre halad — 21 év alatt kb. 9 meccs. A végén teljes értékű lesz ott is, és a <b>régi posztjait megtartja</b>."}]},
+  "form:shape":{n:"A felállás nem illik a kerethez",grp:"csapatepites",scr:"hub",prio:35,
+    mark:"📋",
+    a:"hubFormationBtn",g:"posztfit",
+    why:"Több helyen is idegen poszton álló ember játszik, és nincs a keretedben, aki oda való lenne — ilyenkor nem egy embert kell cserélni, hanem a felállást.",
+    ready(){return teachInCareer();},
+    due(){const m=teachMisfit();return !!(m&&m.bad>=2&&m.fixable===0);},
+    steps:[
+      {a:"hubFormationBtn",pre(){teachRevealInMenu();},
+       t:"Nem az ember a hiba, hanem az alakzat",
+       x:"Több poszton is olyan ember áll, aki nem oda való — és <b>nincs a keretedben</b>, akivel kicserélhetnéd. Ilyenkor a felállás kér mást, mint amid van.<br><br>A felállás módosítása a keretet <b>poszthűen újrarendezi</b>: olyan alakzatot válassz, amilyen emberekkel tényleg rendelkezel."},
+      {a:"hubFormationBtn",
+       t:"És ami vele jár",
+       x:"Az alakzat a <b>taktikád illeszkedésén</b> is látszik, és a középpálya összetételén keresztül a csapat tengelyein is.<br><br>Nem kell félni tőle: a váltás ingyenes, és bármikor visszaállítható."}]},
+  "mid:role":{n:"Megbízás a középpályán",grp:"csapatepites",scr:"hub",prio:38,
+    a:"hubRoster",g:"megbizas",
+    why:"A középpályásaid mind alapbeállításon állnak. A megbízás ingyenes, bármikor átállítható — és valódi tétje van.",
+    ready(){return teachInCareer();},
+    due(){
+      try{
+        const r=S.roles;
+        if(r&&r.map&&Object.keys(r.map).length)return false;   /* már nyúlt hozzá */
+        if(typeof isMidRoleSlot!=="function"||!FORMS[form])return false;
+        return FORMS[form].slots.some((p,i)=>isMidRoleSlot(form,i));
+      }catch(e){return false;}},
+    steps:[
+      {a:"hubRoster",
+       t:"🧭 Megbízás — a középpálya szerepei",
+       x:"A kezdő tizenegy középső középpályásainál a játékos lapján van egy negyedik gomb: <b>🧭 Megbízás módosítása</b>. Itt döntöd el, hogy az az ember <b>védekező</b>, <b>klasszikus</b> vagy <b>támadó</b> megbízást kap.<br><br>Ingyenes, bármikor átállítható, és senki nem mozdul a helyéről tőle."},
+      {a:"hubRoster",
+       t:"Miért nem mindegy",
+       x:"A védekező megbízás a csapat <b>Védekezés-tengelyét</b> emeli a Gólszerzés rovására, a támadó pontosan fordítva.<br><br>Vagyis a taktikád illeszkedésén is meglátszik: ugyanaz a tizenegy más rendszerhez passzol attól függően, milyen megbízásokat osztottál ki."}]},
+  "tactic:change":{n:"Taktika a szezon elején",grp:"csapatepites",scr:"hub",prio:28,
+    mark:"⚙️",
+    a:"hubTacticsBtn",g:"taktika",
+    why:"Új szezon kezdődik — most állíthatod át a rendszert a legkevesebbért.",
+    ready(){return teachInCareer();},
+    due(){return !!S.tacticPrompt;},
+    steps:[
+      {a:"hubTacticsBtn",pre(){teachRevealInMenu();},
+       t:"Most a legolcsóbb átállni",
+       x:"A taktika szintje meccsről meccsre nő, ha azt játszod — de csak <b>85-ös szinttől</b> ad valódi előnyt. Az edződ kedvelt rendszerei magasabbról indulnak (80/76/70), a többi 50-ről.<br><br>Ezért éri meg a szezon elején dönteni: egy évad alatt van idő felhúzni."},
+      {a:"hubTacticsBtn",
+       t:"Azt válaszd, amit a kereted TUD",
+       x:"A taktika illeszkedése a <b>játékosaid képességeiből</b> jön, nem a nevéből. Egy Labdatartás magas passzú középpályásokat kér, a Hosszú labdák mást.<br><br>A választónál minden rendszernél ott áll, mennyire illik a mostani keretedhez — nem kell találgatnod."}]},
+  "subs:live":{n:"Cserék a meccs alatt",grp:"csapatepites",scr:"hub",prio:45,
+    mark:"🔁",
+    a:"hubHalftimeSubsBtn",g:"cserek",
+    why:"A cserék ki vannak kapcsolva: a mérkőzéseid végigfutnak azzal a tizeneggyel, amivel kezdtek.",
+    ready(){return teachInCareer()&&((S.seasonNumber||1)>1||(S.idx||0)>=5);},
+    due(){return !S.halftimeSubs;},
+    steps:[
+      {a:"hubHalftimeSubsBtn",pre(){teachRevealInMenu();},
+       t:"Egy kapcsoló, három csere",
+       x:"Bekapcsolva mérkőzésenként <b>három cseréd</b> van, és a meccs félidőben meg is állhat, hogy kézzel nyúlj bele. A meccsnézet alján lévő gombbal egyébként bármelyik percben cserélhetsz, amíg van kereted.<br><br>A cserepadod eddig is ott ült — enélkül csak nem játszott."},
+      {a:"hubHalftimeSubsBtn",
+       t:"Vagy tervezd meg egyszer, és fusson magától",
+       x:"A beállító ablakban <b>feltételes szabályokat</b> is írhatsz: „a 70. perctől, ha vesztésre állunk, jöjjön be a csatár\". A meccs magától végrehajtja őket.<br><br>Egy terv van, és <b>minden mérkőzésedre</b> érvényes — bajnokira, kupára, párharcra és a végigjátszott szezonra is."}]},
   "sys:token":{n:"Beváltatlan ajándék",grp:"meta",scr:"hub",prio:20,mark:"🎁",
     a:"hubTokenGroup",
     why:"Van beváltatlan ajándékod — ingyen boost vagy ingyen igazolás. Nem jár le, de amíg ott ül, nem dolgozik a keretedért.",
     ready(){return gameMode==="career";},
-    due(){const g=$("hubTokenGroup");return !!(g&&!g.classList.contains("hide"));}}
+    due(){const g=$("hubTokenGroup");return !!(g&&!g.classList.contains("hide"));}},
+  /* AZ ÖLTÖZŐ a MECCS képernyőjén lakik, nem a HUB-ban — ezért `scr:"match"`.
+     Bevezetőt nem kap: a napló magától olvasható, amint egyszer megnyitod. Amit
+     nem tud magától, az az, hogy EGYÁLTALÁN van ott valami új. */
+  "locker:new":{n:"Öltöző",grp:"csapatepites",scr:"match",prio:50,
+    a:"lockerBtn",
+    why:"Új bejegyzés van az öltözői naplóban. A keret hangulata a meccsen kívül is él — és a morál minden mérkőzésen ott van a gólvárhatóságban.",
+    ready(){return teachInCareer();},
+    due(){
+      const t=teachStateObj(),rec=(t&&t.topics["locker:new"])||{};
+      return ((S.lockerLog||[]).length>(rec.seenN||0));}}
 };
+/* ---- KÖZÖS SEGÉD: KI ÁLL IDEGEN POSZTON? ----
+   Két téma épül rá, és a felosztás tudatos, hogy sose villogjon mindkettő
+   ugyanarra:
+     · ha van a keretben NATÍV ember arra a posztra → a KERET a megoldás
+       (csere a listában vagy poszt-tanulás) — ez a „pos:wrong";
+     · ha nincs, és több helyen is így áll → nem egy ember a hiba, hanem a
+       FELÁLLÁS kér mást, mint amid van — ez a „form:shape".
+   A számítás olcsó (11 hely × ~25 fős keret), és csak a HUB rajzolásakor fut. */
+function teachMisfit(){
+  if(typeof slots==="undefined"||!Array.isArray(slots)||!slots.length)return null;
+  const bad=slots.filter(s=>s&&s.player&&(s.fit||1)<1);
+  if(!bad.length)return {bad:0,fixable:0};
+  let roster=[];
+  try{roster=(fullCareerRoster()||[]).filter(Boolean);}catch(e){roster=[];}
+  const inXI={};
+  slots.forEach(s=>{if(s&&s.player)inXI[s.player.n]=1;});
+  let fixable=0;
+  bad.forEach(s=>{
+    if(roster.some(p=>p&&!inXI[p.n]&&(p.pos||[]).indexOf(s.pos)>=0))fixable++;});
+  return {bad:bad.length,fixable};}
+/* A karrier fut-e egyáltalán: draft közben a HUB-témák java értelmetlen (nincs
+   büdzsé, nincs menetrend, a keret még épül). */
+function teachInCareer(){
+  return gameMode==="career"&&!!careerPool
+    &&!(typeof phase!=="undefined"&&phase==="draft");}
 /* A HUB-menü kinyitása a „Mutasd meg" gombhoz. Ugyanazért nem a gomb click()-jét
    hívjuk, amiért a guide sem: az ragadt állapotban görget a nyitás HELYETT. */
 function teachRevealInMenu(){
@@ -15909,6 +16023,7 @@ function teachDueList(scr){
     if(t.grpOff&&d.grp&&t.grpOff[d.grp])return;
     const rec=t.topics[key];
     if(rec&&rec.muted)return;
+    if(rec&&(rec.n||0)>=TEACH_GIVEUP)return;   /* háromszor jelzett, nem történt semmi */
     if(rec&&rec.snooze&&rec.snooze>now)return;
     try{
       if(typeof d.ready==="function"&&!d.ready())return;
@@ -15939,13 +16054,27 @@ function teachNudgeScan(scr){
   _tNudgeScr=scr;
   if(teachMode()==="off")return;
   const L=$("tNudgeDots");if(!L)return;
+  const sn=(S&&S.seasonNumber)||1;
   teachDueList(scr).forEach(key=>{
-    if(_tNudge.length>=TEACH_NUDGE_MAX)return;   /* telítettség-védelem */
     const d=TEACH_TOPICS[key],el=d&&d.a?$(d.a):null;
     /* Ugyanaz a láthatóság-vizsgálat, mint a guide horgonyánál: a nulla magas
        vagy elrejtett elemre húzott keret csak zavarna. Ilyenkor a téma nem
        vész el — a menü-gomb emojija akkor is kint van. */
-    if(!el||!el.offsetParent||el.offsetHeight<=0)return;
+    const visible=!!(el&&el.offsetParent&&el.offsetHeight>0);
+    const room=_tNudge.length<TEACH_NUDGE_MAX;   /* telítettség-védelem */
+    /* A FELADÁS-SZÁMLÁLÓ akkor lép, ha a téma VALAMILYEN formában kint volt:
+       kerettel, vagy — csukott menü mögötti horgonynál — a menü-gomb emojijával.
+       Ez nem apróság: a HUB-menü témái (taktika, felállás, cserék) csukott
+       menüben SOSEM kapnak keretet, tehát a látható rajzoláshoz kötött számláló
+       náluk sosem lépne, és örökké jeleznének.
+       SZEZONONKÉNT EGYSZER lép, nem rajzolásonként: a HUB egy délután alatt is
+       húsz újrarajzolást lát, abból nem szabad „háromszor figyelmen kívül
+       hagyta" következtetést levonni. A mentés a HUB sajátjával jön — ez lágy
+       számláló, nem éri meg külön írni érte. */
+    if((visible&&room)||d.mark){
+      const rec=teachTopicRec(key);
+      if(rec&&rec.lastSeason!==sn){rec.lastSeason=sn;rec.n=(rec.n||0)+1;}}
+    if(!visible||!room)return;
     el.classList.add("tNudge");
     const dot=document.createElement("i");
     dot.className="tNudgeDot";dot.textContent="?";
@@ -16193,6 +16322,9 @@ function teachTick(scr){
 function teachStepsAuto(scr){
   const t=teachStateObj();
   if(!t)return;
+  /* VEZETÉS CSAK A HUB-BAN indul magától. A meccs képernyője feszes hely: ott a
+     halk jelzés a felső határ, egy felugró bevezető elvenné a mérkőzést. */
+  if(scr!=="hub")return;
   /* LIGHT és OFF módban nincs vezetés — a jelzés a felső határ. */
   if(t.mode!=="hard"&&t.mode!=="guided")return;
   if(_tSteps||_guideCur)return;          /* egyszerre EGY tanítás a képernyőn */
@@ -28638,6 +28770,11 @@ function playMatch(){
       $("kickBtn").disabled=false;
       $("kickBtn").textContent=kickBtnLabel();
       saveGame();
+      /* A MECCS UTÁNI nyugalmi pillanat: a képernyő megáll, a felhasználó
+         olvassa az eredményt. Itt frissülnek a meccs képernyőjének halk
+         jelzései (öltözői napló). Auto módban nem: ott senki nem nézi, és a
+         szezon végigfut. */
+      if(!S.auto){try{teachTick("match");}catch(e){}}
       /* A végigjátszás a párharcnál is TOVÁBBLÉP, csak nem vakon: a startRound
          ilyenkor a cserét indítja, és a lejátszás előtt kikapcsolja az autót. */
       if(S.auto)setTimeout(startRound,60);}
@@ -31947,6 +32084,12 @@ function renderLockerModal(){
   box.innerHTML=html;}
 $("lockerBtn")&&($("lockerBtn").onclick=()=>{
   renderLockerModal();
+  /* A napló ELOLVASVA: a jelzés innentől csak akkor tér vissza, ha ÚJ bejegyzés
+     születik. A számot itt jegyezzük fel, nem a bezáráskor — aki kinyitotta,
+     látta. */
+  try{const rec=teachTopicRec("locker:new");
+      if(rec)rec.seenN=(S.lockerLog||[]).length;
+      teachNudgeRescan();}catch(err){}
   $("lockerModal").classList.remove("hide");});
 $("lockerCloseBtn")&&($("lockerCloseBtn").onclick=()=>{$("lockerModal").classList.add("hide");});
 $("lockerModal")&&($("lockerModal").onclick=(ev)=>{if(ev.target.id==="lockerModal")$("lockerModal").classList.add("hide");});

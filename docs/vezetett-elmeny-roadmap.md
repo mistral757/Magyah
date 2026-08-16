@@ -17,7 +17,9 @@
 | **F2** — 3. szint: halk jelzések | ✅ kész |
 | **F3** — 2. szint: vezetett lépéssor (inline + overlay) | ✅ kész |
 | **F4** — beállítóképernyő | ✅ kész |
-| F5 — tartalomcsomagok (A–D) | következik |
+| **F5/A** — csapatépítés (1, 2, 3, 4, 7, 8, 9, 24) | ✅ kész |
+| F5/B — piac | következik |
+| F5/C — hosszú táv · F5/D — meta | — |
 | F6–F8 | — |
 
 **Eldöntött kérdések** (a 8. szakasz nyitott kérdéseiből):
@@ -313,7 +315,7 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
 
 | csomag | témák | megjegyzés |
 |---|---|---|
-| **A — csapatépítés** | 1, 2, 3, 4, 7, 8, 9, 24 | a legnagyobb hatás: itt dől el a meccs |
+| **A — csapatépítés** ✅ | 1, 2, 3, 4, 7, 8, 9, 24 | a legnagyobb hatás: itt dől el a meccs |
 | **B — piac** | 5, 13, 14, 15, 16, 17, 6 | a `due()`-k itt a legdrágábbak, cache kell |
 | **C — hosszú táv** | 18, 19, 20, 21, 22, 23 | java már megvan L1-en, `steps` és `nudge` hiányzik |
 | **D — meta** | 10, 11, 12, 25 | részben megvan, kiegészítés |
@@ -321,6 +323,19 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
 * **Kész, ha:** csomagonként végigjátszott 2 szezon, és minden téma legalább
   egyszer előjött a maga helyén, egyik sem félrehorgonyozva.
 * **Méret:** csomagonként ~400–600 sor (zömmel szöveg).
+
+**Az A csomag két tanulsága, ami a többire is áll:**
+
+1. **Két téma sosem villoghat ugyanarra.** A „rossz pozíció" és a „felállás"
+   ugyanabból a tényből indul (valaki idegen poszton áll), ezért a `due()`-k
+   szétválasztják: ha van a keretben natív ember arra a posztra, a **keret** a
+   téma (csere vagy poszt-tanulás); ha nincs, és több helyen is így áll, a
+   **felállás** kér mást, mint amid van. Egy közös segéd (`teachMisfit`)
+   számolja, a két predikátum ugyanabból dönt.
+2. **Aminek a horgonya a csukott menüben lakik, annak `mark` is kell.** Enélkül
+   a téma sosem kap keretet (a horgony nem látszik), tehát a feladás-számláló
+   sem lép — és örökké jelezne. Az A csomagban ezért kapott emojit a felállás,
+   a taktika és a cserék.
 
 ### F6 — A karmester finomhangolása
 
