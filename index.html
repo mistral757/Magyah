@@ -10395,8 +10395,24 @@ function budgetBreakdownHtml(){
      MOSTANI kezdő 11 egy meccsen és egy 34 meccses idényen — ez az a szám,
      amit a felhasználó a keret mellé tud tenni, mielőtt igazol. */
   const wPer=squadMatchWage();
-  if(wPer>0)
+  if(wPer>0){
     rows+=`<div class="bbRow"><span>💸 Fizetések (kezdő 11, ${WAGE_SEASON_MATCHES} meccs)</span><b class="down">−${fmtFt(Math.round(wPer*WAGE_SEASON_MATCHES))}</b></div>`;
+    /* ---- A BÉR BONTÁSA ----
+       A puszta végösszeg nem mondja meg, MIÉRT annyi. A három új tétel (top
+       sztár-felár, siker-béremelés, plafon) mind a lelátóhoz mért, tehát a
+       menedzsernek látnia kell őket a keret mellett — még mielőtt igazol. */
+    try{
+      const xi=[];slots.forEach(sl=>{if(sl&&sl.player)xi.push(sl.player);});
+      const W=matchWageBill(xi);
+      if(W.stars>0)
+        rows+=`<div class="bbRow"><span style="opacity:.75">…ebből ${W.stars} top sztár felára (a lelátó ${W.stars}/12-e)</span><b class="down">−${fmtFt(Math.round(W.starCost*WAGE_SEASON_MATCHES))}</b></div>`;
+      if(W.titles>0)
+        rows+=`<div class="bbRow"><span style="opacity:.75">…ebből ${W.titles} trófea béremelése (a lelátó ${W.titles}/9-e)</span><b class="down">−${fmtFt(Math.round(W.raise*WAGE_SEASON_MATCHES))}</b></div>`;
+      if(W.fan>0)
+        rows+=`<div class="bbRow"><span style="opacity:.75">…a lelátó bevételének <b>${Math.round(W.due/W.fan*100)}%-a</b>`
+          +` <span style="opacity:.8">(plafon ${W.good?"50% — sikeres idény után":"125%"})</span></span>`
+          +`<b class="${W.capped?"down":""}">${W.capped?"plafonon":""}</b></div>`;
+    }catch(e){}}
   return `<div class="budgetBreak" id="budgetBreak">
     <div class="bbHead"><span>Szezononkénti keret</span><b>${fmtFt(p.total)}</b></div>
     ${rows}
@@ -10527,12 +10543,153 @@ function playerMatchWage(p,scale){
   if(!isFinite(r)||r<=0)return 0;
   const sc=(scale!=null)?scale:WAGE_SCALE;
   return sc*WAGE_REF_PER_MATCH*Math.exp(WAGE_K*(r-WAGE_REF_RATING));}
+/* ================= A BÉR A LELÁTÓHOZ KÖTVE (3.3.18) =================
+   A BAJ, amit ez javít: egy sikeres idény után a bevétel DURVÁN elhúzott a
+   kiadástól. A bér a játékos Ratingjének exponenciális függvénye, a bevétel
+   viszont a szurkolótáboré — és a tábor a liga-sávokkal lépcsőzetesen ugrik.
+   A kettő nem tudott együtt haladni: a bér a lelátó bevételének ~38%-át vitte
+   NB I-ben, ~13%-át a Premier ligában, ~12%-át Infinityben. A klub gazdagodott,
+   a pénznek pedig nem volt hova folynia.
+
+   MOSTANTÓL A KIADÁS A BEVÉTELRE ÉRZÉKENY, három csatornán:
+
+     1. TOP SZTÁR-FELÁR. Egy klub 1-3 emberét EXTRÁN meg kell fizetni, és a
+        felár nem a Ratingből jön, hanem a LELÁTÓBÓL: fejenként a meccsenkénti
+        szurkolói bevétel 1/12-e. Aki a pályára lép közülük, azért fizetsz —
+        tehát a sztár pihentetése tényleg olcsóbb hét.
+     2. A SIKER BÉREMELÉST HOZ. A bajnoki cím és a kupagyőzelmek (KIZÁRÓLAG a
+        győzelmek) új szurkolókat hoztak; ennek az ára, hogy az öltöző is kéri
+        a részét. Trófeánként a meccsenkénti szurkolói bevétel 1/9-e épül be a
+        csapat bérbázisába — vagyis a béremelés PONTOSAN azzal a bevétellel
+        skálázódik, amit a siker termelt.
+     3. A MENEDZSERI FIZETÉS IS ÁTÜT. Aki a saját fizetését feltornászta
+        (S.salaryMod), annak a bérszámfejtése is arányosan drágább — ugyanaz a
+        szorzó, ami a stílus-kategóriák árán ül.
+
+   ÉS KÉT KEMÉNY HATÁR, mert a rendszernek nem szabad se elszállnia, se
+   megfojtania azt, aki jól teljesít:
+
+     · AMÍG SIKERES VAGY — top 3 bajnoki helyezés a legutóbbi idényben, VAGY
+       elődöntő (top 4) egy európai sorozatban, VAGY magyar kupa-győzelem —,
+       a bér NEM haladhatja meg a szurkolói bevétel FELÉT. Ez garancia: a
+       sikeres klub sosem megy tönkre a saját béreitől.
+     · HA EGYIK SEM TELJESÜL, elengedjük a számok kezét: a bér ilyenkor
+       TÚLTERHELHETI a rendszert, egészen a szurkolói bevétel 125%-áig. Egy
+       hanyatló klub drága kerettel valóban vérzik — ez a rendszer foga. */
+const WAGE_STAR_SHARE=1/12;         /* egy top sztár meccs-felára a lelátóból */
+const WAGE_STAR_MAX=3;              /* ennél többet sosem fizetünk így */
+const WAGE_TITLE_SHARE=1/9;         /* egy megnyert trófea béremelése */
+const WAGE_CAP_GOOD=0.50;           /* sikeres klub: a lelátó fele a plafon */
+const WAGE_CAP_BAD=1.25;            /* sikertelen klub: 125% a plafon */
+const WAGE_STAR_RATING_EDGE=1.10;   /* +10% a keret átlaga fölött = kiemelkedő */
+const WAGE_STAR_CONTRIB_EDGE=2.0;   /* a termés az átlag ennyiszerese */
+const WAGE_STAR_MIN_MATCHES=5;      /* ennyi meccs alatt a termés még zaj */
+/* A MECCSENKÉNTI SZURKOLÓI BEVÉTEL — a felárak és a plafon KÖZÖS viszonyítási
+   alapja. Ugyanaz a szám, amit a lelátó ténylegesen fizet (fanMatchTick). */
+function wageFanRef(){
+  try{const v=fanWeeklyIncome();return (isFinite(v)&&v>0)?v:0;}catch(e){return 0;}}
+/* A MENEDZSERI FIZETÉS SZORZÓJA a bérszámfejtésen. Ugyanaz az idióma, mint a
+   stílus-kategóriák áránál (msCatSalaryMult): aki magának emeltetett, annak a
+   klubja is drágább lett. */
+function wageSalaryMult(){return Math.max(0.5,1+(S.salaryMod||0));}
+/* ---- KI A KLUB TOP SZTÁRJA? ----
+   Három út vezet ide, és BÁRMELYIK elég:
+     · a Ratingje SZÁZALÉKBAN kiemelkedik a keret átlagából (+10%),
+     · a termése (gól + gólpassz + bravúr mérkőzésenként) a keret átlagának
+       kétszerese — így a kapus bravúrjai és a védő gólpasszai is számítanak,
+     · a szezonkártyája Gyilkos vagy magasabb.
+   A rangsor a Rating, és LEGFELJEBB HÁRMAN kerülnek be: a felár mindig
+   legfeljebb három emberre szól. */
+function wageTopStars(){
+  /* A MÉRCE A JÁTSZÓ KERET (kezdő 11 + cserepad), NEM a teljes állomány. A
+     tartalék és az akadémia beleszámítva lehúzná az átlagot, és onnantól az
+     első csapat FELE „kiemelkedne" — a mérés elveszítené az értelmét. */
+  let R=[];
+  try{R=(currentRoster()||[]).filter(Boolean);}catch(e){R=[];}
+  if(!R.length){try{R=msRoster()||[];}catch(e){R=[];}}
+  if(!R.length)return [];
+  const ovrOf=p=>{try{return pOvrDisplay(p)||0;}catch(e){return (p&&p.ovr)||0;}};
+  const contribOf=p=>{
+    const c=(S.careerStats&&S.careerStats[p.n])||null;
+    if(!c||(c.matches||0)<WAGE_STAR_MIN_MATCHES)return null;
+    return ((c.g||0)+(c.a||0)+(c.saves||0))/c.matches;};
+  let killerRank=99;
+  try{killerRank=cardTierRank("killer");}catch(e){}
+  const ovrs=R.map(ovrOf).filter(v=>v>0);
+  const ovrAvg=ovrs.length?ovrs.reduce((a,b)=>a+b,0)/ovrs.length:0;
+  const cs=R.map(contribOf).filter(v=>v!=null);
+  const csAvg=cs.length?cs.reduce((a,b)=>a+b,0)/cs.length:0;
+  const out=[];
+  R.forEach(p=>{
+    const o=ovrOf(p);
+    const why=[];
+    if(ovrAvg>0&&o>=ovrAvg*WAGE_STAR_RATING_EDGE)why.push("Rating");
+    const c=contribOf(p);
+    if(c!=null&&csAvg>0&&c>=csAvg*WAGE_STAR_CONTRIB_EDGE)why.push("termés");
+    let rank=0;try{rank=cardTierRank(playerCardTier(p.n));}catch(e){}
+    if(rank&&rank>=killerRank)why.push("szezonkártya");
+    if(why.length)out.push({n:p.n,ovr:o,why});});
+  out.sort((a,b)=>b.ovr-a.ovr||(a.n<b.n?-1:1));
+  return out.slice(0,WAGE_STAR_MAX);}
+/* ---- HÁNY TRÓFEÁT NYERT A KLUB? ----
+   Bajnoki cím (1. hely) és kupagyőzelem — KIZÁRÓLAG a győzelmek. A második
+   hely és az elődöntő nem hoz béremelést, csak szurkolót. */
+function wageTitleCount(){
+  let n=0;
+  try{(S.seasonHistory||[]).forEach(h=>{
+    if(!h)return;
+    if(h.rank===1)n++;
+    if(h.euro&&h.euro.won)n++;});}catch(e){}
+  return n;}
+/* ---- SIKERES-E A KLUB ÉPP MOST? ----
+   A LEGUTÓBB LEZÁRT idény dönti el, és bármelyik feltétel elég:
+     · top 3 bajnoki helyezés,
+     · elődöntő (top 4) egy EURÓPAI sorozatban (a hazai kupa nem európai),
+     · a magyar kupa megnyerése.
+   Ez választja ki, melyik bér-plafon él. */
+function wageSuccessNow(){
+  const H=S.seasonHistory||[];
+  const h=H.length?H[H.length-1]:null;
+  if(!h)return false;
+  if((h.rank||99)<=3)return true;
+  const e=h.euro;
+  if(!e)return false;
+  if(e.comp==="MK")return !!e.won;
+  /* Európai sorozat: a győzelem, a döntő és az elődöntő mind top 4. */
+  const r=String(e.reached||"");
+  return !!e.won||r==="final"||r==="sf";}
+/* ---- A MECCS BÉRSZÁMFEJTÉSE ----
+   EGYETLEN belépési pont: a levonás és a HUB-előrejelzés ugyanezt hívja, tehát
+   a kiírt szám és a ténylegesen fizetett összeg nem tud elcsúszni. */
+function matchWageBill(players){
+  const list=(players||[]).filter(Boolean);
+  let base=0;
+  list.forEach(p=>{base+=playerMatchWage(p);});
+  base*=wageSalaryMult();
+  const fan=wageFanRef();
+  const starNames=new Set(wageTopStars().map(x=>x.n));
+  const stars=list.filter(p=>starNames.has(p.n)).length;
+  const starCost=fan*WAGE_STAR_SHARE*stars;
+  const titles=wageTitleCount();
+  const raise=fan*WAGE_TITLE_SHARE*titles;
+  const gross=base+starCost+raise;
+  const good=wageSuccessNow();
+  const cap=fan*(good?WAGE_CAP_GOOD:WAGE_CAP_BAD);
+  /* Lelátó nélkül (régi mentés, még nincs tábor) nincs mihez mérni: ilyenkor a
+     régi, tiszta alapbér él tovább, plafon nélkül. */
+  const due=(fan>0)?Math.min(gross,cap):gross;
+  return {base,starCost,raise,stars,gross,cap,due,fan,good,titles,
+    capped:fan>0&&gross>cap};}
 /* Egy szezon KERET-BÉRE előrejelzésként: a kezdő 11 egy meccsre. A HUB ezt
-   írja ki, hogy a fizetés ne csak a naplóban jelenjen meg. */
+   írja ki, hogy a fizetés ne csak a naplóban jelenjen meg. A teljes
+   bérszámfejtésből dolgozik (felárak és plafon együtt), nem csak az alapbérből
+   — különben az előrejelzés mást ígérne, mint amit a levonás elvisz. */
 function squadMatchWage(){
-  let sum=0;
-  try{slots.forEach(sl=>{if(sl&&sl.player)sum+=playerMatchWage(sl.player);});}catch(e){}
-  return sum;}
+  try{
+    const xi=[];
+    slots.forEach(sl=>{if(sl&&sl.player)xi.push(sl.player);});
+    return matchWageBill(xi).due;
+  }catch(e){return 0;}}
 /* ---- A BÉRMÉRŐ ----
    Szezononként egy sor: mennyi jött be, mennyi ment el bérre, hány pályára
    lépés volt, és mekkora volt a tábor. A bért KÉTFÉLEKÉPPEN tároljuk: a
@@ -10567,12 +10724,12 @@ function wageProbeNoteEndBudget(){
    ugyanaz a halmaz, amiből a meccs-statisztika is dolgozik. */
 function chargeMatchWages(players){
   if(gameMode!=="career"||!careerPool||!players||!players.length)return 0;
-  let due=0,raw=0;
-  players.forEach(p=>{
-    if(!p)return;
-    due+=playerMatchWage(p);
-    raw+=playerMatchWage(p,1);});
-  due=Math.round(due);raw=Math.round(raw);
+  /* A teljes bérszámfejtés EGY helyről (matchWageBill): alapbér a menedzseri
+     fizetéssel, top sztár-felár, siker-béremelés, és a végén a plafon. */
+  const W=matchWageBill(players);
+  let raw=0;
+  players.forEach(p=>{if(p)raw+=playerMatchWage(p,1);});
+  const due=Math.round(W.due);raw=Math.round(raw);
   const have=Math.max(0,S.transferBudget||0);
   const paid=Math.min(have,due),unpaid=due-paid;
   S.transferBudget=have-paid;
@@ -10580,9 +10737,21 @@ function chargeMatchWages(players){
   r.paid=(r.paid||0)+paid;r.raw=(r.raw||0)+raw;
   r.unpaid=(r.unpaid||0)+unpaid;r.apps=(r.apps||0)+players.length;
   try{
-    addLine(`💸 Fizetések: <b>−${fmtFt(paid)}</b> (${players.length} pályára lépés)`
+    /* A BONTÁS KIÍRVA. Egy összevont szám nem mondja meg, MIÉRT drágult a hét —
+       a felhasználónak pedig pont ezen kell tudnia változtatni (pihentesse a
+       sztárt, vagy vállalja). A plafont is kimondjuk, ha életbe lépett. */
+    const bits=[`${players.length} pályára lépés`];
+    if(W.stars>0)bits.push(`${W.stars} top sztár felára ${fmtFt(Math.round(W.starCost))}`);
+    if(W.titles>0)bits.push(`${W.titles} trófea béremelése ${fmtFt(Math.round(W.raise))}`);
+    addLine(`💸 Fizetések: <b>−${fmtFt(paid)}</b> (${bits.join(" · ")})`
       +(unpaid?` · <span style="color:var(--red)">${fmtFt(unpaid)} fedezetlen maradt</span>`:"")
       +` — a keret most ${fmtFt(S.transferBudget)}.`,"m skillnote");
+    if(W.capped)
+      addLine(`→ ${W.good
+        ?`A bér a lelátó bevételének <b>felénél</b> megállt (${fmtFt(Math.round(W.gross))} helyett ${fmtFt(Math.round(W.cap))}) — a sikeres klub nem megy tönkre a saját béreitől.`
+        :`A bér a lelátó bevételének <b>125%-ánál</b> állt meg (${fmtFt(Math.round(W.gross))} helyett ${fmtFt(Math.round(W.cap))}) — ennél többet a rendszer sem enged rátok.`}`,"m skillnote");
+    else if(W.fan>0&&!W.good&&due>W.fan)
+      addLine(`→ ⚠ A bér <b>többe kerül, mint amennyit a lelátó hoz</b> (${Math.round(due/W.fan*100)}%). Sikeres idény (top 3 bajnoki hely, európai elődöntő vagy magyar kupa) visszavinné a felére.`,"m skillnote");
   }catch(e){}
   return paid;}
 /* ================= JUTALOM-SKILLEK ================= */

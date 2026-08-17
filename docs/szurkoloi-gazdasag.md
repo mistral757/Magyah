@@ -101,6 +101,96 @@ A **Bérmérő** ehhez kapott új oszlopot: szezononként külön látszik a tel
 bevétel, abból a lelátóé, a bér, és a `bér/lelátó` arány — ez a hangolás
 mércéje.
 
+## 5b. A bér a lelátóhoz kötve (3.3.18)
+
+Az 5. szakasz hangolása egyetlen konstanssal (`WAGE_SCALE`) próbálta elérni,
+hogy a bér a szurkolói bevétel ~50%-át vigye. **Nem sikerülhetett**, és a mérés
+maga mondta ki, miért: a tábor a liga-sávokkal *lépcsőzetesen* ugrik, a bér
+viszont a Rating *exponenciális* függvénye — a kettő nem tud együtt haladni. A
+gyakorlatban a bér a lelátó bevételének ~38%-át vitte NB I-ben, ~13%-át a
+Premier ligában és ~12%-át Infinityben. Egy sikeres idény után a bevétel durván
+elhúzott a kiadástól: a klub gazdagodott, a pénznek pedig nem volt hova
+folynia.
+
+**A megoldás nem újabb hangolás, hanem új csatornák: a kiadás mostantól
+közvetlenül a bevételre érzékeny.**
+
+### Három új tétel a bérszámfejtésben
+
+| # | Tétel | Mérték | Mihez kötött |
+|---|---|---|---|
+| 1 | **Top sztár-felár** | fejenként a meccsenkénti szurkolói bevétel **1/12-e**, legfeljebb 3 emberre | a lelátóhoz |
+| 2 | **Siker-béremelés** | megnyert trófeánként a meccsenkénti szurkolói bevétel **1/9-e** | a lelátóhoz |
+| 3 | **Menedzseri fizetés** | `1 + S.salaryMod` szorzó az alapbéren | a saját fizetésedhez |
+
+**1. Top sztár-felár.** Egy klub 1-3 emberét extrán meg kell fizetni, és a felár
+nem a Ratingből jön, hanem a **lelátóból**. Aki a pályára lép közülük, azért
+fizetsz — a sztár pihentetése tényleg olcsóbb hét, pontosan úgy, ahogy az
+alapbér is a játékidőhöz kötött.
+
+Top sztár az, akire **bármelyik** igaz (`wageTopStars`):
+
+* a Ratingje **százalékban** kiemelkedik a *játszó keret* (kezdő 11 + cserepad)
+  átlagából — legalább **+10%**;
+* a **termése** — gól + gólpassz + bravúr mérkőzésenként — a keret átlagának
+  **kétszerese** (legalább 5 lejátszott meccs után, hogy ne zaj legyen); így a
+  kapus bravúrjai és a védő gólpasszai is számítanak;
+* a **szezonkártyája Gyilkos vagy magasabb**.
+
+A rangsor a Rating, és **legfeljebb hárman** kerülnek be. A mérce szándékosan a
+játszó keret, nem a teljes állomány: a tartalék és az akadémia beleszámítva
+lehúzná az átlagot, és onnantól az első csapat fele „kiemelkedne".
+
+**2. Siker-béremelés.** A bajnoki cím és a kupagyőzelmek (**kizárólag** a
+győzelmek — a második hely és az elődöntő nem) új szurkolókat hoztak; ennek az
+ára, hogy az öltöző is kéri a részét. Trófeánként a meccsenkénti szurkolói
+bevétel 1/9-e épül be a bérbázisba — vagyis a béremelés **pontosan azzal a
+bevétellel skálázódik, amit a siker termelt**.
+
+### A két kemény határ
+
+A rendszernek nem szabad se elszállnia, se megfojtania azt, aki jól teljesít:
+
+* **Amíg sikeres vagy**, a bér **nem haladhatja meg a szurkolói bevétel felét**.
+  Sikeres az a klub, amelyiknél a legutóbb lezárt idényben **bármelyik** igaz:
+  top 3 bajnoki helyezés · elődöntő (top 4) egy **európai** sorozatban · a
+  **magyar kupa** megnyerése. Ez garancia: a sikeres klub sosem megy tönkre a
+  saját béreitől.
+* **Ha egyik sem teljesül**, elengedjük a számok kezét: a bér ilyenkor
+  túlterhelheti a rendszert, egészen a szurkolói bevétel **125%-áig**.
+
+A második pont nem *felnyomja* a bért, hanem *leveszi róla a féket*: a valódi
+költség látszik. Aki csak egy jó idényt futott, ott a nyers számok úgyis a
+plafon alatt vannak — aki viszont hosszú éveken át halmozta a trófeákat, annak
+a bérbázisa akkor is ott marad, amikor az eredmények elmaradnak. **Ez a rendszer
+foga:** a siker felépít egy bérterhet, és a hanyatlás azzal együtt jön.
+
+### Mérve
+
+Valósághű kereten (kezdő 11: 78-92, cserepad 74-80, 30 000 fős tábor,
+34 mérkőzéses idény):
+
+| helyzet | szurkolói bevétel | bér | arány |
+|---|--:|--:|--:|
+| bajnokként (1 trófea) | 6 120 | 3 060 | **50%** — plafonon |
+| 11. helyen (1 trófea) | 4 896 | 2 750 | 56% |
+| 3 trófeával, sikeresen | 6 426 | 3 213 | **50%** — plafonon |
+| 8 trófea után bukó idény (Premier líg) | — | — | **113%** |
+| Infinity-keret kis táborral | — | — | **125%** — plafonon |
+
+A régi, tisztán Rating-alapú bér ugyanezeken a pontokon 12-38% között mozgott.
+
+### Visszafelé kompatibilitás
+
+Ahol nincs szurkolótábor (régi mentés, még nem futott `fanCaptureStart`), a
+`wageFanRef()` nullát ad, és **a régi, tiszta alapbér él tovább, plafon
+nélkül** — se felár, se béremelés, se határ. Egy futó gazdaságot nem árazunk át
+visszamenőleg.
+
+A `WAGE_SCALE` és a Bérmérő **változatlan**: az alapbér képlete nem mozdult, és
+a mérő `bér/lelátó` oszlopa most is a hangolás mércéje — csak mostantól a
+plafonok is látszanak rajta.
+
 ## 6. Kihívás-tétek
 
 A szurkoló-tétek a heti gazdasághoz igazodtak: jutalomként **5-25 ezer**
