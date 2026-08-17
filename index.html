@@ -3106,7 +3106,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.39";
+const APP_VERSION="3.3.40";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -25714,6 +25714,10 @@ function h2hWireSnapshot(){
        kliensnél mindkettő hiányzik — a szimuláció ilyenkor a régi viselkedést
        adja (nincs csere, a piros lap marad helyi dobás). */
     plan:_wirePlan,
+    /* ---- A SZEZON-SZEREPEK KIOSZTÁSA ----
+       A kockázati feléjük (roleRiskMult a piroslap-súlyban, roleRiskTeamP a
+       redP-ben) már itt van; ez a gólos felük útja. Lásd h2hWireRoles. */
+    roles:h2hWireRoles(),
     redP:SIM.REDP/18*(_redT0>0?_redT1/_redT0:1)*styleRedMult()*roleRiskTeamP(MS.active,-1),
     formName:(MS.active[MS.gi]&&MS.active[MS.gi].p.n)||null,
     weakName:(MS.active[MS.bi]&&MS.active[MS.bi].p.n)||null,
@@ -25734,14 +25738,118 @@ function h2hWireSnapshot(){
       results:(S.fixtureResults||[]).filter(fr=>!fr.duel).map(fr=>{
         const n=(fr.o&&fr.o.n!==undefined)?String(fr.o.n):String(fr.o||"");
         return {i:SEASON_OPPS.findIndex(o=>o.n===n),n,gf:fr.gf,ga:fr.ga};})}};}
-/* Súlyozott választás egy pillanatkép játékosai közül. */
-function h2hPick(players,key,rnd){
+/* Súlyozott választás egy pillanatkép játékosai közül.
+   A `mul` egy OPCIONÁLIS súlyszorzó (játékos → szám): a pillanatkép gól- és
+   gólpassz-súlya a KEZDŐRÚGÁS képe, a szezon-szerepek viszont a meccs
+   állásától és percétől függenek — azt csak itt, a választás pillanatában
+   lehet beszámítani. Elhagyva a viselkedés betűre a régi.
+   A VÉLETLEN-FOGYASZTÁS VÁLTOZATLAN: mindkét ág pontosan egy R() hívás, és a
+   szorzók sosem nullák, tehát a tot>0 ág sem billen át. */
+function h2hPick(players,key,rnd,mul){
   const R=rnd||Math.random;
-  let tot=0;players.forEach(p=>{tot+=Math.max(0,p[key]||0);});
+  const W=p=>{
+    const w=Math.max(0,p[key]||0);
+    if(!mul||w<=0)return w;
+    const m=mul(p);
+    return w*((typeof m==="number"&&m>0)?m:1);};
+  let tot=0;players.forEach(p=>{tot+=W(p);});
   if(tot<=0)return players[Math.floor(R()*players.length)];
   let r=R()*tot;
-  for(const p of players){r-=Math.max(0,p[key]||0);if(r<=0)return p;}
+  for(const p of players){r-=W(p);if(r<=0)return p;}
   return players[players.length-1];}
+/* ================= SZEZON-SZEREPEK A PÁRHARCBAN =================
+   HIBA, AMIT EZ JAVÍT: a szezon-szerepek (Bombázók: Nyitó/Befejező/Tálaló,
+   Beton: Fal/Árok/Kereszttűz, Villám: Box-to-box/Legolas/Robben) a párharcban
+   NEM hatottak. A H2H mindkét oldalt egyetlen SOROSÍTOTT pillanatképből
+   számolja, és abba a szerep-szorzók nem utaztak: a drótra fűzött gólsúly
+   (`gw`) és gólpassz-súly (`aw`) a roleGoalMult / roleAssistMult nélkül készül,
+   a két csapatszintű szorzó (roleOwnGoalMult / roleOppGoalMult) pedig a HELYI
+   S.roles-ból olvas — vagyis a párharcban vagy semmit nem ért, vagy (ha a
+   számoló fél stílusa aktív) a TÁRSA csapatára is ráült volna.
+   A kockázati oldal már rég átment: a piroslap-súlyban a roleRiskMult, a
+   csapatszintű esélyben a roleRiskTeamP benne van (mpWireRedWeights, redP) —
+   csak a gólos fele maradt le.
+
+   A MEGOLDÁS a defMult és a stílus-gólszorzók mintája: a KIOSZTÁS + a
+   KIÉRTÉKELT SZÁMOK utaznak a pillanatképben (ki melyik szerepet viseli, és
+   milyen szorzót ér a képesség aktuális szintjén), a FELTÉTELEKET pedig a
+   közös szimuláció értékeli ki — az tudja a percet, az állást, a cseréket és
+   a piros lapot. Így mindkét oldal a SAJÁT szerepeivel számol, és a sim
+   determinisztikus marad.
+
+   RÉGI KLIENS: a `roles` mező hiányzik → minden szorzó 1, a viselkedés és a
+   véletlen-fogyasztás betűre a mai. */
+function h2hWireRoles(){
+  if(!roleStyleActive())return null;
+  const out={};
+  roleKeysForStyle().forEach(k=>{
+    const nm=roleOf(k);if(!nm)return;
+    const d=ROLE_DEFS[k]||{};
+    const e={n:nm,v:roleVal(k)};
+    /* A képesség szintje a KIOSZTÓ oldalán dől el, ezért kiértékelve megy át:
+       a fogadó kliens nem tudná a másik stílusfáját megnézni. */
+    if(d.v2)e.v2=roleVal(k,"v2");
+    if(d.v3)e.v3=roleVal(k,"v3");
+    out[k]=e;});
+  return Object.keys(out).length?out:null;}
+function h2hRoleEntry(X,k){
+  const e=X&&X.roles&&X.roles[k];
+  return (e&&e.n)?e:null;}
+function h2hRoleVal(X,k,which){
+  const e=h2hRoleEntry(X,k);if(!e)return 1;
+  const v=e[which||"v"];
+  return (typeof v==="number"&&v>0)?v:1;}
+/* A PÁLYÁN VAN-E: a csere kiveszi a névsorból, a kiállított pedig redName —
+   egyik sem véd és nem robban be. (A CPU-meccsen ez a redIdx-kizárás párja.) */
+function h2hRoleOn(X,k){
+  const e=h2hRoleEntry(X,k);
+  return !!e&&e.n!==X.redName&&X.players.some(p=>p.n===e.n);}
+function h2hRoleIs(X,k,name){
+  const e=h2hRoleEntry(X,k);
+  return !!e&&!!name&&e.n===name;}
+/* VILLÁM: a csapat SAJÁT gólesélyének szorzója — roleOwnGoalMult párja. */
+function h2hRoleOwnMult(X){
+  let m=1;
+  if(h2hRoleOn(X,"legolas"))m*=h2hRoleVal(X,"legolas");
+  if(h2hRoleOn(X,"robben"))m*=h2hRoleVal(X,"robben","v2");
+  return m;}
+/* Az ELLENFÉL gólesélyének szorzója erre az öt perces vödörre — a
+   roleOppGoalMult párja. A `ga` az X csapat által KAPOTT gólok száma. */
+function h2hRoleOppMult(X,min,ga){
+  let m=1;
+  if(min>=75&&h2hRoleOn(X,"fal"))m*=h2hRoleVal(X,"fal");
+  if(min<=25&&ga===0&&h2hRoleOn(X,"arok"))m*=h2hRoleVal(X,"arok");
+  if(min>=35&&min<=60&&h2hRoleOn(X,"kereszttuz"))m*=h2hRoleVal(X,"kereszttuz");
+  if(h2hRoleOn(X,"b2b"))m*=h2hRoleVal(X,"b2b","v2");
+  return m;}
+/* A gólsúly szorzója — roleGoalMult párja. A gf/ga a GÓL ELŐTTI állás: a
+   Nyitó a jégtörő gólra jár (tehát amíg 0:0), a Befejező pedig az 1-2 gólos
+   vezetés MEGTARTÁSÁRA. Szerep nélkül null, hogy a h2hPick gyors ága maradjon. */
+function h2hRoleGoalW(X,min,gf,ga){
+  if(!X.roles)return null;
+  return p=>{
+    let m=1;
+    if(h2hRoleIs(X,"nyito",p.n)&&(gf+ga)===0)m*=h2hRoleVal(X,"nyito");
+    if(h2hRoleIs(X,"befejezo",p.n)&&min>=60){
+      const lead=gf-ga;
+      if(lead>=1&&lead<=2)m*=h2hRoleVal(X,"befejezo");}
+    if(h2hRoleIs(X,"robben",p.n))m*=h2hRoleVal(X,"robben");
+    if(h2hRoleIs(X,"legolas",p.n))m*=h2hRoleVal(X,"legolas","v2");
+    return m;};}
+/* A gólpassz-súly szorzója — roleAssistMult + roleAssistTargetMult párja. A
+   Tálaló célzott ráhatásához a GÓLSZERZŐ neve is kell, ezért az is paraméter. */
+function h2hRoleAssistW(X,scorerName){
+  if(!X.roles)return null;
+  return p=>{
+    let m=1;
+    if(h2hRoleIs(X,"talalo",p.n)){
+      m*=h2hRoleVal(X,"talalo");
+      if(h2hRoleIs(X,"nyito",scorerName)||h2hRoleIs(X,"befejezo",scorerName))
+        m*=h2hRoleVal(X,"talalo","v2");}
+    if(h2hRoleIs(X,"kereszttuz",p.n))m*=h2hRoleVal(X,"kereszttuz","v3");
+    if(h2hRoleIs(X,"b2b",p.n))m*=h2hRoleVal(X,"b2b");
+    if(h2hRoleIs(X,"legolas",p.n))m*=h2hRoleVal(X,"legolas","v2");
+    return m;};}
 /* A szimuláció. RITMUSA AZONOS a CPU-meccsével: 18 tick × 5 perc,
    tickenként poisson(λ/18) — így a teljes várható gólszám pontosan λ, és a
    H2H nem lesz se gólgazdagabb, se szegényebb a megszokottnál.
@@ -25766,6 +25874,10 @@ function h2hSimulate(home,away,rnd,neutral){
     players:(sn.players||[]).map(p=>Object.assign({},p)),
     ovr:sn.ovr||0,subs:0,redName:null,bus:0,
     plan:(sn.plan||[]).map(r=>Object.assign({},r,{used:false})),
+    /* A SZEREPEK a pillanatképből, oldalanként — így a párharcban mindkét
+       játékos a saját kiosztásával számol. Régi kliensnél null: minden
+       szerep-szorzó 1 marad. */
+    roles:(sn.roles&&typeof sn.roles==="object")?sn.roles:null,
     /* Régi kliens pillanatképében nincs redP — ilyenkor NEM dobunk, tehát a
        véletlen-folyam betűre a régi marad, és a piros lap helyben fut tovább. */
     redP:(typeof sn.redP==="number"&&sn.redP>0)?sn.redP:0});
@@ -25843,16 +25955,32 @@ function h2hSimulate(home,away,rnd,neutral){
     const side=(who,lamTot,isHome)=>{
       const g=poisson(lamTot/18,R);
       for(let k=0;k<g;k++){
-        const sc=h2hPick(who.players,"gw",R);
+        /* A GÓL ELŐTTI ÁLLÁS a mérce (a hg/ag csak lentebb lép) — a Nyitó
+           ablaka pont ez: ő a jégtörő gólra jár. */
+        const gfNow=isHome?hg:ag,gaNow=isHome?ag:hg;
+        const sc=h2hPick(who.players,"gw",R,h2hRoleGoalW(who,min,gfNow,gaNow));
         let as=null;
         if(R()<0.75){
-          let guard=0;do{as=h2hPick(who.players,"aw",R);}while(as&&as.n===sc.n&&guard++<8);
+          const aw=h2hRoleAssistW(who,sc.n);
+          let guard=0;do{as=h2hPick(who.players,"aw",R,aw);}while(as&&as.n===sc.n&&guard++<8);
           if(as&&as.n===sc.n)as=null;}
         if(isHome)hg++;else ag++;
         ev.push({min:Math.max(1,min-Math.floor(R()*5)),type:"goal",
           side:isHome?"home":"away",scorer:sc.n,assist:as?as.n:null,hg,ag});}};
-    side(H,lamHome,true);
-    side(A,lamAway,false);
+    /* ---- A SZEZON-SZEREPEK CSAPATSZINTŰ SZORZÓI ----
+       Vödrönként állnak elő, mert IDŐ- ÉS ÁLLÁSFÜGGŐK (a Fal a 75. perctől, az
+       Árok az első 25 percben és csak amíg nem kapott gólt) — a recalc() csak
+       cserénél és piros lapnál fut, oda nem férnének be.
+       A SORREND ugyanaz, mint a CPU-meccsen: a támadó oldal saját szorzója
+       (roleOwnGoalMult) és a védekező oldal ellenfél-szorzója
+       (roleOppGoalMult) is a TELJES gólvárhatóságra megy — pontosan úgy, ahogy
+       a buszsofőr két szorzója (busOwn/busOpp) a két kész λ-n.
+       Az `ag` / `hg` itt a védekező fél által KAPOTT gól: az Árok feltétele
+       ebből olvassa, hogy makulátlan-e még a kapu. Nem fogyaszt véletlent. */
+    const lamH=CL(lamHome*h2hRoleOwnMult(H)*h2hRoleOppMult(A,min,hg));
+    const lamA=CL(lamAway*h2hRoleOwnMult(A)*h2hRoleOppMult(H,min,ag));
+    side(H,lamH,true);
+    side(A,lamA,false);
     /* A félidő a 9. tick VÉGÉN: ekkor van kész az 1-45. perc. */
     if(min===45)ev.push({min:45,type:"half",hg,ag});}
   ev.push({min:90,type:"end",hg,ag});
@@ -28790,7 +28918,15 @@ function playMatch(){
       const beforeDiff=gf-ga;
       if(side==="us"){
         gf++;
-        const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*crossTargetMult(slots[x.idx].pos)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*roleGoalMult(x.p.n,90,gf,ga)*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
+        /* ---- A SZEREP-SZORZÓ A GÓL ELŐTTI ÁLLÁST NÉZI ----
+           A gf a fenti sorban MÁR MEGNŐTT, ezért a roleGoalMult ide gf-1-gyel
+           megy. Enélkül a Nyitó feltétele (gf+ga===0, vagyis „még 0:0") SOHA nem
+           teljesülhetett — a jégtörő gólnál is 1 volt már az összeg —, a
+           Befejező ablaka pedig egy góllal elcsúszott (a 0:0-ból szerzett
+           vezetést jutalmazta a meglévő 1-2 gólos előny megtartása helyett).
+           A clutchHeroWeight szándékosan marad a gól UTÁNI álláson: az más
+           kérdésre felel (ki a hős ebben a pillanatban). */
+        const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*crossTargetMult(slots[x.idx].pos)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*roleGoalMult(x.p.n,90,gf-1,ga)*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
         const dramaScorer=active[si].p;
         mScore[dramaScorer.n]=(mScore[dramaScorer.n]||0)+1;recordScorer(dramaScorer.n);
         try{vlNoteGoal(dMin,dramaScorer.n,null);}catch(e){}
@@ -28821,7 +28957,15 @@ function playMatch(){
     let g=DUEL?duelMine.length:poisson(lf*clutchAttackMult(active,min,gf,ga)*busOwnMult()*roleOwnGoalMult(active,redIdx)/18);
     for(let k=0;k<g;k++){
       gf++;
-      let si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf,ga)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
+      /* ---- A SZEREP-SZORZÓ A GÓL ELŐTTI ÁLLÁST NÉZI ----
+         A gf a fenti sorban MÁR MEGNŐTT, ezért a roleGoalMult ide gf-1-gyel
+         megy. Enélkül a Nyitó feltétele (gf+ga===0, vagyis „még 0:0") SOHA nem
+         teljesülhetett — a jégtörő gólnál is 1 volt már az összeg —, a
+         Befejező ablaka pedig egy góllal elcsúszott (a 0:0-ból szerzett
+         vezetést jutalmazta a meglévő 1-2 gólos előny megtartása helyett).
+         A clutchHeroWeight szándékosan marad a gól UTÁNI álláson: az más
+         kérdésre felel (ki a hős ebben a pillanatban). */
+      let si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf-1,ga)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
       /* Párharcban a gólszerzőt a közös lista dönti el (a súlyozást a saját
          kliensed már a pillanatkép küldésekor elvégezte). A fenti súlyozott
          választás csak TARTALÉK marad: ha a név bármiért nem található a

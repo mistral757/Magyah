@@ -841,12 +841,48 @@ igényel új szimulációs ágat.
   üres táblát ad, tehát nem „felejt", hanem lejár. Egy ember egyszerre egy
   szerepet visel.
 
-  **HATÁR: a szerepek a párharcban NEM hatnak.** A H2H szimuláció mindkét
-  oldalt egyetlen, sorosított pillanatképből számolja (`h2hSimulate`), és abba
-  a szerep-szorzók nem utaznak — ahogy a `roleGoalMult` sem szerepel a drótra
-  fűzött gólsúlyokban. Ez a rendszer indulása óta így van, mind a három
-  stílusnál; nem a Villámmal keletkezett. Kiterjeszteni a `defMult` mintájára
-  lehetne (a pillanatképbe rakva), de az önálló döntés.
+  **A PÁRHARCBAN IS HATNAK (3.3.40).** Korábban nem: a H2H mindkét oldalt egyetlen,
+  sorosított pillanatképből számolja (`h2hSimulate`), és abba a szerep-szorzók
+  nem utaztak — a drótra fűzött gólsúly (`gw`) és gólpassz-súly (`aw`) a
+  `roleGoalMult` / `roleAssistMult` nélkül készült, a két csapatszintű szorzó
+  (`roleOwnGoalMult`, `roleOppGoalMult`) pedig a HELYI `S.roles`-ból olvasott —
+  tehát vagy semmit nem ért, vagy a számoló fél kiosztása ült rá a társa
+  csapatára is. A kockázati felük már rég átment (`roleRiskMult` a
+  piroslap-súlyban, `roleRiskTeamP` a `redP`-ben); csak a gólos felük maradt le.
+  Ez a rendszer indulása óta így volt, mind a három stílusnál.
+
+  **A megoldás a `defMult` és a stílus-gólszorzók mintája.** A pillanatkép új
+  `roles` mezője a KIOSZTÁST és a KIÉRTÉKELT SZÁMOKAT viszi (ki melyik szerepet
+  viseli, és mennyit ér a képesség aktuális szintjén — a fogadó kliens nem
+  látná a másik stílusfáját), a FELTÉTELEKET pedig a közös szimuláció értékeli
+  ki: az tudja a percet, az állást, a cseréket és a piros lapot.
+
+  | ami utazik | ahol hat a sim-ben |
+  |---|---|
+  | `roles[kulcs] = {n, v, v2, v3}` | `h2hRoleGoalW` (gólsúly), `h2hRoleAssistW` (gólpassz-súly, a Tálaló célzott ráhatásával együtt), `h2hRoleOwnMult` / `h2hRoleOppMult` (a két csapatszintű λ-szorzó) |
+
+  A `h2hPick` kapott egy opcionális súlyszorzót: a pillanatkép súlya a
+  KEZDŐRÚGÁS képe, a szerepek viszont perc- és állásfüggők, azt csak a
+  választás pillanatában lehet beszámítani. A két csapatszintű szorzó
+  vödrönként áll elő (a `recalc()` csak cserénél és lapnál fut), és a TELJES
+  gólvárhatóságra megy — ugyanúgy, ahogy a buszsofőr `busOwn`/`busOpp` szorzói
+  a két kész λ-n.
+
+  **Régi kliens:** a `roles` mező hiányzik → minden szorzó 1, a viselkedés és a
+  véletlen-fogyasztás betűre a mai. Mérve (40 000 párharc, 3. szint): szerep
+  nélkül a régi és az új sim eseménylistája **bitre azonos**; Betonnal az
+  ellenfél gólátlaga 1,396 → 1,280, Villámmal a sajátunk 1,396 → 1,564
+  (a Legolas × Robben csapat-szorzó pont ×1,12), Bombázókkal az összgól nem
+  mozdul — ott a szerepek a gólokat ÚJRAOSZTJÁK: a Nyitó a nyitógólok, a
+  Tálaló a gólpasszok jóval nagyobb hányadát viszi.
+
+  **Egy off-by-one is kiderült közben, a CPU-meccsen.** A `roleGoalMult` a
+  már MEGNÖVELT `gf`-fel kapta az állást, ezért a Nyitó feltétele (`gf+ga===0`,
+  vagyis „még 0:0") SOHA nem teljesülhetett — a jégtörő gólnál is 1 volt már az
+  összeg —, a Befejező ablaka pedig egy góllal elcsúszott. A szerep-szorzó
+  mostantól a gól ELŐTTI állást nézi (`gf-1`), a párharc ugyanezt a szabályt
+  követi. A `clutchHeroWeight` szándékosan maradt a gól UTÁNI álláson: az más
+  kérdésre felel.
 
 * **Nulla a tábla — Beton (3.2.00).** A kihívás-rendszer a stílus nyelvén
   szólal meg: gyakrabban jön kapott gól nélküli kihívás (35/50/65% eséllyel),
