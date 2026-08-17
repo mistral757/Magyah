@@ -345,3 +345,30 @@ A bér oldalán: `WAGE_STARDOM_MIN` 0,25 · `WAGE_STARDOM_MAX` 4,00 ·
    (0 megjegyzés 42%, 1 → 36%, 2 → 16%, 3 → 6%) egy kiépült sztárra van szabva.
    Ez a szimuláció EGYETLEN nem mért bemenete; a valós arány a képességektől,
    párkémiáktól és díjaktól függ.
+
+
+---
+
+## 8. A skill-sorsolás iránya (realisztikus módban)
+
+*(3.3.37. Csak akkor létezik, ha a karrier **realisztikus skill-kiosztással**
+indult — lásd a beállítóképernyő „Hogyan kerüljenek ki a képességek?" választóját.)*
+
+A többi stílus a megvett képességfa-szintjével tolja el a sorsolást (15/25/33%).
+A Sztárom a párom **nem trait-hez köti**: a stíluspanelen kiválasztod, melyik
+posztkategória felé húzzon a sorsolás, és **ez a döntés 15 meccsre szól**.
+
+| | |
+|---|---|
+| **hatás** | amikor *nem te döntesz*, **25%** eséllyel a választott kategóriából jön a képesség |
+| **zár** | **15 mérkőzés**, utána szabadon átállítható |
+| **levehető** | ugyanarra a kategóriára koppintva — a „semmilyen irány" is érvényes választás |
+
+**Miért zár.** A költsége maga a döntés: egyetlen kategóriára fogadsz, és nem
+gondolhatod meg magad, amíg le nem telik. Zár nélkül ez nem választás volna,
+hanem a következő jutalom előtti finomhangolás — a stílus pedig pont arról szól,
+hogy elkötelezed magad valami mellett.
+
+**A többi stílushoz képest** ez a leggyengébb torzítás (25%, szemben a teljesen
+kiépített fák 33%-ával), cserébe viszont **irányítható**, és nem kell hozzá
+képességfa-vásárlás.
