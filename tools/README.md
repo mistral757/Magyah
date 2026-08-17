@@ -36,6 +36,24 @@ Stílust, formázást, `no-unused-vars`-t. A kód saját, tömör formázási ny
 beszél, és a hosszú magyarázó kommentárok is annak részei — egy „javítsd meg a
 stílust" futtatás több kárt okozna, mint hasznot.
 
+## ledger-audit.sh — az idény-mérleg őrszeme
+
+```bash
+./tools/ledger-audit.sh
+```
+
+A büdzsé **két kapun** mozoghat (`budgetPay` / `budgetEarn`), különben az
+idény-mérleg és az egyenleg szétcsúszik. Ez a szkript két olyan hibát kap el,
+amit a `check.sh` nem tud — mindkettő szintaktikailag hibátlan, és mindkettő
+NÉMÁN hamis mérleget csinál:
+
+1. **könyveletlen írás** — közvetlen `S.transferBudget=` a kapuk mellett;
+2. **elgépelt kategória** — `budgetPay(x,"sceout")` nem hibázik, csak némán az
+   „Egyéb" sorba esik.
+
+A valóban indokolt közvetlen írások az `INDOKOLT` szóval vannak megjelölve a
+sorban. Részletek: `docs/idenymerleg.md`.
+
 ## A globálisok listája
 
 A `eslint.config.mjs`-ben a böngésző-globálisok **kézzel** vannak felsorolva,
