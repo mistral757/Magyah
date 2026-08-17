@@ -2229,6 +2229,15 @@ button.infPanel:disabled{cursor:default}
     <b style="color:var(--gold)">Mennyit segítsen a játék?</b> A karrier sok rendszerből áll, és egyik sem
     kötelező olvasmány — a vezetés ott szólal meg, ahol épp döntened kell. Bármikor átállítható,
     menet közben is: a HUB menüjében, a <b>🧭 Vezetés</b> alatt.</p>
+  <!-- SKILLEK — csak karrierben. A LAZA az alapértelmezés: az a mai
+       viselkedés, tehát aki hozzá sem nyúl, semmit nem vesz észre. -->
+  <p class="hide" id="skillModeHint" style="font-size:12px;color:var(--dim);margin:14px 0 0;line-height:1.5">
+    <b style="color:var(--gold)">Hogyan kerüljenek ki a képességek?</b> A laza módban te osztod ki őket;
+    a realisztikusban a döntés nagy része kikerül a kezedből — a keret alakul, nem tervezed.</p>
+  <div class="optgrid two hide" id="skillModeGrid" style="margin-top:8px">
+    <button data-sk="loose" class="sel">🎯 Lazán<small>a játék sorsolja a képességet, te választod, ki kapja — bármikor, bárkinek</small></button>
+    <button data-sk="real">🎲 Realisztikusan<small>kétharmadában nem te döntesz: aki kiérdemelte vagy a véletlen kapja</small></button>
+  </div>
   <div class="optgrid two hide" id="guideGrid" style="margin-top:8px">
     <button data-gd="hard" class="sel">🧭 Teljes vezetés<small>bevezető minden fontos rendszerhez, tipp a döntéseknél, jelzés ha van tennivaló</small></button>
     <button data-gd="guided">💡 Tippek és jelzések<small>bevezető csak a visszafordíthatatlan döntéseknél</small></button>
@@ -3039,7 +3048,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.35";
+const APP_VERSION="3.3.36";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -17156,6 +17165,12 @@ $("familyNameMode")&&($("familyNameMode").onchange=()=>{
    A `guideWanted` a TIPPEK régi, logikai kapcsolója maradt (a beginNewGame az
    S.guideOn-hoz használja); a négy fokozatot a guideWantedMode tartja. */
 let guideWantedMode="hard",guideWanted=true;
+/* SKILL-MÓD: ugyanaz a minta, mint a vezetésnél — a választás a beginNewGame-ben
+   kerül az állapotba. Alapértelmezés a LAZA: az a mai viselkedés. */
+let skillModeWanted="loose";
+document.querySelectorAll("#skillModeGrid button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#skillModeGrid button").forEach(x=>x.classList.remove("sel"));
+  b.classList.add("sel");skillModeWanted=b.dataset.sk;});
 document.querySelectorAll("#guideGrid button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#guideGrid button").forEach(x=>x.classList.remove("sel"));
   b.classList.add("sel");
@@ -17686,6 +17701,9 @@ function beginNewGame(){
      futottak, és a huszonöt téma zöme (edzésterv, akadémia, ügynökség, Run)
      ott nem is létezik. A HALK JELZÉS viszont igen: ami ott is értelmes
      (felállás, taktika, csere), azt ugyanúgy jelezheti. */
+  /* SKILL-MÓD: karrierben a beállító képernyő választása, azon kívül mindig
+     laza (a nem-karrier módokban nincs is jutalom-skill folyam). */
+  S.skillReal=(gameMode==="career")&&skillModeWanted==="real";
   S.teach=teachDefaults();
   S.teach.mode=(gameMode==="career")?guideWantedMode:"light";
   /* A Rating alapja a karrier INDULÁSAKOR rögzül: draftnál a globális
@@ -22017,6 +22035,9 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      tölti fel — vagy a régi guide-mezőkből (betöltéskor), vagy a beállító
      képernyő választásából (beginNewGame). */
   teach:null,
+  /* REALISZTIKUS SKILL-KIOSZTÁS (karrierenként választható), és a legutóbbi
+     mérkőzés kiemelkedői, akikből a "kiérdemelte" ág választ. */
+  skillReal:false,lastStars:null,
   /* F6: a párharc tartós állapota. A mpBalance a kiegyenlítő rating-eltolás,
      a mpHistory és a mpDuelLog pedig SZEZONOKON ÁTÍVELŐ — nem nullázódik. */
   oppBuffH:null,   /* a szezonra rögzített rejtett ellenfél-erősítés */
@@ -29148,6 +29169,43 @@ function playMatch(){
     const playedAll=active.filter(a=>!a.bus).map(a=>a.p)
       .concat(halfOut.map(h=>h&&h.p).filter(Boolean));
     playedAll.forEach(p=>{S.seasonMatches[p.n]=(S.seasonMatches[p.n]||0)+1;});
+    /* ---- KI ÉRDEMELTE KI? — pillanatkép a REALISZTIKUS skill-kiosztáshoz ----
+       A jutalom a meccs UTÁN dől el, amikor a mérkőzés változói már nincsenek
+       hatókörben; ezért itt jegyezzük fel, kik emelkedtek ki. Azért ITT, a
+       playedAll mellett, és nem a meccsember-blokkban: az ugyanis csak
+       nem-vereségnél fut, márpedig egy 0-1-re elvesztett meccsen hat védéssel
+       a kapus ugyanúgy kiérdemelte.
+
+       A SÚLYOK SZÁNDÉKOSAN NEM CSAK A TÁMADÓ TELJESÍTMÉNYT mérik. Enélkül a
+       „kiérdemelte" a gyakorlatban azt jelentené, hogy „gólt szerzett", és a
+       védők meg a kapus sosem jutnának skillhez ezen az ágon. A tiszta lap öt
+       ember közös munkája (a kapusé a legnagyobb rész), a bravúr pedig egyéni
+       teljesítmény — mindkettő ugyanúgy súlyt kap, mint egy gól. */
+    try{
+      const st=[],add=(n,w)=>{
+        if(!n||!(w>0))return;
+        const e=st.find(x=>x.n===n);
+        if(e)e.w+=w;else st.push({n,w});};
+      const gkN=(()=>{const g=active.find(a=>slots[a.idx]&&slots[a.idx].pos==="KP");
+                      return g?g.p.n:null;})();
+      active.forEach(a=>{
+        if(a.bus)return;
+        const nm=a.p.n,pos=slots[a.idx]&&slots[a.idx].pos;
+        add(nm,(mScore[nm]||0)*2.5);                  /* gól */
+        add(nm,(mAssist[nm]||0)*2);                   /* gólpassz */
+        if(ga===0&&pos){
+          if(pos==="KP")add(nm,3);                    /* tiszta lap: a kapusé a legtöbb */
+          else if(roleInFormation(pos)==="VEDO")add(nm,2);   /* …és a védőké */
+        }});
+      /* BRAVÚROK: a saveCount a mérkőzés kapus-védéseinek száma. Kettőtől
+         számít kiemelkedésnek — ugyanaz a küszöb, mint a "két bravúr egy
+         meccsen" jutalomnál. */
+      if(gkN&&typeof saveCount==="number"&&saveCount>=2)add(gkN,Math.min(4,saveCount));
+      /* A meccs embere, ha volt (vereségnél nincs). */
+      if(typeof best==="number"&&best>=0&&active[best]&&!active[best].bus)
+        add(active[best].p.n,3);
+      S.lastStars=st.length?st:null;
+    }catch(e){S.lastStars=null;}
     /* KIHÍVÁS: "tegyél új embert a kezdőbe, és játszasd N meccsen".
        A szezon eleji kezdő 11 pillanatképéhez mérünk — aki nem volt benne, de
        most kezd, annak külön számoljuk a meccseit. */
@@ -32417,6 +32475,113 @@ function styleInheritHandle(name,how){
 /* A kihívásokért járó, még ki nem osztott skillek sorának kiürítése: minden
    elemnél megjelenik a választó-képernyő, ahol TE döntöd el a címzettet.
    Auto-módban a szokásos automata kiosztás fut, hogy ne akadjon meg a szezon. */
+/* ================= REALISZTIKUS SKILL-KIOSZTÁS =================
+   A LAZA mód a régi: a játék sorsolja a képességet, te választod, ki kapja.
+   Kényelmes, de a skillek így mindig oda kerülnek, ahova te akarod — a keret
+   nem "alakul", hanem tervezed.
+
+   A REALISZTIKUS módban a döntés nagy része kikerül a kezedből:
+     · 66%-ban NEM te döntesz. Ennek a fele olyanhoz kerül, aki a legutóbbi
+       meccsen KIÉRDEMELTE (és akkor a posztjához illő képességet kap), a
+       másik fele teljesen véletlen.
+     · 33%-ban TE döntesz. Ennek a fele csak azt, hogy KI kapja; a másik
+       felénél előbb a TÍPUST is kiválaszthatod, aztán az embert.
+   A csapatstílusok ezt az arányt és a sorsolás irányát tolják el — a laza mód
+   régi kategória-torzítása (30/45/60%) ilyenkor NEM él, helyette a lentebbi,
+   szerényebb (15/25/33%) hatás dolgozik, és CSAK a "nem te döntesz" ágon. */
+const SKR_AUTO_BASE=0.66;        /* ekkora eséllyel nem te döntesz */
+const SKR_EARNED_SHARE=0.50;     /* az auto-ág fele a kiérdemlőé */
+const SKR_TYPE_SHARE=0.50;       /* a te ágad fele a típust is választhatja */
+const SKR_PANZER_AUTO=0.75;      /* Panzer: keményebb kéz, cserébe teljes döntés */
+const SKR_BIAS_P=[0,0.15,0.25,0.33];   /* stílus-torzítás a megvett szint szerint */
+const SKR_HARMONIA_AUTO=[0,0.50,0.45,0.40];  /* Béke és harmónia: az arányt tolja */
+function skillRealOn(){return gameMode==="career"&&!!S.skillReal;}
+/* A stílus skill-traitjének MEGVETT SZINTJE (0-3). A laza mód p-értékeiből
+   (0.30/0.45/0.60) olvassuk vissza, hogy ne kelljen új traitet kitalálni: a
+   játékos ugyanazt a képességet veszi meg, csak realisztikus módban más a
+   számszerű hatása. */
+function skillRealLevel(){
+  let p=0;
+  try{const b=styleSkillBias();p=b?b.p:0;}catch(e){p=0;}
+  if(!p){try{p=styleSkillPaceBias()?0.45:0;}catch(e){}}
+  return p>=0.60?3:p>=0.45?2:p>0?1:0;}
+/* MEKKORA ESÉLLYEL NEM TE DÖNTESZ. A Panzer keményebb kezű, a Béke és
+   harmónia az EGYETLEN, amelyik ezt az arányt egyáltalán mozdítani tudja. */
+function skillRealAutoShare(){
+  let st=null;try{st=styleState();}catch(e){}
+  const k=st&&st.key;
+  if(k==="panzer")return SKR_PANZER_AUTO;
+  if(k==="harmonia"){const L=skillRealLevel();if(L)return SKR_HARMONIA_AUTO[L];}
+  return SKR_AUTO_BASE;}
+/* MERRE TOLJA A SORSOLÁST a stílus — csak a "nem te döntesz" ágon.
+   Egy szűrő + egy valószínűség; a szűrő a stílus természetét követi. */
+function skillRealBias(){
+  let st=null;try{st=styleState();}catch(e){}
+  const k=st&&st.key,L=skillRealLevel();
+  if(!k||!L)return null;
+  const p=SKR_BIAS_P[L];
+  if(k==="beton")   return {p,test:sk=>sk.cat==="VEDO"||sk.cat==="KAPUS"};
+  if(k==="bombazok")return {p,test:sk=>sk.type==="goalw"||sk.cat==="CSATAR"};
+  if(k==="harmonia")return {p,test:sk=>sk.type==="assistw"};
+  if(k==="villam")  return {p,test:sk=>PACE_SKILL_IDS.indexOf(sk.id)>=0};
+  if(k==="sztar"){
+    const c=st.skrCat;
+    return c?{p,test:sk=>sk.cat===c}:null;}
+  return null;}   /* Panzer: nem a sorsolást tolja, hanem az arányt */
+/* KI ÉRDEMELTE KI. A lefújásnál felvett pillanatképből (S.lastStars) húzunk
+   súlyozottan — gól, gólpassz, tiszta lap, bravúr és meccsemberség szerint,
+   tehát védő és kapus is valódi eséllyel indul. Aki már nincs a keretben, az
+   kiesik. */
+function skillRealEarner(){
+  const st=(S&&S.lastStars)||null;
+  if(!st||!st.length)return null;
+  let names={};
+  try{(fullCareerRoster()||[]).forEach(p=>{if(p)names[p.n]=1;});}catch(e){return null;}
+  const pool=st.filter(x=>x&&names[x.n]&&x.w>0);
+  if(!pool.length)return null;
+  let tot=0;pool.forEach(x=>tot+=x.w);
+  let r=Math.random()*tot;
+  for(let i=0;i<pool.length;i++){r-=pool[i].w;if(r<=0)return pool[i].n;}
+  return pool[pool.length-1].n;}
+/* Egy KONKRÉT emberhez illő képesség sorsolása: a posztkategóriája szerint.
+   Ha nincs hozzá illő (vagy már mindet birtokolja), a sima sorsolásra esünk
+   vissza — a jutalom sosem veszhet el amiatt, hogy a szűrő túl szűk volt. */
+function skillRealDrawFor(name){
+  let cat=null;
+  try{
+    const e=(careerPool&&careerPool[name])||null;
+    const pos=(e&&e.pos&&e.pos[0])||null;
+    cat=pos?(pos==="KP"?"KAPUS":roleInFormation(pos)):null;
+    if(cat==="VEDO"||cat==="KOZEPPALYAS"||cat==="CSATAR"||cat==="KAPUS"){}else cat=null;
+  }catch(e){cat=null;}
+  const has=(S.skills&&S.skills[name])||[];
+  const owned=id=>has.some(i=>i.skill&&i.skill.id===id);
+  let pool=MAIN_SKILLS.filter(sk=>!owned(sk.id));
+  if(cat){const c=pool.filter(sk=>sk.cat===cat);if(c.length)pool=c;}
+  return pool.length?pick(pool):pick(MAIN_SKILLS);}
+/* A SORSOLÁS a "nem te döntesz" ágon, a stílus-torzítással. */
+function skillRealDrawBiased(){
+  const b=skillRealBias();
+  if(b&&Math.random()<b.p){
+    const pool=MAIN_SKILLS.filter(b.test);
+    if(pool.length)return pick(pool);}
+  return pick(MAIN_SKILLS);}
+/* A DÖNTÉS. Visszaadja, mi történjék ezzel a jutalommal:
+     {mode:"auto",   skill, target}  — magától megy, csak bejelentjük
+     {mode:"who",    skill}          — te választod, ki kapja
+     {mode:"both"}                   — előbb típust választasz, aztán embert */
+function skillRealPlan(){
+  if(Math.random()<skillRealAutoShare()){
+    /* A KIÉRDEMLŐ ÁGA. Ha épp nincs kiemelkedő (pl. a szezon első jutalma még
+       mérkőzés előtt), a véletlen ág veszi át — nem marad el a jutalom. */
+    if(Math.random()<SKR_EARNED_SHARE){
+      const who=skillRealEarner();
+      if(who)return {mode:"auto",skill:skillRealDrawFor(who),target:who};}
+    return {mode:"auto",skill:skillRealDrawBiased(),target:null};}
+  /* A TE ÁGAD. Panzer: ha egyszer te döntesz, akkor mindent te döntesz. */
+  let st=null;try{st=styleState();}catch(e){}
+  if((st&&st.key==="panzer")||Math.random()<SKR_TYPE_SHARE)return {mode:"both"};
+  return {mode:"who",skill:pick(MAIN_SKILLS)};}
 function drainRewardSkills(cb){
   const q=S.pendingRewardSkills;
   if(!q||!q.length){cb();return;}
@@ -32428,7 +32593,90 @@ function drainRewardSkills(cb){
      azzal a készültséggel érkezik, ahogy a távozónál állt. */
   const done=Math.max(1,Math.min(item.stagesNeeded||1,item.stagesCompleted||1));
   if(S.auto){autoAssignSkill(skill,item.stagesNeeded,done);drainRewardSkills(cb);return;}
-  showSkillDraw(skill,item.reason||"challenge",item.stagesNeeded,()=>drainRewardSkills(cb),done,item.from);}
+  const next=()=>drainRewardSkills(cb);
+  /* ---- REALISZTIKUS MÓD ----
+     AZ ÖRÖKSÉG KIVÉTEL: ott a KONKRÉT képesség megy tovább a távozótól, azt
+     nem sorsolhatjuk újra — a jutalom lényege épp az, hogy AZ marad meg. */
+  if(skillRealOn()&&item.reason!=="orokseg"){
+    const plan=skillRealPlan();
+    if(plan.mode==="auto"){
+      skillRealAuto(plan.skill,item.reason||"challenge",item.stagesNeeded,done,plan.target,next);
+      return;}
+    if(plan.mode==="both"){
+      showSkillTypePick(item.reason||"challenge",item.stagesNeeded,done,next);
+      return;}
+    showSkillDraw(plan.skill,item.reason||"challenge",item.stagesNeeded,next,done,item.from);
+    return;}
+  showSkillDraw(skill,item.reason||"challenge",item.stagesNeeded,next,done,item.from);}
+/* ---- "NEM TE DÖNTESZ": bejelentjük, mi történt ----
+   A jutalom nem tűnhet el némán. A képernyő ugyanaz, csak a lista helyén egy
+   közlés áll: ki kapta és miért ő. */
+function skillRealAuto(skill,reason,stagesNeeded,done,target,resumeCb){
+  const roster=eligibleForSkill(skill);
+  if(!roster.length){resumeCb();return;}
+  /* A kiérdemlő csak akkor kapja, ha a képességre egyáltalán jogosult; ha nem
+     (rossz poszt), a szokásos auto-választás dönt — a jutalom nem vész el. */
+  const who=(target&&roster.some(p=>p.n===target))?target:null;
+  skillResumeCb=resumeCb;
+  $("scSkill").classList.remove("hide");
+  $("skillTitle").textContent=(SKILL_REASON_TXT[reason]||"Jutalom-skill!")
+    +` (${done}/${stagesNeeded} fázis)`;
+  $("skillAssignWrap").classList.add("hide");
+  $("skillSpinBtn").classList.remove("hide");
+  $("skillSpinBtn").disabled=false;
+  $("skillDesc").textContent="";
+  let t=0;const iv=setInterval(()=>{
+    $("skillSpinName").textContent=pick(MAIN_SKILLS).name;t+=70;
+    if(t>=spinLen(700)){clearInterval(iv);land();}},70);
+  function land(){
+    let name=who;
+    if(!name){
+      /* véletlen ág: a jogosultak közül sorsolunk */
+      name=pick(roster).n;}
+    $("skillSpinName").textContent=skill.name+` (${done}/${stagesNeeded})`;
+    $("skillSpinBtn").classList.add("hide");
+    /* A kiosztás UGYANAZ a három lépés, mint az auto-módban (autoAssignSkill):
+       a lista, az "ever" jegyzék és a napló-sor. */
+    if(!S.skills[name])S.skills[name]=[];
+    S.skills[name].push({skill,stagesNeeded,stagesCompleted:done});
+    updateSkillsLine();
+    noteSkillEver(name,skill.id);
+    addLine(`🎖 Skill: ${esc(name)} megkapta a(z) "${esc(skill.name)}" képességet (${done}/${stagesNeeded} fázis)`,"m life");
+    const why=who?"a legutóbbi mérkőzésen kiérdemelte":"a sors így hozta";
+    $("skillDesc").innerHTML=`<b>${esc(shortName(name))}</b> kapta — ${why}.<br>`
+      +esc(skill.desc);
+    const box=$("skillAssignList");box.innerHTML="";
+    const btn=document.createElement("button");
+    btn.className="btn-p stepbtn";btn.textContent="Rendben";
+    btn.onclick=()=>{$("scSkill").classList.add("hide");
+      const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();};
+    box.appendChild(btn);
+    $("skillAssignWrap").classList.remove("hide");
+    $("scSkill").scrollIntoView({behavior:"smooth"});}}
+/* ---- "TE DÖNTESZ, MINDENT": előbb a TÍPUS, aztán az ember ---- */
+const SKR_CATS=[{k:"KAPUS",n:"Kapus"},{k:"VEDO",n:"Védő"},
+  {k:"KOZEPPALYAS",n:"Középpályás"},{k:"CSATAR",n:"Csatár"}];
+function showSkillTypePick(reason,stagesNeeded,done,resumeCb){
+  skillResumeCb=resumeCb;
+  $("scSkill").classList.remove("hide");
+  $("skillTitle").textContent=(SKILL_REASON_TXT[reason]||"Jutalom-skill!")
+    +` — te döntesz (${done}/${stagesNeeded} fázis)`;
+  $("skillSpinBtn").classList.add("hide");
+  $("skillSpinName").textContent="Milyen képesség legyen?";
+  $("skillDesc").textContent="Előbb a típust választod, utána azt, ki kapja.";
+  const box=$("skillAssignList");box.innerHTML="";
+  SKR_CATS.forEach(c=>{
+    const pool=MAIN_SKILLS.filter(sk=>sk.cat===c.k);
+    if(!pool.length)return;
+    const b=document.createElement("button");
+    b.className="btn-s stepbtn";b.style.marginBottom="6px";
+    b.textContent=`${c.n} — ${pool.length} képességből`;
+    b.onclick=()=>{
+      const skill=pick(pool);
+      showSkillDraw(skill,reason,stagesNeeded,resumeCb,done,null);};
+    box.appendChild(b);});
+  $("skillAssignWrap").classList.remove("hide");
+  $("scSkill").scrollIntoView({behavior:"smooth"});}
 function showSkillDraw(skill,reason,stagesNeeded,resumeCb,stagesDone,fromName){
   skillResumeCb=resumeCb;
   const done=Math.max(1,Math.min(stagesNeeded||1,stagesDone||1));
@@ -48733,6 +48981,7 @@ function saveGame(){
         paceGoals:S.paceGoals,wingPosLearned:S.wingPosLearned,
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
         guideOn:S.guideOn,guideSeen:S.guideSeen,teach:S.teach,
+        skillReal:S.skillReal,lastStars:S.lastStars,
         seasonStartStrength:S.seasonStartStrength,summerPaidAfterSeason:S.summerPaidAfterSeason,
         chemPairs:S.chemPairs,chemInProgress:S.chemInProgress,
         activeChallenges:S.activeChallenges,challengeLastOfferRound:S.challengeLastOfferRound,challengeLastOfferSeason:S.challengeLastOfferSeason,startChallengesDone:S.startChallengesDone,
@@ -49172,6 +49421,8 @@ function applySavedGame(d){
      mentés), a teachMigrate a guide két mezőjéből vezeti le. A guideOn-t
      SZÁNDÉKOSAN nem írjuk felül itt: a mentésben álló érték az igazság, a
      szinkronizálás csak mód-váltáskor és új játéknál kell. */
+  S.skillReal=!!d.S.skillReal;
+  S.lastStars=Array.isArray(d.S.lastStars)?d.S.lastStars:null;
   S.teach=(d.S.teach&&typeof d.S.teach==="object")?d.S.teach:null;
   teachMigrate();
   /* Régi mentés: ha már fut a szezon, a nyitó skill nyilván megvolt — így egy
@@ -49557,6 +49808,8 @@ $("modeClassicBtn").onclick=()=>{
   $("careerStartGrid")&&$("careerStartGrid").classList.add("hide");
   $("guideGrid")&&$("guideGrid").classList.add("hide");   /* a guide karrier-funkció */
   $("guideGridHint")&&$("guideGridHint").classList.add("hide");
+  $("skillModeGrid")&&$("skillModeGrid").classList.add("hide");
+  $("skillModeHint")&&$("skillModeHint").classList.add("hide");
   updateFamilySetupVisibility();
   updateRatingBasisVisibility();   /* klasszikusban nincs karrier-pool → nincs Rating-alap */
   $("modeGrid").classList.remove("hide");   /* klasszikusban van értelme a vak módnak */
@@ -49576,6 +49829,8 @@ $("modeCareerBtn").onclick=()=>{
   $("careerStartGrid")&&$("careerStartGrid").classList.remove("hide");
   $("guideGrid")&&$("guideGrid").classList.remove("hide");
   $("guideGridHint")&&$("guideGridHint").classList.remove("hide");
+  $("skillModeGrid")&&$("skillModeGrid").classList.remove("hide");
+  $("skillModeHint")&&$("skillModeHint").classList.remove("hide");
   updateFamilySetupVisibility();
   updateRatingBasisVisibility();
   $("scModeSelect").classList.add("hide");
@@ -50039,6 +50294,8 @@ function mpGuestReviewShow(s){
   $("careerStartGrid")&&$("careerStartGrid").classList.remove("hide");
   $("guideGrid")&&$("guideGrid").classList.remove("hide");
   $("guideGridHint")&&$("guideGridHint").classList.remove("hide");
+  $("skillModeGrid")&&$("skillModeGrid").classList.remove("hide");
+  $("skillModeHint")&&$("skillModeHint").classList.remove("hide");
   updateFamilySetupVisibility();
   updateRatingBasisVisibility();
   renderAutoAimSetup();
