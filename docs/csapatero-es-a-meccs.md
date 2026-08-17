@@ -121,7 +121,65 @@ a foci nem így működik.
 Amit viszont **nem** szabad, hogy megtörténjen: hogy azt hidd, erősebb voltál,
 amikor nem. Ezt javította a 2. és a 3. pont.
 
-## 5. Mit nézz meg legközelebb
+## 5. „És ha a 3-4-3 gyengít?" — mérve
+
+A 3.3.20 óta a felállás ALAKJA is tengely-erő (`formShapeAxisShift`): a 4-4-2-höz
+mérve a 3-4-3 **−1,3 Védekezés / +0,1 Passz / +1,3 Gólszerzés** eltolást ad. Ez a
+legtámadóbb alak a 4-2-4 után — jogos a gyanú, hogy ez „gyengít".
+
+**Nem gyengít.** Ugyanazzal a kerettel végigmérve, az alak hatása a taktika
+illeszkedésére −10 … +9 százalékpont, ami a mérkőzésen:
+
+| rendszer | 4-4-2 fit | 3-4-3 fit | különbség | **meccs-hatás** |
+|---|---:|---:|---:|---:|
+| Gyors kontra | 54% | 44% | −10pp | **−0,09** |
+| Labdatartás | 40% | 49% | +9pp | **+0,08** |
+| Park the bus | 56% | 48% | −8pp | **−0,07** |
+| Széljáték | 49% | 40% | −9pp | **−0,08** |
+
+Tized-Ratingek. A λ-n ez ×0,995 — a harmadik tizedesben látszik.
+
+### Ami viszont tényleg számít
+
+Mindent OVR-ekvivalensre váltva (mert a λ-ban végül úgyis az áll):
+
+| csatorna | OVR | λ-arány |
+|---|---:|---:|
+| **Morál** (100 → 0) | −5,00 | ×0,64 |
+| **Taktika-szint** (95 → 60) | −4,06 | ×0,69 |
+| **Megbízások** — teljesen szétnyitott alak (+29%) | −2,83 | ×0,78 |
+| **Piros lap** | −2,50 | ×0,80 |
+| Hazai pálya (a párharcban is) | +1,60 | ×1,16 |
+| Megbízás: két embert kiküldesz középről (+13%) | −1,36 | ×0,89 |
+| Forma-dobás (a pechesnek sorsolt ember) | −0,27 | ×0,98 |
+| **A felállás alakja (3-4-3 vs 4-4-2)** | **−0,05** | **×0,995** |
+
+Vagyis a felállás alakja a lista **legkisebb** tétele — harmincad annyi, mint a
+begyakorlatlan taktika.
+
+**A 3-4-3 mégis drágább lehet, de nem az alakja miatt:** négy középpályás
+szerep-helye van (a 4-4-2-nek kettő), tehát ez az alak *csábít* a szélre
+küldésre. Kettő kiküldött középpályás már −1,36, védőkkel együtt −2,83 — és
+**ez** a szám az, ami egy 6-1-hez hozzá tud tenni.
+
+### Honnan tudja meg a játékos?
+
+A felállás-választóban a „📊 Mit ad maga az alak?" tábla eddig
+attribútumpontban beszélt (−1,3 / +0,1 / +1,3). Pontos, de nem válasz arra,
+hogy *mekkora árat fizetek*. Két oszlop került mellé:
+
+* **illeszk.** — mennyi lenne az illeszkedésed ezzel az alakkal, a TE aktív
+  rendszereddel és annak a szintjével;
+* **az alak ára** — az előbbi hány Rating-pontnyit érne a mérkőzésen, a
+  mostanihoz képest.
+
+A tábla **változatlan névsorral** mér, és ezt ki is mondja: a váltás a kezdő 11
+összetételét is átrendezi, ami mérve **4-7 százalékpontot** visz a fiten —
+nagyobbat, mint maga az alak, csak az már nem a felállás ára, hanem a kereté.
+A panel a nagyságrendet is kiírja, hogy senki ne a felállást hibáztassa egy
+begyakorlatlan taktika helyett.
+
+## 6. Mit nézz meg legközelebb
 
 1. **A két számot ugyanabban a skálában** — a szezonindító sor mostantól
    mindkettőt kiírja, mindkét oldalról.

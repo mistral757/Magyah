@@ -31949,6 +31949,38 @@ function applySlotRoleChange(){
     s.xy=slotXY(form,k);
     if(s.player)s.fit=fitFor(s.player,s);});
   return true;}
+/* ---- A SLOT-KIOSZTÁS TISZTA MAGJA ----
+   Adott KERET és adott FELÁLLÁS → kész slot-lista, MELLÉKHATÁS NÉLKÜL (se
+   globális, se BENCH, se extraRoster). Eddig az applyFormationChange
+   belsejében élt, összekeverve azzal a három további körrel, ami a padot és a
+   tartalékot mozgatja — így a puszta kiosztási szabályt nem lehetett se
+   önmagában olvasni, se önmagában mérni.
+   A viselkedés BETŰRE a régi: az applyFormationChange ugyanezt hívja, és a
+   kiemelés után is ugyanazt a tizenegyet állítja fel (mérve, öt felállásra, a
+   szabály független újraírásával). */
+function arrangeSlotsFor(f,pool){
+  const out=FORMS[f].slots.map((p,i)=>({pos:effectiveSlotPos(f,i),xy:slotXY(f,i),player:null,fit:1,origin:null}));
+  const assigned=new Set();
+  const candidatesFor=(slotPos,exactOnly)=>pool.filter(p=>!assigned.has(p)&&(exactOnly
+    ? p.pos.includes(slotPos)
+    : canPlayPos(p,slotPos)));
+  const slotOrder=out.map((s,i)=>i);
+  for(let pass=0;pass<2;pass++){
+    const exact=pass===0;
+    const empties=slotOrder.filter(i=>!out[i].player)
+      .sort((a,b)=>candidatesFor(out[a].pos,exact).length-candidatesFor(out[b].pos,exact).length);
+    empties.forEach(i=>{
+      if(out[i].player)return;
+      const cands=candidatesFor(out[i].pos,exact);
+      if(!cands.length)return;
+      cands.sort((x,y)=>{
+        const ex=careerPool&&careerPool[x.n]?posEffectiveRating(careerPool[x.n],out[i].pos):pOvr(x);
+        const ey=careerPool&&careerPool[y.n]?posEffectiveRating(careerPool[y.n],out[i].pos):pOvr(y);
+        return ey-ex;});
+      const chosen=cands[0];
+      out[i].player=chosen;out[i].fit=fitFor(chosen,out[i]);out[i].origin=null;
+      assigned.add(chosen);});}
+  return {slots:out,assigned};}
 function applyFormationChange(newForm){
   if(!FORMS[newForm])return false;
   /* MÉRFÖLDKŐ: emeli-e a váltás a csapaterőt? A mérést ITT végezzük, nem a
@@ -31959,28 +31991,9 @@ function applyFormationChange(newForm){
   const pool=[];
   slots.forEach(s=>{if(s.player)pool.push(s.player);});
   form=newForm;
-  slots=FORMS[form].slots.map((p,i)=>({pos:effectiveSlotPos(form,i),xy:slotXY(form,i),player:null,fit:1,origin:null}));
-  const assigned=new Set();
-  function candidatesFor(slotPos,exactOnly){
-    return pool.filter(p=>!assigned.has(p)&&(exactOnly
-      ? p.pos.includes(slotPos)
-      : canPlayPos(p,slotPos)));}
-  const slotOrder=slots.map((s,i)=>i);
-  for(let pass=0;pass<2;pass++){
-    const exact=pass===0;
-    const empties=slotOrder.filter(i=>!slots[i].player)
-      .sort((a,b)=>candidatesFor(slots[a].pos,exact).length-candidatesFor(slots[b].pos,exact).length);
-    empties.forEach(i=>{
-      if(slots[i].player)return;
-      const cands=candidatesFor(slots[i].pos,exact);
-      if(!cands.length)return;
-      cands.sort((x,y)=>{
-        const ex=careerPool&&careerPool[x.n]?posEffectiveRating(careerPool[x.n],slots[i].pos):pOvr(x);
-        const ey=careerPool&&careerPool[y.n]?posEffectiveRating(careerPool[y.n],slots[i].pos):pOvr(y);
-        return ey-ex;});
-      const chosen=cands[0];
-      slots[i].player=chosen;slots[i].fit=fitFor(chosen,slots[i]);slots[i].origin=null;
-      assigned.add(chosen);});}
+  const _arr=arrangeSlotsFor(newForm,pool);
+  slots=_arr.slots;
+  const assigned=_arr.assigned;
   const leftover=pool.filter(p=>!assigned.has(p));
   leftover.forEach(p=>{
     const cat=BENCH_CATS.find(c=>c.codes.some(code=>p.pos.includes(code))&&!BENCH[c.key]);
@@ -35886,27 +35899,88 @@ function shapeCostHtml(){
    megszületik. A számok UGYANAZOK, amiket a taktika-panel is felsorol
    (formShapeAxisShift), és mind a 4-4-2-höz mérten értendők — vagyis nem
    „mennyire jó a kereted", hanem „mit tesz hozzá maga az alak". */
+/* ---- „MI LENNE, HA" — A FELÁLLÁS ÁRA A TE RENDSZEREDDEL ----
+   MIÉRT KELLETT. Az alábbi tábla attribútumpontban mondja meg, mit tesz az
+   alak a tengelyekhez (−1,3 Védekezés, +1,3 Gólszerzés…). Ez pontos, de nem
+   válasz arra a kérdésre, ami a döntés pillanatában felmerül: „MEKKORA ÁRAT
+   FIZETEK ezért a felállásért?" Egy attribútumpontból nem következik
+   magától, hány kapott gól.
+   Ez a függvény végigviszi a láncot: alak → tengelyek → a TE aktív
+   rendszered illeszkedése → tacticEffect (OVR-ekvivalens) → gólvárhatóság.
+
+   A CSERE PONTOS, NEM BECSLÉS: a teamAttrStrengths kiadja a saját alak-rétegét
+   (`_shape`), tehát a mostani tengelyekből kivonjuk a MOSTANI alakot és
+   hozzáadjuk a MÁSIKÉT — minden más réteg (névsor, megbízások, skillek)
+   változatlan. Pont ezt a kérdést méri: mit tesz MAGA AZ ALAK.
+   AMIT NEM MÉR: a felállásváltás a kezdő 11 ÖSSZETÉTELÉT is átrendezi (más
+   ember lép pályára), és az önmagában nagyobbat mozdíthat, mint az alak. Ezt
+   a panel ki is mondja — hallgatni róla félrevezetés volna. */
+function formShapeWhatIf(){
+  const key=(S.tactics&&S.tactics.active)||null;
+  if(!key||!TACTICS[key])return null;
+  let A,lvl;
+  try{A=teamAttrStrengths();lvl=tacticLevel(key);}catch(e){return null;}
+  /* ---- CSAK AZ ALAK RÉTEGÉT CSERÉLJÜK, ÉS EZ SZÁNDÉKOS ----
+     A felállás KÉT úton hat a tengelyekre. Az egyik MAGA AZ ALAK
+     (formShapeAxisShift) — ezt cseréljük. A másik a NÉVSOR: más alakban más a
+     szerep-eloszlás (a 4-4-2-ben négy védő és két csatár, a 3-4-3-ban három és
+     három), tehát ugyanaz a tizenegy ember más súlyokkal kerül a tengelyekre,
+     és a kiszorulók helyére más lép be a padról.
+     A MÁSODIKAT NEM MÉRJÜK IDE, mert az nem a FELÁLLÁS ára, hanem a
+     KERETEDÉ — és mert egy előrejelzés belőle csak addig igaz, amíg pontosan
+     ugyanazok az emberek állnak rendelkezésre. (Mérve: a névsor-átrendezés
+     ugyanazon a kereten 4-7 százalékponttal viszi el a fitet — nagyobbat,
+     mint maga az alak.) A panel ezt ki is mondja, nem hallgatja el.
+     ÍGY VISZONT PONTOS: a teamAttrStrengths kiadja a saját alak-rétegét
+     (`_shape`), tehát kivonjuk a mostanit, hozzáadjuk a másikét, és minden más
+     réteg érintetlen marad. A mostani felállásra ezért betűre azt adja, amit a
+     motor is számol. */
+  const sh0=A._shape||{};
+  const fitOf=f=>{
+    if(f===form)return tacticFit(key,A);
+    const sh=formShapeAxisShift(f),A2={};
+    ATTR_KEYS.forEach(k=>{A2[k]=(A[k]||0)-(sh0[k]||0)+(sh[k]||0);});
+    return tacticFit(key,A2);};
+  /* ugyanaz a képlet, mint a tacticEffect — csak tetszőleges fit-tel */
+  const effOf=fit=>{
+    const d=lvl-85;
+    return d<0?d*0.10*(1.3-0.6*fit):Math.min(2.1,d*0.15)*(0.7+0.6*fit);};
+  return {key,lvl,fitOf,effOf,curFit:fitOf(form),curEff:effOf(fitOf(form))};}
 function formShapeTableHtml(){
   const keys=availableFormKeys();
   if(!keys.length)return "";
   const sgn=v=>(Math.abs(v)<0.05?"0":(v>0?"+":"−")+Math.abs(v).toFixed(1).replace(".",","));
   const col=v=>Math.abs(v)<0.05?"var(--dim2)":(v>0?"var(--grass)":"var(--red)");
+  const W=formShapeWhatIf();
   /* VÉDEKEZÉS SZERINT RENDEZVE: felül a legzártabb alak, alul a legnyíltabb —
      így a táblázat egy pillantásra sorrend, nem csak számhalmaz. */
   keys.sort((a,b)=>formShapeAxisShift(b).ved-formShapeAxisShift(a).ved);
   const rows=keys.map(f=>{
     const s=formShapeAxisShift(f),cur=f===form;
     const cell=k=>`<td style="padding:1px 0 1px 10px;text-align:right;color:${col(s[k])}">${sgn(s[k])}</td>`;
+    /* A KÉT UTOLSÓ OSZLOP a döntés nyelvén beszél: mennyi lenne az
+       illeszkedésed ezzel az alakkal, és az mennyit ér a mostanihoz képest. */
+    let extra="";
+    if(W){
+      const fit=W.fitOf(f),d=W.effOf(fit)-W.curEff;
+      const dc=Math.abs(d)<0.05?"var(--dim2)":(d>0?"var(--grass)":"var(--red)");
+      extra=`<td style="padding:1px 0 1px 12px;text-align:right">${Math.round(fit*100)}%</td>`
+        +`<td style="padding:1px 0 1px 10px;text-align:right;color:${dc}">${
+            cur?"—":(Math.abs(d)<0.05?"0":(d>0?"+":"−")+Math.abs(d).toFixed(2).replace(".",","))}</td>`;}
     return `<tr style="${cur?"font-weight:700":"color:var(--dim)"}">
       <td style="padding:1px 0;white-space:nowrap">${cur?"▸ ":""}${esc(FORM_LABELS[f]||f)}</td>
-      ${cell("ved")}${cell("passz")}${cell("gol")}</tr>`;}).join("");
+      ${cell("ved")}${cell("passz")}${cell("gol")}${extra}</tr>`;}).join("");
   return `<div style="margin-top:8px;border-top:1px dashed var(--line);padding-top:6px;font-size:11.5px;line-height:1.5;color:var(--dim2)">
     <b style="color:var(--gold)">📊 Mit ad maga az alak?</b> — ugyanazzal a kerettel, a 4-4-2-höz mérve, attribútumpontban.
     <div style="overflow-x:auto;margin-top:4px"><table style="font-size:11px;border-collapse:collapse">
       <tr style="color:var(--dim2);font-size:10px;text-transform:uppercase;letter-spacing:.5px">
         <td>felállás</td><td style="padding-left:10px;text-align:right">védekezés</td>
-        <td style="padding-left:10px;text-align:right">passz</td><td style="padding-left:10px;text-align:right">gólszerzés</td></tr>
+        <td style="padding-left:10px;text-align:right">passz</td><td style="padding-left:10px;text-align:right">gólszerzés</td>
+        ${W?`<td style="padding-left:12px;text-align:right">illeszk.</td><td style="padding-left:10px;text-align:right">az alak ára</td>`:""}</tr>
       ${rows}</table></div>
+    ${W?`<div style="margin-top:5px;color:var(--dim)">Az utolsó két oszlop a <b>${esc(TACTICS[W.key].n)}</b> (${Math.round(W.lvl)}) rendszereddel számol: mit adna ez az <b>alak</b> az illeszkedésedhez, és az <b>hány Rating-pontnyit</b> érne a mérkőzésen a mostanihoz képest.
+    <div style="margin-top:3px">Ez az ALAK ára — <b>változatlan névsorral</b>. A váltás a kezdő 11 összetételét is átrendezi, és az önmagában nagyobbat mozdíthat (mérve: 4-7 százalékpontot), csak az már nem a felállás ára, hanem a kereté.</div>
+    <div style="margin-top:3px">Nagyságrendben: <b>a felállás alakja tized-Ratingekben mér.</b> Ennél sokkal többet nyom a taktikád <b>begyakorlottsága</b> (85 alatt akár −4), a <b>morál</b> (±2,5), a <b>megbízások</b> ára (lásd lent, akár −2,8) és egy <b>piros lap</b> (−2,5).</div>`:""}
     <span style="color:var(--dim)">Az ötös védelem és a népes középpálya véd, a három támadó gólt szerez — ez a szám a tengelyeidre ül rá, a megbízások (védekező/támadó középpályás) pedig tovább hangolják.</span></div>`;}
 function renderFormationPicker(){
   const cost=formationChangeCost();
