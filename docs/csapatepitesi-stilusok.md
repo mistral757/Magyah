@@ -780,9 +780,9 @@ igényel új szimulációs ágat.
   bosszantó volna, ha minden kattintás visszacsukná. A nyitás/csukás megőrzi a
   görgetést: a megnyomott fejléc a képernyőn a helyén marad.
 
-* **Szezon-szerepek — Bombázók és Beton (3.2.00).** A két „szélső" filozófia
-  kap egy döntést, amit a többi nem: **minden idényben három embert jelöl ki
-  három feladatra**. A szerep nem képesség és nem poszt — csak a mérkőzés egy
+* **Szezon-szerepek — Bombázók, Beton és Villám (3.2.00 / 3.3.39).** Három
+  filozófia kap egy döntést, amit a többi nem: **minden idényben három embert
+  jelöl ki három feladatra**. A szerep nem képesség és nem poszt — csak a mérkőzés egy
   adott SZAKASZÁBAN él, ettől lesz taktikai döntés, nem puszta számnövelés.
 
   | Stílus | Szerep | Mikor él | Mit csinál |
@@ -793,6 +793,37 @@ igényel új szimulációs ágat.
   | 🧱 | **Fal** | 75. perctől, amíg pályán van | ellenfél-gólesély −2,5% → −10% |
   | 🧱 | **Árok** | az első 25 percben, amíg az ellenfél még nem szerzett gólt | ellenfél-gólesély −3% → −11% |
   | 🧱 | **Kereszttűz** | 35-60. perc, amíg pályán van | ellenfél-gólesély −2,5% → −10%; cserébe piros/sérülés-súlya ×1,15 → ×1,75, és enyhe gólpassz-előnye van |
+  | ⚡ | **Box-to-box** | végig, amíg pályán van | gólpassz-súly ×1,015 → ×1,07 · ellenfél-gólesély −1% → −4% · **+1 / +1,25 / +1,5 pont** taktikai illeszkedés 85 / 90 / 95 sebesség fölött |
+  | ⚡ | **Legolas** | végig, amíg pályán van | a **CSAPAT** gólesélye +1,5% → **+5%** · a sajátja gólban ÉS gólpasszban +2,5% → +9% |
+  | ⚡ | **Robben berobban** | végig, amíg pályán van | a saját gólsúlya ×1,035 → **×1,15** · a csapaté +1,5% → +7% |
+
+  **A VILLÁM MÁSKÉPP MŰKÖDIK, és ez szándékos.** A másik két stílus szerepei a
+  meccs egy SZAKASZÁRA szólnak (a hajrára, az első 25 percre); a Villámé addig
+  él, amíg az EMBER a pályán van — mert ez a stílus nem egy időablakot ural,
+  hanem egy embert enged el. Cserébe szigorú a **belépő**:
+
+  | szerep | kire jelölhető |
+  |---|---|
+  | Box-to-box | védő vagy középpályás (a szélső is az — `ROLE_CATS`) |
+  | Legolas | **95-ös sebesség fölött**, Infinityben **100+** |
+  | Robben | ismeri a **középcsatár** posztot (másodlagosan vagy tanultan), és **90+** a sebessége |
+
+  A Legolas belépője a játék egyik legmagasabb attribútum-küszöbe, és
+  Infinityben feljebb csúszik: ott a teljes mezőny feljebb tolódik, tehát a 95
+  már nem kiemelkedő. Egy szám, két világ.
+
+  **A csapatszintű szorzók szerényebbek az egyéni súlyoknál.** Egy egyéni
+  gólsúly EGY ember esélyét tolja a tizenegyen belül; a Legolas és a Robben
+  csapat-szorzója viszont az egész gólvárhatóságot emeli — ugyanaz a szám ott
+  nagyságrenddel többet ér. A kettő együtt, 3. szinten, mindkettőjükkel a
+  pályán: **×1,12 a csapat gólesélyén**.
+
+  A **Box-to-box illeszkedés-bónusza** az egyetlen szerep-hatás, ami nem a
+  képesség szintjétől függ, hanem a JÁTÉKOS SEBESSÉGÉTŐL. A logika: egy
+  box-to-box csak akkor tudja tényleg összekötni a két tizenhatost, ha van
+  hozzá lába — a képesség a gólpasszt és a védekezést emeli, ezt a láb. A
+  bónusz a KERETBEN lévő emberre jár (nem a pályán): az illeszkedés a meccs
+  ELŐTT dől el, ott még nincs „pálya".
 
   **Egy képesség emeli mind a hármat**, stílusonként egy („Kiosztott
   szerepek", III. sáv). A szerepek képesség NÉLKÜL is hatnak, csak aprón; a
@@ -809,6 +840,13 @@ igényel új szimulációs ágat.
   A kiosztás a szezonhoz kötődik: `roleState()` a szezonszám elmozdulásánál
   üres táblát ad, tehát nem „felejt", hanem lejár. Egy ember egyszerre egy
   szerepet visel.
+
+  **HATÁR: a szerepek a párharcban NEM hatnak.** A H2H szimuláció mindkét
+  oldalt egyetlen, sorosított pillanatképből számolja (`h2hSimulate`), és abba
+  a szerep-szorzók nem utaznak — ahogy a `roleGoalMult` sem szerepel a drótra
+  fűzött gólsúlyokban. Ez a rendszer indulása óta így van, mind a három
+  stílusnál; nem a Villámmal keletkezett. Kiterjeszteni a `defMult` mintájára
+  lehetne (a pillanatképbe rakva), de az önálló döntés.
 
 * **Nulla a tábla — Beton (3.2.00).** A kihívás-rendszer a stílus nyelvén
   szólal meg: gyakrabban jön kapott gól nélküli kihívás (35/50/65% eséllyel),

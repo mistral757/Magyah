@@ -3106,7 +3106,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.38";
+const APP_VERSION="3.3.39";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10408,7 +10408,14 @@ function tacticFit(key,A0){
   let z=0;
   tacticFitParts(key,A0).forEach(p=>{z+=p.d;});
   const raw=Math.max(0,Math.min(1,0.5+z*TACTIC_FIT_C));
-  return Math.min(1,raw*(1+styleTacticPaceBoost(key)));}
+  /* A VILLÁM BOX-TO-BOX SZEREPE SZÁZALÉKPONTOT AD, nem szorzót — ezért a
+     pace-bónusz UTÁN adódik hozzá. Itt, a fit egyetlen forrásában van a helye
+     (ugyanaz az indok, mint a styleTacticPaceBoost-nál): hat rendszer olvassa a
+     fitet, és ha csak egy részük tudna a bónuszról, a panel mást állítana,
+     mint a motor. */
+  let f=Math.min(1,raw*(1+styleTacticPaceBoost(key)));
+  let bonus=0;try{bonus=roleFitBonusPP();}catch(e){}
+  return Math.max(0,Math.min(1,f+bonus/100));}
 /* ================= TENGELY-MÉRŐ (kalibrációs napló) =================
    MIÉRT VAN RÁ SZÜKSÉG. Az AXIS_OFFSET/AXIS_SCALE konstansok mind MÉRÉSBŐL
    születtek — de a méréseket a 99-es sebesség-plafon idején, 70-120-as
@@ -28282,6 +28289,7 @@ function playMatch(){
      rossz sorozatban, kinek kerek ez a meccse). A careerStats csak a lefújásnál
      nő, ezért itt még a meccs előtti számok állnak — pont ez kell. */
   const MILE=mileBegin(active);
+  try{vlMatchReset();}catch(e){}   /* VILLÁM: a meccs ritmus-mérője */
   const capPlaying=MS.capPlaying;
   const famSp=MS.famSp;
   const gi=MS.gi,bi=MS.bi;
@@ -28559,8 +28567,13 @@ function playMatch(){
       const specTxt=spec?` — ${esc(spec.inst.skill.name)}${skillProgressSuffix(spec.inst)}`:"";
       if(Math.random()<hit){
         gf++;mScore[taker.n]=(mScore[taker.n]||0)+1;recordScorer(taker.n);
+        /* A percet ELŐRE húzzuk (gminTxt(x) ≡ sbMinTxt(gmin(x))), mert a Villám
+           ritmus-mérője PONTOS percet kér — egy 5 perces vödör egy 15 perces
+           ablakon már érdemben torzítana. */
+        const _pgm=gmin(min);
+        try{vlNoteGoal(_pgm,taker.n,null);}catch(e){}
         updateTTBoard(fx,gf,ga,Math.min(90,min));
-        addLine(`${gminTxt(min)}  TIZENEGYES! ${esc(shortName(taker.n))} magabiztosan értékesíti  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+        addLine(`${sbMinTxt(_pgm)}  TIZENEGYES! ${esc(shortName(taker.n))} magabiztosan értékesíti  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
         sbEv("us","goal",taker.n);
         /* A skill csak akkor szólal meg, ha tényleg ő állt a labda mögé — és a
            fordítás-helyzetet külön kimondjuk, mert az ICE COLD ott a legerősebb. */
@@ -28624,9 +28637,11 @@ function playMatch(){
            kódja megvolt (SHOT_SKILL_BONUS.mf_fk=4), csak sosem fért ki. */
         openGoalNotes(GOAL_NOTE_BUDGET,taker.n);
         gf++;mScore[taker.n]=(mScore[taker.n]||0)+1;recordScorer(taker.n);
+        const _fgm=gmin(min);
+        try{vlNoteGoal(_fgm,taker.n,null);}catch(e){}
         const fkSk=playerSkills(taker.n).find(i=>i.skill.id==="mf_fk"||i.skill.id==="df_cannon");
         updateTTBoard(fx,gf,ga,Math.min(90,min));
-        addLine(`${gminTxt(min)}  SZABADRÚGÁSGÓL! ${esc(shortName(taker.n))} a sorfal fölött a kapuba csavarja${fkSk?` — ${esc(fkSk.skill.name)}${skillProgressSuffix(fkSk)} is közrejátszott`:""}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+        addLine(`${sbMinTxt(_fgm)}  SZABADRÚGÁSGÓL! ${esc(shortName(taker.n))} a sorfal fölött a kapuba csavarja${fkSk?` — ${esc(fkSk.skill.name)}${skillProgressSuffix(fkSk)} is közrejátszott`:""}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
         sbEv("us","goal",taker.n);
         /* Saját szövegkészlet: eddig a gólra EGYETLEN mondat jutott, ezért a
            szabadrúgás mindig ugyanúgy hangzott. */
@@ -28778,6 +28793,7 @@ function playMatch(){
         const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*crossTargetMult(slots[x.idx].pos)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*roleGoalMult(x.p.n,90,gf,ga)*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
         const dramaScorer=active[si].p;
         mScore[dramaScorer.n]=(mScore[dramaScorer.n]||0)+1;recordScorer(dramaScorer.n);
+        try{vlNoteGoal(dMin,dramaScorer.n,null);}catch(e){}
         updateGoallessStreak(dramaScorer.n,true);
         updateTTBoard(fx,gf,ga,90);
         const _txt=lateGoalTxt({side:"us",who:esc(shortName(dramaScorer.n)),
@@ -28802,7 +28818,7 @@ function playMatch(){
       maxDeficit=Math.max(maxDeficit,ga-gf);maxLead=Math.max(maxLead,gf-ga);}
     /* PÁRHARCBAN a vödör góljai a KÖZÖS listából jönnek; egyébként poisson. */
     const duelMine=DUEL?(duelBkt.mine[min/5]||[]):null;
-    let g=DUEL?duelMine.length:poisson(lf*clutchAttackMult(active,min,gf,ga)*busOwnMult()/18);
+    let g=DUEL?duelMine.length:poisson(lf*clutchAttackMult(active,min,gf,ga)*busOwnMult()*roleOwnGoalMult(active,redIdx)/18);
     for(let k=0;k<g;k++){
       gf++;
       let si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf,ga)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
@@ -28835,6 +28851,10 @@ function playMatch(){
         mAssist[asst.n]=(mAssist[asst.n]||0)+1;recordAssist(asst.n);
         atxt=` (${esc(shortName(asst.n))})`;asstName=asst.n;
         asstSk=playerSkills(asst.n).find(i=>i.skill.type==="assistw");}
+      /* VILLÁM — RITMUS: itt már a GÓLPASSZ is eldőlt, ezért a jojó-mérce
+         (gól+gólpassz egy félidőn belül) csak innen tud pontos lenni. A többi
+         gólútvonalon nincs gólpassz, ott a gól magában megy fel. */
+      try{vlNoteGoal(goalMin,scorer.n,asstName);}catch(e){}
       updateTTBoard(fx,gf,ga,Math.min(90,min));
       addLine(`${sbMinTxt(goalMin)}  GÓL! ${esc(shortName(scorer.n))}${atxt}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
       /* a táblára SZÁNDÉKOSAN csak a gólszerző kerül fel — a gólpasszt a valódi
@@ -29165,10 +29185,12 @@ function playMatch(){
       if(sc&&!scInUse&&playerSkills(sc.n).some(i=>i.skill.id==="fw_supersub")&&Math.random()<0.05/18*(min>=75?1.8:1)){
         supersubStruck=true;gf++;
         mScore[sc.n]=(mScore[sc.n]||0)+1;recordScorer(sc.n);
+        const _sgm=gmin(min);
+        try{vlNoteGoal(_sgm,sc.n,null);}catch(e){}
         updateGoallessStreak(sc.n,true);
         const inst=playerSkills(sc.n).find(i=>i.skill.id==="fw_supersub");
         updateTTBoard(fx,gf,ga,Math.min(90,min));
-        addLine(`${gminTxt(min)}  🔥 A PADRÓL! ${esc(shortName(sc.n))} beugrik a semmiből és betalál — csereként is halálos!  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+        addLine(`${sbMinTxt(_sgm)}  🔥 A PADRÓL! ${esc(shortName(sc.n))} beugrik a semmiből és betalál — csereként is halálos!  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
         sbEv("us","goal",sc.n);
         if(inst)addLine(`→ ${esc(inst.skill.name)}${skillProgressSuffix(inst)} — pont ezért ül a padon`,"m skillnote");
         maxDeficit=Math.max(maxDeficit,ga-gf);maxLead=Math.max(maxLead,gf-ga);}}
@@ -29416,6 +29438,7 @@ function playMatch(){
         const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58),null,spreadSkipGK);
         const sc=active[si].p;
         gf++;mScore[sc.n]=(mScore[sc.n]||0)+1;recordScorer(sc.n);
+        try{vlNoteGoal(emin,sc.n,null);}catch(e){}
         updateTTBoard(fx,gf,ga,emin);
         addLine(`${emin}'  GÓL A HOSSZABBÍTÁSBAN! ${esc(shortName(sc.n))}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
         sbEv("us","goal",sc.n,emin,`${emin}'`);}
@@ -29941,6 +29964,9 @@ function playMatch(){
        felülír — utólag visszakereshetetlenek, ezért a csúcsukat itt tesszük
        el. A fordítás csak GYŐZELEMMEL számít: hátrányból egyenlíteni nem
        ugyanaz, mint megfordítani. */
+    /* VILLÁM: a ritmus-számlálók átvezetése a maradandó mérföldkövekbe. A
+       msNoteMatch ELŐTT, hogy ugyanabban a lefújásban legyen kész. */
+    try{vlMatchCommit();}catch(e){}
     if(gameMode==="career")
       msNoteMatch({goalsFor:gf,saves:saveCount,
         comeback:gf>ga?maxDeficit:0,winStreak:S.winStreak||0,
@@ -45366,6 +45392,54 @@ function msNoteGiantKill(gap){
     t.giantKills=(t.giantKills||0)+1;
     t.giantMax=Math.max(t.giantMax||0,Math.round(gap*10)/10);
   }catch(e){}}
+/* ================= ⚡ VILLÁM: A MECCS RITMUSA =================
+   Három mérföldkő-család olyat mér, amit eddig SEMMI nem jegyzett fel: a gólok
+   IDŐBELI sűrűségét. A careerStats összegez, a msNoteMatch a meccs végén kap
+   számokat — egyikből sem derül ki, hogy két gól tíz percen belül esett-e vagy
+   nyolcvan alatt szórva. Márpedig a Villám pont erről szól: nem arról, hogy
+   sok gólt lősz, hanem hogy HIRTELEN lősz sokat.
+
+   Ezért kell egy meccs alatt élő, apró tároló. Csupa szám, a mérkőzés végén
+   kiürül, mentésbe nem kerül — a MARADANDÓ számok belőle a msT() számlálóiba
+   mennek át (vlQuick2, vlTriple3, vlYo2/3/4).
+
+   ÁTFEDŐ ABLAKOK: három gól a 10., 20. és 30. percben KÉT „gyors kettőt" ad
+   (10-20 és 20-30), mert tényleg kétszer történt meg. A „hopp a tripla" a
+   hármas ablakokat számolja ugyanígy. Ez tudatos: a mérce az ESEMÉNY, nem a
+   meccs — különben egy gólzáporban is csak egyszer szólalna meg.
+
+   A JOJÓ FÉLIDŐNKÉNT ÉS EMBERENKÉNT mér: aki egy félidőben négyszer szállt be
+   (gól vagy gólpassz), az MINDHÁROM lépcsőn lép egyet (2-es, 3-as, 4-es) —
+   nem külön díjak, hanem ugyanannak a teljesítménynek három mércéje. */
+const VL_QUICK2_MIN=15;    /* két gól ennyi percen belül */
+const VL_TRIPLE3_MIN=30;   /* három gól ennyi percen belül */
+let _vlM=null;
+function vlMatchReset(){_vlM={g:[],c:{}};}
+/* A gól és (ha van) a gólpassz percével. Minden gólútvonal ezen megy át. */
+function vlNoteGoal(min,scorer,assist){
+  try{
+    if(gameMode!=="career"||!_vlM)return;
+    const m=Math.max(1,Math.round(min||0));
+    _vlM.g.push(m);
+    const half=(m<=45)?1:2;
+    const add=n=>{if(!n)return;const k=half+"|"+n;_vlM.c[k]=(_vlM.c[k]||0)+1;};
+    add(scorer);add(assist);
+  }catch(e){}}
+function vlMatchCommit(){
+  try{
+    if(gameMode!=="career"||!_vlM)return;
+    const t=msT(),g=_vlM.g.slice().sort((a,b)=>a-b);
+    let q2=0,t3=0;
+    for(let i=1;i<g.length;i++)if(g[i]-g[i-1]<=VL_QUICK2_MIN)q2++;
+    for(let i=2;i<g.length;i++)if(g[i]-g[i-2]<=VL_TRIPLE3_MIN)t3++;
+    if(q2)t.vlQuick2=(t.vlQuick2||0)+q2;
+    if(t3)t.vlTriple3=(t.vlTriple3||0)+t3;
+    Object.values(_vlM.c).forEach(c=>{
+      if(c>=2)t.vlYo2=(t.vlYo2||0)+1;
+      if(c>=3)t.vlYo3=(t.vlYo3||0)+1;
+      if(c>=4)t.vlYo4=(t.vlYo4||0)+1;});
+  }catch(e){}
+  _vlM=null;}
 /* Egy lejátszott mérkőzés maradandó számai. */
 function msNoteMatch(o){
   try{
@@ -45964,11 +46038,61 @@ const ROLE_DEFS={
   arok:{style:"beton",ic:"🕳️",n:"Árok",
     d:"A meccs elején (25. percig), amíg az ellenfél még nem szerzett gólt, csökkenti az esélyét, hogy övé legyen az első találat.",
     v:[0.97,0.945,0.92,0.89],u:"ellenfél-gólesély az első 25 percben"},
+  /* ---- ⚡ HOL JÖN A MENNYDÖRGÉS? ----
+     A másik két stílus szerepei a meccs egy SZAKASZÁRA szólnak (a hajrára, az
+     első 25 percre). A Villámé másképp: itt a szerep addig él, amíg az EMBER a
+     pályán van — mert ez a stílus nem egy időablakot ural, hanem egy embert
+     enged el. Cserébe szigorú a BELÉPŐ: a három szerepre nem bárki jelölhető
+     (lásd roleEligible), és a Legolas belépője a játék egyik legmagasabb
+     attribútum-küszöbe.
+     A CSAPATSZINTŰ SZORZÓK (Legolas, Robben) szándékosan szerényebbek az
+     egyéni súlyoknál: azok EGY ember esélyét tolják a tizenegyen belül, ez
+     viszont az egész csapat gólvárhatóságát emeli — ugyanaz a szám itt
+     nagyságrenddel többet ér. */
+  b2b:{style:"villam",ic:"🔁",n:"Box-to-box",
+    d:"Végigfutja az egész pályát: amíg a pályán van, nagyobb eséllyel ő a gólpasszadó, és csökken az ellenfél gólesélye. Ha gyors is, a taktikai illeszkedésen is javít.",
+    v:[1.015,1.03,1.05,1.07],v2:[0.99,0.98,0.97,0.96],
+    u:"gólpassz-súly, amíg a pályán van",
+    who:"védő vagy középpályás"},
+  legolas:{style:"villam",ic:"🏹",n:"Legolas",
+    d:"Gyorsléptű, könnyed szélső. Amíg a pályán van, az EGÉSZ csapat gólesélye nő — és az övé külön is, gólban és gólpasszban egyaránt.",
+    v:[1.015,1.03,1.04,1.05],v2:[1.025,1.05,1.07,1.09],
+    u:"a CSAPAT gólesélye, amíg a pályán van",
+    who:"95-ös sebesség fölött (Infinityben 100+)"},
+  robben:{style:"villam",ic:"💨",n:"Robben berobban",
+    d:"A befelé húzódó, robbanékony csatár. A saját gólesélye ugrik meg a legjobban, de a csapaté is nő, amíg a pályán van.",
+    v:[1.035,1.07,1.10,1.15],v2:[1.015,1.03,1.05,1.07],
+    u:"a saját gólsúlya, amíg a pályán van",
+    who:"középcsatár, 90-es sebesség fölött"},
   kereszttuz:{style:"beton",ic:"⚔️",n:"Kereszttűz",
     d:"Keményebben megy bele: nő a piros lap és a sérülés esélye — cserébe amíg pályán van, a félidő környékén (35-60. perc) csökken az ellenfél gólesélye, és neki magának enyhe gólpassz-előnye van.",
     v:[0.975,0.955,0.93,0.90],v2:[1.15,1.3,1.5,1.75],v3:[1.1,1.2,1.35,1.5],
     u:"ellenfél-gólesély a 35-60. percben"}};
-const ROLE_KEYS_OF={bombazok:["nyito","befejezo","talalo"],beton:["fal","arok","kereszttuz"]};
+const ROLE_KEYS_OF={bombazok:["nyito","befejezo","talalo"],beton:["fal","arok","kereszttuz"],
+  villam:["b2b","legolas","robben"]};
+/* ---- A BELÉPŐ ----
+   A Bombázók és a Beton szerepeire bárki jelölhető (a kapust kivéve); a
+   Villáméira NEM. Itt a szerep maga egy alkati kérdés — egy lassú szélső nem
+   Legolas —, ezért a küszöb a kiosztás feltétele, nem a hatás módosítója.
+   A SEBESSÉG-KÜSZÖB INFINITYBEN FELJEBB CSÚSZIK: ott a teljes attribútum-mezőny
+   feljebb tolódik, tehát a 95 már nem kiemelkedő. Egy szám, két világ. */
+function roleSpeedOf(p){
+  try{const a=attrsOfPlayer(p);return (a&&a.seb)||0;}catch(e){return 0;}}
+function roleLegolasMin(){return infinityMode?100:95;}
+function roleEligible(key,p){
+  if(!p||!p.n)return false;
+  let cat=null;
+  try{cat=getCategoryFor((p.pos&&p.pos[0])||"KKP");}catch(e){}
+  if(key==="b2b")return cat==="VEDO"||cat==="KOZEPPALYAS";
+  if(key==="legolas")return roleSpeedOf(p)>=roleLegolasMin();
+  /* Robben: a KÖZÉPCSATÁR posztot kell ismernie — akár másodlagosan, akár
+     tanultan. A poszt-tanulás a pool-bejegyzés pos-tömbjébe írja be magát,
+     tehát a kettő ugyanazon a listán látszik. */
+  if(key==="robben"){
+    const e=(careerPool&&careerPool[p.n])||null;
+    const pos=(e&&e.pos)||p.pos||[];
+    return pos.indexOf("CS")>=0&&roleSpeedOf(p)>=90;}
+  return true;}
 function roleKeysForStyle(){return ROLE_KEYS_OF[styleKey()]||[];}
 function roleStyleActive(){return roleKeysForStyle().length>0;}
 /* A képesség szintje — stílusonként EGY képesség emeli mind a hármat. */
@@ -46011,13 +46135,52 @@ function roleGoalMult(name,min,gf,ga){
   if(roleOf("befejezo")===name&&min>=60){
     const lead=gf-ga;
     if(lead>=1&&lead<=2)m*=roleVal("befejezo");}
+  /* VILLÁM: a Robben saját gólsúlya és a Legolas kettős előnyének gól-fele. */
+  if(roleOf("robben")===name)m*=roleVal("robben");
+  if(roleOf("legolas")===name)m*=roleVal("legolas","v2");
   return m;}
 function roleAssistMult(name){
   if(!name||!roleStyleActive())return 1;
   let m=1;
   if(roleOf("talalo")===name)m*=roleVal("talalo");
   if(roleOf("kereszttuz")===name)m*=roleVal("kereszttuz","v3");
+  /* VILLÁM: a Box-to-box gólpassz-súlya és a Legolas kettős előnye. Nincs
+     időablak — a szerep addig él, amíg az ember a pályán van, azt pedig a
+     hívási hely már eldöntötte (a súlyozás csak a pályán lévőkre fut). */
+  if(roleOf("b2b")===name)m*=roleVal("b2b");
+  if(roleOf("legolas")===name)m*=roleVal("legolas","v2");
   return m;}
+/* ---- VILLÁM: A CSAPAT GÓLESÉLYE ----
+   A Legolas és a Robben nem csak a saját súlyát emeli, hanem az EGÉSZ csapat
+   gólvárhatóságát — amíg a pályán van. Ez a párja a roleOppGoalMult-nak, csak
+   a másik oldalon: az a kapott gólt fogja vissza, ez a lőttet emeli.
+   A KIÁLLÍTOTT NEM SZÁMÍT (redIdx) — aki lement, az nem robban be. */
+function roleOwnGoalMult(active,redIdx){
+  if(!roleStyleActive())return 1;
+  const on=nm=>!!nm&&active.some((x,i)=>i!==redIdx&&x.p&&x.p.n===nm);
+  let m=1;
+  if(on(roleOf("legolas")))m*=roleVal("legolas");
+  if(on(roleOf("robben")))m*=roleVal("robben","v2");
+  return m;}
+/* ---- VILLÁM: A BOX-TO-BOX ILLESZKEDÉS-BÓNUSZA ----
+   SZÁZALÉKPONTBAN, a taktika-illeszkedésre. Az egyetlen szerep-hatás, ami nem
+   a képesség szintjétől függ, hanem a JÁTÉKOS SEBESSÉGÉTŐL: 85 alatt semmi, és
+   onnan három lépcsőben nő. A logika az, hogy egy box-to-box csak akkor tudja
+   tényleg összekötni a két tizenhatost, ha van hozzá lába — a képesség a
+   gólpasszt és a védekezést emeli, ezt a láb.
+   A KERETBEN kell lennie, nem a pályán: az illeszkedés a MECCS ELŐTT dől el
+   (a taktika-panel és a begyakorlás is ebből olvas), ott még nincs „pálya". */
+const ROLE_B2B_FIT=[[95,1.5],[90,1.25],[85,1]];
+function roleFitBonusPP(){
+  if(!roleStyleActive())return 0;
+  const nm=roleOf("b2b");
+  if(!nm)return 0;
+  let p=null;
+  try{p=msRoster().find(x=>x&&x.n===nm);}catch(e){}
+  if(!p)return 0;
+  const sp=roleSpeedOf(p);
+  const hit=ROLE_B2B_FIT.find(r=>sp>=r[0]);
+  return hit?hit[1]:0;}
 /* A TÁLALÓ CÉLZOTT RÁHATÁSA: ha a gólszerző a Nyitó vagy a Befejező, a Tálaló
    gólpassz-súlya külön megszorzódik. Ezért kell a gólszerző neve is. */
 function roleAssistTargetMult(assistName,scorerName){
@@ -46035,6 +46198,9 @@ function roleOppGoalMult(active,redIdx,min,ga){
   if(min>=75&&on(roleOf("fal")))m*=roleVal("fal");
   if(min<=25&&ga===0&&on(roleOf("arok")))m*=roleVal("arok");
   if(min>=35&&min<=60&&on(roleOf("kereszttuz")))m*=roleVal("kereszttuz");
+  /* VILLÁM: a Box-to-box VÉGIG hat, nem egy ablakban — ezért szerényebb is a
+     szorzója, mint a Falé vagy az Ároké. */
+  if(on(roleOf("b2b")))m*=roleVal("b2b","v2");
   return m;}
 /* KERESZTTŰZ: a piros lap és a sérülés súlyszorzója erre az egy emberre. */
 function roleRiskMult(name){
@@ -46392,23 +46558,39 @@ function fameSectionHtml(){
 function roleCandidates(key){
   const list=msRoster().filter(p=>p&&p.n);
   const outfield=list.filter(p=>!(p.pos&&p.pos[0]==="KP"));
-  const pool=(key==="nyito"||key==="befejezo"||key==="talalo")?outfield:list;
+  /* A BELÉPŐ ELŐBB SZŰR, aztán jön a rangsorolás. Enélkül a Villám listáján
+     ott állnának a nem jelölhető emberek is — és egy kiválaszthatatlan opció
+     rosszabb, mint egy rövid lista. */
+  let pool=(key==="nyito"||key==="befejezo"||key==="talalo")?outfield:list;
+  pool=pool.filter(p=>roleEligible(key,p));
   const cs=n=>(S.careerStats&&S.careerStats[n])||{};
   const score=p=>{
     const c=cs(p.n),m=Math.max(1,c.matches||1);
     const ovr=(()=>{try{return pOvr(p);}catch(e){return 0;}})();
     if(key==="talalo"||key==="kereszttuz")return (c.a||0)/m*100+ovr;
     if(key==="fal"||key==="arok")return ovr;
+    /* VILLÁM: a szerepek alkati kérdések, tehát a SEBESSÉG a fő rendező —
+       a Box-to-boxnál a gólpassz-termés mellett, a másik kettőnél a gól mellett. */
+    if(key==="b2b")return roleSpeedOf(p)+(c.a||0)/m*100+ovr/10;
+    if(key==="legolas"||key==="robben")return roleSpeedOf(p)+(c.g||0)/m*100+ovr/10;
     return (c.g||0)/m*100+ovr;};
   return pool.slice().sort((a,b)=>score(b)-score(a)).slice(0,24);}
 function roleSectionHtml(){
   const R=roleState(),lv=roleLevel();
   const sk=styleKey();
   const traitT=styleTraitByKey("szerepek");
+  /* A BEVEZETŐ NEM MONDHAT MÁST, MINT AMI TÖRTÉNIK. A Bombázók és a Beton
+     szerepei a meccs egy SZAKASZÁRA szólnak; a Villáméi addig élnek, amíg az
+     ember a pályán van. Ugyanaz a mondat a másodikra egyszerűen hamis volna. */
+  const whole=(sk==="villam");
   let h=`<div class="infoCard" style="margin-top:12px">`
     +`<div class="msNote">Minden idényben <b>három embert</b> jelölsz ki három feladatra. `
-    +`A szerep nem képesség és nem poszt: csak a mérkőzés egy adott <b>szakaszában</b> él — `
-    +`ettől lesz taktikai döntés, nem puszta számnövelés. A kiosztás a szezon végén lejár.</div>`
+    +`A szerep nem képesség és nem poszt: `
+    +(whole
+      ?`addig él, amíg az <b>ember a pályán van</b> — ez a stílus nem egy időablakot ural, hanem egy embert enged el. `
+       +`Cserébe mindháromnak saját <b>belépője</b> van: nem bárki jelölhető rájuk.`
+      :`csak a mérkőzés egy adott <b>szakaszában</b> él — ettől lesz taktikai döntés, nem puszta számnövelés.`)
+    +` A kiosztás a szezon végén lejár.</div>`
     +`<div class="msSummary">`
     +`<div class="msSum"><b>${R.season}.</b><span>szezonra szól</span></div>`
     +`<div class="msSum"><b>${lv}/3</b><span>képesség-szint</span></div>`
@@ -46420,6 +46602,8 @@ function roleSectionHtml(){
   h+=`<div class="msList">`;
   roleKeysForStyle().forEach(key=>{
     const d=ROLE_DEFS[key],cur=R.map[key]||null;
+    const cand=roleCandidates(key);
+    const curFitPP=(key==="b2b")?(()=>{try{return roleFitBonusPP();}catch(e){return 0;}})():0;
     const v=roleVal(key),down=v<1;
     const ertek=down?`−${Math.round((1-v)*1000)/10}%`.replace(".",",")
                     :`×${String(Math.round(v*100)/100).replace(".",",")}`;
@@ -46427,12 +46611,20 @@ function roleSectionHtml(){
       +`<div class="msTop"><b>${d.ic} ${esc(d.n)}</b>`
       +`<span class="msRew">${ertek} ${esc(d.u)}</span></div>`
       +`<div class="msDesc">${esc(d.d)}</div>`
+      /* A BELÉPŐ KIÍRVA. A Villám szerepeire nem bárki jelölhető, és egy
+         rövid (vagy üres) lista magyarázat nélkül hibának látszik. */
+      +(d.who?`<div class="msDesc" style="color:var(--dim2)">Kire jelölhető: <b>${esc(d.who)}</b>`
+        +(cand.length?"":` <span style="color:var(--red)">— most nincs ilyen emberd</span>`)+`</div>`:"")
+      +(key==="b2b"?`<div class="msDesc" style="color:var(--dim2)">Illeszkedés-bónusz a sebességétől: `
+        +ROLE_B2B_FIT.map(r=>`${r[0]}+ → <b>+${String(r[1]).replace(".",",")}</b>`).join(" · ")
+        +(curFitPP?` <span style="color:var(--grass)">— most +${String(curFitPP).replace(".",",")} pont</span>`
+                  :` <span style="color:var(--dim)">— most nincs</span>`)+`</div>`:"")
       +`<div class="msDesc" style="color:${cur?"var(--gold)":"var(--dim2)"}">`
       +(cur?`Most: <b>${esc(shortName(cur))}</b>`:`Nincs kiosztva — a szerep nem hat`)+`</div>`
       +`<select class="roleSel" data-role="${key}" style="width:100%;margin-top:7px;padding:9px;`
       +`background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;font-size:13px">`
       +`<option value=""${cur?"":" selected"}>— nincs kijelölve —</option>`;
-    roleCandidates(key).forEach(p=>{
+    cand.forEach(p=>{
       let ovr=0;try{ovr=Math.round(pOvr(p));}catch(e){}
       const mas=roleKeyOfPlayer(p.n);
       h+=`<option value="${esc(p.n)}"${cur===p.n?" selected":""}>`
@@ -46975,6 +47167,10 @@ const ST_FAM_T={
   vl_recN:"Megdöntött klubrekordok", vl_avgmax:"A repülő kezdő 11",
   vl_pace:"Gólok sebességgel", vl_paceM:"Sebességgólok egy meccsen",
   vl_wing:"Megtanult szélső posztok",
+  vl_quick2:"Gyorsan rúgjunk kettőt!", vl_triple3:"Hopp, a tripla!",
+  vl_yo2:"Bepörög a jojó — kettő egy félidőben",
+  vl_yo3:"Bepörög a jojó — három egy félidőben",
+  vl_yo4:"Bepörög a jojó — négy egy félidőben",
   pz_hot:"Lobbanékony emberek", pz_shot:"Lövéserő-klubrekord",
   pz_injwin:"Győzelmek sérülttel", pz_skill:"Kemény képességek",
   pz_card:"A klub legjobb szezonkártyája", pz_redall:"Piros lapok a klub történetében",
@@ -47546,6 +47742,45 @@ stTiers("villam","vl_wing",th=>`${th} megtanult szélső poszt`,
      +`illetve jobb- vagy balszélsőt. A poszt-tanulást a játékos lapján indítod, `
      +`és minden befejezett tanulás egyszer számít.`,
   ST_VL10,[1,2,3,4,5,6,7,8,9,10],()=>S.wingPosLearned||0);
+/* ---- A MECCS RITMUSA: HÁROM ÚJ CSALÁD ----
+   A stílus eddig ÁLLAPOTOT (sebesség-átlag, gyors emberek) és TERMÉST
+   (sebességgólok) mért. Ez a három azt, ami a Villám igazi névjegye: a
+   HIRTELENSÉGET. Nem az számít, hány gólt lősz, hanem hogy milyen szűk időbe
+   fértek bele.
+
+   A PONTGÖRBÉK SZÁNDÉKOSAN LAPOSABBAK a stílus többi lépcsőjénél. Ezek
+   ISMÉTLŐDŐ számlálók sok fokozattal (11-17), nem egyszeri karriercsúcsok —
+   ha fokozatonként ugyanannyit fizetnének, mint egy 32 pontos rekord-fokozat,
+   az öt új család egymaga háromszorosára hizlalná a stílus pont-termelését, és
+   a képességfa ára értelmét vesztené. Így viszont a három család együtt
+   nagyjából annyit ad, mint öt régi család — vagyis bővíti a tartalmat, nem
+   dönti fel a gazdaságot. (Mérve: 969 → ~1400 összpont.) */
+const ST_VL11=[1,2,3,5,7,9,11,13,15,15,15];
+const ST_VL14=[1,1,2,2,3,4,5,6,7,8,9,10,10,10];
+const ST_VL17=[1,1,1,2,2,3,3,4,5,6,7,8,9,10,10,10,10];
+stTiers("villam","vl_quick2",th=>`${th}× két gól 15 percen belül`,
+  th=>`Rúgj kétszer ${VL_QUICK2_MIN} percen belül — ${th} alkalommal a klub történetében. `
+     +`Az ablakok ÁTFEDHETNEK: három gól a 10., 20. és 30. percben kettőt számol.`,
+  ST_VL14,[1,3,5,7,10,15,20,25,30,45,66,90,100,150],()=>msT().vlQuick2||0);
+stTiers("villam","vl_triple3",th=>`${th}× három gól 30 percen belül`,
+  th=>`Rúgj hármat ${VL_TRIPLE3_MIN} percen belül — ${th} alkalommal a klub történetében. `
+     +`Ugyanaz az átfedő számolás, mint a gyors kettőnél.`,
+  ST_VL17,[1,2,3,4,5,7,10,12,15,18,20,25,30,35,40,45,50],()=>msT().vlTriple3||0);
+/* ---- BEPÖRÖG A JOJÓ ----
+   EGYETLEN ember gól+gólpassz hozzájárulásai EGY FÉLIDŐN belül. Három mérce
+   ugyanarra a teljesítményre: aki egy félidőben négyszer szállt be, az
+   MINDHÁRMON lép egyet. Nem külön díjak — három nagyítás ugyanarra. */
+stTiers("villam","vl_yo2",th=>`${th}× kettős félidő`,
+  th=>`Egy játékosod szálljon be KÉTSZER (gól vagy gólpassz) EGYETLEN félidőben — `
+     +`${th} alkalommal a klub történetében.`,
+  ST_VL11,[1,5,10,20,30,40,50,75,100,150,200],()=>msT().vlYo2||0);
+stTiers("villam","vl_yo3",th=>`${th}× hármas félidő`,
+  th=>`Egy játékosod szálljon be HÁROMSZOR egyetlen félidőben — ${th} alkalommal.`,
+  ST_VL14,[1,3,5,7,10,15,20,25,30,45,66,90,100,150],()=>msT().vlYo3||0);
+stTiers("villam","vl_yo4",th=>`${th}× négyes félidő`,
+  th=>`Egy játékosod szálljon be NÉGYSZER vagy többször egyetlen félidőben — ${th} alkalommal. `
+     +`Ez a stílus csúcsa: negyvenöt perc, egy ember, négy érintés a gólban.`,
+  ST_VL17,[1,2,3,4,5,7,10,12,15,18,20,25,30,35,40,45,50],()=>msT().vlYo4||0);
 stTiers("villam","vl_avgmax",th=>`${th}-ös sebesség-átlag`,
   th=>`A kezdő 11 Sebesség-átlaga érje el a ${th}-öt. A 99 fölötti fokozatok `
      +`csak az Infinityben nyílnak meg — és onnantól minden új rekord ugyanannyit fizet.`,
@@ -48490,6 +48725,18 @@ stTraitCfg("sztar","sztar_joga",()=>{
    elzárulna. Így viszont a képesség pont annak ér a legtöbbet, aki NEM
    sebesség-taktikát játszik: a szélessége máshonnan jön, a fejlődése mégis a
    stílus felé húz. */
+/* A VILLÁM SZEREP-KÉPESSÉGE. Ugyanaz a szerkezet, mint a Bombázóké és a
+   Betoné — de itt a három hatás közül KETTŐ csapatszintű (Legolas, Robben),
+   ezért az értékek szerényebbek: egy csapatszintű szorzó ugyanazon a számon
+   nagyságrenddel többet ér, mint egy ember súlya a tizenegyen belül. */
+stTrait("villam","szerepek",3,"Kiosztott szerepek",
+  "A Box-to-box, a Legolas és a Robben szezon-szerep egyszerre erősödik. A szerepeket minden idényben újra kiosztod — és nem bárkire: mindháromnak saját belépője van.",[
+  {fx:{roleLvl:1},note:"B2B ×1,03 gólpassz és −2% ellenfél · Legolas +3% csapat-gólesély · Robben ×1,07 saját gólsúly"},
+  {fx:{roleLvl:2},note:"×1,05 / −3% · +4% · ×1,10"},
+  {fx:{roleLvl:3},note:"×1,07 / −4% · +5% · ×1,15 — és a Robben a csapatra is +7%-ot ad"}],
+  ()=>{const m=roleState().map,k=roleKeysForStyle().filter(x=>m[x]);
+    return k.length?`most kiosztva: ${k.map(x=>`${ROLE_DEFS[x].n} — ${shortName(m[x])}`).join(" · ")}`
+                   :"még egy szerep sincs kiosztva — a képesség így nem hat";});
 stTrait("villam","sebesseg_sorsolas",1,"Sebességre hangolt sorsolás",
   "A sebesség-képesség kihúzásának esélyét MEGSZOROZZA — posztkategóriától függetlenül, mindegyik olyan képesség számít, ami a sebességre hat. Amit a taktikád ad, azt viszi tovább.",[
   {fx:{skillPace:0.30},note:"a meglévő esély ×1,30"},
