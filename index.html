@@ -3039,7 +3039,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.34";
+const APP_VERSION="3.3.35";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -37333,7 +37333,11 @@ function infinityApplyUnlock(){
        tehát csak végigvitt futás kerül a listára. A szám innentől már csak a
        karrier LEZÁRÁSAKOR változhat, és csak felfelé (runBoardOnClose). */
     {const _rb=runBoardOnInfinity();
-     if(_rb)addLine(`🏅 Felkerültél a helyi Run-ranglistára: <b>${String(_rb.run).replace(".",",")}</b> Run-szinttel. A karrier lezárásakor még javíthatsz rajta.`,"m life");}
+     if(_rb)addLine(`🏅 Felkerültél a helyi Run-ranglistára: <b>${String(_rb.run).replace(".",",")}</b> Run-szinttel. A karrier lezárásakor még javíthatsz rajta.`,"m life");
+     /* GLOBÁLIS RANGLISTA: ugyanez a pillanat a belépő oda is. Tűz-és-felejt —
+        ha nincs net vagy nincs becenév, a játék meg sem érzi; a profilban
+        bármikor pótolható egy gombbal. */
+     if(_rb)try{lbAutoUpload(_rb);}catch(e){}}
     /* ---- A BEJELENTETT VISSZAVONULÁSOK ÉRVÉNYÜKET VESZTIK ----
        Az Infinity ígérete az, hogy megszűnik a kor miatti hanyatlás, és
        visszavonulni is csak 55 évesen lehet. Ehhez képest képmutató lett volna
@@ -39850,23 +39854,238 @@ function renderProfileModal(msg){
     <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-top:16px">Az eredményeid</div>
     <p style="font-size:12px;color:var(--dim);margin-top:2px;line-height:1.45">A végigvitt (Infinityt megnyitott) karriereid összegezve.</p>
     <div style="margin-top:9px">${profileStatsHtml()}</div>
-    <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-top:16px">🏅 Run-ranglista</div>
-    <div style="margin-top:7px">${runBoardHtml()}</div>
-    <div style="font-size:11.5px;color:var(--dim2);line-height:1.5;margin-top:12px;border-top:1px dashed var(--line);padding-top:8px">
-      <b style="color:var(--dim)">Hamarosan:</b> globális ranglista az <b>Infinity-megnyitáskori</b> Run-szintekből —
-      ez a becenév és ez az azonosító fog rajta megjelenni.</div>`;
+    <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-top:16px">🌍 Globális ranglista</div>
+    <p style="font-size:12px;color:var(--dim);margin-top:2px;line-height:1.45">Minden játékos <b>Infinity-megnyitáskori</b> Run-szintje, egy listán.${
+      profileNick()?"":` <span style="color:var(--gold)">Előbb adj meg egy becenevet — enélkül nem kerülhetsz fel.</span>`}</p>
+    <div id="profileLbBody" style="margin-top:8px"></div>
+    <button id="profileLbUpBtn" class="btn-s stepbtn" style="margin-top:8px">🌍 Feltöltöm / frissítem a futásaimat</button>
+    <div id="profileLbMsg" style="font-size:11.5px;color:var(--dim2);margin-top:4px;min-height:15px"></div>
+    <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-top:16px">🏅 Helyi Run-ranglista</div>
+    <div style="margin-top:7px">${runBoardHtml()}</div>`;
+  /* A globális lista a megnyitáskor töltődik (lbLoadIntoProfile); ez a gomb a
+     FELTÖLTÉS, plusz utána azonnal újra le is kéri a sorrendet. */
+  {const ub=$("profileLbUpBtn"),um=$("profileLbMsg");
+   if(ub)ub.onclick=()=>{
+     if(_lbBusy)return;
+     if(!profileNick()){if(um)um.textContent="Előbb adj meg egy becenevet.";return;}
+     _lbBusy=true;ub.disabled=true;
+     if(um)um.textContent="Feltöltés…";
+     lbUploadAll().then(r=>{
+       _lbBusy=false;
+       if(um)um.textContent=r.ok?`Kész — ${r.n} futás felküldve.`:`Nem sikerült: ${r.reason}.`;
+       lbLoadIntoProfile(true);
+     }).catch(()=>{_lbBusy=false;if(um)um.textContent="Nem sikerült a feltöltés.";
+       renderProfileLbBox(null);});};
+   if(ub)ub.disabled=_lbBusy||!profileNick();}
   const inp=$("profileNickInput"),btn=$("profileNickSave");
   const save=()=>{
     const r=profileSetNick(inp.value);
     renderProfileBtn();
     renderProfileModal(r.ok
       ? {text:`Mentve — mostantól ${r.nick} ${profileShortId()} vagy.`}
-      : {text:r.reason,err:true});};
+      : {text:r.reason,err:true});
+    /* a globális doboz újrarajzolódott — töltsük vissza a már lekért sorokat */
+    renderProfileLbBox(lbCache.rows||undefined);};
   if(btn)btn.onclick=save;
   if(inp)inp.onkeydown=(e)=>{if(e.key==="Enter"){e.preventDefault();save();}};}
+/* ================= GLOBÁLIS RUN-RANGLISTA (2. fázis) =================
+   A helyi lista a saját karriereidet rangsorolja; ez MINDENKIÉT. Ami felkerül,
+   az kizárólag az INFINITY MEGNYITÁSAKORI Run-szint — az a valódi referencia:
+   ott mindenki ugyanazt a kaput vette be (100-as mezőny megnyerése), és a szám
+   azt méri, milyen körülmények közt és milyen gyorsan jutottál el odáig. A
+   lezáráskori Run helyi marad.
+
+   AZ INFRASTRUKTÚRA MÁR MEGVOLT: a kétjátékos mód ugyanezt a Firebase
+   Realtime Database-t használja. Itt SAJÁT alkalmazás-példány ("lb") indul,
+   hogy a két ág soha ne akadjon egymásba, és mert ehhez BEJELENTKEZÉS is kell
+   (névtelen auth) — az MP-ág szándékosan bejelentkezés nélkül dolgozik.
+
+   AZ AZONOSSÁG KÉT RÉTEGŰ:
+     · az auth-uid a HAMISÍTHATATLAN rész — a bejegyzés kulcsa ezzel kezdődik,
+       az adatbázis-szabály csak a saját kulcsod alá enged írni;
+     · a becenév és a profil-azonosító (pid) a rekordon belül, MEGJELENÍTÉSRE.
+   Vagyis más nevében nem lehet írni, a nevet viszont bárki bármire állíthatja —
+   ahogy a lista alatt ki is mondjuk: ez becsületkassza, nem hitelesített
+   verseny. A játék statikus HTML, a kliens bármit felküldhet; a szabályok a
+   szemetelést és a triviális átírást fogják ki, a szándékos csalást nem.
+
+   SOHA NEM ÁLLÍTJA MEG A JÁTÉKOT: minden hálózati hívás időkorlátos, hibára
+   csendben "nem érhető el" állapotba esik, és a feltöltés tűz-és-felejt. */
+const LB_PATH="lb/runs";
+const LB_TOP=100;                /* ennyi sort kérünk le a szerverről */
+const LB_CACHE_MS=60000;         /* ennyi ideig nem kérdezzük újra */
+const LB_TIMEOUT=9000;
+let lbNet={mode:null,db:null,fns:null,uid:null,initing:null,err:null};
+let lbCache={at:0,rows:null};
+async function lbInit(){
+  if(lbNet.mode==="on")return lbNet;
+  if(lbNet.initing)return lbNet.initing;
+  lbNet.initing=(async()=>{
+    try{
+      const V=MP_FB_VER;
+      const appM=await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
+      const dbM=await import(`https://www.gstatic.com/firebasejs/${V}/firebase-database.js`);
+      const auM=await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
+      /* saját példány — a "mp" nevűt az átigazolási… pardon, a kétjátékos ág
+         viszi, és ott NINCS bejelentkezés */
+      let app=null;
+      try{app=appM.getApp("lb");}catch(e){app=appM.initializeApp(MP_FB_CONFIG,"lb");}
+      const auth=auM.getAuth(app);
+      const cred=await Promise.race([
+        auM.signInAnonymously(auth),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error("időtúllépés")),LB_TIMEOUT))]);
+      lbNet.uid=(cred&&cred.user&&cred.user.uid)||(auth.currentUser&&auth.currentUser.uid)||null;
+      if(!lbNet.uid)throw new Error("nincs azonosító");
+      lbNet.db=dbM.getDatabase(app);
+      lbNet.fns={ref:dbM.ref,get:dbM.get,set:dbM.set,query:dbM.query,
+        orderByChild:dbM.orderByChild,limitToLast:dbM.limitToLast};
+      lbNet.mode="on";
+    }catch(e){
+      lbNet.mode="off";
+      lbNet.err=(e&&e.message)||String(e);}
+    return lbNet;})();
+  return lbNet.initing;}
+/* A bejegyzés kulcsa: <auth-uid>_<karrier>. A karrier-rész a helyi ranglista
+   azonosítójából jön (világ-seed + kontextus), megtisztítva — az adatbázis
+   kulcsaiban csak betű, szám, kötőjel és aláhúzás lehet. */
+function lbEntryKey(careerId){
+  const c=String(careerId||"main").replace(/[^A-Za-z0-9_-]/g,"_").slice(0,48);
+  return `${lbNet.uid}_${c}`;}
+/* Egy helyi ranglista-sorból a feltölthető rekord. A tartományokat ITT vágjuk
+   a szabályokhoz — egy elszállt érték miatt ne bukjon el a teljes írás. */
+function lbRowFrom(x){
+  const nick=profileNick();
+  if(!nick||nick.length<2)return null;
+  const run=runBoardInfRun(x),lvl=runBoardInfLevel(x);
+  if(!(run>0))return null;
+  const cl=(v,lo,hi,d)=>{const n=Math.round(Number(v));return isFinite(n)?Math.max(lo,Math.min(hi,n)):d;};
+  return {v:1,
+    nick:nick.slice(0,20),
+    pid:String(profileUid()).slice(0,24),
+    infRun:Math.max(0,Math.min(100,Math.round(run*10)/10)),
+    infLevel:cl(lvl,60,400,100),
+    infSeasons:cl(x.infSeasons!=null?x.infSeasons:x.seasons,1,999,1),
+    team:String(x.team||"—").slice(0,40),
+    titles:cl(x.titles,0,999,0),
+    ballons:cl(x.ballons,0,999,0),
+    at:Date.now()};}
+/* EGY futás feltöltése. Visszaad {ok} vagy {ok:false,reason} — a felület ezt
+   mondja ki, mert a néma kudarcnál minden jobb. */
+async function lbUploadRow(x){
+  if(!x)return {ok:false,reason:"nincs mit feltölteni"};
+  if(!profileNick())return {ok:false,reason:"előbb adj meg egy becenevet"};
+  await lbInit();
+  if(lbNet.mode!=="on")return {ok:false,reason:"a ranglista most nem érhető el"};
+  const rec=lbRowFrom(x);
+  if(!rec)return {ok:false,reason:"ez a futás nem tölthető fel"};
+  try{
+    const F=lbNet.fns;
+    await Promise.race([
+      F.set(F.ref(lbNet.db,`${LB_PATH}/${lbEntryKey(x.id)}`),rec),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error("időtúllépés")),LB_TIMEOUT))]);
+    lbCache.at=0;                 /* a lista elavult — legközelebb újra kérjük */
+    return {ok:true};
+  }catch(e){
+    /* A 10 másodperces írás-fék (adatbázis-szabály) is ide fut be: az nem hiba,
+       csak annyi, hogy épp az imént töltöttünk fel — mondjuk is ki emberül. */
+    const msg=(e&&e.message)||"";
+    if(/permission|denied/i.test(msg))
+      return {ok:false,reason:"épp az imént töltöttél fel — várj pár másodpercet"};
+    return {ok:false,reason:msg||"a feltöltés nem sikerült"};}}
+/* MINDEN helyi Infinity-futás feltöltése (a profil gombja). Karrierenként egy
+   bejegyzés — a kulcs a karrierhez kötött, tehát az újraküldés FRISSÍT, nem
+   duplikál. */
+async function lbUploadAll(){
+  const list=runBoardLoad().filter(x=>runBoardInfRun(x)>0);
+  if(!list.length)return {ok:false,reason:"még nincs Infinityt megnyitott karriered"};
+  let ok=0,last="";
+  for(const x of list){
+    const r=await lbUploadRow(x);
+    if(r.ok)ok++;else last=r.reason;}
+  return ok?{ok:true,n:ok}:{ok:false,reason:last};}
+/* A TOP LISTA. Szerveroldalon rendez (.indexOn: infRun), tehát a kliens csak a
+   száz sort kapja meg — nem a teljes fát. */
+async function lbFetchTop(force){
+  if(!force&&lbCache.rows&&(Date.now()-lbCache.at)<LB_CACHE_MS)return lbCache.rows;
+  await lbInit();
+  if(lbNet.mode!=="on")return null;
+  try{
+    const F=lbNet.fns;
+    const q=F.query(F.ref(lbNet.db,LB_PATH),F.orderByChild("infRun"),F.limitToLast(LB_TOP));
+    const snap=await Promise.race([
+      F.get(q),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error("időtúllépés")),LB_TIMEOUT))]);
+    const rows=[];
+    snap.forEach(ch=>{const v=ch.val();if(v&&typeof v.infRun==="number")rows.push(Object.assign({_k:ch.key},v));});
+    rows.sort((a,b)=>b.infRun-a.infRun||(a.infSeasons||999)-(b.infSeasons||999));
+    lbCache={at:Date.now(),rows};
+    return rows;
+  }catch(e){
+    lbNet.err=(e&&e.message)||String(e);
+    return null;}}
+/* Az én sorom-e? A kulcs eleje az auth-uid — az azonosít, nem a becenév. */
+function lbIsMine(r){
+  return !!(r&&r._k&&lbNet.uid&&String(r._k).indexOf(lbNet.uid+"_")===0);}
+/* ---- A NÉZET ---- */
+let _lbBusy=false;
+function lbBoardHtml(rows){
+  if(rows===null)
+    return `<div style="font-size:12px;color:var(--dim);line-height:1.55">
+      A globális ranglista most nem érhető el${lbNet.err?` <span style="color:var(--dim2)">(${esc(String(lbNet.err).slice(0,60))})</span>`:""}.
+      A helyi listád ettől függetlenül működik.</div>`;
+  if(!rows)
+    return `<div style="font-size:12px;color:var(--dim2)">Betöltés…</div>`;
+  if(!rows.length)
+    return `<div style="font-size:12px;color:var(--dim);line-height:1.55">
+      Még üres a lista — <b>te lehetsz az első</b>. Egy futás akkor kerül fel, ha megnyitottad az Infinityt.</div>`;
+  const mineIdx=rows.findIndex(lbIsMine);
+  const hu=v=>String(v).replace(".",",");
+  const row=(r,i)=>{
+    const me=lbIsMine(r);
+    return `<div style="display:flex;align-items:baseline;gap:8px;padding:4px 6px;border-radius:6px;margin-bottom:2px;${
+      me?"background:rgba(201,162,51,.14);border:1px solid var(--gold)":""}">
+      <span style="min-width:24px;text-align:right;color:var(--dim2);font-size:11px">${i+1}.</span>
+      <span style="font-family:var(--font-disp);font-size:15px;color:${runColor(r.infRun)};min-width:44px">${hu(r.infRun.toFixed(1))}</span>
+      <span style="flex:1;min-width:0">
+        <span style="font-size:12.5px;font-weight:${me?700:400}">${esc(String(r.nick||"—").slice(0,20))}</span>
+        <span style="font-size:10.5px;color:var(--dim2)"> #${esc(String(r.pid||"").slice(-4))}${me?" · te":""}</span>
+        <span style="display:block;font-size:10.5px;color:var(--dim2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${
+          esc(String(r.team||"—"))} · mezőny ${r.infLevel||"—"} · ${r.infSeasons||"?"}. szezon${
+          r.titles?` · ${r.titles} bajnoki`:""}</span>
+      </span></div>`;};
+  return rows.map(row).join("")
+    +`<div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-top:6px">
+      ${mineIdx>=0
+        ? `A te helyezésed: <b style="color:var(--gold)">${mineIdx+1}.</b> a ${rows.length} közül.`
+        : `A te bejegyzésed nincs a lista első ${rows.length} sorában.`}
+      <br>A lista <b>az Infinity megnyitásakori</b> Run-szintet rangsorolja — a lezáráskori helyi marad.
+      <br><span style="color:var(--dim)">Becsületkassza: a nevet mindenki maga adja meg, a számokat pedig a saját gépe küldi fel.</span></div>`;}
+function renderProfileLbBox(rows){
+  const box=$("profileLbBody");
+  if(box)box.innerHTML=lbBoardHtml(rows);
+  const b=$("profileLbUpBtn");
+  if(b)b.disabled=_lbBusy||!profileNick();}
+/* A profil-ablak megnyitásakor egyszer (a gyorsítótár lejártáig) lekérjük. */
+function lbLoadIntoProfile(force){
+  renderProfileLbBox(undefined);
+  lbFetchTop(force).then(rows=>{
+    if($("profileModal").classList.contains("hide"))return;
+    renderProfileLbBox(rows);}).catch(()=>renderProfileLbBox(null));}
+/* ---- AZ AUTOMATIKUS FELTÖLTÉS ----
+   Az Infinity megnyitásakor fut, tűz-és-felejt módon: ha nincs net vagy nincs
+   becenév, a játék ettől nem áll meg egy pillanatra sem — a profilban bármikor
+   pótolható egy gombbal. */
+function lbAutoUpload(row){
+  if(!row||!profileNick())return;
+  try{
+    lbUploadRow(row).then(r=>{
+      if(r&&r.ok)try{addLine(`🌍 A futásod felkerült a <b>globális ranglistára</b> is — a profilodban megnézheted, hol állsz.`,"m life");}catch(e){}
+    }).catch(()=>{});
+  }catch(e){}}
 function openProfileModal(){
   renderProfileModal(null);
   $("profileModal").classList.remove("hide");
+  lbLoadIntoProfile(false);
   const inp=$("profileNickInput");
   if(inp&&!profileNick())try{inp.focus();}catch(e){}}
 /* A Run-szám színe — ugyanaz a logika, mint a nehézség-sávoknál. */

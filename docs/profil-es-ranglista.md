@@ -1,7 +1,8 @@
 # Profil és ranglista — 1. fázis (helyi), 2. fázis (globális)
 
-*(3.3.21. Érintett kód: `PROFILE_KEY` és a köré épült függvények, `renderProfileModal`,
-`profileTotals`, valamint a már meglévő `runBoard*` réteg.)*
+*(3.3.21 + 3.3.35. Érintett kód: `PROFILE_KEY` és a köré épült függvények, `renderProfileModal`,
+`profileTotals`, a globális ranglistánál `lbInit` / `lbUploadRow` / `lbFetchTop` /
+`lbBoardHtml`, valamint a már meglévő `runBoard*` réteg.)*
 
 ## 1. Mi készült el (1. fázis)
 
@@ -12,8 +13,8 @@ Rákoppintva egy ablak nyílik, benne
 * az **eredményeid** összegezve (a végigvitt karrierekből),
 * és a már meglévő **helyi Run-ranglista**.
 
-Minden a `localStorage`-ban él, hálózat nélkül — a 2. fázis (globális
-ranglista) ugyanezekre az adatokra fog épülni.
+Az 1. fázis mindene a `localStorage`-ban él, hálózat nélkül — a 2. fázis
+(globális ranglista, lásd 5.) pontosan ezekre az adatokra épül.
 
 ## 2. Az adatmodell
 
@@ -62,27 +63,52 @@ Infinity-futás / ebből hány lezárva, összes bajnoki cím, összes Aranylabd
 Ez az EGY függvény a globális statisztika jövőbeli gyűjtőhelye is — ezért van
 külön kiemelve, nem a rajzolásba szőve.
 
-## 5. A 2. fázis terve (globális ranglista)
+## 5. A globális ranglista (2. fázis — kész, 3.3.35)
 
-A döntések megvannak:
+**Ami felkerül: kizárólag az INFINITY MEGNYITÁSAKORI Run-szint.** Az a valódi
+referencia — ott mindenki ugyanazt a kaput vette be (a 100-as mezőny
+megnyerése), és a szám azt méri, milyen körülmények közt és milyen gyorsan
+jutottál el odáig. A lezáráskori Run helyi marad.
 
-* **Csak az Infinity-megnyitáskori Run** kerül fel — az a valódi referencia
-  (a lezáráskori marad helyi).
-* A név nem egyedi, az azonosító különböztet meg.
-* A szűrő már most a helyén van, tehát feltöltéskor nem kell újra dönteni róla.
+### 5.1. A kapcsolat
 
-Ami hátravan (kód): a `runBoardOnInfinity()` mellé egy feltöltés
-`/lb/runs/<uid>` alá, egy top-100 lekérdezés (`orderByChild('infRun')` +
-`limitToLast`), és a lista-nézet a profil-ablakba. A Firebase RTDB **már be van
-kötve** (az MP-ág használja, lusta SDK-importtal és helyi tartalékkal), tehát új
-infrastruktúra nem kell.
+Saját Firebase-példány (`"lb"`), a kétjátékos ágtól függetlenül — ott
+szándékosan nincs bejelentkezés, itt viszont **névtelen auth** kell. Minden
+hívás időkorlátos (9 s), hibára csendben „nem érhető el" állapotba esik, a
+feltöltés pedig tűz-és-felejt: **a játék soha nem áll meg tőle.**
 
-Ami hátravan (konzol, a projektgazdánál) — a két lépés lent, részletesen.
+### 5.2. Az azonosság két rétege
 
-**Amit a rendszer nem tud garantálni:** a játék statikus HTML, a kliens bármit
-felküldhet. A szabályok a szemetelést és a triviális átírást fogják ki, a
-szándékos csalást nem — a lista becsületkassza, és ezt a nézet alatt ki is
-mondjuk majd.
+| réteg | mire jó | hamisítható? |
+|---|---|---|
+| **auth-uid** | a bejegyzés kulcsának eleje; az adatbázis-szabály csak a saját kulcsod alá enged írni | nem |
+| **becenév + pid** | megjelenítés a listán | igen — ahogy a lista alatt ki is mondjuk |
+
+### 5.3. Mikor tölt fel
+
+* **automatikusan**, az Infinity megnyitásakor (ugyanaz a pillanat, ami a helyi
+  listára is felvesz) — ha van becenév és van net;
+* **kézzel**, a profil „🌍 Feltöltöm / frissítem a futásaimat" gombjával: ez az
+  ÖSSZES helyi Infinity-futást felküldi. Karrierenként egy bejegyzés (a kulcs a
+  karrierhez kötött), tehát az újraküldés **frissít, nem duplikál**.
+
+**Becenév nélkül nincs feltöltés** — a lista nem telik meg „Névtelen" sorokkal,
+és a profil ki is írja, mit kell tenni.
+
+### 5.4. Ami a szabályokhoz igazodik
+
+A kliens **vág, mielőtt küld**: `infRun` 0-100, `infLevel` 60-400, `infSeasons`
+1-999, becenév 2-20, csapatnév ≤40, `titles`/`ballons` 0-999 — egy elszállt
+érték miatt ne bukjon el a teljes írás. A kulcs `[A-Za-z0-9_-]`-re tisztított,
+96 karakter alatt. A 10 másodperces írás-fék (szabály) emberi mondatot kap:
+„épp az imént töltöttél fel".
+
+### 5.5. A nézet
+
+A profil-ablakban, a saját eredmények alatt: top 100, Run szerint rendezve, a
+**saját sorod kiemelve**, alatta „A te helyezésed: 2. a 3 közül". A lekérés
+szerveroldalon rendez (`.indexOn: infRun`), és 60 másodpercig gyorsítótárazva
+marad, hogy az ablak nyitogatása ne verje a hálózatot.
 
 ## 6. A Firebase-oldal — két lépés a konzolban
 
@@ -135,7 +161,7 @@ kétjátékos mód működik, és egy elfelejtett mező miatt nem szabad eltörn
 | mezőnkénti tartomány-ellenőrzés | `infRun` 0-100, `infLevel` 60-400, `infSeasons` 1-999, becenév 2-20 karakter, `at` ±reális idő |
 | `"$other": {".validate": false}` | ismeretlen mező nem kerülhet be |
 
-### 6.4. A bejegyzés sémája (ezt fogja írni a 2. fázis kliense)
+### 6.4. A bejegyzés sémája (ezt írja a kliens)
 
 ```
 /lb/runs/<authUid>_<karrierKulcs> = {
