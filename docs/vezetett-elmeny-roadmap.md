@@ -22,8 +22,9 @@
 | **F5/C** — hosszú táv (18, 19, 20, 21, 22, 23) | ✅ kész |
 | **F5/D** — meta (10, 11, 12, 25) | ✅ kész |
 | **A huszonöt téma mind megvan** | ✅ |
-| F6 — karmester-finomhangolás | következik |
-| F7 — első futás · F8 — QA és dokumentáció | — |
+| **F6** — karmester-finomhangolás | ✅ kész |
+| F7 — első futás | következik |
+| F8 — QA és dokumentáció | — |
 
 **Eldöntött kérdések** (a 8. szakasz nyitott kérdéseiből):
 
@@ -391,13 +392,26 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
    mélyebb magyarázatot a „miért?" buborék *Részletek* gombja viszi a
    fogalomtárba. Ugyanez áll az öltözőre.
 
-### F6 — A karmester finomhangolása
+### F6 — A karmester finomhangolása ✅
 
-* Prioritás, cooldown, telítettség-védelem (6.1).
-* Szezononkénti „tanító-költségvetés": hard módban is legfeljebb N lépéssor egy
-  szezonban, a többi átcsúszik.
-* Ha egy téma **kétszer jelzett és nem történt semmi**, a harmadiknál elhallgat,
-  és a beállításokban „elnémítva" jelöléssel jelenik meg.
+* **A tanítás költségvetése.** Az F3 óta „fordulónként egy vezetés" volt a fék.
+  Egyszerű volt, de rosszul fogott: a **szezon előtti HUB-ban a fordulószám nem
+  mozdul**, tehát az egész nyáron — pont amikor a felhasználó a taktikát, a
+  felállást és az edzéstervet rendezi — összesen egy bevezető futhatott le. A
+  legfontosabb pillanatban volt a legszűkebb. Helyette három, egymástól
+  független korlát:
+  * **szezononkénti keret** — hard: 6, vezetett: 3;
+  * **fordulónként kettő** — hogy egy leülés ne váljon faliújsággá;
+  * **a kihagyás mint jelzés** — aki egy bevezetőt félbehagy, az most nem
+    tanulni jött; a forduló hátralévő részében nem indul újabb.
+* **A keret csak a magától indult vezetésre fogy.** Amit a felhasználó kért (edző
+  felvétele, „Mutasd meg"), az nem az ő idejéből megy.
+* **A rangsor szabálya kimondva: ami LEJÁR, előrébb van, mint ami VÁR.** A
+  felderítés az ablakkal együtt elvész, a szezon eleji taktikaváltás olcsó
+  pillanata elmúlik — ezek elé csak a visszafordíthatatlan döntés (csapatstílus)
+  kerülhet. A döntésre váró licit ellenben holnap is ott lesz.
+* A telítettség-védelem (max 3 jelzés) és a hároméves feladás már az F2/F5-ben
+  elkészült, itt változatlan.
 
 ### F7 — Az első futás
 

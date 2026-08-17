@@ -3031,7 +3031,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.30";
+const APP_VERSION="3.3.31";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -15865,6 +15865,21 @@ const TEACH_SNOOZE_ROUNDS=3;  /* a „Most nem" ennyi fordulóra hallgattat el *
    amit három éven át figyelmen kívül hagytak, már nem emlékeztet, csak zajong.
    A beállításokban ettől még bármikor visszakapcsolható. */
 const TEACH_GIVEUP=3;
+/* ---- A TANÍTÁS KÖLTSÉGVETÉSE ----
+   Az F3 óta „fordulónként egy vezetés" volt a fék. Egyszerű volt, de rosszul
+   fogott: a SZEZON ELŐTTI HUB-ban a fordulószám nem mozdul, tehát az egész
+   nyáron — pont amikor a felhasználó a taktikát, a felállást és az edzéstervet
+   rendezi — összesen EGY bevezető futhatott le. A legfontosabb pillanatban volt
+   a legszűkebb.
+
+   Mostantól három, egymástól független korlát:
+     · SZEZONONKÉNTI keret — hogy egy karrier ne álljon bevezetőkből;
+     · FORDULÓNKÉNTI kettő — hogy egy leülés ne váljon faliújsággá;
+     · és a KIHAGYÁS mint jelzés: aki egy bevezetőt félbehagy, az most nem
+       tanulni jött. Ilyenkor a forduló hátralévő részében nem indul újabb.
+   A vezetett mód kisebb keretet kap: ott eleve csak a sorsdöntő témák futnak. */
+const TEACH_STEPS_PER_SEASON={hard:6,guided:3};
+const TEACH_STEPS_PER_ROUND=2;
 /* Egy monoton növő fordulószámláló a türelmi időkhöz. Ugyanaz a képlet, mint a
    piaci ajánlatoknál (saleCareerRound) — nincs értelme két külön időnek. */
 function teachNow(){return (((S&&S.seasonNumber)||1)-1)*30+((S&&S.idx)||0);}
@@ -15930,7 +15945,11 @@ function teachSetMode(m){
      n     emberi név — a beállítólistának és a jelzés-buboréknak
      grp   kategória (csoportos ki/bekapcsoláshoz)
      scr   melyik képernyőn él ("hub", "match", …) — a scan ez szerint szűr
-     prio  rangsor: KISEBB szám = előrébb, ha egyszerre több téma esedékes
+     prio  rangsor: KISEBB szám = előrébb, ha egyszerre több téma esedékes.
+           A SZABÁLY: ami LEJÁR, előrébb van, mint ami VÁR. A felderítés az
+           ablakkal együtt elvész, a szezon eleji taktikaváltás olcsó pillanata
+           elmúlik — ezek elé nem kerülhet olyan téma, ami holnap is ott lesz.
+           Csak a visszafordíthatatlan döntés (csapatstílus) áll előrébb náluk.
      g     GLOSSARY-kulcs a „Részletek" gombhoz
      a     horgony elem azonosítója (a keret és a pötty ide kerül)
      mark  egy emoji a HUB menü-gombjára, ha a horgony épp nem látszik
@@ -16027,7 +16046,7 @@ const TEACH_TOPICS={
       {a:"hubRoster",
        t:"Miért nem mindegy",
        x:"A védekező megbízás a csapat <b>Védekezés-tengelyét</b> emeli a Gólszerzés rovására, a támadó pontosan fordítva.<br><br>Vagyis a taktikád illeszkedésén is meglátszik: ugyanaz a tizenegy más rendszerhez passzol attól függően, milyen megbízásokat osztottál ki."}]},
-  "tactic:change":{n:"Taktika a szezon elején",grp:"csapatepites",scr:"hub",prio:28,
+  "tactic:change":{n:"Taktika a szezon elején",grp:"csapatepites",scr:"hub",prio:16,
     mark:"⚙️",
     a:"hubTacticsBtn",g:"taktika",
     why:"Új szezon kezdődik — most állíthatod át a rendszert a legkevesebbért.",
@@ -16105,7 +16124,7 @@ const TEACH_TOPICS={
       {a:"hubRosterExpandBtn",pre(){teachRevealInMenu();},
        t:"Tele a kereted",
        x:"Innentől minden érkezőnél — igazolás, akadémista, ikon — ott a döntés, hogy <b>kit engedsz el</b> helyette. Ez nem zsákutca, de minden alkalommal elvesz valakit.<br><br>A keretbővítés <b>+2 helyet</b> ad, és megmarad: egyszer fizetsz érte, és a karriered végéig a tiéd."}]},
-  "scout:use":{n:"Kihasználatlan felderítés",grp:"piac",scr:"hub",prio:26,mark:"🔍",
+  "scout:use":{n:"Kihasználatlan felderítés",grp:"piac",scr:"hub",prio:12,mark:"🔍",
     a:"hubBuyBtn",g:"scout",
     why:"Nyitva az átigazolási időszak, és maradt felderítésed — az ablak bezárásakor elvész.",
     ready(){return teachInCareer();},
@@ -16541,11 +16560,11 @@ function teachStepsCur(key){
 function teachStepsAnchorIs(key,anchor){
   const st=teachStepsCur(key);
   return !!(st&&st.a===anchor);}
-function teachStepsStart(key,host){
+function teachStepsStart(key,host,auto){
   if(teachMode()==="off")return false;
   if(_tSteps)return false;                       /* egyszerre EGY tanítás */
   if(!teachStepsDefs(key).length)return false;
-  _tSteps={key,i:0,host:host||null,
+  _tSteps={key,i:0,host:host||null,auto:!!auto,
     form:(TEACH_TOPICS[key].form==="inline")?"inline":"overlay"};
   if(_tSteps.form==="overlay")teachStepsShow();
   return true;}
@@ -16560,9 +16579,9 @@ function teachStepsNext(){
 /* A VÉGE ÉS A KIHAGYÁS UGYANAZ AZ ÁLLAPOT: a téma LEZÁRT (st=2). Aki kihagyta,
    az döntött — nem kapja meg holnap újra. A halk jelzés viszont megmarad neki,
    és az mondja majd, ha tényleg van tennivaló. */
-function teachStepsEnd(){
+function teachStepsEnd(skipped){
   if(!_tSteps)return;
-  const key=_tSteps.key;
+  const key=_tSteps.key,auto=_tSteps.auto;
   _tSteps=null;
   teachStepsHide();
   /* A téma SAJÁT zárása, ha van neki: a stábtag-bevezető például a maga régi
@@ -16572,11 +16591,13 @@ function teachStepsEnd(){
   const t=teachStateObj();
   if(t){
     teachSetSt(key,2);
-    /* FORDULÓNKÉNT EGY vezetés. Az első HUB-on egyébként egymás után indulna
-       az összes esedékes téma lépéssora, és a tanítás pont ott válna
-       zaklatássá, ahol a legtöbbet kéne segítenie. (F6 finomítja: szezonra
-       szóló költségvetéssé.) */
-    t.lastSteps=teachNow();}
+    /* A KÖLTSÉGVETÉS csak a MAGÁTÓL indult vezetésekre fogy. Amit a felhasználó
+       kért (edző felvétele, „Mutasd meg"), az nem az ő idejéből megy. */
+    if(auto){
+      teachStepsBudget();
+      t.stepsUsed=(t.stepsUsed||0)+1;
+      t.stepsRoundUsed=(t.stepsRoundUsed||0)+1;
+      if(skipped)t.stepsHalted=true;}}
   teachSave();
   /* A gazda-panel a saját rajzolásából él — ha inline futott, újra kell rajzolni,
      hogy a doboz és a kiemelés eltűnjön. */
@@ -16621,7 +16642,7 @@ function teachStepsShow(){
     window.addEventListener("scroll",teachStepsReplace,true);
     window.addEventListener("resize",teachStepsReplace);}}
 $("tStepsNext")&&($("tStepsNext").onclick=()=>teachStepsNext());
-$("tStepsSkip")&&($("tStepsSkip").onclick=()=>teachStepsEnd());
+$("tStepsSkip")&&($("tStepsSkip").onclick=()=>teachStepsEnd(true));
 $("tStepsQuiet")&&($("tStepsQuiet").onclick=()=>{
   teachStepsEnd();
   teachSetMode("light");
@@ -16649,7 +16670,7 @@ function teachStepsBindInline(key,rerender){
   const nx=$("tStepsInlineNext");
   if(nx)nx.onclick=()=>{if(teachStepsNext()&&rerender)rerender();};
   const sk=$("tStepsInlineSkip");
-  if(sk)sk.onclick=()=>teachStepsEnd();}
+  if(sk)sk.onclick=()=>teachStepsEnd(true);}
 /* ---- A KARMESTER ----
    A képernyő rajzolásának LEGVÉGÉN fut, és eldönti, mi jelenjen meg. Egy hely,
    ahol a három szint sorrendje látszik: előbb a jelzések (olcsó, passzív),
@@ -16657,6 +16678,15 @@ function teachStepsBindInline(key,rerender){
 function teachTick(scr){
   teachNudgeScan(scr);
   teachStepsAuto(scr);}
+/* A keret könyvelése. Szezonváltáskor a szezonos, fordulóváltáskor a fordulós
+   számláló nullázódik — és vele a „most kihagytam egyet" jelzés is. */
+function teachStepsBudget(){
+  const t=teachStateObj();
+  if(!t)return null;
+  const sn=(S&&S.seasonNumber)||1,rd=teachNow();
+  if(t.stepsSeason!==sn){t.stepsSeason=sn;t.stepsUsed=0;}
+  if(t.stepsRound!==rd){t.stepsRound=rd;t.stepsRoundUsed=0;t.stepsHalted=false;}
+  return t;}
 function teachStepsAuto(scr){
   const t=teachStateObj();
   if(!t)return;
@@ -16666,7 +16696,10 @@ function teachStepsAuto(scr){
   /* LIGHT és OFF módban nincs vezetés — a jelzés a felső határ. */
   if(t.mode!=="hard"&&t.mode!=="guided")return;
   if(_tSteps||_guideCur)return;          /* egyszerre EGY tanítás a képernyőn */
-  if(t.lastSteps===teachNow())return;    /* fordulónként egy */
+  teachStepsBudget();
+  if(t.stepsHalted)return;                                     /* kihagyott egyet */
+  if((t.stepsUsed||0)>=(TEACH_STEPS_PER_SEASON[t.mode]||0))return;   /* szezonos keret */
+  if((t.stepsRoundUsed||0)>=TEACH_STEPS_PER_ROUND)return;            /* fordulós keret */
   const keys=teachDueList(scr);
   for(let i=0;i<keys.length;i++){
     const k=keys[i],d=TEACH_TOPICS[k];
@@ -16675,7 +16708,7 @@ function teachStepsAuto(scr){
     /* VEZETETT módban csak a sorsdöntő témák kapnak teljes lépéssort — a
        többinél elég a buborék meg a jelzés. HARD módban mind. */
     if(t.mode==="guided"&&!d.crit)continue;
-    if(teachStepsStart(k))return;}}
+    if(teachStepsStart(k,null,true))return;}}
 /* ================= A VEZETÉS BEÁLLÍTÁSAI =================
    Eddig EGY kapcsoló volt, a karrier indításakor, és a „ne mutass több tippet"
    után nem volt visszaút. Itt most négy fokozat áll, menet közben váltható,
