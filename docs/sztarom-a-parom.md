@@ -29,6 +29,30 @@ jelzővel érkező sorok, és a **gólonkénti jegyzet-keret** (`GOAL_NOTE_BUDGE
 magától gondoskodik a kért felső korlátról: egy gólra legfeljebb három megjegyzés
 jut. Ezért nincs külön számláló — *a keret AZ a szabály*.
 
+> **3.3.34 — javítva: a megjegyzések fele nem számított.** A beszámítás eddig
+> **a sor SZÖVEGÉBEN kereste a sztár nevét**. Csakhogy a gólhoz fűzött sorok
+> java nem mondja ki a nevet — „Gólzsák *(2/3)* — érződött a rutin", a
+> taktika- és sebesség-ízek, a kártyaszint-idézetek —, pedig mind az ő
+> góljáról szólnak. Ezek némán kiestek.
+>
+> Mostantól a jegyzet-keretnek **gazdája** van (`goalNoteOwner`): ha a gólt a
+> sztár szerezte, **minden** hozzáfűzött megjegyzés számít, akkor is, ha nem
+> nevezi meg. A név szerinti egyezés megmaradt második útnak — az viszi tovább
+> azt az esetet, amikor MÁS gólja körül esik szó róla (gólpassz, kémia-páros).
+>
+> **A lépcsőt ez nem mozdítja.** A `tools/fame-sim.js` eleve név-szűrő nélkül,
+> gólonként 0-3 megjegyzéssel mérte a tempót (`COMMENT_DIST`, átlag 0,86
+> jegyzet/gól) — vagyis a mért ív és a rá épülő mérföldkő-lépcső **mindig is
+> ezt a viselkedést feltételezte**. A javítás a kódot hozza a mérés mellé, nem
+> a mércét mozgatja.
+>
+> **És mostantól látszik is.** A kommentár-pontok némán gyűltek: a
+> `fameAdd` naplója csak 3 pont fölött szólal meg, egy megjegyzés pedig 1
+> pontot ér. Gólonként egy összesítő sor megy ki — *„⭐ Híresség: **+2** pont —
+> a góljához fűzött megjegyzések. Összesen 47."* — a jegyzetek után, a
+> következő esemény előtt. Megjegyzésenként egy sor szétvágná a közvetítést; a
+> keret (3) miatt a szám úgyis kicsi.
+
 A **3., 4., 5. és 6+. gól** saját, hangsúlyos kommentárt kap a motorban
 (mesterhármas, „NÉGY GÓL EGY MECCSEN", …) — ezek fejenként **3 pontot** érnek.
 

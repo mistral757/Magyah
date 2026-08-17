@@ -3039,7 +3039,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.33";
+const APP_VERSION="3.3.34";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -19873,10 +19873,38 @@ function fameNum(v){
 function fameNoteComment(html){
   const n=fameStarName();
   if(!n||typeof html!=="string")return;
+  /* KÉT ÚT vezet a beszámításig, és a MÁSODIK volt eddig az egyetlen:
+     (1) A GÓL GAZDÁJA a sztár — ilyenkor MINDEN hozzáfűzött megjegyzés róla
+         szól, akkor is, ha nem mondja ki a nevét. Eddig a „Gólzsák — érződött
+         a rutin", a taktika- és sebesség-ízek meg a kártyaszint-idézetek mind
+         kiestek emiatt: pontosan az a szövegréteg, amitől a sztár GÓLJA
+         eseménynek érződik.
+     (2) A sor KIMONDJA a nevét — ez viszi tovább azt az esetet, amikor MÁS
+         gólja körül esik szó róla (gólpassz, kémia-páros). */
   let short=n;
   try{short=shortName(n);}catch(e){}
-  if(html.indexOf(short)<0&&html.indexOf(n)<0)return;
-  fameAdd(FAME_COMMENT_PT,null,"comment");}
+  const owned=(goalNoteOwner===n);
+  if(!owned&&html.indexOf(short)<0&&html.indexOf(n)<0)return;
+  fameAdd(FAME_COMMENT_PT,null,"comment");
+  _famePend+=FAME_COMMENT_PT;}
+/* ---- A LÁTHATÓ VISSZAJELZÉS ----
+   A kommentár-pontok eddig NÉMÁN gyűltek: a fameAdd naplója csak 3 pont fölött
+   szólal meg, egy megjegyzés pedig 1 pontot ér. A felhasználó tehát látta a
+   szép sorokat a gólja alatt, és semmi nem mondta meg, hogy azok hírességet is
+   hoztak — jogosan érezte úgy, hogy „ez nincs számolva".
+   Gólonként EGY összesítő sor megy ki, nem megjegyzésenként egy: a keret (3)
+   miatt a szám úgyis kicsi, és a közvetítést nem szabad kettéosztani. */
+let _famePend=0,_fameFlushing=false;
+function fameFlushNotes(){
+  if(_fameFlushing||!(_famePend>0))return;
+  const p=_famePend;_famePend=0;
+  _fameFlushing=true;
+  try{
+    const F=fameState();
+    addLine(`⭐ Híresség: <b>+${fameNum(p)}</b> pont — ${p>1?"a góljához fűzött megjegyzések":"megjegyzés a góljáról"}.`
+      +(F?` Összesen ${fameNum(F.pts)}.`:""),"m skillnote");
+  }catch(e){}
+  _fameFlushing=false;}
 /* A 3., 4., 5. és 6+. gól saját kommentárja — fejenként 3 pont. */
 function fameNoteHaul(name,goals){
   if(!name||name!==fameStarName()||!(goals>=3))return;
@@ -23230,6 +23258,17 @@ const GOAL_NOTE_BUDGET=3;
 const DUEL_GOAL_NOTE_BUDGET=4;
 const DUEL_FLAVOR_MULT=1.7;
 let goalNoteLeft=0;
+/* KI a gazdája a most futó jegyzet-keretnek — vagyis kinek a góljához tartoznak
+   az éppen érkező ízesítő sorok. Ez teszi lehetővé, hogy a HÍRESSÉG olyan
+   megjegyzést is beszámítson, ami NEM mondja ki a nevet: a „Gólzsák — érződött
+   a rutin" ugyanúgy a sztár góljáról szól, mint a névvel kezdődő sorok. */
+let goalNoteOwner=null;
+/* A jegyzet-keretet MINDIG ezen keresztül nyitjuk, hogy a gazda beállítása és
+   az előző gól híresség-összesítőjének kiírása ne maradhasson el sehol. */
+function openGoalNotes(budget,scorerName){
+  fameFlushNotes();
+  goalNoteLeft=budget;
+  goalNoteOwner=scorerName||null;}
 function addLine(html,cls,budgeted){
   if(budgeted){
     if(goalNoteLeft<=0)return;
@@ -23237,10 +23276,19 @@ function addLine(html,cls,budgeted){
     /* HÍRESSÉG: pontosan ezek a sorok a „kommentátori megjegyzés" — a gól maga
        nem elég hozzá, kell a kiegészítő szöveg. A gólonkénti keret (3) egyben
        a kért felső korlát is, ezért nincs külön számláló. */
-    try{fameNoteComment(html);}catch(e){}}
+    try{fameNoteComment(html);}catch(e){}
+  }else{
+    /* A keretes sorok ÖSSZEFÜGGŐ blokkban érkeznek egy gól után; az első nem
+       keretes sor tehát azt jelenti, hogy a blokk véget ért. Itt írjuk ki a
+       gólhoz tartozó híresség-összesítőt — a gól alá, nem a következő közepébe. */
+    try{fameFlushNotes();}catch(e){}}
   const d=document.createElement("div");d.className=cls;d.innerHTML=html;
   lines().appendChild(d);lines().scrollTop=lines().scrollHeight;}
 function updateStanding(){
+  /* A MECCS UTOLSÓ GÓLJA után nem biztos, hogy jön még nem-keretes sor, ami
+     kiírná a híresség-összesítőt. Ez a függvény minden mérkőzés után lefut,
+     tehát itt biztosan kimegy — és ha nincs függőben semmi, nem csinál semmit. */
+  try{fameFlushNotes();}catch(e){}
   /* ÖNGYÓGYÍTÁS: ez a függvény minden meccs után és a képernyő minden
      újrarajzolásakor lefut — ha egy megszakadt mérkőzés után bent ragadt volna
      az élő (gombsor nélküli) elrendezés, itt biztosan lekerül. */
@@ -28117,7 +28165,7 @@ function playMatch(){
            keretbe érkezett, és NÉMÁN elveszett. Épp ezért érződött úgy, hogy
            ennek a skillnek alig van saját flavorje a közvetítésben: a mérés
            kódja megvolt (SHOT_SKILL_BONUS.mf_fk=4), csak sosem fért ki. */
-        goalNoteLeft=GOAL_NOTE_BUDGET;
+        openGoalNotes(GOAL_NOTE_BUDGET,taker.n);
         gf++;mScore[taker.n]=(mScore[taker.n]||0)+1;recordScorer(taker.n);
         const fkSk=playerSkills(taker.n).find(i=>i.skill.id==="mf_fk"||i.skill.id==="df_cannon");
         updateTTBoard(fx,gf,ga,Math.min(90,min));
@@ -28316,7 +28364,7 @@ function playMatch(){
          elveszett. Mostantól egy gólhoz legfeljebb GOAL_NOTE_BUDGET ízesítő
          sor tartozhat; a fölösleg némán kimarad. A sorrend adja a
          rangsorolást: ami előbb próbál megszólalni, az kap helyet. */
-      goalNoteLeft=DUEL?DUEL_GOAL_NOTE_BUDGET:GOAL_NOTE_BUDGET;
+      openGoalNotes(DUEL?DUEL_GOAL_NOTE_BUDGET:GOAL_NOTE_BUDGET,scorer.n);
       mScore[scorer.n]=(mScore[scorer.n]||0)+1;recordScorer(scorer.n);
       /* VILLÁM: sebesség-skilles gól? (összesen + ezen a meccsen) */
       try{if(notePaceGoal(scorer.n))paceGoalsThisMatch++;}catch(e){}
