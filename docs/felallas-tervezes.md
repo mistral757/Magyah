@@ -45,6 +45,26 @@ poszt-idegenséget és a más gól/gólpassz-súlyt fizeti.
 A pályakép követi: a befelé húzódó hely pontja beljebb csúszik (a védőé egy
 hajszállal mélyebbre is) — ugyanúgy, ahogy a szélsővédői megbízás kifelé tolja.
 
+**És a korongok nem másznak egymásra (3.3.41).** Az eltolások slotonként
+számolnak, a szomszédról nem tudnak — a 4-4-2 jobbhátvédje középre állítva
+64-re került, a belső védő viszont 62-n áll: két százalék a különbség, a korong
+tizenkettő. A két ember gyakorlatilag egymásra csúszott (ötös védelemben és a
+középpálya-soron ugyanígy). Két lépés javítja:
+
+* a **behúzódás megáll a szomszédjánál** (`inwardX`), tehát a szélsővédő nem
+  lépi át a belső védőt — az 5-3-2-ben pont ez történt volna (86 → 66, a belső
+  védő meg 68-on áll);
+* a kész pontokat egy **szétnyomó kör** (`pitchSpread`) simítja el: ami a
+  korongnál (13 százalék) közelebb került, azt oldalra bontja szét — sosem
+  föl-le, mert a **mélység információ** a pályaképen. A lökés mindkét pontot
+  mozgatja, tehát a sor együtt csúszik odébb, nem egy ember ugrik ki belőle.
+
+Mérve: mind a 8 alapfelállás és mind a 17 szabályos saját alak **egyetlen
+ponttal sem mozdul** (a játék legsűrűbb sora, a hatos, 14-gyel áll — a határ
+alatta van); 32 000 véletlen megbízás-kombináción a legszorosabb pár is 13
+százalékra maradt egymástól. A koordináta a mentés része, ezért betöltéskor
+újraszámoljuk: a régi mentés is a javított képet kapja.
+
 ## 3. A tervezőasztal: soronkénti szélesség
 
 Eddig a **sor létszáma** egyben eldöntötte a poszt-kiosztást is: négyes

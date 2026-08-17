@@ -3106,7 +3106,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.40";
+const APP_VERSION="3.3.41";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9765,7 +9765,107 @@ const WB_X_PUSH=0.55, WB_Y_LIFT=5;
    beljebb kerül (a védő ráadásul egy hajszállal mélyebbre, ahogy egy
    középhátvéd áll). Kizárólag megjelenítés. */
 const INWARD_X_PULL=0.55, INWARD_Y_DROP=4;
+/* ---- A BEHÚZÓDÁS NE LÉPJE ÁT A SZOMSZÉDJÁT ----
+   Az 5-3-2 jobbhátvédje (x=86) behúzva 66-ra kerülne — a belső védője viszont
+   68-on áll, vagyis a kettő HELYET CSERÉLNE a pályaképen, és a szétnyomó kör
+   már ezt a fordított sorrendet simítaná szét. A pull ezért megáll a legbelső
+   szomszédja mellett (fél százalékkal kívül, hogy a sorrend egyértelmű
+   maradjon); a rendes korong-távolságot utána a pitchSpread adja meg.
+   A „sor" mércéje a mélység: a szomszéd akkor számít, ha 8 százalékon belül
+   van függőlegesen — ennyivel lógnak ki a sorok szélei az alap-felállásokban. */
+const LINE_DY=8;
+function lineInnerX(f,i){
+  const F=FORMS[f];
+  if(!F||!F.xy[i])return null;
+  const x=F.xy[i][0],y=F.xy[i][1],right=x>50;
+  let best=null;
+  F.xy.forEach((q,j)=>{
+    if(j===i||!q||Math.abs(q[1]-y)>LINE_DY)return;
+    if(right?(q[0]>=x||q[0]<50):(q[0]<=x||q[0]>50))return;
+    if(best===null||(right?q[0]>best:q[0]<best))best=q[0];});
+  return best;}
+/* A befelé húzódás célpontja, a szomszédnál megállítva. NEM kerekít: a
+   végleges egész számot a pitchSpread adja (a fél százalékos rés különben
+   épp visszakerekedne a szomszédjára). */
+function inwardX(f,i){
+  const x=FORMS[f].xy[i][0],t=x+(50-x)*INWARD_X_PULL,inner=lineInnerX(f,i);
+  if(inner==null)return t;
+  return x>50?Math.max(t,inner+0.5):Math.min(t,inner-0.5);}
+/* ---- KÉT KORONG NE ÜLJÖN EGYMÁSON ----
+   BEJELENTETT HIBA: négyes (és ötös) védelemben a szélsővédőt középhátvédre
+   állítva a korongja RÁMÁSZOTT a belső védő korongjára — a két név egymáson,
+   az egyik ember gyakorlatilag eltűnt a pályaképről.
+
+   AZ OK: a fenti megbízás-eltolások SLOTONKÉNT számolnak, a szomszédról nem
+   tudnak. A 4-4-2 jobbhátvédje (x=82) középre állítva 82+(50−82)·0,55 = 64-re
+   kerül, a belső védő viszont 62-n áll: KÉT százalék a különbség, a korong meg
+   tizenkettő. Ugyanez a bal oldalon (36 vs 38), az 5-3-2-ben (66 vs 68), és a
+   középpálya-soron is (a behúzódó szélső 65-re, a belső 62-n).
+
+   A JAVÍTÁS a PÁLYAKÉP SZINTJÉN áll, nem az egyes szabályokban: a kész
+   pontokat egy rövid szétnyomó kör futja végig, és ami a korongnál közelebb
+   került, azt szétsimítja. A lökés MINDKÉT pontot mozgatja, tehát a sor
+   együtt csúszik odébb — nem egy ember ugrik ki a sorból.
+
+   A HATÁR a korong mérete: 42 px egy ~360 px széles pályán ≈ 12 százalék, a
+   játék saját legsűrűbb sora pedig (a hatos FORM_LINE_X) 14-gyel áll. A 13
+   tehát pont az a szám, ami az átfedést szétnyomja, az ÉP felállásokat viszont
+   egyetlen ponttal sem mozdítja (mérve: mind a 8 alapfelállás és az összes
+   szabályos saját felállás változatlan marad).
+   Kizárólag MEGJELENÍTÉS: a motor a poszt-kódból dolgozik, nem a
+   koordinátából. */
+const DOT_MIN_GAP=13;
+/* A pálya 3:3.6 arányú, tehát egy y-százalék 1,2-szer akkora távolság
+   képpontban, mint egy x-százalék. Enélkül a kör függőlegesen túl szigorú
+   volna, és a SOROKAT is széthúzná. */
+const PITCH_Y_RATIO=1.2;
+const PITCH_X_MIN=10, PITCH_X_MAX=90;
+/* RÁHAGYÁS A KEREKÍTÉSRE. A pontok a végén egész százalékra kerekednek, és az
+   két korongon összesen ~1,5 százalékot vehet vissza a résből — ezért a
+   szétnyomás mindig egy hajszállal a határ FÖLÉ nyit. A DÖNTÉS (kell-e
+   egyáltalán mozdulni) marad a sima határon, különben a játék saját, 14-gyel
+   álló hatos sora is szétcsúszna. */
+const DOT_GAP_SLACK=1.5;
+function pitchSpread(pts){
+  const P=pts.map(p=>[p[0],p[1]]);
+  const T=DOT_MIN_GAP+DOT_GAP_SLACK;
+  /* Néhány kör elég: minden lépés csökkenti az átfedést, a sorok pedig eleve
+     rendezettek. A felső korlát csak védőháló egy oda-vissza tologatás ellen. */
+  for(let pass=0;pass<12;pass++){
+    let moved=false;
+    for(let i=0;i<P.length;i++)for(let j=i+1;j<P.length;j++){
+      const dx=P[j][0]-P[i][0],dy=(P[j][1]-P[i][1])*PITCH_Y_RATIO;
+      if(Math.sqrt(dx*dx+dy*dy)>=DOT_MIN_GAP)continue;
+      /* OLDALRA BONTUNK, SOSEM FÖL-LE. A sorok vízszintesen állnak, a MÉLYSÉG
+         viszont információ a pályaképen (ki áll hátrébb, ki húzódik vissza) —
+         azt egy ütközés-feloldás nem írhatja át. Az oldalirányú rés ezért a
+         meglévő függőleges távolság MELLÉ számolódik: annyit nyitunk x-ben,
+         amennyi a kettőből együtt kiadja a korong-távolságot.
+         Egybeeső x-nél (dx=0) a lökés iránya rögzített, hogy az eredmény
+         determinisztikus maradjon. */
+      const need=Math.sqrt(Math.max(0,T*T-dy*dy)),ax=Math.abs(dx);
+      if(need<=ax)continue;
+      const sx=dx<0?-1:1,push=(need-ax)/2;
+      P[i][0]-=sx*push;P[j][0]+=sx*push;
+      moved=true;}
+    if(!moved)break;
+    /* A pálya szélén a névsor is kilógna, ezért a lökés nem viheti ki a
+       pontot a felállások által is használt sávból. */
+    P.forEach(q=>{q[0]=Math.max(PITCH_X_MIN,Math.min(PITCH_X_MAX,q[0]));});}
+  return P.map(q=>[Math.round(q[0]),Math.round(q[1])]);}
+/* Egy felállás TELJES pályaképe, a megbízás-eltolásokkal és a szétnyomással
+   együtt. A slotXY ebből olvas, tehát minden hívási hely (felállásváltás,
+   megbízás-váltás, friss karrier) magától a javított képet kapja. */
+function slotXYAll(f){
+  const F=FORMS[f];
+  if(!F||!F.xy)return [];
+  return pitchSpread(F.xy.map((q,i)=>slotXYRaw(f,i)));}
 function slotXY(f,i){
+  const A=slotXYAll(f);
+  return A[i]?A[i]:[50,50];}
+/* A megbízás-eltolások MAGA, szomszéd nélkül. Ezt a slotXYAll hívja, és a
+   szétnyomó kör utána simítja el az ütközéseket. */
+function slotXYRaw(f,i){
   const F=FORMS[f];
   if(!F||!F.xy[i])return [50,50];
   const xy=F.xy[i];
@@ -9775,11 +9875,10 @@ function slotXY(f,i){
              Math.max(4,xy[1]-WB_Y_LIFT)];
    /* szélsővédő → középhátvéd */
    if(eff==="KV"&&(def==="JV"||def==="BV"))
-     return [Math.round(xy[0]+(50-xy[0])*INWARD_X_PULL),
-             Math.min(96,xy[1]+INWARD_Y_DROP)];
+     return [inwardX(f,i),Math.min(96,xy[1]+INWARD_Y_DROP)];
    /* középpályás szélső → belső középpályás */
    if((def==="JSZ"||def==="BSZ")&&MID_ROLE_CODES.indexOf(eff)>=0)
-     return [Math.round(xy[0]+(50-xy[0])*INWARD_X_PULL),xy[1]];}
+     return [inwardX(f,i),xy[1]];}
   if(effectiveSlotPos(f,i)!==SHADOW_POS)return xy.slice();
   const def=F.slots[i];
   const wide=(def==="JSZ"||def==="BSZ");
@@ -50197,6 +50296,14 @@ function applySavedGame(d){
      menthetett a keretbe. A betöltésnél kiszűrjük, hogy a régi törött mentések
      ne omoljanak össze, hanem játszható (bár hiányos) állapotba kerüljenek. */
   slots.forEach(s=>{if(s&&s.player===undefined)s.player=null;});
+  /* ---- ÖNJAVÍTÁS: A PÁLYAKÉP KOORDINÁTÁI ----
+     A slot xy-a a mentés része, tehát egy RÉGI mentésben az egymásra csúszott
+     pont is úgy marad, ahogy elmentettük — hiába javult a szabály. A
+     koordináta tisztán megjelenítés (a motor a poszt-kódból dolgozik), ezért
+     betöltéskor a mostani szabályokkal újraszámoljuk. Ép mentésen ez pontról
+     pontra ugyanazt adja vissza. */
+  {const XY=slotXYAll(form);
+   if(XY.length===slots.length)slots.forEach((s,i)=>{if(s&&XY[i])s.xy=XY[i];});}
   Object.keys(BENCH).forEach(k=>{if(BENCH[k]===undefined)BENCH[k]=null;});
   if(Array.isArray(extraRoster))extraRoster=extraRoster.filter(Boolean);
   /* JAVÍTÁS régi mentésekhez: a poszttanulás korábban csak a careerPool-
