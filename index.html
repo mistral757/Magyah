@@ -3106,7 +3106,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.41";
+const APP_VERSION="3.3.42";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -19413,8 +19413,7 @@ function initialSkillDraw(){
     saveGame();return;}
   S.initialSkillDone=true;
   if(!S.skillPool.length)S.skillPool=weightedShuffleSkills();
-  const skill=S.skillPool.shift();
-  showSkillDraw(skill,"start",1,()=>{
+  const after=()=>{
     $("simGo").classList.remove("hide");
     /* a skill-tipp a sorsolás UTÁN jön: addigra látta, mit kapott, és hogy
        hány fázisból épül ki. A HUB tippje mögé sorolódik be magától. */
@@ -19425,7 +19424,16 @@ function initialSkillDraw(){
        között ül — így az is szem előtt van. */
     if(gameMode==="career")openPreSeasonHub();
     $("scPitch").scrollIntoView({behavior:"smooth"});
-    saveGame();});}
+    saveGame();};
+  /* A NYITÓ KÉPESSÉG IS A MÓD SZABÁLYA SZERINT MEGY. Kiérdemlő még nincs (egy
+     meccs sem ment le), tehát az auto-ág itt a tiszta véletlen — pontosan az,
+     amit a mód ígér: a keret képességprofilja nem a te terved. */
+  if(skillRealOn()){
+    const plan=skillRealPlan();
+    if(plan.mode==="auto"){skillRealAuto(plan.skill,"start",1,1,plan.target,after);return;}
+    if(plan.mode==="both"){showSkillTypePick("start",1,1,after);return;}
+    showSkillDraw(plan.skill,"start",1,after,1,null);return;}
+  showSkillDraw(S.skillPool.shift(),"start",1,after);}
 function teamOVRbase(){
   const f=slots.filter(s=>s.player);if(!f.length)return 0;
   return f.reduce((a,s)=>a+s.player.ovr*s.fit,0)/f.length;}
@@ -30505,19 +30513,43 @@ function playMatch(){
          A türelem-jutalomnál a kvóta dönt, nem a véletlen (forced). */
       const continueChance=Math.min(0.78,0.35+incompleteCands.length*0.09);
       const goCont=forced?forced==="cont":Math.random()<continueChance;
+      const next=()=>processSkillQueue(reasons,cb);
       if(incompleteCands.length&&goCont){
         noteSkillGranted("cont");
         if(S.auto){
           applyUpgrade(pick(incompleteCands));
-          processSkillQueue(reasons,cb);
-        }else showSkillCompletion(()=>processSkillQueue(reasons,cb),incompleteCands);
+          next();return;}
+        /* ---- REALISZTIKUS MÓD: A FEJLESZTÉS IS ----
+           A skill-jutalmak több mint fele NEM új képesség, hanem egy félkész
+           továbbvitele. Ha ez az ág végig a te kezedben maradna, a
+           „kétharmadában nem te döntesz" ígéretből a gyakorlatban a harmada
+           sem teljesülne. */
+        if(skillRealOn()){
+          const up=skillRealPlanUpgrade(incompleteCands);
+          if(up.mode==="auto"){skillRealAutoUpgrade(up.c,up.earned,next);return;}}
+        showSkillCompletion(next,incompleteCands);
         return;
       }
-      const skill=drawSkillFromPool();
       const stagesNeeded=rollStagesNeeded();
       noteSkillGranted("new");
-      if(S.auto){autoAssignSkill(skill,stagesNeeded);processSkillQueue(reasons,cb);}
-      else showSkillDraw(skill,reason,stagesNeeded,()=>processSkillQueue(reasons,cb));}
+      if(S.auto){autoAssignSkill(drawSkillFromPool(),stagesNeeded);next();return;}
+      /* ---- REALISZTIKUS MÓD: A MECCS-JUTALOM IS ----
+         HIBA, AMIT EZ JAVÍT: a kapcsoló EGYETLEN helyre volt bekötve, a
+         kihívás-jutalmak sorába (drainRewardSkills) — a skillek túlnyomó
+         többsége viszont ITT születik, a meccs és a szezon jutalmaiból. Így a
+         realisztikus mód a gyakorlatban nem létezett: aki bekapcsolta, ugyanazt
+         a „te választod, ki kapja" képernyőt látta, mint a laza módban.
+         A DÖNTÉS UGYANAZ a függvény (skillRealPlan), mint a kihívásoknál — egy
+         szabály, két hívási hely. A PAKLIT (drawSkillFromPool) ilyenkor nem
+         húzzuk meg: a képességet a mód saját sorsolása adja (a kiérdemlőnek a
+         posztjához illőt), a paklinak nem szabad emiatt fogynia. */
+      if(skillRealOn()){
+        const plan=skillRealPlan();
+        if(plan.mode==="auto"){
+          skillRealAuto(plan.skill,reason,stagesNeeded,1,plan.target,next);return;}
+        if(plan.mode==="both"){showSkillTypePick(reason,stagesNeeded,1,next);return;}
+        showSkillDraw(plan.skill,reason,stagesNeeded,next,1,null);return;}
+      showSkillDraw(drawSkillFromPool(),reason,stagesNeeded,next);}
     if(skillReasons.length)processSkillQueue(skillReasons,afterAllRewards);
     else afterAllRewards();
   }
@@ -33172,7 +33204,18 @@ function styleInheritHandle(name,how){
        felénél előbb a TÍPUST is kiválaszthatod, aztán az embert.
    A csapatstílusok ezt az arányt és a sorsolás irányát tolják el — a laza mód
    régi kategória-torzítása (30/45/60%) ilyenkor NEM él, helyette a lentebbi,
-   szerényebb (15/25/33%) hatás dolgozik, és CSAK a "nem te döntesz" ágon. */
+   szerényebb (15/25/33%) hatás dolgozik, és CSAK a "nem te döntesz" ágon.
+
+   HOL HAT (3.3.42). MINDEN olyan skill-jutalomnál, ami képernyőt nyit:
+     · a meccs és a szezon jutalmai — új képesség ÉS fejlesztés is
+       (processSkillQueue: skillRealPlan / skillRealPlanUpgrade),
+     · a kihívás-jutalmak sora (drainRewardSkills),
+     · a karrier nyitó képessége (initialSkillDraw).
+   BEJELENTETT HIBA, AMIT EZ JAVÍT: a kapcsoló sokáig CSAK a kihívás-jutalmak
+   sorába volt bekötve, a skillek túlnyomó többsége viszont a meccs-jutalomból
+   születik — a mód így a gyakorlatban nem is létezett.
+   NEM ÉRINTI a kémia-építést (az nem képesség), az auto-módot (ott úgyis a gép
+   oszt) és a szezonvégi padló-pótlást (az eleve automatikus, képernyő nélkül). */
 const SKR_AUTO_BASE=0.66;        /* ekkora eséllyel nem te döntesz */
 const SKR_EARNED_SHARE=0.50;     /* az auto-ág fele a kiérdemlőé */
 const SKR_TYPE_SHARE=0.50;       /* a te ágad fele a típust is választhatja */
@@ -33292,6 +33335,43 @@ function skillRealPlan(){
   let st=null;try{st=styleState();}catch(e){}
   if((st&&st.key==="panzer")||Math.random()<SKR_TYPE_SHARE)return {mode:"both"};
   return {mode:"who",skill:pick(MAIN_SKILLS)};}
+/* ---- A FEJLESZTÉS-JUTALOM (folytatás / csillag) DÖNTÉSE ----
+   Ugyanaz a két arány dolgozik, mint az új képességnél: az auto-ág
+   (skillRealAutoShare), azon belül a kiérdemlő fele. Ha épp nincs kiérdemlő,
+   vagy nincs FÉLKÉSZ MUNKÁJA, a véletlen ág veszi át — a jutalom nem marad el.
+     {mode:"auto", c, earned}  — magától megy, csak bejelentjük
+     {mode:"pick"}             — te választasz (a szokásos képernyő) */
+function skillRealPlanUpgrade(cands){
+  if(!cands||!cands.length)return {mode:"pick"};
+  if(Math.random()>=skillRealAutoShare())return {mode:"pick"};
+  if(Math.random()<SKR_EARNED_SHARE){
+    const who=skillRealEarner();
+    const mine=who?cands.filter(c=>c&&c.name===who):[];
+    if(mine.length)return {mode:"auto",c:pick(mine),earned:true};}
+  return {mode:"auto",c:pick(cands),earned:false};}
+/* "NEM TE DÖNTESZ" a fejlesztésnél is: a lépés megtörténik, mi pedig
+   ugyanazon a képernyőn elmondjuk, kivel és miért. A részleteket (fázisszám,
+   csillag-állás) az applyUpgrade naplósorai hozzák. */
+function skillRealAutoUpgrade(c,earned,resumeCb){
+  if(!c){resumeCb();return;}
+  const star=c.kind==="star";
+  applyUpgrade(c);
+  skillResumeCb=resumeCb;
+  $("scSkill").classList.remove("hide");
+  $("skillTitle").textContent="Fejlesztés — jutalom!";
+  $("skillSpinBtn").classList.add("hide");
+  $("skillSpinName").textContent="⇪";
+  $("skillDesc").innerHTML=`<b>${esc(shortName(c.name))}</b> — „${esc(c.inst.skill.name)}" `
+    +(star?"csillaga lépett":`fejlődött (${c.inst.stagesCompleted}/${c.inst.stagesNeeded} fázis)`)
+    +` · ${earned?"a legutóbbi mérkőzésen kiérdemelte":"a sors így hozta"}.`;
+  const box=$("skillAssignList");box.innerHTML="";
+  const btn=document.createElement("button");
+  btn.className="btn-p stepbtn";btn.textContent="Rendben";
+  btn.onclick=()=>{$("scSkill").classList.add("hide");
+    const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();};
+  box.appendChild(btn);
+  $("skillAssignWrap").classList.remove("hide");
+  $("scSkill").scrollIntoView({behavior:"smooth"});}
 function drainRewardSkills(cb){
   const q=S.pendingRewardSkills;
   if(!q||!q.length){cb();return;}

@@ -372,3 +372,41 @@ hogy elkötelezed magad valami mellett.
 **A többi stílushoz képest** ez a leggyengébb torzítás (25%, szemben a teljesen
 kiépített fák 33%-ával), cserébe viszont **irányítható**, és nem kell hozzá
 képességfa-vásárlás.
+
+### 8.1 Hol hat egyáltalán a realisztikus mód (3.3.42)
+
+**Bejelentett hiba:** a mód *effektíve nem működött*. A kapcsoló (`skillRealOn`)
+egyetlen helyre volt bekötve — a **kihívás-jutalmak sorába**
+(`drainRewardSkills`) —, a képességek túlnyomó többsége viszont nem onnan
+születik, hanem a **meccs és a szezon jutalmaiból** (`processSkillQueue`). Aki
+realisztikus módot választott, a gyakorlatban ugyanazt a „te választod, ki
+kapja" képernyőt látta, mint a laza módban; a 66%-os „nem te döntesz" ág szinte
+sosem jött elő.
+
+| skill-jutalom útja | korábban | most |
+|---|---|---|
+| meccs/szezon — **új képesség** | laza (te választasz) | `skillRealPlan` |
+| meccs/szezon — **fejlesztés** (félkész vagy csillag) | laza (te választasz) | `skillRealPlanUpgrade` |
+| kihívás-jutalom sora | `skillRealPlan` | változatlan |
+| karrier **nyitó képessége** | laza | `skillRealPlan` |
+| kémia-építés | te választasz | **változatlan** — az nem képesség |
+| auto-mód (szezon végigjátszása) | gép osztja | **változatlan** |
+| szezonvégi padló-pótlás | automatikus, képernyő nélkül | **változatlan** |
+
+**A fejlesztés-ág külön is fontos.** A skill-jutalmak több mint fele nem új
+képesség, hanem egy félkész továbbvitele (a folytatás esélye
+`0,35 + 0,09 × félkészek`, maximum 0,78). Ha ez az ág végig a felhasználó
+kezében marad, a „kétharmadában nem te döntesz" ígéretből a gyakorlatban a
+harmada sem teljesül — ezért ugyanaz a két arány dolgozik ott is: az auto-ág
+(66%, Panzernél 75%, Béke és harmóniánál 50/45/40%), azon belül a kiérdemlő
+fele. Ha a kiérdemlőnek épp nincs félkész munkája, a véletlen ág veszi át.
+
+**A paklit a mód nem fogyasztja.** A realisztikus ágon a képességet a mód saját
+sorsolása adja (a kiérdemlőnek a posztjához illőt, `skillRealDrawFor`), ezért a
+`drawSkillFromPool` meg sem hívódik — a súlyozott pakli nem ürül ki olyan
+lapoktól, amiket ki sem osztottunk.
+
+Mérve (200 000 döntés, stílus nélkül): 33,2% kiérdemlő · 33,0% véletlen ·
+17,0% „te választod, ki kapja" · 16,8% „a típust is te választod" — vagyis
+pontosan a tervezett 66/17/17. Panzerrel 75,2% az auto-ág, és a maradékon
+mindig a teljes (típus + ember) döntés jár.
