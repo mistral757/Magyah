@@ -25,6 +25,7 @@
 | **F6** — karmester-finomhangolás | ✅ kész |
 | **F7** — első futás | ✅ kész |
 | **F8** — QA és dokumentáció | ✅ kész |
+| **F5/E** — a sztár (híresség, képességek, bajnoki listák) | ✅ kész |
 | **A terv végigfutott.** A rendszer leírása: `vezetett-elmeny.md` | ✅ |
 | F9 — opcionális ráépülés (haladás-kijelző) | nyitva |
 
@@ -325,6 +326,7 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
 | **B — piac** ✅ | 5, 13, 14, 15, 16, 17, 6 | lásd a lenti két megjegyzést |
 | **C — hosszú táv** ✅ | 18, 19, 20, 21, 22, 23 | lásd a 6. megjegyzést: itt a legtöbb téma helye a TIPP |
 | **D — meta** ✅ | 10, 11, 12, 25 | itt született a CSENDES téma fogalma |
+| **E — a sztár** ✅ | híresség, 4 képesség, bajnoki listák | a 3.3.30 új felülete; lásd a 10. megjegyzést |
 
 * **Kész, ha:** csomagonként végigjátszott 2 szezon, és minden téma legalább
   egyszer előjött a maga helyén, egyik sem félrehorgonyozva.
@@ -388,6 +390,14 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
    lélegezve. Egy szaggatott keret meg egy pötty ugyanarra csak zaj volna.
    A csendes téma tehát van a rangsorban, a beállításokban és a vezetésben —
    csak saját jelzést nem rajzol. Ezt kapta a mérföldkő- és a kihívás-panel.
+10. **Az E csomag új hézagtípust talált: „megvan, de nem dolgozik".** A sztár
+   képességei nem magukban hatnak — BE KELL ÁLLÍTANI őket. Egy megvett, de
+   beállítatlan *Fejlődés gyorsítás* némán nem csinál semmit: se hibaüzenet, se
+   jelzés nem szólt róla. Ez a jelzés-szint legtisztább esete, és minden későbbi
+   „választani kell hozzá valamit" képességnél ugyanígy kezelendő.
+   A *Boooooost!* pedig a csomag egyetlen valóban **lejáró** tétele (a jog a
+   sztár korával jár le), ezért ül elöl a rangsorban — az F6 szabálya szerint.
+
 9. **Ne írj olyan lépéssort, ami sosem futhat le.** A vezetés csak a HUB-ban
    indul magától (a meccs képernyője feszes hely), tehát a `scr:"match"` témák
    lépéssora dead code volna. A rangadó-téma ezért csak jelzést kap, és a
