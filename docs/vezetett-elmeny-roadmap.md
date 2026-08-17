@@ -23,8 +23,10 @@
 | **F5/D** — meta (10, 11, 12, 25) | ✅ kész |
 | **A huszonöt téma mind megvan** | ✅ |
 | **F6** — karmester-finomhangolás | ✅ kész |
-| F7 — első futás | következik |
-| F8 — QA és dokumentáció | — |
+| **F7** — első futás | ✅ kész |
+| **F8** — QA és dokumentáció | ✅ kész |
+| **A terv végigfutott.** A rendszer leírása: `vezetett-elmeny.md` | ✅ |
+| F9 — opcionális ráépülés (haladás-kijelző) | nyitva |
 
 **Eldöntött kérdések** (a 8. szakasz nyitott kérdéseiből):
 
@@ -413,20 +415,29 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
 * A telítettség-védelem (max 3 jelzés) és a hároméves feladás már az F2/F5-ben
   elkészült, itt változatlan.
 
-### F7 — Az első futás
+### F7 — Az első futás ✅
 
-* Új játékosnál a **hard mód az alapértelmezett** (ma a „Tippek nélkül" a
-  kiválasztott gomb!), a kezdőképernyőn egy mondatos magyarázattal.
-* A már-karrierrel-rendelkezőknél marad, ami eddig volt.
-* Egy „Vezess újra végig" gomb a beállításokban, ami az egész regisztrátumot
-  visszaállítja ismeretlenre.
+* A **hard mód az alapértelmezett** (F0-ban előrehozva), és a választó fölé
+  került a keretező mondat: *„Mennyit segítsen a játék?"*
+* A „Vezess újra végig" az F4-ben elkészült.
+* **Amit ez a fázis pótolt:** a migrált karriereknek ígért **egyszeri
+  magyarázat**. Az F0 jegyzete kimondta, hogy jár nekik — de nem épült meg. A
+  `light` fokozatot nem ők választották, hanem mi adtuk; ezért a legelső
+  villogásnál magától kinyílik a „miért?" buborék egy bevezető sorral, ami
+  megmondja, mi ez és hol kapcsolható ki. Pontosan egyszer. Tolakodó egy
+  alkalommal — de a megmagyarázatlan villogás rosszabb, és ez az egyetlen pont,
+  ahol a felhasználó biztosan ott van, amikor a jelenség először megjelenik.
 
-### F8 — QA, diagnosztika, dokumentáció
+### F8 — QA, diagnosztika, dokumentáció ✅
 
-* `teachDebug()` a diagnosztika-ablakba: mind a 25 téma állapota, `ready`/`due`
-  pillanatnyi értéke, mikor jelzett utoljára — és kényszerített indítás.
-* A `docs/` bővítése egy `vezetett-elmeny.md` rendszerleírással (ez a doksi a
-  *terv*, az lesz a *leírás*).
+* **`teachDebugText()`** a kémcső-diagnosztikában: minden témánál a prioritás, az
+  `st`, a horgony láthatósága, és **az első ok, ami kizárta** — ugyanabban a
+  sorrendben, ahogy a `teachDueList` vizsgálja, hogy a dump és a valóság sose
+  mondjon mást. Mentésenként egy tömör sor is bekerül.
+  *Kényszerített indítás nem épült be: a „Vezess újra végig" (F4) ugyanezt adja,
+  felhasználói felületen, tesztelhetően.*
+* **`docs/vezetett-elmeny.md`** — a rendszer leírása. Ez a doksi a *terv* marad;
+  az a *leírás*, és az mondja meg, hogyan kell új témát felvenni.
 
 ### F9 — Opcionális ráépülés
 
