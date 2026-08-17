@@ -100,7 +100,9 @@ maradnak, ezek a saját menüpont alatt élnek, a trait-bolttal együtt.
 
 ---
 
-## 3. A hat stílus
+## 3. A hét stílus
+
+> A 3.4.00-ig hat volt; a **🌀 Tiki-Taka** a hetedik (lásd 3.7).
 
 Mindegyik ugyanazon a vázon áll:
 
@@ -333,6 +335,196 @@ vezetik le. A csapatmorál nem hullámzik — mindig ott áll, ahol kell.
 kikapcsolása lenne — a stílus ára ezért az, hogy a magas temperamentumú
 játékosok **több piros lapot és több öltözői konfliktust** hoznak. A trait nem
 szünteti meg a bajt, csak a következményét tompítja.
+
+---
+
+### 3.7 🌀 TIKI-TAKA (3.4.00)
+
+> *„A labda nem fárad el. Ti igen — ezért járassátok őt."*
+
+**Cél:** a hetedik filozófia, és az egyetlen, ami egy ATTRIBÚTUMOT tesz meg
+mindennek: a **Passzt**. A többi stílus a végeredményt méri (gól, tiszta lap,
+sebesség); ez azt, ami odáig vezet.
+
+**Illeszkedés:** 4-3-3, 4-2-3-1 · Labdatartás, Totális futball
+
+Három olyan rendszert kap, ami a játékban addig nem létezett. Mindhárom a III.
+ársávban áll, mindháromnál az 1. szint a MEGNYITÁS, a 2-3. a fejlesztés, és
+mindhárom **1,35× árszorzót** visel (`TT_SYSTEM_PRICE_MULT`): nem egy szeletet
+erősítenek, hanem egy egész mechanikát adnak hozzá a játékhoz. Enélkül a stílus
+fedezete 276% volna, a mezőny legmagasabbja; így **242%** — a Villám és a
+Pánzer mellett.
+
+#### 3.7.1 Passzkémia — a harmadik kötésfajta
+
+A jutalom-sor eddig két dolgot tudott adni: egy KÉPESSÉGET vagy egy
+PÁRKÉMIA-fázist. Ez a harmadik, és szándékosan **nem vált fel semmit**: mellé
+jön be, ugyanazon az öt fázison és ugyanazon a tempón épül (`PASS_CHEM_BASE_P`
+= a párkémia 0,15-e), és ugyanazon a páron mindkét kötés megépíthető. Saját
+tárban él (`S.passChem`), a pályaképen saját, ibolya vonallal.
+
+| | |
+|---|---|
+| mit ad (1) | mindkét tag **poszt szerinti fő attribútuma** (`attrTrainedBy`) +20%-kal gyorsabban gyűlik — a Sztárom a párom fejlődés-gyorsításával azonos, közös csatornán |
+| mit ad (2) | a gyengébb passzoló **max 15 / 12 / 8 KÖZÖS meccsen belül** felér a társához, onnantól **együtt** haladnak: mindketten kapnak egy maxos passz-edzésnyi adagot a Passzra, a rendes edzésterv MELLÉ |
+| a szint mit emel | a felajánlás gyakoriságát (×1 / ×1,25 / ×1,33) és az összeérési időt (15 / 12 / 8) |
+
+**A mértékegység a KÖZÖS MECCS, nem a forduló** — a kötés attól épül, hogy
+együtt vannak a pályán; aki a padon ül, az nem passzolgat a társával.
+
+**A lépésköz mindig a HÁTRALÉVŐ meccsekre osztott hiány**, ezért a határidő
+akkor is tartható, ha közben a vezető is fejlődik. Mérve: 80 → 110 Passz
+pontosan 15 / 12 / 8 közös meccs alatt zárul, szintenként.
+
+**A felzárkózás a `bumpAttr`-en megy, tehát a specializációs sávot
+(`ATTR_SPEC_CEIL/FLOOR`) tiszteletben tartja.** Mérve: egy 60-as Passzú ember
+egy 130-as társ mellett 91-nél megáll — ott a SAJÁT plafonja van. Ez nem hiba,
+hanem a szabály: a passzkémia nem ír felül határokat, csak az odáig vezető utat
+rövidíti le.
+
+#### 3.7.2 Passzrekord — a tiki-taka gól
+
+A játék egyetlen gólja, amit **nem a gólvárhatóság (λ) szül meg, hanem maga a
+passzsor**. A kezdőrúgáskor dől el (meccsenként 1, a 2. szinttől 2 sor), a
+kommentárja a kisorsolt percben szólal meg — ugyanaz a szerkezet, mint a 90+
+drámánál. Párharcban nem fut: ott az eredményt a közös eseménylista adja.
+
+1. kisorsolunk egy kezdő embert — a **Stabil kezdés** szerepben játszó
+   háromszoros eséllyel indul;
+2. egymás után legfeljebb **30 elemű** sort húzunk;
+3. minden lépésnél a két szomszédos ember Passzának **számtani közepe ±10%-kal
+   sorsolva** mérkőzik az ellenfél **nyers csapaterejével** (`fx.o.ovr`);
+4. ahol elakad (vagy kifut a sor), az utolsó két ember **Gólszerzéséből a
+   magasabbik** +15-30%-ot kap. Ha eléri az ellenfél nyers csapaterejét: GÓL.
+
+**Két ponton mond többet a megvalósítás a leírt szabálynál, és mindkettő
+muszáj volt:**
+
+* **A szabály önmagában LÉPCSŐFÜGGVÉNY.** Amint a passz-átlag 10%-kal az
+  ellenfél fölé kerül, a sorsolás alsó széle is fölötte van, tehát MINDEN passz
+  sikerül. Mérve (20 000 sor, 120-as passz 100-as ellenfél ellen): a sor mindig
+  kifutott a 29. passzig, és a gól 100%-ban megszületett — egy jó passzú csapat
+  mérkőzésenként **két biztos extra gólt** kapott volna. Ezért az ellenállás
+  **passzonként 1,2%-kal szigorodik** (`TT_STEP_UP`): az első passzoknál betűre
+  az eredeti feltétel dönt, a huszadik környékén viszont a legjobb keretnek is
+  elakadhat. A BEFEJEZÉS az alap csapaterő ellen megy, szigorítás nélkül — mire
+  odáig eljutottak, a védelem szét van húzva.
+* **A rövid sor nem akció.** `TT_MIN_PASSES` = 3 alatt semmi nem történik, se
+  gól, se kommentár. Enélkül egy kiegyenlített mérkőzésen a sorok többsége EGY
+  passz után elakadt volna, és abból születtek volna „tiki-taka gólok" — épp a
+  lényeget mondva hazugságnak.
+
+**A mérleg utána** (reális kezdő tizenegy, poszt szerint szóró Gólszerzéssel):
+
+| keret vs mezőny | szint | gól | meccsenkénti extra gól |
+|---|---|--:|--:|
+| azonos szint | 1 | 3,0% | 0,03 |
+| +10 | 1 | 37,8% | 0,38 |
+| +10 | 3 | 66,8% | **1,34** |
+| +30 | 3 | 61,2% | 1,22 |
+| +40 | 3 | 100% | 2,00 |
+
+Vagyis a technika **csak valódi passz-fölénnyel fizet**, és pont azt jutalmazza,
+amit a stílus épít. A leghosszabb gólig vezető sor tipikusan 14-17 passz; a
+29-hez teljes dominancia kell.
+
+#### 3.7.3 Guardiola — a 3.0 óta változatlan taktika-plafon
+
+A készlet egyetlen képessége, ami **edzőt vált**: a klub leszerződteti Pep
+Guardiolát (`guardiolaTakeOver`), és onnantól az ő hatásai élnek — ugyanazon a
+csatornán, amin bármelyik másik edzőé. Ez az 1. szint hozománya, a kétszeres
+begyakorlással együtt.
+
+A 2-3. szint a **Labdatartás** ismertségének 99-es plafonját tolja **125-re**,
+majd **150-re**. Csak ennél az egy rendszernél: a képesség egy EMBERRŐL szól,
+aki egyetlen filozófiát visz tökélyre — ha mindenre hatna, nem Guardiola volna,
+hanem egy általános plafon-emelés.
+
+**A tempó-görbe együtt nyúlik a plafonnal**, különben a kitolt sáv halott
+tartalom volna: a `tacticLevelRate` exponenciálisan lassul (0,92^(L−72)), 99
+fölött már meccsenként ezredeket ad. A szintet ezért visszaképezzük az eredeti
+50-99-es skálára — kitolt plafonnal a 150-ig vezető út pontosan annyi munka,
+mint korábban a 99-ig vezető volt, és a kétszeres tempó ezen FELÜL jön.
+
+| | ma (plafon 99) | Guardiola III (plafon 150, ×2) |
+|---|--:|--:|
+| 80 → 85 | 37 meccs | 7 meccs |
+| 85 → 99 | 237 meccs | 21 meccs |
+| 99 → 125 | — | 83 meccs |
+| 125 → 150 | — | 224 meccs |
+
+A **meccshatás sapkája csak mérsékelten nő**: 2,1 → 2,88 → **3,63** nyers OVR
+(pontonként +0,03). A cél az, hogy legyen MIÉRT feljebb menni, nem az, hogy a
+taktika elvigye a mérkőzést; tökéletes illeszkedéssel a legnagyobb hatás így
+3,63 × 1,3 ≈ 4,7 csapaterő.
+
+#### 3.7.4 Szezon-szerepek
+
+A negyedik stílus, ami szerepeket kap — és az első, ahol mind a három MÁSHOL
+fog.
+
+| Szerep | Kire jelölhető | Mit csinál |
+|---|---|---|
+| 🧭 **Stabil kezdés** | védő vagy középpályás, aki a **saját posztterülete legjobb passzolója** | az ELSŐ FÉLIDŐBEN −2,5% → **−7%** ellenfél-gólesély · saját gólpassz-súly ×1,01 → ×1,04 |
+| 👁️ **Lát a pályán** | középpályás, szélső csatár vagy árnyékék (középcsatár, védő, kapus nem) | gólpassz-súly ×1,05 → **×1,20** · a taktikai illeszkedésnél **1 → 4** társa gyengébb Passza helyett is az övé számít |
+| ✨ **Aurafarmer** | bármelyik mezőnyjátékos | gól- ÉS gólpassz-súly ×1,03 → **×1,11** · amint beírja magát a jegyzőkönyvbe, a saját súlya **×2** a lefújásig, a sérülés-veszélye **×1,5** |
+
+**A Stabil kezdés belépője RELATÍV, nem küszöb.** Nem „80 fölötti Passz" kell,
+hanem hogy a saját posztterületén ő legyen a legjobb passzoló — így a feltétel
+a karrier minden szakaszában ugyanazt jelenti, egy 70-es és egy 150-es
+mezőnyben egyaránt.
+
+**A Lát a pályán az egyetlen szerep-hatás, ami a MECCS ELŐTT dolgozik.** A
+csere a `teamAttrStrengths` Passz-tengelyében ül, vagyis a fit EGYETLEN
+forrásában — ugyanaz az indok, mint a Villám pace-bónuszánál: a fitet hat
+rendszer olvassa, és ha csak egy részük tudna róla, a panel mást állítana, mint
+a motor. Csak FELFELÉ cserél, és a saját sorát sosem.
+
+**Az Aurafarmer a játék egyetlen öngerjesztő szerepe.** A duplázás MECCS-állapot
+(`_roleAuraLit`), nem képesség-szint — a szerep akkor is ugyanannyiszorosára nő,
+ha a képességet meg sem vetted. A gyújtás a `recordScorer` / `recordAssist`
+KÖZÖS csatornáján ül, ezért a tizenegyes, a szabadrúgásgól, a csere-gól és a
+90+ dráma is meggyújtja, külön bekötés nélkül. Az ár a jutalommal EGYSZERRE
+érkezik: a csapat sérülés-esélye is nő, egy ember a tizenegyből arányában
+(+4,5%) — ugyanaz a becsületes számtan, mint a Kereszttűznél. Gyógyító kézzel
+ellenpontozható.
+
+**Mind a három hat a párharcban is**, a 3.3.40-ben lefektetett szerkezeten: a
+kiosztás és a kiértékelt számok a pillanatképben utaznak, a feltételeket a
+közös szimuláció értékeli ki. Az Aurafarmer kigyulladását a sim maga jegyzi
+fel, oldalanként (`X._auraLit`) — determinisztikus, tehát a két kliens ugyanoda
+jut.
+
+#### 3.7.5 A klasszikus réteg
+
+| Szint | Képesség | Hatás (I / II / III) |
+|---|---|---|
+| I | **Passzra hangolt sorsolás** | 30% / 45% / 60% esély passz-alapú képességre. Saját csatorna (`skillPass`), mert a passzos skillek — mint a sebességesek — nem egy posztkategóriában ülnek: a közös nevezőjük a HATÁS (`isPassSkill`) |
+| I | **Passzmester-műhely** | a Passz-attribútumot fejlesztő stábtagok 2× / 3× / 4× tempóval gyűjtenek tapasztalatot |
+| II | **Megfojtjuk a meccset** | Labdatartás taktikánál −4% / −7% / −10% ellenfél-gólesély. Feltételes, mint a Beton „Ötös bástyá"-ja: más rendszerben hallgat |
+| II | **Olcsó a jó középpályás** | −25% / −33% / −40% a középpályások vételárából. Kizárólag a vételi oldal |
+| II | **Passz-iskola** | a passz-alapú képességek csillagozás-feloldása olcsóbb (15/25/33%) |
+| III | **Csillagozható passz** | +12 / +22 / +32 pp csillag-felajánlási esély |
+
+**Mérföldkövek:** 18 család, Infinity nélkül 123, azzal **189 fokozat**. A
+négy kért lépcső elöl áll (kész passzkémiák · passzkémiák a klub történetében ·
+tiki-taka gólok · a legkijátszósabb tiki-taka gól · a Labdatartás ismertsége),
+utánuk a klasszikus réteg fordítja le a többi filozófia mércéit a passz
+nyelvére: a legjobb passzolód Passza, a középpálya össz Passza, a kezdő 11
+passz-átlaga, a csapat Passz-tengelye, gólpasszok idényben és a klub
+történetében, egy ember gólpasszai, a karmester szezonkártyája, aranylabdás
+karmester, Aranypasszok.
+
+**Két család ki van véve az Infinity-hosszabbításból** (`ST_INF_SKIP`), mindkettő
+azért, mert a tetejük nem a mezőny szintjétől függ:
+
+* `tt_chain` — egy passzsor legfeljebb `TT_CHAIN_MAX` (30) elemű, tehát 29
+  passznál több nem létezik. Egy 40 passzos fokozat nem nehéz volna, hanem
+  teljesíthetetlen (ugyanaz az indok, mint a `hm_contribM`-nél);
+* `tt_poss` — a Labdatartás plafonját nem a mezőny szabja meg, hanem a
+  Guardiola-képesség (150). A lépcső 70-től 150-ig visz, és a leírás a 99
+  fölötti fokozatoknál ki is mondja, hogy azok csak Guardiolával nyílnak meg
+  (ugyanaz a szerkezet, mint a Harmónia „Nincs plafon"-jánál).
 
 ---
 

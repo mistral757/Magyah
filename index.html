@@ -1136,6 +1136,10 @@ button.infPanel:disabled{cursor:default}
 #pitchBonds line{vector-effect:non-scaling-stroke;stroke-linecap:round}
 #pitchBonds line.done{stroke:rgba(255,255,255,.34);stroke-width:1.6}
 #pitchBonds line.wip{stroke:rgba(201,162,51,.42);stroke-width:1.4;stroke-dasharray:3 3}
+/* PASSZKÉMIA (Tiki-Taka): saját, ibolya szín — ugyanazon a páron a párkémia és
+   a passzkémia is futhat, tehát a kettőnek szét kell válnia egy pillantásra. */
+#pitchBonds line.done.pass{stroke:rgba(150,120,220,.52);stroke-width:1.6}
+#pitchBonds line.wip.pass{stroke:rgba(150,120,220,.40);stroke-width:1.4;stroke-dasharray:2 4}
 .slot{position:absolute;transform:translate(-50%,-50%);width:74px;text-align:center;z-index:2}
 .slot .dot{width:42px;height:42px;margin:0 auto;border-radius:50%;background:rgba(0,0,0,.28);
   border:2px dashed rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;
@@ -3106,7 +3110,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.3.41";
+const APP_VERSION="3.4.00";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7633,6 +7637,49 @@ const TACTIC_FLAVOR={
 /* Induló szintek: a választott edző kedveltjei 80/76/70, minden más 60.
    A skála 50–99; a 85 a majdani (F2) begyakorlási küszöb. */
 const TACTIC_START_LIKED=[80,76,70],TACTIC_START_OTHER=60,TACTIC_MIN=50,TACTIC_MAX=99;
+/* ================= GUARDIOLA ÉS A KITOLT TAKTIKA-PLAFON (3.4.00) ============
+   A taktika ismertsége a játék indulása óta 99-nél állt meg. A Tiki-Taka
+   Guardiola-képessége EGYETLEN rendszernél tolja ezt feljebb — a
+   LABDATARTÁSNÁL —, 125-ig, majd 150-ig.
+
+   MIÉRT CSAK EGY RENDSZERNÉL. A képesség egy EMBERRŐL szól, aki egyetlen
+   filozófiát visz tökélyre; ha minden taktikára hatna, nem Guardiola volna,
+   hanem egy általános plafon-emelés. Így a döntésnek ára van: a stílus a
+   Labdatartásra köti magát.
+
+   A TEMPÓ-GÖRBE EGYÜTT NYÚLIK A PLAFONNAL — enélkül a kitolt sáv HALOTT
+   TARTALOM volna. A tacticLevelRate exponenciálisan lassul (0,92^(L−72)); 99
+   fölött ez már meccsenként ezredeket ad, tehát a 150 ezer mérkőzés alatt sem
+   jönne össze. Ezért a görbét a NYÚJTOTT skálára képezzük vissza: kitolt
+   plafonnal a 150-ig vezető út pontosan annyi munka, mint korábban a 99-ig
+   vezető volt — és a képesség kétszeres tempója ezen FELÜL jön. A 99 alatti
+   szakasz így is gyorsul; ez a képesség jutalmának a része, és mérve is
+   szerény: a nyújtás a 85→99 szakaszt nagyjából a felére rövidíti.
+
+   A MECCSHATÁS SAPKÁJA CSAK MÉRSÉKELTEN NŐ (2,1 → 2,88 → 3,63 nyers OVR,
+   pontonként +0,03). A kitolt ismertség nem lineárisan váltódik erővé: a cél
+   az, hogy legyen MIÉRT feljebb menni, nem az, hogy a taktika elvigye a
+   mérkőzést. Tökéletes illeszkedéssel a legnagyobb hatás így 3,63×1,3 ≈ 4,7
+   csapaterő — sokat kérő, hosszú karrier jutalma. */
+const TT_POSS_TACTIC="labdatartas";
+const TT_TACTIC_CEIL=[99,99,125,150];
+const TACTIC_EFFECT_CAP_BASE=2.1, TACTIC_EFFECT_CAP_STEP=0.03;
+function guardiolaLevel(){
+  try{return Math.max(0,Math.min(3,Math.round(styleFxMax("guardiola"))||0));}catch(e){return 0;}}
+/* Egy taktika ismertségi PLAFONJA. Kulcs nélkül (vagy bármely más rendszernél)
+   a mindenkori 99 — a hívási helyeken nem kell feltételt írni. */
+function tacticCeil(key){
+  if(key!==TT_POSS_TACTIC)return TACTIC_MAX;
+  return Math.max(TACTIC_MAX,TT_TACTIC_CEIL[guardiolaLevel()]||TACTIC_MAX);}
+function tacticEffectCap(key){
+  return TACTIC_EFFECT_CAP_BASE+Math.max(0,tacticCeil(key)-TACTIC_MAX)*TACTIC_EFFECT_CAP_STEP;}
+/* GUARDIOLA MÁSIK FELE: a Labdatartás begyakorlása kétszeres tempóval halad.
+   Már az 1. szinttől — az az EDZŐVÁLTÁS szintje, és ez a hozománya. */
+function guardiolaTrainMult(key){
+  return (key===TT_POSS_TACTIC&&guardiolaLevel()>0)?2:1;}
+/* Be van-e téve a Labdatartás? A „Megfojtjuk a meccset" feltétele. */
+function ttPossActive(){
+  try{return !!(S.tactics&&S.tactics.active===TT_POSS_TACTIC);}catch(e){return false;}}
 /* ================= EURÓPAI KUPÁK (E1: kvalifikáció + kapu) =================
    A bajnoki helyezés a KÖVETKEZŐ szezonra szóló indulást adja; a kupát a
    következő szezon VÉGÉN játssza a csapat, közvetlenül a szezonzáró
@@ -8961,11 +9008,16 @@ function recordScorer(name){
   /* MÉRFÖLDKŐ: a régi csapat elleni gól. A gólszerzés KÖZÖS csatornája —
      minden találat átfut rajta, a tizenegyestől a hosszabbításig. */
   try{msNoteGoal(name);}catch(e){}
+  /* TIKI-TAKA · AURAFARMER: pontosan EZÉRT ül a gyújtás ezen a közös csatornán
+     és nem a gólblokkban — így a tizenegyes, a szabadrúgásgól, a csere-gól és
+     a 90+ dráma is meggyújtja, külön bekötés nélkül. */
+  try{roleAuraNote(name,"goal");}catch(e){}
   if(euroActive()){euroAddStat("scorers",name,teamName,true);
     try{euroChalMark(name);}catch(e){}
     const b=seasonEuroBucket();b.scorers[name]=(b.scorers[name]||0)+1;}
   else S.scorers[name]=(S.scorers[name]||0)+1;}
 function recordAssist(name){
+  try{roleAuraNote(name,"assist");}catch(e){}
   if(euroActive()){euroAddStat("assists",name,teamName,true);
     try{euroChalMark(name);}catch(e){}
     const b=seasonEuroBucket();b.assists[name]=(b.assists[name]||0)+1;}
@@ -9295,7 +9347,10 @@ function tacticEffect(){
      kell egyszerre, ami tudatos, hosszú távú építkezés eredménye. */
   const fit=tacticFit(S.tactics.active);
   if(d<0)return d*0.10*(1.3-0.6*fit);
-  return Math.min(2.1,d*0.15)*(0.7+0.6*fit);}
+  /* A SAPKA a taktika saját plafonjához igazodik (lásd tacticEffectCap):
+     kitolt plafonnál 2,1 helyett 2,88 / 3,63 — mérsékelten, hogy legyen miért
+     feljebb menni, de a taktika ne vigye el a mérkőzést. */
+  return Math.min(tacticEffectCap(S.tactics.active),d*0.15)*(0.7+0.6*fit);}
 /* ---- F3: csapat-összerők, illeszkedés, kémia-gyorsítás, fejlődés ---- */
 /* A kezdő 11 három összerője a PILLANATNYI SZEREP szerint (roleInFormation):
    def = kapus + védő-szerepűek, pass = középpályás-szerepűek, att = csatár-
@@ -10286,6 +10341,13 @@ function teamAttrStrengths(){
   const acc={},accRole={},wsum={};
   ATTR_KEYS.forEach(k=>{acc[k]=0;accRole[k]=0;wsum[k]=0;});
   const sebPool=[];
+  /* ---- TIKI-TAKA · „LÁT A PÁLYÁN" ----
+     A karmester a keret leggyengébb passzolói HELYETT is ő maga számít, amikor
+     a Passz-tengely előáll. Ezért a passz nem folyik be azonnal az összegbe,
+     hanem — a sebesség-maghoz hasonlóan — előbb egy listába gyűlik, és csak a
+     csere UTÁN adódik össze. Szerep nélkül a lista egy az egyben visszafolyik,
+     tehát a szám BETŰRE a régi. */
+  const passPool=[],passSub=roleLatnokSub();
   /* A felállás alapértelmezett slotlistája — ehhez képest mérjük a szerep-
      eltolást, hogy érintetlen felállásnál a hatás pontosan 0 legyen. Ha
      bármiért nincs meg (ismeretlen felállás, régi mentés), a slot saját kódja
@@ -10302,10 +10364,22 @@ function teamAttrStrengths(){
       if(w<=0)return;
       const v=(a[k]||0)*fit, r=slotAxisShift(sl.pos,defPos,k)*fit;
       if(k==="seb"){sebPool.push({v,r,w});return;}
+      if(k==="passz"){passPool.push({v,r,w,n:sl.player.n});return;}
       acc[k]+=v*w;accRole[k]+=r*w;wsum[k]+=w;});});
   /* a sebesség-mag: a leggyorsabb hat súlyozott átlaga */
   sebPool.sort((x,y)=>(y.v+y.r)-(x.v+x.r));
   sebPool.slice(0,SPEED_CORE_N).forEach(o=>{acc.seb+=o.v*o.w;accRole.seb+=o.r*o.w;wsum.seb+=o.w;});
+  /* A PASSZ-TENGELY, a karmester cseréjével. A csere a LEGGYENGÉBB passzolókat
+     éri (a kapust nem — neki nincs passz-súlya), a saját sorát pedig sosem: a
+     karmester egyszer áll a listán. Csak FELFELÉ cserél; ha a "leggyengébb" is
+     jobb nála, a sor marad, ahogy volt. */
+  if(passSub&&passSub.n&&passSub.k>0){
+    const me=passPool.find(o=>o.n===passSub.n);
+    if(me){
+      const others=passPool.filter(o=>o.n!==passSub.n).sort((x,y)=>(x.v+x.r)-(y.v+y.r));
+      others.slice(0,passSub.k).forEach(o=>{
+        if(me.v+me.r>o.v+o.r){o.v=me.v;o.r=me.r;}});}}
+  passPool.forEach(o=>{acc.passz+=o.v*o.w;accRole.passz+=o.r*o.w;wsum.passz+=o.w;});
   const base={},role={},out={};
   ATTR_KEYS.forEach(k=>{
     base[k]=wsum[k]?acc[k]/wsum[k]:0;
@@ -10629,7 +10703,15 @@ function tacticChemCount(key){
    Az alapok gyorsan rögzülnek, a csiszolás viszont egyre nehezebb: a 72-es
    szintig gyorsabb a haladás, fölötte szintenként 8%-kal lassul. Így a
    taktika-fejlesztés hosszú távú PROJEKT, nem pár meccs kérdése. */
-function tacticLevelRate(L){return L<=72?1+(72-L)*0.03:Math.pow(0.92,L-72);}
+/* A begyakorlás lassulási görbéje. KULCCSAL hívva a taktika saját plafonjához
+   igazodik: kitolt plafonnál (Guardiola) a szintet visszaképezzük az eredeti
+   50-99-es skálára, tehát a görbe ALAKJA ugyanaz marad, csak hosszabb úton
+   fut végig. Kulcs nélkül a régi, betűre változatlan viselkedés. */
+function tacticLevelRate(L,key){
+  const C=key?tacticCeil(key):TACTIC_MAX;
+  const LL=(C>TACTIC_MAX)
+    ?TACTIC_MIN+(L-TACTIC_MIN)*(TACTIC_MAX-TACTIC_MIN)/(C-TACTIC_MIN):L;
+  return LL<=72?1+(72-LL)*0.03:Math.pow(0.92,LL-72);}
 /* ---- TELJESÍTMÉNY-SZORZÓ ----
    A rendszer a GYŐZELMEKBŐL rögzül igazán: a nagyarányú siker adja a
    legtöbbet, a döntetlen keveset, a vereség alig valamit. Ezért ugyanaz a
@@ -10675,9 +10757,12 @@ function tacticTrainAfterMatch(gf,ga){
      fitMult-on át már beszivárgott ide — ez a szorzó azon FELÜL gyorsítja a
      begyakorlást, ahogy a képesség ígéri (a kettő szándékosan összeadódik:
      a képesség egyszerre gyorsítja mindkettőt). */
-  const styleMult=1+styleTacticPaceBoost(k);
-  const gain=0.237*tacticLevelRate(lvl)*fitMult*chemMult*perfMult*devTempo()*tacticTeamMult(lvl)*styleMult;
-  S.tactics.levels[k]=Math.min(TACTIC_MAX,Math.max(TACTIC_MIN,lvl+gain));
+  /* GUARDIOLA (Tiki-Taka): a Labdatartás kétszeres tempóval gyakorlódik be. A
+     szorzó a stílus-szorzó MELLÉ jön, nem helyette — a kettőnek nincs köze
+     egymáshoz (az egyik a Villámé, a másik a Tiki-Takáé). */
+  const styleMult=(1+styleTacticPaceBoost(k))*guardiolaTrainMult(k);
+  const gain=0.237*tacticLevelRate(lvl,k)*fitMult*chemMult*perfMult*devTempo()*tacticTeamMult(lvl)*styleMult;
+  S.tactics.levels[k]=Math.min(tacticCeil(k),Math.max(TACTIC_MIN,lvl+gain));
   if(lvl<85&&S.tactics.levels[k]>=85)
     addLine(`⚙️ A(z) ${TACTICS[k].n} beérett (85) — a csapat felvette a rendszer ritmusát, mostantól előnyt ad!`,"m life");
   else if(lvl<92&&S.tactics.levels[k]>=92)
@@ -13816,6 +13901,11 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
      kibillenését. Most a védekező posztok (hátvédek, védekező középpályás)
      is kapnak egy tisztalap-bónuszt, nagyjából egy gólnyi értékben. */
   const DEF_POS=["JV","BV","KV","VKP"];
+  /* PASSZKÉMIA: kik voltak TÉNYLEG a pályán. A kötés hatásai (a gyorsított
+     közös passzfejlődés és a felzárkózás) csak akkor élnek, ha mindkét fél
+     itt van — a padon ülő nem passzolgat a társával. A buszsofőr nem személy,
+     ezért nem kerül a halmazba. */
+  const _pcNames=new Set(active.filter(a=>a&&a.p&&!a.bus).map(a=>a.p.n));
   active.forEach((a,k)=>{
     const p=a.p;
     /* A CSALÁDTAG IS FEJLŐDIK: van pool-bejegyzése, így ugyanaz a fejlődés
@@ -13881,6 +13971,10 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
          a személyi edző, a képesség-képzés és a pályán szerzett pont is
          gyorsul. Csak a POZITÍV fejlődést szorozza — a büntetést nem. */
       if(val>0)val*=styleStarAttrMult(p.n,key);
+      /* PASSZKÉMIA (Tiki-Taka): a kész kötés MINDKÉT tagjának a poszt szerinti
+         FŐ attribútuma gyorsabban gyűlik. Ugyanaz a közös csatorna, ugyanaz a
+         szabály: csak a POZITÍV fejlődést szorozza. */
+      if(val>0)val*=passChemAttrMult(p.n,key);
       /* a lassítás VESZTESÉGÉT is a mérlegbe könyveljük, hogy a játékos lássa,
          mibe került neki az edzésterv */
       if(_slow&&_slow.has(key)&&val>0){const loss=val*TRAIN_SLOW;val-=loss;_tlog.pts[key]-=loss;}
@@ -13890,6 +13984,14 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
       const _ts=trainScale(entry);   /* az edzés ereje a játékos szintjével nő */
       if(_tr.main)addA(_tr.main,TRAIN_MAIN_PTS*_ts*share,true);
       if(_tr.sec) addA(_tr.sec, TRAIN_SEC_PTS*_ts*share,true);}
+    /* ---- PASSZKÉMIA: A KÖZÖS HALADÁS ADAGJA ----
+       Az ÖSSZEÉRT kötés mindkét tagja kap egy MAXOS PASSZ-EDZÉSNYI adagot a
+       Passzra — és szándékosan a rendes edzésterv MELLÉ, nem helyette: a
+       felhasználói ígéret szó szerint az, hogy ez akkor is jár, ha emellett
+       tényleg maxos passz-edzést kapnak. A trainScale-lel EGYÜTT nő, tehát
+       nem halványul el a karrier előrehaladtával. */
+    {const _pb=passChemPassBoost(p.n,_pcNames);
+     if(_pb>0)addA("passz",TRAIN_MAIN_PTS*trainScale(entry)*share*_pb,true);}
     /* ---- ATTRIBÚTUM-FEJLESZTŐ SKILL (Kényszerítő) ----
        UGYANABBA a csatornába folyik, mint az edzésterv és a személyi edző:
        ugyanaz a kor-görbe, underdog-szorzó és globális tempó hat rá, és a
@@ -13940,7 +14042,12 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
       if(mAssist[p.n])perf+=0.3*mAssist[p.n];
       if(k===bestIdx)perf+=0.6;
       if(ga===0&&(pos==="KP"||DEF_POS.includes(pos)))perf+=0.3;
-      stepPosLearning(entry,Math.min(1.5,perf)*share);}});}
+      stepPosLearning(entry,Math.min(1.5,perf)*share);}});
+  /* ---- PASSZKÉMIA: A KÖZÖS MECCS LEKÖNYVELÉSE ----
+     SZÁNDÉKOSAN a fejlődési ciklus UTÁN: a felzárkózás a FRISS Passz-értékekhez
+     méri a hiányt, tehát azt is beszámítja, amit a vezető ezen a mérkőzésen
+     szerzett. Egyszer fut meccsenként. */
+  try{passChemTick(_pcNames);}catch(e){}}
 /* A cserepadon ülők és a tartalék-keret sem áll meg — kisebb, de valódi
    "edzés-alapú" fejlődést kapnak minden meccs után, teljesítmény-bónuszok
    nélkül (hiszen nem játszottak), ugyanazzal a kor-görbével súlyozva. Így
@@ -19287,6 +19394,16 @@ function buildPitchBonds(){
     const done=(pr.stages||0)>=CHEM_PAIR_NEED;
     if(!done&&!(pr.stages>0))return;        /* a 0 fázisú kötés még nem kötés */
     lines.push({A,B,done});});
+  /* PASSZKÉMIA: ugyanaz a réteg, SAJÁT osztállyal — a kettő ugyanazon a
+     páron is futhat egyszerre, ezért kell megkülönböztetni őket. Ha a
+     passzkémia-tár még nem létezik (régi mentés), ez a blokk kimarad. */
+  Object.values(S.passChem||{}).forEach(pr=>{
+    if(!pr)return;
+    const A=pos[pr.a],B=pos[pr.b];
+    if(!A||!B)return;
+    const done=(pr.stages||0)>=PASS_CHEM_NEED;
+    if(!done&&!(pr.stages>0))return;
+    lines.push({A,B,done,pass:true});});
   if(!lines.length)return null;
   const NS="http://www.w3.org/2000/svg";
   const svg=document.createElementNS(NS,"svg");
@@ -19294,11 +19411,11 @@ function buildPitchBonds(){
   svg.setAttribute("viewBox","0 0 100 100");
   svg.setAttribute("preserveAspectRatio","none");
   svg.setAttribute("aria-hidden","true");
-  lines.forEach(({A,B,done})=>{
+  lines.forEach(({A,B,done,pass})=>{
     const ln=document.createElementNS(NS,"line");
     ln.setAttribute("x1",A[0]);ln.setAttribute("y1",A[1]);
     ln.setAttribute("x2",B[0]);ln.setAttribute("y2",B[1]);
-    ln.setAttribute("class",done?"done":"wip");
+    ln.setAttribute("class",(done?"done":"wip")+(pass?" pass":""));
     svg.appendChild(ln);});
   return svg;}
 const NAT_BY_NAME={};ALL_PLAYERS.forEach(p=>{if(!(p.n in NAT_BY_NAME))NAT_BY_NAME[p.n]=p.nat;});
@@ -19894,9 +20011,14 @@ function buyPrice(entry){
 function styleBuyMultFor(entry){
   try{
     if(!entry||!entry.pos||!entry.pos[0])return 1;
-    const m=styleDefBuyMult();
-    if(m>=1)return 1;
-    return getCategoryFor(entry.pos[0])==="VEDO"?m:1;
+    const cat=getCategoryFor(entry.pos[0]);
+    let m=1;
+    if(cat==="VEDO")m*=styleDefBuyMult();
+    /* TIKI-TAKA („Olcsó a jó középpályás"): ugyanaz a forma a másik sorra. A
+       két kedvezmény nem ütközik — egy játékos egy posztcsoportba tartozik —,
+       de a szorzás így akkor is helyes marad, ha valaha lesz átfedés. */
+    if(cat==="KOZEPPALYAS")m*=styleMidBuyMult();
+    return m;
   }catch(e){return 1;}}
 /* Determinisztikus "véletlen": a névből és a szezonból képzett hash dönti el,
    kapott-e kedvezményt ez a játékos. Így stabil marad két megjelenítés közt. */
@@ -22508,6 +22630,19 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      ajánl új párost. Az alap-kémia (közös klub/nemzet) eleve 5/5-ös párként
      kerül be a keret megalakulásakor. */
   chemPairs:{},chemInProgress:null,
+  /* PASSZKÉMIA (Tiki-Taka): passChem[kulcs] = {a,b,stages,need,co,gap,said} —
+     a párkémiával PÁRHUZAMOS, harmadik kötésfajta. Ugyanaz az öt fázis, de
+     saját tárban él: ugyanazon a páron mindkettő megépíthető, és a hatásaik
+     külön csatornán futnak. A `co` a KÖZÖS meccsek száma a kötés elkészülte
+     óta (ebből dolgozik a felzárkózás), a `gap` a felzárkózás tört egyenlege.
+     A passChemSeen a KARRIER-regiszter: minden kötés egyszer számít, az eladás
+     nem veszi el (lásd passChemCareer). */
+  passChem:{},passChemInProgress:null,passChemSeen:{},
+  /* TIKI-TAKA · PASSZREKORD: karrier-számlálók. ttGoals = hány tiki-taka gól
+     született összesen, ttBest = a leghosszabb GÓLLAL zárult passzsor, a
+     ttFutile a meddő passzolgatások száma (a mérföldkövekhez nem kell, a
+     kimutatáshoz és a hangoláshoz igen). */
+  ttGoals:0,ttBest:0,ttFutile:0,
   /* SKILL-PADLÓ: türelem-számláló + szezonos kvóták + az első kémia jelzője */
   matchesSinceSkill:0,seasonNewSkills:0,seasonSkillCont:0,firstChemDone:false,
   /* CSAPATEGYENSÚLY → INGYEN KÉPESSÉG: balSkillMatches a szezonban
@@ -22720,6 +22855,20 @@ function isPaceSkill(sk){
   if(!sk)return false;
   const types=[sk.type].concat(sk.combo?sk.combo.map(c=>c.type):[]);
   return types.indexOf("pace")>=0;}
+/* ---- PASSZ-ALAPÚ KÉPESSÉG (Tiki-Taka) ----
+   Ugyanaz a szerkezeti gond, mint a sebesség-képességeknél: a passzos skillek
+   nem EGY posztkategóriában ülnek (van köztük védő, középpályás és csatár is),
+   a közös nevezőjük a HATÁS. Ezért kap a Tiki-Taka is saját szűrőt a
+   kategóriás (skillCat) helyett. Kettő számít bele:
+     · amelyik a GÓLPASSZ-súlyt emeli (type/combo "assistw"),
+     · amelyik a PASSZ-attribútumot edzi (attrTrain.key === "passz").
+   A poolban ma 14 assistw-képesség van, tehát a torzításnak van mit felhoznia,
+   de ki is fogy — ugyanúgy önmagát korlátozza, mint a sebesség-ág. */
+function isPassSkill(sk){
+  if(!sk)return false;
+  const types=[sk.type].concat(sk.combo?sk.combo.map(c=>c.type):[]);
+  if(types.indexOf("assistw")>=0)return true;
+  return !!(sk.attrTrain&&sk.attrTrain.key==="passz");}
 function paceSkillBias(){
   const act=S.tactics&&S.tactics.active;
   if(!act||PACE_TACTICS.indexOf(act)<0)return 0;
@@ -22861,6 +23010,14 @@ function drawSkillFromPool(){
   {const sb=(typeof styleSkillBias==="function")?styleSkillBias():null;
    if(sb&&Math.random()<sb.p){
      const sk=poolTake(x=>x&&sb.cats.indexOf(x.cat)>=0);
+     if(sk)return sk;}}
+  /* A PASSZ-ÁG (Tiki-Taka). A kategóriás torzítás UTÁN áll, ugyanazon a
+     szinten, mint a sebesség-ág: külön esély, saját szűrővel. A két
+     torzítás sosem fut egyszerre — a stílus egy, tehát legfeljebb az egyik
+     van megvéve. */
+  {const pb=(typeof styleSkillPassBias==="function")?styleSkillPassBias():0;
+   if(pb>0&&Math.random()<pb){
+     const sk=poolTake(isPassSkill);
      if(sk)return sk;}}
   const g=goalSkillBias();
   if(g>0&&Math.random()<g){
@@ -23085,7 +23242,343 @@ function pruneChemistry(){
       delete S.chemPairs[k];
       if(S.chemInProgress===k)S.chemInProgress=null;
       refreshPitchBonds();}   /* a megszűnt kötés vonala is tűnjön el */
-  });}
+  });
+  /* A passzkémia ugyanezt a sorsot osztja: aki kikerül a keretből, azzal a
+     kötése is megszűnik. Egy helyen, hogy egyetlen távozási út se maradjon ki. */
+  Object.keys(passChemStore()).forEach(k=>{
+    const pr=S.passChem[k];
+    if(!pr||!inRoster.has(pr.a)||!inRoster.has(pr.b)){
+      delete S.passChem[k];
+      if(S.passChemInProgress===k)S.passChemInProgress=null;}});}
+/* ================= 🌀 PASSZKÉMIA (Tiki-Taka, 3.4.00) =================
+   A HARMADIK KÖTÉSFAJTA. A jutalom-sor eddig két dolgot tudott adni: egy
+   KÉPESSÉGET vagy egy PÁRKÉMIA-fázist. A Tiki-Taka nyit egy harmadikat — és
+   szándékosan NEM vált fel semmit: a passzkémia a másik kettő MELLÉ jön be,
+   ugyanazon a tempón épül (öt fázis), és ugyanúgy a jutalom-soron.
+
+   MIT CSINÁL, HA KÉSZ. Két dolgot, és a kettő külön csatornán fut:
+
+     1) MINDKETTEN GYORSABBAN FEJLŐDNEK. A poszt szerinti FŐ attribútumuk
+        (attrTrainedBy: a védőé a Védekezés, a középpályásé a Passz, a csatáré
+        a Gólszerzés) +20%-kal gyűlik. Ugyanazon a közös csatornán ül, mint a
+        Sztárom a párom fejlődés-gyorsítása, tehát az edzésterv, a személyi
+        edző és a pályán szerzett pont EGYARÁNT gyorsul tőle.
+
+     2) A GYENGÉBB PASSZOLÓ FELZÁRKÓZIK. A magasabb Passzú fél a megszokott
+        tempóján halad; a társa MAX 15 (12 / 8) KÖZÖS MECCSEN BELÜL utoléri —
+        a lépésköz mindig a HÁTRALÉVŐ meccsekre osztott hiány, tehát a
+        határidő akkor is tartható, ha közben a vezető is fejlődik.
+        Amint összeértek, EGYÜTT haladnak tovább: mindketten kapnak egy adag
+        gyorsított passzfejlődést, akkorát, mint egy MAXOS passz-edzés — és ez
+        akkor is jár, ha emellett tényleg maxos passz-edzést is kapnak.
+
+   MIÉRT KÖZÖS MECCS A MÉRTÉKEGYSÉG, nem forduló: a kötés attól épül, hogy
+   EGYÜTT vannak a pályán. Aki a padon ül, az nem passzolgat a társával.
+
+   A FELZÁRKÓZÁS A bumpAttr-en megy, tehát a specializációs sávot (ATTR_SPEC_
+   CEIL/FLOOR) tiszteletben tartja: ha a gyengébb fél a saját plafonján áll, ott
+   megáll. Ez nem hiba, hanem a szabály — a passzkémia nem ír felül határokat,
+   csak az odáig vezető utat rövidíti le. */
+const PASS_CHEM_NEED=5;
+/* Az összeérési idő KÖZÖS MECCSBEN, a képesség megvett szintje szerint.
+   A [0] a "nincs megvéve" eset — ott a rendszer sem létezik, de a tömb így
+   indexelhető marad. */
+const PASS_CHEM_RIPE=[15,15,12,8];
+/* A felajánlás gyakorításának szorzója szintenként. Az 1. szint a MEGNYITÁS:
+   ott a passzkémia pontosan olyan tempóval jön, mint a párkémia. */
+const PASS_CHEM_OFFER=[0,1,1.25,1.33];
+/* A poszt szerinti fő attribútum gyorsulása egy KÉSZ kötésben. */
+const PASS_CHEM_ATTR_MULT=0.20;
+/* Az alap-esély, amivel a jutalom passzkémia-építés lesz. SZÁNDÉKOSAN azonos a
+   párkémiáéval (0.15) — a felhasználói kérés szó szerint az, hogy "ugyanolyan
+   tempóval lehet építeni, mint a párkémiákat". A roll a párkémia-ág UTÁN fut,
+   tehát a kettő nem eszi el egymást, csak sorban áll. */
+const PASS_CHEM_BASE_P=0.15;
+function passChemLevel(){
+  try{return Math.max(0,Math.min(3,Math.round(styleFxMax("passChem"))||0));}catch(e){return 0;}}
+function passChemOn(){return gameMode==="career"&&passChemLevel()>0;}
+function passChemRipeNeed(){return PASS_CHEM_RIPE[passChemLevel()]||PASS_CHEM_RIPE[0];}
+function passChemOfferP(){
+  const m=PASS_CHEM_OFFER[passChemLevel()]||0;
+  return m>0?PASS_CHEM_BASE_P*m:0;}
+function passChemStore(){if(!S.passChem)S.passChem={};return S.passChem;}
+function passChemKey(a,b){return [a,b].sort().join("§");}
+function passChemPairOf(a,b){return passChemStore()[passChemKey(a,b)]||null;}
+function passChemStages(a,b){const p=passChemPairOf(a,b);return p?p.stages:0;}
+function passChemComplete(a,b){return passChemStages(a,b)>=PASS_CHEM_NEED;}
+function addPassChemPair(a,b,stages){
+  const k=passChemKey(a,b),st=passChemStore();
+  if(!st[k])st[k]={a:[a,b].sort()[0],b:[a,b].sort()[1],stages:stages||0,need:PASS_CHEM_NEED,co:0,gap:0};
+  else st[k].stages=Math.max(st[k].stages,stages||0);
+  if(st[k].stages>=PASS_CHEM_NEED)passChemRecord(k);
+  return st[k];}
+/* Hány KÉSZ passzkémia van egyszerre? (mérföldkő-mérce) */
+function passChemDone(){
+  let n=0;
+  Object.values(passChemStore()).forEach(pr=>{if(pr&&(pr.stages||0)>=PASS_CHEM_NEED)n++;});
+  return n;}
+/* ---- KARRIER-REGISZTER ----
+   Ugyanaz az indok, mint a Panzer „Bajtársak" lépcsőjénél: a kötések a keret
+   méretével elfogynak, és a távozóval törlődnek is (pruneChemistry) — egy
+   pillanatkép-számláló néhány tucatnál megállna. A regiszter a PÁROS kulcsára
+   megy, tehát minden kötés pontosan egyszer számít, és az eladás nem veszi el.
+   ÖNGYÓGYÍTÓ: minden méréskor végigolvassuk a kész kötéseket. */
+function passChemRecord(k){
+  const seen=(S.passChemSeen=S.passChemSeen||{});
+  if(k)seen[k]=1;}
+function passChemCareer(){
+  if(gameMode!=="career")return 0;
+  try{
+    Object.keys(passChemStore()).forEach(k=>{
+      const pr=S.passChem[k];
+      if(pr&&(pr.stages||0)>=PASS_CHEM_NEED)passChemRecord(k);});
+  }catch(e){}
+  return Object.keys(S.passChemSeen||{}).length;}
+/* Egy játékos KÉSZ passzkémia-kötései. */
+function passChemPairsOf(name){
+  if(!name)return [];
+  return Object.values(passChemStore()).filter(pr=>
+    pr&&(pr.stages||0)>=PASS_CHEM_NEED&&(pr.a===name||pr.b===name));}
+function passChemMateOf(pr,name){return pr.a===name?pr.b:pr.a;}
+/* A poszt szerinti FŐ attribútum gyorsulása. A közös fejlődés-csatornán ül
+   (lásd az addA-t a processCareerDevelopment-ben), tehát a kor-görbe, a
+   globális tempó és az underdog-szorzó ugyanúgy hat rá. Több kötés nem
+   halmozódik: egy ember egyszer gyorsul, különben a hálózat kiépítése
+   önmagát erősítő lavina lenne. */
+function passChemAttrMult(name,key){
+  if(!passChemOn()||!name)return 1;
+  const list=passChemPairsOf(name);
+  if(!list.length)return 1;
+  let pos=null;
+  try{const e=msEntry(name);pos=(e&&e.pos&&e.pos[0])||null;}catch(e){}
+  if(!pos)return 1;
+  let main=null;
+  try{main=attrTrainedBy(pos);}catch(e){}
+  return (main&&key===main)?1+PASS_CHEM_ATTR_MULT:1;}
+/* A jelenlegi Passz-attribútum (a bejegyzésből, nem a pályára állított
+   másolatból — a fejlődés ott él). */
+function passChemPassOf(name){
+  try{
+    const e=msEntry(name);
+    if(!e)return 0;
+    if(!e.attrs)initPlayerAttrs(e);
+    return e.attrs.passz||0;
+  }catch(err){return 0;}}
+/* ÖSSZEÉRT-E A KÖTÉS? Az EGYENLŐSÉG a mérce, nem a "legalább": amíg a
+   gyengébb fél nem ért fel pontosan, még a felzárkózás szakasza tart. */
+function passChemRipe(pr){
+  return !!pr&&passChemPassOf(pr.a)===passChemPassOf(pr.b);}
+/* Jár-e ennek az embernek a GYORSÍTOTT passzfejlődés ezen a mérkőzésen? Csak
+   ÖSSZEÉRT kötésre, és csak ha a társa is a pályán van — a kötés attól él,
+   hogy együtt játszanak. Több kötésnél is EGY adag jár. */
+function passChemPassBoost(name,activeNames){
+  if(!passChemOn()||!name||!activeNames)return 0;
+  return passChemPairsOf(name).some(pr=>
+    activeNames.has(passChemMateOf(pr,name))&&passChemRipe(pr))?1:0;}
+/* ---- A MECCS UTÁNI LÉPTETÉS ----
+   Egyszer fut mérkőzésenként, a fejlődés UTÁN (hogy a friss Passz-értékekkel
+   számoljon). Két dolgot csinál: lépteti a közös meccsek számlálóját, és
+   végrehajtja a felzárkózást azoknál a kötéseknél, ahol mindkét fél pályán
+   volt. */
+function passChemTick(activeNames){
+  if(!passChemOn()||!activeNames)return;
+  const need=passChemRipeNeed();
+  Object.values(passChemStore()).forEach(pr=>{
+    if(!pr||(pr.stages||0)<PASS_CHEM_NEED)return;
+    if(!activeNames.has(pr.a)||!activeNames.has(pr.b))return;
+    pr.co=(pr.co||0)+1;
+    const pa=passChemPassOf(pr.a),pb=passChemPassOf(pr.b);
+    if(pa===pb)return;                     /* összeértek — innen együtt mennek */
+    const loN=pa<pb?pr.a:pr.b;
+    const gapVal=Math.abs(pa-pb);
+    const e=msEntry(loN);
+    if(!e)return;
+    /* A LÉPÉSKÖZ MINDIG A HÁTRALÉVŐ MECCSEKRE OSZTOTT HIÁNY. Így a határidő
+       akkor is tartható, ha a vezető közben tovább fejlődik — és ha a
+       határidő letelt, a maradék egy lépésben zárul. */
+    const left=Math.max(1,need-(pr.co||0)+1);
+    pr.gap=(pr.gap||0)+gapVal/left;
+    let guard=0;
+    while(pr.gap>=1&&guard++<60){
+      pr.gap-=1;
+      const before=passChemPassOf(loN);
+      bumpAttr(e,"passz",1);
+      /* Ha a plafon megállította, nincs értelme tovább pörgetni: a maradék
+         egyenleget eldobjuk, különben a következő meccsen ugyanide futnánk. */
+      if(passChemPassOf(loN)<=before){pr.gap=0;break;}
+      if(passChemPassOf(loN)>=Math.max(pa,pb))break;}
+    /* AZ ÖSSZEÉRÉS PILLANATÁT KIMONDJUK. Egy némán befejeződő, több szezonos
+       folyamat nem visszajelzés. */
+    if(passChemRipe(pr)&&!pr.said){
+      pr.said=1;
+      try{addLine(`🌀 <b>Összeértek!</b> ${esc(shortName(pr.a))} és ${esc(shortName(pr.b))} passza `
+        +`egy szintre került (${passChemPassOf(pr.a)}) — innentől EGYÜTT fejlődnek tovább, `
+        +`gyorsított tempóval.`,"m life");}catch(err){}}});}
+
+/* ================= 🌀 PASSZREKORD — A TIKI-TAKA GÓL (3.4.00) =================
+   ÚJ GÓLSZERZÉSI TECHNIKA, és a játék egyetlen olyan gólja, amit nem a
+   gólvárhatóság (λ) szül meg, hanem MAGA A PASSZSOR. A kérdés nem az, hogy
+   "esik-e gól", hanem hogy "meddig bírja a labdajáratás" — és a válaszból
+   következik a gól.
+
+   HOGYAN DŐL EL. A kezdőrúgáskor lefut a szimuláció (meccsenként legfeljebb
+   kétszer, a képesség szintje szerint):
+     1. kisorsolunk egy kezdő embert — a STABIL KEZDÉS szerepben játszó
+        HÁROMSZOROS eséllyel indul, mert a filozófiában övé a labdaindítás;
+     2. utána egymás után kisorsolunk egy legfeljebb 30 ELEMES sort;
+     3. minden lépésnél megnézzük: a két szomszédos ember Passz-attribútumának
+        SZÁMTANI KÖZEPE ±10%-kal sorsolva magasabb-e, mint az ellenfél NYERS
+        csapatereje. Amíg igen, gördül tovább a tiki-taka;
+     4. amikor elakad (vagy a 30. passznál kifut a sor), az UTOLSÓ KÉT ember
+        Gólszerzés-attribútumából a MAGASABBIKAT megtoldjuk +15-30%-kal. Ha ez
+        eléri az ellenfél nyers csapaterejét: GÓL. Ha nem: csak egy szép, de
+        meddő passzolgatás volt.
+
+   MIÉRT A NYERS CSAPATERŐ A MÉRCE. Ez az egyetlen szám, ami az ellenfélről
+   objektíven megvan (fx.o.ovr), és nem tartalmazza a saját rejtett bónuszaidat
+   — vagyis a passzsor tényleg az ELLENFÉL ellen mérkőzik, nem egy származtatott
+   képlet ellen. Ebből következik a rendszer önszabályozása is: gyenge passzú
+   kerettel a sor néhány lépés után elakad, és a befejezés sem ér oda.
+
+   A KÖVETKEZTETÉS A KEZDŐRÚGÁSKOR MEGVAN, a KOMMENTÁR viszont a kisorsolt
+   percben hangzik el — ugyanaz a szerkezet, mint a 90+ drámánál: az esemény
+   előre eldől, a közvetítés a helyén szólal meg.
+
+   PÁRHARCBAN NEM FUT. Ott az eredményt a közös eseménylista adja; egy helyben
+   sorsolt extra gól azonnal szétvinné a két kliens állását. */
+const TT_CHAIN_MAX=30;
+/* A passz-sorsolás ablaka és a befejezés ráadása szintenként. A 3. szint nem
+   új mechanikát ad, hanem ELTOLJA a két eloszlást: a passz ±10% helyett
+   −5…+15%, a befejezés +15-30% helyett +20-40%. */
+const TT_PASS_SPREAD=[0.10,0.10,0.10,0.10];
+const TT_PASS_BIAS=[0,0,0,0.05];
+const TT_FIN_LO=[0.15,0.15,0.15,0.20];
+const TT_FIN_HI=[0.30,0.30,0.30,0.40];
+/* ---- A PASSZONKÉNT SZIGORODÓ ELLENÁLLÁS ----
+   EZ AZ EGYETLEN PONT, AHOL A MEGVALÓSÍTÁS TÖBBET MOND A LEÍRT SZABÁLYNÁL, és
+   muszáj volt. A szabály önmagában (a két ember Passzának átlaga ±10%-kal
+   sorsolva az ellenfél nyers csapatereje ellen) LÉPCSŐFÜGGVÉNY: amint az átlag
+   10%-kal az ellenfél fölé kerül, a sorsolás alsó széle is fölötte van, tehát
+   MINDEN passz sikerül. Mérve (20 000 sor, 120-as passz 100-as ellenfél ellen)
+   így a sor mindig kifutott a 29. passzig, és a gól 100%-ban megszületett —
+   vagyis egy jó passzú csapat mérkőzésenként KÉT BIZTOS extra gólt kapott
+   volna, a gólvárhatóság mellé.
+
+   A JAVÍTÁS NEM MOND ELLENT A SZABÁLYNAK, hanem kiegészíti: minél tovább tart a
+   labdajáratás, annál szorosabban zárnak az ellenfél védői. Az ellenállás
+   passzonként 1,2%-kal nő, tehát az első passzoknál betűre az eredeti feltétel
+   dönt, a huszadik környékén viszont már a legjobb keretnek is elakadhat.
+   Mérve ugyanazon a kereten: 100% → 62% gól, az átlagos sor 29 → 13,4 passz.
+
+   A BEFEJEZÉS az ALAP csapaterő ellen megy, szigorítás nélkül: mire odáig
+   eljutottak, a védelem szét van húzva — ez a hosszú sor jutalma. */
+const TT_STEP_UP=0.012;
+/* ---- A LEGRÖVIDEBB, AMI MÉG TIKI-TAKA ----
+   Ha a sor az első egy-két passznál elakad, az nem akció, hanem egy eladott
+   labda: a technika ígérete kifejezetten az, hogy „minél több játékoson megy
+   keresztül a labda". E küszöb alatt tehát semmi nem történik — se gól, se
+   kommentár. Enélkül egy kiegyenlített mérkőzésen a sorok többsége EGY passz
+   után elakadt volna, és abból születtek volna „tiki-taka gólok", ami épp a
+   lényeget mondaná hazugságnak. Mérve: azonos szintű ellenfél ellen a gólarány
+   28% → 9%, a rájuk épülő mérföldkő-lépcső pedig valódi célt kap. */
+const TT_MIN_PASSES=3;
+/* Hányszor próbálkozik a csapat egy mérkőzésen. Az 1. szint a MEGNYITÁS: ott
+   egy passzsor fut. A 2-3. szinten kettő — ez a felhasználó által kimondott
+   felső korlát („meccsenként max 2 ilyen gól lehet"). */
+const TT_TRIES=[0,1,2,2];
+function ttLevel(){
+  try{return Math.max(0,Math.min(3,Math.round(styleFxMax("tikiLv"))||0));}catch(e){return 0;}}
+function ttOn(){return gameMode==="career"&&ttLevel()>0;}
+/* A jelöltek: a pályán lévő MEZŐNYJÁTÉKOSOK (a kapus és a kiállított kimarad,
+   a buszsofőr nem személy). Névvel és a két attribútummal, hogy a szimuláció
+   ne olvasson újra a poolból harmincszor. */
+function ttChainPool(active,redIdx){
+  const out=[];
+  active.forEach((a,i)=>{
+    if(!a||!a.p||a.bus||i===redIdx)return;
+    let pos=null;
+    try{pos=(slots[a.idx]&&slots[a.idx].pos)||null;}catch(e){}
+    if(pos==="KP")return;
+    let at=null;
+    try{at=attrsOfPlayer(a.p);}catch(e){}
+    if(!at)return;
+    out.push({n:a.p.n,passz:at.passz||0,gol:at.gol||0});});
+  return out;}
+/* EGY passzsor lefuttatása. Tisztán számol: nem ír állapotot és nem naplóz —
+   így ugyanez a függvény használható mérésre és teszteléshez is. */
+function ttRunChain(pool,oppOvr,lvl){
+  if(!pool||pool.length<2)return null;
+  const L=Math.max(1,Math.min(3,lvl||1));
+  const spread=TT_PASS_SPREAD[L],bias=TT_PASS_BIAS[L];
+  const finLo=TT_FIN_LO[L],finHi=TT_FIN_HI[L];
+  /* A KEZDŐ EMBER: a Stabil kezdés szerepben játszó háromszoros súllyal. */
+  const starter=roleStyleActive()?roleOf("stabil"):null;
+  const w=pool.map(p=>(starter&&p.n===starter)?3:1);
+  let tot=0;w.forEach(x=>tot+=x);
+  let r=Math.random()*tot,cur=pool[pool.length-1];
+  for(let i=0;i<pool.length;i++){r-=w[i];if(r<=0){cur=pool[i];break;}}
+  const chain=[cur];
+  let broke=false;
+  for(let step=1;step<TT_CHAIN_MAX;step++){
+    /* A következő ember bárki lehet, csak nem az, akinél a labda van. */
+    const cands=pool.filter(p=>p.n!==cur.n);
+    if(!cands.length)break;
+    const next=cands[Math.floor(Math.random()*cands.length)];
+    const mid=(cur.passz+next.passz)/2;
+    const roll=mid*(1+bias+(Math.random()*2-1)*spread);
+    /* Az ellenállás passzonként szigorodik — lásd TT_STEP_UP. */
+    if(roll<=oppOvr*(1+TT_STEP_UP*step)){broke=true;break;}
+    chain.push(next);cur=next;}
+  /* A BEFEJEZÉS. Az utolsó két ember Gólszerzéséből a magasabbik, megtoldva.
+     A rövid sor (lásd TT_MIN_PASSES) nem akció, hanem egy eladott labda —
+     csendben elhagyjuk, se gól, se kommentár nem lesz belőle. */
+  if(chain.length-1<TT_MIN_PASSES)return null;
+  const last=chain[chain.length-1],prev=chain[chain.length-2];
+  const finisher=last.gol>=prev.gol?last:prev;
+  const helper=finisher===last?prev:last;
+  const shot=finisher.gol*(1+finLo+Math.random()*(finHi-finLo));
+  return {passes:chain.length-1,goal:shot>=oppOvr,broke,
+    scorer:finisher.n,assist:helper.n,
+    /* a sor eleje a kommentárhoz: ki indította az egészet */
+    starter:chain[0].n};}
+/* A MECCS TERVE. A kezdőrúgáskor fut le; a percek külön vödörbe esnek, hogy a
+   két akció ne torlódjon egymásra. */
+function ttPlanMatch(active,redIdx,oppOvr){
+  if(!ttOn())return [];
+  const L=ttLevel(),tries=TT_TRIES[L]||0;
+  const pool=ttChainPool(active,redIdx);
+  if(pool.length<2)return [];
+  const out=[],used={};
+  for(let i=0;i<tries;i++){
+    const res=ttRunChain(pool,oppOvr,L);
+    if(!res)continue;
+    /* A vödör 2..18 közül (a 0-5. percben még nem járatják a labdát húszszor). */
+    let b=0,guard=0;
+    do{b=2+Math.floor(Math.random()*17);}while(used[b]&&guard++<20);
+    used[b]=1;
+    res.bucket=b*5;
+    out.push(res);}
+  return out.sort((x,y)=>x.bucket-y.bucket);}
+/* ---- A KÖZVETÍTÉS ----
+   A gólnál ÉS a meddő passzolgatásnál is megszólal: a filozófia lényege maga a
+   passzsor, nem csak a végeredménye. A számot mindig kiírjuk — a mérföldkő
+   („hány passzal született a legkijátszósabb tiki-taka gól") ebből él, tehát
+   látnia is kell a felhasználónak. */
+function ttGoalLine(res){
+  const S1=esc(shortName(res.scorer)),H=esc(shortName(res.assist)),ST=esc(shortName(res.starter));
+  const arr=[
+    `${res.passes} tökéletes passz. Milyen gyönyörűen járatták a labdát! A végén ${S1}-nak már csak be kellett passzolnia a kapuba. Azért jól jött az az utolsó passz is ${H}-tól.`,
+    `Számoltam: ${res.passes}. ${res.passes} passz, és az ellenfél egyszer sem ért labdát! ${ST} indította el, ${H} tálalt, ${S1} pedig lezárta a művet.`,
+    `Ez nem gól volt, hanem egy hímzés vége. ${res.passes} érintésen át vándorolt a labda, mire ${H} megtalálta ${S1}-t — aki nem hibázott.`,
+    `${res.passes} passz után szakadt be a védelem. Ennyi ideig senki nem bírja koncentrációval. ${S1} a befejező, ${H} az utolsó tálaló.`];
+  return arr[Math.floor(Math.random()*arr.length)];}
+function ttFutileLine(res){
+  const S1=esc(shortName(res.scorer)),ST=esc(shortName(res.starter));
+  const arr=[
+    `${res.passes} passz — és a végén semmi. ${S1} elé odaért a védő, a labda meg kigurult. Gyönyörű volt, de pont nem járt érte.`,
+    `Elképesztő labdajáratás, ${res.passes} érintés ${ST} indításától kezdve… aztán ${S1} lövése a kapu mellé szállt. A művészet néha meddő.`,
+    `${res.passes} passz, nulla gól. Az ellenfél szurkolói már fütyülnek — és igazuk is van: ebből be kellett volna találni.`];
+  return arr[Math.floor(Math.random()*arr.length)];}
 /* Kombó-skill támogatás (pl. Elastico!): egy skillnek lehet `combo` tömbje,
    ami több effekt-típusra (pl. assistw+goalw+mvp) is ad egyszerre egy kisebb
    bónuszt — ugyanazzal a fázis-alapú fokozatossággal, mint a sima skilleké. */
@@ -25920,7 +26413,18 @@ function h2hRoleOppMult(X,min,ga){
   if(min<=25&&ga===0&&h2hRoleOn(X,"arok"))m*=h2hRoleVal(X,"arok");
   if(min>=35&&min<=60&&h2hRoleOn(X,"kereszttuz"))m*=h2hRoleVal(X,"kereszttuz");
   if(h2hRoleOn(X,"b2b"))m*=h2hRoleVal(X,"b2b","v2");
+  if(min<=45&&h2hRoleOn(X,"stabil"))m*=h2hRoleVal(X,"stabil");
   return m;}
+/* TIKI-TAKA · AURAFARMER a párharcban. A duplázás a MÉRKŐZÉS állapota, nem a
+   pillanatképé — ezért a sim maga jegyzi fel, oldalanként (X._auraLit). A
+   jelző a szimuláció determinisztikus menetéből következik (ugyanaz a seedelt
+   eseménysor mindkét gépen), tehát a két kliens ugyanoda jut. */
+function h2hRoleAuraMult(X,name){
+  if(!h2hRoleIs(X,"aura",name))return 1;
+  return h2hRoleVal(X,"aura")*(X._auraLit?ROLE_AURA_MULT:1);}
+function h2hRoleAuraFire(X,name){
+  if(!X||X._auraLit)return;
+  if(h2hRoleIs(X,"aura",name))X._auraLit=true;}
 /* A gólsúly szorzója — roleGoalMult párja. A gf/ga a GÓL ELŐTTI állás: a
    Nyitó a jégtörő gólra jár (tehát amíg 0:0), a Befejező pedig az 1-2 gólos
    vezetés MEGTARTÁSÁRA. Szerep nélkül null, hogy a h2hPick gyors ága maradjon. */
@@ -25934,6 +26438,7 @@ function h2hRoleGoalW(X,min,gf,ga){
       if(lead>=1&&lead<=2)m*=h2hRoleVal(X,"befejezo");}
     if(h2hRoleIs(X,"robben",p.n))m*=h2hRoleVal(X,"robben");
     if(h2hRoleIs(X,"legolas",p.n))m*=h2hRoleVal(X,"legolas","v2");
+    m*=h2hRoleAuraMult(X,p.n);
     return m;};}
 /* A gólpassz-súly szorzója — roleAssistMult + roleAssistTargetMult párja. A
    Tálaló célzott ráhatásához a GÓLSZERZŐ neve is kell, ezért az is paraméter. */
@@ -25948,6 +26453,9 @@ function h2hRoleAssistW(X,scorerName){
     if(h2hRoleIs(X,"kereszttuz",p.n))m*=h2hRoleVal(X,"kereszttuz","v3");
     if(h2hRoleIs(X,"b2b",p.n))m*=h2hRoleVal(X,"b2b");
     if(h2hRoleIs(X,"legolas",p.n))m*=h2hRoleVal(X,"legolas","v2");
+    if(h2hRoleIs(X,"latnok",p.n))m*=h2hRoleVal(X,"latnok");
+    if(h2hRoleIs(X,"stabil",p.n))m*=h2hRoleVal(X,"stabil","v2");
+    m*=h2hRoleAuraMult(X,p.n);
     return m;};}
 /* A szimuláció. RITMUSA AZONOS a CPU-meccsével: 18 tick × 5 perc,
    tickenként poisson(λ/18) — így a teljes várható gólszám pontosan λ, és a
@@ -25977,6 +26485,9 @@ function h2hSimulate(home,away,rnd,neutral){
        játékos a saját kiosztásával számol. Régi kliensnél null: minden
        szerep-szorzó 1 marad. */
     roles:(sn.roles&&typeof sn.roles==="object")?sn.roles:null,
+    /* TIKI-TAKA: az Aurafarmer kigyulladt-e már. Meccs-állapot, tehát minden
+       szimuláció friss oldallal indul — a mkSide amúgy is másolatot ad. */
+    _auraLit:false,
     /* Régi kliens pillanatképében nincs redP — ilyenkor NEM dobunk, tehát a
        véletlen-folyam betűre a régi marad, és a piros lap helyben fut tovább. */
     redP:(typeof sn.redP==="number"&&sn.redP>0)?sn.redP:0});
@@ -26064,6 +26575,12 @@ function h2hSimulate(home,away,rnd,neutral){
           let guard=0;do{as=h2hPick(who.players,"aw",R,aw);}while(as&&as.n===sc.n&&guard++<8);
           if(as&&as.n===sc.n)as=null;}
         if(isHome)hg++;else ag++;
+        /* TIKI-TAKA · AURAFARMER: a gyújtás a gólszerző ÉS a gólpasszadó
+           kiválasztása UTÁN történik — a duplázás a KÖVETKEZŐ találattól él,
+           pontosan úgy, ahogy a CPU-meccsen (ott a recordScorer sorrendje adja
+           ugyanezt). Véletlent nem fogyaszt. */
+        h2hRoleAuraFire(who,sc.n);
+        if(as)h2hRoleAuraFire(who,as.n);
         ev.push({min:Math.max(1,min-Math.floor(R()*5)),type:"goal",
           side:isHome?"home":"away",scorer:sc.n,assist:as?as.n:null,hg,ag});}};
     /* ---- A SZEZON-SZEREPEK CSAPATSZINTŰ SZORZÓI ----
@@ -28517,6 +29034,7 @@ function playMatch(){
      nő, ezért itt még a meccs előtti számok állnak — pont ez kell. */
   const MILE=mileBegin(active);
   try{vlMatchReset();}catch(e){}   /* VILLÁM: a meccs ritmus-mérője */
+  try{roleAuraReset();}catch(e){}  /* TIKI-TAKA: az Aurafarmer még nem gyulladt ki */
   const capPlaying=MS.capPlaying;
   const famSp=MS.famSp;
   const gi=MS.gi,bi=MS.bi;
@@ -28699,6 +29217,10 @@ function playMatch(){
   const onPitch=()=>active.filter((a,i)=>i!==redIdx);
   const notRed=(x,idx)=>idx!==redIdx;
   S._goldQuotesThisMatch=0;   /* BL díj-kommentárok meccsenkénti korlátja */
+  /* 🌀 TIKI-TAKA · PASSZREKORD: a passzsorok MOST dőlnek el, a kezdőrúgáskor —
+     a kommentárjuk a kisorsolt percben szólal meg (lásd ttPlanMatch). A
+     párharcban nem fut: ott az eredményt a közös eseménylista adja. */
+  const TT_PLAN=DUEL?[]:(()=>{try{return ttPlanMatch(MS.active,-1,fx.o.ovr);}catch(e){return [];}})();
   let min=0,gf=0,ga=0,redIdx=-1,saveCount=0,maxDeficit=0,maxLead=0,specialEventHappened=false,specialEventCount=0,titleLiveNotes=0,skillFlavorShown=false,paceFlavorShown=false,supersubStruck=false,tierQuoteShown=false,tacGoalFlavorShown=false,tacRawShown=false,genGoalShown=false,styleLineShown=false,hardTackleShown=false,clutchWallShown=false,clutchHeroShown=false,paceGoalsThisMatch=0;
   /* az eredményjelző MÉG az első kiírás előtt áll fel: onnantól a
      updateTTBoard minden hívása őt is frissíti */
@@ -29051,6 +29573,50 @@ function playMatch(){
         sbEv("them","goal",dramaOppScorer,dMin);
         mileGkConceded(MILE,`${sbMinTxt(dMin)}  `);}
       maxDeficit=Math.max(maxDeficit,ga-gf);maxLead=Math.max(maxLead,gf-ga);}
+    /* ---- 🌀 TIKI-TAKA · PASSZREKORD ----
+       A kezdőrúgáskor eldőlt akció a saját percében. A gól ugyanazon a
+       könyvelési úton megy, mint bármelyik másik (mScore → recordScorer →
+       mérföldkövek), tehát a statisztika, a szezonkártya és a karrier-
+       mérföldkövek magától beleesnek. A meddő passzolgatás nem gól, de
+       ESEMÉNY: azt is kimondjuk, mert a filozófia lényege maga a passzsor. */
+    while(TT_PLAN.length&&TT_PLAN[0].bucket<=min){
+      const _tt=TT_PLAN.shift();
+      const _si=active.findIndex((x,i)=>i!==redIdx&&x.p&&x.p.n===_tt.scorer);
+      /* Ha a befejező időközben lekerült a pályáról (csere vagy piros lap), az
+         akció elmarad. A passzsor a KEZDŐRÚGÁS képéből készült — nem írunk be
+         gólt olyantól, aki már nincs a pályán, és nem is nevezünk meg helyette
+         valaki mást, mert akkor nem az az akció volna, amit lesimuláltunk. */
+      if(_si<0)continue;
+      const _ai=active.findIndex((x,i)=>i!==redIdx&&i!==_si&&x.p&&x.p.n===_tt.assist);
+      const _tmin=gmin(min);
+      if(!_tt.goal){
+        S.ttFutile=(S.ttFutile||0)+1;
+        addLine(`${sbMinTxt(_tmin)}  🌀 ${ttFutileLine(_tt)}`,"m ev");
+        continue;}
+      gf++;
+      const _sc=active[_si].p;
+      openGoalNotes(DUEL?DUEL_GOAL_NOTE_BUDGET:GOAL_NOTE_BUDGET,_sc.n);
+      mScore[_sc.n]=(mScore[_sc.n]||0)+1;recordScorer(_sc.n);
+      try{if(notePaceGoal(_sc.n))paceGoalsThisMatch++;}catch(e){}
+      updateGoallessStreak(_sc.n,true);
+      let _atxt="",_asN=null;
+      if(_ai>=0){
+        _asN=active[_ai].p.n;
+        mAssist[_asN]=(mAssist[_asN]||0)+1;recordAssist(_asN);
+        _atxt=` (${esc(shortName(_asN))})`;}
+      try{vlNoteGoal(_tmin,_sc.n,_asN);}catch(e){}
+      updateTTBoard(fx,gf,ga,Math.min(90,min));
+      addLine(`${sbMinTxt(_tmin)}  GÓL! ${esc(shortName(_sc.n))}${_atxt}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+      sbEv("us","goal",_sc.n,_tmin);
+      /* A PASSZSZÁM KIÍRÁSA NEM ÍZESÍTÉS, hanem adat: a „hány passzal született
+         a legkijátszósabb tiki-taka gól" mérföldkő ebből él, tehát a
+         gólonkénti ízkeretből NEM fogyaszthat. */
+      addLine(`→ 🌀 <b>${_tt.passes} PASSZ!</b> ${ttGoalLine(_tt)}`,"m skillnote");
+      mileEffective(MILE,_sc.n,"goal",`${sbMinTxt(_tmin)}  `);
+      if(_asN)mileEffective(MILE,_asN,"assist",`${sbMinTxt(_tmin)}  `);
+      S.ttGoals=(S.ttGoals||0)+1;
+      S.ttBest=Math.max(S.ttBest||0,_tt.passes);
+      maxLead=Math.max(maxLead,gf-ga);}
     /* PÁRHARCBAN a vödör góljai a KÖZÖS listából jönnek; egyébként poisson. */
     const duelMine=DUEL?(duelBkt.mine[min/5]||[]):null;
     let g=DUEL?duelMine.length:poisson(lf*clutchAttackMult(active,min,gf,ga)*busOwnMult()*roleOwnGoalMult(active,redIdx)/18);
@@ -30496,6 +31062,29 @@ function playMatch(){
           showChemBuild(()=>processSkillQueue(reasons,cb));
           return;
         }
+      }
+      /* ---- PASSZKÉMIA (Tiki-Taka) ----
+         SAJÁT, FÜGGETLEN DOBÁS a párkémia-ág UTÁN. Nem osztozik vele: a
+         felhasználói kérés szó szerint az, hogy a passzkémiát "ugyanolyan
+         tempóval lehet építeni, mint a párkémiákat" — ha a 15%-on osztoznának,
+         mindkettő feleannyit teremne. A türelem-jutalmat itt is kihagyjuk: az
+         a skill-padló garanciája, azt nem viheti el egy kötés-dobás. */
+      if(reason!=="pity"&&passChemOn()
+         &&Math.random()<passChemOfferP()*(1+underdogFactor()*0.8)){
+        if(S.passChemInProgress&&passChemStore()[S.passChemInProgress]){
+          if(S.auto){
+            const _pr=S.passChem[S.passChemInProgress];
+            _pr.stages=Math.min(PASS_CHEM_NEED,_pr.stages+1);
+            passChemAnnounce(_pr);
+            processSkillQueue(reasons,cb);
+          }else showPassChemBuild(()=>processSkillQueue(reasons,cb));
+          return;}
+        if(S.auto){
+          if(autoStartPassChem()){processSkillQueue(reasons,cb);return;}
+          /* ha nincs indítható páros, essen vissza skillre */
+        }else{
+          showPassChemBuild(()=>processSkillQueue(reasons,cb));
+          return;}
       }
       const incompleteCands=buildUpgradeCands();
       /* A folytatás esélye a hátralék méretével nő — így a rendszer önmagát
@@ -33187,7 +33776,14 @@ function skillRealOn(){return gameMode==="career"&&!!S.skillReal;}
 function skillRealLevel(){
   let p=0;
   try{const b=styleSkillBias();p=b?b.p:0;}catch(e){p=0;}
+  /* A VILLÁM SORA SZÁNDÉKOSAN VÁLTOZATLAN. A pace-ág itt logikai értéket ad
+     vissza (megvan/nincs), és ezzel a Villám mindhárom szintje a 2. szintre
+     lapul — a többi stílushoz képest eltérés, de RÉGÓTA így viselkedik, és a
+     realisztikus mód egyensúlya erre van beállítva. A javítása külön döntés,
+     nem ennek a kiadásnak a dolga. A Tiki-Taka új ág, ott nincs mit elrontani:
+     az a saját, valódi értékéből olvassa vissza a szintet. */
   if(!p){try{p=styleSkillPaceBias()?0.45:0;}catch(e){}}
+  if(!p){try{p=styleSkillPassBias()||0;}catch(e){}}
   return p>=0.60?3:p>=0.45?2:p>0?1:0;}
 /* MEKKORA ESÉLLYEL NEM TE DÖNTESZ. A Panzer keményebb kezű, a Béke és
    harmónia az EGYETLEN, amelyik ezt az arányt egyáltalán mozdítani tudja. */
@@ -33219,6 +33815,7 @@ function skillRealStyleBias(k,p){
   if(k==="bombazok")return {p,test:sk=>sk.type==="goalw"||sk.cat==="CSATAR"};
   if(k==="harmonia")return {p,test:sk=>sk.type==="assistw"};
   if(k==="villam")  return {p,test:sk=>PACE_SKILL_IDS.indexOf(sk.id)>=0};
+  if(k==="tikitaka")return {p,test:sk=>isPassSkill(sk)};
   return null;}   /* Panzer: nem a sorsolást tolja, hanem az arányt */
 /* Hány meccs múlva választhat újra a sztár-stílus. 0 = most is lehet. */
 /* Karrier-szintű meccsszámláló. Ugyanaz a képlet, amit a piaci türelmi idők és
@@ -33772,6 +34369,159 @@ function renderChemPick(){
             addLine(`🤝 Kémia kész: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} — együtt veszélyesek!`,"m life");}
           else addLine(`🤝 ${_cur?"Kémia épül":"Új kémia-építés indul"}: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} (${pr.stages}/${CHEM_PAIR_NEED} fázis)`,"m life");
           chemPickFirst=null;
+          $("scSkill").classList.add("hide");
+          const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();}});};
+    box.appendChild(row);});}
+/* ================= PASSZKÉMIA — KÉZI FELÜLET =================
+   Ugyanaz a scSkill panel, ugyanaz a két lépéses választó, mint a párkémiánál
+   — szándékosan: a felhasználónak nem kell új felületet megtanulnia ahhoz,
+   hogy a harmadik kötésfajtát is építse. A KÜLÖNBSÉG a szövegben és a
+   listában van: itt a PASSZ-attribútum a döntő szám, ezért az áll a soron
+   (a párkémiánál a poszt és az életkor), és a választó kiírja, hogy a
+   gyengébb fél hány közös meccs alatt zárkózik fel. */
+let passChemPickFirst=null;
+function showPassChemBuild(resumeCb){
+  skillResumeCb=resumeCb;
+  passChemPickFirst=null;
+  $("scSkill").classList.remove("hide");
+  $("skillSpinBtn").classList.add("hide");
+  $("skillSpinName").textContent="🌀";
+  $("skillAssignWrap").classList.remove("hide");
+  const inProg=S.passChemInProgress&&passChemStore()[S.passChemInProgress]
+    ?S.passChem[S.passChemInProgress]:null;
+  if(inProg){
+    $("skillTitle").textContent=`Passzkémia (${inProg.stages}/${PASS_CHEM_NEED} fázis)`;
+    $("skillDesc").textContent=`${shortName(inProg.a)} & ${shortName(inProg.b)} passzkémiája épül tovább. `
+      +`A hatás a teljes ${PASS_CHEM_NEED}/${PASS_CHEM_NEED}-nél lép életbe: gyorsabban fejlődik a poszt szerinti fő attribútumuk, `
+      +`és a gyengébb passzoló ${passChemRipeNeed()} közös meccsen belül felér a társához.`;
+    const box=$("skillAssignList");box.innerHTML="";
+    const row=document.createElement("div");row.className="prow";
+    row.innerHTML=`<span class="pos pc-KOZEPPALYAS">${inProg.stages}/${PASS_CHEM_NEED}</span>`
+      +`<span class="main"><div class="nm">${esc(shortName(inProg.a))} &amp; ${esc(shortName(inProg.b))}</div>`
+      +`<div class="trait">koppints a továbblépéshez</div></span>`;
+    row.onclick=()=>{advancePassChemManual();};
+    box.appendChild(row);
+    /* Ugyanaz a kiút, mint a párkémiánál: a megkezdett fázisok NEM vesznek el. */
+    const sw=document.createElement("button");
+    sw.className="btn-s stepbtn";sw.style.marginTop="8px";
+    sw.textContent="↩ Mégis másik párost építek";
+    sw.onclick=()=>{
+      askConfirm({title:"Másik párosra váltasz?",yes:"Igen, másikat választok",
+        html:`<div style="font-size:13px;line-height:1.55">
+          <b>${esc(shortName(inProg.a))} &amp; ${esc(shortName(inProg.b))}</b> passzkémiája félbemarad
+          <b>${inProg.stages}/${PASS_CHEM_NEED}</b> fázisnál.<br><br>
+          <span style="color:var(--grass)">A megszerzett fázisok megmaradnak</span> — ez a páros később, a választóból bármikor folytatható.</div>`,
+        onYes:()=>{
+          S.passChemInProgress=null;passChemPickFirst=null;
+          try{saveGame();}catch(e){}
+          showPassChemBuild(skillResumeCb);}});};
+    box.appendChild(sw);
+    $("scSkill").scrollIntoView({behavior:"smooth"});
+    return;}
+  $("skillTitle").textContent="Passzkémia — válassz párost!";
+  $("skillDesc").textContent="Két játékos, akik egymásra hangolják a játékukat. A kötés 5 fázisban épül fel, "
+    +"és a párkémiát NEM váltja fel — mellé jön be, harmadikként. Kész állapotban mindkettejük poszt szerinti "
+    +"fő attribútuma gyorsabban nő, a gyengébb passzoló pedig felzárkózik a társához, onnantól pedig együtt "
+    +"haladnak, gyorsított passzfejlődéssel.";
+  renderPassChemPick();
+  $("scSkill").scrollIntoView({behavior:"smooth"});}
+function advancePassChemManual(){
+  const pr=passChemStore()[S.passChemInProgress];
+  if(pr){
+    pr.stages=Math.min(PASS_CHEM_NEED,pr.stages+1);
+    passChemAnnounce(pr);}
+  $("scSkill").classList.add("hide");
+  const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();}
+/* A fázis-bejelentés egy helyen — a kézi, az auto és a választó is ezt hívja,
+   hogy a szöveg és a "kész" könyvelés sose csússzon szét. */
+function passChemAnnounce(pr){
+  if(!pr)return;
+  if(pr.stages>=PASS_CHEM_NEED){
+    pr.built=1;
+    passChemRecord(passChemKey(pr.a,pr.b));
+    if(S.passChemInProgress===passChemKey(pr.a,pr.b))S.passChemInProgress=null;
+    const pa=passChemPassOf(pr.a),pb=passChemPassOf(pr.b);
+    addLine(`🌀 <b>Passzkémia kész:</b> ${esc(shortName(pr.a))} &amp; ${esc(shortName(pr.b))} — `
+      +(pa===pb?`a passzuk már egy szinten van, innentől együtt gyorsulnak.`
+               :`${esc(shortName(pa<pb?pr.a:pr.b))} legfeljebb ${passChemRipeNeed()} közös meccsen belül `
+                +`felér ${passChemPassOf(pr.a)>passChemPassOf(pr.b)?esc(shortName(pr.a)):esc(shortName(pr.b))} `
+                +`passzához (${Math.min(pa,pb)} → ${Math.max(pa,pb)}).`),"m life");
+  }else{
+    S.passChemInProgress=passChemKey(pr.a,pr.b);
+    addLine(`🌀 Passzkémia épül: ${esc(shortName(pr.a))} &amp; ${esc(shortName(pr.b))} `
+      +`(${pr.stages}/${PASS_CHEM_NEED} fázis)`,"m life");}}
+/* Auto-mód: a legjobb passzoló és a hozzá LEGNAGYOBB hiánnyal álló társ — a
+   kötés ott ér a legtöbbet, ahol a legnagyobb a felzárkóznivaló. A félbehagyott
+   párost itt is előnyben részesítjük (a +100-as lökés), mert befejezni egy
+   kötést többet ér, mint újat kezdeni. */
+function autoStartPassChem(){
+  const onPitch=slots.filter(s=>s.player).map(s=>s.player.n).filter(n=>{
+    const e=msEntry(n);return !(e&&e.pos&&e.pos[0]==="KP");});
+  let best=null;
+  for(let i=0;i<onPitch.length;i++)for(let j=i+1;j<onPitch.length;j++){
+    const a=onPitch[i],b=onPitch[j];
+    if(passChemComplete(a,b))continue;
+    const cur=passChemStages(a,b);
+    const score=Math.abs(passChemPassOf(a)-passChemPassOf(b))
+      +Math.max(passChemPassOf(a),passChemPassOf(b))/10
+      +(cur>0?100+cur:0)+Math.random();
+    if(!best||score>best.score)best={a,b,score,cur};}
+  if(!best)return false;
+  const pr=addPassChemPair(best.a,best.b,best.cur+1);
+  S.passChemInProgress=passChemKey(best.a,best.b);
+  passChemAnnounce(pr);
+  return true;}
+function renderPassChemPick(){
+  const roster=currentRoster();
+  const box=$("skillAssignList");box.innerHTML="";
+  if(passChemPickFirst){
+    const info=document.createElement("div");
+    info.style.cssText="font-size:12px;color:#cfd6ff;margin-bottom:5px";
+    info.textContent=`Első játékos: ${shortName(passChemPickFirst)} `
+      +`(Passz ${passChemPassOf(passChemPickFirst)}) — válaszd ki a párját:`;
+    box.appendChild(info);
+    const back=document.createElement("button");
+    back.className="btn-s";back.style.cssText="width:100%;font-size:12px;padding:5px 0;margin-bottom:7px";
+    back.textContent="↩ Mégis mást választok elsőnek";
+    back.onclick=()=>{passChemPickFirst=null;renderPassChemPick();};
+    box.appendChild(back);}
+  roster.forEach(p=>{
+    if(!p)return;
+    /* A KAPUS KIMARAD. A passzkémia a mezőnyjáték kötése; a kapus Passza nem
+       a passzjátékról szól, és a poszt fő attribútuma sem az. */
+    if(p.pos&&p.pos[0]==="KP")return;
+    if(passChemPickFirst&&p.n===passChemPickFirst)return;
+    if(passChemPickFirst&&passChemComplete(passChemPickFirst,p.n))return;
+    const row=document.createElement("div");row.className="prow";
+    const existing=passChemPickFirst?passChemStages(passChemPickFirst,p.n):0;
+    const pv=passChemPassOf(p.n);
+    row.innerHTML=`<span class="pos pc-${getCategoryFor(p.pos[0])}">${p.pos.join("/")}</span>`
+      +`<span class="main"><div class="nm">${esc(shortName(p.n))} `
+      +`<small style="color:var(--gold)">Passz ${pv}</small>`
+      +`${existing?` <small>(már ${existing}/${PASS_CHEM_NEED})</small>`:""}</div></span>`;
+    row.onclick=()=>{
+      if(!passChemPickFirst){passChemPickFirst=p.n;renderPassChemPick();return;}
+      const _mate=p.n,_first=passChemPickFirst;
+      const _cur=passChemStages(_first,_mate);
+      const _next=Math.min(PASS_CHEM_NEED,Math.max(1,_cur+1));
+      const pa=passChemPassOf(_first),pb=passChemPassOf(_mate);
+      const loN=pa<pb?_first:_mate;
+      askConfirm({title:_cur?"Tovább építed ezt a passzkémiát?":"Elindítod ezt a passzkémiát?",
+        yes:_cur?"Igen, tovább építem":"Igen, ezt a párost építem",
+        html:`<div style="font-size:13px;line-height:1.6">
+          <b>${esc(shortName(_first))}</b> (Passz ${pa}) &amp; <b>${esc(shortName(_mate))}</b> (Passz ${pb})<br>
+          Készültség: <b>${_cur}/${PASS_CHEM_NEED}</b> → <b style="color:var(--gold)">${_next}/${PASS_CHEM_NEED}</b><br><br>
+          ${pa===pb
+            ?`<span style="color:var(--grass)">Egy szinten állnak</span> — a kötés elkészültétől azonnal EGYÜTT gyorsulnak.`
+            :`Kész állapotban <b>${esc(shortName(loN))}</b> legfeljebb <b>${passChemRipeNeed()} közös meccs</b> alatt
+              felzárkózik <b>${Math.max(pa,pb)}</b>-ra, onnantól pedig együtt haladnak tovább.`}
+          <br><br><span style="color:var(--dim)">A poszt szerinti fő attribútumuk mindkettejüknél
+          ${Math.round(PASS_CHEM_ATTR_MULT*100)}%-kal gyorsabban nő. A passzkémia nem váltja fel a párkémiát —
+          ugyanazon a páron mindkettő megépíthető.</span></div>`,
+        onYes:()=>{
+          const pr=addPassChemPair(_first,_mate,Math.max(1,passChemStages(_first,_mate)+1));
+          passChemAnnounce(pr);
+          passChemPickFirst=null;
           $("scSkill").classList.add("hide");
           const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();}});};
     box.appendChild(row);});}
@@ -36694,8 +37444,12 @@ function renderHubTacticsPanel(){
     const paceBoost=styleTacticPaceBoost(k);
     const isActive=S.tactics&&S.tactics.active===k;
     const stars=fit>=0.62?"★★★":fit>=0.52?"★★":"★";
-    const pct=Math.round((lvl-TACTIC_MIN)/(TACTIC_MAX-TACTIC_MIN)*100);
-    const th=Math.round((85-TACTIC_MIN)/(TACTIC_MAX-TACTIC_MIN)*100);
+    /* A sáv a TAKTIKA SAJÁT plafonjához mér (Guardiolával a Labdatartásé 125
+       vagy 150) — enélkül a kitolt rendszer sávja 100%-on ragadna, miközben
+       még van hova fejlődnie. */
+    const _ceil=tacticCeil(k);
+    const pct=Math.round((lvl-TACTIC_MIN)/(_ceil-TACTIC_MIN)*100);
+    const th=Math.round((85-TACTIC_MIN)/(_ceil-TACTIC_MIN)*100);
     const w=TACTICS[k].attrProfile;
     /* súlyprofil mini-sávok: melyik tengelyre mennyire épül ez a taktika.
        ZÖLD = ezen a tengelyen az ELVÁRÁS FÖLÖTT állsz (z≥0), tehát tényleg
@@ -42845,7 +43599,7 @@ function euroCampaignEndNow(kind){
     /* A GYŐZELEMHEZ HASZNÁLT taktika azonnali szintugrást kap. */
     if(S.tactics&&S.tactics.active&&TACTICS[S.tactics.active]){
       const k=S.tactics.active,before=tacticLevel(k);
-      S.tactics.levels[k]=Math.min(TACTIC_MAX,before+c.tacticBoost);
+      S.tactics.levels[k]=Math.min(tacticCeil(k),before+c.tacticBoost);
       E.tacticBoosted={k,from:Math.round(before),to:Math.round(S.tactics.levels[k])};
       addLine(`⚙️ A(z) ${TACTICS[k].n} a kupagyőzelemtől +${c.tacticBoost} szintet ugrott (${E.tacticBoosted.from} → ${E.tacticBoosted.to}).`,"m life");}}
   /* ===== BL EGYÉNI ARANY-DÍJAK: a Bajnokok Ligája gólkirálya, gólpassz-
@@ -46240,7 +46994,18 @@ const STYLES=[
   {key:"panzer", ic:"🛡️", n:"Panzerkampfwagen",
    tag:"Nem szeretnek minket. Nem is kell.",
    d:"Kőkemény, összezáró csapat. Sok temperamentumos, lobbanékony játékos, akik egymásért harcolnak. A csapatmorál nem hullámzik, a lapok nem rettentenek el, és a sérült bajtárs csak még jobban összekovácsolja a keretet.",
-   forms:["442","532"], tactics:["busz","hosszu"], col:"#8a6a3e"}
+   forms:["442","532"], tactics:["busz","hosszu"], col:"#8a6a3e"},
+  /* ---- 🌀 TIKI-TAKA (3.4.00) ----
+     A hetedik filozófia, és az egyetlen, ami egy ATTRIBÚTUMOT tesz meg
+     mindennek: a PASSZ. A többi stílus a végeredményt méri (gól, tiszta lap,
+     sebesség); ez azt, ami odáig vezet. Ezért kap három olyan rendszert, ami
+     máshol nincs: a PASSZKÉMIÁT (harmadik kötésfajta a skill és a párkémia
+     mellé), a TIKI-TAKA GÓLT (a passzsor maga dönti el, lesz-e belőle gól) és
+     GUARDIOLÁT (a Labdatartás ismertsége 99 fölé tolható). */
+  {key:"tikitaka", ic:"🌀", n:"Tiki-Taka",
+   tag:"A labda nem fárad el. Ti igen — ezért járassátok őt.",
+   d:"A passz a mindenük. A mérföldkövek a passzkémiákat, a keret Passz-attribútumát, a gólpasszokat és a Labdatartás ismertségét mérik. A képességfa három saját rendszert nyit meg: a PASSZKÉMIÁT (két ember egymáshoz igazodik és együtt gyorsul), a PASSZREKORDOT (a hosszú passzsorból születő gólt) és GUARDIOLÁT, akivel a Labdatartás 99 fölé is fejleszthető.",
+   forms:["433","4231"], tactics:["labdatartas","totalis"], col:"#7c5cbf"}
 ];
 function styleByKey(k){return STYLES.find(x=>x.key===k)||null;}
 /* Az állapot. Csak akkor jön létre, ha tényleg választottál — a `null` maga is
@@ -46310,9 +47075,33 @@ const ROLE_DEFS={
   kereszttuz:{style:"beton",ic:"⚔️",n:"Kereszttűz",
     d:"Keményebben megy bele: nő a piros lap és a sérülés esélye — cserébe amíg pályán van, a félidő környékén (35-60. perc) csökken az ellenfél gólesélye, és neki magának enyhe gólpassz-előnye van.",
     v:[0.975,0.955,0.93,0.90],v2:[1.15,1.3,1.5,1.75],v3:[1.1,1.2,1.35,1.5],
-    u:"ellenfél-gólesély a 35-60. percben"}};
+    u:"ellenfél-gólesély a 35-60. percben"},
+  /* ---- 🌀 TIKI-TAKA ----
+     A három szerep három KÜLÖNBÖZŐ oldalról nyúl ugyanahhoz: a Stabil kezdés a
+     mérkőzés első felét fogja meg, a Lát a pályán a taktika-illeszkedésbe szól
+     bele (az egyetlen szerep, ami a MECCS ELŐTT is hat), az Aurafarmer pedig a
+     játék egyetlen ÖNGERJESZTŐ szerepe: az első találata után megkétszerezi
+     magát — cserébe másfélszeres sérülés-veszéllyel fizet érte. */
+  stabil:{style:"tikitaka",ic:"🧭",n:"Stabil kezdés",
+    d:"A hátsó és a középső harmad legpontosabb passzolója. Az ELSŐ FÉLIDŐBEN csökkenti az ellenfél gólesélyét — a nyugodt kezdés az ő kezében van —, és neki magának enyhe gólpassz-előnye is van.",
+    v:[0.975,0.96,0.94,0.93],v2:[1.01,1.02,1.03,1.04],
+    u:"ellenfél-gólesély az első félidőben",
+    who:"védő vagy középpályás, aki a saját posztterülete legjobb passzolója"},
+  latnok:{style:"tikitaka",ic:"👁️",n:"Lát a pályán",
+    d:"A karmester. Amíg a pályán van, jóval nagyobb eséllyel övé a gólpassz — és a taktikai illeszkedés számításánál az ő Passza váltja ki a keret leggyengébb passzolóinak az értékét.",
+    v:[1.05,1.10,1.15,1.20],v2:[1,2,3,4],
+    u:"gólpassz-súly, amíg a pályán van",
+    who:"középpályás, szélső csatár vagy árnyékék (középcsatár, védő és kapus nem)"},
+  aura:{style:"tikitaka",ic:"✨",n:"Aurafarmer",
+    d:"Amíg a pályán van, nő a gól- és a gólpassz-esélye — és amint egyszer beírja magát a jegyzőkönyvbe, a saját alapesélye a mérkőzés hátralévő részére MEGKÉTSZEREZŐDIK. Az ára: onnantól másfélszeres a sérülés-veszélye.",
+    v:[1.03,1.05,1.07,1.11],
+    u:"gól- és gólpassz-súly, amíg a pályán van"}};
+/* AURAFARMER: a szám nem szintfüggő, ezért nem a `v`-tömbben él. A duplázás a
+   MÉRKŐZÉS állapota (beírta-e már magát), nem a képességé — a szerep akkor is
+   ugyanannyiszorosára nő, ha a képességet még meg sem vetted. */
+const ROLE_AURA_MULT=2, ROLE_AURA_RISK=1.5;
 const ROLE_KEYS_OF={bombazok:["nyito","befejezo","talalo"],beton:["fal","arok","kereszttuz"],
-  villam:["b2b","legolas","robben"]};
+  villam:["b2b","legolas","robben"],tikitaka:["stabil","latnok","aura"]};
 /* ---- A BELÉPŐ ----
    A Bombázók és a Beton szerepeire bárki jelölhető (a kapust kivéve); a
    Villáméira NEM. Itt a szerep maga egy alkati kérdés — egy lassú szélső nem
@@ -46335,7 +47124,37 @@ function roleEligible(key,p){
     const e=(careerPool&&careerPool[p.n])||null;
     const pos=(e&&e.pos)||p.pos||[];
     return pos.indexOf("CS")>=0&&roleSpeedOf(p)>=90;}
+  /* ---- TIKI-TAKA ----
+     A Stabil kezdés belépője RELATÍV, nem küszöb: nem "80 fölötti Passz" kell,
+     hanem hogy a SAJÁT posztterületén ő legyen a legjobb passzoló. Így a
+     feltétel a karrier minden szakaszában ugyanazt jelenti — egy 70-es és egy
+     150-es mezőnyben egyaránt egy embert enged át védőnként/középpályásonként.
+     A Lát a pályán tiltó listával dolgozik: középcsatár, védő és kapus nem
+     lehet karmester, minden más támadó-középpálya igen. */
+  if(key==="stabil"){
+    if(cat!=="VEDO"&&cat!=="KOZEPPALYAS")return false;
+    return rolePassLeader(cat)===p.n;}
+  if(key==="latnok"){
+    const e=(careerPool&&careerPool[p.n])||null;
+    const pos=((e&&e.pos)||p.pos||[])[0]||"KKP";
+    if(pos==="KP"||pos==="CS")return false;
+    if(cat==="VEDO")return false;
+    return true;}
   return true;}
+/* A posztterület legjobb passzolója — a Stabil kezdés belépője. A kapust
+   szándékosan kihagyja: ő nem passzterület, hanem külön tengely. */
+function rolePassOf(p){
+  try{const a=attrsOfPlayer(p);return (a&&a.passz)||0;}catch(e){return 0;}}
+function rolePassLeader(cat){
+  let best=null,bv=-1;
+  msRoster().forEach(p=>{
+    if(!p||!p.n)return;
+    let c=null;
+    try{c=getCategoryFor((p.pos&&p.pos[0])||"KKP");}catch(e){}
+    if(c!==cat)return;
+    const v=rolePassOf(p);
+    if(v>bv){bv=v;best=p.n;}});
+  return best;}
 function roleKeysForStyle(){return ROLE_KEYS_OF[styleKey()]||[];}
 function roleStyleActive(){return roleKeysForStyle().length>0;}
 /* A képesség szintje — stílusonként EGY képesség emeli mind a hármat. */
@@ -46371,6 +47190,33 @@ function roleAssign(key,name){
 /* ---- A MOTOR OLDALA ----
    Mind hibatűrő: szerep nélkül 1-et adnak vissza, tehát a hívási helyeken nem
    kell feltételt írni. */
+/* ---- AZ AURAFARMER MECCS-ÁLLAPOTA ----
+   A szerep egyetlen bitre épül: beírta-e már magát ezen a mérkőzésen. Azért
+   modul-szintű jelző és nem a szerep adata, mert MECCSRE szól, nem szezonra —
+   a kezdőrúgás nullázza (ugyanaz a minta, mint a vlMatchReset-nél). A
+   kockázati fele ugyanezt a bitet olvassa: a duplázás és a másfélszeres
+   sérülés-veszély EGYÜTT kapcsol be, ez a szerep alkuja. */
+let _roleAuraLit=false;
+function roleAuraReset(){_roleAuraLit=false;}
+function roleAuraLit(){return _roleAuraLit;}
+/* A gól- vagy gólpassz-blokk közös hívása. Igazzal tér vissza, ha MOST gyulladt
+   ki — a hívó ilyenkor kiírja a kommentárt. */
+function roleAuraFire(name){
+  if(_roleAuraLit||!name||!roleStyleActive())return false;
+  if(roleOf("aura")!==name)return false;
+  _roleAuraLit=true;
+  return true;}
+/* Az Aurafarmer súlyszorzója (gólra és gólpasszra egyaránt ugyanaz). */
+function roleAuraMult(name){
+  if(!name||!roleStyleActive()||roleOf("aura")!==name)return 1;
+  return roleVal("aura")*(_roleAuraLit?ROLE_AURA_MULT:1);}
+/* A KIGYULLADÁS PILLANATA. Egy némán megkétszereződő súly használhatatlan
+   visszajelzés — és itt az ÁR is most kapcsol be, azt pedig ki kell mondani. */
+function roleAuraNote(name,kind){
+  if(!roleAuraFire(name))return;
+  addLine(`✨ <b>FELIZZOTT AZ AURA!</b> ${esc(shortName(name))} beírta magát `
+    +`${kind==="goal"?"a góllal":"a gólpasszal"} — innentől a lefújásig `
+    +`<b>kétszeres</b> eséllyel keresi a labda, de <b>másfélszeres</b> a sérülés-veszélye is.`,"m mvp");}
 function roleGoalMult(name,min,gf,ga){
   if(!name||!roleStyleActive())return 1;
   let m=1;
@@ -46381,12 +47227,18 @@ function roleGoalMult(name,min,gf,ga){
   /* VILLÁM: a Robben saját gólsúlya és a Legolas kettős előnyének gól-fele. */
   if(roleOf("robben")===name)m*=roleVal("robben");
   if(roleOf("legolas")===name)m*=roleVal("legolas","v2");
+  /* TIKI-TAKA: az Aurafarmer — a duplázás a meccs állapotából jön. */
+  m*=roleAuraMult(name);
   return m;}
 function roleAssistMult(name){
   if(!name||!roleStyleActive())return 1;
   let m=1;
   if(roleOf("talalo")===name)m*=roleVal("talalo");
   if(roleOf("kereszttuz")===name)m*=roleVal("kereszttuz","v3");
+  /* TIKI-TAKA: a karmester gólpassz-előnye és az Aurafarmer önerősítése. */
+  if(roleOf("latnok")===name)m*=roleVal("latnok");
+  if(roleOf("stabil")===name)m*=roleVal("stabil","v2");
+  m*=roleAuraMult(name);
   /* VILLÁM: a Box-to-box gólpassz-súlya és a Legolas kettős előnye. Nincs
      időablak — a szerep addig él, amíg az ember a pályán van, azt pedig a
      hívási hely már eldöntötte (a súlyozás csak a pályán lévőkre fut). */
@@ -46424,6 +47276,19 @@ function roleFitBonusPP(){
   const sp=roleSpeedOf(p);
   const hit=ROLE_B2B_FIT.find(r=>sp>=r[0]);
   return hit?hit[1]:0;}
+/* ---- TIKI-TAKA: A KARMESTER HELYETTESÍTÉSE A TAKTIKA-ILLESZKEDÉSBEN ----
+   {n, k} — kinek a Passza és hány társáét váltja ki. Null, ha nincs kiosztva
+   vagy nem ez a stílus. A teamAttrStrengths olvassa, tehát a hatás a fit
+   EGYETLEN forrásába kerül: a panel, a begyakorlás, a meccshatás és a
+   tanács-sorok mind ugyanazt a számot látják (ugyanaz az indok, mint a Villám
+   pace-bónuszánál). A KEZDŐ 11-re szól, nem a keretre — az illeszkedés a
+   pályára állított tizenegyről szól. */
+function roleLatnokSub(){
+  if(!roleStyleActive())return null;
+  const nm=roleOf("latnok");
+  if(!nm)return null;
+  const k=Math.round(roleVal("latnok","v2"))||0;
+  return k>0?{n:nm,k}:null;}
 /* A TÁLALÓ CÉLZOTT RÁHATÁSA: ha a gólszerző a Nyitó vagy a Befejező, a Tálaló
    gólpassz-súlya külön megszorzódik. Ezért kell a gólszerző neve is. */
 function roleAssistTargetMult(assistName,scorerName){
@@ -46444,20 +47309,35 @@ function roleOppGoalMult(active,redIdx,min,ga){
   /* VILLÁM: a Box-to-box VÉGIG hat, nem egy ablakban — ezért szerényebb is a
      szorzója, mint a Falé vagy az Ároké. */
   if(on(roleOf("b2b")))m*=roleVal("b2b","v2");
+  /* TIKI-TAKA: a Stabil kezdés az ELSŐ FÉLIDŐ egészére szól. Szélesebb ablak,
+     mint az Ároké (25 perc), ezért szerényebb szorzóval — és feltétel nélkül:
+     itt nem az számít, kapott-e már gólt a csapat, hanem hogy ki indítja a
+     játékot hátulról. */
+  if(min<=45&&on(roleOf("stabil")))m*=roleVal("stabil");
   return m;}
-/* KERESZTTŰZ: a piros lap és a sérülés súlyszorzója erre az egy emberre. */
+/* KERESZTTŰZ: a piros lap és a sérülés súlyszorzója erre az egy emberre.
+   TIKI-TAKA: ugyanezen a csatornán fizet az Aurafarmer is — de csak MIUTÁN
+   kigyulladt. Amíg nem írta be magát, semmivel nem kockáztat többet. */
 function roleRiskMult(name){
   if(!name||!roleStyleActive())return 1;
-  return roleOf("kereszttuz")===name?roleVal("kereszttuz","v2"):1;}
+  if(roleOf("kereszttuz")===name)return roleVal("kereszttuz","v2");
+  if(roleOf("aura")===name&&_roleAuraLit)return ROLE_AURA_RISK;
+  return 1;}
 /* A CSAPAT ÖSSZ-kockázata is nő, nem csak az eloszlás. A súlyszorzó önmagában
    csak ÁTTOLNÁ a lapot és a sérülést a Kereszttűzre — a szerep viszont valódi
    ár, tehát a forduló esélyét is emeli. A mérték a becsületes szám: egy ember a
    tizenegyből, tehát a többletsúlyának a tizenegyed része (3. szinten +6,8%). */
 function roleRiskTeamP(active,redIdx){
-  const nm=roleOf("kereszttuz");
-  if(!nm||!roleStyleActive())return 1;
-  if(!active.some((x,i)=>i!==redIdx&&x.p&&x.p.n===nm))return 1;
-  return 1+(roleVal("kereszttuz","v2")-1)/11;}
+  if(!roleStyleActive())return 1;
+  const on=nm=>!!nm&&active.some((x,i)=>i!==redIdx&&x.p&&x.p.n===nm);
+  let m=1;
+  if(on(roleOf("kereszttuz")))m*=1+(roleVal("kereszttuz","v2")-1)/11;
+  /* AURAFARMER: ugyanaz a becsületes számtan. A súlyszorzó önmagában csak
+     ÁTTOLNÁ a sérülést őrá, a szerep viszont valódi árat kér — tehát a forduló
+     esélye is nő, egy ember a tizenegyből arányában (+4,5%). Csak akkor, ha
+     már kigyulladt: az ár a jutalommal EGYSZERRE érkezik. */
+  if(_roleAuraLit&&on(roleOf("aura")))m*=1+(ROLE_AURA_RISK-1)/11;
+  return m;}
 function styleDef(){return styleByKey(styleKey());}
 /* (A styleHas a képesség-blokkban él — a szintes rendszer definiálja.) */
 /* Választható-e MÁR a stílus? Legalább egy LEZÁRT szezon kell hozzá.
@@ -46804,7 +47684,7 @@ function roleCandidates(key){
   /* A BELÉPŐ ELŐBB SZŰR, aztán jön a rangsorolás. Enélkül a Villám listáján
      ott állnának a nem jelölhető emberek is — és egy kiválaszthatatlan opció
      rosszabb, mint egy rövid lista. */
-  let pool=(key==="nyito"||key==="befejezo"||key==="talalo")?outfield:list;
+  let pool=(key==="nyito"||key==="befejezo"||key==="talalo"||key==="aura")?outfield:list;
   pool=pool.filter(p=>roleEligible(key,p));
   const cs=n=>(S.careerStats&&S.careerStats[n])||{};
   const score=p=>{
@@ -46816,6 +47696,13 @@ function roleCandidates(key){
        a Box-to-boxnál a gólpassz-termés mellett, a másik kettőnél a gól mellett. */
     if(key==="b2b")return roleSpeedOf(p)+(c.a||0)/m*100+ovr/10;
     if(key==="legolas"||key==="robben")return roleSpeedOf(p)+(c.g||0)/m*100+ovr/10;
+    /* TIKI-TAKA: itt a PASSZ a rendező — a Stabil kezdésnél önmagában (a
+       belépő úgyis egy emberre szűkít), a karmesternél a gólpassz-termés
+       mellett. Az Aurafarmer a termelést nézi: gól ÉS gólpassz együtt, mert
+       a szerep mindkettőre fizet. */
+    if(key==="stabil")return rolePassOf(p)+ovr/10;
+    if(key==="latnok")return rolePassOf(p)+(c.a||0)/m*100+ovr/10;
+    if(key==="aura")return ((c.g||0)+(c.a||0))/m*100+ovr;
     return (c.g||0)/m*100+ovr;};
   return pool.slice().sort((a,b)=>score(b)-score(a)).slice(0,24);}
 function roleSectionHtml(){
@@ -46825,11 +47712,15 @@ function roleSectionHtml(){
   /* A BEVEZETŐ NEM MONDHAT MÁST, MINT AMI TÖRTÉNIK. A Bombázók és a Beton
      szerepei a meccs egy SZAKASZÁRA szólnak; a Villáméi addig élnek, amíg az
      ember a pályán van. Ugyanaz a mondat a másodikra egyszerűen hamis volna. */
-  const whole=(sk==="villam");
+  const whole=(sk==="villam"),mixed=(sk==="tikitaka");
   let h=`<div class="infoCard" style="margin-top:12px">`
     +`<div class="msNote">Minden idényben <b>három embert</b> jelölsz ki három feladatra. `
     +`A szerep nem képesség és nem poszt: `
-    +(whole
+    +(mixed
+      ?`itt mind a három MÁSHOL fog. A <b>Stabil kezdés</b> a mérkőzés első félidejére szól, a `
+       +`<b>Lát a pályán</b> már a kezdőrúgás ELŐTT is hat (a taktikai illeszkedésen), az `
+       +`<b>Aurafarmer</b> pedig magától gyullad ki — az első góljával vagy gólpasszával.`
+      :whole
       ?`addig él, amíg az <b>ember a pályán van</b> — ez a stílus nem egy időablakot ural, hanem egy embert enged el. `
        +`Cserébe mindháromnak saját <b>belépője</b> van: nem bárki jelölhető rájuk.`
       :`csak a mérkőzés egy adott <b>szakaszában</b> él — ettől lesz taktikai döntés, nem puszta számnövelés.`)
@@ -46862,6 +47753,15 @@ function roleSectionHtml(){
         +ROLE_B2B_FIT.map(r=>`${r[0]}+ → <b>+${String(r[1]).replace(".",",")}</b>`).join(" · ")
         +(curFitPP?` <span style="color:var(--grass)">— most +${String(curFitPP).replace(".",",")} pont</span>`
                   :` <span style="color:var(--dim)">— most nincs</span>`)+`</div>`:"")
+      /* A karmester MÁSODIK hatása nem szorzó, hanem darabszám — a kártyán
+         külön sort érdemel, mert ez az egyetlen szerep-hatás, ami a mérkőzés
+         ELŐTT, a taktika-illeszkedésben dolgozik. */
+      +(key==="latnok"?`<div class="msDesc" style="color:var(--dim2)">A taktikai illeszkedésnél `
+        +`<b>${Math.round(roleVal("latnok","v2"))}</b> társa gyengébb Passza helyett is az övé számít`
+        +(cur?"":` <span style="color:var(--dim)">— amint kiosztod</span>`)+`</div>`:"")
+      +(key==="aura"?`<div class="msDesc" style="color:var(--dim2)">Ha beírja magát a jegyzőkönyvbe: `
+        +`a saját súlya <b>×${ROLE_AURA_MULT}</b> a lefújásig, a sérülés-veszélye `
+        +`<b>×${String(ROLE_AURA_RISK).replace(".",",")}</b>. A gyógyító kézzel ellenpontozható.</div>`:"")
       +`<div class="msDesc" style="color:${cur?"var(--gold)":"var(--dim2)"}">`
       +(cur?`Most: <b>${esc(shortName(cur))}</b>`:`Nincs kiosztva — a szerep nem hat`)+`</div>`
       +`<select class="roleSel" data-role="${key}" style="width:100%;margin-top:7px;padding:9px;`
@@ -47209,7 +48109,11 @@ const STYLE_MATCH_LINES={
     "Nézzék, hogy segítik egymást. Itt nincs sztár és nincs statiszta — tizenegy ember ugyanazt a meccset játssza."],
   panzer:[
     "Egy eredeti panzerkampfwagen vier! Tigris! Komótosan, de megállíthatatlanul tapossa el ellenfelét. Kíméletlen!",
-    "Nem szépek, nem kedvesek, és nem is akarnak azok lenni. Csak jönnek előre, és ami az útjukba kerül, az ott is marad."]};
+    "Nem szépek, nem kedvesek, és nem is akarnak azok lenni. Csak jönnek előre, és ami az útjukba kerül, az ott is marad."],
+  tikitaka:[
+    "Nézzék, hogy jár a labda! Egy érintés, két érintés, és már ott sincs. Az ellenfél húsz perce fut utána, és még csak közel sem került hozzá. Ez nem futball, ez hímzés.",
+    "Tik. Tak. Tik. Tak. Hallják? Ez a labda hangja, ahogy oda-vissza pattog a lábak között — és minden egyes passzal egy centivel közelebb a kapuhoz.",
+    "Megint visszafelé. Megint oldalra. Aztán egyszer csak előre — és pont ott nyílik a rés, ahol az előbb még nem volt semmi. Türelem, uraim, ezt hívják türelemnek."]};
 /* ================= A KIÁLLÍTÁS SZTORIJAI =================
    A piros lap eddig EGYETLEN, mindig azonos mondatot kapott („mehet
    zuhanyozni, emberhátrányba kerülünk") — pedig ez a mérkőzés egyik
@@ -47420,7 +48324,14 @@ const ST_FAM_T={
   pz_redseason:"Piros lapok egy idényben", pz_injwin2:"Győzelmek sérülttel",
   pz_shotmax:"Az ágyúgolyó",
   pz_tough:"Az összes keményfiú", pz_capt:"A kőkemény vezető",
-  pz_buddy:"Bajtársak", pz_tackle:"Kőkemény belépő"};
+  pz_buddy:"Bajtársak", pz_tackle:"Kőkemény belépő",
+  tt_pchem:"Kész passzkémiák", tt_pchemall:"Passzkémiák a klub történetében",
+  tt_goal:"Tiki-taka gólok", tt_chain:"A legkijátszósabb tiki-taka gól",
+  tt_poss:"A Labdatartás ismertsége", tt_skill:"Passz-alapú képességek",
+  tt_passattr:"A legjobb passzolód Passza", tt_midsum:"A középpálya össz Passza",
+  tt_avg:"A kezdő 11 passz-átlaga", tt_axis:"A csapat Passz-tengelye",
+  tt_assist:"Gólpasszok egy idényben", tt_assistall:"Gólpasszok a klub történetében",
+  tt_solo:"Egy játékos gólpasszai egy idényben", tt_card:"A karmester szezonkártyája"};
 /* `nOf`: a KÜSZÖBÖK, ha eltérnek a címben szereplő számtól. Enélkül a fordított
    mércéjű családoknál (ahol a KISEBB szám a jobb: kapott gól, szórás) a
    címke és a valódi feltétel elcsúszik egymástól — a fokozatok sorrendje
@@ -48118,6 +49029,155 @@ stTiers("panzer","pz_tackle",th=>`${th} kőkemény belépő`,
 stTiers("panzer","pz_capt",th=>ST_CAPT_HARD_T[th],th=>ST_CAPT_HARD_D[th],
   [3,5,8,12,16,24],[1,2,3,4,5,6],stCaptainHardRank);
 
+/* ---------- 🌀 TIKI-TAKA MÉRŐI ---------- */
+/* A KERET legjobb passzolójának Passz-attribútuma. A kapus kimarad: az ő
+   Passza nem a passzjátékról szól. Ugyanaz a szerkezet, mint a Beton
+   stBestDefAttr-jánál — EGY ember felneveléséről szól, nem arról, ki játszik. */
+function ttBestPassAttr(){
+  let m=0;
+  msRoster().forEach(p=>{
+    if(p.pos&&p.pos[0]==="KP")return;
+    const a=attrsOfPlayer(p);
+    if(a&&(a.passz||0)>m)m=a.passz;});
+  return Math.round(m);}
+/* A kezdő 11 MEZŐNYJÁTÉKOSAINAK Passz-átlaga — a vl_avg párja a másik
+   tengelyen. A kapus itt is kimarad, különben a sor egy tizeneggyel osztott,
+   szerkezetileg lehúzott számot adna. */
+function ttXIPassAvg(){
+  const v=stXI().filter(o=>stRoleOf(o)!=="KAPUS").map(o=>{
+    const a=attrsOfPlayer(o.sl.player);
+    return (a&&a.passz)||0;}).filter(x=>x>0);
+  return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;}
+/* A kezdő 11 KÖZÉPPÁLYÁJÁNAK össz Passza. A stBackLineDefSum párja: aki
+   hatalmas egyéniséget nevel, a ttBestPassAttr lépcsőt viszi; aki mély,
+   egyenletes középpályát épít — vagy egyszerűen ötösével áll középen —, ezt. */
+function ttMidPassSum(){
+  let s=0;
+  stXI().forEach(o=>{
+    if(stRoleOf(o)!=="KOZEPPALYAS")return;
+    const a=attrsOfPlayer(o.sl.player);
+    s+=(a&&a.passz)||0;});
+  return Math.round(s);}
+/* A csapat PASSZ-tengelye (a taktika-illeszkedés valódi bemenete). */
+function ttPassAxis(){
+  try{return Math.round(teamAttrStrengths().passz||0);}catch(e){return 0;}}
+/* A Labdatartás ismertsége — a Guardiola-lépcső mércéje. */
+function ttPossLevel(){
+  try{return Math.round(tacticLevel(TT_POSS_TACTIC));}catch(e){return 0;}}
+/* Hány KIÉPÍTETT passz-alapú képesség ül a kereten? A stSkillCount párja, csak
+   nem kategóriára, hanem HATÁSRA szűr (isPassSkill) — ugyanaz az indok, mint a
+   sorsolás-torzításnál. A félkész arányosan számít. */
+function ttPassSkillCount(){
+  let n=0;
+  msRoster().forEach(p=>{
+    ((S.skills&&S.skills[p.n])||[]).forEach(i=>{
+      if(!i||!i.skill||!isPassSkill(i.skill))return;
+      n+=(typeof skillFraction==="function")?skillFraction(i):1;});});
+  return n;}
+/* A csapat gólpasszai a FUTÓ szezonban — bajnoki és kupa együtt (a stSeasonAssists
+   egy emberre szól, ez az egész keretre). */
+function stSeasonAssistTotal(){
+  let n=0;
+  Object.values(S.assists||{}).forEach(v=>{n+=v||0;});
+  Object.values((S.seasonEuro&&S.seasonEuro.assists)||{}).forEach(v=>{n+=v||0;});
+  return n;}
+/* A legtöbb gólpassz EGY embertől a futó szezonban (bajnoki + kupa). */
+function stSeasonMaxAssists(){
+  const all={};
+  Object.keys(S.assists||{}).forEach(k=>{all[k]=(all[k]||0)+(S.assists[k]||0);});
+  const eb=(S.seasonEuro&&S.seasonEuro.assists)||{};
+  Object.keys(eb).forEach(k=>{all[k]=(all[k]||0)+(eb[k]||0);});
+  return stSeasonMax(all);}
+
+/* ---------- 🌀 TIKI-TAKA ---------- */
+/* A NÉGY KÉRT LÉPCSŐ ELÖL: passzkémiák, tiki-taka gólok, a leghosszabb
+   gólig vezető passzsor, és a Labdatartás ismertsége. Utánuk jön a klasszikus
+   réteg, ami a többi filozófia mércéit fordítja le a passz nyelvére. */
+stTiers("tikitaka","tt_pchem",th=>`${th} kész passzkémia`,
+  th=>`Legyen egyszerre ${th} teljesen kiépített passzkémia a klubodnál. `
+     +`A rendszer a Passzkémia képességgel nyílik meg — addig ez a sor nem tud gyűlni.`,
+  ST_L9,[1,2,3,4,6,8,10,13,16],passChemDone);
+stTiers("tikitaka","tt_pchemall",th=>`${th} passzkémia a klub történetében`,
+  th=>`Építs ki összesen ${th} passzkémiát a karrier során. A számláló NÉVRE megy: `
+     +`minden kötés pontosan egyszer számít, és az eladás nem veszi el.`,
+  ST_L9,[2,4,7,11,16,22,30,45,70],passChemCareer);
+stTiers("tikitaka","tt_goal",th=>`${th} tiki-taka gól`,
+  th=>`Szerezzetek összesen ${th} gólt hosszú passzsorból. A technika a Passzrekord `
+     +`képességgel nyílik meg; a befejező ember mindig az, akihez épp odaért a labda.`,
+  ST_L9,[1,3,6,12,22,40,70,120,200],()=>S.ttGoals||0);
+/* ---- A LEGKIJÁTSZÓSABB GÓL ----
+   CSÚCS-mérce, nem darabszám: nem sokszor kell összehozni, hanem EGYSZER
+   messzebbre jutni. A tető NEM önkényes: egy passzsor legfeljebb TT_CHAIN_MAX
+   (30) elemű, tehát 29 passznál több egyszerűen nem létezik. Ezért van
+   kivéve az Infinity-hosszabbításból is — egy 40 passzos fokozat nem nehéz
+   volna, hanem teljesíthetetlen. */
+stTiers("tikitaka","tt_chain",th=>`${th} passzos tiki-taka gól`,
+  th=>`Szülessen olyan tiki-taka gólotok, amit ${th} sikeres passz előzött meg.`
+     +(th>=25?` Ez már a passzsor felső határának a közelében jár (${TT_CHAIN_MAX-1} az abszolút maximum).`:""),
+  ST_PEAK,[5,8,10,12,14,16,18,20,22,24,26,28],()=>S.ttBest||0);
+/* ---- A LABDATARTÁS ISMERTSÉGE ----
+   A 99 fölötti fokozatok CSAK Guardiolával érhetők el (a 2. szinttel 125-ig,
+   a 3.-kal 150-ig) — ugyanaz a szerkezet, mint a Harmónia „Nincs plafon"-jánál
+   a csapategyensúly-lépcsőnél, és a leírás ki is mondja. Az Infinity ezt a
+   családot sem hosszabbítja: a plafont nem a mezőny szintje szabja meg, hanem
+   a képesség. */
+stTiers("tikitaka","tt_poss",th=>`${th}-ös Labdatartás`,
+  th=>`Vidd fel a Labdatartás taktika ismertségét ${th}-re.`
+     +(th>99?` A 99 fölötti sáv csak GUARDIOLÁVAL nyílik meg (a 2. szinttel 125-ig, a 3.-kal 150-ig).`
+            :` A taktika a HASZNÁLATÁVAL fejlődik — játszani kell vele.`),
+  [2,3,5,8,12,16,22,26,30,32],[70,80,85,90,95,99,110,125,140,150],ttPossLevel);
+/* ---- A KLASSZIKUS RÉTEG ---- */
+stDef("tikitaka","tt_line","A középpálya a legerősebb",
+  "A középpálya Rating-átlaga legyen a legmagasabb a három mezőnysor közül.",
+  10,()=>stLineIsTop("KOZEPPALYAS"),1);
+stDef("tikitaka","tt_top","A karmester a klub legjobbja",
+  "Legyen a klub legmagasabb Ratingű játékosa középpályás.",
+  10,()=>stTopPlayerRole()==="KOZEPPALYAS"?1:0,1);
+stDef("tikitaka","tt_capt","Karszalag a középpályán",
+  "Viselje a csapatkapitányi karszalagot középpályás.",
+  8,()=>stCaptainRole()==="KOZEPPALYAS"?1:0,1);
+stDef("tikitaka","tt_fit","A rendszer működik",
+  "Érd el a 90%-os illeszkedést a stílusod otthonos taktikájában (Labdatartás vagy Totális futball).",
+  10,stHomeTacticFit,90);
+stDef("tikitaka","tt_ballon","Aranylabdás karmester",
+  "Nyerje meg az Aranylabdát a te középpályásod.",
+  32,()=>stBallonRole(["KOZEPPALYAS"])?1:0,1);
+stDef("tikitaka","tt_king","Aranypasszok",
+  "Legyen a te játékosod a Bajnokok Ligája gólpassz-királya.",
+  12,()=>stWonKing("passes")?1:0,1);
+stTiers("tikitaka","tt_skill",th=>`${th} passz-alapú képesség`,
+  th=>`Legyen ${th} kiépített passz-alapú képesség a keretedben — gólpassz-súlyt emelő `
+     +`vagy a Passz-attribútumot edző. A félkész képesség arányosan számít.`,
+  [2,2,3,4,6,8,10,13,16,20,24,28,33],
+  [1,3,5,7,10,12,15,17,20,25,30,40,50],ttPassSkillCount);
+stTiers("tikitaka","tt_passattr",th=>`${th}-ös Passz egy játékosnál`,
+  th=>`Érje el valamelyik mezőnyjátékosod a ${th}-ös Passz-attribútumot. A keret `
+     +`bármelyik tagja számít, nem csak a kezdő 11-é.`,
+  [5,8,12,17,22,26,30],[85,90,95,100,105,110,115],ttBestPassAttr);
+stTiers("tikitaka","tt_midsum",th=>`${th} össz Passz a középpályán`,
+  th=>`A kezdő 11 középpályájának össz Passz-attribútuma érje el a ${th} pontot. `
+     +`Minél többen állnak középen, annál könnyebb — ez a filozófia jutalma.`,
+  [4,7,11,15,19,23,27],[300,350,400,450,500,550,600],ttMidPassSum);
+stTiers("tikitaka","tt_avg",th=>`${th}-ös passz-átlag a kezdőben`,
+  th=>`A kezdő 11 mezőnyjátékosainak Passz-átlaga érje el a ${th}-öt.`,
+  ST_L6,[75,80,85,90,95,100],()=>Math.round(ttXIPassAvg()));
+stTiers("tikitaka","tt_axis",th=>`${th}-ös Passz-tengely`,
+  th=>`Érje el a csapat Passz-tengelye a ${th}-öt. Ez az a szám, amivel a `
+     +`Labdatartás illeszkedése is számol.`,
+  ST_L6,[70,75,80,85,90,95],ttPassAxis);
+stTiers("tikitaka","tt_assist",th=>`${th} gólpassz egy idényben`,
+  th=>`Adjatok ${th} gólpasszt egyetlen szezonban.`,
+  ST_L6,[30,45,60,75,90,110],()=>stSeasonAssistTotal());
+stTiers("tikitaka","tt_assistall",th=>`${th} gólpassz a klubnál`,
+  th=>`Gyűjtsetek össze ${th} gólpasszt a karrier során.`,
+  ST_L9,[40,90,175,300,450,650,900,1300,2000],()=>stCareerSum("a"));
+stTiers("tikitaka","tt_solo",th=>`${th} gólpassz egy embertől`,
+  th=>`Osszon ki ${th} gólpasszt egyetlen játékosod egyetlen szezonban.`,
+  ST_L6,[10,14,18,22,26,32],()=>stSeasonMaxAssists());
+stCardLadder("tikitaka","tt_card",th=>`A karmester kártyája: ${ST_CARD_N[th]}`,
+  th=>`Érje el valamelyik középpályásod a(z) ${ST_CARD_N[th]} szezonkártya-szintet.`,
+  ()=>stTopCardRank("KOZEPPALYAS"));
+
 /* ================= APRÓ STÍLUS-MÉRFÖLDKÖVEK =================
    A nagy célok (Aranylabda, 120 gól, 99-es sebesség) egy hosszú karrier
    végén jönnek. Közben a stílus-pálya néma maradt: hónapokig nem történt
@@ -48232,6 +49292,19 @@ stDef("panzer","pz_s_inj","Összezárás",
   "Nyerj meg egy mérkőzést úgy, hogy volt sérült emberetek.",3,
   ()=>msT().injWins||0,1);
 
+/* ---- 🌀 Tiki-Taka ---- */
+stDef("tikitaka","tt_s_avg","Kezd forogni a labda",
+  "A kezdő 11 mezőnyjátékosainak Passz-átlaga érje el a 70-et.",3,
+  ()=>Math.round(ttXIPassAvg()),70);
+stDef("tikitaka","tt_s_attr","Az első karmester",
+  "Legyen egy 80-as Passz-attribútumú mezőnyjátékosod.",3,ttBestPassAttr,80);
+stDef("tikitaka","tt_s_poss","Ismerkedés a rendszerrel",
+  "Vidd fel a Labdatartás ismertségét 75-re.",4,ttPossLevel,75);
+stDef("tikitaka","tt_s_assist","Osztogatás",
+  "Adjatok 20 gólpasszt egyetlen szezonban.",3,stSeasonAssistTotal,20);
+stDef("tikitaka","tt_s_fit","Kezd összeállni",
+  "Érd el a 70%-os illeszkedést a stílusod otthonos taktikájában.",4,stHomeTacticFit,70);
+
 /* ================= A STÍLUS-KIÉRTÉKELŐ =================
    Ugyanaz a minta, mint a msScan: minden nem teljesített mérföldkövet
    végigfuttat, saját try-ban, és a jutalmat ugyanabba a stíluspont-tárcába
@@ -48274,6 +49347,10 @@ const ST_INF_TOP={
      tehát ugyanaz a 200. A védősor ÖSSZEGE viszont nem: ott a családnak nincs
      saját skálája, marad az általános ×1,8. */
   bt_defattr:()=>200,
+  /* A Passz ugyanazon a Rating-skálán fut, mint a Védekezés — a tetője
+     ugyanaz a 200. A középpálya ÖSSZEGE viszont nem: ott a családnak nincs
+     saját skálája, marad az általános ×1,8. */
+  tt_passattr:()=>200, tt_avg:()=>200, tt_axis:()=>200,
   hm_axisN:()=>200, hm_balN:()=>200,
   /* A paletta és a szivárvány SAJÁT lépésköze folytatódik: a hosszabbító hat
      fokozatot vág a mostani tető és az itteni tető közé, tehát a 100-ról a
@@ -48287,7 +49364,10 @@ const ST_INF_TOP={
    van itt, mert FIZIKAI teteje van: egy mérkőzésen 11 kezdő + 3 csere tud
    pályára lépni, tehát a 14 fölötti fokozat nem nehéz volna, hanem
    TELJESÍTHETETLEN. */
-const ST_INF_SKIP=["pz_capt","hm_card","hm_contribM"];
+/* A tt_chain teteje FIZIKAI: egy passzsor legfeljebb TT_CHAIN_MAX elemű, tehát
+   29 passznál több nem létezik. A tt_poss plafonját nem a mezőny szintje szabja
+   meg, hanem a Guardiola-képesség (150) — az Infinity ott sem ad hozzá semmit. */
+const ST_INF_SKIP=["pz_capt","hm_card","hm_contribM","tt_chain","tt_poss"];
 let _stInfExtended=false;
 function stExtendForInfinity(){
   if(_stInfExtended||!infinityMode)return 0;
@@ -49201,6 +50281,120 @@ stTrait("panzer","kemeny_iskola",2,"Kőkemény iskola-műhely",
   "A VÉDŐ- és CSATÁR-képességek csillagozásának feloldása olcsóbb.",
   stStarDiscLevels(sk=>sk&&(sk.cat==="VEDO"||sk.cat==="CSATAR")));
 
+/* ---------- 🌀 TIKI-TAKA ----------
+   A fa két rétegű. Az alsó réteg a KLASSZIKUS négy-öt képesség: sorsolás-
+   torzítás, stábgyorsítás, olcsóbb igazolás, csillagozás-kedvezmény — ugyanaz
+   a szerkezet, amit mind a hat régi stílus is visel, csak a passz nyelvén.
+   A felső réteg a HÁROM SAJÁT RENDSZER: a passzkémia, a passzrekord és
+   Guardiola. Ezek nem egy meglévő számot mozdítanak, hanem megnyitnak valamit,
+   ami nélkülük nem létezik — ezért mindhárom a III. ársávban áll, és mindnél
+   az 1. szint a MEGNYITÁS, a 2-3. a fejlesztés. */
+/* A HÁROM SAJÁT RENDSZER ÁRSZORZÓJA. Ugyanaz az indok, mint a Beton
+   buszsofőrjénél és a Harmónia egyensúly-képességeinél: ezek nem egy szeletet
+   erősítenek, hanem egy egész MECHANIKÁT adnak a játékhoz — a passzkémia egy
+   harmadik kötésfajtát, a passzrekord egy új gólszerzési utat, Guardiola pedig
+   a 3.0 óta változatlan taktika-plafont mozdítja el. A hatásukat nem vágjuk
+   vissza (a filozófia LEGYEN erős), csak megkérjük az árát: a III. ársáv
+   216 pontja képességenként 292-re nő. Mérve: enélkül a stílus fedezete 276%
+   volna, a mezőny legmagasabbja; így 242% — a Villám és a Pánzer mellett. */
+const TT_SYSTEM_PRICE_MULT=1.35;
+stTrait("tikitaka","passz_sorsolas",1,"Passzra hangolt sorsolás",
+  "A képesség-sorsolás a PASSZ-alapú képességek felé tolódik — posztkategóriától függetlenül mindegyik olyan képesség számít, ami a gólpasszt vagy a Passz-attribútumot emeli.",[
+  {fx:{skillPass:0.30},note:"30% esély passz-alapú képességre"},
+  {fx:{skillPass:0.45},note:"45% esély"},
+  {fx:{skillPass:0.60},note:"60% esély"}],
+  ()=>{try{
+    const pool=S.skillPool||[];
+    if(!pool.length)return "";
+    const n=pool.filter(isPassSkill).length;
+    return n?`most ${n} passz-alapú képesség van a pakliban`
+            :"a pakliban most nincs passz-alapú képesség — a húzás friss példányt vesz a készletből";
+  }catch(e){return "";}});
+stTrait("tikitaka","passzmester_muhely",1,"Passzmester-műhely",
+  "A Passz-attribútumot fejlesztő stábtagjaid gyorsabban gyűjtenek tapasztalatot.",[
+  {fx:{coachXp:1,coachXpTypes:["attr:passz"]},note:"kétszeres tempó"},
+  {fx:{coachXp:2,coachXpTypes:["attr:passz"]},note:"háromszoros tempó"},
+  {fx:{coachXp:3,coachXpTypes:["attr:passz"]},note:"négyszeres tempó"}]);
+/* ---- MEGFOJTJUK A MECCSET ----
+   FELTÉTELES, mint a Beton „Ötös bástyá"-ja: csak akkor fizet, ha tényleg
+   Labdatartással álltok fel. A logika a filozófia magja — akinél a labda van,
+   az ellen nem lehet gólt szerezni —, és a feltétel miatt lehet szerényebb
+   sávban, mint egy feltétel nélküli gólesély-csökkentő. */
+stTrait("tikitaka","megfojtjuk",2,"Megfojtjuk a meccset",
+  "Labdatartás taktikánál az ellenfél gólesélye csökken. Más rendszerben a képesség hallgat — akinél nincs a labda, az nem tud fojtani.",[
+  {fx:{oppGoalMult:()=>ttPossActive()?0.96:1},note:"−4% ellenfél-gólesély Labdatartással"},
+  {fx:{oppGoalMult:()=>ttPossActive()?0.93:1},note:"−7%"},
+  {fx:{oppGoalMult:()=>ttPossActive()?0.90:1},note:"−10%"}],
+  ()=>ttPossActive()?"a Labdatartás be van téve — a képesség ÉL"
+                    :"most nem Labdatartással játszotok — a képesség alszik");
+stTrait("tikitaka","olcso_kozeppalyas",2,"Olcsó a jó középpályás",
+  "A KÖZÉPPÁLYÁS posztcsoportba tartozó játékosok igazolása olcsóbb. Az eladási árakat nem érinti.",[
+  {fx:{midBuyDisc:0.25},note:"−25% a középpályások vételárából"},
+  {fx:{midBuyDisc:0.33},note:"−33%"},
+  {fx:{midBuyDisc:0.40},note:"−40%"}],
+  ()=>`most ${Math.round((1-styleMidBuyMult())*100)}% a kedvezmény a középpályásokra`);
+stTrait("tikitaka","passz_iskola",2,"Passz-iskola",
+  "A PASSZ-alapú képességek csillagozásának feloldása olcsóbb.",
+  stStarDiscLevels(sk=>(typeof isPassSkill==="function")&&isPassSkill(sk)));
+stTrait("tikitaka","csillagozhato_passz",3,"Csillagozható passz",
+  "A kiépült képességeidet nagyobb eséllyel ajánlja fel csillagozásra a jutalom-sor.",[
+  {fx:{starOffer:0.12},note:"+12 százalékpont csillag-esély"},
+  {fx:{starOffer:0.22},note:"+22 pp"},
+  {fx:{starOffer:0.32},note:"+32 pp"}]);
+stTrait("tikitaka","szerepek",3,"Kiosztott szerepek",
+  "A Stabil kezdés, a Lát a pályán és az Aurafarmer szezon-szerep egyszerre erősödik. A szerepeket minden idényben újra kiosztod.",[
+  {fx:{roleLvl:1},note:"−4% ellenfél-gólesély az első félidőben · karmester ×1,10 gólpassz, 2 társ Passzát váltja ki · aura +5%"},
+  {fx:{roleLvl:2},note:"−6% · ×1,15 és 3 társ · +7%"},
+  {fx:{roleLvl:3},note:"−7% · ×1,20 és 4 társ · +11% — és az aura kigyulladva mindezt megkétszerezi"}],
+  ()=>{const m=roleState().map,k=roleKeysForStyle().filter(x=>m[x]);
+    return k.length?`most kiosztva: ${k.map(x=>`${ROLE_DEFS[x].n} — ${shortName(m[x])}`).join(" · ")}`
+                   :"még egy szerep sincs kiosztva — a képesség így nem hat";});
+/* ---- PASSZKÉMIA ----
+   A HARMADIK KÖTÉSFAJTA megnyitása. Nem vált fel semmit: a képesség és a
+   párkémia marad, ez MELLÉJÜK jön be. Az 1. szint maga a rendszer; a 2-3.
+   kettőt gyorsít egyszerre — sűrűbben jön a felajánlás, és rövidebb az
+   összeérési idő. Azért III. sáv, mert nem egy szorzót emel, hanem egy egész
+   mechanikát ad hozzá a játékhoz. */
+stTrait("tikitaka","passzkemia",3,"Passzkémia",
+  "Megnyílik a HARMADIK kötésfajta. A párkémiát nem váltja fel — mellé jön be, és ugyanolyan tempóval épül. Egy kész passzkémia mindkét tagjának gyorsítja a poszt szerinti fő attribútumát, a gyengébb passzoló pedig felzárkózik a társához, onnantól együtt haladnak, gyorsított passzfejlődéssel.",[
+  {fx:{passChem:1},note:"a rendszer megnyílik · összeérési idő legfeljebb 15 közös meccs"},
+  {fx:{passChem:2},note:"25%-kal gyakoribb felajánlás · összeérés 12 meccsen belül"},
+  {fx:{passChem:3},note:"33%-kal gyakoribb felajánlás · összeérés 8 meccsen belül"}],
+  ()=>{if(!passChemOn())return "";
+    const n=passChemDone(),c=passChemCareer();
+    return `most ${n} kész passzkémiád van (a klub történetében ${c}) — az összeérési idő ${passChemRipeNeed()} közös meccs`;},
+  TT_SYSTEM_PRICE_MULT);
+/* ---- PASSZREKORD ----
+   Új GÓLSZERZÉSI TECHNIKA (lásd ttRunChain). Az 1. szint egy passzsort futtat
+   mérkőzésenként, a 2. kettőt — ez a felhasználó által kimondott felső korlát.
+   A 3. szint nem harmadik sort ad, hanem KÖNNYEBBÉ teszi mindkettőt: a passz
+   sorsolási ablaka feljebb csúszik, a befejezés ráadása nő. */
+stTrait("tikitaka","passzrekord",3,"Passzrekord",
+  "A hosszú passzsorból gól is születhet. A mérkőzés indításakor eldől, meddig bírja a labdajáratás: minden lépésnél a két szomszédos ember Passzának átlaga mérkőzik az ellenfél nyers csapaterejével, és ahol elakad, ott jön a befejezés. A befejező ember nem a legjobb csatár — az, akihez épp odaért a labda.",[
+  {fx:{tikiLv:1},note:"egy passzsor mérkőzésenként · passz ±10% · befejezés +15-30%"},
+  {fx:{tikiLv:2},note:"KÉT passzsor mérkőzésenként"},
+  {fx:{tikiLv:3},note:"két passzsor · passz −5…+15% · befejezés +20-40%"}],
+  ()=>{if(!ttOn())return "";
+    return `eddig ${S.ttGoals||0} tiki-taka gólotok van (${S.ttFutile||0} meddő passzolgatás mellett), `
+      +`a leghosszabb gólig vezető sor ${S.ttBest||0} passz`;},
+  TT_SYSTEM_PRICE_MULT);
+/* ---- GUARDIOLA ----
+   A készlet egyetlen képessége, ami EDZŐT VÁLT (lásd guardiolaTakeOver), és
+   az egyetlen, ami egy 3.0 óta változatlan plafont mozdít el: a taktika
+   ismertsége 99 fölé megy. Kizárólag a LABDATARTÁSNÁL — a képesség egy
+   emberről szól, aki egyetlen filozófiát visz tökélyre. */
+stTrait("tikitaka","guardiola",3,"Guardiola",
+  "A klub leszerződteti Pep Guardiolát. Onnantól a Labdatartás kétszeres tempóval gyakorlódik be — a felsőbb szinteken pedig a rendszer ismertségének 99-es plafonja is feljebb tolódik, egyedül ennél a taktikánál.",[
+  {fx:{guardiola:1},note:"megérkezik Guardiola · a Labdatartás kétszeres tempóval fejlődik"},
+  {fx:{guardiola:2},note:"a Labdatartás ismertsége 125-ig vihető"},
+  {fx:{guardiola:3},note:"…és 150-ig — a meccshatás sapkája 2,1-ről 3,63-ra nő"}],
+  ()=>{const c=tacticCeil(TT_POSS_TACTIC);
+    let lvl=0;try{lvl=Math.round(tacticLevel(TT_POSS_TACTIC));}catch(e){}
+    return (coach&&coach.n==="Pep Guardiola")
+      ?`Guardiola a kispadon · a Labdatartás ${lvl}/${c}`
+      :`most ${coach?coach.n:"—"} az edző · a Labdatartás ${lvl}/${c}`;},
+  TT_SYSTEM_PRICE_MULT);
+
 /* ================= A HATÁS-CSATORNÁK =================
    EGYETLEN belépési pont csatornánként, hogy a motor és a felület ugyanabból
    a számból dolgozzon. Mind hibatűrő: stílus nélkül a semleges értéket adja,
@@ -49310,6 +50504,9 @@ function styleWallTackleNeed(){
   return best;}
 /* A védő-igazolások árszorzója a piacon (1 = nincs kedvezmény). */
 function styleDefBuyMult(){return Math.max(0.4,1-styleFxMax("defBuyDisc"));}
+/* A középpályás-igazolások árszorzója (Tiki-Taka). Ugyanaz a padló és ugyanaz
+   a szabály, mint a védőknél: KIZÁRÓLAG a vételi oldal. */
+function styleMidBuyMult(){return Math.max(0.4,1-styleFxMax("midBuyDisc"));}
 /* A buszsofőr megvett szintje (0-3). */
 function styleBusLevel(){return Math.round(styleFxMax("busLv"))||0;}
 function styleMoraleFloor(){return styleFxMax("moraleFloor");}
@@ -49531,6 +50728,10 @@ function styleSkillBias(){
    kategóriástól, mert a pace-skillek minden posztkategóriában ott vannak —
    lásd a „Sebességre hangolt sorsolás" képességnél. 0 = nincs megvéve. */
 function styleSkillPaceBias(){return styleFxMax("skillPace");}
+/* A sorsolás eltolása a PASSZ-alapú képességek felé (Tiki-Taka). Külön
+   csatorna a kategóriástól, ugyanazon az indokon, mint a sebességé: a passzos
+   képességek minden posztkategóriában ott vannak. 0 = nincs megvéve. */
+function styleSkillPassBias(){return styleFxMax("skillPass");}
 /* BOMBÁZÓK: a gólzápor izgalom-jutalma. {add,floor} vagy null. */
 function styleExciteBoost(){
   let best=null;
@@ -49716,7 +50917,34 @@ function styleBuyTrait(key){
     addLine(`${sd?sd.ic:"🎯"} <b>${esc(t.n.toUpperCase())} — ${lv+1}. SZINT</b> · −${price} csapatstílus-pont`,"m mvp");
     addLine(`→ ${esc(t.lv[lv].note||t.d)}`,"m skillnote");
   }catch(e){}
+  /* ---- A VÁSÁRLÁS EGYETLEN MELLÉKHATÁSA AZ EGÉSZ RENDSZERBEN ----
+     A Guardiola-képesség 1. szintje nem szorzót nyit, hanem EDZŐT VÁLT. Ez a
+     helye: a hatás egyszeri és azonnali, nem egy csatorna, amit a motor minden
+     meccsen újraolvas. */
+  if(key==="guardiola"&&lv===0){try{guardiolaTakeOver();}catch(e){}}
   return {ok:true,level:lv+1};}
+/* ---- AZ EDZŐVÁLTÁS ----
+   A klub kirúgja az addigi szakvezetőt, és leszerződteti Pep Guardiolát. Az
+   edző hatásai (csapaterő, szezon-kezdő morál, hangulat-kilengés) onnantól az
+   övéi — ugyanazon a csatornán, amin bármelyik másik edzőé. Ha valaki eleve
+   Guardiolával indult, a képesség nem vesz el semmit: a plafon és a kétszeres
+   begyakorlás akkor is jár, csak nincs mit lecserélni. */
+function guardiolaTakeOver(){
+  const c=COACHES.find(x=>x.n==="Pep Guardiola");
+  if(!c)return false;
+  if(coach&&coach.n===c.n){
+    addLine(`🎩 Guardiola már a kispadotokon ül — a képesség így a Labdatartás `
+      +`fejlesztését gyorsítja meg, edzőváltás nélkül.`,"m life");
+    return false;}
+  const old=coach?coach.n:"";
+  coach=c;
+  addLine(`🎩 <b>EDZŐVÁLTÁS — MEGJÖTT PEP GUARDIOLA.</b>`
+    +(old?` ${esc(old)} elköszön a klubtól.`:""),"m mvp");
+  addLine(`→ ${esc(c.tag)} · játékerő +${c.ovrMod} · morál ${c.moraleBase>=0?"+":""}${c.moraleBase}. `
+    +`A Labdatartás mostantól <b>kétszeres tempóval</b> gyakorlódik be.`,"m skillnote");
+  try{updateBar();}catch(e){}
+  try{drawPitch();}catch(e){}
+  return true;}
 /* ---- A BOLT ---- */
 const STYLE_TIER_LABEL={1:"I. sáv",2:"II. sáv",3:"III. sáv"};
 /* ---- „ÉL-E MOST?" — A FELTÉTELES KÉPESSÉGEK ÉLŐ ÁLLAPOTA ----
@@ -50163,6 +51391,10 @@ function saveGame(){
         skillReal:S.skillReal,lastStars:S.lastStars,
         seasonStartStrength:S.seasonStartStrength,summerPaidAfterSeason:S.summerPaidAfterSeason,
         chemPairs:S.chemPairs,chemInProgress:S.chemInProgress,
+        /* PASSZKÉMIA: a kötések, az épülő páros és a karrier-regiszter. */
+        passChem:S.passChem,passChemInProgress:S.passChemInProgress,passChemSeen:S.passChemSeen,
+        /* TIKI-TAKA: a passzrekord-gólok karrier-számlálói. */
+        ttGoals:S.ttGoals,ttBest:S.ttBest,ttFutile:S.ttFutile,
         activeChallenges:S.activeChallenges,challengeLastOfferRound:S.challengeLastOfferRound,challengeLastOfferSeason:S.challengeLastOfferSeason,startChallengesDone:S.startChallengesDone,
         frozenAcademySeasons:S.frozenAcademySeasons,teamFormMalus:S.teamFormMalus,tsiBlocked:S.tsiBlocked,
         /* karrier-mérföldkövek */
@@ -50382,6 +51614,11 @@ function applySavedGame(d){
   S.infLiftRetired=!!d.S.infLiftRetired;
   S.discWatch=d.S.discWatch||{};S.hotStreak=d.S.hotStreak||{};S.goallessStreak=d.S.goallessStreak||{};
   S.chemPairs=d.S.chemPairs||{};S.chemInProgress=d.S.chemInProgress||null;
+  /* PASSZKÉMIA: régi mentésben nincs — ott üres tárral indul, ami helyes: a
+     rendszer a Tiki-Taka képességével nyílik meg, nem visszamenőleg. */
+  S.passChem=d.S.passChem||{};S.passChemInProgress=d.S.passChemInProgress||null;
+  S.passChemSeen=d.S.passChemSeen||{};
+  S.ttGoals=d.S.ttGoals||0;S.ttBest=d.S.ttBest||0;S.ttFutile=d.S.ttFutile||0;
   /* CHALLENGE-állapot visszatöltése — régi mentéseknél (a rendszer előttről)
      biztonságos alapértékek, hogy semmi ne törjön el. Az egyszerűsítés ELŐTTI
      típusú aktív kihívásokat (rating, teamStrength, money, mvp, saves, skills3)

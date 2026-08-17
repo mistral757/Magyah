@@ -1,6 +1,6 @@
 # CSAPATSTÍLUSOK — SZÁM SZERINT
 
-**Mérés dátuma:** 2026-08-15 · **Verzió:** 3.3.16 (`index.html`)
+**Mérés dátuma:** 2026-08-18 · **Verzió:** 3.4.00 (`index.html`)
 **Beállítás:** 100-as nehézségi szint · **Infinity megnyitva** · Alap fejlődési tempó (×1,00)
 
 > A számok nem becslések: az `index.html` `STYLE_MILESTONES` és `STYLE_TRAITS`
@@ -34,10 +34,11 @@ A 100-as nehézség szerepe tehát közvetett: ez az Infinity nyitó küszöbe
 | 🧱 Beton védelem | 13 | 39 | **1 992** | 154 | **4 063** | 2 821 | 204% |
 | ⚽ Bombázók | 9 | 27 | **1 364** | 118 | **2 578** | 1 826 | 189% |
 | ☯️ Béke és harmónia | 12 | 36 | **2 051** | 186 | **3 302** | 1 961 | 161% |
-| ⭐ Sztárom a párom | 7 | 21 | **1 007** | 107 | **2 532** | 1 835 | 251% |
-| ⚡ Villámcsapat | 11 | 33 | **1 516** | 136 | **3 302** | 2 333 | 218% |
+| ⭐ Sztárom a párom | 11 | 33 | **1 581** | 123 | **2 977** | 2 175 | 188% |
+| ⚡ Villámcsapat | 12 | 36 | **1 732** | 239 | **4 331** | 2 926 | 250% |
 | 💥 Pánzer | 10 | 30 | **1 440** | 148 | **3 563** | 2 567 | 247% |
-| **ÖSSZESEN** | **62** | **186** | **9 370** | **849** | **19 340** | **13 343** | **206%** |
+| 🌀 Tiki-Taka | 10 | 30 | **1 883** | 189 | **4 560** | 3 001 | 242% |
+| **ÖSSZESEN** | **77** | **231** | **12 043** | **1 157** | **25 374** | **17 277** | **211%** |
 
 *Fedezet = a stílus saját mérföldköveiből gyűjthető pont a fa teljes árához mérve.*
 
@@ -46,32 +47,45 @@ A 100-as nehézség szerepe tehát közvetett: ez az Infinity nyitó küszöbe
 - Az **általános (karrier-)mérföldkövek** további **490 SP**-t adnak, stílustól
   függetlenül (`trófeák` 235 · `piac` 69 · `utánpótlás` 54 · `vagyon` 52 ·
   `fölény` 50 · `ugrás` 30). Ezek a kategória-nyitás **pénzbe** kerül, nem pontba.
-- Infinity **előtt** a hat fa fedezete 55–69% között mozog, átlagosan **64%** —
+- Infinity **előtt** a hét fa fedezete 51–83% között mozog, átlagosan **67%** —
   vagyis a doksi eredeti ígérete („a fát kimaxolni nem lehet") Infinity előtt
-  igaz. Infinity **után** átlagosan 206%: a fa kimaxolható lett, de csak a
+  igaz. Infinity **után** átlagosan 211%: a fa kimaxolható lett, de csak a
   lépcsők tetejét megjárva.
+- A **Tiki-Taka** két családja (`tt_chain`, `tt_poss`) ki van véve az
+  Infinity-hosszabbításból, mert a tetejüket nem a mezőny szintje szabja meg,
+  hanem egy fizikai és egy képesség-korlát (30 elemű passzsor · 150-es
+  taktika-plafon). Enélkül a stílus SP-je magasabb volna, a felső fokozatai
+  viszont teljesíthetetlenek.
 
 ---
 
 ## 2. A KÉPESSÉGEK DARABSZÁMA
 
-**62 képesség**, egyenként **3 szint** → **186 megvásárolható szint**.
+**77 képesség**, egyenként **3 szint** → **231 megvásárolható szint**.
 
 | Stílus | I. rang | II. rang | III. rang | Össz |
 |---|--:|--:|--:|--:|
 | Beton védelem | 3 | 6 | 4 | 13 |
-| Bombázók | 2 | 4 | 3 | 9 |
+| Bombázók | 2 | 4 | 3 | **9** |
 | Béke és harmónia | 3 | 4 | 5 | 12 |
-| Sztárom a párom | 2 | 3 | 2 | **7** |
-| Villámcsapat | 4 | 4 | 3 | 11 |
+| Sztárom a párom | 3 | 5 | 3 | 11 |
+| Villámcsapat | 4 | 4 | 4 | 12 |
 | Pánzer | 3 | 4 | 3 | 10 |
+| Tiki-Taka | 2 | 3 | 5 | 10 |
 
 Ársávok: **I. rang 76 SP** (14+24+38) · **II. rang 141 SP** (26+45+70) ·
-**III. rang 216 SP** (40+68+108). Három kivétel, mind árszorzóval: a Harmónia
+**III. rang 216 SP** (40+68+108). Hat kivétel, mind árszorzóval: a Harmónia
 **Természetes összhang**ja (212 SP) és **Nincs plafon**ja (324 SP) a
 `STYLE_BAL_PRICE_MULT = 1,5`-tel — utóbbi a játék legdrágább egyetlen
-képessége —, valamint a Beton **Jöhet a buszsofőr!**-je (270 SP) a
-`STYLE_BUS_PRICE_MULT = 1,25`-tel.
+képessége —, a Beton **Jöhet a buszsofőr!**-je (270 SP) a
+`STYLE_BUS_PRICE_MULT = 1,25`-tel, valamint a Tiki-Taka három saját rendszere —
+**Passzkémia**, **Passzrekord**, **Guardiola** (292 SP egyenként) — a
+`TT_SYSTEM_PRICE_MULT = 1,35`-tel.
+
+**A Tiki-Taka a legfelülre súlyozott fa:** tíz képességéből **öt** a III.
+sávban áll, mert három közülük nem egy meglévő számot mozdít, hanem egy új
+mechanikát ad a játékhoz. Ezért a legkevesebb képességgel is a második
+legdrágább fája van (1 883 SP), közvetlenül a Harmónia mögött.
 
 ---
 
@@ -117,12 +131,20 @@ Mesterhármas-csillag III. (Villám, ingyen csillag-nyitás az egész keretre).
 
 ## 4. A NÉGY VERDIKT
 
+> ⚠️ **A 4. és az 5. szakasz PRÓZÁJA a 3.3.16-os méréshez készült**, és azóta
+> három stílus is bővült (Sztárom a párom 7 → 11 képesség, Villám 11 → 12,
+> plusz a hetedik filozófia, a 🌀 Tiki-Taka). Az 1., a 2. és a mellékleti
+> táblázat számai FRISSEK (3.4.00); az alábbi indoklások közül a
+> „Legkönnyebb" gazdát cserélt (a Sztár 251% → 188% fedezetre esett, az élre a
+> Villám és a Pánzer került), a többi verdikt áll.
+
 | Cím | Nyertes | A döntő szám |
 |---|---|---|
 | **Legkidolgozottabb** | ☯️ **Béke és harmónia** | 186 mérföldkő · 2 051 SP fa · hét saját motor-csatorna |
-| **Legkönnyebb** | ⭐ **Sztárom a párom** | 251% fedezet · 1 007 SP fa · 22 mérföldkő fedezi az egészet |
+| **Legkönnyebb** | ⚡ **Villámcsapat** | 250% fedezet · 239 fokozat — a legtöbb mérföldkő a mezőnyben |
 | **Legsivárabb** | ⚽ **Bombázók** | 9 képesség · 118 mérföldkő · 2 578 SP — mindhárom a legkevesebb |
 | **Legmelósabb** | ☯️ **Béke és harmónia** | a legdrágább fa a leglassabb pontcsordogálással (17,8 SP/mérföldkő) |
+| **Legfelülre súlyozott** | 🌀 **Tiki-Taka** | tíz képességéből öt a III. sávban · három saját mechanika, 1,35× árszorzóval |
 
 > **A 3.3.16 átrendezte a mezőnyt.** A Beton védelem — a korábbi mérés
 > legsivárabb stílusa — négy képességgel és öt mérföldkő-lépcsővel bővült
@@ -219,12 +241,13 @@ megszerezhető pontjainak **62%-át** viszi el, szemben a Sztár és a Pánzer
 
 | # | Stílus | Fa ára | Gyűjthető SP | Fedezet | A fa a pontok hány %-át viszi |
 |---|---|--:|--:|--:|--:|
-| 1 | ⭐ Sztárom a párom | 1 007 | 2 532 | 251% | 40% |
+| 1 | ⚡ Villámcsapat | 1 732 | 4 331 | 250% | 40% |
 | 2 | 💥 Pánzer | 1 440 | 3 563 | 247% | 40% |
-| 3 | ⚡ Villámcsapat | 1 516 | 3 302 | 218% | 46% |
+| 3 | 🌀 Tiki-Taka | 1 883 | 4 560 | 242% | 41% |
 | 4 | 🧱 Beton védelem | 1 992 | 4 063 | 204% | 49% |
 | 5 | ⚽ Bombázók | 1 364 | 2 578 | 189% | 53% |
-| 6 | ☯️ Béke és harmónia | 2 051 | 3 302 | 161% | 62% |
+| 6 | ⭐ Sztárom a párom | 1 581 | 2 977 | 188% | 53% |
+| 7 | ☯️ Béke és harmónia | 2 051 | 3 302 | 161% | 62% |
 
 **A legnagyobb egyetlen pontforrás stílusonként** (egy mérföldkő-család teljes
 kifizetése): Beton „A bevehetetlen idény" **605** · Bombázók „A gólrekord-idény"
