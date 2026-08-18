@@ -3110,7 +3110,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.4.03";
+const APP_VERSION="3.4.04";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -23633,12 +23633,15 @@ function passChemTick(activeNames){
         HÁROMSZOROS eséllyel indul, mert a filozófiában övé a labdaindítás;
      2. utána egymás után kisorsolunk egy legfeljebb 30 ELEMES sort;
      3. minden lépésnél megnézzük: a két szomszédos ember Passz-attribútumának
-        SZÁMTANI KÖZEPE ±10%-kal sorsolva magasabb-e, mint az ellenfél NYERS
-        csapatereje. Amíg igen, gördül tovább a tiki-taka;
+        SZÁMTANI KÖZEPE ±10%-kal sorsolva — a LABDATARTÁS-HAJTÓERŐVEL
+        megszorozva (3.4.04, lásd ttPossBoost) — magasabb-e, mint az ellenfél
+        NYERS csapatereje. Amíg igen, gördül tovább a tiki-taka;
      4. amikor elakad (vagy a 30. passznál kifut a sor), az UTOLSÓ KÉT ember
-        Gólszerzés-attribútumából a MAGASABBIKAT megtoldjuk +15-30%-kal. Ha ez
-        eléri az ellenfél nyers csapaterejét: GÓL. Ha nem: csak egy szép, de
-        meddő passzolgatás volt.
+        Gólszerzés-attribútumából a MAGASABBIKAT megtoldjuk +15-30%-kal, plusz
+        a hosszú sor jutalmával. Ha ez eléri az ellenfél nyers csapaterejének
+        1,4-szeresét (TT_FIN_WALL): GÓL. Ha nem: csak egy szép, de meddő
+        passzolgatás volt. A HAJTÓERŐ A PASSZOLDALÉ, a befejezés nem kap
+        belőle: a labdatartástól nem lesz jobb befejező senki.
 
    MIÉRT A NYERS CSAPATERŐ A MÉRCE. Ez az egyetlen szám, ami az ellenfélről
    objektíven megvan (fx.o.ovr), és nem tartalmazza a saját rejtett bónuszaidat
@@ -23660,6 +23663,11 @@ const TT_PASS_SPREAD=[0.10,0.10,0.10,0.10];
 const TT_PASS_BIAS=[0,0,0,0.05];
 const TT_FIN_LO=[0.15,0.15,0.15,0.20];
 const TT_FIN_HI=[0.30,0.30,0.30,0.40];
+/* A BEFEJEZÉS MÉRCÉJE ÉS A HOSSZÚ SOR JUTALMA — a részletes indoklás a
+   ttRunChain befejezés-blokkjában áll, ahol használjuk őket. */
+const TT_FIN_WALL=1.40;
+const TT_FIN_PER_PASS=0.012;
+const TT_FIN_PASS_CAP=10;
 /* ---- A PASSZONKÉNT SZIGORODÓ ELLENÁLLÁS ----
    EZ AZ EGYETLEN PONT, AHOL A MEGVALÓSÍTÁS TÖBBET MOND A LEÍRT SZABÁLYNÁL, és
    muszáj volt. A szabály önmagában (a két ember Passzának átlaga ±10%-kal
@@ -23678,7 +23686,14 @@ const TT_FIN_HI=[0.30,0.30,0.30,0.40];
 
    A BEFEJEZÉS az ALAP csapaterő ellen megy, szigorítás nélkül: mire odáig
    eljutottak, a védelem szét van húzva — ez a hosszú sor jutalma. */
-const TT_STEP_UP=0.012;
+/* 3.4.04: 0.012 → 0.020. Az érték a LABDATARTÁS-HAJTÓERŐVEL együtt mozdult
+   (lásd ttPossBoost): mivel a passzoldal mostantól szorzót kap, az ellenállás
+   is meredekebben zárhat. A nyereség a SZÓRÁSON látszik — a sorhossz átmeneti
+   sávja 0,2/lépés széles, tehát a meredekebb zárás szűkebb, olvashatóbb sávba
+   fogja a sorokat. Mérve (60 000 sor, begyakorolt rendszer, azonos szintű
+   ellenfél): a 8-14 passzos sáv aránya 65% → 79%, a leggyakoribb sorhossz 10,
+   a kimaxolt építés csúcsa pedig 29 → 21 passz. */
+const TT_STEP_UP=0.020;
 /* ---- A LEGRÖVIDEBB, AMI MÉG TIKI-TAKA ----
    Ha a sor az első egy-két passznál elakad, az nem akció, hanem egy eladott
    labda: a technika ígérete kifejezetten az, hogy „minél több játékoson megy
@@ -23692,6 +23707,60 @@ const TT_MIN_PASSES=3;
    egy passzsor fut. A 2-3. szinten kettő — ez a felhasználó által kimondott
    felső korlát („meccsenként max 2 ilyen gól lehet"). */
 const TT_TRIES=[0,1,2,2];
+/* ================= A LABDATARTÁS MINT HAJTÓERŐ (3.4.04) =================
+   A BEJELENTETT HIBA. „4-0-ra nyerek, magas a Labdatartás ismertsége és az
+   illeszkedése is, a tiki-takáim mégis egy passz után elakadnak minden
+   meccsen." Mérve igaza volt: a passzsor a két szomszédos ember Passz-
+   attribútumának átlagát mérte az ellenfél NYERS CSAPATEREJÉHEZ — csakhogy a
+   pályán lévő tíz mezőnyjátékos passz-átlaga a poszt-profilok miatt
+   SZERKEZETILEG a Rating ALATT van (a védő −8, a középhátvéd −10, a csatár −8;
+   a tíz emberre nézve ez ~−5). Azonos szintű ellenfél ellen tehát az arány
+   0,95 volt: 20 000 sorból a mód 0 passz, a sorok 99,7%-a meddő. A rendszer
+   csak +10 fölötti keret-fölénnyel mozdult meg egyáltalán.
+
+   AMI HIÁNYZOTT: A TAKTIKA. A filozófia magja a labdatartás, a játékban mégis
+   semmilyen kapcsolat nem volt a Labdatartás taktika és a passzsor között — a
+   begyakorlás és az illeszkedés a meccs minden más pontján számított, itt nem.
+   Mostantól a passzoldal SZORZÓT kap belőlük.
+
+   A HAJTÓERŐ (0..1) három részből áll:
+     · az AKTÍV rendszer ISMERTSÉGE (begyakorlás, 60 = nyers, 100 = mesteri),
+     · az AKTÍV rendszer ILLESZKEDÉSE a kerethez (tacticFit),
+     · és maga a PASSZREKORD képesség szintje.
+   Az első kettőt a rendszer PASSZ-SÚLYA skálázza (a Labdatartás .61-e a
+   mérce): egy Park the bus begyakorlása nem labdajáratás, egy Totális futball
+   féligazság. A harmadik taktikától függetlenül jár — a filozófia saját
+   hozadéka, hogy ez a csapat jobban tartja a labdát.
+
+   KALIBRÁCIÓ (60 000 sor keretenként, valós poszt-profilokból épült 4-4-2):
+   87-es ismertség, 75%-os illeszkedés, 2. szintű képesség, AZONOS szintű
+   ellenfél → a leggyakoribb sorhossz 10 passz, a sorok 79%-a a 8-14-es sávba
+   esik, és gyakorlatilag nincs megszakadt nekifutás. A kiegyensúlyozott sáv
+   (85-90 ismertség) 10-12 passzt ad, a begyakorolatlan rendszer (75) 7-et, a
+   nyers (60) továbbra is nullát — ez utóbbi nem hiba, hanem a rendszer
+   üzenete: egy be nem gyakorolt taktikával nem lehet tiki-takázni. */
+const TT_DRIVE_LV0=60;      /* ennyi ismertségtől számít bármit */
+const TT_DRIVE_LV1=100;     /* és ennyinél éri el a teljes hozamát */
+const TT_DRIVE_W_LV=0.50;   /* a három rész súlya — az összegük 1 */
+const TT_DRIVE_W_FIT=0.32;
+const TT_DRIVE_W_TRAIT=0.18;
+const TT_DRIVE_MAX=0.54;    /* a teljes hajtóerő ennyivel szorozza a passzt */
+/* Az a hajtóerő-szint, ami alatt a rendszer még „nyers": a megszakadt
+   nekifutás kommentárja ilyenkor meg is mondja, mi hiányzik. */
+const TT_DRIVE_RAW=0.45;
+function ttPossDrive(){
+  let w=0,lvN=0,fit=0;
+  try{
+    const key=(S.tactics&&S.tactics.active)||null;
+    if(key&&TACTICS[key]){
+      const pw=TACTICS[TT_POSS_TACTIC].attrProfile.passz||1;
+      w=Math.max(0,Math.min(1,(TACTICS[key].attrProfile.passz||0)/pw));
+      lvN=Math.max(0,Math.min(1,(tacticLevel(key)-TT_DRIVE_LV0)/(TT_DRIVE_LV1-TT_DRIVE_LV0)));
+      fit=Math.max(0,Math.min(1,tacticFit(key)||0));}
+  }catch(e){}
+  let tr=0;try{tr=Math.max(0,Math.min(1,(ttLevel()||0)/3));}catch(e){}
+  return Math.max(0,Math.min(1,w*(TT_DRIVE_W_LV*lvN+TT_DRIVE_W_FIT*fit)+TT_DRIVE_W_TRAIT*tr));}
+function ttPossBoost(){return 1+TT_DRIVE_MAX*ttPossDrive();}
 function ttLevel(){
   try{return Math.max(0,Math.min(3,Math.round(styleFxMax("tikiLv"))||0));}catch(e){return 0;}}
 function ttOn(){return gameMode==="career"&&ttLevel()>0;}
@@ -23712,11 +23781,15 @@ function ttChainPool(active,redIdx){
   return out;}
 /* EGY passzsor lefuttatása. Tisztán számol: nem ír állapotot és nem naplóz —
    így ugyanez a függvény használható mérésre és teszteléshez is. */
-function ttRunChain(pool,oppOvr,lvl){
+function ttRunChain(pool,oppOvr,lvl,boost){
   if(!pool||pool.length<2)return null;
   const L=Math.max(1,Math.min(3,lvl||1));
   const spread=TT_PASS_SPREAD[L],bias=TT_PASS_BIAS[L];
   const finLo=TT_FIN_LO[L],finHi=TT_FIN_HI[L];
+  /* A HAJTÓERŐ PARAMÉTER, nem globális olvasás: így marad a függvény tiszta
+     (méréshez és teszthez ugyanaz a bemenet ugyanazt adja), és a hívó dönti
+     el, milyen taktikai állapotra futtatja. */
+  const B=(typeof boost==="number"&&boost>0)?boost:1;
   /* A KEZDŐ EMBER: a Stabil kezdés szerepben játszó háromszoros súllyal. */
   const starter=roleStyleActive()?roleOf("stabil"):null;
   const w=pool.map(p=>(starter&&p.n===starter)?3:1);
@@ -23736,7 +23809,7 @@ function ttRunChain(pool,oppOvr,lvl){
     if(!cands.length)break;
     const next=cands[Math.floor(Math.random()*cands.length)];
     const mid=(cur.passz+next.passz)/2;
-    const roll=mid*(1+bias+(Math.random()*2-1)*spread);
+    const roll=mid*B*(1+bias+(Math.random()*2-1)*spread);
     /* Az ellenállás passzonként szigorodik — lásd TT_STEP_UP. */
     if(roll<=oppOvr*(1+TT_STEP_UP*step)){broke=true;loser=cur.n;target=next.n;break;}
     chain.push(next);cur=next;}
@@ -23754,8 +23827,28 @@ function ttRunChain(pool,oppOvr,lvl){
   const last=chain[chain.length-1],prev=chain[chain.length-2];
   const finisher=last.gol>=prev.gol?last:prev;
   const helper=finisher===last?prev:last;
-  const shot=finisher.gol*(1+finLo+Math.random()*(finHi-finLo));
-  return {passes:chain.length-1,goal:shot>=oppOvr,broke,loser,target,
+  /* ---- A BEFEJEZÉS FALA (3.4.04) ----
+     A hajtóerő a LABDAJÁRATÁST segíti, a befejezést NEM: attól, hogy egy
+     csapat jól tartja a labdát, még nem lesz jobb befejező. A régi feltétel
+     (a megtoldott Gólszerzés érje el a nyers csapaterőt) viszont a hosszú
+     sorok világában szinte ingyen teljesült — egy középpályás −8-as
+     gólprofilja +15-30%-kal simán a csapaterő fölé ért. Így a passzsor
+     meghosszabbítása önmagában MECCSENKÉNT EGY EXTRA GÓLT jelentett volna
+     azonos szintű ellenfél ellen is.
+     A fal ezért emel a mércén: a befejezésnek a csapaterő 1,4-szeresét kell
+     elérnie. A gyakorlatban ez azt jelenti, hogy AZONOS szinten csak akkor
+     lesz gól, ha a sor VÉGÉN igazi befejező áll (szélső vagy csatár) — a
+     felhasználó kérése szerint: inkább a gól maradjon el, mint a labdajáratás.
+     A HOSSZÚ SOR JUTALMA marad, csak mostantól kimondva: minden passz a
+     harmadik fölött +1,2%-ot ad a befejezésre, legfeljebb tíz passzon át
+     (+12%). Ez a „szétcincált védelem" — és ez teszi a passzszámot valódi
+     téttel bíró számmá, nem csak dísszé.
+     MÉRVE (60 000 sor): azonos szinten 0,17 gól/meccs, +5-ön 0,85, +10-en 1,39,
+     +30-on 2,00 — vagyis a felső vég betűre ott maradt, ahol a 3.4.00 mérése
+     hagyta (1,34 / 2,00), a passzsor viszont már azonos szinten is él. */
+  const stretch=TT_FIN_PER_PASS*Math.min(TT_FIN_PASS_CAP,chain.length-1-TT_MIN_PASSES);
+  const shot=finisher.gol*(1+finLo+Math.random()*(finHi-finLo)+stretch);
+  return {passes:chain.length-1,goal:shot>=oppOvr*TT_FIN_WALL,broke,loser,target,
     scorer:finisher.n,assist:helper.n,
     /* a sor eleje a kommentárhoz: ki indította az egészet */
     starter:chain[0].n};}
@@ -23766,9 +23859,13 @@ function ttPlanMatch(active,redIdx,oppOvr){
   const L=ttLevel(),tries=TT_TRIES[L]||0;
   const pool=ttChainPool(active,redIdx);
   if(pool.length<2)return [];
+  /* A HAJTÓERŐ A KEZDŐRÚGÁSKOR FAGY BE, egyszer — a taktika és az illeszkedés
+     a mérkőzés alatt úgysem változik, a fit viszont drága számítás. */
+  const drive=ttPossDrive(),B=1+TT_DRIVE_MAX*drive;
   const out=[],used={};
   for(let i=0;i<tries;i++){
-    const res=ttRunChain(pool,oppOvr,L);
+    const res=ttRunChain(pool,oppOvr,L,B);
+    if(res)res.raw=drive<TT_DRIVE_RAW;
     if(!res)continue;
     /* A vödör 2..18 közül (a 0-5. percben még nem járatják a labdát húszszor). */
     let b=0,guard=0;
@@ -23842,6 +23939,15 @@ function ttFutileLine(res){
 function ttDudLine(res){
   const ST=esc(shortName(res.starter));
   const L=ttWho(res.loser,ST),T=ttWho(res.target,"a társa");
+  /* NYERS RENDSZER: ha nem a keret hibázott, hanem nincs mögötte taktika, azt
+     ki is mondjuk. Enélkül a felhasználó a játékosait okolja olyasmiért, amit
+     a taktika-panelen tudna orvosolni — a labdajáratás hosszát a Labdatartás
+     ismertsége és illeszkedése hajtja (lásd ttPossDrive). */
+  if(res.raw){
+    const arrR=[
+      `${ST} indítaná a járatást, de nincs mögötte rendszer: ${res.passes?`${res.passes} passz után `:""}elvették a labdát. Begyakorlatlan taktikával nem lehet tiki-takázni.`,
+      `Megint elakadtak, ${L} labdáját szedték el. A labdatartás nem megy magától: a rendszert be kell gyakorolni, és illenie is kell a kerethez.`];
+    return arrR[Math.floor(Math.random()*arrR.length)];}
   if(!res.passes){
     const arr0=[
       `Indult volna a labdajáratás ${ST} lábáról, de a legelső passzt elcsípték. Ennyi volt.`,
@@ -50857,13 +50963,14 @@ stTrait("tikitaka","passzkemia",3,"Passzkémia",
    A 3. szint nem harmadik sort ad, hanem KÖNNYEBBÉ teszi mindkettőt: a passz
    sorsolási ablaka feljebb csúszik, a befejezés ráadása nő. */
 stTrait("tikitaka","passzrekord",3,"Passzrekord",
-  "A hosszú passzsorból gól is születhet. A mérkőzés indításakor eldől, meddig bírja a labdajáratás: minden lépésnél a két szomszédos ember Passzának átlaga mérkőzik az ellenfél nyers csapaterejével, és ahol elakad, ott jön a befejezés. A befejező ember nem a legjobb csatár — az, akihez épp odaért a labda.",[
+  "A hosszú passzsorból gól is születhet. A mérkőzés indításakor eldől, meddig bírja a labdajáratás: minden lépésnél a két szomszédos ember Passzának átlaga mérkőzik az ellenfél nyers csapaterejével, és ahol elakad, ott jön a befejezés. A befejező ember nem a legjobb csatár — az, akihez épp odaért a labda.<br><br>A SOR HOSSZÁT A TAKTIKÁD HAJTJA: a Labdatartás ismertsége és illeszkedése is beleszámít, a képesség szintje mellett. Egy be nem gyakorolt rendszerrel a járatás pár passz után elakad. A BEFEJEZÉS viszont nem kap ebből semmit — a leghosszabb sor sem ér semmit, ha nem igazi befejezőnél ér véget.",[
   {fx:{tikiLv:1},note:"egy passzsor mérkőzésenként · passz ±10% · befejezés +15-30%"},
   {fx:{tikiLv:2},note:"KÉT passzsor mérkőzésenként"},
   {fx:{tikiLv:3},note:"két passzsor · passz −5…+15% · befejezés +20-40%"}],
   ()=>{if(!ttOn())return "";
+    let d=0;try{d=Math.round(ttPossDrive()*100);}catch(e){}
     return `eddig ${S.ttGoals||0} tiki-taka gólotok van (${S.ttFutile||0} meddő passzolgatás mellett), `
-      +`a leghosszabb gólig vezető sor ${S.ttBest||0} passz`;},
+      +`a leghosszabb gólig vezető sor ${S.ttBest||0} passz · a labdajáratás hajtóereje most ${d}%`;},
   TT_SYSTEM_PRICE_MULT);
 /* ---- GUARDIOLA ----
    A készlet egyetlen képessége, ami EDZŐT VÁLT (lásd guardiolaTakeOver), és

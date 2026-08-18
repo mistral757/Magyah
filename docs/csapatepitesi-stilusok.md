@@ -393,9 +393,11 @@ drámánál. Párharcban nem fut: ott az eredményt a közös eseménylista adja
    háromszoros eséllyel indul;
 2. egymás után legfeljebb **30 elemű** sort húzunk;
 3. minden lépésnél a két szomszédos ember Passzának **számtani közepe ±10%-kal
-   sorsolva** mérkőzik az ellenfél **nyers csapaterejével** (`fx.o.ovr`);
+   sorsolva**, a **labdatartás-hajtóerővel megszorozva** mérkőzik az ellenfél
+   **nyers csapaterejével** (`fx.o.ovr`);
 4. ahol elakad (vagy kifut a sor), az utolsó két ember **Gólszerzéséből a
-   magasabbik** +15-30%-ot kap. Ha eléri az ellenfél nyers csapaterejét: GÓL.
+   magasabbik** +15-30%-ot kap, plusz a hosszú sor jutalmát. Ha eléri az
+   ellenfél nyers csapaterejének **1,4-szeresét**: GÓL.
 
 **Két ponton mond többet a megvalósítás a leírt szabálynál, és mindkettő
 muszáj volt:**
@@ -407,8 +409,7 @@ muszáj volt:**
   mérkőzésenként **két biztos extra gólt** kapott volna. Ezért az ellenállás
   **passzonként 1,2%-kal szigorodik** (`TT_STEP_UP`): az első passzoknál betűre
   az eredeti feltétel dönt, a huszadik környékén viszont a legjobb keretnek is
-  elakadhat. A BEFEJEZÉS az alap csapaterő ellen megy, szigorítás nélkül — mire
-  odáig eljutottak, a védelem szét van húzva.
+  elakadhat. *(3.4.04: az érték 1,2% → 2,0% a hajtóerővel együtt — lásd lent.)*
 * **A rövid sor nem akció.** `TT_MIN_PASSES` = 3 alatt nem születhet gól, és
   dicséret sem jár érte. Enélkül egy kiegyenlített mérkőzésen a sorok többsége
   EGY passz után elakadt volna, és abból születtek volna „tiki-taka gólok" —
@@ -436,19 +437,70 @@ befejező **ugyanaz az ember** (a sor végén nála volt a labda, és az utolsó
 kettőből ő a jobb gólszerző) — különben a „X eladta a labdát, X még utánalőtt"
 alak nevetségesen hangzana.
 
-**A mérleg utána** (reális kezdő tizenegy, poszt szerint szóró Gólszerzéssel):
+#### 3.7.2b A labdatartás-hajtóerő (3.4.04)
 
-| keret vs mezőny | szint | gól | meccsenkénti extra gól |
-|---|---|--:|--:|
-| azonos szint | 1 | 3,0% | 0,03 |
-| +10 | 1 | 37,8% | 0,38 |
-| +10 | 3 | 66,8% | **1,34** |
-| +30 | 3 | 61,2% | 1,22 |
-| +40 | 3 | 100% | 2,00 |
+**A BEJELENTETT HIBA.** „4-0-ra nyerek, magas a Labdatartás ismertsége és az
+illeszkedése is, a tiki-takáim mégis egy passz után elakadnak minden meccsen."
+Mérve igaza volt, és a hiba szerkezeti: a passzsor a két szomszédos ember
+Passz-attribútumának átlagát mérte a csapaterőhöz, csakhogy a pályán lévő tíz
+mezőnyjátékos passz-átlaga a poszt-profilok miatt **rendszerszinten a Rating
+alatt van** (szélső védő −8, középhátvéd −10, csatár −8; tízre vetítve ~−5).
+Azonos szintű ellenfél ellen az arány 0,95 volt: 20 000 sorból a leggyakoribb
+hossz **0 passz**, a sorok **99,7%-a meddő**. A technika csak +10 fölötti
+keret-fölénnyel mozdult meg egyáltalán.
 
-Vagyis a technika **csak valódi passz-fölénnyel fizet**, és pont azt jutalmazza,
-amit a stílus épít. A leghosszabb gólig vezető sor tipikusan 14-17 passz; a
-29-hez teljes dominancia kell.
+**AMI HIÁNYZOTT: A TAKTIKA.** A filozófia magja a labdatartás, a játékban
+mégsem volt semmilyen kapcsolat a Labdatartás taktika és a passzsor között — a
+begyakorlás és az illeszkedés a meccs minden más pontján számított, itt nem.
+Mostantól a passzoldal szorzót kap belőlük (`ttPossDrive` → `ttPossBoost`):
+
+| rész | súly | mit mér |
+|---|--:|---|
+| **ismertség** | 0,50 | az AKTÍV rendszer begyakorlása (60 = nyers, 100 = mesteri) |
+| **illeszkedés** | 0,32 | az AKTÍV rendszer `tacticFit`-je a kerethez |
+| **képesség** | 0,18 | a Passzrekord szintje (taktikától függetlenül) |
+
+Az első kettőt a rendszer **passz-súlya** skálázza (a Labdatartás .61-e a
+mérce): egy Park the bus begyakorlása nem labdajáratás (×0,08), egy Totális
+futball féligazság (×0,56). A hajtóerő 0..1 közötti, és legfeljebb **+54%-kal**
+szorozza a passzoldalt.
+
+**A BEFEJEZÉS NEM KAP BELŐLE SEMMIT.** Attól, hogy egy csapat jól tartja a
+labdát, még nem lesz jobb befejező — és a régi feltétel (a megtoldott
+Gólszerzés érje el a nyers csapaterőt) a hosszú sorok világában szinte ingyen
+teljesült volna: meccsenként +1 gól azonos szintű ellenfél ellen is. A fal
+ezért **1,40× csapaterő** (`TT_FIN_WALL`). A gyakorlatban ez azt jelenti, hogy
+azonos szinten csak akkor lesz gól, ha a sor VÉGÉN igazi befejező áll — a
+felhasználó kérése szerint: *inkább a gól maradjon el, mint a labdajáratás*.
+A hosszú sor jutalma megmarad, csak mostantól kimondva: a harmadik fölötti
+minden passz **+1,2%** a befejezésre, legfeljebb tíz passzon át (+12%). Ettől
+lesz a passzszám valódi tét, nem dísz.
+
+**A mérleg** (60 000 sor keretenként, valós poszt-profilokból épült 4-4-2,
+87-es ismertség · 75%-os illeszkedés · 2. szintű képesség, ahol más nincs
+jelölve):
+
+| helyzet | hajtóerő | leggyakoribb sor | 8-14 passz | gól/meccs |
+|---|--:|--:|--:|--:|
+| ismertség 85, azonos szint | ×1,36 | 10 | 77% | 0,15 |
+| ismertség 87, azonos szint | ×1,38 | 10 | 80% | 0,17 |
+| ismertség 90, azonos szint | ×1,40 | 11 | 81% | 0,20 |
+| ismertség 87 · fit 90% · 3. szint | ×1,44 | 16 | 29% | 0,82 |
+| ismertség 75 (félig begyakorolt) | ×1,29 | 6 | 35% | 0,05 |
+| ismertség 60 (nyers) | ×1,12 | 0 | 0% | 0,00 |
+| Park the bus, 3. szintű képességgel | ×1,12 | 2 | 1% | 0,11 |
+| +10 fölény | ×1,38 | 18 | 10% | 1,40 |
+| kimaxolt építés, +10 | ×1,54 | 29 | 0% | 1,66 |
+| kimaxolt építés, +30 | ×1,54 | 29 | 0% | 2,00 |
+| −6 hátrány | ×1,38 | 6 | 25% | 0,00 |
+
+Vagyis a **felső vég ott maradt, ahol a 3.4.00 mérése hagyta** (+10 → 1,34 →
+most 1,40; +30-40 → 2,00), a passzsor viszont **azonos szinten is él**. A
+technika továbbra sem fizet fölény nélkül — hátrányban nulla gól —, de a
+labdajáratás már látszik, és a hossza a taktikádról beszél. A nyers rendszer
+nulla passza nem hiba, hanem a rendszer üzenete: **be nem gyakorolt taktikával
+nem lehet tiki-takázni** — a megszakadt nekifutás kommentárja ezt ki is mondja
+(lásd `TT_DRIVE_RAW`).
 
 #### 3.7.3 Guardiola — a 3.0 óta változatlan taktika-plafon
 
