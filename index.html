@@ -3132,7 +3132,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.4.08";
+const APP_VERSION="3.4.09";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -31586,6 +31586,10 @@ function playMatch(){
        meccsszám lehet (felvétel + 8), ami nem esik checkpointra, ezért
        korábban "lejárt, de aktív" maradt a következő checkpointig. */
     if(gameMode==="career"&&careerPool&&!euroFrozen())evaluateDueChallenges("round",S.idx);
+    /* RUN: az Infinity-határidő meccsenkénti könyvelése. Ugyanabban a
+       ritmusban, mint a rövid kihívások lejárata — a bajnoki forduló lezárása
+       UTÁN, tehát a S.idx már a lejátszott meccsek száma. */
+    if(gameMode==="career"&&careerPool&&!euroFrozen()){try{runPaceTick();}catch(e){}}
     /* FIX: a meccs alatt megváltozhatott bárki élő Ratingje (fejlődés/visszaesés,
        skill-szerzés, piros lap, sérülés) — a pálya és a csapaterő eddig SOHA nem
        rajzolódott újra a meccs után, csak akkor, ha egy átigazolási ablak vagy a
@@ -39831,6 +39835,7 @@ function infinityApplyUnlock(){
     S.infLiftRetired=true;
     /* RUN: a futás sebességét ez a szezonszám dönti el (2.0 súly). */
     {const R=runInit();if(R.infinitySeason==null)R.infinitySeason=S.seasonNumber||1;
+     try{runPaceNoteUnlock();}catch(e){}   /* RUN: a határidőhöz mért tempó lezárása */
      runLoyalSnapshot();}   /* RUN: kik voltak végig veled az eredeti kezdőből */
     /* ---- HELYI RUN-RANGLISTA: ITT KERÜL FEL A KARRIER ----
        Az Infinity megnyitása a belépő: ide a 100-as mezőny megnyerése kell,
@@ -41593,7 +41598,7 @@ function hubLocRef(loc){
      2a. Nehézség-belövés    súly 0.25   (egyszer, csak draftos indulásnál)
      3. Első szezon          súly 1.0    (egyszer)
      4. További szezonok     súly 0.25   (szezononként)
-     5. Run-sebesség         súly 2.0    (egyszer, a legnagyobb súly)
+     5. Infinity-határidő    súly SZÁMÍTOTT (meccsenként könyvelt levonás/bónusz)
      6. Mérföldkövek         súly 0.05-0.1 (darabonként, CSAK ha megvan)
      7. Taktikai alaposság   súly 0.25   (szezononként)
      8. Szezon-alapú Rating  súly 0.25   (egyszer, CSAK ha vállaltad)
@@ -41607,11 +41612,15 @@ function hubLocRef(loc){
    (nehézség-belövés) a 3.3.06-ban VISSZAKERÜLT, lásd a runBreakdown 2a. ágát. */
 /* A `tactic` súly SZEZONONKÉNT számít: minden lezárt idény külön sort termel.
    0,25-tel egy tízszezonos karrierben 2,5 összsúlyt adott — többet, mint a
-   Run-sebesség (2,0), a kezdő nehézség (1,0) és az első szezon (1,0) együtt
-   véve is számottevő részt. A taktika kidolgozottsága fontos, de nem ez a
+   kezdő nehézség (1,0) és az első szezon (1,0) együtt véve is számottevő
+   részt. A taktika kidolgozottsága fontos, de nem ez a
    karrier mércéje. 0,075-tel ugyanaz a tíz szezon 0,75-öt ad: érezhető
    hozzájárulás, ami már nem nyomja el a többi komponenst. */
-const RUN_W={start:0, diff:1.0, first:1.0, season:0.25, speed:2.0, tactic:0.075, reroll:0.333, aim:0.25, basis:0.25, skreal:0.25};
+/* A `speed` (Run-sebesség) KIVEZETETT tétel: a helyére az Infinity-HATÁRIDŐ
+   lépett, aminek nincs fix súlya — a súlyát a beígért Run-pontból számoljuk
+   vissza (lásd runPaceRow). A kulcs 0-val marad, hogy a régi mentések bontása
+   olvasható maradjon. */
+const RUN_W={start:0, diff:1.0, first:1.0, season:0.25, speed:0, tactic:0.075, reroll:0.333, aim:0.25, basis:0.25, skreal:0.25};
 /* A NEHÉZ (kártyánkénti) Rating-alap súly-szorzója a `basis` tételen — a közepes
    1×, a nehéz ennyiszer annyit ér. Lásd a runBreakdown basis-ágát. */
 const RUN_BASIS_WILD_MULT=1.5;
@@ -41631,20 +41640,42 @@ function runAimScore(teamAvg,baseDiff){
 /* Mérföldkövek: kulcs → {címke, súly}. A detektálás nagyrészt LUSTA (a
    játékállapotból olvassuk ki), így nem kell minden mutációs pontra hookolni;
    csak a kupa-királyokat kell menteni, mert a kampány-objektum eldobódik. */
+/* ---- A SIKER MINDIG 100 PONT, A RANGOT A SÚLY HORDOZZA (3.4.09) ----
+   A sorozat rangja SOHA nem a pontszámban jelenik meg, csak a SÚLYBAN. Egy
+   Magyar Kupa-gólkirályi cím ugyanúgy 100 pontos teljesítmény, mint egy
+   BL-beli — csak kevesebbet nyom a latban. A fordítottja (eleve kisebb
+   pontszám a kisebb sorozatért) azt állítaná, hogy a játékos ROSSZABBUL
+   teljesített, pedig csak kisebb mezőnyben tette ugyanazt; a mezőny súlyát
+   pedig már a kihívás-szorzó is méri.
+   A NÉGY SOROZAT MIND TELJES SORT KAP — győzelem és mindhárom királyi cím.
+   Korábban a KL-nek csak győzelme volt, a Magyar Kupának semmije: ugyanaz a
+   teljesítmény az egyik sorozatban ért valamit, a másikban nullát. */
+const RUN_CUP_W={BL:0.1,EL:0.075,KL:0.05,MK:0.04};
 const RUN_MILESTONES={
   godlike:   {n:"Első GODLIKE kártya",        w:0.1},
-  bl_win:    {n:"Első BL-győzelem",           w:0.1},
-  bl_boot:   {n:"BL-gólkirály",               w:0.1},
-  bl_pass:   {n:"BL-gólpassz-király",         w:0.1},
-  bl_glove:  {n:"BL-kapus-király",            w:0.1},
   tactic99:  {n:"99-es taktika-szint",        w:0.1},
-  el_win:    {n:"Első EL-győzelem",           w:0.075},
-  el_boot:   {n:"EL-gólkirály",               w:0.075},
-  el_pass:   {n:"EL-gólpassz-király",         w:0.075},
-  el_glove:  {n:"EL-kapus-király",            w:0.075},
-  kl_win:    {n:"Első KL-győzelem",           w:0.05},
-  vandal:    {n:"Első Vadista szandál kártya",w:0.05}
+  vandal:    {n:"Első Vadista szandál kártya",w:0.05},
+  bl_win:    {n:"Első BL-győzelem",           w:RUN_CUP_W.BL},
+  bl_boot:   {n:"BL-gólkirály",               w:RUN_CUP_W.BL},
+  bl_pass:   {n:"BL-gólpassz-király",         w:RUN_CUP_W.BL},
+  bl_glove:  {n:"BL-kapus-király",            w:RUN_CUP_W.BL},
+  el_win:    {n:"Első EL-győzelem",           w:RUN_CUP_W.EL},
+  el_boot:   {n:"EL-gólkirály",               w:RUN_CUP_W.EL},
+  el_pass:   {n:"EL-gólpassz-király",         w:RUN_CUP_W.EL},
+  el_glove:  {n:"EL-kapus-király",            w:RUN_CUP_W.EL},
+  kl_win:    {n:"Első KL-győzelem",           w:RUN_CUP_W.KL},
+  kl_boot:   {n:"KL-gólkirály",               w:RUN_CUP_W.KL},
+  kl_pass:   {n:"KL-gólpassz-király",         w:RUN_CUP_W.KL},
+  kl_glove:  {n:"KL-kapus-király",            w:RUN_CUP_W.KL},
+  mk_win:    {n:"Első Magyar Kupa-győzelem",  w:RUN_CUP_W.MK},
+  mk_boot:   {n:"Magyar Kupa-gólkirály",      w:RUN_CUP_W.MK},
+  mk_pass:   {n:"Magyar Kupa-gólpassz-király",w:RUN_CUP_W.MK},
+  mk_glove:  {n:"Magyar Kupa-kapus-király",   w:RUN_CUP_W.MK}
 };
+/* A sorozat kulcsa → mérföldkő-előtag. Egy helyen, hogy a győzelem és a
+   királyi címek SOSE csúszhassanak szét (a KL és az MK azért maradt ki
+   korábban a királyi címekből, mert ez a leképezés két helyen élt). */
+const RUN_CUP_PFX={BL:"bl",EL:"el",KL:"kl",MK:"mk"};
 /* ================= A DRAFTBÓL KIHOZHATÓ LEGJOBB 11 =================
    Ez a szám a „Kezdő nehézség" tétel VISZONYÍTÁSI PONTJA (lásd ott): nem a
    puszta nehézségi szám a pontszám, hanem az, hogy mekkora mezőnyt vállaltál
@@ -41767,7 +41798,7 @@ function runChallengeMult(diff,teamAvg){
   const under=Math.max(-1,Math.min(1,(d-(teamAvg||d))/12));
   return 0.80+level*0.28+under*0.22;}
 /* A karrier ÁTLAGOS körülményei — azokhoz a komponensekhez, amelyek nem egy
-   konkrét szezonhoz kötődnek (pl. Run-sebesség). */
+   konkrét szezonhoz kötődnek (pl. az Infinity-határidő). */
 function runAvgContext(){
   const h=(S.seasonHistory||[]).filter(x=>x&&x.oppRating);
   if(!h.length)return {diff:(typeof oppTargetRating!=="undefined"?oppTargetRating:84),teamAvg:null};
@@ -41883,13 +41914,92 @@ function runEarliestInfinitySeason(){
   /* Ha nincs indulási pillanatkép (régi mentés), a régi fix 2-es referencia. */
   if(R.startAvg==null)return 2;
   const gap=Math.max(0,INFINITY_UNLOCK_RATING-R.startAvg);
-  return 1+Math.ceil(gap/RUN_CLIMB_PER_SEASON);}
-function runSpeedScore(){
+  /* A VÁLLALT TEMPÓ IS BELESZÁMÍT (3.4.09): Gleccser-tempón ugyanaz a
+     Rating-táv 40%-kal lassabban jön össze, tehát a legkorábbi elérhető
+     Infinity is arányosan később van. A referencia csak akkor igazságos, ha a
+     BEÁLLÍTÁSAIDDAL számol — enélkül a lassított karrier a saját vállalásáért
+     kapott volna büntetést. */
+  let k=1;
+  try{const t=(R.tempo&&GAME_TEMPO[R.tempo])?GAME_TEMPO[R.tempo].k:1;if(t>0)k=t;}catch(e){}
+  return 1+Math.ceil(gap/(RUN_CLIMB_PER_SEASON*k));}
+/* ================= A RUN TEMPÓJA: AZ INFINITY HATÁRIDEJE (3.4.09) =================
+   A RÉGI „Run-sebesség" egyetlen számot pontozott — hányadik SZEZONBAN nyílt
+   meg az Infinity —, szezononként −8-cal. Két baja volt. Túl DURVA: egy
+   fordulónyi csúszás semmit nem jelentett, egy szezonnyi mindent. És túl
+   ELVONT: a felhasználó nem látta, mennyibe kerül neki a következő meccs.
+
+   AZ ÚJ MÉRCE MECCSENKÉNT KÖNYVEL. A viszonyítási pont annak a szezonnak az
+   UTOLSÓ BAJNOKI MECCSE, amelyikben az induló keretedből és a beállításaidból
+   számolva az Infinity leghamarabb megnyitható (runEarliestInfinitySeason).
+   Onnantól MINDEN további bajnoki, amit Infinity nélkül játszol le, levon —
+   és minden meccs, amivel a határidő ELŐTT nyitod meg, hozzáad.
+
+   MENNYIT? Két dolog dönti el, és mindkettő a MECCS PILLANATÁBAN érvényes:
+     · a MEZŐNY SZINTJE (70/80/90/100 — köztük lineárisan),
+     · és hogy MI HIÁNYZIK MÉG a megnyitáshoz:
+         A) se a 100-as mezőnyön szerzett bajnoki cím, se a pénz,
+         B) a pénz megvan, a bajnoki cím nem,
+         C) a bajnoki cím megvan, csak a pénz nem.
+   A táblázat 40 MECCSRE szóló Run-pontban van megadva — az A/100 sarok 40
+   meccs alatt 15 Run-pontot visz el, a C/70 sarok egyet. Minél közelebb vagy
+   a megnyitáshoz, annál olcsóbb a várakozás: a bajnoki cím a nehezebb fele,
+   ha az megvan, a pénz kivárása már csak idő kérdése.
+
+   A KÖNYVELÉS MECCSENKÉNT TÖRTÉNIK (runPaceTick), tehát mindig az AKKORI
+   körülmények számítanak — a mérleg nem írható át visszamenőleg azzal, hogy a
+   szezon végén feltolod a nehézséget. A mentésben egyetlen szám gyűlik
+   (R.paceLoss, Run-pontban), amit a bontás egyetlen 0 pontos sorrá alakít; a
+   súlya pontosan akkora, hogy a levonás a beígért pontszám legyen. */
+const RUN_PACE_N=40;   /* a táblázat ennyi meccsre szól */
+const RUN_PACE_TABLE={
+  A:{70:5,80:8,90:10,100:15},
+  B:{70:3,80:5,90:8, 100:10},
+  C:{70:1,80:3,90:5, 100:7}};
+/* MELYIK ESET áll fenn MOST. Ha mindkettő megvan, a C-t használjuk: a bajnoki
+   cím a nehezebb fele, és ilyenkor a megnyitás egy koppintás — a legenyhébb
+   sáv pontosan ezt a helyzetet írja le. */
+function runPaceCase(){
+  let champ=false,money=false;
+  try{champ=(typeof infWonAtGate==="function")&&infWonAtGate();}catch(e){}
+  try{const pr=(typeof infinityMyPrice==="function")?infinityMyPrice():INFINITY_PRICE;
+      money=(S.transferBudget||0)>=pr;}catch(e){}
+  return champ?"C":money?"B":"A";}
+/* A sáv KÖZTES értékeit lineárisan interpoláljuk: a 95-ös mezőny a 90 és a
+   100 közt félúton áll, nem ugrik. 70 alatt és 100 fölött a szélső érték. */
+function runPacePoints(band,key){
+  const t=RUN_PACE_TABLE[key]||RUN_PACE_TABLE.A;
+  const b=Math.max(70,Math.min(100,band||84));
+  const lo=Math.min(90,Math.floor((b-70)/10)*10+70),hi=lo+10;
+  return t[lo]+(t[hi]-t[lo])*((b-lo)/10);}
+/* A karrier hányadik MECCSÉNÉL tartunk (bajnoki fordulókban mérve). */
+function runCareerRound(){return (((S.seasonNumber||1)-1)*30)+(S.idx||0);}
+/* A VISZONYÍTÁSI PONT: a legkorábbi lehetséges Infinity-szezon UTOLSÓ bajnoki
+   meccse. Innen indul a levonás és eddig tart a bónusz. */
+function runPaceRefRound(){return runEarliestInfinitySeason()*30;}
+/* MECCSENKÉNTI KÖNYVELÉS. A bajnoki forduló lezárása után fut; a kupameccsek
+   nem számítanak, mert a mérce is bajnoki fordulókban van megadva. */
+function runPaceTick(){
+  if(gameMode!=="career")return;
+  if(typeof infinityMode!=="undefined"&&infinityMode)return;
   const R=runInit();
-  const s=R.infinitySeason||Math.max(1,S.seasonNumber||1);
-  const ref=runEarliestInfinitySeason();
-  return {score:Math.max(0,Math.min(100,100-Math.max(0,s-ref)*8)),
-          seasons:s,ref,done:!!R.infinitySeason};}
+  if(R.infinityRound!=null)return;
+  if(runCareerRound()<=runPaceRefRound())return;
+  const pts=runPacePoints(typeof oppTargetRating!=="undefined"?oppTargetRating:84,runPaceCase());
+  R.paceLoss=(R.paceLoss||0)+pts/RUN_PACE_N;
+  R.paceLate=(R.paceLate||0)+1;}
+/* A MEGNYITÁS PILLANATA. A korai feloldás bónusza itt dől el: minden meccs,
+   amivel a határidő előtt vagy, egy 100 pontos sort ér — a súlya ugyanabból a
+   táblázatból jön, a legszigorúbb (A) oszlopból, mert a teljes utat megspórolni
+   a legtöbbet érő teljesítmény. */
+function runPaceNoteUnlock(){
+  const R=runInit();
+  if(R.infinityRound!=null)return;
+  R.infinityRound=runCareerRound();
+  const ref=runPaceRefRound();
+  if(R.infinityRound<ref){
+    R.paceEarly=ref-R.infinityRound;
+    R.paceGain=R.paceEarly*runPacePoints(
+      typeof oppTargetRating!=="undefined"?oppTargetRating:84,"A")/RUN_PACE_N;}}
 /* LUSTA MÉRFÖLDKŐ-DETEKTÁLÁS: a játékállapotból olvassuk ki, mi teljesült.
    Egyszer beállítva soha nem vész el (a flag mentődik). Minden mérföldkő
    BÉLYEGET kap a megszerzés körülményeiről (mezőnyszint + csapaterő), hogy a
@@ -41909,16 +42019,11 @@ function runScanMilestones(){
   (S.seasonHistory||[]).forEach(h=>{
     if(!h.euro)return;
     const ctx={diff:h.oppRating,teamAvg:h.teamAvg};
-    if(h.euro.won){
-      if(h.euro.comp==="BL")stamp("bl_win",ctx);
-      if(h.euro.comp==="EL")stamp("el_win",ctx);
-      if(h.euro.comp==="KL")stamp("kl_win",ctx);}
+    const pfx=RUN_CUP_PFX[h.euro.comp];
+    if(!pfx)return;
+    if(h.euro.won)stamp(pfx+"_win",ctx);
     (h.euro.kings||[]).forEach(kg=>{
-      const pfx=h.euro.comp==="BL"?"bl":h.euro.comp==="EL"?"el":null;
-      if(!pfx)return;
-      if(kg==="boot")stamp(pfx+"_boot",ctx);
-      if(kg==="pass")stamp(pfx+"_pass",ctx);
-      if(kg==="glove")stamp(pfx+"_glove",ctx);});});
+      if(kg==="boot"||kg==="pass"||kg==="glove")stamp(pfx+"_"+kg,ctx);});});
   return M;}
 /* Egy mérföldkő bélyegének kiolvasása — a régi, sima `true` értékekkel is elbír. */
 function runMsCtx(v){
@@ -42045,14 +42150,10 @@ function runBreakdown(){
     rows.push({k:"s"+i,n:i===0?"Első szezon":`${h.season}. szezon`,
       w:i===0?RUN_W.first:RUN_W.season,s:sc,
       d:`${h.rank}. hely · mezőny ${h.oppRating}${h.teamAvg?` · kereted ${Math.round(h.teamAvg)}`:""}`});});
-  /* 5. Run-sebesség — a legnagyobb súlyú komponens. A karrier ÁTLAGOS
-     körülményeivel skálázva: gyorsan Infinityig jutni magas mezőnyben többet ér. */
-  const sp=runSpeedScore(),spM=cm(avg.diff,avg.teamAvg);
-  rows.push({k:"speed",n:"Run-sebesség",w:RUN_W.speed,
-    s:Math.max(0,Math.min(100,sp.score*spM)),
-    d:(sp.done?`Infinity a ${sp.seasons}. szezonban`:`${sp.seasons}. szezon — még nincs Infinity (előrejelzés)`)
-      +` · a kereteddel leghamarabb a ${sp.ref}. szezonban volt elérhető (az a 100 pont)`
-      +` · átlagmezőny ${Math.round(avg.diff)} · kihívás ${pct(spM)}`});
+  /* 5. AZ INFINITY HATÁRIDEJE — a sor a TÖBBI sor kiszámítása UTÁN kerül be
+     (lásd lentebb, runPaceRow): a súlya a többiek összsúlyából és a nélküle
+     számolt összpontszámból származik, hogy a levonás/bónusz PONTOSAN a
+     beígért Run-pont legyen. */
   /* ---- "VÉGIG VELED VOLT" (csak kész klub) ----
      Játékosonként EGY sor, 0.25 súllyal, 100 ponttal. Csak a MEGFELELŐK
      kapnak sort — aki elment vagy lemaradt, az nem von le, egyszerűen nincs
@@ -42081,10 +42182,60 @@ function runBreakdown(){
     rows.push({k:"m_"+k,n:RUN_MILESTONES[k].n,w:RUN_MILESTONES[k].w,
       s:Math.max(0,Math.min(100,100*m)),
       d:c.diff!=null?`mezőny ${Math.round(c.diff)} · kihívás ${pct(m)}`:"megszerezve",ms:true});});
+  /* ---- AZ INFINITY HATÁRIDEJE: A SOR SÚLYA VISSZAFELÉ SZÁMOLVA ----
+     A Run egy SÚLYOZOTT ÁTLAG, tehát egy 0 pontos sor hatása attól függ,
+     mekkora a többi sor összsúlya — ugyanaz a súly egy háromszezonos és egy
+     tízszezonos karrierben mást vinne el. A beígért szám viszont a
+     táblázatból jön (pl. „40 meccs alatt 15 pont"), ezért a súlyt VISSZAFELÉ
+     számoljuk:
+        levonásnál  w = L·D/(T−L)   → az új átlag pontosan T−L,
+        bónusznál   w = G·D/(100−T−G) → az új átlag pontosan T+G,
+     ahol T a sor nélküli összpontszám, D a többi sor összsúlya. A képlet
+     mindkét irányban EGZAKT, tehát a felületen ígért pont az, amit kapsz. */
   let num=0,den=0;
   rows.forEach(r=>{num+=r.s*r.w;den+=r.w;});
+  const base=den?Math.max(0,Math.min(100,num/den)):0;
+  {const pr=runPaceRow(base,den);
+   if(pr){rows.push(pr);num+=pr.s*pr.w;den+=pr.w;}}
   const total=den?Math.max(0,Math.min(100,num/den)):0;
   return {rows,total,missing:Object.keys(RUN_MILESTONES).filter(k=>!R.ms[k])};}
+/* A határidő-sor előállítása. Három állapota van, és mindhárom mást mond:
+     · KÉSÉSBEN — 0 pont, a súly a felgyűlt levonásból (R.paceLoss);
+     · IDŐBEN   — 0 SÚLYÚ tájékoztató sor: nincs se levonás, se bónusz, de a
+                  felhasználónak látnia kell, hogy ez a tétel létezik;
+     · KORÁN    — 100 pont, a súly a megspórolt meccsekből (R.paceGain).
+   A KIHÍVÁS-SZORZÓ CSAK A BÓNUSZRA MEGY, a levonásra NEM — és ez tudatos.
+   A levonás mértékét a sáv-táblázat MÁR a mezőnyszinthez köti (100-on 15
+   pont/40 meccs, 70-en 5), tehát a szorzó másodszor mérné ugyanazt; ráadásul
+   fordítva sülne el, mint kellene: az esélytelenebb (gyenge kerettel magas
+   mezőnyt vállaló) futás kapná a NAGYOBB büntetést azért, mert több időre van
+   szüksége. A bónusz viszont teljesítmény — ott a szorzó ugyanúgy jár, mint a
+   régi Run-sebességen: korán megnyitni magas mezőnyben, gyenge kerettel
+   többet ér. */
+function runPaceRow(base,den){
+  const R=runInit();
+  const ref=runPaceRefRound(),now=runCareerRound();
+  const avg=runAvgContext(),m=runChallengeMult(avg.diff,avg.teamAvg);
+  const refTxt=`a határidő a ${runEarliestInfinitySeason()}. szezon utolsó bajnokija`;
+  if(R.paceEarly>0){
+    const G=Math.max(0,Math.min(Math.max(0,100-base)*0.9,(R.paceGain||0)*m));
+    if(G<=0)return null;
+    return {k:"pace",n:"Infinity-határidő",w:G*den/Math.max(0.01,100-base-G),s:100,
+      d:`${R.paceEarly} meccsel a határidő ELŐTT nyitottad meg — +${G.toFixed(1)} Run-pont · ${refTxt} · kihívás ${
+        `${m>=1?"+":""}${Math.round((m-1)*100)}%`}`};}
+  const late=R.paceLate||0;
+  if(late>0&&(R.paceLoss||0)>0){
+    const L=Math.max(0,Math.min(base*0.9,R.paceLoss||0));
+    if(L<=0)return null;
+    const done=R.infinityRound!=null;
+    return {k:"pace",n:"Infinity-határidő",w:L*den/Math.max(0.01,base-L),s:0,
+      d:`${late} bajnoki a határidő UTÁN${done?" (a megnyitásig)":" — és még nincs Infinity"} — −${L.toFixed(1)} Run-pont · ${refTxt}`
+        +(done?"":` · most ${runPacePoints(typeof oppTargetRating!=="undefined"?oppTargetRating:84,runPaceCase()).toFixed(1)} pont / 40 meccs a tempó`)};}
+  if(R.infinityRound!=null||now>=ref-30)
+    return {k:"pace",n:"Infinity-határidő",w:0,s:0,
+      d:R.infinityRound!=null?`pontosan a határidőre — se levonás, se bónusz · ${refTxt}`
+        :`még nincs késésben · ${refTxt}`};
+  return null;}
 function runScore(){return runBreakdown().total;}
 /* ================= HELYI RUN-RANGLISTA =================
    A karriereid legjobb futásai, EGY HELYEN, a böngésződben.
@@ -42644,21 +42795,22 @@ function runIntroHtml(){
       <div>2. <b>Nyerd meg a bajnokságot</b></div>
       <div>3. Gyűjts össze <b>${fmtFt(infinityMyPrice())}</b> <span style="color:var(--dim2)">(most: ${fmtFt(S.transferBudget||0)})${
         infinityMyPrice()<INFINITY_PRICE?` · közös karrierben ez a te feled, a másikat a társad állja`:""}</span></div>
-      <div>4. <b>Oldd fel az Infinityt</b> — és mindezt minél kevesebb szezon alatt</div>
+      <div>4. <b>Oldd fel az Infinityt</b> — lehetőleg a határidő előtt</div>
     </div>`}
     <div style="font-size:11.5px;color:var(--dim2);margin-top:8px">
-      A leggyorsabb út a legtöbbet érő: a Run-sebesség a legnagyobb súlyú tényező.
+      A tempó meccsenként számít: a határidő a <b>${runEarliestInfinitySeason()}. szezon utolsó bajnokija</b> — onnantól minden Infinity nélkül lejátszott forduló levon, minden korábban megnyitott hozzáad.
     </div>
   </div>`;}
 function runGuideHtml(){
-  /* a `start` súlya 0 (kivezetve), ezért kimarad a nevezőből */
-  const den=(RUN_W.speed+RUN_W.diff+RUN_W.first).toFixed(2);
+  const paceNow=runPacePoints(typeof oppTargetRating!=="undefined"?oppTargetRating:84,runPaceCase());
   return `<div style="background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px;line-height:1.6;font-size:12px">
     <div style="color:var(--gold);font-weight:700;margin-bottom:5px">Hogyan lesz magas a Run szinted?</div>
     <div style="color:var(--dim);margin-bottom:8px">A Run az alábbi tételek <b>súlyozott átlaga</b>. Minden tétel 0-100 pont, a súly azt mondja meg, mennyit nyom a latban.</div>
 
-    <div style="margin-bottom:7px"><b>⚡ Run-sebesség · ×${RUN_W.speed}</b> — <span style="color:var(--dim2)">a legnagyobb súlyú tétel, magában annyit ér, mint a következő kettő együtt</span><br>
-      Hányadik szezonban oldod fel az Infinityt. A 2. szezon ér 100 pontot, onnantól <b>szezononként −8</b>. Ez az egyetlen tétel, ami az idő múlásával romlik — minden halogatott szezon pontba kerül.</div>
+    <div style="margin-bottom:7px"><b>⏳ Infinity-határidő</b> — <span style="color:var(--dim2)">nincs fix súlya: annyit visz vagy hoz, amennyit a tempód ér</span><br>
+      A határidő annak a szezonnak az <b>utolsó bajnoki meccse</b>, amelyikben az induló keretedből és a beállításaidból számolva az Infinity leghamarabb megnyitható — most a <b>${runEarliestInfinitySeason()}. szezoné</b>. Onnantól <b>minden bajnoki, amit Infinity nélkül játszol le, levon</b>; minden meccs, amivel a határidő előtt nyitod meg, <b>hozzáad</b>.<br>
+      Mennyit? A mezőny szintje és az dönti el, mi hiányzik még: ha se a 100-as mezőnyön szerzett bajnoki cím, se a pénz nincs meg, 40 meccs <b>15 Run-pontot</b> visz el a 100-as mezőnyön (90-en 10, 80-on 8, 70-en 5). Ha a pénz megvan, csak a cím nem: 10 / 8 / 5 / 3. Ha a cím megvan, csak a pénz nem: 7 / 5 / 3 / 1 — <b>minél közelebb vagy, annál olcsóbb a várakozás</b>.
+      ${(typeof infinityMode!=="undefined"&&infinityMode)?"":`<br><span style="color:var(--gold)">Nálad most ${paceNow.toFixed(1)} Run-pont / 40 meccs a tempó.</span>`}</div>
 
     <div style="margin-bottom:7px;color:var(--dim)"><b>🎲 Kezdő csapaterő — megszűnt</b><br>
       Ez a tétel azt pontozta, mennyivel maradt a draftolt kereted a lehetséges maximum alatt. Kivezettük: a draft kimenetele szerencse és játékosismeret együtt, a szerényebb kerettel vállalt magas mezőnyt pedig a <b>kihívás-szorzó</b> már MINDEN másik tételen jutalmazza — ez a sor másodszor mérte ugyanazt, csak levonásként. <b>A kiindulási keret ereje többé semmilyen hatással nincs a Run-szintre.</b></div>
@@ -42686,8 +42838,8 @@ function runGuideHtml(){
     <div style="margin-bottom:7px"><b>⚙️ Taktika-illeszkedés · ×${RUN_W.tactic}/szezon</b><br>
       Szezononként rögzül, mennyire illett az aktív taktikád a kerethez. A keretedhez válaszd a rendszert, ne fordítva.</div>
 
-    <div style="margin-bottom:7px"><b>🏆 Mérföldkövek · ×0.05–0.1</b><br>
-      Egyszeri, örökre megmaradó tételek: BL/EL/KL-győzelem, kupa-gólkirály, -gólpassz- és -kapuskirály, 99-es taktika, GODLIKE és Vadista szandál kártya. Egyenként kicsik, de <b>összeadódnak</b>, és sosem vesznek el.</div>
+    <div style="margin-bottom:7px"><b>🏆 Mérföldkövek · ×${RUN_CUP_W.MK}–0.1</b><br>
+      Egyszeri, örökre megmaradó tételek: mind a négy sorozat <b>győzelme</b> és mindhárom <b>királyi címe</b> (gólkirály, gólpassz-király, kapus-király), 99-es taktika, GODLIKE és Vadista szandál kártya. <b>Mindegyik siker 100 pontot ér</b> — a sorozat rangja a SÚLYBAN jelenik meg, nem a pontszámban: BL ×${RUN_CUP_W.BL}, EL ×${RUN_CUP_W.EL}, KL ×${RUN_CUP_W.KL}, Magyar Kupa ×${RUN_CUP_W.MK}. Egy MK-gólkirályi cím ugyanolyan teljesítmény, mint egy BL-beli, csak kisebb mezőnyben — kevesebbet nyom a latban, de nem „ér kevesebbet". Egyenként kicsik, de <b>összeadódnak</b>, és sosem vesznek el.</div>
 
     <div style="margin-top:9px;padding-top:8px;border-top:1px solid var(--line)">
       <b style="color:var(--gold)">A kihívás-szorzó</b> — ez köti össze az egészet.<br>
