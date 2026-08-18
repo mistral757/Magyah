@@ -359,15 +359,43 @@ Pánzer mellett.
 
 A jutalom-sor eddig két dolgot tudott adni: egy KÉPESSÉGET vagy egy
 PÁRKÉMIA-fázist. Ez a harmadik, és szándékosan **nem vált fel semmit**: mellé
-jön be, ugyanazon az öt fázison és ugyanazon a tempón épül (`PASS_CHEM_BASE_P`
-= a párkémia 0,15-e), és ugyanazon a páron mindkét kötés megépíthető. Saját
-tárban él (`S.passChem`), a pályaképen saját, ibolya vonallal.
+jön be, ugyanazon az öt fázison épül, és ugyanazon a páron mindkét kötés
+megépíthető. Saját tárban él (`S.passChem`), a pályaképen saját, ibolya
+vonallal.
 
 | | |
 |---|---|
 | mit ad (1) | mindkét tag **poszt szerinti fő attribútuma** (`attrTrainedBy`) +20%-kal gyorsabban gyűlik — a Sztárom a párom fejlődés-gyorsításával azonos, közös csatornán |
 | mit ad (2) | a gyengébb passzoló **max 15 / 12 / 8 KÖZÖS meccsen belül** felér a társához, onnantól **együtt** haladnak: mindketten kapnak egy maxos passz-edzésnyi adagot a Passzra, a rendes edzésterv MELLÉ |
 | a szint mit emel | a felajánlás gyakoriságát (×1 / ×1,25 / ×1,33) és az összeérési időt (15 / 12 / 8) |
+
+**A TEMPÓ (3.4.06).** Az alap-esély eredetileg 0,15 volt, pontosan annyi, mint
+a párkémiáé — abból a kérésből, hogy „ugyanolyan tempóval lehet építeni".
+A gyakorlatban jóval lassabbnak bizonyult, mint amit a szám ígért, két okból:
+a roll a párkémia-ág UTÁN fut (tehát a tényleges esély 0,85 × 0,15 = **12,8%**,
+nem 15%), a jutalom-események pedig ritkák. Bejelentve: *„három párkémia alatt
+egyetlen passzkémia jutott 2/5-ig."*
+
+Az alap ezért **0,26**, és mellé jön a **rendszer fogása** (`ttTacticGrip`) — a
+passzkémia a labdajáratás kötése, az épül, aki tényleg passzolgat. Ugyanaz a
+szám hajtja, mint a passzsort: az AKTÍV rendszer ismertsége (súly 0,50) és
+illeszkedése (0,32), a rendszer passz-súlyával skálázva. Teljes fogásnál +50%,
+a plafon 0,50 — a passzkémia-ág ugyanis, ha eltalál, elviszi a jutalmat a
+skillek elől, és 50% fölött a keret képesség-fejlődése kiszáradna.
+
+| helyzet | fogás | felajánlás | tényleges |
+|---|--:|--:|--:|
+| nyers rendszer (60), 1. szint | 20% | 28,5% | 24,3% |
+| félig begyakorolt (75), 1. szint | 50% | 32,5% | 27,6% |
+| begyakorolt (87 · fit 75%), 1. szint | 70% | 35,2% | 29,9% |
+| begyakorolt, 2. szint | 70% | 43,9% | 37,4% |
+| begyakorolt, 3. szint | 70% | 46,8% | 39,7% |
+| Park the bus, 3. szint | 7% | 35,8% | 30,5% |
+| *régi érték, 1. / 3. szint* | — | *15,0% / 20,0%* | *12,8% / 17,0%* |
+
+Vagyis ott, ahol a filozófia tényleg meg van építve, nagyjából a
+**háromszorosa** a régi tempónak — egy ötfázisú kötés ~13 jutalom-eseményből
+áll össze a korábbi ~39 helyett.
 
 **A mértékegység a KÖZÖS MECCS, nem a forduló** — a kötés attól épül, hogy
 együtt vannak a pályán; aki a padon ül, az nem passzolgat a társával.

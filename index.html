@@ -3132,7 +3132,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.4.05";
+const APP_VERSION="3.4.06";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -23517,18 +23517,40 @@ const PASS_CHEM_RIPE=[15,15,12,8];
 const PASS_CHEM_OFFER=[0,1,1.25,1.33];
 /* A poszt szerinti fő attribútum gyorsulása egy KÉSZ kötésben. */
 const PASS_CHEM_ATTR_MULT=0.20;
-/* Az alap-esély, amivel a jutalom passzkémia-építés lesz. SZÁNDÉKOSAN azonos a
-   párkémiáéval (0.15) — a felhasználói kérés szó szerint az, hogy "ugyanolyan
-   tempóval lehet építeni, mint a párkémiákat". A roll a párkémia-ág UTÁN fut,
-   tehát a kettő nem eszi el egymást, csak sorban áll. */
-const PASS_CHEM_BASE_P=0.15;
+/* ---- AZ ALAP-ESÉLY, amivel a jutalom passzkémia-építés lesz (3.4.06) ----
+   EREDETILEG 0,15 volt, pontosan annyi, mint a párkémiáé — abból a kérésből,
+   hogy „ugyanolyan tempóval lehet építeni". A gyakorlatban ez sokkal
+   lassabbnak bizonyult, mint amit a szám ígért, két okból:
+     · a roll a párkémia-ág UTÁN fut, tehát a tényleges esély 0,85 × 0,15 =
+       12,75% — nem 15%;
+     · a jutalom-események RITKÁK (mesterhármas, nagy győzelem, MVP-sorozat…),
+       tehát a különbség abszolút értékben is kevés kötést jelent. Bejelentve:
+       „három párkémia alatt egyetlen passzkémia jutott 2/5-ig".
+   Az alap ezért 0,26, és mellé jön a rendszer fogása. A tényleges tempó így
+   0,22-ről (nyers rendszer, 1. szint) 0,40-ig (begyakorolt rendszer, 3. szint)
+   megy — a régi 0,13 / 0,17 helyett, tehát nagyjából a HÁROMSZOROSA ott, ahol
+   a filozófia tényleg meg van építve.
+
+   A LABDATARTÁS MOSTANTÓL A TEMPÓRA IS HAT. A passzkémia a labdajáratás
+   kötése: az épül, aki tényleg passzolgat. A begyakorlás és az illeszkedés
+   ugyanabból a ttTacticGrip()-ből jön, mint a passzsor hajtóereje — a
+   „begyakorolt, illeszkedő Labdatartás" egy szám, nem kettő.
+
+   A PLAFON nem díszítés: a passzkémia-ág, ha eltalál, ELVISZI a jutalmat a
+   skillek elől. 50% fölött a keret képesség-fejlődése érezhetően kiszáradna,
+   ezért ott megáll — a szintekkel és a fogással együtt is. */
+const PASS_CHEM_BASE_P=0.26;
+const PASS_CHEM_GRIP_BOOST=0.50;   /* teljes fogásnál +50% */
+const PASS_CHEM_MAX_P=0.50;
 function passChemLevel(){
   try{return Math.max(0,Math.min(3,Math.round(styleFxMax("passChem"))||0));}catch(e){return 0;}}
 function passChemOn(){return gameMode==="career"&&passChemLevel()>0;}
 function passChemRipeNeed(){return PASS_CHEM_RIPE[passChemLevel()]||PASS_CHEM_RIPE[0];}
 function passChemOfferP(){
   const m=PASS_CHEM_OFFER[passChemLevel()]||0;
-  return m>0?PASS_CHEM_BASE_P*m:0;}
+  if(m<=0)return 0;
+  let grip=0;try{grip=ttTacticGrip();}catch(e){}
+  return Math.min(PASS_CHEM_MAX_P,PASS_CHEM_BASE_P*m*(1+PASS_CHEM_GRIP_BOOST*grip));}
 function passChemStore(){if(!S.passChem)S.passChem={};return S.passChem;}
 function passChemKey(a,b){return [a,b].sort().join("§");}
 function passChemPairOf(a,b){return passChemStore()[passChemKey(a,b)]||null;}
@@ -23770,7 +23792,15 @@ const TT_DRIVE_MAX=0.54;    /* a teljes hajtóerő ennyivel szorozza a passzt */
 /* Az a hajtóerő-szint, ami alatt a rendszer még „nyers": a megszakadt
    nekifutás kommentárja ilyenkor meg is mondja, mi hiányzik. */
 const TT_DRIVE_RAW=0.45;
-function ttPossDrive(){
+/* ---- A RENDSZER FOGÁSA (0..1) ----
+   Mennyire ül a csapaton a labdatartás MINT TAKTIKA: az aktív rendszer
+   ismertsége és illeszkedése, a rendszer passz-súlyával skálázva. A
+   Passzrekord képesség szintje SZÁNDÉKOSAN nincs benne — ez a TAKTIKA
+   mérőszáma, nem a stílus-fáé. Két helyen olvassuk: a passzsor hajtóereje
+   (ttPossDrive) ezt egészíti ki a képesség-résszel, a passzkémia felajánlása
+   (passChemOfferP) pedig közvetlenül ezt szorozza. Így a „begyakorolt,
+   illeszkedő Labdatartás" EGY számban van meghatározva, nem kettőben. */
+function ttTacticGrip(){
   let w=0,lvN=0,fit=0;
   try{
     const key=(S.tactics&&S.tactics.active)||null;
@@ -23780,8 +23810,12 @@ function ttPossDrive(){
       lvN=Math.max(0,Math.min(1,(tacticLevel(key)-TT_DRIVE_LV0)/(TT_DRIVE_LV1-TT_DRIVE_LV0)));
       fit=Math.max(0,Math.min(1,tacticFit(key)||0));}
   }catch(e){}
+  const sum=TT_DRIVE_W_LV+TT_DRIVE_W_FIT;
+  return Math.max(0,Math.min(1,w*(TT_DRIVE_W_LV*lvN+TT_DRIVE_W_FIT*fit)/sum));}
+function ttPossDrive(){
   let tr=0;try{tr=Math.max(0,Math.min(1,(ttLevel()||0)/3));}catch(e){}
-  return Math.max(0,Math.min(1,w*(TT_DRIVE_W_LV*lvN+TT_DRIVE_W_FIT*fit)+TT_DRIVE_W_TRAIT*tr));}
+  return Math.max(0,Math.min(1,
+    (TT_DRIVE_W_LV+TT_DRIVE_W_FIT)*ttTacticGrip()+TT_DRIVE_W_TRAIT*tr));}
 function ttPossBoost(){return 1+TT_DRIVE_MAX*ttPossDrive();}
 function ttLevel(){
   try{return Math.max(0,Math.min(3,Math.round(styleFxMax("tikiLv"))||0));}catch(e){return 0;}}
@@ -50971,13 +51005,16 @@ stTrait("tikitaka","szerepek",3,"Kiosztott szerepek",
    összeérési idő. Azért III. sáv, mert nem egy szorzót emel, hanem egy egész
    mechanikát ad hozzá a játékhoz. */
 stTrait("tikitaka","passzkemia",3,"Passzkémia",
-  "Megnyílik a HARMADIK kötésfajta. A párkémiát nem váltja fel — mellé jön be, és ugyanolyan tempóval épül. Egy kész passzkémia mindkét tagjának gyorsítja a poszt szerinti fő attribútumát, a gyengébb passzoló pedig felzárkózik a társához, onnantól együtt haladnak, gyorsított passzfejlődéssel.",[
+  "Megnyílik a HARMADIK kötésfajta. A párkémiát nem váltja fel — mellé jön be, és a párkémiánál sűrűbben épül. Egy kész passzkémia mindkét tagjának gyorsítja a poszt szerinti fő attribútumát, a gyengébb passzoló pedig felzárkózik a társához, onnantól együtt haladnak, gyorsított passzfejlődéssel.<br><br>A TEMPÓT A TAKTIKÁD IS HAJTJA: a Labdatartás ismertsége és illeszkedése együtt akár felével sűrűbbé teszi a felajánlást — az a kötés épül, aki tényleg passzolgat.",[
   {fx:{passChem:1},note:"a rendszer megnyílik · összeérési idő legfeljebb 15 közös meccs"},
   {fx:{passChem:2},note:"25%-kal gyakoribb felajánlás · összeérés 12 meccsen belül"},
   {fx:{passChem:3},note:"33%-kal gyakoribb felajánlás · összeérés 8 meccsen belül"}],
   ()=>{if(!passChemOn())return "";
     const n=passChemDone(),c=passChemCareer();
-    return `most ${n} kész passzkémiád van (a klub történetében ${c}) — az összeérési idő ${passChemRipeNeed()} közös meccs`;},
+    let gr=0;try{gr=Math.round(ttTacticGrip()*100);}catch(e){}
+    return `most ${n} kész passzkémiád van (a klub történetében ${c}) — az összeérési idő `
+      +`${passChemRipeNeed()} közös meccs · a jutalmak ${Math.round(passChemOfferP()*100)}%-a `
+      +`épít kötést (a rendszer fogása ${gr}%)`;},
   TT_SYSTEM_PRICE_MULT);
 /* ---- PASSZREKORD ----
    Új GÓLSZERZÉSI TECHNIKA (lásd ttRunChain). Az 1. szint egy passzsort futtat
