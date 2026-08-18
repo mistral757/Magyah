@@ -62,6 +62,33 @@ felvett név tudatos döntés. Ha egy új böngésző-API-t kezdünk használni
 (mondjuk `IndexedDB`), azt oda is fel kell venni — különben a `no-undef`
 jogosan tiltakozik.
 
+## pyramid-sim.js — a készülő ligapiramis mérője
+
+```bash
+node tools/pyramid-sim.js            # a kalibrációs alapriport
+node tools/pyramid-sim.js gaps       # a Rating-különbség hatása egy szezonra
+node tools/pyramid-sim.js speeds     # a négy ellenfél-fejlődési fokozat íve
+node tools/pyramid-sim.js sweep      # tempó-söprés hangoláshoz
+node tools/pyramid-sim.js bands      # mire elég az adatbázis 6 osztályhoz
+```
+
+**Nem a játék része** — tervezési mérőeszköz a `docs/karrier-hagyomanyos-mod.md`
+szerinti, együtt fejlődő ligapiramishoz. A bajnoki szimuláció a motor SAJÁT
+konstansaival dolgozik (`SIM.K=0.09`, `BASE=1.3`, `HOME/AWAY`), tehát amit
+mér, az a valódi játékmenet.
+
+Miért kell: az egész játékmód egyetlen számon áll vagy bukik — azon, hogy az
+ellenfelek milyen gyorsan fejlődnek a játékoshoz képest. Megérzésre nem lehet
+belőni, mert a gólgörbe exponenciális: a játszható ablak mindössze ±4 Rating.
+A `bands` parancs az `index.html` `SQUADS` tömbjét olvassa ki, tehát az
+adatbázis bővülésével magától frissül.
+
+Minden paraméter felülírható parancssorból:
+
+```bash
+node tools/pyramid-sim.js speeds pace=8 step=2.5 seasons=30 runs=800
+```
+
 ## firebase-rules.json — az adatbázis szabályai
 
 A Realtime Database (`magyahok`) teljes szabályfája, érvényes JSON-ként. A
