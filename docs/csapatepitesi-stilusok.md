@@ -409,10 +409,32 @@ muszáj volt:**
   az eredeti feltétel dönt, a huszadik környékén viszont a legjobb keretnek is
   elakadhat. A BEFEJEZÉS az alap csapaterő ellen megy, szigorítás nélkül — mire
   odáig eljutottak, a védelem szét van húzva.
-* **A rövid sor nem akció.** `TT_MIN_PASSES` = 3 alatt semmi nem történik, se
-  gól, se kommentár. Enélkül egy kiegyenlített mérkőzésen a sorok többsége EGY
-  passz után elakadt volna, és abból születtek volna „tiki-taka gólok" — épp a
-  lényeget mondva hazugságnak.
+* **A rövid sor nem akció.** `TT_MIN_PASSES` = 3 alatt nem születhet gól, és
+  dicséret sem jár érte. Enélkül egy kiegyenlített mérkőzésen a sorok többsége
+  EGY passz után elakadt volna, és abból születtek volna „tiki-taka gólok" —
+  épp a lényeget mondva hazugságnak.
+
+**A KÖZVETÍTÉS HÁROM VÉGE (3.4.03).** A passzsor korábban csak akkor szólalt
+meg, ha legalább három passz összejött; a rövid sor **némán** hullott ki. Ez a
+felhasználó felől nézve nem „nem történt semmi", hanem „vártam, és nem tudom
+meg, mi lett" — pedig történt valami: elvették tőlünk a labdát. Mostantól
+mindhárom kimenetel megszólal, és a kommentár **megnevezi, kinél veszett el a
+labda** (`loser`) és **kit akart megjátszani** (`target`):
+
+| vég | mikor | mit mond |
+|---|---|---|
+| **gól** | a befejezés eléri a nyers csapaterőt | `ttGoalLine` — a passzszámmal, a mérföldkő ebből él |
+| **meddő** | 3+ passz, de a befejezés nem talált be | `ttFutileLine` — elakadásnál névvel, kifutott sornál (30 passz) a befejezésről |
+| **megszakadt nekifutás** | 3 passz alatt (`dud`) | `ttDudLine` — egy sor arról, kinél veszett el a labda; **nem** nevezi tiki-takának, ami nem az volt |
+
+Két fék tartja ezt hírnek és nem faliújságnak: **meccsenként legfeljebb egy**
+megszakadt nekifutásról számolunk be (a hosszabbikról — az mond többet a
+keretről), és a `dud` **nem növeli** az `S.ttFutile` számlálót, hiszen az a
+„meddő passzolgatás" mérőszáma, egy elvesztett labda pedig nem az. A
+`ttFutileLine`-nak külön mondatsora van arra, amikor a labdát elvesztő és a
+befejező **ugyanaz az ember** (a sor végén nála volt a labda, és az utolsó
+kettőből ő a jobb gólszerző) — különben a „X eladta a labdát, X még utánalőtt"
+alak nevetségesen hangzana.
 
 **A mérleg utána** (reális kezdő tizenegy, poszt szerint szóró Gólszerzéssel):
 

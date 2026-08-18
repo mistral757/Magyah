@@ -3110,7 +3110,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.4.02";
+const APP_VERSION="3.4.03";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -23724,7 +23724,12 @@ function ttRunChain(pool,oppOvr,lvl){
   let r=Math.random()*tot,cur=pool[pool.length-1];
   for(let i=0;i<pool.length;i++){r-=w[i];if(r<=0){cur=pool[i];break;}}
   const chain=[cur];
-  let broke=false;
+  /* KI VESZTETTE EL A LABDÁT. A `broke` maga csak annyit mond, hogy elakadt —
+     a közvetítésnek viszont NEVE kell: annak, akinél a labda volt (`loser`), és
+     annak, akit épp meg akart játszani (`target`). Enélkül minden félresikerült
+     akció ugyanaz az arctalan mondat, és a felhasználó nem tanul belőle semmit
+     a keretéről. */
+  let broke=false,loser=null,target=null;
   for(let step=1;step<TT_CHAIN_MAX;step++){
     /* A következő ember bárki lehet, csak nem az, akinél a labda van. */
     const cands=pool.filter(p=>p.n!==cur.n);
@@ -23733,17 +23738,24 @@ function ttRunChain(pool,oppOvr,lvl){
     const mid=(cur.passz+next.passz)/2;
     const roll=mid*(1+bias+(Math.random()*2-1)*spread);
     /* Az ellenállás passzonként szigorodik — lásd TT_STEP_UP. */
-    if(roll<=oppOvr*(1+TT_STEP_UP*step)){broke=true;break;}
+    if(roll<=oppOvr*(1+TT_STEP_UP*step)){broke=true;loser=cur.n;target=next.n;break;}
     chain.push(next);cur=next;}
   /* A BEFEJEZÉS. Az utolsó két ember Gólszerzéséből a magasabbik, megtoldva.
-     A rövid sor (lásd TT_MIN_PASSES) nem akció, hanem egy eladott labda —
-     csendben elhagyjuk, se gól, se kommentár nem lesz belőle. */
-  if(chain.length-1<TT_MIN_PASSES)return null;
+     A RÖVID SOR (lásd TT_MIN_PASSES) továbbra sem akció: se gól, se
+     tiki-taka-dicséret nem lesz belőle. NÉMA viszont mostantól nem marad
+     (3.4.03). A felhasználó tudja, hogy a filozófiája meccsenként egyszer-
+     kétszer nekifut a labdajáratásnak; ha ilyenkor egyetlen sor sem íródik ki,
+     annyit lát, hogy „vártam, és nem történt semmi" — pedig történt: elvették
+     tőlünk a labdát. A `dud` jelző pontosan ezt viszi ki a közvetítésre, és
+     szándékosan NEM nevezi tiki-takának, ami nem az volt. */
+  if(chain.length-1<TT_MIN_PASSES)
+    return {dud:true,goal:false,passes:chain.length-1,broke,loser,target,
+      starter:chain[0].n};
   const last=chain[chain.length-1],prev=chain[chain.length-2];
   const finisher=last.gol>=prev.gol?last:prev;
   const helper=finisher===last?prev:last;
   const shot=finisher.gol*(1+finLo+Math.random()*(finHi-finLo));
-  return {passes:chain.length-1,goal:shot>=oppOvr,broke,
+  return {passes:chain.length-1,goal:shot>=oppOvr,broke,loser,target,
     scorer:finisher.n,assist:helper.n,
     /* a sor eleje a kommentárhoz: ki indította az egészet */
     starter:chain[0].n};}
@@ -23764,7 +23776,16 @@ function ttPlanMatch(active,redIdx,oppOvr){
     used[b]=1;
     res.bucket=b*5;
     out.push(res);}
-  return out.sort((x,y)=>x.bucket-y.bucket);}
+  /* EGY MECCSEN EGY MEGSZAKADT NEKIFUTÁSRÓL számolunk be, nem kettőről. Két
+     „elvették tőlünk" mondat ugyanabban a mérkőzésben már nem hír, hanem
+     ismétlés; a HOSSZABBIK marad, mert az mondja többet a keretről. A valódi
+     sorok (TT_MIN_PASSES fölött) mind kimennek — azokból meccsenként úgyis
+     legfeljebb kettő van. */
+  const duds=out.filter(r=>r.dud);
+  if(duds.length>1){
+    duds.sort((x,y)=>y.passes-x.passes);
+    duds.slice(1).forEach(r=>{r.skip=1;});}
+  return out.filter(r=>!r.skip).sort((x,y)=>x.bucket-y.bucket);}
 /* ---- A KÖZVETÍTÉS ----
    A gólnál ÉS a meddő passzolgatásnál is megszólal: a filozófia lényege maga a
    passzsor, nem csak a végeredménye. A számot mindig kiírjuk — a mérföldkő
@@ -23778,12 +23799,59 @@ function ttGoalLine(res){
     `Ez nem gól volt, hanem egy hímzés vége. ${res.passes} érintésen át vándorolt a labda, mire ${H} megtalálta ${S1}-t — aki nem hibázott.`,
     `${res.passes} passz után szakadt be a védelem. Ennyi ideig senki nem bírja koncentrációval. ${S1} a befejező, ${H} az utolsó tálaló.`];
   return arr[Math.floor(Math.random()*arr.length)];}
+/* A ragozás a kommentárokban végig KÖTŐJELES (mint a többi közvetítés-sorban),
+   és minden névnek van esés nélküli tartaléka is: ha bármiért nincs meg a
+   megjátszott ember neve, „a társa" áll a helyén — üres lyuk sosem marad. */
+function ttWho(n,fallback){return n?esc(shortName(n)):fallback;}
+/* ---- AMIKOR NEM JÖTT ÖSSZE ----
+   KÉT KÜLÖN VÉGE van egy meddő sornak, és a közvetítésnek meg kell tudnia
+   különböztetni őket — különben két teljesen más történésre ugyanaz a mondat
+   jön:
+     · ELVETTÉK (`broke`) — egy passz nem ért célba. Ilyenkor van neve annak,
+       akinél a labda elveszett, és annak is, akit meg akart játszani.
+     · KIFUTOTT (30 passz) — az ellenfél egyszer sem ért labdát, csak a
+       befejezés nem talált be. Itt nincs kit megnevezni: nem hiba történt,
+       hanem elfogyott a sor. */
 function ttFutileLine(res){
   const S1=esc(shortName(res.scorer)),ST=esc(shortName(res.starter));
+  if(res.broke&&res.loser){
+    const L=ttWho(res.loser,"a labdabirtokos"),T=ttWho(res.target,"a társa");
+    /* A LABDÁT ELVESZTŐ ÉS A BEFEJEZŐ GYAKRAN UGYANAZ AZ EMBER: a sor végén
+       nála volt a labda, és az utolsó kettőből ő a jobb gólszerző. Ilyenkor a
+       „X eladta a labdát, X még utánalőtt" alak nevetségesen hangzik — külön
+       mondatsor jár rá, amiben egyszer szerepel a neve. */
+    const arr=(res.loser===res.scorer)?[
+      `${res.passes} passz után ${L} nem találta a folytatást ${T} felé — inkább maga lőtt, de nem talált be.`,
+      `Ez már-már megvolt! ${res.passes} érintés ${ST} indítása óta, aztán ${L} beleszaladt a védőbe. A kényszerlövés a kapu mellé szállt.`,
+      `${res.passes} passz után ért először labdát az ellenfél: ${L} passzát csípték el ${T} elől, a kapkodós befejezés pedig sehova nem tartott.`]:[
+      `${res.passes} passz, és akkor vége: ${L} még elindította a labdát ${T} felé, de a védő elé vágódott. A kapkodós befejezés ${S1} lábáról a kapu mellé szállt.`,
+      `Ez már-már megvolt! ${res.passes} érintés ${ST} indítása óta — aztán ${L} eladta a labdát. ${S1} még utánalőtt, de nem talált be.`,
+      `${res.passes} passz után ért először labdát az ellenfél: ${L} passzát csípték el ${T} elől. ${S1} befejezése így nem sokat ért.`,
+      `Szemet gyönyörködtető ${res.passes} passz, aztán egy rossz döntés — ${L} beleszaladt a védőbe. ${S1} lövése már csak formaság volt.`];
+    return arr[Math.floor(Math.random()*arr.length)];}
   const arr=[
     `${res.passes} passz — és a végén semmi. ${S1} elé odaért a védő, a labda meg kigurult. Gyönyörű volt, de pont nem járt érte.`,
     `Elképesztő labdajáratás, ${res.passes} érintés ${ST} indításától kezdve… aztán ${S1} lövése a kapu mellé szállt. A művészet néha meddő.`,
     `${res.passes} passz, nulla gól. Az ellenfél szurkolói már fütyülnek — és igazuk is van: ebből be kellett volna találni.`];
+  return arr[Math.floor(Math.random()*arr.length)];}
+/* ---- A MEGSZAKADT NEKIFUTÁS (3.4.03) ----
+   Három passz alatt nincs tiki-taka, tehát ez a mondat nem is nevezi annak:
+   egy ELVESZÍTETT LABDÁRÓL szól, névvel. Rövid, egysoros, és sosem ígér
+   semmit — de kimondja, hogy a nekifutás megtörtént. Ez a különbség a
+   „vártam, és nem történt semmi" meg a „nekifutottunk, és elvették" között. */
+function ttDudLine(res){
+  const ST=esc(shortName(res.starter));
+  const L=ttWho(res.loser,ST),T=ttWho(res.target,"a társa");
+  if(!res.passes){
+    const arr0=[
+      `Indult volna a labdajáratás ${ST} lábáról, de a legelső passzt elcsípték. Ennyi volt.`,
+      `${ST} indított volna ${T} felé, csakhogy az ellenfél hamarabb ért oda — meg sem indult a járatás.`,
+      `Meg sem indult: ${ST} első labdáját azonnal megfogták. Ma nem így kezdődik a tiki-taka.`];
+    return arr0[Math.floor(Math.random()*arr0.length)];}
+  const arr=[
+    `Csak ${res.passes} passzig jutottak: ${L} labdáját elvették. Ebből ma nem lesz tiki-taka.`,
+    `${ST} indította a járatást, de ${res.passes} passz után elszedték ${L} elől. Ennyi volt a nekifutás.`,
+    `Belekezdtek — aztán ${res.passes} passz után ${L} eladta a labdát. A filozófia ma nem melegedett be.`];
   return arr[Math.floor(Math.random()*arr.length)];}
 /* Kombó-skill támogatás (pl. Elastico!): egy skillnek lehet `combo` tömbje,
    ami több effekt-típusra (pl. assistw+goalw+mvp) is ad egyszerre egy kisebb
@@ -29959,6 +30027,16 @@ function playMatch(){
        ESEMÉNY: azt is kimondjuk, mert a filozófia lényege maga a passzsor. */
     while(TT_PLAN.length&&TT_PLAN[0].bucket<=min){
       const _tt=TT_PLAN.shift();
+      const _tmin=gmin(min);
+      /* A MEGSZAKADT NEKIFUTÁS: három passz alatt nincs se gól, se befejező —
+         csak egy elveszített labda, névvel. Ugyanaz a pályán-lét szabály áll rá,
+         mint a befejezőre: ha az, akinél elveszett, időközben lekerült, az
+         akció elmarad (nem nevezünk meg helyette mást). */
+      if(_tt.dud){
+        const _li=_tt.loser?active.findIndex((x,i)=>i!==redIdx&&x.p&&x.p.n===_tt.loser):-1;
+        if(_tt.loser&&_li<0)continue;
+        addLine(`${sbMinTxt(_tmin)}  🌀 ${ttDudLine(_tt)}`,"m ev");
+        continue;}
       const _si=active.findIndex((x,i)=>i!==redIdx&&x.p&&x.p.n===_tt.scorer);
       /* Ha a befejező időközben lekerült a pályáról (csere vagy piros lap), az
          akció elmarad. A passzsor a KEZDŐRÚGÁS képéből készült — nem írunk be
@@ -29966,7 +30044,6 @@ function playMatch(){
          valaki mást, mert akkor nem az az akció volna, amit lesimuláltunk. */
       if(_si<0)continue;
       const _ai=active.findIndex((x,i)=>i!==redIdx&&i!==_si&&x.p&&x.p.n===_tt.assist);
-      const _tmin=gmin(min);
       if(!_tt.goal){
         S.ttFutile=(S.ttFutile||0)+1;
         addLine(`${sbMinTxt(_tmin)}  🌀 ${ttFutileLine(_tt)}`,"m ev");
