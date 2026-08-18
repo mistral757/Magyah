@@ -3132,7 +3132,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.4.06";
+const APP_VERSION="3.4.07";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -21082,6 +21082,22 @@ function challengeStatFor(name,stat){
    teljesítési arány kijön. Így a "Nehéz" mindig kb. ugyanolyan nehéz — akár
    sereghajtó vagy, akár bajnokesélyes —, és egyetlen típus sem lehet se
    teljesíthetetlen, se ingyen. */
+/* ================= RIVÁLIS ERŐ (3.4.07) =================
+   A „nagy skalp" kihívás eddig SZIGORÚAN nálad erősebb ellenfelet kért: a
+   88-as csapaterődhöz a 88,1-es ellenfél még számított, a 87,9-es már nem.
+   Egy hajszálnyi különbség nem érdemel külön kategóriát — a pályán a
+   86-os csapat ugyanolyan rangadó, mint a 89-es. Ráadásul a kereted a szezon
+   alatt erősödik, tehát a saját fejlődésed folyamatosan APASZTOTTA a
+   jelöltlistát, és a kihívás sokszor fel sem volt ajánlható.
+   Innentől a mérce RIVÁLIS ERŐ: az ellenfél legfeljebb ennyivel maradhat el a
+   te csapaterődtől. Egy szám, egy helyen — a felajánlás, a kalibráló
+   szimuláció, a bajnoki és a kupa-kiértékelés is ezt olvassa. */
+const CH_RIVAL_MARGIN=2;
+function chRivalOvrMin(myOvr){
+  const my=(typeof myOvr==="number")?myOvr:teamOVRbase();
+  return my-CH_RIVAL_MARGIN;}
+function chIsRivalOvr(oppOvr,myOvr){
+  return typeof oppOvr==="number"&&oppOvr>=chRivalOvrMin(myOvr);}
 const CH_PASS_TARGET={easy:0.72,medium:0.48,hard:0.26};
 const CH_SIM_N=300;   /* 300 minta: ±3%-on belüli becslés, futásideje pár ms */
 function chLevelGap(){
@@ -21100,9 +21116,12 @@ function chSimOne(gap,rounds){
     const gf=poisson(lam(d)),ga=poisson(lam(-d));
     s.GF+=gf;s.GA+=ga;
     /* skalp: az ellenfél abszolút ereje (átlag+oppDelta) a TIÉD (átlag+gap)
-       fölött van ⇔ oppDelta>gap. A régi oppDelta<0 fordítva számolt: az
-       átlagnál GYENGÉBBEK elleni győzelmeket hitte skalpnak. */
-    if(gf>ga){s.W++;s.pts+=3;if(!home)s.awayW++;if(ga===0)s.zeroW++;if(oppDelta>gap)s.scalps++;}
+       RIVÁLIS SÁVJÁBAN van ⇔ oppDelta > gap − CH_RIVAL_MARGIN. A régi
+       oppDelta<0 fordítva számolt: az átlagnál GYENGÉBBEK elleni győzelmeket
+       hitte skalpnak; a 3.4.07 óta pedig a hajszálnyival gyengébb, de rivális
+       erejű ellenfél is beleszámít. */
+    if(gf>ga){s.W++;s.pts+=3;if(!home)s.awayW++;if(ga===0)s.zeroW++;
+      if(oppDelta>gap-CH_RIVAL_MARGIN)s.scalps++;}
     else if(gf===ga){s.D++;s.pts++;}
     else s.L++;
     if(gf>=ga){s.unb++;if(s.unb>s.maxUnb)s.maxUnb=s.unb;}else s.unb=0;
@@ -21244,8 +21263,10 @@ function genChallenge(scope,diff,ctx){
       if(short)list=list.slice(0,Math.max(1,shortWindow));
       if(!list.length)return null;
       const growth=2*(list.length/30);   /* várt keret-erősödés az ablak alatt */
-      const cands=list.filter(x=>x.ovr>myOvr+growth);
-      if(!cands.length)return null;      /* nincs tartós skalp-jelölt — nincs ajánlat */
+      /* A JELÖLT a rivális sávban áll: a növekedési ráhagyás UTÁN is legfeljebb
+         CH_RIVAL_MARGIN-nal marad el a keretedtől. */
+      const cands=list.filter(x=>x.ovr>myOvr+growth-CH_RIVAL_MARGIN);
+      if(!cands.length)return null;      /* nincs tartós jelölt — nincs ajánlat */
       /* várható győzelemszám a motor saját modelljével, a REJTETT tagokkal */
       const lam=d=>Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)));
       const myMatch=(typeof teamMatchStrength==="function")?teamMatchStrength():myOvr;
@@ -21262,8 +21283,8 @@ function genChallenge(scope,diff,ctx){
       const szorzo=diff==="hard"?1.05:diff==="medium"?0.8:0.55;
       const target=Math.max(1,Math.min(cands.length,Math.round(expected*szorzo)));
       return {type:"bigScalps",target,
-        desc:`Győzz le ${target} nálad erősebb ellenfelet ${horizon}`,
-        rule:`Akkor számít, ha a legyőzött ellenfél Ratingje MAGASABB a kezdő 11-ed átlagánál a meccs (pontosabban a határidős kiértékelés) idején. Vigyázat: ahogy a kereted erősödik, egyre kevesebb ellenfél számít "nálad erősebbnek" — most ${cands.length} tartós jelölt van a hátralévő sorsolásban.`};},
+        desc:`Győzz le ${target} rivális erejű ellenfelet ${horizon}`,
+        rule:`Rivális erejű az az ellenfél, akinek a Ratingje legfeljebb ${CH_RIVAL_MARGIN}-vel marad el a kezdő 11-ed átlagától — vagyis a nálad erősebbek MELLETT a hajszálnyival gyengébbek is számítanak (88-as csapaterőnél a 86-os ellenfél is). A kiértékelés a meccs (pontosabban a határidős kiértékelés) idején mért két erőt nézi, tehát ahogy a kereted nő, a lista fogy — most ${cands.length} tartós jelölt van a hátralévő sorsolásban.`};},
     ()=>{const target=CAL("zeroHeroWins",short?R(1,3):R(6,10));
       return {type:"zeroHeroWins",target,
         desc:`Nyerj ${target} meccset úgy, hogy gólt sem kapsz ${horizon}`,
@@ -21809,7 +21830,7 @@ function challengeRawValue(ch){
     case "replaceWorst": return chWorstReplaced(ch);
     /* ---- ÚJ TÍPUSOK ---- */
     case "awayWins":     return chCountFixtures(f=>!f.home&&f.gf>f.ga);
-    case "bigScalps":    return chCountFixtures(f=>f.gf>f.ga&&f.o&&f.o.ovr>teamOVRbase());
+    case "bigScalps":    return chCountFixtures(f=>f.gf>f.ga&&f.o&&chIsRivalOvr(f.o.ovr));
     case "zeroHeroWins": return chCountFixtures(f=>f.gf>f.ga&&f.ga===0);
     case "teamConceded": return S.GA||0;                  /* inverz */
     case "discipline":   return S.reds||0;                /* inverz */
@@ -21885,6 +21906,24 @@ function challengeLiveNote(ch){
     if(!all.length)return `${st.n} kupameccs után már senki nem eredményes mindegyiken — ez a kihívás elveszett.`;
     return `${all.map(n=>esc(shortName(n))).join(", ")} eddig mind a(z) ${st.n} meccsen eredményes volt`
       +(st.n<CUP_ALLMATCH_MIN?` (legalább ${CUP_ALLMATCH_MIN} meccs kell)`:"")+".";}
+  /* SKALP: a puszta „0/2" nem mondja meg, VAN-E egyáltalán kit legyőznöd. A
+     mérce a mostani csapaterőd, tehát a lista a kereted erősödésével fogy —
+     ezt élőben kell látni, nem a vállaláskori pillanatképből. */
+  if(ch.type==="cupScalps"){
+    const g=(typeof cupRivalGroupOpps==="function")?cupRivalGroupOpps():null;
+    if(!g)return "";
+    const th=Math.round(chRivalOvrMin(g.my));
+    if(!g.rivals.length)
+      return `A csoportodban most egyetlen rivális erejű ellenfél sincs (küszöb: ${th}) — a skalp a kieséses szakaszban jöhet.`;
+    return `A csoportodban ${g.rivals.length}/${g.all} ellenfél rivális erejű (küszöb: ${th}): `
+      +`${g.rivals.map(n=>esc(n)).join(", ")}.`;}
+  if(ch.type==="bigScalps"){
+    let my=0;try{my=teamOVRbase();}catch(e){return "";}
+    const th=chRivalOvrMin(my);
+    const rest=((S.fixtures||[]).slice(S.idx||0)).filter(f=>f&&!f.duel&&f.o&&chIsRivalOvr(f.o.ovr,my));
+    if(!rest.length)
+      return `A hátralévő sorsolásban most nincs rivális erejű ellenfeled (küszöb: ${Math.round(th)}) — ahogy a kereted nőtt, kifogytak alólad.`;
+    return `A hátralévő sorsolásban ${rest.length} rivális erejű ellenfél vár (küszöb: ${Math.round(th)}).`;}
   if(ch.type==="newStarter"){
     const m=S.chNewStarterMatches||{};
     const rows=Object.entries(m).sort((a,b)=>b[1]-a[1]);
@@ -44428,7 +44467,8 @@ function cupChalStat(){
       else if(mine>out.awayMax)out.awayMax=mine;
       /* SKALP: a meccs pillanatában mért két erő — pontosan az a két szám,
          amit a kupaképernyő is kiírt a kezdőrúgás előtt. */
-      if(mine>th&&typeof r.oovr==="number"&&typeof r.movr==="number"&&r.oovr>r.movr)out.scalps++;
+      if(mine>th&&typeof r.oovr==="number"&&typeof r.movr==="number"
+         &&chIsRivalOvr(r.oovr,r.movr))out.scalps++;
       return;}
     if(r.k==="tie"&&r.won){
       const d=(r.mine||0)-(r.theirs||0);
@@ -44492,6 +44532,28 @@ function euroChalMatchDone(){
   if(!b)return;
   Object.keys(b.cur).forEach(n=>{b.contrib[n]=(b.contrib[n]||0)+1;});
   b.cur={};}
+/* ---- HÁNY RIVÁLIS EREJŰ ELLENFÉL VAN A CSOPORTODBAN? (3.4.07) ----
+   A „győzz le N rivális erejű csapatot" kihívás a kupában csak egy számot
+   mutatna (0/2), miközben a felhasználó azt nem látja, hogy VAN-E egyáltalán
+   kit legyőznie. A csoport négyese ezt megválaszolja — és mivel a mérce a
+   MOSTANI csapaterőd, a lista menet közben fogy, ahogy a kereted erősödik.
+   A kieséses szakaszban nincs csoport: ott null jön vissza, és a jelzés
+   elhallgat (a párharc ellenfele úgyis névre szólóan ott áll a kupalapon). */
+function cupRivalGroupOpps(){
+  const E=S.euro;
+  if(!E||!E.teams||!E.groups)return null;
+  const gi=E.groups[E.userG];
+  if(!gi||!gi.length)return null;
+  /* UGYANAZ A KÉT SZÁM, AMIVEL A KIÉRTÉKELÉS IS DOLGOZIK (euroPathPush):
+     a te oldaladon a KIJELZETT csapaterő (teamStrength — a skill-bónuszokkal),
+     az ellenfélén a dispOvr, ha van. A nyers teamOVRbase() alacsonyabb küszöböt
+     adna, tehát a jelzés többet ígérne, mint amit a kihívás beszámít. */
+  const my=(typeof teamStrength==="function")?teamStrength():teamOVRbase();
+  const ovrOf=t=>(typeof t.dispOvr==="number")?t.dispOvr:t.ovr;
+  const list=gi.filter(i=>i!==E.userIdx&&E.teams[i]).map(i=>E.teams[i]);
+  if(!list.length)return null;
+  return {all:list.length,my,
+    rivals:list.filter(t=>chIsRivalOvr(ovrOf(t),my)).map(t=>t.n)};}
 /* ---- A HALADÁS MÉRÉSE ---- */
 function cupChalValue(ch){
   const st=cupChalStat();
@@ -44568,11 +44630,13 @@ function genCupChallenge(diff,ctx){
     ()=>({type:"cupAllMatch",target:1,
       desc:`Legyen olyan játékosod, aki MINDEN kupameccseden eredményes`,
       rule:`Gól VAGY gólpassz mindegyik mérkőzésen, amit a főtáblán játszotok — egyetlen kihagyott meccs elrontja. Legalább ${CUP_ALLMATCH_MIN} lejátszott mérkőzés kell hozzá, tehát a korai kiesés magától bukás.`}),
-    /* 9. NÁLAD ERŐSEBBEK LEGYŐZÉSE. */
+    /* 9. RIVÁLIS EREJŰ ELLENFÉL LEGYŐZÉSE. */
     ()=>{const target=T(1,2,3);
+      const g=(typeof cupRivalGroupOpps==="function")?cupRivalGroupOpps():null;
       return {type:"cupScalps",target,
-        desc:`Győzz le ${target} nálad erősebb csapatot a sorozatban`,
-        rule:`Akkor számít, ha a legyőzött ellenfél ereje MAGASABB volt a csapaterődnél a mérkőzés pillanatában — pontosan az a két szám, amit a kupaképernyő a kezdőrúgás előtt kiír.`};},
+        desc:`Győzz le ${target} rivális erejű csapatot a sorozatban`,
+        rule:`Rivális erejű az a csapat, aminek az ereje legfeljebb ${CH_RIVAL_MARGIN}-vel marad el a tiédtől a mérkőzés pillanatában — pontosan az a két szám, amit a kupaképernyő a kezdőrúgás előtt kiír.`
+          +(g&&g.all?` A csoportodban jelenleg ${g.rivals.length} ilyen ellenfél van a ${g.all}-ből${g.rivals.length?` (${g.rivals.map(n=>esc(n)).join(", ")})`:""}.`:"")};},
     /* 10. IDEGENBELI GÓLZÁPOR. */
     ()=>{const target=T(3,4,5);
       return {type:"cupAwayHaul",target,
