@@ -70,6 +70,7 @@ indításakor (`#guideGrid`) és **menet közben bármikor**: HUB → ☰ Menü 
   form:"inline",           /* a lépéssor formája: "inline" | "overlay" */
   ready(){…},              /* elérhető-e MÁR a funkció */
   due(){…},                /* van-e MOST tennivaló */
+  sig(){…},                /* MEGÚJULÓ téma aláírása — lásd az 5. pontot */
   onEnd(){…},              /* a téma saját zárása */
   steps:[{a,t,x,pre}],     /* a 2. szint lépései */
   tip:{t,x,g}              /* az 1. szint buborékja (a GUIDE_TIPS-ből fűzve) */
@@ -96,6 +97,27 @@ Három szabály dönti el, és mindhármat egy-egy hiba tanította meg:
    nézett mérföldkövek számát az Infópult ikonja írja ki, aranyban lélegezve;
    egy szaggatott keret ugyanarra csak zaj volna. A csendes téma ott van a
    rangsorban, a beállításokban és a vezetésben — csak nem rajzol.
+4. **Ami újra és újra esedékessé válik → MEGÚJULÓ (`sig`).** A hallgatás
+   alapesetben „nem": három idény után a téma feladja (`TEACH_GIVEUP`). Ez
+   viszont abból indul ki, hogy a tennivaló UGYANAZ maradt. A szezon-szerepek
+   minden idényben lejárnak, az el nem költött stíluspont pedig minden új
+   ponttal ÚJ ajánlat — itt a tavalyi hallgatás nem a mai kérdésre válaszolt.
+   Az ilyen téma `sig()`-et kap: amíg az aláírás nem mozdul, minden a szokásos
+   módon megy (halasztás, feladás); ha megváltozik, a téma **tiszta lappal**
+   indul. Az elnémítást (`muted`) az aláírás-váltás **nem** töri fel — az
+   kifejezett döntés az egész témáról, nem egy alkalomról.
+
+### Ami nem jár le: az időablak
+
+Az el nem költött stíluspont különleges eset: **nem sürget** (holnap is ott
+lesz), de **némán gyűlik**, és a boltja a menü két kattintásnyi mélyén van. Egy
+ilyet folyamatosan kint tartani zaj, teljesen elhallgatni viszont veszteség.
+A `style:spend` ezért **ciklikus**: `teachSpendWindow()` minden hat fordulóból
+az első kettőn engedi elő. A fordulószámláló idényenként 30-cal lép, ami a
+ciklus egész többszöröse — így minden idény **első fordulója** beleesik az
+ablakba, épp amikor a szezon tervezése zajlik. A téma ráadásul csak akkor
+esedékes, ha `styleSpendable().items > 0`, vagyis van MOST kifizethető tétel:
+a puszta „gyűlik a pont" nem tennivaló.
 
 **Ne írj olyan lépéssort, ami sosem futhat le.** A vezetés csak a HUB-ban indul
 magától, tehát a `scr:"match"` témák lépéssora dead code volna. Ott a jelzés
@@ -183,5 +205,12 @@ pos:wrong  [hub/p25] st=0    · horgony: látszik · elhalasztva (2 forduló)
    a tényből indul, a `due()`-k osszák szét (lásd `teachMisfit`). Ha viszont két
    *különböző kiutat* kínálnak ugyanarra a szorulásra (eladás vs. keretbővítés),
    az nem ütközés, hanem választék.
-5. Új globális név mindig `teach` / `TEACH_` előtaggal — egy globális scope van,
+5. Ha a tennivaló **idényenként újra előáll** (szezon-szerepek) vagy **új
+   ajánlattá válik** (stíluspont), adj neki `sig()`-et — enélkül három idény
+   után végleg elhallgat arról, amit minden idényben újra el kell dönteni.
+6. **A jelzésnek legyen kiútja.** Ne villogjon olyan tennivalóra, amit a
+   felhasználó most nem tud elintézni: a `style:roles` ezért nézi meg a
+   jelöltlistát is (a Villám szerepeinek belépője van), a `style:spend` pedig
+   azt, hogy van-e KIFIZETHETŐ tétel, nem csak pont.
+7. Új globális név mindig `teach` / `TEACH_` előtaggal — egy globális scope van,
    és a `no-undef` az egyetlen háló. Futtasd a `./tools/check.sh`-t.

@@ -3110,7 +3110,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.4.01";
+const APP_VERSION="3.4.02";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16566,6 +16566,18 @@ const TEACH_STEPS_PER_ROUND=2;
 /* Egy monoton növő fordulószámláló a türelmi időkhöz. Ugyanaz a képlet, mint a
    piaci ajánlatoknál (saleCareerRound) — nincs értelme két külön időnek. */
 function teachNow(){return (((S&&S.seasonNumber)||1)-1)*30+((S&&S.idx)||0);}
+/* ---- IDŐRŐL IDŐRE ----
+   Van tennivaló, ami NEM jár le: az el nem költött csapatstílus-pont holnap is
+   ott lesz. Egy ilyet nem szabad folyamatosan kint tartani — de teljesen
+   elhallgatni sem, mert a pont némán gyűlik, a boltja pedig a menü két
+   kattintásnyi mélyén van. A megoldás a CIKLUS: minden `TEACH_SP_EVERY`
+   fordulóból az első kettőn jelez, a többin csendben van.
+   A fordulószámláló szezononként 30-cal lép (teachNow), ami a ciklus egész
+   többszöröse — így minden idény ELSŐ fordulója beleesik az ablakba, épp
+   akkor, amikor a szezon tervezése zajlik. */
+const TEACH_SP_EVERY=6;    /* ennyi fordulónként jön elő */
+const TEACH_SP_WINDOW=2;   /* és ennyi fordulón át marad kint */
+function teachSpendWindow(){return (teachNow()%TEACH_SP_EVERY)<TEACH_SP_WINDOW;}
 function teachDefaults(){return {ver:1,mode:"hard",topics:{},grpOff:{}};}
 /* ---- MIGRÁCIÓ ----
    A régi mentésben nincs S.teach, csak a guide két mezője. A módot ABBÓL
@@ -16671,6 +16683,62 @@ const TEACH_TOPICS={
        x:"Minden stílushoz SAJÁT MÉRFÖLDKÖVEK tartoznak, hat kategóriában: vagyon, transzferpiac, utánpótlás és stáb, trófeák, bajnoki fölény, és a nagy ugrás.<br><br>Ezek több szezonon átívelő építkezések. Pont ezért végleges a döntés: egy szabadon váltogatható stílusból „vedd fel azt, amelyik épp majdnem teljesült\" optimalizálás lenne."},
       {t:"Nézd meg mind, mielőtt döntesz",
        x:"Néhány stílushoz ki kell jelölnöd a <b>sztárodat</b> is — a klub köré épül innentől.<br><br>Ahhoz válassz, amilyen a kereted, és ahogyan játszani szeretsz. Ez nem egy szám, amit maximalizálni kell: ez a klubod arca a következő tíz szezonra."}]},
+  /* ---- A SZEZON-SZEREPEK: AMI MINDEN IDÉNYBEN ÚJRA ÜRESEN ÁLL ----
+     A kiosztás a SZEZONHOZ van kötve (roleState): ha a szezonszám elmozdult, a
+     tábla üres — nem felejt, hanem LEJÁR. Ez tehát nem egyszeri tennivaló,
+     hanem minden idény elején visszatérő, és pont ezért kap `sig`-et a
+     szezonszámra: a feladás-számláló minden nyáron tiszta lappal indul.
+     Enélkül három idény után végleg elhallgatna arról, amit minden idényben
+     újra el kell dönteni.
+     A HORGONY a menü-gomb, nem a panel törzse: a kiosztó a stílus műszerfalán,
+     egy csukható kategórián belül él, tehát csukott menüben nincs mire keretet
+     húzni — a 🎽 viszont akkor is kikerül a menü jelvényére.
+     A RANGSORBAN elöl van (17): a szerep a szezon minden mérkőzésén fizet,
+     tehát amit a nyáron elmulasztasz, azt harminc fordulón át fizeted. */
+  "style:roles":{n:"Szezon-szerepek",grp:"csapatepites",scr:"hub",prio:17,mark:"🎽",
+    a:"hubStyleBtn",
+    why:"A csapatstílusod szezon-szerepei nincsenek kiosztva. A kiosztás minden idény elején ÜRESEN indul, és amelyik szerep üres marad, az egyetlen mérkőzésen sem dolgozik.",
+    pre(){teachOpenStylePanel("role");},
+    sig(){return "s"+((S&&S.seasonNumber)||1);},
+    ready(){try{return teachInCareer()&&roleStyleActive();}catch(e){return false;}},
+    /* A JELÖLTLISTÁT IS MEGNÉZI, nem csak az üres helyet: a Villám szerepeinek
+       BELÉPŐJE van, és egy olyan szerepre, amire a keretedből senki nem
+       jelölhető, nincs értelme villogni — a jelzésnek mindig kell hogy legyen
+       kiútja. Csak a tényleg üres helyekre kérdez rá, tehát a drágább
+       jelölt-bejárás a legtöbb rajzolásnál le sem fut. */
+    due(){try{const m=roleState().map;
+      return roleKeysForStyle().some(k=>!m[k]&&roleCandidates(k).length>0);}catch(e){return false;}},
+    steps:[
+      {a:"hubStyleBtn",pre(){teachOpenStylePanel();},
+       t:"Három megbízás, minden idényben újra",
+       x:"A csapatstílusodhoz <b>három szezon-szerep</b> tartozik. A szerep nem képesség és nem poszt: <b>megbízatás</b>, ami a mérkőzésnek egy adott pillanatában szól bele a játékba — ettől taktikai döntés, nem puszta számnövelés.<br><br>A kiosztás a szezon végén <b>lejár</b>: minden idény üres táblával indul, és neked kell újra kiosztanod."},
+      {a:"hubStyleBody",pre(){teachOpenStylePanel("role");},
+       t:"Az üres szerep semmit nem ér",
+       x:"Egy szerep addig nem dolgozik, amíg nem áll rajta ember — nincs alapértelmezett kijelölt. A jelöltlista magától a szerep saját mércéje szerint rangsorol (gólerő, gólpassz, sebesség, passz), és van, amelyiknek <b>belépője</b> is van: nem bárki jelölhető rá.<br><br>Egy ember egyszerre <b>egy</b> szerepet visel, a kiosztás viszont a szezonon belül bármikor átírható. A stílusod „Kiosztott szerepek\" képessége mind a hármat együtt emeli."}]},
+  /* ---- AZ EL NEM KÖLTÖTT, DE BEVÁLTHATÓ STÍLUSPONT ----
+     Nem lejáró ügy: a pont holnap is ott lesz, tehát a rangsor hátsóbb felébe
+     való, és nem szabad folyamatosan kint tartani. Elhallgatni viszont nem
+     lehet róla: a pont NÉMÁN gyűlik (mérföldkő, kihívás), a két boltja pedig a
+     menü két kattintásnyi mélyén van — egy vásárlás, ami sosem történik meg,
+     ugyanúgy elfolyt érték, mint a padon ülő igazolás.
+     Ezért IDŐRŐL IDŐRE jelez (teachSpendWindow), és csak akkor, ha van MOST
+     kifizethető tétel: a puszta „gyűlik a pont" nem tennivaló.
+     A `sig` az egyenleg: minden újonnan szerzett pont ÚJ ajánlat, tehát a
+     halasztás és a feladás-számláló olyankor tiszta lappal indul. */
+  "style:spend":{n:"Elkölthető stíluspont",grp:"csapatepites",scr:"hub",prio:36,mark:"🧩",
+    a:"hubStyleBtn",
+    why:"Van el nem költött csapatstílus-pontod, és van is mire költeni MOST. A pont önmagában semmit nem csinál — a megvett szint viszont a hátralévő szezonok minden mérkőzésén dolgozik.",
+    pre(){teachOpenStylePanel(styleSpendable().sec);},
+    sig(){try{return "p"+msStylePoints();}catch(e){return "p";}},
+    ready(){try{return teachInCareer()&&!!styleState();}catch(e){return false;}},
+    due(){try{return teachSpendWindow()&&styleSpendable().items>0;}catch(e){return false;}},
+    steps:[
+      {a:"hubStyleBtn",pre(){teachOpenStylePanel();},
+       t:"A pont magától nem dolgozik",
+       x:"A csapatstílus-pont a mérföldkövekből és a kihívásokból gyűlik, és <b>nem jár le</b> — épp ezért lehet észrevétlenül elfelejteni. Amíg az egyenlegen ül, pontosan annyit ér, mint a nulla.<br><br>Most van annyi pontod, hogy legalább egy tételt ki tudj fizetni."},
+      {a:"hubStyleBody",pre(){teachOpenStylePanel(styleSpendable().sec);},
+       t:"Két bolt költi",
+       x:"A <b>stílus-képességek</b> a filozófiád saját fájáról nyílnak, három szinten — ezek a szezon minden mérkőzésén dolgoznak, és a magasabb szint mindig drágább, mint az előző.<br><br>A <b>csillagozás feloldása</b> képességenként és <b>véglegesen</b> nyitja meg a jogot: onnantól mindenkinél csillagozható, aki valaha kiépíti. Csak arra érdemes költeni, ami a keretedben már megvan."}]},
   "train:plan":{n:"Edzésterv",grp:"csapatepites",scr:"hub",prio:15,mark:"🏋️",g:"edzesterv",
     a:"hubTrainingBtn",
     why:"Nincs beállított edzésterved. Ez az egyetlen dolog, ami minden meccsen, mindenkin dolgozik — enélkül a kereted magától fejlődik, irány nélkül.",
@@ -17047,6 +17115,17 @@ function teachRevealInMenu(){
       hubMenuToggle(true,true,true);
   }catch(e){}}
 ["style:choose","train:plan","sys:token"].forEach(k=>{TEACH_TOPICS[k].pre=teachRevealInMenu;});
+/* A STÍLUS-PANEL MEGNYITÁSA. A menü kinyitása önmagában kevés: a csapatstílus
+   műszerfala csukható kategóriákra bomlik, és egy csukott kategória mögül nem
+   látszik, amiről szó van. Ugyanaz a három lépés, mint a szezonjelentésből
+   nyíló választónál (openStylePickFromReport). */
+function teachOpenStylePanel(sec){
+  teachRevealInMenu();
+  try{
+    if(sec&&typeof styleSecOpenKey==="function")styleSecOpenKey(sec);
+    if(typeof hubStyleSetOpen==="function")hubStyleSetOpen(true);
+    if(typeof renderStylePanel==="function")renderStylePanel();
+  }catch(e){}}
 /* A MAI TIPPEK BEFŰZÉSE. Nem másolat: a `tip` MAGA a GUIDE_TIPS rekord, tehát
    nincs két igazság, amit szinkronban kellene tartani. */
 /* ---- EGY TÉMA, HÁROM SZINT ----
@@ -17096,8 +17175,25 @@ function teachDueList(scr){
     if(!d||typeof d.due!=="function")return;       /* tiszta tipp-téma: nem jelez */
     if(d.scr&&scr&&d.scr!==scr)return;
     if(t.grpOff&&d.grp&&t.grpOff[d.grp])return;
-    const rec=t.topics[key];
+    let rec=t.topics[key];
     if(rec&&rec.muted)return;
+    /* ---- A MEGÚJULÓ TÉMA ----
+       A halasztás és a feladás-számláló abból indul ki, hogy a tennivaló
+       UGYANAZ marad: amit három idényen át átléptek, arra nem kell újra szólni.
+       Két témánál viszont nem ez a helyzet. A szezon-szerepek minden idényben
+       LEJÁRNAK, az el nem költött stíluspont pedig minden újonnan szerzett
+       ponttal ÚJ ajánlat — ezekre a hallgatás nem „nem", mert nem ugyanarra a
+       kérdésre válaszolt.
+       Az ilyen téma `sig()`-et kap. Amíg az aláírás nem mozdul, minden a
+       szokásos módon megy; ha MEGVÁLTOZIK, a téma tiszta lappal indul. Az
+       elnémítást NEM törli: az kifejezett döntés az egész témáról, nem egy
+       alkalomról. */
+    if(d.sig){
+      let sg=null;
+      try{sg=String(d.sig());}catch(e){sg=null;}
+      if(sg!==null){
+        if(!rec)rec=teachTopicRec(key);
+        if(rec.sig!==sg){rec.sig=sg;rec.n=0;rec.lastSeason=null;delete rec.snooze;}}}
     if(rec&&(rec.n||0)>=TEACH_GIVEUP)return;   /* háromszor jelzett, nem történt semmi */
     if(rec&&rec.snooze&&rec.snooze>now)return;
     try{
@@ -47870,6 +47966,9 @@ function styleScrollerOf(el){
     if((ov==="auto"||ov==="scroll")&&n.scrollHeight>n.clientHeight+2)return n;
     n=n.parentElement;}
   return null;}
+/* KÍVÜLRŐL NYITÁS. A vezetés csak akkor tud egy kategóriára mutatni, ha az
+   nyitva van. Nem rajzol — a hívó úgyis újrarajzolja a panelt. */
+function styleSecOpenKey(key){_styleSecOpen[key]=true;}
 function styleSecIsOpen(key,defOpen){
   const v=_styleSecOpen[key];
   return v===undefined?!!defOpen:!!v;}
@@ -51208,6 +51307,41 @@ function starUnlockHtml(noHead){
 function styleTraitNextPrice(t){
   const lv=styleTraitLevel(t.key);
   return lv>=t.lv.length?null:t.lv[lv].price;}
+/* ---- MI VEHETŐ MEG MOST A PONTJAIDBÓL? ----
+   Két bolt költi a csapatstílus-pontot: a stílus-képességek következő szintje
+   és a csillagozás feloldása. A jelzésnek AZ a kérdése, hogy van-e MOST olyan
+   tétel, amit a mai egyenlegedből ki tudsz fizetni — a „gyűlik a pont"
+   önmagában nem tennivaló, csak a „van miből venni, és mégsem vettél".
+   Visszaad: `sp` az egyenleg, `items` a most kifizethető tételek száma,
+   `cheapest` a legolcsóbb tétel ára (0, ha nincs egy vehető dolog sem), és
+   `sec` annak a boltnak a kategória-kulcsa, ahová a „Mutasd meg" vigyen. A
+   képességek előbb futnak, tehát ha ott van vehető szint, oda mutatunk: az a
+   filozófia saját fája, a csillagozás pedig mindenkinek ugyanaz.
+   A MEMÓ nem kényelmi kérdés: a jelzésmotor EGY rajzoláson belül háromszor is
+   kérdez (menü-emoji, keret, vezetés), a keret-bejárás pedig nem való
+   háromszor. Az eredmény addig él, amíg a bemenete nem mozdul. */
+let _styleSpendMemo=null;
+function styleSpendable(){
+  const sp=msStylePoints();
+  if(!styleState())return {sp:sp,items:0,cheapest:0,sec:"trait"};
+  const tl=styleTraitList(styleKey());
+  const key=[sp,teachNow(),tl.reduce((a,t)=>a+styleTraitLevel(t.key),0),
+             Object.keys(S.starUnlocked||{}).length,
+             Object.keys(S.skills||{}).length].join("|");
+  if(_styleSpendMemo&&_styleSpendMemo.key===key)return _styleSpendMemo.v;
+  let items=0,cheapest=0,sec="";
+  const bump=(pr,section)=>{
+    if(typeof pr!=="number"||!(pr>0))return;
+    if(!cheapest||pr<cheapest)cheapest=pr;
+    if(pr>sp)return;
+    items++;
+    if(!sec)sec=section;};
+  try{tl.forEach(t=>bump(styleTraitNextPrice(t),"trait"));}catch(e){}
+  if(gameMode==="career"){
+    try{starLockedInSquad().forEach(o=>bump(starUnlockPrice(o.skill),"star"));}catch(e){}}
+  const v={sp:sp,items:items,cheapest:cheapest,sec:sec||"trait"};
+  _styleSpendMemo={key:key,v:v};
+  return v;}
 function styleBuyTrait(key){
   const st=styleState();
   if(!st)return {ok:false,reason:"Előbb válassz csapatépítési stílust."};

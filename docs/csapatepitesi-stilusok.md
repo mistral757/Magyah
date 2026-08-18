@@ -628,6 +628,24 @@ csúcs-lépcső pedig 265 — az utóbbi tetején a fokozatok már-már elérhet
 Az Aranylabda és a GODLIKE-kártya egyaránt **32 pont**: a karrier két egyéni
 csúcsa azonos súlyú.
 
+### 4.1c A pont, ami az egyenlegen ül (3.4.02)
+
+A stíluspont **nem jár le**, és pont ezért lehet elfelejteni: némán gyűlik
+(mérföldkő, kihívás), a két boltja — a stílus-képességek következő szintje és a
+csillagozás feloldása — pedig a menü két kattintásnyi mélyén van. Egy vásárlás,
+ami sosem történik meg, ugyanúgy elfolyt érték, mint a padon ülő igazolás.
+
+A tanítóréteg `style:spend` témája (🧩, prio 36) ezt jelzi — **időről időre**,
+nem folyamatosan, mert a tennivaló nem sürget. A `teachSpendWindow()` minden
+hat fordulóból az első kettőn engedi elő; mivel a fordulószámláló idényenként
+30-cal lép, minden idény első fordulója beleesik az ablakba. A `styleSpendable()`
+adja meg, hogy van-e MOST kifizethető tétel — az egyenleg mellett a legolcsóbb
+árat és azt is visszaadja, MELYIK boltra vigyen a „Mutasd meg" (a képességek
+elsőbbséget élveznek: az a filozófia saját fája) — pusztán a gyűlő pont nem tennivaló, csak a „van miből
+venni, és mégsem vettél". Az aláírása (`sig`) az egyenleg: minden újonnan
+szerzett pont új ajánlat, tehát a halasztás és a feladás-számláló olyankor
+tiszta lappal indul.
+
 ### 4.2 Mit NEM csinál a rendszer
 
 - **Nem tilt.** Egyetlen stílus sem zár ki felállást, taktikát vagy igazolást.
@@ -1032,6 +1050,16 @@ igényel új szimulációs ágat.
   A kiosztás a szezonhoz kötődik: `roleState()` a szezonszám elmozdulásánál
   üres táblát ad, tehát nem „felejt", hanem lejár. Egy ember egyszerre egy
   szerepet visel.
+
+  **AZ IDÉNY ELEJI EMLÉKEZTETŐ (3.4.02).** Egy lejáró kiosztás némán jár le: az
+  új idény első HUB-ja pontosan úgy néz ki, mint a tegnapi, csak a három szerep
+  már nem dolgozik. Ezért a tanítóréteg saját témát kapott rá (`style:roles`,
+  🎽, prio 17): amíg van üres szerep, a ☰ Menü jelvényén ott a 🎽, a Csapatstílus
+  sávján pedig a szaggatott keret. A téma **megújuló** (`sig` = a szezonszám),
+  tehát a „három idény után feladom" szabály nem tudja végleg elhallgattatni
+  azt, amit minden idényben újra el kell dönteni. Üres szerepre csak akkor
+  jelez, ha van rá **jelölhető ember** — a Villám belépői mellett ez nem
+  formalitás. Kikapcsolni a HUB → ☰ Menü → 🧭 Vezetés alatt lehet, témánként.
 
   **A PÁRHARCBAN IS HATNAK (3.3.40).** Korábban nem: a H2H mindkét oldalt egyetlen,
   sorosított pillanatképből számolja (`h2hSimulate`), és abba a szerep-szorzók
