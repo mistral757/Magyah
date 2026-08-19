@@ -3318,7 +3318,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.4.13";
+const APP_VERSION="3.4.14";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8042,6 +8042,21 @@ function pyrRollover(myOrder,rnd){
   row.net=(row.me!=null)?rd(row.me-row.ai):null;
   if(_ok)W.meas={my:_myOvr};
   (W.log=W.log||[]).push(row);
+  /* ---- A RANGLISTA BELÉPŐJE: AZ ELSŐ ÉLVONALBELI ARANY ----
+     A dinamikus módban az Infinity megnyitása a kapu; a piramisban nincs
+     Infinity, viszont van egy nála beszédesebb pillanat — amikor felérsz a
+     csúcsra ÉS meg is nyered az élvonalat. A napló-sor MÁR bent van, amikor
+     ezt hívjuk: a runBreakdown ütem-sorai abból olvassák ki, hányadik
+     szezonban nyertél, tehát a sorrend számít. */
+  if(myId===1&&_rank===1){
+    try{
+      const _rb=runBoardOnPyrTitle();
+      if(_rb){
+        addLine(`🏅 <b>Felkerültél a helyi Run-ranglistára</b> — az élvonal megnyerésével, `
+          +`<b>${String(_rb.run).replace(".",",")}</b> Run-szinttel. `
+          +`A karrier lezárásakor még javíthatsz rajta.`,"m win");
+        try{lbAutoUpload(_rb);}catch(e){}}
+    }catch(e){}}
   return res;}
 /* ---- A PIRAMIS-KARRIER INDÍTÁSA ----
    FEJLESZTŐI BELÉPÉSI PONT. A módnak MÉG NINCS felülete: a négyoldalas
@@ -34311,10 +34326,24 @@ function showIconOffer(rawIcon){
    piac volt a mérce, csak ott nem tűnt fel. Egy 79-ről indult, 99-es mezőnyön
    játszó karrierben a piac teteje már 116 volt — az ikon-sáv teteje 110 —,
    vagyis a hiba ott is fennállt, csak kisebb mértékben. */
+/* ---- AZ ELTOLÁS MOSTANTÓL LEFELÉ IS MŰKÖDIK ----
+   A képlet eddig `Math.max(0, …)`-lal indult: a sáv SOHA nem mozdult lefelé,
+   akármilyen alacsony volt a mezőny. A ligapiramissal ez tarthatatlanná vált —
+   ott a karrier a 71-es hatodosztályban kezdődik, és a bedrótozott 92-110-es
+   ikonsáv oda egyszerűen nem való: egy megyei csapatnál egy 110-es legenda
+   nem ünnep, hanem képtelenség.
+   A padló ezért lekerült. A KÉT HORGONY viszonya változatlan (a nagyobbik
+   nyer), csak most negatív tartományban is: a piramisban a pool maga is
+   lefelé tolódik (pyrPoolOffset), tehát a marketPeakShift() negatív, és az
+   ikon vele együtt mozog — a legerősebb ikon így MINDEN szinten ugyanannyival
+   marad a legjobb megvásárolható játékos fölött, ahogy a fenti indoklás kéri.
+   AMI NEM VÁLTOZIK: a dinamikus módban és klasszikusban a piaci horgony 0-nál
+   nem megy lejjebb (a pool ott nem skálázódik a nehézséggel), tehát ott az
+   ikonsáv a megszokott marad — csak fölfelé mozdul, mint eddig. */
 function iconFieldShift(){
   const field=(oppTargetRating||0)-INFINITY_UNLOCK_RATING;
   const market=(gameMode==="career"&&careerPool)?marketPeakShift():0;
-  return Math.max(0,Math.round(Math.max(field,market)));}
+  return Math.round(Math.max(field,market));}
 /* ================= SZEZONONKÉNT EGY IKON-IGAZOLÁS =================
    BEJELENTETT ARÁNY: 3 szezon alatt 4 ikon. Az esély önmagában nem volt magas
    (scoutIconChance: 16-26%), de az átigazolási események SZÁMA sok — szezononként
@@ -34343,7 +34372,9 @@ function twIconSigning(){
   /* MÁSOLATOT adunk vissza: a megosztott ICON_PLAYERS bejegyzést sosem írjuk át,
      különben az eltolás beleragadna, és a következő karrierbe (vagy egy
      alacsonyabb szintű szezonba) is átszivárogna — halmozódva. */
-  return {...base,ovr:base.ovr+shift};}
+  /* PADLÓ a negatív irányra: az eltolás sosem viheti értelmetlenül mélyre az
+     ikont. 50 a játék általános alsó Rating-korlátja (lásd buildOpponents). */
+  return {...base,ovr:Math.max(50,base.ovr+shift)};}
 /* Az ICON_PLAYERS bejegyzések csak {n,pos,ovr,nat,conf} mezőket tartalmaznak —
    nincs bennük leadI/coopI/aggroI (vezetői/együttműködési/temperamentum
    tulajdonság). Ha egy icon nyers formában kerülne be a slots/BENCH közé,
@@ -38717,11 +38748,30 @@ function scoutQuality(sc){
   return q*((typeof tempoMult==="function")?tempoMult():1);}
 /* Az ikon (jutalom) nyitás esélye is a scout minőségével nő: alap 16%,
    top scoutnál ~26%. Egy fejlettebb scout jobban rátalál a nagy nevekre. */
+/* ---- AZ IKON-ESÉLY A MEZŐNYSZINTTEL NŐ ----
+   Eddig az esély FIX volt: ugyanakkora egy 71-es hatodosztályban, mint egy
+   130-as élvonalban. Ez két sebből vérzett. Egyrészt a legendás ajánlat épp
+   ott volt a leggyakoribb, ahol a legkevésbé illett a világba — egy megyei
+   csapatnál Puskás. Másrészt a ligapiramis megjelenésével a karrier ELEJE
+   sokkal lejjebbről indul (71), tehát a régi arány ott aránytalanul bőkezű
+   lett volna.
+   MOSTANTÓL a szint arányosan skáláz, és a 100-AS MEZŐNYNÉL éri el pontosan
+   azt az értéket, ami eddig mindenhol alapból volt — vagyis a megszokott
+   élmény oda kerül, ahol a régi rendszer horgonya (INFINITY_UNLOCK_RATING) is
+   van. 100 fölött nem nő tovább: az ikon ritkasága a lényege, és a felső
+   végtelen amúgy is a mezőny-erősödésről szól, nem a gyakoriságról.
+   PADLÓ: 0,5 — a legalsó osztályban is legyen esély, csak feleannyi.
+   Mindkét karriermódra és SP-re/MP-re egyaránt érvényes: az egyetlen bemenete
+   a mezőnyszint, ami mindkét világban ugyanazt jelenti. */
+function iconChanceScale(){
+  const lvl=(typeof oppTargetRating!=="undefined"?oppTargetRating:84)||84;
+  return Math.max(0.5,Math.min(1,lvl/INFINITY_UNLOCK_RATING));}
 function scoutIconChance(){
   /* az ALAP 16% is a globális tempóra ül (nem csak a scout-minőségtől függő
      rész), különben a Csigatempó alig érződne az ikonoknál */
   return (0.16+(gameMode==="career"?scoutQuality(scout)*0.10:0))
-    *((typeof tempoMult==="function")?tempoMult():1);}
+    *((typeof tempoMult==="function")?tempoMult():1)
+    *iconChanceScale();}
 /* ================= KLUB-SZEMLE: EGY JÁTÉKOS, EGY ESÉLY =================
    Eddig a "végleg nemet mondott" képernyő után a completeFn visszavitt a keret
    listájára, ahol UGYANAZ a játékos újra kattintható volt — korlátlanul
@@ -43649,6 +43699,26 @@ function runBoardSave(list){
 function runBoardCareerId(){
   const seed=(typeof worldSeed!=="undefined"&&worldSeed)?String(worldSeed):"nincs";
   return seed+"|"+(MP&&MP.active&&MP.activeRoom?MP.activeRoom:"sp");}
+/* ---- MELYIK KARRIERMÓD FUTOTT? ----
+   A két mód két KÜLÖNBÖZŐ játékot mér, ezért a ranglistán sem keveredhetnek:
+   a dinamikusban a mérföldkő az Infinity megnyitása, a hagyományosban az
+   ELSŐ ÉLVONALBELI BAJNOKI CÍM, és a Run-plafon is egészen más tartományban
+   mozog. Egy közös listán a kettő összehasonlítása értelmetlen volna.
+   A régi bejegyzésekben nincs `mode` — azok mind dinamikusak. */
+function runBoardMode(){return (typeof pyrOn==="function"&&pyrOn())?"pyr":"dyn";}
+function runBoardModeOf(x){return (x&&x.mode==="pyr")?"pyr":"dyn";}
+const RUNBOARD_MODE_N={dyn:"♾️ Dinamikus karrier",pyr:"🏆 Hagyományos karrier"};
+/* A futás CSAPATSTÍLUSA. A stílus a karrier legmeghatározóbb építési döntése
+   (végleges, és az egész fejlődési fát megszabja), viszont eddig sehol nem
+   látszott a ranglistán — pedig épp azt mondja meg, HOGYAN érte el valaki azt
+   a számot. A kulcsot mentjük, a nevet a STYLES-ból oldjuk fel megjelenítéskor:
+   így egy átnevezett stílus a régi bejegyzéseken is helyesen jelenik meg. */
+function runBoardStyleKey(){
+  try{return styleKey()||null;}catch(e){return null;}}
+function runBoardStyleLabel(k){
+  if(!k)return "";
+  let sd=null;try{sd=styleByKey(k);}catch(e){}
+  return sd?`${sd.ic} ${sd.n}`:String(k);}
 function runBoardRow(){
   const bd=runBreakdown();
   return {id:runBoardCareerId(),
@@ -43657,6 +43727,8 @@ function runBoardRow(){
     seasons:S.seasonNumber||1,
     level:Math.round(oppTargetRating||0),
     inf:!!infinityMode,
+    mode:runBoardMode(),
+    style:runBoardStyleKey(),
     mp:!!(MP&&MP.active&&MP.activeRoom),
     /* a felkerülés (Infinity) és a lezárás dátuma külön — a lista mindkettőt
        meg tudja mutatni, és látszik, mennyi idő telt el közben */
@@ -43691,14 +43763,34 @@ function runBoardOnInfinity(){
   else list.push(row);
   runBoardSave(list);
   return row;}
+/* ---- A HAGYOMÁNYOS MÓD MÉRFÖLDKÖVE: AZ ELSŐ ÉLVONALBELI ARANY ----
+   A dinamikus módban a felkerülés kapuja az Infinity megnyitása. A
+   piramisban nincs Infinity, viszont van egy nála sokkal beszédesebb
+   pillanat: amikor a hatodosztályból (vagy ahonnan indultál) FELÉRSZ a
+   csúcsra ÉS meg is nyered az élvonalat. Ez a karrier tétje, tehát ez a
+   viszonyítási pont — a projektgazda döntése.
+   Ugyanazokba a mezőkbe írunk (infRun/infLevel/infSeasons), mert a két szám
+   ugyanazt a szerepet tölti be: "hol tartottál a mérföldkőnél". A lista a
+   `mode` alapján tudja, melyiket hogyan kell NEVEZNI. */
+function runBoardOnPyrTitle(){
+  if(gameMode!=="career")return null;
+  if(!(typeof pyrOn==="function"&&pyrOn()))return null;
+  const list=runBoardLoad();
+  const id=runBoardCareerId();
+  if(list.some(x=>x.id===id))return null;      /* csak az ELSŐ arany számít */
+  const row=runBoardRow();
+  row.infRun=row.run;row.infLevel=row.level;row.infSeasons=row.seasons;
+  list.push(row);
+  runBoardSave(list);
+  return row;}
 /* A KARRIER LEZÁRÁSA — csak FELFELÉ frissít, és csak ha van már bejegyzés
-   (vagyis megnyitottad az Infinityt). */
+   (dinamikusban: megnyitottad az Infinityt; piramisban: nyertél az élvonalban). */
 function runBoardOnClose(){
   if(gameMode!=="career")return null;
   const list=runBoardLoad();
   const id=runBoardCareerId();
   const at=list.findIndex(x=>x.id===id);
-  if(at<0)return null;                      /* nem nyitotta meg az Infinityt — nem kerül fel */
+  if(at<0)return null;                      /* nem érte el a mérföldkövet — nem kerül fel */
   const now=runBoardRow();
   const prev=list[at];
   const improved=now.run>prev.run;
@@ -43708,6 +43800,11 @@ function runBoardOnClose(){
        csak felfelé mozdul, ahogy kérted. */
     seasons:now.seasons,level:now.level,titles:now.titles,ballons:now.ballons,
     team:now.team,
+    /* A stílus a karrier VÉGÉN a legmegbízhatóbb (a mérföldkőnél még nem
+       biztos, hogy választva volt); a módot viszont nem írjuk felül, ha már
+       megvolt — az a karrier indulásakor dőlt el. */
+    style:now.style||prev.style||null,
+    mode:prev.mode||now.mode,
     /* A LEZÁRÁS SAJÁT PILLANATKÉPE. Külön mezőben, mert a megnyitáskori
        (infRun/infLevel) nem veszhet el — a két ranglista abból él. Ez a szám
        a VALÓDI záró érték, akkor is, ha nem javult: a "csak felfelé" szabály a
@@ -43726,19 +43823,23 @@ function runBoardHtml(){
   const list=runBoardLoad();
   if(!list.length)
     return `<div style="font-size:12.5px;color:var(--dim);line-height:1.6">
-      Még nincs bejegyzés. Egy karrier akkor kerül fel, amikor <b>megnyitod az Infinityt</b> —
-      addig nem, mert oda a 100-as mezőny megnyerése kell.
+      Még nincs bejegyzés. Egy karrier akkor kerül fel, amikor eléri a <b>mérföldkövét</b>:
+      a dinamikus módban az <b>Infinity megnyitásakor</b>, a hagyományosban az
+      <b>első élvonalbeli bajnoki címmel</b>.
       <br><span style="color:var(--dim2)">A szám ezután már csak a karrier lezárásakor változhat, és csak felfelé.</span></div>`;
   const d=t=>{if(!t)return "—";const x=new Date(t);
     return `${x.getFullYear()}.${String(x.getMonth()+1).padStart(2,"0")}.${String(x.getDate()).padStart(2,"0")}`;};
-  /* ---- KÉT RANGLISTA ----
-     A két szám két KÜLÖNBÖZŐ teljesítményt mér, ezért nem szabad egy listába
-     keverni őket: az Infinity-lista azt mondja meg, MILYEN GYORSAN és milyen
-     mezőnyön jutottál el a végjátékig, a lezárási lista pedig azt, MEDDIG
-     vitted onnan. Ugyanaz a karrier mindkettőn szerepelhet, más számmal és más
-     nehézségi szinttel. */
-  const sor=(x,i,run,level,datum,fut,seasons)=>
-    `<div style="display:flex;align-items:center;gap:9px;border-top:1px solid var(--line);padding:6px 0">
+  /* ---- KÉT MÓD, MÓDONKÉNT KÉT RANGLISTA ----
+     A két karriermód két KÜLÖNBÖZŐ játékot mér: a dinamikusban a mérföldkő az
+     Infinity megnyitása, a hagyományosban az első élvonalbeli arany, és a
+     Run-plafon is más tartományban mozog. Egy közös listán a kettő
+     összehasonlítása értelmetlen volna, ezért külön szekciót kapnak.
+     Módon BELÜL marad a régi kettősség: a mérföldkőnél elért szám azt mondja
+     meg, MILYEN GYORSAN jutottál el odáig, a lezárási pedig azt, MEDDIG
+     vitted onnan. */
+  const sor=(x,i,run,level,datum,fut,seasons)=>{
+    const st=runBoardStyleLabel(x.style);
+    return `<div style="display:flex;align-items:center;gap:9px;border-top:1px solid var(--line);padding:6px 0">
       <b style="min-width:22px;text-align:right;color:var(--dim2);font-size:12px">${i+1}.</b>
       <b style="min-width:46px;font-size:15px;color:${runColor(run)}">${String(run).replace(".",",")}</b>
       <span style="flex:1;min-width:0">
@@ -43747,23 +43848,37 @@ function runBoardHtml(){
         ${fut?`<span style="font-size:10px;color:var(--gold)"> ● fut</span>`:""}
         <br><span style="font-size:11px;color:var(--dim2)">mezőny <b style="color:var(--gold)">${level}</b> · ${seasons} szezon${
           x.titles?` · ${x.titles} bajnoki`:""}${x.ballons?` · ${x.ballons} Aranylabda`:""} · ${datum}</span>
-      </span></div>`;
-  const infList=list.slice().sort((a,b)=>runBoardInfRun(b)-runBoardInfRun(a));
-  const closed=list.filter(x=>x.closedAt)
-    .sort((a,b)=>(b.closeRun!=null?b.closeRun:b.run)-(a.closeRun!=null?a.closeRun:a.run));
+        ${st?`<br><span style="font-size:11px;color:var(--dim)">${esc(st)}</span>`:""}
+      </span></div>`;};
   let h=`<div style="font-size:11.5px;color:var(--dim2);line-height:1.45;margin-bottom:7px">
     A lista <b>ebben a böngészőben</b> él — másik eszközön külön lista van.</div>`;
-  h+=`<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin:10px 0 2px">∞ Az Infinity megnyitásakor</div>
-    <div style="font-size:11px;color:var(--dim2);line-height:1.45;margin-bottom:3px">Milyen Run-szinten és milyen mezőnyön jutottál el a végjátékig.</div>`;
-  infList.forEach((x,i)=>h+=sor(x,i,runBoardInfRun(x),runBoardInfLevel(x),"∞ "+d(x.at),!x.closedAt,
-    x.infSeasons!=null?x.infSeasons:x.seasons));
-  h+=`<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--grass);margin:14px 0 2px">🏁 A karrier lezárásakor</div>`;
-  if(!closed.length)
-    h+=`<div style="font-size:11.5px;color:var(--dim);line-height:1.5">Még nincs lezárt karriered. A záró Run-szint és az akkori mezőny ide kerül.</div>`;
-  else{
-    h+=`<div style="font-size:11px;color:var(--dim2);line-height:1.45;margin-bottom:3px">Meddig vitted onnan — a záró Run-szint és az akkori nehézség.</div>`;
-    closed.forEach((x,i)=>h+=sor(x,i,(x.closeRun!=null?x.closeRun:x.run),
-      (x.closeLevel!=null?x.closeLevel:x.level),"🏁 "+d(x.closedAt),false,x.seasons));}
+  /* A HAGYOMÁNYOS mód áll elöl, ha van benne bejegyzés: az az újabb, és a
+     mérföldköve (élvonalbeli arany) beszédesebb. */
+  ["pyr","dyn"].forEach(mode=>{
+    const mine=list.filter(x=>runBoardModeOf(x)===mode);
+    if(!mine.length)return;
+    const msLabel=mode==="pyr"?"🏆 Az első élvonalbeli aranynál":"∞ Az Infinity megnyitásakor";
+    const msLead=mode==="pyr"
+      ?"Hányadik szezonban értél fel a csúcsra és nyerted meg — és milyen Run-szinten."
+      :"Milyen Run-szinten és milyen mezőnyön jutottál el a végjátékig.";
+    h+=`<div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+      color:var(--ink);margin:16px 0 4px;padding-bottom:4px;border-bottom:2px solid var(--line)">
+      ${RUNBOARD_MODE_N[mode]}</div>`;
+    h+=`<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin:8px 0 2px">${msLabel}</div>
+      <div style="font-size:11px;color:var(--dim2);line-height:1.45;margin-bottom:3px">${msLead}</div>`;
+    mine.slice().sort((a,b)=>runBoardInfRun(b)-runBoardInfRun(a))
+      .forEach((x,i)=>h+=sor(x,i,runBoardInfRun(x),runBoardInfLevel(x),
+        (mode==="pyr"?"🏆 ":"∞ ")+d(x.at),!x.closedAt,
+        x.infSeasons!=null?x.infSeasons:x.seasons));
+    const closed=mine.filter(x=>x.closedAt)
+      .sort((a,b)=>(b.closeRun!=null?b.closeRun:b.run)-(a.closeRun!=null?a.closeRun:a.run));
+    h+=`<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--grass);margin:12px 0 2px">🏁 A karrier lezárásakor</div>`;
+    if(!closed.length)
+      h+=`<div style="font-size:11.5px;color:var(--dim);line-height:1.5">Még nincs lezárt karriered ebben a módban. A záró Run-szint és az akkori mezőny ide kerül.</div>`;
+    else{
+      h+=`<div style="font-size:11px;color:var(--dim2);line-height:1.45;margin-bottom:3px">Meddig vitted onnan — a záró Run-szint és az akkori nehézség.</div>`;
+      closed.forEach((x,i)=>h+=sor(x,i,(x.closeRun!=null?x.closeRun:x.run),
+        (x.closeLevel!=null?x.closeLevel:x.level),"🏁 "+d(x.closedAt),false,x.seasons));}});
   return h;}
 /* ================= PROFIL — BECENÉV, AZONOSÍTÓ, EREDMÉNYEK =================
    MIÉRT KELL. Eddig a játékosnak nem volt SEMMILYEN önazonossága: a mentés a
@@ -44011,9 +44126,18 @@ function lbRowFrom(x){
     nick:nick.slice(0,20),
     pid:String(profileUid()).slice(0,24),
     infRun:Math.max(0,Math.min(100,Math.round(run*10)/10)),
-    infLevel:cl(lvl,60,400,100),
+    /* A PIRAMISBAN a mezőny a végtelenbe nő — a régi 400-as felső vágás egy
+       hosszú hagyományos karriernél hamis számot küldött volna fel. */
+    infLevel:cl(lvl,60,2000,100),
     infSeasons:cl(x.infSeasons!=null?x.infSeasons:x.seasons,1,999,1),
     team:String(x.team||"—").slice(0,40),
+    /* A KARRIERMÓD és a CSAPATSTÍLUS. A mód nélkül a globális lista két
+       különböző játékot rangsorolna együtt (a hagyományosban a mérföldkő az
+       első élvonalbeli arany, nem az Infinity), a stílus pedig azt mondja el,
+       HOGYAN érte el valaki azt a számot. Mindkettő rövid, ellenőrzött kulcs —
+       a szabályfájl (tools/firebase-rules.json) is erre van szabva. */
+    mode:runBoardModeOf(x),
+    style:String(x.style||"").replace(/[^a-z0-9_-]/gi,"").slice(0,16),
     titles:cl(x.titles,0,999,0),
     ballons:cl(x.ballons,0,999,0),
     at:Date.now()};}
@@ -44085,8 +44209,8 @@ function lbBoardHtml(rows){
     return `<div style="font-size:12px;color:var(--dim2)">Betöltés…</div>`;
   if(!rows.length)
     return `<div style="font-size:12px;color:var(--dim);line-height:1.55">
-      Még üres a lista — <b>te lehetsz az első</b>. Egy futás akkor kerül fel, ha megnyitottad az Infinityt.</div>`;
-  const mineIdx=rows.findIndex(lbIsMine);
+      Még üres a lista — <b>te lehetsz az első</b>. Egy futás akkor kerül fel, ha elérte a mérföldkövét:
+      az Infinity megnyitásakor, hagyományos módban pedig az első élvonalbeli bajnoki címmel.</div>`;
   const hu=v=>String(v).replace(".",",");
   const row=(r,i)=>{
     const me=lbIsMine(r);
@@ -44099,14 +44223,32 @@ function lbBoardHtml(rows){
         <span style="font-size:10.5px;color:var(--dim2)"> #${esc(String(r.pid||"").slice(-4))}${me?" · te":""}</span>
         <span style="display:block;font-size:10.5px;color:var(--dim2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${
           esc(String(r.team||"—"))} · mezőny ${r.infLevel||"—"} · ${r.infSeasons||"?"}. szezon${
-          r.titles?` · ${r.titles} bajnoki`:""}</span>
+          r.titles?` · ${r.titles} bajnoki`:""}${
+          r.style?` · ${esc(runBoardStyleLabel(r.style))}`:""}</span>
       </span></div>`;};
-  return rows.map(row).join("")
-    +`<div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-top:6px">
-      ${mineIdx>=0
-        ? `A te helyezésed: <b style="color:var(--gold)">${mineIdx+1}.</b> a ${rows.length} közül.`
-        : `A te bejegyzésed nincs a lista első ${rows.length} sorában.`}
-      <br>A lista <b>az Infinity megnyitásakori</b> Run-szintet rangsorolja — a lezáráskori helyi marad.
+  /* ---- A KÉT MÓD KÜLÖN RANGSOR ----
+     Ugyanaz az elv, mint a helyi listán: a hagyományos mód mérföldköve az
+     első élvonalbeli arany, a dinamikusé az Infinity megnyitása — két külön
+     teljesítmény, tehát két külön rangsor. A régi, `mode` nélküli rekordok
+     mind dinamikusak (akkor még nem létezett a másik mód). */
+  let out="";
+  ["pyr","dyn"].forEach(mode=>{
+    const mine=rows.filter(r=>((r&&r.mode==="pyr")?"pyr":"dyn")===mode);
+    if(!mine.length)return;
+    const idx=mine.findIndex(r=>r&&r.pid===profileUid());
+    out+=`<div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+      color:var(--ink);margin:14px 0 4px;padding-bottom:4px;border-bottom:2px solid var(--line)">
+      ${RUNBOARD_MODE_N[mode]}</div>`;
+    out+=`<div style="font-size:11px;color:var(--dim2);line-height:1.45;margin-bottom:3px">${
+      mode==="pyr"?"Az első élvonalbeli aranynál elért Run-szint szerint."
+                  :"Az Infinity megnyitásakori Run-szint szerint."}</div>`;
+    out+=mine.map((r,i)=>row(r,i)).join("");
+    out+=`<div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-top:5px">${
+      idx>=0?`A te helyezésed: <b style="color:var(--gold)">${idx+1}.</b> a ${mine.length} közül.`
+            :`A te bejegyzésed nincs ennek a listának a soraiban.`}</div>`;});
+  return out
+    +`<div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-top:8px">
+      A <b>lezáráskori</b> Run-szint helyi marad — a globális listát a mérföldkő rangsorolja.
       <br><span style="color:var(--dim)">Becsületkassza: a nevet mindenki maga adja meg, a számokat pedig a saját gépe küldi fel.</span></div>`;}
 function renderProfileLbBox(rows){
   const box=$("profileLbBody");
