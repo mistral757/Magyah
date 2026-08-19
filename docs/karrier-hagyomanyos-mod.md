@@ -1,7 +1,7 @@
 # Hagyományos karrier — a dinamikus ligapiramis
 
-*(Tervdokumentum. Állapot: **P3 kész — a világ, a ligarendszer ÉS a fejlődés
-megvan; a mód működik, felület nélkül.** Lásd a 11.3 fázistáblát. A mérőeszköz,
+*(Tervdokumentum. Állapot: **P4 kész — világ, ligarendszer, fejlődés, súlyozott
+draft és kupák. A mód teljes, csak felülete nincs.** Lásd a 11.3 fázistáblát. A mérőeszköz,
 amivel a számai születtek: `tools/pyramid-sim.js`. A hozzá tartozó
 beállítás-átalakítás: `karrier-beallitasok-terv.md`; a mai kapcsolók
 hibalistája: `karrier-beallitasok-audit.md`.)*
@@ -268,9 +268,32 @@ D6-ból indulva, 200 draft / sor, csak klubcsapatok:
    D3-ból +3,7, válogatottakkal D6-ból +2,8 — vagyis egy egyszerű konstanssal
    korrigálható.
 
-**A javasolt beállítás:** `q = 0,15` + klubeltolás + `PYR_DRAFT_PREMIUM = 3`
-konstans levonás → a kezdő rés minden osztályban **0 … +1**, azaz feljutásra
-esélyes, de nem befutó újonc vagy.
+**A MEGVALÓSULT MEGOLDÁS** (`node tools/pyramid-sim.js draft`, immár a valódi
+`pyrDraftPick`-kel és a valódi pool-eltolással, 250 draft/sor):
+
+| indulás | osztály közepe | pool-eltolás | kezdő XI | **rés** |
+|---|---|---|---|---|
+| D6 | 71,6 | −8,4 | 71,0 | **−0,5** |
+| D5 | 74,0 | −7,0 | 74,0 | **−0,0** |
+| D4 | 76,9 | −4,9 | 77,2 | **+0,4** |
+| D3 | 80,1 | −2,9 | 80,9 | **+0,8** |
+| D2 | 82,8 | −1,6 | 83,8 | **+1,0** |
+| D1 | 86,2 | −1,8 | 86,5 | **+0,3** |
+
+`q = 0,15` + `PYR_DRAFT_PREMIUM = 3` + a pool eltolása a piramis skálájára —
+a rés mind a hat indulási osztályban a **−0,5 … +1,0** sávban van.
+
+**Egy pótlólagos korrekció: `PYR_DRAFT_FLOOR = 0,004`.** A mértani csökkenés
+önmagában túl gyorsan hal el: a hatodosztályból az élvonal esélye
+0,15⁵ ≈ 0,008%, azaz gyakorlatilag SOHA — pedig épp az a draft öröme, hogy
+néha egy nagy név is eléd kerül. A padló minden osztálynak ad minimális
+esélyt; a hatodosztályból a felső három együtt ~1,2%-ot kap. Mérve a
+merítés D6-ból: **84,6% D6 · 13,3% D5 · 1,8% D4 · 0,3% D3** + a padló.
+
+**Hol lakik a két összetevő:** a súlyozás a `pyrDraftPick`-ben (a KEZDŐ
+osztályhoz mérve, hogy egy feljutás után a Run-visszajátszás se csússzon el),
+az eltolás a `marketPeakShift()`-ben — vagyis ugyanazon az egy kapun, amin a
+piac amúgy is a világhoz igazodik.
 
 **Egy független megerősítés:** a felhasználó saját tapasztalata szerint a mai
 draftból válogatottakkal együtt 80–86-os csapatok jönnek ki, és a súlyozástól
@@ -513,40 +536,48 @@ vagy ha a fix `oppBuffFor` tag a magasba nőtt szinteken bekapcsolva marad.
 
 ---
 
-## 7. Kupák
+## 7. Kupák — MEGVALÓSULT
 
-A terv szerinti szerkezet, a mai `S.euro` kampánymotorra ültetve
-(`euroLam`, `endEuroCampaign`, a 32 csapatos főtábla, `RUN_CUP_W`):
+A kvalifikációt a hagyományos módban nem a Rating-sáv adja, hanem az
+**osztály**. A `PYR_CUPS` tábla alakja szándékosan azonos a `CUP_TIERS`-ével,
+így a teljes kupagépezet (`cupEntryFor`, selejtező, mezőnyépítés, ünneplés)
+egyetlen hook-kal átvette — a `cupTierFor` ad a piramisban osztály-alapú sort.
 
-| osztály | hazai kupa | nemzetközi |
-|---|---|---|
-| **D1** (premier líg) | FA-kupa, **selejtező nélkül**, egyből a top 32 | 1–3. hely: **BL** selejtező nélkül · 4–5.: **EL** · 6.: **KL** · **FA-kupa-győztes: BL** |
-| **D2** (másodosztály) | FA-kupa, **4 körös selejtezővel** | — |
-| **D3** (NB I) | Magyar Kupa, **akárhányadik helyről** | 1\.: **BL-selejtező** · 2\.: **EL-selejtező** · 3\.: **KL-selejtező** · MK-győztes: a **következő** idényben BL-selejtező |
-| **D4** (NB II) | Magyar Kupa, **az első 3 helyezett** | — |
-| **D5–D6** | — | — |
+| oszt | liga | hazai kupa | nemzetközi | a kupagyőzelem jutalma |
+|---|---|---|---|---|
+| **D1** | premier líg | FA-kupa a top 32-ből, **selejtező nélkül** | 1–3. **BL** · 4–5. **EL** · 6. **KL**, mind selejtező nélkül | FA → **BL közvetlenül**, a következő idényben |
+| **D2** | másodosztály | FA-kupa, **4 körös** selejtezővel, minden csapat | — | — |
+| **D3** | NB I | Magyar Kupa, 4. helytől bárkinek | 1. **BL-sel.** · 2. **EL-sel.** · 3. **KL-sel.** | MK → **BL-selejtező**, a következő idényben |
+| **D4** | NB II | Magyar Kupa, az első **3** helyezett | — | — |
+| **D5–D6** | NB III / megyei | — | — | — |
 
-A selejtező mind a háromnál **4 mérkőzés**, oda-visszavágóval, és a kiesés
-**alacsonyabb sorozat selejtezőjébe ejt** (BL→EL→KL), nem ki a kupából.
+Böngészőben ellenőrizve, mind a hat osztályon, helyezésenként.
 
-**Két inkonzisztencia a tervben, döntést igényel:**
+**Két új darab a gépezetben:**
 
-1. **Kétféle hazai kupa** szerepel: „Magyar Kupa" (D3–D4) és „FA-kupa"
-   (D1–D2). Ha ez szándékos (a piramis felső fele más országé), akkor a
-   D2→D3 mozgás **kupát is vált** — az érdekes, de a mérföldkövek
-   (`RUN_MILESTONES.mk_*`) csak az egyiket ismerik. Ha nem szándékos, egy
-   kupanév legyen, sávonként más nevezési joggal.
-2. **A D1 FA-kupa-győztes BL-t kap, de a D3 MK-győztes csak a KÖVETKEZŐ
-   idényben.** Ha ez tudatos (a felsőbb liga azonnal jutalmaz), érdemes
-   kiírni; ha nem, egységesíteni kell — különben a szabály véletlenszerűnek
-   hat.
+* **Az FA-kupa mint második hazai sorozat** (`EURO_COMPS.FA`). A piramis felső
+  felében a hazai kupa nem szerény sorozat: a legjobb 32 játssza, és a
+  győzelme BL-t ér — ezért erősebb mezőnyt kap (`oppDelta 0`, szemben az MK
+  −4-ével) és a KL/EL közé árazott díjazást.
+* **A selejtező körszáma sávonként állítható** (`euroQualRounds`). Alapban
+  kettő; a D2 FA-kupája négy körrel kezd, mert onnan minden csapat nevez —
+  ott a főtáblára jutás maga a szűrő.
 
-**Amit a mai kódból örökölhetünk:** az `euroDominance()` (mennyire uraltad a
-szezont) továbbra is jó jelzés, de a bemenete változik: a `base` ne
-`oppTargetRating` legyen, hanem **a saját osztályod középértéke**. Így egy D3
-bajnok nem a D1 mércéjével mérve „nem uralta" a szezont.
+**A selejtező-lecsúszás már megvolt:** az `EURO_DROP` (BL→EL→KL) pontosan azt
+csinálja, amit a terv kért — a bukott BL-selejtező nem kiesés, hanem az EL
+selejtezőjébe ejt.
 
----
+**Egy útközben talált hiba.** A „következő idényre szóló indulás" ága
+(`S.euroEntry.forSeason`) **nem állította be a selejtező-jelzőt**. Eddig ez
+nem látszott, mert az ág csak régi mentéseket szolgált ki; a piramisban
+viszont ÉLŐ út, és nélküle a D3 Magyar Kupa-győztese a **BL főtábláján**
+kezdett volna, selejtező nélkül. Javítva.
+
+**Ami nyitva maradt:** a piramis felső fele FA-kupát játszik, az alsó Magyar
+Kupát, tehát egy D2→D3 kiesés **kupát is vált**. Ez szándékos (a felső kupa
+erősebb és BL-t ér), de ha zavarónak bizonyul, elég a `PYR_CUPS` két `comp`
+mezőjét egységesíteni. A `RUN_MILESTONES` egyelőre csak az MK-t ismeri — az
+FA-kupa mérföldkövei a Run-szint lépésénél (P5) jönnek.
 
 ## 8. Riválisok
 
@@ -668,9 +699,10 @@ kihívás és statisztika ugyanúgy fut, mint ma.
 | fejlődés | `pyrDevelopWorld()` ✅ | osztályonkénti ütem, ±20% zaj, eredmény-alapú tag; a fel-/kiesés ELŐTT fut |
 | Rating-plafon | `ratingCap()` ✅ | a piramisban nincs plafon (6.1b) |
 | mérő | `S.pyr.log` ✅ | szezononként egy sor: erőd · a te lépésed · a mezőnyé · NETTÓ |
-| kupa-nevezés | `cupEntryFor` | a piramis táblájából, nem `CUP_TIERS`-ből |
+| kupa-nevezés | `cupTierFor` ✅ | a piramisban osztály-alapú sort ad (`PYR_CUPS`) |
+| draft-merítés | `pyrDraftPick` ✅ | súlyozva a kezdő osztályod felé, padlóval |
 | rejtett buff | `oppBuffFor` ✅ | `if(pyrOn())return 0;` |
-| piac-horgony | `marketPeakShift` | `careerBaseRating` helyett az osztály középértéke |
+| piac-horgony | `marketPeakShift` ✅ | a piramis skálájára tolt pool + 1:1 követés a növő világgal |
 | szintváltás | `applyOppLevel`, `autoLevelSync` ✅ | `if(pyrOn())return false;` — a szintet az OSZTÁLYOD adja |
 | Infinity | `infinityMode` ág | a piramisban nem fut |
 
@@ -682,7 +714,7 @@ kihívás és statisztika ugyanúgy fut, mint ma.
 | **P1** | az egyszerű beállítómód + a négyoldalas belépés | önállóan is érték |
 | **P2** | ✅ **kész** — `pyrBuildWorld`, a 6 osztály, `SEASON_OPPS` átirányítás, fel-/kiesés mind a hat osztályban, mentés. **Fejlődés nélkül**: statikus piramis. Belépés: `pyrStart(6)` a konzolból | első játszható mérföldkő |
 | **P3** | ✅ **kész** — `pyrDevelopWorld`, a négy fokozat, a tempó-csatolás, az élvonali utolérés, a Rating-plafon feloldása és a beépített mérő (`S.pyr.log`) | **a mód működik** |
-| **P4** | kupák a piramis szabályai szerint | |
+| **P4** | ✅ **kész** — súlyozott draft (`pyrDraftPick` + pool-eltolás) és a teljes kuparendszer (`PYR_CUPS`, FA-kupa, sávonkénti selejtező-körszám, a kupagyőzelem jutalma a következő idényre) | |
 | **P5** | Run-szint a 9. pont szerint, riválisok, Infópult | |
 | **P6** | hangolás valós runokból; a négy fokozat véglegesítése | |
 
@@ -706,11 +738,13 @@ fokozat átlövéséhez `live tier=kegyet share=0,84 top=0,92`.
 4. **Kész klub + osztályválasztás** — ha kész klubbal indulsz, a klubod
    *saját* Ratingje meghatározza, melyik osztályba illik. Engedjük-e, hogy a
    Barcelonával a hatodosztályban kezdj (azonnali 5 feljutás), vagy a
-   klubválasztás **szűkítse** a választható osztályokat?
-5. **A draft-paradoxon melyik megoldása** (4.1: a, b vagy c)? A dokumentum a
-   **(a) kész klub alapértelmezést + (b) ellensúlyozott draftot** javasolja
-   párban — de ha a draft marad a fő út, a (b) rés-konstansait ki kell mérni
-   és karban kell tartani, valahányszor az adatbázis bővül.
+   klubválasztás **szűkítse** a választható osztályokat? *(A draft ága
+   megoldva — lásd 4.2; ez már csak a kész-klub útra vonatkozik.)*
+5. ~~A draft-paradoxon melyik megoldása?~~ **Eldőlt és kész** (4.2): súlyozott
+   merítés + pool-eltolás + prémium-korrekció. A rés mind a hat osztályban
+   −0,5 … +1,0. **Karbantartás:** ha az adatbázis bővül, a
+   `node tools/pyramid-sim.js draft` újrafuttatandó — a `PYR_DRAFT_PREMIUM`
+   az egyetlen szám, amit hangolni kell.
 6. **A KIESÉS gyakorlatilag csak a Kegyetlen fokozaton fordul elő** (0,3
    karrierenként; a többi hárommal 0,0). Az ok szerkezeti: feljutni akkor
    fogsz, amikor már +2…+3-mal a saját mezőnyöd fölött állsz, tehát az új

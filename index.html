@@ -7356,10 +7356,10 @@ function shuffleArr(a,rnd){
    mentés viszi. A localStorage-preferencia érintetlen marad — az a KÖVETKEZŐ
    játékot állítja, ahogy eddig is. */
 function wcOn(){
-  /* A typeof-őr kell: ez a fájlban KORÁBBAN áll, mint az S deklarációja
-     (23074), és egy korai hívás különben TDZ-hibával döntené a szkriptet —
-     ugyanaz az őr, ami a cupTierFor-ban is védi az oppTargetRating-et. */
-  if(typeof S!=="undefined"&&S&&S.careerWc!=null)return !!S.careerWc;
+  /* TRY/CATCH: ez a fájlban KORÁBBAN áll, mint az S deklarációja, és egy
+     `const` a deklarációja előtt `typeof`-fal kérdezve is ReferenceError —
+     a TDZ-t a typeof nem kerüli meg. Lásd a pyrOn() azonos indoklását. */
+  try{if(S&&S.careerWc!=null)return !!S.careerWc;}catch(e){}
   return wcEnabled;}
 function activeSquads(){return wcOn()?SQUADS:SQUADS.filter(sq=>!sq.wc);}
 function draftPool(){return activeSquads();}
@@ -7631,7 +7631,14 @@ function pyrDumpWorld(w){
    tizenhatodik hely a tiéd — így a fel-/kiesésnél nem kell külön szabály rád:
    ugyanúgy mozogsz, mint bárki más, és a klubok száma magától megmarad. */
 const PYR_UP=2, PYR_DOWN=2;   /* feljutó / kieső helyek osztályonként */
-function pyrOn(){return !!(typeof S!=="undefined"&&S&&S.pyr&&S.pyr.on);}
+/* TRY/CATCH, NEM `typeof`-ŐR. Ez a függvény a fájlban KORÁBBRÓL is hívódik,
+   mint ahol az `S` megszületik (const S=freshS()), márpedig egy `const` a
+   deklarációja előtt AKKOR IS ReferenceError-t dob, ha `typeof`-fal kérdezed —
+   a TDZ-t a typeof nem kerüli meg (ellentétben a sosem deklarált nevekkel).
+   Konkrétan a cupTierFor→diffTierLabel lánc fut le a betöltéskor, jóval az S
+   előtt: ott a typeof-őr megállította volna a teljes szkriptet. */
+function pyrOn(){
+  try{return !!(S&&S.pyr&&S.pyr.on);}catch(e){return false;}}
 function pyrDivs(){return (S.pyr&&S.pyr.divs)||[];}
 function pyrMyDivId(){return (S.pyr&&S.pyr.my)||PYR_DIVS;}
 function pyrMyDiv(){return pyrDivs()[pyrMyDivId()-1]||null;}
@@ -7871,13 +7878,33 @@ function pyrStart(startDiv,speed){
   const home=w.divs[d0-1];
   home.teams.sort((a,b)=>b.ovr-a.ovr);
   const spare=home.teams.pop();          /* a leggyengébb helyére lépsz be */
-  S.pyr={on:true,my:d0,aiSpeed:sp,divs:w.divs,spare,log:[],meas:null,v:1};
+  /* ---- A POOL ELTOLÁSA, EGYSZER, ITT ----
+     A kezdő osztályod NORMALIZÁLT középértéke és ugyanazon klubok NYERS
+     középértéke közti különbség. Draftnál a szerkezeti prémium is levonódik
+     (lásd PYR_DRAFT_PREMIUM); kész klubbal indulva nem, mert ott az erőd
+     definíció szerint a klub ereje. */
+  const rawMean=home.teams.reduce((a,t)=>a+t.raw,0)/home.teams.length;
+  const pyrMean=home.teams.reduce((a,t)=>a+t.ovr,0)/home.teams.length;
+  const draftStart=!(typeof careerStart!=="undefined"&&careerStart==="club");
+  const off=Math.round((pyrMean-rawMean-(draftStart?PYR_DRAFT_PREMIUM:0))*10)/10;
+  S.pyr={on:true,my:d0,startDiv:d0,aiSpeed:sp,divs:w.divs,spare,
+         off,rawMean:Math.round(rawMean*10)/10,log:[],meas:null,v:1};
   oppTargetRating=pyrLevel();
   careerBaseRating=oppTargetRating;
+  /* A teljes karrier-pool AZONNAL a piramis skálájára kerül — enélkül a draft
+     a nyers adatbázisból merítene, és a kezdő kereted messze a mezőnye fölé
+     nőne. Ugyanaz a lánc, amit az applyOppLevel futtat szintváltáskor. */
+  if(gameMode==="career"&&careerPool)Object.values(careerPool).forEach(e=>{
+    if(drafted.has(e.n))return;
+    applyMarketShift(e);
+    e.startRating=Math.round(ratingAtAge(e.peak,e.age));
+    syncAttrsToRating(e);
+    if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
   SEASON_OPPS=pyrOpponents();
   if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
   return `Piramis indítva: D${d0} · ${home.name} · mezőny ${oppTargetRating} `
     +`· ${PYR_SPEEDS[sp].n} (AI-ütem ${pyrAiRate(d0).toFixed(1)}/szezon) `
+    +`· pool-eltolás ${off>0?"+":""}${off} `
     +`· a helyedet ${spare.n} adta át.`;}
 /* A futó piramis állapotának kiíratása — a konzolhoz, a fejlesztéshez. */
 function pyrDumpState(){
@@ -7898,6 +7925,69 @@ function pyrDumpState(){
       +`  ${String(x.net==null?"—":(x.net>=0?"+":"")+x.net.toFixed(1)).padStart(6)}`
       +(x.to!==x.div?(x.to<x.div?"   ⬆️":"   ⬇️"):"")));}
   return L.join("\n");}
+/* ================= A SÚLYOZOTT DRAFT =================
+   A DRAFT-PARADOXON: egy draftolt tizenegy szerkezetileg ERŐSEBB, mint azok a
+   klubok, amikből draftoltad — a draft minden keretből a LEGJOBB embert emeli
+   ki, a klub tábla-Ratingje viszont a saját top-11 átlaga. Mérve: egyenletes
+   merítésnél a hatodosztályból induló draftos játékos +10,5-en áll a saját
+   mezőnye fölött, ami a `gaps` táblázat szerint azonnali, biztos feljutás —
+   vagyis az indulási osztály és az ellenfél-tempó választása egyaránt
+   hatástalanná válna.
+
+   A MEGOLDÁS KÉT ÖSSZETEVŐ, és egyik sem elég önmagában:
+
+   1. SÚLYOZOTT PÖRGETÉS. Nem a pool erejét nyomjuk le, hanem a pörgetés
+      ESÉLYÉT toljuk el a saját osztályod felé: w[d] = q^|d − indulás|. A
+      q=0,15 mellett a pörgetések ~85%-a a saját osztályodból jön, de marad
+      ~2% esély egy élvonalbeli klubra — a "hátha most jön egy nagy név"
+      élmény megmarad. Ez +10,5-ről +3,1-re visz.
+   2. A PIRAMIS SKÁLÁJA (pyrPoolOffset). A világ Ratingjei normalizáltak, a
+      játékosoké nyersek — a kettő közti különbséggel a teljes karrier-poolt
+      eltoljuk. Enélkül a kezdő XI 79,5-83,4 marad, vagyis +8…+12, akármilyen
+      meredek a súlyozás.
+
+   A maradék ~+2,7 a draft szerkezeti prémiuma (mérve ÁLLANDÓ: D6-ból +2,7,
+   D3-ból +3,7, válogatottakkal +2,8) — ezt a PYR_DRAFT_PREMIUM konstans
+   viszi le. Kész klubbal indulva NEM jár: ott az erőd definíció szerint a
+   klub ereje, nincs mit korrigálni. */
+const PYR_DRAFT_Q=0.15;       /* a súlyprofil meredeksége */
+/* PADLÓ A TÁVOLI OSZTÁLYOKRA. A mértani csökkenés önmagában túl gyorsan hal
+   el: a hatodosztályból az élvonal esélye 0,15^5 ≈ 0,008%, azaz SOHA — pedig
+   épp az a draft egyik öröme, hogy néha egy nagy név is eléd kerül. A padló
+   minden osztálynak ad egy minimális esélyt; a hatodosztályból a felső három
+   együtt így ~1,2%-ot kap: ritka, de nem lehetetlen. */
+const PYR_DRAFT_FLOOR=0.004;
+const PYR_DRAFT_PREMIUM=3;    /* a draft szerkezeti prémiuma, mérve */
+/* A piramis-tábla egy sorához tartozó VALÓS keret. A világ csak {club,season}
+   párost tárol; a draftnak a teljes keret kell. */
+function pyrSquadOf(t){
+  if(!t)return null;
+  const L=activeSquads();
+  for(let i=0;i<L.length;i++)
+    if(L[i].club===t.club&&L[i].season===t.season)return L[i];
+  return null;}
+/* EGY PÖRGETÉS LANDOLÁSA a piramisban: előbb osztályt sorsolunk a súlyokkal,
+   aztán azon belül egyenletesen klubot. A KEZDŐ osztályhoz mérünk, nem a
+   mostanihoz: a draft a karrier elején zajlik, és így a Run-visszajátszás
+   (runRebuildDraftTop11) egy feljutás után is ugyanazt a sorozatot adja. */
+function pyrDraftPick(rnd){
+  const r=rnd||Math.random;
+  const start=(S.pyr&&S.pyr.startDiv)||pyrMyDivId();
+  const w=[];let tot=0;
+  for(let d=1;d<=PYR_DIVS;d++){
+    const x=Math.max(PYR_DRAFT_FLOOR,Math.pow(PYR_DRAFT_Q,Math.abs(d-start)));
+    w.push(x);tot+=x;}
+  let x=r()*tot,d=0;
+  while(d<PYR_DIVS-1&&x>w[d]){x-=w[d];d++;}
+  const teams=(pyrDivs()[d]&&pyrDivs()[d].teams)||[];
+  if(!teams.length)return null;
+  return pyrSquadOf(teams[Math.floor(r()*teams.length)]);}
+/* ---- A POOL ELTOLÁSA A PIRAMIS SKÁLÁJÁRA ----
+   A világ tábla-Ratingjei normalizáltak (rang-alapú elhelyezés), a
+   játékos-adatbázis viszont nyers. A különbség a KEZDŐ osztályodban mérve
+   adja az eltolást, amit a teljes karrier-pool megkap. Draftnál a szerkezeti
+   prémium is levonódik. Az érték a karrier indulásakor rögzül. */
+function pyrPoolOffset(){return (S.pyr&&S.pyr.off)||0;}
 /* ==== PYR-BLOKK VÉGE ==== */
 /* Posztengedmények: csak reális, valós futballban is előforduló szomszédos
    szerepkör-váltásokat engedünk meg (pl. hátvéd ⇄ hátrébb húzódó középpályás,
@@ -8186,7 +8276,16 @@ const EURO_COMPS={
      legkisebb európai kupáé. A színe a magyar piros. */
   MK:{n:"Magyar Kupa",short:"MK",col:"#d92b3a",winCol:"#ff9aa2",oppDelta:-4,
       domestic:true,
-      champBoost:1,tacticBoost:1,prize:{win:0.5,final:0.25,semi:0.125}}
+      champBoost:1,tacticBoost:1,prize:{win:0.5,final:0.25,semi:0.125}},
+  /* A FELSŐ KÉT OSZTÁLY HAZAI KUPÁJA — csak a ligapiramis-módban.
+     Ott a hazai kupa NEM az alsóbb szintek szerény sorozata: a legjobb 32
+     csapat játssza, és a győzelme BL-indulást ér. Ezért kap saját, erősebb
+     mezőnyt (oppDelta 0, szemben az MK −4-ével) és nagyobb díjazást — a
+     KL és az EL közé árazva. A színe királykék, hogy egy pillantásra
+     megkülönböztethető legyen a piros Magyar Kupától. */
+  FA:{n:"FA-kupa",short:"FA",col:"#4f46e5",winCol:"#c7d2fe",oppDelta:0,
+      domestic:true,
+      champBoost:2,tacticBoost:2,prize:{win:1.0,final:0.5,semi:0.25}}
 };
 /* ================= NEHÉZSÉGI SÁV → LIGANÉV + KUPAJOGOSULTSÁG =================
    EGY táblázat mondja meg, hogy egy adott mezőnyszinten hogy hívják a
@@ -8227,9 +8326,64 @@ const CUP_TIERS=[
   {max:Infinity, league:"Biszem-baszom premier líg",
    entries:[{comp:"BL",max:1},{comp:"EL",max:3},{comp:"KL",max:5}]}
 ];
+/* ================= A LIGAPIRAMIS KUPARENDSZERE =================
+   A hagyományos módban a kvalifikációt nem a Rating-sáv adja, hanem az
+   OSZTÁLY — ez az egész mód lényege. A tábla alakja szándékosan azonos a
+   CUP_TIERS-ével, hogy a teljes kupagépezet (cupEntryFor, euroMkChainPending,
+   a selejtező, a mezőnyépítés) egyetlen sor változtatásával átvegye.
+
+   A RENDSZER, fentről lefelé:
+     D1  élvonal   — FA-kupa a legjobb 32-ből, SELEJTEZŐ NÉLKÜL.
+                     1-3. BL · 4-5. EL · 6. KL, mind selejtező nélkül.
+                     Az FA-kupa győztese a KÖVETKEZŐ idényben BL-t játszik.
+     D2  másodoszt.— innen MINDEN csapat nevez az FA-kupába, NÉGY körös
+                     selejtezővel. Nemzetközi hely nincs.
+     D3  NB I      — 1. BL-selejtező · 2. EL-selejtező · 3. KL-selejtező;
+                     aki nem fér be, az a Magyar Kupában indul (bárhányadik
+                     helyről). Az MK győztese a KÖVETKEZŐ idényben BL-selejtezőt
+                     játszik.
+     D4  NB II     — az első 3 helyezett nevez a Magyar Kupába.
+     D5-D6         — nincs kupa.
+
+   A SELEJTEZŐ MINDENÜTT 4 MÉRKŐZÉS (két oda-visszavágós párharc), és a
+   bukás nem kiesés, hanem LECSÚSZÁS a következő sorozat selejtezőjébe
+   (EURO_DROP: BL→EL→KL) — ez a gépezetben már megvolt.
+
+   EGY MEGJEGYZÉS A KÉT HAZAI KUPÁHOZ: a piramis felső fele FA-kupát játszik,
+   az alsó Magyar Kupát. Ez szándékos (a felső kupa erősebb mezőnyű és
+   BL-t ér), de azt is jelenti, hogy egy D2→D3 kiesés KUPÁT IS VÁLT. Ha ez
+   zavarónak bizonyul, elég a lenti tábla két `comp` mezőjét egységesíteni. */
+const PYR_CUPS=[
+  /* D1 */ {entries:[{comp:"BL",max:3},{comp:"EL",max:5},{comp:"KL",max:6},{comp:"FA",max:99}],
+            cupWins:{comp:"FA",gives:"BL",qual:false}},
+  /* D2 */ {qual:true,qualRounds:4,entries:[{comp:"FA",max:99}]},
+  /* D3 */ {qual:true,entries:[{comp:"BL",max:1},{comp:"EL",max:2},{comp:"KL",max:3},{comp:"MK",max:99}],
+            cupWins:{comp:"MK",gives:"BL",qual:true}},
+  /* D4 */ {qual:true,entries:[{comp:"MK",max:3}]},
+  /* D5 */ {entries:[]},
+  /* D6 */ {entries:[]}
+];
+/* Melyik osztályhoz tartozik egy adott mezőnyszint? A piramisban a szint az
+   osztály középértéke, de a hívók tetszőleges számmal is jöhetnek (pl. a
+   nehézség-címke) — ezért a LEGKÖZELEBBI osztályt választjuk. */
+function pyrDivForLevel(level){
+  const D=(typeof pyrDivs==="function")?pyrDivs():[];
+  if(!D.length)return 1;
+  if(level==null)return (typeof pyrMyDivId==="function")?pyrMyDivId():1;
+  let best=1,bd=Infinity;
+  D.forEach(d=>{const x=Math.abs((d.mean||0)-level);if(x<bd){bd=x;best=d.id;}});
+  return best;}
 function cupTierFor(level){
   /* a typeof-őr kell: ez a fájlban KORÁBBAN áll, mint az oppTargetRating
      deklarációja, és egy korai hívás különben TDZ-hibával döntené a szkriptet */
+  /* PIRAMIS: az OSZTÁLY dönt, nem a Rating-sáv. A visszaadott alak azonos a
+     CUP_TIERS sorokéval, ezért minden hívó változtatás nélkül működik. */
+  if(typeof pyrOn==="function"&&pyrOn()){
+    const id=pyrDivForLevel(level);
+    const c=PYR_CUPS[id-1]||PYR_CUPS[PYR_CUPS.length-1];
+    const d=(typeof pyrDivs==="function")?pyrDivs()[id-1]:null;
+    return {league:(d&&d.name)||("D"+id),qual:!!c.qual,qualRounds:c.qualRounds,
+            entries:c.entries,cupWins:c.cupWins,pyrDiv:id};}
   const r=level!=null?level:(typeof oppTargetRating!=="undefined"?oppTargetRating:84);
   return CUP_TIERS.find(t=>r<=t.max)||CUP_TIERS[CUP_TIERS.length-1];}
 /* A megszerzett indulás: {comp, qual} vagy null. A qual azt jelzi, hogy a
@@ -9728,8 +9882,16 @@ function euroStartRound(round,pool){
    miközben itt semmi nem fejlődik. Két kör megtartja a tétet anélkül, hogy
    elnyújtaná a szezonzárást. */
 const EURO_QUAL_ROUNDS=2;
-const EURO_DROP={BL:"EL",EL:"KL",KL:null,MK:null};
-function euroQualLabel(r){return `Selejtező ${r}/${EURO_QUAL_ROUNDS}. kör`;}
+/* ---- HÁNY KÖRÖS A SELEJTEZŐ? ----
+   Alapesetben kettő (a fenti indoklás). A ligapiramisban viszont a
+   másodosztály FA-kupája NÉGY körrel kezd: onnan MINDEN csapat nevez, tehát
+   a főtáblára jutás maga a szűrő. A sáv `qualRounds` mezője dönt. */
+function euroQualRounds(){
+  const t=(typeof cupTierFor==="function")?cupTierFor():null;
+  const n=t&&t.qualRounds;
+  return (n>=1&&n<=6)?n:EURO_QUAL_ROUNDS;}
+const EURO_DROP={BL:"EL",EL:"KL",KL:null,MK:null,FA:null};
+function euroQualLabel(r){return `Selejtező ${r}/${euroQualRounds()}. kör`;}
 function euroStartQual(){
   const E=S.euro;
   E.stage="qual";E.idx=0;E.qRound=(E.qRound||0)+1;E.qLegs=[null,null];
@@ -9771,7 +9933,7 @@ function euroResolveQual(){
     opp:E.teams[E.qOppIdx].n});
   addLine(`${won?"✅":"❌"} ${euroQualLabel(E.qRound)} — összesítés ${mine}:${theirs}, ${how}. ${won?"Tovább!":"Elbuktátok a selejtezőt."}`,"m life");
   if(!won){euroQualFailed();return;}
-  if(E.qRound>=EURO_QUAL_ROUNDS){euroEnterMain();return;}
+  if(E.qRound>=euroQualRounds()){euroEnterMain();return;}
   euroStartQual();showEuroScreen();}
 function euroQualFailed(){
   const E=S.euro,next=EURO_DROP[E.comp];
@@ -12734,6 +12896,16 @@ const MARKET_INF_SCALE=0.75;   /* 0.55 volt — lásd a marketPeakShift indoklá
 const MARKET_INF_MAX_LAG=8;      /* a piac teteje ennyivel maradhat a mezőny mögött */
 const MARKET_TOP_BASEPEAK=96;    /* a pool legjobb basePeak-je (a tsiToPeakOvr telítése) */
 function marketPeakShift(){
+  /* ---- A PIRAMIS SAJÁT SKÁLÁJA ----
+     Két dolgot hordoz egyszerre. (1) A világ Ratingjei normalizáltak, a
+     játékos-adatbázis nyers — a különbséget (pyrPoolOffset) a teljes pool
+     megkapja, különben a draftolt keret +8…+12-vel a saját mezőnye fölött
+     állna. (2) A világ a végtelenbe nő, tehát a piacnak 1:1-ben követnie kell
+     — a 100 fölötti csillapítás (MARKET_INF_SCALE) itt kifejezetten káros
+     volna: a piramisban a mezőny SOSEM áll meg, tehát a lemaradás sem
+     állna meg soha. */
+  if(typeof pyrOn==="function"&&pyrOn())
+    return pyrPoolOffset()+((oppTargetRating||0)-careerBaseRating);
   const raw=Math.max(0,(oppTargetRating||0)-careerBaseRating);
   if(raw<=0)return 0;
   /* hány pont esik a 100-as küszöb ALÁ a karrier indulószintjéhez képest */
@@ -19180,7 +19352,10 @@ function spin(isReroll){
        Az animáció flicker-e fent marad Math.random — csak látvány. */
     draftSpinNo++;
     const r=rngFor("draft:spin:"+draftSpinNo);
-    curSquad=pool[Math.floor(r()*pool.length)];
+    /* PIRAMIS: súlyozott merítés a saját osztályod felé (lásd pyrDraftPick).
+       A `pool` egyenletes indexelése marad a tartalék, ha a piramisból
+       bármiért nem jönne keret. */
+    curSquad=(pyrOn()&&pyrDraftPick(r))||pool[Math.floor(r()*pool.length)];
     showSquadCard(curSquad);
     if(!squadHasUsablePlayer(curSquad)){
       setDraftStatus("Nincs beilleszthető játékos ebből a keretből — ingyen újrapörgetés!");
@@ -42260,7 +42435,8 @@ function runRebuildDraftTop11(){
   if(!pool.length)return false;
   const seen=new Map(),t=[];
   for(let i=1;i<=draftSpinNo;i++){
-    const sq=pool[Math.floor(rngFor("draft:spin:"+i)()*pool.length)];
+    const _r=rngFor("draft:spin:"+i);
+    const sq=(pyrOn()&&pyrDraftPick(_r))||pool[Math.floor(_r()*pool.length)];
     if(!sq)continue;
     careerCandidatesFromSquad(sq,careerPool).forEach(e=>{
       if(!e)return;
@@ -45049,9 +45225,36 @@ function euroCampaignEndNow(kind){
    szövege és maga a láncindítás. */
 function euroMkChainPending(){
   const E=S.euro;
-  if(!E||E.comp!=="MK"||E.result!=="win")return false;
+  if(!E||E.result!=="win")return false;
   const tier=cupTierFor();
+  /* PIRAMIS: a hazai kupa jutalma a KÖVETKEZŐ idényre szól (a specifikáció
+     szerint "a következő idényben játszhat BL-selejtezőt"), tehát itt nincs
+     azonnal induló lánc — a nevezést a pyrCupWinNote teszi el. */
+  if(typeof pyrOn==="function"&&pyrOn())return false;
+  if(E.comp!=="MK")return false;
   return !!(tier&&tier.mkWinsKL)&&!S.mkToKLDone;}
+/* ---- A HAZAI KUPA GYŐZTESE A KÖVETKEZŐ IDÉNYBEN INDULHAT ----
+   A piramisban a hazai kupa nem azonnali láncot indít, hanem a KÖVETKEZŐ
+   szezonra szóló nevezést ad (D1: FA-kupa → BL selejtező nélkül; D3: Magyar
+   Kupa → BL-selejtező). Az S.euroEntry a meglévő "jövő szezonra szóló
+   indulás" mechanizmus — ugyanaz, amit a bajnoki helyezés is használ.
+   FELÜLÍRJA a helyezésből járó indulást, ha az gyengébb: a kupagyőzelem a
+   legerősebb út Európába. */
+function pyrCupWinNote(){
+  if(!(typeof pyrOn==="function"&&pyrOn()))return false;
+  const E=S.euro;
+  if(!E||E.result!=="win")return false;
+  const cw=cupTierFor().cupWins;
+  if(!cw||cw.comp!==E.comp)return false;
+  const RANK={BL:3,EL:2,KL:1,FA:0,MK:0};
+  const cur=S.euroEntry;
+  if(cur&&cur.forSeason===(S.seasonNumber||1)+1
+     &&(RANK[cur.comp]||0)>=(RANK[cw.gives]||0))return false;
+  S.euroEntry={comp:cw.gives,qual:!!cw.qual,forSeason:(S.seasonNumber||1)+1};
+  addLine(`🎫 A(z) ${esc(EURO_COMPS[E.comp].n)} megnyerésével kiharcoltad a `
+    +`${esc(EURO_COMPS[cw.gives].n)}-indulást a KÖVETKEZŐ idényre`
+    +`${cw.qual?" (selejtezőtől)":" — selejtező nélkül"}.`,"m life");
+  return true;}
 /* ---- KUPAGYŐZELEM: ÜNNEPLÉS ----
    A bajnoki címnek eddig is volt saját képernyője; a kupák megnyerése viszont
    csak egy sor szöveg volt a menetrend-dobozban. Innentől mindegyik sorozat
@@ -45407,7 +45610,10 @@ function endEuroCampaign(){
      ez ugyanaz az elv, amin a nevezés is áll (a jobbik eredménye viszi a
      kettőt). Ezért a lánc-ág akkor is meghívódik, ha ÉN nem nyertem: a
      társam győzelme az én oldalamon is elsütheti. */
-  const chainable=!!(E&&E.comp==="MK"&&tier.mkWinsKL&&!S.mkToKLDone);
+  /* PIRAMIS: a kupagyőzelem jutalma a következő idényre szól — itt tesszük el. */
+  try{pyrCupWinNote();}catch(e){}
+  const chainable=!!(E&&E.comp==="MK"&&tier.mkWinsKL&&!S.mkToKLDone
+                     &&!(typeof pyrOn==="function"&&pyrOn()));
   const fireChain=()=>{
     S.mkToKLDone=true;
     S.euro=null;S.euroCurrent="KL";S.euroCurrentQual=false;S.euroOptOut=false;
@@ -46425,8 +46631,14 @@ function startNextCareerSeason(){
      csak a RÉGI mentéseket szolgálja ki, amikben egy szezont csúszó indulás
      maradt függőben — azok még egyszer lefutnak, utána minden azonos szezonos. */
   if(S.euroEntry&&S.euroEntry.forSeason===S.seasonNumber){
-    S.euroCurrent=S.euroEntry.comp;S.euroOptOut=false;}
-  else S.euroCurrent=null;
+    S.euroCurrent=S.euroEntry.comp;S.euroOptOut=false;
+    /* A SELEJTEZŐ-JELZŐ IS: eddig kimaradt ebből az ágból, mert az ág csak
+       régi mentéseket szolgált ki (a szezont csúsztató indulás megszűnt). A
+       ligapiramisban viszont ÉLŐ út: a hazai kupa győztese a KÖVETKEZŐ
+       idényre kap nevezést, és annál számít, selejtezőtől indul-e. Enélkül a
+       D3 Magyar Kupa-győztese a BL FŐTÁBLÁJÁN kezdett volna. */
+    S.euroCurrentQual=!!S.euroEntry.qual;}
+  else {S.euroCurrent=null;S.euroCurrentQual=false;}
   S.finalTable=null;S.seasonClosed=false;S.hubReportHtml=null;S.fixtureResults=[];
   S.mkToKLDone=false;   /* a hazai kupa → KL lánc szezononként egyszer süthet el */
   /* F5/F6: a társ szezonzárása és a szezonzáró döntés szezononként új — a
