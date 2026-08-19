@@ -3408,7 +3408,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.01";
+const APP_VERSION="3.5.02";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -10421,7 +10421,10 @@ function recordScorer(name){
   if(euroActive()){euroAddStat("scorers",name,teamName,true);
     try{euroChalMark(name);}catch(e){}
     const b=seasonEuroBucket();b.scorers[name]=(b.scorers[name]||0)+1;}
-  else S.scorers[name]=(S.scorers[name]||0)+1;}
+  else S.scorers[name]=(S.scorers[name]||0)+1;
+  /* A SZTÁR GÓLBÓNUSZA. Azért ITT és nem a gólblokkban: ez a közös csatorna,
+     tehát a tizenegyes, a szabadrúgás, a csere-gól és a kupameccs is fizet. */
+  try{starGoalBonusPay(name);}catch(e){}}
 function recordAssist(name){
   try{roleAuraNote(name,"assist");}catch(e){}
   if(euroActive()){euroAddStat("assists",name,teamName,true);
@@ -12729,7 +12732,10 @@ function wageStardomOf(name,normalWage){
   if(!name||name!==fameStarName())return 0;
   let anchor=0;
   try{anchor=fameWageAnchor();}catch(e){return 0;}
-  return Math.max(normalWage||0,anchor*wageStardomShare());}
+  /* A KIALKUDOTT BÉREMELÉS a hírnév-alapú bérre ül rá (starWageMult) — az
+     alapból 1,0, tehát aki sosem egyezett bele, annál semmi nem változik. */
+  let mult=1;try{mult=starWageMult();}catch(e){}
+  return Math.max(normalWage||0,anchor*wageStardomShare()*mult);}
 /* A RATING-KULCS: a szétosztás súlya. Önmagában nem forint, csak arány — a
    bázist ennek mentén osztjuk szét. */
 function wageKey(r){
@@ -12942,6 +12948,7 @@ const LEDGER_CATS={
   penalty: {n:"Kihívás-büntetés",         ic:"⚠️", side:-1},
   wageStar:{n:"A bére",                   ic:"💸", side:-1, star:1},
   boostStar:{n:"A boostja",               ic:"⚡", side:-1, star:1},
+  bonusStar:{n:"A gólbónusza",            ic:"🎯", side:-1, star:1},
   other:   {n:"Egyéb",                    ic:"·",  side:-1}
 };
 /* Ha a tétel a KIJELÖLT SZTÁRÉ, ide kerül helyette. Így a hívási helyeken
@@ -13092,7 +13099,9 @@ function chargeMatchWages(players){
     addLine(`💸 Fizetések: <b>−${fmtFt(paid)}</b> (${players.length} pályára lépés`
       +(bill.stars?` · ${bill.stars} top sztár felára`:"")+`)`
       +(bill.stardom>0?` · <span style="color:var(--gold)">ebből ${esc(shortName(bill.ctx.stardom))} egyedül `
-        +`${fmtFt(Math.round(bill.stardom))} (a heti lelátó ${Math.round(wageStardomShare()*100)}%-a, plafonon kívül)</span>`:"")
+        +`${fmtFt(Math.round(bill.stardom))} (a heti lelátó ${Math.round(wageStardomShare()*starWageMult()*100)}%-a`
+        +(starWageMult()>1?` — ebben a kialkudott ${Math.round(starWageMult()*100)}%-os emelés`:"")
+        +`, plafonon kívül)</span>`:"")
       +(bill.capped?` · <span style="color:var(--gold)">a plafon ${fmtFt(Math.round(raw-due))}-tal visszahúzta`
         +` (a lelátó ${Math.round(bill.ctx.capShare*100)}%-a${bill.ctx.success?", sikeres idény után":""})</span>`:"")
       +(unpaid?` · <span style="color:var(--red)">${fmtFt(unpaid)} fedezetlen maradt</span>`:"")
@@ -17342,7 +17351,17 @@ function computeLeaveCandidate(){
     (i===captainIdx||!s.player||s.player.family)?0
       :Math.max(0.3,4-(s.player.coopI!=null?s.player.coopI:2.5)));
   if(!weights.some(w=>w>0))return null;
-  const idx=weightedIndex(weights);
+  /* „SZTÁROM A PÁROM": ha jön az elvágyódás, 50% eséllyel épp AZ AZ EMBER akar
+     menni, akire az egész karriered épül. A kizárások (kapitány, családtag)
+     itt is érvényesek — ha a sztár egyikük, marad a szokásos sorsolás. */
+  let idx=-1;
+  try{
+    if(starDealOn()&&Math.random()<STAR_LEAVE_IS_STAR){
+      const n=fameStarName();
+      const si=slots.findIndex((sl,i)=>weights[i]>0&&sl&&sl.player&&sl.player.n===n);
+      if(si>=0)idx=si;}
+  }catch(e){}
+  if(idx<0)idx=weightedIndex(weights);
   if(idx<0||!slots[idx]||!slots[idx].player)return null;
   const leaver=slots[idx].player;
   const e=(gameMode==="career"&&careerPool)?careerPool[leaver.n]:null;
@@ -17607,7 +17626,7 @@ const GLOSSARY={
   csaladtag:{title:"Családtag",text:"Karrier mód elején egy családtagod is bekerülhet a keretbe, saját specialitással (pl. gyors reflexek, kőkemény játékos, 200 IQ). Ő sosem cserélhető le automatikusan, és ha kiemelkedő pillanata van egy meccsen, a csapat morálja jobban felnagyítva reagál rá."},
   infinity:{title:"Infinity mód",text:"A 100-as szint elérése után feloldható a végtelen mód: eltűnik a 119-es Rating-plafon, a játékosok 55 éves korig játszhatnak, az akadémia a mezőnyszinthez skálázódik, a nehézség pedig 200-ig (majd további szintekkel még feljebb) tolható. Itt már nincs Rating-hanyatlás, csak a fejlődés és a végtelen kihívás. A MEGNYITÁS PILLANATÁBAN a teljes kereted — kezdő 11, cserepad és tartalék egyaránt — egyszeri TSI-boostot kap: magasabb lesz a fejlődési plafonjuk, amibe játékkal lehet belenőni. A SZINTLÉPÉS 100 FÖLÖTT PONTOSAN UGYANAZ, mint alatta: a mezőnyt állítja, a te keretedhez nem nyúl. Ami megvéd az elavulástól, az a piac: 100 fölött a megvásárolható és a scout által talált játékosok jóval lassabban erősödnek, mint a mezőny — így a saját, felnevelt kereted marad a karriered gerince, nem a folyamatos vásárlás."},
   ifiboost:{title:"Ifi-boost",text:"A HUB-ban egy topjátékos áráért berobbanthatod egy saját akadémistád fejlődését: azonnal +6-12 Rating és jelentős TSI-ugrás, ami a hosszú távú fejlődését is felgyorsítja. Magasabb mezőnyszinten arányosan drágább, de erősebb is. Így egy ígéretes tehetség pár szezon alatt sztárrá érlelhető."},
-  hiresseg:{title:"Híresség (Sztárom a párom)",text:"A ⭐ Sztárom a párom filozófia saját valutája: a KIJELÖLT SZTÁR hírneve. Három forrásból gyűlik. (1) KOMMENTÁTORI MEGJEGYZÉS — 1 pont; nem a gól maga, hanem a hozzá tartozó ízesítő sor (bombagól, párkémia, díj-idézet), gólonként legfeljebb három; a 3., 4., 5. és 6+. gól saját, hangsúlyos kommentárja 3-3 pont. (2) A MECCS EMBERE — bajnokiban 1, rangadón 2, a Magyar Kupában 2, Konferencia-ligában 3, Európa-ligában 4, Bajnokok Ligájában 5; az európai kupák kieséses szakaszában ×1,5, a döntőben ×4 (a kettő nem szorzódik össze). (3) EGYÉNI DÍJ — a legritkább és a legnagyobb: bajnoki és Magyar Kupa-gólkirály/gólpasszkirály 1, KL 1,5, EL 3, BL 10, Aranylabda 15 — mindet a MEZŐNY SZINTJE szorozza (szint/5), ezért egy díj a magasabb ligában nagyságrenddel többet ér. A gyűlő pontnak két következménye van: MÉRFÖLDKŐ-lépcsőt fizet, és HÍRESSÉG-SZINTET ad (hat fokozat, Helyi kedvenctől az Élő legendáig). A szint nyitja a sztár körüli véletlen bevételeket: szurkoló-robbanás (a törzsközönség 20-250%-a, idényenként max 4), reklámszerződés (a heti lelátó 100-700%-a, idényenként 2-8 a szinttől függően) és befektető (a heti lelátó 1000-10 000%-a, idényenként max 1 — csak a 2. híresség-szinttől és legalább a második idénytől). Az ára is kiugró: a sztár bére nem a Rating-kulcsból jön, hanem a hírnevéből, és a keret-bér plafonja RÁ NEM VONATKOZIK — emiatt a csapatbér a feltételek teljesülése ellenére is túllépheti a szurkolói bevétel felét. A hírneve által hozott tömeg viszont nem drágítja vissza a saját bérét."},
+  hiresseg:{title:"Híresség (Sztárom a párom)",text:"A ⭐ Sztárom a párom filozófia saját valutája: a KIJELÖLT SZTÁR hírneve. Három forrásból gyűlik. (1) KOMMENTÁTORI MEGJEGYZÉS — 1 pont; nem a gól maga, hanem a hozzá tartozó ízesítő sor (bombagól, párkémia, díj-idézet), gólonként legfeljebb három; a 3., 4., 5. és 6+. gól saját, hangsúlyos kommentárja 3-3 pont. (2) A MECCS EMBERE — bajnokiban 1, rangadón 2, a Magyar Kupában 2, Konferencia-ligában 3, Európa-ligában 4, Bajnokok Ligájában 5; az európai kupák kieséses szakaszában ×1,5, a döntőben ×4 (a kettő nem szorzódik össze). (3) EGYÉNI DÍJ — a legritkább és a legnagyobb: bajnoki és Magyar Kupa-gólkirály/gólpasszkirály 1, KL 1,5, EL 3, BL 10, Aranylabda 15 — mindet a MEZŐNY SZINTJE szorozza (szint/5), ezért egy díj a magasabb ligában nagyságrenddel többet ér. A gyűlő pontnak két következménye van: MÉRFÖLDKŐ-lépcsőt fizet, és HÍRESSÉG-SZINTET ad (hat fokozat, Helyi kedvenctől az Élő legendáig). A szint nyitja a sztár körüli véletlen bevételeket: szurkoló-robbanás (a törzsközönség 20-250%-a, idényenként max 4), reklámszerződés (a heti lelátó 100-700%-a, idényenként 2-8 a szinttől függően) és befektető (a heti lelátó 1000-10 000%-a, idényenként max 1 — csak a 2. híresség-szinttől és legalább a második idénytől). Az ára is kiugró: a sztár bére nem a Rating-kulcsból jön, hanem a hírnevéből, és a keret-bér plafonja RÁ NEM VONATKOZIK — emiatt a csapatbér a feltételek teljesülése ellenére is túllépheti a szurkolói bevétel felét. A hírneve által hozott tömeg viszont nem drágítja vissza a saját bérét. A SZTÁR NEM CSAK AD, HANEM KÖVETEL IS — ez a stílus kockázati oldala. Az elvágyódás-esemény itt PONTOSAN KÉTSZER olyan gyakori, mint bármely más stílusban (mérve: 8,3% helyett 16,7% a váratlan fordulatokból), és ha jön, 50% eséllyel épp a SZTÁR akar menni. Ezen felül két saját követeléssel állhat elő az átigazolási időszakban: GÓLONKÉNTI BÓNUSZT kér (a heti lelátó 2-10%-a minden góljáért — innentől minden találata a kasszából is fizet, és minél jobb, annál drágább), vagy BÉREMELÉST (+50-400% a meccs-bérére; a halmozott emelés hatszorosnál megáll). Mindkettő visszautasítható, de nem következmény nélkül: a sértődés 6 morált visz, és minden egyes visszautasítás FÉLSZERESÉVEL tovább emeli az elvágyódás esélyét (egy nem után 3×, kettő után 4×). A megkötött alkuk a karrier végéig élnek, és a szezonmérleg sztár-blokkjában külön sorban látszanak."},
   bajnokilistak:{title:"Bajnoki góllövő-, gólpassz- és tisztalap-lista",text:"A kupasorozatnak mindig volt egész mezőnyre szóló egyéni statisztikája; mostantól a BAJNOKSÁGNAK is. A Menetrend és tabella képernyőn, a tabella alatt látod a teljes, 16 csapatos mezőny három egyéni versenyét: góllövőlista, gólpassz-lista, tisztalap-lista. A mezőny AI-meccseinek gólszerzőit ugyanaz a súlyozás választja ki, mint a kupában (poszt + játékoserő), valódi klubkeretekből — a listán tehát igazi nevek állnak, és a számok pontosan a tabella eredményeiből jönnek. A szezon végén mindhárom lista élén álló játékos díjat kap; ha a TIÉD, tartós képességet is: a Bajnoki gólkirály, a Bajnoki gólpassz-király és a Bajnoki kapus-király a BL megfelelő arany-díjának a HARMADÁT éri. A díj beleszámít az Aranylabda szavazásába is."},
   statisztika:{title:"Statisztika",text:"A karrier során vezetjük minden játékos mindenkori teljesítményét: meccsek, gólok, gólpasszok, mesterhármasok (MH), MVP-k, bravúrok, tiszta lapok. A kártyaszintű játékosok neve a saját színükkel jelenik meg a táblázatban. A karrier lezárásakor egy összefoglaló .txt is letölthető."},
   ikonok:{title:"Ikonok",text:"Ritka, ikonikus ajánlatként legendás játékosok (pl. Puskás, Szoboszlai) csatlakozhatnak a csapatodhoz. Ők a jelenlegi erejükről indulnak, de innentől ők is fejlődnek és kaphatnak kártyaszintet — akár GODLIKE-ig. Egy ikon hosszú távon a keret meghatározó alakjává válhat."},
@@ -22586,6 +22605,108 @@ function fameState(){
     F.ev={surge:0,ad:0,inv:0};}
   return F;}
 function famePoints(){const F=fameState();return F?F.pts:0;}
+/* ================= A SZTÁR KÖVETELÉSEI — a filozófia ÁRA =================
+   A „Sztárom a párom" eddig egyoldalú alku volt: a sztár kiugró bért vitt, de
+   cserébe csak adott (hírnév, reklám, tömeg). Ez a blokk teszi mellé a
+   KOCKÁZATOT — innentől a sztár nemcsak drága, hanem KÖVETELŐ is.
+
+   HÁROM SZÁLON NEHEZÍT, és mind a három ugyanannak a döntésnek a két oldala:
+     · az ELVÁGYÓDÁS kétszer olyan gyakran jön elő, mint bármely más stílusban,
+       és ha jön, 50% eséllyel épp a SZTÁR akar menni — vagyis az az ember,
+       akire az egész karriered épül;
+     · GÓLONKÉNTI BÓNUSZT kér (a heti lelátó 2-10%-a gólonként): a
+       teljesítménye innentől a saját zsebét is tölti, és minél jobb, annál
+       drágább;
+     · BÉREMELÉST kér (+50-400%): a már amúgy is plafon fölötti fizetése
+       megsokszorozódik.
+   MINDKÉT KÖVETELÉS VISSZAUTASÍTHATÓ, de nem következmény nélkül: a sértődés
+   morált visz, és TOVÁBB emeli az elvágyódás esélyét. A stílus így egy valódi
+   üzleti kötéltánc lesz — megéri-e még?
+
+   MIÉRT A HÍRESSÉG-ÁLLAPOTBAN LAKIK. A `fameState()` úgyis a `S.style`-on
+   belül él, tehát a mentés magától viszi, és a szezononkénti önnullázás
+   KIFEJEZETTEN nem érinti ezeket a mezőket: egy megkötött bónusz-alku és egy
+   sértődés a karrier végéig él, nem évente újraindul. */
+const STAR_LEAVE_MULT=2;           /* a stílusban ennyiszeres az elvágyódás esélye */
+const STAR_LEAVE_IS_STAR=0.50;     /* és ekkora eséllyel épp a sztár az elvágyódó */
+const STAR_DEMAND_W=0.10;          /* a váratlan fordulatok ennyi része sztár-követelés */
+const STAR_SNUB_STEP=0.5;          /* minden visszautasítás ennyivel emeli az elvágyódást */
+const STAR_SNUB_MORALE=-6;         /* és ennyi morált visz */
+const STAR_GOAL_PCT=[0.02,0.10];   /* gólonként a heti lelátó ennyi része */
+const STAR_RAISE_PCT=[0.50,4.00];  /* a kért béremelés mértéke */
+/* A HALMOZOTT BÉREMELÉS PLAFONJA. Az esemény ismétlődhet, a szorzók pedig
+   egymásra ülnek — plafon nélkül két elfogadott kérés után a sztár bére
+   elszállna a lelátó tízszereséig, és onnan nincs visszaút. Hatszoros a
+   végpont: az már fájdalmas, de a klub még életben marad. */
+const STAR_WAGE_MULT_CAP=6;
+/* Él-e a sztár-alku? Csak akkor, ha a sztár TÉNYLEG a keretben van — egy
+   eladott vagy visszavonult sztár nem követelhet semmit. */
+function starDealOn(){
+  const n=fameStarName();
+  if(!n)return false;
+  try{return (fullCareerRoster()||[]).some(p=>p&&p.n===n);}catch(e){return false;}}
+/* Az elvágyódás szorzója: a stílus alapból duplázza, és minden visszautasítás
+   tovább emeli. Máshol 1,0 — a többi stílus viselkedése nem változik. */
+function starLeaveMult(){
+  if(!starDealOn())return 1;
+  const F=fameState();
+  return STAR_LEAVE_MULT*(1+STAR_SNUB_STEP*((F&&F.snub)||0));}
+function starWageMult(){const F=fameState();return Math.min(STAR_WAGE_MULT_CAP,(F&&F.wageMult)||1);}
+function starGoalPct(){const F=fameState();return (F&&F.goalPct)||0;}
+/* EGY KÖVETELÉS MEGSZÜLETÉSE. A kettő közül véletlenszerűen — de a
+   gólbónuszt csak egyszer kérheti (ha már áll egy alku, marad a béremelés). */
+function makeStarDemand(){
+  if(!starDealOn())return null;
+  const n=fameStarName();
+  const rnd=(a,b)=>a+Math.random()*(b-a);
+  const canGoal=!(starGoalPct()>0);
+  const kind=(canGoal&&Math.random()<0.5)?"goal":"raise";
+  if(kind==="goal"){
+    const pct=Math.round(rnd(STAR_GOAL_PCT[0],STAR_GOAL_PCT[1])*1000)/1000;
+    let week=0;try{week=fanWeeklyIncome();}catch(e){}
+    return {kind:"goal",name:n,pct,per:Math.max(1,Math.round(week*pct))};}
+  const pct=Math.round(rnd(STAR_RAISE_PCT[0],STAR_RAISE_PCT[1])*100)/100;
+  let now=0;try{now=wageStardomOf(n,0);}catch(e){}
+  return {kind:"raise",name:n,pct,now:Math.round(now),
+          after:Math.round(now*Math.min(STAR_WAGE_MULT_CAP/Math.max(1,starWageMult()),1+pct))};}
+/* A DÖNTÉS KÖVETKEZMÉNYE. Egy helyen, hogy a kézi és az auto ág sose
+   csússzon szét. Visszaad egy elbeszélhető mondatot. */
+function applyStarDemand(deal,accept){
+  const F=fameState();
+  if(!deal||!F)return "";
+  if(!accept){
+    F.snub=(F.snub||0)+1;
+    S.morale=Math.max(0,Math.min(100,(S.morale||50)+STAR_SNUB_MORALE));
+    return `${esc(shortName(deal.name))} sértetten fogadta a nemet. A csapat morálja `
+      +`<b>${STAR_SNUB_MORALE}</b>, és innentől jóval nagyobb eséllyel keres másik klubot `
+      +`(${deal.kind==="goal"?"a gólbónusz":"a béremelés"} elutasítva · `
+      +`${F.snub}. visszautasítás).`;}
+  if(deal.kind==="goal"){
+    F.goalPct=deal.pct;
+    return `Megegyeztetek: ${esc(shortName(deal.name))} <b>minden góljáért</b> a heti lelátó `
+      +`<b>${(deal.pct*100).toFixed(1).replace(".",",")}%-át</b> kapja `
+      +`(a mai forgalommal ${fmtFt(deal.per)} gólonként). Innentől minden találata a kasszából is fizet.`;}
+  const before=starWageMult();
+  F.wageMult=Math.min(STAR_WAGE_MULT_CAP,before*(1+deal.pct));
+  return `Aláírva: ${esc(shortName(deal.name))} bére <b>+${Math.round(deal.pct*100)}%</b>`
+    +(F.wageMult>=STAR_WAGE_MULT_CAP&&before*(1+deal.pct)>STAR_WAGE_MULT_CAP
+      ?` (a halmozott emelés a ${STAR_WAGE_MULT_CAP}× plafonon megállt)`:"")
+    +`. A mostani meccs-bére <b>${fmtFt(Math.round(wageStardomOf(deal.name,0)))}</b>.`;}
+/* A GÓLBÓNUSZ KIFIZETÉSE. A gólszerzés közös csatornáján (recordScorer) ül,
+   tehát a tizenegyestől a 90+ drámáig minden találat fizet. */
+function starGoalBonusPay(name){
+  if(!name||name!==fameStarName())return;
+  const pct=starGoalPct();
+  if(!(pct>0))return;
+  let week=0;try{week=fanWeeklyIncome();}catch(e){return;}
+  const due=Math.round(week*pct);
+  if(!(due>0))return;
+  const paid=budgetPay(due,"bonusStar",name);
+  try{
+    addLine(`⭐ Gólbónusz: <b>−${fmtFt(paid)}</b> ${esc(shortName(name))} szerződése szerint `
+      +`(a heti lelátó ${(pct*100).toFixed(1).replace(".",",")}%-a)`
+      +(paid<due?` · <span style="color:var(--red)">${fmtFt(due-paid)} fedezetlen</span>`:"")+".","m skillnote");
+  }catch(e){}}
 function fameLevelIdx(p){
   let i=0;
   FAME_LEVELS.forEach((L,k)=>{if((p||0)>=L.p)i=k;});
@@ -34828,6 +34949,7 @@ function twStartPhase2(){
       }
       const result=twResolvePhase2();
       if(result.title==="__LEAVE_PENDING__"&&result.cand){showLeaveOffer(result.cand);return;}
+      if(result.title==="__STARDEAL_PENDING__"&&result.deal){showStarDemand(result.deal);return;}
       if(result.title==="__DREAM_PENDING__"){
         const cand=computeDreamCandidate();
         if(cand){showDreamOffer(cand);return;}
@@ -34850,6 +34972,51 @@ function twStartPhase2(){
       sb.onclick=()=>twNextCycleOrFinish();
       $("twActions").innerHTML="";$("twActions").appendChild(sb);}
   }}
+/* ---- A SZTÁR KÖVETELÉSE: KÉT VÁLASZ ----
+   Szándékosan egyszerűbb képernyő, mint az elvágyódásé: itt nincs harmadik út,
+   nincs halasztás. Vagy aláírod, vagy nemet mondasz és vállalod a sértődést.
+   A KÖVETKEZMÉNY MINDKÉT GOMBON KI VAN ÍRVA — a döntés csak akkor döntés, ha
+   előre látod, mit vásárolsz vele. */
+function showStarDemand(deal){
+  const goal=deal.kind==="goal";
+  let week=0;try{week=fanWeeklyIncome();}catch(e){}
+  $("twTitle").textContent=goal?"Gólbónusz-alku":"Béremelés";
+  $("twBody").innerHTML=`<div class="h" style="color:var(--gold)">⭐ ${esc(shortName(deal.name))} `
+    +`${goal?"gólonkénti bónuszt kér":"béremelést kér"}</div>
+    <p style="font-size:13px;margin-top:5px;line-height:1.55">`
+    +(goal
+      ?`A menedzsmentje szerint a gólok a klub kasszáját töltik, tehát részesedés jár belőlük.
+        A kérés: <b style="color:var(--gold)">minden góljáért a heti lelátó
+        ${(deal.pct*100).toFixed(1).replace(".",",")}%-a</b> — a mai forgalommal
+        <b>${fmtFt(deal.per)}</b> gólonként.
+        <span style="color:var(--dim2)">(Heti lelátó: ${fmtFt(Math.round(week))}.)</span>`
+      :`A hírneve messze túlnőtt a szerződésén, és ezt a menedzsmentje is tudja.
+        A kérés: <b style="color:var(--gold)">+${Math.round(deal.pct*100)}%</b> a meccs-bérére.
+        Most <b>${fmtFt(deal.now)}</b> meccsenként — utána <b>${fmtFt(deal.after)}</b>.`)
+    +`<br><br><span style="color:var(--dim)">A sztár bérére a keret-bér plafonja nem vonatkozik:
+      ez a tétel a lelátón FELÜL áll.</span></p>`;
+  $("twActions").innerHTML="";
+  const finish=(head,body)=>{
+    $("twBody").innerHTML=`<div class="h">${head}</div><p style="font-size:13px;margin-top:5px;line-height:1.55">${body}</p>`;
+    $("twActions").innerHTML="";
+    const ok=document.createElement("button");ok.className="btn-p stepbtn";ok.textContent="Tovább";
+    ok.onclick=()=>twNextCycleOrFinish();
+    $("twActions").appendChild(ok);
+    drawPitch();updateBar();};
+  const mk=(cls,html,fn)=>{
+    const b=document.createElement("button");b.className=cls+" stepbtn";b.style.marginTop="6px";
+    b.innerHTML=html;b.onclick=fn;$("twActions").appendChild(b);};
+  mk("btn-y",`✍️ Aláírom<small>${goal?`${fmtFt(deal.per)} minden góljáért, a karrier végéig`
+      :`a bére ${fmtFt(deal.now)} → ${fmtFt(deal.after)} meccsenként`}</small>`,
+    ()=>{
+      const txt=applyStarDemand(deal,true);
+      try{addLine(`⭐ ${txt.replace(/<[^>]+>/g,"")}`,"m life");}catch(e){}
+      finish(`<span style="color:var(--grass)">✓ Megegyeztetek</span>`,txt);});
+  mk("btn-s",`🚫 Nemet mondok<small>morál ${STAR_SNUB_MORALE} · innentől jóval nagyobb eséllyel akar majd elmenni</small>`,
+    ()=>{
+      const txt=applyStarDemand(deal,false);
+      try{addLine(`⭐ ${txt.replace(/<[^>]+>/g,"")}`,"m ev");}catch(e){}
+      finish(`<span style="color:var(--red)">✗ Elutasítva</span>`,txt);});}
 /* ---- ELVÁGYÓDÁS-KÉPERNYŐ: HÁROM VÁLASZ ---- */
 function showLeaveOffer(cand){
   const p=cand.leaver,e=careerPool&&careerPool[p.n];
@@ -35188,7 +35355,38 @@ function twResolvePhase2(){
   const roll=Math.random();
   const roster=currentRoster();
   const riskFactor=gameMode==="career"?chemMoraleRiskFactor():1;
-  const leaveW=0.04*riskFactor,peakFormW=0.20,lockerW=0.25;
+  /* „SZTÁROM A PÁROM": az elvágyódás KÉTSZER olyan gyakori (és minden
+     visszautasított követelés tovább emeli) — a stíluson kívül a szorzó 1,0,
+     tehát a többi karrier viselkedése változatlan. */
+  let starMult=1;try{starMult=starLeaveMult();}catch(e){}
+  let demandW=0;try{demandW=starDealOn()?STAR_DEMAND_W:0;}catch(e){}
+  /* A KÖVETELÉS A TÖBBI ESEMÉNY ROVÁSÁRA JÖN, NEM AZ ELVÁGYÓDÁSÉRA. Ha az új
+     ág egyszerűen beékelődne, a hátralévő sávból venne el — abban pedig ott
+     van maga az elvágyódás is, tehát az új esemény pont azt hígítaná, amit
+     erősíteni akarunk. Ezért a csúcsforma- és az öltöző-ág zsugorodik
+     helyette, és a hátsó (átigazolás-típus) sáv mérete változatlan marad. */
+  const _shrink=demandW>0?Math.max(0,(0.45-demandW)/0.45):1;
+  const peakFormW=0.20*_shrink,lockerW=0.25*_shrink;
+  /* ---- A SZORZÓ A VÉGSŐ ESÉLYRE MEGY, NEM A SÚLYRA ----
+     Az elvágyódás KÉT helyen születhet: itt elöl, és a hátsó, súlyozott
+     átigazolás-sorsolásban. Ha egyszerűen mindkét SÚLYT megszoroznánk, a
+     tényleges esély nem duplázódna (mérve 1,81×), mert az elöl nagyobb sáv a
+     hátsót szűkíti, ott pedig szintén ül belőle egy adag. Ezért kiszámoljuk az
+     ALAP-esélyt a teljes láncra, megszorozzuk, és VISSZAFELÉ oldjuk meg, mekkora
+     elülső sáv adja ki pontosan azt:
+         P(f) = f + (0,55 − f)·q,  q = w/(11+w)
+         f    = (cél − 0,55q) / (1 − q)
+     A 0,55 a hátsó sáv teteje (1 − 0,45, a középső három ág együtt). Szorzó
+     nélkül a képlet pontosan a régi 0,04·rf-et adja vissza, tehát a stíluson
+     kívül semmi nem változik — ezt a teszt méri is. */
+  const _q0=riskFactor/(11+riskFactor);
+  const _base=0.04*riskFactor+(0.55-0.04*riskFactor)*_q0;
+  const _w=riskFactor*starMult,_q=_w/(11+_w);
+  /* A CÉL PLAFONOS: sok visszautasítás után a kért esély a 0,55-ös tetőnek
+     feszülne, onnan a szorzó telítődik — az elvágyódás nem eheti meg az
+     összes többi eseményt. */
+  const _target=Math.min(0.55,_base*starMult);
+  const leaveW=Math.max(0,Math.min(0.55,(_target-0.55*_q)/Math.max(1e-6,1-_q)));
   let t=leaveW;
   if(roll<t){
     /* KARRIERBEN ALKU, nem közlemény: a felajánlást a képernyő kezeli.
@@ -35198,6 +35396,12 @@ function twResolvePhase2(){
       if(cand&&cand.fee>0)return {title:"__LEAVE_PENDING__",cand};}
     const type=TRANSFER_TYPES.find(t=>t.key==="leave");
     return {title:"Elvágyódás",text:applyTransfer(type)};}
+  /* A SZTÁR KÖVETELÉSE — csak a „Sztárom a párom" stílusban, csak akkor, ha a
+     sztár tényleg a keretben van. A képernyő kezeli, mint az elvágyódást. */
+  t+=demandW;
+  if(roll<t){
+    const deal=makeStarDemand();
+    if(deal)return {title:"__STARDEAL_PENDING__",deal};}
   t+=peakFormW;
   if(roll<t){
     const p=pick(roster);
@@ -35218,7 +35422,7 @@ function twResolvePhase2(){
        miközben a háttérben egy másik kimenet futott — a kettő ütközése okozhatta
        a beakadást. Most explicit, ártalmatlan visszatérés zárja az ágat. */
     return {title:"Nyugodt öltöző",text:"Az öltözőben csendes, kiegyensúlyozott a hangulat — nincs említésre méltó esemény."};}
-  const type=weightedPickArr(TRANSFER_TYPES.map(x=>x.key==="leave"?{...x,weight:x.weight*riskFactor}:x));
+  const type=weightedPickArr(TRANSFER_TYPES.map(x=>x.key==="leave"?{...x,weight:x.weight*riskFactor*starMult}:x));
   if(type.key==="dream")return {title:"__DREAM_PENDING__"};
   if(type.key==="leave"&&gameMode==="career"&&careerPool){
     const cand=computeLeaveCandidate();
@@ -39251,6 +39455,12 @@ function autoResolveCheckpoint(round){
         return {title:"Elvágyódás",text:`${esc(shortName(c.leaver.n))} maradt — a csapat kifizette a ${fmtFt(c.fee)} megtartási díjat.`};}
       addLeaveDeal(c.leaver.n,c.fee);
       return {title:"Elvágyódás",text:`${esc(shortName(c.leaver.n))} marad, de a ${fmtFt(c.fee)} megtartási díj a szezon végén esedékes.`};}
+    /* AUTO-MÓD: nincs kinek felajánlani az alkut, tehát ugyanazt választjuk,
+       amit egy elfogadó menedzser — a sztár marad, az ára meg majd látszik a
+       számlán. (Ugyanaz az elv, mint fent az elvágyódásnál.) */
+    if(result.title==="__STARDEAL_PENDING__"&&result.deal){
+      const txt=applyStarDemand(result.deal,true);
+      return {title:result.deal.kind==="goal"?"Gólbónusz-alku":"Béremelés",text:txt};}
     if(result.title==="__DREAM_PENDING__"){
       const cand=computeDreamCandidate();
       if(!cand)return {title:"Álomigazolás",text:"Próbálkoztunk egy nagy dobással, de az igazolás végül meghiúsult."};
