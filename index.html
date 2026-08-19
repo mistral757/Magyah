@@ -7669,6 +7669,113 @@ function pyrSimDivision(teams,rnd){
     if(gh>ga)T[h].pts+=3;else if(gh===ga){T[h].pts++;T[a].pts++;}else T[a].pts+=3;}
   T.sort((x,y)=>(y.pts-x.pts)||(y.gd-x.gd));
   return T.map(x=>({t:x.t,pts:x.pts,gd:x.gd}));}
+/* ================= AZ ELLENFELEK FEJLŐDÉSE =================
+   EZEN ÁLL VAGY BUKIK AZ EGÉSZ MÓD. Idáig a piramis statikus volt: a klubok
+   ereje végig ugyanaz, tehát elég volt kinőni az osztályt, és onnantól minden
+   feljutás magától jött. Innentől a mezőny is fejlődik.
+
+   A FELISMERÉS, AMI EGYSZERŰVÉ TESZI: ha minden AI-csapat ugyanazzal az R
+   ütemmel fejlődik, a játékos pedig P-vel, akkor a piramis ALAKJA változatlan
+   marad, és kizárólag a KÜLÖNBSÉG (P − R) mozgat téged benne. Az abszolút
+   számok csak inflálódnak. Nem az AI sebességét kell tehát kalibrálni, hanem
+   a NETTÓ MÁSZÁST — ez az egyetlen szám, amit a négy fokozat állít.
+
+   A JÁTÉKOS ÜTEME MÉRVE: hét lezárt karrier összegzéséből 5,95 … 8,96
+   Rating/szezon, átlag 7,27, medián 7,18 (docs 5.2). A PYR_PACE ezért 7,0 —
+   szándékosan a mért mediánhoz, nem a kód korábbi, optimista 10-es
+   becsléséhez (RUN_CLIMB_PER_SEASON), ami ~30%-kal fölé lőtt.
+
+   A TEMPÓ-CSATOLÁS — ELVI HIBA, AMIT ITT KERÜLÜNK EL. A játékos saját tempója
+   (Alap ×1,00 … Gleccser ×0,60) szorozza a P-t. Ha az AI ütemét abszolút
+   számban rögzítenénk, a Gleccser-tempó (7,0×0,60 = 4,2) a "Lépést tartanak"
+   AI-ütemével (5,6) szemben NEGATÍV nettó mászást adna — a játékos nemhogy
+   nem jutna fel, hanem osztályról osztályra lefelé csúszna, miközben a
+   Run-mérő a lassított tempóért JUTALMAT ad. Ezért az AI üteme mindig
+   ugyanazon a tempoMult()-on megy át, mint a tiéd.
+
+   AZ ÉLVONAL ELNYELŐ ÁLLAPOT. Onnan nincs hova feljutni: ha ott is te
+   fejlődsz gyorsabban, a mód pár szezon után visszazuhan a mai "örök bajnok"
+   élménybe. Ezért az AI üteme OSZTÁLYONKÉNT ELTÉR — fölfelé haladva gyorsul,
+   ahogy a valóságban is (egy élvonalbeli klub költségvetése nagyságrenddel
+   nagyobb). Az élvonalban az AI a te ütemed PYR_TOPSHARE-szeresével fejlődik,
+   a legalsó osztályban a választott fokozatéval, közte lineárisan. Ettől a
+   bajnoki cím az élvonalban örökre igazi verseny marad — pontosan a
+   hagyományos karrier-érzet, Infinity-vásárlás nélkül. */
+const PYR_PACE=7.0;        /* a játékos MÉRT üteme, Rating/szezon (docs 5.2) */
+/* AZ ÉLVONALI UTOLÉRÉS FOKOZATONKÉNT MÁS — mért javítás.
+   ELSŐ VÁLTOZAT: egyetlen közös 0,92-es érték minden fokozatra. MÉRVE
+   MEGBUKOTT (25 szezon, 60 karrier, az index.html saját kódjával):
+
+       😴 Alvó         élvonal 11,4. szezon · bajnok  2% · nettó 1,58
+       🚶 Lassan       élvonal 13,9.        · bajnok  0% · nettó 1,50
+       🏃 Lépést tart  élvonal 17,9.        · bajnok  0% · nettó 1,30
+       🔥 Kegyetlen    élvonal 18,4.        · bajnok  0% · nettó −0,21
+
+   Két baj volt. (1) A négy fokozat a végén ÖSSZEOLVAD: a karrier zöme az
+   élvonalba jutás után telik, ott viszont mindegyik ugyanazt a 0,92-t kapta —
+   vagyis a legfontosabb döntésed a második felétől nem számított. (2) A
+   BAJNOKI CÍM ELÉRHETETLEN: frissen feljutva ~−3-on állsz az élvonal
+   közepéhez, a címhez ~+3 kell, tehát ~6 pont relatív mozgás — 0,92-nél
+   (nettó 0,56/szezon) ez tizenegy szezon, a karrier végén túl.
+
+   MOSTANTÓL az utolérés a fokozat sajátja: a `top` az AI üteme az
+   ÉLVONALBAN, a `share` ugyanaz a legalsó osztályban, közte lineárisan. Így a
+   fokozat végig számít, és a cím a mérce marad, nem a lehetetlen. */
+const PYR_DEV_NOISE=0.20;  /* csapatonkénti zaj: ±20% */
+const PYR_DEV_FORM=0.15;   /* eredmény-alapú tag: a bajnok +15%, az utolsó −15% */
+/* A NÉGY FOKOZAT. A `share` az AI üteme a játékoséhoz mérve a LEGALSÓ
+   osztályban; az élvonal felé PYR_TOPSHARE-ig emelkedik. A `net` a belőle
+   adódó nettó mászás a legalsó osztályban, tájékoztatásul — a szimulált ívet
+   lásd docs 5.3 és `node tools/pyramid-sim.js speeds`. */
+const PYR_SPEEDS={
+  alvo:  {n:"😴 Alvó mezőny",    share:0.50,top:0.65,d:"az ellenfelek lemaradnak — a mai karrier érzete"},
+  lassu: {n:"🚶 Lassan követnek", share:0.68,top:0.75,d:"van idő építkezni, de a felső osztály nem áll meg"},
+  tarto: {n:"🏃 Lépést tartanak", share:0.76,top:0.82,d:"ajánlott — minden feljutásért külön meg kell dolgozni"},
+  kegyet:{n:"🔥 Kegyetlen",       share:0.83,top:0.91,d:"a mezőny majdnem olyan gyors, mint te — évekig ragadhatsz"}};
+/* A NÉGY SOR MÉRVE (80 karrier × 25 szezon, D6-ból, az index.html saját
+   kódjával — `node tools/pyramid-sim.js live`):
+     fokozat        élvonal   első arany   nettó mászás   vég-osztály
+     😴 Alvó         8,5.      8,9. (100%)      4,33          1,0
+     🚶 Lassan      10,2.     12,2. (100%)      3,37          1,0
+     🏃 Lépést tart 12,4.     18,5.  (96%)      2,54          1,0
+     🔥 Kegyetlen   19,1. (69%-nak)  (1%)       1,14          1,7
+   A Kegyetlen SZÁNDÉKOSAN olyan, hogy a karrierek harmada el sem jut az
+   élvonalig. A share-t viszont NEM lehet 0,85 fölé vinni: ott a modell
+   halálspirálba fordul (0,89-nél a mért nettó −0,41, a karrier a piramis
+   aljára csúszik) — a rossz szezon kevesebb pénzt hoz, az kevesebb fejlődést,
+   az még rosszabb szezont. A 0,83 az a határ, ahol a fokozat még kemény, de
+   nem zsákutca. */
+function pyrSpeedKey(){
+  const k=S.pyr&&S.pyr.aiSpeed;
+  return PYR_SPEEDS[k]?k:"tarto";}
+/* Az AI éves üteme egy adott osztályban. A képlet mindhárom fenti szabályt
+   egyben hordozza: fokozat + osztály-függés + tempó-csatolás. */
+function pyrAiRate(div){
+  const sp=PYR_SPEEDS[pyrSpeedKey()];
+  const t=(PYR_DIVS-div)/(PYR_DIVS-1);        /* 0 = legalsó, 1 = élvonal */
+  const share=sp.share+(sp.top-sp.share)*t;
+  const k=(typeof tempoMult==="function")?tempoMult():1;
+  return PYR_PACE*k*share;}
+/* A VILÁG FEJLŐDÉSE. Minden osztály EGYSZERRE lép, a szezon lezárulta után és
+   a fel-/kiesés ELŐTT — így a csere már az új erőviszonyok szerint történik.
+   Visszaadja az osztályonkénti ÁTLAGOS lépést: ez a mérő bemenete. */
+function pyrDevelopWorld(order,rnd){
+  const r=rnd||Math.random;
+  const steps=[];
+  order.forEach((arr,i)=>{
+    const rate=pyrAiRate(i+1);
+    let sum=0,n=0;
+    arr.forEach((e,pos)=>{
+      if(e.me||!e.t)return;
+      /* eredmény-alapú tag: a bajnok gyorsabban nő, a sereghajtó lassabban —
+         ez tartja versenyben a feljutókat, és akadályozza meg, hogy egy örök
+         sereghajtó örökre az maradjon */
+      const rel=arr.length>1?(pos/(arr.length-1)):0.5;   /* 0 = bajnok */
+      const d=rate*(1+PYR_DEV_FORM*(1-2*rel))*(1+(r()*2-1)*PYR_DEV_NOISE);
+      e.t.ovr=Math.round((e.t.ovr+d)*10)/10;
+      sum+=d;n++;});
+    steps.push(n?Math.round(sum/n*100)/100:0);});
+  return steps;}
 /* ---- A SZEZONFORDULÓ ----
    `myOrder` a SAJÁT osztályod VALÓS végsorrendje (nevek, 1. helytől), az
    S.finalTable-ből — vagyis a te osztályodban nem szimulálunk semmit, a
@@ -7694,12 +7801,17 @@ function pyrRollover(myOrder,rnd){
       if(!out.some(x=>x.me))out.push({me:true});
       return out;}
     return pyrSimDivision(d.teams,r).map(x=>({t:x.t}));});
-  /* 2) ki megy fel és ki le */
+  /* 2) MÉRÉS a fejlődés ELŐTT — ez volt a lezárult szezon állása */
+  const _myOvr=(typeof teamStrength==="function")?teamStrength():0;
+  const _rank=(myOrder||[]).findIndex(n=>n===teamName)+1||null;
+  /* 3) A VILÁG FEJLŐDÉSE. Minden osztály egyszerre, a fel-/kiesés ELŐTT. */
+  const _steps=pyrDevelopWorld(order,r);
+  /* 4) ki megy fel és ki le */
   const up=[],down=[];
   order.forEach((arr,i)=>{
     up.push(i>0?arr.slice(0,PYR_UP):[]);
     down.push(i<W.divs.length-1?arr.slice(arr.length-PYR_DOWN):[]);});
-  /* 3) az új összetétel: maradók + a fentről lejövők + a lentről feljövők */
+  /* 5) az új összetétel: maradók + a fentről lejövők + a lentről feljövők */
   const moved={up:[],down:[]};
   const next=order.map((arr,i)=>{
     const leaving=new Set([...up[i],...down[i]]);
@@ -7707,7 +7819,7 @@ function pyrRollover(myOrder,rnd){
     const fromAbove=i>0?down[i-1]:[];
     const fromBelow=i<W.divs.length-1?up[i+1]:[];
     return stay.concat(fromAbove,fromBelow);});
-  /* 4) visszaírás + a te új osztályod */
+  /* 6) visszaírás + a te új osztályod */
   let newMy=myId;
   next.forEach((arr,i)=>{
     W.divs[i].teams=arr.filter(x=>!x.me).map(x=>x.t);
@@ -7717,11 +7829,28 @@ function pyrRollover(myOrder,rnd){
       W.divs[i].mean=Math.round(ov.reduce((s,v)=>s+v,0)/ov.length*10)/10;
       W.divs[i].lo=Math.min.apply(null,ov);W.divs[i].hi=Math.max.apply(null,ov);}});
   const res={from:myId,to:newMy,
-    kind:newMy<myId?"up":newMy>myId?"down":"stay",
-    rank:(myOrder||[]).findIndex(n=>n===teamName)+1||null};
+    kind:newMy<myId?"up":newMy>myId?"down":"stay",rank:_rank,
+    aiStep:_steps[myId-1]};
   W.my=newMy;
-  (W.log=W.log||[]).push({s:(S.seasonNumber||1),div:myId,to:newMy,rank:res.rank});
-  moved.up.length;   /* (a részletes mozgásnapló a következő lépésé) */
+  /* ---- A MÉRŐ ----
+     Szezononként egy sor, és ez az EGYETLEN forrás, amiből a négy fokozat
+     valós játékon hangolható (a szimuláció csak a kiindulást adja). A `net`
+     a lényeg: mennyivel nőttél gyorsabban a mezőnynél. Ha ez tartósan 0 alá
+     megy, a fokozat túl kemény; ha 3 fölé, túl könnyű. (docs 10/b) */
+  const prev=W.meas||null;
+  const rd=x=>Math.round(x*10)/10;
+  /* ÜRES KERET (fejlesztői teszt, félbemaradt betöltés) esetén a teamStrength
+     0-t ad — abból egy hatalmas negatív "nettó" születne, ami a hangoláskor
+     félrevezetne. Ilyenkor a sor MÉRÉS NÉLKÜL kerül a naplóba: a hiányzó adat
+     jobb, mint a hamis. */
+  const _ok=isFinite(_myOvr)&&_myOvr>0;
+  const row={s:(S.seasonNumber||1),div:myId,to:newMy,rank:_rank,
+    my:_ok?rd(_myOvr):null,mean:(W.divs[myId-1]?W.divs[myId-1].mean:null),
+    ai:_steps[myId-1],
+    me:(_ok&&prev&&prev.my>0)?rd(_myOvr-prev.my):null};
+  row.net=(row.me!=null)?rd(row.me-row.ai):null;
+  if(_ok)W.meas={my:_myOvr};
+  (W.log=W.log||[]).push(row);
   return res;}
 /* ---- A PIRAMIS-KARRIER INDÍTÁSA ----
    FEJLESZTŐI BELÉPÉSI PONT. A módnak MÉG NINCS felülete: a négyoldalas
@@ -7733,21 +7862,23 @@ function pyrRollover(myOrder,rnd){
    A te helyed az osztály LEGGYENGÉBB klubjáé: egy frissen alapított csapat
    nem az élen kezd. A kiszorított klub a világból kilép (S.pyr.spare), és a
    fel-/kiesés sosem nyúl hozzá — így a létszám mindig stimmel. */
-function pyrStart(startDiv){
+function pyrStart(startDiv,speed){
   if(typeof S==="undefined"||!S)return "Nincs betöltött játék.";
   const d0=Math.max(1,Math.min(PYR_DIVS,startDiv||PYR_DIVS));
+  const sp=PYR_SPEEDS[speed]?speed:"tarto";
   const w=pyrBuildWorld(rngFor("pyr:world"));
   if(!w.divs.length)return `Kevés a klub: ${w.short} hiányzik.`;
   const home=w.divs[d0-1];
   home.teams.sort((a,b)=>b.ovr-a.ovr);
   const spare=home.teams.pop();          /* a leggyengébb helyére lépsz be */
-  S.pyr={on:true,my:d0,divs:w.divs,spare,log:[],v:1};
+  S.pyr={on:true,my:d0,aiSpeed:sp,divs:w.divs,spare,log:[],meas:null,v:1};
   oppTargetRating=pyrLevel();
   careerBaseRating=oppTargetRating;
   SEASON_OPPS=pyrOpponents();
   if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
   return `Piramis indítva: D${d0} · ${home.name} · mezőny ${oppTargetRating} `
-    +`(a helyedet ${spare.n} adta át).`;}
+    +`· ${PYR_SPEEDS[sp].n} (AI-ütem ${pyrAiRate(d0).toFixed(1)}/szezon) `
+    +`· a helyedet ${spare.n} adta át.`;}
 /* A futó piramis állapotának kiíratása — a konzolhoz, a fejlesztéshez. */
 function pyrDumpState(){
   if(!pyrOn())return "Nem piramis-karrier.";
@@ -7755,8 +7886,17 @@ function pyrDumpState(){
   pyrDivs().forEach((d,i)=>L.push(
     `  D${d.id} ${d.name.padEnd(28)} ${d.teams.length+((i+1)===pyrMyDivId()?1:0)} csapat`
     +`  közép ${d.mean.toFixed(1)}${(i+1)===pyrMyDivId()?"   ← ITT VAGY":""}`));
-  (S.pyr.log||[]).forEach(x=>L.push(
-    `  ${x.s}. szezon: D${x.div} ${x.rank?x.rank+". hely":""} → D${x.to}`));
+  L.push(`  fokozat: ${PYR_SPEEDS[pyrSpeedKey()].n} — AI-ütem az osztályodban `
+    +`${pyrAiRate(pyrMyDivId()).toFixed(2)}/szezon`);
+  if((S.pyr.log||[]).length){
+    L.push("  szez  oszt  hely   erőd   te    mezőny  NETTÓ");
+    (S.pyr.log||[]).forEach(x=>L.push(
+      `   ${String(x.s).padStart(2)}    D${x.div}   ${String(x.rank||"—").padStart(3)}`
+      +`   ${String(x.my==null?"—":x.my.toFixed(1)).padStart(5)}`
+      +`  ${String(x.me==null?"—":(x.me>=0?"+":"")+x.me.toFixed(1)).padStart(5)}`
+      +`  ${String(x.ai==null?"—":"+"+x.ai.toFixed(1)).padStart(6)}`
+      +`  ${String(x.net==null?"—":(x.net>=0?"+":"")+x.net.toFixed(1)).padStart(6)}`
+      +(x.to!==x.div?(x.to<x.div?"   ⬆️":"   ⬇️"):"")));}
   return L.join("\n");}
 /* ==== PYR-BLOKK VÉGE ==== */
 /* Posztengedmények: csak reális, valós futballban is előforduló szomszédos
@@ -9260,7 +9400,10 @@ function buildEuroField(comp){
   const M=(function(){const c=mpCup();
     return (c&&c.comp===comp&&!c.droppedApart)?c:null;})();
   const target=((M&&M.mid!=null)?M.mid:euroMidRating(comp))+c.oppDelta;
-  const cap=infinityMode?Infinity:RATING_CAP;
+  /* A kupamezőny plafonja UGYANAZ a kapu, mint a játékosoké: a piramisban a
+     világ 119 fölé nő, és egy 119-re vágott kupamezőny ott néma könnyítés
+     volna. Lásd ratingCap(). */
+  const cap=ratingCap();
   const rnd=M?mpCupRng("field"):null;
   const rr=rnd||Math.random;
   const shuf=a=>shuffleArr(a,rnd||undefined);
@@ -12482,7 +12625,19 @@ function infinityMyPrice(){
     ?Math.round(INFINITY_PRICE*INFINITY_MP_SHARE):INFINITY_PRICE;}
 let infinityMode=false;   /* meg van-e nyitva */
 let infinityTiers=0;      /* hány db +100-as tier van megvéve */
-function ratingCap(){return infinityMode?Infinity:RATING_CAP;}
+/* ---- A PIRAMISBAN NINCS PLAFON ----
+   A hagyományos mód világa a végtelenbe fejlődik, és szándékosan nincs benne
+   Infinity-vásárlás: "a tető magától nyílik". Ha a 119-es plafon maradna, a
+   mezőny pár szezon alatt átlépné a játékost (az élvonal AI-üteme ~6,4/szezon,
+   tehát 86-ról 119-re öt szezon), és onnantól a karrier feltartóztathatatlanul
+   csúszna lefelé a piramisban — nem nehézség, hanem szerkezeti zsákutca.
+   Ez a konstans épp erre az egy sorra készült ("hogy az Infinity mód később
+   egy sorral feloldhassa"); a piramis a második ilyen feloldó. A KOR-GÖRBE
+   viszont marad: az öregedés lassítása könnyítés volna, nem a plafon ügye. */
+function ratingCap(){
+  if(infinityMode)return Infinity;
+  if(typeof pyrOn==="function"&&pyrOn())return Infinity;
+  return RATING_CAP;}
 /* Magyar szám-ragozás: a "-s" melléknévképző kötőhangzója a szám KIEJTETT
    nevének utolsó hangjától függ, nem a számjegytől. Pl. 5 (öt) → 5-ös, 6 (hat)
    → 6-os, 3 (három) → 3-as, de 1/2/4/7/9 → -es. Kerek tízeseknél/százasoknál a

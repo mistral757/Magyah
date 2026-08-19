@@ -27,6 +27,7 @@
      node tools/pyramid-sim.js world            — a LEGENERÁLT piramis, klubnevekkel
      node tools/pyramid-sim.js draft            — mit hoz ki egy SÚLYOZOTT draft
      node tools/pyramid-sim.js league           — a fel-/kiesés élete sok szezonon át
+     node tools/pyramid-sim.js live             — A TELJES MÓD: fejlődő világ, karrier-ív
    Opciók (bárhol, kulcs=érték alakban):
      runs=200 seasons=20 start=6 pace=7.0 step=3.0 teams=16 up=2 down=2
 ============================================================================ */
@@ -308,9 +309,14 @@ function loadPyrBlock(wcOn){
     const t=sq.players.map(p=>p.ovr).sort((x,y)=>y-x).slice(0,11);
     return t.reduce((s,v)=>s+v,0)/t.length;};
   const activeSquads=()=>wcOn?SQUADS:SQUADS.filter(sq=>!sq.wc);
-  const env={SQUADS,squadAvgOvr,activeSquads,SIM};
+  /* A blokk `S`-ből olvassa a választott fokozatot (pyrSpeedKey) — adunk neki
+     egy üres állapotot, amit a hívó állít be. Így a tool a VALÓDI kódutat
+     futtatja, nem egy másolatot. */
+  const S={pyr:null};
+  const env={SQUADS,squadAvgOvr,activeSquads,SIM,S,
+    tempoMult:()=>(ARG.tempo!=null?ARG.tempo:1)};
   const names=Object.keys(env);
-  const body=src.slice(a,b)+"\nreturn {pyrBuildWorld,pyrDumpWorld,pyrSimDivision,PYR_DIVS,PYR_TEAMS,PYR_STEP,PYR_SPREAD,PYR_TOPMEAN,PYR_UP,PYR_DOWN};";
+  const body=src.slice(a,b)+"\nreturn {pyrBuildWorld,pyrDumpWorld,pyrSimDivision,pyrDevelopWorld,pyrAiRate,PYR_SPEEDS,PYR_PACE,PYR_DIVS,PYR_TEAMS,PYR_STEP,PYR_SPREAD,PYR_TOPMEAN,PYR_UP,PYR_DOWN,__S:S};";
   return new Function(...names,body)(...names.map(k=>env[k]));
 }
 /* Ugyanaz a determinisztikus, seedelhető folyam, amit a játék rngFor()-ja ad:
@@ -508,10 +514,108 @@ function reportLeague(){
   console.log("dolga valós), 80% fölött a lépcső túl nagy, 10% alatt túl kicsi.\n");
 }
 
+/* ============================================================================
+   8. `live` — A TELJES MÓD, AZ INDEX.HTML SAJÁT KÓDJÁVAL
+   ---------------------------------------------------------------------------
+   Ez a kritikus kapu. A 3. fejezet `speeds` parancsa egy ABSZTRAKT modellen
+   mért (a játékos ereje egy szám, ami évente nő); ez itt a VALÓDI kódot
+   futtatja: az index.html pyrBuildWorld / pyrSimDivision / pyrDevelopWorld
+   függvényeit, a valós klubokkal, valódi fel-/kieséssel.
+
+   A játékost továbbra is modellezzük (a teljes karriermotort nem futtathatjuk
+   node-ból): PYR_PACE ütemmel nő, a teljesítménye ±25%-ban módosítja, és a
+   `decay` kopással. Ez a modell a hét lezárt karrierből mért ütemre van
+   illesztve (docs 5.2).
+============================================================================ */
+function reportLive(){
+  const P0=loadPyrBlock(!!ARG.wc);
+  const seasons=ARG.seasons||25, runs=ARG.runs||120;
+  const start=ARG.start||6, decay=ARG.decay!=null?ARG.decay:1.0;
+  const pace=ARG.pace!=null?ARG.pace:P0.PYR_PACE;
+  console.log(`\n=== A TELJES MÓD — ${runs} karrier × ${seasons} szezon ===`);
+  console.log(`indulás: D${start} · játékos-ütem ${pace.toFixed(1)}/szezon`
+    +(decay!==1?` (kopás ${decay})`:"")+(ARG.tempo!=null?` · tempó ×${ARG.tempo}`:"")
+    +` · az index.html saját generátorával és fejlődésével\n`);
+  console.log(String("fokozat").padStart(22)+" | élvon | mikor | bajnok| mikor |feljut|kiesés| vég- | nettó | mezőny");
+  console.log(String("").padStart(22)+" | elér% | (szez)|  lett%| (szez)| db   | db   | oszt.| mászás| a végén");
+  console.log("-".repeat(22)+"-+-------+-------+-------+-------+------+------+------+-------+--------");
+  /* HANGOLÁS: egy fokozat share/top értéke felülírható a parancssorból, hogy
+     ne kelljen minden próbához az index.html-t szerkeszteni.
+       node tools/pyramid-sim.js live tier=kegyet share=0.84 top=0.92          */
+  const only=process.argv.slice(2).map(x=>/^tier=(.+)$/.exec(x)).filter(Boolean)[0];
+  const tierKey=only?only[1]:null;
+  if(tierKey&&P0.PYR_SPEEDS[tierKey]){
+    if(ARG.share!=null)P0.PYR_SPEEDS[tierKey].share=ARG.share;
+    if(ARG.top!=null)P0.PYR_SPEEDS[tierKey].top=ARG.top;}
+  Object.keys(P0.PYR_SPEEDS).filter(k=>!tierKey||k===tierKey).forEach(key=>{
+    P0.__S.pyr={aiSpeed:key};        /* a fokozat a valódi kódúton át hat */
+    let top=0,topSum=0,title=0,titleSum=0,pro=0,rel=0,endD=0,netSum=0,netN=0,endMean=0;
+    for(let k=0;k<runs;k++){
+      const r=seededRnd("live:"+key+":"+k);
+      const w=P0.pyrBuildWorld(r);
+      /* a játékos beszúrása a legalsó helyre, ahogy a pyrStart teszi */
+      let div=start;
+      w.divs[div-1].teams.sort((a,b)=>b.ovr-a.ovr);
+      const spare=w.divs[div-1].teams.pop();
+      let my=spare.ovr;            /* a kezdő erőd a kiszorított klubé */
+      let firstTop=null,firstTitle=null,lastMy=null;
+      for(let s=1;s<=seasons;s++){
+        /* a saját osztályod: te + 15 klub, a motor gólgörbéjével */
+        const mine=w.divs[div-1].teams.map(t=>({ovr:t.ovr}));
+        const field=mine.concat([{ovr:my,me:true}]);
+        const tbl=P0.pyrSimDivision(field.map(x=>({ovr:x.ovr,__me:x.me})),r);
+        const rank=tbl.findIndex(x=>x.t.__me)+1;
+        if(div===1&&firstTop==null)firstTop=s;
+        if(div===1&&rank===1&&firstTitle==null)firstTitle=s;
+        /* a világ fejlődése — az INDEX.HTML függvénye */
+        const order=w.divs.map((d,i)=>{
+          const arr=P0.pyrSimDivision(d.teams,r).map(x=>({t:x.t}));
+          if(i+1===div)arr.splice(Math.min(rank-1,arr.length),0,{me:true});
+          return arr;});
+        const steps=P0.pyrDevelopWorld(order,r);
+        /* a te fejlődésed: alapütem × teljesítmény × kopás */
+        const perf=1.25-0.5*((rank-1)/15);
+        const step=pace*(ARG.tempo!=null?ARG.tempo:1)*perf*Math.pow(decay,s-1);
+        my+=step;
+        if(lastMy!=null){netSum+=step-steps[div-1];netN++;}
+        lastMy=my;
+        /* fel-/kiesés */
+        const U=P0.PYR_UP,D=P0.PYR_DOWN;
+        const up=order.map((a,i)=>i>0?a.slice(0,U):[]);
+        const dn=order.map((a,i)=>i<5?a.slice(a.length-D):[]);
+        const next=order.map((a,i)=>{
+          const leave=new Set([...up[i],...dn[i]]);
+          return a.filter(x=>!leave.has(x)).concat(i>0?dn[i-1]:[],i<5?up[i+1]:[]);});
+        let nd=div;
+        next.forEach((arr,i)=>{
+          w.divs[i].teams=arr.filter(x=>!x.me).map(x=>x.t);
+          if(arr.some(x=>x.me))nd=i+1;
+          const ov=w.divs[i].teams.map(t=>t.ovr);
+          if(ov.length)w.divs[i].mean=ov.reduce((a,b)=>a+b,0)/ov.length;});
+        if(nd<div)pro++;else if(nd>div)rel++;
+        div=nd;}
+      if(firstTop!=null){top++;topSum+=firstTop;}
+      if(firstTitle!=null){title++;titleSum+=firstTitle;}
+      endD+=div;endMean+=w.divs[div-1].mean;}
+    const f=(x,w2)=>String(x).padStart(w2);
+    console.log(f(P0.PYR_SPEEDS[key].n,22)
+      +" |"+f((100*top/runs).toFixed(0)+"%",6)
+      +" |"+f(top?(topSum/top).toFixed(1):"—",6)
+      +" |"+f((100*title/runs).toFixed(0)+"%",6)
+      +" |"+f(title?(titleSum/title).toFixed(1):"—",6)
+      +" |"+f((pro/runs).toFixed(1),5)
+      +" |"+f((rel/runs).toFixed(1),5)
+      +" |"+f((endD/runs).toFixed(1),5)
+      +" |"+f(netN?(netSum/netN).toFixed(2):"—",6)
+      +" |"+f((endMean/runs).toFixed(0),7));});
+  console.log("\nCÉL: a 'Lépést tartanak' fokozat ~10-14 szezon alatt vigyen az élvonalba,");
+  console.log("legalább egy kieséssel útközben; a nettó mászás 0,8 és 3,5 közt legyen.\n");
+}
+
 function reportMain(){
   reportGaps();
   reportSpeeds();
 }
 
 ({gaps:reportGaps,speeds:reportSpeeds,sweep:reportSweep,bands:reportBands,
-  world:reportWorld,draft:reportDraft,league:reportLeague,report:reportMain}[CMD]||reportMain)();
+  world:reportWorld,draft:reportDraft,league:reportLeague,live:reportLive,report:reportMain}[CMD]||reportMain)();

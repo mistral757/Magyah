@@ -73,11 +73,19 @@ node tools/pyramid-sim.js bands      # mire elég az adatbázis 6 osztályhoz
 node tools/pyramid-sim.js world      # a LEGENERÁLT piramis, klubnevekkel
 node tools/pyramid-sim.js draft      # mit hoz ki egy súlyozott draft
 node tools/pyramid-sim.js league     # a fel-/kiesés élete sok szezonon át
+node tools/pyramid-sim.js live       # A TELJES MÓD: fejlődő világ, karrier-ív
 ```
 
 A `world` parancs **nem másolat**: az `index.html`-ből, a `PYR-BLOKK`
 jelölők közül vágja ki a generátort, és azt futtatja — amit kiír, betűre az,
 ami a játékban is fut. `seed=…` a világ sorsolásához, `wc=1` a válogatottakkal.
+
+A `live` parancs ugyanígy a valódi kódot futtatja (generátor + fejlődés +
+fel-/kiesés), és egy fokozat átlőhető a játék szerkesztése nélkül:
+
+```bash
+node tools/pyramid-sim.js live tier=kegyet share=0.84 top=0.92
+```
 
 **Nem a játék része** — tervezési mérőeszköz a `docs/karrier-hagyomanyos-mod.md`
 szerinti, együtt fejlődő ligapiramishoz. A bajnoki szimuláció a motor SAJÁT

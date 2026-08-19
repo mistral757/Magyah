@@ -1,7 +1,7 @@
 # Hagyományos karrier — a dinamikus ligapiramis
 
-*(Tervdokumentum. Állapot: **P2 kész — a világ és a ligarendszer megvan,
-felület és fejlődés nélkül.** Lásd a 11.3 fázistáblát. A mérőeszköz,
+*(Tervdokumentum. Állapot: **P3 kész — a világ, a ligarendszer ÉS a fejlődés
+megvan; a mód működik, felület nélkül.** Lásd a 11.3 fázistáblát. A mérőeszköz,
 amivel a számai születtek: `tools/pyramid-sim.js`. A hozzá tartozó
 beállítás-átalakítás: `karrier-beallitasok-terv.md`; a mai kapcsolók
 hibalistája: `karrier-beallitasok-audit.md`.)*
@@ -331,32 +331,52 @@ Két minta is látszik: a **hosszabb runok üteme lassabb** (BARSZA 8 szezon →
 5,98; 757 két szezon → 7,90), tehát a fejlődés kopik; és a **magasabbról induló
 run gyorsabb** (O-o' 87-ről → 8,96), mert a jobb kerethez jobb büdzsé jár.
 
-### 5.3 A négy fokozat — szimulált ív
+### 5.3 A négy fokozat — MÉRVE, a valódi kóddal
 
-`node tools/pyramid-sim.js speeds` (7,0-es játékos-ütem, 3,0-as osztálylépcső,
-a 6. osztályból indulva, 25 szezon, 400 karrier):
+`node tools/pyramid-sim.js live` — ez már nem absztrakt modell: az index.html
+`pyrBuildWorld` / `pyrSimDivision` / `pyrDevelopWorld` függvényeit futtatja, a
+valós klubokkal és valódi fel-/kieséssel. (120 karrier × 25 szezon, D6-ból.)
+
+| fokozat | AI-ütem alul / az élvonalban | élvonalba jut | első arany | nettó mászás | vég-osztály |
+|---|---|---|---|---|---|
+| 😴 **Alvó mezőny** | 0,50 / 0,65 | 100% · 8,4. szezon | 8,8. (100%) | 4,32 | 1,0 |
+| 🚶 **Lassan követnek** | 0,68 / 0,75 | 100% · 10,2. | 12,3. (100%) | 3,37 | 1,0 |
+| 🏃 **Lépést tartanak** *(ajánlott)* | 0,76 / 0,82 | 100% · 12,3. | 18,5. (95%) | 2,55 | 1,0 |
+| 🔥 **Kegyetlen** | 0,83 / 0,91 | **73%** · 18,8. | 21,0. **(1%)** | 1,18 | 1,6 |
+
+A Kegyetlen szándékosan olyan, hogy a karrierek negyede **el sem jut az
+élvonalig** 25 szezon alatt.
+
+**KÉT HANGOLÁSI KORLÁT, mindkettő mérve:**
+
+**(1) Az élvonali utolérés nem lehet közös.** Az első változatban minden
+fokozat ugyanazt a 0,92-t kapta az élvonalban. Mérve megbukott:
 
 ```
-               fokozat |  net | élvon | mikor | bajnok| mikor |feljut|kiesés| vég-
-                       |mászás| elér% | (szez)|  lett%| (szez)| db   | db   | oszt.
------------------------+------+-------+-------+-------+-------+------+------+------
-        😴 Alvó mezőny |  3,5 |  100% |   7,9 |  100% |  10,2 |  5,2 |  0,2 |  1,0
-    🚶 Lassan követnek |  2,2 |  100% |  10,6 |  100% |  14,1 |  5,5 |  0,5 |  1,0
-    🏃 Lépést tartanak |  1,4 |  100% |  14,3 |  100% |  18,8 |  6,0 |  1,0 |  1,0
-          🔥 Kegyetlen |  0,8 |  100% |  20,9 |   47% |  24,0 |  6,8 |  1,8 |  1,0
+😴 Alvó         élvonal 11,4. szezon · bajnok  2% · nettó 1,58
+🚶 Lassan       élvonal 13,9.        · bajnok  0% · nettó 1,50
+🏃 Lépést tart  élvonal 17,9.        · bajnok  0% · nettó 1,30
+🔥 Kegyetlen    élvonal 18,4.        · bajnok  0% · nettó −0,21
 ```
 
-| fokozat | AI-ütem a játékosé %-ában | nettó mászás | az élmény |
+A négy fokozat a karrier második felében **összeolvadt** (a karrier zöme az
+élvonalban telik, ott viszont mind ugyanazt kapta), és a **bajnoki cím
+elérhetetlen** volt: frissen feljutva ~−3-on állsz az élvonal közepéhez, a
+címhez ~+3 kell, tehát ~6 pont relatív mozgás — 0,92-nél (nettó 0,56/szezon)
+ez tizenegy szezon, a karrier végén túl. Ezért lett az utolérés a **fokozat
+sajátja** (`top`).
+
+**(2) A `share` nem mehet 0,85 fölé — halálspirál.** 0,89-nél a mért nettó
+**−0,41**, és a karrierek 89%-a a piramis aljára csúszik. Az ok visszacsatolás:
+a rossz szezon kevesebb pénzt hoz, az kevesebb fejlődést, az még rosszabb
+szezont. A 0,83 az a határ, ahol a fokozat még kemény, de nem zsákutca.
+
+| share | élvonalba jut | nettó | vég-osztály |
 |---|---|---|---|
-| 😴 **Alvó mezőny** | 50% | 3,5 | a mai karrier érzete — 8 szezon a csúcsig, kiesés gyakorlatilag nincs |
-| 🚶 **Lassan követnek** | 68% | 2,2 | ~11 szezon a csúcsig, minden második karrierben egy kiesés |
-| 🏃 **Lépést tartanak** *(ajánlott)* | 80% | 1,4 | ~14 szezon a csúcsig, ~19 az első aranyig, **átlagosan egy kiesés** |
-| 🔥 **Kegyetlen** | 89% | 0,8 | ~21 szezon a csúcsig, két kiesés, és **25 szezon alatt is csak 47% esély az első aranyra** |
-
-A 0,4-es nettó mászás (95%-os AI-ütem) már **átbillen**: a szimuláció szerint a
-karrierek 98%-a el sem jut az élvonalig 25 szezon alatt, és a végosztály
-átlaga 2,5 — vagyis a piramis középső harmadában ragad. Ez a **sáv alsó
-határa**: 0,7 alá nem érdemes menni.
+| 0,89 | 11% | −0,41 | 5,2 |
+| 0,86 | 25% | +0,42 | 3,9 |
+| **0,83** | **73%** | **+1,18** | **1,6** |
+| 0,80 | 100% | +1,64 | 1,0 |
 
 ### 5.4 A tempó-csatolás — ELVI HIBALEHETŐSÉG
 
@@ -385,12 +405,15 @@ szimuláció ezt meg is mutatja (`top=1.0` nélkül minden fokozat 100% arany).
 
 **Megoldás:** az AI üteme **osztályonként eltér** — fölfelé haladva gyorsul,
 ahogy a valóságban is (egy élvonalbeli klub költségvetése nagyságrenddel
-nagyobb). Az élvonalban az AI-ütem a **játékos ütemének 92%-a**, a legalsó
-osztályban a beállított fokozaté; a kettő közt lineáris.
+nagyobb). Az élvonali érték a **fokozat sajátja** (`top`), nem közös konstans
+— lásd 5.3/(1), ahol a közös érték mérve megbukott.
 
 ```
-share(osztály) = share[fokozat] + (0,92 − share[fokozat]) × (6 − osztály)/5
+share(osztály) = share[fokozat] + (top[fokozat] − share[fokozat]) × (6 − osztály)/5
 ```
+
+Játékban ellenőrizve: a „Lépést tartanak" fokozat AI-üteme D6-ban 5,32,
+D1-ben 5,74 — a rés a te 7,0-es ütemedhez képest 1,68-ról 1,26-ra szűkül.
 
 Ettől a bajnoki cím az élvonalban **örökre igazi verseny marad** — pontosan a
 hagyományos karrier-érzet: az évek nagy részében dobogós vagy, néha bajnok,
@@ -444,6 +467,27 @@ nem változik.
 Ha mégis kell fék, akkor **csak a mért tag maradjon, feleakkora súllyal**
 (0,25), és a fix tag mindenképpen essen ki — az utóbbi a 84-es abszolút
 horgonya miatt egy önmagához képest mérő piramisban értelmezhetetlen.
+
+### 6.1b A RATING-PLAFON — a második szerkezeti akadály a motorban
+
+`RATING_CAP = 119` a játékosok Rating/peak felső határa, és a mai módban ezt
+kizárólag az Infinity megvásárlása oldja fel. A piramis viszont **szándékosan
+nem tartalmaz Infinity-vásárlást** („a tető magától nyílik"), miközben a
+világ a végtelenbe fejlődik.
+
+Mérve: az élvonal AI-üteme ~5,7/szezon, tehát a 86-os induló középérték
+**hat szezon alatt átlépi a 119-et**. Onnantól a játékos plafonon áll, a világ
+tovább nő, és a karrier feltartóztathatatlanul csúszik lefelé a piramisban —
+nem nehézség, hanem szerkezeti zsákutca.
+
+**Megoldás:** a `ratingCap()` a piramisban is `Infinity`-t ad. A konstans épp
+erre az egy sorra készült („hogy az Infinity mód később egy sorral
+feloldhassa"); a piramis a második ilyen feloldó. **A kor-görbe marad**: az
+öregedés lassítása könnyítés volna, nem a plafon ügye.
+
+Ugyanez a kapu vonatkozik a **kupamezőnyre** is (a kampány mezőnye korábban
+közvetlenül a `RATING_CAP`-re vágott) — egy 119-re vágott kupamezőny egy
+150-es világban néma könnyítés lett volna.
 
 ### 6.2 Amit ellenőriztünk, és rendben van
 
@@ -621,7 +665,9 @@ kihívás és statisztika ugyanúgy fut, mint ma.
 | szezonforduló | `startNextCareerSeason` ✅ | `pyrRollover()` — a te osztályod a VALÓS végtabellából, a másik öt `pyrSimDivision()`-nel |
 | ellenféltábla | `startNextCareerSeason` ✅ | `SEASON_OPPS = pyrOpponents()` |
 | mentés | `saveGame` / `applySavedGame` ✅ | `S.pyr` (~6 kB), plusz a szint önjavítása betöltéskor |
-| fejlődés | `pyrDevelopWorld()` | **még nincs** — P3 |
+| fejlődés | `pyrDevelopWorld()` ✅ | osztályonkénti ütem, ±20% zaj, eredmény-alapú tag; a fel-/kiesés ELŐTT fut |
+| Rating-plafon | `ratingCap()` ✅ | a piramisban nincs plafon (6.1b) |
+| mérő | `S.pyr.log` ✅ | szezononként egy sor: erőd · a te lépésed · a mezőnyé · NETTÓ |
 | kupa-nevezés | `cupEntryFor` | a piramis táblájából, nem `CUP_TIERS`-ből |
 | rejtett buff | `oppBuffFor` ✅ | `if(pyrOn())return 0;` |
 | piac-horgony | `marketPeakShift` | `careerBaseRating` helyett az osztály középértéke |
@@ -635,14 +681,15 @@ kihívás és statisztika ugyanúgy fut, mint ma.
 | **P0** | a beállítás-audit 1–5. hibája javítva | az új mód ELŐTT |
 | **P1** | az egyszerű beállítómód + a négyoldalas belépés | önállóan is érték |
 | **P2** | ✅ **kész** — `pyrBuildWorld`, a 6 osztály, `SEASON_OPPS` átirányítás, fel-/kiesés mind a hat osztályban, mentés. **Fejlődés nélkül**: statikus piramis. Belépés: `pyrStart(6)` a konzolból | első játszható mérföldkő |
-| **P3** | `pyrDevelopWorld` (a négy tempó-fokozat) + a mérő (10/b) | itt dől el, működik-e a mód |
+| **P3** | ✅ **kész** — `pyrDevelopWorld`, a négy fokozat, a tempó-csatolás, az élvonali utolérés, a Rating-plafon feloldása és a beépített mérő (`S.pyr.log`) | **a mód működik** |
 | **P4** | kupák a piramis szabályai szerint | |
 | **P5** | Run-szint a 9. pont szerint, riválisok, Infópult | |
 | **P6** | hangolás valós runokból; a négy fokozat véglegesítése | |
 
-**A P3 a kritikus kapu.** Ha az ott mért nettó mászás nem esik a
-0,8 – 3,5 sávba, a fokozatokat kell újralőni — a `tools/pyramid-sim.js`
-`sweep` parancsa pont ehhez van.
+**A P3 volt a kritikus kapu, és átment.** A mért nettó mászás mind a négy
+fokozatnál a 0,8 – 3,5 sávban van (1,18 … 4,32), és a fokozatok végig
+megkülönböztethetők. A hangoláshoz `node tools/pyramid-sim.js live`, egy
+fokozat átlövéséhez `live tier=kegyet share=0,84 top=0,92`.
 
 ---
 
@@ -664,7 +711,15 @@ kihívás és statisztika ugyanúgy fut, mint ma.
    **(a) kész klub alapértelmezést + (b) ellensúlyozott draftot** javasolja
    párban — de ha a draft marad a fő út, a (b) rés-konstansait ki kell mérni
    és karban kell tartani, valahányszor az adatbázis bővül.
-6. **A `PYR_STEP` és a fejlődési fokozatok együtt mozognak.** A négy
+6. **A KIESÉS gyakorlatilag csak a Kegyetlen fokozaton fordul elő** (0,3
+   karrierenként; a többi hárommal 0,0). Az ok szerkezeti: feljutni akkor
+   fogsz, amikor már +2…+3-mal a saját mezőnyöd fölött állsz, tehát az új
+   osztályba nagyjából a KÖZÉPRE érkezel, nem az aljára. A mód ígéretének
+   („akár ki is lehet esni") ez csak részben felel meg. Ha a kiesés korábban
+   is kellene, két lehetőség van: **rájátszás** a 3–6. helyezetteknek (a
+   gyengébb feljutó tényleg szenvedne), vagy nagyobb `PYR_STEP` — de az
+   utóbbit a ±4-es ablak erősen korlátozza.
+7. **A `PYR_STEP` és a fejlődési fokozatok együtt mozognak.** A négy
    ellenfél-tempó a 3,0-as lépcsőhöz van kalibrálva; ha a `PYR_STEP`
    változik, a `tools/pyramid-sim.js speeds step=…` futtatásával a fokozatokat
    újra kell lőni. A kettőt sosem szabad külön hangolni.
