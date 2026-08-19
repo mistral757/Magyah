@@ -3371,7 +3371,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.4.19";
+const APP_VERSION="3.4.20";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8317,12 +8317,17 @@ const PYR_REC_GAP={alvo:-2.5,lassu:-1.8,tarto:-1.0,kegyet:0.0};
    Minden osztályra megadja, hol állnál benne a választott klubbal: a rést, a
    hozzá tartozó címkét és a Run-plafont. Tiszta függvény — a képernyő és az
    ajánlás is ebből dolgozik, tehát nem csúszhatnak szét. */
-function pyrDivOptions(sq,speed){
-  const w=pyrBuildWorld(rngFor("pyr:world"));
+function pyrDivOptions(sq,speed,world){
+  /* A VILÁG ÁTADHATÓ. A klublistában minden sorhoz kell egy plafon, és a világ
+     felépítése (115 klub rendezése, hat osztály) 200-szor lefutva már érezhető
+     — egyszer építjük, és körbeadjuk. */
+  const w=world||pyrBuildWorld(rngFor("pyr:world"));
   if(!w.divs.length)return [];
   const clubRaw=squadAvgOvr(sq);
   const sp=PYR_SPEEDS[speed]?speed:"tarto";
   const tp=(typeof gameTempoPref==="function")?gameTempoPref():"normal";
+  const fSpeed=PYR_RUN_CAP.speed[sp]||1;
+  const fTempo=PYR_RUN_CAP.tempo[tp]||0.88;
   return w.divs.map(d=>{
     /* A belépéskor a leggyengébb (vagy a saját) klub kikerül — a rést tehát
        ugyanarra a 15 csapatra számoljuk, amivel majd tényleg játszol. */
@@ -8331,15 +8336,24 @@ function pyrDivOptions(sq,speed){
     if(own>=0)ts.splice(own,1);else ts.pop();
     const mean=ts.reduce((a,t)=>a+t.raw,0)/ts.length;
     const gap=Math.round((clubRaw-mean)*10)/10;
-    let cap=1;
-    cap*=PYR_RUN_CAP.div[d.id-1]||1;
-    cap*=PYR_RUN_CAP.speed[sp]||1;
-    cap*=PYR_RUN_CAP.tempo[tp]||0.88;
-    cap*=PYR_RUN_CAP.club;
-    cap*=pyrGapFactor(gap);
+    const fDiv=PYR_RUN_CAP.div[d.id-1]||1,fGap=pyrGapFactor(gap);
+    const cap=fDiv*fSpeed*fTempo*fGap;
     return {id:d.id,name:d.name,gap,
             cap:Math.round(Math.max(0.05,Math.min(1,cap))*100),
-            zone:pyrGapZone(gap)};});}
+            zone:pyrGapZone(gap),
+            /* A TÉNYEZŐK NÉVVEL. A kérdés szó szerint az volt, hogy "nem tudom,
+               mitől függ ez most" — a szorzat legyen látható, ne csak az
+               eredménye. */
+            parts:[{n:`osztály D${d.id}`,v:fDiv},
+                   {n:"ellenfél-tempó",v:fSpeed},
+                   {n:"saját tempó",v:fTempo},
+                   {n:"kezdő rés",v:fGap}]};});}
+/* A klubbal EGYÁLTALÁN elérhető legmagasabb plafon — a klublista sorainak.
+   Ez az a szám, ami megmondja, nyitva áll-e ezzel a kerettel a 100-as Run,
+   akármelyik osztályt választod. */
+function pyrClubBestCap(sq,speed,world){
+  const o=pyrDivOptions(sq,speed,world);
+  return o.length?Math.max.apply(null,o.map(x=>x.cap)):0;}
 /* A rés szöveges olvasata. A számokat a mérések adják (docs 4.): +4 fölött a
    bajnoki cím szinte biztos, −6 alatt egyetlen győzelem sincs. */
 function pyrGapZone(g){
@@ -8473,19 +8487,26 @@ const PYR_RUN_CAP={
      lásd docs/karrier-beallitasok-audit.md 2.6). Itt a plafonba olvad, ahol
      a helye van: vállalás, nem teljesítmény. */
   tempo:{normal:0.88,komotos:0.93,csiga:0.97,gleccser:1.00},
-  /* kész klubbal indulva a keretet nem te válogattad össze */
-  club:0.95,
-  /* A KEZDŐ RÉS BÜNTETÉSE. Kész klubbal indulva az osztály önmagában már nem
-     mér kihívást: a hatodosztályba be lehet lépni egy élvonalbeli kerettel is,
-     és az a legmagasabb osztály-plafont adná a legkönnyebb futáshoz. A rés
-     ezt zárja le — ha a klubod a saját mezőnye FÖLÖTT áll, a plafon annyival
-     csökken, amennyivel könnyebbé tetted magadnak. Lefelé nincs jutalom: a
-     plafon plafon marad, a mélyről indulást a teljesítmény fizeti ki. */
-  gapK:0.075,gapFloor:0.40};
+  /* A KEZDÉS MÓDJA MÁR NEM TÉNYEZŐ. A piramisban a draft megszűnt (v3.4.18),
+     tehát a "kész klubbal indultál ×0,95" mindenkire egyformán ült — nem
+     különbséget mért, hanem egyetemes adó volt, ami a 100-as plafont
+     mindenkinek elérhetetlenné tette. Kivezetve.
+     A KEZDŐ RÉS BÜNTETÉSE viszont marad, mert az VALÓDI különbséget mér: az
+     osztály önmagában nem kihívás, a hatodosztályba be lehet lépni egy
+     élvonalbeli kerettel is, és az adná a legmagasabb osztály-plafont a
+     legkönnyebb futáshoz.
+     HOLTSÁV +1,0-IG. A mérés szerint a +1-es rés még egyenrangú kezdés (a
+     bajnoki cím esélye 5,5%-ról épphogy mozdul), a +2 viszont már 37% — a
+     büntetés tehát csak ott induljon, ahol a könnyebbség tényleg megjelenik.
+     Enélkül az AJÁNLOTT osztály is büntetést kapott volna, ami képtelenség.
+     Lefelé nincs jutalom: a plafon plafon marad, a mélyről indulást a
+     teljesítmény fizeti ki. */
+  gapFree:1.0,gapK:0.075,gapFloor:0.40};
 function pyrGapFactor(gap){
   const g=(gap==null||!isFinite(gap))?0:gap;
-  if(g<=0)return 1;
-  return Math.max(PYR_RUN_CAP.gapFloor,1-PYR_RUN_CAP.gapK*g);}
+  const over=g-PYR_RUN_CAP.gapFree;
+  if(over<=0)return 1;
+  return Math.max(PYR_RUN_CAP.gapFloor,1-PYR_RUN_CAP.gapK*over);}
 function pyrRunCap(){
   const R=(S&&S.run)||{};
   const P=S&&S.pyr;
@@ -8493,13 +8514,11 @@ function pyrRunCap(){
   const sp=(P&&PYR_SPEEDS[P.aiSpeed])?P.aiSpeed:"tarto";
   const tp=(R.tempo&&PYR_RUN_CAP.tempo[R.tempo])?R.tempo
     :((typeof gameTempo==="function")?gameTempo():"normal");
-  const club=!!(R.clubStart!=null?R.clubStart:(typeof careerStart!=="undefined"&&careerStart==="club"));
   const gap=(P&&P.gap0!=null)?P.gap0:null;
   const parts=[
     {n:`Kezdő osztály: D${d}`,v:PYR_RUN_CAP.div[d-1]||1},
     {n:`Ellenfél-tempó: ${PYR_SPEEDS[sp].n}`,v:PYR_RUN_CAP.speed[sp]},
-    {n:`Saját tempó: ${(GAME_TEMPO[tp]||GAME_TEMPO.normal).n}`,v:PYR_RUN_CAP.tempo[tp]||0.88},
-    {n:club?"Kész klubbal indultál":"Drafttal indultál",v:club?PYR_RUN_CAP.club:1}];
+    {n:`Saját tempó: ${(GAME_TEMPO[tp]||GAME_TEMPO.normal).n}`,v:PYR_RUN_CAP.tempo[tp]||0.88}];
   /* A rés csak akkor sor, ha van mit mondania: a régi mentésekben nincs gap0,
      és a mezőny alól indulva a szorzó amúgy is 1,00. */
   if(gap!=null&&gap>0)parts.push(
@@ -19090,7 +19109,7 @@ function renderPyrCapNote(){
      mutatunk: ami MÁR eldőlt (fokozat + saját tempó), és hogy ez meddig
      mehet a legmélyebb osztályból indulva. A pontos érték az osztályválasztón
      áll össze, klubbal együtt. */
-  const fix=(PYR_RUN_CAP.speed[pyrWantedSpeed]||1)*(PYR_RUN_CAP.tempo[tp]||0.88)*PYR_RUN_CAP.club;
+  const fix=(PYR_RUN_CAP.speed[pyrWantedSpeed]||1)*(PYR_RUN_CAP.tempo[tp]||0.88);
   const best=Math.round(Math.max(0.05,Math.min(1,fix*(PYR_RUN_CAP.div[PYR_DIVS-1]||1)))*100);
   const worst=Math.round(Math.max(0.05,Math.min(1,fix*(PYR_RUN_CAP.div[0]||1)))*100);
   el.innerHTML=`🎯 <b>A Run-szinted plafonja ezzel a fokozattal: `
@@ -20066,7 +20085,7 @@ function renderSetupRecap(){
     add("Ellenfelek",PYR_SPEEDS[pyrWantedSpeed]?PYR_SPEEDS[pyrWantedSpeed].n:pyrWantedSpeed,2);
     add("Kezdő osztály","a klubválasztás után dől el",2);
     {const fix=(PYR_RUN_CAP.speed[pyrWantedSpeed]||1)
-       *(PYR_RUN_CAP.tempo[gameTempoPref()]||0.88)*PYR_RUN_CAP.club;
+       *(PYR_RUN_CAP.tempo[gameTempoPref()]||0.88);
      const pc=v=>Math.round(Math.max(0.05,Math.min(1,fix*v))*100);
      add("Run-plafon",`${pc(PYR_RUN_CAP.div[0]||1)}–${pc(PYR_RUN_CAP.div[PYR_DIVS-1]||1)}`,2);}
   }else{
@@ -20722,9 +20741,12 @@ function renderClubPickList(q){
   /* A kiírt átlagerő MOST már a valóság: kész klubnál mindig a szezon-alap fut,
      tehát a keret pontosan ezekkel az értékelésekkel érkezik. */
   if(note)note.textContent=pyrPending
-    ?`${all.length} valós klub-szezon · előbb a klub, utána az osztály — a kiírt erő alapján kapsz majd ajánlást, hogy hol kezdd a mászást.`
+    ?`${all.length} valós klub-szezon · előbb a klub, utána az osztály. A Run-plafon a klubbal ELÉRHETŐ legmagasabb érték: minél kevésbé vagy esélyes a saját mezőnyödben, annál magasabbra érhet a futás.`
     :`${all.length} valós klub-szezon · a keret az adott idény értékeléseivel érkezik · a keretlimit a klub méretéhez igazodik (+${CLUB_ROSTER_SPARE} hely a tartalékoknak).`;
   const list=all.filter(sq=>!needle||`${sq.club} ${sq.season} ${sq.league||""}`.toLowerCase().includes(needle));
+  /* A piramis világa EGYSZER épül fel a listához — soronként újraépítve
+     kétszáz klubnál már látható akadás lenne. */
+  const _pyrListWorld=pyrPending?pyrBuildWorld(rngFor("pyr:world")):null;
   box.innerHTML="";
   if(!list.length){box.innerHTML=`<p style="font-size:13px;color:var(--dim);text-align:center;padding:14px 0">Nincs találat.</p>`;return;}
   const byLeague={};
@@ -20735,6 +20757,10 @@ function renderClubPickList(q){
     h.textContent=L;box.appendChild(h);
     byLeague[L].sort((a,b)=>a.club.localeCompare(b.club,"hu")||a.season.localeCompare(b.season)).forEach(sq=>{
       const n=sq.players.length,avg=Math.round(squadAvgOvr(sq));
+      /* A PIRAMISBAN a klub NEM csak keret: ő szabja meg, meddig érhet a Run.
+         Ezért a plafon már a listában ott áll — enélkül a felhasználó csak a
+         következő képernyőn szembesül vele, klubonként külön-külön. */
+      const bestCap=pyrPending?pyrClubBestCap(sq,pyrPendingSpeed,_pyrListWorld):null;
       const b=document.createElement("button");
       b.className="btn-s";
       b.style.cssText="width:100%;text-align:left;margin-bottom:6px;padding:9px 11px;border-radius:8px";
@@ -20742,7 +20768,8 @@ function renderClubPickList(q){
           <div style="font-weight:700;font-size:13.5px">${esc(sq.club)} <span style="color:var(--dim2);font-weight:400">(${esc(sq.season)})</span></div>
           <div style="font-family:var(--font-disp);font-size:17px;color:var(--gold);flex:0 0 auto">${avg}</div>
         </div>
-        <div style="font-size:11.5px;color:var(--dim);margin-top:2px">${n} fős keret${n<11?" · ifikkel kiegészítve":""}${sq.note?` · ${esc(sq.note)}`:""}</div>`;
+        <div style="font-size:11.5px;color:var(--dim);margin-top:2px">${n} fős keret${n<11?" · ifikkel kiegészítve":""}${sq.note?` · ${esc(sq.note)}`:""}${
+          bestCap!=null?` · <b style="color:${runColor(bestCap)}">Run-plafon ${bestCap}</b>`:""}</div>`;
       b.onclick=()=>{if(pyrPending)pyrOpenDivPick(sq);else startClubCareer(sq);};
       box.appendChild(b);});});}
 /* ================= AZ OSZTÁLYVÁLASZTÓ (HAGYOMÁNYOS KARRIER) =================
@@ -20797,16 +20824,34 @@ function renderPyrDivPick(){
     box.appendChild(b);});
   const cur=opts.filter(o=>o.id===pyrPickDiv)[0]||opts[opts.length-1];
   const note=$("pyrDivPickNote");
+  /* A SZORZAT LÁTHATÓ. Négy tényező adja a plafont, és ha csak az eredmény
+     látszik, a felhasználónak fogalma sincs, melyiken tudna javítani —
+     különösen a KEZDŐ RÉS-en, ami nem a beállításból, hanem a klubválasztásból
+     jön. Az 1,00-s tényezőket is kiírjuk: azok mondják meg, hogy ott már nincs
+     mit nyerni. */
+  /* AMI A PLAFONT VISSZAFOGJA, NÉVVEL. Nem általánosságban mondjuk meg, mit
+     kellene másképp: megkeressük a klubbal elérhető LEGJOBB osztályt, és
+     felsoroljuk, ott melyik tényező marad 1,00 alatt. Az a lista pontosan
+     az, amin még lehetne javítani. */
+  const bestOpt=opts.reduce((a,o)=>o.cap>a.cap?o:a,opts[0]);
+  const best=bestOpt.cap;
+  const lack=bestOpt.parts.filter(x=>x.v<0.999).map(x=>x.n);
   if(note)note.innerHTML=`🎯 <b>D${cur.id} · ${esc(cur.name)} — `
     +`<span style="color:${cur.zone.c}">${cur.zone.n}</span>, Run-plafon `
     +`<span style="color:${runColor(cur.cap)}">${cur.cap}</span>.</b><br>`
+    +`<span style="font-size:11px;color:var(--dim2)">`
+    +cur.parts.map(x=>`${esc(x.n)} <b style="color:${x.v>=0.999?"var(--grass)":"var(--ink)"}">×${x.v.toFixed(2).replace(".",",")}</b>`).join(" · ")
+    +`</span><br>`
     +`<span style="color:var(--dim);font-size:11px">`
     +(cur.gap>2.5
-      ?`A klubod jóval a mezőnye fölött áll — a feljutás szinte adott, ezért a Run-plafon is lejjebb kerül.`
+      ?`A klubod jóval a mezőnye fölött áll — a feljutás szinte adott, ezért a plafon is lejjebb kerül. `
       :cur.gap<-4
-      ?`A klubod messze a mezőnye alatt van. Ez évekig tartó kapaszkodás, akár kieséssel — de a legtöbbet érő út.`
-      :`Ebből az osztályból megdolgozol a feljutásért, de nem reménytelen. A bajnok feljut, a 2–3. hely osztályozót játszik.`)
-    +` A döntés a karrier végéig rögzül.</span>`;
+      ?`A klubod messze a mezőnye alatt van. Ez évekig tartó kapaszkodás, akár kieséssel — de a legtöbbet érő út. `
+      :`Ebből az osztályból megdolgozol a feljutásért, de nem reménytelen. A bajnok feljut, a 2–3. hely osztályozót játszik. `)
+    +(best>=100
+      ?`<b style="color:var(--grass)">Ezzel a klubbal a 100 is elérhető</b> — D${bestOpt.id}-ból indulva. `
+      :`A klubbal elérhető legmagasabb plafon <b>${best}</b> (D${bestOpt.id}); ott ez fogja vissza: <b>${esc(lack.join(", "))}</b>. `)
+    +`A döntés a karrier végéig rögzül.</span>`;
   const go=$("pyrDivGoBtn");
   if(go)go.textContent=`Indulás innen: D${cur.id} →`;}
 $("pyrDivBackBtn")&&($("pyrDivBackBtn").onclick=()=>{
@@ -21046,6 +21091,16 @@ function redisplayChemistry(){
 $("chemOk").onclick=()=>{
   $("chemBox").classList.add("hide");
   if(gameMode==="career"&&CHEM&&CHEM.goodPairs)seedBaseChemistry(CHEM.goodPairs);
+  /* ---- KÉSZ KLUB: A NÉV ADOTT ----
+     Nem a keretet válogattad össze, hanem ÁTVETTED egy valós klubot — a neve
+     része annak, amit átvettél. Elnevezni azt, ami már létezik, két helyen is
+     hazuggá tette a képernyőt: a tabellán a saját sorod más néven futott, mint
+     amit a klubválasztóban választottál, a ligapiramisban pedig a világból
+     kivett klubod helyére egy idegen név lépett be. */
+  if(gameMode==="career"&&careerStart==="club"&&curSquad&&curSquad.club){
+    teamName=String(curSquad.club).slice(0,22);
+    phase="coach";$("coachBox").classList.remove("hide");
+    saveGame();return;}
   phase="name";$("nameBox").classList.remove("hide");$("teamNameInput").focus();
   saveGame();};
 $("nameOk").onclick=()=>{
@@ -21495,7 +21550,7 @@ function initialSkillDraw(){
   S.initialSkillDone=true;
   if(!S.skillPool.length)S.skillPool=weightedShuffleSkills();
   const skill=S.skillPool.shift();
-  showSkillDraw(skill,"start",1,()=>{
+  grantSkillDecide(skill,"start",1,()=>{
     $("simGo").classList.remove("hide");
     /* a skill-tipp a sorsolás UTÁN jön: addigra látta, mit kapott, és hogy
        hány fázisból épül ki. A HUB tippje mögé sorolódik be magától. */
@@ -33563,6 +33618,8 @@ function playMatch(){
         if(S.auto){
           applyUpgrade(pick(incompleteCands));
           processSkillQueue(reasons,cb);
+        }else if(skillRealOn()&&Math.random()<skillRealAutoShare()){
+          skillRealAutoUpgrade(incompleteCands,()=>processSkillQueue(reasons,cb));
         }else showSkillCompletion(()=>processSkillQueue(reasons,cb),incompleteCands);
         return;
       }
@@ -33570,7 +33627,7 @@ function playMatch(){
       const stagesNeeded=rollStagesNeeded();
       noteSkillGranted("new");
       if(S.auto){autoAssignSkill(skill,stagesNeeded);processSkillQueue(reasons,cb);}
-      else showSkillDraw(skill,reason,stagesNeeded,()=>processSkillQueue(reasons,cb));}
+      else grantSkillDecide(skill,reason,stagesNeeded,()=>processSkillQueue(reasons,cb));}
     if(skillReasons.length)processSkillQueue(skillReasons,afterAllRewards);
     else afterAllRewards();
   }
@@ -36365,10 +36422,67 @@ function skillRealPlan(){
       const who=skillRealEarner();
       if(who)return {mode:"auto",skill:skillRealDrawFor(who),target:who};}
     return {mode:"auto",skill:skillRealDrawBiased(),target:null};}
-  /* A TE ÁGAD. Panzer: ha egyszer te döntesz, akkor mindent te döntesz. */
+  /* A TE ÁGAD. Panzer: ha egyszer te döntesz, akkor mindent te döntesz.
+     A "ki kapja" ág SZÁNDÉKOSAN nem ad vissza képességet: ott a hívó saját
+     sorsolása marad érvényben (a jutalom-sorban a sor eleme, a meccs utáni
+     ágon a skillPool-ból húzott). Így a realisztikus mód CSAK a döntést veszi
+     el, a merítés szabályait nem írja felül. */
   let st=null;try{st=styleState();}catch(e){}
   if((st&&st.key==="panzer")||Math.random()<SKR_TYPE_SHARE)return {mode:"both"};
-  return {mode:"who",skill:pick(MAIN_SKILLS)};}
+  return {mode:"who"};}
+/* ================= EGYETLEN KAPU MINDEN KÉZI SKILL-KIOSZTÁSHOZ =================
+   HIBA, AMIT EZ JAVÍT. A realisztikus mód logikája kész volt és helyes — csak
+   EGYETLEN helyről hívta bárki, a jutalom-sor ürítéséből (drainRewardSkills).
+   Abba a sorba viszont csak a KIHÍVÁS-jutalom skilljei kerülnek. A skillek
+   túlnyomó része nem onnan jön, hanem a meccs utáni jutalom-ágból
+   (processSkillQueue) és a karrier legelső sorsolásából (initialSkillDraw) —
+   azok pedig egyenesen a kézi választóra mentek. Mérve tehát a "realisztikus"
+   kapcsoló bekapcsolva is ~kézi maradt: a felhasználó szerint az esetek
+   98%-ában ő döntött, a beígért 33% helyett.
+   Innentől MINDEN kézi kiosztás ezen a kapun megy át. */
+function grantSkillDecide(skill,reason,stagesNeeded,resumeCb,stagesDone,fromName,noReal){
+  const done=stagesDone||1;
+  if(skillRealOn()&&!noReal){
+    const plan=skillRealPlan();
+    if(plan.mode==="auto"){
+      skillRealAuto(plan.skill||skill,reason,stagesNeeded,done,plan.target,resumeCb);return;}
+    if(plan.mode==="both"){
+      showSkillTypePick(reason,stagesNeeded,done,resumeCb);return;}
+    /* "who": a képesség a hívóé marad, csak a címzettet választod. */
+    showSkillDraw(plan.skill||skill,reason,stagesNeeded,resumeCb,done,fromName);return;}
+  showSkillDraw(skill,reason,stagesNeeded,resumeCb,done,fromName);}
+/* ---- A FEJLESZTÉS-JUTALOM "NEM TE DÖNTESZ" ÁGA ----
+   A jutalmak zöme nem új képesség, hanem FOLYTATÁS: a continueChance a
+   félkészek számával 0,35-ről 0,78-ig nő. Ha ez az ág végig kézi maradna, a
+   realisztikus mód a saját ígéretét sem tudná betartani — hiába megy át az új
+   skillek 66%-a automatikusan, a képernyők többsége attól még döntés volna.
+   Ugyanaz az arány (skillRealAutoShare) dönt, és ugyanúgy BEJELENTJÜK: a
+   jutalom nem tűnhet el némán. */
+function skillRealAutoUpgrade(cands,resumeCb){
+  const c=pick(cands);
+  if(!c){resumeCb();return;}
+  skillResumeCb=resumeCb;
+  $("scSkill").classList.remove("hide");
+  $("skillTitle").textContent="Fejlesztés — jutalom!";
+  $("skillSpinBtn").classList.add("hide");
+  $("skillSpinName").textContent="⇪";
+  $("skillAssignWrap").classList.remove("hide");
+  const star=c.kind==="star";
+  applyUpgrade(c);
+  /* A PONTOS ÁLLÁST a csillag-ágon nem írjuk ki: a friss csillag fázisigénye
+     épp az indításkor sorsolódik, tehát egy "előtte → utána" pár félrevezetne.
+     A meccsnapló amúgy is részletesen közli, mi történt (applyUpgrade). */
+  $("skillDesc").innerHTML=`<b>${esc(shortName(c.name))}</b> — „${esc(c.inst.skill.name)}"${star?" ⭐" :""} `
+    +(star?"csillaga lépett tovább."
+          :`fejlődött: ${c.inst.stagesCompleted}/${c.inst.stagesNeeded} fázis.`)+`<br>`
+    +`<span style="color:var(--dim)">Realisztikus képesség-kiosztás: ezt a lépést nem te választottad.</span>`;
+  const box=$("skillAssignList");box.innerHTML="";
+  const btn=document.createElement("button");
+  btn.className="btn-p stepbtn";btn.textContent="Rendben";
+  btn.onclick=()=>{$("scSkill").classList.add("hide");
+    const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();};
+  box.appendChild(btn);
+  $("scSkill").scrollIntoView({behavior:"smooth"});}
 function drainRewardSkills(cb){
   const q=S.pendingRewardSkills;
   if(!q||!q.length){cb();return;}
@@ -36384,17 +36498,8 @@ function drainRewardSkills(cb){
   /* ---- REALISZTIKUS MÓD ----
      AZ ÖRÖKSÉG KIVÉTEL: ott a KONKRÉT képesség megy tovább a távozótól, azt
      nem sorsolhatjuk újra — a jutalom lényege épp az, hogy AZ marad meg. */
-  if(skillRealOn()&&item.reason!=="orokseg"){
-    const plan=skillRealPlan();
-    if(plan.mode==="auto"){
-      skillRealAuto(plan.skill,item.reason||"challenge",item.stagesNeeded,done,plan.target,next);
-      return;}
-    if(plan.mode==="both"){
-      showSkillTypePick(item.reason||"challenge",item.stagesNeeded,done,next);
-      return;}
-    showSkillDraw(plan.skill,item.reason||"challenge",item.stagesNeeded,next,done,item.from);
-    return;}
-  showSkillDraw(skill,item.reason||"challenge",item.stagesNeeded,next,done,item.from);}
+  grantSkillDecide(skill,item.reason||"challenge",item.stagesNeeded,next,done,item.from,
+    item.reason==="orokseg");}
 /* ---- "NEM TE DÖNTESZ": bejelentjük, mi történt ----
    A jutalom nem tűnhet el némán. A képernyő ugyanaz, csak a lista helyén egy
    közlés áll: ki kapta és miért ő. */

@@ -744,8 +744,15 @@ Run = KIHÍVÁS-PLAFON × TELJESÍTMÉNY
 | **Kezdő osztály** | D1 ×0,55 · D2 ×0,70 · D3 ×0,80 · D4 ×0,88 · D5 ×0,94 · **D6 ×1,00** |
 | **Ellenfél-tempó** | 😴 ×0,55 · 🚶 ×0,75 · 🏃 ×0,90 · 🔥 **×1,00** |
 | **Saját tempó** | Alap ×0,88 · Komótos ×0,93 · Csiga ×0,97 · Gleccser **×1,00** |
-| **Indulás** | draft ×1,00 · kész klub ×0,95 |
-| **Kezdő rés** | rés ≤ 0 → ×1,00 · rés > 0 → ×(1 − 0,075 × rés), padló **×0,40** |
+| **Kezdő rés** | rés ≤ **+1,0** → ×1,00 · fölötte ×(1 − 0,075 × (rés − 1,0)), padló **×0,40** |
+
+*(Az „Indulás: draft ×1,00 · kész klub ×0,95" sor **kivezetve, v3.4.20**. A draft
+megszűnésével mindenkire egyformán ült — nem különbséget mért, hanem egyetemes
+adó volt, ami a 100-as plafont mindenkinek elérhetetlenné tette. A rés
+**+1,0-ig terjedő holtsávja** ugyanabból a kiadásból való: a mérés szerint a
++1-es rés még egyenrangú kezdés, a +2 viszont már 37%-os bajnoki esély — a
+büntetés csak ott induljon, ahol a könnyebbség tényleg megjelenik, különben
+maga az AJÁNLOTT osztály is büntetést kapott volna.)*
 
 **Miért kellett a rés-szorzó (v3.4.18).** A draft kivétele után az osztály
 önmagában már nem mért kihívást: a hatodosztályba be lehetett volna lépni egy
@@ -758,9 +765,22 @@ Run = KIHÍVÁS-PLAFON × TELJESÍTMÉNY
 | Deportivo (80,6) | 41 | 53 | 58 | 57 | 56 | 54 |
 | Debreceni VSC (69,0) | 41 | 53 | 60 | 66 | 71 | **75** |
 
-Egy szuperklubbal **sehol** nem lehet magasra futni (25–30), és a „mélyről
-indulok egy nagy kerettel" út sem éri meg jobban, mint az őszinte kezdés. Egy
-gyenge klubbal a plafon a szokásos módon nő lefelé haladva.
+Egy szuperklubbal **sehol** nem lehet magasra futni, és a „mélyről indulok egy
+nagy kerettel" út sem éri meg jobban, mint az őszinte kezdés. Egy gyenge klubbal
+a plafon a szokásos módon nő lefelé haladva.
+
+**A 100 elérhető — de a klub dönti el (v3.4.20).** A legkeményebb beállításon
+(🔥 Kegyetlen + Gleccser) a **172 választható klub-szezonból 39** ér el 100-as
+plafont; a Barcelona **46**-ig jut, akármelyik osztályból indul. Ezt a
+klubválasztó már a listában kiírja (a klubbal ELÉRHETŐ legmagasabb plafon),
+az osztályválasztó pedig a teljes szorzatot mutatja, és megnevezi, melyik
+tényező fogja vissza:
+
+| klub | D1 | D2 | D3 | D4 | D5 | D6 |
+|---|---|---|---|---|---|---|
+| FC Barcelona (88,0) | 46 | 42 | 40 | 36 | 38 | 40 |
+| Deportivo (80,6) | 55 | 70 | 80 | 84 | 83 | 81 |
+| Debreceni VSC (69,0) | 55 | 70 | 80 | 88 | 94 | **100** |
 
 Mért plafonok:
 
