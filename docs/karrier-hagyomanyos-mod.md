@@ -579,6 +579,57 @@ erősebb és BL-t ér), de ha zavarónak bizonyul, elég a `PYR_CUPS` két `comp
 mezőjét egységesíteni. A `RUN_MILESTONES` egyelőre csak az MK-t ismeri — az
 FA-kupa mérföldkövei a Run-szint lépésénél (P5) jönnek.
 
+## 7.1 Fel- és kiesés: az OSZTÁLYOZÓ
+
+A helyezés nem puszta sorszám. Az osztályok között van egy **osztályozó sáv**,
+ahol a feljutás nem jár, hanem ki kell harcolni:
+
+| helyezés | mi történik |
+|---|---|
+| **1.** | közvetlen feljutás |
+| **2–3.** | **osztályozó** a fentebbi osztály **15.**, illetve **14.** helyezettje ellen |
+| 4–13. | marad |
+| **14–15.** | **osztályozón védi a helyét** |
+| **16.** | közvetlen kiesés |
+
+A párosítás keresztbe megy: a jobbik feljutó-jelölt (2.) a gyengébb védőt
+(15.) kapja. Két oda-visszavágós párharc osztálypáronként — **az első meccs a
+kihívónál, a visszavágó a védőnél**, tehát a döntő mérkőzésen a bennmaradásra
+játszó csapaté a hazai pálya, ahogy a valóságban is.
+
+**Mérve** (a motor saját gólgörbéjével, 300 párharc értékenként) — a kihívó
+győzelmi esélye:
+
+| erőviszony | azonos | +3 | −3 | −6 |
+|---|---|---|---|---|
+| kihívó nyer | **48%** | 71% | 32% | 10% |
+
+Az azonos erőnél mért 48% mutatja a védő hazai előnyét a visszavágón. Mivel
+egy alsóbb osztály 2. helyezettje jellemzően 2–3 Ratinggel a felsőbb osztály
+15. helyezettje alatt van, a párharc valóban **nyitott** — ez a mód
+legdrámaibb két mérkőzése.
+
+**Egyelőre SZIMULÁLT, nem játszott.** A lejátszható osztályozóhoz a szezon
+utáni szakaszba kellene egy teljes mérkőzés-folyam (mint az európai kupáé) —
+az külön lépés. Addig a párharc a motor saját törvényei szerint dől el, és
+részletesen elbeszéljük: mindkét meccs eredménye, az összesítés és a döntés
+módja (összesítés vagy büntetők) is kiírásra kerül.
+
+## 7.2 A hegymászás vezetése
+
+A mód akkor működik, ha a felhasználó **tudja, hogy hegyet mászik**. Három
+helyen mondjuk ki:
+
+* **A HUB nagy kijelzője** (`pyrLadderHtml`) a nehézségi gomb helyén: egy
+  hatfokú létra, a jelenlegi osztály kiemelve, mellette a cél („a csúcsig 3
+  osztály"), a feljutás és a kiesés pontos feltételei, és a meccs-erőd a
+  mezőnyhöz mérve.
+* **A tabella fejléce** megmondja, MELYIK osztály állásáról van szó, és a
+  sorok színes csíkot kapnak: feljutás · osztályozó · kiesés, jelmagyarázattal.
+* **A szezon eleji tájékoztató** (`announcePyrSeason`) a kezdőrúgás előtt
+  kimondja a tétet: hányadik idény, melyik osztály, mi kell a feljutáshoz, mi
+  fenyeget alul, és hogy a mezőny is fejlődik — „ha megállsz, lecsúszol".
+
 ## 8. Riválisok
 
 A mai rangadó-lista helyett: **a hozzád Ratingben legközelebb álló 2–3
@@ -795,14 +846,11 @@ fokozat átlövéséhez `live tier=kegyet share=0,84 top=0,92`.
    −0,5 … +1,0. **Karbantartás:** ha az adatbázis bővül, a
    `node tools/pyramid-sim.js draft` újrafuttatandó — a `PYR_DRAFT_PREMIUM`
    az egyetlen szám, amit hangolni kell.
-6. **A KIESÉS gyakorlatilag csak a Kegyetlen fokozaton fordul elő** (0,3
-   karrierenként; a többi hárommal 0,0). Az ok szerkezeti: feljutni akkor
-   fogsz, amikor már +2…+3-mal a saját mezőnyöd fölött állsz, tehát az új
-   osztályba nagyjából a KÖZÉPRE érkezel, nem az aljára. A mód ígéretének
-   („akár ki is lehet esni") ez csak részben felel meg. Ha a kiesés korábban
-   is kellene, két lehetőség van: **rájátszás** a 3–6. helyezetteknek (a
-   gyengébb feljutó tényleg szenvedne), vagy nagyobb `PYR_STEP` — de az
-   utóbbit a ±4-es ablak erősen korlátozza.
+6. ~~A kiesés gyakorlatilag csak a Kegyetlen fokozaton fordul elő~~ —
+   **megoldva az osztályozóval** (lásd lentebb). A 2–3. helyezett immár
+   párharcot játszik a fentebbi osztály 15., illetve 14. helyezettje ellen,
+   tehát gyengébb csapatok is feljuthatnak (és ott tényleg szenvednek), a
+   fentiek pedig valódi kiesés-veszélyben vannak.
 7. **A `PYR_STEP` és a fejlődési fokozatok együtt mozognak.** A négy
    ellenfél-tempó a 3,0-as lépcsőhöz van kalibrálva; ha a `PYR_STEP`
    változik, a `tools/pyramid-sim.js speeds step=…` futtatásával a fokozatokat
