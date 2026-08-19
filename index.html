@@ -7333,7 +7333,30 @@ function shuffleArr(a,rnd){
    (wcEnabled) csak azt dönti el, hogy a FUTÓ JÁTÉKBAN aktívak-e: ha ki van
    kapcsolva, a válogatottak sem draftban, sem ellenfélként, sem szemlén nem
    jelennek meg. Ha be van kapcsolva, teljes értékű keretek minden szinten. */
-function activeSquads(){return wcEnabled?SQUADS:SQUADS.filter(sq=>!sq.wc);}
+/* ---- A KAPCSOLÓ A KARRIER INDULÁSAKOR RÖGZÜL ----
+   HIBA, AMIT EZ JAVÍT: a `wcEnabled` globális localStorage-preferencia volt, és
+   az alábbi olvasók MINDEN hívásnál élőben kérdezték. A mentésbe viszont nem
+   került bele, tehát egy újratöltés után a FUTÓ karrier arra az értékre esett
+   vissza, ami épp a localStorage-ban állt — akkor is, ha közben egy másik
+   karrierhez átkapcsoltad. Az ellenféltábla, a draft-pool és az igazolható
+   játékosok köre így NÉMÁN megváltozott a futó karrier alatt.
+   KÖZÖS KARRIERBEN súlyosabb: a házigazda választása csak a modulszintű
+   változóba érkezett meg (mpApplySettings), a mentésbe nem — a vendég egy
+   újratöltés után a SAJÁT preferenciájára esett vissza, és a közös világ
+   pool-ja kettévált. Pontosan az a szétcsúszás, amit a sorsolás rendjénél és a
+   fejlődési tempónál az mpWorldSched/mpWorldTempo rögzítése már megszüntetett;
+   ez volt a harmadik, kimaradt tengely.
+   A MEGOLDÁS ugyanaz a minta, mint a Rating-alapnál (careerRatingBasis): a
+   beginNewGame lezárja az S-be, onnantól a futó játék azt olvassa, és a
+   mentés viszi. A localStorage-preferencia érintetlen marad — az a KÖVETKEZŐ
+   játékot állítja, ahogy eddig is. */
+function wcOn(){
+  /* A typeof-őr kell: ez a fájlban KORÁBBAN áll, mint az S deklarációja
+     (23074), és egy korai hívás különben TDZ-hibával döntené a szkriptet —
+     ugyanaz az őr, ami a cupTierFor-ban is védi az oppTargetRating-et. */
+  if(typeof S!=="undefined"&&S&&S.careerWc!=null)return !!S.careerWc;
+  return wcEnabled;}
+function activeSquads(){return wcOn()?SQUADS:SQUADS.filter(sq=>!sq.wc);}
 function draftPool(){return activeSquads();}
 /* A csapat valós erejét a legjobb 11 játékos átlaga adja (nem a teljes,
    cserékkel felhígított keret átlaga) — ez azért fontosabb mérték, mert
@@ -11977,7 +12000,7 @@ SQUADS.forEach(sq=>sq.players.forEach(p=>{
    ezt a wcActive() szűrővel veszik figyelembe: ha a kezdőlapon a VB ki van
    kapcsolva, a válogatott-játékosok sehol nem igazolhatók — ha be, teljes
    értékű igazolható játékosok. */
-function wcOk(p){return wcEnabled||!p._wc;}
+function wcOk(p){return wcOn()||!p._wc;}
 
 /* ================= KARRIER MÓD — VALÓS SZEMÉLY REGISZTER =================
    Az adatbázisban (SQUADS) egy valódi ember — pl. Messi — TÖBB, EGYMÁSTÓL
@@ -12048,7 +12071,7 @@ const CAREER_BEST_CARD=(function(){
 function careerBestCardFor(name){
   const e=CAREER_BEST_CARD[name];
   if(!e)return null;
-  return (wcEnabled?(e.any||e.club):(e.club||e.any))||null;}
+  return (wcOn()?(e.any||e.club):(e.club||e.any))||null;}
 
 /* ================= KARRIER MÓD — TSI ÉS FEJLŐDÉSI GÖRBE =================
    Ez a réteg még nincs bekötve semmilyen UI-ba (az a 3. lépés lesz, a
@@ -18433,6 +18456,11 @@ function beginNewGame(){
   /* A közös világ két globális tengelye (sorsolás rendje, fejlődési tempó) is itt
      rögzül — enélkül a két kliens a SAJÁT localStorage-beállításával játszott. */
   lockMpWorldSettings();
+  /* A VÁLOGATOTT-KAPCSOLÓ a harmadik ilyen tengely, és eddig kimaradt: a
+     globális preferencia menet közben is átírta a futó világot, közös
+     karrierben pedig egy újratöltés kettéválasztotta a pool-t. Innentől a
+     mentés viszi. Lásd a wcOn() fölötti indoklást. */
+  S.careerWc=!!wcEnabled;
   /* A PIAC HORGONYA = AZ INDULÁSI MEZŐNYSZINT — egy helyen, mindenkire.
      Eddig két külön esemény állította be (a nehézség-csúszka mozgatása és a
      kezdésmód-választó kattintása), tehát aki egyiket sem érintette, annál a
@@ -22905,6 +22933,10 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   /* REALISZTIKUS SKILL-KIOSZTÁS (karrierenként választható), és a legutóbbi
      mérkőzés kiemelkedői, akikből a "kiérdemelte" ág választ. */
   skillReal:false,lastStars:null,
+  /* A VÁLOGATOTT-KAPCSOLÓ a karrier indulásakor ide rögzül (lásd wcOn()).
+     null = még nincs rögzítve → a globális preferencia él, ahogy a mérő
+     bevezetése előtti mentésekben. */
+  careerWc:null,
   /* F6: a párharc tartós állapota. A mpBalance a kiegyenlítő rating-eltolás,
      a mpHistory és a mpDuelLog pedig SZEZONOKON ÁTÍVELŐ — nem nullázódik. */
   oppBuffH:null,   /* a szezonra rögzített rejtett ellenfél-erősítés */
@@ -43233,7 +43265,7 @@ function careerSetupHtml(){
      mp?"Közös világ-beállítás — nálatok ugyanaz a menetrend.":"",1);}
   h+=row("👨‍👦","Családtag",familyEnabled?"<b>Van</b>":"<b>Nincs</b>",
     familyEnabled?`Névkészlet: <b>${esc2({default:"alap",custom:"saját",extend:"alap + saját"}[familyNameMode]||familyNameMode)}</b>`:"",1);
-  h+=row("🌍","Világbajnokság",wcEnabled?"<b>Van</b>":"<b>Nincs</b>","",1);
+  h+=row("🌍","Világbajnokság",wcOn()?"<b>Van</b>":"<b>Nincs</b>","",1);
 
   /* ---- 5. AMI MENET KÖZBEN IS ÁLLÍTHATÓ ---- */
   h+=sec("Menet közben állítható");
@@ -52328,6 +52360,9 @@ function saveGame(){
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
         guideOn:S.guideOn,guideSeen:S.guideSeen,teach:S.teach,
         skillReal:S.skillReal,lastStars:S.lastStars,
+        /* A karrierre rögzített válogatott-kapcsoló. NÉLKÜLE egy újratöltés a
+           globális preferenciára ejtette vissza a futó világot — lásd wcOn(). */
+        careerWc:S.careerWc,
         seasonStartStrength:S.seasonStartStrength,summerPaidAfterSeason:S.summerPaidAfterSeason,
         chemPairs:S.chemPairs,chemInProgress:S.chemInProgress,
         /* PASSZKÉMIA: a kötések, az épülő páros és a karrier-regiszter. */
@@ -52951,6 +52986,13 @@ function applySavedGame(d){
     if(e&&e.skillsEver===undefined)
       e.skillsEver=((S.skills&&S.skills[e.n])||[]).map(i=>i.skill&&i.skill.id).filter(Boolean);});
   S.playing=false;
+  /* ---- ÖNJAVÍTÁS: A VÁLOGATOTT-KAPCSOLÓ RÖGZÍTÉSE RÉGI MENTÉSBEN ----
+     A rögzítés (S.careerWc) előtti mentésekben ez a mező nincs meg, tehát a
+     wcOn() a globális preferenciára esne vissza — vagyis a régi karrier
+     tovább sodródna minden újratöltéssel. Itt EGYSZER befagyasztjuk arra az
+     értékre, ami ÉPP MOST érvényes: ez pontosan az, amivel a karrier eddig is
+     futott, tehát a viselkedés nem változik — csak megszűnik a sodródás. */
+  if(S.careerWc==null)S.careerWc=!!wcEnabled;
   pendingPlayer=null;pendingCaptainIdx=-1;rerolls=d.rerolls!==undefined?d.rerolls:1;
   slots.forEach(s=>{if(s.player&&!(s.player.n in NAT_BY_NAME))NAT_BY_NAME[s.player.n]=s.player.nat;});
   Object.values(BENCH).forEach(p=>{if(p&&!(p.n in NAT_BY_NAME))NAT_BY_NAME[p.n]=p.nat;});
@@ -53179,8 +53221,15 @@ function initSaveSystem(){
 /* Az ÜGYNÖKSÉG a scout párja: a scout felmér, az ügynökség üzletet köt. Nincs
    kisorsolva — minden karrier egy csillagon indul, és onnan te építed. */
 let gameMode="classic",scout=null,careerPool=null,agency=null;
+/* A BEÁLLÍTÓ KÉPERNYŐRE LÉPVE FELOLDJUK a válogatott-zárat. Enélkül az ELŐZŐ
+   karrier rögzített értéke szűrné a draft-pool előnézetét (showSquadCount),
+   miközben a képernyő szövege és a választó már az ÚJ, globális preferenciát
+   mutatná — a kettő némán szétcsúszna. A tényleges rögzítés a beginNewGame-ben
+   történik, a többi zárolás mellett. */
+function wcUnlockForSetup(){S.careerWc=null;}
 $("modeClassicBtn").onclick=()=>{
   gameMode="classic";
+  wcUnlockForSetup();
   careerStart="draft";
   $("careerStartGrid")&&$("careerStartGrid").classList.add("hide");
   $("guideGrid")&&$("guideGrid").classList.add("hide");   /* a guide karrier-funkció */
@@ -53678,6 +53727,10 @@ function mpGuestReviewShow(s){
   const sec=$("scFormation");
   if(!sec)return false;
   _mpGuestReview=true;
+  /* A vendég is a beállító képernyőre lép, tehát ugyanaz a feloldás jár neki,
+     mint a két módválasztó gombnak — a rögzítés itt is a beginNewGame-ben
+     történik, immár a HÁZIGAZDA értékével (mpApplySettings). */
+  wcUnlockForSetup();
   /* A képernyő karrier-arca: a vak mód nincs, a kezdés-választó és a
      Rating-alap viszont látszik — pontosan az, amit a házigazda eldöntött. */
   $("modeGrid")&&$("modeGrid").classList.add("hide");
