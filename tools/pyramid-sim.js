@@ -25,6 +25,7 @@
      node tools/pyramid-sim.js sweep            — tempó-söprés, hangoláshoz
      node tools/pyramid-sim.js bands            — a piramis sávjai az adatbázisból
      node tools/pyramid-sim.js world            — a LEGENERÁLT piramis, klubnevekkel
+     node tools/pyramid-sim.js draft            — mit hoz ki egy SÚLYOZOTT draft
    Opciók (bárhol, kulcs=érték alakban):
      runs=200 seasons=20 start=6 pace=7.0 step=3.0 teams=16 up=2 down=2
 ============================================================================ */
@@ -343,10 +344,112 @@ function reportWorld(){
   console.log("efölött az osztály alja már az osztály teteje ellen is esélytelen.\n");
 }
 
+/* ============================================================================
+   6. A SÚLYOZOTT DRAFT — megoldja-e a draft-paradoxont?
+   ---------------------------------------------------------------------------
+   A PROBLÉMA (docs 4.1): egy draftolt tizenegy erősebb, mint azok a klubok,
+   amikből draftoltad, mert a draft minden keretből a LEGJOBB embert emeli ki,
+   a klub tábla-Ratingje viszont a saját top-11 átlaga.
+
+   A JAVASLAT: ne a pool erejét nyomjuk le, hanem a PÖRGETÉS ESÉLYÉT toljuk el
+   az alsóbb osztályok felé — a felső osztályok klubjai csak kis eséllyel
+   nyílnak ki. Így megmarad a draft izgalma ("hátha most jön egy nagy név"),
+   és a kezdő keret mégis az indulási osztályodhoz igazodik.
+
+   AMIT ITT MÉRÜNK: egy 11 körös draftot szimulálunk (körönként egy pörgetés,
+   a felkínált keretből a legjobb olyan játékos, aki még betöltetlen posztra
+   való), és megnézzük, milyen erős tizenegy jön ki belőle.
+
+   KÉT VÁLTOZAT, mert a piramis Ratingjei NORMALIZÁLTAK, a játékosoké nyersek:
+     · NYERS      — a játékos a valós ovr-jével érkezik;
+     · KLUBELTOLT — a játékos megkapja a KLUBJA eltolását (piramis − nyers),
+       vagyis egy hatodosztályú klub játékosa annyival gyengébb, amennyivel a
+       klubja is. Ez a `applyMarketShift` már meglévő mintája.
+   A kettő közti különbség dönti el, kell-e egyáltalán eltolás.
+============================================================================ */
+const DRAFT_SHAPE={KP:1,VEDO:4,KOZEP:4,TAMADO:2};   /* 4-4-2 */
+const POS_GROUP={KP:"KP",JV:"VEDO",BV:"VEDO",KV:"VEDO",
+  VKP:"KOZEP",KKP:"KOZEP",TKP:"KOZEP",JSZ:"KOZEP",BSZ:"KOZEP",
+  CS:"TAMADO","ÁÉ":"TAMADO"};
+function draftOne(world,weights,shifted,rnd){
+  const need=Object.assign({},DRAFT_SHAPE);
+  const taken=new Set();
+  const xi=[];
+  /* a súlyok kumulatívan, osztályonként */
+  const cum=[];let acc=0;weights.forEach(w=>{acc+=w;cum.push(acc);});
+  for(let round=0;round<11;round++){
+    let best=null;
+    /* 3 pörgetési kísérlet: ha a kisorsolt keretben nincs használható ember,
+       a játék is ingyen újrapörget (lásd squadHasUsablePlayer) */
+    for(let att=0;att<3&&!best;att++){
+      const x=rnd()*acc;
+      let d=cum.findIndex(c=>x<=c);if(d<0)d=weights.length-1;
+      const div=world.divs[d];
+      const team=div.teams[Math.floor(rnd()*div.teams.length)];
+      const shift=shifted?(team.ovr-team.raw):0;
+      (team.players||[]).forEach(p=>{
+        if(taken.has(p.n))return;
+        const g=POS_GROUP[p.pos&&p.pos[0]];
+        if(!g||!need[g])return;
+        const v=p.ovr+shift;
+        if(!best||v>best.v)best={v,n:p.n,g};});}
+    if(!best)continue;
+    taken.add(best.n);need[best.g]--;xi.push(best.v);}
+  return xi.length?xi.reduce((s,v)=>s+v,0)/xi.length:0;
+}
+/* ---- A SÚLYPROFIL EGY KÉPLETBŐL ----
+   Az indulási osztályodtól MÉRT TÁVOLSÁGGAL mértani ütemben csökken a
+   pörgetési esély: w[d] = q^|d − indulás|. A `q` az EGYETLEN hangolható szám:
+     q=1,0  — egyenletes (bármelyik klub egyforma eséllyel)
+     q=0,5  — a szomszédos osztály fele akkora eséllyel
+     q=0,15 — gyakorlatilag a saját osztályod, ritka kiruccanásokkal
+     q=0    — kizárólag a saját osztályod
+   A "hátha most jön egy nagy név" élmény ettől nem vész el: q=0,15 mellett is
+   marad ~2% esély a legfelső osztály egy klubjára a hatodosztályból. */
+function draftWeights(start,q){
+  const w=[];
+  for(let d=1;d<=6;d++)w.push(q===0?(d===start?1:0):Math.pow(q,Math.abs(d-start)));
+  return w;}
+function reportDraft(){
+  const P0=loadPyrBlock(!!ARG.wc);
+  const N=ARG.runs||300;
+  /* a kereteket is oda kell adnunk a draftnak — a generátor csak a
+     tábla-Ratinget adja vissza, a játékosokat innen kötjük hozzá */
+  const fs=require("fs"),path=require("path");
+  const src=fs.readFileSync(path.join(__dirname,"..","index.html"),"utf8");
+  const i=src.indexOf("const SQUADS=[");const j=src.indexOf("\n];",i);
+  const SQUADS=(0,eval)("("+src.slice(i+"const SQUADS=".length,j+2)+")");
+  const byKey={};SQUADS.forEach(sq=>{byKey[sq.club+"|"+sq.season]=sq;});
+  const world=P0.pyrBuildWorld(seededRnd("pyr:"+(ARG.seed!=null?ARG.seed:1)));
+  world.divs.forEach(d=>d.teams.forEach(t=>{
+    const sq=byKey[t.club+"|"+t.season];t.players=sq?sq.players:[];}));
+
+  const start=ARG.start||6, d0=world.divs[start-1];
+  console.log("\n=== MIT HOZ KI EGY SÚLYOZOTT DRAFT ===");
+  console.log(`${N} draft / sor · 11 kör · 4-4-2 · indulás: D${start} `
+    +`(közép ${d0.mean.toFixed(1)}) · `+(ARG.wc?"válogatottakkal":"csak klubcsapatok"));
+  console.log("Az osztályok közepe:  "
+    +world.divs.map(d=>`D${d.id} ${d.mean.toFixed(1)}`).join(" · "));
+  console.log("\n   q  | esély a saját oszt.-ra | kezdő XI nyers | klubeltolt | RÉS a saját osztályhoz");
+  console.log("------+------------------------+----------------+------------+-----------------------");
+  [1,0.7,0.5,0.35,0.25,0.15,0.08,0].forEach(q=>{
+    const w=draftWeights(start,q);
+    const tot=w.reduce((a,b)=>a+b,0);
+    let raw=0,shi=0;
+    for(let n=0;n<N;n++){
+      raw+=draftOne(world,w,false,seededRnd("dr:"+q+":"+n));
+      shi+=draftOne(world,w,true, seededRnd("dr:"+q+":"+n));}
+    raw/=N;shi/=N;
+    console.log(String(q).padStart(5)+" |"+(100*w[start-1]/tot).toFixed(0).padStart(21)+"% |"
+      +raw.toFixed(1).padStart(15)+" |"+shi.toFixed(1).padStart(11)+" |"
+      +(shi-d0.mean>=0?"+":"")+(shi-d0.mean).toFixed(1).padStart(22-((shi-d0.mean>=0)?1:0)));});
+  console.log("\nCÉL: a rés a 0…+2 sávban (a `gaps` szerint +2 → 37% bajnoki esély,");
+  console.log("vagyis feljutásra esélyes újonc vagy, de semmi nem jár ingyen).\n");
+}
 function reportMain(){
   reportGaps();
   reportSpeeds();
 }
 
 ({gaps:reportGaps,speeds:reportSpeeds,sweep:reportSweep,bands:reportBands,
-  world:reportWorld,report:reportMain}[CMD]||reportMain)();
+  world:reportWorld,draft:reportDraft,report:reportMain}[CMD]||reportMain)();

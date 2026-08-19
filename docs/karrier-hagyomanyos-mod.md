@@ -227,26 +227,66 @@ játékos (80 és 87 között); ezért létezik egyáltalán a „nehézség-bel
 draftodhoz. A mai módban ez a *játékos döntése*; a piramisban viszont a
 mezőnyt nem te állítod, tehát a résnek **strukturálisan** el kell tűnnie.
 
-Három megoldás, romló sorrendben:
+### 4.2 A MEGOLDÁS: súlyozott draft + klubeltolás — mérve
 
-**(a) Kész klub — a legtisztább.** Átveszed egy valós klub kész keretét abból
-az osztályból, ahol kezdesz: az erőd *definíció szerint* a klub ereje, a rés
-nulla. Immerzióban is ez a legerősebb (te vagy a Paksi FC), és a mód
-alaphangulatához is ez illik. **Javaslat: a hagyományos mód alapértelmezett
-indulása a kész klub legyen.**
+*(A megoldás a felhasználó javaslata: ne a pool erejét nyomjuk le, hanem a
+PÖRGETÉS ESÉLYÉT toljuk el az alsóbb osztályok felé, hogy a felső osztályok
+klubjai csak kis eséllyel nyíljanak ki. Így megmarad a draft izgalma.
+Mérve: `node tools/pyramid-sim.js draft`.)*
 
-**(b) Draft, ellensúlyozott pool-lal.** A draft marad, de a felkínált
-játékosok Ratingje a fenti rés mértékével lejjebb tolódik (osztályonként
-~9–13 pont). Ez pontosan az a mechanizmus, ami ma is létezik
-(`applyMarketShift` / `marketPeakShift`), csak fordított előjellel és a
-világ születésekor rögzítve. A nevek és a klubok valósak maradnak, a
-számok igazodnak. **A rés mértékét osztályonként EGYSZER kell kimérni**
-(a fenti táblázat épp ezt adja), és konstansként eltenni.
+**A súlyprofil egyetlen számból.** Az indulási osztálytól mért távolsággal
+mértani ütemben csökken a pörgetési esély: `w[d] = q^|d − indulás|`.
 
-**(c) Korlátozott draft.** Nem a legjobb embert viheted minden keretből,
-hanem a keret 5–20. helyezettjéből választhatsz. Immerzióban gyenge
-(„miért nem vihetem el a csapat legjobbját?"), és a kimenetel szórása
-nagy — csak végszükségre.
+**Két összetevő kell, nem egy.** A súlyozás megmondja, MELYIK klubok
+nyílnak ki; a **klubeltolás** azt, hogy a bennük lévő játékos milyen erős.
+Az utóbbi a már meglévő `applyMarketShift` mintája: a játékos annyival
+gyengébb, amennyivel a klubja is (piramis-Rating − nyers Rating).
+
+D6-ból indulva, 200 draft / sor, csak klubcsapatok:
+
+| q | esély a saját osztályra | kezdő XI nyers | klubeltolt | **rés a saját osztályhoz** |
+|---|---|---|---|---|
+| 1,0 *(egyenletes)* | 17% | 83,4 | 81,9 | **+10,5** |
+| 0,5 | 51% | 80,7 | 76,6 | +5,2 |
+| 0,25 | 75% | 80,0 | 75,1 | +3,7 |
+| **0,15** | **85%** | **79,8** | **74,5** | **+3,1** |
+| 0,08 | 92% | 79,6 | 74,2 | +2,8 |
+| 0 *(csak a saját)* | 100% | 79,5 | 74,1 | +2,7 |
+
+**Három dolog olvasható ki:**
+
+1. **A súlyozás a nagyját megoldja** — +10,5-ről +2,7-re visz. A `q=0,15`
+   mellett a pörgetések 85%-a a saját osztályból jön, de marad ~2% esély egy
+   élvonalbeli klubra: a „hátha most jön egy nagy név" élmény megmarad.
+2. **A klubeltolás nélkül nem működik.** Eltolás nélkül a kezdő XI 79,5–83,4
+   — vagyis +8…+12 a D6 fölött, akármilyen meredek a súlyozás. A két
+   összetevő együtt jár.
+3. **Marad egy ~+2,7-es maradék**, ami *nem tüntethető el* súlyozással: ez a
+   draft szerkezeti prémiuma (a legjobb 11 tizenhat keretből mindig erősebb,
+   mint egy keret saját top-11 átlaga). Mérve **állandó**: D6-ból +2,7,
+   D3-ból +3,7, válogatottakkal D6-ból +2,8 — vagyis egy egyszerű konstanssal
+   korrigálható.
+
+**A javasolt beállítás:** `q = 0,15` + klubeltolás + `PYR_DRAFT_PREMIUM = 3`
+konstans levonás → a kezdő rés minden osztályban **0 … +1**, azaz feljutásra
+esélyes, de nem befutó újonc vagy.
+
+**Egy független megerősítés:** a felhasználó saját tapasztalata szerint a mai
+draftból válogatottakkal együtt 80–86-os csapatok jönnek ki, és a súlyozástól
+76–84-et várt. A mérés `q=0,15`, válogatottakkal: nyers XI **80,8** — pontosan
+a jelzett sávban —, klubeltolással 74,4. A modell tehát a valós tapasztalattal
+egyezik, és az eltolás az, ami a becsült sávot a helyére viszi.
+
+### 4.3 A többi megfontolt út
+
+**Kész klub.** Átveszed egy valós klub kész keretét abból az osztályból, ahol
+kezdesz: az erőd definíció szerint a klub ereje, a rés nulla. Immerzióban ez a
+legerősebb (te vagy a Paksi FC), és korrekció sem kell hozzá. **Marad a
+legegyszerűbb út — de a 4.2 után nem az EGYETLEN.**
+
+**Korlátozott draft** (nem a legjobb embert viheted minden keretből, hanem az
+5–20. helyezettből). Immerzióban gyenge, a szórása nagy — elvetve, mert a
+4.2-es megoldás ugyanazt éri el érthetőbben.
 
 
 ---
