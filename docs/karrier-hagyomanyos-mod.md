@@ -1,7 +1,7 @@
 # Hagyományos karrier — a dinamikus ligapiramis
 
-*(Tervdokumentum. Állapot: **P4 kész — világ, ligarendszer, fejlődés, súlyozott
-draft és kupák. A mód teljes, csak felülete nincs.** Lásd a 11.3 fázistáblát. A mérőeszköz,
+*(Tervdokumentum. Állapot: **P5 kész — a mód elérhető és játszható.** Világ,
+ligarendszer, fejlődés, súlyozott draft, kupák, Run-szint, riválisok, belépő. Lásd a 11.3 fázistáblát. A mérőeszköz,
 amivel a számai születtek: `tools/pyramid-sim.js`. A hozzá tartozó
 beállítás-átalakítás: `karrier-beallitasok-terv.md`; a mai kapcsolók
 hibalistája: `karrier-beallitasok-audit.md`.)*
@@ -592,29 +592,78 @@ detektálás kódja **átvehető változatlanul**.
 
 ---
 
-## 9. Run-szint a hagyományos módban
+## 9. Run-szint a hagyományos módban — MEGVALÓSULT
 
-A mai `runBreakdown` sorai közül a **beállításokhoz kötöttek eltűnnek**
-(nincs nehézség-belövés, nincs Rating-alap-vállalás, nincs Infinity-határidő),
-és a helyükre a piramis saját mércéi lépnek:
+**A vezérelv (a projektgazda döntése): *egy könnyű Run nem kaphat magas
+értékelést, akármilyen jól játsszák.*** A mai módban ez nem teljesült — a
+nehézség a súlyozott átlag EGYIK tétele volt, tehát elég jó teljesítménnyel a
+könnyű beállítás is felkúszhatott 80 fölé.
 
-| sor | súly | pont |
+Mostantól **két szám szorzata**:
+
+```
+Run = KIHÍVÁS-PLAFON × TELJESÍTMÉNY
+```
+
+### 9.1 A plafon — tisztán a vállalásaidból
+
+| tényező | értékek |
+|---|---|
+| **Kezdő osztály** | D1 ×0,55 · D2 ×0,70 · D3 ×0,80 · D4 ×0,88 · D5 ×0,94 · **D6 ×1,00** |
+| **Ellenfél-tempó** | 😴 ×0,55 · 🚶 ×0,75 · 🏃 ×0,90 · 🔥 **×1,00** |
+| **Saját tempó** | Alap ×0,88 · Komótos ×0,93 · Csiga ×0,97 · Gleccser **×1,00** |
+| **Indulás** | draft ×1,00 · kész klub ×0,95 |
+
+Mért plafonok:
+
+| beállítás | plafon |
+|---|---|
+| **legkönnyebb** — D1 + alvó mezőny + alap tempó + kész klub | **25** |
+| D3 + lassan követnek + alap tempó + draft | 53 |
+| **ajánlott** — D6 + lépést tartanak + alap tempó + draft | 79 |
+| **legnehezebb** — D6 + kegyetlen + gleccser + draft | **100** |
+
+**A direktíva mérve teljesül:** egy *hibátlan* futás (minden szezon 1. hely,
+minden mérföldkő megvan) a legkönnyebb beállításon **99 teljesítményt** ér el
+— és a Run-szintje **25**. Ugyanaz a hibátlan futás a legnehezebb
+beállításon: **85,7**.
+
+A saját tempó ezzel **kikerült a sorok közül a plafonba**, ahol a helye van:
+vállalás, nem teljesítmény. Ez egyben orvosolja az auditban jelzett
+aránytalanságot is (a Komótos egyetlen kattintása annyit vitt, mint a teljes
+első szezon — `karrier-beallitasok-audit.md` 2.6).
+
+### 9.2 A teljesítmény — mit mérünk a plafonon belül
+
+| sor | súly | mit mér |
 |---|---|---|
-| **Kezdő osztály** | 1,0 | minél lentebb kezdtél, annál több (D6 = 100, D1 = 40) |
-| **Az ellenfelek tempója** | 1,0 | 😴 25 · 🚶 55 · 🏃 80 · 🔥 100 |
-| **Vállalt fejlődési tempó** | 0,25 / 0,5 / 0,75 | mint ma, de a 2.6-os arányon (lásd audit) |
-| **Az élvonalba jutás üteme** | 1,0 | a szimulált medián a mércéje: a fokozat mediánjánál (pl. 🏃 = 14) 100 pont, szezononként −6 |
-| **Az első bajnoki arany üteme** | 1,0 | ua., a fokozat arany-mediánjához mérve |
-| **Szezononként** | 0,25 | a helyezés az OSZTÁLYON belül, `runRankScore` |
-| **Kiesések** | — | **nem vonnak le** — a kiesés a mód része, nem kudarc |
-| **Mérföldkövek** | 0,04–0,1 | mint ma |
+| **Az élvonalba jutás üteme** | 1,0 | a fokozat szimulált MEDIÁNJÁHOZ mérve (docs 5.3), szezononként −6 |
+| **Az első bajnoki arany üteme** | 1,0 | ua., a fokozat arany-mediánjához |
+| **Feljutások** | 0,2 / db | tiszta jutalom |
+| **Kiesések** | — | **nem vonnak le** — a mód része, nem kudarc |
+| szezononkénti helyezés | 1,0 / 0,25 | mint ma, `runRankScore` |
+| taktika, hűség, mérföldkövek | mint ma | változatlan |
 
-A **kihívás-szorzó** (`runChallengeMult`) helyére az **osztály** lép: egy
-D1-beli bajnoki cím többet ér, mint egy D5-beli. A mai képlet abszolút
-Rating-szintre horgonyoz (70…110), ami egy végtelenbe növő piramisban
-elszalad — helyette `1 − (osztály−1)×0,12`, azaz D1 = 1,00 … D6 = 0,40.
+**Ami kiesett a piramisban:** a „Kezdő nehézség" és a „Nehézség-belövés"
+(a mezőnyt nem te állítod be — a kezdő osztály már a plafonban van), a
+„Szezon-alapú Rating" (a piramisban kötelezően csúcsforma) és az
+**Infinity-határidő** (nincs Infinity — a helyét a két ütem-sor vette át).
 
----
+**A kihívás-szorzó is osztály-alapú lett** (`pyrChallengeMult`): D1 ×1,00 …
+D6 ×0,40. A mai, abszolút Ratingre horgonyzott képlet egy végtelenbe növő
+piramisban azonnal telítődne — a hatodosztály és az élvonal ugyanazt a
+szorzót kapná, amint a világ 110 fölé ér.
+
+**A felületen** a plafon külön blokkban jelenik meg, tényezőnként lebontva, és
+a beállító képernyőn **már a döntés pillanatában** látszik — utólag nem
+változtatható.
+
+## 9.3 Riválisok
+
+A véletlen sorsolás helyett a piramisban a **hozzád erőben legközelebb álló**
+csapatok a riválisaid. Mivel a mezőny fejlődik, a rivális **szezononként
+változik**: akit tavaly lehagytál, idén már nem az. Ugyanaz a definíció,
+amit a kihívás-rendszer is használ (`chIsRivalOvr`).
 
 ## 10. A MÉRŐ — amit muszáj beépíteni
 
@@ -715,8 +764,9 @@ kihívás és statisztika ugyanúgy fut, mint ma.
 | **P2** | ✅ **kész** — `pyrBuildWorld`, a 6 osztály, `SEASON_OPPS` átirányítás, fel-/kiesés mind a hat osztályban, mentés. **Fejlődés nélkül**: statikus piramis. Belépés: `pyrStart(6)` a konzolból | első játszható mérföldkő |
 | **P3** | ✅ **kész** — `pyrDevelopWorld`, a négy fokozat, a tempó-csatolás, az élvonali utolérés, a Rating-plafon feloldása és a beépített mérő (`S.pyr.log`) | **a mód működik** |
 | **P4** | ✅ **kész** — súlyozott draft (`pyrDraftPick` + pool-eltolás) és a teljes kuparendszer (`PYR_CUPS`, FA-kupa, sávonkénti selejtező-körszám, a kupagyőzelem jutalma a következő idényre) | |
-| **P5** | Run-szint a 9. pont szerint, riválisok, Infópult | |
+| **P5** | ✅ **kész** — Run-plafon + a piramis teljesítmény-sorai, riválisok, Infópult-lap, és a **belépő** (a karrier fajtájának választója, osztály-csúszka, fokozat-választó, a plafon élő kiírásával) | a mód elérhető |
 | **P6** | hangolás valós runokból; a négy fokozat véglegesítése | |
+| **P7** | a beállítóképernyő négy oldalra bontása (`karrier-beallitasok-terv.md` 7.) — tiszta megjelenítés, viselkedés nem változik | nyitva |
 
 **A P3 volt a kritikus kapu, és átment.** A mért nettó mászás mind a négy
 fokozatnál a 0,8 – 3,5 sávban van (1,18 … 4,32), és a fokozatok végig

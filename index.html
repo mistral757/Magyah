@@ -2293,6 +2293,31 @@ button.infPanel:disabled{cursor:default}
     <button data-cs="draft" class="sel">Draft<small>klubokat pörgetsz, játékosonként építkezel</small></button>
     <button data-cs="club">Kész klub<small>egy valós klub keretével kezdesz, az adott idény értékeléseivel</small></button>
   </div>
+  <!-- ================= A KARRIER FAJTÁJA =================
+       Az első valódi elágazás: a mai, csúszkás világ vagy a ligapiramis.
+       Csak karrier módban látszik. A választás a hagyományosra állítva
+       ELREJTI mindazt, aminek ott nincs értelme (nehézségi csúszka, auto
+       szintkövetés, Rating-alap), és előhozza a piramis két kapcsolóját. -->
+  <div class="optgrid two hide" id="pyrModeGrid" style="margin-top:8px">
+    <button data-pyr="off" class="sel">♾️ Dinamikus karrier<small>a megszokott: egy mezőny, amit csúszkával állítasz, és ami veled együtt lép feljebb</small></button>
+    <button data-pyr="on">🏆 Hagyományos karrier<small>hat osztályos ligapiramis, fel- és kieséssel — és az ellenfelek is fejlődnek</small></button>
+  </div>
+  <div class="hide" id="pyrSetupWrap" style="margin-top:8px">
+    <div style="font-size:11.5px;color:var(--dim);line-height:1.5;margin-bottom:8px;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--gold) 10%,transparent)">
+      🏆 <b>A ligapiramis.</b> Hat osztály, egyenként 16 valós klubbal. A célod feljutni az élvonalba
+      — de az ellenfelek is fejlődnek, és ki is eshetsz. <b>Ez a három beállítás a karrier végéig rögzül</b>:
+      nincs nehézségi csúszka, nincs szintkövetés, és a tető magától nyílik.
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <label for="pyrDivSlider" style="font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px">Melyik osztályban kezdesz</label>
+      <span id="pyrDivVal" style="font-family:'Archivo Black';color:var(--gold);font-size:15px">D6</span>
+    </div>
+    <input type="range" id="pyrDivSlider" min="1" max="6" value="6" step="1" style="width:100%;margin-top:7px;accent-color:var(--gold)">
+    <div style="font-size:11px;color:var(--dim);margin-top:2px" id="pyrDivHint">a legalsó osztályból indulva a leghosszabb az út — és a legtöbbet érő</div>
+    <div style="font-size:11.5px;color:var(--dim2);margin:12px 0 5px">Milyen gyorsan fejlődnek az ellenfelek?</div>
+    <div class="optgrid two" id="pyrSpeedGrid"></div>
+    <div id="pyrCapNote" style="font-size:11.5px;line-height:1.5;margin-top:9px;padding:8px 10px;border-radius:8px;background:var(--panel2);color:var(--ink)"></div>
+  </div>
   <!-- VEZETÉS — csak karrierben. A tippek a döntés PILLANATÁBAN szólalnak meg,
        nem előre, és bármikor elnémíthatók.
        AZ ALAPÉRTELMEZETT MOSTANTÓL A VEZETÉS. Korábban a "tippek nélkül" volt a
@@ -7735,10 +7760,13 @@ const PYR_DEV_FORM=0.15;   /* eredmény-alapú tag: a bajnok +15%, az utolsó �
    adódó nettó mászás a legalsó osztályban, tájékoztatásul — a szimulált ívet
    lásd docs 5.3 és `node tools/pyramid-sim.js speeds`. */
 const PYR_SPEEDS={
-  alvo:  {n:"😴 Alvó mezőny",    share:0.50,top:0.65,d:"az ellenfelek lemaradnak — a mai karrier érzete"},
-  lassu: {n:"🚶 Lassan követnek", share:0.68,top:0.75,d:"van idő építkezni, de a felső osztály nem áll meg"},
-  tarto: {n:"🏃 Lépést tartanak", share:0.76,top:0.82,d:"ajánlott — minden feljutásért külön meg kell dolgozni"},
-  kegyet:{n:"🔥 Kegyetlen",       share:0.83,top:0.91,d:"a mezőny majdnem olyan gyors, mint te — évekig ragadhatsz"}};
+  alvo:  {n:"😴 Alvó mezőny",    share:0.50,top:0.65,refTop:8.4, refTitle:8.8, d:"az ellenfelek lemaradnak — a mai karrier érzete"},
+  lassu: {n:"🚶 Lassan követnek", share:0.68,top:0.75,refTop:10.2,refTitle:12.3,d:"van idő építkezni, de a felső osztály nem áll meg"},
+  tarto: {n:"🏃 Lépést tartanak", share:0.76,top:0.82,refTop:12.3,refTitle:18.5,d:"ajánlott — minden feljutásért külön meg kell dolgozni"},
+  kegyet:{n:"🔥 Kegyetlen",       share:0.83,top:0.91,refTop:18.8,refTitle:21.0,d:"a mezőny majdnem olyan gyors, mint te — évekig ragadhatsz"}};
+/* A refTop / refTitle a SZIMULÁLT MEDIÁN (docs 5.3): hányadik szezonban ér az
+   élvonalba, illetve nyer ott először aranyat egy átlagos futás. A Run
+   ütem-sorai ehhez mérnek — lásd pyrPaceScore. */
 /* A NÉGY SOR MÉRVE (80 karrier × 25 szezon, D6-ból, az index.html saját
    kódjával — `node tools/pyramid-sim.js live`):
      fokozat        élvonal   első arany   nettó mászás   vég-osztály
@@ -7988,6 +8016,80 @@ function pyrDraftPick(rnd){
    adja az eltolást, amit a teljes karrier-pool megkap. Draftnál a szerkezeti
    prémium is levonódik. Az érték a karrier indulásakor rögzül. */
 function pyrPoolOffset(){return (S.pyr&&S.pyr.off)||0;}
+/* ================= A RUN-SZINT A LIGAPIRAMISBAN =================
+   A VEZÉRELV, amit ez a rész megvalósít: **egy könnyű Run nem kaphat magas
+   értékelést, akármilyen jól játsszák.** A mai módban ez nem teljesült — a
+   nehézség egy súlyozott átlag EGYIK tétele volt, tehát elég jó
+   teljesítménnyel a könnyű beállítás is felkúszhatott 80 fölé.
+
+   MOSTANTÓL KÉT SZÁM SZORZATA:
+
+       Run = KIHÍVÁS-PLAFON × TELJESÍTMÉNY
+
+   · a PLAFON tisztán a VÁLLALÁSAIDBÓL jön (hol kezdtél, milyen gyorsan
+     fejlődik a mezőny, milyen a saját tempód, draftoltál-e) — ez a felső
+     határ, amit ez a konfiguráció EGYÁLTALÁN elérhet;
+   · a TELJESÍTMÉNY (0-100) azt méri, mennyire hoztad ki belőle a maximumot.
+
+   A legkönnyebb kombináció (élvonalbeli kezdés kész klubbal, alvó mezőny,
+   alap tempó) plafonja **25** — hibátlan futással is. A legnehezebbé
+   (hatodosztály, drafttal, kegyetlen mezőny, gleccser-tempó) **100**.
+   A szám így már önmagában megmondja, mekkora fáról szedted le. */
+const PYR_RUN_CAP={
+  /* kezdő osztály, D1 → D6. Az élvonalból indulva nincs mit megmászni. */
+  div:[0.55,0.70,0.80,0.88,0.94,1.00],
+  /* az ellenfelek fejlődése — ez a mód legfontosabb kapcsolója */
+  speed:{alvo:0.55,lassu:0.75,tarto:0.90,kegyet:1.00},
+  /* a SAJÁT tempód. A mai módban ez külön sor volt 1,0-2,0 súllyal, ami
+     aránytalan volt (egy kattintás annyit vitt, mint a teljes első szezon —
+     lásd docs/karrier-beallitasok-audit.md 2.6). Itt a plafonba olvad, ahol
+     a helye van: vállalás, nem teljesítmény. */
+  tempo:{normal:0.88,komotos:0.93,csiga:0.97,gleccser:1.00},
+  /* kész klubbal indulva a keretet nem te válogattad össze */
+  club:0.95};
+function pyrRunCap(){
+  const R=(S&&S.run)||{};
+  const P=S&&S.pyr;
+  const d=(P&&P.startDiv)||6;
+  const sp=(P&&PYR_SPEEDS[P.aiSpeed])?P.aiSpeed:"tarto";
+  const tp=(R.tempo&&PYR_RUN_CAP.tempo[R.tempo])?R.tempo
+    :((typeof gameTempo==="function")?gameTempo():"normal");
+  const club=!!(R.clubStart!=null?R.clubStart:(typeof careerStart!=="undefined"&&careerStart==="club"));
+  const parts=[
+    {n:`Kezdő osztály: D${d}`,v:PYR_RUN_CAP.div[d-1]||1},
+    {n:`Ellenfél-tempó: ${PYR_SPEEDS[sp].n}`,v:PYR_RUN_CAP.speed[sp]},
+    {n:`Saját tempó: ${(GAME_TEMPO[tp]||GAME_TEMPO.normal).n}`,v:PYR_RUN_CAP.tempo[tp]||0.88},
+    {n:club?"Kész klubbal indultál":"Drafttal indultál",v:club?PYR_RUN_CAP.club:1}];
+  let cap=1;parts.forEach(x=>{cap*=x.v;});
+  return {cap:Math.max(0.05,Math.min(1,cap)),parts};}
+/* ---- A KIHÍVÁS-SZORZÓ A PIRAMISBAN: AZ OSZTÁLY DÖNT ----
+   A mai szorzó abszolút Rating-szintre horgonyoz (70…110). Egy végtelenbe
+   növő piramisban az azonnal telítődne — a hatodosztály és az élvonal
+   ugyanazt a szorzót kapná, amint a világ 110 fölé ér. Az osztály viszont
+   mindig ugyanazt jelenti: D1 = 1,00 … D6 = 0,40. */
+function pyrChallengeMult(level){
+  const d=pyrDivForLevel(level);
+  return Math.max(0.4,1-(d-1)*0.12);}
+/* ---- AZ ÜTEM-SOROK VISZONYÍTÁSI PONTJA ----
+   A `refTop` / `refTitle` a szimulált MEDIÁN: ennyi szezon alatt ér az
+   élvonalba, illetve nyer először bajnokságot egy átlagos futás az adott
+   fokozaton (`node tools/pyramid-sim.js live`, 120 karrier). A mediánnál
+   100 pont jár, onnan szezononként −6. Így a fokozat nehézsége NEM
+   számít bele kétszer: a plafon már díjazta, ez már csak azt méri, hogy a
+   FOKOZATON BELÜL milyen gyors voltál. */
+function pyrPaceScore(season,ref){
+  if(!season||!ref)return null;
+  return Math.max(0,Math.min(100,100-(season-ref)*6));}
+/* Hányadik szezonban értél először az élvonalba / nyertél ott aranyat?
+   A mérő naplójából olvassuk ki, tehát visszamenőleg is helyes. */
+function pyrFirstTop(){
+  const L=(S.pyr&&S.pyr.log)||[];
+  for(let i=0;i<L.length;i++)if(L[i].to===1||L[i].div===1)return L[i].s;
+  return null;}
+function pyrFirstTitle(){
+  const L=(S.pyr&&S.pyr.log)||[];
+  for(let i=0;i<L.length;i++)if(L[i].div===1&&L[i].rank===1)return L[i].s;
+  return null;}
 /* ==== PYR-BLOKK VÉGE ==== */
 /* Posztengedmények: csak reális, valós futballban is előforduló szomszédos
    szerepkör-váltásokat engedünk meg (pl. hátvéd ⇄ hátrébb húzódó középpályás,
@@ -18467,6 +18569,70 @@ document.querySelectorAll("#modeGrid button").forEach(b=>b.onclick=()=>{
    ilyenkor a kapcsoló félrevezető lenne, ezért elrejtjük. A familyEnabled
    értékét NEM írjuk át: inert marad, és ha a felhasználó visszavált draftra,
    ott találja, ahol hagyta. */
+/* ================= A KARRIER FAJTÁJÁNAK VÁLASZTÓJA =================
+   A beállító képernyő legfontosabb elágazása. A választás — a többi
+   kapcsoló mintájára — modulszintű változóban él, és a beginNewGame teszi
+   át az állapotba (ott indul a pyrStart is).
+   A HAGYOMÁNYOS MÓD EGYELŐRE CSAK EGYJÁTÉKOS: a piramis világa nincs
+   szinkronizálva a szobában, tehát közös karrierben a választó rejtve marad. */
+let pyrWanted=false,pyrWantedDiv=6,pyrWantedSpeed="tarto";
+function pyrSetupAvailable(){
+  return gameMode==="career"&&!(typeof MP!=="undefined"&&MP&&MP.active);}
+function renderPyrSpeedGrid(){
+  const g=$("pyrSpeedGrid");if(!g)return;
+  g.innerHTML="";
+  Object.keys(PYR_SPEEDS).forEach(k=>{
+    const sp=PYR_SPEEDS[k];
+    const b=document.createElement("button");
+    if(k===pyrWantedSpeed)b.classList.add("sel");
+    b.innerHTML=`${sp.n}<small>${esc(sp.d)}</small>`;
+    b.onclick=()=>{pyrWantedSpeed=k;renderPyrSpeedGrid();renderPyrCapNote();};
+    g.appendChild(b);});}
+/* A PLAFON MÁR ITT LÁTSZIK. Ez a lap egyetlen igazán fontos visszajelzése:
+   a felhasználó a döntés PILLANATÁBAN lássa, mekkora Run-szintet tett
+   elérhetővé — utólag ezen nem lehet változtatni. */
+function renderPyrCapNote(){
+  const el=$("pyrCapNote");if(!el)return;
+  const club=(typeof careerStart!=="undefined"&&careerStart==="club");
+  const tp=(typeof gameTempoPref==="function")?gameTempoPref():"normal";
+  let cap=1;
+  cap*=PYR_RUN_CAP.div[pyrWantedDiv-1]||1;
+  cap*=PYR_RUN_CAP.speed[pyrWantedSpeed]||1;
+  cap*=PYR_RUN_CAP.tempo[tp]||0.88;
+  cap*=club?PYR_RUN_CAP.club:1;
+  const pct=Math.round(Math.max(0.05,Math.min(1,cap))*100);
+  el.innerHTML=`🎯 <b>A Run-szinted plafonja ezzel a beállítással: `
+    +`<span style="color:${runColor(pct)}">${pct}</span></b><br>`
+    +`<span style="color:var(--dim);font-size:11px">A vállalásod szabja meg, meddig juthat a Run-szint — `
+    +`egy könnyű futás hibátlanul sem érhet magasra. A saját fejlődési tempód is beleszámít.</span>`;}
+function renderPyrDivRow(){
+  const v=pyrWantedDiv;
+  const lbl=$("pyrDivVal"),hint=$("pyrDivHint");
+  if(lbl)lbl.textContent=`D${v} · ${PYR_LEAGUES[v-1]||""}`;
+  if(hint)hint.textContent=v===1
+    ?"az élvonalból indulva nincs mit megmászni — a Run-plafon itt a legalacsonyabb"
+    :v>=5?"a legalsó osztályokból indulva a leghosszabb az út — és a legtöbbet érő"
+    :"középről indulva rövidebb az út a csúcsig";}
+function updatePyrSetupVisibility(){
+  const on=pyrSetupAvailable();
+  const g=$("pyrModeGrid");if(g)g.classList.toggle("hide",!on);
+  const w=$("pyrSetupWrap");if(w)w.classList.toggle("hide",!(on&&pyrWanted));
+  /* AMI A PIRAMISBAN ÉRTELMETLEN: a mezőny csúszkája, az auto szintkövetés és
+     a Rating-alap. Mindhármat az OSZTÁLY, illetve a mód szabálya váltja ki. */
+  const hideOld=on&&pyrWanted;
+  const diffBox=$("diffSlider")&&$("diffSlider").closest("div").parentElement;
+  if(diffBox)diffBox.classList.toggle("hide",hideOld);
+  const rb=$("ratingBasisWrap");
+  if(rb&&hideOld)rb.classList.add("hide");
+  else if(rb&&typeof updateRatingBasisVisibility==="function")updateRatingBasisVisibility();
+  if(on&&pyrWanted){renderPyrDivRow();renderPyrSpeedGrid();renderPyrCapNote();}}
+document.querySelectorAll("#pyrModeGrid button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#pyrModeGrid button").forEach(x=>x.classList.remove("sel"));
+  b.classList.add("sel");pyrWanted=b.dataset.pyr==="on";
+  updatePyrSetupVisibility();});
+$("pyrDivSlider")&&($("pyrDivSlider").oninput=()=>{
+  pyrWantedDiv=parseInt($("pyrDivSlider").value,10)||6;
+  renderPyrDivRow();renderPyrCapNote();});
 /* ---- AZ ÚJRAPÖRGETÉS-CSÚSZKA LÁTHATÓSÁGA ----
    Kész klubbal indulva nincs draft (a maybeSpinFamily és a spin() is csak a
    draft-ágon fut), tehát az újrapörgetés értelmezhetetlen. A `rerolls`
@@ -18554,6 +18720,7 @@ document.querySelectorAll("#careerStartGrid button").forEach(b=>b.onclick=()=>{
   updateFamilySetupVisibility();   /* kész klubnál nincs draft → nincs családtag-kör */
   updateRatingBasisVisibility();   /* …és nincs választható Rating-alap sem */
   updateRerollVisibility();        /* …és nincs mit újrapörgetni */
+  updatePyrSetupVisibility();      /* a kész klub a Run-plafont is állítja */
   const nb=$("oppNextBtn");if(nb)nb.textContent=careerStart==="club"?"Irány a klubválasztás →":"Irány a draft →";
   /* Kész klubbal indulva a keretet nem te válogatod össze, ezért az ajánlott
      kiindulás alacsonyabb: a mezőny 80-ra áll (drafttal marad a 84). */
@@ -18703,7 +18870,9 @@ function renderTempoGrid(){
   document.querySelectorAll("#tempoGrid button").forEach(b=>{
     b.classList.toggle("sel",b.dataset.tempo===cur);});}
 document.querySelectorAll("#tempoGrid button").forEach(b=>b.onclick=()=>{
-  setGameTempo(b.dataset.tempo);renderTempoGrid();});
+  setGameTempo(b.dataset.tempo);renderTempoGrid();
+  /* a saját tempó a piramis Run-plafonjának része — a kiírás kövesse */
+  try{if(typeof renderPyrCapNote==="function")renderPyrCapNote();}catch(e){}});
 renderTempoGrid();
 /* a NYERS preferencia (localStorage) — a beállító képernyő választója ezt mutatja */
 function schedulePref(){
@@ -19091,6 +19260,14 @@ function beginNewGame(){
      karrierben pedig egy újratöltés kettéválasztotta a pool-t. Innentől a
      mentés viszi. Lásd a wcOn() fölötti indoklást. */
   S.careerWc=!!wcEnabled;
+  /* ---- A LIGAPIRAMIS INDÍTÁSA ----
+     A világ MÉG a scout és az ellenféltábla előtt megszületik, mert az
+     oppTargetRating-et (és vele a kupasávot, a piac horgonyát, a
+     nehézség-címkét) az OSZTÁLYOD adja. A karrier-pool eltolása később, a
+     scoutnál történik — a pool ott születik meg. */
+  if(gameMode==="career"&&pyrWanted&&pyrSetupAvailable()){
+    S.autoLevel=false;                 /* a piramisban nincs mit követni */
+    pyrStart(pyrWantedDiv,pyrWantedSpeed);}
   /* A PIAC HORGONYA = AZ INDULÁSI MEZŐNYSZINT — egy helyen, mindenkire.
      Eddig két külön esemény állította be (a nehézség-csúszka mozgatása és a
      kezdésmód-választó kattintása), tehát aki egyiket sem érintette, annál a
@@ -19166,6 +19343,17 @@ $("scoutSpinBtn").onclick=()=>{
   function land(){
     scout=generateScout();
     careerPool=initCareerPlayerPool(scout);
+    /* ---- PIRAMIS: A POOL A VILÁG SKÁLÁJÁRA ----
+       A pool ITT születik meg, a beginNewGame UTÁN — ezért a pyrStart nem
+       tudta eltolni. A marketPeakShift() már a piramis eltolását adja
+       vissza, tehát elég egyszer végigfuttatni. Enélkül a draft a nyers
+       adatbázisból merítene, és a kezdő kereted messze a mezőnye fölé nőne
+       (a draft-paradoxon, lásd docs 4.1-4.2). */
+    if(typeof pyrOn==="function"&&pyrOn())Object.values(careerPool).forEach(e=>{
+      applyMarketShift(e);
+      e.startRating=Math.round(ratingAtAge(e.peak,e.age));
+      syncAttrsToRating(e);
+      e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
     $("scoutSpinName").textContent=scout.name;
     $("scoutSpinStars").textContent=scoutStarsLabel(scout.stars);
     $("scoutSpinBtn").classList.add("hide");
@@ -36733,6 +36921,21 @@ function pickSeasonRivals(){
     S.rivals={season:S.seasonNumber||1,names:pool.slice()};
     return S.rivals.names;}
   const r=rngFor("s"+(S.seasonNumber||1)+":rivals");
+  /* ---- A PIRAMISBAN A RIVÁLIS A SZOMSZÉD A TABELLÁN ----
+     A véletlen sorsolás egy ligarendszerben félrevezető: a rangadó akkor
+     rangadó, ha a másik csapat ugyanazért a helyért küzd. Ezért a piramisban
+     a hozzád ERŐBEN legközelebb álló csapatok a riválisaid — és mivel a
+     mezőny fejlődik, a rivális SZEZONONKÉNT VÁLTOZIK: akit tavaly lehagytál,
+     idén már nem az. Ugyanaz a definíció, amit a kihívás-rendszer is használ
+     (chIsRivalOvr: a saját erődhöz mért szűk sáv). */
+  if(typeof pyrOn==="function"&&pyrOn()){
+    let my=0;try{my=teamOVRbase();}catch(e){}
+    const near=leagueOpps().filter(o=>o&&o.n)
+      .map(o=>({n:o.n,d:Math.abs((o.ovr||0)-my)}))
+      .sort((a,b)=>a.d-b.d).slice(0,RIVAL_COUNT).map(x=>x.n);
+    if(near.length){
+      S.rivals={season:S.seasonNumber||1,names:near};
+      return near;}}
   const names=shuffleArr(pool,r).slice(0,RIVAL_COUNT);
   S.rivals={season:S.seasonNumber||1,names};
   return names;}
@@ -42476,6 +42679,9 @@ function runCurrentXIAvg(){
    számít elsősorban, milyen magasan játszol, hanem hogy mennyivel a kereted
    fölötti mezőnyt vállaltál. */
 function runChallengeMult(diff,teamAvg){
+  /* PIRAMIS: az OSZTÁLY dönt, nem az abszolút Rating — a világ a végtelenbe
+     nő, ott ez a képlet azonnal telítődne. Lásd pyrChallengeMult. */
+  if(typeof pyrOn==="function"&&pyrOn())return pyrChallengeMult(diff);
   const d=diff||84;
   const level=Math.max(0,Math.min(1,(d-70)/40));
   const under=Math.max(-1,Math.min(1,(d-(teamAvg||d))/12));
@@ -42717,6 +42923,9 @@ function runMsCtx(v){
    hogy mekkora csapaterő mellett született az eredmény. */
 function runBreakdown(){
   const R=runInit();runScanMilestones();
+  /* A LEGELEJÉN: több sor is erre ágazik el, és egy `const` a deklarációja
+     előtti használata TDZ-hiba volna (a szkriptet döntené). */
+  const _pyr=(typeof pyrOn==="function")&&pyrOn();
   const rows=[],avg=runAvgContext();
   const cm=(diff,team)=>runChallengeMult(diff,team);
   const pct=m=>`${m>=1?"+":""}${Math.round((m-1)*100)}%`;
@@ -42744,7 +42953,11 @@ function runBreakdown(){
      (fölötte 100-ra vágjuk: annál merészebbet nem lehet vállalni).
      Ha nincs referencia (a mérő előtti mentés, vagy visszajátszhatatlan
      draft), marad a régi, abszolút pontozás — egy régi run így sem veszít. */
-  if(R.baseDiff!=null){
+  /* PIRAMIS: a "kezdő nehézség" nem egy csúszka, hanem az OSZTÁLY, ahonnan
+     indultál — és az már a KIHÍVÁS-PLAFONBAN megjelenik. Itt ezért nem
+     termelünk sort, különben kétszer számítana. A "nehézség-belövés" pedig
+     értelmezhetetlen: a mezőnyt nem te állítod be. */
+  if(!_pyr&&R.baseDiff!=null){
     const ref=(R.refV===RUN_REF_V&&R.maxAvg>0)?R.maxAvg:null;
     rows.push({k:"diff",n:"Kezdő nehézség",w:RUN_W.diff,
       s:Math.max(0,Math.min(100,ref?(R.baseDiff/ref*100):R.baseDiff)),
@@ -42762,7 +42975,7 @@ function runBreakdown(){
      súlyok egyikén (×${RUN_W.aim}).
      Csak DRAFTOS karrierben van értelme: kész klubnál a keret nem a te
      döntésed volt, ott nem lehet „eltalálni". */
-  if(R.startAvg!=null&&R.baseDiff!=null&&!R.clubStart){
+  if(!_pyr&&R.startAvg!=null&&R.baseDiff!=null&&!R.clubStart){
     const aim=runAimScore(R.startAvg,R.baseDiff);
     const irany=aim.d===0?"telitalálat":aim.d>0?`${aim.d}-tal fölé`:`${-aim.d}-tal alá`;
     rows.push({k:"aim",n:"Nehézség-belövés",w:RUN_W.aim,s:aim.score,
@@ -42783,7 +42996,10 @@ function runBreakdown(){
      nem "elvesztett" pont, hanem meg nem szerzett bónusz — így a régi runok
      értéke sem csökken. A rerollhoz hasonlóan ez is előre beállított kapcsoló,
      ezért — szándékosan — NEM kap kihívás-szorzót. */
-  if(R.tempo&&RUN_TEMPO_W[R.tempo])
+  /* A PIRAMISBAN a saját tempó a KIHÍVÁS-PLAFON része (pyrRunCap), nem külön
+     sor — különben kétszer számítana, és a mai aránytalan súlyt (1,0-2,0) is
+     magával hozná. */
+  if(!_pyr&&R.tempo&&RUN_TEMPO_W[R.tempo])
     rows.push({k:"tempo",n:"Vállalt fejlődési tempó",w:RUN_TEMPO_W[R.tempo],s:100,
       d:`${GAME_TEMPO[R.tempo].n} — −${Math.round((1-GAME_TEMPO[R.tempo].k)*100)}% minden fejlődésre, végig tartva`});
   /* 2d. SZEZON-ALAPÚ RATING. Vállalás, mint a lassított tempó: a draftolt
@@ -42878,13 +43094,47 @@ function runBreakdown(){
         bónusznál   w = G·D/(100−T−G) → az új átlag pontosan T+G,
      ahol T a sor nélküli összpontszám, D a többi sor összsúlya. A képlet
      mindkét irányban EGZAKT, tehát a felületen ígért pont az, amit kapsz. */
+  /* ---- A PIRAMIS ÜTEM-SORAI ----
+     Az Infinity-határidő helyére lépnek: ott a kérdés az volt, milyen hamar
+     nyitod meg a végtelent, itt az, milyen hamar érsz FEL és milyen hamar
+     nyersz ODAFENT. A viszonyítás a fokozat szimulált MEDIÁNJA (docs 5.3),
+     tehát a fokozat nehézsége nem számít bele kétszer — azt a plafon díjazta.
+     Amíg nem értél fel, a sor 0 SÚLLYAL, tájékoztatásként jelenik meg: látnod
+     kell, hogy a tétel létezik, de még nincs mit pontozni rajta. */
+  if(_pyr&&S.pyr){
+    const sp=PYR_SPEEDS[pyrSpeedKey()];
+    const ft=pyrFirstTop(),fw=pyrFirstTitle();
+    {const sc=pyrPaceScore(ft,sp.refTop);
+     rows.push({k:"pyrtop",n:"Az élvonalba jutás üteme",w:sc==null?0:1.0,s:sc==null?0:sc,
+       d:sc==null?`még nem értél fel — a mérce a ${sp.refTop.toFixed(1)}. szezon`
+         :`a ${ft}. szezonban · a mérce ${sp.refTop.toFixed(1)} (${sp.n})`});}
+    {const sc=pyrPaceScore(fw,sp.refTitle);
+     rows.push({k:"pyrtitle",n:"Az első bajnoki arany üteme",w:sc==null?0:1.0,s:sc==null?0:sc,
+       d:sc==null?`még nincs élvonalbeli arany — a mérce a ${sp.refTitle.toFixed(1)}. szezon`
+         :`a ${fw}. szezonban · a mérce ${sp.refTitle.toFixed(1)} (${sp.n})`});}
+    /* A FELJUTÁSOK önmagukban is teljesítmény — a kiesés viszont SZÁNDÉKOSAN
+       nem von le: a mód része, nem kudarc (docs 9.). */
+    {const L=S.pyr.log||[];
+     const up=L.filter(x=>x.to<x.div).length;
+     if(up>0)rows.push({k:"pyrup",n:"Feljutások",w:0.2*up,s:100,
+       d:`${up} feljutás${L.filter(x=>x.to>x.div).length?` · ${L.filter(x=>x.to>x.div).length} kiesés (nem von le)`:""}`});}}
   let num=0,den=0;
   rows.forEach(r=>{num+=r.s*r.w;den+=r.w;});
   const base=den?Math.max(0,Math.min(100,num/den)):0;
-  {const pr=runPaceRow(base,den);
+  /* Az Infinity-határidő a PIRAMISBAN nem létezik (nincs Infinity-vásárlás,
+     a tető magától nyílik) — a helyét a fenti két ütem-sor vette át. */
+  if(!_pyr){const pr=runPaceRow(base,den);
    if(pr){rows.push(pr);num+=pr.s*pr.w;den+=pr.w;}}
-  const total=den?Math.max(0,Math.min(100,num/den)):0;
-  return {rows,total,missing:Object.keys(RUN_MILESTONES).filter(k=>!R.ms[k])};}
+  const perf=den?Math.max(0,Math.min(100,num/den)):0;
+  /* ================= A KIHÍVÁS-PLAFON =================
+     Run = PLAFON × TELJESÍTMÉNY. A plafon tisztán a vállalásaidból jön, tehát
+     egy könnyű beállítás hibátlan futással sem kúszhat magasra. Lásd
+     pyrRunCap. A mai módban nincs plafon (cap=1), ott a viselkedés változatlan. */
+  const capInfo=_pyr?pyrRunCap():null;
+  const cap=capInfo?capInfo.cap:1;
+  const total=Math.max(0,Math.min(100,perf*cap));
+  return {rows,total,perf,cap,capParts:capInfo?capInfo.parts:null,
+    missing:Object.keys(RUN_MILESTONES).filter(k=>!R.ms[k])};}
 /* A határidő-sor előállítása. Három állapota van, és mindhárom mást mond:
      · KÉSÉSBEN — 0 pont, a súly a felgyűlt levonásból (R.paceLoss);
      · IDŐBEN   — 0 SÚLYÚ tájékoztató sor: nincs se levonás, se bónusz, de a
@@ -43583,7 +43833,29 @@ function renderRunMeter(){
     const den=B.rows.reduce((s,r)=>s+r.w,0);
     html+=`<div style="border-top:1px solid var(--panel2);margin-top:7px;padding-top:7px;font-size:12px">
       <b>Súlyozott átlag:</b> ${B.rows.reduce((s,r)=>s+r.s*r.w,0).toFixed(0)} / ${den.toFixed(2)} =
-      <b style="color:${col}">${B.total.toFixed(1)}</b></div>`;
+      <b style="color:${col}">${(B.perf!=null?B.perf:B.total).toFixed(1)}</b></div>`;
+    /* ---- A KIHÍVÁS-PLAFON (csak ligapiramisban) ----
+       A szám önmagában félrevezető volna: a felhasználónak LÁTNIA kell, hogy
+       a beállításai hol húzták meg a felső határt, és melyik kapcsoló mennyit
+       vitt el belőle. Enélkül a "miért csak 41 a Run-om, hisz mindent
+       megnyertem?" kérdésre nincs válasz a képernyőn. */
+    if(B.capParts){
+      const capPct=Math.round(B.cap*100);
+      html+=`<div style="margin-top:9px;border-top:1px solid var(--panel2);padding-top:8px">
+        <div style="font-size:11.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">A vállalásod plafonja</div>`;
+      B.capParts.forEach(x=>{
+        const bad=x.v<0.8;
+        html+=`<div style="display:flex;align-items:baseline;gap:7px;font-size:12px;margin-bottom:4px">
+          <span style="flex:1;color:${bad?"var(--dim2)":"var(--ink)"}">${esc(x.n)}</span>
+          <span style="color:${bad?"var(--dim2)":"var(--grass)"};font-weight:700;min-width:44px;text-align:right">×${x.v.toFixed(2)}</span>
+        </div>`;});
+      html+=`<div style="border-top:1px solid var(--panel2);margin-top:6px;padding-top:6px;font-size:12px">
+        <b>Plafon:</b> <b style="color:${runColor(capPct)}">${capPct}</b>
+        &nbsp;→&nbsp; ${(B.perf||0).toFixed(1)} × ${(B.cap).toFixed(2)} =
+        <b style="color:${col}">${B.total.toFixed(1)}</b></div>
+        <div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-top:5px">
+        Ennél magasabbra ezzel a beállítással hibátlan futással sem lehet jutni —
+        a Run-szint azt is méri, MEKKORA fát választottál.</div></div>`;}
     if(B.missing.length){
       html+=`<div style="margin-top:9px;font-size:11.5px;color:var(--dim2);line-height:1.6">
         <b style="color:var(--dim)">Még megszerezhető:</b> ${B.missing.map(k=>`${RUN_MILESTONES[k].n} <span style="opacity:.7">(×${RUN_MILESTONES[k].w})</span>`).join(" · ")}</div>`;}
@@ -43882,6 +44154,30 @@ function careerSetupHtml(){
       : "A keretedet magad válogattad össze a felkínált játékosokból.",1);
 
   /* ---- 2. A NEHÉZSÉG ---- */
+  /* LIGAPIRAMIS: ott nincs nehézségi csúszka és nincs szintkövetés — az
+     osztályod adja a mezőnyt. A lap ezért egészen mást mond. */
+  if(typeof pyrOn==="function"&&pyrOn()){
+    const P=S.pyr,d=pyrMyDiv(),sp=PYR_SPEEDS[pyrSpeedKey()];
+    h+=sec("A ligapiramis");
+    h+=row("🏆","Osztályod",`<b>D${pyrMyDivId()} · ${esc2(d?d.name:"—")}</b>`,
+      `Mezőny: <b>${oppTargetRating}</b> · a piramis ${PYR_DIVS} osztályból áll, `
+      +`${PYR_TEAMS} csapattal. Feljutás: az első ${PYR_UP}, kiesés: az utolsó ${PYR_DOWN}.`);
+    h+=row("🚩","Innen indultál",`<b>D${(P&&P.startDiv)||"—"}</b>`,
+      "A kezdő osztály a Run-szint plafonjának legnagyobb tétele.",1);
+    h+=row("🏃","Ellenfelek fejlődése",`<b>${esc2(sp.n)}</b>`,
+      `${esc(sp.d)} — az osztályodban <b>${pyrAiRate(pyrMyDivId()).toFixed(1)}</b> Rating/szezon.`,1);
+    {const c=pyrRunCap();
+     h+=row("🎯","Run-plafon",`<b>${Math.round(c.cap*100)}</b>`,
+       "Ennél magasabb Run-szintre ezzel a beállítással hibátlan futással sem lehet jutni. "
+       +c.parts.map(x=>`${esc(x.n)} ×${x.v.toFixed(2)}`).join(" · "),1);}
+    {const L=(P&&P.log)||[];
+     const last=L.length?L[L.length-1]:null;
+     if(last&&last.net!=null)
+       h+=row("📈","Fejlődési mérleg",
+         `<b>${last.net>=0?"+":""}${last.net.toFixed(1)}</b>`,
+         `A legutóbbi idényben te <b>${last.me>=0?"+":""}${last.me.toFixed(1)}</b>, `
+         +`a mezőny <b>+${last.ai.toFixed(1)}</b> Ratinget fejlődött.`);}
+  }else{
   h+=sec("Nehézség");
   {const bd=(R.baseDiff!=null)?R.baseDiff:careerBaseRating;
    h+=row("📈","Kezdő mezőnyszint",`<b>${bd}</b> · ${esc2(diffTierLabel(bd))}`,
@@ -43894,6 +44190,7 @@ function careerSetupHtml(){
    h+=row("📊","Szintkövetés",al?"<b>Automatikus</b>":"<b>Kézi</b>",
      al?`Cél-sáv: <b>${esc2(autoLevelAim().n)}</b> (${autoLevelAim().lo>=0?"+":""}${autoLevelAim().lo} … ${autoLevelAim().hi>=0?"+":""}${autoLevelAim().hi})`
        :(mp?"Közös karrierben a szintet a ti alkutok adja, nem automatika.":"A mezőny szintjét te told feljebb."));}
+  }
 
   /* ---- 3. AMI VISSZAFORDÍTHATATLAN ---- */
   h+=sec("Ami rögzült");
@@ -53965,6 +54262,7 @@ $("modeClassicBtn").onclick=()=>{
   updateFamilySetupVisibility();
   updateRatingBasisVisibility();   /* klasszikusban nincs karrier-pool → nincs Rating-alap */
   updateRerollVisibility();
+  updatePyrSetupVisibility();
   $("modeGrid").classList.remove("hide");   /* klasszikusban van értelme a vak módnak */
   $("scModeSelect").classList.add("hide");
   $("scFormation").classList.remove("hide");
@@ -53988,6 +54286,7 @@ $("modeCareerBtn").onclick=()=>{
   updateFamilySetupVisibility();
   updateRatingBasisVisibility();
   updateRerollVisibility();
+  updatePyrSetupVisibility();
   $("scModeSelect").classList.add("hide");
   $("scFormation").classList.remove("hide");
   renderAutoAimSetup();   /* a cél-sáv választója itt jelenik meg először */
