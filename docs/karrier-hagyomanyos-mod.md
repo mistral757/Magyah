@@ -539,6 +539,61 @@ néha 5. Ez adja a mód végtelenjét, Infinity-vásárlás nélkül.
   `buildOpponents` ma is `{n, ovr}` párokkal dolgozik, és a góllövő-választás
   (`pickOpponentScorer`) a klub valós keretéből merít. Ez változatlan marad.
 
+### 5.7 FORDULÓRÓL FORDULÓRA — a szezon közbeni kúszás (v3.4.22)
+
+**A probléma.** Te minden héten fejlődsz (edzés, képességek, igazolások), a
+mezőny viszont évente EGYSZER, egyetlen ugrással lépett. A szezon vége felé
+egyre kényelmesebb lett a bajnokság, aztán idényváltáskor hirtelen keményebb —
+ez a mód legfeltűnőbb művi eleme volt.
+
+**A megoldás SZÁMÍTOTT, nem halmozott.** A mezőny fordulónkénti ereje
+
+```
+ovr(r) = ovrBase + (éves alapütem / 30) × r
+```
+
+ahol `ovrBase` a szezonkezdő érték, `r` a lejátszott fordulók száma. Három baj
+marad így ki, és mind a hármat a kód meglévő garanciái okoznák:
+
+1. **A menetrend és a mezőny külön mentődik** (a `buildLeagueTable` névalapú
+   párosításánál ez már dokumentált hiba volt). Egy helyben növelt szám
+   újratöltés után szétcsúszna a két oldalon; a képlet mindkettőn ugyanazt adja.
+2. **A tabella minden rajzoláskor újrajátssza az egész szezont**, és garantálja,
+   hogy a féltávi állás a végleges valódi előzménye. Halmozott számmal a replay
+   a mai erővel játszaná újra az 1. fordulót is.
+3. **Idempotens:** kétszer futtatva sem romlik el semmi.
+
+**Miért nem billenti fel az AI-bajnokságot.** Az ütem az osztályon belül
+mindenkire ugyanaz, tehát az AI-vs-AI meccsek *erőkülönbsége* — és így a
+szimulált eredmény — változatlan. Mérve: a 10 fordulós tabella a szezon elején
+és a 29. fordulónál nézve **betűre azonos**.
+
+**Miért nem számolunk kétszer.** A világ csapatai (`S.pyr.divs`) a szezon alatt
+érintetlenek; a kúszás csak a szezon mezőnyének (`SEASON_OPPS`) a fedőrétege. A
+szezonfordulón a `pyrDevelopWorld` a szokásos éves lépést adja a világnak, és
+az új szezon mezőnye onnan születik újra. Mérve D4-ben: ütem **0,183/forduló**,
+30 forduló = **5,49** = pontosan az éves alapütem; a szezonhatáron a 30.
+forduló mezőnye 82,38 → az új szezon eleje 82,24, azaz **−0,14 ugrás** (a
+helyezés- és zajmódosító különbsége).
+
+**A mezőnyszint (`oppTargetRating`) SZÁNDÉKOSAN nem mozdul menet közben.** Az a
+szezon horgonya: erre épül a piac (`marketPeakShift`), a kupasáv (`cupTierFor`
+→ `pyrDivForLevel`, ami egy +5-ös elcsúszástól MÁS osztályt adna vissza) és a
+gazdaság. A `levelGap`/underdog viszont látja a kúszást: az `oppMatchStrength`
+az „itt és most" kérdésre hozzáadja, különben a játék a szezon vége felé
+könnyebbnek hinné magát, mint amilyen.
+
+**Egy mellékjavítás.** A lejátszott meccs ellenfele mostantól PILLANATKÉP a
+`fixtureResults`-ban, nem hivatkozás: enélkül a 3. fordulóban legyőzött
+ellenfél ereje a 25. fordulóban visszamenőleg magasabbnak látszana, és a rá
+épülő kihívás-számlálók (pl. „verj meg egy rivális erejűt") elcsúsznának.
+(A mentés/betöltés amúgy is másolatot csinált belőle, tehát a hivatkozás
+megtartása csak újratöltésig tartó, hamis azonosság volt.)
+
+**A dinamikus módban EGYELŐRE NINCS bevezetve.** Ott az auto szintkövetés
+(`autoLevelSync`) a funkcionális párja, és a kettő együtt kétszer mozgatná a
+mezőnyt — az összevonás külön döntés.
+
 ---
 
 ## 6. A PvE meccs-motor átvizsgálása

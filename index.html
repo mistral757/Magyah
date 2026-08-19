@@ -3371,7 +3371,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.4.21";
+const APP_VERSION="3.4.22";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -7873,6 +7873,9 @@ function pyrLadderHtml(){
     <div class="pyrLadderGoal">${goal}<br>${risk}</div>
     <div class="pyrLadderMeta">Meccs-erőd ${teamMatchStrength().toFixed(1)} `
       +`(${g>=0?"+":""}${Math.round(g)} a mezőnyhöz képest)`
+      +` · <span title="A mezőny minden fordulóval erősödik">📈 a mezőny idén `
+      +`+${pyrGrowNow().toFixed(1).replace(".",",")}-nél tart `
+      +`(+${(pyrGrowStep()*30).toFixed(1).replace(".",",")} a teljes idényre)</span>`
       +(uLbl?` · <b style="color:var(--grass)">⚡ ${uLbl}: +${Math.round(u*50)}% fejlődés</b>`:"")
       +`${start!==id?` · a(z) D${start}-ból indultál`:""}</div>`;}
 /* ---- A FEJLESZTŐI KIÍRATÓ ----
@@ -7944,7 +7947,56 @@ function pyrLevel(){
    a menetrend, a tabella és a meccs-motor felé a piramis LÁTHATATLAN. */
 function pyrOpponents(){
   const d=pyrMyDiv();
-  return d?d.teams.map(t=>({n:t.n,ovr:t.ovr})):[];}
+  return d?d.teams.map(t=>({n:t.n,ovr:t.ovr,ovrBase:t.ovr})):[];}
+/* ================= A MEZŐNY FORDULÓRÓL FORDULÓRA FEJLŐDIK =================
+   MIÉRT. Te minden héten fejlődsz — edzés, képességek, igazolások —, a mezőny
+   viszont évente EGYSZER, egyetlen ugrással lépett. Ez az aszimmetria a mód
+   legfeltűnőbb művi eleme volt: a szezon vége felé egyre kényelmesebb lett a
+   bajnokság, aztán újévkor hirtelen keményebb.
+
+   A MEGOLDÁS SZÁMÍTOTT, NEM HALMOZOTT. A fordulónkénti erő nem egy növelgetett
+   szám, hanem SZÁRMAZTATOTT: `ovrBase + fordulónkénti ütem × lejátszott
+   fordulók`. Három baj marad így ki:
+     · A menetrend és a mezőny KÜLÖN mentődik (lásd a buildLeagueTable
+       névalapú párosításánál írt indoklást): egy helyben növelt szám
+       újratöltés után szétcsúszna a két oldalon. A képlet mindkettőn
+       ugyanazt adja.
+     · A tabella minden rajzoláskor ÚJRAJÁTSSZA az egész szezont, és garantálja,
+       hogy a féltávi állás a végleges valódi előzménye. Halmozott számmal a
+       replay a mai erővel játszaná újra az 1. fordulót is.
+     · Kétszer futtatva sem romlik el semmi (idempotens).
+
+   MIÉRT NEM BILLENTI FEL AZ AI-BAJNOKSÁGOT. Az ütem az osztályon belül
+   MINDENKIRE ugyanaz, tehát az AI-vs-AI meccsek erőkülönbsége (és így a
+   szimulált eredmény) változatlan. A növekedés kizárólag a TE mérkőzéseidben
+   és a kijelzett erőkben jelenik meg — pontosan ott, ahol számít.
+
+   MIÉRT NEM SZÁMOLUNK KÉTSZER. A világ csapatai (S.pyr.divs) a szezon alatt
+   ÉRINTETLENEK; a növekedés csak a szezon mezőnyének (SEASON_OPPS) a
+   fedőrétege. A szezonfordulón a pyrDevelopWorld a szokásos éves lépést adja
+   a világnak, és az új szezon mezőnye onnan születik újra — a két érték a
+   szezonhatáron simán találkozik (30 × ütem ≈ éves alapütem). */
+function pyrGrowStep(){
+  if(!(typeof pyrOn==="function"&&pyrOn()))return 0;
+  const W=S.pyr;
+  if(!W)return 0;
+  if(W.grow==null)W.grow=Math.round(pyrAiRate(pyrMyDivId())/30*1000)/1000;
+  return W.grow||0;}
+/* Mennyivel erősebb a mezőnyöd MOST, mint a szezon első fordulóján. */
+function pyrGrowNow(){return pyrGrowStep()*(S.idx||0);}
+/* A szezon mezőnyének átszámolása a mostani fordulóra. Idempotens: mindig az
+   érintetlen ovrBase-ből dolgozik, tehát bárhonnan, bármennyiszer hívható. */
+function pyrOppRefresh(){
+  if(!(typeof pyrOn==="function"&&pyrOn()))return;
+  const g=pyrGrowNow();
+  const fix=o=>{
+    if(!o||typeof o.ovr!=="number")return;
+    if(o.ovrBase==null)o.ovrBase=o.ovr;
+    o.ovr=Math.round((o.ovrBase+g)*100)/100;};
+  if(Array.isArray(SEASON_OPPS))SEASON_OPPS.forEach(fix);
+  /* A menetrend a mezőny objektumaira mutat — újratöltés után viszont SAJÁT
+     másolatokra, ezért azokat külön is át kell számolni. */
+  if(Array.isArray(S.fixtures))S.fixtures.forEach(fx=>{if(fx&&!fx.duel)fix(fx.o);});}
 /* ---- EGY AI-OSZTÁLY SZEZONJA ----
    A többi öt osztály is lejátssza a maga bajnokságát — enélkül a piramis
    díszlet volna, és a feljutás után ismeretlen, sorsolt csapatokat találnál.
@@ -8306,7 +8358,9 @@ function pyrStart(startDiv,speed,sq){
     e.startRating=Math.round(ratingAtAge(e.peak,e.age));
     syncAttrsToRating(e);
     if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
+  S.pyr.grow=null;                 /* az osztályodhoz tartozó ütem újraszámol */
   SEASON_OPPS=pyrOpponents();
+  pyrGrowStep();pyrOppRefresh();
   if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
   return `Piramis indítva: D${d0} · ${home.name} · mezőny ${oppTargetRating} `
     +`· ${PYR_SPEEDS[sp].n} (AI-ütem ${pyrAiRate(d0).toFixed(1)}/szezon) `
@@ -26377,6 +26431,7 @@ function startFirstSeason(){
      meccsenként gyűlnek rá — a kettőből áll össze a szezon mérlege. */
   try{if(gameMode==="career")wageProbeNoteIncome(S.transferBudget);}catch(e){}
   buildSeasonFixtures();
+  try{pyrOppRefresh();}catch(e){}   /* a friss menetrend is a mostani erőket lássa */
   /* a mezőny rejtett erősítése a szezonra rögzül — MÁR a morál beállítása után */
   freezeSeasonHiddenBonus();
   /* A SZEZONKEZDŐ CSAPATERŐ — a kupamezőny egyik horgonya (euroDominance):
@@ -32847,7 +32902,17 @@ function playMatch(){
          skalp" mérése — így egyik új típushoz sem kell külön nyomkövetés */
       /* A PÁRHARC eredménye külön meg van jelölve: az F5 tabella-integráció
          innen tudja majd, hogy ez a két forduló nem CPU-ellenfél ellen ment. */
-      S.fixtureResults.push({o:fx.o,gf,ga,home:!!fx.home,duel:!!fx.duel,round:S.idx+1});
+      /* AZ ELLENFÉL PILLANATKÉPE, nem a hivatkozása. Két oka van, és a
+         második a ligapiramissal vált élessé:
+           · a mentés/betöltés amúgy is másolatot csinál belőle (lásd a
+             buildLeagueTable névalapú párosításánál írt indoklást), tehát a
+             hivatkozás megtartása csak újratöltésig tartó, HAMIS azonosság;
+           · a piramisban a mezőny fordulóról fordulóra erősödik — egy közös
+             objektummal a 3. fordulóban legyőzött ellenfél ereje a 25.
+             fordulóban visszamenőleg magasabbnak látszana, és a rá épülő
+             kihívás-számlálók (pl. "verj meg egy rivális erejűt") elcsúsznának. */
+      S.fixtureResults.push({o:{n:fx.o&&fx.o.n,ovr:fx.o&&fx.o.ovr},
+        gf,ga,home:!!fx.home,duel:!!fx.duel,round:S.idx+1});
       /* KIHÍVÁS-KÖNYVELÉS: a RANGADÓK mérlege. Két külön számláló, mert a két
          kihívás (nyerj egyet / ne kapj ki egyen sem) ellentétes irányból néz
          ugyanarra a meccsre. */
@@ -33433,6 +33498,11 @@ function playMatch(){
        ritmusban, mint a rövid kihívások lejárata — a bajnoki forduló lezárása
        UTÁN, tehát a S.idx már a lejátszott meccsek száma. */
     if(gameMode==="career"&&careerPool&&!euroFrozen()){try{runPaceTick();}catch(e){}}
+    /* A LIGAPIRAMIS MEZŐNYE IS LÉPETT EGYET. Ugyanabban a ritmusban, mint a
+       fenti két könyvelés: a bajnoki forduló lezárása UTÁN, tehát az S.idx
+       már a lejátszott meccsek száma — pontosan ennyi fordulónyi fejlődés
+       van a mezőny mögött. */
+    try{pyrOppRefresh();}catch(e){}
     /* FIX: a meccs alatt megváltozhatott bárki élő Ratingje (fejlődés/visszaesés,
        skill-szerzés, piros lap, sérülés) — a pálya és a csapaterő eddig SOHA nem
        rajzolódott újra a meccs után, csak akkor, ha egy átigazolási ablak vagy a
@@ -37787,7 +37857,8 @@ function renderFinalTable(teams){
       <span style="font-family:var(--font-disp);font-size:22px;line-height:1;color:var(--badge-ink)">D${id}</span>
       <span style="flex:1;min-width:0;font-size:13.5px;font-weight:800;color:var(--badge-ink);
         overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((d&&d.name)||"")}</span>
-      <span style="font-size:11.5px;color:var(--badge-ink);white-space:nowrap">mezőny ${oppTargetRating}</span>
+      <span style="font-size:11.5px;color:var(--badge-ink);white-space:nowrap">mezőny ${
+        (oppTargetRating+pyrGrowNow()).toFixed(1).replace(".",",")}</span>
     </div>`;}
   html+='<div class="stattblwrap"><div class="stattbl">';
   html+='<div class="strow tbl shead"><span>#</span><span>Csapat</span><span>M</span><span>GY</span><span>D</span><span>V</span><span>Gk</span><span>P</span></div>';
@@ -38093,7 +38164,11 @@ function pyrSeasonTurn(){
   if(!_pr){W.note=null;return null;}
   W.rolledFor=sn;
   oppTargetRating=pyrLevel();
+  /* AZ ÜTEM AZ ÚJ OSZTÁLYODHOZ TARTOZIK: feljebb gyorsabban fejlődik a mezőny.
+     A nullázás után a pyrGrowStep számolja újra. */
+  W.grow=null;
   SEASON_OPPS=pyrOpponents();
+  pyrGrowStep();pyrOppRefresh();
   if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
   const _d=pyrMyDiv();
   /* ---- AZ OSZTÁLYOZÓ ELBESZÉLÉSE ----
@@ -38165,8 +38240,11 @@ function announcePyrSeason(){
   if(id<PYR_DIVS)
     addLine(`&nbsp;&nbsp;⬇️ <b>Kiesés:</b> a <b>16. hely</b> közvetlenül esik, a <b>14–15.</b> `
       +`osztályozón védi a helyét.`,"m ev");
-  addLine(`&nbsp;&nbsp;<span style="color:var(--dim)">A mezőny is fejlődik: minden idény végén az `
-    +`egész piramis erősödik, veled együtt. Ha megállsz, lecsúszol.</span>`,"m ev");}
+  {const st=(typeof pyrGrowStep==="function")?pyrGrowStep():0;
+   addLine(`&nbsp;&nbsp;<span style="color:var(--dim)">A mezőny <b>minden fordulóval</b> erősödik `
+     +`(+${st.toFixed(2).replace(".",",")}/meccs, az idény alatt kb. `
+     +`+${(st*30).toFixed(1).replace(".",",")}), nem csak idényváltáskor. `
+     +`Ha megállsz, lecsúszol.</span>`,"m ev");}}
 function announceSeasonRivals(){
   const rv=seasonRivals();
   if(!rv.length)return;
@@ -41182,7 +41260,15 @@ function freezeSeasonHiddenBonus(){S.oppBuffH=hiddenMatchBonus();}
    használod. A futó szezon meccsei a rögzített értéket viszik tovább. */
 function oppMatchStrength(lvl){
   const v=(lvl===undefined?oppTargetRating:lvl);
-  return v+oppBuffFor(v,hiddenMatchBonus());}
+  /* A PIRAMISBAN a mezőnyszint (oppTargetRating) SZÁNDÉKOSAN a szezon
+     horgonya: a piac, a kupasáv és a gazdaság erre épül, tehát a szezon
+     közben nem mozdulhat. A mezőny ereje viszont fordulóról fordulóra nő —
+     és ezt a levelGap/underdog-számításnak látnia kell, különben a szezon
+     vége felé a játék egyre könnyebbnek HINNÉ magát, mint amilyen. Csak az
+     „itt és most" kérdésre adjuk hozzá; a kifejezett szintre kérdezők
+     (hipotetikus számolások) a tiszta értéket kapják. */
+  const g=(lvl===undefined&&typeof pyrGrowNow==="function")?pyrGrowNow():0;
+  return v+g+oppBuffFor(v,hiddenMatchBonus());}
 /* ================= REJTETT MECCS-BÓNUSZOK =================
    A KIJELZETT csapaterő (teamStrength) szándékosan csak a KERETET méri: a
    szituatív tagokat — morál, edző, aura-skillek, kapitány-rutin, taktika,
@@ -48454,6 +48540,7 @@ function startNextCareerSeason(){
     }});
   S._chAnchorPending=false;
   buildSeasonFixtures();
+  try{pyrOppRefresh();}catch(e){}   /* a friss menetrend is a mostani erőket lássa */
   /* a mezőny rejtett erősítése az ÚJ szezonra rögzül — a nyári igazolások, az
      öregedés és a friss morál már benne van, az auto szintkövetés viszont MÁR
      lefutott fölötte (az a mostani kerettel dolgozik, ez a szezonra fagyaszt) */
@@ -55069,6 +55156,11 @@ function applySavedGame(d){
   }catch(e){}
   /* a mezőny saját menetrendje és az élő tabella a betöltött állapotból épül újra */
   _aiSchedCache=null;liveTableInvalidate();
+  /* A PIRAMIS SZEZON KÖZBENI FEJLŐDÉSE ÚJRASZÁMOL. A mentés a NYERS alapot
+     (ovrBase) viszi; a mostani forduló szerinti erőt a képlet adja vissza —
+     így a mezőny és a menetrend a betöltés után is ugyanazt mutatja, és nem
+     számít, hogy a JSON-körút szétválasztotta-e a két oldalt. */
+  try{pyrOppRefresh();}catch(e){}
   S.seasonNews=d.S.seasonNews||{};
   /* KIFEJEZETTEN a mentésből: az Object.assign csak a MEGLÉVŐ kulcsokat írja
      felül, egy régi mentés tehát a freshS true-ját örökölné, és a migráció
