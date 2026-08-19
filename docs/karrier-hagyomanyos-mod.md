@@ -695,6 +695,25 @@ Böngészőben ellenőrizve, mind a hat osztályon, helyezésenként.
   felében a hazai kupa nem szerény sorozat: a legjobb 32 játssza, és a
   győzelme BL-t ér — ezért erősebb mezőnyt kap (`oppDelta 0`, szemben az MK
   −4-ével) és a KL/EL közé árazott díjazást.
+
+  **A DINAMIKUS MÓDBAN IS FUT (v3.5.01).** A két Biszem-baszom sávban eddig az
+  volt a helyzet, hogy aki lecsúszott a nemzetközi helyekről, annak egyáltalán
+  nem jutott kupa (a Magyar Kupa a 79-es és 84-es sávé). Ugyanaz a sorozat
+  ugyanoda került be: `{comp:"FA",max:99}` a `CUP_TIERS` két felső sorának a
+  végére, tehát a nemzetközi helyek után mindenki más az FA-kupát játssza.
+
+  **A hírességpontokból hiányzott** (v3.5.01): sem a `FAME_AWARD_BASE`, sem a
+  `FAME_MVP_BASE` nem ismerte, ezért az FA-kupában szerzett egyéni díj a
+  BAJNOKI bázison fizetett (1), a meccs embere pedig egy sima ligameccsén.
+  Az értéke ott is a két hazai kupa viszonyát követi: **díj 1,25** és
+  **MVP 2,5**, vagyis MK és KL közé — pont oda, ahova a díjazása.
+
+  **Az arculata angol piros-fehér** (v3.5.01): az eredményjelző az EGYETLEN
+  világos lemezű tábla a játékban (`#sbBoard.comp-FA`), piros fordítós
+  lapokkal. A sorozatszín ezért királykékről `#c8102e`-re váltott — egy
+  sorozatot egy szín visz végig (fejléc, Champion-gyűrű, eredményjelző). A
+  Magyar Kupa szintén piros, de a kettő SOHA nem fut együtt: az MK a 79/84-es
+  sávé és a D3–D4-é, az FA a fölöttük lévő szinteké.
 * **A selejtező körszáma sávonként állítható** (`euroQualRounds`). Alapban
   kettő; a D2 FA-kupája négy körrel kezd, mert onnan minden csapat nevez —
   ott a főtáblára jutás maga a szűrő.
