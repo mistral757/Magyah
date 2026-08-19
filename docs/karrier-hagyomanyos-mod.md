@@ -37,22 +37,78 @@ csapat vár, akivel három éve az NB II-ben szenvedtél.
 
 ---
 
-## 2. A három kapcsoló
+## 2. A kapcsolók — és a sorrendjük (v3.4.18)
+
+A beállító képernyőn **egyetlen** piramis-kapcsoló maradt:
 
 ```
-① Honnan indulsz     🎲 Draft        /  🏟️ Kész klub
-② Melyik osztályban  ●━━━━━━━━━━━    (6. … 1. osztály)
-③ Az ellenfelek      ━━━●━━━━━━━━    😴 / 🚶 / 🏃 / 🔥
+① Az ellenfelek      ━━━●━━━━━━━━    😴 / 🚶 / 🏃 / 🔥
    fejlődése
 ```
+
+A másik kettő **átköltözött a belépő útvonalra**, mert egyik sem eldönthető a
+másik ismerete nélkül:
+
+```
+scScout  →  scClubPick   (② melyik klub kerete)
+         →  scPyrDiv     (③ melyik osztályból indulsz — AJÁNLÁSSAL)
+         →  a karrier
+```
+
+**Nincs draft.** A hagyományos módban a kezdés kötelezően kész klub — a
+kezdésmód-választó el is tűnik a beállításról (`updatePyrSetupVisibility`
+odaállítja a `careerStart`-ot). Az indoklás a **4.2 lezárása**.
+
+**A klub ELŐBB jön, mint az osztály.** Az osztály önmagában nem nehézség: a
+negyedosztály egy 84-es kerettel sétagalopp, egy 73-assal évekig tartó
+kapaszkodás. Csak a keret ismeretében lehet értelmes ajánlást adni, és csak
+akkor lehet a Run-plafont őszintén kiírni. Az osztályválasztó ezért nem
+osztályokat sorol, hanem **réseket** (`pyrDivOptions`).
+
+**A rés (gap).** `gap = a klubod top-11 nyers ereje − a célosztály nyers közepe`
+(a belépéskor kieső 16. csapat nélkül). A pool-eltolás mindkét oldalt ugyanúgy
+mozgatja, tehát a rés a **nyers** skálán is igaz — ez az egyetlen szám, ami
+megmondja, mekkora falat vállaltál. Címkék (a **4.** mérései szerint):
+
+| rés | címke |
+|---|---|
+| ≥ +6 | sétagalopp |
+| +2,5 … +6 | kényelmes |
+| −1,5 … +2,5 | **egyenrangú** |
+| −4 … −1,5 | kemény menet |
+| −7 … −4 | brutális |
+| < −7 | fal — évekig a kiesés ellen |
+
+**Az ajánlás** a fokozathoz tartozó cél-réshez legközelebbi osztály
+(`PYR_REC_GAP`): 😴 −2,5 · 🚶 −1,8 · 🏃 −1,0 · 🔥 0,0. Alvó mezőnynél mélyebbről
+is felérsz, kegyetlennél már az egyenrangú kezdés is kemény menet. Döntetlennél
+a **mélyebb** osztály nyer — a mód ígérete a hegymászás. **Ajánlás, nem
+korlátozás:** mind a hat osztály választható marad.
 
 Ezen felül a játékos **saját** fejlődési tempója a mai négy fokozat marad
 (Alap / Komótos / Csiga / Gleccser) — de lásd **5.4**: ez a hagyományos módban
 **nem független** az ellenfél tempójától.
 
-Minden más rögzül: nincs Rating-alap-választás (kötelezően **csúcsforma**, mert
-a világ ereje a valós kluberősségekre épül), nincs auto szintkövetés (nincs mit
-követni), nincs Infinity-kapu.
+Minden más rögzül: nincs Rating-alap-választás (kötelezően **szezon-alap**, mert
+a kész klub kerete a saját idényének értékeléseivel érkezik), nincs auto
+szintkövetés (nincs mit követni), nincs Infinity-kapu.
+
+### 2.1 A két skála összecsúszása — MÉRT HIBA, javítva (v3.4.18)
+
+A klub-elsős sorrend hozta felszínre. A piramis világa **normalizált**
+Ratingeken áll (a valós, sűrűn tömött 69–88-as mezőnyt hat tiszta sávba húzzuk
+szét), a karrier-pool ezért egy eltolást kap (`pyrPoolOffset`). A kész klub
+kerete viszont **nem a poolból** jön: a szezon-alap a klub-szezon saját, nyers
+értékeléseit írja be (`commitSeasonBasis`).
+
+Mérve: a hatodosztály nyers közepe **77,0**, normalizálva **71,4** — vagyis egy
+pontosan átlagos hatodosztályú klubbal **+5,6-tal a saját mezőnyöd fölött**
+kezdtél volna. A **4.** táblázata szerint ez azonnali, biztos feljutás: a mód
+egész ígérete elveszett volna.
+
+Javítás: `pyrScaleClubPlayer` — a kész klub kerete ugyanazt az eltolást kapja,
+amit a pool. Mérve a javítás után: kezdő XI **70,5**, osztályközép **71,3**,
+azaz a hirdetett −1,4-es rés valóban teljesül.
 
 ---
 
@@ -301,12 +357,31 @@ draftból válogatottakkal együtt 80–86-os csapatok jönnek ki, és a súlyoz
 a jelzett sávban —, klubeltolással 74,4. A modell tehát a valós tapasztalattal
 egyezik, és az eltolás az, ami a becsült sávot a helyére viszi.
 
+#### A LEZÁRÁS: a draft kikerült a módból (v3.4.18)
+
+A számok fentebb rendben vannak — a **játékélmény** viszont nem lett az. A
+súlyozott draft ugyanis pont azt a döntést teszi kiszámíthatatlanná, amire az
+egész mód épül: **hogy TUDD, mekkora falat vállaltál.** A rés a súlyozás
+mellett is szórt marad (nem a mért középérték a te futásod), és a mód
+belépője emiatt egy olyan vállalást kért, amit csak utólag lehetett látni.
+Ehhez jött, hogy a draft belépő-sorrendje fordított: ott az osztály KELL a
+merítés súlyozásához, tehát a klub után választott osztály nem is lehetséges.
+
+**Döntés:** a hagyományos módban egyetlen kezdés van, a **kész klub**. Ekkor
+a rés nem szórt, hanem *kiszámított és kiírt* szám (`gap0`), és a Run-plafon
+is őszinte lehet (**9.1**).
+
+A súlyozott draft KÓDJA megmarad (`pyrDraftPick`, `PYR_DRAFT_Q`,
+`PYR_DRAFT_PREMIUM`): a mérőeszköz `draft` parancsa dolgozik vele, és a
+Run-visszajátszás merítés-súlyozása is ezen az egy kapun megy. A módban
+viszont nincs út, ami elvezetne hozzá.
+
 ### 4.3 A többi megfontolt út
 
-**Kész klub.** Átveszed egy valós klub kész keretét abból az osztályból, ahol
-kezdesz: az erőd definíció szerint a klub ereje, a rés nulla. Immerzióban ez a
-legerősebb (te vagy a Paksi FC), és korrekció sem kell hozzá. **Marad a
-legegyszerűbb út — de a 4.2 után nem az EGYETLEN.**
+**Kész klub.** Átveszed egy valós klub kész keretét, és utána döntöd el, melyik
+osztályból indulsz vele. Immerzióban ez a legerősebb (te vagy a Paksi FC), a rés
+pedig nem becslés, hanem kiírt szám. **A v3.4.18 óta ez az EGYETLEN út** — az
+indoklás a 4.2 lezárásában.
 
 **Korlátozott draft** (nem a legjobb embert viheted minden keretből, hanem az
 5–20. helyezettből). Immerzióban gyenge, a szórása nagy — elvetve, mert a
@@ -664,6 +739,22 @@ Run = KIHÍVÁS-PLAFON × TELJESÍTMÉNY
 | **Ellenfél-tempó** | 😴 ×0,55 · 🚶 ×0,75 · 🏃 ×0,90 · 🔥 **×1,00** |
 | **Saját tempó** | Alap ×0,88 · Komótos ×0,93 · Csiga ×0,97 · Gleccser **×1,00** |
 | **Indulás** | draft ×1,00 · kész klub ×0,95 |
+| **Kezdő rés** | rés ≤ 0 → ×1,00 · rés > 0 → ×(1 − 0,075 × rés), padló **×0,40** |
+
+**Miért kellett a rés-szorzó (v3.4.18).** A draft kivétele után az osztály
+önmagában már nem mért kihívást: a hatodosztályba be lehetett volna lépni egy
+élvonalbeli kerettel, és az adta volna a **legmagasabb** osztály-plafont a
+**legkönnyebb** futáshoz. A rés ezt zárja le. Mérve (🏃 + alap tempó):
+
+| klub | D1 | D2 | D3 | D4 | D5 | D6 |
+|---|---|---|---|---|---|---|
+| FC Barcelona (88,0) | 30 | 27 | 25 | 26 | 28 | 30 |
+| Deportivo (80,6) | 41 | 53 | 58 | 57 | 56 | 54 |
+| Debreceni VSC (69,0) | 41 | 53 | 60 | 66 | 71 | **75** |
+
+Egy szuperklubbal **sehol** nem lehet magasra futni (25–30), és a „mélyről
+indulok egy nagy kerettel" út sem éri meg jobban, mint az őszinte kezdés. Egy
+gyenge klubbal a plafon a szokásos módon nő lefelé haladva.
 
 Mért plafonok:
 
@@ -817,7 +908,8 @@ kihívás és statisztika ugyanúgy fut, mint ma.
 | **P4** | ✅ **kész** — súlyozott draft (`pyrDraftPick` + pool-eltolás) és a teljes kuparendszer (`PYR_CUPS`, FA-kupa, sávonkénti selejtező-körszám, a kupagyőzelem jutalma a következő idényre) | |
 | **P5** | ✅ **kész** — Run-plafon + a piramis teljesítmény-sorai, riválisok, Infópult-lap, és a **belépő** (a karrier fajtájának választója, osztály-csúszka, fokozat-választó, a plafon élő kiírásával) | a mód elérhető |
 | **P6** | hangolás valós runokból; a négy fokozat véglegesítése | |
-| **P7** | a beállítóképernyő négy oldalra bontása (`karrier-beallitasok-terv.md` 7.) — tiszta megjelenítés, viselkedés nem változik | nyitva |
+| **P7** | ✅ **kész** — a beállítóképernyő négy oldalra bontása (`karrier-beallitasok-terv.md` 7.) | |
+| **P8** | ✅ **kész** (v3.4.18) — a draft kikerült a módból, a belépő sorrendje **klub → osztály**, ajánlott osztály a klub erejéhez és a fokozathoz mérve (`pyrDivOptions`, `pyrRecommendDiv`), a kezdő rés a Run-plafonban (`pyrGapFactor`), és a kész klub kerete a piramis skálájára kerül (`pyrScaleClubPlayer`) | |
 
 **A P3 volt a kritikus kapu, és átment.** A mért nettó mászás mind a négy
 fokozatnál a 0,8 – 3,5 sávban van (1,18 … 4,32), és a fokozatok végig
@@ -836,16 +928,18 @@ fokozat átlövéséhez `live tier=kegyet share=0,84 top=0,92`.
 3. **Kiesés az utolsó osztályból** — mi történik, ha a D6-ból esnél ki?
    Javaslat: nincs hetedik osztály, a D6 utolsó helye a padló (egy „megyei
    pokol" szezon).
-4. **Kész klub + osztályválasztás** — ha kész klubbal indulsz, a klubod
-   *saját* Ratingje meghatározza, melyik osztályba illik. Engedjük-e, hogy a
-   Barcelonával a hatodosztályban kezdj (azonnali 5 feljutás), vagy a
-   klubválasztás **szűkítse** a választható osztályokat? *(A draft ága
-   megoldva — lásd 4.2; ez már csak a kész-klub útra vonatkozik.)*
-5. ~~A draft-paradoxon melyik megoldása?~~ **Eldőlt és kész** (4.2): súlyozott
-   merítés + pool-eltolás + prémium-korrekció. A rés mind a hat osztályban
-   −0,5 … +1,0. **Karbantartás:** ha az adatbázis bővül, a
-   `node tools/pyramid-sim.js draft` újrafuttatandó — a `PYR_DRAFT_PREMIUM`
-   az egyetlen szám, amit hangolni kell.
+4. ~~**Kész klub + osztályválasztás**~~ **Eldőlt** (2. és 9.1, v3.4.18): a
+   választás **nem szűkül** — a Barcelonával el lehet indulni a
+   hatodosztályból. Nem korlátozunk, hanem **árazunk**: a kezdő rés
+   szorzója (`pyrGapFactor`) levágja a plafont, és a képernyő már a döntés
+   pillanatában kiírja, mennyit ér az adott út. Mérve: a szuperklub sehol
+   nem jut 30 fölé, és a „mélyről egy nagy kerettel" út sem éri meg jobban
+   az őszinte kezdésnél.
+5. ~~A draft-paradoxon melyik megoldása?~~ **Tárgytalan** (4.2 lezárása,
+   v3.4.18): a draft kikerült a módból. A kódja megmarad a mérőeszköznek és a
+   Run-visszajátszásnak, de a belépőn nincs út hozzá. **Karbantartás a helyén:**
+   ha az adatbázis bővül, a `node tools/pyramid-sim.js bands` és `world`
+   újrafuttatandó — az osztályok nyers közepe mozdul, és vele az ajánlás.
 6. ~~A kiesés gyakorlatilag csak a Kegyetlen fokozaton fordul elő~~ —
    **megoldva az osztályozóval** (lásd lentebb). A 2–3. helyezett immár
    párharcot játszik a fentebbi osztály 15., illetve 14. helyezettje ellen,
