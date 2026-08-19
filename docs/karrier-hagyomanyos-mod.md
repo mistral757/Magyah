@@ -420,10 +420,16 @@ A kezdő 11 becsült ereje = a kezdő mezőny + 4 (az auto szintkövetés
 
 **átlag 7,27 · medián 7,18 · sáv 5,95 – 8,96**
 
-Ez független megerősítése a kód saját becslésének
+Ez független megerősítése a kód akkori becslésének
 (`RUN_CLIMB_PER_SEASON = 10`) — azzal, hogy a valóság **~30%-kal szerényebb**,
-mint amit a Run-mérő legkorábbi-Infinity referenciája feltételez. A tervezés
+mint amit a Run-mérő legkorábbi-Infinity referenciája feltételezett. A tervezés
 alapja legyen a mért **7,0**.
+
+*(Utóirat, v3.4.19: ugyanez a 10-es becslés a dinamikus mód Infinity-határidejét
+is állította, ott viszont FÖLFELÉ tévedett — túl késői határidőt adott, és a
+korai megnyitás bónuszát érdemtelenül felnagyította. A határidő azóta fix: a
+3. szezon 30. bajnokija, `RUN_INF_DEADLINE_SEASON`, és a
+`RUN_CLIMB_PER_SEASON` kivezetve.)*
 
 Két minta is látszik: a **hosszabb runok üteme lassabb** (BARSZA 8 szezon →
 5,98; 757 két szezon → 7,90), tehát a fejlődés kopik; és a **magasabbról induló
