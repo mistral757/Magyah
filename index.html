@@ -3371,7 +3371,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.4.20";
+const APP_VERSION="3.4.21";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8115,6 +8115,20 @@ function pyrPlayoffTie(ch,df,rnd,lowerDiv,k){
     ch:pyrEntityName(ch),df:pyrEntityName(df),
     mine:!!(ch&&ch.me)||!!(df&&df.me),
     iAmChallenger:!!(ch&&ch.me)};}
+/* ---- A SZEZONFORDULÓ ELBESZÉLÉSE: PUFFERELVE ----
+   HIBA, AMIT EZ JAVÍT. A szezonforduló minden mondata az addLine-on ment a
+   meccs-naplóba (#ttLines) — csakhogy a naplót az új szezon indítása pár
+   tucat sorral később KITÖRLI ($("ttLines").innerHTML=""). Az osztályozó két
+   meccse, az összesítés, a feljutás bejelentése: mind megszületett, és mind
+   elveszett, mielőtt bárki láthatta volna. A felhasználó a következő szezon
+   első meccsén szembesült azzal, hogy már egy másik osztályban van.
+   Mostantól a forduló mondatai PUFFERBE mennek (S.pyr.note), és két helyre
+   jutnak el: azonnal egy saját képernyőre (showPyrTurnReveal), majd a napló
+   tetejére, amikor az új szezon naplója már megszületett. */
+function pyrSay(html,cls){
+  const W=(typeof S!=="undefined"&&S)?S.pyr:null;
+  if(W&&W.note){W.note.push({h:html,c:cls||"m ev"});return;}
+  if(typeof addLine==="function")addLine(html,cls||"m ev");}
 /* ---- A SZEZONFORDULÓ ----
    `myOrder` a SAJÁT osztályod VALÓS végsorrendje (nevek, 1. helytől), az
    S.finalTable-ből — vagyis a te osztályodban nem szimulálunk semmit, a
@@ -8214,7 +8228,7 @@ function pyrRollover(myOrder,rnd){
     try{
       const _rb=runBoardOnPyrTitle();
       if(_rb){
-        addLine(`🏅 <b>Felkerültél a helyi Run-ranglistára</b> — az élvonal megnyerésével, `
+        pyrSay(`🏅 <b>Felkerültél a helyi Run-ranglistára</b> — az élvonal megnyerésével, `
           +`<b>${String(_rb.run).replace(".",",")}</b> Run-szinttel. `
           +`A karrier lezárásakor még javíthatsz rajta.`,"m win");
         try{lbAutoUpload(_rb);}catch(e){}}
@@ -38046,6 +38060,92 @@ function rivalRoundNumbers(){
    feljutáshoz, és mi fenyeget alul. A dinamikus módban erre nincs szükség (ott
    a mezőny követ téged), ezért ez a blokk kizárólag a piramisban szólal meg.
    A riválisok bejelentése előtt fut: előbb a TÉT, aztán a szereplők. */
+/* ================= A PIRAMIS SZEZONFORDULÓJA =================
+   MIKOR FUT, ÉS MIÉRT PONT AKKOR. A dinamikus módban a szezonhatár első
+   dolga az auto szintkövetés, és a kód ott KIMONDJA, miért: „a kihívás-
+   kalibráció a szint-különbségből dolgozik — ha az automatika csak UTÁNA
+   lépne, a vállalásaid egy elavult szinthez mérve születnének."
+   A piramisban ennek a párja a szezonforduló (ez lép az auto szintkövetés
+   HELYETT), csakhogy az a startNextCareerSeason-ben ült, vagyis A KIHÍVÁSOK
+   UTÁN. A felhasználó tehát úgy vállalt öt hosszú kihívást, hogy nem tudta,
+   melyik osztályban fogja teljesíteni őket — a feljutása csak az első meccsen
+   derült ki. Innentől a forduló a kihívások ELŐTT fut, ugyanazon a ponton,
+   ahol a dinamikus mód a szintjét rendezi.
+
+   EGYSZER EGY SZEZONFORDULÓN. A forduló MUTÁLJA a világot (fel- és kiesés,
+   fejlődés), tehát kétszer lefuttatni végzetes volna — egy félbeszakadt lánc
+   vagy egy újratöltés után is. A `rolledFor` bélyeg a lezáruló szezon száma:
+   amíg az áll, a forduló nem futhat újra. */
+function pyrSeasonTurn(){
+  if(!(typeof pyrOn==="function"&&pyrOn()))return null;
+  const W=S.pyr;if(!W)return null;
+  const sn=S.seasonNumber||1;
+  if(W.rolledFor===sn)return null;
+  /* CSAK LEZÁRT SZEZON UTÁN. A forduló a végtabellából dolgozik; ha nincs
+     ilyen, nem „óvatosan" fordulnánk, hanem a semmiből léptetnénk fel-le és
+     fejlesztenénk az egész piramist. Ilyenkor nincs mit tenni. */
+  if(!(S.finalTable&&S.finalTable.length))return null;
+  W.note=[];                       /* innentől a pyrSay ide gyűjt */
+  const _mo=S.finalTable.map(t=>t.n);
+  let _pr=null;
+  try{_pr=pyrRollover(_mo,rngFor("pyr:s"+sn+":roll"));}
+  catch(e){W.note=null;throw e;}   /* a puffer sosem maradhat félig nyitva */
+  if(!_pr){W.note=null;return null;}
+  W.rolledFor=sn;
+  oppTargetRating=pyrLevel();
+  SEASON_OPPS=pyrOpponents();
+  if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
+  const _d=pyrMyDiv();
+  /* ---- AZ OSZTÁLYOZÓ ELBESZÉLÉSE ----
+     Ha volt párharcod, azt RÉSZLETESEN kiírjuk: két meccs, összesítés, a
+     döntés módja. Ez a mód legdrámaibb pillanata — egy puszta „feljutottál"
+     sor elvenné a súlyát. */
+  if(_pr.po){
+    const t=_pr.po;
+    const meWon=t.iAmChallenger?t.chWon:!t.chWon;
+    const rival=t.iAmChallenger?t.df:t.ch;
+    pyrSay(`🎬 <b>OSZTÁLYOZÓ</b> — ${esc(teamName)} ${
+      t.iAmChallenger?"a feljutásért":"a bennmaradásért"} ${esc(rival)} ellen.`,"m ev");
+    const l1=t.legs[0],l2=t.legs[1];
+    const mine1=t.iAmChallenger?l1[0]:l1[1], his1=t.iAmChallenger?l1[1]:l1[0];
+    const mine2=t.iAmChallenger?l2[0]:l2[1], his2=t.iAmChallenger?l2[1]:l2[0];
+    pyrSay(`&nbsp;&nbsp;1. mérkőzés (${t.iAmChallenger?"hazai":"idegenben"}): <b>${mine1}:${his1}</b>`,"m ev");
+    pyrSay(`&nbsp;&nbsp;2. mérkőzés (${t.iAmChallenger?"idegenben":"hazai"}): <b>${mine2}:${his2}</b>`,"m ev");
+    pyrSay(`&nbsp;&nbsp;Összesítés: <b>${mine1+mine2}:${his1+his2}</b> — ${esc(t.how)}. `
+      +(meWon?`<b style="color:var(--grass)">TOVÁBB!</b>`:`<b style="color:#e07a5f">Elbuktátok.</b>`),
+      meWon?"m win":"m ev");}
+  if(_pr.kind==="up")
+    pyrSay(`⬆️ <b>FELJUTÁS!</b> ${esc(teamName)} a(z) ${esc(_d.name)} mezőnyében folytatja — `
+      +`az új mezőny ${oppTargetRating}. `
+      +(pyrMyDivId()===1?`<b>Ez az élvonal — feljebb már nincs. Innen a bajnoki cím a tét.</b>`
+        :`Még ${pyrMyDivId()-1} osztály választ el a csúcstól.`),"m win");
+  else if(_pr.kind==="down")
+    pyrSay(`⬇️ <b>Kiesés.</b> ${esc(teamName)} a(z) ${esc(_d.name)} mezőnyébe kerül — `
+      +`az új mezőny ${oppTargetRating}. Vissza kell kapaszkodni.`,"m ev");
+  else
+    pyrSay(`🏟️ Maradsz a(z) ${esc(_d.name)} mezőnyében — a mezőny ${oppTargetRating}, `
+      +`mert a mezőny is fejlődött (+${(_pr.aiStep||0).toFixed(1)}). `
+      +(pyrMyDivId()===1?`Az élvonalban vagy: a cím a tét.`
+        :`A csúcsig még ${pyrMyDivId()-1} osztály.`),"m life");
+  return {res:_pr,lines:W.note.slice()};}
+/* A FORDULÓ SAJÁT KÉPERNYŐJE. Azért kell külön felület, mert ezen a ponton
+   még nincs hova naplózni: a HUB-ban állunk, a meccs-napló pedig csak az új
+   szezon indulásakor születik meg. A jelentés így a döntés PILLANATÁBAN
+   érkezik — még a vállalások előtt, ahogy kell. */
+function showPyrTurnReveal(turn,next){
+  const k=turn&&turn.res&&turn.res.kind;
+  $("scUnlock").classList.remove("hide");
+  $("unlockTitle").textContent=k==="up"?"⬆️ FELJUTÁS":k==="down"?"⬇️ KIESÉS":"⛰️ A SZEZON UTÁN";
+  $("unlockBody").innerHTML=`<div style="font-size:13px;line-height:1.6">`
+    +turn.lines.map(x=>`<div style="margin:5px 0">${x.h}</div>`).join("")
+    +`</div><p style="font-size:11.5px;color:var(--dim);margin-top:9px;line-height:1.5">`
+    +`Az idény vállalásait már EBBEN az osztályban teljesíted — a kihívás-felajánlás `
+    +`a mostani mezőnyödhöz méri a nehézséget.</p>`;
+  const btn=document.createElement("button");
+  btn.className="btn-y stepbtn";btn.textContent="Rendben, jöhetnek a vállalások →";
+  btn.onclick=()=>{$("scUnlock").classList.add("hide");if(typeof next==="function")next();};
+  $("unlockActions").innerHTML="";$("unlockActions").appendChild(btn);
+  $("scUnlock").scrollIntoView({behavior:"smooth"});}
 function announcePyrSeason(){
   if(!(typeof pyrOn==="function"&&pyrOn()))return;
   const id=pyrMyDivId(),d=pyrMyDiv();
@@ -48155,15 +48255,27 @@ function beginNextSeasonWithChallenges(){
        korábban), a vállalásaid egy elavult szinthez mérve születnének. */
     autoLevelSync(true);   /* SZEZONHATÁR: itt jogos a lépés */
     S._chAnchorPending=true;
-    if(gameMode==="career"&&careerPool&&!S.auto){
-      /* hubBack: a szezon eleji nagy vállalásoknál át lehet ugrani a HUB-ba
-         megnézni a keretet, és onnan vissza ide. Az első szezon nyitó
-         kihívásainál (a draft után) ez nincs — ott még nincs mit megnézni. */
-      showChallengeOffers("long",5,startNextCareerSeason,false,{hubBack:true});
-    }else{
-      if(gameMode==="career"&&careerPool)autoHandleChallengeOffers("long",5);
-      startNextCareerSeason();
-    }});}
+    /* ---- A PIRAMIS FORDULÓJA UGYANEZEN A PONTON ----
+       Ez a piramis megfelelője az imént lefuttatott szintkövetésnek, és
+       ugyanabból az okból tartozik IDE: a fel- vagy kiesésedet még a
+       vállalások előtt tudnod kell, és a kihívás-kalibrációnak is az ÚJ
+       osztályod mezőnyét kell látnia. (A kalibráció a hátralévő menetrendből
+       dolgozik; szezonvégen az üres, tehát a SEASON_OPPS-ra esik vissza —
+       amit a forduló ekkorra már az új osztályra cserélt.) */
+    let _turn=null;
+    try{_turn=pyrSeasonTurn();}catch(e){}
+    const _offer=()=>{
+      if(gameMode==="career"&&careerPool&&!S.auto){
+        /* hubBack: a szezon eleji nagy vállalásoknál át lehet ugrani a HUB-ba
+           megnézni a keretet, és onnan vissza ide. Az első szezon nyitó
+           kihívásainál (a draft után) ez nincs — ott még nincs mit megnézni. */
+        showChallengeOffers("long",5,startNextCareerSeason,false,{hubBack:true});
+      }else{
+        if(gameMode==="career"&&careerPool)autoHandleChallengeOffers("long",5);
+        startNextCareerSeason();
+      }};
+    if(_turn&&!S.auto)showPyrTurnReveal(_turn,_offer);
+    else _offer();});}
 function startNextCareerSeason(){
   phase="season";
   /* ---- AUTO NEHÉZSÉGI SZINTKÖVETÉS ----
@@ -48193,47 +48305,12 @@ function startNextCareerSeason(){
      dönti el a saját osztályodban, ki jut fel és ki esik ki; a többi öt
      osztály ugyanabban a pillanatban játssza le a magáét (pyrSimDivision).
      A sorrend SZÁMÍT: ez még a szezonszám növelése ELŐTT fut, hogy a napló a
-     lezáruló idényhez tartozzon — ugyanaz az indok, mint a szintkövetésnél. */
-  if(pyrOn()){
-    const _mo=(S.finalTable||[]).map(t=>t.n);
-    const _pr=pyrRollover(_mo,rngFor("pyr:s"+(S.seasonNumber||1)+":roll"));
-    if(_pr){
-      oppTargetRating=pyrLevel();
-      SEASON_OPPS=pyrOpponents();
-      if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
-      const _d=pyrMyDiv();
-      /* ---- AZ OSZTÁLYOZÓ ELBESZÉLÉSE ----
-         Ha volt párharcod, azt RÉSZLETESEN kiírjuk: két meccs, összesítés,
-         a döntés módja. Ez a mód legdrámaibb pillanata — egy puszta
-         "feljutottál" sor elvenné a súlyát. */
-      if(_pr.po){
-        const t=_pr.po;
-        const meWon=t.iAmChallenger?t.chWon:!t.chWon;
-        const rival=t.iAmChallenger?t.df:t.ch;
-        addLine(`🎬 <b>OSZTÁLYOZÓ</b> — ${esc(teamName)} ${
-          t.iAmChallenger?"a feljutásért":"a bennmaradásért"} ${esc(rival)} ellen.`,"m ev");
-        const l1=t.legs[0],l2=t.legs[1];
-        const mine1=t.iAmChallenger?l1[0]:l1[1], his1=t.iAmChallenger?l1[1]:l1[0];
-        const mine2=t.iAmChallenger?l2[0]:l2[1], his2=t.iAmChallenger?l2[1]:l2[0];
-        addLine(`&nbsp;&nbsp;1. mérkőzés (${t.iAmChallenger?"hazai":"idegenben"}): <b>${mine1}:${his1}</b>`,"m ev");
-        addLine(`&nbsp;&nbsp;2. mérkőzés (${t.iAmChallenger?"idegenben":"hazai"}): <b>${mine2}:${his2}</b>`,"m ev");
-        addLine(`&nbsp;&nbsp;Összesítés: <b>${mine1+mine2}:${his1+his2}</b> — ${esc(t.how)}. `
-          +(meWon?`<b style="color:var(--grass)">TOVÁBB!</b>`:`<b style="color:#e07a5f">Elbuktátok.</b>`),
-          meWon?"m win":"m ev");}
-      if(_pr.kind==="up")
-        addLine(`⬆️ <b>FELJUTÁS!</b> ${esc(teamName)} a(z) ${esc(_d.name)} mezőnyében folytatja — `
-          +`az új mezőny ${oppTargetRating}. `
-          +(pyrMyDivId()===1?`<b>Ez az élvonal — feljebb már nincs. Innen a bajnoki cím a tét.</b>`
-            :`Még ${pyrMyDivId()-1} osztály választ el a csúcstól.`),"m win");
-      else if(_pr.kind==="down")
-        addLine(`⬇️ <b>Kiesés.</b> ${esc(teamName)} a(z) ${esc(_d.name)} mezőnyébe kerül — `
-          +`az új mezőny ${oppTargetRating}. Vissza kell kapaszkodni.`,"m ev");
-      else
-        addLine(`🏟️ Maradsz a(z) ${esc(_d.name)} mezőnyében — a mezőny ${oppTargetRating}, `
-          +`mert a mezőny is fejlődött (+${(_pr.aiStep||0).toFixed(1)}). `
-          +(pyrMyDivId()===1?`Az élvonalban vagy: a cím a tét.`
-            :`A csúcsig még ${pyrMyDivId()-1} osztály.`),"m life");}
-  }
+  /* A PIRAMIS SZEZONFORDULÓJA MÁR LEFUTOTT — a kihívás-felajánlás ELŐTT
+     (beginNextSeasonWithChallenges → pyrSeasonTurn). Ez itt a VÉDŐHÁLÓ:
+     ha bármiért kimaradt (régi mentés, félbeszakadt lánc, konzolból indított
+     szezon), most pótoljuk. Jobb egy elkésett forduló, mint egy egész szezon
+     rossz osztályban. */
+  if(pyrOn()){try{pyrSeasonTurn();}catch(e){}}
   else if(autoLevelSync(true)&&MP.active&&MP.role==="host")mpPushLevel();
   /* a vendég a szezonfordulón mindenképp ránéz a közös szintre */
   if(mpLevelLocked())mpPullLevel(true);
@@ -48394,6 +48471,14 @@ function startNextCareerSeason(){
   if(gameMode==="career")$("matchHubBtn").classList.remove("hide");
   $("ttLines").innerHTML="";
   $("ttTeam").textContent=teamName.toUpperCase().slice(0,16);
+  /* A SZEZONFORDULÓ A NAPLÓ TETEJÉN. A mondatok a HUB-ban már megjelentek egy
+     saját képernyőn; ide azért kerülnek be újra, mert a napló a szezon
+     krónikája — ha ez kimaradna, a visszalapozó felhasználó számára a
+     feljutás sosem történt volna meg. A puffert ki is ürítjük: egy forduló
+     egyszer szerepel. */
+  if(S.pyr&&S.pyr.note&&S.pyr.note.length){
+    S.pyr.note.forEach(x=>{try{addLine(x.h,x.c);}catch(e){}});
+    S.pyr.note=null;}
   addLine(`Új szezon kezdődik, ${esc(teamName)}! Edző: ${coach.n}. Sok sikert!`,"m");
   if(h2hRoomActive())
     addLine(`⚔ A ${H2H_ROUNDS.join(". és a ")}. fordulóban a társad ellen játszol.`,"m ev");
