@@ -79,21 +79,21 @@ Barcelona 2010/11 (88,0), és mindössze két klub éri el a 87-et.
 
 Három út vezet ki ebből:
 
-**(A) Sávnyújtás — ajánlott.** A klubok **valós SORRENDJE** marad, csak a
-skálát húzzuk szét egy monoton lineáris leképezéssel, a tetőhöz horgonyozva:
+**(A) A RANG DÖNT, A GEOMETRIA TERVEZETT — ez lett megvalósítva.**
+*(Az eredetileg javasolt konstans sávnyújtás — `88 − (88−valós)×1,7` — MÉRVE
+MEGBUKOTT, lásd 3.3.)* Két dolgot választunk szét:
+
+* **ki hová kerül** — teljes egészében a valós erő dönti: a klubok valós
+  Rating szerinti rangsorban állnak, az első 16 az élvonal, és így tovább;
+* **mekkora a különbség** — ezt tervezzük, mert ezen múlik a játszhatóság:
 
 ```
-piramis_rating = 88 − (88 − valós_rating) × k
+ovr = 86 − (osztály−1)×3,0 + (helyzet − 0,5)×4,0
 ```
 
-`k = 1,7` mellett: D1 = 83,8–88,0 · D2 = 79,0–83,1 · D3 = 76,6–79,0 ·
-D4 = 74,4–76,4 · D5 = 72,2–74,4 · D6 = 70,7–72,1. Az osztályok
-**középértékei közti lépcső ~3,3**, a sávok ~2–4 szélesek — pontosan a
-játszható tartományban (lásd 4.). A Barcelona 88 marad, a Paksi FC 71 lesz:
-a piramis alja tényleg megyei szintű, és a legfelső osztály tényleg
-elérhetetlennek tűnik onnan. A `buildOpponents` már ma is csinál ilyen
-eltolást (`lift`), csak szezononként és felfelé; itt **egyszer, a világ
-születésekor**, lefelé.
+ahol a `helyzet` a klub 0…1 közti helye a saját osztálya **nyers**
+Rating-tartományában — tehát az osztályon belüli sorrend és a relatív
+távolságok is a valóságból jönnek, csak a nagyságrend normalizálódik.
 
 **(B) Nyers Ratingek, lapos piramis.** Semmit nem skálázunk. A piramis
 77,5–88,0 közt fekszik, osztályonként ~1,7 lépcsővel. Immerzió tökéletes,
@@ -105,26 +105,57 @@ szezon), és a piramis alja nem „megyei", hanem „erős másodosztály".
 legtöbb munka, de az egyetlen út, ami skálázás nélkül adja a teljes ívet.
 Az (A) és a (C) nem zárja ki egymást: bővítés után a `k` csökkenthető.
 
-### 3.2 A javasolt alak (A esetén)
+### 3.2 A megvalósult alak — mért, nem tervezett
 
-| osztály | név | sáv | középérték | csapat |
-|---|---|---|---|---|
-| D1 | Biszem-baszom premier líg | 83,8 – 88,0 | 86,3 | 16 |
-| D2 | Biszem-baszom másodosztály | 79,0 – 83,1 | 81,3 | 16 |
-| D3 | NB I | 76,6 – 79,0 | 77,9 | 16 |
-| D4 | NB II | 74,4 – 76,4 | 75,4 | 16 |
-| D5 | NB III | 72,2 – 74,4 | 73,3 | 16 |
-| D6 | mennyei megyei | 70,7 – 72,1 | 71,4 | 16 |
+`node tools/pyramid-sim.js world seed=1` (a generátor az index.html
+`PYR-BLOKK`-jából, tehát ez betűre a játék kódja):
 
-96 klub kell, 115 egyedi klub van — **elég, tartalékkal**. Az osztályon belül
-a névütközés kizárt (klubonként egy szezon); két osztály közt sem, mert minden
-klub pontosan egy helyre kerül. A világ generálása seedelt (`rngFor`), tehát
-minden Run **saját beosztást** kap, de újratöltésre azonos.
+| oszt | név | sáv | közép | lépcső | szórás |
+|---|---|---|---|---|---|
+| D1 | Biszem-baszom premier líg | 84,0 – 88,0 | 86,0 | — | 1,35 |
+| D2 | Biszem-baszom másodosztály | 81,0 – 85,0 | 82,7 | −3,3 | 1,31 |
+| D3 | NB I | 78,0 – 82,0 | 80,0 | −2,7 | 1,17 |
+| D4 | NB II | 75,0 – 79,0 | 76,8 | −3,2 | 1,27 |
+| D5 | NB III | 72,0 – 76,0 | 73,9 | −2,9 | 1,42 |
+| D6 | mennyei megyei | 69,0 – 73,0 | 71,4 | −2,5 | 1,14 |
 
-*Megjegyzés a 15 helyett 16-ról:* a mai motor 16 csapatos, 30 fordulós
-szezonra van kalibrálva (`SEASON_OPPS=buildOpponents(15,…)` + a játékos), és a
-kupa-, kihívás- és Run-kalibráció mind ezen a 30 fordulón áll. 15 csapatos
-osztályok 28 fordulót adnának, és minden mért küszöböt újra kellene lőni.
+Minden lépcső a **≤3,5**-ös korlát alatt, minden szórás a **≤2,5** alatt (4.),
+a piramis 69-től 88-ig ér — lényegében a terv eredeti 71–91-es íve. A sávok
+1 ponttal átfednek: **a másodosztály bajnoka erősebb, mint az élvonal
+sereghajtója**, ahogy a valóságban is.
+
+96 klub kell, 115 egyedi klub van (válogatottak nélkül 102) — **elég, de a
+tartalék vékony: 6 klub.** Az adatbázis bővítése ezért továbbra is hasznos
+volna, még ha már nem is kötelező.
+
+Böngészőben ellenőrizve: 6×16 csapat, **nulla névütközés és nulla
+klubütközés**, és a generálás determinisztikus a világ-seedből (`rngFor`) —
+ugyanaz a karrier újratöltve bitre ugyanazt a piramist kapja. Két különböző
+seed viszont érdemben más világot ad: az egyikben a Barcelona 2008/09 és a
+Real Madrid 2025/26 van az élvonalban, a másikban a Barcelona 2014/15 és a
+Real Madrid 1959/60 — a klubok azonossága stabil, az évadok és a sorrend nem.
+
+### 3.3 Miért bukott meg a konstans sávnyújtás — mért adat
+
+A valós Rating-eloszlás **nem egyenletes**: sűrű a 76–82-es sávban, ritka a
+tetején. Ha egyenlő *darabszámú* szeletekre vágjuk (16 csapat/osztály), a felső
+osztály széles nyers sávot fog át, az alsók szinte semmit. A ×1,7-es konstans
+szorzó ezt az egyenetlenséget nem javítja, hanem **felnagyítja**:
+
+| oszt | közép | lépcső | szórás |
+|---|---|---|---|
+| D1 | 82,6 | — | 2,36 |
+| D2 | 76,7 | **−5,9** | 1,13 |
+| D3 | 74,3 | −2,4 | **0,59** |
+| D4 | 72,3 | −2,0 | **0,59** |
+| D5 | 70,9 | −1,4 | **0,39** |
+| D6 | 69,1 | −1,8 | 0,80 |
+
+A D1→D2 zuhanás játszhatatlan (a korlát 3,5), az alsó négy osztály viszont
+egyetlen, szétválaszthatatlan masszává olvad, ahol minden csapat ugyanolyan
+erős. **A szorzó hangolása nem segít**: bármelyik értékkel az egyik vég
+elromlik, mert a baj az eloszlásban van, nem a skálában. Ez indokolja a
+rang-alapú elhelyezést.
 
 ---
 
@@ -554,9 +585,10 @@ kihívás és statisztika ugyanúgy fut, mint ma.
 
 ## 12. Nyitott kérdések
 
-1. **Sávnyújtás vagy adatbázis-bővítés** (3.1: A vagy C)? A `k=1,7`
-   szétfeszíti a valós erőviszonyokat: két klub, ami a valóságban 1 ponttal
-   tér el, a piramisban 1,7-tel fog. Elfogadható-e ez az immerzió-ár?
+1. ~~Sávnyújtás vagy adatbázis-bővítés?~~ **Eldőlt** (3.1/A + 3.3): a rang
+   dönti el a helyet, a geometriát tervezzük. Az adatbázis bővítése már nem
+   kötelező, de a 6 klubos tartalék vékony — 20-30 további klub kényelmesebbé
+   tenné a merítést.
 2. **Két hazai kupa vagy egy?** (7. pont, 1. inkonzisztencia)
 3. **Kiesés az utolsó osztályból** — mi történik, ha a D6-ból esnél ki?
    Javaslat: nincs hetedik osztály, a D6 utolsó helye a padló (egy „megyei
@@ -569,11 +601,7 @@ kihívás és statisztika ugyanúgy fut, mint ma.
    **(a) kész klub alapértelmezést + (b) ellensúlyozott draftot** javasolja
    párban — de ha a draft marad a fő út, a (b) rés-konstansait ki kell mérni
    és karban kell tartani, valahányszor az adatbázis bővül.
-6. **A saját kereted fejlődése a nyújtott skálán.** A világ Ratingjeit `k`-val
-   nyújtjuk, a te játékosaid viszont a nyers skálán fejlődnek — tehát a te
-   +7/szezonod a **nyújtott** világban is +7 marad, miközben a világ lépcsői
-   nyújtottak. Ez önmagában NEM baj (a mérce ugyanaz a szám), de azt jelenti,
-   hogy a `k` növelése **közvetve gyorsítja** a te relatív mászásodat: ugyanaz
-   a +7 több osztálynyi lépcsőt fal fel. A `tools/pyramid-sim.js` `step`
-   paramétere pont ezt modellezi — `k` változtatásakor a `step`-et is
-   újra kell állítani (`step ≈ 1,95 × k`), és a fokozatokat újralőni.
+6. **A `PYR_STEP` és a fejlődési fokozatok együtt mozognak.** A négy
+   ellenfél-tempó a 3,0-as lépcsőhöz van kalibrálva; ha a `PYR_STEP`
+   változik, a `tools/pyramid-sim.js speeds step=…` futtatásával a fokozatokat
+   újra kell lőni. A kettőt sosem szabad külön hangolni.

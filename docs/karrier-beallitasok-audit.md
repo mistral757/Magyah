@@ -56,6 +56,8 @@ A `careerSetupHtml` a `lock=1` jelzővel írja ki, hogy „a karrier indulásako
 rögzült, menet közben nem változtatható". Ez **egyjátékos karrierben három
 sornál nem igaz**:
 
+*(A válogatott-sor azóta javítva — lásd 2.2. A másik kettő áll.)*
+
 | sor | jelenleg | valóság |
 |---|---|---|
 | 🗓️ **Sorsolás rendje** | 🔒 | a HUB-ban egy koppintással váltható (`hubSchedRow.onclick` → `setScheduleMode`, ~39437) |
@@ -71,6 +73,9 @@ válogatott-sor pedig lakat nélkül, „globális beállítás — a következ�
 mezőnyétől hat" megjegyzéssel. (Vagy — jobb — lásd 2.2.)
 
 ### 2.2 A válogatott-kapcsoló nincs a mentésben → néma világváltás
+
+> **✅ JAVÍTVA** — `S.careerWc`, `wcOn()`, `wcUnlockForSetup()`. A 🔒 az
+> Infópulton mostantól igaz.
 
 `wcEnabled` **nem szerepel a `saveGame()` adatcsomagjában** (52210 körül:
 `familyEnabled` igen, `wcEnabled` nem). Két következménye van:
@@ -102,6 +107,9 @@ ablak érintett; ott viszont a névkészlet is elveszik.
 **Javítás:** `FAMILY_KEY` localStorage, a `WC_KEY` mintájára.
 
 ### 2.4 Az újrapörgetés-csúszka kész klubnál is él — és Run-pontot ad
+
+> **✅ JAVÍTVA** — `updateRerollVisibility()`, `rerollsChosen=null` kész
+> klubnál, és a `runBreakdown` az `R.clubStart`-ra is szűr.
 
 * A beállító képernyőn a csúszka **kész klub indulásnál is látszik**
   (`#rerollSlider` blokkjának nincs `hide` ága, ellentétben a
@@ -208,9 +216,9 @@ meglévő karrierek pontszámát változtatja, tehát verzióhoz kötendő.)
 
 | prioritás | tétel | miért |
 |---|---|---|
-| 1 | 2.2 — `wcEnabled` a mentésbe | néma világváltás + MP-szétcsúszás |
-| 2 | 2.4 — reroll-sor kész klubnál | ingyen Run-pont |
-| 3 | 2.1 — a három hazug lakat | a felület mást állít, mint a kód |
+| ~~1~~ | ~~2.2 — `wcEnabled` a mentésbe~~ | ✅ kész |
+| ~~2~~ | ~~2.4 — reroll-sor kész klubnál~~ | ✅ kész |
+| 3 | 2.1 — a maradék két hazug lakat (sorsolás, tempó) | a felület mást állít, mint a kód |
 | 4 | 2.3 — családtag localStorage | elvesző választás |
 | 5 | 2.5 — a csúszka néma visszaállása | elvesző választás |
 | 6 | 2.6 / 2.7 — Run-súlyok | egyensúly, verzióhoz kötendő |

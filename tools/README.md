@@ -70,7 +70,12 @@ node tools/pyramid-sim.js gaps       # a Rating-különbség hatása egy szezonr
 node tools/pyramid-sim.js speeds     # a négy ellenfél-fejlődési fokozat íve
 node tools/pyramid-sim.js sweep      # tempó-söprés hangoláshoz
 node tools/pyramid-sim.js bands      # mire elég az adatbázis 6 osztályhoz
+node tools/pyramid-sim.js world      # a LEGENERÁLT piramis, klubnevekkel
 ```
+
+A `world` parancs **nem másolat**: az `index.html`-ből, a `PYR-BLOKK`
+jelölők közül vágja ki a generátort, és azt futtatja — amit kiír, betűre az,
+ami a játékban is fut. `seed=…` a világ sorsolásához, `wc=1` a válogatottakkal.
 
 **Nem a játék része** — tervezési mérőeszköz a `docs/karrier-hagyomanyos-mod.md`
 szerinti, együtt fejlődő ligapiramishoz. A bajnoki szimuláció a motor SAJÁT

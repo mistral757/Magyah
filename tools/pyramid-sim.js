@@ -24,6 +24,7 @@
      node tools/pyramid-sim.js speeds           — a négy ellenfél-tempó íve
      node tools/pyramid-sim.js sweep            — tempó-söprés, hangoláshoz
      node tools/pyramid-sim.js bands            — a piramis sávjai az adatbázisból
+     node tools/pyramid-sim.js world            — a LEGENERÁLT piramis, klubnevekkel
    Opciók (bárhol, kulcs=érték alakban):
      runs=200 seasons=20 start=6 pace=7.0 step=3.0 teams=16 up=2 down=2
 ============================================================================ */
@@ -280,9 +281,72 @@ function reportBands(){
   console.log("akarunk, az osztályokat SZÉT KELL HÚZNI (lásd a docs 'sávnyújtás' pontját).\n");
 }
 
+
+/* ============================================================================
+   5. A LEGENERÁLT VILÁG — az index.html SAJÁT generátorával
+   ---------------------------------------------------------------------------
+   NEM MÁSOLAT: a `PYR-BLOKK` jelölők közti kódot közvetlenül az index.html-ből
+   vágjuk ki és futtatjuk. Így nincs két, egymástól elcsúszó implementáció —
+   amit itt látsz, betűre az, ami a játékban is futna.
+
+   A blokk három dolgot kér a környezettől (SQUADS, squadAvgOvr, activeSquads),
+   ezeket alább megadjuk. A wcOn()-t a válogatottak ki/be kapcsolására
+   helyettesítjük: `world wc=1` bekapcsolja őket.
+============================================================================ */
+function loadPyrBlock(wcOn){
+  const fs=require("fs"),path=require("path");
+  const src=fs.readFileSync(path.join(__dirname,"..","index.html"),"utf8");
+  const a=src.indexOf("/* ==== PYR-BLOKK KEZDETE");
+  const b=src.indexOf("/* ==== PYR-BLOKK VÉGE ====");
+  if(a<0||b<0){console.error("Nem találom a PYR-BLOKK jelölőket az index.html-ben.");process.exit(1);}
+  const i=src.indexOf("const SQUADS=[");
+  const j=src.indexOf("\n];",i);
+  const SQUADS=(0,eval)("("+src.slice(i+"const SQUADS=".length,j+2)+")");
+  const squadAvgOvr=sq=>{
+    const t=sq.players.map(p=>p.ovr).sort((x,y)=>y-x).slice(0,11);
+    return t.reduce((s,v)=>s+v,0)/t.length;};
+  const activeSquads=()=>wcOn?SQUADS:SQUADS.filter(sq=>!sq.wc);
+  const env={SQUADS,squadAvgOvr,activeSquads};
+  const names=Object.keys(env);
+  const body=src.slice(a,b)+"\nreturn {pyrBuildWorld,pyrDumpWorld,PYR_DIVS,PYR_TEAMS,PYR_STEP,PYR_SPREAD,PYR_TOPMEAN};";
+  return new Function(...names,body)(...names.map(k=>env[k]));
+}
+/* Ugyanaz a determinisztikus, seedelhető folyam, amit a játék rngFor()-ja ad:
+   azonos seed → azonos piramis. Enélkül nem lehetne kétszer ugyanazt megnézni. */
+function seededRnd(seed){
+  let h=2166136261>>>0;
+  String(seed).split("").forEach(c=>{h^=c.charCodeAt(0);h=Math.imul(h,16777619)>>>0;});
+  return function(){h+=0x6D2B79F5;let t=h;
+    t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);
+    return ((t^(t>>>14))>>>0)/4294967296;};}
+
+function reportWorld(){
+  const P0=loadPyrBlock(!!ARG.wc);
+  const seed=ARG.seed!=null?ARG.seed:1;
+  const w=P0.pyrBuildWorld(seededRnd("pyr:"+seed));
+  console.log("\nseed="+seed+(ARG.wc?"  (válogatottakkal)":"  (csak klubcsapatok)"));
+  console.log(P0.pyrDumpWorld(w));
+  /* A LÉNYEG a lista alatt: a lépcsők és a szórás — ezek döntik el, játszható-e. */
+  console.log("\n── ELLENŐRZŐ SZÁMOK ──");
+  console.log("oszt | közép | lépcső | szórás | a sáv alja a fölötte lévő közepéhez");
+  w.divs.forEach((d,i)=>{
+    const ov=d.teams.map(t=>t.ovr);
+    const m=ov.reduce((s,v)=>s+v,0)/ov.length;
+    const sd=Math.sqrt(ov.reduce((s,v)=>s+(v-m)*(v-m),0)/ov.length);
+    const step=i?w.divs[i-1].mean-d.mean:null;
+    const up=i?(d.hi-w.divs[i-1].mean):null;
+    console.log(` D${d.id}  |${m.toFixed(1).padStart(6)} |`
+      +(step==null?"     — ":step.toFixed(1).padStart(6)+" ")+"|"
+      +sd.toFixed(2).padStart(7)+" |"
+      +(up==null?"      —":up.toFixed(1).padStart(7)));});
+  console.log("\nKORLÁTOK (lásd `gaps`): a lépcső <= 3,5 és a szórás <= 2,5 —");
+  console.log("efölött az osztály alja már az osztály teteje ellen is esélytelen.\n");
+}
+
 function reportMain(){
   reportGaps();
   reportSpeeds();
 }
 
-({gaps:reportGaps,speeds:reportSpeeds,sweep:reportSweep,bands:reportBands,report:reportMain}[CMD]||reportMain)();
+({gaps:reportGaps,speeds:reportSpeeds,sweep:reportSweep,bands:reportBands,
+  world:reportWorld,report:reportMain}[CMD]||reportMain)();

@@ -7471,6 +7471,153 @@ function buildOpponents(n,targetMean){
   }
   return shuffleArr(real,_r);
 }
+/* ==== PYR-BLOKK KEZDETE — a tools/pyramid-sim.js innen vágja ki a kódot ====
+   ================= HAGYOMÁNYOS KARRIER — A LIGAPIRAMIS VILÁGA =================
+   A készülő "hagyományos" karriermód világgenerátora. A teljes terv:
+   docs/karrier-hagyomanyos-mod.md.
+
+   MIT CSINÁL: a valós klubokból hat osztályt épít, egyenként PYR_TEAMS
+   csapattal. Ennyi — és szándékosan csak ennyi. Nincs benne fejlődés,
+   fel-/kiesés, kupa, mentés, felület: az mind külön lépés lesz. Ez a TISZTA
+   FÜGGVÉNY, amiből a világ születik.
+
+   ---- MIÉRT NEM A NYERS RATING KERÜL A TÁBLÁRA ----
+   Kézenfekvő volna a klubok valós erejét használni, esetleg egy konstans
+   szorzóval szétnyújtva. MÉRVE NEM MŰKÖDIK, és az ok szerkezeti: a valós
+   Rating-eloszlás NEM EGYENLETES — sűrű a 76-82-es sávban, ritka a tetején.
+   Ha egyenlő DARABSZÁMÚ szeletekre vágjuk (16 csapat / osztály), a felső
+   osztály széles nyers sávot fog át, az alsók szinte semmit. Egy konstans
+   ×1,7-es nyújtással mérve ez jött ki:
+
+       D1 közép 82,6                      szórás 2,36
+       D2 közép 76,7   lépcső −5,9        szórás 1,13
+       D3 közép 74,3   lépcső −2,4        szórás 0,59
+       D4 közép 72,3   lépcső −2,0        szórás 0,59
+       D5 közép 70,9   lépcső −1,4        szórás 0,39
+       D6 közép 69,1   lépcső −1,8        szórás 0,80
+
+   Vagyis a D1→D2 zuhanás játszhatatlan (a korlát 3,5), az alsó négy osztály
+   viszont egyetlen, szétválaszthatatlan masszává olvad, ahol minden csapat
+   ugyanolyan erős. A szorzó hangolása nem segít: bármelyik értékkel az egyik
+   vég elromlik, mert a BAJ AZ ELOSZLÁSBAN VAN, nem a skálában.
+
+   ---- AMIT HELYETTE CSINÁLUNK: A RANG DÖNT, A GEOMETRIA TERVEZETT ----
+   Két dolgot választunk szét, amit a nyújtás összemosott:
+
+     · KI HOVÁ KERÜL — ezt teljes egészében a VALÓS ERŐ dönti. A klubok valós
+       Rating szerinti rangsorban állnak, az első PYR_TEAMS az élvonal, a
+       következő a másodosztály, és így tovább. Az immerzió ebben van: a
+       Manchester City az élvonalban lesz, a Paksi a legalsó osztályban.
+
+     · MEKKORA A KÜLÖNBSÉG — ezt viszont MI tervezzük, mert ezen múlik, hogy
+       játszható-e egyáltalán. A motor gólgörbéje exponenciális
+       (λ = 1,3·e^(0,09·d)), ezért a játszható ablak mindössze ±4 Rating: a
+       −6 alatti tartományban a szezon 0 győzelemmel és biztos kieséssel
+       zárul. (Mérve: node tools/pyramid-sim.js gaps)
+
+   Az osztályon BELÜLI sorrend és a relatív távolságok továbbra is a valós
+   Ratingből jönnek — csak a nagyságrend normalizálódik. Így a D1-ben tényleg
+   a City a legerősebb és a Newcastle a leggyengébb, valós arányban, de a
+   különbség akkora, amekkorát a motor elbír.
+
+       ovr = PYR_TOPMEAN − (osztály−1)×PYR_STEP + (helyzet − 0,5)×PYR_SPREAD
+
+   ahol a `helyzet` a klub 0..1 közti helye a SAJÁT osztálya nyers
+   Rating-tartományában.
+
+   ---- MINDEN RUN SAJÁT BEOSZTÁST KAP ----
+   Klubonként a felkínált klub-szezonok közül SORSOLUNK egyet, és a klub a
+   sorsolt szezon erejével kerül a rangsorba. Egy gyengébb Barcelona-évad
+   tehát tényleg lejjebb csúszhat. Egy klub PONTOSAN EGYSZER szerepel az egész
+   piramisban, tehát sem osztályon belül, sem osztályok közt nincs névütközés. */
+const PYR_DIVS=6;      /* hány osztály */
+const PYR_TEAMS=16;    /* csapat / osztály — a motor 16 csapatos, 30 fordulós
+   szezonra van kalibrálva (SEASON_OPPS=buildOpponents(15,…) + te), és a kupa-,
+   kihívás- és Run-küszöbök mind ezen állnak. 15-tel 28 forduló lenne, és
+   minden mért küszöböt újra kellene lőni. */
+const PYR_TOPMEAN=86;  /* az élvonal középértéke. A sáv teteje így 88 — pont a
+   legerősebb valós keret (Barcelona 2010/11) ereje. Fölé nem megyünk: a világ
+   teteje a valóság teteje. */
+const PYR_STEP=3.0;    /* két osztály KÖZÉPÉRTÉKE közti lépcső. A ±4-es ablak
+   miatt 3,5 a felső korlát; 3,0-val egy frissen feljutott csapat a
+   −1 … −3 sávban indul, ami küzdelmes, de nem reménytelen. */
+const PYR_SPREAD=4.0;  /* egy osztály teljes szélessége (a leggyengébbtől a
+   legerősebbig). A leggyengébb csapat így −2,0-n áll a saját mezőnye
+   közepéhez képest: kieső-jelölt, de nem esélytelen. A STEP-nél NAGYOBB,
+   tehát a szomszédos osztályok 1 ponttal átfednek — a másodosztály bajnoka
+   erősebb, mint az élvonal sereghajtója, ahogy a valóságban is. */
+/* A hat osztály neve. A CUP_TIERS liganeveivel egy sorban, hogy a két
+   rendszer ne beszéljen kétféle nyelvet — a hagyományos módban viszont a
+   NEVET az osztály adja, nem a Rating-sáv. */
+const PYR_LEAGUES=[
+  "Biszem-baszom premier líg",
+  "Biszem-baszom másodosztály",
+  "NB I",
+  "NB II",
+  "NB III",
+  "mennyei megyei"];
+/* A merítés: klubonként EGY, sorsolt szezon. A wcOn() itt is dönt — a
+   válogatottak ugyanúgy ki-be kapcsolhatók, mint mindenhol máshol. */
+function pyrClubPool(rnd){
+  const r=rnd||Math.random;
+  const by={};
+  activeSquads().forEach(sq=>{(by[sq.club]=by[sq.club]||[]).push(sq);});
+  return Object.keys(by).map(club=>{
+    const list=by[club];
+    const sq=list[Math.floor(r()*list.length)];
+    return {club,season:sq.season,raw:squadAvgOvr(sq)};});}
+/* A VILÁG. Tiszta függvény: azonos rnd-ből azonos piramis.
+   Visszaad: {divs:[{id,name,mean,lo,hi,teams:[{n,ovr,club,season,raw}]}], left}
+   — a `left` a kimaradt klubok száma, hogy a hívó lássa, mennyi a tartalék. */
+function pyrBuildWorld(rnd){
+  const r=rnd||Math.random;
+  const pool=pyrClubPool(r).sort((a,b)=>b.raw-a.raw);
+  const need=PYR_DIVS*PYR_TEAMS;
+  /* KEVÉS KLUB esetén nem csonkolunk némán: a hívó dolga eldönteni, mit tesz.
+     (Ma 115 egyedi klub van, válogatottak nélkül 102 — mindkettő elég a 96-hoz.) */
+  if(pool.length<need)return {divs:[],left:pool.length,short:need-pool.length};
+  const divs=[];
+  for(let d=0;d<PYR_DIVS;d++){
+    const take=pool.slice(d*PYR_TEAMS,(d+1)*PYR_TEAMS);
+    const lo=take[take.length-1].raw,hi=take[0].raw;
+    const span=hi-lo;
+    const base=PYR_TOPMEAN-d*PYR_STEP;
+    const teams=take.map(x=>{
+      /* A HELYZET az osztályon belül, a valós Ratingből. Ha az egész osztály
+         egyforma (span 0 — az adatbázis sűrű részén előfordulhat), mindenki a
+         közepére kerül: ott tényleg nincs mit megkülönböztetni. */
+      const pos=span>0?(x.raw-lo)/span:0.5;
+      return {
+        n:`${x.club} (${x.season})`,
+        ovr:Math.round((base+(pos-0.5)*PYR_SPREAD)*10)/10,
+        club:x.club,season:x.season,raw:Math.round(x.raw*10)/10};});
+    const ov=teams.map(t=>t.ovr);
+    divs.push({
+      id:d+1,name:PYR_LEAGUES[d]||`${d+1}. osztály`,
+      mean:Math.round(ov.reduce((s,v)=>s+v,0)/ov.length*10)/10,
+      lo:Math.min.apply(null,ov),hi:Math.max.apply(null,ov),
+      teams});}
+  return {divs,left:pool.length-need,short:0};}
+/* ---- A FEJLESZTŐI KIÍRATÓ ----
+   Nincs felülete és nincs mentése: a böngésző konzoljából hívható
+   (`pyrDumpWorld()`), és a tools/pyramid-sim.js is ezt futtatja `world`
+   paranccsal. Az EGYETLEN dolga, hogy látni lehessen, mit generáltunk. */
+function pyrDumpWorld(w){
+  w=w||pyrBuildWorld();
+  if(!w.divs.length)return `Kevés a klub: ${w.short} hiányzik.`;
+  const L=[];
+  L.push(`LIGAPIRAMIS — ${PYR_DIVS} osztály × ${PYR_TEAMS} csapat`
+    +`  ·  élvonal közép ${PYR_TOPMEAN}, lépcső ${PYR_STEP}, sávszélesség ${PYR_SPREAD}`
+    +`  ·  tartalék: ${w.left} klub`);
+  w.divs.forEach((d,i)=>{
+    const prev=i?w.divs[i-1].mean-d.mean:0;
+    L.push("");
+    L.push(`── D${d.id} · ${d.name} — ${d.lo.toFixed(1)}…${d.hi.toFixed(1)} `
+      +`(közép ${d.mean.toFixed(1)}${i?`, lépcső −${prev.toFixed(1)}`:""})`);
+    d.teams.slice().sort((a,b)=>b.ovr-a.ovr).forEach(t=>
+      L.push(`   ${t.ovr.toFixed(1).padStart(5)}  ${t.n}   (valós ${t.raw.toFixed(1)})`));});
+  return L.join("\n");}
+/* ==== PYR-BLOKK VÉGE ==== */
 /* Posztengedmények: csak reális, valós futballban is előforduló szomszédos
    szerepkör-váltásokat engedünk meg (pl. hátvéd ⇄ hátrébb húzódó középpályás,
    szélső ⇄ támadó középpályás/csatár, hátvéd ⇄ saját oldali szélső).
