@@ -1,6 +1,7 @@
 # Hagyományos karrier — a dinamikus ligapiramis
 
-*(Tervdokumentum. Állapot: **váz, még egy sor kód sincs belőle.** A mérőeszköz,
+*(Tervdokumentum. Állapot: **P2 kész — a világ és a ligarendszer megvan,
+felület és fejlődés nélkül.** Lásd a 11.3 fázistáblát. A mérőeszköz,
 amivel a számai születtek: `tools/pyramid-sim.js`. A hozzá tartozó
 beállítás-átalakítás: `karrier-beallitasok-terv.md`; a mai kapcsolók
 hibalistája: `karrier-beallitasok-audit.md`.)*
@@ -572,20 +573,40 @@ valós játékon hangolni; a szimuláció csak a kiindulást adja.
 
 ## 11. Megvalósítási váz
 
+### 11.0 A P2 mérése — a ligarendszer egészséges-e
+
+`node tools/pyramid-sim.js league seasons=20` (statikus piramis, 20 szezon):
+
+```
+csapatszám osztályonként: 16 / 16 / 16 / 16 / 16 / 16   ✓ stabil
+feljutás összesen: 200 · ebből azonnal visszaesett: 58  (29%)
+elmozdult a kiinduló osztályától: 34/96 klub (35%)
+```
+
+A bumeráng-arány 29% (a 30–60%-os egészséges sáv alsó pereme, ami statikus
+világnál várható), és a klubok harmada elmozdult a kiinduló osztályától —
+tehát a világ él, de nem kaotikus.
+
+A játékbeli kód böngészőben ellenőrizve: bajnokként feljutsz, utolsóként
+kiesel, 14 vegyes szezon után is 6×16 a létszám, nulla névütközés, és a
+mentés–betöltés bitre visszaadja a piramist.
+
 ### 11.1 Az állapot
 
 ```js
-S.pyr = {
+S.pyr = {                        /* MEGVALÓSULT ALAK */
   on:true,                       /* a hagyományos mód jelzője */
-  k:1.7,                         /* a sávnyújtás szorzója (3.1/A) */
-  divs:[                         /* 6 osztály, a világ generálásakor egyszer */
-    {id:1,n:"Biszem-baszom premier líg",
-     teams:[{club:"FC Barcelona",season:"2010/11",ovr:88.0}, …]},
+  my:6,                          /* melyik osztályban állsz */
+  divs:[                         /* 6 osztály; a TIÉDBEN 15 klub + te */
+    {id:1,name:"Biszem-baszom premier líg",mean:86.0,lo:84,hi:88,
+     teams:[{n:"Manchester City (2022/23)",ovr:88.0,
+             club:"Manchester City",season:"2022/23",raw:86.8}, …]},
     …],
-  my:{div:6,idx:0},              /* hol vagy */
-  aiSpeed:"tarto",               /* a választott fokozat */
-  log:[]                         /* a mérő (10/b) */
+  spare:{…},                     /* a klub, akinek a helyére beléptél */
+  log:[{s:1,div:6,to:5,rank:1}], /* a mérő (10/b) magja */
+  v:1
 };
+/* MÉG NINCS BENNE (P3): aiSpeed — a választott fejlődési fokozat. */
 ```
 
 A `SEASON_OPPS` **változatlan alakban** áll elő: a saját osztályod 15 másik
@@ -596,13 +617,15 @@ kihívás és statisztika ugyanúgy fut, mint ma.
 
 | lépés | hol | mit |
 |---|---|---|
-| világ-generálás | új `pyrBuildWorld()` | 96 klub, 6 osztály, sávnyújtás, seedelt |
-| szezonindítás | `startNextCareerSeason` | `SEASON_OPPS = pyrMyDivision()` |
-| szezonzárás | `endSeason` után | `pyrDevelopWorld()` → `pyrPromoteRelegate()` |
+| világ-generálás | `pyrBuildWorld()` ✅ | 96 klub, 6 osztály, rang-alapú elhelyezés, seedelt |
+| szezonforduló | `startNextCareerSeason` ✅ | `pyrRollover()` — a te osztályod a VALÓS végtabellából, a másik öt `pyrSimDivision()`-nel |
+| ellenféltábla | `startNextCareerSeason` ✅ | `SEASON_OPPS = pyrOpponents()` |
+| mentés | `saveGame` / `applySavedGame` ✅ | `S.pyr` (~6 kB), plusz a szint önjavítása betöltéskor |
+| fejlődés | `pyrDevelopWorld()` | **még nincs** — P3 |
 | kupa-nevezés | `cupEntryFor` | a piramis táblájából, nem `CUP_TIERS`-ből |
-| rejtett buff | `oppBuffFor` | `if(S.pyr&&S.pyr.on)return 0;` |
+| rejtett buff | `oppBuffFor` ✅ | `if(pyrOn())return 0;` |
 | piac-horgony | `marketPeakShift` | `careerBaseRating` helyett az osztály középértéke |
-| szintváltás | `applyOppLevel`, `autoLevelSync` | `if(S.pyr&&S.pyr.on)return false;` |
+| szintváltás | `applyOppLevel`, `autoLevelSync` ✅ | `if(pyrOn())return false;` — a szintet az OSZTÁLYOD adja |
 | Infinity | `infinityMode` ág | a piramisban nem fut |
 
 ### 11.3 Fázisok
@@ -610,9 +633,9 @@ kihívás és statisztika ugyanúgy fut, mint ma.
 | fázis | tartalom | mikor kész |
 |---|---|---|
 | **P0** | a beállítás-audit 1–5. hibája javítva | az új mód ELŐTT |
-| **P1** | a két csúszkás egyszerű mód + a négy oldalas belépés | önállóan is érték |
-| **P2** | `pyrBuildWorld` + a 6 osztály + `SEASON_OPPS` átirányítás; **fejlődés és fel-/kiesés nélkül** — egy statikus piramis, ami már játszható | első játszható mérföldkő |
-| **P3** | `pyrDevelopWorld` + fel-/kiesés + a mérő (10/b) | itt dől el, működik-e a mód |
+| **P1** | az egyszerű beállítómód + a négyoldalas belépés | önállóan is érték |
+| **P2** | ✅ **kész** — `pyrBuildWorld`, a 6 osztály, `SEASON_OPPS` átirányítás, fel-/kiesés mind a hat osztályban, mentés. **Fejlődés nélkül**: statikus piramis. Belépés: `pyrStart(6)` a konzolból | első játszható mérföldkő |
+| **P3** | `pyrDevelopWorld` (a négy tempó-fokozat) + a mérő (10/b) | itt dől el, működik-e a mód |
 | **P4** | kupák a piramis szabályai szerint | |
 | **P5** | Run-szint a 9. pont szerint, riválisok, Infópult | |
 | **P6** | hangolás valós runokból; a négy fokozat véglegesítése | |

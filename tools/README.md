@@ -72,6 +72,7 @@ node tools/pyramid-sim.js sweep      # tempó-söprés hangoláshoz
 node tools/pyramid-sim.js bands      # mire elég az adatbázis 6 osztályhoz
 node tools/pyramid-sim.js world      # a LEGENERÁLT piramis, klubnevekkel
 node tools/pyramid-sim.js draft      # mit hoz ki egy súlyozott draft
+node tools/pyramid-sim.js league     # a fel-/kiesés élete sok szezonon át
 ```
 
 A `world` parancs **nem másolat**: az `index.html`-ből, a `PYR-BLOKK`

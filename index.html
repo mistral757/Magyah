@@ -7617,6 +7617,147 @@ function pyrDumpWorld(w){
     d.teams.slice().sort((a,b)=>b.ovr-a.ovr).forEach(t=>
       L.push(`   ${t.ovr.toFixed(1).padStart(5)}  ${t.n}   (valós ${t.raw.toFixed(1)})`));});
   return L.join("\n");}
+/* ================= A FUTÓ PIRAMIS — ÁLLAPOT ÉS SZEZONFORDULÓ =================
+   Idáig a világ csak legenerálódott; innentől ÉL. Ez a rész teszi
+   ligarendszerré: megmondja, kik az ellenfeleid, mi történik a szezon végén,
+   és hogyan mozogsz benne fel-le.
+
+   AMI MÉG NINCS BENNE, SZÁNDÉKOSAN: a csapatok FEJLŐDÉSE. Ez a lépés egy
+   STATIKUS piramist ad — a klubok ereje végig ugyanaz —, hogy előbb a
+   ligaszerkezet legyen bizonyítottan jó. A fejlődés (és vele a mód igazi
+   tétje) a következő lépés; a mérőt is oda tesszük.
+
+   A JÁTÉKOS EGY ENTITÁS A TÖBBI KÖZT. A saját osztályod 15 klubot tart, a
+   tizenhatodik hely a tiéd — így a fel-/kiesésnél nem kell külön szabály rád:
+   ugyanúgy mozogsz, mint bárki más, és a klubok száma magától megmarad. */
+const PYR_UP=2, PYR_DOWN=2;   /* feljutó / kieső helyek osztályonként */
+function pyrOn(){return !!(typeof S!=="undefined"&&S&&S.pyr&&S.pyr.on);}
+function pyrDivs(){return (S.pyr&&S.pyr.divs)||[];}
+function pyrMyDivId(){return (S.pyr&&S.pyr.my)||PYR_DIVS;}
+function pyrMyDiv(){return pyrDivs()[pyrMyDivId()-1]||null;}
+/* Az osztály középértéke, egészre kerekítve. EZ lesz az oppTargetRating a
+   piramisban: a piac (marketPeakShift), a kupa-sáv, a nehézség-címke és a
+   jelvény mind ezt olvassa, tehát a többi rendszer változtatás nélkül,
+   értelmes horgonnyal működik tovább. */
+function pyrLevel(){
+  const d=pyrMyDiv();
+  if(!d)return 84;
+  const t=d.teams||[];
+  if(!t.length)return 84;
+  return Math.round(t.reduce((s,x)=>s+x.ovr,0)/t.length);}
+/* A SEASON_OPPS alakja: {n,ovr} — pontosan az, amit a buildOpponents ad, tehát
+   a menetrend, a tabella és a meccs-motor felé a piramis LÁTHATATLAN. */
+function pyrOpponents(){
+  const d=pyrMyDiv();
+  return d?d.teams.map(t=>({n:t.n,ovr:t.ovr})):[];}
+/* ---- EGY AI-OSZTÁLY SZEZONJA ----
+   A többi öt osztály is lejátssza a maga bajnokságát — enélkül a piramis
+   díszlet volna, és a feljutás után ismeretlen, sorsolt csapatokat találnál.
+   Körmérkőzés oda-vissza, a MOTOR SAJÁT gólgörbéjével (λ = BASE·e^(K·d)),
+   tehát az AI-bajnokságok ugyanolyan törvények szerint dőlnek el, mint a tiéd.
+   Olcsó: 16 csapat = 240 meccs, öt osztályra ~1200 Poisson-húzás. */
+function pyrSimDivision(teams,rnd){
+  const r=rnd||Math.random;
+  const pois=l=>{let L=Math.exp(-l),k=0,p=1;do{k++;p*=r();}while(p>L);return k-1;};
+  const lam=d=>Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)));
+  const T=teams.map((t,i)=>({i,t,pts:0,gd:0}));
+  for(let h=0;h<T.length;h++)for(let a=0;a<T.length;a++){
+    if(h===a)continue;
+    const d=T[h].t.ovr-T[a].t.ovr+SIM.HOME;
+    const gh=pois(lam(d)),ga=pois(lam(-d));
+    T[h].gd+=gh-ga;T[a].gd+=ga-gh;
+    if(gh>ga)T[h].pts+=3;else if(gh===ga){T[h].pts++;T[a].pts++;}else T[a].pts+=3;}
+  T.sort((x,y)=>(y.pts-x.pts)||(y.gd-x.gd));
+  return T.map(x=>({t:x.t,pts:x.pts,gd:x.gd}));}
+/* ---- A SZEZONFORDULÓ ----
+   `myOrder` a SAJÁT osztályod VALÓS végsorrendje (nevek, 1. helytől), az
+   S.finalTable-ből — vagyis a te osztályodban nem szimulálunk semmit, a
+   lejátszott szezon dönt. A többi osztály a pyrSimDivision-t kapja.
+   Minden osztály EGYSZERRE vált: a feljutók és a kiesők egy lépésben cserélnek
+   helyet, tehát a létszám sosem csúszhat el. */
+function pyrRollover(myOrder,rnd){
+  const W=S.pyr;if(!W||!W.divs)return null;
+  const r=rnd||Math.random;
+  const myId=pyrMyDivId();
+  /* 1) minden osztály végsorrendje, entitásokban ({t} vagy {me:true}) */
+  const order=W.divs.map((d,i)=>{
+    if(i+1===myId){
+      const byName={};d.teams.forEach(t=>{byName[t.n]=t;});
+      const out=[];
+      (myOrder||[]).forEach(n=>{
+        if(byName[n]){out.push({t:byName[n]});delete byName[n];}
+        else out.push({me:true});});
+      /* VÉDŐHÁLÓ: ha a valós tabella hiányos volt (régi mentés, elmaradt
+         szinkron), a kimaradtakat a végére fűzzük — sorrend nélkül is jobb,
+         mint elveszíteni egy klubot a világból. */
+      Object.keys(byName).forEach(n=>out.push({t:byName[n]}));
+      if(!out.some(x=>x.me))out.push({me:true});
+      return out;}
+    return pyrSimDivision(d.teams,r).map(x=>({t:x.t}));});
+  /* 2) ki megy fel és ki le */
+  const up=[],down=[];
+  order.forEach((arr,i)=>{
+    up.push(i>0?arr.slice(0,PYR_UP):[]);
+    down.push(i<W.divs.length-1?arr.slice(arr.length-PYR_DOWN):[]);});
+  /* 3) az új összetétel: maradók + a fentről lejövők + a lentről feljövők */
+  const moved={up:[],down:[]};
+  const next=order.map((arr,i)=>{
+    const leaving=new Set([...up[i],...down[i]]);
+    const stay=arr.filter(x=>!leaving.has(x));
+    const fromAbove=i>0?down[i-1]:[];
+    const fromBelow=i<W.divs.length-1?up[i+1]:[];
+    return stay.concat(fromAbove,fromBelow);});
+  /* 4) visszaírás + a te új osztályod */
+  let newMy=myId;
+  next.forEach((arr,i)=>{
+    W.divs[i].teams=arr.filter(x=>!x.me).map(x=>x.t);
+    if(arr.some(x=>x.me))newMy=i+1;
+    const ov=W.divs[i].teams.map(t=>t.ovr);
+    if(ov.length){
+      W.divs[i].mean=Math.round(ov.reduce((s,v)=>s+v,0)/ov.length*10)/10;
+      W.divs[i].lo=Math.min.apply(null,ov);W.divs[i].hi=Math.max.apply(null,ov);}});
+  const res={from:myId,to:newMy,
+    kind:newMy<myId?"up":newMy>myId?"down":"stay",
+    rank:(myOrder||[]).findIndex(n=>n===teamName)+1||null};
+  W.my=newMy;
+  (W.log=W.log||[]).push({s:(S.seasonNumber||1),div:myId,to:newMy,rank:res.rank});
+  moved.up.length;   /* (a részletes mozgásnapló a következő lépésé) */
+  return res;}
+/* ---- A PIRAMIS-KARRIER INDÍTÁSA ----
+   FEJLESZTŐI BELÉPÉSI PONT. A módnak MÉG NINCS felülete: a négyoldalas
+   belépő a beállítás-átalakítással együtt jön (docs/karrier-beallitasok-terv.md
+   7. pont). Addig egy futó karrier a böngésző konzoljából alakítható piramissá:
+       pyrStart(6)      → a legalsó osztályba helyez, és átveszi a mezőnyt
+   A világ a KARRIER SAJÁT SEEDJÉBŐL épül (rngFor), tehát újratöltés után
+   ugyanaz — és a mentés amúgy is viszi az egészet.
+   A te helyed az osztály LEGGYENGÉBB klubjáé: egy frissen alapított csapat
+   nem az élen kezd. A kiszorított klub a világból kilép (S.pyr.spare), és a
+   fel-/kiesés sosem nyúl hozzá — így a létszám mindig stimmel. */
+function pyrStart(startDiv){
+  if(typeof S==="undefined"||!S)return "Nincs betöltött játék.";
+  const d0=Math.max(1,Math.min(PYR_DIVS,startDiv||PYR_DIVS));
+  const w=pyrBuildWorld(rngFor("pyr:world"));
+  if(!w.divs.length)return `Kevés a klub: ${w.short} hiányzik.`;
+  const home=w.divs[d0-1];
+  home.teams.sort((a,b)=>b.ovr-a.ovr);
+  const spare=home.teams.pop();          /* a leggyengébb helyére lépsz be */
+  S.pyr={on:true,my:d0,divs:w.divs,spare,log:[],v:1};
+  oppTargetRating=pyrLevel();
+  careerBaseRating=oppTargetRating;
+  SEASON_OPPS=pyrOpponents();
+  if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
+  return `Piramis indítva: D${d0} · ${home.name} · mezőny ${oppTargetRating} `
+    +`(a helyedet ${spare.n} adta át).`;}
+/* A futó piramis állapotának kiíratása — a konzolhoz, a fejlesztéshez. */
+function pyrDumpState(){
+  if(!pyrOn())return "Nem piramis-karrier.";
+  const L=[`D${pyrMyDivId()} · ${pyrMyDiv().name} — mezőny ${pyrLevel()}`];
+  pyrDivs().forEach((d,i)=>L.push(
+    `  D${d.id} ${d.name.padEnd(28)} ${d.teams.length+((i+1)===pyrMyDivId()?1:0)} csapat`
+    +`  közép ${d.mean.toFixed(1)}${(i+1)===pyrMyDivId()?"   ← ITT VAGY":""}`));
+  (S.pyr.log||[]).forEach(x=>L.push(
+    `  ${x.s}. szezon: D${x.div} ${x.rank?x.rank+". hely":""} → D${x.to}`));
+  return L.join("\n");}
 /* ==== PYR-BLOKK VÉGE ==== */
 /* Posztengedmények: csak reális, valós futballban is előforduló szomszédos
    szerepkör-váltásokat engedünk meg (pl. hátvéd ⇄ hátrébb húzódó középpályás,
@@ -18359,6 +18500,7 @@ function autoLevelTargetNow(){
    halmoz semmit. Szezon KÖZBEN nem fut: a mezőny ott továbbra is fix. */
 function autoLevelSync(atBoundary){
   if(gameMode!=="career"||!S.autoLevel)return false;
+  if(typeof pyrOn==="function"&&pyrOn())return false;   /* a piramisban nincs mit követni */
   if(typeof h2hRoomActive==="function"&&h2hRoomActive())return false;
   /* ---- UGYANAZ A ZÁR, MINT A KÉZI ÁTÁLLÍTÁSNÁL ----
      HIBA, amit ez javít: itt korábban CSAK a hubMidSeasonMode jelző védett —
@@ -28822,6 +28964,9 @@ function levelChangeLockReason(){
    legelső sora állítja át a fázist, a menetrend viszont csak jóval később
    épül fel. Kizárólag a szezonindító lánc adja át — a felületről sosem. */
 function applyOppLevel(v,atBoundary){
+  /* A PIRAMISBAN a mezőny szintjét az OSZTÁLYOD adja, nem egy csúszka — a
+     szint csak fel-/kieséssel változhat (pyrRollover). */
+  if(typeof pyrOn==="function"&&pyrOn())return false;
   /* VÉDŐHÁLÓ: futó szezonban SOSEM nyúlunk a mezőnyhöz, jöjjön a hívás
      bárhonnan. Ez a szabály utolsó bástyája — a felület már korábban tilt, de
      egy jövőbeli hívási hely sem tudja véletlenül szétverni a bajnokságot. */
@@ -39261,6 +39406,15 @@ const OPP_BUFF_MEASURED=0.5;   /* a MÉRT rejtett bónuszod ekkora hányadát ka
 const OPP_BUFF_FIXED=0.12;     /* + szintenkénti kis fix rész a 84 fölött */
 function oppBuffFor(lvl,hidden){
   if(gameMode!=="career")return 0;
+  /* ---- A PIRAMISBAN NEM FUT ----
+     Ez a mechanika azért született, mert a mai módban az ellenfelek NEM
+     fejlődnek: kell valami, ami megakadályozza a tarolást. A hagyományos
+     módban viszont a mezőny fejlődése MAGA ez a fék — a kettő együtt duplán
+     fogna. Ráadásul a fix tag (lvl−84)×0,12 korlátlanul nő a szinttel, egy
+     végtelenbe növő piramisban pedig 150-es szinten már +7,9 — az a ±4-es
+     játszható ablakot többszörösen túllépi, vagyis magától lezárná a játékot.
+     Lásd docs/karrier-hagyomanyos-mod.md 6.1. */
+  if(typeof pyrOn==="function"&&pyrOn())return 0;
   return Math.max(0,(lvl-84)*OPP_BUFF_FIXED)+Math.max(0,(hidden||0)*OPP_BUFF_MEASURED);}
 /* A SZEZONRA RÖGZÍTETT rejtett bónusz. Szándékosan nem meccsenként friss: a
    morál menet közben ±2,5-öt ingadozik, és ha a mezőny ezt követné, minden
@@ -46083,7 +46237,31 @@ function startNextCareerSeason(){
      Itt már többnyire nincs mit tenni: a nyáron végig követte a keretet. Ez a
      hívás az utolsó ellenőrzés, illetve azoké a régi mentéseké, amik még a
      folyamatos követés előtt keletkeztek. */
-  if(autoLevelSync(true)&&MP.active&&MP.role==="host")mpPushLevel();
+  /* ---- A PIRAMIS SZEZONFORDULÓJA ----
+     Az auto szintkövetés HELYETT lép: nem a mezőnyt húzzuk a kereted után,
+     hanem TE mozogsz a ligarendszerben. A lezárult szezon valós végtabellája
+     dönti el a saját osztályodban, ki jut fel és ki esik ki; a többi öt
+     osztály ugyanabban a pillanatban játssza le a magáét (pyrSimDivision).
+     A sorrend SZÁMÍT: ez még a szezonszám növelése ELŐTT fut, hogy a napló a
+     lezáruló idényhez tartozzon — ugyanaz az indok, mint a szintkövetésnél. */
+  if(pyrOn()){
+    const _mo=(S.finalTable||[]).map(t=>t.n);
+    const _pr=pyrRollover(_mo,rngFor("pyr:s"+(S.seasonNumber||1)+":roll"));
+    if(_pr){
+      oppTargetRating=pyrLevel();
+      SEASON_OPPS=pyrOpponents();
+      if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
+      const _d=pyrMyDiv();
+      if(_pr.kind==="up")
+        addLine(`⬆️ <b>FELJUTÁS!</b> ${esc(teamName)} a(z) ${esc(_d.name)} mezőnyében folytatja — `
+          +`az új mezőny ${oppTargetRating}.`,"m win");
+      else if(_pr.kind==="down")
+        addLine(`⬇️ <b>Kiesés.</b> ${esc(teamName)} a(z) ${esc(_d.name)} mezőnyébe kerül — `
+          +`az új mezőny ${oppTargetRating}.`,"m ev");
+      else
+        addLine(`🏟️ Maradsz a(z) ${esc(_d.name)} mezőnyében — a mezőny ${oppTargetRating}.`,"m life");}
+  }
+  else if(autoLevelSync(true)&&MP.active&&MP.role==="host")mpPushLevel();
   /* a vendég a szezonfordulón mindenképp ránéz a közös szintre */
   if(mpLevelLocked())mpPullLevel(true);
   S.seasonNumber=(S.seasonNumber||1)+1;
@@ -52532,6 +52710,10 @@ function saveGame(){
         /* A karrierre rögzített válogatott-kapcsoló. NÉLKÜLE egy újratöltés a
            globális preferenciára ejtette vissza a futó világot — lásd wcOn(). */
         careerWc:S.careerWc,
+        /* A LIGAPIRAMIS teljes állapota: a hat osztály összetétele, hol állsz
+           benne, és a fel-/kiesés naplója. ~6 kB, tehát elfér a careerPool
+           mellett. Enélkül egy újratöltés az egész világot elveszítené. */
+        pyr:S.pyr,
         seasonStartStrength:S.seasonStartStrength,summerPaidAfterSeason:S.summerPaidAfterSeason,
         chemPairs:S.chemPairs,chemInProgress:S.chemInProgress,
         /* PASSZKÉMIA: a kötések, az épülő páros és a karrier-regiszter. */
@@ -53162,6 +53344,14 @@ function applySavedGame(d){
      értékre, ami ÉPP MOST érvényes: ez pontosan az, amivel a karrier eddig is
      futott, tehát a viselkedés nem változik — csak megszűnik a sodródás. */
   if(S.careerWc==null)S.careerWc=!!wcEnabled;
+  /* ---- PIRAMIS: A SZINT MINDIG AZ OSZTÁLYODÉ ----
+     Az oppTargetRating külön mezőként is mentődik, a piramisban viszont
+     SZÁRMAZTATOTT érték (az osztályod középértéke). Ha a kettő valaha
+     elcsúszna — régi mentés, félbemaradt szezonforduló —, az osztály az
+     igazság: a piac horgonya és a kupa-sáv is ebből dolgozik. */
+  if(pyrOn()){
+    const _l=pyrLevel();
+    if(oppTargetRating!==_l)oppTargetRating=_l;}
   pendingPlayer=null;pendingCaptainIdx=-1;rerolls=d.rerolls!==undefined?d.rerolls:1;
   slots.forEach(s=>{if(s.player&&!(s.player.n in NAT_BY_NAME))NAT_BY_NAME[s.player.n]=s.player.nat;});
   Object.values(BENCH).forEach(p=>{if(p&&!(p.n in NAT_BY_NAME))NAT_BY_NAME[p.n]=p.nat;});

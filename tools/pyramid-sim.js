@@ -26,6 +26,7 @@
      node tools/pyramid-sim.js bands            — a piramis sávjai az adatbázisból
      node tools/pyramid-sim.js world            — a LEGENERÁLT piramis, klubnevekkel
      node tools/pyramid-sim.js draft            — mit hoz ki egy SÚLYOZOTT draft
+     node tools/pyramid-sim.js league           — a fel-/kiesés élete sok szezonon át
    Opciók (bárhol, kulcs=érték alakban):
      runs=200 seasons=20 start=6 pace=7.0 step=3.0 teams=16 up=2 down=2
 ============================================================================ */
@@ -307,9 +308,9 @@ function loadPyrBlock(wcOn){
     const t=sq.players.map(p=>p.ovr).sort((x,y)=>y-x).slice(0,11);
     return t.reduce((s,v)=>s+v,0)/t.length;};
   const activeSquads=()=>wcOn?SQUADS:SQUADS.filter(sq=>!sq.wc);
-  const env={SQUADS,squadAvgOvr,activeSquads};
+  const env={SQUADS,squadAvgOvr,activeSquads,SIM};
   const names=Object.keys(env);
-  const body=src.slice(a,b)+"\nreturn {pyrBuildWorld,pyrDumpWorld,PYR_DIVS,PYR_TEAMS,PYR_STEP,PYR_SPREAD,PYR_TOPMEAN};";
+  const body=src.slice(a,b)+"\nreturn {pyrBuildWorld,pyrDumpWorld,pyrSimDivision,PYR_DIVS,PYR_TEAMS,PYR_STEP,PYR_SPREAD,PYR_TOPMEAN,PYR_UP,PYR_DOWN};";
   return new Function(...names,body)(...names.map(k=>env[k]));
 }
 /* Ugyanaz a determinisztikus, seedelhető folyam, amit a játék rngFor()-ja ad:
@@ -446,10 +447,71 @@ function reportDraft(){
   console.log("\nCÉL: a rés a 0…+2 sávban (a `gaps` szerint +2 → 37% bajnoki esély,");
   console.log("vagyis feljutásra esélyes újonc vagy, de semmi nem jár ingyen).\n");
 }
+/* ============================================================================
+   7. A LIGARENDSZER ÉLETE — a fel-/kiesés ellenőrzése
+   ---------------------------------------------------------------------------
+   Az index.html pyrSimDivision-jével lejátssza mind a hat osztályt, sok
+   szezonon át, és megnézi, EGÉSZSÉGES-e a rendszer. Amit keresünk:
+
+     · a létszám sosem csúszhat el (6×16 = 96 klub, végig);
+     · a felkerülő csapatok NE bumerángoljanak azonnal vissza (ha minden
+       újonc egyből kiesik, a fel-/kiesés csak zaj, nem történet);
+     · legyen mozgás — ha ugyanaz a 16 klub ül az élvonalban 20 szezonon át,
+       a világ halott.
+
+   FONTOS: ez a STATIKUS piramist méri (a klubok ereje nem változik) — ez a
+   jelenlegi fejlesztési lépés. A fejlődés a következő lépésben jön.
+============================================================================ */
+function reportLeague(){
+  const P0=loadPyrBlock(!!ARG.wc);
+  const seasons=ARG.seasons||20;
+  const w=P0.pyrBuildWorld(seededRnd("pyr:"+(ARG.seed!=null?ARG.seed:1)));
+  const U=P0.PYR_UP,D=P0.PYR_DOWN;
+  /* minden klub megjegyzi, hol kezdett és merre járt */
+  const home={};w.divs.forEach((d,i)=>d.teams.forEach(t=>{home[t.n]={start:i+1,visits:{}};}));
+  let bounce=0,promos=0;
+  const prevUp={};
+  for(let s=1;s<=seasons;s++){
+    const r=seededRnd("liga:"+s);
+    const order=w.divs.map(d=>P0.pyrSimDivision(d.teams,r));
+    const up=order.map((a,i)=>i>0?a.slice(0,U).map(x=>x.t):[]);
+    const down=order.map((a,i)=>i<5?a.slice(a.length-D).map(x=>x.t):[]);
+    /* bumeráng: aki TAVALY jutott fel, idén rögtön kiesik-e */
+    order.forEach((a,i)=>{
+      if(i>=5)return;
+      down[i].forEach(t=>{if(prevUp[t.n]===s-1)bounce++;});});
+    Object.keys(prevUp).forEach(k=>{if(prevUp[k]<s-1)delete prevUp[k];});
+    up.forEach(list=>list.forEach(t=>{prevUp[t.n]=s;promos++;}));
+    const next=order.map((a,i)=>{
+      const leave=new Set([...up[i],...down[i]].map(t=>t.n));
+      const stay=a.map(x=>x.t).filter(t=>!leave.has(t.n));
+      return stay.concat(i>0?down[i-1]:[],i<5?up[i+1]:[]);});
+    next.forEach((arr,i)=>{w.divs[i].teams=arr;
+      arr.forEach(t=>{home[t.n].visits[i+1]=(home[t.n].visits[i+1]||0)+1;});});
+  }
+  console.log(`\n=== A LIGARENDSZER ${seasons} SZEZON UTÁN ===`);
+  const counts=w.divs.map(d=>d.teams.length);
+  console.log("csapatszám osztályonként: "+counts.join(" / ")
+    +(counts.every(c=>c===P0.PYR_TEAMS)?"   ✓ stabil":"   ✗ ELCSÚSZOTT"));
+  console.log(`feljutás összesen: ${promos} · ebből azonnal visszaesett: ${bounce}`
+    +`  (${(100*bounce/Math.max(1,promos)).toFixed(0)}%)`);
+  /* mennyire keveredett a világ: hány klub van MÁS osztályban, mint ahol kezdett */
+  let moved=0,tot=0;
+  w.divs.forEach((d,i)=>d.teams.forEach(t=>{tot++;if(home[t.n].start!==i+1)moved++;}));
+  console.log(`elmozdult a kiinduló osztályától: ${moved}/${tot} klub `
+    +`(${(100*moved/tot).toFixed(0)}%)`);
+  console.log("\naz élvonal most:");
+  w.divs[0].teams.slice().sort((a,b)=>b.ovr-a.ovr).forEach(t=>
+    console.log(`   ${t.ovr.toFixed(1).padStart(5)}  ${t.n}`
+      +(home[t.n].start!==1?`   ← D${home[t.n].start}-ból jött`:"")));
+  console.log("\nOLVASAT: a bumeráng-arány 30-60% közt egészséges (az újonc nehéz");
+  console.log("dolga valós), 80% fölött a lépcső túl nagy, 10% alatt túl kicsi.\n");
+}
+
 function reportMain(){
   reportGaps();
   reportSpeeds();
 }
 
 ({gaps:reportGaps,speeds:reportSpeeds,sweep:reportSweep,bands:reportBands,
-  world:reportWorld,draft:reportDraft,report:reportMain}[CMD]||reportMain)();
+  world:reportWorld,draft:reportDraft,league:reportLeague,report:reportMain}[CMD]||reportMain)();
