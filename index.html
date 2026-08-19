@@ -1730,6 +1730,10 @@ button.infPanel:disabled{cursor:default}
   padding:10px 14px;margin-bottom:6px;background:rgba(250,248,244,.8);font-family:inherit;cursor:pointer;
   border:1px solid rgba(182,130,53,.4);border-radius:9px;color:#201f1d;font-size:13.5px}
 .mpRoomChip:hover{background:rgba(182,130,53,.11)}
+/* ÚJ KARRIER chipje: ugyanaz az alak, de láthatóan nem egy futó játék —
+   szaggatott keret, halványabb tinta. */
+.mpRoomChip.mpSoloNew{border-style:dashed;color:#5f4a24;background:transparent}
+.mpRoomsNote{font-size:11.5px;line-height:1.5;color:#5f4a24;margin:2px 0 6px}
 .mpErr{font-size:12.5px;color:#9b3b34;min-height:17px;margin-top:8px;text-align:center}
 @keyframes magyahGlideIn{0%{opacity:0;transform:translateX(-13%) scale(.965)}100%{opacity:1;transform:translateX(0) scale(1)}}
 @keyframes magyahFadeUp{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
@@ -3280,7 +3284,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.4.11";
+const APP_VERSION="3.4.12";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8842,7 +8846,12 @@ function mpDiagCollect(){
   keys.forEach(k=>{
     L.push("");
     let bytes=0;try{bytes=(localStorage.getItem(k)||"").length;}catch(e){}
-    L.push("── "+k+"  ["+(bytes/1024).toFixed(0)+" kB]");
+    /* Melyik hely ez? A puszta kulcsnév ("…-v1-s2") olvasható, de egy
+       bejelentésben a "2. egyjátékos hely" sokkal gyorsabban érthető. */
+    let hely="";
+    for(let n=1;n<=SP_SLOT_MAX;n++)if(k===spSaveKeyFor(n))hely=`  (${n}. egyjátékos hely)`;
+    if(!hely&&k.indexOf(SAVE_KEY_MP_PREFIX)===0)hely="  (szoba)";
+    L.push("── "+k+"  ["+(bytes/1024).toFixed(0)+" kB]"+hely);
     let d=null;
     try{d=JSON.parse(localStorage.getItem(k));}catch(e){L.push("  olvashatatlan: "+e.message);return;}
     const S2=(d&&d.S)||{};
@@ -39982,7 +39991,7 @@ function startEndCareer(){
       try{await mpBk().leave(room);}catch(e){}
       clearSave(mpSaveKeyFor(room));
     }else{
-      clearSave(SAVE_KEY);}
+      clearSave(spSaveKey());}
     location.reload();};
   const backBtn=document.createElement("button");backBtn.className="btn-s stepbtn";backBtn.style.marginTop="6px";backBtn.textContent="Mégsem, folytatom a karriert";
   backBtn.onclick=()=>csReturnToHub();
@@ -52359,11 +52368,71 @@ function styleTraitsHtml(noHead){
    Mostantól minden szoba SAJÁT helyre ment, az egyjátékos pedig a régi,
    változatlan kulcsra — így a meglévő mentések is érintetlenül betöltődnek.
    Szobánként külön hely kell, mert a terv szerint több szoba futhat egyszerre. */
-const SAVE_KEY="30-0-save-v1";                /* egyjátékos — VÁLTOZATLAN */
+const SAVE_KEY="30-0-save-v1";                /* egyjátékos, 1. hely — VÁLTOZATLAN */
 const SAVE_KEY_MP_PREFIX="30-0-save-mp-";     /* + szobakód + "-v1" */
 function mpSaveKeyFor(room){return SAVE_KEY_MP_PREFIX+room+"-v1";}
+/* ================= TÖBB PÁRHUZAMOS EGYJÁTÉKOS KARRIER =================
+   A szobák régóta külön mentési helyen élnek, az egyjátékos viszont EGYETLEN
+   helyen — aki új karriert akart kipróbálni (más felállás, keményebb piramis,
+   Gleccser-tempó), annak törölnie kellett a régit. Mostantól HÁROM hely van.
+
+   MIÉRT PONT HÁROM. A korlát nem ízlés kérdése, hanem a localStorage kvótája.
+   Mérve (lásd a packCareerPool fölötti feljegyzést): egy 4. szezonjában járó
+   karrier NYERSEN 578 kB, ennek 96%-a a careerPool; a tömörítés után egy késői
+   karrier a 150-250 kB sávban van. A szokásos kvóta 5 MB, és ezen OSZTOZIK
+   minden szoba-mentés is (azok szintén 150-250 kB-osak, és a szoba bezárása a
+   mentést szándékosan meghagyja), plusz a profil, a Run-ranglista és a
+   beállítás-kulcsok. Három egyjátékos hely a legrosszabb esetben ~750 kB —
+   bőven a kvóta alatt marad akkor is, ha mellette több szoba fut. Négy-öt
+   hellyel a tartalék elfogyna, és a tele tárhely tünete a lehető legrosszabb:
+   a setItem némán elszáll, a játék "menteni látszik", és egy újratöltés egy
+   egész szezont visszaugrik. Inkább legyen három hely, ami MINDIG ment.
+
+   SZERVEROLDALON EZ SEMMIT NEM MOZDÍT: az egyjátékos karrier teljes egészében
+   a böngészőben él, hálózat nélkül. A Firebase-t kizárólag a kétjátékos ág
+   tölti be (lásd mpNetInit), és annak a szoba-korlátain semmi nem változott.
+
+   A KULCSOK VISSZAFELÉ KOMPATIBILISEK: az 1. hely a RÉGI kulcson maradt, tehát
+   minden meglévő mentés pontosan ott van, ahol volt, és ugyanúgy betöltődik.
+   A 2-3. hely a régi kulcs utótagos változata ("…-v1-s2"), így a diagnosztika
+   prefix-szűrője (indexOf(SAVE_KEY)===0) is elkapja mindet. */
+const SP_SLOT_MAX=3;
+/* A figyelmeztetés küszöbe: a szokásos 5 MB-os keret 70%-a. Efölött már egy
+   késői karrier egyetlen mentése (150-250 kB) is elviheti a maradékot. */
+const STORAGE_WARN_BYTES=3.5*1024*1024;
+const SP_SLOT_KEY="harminc_nulla_sp_slot_v1";   /* melyik helyen játszottál utoljára */
+function spSaveKeyFor(n){return n>1?(SAVE_KEY+"-s"+n):SAVE_KEY;}
+function spSlotNorm(n){
+  n=parseInt(n,10);
+  return (n>=1&&n<=SP_SLOT_MAX)?n:1;}
+let _spSlot=null;
+function spSlot(){
+  if(_spSlot===null){
+    let v=null;try{v=localStorage.getItem(SP_SLOT_KEY);}catch(e){}
+    _spSlot=spSlotNorm(v);}
+  return _spSlot;}
+/* A hely váltása CSAK az újratöltés útján történhet (mpSwitchContext) — ez a
+   függvény a megérkezés után rögzíti, hol vagyunk. Menet közbeni átállítás
+   ugyanazt az adatvesztést hozná, ami ellen a mentési zár véd. */
+function spSetSlot(n){
+  _spSlot=spSlotNorm(n);
+  try{localStorage.setItem(SP_SLOT_KEY,String(_spSlot));}catch(e){}
+  return _spSlot;}
+function spSaveKey(){return spSaveKeyFor(spSlot());}
+/* Van-e valódi karrier az adott helyen? (Az üres mentés nem számít — lásd
+   saveHasGame.) A kezdőlap chipjei és a szabad hely keresése ezt használja. */
+function spSlotSave(n){
+  const d=loadSavedGame(spSaveKeyFor(spSlotNorm(n)));
+  return saveHasGame(d)?d:null;}
+function spFreeSlot(){
+  for(let n=1;n<=SP_SLOT_MAX;n++)if(!spSlotSave(n))return n;
+  return 0;}
+function spUsedCount(){
+  let c=0;
+  for(let n=1;n<=SP_SLOT_MAX;n++)if(spSlotSave(n))c++;
+  return c;}
 function saveKey(){
-  return (MP.active&&MP.activeRoom)?mpSaveKeyFor(MP.activeRoom):SAVE_KEY;}
+  return (MP.active&&MP.activeRoom)?mpSaveKeyFor(MP.activeRoom):spSaveKey();}
 /* ---- VAN-E EGYÁLTALÁN MENTHETŐ JÁTÉK? ----
    HIBA, amit ez javít: a fejléc 🏠 gombja (és a kontextusváltás) FELTÉTEL NÉLKÜL
    mentett. A kezdőképernyőn viszont még nincs játék — ilyenkor egy ÜRES mentés
@@ -52464,12 +52533,19 @@ function saveSlotList(){
   let keys=[];
   try{keys=Object.keys(localStorage);}catch(e){return [];}
   const cur=saveKey();
-  return keys.filter(k=>k===SAVE_KEY||k.indexOf(SAVE_KEY_MP_PREFIX)===0).map(k=>{
+  /* Mind a három egyjátékos hely + minden szoba. A slot-kulcsokat névről
+     állítjuk elő, nem prefix-találgatással: így egy jövőbeli, hasonló nevű
+     kulcs sem keveredhet ide. */
+  const spKeys=[];
+  for(let n=1;n<=SP_SLOT_MAX;n++)spKeys.push(spSaveKeyFor(n));
+  return keys.filter(k=>spKeys.indexOf(k)>=0||k.indexOf(SAVE_KEY_MP_PREFIX)===0).map(k=>{
     let raw="";try{raw=localStorage.getItem(k)||"";}catch(e){}
     let d=null;try{d=JSON.parse(raw);}catch(e){}
     const S2=(d&&d.S)||{};
+    const sp=spKeys.indexOf(k);
     return {key:k,bytes:raw.length,broken:!d,
-      room:k===SAVE_KEY?null:k.slice(SAVE_KEY_MP_PREFIX.length).replace(/-v1$/,""),
+      slot:sp>=0?sp+1:null,
+      room:sp>=0?null:k.slice(SAVE_KEY_MP_PREFIX.length).replace(/-v1$/,""),
       team:(d&&d.teamName)||null,mode:(d&&d.gameMode)||null,phase:(d&&d.phase)||null,
       season:S2.seasonNumber||null,idx:S2.idx,
       real:saveHasGame(d),current:k===cur};
@@ -53507,30 +53583,38 @@ function initSaveSystem(){
     /* nincs még karrier ebben a szobában → a lobby várja (azt az mpBoot nyitja) */
     MP.started=false;
     return;}
-  /* ---- F7: EGYJÁTÉKOSBA TÖLTÉS ---- */
+  /* ---- F7: EGYJÁTÉKOSBA TÖLTÉS ----
+     A szándék MEGNEVEZHETI, melyik egyjátékos helyre megyünk (1-3). Ha nem
+     nevezi meg, a legutóbb használt hely marad — ugyanaz, ahol kiléptél. */
   if(_mpBootIntent&&_mpBootIntent.solo){
     MP.active=false;MP.activeRoom=null;MP.role=null;MP.started=false;
+    if(_mpBootIntent.slot)spSetSlot(_mpBootIntent.slot);
     _mpBootedIntoGame=true;
     $("mpEntry").classList.add("hide");}
   /* Egyébként MINDIG az egyjátékos helyet nézzük: az MP-karrierek a saját
      szobájuk helyén élnek, azokat a szoba-lobbyból lehet folytatni. */
-  let saved=loadSavedGame(SAVE_KEY);
+  const spKey=spSaveKey();
+  let saved=loadSavedGame(spKey);
   /* ÖNGYÓGYÍTÁS: a korábbi verziók által írt ÜRES mentés (lásd saveHasGame) nem
      folytatható — csendben eldobjuk, és a felhasználó a megszokott
      módválasztóval indul, nem egy üres draftban ragad. */
-  if(saved&&!saveHasGame(saved)){clearSave(SAVE_KEY);saved=null;}
+  if(saved&&!saveHasGame(saved)){clearSave(spKey);saved=null;}
   if(!saved){$("scModeSelect").classList.remove("hide");return;}
   $("scModeSelect").classList.add("hide");
   $("resumeBanner").classList.remove("hide");
   const ph=saved.phase;
-  $("resumeInfo").textContent=
+  /* TÖBB HELY ESETÉN MEGNEVEZZÜK, MELYIKBEN VAGY. Egy helynél ez fölösleges
+     zaj lenne; kettőnél viszont a "Folytatom" és a mellette álló, VÉGLEG TÖRLŐ
+     gomb egyaránt kétértelmű lenne anélkül, hogy kiírnánk. */
+  const slotTag=(spUsedCount()>1)?`${spSlot()}. hely · `:"";
+  $("resumeInfo").textContent=slotTag+(
     ph==="season" ? `${saved.teamName} — ${saved.S.idx}/30 forduló, ${saved.S.W}GY ${saved.S.D}D ${saved.S.L}V`
     : ph==="verdict" ? `${saved.teamName} — szezonzárás (${saved.S.pts} pont), a HUB vár`
     : ph==="hub" ? `${saved.teamName} — a HUB-ban vagy, a szezonváltás előtt`
     : ph==="hubreport" ? `${saved.teamName} — szezonváltás megtörtént, indulhat az új idény`
-    : `${saved.teamName||"Csapatod"} — a csapatépítés közben hagytad abba`;
+    : `${saved.teamName||"Csapatod"} — a csapatépítés közben hagytad abba`);
   $("resumeYesBtn").onclick=()=>{
-    if(!loadIntoGame(saved,SAVE_KEY)){mpShowLoadFailure(null);return;}
+    if(!loadIntoGame(saved,spKey)){mpShowLoadFailure(null);return;}
     $("resumeBanner").classList.add("hide");
     resumeUIFromSave();};
   /* ---- AZ EGYETLEN GOMB, AMI VALÓDI MENTÉST TÖRÖL ----
@@ -53548,12 +53632,13 @@ function initSaveSystem(){
     if(noArm){
       clearTimeout(noArm);noArm=null;
       noBtn.textContent=noLabel;
-      clearSave(SAVE_KEY);   /* kifejezetten az EGYJÁTÉKOS helyet dobja el */
+      clearSave(spKey);   /* kifejezetten EZT az egyjátékos helyet dobja el */
       $("resumeBanner").classList.add("hide");
       $("scModeSelect").classList.remove("hide");
       return;}
     const sn=(saved.S&&saved.S.seasonNumber)||1;
-    const who=saved.teamName?`${saved.teamName} (${sn}. szezon)`:`a ${sn}. szezonos karriered`;
+    const who=(saved.teamName?`${saved.teamName} (${sn}. szezon)`:`a ${sn}. szezonos karriered`)
+      +(spUsedCount()>1?` a(z) ${spSlot()}. helyen`:"");
     noBtn.textContent=`Biztos? ${who} véglegesen törlődik — koppints még egyszer`;
     noArm=setTimeout(()=>{noArm=null;noBtn.textContent=noLabel;},4000);};}
 /* Az ÜGYNÖKSÉG a scout párja: a scout felmér, az ügynökség üzletet köt. Nincs
@@ -53638,7 +53723,12 @@ try{const _r=sessionStorage.getItem(MP_BOOT_KEY);
     sessionStorage.removeItem(MP_BOOT_KEY);
     _mpBootIntent=_r?JSON.parse(_r):null;}catch(e){_mpBootIntent=null;}
 let _mpBootedIntoGame=false;   /* igaz, ha induláskor egyenesen játékba töltöttünk */
-function mpCtxKey(){return (MP.active&&MP.activeRoom)?("room:"+MP.activeRoom):"solo";}
+/* A KONTEXTUS-KULCS MEGNEVEZI AZ EGYJÁTÉKOS HELYET IS. Enélkül a három hely
+   közti váltás "solo → solo" lenne, vagyis a mpSwitchContext azonosnak látná a
+   kettőt, és NEM töltene újra — a felhasználó ugyanabban a karrierben maradt
+   volna, miközben a mentés célja már a másik helyre mutat. Pontosan ez az a
+   hibaosztály, ami ellen a mentési zár véd; itt a gyökerénél zárjuk le. */
+function mpCtxKey(){return (MP.active&&MP.activeRoom)?("room:"+MP.activeRoom):("solo:"+spSlot());}
 /* ---- ÚJRATÖLTÉS EGY SZÁNDÉKKAL — A KONTEXTUSVÁLTÁS EGYETLEN ÚTJA ----
    A szándék a sessionStorage-ban utazik át az újratöltésen; az indulás
    (initSaveSystem + mpBoot) ebből tudja, hova kell megérkezni.
@@ -53660,7 +53750,8 @@ function mpReloadWithIntent(intent){
   }catch(e){}
   location.reload();}
 function mpSwitchContext(intent){
-  const want=intent&&intent.room?("room:"+intent.room):"solo";
+  const want=(intent&&intent.room)?("room:"+intent.room)
+    :("solo:"+spSlotNorm((intent&&intent.slot)||spSlot()));
   /* meccs közben sosem mentünk (a mentés szabálya: csak lezárt pillanatokban) */
   try{if(!S.playing)saveGame();}catch(e){}
   if(mpCtxKey()===want){$("mpEntry").classList.add("hide");return;}
@@ -54249,26 +54340,56 @@ async function mpRenderHomeRooms(){
       /* Se szoba, se mentés, és tényleg megkérdeztük: ezt el lehet felejteni. */
       mpForgetCode(c);}}
   mpDrawRoomChips(rooms);}
-/* ---- AZ EGYJÁTÉKOS KARRIER CHIPJE ----
+/* ---- AZ EGYJÁTÉKOS KARRIEREK CHIPJEI ----
    A kezdőlap eddig ASZIMMETRIKUS volt: a szobák kiírták a csapatnevet és azt,
    hányadik szezonnál tartanak, az egyjátékos karrierről viszont SEMMIT nem
    mondott — az "Egyedül játszom" gomb ugyanúgy nézett ki üres állapotban és egy
    hetedik szezonos karrier fölött. Így a felhasználó nem látta, hogy egyáltalán
    van-e mit folytatnia, és nem lehetett biztos benne, hogy egy szobába lépés nem
-   nyúl-e hozzá. Pedig a két hely fizikailag külön kulcson él (SAVE_KEY vs.
-   szobánkénti kulcs), és soha nem ütköznek — ezt most a felület is kimondja.
-   A chip ugyanabba a dobozba kerül, mint a szobák, és ugyanúgy viselkedik. */
+   nyúl-e hozzá. Pedig minden hely fizikailag külön kulcson él (a három
+   egyjátékos hely és a szobánkénti kulcs), és soha nem ütköznek — ezt most a
+   felület is kimondja. A chipek ugyanabba a dobozba kerülnek, mint a szobák, és
+   ugyanúgy viselkednek. */
+/* MOSTANTÓL HÁROM HELY. Minden foglalt hely saját chipet kap (csapatnév,
+   szezon), és ha maradt szabad hely, egy szaggatott chip kínálja fel az új
+   karriert — az a hely ugyanígy egy koppintás, csak épp a beállító képernyőn
+   köt ki, nem egy futó játékban. Ha mind a három foglalt, azt kimondjuk, és
+   megnevezzük az egyetlen utat: nyiss meg egyet, és ott indíts újat. Magunktól
+   SOHA nem törlünk valódi mentést. */
 function mpSoloChipHtml(){
-  const d=loadSavedGame(SAVE_KEY);
-  if(!saveHasGame(d))return "";
-  const sn=(d.S&&d.S.seasonNumber)||1;
-  const tn=d.teamName?` <span style="opacity:.7;font-weight:400">· ${esc(String(d.teamName))}</span>`:"";
-  const mode=d.gameMode==="career"?`▶ ${sn}. szezon — folytatható`:"▶ folytatható";
-  return `<div class="lbl">Egyjátékos karriered</div>
-    <button class="mpRoomChip" id="mpSoloChip">
-      <span>🏠 Egyedül${tn}</span>
+  const chips=[];
+  for(let n=1;n<=SP_SLOT_MAX;n++){
+    const d=spSlotSave(n);
+    if(!d)continue;
+    const sn=(d.S&&d.S.seasonNumber)||1;
+    const tn=d.teamName?` <span style="opacity:.7;font-weight:400">· ${esc(String(d.teamName))}</span>`:"";
+    const mode=d.gameMode==="career"?`▶ ${sn}. szezon — folytatható`:"▶ folytatható";
+    chips.push(`<button class="mpRoomChip mpSoloChip" data-slot="${n}">
+      <span>🏠 ${n}. hely${tn}</span>
       <span style="color:#8fd99a;font-size:12px">${mode}</span>
-    </button>`;}
+    </button>`);}
+  /* Egyetlen karrier sincs? Akkor a chipeknek sincs mit mondaniuk — az
+     "Egyedül játszom" gomb pontosan ezt az egy dolgot csinálja. */
+  if(!chips.length)return "";
+  const free=spFreeSlot();
+  chips.push(free
+    ?`<button class="mpRoomChip mpSoloNew" data-slot="${free}">
+        <span>+ Új egyjátékos karrier</span>
+        <span style="font-size:12px;opacity:.7">${spUsedCount()}/${SP_SLOT_MAX} hely foglalt</span>
+      </button>`
+    :`<div class="mpRoomsNote">Mind a ${SP_SLOT_MAX} egyjátékos hely foglalt. Új karrierhez nyiss meg egyet, és ott válaszd az „Új játék elölről” gombot.</div>`);
+  /* ---- TÁRHELY-ELŐREJELZÉS ----
+     A mentés elszállása eddig CSAK utólag derült ki (piros sáv az első sikertelen
+     írásnál). Több párhuzamos karrierrel a betelés reálisabb, ezért előre szólunk:
+     a szokásos 5 MB-os keret 70%-a fölött kiírjuk, mennyi fogy, és megnevezzük a
+     takarítás helyét (a HUB menüjének „Mentések és tárhely" ablaka). Ez csak
+     tájékoztat — magunktól továbbra sem törlünk semmit. */
+  {const used=storageUsedBytes();
+   if(used>STORAGE_WARN_BYTES)
+     chips.push(`<div class="mpRoomsNote">⚠ A böngésző tárhelyéből ${kb(used)} fogy `
+       +`(a keret jellemzően 5 MB). Ha betelik, a mentés elszáll — a HUB menüjében a `
+       +`<b>Mentések és tárhely</b> ablakban elengedhetsz egy rég nem használt szoba-mentést.</div>`);}
+  return `<div class="lbl">Egyjátékos karriereid</div>`+chips.join("");}
 function mpDrawRoomChips(rooms){
   const box=$("mpHomeRooms");if(!box)return;
   const fail=mpLoadFailureHtml();
@@ -54276,8 +54397,10 @@ function mpDrawRoomChips(rooms){
   box.classList.toggle("hide",!rooms.length&&!solo&&!fail);
   if(!rooms.length&&!solo&&!fail){box.innerHTML="";return;}
   box.innerHTML=fail+solo+(rooms.length?`<div class="lbl"${(solo||fail)?' style="margin-top:10px"':""}>Szobáid</div>`:"");
-  {const sc=$("mpSoloChip");
-   if(sc)sc.onclick=()=>mpSwitchContext({solo:true});}
+  /* A hely SOSEM itt áll át: a kontextusváltás menti a futó játékot, és csak az
+     újratöltés után foglalja el az új helyet (lásd mpSwitchContext). */
+  box.querySelectorAll(".mpSoloChip,.mpSoloNew").forEach(c=>{
+    c.onclick=()=>mpSwitchContext({solo:true,slot:parseInt(c.dataset.slot,10)});});
   rooms.forEach(({code,room,gone,offline})=>{
     const b=document.createElement("button");b.className="mpRoomChip";
     /* F7: látszik, hol fut már karrier — így a chip nem csak szoba, hanem
@@ -54411,7 +54534,13 @@ function mpRenderLobby(){
 /* ---- bekötés ---- */
 /* F7: az "Egyedül játszom" mostantól KONTEXTUST VÁLT — ha épp egy szoba
    karrierje fut a memóriában, az egyjátékos mentés töltődik be helyette. */
-$("mpSoloBtn").onclick=()=>mpSwitchContext({solo:true});
+/* Ha a legutóbb használt helyen fut karrier, oda megyünk vissza (a gomb
+   jelentése változatlan: "folytatom, ahol abbahagytam"); ha az a hely üres, az
+   első szabadra — így egy friss játékos mindig az 1. helyen kezd, akkor is, ha
+   egy korábbi karriert időközben töröltek egy másik helyről. */
+$("mpSoloBtn").onclick=()=>{
+  const cur=spSlot();
+  mpSwitchContext({solo:true,slot:spSlotSave(cur)?cur:(spFreeSlot()||cur)});};
 $("mpResumeBtn")&&($("mpResumeBtn").onclick=()=>{
   if(!MP.activeRoom)return;
   mpSwitchContext({room:MP.activeRoom});});
@@ -54608,7 +54737,10 @@ function renderStoreModal(){
     +`<span style="opacity:.7">(a keret jellemzően 5 MB)</span>`;
   if(!slots.length){list.innerHTML=`<div style="font-size:12px;color:var(--dim)">Nincs mentés.</div>`;return;}
   list.innerHTML=slots.map((s,i)=>{
-    const title=s.room?`🎮 Szoba: <b>${esc(s.room)}</b>`:"🏠 Egyjátékos karrier";
+    /* HÁROM egyjátékos hely van — a listának meg kell neveznie, melyik melyik,
+       különben a törlés-gomb találgatás lenne. */
+    const title=s.room?`🎮 Szoba: <b>${esc(s.room)}</b>`
+      :`🏠 Egyjátékos karrier · <b>${s.slot||1}. hely</b>`;
     const sub=s.broken?`<span style="color:#e08">olvashatatlan mentés</span>`
       :`${esc(s.team||"—")} · ${s.mode==="career"?"karrier":"klasszikus"}`
         +(s.season?` · ${s.season}. szezon`:"")
@@ -54682,7 +54814,14 @@ window.addEventListener("storage",e=>{
     mpShow("mpViewLobby");
     return;}
   const codes=mpMyCodes();
-  if(!invite&&!codes.length)return;
+  /* SZOBA NÉLKÜL IS VAN MIT KIRAJZOLNI. Itt korábban egy csupasz `return` állt,
+     és ez egy néma hiányt okozott: aki sosem járt kétjátékos szobában, annak a
+     kezdőlapja ÜRES maradt — az egyjátékos karrierjének chipje sem jelent meg,
+     pedig a mentése ott volt. Amíg egyetlen egyjátékos hely létezett, ez csak
+     kényelmetlenség volt (az "Egyedül játszom" gomb odavitt); HÁROM hellyel
+     viszont ez lenne az EGYETLEN út a 2. és 3. helyre, tehát a hiány elzárná
+     őket. A rajzoláshoz nem kell hálózat: a mentések helyben vannak. */
+  if(!invite&&!codes.length){await mpRenderHomeRooms();return;}
   await mpNetInit();
   if(megall()){await mpRenderHomeRooms();return;}
   if(invite){
