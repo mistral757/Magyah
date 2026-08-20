@@ -3408,7 +3408,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.02";
+const APP_VERSION="3.5.03";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -25010,6 +25010,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   ttGoals:0,ttBest:0,ttFutile:0,
   /* SKILL-PADLÓ: türelem-számláló + szezonos kvóták + az első kémia jelzője */
   matchesSinceSkill:0,seasonNewSkills:0,seasonSkillCont:0,firstChemDone:false,
+  matchesSinceChem:0,   /* KÉMIA-PADLÓ: hány meccs telt el kémia-prompt nélkül */
   /* CSAPATEGYENSÚLY → INGYEN KÉPESSÉG: balSkillMatches a szezonban
      ledolgozott mérkőzés-egyenérték (kupában fél), balSkillsSeason a már
      kiosztott darabszám. Mindkettő szezononként nullázódik, de a MENTÉS
@@ -25193,6 +25194,31 @@ function skillMinNew(){return Math.max(1,Math.round(SKILL_MIN_NEW*tempoMult()));
 function skillMinCont(){return Math.max(1,Math.round(SKILL_MIN_CONT*tempoMult()));}
 /* Az első kémia-prompt legkésőbb ekkorra lefut az ELSŐ szezonban. */
 const FIRST_CHEM_BY_ROUND=8;
+/* ================= KÉMIA-PADLÓ =================
+   JELENTETT HIBA: öt szezon alatt egyetlen párkémia sem épült ki (a legjobb
+   3/5-nél állt). Az ok a jutalom-elosztás két szabályának az ÜTKÖZÉSE:
+
+     · a kémiaépítés a jutalmak ~15%-a, és a szabály KIFEJEZETTEN kihagyja a
+       türelem-jutalmat (`reason!=="pity"`) — jó okkal: a türelem-jutalom a
+       SKILL-padló garanciája, azt nem viheti el egy kémia-dobás;
+     · a türelem-jutalom viszont pontosan akkor ad jutalmat, amikor a meccsen
+       SEMMILYEN teljesítmény-jutalom nem indult be (nincs mesterhármas, nincs
+       +5-ös győzelem, nincs három MVP…).
+
+   Egy NEHÉZ karrierben — és a ligapiramis szándékosan ilyen: sokáig
+   egyenrangú vagy esélytelen vagy — a jutalmak nagy része a türelem-ágon
+   érkezik, tehát SOHA nem juthat el a kémiához. A kód szándéka épp az
+   ellenkezője volt: a `0,15*(1+underdog*0,8)` szorzó az esélytelennek
+   TÖBB kémiát ígér — csak épp az esélytelen az, aki oda sem jut el.
+
+   A MEGOLDÁS a skill-padló mintája, saját számlálóval: ha ennyi meccsen át
+   nem jött kémia-prompt, a következő meccs jutalmai közé bekerül egy
+   kényszerített. A skill-padlót NEM bántja (a sor ELEJÉRE fűzzük, nem a
+   türelem-jutalom HELYETT), és a véletlen 15-27%-os ág is megmarad mellette.
+   TIZENKETTŐ, mert a kötés öt fázisból áll: így egy párost a legrosszabb
+   esetben is két idény alatt fel lehet építeni, ahogy a mechanika ígéri. */
+const CHEM_PITY_MATCHES=12;
+function chemPityMatches(){return Math.max(3,Math.round(CHEM_PITY_MATCHES/tempoMult()));}
 /* A türelem-jutalom TÍPUSA: azt tölti, amiből még hiányzik. null = mindkét
    kvóta megvan, mehet a szokásos véletlen logika. */
 function pitySkillKind(){
@@ -33627,6 +33653,15 @@ function playMatch(){
        legkésőbb a FIRST_CHEM_BY_ROUND. fordulóra mindenképp lefut egyszer. */
     if(gameMode==="career"&&(S.seasonNumber||1)===1&&!S.firstChemDone
        &&(S.idx||0)>=FIRST_CHEM_BY_ROUND)skillReasons.unshift("firstchem");
+    /* ---- KÉMIA-PADLÓ (lásd a CHEM_PITY_MATCHES fölötti indoklást) ----
+       MINDEN meccs számít, nem csak a jutalom nélküli: a kémia nem a
+       teljesítmény jutalma, hanem a közös munka ideje. A sor ELEJÉRE kerül,
+       tehát a skill-padló érintetlen marad — ez egy RÁADÁS jutalom, nem egy
+       elvett. */
+    if(gameMode==="career"&&careerPool){
+      S.matchesSinceChem=(S.matchesSinceChem||0)+1;
+      if(S.matchesSinceChem>=chemPityMatches()&&!skillReasons.includes("firstchem"))
+        skillReasons.unshift("chem");}
     /* --- karrier mód: játékos-nyitás esélye, jutalom-alapú (kisebb eséllyel,
        a skill-jutalomtól függetlenül) és időszakos random --- */
     let careerUnlockReasons=[];
@@ -33826,8 +33861,10 @@ function playMatch(){
          kémiaépítés esélye 15%-ról akár 27%-ig nő.
          A türelem-jutalomnál viszont KIHAGYJUK a kémia-ágat: az a padló
          garanciája, azt nem viheti el egy véletlen kémia-dobás. */
-      if(reason==="firstchem"||(reason!=="pity"&&Math.random()<0.15*(1+underdogFactor()*0.8))){
+      if(reason==="firstchem"||reason==="chem"
+         ||(reason!=="pity"&&Math.random()<0.15*(1+underdogFactor()*0.8))){
         S.firstChemDone=true;
+        S.matchesSinceChem=0;   /* a padló számlálója innen indul újra */
         if(S.chemInProgress&&S.chemPairs[S.chemInProgress]){
           if(S.auto){advanceChemInProgress();processSkillQueue(reasons,cb);}
           else showChemBuild(()=>processSkillQueue(reasons,cb));
@@ -55177,6 +55214,7 @@ function saveGame(){
         starUnlockNew:S.starUnlockNew, /* … és melyiknek nem indult még el az első csillaga */
         /* skill-padló: türelem-számláló, szezonos kvóták, első kémia megvolt-e */
         matchesSinceSkill:S.matchesSinceSkill,seasonNewSkills:S.seasonNewSkills,
+        matchesSinceChem:S.matchesSinceChem,
         balSkillMatches:S.balSkillMatches,balSkillsSeason:S.balSkillsSeason,
         balLoadPrev:S.balLoadPrev,balLoadHandover:S.balLoadHandover,cupRunNo:S.cupRunNo,
         toughSeen:S.toughSeen,buddySeen:S.buddySeen,hardTackleNotes:S.hardTackleNotes,seasonHardTackles:S.seasonHardTackles,shapeStat:S.shapeStat,
@@ -55644,6 +55682,10 @@ function applySavedGame(d){
   /* SKILL-PADLÓ (régi mentésben nincs — nulláról indul, ami helyes: a padló
      a betöltés utáni szezontól kezd el számolni) */
   S.matchesSinceSkill=d.S.matchesSinceSkill||0;
+  /* A kémia-padló számlálója: régi mentésben nincs — nulláról indul, tehát a
+     futó karrier a betöltés utáni 12. meccsen kapja az első garantált
+     kémia-promptot. */
+  S.matchesSinceChem=d.S.matchesSinceChem||0;
   /* Régi mentésben nincsenek — nulláról indulnak, ami helyes: a gyűjtés a
      betöltés utáni mérkőzésektől kezd számolni. */
   S.balSkillMatches=d.S.balSkillMatches||0;
