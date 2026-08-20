@@ -3458,7 +3458,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.11";
+const APP_VERSION="3.5.12";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8419,6 +8419,44 @@ function pyrRollover(myOrder,rnd){
    klubod kikerül a világból (különben két azonos nevű csapat futna, egy a
    kezedben, egy AI-ként), és a KEZDŐ RÉS (gap0) is itt születik meg — ez
    méri, mekkora kihívást vállaltál, és ez fogja a Run-plafont is szabni. */
+/* ================= A VILÁG JÖN A KERETHEZ, NEM FORDÍTVA (3.5.12) =========
+   HIBA, AMIT EZ JAVÍT. A piramis Ratingjei normalizáltak (D1 közép 86, D6
+   közép 71), a játékos-adatbázis viszont nyers (D1 84,7 … D6 76,9). A kettőt
+   eddig úgy hoztuk közös nevezőre, hogy a TE KERETEDET (és a teljes poolt)
+   toltuk el a piramis skálájára — egy D6-os kezdésnél mindenkit −5…−7-tel.
+   Ez matematikailag helyes volt, élményben viszont hazugság: a klubválasztó
+   84-es Haalandot hirdetett, a pályán 78 állt, és semmilyen magyarázó szöveg
+   nem tette ezt elfogadhatóvá. („Amit látsz, azt kapod" — a projektgazda
+   döntése.)
+
+   A MEGOLDÁS EGY ORIGÓ-CSERE. Ugyanazt a különbséget most a VILÁGRA
+   alkalmazzuk, ellenkező előjellel: minden osztály minden csapata `−off`-fal
+   mozdul. Ettől
+     · a kereted PONTOSAN az adatbázis Ratingjeivel érkezik (Haaland 84),
+     · a pool és a piac is a nyers skálán marad (pyrPoolOffset = 0), tehát a
+       kereted és a piac ugyanazt a nyelvet beszéli,
+     · az osztályok EGYMÁSHOZ képesti távolsága (a 3,0-s lépcső) érintetlen,
+     · és a RÉS BITRE UGYANAZ marad:
+          régi:  (nyers + off) − pyrKözép      = nyers − nyersKözép − up
+          új:     nyers        − (pyrKözép−off) = nyers − nyersKözép − up
+   Vagyis a nehézség, a fel-/kiesés, a felskálázó és a Run-plafon semmit nem
+   változik — csak a számok origója költözik oda, ahol a felhasználó él.
+
+   AMI ELMOZDUL: a kiírt mezőnyszint (D6 71 helyett ~77) és vele az
+   Infinity-küszöb elérése, ugyanannyival, amennyivel a kereted is feljebb
+   van. A kettő együtt mozdul, tehát a viszony változatlan.
+
+   RÉGI MENTÉS: érintetlen. A világ a mentésben él (S.pyr.divs) a maga
+   eltolásával és a nem nulla S.pyr.off-fal; a pyrScaleClubPlayer ott
+   változatlanul fut. Új karrierben off = 0, tehát ugyanaz a kód nem csinál
+   semmit. Nincs migráció, nincs kettős igazság. */
+function pyrShiftWorld(w,off){
+  if(!w||!w.divs||!off)return;
+  w.divs.forEach(d=>{
+    d.teams.forEach(t=>{t.ovr=Math.round((t.ovr-off)*10)/10;});
+    const ov=d.teams.map(t=>t.ovr);
+    d.mean=Math.round(ov.reduce((s,v)=>s+v,0)/ov.length*10)/10;
+    d.lo=Math.min.apply(null,ov);d.hi=Math.max.apply(null,ov);});}
 function pyrStart(startDiv,speed,sq,upLv){
   if(typeof S==="undefined"||!S)return "Nincs betöltött játék.";
   const d0=Math.max(1,Math.min(PYR_DIVS,startDiv||PYR_DIVS));
@@ -8457,9 +8495,14 @@ function pyrStart(startDiv,speed,sq,upLv){
        viszi a világ skálájára, és ha a felskálázás is benne volna, a kereted
        EGYÜTT emelkedne a mezőnnyel — a felskálázó pontosan semmit nem érne. */
     const offMp=Math.round((pyrMeanMp-up-rawMeanMp)*10)/10;
+    /* ORIGÓ-CSERE: a világ jön a kerethez (lásd pyrShiftWorld). A spare-eket
+       is mozgatni kell — azok a világ csapatai, csak épp kiszorultak. */
+    pyrShiftWorld(w,offMp);
+    if(sp1)sp1.ovr=Math.round((sp1.ovr-offMp)*10)/10;
+    if(sp2)sp2.ovr=Math.round((sp2.ovr-offMp)*10)/10;
     const clubRawMp=sq?Math.round(squadAvgOvr(sq)*10)/10:null;
     S.pyr={on:true,my:d0,startDiv:d0,aiSpeed:sp,divs:w.divs,spare:sp1,spare2:sp2,
-           off:offMp,rawMean:Math.round(rawMeanMp*10)/10,clubRaw:clubRawMp,
+           off:0,worldShift:offMp,rawMean:Math.round(rawMeanMp*10)/10,clubRaw:clubRawMp,
            up,upLv:upL,
            gap0:clubRawMp==null?null:Math.round((clubRawMp-rawMeanMp-up)*10)/10,
            log:[],meas:null,mp:1,v:1};
@@ -8503,8 +8546,13 @@ function pyrStart(startDiv,speed,sq,upLv){
      közepe. Ez az egyetlen szám, ami megmondja, mekkora falat vállaltál. */
   const clubRaw=sq?Math.round(squadAvgOvr(sq)*10)/10:null;
   const gap0=clubRaw==null?null:Math.round((clubRaw-rawMean-up)*10)/10;
+  /* ORIGÓ-CSERE: a világ jön a kerethez (lásd pyrShiftWorld). A `spare` is a
+     világ csapata — vele kell mozdulnia, különben a kiesés/feljutás cseréje
+     egy másik skáláról hozna vissza csapatot. */
+  pyrShiftWorld(w,off);
+  if(spare)spare.ovr=Math.round((spare.ovr-off)*10)/10;
   S.pyr={on:true,my:d0,startDiv:d0,aiSpeed:sp,divs:w.divs,spare,
-         off,rawMean:Math.round(rawMean*10)/10,clubRaw,up,upLv:upL,gap0,
+         off:0,worldShift:off,rawMean:Math.round(rawMean*10)/10,clubRaw,up,upLv:upL,gap0,
          log:[],meas:null,v:1};
   oppTargetRating=pyrLevel();
   careerBaseRating=oppTargetRating;
@@ -21324,9 +21372,6 @@ function clubPeekHtml(sq){
     +`Oszlopok: poszt · név · kor · <b>Rating</b> · a csúcsáig hátralévő fejlődés · <b style="color:var(--gold)">potenciál</b> (0-100). `
     +`A potenciál a hátralévő fejlődést, a tehetséget (TSI) és a fiatalságot fogja egy számba — ugyanaz a mérce, amivel a játék is dolgozik. `
     +`A Rating és a kor az <b>adott idény</b> valós értéke — a kezdő Rating pontosan ennyi lesz, a TSI-sorsolás nem nyúl hozzá.`
-    +(pyrPending
-      ?` A piramisban a keret ezután még egy EGYSÉGES eltolást kap a választott osztály skálájára (a következő képernyő kiírja a pontos számot) — a sorrend attól nem változik.`
-      :"")
     +` A PÁLYÁN ezeknél kisebb szám is állhat: ott a <b>poszt-effektív</b> érték látszik, tehát aki idegen poszton játszik, kevesebbet mutat.`
     +`</div>`
     +`<button class="btn-p" data-clubgo="1" style="width:100%;margin-top:9px">${go}</button>`;
@@ -21371,34 +21416,22 @@ function renderPyrUpRow(){
      +(pyrPickUp===PYR_UP_STEPS
        ?` <span style="color:var(--gold)">A maximum: a hatodosztály itt pontosan annyit ér, mint ma az élvonal.</span>`
        :"");}
-/* A KERET ÁTLAGA A VÁLASZTOTT OSZTÁLY SKÁLÁJÁN. Pontosan azt a képletet
-   futtatja, amit a pyrStart használ (`off = pyrMean − up − rawMean`), csak
-   előre — így a képernyőn hirdetett szám és a pályán megjelenő ugyanaz.
-   A klub SAJÁT példánya kikerül a mezőnyből (ahogy a belépéskor is), mert
-   különben a nyers közép önmagadat is tartalmazná. */
-function pyrShiftedAvgFor(sq,divId,upLv){
-  if(!sq||!divId)return null;
+/* AZ OSZTÁLY MEZŐNYSZINTJE A TE SKÁLÁDON. A világ az origó-csere után (lásd
+   pyrShiftWorld) a NYERS adatbázis-skálán áll, tehát ez a szám közvetlenül
+   összevethető a kereted átlagával — nem kell hozzá se eltolás, se magyarázat.
+   Ugyanazt a `−off`-ot vonja le, amit a pyrStart is alkalmaz, tehát a kiírt
+   szint pontosan az lesz, amit a HUB is mutat majd. */
+function pyrDivMeanFor(divId,upLv){
+  if(!divId)return null;
   try{
     const up=pyrUpAmount(upLv);
     const w=pyrBuildWorld(rngFor("pyr:world"),upLv);
     const d=w.divs[divId-1];
     if(!d)return null;
-    const ts=d.teams.slice().sort((a,b)=>b.ovr-a.ovr);
-    const own=ts.findIndex(t=>t.club===sq.club);
-    if(own>=0)ts.splice(own,1);else ts.pop();
-    const rawMean=ts.reduce((a,t)=>a+t.raw,0)/ts.length;
-    const pyrMean=ts.reduce((a,t)=>a+t.ovr,0)/ts.length;
+    const rawMean=d.teams.reduce((a,t)=>a+t.raw,0)/d.teams.length;
+    const pyrMean=d.teams.reduce((a,t)=>a+t.ovr,0)/d.teams.length;
     const off=Math.round((pyrMean-up-rawMean)*10)/10;
-    /* ---- A KEREKÍTÉS UGYANÚGY MEGY, MINT A VALÓSÁGBAN ----
-       A pyrScaleClubPlayer JÁTÉKOSONKÉNT kerekít (`Math.round(startRating+sh)`),
-       és a top-11 az ÍGY kapott értékekből áll össze. Ha itt az átlagra
-       tennénk rá az eltolást és azt kerekítenénk egyszer, az ígért szám
-       félpontokat tévedne — épp azt a bizalmat rontva el, amiért ez a sor
-       egyáltalán kiíródik. */
-    const vals=(sq.players||[]).map(p=>Math.round(Math.max(40,(p.ovr||0)+off)))
-      .sort((a,b)=>b-a).slice(0,11);
-    if(!vals.length)return null;
-    return Math.round(vals.reduce((a,v)=>a+v,0)/vals.length);
+    return Math.round((d.mean-off)*10)/10;
   }catch(e){return null;}}
 function pyrFmtGap(v){return (v>0?"+":v<0?"−":"")+Math.abs(v).toFixed(1).replace(".",",");}
 function renderPyrDivPick(){
@@ -21421,18 +21454,15 @@ function renderPyrDivPick(){
      számot ki kell mondani ott, ahol a döntés születik — és a KIVÁLASZTOTT
      osztályra, mert az eltolás osztályonként más. */
   const rawAvg=Math.round(squadAvgOvr(sq));
-  const shifted=pyrShiftedAvgFor(sq,pyrPickDiv,pyrPickUp);
+  const divMean=pyrDivMeanFor(pyrPickDiv,pyrPickUp);
   if(head)head.innerHTML=`🛡️ <b>${esc(sq.club)}</b> <span style="color:var(--dim2)">(${esc(sq.season)})</span>`
-    +` · a kereted nyers ereje <b>${rawAvg}</b>`
-    +(shifted==null?""
-      :shifted!==rawAvg
-      ?` → <b style="color:var(--gold)">${shifted}</b> a D${pyrPickDiv} skáláján`
-      :` — a D${pyrPickDiv} skáláján <b style="color:var(--gold)">változatlan</b>`)
+    +` · a kereted ereje <b style="color:var(--gold)">${rawAvg}</b>`
+    +(divMean!=null?` · a D${pyrPickDiv} mezőnye <b>${Math.round(divMean)}</b>`:"")
     +` · ellenfél-tempó: <b>${esc(sp.n)}</b>`
     +(pyrPickUp?` · felskálázás: <b style="color:var(--gold)">${esc(pyrUpLabel(pyrPickUp))}</b>`:"")
     +`<div style="font-size:11px;color:var(--dim);margin-top:3px;line-height:1.45">`
-    +`A piramis Ratingjei normalizáltak, ezért a kereted EGYSÉGES eltolást kap a választott osztály skálájára — `
-    +`ez a második szám az, amit a pályán is látni fogsz. A rés ettől nem változik: a mezőny közepe ugyanennyivel mozdul.`
+    +`A kereted <b>pontosan ezekkel a Ratingekkel</b> érkezik — az adatbázis értékeivel. A piramis jön hozzájuk: `
+    +`az osztályok szintje a te skáládra van igazítva, tehát a fenti két szám közvetlenül összevethető.`
     +`</div>`;
   box.innerHTML="";
   opts.forEach(o=>{
@@ -23476,8 +23506,21 @@ function fameRevenueTick(){
    Mindkét szám EGY helyen áll, hogy a további hangolás egy sor legyen. */
 const INCOME_TRIM=0.75;    /* nyári keret és minden belőle származó bevétel */
 const MS_CASH_TRIM=0.75;   /* a mérföldkő-jutalmak külön féke */
+/* ---- MENNYIVEL RELABELTÜK A PIRAMIS SKÁLÁJÁT ----
+   A 3.5.12 origó-cseréje (pyrShiftWorld) a VILÁGOT mozdítja, nem a keretedet,
+   hogy a Ratingek az adatbázis értékei maradjanak. A nehézségre ez semleges (a
+   rés bitre ugyanaz), de a GAZDASÁG néhány pontja ABSZOLÚT Ratinghez horgonyoz
+   — ott a puszta átcímkézés valódi balansz-változás volna. Ez a szám adja
+   vissza az eltolást, hogy az ilyen helyek a régi léptéken számolhassanak.
+   Dinamikus módban és a 3.5.12 előtti mentésekben 0. */
+function pyrWorldShift(){return (S&&S.pyr&&S.pyr.worldShift)||0;}
 function seasonBudgetParts(){
-  const teamR=teamOVRbase();
+  /* A BÜDZSÉ A VILÁGHOZ MÉRT HELYZETEDET ÁRAZZA, nem a Rating címkéjét. A
+     görbe fix 60-90-es ablakra van hangolva ((teamR−60)/30, négyzetesen), így
+     a piramis átcímkézése magától +42%-ot adott volna a hatodosztálynak —
+     olyan változás, amit senki nem kért. A worldShift visszaadása pontosan a
+     3.5.12 ELŐTTI büdzsét állítja vissza, minden osztályban. */
+  const teamR=teamOVRbase()+pyrWorldShift();
   const normalized=Math.max(0,Math.min(1,(teamR-60)/30));
   /* CSÖKKENTETT alapbüdzsé — a cél a reálisabb karrier-grind. Mérve: a régi
      képlet (4200 + n²·18000) egyetlen szezon büdzséjéből (85-ös csapatnál

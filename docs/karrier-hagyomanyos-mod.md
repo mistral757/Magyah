@@ -127,26 +127,57 @@ saját Ratingje. Ez adja a látszólagos „egyenetlenséget": ugyanabban a mér
 Haaland (középcsatár a helyén) −6-ot, Hwang Hee-chan (csatár BALSZÉLEN) **−10**-et
 mutat. A különbség a poszt-illeszkedés, nem TSI-lutri.
 
-**A JAVÍTÁS az 1. elv szerint: amit az előrejelzésben látsz, az legyen az, ami
-lesz.** A 2. pont eltolása nélkülözhetetlen, tehát nem az eltolást szüntetjük
-meg, hanem KIÍRJUK — ott, ahol a döntés születik, és a KIVÁLASZTOTT osztályra
-(az eltolás osztályonként más):
+**AZ ELSŐ NEKIFUTÁS (v3.5.11) CSAK KIÍRTA az eltolást a döntési képernyőn.
+Megbukott:** a felhasználó továbbra is 84-es Haalandot választott és 78-asat
+kapott. Egy magyarázó mondat nem tesz igazzá egy hamis számot.
+
+### 2.3b A VILÁG JÖN A KERETHEZ — origó-csere (v3.5.12)
+
+**A döntés:** *„azt kapjuk, ami az adatbázisban van, csak hozzátársítunk egy
+TSI-t random"* — és a plusz-Rating problémára ott a **felskálázó**.
+
+Nem a 2. pont eltolását szüntetjük meg (arra szükség van), hanem az
+**előjelét fordítjuk meg**: ugyanazt a különbséget a VILÁGRA alkalmazzuk.
+Minden osztály minden csapata `−off`-fal mozdul (`pyrShiftWorld`), a kereted
+és a pool pedig érintetlen marad (`S.pyr.off = 0`).
 
 ```
-🛡️ RB Salzburg (2019/20) · a kereted nyers ereje 76 → 70 a D6 skáláján
+régi:  (nyers + off) − pyrKözép        = nyers − nyersKözép − up
+új:     nyers        − (pyrKözép − off) = nyers − nyersKözép − up
 ```
 
-A `pyrShiftedAvgFor` ugyanazt a képletet futtatja, amit a `pyrStart`
-(`off = pyrMean − up − rawMean`, a saját klub példánya kivéve), csak előre.
-Mérve: az ígért 70 és a valóban kapott top-11 kezdő Rating-átlag **70**.
+**A rés bitre ugyanaz.** Mérve mind a 18 kombinációra (6 osztály × 3
+felskálázási fokozat, RB Salzburg 2019/20): a régi és az új modell rése
+minden sorban azonos (−9,0 · −6,2 · −4,8 · −3,4 · −2,5 · −1,5 felskálázás
+nélkül; −16,5 … −9,0 a 2. fokozaton). A nehézség, a fel- és kiesés, a
+felskálázó és a Run-plafon tehát **semmit nem változik** — csak a számok
+origója költözik oda, ahol a felhasználó él.
 
-Ugyanennek a klubnak osztályonként (a felskálázás — helyesen — nem mozdítja,
-hiszen az a VILÁGOT emeli): D1: 77 · D2: 77 · D3: 76 · D4: 74 · D5: 72 · D6: 70.
+**Mérve, ami megváltozott a képernyőn** (Salzburg, D6): a keret mind a 15
+játékosa **pontosan a kártya-Ratinggel** érkezik (Haaland 84, Szoboszlai 77,
+Hee-chan 76 — Δ = 0), a mezőnyszint 71,6 helyett **77**, az osztályok közepe
+D1 90,9 · D2 88,4 · D3 85,7 · D4 82,2 · D5 79,5 · D6 77. A kereted és a
+mezőny így **közvetlenül összevethető**, magyarázat nélkül.
 
-A klubválasztó betekintőjének lábjegyzete is kimondja mindhármat: a kezdő
-Ratinghez a TSI-sorsolás nem nyúl, a piramisban jön még egy egységes eltolás
-(a pontos számot a következő képernyő írja ki), és a pályán poszt-effektív
-érték látszik.
+**A pool és a piac is a nyers skálán marad** (`pyrPoolOffset() = 0`), tehát a
+kereted és az igazolható játékosok ugyanazt a nyelvet beszélik — korábban a
+kereted el volt tolva, a piac árazása (TSI-alapú) viszont nem.
+
+**AMIT KÜLÖN SEMLEGESÍTENI KELLETT: a büdzsé.** A `seasonBudgetParts` fix
+60-90-es ablakra hangolt, NÉGYZETES görbével árazik (`(teamR−60)/30`), tehát a
+puszta átcímkézés a hatodosztálynak **+42%** keretet adott volna (2835 → 4040)
+— olyan változás, amit senki nem kért. A `pyrWorldShift()` visszaadja az
+eltolást a büdzsé-számításnak, és ezzel a keret **bitre a 3.5.12 előtti**
+(mérve: 2835 = 2835). A többi gazdasági ág érintetlen: a szurkolótábor tárolt
+számláló, az árazás pedig TSI- és kor-alapú, amiket az eltolás sosem mozgatott.
+
+**RÉGI MENTÉS: érintetlen.** A világ a mentésben él a maga eltolásával és a
+nem nulla `S.pyr.off`-fal; a `pyrScaleClubPlayer` ott változatlanul fut. Új
+karrierben `off = 0`, tehát ugyanaz a kód nem csinál semmit. Nincs migráció.
+
+**AMI MEGMARADT ELTÉRÉSNEK:** a pályán továbbra is **poszt-effektív** szám
+látszik (3. pont) — ez viszont a dinamikus módban is így van, és a betekintő
+lábjegyzete kimondja.
 
 **A klub ELŐBB jön, mint az osztály.** Az osztály önmagában nem nehézség: a
 negyedosztály egy 84-es kerettel sétagalopp, egy 73-assal évekig tartó
