@@ -785,6 +785,39 @@ helyen mondjuk ki:
   kimondja a tétet: hányadik idény, melyik osztály, mi kell a feljutáshoz, mi
   fenyeget alul, és hogy a mezőny is fejlődik — „ha megállsz, lecsúszol".
 
+### 6.1c A HATÁROK FELOLDÁSA — Infinity nélkül (v3.5.04)
+
+A **6.1b** feloldotta a Rating-plafont a piramisban, mert enélkül a mód
+szerkezeti zsákutca volna. A többi Infinity-határ viszont ott maradt, és
+pontosan ugyanaz a logika vonatkozik rájuk: a sebesség 99-es plafonja, a kor
+miatti hanyatlás, a 32 éves visszavonulás, az akadémia sávja, a TSI- és
+attribútum-plafon, a stílus-mérföldkövek teteje. Egy végtelenbe növő világban
+mindegyik ugyanúgy megfogja a karriert.
+
+**A kapu: az osztályod mezőnye eléri a 100-as átlagot** (`pyrInfinityCheck`).
+Nincs vásárlás, nincs ár, nincs gomb — a mód ígérete szerint „a tető magától
+nyílik".
+
+**Az `infinityMode` zászlót állítjuk át, szándékosan azt**, és nem egy második
+predikátumot: a játékban minden Infinity-szabály ezen az egy zászlón dől el, és
+egy párhuzamos predikátumból előbb-utóbb kimaradna egy hívási hely. Mérve a
+3. szezonfordulón, 104-es mezőnynél: sebesség-plafon 99 → feloldva,
+visszavonulás 32 → 55, stílus-mérföldkövek +444 új fokozat.
+
+**Amit NEM ad meg:** a megnyitás egyszeri ajándékait — a keret ×TSI-boostját
+(az a 100 milliárdos ár ellentételezése; ingyen odaadva a mért fejlődési
+egyensúlyt billentené fel) és a 119-re csonkolt basePeak-ek helyreállítását
+(tárgytalan: itt a plafon sosem csonkolt). A **határok** nyílnak ki, nem az
+ajándékok.
+
+**Az Infinity-VÁSÁRLÁS eltűnt a HUB-ból.** Korábban a 100-as mezőny
+megnyerésekor megjelent a 100 milliárdos sáv, ami azt is sugallta, hogy a
+ranglistára jutás ehhez van kötve. Nincs így: a piramis belépője az **élvonal
+megnyerése** (`runBoardOnPyrTitle`, lásd 9.), és az Infinitynek semmi köze
+hozzá.
+
+---
+
 ## 8. Riválisok
 
 A mai rangadó-lista helyett: **a hozzád Ratingben legközelebb álló 2–3

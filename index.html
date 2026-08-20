@@ -3408,7 +3408,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.03";
+const APP_VERSION="3.5.04";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8398,6 +8398,7 @@ function pyrStart(startDiv,speed,sq){
   S.pyr.grow=null;                 /* az osztályodhoz tartozó ütem újraszámol */
   SEASON_OPPS=pyrOpponents();
   pyrGrowStep();pyrOppRefresh();
+  try{pyrInfinityCheck();}catch(e){}   /* konzolból indított, magas osztály esetére */
   if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
   return `Piramis indítva: D${d0} · ${home.name} · mezőny ${oppTargetRating} `
     +`· ${PYR_SPEEDS[sp].n} (AI-ütem ${pyrAiRate(d0).toFixed(1)}/szezon) `
@@ -38497,7 +38498,69 @@ function pyrSeasonTurn(){
       +`mert a mezőny is fejlődött (+${(_pr.aiStep||0).toFixed(1)}). `
       +(pyrMyDivId()===1?`Az élvonalban vagy: a cím a tét.`
         :`A csúcsig még ${pyrMyDivId()-1} osztály.`),"m life");
+  /* A HATÁROK FELOLDÁSA a forduló UTOLSÓ lépése: a mezőnyszint ekkorra már az
+     ÚJ osztályodé, és a mondat a forduló képernyőjén is megjelenik. */
+  try{pyrInfinityCheck();}catch(e){}
   return {res:_pr,lines:W.note.slice()};}
+/* ================= A PIRAMIS TETEJE: A HATÁROK MAGUKTÓL NYÍLNAK =================
+   A dinamikus módban az Infinity egy VÁSÁRLÁS: megnyered a 100-as mezőnyt,
+   kifizeted az árát, és cserébe eltűnnek a plafonok. A ligapiramisban ennek a
+   fele sem áll:
+
+     · NINCS MIT MEGVENNI. A mód ígérete az, hogy „a tető magától nyílik" — a
+       világ a végtelenbe fejlődik, tehát a plafonok feloldása nem jutalom,
+       hanem a mód működésének a FELTÉTELE. A Rating-plafont ezért már az első
+       perctől feloldottuk (ratingCap); a többi határ viszont ott maradt.
+     · AZ ÁR ÉRTELMEZHETETLEN. Egy 100 milliárdos gomb megjelenése a HUB-ban
+       ráadásul azt sugallta, hogy a ranglistára jutás ehhez van kötve — pedig
+       a piramisban a belépő az ÉLVONAL MEGNYERÉSE (runBoardOnPyrTitle), és az
+       Infinitynek semmi köze hozzá.
+
+   Mostantól: amint az OSZTÁLYOD mezőnye eléri a 100-as átlagot, a határok
+   maguktól feloldódnak. Az `infinityMode` zászlót állítjuk át — szándékosan
+   AZT, és nem egy második predikátumot —, mert a játékban minden
+   Infinity-szabály EZEN az egy zászlón dől el (a sebesség 99-es plafonja, a
+   kor-görbe, a visszavonulási kor, az akadémia sávja, a TSI-plafon, az
+   attribútum-plafon, a stílus-mérföldkövek). Egy párhuzamos predikátumból
+   előbb-utóbb kimaradna egy hívási hely, és a hiba némán jelentkezne.
+
+   AMIT NEM AD MEG: a megnyitás EGYSZERI AJÁNDÉKAIT (a keret ×TSI-boostját és
+   a 119-re csonkolt basePeak-ek helyreállítását). Az előbbi a 100 milliárdos
+   ár ellentételezése — ingyen odaadva a piramis mért fejlődési egyensúlyát
+   billentené fel; az utóbbi tárgytalan, mert itt a plafon sosem csonkolt.
+   A HATÁROK nyílnak ki, nem az ajándékok. */
+function pyrInfinityCheck(){
+  if(!(typeof pyrOn==="function"&&pyrOn()))return false;
+  if(infinityMode)return false;
+  let lvl=0;try{lvl=pyrLevel();}catch(e){return false;}
+  if(lvl<INFINITY_UNLOCK_RATING)return false;
+  infinityMode=true;
+  S.infLiftRetired=true;   /* futó karrierben nincs mit migrálni */
+  /* Könyvelés: melyik szinten volt nálad a játékos a feloldáskor. */
+  {const at=oppTargetRating||0;
+   Object.values(careerPool||{}).forEach(e=>{
+     if(e&&drafted.has(e.n)&&e.joinLevel==null)e.joinLevel=at;});}
+  pyrSay(`∞ <b>A HATÁROK FELOLDVA</b> — az osztályod mezőnye elérte a `
+    +`<b>${INFINITY_UNLOCK_RATING}</b>-as átlagot. Innentől nincs Rating-plafon, `
+    +`nincs kor miatti hanyatlás (a csúcs ${INFINITY_PEAK_END} éves korig tart), `
+    +`a visszavonulás ${INFINITY_RETIRE_AGE} évtől indul, az akadémia `
+    +`${INFINITY_ACADEMY_MIN}-${INFINITY_ACADEMY_MAX}-ös tehetségeket ad, és a `
+    +`<b>sebesség ${SPEED_MAX}-es plafonja is megnyílik</b> (fölötte negyed tempóval).`,"m win");
+  /* A BEJELENTETT VISSZAVONULÁSOK ÉRVÉNYÜKET VESZTIK — ugyanaz a
+     következetesség, mint a dinamikus megnyitásnál: ha megszűnt a kor miatti
+     hanyatlás, képmutatás volna életben hagyni a korábbi búcsúkat. */
+  {const cancelled=[];
+   Object.values(careerPool||{}).forEach(e=>{
+     if(e&&e.retirePlan&&e.age<INFINITY_RETIRE_AGE){delete e.retirePlan;cancelled.push(e.n);}});
+   if(cancelled.length)
+     pyrSay(`∞ A bejelentett visszavonulások érvényüket vesztették: `
+       +`${cancelled.map(n=>esc(shortName(n))).join(", ")} marad${cancelled.length>1?"nak":""} a pályán.`,"m life");}
+  /* A STÍLUS-LÉPCSŐK IS KINYÍLNAK — enélkül a filozófia pont ott hallgatna el,
+     ahol a piramis igazán kezdődik. */
+  try{const n=stExtendForInfinity();
+    if(n)pyrSay(`∞ A csapatstílusod mérföldkövei is kinyíltak: ${n} új fokozat.`,"m life");}catch(e){}
+  try{updateOppRatingBadge();}catch(e){}
+  return true;}
 /* A FORDULÓ SAJÁT KÉPERNYŐJE. Azért kell külön felület, mert ezen a ponton
    még nincs hova naplózni: a HUB-ban állunk, a meccs-napló pedig csak az új
    szezon indulásakor születik meg. A jelentés így a döntés PILLANATÁBAN
@@ -46370,8 +46433,14 @@ function renderHub(){
      ha a társad már be is fizetett —, a gomb NÁLAD is megjelenik, hogy legyen
      hova befizetned a részed. Enélkül a nem-bajnok fél sosem tudott volna
      hozzájárulni, és a mód sosem nyílt volna meg. */
-  const canInfinity=!infinityMode&&(wonAtLevel(INFINITY_UNLOCK_RATING)||mpInfPartnerOpened());
-  const canTier=infinityMode&&wonAtLevel(maxOppRating());
+  /* A PIRAMISBAN NINCS INFINITY-VÁSÁRLÁS. Ott a határok maguktól nyílnak a
+     100-as mezőnynél (pyrInfinityCheck), tehát sem a megnyitó, sem a
+     tier-gomb nem értelmezhető — a 100 milliárdos sáv ráadásul azt sugallta,
+     hogy a ranglistára jutás ehhez van kötve, pedig a piramis belépője az
+     élvonal megnyerése. */
+  const _pyrNoBuy=(typeof pyrOn==="function")&&pyrOn();
+  const canInfinity=!_pyrNoBuy&&!infinityMode&&(wonAtLevel(INFINITY_UNLOCK_RATING)||mpInfPartnerOpened());
+  const canTier=!_pyrNoBuy&&infinityMode&&wonAtLevel(maxOppRating());
   /* Közös karrierben a szoba állását ritkán megnézzük: innen tudja meg a nem-
      bajnok fél, hogy a társánál megvan a belépő (vagy hogy már be is fizetett),
      és ettől nyílik meg a mód akkor is, ha a várakozó ablak épp nincs nyitva.
@@ -46431,13 +46500,18 @@ function renderHub(){
     else if(infinityMode){
       /* Már fut az Infinity: a sáv az összegzőt nyitja. Így nem kell külön
          menüpontot keresni ahhoz, hogy visszanézd, mit oldottál fel. */
+      /* A PIRAMIS A SAJÁT NYELVÉN BESZÉL: ott nincs megvásárolt „Infinity mód"
+         és nincs 200-as mezőny-plafon — ott a HATÁROK oldódtak fel maguktól,
+         amikor az osztály mezőnye elérte a 100-at. */
+      const _pyrInf=(typeof pyrOn==="function")&&pyrOn();
       slot.innerHTML=
         `<button id="hubInfinityHero" class="infPanel on">
           <div class="infHead">
-            <span class="infTitle">∞ INFINITY AKTÍV</span>
-            <span class="infPrice">plafon: ${maxOppRating()}</span>
+            <span class="infTitle">∞ ${_pyrInf?"A HATÁROK FELOLDVA":"INFINITY AKTÍV"}</span>
+            <span class="infPrice">${_pyrInf?`D${pyrMyDivId()} · mezőny ${oppTargetRating}`:`plafon: ${maxOppRating()}`}</span>
           </div>
-          <div class="infSub">Nincs Rating-plafon, nincs hanyatlás, a visszavonulás ${INFINITY_RETIRE_AGE} évtől indul.</div>
+          <div class="infSub">Nincs Rating-plafon, nincs hanyatlás, a visszavonulás ${INFINITY_RETIRE_AGE} évtől indul${
+            _pyrInf?", és a sebesség "+SPEED_MAX+"-es plafonja is nyitva":""}.</div>
           <div class="infSub" style="font-weight:700;color:#e6d8ff">Koppints az összegzőért →</div>
         </button>`;
       const hero=$("hubInfinityHero");
@@ -55463,6 +55537,9 @@ function applySavedGame(d){
      így a mezőny és a menetrend a betöltés után is ugyanazt mutatja, és nem
      számít, hogy a JSON-körút szétválasztotta-e a két oldalt. */
   try{pyrOppRefresh();}catch(e){}
+  /* A HATÁROK FELOLDÁSA visszamenőleg is: egy olyan mentés, ami már 100 fölött
+     jár, de a feloldás előttről való, betöltéskor kapja meg. */
+  try{pyrInfinityCheck();}catch(e){}
   S.seasonNews=d.S.seasonNews||{};
   /* KIFEJEZETTEN a mentésből: az Object.assign csak a MEGLÉVŐ kulcsokat írja
      felül, egy régi mentés tehát a freshS true-ját örökölné, és a migráció
