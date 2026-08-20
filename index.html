@@ -2666,10 +2666,11 @@ button.infPanel:disabled{cursor:default}
        viselkedés, tehát aki hozzá sem nyúl, semmit nem vesz észre. -->
   <p class="hide" id="skillModeHint" style="font-size:12px;color:var(--dim);margin:14px 0 0;line-height:1.5">
     <b style="color:var(--gold)">Hogyan kerüljenek ki a képességek?</b> A laza módban te osztod ki őket;
-    a realisztikusban a döntés nagy része kikerül a kezedből — a keret alakul, nem tervezed.</p>
+    a realisztikusban a döntés nagy része kikerül a kezedből — a keret alakul, nem tervezed.
+    A karrier <b>legelső</b> képességét mindkét módban te adod oda, akinek akarod.</p>
   <div class="optgrid two hide" id="skillModeGrid" style="margin-top:8px">
     <button data-sk="loose" class="sel">🎯 Lazán<small>a játék sorsolja a képességet, te választod, ki kapja — bármikor, bárkinek</small></button>
-    <button data-sk="real">🎲 Realisztikusan<small>kétharmadában nem te döntesz: aki kiérdemelte vagy a véletlen kapja</small></button>
+    <button data-sk="real">🎲 Realisztikusan<small>a legelső képességen túl az esetek kétharmadában nem te döntesz: aki kiérdemelte vagy a véletlen kapja</small></button>
   </div>
     <!-- ÖSSZEFOGLALÓ: az első három oldal döntései egy dobozban. Minden sor
          koppintható, és arra az oldalra visz, ahol a beállítás lakik — így az
@@ -3430,7 +3431,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.05";
+const APP_VERSION="3.5.06";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -21833,6 +21834,15 @@ function initialSkillDraw(){
   S.initialSkillDone=true;
   if(!S.skillPool.length)S.skillPool=weightedShuffleSkills();
   const skill=S.skillPool.shift();
+  /* A KARRIER LEGELSŐ KÉPESSÉGE MINDIG A TIÉD — realisztikus módban is.
+     A "nem te döntesz" arány a menet közben ÉRDEMELT jutalmakra való: ott van
+     mit érdemelni, van lejátszott meccs, van kiemelkedő ember. A rajtnál nincs
+     — a sorsolás ilyenkor tiszta véletlenre esik vissza (skillRealEarner üres
+     S.lastStars mellett null-t ad), tehát a keret legelső, teljes értékű
+     képessége kétharmad eséllyel egy találomra kiválasztott emberre került.
+     Ez nem realizmus, csak elvett indulóhelyzet. Az utolsó paraméter (noReal)
+     kihagyja a realisztikus kaput: a kiosztás a hagyományos, kézi választón
+     megy. Minden KÉSŐBBI jutalom változatlanul a 33/66 arány alá esik. */
   grantSkillDecide(skill,"start",1,()=>{
     $("simGo").classList.remove("hide");
     /* a skill-tipp a sorsolás UTÁN jön: addigra látta, mit kapott, és hogy
@@ -21844,7 +21854,7 @@ function initialSkillDraw(){
        között ül — így az is szem előtt van. */
     if(gameMode==="career")openPreSeasonHub();
     $("scPitch").scrollIntoView({behavior:"smooth"});
-    saveGame();});}
+    saveGame();},1,null,true);}
 function teamOVRbase(){
   const f=slots.filter(s=>s.player);if(!f.length)return 0;
   return f.reduce((a,s)=>a+s.player.ovr*s.fit,0)/f.length;}
@@ -31724,6 +31734,16 @@ function mileFullTime(M,active,cleanSheet,saves,result,lastRound,ctx){
   if(!M)return;
   if(!M.on&&!M.career)return;
   ctx=ctx||{};
+  /* ---- AKI PÁLYÁRA LÉPETT ----
+     HIBA, AMIT EZ JAVÍT: az `active` a LEFÚJÁS pillanatának tizenegye, tehát
+     akit a 85. percben lecseréltél, abból kiesett. A kispad-számláló ettől úgy
+     látta, hogy ki sem maradt a kezdőből — a rendszeresen lecserélt emberek
+     három meccs után megkapták a "félretett kedvenc" ellensúlyt és a −2
+     morált, pedig végigjátszották a meccsek javát. Ugyanez torzította az
+     újonc-számlálót is. A `ctx.subbedOff` a lecseréltek neve; a kettő uniója
+     az igazság. */
+  const mfPlayed=new Set(active.map(a=>a.p.n));
+  (ctx.subbedOff||[]).forEach(n=>{if(n)mfPlayed.add(n);});
   /* A KAPUS ÉS A VÉDŐ "eredményessége" a tiszta lap — ez csak lefújáskor derül
      ki. Ugyanazon a döntési ágon megy át, mint a gól és a gólpassz, ezért a
      késői áttörés és az ifi-mérföldkő is működik rájuk: egy nyolc meccse
@@ -31809,8 +31829,7 @@ function mileFullTime(M,active,cleanSheet,saves,result,lastRound,ctx){
   /* ---- AZ ÚJONC-SZÁMLÁLÓ LÉPTETÉSE, ÉS AZ ELHALÓ BEMUTATKOZÁS ----
      FONTOS, hogy ez a hatások kiosztása ELŐTT álljon: az itt keletkező
      ellensúly is ugyanabban a körben kerül könyvelésre. */
-  active.forEach(a=>{
-    const n=a.p.n;
+  mfPlayed.forEach(n=>{
     if(!Object.prototype.hasOwnProperty.call(S.debutWatch,n))return;
     S.debutWatch[n]=(S.debutWatch[n]||0)+1;
     /* A 2-5. meccs ablaka szándékosan néma volt — de a NÉMASÁG önmagában nem
@@ -31828,10 +31847,9 @@ function mileFullTime(M,active,cleanSheet,saves,result,lastRound,ctx){
      küszöbnél szólal meg (MILE_BENCH_RETURN): aki sok meccset lehúzott a
      klubban, annak a kiszorulása hír. Pontosan a küszöb ELÉRÉSEKOR egyszer. */
   if(M.career){
-    const played=new Set(active.map(a=>a.p.n));
     S.benchRun=S.benchRun||{};
     currentRoster().filter(Boolean).forEach(p=>{
-      if(played.has(p.n)){S.benchRun[p.n]=0;return;}
+      if(mfPlayed.has(p.n)){S.benchRun[p.n]=0;return;}
       /* A SÉRÜLT (vagy eltiltott) játékos kihagyása NEM kiszorulás: nem az
          edző döntött róla, hanem a teste. Korábban az ő kihagyása is ezt a
          számlálót hizlalta, ezért a sérülés után megkapta a "kiszorult a
@@ -33475,7 +33493,9 @@ function playMatch(){
     const _capDid=!!_capN&&((mScore[_capN]||0)>0||(mAssist[_capN]||0)>0
       ||(ga===0&&(_capRole==="KAPUS"||_capRole==="VEDO")));
     mileFullTime(MILE,active,ga===0,saveCount,cls,!euroActive()&&(S.idx+1)>=30,
-      {capName:_capN,capDid:_capDid});
+      {capName:_capN,capDid:_capDid,
+       /* a lecseréltek: ők is pályára léptek, csak nem ők fejezték be a meccset */
+       subbedOff:halfOut.map(h=>h&&h.p&&h.p.n).filter(Boolean)});
     /* ---- SORSDÖNTŐ MECCS: A KÉT HŐS-SKILL KIOSZTÁSA ----
        A meccs embere ELŐTT fut, mert ez a nagyobb pillanat — és mert a
        kiosztott skill (mvp-típusú combók) nem befolyásolhatja visszamenőleg a
