@@ -627,14 +627,89 @@ Két tagja van, és **mindkettő ütközik az új móddal**:
   +13,9 — **magától lezárja a játékot**, mert a 4-es játszható ablakot
   többszörösen túllépi.
 
-**Javaslat a hagyományos módra:** `oppBuffFor` **mindkét tagja kikapcsolva**
-(0-t ad vissza). Az AI-fejlődés váltja ki a szerepét, és ez az EGYETLEN pont,
-ahol a rejtett bónusz és a nyílt fejlődés nem duplázódik. A mai módban semmi
-nem változik.
+**Javaslat a hagyományos módra (v3.4.x, MEGHALADVA):** `oppBuffFor` **mindkét
+tagja kikapcsolva** (0-t ad vissza). Az AI-fejlődés váltja ki a szerepét, és ez
+az EGYETLEN pont, ahol a rejtett bónusz és a nyílt fejlődés nem duplázódik.
 
-Ha mégis kell fék, akkor **csak a mért tag maradjon, feleakkora súllyal**
-(0,25), és a fix tag mindenképpen essen ki — az utóbbi a 84-es abszolút
-horgonya miatt egy önmagához képest mérő piramisban értelmezhetetlen.
+### 6.1a A MÉRT TAG VISSZAKAPCSOLVA — mért ellenérv (v3.5.09)
+
+**A fenti javaslat fele megbukott.** A „az AI-fejlődés MAGA ez a mechanizmus"
+érv csak akkor állna, ha a két fék UGYANAZT fékezné. Nem ugyanazt:
+
+| fék | mit követ |
+|---|---|
+| a mezőny évi fejlődése (≈+3,5) | a **kereted** erősödését — Ratingek, igazolások, akadémia |
+| a mért rejtett bónusz | a **szituatív** oldalt — morál, edző, taktika-begyakorlás, aura-képességek, kapitányi rutin, kémia |
+
+A második csatornának a mezőny oldalán **semmilyen megfelelője nincs**, és a
+mezőny évi lépése sem követi. Mérve egy futó karrieren, az 1. szezon 4.
+fordulójában (D6, 2. felskálázási fokozat):
+
+```
+kijelzett csapaterő  76,8
+valódi meccs-erő     82,0     ← +5,2 rejtett, amiről a rés-mérce nem tudott
+a mezőny             80,2
+vállalt („egyenrangú") rés   −1,2
+a pályán mért rés            +1,8
+```
+
+Vagyis a mód központi ígérete — *„a rés az egyetlen szám, ami megmondja,
+mekkora falat vállaltál"* — nem teljesült: a vállalt egyenrangú kezdésből a
+pályán 3 ponttal fölényes lett, és a különbség a karrierrel együtt nő.
+
+**KÖVETKEZETLENSÉG IS VOLT.** A `hiddenOppBuff` kupa-ága
+(`Math.max(0,seasonHiddenBonus()*OPP_BUFF_MEASURED)`) a `pyrOn`-tól
+**függetlenül** adta a mért felét. A piramis kupája és bajnoksága tehát
+kétféle szabály szerint ment.
+
+**A MEGVALÓSULT SZABÁLY.** A piramisban `oppBuffFor` a **mért tagot adja**
+(`hidden × 0,5`), a **fix tag továbbra is kimarad** — az utóbbi indoka
+változatlan és helyes: korlátlanul nő a szinttel, egy végtelenbe növő
+piramisban 150-es szinten +7,9, ami magától lezárná a játékot. A dinamikus
+mód érintetlen.
+
+A kompenzáció **félig** megy, ugyanazzal az indokkal, amiért a dinamikus
+módban is: a teljes kioltás pontosan értelmetlenné tenné a morált, a taktikát,
+az aurát és a kapitányt. A másik fele a te előnyöd marad — csak most már a
+rés-mérce is tud róla.
+
+**MÉRVE, a fenti karrieren:**
+
+| | meccs-rés | 30 fordulós várható pont |
+|---|---|---|
+| előtte | **+1,8** | 52,9 |
+| utána | **−0,8** | 39,1 |
+
+Vagyis a vállalt „egyenrangú" kezdés tényleg egyenrangú lett.
+
+### 6.1a-2 AZ UNDERDOG-MÉRCE (v3.5.09)
+
+Ugyanez a vizsgálat hozta felszínre, hogy az `underdogFactor` a mezőny
+**meccs-erejét** a te **nyers** csapaterődhöz mérte. Két különböző fajta szám,
+és a különbség pontosan a rejtett bónuszod — a HUB hegy-doboza ezért tudta
+ugyanabban a sorban azt írni, hogy *„+2 a mezőnyhöz képest"* (előnyben vagy)
+ÉS hogy *„enyhe hátrány: +9% fejlődés"* (hátrányban vagy).
+
+A bónusz **szerepe változatlan**: fejlődési kárpótlás annak, aki tényleg
+gyengébb — nem meccserő-bónusz (a faktor ma is csak a fejlődést, a
+jutalom-esélyt és a kémia-ajánlatokat szorozza). Csak a **mérés** lett
+becsületes: meccs-erő a meccs-erőhöz. A piramisban ez külön is kellett: a
+mezőny mostantól megkapja a rejtett bónuszod felét, tehát a régi képlettel a
+kompenzáció MAGA hizlalta volna az underdog-bónuszt — jutalom járt volna
+azért, hogy erős vagy.
+
+**MÉRVE:**
+
+| eset | fejlődés régi | fejlődés új |
+|---|---|---|
+| PIRAMIS · rajt, fejletlen keret (76 · mezőny 78 · rejtett 1,5) | 5% | 3% |
+| PIRAMIS · a fenti futás (76,8 · 80,2 · rejtett 5,2) | 9% | 2% |
+| PIRAMIS · kiépített keret (95 · 95 · rejtett 9) | 8% | 8% |
+| DINAMIKUS · gyenge keret (80 · mezőny 90 · rejtett 2) | 36% | **31%** |
+| DINAMIKUS · kiépített (100 · mezőny 98 · rejtett 8) | 19% | **9%** |
+
+A tényleg gyenge keret gyakorlatilag mindent megtart; a kényelmesen nyerő
+veszíti el — pontosan az, amiért a bónusz született.
 
 ### 6.1b A RATING-PLAFON — a második szerkezeti akadály a motorban
 
