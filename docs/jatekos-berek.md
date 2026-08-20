@@ -27,10 +27,14 @@ A klub két csatornán keres, és a meccsenkénti keret-bér bázisa **mindkett�
 érzékeny**:
 
 ```
-bázis = 0,50 × heti szurkolói bevétel
+bázis = 0,50 × a BÉRHORGONY heti bevétele
       + 0,25 × (nyári klub-keret ÷ 34)        ← az „edzői fizetés" ága
-      + trófeák × (heti szurkolói bevétel ÷ 9)
+      + trófeák × (a BÉRHORGONY heti bevétele ÷ 9)
 ```
+
+> **A bérhorgony (v3.5.17)** a szurkolótábor létszáma, ahogy a **szezon elején**
+> állt — nem a mai. Lásd a 6.1 szakaszt: ez a szám hajtja a bázist, a
+> sztár-felárat ÉS a plafont is.
 
 A klub-keret a `seasonBudgetParts().club`, vagyis a csapaterőből, az edzői
 fizetésemelésből és a tempóból álló összeg — ha kihívásból fizetésemelést kapsz,
@@ -102,6 +106,48 @@ felépített bér **túlterheli a rendszert**, de egy ponton (125%) megáll.
 
 Az első idényben nincs mihez mérni, ezért ott a 125%-os plafon él.
 
+## 6.1 A BÉRHORGONY — a szerződések lassabbak, mint a lelátó (v3.5.17)
+
+**BEJELENTETT HIBA:** „a szurkolótábor azonnal magával rántja a fizetéseket —
+így olyan, mintha nem lenne értelme, hogy többen járnak a meccsre."
+
+**Mérve, a bejelentő karrierjében:** egy kihívás-jutalom **+5 410 fővel** emelte
+a tábort (12 021 → 17 431), a meccsenkénti lelátó 122 → 176 M Ft-ra nőtt — a
+bérszámla viszont **ugyanabban a pillanatban** 152 → 220 M-re, mert a bér minden
+száma a MAI lelátóból számolt: a bázis (a lelátó fele), a sztár-felár (1/12) és a
+plafon (125%) is. A nettó eredmény **−14 M Ft/meccs** lett: a nagyobb tábor
+kevesebbet ért, mint a kisebb.
+
+**A javítás.** A bér a **bérhorgonyhoz** van kötve: a szurkolótábor létszámához,
+ahogy a **szezon elején** állt (`S.wageFans`). Menet közben a horgony nem
+mozdul — egyik irányba sem —, tehát:
+
+* amit az idény során hozzászerzel, annak a bevétele **teljes egészében a klubé**;
+* egy megcsappanó tábor sem rúgja szét azonnal a bérszámlát.
+
+**A szerződések a szezonfordulón tárgyalnak újra**, és akkor is csak a lemaradás
+**felét** hozzák be (`WAGE_ANCHOR_CATCH = 0,5`, `wageAnchorSeasonTurn`). Aki
+évről évre nő, tartósan nyereséges marad; aki megáll, annál a horgony pár idény
+alatt utoléri a lelátót — onnantól a rendszer betűre a régi.
+
+**A plafon is ezen az egy számon áll.** Enélkül a javítás visszafelé sült volna
+el: a bázis befagy 210 M-en, a plafon viszont a friss lelátóval 220 M-re nő —
+vagyis a plafon *kiengedne*, és a fizetés 152 → **210 M-re ugrana**. Egy
+horgony, minden bér-szám alatta.
+
+**MÉRVE a bejelentett esetre** (a valódi kóddal, `élmény ×1,00`):
+
+| | tábor | bérhorgony | lelátó/meccs | plafon | nettó a meccsen |
+|---|--:|--:|--:|--:|--:|
+| szezon eleje | 12 021 | 12 021 | 120 M | 150 M | **−30 M** |
+| a kihívás után, menet közben | 17 431 | 12 021 | 174 M | 150 M | **+24 M** |
+| a következő idényben | 17 431 | 14 726 | 174 M | 184 M | −10 M |
+| még egy idénnyel később | 17 431 | 16 079 | 174 M | 200 M | −26 M |
+
+A „Sztárom a párom" sztár-bére (`fameWageAnchor`) ugyanezen a horgonyon áll,
+a saját hírneve hozta tömegtől megtisztítva — így sem a saját hírneve, sem a
+szezon közben szerzett tábor nem drágítja vissza a bérét.
+
 ## 7. Hol látszik
 
 * **Infópult → Szezon és mérleg:** a kezdő 11 bére meccsre és idényre, a
@@ -110,7 +156,13 @@ Az első idényben nincs mihez mérni, ezért ott a 125%-os plafon él.
   bér, a bér/lelátó arány — a lábjegyzetben pedig a **plafon előtti (nyers) bér**
   és az, mennyit húzott vissza a plafon.
 * **Meccsnapló:** minden lefújás után a levonás, a sztár-felárak száma, és ha a
-  plafon fogott, az is, mennyivel.
+  plafon fogott, az is, mennyivel — a plafon mostantól kimondja, hogy a
+  **szerződéskori** lelátóhoz mér.
+* **HUB → Szurkolók doboz:** a bérhorgony létszáma, és élőben az, mennyivel jár
+  előrébb a tábor — vagyis mennyi a menet közben szerzett, tiszta haszon.
+* **Szezonforduló:** a napló kimondja a szerződés-újratárgyalást (a horgony régi
+  és új értékét), hogy a bér emelkedése ne a 3. fordulóban érje meglepetésként a
+  menedzsert.
 
 ## 8. Hangoló számok
 
@@ -119,7 +171,7 @@ Mind egy helyen, a `JÁTÉKOS-FIZETÉSEK` blokk tetején:
 `WAGE_FAN_SHARE` 0,50 · `WAGE_CLUB_SHARE` 0,25 · `WAGE_STAR_DIV` 12 ·
 `WAGE_STAR_MAX` 3 · `WAGE_TITLE_DIV` 9 · `WAGE_CAP_OK` 0,50 ·
 `WAGE_CAP_FAIL` 1,25 · `WAGE_STAR_RATING_PCT` 0,06 · `WAGE_STAR_CONTRIB` 1,6 ·
-`WAGE_STAR_CARD` „killer".
+`WAGE_STAR_CARD` „killer" · `WAGE_ANCHOR_CATCH` 0,5.
 
 ## 9. Nyitott kérdés
 
