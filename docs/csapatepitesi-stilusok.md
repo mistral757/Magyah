@@ -593,6 +593,16 @@ Guardiolát (`guardiolaTakeOver`), és onnantól az ő hatásai élnek — ugyan
 csatornán, amin bármelyik másik edzőé. Ez az 1. szint hozománya, a kétszeres
 begyakorlással együtt.
 
+**AKINÉL ELEVE GUARDIOLA AZ EDZŐ, OTT AZ 1. SZINT INGYEN JÁR.** Az a szint az
+edzőváltásért kérné a pontot — egy olyan emberért, aki már a kispadon ül. Ezért
+Guardiola-edzővel a képesség a **Tiki-Taka választásának pillanatától** az 1.
+szinten áll: a Labdatartás azonnal kétszeres tempóval gyakorlódik be, a bolt
+pedig rögtön a 2. szintet (a 125-ös plafont) kínálja. A szint
+**származtatott, nem mentett** (`guardiolaFreeLevel` → `styleTraitLevel`), tehát
+a már futó karrierek is megkapják betöltéskor, és minden csatorna — a
+tempószorzó, a plafon, a bolt ára, a fa összege, a kártya — ugyanabból az egy
+számból dolgozik.
+
 A 2-3. szint a **Labdatartás** ismertségének 99-es plafonját tolja **125-re**,
 majd **150-re**. Csak ennél az egy rendszernél: a képesség egy EMBERRŐL szól,
 aki egyetlen filozófiát visz tökélyre — ha mindenre hatna, nem Guardiola volna,
@@ -1052,7 +1062,7 @@ igényel új szimulációs ágat.
   |---|---|---|
   | **Gólok sebességgel** | gól olyan embertől, akinek van gyorsasági képessége (`S.paceGoals`, karrier-számláló) | 10 · 20 · 30 · 50 · 100 · 200 |
   | **Sebességgólok egy meccsen** | ugyanez EGY mérkőzésen belül, csapatszinten (`msT().paceHaulMax`) | 1 … 10 |
-  | **Megtanult szélső posztok** | befejezett poszt-tanulás JV / BV / JSZ / BSZ kódra (`S.wingPosLearned`) | 1 … 10 |
+  | **Megtanult szélső posztok** | befejezett poszt-tanulás JV / BV / JSZ / BSZ kódra (`S.wingPosLearned`) — a megvásárolt és a fizetés nélküli „beszokás" is számít | 1 … 10 |
 
   A sebesség-gól jelölése a gól KÖZÖS csatornáján megy (a gólblokkban, a
   `recordScorer` mellett), ezért minden gól-ág — szabadrúgás, tizenegyes,
