@@ -1164,6 +1164,23 @@ elmozdítja, visszavált a rés-alapú **AJÁNLOTT**-ra (`pyrImmersionDivOf`).
 Enélkül a képernyő két különböző osztályra mutatna: a fenti csík a
 megcélzottra, a lenti jelvény a réshez illőre.
 
+**4. UGYANEZ A CSÍK ÁLL A KÖZÖS KARRIER (PvP) BEÁLLÍTÓJÁN IS** (v3.5.16). Két
+képernyő, egy nyelv: ugyanaz a `renderPyrImmChips`, ugyanaz a hat gomb, ugyanaz
+az olvasási sorrend (csúszka + `−0,1 / nulla / +0,1` → immerzió-csík). Két
+paraméter tér el, és mindkettő a helyzetből jön:
+
+| | egyjátékos (`scPyrDiv`) | közös karrier (beállító) |
+|---|---|---|
+| mihez mérünk | a **kiválasztott klub** ereje | a **kezdő klub-sáv közepe** (a klubot még egyikőtök sem választotta) |
+| hány hely szabadul fel | 1 (te lépsz be) | 2 (két menedzser lép be) |
+| mit állít a koppintás | kezdő osztály + felskálázás | **közös** osztály + felskálázás |
+
+A házigazdánál a felskálázás **követi a ligaválasztást**, amíg kézzel nem
+nyúlnak hozzá (`pyrMpUpTouched`): a sáv vagy a közös osztály mozgatása után is
+középmezőny marad a kezdés. Az első kézi mozdítás után marad, ahol hagyták. A
+vendégnél a jelző eleve „megérintett" — ott a házigazdától érkező érték az
+igazság, nem a helyi számítás.
+
 **Visszafelé kompatibilis.** A futó karrierek a világot MENTIK (`S.pyr.divs`),
 tehát semmi nem mozdul alattuk. A 3.5.15 előtti mentések/szobák 0-4
 **fokozatot** tároltak: egy 0-4 közti egész ma legális eltolás is, ezért a mai

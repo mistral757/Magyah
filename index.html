@@ -2552,11 +2552,21 @@ button.infPanel:disabled{cursor:default}
       </div>
       <input type="range" id="pyrMpUp" min="-15" max="15" value="0" step="0.1" style="width:100%;margin-top:6px;accent-color:var(--gold)">
       <div style="display:flex;gap:6px;margin-top:5px">
-        <button type="button" id="pyrMpUpMinus" class="btn-s" style="flex:0 0 auto;padding:5px 10px;font-size:12px">−&nbsp;0,1</button>
-        <button type="button" id="pyrMpUpImm" class="btn-s" style="flex:1;padding:5px 8px;font-size:11.5px">🎬 Immerzió</button>
-        <button type="button" id="pyrMpUpPlus" class="btn-s" style="flex:0 0 auto;padding:5px 10px;font-size:12px">+&nbsp;0,1</button>
+        <button type="button" id="pyrMpUpMinus" class="btn-s" style="flex:1;padding:5px 0;font-size:12px">−&nbsp;0,1</button>
+        <button type="button" id="pyrMpUpZero" class="btn-s" style="flex:1;padding:5px 0;font-size:12px">nulla</button>
+        <button type="button" id="pyrMpUpPlus" class="btn-s" style="flex:1;padding:5px 0;font-size:12px">+&nbsp;0,1</button>
       </div>
       <div style="font-size:11px;color:var(--dim);margin-top:3px" id="pyrMpUpHint"></div>
+      <!-- ════ IMMERZIÓ ════
+           UGYANAZ A CSÍK, mint az egyjátékos osztályválasztón — csak itt a
+           mérce a klub-sáv KÖZEPE, mert a klubot még egyikőtök sem választotta
+           ki. Egy koppintás beállítja a közös osztályt ÉS a felskálázást. -->
+      <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--line)">
+        <div style="font-size:11.5px;color:var(--ink)">🎬 <b>Immerzió</b> — melyik ligában kezdenétek?
+          <span style="color:var(--dim2)">A világot úgy állítjuk be, hogy a sáv közepén álló keret ott középmezőny legyen.</span></div>
+        <div id="pyrMpImmRow" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px"></div>
+        <div id="pyrMpImmHint" style="font-size:11px;color:var(--dim);margin-top:5px;line-height:1.45"></div>
+      </div>
     </div>
     <div style="font-size:11.5px;color:var(--dim2);margin:12px 0 5px">Milyen gyorsan fejlődnek az ellenfelek?</div>
     <div class="optgrid two" id="pyrSpeedGrid"></div>
@@ -3481,7 +3491,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.15";
+const APP_VERSION="3.5.16";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -19563,6 +19573,13 @@ let pyrPending=false,pyrPendingSpeed="tarto",pyrPickSq=null,pyrPickDiv=null;
    Egyjátékosban az osztályválasztón állítod, a klub ismeretében; közös
    karrierben a házigazdáé, és a szobán át utazik. */
 let pyrPickUp=0,pyrWantedUp=0;
+/* ---- KÖVETI-E A FELSKÁLÁZÁS A LIGAVÁLASZTÁST? (közös karrier) ----
+   Amíg a házigazda nem nyúlt a csúszkához, a felskálázás MAGÁTÓL az immerziós
+   értéken áll: a sáv vagy a közös osztály mozgatása után is középmezőny marad
+   a kezdés. Az első kézi mozdítás után viszont marad, ahol hagyták — onnantól
+   a szám a házigazda döntése, nem a rendszeré. (A vendégnél is „megérintett":
+   ott a házigazdától érkező érték az igazság, nem a helyi számítás.) */
+let pyrMpUpTouched=false;
 /* KÖZÖS KARRIER: a szobából érkező közös osztály és a klublista sávja. */
 let pyrPendingDiv=null,pyrPendingBand=null,pyrPendingUp=0;
 function pyrSetupAvailable(){return gameMode==="career";}
@@ -19643,38 +19660,67 @@ function renderPyrMpDiv(){
   pyrWantedDiv=v;
   const lbl=$("pyrMpDivVal"),hint=$("pyrMpDivHint");
   if(lbl)lbl.textContent=`D${v} · ${PYR_LEAGUES[v-1]||""}`;
+  pyrMpAutoUp();          /* a felskálázás követi a ligaválasztást, amíg kézzel nem nyúltak hozzá */
   if(hint){
-    const rec=pyrMpRecDiv();
-    const mid=Math.round((pyrWantedBand[0]+pyrWantedBand[1])/2*10)/10;
+    const mid=Math.round(pyrMpBandMid()*10)/10;
+    /* AZ AJÁNLÁS EGY HANGON BESZÉL, ahogy az egyjátékos választón: ha a
+       felskálázás épp egy liga IMMERZIÓS értékén áll, akkor az a liga az
+       ajánlás — különben a rés-alapú jön, ahogy eddig. */
+    const imm=pyrMpImmersionDivOf(pyrWantedUp);
+    const rec=imm||pyrMpRecDiv();
     hint.innerHTML=v===rec
-      ?`<span style="color:var(--grass)">Ez az ajánlott osztály</span> a sáv közepéhez (${String(mid).replace(".",",")}) és a választott ellenfél-tempóhoz mérve.`
+      ?(imm
+        ?`<span style="color:var(--gold)">🎬 Immerzió:</span> a sáv közepén álló keret (${String(mid).replace(".",",")}) itt a mezőny közepe.`
+        :`<span style="color:var(--grass)">Ez az ajánlott osztály</span> a sáv közepéhez (${String(mid).replace(".",",")}) és a választott ellenfél-tempóhoz mérve.`)
       :`Az ajánlott <b>D${rec}</b> volna a sáv közepéhez (${String(mid).replace(".",",")}) mérve — feljebb könnyebb bennmaradni, lejjebb hosszabb a mászás.`;}}
+/* Melyik közös osztályra van beállítva a mostani felskálázás? (A párja:
+   pyrImmersionDivOf, csak a sáv közepével és két felszabaduló hellyel.) */
+function pyrMpImmersionDivOf(up){
+  const v=pyrUpNorm(up);
+  if(!v&&v!==0)return null;
+  for(let d=1;d<=PYR_DIVS;d++)
+    if(Math.abs(pyrMpImmersionUp(d)-v)<0.05)return d;
+  return null;}
 /* KÖZÖS KARRIER: az immerzió itt a SÁV KÖZEPÉHEZ méri magát — a klubot
    mindketten később választjátok, tehát ez az egyetlen ismert kezdő erő. A
    közös osztályból két hely szabadul fel (két menedzser lép be). */
-function pyrMpImmersionUp(){
-  const mid=(pyrWantedBand[0]+pyrWantedBand[1])/2;
+function pyrMpBandMid(){return (pyrWantedBand[0]+pyrWantedBand[1])/2;}
+function pyrMpImmersionUp(divId){
   let w=null;try{w=pyrBuildWorld(rngFor("pyr:world"),0);}catch(e){}
-  const m=pyrDivRawMeanFor(null,pyrWantedDiv,w,2);
-  if(m==null)return 0;
-  return pyrUpNorm(mid-m);}
+  const v=pyrImmNeedRaw(pyrMpBandMid(),null,divId||pyrWantedDiv,w,2);
+  return v==null?0:pyrUpNorm(v);}
+/* A KÖZÖS KARRIER LIGAVÁLASZTÓ CSÍKJA — ugyanaz a kód, mint az egyjátékosé. */
+function renderPyrMpImmRow(){
+  renderPyrImmChips({
+    rowId:"pyrMpImmRow",hintId:"pyrMpImmHint",
+    sq:null,raw:pyrMpBandMid(),drop:2,
+    div:pyrWantedDiv,up:pyrWantedUp,
+    who:"sávnál",what:"a sáv közepén álló keret",
+    tail:", a közös osztályt pedig a fenti csúszkával is átállíthatod",
+    pick:(d,need)=>{
+      pyrWantedDiv=d;
+      {const el=$("pyrMpDiv");if(el)el.value=String(d);}
+      pyrWantedUp=need;
+      renderPyrMpDiv();renderPyrMpUp();}});}
+/* A KÖVETÉS EGY HELYEN. Két rajzoló olvassa ugyanazt a számot (a csúszka és a
+   közös osztály jegyzete), tehát a követésnek MINDKETTŐ előtt le kell futnia —
+   különben az egyik a régi értékkel írna, a másik az újjal. Egymást nem hívják:
+   ez a függvény a közös pont, nem a kereszthívás. */
+function pyrMpAutoUp(){
+  if(!pyrMpUpTouched)pyrWantedUp=pyrMpImmersionUp();}
 function renderPyrMpUp(){
-  const lbl=$("pyrMpUpVal"),hint=$("pyrMpUpHint"),rng=$("pyrMpUp"),imm=$("pyrMpUpImm");
+  const lbl=$("pyrMpUpVal"),hint=$("pyrMpUpHint"),rng=$("pyrMpUp");
+  pyrMpAutoUp();
   const up=pyrUpNorm(pyrWantedUp);
   if(lbl)lbl.textContent=pyrUpTxt(up);
   if(rng&&parseFloat(rng.value)!==up)rng.value=String(up);
-  if(imm){
-    const need=pyrMpImmersionUp();
-    const on=Math.abs(need-up)<0.05;
-    imm.textContent=`🎬 Immerzió: D${pyrWantedDiv} · ${pyrUpTxt(need)}`;
-    imm.style.borderColor=on?"var(--gold)":"";
-    imm.style.color=on?"var(--gold)":"";}
+  renderPyrMpImmRow();
   if(!hint)return;
   hint.innerHTML=(up===0
     ?`A világ a valós kluberősségeken áll. Elhúzva a piramis megemelkedik (vagy lejjebb kerül), a kereteitek viszont nem — így erős klubokkal is a mélyből indulhattok. `
     :`A piramis <b>${pyrUpTxt(up)}</b> Ratinggel ${up>0?"feljebb":"lejjebb"} kerül, a kereteitek nem. `
      +`A legalsó osztály közepe <b style="color:var(--gold)">${String(Math.round((PYR_TOPMEAN-(PYR_DIVS-1)*PYR_STEP+up)*10)/10).replace(".",",")}</b>. `)
-    +`Az <b>immerzió</b> gomb úgy állítja be, hogy a sáv közepén álló keret a közös osztály <b>középmezőnye</b> legyen.`;}
+    +`Alul az <b>immerzió</b>-csík: ott egy koppintással a közös osztályt és a felskálázást is beállítod.`;}
 function updatePyrSetupVisibility(){
   const on=pyrSetupAvailable();
   const g=$("pyrModeGrid");if(g)g.classList.toggle("hide",!on);
@@ -19726,14 +19772,16 @@ function updatePyrSetupVisibility(){
    ezért mindkettőnél újrarajzol. */
 $("pyrMpDiv")&&($("pyrMpDiv").oninput=()=>{renderPyrMpDiv();renderPyrMpUp();});
 $("pyrMpUp")&&($("pyrMpUp").oninput=()=>{
+  pyrMpUpTouched=true;
   pyrWantedUp=pyrUpNorm(parseFloat($("pyrMpUp").value)||0);
   renderPyrMpUp();renderPyrMpDiv();});
 function pyrMpUpSet(v){
+  pyrMpUpTouched=true;
   pyrWantedUp=pyrUpNorm(v);
   renderPyrMpUp();renderPyrMpDiv();}
 $("pyrMpUpMinus")&&($("pyrMpUpMinus").onclick=()=>pyrMpUpSet(pyrUpNorm(pyrWantedUp)-PYR_UP_UI_STEP));
 $("pyrMpUpPlus") &&($("pyrMpUpPlus").onclick =()=>pyrMpUpSet(pyrUpNorm(pyrWantedUp)+PYR_UP_UI_STEP));
-$("pyrMpUpImm")  &&($("pyrMpUpImm").onclick  =()=>pyrMpUpSet(pyrMpImmersionUp()));
+$("pyrMpUpZero") &&($("pyrMpUpZero").onclick =()=>pyrMpUpSet(0));
 document.querySelectorAll("#pyrModeGrid button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#pyrModeGrid button").forEach(x=>x.classList.remove("sel"));
   b.classList.add("sel");pyrWanted=b.dataset.pyr==="on";
@@ -21598,15 +21646,20 @@ function pyrDivRawMeanFor(sq,divId,world,drop){
   for(let i=1;i<n;i++)ts.pop();
   if(!ts.length)return null;
   return ts.reduce((a,t)=>a+t.raw,0)/ts.length;}
-/* Mennyi felskálázás kell ahhoz, hogy EBBEN az osztályban középmezőny legyél?
-   A sáv széle nem hiba, hanem üzenet: ha a szám odaütközik, az azt jelenti,
-   hogy ezzel a kerettel abban a ligában nem lehet pontosan középmezőny — a
-   képernyő ilyenkor kiírja a maradék rést. */
+/* Mennyi felskálázás kell ahhoz, hogy EBBEN az osztályban középmezőny legyen a
+   megadott erejű keret? NYERS érték: NINCS a sávba vágva — a felület ebből
+   mondja meg, hogy „−15,2 kellene", amikor a csúszka határa megfogja. A
+   beállítás helye vág (pyrUpNorm), a kiírásé nem. */
+function pyrImmNeedRaw(raw,sq,divId,world,drop){
+  if(!divId||typeof raw!=="number")return null;
+  const m=pyrDivRawMeanFor(sq,divId,world,drop);
+  if(m==null)return null;
+  return Math.round((raw-m)*10)/10;}
+/* …és ugyanez a SAJÁT klubodra, a sávba vágva — ezt állítja be a koppintás. */
 function pyrImmersionUp(sq,divId,world){
   if(!sq||!divId)return 0;
-  const m=pyrDivRawMeanFor(sq,divId,world);
-  if(m==null)return 0;
-  return pyrUpNorm(squadAvgOvr(sq)-m);}
+  const v=pyrImmNeedRaw(squadAvgOvr(sq),sq,divId,world,1);
+  return v==null?0:pyrUpNorm(v);}
 /* MELYIK LIGÁRA VAN BEÁLLÍTVA A MOSTANI ÉRTÉK? (null = egyikre sem, mert a
    felhasználó kézzel elmozdította.) Ebből tudja a lista, hogy az „ajánlott"
    jelvényt IMMERZIÓ-ként írja-e ki: két rendszer nem mutathat két különböző
@@ -21618,21 +21671,29 @@ function pyrImmersionDivOf(sq,up,world){
   for(let d=1;d<=PYR_DIVS;d++)
     if(Math.abs(pyrImmersionUp(sq,d,w)-v)<0.05)return d;
   return null;}
-/* ---- A LIGAVÁLASZTÓ CSÍK ----
+/* ================= A LIGAVÁLASZTÓ CSÍK — EGY KÓD, KÉT KÉPERNYŐ =============
    Hat gomb, hat vállalás. A koppintás KÉT dolgot állít be egyszerre: a kezdő
    osztályt és a hozzá tartozó felskálázást — ez az „immerzió". A csík azt is
    megmutatja, melyik állás felel meg a mostani csúszka-értéknek, tehát a kézi
-   hangolás után is látod, honnan indultál. */
-function renderPyrImmRow(){
-  const row=$("pyrImmRow");if(!row)return;
-  const sq=pyrPickSq;
-  const hint=$("pyrImmHint");
-  if(!sq){row.innerHTML="";if(hint)hint.innerHTML="";return;}
+   hangolás után is látod, honnan indultál.
+
+   UGYANEZ A CSÍK ÁLL A KÖZÖS KARRIER (PvP) BEÁLLÍTÓJÁN IS. Ott a klubot még
+   egyikőtök sem választotta ki, ezért a mérce a KEZDŐ KLUB-SÁV KÖZEPE, és az
+   osztályból két hely szabadul fel (két menedzser lép be) — a `ctx` pontosan
+   ezt a két különbséget hordozza, minden más betűre azonos. Két képernyő,
+   egy nyelv: ha egyszer megértetted az egyiket, érted a másikat is. */
+function renderPyrImmChips(ctx){
+  const row=ctx&&$(ctx.rowId),hint=ctx&&$(ctx.hintId);
+  if(!row)return;
+  if(typeof ctx.raw!=="number"||!isFinite(ctx.raw)){
+    row.innerHTML="";if(hint)hint.innerHTML="";return;}
   let w=null;try{w=pyrBuildWorld(rngFor("pyr:world"),0);}catch(e){}
+  const cur=pyrUpNorm(ctx.up);
   row.innerHTML="";
   for(let d=1;d<=PYR_DIVS;d++){
-    const need=pyrImmersionUp(sq,d,w);
-    const on=(d===pyrPickDiv&&Math.abs(need-pyrUpNorm(pyrPickUp))<0.05);
+    const raw=pyrImmNeedRaw(ctx.raw,ctx.sq,d,w,ctx.drop);
+    const need=raw==null?0:pyrUpNorm(raw);
+    const on=(d===ctx.div&&Math.abs(need-cur)<0.05);
     const b=document.createElement("button");
     b.type="button";
     b.style.cssText="flex:1 1 30%;min-width:92px;text-align:left;padding:6px 8px;border-radius:7px;"
@@ -21642,23 +21703,27 @@ function renderPyrImmRow(){
       +`color:var(--ink)`;
     b.innerHTML=`<b style="font-size:12px">${on?"● ":""}D${d}</b> <span style="color:var(--dim2)">${esc(PYR_LEAGUES[d-1]||"")}</span>`
       +`<br><span style="color:var(--dim)">${d===1?"nincs feljebb":`${d-1} osztály a csúcsig`} · ${pyrUpTxt(need)}</span>`;
-    b.onclick=()=>{
-      pyrPickDiv=d;
-      pyrPickUp=pyrImmersionUp(sq,d);
-      renderPyrDivPick();};
+    b.onclick=()=>ctx.pick(d,need);
     row.appendChild(b);}
   if(!hint)return;
-  const mean=pyrDivRawMeanFor(sq,pyrPickDiv,w);
-  if(mean==null){hint.innerHTML="";return;}
-  const ideal=Math.round((squadAvgOvr(sq)-mean)*10)/10;   /* amennyi a 0 réshez kellene */
-  const need=pyrUpNorm(ideal);                            /* …és amennyi a sávból kifér */
+  const ideal=pyrImmNeedRaw(ctx.raw,ctx.sq,ctx.div,w,ctx.drop);
+  if(ideal==null){hint.innerHTML="";return;}
+  const need=pyrUpNorm(ideal);                            /* amennyi a sávból kifér */
   const rest=Math.round((ideal-need)*10)/10;              /* ami a végén rés marad */
-  hint.innerHTML=`A koppintás a csúszkát is beállítja: a <b>D${pyrPickDiv}</b>-ben `
+  hint.innerHTML=`A koppintás a csúszkát is beállítja: a <b>D${ctx.div}</b>-ben `
     +(rest!==0
-      ?`ennél a keretnél a világ nem tolható elég messzire (${pyrUpTxt(ideal)} kellene) — a legtöbb, amit adhat: rés <b>${pyrFmtGap(rest)}</b>.`
-      :`a kereted pontosan a mezőny közepe (<b>rés 0,0</b>).`)
-    +` Innen szabadon elmozdíthatod: a csúszka Rating-pontonként hangol, `
-    +`és a lenti listából bármelyik osztályt választhatod.`;}
+      ?`ennél a ${ctx.who} a világ nem tolható elég messzire (${pyrUpTxt(ideal)} kellene) — a legtöbb, amit adhat: rés <b>${pyrFmtGap(rest)}</b>.`
+      :`${ctx.what} pontosan a mezőny közepe (<b>rés 0,0</b>).`)
+    +` Innen szabadon elmozdíthatod: a csúszka Rating-pontonként hangol${ctx.tail||""}.`;}
+/* Az EGYJÁTÉKOS osztályválasztó csíkja. */
+function renderPyrImmRow(){
+  renderPyrImmChips({
+    rowId:"pyrImmRow",hintId:"pyrImmHint",
+    sq:pyrPickSq,raw:pyrPickSq?squadAvgOvr(pyrPickSq):null,drop:1,
+    div:pyrPickDiv,up:pyrPickUp,
+    who:"keretnél",what:"a kereted",
+    tail:", és a lenti listából bármelyik osztályt választhatod",
+    pick:(d,need)=>{pyrPickDiv=d;pyrPickUp=need;renderPyrDivPick();}});}
 /* AZ OSZTÁLY MEZŐNYSZINTJE A TE SKÁLÁDON. A világ az origó-csere után (lásd
    pyrShiftWorld) a NYERS adatbázis-skálán áll, tehát ez a szám közvetlenül
    összevethető a kereted átlagával — nem kell hozzá se eltolás, se magyarázat.
@@ -58002,7 +58067,7 @@ function mpApplySettings(s){
      pyrWantedDiv=Math.max(1,Math.min(PYR_DIVS,P.div||5));
      pyrWantedBand=[Math.min(P.bmin,P.bmax),Math.max(P.bmin,P.bmax)];
      /* Régi szobában nincs mező — ott nincs felskálázás, ahogy eddig sem. */
-     pyrWantedUp=pyrUpRead(P);
+     pyrWantedUp=pyrUpRead(P);pyrMpUpTouched=true;
      /* Kész klub az egyetlen kezdés a piramisban — a vendégnél is. */
      careerStart="club";}}
   updateOppRatingBadge&&updateOppRatingBadge();}
