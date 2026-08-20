@@ -82,6 +82,11 @@ képessége —, a Beton **Jöhet a buszsofőr!**-je (270 SP) a
 **Passzkémia**, **Passzrekord**, **Guardiola** (292 SP egyenként) — a
 `TT_SYSTEM_PRICE_MULT = 1,35`-tel.
 
+**Egy kedvezmény van az egész fában:** ha a klub edzője eleve **Pep Guardiola**,
+a Guardiola-képesség 1. szintje (54 SP) INGYEN jár, a Tiki-Taka választásának
+pillanatától. Ilyen klubnál a képesség 238 SP-be kerül, a fa pedig 1 829-be —
+a felület mindkét számot a tényleges állapotból írja ki (`guardiolaFreeLevel`).
+
 **A Tiki-Taka a legfelülre súlyozott fa:** tíz képességéből **öt** a III.
 sávban áll, mert három közülük nem egy meglévő számot mozdít, hanem egy új
 mechanikát ad a játékhoz. Ezért a legkevesebb képességgel is a második
