@@ -3458,7 +3458,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.10";
+const APP_VERSION="3.5.11";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -21323,8 +21323,11 @@ function clubPeekHtml(sq){
   h+=`<div style="font-size:10.5px;color:var(--dim2);line-height:1.5;margin-top:6px">`
     +`Oszlopok: poszt · név · kor · <b>Rating</b> · a csúcsáig hátralévő fejlődés · <b style="color:var(--gold)">potenciál</b> (0-100). `
     +`A potenciál a hátralévő fejlődést, a tehetséget (TSI) és a fiatalságot fogja egy számba — ugyanaz a mérce, amivel a játék is dolgozik. `
-    +`A Rating és a kor az <b>adott idény</b> valós értéke, pont az, amivel a keret meg fog érkezni.`
-    +(pyrPending?` A piramisban a keret ezután még egy EGYSÉGES eltolást kap az osztályod skálájára — a sorrend attól nem változik.`:"")
+    +`A Rating és a kor az <b>adott idény</b> valós értéke — a kezdő Rating pontosan ennyi lesz, a TSI-sorsolás nem nyúl hozzá.`
+    +(pyrPending
+      ?` A piramisban a keret ezután még egy EGYSÉGES eltolást kap a választott osztály skálájára (a következő képernyő kiírja a pontos számot) — a sorrend attól nem változik.`
+      :"")
+    +` A PÁLYÁN ezeknél kisebb szám is állhat: ott a <b>poszt-effektív</b> érték látszik, tehát aki idegen poszton játszik, kevesebbet mutat.`
     +`</div>`
     +`<button class="btn-p" data-clubgo="1" style="width:100%;margin-top:9px">${go}</button>`;
   return h;}
@@ -21368,6 +21371,35 @@ function renderPyrUpRow(){
      +(pyrPickUp===PYR_UP_STEPS
        ?` <span style="color:var(--gold)">A maximum: a hatodosztály itt pontosan annyit ér, mint ma az élvonal.</span>`
        :"");}
+/* A KERET ÁTLAGA A VÁLASZTOTT OSZTÁLY SKÁLÁJÁN. Pontosan azt a képletet
+   futtatja, amit a pyrStart használ (`off = pyrMean − up − rawMean`), csak
+   előre — így a képernyőn hirdetett szám és a pályán megjelenő ugyanaz.
+   A klub SAJÁT példánya kikerül a mezőnyből (ahogy a belépéskor is), mert
+   különben a nyers közép önmagadat is tartalmazná. */
+function pyrShiftedAvgFor(sq,divId,upLv){
+  if(!sq||!divId)return null;
+  try{
+    const up=pyrUpAmount(upLv);
+    const w=pyrBuildWorld(rngFor("pyr:world"),upLv);
+    const d=w.divs[divId-1];
+    if(!d)return null;
+    const ts=d.teams.slice().sort((a,b)=>b.ovr-a.ovr);
+    const own=ts.findIndex(t=>t.club===sq.club);
+    if(own>=0)ts.splice(own,1);else ts.pop();
+    const rawMean=ts.reduce((a,t)=>a+t.raw,0)/ts.length;
+    const pyrMean=ts.reduce((a,t)=>a+t.ovr,0)/ts.length;
+    const off=Math.round((pyrMean-up-rawMean)*10)/10;
+    /* ---- A KEREKÍTÉS UGYANÚGY MEGY, MINT A VALÓSÁGBAN ----
+       A pyrScaleClubPlayer JÁTÉKOSONKÉNT kerekít (`Math.round(startRating+sh)`),
+       és a top-11 az ÍGY kapott értékekből áll össze. Ha itt az átlagra
+       tennénk rá az eltolást és azt kerekítenénk egyszer, az ígért szám
+       félpontokat tévedne — épp azt a bizalmat rontva el, amiért ez a sor
+       egyáltalán kiíródik. */
+    const vals=(sq.players||[]).map(p=>Math.round(Math.max(40,(p.ovr||0)+off)))
+      .sort((a,b)=>b-a).slice(0,11);
+    if(!vals.length)return null;
+    return Math.round(vals.reduce((a,v)=>a+v,0)/vals.length);
+  }catch(e){return null;}}
 function pyrFmtGap(v){return (v>0?"+":v<0?"−":"")+Math.abs(v).toFixed(1).replace(".",",");}
 function renderPyrDivPick(){
   const sq=pyrPickSq;if(!sq)return;
@@ -21379,10 +21411,29 @@ function renderPyrDivPick(){
   if(!pyrPickDiv)pyrPickDiv=rec;
   const sp=PYR_SPEEDS[pyrPendingSpeed]||PYR_SPEEDS.tarto;
   const head=$("pyrDivClub");
+  /* ---- AMIT ITT LÁTSZ, AZT KAPOD ----
+     HIBA, AMIT EZ JAVÍT: a fejléc a keret NYERS erejét hirdette (a
+     klubválasztóban is ez az átlag), a pályán viszont a POOL-ELTOLÁS UTÁNI
+     szám jelenik meg — egy D6-os kezdésnél ez 5-7 ponttal kevesebb. A
+     felhasználó tehát 76-ot választott és 69-et kapott, magyarázat nélkül.
+     Az eltolás maga helyes és nélkülözhetetlen (lásd docs 2.1: enélkül egy
+     hatodosztályú klubbal +5,6-tal a saját mezőnyöd FÖLÖTT kezdenél), de a
+     számot ki kell mondani ott, ahol a döntés születik — és a KIVÁLASZTOTT
+     osztályra, mert az eltolás osztályonként más. */
+  const rawAvg=Math.round(squadAvgOvr(sq));
+  const shifted=pyrShiftedAvgFor(sq,pyrPickDiv,pyrPickUp);
   if(head)head.innerHTML=`🛡️ <b>${esc(sq.club)}</b> <span style="color:var(--dim2)">(${esc(sq.season)})</span>`
-    +` · a kereted ereje <b style="color:var(--gold)">${Math.round(squadAvgOvr(sq))}</b>`
+    +` · a kereted nyers ereje <b>${rawAvg}</b>`
+    +(shifted==null?""
+      :shifted!==rawAvg
+      ?` → <b style="color:var(--gold)">${shifted}</b> a D${pyrPickDiv} skáláján`
+      :` — a D${pyrPickDiv} skáláján <b style="color:var(--gold)">változatlan</b>`)
     +` · ellenfél-tempó: <b>${esc(sp.n)}</b>`
-    +(pyrPickUp?` · felskálázás: <b style="color:var(--gold)">${esc(pyrUpLabel(pyrPickUp))}</b>`:"");
+    +(pyrPickUp?` · felskálázás: <b style="color:var(--gold)">${esc(pyrUpLabel(pyrPickUp))}</b>`:"")
+    +`<div style="font-size:11px;color:var(--dim);margin-top:3px;line-height:1.45">`
+    +`A piramis Ratingjei normalizáltak, ezért a kereted EGYSÉGES eltolást kap a választott osztály skálájára — `
+    +`ez a második szám az, amit a pályán is látni fogsz. A rés ettől nem változik: a mezőny közepe ugyanennyivel mozdul.`
+    +`</div>`;
   box.innerHTML="";
   opts.forEach(o=>{
     const sel=o.id===pyrPickDiv;

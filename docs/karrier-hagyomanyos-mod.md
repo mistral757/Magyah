@@ -104,6 +104,50 @@ indulok →" vagy „Tovább az osztályválasztóhoz →"). A hagyományos mód
 lábjegyzet külön kimondja, hogy a keret még egy EGYSÉGES eltolást kap az
 osztály skálájára — a sorrend attól nem változik.
 
+### 2.3 „Amit látsz, azt kapod" — a pool-eltolás kiírva (v3.5.11)
+
+**BEJELENTETT TÜNET:** a klubválasztó 76-os átlagot hirdetett, a pályán viszont
+68-as csapaterő fogadott. Három külön dolog keveredett össze; a mérés
+(RB Salzburg 2019/20, D6) mindhármat szétválasztotta.
+
+**1. A DINAMIKUS MÓDBAN NINCS ELTÉRÉS.** Mind a 15 játékos pontosan a
+kártya-Ratinggel érkezik (Δ = 0). A `seasonBasisFor` `ovr`-je a kártya értéke,
+és a TSI-sorsolás nem nyúl hozzá — a kor is a valós születési évből jön, csak
+ott sorsol, ahol nincs adat. Ez a viselkedés a kívánt, és már megvolt.
+
+**2. A PIRAMISBAN EGY EGYSÉGES ELTOLÁS FUT** (`pyrScaleClubPlayer` →
+`applyMarketShift`), és mérve tényleg egységes: D6-ban mind a 15 emberre
+pontosan **−6** (off = −5,4). Ez nem hiba, hanem a mód gerince: a piramis
+Ratingjei normalizáltak, a játékos-adatbázis nyers, és eltolás nélkül egy
+hatodosztályú klubbal **+5,6-tal a saját mezőnyöd FÖLÖTT** kezdenél (lásd 2.1).
+A rés nem változik tőle: a mezőny közepe ugyanennyivel mozdul.
+
+**3. A PÁLYÁN POSZT-EFFEKTÍV SZÁM LÁTSZIK** (`playerStrength`), nem a játékos
+saját Ratingje. Ez adja a látszólagos „egyenetlenséget": ugyanabban a mérésben
+Haaland (középcsatár a helyén) −6-ot, Hwang Hee-chan (csatár BALSZÉLEN) **−10**-et
+mutat. A különbség a poszt-illeszkedés, nem TSI-lutri.
+
+**A JAVÍTÁS az 1. elv szerint: amit az előrejelzésben látsz, az legyen az, ami
+lesz.** A 2. pont eltolása nélkülözhetetlen, tehát nem az eltolást szüntetjük
+meg, hanem KIÍRJUK — ott, ahol a döntés születik, és a KIVÁLASZTOTT osztályra
+(az eltolás osztályonként más):
+
+```
+🛡️ RB Salzburg (2019/20) · a kereted nyers ereje 76 → 70 a D6 skáláján
+```
+
+A `pyrShiftedAvgFor` ugyanazt a képletet futtatja, amit a `pyrStart`
+(`off = pyrMean − up − rawMean`, a saját klub példánya kivéve), csak előre.
+Mérve: az ígért 70 és a valóban kapott top-11 kezdő Rating-átlag **70**.
+
+Ugyanennek a klubnak osztályonként (a felskálázás — helyesen — nem mozdítja,
+hiszen az a VILÁGOT emeli): D1: 77 · D2: 77 · D3: 76 · D4: 74 · D5: 72 · D6: 70.
+
+A klubválasztó betekintőjének lábjegyzete is kimondja mindhármat: a kezdő
+Ratinghez a TSI-sorsolás nem nyúl, a piramisban jön még egy egységes eltolás
+(a pontos számot a következő képernyő írja ki), és a pályán poszt-effektív
+érték látszik.
+
 **A klub ELŐBB jön, mint az osztály.** Az osztály önmagában nem nehézség: a
 negyedosztály egy 84-es kerettel sétagalopp, egy 73-assal évekig tartó
 kapaszkodás. Csak a keret ismeretében lehet értelmes ajánlást adni, és csak
