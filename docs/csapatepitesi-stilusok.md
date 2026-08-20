@@ -221,6 +221,62 @@ Nincs kiemelkedő ember, és nincs gyenge láncszem sem.
 
 **Illeszkedés:** 4-4-2, 4-3-3, 4-2-4 · Labdatartás, Totális futball
 
+#### 3.3.1 Szezon-szerepek (3.5.07)
+
+A negyedik filozófia, ami szezon-szerepeket kap — és a három közül **egyik sem
+úgy néz ki, mint a többi stílusé**.
+
+| Szerep | Kire jelölhető | Mikor él | Mit csinál |
+|---|---|---|---|
+| 🕊️ **Peace on you!** | temperamentumos, lobbanékony, bajkeverő vagy öntörvényű (`coopI≤1` VAGY `aggroI≥3`) | az első **KAPOTT** góltól a lefújásig | saját gólsúlya **+3% → +15%** · ellenfél-gólesély **−2% → −7%** · a **piroslapja ×10 → ×2,5** |
+| ⚖️ **Egyensúly** | bárki (nincs kapu, csak lejtő) | a mérkőzésen **kívül** | **+2,25% → +22,5%** könnyítés a csapategyensúly-mérőn |
+| 🧠 **Agy** | a keret **passz-átlaga fölött** | végig, amíg a pályán van | gólpassz-súly **×1,03 → ×1,09** |
+
+**A PEACE ON YOU! AZ EGYETLEN SZEREP, AHOL A KÉPESSÉG AZ ÁRAT SZELÍDÍTI.**
+Máshol a `szerepek` képesség szintje a hasznot emeli, és kész. Itt a haszon is
+nő (+5/+10/+15% saját gól, −3/−5/−7% ellenfél), de a piroslap-szorzó **lefelé**
+megy: `10 / (szint+1)` — vagyis képesség nélkül **tízszeres**, az 1. szinten 5×,
+a 2.-on 3,3×, a 3.-on 2,5×. Kiosztani képesség nélkül tehát rossz üzlet, és a
+panel ezt **ki is mondja**: a teljes létra ott áll a kártyán, a mostani fokozat
+kiemelve. Ez a szerep alkuja, nem rejtett csapda.
+
+A szorzó **külön csatornán** megy (`roleRedMult` / `roleRedTeamP`), nem a
+`roleRiskMult`-on: az ugyanis a SÉRÜLÉST is súlyozza, itt viszont csak a lapról
+van szó — egy dühöngő ember nem sérülékenyebb, csak fegyelmezetlenebb. A
+csapatszintű esély is nő, a szokásos becsületes számtannal: a többletsúly
+tizenegyed része (3. szinten +13,6%).
+
+**AZ EGYENSÚLY AZ EGYETLEN SZEREP, AMI NEM A MECCSEN DOLGOZIK.** A hatása a
+`balEase` — ugyanaz a csatorna, amit a **Természetes összhang** képesség is
+használ, és a kettő **összeadódik** (képesség max 30% + szerep max 22,5% =
+52,5%; a `BAL_EASE_CAP` 60%-nál vág, hogy a `balRatingCvMax` 1−ease osztása
+sose szaladjon el).
+
+A százalék három tényező szorzata:
+
+```
+alap (3%) × közelség-szorzó × szint-szorzó
+```
+
+A **közelség** az öt attribútumból a **három legközelebbi terjedelme** (rendezett
+sorban a legszorosabb hármas mindig szomszédos, ezért elég három ablakot
+megnézni):
+
+| terjedelem | 0 | ≤1 | ≤2 | ≤3 | ≤4 | ≤5 | ≤7 | &lt;10 | ≥10 | ≥20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| szorzó | ×5 | ×3,5 | ×2,5 | ×2 | ×1,75 | ×1,5 | ×1,25 | ×1 | ×0,5 | ×0,1 |
+
+A **szint-szorzó** 0,75 / 1 / 1,25 / 1,5 (0. → 3. szint). Példa: egy 3-as
+terjedelmű ember 2. szinten `3 × 2 × 1,25 = **7,5%**` könnyítést ad. A HUB
+egyensúly-doboza külön kiírja, mennyi jön a szerepből — a szám így visszakereshető.
+
+**PÁRHARCBAN** mindhárom szerep átmegy a pillanatképen (`h2hWireRoles` a `v`,
+`v2` és `v3` értékeket is átküldi kiértékelve). A Peace on you! piroslapja
+azért kap külön kezelést (`h2hRolePeaceRedW` / `h2hRolePeaceRedTeam`), mert a
+súlyok és a piroslap-esély a kezdőrúgás előtt fűződnek drótra, a FELTÉTELT
+(kaptunk-e már gólt) viszont csak a közös szimuláció ismeri. A
+véletlen-fogyasztás nem változik: a küszöb mozdul el, nem a dobások száma.
+
 ---
 
 ### 3.4 ⭐ SZTÁROM A PÁROM
@@ -1092,10 +1148,13 @@ igényel új szimulációs ágat.
   bosszantó volna, ha minden kattintás visszacsukná. A nyitás/csukás megőrzi a
   görgetést: a megnyomott fejléc a képernyőn a helyén marad.
 
-* **Szezon-szerepek — Bombázók, Beton és Villám (3.2.00 / 3.3.39).** Három
-  filozófia kap egy döntést, amit a többi nem: **minden idényben három embert
+* **Szezon-szerepek — Bombázók, Beton, Villám, Tiki-Taka és Béke és harmónia
+  (3.2.00 / 3.3.39 / 3.4.00 / 3.5.07).** Öt filozófia kap egy döntést, amit a
+  többi nem: **minden idényben három embert
   jelöl ki három feladatra**. A szerep nem képesség és nem poszt — csak a mérkőzés egy
   adott SZAKASZÁBAN él, ettől lesz taktikai döntés, nem puszta számnövelés.
+  (A Tiki-Taka szerepeit a 3.7.4, a Béke és harmónia szerepeit a 3.3.1
+  szakasz írja le; az alábbi tábla a három induló stílusé.)
 
   | Stílus | Szerep | Mikor él | Mit csinál |
   |---|---|---|---|
