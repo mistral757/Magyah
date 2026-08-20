@@ -2737,7 +2737,7 @@ button.infPanel:disabled{cursor:default}
 <section id="scClubPick" class="hide">
   <div class="card">
     <div class="steplbl">3 · Válassz klubot</div>
-    <p style="font-size:13px;color:var(--dim);line-height:1.5">Ezzel a kerettel kezded a karriert. A játékosok ereje — mint mindig — a tehetségükből (TSI) és az életkorukból alakul, tehát a nevek adottak, a formájuk viszont meglepetés lehet.</p>
+    <p style="font-size:13px;color:var(--dim);line-height:1.5">Ezzel a kerettel kezded a karriert. A játékosok ereje — mint mindig — a tehetségükből (TSI) és az életkorukból alakul, tehát a nevek adottak, a formájuk viszont meglepetés lehet.<br><b style="color:var(--gold)">Koppints egy klubra a betekintőért</b> — megnézheted a hét legnagyobb potenciálú emberét, és csak utána, külön gombbal döntesz.</p>
     <p style="font-size:12.5px;color:var(--gold);margin-top:4px" id="clubPickNote"></p>
     <input type="search" id="clubSearch" placeholder="Keresés klubra vagy bajnokságra…" style="width:100%;margin-top:10px;padding:9px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:13.5px">
     <div id="clubPickList" style="margin-top:10px;max-height:60vh;overflow-y:auto"></div>
@@ -3458,7 +3458,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.09";
+const APP_VERSION="3.5.10";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -21201,13 +21201,133 @@ function renderClubPickList(q){
         </div>
         <div style="font-size:11.5px;color:var(--dim);margin-top:2px">${n} fős keret${n<11?" · ifikkel kiegészítve":""}${sq.note?` · ${esc(sq.note)}`:""}${
           bestCap!=null?` · <b style="color:${runColor(bestCap)}">Run-plafon ${bestCap}</b>`:""}</div>`;
-      b.onclick=()=>{
+      /* ---- A BETEKINTŐ (3.5.10) ----
+         A klubválasztás eddig EGY koppintás volt, visszaút nélkül: a listából
+         csak a nevet, az idényt és az átlagerőt lehetett látni, a döntés
+         viszont a teljes karrierre szólt. Az átlag nem mondja meg, MILYEN
+         keretet kapsz — egy 80-as öreg gárda és egy 80-as, feltörő fiatal
+         csapat két külön karrier.
+         Mostantól az első koppintás LENYIT, és csak a megerősítő gomb indít.
+         MÓDTÓL FÜGGETLENÜL: a dinamikus, a hagyományos és a közös karrier is
+         ugyanezen az úton megy — a gomb felirata mondja meg, mi következik. */
+      const det=document.createElement("div");
+      det.className="hide";
+      det.style.cssText="margin:-2px 0 8px;padding:9px 11px;border-radius:8px;"
+        +"background:var(--panel2);border:1px solid var(--line)";
+      const go=()=>{
         /* KÖZÖS KARRIERBEN az osztály már eldőlt (a házigazda adta), tehát
            nincs mit választani — a klubbal együtt indul a karrier. */
         if(pyrPending&&pyrPendingDiv){pyrPickSq=sq;pyrPickDiv=pyrPendingDiv;pyrConfirmDiv();}
         else if(pyrPending)pyrOpenDivPick(sq);
         else startClubCareer(sq);};
-      box.appendChild(b);});});}
+      b.onclick=()=>{
+        const open=!det.classList.contains("hide");
+        /* HARMONIKA: egyszerre egy klub van nyitva — különben a lista
+           áttekinthetetlenné hízik, és a görgetés elveszti a helyét. */
+        box.querySelectorAll("[data-clubdet]").forEach(x=>x.classList.add("hide"));
+        if(open)return;                       /* második koppintás = becsukás */
+        det.innerHTML=clubPeekHtml(sq);
+        det.classList.remove("hide");
+        const btn=det.querySelector("[data-clubgo]");
+        if(btn)btn.onclick=(ev)=>{if(ev&&ev.stopPropagation)ev.stopPropagation();go();};
+        det.scrollIntoView({behavior:"smooth",block:"nearest"});};
+      det.setAttribute("data-clubdet","1");
+      box.appendChild(b);box.appendChild(det);});});}
+/* ---- A BETEKINTŐ TARTALMA: A HÉT LEGNAGYOBB POTENCIÁLÚ EMBER ----
+   A rangsor a `playerPotential`-ből jön — ugyanabból a számból, amit a
+   skill-kiosztás és az árazás is használ, tehát nem egy külön, kitalált mérce.
+
+   A SZÁMOK A SZEZON-ALAPRÓL SZÓLNAK, nem a pool nyers bejegyzéséről: a kész
+   klub kerete a `commitSeasonBasis`-on át pontosan az adott idény
+   értékelésével és a hozzá tartozó VALÓS életkorral érkezik. A `seasonBasisFor`
+   tiszta függvény (nevesített, seedelt véletlenfolyam a név+klub+idény
+   hármasra), tehát ugyanazt adja itt, mint majd a leigazolásnál — a betekintő
+   nem ígérhet mást, mint amit kapsz, és nem is fogyaszt véletlent a
+   fő folyamból.
+
+   A HAGYOMÁNYOS MÓDBAN a keret később egy egységes eltolást kap
+   (`pyrScaleClubPlayer`), ami MINDENKIT ugyanannyival mozdít — a rangsor tehát
+   érintetlen, a kiírt Rating viszont a nyers (a listában hirdetett átlaggal
+   azonos) skálán áll. Ezt a lábjegyzet ki is mondja. */
+const CLUB_PEEK_N=7;
+/* ---- A POTENCIÁL SÁVJAI, MÉRVE ----
+   Nem hasraütés: a 172 választható klub-szezon top-7-eseit végigszámolva
+   (1203 érték) az eloszlás medián 7, p75 11, p90 15, p97 29, maximum 78. Egy
+   beérett szuperklub top-embere 5-10 körül áll, egy feltörő keretben viszont
+   60-80-as érték is akad (Sporting 2017/18: 78 · Arsenal 2003/04: 76 ·
+   Barcelona 2008/09: 72). A színek ehhez a valósághoz igazodnak — a régi
+   70/45-ös küszöb mellett gyakorlatilag minden szürke lett volna. */
+const CLUB_PEEK_BANDS=[[30,"var(--grass)"],[15,"var(--gold)"],[8,"var(--ink)"]];
+function clubPeekColor(v){
+  const hit=CLUB_PEEK_BANDS.find(x=>v>=x[0]);
+  return hit?hit[1]:"var(--dim2)";}
+/* Egy mondat arról, MIT jelent a keret legnagyobb potenciálja — a fenti
+   ugyanazon mérésből. A szám önmagában semmit nem mond annak, aki most látja
+   először. */
+function clubPeekVerdict(best){
+  if(best>=30)return {t:"Kivételes tehetség van a keretben — ez a klub a jövőt is hozza.",c:"var(--grass)"};
+  if(best>=15)return {t:"Van kire építeni: néhány ember még érdemben fejlődik.",c:"var(--gold)"};
+  if(best>=8)return {t:"Pár fejlődőképes ember, de a keret nagyja már kész.",c:"var(--ink)"};
+  return {t:"Beérett keret — alig van benne hátralévő fejlődés. Amit látsz, azt kapod.",c:"var(--dim2)"};}
+function clubPeekRows(sq){
+  const rows=[];
+  (sq.players||[]).forEach(sp=>{
+    if(!sp||!sp.n)return;
+    const e=(typeof careerPool!=="undefined"&&careerPool)?careerPool[sp.n]:null;
+    if(!e)return;
+    let b=null;
+    try{b=seasonBasisFor(e,sp,sq);}catch(err){b=null;}
+    const ovr=b?b.ovr:Math.round(sp.ovr||0);
+    const age=b?b.age:(e.age||24);
+    const peak=b?b.peak:(e.peak||ovr);
+    const tsi=b?b.tsi:(e.tsi||0);
+    let pot=0;
+    try{pot=playerPotential({peak,startRating:ovr,age,tsi});}catch(err){pot=0;}
+    rows.push({n:sp.n,pos:(sp.pos||[]).join("/"),ovr,age,peak,pot,
+               up:Math.max(0,Math.round(peak-ovr))});});
+  rows.sort((a,b)=>b.pot-a.pot||b.ovr-a.ovr);
+  return rows;}
+function clubPeekHtml(sq){
+  const all=clubPeekRows(sq);
+  const rows=all.slice(0,CLUB_PEEK_N);
+  const go=pyrPending
+    ?(pyrPendingDiv?`Ezzel a klubbal indulok →`:`Tovább az osztályválasztóhoz →`)
+    :`Ezzel a klubbal indulok →`;
+  if(!rows.length)
+    return `<div style="font-size:12px;color:var(--dim)">Ehhez a kerethez nincs betekintő adat.</div>`
+      +`<button class="btn-p" data-clubgo="1" style="width:100%;margin-top:9px">${go}</button>`;
+  /* A LISTA A POTENCIÁL SZERINT RENDEZ, tehát a legERŐSEBB ember simán
+     lemaradhat róla (egy csúcson lévő 91-esnek nincs hátralévő fejlődése). A
+     fejléc ezért külön kimondja, ki a keret legjobbja — a két kérdés
+     („mennyire jó most" / „mennyi van még benne") így egy dobozban megvan. */
+  const top=all.slice().sort((a,b)=>b.ovr-a.ovr)[0];
+  const verd=clubPeekVerdict(rows[0].pot);
+  let h=`<div style="font-size:11.5px;color:var(--dim);margin-bottom:7px;line-height:1.5">`
+    +`<b style="color:var(--ink)">${(sq.players||[]).length} fős keret</b> · top-11 átlag `
+    +`<b style="color:var(--gold)">${Math.round(squadAvgOvr(sq))}</b>`
+    +(top?` · a legerősebb: <b style="color:var(--ink)">${esc(shortName(top.n))}</b> (${top.ovr})`:"")
+    +`<br><span style="color:${verd.c}">${esc(verd.t)}</span></div>`
+    +`<div style="font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--gold);margin-bottom:6px">`
+    +`🔭 A ${rows.length} legnagyobb potenciálú ember</div>`;
+  rows.forEach((r,i)=>{
+    const col=clubPeekColor(r.pot);
+    h+=`<div style="display:flex;align-items:baseline;gap:8px;font-size:12.5px;padding:3px 0${
+      i?";border-top:1px solid var(--line)":""}">
+      <span style="flex:0 0 46px;font-size:10.5px;letter-spacing:.4px;color:var(--dim2)">${esc(r.pos||"—")}</span>
+      <span style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(shortName(r.n))}</span>
+      <span style="flex:0 0 auto;color:var(--dim);font-size:11px">${r.age} év</span>
+      <span style="flex:0 0 30px;text-align:right;font-family:var(--font-disp);font-size:14px">${r.ovr}</span>
+      <span style="flex:0 0 40px;text-align:right;color:var(--dim2);font-size:11px" title="a csúcsáig hátralévő fejlődés">${r.up?"+"+r.up:"—"}</span>
+      <span style="flex:0 0 34px;text-align:right;font-family:var(--font-disp);font-size:15px;color:${col}">${r.pot}</span>
+    </div>`;});
+  h+=`<div style="font-size:10.5px;color:var(--dim2);line-height:1.5;margin-top:6px">`
+    +`Oszlopok: poszt · név · kor · <b>Rating</b> · a csúcsáig hátralévő fejlődés · <b style="color:var(--gold)">potenciál</b> (0-100). `
+    +`A potenciál a hátralévő fejlődést, a tehetséget (TSI) és a fiatalságot fogja egy számba — ugyanaz a mérce, amivel a játék is dolgozik. `
+    +`A Rating és a kor az <b>adott idény</b> valós értéke, pont az, amivel a keret meg fog érkezni.`
+    +(pyrPending?` A piramisban a keret ezután még egy EGYSÉGES eltolást kap az osztályod skálájára — a sorrend attól nem változik.`:"")
+    +`</div>`
+    +`<button class="btn-p" data-clubgo="1" style="width:100%;margin-top:9px">${go}</button>`;
+  return h;}
 /* ================= AZ OSZTÁLYVÁLASZTÓ (HAGYOMÁNYOS KARRIER) =================
    A klub UTÁN jön, és ez a sorrend a lényeg: az osztály önmagában nem
    nehézség, csak a kerettel EGYÜTT az. Ugyanaz a negyedosztály egy 84-es

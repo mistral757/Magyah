@@ -68,6 +68,42 @@ ezért ott a kezdésmód-választó eltűnik, és a helyén egy rövid magyaráz
 kezdésmód-választó el is tűnik a beállításról (`updatePyrSetupVisibility`
 odaállítja a `careerStart`-ot). Az indoklás a **4.2 lezárása**.
 
+### 2.2 A klubválasztó betekintője (v3.5.10) — MINDEN MÓDBAN
+
+A klubválasztás eddig **egy koppintás** volt, visszaút nélkül: a listából a
+nevet, az idényt és a top-11 átlagot lehetett látni, a döntés viszont a teljes
+karrierre szólt. Az átlag nem mondja meg, MILYEN keretet kapsz — egy 85-ös,
+beérett gárda és egy 85-ös, feltörő csapat két külön karrier.
+
+Mostantól az első koppintás **lenyit**, és csak a megerősítő gomb indít. A
+doboz három dolgot mond:
+
+* **fejléc** — keretméret, top-11 átlag, és a keret **legerősebb** embere (a
+  lista potenciál szerint rendez, tehát a 91-es sztár simán lemaradhat róla);
+* **a hét legnagyobb potenciálú ember** — poszt · név · kor · Rating · a
+  csúcsáig hátralévő fejlődés · potenciál. A rangsor a `playerPotential`-ből
+  jön, ugyanabból a számból, amit a skill-kiosztás és az árazás is használ;
+* **egy mondatos ítélet** a keret legnagyobb potenciáljáról.
+
+**A számok a szezon-alapról szólnak, nem a pool nyers bejegyzéséről.** A
+`seasonBasisFor` tiszta függvény (nevesített, seedelt folyam a
+név+klub+idény hármasra), tehát ugyanazt adja a betekintőben, mint majd a
+leigazolásnál — a doboz nem ígérhet mást, mint amit kapsz, és nem fogyaszt
+véletlent a fő folyamból.
+
+**A sávok mérve.** A 172 választható klub-szezon top-7-eseit végigszámolva
+(1203 érték): medián **7**, p75 11, p90 15, p97 **29**, maximum **78**. Egy
+beérett szuperklub top-embere 5-10 körül áll (Barcelona 1993/94: 13), egy
+feltörő keretben viszont 60-80 is akad — Sporting CP 2017/18: **78**, Arsenal
+2003/04: 76, Barcelona 2008/09: 72. A színküszöbök ehhez igazodnak
+(≥30 zöld · ≥15 arany · ≥8 alap · alatta halvány).
+
+**Mód-független.** A dinamikus, a hagyományos és a közös karrier is ugyanezen
+az úton megy; a gomb felirata mondja meg, mi következik („Ezzel a klubbal
+indulok →" vagy „Tovább az osztályválasztóhoz →"). A hagyományos módban a
+lábjegyzet külön kimondja, hogy a keret még egy EGYSÉGES eltolást kap az
+osztály skálájára — a sorrend attól nem változik.
+
 **A klub ELŐBB jön, mint az osztály.** Az osztály önmagában nem nehézség: a
 negyedosztály egy 84-es kerettel sétagalopp, egy 73-assal évekig tartó
 kapaszkodás. Csak a keret ismeretében lehet értelmes ajánlást adni, és csak
