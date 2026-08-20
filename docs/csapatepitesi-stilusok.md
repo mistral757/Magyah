@@ -1569,6 +1569,57 @@ A Beton ezzel a legtöbbet termelő stílus lett (4 063 pont), a fája pedig a
 második legnagyobb a Harmónia 2 051-e mögött. A „legsivárabb" cím átkerült a
 **Bombázókhoz** (9 képesség, 118 mérföldkő, 2 578 pont) — az a stílus a Beton
 tükörképe, tehát ugyanez a bővítés ott is elvégezhető, csatárokra fordítva.
+**(A 3.5.18-ban ez meg is történt — lásd 3.9.)**
+
+### 3.9 A BOMBÁZÓK BŐVÍTÉSE (3.5.18)
+
+**A bejelentés:** „nincs elég mérföldkő a Bombázóknak." A 3.3.16 óta ez volt a
+legsivárabb tábla, és a fenti bekezdés maga jelölte ki az irányt.
+
+**Hat új mérföldkő-család** (42 fokozat), mind a stílus SAJÁT tengelyén — a
+Gólszerzés-attribútumon és a gólszerző képességeken:
+
+| Család | Mit mér | Fokozatok |
+|---|---|--:|
+| `bz_g80` / `bz_g85` / `bz_g90` | hányan érik el a 80 / 85 / 90-es Gólszerzést | 8 / 6 / 5 |
+| `bz_gtop` | a keret legjobb Gólszerzés-attribútuma, 80-tól ötösével 115-ig | 8 (+6 Infinityben) |
+| `bz_gsk` | gólok KÉSZ gólszerző képességgel — a klub teljes története | 6 |
+| `bz_gskM` | ugyanez egyetlen mérkőzésen | 8 |
+
+A `bz_gsk`/`bz_gskM` a Villám `vl_pace`/`vl_paceM` párja a másik tengelyen: nem
+azt méri, hány gólt rúgtatok, hanem hogy MIVEL. Gólszerző képesség az, ami a
+GÓLSÚLYT emeli (`goalw`) vagy a GÓLSZERZÉS attribútumot edzi — és csak a KÉSZ
+számít, mert a félkész még nem hat a pályán. A három darabszám-család ki van
+véve az Infinity-hosszabbításból (a tetejüket a KERET MÉRETE szabja, nem a
+mezőny szintje); a `bz_gtop` viszont a 200-as Rating-skálán fut tovább.
+
+**Két új képesség**
+
+| Rang | Képesség | Ár | Hatás (I / II / III) |
+|---|---|--:|---|
+| III. | **Gólétvágy** | 216 | kész gólszerző képességgel esett gól után a következő ÖT PERCBEN 25 / 33 / 50% eséllyel jön a következő találat is — mérkőzésenként egy ilyen extra gól |
+| II. | **Mesterhármas-hajsza** | 141 | aki két gólnál tart, azt a csapat kiszolgálja: minden más középpályás és támadó +12 / 15 / 20% gólpassz-súlyt kap, ő maga +5 / 10 / 15% gólsúlyt — a harmadik gólig |
+
+A **Gólétvágy** az első bombázó-képesség, ami nem egy szorzót emel, hanem egy
+ESEMÉNYT ad hozzá a mérkőzéshez. A kiváltója a stílus saját terméke (ugyanaz a
+kész gólszerző képesség, amit a `bz_gsk` is számol), tehát a fa alsó fele
+(Befejezés-iskola, Gólvágó-műhely) itt fizet vissza másodszor. A korlát az EXTRA
+GÓLRA szól, nem a próbálkozásra: ha az esély nem jön be, a következő
+képesség-gól újra felébresztheti az étvágyat — enélkül egy gólzáporos meccsen
+viszont önmagát gerjesztené.
+**Párharcban nem fut:** ott a gólokat a közös eseménylista adja, egy helyben
+injektált gól a két kliens állását némán szétvinné (ugyanaz az indoklás, mint a
+Tiki-Taka passzrekordjánál).
+
+A **Mesterhármas-hajsza** a csapat viselkedését írja át egy pillanatra. A súlyok
+RELATÍVAK (`weightedPick`), tehát a hatás nem több gól, hanem az, hogy a
+meglévők nagyobb eséllyel futnak össze nála. Mérve, egy 4-3-3-as tizenegyen, a
+III. szinten: a kétgólos középcsatár gólsúly-részesedése **30,3% → 33,3%**, a
+középpálya és a támadósor gólpassz-részesedése **75,1% → 78,4%**.
+
+**Az eredmény:** 9 → **11 képesség**, 118 → **177 mérföldkő**, 2 578 → **3 753
+SP**, fedezet 189% → **218%** (a mezőny közepe). Infinity előtt 55% → **70%**.
+A „legsivárabb" cím a **Sztárom a páromhoz** került.
 
 ### 3.3 Párharc-cseretervező (3.3.17)
 

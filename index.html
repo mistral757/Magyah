@@ -3491,7 +3491,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.17";
+const APP_VERSION="3.5.18";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -11926,6 +11926,74 @@ function notePaceGoal(name){
   if(gameMode!=="career"||!isPaceGoal(name))return false;
   S.paceGoals=(S.paceGoals||0)+1;
   return true;}
+/* ================= BOMBÁZÓK: A GÓLSZERZŐ KÉPESSÉGEK KÖNYVELÉSE ============
+   A Villám sebesség-ágának párja (lásd notePaceGoal), a másik tengelyen: hány
+   gól született GÓLSZERZŐ KÉPESSÉGGEL — összesen és egyetlen mérkőzésen.
+
+   MI SZÁMÍT GÓLSZERZŐ KÉPESSÉGNEK: ami a GÓLSÚLYT emeli (type/combo "goalw"),
+   vagy ami a GÓLSZERZÉS attribútumot edzi. Ugyanaz a szerkezet, mint az
+   isPaceSkill/isPassSkill — nem posztkategória, hanem HATÁS.
+
+   ÉS CSAK A KÉSZ KÉPESSÉG. A félkész még nem hat a pályán (a súlyt a
+   skillProgOf arányosítja), tehát nem is ő szerezte a gólt. A Villám ID-listás
+   megoldásához képest ez szigorúbb, cserébe a mérföldkő azt méri, amit ígér. */
+function isGoalSkillDef(sk){
+  if(!sk)return false;
+  const types=[sk.type].concat(sk.combo?sk.combo.map(c=>c.type):[]);
+  if(types.indexOf("goalw")>=0)return true;
+  return !!(sk.attrTrain&&sk.attrTrain.key==="gol");}
+function goalSkillInst(name){
+  try{return playerSkills(name).find(i=>i&&i.skill&&isGoalSkillDef(i.skill)&&skillComplete(i))||null;}
+  catch(e){return null;}}
+function isGoalSkillGoal(name){return !!goalSkillInst(name);}
+function noteGoalSkillGoal(name){
+  if(gameMode!=="career"||!isGoalSkillGoal(name))return false;
+  S.golSkillGoals=(S.golSkillGoals||0)+1;
+  return true;}
+/* Hány emberednél van KÉSZ gólszerző képesség? A képesség-kártya élő mérése
+   ebből mondja meg, hányan tudják egyáltalán kiváltani a gólétvágyat. */
+function goalSkillCarriers(){
+  let n=0;
+  try{msRoster().forEach(p=>{if(p&&p.n&&goalSkillInst(p.n))n++;});}catch(e){}
+  return n;}
+/* ---- GÓLÉTVÁGY (stílus-képesség) ----
+   Ha gólszerző képességgel bíró ember talál be, a következő ÖTPERCBEN eséllyel
+   jön a következő gól is. Meccsenként egyszer — a szintje adja az esélyt.
+   PÁRHARCBAN NEM FUT: ott a gólokat a közös eseménylista adja (ugyanaz az
+   indoklás, mint a Tiki-Taka passzrekordnál), egy helyben injektált gól a két
+   kliens állását némán szétvinné. */
+const BZ_APPETITE_P=[0,0.25,0.33,0.50];
+function bzAppetiteLevel(){
+  try{return Math.max(0,Math.min(3,Math.round(styleFxMax("bzAppetite"))||0));}catch(e){return 0;}}
+function bzAppetiteChance(){return BZ_APPETITE_P[bzAppetiteLevel()]||0;}
+/* ---- MESTERHÁRMAS-HAJSZA (stílus-képesség) ----
+   Aki KÉT gólnál tart, azt a csapat kiszolgálja: a többi középpályás és támadó
+   gólpassz-súlyt kap, ő maga gólsúlyt. A hatás a harmadik gólig él — utána a
+   hajszának nincs tárgya. A súlyok RELATÍVAK (weightedPick), tehát a hatás
+   nem több gólt jelent, hanem azt, hogy a meglévők nagyobb eséllyel FUTNAK
+   ÖSSZE nála. */
+const BZ_CHASE_ASSIST=[0,0.12,0.15,0.20], BZ_CHASE_GOAL=[0,0.05,0.10,0.15];
+function bzChaseLevel(){
+  try{return Math.max(0,Math.min(3,Math.round(styleFxMax("bzChase"))||0));}catch(e){return 0;}}
+/* Ki az, aki PONTOSAN két gólnál tart? (Több ilyennél az utolsó — a hajsza egy
+   emberről szól.) A háromgólos már nem cél: neki meglett. */
+function bzChaseTarget(mScore){
+  if(!mScore||!bzChaseLevel())return null;
+  let t=null;
+  Object.keys(mScore).forEach(n=>{if(mScore[n]===2)t=n;});
+  return t;}
+function bzChaseGoalMult(name,mScore){
+  const lv=bzChaseLevel();
+  if(!lv||!name)return 1;
+  return (bzChaseTarget(mScore)===name)?1+BZ_CHASE_GOAL[lv]:1;}
+function bzChaseAssistMult(name,pos,mScore){
+  const lv=bzChaseLevel();
+  if(!lv||!name)return 1;
+  const t=bzChaseTarget(mScore);
+  if(!t||t===name)return 1;
+  let cat="CSATAR";
+  try{cat=getCategoryFor(pos||"KKP");}catch(e){}
+  return (cat==="KOZEPPALYAS"||cat==="CSATAR")?1+BZ_CHASE_ASSIST[lv]:1;}
 /* ---- A MESTERHÁRMAS MINT CSILLAG-KULCS ----
    A csillagozás joga a karrier legdrágább stíluspont-nyelője. A Villám
    képessége egy MÁSIK utat nyit rá: aki mesterhármast lő, annak a képességénél
@@ -26060,7 +26128,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
   mpSubPlan:null,
   /* VILLÁM: sebesség-képességgel szerzett gólok a klub történetében, és a
      befejezett SZÉLSŐ poszt-tanulások száma. Mindkettő karrier-szintű. */
-  paceGoals:0,wingPosLearned:0,
+  paceGoals:0,golSkillGoals:0,wingPosLearned:0,
   /* AZ ALAKZAT ÁRA: idényenkénti gyűjtő {season,matches,sumMult,xga} */
   shapeStat:null,
   balSkillMatches:0,balSkillsSeason:0,
@@ -33057,7 +33125,11 @@ function playMatch(){
      a kommentárjuk a kisorsolt percben szólal meg (lásd ttPlanMatch). A
      párharcban nem fut: ott az eredményt a közös eseménylista adja. */
   const TT_PLAN=DUEL?[]:(()=>{try{return ttPlanMatch(MS.active,-1,fx.o.ovr);}catch(e){return [];}})();
-  let min=0,gf=0,ga=0,redIdx=-1,saveCount=0,maxDeficit=0,maxLead=0,specialEventHappened=false,specialEventCount=0,titleLiveNotes=0,skillFlavorShown=false,paceFlavorShown=false,supersubStruck=false,tierQuoteShown=false,tacGoalFlavorShown=false,tacRawShown=false,genGoalShown=false,styleLineShown=false,hardTackleShown=false,clutchWallShown=false,clutchHeroShown=false,paceGoalsThisMatch=0;
+  let min=0,gf=0,ga=0,redIdx=-1,saveCount=0,maxDeficit=0,maxLead=0,specialEventHappened=false,specialEventCount=0,titleLiveNotes=0,skillFlavorShown=false,paceFlavorShown=false,supersubStruck=false,tierQuoteShown=false,tacGoalFlavorShown=false,tacRawShown=false,genGoalShown=false,styleLineShown=false,hardTackleShown=false,clutchWallShown=false,clutchHeroShown=false,paceGoalsThisMatch=0,
+    /* BOMBÁZÓK: képesség-gólok ezen a meccsen · a gólétvágy állapota (élesítve
+       a következő ötpercre / elsütve — meccsenként egyszer) · a hajsza
+       bejelentése (szintén egyszer). */
+    golSkillGoalsThisMatch=0,bzAppetiteArmed=false,bzAppetiteUsed=false,bzAppetiteName="",bzChaseNoted="";
   /* az eredményjelző MÉG az első kiírás előtt áll fel: onnantól a
      updateTTBoard minden hívása őt is frissíti */
   sbStart(fx,tickMs,!!S.auto);
@@ -33383,9 +33455,13 @@ function playMatch(){
            vezetést jutalmazta a meglévő 1-2 gólos előny megtartása helyett).
            A clutchHeroWeight szándékosan marad a gól UTÁNI álláson: az más
            kérdésre felel (ki a hős ebben a pillanatban). */
-        const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*crossTargetMult(slots[x.idx].pos)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*roleGoalMult(x.p.n,90,gf-1,ga)*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
+        const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*crossTargetMult(slots[x.idx].pos)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*roleGoalMult(x.p.n,90,gf-1,ga)*bzChaseGoalMult(x.p.n,mScore)*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
         const dramaScorer=active[si].p;
         mScore[dramaScorer.n]=(mScore[dramaScorer.n]||0)+1;recordScorer(dramaScorer.n);
+        /* BOMBÁZÓK: a hajrágól is gól — a képesség-számláló ezt is látja.
+           (A Villám sebesség-számlálója ezt az ágat történetileg nem nézi; azt
+           szándékosan nem írjuk át itt, mert az egy másik stílus mércéje.) */
+        try{if(noteGoalSkillGoal(dramaScorer.n))golSkillGoalsThisMatch++;}catch(e){}
         try{vlNoteGoal(dMin,dramaScorer.n,null);}catch(e){}
         updateGoallessStreak(dramaScorer.n,true);
         updateTTBoard(fx,gf,ga,90);
@@ -33457,6 +33533,7 @@ function playMatch(){
          a legkijátszósabb tiki-taka gól" mérföldkő ebből él, tehát a
          gólonkénti ízkeretből NEM fogyaszthat. */
       addLine(`→ 🌀 <b>${_tt.passes} PASSZ!</b> ${ttGoalLine(_tt)}`,"m skillnote");
+      try{if(noteGoalSkillGoal(_sc.n))golSkillGoalsThisMatch++;}catch(e){}
       mileEffective(MILE,_sc.n,"goal",`${sbMinTxt(_tmin)}  `);
       if(_asN)mileEffective(MILE,_asN,"assist",`${sbMinTxt(_tmin)}  `);
       S.ttGoals=(S.ttGoals||0)+1;
@@ -33465,6 +33542,19 @@ function playMatch(){
     /* PÁRHARCBAN a vödör góljai a KÖZÖS listából jönnek; egyébként poisson. */
     const duelMine=DUEL?(duelBkt.mine[min/5]||[]):null;
     let g=DUEL?duelMine.length:poisson(lf*clutchAttackMult(active,min,gf,ga)*busOwnMult()*roleOwnGoalMult(active,redIdx)/18);
+    /* ---- BOMBÁZÓK · GÓLÉTVÁGY ----
+       Az előző ötpercben gólszerző képességgel esett gól: most dől el, jön-e a
+       folytatás. Meccsenként EGY extra gól, párharcban sosem (lásd fent). */
+    if(bzAppetiteArmed){
+      bzAppetiteArmed=false;
+      /* A KORLÁT AZ EXTRA GÓLRA SZÓL, NEM A PRÓBÁLKOZÁSRA: ha az esély nem jön
+         be, a következő képesség-gól újra felébresztheti az étvágyat. Így a
+         képesség nem egyetlen érme-dobáson múlik, a „meccsenként egy" ígéret
+         viszont áll. */
+      if(Math.random()<bzAppetiteChance()){
+        bzAppetiteUsed=true;g++;
+        addLine(`${sbMinTxt(gmin(min))}  🔥 <b>FELÉBREDT A GÓLÉTVÁGY!</b> `
+          +`${esc(shortName(bzAppetiteName))} találata után a csapat azonnal ment a következőért.`,"m mvp");}}
     for(let k=0;k<g;k++){
       gf++;
       /* ---- A SZEREP-SZORZÓ A GÓL ELŐTTI ÁLLÁST NÉZI ----
@@ -33475,7 +33565,7 @@ function playMatch(){
          vezetést jutalmazta a meglévő 1-2 gólos előny megtartása helyett).
          A clutchHeroWeight szándékosan marad a gól UTÁNI álláson: az más
          kérdésre felel (ki a hős ebben a pillanatban). */
-      let si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf-1,ga)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
+      let si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf-1,ga)*bzChaseGoalMult(x.p.n,mScore)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
       /* Párharcban a gólszerzőt a közös lista dönti el (a súlyozást a saját
          kliensed már a pillanatkép küldésekor elvégezte). A fenti súlyozott
          választás csak TARTALÉK marad: ha a név bármiért nem található a
@@ -33495,11 +33585,28 @@ function playMatch(){
       mScore[scorer.n]=(mScore[scorer.n]||0)+1;recordScorer(scorer.n);
       /* VILLÁM: sebesség-skilles gól? (összesen + ezen a meccsen) */
       try{if(notePaceGoal(scorer.n))paceGoalsThisMatch++;}catch(e){}
+      /* BOMBÁZÓK: gólszerző képességgel esett gól? (összesen + ezen a meccsen)
+         …és ha a stílus képessége áll mögötte, a következő ötpercre FELÉLED az
+         étvágy. Meccsenként egyszer; párharcban a gólétvágy esélye 0. */
+      try{
+        if(noteGoalSkillGoal(scorer.n))golSkillGoalsThisMatch++;
+        if(!DUEL&&!bzAppetiteUsed&&!bzAppetiteArmed&&bzAppetiteChance()>0
+           &&min<90&&isGoalSkillGoal(scorer.n)){
+          bzAppetiteArmed=true;bzAppetiteName=scorer.n;}
+      }catch(e){}
+      /* BOMBÁZÓK · MESTERHÁRMAS-HAJSZA: a második gólnál a csapat átáll rá.
+         Egyszer mondjuk ki emberenként — a szorzók onnantól némán dolgoznak. */
+      try{
+        if(bzChaseLevel()&&mScore[scorer.n]===2&&bzChaseNoted!==scorer.n){
+          bzChaseNoted=scorer.n;
+          addLine(`→ 🎯 <b>MEGY A MESTERHÁRMASÉRT!</b> ${esc(shortName(scorer.n))} két gólnál tart — `
+            +`a középpálya és a támadósor innentől őt keresi.`,"m skillnote",true);}
+      }catch(e){}
       updateGoallessStreak(scorer.n,true);
       let atxt="",asstSk=null,asstName=null;
       /* Párharcban a gólpassz ténye és adója is a közös listából jön. */
       if(duelGoal?!!duelGoal.assist:Math.random()<crossAssistChance(0.75)){
-        let ai;do{ai=weightedPick(active,(x,idx)=>idx===redIdx?0:(ASSTW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"assistw")*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*mileWeight(MILE,x.p.n)*roleAssistMult(x.p.n)*roleAssistTargetMult(x.p.n,scorer.n),null,spreadSkipGK);}while(ai===si);
+        let ai;do{ai=weightedPick(active,(x,idx)=>idx===redIdx?0:(ASSTW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"assistw")*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*mileWeight(MILE,x.p.n)*roleAssistMult(x.p.n)*roleAssistTargetMult(x.p.n,scorer.n)*bzChaseAssistMult(x.p.n,slots[x.idx].pos,mScore),null,spreadSkipGK);}while(ai===si);
         if(duelGoal){const _a=active.findIndex(a=>a.p.n===duelGoal.assist);if(_a>=0&&_a!==si)ai=_a;}
         const asst=active[ai].p;
         mAssist[asst.n]=(mAssist[asst.n]||0)+1;recordAssist(asst.n);
@@ -34646,6 +34753,8 @@ function playMatch(){
         redWin:(gf>ga&&redIdx>=0),
         /* VILLÁM: hány gól esett sebesség-képességgel EZEN a mérkőzésen */
         paceGoals:paceGoalsThisMatch,
+        /* BOMBÁZÓK: …és hány gólszerző KÉPESSÉGGEL */
+        golSkillGoals:golSkillGoalsThisMatch,
         /* BÉKE ÉS HARMÓNIA: hányan OSZTOZTAK a termelésen ezen a mérkőzésen.
            A careerStats csak összegez, tehát utólag visszakereshetetlen, hogy
            egy adott meccsen hány KÜLÖNBÖZŐ ember talált be és hányan adtak
@@ -51524,6 +51633,8 @@ function msNoteMatch(o){
     if(o.goalsFor!=null)t.haulMax=Math.max(t.haulMax||0,o.goalsFor);
     /* VILLÁM: a sebesség-gólok egy mérkőzésen elért csúcsa */
     if(o.paceGoals!=null)t.paceHaulMax=Math.max(t.paceHaulMax||0,o.paceGoals);
+    /* BOMBÁZÓK: a képesség-gólok egy mérkőzésen elért csúcsa */
+    if(o.golSkillGoals!=null)t.golSkillHaulMax=Math.max(t.golSkillHaulMax||0,o.golSkillGoals);
     if(o.saves!=null)t.savesMax=Math.max(t.savesMax||0,o.saves);
     if(o.comeback!=null)t.mCbMax=Math.max(t.mCbMax||0,o.comeback);
     if(o.winStreak!=null)t.winStreakMax=Math.max(t.winStreakMax||0,o.winStreak);
@@ -53134,7 +53245,7 @@ function styleBindPanel(body){
       if(lv>=t.lv.length)return;
       askConfirm({html:`<div style="font-size:13px;line-height:1.5">`
         +`<b>${esc(t.n)}</b> — ${lv+1}. szint, <b style="color:var(--gold)">${t.lv[lv].price} csapatstílus-pont</b>.<br>`
-        +`${esc(t.d)}<br><br>`
+        +`${styleTraitDescHtml(t.d)}<br><br>`
         +(lv?`Most: <b>${esc(t.lv[lv-1].note)}</b> → `:"")
         +`Ezután: <b style="color:var(--grass)">${esc(t.lv[lv].note)}</b>`
         +`<br><br><span style="color:var(--dim2)">A pont elköltése végleges — `
@@ -53586,6 +53697,9 @@ const ST_FAM_T={
   vl_recN:"Megdöntött klubrekordok", vl_avgmax:"A repülő kezdő 11",
   vl_pace:"Gólok sebességgel", vl_paceM:"Sebességgólok egy meccsen",
   vl_wing:"Megtanult szélső posztok",
+  bz_g80:"80-as Gólszerzésű emberek", bz_g85:"85-ös Gólszerzésű emberek",
+  bz_g90:"90-es Gólszerzésű emberek", bz_gtop:"A legjobb gólvágód Gólszerzése",
+  bz_gsk:"Gólok gólszerző képességgel", bz_gskM:"Képesség-gólok egy meccsen",
   vl_quick2:"Gyorsan rúgjunk kettőt!", vl_triple3:"Hopp, a tripla!",
   vl_yo2:"Bepörög a jojó — kettő egy félidőben",
   vl_yo3:"Bepörög a jojó — három egy félidőben",
@@ -53668,10 +53782,19 @@ function stFastestName(){
     const a=attrsOfPlayer(p);const v=(a&&a.seb)||0;
     if(v>m){m=v;b=p.n;}});
   return b;}
-function stFastCount(th){
+/* ---- ATTRIBÚTUM-MÉRCÉK A KERETRE ----
+   Két kérdés, egy megvalósítás: HÁNYAN érik el a küszöböt, és MENNYI a legjobb
+   érték. A Villám a Sebességen, a Bombázók a Gólszerzésen, a Tiki-Taka a
+   Passzon áll — ugyanaz a két függvény szolgálja ki mindet. */
+function stAttrCount(key,th){
   let n=0;
-  msRoster().forEach(p=>{const a=attrsOfPlayer(p);if(a&&(a.seb||0)>=th)n++;});
+  msRoster().forEach(p=>{const a=attrsOfPlayer(p);if(a&&(a[key]||0)>=th)n++;});
   return n;}
+function stAttrMax(key){
+  let m=0;
+  msRoster().forEach(p=>{const a=attrsOfPlayer(p);if(a&&(a[key]||0)>m)m=a[key];});
+  return Math.round(m);}
+function stFastCount(th){return stAttrCount("seb",th);}
 /* Mindenkori klub-összeg egy karrier-statisztika mezőjéből. */
 function stCareerSum(field){
   let n=0;
@@ -53885,6 +54008,47 @@ stTiers("bombazok","bz_memo",th=>`${th} emlékezetes mérkőzés`,
   th=>`Zárj ${th} mérkőzést legalább ${MS_MEMORABLE}-ös izgalom-pontszámmal. `
      +`Ez a mért eloszlás felső néhány százaléka — amit évekig emlegetnek.`,
   ST_L6,[2,5,10,18,30,50],()=>msT().memorable||0);
+/* ---- A GÓLSZERZÉS-ATTRIBÚTUM: A STÍLUS SAJÁT TENGELYE (3.5.18) ----
+   A Villám a SEBESSÉGET teszi meg mércének (vl_fast, vl_max), a Tiki-Taka a
+   PASSZT (tt_passattr) — a Bombázóknak eddig egyetlen attribútum-mérföldköve
+   sem volt, pedig a Gólszerzés pontosan ilyen tengely, és a stílus egész
+   képességfája (Gólvágó-műhely, Befejezés-iskola) ezt építi.
+
+   NÉGY CSALÁD. Három a KERET SZÉLESSÉGÉT méri (hányan érik el a 80-at, a
+   85-öt, a 90-et — egyre kevesebb fokozattal, mert egyre nehezebb), egy pedig
+   a CSÚCSOT: a legjobb gólvágód Gólszerzése, 80-tól ötösével felfelé. A csúcs-
+   lépcső Infinityben tovább nyílik (lásd ST_INF_TOP.bz_gtop) — ott a 115 után
+   hat új fokozat vezet a 200-ig, vagyis a lépcsőnek gyakorlatilag nincs teteje. */
+stTiers("bombazok","bz_g80",th=>`${th} ember 80-as Gólszerzéssel`,
+  th=>`Legyen ${th} játékosod 80-as vagy jobb Gólszerzés-attribútummal. A keret `
+     +`bármelyik tagja számít, nem csak a kezdő 11-é.`,
+  [2,2,3,5,8,10,20,32],[1,2,3,4,5,6,8,10],()=>stAttrCount("gol",80));
+stTiers("bombazok","bz_g85",th=>`${th} ember 85-ös Gólszerzéssel`,
+  th=>`Legyen ${th} játékosod 85-ös vagy jobb Gólszerzés-attribútummal.`,
+  ST_L6,[1,2,3,4,5,6],()=>stAttrCount("gol",85));
+stTiers("bombazok","bz_g90",th=>`${th} ember 90-es Gólszerzéssel`,
+  th=>`Legyen ${th} játékosod 90-es vagy jobb Gólszerzés-attribútummal. Ennyi `
+     +`befejezőt együtt tartani már egész karrier munkája.`,
+  [5,8,12,20,32],[1,2,3,4,5],()=>stAttrCount("gol",90));
+stTiers("bombazok","bz_gtop",th=>`${th}-es Gólszerzés egy játékosnál`,
+  th=>`Érje el valamelyik játékosod a ${th}-es Gólszerzés-attribútumot. `
+     +`A lépcsőnek nincs teteje: minden újabb szint újabb mérföldkő.`,
+  [3,5,8,12,17,22,26,30],[80,85,90,95,100,105,110,115],()=>stAttrMax("gol"));
+/* ---- A KÉPESSÉGGEL SZERZETT GÓL ----
+   A Villám sebesség-ágának (vl_pace, vl_paceM) párja a másik tengelyen. Nem
+   AZT méri, hány gólt rúgtatok, hanem hogy MIVEL: hány gól esett olyan
+   embertől, akinél KÉSZ gólszerző képesség van. Ez a stílus képességfájának a
+   termése — a Befejezés-iskola és a Gólvágó-műhely itt fizet vissza. */
+stTiers("bombazok","bz_gsk",th=>`${th} gól gólszerző képességgel`,
+  th=>`Szerezz ${th} gólt olyan játékossal, akinél KÉSZ gólszerző képesség van `
+     +`(ami a gólsúlyt emeli, vagy a Gólszerzés attribútumot edzi). A klub `
+     +`teljes története számít.`,
+  ST_L6,[10,20,30,50,100,200],()=>S.golSkillGoals||0);
+stTiers("bombazok","bz_gskM",th=>`${th} képesség-gól egy meccsen`,
+  th=>`Essen ${th} gól EGYETLEN mérkőzésen kész gólszerző képességgel bíró `
+     +`emberektől. Nem kell ugyanannak lőnie mindet — a csapat egy meccsen `
+     +`belüli termése számít.`,
+  [2,3,5,8,10,14,18,22],[1,2,3,4,5,6,7,8],()=>msT().golSkillHaulMax||0);
 
 /* ---------- ☯️ BÉKE ÉS HARMÓNIA ---------- */
 /* FORDÍTOTT MÉRCE — ugyanaz a hiba, mint a bt_ga-nál: a haladás „20 mínusz a
@@ -54623,6 +54787,11 @@ const ST_INF_TOP={
      ugyanaz a 200. A középpálya ÖSSZEGE viszont nem: ott a családnak nincs
      saját skálája, marad az általános ×1,8. */
   tt_passattr:()=>200, tt_avg:()=>200, tt_axis:()=>200,
+  /* A Gólszerzés ugyanazon a Rating-skálán fut, mint a Passz és a Védekezés —
+     a csúcs-lépcső teteje ugyanaz a 200. A DARABSZÁM-családok (hányan érik el a
+     80/85/90-et) az általános ×1,8-cal folytatódnak: ott a keret mérete a
+     korlát, nem az attribútum skálája. */
+  bz_gtop:()=>200,
   hm_axisN:()=>200, hm_balN:()=>200,
   /* A paletta és a szivárvány SAJÁT lépésköze folytatódik: a hosszabbító hat
      fokozatot vág a mostani tető és az itteni tető közé, tehát a 100-ról a
@@ -54639,7 +54808,12 @@ const ST_INF_TOP={
 /* A tt_chain teteje FIZIKAI: egy passzsor legfeljebb TT_CHAIN_MAX elemű, tehát
    29 passznál több nem létezik. A tt_poss plafonját nem a mezőny szintje szabja
    meg, hanem a Guardiola-képesség (150) — az Infinity ott sem ad hozzá semmit. */
-const ST_INF_SKIP=["pz_capt","hm_card","hm_contribM","tt_chain","tt_poss"];
+/* A HÁROM BOMBÁZÓ-DARABSZÁM (hányan érik el a 80/85/90-es Gólszerzést) is
+   ide tartozik: a tetejüket nem a mezőny szintje szabja meg, hanem a KERET
+   MÉRETE — ugyanaz az indok, mint a hm_contribM-nél. Az attribútum-CSÚCS
+   (bz_gtop) viszont hosszabbodik, hiszen az a 200-as Rating-skálán fut. */
+const ST_INF_SKIP=["pz_capt","hm_card","hm_contribM","tt_chain","tt_poss",
+  "bz_g80","bz_g85","bz_g90"];
 let _stInfExtended=false;
 function stExtendForInfinity(){
   if(_stInfExtended||!infinityMode)return 0;
@@ -55029,6 +55203,43 @@ stTrait("bombazok","szerepek",3,"Kiosztott szerepek",
   ()=>{const m=roleState().map,k=roleKeysForStyle().filter(x=>m[x]);
     return k.length?`most kiosztva: ${k.map(x=>`${ROLE_DEFS[x].n} — ${shortName(m[x])}`).join(" · ")}`
                    :"még nincs kiosztva egy szerep sem ebben az idényben";});
+/* ---- GÓLÉTVÁGY ----
+   A stílus első képessége, ami a MECCS MENETÉBE nyúl bele: nem egy szorzót
+   emel, hanem egy ESEMÉNYT ad hozzá. A kiváltó nem véletlen, hanem a stílus
+   saját terméke — a KÉSZ gólszerző képesség (ugyanaz a halmaz, amit a bz_gsk
+   mérföldkő is számol), tehát a fa alsó fele (Befejezés-iskola, Gólvágó-műhely)
+   itt fizet vissza másodszor is.
+
+   MIÉRT MECCSENKÉNT EGY: enélkül egy gólzáporos meccsen önmagát gerjesztené
+   (minden képesség-gól újabb gólt hozna), és a 3. szinten egy 5-gólos meccsből
+   8-gólos lenne. A korlát az EXTRA GÓLRA szól, nem a próbálkozásra: ha az esély
+   nem jön be, a következő képesség-gól újra felébresztheti az étvágyat — a
+   képesség így nem egyetlen érme-dobáson múlik, a „meccsenként egy" ígéret
+   viszont áll.
+
+   PÁRHARCBAN NEM FUT: ott a gólokat a közös eseménylista adja, egy helyben
+   injektált gól a két kliens állását némán szétvinné (ugyanaz az indoklás,
+   mint a Tiki-Taka passzrekordjánál). */
+stTrait("bombazok","goletvagy",3,"Gólétvágy",
+  "Ha KÉSZ gólszerző képességgel bíró emberetek talál be, felébred az étvágy: a következő öt percben eséllyel jön a következő találat is. Mérkőzésenként EGY ilyen extra gól eshet — ha az esély nem jön be, a következő képesség-gól újra felébreszti az étvágyat.<br><br>Gólszerző képesség az, ami a GÓLSÚLYT emeli, vagy a GÓLSZERZÉS attribútumot edzi — a félkész nem számít, csak a kiépült.",[
+  {fx:{bzAppetite:1},note:"25% esély gólra a következő 5 percben"},
+  {fx:{bzAppetite:2},note:"33% esély"},
+  {fx:{bzAppetite:3},note:"50% esély"}],
+  ()=>{const n=goalSkillCarriers();
+    return n?`most ${n} emberednél van kész gólszerző képesség — ők tudják kiváltani`
+            :"még senkinél nincs kész gólszerző képesség — a képesség így néma marad";});
+/* ---- MESTERHÁRMAS-HAJSZA ----
+   A csapat viselkedését írja át egy pillanatra: aki két gólnál tart, azt
+   KISZOLGÁLJÁK. A súlyok relatívak (weightedPick), tehát a hatás nem több gól,
+   hanem az, hogy a meglévők nagyobb eséllyel futnak össze nála — pontosan az,
+   ami egy mesterhármas-hajszában történik a pályán. A harmadik góllal a hatás
+   magától elmúlik: onnan már nincs mit hajszolni. */
+stTrait("bombazok","hajsza",2,"Mesterhármas-hajsza",
+  "Amint valakinek meglett a második gólja, a csapat őt szolgálja ki: minden más KÖZÉPPÁLYÁS és TÁMADÓ gólpassz-súlyt kap, ő maga gólsúlyt — amíg meg nem lesz a harmadik.",[
+  {fx:{bzChase:1},note:"+12% gólpassz-súly a társaknak · +5% gólsúly neki"},
+  {fx:{bzChase:2},note:"+15% · +10%"},
+  {fx:{bzChase:3},note:"+20% · +15%"}],
+  ()=>`a klub eddigi mesterhármasai: ${stCareerSum("hattricks")}`);
 stTrait("bombazok","kettos_veszely",3,"Kettős veszély",
   "Ha a támadósorod a legerősebb sorod, a csapat csapaterőt kap.",[
   {fx:{ovrTeam:()=>stLineIsTop("CSATAR")?1.5:0},note:"+1,5 csapaterő"},
@@ -55683,6 +55894,14 @@ stTrait("tikitaka","guardiola",3,"Guardiola",
    EGYETLEN belépési pont csatornánként, hogy a motor és a felület ugyanabból
    a számból dolgozzon. Mind hibatűrő: stílus nélkül a semleges értéket adja,
    tehát a hívási helyeken nem kell feltételt írni. */
+/* ---- A KÉPESSÉG-LEÍRÁS FORMÁZÁSA ----
+   A leírások felhasználói szöveget nem tartalmaznak, de HTML-t igen: a hosszabb
+   képességek (Passzkémia, Passzrekord, Guardiola, Gólétvágy) bekezdést törnek
+   `<br>`-rel. A puszta esc() ezt kiírta betű szerint („<br><br>"), tehát a
+   kártyán ott állt a nyers tag a szöveg közepén. Escape-elünk — az idézőjelek
+   és a & miatt muszáj —, majd EGYETLEN engedélyezett tagot visszaengedünk. */
+function styleTraitDescHtml(d){
+  return esc(String(d||"")).replace(/&lt;br\s*\/?&gt;/gi,"<br>");}
 function styleTraitList(k){return STYLE_TRAITS[k||styleKey()]||[];}
 function styleTraitByKey(key){
   return styleTraitList().find(t=>t.key===key)||null;}
@@ -56364,7 +56583,7 @@ function styleTraitsHtml(noHead){
         +`<div class="msTop"><b>${maxed?"✓ ":""}${esc(t.n)}</b>`
         +`<span class="msRew">${STYLE_TIER_LABEL[tier]} · ${lv}/${t.lv.length}. szint</span></div>`
         +`<div style="margin-top:5px">${dots}</div>`
-        +`<div class="msDesc">${esc(t.d)}</div>`
+        +`<div class="msDesc">${styleTraitDescHtml(t.d)}</div>`
         +`<div class="msDesc" style="color:var(--gold)">Most: <b>${lv?esc(t.lv[lv-1].note):"nincs megnyitva"}</b>`
         +(maxed?"":` · Következő: <b>${esc(t.lv[lv].note)}</b>`)+`</div>`
         +freeHere
@@ -56807,7 +57026,7 @@ function saveGame(){
            marad benne, új játékban már nem születik. */
         subPlan:S.subPlan,subHalftimeStop:S.subHalftimeStop,subPlanAsked:S.subPlanAsked,
         mpSubPlan:S.mpSubPlan,
-        paceGoals:S.paceGoals,wingPosLearned:S.wingPosLearned,
+        paceGoals:S.paceGoals,golSkillGoals:S.golSkillGoals,wingPosLearned:S.wingPosLearned,
         seasonSkillCont:S.seasonSkillCont,firstChemDone:S.firstChemDone,initialSkillDone:S.initialSkillDone,
         guideOn:S.guideOn,guideSeen:S.guideSeen,teach:S.teach,
         skillReal:S.skillReal,lastStars:S.lastStars,
@@ -57308,6 +57527,7 @@ function applySavedGame(d){
   S.subPlanAsked=d.S.subPlanAsked||null;
   S.shapeStat=d.S.shapeStat||null;
   S.paceGoals=d.S.paceGoals||0;
+  S.golSkillGoals=d.S.golSkillGoals||0;   /* BOMBÁZÓK: gólok gólszerző képességgel */
   S.wingPosLearned=d.S.wingPosLearned||0;
   S.seasonNewSkills=d.S.seasonNewSkills||0;
   S.seasonSkillCont=d.S.seasonSkillCont||0;
