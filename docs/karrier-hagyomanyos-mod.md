@@ -51,9 +51,18 @@ másik ismerete nélkül:
 
 ```
 scScout  →  scClubPick   (② melyik klub kerete)
-         →  scPyrDiv     (③ melyik osztályból indulsz — AJÁNLÁSSAL)
+         →  scPyrDiv     (③ a világ FELSKÁLÁZÁSA + ④ melyik osztályból
+                             indulsz — mindkettő AJÁNLÁSSAL)
          →  a karrier
 ```
+
+**A karrier fajtájának választója az 1. oldalra költözött (v3.5.08)** — a
+felállás alá, a kezdésmód-választó fölé. Ez a beállítás első és legfontosabb
+elágazása: a 3. oldal fél vezérlőkészlete és a 2. oldal Rating-alapja is tőle
+függ. A régi helyén (a „kihívás" oldal tetején) a felhasználó már két oldalnyi
+olyan kapcsolót állított be, amiből hagyományos módban a fele értelmét veszti.
+A két választó **egy döntéscsoport**: a hagyományos mód kötelezően kész klub,
+ezért ott a kezdésmód-választó eltűnik, és a helyén egy rövid magyarázó sor áll.
 
 **Nincs draft.** A hagyományos módban a kezdés kötelezően kész klub — a
 kezdésmód-választó el is tűnik a beállításról (`updatePyrSetupVisibility`
@@ -831,6 +840,73 @@ detektálás kódja **átvehető változatlanul**.
 
 ---
 
+## 8.5 A VILÁG FELSKÁLÁZÁSA (v3.5.08)
+
+**A hiány.** A piramis a valós klubokat a valós erejük szerint rangsorolja,
+tehát egy top nevekkel teli keret **mindig** az élvonalba tartozik. Aki
+Barcelonával akarta végigmászni a hegyet, annak két rossz választása volt:
+vagy az élvonalból indul (nincs mit megmászni, plafon 30), vagy a
+hatodosztályból **+11,0-es réssel** — sétagalopp, plafon 30. A „top nevek, de
+a piramis aljáról" karrier egyszerűen nem létezett.
+
+**A megoldás.** A felskálázó a **VILÁGOT** emeli meg, nem a keretedet. Négy
+fokozat; a negyediken a legalsó osztály átlagereje pontosan a mai legerősebb
+osztály átlagereje.
+
+| fokozat | eltolás | D6 közepe | D1 közepe |
+|---|---|---|---|
+| 0 | — | 71,4 | 85,9 |
+| 1 | +3,75 | 75,2 | 89,7 |
+| 2 | +7,50 | 78,9 | 93,4 |
+| 3 | +11,25 | 82,7 | 97,2 |
+| **4** | **+15,00** | **86,4** | 100,9 |
+
+A lépcső a piramis **saját geometriájából** jön, nem kitalált számból:
+`(osztályok−1) × PYR_STEP = 5 × 3,0 = 15,0` — pontosan a D1 és a D6 közepe
+közti távolság, négy fokozatra osztva.
+
+**Hogyan hat — két helyen, és sehol máshol.**
+
+1. A világ generálásakor a `base` ennyivel feljebb indul (`pyrBuildWorld(rnd,
+   upLv)`), tehát a mezőny tényleg erősebb, és a mezőnyszint is ennyivel
+   magasabb.
+2. A **kereted viszont nem emelkedik vele**: a pool-eltolás (`off`) a
+   felskálázás NÉLKÜLI osztályközépre horgonyoz (`off = pyrMean − up −
+   rawMean`). Enélkül a kereted együtt emelkedne a mezőnnyel, és a felskálázó
+   pontosan semmit nem érne.
+
+Ebből a rés:
+
+```
+gap0 = klub_nyers − az osztály nyers közepe − felskálázás
+```
+
+Minden más — rangsor, osztályon belüli sorrend, kupák, fel- és kiesés, AI-tempó
+— **érintetlen**: a felskálázás egy eltolás, nem új szabály.
+
+**MÉRVE** (FC Barcelona 2010/11, nyers 88,0 · 🏃 Lépést tartanak · alap tempó):
+
+| fokozat | ajánlott osztály | rés | zóna | Run-plafon |
+|---|---|---|---|---|
+| 0 | D1 | +3,6 | kényelmes | 35 |
+| 1 | D1 | −0,2 | egyenrangú | 44 |
+| 2 | D2 | −1,3 | egyenrangú | 56 |
+| 3 | D5 | −1,3 | egyenrangú | 76 |
+| **4** | **D6** | **−4,0** | **kemény menet** | **91** |
+
+Ez a kért karrier: a legerősebb valós keret a piramis legaljáról indul,
+egyenrangú vagy annál nehezebb küzdelemben, és a Run-plafon 35-ről 91-re nő.
+
+**A másik oldal ugyanígy látszik.** Egy gyenge klubbal a felskálázás
+öngyilkosság: a Paksi FC (77,4) már a 2. fokozaton `−7,1`-es réssel, „fal"
+zónában áll. Épp ezért **a klub UTÁN** áll a csúszka, és a lista **élőben**
+követi: a döntés pillanatában látod, melyik osztály lesz az ajánlott.
+
+**Közös karrierben** a felskálázás világ-tulajdonság, tehát a **házigazdáé**:
+a beállító képernyőn állítja, a szoba-csomag viszi át (`pyr.up`), és a klub
+sávjának közepéhez mérve kapja hozzá az osztály-ajánlást. Régi szobában nincs
+mező — ott nincs felskálázás, ahogy eddig sem.
+
 ## 9. Run-szint a hagyományos módban — MEGVALÓSULT
 
 **A vezérelv (a projektgazda döntése): *egy könnyű Run nem kaphat magas
@@ -851,7 +927,7 @@ Run = KIHÍVÁS-PLAFON × TELJESÍTMÉNY
 | **Kezdő osztály** | D1 ×0,55 · D2 ×0,70 · D3 ×0,80 · D4 ×0,88 · D5 ×0,94 · **D6 ×1,00** |
 | **Ellenfél-tempó** | 😴 ×0,55 · 🚶 ×0,75 · 🏃 ×0,90 · 🔥 **×1,00** |
 | **Saját tempó** | Alap ×0,88 · Komótos ×0,93 · Csiga ×0,97 · Gleccser **×1,00** |
-| **Kezdő rés** | rés ≤ **+1,0** → ×1,00 · fölötte ×(1 − 0,075 × (rés − 1,0)), padló **×0,40** |
+| **Kezdő rés** | **holtsáv ±1,0** → ×1,00 · fölötte ×(1 − 0,075 × (rés − 1,0)), padló **×0,40** · alatta ×(1 + 0,05 × (−rés − 1,0)), mennyezet **×1,30** |
 
 *(Az „Indulás: draft ×1,00 · kész klub ×0,95" sor **kivezetve, v3.4.20**. A draft
 megszűnésével mindenkire egyformán ült — nem különbséget mért, hanem egyetemes
@@ -860,6 +936,24 @@ adó volt, ami a 100-as plafont mindenkinek elérhetetlenné tette. A rés
 +1-es rés még egyenrangú kezdés, a +2 viszont már 37%-os bajnoki esély — a
 büntetés csak ott induljon, ahol a könnyebbség tényleg megjelenik, különben
 maga az AJÁNLOTT osztály is büntetést kapott volna.)*
+
+**A rés-szorzó KÉTOLDALAS lett (v3.5.08).** A projektgazda döntése: *„ha
+középre lő, akkor nem kap semmi buffot nerföt. ha viszont alá vagy felé lő,
+akkor kompenzáljuk."* A kezdő osztály vállalása a mód **két fő mérőszámának
+egyike** (a másik a mászás sebessége), és egy csak lefelé büntető szorzó ezt
+félig mérte: aki középre lőtt, ugyanazt kapta, mint aki egy nála sokkal
+erősebb mezőnybe merészkedett.
+
+Aszimmetrikus marad a **mérték**: a büntetés meredekebb (0,075/pont), mint a
+jutalom (0,05/pont) — a könnyítés biztos előny, a nehezítés viszont csak
+lehetőség. A szorzat pedig **1,00-nál akkor is elvágódik**: a bátor kezdés nem
+visz 100 fölé, csak ellensúlyozza a többi tényező visszafogását (könnyebb
+ellenfél-tempó, magasabb kezdő osztály). Ez adja a felskálázott karrier
+plafonját is: Barcelonával a 4. fokozaton `−4,0` a rés → ×1,15, és a plafon 91.
+
+| rés | −10 | −8 | −6 | −4 | −2 | −1 … +1 | +2 | +4 | +6 | +8 | +12 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| szorzó | 1,30 | 1,30 | 1,25 | 1,15 | 1,05 | **1,00** | 0,93 | 0,78 | 0,63 | 0,48 | 0,40 |
 
 **Miért kellett a rés-szorzó (v3.4.18).** A draft kivétele után az osztály
 önmagában már nem mért kihívást: a hatodosztályba be lehetett volna lépni egy
@@ -912,12 +1006,53 @@ első szezon — `karrier-beallitasok-audit.md` 2.6).
 
 | sor | súly | mit mér |
 |---|---|---|
-| **Az élvonalba jutás üteme** | 1,0 | a fokozat szimulált MEDIÁNJÁHOZ mérve (docs 5.3), szezononként −6 |
-| **Az első bajnoki arany üteme** | 1,0 | ua., a fokozat arany-mediánjához |
+| **Az élvonalba jutás üteme** | **2,5** | a TÖKÉLETES mászáshoz mérve (lásd alább) |
+| **Az első bajnoki arany üteme** | **2,5** | ua., az arany ideáljához |
 | **Feljutások** | 0,2 / db | tiszta jutalom |
 | **Kiesések** | — | **nem vonnak le** — a mód része, nem kudarc |
 | szezononkénti helyezés | 1,0 / 0,25 | mint ma, `runRankScore` |
 | taktika, hűség, mérföldkövek | mint ma | változatlan |
+
+#### 9.2.1 Az ütem mércéje: a tökéletes mászás (v3.5.08)
+
+**Mi volt a baj.** Az ütem-sorok a fokozat **szimulált mediánjához** mértek
+(`refTop` / `refTitle`): ahhoz, amit egy átlagos futás hoz. Két hibája volt.
+Egyrészt a mérce fokozatonként **más** volt, tehát a 100-as Run-sebesség nem
+jelentette ugyanazt két karrierben. Másrészt a medián egy **statisztika**, nem
+cél: egy „12,3. szezonos mérce" semmit nem mond arról, mi lett volna a lehető
+leggyorsabb.
+
+**A mérce mostantól a tökéletes futás**, és az egyetlen dologból következik,
+ami a mászás hosszát meghatározza: a **kezdő osztályból**. A leggyorsabb
+lehetséges karrier minden idényben feljut, és az élvonalba érve azonnal bajnok:
+
+```
+D5-ből indulva  →  1-4. szezon: négy feljutás (D4, D3, D2, D1)
+                   5. szezon:  bajnoki cím az élvonalban
+```
+
+| kezdő osztály | D1 | D2 | D3 | D4 | D5 | D6 |
+|---|---|---|---|---|---|---|
+| ideális felérés | 1. | 1. | 2. | 3. | 4. | 5. |
+| **ideális arany** | **1.** | **2.** | **3.** | **4.** | **5.** | **6.** |
+
+A pontozás **arányos**, nem lineáris: `100 × ideális / tényleges`. Kétszer annyi
+idő fele annyi pont — és a képlet magától skálázódik a kezdő osztállyal, tehát
+egy D6-os és egy D2-es futás ugyanazon a mércén áll. Mérve (D6-ból indulva,
+ideális arany a 6. szezon): tökéletes mászás → **100/100**; a 12. szezonban
+felérve és a 18.-ban aranyat nyerve → **42 / 33**.
+
+Az **ellenfél-tempó szándékosan nem szerepel** benne: azt a Run-plafon már
+megfizette (`PYR_RUN_CAP.speed`), és kétszer mérni ugyanazt hiba volna. A
+medián-értékek mérési adatként megmaradnak — a sor leírásában viszonyítási
+pontként megjelennek.
+
+**A SÚLY IS MEGVÁLTOZOTT: 1,0 → 2,5 soronként.** A projektgazda döntése szerint
+a mód két fő mérőszáma a **sebesség** és a **kezdő osztály vállalása**; az
+utóbbi a plafonban ül, az előbbi itt. Korábban a két ütem-sor 1,0-1,0 súlyt
+vitt, vagyis a mód fő mérőszáma ugyanannyit nyomott, mint egyetlen szezon
+helyezése — egy hosszú karrierben a sok apró sor egyszerűen elnyelte. Az új
+5,0 összsúly nagyságrenddel a legnagyobb tétel (a legnagyobb egyéb sor 1,0).
 
 **Ami kiesett a piramisban:** a „Kezdő nehézség" és a „Nehézség-belövés"
 (a mezőnyt nem te állítod be — a kezdő osztály már a plafonban van), a
