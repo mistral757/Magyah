@@ -1051,6 +1051,48 @@ fokozat átlövéséhez `live tier=kegyet share=0,84 top=0,92`.
 
 ---
 
+## 11.4 KÖZÖS KARRIER (PvP) — v3.5.05
+
+**Ami lehetővé tette:** a piramis világa a `rngFor("pyr:world")`-ből épül, az
+pedig a SZOBA seedjéből — a két kliensen bitre ugyanaz a hat osztály. Nem kell
+átküldeni a világot, csak négy döntést.
+
+**Két dolog közös, és mindkettőt a HÁZIGAZDA állítja:**
+
+| beállítás | miért közös |
+|---|---|
+| **Kezdő osztály** (D1–D6) | egy tabellán osztoztok, tehát nem lehet személyes döntés. A képernyő ajánlást ad a sáv KÖZEPÉHEZ mérve |
+| **Kezdő klub Rating-sávja** (min–max) | e nélkül a párharcnak nincs tétje. A sáv a klublistát szűri mindkét oldalon, determinisztikusan |
+
+Az osztályválasztó képernyő emiatt közös karrierben **nincs**: a klub
+kiválasztása után egyből indul az idény.
+
+**A mezőny 14 AI + ti ketten = 16**, pontosan annyi, amennyit a közös karrier
+menetrendje amúgy is vár (28 CPU-meccs + 2 párharc = 30 forduló). Az osztályból
+ezért **két** csapat lép ki, nem egy — és determinisztikusan a két leggyengébb,
+nem klub-alapon. A klub-alapú kivétel ugyanis kliensenként MÁS klubot venne ki,
+és a két világ némán szétnőne (a mezőnyszinted, a kupasávod és a fel-/kiesés is
+a világból jön). **Ára:** ha valamelyikőtök klubja szerepel a világban is, a
+neve kétszer tűnhet fel — más évjárattal. Ez a szétnövésnél kisebb rossz.
+
+**A páros EGY entitás a fel-/kiesésnél:** a JOBBIK helyezésetek dönt, és a
+rosszabbik sora kikerül a rolloverbe adott sorrendből — így 16 tabellasorból
+pontosan 15 entitás lesz (14 világ-csapat + ti egyként). Együtt maradtok; a
+verseny az, ki végez a másik fölött, szezonról szezonra. Ha a társad helyezése
+vitt feljebb, a szezonforduló ki is mondja.
+
+**A második ülés is költözik.** A rollover 1:1-ben cserél, tehát költözéskor az
+új osztályod 15-tel maradna, az elhagyott is 15-tel. Egyetlen csere rendezi: a
+félretett második csapat visszatér az elhagyott osztályba, és az újból kilép a
+leggyengébb. Mérve 12 szezonon át: a saját osztály végig 14, a többi 16, a
+világ összlétszáma végig **96**.
+
+**A szezonindító alku kimarad:** a piramisban a mezőnyt az osztály adja, nem a
+két javaslat számtani közepe. A csapatlap-csere marad — abból tudja meg a két
+kliens egymás keretét.
+
+---
+
 ## 12. Nyitott kérdések
 
 1. ~~Sávnyújtás vagy adatbázis-bővítés?~~ **Eldőlt** (3.1/A + 3.3): a rang
