@@ -1062,7 +1062,7 @@ igényel új szimulációs ágat.
   |---|---|---|
   | **Gólok sebességgel** | gól olyan embertől, akinek van gyorsasági képessége (`S.paceGoals`, karrier-számláló) | 10 · 20 · 30 · 50 · 100 · 200 |
   | **Sebességgólok egy meccsen** | ugyanez EGY mérkőzésen belül, csapatszinten (`msT().paceHaulMax`) | 1 … 10 |
-  | **Megtanult szélső posztok** | befejezett poszt-tanulás JV / BV / JSZ / BSZ kódra (`S.wingPosLearned`) | 1 … 10 |
+  | **Megtanult szélső posztok** | befejezett poszt-tanulás JV / BV / JSZ / BSZ kódra (`S.wingPosLearned`) — a megvásárolt és a fizetés nélküli „beszokás" is számít | 1 … 10 |
 
   A sebesség-gól jelölése a gól KÖZÖS csatornáján megy (a gólblokkban, a
   `recordScorer` mellett), ezért minden gól-ág — szabadrúgás, tizenegyes,

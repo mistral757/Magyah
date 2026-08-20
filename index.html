@@ -3458,7 +3458,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.12";
+const APP_VERSION="3.5.14";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -15506,35 +15506,80 @@ function posLearnCost(entry){
   /* Rating-függő ár, 5000–10000 sávban (a kért tartomány) */
   const t=Math.max(0,Math.min(1,(r-60)/40));
   return Math.round((5000+t*5000)/500)*500;}
-/* Hány meccs kell a tanuláshoz — kor és TSI szabja az alaptempót. */
-function posLearnMatchesNeeded(entry){
-  const age=entry.age||24;
-  const tsi=entry.tsi||3000;
-  let base=14;
-  if(age<21)base=9; else if(age<25)base=11; else if(age<30)base=15; else base=20;
-  /* magasabb TSI = tehetségesebb = gyorsabb tanulás (max ~3 meccs kedvezmény) */
-  const tsiCut=Math.min(3,Math.round((tsi-2500)/2500));
-  return Math.max(6,base-tsiCut);}
+/* ================= A TANULÁS TEMPÓJA: EGY BÁZIS, KÉT ÚT =================
+   MEGVÁSÁROLVA a bázis MINDENKINÉL 12 lejátszott meccs. Korábban a kor és a
+   TSI szabta (9-20 meccs), és ezt cseréljük le: a tempó-különbséget mostantól
+   az adja, amit a játékos a pályán MUTAT — a jó teljesítmény (gól, gólpassz,
+   meccsember, tiszta lap a helyén) gyorsítja a tanulást, meccsenként legfeljebb
+   másfélszeresére. Egy fiatal tehetség így sem lassabb, mint eddig: attól lesz
+   gyors, hogy jól játszik, nem attól, hogy fiatalnak sorsolták.
+
+   FIZETÉS NÉLKÜL IS HALAD. Aki idegen poszton játszik, magától is szokja a
+   helyet — ez a "beszokás" (posDrift), és HÁROMSZOR lassabb a megvásárolt
+   tanulásnál: 36 lejátszott meccs. Minden más egyezik, a vége is: a poszt
+   ugyanúgy a lista élére kerül, teljes értékkel. A gyorsító erő is UGYANAZ, és
+   mivel a szükséglet is háromszoros, a jó teljesítmény ARÁNYOSAN ugyanannyit
+   gyorsít mindkét úton — a fizetés a tempót veszi meg, nem a szabályt.
+   A beszokás POSZTONKÉNT gyűlik (posDrift = {poszt: haladás}), tehát a
+   félbehagyott szoktatás nem vész el, ha az ember időközben máshol játszik.
+
+   GLOBÁLIS: nincs mód- vagy beállítás-kapcsolója. Minden karrierben, minden
+   nehézségen és minden tempó-beállításnál ugyanígy működik. */
+const POS_LEARN_BASE=12;
+const POS_DRIFT_MULT=3;
+/* Hány meccs kell a MEGVÁSÁROLT tanuláshoz. (Az `entry` a hívási helyek miatt
+   marad a szignatúrában: a bázis ma mindenkinél azonos.) */
+function posLearnMatchesNeeded(entry){return POS_LEARN_BASE;}
+/* …és mennyi a fizetés nélküli beszokáshoz. */
+function posDriftMatchesNeeded(entry){return POS_LEARN_BASE*POS_DRIFT_MULT;}
+/* ---- A TANULÁS VÉGE — KÖZÖS PONT MINDKÉT ÚTNAK ----
+   Bármelyik úton ér célba, ugyanaz történik: az új poszt a lista ÉLÉRE kerül
+   (1.0 fit), a régiek utána maradnak. */
+function posLearnFinish(entry,target,drift){
+  entry.pos=[target].concat(entry.pos.filter(p=>p!==target));
+  if(entry.attrs){/* az új poszt profiljához igazítjuk a horgonyt, hogy a
+    specializáció-számítás konzisztens legyen — a szintet nem visszük el */
+    entry._attrAnchor=entry.startRating;}
+  entry.posLearnDone=target;              /* jelző az értesítéshez */
+  entry.posLearnDoneDrift=!!drift;        /* …és hogy melyik úton ért célba */
+  /* VILLÁM: a megtanult SZÉLSŐ posztok külön számlálón futnak — a stílus
+     mérföldköve ezt gyűjti. Négy kód számít, mind a három sorból: JV/BV a
+     védelemben, JSZ/BSZ a középpályán és a támadósorban. */
+  if(WING_POS_CODES.indexOf(target)>=0)S.wingPosLearned=(S.wingPosLearned||0)+1;
+  /* A megtanult posztra gyűlt beszokás elvégezte a dolgát; a többi poszté
+     megmarad, azt nem ez az ember döntötte el, hogy hol játszik. */
+  if(entry.posDrift){delete entry.posDrift[target];
+    if(!Object.keys(entry.posDrift).length)delete entry.posDrift;}
+  /* A megtanult poszt átvezetése a PÁLYÁN/PADON lévő objektumokra is. */
+  syncLearnedPositions(entry.n);}
 /* Egy meccsnyi tanulási lépés a játékosra (a fejlődés-hurokból hívva). A jó
-   teljesítmény (gól, gólpassz, MVP, tiszta lap a helyén) gyorsítja. */
-function stepPosLearning(entry,perfBoost){
+   teljesítmény (gól, gólpassz, MVP, tiszta lap a helyén) gyorsítja.
+   A `share` a lejátszott meccs-hányad: fél meccs fél lépés — ezt eddig csak a
+   teljesítmény-ráadás vitte, az alaplépés nem, pedig a szabály (lásd a share
+   feljegyzését) a tanulási lépésre is szól. */
+function stepPosLearning(entry,perfBoost,share){
   const L=entry.posLearning;
   if(!L)return;
-  L.progress=(L.progress||0)+1+ (perfBoost||0);
+  L.progress=(L.progress||0)+(share==null?1:share)+(perfBoost||0);
   if(L.progress>=L.needed){
-    /* KÉSZ: az új poszt a lista élére (1.0 fit), a régiek utána maradnak */
-    entry.pos=[L.target].concat(entry.pos.filter(p=>p!==L.target));
-    if(entry.attrs){/* az új poszt profiljához igazítjuk a horgonyt, hogy a
-      specializáció-számítás konzisztens legyen — a szintet nem visszük el */
-      entry._attrAnchor=entry.startRating;}
-    entry.posLearnDone=L.target;   /* jelző az értesítéshez */
-    /* VILLÁM: a megtanult SZÉLSŐ posztok külön számlálón futnak — a stílus
-       mérföldköve ezt gyűjti. Négy kód számít, mind a három sorból: JV/BV a
-       védelemben, JSZ/BSZ a középpályán és a támadósorban. */
-    if(WING_POS_CODES.indexOf(L.target)>=0)S.wingPosLearned=(S.wingPosLearned||0)+1;
     delete entry.posLearning;
-    /* A megtanult poszt átvezetése a PÁLYÁN/PADON lévő objektumokra is. */
-    syncLearnedPositions(entry.n);}}
+    posLearnFinish(entry,L.target,false);}}
+/* ---- BESZOKÁS: A FIZETÉS NÉLKÜLI TANULÁS EGY MECCSNYI LÉPÉSE ----
+   Csak akkor fut, ha a játékos tényleg IDEGEN poszton kezdett, és nincs futó
+   fizetett tanulása — az kizárólagos, amíg tart (ugyanaz a szabály, amit a
+   felület is kimond: „amíg tart, másikat nem kezdhet el"). */
+function stepPosDrift(entry,pos,perfBoost,share){
+  if(!entry||!pos||entry.posLearning)return;
+  if(!entry.pos||entry.pos.indexOf(pos)>=0)return;
+  const d=entry.posDrift=entry.posDrift||{};
+  d[pos]=(d[pos]||0)+(share==null?1:share)+(perfBoost||0);
+  if(d[pos]>=posDriftMatchesNeeded(entry))posLearnFinish(entry,pos,true);}
+/* A beszokás állása egy poszton — a felület ebből írja ki, hány meccs van még
+   hátra. Fizetett tanulásnál ugyanez a szám a posLearning-ből jön. */
+function posDriftProgress(entry,pos){
+  return (entry&&entry.posDrift&&entry.posDrift[pos])||0;}
+function posDriftLeft(entry,pos){
+  return Math.max(0,Math.ceil(posDriftMatchesNeeded(entry)-posDriftProgress(entry,pos)));}
 /* ---- TANULT POSZT SZINKRONIZÁLÁSA ----
    A keret-, pad- és tartalék-játékos objektumok a careerPool-bejegyzésből
    MÁSOLATTAL készülnek (careerPlayerFromPoolEntry: entry.pos.slice()), ezért a
@@ -15701,15 +15746,19 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
     ATTR_KEYS.forEach(k2=>{
       while(ap[k2]>=CAREER_DEV_THRESHOLD){ap[k2]-=CAREER_DEV_THRESHOLD;bumpAttr(entry,k2,1);}
       while(ap[k2]<=-CAREER_DEV_THRESHOLD){ap[k2]+=CAREER_DEV_THRESHOLD;bumpAttr(entry,k2,-1);}});
-    /* ---- POSZT-TANULÁS: ha e játékos épp posztot tanul, egy meccsnyi lépés.
-       A jó teljesítmény gyorsítja (gól/gólpassz/MVP/tiszta lap a helyén). ---- */
-    if(entry.posLearning){
-      let perf=0;
-      if(mScore[p.n])perf+=0.5*mScore[p.n];
-      if(mAssist[p.n])perf+=0.3*mAssist[p.n];
-      if(k===bestIdx)perf+=0.6;
-      if(ga===0&&(pos==="KP"||DEF_POS.includes(pos)))perf+=0.3;
-      stepPosLearning(entry,Math.min(1.5,perf)*share);}});
+    /* ---- POSZT-TANULÁS: egy meccsnyi lépés ----
+       KÉT ÚT, EGY GYORSÍTÓ. Ha fut a megvásárolt tanulás, az halad; ha nem, de
+       a játékos IDEGEN poszton kezdett, akkor magától szokja a helyet (három-
+       szor lassabban). A jó teljesítmény (gól/gólpassz/MVP/tiszta lap a helyén)
+       mindkét úton ugyanúgy gyorsít — ezért közös itt a `perf` számítása. */
+    {let perf=0;
+     if(mScore[p.n])perf+=0.5*mScore[p.n];
+     if(mAssist[p.n])perf+=0.3*mAssist[p.n];
+     if(k===bestIdx)perf+=0.6;
+     if(ga===0&&(pos==="KP"||DEF_POS.includes(pos)))perf+=0.3;
+     const boost=Math.min(1.5,perf)*share;
+     if(entry.posLearning)stepPosLearning(entry,boost,share);
+     else stepPosDrift(entry,pos,boost,share);}});
   /* ---- PASSZKÉMIA: A KÖZÖS MECCS LEKÖNYVELÉSE ----
      SZÁNDÉKOSAN a fejlődési ciklus UTÁN: a felzárkózás a FRISS Passz-értékekhez
      méri a hiányt, tehát azt is beszámítja, amit a vezető ezen a mérkőzésen
@@ -17816,7 +17865,7 @@ const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 /* ================= FOGALOMTÁR ================= */
 const GLOSSARY={
   draft:{title:"Draft és posztok",text:"Minden körben egy valós NB I-es klub egy szezonjának keretét pörgeted ki. Egy játékost draftolsz egy nyitott posztra — rokon posztok (pl. szélső védő ⇄ szélső középpályás) is elfogadottak, kényszer-illesztésnél gyengébb hatásfokkal. Ugyanaz a valódi játékos csak egyszer kerülhet be. 11 kezdő + 4 csere (1-1 minden posztra)."},
-  posztfit:{title:"Poszt-illeszkedés és poszt-tanulás",text:"Minden játékosnak van egy vagy több natív posztja. A saját posztján teljes értékkel számít, idegen poszton 0,93-as hatásfokkal — a kényszer-illesztés tehát nem tilos, csak folyamatosan fizetsz érte. Egy játékost véglegesen át is képezhetsz: a poszt-tanulás ára a Ratingjétől függ (5 000–10 000 Ft), és MECCSENKÉNT halad, nem naptár szerint. A tempót a kor és a TSI szabja: 21 év alatt kb. 9 meccs, 25 alatt 11, 30 alatt 15, afölött 20 — ebből a magas TSI legfeljebb 3 meccset lefarag. A jó teljesítmény (gól, gólpassz, meccsemberség, tiszta lap a helyén) gyorsítja. Ha kész, az új poszt kerül a lista élére teljes hatásfokkal, a RÉGI POSZTJAIT PEDIG MEGTARTJA — vagyis a tanulás nem cserél, hanem bővít, és ettől lesz igazán értékes egy sokoldalú játékos."},
+  posztfit:{title:"Poszt-illeszkedés és poszt-tanulás",text:"Minden játékosnak van egy vagy több natív posztja. A saját posztján teljes értékkel számít, idegen poszton 0,93-as hatásfokkal — a kényszer-illesztés tehát nem tilos, csak folyamatosan fizetsz érte. Egy játékost véglegesen át is képezhetsz: a poszt-tanulás ára a Ratingjétől függ (5 000–10 000 Ft), és MECCSENKÉNT halad, nem naptár szerint. A bázis mindenkinél 12 lejátszott meccs, és a jó teljesítmény (gól, gólpassz, meccsemberség, tiszta lap a helyén) gyorsítja — meccsenként akár másfélszeresére. A TANULÁS FIZETÉS NÉLKÜL IS MEGY: aki idegen poszton játszik, magától is BESZOKIK oda, csak háromszor lassabban (kb. 36 meccs) — ugyanazzal a szabállyal és ugyanazzal a gyorsító erővel. A hátralévő meccsek a játékos lapján ott állnak, akárcsak a megvásárolt tanulásnál, és amit már beszokott, azt beszámítjuk, ha közben mégis fizetsz a tanulásért. Ha kész, az új poszt kerül a lista élére teljes hatásfokkal, a RÉGI POSZTJAIT PEDIG MEGTARTJA — vagyis a tanulás nem cserél, hanem bővít, és ettől lesz igazán értékes egy sokoldalú játékos."},
   arnyekek:{title:"Árnyékék",text:"A második csatár: az a támadó, aki nem a kapu előtt áll, hanem egy sorral hátrébb, a védők és a középpálya közti sávban. A pályaképen is ott látod — az árnyékékre állított hely pontja hátracsúszik. Kevesebb gólt szerez, mint egy középcsatár (gólsúly 3,5 az 5,0 helyett), cserébe övé a JÁTÉK LEGNAGYOBB GÓLPASSZ-SÚLYA (5,0, a támadó középpályás 4,5-e fölött) — vagyis nem ő fejezi be a támadást, hanem ő hozza létre. A csapat tengelyein a Gólszerzésből vesz el 4 pontot és a Passzhoz teszi hozzá: ettől a Labdatartás és a Totális futball illeszkedése nő, a Hosszú labdáké, a Gyors kontráé és a Széljátéké csökken. TÁMADÓ marad minden más szempontból: a csatár-tengelyeken súlyozódik, csatár-skilleket kaphat, és a csatár-cserehelyre ülhet. HOGYAN JÁTSSZ VELE: az árnyékék nem felállás, hanem MEGBÍZÁS — bármelyik TÁMADÓ helyet átállíthatod rá a keretlistában, az ott álló játékos lapján, ingyen és bármikor. Két csatáros felállásban (4-4-2, 3-5-2, 5-3-2) az egyik vagy mindkét csatár, egy csatárosban a magányos támadó is hátrahúzódhat: az a hamis kilences. A 4-3-3, a 4-2-3-1 és a 3-4-3 TÁMADÓ SZÉLSŐI ugyanígy behúzódhatnak a belső sávba — ilyenkor a csapat elveszíti a szélességet azon az oldalon, cserébe egy plusz emberrel játszik középen. A 4-4-2, a 3-5-2, az 5-3-2 és a 4-5-1 szélsői NEM: azok középpályásként súlyozódnak, és az átállításuk már a felállás dolga lenne, nem a megbízásé. KI TUDJA: natívan azok, akik az adatbázisban támadó középpályát ÉS csatárt is játszottak — Hidegkuti, Maradona, Cruyff, Di Stéfano, Bergkamp, Baggio, Del Piero, Litmanen, Müller, Firmino, Messi, Rooney és társaik; közülük tizennyolcnak ez a FŐ posztja. Mindenki más megtanulhatja poszt-tanulással, vagy addig rokonposztként áll ott, kisebb hátránnyal."},
   megbizas:{title:"Középpályás megbízás",text:"A felállás megadja, HÁNY középpályással játszol — a megbízás azt, hogy ezek közül ki MIT csinál. A kezdő 11 középső középpályás helyei háromféle megbízást kaphatnak: VÉDEKEZŐ (a védelem előtt szerez labdát és rendez), KLASSZIKUS (kétirányú motor) és TÁMADÓ (a támadók mögött készít elő). A megbízás MINDKÉT IRÁNYBAN működik: a belső helyek közül a sor két legszélsője SZÉLSŐRE is állítható (a hely attól még középpályás marad, nem lesz belőle támadó szélső), a felállás által eleve SZÉLRE tett középpályás hely pedig BEFELÉ húzható — védekező, klasszikus vagy támadó középpályásnak. Így egy négyes középpályát fel lehet állítani négy szélessel és négy belsővel is, ugyanazon a felálláson belül. Ugyanez áll a védősorra: a középhátvéd kimehet szélsővédőnek, a szélsővédő pedig behúzódhat középhátvédnek. UGYANEZ A GOMB A TÁMADÓKNÁL mást kérdez: a középcsatár álljon-e legelöl és a támadó szélső maradjon-e kint, vagy ÁRNYÉKÉK húzódjon be mögéjük (lásd a saját bejegyzését). A megbízást a HUB keretlistájában állítod: koppints a középpályásra, és a lapján ott a Megbízás módosítása gomb a posztcsere és a poszt-tanulás mellett. Ingyenes, bármikor átállítható, és SENKI nem mozdul tőle a helyéről — csak a hely poszt-kódja és az illeszkedés változik, a kézzel összerakott csapatod a helyén marad. Hatása a csapat tengelyein érződik, mindig a felállás saját alapbeállításához képest: a védekező megbízás 3 attribútumpontot tesz a Védekezés-tengelyre a Gólszerzés rovására, a támadó pontosan fordítva, a klasszikus semleges. Ez a taktikád illeszkedésén is látszik — a Park the bus a Védekezésre épül, a Hosszú labdák a Gólszerzésre —, de szándékosan gyengébb eszköz, mint maga a rendszerválasztás: hangolni lehet vele, felülírni nem."},
   kemia:{title:"Csapatkémia",text:"A 11. játékos beérkezése után lefut egy elemzés. Azonos klubból jött társak dupla pluszt kapnak, azonos nemzetiségűek egyszereset. Történelmi rivális klubokból jövők között 25% eséllyel jó, 75%-ban feszült a viszony — ez egy állandó Rating-módosítót ad a teljes szezonra."},
@@ -18016,7 +18065,7 @@ const GUIDE_TIPS={
     x:"Az akadémia meccsről meccsre dolgozik a fiatalon: ha VISSZAKÜLDÖD, a Ratingje és a TSI-je tovább nő, és később, erősebben tér vissza — cserébe most nem játszik nálad, és a keret sem lesz tőle mélyebb. Ha FELHOZOD, azonnal a tartalékba kerül, helyet foglal, viszont a nálad lejátszott meccsek is fejlesztik, és skillt is szerezhet. A visszaküldés nem örökre szól: az akadémiai időnek VÉGE van, és a ballagáskor jön az utolsó ajánlat — ha akkor nem kell, végleg elhagyja a klubot. Egy dolgot mérj: van-e most helyed és játékpercet adnál-e neki. Ha nincs, az akadémia jobb helye, mint a tartalék vége.",
     g:"akademia"},
   "ev:poslearn":{t:"Poszt-tanulás — drága, de végleges",
-    x:"Egy játékos MEGTANULHAT egy új posztot: meccsről meccsre halad, és ha végez, ott is teljes értékű lesz — eltűnik az illeszkedés-hátrány. Fizetni előre kell, és amíg tanul, mást nem kezdhet. Akkor éri meg, ha valaki tartósan idegen poszton játszik nálad, vagy ha egy poszton krónikus a hiányod.",
+    x:"Egy játékos MEGTANULHAT egy új posztot: meccsről meccsre halad (bázis 12 meccs, a jó teljesítmény gyorsítja), és ha végez, ott is teljes értékű lesz — eltűnik az illeszkedés-hátrány. Fizetni előre kell, és amíg tanul, mást nem kezdhet. Fizetés NÉLKÜL is megtörténik ugyanez, csak háromszor lassabban: aki idegen poszton játszik, kb. 36 meccs alatt magától beszokik oda. A pénz tehát a TEMPÓT veszi meg — akkor éri meg, ha valaki tartósan idegen poszton játszik nálad, vagy ha egy poszton krónikus a hiányod.",
     g:"posztfit"},
   /* Az EGYETLEN hely, ahol a megbízás előkerül, ez a lap — ezért a tipp itt
      szólal meg, és konkrétan a gombra mutat rá, nem általánosságban beszél. */
@@ -18401,7 +18450,7 @@ const TEACH_TOPICS={
        x:"A saját posztján mindenki <b>teljes értékű</b>; idegen poszton <b>0,93-as</b> hatásfokkal játszik. Ez nem tilos — csak minden meccsen fizetsz érte.<br><br>És most van a keretedben olyan ember, aki oda való: egy csere ingyen visszaadja a különbséget."},
       {a:"hubRoster",
        t:"Két megoldás van",
-       x:"<b>Csere:</b> koppints a játékosra a listában, és cseréld a helyét azzal, aki oda való. Ingyenes, azonnali.<br><br><b>Poszt-tanulás:</b> ha valaki tartósan idegen poszton kell hogy játsszon, megtanulhatja azt a posztot. Fizetni előre kell (5–10 ezer Ft), és meccsről meccsre halad — 21 év alatt kb. 9 meccs. A végén teljes értékű lesz ott is, és a <b>régi posztjait megtartja</b>."}]},
+       x:"<b>Csere:</b> koppints a játékosra a listában, és cseréld a helyét azzal, aki oda való. Ingyenes, azonnali.<br><br><b>Poszt-tanulás:</b> ha valaki tartósan idegen poszton kell hogy játsszon, megtanulhatja azt a posztot. Fizetni előre kell (5–10 ezer Ft), és meccsről meccsre halad — kb. 12 meccs, a jó teljesítmény gyorsítja. A végén teljes értékű lesz ott is, és a <b>régi posztjait megtartja</b>.<br><br><b>És ha nem csinálsz semmit:</b> aki idegen poszton játszik, magától is beszokik oda, csak háromszor lassabban (kb. 36 meccs). A hátralévő meccsek a játékos lapján látszanak."}]},
   "form:shape":{n:"A felállás nem illik a kerethez",grp:"csapatepites",scr:"hub",prio:35,
     mark:"📋",
     a:"hubFormationBtn",g:"posztfit",
@@ -34148,8 +34197,10 @@ function playMatch(){
     if(gameMode==="career"){processCareerDevelopment(halfOut.length?active.concat(halfOut):active,mScore,mAssist,gi,bi,best,redIdx,injuredThisMatchName,ga);processBenchDevelopment();processAcademyDevelopment();processCoachMatchEffects();
       /* POSZT-TANULÁS kész-értesítés: ha valakinek e meccsen ért véget a tanulása */
       Object.values(careerPool).forEach(e=>{if(e&&e.posLearnDone){
-        addLine(`🎓 Poszt-tanulás kész! ${esc(shortName(e.n))} mostantól otthon van a(z) ${e.posLearnDone} poszton — teljes értékű ott, és a specializáció is jutalmazza.`,"m life");
-        delete e.posLearnDone;}});
+        addLine(e.posLearnDoneDrift
+          ? `🎓 Beszokta a posztot! ${esc(shortName(e.n))} annyit játszott a(z) ${e.posLearnDone} helyén, hogy mostantól otthon van rajta — teljes értékű ott, és a specializáció is jutalmazza.`
+          : `🎓 Poszt-tanulás kész! ${esc(shortName(e.n))} mostantól otthon van a(z) ${e.posLearnDone} poszton — teljes értékű ott, és a specializáció is jutalmazza.`,"m life");
+        delete e.posLearnDone;delete e.posLearnDoneDrift;}});
       /* (A kihívások haladása már NEM a naplóban látszik — a Kihívások
          ablakban követhető, élő haladás-sávval. A napló csak a végső
          teljesítést/bukást jelzi, a resolveChallenge-ben.) */}
@@ -44443,8 +44494,11 @@ function buildHubDetail(loc){
         tip=e.posLearning.target===slotPos
           ?`🎓 Épp ezt a posztot tanulja — ha végez, teljes értékű lesz itt. A haladás lent.`
           :`🎓 Most a(z) <b>${e.posLearning.target}</b> posztot tanulja; amíg tart, másikat nem kezdhet el.`;}
-      else if(fit<0.6)tip=`💡 Tedd a fő posztjára (${e.pos[0]}), vagy taníttasd meg vele ezt a posztot — akkor teljes értékű lesz itt.`;
-      else if(fit<1)tip=`💡 A rokon/másodlagos poszt kis hátrány. A fő posztján (${e.pos[0]}) a legjobb, vagy taníttasd meg neki ezt a posztot.`;
+      /* A FIZETÉS NÉLKÜLI BESZOKÁS is válasz a „mit tegyek?" kérdésre: ha itt
+         hagyod, magától is megtanulja, csak háromszor lassabban. A tipp ezért
+         kimondja — a hátralévő meccsek külön sorban, lent. */
+      else if(fit<0.6)tip=`💡 Tedd a fő posztjára (${e.pos[0]}), vagy taníttasd meg vele ezt a posztot — akkor teljes értékű lesz itt. Ha itt hagyod, magától is beszokik, csak ${POS_DRIFT_MULT}× lassabban.`;
+      else if(fit<1)tip=`💡 A rokon/másodlagos poszt kis hátrány. A fő posztján (${e.pos[0]}) a legjobb, vagy taníttasd meg neki ezt a posztot${e.pos.indexOf(slotPos)<0?` — de itt hagyva magától is beszokik, ${POS_DRIFT_MULT}× lassabban`:""}.`;
       else if(keyVal<Math.round(pOvr(p))-2)tip=`💡 A ${ATTR_LABELS[keyHere]} attribútuma elmarad — ha ezen a poszton játszik és jól teljesít (gól/gólpassz/tiszta lap), fejlődik ez az attribútum, és nő az itteni értéke.`;
       else tip=`✓ Jó helyen van, és az attribútumai illenek a poszthoz.`;
       html+=`<div class="hdRow" style="color:var(--dim2)">${tip}</div>`;
@@ -44574,6 +44628,28 @@ function buildHubDetail(loc){
       prog.innerHTML=`🎓 <b>Poszt-tanulás:</b> ${L.target} — még kb. <b>${left}</b> lejátszott meccs (a jó teljesítmény gyorsítja)`;
       d.appendChild(prog);
     }else{
+      /* ---- BESZOKÁS: A FIZETÉS NÉLKÜLI TANULÁS IS LÁTSZIK ----
+         Ugyanaz a mondat, ugyanazon a helyen, mint a megvásárolté — csak ez
+         magától halad, háromszor lassabban. Elöl az a poszt áll, AHOL A
+         JÁTÉKOS MOST ÁLL (ha idegen neki); utána a többi, amin már gyűlt
+         valamennyi. Enélkül a rendszer láthatatlanul dolgozna: a felhasználó
+         csak a kész tényt kapná meg, a hátralévő utat nem. */
+      const herePos=hubLocPosTxt(loc);
+      const hereOff=loc.type==="slot"&&e.pos&&e.pos.indexOf(herePos)<0;
+      if(hereOff){
+        const prog=document.createElement("div");prog.className="hdRow";prog.style.marginTop="7px";
+        prog.innerHTML=`🎓 <b>Beszokás:</b> ${herePos} — még kb. <b>${posDriftLeft(e,herePos)}</b> `
+          +`lejátszott meccs (magától tanulja, ${POS_DRIFT_MULT}× lassabban, mint a megvásárolt `
+          +`poszt-tanulás; a jó teljesítmény ezt is gyorsítja)`;
+        d.appendChild(prog);}
+      /* A máshol gyűlt beszokások egy tömör sorban — ezekért nem fizetett
+         senki, de ott vannak, és a felállás-döntésnél számítanak. */
+      const others=Object.keys(e.posDrift||{}).filter(x=>x!==herePos&&posDriftProgress(e,x)>0);
+      if(others.length){
+        const row=document.createElement("div");row.className="hdRow";row.style.color="var(--dim2)";
+        row.innerHTML=`🎓 Máshol is szokja: `+others.sort((a,b)=>posDriftLeft(e,a)-posDriftLeft(e,b))
+          .map(x=>`<b>${x}</b> — még kb. ${posDriftLeft(e,x)} meccs`).join(" · ");
+        d.appendChild(row);}
       const learnBtn=document.createElement("button");
       learnBtn.className="btn-s stepbtn";learnBtn.style.marginTop="6px";
       learnBtn.textContent="🎓 Poszt-tanulás indítása";
@@ -44801,7 +44877,14 @@ function openPosLearnPicker(loc){
   $("twPanel").classList.remove("hide");
   $("twTitle").textContent="🎓 Poszt-tanulás";
   const needed=posLearnMatchesNeeded(e);
-  let body=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">${esc(shortName(p.n))} (Rating ${Math.round(pOvr(p))}, ${e.age} év) új posztot tanulhat. A tanulás <b>meccsenként</b> halad (kb. <b>${needed}</b> lejátszott meccs, a kor és a TSI szabja a tempót, a jó teljesítmény gyorsítja). Ha kész, teljes értékűen otthon lesz az új poszton.<br><br>Ára: <b>${fmtFt(cost)}</b>. Egyenleged: ${fmtFt(S.transferBudget||0)}.</p>`;
+  /* A MÁR MEGLÉVŐ BESZOKÁS BESZÁMÍT. Aki húsz meccset lehúzott egy idegen
+     poszton, azt nem küldjük vissza a startvonalra, amikor fizetsz is érte: a
+     beszokás ARÁNYOS haladását visszük át a megvásárolt tanulásba (a
+     szükséglet háromszoros ott, tehát a haladás harmada jön át). Így a fizetés
+     mindig gyorsít, sosem lassít. */
+  const carryOf=pos=>Math.min(needed,posDriftProgress(e,pos)/POS_DRIFT_MULT);
+  const leftOf=pos=>Math.max(1,Math.ceil(needed-carryOf(pos)));
+  let body=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">${esc(shortName(p.n))} (Rating ${Math.round(pOvr(p))}, ${e.age} év) új posztot tanulhat. A tanulás <b>meccsenként</b> halad (kb. <b>${needed}</b> lejátszott meccs — a jó teljesítmény gyorsítja). Ha kész, teljes értékűen otthon lesz az új poszton.<br><br>Fizetés nélkül is <b>beszokik</b> minden posztot, ahol játszik, csak <b>${POS_DRIFT_MULT}× lassabban</b> (kb. ${posDriftMatchesNeeded(e)} meccs) — amit így már összeszedett, azt a megvásárolt tanulásba <b>beszámítjuk</b>.<br><br>Ára: <b>${fmtFt(cost)}</b>. Egyenleged: ${fmtFt(S.transferBudget||0)}.</p>`;
   $("twBody").innerHTML=body;
   $("twActions").innerHTML="";
   if((S.transferBudget||0)<cost){
@@ -44816,11 +44899,14 @@ function openPosLearnPicker(loc){
       html:`<div style="font-size:15px;font-weight:700">${esc(shortName(p.n))} → <span style="color:var(--gold)">${pos}</span></div>
         <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))}</div>
         <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(cost)}</b>, ami azonnal levonódik — az egyenleged ${fmtFt(S.transferBudget||0)} → <b>${fmtFt((S.transferBudget||0)-cost)}</b>.
-          A tanulás kb. <b>${needed}</b> lejátszott meccsig tart, és közben egy másik posztot nem tanulhat.</div>`,
+          A tanulás kb. <b>${leftOf(pos)}</b> lejátszott meccsig tart${carryOf(pos)>0?` (a már meglévő beszokását beszámítottuk)`:""}, és közben egy másik posztot nem tanulhat.</div>`,
       onYes:()=>{
         if((S.transferBudget||0)<cost)return;
         budgetPay(cost,"poslearn",p.n);
-        e.posLearning={target:pos,needed:posLearnMatchesNeeded(e),progress:0,startedSeason:S.seasonNumber||1};
+        const carry=carryOf(pos);
+        if(e.posDrift){delete e.posDrift[pos];
+          if(!Object.keys(e.posDrift).length)delete e.posDrift;}
+        e.posLearning={target:pos,needed:posLearnMatchesNeeded(e),progress:carry,startedSeason:S.seasonNumber||1};
         S.chPosLearnStarted=(S.chPosLearnStarted||0)+1;   /* kihívás-könyvelés */
         addLine(`🎓 Poszt-tanulás elindítva: ${esc(shortName(p.n))} elkezdte a(z) ${pos} poszt tanulását (−${fmtFt(cost)}).`,"m life");
         $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">🎓 Elindítva!</div><p style="font-size:13px;margin-top:5px">${esc(shortName(p.n))} mostantól a(z) <b>${pos}</b> posztot tanulja. A haladást a lenyíló játékos-panelen követheted. Szólunk, ha kész!</p>`;
@@ -44832,9 +44918,12 @@ function openPosLearnPicker(loc){
     const b=document.createElement("button");
     b.className=rec?"btn-y stepbtn":"btn-s stepbtn";
     b.style.marginTop="6px";b.style.textAlign="left";
+    /* A gomb a TÉNYLEGES hátralévő utat mondja, nem a névleges bázist: ahol
+       már szokik, ott rövidebb. */
+    const dl=carryOf(pos)>0?` <small style="opacity:.85">már szokja — kb. ${leftOf(pos)} meccs</small>`:"";
     b.innerHTML=rec
-      ?`<b>${pos}</b> — ajánlott<small>itt játszik most, és ezt a posztot még nem ismeri</small>`
-      :`<b>${pos}</b>`;
+      ?`<b>${pos}</b> — ajánlott<small>itt játszik most, és ezt a posztot még nem ismeri${carryOf(pos)>0?` · már szokja: kb. ${leftOf(pos)} meccs`:""}</small>`
+      :`<b>${pos}</b>${dl}`;
     b.disabled=(S.transferBudget||0)<cost;
     b.onclick=()=>start(pos);
     $("twActions").appendChild(b);};
@@ -47576,9 +47665,16 @@ function openHubPositionPicker(loc){
        emberünk az övén — a csere teljes mérlege egy pillantásra. */
     const tgtSlot=loc.type==="slot"?slots[loc.idx]:null;
     const srcSlot=other.type==="slot"?slots[other.idx]:null;
+    /* ---- A JELÖLT RATINGJE A SOR JOBB SZÉLÉN ----
+       A cserelistán eddig csak a név és a poszt látszott: pad- vagy tartalék-
+       helyre cserélve (ahol nincs cél-slot, tehát előnézet sincs) a döntést
+       teljesen szám nélkül kellett meghozni. A sor mostantól ugyanazt a nagy
+       Ratinget viseli, amit a keretlista — a MOSTANI helyén vett effektív
+       érték, tehát ugyanaz a szám, amit a HUB-ban is lát az ember. */
+    const nowOvr=Math.round(effOvrIfPlaced(other.p,srcSlot));
     let prev="";
     if(tgtSlot){
-      const now=Math.round(effOvrIfPlaced(other.p,srcSlot)),then=Math.round(effOvrIfPlaced(other.p,tgtSlot));
+      const now=nowOvr,then=Math.round(effOvrIfPlaced(other.p,tgtSlot));
       const off=!other.p.pos.includes(tgtSlot.pos);
       prev=`<div style="font-size:11px;color:var(--dim);margin-top:1px">itt: <b style="color:${then<now?"var(--red)":then>now?"var(--grass)":"var(--ink)"}">${then}</b>${then!==now?` (most ${now})`:""}${off?' · <span style="color:var(--red)">idegen poszt</span>':""}</div>`;}
     /* CSEREZÁR: a zárolt ember a partnerlistán is zárolt — látszik, miért nem
@@ -47588,7 +47684,8 @@ function openHubPositionPicker(loc){
       row.style.opacity=".45";
       prev=`<div style="font-size:11px;color:var(--red);margin-top:1px">🔒 egy szezonon át nem cserélhető (kihívás-büntetés)</div>`;}
     row.innerHTML=`<span class="pos pc-${getCategoryFor(posTxt)}">${posLabel}</span>
-      <span class="main"><div class="nm">${esc(other.p.n)}${tag}</div>${prev}</span>`;
+      <span class="main"><div class="nm">${esc(other.p.n)}${tag}</div>${prev}</span>
+      <span class="ovr">${nowOvr}</span>`;
     row.onclick=()=>{
       if(locked)return;
       if(fillEmptyBench){
