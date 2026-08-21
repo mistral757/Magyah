@@ -1180,6 +1180,38 @@ nem érzi a változást. A vendégnél a rés a KAPOTT eltolásból fejtődik vi
 (`pyrMpGapFromUp`) — enélkül a helyi rajzoló a saját (nulla) résével némán
 felülírná a házigazda döntését.
 
+### Egyszerű és részletes nézet (v3.5.20)
+
+A választó **alapból egyetlen kérdést tesz fel:** melyik ligában kezdesz. A hat
+sor a liga nevét, a mászás hosszát és a Run-plafont mutatja, alattuk egy mondat
+arról, mit vállaltál — és kész. A rajt nehézsége a háttérben az **ajánlott
+értéken** fut, a világ eltolása magától igazodik hozzá.
+
+A **⚙️ Részletes mód** gomb ugyanazt a gépezetet nyitja ki, nem egy másikat: a
+rés-csúszkát, a soronkénti világ-eltolást, a Run-plafon tényezőit és a
+„rés a nyers erőké" magyarázatot. A gomb bármikor oda-vissza vált, és semmit
+nem állít át.
+
+**Az alapértelmezett rajt +2** (`PYR_GAP_DEFAULT`), nem 0. A pontos középmezőny
+matematikailag szép kiindulás, játékként viszont nem az: az első idény ott
+érem nélküli középcsapatot ad, és a mód ígérete (a MÁSZÁS) csak a második-
+harmadik szezonban indul be. A +2 az „egyenrangú" zóna felső fele — feljutásra
+esélyes, de nem sétagalopp. A csúszka innen indul, a „🎬 ajánlott · +2" gomb ide
+tér vissza, és a 0 továbbra is egyetlen mozdulatra van.
+
+### A „keret" beállítóoldal eltűnt a hagyományos módból (v3.5.20)
+
+Ott nincs draft, tehát az oldal minden vezérlője értelmetlen volt: a Rating-alap,
+az újrapörgetés és a családtag már eddig is rejtve volt, a VB/EB-kapcsoló pedig
+a piramis világára sem hat többé — **a liga klubokból épül** (`pyrClubPool`
+szűrője). Ez egyben egy régi következetlenséget is lezár: a klubválasztó SOSEM
+kínált válogatottat (`clubPickEligible: !sq.wc`), a világ viszont igen, tehát be
+lehetett futni olyan ellenfélbe, amilyet te magad nem választhattál.
+
+Az oldal így üresen marad, és a lapozó magától átugorja (`setupPageAlive`). A
+lépcső sorszáma mostantól a LÁTHATÓ oldalakat számolja, nem a tömb indexét —
+különben „1 · 3 · 4" állna ott, ami hiányzó lépésnek látszik.
+
 **Visszafelé kompatibilis.** A futó karrierek a világot MENTIK (`S.pyr.divs`),
 tehát semmi nem mozdul alattuk. A 3.5.15 előtti mentések/szobák 0-4
 **fokozatot** tároltak: egy 0-4 közti egész ma legális eltolás is, ezért a mai
