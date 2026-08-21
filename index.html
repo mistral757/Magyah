@@ -3535,7 +3535,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.28";
+const APP_VERSION="3.5.29";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -9090,9 +9090,15 @@ function pyrAiRate(div){
 /* A VILÁG FEJLŐDÉSE. Minden osztály EGYSZERRE lép, a szezon lezárulta után és
    a fel-/kiesés ELŐTT — így a csere már az új erőviszonyok szerint történik.
    Visszaadja az osztályonkénti ÁTLAGOS lépést: ez a mérő bemenete. */
-function pyrDevelopWorld(order,rnd){
+/* `dry` — SZÁRAZ FUTÁS: a világ NEM változik, csak a deltákat adjuk vissza
+   (Map: csapat-objektum → mennyivel nőne). A lejátszható osztályozó
+   előnézetének kell: az ellenfél erejét a fejlődés UTÁNI állapotában kell
+   ismernie, miközben a valódi fejlődést továbbra is a rollover végzi el,
+   pontosan egyszer. Ugyanaz a képlet és ugyanaz a sorsolás-sorrend szolgálja
+   ki mindkét hívót — így a kettő nem tud szétcsúszni. */
+function pyrDevelopWorld(order,rnd,dry){
   const r=rnd||Math.random;
-  const steps=[];
+  const steps=[],deltas=dry?new Map():null;
   order.forEach((arr,i)=>{
     const rate=pyrAiRate(i+1);
     let sum=0,n=0;
@@ -9103,10 +9109,11 @@ function pyrDevelopWorld(order,rnd){
          sereghajtó örökre az maradjon */
       const rel=arr.length>1?(pos/(arr.length-1)):0.5;   /* 0 = bajnok */
       const d=rate*(1+PYR_DEV_FORM*(1-2*rel))*(1+(r()*2-1)*PYR_DEV_NOISE);
-      e.t.ovr=Math.round((e.t.ovr+d)*10)/10;
+      if(dry)deltas.set(e.t,d);
+      else e.t.ovr=Math.round((e.t.ovr+d)*10)/10;
       sum+=d;n++;});
     steps.push(n?Math.round(sum/n*100)/100:0);});
-  return steps;}
+  return dry?deltas:steps;}
 /* ================= AZ OSZTÁLYOZÓ =================
    Két meccs, oda-visszavágó, a motor SAJÁT gólgörbéjével — ugyanaz a képlet,
    ami a bajnokit és a kupát is eldönti. Az első meccs a KIHÍVÓ otthonában
@@ -9148,6 +9155,93 @@ function pyrPlayoffTie(ch,df,rnd,lowerDiv,k){
     ch:pyrEntityName(ch),df:pyrEntityName(df),
     mine:!!(ch&&ch.me)||!!(df&&df.me),
     iAmChallenger:!!(ch&&ch.me)};}
+/* ================= A LEJÁTSZHATÓ OSZTÁLYOZÓ =================
+   MIÉRT: az osztályozó a hagyományos mód EGYETLEN olyan tétmérkőzése volt,
+   amit nem lehetett lejátszani. A szezonforduló elbeszélte, mi történt — de a
+   feljutásról vagy a bennmaradásról a motor döntött helyetted, miközben a
+   szezon harminc fordulóját végigjátszottad. Innentől a SAJÁT párharcod
+   ugyanolyan mérkőzés, mint bármelyik másik: kiállsz, cserélsz, izgulsz.
+   Egy kis mini kupa a szezon és a nyár között.
+
+   HOGYAN ILLESZKEDIK A FORDULÓBA. A rollover (pyrRollover) EGYETLEN,
+   determinisztikus számítás: sorrendek → világ-fejlődés → osztályozók →
+   fel/kiesés. Ezt nem szabad kettévágni egy meccs-folyam kedvéért. Ezért a
+   párharcod MEGELŐZI a fordulót:
+     1. az ELŐNÉZET (pyrPoPreview) ugyanabból a seedből, ugyanabban a
+        sorrendben felépíti a sorrendeket és SZÁRAZON lefuttatja a
+        világ-fejlődést — így pontosan azt az ellenfelet és azt az erőt kapod,
+        amivel a forduló is számolna;
+     2. lejátszod a két meccset (a valódi meccsmotorral);
+     3. az eredmény S.pyr.poPlayed-be kerül, és a forduló a saját párharcod
+        szimulált eredményét erre CSERÉLI (pyrPoPlayedSwap) — a világ többi
+        osztályozója és a sorsolás-folyam érintetlen marad.
+
+   HOL NEM FUT: közös karrierben (ott a két kliens világa csak akkor marad
+   együtt, ha mindkét oldalon ugyanaz a számítás fut), auto szezonban, és
+   akkor sem, ha a felhasználó a szimulációt választja. Mindhárom esetben a
+   régi, szimulált út él tovább, változatlanul. */
+const PYR_PO_LEGS=2;
+/* A SAJÁT osztályod végsorrendje NÉVLISTAKÉNT — ugyanaz, amit a szezonforduló
+   is átad a rollovernek (közös karrierben a páros egy entitás). */
+function pyrMyFinalOrder(){
+  const rows=S.finalTable||[];
+  const mine=[];rows.forEach((t,i)=>{if(t&&t.player)mine.push(i);});
+  const out=rows.map(t=>t.n);
+  if(mine.length>=2){out[mine[0]]=teamName;out.splice(mine[1],1);}
+  return out;}
+/* Van-e SAJÁT osztályozód, és ha igen, ki ellen? A visszaadott ellenfél-erő
+   MÁR tartalmazza a szezonvégi világ-fejlődést (lásd a fenti 1. pontot). */
+function pyrPoPreview(){
+  try{
+    if(!(typeof pyrOn==="function"&&pyrOn()))return null;
+    const W=S.pyr;if(!W||!W.divs)return null;
+    if(!(S.finalTable&&S.finalTable.length))return null;
+    const sn=S.seasonNumber||1;
+    if(W.rolledFor===sn)return null;              /* a forduló már lement */
+    const r=rngFor("pyr:s"+sn+":roll");
+    const order=pyrBuildOrders(pyrMyFinalOrder(),r);
+    const dev=pyrDevelopWorld(order,r,true);      /* SZÁRAZ: a világ nem mozdul */
+    const myId=pyrMyDivId();
+    const mine=order[myId-1]||[];
+    const idx=mine.findIndex(x=>x&&x.me);
+    if(idx<0)return null;
+    const ovrOf=e=>{
+      if(!e)return 0;
+      if(e.me)return (typeof teamMatchStrength==="function")?teamMatchStrength():0;
+      const base=(e.t&&e.t.ovr)||0;
+      return Math.round((base+(dev.get(e.t)||0))*10)/10;};
+    /* KIHÍVÓ: a 2-3. hely a fentebbi osztály 15., illetve 14. helyezettje ellen */
+    if(myId>1&&idx>=PYR_UP&&idx<PYR_UP+PYR_PO_N){
+      const k=idx-PYR_UP,upper=order[myId-2]||[];
+      const df=upper[upper.length-2-k];
+      if(!df)return null;
+      return {iAmCh:true,k,lowerDiv:myId-1,myRank:idx+1,
+        oppName:pyrEntityName(df),oppOvr:ovrOf(df),
+        oppRank:upper.length-1-k,oppDiv:myId-1,myDiv:myId};}
+    /* VÉDŐ: a 14-15. hely az alsóbb osztály 2., illetve 3. helyezettje ellen */
+    if(myId<PYR_DIVS){
+      const last=mine.length-1;
+      const k=last-1-idx;
+      if(k>=0&&k<PYR_PO_N){
+        const lower=order[myId]||[];
+        const ch=lower[PYR_UP+k];
+        if(!ch)return null;
+        return {iAmCh:false,k,lowerDiv:myId,myRank:idx+1,
+          oppName:pyrEntityName(ch),oppOvr:ovrOf(ch),
+          oppRank:PYR_UP+k+1,oppDiv:myId+1,myDiv:myId};}}
+    return null;}
+  catch(e){return null;}}
+/* A lejátszott párharc BECSERÉLÉSE a szimulált helyére. Csak akkor cserél, ha
+   a párharc tényleg az enyém, ugyanabban a szezonban és ugyanazon a
+   helyen (osztálypár + sorszám) áll. */
+function pyrPoPlayedSwap(t){
+  const P=S.pyr&&S.pyr.poPlayed;
+  if(!P||!t||!t.mine)return t;
+  if(P.season!==(S.seasonNumber||1))return t;
+  if(P.lowerDiv!==t.lowerDiv||P.k!==t.k)return t;
+  if(!!P.iAmChallenger!==!!t.iAmChallenger)return t;
+  return Object.assign({},t,{chWon:P.chWon,how:P.how,legs:P.legs,
+    chG:P.chG,dfG:P.dfG,played:true});}
 /* ---- A SZEZONFORDULÓ ELBESZÉLÉSE: PUFFERELVE ----
    HIBA, AMIT EZ JAVÍT. A szezonforduló minden mondata az addLine-on ment a
    meccs-naplóba (#ttLines) — csakhogy a naplót az új szezon indítása pár
@@ -9168,12 +9262,14 @@ function pyrSay(html,cls){
    lejátszott szezon dönt. A többi osztály a pyrSimDivision-t kapja.
    Minden osztály EGYSZERRE vált: a feljutók és a kiesők egy lépésben cserélnek
    helyet, tehát a létszám sosem csúszhat el. */
-function pyrRollover(myOrder,rnd){
-  const W=S.pyr;if(!W||!W.divs)return null;
-  const r=rnd||Math.random;
-  const myId=pyrMyDivId();
-  /* 1) minden osztály végsorrendje, entitásokban ({t} vagy {me:true}) */
-  const order=W.divs.map((d,i)=>{
+/* ---- MINDEN OSZTÁLY VÉGSORRENDJE, EGY HELYEN ----
+   A SAJÁT osztályod a VALÓS végtabellából jön (ott nincs mit szimulálni), a
+   többi ötöt a pyrSimDivision adja — a kapott rng-folyamból, MINDIG ugyanabban
+   a sorrendben. Ezért adhatja ugyanazt a képet a rollover és a lejátszható
+   osztályozó előnézete: azonos seed → azonos sorrendek. */
+function pyrBuildOrders(myOrder,r){
+  const W=S.pyr;const myId=pyrMyDivId();
+  return W.divs.map((d,i)=>{
     if(i+1===myId){
       const byName={};d.teams.forEach(t=>{byName[t.n]=t;});
       const out=[];
@@ -9186,7 +9282,13 @@ function pyrRollover(myOrder,rnd){
       Object.keys(byName).forEach(n=>out.push({t:byName[n]}));
       if(!out.some(x=>x.me))out.push({me:true});
       return out;}
-    return pyrSimDivision(d.teams,r).map(x=>({t:x.t}));});
+    return pyrSimDivision(d.teams,r).map(x=>({t:x.t}));});}
+function pyrRollover(myOrder,rnd){
+  const W=S.pyr;if(!W||!W.divs)return null;
+  const r=rnd||Math.random;
+  const myId=pyrMyDivId();
+  /* 1) minden osztály végsorrendje, entitásokban ({t} vagy {me:true}) */
+  const order=pyrBuildOrders(myOrder,r);
   /* 2) MÉRÉS a fejlődés ELŐTT — ez volt a lezárult szezon állása */
   const _myOvr=(typeof teamStrength==="function")?teamStrength():0;
   const _rank=(myOrder||[]).findIndex(n=>n===teamName)+1||null;
@@ -9205,7 +9307,10 @@ function pyrRollover(myOrder,rnd){
     for(let k=0;k<PYR_PO_N;k++){
       const ch=lower[1+k],df=upper[upper.length-2-k];
       if(!ch||!df)continue;
-      const t=pyrPlayoffTie(ch,df,r,i+1,k);
+      /* A szimuláció MINDIG lefut — a világ sorsolás-folyama így betűre
+         ugyanaz marad, akkor is, ha a saját párharcodat te játszottad le.
+         A lejátszott eredmény ezután lép a helyére (pyrPoPlayedSwap). */
+      const t=pyrPoPlayedSwap(pyrPlayoffTie(ch,df,r,i+1,k));
       po.push(t);
       if(t.chWon){up[i+1].push(ch);down[i].push(df);}}}
   /* 5) az új összetétel: maradók + a fentről lejövők + a lentről feljövők */
@@ -11484,7 +11589,10 @@ function buildEuroUserFixtures(){
    statisztikák NEM a bajnoki vödörbe mennek, hanem a kupa sajátjába. Egyetlen
    őrfüggvény vezérli mindkettőt, hogy ne lehessen elfelejteni egy ágat. */
 function euroActive(){return !!(S.euro&&S.euro.stage&&S.euro.stage!=="done");}
-function euroFrozen(){return euroActive();}
+/* „Be van-e fagyasztva" a bajnoki könyvelés? Kupában igen — és az osztályozón
+   is: az a mérkőzés már a LEZÁRT szezon után van, a bajnoki góllövőlistát és a
+   forduló-kihívásokat tehát nem mozgathatja. */
+function euroFrozen(){return euroActive()||(typeof pyrPoActive==="function"&&pyrPoActive());}
 /* A kupasorozat alatt a hosszú távú építkezés FELE TEMPÓVAL halad (a korábbi
    teljes befagyasztás helyett): játékos-fejlődés, skill-fázisok, párkémia,
    taktika. Így a kupa nem "ingyen szezon", de nem is áll meg tőle a fejlődés.
@@ -27047,6 +27155,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      championCards a megnyert Champion-kártyák (játékosnév → {comp,boost}). */
   euroEntry:null,euroCurrent:null,euroOptOut:false,championCards:{},
   friendlyCupSeason:0,   /* melyik nyáron döntöttél már a felkészülési kupáról */
+  pyrPo:null,            /* a FUTÓ, lejátszható osztályozó-párharc */
   /* játékosnév → hány BL egyéni díjat nyert összesen (a 2.-tól +3 Rating/díj) */
   goldenAwardCount:{},
   /* MÉRT EGYÉNI CSÚCSOK (km/h): a gyorsaság-skillek végsebessége és a
@@ -28893,6 +29002,12 @@ function updateStanding(){
   if(typeof sbApplyLiveLayout==="function")sbApplyLiveLayout();
   /* A kupában a bajnoki mérleg helyett a sorozat állása látszik — a VALÓS
      szakasszal (korábban mindig "csoportkör" volt kiírva, a kieséses körökben is). */
+  if(typeof pyrPoActive==="function"&&pyrPoActive()){
+    const P=S.pyrPo;
+    $("standing").textContent=`Osztályozó · ${Math.min(P.idx+1,PYR_PO_LEGS)}/${PYR_PO_LEGS}. mérkőzés · `
+      +(P.iAmCh?"a feljutásért":"a bennmaradásért");
+    sbSync();
+    return;}
   if(euroActive()){
     const c=EURO_COMPS[S.euro.comp],E=S.euro;
     let txt;
@@ -33807,7 +33922,8 @@ function playMatch(){
             kupa-kihívás könyvelése is ismeri, tehát új útvonal nem kell hozzá */
          ...(DUEL.oppShown!=null?{dispOvr:DUEL.oppShown}:{})},
        home:!DUEL.neutral&&!!DUEL.iAmHome,duel:true}
-    :(euroActive()?S.euro.fixtures[S.euro.idx]:S.fixtures[S.idx]);
+    /* OSZTÁLYOZÓ: saját, két meccses menetrend — ugyanabban az alakban. */
+    :(pyrPoActive()?pyrPoFx():(euroActive()?S.euro.fixtures[S.euro.idx]:S.fixtures[S.idx]));
   /* VÉDŐHÁLÓ: ha a kupa-meccs bármiért hiányzik (elcsúszott állapot), ne dobjunk
      kivételt a meccs közepén — inkább visszatérünk a kupa-képernyőre. */
   if(!fx){
@@ -35186,14 +35302,17 @@ function playMatch(){
          _TIE): az S.euro.penWin-t a párharc lezárása később elfogyasztja és
          nullázza, ezért arra a lefújáskor nem támaszkodhatunk. */
       _penHere=won;
-      S.euro.penWin=won;S.euro.penScore=`${us}:${them}`;
+      /* A párbaj eredménye oda kerül, ahol a párharc lakik. Osztályozón az
+         S.euro null — enélkül itt kivétel dobódna a meccs kellős közepén. */
+      if(S.euro){S.euro.penWin=won;S.euro.penScore=`${us}:${them}`;}
+      else if(S.pyrPo){S.pyrPo.penWin=won;S.pyrPo.penScore=`${us}:${them}`;}
       addLine(`${won?"🏆 MEGNYERTÉTEK A BÜNTETŐPÁRBAJT":"❌ Elvesztettétek a büntetőpárbajt"}  ${us}:${them}`,won?"m win":"m loss");
       done();};
     setTimeout(shoot,tickMs);}
   function fullTime(){
     /* KUPA: ha a párharc döntetlen, előbb a hosszabbítás (és ha kell, a
        büntetők) futnak le — csak utána zárjuk le a mérkőzést. */
-    if(euroActive()&&!_etDone&&euroTieStillLevel(gf,ga)){
+    if((euroActive()||pyrPoActive())&&!_etDone&&euroTieStillLevel(gf,ga)){
       _etDone=true;runExtraTime(()=>fullTime());return;}
     /* Lefújás: a csere-gomb fogantyúja megszűnik, a gomb magától eltűnik. */
     MATCH_CTL=null;updateLiveSubBar();
@@ -35220,7 +35339,11 @@ function playMatch(){
           advanced:d>0?true:(d<0?false:_penHere===true),
           byPens:(d===0&&_penHere!=null)};}
       catch(e){return null;}})();
-    if(euroActive()){
+    if(pyrPoActive()){
+      /* OSZTÁLYOZÓ: se bajnoki mérleg, se kupa-tabella — a párharc saját
+         eredménylapja. A szezon már lezárult, a bajnoki sorod végleges. */
+      pyrPoFinishMatch(gf,ga);
+    }else if(euroActive()){
       /* KUPA: az eredmény a csoporttabellába megy, a bajnoki mérleg érintetlen */
       euroFinishUserMatch(gf,ga);
     }else{
@@ -35257,11 +35380,15 @@ function playMatch(){
         if(!S.mpDuelLog.some(m=>m.season===sn&&m.round===rnd))
           S.mpDuelLog.push({season:sn,round:rnd,gf,ga,home:!!fx.home});}}
     addLine(`VÉGE  ${title}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m "+cls);
-    if(_TIE)
-      addLine(`🏆 <b>A párharc mérlege:</b> ${_TIE.mine}–${_TIE.theirs} összesítésben`
-        +(_TIE.byPens?` (büntetőkkel ${esc(String((S.euro&&S.euro.penScore)||""))})`:"")
-        +` — <b>${_TIE.advanced?"TOVÁBBJUTÁS":"KIESÉS"}</b>. A mai eredmény önmagában nem mond ítéletet: ezen a meccsen az összesítés a mérce.`,
-        _TIE.advanced?"m win":"m loss");
+    if(_TIE){
+      const _po=pyrPoActive();
+      const _pens=String((S.euro&&S.euro.penScore)||(S.pyrPo&&S.pyrPo.penScore)||"");
+      const _yes=_po?(S.pyrPo&&S.pyrPo.iAmCh?"FELJUTÁS":"BENNMARADÁS"):"TOVÁBBJUTÁS";
+      const _no=_po?(S.pyrPo&&S.pyrPo.iAmCh?"MARADTOK, AHOL VOLTATOK":"KIESÉS"):"KIESÉS";
+      addLine(`${_po?"⚔️":"🏆"} <b>A párharc mérlege:</b> ${_TIE.mine}–${_TIE.theirs} összesítésben`
+        +(_TIE.byPens?` (büntetőkkel ${esc(_pens)})`:"")
+        +` — <b>${_TIE.advanced?_yes:_no}</b>. A mai eredmény önmagában nem mond ítéletet: ezen a meccsen az összesítés a mérce.`,
+        _TIE.advanced?"m win":"m loss");}
     /* ---- A MEGFIGYELÉS EREDMÉNYE ----
        A társ felállása már a kezdőrúgáskor befagyott (h2hStart); itt kap
        eredményt is, hogy a visszanézéskor lásd, MELYIK meccsről szól a kép. */
@@ -35287,7 +35414,7 @@ function playMatch(){
         decisiveMin:_sw.decisiveMin,comeback:maxDeficit,
         /* a lefolyás jelei: pengeélen töltött idő, saját gólsorozat, kései gólok */
         openShare:_sw.openShare,runUs:_sw.runUs,lateGoals:_sw.lateGoals,
-        rival:isRivalFixture(fx),cup:euroActive(),duel:!!DUEL,
+        rival:isRivalFixture(fx),cup:euroActive()||pyrPoActive(),duel:!!DUEL,
         /* HAJRÁ-RANGADÓ: a tét-tétel a TABELLÁRA is érzékeny — a hajrában egy
            pontszomszéd elleni meccs önmagában tét, akkor is, ha a cím még nem
            dőlhet el rajta. */
@@ -35835,7 +35962,7 @@ function playMatch(){
        léptetésével EGYÜTT. Így ha a meccs utáni jutalom-lánc (pl. új-felfedezés
        modál) megáll, az állapot akkor sem csúszik szét (korábban az idx már
        nőtt, a md nem — a következő kezdőrúgás nem létező meccsre mutatott). */
-    if(euroActive()){S.playing=false;updateStanding();updateMorale();tacticTrainAfterMatch(gf,ga);}
+    if(euroActive()||pyrPoActive()){S.playing=false;updateStanding();updateMorale();tacticTrainAfterMatch(gf,ga);}
     else{S.idx++;S.playing=false;tacticTrainAfterMatch(gf,ga);updateStanding();updateMorale();
       /* RIVÁLIS + BAJNOKI NARRATÍVA: a fordulót MÁR lekönyveltük (S.idx nőtt),
          tehát az élő tabella a friss állást mutatja — innen jön a rangadó utáni
@@ -35901,6 +36028,7 @@ function playMatch(){
          lüktető gomb kínálja, és 30 másodperc TÉTLENSÉG után magától is
          megtörténik (minden koppintás, görgetés, billentyű újraindítja a
          visszaszámlálást). Auto módban nincs tartás: ott végig kell futnia. */
+      if(pyrPoActive()){pyrPoAfterMatch();return;}
       if(euroActive()){
         if(S.auto){euroAfterUserMatch();return;}
         euroHoldStart();return;}
@@ -40871,6 +40999,181 @@ function showPyrTurnReveal(turn,next){
   btn.onclick=()=>{$("scUnlock").classList.add("hide");if(typeof next==="function")next();};
   $("unlockActions").innerHTML="";$("unlockActions").appendChild(btn);
   $("scUnlock").scrollIntoView({behavior:"smooth"});}
+/* ================= AZ OSZTÁLYOZÓ LEJÁTSZÁSA: ÁLLAPOT ÉS FOLYAM =================
+   Az S.pyrPo a FUTÓ párharc: kinek a helyéért megy, ki az ellenfél, hol tart.
+   A mentés része, tehát egy meccs közbeni újratöltés sem veszíti el. */
+function pyrPoActive(){return !!(S.pyrPo&&S.pyrPo.stage==="play");}
+/* Lejátszható-e egyáltalán? Közös karrierben NEM (ott a két kliens világa csak
+   akkor marad együtt, ha mindkét oldalon ugyanaz a számítás fut), és auto
+   szezonban sem (ott a szezonnak magától kell végigfutnia). */
+function pyrPoPlayable(){
+  if(!(typeof pyrOn==="function"&&pyrOn()))return false;
+  if(gameMode!=="career"||!careerPool)return false;
+  if(S.auto)return false;
+  if(typeof h2hRoomActive==="function"&&h2hRoomActive())return false;
+  return true;}
+/* A most soron lévő mérkőzés — ugyanabban az alakban, amit a motor a bajnokitól
+   és a kupától is kap. 1. meccs a KIHÍVÓ otthonában, a visszavágó a VÉDŐÉ. */
+function pyrPoFx(){
+  const P=S.pyrPo;if(!P)return null;
+  const home=P.iAmCh?(P.idx===0):(P.idx===1);
+  return {o:{n:P.opp.n,ovr:P.opp.ovr},home:home,po:true};}
+/* Az összesítés a SAJÁT nézőpontodból, a most futó meccs állásával együtt. */
+function pyrPoLiveTie(gf,ga){
+  const P=S.pyrPo;
+  if(!P||P.stage!=="play"||P.idx!==1)return null;
+  const l0=P.legs[0]||[0,0];
+  const pm=P.iAmCh?l0[0]:l0[1], pt=P.iAmCh?l0[1]:l0[0];
+  const mine=pm+(gf||0),theirs=pt+(ga||0);
+  return {prevMine:pm,prevTheirs:pt,mine,theirs,
+    lead:mine>theirs?"us":(mine<theirs?"them":"level")};}
+function pyrPoTieLevel(gf,ga){
+  const A=pyrPoLiveTie(gf,ga);
+  return !!A&&A.mine===A.theirs;}
+/* A lefújás könyvelése — a bajnoki mérleg és a kupa helyett ide kerül. */
+function pyrPoFinishMatch(gf,ga){
+  const P=S.pyrPo;if(!P)return;
+  /* A legs SZEREP szerint tárol ([kihívó gólja, védő gólja]) — pontosan úgy,
+     ahogy a szimulált párharc (pyrPlayoffTie), hogy a szezonforduló
+     elbeszélése és a fel-/kiesés számítása változtatás nélkül olvassa. */
+  P.legs[P.idx]=P.iAmCh?[gf,ga]:[ga,gf];}
+let _pyrPoNext=null;
+function pyrPoContinue(){
+  const f=_pyrPoNext;_pyrPoNext=null;
+  if(typeof f==="function"){try{f();return;}catch(e){}}
+  /* Ha a folytatás elveszett (újratöltés a párharc közben), a szezonindítás
+     közös kapuja viszi tovább — a forduló maga idempotens (rolledFor). */
+  try{beginNextSeasonWithChallenges();}catch(e){}}
+/* A meccs utáni léptetés: jöhet a visszavágó, vagy lezárul a párharc. */
+function pyrPoAfterMatch(){
+  const P=S.pyrPo;if(!P)return;
+  P.idx++;
+  if(P.idx<PYR_PO_LEGS){pyrPoScreen();try{saveGame();}catch(e){}return;}
+  /* ---- A PÁRHARC EREDMÉNYE ---- */
+  const l0=P.legs[0]||[0,0],l1=P.legs[1]||[0,0];
+  const chG=l0[0]+l1[0],dfG=l0[1]+l1[1];
+  let chWon,how;
+  if(chG!==dfG){chWon=chG>dfG;how="összesítésben";}
+  else{
+    /* Döntetlen összesítésnél a mérkőzésen lefutott büntetőpárbaj dönt. */
+    const iWon=!!P.penWin;
+    chWon=P.iAmCh?iWon:!iWon;
+    how=`büntetőkkel (${P.penScore||""})`.trim();}
+  P.stage="done";
+  S.pyr=S.pyr||{};
+  S.pyr.poPlayed={season:S.seasonNumber||1,lowerDiv:P.lowerDiv,k:P.k,
+    iAmChallenger:!!P.iAmCh,chWon,how,legs:[l0,l1],chG,dfG,played:true};
+  const meWon=P.iAmCh?chWon:!chWon;
+  addLine(`⚔️ <b>Az osztályozó lezárult:</b> ${meWon?"SIKERÜLT":"nem sikerült"} — `
+    +`${esc(P.opp.n)} ellen ${P.iAmCh?chG:dfG}–${P.iAmCh?dfG:chG} ${esc(how)}.`,
+    meWon?"m win":"m loss");
+  try{saveGame();}catch(e){}
+  pyrPoResultScreen(meWon,chG,dfG,how);}
+/* ---- A KÉPERNYŐK (a meglévő „feloldás" felületen) ---- */
+function pyrPoScreen(){
+  const P=S.pyrPo;if(!P)return;
+  const leg=P.idx+1;
+  const home=P.iAmCh?(P.idx===0):(P.idx===1);
+  const l0=P.legs[0];
+  $("scUnlock").classList.remove("hide");
+  $("unlockTitle").textContent=`⚔️ OSZTÁLYOZÓ — ${leg}/${PYR_PO_LEGS}. MÉRKŐZÉS`;
+  const mineFirst=l0?(P.iAmCh?l0[0]:l0[1]):null, hisFirst=l0?(P.iAmCh?l0[1]:l0[0]):null;
+  $("unlockBody").innerHTML=
+    `<div style="font-size:13px;line-height:1.65">`
+    +`<p>${P.iAmCh
+        ? `A <b>${P.myRank}. helyeddel</b> osztályozót játszol a <b>FELJUTÁSÉRT</b>: `
+          +`a D${P.oppDiv} <b>${P.oppRank}. helyezettje</b>, a(z) <b>${esc(P.opp.n)}</b> a soros.`
+        : `A <b>${P.myRank}. helyeddel</b> osztályozón <b>VÉDED A HELYEDET</b>: `
+          +`a D${P.oppDiv} <b>${P.oppRank}. helyezettje</b>, a(z) <b>${esc(P.opp.n)}</b> jön fel érte.`}</p>`
+    +(l0?`<p>Az első mérkőzés: <b>${mineFirst}:${hisFirst}</b> `
+        +`(${P.iAmCh?"hazai pálya":"idegenben"}). Most a visszavágó jön `
+        +`${home?"<b>otthon</b>":"<b>idegenben</b>"}.</p>`
+       :`<p>Két mérkőzés, oda-visszavágó: az első a KIHÍVÓ otthonában, a visszavágó a VÉDŐÉ. `
+        +`Most ${home?"<b>hazai pályán</b>":"<b>idegenben</b>"} kezdtek. Döntetlen összesítésnél `
+        +`hosszabbítás, majd büntetők.</p>`)
+    +`<p style="font-size:11.5px;color:var(--dim)">Az ellenfél ereje: <b>${(P.opp.ovr||0).toFixed(1)}</b>. `
+    +`Ez ugyanaz a mérkőzés, mint bármelyik másik: cserélhetsz, a sérülés és a kiállítás valódi, `
+    +`a fejlődés és a képességek is a szokott módon jönnek.</p></div>`;
+  const act=$("unlockActions");act.innerHTML="";
+  const b=document.createElement("button");
+  b.className="btn-y stepbtn";b.textContent="Kezdőrúgás →";
+  b.onclick=()=>pyrPoKick();
+  act.appendChild(b);
+  $("scUnlock").scrollIntoView({behavior:"smooth"});}
+function pyrPoKick(){
+  const go=()=>{
+    $("scUnlock").classList.add("hide");
+    $("scSim").classList.remove("hide");
+    $("scSim").scrollIntoView({behavior:"smooth"});
+    playMatch();};
+  if(!S.auto&&typeof unavailableStarters==="function"&&unavailableStarters().length){
+    openAbsencePanel(go);return;}
+  go();}
+function pyrPoResultScreen(meWon,chG,dfG,how){
+  const P=S.pyrPo;
+  $("scUnlock").classList.remove("hide");
+  $("unlockTitle").textContent=meWon
+    ?(P.iAmCh?"⬆️ AZ OSZTÁLYOZÓ A TIÉTEK":"🛡️ MEGVÉDTÉTEK A HELYETEKET")
+    :(P.iAmCh?"⬇️ AZ OSZTÁLYOZÓ ELVESZETT":"⬇️ ELBUKOTT A BENNMARADÁS");
+  const mine=P.iAmCh?chG:dfG,his=P.iAmCh?dfG:chG;
+  $("unlockBody").innerHTML=
+    `<div style="font-size:13px;line-height:1.65">`
+    +`<p>Összesítésben <b>${mine}–${his}</b> a(z) ${esc(P.opp.n)} ellen — <b>${esc(how)}</b>.</p>`
+    +`<p>${meWon
+        ?(P.iAmCh?"Feljebb kerültök egy osztállyal. A szezonforduló többi része most következik."
+                 :"Maradtok az osztályotokban. A szezonforduló többi része most következik.")
+        :(P.iAmCh?"Maradtok az osztályotokban — jövőre újra neki."
+                 :"Egy osztállyal lejjebb folytatjátok.")}</p></div>`;
+  const act=$("unlockActions");act.innerHTML="";
+  const b=document.createElement("button");
+  b.className="btn-y stepbtn";b.textContent="Tovább a szezonfordulóra →";
+  b.onclick=()=>{$("scUnlock").classList.add("hide");pyrPoContinue();};
+  act.appendChild(b);
+  $("scUnlock").scrollIntoView({behavior:"smooth"});}
+/* ---- A BELÉPŐ: a szezonforduló ELŐTT hívja a szezonindítás ---- */
+function pyrPlayoffFlow(next){
+  /* FÉLBEHAGYOTT PÁRHARC (újratöltés): ott folytatjuk, ahol abbamaradt. */
+  if(S.pyrPo&&S.pyrPo.stage==="play"&&S.pyrPo.season===(S.seasonNumber||1)){
+    _pyrPoNext=next;pyrPoScreen();return;}
+  if(!pyrPoPlayable()){next();return;}
+  /* Egy szezonban egyszer: ha már lejátszottad (vagy szimulációt kértél), megy tovább. */
+  if(S.pyr&&S.pyr.poPlayed&&S.pyr.poPlayed.season===(S.seasonNumber||1)){next();return;}
+  if(S.pyr&&S.pyr.poSkipped===(S.seasonNumber||1)){next();return;}
+  const pv=pyrPoPreview();
+  if(!pv){next();return;}
+  _pyrPoNext=next;
+  $("scUnlock").classList.remove("hide");
+  $("unlockTitle").textContent="⚔️ OSZTÁLYOZÓ VÁR RÁD";
+  $("unlockBody").innerHTML=
+    `<div style="font-size:13px;line-height:1.65">`
+    +`<p>A szezont a <b>${pv.myRank}. helyen</b> zártátok — ez `
+    +`${pv.iAmCh?"<b>osztályozót a feljutásért</b>":"<b>osztályozót a bennmaradásért</b>"} jelent.</p>`
+    +`<p>Az ellenfél: a D${pv.oppDiv} ${pv.oppRank}. helyezettje, a(z) <b>${esc(pv.oppName)}</b> `
+    +`(erő <b>${(pv.oppOvr||0).toFixed(1)}</b>). Két mérkőzés, oda-visszavágó — `
+    +`az első a kihívó otthonában, a visszavágó a védőnél. Döntetlen összesítésnél `
+    +`hosszabbítás, majd büntetők.</p>`
+    +`<p style="font-size:11.5px;color:var(--dim)">Lejátszhatod magad — ez ugyanolyan mérkőzés, `
+    +`mint bármelyik másik —, vagy rábízhatod a motorra, ahogy eddig volt.</p></div>`;
+  const act=$("unlockActions");act.innerHTML="";
+  const play=document.createElement("button");
+  play.className="btn-y stepbtn";play.textContent="⚔️ Lejátszom a párharcot";
+  play.onclick=()=>{
+    S.pyrPo={season:S.seasonNumber||1,stage:"play",idx:0,legs:[null,null],
+      iAmCh:!!pv.iAmCh,k:pv.k,lowerDiv:pv.lowerDiv,myRank:pv.myRank,
+      oppDiv:pv.oppDiv,oppRank:pv.oppRank,penWin:null,penScore:null,
+      opp:{n:pv.oppName,ovr:pv.oppOvr}};
+    try{saveGame();}catch(e){}
+    pyrPoScreen();};
+  const sim=document.createElement("button");
+  sim.className="btn stepbtn";sim.style.marginTop="7px";
+  sim.textContent="A motor döntse el (szimuláció) →";
+  sim.onclick=()=>{
+    S.pyr=S.pyr||{};S.pyr.poSkipped=S.seasonNumber||1;
+    $("scUnlock").classList.add("hide");
+    addLine("⚔️ Az osztályozót a motor játssza le — az eredményt a szezonforduló mondja el.","m ev");
+    pyrPoContinue();};
+  act.appendChild(play);act.appendChild(sim);
+  $("scUnlock").scrollIntoView({behavior:"smooth"});}
 function announcePyrSeason(){
   if(!(typeof pyrOn==="function"&&pyrOn()))return;
   const id=pyrMyDivId(),d=pyrMyDiv();
@@ -40885,6 +41188,9 @@ function announcePyrSeason(){
     addLine(`&nbsp;&nbsp;⬆️ <b>Feljutás:</b> az <b>1. hely</b> közvetlenül visz feljebb. `
       +`A <b>2–3. hely</b> osztályozót játszik a fentebbi osztály 15., illetve 14. helyezettje ellen `
       +`— oda-visszavágó, a visszavágó náluk.`,"m ev");
+    addLine(`&nbsp;&nbsp;⚔️ <b>Az osztályozót LE IS JÁTSZHATOD</b> — két mérkőzés, ugyanaz a motor, `
+      +`ugyanaz a csereszünet, hosszabbítás és büntetők. Aki nem akarja, továbbra is `
+      +`rábízhatja a szimulációra.`,"m ev");
     addLine(`&nbsp;&nbsp;⛰️ A csúcsig <b>${id-1} osztály</b> van hátra`
       +(start!==id?` — a(z) D${start}-ból indultál.`:"."),"m ev");}
   if(id<PYR_DIVS)
@@ -49433,6 +49739,12 @@ function euroDecidingLeg(){
    "level" — onnan hosszabbítás dönt, nem az idegenben lőtt gól (az a szabály
    megszűnt, lásd euroResolveTie). */
 function euroLiveTie(gf,ga){
+  /* ---- AZ OSZTÁLYOZÓ IS PÁRHARC ----
+     A név a kupából maradt, a szerep viszont általános: EZ az egyetlen forrás,
+     amiből az eredményjelző összesítés-sávja, a „megfordult a párharc"
+     kommentár, az izgalom-mérő és a meccs embere is dolgozik. A ligapiramis
+     osztályozója ugyanolyan oda-visszavágós párharc, tehát ugyanezt kapja. */
+  if(typeof pyrPoActive==="function"&&pyrPoActive())return pyrPoLiveTie(gf,ga);
   if(typeof euroActive!=="function"||!euroActive())return null;
   const E=S.euro;if(!E)return null;
   if(E.stage==="group"||E.stage==="final"||E.stage==="done")return null;
@@ -49453,6 +49765,9 @@ function euroLiveTie(gf,ga){
           lead:mine>theirs?"us":(mine<theirs?"them":"level")};}
 /* Döntetlen-e a párharc, ha a MOSTANI meccs gf:ga-val zárul? */
 function euroTieStillLevel(gf,ga){
+  /* Az osztályozó visszavágóján ugyanaz a szabály: döntetlen összesítésnél
+     hosszabbítás, majd büntetők. */
+  if(typeof pyrPoActive==="function"&&pyrPoActive())return pyrPoTieLevel(gf,ga);
   const E=S.euro;if(!E||!euroDecidingLeg())return false;
   if(E.stage==="final")return gf===ga;
   /* AZ IDEGENBEN LŐTT GÓL KIKERÜLT: ha az összesítés döntetlen, MEGY a
@@ -51225,6 +51540,12 @@ function beginNextSeasonWithChallenges(){
        osztályod mezőnyét kell látnia. (A kalibráció a hátralévő menetrendből
        dolgozik; szezonvégen az üres, tehát a SEASON_OPPS-ra esik vissza —
        amit a forduló ekkorra már az új osztályra cserélt.) */
+    /* ---- AZ OSZTÁLYOZÓ ELŐBB JÖN, MINT A FORDULÓ ----
+       A rollover egyetlen, determinisztikus számítás (sorrendek → fejlődés →
+       osztályozók → fel/kiesés), amit nem szabad kettévágni egy meccs-folyam
+       kedvéért. Ezért a saját párharcodat MÉG ELŐTTE játszod le; az eredményt
+       a forduló a szimulált helyére cseréli be (pyrPoPlayedSwap). */
+    pyrPlayoffFlow(()=>{
     let _turn=null;
     try{_turn=pyrSeasonTurn();}catch(e){}
     const _offer=()=>{
@@ -51238,7 +51559,7 @@ function beginNextSeasonWithChallenges(){
         startNextCareerSeason();
       }};
     if(_turn&&!S.auto)showPyrTurnReveal(_turn,_offer);
-    else _offer();});}
+    else _offer();});});}
 function startNextCareerSeason(){
   phase="season";
   /* ---- AUTO NEHÉZSÉGI SZINTKÖVETÉS ----
@@ -51349,6 +51670,7 @@ function startNextCareerSeason(){
      A KARRIER-MÉRFÖLDKŐ (leghosszabb győzelmi sorozat) NEM ezekből él: azt a
      msNoteMatch már a meccs pillanatában eltette, tehát a nullázás nem vesz
      el rekordot. */
+  S.pyrPo=null;   /* a lejátszott osztályozó lezárult — az új idénybe nem lóg át */
   const _clrUnav=Object.keys(S.unavailable||{}).length;
   const _clrWin=S.winStreak||0,_clrWinless=S.winlessStreak||0;
   S.unavailable={};S.replacementChoice={};
@@ -58230,7 +58552,7 @@ function saveGame(){
         /* A LIGAPIRAMIS teljes állapota: a hat osztály összetétele, hol állsz
            benne, és a fel-/kiesés naplója. ~6 kB, tehát elfér a careerPool
            mellett. Enélkül egy újratöltés az egész világot elveszítené. */
-        pyr:S.pyr,pyrMp:S.pyrMp,
+        pyr:S.pyr,pyrMp:S.pyrMp,pyrPo:S.pyrPo,
         seasonStartStrength:S.seasonStartStrength,summerPaidAfterSeason:S.summerPaidAfterSeason,
         chemPairs:S.chemPairs,chemInProgress:S.chemInProgress,
         /* PASSZKÉMIA: a kötések, az épülő páros és a karrier-regiszter. */
@@ -58931,7 +59253,17 @@ function applySavedGame(d){
      ITT viszont már minden a helyén van: az S.pyr, az oppTargetRating és a
      fenti osztály-korrekció is lefutott — a jelvény innentől a mód nyelvén
      beszél. */
-  try{updateOppRatingBadge();}catch(e){}}
+  try{updateOppRatingBadge();}catch(e){}
+  /* ---- FÉLBEHAGYOTT OSZTÁLYOZÓ: A BETÖLTÉS VISSZAVISZ ----
+     A párharc a szezon és a nyár KÖZÖTT zajlik, ott, ahol a HUB-ból már
+     kiléptünk, de az új idény még nem indult el. Ha a felhasználó a két meccs
+     között tölti újra a lapot, a folytatás nélkül a párharc a levegőben
+     maradna (a forduló később egyszerűen szimulálná). A mentés viszont tudja,
+     hol tart — ezért a betöltés VÉGÉN visszavisszük a párharc képernyőjére. */
+  try{
+    if(S.pyrPo&&S.pyrPo.stage==="play"&&S.pyrPo.season===(S.seasonNumber||1)
+       &&typeof pyrPoScreen==="function")pyrPoScreen();
+  }catch(e){}}
 function resumeUIFromSave(){
   /* A BEÁLLÍTÓ FELÜLET LEZÁRÁSA — ugyanaz az elv, mint a beginNewGame-ben, csak
      a MENTÉSBŐL VISSZALÉPÉS közös belépési pontján. A "Válassz módot" kártya a
