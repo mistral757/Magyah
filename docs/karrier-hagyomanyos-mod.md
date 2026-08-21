@@ -51,15 +51,16 @@ másik ismerete nélkül:
 
 ```
 scScout  →  scClubPick   (② melyik klub kerete)
-         →  scPyrDiv     (③ a világ FELSKÁLÁZÁSA + ④ melyik osztályból
-                             indulsz — mindkettő AJÁNLÁSSAL)
+         →  scPyrDiv     (③ MELYIK LIGÁBAN kezdesz +
+                          ④ MILYEN ERŐS legyél a mezőnyhöz képest)
          →  a karrier
 ```
 
-A ③ és a ④ **egy döntés két fele**, és a v3.5.15 óta egy koppintással is
-megadható: a felskálázó folyamatos csúszka (−15 … +15 Rating, 0,1-es lépés), az
-**immerzió** pedig megfordítja a kérdést — kiválasztod, melyik ligában akarsz
-kezdeni, és a világ igazodik hozzád úgy, hogy ott középmezőny légy. Lásd 8.6.
+A ③ és a ④ **egy döntés két fele**, és a v3.5.19 óta pontosan ebben a két
+kérdésben áll a képernyőn: fent a hat liga (ez a futás hossza és a Run-plafon),
+lent EGY csúszka a rajt nehézségére (mennyivel légy erősebb vagy gyengébb a
+mezőnynél, nyers csapaterőben). A világ felskálázása ebből SZÁMÍTÓDIK — nincs
+külön csúszkája. Lásd 8.6.
 
 **A karrier fajtájának választója az 1. oldalra költözött (v3.5.08)** — a
 felállás alá, a kezdésmód-választó fölé. Ez a beállítás első és legfontosabb
@@ -1101,85 +1102,123 @@ nincs felskálázás, ahogy eddig sem.
 
 ---
 
-## 8.6 FOLYAMATOS SKÁLA ÉS IMMERZIÓ (v3.5.15)
+## 8.6 A RÉS A VEZÉRLŐ (v3.5.15 → v3.5.19)
 
-**A hiány.** A 8.5 négy fokozata **durva eszköz**: két szomszédos állás között
-3,75 Rating a lépés, miközben a rés-sávok, amikre a döntés épül, 1-2 Rating
-szélesek (`pyrGapZone`: „egyenrangú" −1,5 … +2,5). A felhasználó tehát nem azt
-tudta beállítani, amit akart, hanem a hozzá legközelebbi fokozatot — és a
-fokozat-tábla fenti sorai (D1 → D1 → D2 → D5 → D6) pontosan ezt mutatják: a
-2. és a 3. fokozat között **három osztályt ugrik** az ajánlás.
+**A 3.5.15 lépése.** A felskálázó négy fokozat volt (0 / 3,75 / 7,5 / 11,25 /
+15); a fokozat durva eszköz, mert a rés-sávok, amikre a döntés épül, 1-2 Rating
+szélesek. A skála ezért folyamatos lett (`pyrUpNorm`, 0,1-es lépés) és
+szimmetrikus: **−15,0 … +15,0** (`PYR_UP_MIN`/`PYR_UP_MAX`). A felső határ
+jelentése változatlan (a D6 közepe = a mai D1 közepe), az alsó a tükörképe. A
+negatív irány nem külön szabály: egy 69-es kerettel az élvonalban csak úgy
+lehetsz középmezőny, ha a világ jön **le** hozzád.
 
-**1. A skála folyamatos.** A tárolt szám mostantól **maga az eltolás
-Ratingben**, `0,1`-es lépésekben (`pyrUpNorm`), és **szimmetrikus**:
+**A 3.5.19 lépése — a bejelentés:** *„a mostani csúszka teljesen gyilkosan
+nehéz, felfoghatatlan még nekem is, pedig én tudom, mit akar."*
 
-```
-PYR_UP_MIN = −15,0   …   PYR_UP_MAX = +15,0
-```
+Igaza volt, és a hiba szerkezeti: a csúszka a **világ eltolását** állította,
+vagyis egy KÖZVETETT számot. A felhasználót nem az érdekli, hány ponttal
+emelkedik a piramis, hanem hogy Ő milyen erős lesz a saját mezőnyében — a kettő
+között egy fejben elvégzendő kivonás állt (`rés = klub − osztályközép −
+eltolás`), és **három vezérlő** versengett ugyanazért a döntésért: a csúszka, az
+immerzió-csík és a lista.
 
-A felső határ jelentése változatlan (a D6 közepe = a mai D1 közepe); az alsó a
-tükörképe (a D1 közepe = a mai D6 közepe). A csúszka mellett **± 0,1** gombok
-állnak: húzással durván, gombbal pontosan — egy 30 pont széles csúszkán ujjal
-nem lehet tizedet találni.
-
-**Miért kell a negatív irány?** Az immerzió miatt: egy 69-es kerettel az
-élvonalban csak úgy lehetsz középmezőny, ha a világ jön **le** hozzád. A két
-irány ugyanaz az egy eltolás, nem két külön szabály.
-
-**2. Immerzió — a világ jön a ligához.** Megfordítja a kérdést: nem az a
-kérdés, hova illik a kereted egy adott világban, hanem hogy **melyik ligában
-akarsz kezdeni** — vagyis milyen hosszú futást vállalsz —, és a világ igazodik
-hozzád úgy, hogy ott **középmezőny** légy. A számtan a rés képletéből esik ki:
+### A mai modell: két kérdés, két vezérlő
 
 ```
-rés = klub_nyers − az osztály nyers közepe − felskálázás
-0 rés  ⇒  felskálázás = klub_nyers − az osztály nyers közepe
+① Melyik ligában kezdesz?        → a hat sor: a futás HOSSZA és a Run-plafon
+② Milyen erős legyél a mezőnyhöz → EGY csúszka: a rés, NYERS csapaterőben
+   képest?                          (−8 … +8, félpontos lépés)
 ```
 
-Ugyanaz a 15 csapatos közép, amivel a rés-számítás dolgozik (belépéskor egy
-csapat kikerül a mezőnyből), tehát a kiírt rés **tényleg 0,0** — nem közelítés.
-A hat liga hat gombja a választó tetején ül; a koppintás **egyszerre** állítja
-be a kezdő osztályt és a hozzá tartozó felskálázást.
+A világ eltolása ebből **számítódik**: `up = klub_nyers − osztály_nyers_közepe −
+rés` (`pyrUpForGap`). A felhasználónak nem kell tudnia róla — a csúszka alatt
+egy szürke, zárójeles sor kiírja annak, aki kíváncsi. A **0 rés = immerzió**: a
+fogalom megmaradt, csak nem külön vezérlő többé, hanem a skála természetes
+középpontja (és a „🎬 középmezőny" gomb helye).
 
-**MÉRVE** (a valódi kóddal, 🏃 Lépést tartanak · alap tempó):
+**A csúszka határa ligánként más** (`pyrGapRangeFor`): a világ ±15-nél messzebb
+nem tolható, tehát egy 69-es kerettel az élvonalban a „legyek erősebb" egyszerűen
+nem elérhető. A csúszka ott megáll, és a hint kimondja, miért — nem tiltunk,
+csak nem hazudunk.
 
-| liga | Barcelona 2010/11 (88,0) | Debreceni VSC 2025/26 (69,0) | rés | Run-plafon |
-|---|--:|--:|--:|--:|
-| D1 | +3,4 | −15,0 * | 0,0 (*−0,7) | 44 |
-| D2 | +6,4 | −12,6 | 0,0 | 55 |
-| D3 | +7,8 | −11,2 | 0,0 | 63 |
-| D4 | +9,1 | −9,9 | 0,0 | 70 |
-| D5 | +10,0 | −9,0 | 0,0 | 74 |
-| D6 | +11,0 | −8,0 | 0,0 | 79 |
+**A hat sor mind a VÁLASZTOTT réssel számol.** A régi lista egy világ-eltolással
+dolgozott, tehát a hat sorban hat KÜLÖNBÖZŐ rés állt, és a felhasználónak fejben
+kellett kikeresnie a neki tetszőt. Most fordítva: a rés adott, és a sorok azt
+mutatják, mit ér ugyanaz a vállalás a hat ligában — a futás hossza, a Run-plafon,
+és szürkén az, mennyivel mozdul hozzá a világ. Az egyetlen jelvény a
+**🏠 ITT VAN OTTHON**: az az osztály, ahol a klubod felskálázás nélkül is a
+mezőny közepe volna (`pyrHomeDivRaw`) — tájékozódási pont, nem előírás.
 
-`*` az egyetlen eset, ahol a sáv széle megfogja: a leggyengébb kerettel az
-élvonalban −0,7 marad — még mindig „egyenrangú". A képernyő ezt ki is írja,
-nem hallgatja el.
+**MÉRVE, végig a valódi kóddal** (a `pyrStart` MENTETT `gap0`-ja, tehát az, ami
+tényleg a karrierbe kerül):
 
-**3. Az ajánlás EGY hangon beszél.** A választó nyitáskor kiszámolja az
-ajánlott osztályt, és rögtön oda is igazítja a világot — a nyitóállapot tehát
-egy kész, játszható vállalás, nem nyers alapérték. Amíg a csúszka egy liga
-immerziós értékén áll, a lista jelvénye **🎬 IMMERZIÓ**; ha a felhasználó
-elmozdítja, visszavált a rés-alapú **AJÁNLOTT**-ra (`pyrImmersionDivOf`).
-Enélkül a képernyő két különböző osztályra mutatna: a fenti csík a
-megcélzottra, a lenti jelvény a réshez illőre.
+| klub | liga | kért rés | beállt | világ | mentett `gap0` |
+|---|---|--:|--:|--:|--:|
+| Barcelona 2010/11 (88,0) | D6 | 0 | 0 | +11,0 | **0,0** |
+| Barcelona 2010/11 | D6 | −3 | −3 | +14,0 | **−3,0** |
+| Barcelona 2010/11 | D1 | +2,5 | +2,5 | +1,1 | **+2,5** |
+| Debreceni VSC 2025/26 (69,0) | D1 | 0 | **−0,5** | −15,0 (a határ) | **−0,5** |
+| Debreceni VSC 2025/26 | D6 | −2 | −2 | −6,0 | **−2,0** |
 
-**4. UGYANEZ A CSÍK ÁLL A KÖZÖS KARRIER (PvP) BEÁLLÍTÓJÁN IS** (v3.5.16). Két
-képernyő, egy nyelv: ugyanaz a `renderPyrImmChips`, ugyanaz a hat gomb, ugyanaz
-az olvasási sorrend (csúszka + `−0,1 / nulla / +0,1` → immerzió-csík). Két
-paraméter tér el, és mindkettő a helyzetből jön:
+Amit beállítasz, azt kapod — egyetlen kivétellel, ahol a világ nem tolható elég
+messzire, és ott a csúszka is odáig megy csak.
 
-| | egyjátékos (`scPyrDiv`) | közös karrier (beállító) |
-|---|---|---|
-| mihez mérünk | a **kiválasztott klub** ereje | a **kezdő klub-sáv közepe** (a klubot még egyikőtök sem választotta) |
-| hány hely szabadul fel | 1 (te lépsz be) | 2 (két menedzser lép be) |
-| mit állít a koppintás | kezdő osztály + felskálázás | **közös** osztály + felskálázás |
+### Közös karrier (PvP): három számozott döntés
 
-A házigazdánál a felskálázás **követi a ligaválasztást**, amíg kézzel nem
-nyúlnak hozzá (`pyrMpUpTouched`): a sáv vagy a közös osztály mozgatása után is
-középmezőny marad a kezdés. Az első kézi mozdítás után marad, ahol hagyták. A
-vendégnél a jelző eleve „megérintett" — ott a házigazdától érkező érték az
-igazság, nem a helyi számítás.
+```
+① A kezdő csapaterő   → EGY csúszka (69-88). A klublista ennek a ±1-es
+                         környezetéből kínál (82 → 81-83 · PYR_BAND_HALF).
+② Közös kezdő osztály → a közös tabella, ahol mindketten kezdtek.
+③ A rajt nehézsége    → ugyanaz a rés-csúszka, a SÁV KÖZEPÉHEZ mérve;
+                         az osztályból KÉT hely szabadul fel (két menedzser).
+```
+
+A két külön min/max csúszka megszűnt: ugyanazt tudta, csak három döntést kért
+kettő helyett, és a „min > max" állapotot is kezelni kellett. A szoba-csomag
+**változatlan** (`bmin`/`bmax` + `upAmt`), tehát a vendég- és a régi kliensoldal
+nem érzi a változást. A vendégnél a rés a KAPOTT eltolásból fejtődik vissza
+(`pyrMpGapFromUp`) — enélkül a helyi rajzoló a saját (nulla) résével némán
+felülírná a házigazda döntését.
+
+### Egyszerű és részletes nézet (v3.5.20)
+
+A választó **alapból egyetlen kérdést tesz fel:** melyik ligában kezdesz. A hat
+sor a liga nevét, a mászás hosszát és a Run-plafont mutatja, alattuk egy mondat
+arról, mit vállaltál — és kész. A rajt nehézsége a háttérben az **ajánlott
+értéken** fut, a világ eltolása magától igazodik hozzá.
+
+A **⚙️ Részletes mód** gomb ugyanazt a gépezetet nyitja ki, nem egy másikat: a
+rés-csúszkát, a soronkénti világ-eltolást, a Run-plafon tényezőit és a
+„rés a nyers erőké" magyarázatot. A gomb bármikor oda-vissza vált, és semmit
+nem állít át.
+
+**Az alapértelmezett rajt +2** (`PYR_GAP_DEFAULT`), nem 0. A pontos középmezőny
+matematikailag szép kiindulás, játékként viszont nem az: az első idény ott
+érem nélküli középcsapatot ad, és a mód ígérete (a MÁSZÁS) csak a második-
+harmadik szezonban indul be. A +2 az „egyenrangú" zóna felső fele — feljutásra
+esélyes, de nem sétagalopp. A csúszka innen indul, a „🎬 ajánlott · +2" gomb ide
+tér vissza, és a 0 továbbra is egyetlen mozdulatra van.
+
+**A közös karrier beállítója ugyanezt kapta (v3.5.21):** alapból a két KÖTELEZŐ
+döntés áll a képernyőn (① kezdő csapaterő, ② közös osztály), a ③ rajt nehézsége
+az ajánlott +2-n fut és a részletes mód nyitja ki. A ② jegyzete mostantól a
+DÖNTÉS KÖVETKEZMÉNYÉT mondja — hány osztály vezet a csúcsig és mekkora a
+Run-plafon (`pyrMpRunCap`) —, nem a gépezetét; a világ eltolása csak részletes
+módban jelenik meg. Eddig ez a két szám sehol nem látszott a közös karrier
+oldalán, pedig az egyjátékos lista minden sorára kiírja őket.
+
+### A „keret" beállítóoldal eltűnt a hagyományos módból (v3.5.20)
+
+Ott nincs draft, tehát az oldal minden vezérlője értelmetlen volt: a Rating-alap,
+az újrapörgetés és a családtag már eddig is rejtve volt, a VB/EB-kapcsoló pedig
+a piramis világára sem hat többé — **a liga klubokból épül** (`pyrClubPool`
+szűrője). Ez egyben egy régi következetlenséget is lezár: a klubválasztó SOSEM
+kínált válogatottat (`clubPickEligible: !sq.wc`), a világ viszont igen, tehát be
+lehetett futni olyan ellenfélbe, amilyet te magad nem választhattál.
+
+Az oldal így üresen marad, és a lapozó magától átugorja (`setupPageAlive`). A
+lépcső sorszáma mostantól a LÁTHATÓ oldalakat számolja, nem a tömb indexét —
+különben „1 · 3 · 4" állna ott, ami hiányzó lépésnek látszik.
 
 **Visszafelé kompatibilis.** A futó karrierek a világot MENTIK (`S.pyr.divs`),
 tehát semmi nem mozdul alattuk. A 3.5.15 előtti mentések/szobák 0-4

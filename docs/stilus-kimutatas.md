@@ -32,13 +32,13 @@ A 100-as nehézség szerepe tehát közvetett: ez az Infinity nyitó küszöbe
 | Stílus | Képesség | Szint | **Fa teljes ára** | Mérföldkő (Inf) | **Gyűjthető SP (Inf)** | ebből Inf-hosszabbítás | Fedezet |
 |---|--:|--:|--:|--:|--:|--:|--:|
 | 🧱 Beton védelem | 13 | 39 | **1 992** | 154 | **4 063** | 2 821 | 204% |
-| ⚽ Bombázók | 9 | 27 | **1 364** | 118 | **2 578** | 1 826 | 189% |
+| ⚽ Bombázók | 11 | 33 | **1 721** | 177 | **3 753** | 2 551 | 218% |
 | ☯️ Béke és harmónia | 12 | 36 | **2 051** | 186 | **3 302** | 1 961 | 161% |
 | ⭐ Sztárom a párom | 11 | 33 | **1 581** | 123 | **2 977** | 2 175 | 188% |
 | ⚡ Villámcsapat | 12 | 36 | **1 732** | 239 | **4 331** | 2 926 | 250% |
 | 💥 Pánzer | 10 | 30 | **1 440** | 148 | **3 563** | 2 567 | 247% |
 | 🌀 Tiki-Taka | 10 | 30 | **1 883** | 189 | **4 560** | 3 001 | 242% |
-| **ÖSSZESEN** | **77** | **231** | **12 043** | **1 157** | **25 374** | **17 277** | **211%** |
+| **ÖSSZESEN** | **79** | **237** | **12 400** | **1 216** | **26 549** | **18 002** | **214%** |
 
 *Fedezet = a stílus saját mérföldköveiből gyűjthető pont a fa teljes árához mérve.*
 
@@ -61,12 +61,12 @@ A 100-as nehézség szerepe tehát közvetett: ez az Infinity nyitó küszöbe
 
 ## 2. A KÉPESSÉGEK DARABSZÁMA
 
-**77 képesség**, egyenként **3 szint** → **231 megvásárolható szint**.
+**79 képesség**, egyenként **3 szint** → **237 megvásárolható szint**.
 
 | Stílus | I. rang | II. rang | III. rang | Össz |
 |---|--:|--:|--:|--:|
 | Beton védelem | 3 | 6 | 4 | 13 |
-| Bombázók | 2 | 4 | 3 | **9** |
+| Bombázók | 2 | 5 | 4 | **11** |
 | Béke és harmónia | 3 | 4 | 5 | 12 |
 | Sztárom a párom | 3 | 5 | 3 | 11 |
 | Villámcsapat | 4 | 4 | 4 | 12 |
@@ -147,7 +147,7 @@ Mesterhármas-csillag III. (Villám, ingyen csillag-nyitás az egész keretre).
 |---|---|---|
 | **Legkidolgozottabb** | ☯️ **Béke és harmónia** | 186 mérföldkő · 2 051 SP fa · hét saját motor-csatorna |
 | **Legkönnyebb** | ⚡ **Villámcsapat** | 250% fedezet · 239 fokozat — a legtöbb mérföldkő a mezőnyben |
-| **Legsivárabb** | ⚽ **Bombázók** | 9 képesség · 118 mérföldkő · 2 578 SP — mindhárom a legkevesebb |
+| **Legsivárabb** | ⭐ **Sztárom a párom** | 63 mérföldkő · 802 SP Infinity előtt — a legkevesebb (a Bombázók a 3.5.18-ban kinőtték a címet) |
 | **Legmelósabb** | ☯️ **Béke és harmónia** | a legdrágább fa a leglassabb pontcsordogálással (17,8 SP/mérföldkő) |
 | **Legfelülre súlyozott** | 🌀 **Tiki-Taka** | tíz képességéből öt a III. sávban · három saját mechanika, 1,35× árszorzóval |
 
@@ -197,26 +197,38 @@ legtöbb), 12 mérföldkő-család és 154 fokozat; a fája viszont 59 ponttal o
 **Az ára:** a Nélküle nem megy III. **−4 csapaterő**, ha a sztár nincs a kezdőben.
 A stílus olcsó, de törékeny.
 
-### 4.3 Legsivárabb — ⚽ Bombázók
+### 4.3 Legsivárabb — ⭐ Sztárom a párom (3.5.18-tól)
 
-A cím a 3.3.16-ban gazdát cserélt: a Beton bővítése után a Bombázók maradt a
-legszűkebb tábla — és pontosan ugyanazokból az okokból, amiket a Beton most
-kinőtt.
+**A cím másodszor is gazdát cserélt.** Előbb a Beton nőtte ki (3.3.16), most a
+Bombázók (3.5.18): a bejelentés szó szerint az volt, hogy „nincs elég mérföldkő
+a Bombázóknak", és a bővítés pontosan azt az utat járta be, amit ez a doksi
+maga javasolt — a **Gólszerzés-attribútum** és a **karrier-szintű gólszámláló**.
 
-- **9 képesség / 27 szint** — a Sztárral holtversenyben a legkevesebb, és a fája
-  (1 364 SP) a második legolcsóbb.
-- **118 mérföldkő** — csak a Sztáré (107) kevesebb.
-- **2 578 SP** — a legkevesebb megszerezhető pont; a Beton mostani 4 063-jának
-  63%-a.
-- **A befejező képességek lépcsője 3 fokozat** (3/6/10), ugyanaz a rövid
-  `bz_skill`, ami a Betonnál a szűkösség fő oka volt — ott már 13 fokozat.
+**Mi került bele (3.5.18):** hat új mérföldkő-család (42 fokozat, +450 SP) és
+két képesség (+357 SP a fában):
 
-A Bombázók a Beton tükörképe, tehát ugyanaz a bővítés itt is elvégezhető,
-csatárokra fordítva: hosszú képesség-lépcső, a Gólszerzés-attribútum és a
-támadósor összereje, karrier-szintű gólszámláló, gólos sorozat.
+| Család | Mit mér | Fokozatok |
+|---|---|--:|
+| `bz_g80` / `bz_g85` / `bz_g90` | hányan érik el a 80 / 85 / 90-es Gólszerzést | 8 / 6 / 5 |
+| `bz_gtop` | a keret legjobb Gólszerzés-attribútuma, 80-tól ötösével | 8 (+6 Infinityben) |
+| `bz_gsk` | gólok KÉSZ gólszerző képességgel — a klub teljes története | 6 |
+| `bz_gskM` | ugyanez egyetlen mérkőzésen | 8 |
 
-*Második:* ⭐ Sztárom a párom — a **legvékonyabb fa** (7 képesség, 21 szint), de
-mérföldkőben gazdag, tehát a sivárság nála csak a bolt oldalán jelenik meg.
+A három DARABSZÁM-család ki van véve az Infinity-hosszabbításból
+(`ST_INF_SKIP`): a tetejüket nem a mezőny szintje szabja meg, hanem a KERET
+MÉRETE — ugyanaz az indok, mint a `hm_contribM`-nél. A `bz_gtop` viszont
+hosszabbodik, hiszen a 200-as Rating-skálán fut.
+
+**Az eredmény:** 9 → **11 képesség**, 118 → **177 mérföldkő**, 2 578 → **3 753
+SP**, fedezet 189% → **218%** — a mezőny közepe (146-250%), Infinity előtt
+pedig 55% → **70%**, szintén középen (51-83%).
+
+**Innentől a legsivárabb a ⭐ Sztárom a párom:** 63 mérföldkő és 802 SP Infinity
+előtt (a mezőny legkevesebbje), 51%-os fedezettel — a fája viszont nem a
+legvékonyabb, tehát nála a szűkösség a MÉRCÉK oldalán van, nem a bolt oldalán.
+
+*Második:* 💥 Pánzer — 82 mérföldkő és 996 SP Infinity előtt; a fája viszont a
+legolcsóbb (1 440 SP), tehát a fedezete (69%) rendben van.
 
 ### 4.4 Legmelósabb — ☯️ Béke és harmónia
 
@@ -237,8 +249,8 @@ Ugyanaz a stílus, ami a legkidolgozottabb — és pontosan ezért:
 
 A Harmónia a bővítés után **arányaiban is** a legszűkebb: a fája a
 megszerezhető pontjainak **62%-át** viszi el, szemben a Sztár és a Pánzer
-40%-ával. A második legszűkebb a Bombázók (53%), a Beton a bővítéssel 69%-ról
-**49%-ra** enyhült.
+40%-ával. A második legszűkebb a Sztár (53%); a Bombázók a 3.5.18-as bővítéssel
+53%-ról **46%-ra** enyhült, a Beton pedig korábban 69%-ról **49%-ra**.
 
 ---
 
@@ -250,7 +262,7 @@ megszerezhető pontjainak **62%-át** viszi el, szemben a Sztár és a Pánzer
 | 2 | 💥 Pánzer | 1 440 | 3 563 | 247% | 40% |
 | 3 | 🌀 Tiki-Taka | 1 883 | 4 560 | 242% | 41% |
 | 4 | 🧱 Beton védelem | 1 992 | 4 063 | 204% | 49% |
-| 5 | ⚽ Bombázók | 1 364 | 2 578 | 189% | 53% |
+| 5 | ⚽ Bombázók | 1 721 | 3 753 | 218% | 46% |
 | 6 | ⭐ Sztárom a párom | 1 581 | 2 977 | 188% | 53% |
 | 7 | ☯️ Béke és harmónia | 2 051 | 3 302 | 161% | 62% |
 
