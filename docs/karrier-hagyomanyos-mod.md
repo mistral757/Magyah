@@ -1199,6 +1199,14 @@ harmadik szezonban indul be. A +2 az „egyenrangú" zóna felső fele — felju
 esélyes, de nem sétagalopp. A csúszka innen indul, a „🎬 ajánlott · +2" gomb ide
 tér vissza, és a 0 továbbra is egyetlen mozdulatra van.
 
+**A közös karrier beállítója ugyanezt kapta (v3.5.21):** alapból a két KÖTELEZŐ
+döntés áll a képernyőn (① kezdő csapaterő, ② közös osztály), a ③ rajt nehézsége
+az ajánlott +2-n fut és a részletes mód nyitja ki. A ② jegyzete mostantól a
+DÖNTÉS KÖVETKEZMÉNYÉT mondja — hány osztály vezet a csúcsig és mekkora a
+Run-plafon (`pyrMpRunCap`) —, nem a gépezetét; a világ eltolása csak részletes
+módban jelenik meg. Eddig ez a két szám sehol nem látszott a közös karrier
+oldalán, pedig az egyjátékos lista minden sorára kiírja őket.
+
 ### A „keret" beállítóoldal eltűnt a hagyományos módból (v3.5.20)
 
 Ott nincs draft, tehát az oldal minden vezérlője értelmetlen volt: a Rating-alap,
