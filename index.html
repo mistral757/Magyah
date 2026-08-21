@@ -3608,7 +3608,7 @@ button.infPanel:disabled{cursor:default}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.5.32";
+const APP_VERSION="3.5.33";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -8997,6 +8997,19 @@ function pyrLevel(){
   const t=d.teams||[];
   if(!t.length)return 84;
   return Math.round(t.reduce((s,x)=>s+x.ovr,0)/t.length);}
+/* ---- A PIRAMIS TETEJE ----
+   Ugyanaz a szám, mint a pyrLevel, csak MINDIG az élvonalra (D1). Két helyen
+   kell: a KUPA mezőnyéhez (a hazai kupa nemzeti, tehát az élvonal is benne
+   van) és az ARANYLABDÁHOZ (a világ legjobbja a világ tetején játszik). Ez a
+   szám a világ FELSKÁLÁZÁSÁT is követi, mert a divs.teams már a megemelt
+   értékeket tartalmazza — a mérce tehát mindig ahhoz a világhoz igazodik,
+   amit valóban felépítettél. */
+function pyrTopLevel(){
+  const D=pyrDivs();
+  if(!D.length)return 0;
+  const t=(D[0]&&D[0].teams)||[];
+  if(!t.length)return Math.round((D[0]&&D[0].mean)||0);
+  return Math.round(t.reduce((s,x)=>s+x.ovr,0)/t.length);}
 /* A SEASON_OPPS alakja: {n,ovr} — pontosan az, amit a buildOpponents ad, tehát
    a menetrend, a tabella és a meccs-motor felé a piramis LÁTHATATLAN. */
 function pyrOpponents(){
@@ -10499,7 +10512,24 @@ function euroMidRating(comp){
     const ts=(typeof teamStrength==="function")?teamStrength():0;
     const src=raw>0?raw:(ts>0?ts:(oppTargetRating||84));
     return Math.max(50,Math.min(ratingCap(),Math.round(src)-1));}
-  const base=oppTargetRating||84;
+  /* ---- HAGYOMÁNYOS MÓD: A KUPA NEMZETI, NEM OSZTÁLYSZINTŰ ----
+     A horgony eddig a SAJÁT osztályod mezőnye volt (oppTargetRating =
+     pyrLevel). A ligapiramisban ez azt jelentette, hogy a hazai kupa mezőnye
+     együtt maradt lent veled: egy D4-es, 100-as mezőnyben játszó, de már
+     105-ös keret 100-as kupamezőnyt kapott — vagyis a saját másodosztályát
+     kapta vissza kupa néven, miközben a Magyar Kupában ott van az egész
+     ország, az élvonal is.
+     A horgony ezért a piramisban az ÉLVONAL szintje (D1). Nem a te
+     osztályodé és nem a te keretedé: a kupa arról szól, hogy a nemzet
+     legjobbjaival kerülsz szembe, akárhányadik osztályból érkeztél.
+     A SORREND ettől nem borul: a sorozatok közti különbséget továbbra is az
+     EURO_EDGE add/cap és az oppDelta adja (a BL a legszorosabb, a hazai kupa
+     a legengedékenyebb), tehát a közös horgony fölött a rangsor megmarad.
+     A FELKÉSZÜLÉSI KUPA kimarad ebből: az fentebb, saját ágon tér vissza — ott
+     az ígéret kifejezetten a SAJÁT nyers erőd mínusz egy. */
+  const base=pyrOn()
+    ? Math.max(pyrTopLevel(),oppTargetRating||0)
+    : (oppTargetRating||84);
   const ts=(typeof teamStrength==="function")?teamStrength():0;
   if(!(ts>0))return Math.max(50,Math.round(base));
   const anchor=Math.max(ts,base);
@@ -10867,7 +10897,14 @@ async function mpMkTickRun(key,myField,oppField,myEntry,done){
    (Régi mentés/kliens dominancia nélkül: 0-val számol, azaz a régi,
    kedvezmény nélküli viselkedést kapja — nem törik el semmi.) */
 function mpCupSharedMid(a,b,domA,domB,comp){
-  const base=oppTargetRating||84;
+  /* A PIRAMISBAN itt is az ÉLVONAL a horgony (ugyanaz az indok, mint az
+     euroMidRating-nél: a hazai kupa nemzeti sorozat). Ez a KÖZÖS kupának
+     ráadásul jót tesz: a D1 szintje a közös világból jön, tehát bitre azonos a
+     két kliensen — az oppTargetRating viszont eltérhet, ha a két menedzser
+     időközben más osztályba került. */
+  const base=(typeof pyrOn==="function"&&pyrOn())
+    ? Math.max(pyrTopLevel(),oppTargetRating||0)
+    : (oppTargetRating||84);
   const ts=Math.max((typeof a==="number"?a:0),(typeof b==="number"?b:0));
   if(!(ts>0))return Math.max(50,Math.round(base));
   const dom=Math.max(0,Math.min(1,
@@ -24089,8 +24126,10 @@ function ballonRival(){
   const name=pool.length?pool[Math.floor(r()*pool.length)].n:"egy ismeretlen világsztár";
   /* A trófea-szorzó nála FIX (BL-döntő + egy egyéni díj) — lásd a
      BALLON_RIVAL_TROPHY indoklását. */
-  return {name,g,a,cs,trophy:BALLON_RIVAL_TROPHY,
-    score:ballonScoreOf(100,g,a,cs,1.3)*BALLON_RIVAL_TROPHY};}
+  /* A MÉRCE SZINTJE: dinamikus módban a fix 100-as mezőny, a piramisban az
+     élvonal, amit ténylegesen felépítettél (lásd ballonTopLevel). */
+  return {name,g,a,cs,trophy:BALLON_RIVAL_TROPHY,lvl:ballonTopLevel(),
+    score:ballonScoreOf(ballonTopLevel(),g,a,cs,1.3)*BALLON_RIVAL_TROPHY};}
 /* A te legjobb embered az idényből — BAJNOKI ÉS KUPA EGYÜTT.
    A kupában szerzett gól ugyanúgy gól: a díjat a szezon TELJES produkciója
    dönti el, nem csak a bajnoki. (A két vödör az adatban külön él: a bajnoki a
@@ -24133,8 +24172,42 @@ function ballonBestOwn(){
    mezőny szintje legyen legalább 90. A képzelt vetélytárs ilyenkor is
    megkapja a díjat, tehát az Aranylabda minden szezonban gazdára talál. */
 const BALLON_MIN_LEVEL=90;
-function ballonLevelOk(){
-  return (typeof oppTargetRating!=="undefined"?oppTargetRating:84)>=BALLON_MIN_LEVEL;}
+/* ---- HAGYOMÁNYOS MÓD: A MÉRCE AZ ÉLVONAL, NEM A SAJÁT OSZTÁLYOD ----
+   A 90-es abszolút kapu a DINAMIKUS módra készült, ahol a mezőny szintje maga
+   a világ szintje. A ligapiramisban ez elromlott: ott a világ FELSKÁLÁZHATÓ,
+   tehát egy megemelt világban már a hatodosztály közepe is 93 — vagyis a
+   legalsó osztály is átment a kapun, és a D5-ben nyomuló csatár Aranylabdát
+   kapott. A díj épp az ellenkezőjét jelenti.
+   A piramisban ezért az ÉLVONAL a mérce, két helyen egyszerre:
+     · a KAPU — az osztályod szintje érje el a D1 szintjét (egy pontnyi
+       tűréssel a kerekítésre). A lépcső 3,0 Rating, tehát a másodosztály
+       ebbe nem fér bele: a díjhoz fel kell jutni.
+     · a VETÉLYTÁRS — a képzelt világelső nem egy fix 100-as mezőnyben
+       játszik, hanem AZ élvonalban, amit felépítettél. Egy megemelt világban
+       tehát a mérce is feljebb megy, egy levitt világban pedig nem
+       teljesíthetetlen. Így a díj mindkét irányban a saját világod teteje
+       marad, nem egy tőle független szám. */
+const BALLON_PYR_SLACK=1;
+function ballonTopLevel(){
+  if(!pyrOn())return 100;
+  const t=pyrTopLevel();
+  return t>0?t:100;}
+/* Melyik feltételen bukott el — a napló ezt mondja ki, hogy a kapu ne
+   némán zárjon. null = átment. */
+function ballonGateFail(){
+  const my=(typeof oppTargetRating!=="undefined"?oppTargetRating:84);
+  /* A PIRAMISBAN a D1-mérce nem HOZZÁADÓDIK a 90-es kapuhoz, hanem HELYETTE
+     áll. Az abszolút küszöb ott vagy fölösleges (egy megemelt világ élvonala
+     amúgy is jóval 90 fölött van), vagy egyenesen zsákutca: egy szándékosan
+     levitt világban a D1 lehet 88 — ott a régi kapu azt üzente volna, hogy
+     „emeld a szintet", pedig a piramisban a világ a karrier elején eldőlt, és
+     nincs mit emelni. A vetélytárs mércéje ugyanígy lekövette a levitt világot,
+     tehát a verseny ott is tisztességes: a saját világod teteje a mérce. */
+  if(pyrOn()){
+    const top=ballonTopLevel();
+    return (my<top-BALLON_PYR_SLACK)?{k:"pyr",my,need:top,div:pyrMyDivId()}:null;}
+  return (my<BALLON_MIN_LEVEL)?{k:"abs",my,need:BALLON_MIN_LEVEL}:null;}
+function ballonLevelOk(){return !ballonGateFail();}
 function awardBallonDor(){
   if(gameMode!=="career")return;
   const rival=ballonRival(),mine=ballonBestOwn();
@@ -24144,8 +24217,11 @@ function awardBallonDor(){
   const scoreWins=!!mine&&mine.score>rival.score;
   const iWin=scoreWins&&levelOk;
   const win=iWin?mine:rival;
+  /* A MÉRCE SZINTJE is elmentődik: a szezonjelentés így akkor is a helyes
+     számot írja ki, ha a piramis élvonala nem 100 (lásd ballonTopLevel). */
   S.ballonDor={name:win.name,own:iWin,season:S.seasonNumber||1,
-    score:Math.round(win.score*10)/10,g:win.g,a:win.a,cs:win.cs};
+    score:Math.round(win.score*10)/10,g:win.g,a:win.a,cs:win.cs,
+    lvl:(rival&&rival.lvl)||100};
   S.ballonHistory=S.ballonHistory||[];
   S.ballonHistory.push({season:S.ballonDor.season,name:win.name,own:iWin});
   const line=`⚽🏆 ARANYLABDA — ${esc(shortName(win.name))}${iWin?" (a TE játékosod!)":""}: `
@@ -24170,10 +24246,20 @@ function awardBallonDor(){
   /* Ha CSAK a szint-kapun bukott el, azt külön kimondjuk: a felhasználó látja a
      saját fölényben lévő pontszámát, és jogosan hibára gyanakodna, ha némán
      mégis a vetélytárs vinné el a díjat. */
-  if(scoreWins&&!levelOk)
-    addLine(`A te legjobbad ${esc(shortName(mine.name))} pontszámban felül is múlta a világelsőt (${Math.round(mine.score*10)/10} a ${Math.round(rival.score*10)/10} ellen) — az Aranylabdához viszont legalább ${hunS(BALLON_MIN_LEVEL)} mezőny kell, a tiéd most ${typeof oppTargetRating!=="undefined"?oppTargetRating:"?"}. Emeld a szintet, és a díj is elérhetővé válik.`,"m life");
+  if(scoreWins&&!levelOk){
+    /* MELYIK kapun bukott el — a kettő MÁS tennivalót jelent: az abszolút
+       küszöbnél a szintet kell emelni, a piramisban FEL KELL JUTNI. Egy közös,
+       homályos mondat itt rossz tanács volna. */
+    const _f=ballonGateFail()||{};
+    const _txt=(_f.k==="pyr")
+      ? `az Aranylabda viszont az ÉLVONALÉ: a mércéje a D1 szintje (${_f.need}), `
+        +`te pedig a D${_f.div} mezőnyében (${_f.my}) játszol. Juss fel, és a díj is elérhetővé válik.`
+      : `az Aranylabdához viszont legalább ${hunS(BALLON_MIN_LEVEL)} mezőny kell, `
+        +`a tiéd most ${_f.my!=null?_f.my:"?"}. Emeld a szintet, és a díj is elérhetővé válik.`;
+    addLine(`A te legjobbad ${esc(shortName(mine.name))} pontszámban felül is múlta a világelsőt (${Math.round(mine.score*10)/10} a ${Math.round(rival.score*10)/10} ellen) — ${_txt}`,"m life");}
   else if(!iWin&&mine)
-    addLine(`A te legjobbad ${esc(shortName(mine.name))} volt (${Math.round(mine.score*10)/10} pont a világelső ${Math.round(rival.score*10)/10} pontja ellen) — a 100-as mezőny mércéjéhez még nőni kell.`,"m life");}
+    addLine(`A te legjobbad ${esc(shortName(mine.name))} volt (${Math.round(mine.score*10)/10} pont a világelső ${Math.round(rival.score*10)/10} pontja ellen) — ${
+      pyrOn()?`az élvonal (${ballonTopLevel()}) mércéjéhez`:"a 100-as mezőny mércéjéhez"} még nőni kell.`,"m life");}
 function isBallonHolder(n){return !!(S.ballonDor&&S.ballonDor.own&&S.ballonDor.name===n);}
 /* A Champion-kártya tartós Rating-bónusza (KL +2 / EL +3 / BL +4). */
 function championBoost(n){const c=S.championCards&&S.championCards[n];return c?c.boost||0:0;}
@@ -42672,7 +42758,7 @@ function finish(){
       `<div class="vplain">⚽🏆 <b style="color:${B.own?"var(--gold)":"var(--ink)"}">${esc(shortName(B.name))}</b>`
       +`${B.own?' <b style="color:var(--gold)">— a te játékosod!</b>':""}<br>`
       +`<span style="color:var(--dim);font-size:12.5px">${B.g} gól, ${B.a} gólpassz${B.cs?`, ${B.cs} tiszta lap`:""} · ${B.score} pont`
-      +`${B.own?"":" — a 100-as mezőny mércéje"}</span></div>`);}
+      +`${B.own?"":` — ${hunS(B.lvl||100)} mezőny mércéje`}</span></div>`);}
   st+=vsec("Házi góllövőlista",vlist(topS));
   st+=vsec("Gólpasszok",vlist(topA));
   st+=vsec("Legtöbbször a meccs embere",vlist(topM));
@@ -51168,7 +51254,12 @@ function renderEuroScreen(){
        :`Csoportkör · ${E.md+1}/${EURO_SCHEDULE.length}. forduló`;
   $("euroHead").innerHTML=`<div style="font-family:var(--font-disp);font-size:20px;color:${c.col}">${c.n}</div>`
     +`<div style="font-size:12px;color:var(--dim);margin-top:2px">${stageTxt} · a keret és a taktika a szezonzáró állapoton fagyva</div>`
-    +(E.target!=null?`<div style="font-size:11.5px;color:var(--dim2);margin-top:3px">A sorozat mezőnye: <b style="color:${c.col}">${Math.round(E.target)}</b> — a bajnoki szinted (${oppTargetRating}) és a csapaterőd (${teamStrength().toFixed(1)}) közül a magasabbhoz igazítva, ${c.short}-szinttel.</div>`:"")
+    /* A MAGYARÁZAT KÖVESSE A KÉPLETET: a piramisban a horgony nem a saját
+       osztályod, hanem az ÉLVONAL — a hazai kupa nemzeti sorozat. */
+    +(E.target!=null?`<div style="font-size:11.5px;color:var(--dim2);margin-top:3px">A sorozat mezőnye: <b style="color:${c.col}">${Math.round(E.target)}</b> — ${
+        pyrOn()?`az élvonal szintje (D1: ${pyrTopLevel()})`:`a bajnoki szinted (${oppTargetRating})`
+      } és a csapaterőd (${teamStrength().toFixed(1)}) közül a magasabbhoz igazítva, ${c.short}-szinttel.${
+        pyrOn()?` A kupában az ország ELSŐ osztálya is ott van — a mezőny nem a te osztályodhoz igazodik.`:""}</div>`:"")
     +mpCupHeadHtml();
   const nx=$("euroNext");
   if(done){
