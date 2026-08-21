@@ -245,16 +245,17 @@ azaz a hirdetett −1,4-es rés valóban teljesül.
 `node tools/pyramid-sim.js bands`:
 
 ```
-klub-szezon: 200 · egyedi klub: 115 · sáv: 71,1 … 88,0
+klub-szezon: 212 · egyedi klub: 122 · sáv: 71,1 … 88,0
 
 csapat/oszt |  teljes sáv  | D1        | D2        | D3        | D4        | D5        | D6
-         16 | 77,5…88,0    | 85,1-88,0 | 82,7-85,0 | 80,7-82,5 | 79,9-80,6 | 78,4-79,5 | 77,5-78,3
-         15 | 77,8…88,0    | 85,5-88,0 | 82,7-85,1 | 81,3-82,7 | 80,0-81,2 | 78,7-80,0 | 77,8-78,6
-         12 | 78,9…88,0    | 85,8-88,0 | 83,6-85,8 | 82,5-83,5 | 80,7-82,1 | 80,0-80,6 | 78,9-80,0
+         16 | 77,8…88,0    | 85,1-88,0 | 83,0-85,0 | 81,6-82,7 | 80,0-81,5 | 78,8-80,0 | 77,8-78,7
+         15 | 78,3…88,0    | 85,5-88,0 | 83,4-85,1 | 81,7-83,3 | 80,4-81,7 | 79,2-80,3 | 78,3-79,0
+         12 | 79,3…88,0    | 85,8-88,0 | 83,7-85,8 | 82,7-83,7 | 81,6-82,5 | 80,4-81,5 | 79,3-80,3
 ```
 
 **A tervezett 71–91-es piramis nyers Ratingekből NEM építhető meg.** A 90
-legerősebb egyedi klub mindössze **11,3 Rating-pontot** fog át (76,7 … 88,0),
+legerősebb egyedi klub mindössze **11,3 Rating-pontot** fog át (76,7 … 88,0;
+a 10. köteg utáni, 212 keretes adatbázisban is ugyanez a kép),
 tehát két szomszédos osztály közé csak ~1,5–2 pont jut — nem 2-pontos lépcső
 8 pont széles sávokkal, ahogy a terv szólt, hanem 1,5-es lépcső 2 pont
 széles sávokkal. Ráadásul **88 fölött egyetlen csapat sincs**: a legerősebb a
