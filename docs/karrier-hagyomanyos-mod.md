@@ -245,19 +245,19 @@ azaz a hirdetett −1,4-es rés valóban teljesül.
 `node tools/pyramid-sim.js bands`:
 
 ```
-klub-szezon: 230 · egyedi klub: 131 · sáv: 71,1 … 88,0
+klub-szezon: 236 · egyedi klub: 137 · sáv: 71,1 … 88,0
 
 csapat/oszt |  teljes sáv  | D1        | D2        | D3        | D4        | D5        | D6
-         16 | 78,4…88,0    | 85,1-88,0 | 83,0-85,0 | 81,7-83,0 | 80,3-81,7 | 79,3-80,3 | 78,4-79,3
-         15 | 78,7…88,0    | 85,5-88,0 | 83,4-85,1 | 82,0-83,3 | 80,5-81,9 | 79,5-80,5 | 78,7-79,5
-         12 | 79,9…88,0    | 85,8-88,0 | 83,7-85,8 | 82,7-83,7 | 81,7-82,7 | 80,5-81,7 | 79,9-80,5
+         16 | 78,7…88,0    | 85,1-88,0 | 83,0-85,0 | 81,9-83,0 | 80,5-81,8 | 79,5-80,5 | 78,7-79,5
+         15 | 79,0…88,0    | 85,5-88,0 | 83,4-85,1 | 82,1-83,3 | 80,7-82,0 | 79,9-80,6 | 79,0-79,9
+         12 | 80,1…88,0    | 85,8-88,0 | 83,7-85,8 | 82,7-83,7 | 81,9-82,7 | 80,7-81,8 | 80,1-80,6
 ```
 
 **A tervezett 71–91-es piramis nyers Ratingekből NEM építhető meg.** A 90
-legerősebb egyedi klub mindössze **9,3 Rating-pontot** fog át (78,7 … 88,0).
+legerősebb egyedi klub mindössze **9,0 Rating-pontot** fog át (79,0 … 88,0).
 A KÖTEGEKKEL EZ SZŰKÜL, nem tágul: a 200 keretes adatbázisban még 11,3 pont
 volt a 90-es sáv (76,7 … 88,0), a 10. köteg után 9,8, a 11-12. köteg után 9,6,
-a 13. után 9,3 — a bővítés a MEZŐNYT sűríti, a tetőt nem emeli. Tehát két szomszédos osztály
+a 13. után 9,3, a 14. után 9,0 — a bővítés a MEZŐNYT sűríti, a tetőt nem emeli. Tehát két szomszédos osztály
 közé csak ~1,5–2 pont jut — nem 2-pontos lépcső 8 pont széles sávokkal, ahogy
 a terv szólt, hanem 1,5-es lépcső 2 pont széles sávokkal. Ráadásul **88 fölött egyetlen csapat sincs**: a legerősebb a
 Barcelona 2010/11 (88,0), és mindössze két klub éri el a 87-et.
