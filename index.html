@@ -3700,7 +3700,7 @@ body.stadium.fa-board #speedRow .speedVal{color:#c8102e}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.6.4";
+const APP_VERSION="3.6.5";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -15012,7 +15012,47 @@ function axisZSoft(z){
 
    Ez a függvény ezért EGY forrás: a fit is ebből összegez, a panel is ebből
    magyaráz. A `d` mezője a tengely hozzájárulása a z-hez; százalékpontban
-   d × TACTIC_FIT_C × 100 (tehát d=0.15 ≈ 3 pp illeszkedés). */
+   d × TACTIC_FIT_C × 100 (tehát d=0.15 ≈ 3 pp illeszkedés).
+
+   ---- BEJELENTETT HIBA: „a legfontosabb tengelyemet emelem, és ROMLIK a
+   illeszkedés" (Labdatartás, Passz 141 mellett 75%) ----
+   A bejelentés igaz volt, és nem szintfüggő: MÉRVE, a taktika SAJÁT fő
+   tengelyét lépésenként emelve (85-125 horgony, 6 rendszer, 15 lépés) a régi
+   képlet 450 lépésből 280-ban CSÖKKENT. Például Labdatartáson a Passz +12-nél
+   tetőzött, utána monoton esett (a bejelentő kerete pont a lejtőn állt: 141-en
+   75%, 130-on 79,6% lett volna). Gyors kontrán a Gólszerzés már +2 után rontott.
+   AZ EGYETLEN monoton rendszer a Széljáték volt — és pont az az egy, aminek a
+   fő tengelye (Sebesség) NINCS BENNE a horgonyban.
+
+   AZ OK. A horgony T = (véd+passz+gól)/3 magukat a pontozott tengelyeket
+   tartalmazza. Egy tengelyt δ-val emelve T is nő δ/3-mal, tehát a saját
+   maradéka csak (2/3)δ-t nyer, MIND A NÉGY másiké pedig δ/3-ot veszít. A
+   képlet deriváltja így (2/3)·w_k/s_k − (1/3)·Σ_{j≠k} w_j/s_j volt: Gyors
+   kontránál +0.005, vagyis épphogy pozitív — és amint a saját tengely beleér a
+   tanh-vágásba, a pozitív tag eltűnik, a négy negatív szivárgás marad, és a
+   derivált ELŐJELET VÁLT. A tengelyek pedig magas szinten mind a vágásban
+   ülnek (a bejelentő keretén a Passz z0 = 9,5, a Védekezés −6,0).
+
+   A JAVÍTÁS: a súly helyett a LAPOS ALAPHOZ MÉRT TÖBBLETSÚLY pontoz.
+       d = (w_k − 1/5) · z_k        (1/5 = ATTR_FLAT_W, az öt tengely lapos súlya)
+   Mivel Σ(w_k − 1/5) = 0, a horgony szivárgása KIESIK: azonos skálák mellett a
+   derivált pontosan (w_k − 1/5)/s_k, tehát egy tengely emelése akkor és csak
+   akkor javít, ha a taktika a laposnál JOBBAN épít rá — és ez akkor is igaz
+   marad, ha a tengely már a vágásban ül. Ez egyben pontosan az, amit a panel
+   szövege mindig is állított: „az illeszkedés azt méri, mennyire a TE erős
+   tengelyeidre épít a taktika".
+
+   MÉRVE a javítás után: 450 lépésből 10-ben csökken (mind Gyors kontra, a
+   legnagyobb visszaesés 0,66 százalékpont — a kijelzett egész százalék alatt).
+   A TACTIC_FIT_C-hez NEM KELLETT NYÚLNI: 4000 szintetikus kereten az eloszlás
+   betűre a régi (átlag 49,9 → 50,0 · p5/p95 38,5/61,2 → 40,5/59,6 · kereten
+   belüli medián szórás 14,0 → 14,1), tehát ez hibajavítás, nem újrahangolás.
+   A bejelentő keretén: Labdatartás 75,1% → 80,3%, és a Passz emelése VÉGIG
+   javít (125→58%, 140→80%, 165→95%).
+
+   MELLÉKHATÁS, SZÁNDÉKOS: egy tengely, amin erős vagy, de a taktika a laposnál
+   KEVESEBBET épít rá, mostantól negatív hozzájárulás — kihasználatlan erő. A
+   panel ezért nem jelöli zölden pusztán azért, mert a szám nagy. */
 function tacticFitParts(key,A0){
   const A=A0||teamAttrStrengths(),w=TACTICS[key].attrProfile;
   /* a mezőny szintje a horgony (a kapus szándékosan kimarad belőle) */
@@ -15020,8 +15060,10 @@ function tacticFitParts(key,A0){
   return ATTR_KEYS.map(k=>{
     const ww=w[k]||0,z0=(A[k]-axisExpected(k,T))/(AXIS_SCALE[k]||1),z=axisZSoft(z0);
     /* z0 = a nyers eltérés (a mérőnek és a hibakeresésnek), z = a lágyan
-       vágott, amiből a fit és a panel minden állítása dolgozik. */
-    return {key:k,w:ww,z0,z,d:ww*z};});}
+       vágott, amiből a fit és a panel minden állítása dolgozik.
+       lean = a taktika a lapos 1/5-nél jobban épít erre a tengelyre; csak
+       ezeken segít az erősítés, ezt olvassa a panel tanács-sora is. */
+    return {key:k,w:ww,z0,z,lean:ww>ATTR_FLAT_W,d:(ww-ATTR_FLAT_W)*z};});}
 /* A KÉT SEBESSÉG-RENDSZER. Egy helyen felsorolva, mert három különböző szabály
    hivatkozik rá: a sebesség-skillek sorsolása (PACE_TACTICS), a Villám
    „Vérükben a rendszer" képessége, és a taktika-panel jelölése. */
@@ -18020,6 +18062,12 @@ function commitSeasonBasis(p){
      · a plafonja kemény 99 — a többi attribútum Rating+35-ig mehet
      · edzeni 1.5x lassabban lehet (SPEED_TRAIN_DIV) */
 const ATTR_KEYS=["ved","kapus","passz","gol","seb"];
+/* A LAPOS SÚLY: ennyi jutna egy tengelyre, ha a taktika egyenletesen épülne
+   mindre. A taktika-illeszkedés EHHEZ KÉPEST pontoz (lásd tacticFitParts) —
+   ezért itt lakik, közvetlenül a tengelylista mellett: ha egyszer új tengely
+   jön, ez magától követi. (Fentebb, a fit mellé írva TDZ-hibát adna: az
+   ATTR_KEYS ennél a sornál dől el, a fit-blokk pedig jóval előtte fut le.) */
+const ATTR_FLAT_W=1/ATTR_KEYS.length;
 const ATTR_LABELS={ved:"Védekezés",kapus:"Védés",passz:"Passz",gol:"Gólszerzés",seb:"Sebesség"};
 const SPEED_MAX=99;          /* a sebesség kemény plafonja — NORMÁL módban */
 const SPEED_TRAIN_DIV=1.5;   /* ennyivel lassabban edzhető, mint a többi */
@@ -45374,22 +45422,39 @@ function renderHubTacticsPanel(){
     const th=Math.round((85-TACTIC_MIN)/(_ceil-TACTIC_MIN)*100);
     const w=TACTICS[k].attrProfile;
     /* súlyprofil mini-sávok: melyik tengelyre mennyire épül ez a taktika.
-       ZÖLD = ezen a tengelyen az ELVÁRÁS FÖLÖTT állsz (z≥0), tehát tényleg
-       hoz neked illeszkedést — nem az, hogy a szám nagyobb a saját átlagodnál. */
+       ZÖLD = ez a tengely NEKED DOLGOZIK ebben a rendszerben (d>0). Nem
+       ugyanaz, mint hogy nagy a szám: egy tengely, amin erős vagy, de amire a
+       taktika a lapos 1/5-nél kevesebbet épít, KIHASZNÁLATLAN erő — az
+       illeszkedést lefelé viszi, tehát nem kaphat zöldet. (Korábban a jelölés
+       a z≥0-t nézte, és így zölden mutatta azt a tengelyt is, amelyik a
+       számot éppen lehúzta — pontosan az a fajta ellentmondás, ami miatt ez a
+       panel egy forrásból dolgozik.) */
     const wBars=ATTR_KEYS.map(key=>{
       const ww=w[key]||0;if(ww<=0)return "";
-      const strong=(pByKey[key]||{z:0}).z>=0;
+      const strong=(pByKey[key]||{d:0}).d>0;
       return `<span style="display:inline-block;margin-right:7px;font-size:10.5px;color:${strong?"var(--grass)":"var(--dim2)"}">
         ${ATTR_SHORT[key]} ${Math.round(ww*100)}%</span>`;}).join("");
-    /* magyarázó mondat: melyik tengely húzza fel és melyik le ezt a rendszert */
-    const contrib=parts.filter(p=>p.w>=0.15).sort((x,y)=>y.d-x.d);
+    /* MAGYARÁZÓ MONDAT. Két külön dolgot kell tudni mondani, mert a d előjele
+       önmagában kétértelmű: egy MEGTÁMASZTOTT tengelyen (lean: a taktika a
+       lapos 1/5-nél jobban épít rá) a negatív d gyengeséget jelent, egy
+       ALULSÚLYOZOTT tengelyen viszont KIHASZNÁLATLAN ERŐT. A régi szöveg
+       mindkettőre „gyengeséged"-et írt volna. */
+    const lean=parts.filter(p=>p.lean).sort((x,y)=>y.d-x.d);
+    const off=parts.filter(p=>!p.lean).sort((x,y)=>x.d-y.d);
+    const up=lean.length?lean[0]:null, down=lean.length?lean[lean.length-1]:null;
+    /* A KIHASZNÁLATLAN ERŐ KÜSZÖBE SZIGORÚBB (−0.30 ≈ 6 pp, a másik kettő
+       −0.15 ≈ 3 pp). Ok: a Védés súlya MINDEN rendszerben a lapos 1/5 alatt
+       van (4-24%), tehát egy jó kapus mellett ez a mondat különben mind a hat
+       sorban ott állna, és elnyomná a rendszerek közti valódi különbséget.
+       Így csak akkor szólal meg, ha tényleg ez a sor fő története. */
+    const waste=off.length&&off[0].d<-0.30?off[0]:null;
     let why="";
-    if(contrib.length){
-      const best=contrib[0],worst=contrib[contrib.length-1];
-      if(best.d>0.15&&worst.d<-0.15)why=`A <b>${ATTR_LABELS[best.key]}</b> erősséged emeli, a <b>${ATTR_LABELS[worst.key]}</b> húzza vissza.`;
-      else if(best.d>0.15)why=`A <b>${ATTR_LABELS[best.key]}</b> erősségedre épít.`;
-      else if(worst.d<-0.15)why=`A <b>${ATTR_LABELS[worst.key]}</b> gyengeséged miatt nem illik a kerethez.`;
-      else why=`Kiegyensúlyozottan illeszkedik a keretedhez.`;}
+    if(up&&up.d>0.15&&down&&down.d<-0.15)why=`A <b>${ATTR_LABELS[up.key]}</b> erősséged emeli, a <b>${ATTR_LABELS[down.key]}</b> húzza vissza.`;
+    else if(up&&up.d>0.15)why=waste?`A <b>${ATTR_LABELS[up.key]}</b> erősségedre épít, a <b>${ATTR_LABELS[waste.key]}</b> viszont kihasználatlan marad.`
+                                   :`A <b>${ATTR_LABELS[up.key]}</b> erősségedre épít.`;
+    else if(down&&down.d<-0.15)why=`A <b>${ATTR_LABELS[down.key]}</b> gyengeséged miatt nem illik a kerethez.`;
+    else if(waste)why=`A <b>${ATTR_LABELS[waste.key]}</b> erősséged itt kihasználatlan marad.`;
+    else why=`Kiegyensúlyozottan illeszkedik a keretedhez.`;
     /* az aktív rendszernél kiírjuk a KONKRÉT meccs-hatást, skálázással együtt */
     let effLine="";
     if(isActive){
@@ -45398,11 +45463,13 @@ function renderHubTacticsPanel(){
       const col=eff>=0?"var(--grass)":"var(--red)";
       effLine=`<div style="font-size:11px;margin-top:3px">Meccs-hatás: <b style="color:${col}">${eff>=0?"+":""}${eff.toFixed(2)} OVR</b>
         <span style="color:var(--dim2)">(szint ${Math.round(lvl)} × illeszkedés ${Math.round(fit*100)}%)</span></div>`;
-      /* MIT TEGYÉK a jobb illeszkedésért: az a fontos tengely, amelyik a
-         LEGTÖBB illeszkedést viszi el — vagyis a legnegatívabb hozzájárulás.
-         A küszöb is ebben az egységben van: d = −0.15 pontosan 3 százalékpont
-         elveszett illeszkedés (d × TACTIC_FIT_C × 100). */
-      const worst=contrib.length?contrib[contrib.length-1]:null;
+      /* MIT TEGYÉK a jobb illeszkedésért. CSAK MEGTÁMASZTOTT tengelyt szabad
+         ajánlani (lean): ezeken javít az erősítés, az alulsúlyozottakon
+         ROMLANA tőle az illeszkedés — a régi sor a puszta súly (≥15%) alapján
+         választott, és így olyan tengely erősítését is javasolhatta, amitől a
+         szám lefelé ment volna. A küszöb változatlan egységben van: d = −0.15
+         pontosan 3 százalékpont elveszett illeszkedés (d × TACTIC_FIT_C × 100). */
+      const worst=down;
       if(worst&&worst.d<-0.15){
         const roles=axisRoleHint(worst.key);
         const roleTxt=roles.length?roles.join(" vagy "):"a kulcsposztok";
