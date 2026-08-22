@@ -3700,7 +3700,7 @@ body.stadium.fa-board #speedRow .speedVal{color:#c8102e}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.6.5";
+const APP_VERSION="3.6.6";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -29599,7 +29599,17 @@ const SKILL_MAX_STARS=3;
    hatalmi ugrás — három csillaggal is csak ~16%-kal erősebb a képesség. */
 const SKILL_STAR_STEP=1.05;
 function skillStars(inst){return Math.max(0,Math.min(SKILL_MAX_STARS,(inst&&inst.stars)||0));}
-function skillStarMult(inst){return Math.pow(SKILL_STAR_STEP,skillStars(inst));}
+/* A LÉPÉSKÖZ SKILLENKÉNT IS EMELHETŐ. Alapból mindenkinél a globális 1.05, de
+   egy stílus-képesség megemelheti EGY SZŰK KÖRRE (lásd Tüzérség). Azért itt,
+   a szorzó egyetlen forrásában van, és nem a hívási helyeken, mert a csillag
+   százalékát négy különböző felület írja ki (napló, keretlista, jutalom-sor,
+   skill-kártya) — ha csak egy részük tudna a bónuszról, a kiírt szám nem
+   egyezne a hatással. Hibánál a globális alapérték jön vissza. */
+function skillStarStep(inst){
+  const id=inst&&inst.skill&&inst.skill.id;
+  if(!id)return SKILL_STAR_STEP;
+  try{return styleSkillStarStep(id);}catch(e){return SKILL_STAR_STEP;}}
+function skillStarMult(inst){return Math.pow(skillStarStep(inst),skillStars(inst));}
 function skillStarSuffix(inst){const s=skillStars(inst);return s?" "+"★".repeat(s):"";}
 /* A hatás teljes ereje: a fázis-készültség és a csillagszorzó együtt. Csillag
    nélkül pontosan a régi skillFraction — a meglévő balansz nem mozdul.
@@ -59546,6 +59556,58 @@ stTrait("beton","pajzs_iskola",2,"Pajzs-iskola",
 stTrait("bombazok","gol_iskola",2,"Gólvágó-iskola",
   "A CSATÁR-képességek csillagozásának feloldása olcsóbb.",
   stStarDiscLevels(sk=>sk&&sk.cat==="CSATAR"));
+/* ---- 🎯 TÜZÉRSÉG (Bombázók) ----
+   A HÁROM LÖVŐ-KÉPESSÉG. Az Ágyúgolyó (védő), a Szitálós (csatár) és a
+   Szabadrúgás-mester (középpályás) ugyanazt mondja három poszton: ennek az
+   embernek a LÖVÉSE a fegyver. Eddig három külön, drága csillagozási jog volt;
+   ez a képesség egyben nyitja meg mind a hármat, és a második szinttől többet
+   is ér náluk egy csillag.
+
+   MIÉRT NEM A CSUPASZ I. ÁRSÁVON MEGY. A három jog listaára együtt 114
+   stíluspont (39+40+35) — a 14 pontos belépőért odaadni azt jelentené, hogy
+   minden Bombázók-karrier ezzel kezdődik, és nincs is más helyes első lépés.
+   Ezért ársázorzót kap (×1,8 → 25/43/68): a rang továbbra is I. (egyszerű,
+   fókuszált hatás), csak nem ingyen. Így is bőven megéri — de döntés marad.
+
+   ÉS MIÉRT NEM TÖBB. A hatás FELTÉTELES a maga módján: a Bombázók sorsolása a
+   CSATÁR-kategória felé tolódik (Befejezés-iskola), tehát a másik kettő
+   ÉPPEN NEM a stílus alapértelmezett iránya. Aki mind a hármat ki akarja
+   építeni, annak szét kell húznia a keretét — ezt fizeti meg a képesség.
+
+   A CSILLAG-LÉPÉSKÖZ a globális 1.05-ről megy 1.08-ra, majd 1.11-re, és CSAK
+   ezen a három képességen. Három csillagnál ez +15,8% helyett +26,0%, illetve
+   +36,8% — érezhető, de a skill alaphatásának töredéke marad. */
+const ARTILLERY_SKILLS=["df_cannon","fw_cannon","mf_fk"];
+/* Élő mondat a kártyára: mi van meg a háromból a keretedben, és hány csillaggal.
+   A LISTAÁR is innen jön, nem beégetve — a STAR_PRICES a fájlban lentebb épül
+   fel, tehát a definíció pillanatában még nem is létezik. */
+function artilleryCondTxt(){
+  const got=[];let none=0,price=0;
+  ARTILLERY_SKILLS.forEach(id=>{
+    const sk=SKILLS.find(x=>x.id===id);
+    if(!sk){none++;return;}
+    try{price+=starUnlockBasePrice(sk);}catch(e){}
+    let best=-1;
+    try{
+      const roster=new Set((gameMode==="career"?fullCareerRoster():currentRoster()).map(p=>p.n));
+      Object.entries(S.skills||{}).forEach(([name,arr])=>{
+        if(!roster.has(name))return;
+        (arr||[]).forEach(inst=>{
+          if(!inst||!inst.skill||inst.skill.id!==id||!skillComplete(inst))return;
+          best=Math.max(best,skillStars(inst));});});
+    }catch(e){}
+    if(best>=0)got.push(`${sk.name}${best?" "+"★".repeat(best):""}`);else none++;});
+  if(!got.length)return `a keretedben még egyik lövő-képesség sincs kiépítve — a három jog listaára ${price} stíluspont`;
+  return `kiépítve: ${got.join(" · ")}${none?` · még ${none} hiányzik`:" — mind a három megvan"}`;}
+stTrait("bombazok","tuzerseg",1,"Tüzérség",
+  "Az Ágyúgolyó, a Szitálós és a Szabadrúgás-mester csillagozását EGYSZERRE nyitja meg — mindhárom lövő-képességét, poszttól függetlenül. A második szinttől ráadásul ezeknél többet is ér egy csillag.",[
+  {fx:{starFree:ARTILLERY_SKILLS},
+   note:"mind a három lövő-képesség csillagozása megnyílik"},
+  {fx:{starFree:ARTILLERY_SKILLS,starStep:{step:1.08,ids:ARTILLERY_SKILLS}},
+   note:"…és náluk egy csillag 5% helyett 8% (három csillagnál +16% → +26%)"},
+  {fx:{starFree:ARTILLERY_SKILLS,starStep:{step:1.11,ids:ARTILLERY_SKILLS}},
+   note:"egy csillag 11% (három csillagnál +37%)"}],
+  artilleryCondTxt,1.8);
 stTrait("harmonia","szerepek",3,"Kiosztott szerepek",
   "A Peace on you!, az Egyensúly és az Agy szezon-szerep egyszerre erősödik. A kiosztás a nyárról átjön az új idényre, de bármikor átírhatod.",[
   {fx:{roleLvl:1},note:"Peace +5% saját gól / −3% ellenfél, piroslap ×5 · Egyensúly ×1 · Agy +5% gólpassz"},
@@ -59906,6 +59968,22 @@ function styleStarCat(){
 /* A csillagozás-feloldás kedvezménye egy KONKRÉT képességre. A megvett
    kedvezmények közül a legnagyobb ÉRVÉNYES él (nem adódnak össze — egy
    képességre egy kedvezmény jár). */
+/* CSILLAG-LÉPÉSKÖZ EGY SZŰK KÖRRE (Tüzérség). A legmagasabb megvett lépésköz
+   él; ami nincs a listán, az a globális alapértéket kapja. Ugyanaz a minta,
+   mint a starDisc-nél: a képesség hozza a kört, a motor csak kérdez. */
+function styleSkillStarStep(id){
+  let s=SKILL_STAR_STEP;
+  styleActiveFx().forEach(f=>{
+    const d=f.starStep;
+    if(!d||!(d.step>0)||!Array.isArray(d.ids)||d.ids.indexOf(id)<0)return;
+    if(d.step>s)s=d.step;});
+  return s;}
+/* INGYEN MEGNYITOTT CSILLAGOZÁS (Tüzérség). Nem ír a mentésbe: amíg a képesség
+   megvan, a jog él — így nem tud „elveszni", és a bolt sem kínálja fel újra
+   megvételre (a kínálat is ezen a kapun megy át, lásd starLockedInSquad). */
+function styleStarFreeUnlock(id){
+  try{return styleActiveFx().some(f=>Array.isArray(f.starFree)&&f.starFree.indexOf(id)>=0);}
+  catch(e){return false;}}
 function styleStarDiscount(sk){
   let best=0;
   styleActiveFx().forEach(f=>{
@@ -60147,8 +60225,12 @@ function starUnlockPrice(sk){
   const base=starUnlockBasePrice(sk);
   const d=(typeof styleStarDiscount==="function")?styleStarDiscount(sk):0;
   return Math.max(1,Math.round(base*(1-d)));}
+/* KÉT FORRÁS: a megvásárolt jog (mentésben) és a stílus-képesség adta ingyenes
+   (élőben számolt). Minden hívási hely ezen az egy kapun megy át — a bolt
+   kínálata, a jutalom-sor, a mesterhármas-jutalom és a keretlista is. */
 function starUnlocked(id){
-  return !!(S.starUnlocked&&S.starUnlocked[id]);}
+  if(S.starUnlocked&&S.starUnlocked[id])return true;
+  return styleStarFreeUnlock(id);}
 function starUnlockBuy(id){
   const sk=SKILLS.find(x=>x.id===id);
   if(!sk)return {ok:false,reason:"Ilyen képesség nincs."};
@@ -60298,6 +60380,24 @@ function styleBuyTrait(key){
      ott az 1. szint ingyen jár — lásd guardiolaFreeLevel —, tehát a vásárlás
      már a 2. szintről szól.) */
   if(key==="guardiola"&&lv===0){try{guardiolaTakeOver();}catch(e){}}
+  /* TÜZÉRSÉG 1. SZINT: a három lövő-képesség jogát ugyanúgy FRISSNEK jelöljük,
+     mint a pénzért vett feloldást (starUnlockBuy) — különben a 30%-os
+     ritkításon keresztül hetekig nem jönne fel a jutalom-sorban az, amiért
+     éppen most fizettél. Amit korábban már megvettél, azt nem jelöljük újra:
+     annak a csillaga jó eséllyel épül is már. */
+  if(key==="tuzerseg"&&lv===0){
+    try{
+      S.starUnlockNew=S.starUnlockNew||{};
+      const fresh=[];
+      ARTILLERY_SKILLS.forEach(id=>{
+        if(S.starUnlocked&&S.starUnlocked[id])return;
+        S.starUnlockNew[id]=true;
+        const sk=SKILLS.find(x=>x.id===id);
+        if(sk)fresh.push(sk.name);});
+      if(fresh.length)
+        addLine(`⭐ → Megnyílt a csillagozásuk: <b>${esc(fresh.join(" · "))}</b>. `
+          +`A legközelebbi fejlesztés-jutalomnál rögtön felajánljuk őket.`,"m skillnote");
+    }catch(e){}}
   return {ok:true,level:lv+1};}
 /* ---- AZ EDZŐVÁLTÁS ----
    A klub kirúgja az addigi szakvezetőt, és leszerződteti Pep Guardiolát. Az

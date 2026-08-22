@@ -180,6 +180,7 @@ kapus a klub legjobb embere, a kapitány és az aranylabdás is innen kerül ki.
 |---|---|---|
 | I | **Befejezés-iskola** | +40% esély CSATÁR-kategóriájú skillre a pörgetésben |
 | I | **Gólvágó-műhely** | a Gólvágó-mentor stábtag 1,5× tempóval fejlődik |
+| I | **Tüzérség** | az Ágyúgolyó, a Szitálós és a Szabadrúgás-mester csillagozása egyszerre nyílik meg; a 2. szinttől náluk egy csillag 5% helyett 8%, a 3.-tól 11% |
 | II | **Csillagozható ösztön** | megnyílik egy csillagozható befejező-skill |
 | II | **A hajrá embere** | a 75. perctől a csapat gólesélye 12%-kal nő |
 | III | **Kettős veszély** | ha két 90+ Ratingű csatár van a kezdőben, mindkettő +2 Gólszerzés |
