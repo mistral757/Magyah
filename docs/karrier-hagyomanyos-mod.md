@@ -245,12 +245,12 @@ azaz a hirdetett −1,4-es rés valóban teljesül.
 `node tools/pyramid-sim.js bands`:
 
 ```
-klub-szezon: 310 · egyedi klub: 183 · sáv: 71,1 … 88,0
+klub-szezon: 319 · egyedi klub: 192 · sáv: 71,1 … 88,0
 
 csapat/oszt |  teljes sáv  | D1        | D2        | D3        | D4        | D5        | D6
-         16 | 79,4…88,0    | 85,1-88,0 | 83,0-85,0 | 82,1-83,0 | 81,5-82,0 | 80,3-81,3 | 79,4-80,2
-         15 | 79,9…88,0    | 85,5-88,0 | 83,4-85,1 | 82,5-83,3 | 81,6-82,5 | 80,5-81,6 | 79,9-80,5
-         12 | 80,5…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,7 | 81,6-82,0 | 80,5-81,6
+         16 | 79,6…88,0    | 85,1-88,0 | 83,0-85,0 | 82,1-83,0 | 81,5-82,0 | 80,3-81,5 | 79,6-80,3
+         15 | 79,9…88,0    | 85,5-88,0 | 83,4-85,1 | 82,5-83,3 | 81,7-82,5 | 80,5-81,6 | 79,9-80,5
+         12 | 80,6…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,7 | 81,7-82,0 | 80,6-81,6
 ```
 
 **A tervezett 71–91-es piramis nyers Ratingekből NEM építhető meg.** A 90
@@ -258,9 +258,9 @@ legerősebb egyedi klub mindössze **8,1 Rating-pontot** fog át (79,9 … 88,0)
 A KÖTEGEKKEL EZ SZŰKÜL, nem tágul: a 200 keretes adatbázisban még 11,3 pont
 volt a 90-es sáv (76,7 … 88,0), a 10. köteg után 9,8, a 11-12. köteg után 9,6,
 a 13. után 9,3, a 14-15. köteg után 8,7, a topliga-kötegek (16-26.) után 8,1.
-A 27. köteg (öt alsó-középmezőnybeli keret) ezen NEM változtatott: a sáv a
-legjobb 90 klubból számol, és mind az öt új keret az alá esik — a bővítés a
-MEZŐNYT sűríti, a tetőt nem emeli. Tehát két szomszédos osztály
+A 27. és a 28. köteg ezen érdemben nem változtatott (8,1): a sáv a legjobb 90
+klubból számol, és a két köteg tizennégy keretéből egy sem éri el azt — a
+bővítés a MEZŐNYT sűríti, a tetőt nem emeli. Tehát két szomszédos osztály
 közé csak ~1,5–2 pont jut — nem 2-pontos lépcső 8 pont széles sávokkal, ahogy
 a terv szólt, hanem 1,5-es lépcső 2 pont széles sávokkal. Ráadásul **88 fölött egyetlen csapat sincs**: a legerősebb a
 Barcelona 2010/11 (88,0), és mindössze két klub éri el a 87-et.
@@ -890,7 +890,7 @@ egyetlen hook-kal átvette — a `cupTierFor` ad a piramisban osztály-alapú so
 
 | oszt | liga | hazai kupa | nemzetközi | a kupagyőzelem jutalma |
 |---|---|---|---|---|
-| **D1** | premier líg | FA-kupa a top 32-ből, **selejtező nélkül** | 1–3. **BL** · 4–5. **EL** · 6. **KL**, mind selejtező nélkül | FA → **BL közvetlenül**, a következő idényben |
+| **D1** | premier líg | FA-kupa a top 32-ből, **selejtező nélkül** | 1–3. **BL** · 4–5. **EL** · 6. **KL**, mind selejtező nélkül | FA → **BL-selejtező**, a következő idényben |
 | **D2** | másodosztály | FA-kupa, **4 körös** selejtezővel, minden csapat | — | — |
 | **D3** | NB I | Magyar Kupa, 4. helytől bárkinek | 1. **BL-sel.** · 2. **EL-sel.** · 3. **KL-sel.** | MK → **BL-selejtező**, a következő idényben |
 | **D4** | NB II | Magyar Kupa, az első **3** helyezett | — | — |
@@ -910,6 +910,28 @@ Böngészőben ellenőrizve, mind a hat osztályon, helyezésenként.
   nem jutott kupa (a Magyar Kupa a 79-es és 84-es sávé). Ugyanaz a sorozat
   ugyanoda került be: `{comp:"FA",max:99}` a `CUP_TIERS` két felső sorának a
   végére, tehát a nemzetközi helyek után mindenki más az FA-kupát játssza.
+
+  **A MEZŐNYE MOSTANTÓL ANGOL (v3.7.0).** Az `EURO_COMPS.FA.leagues` megnevezi
+  a ligát (`Premier League`), és a `buildEuroField` először onnan tölt fel.
+  A 32-es tábla 31 AI-klubot kér; a 28. köteg kilenc angol klubbal 34-re vitte
+  az adatbázist, és a hazai kupában a bajnoki rivális is benn maradhat (azzal a
+  kerettel, amivel a bajnokságban is találkozol) — mérve **60 sorsolásból 60-szor
+  tisztán angol** a mezőny, 80-tól 125-ig minden célszinten, idényenként 4 klub
+  forgással. Ha egyszer mégsem lenne elég angol klub, a maradék helyet a mezőny
+  többi része tölti ki: a tábla soha nem törik el.
+
+  A **Magyar Kupa szándékosan NEM kap ilyen listát**: az NB I-ből kilenc klub
+  van az adatbázisban, abból egy 32-es tábla harmada sem jönne ki.
+
+  **A GYŐZELME BL-SELEJTEZŐT ÉR (v3.7.1), nem közvetlen főtáblát.** Eddig
+  selejtező nélkül vitt be, és ezzel a hazai kupa erősebb belépő volt, mint a
+  bajnoki dobogó: egy hetedik helyezett kupagyőztes ugyanoda jutott, ahova a
+  bajnok. A selejtező megtartja a jutalmat, de van ára — ugyanaz a szabály,
+  mint a D3-ban a Magyar Kupa győztesénél (`PYR_CUPS[0].cupWins.qual`).
+  A DINAMIKUS módban az FA-kupa győzelmének továbbra sincs következő szezonra
+  szóló jutalma: ott a kvalifikáció UGYANARRA a szezonra szól (a kupa a
+  bajnokság után fut), tehát egy „következő idényre" szóló nevezés más
+  horgonyt kívánna.
 
   **A hírességpontokból hiányzott** (v3.5.01): sem a `FAME_AWARD_BASE`, sem a
   `FAME_MVP_BASE` nem ismerte, ezért az FA-kupában szerzett egyéni díj a
