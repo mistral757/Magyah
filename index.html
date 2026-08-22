@@ -3700,7 +3700,7 @@ body.stadium.fa-board #speedRow .speedVal{color:#c8102e}
      · MAJOR — csak a projektgazda döntése, félreérthetetlenül jelezni fogja.
    A szám a fejlécben, a versionBadge-en látszik. Frissítéskor csak ezt az egy
    sort kell módosítani — KIADÁSONKÉNT egyszer, nem commitonként. */
-const APP_VERSION="3.7.0";
+const APP_VERSION="3.7.1";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -12034,6 +12034,13 @@ const EURO_COMPS={
      megkülönböztethetők — az MK sötétvörös lemez, az FA fehér tábla. */
   FA:{n:"FA-kupa",short:"FA",col:"#c8102e",winCol:"#ffd0d6",oppDelta:0,
       domestic:true,
+      /* A CHAMPION-KÁRTYA GYŰRŰJE KÉTSZÍNŰ. A Magyar Kupa (#d92b3a) és az
+         FA-kupa (#c8102e) is piros, és a keretlista 42 pixeles korongján a
+         két árnyalat ránézésre ugyanaz — a gyűrűből tehát nem derült ki,
+         melyik sorozatot nyerted. Az FA innentől PIROS-FEHÉR: két koncentrikus
+         sáv, az angol kupa színe. Ahol csak egy szín kell (fejléc,
+         eredményjelző, ünneplő képernyő), ott marad a `col`. */
+      ringCols:["#c8102e","#ffffff"],
       /* A MEZŐNY NEMZETE. Az FA-kupát angol klubok játsszák — a merítés innen
          tölt fel először (lásd buildEuroField). Amíg az adatbázisban nincs 31
          angol klub, a maradék helyet a mezőny többi része tölti ki; a köteg-
@@ -12125,7 +12132,8 @@ const CUP_TIERS=[
    A RENDSZER, fentről lefelé:
      D1  élvonal   — FA-kupa a legjobb 32-ből, SELEJTEZŐ NÉLKÜL.
                      1-3. BL · 4-5. EL · 6. KL, mind selejtező nélkül.
-                     Az FA-kupa győztese a KÖVETKEZŐ idényben BL-t játszik.
+                     Az FA-kupa győztese a KÖVETKEZŐ idényben BL-SELEJTEZŐT
+                     játszik (mint a D3-ban a Magyar Kupa győztese).
      D2  másodoszt.— innen MINDEN csapat nevez az FA-kupába, NÉGY körös
                      selejtezővel. Nemzetközi hely nincs.
      D3  NB I      — 1. BL-selejtező · 2. EL-selejtező · 3. KL-selejtező;
@@ -12145,7 +12153,14 @@ const CUP_TIERS=[
    zavarónak bizonyul, elég a lenti tábla két `comp` mezőjét egységesíteni. */
 const PYR_CUPS=[
   /* D1 */ {entries:[{comp:"BL",max:3},{comp:"EL",max:5},{comp:"KL",max:6},{comp:"FA",max:99}],
-            cupWins:{comp:"FA",gives:"BL",qual:false}},
+            /* Az FA-kupa győztese BL-SELEJTEZŐT kap, nem közvetlen főtáblát.
+               Eddig selejtező nélkül ment be, és ezzel a hazai kupa erősebb
+               belépő volt, mint a bajnoki dobogó harmadik helye (az is
+               selejtező nélküli, de a kupa MELLÉ jön, tehát a kupagyőzelem
+               felülírta): egy hetedik helyezett kupagyőztes ugyanoda jutott,
+               ahova a bajnok. A selejtező megtartja a jutalmat — a BL-be
+               bejutni innen is reális —, de van ára. */
+            cupWins:{comp:"FA",gives:"BL",qual:true}},
   /* D2 */ {qual:true,qualRounds:4,entries:[{comp:"FA",max:99}]},
   /* D3 */ {qual:true,entries:[{comp:"BL",max:1},{comp:"EL",max:2},{comp:"KL",max:3},{comp:"MK",max:99}],
             cupWins:{comp:"MK",gives:"BL",qual:true}},
@@ -24069,9 +24084,13 @@ $("scoutSpinBtn").onclick=()=>{
     $("scoutSpinBtn").classList.add("hide");
     $("scoutNextBtn").classList.remove("hide");
   }};
+/* A SZÁM IS OTT VAN A CSILLAGOK MELLETT, ahogy az ügynökségnél (agencyStarsLabel):
+   hét és fél csillagot ránézésre senki nem számol meg, a „(7,5★)" viszont
+   azonnal olvasható — és a fejlesztés-gomb ára is ehhez a számhoz igazodik. */
 function scoutStarsLabel(stars){
   const full=Math.floor(stars),half=stars%1!==0;
-  return "★".repeat(full)+(half?"½":"")+`  (±${Math.round(scoutErrorPct(stars)*100)}%-os TSI-becslés)`;}
+  return "★".repeat(full)+(half?"½":"")+` (${stars.toFixed(1)}★)`
+    +` · ±${Math.round(scoutErrorPct(stars)*100)}%-os TSI-becslés`;}
 $("scoutNextBtn").onclick=()=>{
   $("scScout").classList.add("hide");
   /* LIGAPIRAMIS: az ellenféltábla-sorsolás kimarad. Nem díszlet-döntés — a
@@ -30747,13 +30766,23 @@ function cardTierColor(t){
 /* A korong stílusa: a kártyaszint karikája + (ha van) a Champion-kártya
    TÁGABB külső gyűrűje. A kettő megfér egymás mellett — aki mindkettőt bírja,
    két gyűrűt visel. */
+/* A Champion-gyűrű lehet EGY- vagy KÉTSZÍNŰ. A kártyaszint karikája 3 pixelig
+   tart; a Champion-gyűrű efölé jön. Egyszínűnél egy 6 pixeles sáv, kétszínűnél
+   két koncentrikus, egyenként 2 pixeles sáv (3→5 és 5→7). A 7 pixel a 42-es
+   korongon 56 pixelre nő, ami a 74 pixeles sloton belül marad. */
+function champRingShadow(champ){
+  const c=champ&&EURO_COMPS[champ.comp];
+  if(!c)return "";
+  const two=Array.isArray(c.ringCols)&&c.ringCols.length>=2?c.ringCols:null;
+  return two?`0 0 0 5px ${two[0]},0 0 0 7px ${two[1]}`
+            :(c.col?`0 0 0 6px ${c.col}`:"");}
 function cardTierDotStyle(t,champ){
-  const cc=champ&&EURO_COMPS[champ.comp]?EURO_COMPS[champ.comp].col:null;
+  const ring=champRingShadow(champ);
   let st=cardTierDotStyleBase(t);
-  if(cc){
+  if(ring){
     st=/box-shadow:/.test(st)
-      ? st.replace(/box-shadow:([^;]*)/,(m,g)=>`box-shadow:${g},0 0 0 6px ${cc}`)
-      : st+(st?";":"")+`box-shadow:0 0 0 6px ${cc}`;}
+      ? st.replace(/box-shadow:([^;]*)/,(m,g)=>`box-shadow:${g},${ring}`)
+      : st+(st?";":"")+`box-shadow:${ring}`;}
   return st;}
 function cardTierDotStyleBase(t){
   if(!t)return "";
@@ -52562,8 +52591,8 @@ function euroMkChainPending(){
   return !!(tier&&tier.mkWinsKL)&&!S.mkToKLDone;}
 /* ---- A HAZAI KUPA GYŐZTESE A KÖVETKEZŐ IDÉNYBEN INDULHAT ----
    A piramisban a hazai kupa nem azonnali láncot indít, hanem a KÖVETKEZŐ
-   szezonra szóló nevezést ad (D1: FA-kupa → BL selejtező nélkül; D3: Magyar
-   Kupa → BL-selejtező). Az S.euroEntry a meglévő "jövő szezonra szóló
+   szezonra szóló nevezést ad (D1: FA-kupa → BL-selejtező; D3: Magyar Kupa →
+   BL-selejtező). Az S.euroEntry a meglévő "jövő szezonra szóló
    indulás" mechanizmus — ugyanaz, amit a bajnoki helyezés is használ.
    FELÜLÍRJA a helyezésből járó indulást, ha az gyengébb: a kupagyőzelem a
    legerősebb út Európába. */

@@ -890,7 +890,7 @@ egyetlen hook-kal átvette — a `cupTierFor` ad a piramisban osztály-alapú so
 
 | oszt | liga | hazai kupa | nemzetközi | a kupagyőzelem jutalma |
 |---|---|---|---|---|
-| **D1** | premier líg | FA-kupa a top 32-ből, **selejtező nélkül** | 1–3. **BL** · 4–5. **EL** · 6. **KL**, mind selejtező nélkül | FA → **BL közvetlenül**, a következő idényben |
+| **D1** | premier líg | FA-kupa a top 32-ből, **selejtező nélkül** | 1–3. **BL** · 4–5. **EL** · 6. **KL**, mind selejtező nélkül | FA → **BL-selejtező**, a következő idényben |
 | **D2** | másodosztály | FA-kupa, **4 körös** selejtezővel, minden csapat | — | — |
 | **D3** | NB I | Magyar Kupa, 4. helytől bárkinek | 1. **BL-sel.** · 2. **EL-sel.** · 3. **KL-sel.** | MK → **BL-selejtező**, a következő idényben |
 | **D4** | NB II | Magyar Kupa, az első **3** helyezett | — | — |
@@ -922,6 +922,16 @@ Böngészőben ellenőrizve, mind a hat osztályon, helyezésenként.
 
   A **Magyar Kupa szándékosan NEM kap ilyen listát**: az NB I-ből kilenc klub
   van az adatbázisban, abból egy 32-es tábla harmada sem jönne ki.
+
+  **A GYŐZELME BL-SELEJTEZŐT ÉR (v3.7.1), nem közvetlen főtáblát.** Eddig
+  selejtező nélkül vitt be, és ezzel a hazai kupa erősebb belépő volt, mint a
+  bajnoki dobogó: egy hetedik helyezett kupagyőztes ugyanoda jutott, ahova a
+  bajnok. A selejtező megtartja a jutalmat, de van ára — ugyanaz a szabály,
+  mint a D3-ban a Magyar Kupa győztesénél (`PYR_CUPS[0].cupWins.qual`).
+  A DINAMIKUS módban az FA-kupa győzelmének továbbra sincs következő szezonra
+  szóló jutalma: ott a kvalifikáció UGYANARRA a szezonra szól (a kupa a
+  bajnokság után fut), tehát egy „következő idényre" szóló nevezés más
+  horgonyt kívánna.
 
   **A hírességpontokból hiányzott** (v3.5.01): sem a `FAME_AWARD_BASE`, sem a
   `FAME_MVP_BASE` nem ismerte, ezért az FA-kupában szerzett egyéni díj a
