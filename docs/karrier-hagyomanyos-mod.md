@@ -245,12 +245,12 @@ azaz a hirdetett −1,4-es rés valóban teljesül.
 `node tools/pyramid-sim.js bands`:
 
 ```
-klub-szezon: 310 · egyedi klub: 183 · sáv: 71,1 … 88,0
+klub-szezon: 319 · egyedi klub: 192 · sáv: 71,1 … 88,0
 
 csapat/oszt |  teljes sáv  | D1        | D2        | D3        | D4        | D5        | D6
-         16 | 79,4…88,0    | 85,1-88,0 | 83,0-85,0 | 82,1-83,0 | 81,5-82,0 | 80,3-81,3 | 79,4-80,2
-         15 | 79,9…88,0    | 85,5-88,0 | 83,4-85,1 | 82,5-83,3 | 81,6-82,5 | 80,5-81,6 | 79,9-80,5
-         12 | 80,5…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,7 | 81,6-82,0 | 80,5-81,6
+         16 | 79,6…88,0    | 85,1-88,0 | 83,0-85,0 | 82,1-83,0 | 81,5-82,0 | 80,3-81,5 | 79,6-80,3
+         15 | 79,9…88,0    | 85,5-88,0 | 83,4-85,1 | 82,5-83,3 | 81,7-82,5 | 80,5-81,6 | 79,9-80,5
+         12 | 80,6…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,7 | 81,7-82,0 | 80,6-81,6
 ```
 
 **A tervezett 71–91-es piramis nyers Ratingekből NEM építhető meg.** A 90
@@ -258,9 +258,9 @@ legerősebb egyedi klub mindössze **8,1 Rating-pontot** fog át (79,9 … 88,0)
 A KÖTEGEKKEL EZ SZŰKÜL, nem tágul: a 200 keretes adatbázisban még 11,3 pont
 volt a 90-es sáv (76,7 … 88,0), a 10. köteg után 9,8, a 11-12. köteg után 9,6,
 a 13. után 9,3, a 14-15. köteg után 8,7, a topliga-kötegek (16-26.) után 8,1.
-A 27. köteg (öt alsó-középmezőnybeli keret) ezen NEM változtatott: a sáv a
-legjobb 90 klubból számol, és mind az öt új keret az alá esik — a bővítés a
-MEZŐNYT sűríti, a tetőt nem emeli. Tehát két szomszédos osztály
+A 27. és a 28. köteg ezen érdemben nem változtatott (8,1): a sáv a legjobb 90
+klubból számol, és a két köteg tizennégy keretéből egy sem éri el azt — a
+bővítés a MEZŐNYT sűríti, a tetőt nem emeli. Tehát két szomszédos osztály
 közé csak ~1,5–2 pont jut — nem 2-pontos lépcső 8 pont széles sávokkal, ahogy
 a terv szólt, hanem 1,5-es lépcső 2 pont széles sávokkal. Ráadásul **88 fölött egyetlen csapat sincs**: a legerősebb a
 Barcelona 2010/11 (88,0), és mindössze két klub éri el a 87-et.
@@ -910,6 +910,18 @@ Böngészőben ellenőrizve, mind a hat osztályon, helyezésenként.
   nem jutott kupa (a Magyar Kupa a 79-es és 84-es sávé). Ugyanaz a sorozat
   ugyanoda került be: `{comp:"FA",max:99}` a `CUP_TIERS` két felső sorának a
   végére, tehát a nemzetközi helyek után mindenki más az FA-kupát játssza.
+
+  **A MEZŐNYE MOSTANTÓL ANGOL (v3.7.0).** Az `EURO_COMPS.FA.leagues` megnevezi
+  a ligát (`Premier League`), és a `buildEuroField` először onnan tölt fel.
+  A 32-es tábla 31 AI-klubot kér; a 28. köteg kilenc angol klubbal 34-re vitte
+  az adatbázist, és a hazai kupában a bajnoki rivális is benn maradhat (azzal a
+  kerettel, amivel a bajnokságban is találkozol) — mérve **60 sorsolásból 60-szor
+  tisztán angol** a mezőny, 80-tól 125-ig minden célszinten, idényenként 4 klub
+  forgással. Ha egyszer mégsem lenne elég angol klub, a maradék helyet a mezőny
+  többi része tölti ki: a tábla soha nem törik el.
+
+  A **Magyar Kupa szándékosan NEM kap ilyen listát**: az NB I-ből kilenc klub
+  van az adatbázisban, abból egy 32-es tábla harmada sem jönne ki.
 
   **A hírességpontokból hiányzott** (v3.5.01): sem a `FAME_AWARD_BASE`, sem a
   `FAME_MVP_BASE` nem ismerte, ezért az FA-kupában szerzett egyéni díj a
