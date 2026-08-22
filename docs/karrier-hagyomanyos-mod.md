@@ -245,7 +245,7 @@ azaz a hirdetett −1,4-es rés valóban teljesül.
 `node tools/pyramid-sim.js bands`:
 
 ```
-klub-szezon: 305 · egyedi klub: 178 · sáv: 71,1 … 88,0
+klub-szezon: 310 · egyedi klub: 183 · sáv: 71,1 … 88,0
 
 csapat/oszt |  teljes sáv  | D1        | D2        | D3        | D4        | D5        | D6
          16 | 79,4…88,0    | 85,1-88,0 | 83,0-85,0 | 82,1-83,0 | 81,5-82,0 | 80,3-81,3 | 79,4-80,2
@@ -257,8 +257,10 @@ csapat/oszt |  teljes sáv  | D1        | D2        | D3        | D4        | D5
 legerősebb egyedi klub mindössze **8,1 Rating-pontot** fog át (79,9 … 88,0).
 A KÖTEGEKKEL EZ SZŰKÜL, nem tágul: a 200 keretes adatbázisban még 11,3 pont
 volt a 90-es sáv (76,7 … 88,0), a 10. köteg után 9,8, a 11-12. köteg után 9,6,
-a 13. után 9,3, a 14-15. köteg után 8,7, a topliga-kötegek (16-26.) után 8,1
-— a bővítés a MEZŐNYT sűríti, a tetőt nem emeli. Tehát két szomszédos osztály
+a 13. után 9,3, a 14-15. köteg után 8,7, a topliga-kötegek (16-26.) után 8,1.
+A 27. köteg (öt alsó-középmezőnybeli keret) ezen NEM változtatott: a sáv a
+legjobb 90 klubból számol, és mind az öt új keret az alá esik — a bővítés a
+MEZŐNYT sűríti, a tetőt nem emeli. Tehát két szomszédos osztály
 közé csak ~1,5–2 pont jut — nem 2-pontos lépcső 8 pont széles sávokkal, ahogy
 a terv szólt, hanem 1,5-es lépcső 2 pont széles sávokkal. Ráadásul **88 fölött egyetlen csapat sincs**: a legerősebb a
 Barcelona 2010/11 (88,0), és mindössze két klub éri el a 87-et.
