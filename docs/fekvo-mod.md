@@ -1,6 +1,6 @@
 # Fekvő mód — a stadion-nézet, a HUB és minden más képernyő
 
-*(3.7.05–3.7.07. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
+*(3.7.05–3.7.08. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
 `body.appFs` CSS-blokk az `index.html`-ben, `stadiumWanted`,
 `STADIUM_BLOCKERS`, `sbApplyStadium`, `stadiumSync` + a `MutationObserver`,
 `stadiumFsActive` / `stadiumFsToggle`, `#stadiumFsBtn`. A HUB oldaláról:
@@ -9,8 +9,10 @@
 `sbStadiumFits` / `SB_LAND_MIN_RATIO` / `sbViewportW`, `body.landPage`
 CSS-blokk, `landPageWanted` / `applyLandPage`, a `.cpLeague` osztály a
 `renderClubPickList`-ben, és a belépő képernyő fekvő médialekérdezése.
-A manifest oldaláról: `icons/site.webmanifest` — `display: fullscreen`, és
-`sw-1.js` cache-neve.)*
+A 3.7.08-ból: `hubLandPitchApply` / `_hubLandShowedPitch`, az `applyHubLand`
+menü-mód-újraszámolása, a `.hubDetail` rács-szabálya és a kihívás-ablak
+`:has(.chCard)` szabálya. A manifest oldaláról: `icons/site.webmanifest` —
+`display: fullscreen`, és `sw-1.js` cache-neve.)*
 
 ## 1. Ami volt: egy nézet, ami a lefújással elmúlt
 
@@ -366,3 +368,107 @@ klubválasztó → felállás → skill → HUB → kihívások → meccsképern
 | 1920×1080 | `stadium`, sáv 300 px, napló 17 px | `hubLand`, menü 306, oszlop 1180, középre zárva |
 
 Vízszintes görgetés egyetlen méretnél és egyetlen képernyőn sem.
+
+
+---
+
+## 9. Négy csiszolás a fekvő módon (3.7.08)
+
+Az első kör után négy dolog maradt, ami fektetve rosszul viselkedett. Mind a
+négy ugyanabból jött: a képernyők **álló nézetre írt vezérlése** fekvő módban
+más következménnyel járt, mint amire számított.
+
+### 9.1 A felállás sehol nem látszott
+
+A HUB-ba lépés szezon közben **elrejti a pályát** (`hubMidSeasonEnter` — a
+`S._hubReturn` feljegyzi, hogy vissza tudja adni). Álló nézetben ez rendben van:
+a pályát a **menü-mód** hozza vissza (`hubMenuApply`, 3.2.00 óta), mert a menü
+fele — taktika, kapitány, csere, igazolás — épp a felállásra való.
+
+Fekvő módban viszont **nincs menü-mód** (7. szakasz), tehát az a visszahozás
+soha nem futott le. A stadion-nézet meg mindent elrejt a meccsképernyőn kívül —
+így a felállás fektetve *sehol* nem volt látható, pedig a fekvő HUB jobb
+oszlopának épp az a teteje.
+
+`hubLandPitchApply(on)` ugyanazt a párost adja a pályára, amit a
+`_hubLandOpenedMenu` a menülistára: fekvő módban felfedi (és újrarajzolja),
+visszaforgatáskor pedig **csak akkor** rejti el, ha mi fedtük fel. Draft közben
+nem nyúl hozzá — ott a pálya a draft képernyőé.
+
+### 9.2 A kinyitott játékos részletei feleződtek
+
+A fekvő HUB keretlistája rács (`minmax(238px, 1fr)`), a részletdoboz
+(`.hubDetail`) pedig a sor UTÁN, ugyanabba a csoport-testbe kerül — vagyis a
+rács **egyetlen cellájába**, egy 238 px-es hasábba. Azon belül az
+attribútum-dobozok (`.hdAttrs`, `1fr 1fr`) még egyszer feleződtek. A fekvő mód
+így pont ott adott kevesebb helyet, ahol a legtöbb adat van.
+
+```css
+body.hubLand #hubRoster .hubDetail{grid-column:1/-1}
+body.hubLand .hubDetail .hdAttrs{grid-template-columns:repeat(auto-fit,minmax(155px,1fr))}
+```
+
+A `grid-column:1/-1` teljes szélességű sort nyit a részletnek a saját sora
+alatt; az attribútum-rács pedig `auto-fit`, tehát 844×390-en három, 1920-on mind
+az öt attribútum egy sorba áll.
+
+### 9.3 A kihívás-ajánlat ablakká vált
+
+A kihívás-felajánlás nem képernyő, hanem **kérdés**: elvállalod vagy sem, aztán
+visszatérsz oda, ahonnan jöttél. Ugyanaz a megszakítás-fajta, mint a
+skill-sorsolás vagy a felfedezés-panel — azok fektetve régóta ablakként jönnek
+be (3. szakasz). A kihívás lapként viselkedett: alatta üresen maradt a fél
+képernyő, a „Kész — tovább" pedig kigörgött.
+
+```css
+body.landPage>#scWindow:not(.hide):has(.chCard){ /* sötét háttér, középre zárt kártya */ }
+```
+
+A `:has(.chCard)` a kapu: a `#scWindow` **háromféle** tartalmat kap, és csak a
+kihívás-lista kérdés — a vásárlás és a klub-szemle valódi munkafelület, az marad
+teljes lap. A `.chCard` osztályt egyedül a `renderChallengeOffers` írja ki.
+A `#twActions` (a „Kész — tovább", az ajánlat egyetlen kiútja) `position:sticky`
+az ablak alján, tehát a hasábok görgetése nem viheti ki a képből.
+
+Mögötte **ottmarad, amiből jöttél** — kupa-kihívásnál például végig látszik a
+kupa-HUB.
+
+### 9.4 A szezonközi átigazolási ablak menü-módban nyílt
+
+`twEnterHubWindow()` felfedi a `#scHub`-ot, majd **azonnal** menü-módba kapcsol
+(`hubMenuToggle(true, true)`). A `hubMenuApply` kapuja `_inHubMenu && onHub &&
+!hubLand` — csakhogy a `hubLand` jelzőt az `applyHubLand` teszi ki, azt pedig egy
+`MutationObserver` hívja, vagyis **a következő mikrotaszkban**. A menü-mód
+kérdése tehát még a régi, `hubLand` nélküli világban dőlt el.
+
+Az eredmény fektetve: a jobb oszlopból csak a lezáró gomb és a ☰ sáv maradt
+(`#scHub.menuMode>.card.hubMainCard>*{display:none}` + a két kivétel), a HUB
+lapja eltűnt alóluk.
+
+A javítás egy sor: az `applyHubLand` a `hubLand` jelző **minden billenésekor**
+újraszámoltatja a menü-módot.
+
+```js
+const was=b.classList.contains("hubLand");
+b.classList.toggle("hubLand",on);
+if(was!==on)hubMenuApply();
+```
+
+Így fektetve a sima HUB fogad, a bal sávban a már kinyitott **Átigazolás**
+csoporttal (azt a `twEnterHubWindow` amúgy is kinyitja) — állóra forgatva pedig
+visszatér a menü-mód, ahogy addig is.
+
+### 9.5 Mérés
+
+| Amit néztünk | 844×390 | 1280×720 | 1920×1080 |
+|---|---|---|---|
+| HUB: `menuMode` / felállás | ki / 279×331 | ki / 340×404 | ki / 340×404 |
+| Kinyitott játékos: doboz / szülő | 526 / 526 | 918 / 918 | 1124 / 1124 |
+| …attribútum-hasábok | 3 | 5 | 5 |
+| Kihívás-ablak: kártya | 816×370 | 1020×510 | 1020×492 |
+| …lap-görgetés | nincs | nincs | nincs |
+| Átigazolási ablak: `menuMode` / fő kártya / ☰ | ki / látszik / rejtve | ki / látszik / rejtve | ki / látszik / rejtve |
+
+Forgatás 844×390 ↔ 390×844, HUB-on és nyitott átigazolási ablakkal is: a pálya
+oda-vissza követi a nézetet, a menü-mód állóban visszajön, fektetve elmarad,
+vízszintes görgetés sehol.
