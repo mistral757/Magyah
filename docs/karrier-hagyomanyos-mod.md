@@ -1258,6 +1258,49 @@ olvassa fokozatként, ha `upAmt` nincs (`pyrUpRead`, `pyrUpFromLegacyLevel`).
 
 ## 9. Run-szint a hagyományos módban — MEGVALÓSULT
 
+### 9.0 A megjelenése: szezonkártya-nyelven (v3.7.03)
+
+A Run-szint a karrier összefoglaló mutatója, ezért **ugyanazt a vizuális rangot
+kapta, mint a játékosok szezonkártyái** — minden módban, globálisan. A számhoz
+tartozó sáv a nyolc kártyaszint egyike, a színe a `cardTierColor`-ból jön, és a
+kártya jelvényt is visel (`runCardHtml` + `cardTierPanelVars`):
+
+| Run | sáv |
+|---|---|
+| < 30 | Ezüst |
+| 30–39 | Gold |
+| 40–54 | Diamond |
+| 55–69 | Stellar |
+| 70–79 | Mítikus |
+| 80–84 | Gyilkos |
+| 85–92 | Vadista szandál |
+| **93+** | **GODLIKE** |
+
+A régi ötfokú szöveges skála (`runLabel`) határai — 40 / 55 / 70 / 85 — mind
+sávhatárok maradtak, tehát a megszokott „Stabil futás" ugyanott kezdődik, ahol
+eddig. A csúcs szándékosan nagyon szűk: egy GODLIKE-futás legyen ugyanolyan
+ritka, mint egy GODLIKE-kártya.
+
+### 9.0.1 A D1-es bajnoki cím záróképernyője (v3.7.03)
+
+A D1-ben nincs feljebb: ott a bajnoki cím a mód végpontja. Ez a pillanat eddig
+egy sor volt a forduló-jelentésben; mostantól **saját záróképernyőt** kap
+(`showRunFinale`), a szezonforduló ELŐTT:
+
+* a tetején a futás **végleges Run-szintje**, nagy kártyaként;
+* alatta **a futásod története** (`runStoryHtml`) — honnan indultál (osztály,
+  szint, kezdő tizenegy), hány idény és hány osztály vezetett idáig, hogyan
+  nőtt közben a mezőny, mikor tűntek el a határok, mit vállaltál, és a cím
+  maga. Minden mondat MÉRT adatból jön (`S.pyr`, `S.run`, `S.seasonHistory`);
+  ami hiányzik egy régi mentésből, az a mondattal együtt marad ki;
+* ha a határok feloldódtak, a **Határtalan tartalma** tételesen;
+* végül a **plafonod** összetevői egy sorban.
+
+Auto-szezonban nem jelenik meg (`S.auto`), és a gomb után a megszokott folyam
+megy tovább: forduló-jelentés → vállalások.
+
+
+
 **A vezérelv (a projektgazda döntése): *egy könnyű Run nem kaphat magas
 értékelést, akármilyen jól játsszák.*** A mai módban ez nem teljesült — a
 nehézség a súlyozott átlag EGYIK tétele volt, tehát elég jó teljesítménnyel a
