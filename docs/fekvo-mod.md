@@ -1,9 +1,11 @@
-# Fekvő mód — a stadion-nézet, egész karrierre
+# Fekvő mód — a stadion-nézet és a HUB, egész karrierre
 
-*(3.7.05. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
+*(3.7.05–3.7.06. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
 `body.appFs` CSS-blokk az `index.html`-ben, `stadiumWanted`,
 `STADIUM_BLOCKERS`, `sbApplyStadium`, `stadiumSync` + a `MutationObserver`,
-`stadiumFsActive` / `stadiumFsToggle`, `#stadiumFsBtn`. A manifest oldaláról:
+`stadiumFsActive` / `stadiumFsToggle`, `#stadiumFsBtn`. A HUB oldaláról:
+`body.hubLand` CSS-blokk, `hubLandWanted`, `HUBLAND_BLOCKERS`, `applyHubLand`,
+`_hubLandOpenedMenu` és a `hubMenuApply` `land`-kapuja. A manifest oldaláról:
 `icons/site.webmanifest` — `display: fullscreen`, és `sw-1.js` cache-neve.)*
 
 ## 1. Ami volt: egy nézet, ami a lefújással elmúlt
@@ -121,3 +123,66 @@ nulla magas: nem kell két külön elrendezés a két esethez.
   kétharmad a képernyő tetején.
 * A biztonságos zóna (`env(safe-area-inset-*)`) a sáv felőli oldalon a **sávra**
   költözik, élő meccs alatt viszont visszakerül a táblára és a naplóra.
+
+---
+
+## 7. Ugyanez a HUB-on (3.7.06)
+
+A metódus változatlan: **két sáv**, közös fejléc.
+
+```
+  ┌──────────────────────────────────────────────────────────┐
+  │  fejléc — közös, kitapad a lap tetejére                   │
+  ├──────────────┬───────────────────────────────────────────┤
+  │              │  felállás (#scPitch)                      │
+  │   ☰ MENÜ     │  ─────────────────────────────────────────│
+  │  végig nyitva│  Run-kártya · továbblépés · nehézség ·     │
+  │  saját       │  büdzsé · kihívások · KERET (két hasábban) │
+  │  görgetéssel │                                           │
+  └──────────────┴───────────────────────────────────────────┘
+```
+
+* **A bal sáv a `#hubActions`** — ugyanaz a menülista, amit álló nézetben a ☰
+  gomb nyit. Itt nincs mit megnyitni: fektetve elfér a HUB mellett, tehát végig
+  ott van. A ☰ gomb és a „← Vissza a HUB-ba" sáv elrejtve — nincs hova vissza.
+* **Nincs menü-mód.** Álló nézetben a menü KÜLÖN KÉPERNYŐ (`#scHub.menuMode`
+  elrejti alóla a HUB egész lapját). Fektetve ez pont a jobb oszlopot venné el,
+  ezért a `hubMenuApply` kapuja: `active = _inHubMenu && onHub && !hubLand`.
+* **Az aloldalak (taktika-, kapitány-, posztválasztó) lebegnek.** A `#scHub`
+  végén, a keretlista *alatt* laknak; a bal sávból megnyitva a jobb oszlop
+  aljára kerülnének. Fektetve a fejléc alá zárt, kitűzött panelként jönnek elő.
+* **A felállás melletti sáv kap tartalmat.** A pálya `float:left`, a csapaterő,
+  a kapitány, a morál és az „Irány a szezon" gomb mellé kerül; ami nem fér el,
+  az magától a pálya alá csúszik. `740 px` viewport-szélesség alatt nincs
+  úsztatás — ott a mellé szorított szövegoszlop 100 px alá menne.
+* **A keret két hasábban** (`repeat(auto-fill, minmax(238px, 1fr))`). A
+  csoportfejlécek (`.prow`) és a „Mindent kinyit" sáv végigérnek.
+* **Visszaforgatáskor a menü becsukódik**, ha mi nyitottuk ki
+  (`_hubLandOpenedMenu`) — álló nézetben nem maradhat ott egy kinyitott,
+  hosszú menülista, amit a felhasználó nem kért.
+
+### Hol NEM kapcsol be
+
+`HUBLAND_BLOCKERS` = `scSim`, `scVerdict`, `scEuro`, `scInfReport`, `scDraft`,
+`scPyrDiv`, `scClubPick`, `scScout`, `scOpponents`. A meccsképernyő a
+stadion-nézeté, a többi a saját, lineáris folyamatáé.
+
+**A nagy felületek (vásárlás, klub-szemle, edzésterv, stáb) egyelőre kimaradnak.**
+Azok a `#scWindow` szakaszban laknak, és megnyitáskor **elrejtik a `#scHub`-ot**
+— a bal sáv viszont fizikailag a `#scHub` belsejében van, tehát vele együtt
+tűnne el. Ilyenkor a lap visszaesik a megszokott, 520 px-es hasábba. Ez a
+következő lépés helye, ha kell: vagy a menü költözik ki a `#scHub`-ból egy saját
+gazdába, vagy a `#scWindow` kap saját fekvő elrendezést.
+
+### Mérés (844×390, világos és sötét témán)
+
+| Amit néztünk | Eredmény |
+|---|---|
+| HUB fektetve | `hubLand` be, `menuMode` ki · sáv 262×390 · jobb oszlop 526 |
+| Aloldal (Taktika) a sávból | `position:fixed`, x=274, a menü végig látszik |
+| Infópult ablak | `position:fixed`, 844×390 — fektetve is teljes |
+| „Irány a szezon" | `hubLand` ki, a meccsképernyőn `stadium` be |
+| HUB szezon közben (`matchHubBtn`) | `hubLand` újra be |
+| Visszaforgatás állóra | `hubLand` ki, a menü becsukva, `scrollHeight` a régi |
+| 568×320 · 932×430 | bekapcsol · 1280×720 (asztali) nem |
+| Vízszintes görgetés | sehol |
