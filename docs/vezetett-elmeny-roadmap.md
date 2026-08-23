@@ -277,6 +277,21 @@ nyereség), **C** = optimalizálás.
   a motoron át kerül ki, nem külön ágon.
 * **Új:** koppintásra egy egysoros „miért villog?" fülecske (`why`), és benne
   „Mutasd meg" (elviszi a művelethez) + „Most nem" (cooldown) + „Ne jelezd".
+* **A „Mutasd meg" MEGNYIT, nem görget (v3.7.04).** Eddig csak odagörgetett a
+  horgonyhoz — ami a legtöbb témánál a semmit csinálta, mert a HUB műveletei
+  csukható almenükben laknak: a horgony NEM is látszott. A gomb most három
+  ágon dolgozik (`teachOpenAnchor`):
+  1. **saját nyitó** (`go`) — ha a téma tudja, hogyan kell megnyitni (kell
+     mindenhez, ami nem gomb: a Run-mérőnél pl. egy állapotot kell billenteni);
+  2. **harmonika-fejléc** — a kattintás ott TOGGLE, egy már nyitott csoportot
+     becsukna, ezért csak a kinyitás megy, utána görgetés;
+  3. **gomb** — a tipikus eset: látható és engedélyezett gombra kattintunk.
+  Előtte mindig lefut a `teachRevealAnchor`: kinyitja a HUB-menüt és azt az egy
+  almenüt, amiben a horgony ül (`hubAccToggle`-lel, hogy a többi bezáruljon és
+  a stílus-panel törzse feltöltődjön). Ha semmi nem nyílt meg, marad a régi
+  görgetés — de már a KINYITOTT almenüben.
+  Amire nem kattintunk: rejtett vagy letiltott gomb. A jelzés amúgy is csak
+  akkor villog, ha a funkció elérhető, tehát a gombja látszik.
 * `prefers-reduced-motion` esetén nincs animáció, csak statikus keret.
 * **Kész, ha:** a 3 meglévő jelvény az új motoron megy, viselkedés-azonosan.
 * **Méret:** ~300 sor. **Kockázat:** közepes (teljesítmény — lásd 6.2).

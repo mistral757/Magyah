@@ -8,7 +8,13 @@
      változnak, gyorsabb betöltést ad, és offline is biztosan elérhetők.
    - ha nincs net ÉS nincs cache-elt HTML sem (első látogatás offline), az
      esemény simán elbukik — ez elkerülhetetlen, első betöltéshez net kell. */
-const CACHE_NAME = "harminc-nulla-cache-v1";
+/* A CACHE NEVÉT AKKOR KELL LÉPTETNI, ha egy STATIKUS fájl tartalma változik.
+   A statikus ág "cache-first": amit egyszer eltett, azt onnantól a cache-ből
+   adja, hálózat nélkül. A manifest teljes képernyőre állítása (display:
+   fullscreen) így a régi telepítéseknél sosem érne el — hacsak a cache neve nem
+   változik. Új név = új install = friss addAll, az activate pedig kitakarítja a
+   régit. A FŐ HTML nem érintett: az mindig "network-first". */
+const CACHE_NAME = "harminc-nulla-cache-v2";
 const STATIC_ASSETS = [
   "/",
   "/icons/site.webmanifest",
