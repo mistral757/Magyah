@@ -1,6 +1,6 @@
 # Fekvő mód — a stadion-nézet, a HUB és minden más képernyő
 
-*(3.7.05–3.7.08. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
+*(3.7.05–3.7.11. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
 `body.appFs` CSS-blokk az `index.html`-ben, `stadiumWanted`,
 `STADIUM_BLOCKERS`, `sbApplyStadium`, `stadiumSync` + a `MutationObserver`,
 `stadiumFsActive` / `stadiumFsToggle`, `#stadiumFsBtn`. A HUB oldaláról:
@@ -11,7 +11,8 @@ CSS-blokk, `landPageWanted` / `applyLandPage`, a `.cpLeague` osztály a
 `renderClubPickList`-ben, és a belépő képernyő fekvő médialekérdezése.
 A 3.7.08-ból: `hubLandPitchApply` / `_hubLandShowedPitch`, az `applyHubLand`
 menü-mód-újraszámolása, a `.hubDetail` rács-szabálya és a kihívás-ablak
-`:has(.chCard)` szabálya. A manifest oldaláról: `icons/site.webmanifest` —
+`:has(.chCard)` szabálya. A 3.7.11-ből: `hubLandBackSync` / `--hubBackH` és a
+kitapadt `#hubNextSeasonBtn`. A manifest oldaláról: `icons/site.webmanifest` —
 `display: fullscreen`, és `sw-1.js` cache-neve.)*
 
 ## 1. Ami volt: egy nézet, ami a lefújással elmúlt
@@ -472,3 +473,69 @@ visszatér a menü-mód, ahogy addig is.
 Forgatás 844×390 ↔ 390×844, HUB-on és nyitott átigazolási ablakkal is: a pálya
 oda-vissza követi a nézetet, a menü-mód állóban visszajön, fektetve elmarad,
 vízszintes görgetés sehol.
+
+
+---
+
+## 10. A kijárat kitapad a bal sáv tetejére (3.7.11)
+
+A `#hubNextSeasonBtn` a HUB **egyetlen kijárata**, négy felirattal, egy
+szerepben:
+
+| Felirat | Mikor |
+|---|---|
+| `← Vissza a szezonhoz` | szezon közben megnyitott HUB |
+| `← Vissza a kihívásokhoz` | a kihívás-felajánlásból kitérve (9.3) |
+| `✅ Lezárom a … átigazolási időszakot` | nyitott checkpoint-ablak |
+| `Irány a pályára →` / nyárzáró feliratok | szezonok között |
+
+A lapon a nehézségi szint fölött ül — vagyis egy 28 fős keretlistával a jobb
+oszlop **tetején**. Egy 390 px magas fektetett kijelzőn ez azt jelenti, hogy a
+kijárat mindig görgetésre van: nézed a keret alját, és vissza kell kaparásznod
+a lap tetejére. (Az alsó iker-gomb pont ezért született — de az meg a lista
+ALJÁN van, tehát középről ugyanúgy görgetni kell.)
+
+Fektetve ezért **kitapad a bal sáv tetejére**, közvetlenül a fejléc alá:
+
+```
+  ┌──────────────────────────────────────────────┐
+  │  fejléc                                       │
+  ├──────────────┬───────────────────────────────┤
+  │ ← VISSZA A   │                               │
+  │   SZEZONHOZ  │   felállás                    │  ← a gomb fix,
+  ├──────────────┤   Run-kártya                  │    a sáv alatta
+  │  ☰ MENÜ      │   keret…                      │    kezdődik
+  │  (görgethető)│                               │
+  └──────────────┴───────────────────────────────┘
+```
+
+**Miért nem költöztetjük át a DOM-ban** a menü belsejébe: a gomb a
+`.hubMainCard` közvetlen gyereke, és több szabály épül erre — a menü-mód
+kivétele a `.twCloseBtn`-re, az alsó iker szinkronja, a rejtés-logika. Egy
+oda-vissza mozgatás forgatásonként mindezt kockáztatná. A `position:fixed`
+ugyanazt adja, **nulla DOM-mozgatással**; a jelölés betűre változatlan.
+
+**A sáv teteje mért adat** (`--hubBackH`, `hubLandBackSync`): a felirat egy vagy
+két sorba tördelhet (a nyárzáró és az ablak-lezáró hosszú), és a menünek
+pontosan a gomb alatt kell kezdődnie. Nulla három esetben — nincs fekvő HUB, a
+gomb rejtve van, vagy egy nagy felület elnyelte a HUB lapját (`hubWin`); az
+utóbbi kettőt maga a mérés intézi, mert egy nem festett elem magassága 0.
+
+**A mérés hívási helye a `syncHubNextSeasonTwin`.** Az a közös torok: minden
+hívó, ami a gomb feliratát vagy műveletét állítja, oda fut be — tehát egyetlen
+jövőbeli állapot sem maradhat ki. (A másik hívó az `applyHubLand`, a jelző
+billenésekor.)
+
+**Az alsó iker fektetve rejtve** (`#hubNextSeasonBtn2`): a felső példány végig a
+képernyőn van, tehát az indoka — „ne kelljen visszagörgetni" — megszűnt.
+
+### Mérés (844×390)
+
+| Helyzet | Gomb | Sáv teteje | `--hubBackH` |
+|---|---|---|---|
+| `← Vissza a szezonhoz` | 0,67 · 262×42 | y=109 | 42px |
+| a keret aljára görgetve | 0,67 · 262×42 | y=109 | 42px |
+| `✅ Lezárom …` (két sor) | 0,67 · 262×59 | y=126 | 59px |
+| állóra forgatva | `position:static`, a változó törlődik | — | — |
+
+Átfedés a gomb és a sáv között egyik állapotban sem.
