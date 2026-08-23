@@ -1,6 +1,6 @@
 # Fekvő mód — a stadion-nézet, a HUB és minden más képernyő
 
-*(3.7.05–3.7.11. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
+*(3.7.05–3.7.14. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
 `body.appFs` CSS-blokk az `index.html`-ben, `stadiumWanted`,
 `STADIUM_BLOCKERS`, `sbApplyStadium`, `stadiumSync` + a `MutationObserver`,
 `stadiumFsActive` / `stadiumFsToggle`, `#stadiumFsBtn`. A HUB oldaláról:
@@ -12,7 +12,9 @@ CSS-blokk, `landPageWanted` / `applyLandPage`, a `.cpLeague` osztály a
 A 3.7.08-ból: `hubLandPitchApply` / `_hubLandShowedPitch`, az `applyHubLand`
 menü-mód-újraszámolása, a `.hubDetail` rács-szabálya és a kihívás-ablak
 `:has(.chCard)` szabálya. A 3.7.11-ből: `hubLandBackSync` / `--hubBackH` és a
-kitapadt `#hubNextSeasonBtn`. A manifest oldaláról: `icons/site.webmanifest` —
+kitapadt `#hubNextSeasonBtn`. A 3.7.14-ből: a `sbFitTeams` ResizeObserver-e
+(`_sbFitState`) és a tábla függőleges sorrendje (`#sbMain` / `#sbEvents`
+flex-szabályai). A manifest oldaláról: `icons/site.webmanifest` —
 `display: fullscreen`, és `sw-1.js` cache-neve.)*
 
 ## 1. Ami volt: egy nézet, ami a lefújással elmúlt
@@ -539,3 +541,63 @@ képernyőn van, tehát az indoka — „ne kelljen visszagörgetni" — megszű
 | állóra forgatva | `position:static`, a változó törlődik | — | — |
 
 Átfedés a gomb és a sáv között egyik állapotban sem.
+
+
+---
+
+## 11. Két bug a kupa-táblán (3.7.14)
+
+Egy kupameccs stadion-nézetében két dolog romlott el egyszerre, és mindkettő
+ugyanabból jött: **a tábla két olyan feltevésre épült, ami a fekvő módban nem
+igaz.**
+
+### 11.1 A csapatnév a 3 betűs kódnál ragadt
+
+A `sbFitTeams` eldönti, kifér-e a teljes név a mezőbe — ha nem, a 3 betűs kódra
+(`POF`, `MCI`) vált. A döntést a **festés pillanatában** hozza meg, és utána
+csak egy **ablak-átméretezés** mérte újra.
+
+Van egy harmadik eset, ami egyik sem: **a fekvő mód bekapcsolása.** A tábla
+ilyenkor a lap hasábjából a teljes képernyőre ugrik — a névmező 105-135 px-ről
+337-re nő —, csakhogy az ablak mérete nem változott, tehát `resize` sem
+érkezett. A kupában ez a tipikus út: a sorozat lapján (egy ~400 px-es
+hasáb-kártyában) festünk, a stadion-nézet utána kapcsol be.
+
+Mostantól a **mezőt** figyeljük, nem az ablakot: egy `ResizeObserver` szól, ha a
+doboz mérete bármiért megváltozik — forgatás, fekvő mód, sáv be/ki,
+betűtípus-betöltés. A `resize`-figyelő tartalékként marad a régi böngészőknek.
+
+Az újraírás **feltételes** (`_sbFitState`: szélesség + csapatnév), és ez nem
+takarékosság: a megfigyelő a saját írásunkra is felébredne, és egy önmagát
+ébresztő kör indulna. Így a második hívás már nem ír, tehát a kör azonnal leáll.
+
+Mérve (890×400, festés egy 400 px-es hasábban, majd stadion-mód `resize`
+nélkül): `BOM` → egy képkockával később `Borussia Mönchengladbach`, és
+visszaszűkítve újra `BOM`.
+
+### 11.2 A gólkrónika félbevágva látszott
+
+A tábla négy sávja fentről lefelé: **óra · állás · összesítés · gólkrónika**. Az
+állást egy `margin:auto 0` zárta középre, a maradék sávok pedig a
+`flex-shrink:1` alapértelmezéssel osztoztak — a gólkrónikát ráadásul egy
+`min-height:0` engedte **nulláig** összenyomni.
+
+Egy **kupameccsen** jön be az összesítés-sáv is (`#sbAgg`, ötödik elem egy
+olyan magasságban, ami négyre volt méretezve), és egy alacsony fektetett
+kijelzőn épp a krónika fogyott el: a sor félbevágva látszott, a percek lelógtak
+a tábla aljáról.
+
+A sorrend most **kimondott**:
+
+| Sáv | Viselkedés |
+|---|---|
+| óra, összesítés | `flex:0 0 auto` — a saját magasságán marad |
+| gólkrónika | `flex:0 1 auto`, `min-height:32px`, `max-height:38%`, `overflow:hidden` |
+| állás | `flex:1 1 auto`, `min-height:0` — **ő** nyeli el a szabad helyet, és ő adja is fel |
+
+A krónika így legalább egy **teljes** sort tart (nincs több félbevágott perc), és
+legfeljebb a tábla 38%-át viszi — egy hat gólos meccs sem nyomja szét az
+eredményt.
+
+Mérve 890×340 / 300 / 270-en: a tábla tartalma korábban 32-45 px-szel túlnyúlt a
+dobozán, most **0**; a krónika mindhárom méretnél teljes egészében látszik.
