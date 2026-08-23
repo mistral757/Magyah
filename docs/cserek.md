@@ -100,3 +100,37 @@ párharcát, nem veszíti el a munkáját.
 * **A párharc előtti kérdés megmaradt.** Ott a tét nagy, és a keret is
   változhatott a legutóbbi beállítás óta — egy pillantás a tervre a kezdőrúgás
   előtt megéri. A „már megkérdeztük" jelző párharconként külön él.
+
+
+## 7. A keretlistán is látszik (3.7.10)
+
+A cseretervnek volt egy hallgatólagos hibája: **a HUB keretlistájáról sehogy nem
+derült ki, hogy valakivel épp folyik valami.** A terv a Cserék menüben él, a
+keretlista pedig egy másik képernyő — vagyis pont akkor nem tudtad, ki van
+betervezve, amikor a keretet nézegetve döntöttél volna róla.
+
+Ugyanez a piaci oldalra is igaz volt (`saleMarket`): a kirakatban álló ember
+sora semmiben nem különbözött a többitől.
+
+Mostantól **a sor háttere mondja meg**, nem egy ikon a név mellett — a háttér
+az, ami végigfut a soron, tehát görgetés közben, olvasás nélkül is kiugrik:
+
+| Állapot | Jel | Osztály |
+|---|---|---|
+| élő cseretervben szerepel | kék háttér + kék bal él + kék név | `.prow.rowSub` |
+| a piacon áll | arany háttér + arany bal él + arany név | `.prow.rowSale` |
+| mindkettő | a háttér a soron belül vált kékről aranyra | `.prow.rowSub.rowSale` |
+
+**A jelvény egyben út is.** A sor koppintása továbbra is a játékos lapját nyitja
+(az a megszokott, nem vesszük el) — a név mellé kerülő `🔁 csere` / `📈 piacon`
+jelvény viszont ODA visz: a cseretervezőbe, illetve az eladási ajánlatokhoz. Az
+esemény megáll a jelvényen (`stopPropagation`), különben a lap is kinyílna
+alatta. A piac jelvénye `📈 licit!`-re vált, ha ajánlat vár döntésre.
+
+Ugyanez a két ügy **darabszámban** ott van a keret-mérőn is (`rosterCapHtml`),
+még azelőtt, hogy végiggörgetnéd a keretet — és mindkét chip gomb:
+`🔁 Cseretervben 2 ›` és `📈 Piacon 2 · 1 licit vár! ›`.
+
+**A kapu a `subPlanActive()`**, nem pusztán a szabályok léte: ha a cserék
+mesterkapcsolója ki van kapcsolva, a terv nem fut le, tehát a jelölés hazudna.
+A jelvény azt mondja, hogy a MECCSEN történni fog valami — ne mondja, ha nem fog.
