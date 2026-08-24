@@ -129,3 +129,140 @@ Playwright-tal, a beállító képernyőn és a teljes indítási láncon:
   "vissza" gomb megmaradt.
 
 Mind a négy forgatókönyv a várt eredményt adta, `tools/check.sh` zöld.
+
+---
+
+# A hiányzó fél: a Draft gomb valóban a draftra visz (3.7.22)
+
+*(Érintett kód: `$("scoutNextBtn").onclick`, `scoutSpinBtn` land-ága,
+`renderSetupRecap`, `draftComplete` (új), `saveGame` (`pyrPend` mező),
+`applySavedGame`, `resumeUIFromSave`, `pyrSetupWrap` és `renderPyrCapNote`
+szövegek.)*
+
+## A tünet
+
+A 3.7.18 visszahozta a Draft / Kész klub választót a hagyományos karrier
+belépőjére — **de csak a kapcsolót**. A Draftot választva a folyamat ugyanúgy
+a kész csapatválasztóba futott tovább: a scout után a klublista jött, a keretet
+nem te draftoltad össze. A kapcsoló tehát látszott, de nem csinált semmit.
+
+## Az ok: EGY ág, ami nem kérdezett rá a kezdés módjára
+
+A `scoutNextBtn` kezelője a piramist EGYETLEN dolognak vette:
+
+```js
+if(pyrPending){          /* piramis → klubválasztó, kérdés nélkül */
+  $("scClubPick").classList.remove("hide"); … return;}
+$("scOpponents")…        /* minden más → ellenféltábla, utána draft */
+```
+
+Ez a 3.4.18 óta igaz volt (ott a piramis tényleg csak kész klubbal indult), és
+a 3.7.18 a *kimenetet* (`placeBench` → `pyrOpenDivPickFromDraft`) meg a
+*belépőt* (a választó láthatóságát) is megcsinálta — csak épp ezt a **bemeneti
+elágazást** nem. A draft-ág így soha nem kapott vezérlést.
+
+A javítás pontosan egy kérdés: piramisban is a `careerStart` dönti el, hova
+megyünk a scout után.
+
+```
+piramis + kész klub :  scout → KLUBVÁLASZTÓ → osztályválasztó → kémia   (változatlan)
+piramis + draft     :  scout → DRAFT        → osztályválasztó → kémia   (ÚJ: eddig ide sosem jutott el)
+dinamikus + draft   :  scout → ellenféltábla → draft → kémia            (változatlan)
+```
+
+Az ellenféltábla-sorsolás a draftos piramis-ágon is kimarad — ugyanazért, amiért
+a klubosnál: a mezőnyt az OSZTÁLYOD adja (`pyrOpponents`), és a pörgetés
+(`SEASON_OPPS=buildOpponents`) felül is írná. `SEASON_OPPS` a draft alatt üres,
+pontosan úgy, ahogy a klubos ágon a klubválasztás alatt.
+
+## A gomb felirata
+
+A `scoutNextBtn` fix „Irány az ellenfél-tábla →" felirata mindkét piramis-ágon
+hazudott (ott nincs ellenféltábla). A felirat mostantól a land-ágban dől el:
+ellenfél-tábla / klubválasztás / draft.
+
+## A mentés: a függő piramis is állapot (`pyrPend`)
+
+Ez a fix nélkül **adatvesztés** lett volna. Drafttal induló piramis-karrierben
+a piramis VILÁGA csak az osztályválasztó megerősítésekor születik meg
+(`pyrConfirmDiv`) — a draft egésze alatt a mód csak a `pyrPending`
+modulváltozóban létezik. A draft viszont **minden körben ment** (`place`,
+`placeBench` → `saveGame`), az `applySavedGame` pedig vakon `pyrPending=false`-ra
+állt. Egy újratöltés a draft közepén tehát némán **dinamikus karrierré** tette a
+futást: a `placeBench` a végén osztályválasztó nélkül a kémia-képernyőre lépett
+volna.
+
+Kész klubos piramisnál ez sosem derülhetett ki, mert ott az ELSŐ mentés már a
+kész piramis-világgal (`S.pyr`) születik — a `pyrPending` nullázása ott
+szándékos és helyes (egy félbehagyott beállítás ne ragadjon a modulváltozóban).
+Ezért nem a nullázás tűnt el, hanem mellé került a mentett szándék:
+
+- `saveGame`: `pyrPend: pyrPending ? {speed:pyrPendingSpeed} : null`
+- `applySavedGame`: a modulváltozók továbbra is törlődnek, majd a **betöltött
+  állás** saját `pyrPend`-jéből élednek újra.
+
+## A lezárt draft mint érvényes köztes állapot (`draftComplete`)
+
+A `phase` végig `"draft"` marad, amíg az osztályválasztó meg nem erősít — a
+draft VÉGE és a karrier indulása közé tehát belefér egy újratöltés. Két hely
+kezelte ezt korábban sérült mentésként:
+
+- `applySavedGame` a `benchCatIndex`-et nullázta, ha az nem mutatott a négy
+  általános padhely valamelyikére. A lezárt draftnál viszont éppen a lista
+  VÉGÉRE mutat (`=DRAFT_BENCH_CATS.length`), tehát a nullázás egy KÉSZ
+  cserepaddal dobta volna vissza a padkörbe.
+- `resumeUIFromSave` a `phase==="draft"`-ot mindig a draft-képernyővel
+  folytatta — a kész kerettel ez egy pörgethetetlen zsákutca lett volna.
+
+Mindkettő ugyanarra az EGY állításra épül (`draftComplete()`: teli kezdő 11 +
+teli négy általános padhely). Ha igaz és a piramis még függőben van, a folytatás
+helye az osztályválasztó, pontosan ott, ahol a `placeBench` hagyta.
+
+## Az összefoglaló (`renderSetupRecap`)
+
+Az utolsó beállító-oldal a régi világot írta ki: a **Kezdés** sort piramisban
+kihagyta, majd egy fix `"Kész klub kerete · nincs draft"` sorral pótolta — a
+Draftot választó felhasználónak szó szerint az ellenkezőjét állítva. Mostantól:
+
+- **Kezdés** — minden karrierben a valódi választás (`Draft` / `Kész klub
+  kerete`), piramisban is; a „Draft-nézet" (vak mód) továbbra is csak
+  klasszikusban, ahol a `modeGrid` tényleg látszik;
+- **Rating alapja** — a draft sajátja, tehát piramisban is megjelenik
+  drafttal (pontosan úgy dönt, ahogy az `updateRatingBasisVisibility`);
+- **Draft-pool** — kimarad kész klubos PIRAMIS-indulásnál, mert ott a lista a
+  liga klubjaiból épül (`pyrClubPool`), a kapcsoló hatástalan és rejtve is van;
+- **Kezdő osztály / A rajt nehézsége** — „a draft után dől el", ha drafttal
+  indulsz.
+
+## Szövegek
+
+A `pyrSetupWrap` bevezetője („Itt **nincs draft**") és a Run-plafon jegyzete
+(„mindhármat a **klubválasztás** után döntöd el") még a 3.4.18-as világot
+mondta. Mindkettő a keret összeállításáról beszél, ami mindkét úton igaz.
+
+## Tesztelés
+
+Playwright-tal, valódi kattintásokkal, `http-server`-en:
+
+- **piramis + Draft**: a beállító összefoglaló `Kezdés = Draft`, `Kezdő osztály
+  = a draft után dől el`; a scout-gomb felirata „Irány a draft →"; a gomb a
+  **draft-képernyőre** visz (`scDraft` látszik, `scClubPick`/`scOpponents` nem),
+  `roundInfo` = „1. draftkör / 11";
+- **teljes draft lezárása** → az osztályválasztó nyílik meg a 15 fős kész
+  kerettel, a „← Mégis másik klubot választok" gomb rejtve; az „Indulás"
+  után `phase="chem"`, `pyrOn()` igaz, a kezdő 11 változatlan, a Run-bontásban
+  ott a `reroll` sor;
+- **újratöltés a draft közepén** (5 betöltött poszt): a folytatás után
+  `pyrPending` igaz, a draft-képernyő az 5 poszttal jön vissza;
+- **újratöltés az osztályválasztón**: `benchCatIndex` marad 4, a pad tele, és a
+  folytatás az osztályválasztót nyitja újra (`pyrPickFromDraft` igaz);
+- **regresszió — piramis + kész klub**: a Rating-alap/újrapörgetés/családtag/
+  VB-EB kapcsolók rejtve, az összefoglalóban nincs Draft-pool és Rating-alap
+  sor, a scout-gomb „Irány a klubválasztás →", a lánc scout → klub →
+  osztályválasztó (látható „vissza" gombbal) → kémia;
+- **regresszió — dinamikus karrier + draft**: scout → ellenféltábla → draft,
+  változatlanul;
+- **regresszió — klasszikus**: az összefoglalóban a „Draft-nézet" sor, a
+  `modeGrid` látszik.
+
+Minden forgatókönyv a várt eredményt adta, `tools/check.sh` zöld.
