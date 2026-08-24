@@ -3309,8 +3309,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
     <button data-cs="club">Kész klub<small>egy valós klub keretével kezdesz, az adott idény értékeléseivel</small></button>
   </div>
   <div class="hide" id="pyrStartNote" style="margin-top:8px;font-size:11.5px;color:var(--dim);line-height:1.5;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--gold) 10%,transparent)">
-    🏆 <b>Hagyományos karrier:</b> itt <b>nincs draft</b> — egy valós klub keretét veszed át. A kezdő osztályt és a
-    <b>kezdő ligádat</b> és a <b>rajt nehézségét</b> a klub kiválasztása UTÁN döntöd el, hogy lásd, mekkora falat vállalsz. A világ igazodik hozzád: te csak azt mondod meg, hol kezdesz és mennyivel legyél erősebb vagy gyengébb a mezőnynél.
+    🏆 <b>Hagyományos karrier:</b> a <b>kezdő ligádat</b> és a <b>rajt nehézségét</b> a kereted összeállítása UTÁN döntöd el, hogy lásd, mekkora falat vállalsz — akár draftolsz, akár kész klubot veszel át. Draftnál a felállás után jön az osztályválasztó, ugyanúgy felskálázva. A világ igazodik hozzád: te csak azt mondod meg, hol kezdesz és mennyivel legyél erősebb vagy gyengébb a mezőnynél.
   </div>
   </div>
 
@@ -4416,7 +4415,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.17";
+const APP_VERSION="3.7.18";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -23621,6 +23620,11 @@ let pyrWantedDiv=5,pyrWantedBand=[78,82];
    (pyrConfirmDiv). Amíg ez igaz, a karrier NEM piramis: a pyrOn() hamis, a
    pool nyers, és a klubválasztó a valós adatbázis-erősségeket mutatja. */
 let pyrPending=false,pyrPendingSpeed="tarto",pyrPickSq=null,pyrPickDiv=null;
+/* IGAZ, ha az osztályválasztó (#scPyrDiv) a DRAFT VÉGÉN nyílt, nem a
+   klubválasztóból — lásd pyrOpenDivPickFromDraft. A képernyő ugyanaz, a
+   "Indulás" gomb (pyrConfirmDiv) viszont ettől függően más folytatást indít:
+   drafttal nincs mit "startClubCareer"-ezni, a keret már kész. */
+let pyrPickFromDraft=false;
 /* A VILÁG FELSKÁLÁZÁSA — RATINGBEN (−15 … +15, tizedpontos lépéssel).
    Egyjátékosban az osztályválasztón állítod, a klub ismeretében; közös
    karrierben a házigazdáé, és a szobán át utazik. */
@@ -23780,39 +23784,47 @@ function updatePyrSetupVisibility(){
      kerestük vissza a DOM-ban, ami a beállító képernyő minden átrendezésekor
      elromlott volna. */
   {const d=$("dynSetupWrap");if(d)d.classList.toggle("hide",hideOld);}
-  /* A Rating-alap a piramisban kötelezően csúcsforma (a világ a valós
-     kluberősségekre épül), tehát nincs mit választani. */
-  const rb=$("ratingBasisWrap");
-  if(rb&&hideOld)rb.classList.add("hide");
-  else if(rb&&typeof updateRatingBasisVisibility==="function")updateRatingBasisVisibility();
-  /* A 3. oldal alcíme is mást ígér a két módban. */
+  /* A RATING-ALAP MÁR NEM PIRAMIS-SPECIFIKUS TILTÁS. Kész klubbal indulva
+     (piramisban vagy sem) kötelezően csúcsforma — ezt az updateRatingBasisVisibility
+     saját maga eldönti a careerStart-ból, ide nem kell külön piramis-ág. */
+  if(typeof updateRatingBasisVisibility==="function")updateRatingBasisVisibility();
+  /* A 3. oldal alcíme is mást ígér a két módban — draft/kész klub választástól
+     függetlenül, hiszen a piramisban MINDKETTŐ a keret ismeretében választja
+     az osztályt (lásd lent). */
   {const l=$("setupPg3Lead");
    if(l)l.textContent=hideOld
-     ?"Milyen gyorsan fejlődnek az ellenfelek, és milyen ütemben fejlődsz te. A kezdő osztályt és a világ felskálázását a klubod után választod."
+     ?"Milyen gyorsan fejlődnek az ellenfelek, és milyen ütemben fejlődsz te. A kezdő osztályt és a világ felskálázását a kereted összeállítása után választod."
      :"Milyen erős a mezőny, mennyire szorítson, és milyen ütemben fejlődsz.";}
-  /* A PIRAMISBAN NINCS DRAFT (docs 4.1: a draftolt tizenegy szerkezetileg
-     erősebb, mint a klubok, amikből draftoltad — a súlyozás ezt tompítja, de
-     a kezdő rés így is kiszámíthatatlan marad, és a mód egész ígérete az, hogy
-     TUDOD, mekkora falat vállaltál). Kész klub az egyetlen kezdés, ezért a
-     választót elrejtjük, és a modulváltozót is odaállítjuk. */
+  /* ---- A DRAFT VISSZATÉRT A PIRAMISBA (3.7.18) ----
+     A v3.4.18 előtt itt draft is volt: OSZTÁLY a beállításon (csúszkával),
+     utána draft, súlyozva a cél felé (pyrDraftPick, PYR_DRAFT_PREMIUM — ez a
+     két függvény a régi mentések Run-visszajátszásához MEGMARADT, de új
+     karrier ma már nem ezen az úton indul). A 3.4.18 kivezette: a súlyozás
+     mellett is SZÓRT maradt a rés, tehát a mód épp azt kérte kiszámíthatatlanul,
+     amire épül — hogy TUDD, mekkora falat vállaltál. A válasz akkor az volt,
+     hogy a sorrend megfordult (KLUB → OSZTÁLY, a keret ismeretében).
+     MOSTANTÓL EZ A DRAFTRA IS IGAZ: a draft ELŐSZÖR fut, KALIBRÁLATLANUL —
+     pontosan úgy, mint egy sima (nem piramis) karrierben —, és csak UTÁNA jön
+     az osztályválasztó (pyrOpenDivPickFromDraft), a MÁR KÉSZ kereteddel, a
+     felskálázással pontosan úgy, mint kész klubnál. A régi objekció (szórt,
+     kiszámíthatatlan rés) ezzel eltűnt: nem kell előre eltalálni semmit, a
+     képernyő a TÉNYLEGES kereteddel mutatja meg, hol állsz — a draft
+     "szerkezeti prémiuma" (PYR_DRAFT_PREMIUM) sem kell többé, mert a rés már
+     nem egy becslés, hanem a valódi szám. */
   {const n=$("pyrStartNote");if(n)n.classList.toggle("hide",!hideOld);}
-  {const cg=$("careerStartGrid");
-   if(cg){
-     if(hideOld){cg.classList.add("hide");if(careerStart!=="club")setCareerStart("club");}
-     /* VISSZAKAPCSOLNI csak akkor szabad, ha a választónak tényleg van itt
-        dolga: egyjátékos karrier, dinamikus ággal. Klasszikusban és közös
-        karrierben MÁS rejtette el (modeClassicBtn, illetve a vendég-átnéző),
-        és egy vak toggle visszahozná a képernyőre. */
-     else if(on)cg.classList.remove("hide");}}
-  /* ---- A „KERET" OLDAL A HAGYOMÁNYOS MÓDBAN ÜRESSÉ VÁLIK ----
-     Ott nincs draft: a Rating-alap, az újrapörgetés és a családtag már eddig is
-     rejtve volt, a VB/EB-kapcsoló pedig a piramis világára sem hat többé (lásd
-     pyrClubPool: a liga klubokból épül). Ami maradt, az egy cím és egy alcím —
-     a lapozó az ilyen oldalt magától átugorja (setupPageAlive). */
-  {const wc=$("wcToggleGrid");if(wc)wc.classList.toggle("hide",hideOld);}
+  {const cg=$("careerStartGrid");if(cg)cg.classList.toggle("hide",!on);}
+  /* ---- A „KERET" OLDAL DRAFTNÁL UGYANÚGY ÉLŐ, MINT DINAMIKUS MÓDBAN ----
+     Kész klubbal indulva (piramisban vagy sem) nincs draft, tehát a
+     Rating-alap, az újrapörgetés és a családtag-kör értelmetlen — ezeket az
+     updateRatingBasisVisibility/updateFamilySetupVisibility/updateRerollVisibility
+     már a careerStart-ból eldönti, piramistól függetlenül (lásd setCareerStart).
+     A VB/EB-kapcsoló MÁS ok miatt piramis-specifikus: kész klubnál a lista a
+     liga klubjaiból épül (pyrClubPool), a wcEnabled ott tényleg hatástalan —
+     de DRAFTNÁL a pool ugyanaz a draftPool()/activeSquads(), amit egy sima
+     karrier is használ, tehát a kapcsoló ÚJRA számít. */
+  {const wc=$("wcToggleGrid");if(wc)wc.classList.toggle("hide",hideOld&&careerStart!=="draft");}
   {const mg=$("modeGrid");if(mg&&hideOld)mg.classList.add("hide");}
-  {const fg=$("familyToggleGrid");if(fg&&hideOld)fg.classList.add("hide");}
-  {const fw=$("familyNameWrap");if(fw&&hideOld)fw.classList.add("hide");}
+  if(typeof updateFamilySetupVisibility==="function")updateFamilySetupVisibility();
   /* A KÖZÖS KARRIER KÉT EXTRA VEZÉRLŐJE csak MP-ben létezik. */
   {const w=$("pyrMpWrap");if(w)w.classList.toggle("hide",!(on&&pyrWanted&&pyrMpSetup()));}
   if(on&&pyrWanted){
@@ -25522,8 +25534,18 @@ function placeBench(p){
   if(benchCatIndex<DRAFT_BENCH_CATS.length){updateRound();}
   else{
     $("scDraft").classList.add("hide");
-    phase="chem";
-    showChemistry();
+    /* HAGYOMÁNYOS (PIRAMIS) KARRIER, DRAFTTAL: a felállás most készült el,
+       az osztályt viszont csak MOST, a kész kereted ismeretében választod —
+       lásd pyrOpenDivPickFromDraft és az updatePyrSetupVisibility fenti
+       magyarázatát arról, miért fordult meg ez a sorrend a v3.4.18-hoz
+       képest. pyrPending azért a helyes jelző itt (nem pyrOn()): a piramis
+       világa (S.pyr) csak az osztályválasztó megerősítésekor születik meg —
+       a draft alatt szándékosan még nem létezik. */
+    if(pyrPending){pyrOpenDivPickFromDraft();}
+    else{
+      phase="chem";
+      showChemistry();
+    }
   }
   saveGame();}
 /* ================= KARRIER: KÉSZ KLUB INDULÁS =================
@@ -25732,6 +25754,24 @@ function pyrOpenDivPick(sq){
   $("scPyrDiv").classList.remove("hide");
   renderPyrDivPick();
   $("scPyrDiv").scrollIntoView({behavior:"smooth"});}
+/* ---- UGYANEZ, DE A DRAFT VÉGÉN (3.7.18) ----
+   A klubválasztós ág egy VALÓS klub {club,season,players} hármasát adja
+   pyrOpenDivPick-nek. A draft végén nincs "klub" — a kereted a slots/BENCH/
+   extraRoster háromból áll össze, és nincs egyetlen valós csapatnév sem, amit
+   ki kellene zárni a piramisból (a pyrStart ezt már tudja: lásd a `myClub`
+   ágat ott — egy nem létező klubnévre sosem talál dupe-ot, tehát a
+   leggyengébb csapat adja át a helyét, pontosan úgy, mint a régi,
+   v3.4.18 előtti drafttal induló piramisban).
+   A `season` szándékosan üres — a fejléc (renderPyrDivPick) ezt kihagyja a
+   zárójelből, amíg nincs mit odaírni (a csapatnév csak a draft UTÁN, a "name"
+   fázisban dől el). */
+function pyrOpenDivPickFromDraft(){
+  const roster=slots.filter(s=>s&&s.player).map(s=>s.player)
+    .concat(BENCH_KEYS.map(k=>BENCH[k]).filter(Boolean))
+    .concat(extraRoster||[]);
+  const sq={club:"A drafton összeállított kereted",season:"",players:roster};
+  pyrPickFromDraft=true;
+  pyrOpenDivPick(sq);}
 /* A RÉSBŐL A VILÁG. Egyetlen hely, ahol a pyrPickUp születik — a liga vagy a
    rés bármelyik mozdulata után ezt kell futtatni, és a vágást is itt intézzük
    el (ha a kért rés nem fér bele, a csúszka is odaáll, ahová tényleg lehet). */
@@ -25923,7 +25963,7 @@ function renderPyrDivPick(){
      osztályra, mert az eltolás osztályonként más. */
   const rawAvg=Math.round(squadAvgOvr(sq));
   const divMean=pyrDivMeanFor(pyrPickDiv,pyrPickUp);
-  if(head)head.innerHTML=`🛡️ <b>${esc(sq.club)}</b> <span style="color:var(--dim2)">(${esc(sq.season)})</span>`
+  if(head)head.innerHTML=`🛡️ <b>${esc(sq.club)}</b>${sq.season?` <span style="color:var(--dim2)">(${esc(sq.season)})</span>`:""}`
     +` · a kereted ereje <b style="color:var(--gold)">${rawAvg}</b>`
     +(divMean!=null?` · a D${pyrPickDiv} mezőnye <b>${Math.round(divMean)}</b>`:"")
     +` · ellenfél-tempó: <b>${esc(sp.n)}</b>`
@@ -26029,7 +26069,13 @@ function renderPyrDivPick(){
        +`<br><span style="color:var(--dim2)">Run-plafon <b style="color:${runColor(cur.cap)}">${cur.cap}</b>. `
        +`A rajt nehézségén a részletes módban állíthatsz.</span>`;}}
   const go=$("pyrDivGoBtn");
-  if(go)go.textContent=`Indulás innen: D${cur.id} →`;}
+  if(go)go.textContent=`Indulás innen: D${cur.id} →`;
+  /* DRAFT VÉGÉN NINCS "MÁSIK KLUB" — a "← Mégis másik klubot választok" a
+     klubválasztó listára vinne vissza, ami a draftos ágon nem is létezik
+     ebben a lépésben (nincs mit "másik klubbá" tenni: a kereted a saját
+     drafted tizenegyed). Itt a liga/rés bármikor átállítható a képernyőn
+     belül — ez adja a mozgásteret, külön "vissza" nélkül. */
+  {const bb=$("pyrDivBackBtn");if(bb)bb.classList.toggle("hide",pyrPickFromDraft);}}
 /* A NÉZETVÁLTÓ. Semmit nem állít át — csak megmutatja vagy elrejti azt, ami a
    döntéshez nem kell. */
 $("pyrDetailBtn")&&($("pyrDetailBtn").onclick=()=>{
@@ -26037,23 +26083,30 @@ $("pyrDetailBtn")&&($("pyrDetailBtn").onclick=()=>{
   renderPyrDivPick();
   if(_pyrDetail){const el=$("pyrDetailWrap");if(el)el.scrollIntoView({behavior:"smooth",block:"nearest"});}});
 $("pyrDivBackBtn")&&($("pyrDivBackBtn").onclick=()=>{
-  pyrPickSq=null;pyrPickDiv=null;
+  pyrPickSq=null;pyrPickDiv=null;pyrPickFromDraft=false;
   $("scPyrDiv").classList.add("hide");
   $("scClubPick").classList.remove("hide");
   renderClubPickList($("clubSearch")?$("clubSearch").value:"");
   $("scClubPick").scrollIntoView({behavior:"smooth"});});
-/* A MÓD VISSZAFORDÍTHATATLAN PILLANATA. A SORREND KÖTÖTT: előbb a piramis áll
-   fel (világ, mezőnyszint, pool-eltolás), és csak UTÁNA születik meg a kereted
-   — különben a nyers adatbázisból kapnád a játékosokat, és a kezdő tizenegyed
-   a saját mezőnye fölé nőne. */
+/* A MÓD VISSZAFORDÍTHATATLAN PILLANATA. KÉSZ KLUBBAL a sorrend kötött: előbb
+   a piramis áll fel (világ, mezőnyszint, pool-eltolás), és csak UTÁNA
+   születik meg a kereted (startClubCareer) — különben a nyers adatbázisból
+   kapnád a játékosokat, és a kezdő tizenegyed a saját mezőnye fölé nőne.
+   DRAFTTAL FORDÍTVA IGAZ, és ez szándékos (lásd pyrOpenDivPickFromDraft): a
+   kereted MÁR KÉSZ, a nyers (nem piramis-skálázott) draft-poolból — pontosan
+   úgy, mint egy sima karrierben. Nincs mit "startClubCareer"-ezni: a
+   pyrStart csak a VILÁGOT (és a MARADÉK, még nem draftolt pool-t) igazítja a
+   már meglévő kereted mellé, a gap0-n keresztül. */
 function pyrConfirmDiv(){
   const sq=pyrPickSq;if(!sq)return;
   const d=pyrPickDiv||PYR_DIVS;
+  const fromDraft=pyrPickFromDraft;
   pyrPending=false;
   pyrStart(d,pyrPendingSpeed,sq,pyrMpSetup()?pyrPendingUp:pyrPickUp);
   $("scPyrDiv").classList.add("hide");
-  pyrPickSq=null;pyrPickDiv=null;
-  startClubCareer(sq);}
+  pyrPickSq=null;pyrPickDiv=null;pyrPickFromDraft=false;
+  if(fromDraft){phase="chem";showChemistry();}
+  else startClubCareer(sq);}
 $("pyrDivGoBtn")&&($("pyrDivGoBtn").onclick=pyrConfirmDiv);
 /* A csúszka AZONNAL újrarajzol: a felskálázás egyetlen értelme, hogy lásd,
    melyik osztály lesz tőle az ajánlott — ehhez a listának élőben kell
