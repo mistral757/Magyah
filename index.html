@@ -3154,6 +3154,11 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
          ott van, így egyetlen gomb elég ahhoz, hogy bárhonnan vissza lehessen
          jutni — nem kell minden szekcióba külön gombot tenni. -->
     <button id="homeBtn" title="Vissza a kezdőlapra" style="font-size:14px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer;line-height:1">🏠</button>
+    <!-- TELEPÍTÉS A KEZDŐKÉPERNYŐRE. Szándékosan a FEJLÉCBEN, homeBtn mellett:
+         ugyanúgy minden képernyőn ott van (kivéve élő meccs közben, ahol a
+         fejléc amúgy is eltűnik), tehát bárhonnan elérhető, nem csak a
+         nyitóképernyőről. JS rejti el, ha a játék már telepítve fut. -->
+    <button id="installBtn" class="hide" title="Telepítés a kezdőképernyőre" style="font-size:14px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer;line-height:1">📲</button>
     <button id="themeToggle" title="Téma váltása" style="font-size:14px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer;line-height:1">◑</button>
     <span class="badge-version" id="versionBadge"></span>
   </div>
@@ -3888,6 +3893,19 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
     <button id="themeCloseBtn" class="btn-s stepbtn">Bezár</button>
   </div>
 </div>
+<!-- TELEPÍTÉS A KEZDŐKÉPERNYŐRE — a fejléc 📲 gombjáról, bármely böngészőből.
+     Ahol van natív böngésző-támogatás (Chrome/Edge, Android), ott a
+     beforeinstallprompt eseményt használjuk, és ez az ablak elő sem kerül —
+     egyenesen a böngésző saját telepítő-párbeszéde nyílik. Ahol nincs ilyen
+     esemény (iOS Safari, asztali Safari/Firefox), itt mutatunk platform
+     szerinti kézi útmutatót. -->
+<div class="hide" id="installModal" style="position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:60;display:flex;align-items:center;justify-content:center;padding:14px">
+  <div class="card" style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+    <div class="steplbl" style="color:var(--gold)">📲 Telepítés a kezdőképernyőre</div>
+    <div id="installModalBody" style="margin-top:10px;font-size:13px;color:var(--ink);line-height:1.55"></div>
+    <button id="installCloseBtn" class="btn-s stepbtn">Bezár</button>
+  </div>
+</div>
 <!-- PROFIL — a kezdőlap jobb felső sarkából. Becenév + a karriereid eredményei.
      z-index 520: a kezdőlap (#mpEntry) 400-on, a diagnosztika 500-on ül. -->
 <div class="hide" id="profileModal" style="position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:520;display:flex;align-items:center;justify-content:center;padding:14px">
@@ -4368,7 +4386,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.14";
+const APP_VERSION="3.7.15";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -65244,6 +65262,92 @@ const DEFAULT_THEME="paper";
        jelölés a fejléc-gombbal váltva elavulna. */
     if($("themeModal")&&!$("themeModal").classList.contains("hide"))renderThemeModal();
   };
+})();
+/* ---- TELEPÍTÉS A KEZDŐKÉPERNYŐRE ----
+   A cél: EGY gomb, ami minden böngészőben csinál valamit — nem csak azokban,
+   ahol a beforeinstallprompt esemény létezik. Chrome/Edge/Android alatt ezt
+   az eseményt kapjuk el és indítjuk a saját gombunkkal (a böngésző natív
+   telepítő-párbeszéde amúgy egy nehezen észrevehető menüpont mögött bujkál).
+   Ahol az esemény nem létezik (iOS Safari sosem küldi, asztali Safari/
+   Firefox szintén nem), ott a #installModal mutat lépésről lépésre
+   útmutatót, platform szerint más szöveggel — a telepítés ott csak kézzel,
+   a böngésző saját "megosztás"/menü funkciójával megy. */
+let _pwaInstallEvt=null;
+function pwaInstalled(){
+  try{
+    if(window.matchMedia){
+      if(window.matchMedia("(display-mode: standalone)").matches)return true;
+      if(window.matchMedia("(display-mode: fullscreen)").matches)return true;}
+    if(navigator.standalone)return true;   /* iOS, kezdőképernyőről indítva */
+  }catch(e){}
+  return false;}
+/* A gomb csak addig mutat értelmet, amíg a játék NEM telepítve fut — utána
+   nincs mit telepíteni, a manifest amúgy is teljes képernyőt ad. */
+function pwaSyncBtn(){
+  const b=$("installBtn");if(!b)return;
+  b.classList.toggle("hide",pwaInstalled());}
+window.addEventListener("beforeinstallprompt",(ev)=>{
+  ev.preventDefault();   /* a böngésző saját, késleltetett mini-infósávját tiltjuk le — a mi gombunk hívja elő ugyanezt */
+  _pwaInstallEvt=ev;
+  pwaSyncBtn();});
+window.addEventListener("appinstalled",()=>{
+  /* Ez a fül maga NEM vált standalone-ra (a rendszer egy ÚJ ablakban nyitja
+     meg a telepített változatot) — tehát a pwaInstalled() display-mode
+     ellenőrzése itt még hamis lenne. Az esemény önmagában elég bizonyíték,
+     ezért itt közvetlenül elrejtjük a gombot, nem a pwaSyncBtn() újramérésére
+     támaszkodunk. */
+  _pwaInstallEvt=null;
+  const b=$("installBtn");if(b)b.classList.add("hide");});
+/* Platform-felismerés KIZÁRÓLAG a kézi útmutató szövegéhez kell — maga a
+   telepítés sosem ezen múlik, csak azon, van-e natív esemény. */
+function pwaPlatformHint(){
+  const ua=navigator.userAgent||"";
+  const iOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  if(iOS)return "ios";
+  if(/Android/.test(ua))return "android";
+  return "desktop";}
+function pwaManualHtml(){
+  const wrap=(list)=>`<p style="color:var(--dim);margin-bottom:6px">A böngésződ nem kínálja fel automatikusan a telepítést — de kézzel is pár lépés az egész:</p>`+
+    list.map((s,i)=>`<div style="display:flex;gap:8px;margin-top:7px"><b style="color:var(--gold)">${i+1}.</b><span>${s}</span></div>`).join("");
+  const plat=pwaPlatformHint();
+  if(plat==="ios")
+    return wrap([
+      "Nyisd meg a <b>Megosztás</b> ikont a Safari sávján (a felfelé mutató nyíl a négyzetben).",
+      "Görgess le a listában, és koppints: <b>„Kezdőképernyőhöz adás”</b>.",
+      "Erősítsd meg a <b>Hozzáadás</b> gombbal — az ikon a kezdőképernyőn landol, onnantól egy koppintással nyílik, teljes képernyőn."]);
+  if(plat==="android")
+    return wrap([
+      "Nyisd meg a böngésző <b>menüjét</b> (a három pötty a jobb felső sarokban).",
+      "Keresd a <b>„Telepítés”</b> vagy <b>„Hozzáadás a kezdőképernyőhöz”</b> menüpontot.",
+      "Erősítsd meg — az ikon a kezdőképernyőn landol, onnantól egy koppintással nyílik, teljes képernyőn."]);
+  return wrap([
+    "Chrome/Edge: a címsor jobb szélén lévő telepítés-ikonra koppints, vagy a böngésző-menüben keresd a <b>„Telepítés…”</b> pontot.",
+    "Ha ilyet nem látsz (pl. Firefox/Safari asztali gépen), az adott böngésző nem támogatja az önálló telepítést — de a lap könyvjelzőzve ugyanúgy egy kattintással elérhető."]);}
+function pwaShowManual(){
+  const box=$("installModalBody");
+  if(box)box.innerHTML=pwaManualHtml();
+  const m=$("installModal");if(m)m.classList.remove("hide");}
+async function pwaInstallClick(){
+  if(_pwaInstallEvt){
+    const ev=_pwaInstallEvt;_pwaInstallEvt=null;
+    try{
+      ev.prompt();
+      await ev.userChoice;
+      pwaSyncBtn();
+      return;
+    }catch(e){/* elhasznált vagy elutasított esemény — essünk vissza a kézi útmutatóra */}}
+  pwaShowManual();}
+(function initPwaInstall(){
+  const b=$("installBtn");if(b)b.onclick=pwaInstallClick;
+  const c=$("installCloseBtn");if(c)c.onclick=()=>$("installModal").classList.add("hide");
+  const m=$("installModal");
+  if(m)m.onclick=(ev)=>{if(ev.target.id==="installModal")m.classList.add("hide");};
+  pwaSyncBtn();
+  /* display-mode menet közben is válthat (pl. valaki most fejezi be a
+     telepítést egy másik ablakban) — kövessük, hogy a gomb magától eltűnjön. */
+  try{
+    if(window.matchMedia)window.matchMedia("(display-mode: standalone)").addEventListener("change",pwaSyncBtn);
+  }catch(e){}
 })();
 initSaveSystem();
 </script>
