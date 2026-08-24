@@ -4415,7 +4415,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.19";
+const APP_VERSION="3.7.20";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -30569,11 +30569,13 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      rivals        : {season, names:[...]} — a szezonra kisorsolt 2 rivális.
      seasonNews    : a már elhangzott dinamikus szezonhírek kulcsai (szezononként).
      titleWonSeason: melyik szezonban avattunk már bajnokot (a dupla ünneplés ellen).
+     runFinaleSeason: melyik szezonban ment már el a D1-es piramis-cím
+       Run-záróképernyője (runD1FinaleDue) — ugyanaz az elv, mint fent.
      _titleChanceThisMatch: a most lejátszott meccs bajnoki tétmeccs volt-e —
        ebből tudjuk, hogy vereség/döntetlen után jár-e az "elhalasztott ünnep".
      _wasLeader    : az előző forduló után éllovas voltál-e (a "visszavettétek a
        vezetést" hírhez). */
-  rivals:null,seasonNews:{},titleWonSeason:null,_titleChanceThisMatch:false,_wasLeader:null,
+  rivals:null,seasonNews:{},titleWonSeason:null,runFinaleSeason:null,_titleChanceThisMatch:false,_wasLeader:null,
   /* Az Infinity szint-követő liftjének kivezetése (2.6.023). Friss karrierben
      nincs mit migrálni, ezért itt eleve true — a RÉGI mentésekben hiányzik a
      mező, és az applySavedGame kifejezetten false-ra állítja, hogy lefusson. */
@@ -52558,17 +52560,28 @@ function showRunFinale(next){
   btn.onclick=()=>{$("scUnlock").classList.add("hide");if(typeof next==="function")next();};
   $("unlockActions").innerHTML="";$("unlockActions").appendChild(btn);
   $("scUnlock").scrollIntoView({behavior:"smooth"});}
-/* Megnyerted-e a bajnokságot az élvonalban? A forduló EREDMÉNYÉBŐL dolgozik
-   (`from` = az az osztály, amiben a szezont játszottad), nem a mostani
-   osztályból: D1-ben a cím nem jár feljutással, tehát a kettő itt egybeesne,
-   de egy jövőbeli szabályváltozás máris félrevihetné. */
-function runD1TitleNow(turn){
+/* Éppen MOST ünnepelhető-e egy frissen megszerzett D1-es bajnoki cím a
+   Run-záróképernyővel?
+   BEJELENTETT HIBA, amit ez javít: „ezt a képernyőt akkor kéne beadja, amikor
+   vége lett a bajnoki szezonnak. rögtön. hiszen akkor szerzed meg" — korábban
+   ez a képernyő csak a KÖVETKEZŐ szezon indításakor (beginNextSeasonWithChallenges)
+   jött elő, vagyis a cím megszerzése és az ünneplés között ott állt a teljes
+   nyár: kupasorozat, Aranylabda, átigazolási ablak, HUB-ozgatás.
+   Most a hívás a hubShowSeasonReport() ELEJÉN ül — pontosan ott, ahol a szezon
+   (bajnoki + kupa) ténylegesen lezárul. Ezen a ponton a piramis fordulója (a
+   fel-/kiesés alkalmazása) MÉG NEM futott le — az csak a KÖVETKEZŐ szezon
+   indításakor, beginNextSeasonWithChallenges()-ben —, tehát pyrMyDivId() itt
+   még a LEZÁRULÓ szezon osztályát adja vissza; nincs szükség a
+   pyrSeasonTurn() rollover-számítására, mint a régi verzióban.
+   Az S.runFinaleSeason őrzi, hogy egy esetleges kettős hívás (a
+   hubShowSeasonReport()-nek több belépési pontja is van) ne ünnepeljen
+   kétszer, és hogy egy újratöltés se hozza elő újra. */
+function runD1FinaleDue(){
   if(!(typeof pyrOn==="function"&&pyrOn()))return false;
-  const from=turn&&turn.res&&turn.res.from;
-  if(from!==1)return false;
-  const H=S.seasonHistory||[];
-  const last=H[H.length-1];
-  return !!(last&&last.rank===1);}
+  if(pyrMyDivId()!==1)return false;
+  const sn=S.seasonNumber||1;
+  if(S.titleWonSeason!==sn)return false;
+  return S.runFinaleSeason!==sn;}
 function renderRunMeter(){
   const box=$("hubRunMeter");if(!box)return;
   if(gameMode!=="career"){box.classList.add("hide");return;}
@@ -55597,6 +55610,16 @@ function renderInvestOffer(){
   grid.appendChild(skip);
   box.appendChild(grid);}
 function hubShowSeasonReport(){
+  /* A D1-ES BAJNOKI CÍM ZÁRÓKÉPERNYŐJE — RÖGTÖN, MIELŐTT BÁRMI MÁS TÖRTÉNNE.
+     Lásd runD1FinaleDue a pontos indoklásért. A "Tovább →" gomb a lenti,
+     változatlan jelentés-összeállítást folytatja — a felhasználó semmit nem
+     veszít belőle, csak előbb kapja meg az ünneplést. */
+  if(!S.auto&&runD1FinaleDue()){
+    S.runFinaleSeason=S.seasonNumber||1;
+    showRunFinale(hubShowSeasonReportBody);
+    return;}
+  hubShowSeasonReportBody();}
+function hubShowSeasonReportBody(){
   /* EDZÉSTERV: itt van a "nyár vége" — ez a módosítási lehetőség frissülési
      pontja. Innentől megint átállíthatod a tervet (akár most, a HUB-ban, akár
      majd menet közben a szezonban). */
@@ -55878,13 +55901,11 @@ function beginNextSeasonWithChallenges(){
         if(gameMode==="career"&&careerPool)autoHandleChallengeOffers("long",5);
         startNextCareerSeason();
       }};
-    /* A D1-ES BAJNOKI CÍM SAJÁT ZÁRÓKÉPERNYŐT KAP, a forduló-jelentés ELŐTT:
-       ez a mód csúcspontja, nem egy sor a fel-/kiesés mellett. Utána a
-       megszokott folyam megy tovább (forduló → vállalások). */
+    /* A D1-ES BAJNOKI CÍM ZÁRÓKÉPERNYŐJE MÁR KORÁBBAN, a szezonzáráskor lement
+       (lásd hubShowSeasonReport / runD1FinaleDue) — rögtön ott, ahol a cím
+       ténylegesen megszületik, nem itt, a következő szezon küszöbén. */
     const _after=()=>{ if(_turn&&!S.auto)showPyrTurnReveal(_turn,_offer); else _offer(); };
-    let _fin=false;try{_fin=!S.auto&&runD1TitleNow(_turn);}catch(e){}
-    if(_fin)showRunFinale(_after);
-    else _after();});});}
+    _after();});});}
 function startNextCareerSeason(){
   phase="season";
   /* ---- AUTO NEHÉZSÉGI SZINTKÖVETÉS ----
@@ -56037,7 +56058,7 @@ function startNextCareerSeason(){
   /* RIVÁLISOK ÉS BAJNOKI NARRATÍVA: minden szezon tiszta lappal indul — új
      riválisok (a buildSeasonFixtures sorsolja), üres hírnapló, nem avatott
      bajnok. Az _aiSchedCache azért is dől, mert a menetrend teljesen új. */
-  S.rivals=null;S.seasonNews={};S.titleWonSeason=null;S._titleChanceThisMatch=false;S._wasLeader=null;
+  S.rivals=null;S.seasonNews={};S.titleWonSeason=null;S.runFinaleSeason=null;S._titleChanceThisMatch=false;S._wasLeader=null;
   _aiSchedCache=null;liveTableInvalidate();
   /* Mérföldkövek: az IDEIGLENES hatások és a kapus-szárazság a cleanSheetStreak
      mellé nullázódnak — új szezon, tiszta lap. A debutWatch, a youthMilestone és
@@ -63092,6 +63113,10 @@ function saveGame(){
         finalTable:S.finalTable,seasonClosed:S.seasonClosed,hubReportHtml:S.hubReportHtml,
         /* rivális-rendszer és bajnoki narratíva (szezononként új) */
         rivals:S.rivals,seasonNews:S.seasonNews,titleWonSeason:S.titleWonSeason,
+        /* D1-es piramis-cím: melyik szezonban ment már el a Run-záróképernyő
+           (runD1FinaleDue) — a dupla ünneplés és egy újratöltés utáni
+           ismétlés ellen, ugyanaz az elv, mint a titleWonSeason-nél. */
+        runFinaleSeason:S.runFinaleSeason,
         seasonOppLevel:S.seasonOppLevel,   /* a szint, amire a menetrend épült */
         infLiftRetired:S.infLiftRetired,
         _titleChanceThisMatch:S._titleChanceThisMatch,_wasLeader:S._wasLeader,
