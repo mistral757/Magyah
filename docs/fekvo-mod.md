@@ -601,3 +601,21 @@ eredményt.
 
 Mérve 890×340 / 300 / 270-en: a tábla tartalma korábban 32-45 px-szel túlnyúlt a
 dobozán, most **0**; a krónika mindhárom méretnél teljes egészében látszik.
+
+---
+
+## 12. A szezonzárás utáni HUB-gomb (3.7.30)
+
+A fekvő módnak három jelzője van (`stadium`, `hubLand`, `landPage`), és a
+kapujuk a szekciók LÁTHATÓSÁGÁBÓL olvas. Ebből következik, hogy egy nyitva
+FELEJTETT szakasz nem kozmetikai hiba: átbillenti a lapot egy másik módba.
+
+Pontosan ez történt a szezonzáró verdikt „Tovább a HUB-ba →" gombjánál: a
+kezelő nem rejtette el a lefújás utáni meccsképernyőt, az pedig
+`HUBLAND_BLOCKERS`-tag — így a HUB fekvő elrendezése sosem kapcsolt be, és a
+lap az általános `landPage` hasábra esett vissza, a teljes meccsnaplóval a HUB
+fölött.
+
+A teljes leírás — a második hibával (az elavult koordinátára futó
+`scrollIntoView`) és a mérésekkel együtt — a
+[`szezonzaras-hub-gomb.md`](szezonzaras-hub-gomb.md) fájlban van.
