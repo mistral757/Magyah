@@ -730,6 +730,102 @@ megtartása csak újratöltésig tartó, hamis azonosság volt.)
 (`autoLevelSync`) a funkcionális párja, és a kettő együtt kétszer mozgatná a
 mezőnyt — az összevonás külön döntés.
 
+### 5.8 …ÉS AMI EBBŐL LÁTSZIK IS (v3.7.23)
+
+*(Érintett kód: `pyrLadderHtml`, `pyrNowHtml` + `pyrN1` (új), `.pyrNow` CSS,
+`sbPaintTeams`, `sbFitTeams`, `.sbTeam .sbOvr` CSS, a mérkőzés nyitósora a
+`playMatch` naplófejlécében.)*
+
+Az 5.7 a MECHANIKÁT írja le: a mezőny fordulóról fordulóra erősödik, és a
+`levelGap`/underdog ezt látja is. A FELÜLET viszont nem mondta ki. Amit a
+játékos a HUB-on látott:
+
+```
+D6 · mennyei megyei                                    mezőny 80
+…
+Meccs-erőd 83.4 (+1 a mezőnyhöz képest) · 📈 a mezőny idén +2,0-nál tart
+```
+
+Három baj volt ezzel egyszerre:
+
+1. **A „mezőny 80" a VILÁG osztályközepe**, ami a szezon alatt nem mozdul — a
+   12. fordulóban viszont már nem az a szám, amivel szembeállsz. A felirat
+   mégis „mezőny"-t mondott, ugyanazt a szót, mint amire a kérdés vonatkozik.
+   Mostantól **`osztályközép 80`**: pontosan azt mondja, ami — és így nem
+   versenyez a MOSTANI értékkel. (A létra fokai ugyanezt a világ-skálát
+   mutatják, tehát a fejléc és a lista továbbra is egy nyelven beszél.)
+2. **A rés EGÉSZRE volt kerekítve.** A +1,4-ből „+1" lett, és onnantól a
+   képernyőn lévő számok nem jöttek ki egymásból. Most egy tizedessel megy.
+3. **A mezőny mostani erejét sehol nem írtuk ki** — csak a növekmény állt ott,
+   külön mondatban, a nyers osztályközéptől távol.
+
+**A megoldás egy három-dobozos sor** (`pyrNowHtml`), közvetlenül a létra alatt:
+
+```
+┌──────────────────┬──────────────────┬──────────────────┐
+│ A TE MECCS-ERŐD  │   EGYENRANGÚ     │  A MEZŐNY MOST   │
+│      82,9        │      +0,7        │      82,2        │
+└──────────────────┴──────────────────┴──────────────────┘
+```
+
+A három szám **egymásból jön ki**, és ez nem kozmetika: a bal a
+`teamMatchStrength()`, a jobb az `oppMatchStrength()`, a közép pontosan a
+kettő különbsége — vagyis a `levelGap()`, ugyanaz, amiből az underdog-bónusz
+(6.1a-2) és az auto szintkövetés is dolgozik. A címke és a szín a
+`pyrGapZone`-ból jön: ugyanaz a rés-skála, amit az osztályválasztó csúszkáján
+vállaltál (8.6) — ott ígérted, itt látod.
+
+**Miért MECCS-erő mindkét oldalon.** A nyers `teamStrength()` szándékosan csak
+a keretet méri; a morált, az edzőt, a taktikát, az aurát és a kapitányt a
+`hiddenMatchBonus` külön számolja, a mezőny oldalán pedig az `oppBuffFor`
+ellensúlyoz (6.1). Ha a doboz a nyers számokat mutatná, épp azt a rést
+hazudná el, amiért a mérce létezik. A meta-sor ezért ki is mondja egy
+mondatban, hogy mindkét szám a meccs-erő — és mellette áll a szezon íve
+(`78,0 → 80,6`, a teljes idényre `+5,6`).
+
+### 5.9 AZ ELLENFÉL ERŐSSÉGE A MECCSNÉL IS (v3.7.23)
+
+A HUB az ÁTLAGRÓL szól. A konkrét mérkőzés előtt viszont az a kérdés, hogy
+**ez a mai ellenfél** hol áll — egy 16 csapatos osztályon belül a szórás
+bőven meccset dönt.
+
+**Az eredményjelzőn** (`sbPaintTeams` → `sbFitTeams`) a név alá került egy
+szám, mindkét oldalon:
+
+```
+      HAZAI                            VENDÉG
+   GRÊMIO FBPA         0:0           SSC NAPOLI
+       79,6                             79,3
+```
+
+Mindkét oldalon, mert egy szám önmagában nem mond semmit — a KÜLÖNBSÉG az
+információ. A tábla a kezdőrúgás ELŐTT is látszik (`sbSync` előnézet), tehát
+a döntéseidet (felállás, taktika, csere-terv) már ennek ismeretében hozod.
+
+**A skála itt szándékosan a NYILVÁNOS**: a te `teamStrength()`-ed és a mezőny
+saját `ovr`-je — pontosan az a két szám, amit a tabella, a klubválasztó és a
+felállásképernyő is mutat. A rejtett meccs-tagok a HUB rés-mércéjének a dolga;
+egy eredményjelző nem a hely, ahol egy szándékosan rejtett mechanika kibukik.
+
+**A naplóban** ugyanez egy mondatban, a fordulófejléc után — a párharc
+(`DUEL`) régi sorának a mintájára, csak az AI-ellenfelekre:
+
+```
+— 15. FORDULÓ · GRÊMIO FBPA – SSC NAPOLI (1986/87) —
+⚔ SSC Napoli (1986/87) — csapaterő 79,3 · a tiéd 79,6 (a te oldaladon +0,3)
+  · a D3 mezőnye most 80,6 átlagon áll (ő −1,3)
+```
+
+A harmadik tag CSAK a piramisban jár (és a kupában nem, ahol a mezőny más
+szabály szerint épül): enélkül a „79,3" nem mond semmit, így viszont
+egyszerre látszik, hogy **az ellenfél a mezőnyön belül hol áll**, és hogy
+**maga a mezőny hol tart** a szezonnyitó szintjéhez képest.
+
+**Magyar toldalék tizedes után.** A „−1,3-del" vagy „−1,3-mal"? A kimondott
+alak dönti el, az pedig a tizedestől függ — ezért minden ilyen viszonyt
+ELŐJELES SZÁMMAL mondunk ki, nem ragozott hasonlítással. Ugyanezért lett a
+HUB növekmény-mondatából `78,0 → 80,6` a korábbi „+2,6-t erősödött" helyett.
+
 ---
 
 ## 6. A PvE meccs-motor átvizsgálása
