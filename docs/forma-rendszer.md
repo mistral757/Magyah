@@ -1,12 +1,15 @@
 # Forma-rendszer és a lenyitható játékos-panel
 
-*(3.7.28. Érintett kód: `pformRefresh`, `pformSeasonReset`, `pformOf` /
+*(3.7.28 — a forma-rendszer és a lenyitható panel; 3.7.29 — a Ritmusmester és
+a HUB görgetés-horgonya. Érintett kód: `pformRefresh`, `pformSeasonReset`, `pformOf` /
 `pformStep` / `pformPct` / `pformMult` / `pformEdge` / `pformPickMult`,
 `pformBaseline`, `pformRecent`, `pformTeamForm` / `pformTeamSignal`,
 `pstatPush` / `pstatHistoryHtml`, `pformBarsHtml` / `pformRowHtml` /
 `pformDetailHtml`, `hdMark` / `hdSectionize` / `hdBindSections`; bekötés a
 `buildMatchSnapshot`-ban, a `weightedPick`-ben, a checkpoint-ágban, a
-`fullTime` végén és a `startNextCareerSeason`-ben.)*
+`fullTime` végén és a `startNextCareerSeason`-ben. 3.7.29: `PFORM_COACH_PULL` /
+`PFORM_COACH_FLOOR`, a `COACH_TYPES` „form" bejegyzése és a `coachEffectLines`
+előnézete, valamint `hubKeepRowAnchor` / `hubScrollerOf` a keretlista-soron.)*
 
 ## Volt már forma — csak egyetlen napra szólt
 
@@ -168,6 +171,72 @@ A `<details>` **natív**: nincs saját kattintás-kezelő, nincs mit elrontani e
 újrarajzoláson, és billentyűvel is működik. A nyitott állapot a mentésben él
 (`S.hubDetOpen`), tehát a következő megnyitáskor ott folytatod, ahol
 abbahagytad.
+
+## A Ritmusmester: formaedző a stábban (3.7.29)
+
+A stábban **eddig is volt** `form` típusú edző — a **📈 Ritmusmester** —, csak
+egyetlen dolgot csinált: a meccsenkénti jó/rossz forma sorsolását tolta el
+(`COACH_FORM_W`). Amióta van tartós, 14 fokú forma, a típus ígéretének
+(„Formakezelés — kisebb hullámvölgyek") itt van a helye.
+
+**Pontosan úgy működik, mint a többi edző.** A `coachPower` már magában hordja
+a **fókuszt** és az edző minőségét, a fókusz-választó pedig eleve három módot
+kínál — **az egész keret, egy posztcsoport, vagy legfeljebb két ember** —,
+tehát a „keretre / posztra / játékosra" külön felület nélkül megvolt.
+
+Két dolgot csinál, és a kettő együtt adja a formakezelést:
+
+* **fölfelé húz**, de mértékkel (`PFORM_COACH_PULL` = 1,5 fok teljes erővel);
+* **megfogja a mélyrepülést**: a fókuszáltjai nem eshetnek a padló alá
+  (`PFORM_COACH_FLOOR` = 6). A padló a **közép alatt marad** — jó formát nem
+  garantál, csak a gödröt tölti fel.
+
+### MÉRT HIBA: a csillapítás kioltotta az edzőt
+
+Az első változat a **célértékhez** adta hozzá az edző erejét — és a mérőn
+kiderült, hogy egy **teljes keretre** állított csúcsedző így pontosan semmit
+nem ért: 4,30 → **4,31**. Az ok szerkezeti: a keretre szóló húzás mindenkinél
+**ugyanaz**, tehát épp az a „közös rész", amit a divergencia-csillapítás
+szándékosan kivon.
+
+A csillapítás a csapat **hangulatának** együttmozgása ellen való, nem a
+menedzser tudatos befektetése ellen — az edző hatásának tehát a csillapítás
+**után** van a helye.
+
+Mérve a javítás után, mindenkit 3,0-ról indítva:
+
+| fókusz | a fókuszáltak | a többiek |
+|---|---|---|
+| nincs edző | átlag 4,08 | — |
+| **teljes keret** (22 fő) | átlag **4,24** | — |
+| **posztcsoport** (7 védő) | +0,3…+0,5 | változatlan |
+| **egy ember** | 3,5 → **6,0** (a padló) | változatlan |
+
+A munkanapló is vezetve van: a típus egysége „hány meccsen dolgozott a
+kereten" — a meccsenkénti könyvelés a `buildMatchSnapshot`-ban fut, a
+formafrissítés a másik fele.
+
+## A HUB görgetése a helyén marad (3.7.29)
+
+**Bejelentett hiba:** „bugos a görgetés amikor lenyitom egy játékos nézetét —
+felgörget, és vissza kell görgetni hozzá."
+
+**Az ok:** a lenyitás a **teljes HUB-ot** újrarajzolja (`renderHub`), a régi DOM
+eltűnik, a dokumentum egy pillanatra rövidebb lesz, és a böngésző a görgetést a
+tetejére csippenti. Semmi nem „ugrott" — egyszerűen nem volt mihez
+ragaszkodnia.
+
+**A javítás nem a görgetés-pozíció megjegyzése.** Az újrarajzolás után a sor
+*más helyre kerül*: a fölötte lévő lenyíló bezárul, a sajátja kinyílik. Ezért a
+**koppintott sor képernyőn elfoglalt helyét** mérjük (`hubKeepRowAnchor`), és
+utána oda állítjuk vissza — így az ujjad alatt marad az a sor, amire
+koppintottál.
+
+A horgony kétszer fut le: azonnal és a következő képkockán is — a lenyíló panel
+magassága ugyanis képek és betűtípusok betöltésekor még változhat. A görgető
+nem feltétlenül az ablak, ezért megkeressük a sor legközelebbi görgethető ősét.
+
+Mérve: a sor elmozdulása **0 px** lenyitáskor és becsukáskor egyaránt.
 
 ## Tesztelés
 
