@@ -67,12 +67,14 @@ felállás alá, a kezdésmód-választó fölé. Ez a beállítás első és le
 elágazása: a 3. oldal fél vezérlőkészlete és a 2. oldal Rating-alapja is tőle
 függ. A régi helyén (a „kihívás" oldal tetején) a felhasználó már két oldalnyi
 olyan kapcsolót állított be, amiből hagyományos módban a fele értelmét veszti.
-A két választó **egy döntéscsoport**: a hagyományos mód kötelezően kész klub,
-ezért ott a kezdésmód-választó eltűnik, és a helyén egy rövid magyarázó sor áll.
+A két választó **egy döntéscsoport**: a 3. oldal fél vezérlőkészlete és a 2.
+oldal Rating-alapja a kezdésmód-választóból is következik.
 
-**Nincs draft.** A hagyományos módban a kezdés kötelezően kész klub — a
-kezdésmód-választó el is tűnik a beállításról (`updatePyrSetupVisibility`
-odaállítja a `careerStart`-ot). Az indoklás a **4.2 lezárása**.
+**A draft VISSZATÉRT (3.7.18), és a 3.7.22 óta tényleg járható út.** A
+hagyományos módban mindkét kezdés választható; az osztályválasztó ilyenkor a
+draft VÉGÉN, a kész kereteddel nyílik meg. Lásd `docs/piramis-draft.md` — ott
+a **4.2 lezárása** (miért tűnt el annak idején a draft) és az is, miért nem
+probléma többé a „kiszámíthatatlan rés".
 
 ### 2.2 A klubválasztó betekintője (v3.5.10) — MINDEN MÓDBAN
 
