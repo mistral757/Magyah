@@ -4445,7 +4445,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.23";
+const APP_VERSION="3.7.24";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -27249,6 +27249,7 @@ function hasAwardRing(n){return awardCount(n)>=2;}
 /* ---- F6: A PÁRHARC KIEGYENLÍTŐ ELTOLÁSA ----
    Ha a két menedzser a FOLYTATÁST választja, a rendszer +1 OVR különbségre
    hangolja a két keretet: az erősebbét lefelé, a gyengébbét fölfelé tolja.
+   (A ±MP_TUNE_CAP-es plafon miatt ez CÉL, nem garancia — lásd lent.)
 
    NÉVRE SZÓLÓ, NEM A KERET EGÉSZÉRE (3.4.01). Eredetileg egyetlen globális szám
    volt, három indokkal: a szezonváltás a játékosonkénti S.ratingAdj-ot nullázza,
@@ -27259,9 +27260,27 @@ function hasAwardRing(n){return awardCount(n)>=2;}
    a párharc a KEZDŐ CSAPATOKRÓL szól.
 
    MOSTANTÓL a hangolás egy pontosan meghatározott körre szól (mpTuneSquad):
-   a szezont vagy a kupasorozatot LEZÁRÓ kezdő tizenegy, plusz posztonként
-   egy-egy csere — a keretben maradt legjobb TSI-jű kapus, védő, középpályás és
-   támadó. Tizenöt ember, akik a következő idényt is viszik.
+   a KERET 11 LEGNAGYOBB POTENCIÁLÚ JÁTÉKOSA — és ez a kör NÉVRE SZÓLÓAN
+   legfeljebb ±MP_TUNE_CAP ratinget vihet (3.7.24).
+
+   MIÉRT A POTENCIÁL, ÉS MIÉRT NEM A KEZDŐ TIZENEGY (a 3.4.01-es kör). A régi
+   kör a szezont lezáró kezdő tizenegy volt, plusz posztonként a legjobb TSI-jű
+   csere — vagyis a MAI felállásod. Ez két dolgot tett: menet közben mozgó
+   névsort adott (egy csere a 30. fordulóban átírta, kit érint a hangolás), és
+   a keret ÖREGEDŐ végére is rátolta az eltolást, ahol a következő idényre
+   már nem marad belőle semmi. A potenciál-rangsor (playerPotential: a még
+   elérhető Rating-emelkedés, a TSI és a fiatalság) azt a tizenegyet adja, aki
+   a karriert TÉNYLEG viszi tovább — és stabil: nem mozdul attól, hogy ki
+   játszott a záró fordulóban.
+
+   MIÉRT VAN PLAFON. Plafon nélkül a hangolás korlátlanul kumulálódott: aki
+   három idényen át a gyengébb oldalon állt, annál a kör ±6-8 ratinget is
+   összeszedhetett, és a Rating többé nem a játékosról szólt, hanem a
+   könyvelésről. A ±MP_TUNE_CAP azt mondja ki, meddig mehet el a rendszer:
+   egy embertől legfeljebb két ratinget vesz el, és legfeljebb kettőt ad neki
+   — a többit a párharcnak a pályán kell elrendeznie. A plafon a KIOLVASÁSNÁL
+   is érvényes, nem csak az íráskor: egy régi mentés túlnőtt tétele sem hat
+   tovább kettőnél (a tárolt szám érintetlen marad).
 
    AZ ELSŐ INDOK MEGMARAD: ez NEM az S.ratingAdj csatornán megy (azt a
    szezonváltás nullázza), hanem saját, tartós táblán (S.mpBalanceP).
@@ -27273,10 +27292,17 @@ function hasAwardRing(n){return awardCount(n)>=2;}
    tovább. Egy futó közös karrier egyensúlya nem borulhat fel attól, hogy a
    könyvelés módja megváltozott; az új hangolások viszont már a névre szóló
    táblára kerülnek. */
+/* A HÁROM SZÁM, AMIN AZ EGÉSZ ÁLL. Itt, a mpBalanceOffset FÖLÖTT állnak, nem a
+   párharc-szekcióban: a kiolvasás-plafonnak a `const` TDZ-je miatt előbb kell
+   megszületnie, mint az első pOvrDisplay-hívásnak. */
+const MP_COMPARE_N=14;   /* ennyi legjobb ratingű keretjátékos adja az összevetést */
+const MP_TUNE_N=11;      /* ennyi legnagyobb potenciálúra megy a hangolás */
+const MP_TUNE_CAP=2;     /* névre szólóan ennyivel mehet FEL vagy LE, összesen */
 function mpBalanceOffset(name){
   let v=(S.mpBalance||0);
   const m=S.mpBalanceP;
-  if(m&&name&&typeof m[name]==="number")v+=m[name];
+  if(m&&name&&typeof m[name]==="number")
+    v+=Math.max(-MP_TUNE_CAP,Math.min(MP_TUNE_CAP,m[name]));
   return v;}
 function pOvrDisplay(p){return p.ovr+sumSkillEffect(p.n,"rating")+((S.ratingAdj&&S.ratingAdj[p.n])||0)+championBoost(p.n)+awardBoost(p.n)+mpBalanceOffset(p.n)+nextMatchOvrOf(p.n);}
 function effOvr(slot){return slot&&slot.player?pOvrDisplay(slot.player)*(slot.fit||1):0;}
@@ -27319,6 +27345,38 @@ function playerStrength(p,pos){
 function teamStrength(){
   const f=slots.filter(s=>s.player);if(!f.length)return 0;
   return f.reduce((a,s)=>a+playerStrength(s.player,s.pos),0)/f.length;}
+/* ================= A PÁRHARC MÉRCÉJE: A KERET, NEM A KEZDŐ 11 (3.7.24) ======
+   A teamStrength() a MAI FELÁLLÁST méri: a kezdő tizenegyet, a posztjukon.
+   Ez a MECCSRE a helyes szám — de a párharc összevetésére nem az volt:
+     · egy meccs előtti átrendezés (pihentetés, sérült pótlása, kísérleti
+       felállás) azonnal MOZDÍTOTTA a párharc mérlegét, pedig a kereted
+       ereje nem változott;
+     · a padon ülő 88-as sztár nem számított bele, a poszton kívül beugró
+       tartalék viszont a fit-szorzóval LEHÚZTA a számot;
+     · és mivel a hangolás is ezen mért, a két hatás egymást erősítette.
+   A KERET a párharc igazi tétje, ezért a mérce mostantól a keret
+   MP_COMPARE_N (14) legjobb ratingű játékosának átlaga — MINDEGY, ki a kezdő.
+   A rating itt a KIJELZETT szám (pOvrDisplay): pontosan az, amit a keretlistán
+   a játékos kártyáján látsz, poszt-illeszkedés nélkül — hiszen a pad és a
+   tartalék embereinek nincs is „posztjuk" a felállásban.
+   MIÉRT 14 ÉS NEM 11: a kezdő tizenegy mellett a három legjobb tartalék az,
+   ami egy szezont ténylegesen kibír (sérülés, eltiltás, rotáció). Egy 11-es
+   mérce a mély keretet ingyen adná, egy 20-as a keret alját is beszámítaná. */
+function mpRatedRoster(){
+  const seen={},out=[];
+  const add=p=>{
+    if(!p||!p.n||seen[p.n])return;
+    seen[p.n]=1;
+    out.push({n:p.n,r:pOvrDisplay(p)});};
+  let roster=[];
+  try{roster=(typeof fullCareerRoster==="function")?fullCareerRoster():[];}catch(e){roster=[];}
+  roster.forEach(add);
+  out.sort((a,b)=>b.r-a.r||a.n.localeCompare(b.n));
+  return out;}
+function mpSquadStrength(){
+  const take=mpRatedRoster().slice(0,MP_COMPARE_N);
+  if(!take.length)return 0;
+  return take.reduce((a,x)=>a+x.r,0)/take.length;}
 /* ================= KARRIER MÓD — ÁTIGAZOLÁSI BÜDZSÉ =================
    A piaci érték elsősorban a TSI-ből (rejtett tehetség/potenciál) és az
    életkorból adódik — fiatal, magas TSI-jű "csodagyerek" a legdrágább,
@@ -36375,7 +36433,7 @@ function mpSeasonReport(){
     /* F6 — a kétoldali verdikthez. A csapaterő a KIJELZETT (teamStrength),
        mert a párharc mérlege és a rating-hangolás is ezen a skálán megy. */
     stats:{
-      strength:teamStrength(),
+      strength:mpSquadStrength(),
       morale:Math.round(S.morale),
       reds:S.reds||0,injuries:S.injuries||0,
       coach:(coach&&coach.n)||"",
@@ -36413,7 +36471,7 @@ async function mpSyncSeasonEnd(){
   if(!node||!node[myField]){
     const rep=mpSeasonReport();
     S.mpMyFinal={season:(S.seasonNumber||1),
-      strength:(rep&&rep.stats&&rep.stats.strength)||teamStrength()};
+      strength:(rep&&rep.stats&&rep.stats.strength)||mpSquadStrength()};
     try{await mpBk().h2hPut(MP.activeRoom,key,myField,rep);}catch(e){}
     try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}}
   if(node&&node[oppField]){
@@ -36467,9 +36525,13 @@ function mpFinalWait(onReady){
    itt dől el, folytatjátok-e. A szabály a tervből:
      · BEFEJEZÉS — aki CSAPATERŐBEN +2 OVR-rel vezet, megnyerte a párharcot;
      · FOLYTATÁS — a rendszer +1 OVR különbségre hangolja a két keretet, és
-       ehhez MINDKÉT játékos beleegyezése kell.
-   A csapaterő mércéje a KIJELZETT teamStrength: azt látja a felhasználó a
-   pályán, és a hangolás is ezen a skálán mozog. */
+       ehhez MINDKÉT játékos beleegyezése kell. A hangolás a 11 legnagyobb
+       potenciálú játékoson megy, névre szólóan legfeljebb ±MP_TUNE_CAP
+       ratinggel: nagy szakadéknál tehát a plafon előbb megállítja.
+   A csapaterő mércéje a KERET 14 legjobb ratingű játékosának átlaga
+   (mpSquadStrength) — nem a mai kezdő tizenegy: a párharc a keretről szól,
+   nem arról, kit ültettél le a záró fordulóban. A rating a KIJELZETT szám,
+   amit a felhasználó a keretlistán lát, és a hangolás is ezen a skálán mozog. */
 /* A GYŐZELEMHEZ KÉT DOLOG KELL, nem egy:
      · legalább MP_DUEL_WIN_GAP csapaterő-fölény, ÉS
      · JOBB BAJNOKI HELYEZÉS.
@@ -36479,7 +36541,11 @@ function mpFinalWait(onReady){
    TELJESÍTETTÉL vele. */
 const MP_DUEL_WIN_GAP=2;     /* ekkora fölény dönti el a párharcot */
 const MP_BALANCE_GAP=1;      /* ekkorára hangolunk folytatáskor */
-function mpMyStrength(){return teamStrength();}
+/* A MÉRCE a KERET 14 legjobb ratingű játékosa — nem a mai kezdő tizenegy.
+   Az indoklás a mpSquadStrength fölött áll. Mindkét kliens ugyanezt számolja
+   a SAJÁT keretére, és ugyanezt a számot publikálja a szobába, tehát a két
+   oldal továbbra is ugyanazon a skálán találkozik. */
+function mpMyStrength(){return mpSquadStrength();}
 function mpMateStrength(){
   const r=mpMateFinal();
   return (r&&r.stats&&typeof r.stats.strength==="number")?r.stats.strength:null;}
@@ -36497,7 +36563,7 @@ function mpMateStrength(){
 function mpMyFinalStrength(){
   const m=S.mpMyFinal;
   return (m&&m.season===(S.seasonNumber||1)&&typeof m.strength==="number")
-    ?m.strength:teamStrength();}
+    ?m.strength:mpSquadStrength();}
 /* A két bajnoki helyezés. A verdikt-szekció írja be, amikor a közös
    végtabella összeáll — azért MENTVE, mert a szezonjelentés (a kupa UTÁN) is
    ebből dolgozik, és egy újratöltés után a képernyő-kontextus már nincs meg. */
@@ -36524,74 +36590,100 @@ function mpDuelStanding(){
    eredmény szimmetrikus, nem kell külön egyeztetni.
    A hangolás KUMULÁLÓDIK: a következő szezonban az így kapott (már eltolt)
    csapaterőkből indul a mérés, tehát nem nullázza a korábbit. */
-/* ---- KIT ÉRINT A HANGOLÁS ----
-   A szezont vagy a kupasorozatot LEZÁRÓ kezdő tizenegy, plusz posztonként
-   egy-egy csere: a keretben MARADT legjobb TSI-jű kapus, védő, középpályás és
-   támadó. Tizenöt ember — a következő idény gerince.
+/* ---- KIT ÉRINT A HANGOLÁS: A 11 LEGNAGYOBB POTENCIÁLÚ (3.7.24) ----
+   A keret MP_TUNE_N (11) legnagyobb potenciálú játékosa — mindegy, ki a kezdő,
+   és mindegy, ki játszotta a záró fordulót.
 
-   MIÉRT A TSI ÉS NEM A RATING. A Rating a pillanatnyi forma és a boostok
-   összege (kártya, díj, épp futó eltolás), a TSI viszont a játékos tartós
-   PIACI ÉRTÉKE — az mondja meg, ki a keret következő embere azon a poszton.
-   Ráadásul a Rating már tartalmazza a korábbi hangolásokat, tehát önmagára
-   hivatkozna: aki egyszer bekerült a körbe, azt a saját eltolása tartaná bent.
+   MIÉRT A POTENCIÁL. A playerPotential EGY számba fogja, mennyit ér a játékos
+   MÉG EZUTÁN: a még elérhető Rating-emelkedést (a fő tag), a nyers tehetséget
+   (TSI) és a fiatalságot. Vagyis pontosan azt a tizenegyet adja, aki a
+   karriert TOVÁBB fogja vinni — és ez a helyes cél, mert a hangolás nem a
+   lezárult idényről szól, hanem a KÖVETKEZŐRŐL.
 
-   A KEZDŐ 11 A SLOTOKBÓL jön, mert a hangolás pontosan azzal a tizeneggyel
-   számol, amelyikre a csapaterő-mérés (teamStrength) is fut — így a mérő-hurok
-   garantáltan konvergál. */
-const MP_TUNE_CATS=["KAPUS","VEDO","KOZEPPALYAS","CSATAR"];
+   MIÉRT NEM A RATING. A Rating már tartalmazza a korábbi hangolásokat, tehát
+   önmagára hivatkozna: aki egyszer bekerült a körbe, azt a saját eltolása
+   tartaná bent. A potenciál a `careerPool` bejegyzéséből számol (peak, TSI,
+   kor), amit a hangolás NEM ír — a rangsor tehát stabil.
+
+   MIÉRT NEM A SLOTOKBÓL. A régi kör a kezdő tizenegyből épült, mert a mérce is
+   az volt (teamStrength) — így a mérő-hurok garantáltan konvergált. A mérce
+   most a keret 14 legjobbja (mpSquadStrength), a kör pedig a 11 legnagyobb
+   potenciálú: a kettő ÁTFED, de nem azonos, ezért a hurok lassabban, viszont
+   ugyanúgy monoton közelít (a kör minden lépésben ugyanannyit kap, a mérce
+   ennek csak egy hányadát látja — túllőni tehát nem tud). */
 function mpTuneSquad(){
-  const out=[],seen={};
-  (typeof slots!=="undefined"?slots:[]).forEach(s=>{
-    const n=s&&s.player&&s.player.n;
-    if(n&&!seen[n]){seen[n]=1;out.push(n);}});
-  MP_TUNE_CATS.forEach(cat=>{
-    let best=null,bv=-1;
-    msRoster().forEach(p=>{
-      if(!p||!p.n||seen[p.n])return;
-      let c=null;
-      try{c=getCategoryFor((p.pos&&p.pos[0])||"KKP");}catch(e){}
-      if(c!==cat)return;
-      const e=msEntry(p.n);
-      const tsi=(e&&e.tsi)||0;
-      if(tsi>bv){bv=tsi;best=p.n;}});
-    if(best){seen[best]=1;out.push(best);}});
-  return out;}
-/* Az eltolás rávezetése a körre. Additív: a hangolások KUMULÁLÓDNAK, ahogy
-   eddig is — a következő mérés a már eltolt értékekből indul. */
+  const seen={},cand=[];
+  let roster=[];
+  try{roster=msRoster();}catch(e){roster=[];}
+  roster.forEach(p=>{
+    if(!p||!p.n||seen[p.n])return;
+    seen[p.n]=1;
+    let v=0;
+    try{v=playerPotential(msEntry(p.n))||0;}catch(e){v=0;}
+    cand.push({n:p.n,v});});
+  cand.sort((a,b)=>b.v-a.v||a.n.localeCompare(b.n));
+  return cand.slice(0,MP_TUNE_N).map(x=>x.n);}
+/* Az eltolás rávezetése a körre. Additív — a hangolások KUMULÁLÓDNAK, ahogy
+   eddig is —, de NÉVRE SZÓLÓAN ±MP_TUNE_CAP-nál megáll: egy embertől
+   legfeljebb két ratinget vesz el a rendszer, és legfeljebb kettőt ad neki.
+   A visszatérési érték az, HÁNY névnél mozdult tényleg valami: ebből tudja a
+   hívó hurok, mikor ért mindenki a plafonra (onnantól nincs értelme
+   tovább iterálni). */
 function mpTuneAdd(names,delta){
-  if(!delta)return;
+  if(!delta)return 0;
   const m=S.mpBalanceP=S.mpBalanceP||{};
-  (names||[]).forEach(n=>{if(n)m[n]=(m[n]||0)+delta;});}
+  let n=0;
+  (names||[]).forEach(name=>{
+    if(!name)return;
+    const cur=m[name]||0;
+    const next=Math.max(-MP_TUNE_CAP,Math.min(MP_TUNE_CAP,cur+delta));
+    if(Math.abs(next-cur)>1e-9){m[name]=next;n++;}});
+  return n;}
 function mpApplyBalance(){
   const st=mpDuelStanding();
   if(!st)return null;
   const gap=Math.abs(st.gap);
-  if(gap<=MP_BALANCE_GAP)return {moved:0,gap};
+  /* A VISSZATÉRŐ ALAK EGYFORMA a két ágon — a hívónak ne kelljen tudnia,
+     melyiken jött (a régi rövid alak `newGap`-je undefined volt). */
+  if(gap<=MP_BALANCE_GAP)
+    return {moved:0,gap,newGap:gap,mateTarget:null,names:[],n:0,capped:false,cap:MP_TUNE_CAP};
   /* A CÉLÉRTÉK: a két csapaterő közepétől fél lépésre, a magam oldalán. Mindkét
      kliens ugyanezt a két számot ismeri, tehát a két célérték pontosan
      MP_BALANCE_GAP-re esik egymástól — külön egyeztetés nélkül. */
   const mid=(st.mine+st.mate)/2;
   const target=mid+(st.iLead?MP_BALANCE_GAP/2:-MP_BALANCE_GAP/2);
-  /* A KÖR itt dől el, a hangolás pillanatában: az AKKORI kezdő tizenegy és az
-     AKKOR keretben lévő legjobb TSI-jű cserék. Két hangolás (bajnokság és kupa
-     után) tehát két, akár eltérő névsorra írhat. */
+  /* A KÖR itt dől el, a hangolás pillanatában: az AKKORI keret 11 legnagyobb
+     potenciálú embere. Két hangolás (bajnokság és kupa után) tehát két, akár
+     eltérő névsorra írhat. */
   const names=mpTuneSquad();
-  let moved=0;
-  /* NEM számolunk, hanem MÉRÜNK: a keretben nem minden játékos reagál 1:1-ben
-     az eltolásra (a posztból kilógónál a fit-szorzó tompít), ezért addig
-     igazítunk, amíg a kijelzett csapaterő rá nem áll a célra. 1:1-es esetben
-     ez egyetlen lépés. A mérő-hurok azért konvergál, mert a kezdő tizenegy
-     MINDEN tagja benne van a körben. */
-  for(let i=0;i<12;i++){
+  /* NEM számolunk, hanem MÉRÜNK: a kör (11 legnagyobb potenciálú) és a mérce
+     (14 legjobb ratingű) átfed, de nem azonos — egy körtag, aki nincs a
+     legjobb 14-ben, ratinget kap, a mérleget viszont nem mozdítja. Ezért
+     addig igazítunk, amíg a mért csapaterő rá nem áll a célra. Túllőni nem
+     tud: a mérce a kör lépésének mindig csak egy HÁNYADÁT látja.
+     KÉT kilépő feltétel van, és a második az új: ha már MINDENKI a
+     ±MP_TUNE_CAP plafonon áll, nincs hova tovább mozdulni — ilyenkor a
+     rendszer ott áll meg, ahová a plafon engedte, és ezt a hívó ki is írja. */
+  const before=mpMyStrength();
+  let capped=false;
+  for(let i=0;i<40;i++){
     const diff=target-mpMyStrength();
     if(Math.abs(diff)<0.005)break;
-    mpTuneAdd(names,diff);moved+=diff;}
+    if(!mpTuneAdd(names,diff)){capped=true;break;}}
+  const after=mpMyStrength();
+  const moved=after-before;
   /* A társ oldala ugyanezzel a képlettel, ugyanebből a két számból mozdul —
      tehát a hangolás UTÁNI erejét pontosan tudjuk. Vissza is írjuk a tárolt
      jelentésébe, különben a mérleg a saját eltolásunk után a MÁR NEM ÉRVÉNYES
-     régi számhoz hasonlítana, és hamis fölényt mutatna. */
+     régi számhoz hasonlítana, és hamis fölényt mutatna.
+     (A plafon miatt a társ is elakadhat a saját célja előtt — azt innen nem
+     látjuk. Nem is baj: a következő szezonzáráskor mindkét kliens a VALÓDI,
+     mért erejét publikálja újra, tehát a becslés legfeljebb egy idényig él.) */
   const mateTarget=mid+(st.iLead?-MP_BALANCE_GAP/2:MP_BALANCE_GAP/2);
-  return {moved,gap,newGap:MP_BALANCE_GAP,mateTarget,names,n:names.length};}
+  /* A KIÍRT „utána" NEM feltételezés, hanem a TÉNYLEGESEN elért különbség:
+     plafonba ütközve a régi, fix MP_BALANCE_GAP hazudott volna. */
+  const newGap=Math.abs(after-mateTarget);
+  return {moved,gap,newGap,mateTarget,names,n:names.length,capped,cap:MP_TUNE_CAP};}
 /* ================= A DÖNTÉS CSATORNÁJA — KÉT KAPU (3.4.01) =================
    Eddig szezononként EGY kapu volt, a bajnokság végén (a verdikt-képernyőn). A
    kupasorozat viszont UTÁNA következik, és érdemben átrendezheti a képet: egy
@@ -37021,7 +37113,7 @@ function mpRecordHistory(rep){
   S.mpHistory=S.mpHistory||[];
   if(S.mpHistory.some(h=>h.season===season))return;
   S.mpHistory.push({season,
-    me:{team:teamName,pts:S.pts,w:S.W,d:S.D,l:S.L,gf:S.GF,ga:S.GA,strength:teamStrength()},
+    me:{team:teamName,pts:S.pts,w:S.W,d:S.D,l:S.L,gf:S.GF,ga:S.GA,strength:mpSquadStrength()},
     mate:{team:String((rep&&rep.teamName)||"A társad"),pts:(rep&&rep.pts)||0,
       w:(rep&&rep.w)||0,d:(rep&&rep.d)||0,l:(rep&&rep.l)||0,
       gf:(rep&&rep.gf)||0,ga:(rep&&rep.ga)||0,
@@ -37117,17 +37209,24 @@ function mpMaybeApplyBalance(kind){
     gapBefore:before?Math.abs(before.gap):0,
     gapAfter:(r&&r.newGap!=null)?r.newGap:(before?Math.abs(before.gap):0),
     /* hányan kapták — a doboz ezt írja ki, hogy a kör ne legyen rejtett */
-    n:(r&&r.n)||0};
+    n:(r&&r.n)||0,
+    /* IGAZ, ha a ±2-es névre szóló plafon állította meg a hangolást a cél
+       előtt — ilyenkor a maradék különbség a pályán dől el. */
+    capped:!!(r&&r.capped)};
   /* a társ hangolt ereje — innentől ehhez mérünk (lásd mpApplyBalance) */
   if(r&&r.mateTarget!=null&&S.mpMateFinal&&S.mpMateFinal.rep){
     S.mpMateFinal.rep.stats=S.mpMateFinal.rep.stats||{};
     S.mpMateFinal.rep.stats.strength=r.mateTarget;}
   if(d.balanceInfo.moved)
     addLine(`⚖ Kiegyenlítés a folytatáshoz (${k==="cup"?"a kupasorozat":"a bajnokság"} után): `
-      +`a sorozatot lezáró kezdő tizenegy és `
-      +`posztonként a legjobb TSI-jű cserétek — összesen <b>${d.balanceInfo.n} játékos</b> — `
-      +`${d.balanceInfo.moved>=0?"+":""}${d.balanceInfo.moved.toFixed(2)} ratinget kap, hogy a két csapat `
-      +`közti különbség ${MP_BALANCE_GAP} OVR-re szűküljön.`,"m life");
+      +`a keretetek <b>${d.balanceInfo.n} legnagyobb potenciálú játékosa</b> `
+      +`${d.balanceInfo.moved>=0?"+":"−"}${Math.abs(d.balanceInfo.moved).toFixed(2)} ratinget kap `
+      +`(játékosonként legfeljebb ±${MP_TUNE_CAP}), hogy a két keret `
+      +`közti különbség ${MP_BALANCE_GAP} OVR-re szűküljön.`
+      +(d.balanceInfo.capped
+        ?` <b>A ±${MP_TUNE_CAP}-es plafon megfogta:</b> a különbség `
+          +`${d.balanceInfo.gapAfter.toFixed(2)} OVR maradt — a többit a pályán kell behozni.`
+        :""),"m life");
   try{saveGame();}catch(e){}}
 /* A döntés doboza — a saját és a társ választása szerint négy állapota van.
    A KAPU (bajnokság vagy kupa) csak a szövegeket változtatja: a mechanika és a
@@ -37147,9 +37246,11 @@ function mpDecisionBox(){
     const bi=(d&&d.balanceInfo)||{moved:0,gapBefore:0,gapAfter:0,n:0};
     return `<div class="vsVerdict" style="background:rgba(110,190,120,.10);border-color:rgba(110,190,120,.4)">
       🤝 <b>Mindketten folytatjátok.</b> ${bi.moved
-        ?`A különbség ${bi.gapBefore.toFixed(1)} OVR volt — ezt ${bi.gapAfter} OVR-re hangoltuk: a
-          ${cupG?"kupasorozatot":"szezont"} lezáró kezdő tizenegy és posztonként a legjobb TSI-jű
-          cseréd, <b>${bi.n||15} játékos</b> <b>${bi.moved>=0?"+":""}${bi.moved.toFixed(2)}</b> ratinget kapott.`
+        ?`A különbség ${bi.gapBefore.toFixed(1)} OVR volt — ezt <b>${Number(bi.gapAfter).toFixed(1)}</b> OVR-re
+          hangoltuk: a kereted <b>${bi.n||MP_TUNE_N} legnagyobb potenciálú játékosa</b>
+          <b>${bi.moved>=0?"+":"−"}${Math.abs(bi.moved).toFixed(2)}</b> ratinget kapott
+          <span style="color:var(--dim2)">(játékosonként legfeljebb ±${MP_TUNE_CAP})</span>.${bi.capped
+            ?` <b>A plafon megfogta</b> — a maradék különbséget a pályán kell behozni.`:""}`
         :`A két keret között csak ${bi.gapBefore.toFixed(1)} OVR a különbség — nem kellett hangolni.`}
       Indulhat a következő szezon.</div>`;}
   if(mine==="stop"||mate==="stop")return mpFinalSummaryBox();

@@ -89,6 +89,10 @@ szám volt (`S.mpBalance`); ettől viszont az ifiakadémiáról felhozott
 tizenhetedik ember és a tartalék kapus is ugyanazt a büntetést vagy ajándékot
 vitte, pedig a párharc a **kezdő csapatokról** szól.
 
+> **A 3.7.24 ezt a szakaszt felülírta** — a mérce a keret 14 legjobb ratingű
+> játékosa, a kör a 11 legnagyobb potenciálú, névre szólóan ±2-es plafonnal.
+> Lásd **2b**. Az alábbi leírás a 3.4.01–3.7.23 közti állapotot rögzíti.
+
 A kör **tizenöt ember**:
 
 | | kik |
@@ -132,6 +136,114 @@ cserékre íródik — vagyis az új ember a következő hangoláskor magától 
 hat tovább. Egy futó karrier egyensúlya nem borulhat fel attól, hogy a
 könyvelés módja megváltozott; az új hangolások viszont már a névre szóló
 táblára (`S.mpBalanceP`) kerülnek.
+
+---
+
+## 2b. A MÉRCE ÉS A KÖR ÚJRAGONDOLVA (3.7.24)
+
+*(Érintett kód: `mpRatedRoster` + `mpSquadStrength` (új), `mpMyStrength`,
+`mpSeasonReport`, `mpMyFinalStrength`, `mpRecordHistory`, `mpTuneSquad`,
+`mpTuneAdd`, `mpApplyBalance`, `mpBalanceOffset`, `MP_COMPARE_N` /
+`MP_TUNE_N` / `MP_TUNE_CAP`.)*
+
+Két külön kérdés van, és a 3.4.01-es rendszer mindkettőre ugyanazt a választ
+adta — a **kezdő tizenegyet**:
+
+1. **MIHEZ mérünk?** (ki áll jobban, mennyit kell hangolni)
+2. **KIRE írjuk rá?** (kinek a Ratingje mozdul)
+
+### A mérce: a keret 14 legjobb ratingű játékosa
+
+A régi mérce a `teamStrength()` volt: a **mai felállás**, a posztjukon. Ez a
+MECCSRE a helyes szám, az összevetésre viszont nem:
+
+* egy meccs előtti átrendezés (pihentetés, sérült pótlása, kísérleti felállás)
+  azonnal **mozdította a párharc mérlegét**, pedig a kereted ereje nem
+  változott;
+* a padon ülő 92-es sztár **nem számított bele**, a poszton kívül beugró
+  tartalék viszont a fit-szorzóval **lehúzta** a számot;
+* és mivel a hangolás is ezen mért, a két hatás egymást erősítette.
+
+Mérve, egy valós kereten (Real Madrid 2011/12, 22 fő): a kezdőből kiül
+Cristiano Ronaldo, beáll a harmadik kapus —
+
+| | mérce |
+|---|--:|
+| régi (`teamStrength`, kezdő 11) | 86,18 → **82,27** |
+| új (`mpSquadStrength`, top 14) | 85,93 → **85,93** |
+
+A párharc a **keretről** szól, ezért a mérce mostantól a keret
+`MP_COMPARE_N` = **14** legjobb ratingű játékosának átlaga — mindegy, ki a
+kezdő. A rating itt a **kijelzett** szám (`pOvrDisplay`), pontosan az, amit a
+keretlistán a kártyán látsz: poszt-illeszkedés nélkül, hiszen a pad és a
+tartalék embereinek nincs is „posztjuk" a felállásban.
+
+**Miért 14 és nem 11.** A kezdő tizenegy mellett a három legjobb tartalék az,
+ami egy szezont ténylegesen kibír (sérülés, eltiltás, rotáció). Egy 11-es
+mérce a mély keretet ingyen adná, egy 20-as a keret alját is beszámítaná.
+
+Ugyanez a szám megy a szobába (`mpSeasonReport().stats.strength`), a közös
+előzménybe (`mpRecordHistory`) és a nyári igazolási referenciába
+(`mpFreezeSummerRef`) — a két oldal tehát végig egy skálán találkozik.
+
+### A kör: a 11 legnagyobb potenciálú játékos
+
+A régi kör a záró kezdő tizenegy volt + posztonként a legjobb TSI-jű csere.
+Ez **menet közben mozgó névsort** adott (egy csere a 30. fordulóban átírta,
+kit érint a hangolás), és a keret **öregedő végére** is rátolta az eltolást,
+ahol a következő idényre már nem marad belőle semmi.
+
+A kör mostantól a keret `MP_TUNE_N` = **11 legnagyobb potenciálú** játékosa.
+A `playerPotential` egy számba fogja, mennyit ér a játékos MÉG EZUTÁN: a még
+elérhető Rating-emelkedést (a fő tag), a nyers tehetséget (TSI) és a
+fiatalságot. Vagyis pontosan azt a tizenegyet adja, aki a karriert **tovább
+fogja vinni** — és ez a helyes cél, mert a hangolás nem a lezárult idényről
+szól, hanem a következőről.
+
+**Miért nem a Rating.** Változatlan az indok: a Rating már tartalmazza a
+korábbi hangolásokat, tehát önmagára hivatkozna. A potenciál a `careerPool`
+bejegyzéséből számol (peak, TSI, kor), amit a hangolás **nem ír** — a rangsor
+tehát stabil.
+
+**A kör és a mérce ÁTFED, de nem azonos**, és ez szándékos: a boost oda megy,
+ahol a jövő van, a mérleg viszont a mai erőt méri. Egy körtag, aki nincs benne
+a legjobb 14-ben (tipikusan egy akadémista tehetség), ratinget kap, de a mai
+mérleget nem mozdítja — a hangolás így a **következő** idényben fizet.
+
+### A plafon: ±2 rating, névre szólóan
+
+Plafon nélkül a hangolás korlátlanul kumulálódott: aki három idényen át a
+gyengébb oldalon állt, annál a kör ±6-8 ratinget is összeszedhetett, és a
+Rating többé nem a játékosról szólt, hanem a könyvelésről.
+
+`MP_TUNE_CAP` = **2**: egy embertől legfeljebb két ratinget vesz el a
+rendszer, és legfeljebb kettőt ad neki — **összesen, kumulálva**, nem
+kapunként. A plafon a **kiolvasásnál** is érvényes (`mpBalanceOffset`), nem
+csak az íráskor: egy régi mentés túlnőtt tétele sem hat tovább kettőnél. A
+tárolt szám érintetlen marad.
+
+Ezért a hangolás célja (`MP_BALANCE_GAP` = 1 OVR) mostantól **cél, nem
+garancia**. A hurok akkor is megáll, ha mindenki a plafonra ért — a felület
+ilyenkor kiírja, mennyi maradt, és hogy a többit a pályán kell behozni. A
+`mpApplyBalance` ezért `newGap`-ként a **ténylegesen elért** különbséget adja
+vissza, nem a fix 1-et.
+
+### Mérve
+
+Ugyanaz a 22 fős keret, `mpSquadStrength()` = 85,93:
+
+| eset | a társ | utána | elmozdulás | maradék rés | plafon | eltolás/fő |
+|---|--:|--:|--:|--:|:-:|--:|
+| a társ +3 | 88,93 | 86,93 | +1,00 | **1,00** | nem | +1,75 |
+| én +3 | 82,93 | 84,93 | −1,00 | **1,00** | nem | −1,75 |
+| a társ +20 | 105,93 | 87,21 | +1,29 | **9,22** | **IGEN** | **+2,00** |
+| 0,4 OVR | 86,33 | 85,93 | 0 | 0,40 | — | — |
+| régi mentés: tárolt +7,5 | | | | | | **érvényes +2,00** |
+
+Az eltolás/fő azért nagyobb, mint az elmozdulás (1,75 vs 1,00): a 11 fős kör
+közül csak nyolc van benne a legjobb 14-ben, tehát a mérce a kör lépésének
+csak egy hányadát látja. A hurok ezért **mér, nem számol** — és túllőni nem
+tud, mert a mérce mindig kevesebbet mozdul, mint a kör.
 
 ---
 
