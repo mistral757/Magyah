@@ -1294,6 +1294,9 @@ button.infPanel:disabled{cursor:default}
 .msBar{height:4px;border-radius:3px;margin-top:3px;overflow:hidden;
   background:color-mix(in srgb,var(--ink) 14%,transparent)}
 .msBar i{display:block;height:100%;background:var(--gold);border-radius:3px}
+.msDrv{margin-top:10px;padding:6px 8px;border-radius:7px;font-size:11px;line-height:1.5;
+  color:var(--dim);background:color-mix(in srgb,var(--gold) 8%,transparent)}
+.msDrv b{color:var(--ink)}
 .msSec{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--gold);
   margin:14px 0 4px;padding-top:9px;border-top:1px solid var(--line)}
 /* Egy játékos sora: név + poszt/perc, mellette a csillagsor és a szám, alul a
@@ -4509,7 +4512,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.26";
+const APP_VERSION="3.7.27";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -38022,6 +38025,15 @@ function mileFullTime(M,active,cleanSheet,saves,result,lastRound,ctx){
      6. EREDMÉNYESSÉG — gól, gólpassz, tiszta lap, védés, labdaszerzés, piros
         lap, és a meccs embere. A poszt számít: egy védő gólja többet ér, egy
         kapusé a mérkőzés eseménye.
+     7. KÉPESSÉGEK — csak a SZITUATÍV csatornák (gól-, gólpassz-, védő-súly).
+        A `rating` típusúak már az 1. tételben benne vannak a pOvrDisplay-en
+        keresztül; itt újra beszámítani dupla könyvelés volna.
+     8. SZEZON-SZEREP — a stílus megbízatása (Fal, Tálaló, Lát a pályán…)
+        felelősség, amit a pályán vitt.
+     9. POSZT- ÉS MEGBÍZÁS-ILLESZKEDÉS — az elsődleges posztján játszó ember
+        természetesen mozog, a posztidegen végig kapkod (attrPosFit); a
+        `brief` külön azt méri, hogy a MEGBÍZÁS (a felállás alapkódjának
+        felülírása) épp neki kedvez-e.
    A csapat eredménye is színez (győzelem +, vereség −): tizenegyen nyernek és
    tizenegyen veszítenek. */
 const MSTAT_STARS=7;
@@ -38062,6 +38074,141 @@ function mstatAxisZ(){
     ATTR_KEYS.forEach(k=>{out[k]=axisZSoft((A[k]-axisExpected(k,T))/(AXIS_SCALE[k]||1));});
   }catch(e){}
   return out;}
+/* ================= A NÉGY BEFOLYÁS: MI ALAKÍTJA A STATOKAT? (3.7.27) =======
+   Az első lépcső a statokat a mérkőzés SZÁMAIBÓL vezette le (λ, erőkülönbség,
+   tengelyek). Ez helyes volt, de hiányos: a játékban négy olyan rendszer él,
+   ami a pályán MINDENT eldönt, a statisztikán mégsem látszott.
+
+     1. CSAPATSTÍLUS — a klub filozófiája (Beton, Bombázók, Tiki-Taka…).
+     2. KÉPESSÉGEK — a kezdő tizenegy skilljei (Sebészi passz, Betonfal…).
+     3. SZEZON-SZEREPEK — a stílus három megbízatása (Fal, Tálaló, Lát a
+        pályán…), ha az adott ember pályán volt.
+     4. POSZT- ÉS MEGBÍZÁS-ILLESZKEDÉS — kinek mennyire való az a hely, ahol
+        áll, és összesítve mennyire poszthű a tizenegy.
+
+   MIÉRT EGY HELYEN. Mind a négy hatás EGYSZERRE kell a csapat-statokhoz (egy
+   passzos keret többet birtokol) és az EGYÉNI értékeléshez (a Sebészi passz
+   birtokosa más meccset játszik). Ha két helyen számolnánk, a kettő
+   előbb-utóbb szétcsúszna — ezért EGY függvény adja mindkettőt, és a
+   visszatérő objektum viszi a csapat-szintű összegeket ÉS a személyenkénti
+   bontást.
+
+   A CSATORNÁK. Nem skill-azonosítókra hivatkozunk, hanem a motor saját
+   HATÁSTÍPUSAIRA (`assistw`, `goalw`, `defense`) — így minden új képesség
+   magától bekerül, és a statisztika sosem csúszhat el a valódi mechanikától.
+     · passz-csatorna  = assistw (aki tálal, az passzol)
+     · támadó-csatorna = goalw   (aki betalál, az lő is)
+     · védő-csatorna   = defense (szorzó! 1 alatti = jó, ezért 1−mult a jel)
+
+   A NORMALIZÁLÁS. A nyers összegek nagyságrendje csatornánként más (egy
+   assistw 1,8-tól 6-ig terjed, egy defense 0,82-től 0,95-ig), ezért mindent
+   egy „csapatnyi átlagos ember = 0" skálára hozunk: az összeget elosztjuk a
+   pályán töltött idővel súlyozott létszámmal, és levonjuk a semleges alapot. */
+/* Egy szerep-kulcs melyik csatornát erősíti. A szám a csatorna-egységben
+   értendő (ugyanaz a skála, amin a skillek is pontoznak), és a szerep
+   KÉPESSÉG-SZINTJÉVEL nő — pontosan úgy, ahogy a mechanikai hatásuk is. */
+const MSTAT_ROLE_CH={
+  /* Bombázók */ nyito:{atk:1.0}, befejezo:{atk:1.0}, talalo:{pass:1.2},
+  /* Beton    */ fal:{def:1.2}, arok:{def:1.0}, kereszttuz:{def:0.6,atk:0.4},
+  /* Villám   */ b2b:{pass:0.8,def:0.6}, legolas:{atk:0.8}, robben:{atk:1.2},
+  /* Tiki-Taka*/ stabil:{pass:1.2}, latnok:{pass:1.6}, aura:{pass:0.4,def:0.4},
+  /* Harmónia */ peace:{def:0.5}, egyensuly:{pass:0.5,def:0.5}, agy:{pass:1.4}
+};
+/* A FILOZÓFIÁK a három csatornán. Ugyanaz a hét kulcs, mint a MSTAT_STYLE_W-ben
+   — ott az EGYÉNI attribútum-illeszkedést súlyozza, itt a CSAPAT képét tolja.
+   A `poss` külön szerepel, mert a labdabirtoklás nem vezethető le a másik
+   háromból: a Beton szándékosan ÁTENGEDI a labdát, a Tiki-Taka megtartja. */
+const MSTAT_STYLE_CH={
+  beton:    {poss:-6, pass:-0.3, atk:-0.4, def:+1.2},
+  bombazok: {poss:-2, pass:0,    atk:+1.2, def:-0.3},
+  harmonia: {poss:+1, pass:+0.3, atk:+0.2, def:+0.3},
+  sztar:    {poss:0,  pass:+0.2, atk:+0.6, def:0},
+  villam:   {poss:-4, pass:+0.2, atk:+0.8, def:-0.2},
+  panzer:   {poss:-3, pass:-0.2, atk:0,    def:+1.0},
+  tikitaka: {poss:+8, pass:+1.4, atk:-0.2, def:-0.2}
+};
+/* AZ ÖSSZESÍTETT POSZT-ILLESZKEDÉS HORGONYA. Az attrPosFit skálája:
+   1,0 = elsődleges posztja · 0,6 = további sajátja · 0,35 = rokonposzt ·
+   0 = posztidegen. Egy gondosan összerakott tizenegy 0,85 körül jár (mérve),
+   ezért ez a semleges pont: efölött jutalom, alatta büntetés. */
+const MSTAT_FIT_ANCHOR=0.85;
+/* A VÉGES SZÁM AZ EGYETLEN ELFOGADOTT VÁLASZ. Egy sérült skill-példány (régi
+   mentés, félbemaradt fázis-könyvelés) NaN-t ad vissza a motor
+   effektus-számolóiból; egy NaN pedig innen továbbterjedne a labdabirtoklásba,
+   a passzpontosságba és minden értékelésbe. Ezért minden csatorna egy explicit
+   szűrőn megy át — a statisztika sosem mondhat „NaN%"-ot. */
+function mstatFin(v,dflt){v=Number(v);return isFinite(v)?v:(dflt||0);}
+function mstatSkillCh(name){
+  let pass=0,atk=0,def=0;
+  try{
+    pass=mstatFin(sumSkillEffect(name,"assistw"));
+    atk =mstatFin(sumSkillEffect(name,"goalw"));
+    /* A `defense` SZORZÓ (0,82…0,95): minél kisebb, annál jobb. A jel a
+       semleges 1-től mért távolság, tízszeres nagyításban — így ugyanabban a
+       nagyságrendben mozog, mint a másik két csatorna nyers összege. */
+    const dm=mstatFin(multSkillEffect(name,"defense"),1);
+    def=(dm>0)?Math.max(0,(1-dm)*10):0;
+  }catch(e){}
+  return {pass,atk,def};}
+/* Egy szerep csatorna-hozzájárulása, a képesség szintjével (0-3) nőve. */
+function mstatRoleCh(name){
+  const out={pass:0,atk:0,def:0,key:null};
+  try{
+    const k=roleKeyOfPlayer(name);
+    if(!k||!MSTAT_ROLE_CH[k])return out;
+    out.key=k;
+    const lv=1+0.25*(roleLevel()||0);
+    Object.keys(MSTAT_ROLE_CH[k]).forEach(c=>{out[c]=(MSTAT_ROLE_CH[k][c]||0)*lv;});
+  }catch(e){}
+  return out;}
+/* Egy játékos poszt-illeszkedése ott, ahol ÁLL — és külön az, hogy a
+   MEGBÍZÁS (a felállás alapértelmezett kódjának felülírása) neki jó-e.
+   A kettő szándékosan külön: az első a menedzser összeállítását méri, a
+   második azt az EGY döntést, hogy erre a helyre más brief került. */
+function mstatFitOf(pl,pos,defPos){
+  const ent=(gameMode==="career"&&careerPool)?careerPool[pl.n]:null;
+  let fit=1,base=1;
+  try{
+    if(ent){
+      fit=attrPosFit(ent,pos);
+      base=(defPos&&defPos!==pos)?attrPosFit(ent,defPos):fit;
+    }else{
+      /* klasszikus mód: nincs pool-bejegyzés, a durva poszt-egyezés dönt */
+      fit=(pl.pos&&pl.pos.indexOf(pos)>=0)?1:0.35;base=fit;}
+  }catch(e){}
+  return {fit,brief:(defPos&&defPos!==pos)?(fit-base):0};}
+/* ---- A NÉGY BEFOLYÁS EGYBEN ----
+   `rows` a mérkőzést lejátszó emberek (a lecseréltekkel együtt), mindegyik a
+   pályán töltött arányával (`share`). A csapat-szintű összegek MIND
+   idővel súlyozottak: aki tíz percet játszott, tizedannyit nyom a latba. */
+function mstatMods(rows){
+  const stK=(typeof styleKey==="function")?styleKey():null;
+  const sc=MSTAT_STYLE_CH[stK]||{poss:0,pass:0,atk:0,def:0};
+  let wsum=0,pass=0,atk=0,def=0,fitW=0,gkDef=0;
+  const per={};
+  (rows||[]).forEach(x=>{
+    const w=mstatClamp(x.share==null?1:x.share,0,1);
+    const sk=mstatSkillCh(x.pl.n),rl=mstatRoleCh(x.pl.n);
+    const ft=mstatFitOf(x.pl,x.pos,x.defPos);
+    per[x.pl.n]={sk,rl,ft};
+    if(w<=0)return;
+    wsum+=w;
+    pass+=(sk.pass+rl.pass)*w;
+    atk +=(sk.atk +rl.atk )*w;
+    def +=(sk.def +rl.def )*w;
+    fitW+=ft.fit*w;
+    if(x.pos==="KP")gkDef=sk.def;});
+  const n=wsum||1;
+  /* A SEMLEGES ALAP levonva: egy képesség és szerep nélküli, poszthű tizenegy
+     mindhárom csatornán 0-t ad, tehát a mai balance BETŰRE változatlan marad —
+     a hatás csak ott jelenik meg, ahol tényleg van mire hivatkozni. */
+  return {
+    style:stK,styleCh:sc,
+    pass:pass/n,atk:atk/n,def:def/n,
+    gkDef,
+    fit:wsum?fitW/n:MSTAT_FIT_ANCHOR,
+    fitDelta:(wsum?fitW/n:MSTAT_FIT_ANCHOR)-MSTAT_FIT_ANCHOR,
+    per};}
 /* ---- EGY EMBER ILLESZKEDÉSE EGY SÚLYPROFILHOZ ----
    A csapat-szintű tacticFitParts mintájára, de a JÁTÉKOS saját tengelyeire és
    a saját átlagához mérve: nem az számít, hogy jó-e általában, hanem hogy a
@@ -38105,6 +38252,24 @@ function mstatRate(row,ctx){
     parts.style=(ctx.styleStar&&ctx.styleStar===p.n)?0.4:0;
   else
     parts.style=mstatClamp(mstatProfileFit(attrs,MSTAT_STYLE_W[ctx.styleKey]||null)*0.030,-0.4,0.4);
+  /* 7. KÉPESSÉGEK — CSAK A SZITUATÍV CSATORNÁK. A `rating` típusú skillek
+        (Szitálós, Aranycipő) MÁR benne vannak a pOvrDisplay-ben, tehát az
+        1. tétel számolja őket: itt megint beszámítani dupla könyvelés volna.
+        Ami itt pontoz, az a gól-, gólpassz- és védő-csatorna: az a fajta
+        képesség, ami a MÉRKŐZÉST alakítja, nem a Ratinget. Csak fölfelé —
+        egy képesség sosem rontja el a napodat. */
+  const _pm=(ctx.mod&&ctx.mod.per&&ctx.mod.per[p.n])||null;
+  parts.skills=_pm?mstatClamp((_pm.sk.pass+_pm.sk.atk+_pm.sk.def)*0.055,0,0.5):0;
+  /* 8. SZEZON-SZEREP — a stílus megbízatása felelősség, amit a pályán vitt.
+        A képesség szintjével nő, ahogy maga a szerep hatása is. */
+  parts.role=(_pm&&_pm.rl.key)?mstatClamp(0.15+0.05*((typeof roleLevel==="function")?roleLevel():0),0,0.3):0;
+  /* 9. POSZT- ÉS MEGBÍZÁS-ILLESZKEDÉS. Az elsődleges posztján játszó ember
+        természetesen mozog; a rokonposztra kényszerített küzd a hellyel, a
+        posztidegen pedig végig kapkod. A `brief` külön tétel: ha a MEGBÍZÁS
+        (a felállás alapkódjának felülírása) épp NEKI kedvez, az a menedzser
+        jó döntése — és a játékos meccsén is látszik. */
+  parts.posfit=_pm?mstatClamp(-0.5+_pm.ft.fit*0.65,-0.5,0.15):0;
+  parts.brief =_pm?mstatClamp(_pm.ft.brief*0.35,-0.15,0.15):0;
   /* 6. EREDMÉNYESSÉG — a poszt szerint súlyozva. Egy védő gólja ritkább
         esemény, egy kapusé maga a mérkőzés; a tiszta lap a hátsó soré. */
   let eR=0;
@@ -38138,10 +38303,19 @@ function mstatCompute(c){
   const r=rngFor("mstat:s"+(S.seasonNumber||1)+":i"+(S.idx||0)+":"+(c.gf|0)+"-"+(c.ga|0)+":"+(c.oppName||""));
   const z=mstatAxisZ();
   const stl=c.tacticStyle||null;
+  /* A NÉGY BEFOLYÁS — stílus, képességek, szerepek, poszt-illeszkedés. Egy
+     helyről, mielőtt bármelyik szám megszületne: a csapat-statok és az egyéni
+     értékelések UGYANEBBŐL dolgoznak (lásd mstatMods). */
+  const MOD=mstatMods(c.rows||[]);
   /* --- LABDABIRTOKLÁS --- */
   const grip=mstatClamp(c.tacticGrip==null?1:c.tacticGrip,0.35,1);
+  /* A BIRTOKLÁS NÉGY FORRÁSA a taktikán és az erőkülönbségen felül:
+     a FILOZÓFIA szándéka (a Beton átengedi, a Tiki-Taka megtartja), a keret
+     PASSZ-CSATORNÁJA (skillek + szerepek), és az ÖSSZESÍTETT POSZT-
+     ILLESZKEDÉS — aki nem a helyén áll, gyakrabban veszti el a labdát. */
   const poss=Math.round(mstatClamp(
-    50+(MSTAT_POSS_SHIFT[stl]||0)*grip+z.passz*1.6+mstatClamp(c.diff,-12,12)*0.8+(r()-0.5)*6,24,76));
+    50+(MSTAT_POSS_SHIFT[stl]||0)*grip+z.passz*1.6+mstatClamp(c.diff,-12,12)*0.8
+    +(MOD.styleCh.poss||0)+MOD.pass*1.6+MOD.fitDelta*14+(r()-0.5)*6,20,80));
   /* --- PASSZOK: a birtoklás az elsődleges hajtó, a rendszer szorzó --- */
   /* A NAGYSÁGREND MÉRT: egy 90 perces mérkőzésen egy csapat 350-600 passzt
      ad, a birtoklás arányában. A 430-as alap az 50%-hoz tartozik. */
@@ -38153,8 +38327,11 @@ function mstatCompute(c){
      mennyire passzos a csapat) és az ABSZOLÚT erő (egy jobb csapat kevesebbet
      ad el). Az első változatból a második hiányzott, és a mérőn egy 88-as
      Real Madrid 70%-ot passzolt — az a valóságban a kiesőzóna szintje. */
+  /* A PONTOSSÁGON a poszt-illeszkedés a legerősebb: egy posztidegen ember
+     rossz szögből, rossz ütemben adja tovább — ez a szám mondja ki. */
   const acc=Math.round(mstatClamp(
-    78+z.passz*2.4+mstatClamp(c.diff,-12,12)*0.35+(MSTAT_POSS_SHIFT[stl]||0)*0.12*grip+(r()-0.5)*3,58,95)*10)/10;
+    78+z.passz*2.4+mstatClamp(c.diff,-12,12)*0.35+(MSTAT_POSS_SHIFT[stl]||0)*0.12*grip
+    +MOD.pass*0.9+(MOD.styleCh.pass||0)*1.2+MOD.fitDelta*16+(r()-0.5)*3,56,96)*10)/10;
   const oAcc=Math.round(mstatClamp(
     78-mstatClamp(c.diff,-12,12)*0.35+(r()-0.5)*3,58,95)*10)/10;
   /* --- KAPURA LÖVÉS ÉS VÉDÉS: A KÉT OSZLOP EGYMÁSBÓL KÖVETKEZIK ---
@@ -38162,14 +38339,23 @@ function mstatCompute(c){
      védése. Így a négy szám (lövés/védés × két oldal) sosem mondhat ellent
      egymásnak, és a bravúrok (saveCount) is beleférnek. */
   const gf=c.gf|0,ga=c.ga|0;
-  let theirSaves=mstatPois(r,Math.max(0.6,(c.lf||1)*2.1));
+  /* A GÓLON FELÜLI kapura lövéseket a TÁMADÓ-CSATORNA tolja: a gólsúly-
+     képességek és a támadó szerepek nemcsak betalálnak, hanem lőnek is. A
+     saját védéseinket a KAPUS védő-képességei emelik — akit nehezebb bevenni,
+     az többször nyúl a labdához. A góllal való egyezés VÁLTOZATLAN: mindkét
+     oldal a saját góljából indul, tehát a négy szám továbbra sem mondhat
+     ellent egymásnak. */
+  const atkK=1+mstatClamp(MOD.atk*0.10+(MOD.styleCh.atk||0)*0.08,-0.3,0.6);
+  const gkK =1+mstatClamp(MOD.gkDef*0.09+MOD.def*0.03,-0.2,0.5);
+  let theirSaves=mstatPois(r,Math.max(0.6,(c.lf||1)*2.1*atkK));
   if(gf===0)theirSaves=Math.max(1,theirSaves);          /* gól nélkül is lőttünk kapura */
   const sot=gf+theirSaves;
-  let mySaves=Math.max(c.saveCount|0,mstatPois(r,Math.max(0.6,(c.la||1)*2.1)));
+  let mySaves=Math.max(c.saveCount|0,mstatPois(r,Math.max(0.6,(c.la||1)*2.1*gkK)));
   if(ga===0)mySaves=Math.max(1,mySaves);
   const oSot=ga+mySaves;
   /* --- LABDASZERZÉSEK: aki kevesebbet birtokol, többet véd --- */
-  const tk=Math.round(mstatClamp(11+(100-poss)*0.20+z.ved*1.3+(r()-0.5)*4,4,36));
+  const tk=Math.round(mstatClamp(11+(100-poss)*0.20+z.ved*1.3
+    +MOD.def*1.8+(MOD.styleCh.def||0)*1.6+MOD.fitDelta*6+(r()-0.5)*4,4,40));
   const oTk=Math.round(mstatClamp(11+poss*0.20+(r()-0.5)*4,4,36));
   /* --- A LABDASZERZÉSEK SZÉTOSZTÁSA A KERETEN ---
      Súlyozva: a Védekezés-attribútum és a poszt (hátul több, elöl kevesebb),
@@ -38181,7 +38367,14 @@ function mstatCompute(c){
     try{role=roleInFormation(x.pos)||"KOZEPPALYAS";}catch(e){}
     let ved=60;try{const A=attrsOfPlayer(x.pl);ved=(A&&A.ved)||60;}catch(e){}
     const share=mstatClamp(x.share==null?1:x.share,0,1);
-    return Object.assign({},x,{role,_w:Math.max(0.02,(RW[role]||0.5)*(0.5+ved/120)*share)});});
+    /* A VÉDŐ-KÉPESSÉGEK ÉS A SZEREP IS SÚLYOZ: egy Betonfal vagy egy Fal
+       szerepű ember tényleg többször szerzi meg a labdát, mint egy ugyanolyan
+       attribútumú társa. A `per` bontás a MOD-ból jön, tehát ugyanaz a jel,
+       amiből a csapat száma is született. */
+    const pm=(MOD.per&&MOD.per[x.pl.n])||null;
+    const chDef=pm?(pm.sk.def+pm.rl.def):0;
+    return Object.assign({},x,{role,
+      _w:Math.max(0.02,(RW[role]||0.5)*(0.5+ved/120)*(1+mstatClamp(chDef*0.18,0,1.2))*share)});});
   const wsum=rows.reduce((s,x)=>s+x._w,0)||1;
   let left=tk;
   rows.forEach((x,i)=>{
@@ -38197,7 +38390,7 @@ function mstatCompute(c){
   rows.forEach(x=>{try{_sum+=pOvrDisplay(x.pl);_n++;}catch(e){}});
   const ctx={oppOvr:c.oppOvr,teamAvg:_n?_sum/_n:(c.oppOvr||70),
     tacticKey:c.tacticKey,styleKey:c.styleKey,
-    styleStar:c.styleStar,cleanSheet:ga===0,ga,cls:c.cls};
+    styleStar:c.styleStar,cleanSheet:ga===0,ga,cls:c.cls,mod:MOD};
   const players=rows.map(x=>{
     const rt=mstatRate(x,ctx);
     return {n:x.pl.n,pos:x.pos,role:x.role,
@@ -38205,7 +38398,22 @@ function mstatCompute(c){
       g:x.g||0,a:x.a||0,saves:x.saves||0,tackles:x.tackles||0,
       red:!!x.red,mvp:!!x.mvp,star:rt.v};});
   players.sort((a,b)=>b.star-a.star||b.g-a.g||b.a-a.a||a.n.localeCompare(b.n,"hu"));
+  /* A HATÁSOK KIÍRVA. Nem elég, hogy a számok mögött ott van a négy rendszer —
+     LÁTNI is kell, különben a felhasználó csak annyit tapasztal, hogy „valamiért
+     többet birtokoltunk". Sorosítható, tehát a mentésből is visszajön. */
+  const drivers=[];
+  if(MOD.style){const d=styleByKey(MOD.style);if(d)drivers.push(`${d.ic} ${d.n}`);}
+  {const rk=[];Object.keys(MOD.per||{}).forEach(n=>{
+     const k=MOD.per[n]&&MOD.per[n].rl.key;
+     if(k&&ROLE_DEFS[k])rk.push(`${ROLE_DEFS[k].ic} ${ROLE_DEFS[k].n}`);});
+   if(rk.length)drivers.push(rk.join(" · "));}
   return {v:1,season:S.seasonNumber||1,round:(S.idx||0)+1,
+    fit:Math.round(MOD.fit*100),drivers,
+    ch:{pass:Math.round(MOD.pass*10)/10,atk:Math.round(MOD.atk*10)/10,def:Math.round(MOD.def*10)/10,
+        /* a két gólvárhatóság-szorzó: EGY sorsolásból nem látszanak (a Poisson
+           egész számot ad), sok mérkőzésen viszont ezek mozgatják a lövés- és
+           védés-oszlopot — a mérőnek és a hibakeresésnek kellenek */
+        kAtk:Math.round(atkK*100)/100,kGk:Math.round(gkK*100)/100},
     home:!!c.home,us:c.usName||teamName,them:c.oppName||"Ellenfél",
     gf,ga,cls:c.cls,
     team:{poss,passes,acc,sot,saves:mySaves,tackles:tk},
@@ -38271,6 +38479,14 @@ function mstatRender(){
   h+=mstatRowHtml("kapura lövés",t.sot,o.sot);
   h+=mstatRowHtml("labdaszerzés",t.tackles,o.tackles);
   h+=mstatRowHtml("védés",t.saves,o.saves);
+  /* MI ALAKÍTOTTA EZEKET A SZÁMOKAT — a filozófia, a pályán lévő szerepek és
+     az összesített poszt-illeszkedés. Ez a sáv köti össze a statisztikát a
+     játék többi rendszerével: enélkül a számok magyarázat nélkül állnának. */
+  if(M.drivers||M.fit!=null){
+    const bits=[];
+    (M.drivers||[]).forEach(d=>bits.push(esc(d)));
+    if(M.fit!=null)bits.push(`poszt-illeszkedés <b>${M.fit}%</b>`);
+    if(bits.length)h+=`<div class="msDrv">${bits.join(" &nbsp;·&nbsp; ")}</div>`;}
   const ps=M.players||[];
   h+=`<div class="msSec">A mérkőzés három legjobbja</div>`;
   ps.slice(0,3).forEach((p,i)=>{h+=mstatPlayerHtml(p,i+1);});
@@ -40073,7 +40289,13 @@ function playMatch(){
        statisztika nem akaszthatja meg a lefújás utáni láncot. */
     try{
       const _mvpN=(typeof best==="number"&&best>=0&&active[best])?active[best].p.n:null;
+      /* A `defPos` a FELÁLLÁS alapértelmezett kódja azon a helyen; a `pos` a
+         TÉNYLEGES (megbízással esetleg átírt). A kettő különbsége maga a
+         megbízás — ebből tudja a statisztika, hogy a menedzser döntött-e ott
+         valamit, és hogy az a döntés az adott embernek kedvez-e. */
+      const _defSlots=(FORMS[form]&&FORMS[form].slots)||null;
       const _rowOf=(pl,idx,share,red)=>({pl,pos:(slots[idx]&&slots[idx].pos)||"KKP",
+        defPos:(_defSlots&&_defSlots[idx])||(slots[idx]&&slots[idx].pos)||"KKP",
         share,red:!!red,g:mScore[pl.n]||0,a:mAssist[pl.n]||0,mvp:!!(_mvpN&&_mvpN===pl.n)});
       const _rows=active.filter(a=>!a.bus)
         .map(a=>_rowOf(a.p,a.idx,(a.share==null?1:a.share),active.indexOf(a)===redIdx))

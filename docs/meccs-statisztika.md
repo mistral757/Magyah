@@ -1,8 +1,10 @@
 # Meccsenkénti statisztika és játékos-értékelés
 
-*(3.7.26 — a statisztika-réteg ELSŐ lépcsője. Érintett kód: `mstatCompute`,
-`mstatRate`, `mstatProfileFit`, `mstatAxisZ`, `mstatPois`, `mstatShow` /
-`mstatRender` / `mstatAfterMatch` / `mstatSyncBtn`, `MSTAT_STYLE_W`,
+*(3.7.26 — a statisztika-réteg ELSŐ lépcsője; 3.7.27 — a négy befolyás.
+Érintett kód: `mstatCompute`, `mstatRate`, `mstatMods`, `mstatSkillCh`,
+`mstatRoleCh`, `mstatFitOf`, `mstatProfileFit`, `mstatAxisZ`, `mstatPois`,
+`mstatFin`, `mstatShow` / `mstatRender` / `mstatAfterMatch` / `mstatSyncBtn`,
+`MSTAT_STYLE_W`, `MSTAT_STYLE_CH`, `MSTAT_ROLE_CH`, `MSTAT_FIT_ANCHOR`,
 `MSTAT_POSS_SHIFT`, `MSTAT_PASS_MULT`, a `#mstatModal` markup és a `.ms*` CSS;
 bekötés a `fullTime` végén és az `afterAllRewards` láncban.)*
 
@@ -149,6 +151,106 @@ Playwright-tal, valódi mérkőzéseken (Real Madrid 2011/12 kerettel):
 - **a bezárás után a folyamat nem akad el**: a Kezdőrúgás gomb újra él.
 
 `tools/check.sh` zöld.
+
+## A négy befolyás (3.7.27)
+
+Az első lépcső a statokat a mérkőzés **számaiból** vezette le (λ,
+erőkülönbség, tengelyek). Ez helyes volt, de hiányos: a játékban négy olyan
+rendszer él, ami a pályán mindent eldönt, a statisztikán mégsem látszott.
+
+| befolyás | honnan |
+|---|---|
+| **csapatstílus** | `MSTAT_STYLE_CH` — a hét filozófia a birtoklás/passz/támadás/védés csatornákon |
+| **képességek** | a motor saját HATÁSTÍPUSAI: `assistw` → passz, `goalw` → támadás, `defense` → védés |
+| **szezon-szerepek** | `MSTAT_ROLE_CH` — a tizenöt megbízatás ugyanezeken a csatornákon, a szerep-képesség szintjével nőve |
+| **poszt- és megbízás-illeszkedés** | `attrPosFit` személyenként, és a tizenegy súlyozott átlaga (`MSTAT_FIT_ANCHOR` = 0,85 a semleges pont) |
+
+**Egy helyről, mind a kettőre.** A négy hatás egyszerre kell a csapat-statokhoz
+(egy passzos keret többet birtokol) és az egyéni értékeléshez (a Sebészi passz
+birtokosa más meccset játszik). Ha két helyen számolnánk, a kettő előbb-utóbb
+szétcsúszna — ezért **egy** függvény adja mindkettőt (`mstatMods`), és a
+visszatérő objektum viszi a csapat-szintű összegeket ÉS a személyenkénti
+bontást.
+
+**Nem skill-azonosítókra hivatkozunk, hanem hatástípusokra.** Így minden új
+képesség magától bekerül, és a statisztika sosem csúszhat el a valódi
+mechanikától. A `defense` szorzó (1 alatti = jó), ezért ott a jel az `1−mult`.
+
+**A semleges alap 0.** Egy képesség és szerep nélküli, poszthű tizenegy
+mindhárom csatornán nullát ad — a mai balance tehát betűre változatlan marad, a
+hatás csak ott jelenik meg, ahol tényleg van mire hivatkozni.
+
+### A skillek KÉT úton érkeznek — és ez szándékos
+
+A `SKILL_AXIS` már eddig is a csapat-tengelyekbe vezette a képességeket
+(`defense`→ved, `assistw`→passz, `goalw`→gól), a tengelyek pedig a
+`mstatAxisZ`-n át a statokba. Az új csatorna **ezen felül** hat. A kettő nem
+duplázás, mert mást mér: a tengely a keret **egyensúlyát** (mennyire passzos
+csapat ez a többihez képest), a csatorna a mérkőzést alakító képességek
+**sűrűségét**. Ezért látszik a mérőn az is, hogy hat védő-képesség **rontja** a
+passzpontosságot: a védekezésre szakosodott keret relatíve kevesebbet passzol.
+
+### Az egyéni értékelés három új tétele
+
+* **képességek** (0 … +0,5) — **csak a szituatív csatornák**. A `rating` típusú
+  skillek (Szitálós, Aranycipő) már az 1. tételben benne vannak a
+  `pOvrDisplay`-en keresztül; itt újra beszámítani dupla könyvelés volna.
+* **szezon-szerep** (0 … +0,3) — a megbízatás felelősség, amit a pályán vitt.
+* **poszt-illeszkedés** (−0,5 … +0,15) és **megbízás** (±0,15) — az elsődleges
+  posztján játszó ember természetesen mozog, a posztidegen végig kapkod. A
+  `brief` külön azt méri, hogy a **megbízás** (a felállás alapkódjának
+  felülírása) épp neki kedvez-e: a `defPos` a formáció alapértelmezett kódja
+  azon a helyen, a `pos` a ténylegesen érvényes — a kettő különbsége maga a
+  megbízás.
+
+### A hatások ki is vannak írva
+
+Nem elég, hogy a számok mögött ott a négy rendszer — **látni is kell**,
+különben a felhasználó csak annyit tapasztal, hogy „valamiért többet
+birtokoltunk". Az ablakban egy sáv sorolja fel a filozófiát, a pályán lévő
+szerepeket és az összesített poszt-illeszkedést:
+
+```
+🌀 Tiki-Taka · 🧭 Stabil kezdés · 👁️ Lát a pályán · ✨ Aurafarmer · poszt-illeszkedés 75%
+```
+
+### Mérve — A/B, ugyanazon a kereten és ugyanazzal a seeddel
+
+Alap (nincs stílus, képesség, szerep; poszthű keret): birtoklás **50%** ·
+passz **440** · pontosság **77,4%** · labdaszerzés **23** · illeszkedés **89%**.
+
+| befolyás | birtoklás | passz | pontosság | szerzés | λ-szorzók |
+|---|--:|--:|--:|--:|--|
+| 🌀 Tiki-Taka | **+8** | +68 | +1,7 | −2 | — |
+| 🧱 Beton védelem | **−6** | −52 | −0,3 | **+3** | — |
+| ⚽ Bombázók | −2 | −18 | 0 | 0 | **kAtk 1,10** |
+| 6× Sebészi passz | **+7** | +60 | **+8,5** | −3 | — |
+| 6× Betonfal | −2 | −18 | −2,9 | **+4** | kGk 1,11 |
+| 5× Gólzsák | −2 | −18 | −2,9 | −2 | **kAtk 1,13** |
+| kapus K9 - Kutyareflex | −1 | −9 | −0,7 | +1 | **kGk 1,11** |
+| Tiki-Taka + 3 szerep | **+9** | +77 | +3,5 | −3 | — |
+| négy ember idegen poszton | −2 | −18 | −1,4 | −2 | illeszkedés **89% → 60%** |
+
+A **kapura lövés és a védés** oszlopa egyetlen mérkőzésen nem mozdul, mert a
+Poisson egész számot ad — a hatás a **λ-szorzókban** (`kAtk`, `kGk`) látszik, és
+sok mérkőzésen ezek mozgatják a két oszlopot. A két szorzó a mentett
+objektumban is ott van, hogy mérhető és visszakereshető legyen.
+
+Egy teljes, valódi mérkőzésen mind a négy befolyással együtt: birtoklás **63%**,
+passz **545/308**, pontosság **83,6/75,4%**, és a magyarázó sáv kiírta
+mindhárom forrást. A konzisztencia-állítások (lövés ≥ gól, a védés-oszlopok
+egymásból, a birtoklás 100, az egyéni labdaszerzések összege = a csapat száma)
+mind teljesültek.
+
+### Egy megkeményítés, amit a mérés hozott
+
+A teszt először hibás alakú skill-példányt gyártott
+(`{stage,need}` a valódi `{stagesNeeded,stagesCompleted}` helyett), és a motor
+effektus-számolói **NaN**-t adtak vissza. Egy NaN innen továbbterjedne a
+labdabirtoklásba, a passzpontosságba és minden értékelésbe. A csatornák ezért
+egy explicit `mstatFin` szűrőn mennek át: **a statisztika sosem mondhat
+„NaN%"-ot**, akkor sem, ha egy régi mentés vagy egy félbemaradt fázis-könyvelés
+sérült példányt hagyott hátra.
 
 ## Ami a következő lépcsőkre marad
 
