@@ -1,6 +1,6 @@
 # Fekvő mód — a stadion-nézet, a HUB és minden más képernyő
 
-*(3.7.05–3.7.14. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
+*(3.7.05–3.7.31. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
 `body.appFs` CSS-blokk az `index.html`-ben, `stadiumWanted`,
 `STADIUM_BLOCKERS`, `sbApplyStadium`, `stadiumSync` + a `MutationObserver`,
 `stadiumFsActive` / `stadiumFsToggle`, `#stadiumFsBtn`. A HUB oldaláról:
@@ -14,8 +14,9 @@ menü-mód-újraszámolása, a `.hubDetail` rács-szabálya és a kihívás-abla
 `:has(.chCard)` szabálya. A 3.7.11-ből: `hubLandBackSync` / `--hubBackH` és a
 kitapadt `#hubNextSeasonBtn`. A 3.7.14-ből: a `sbFitTeams` ResizeObserver-e
 (`_sbFitState`) és a tábla függőleges sorrendje (`#sbMain` / `#sbEvents`
-flex-szabályai). A manifest oldaláról: `icons/site.webmanifest` —
-`display: fullscreen`, és `sw-1.js` cache-neve.)*
+flex-szabályai). A 3.7.31-ből: `pitchLandOn` / `pitchXY`, `applyPitchLand` /
+`pitchLandRedraw` és a `body.landPitch` CSS-blokk. A manifest oldaláról:
+`icons/site.webmanifest` — `display: fullscreen`, és `sw-1.js` cache-neve.)*
 
 ## 1. Ami volt: egy nézet, ami a lefújással elmúlt
 
@@ -619,3 +620,125 @@ fölött.
 A teljes leírás — a második hibával (az elavult koordinátára futó
 `scrollIntoView`) és a mérésekkel együtt — a
 [`szezonzaras-hub-gomb.md`](szezonzaras-hub-gomb.md) fájlban van.
+
+---
+
+## 13. A pálya is elfordul (3.7.31)
+
+*(Érintett kód: `pitchLandOn` / `pitchXY`, `applyPitchLand` / `pitchLandRedraw`
+és a `stadiumSync` negyedik lépése; a `body.landPitch` CSS-blokk. A hívási
+helyek: `drawPitch`, `buildPitchBonds`, `drawOppPitch`, `renderFormPreview`.)*
+
+### 13.1 Ami maradt a 3.7.07 után
+
+A fekvő mód eddig a KÉPERNYŐK elrendezését fordította el; a pályakép maga
+végig állva állt. Nem véletlenül: a `#pitch` `width:100%` + `aspect-ratio:3/3.6`,
+vagyis a MAGASSÁGA a szélességéből jön — egy 340 px széles pálya 408 px magas.
+Fektetve ez másfél képernyő, tehát a szélességet vissza kellett fogni
+(`min(100%, 66vh, 340px)`).
+
+Az eredmény egy **bélyegkép** volt a képernyő közepén, két oldalt üres sávokkal:
+egy 1920 px széles ablakban a felállás 340 px-en ült. Fektetve pont abból volt
+bőven — a szélességből —, amit a pálya alakja nem tudott felhasználni.
+
+### 13.2 A forgatás egy KÉPLET, nem második koordináta-készlet
+
+```
+  fekvő:   bal = 100 − y        fent = x
+```
+
+Óramutató járása szerinti 90°: az álló kép ALJA — a saját kapunk — a **bal**
+oldalra fordul, tehát balról jobbra támadunk, ahogy a tévében.
+
+A felállások `xy`-jai (`FORMS`, a megbízás-eltolások, a befagyasztott
+ellenfél-kártya, az előnézet) **betűre változatlanok**. A négy rajzoló hívási
+hely egyetlen függvényen kéri el a százalékokat:
+
+| Hívási hely | Mit rajzol |
+|---|---|
+| `drawPitch` | a saját felállás (a hibatűrő ág is) |
+| `buildPitchBonds` | a kémia-vonalak — ugyanazokból a számokból, tehát magától követi |
+| `drawOppPitch` | az ellenfél befagyasztott pályaképe (közös karrier) |
+| `renderFormPreview` | a beállító képernyő felállás-előnézete |
+
+**MIÉRT NEM `transform: rotate(90deg)`.** Egy sorban megvolna — de a NEVEKET is
+megforgatná. Azokat vissza kellene forgatni egyenként, és a korong alatti címke
+elcsúszna a saját korongjától. Így viszont a `.slot` doboz betűre ugyanaz marad:
+karika, alatta **vízszintes** név. Csak a doboz kerül máshova a pályán.
+
+### 13.3 A negyedik jelző: `body.landPitch`
+
+A másik három jelző azt mondja meg, melyik KÉPERNYŐ-elrendezés jár; ez azt,
+milyen ALAKÚ a pálya. Ezért nem tartozik egyikhez sem — a felállás mindhárom
+fekvő módban ugyanúgy néz ki, sőt a beállító képernyő előnézetében is, ahol
+egyik jelző sem áll. A kapuja ezért a legszélesebb, ami van: maga a
+`sbStadiumFits()`.
+
+**A billenéskor újra kell rajzolni.** A korongok helye INLINE stílus (left/top
+százalék), azt a CSS nem tudja átfordítani. A `pitchLandRedraw` csak azt rajzolja
+újra, ami LÁTSZIK — egy rejtett pálya úgyis újrarajzolódik, mielőtt előjön.
+
+A `stadiumSync` negyedik és utolsó lépése, mert az `applyHubLand` felfedheti a
+felállást (`hubLandPitchApply`), és az még a régi koordinátákkal rajzol.
+
+### 13.4 Ami a CSS-ben fordul
+
+1. **Az alak** — `aspect-ratio: 3.6/3` a `3/3.6` helyett.
+2. **A felfestés** — ugyanaz az SVG, `120×100`-as viewBox-szal és elforgatott
+   koordinátákkal: `T(x,y) = (120 − y, x)`. A körök körök maradnak (a viewBox
+   pontosan az oldalarány), az ívek ívek: a forgatás **iránytartó**, tehát a
+   sweep-flagek változatlanok.
+3. **A nyírási sávok** — a kertész gépe a hosszabb tengely mentén megy, tehát
+   fekvő pályán a sávok FÜGGŐLEGESEK (`90deg`, nem `180deg`). A szálkázás és a
+   sarok-árnyék irányfüggetlen, azok maradnak.
+
+### 13.5 …és amiért az egészet csináltuk: a pálya kitölti a kijelzőt
+
+Az álló pályánál a 340 px-es korlát nem takarékosság volt, hanem kényszer.
+Fekvő pályán ez megfordul — 1,2-es oldalaránynál a magasság a szélesség 83%-a —,
+tehát a korlát fölöslegessé vált: a pálya annyit kap, amennyi van, és CSAK a
+kijelző magassága fogja vissza.
+
+```
+  max-szélesség = min(100%, 88dvh × 1,2)
+```
+
+A 88 (nem 100) a fejlécnek és a lap szegélyének hagy helyet, hogy a pálya egy
+képernyőn, görgetés nélkül teljes egészében látszódjon, amint rágörgetsz.
+
+Két kísérő szabály:
+
+* **A HUB-on megszűnik az úsztatás.** Az álló pálya mellett 180 px maradt
+  üresen, azt kapta meg a csapaterő és a kapitány-doboz (7. szakasz). A fekvő
+  pálya viszont ELVISZI a teljes oszlopot — mellé szorítva 340 px-re esne
+  vissza, vagyis pont az a bélyegkép lenne belőle, ami elől elfordítottuk. A
+  mellé szánt tartalom így visszakerül a pálya ALÁ.
+* **Draftban a pálya hasábja 400 → 520 px.** A százalék (41%) változatlan — a
+  két hasáb aránya marad —, csak a korlát nő: az még az álló alakhoz készült, és
+  fekvőn a hasáb alja üresen maradna alatta.
+
+A beállító képernyő előnézete (`#formPreview`) ugyanezt kapja: `4/3` alak,
+420 px-es korlát, és a felezővonala vízszintesből függőlegesbe fordul.
+
+### 13.6 Mérés
+
+Végigjátszva a belépőtől a draftig, mindhárom méreten:
+
+| Ablak | `body` | Pálya (wrap) | Vízszintes görgetés |
+|---|---|---|---|
+| 390×844 (álló) | — | 340×404 (3/3.6, **változatlan**) | nincs |
+| 844×390 | `landPage landPitch` | 412×347 (a 88dvh korlát) | nincs |
+| 1280×720 | `landPage landPitch` | 760×637 | nincs |
+| 1920×1080 | `landPage landPitch` | 1098×918 (a `--landW` 1120-as sávjában) | nincs |
+
+**Forgatás menet közben** (390×844 → 844×390 → vissza), nyitott felállással:
+
+| | 1. korong | 2. korong | 3. korong |
+|---|---|---|---|
+| álló | 50% / 93% | 82% / 74% | 62% / 78% |
+| fekvő | 7% / 50% | 26% / 82% | 22% / 62% |
+| visszaforgatva | 50% / 93% | 82% / 74% | 62% / 78% |
+
+A kapus a 93%-os mélységből a bal szélre (7%) kerül, a jobbhátvéd a jobb szélről
+(82%) a pálya aljára — pontosan az óramutató járása szerinti negyed fordulat.
+Visszaforgatva betűre a régi kép.

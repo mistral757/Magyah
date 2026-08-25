@@ -1683,6 +1683,133 @@ szerkesztő, az első opcióval eleve nyitva. A döntés — a „nem" is — a 
 része, tehát egy újratöltés nem kérdezi meg újra; a keret visszahívása viszont
 eldobja a tervet, mert az átrendezett keretre épülő szabályok elavulnak.
 
+### 4.3b Az ember is számít — a szerepek attribútum-szorzója (3.7.31)
+
+*(Érintett kód: `ROLE_ATTR_OF`, `ROLE_ATTR_SLOPE` / `_MIN` / `_MAX`,
+`roleAttrOf`, `roleAvgAttr`, `roleAttrInfo`, `roleAttrK`, a kibővített
+`roleVal`, a `_roleAttrCache` és a `roleSectionHtml` új sorai.)*
+
+#### Mi volt a baj
+
+A Tiki-Taka szerepei nem egy NEVET kérnek, hanem egy EMBERT. A Stabil kezdés
+belépője az, hogy a jelölt a saját posztterülete legjobb passzolója legyen; a
+Lát a pályán hatása pedig egy az egyben az ő Passzából számol (a leggyengébb
+társak értékét váltja ki a taktikai illeszkedésben). Ott tehát tétje van annak,
+kire osztod.
+
+A másik négy stílusnál nem volt. A szorzót egyedül a **képesség szintje** adta:
+
+```
+  hatás = ROLE_DEFS[szerep].v[roleLevel()]
+```
+
+Ebből az következett, hogy egy 35-ös Gólszerzésű hátvéd pontosan ugyanannyit ért
+**Nyitóként**, mint a klub 90-es csatára — a kiosztás így nem döntés volt, hanem
+adminisztráció. (Két kivétel volt már: az **Egyensúly**, aminek a hatása a három
+legközelebbi attribútum terjedelméből számol, és a **Box-to-box** illeszkedés-
+bónusza, ami a sebességből.)
+
+#### A megoldás: minden szerepnek van gazda-attribútuma
+
+| Stílus | Szerep | Gazda-attribútum |
+|---|---|---|
+| ⚽ | Nyitó · Befejező | Gólszerzés |
+| ⚽ | Tálaló (mindkét fele) | Passz |
+| 🧱 | Fal · Árok | Védekezés |
+| 🧱 | Kereszttűz | Védekezés (az ellenfél-gólesélyre), Passz (a gólpassz-előnyre) |
+| ⚡ | Box-to-box | Passz (gólpassz), Védekezés (ellenfél-gólesély) |
+| ⚡ | Legolas | Sebesség (mindkét hatásra) |
+| ⚡ | Robben berobban | Gólszerzés (a sajátjára), Sebesség (a csapatéra) |
+| ☯️ | Peace on you! | Gólszerzés (a sajátjára), Védekezés (az ellenfél-gólesélyre) |
+| ☯️ | Agy | Passz |
+
+#### A mérce RELATÍV — ez is a Tiki-Takától jön
+
+Nem „80 fölötti Gólszerzés" a feltétel, hanem a **keret átlagához** mérünk.
+Így a mérce a karrier minden szakaszában ugyanazt jelenti: egy 60-as és egy
+150-es mezőnyben egyaránt azt, hogy a TE embereid közül ő az, aki ehhez ért.
+(Ugyanaz a mérce, amit az Agy belépője — `roleAvgPass` — is használ; az most a
+`roleAvgAttr` általános alakjából olvas.)
+
+```
+  k     = clamp(0,6 … 1,45;  1 + (attribútum / keret-átlag − 1) × 3)
+  hatás = 1 + (alap − 1) × k
+```
+
+**A szorzó a 1-től való ELTÉRÉSRE hat, nem magára a számra.** Ezért egy
+csökkentő szerep ugyanúgy erősödik lefelé, ahogy egy növelő fölfelé — egy
+képlet, két irány:
+
+| Szerep (3. szint) | Alap | Gyenge ember (k=0,6) | Átlagos (k=1) | Kiváló (k=1,45) |
+|---|---|---|---|---|
+| 🔓 Nyitó (gólsúly) | ×3,70 | ×2,62 | ×3,70 | ×4,92 |
+| 🧱 Fal (ellenfél-gólesély) | ×0,900 | ×0,940 | ×0,900 | ×0,855 |
+
+**Az ÁTLAGOS ember k=1-et kap**, vagyis pontosan a mai számokat: aki eddig is jól
+osztotta ki a szerepeit, annak semmi nem lett gyengébb, csak a rossz kiosztásnak
+lett ára. A 0,6-1,45-ös korlát két végletet zár ki: egy sérülés utáni mélyponton
+se csússzon nullába a szerep, és egy kiugró attribútum se tegye
+megkerülhetetlenné a képesség-szintet.
+
+#### Egyetlen torok
+
+A szorzót a `roleVal` adja rá — az az egy függvény, amin **minden** hívási hely
+átmegy: a mérkőzés-motor (`roleGoalMult`, `roleAssistMult`, `roleOppGoalMult`,
+`roleOwnGoalMult`), a kiosztó panel és a meccs-összegző is. Nincs olyan hely,
+ami mellette elcsúszhatna, és nem kellett húsz hívási helyet átírni.
+
+#### Amit szándékosan NEM érint
+
+* **A Tiki-Taka három szerepét** (Stabil kezdés, Lát a pályán, Aurafarmer) — ők
+  a minta, nem az alany.
+* **Az Egyensúlyt** — ott a hatás MÁR az attribútumokból számol
+  (`roleBalProx`); egy második szorzó kétszer fizetné ugyanazt.
+* **Minden ÁRAT.** A Peace on you! piroslap-szorzója (`v3`) és a Kereszttűz
+  sérülés-kockázata (`v2`) a szerep alkujának a másik fele — azt nem
+  szelídítheti egy jó attribútum. Az árat a képesség-szint szabja, ahogy eddig.
+* **A Lát a pályán `v2`-jét** — az DARABSZÁM (hány társ Passzát váltja ki), nem
+  szorzó: egy 3,4 ember értelmezhetetlen volna.
+
+#### A felületen
+
+A kiosztó minden kártyán kiírja a gazda-attribútumot, a lejtőt, és — ha van
+kiosztott ember — a MOSTANI állást is:
+
+> Az EMBER is számít: a hatás erejét a **Gólszerzés**-attribútuma szabja, a
+> keret átlagához mérve (átlagos ember ×1 · a lejtő ×0,6-tól ×1,45-ig ér).
+> Most: Kis Á. Gólszerzés **88** · keret-átlag 65,5 → **×1,45**
+
+…és a **jelöltlistában is ott a szám** (`Kis Á. · CS · 84 · Gólszerzés 88`),
+különben minden egyes jelöltért vissza kellene menni a keretlistába. A fejlécben
+látszó szorzó (`×1,36 gólsúly, amíg 0:0 az állás`) mostantól a **kiosztott
+emberre** vonatkozik, nem egy elvont alapértékre.
+
+#### Teljesítmény
+
+A `roleVal` a motor egyik legforgalmasabb hívása (percenként, játékosonként), a
+keret-átlag viszont csak edzésre vagy igazolásra mozdul. A mért érték ezért el
+van téve (`_roleAttrCache`), és három helyen dobjuk el: **kezdőrúgáskor**
+(`roleAuraReset`), **új kiosztásnál** (`roleAssign`) és **a kiosztó
+megnyitásakor** (`roleSectionHtml`) — vagyis minden olyan pillanatban, ami után
+más számot kellene mutatni.
+
+#### Mérés
+
+Hatfős próbakerettel (Gólszerzés-átlag 60,83), képesség-szint 0, Nyitó (alap
+×1,25):
+
+| Viselő | Gólszerzés | k | hatás |
+|---|---|---|---|
+| nincs kiosztva | — | 1 | ×1,25 |
+| átlagos | 60 | 0,96 | ×1,24 |
+| gólvágó | 90 | 1,45 (korlát) | ×1,363 |
+| gyenge | 35 | 0,60 (korlát) | ×1,15 |
+
+Fal (alap ×0,975): jó védővel ×0,964, gyengével ×0,98. Változatlanul jött vissza
+a Kereszttűz kockázata (`v2` = 1,15), a Peace on you! piroslap-szorzója
+(`v3` = 10), az Egyensúly szint-szorzója (0,75), a Lát a pályán darabszáma (1) és
+az Aurafarmer szorzója (1,03).
+
 ### 4.4 Nyitott kérdések
 
 1. **Stílusváltás** — legyen-e egyáltalán, és ha igen, milyen áron? (2.2)
