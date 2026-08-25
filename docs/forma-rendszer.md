@@ -1,0 +1,198 @@
+# Forma-rendszer és a lenyitható játékos-panel
+
+*(3.7.28. Érintett kód: `pformRefresh`, `pformSeasonReset`, `pformOf` /
+`pformStep` / `pformPct` / `pformMult` / `pformEdge` / `pformPickMult`,
+`pformBaseline`, `pformRecent`, `pformTeamForm` / `pformTeamSignal`,
+`pstatPush` / `pstatHistoryHtml`, `pformBarsHtml` / `pformRowHtml` /
+`pformDetailHtml`, `hdMark` / `hdSectionize` / `hdBindSections`; bekötés a
+`buildMatchSnapshot`-ban, a `weightedPick`-ben, a checkpoint-ágban, a
+`fullTime` végén és a `startNextCareerSeason`-ben.)*
+
+## Volt már forma — csak egyetlen napra szólt
+
+A motorban eddig is volt forma: a kezdőrúgáskor kisorsolt jó és rossz formájú
+ember (±`SIM.FORM`). Az **megmarad** — az a mérkőzés napi hangulata —, csak a
+szövege lett pontosabb, mert most már van mitől megkülönböztetni:
+
+```
+▲ Csúcsformában ezen a meccsen: Pepe · ▼ Nem érzi a labdát ezen a meccsen: Higuaín
+```
+
+Mellé került egy **tartós** állapot: hol tart most ez a játékos a saját
+hullámán.
+
+## A skála
+
+**Tizennégy fok**, ugyanaz a felbontás, mint a meccsvégi értékelésé (hét
+csillag, fél lépésekben). A közép a **7,5**. A kijelzés egy hangerő-mérő:
+tizennégy vékony oszlop, balról jobbra növekvő magassággal, pirosból zöldbe.
+
+A növekvő magasság nem dísz: a szélek így akkor is megkülönböztethetők, ha
+valaki nem látja a színkülönbséget — **a szín önmagában sosem lehet az egyetlen
+jel**.
+
+A skála ott van a **keretlistán minden soron** (ott dől el a felállítás, tehát
+ott kell látni) és a játékos lapján, a hatás számával együtt.
+
+## A hatás
+
+| fok | teljesítmény | eredményesség |
+|--:|--:|--:|
+| 1 | **−15,0%** | −3% |
+| 4 | −8,1% | — |
+| 7 / 8 | ∓1,2% | — |
+| 11 | +8,1% | — |
+| 14 | **+15,0%** | +3% |
+
+Lineáris a két szél között: `(v − 7,5) / 6,5 × 15`. A félskálák közepén (4 és
+11) ez pontosan a kért ±8%.
+
+**A teljesítmény-szorzó a `contrib`-on ül, nem a `pOvr`-ben.** A forma a MAI
+teljesítményt írja, nem a játékos értékét: a keretlistán, a piacon, a
+szerződésnél tehát ugyanaz a Rating marad — a különbség a pályán jön ki.
+
+**Az eredményesség-ráadás poszthelyes.** Az 1-3 és 12-14 fokon álló ember
+±3%-kal gyakrabban lesz a gól, a gólpassz, a tizenegyes vagy a kapufa embere —
+ez a `weightedPick`-ben ül, mert **minden** ilyen sorsolás azon az egy
+függvényen megy át, tehát nem maradhat ki egy sem és nem is duplázódhat. A
+védőké és a kapusé nem ott dől el: az ő „eredményességük" a kapott gólok
+oldala, azt a pillanatkép `defMult`-ja viszi — a hátsó sor formaéleinek
+**átlagával** (öt ember nem ötszörözheti meg a hatást).
+
+## Mi táplálja
+
+* a **saját utolsó 7-8 mérkőzésének csillagátlaga** — pontosan az a szám, amit
+  a meccs végi ablak is kiírt neki;
+* a **csapatmorál**;
+* a **csapat formája** — a periódus győzelmei és vereségei, külön súllyal a
+  nagy győzelmeknek és a súlyos vereségeknek;
+* a **képességek** — az Iránytű (`formlock`) padlót ad: sosem eshet a közép
+  alá, és fölfelé is húz; a szituatív csatornák (gól-, gólpassz-, védő-súly)
+  apró, de valós jel;
+* és egy **egyéni véletlen**, ami nélkül a rendszer determinisztikus volna.
+
+### MÉRT HIBA: a forma önmagát erősítette
+
+Az első változat a csillagátlagot a **fix 3,5-ös alaphoz** mérte. Csakhogy a
+csillag maga is a keret erejéből származik (lásd a `mstatRate` „rating" és „a
+csapat éle" tételét): egy erős csapat **mindig** 5,5 csillag körül jár. A forma
+tehát nem azt mérte, hogy jól megy-e most valakinek, hanem hogy **jó
+játékos-e** — és mivel a forma vissza is hat a teljesítményre, a kör bezárult.
+
+Mérve, nyolc győzelem (öt nagy) után:
+
+| | forma-fokok | csapat meccs-erő |
+|---|---|--:|
+| **abszolút mérce** (hibás) | 9 9 9 9 10 10 11 11 11 11 12 | 87,9 → **94,5 (+6,5)** |
+| **saját mérce** (javított) | 7 8 8 8 8 8 9 9 9 9 10 | 89,1 → **91,1 (+2,0)** |
+
+**A forma definíció szerint relatív**: nem az, hogy jó vagy, hanem hogy a saját
+szokásos szintedhez képest hol tartasz. Ezért a mérce a játékos **hosszabb távú
+átlaga** (`pformBaseline`, a teljes tárolt története), és a forma ehhez képest
+mozdul. Aki mindig 5,5-öt hoz, annál a jel 0 — középen marad; aki 5,5-ről
+4,2-re esett, az hullámvölgybe kerül, akármilyen erős csapatban játszik.
+
+**Ugyanez a csapat jelére is igaz** (`pformTeamSignal`): egy mindig nyerő
+csapatnál a periódus nyolc győzelme nem jó forma, hanem a szokásos — a jel
+ezért a periódus mérlege az **idény egészéhez** képest.
+
+### …és nem csúszik együtt az egész keret
+
+A csapat-szintű tételek (morál, eredmények) mindenkire ugyanúgy hatnak, tehát
+önmagukban egy vereségsorozat **mindenkit** lehúzna — egy jó sorozat pedig
+mindenkit feltolna, ami magától megnyerné a következő szezont is. Ezért a
+kiszámolt elmozdulások **közös részét visszavesszük** (`PFORM_DAMP` = 0,60):
+marad a csapat-hangulat jele, de a keret nem egyetlen tömbként mozog.
+
+Mérve a javított rendszerrel: a tizenegy forma-foka **7 és 10** között szóródott
+egy tökéletes, nyolc győzelmes periódus után is.
+
+## Az időzítés
+
+| mikor | miért |
+|---|---|
+| **kihívás-periódusonként** (a 8./15./23. forduló checkpointjain) | pontosan 7-8 meccsenként jönnek, és annyi az az ablak, amiből egy forma értelmesen leolvasható |
+| **kupasorozat alatt minden mérkőzés után** | ott nincs checkpoint, és egy hat-nyolc meccses kampány egésze elférne egyetlen periódusban |
+| **szezonnyitáskor** | nullázás |
+
+**A frissítés az auto/kézi elágazás ELŐTT ül.** Az első próbálkozás a
+`handleCheckpoint`-ba került — az viszont csak a kézi úton fut le, az auto
+szezonlejátszás az `autoResolveCheckpoint`-ra ágazik el, tehát a forma egy
+végigjátszott idényben **soha nem mozdult volna**. A mérőn ez azonnal látszott:
+kilenc forduló után `S.pFormUpd` `null`, minden fok 8.
+
+## Szezononként nullázódik
+
+Mindenki középre: **7 vagy 8**, aszerint, hogy az előző idénye a 3,5-ös alap
+alatt vagy fölött zárult. A forma nem öröklődik idényről idényre; a nyár
+mindent újraír.
+
+A **meccs-történetet szándékosan megtartjuk** — az a HUB követése, és szezonra
+bontva továbbra is olvasható.
+
+## Az egyéni meccs-történet
+
+`S.pStat[név]` az utolsó 24 mérkőzés bejegyzéseit tartja: szezon, forduló,
+csillag, gól, gólpassz, védés, labdaszerzés, perc, eredmény. A lefújásnál
+íródik, a meccsvégi statisztikából (`S.lastMatch.players`) — **egy forrás, egy
+igazság**: amit az ablak kiírt, az kerül a történetbe is, és abból számol a
+forma. Ugyanaz a szezon+forduló csak egyszer kerül be, tehát egy újratöltés
+vagy egy idempotens újrafutás nem duplázhat.
+
+## A lenyitható játékos-panel
+
+A panel egyetlen, több képernyőnyi folyammá nőtt — attribútumok, edzés, TSI,
+poszt-térkép, Statzone, skillek, kémia, személyiség —, és a keresett dolog
+mindig valahol a közepén volt. Innentől:
+
+```
+(mindig látszik)  az attribútum-dobozok
+🏋 Edzés és fejlődés
+🧭 Poszt, megbízás és TSI
+📊 Statisztikák
+   └ 📈 Forma
+   └ 🗂 Statzone
+   └ 🕐 Meccsről meccsre
+🎖 Képességek
+🔗 Kémia
+🙂 Személyiség
+```
+
+**A megoldás nem a függvény átírása.** A blokkokat előállító, négyszáz soros
+folyam betűre a régi marad; csak **jelölőket** teszünk közé (`hdMark`), és a
+végén egy lépésben szekciókra vágjuk (`hdSectionize`). Így a szakaszok
+tartalma garantáltan változatlan (nincs mit elrontani egy átmozgatáson), a
+bővítés pedig egy sor: ahova jelölő kerül, ott új szekció kezdődik.
+
+A `<details>` **natív**: nincs saját kattintás-kezelő, nincs mit elrontani egy
+újrarajzoláson, és billentyűvel is működik. A nyitott állapot a mentésben él
+(`S.hubDetOpen`), tehát a következő megnyitáskor ott folytatod, ahol
+abbahagytad.
+
+## Tesztelés
+
+Playwright-tal, valódi karrieren:
+
+- **a skála határai**: 1 → −15,0% · 4 → −8,1% · 7,5 → 0,00% · 11 → +8,1% ·
+  14 → +15,0%;
+- **frissülés**: 24 forduló és három checkpoint után `S.pFormUpd` a 23.
+  fordulóra mutat, a fokok 7 és 10 között szóródnak;
+- **nem csúszik együtt a keret**: a szórás egy tökéletes, 8/8-as periódus után
+  is 3 fok;
+- **a csapatszintű hatás**: 89,1 → 91,1 (+2,0) — a hibás, abszolút mércés
+  változatnál ugyanez +6,5 volt;
+- **szezonnullázás**: minden fok 7 vagy 8;
+- **a panel**: kilenc szekció épül fel, a Statisztikák alatt három beágyazott
+  alponttal; a nyitás-állapot a mentésbe kerül (`{"hdPos":true,"hdStats":true,…}`);
+- **a skála kirajzolása**: 14 oszlop, ebből 9 kigyulladt egy 9/14-es formánál,
+  a keretlistában és a panelen egyaránt;
+- **a meccs-történet**: 11 sor, a legfrissebb elöl.
+
+`tools/check.sh` zöld.
+
+## Ami nyitva marad
+
+A **±15% a két szélen szándékosan erős**. Egy tökéletes periódus után a mért
+csapatszintű hatás +2,0 meccs-erő — ez „a csapat szárnyal" érzés ára, és a
+divergencia-csillapítás tartja ennyiben. Ha a játékon ez soknak bizonyul, egyetlen
+konstans (`PFORM_MAX_PCT`) állítja az egészet.

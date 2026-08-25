@@ -54,8 +54,14 @@ megtanult Labdatartás is birtokol, csak kevésbé. Ezt a `grip` fejezi ki
 ## A játékos-értékelés
 
 **Hét csillag, fél csillag lépésekben.** A **3,5 az „elvégezte a dolgát"** —
-innen mozdul föl és le. A bemenetek (a **forma-rendszer kivételével**, az a
-következő lépcső):
+innen mozdul föl és le. A bemenetek:
+
+> A **forma-rendszer** a 3.7.28-cal külön lépcsőként megérkezett, és
+> szándékosan NEM tétel ebben a listában: a forma a mérkőzés
+> TELJESÍTMÉNYÉT szorozza (`buildMatchSnapshot`), tehát az értékelésbe a
+> gólokon, gólpasszokon és a keretbeli helyezésen keresztül épül be. Egy
+> külön tétel dupla könyvelés volna. Lásd `docs/forma-rendszer.md`.
+
 
 | tétel | súly | miből |
 |---|--:|---|
