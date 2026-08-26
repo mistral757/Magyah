@@ -4692,7 +4692,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.38";
+const APP_VERSION="3.7.39";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -20967,19 +20967,38 @@ function focusTargets(c){
 function coachIsActive(c){
   const arr=staff(),i=arr.indexOf(c);
   return i>=0&&arr.findIndex(x=>x&&x.type===c.type)===i;}
-/* Az edző hatás-együtthatója egy adott játékosra: 0.035 … 1.00.
+/* ---- A MINŐSÉG-TAG: EGY FORRÁS, HÁROM OLVASÓ (3.7.39) ----
    A 0.35+0.65*q tag azt jelenti, hogy MÉG A LEGGYENGÉBB EDZŐ IS ad valamit (a
    teljes hatás 35%-át), de a legjobb közel háromszor annyit. Enélkül egy 22-es
    Szakértelmű stábtag puszta teher lenne, és a rendszer csak akkor indulna be,
-   ha véletlenül kiváló statisztikájú legendád akad. */
+   ha véletlenül kiváló statisztikájú legendád akad.
+
+   EDDIG HÁROM HELYEN állt ugyanez a képlet (coachPower, coachTeamScope,
+   legacyRate). Most EGY helyre került, mert a csapatstílus „műhely"-képességei
+   mostantól nem csak a tapasztalatgyűjtést gyorsítják, hanem a HATÉKONYSÁGOT
+   is emelik (styleCoachPowerMult) — és egy három példányban élő képletnél
+   biztos lett volna, hogy az egyik ág kimarad a szorzóból.
+
+   A PLAFON védőháló, nem tervezett határ: a szorzó `Math.max`-szal jön (csak a
+   legjobb megvett szint él), tehát a mai értékekkel 1,45 a legnagyobb, amit
+   elérhet. A clamp azért van itt, hogy egy jövőbeli, összeadódó csatorna se
+   tudja elszabadítani a rendszert. */
+const COACH_QUAL_MAX=1.6;
+function coachQual(c){
+  if(!c)return 0;
+  const q=Math.max(0,Math.min(1,(c.sz-COACH_SZ_MIN)/(COACH_SZ_MAX-COACH_SZ_MIN)));
+  let m=1;
+  try{m=styleCoachPowerMult(c.type);}catch(e){}
+  return Math.min(COACH_QUAL_MAX,(0.35+0.65*q)*m);}
+/* Az edző hatás-együtthatója egy adott játékosra: 0.035 … 1.00 (a stílus
+   műhely-képességével fölfelé 1,45-ig). */
 function coachPower(c,playerName){
   if(!c||!coachIsActive(c))return 0;
   const t=focusTargets(c);
   if(!t.length)return 0;
   if(playerName&&t.indexOf(playerName)<0)return 0;
   const share=focusShare(t.length)/FOCUS_BUDGET;
-  const q=Math.max(0,Math.min(1,(c.sz-COACH_SZ_MIN)/(COACH_SZ_MAX-COACH_SZ_MIN)));
-  return share*(0.35+0.65*q);}
+  return share*coachQual(c);}
 /* Az aktív, adott típusú edzők — a hatás-bekötések (F3) ezen keresztül kérdezik
    le, ki figyel egy játékosra. */
 function coachesFor(typeKey,playerName){
@@ -21000,8 +21019,7 @@ function legacyRate(c){
   if(!c||c.type!=="skill")return 0;
   const n=focusTargets(c).length;
   if(!n)return 0;
-  const q=Math.max(0,Math.min(1,(c.sz-COACH_SZ_MIN)/(COACH_SZ_MAX-COACH_SZ_MIN)));
-  return LEGACY_RATE0*(0.35+0.65*q)*Math.pow(n,-0.35);}
+  return LEGACY_RATE0*coachQual(c)*Math.pow(n,-0.35);}
 function legacyBudget(c){
   if(!c||c.type!=="skill")return 0;
   const L=((c.fp&&c.fp.skillsEver)||[]).length,n=focusTargets(c).length;
@@ -21090,9 +21108,8 @@ function coachTeamScope(c){
   const t=focusTargets(c);
   if(!t.length)return 0;
   const roster=(typeof fullCareerRoster==="function"?fullCareerRoster():[]).filter(Boolean).length;
-  const q=Math.max(0,Math.min(1,(c.sz-COACH_SZ_MIN)/(COACH_SZ_MAX-COACH_SZ_MIN)));
   const cover=Math.min(1,t.length/Math.max(11,roster));
-  return (0.35+0.65*q)*cover;}
+  return coachQual(c)*cover;}
 function coachTeamPower(typeKey){
   let best=0;
   staff().forEach(c=>{if(c&&c.type===typeKey)best=Math.max(best,coachTeamScope(c));});
@@ -49688,6 +49705,14 @@ function coachEffectLines(c){
   const pw=coachPower(c,t[0]),L=[];
   const hu=x=>String(x).replace(".",",");
   L.push(`<span style="color:var(--dim2)">Fejenkénti figyelem: <b>${hu(focusShare(n).toFixed(1))}</b> · ${n} játékos</span>`);
+  /* ---- A STÍLUS MŰHELY-KÉPESSÉGE ITT LÁTSZIK MEG (3.7.39) ----
+     Az alábbi számok a coachPower/coachTeamScope értékéből jönnek, tehát a
+     szorzót MÁR TARTALMAZZÁK — de szám nélkül nem derülne ki, honnan a
+     különbség. Ez az a sor, ami a bolti döntést utólag is igazolja. */
+  {let _m=1;try{_m=styleCoachPowerMult(c.type);}catch(e){}
+   if(_m>1){
+     let _ic="🎯";try{const _d=styleDef();if(_d&&_d.ic)_ic=_d.ic;}catch(e){}
+     L.push(`<span style="color:var(--grass)">${_ic} A stílus műhely-képessége <b>×${hu(_m.toFixed(2))}</b>-re erősíti a munkáját — az alábbi számok ezt már tartalmazzák.</span>`);}}
   if(c.attrKey){
     const pts=COACH_ATTR_PTS*pw;
     const steps=pts*COACH_SEASON_MATCHES/CAREER_DEV_THRESHOLD;
@@ -64286,6 +64311,28 @@ function stTrait(styleK,key,tier,n,d,levels,cond,mult){
     key,tier,n,d,cond:cond||null,
     lv:levels.map((L,i)=>({price:Math.round(price[i]*m),fx:L.fx||{},note:L.note||""}))});}
 
+/* ---- A MŰHELY-KÉPESSÉGEK ÉLŐ MÉRÉSE (3.7.39) ----
+   Hét stílusnak van „műhely"-képessége, mind ugyanazt csinálja két csatornán
+   (coachXp + coachPow), csak más edzőtípusokra. Egy közös mérés-készítő
+   szolgálja ki mindet: kimondja, KIRE hat most, és MENNYIVEL — enélkül a
+   kártyán csak egy elvont szorzó állna, és pont az nem derülne ki, hogy van-e
+   egyáltalán olyan stábtagod, akin fogna.
+   EZ VOLT A KÉPESSÉG MÁSIK BAJA: aki nem tudta, hogy előbb fel kell vennie egy
+   Bástyát, annak a megvett szint némán nem csinált semmit. */
+function stCoachShopCond(types){
+  const L=(Array.isArray(types)?types:[types]);
+  return ()=>{
+    try{
+      const nm=L.map(t=>{const d=coachTypeByKey(t);return d?d.n:t;}).join(" / ");
+      const on=((typeof staff==="function")?staff():[]).filter(c=>c&&L.indexOf(c.type)>=0);
+      if(!on.length)return `most nincs ${nm} a stábodban — a képesség addig nem fog semmin`;
+      const m=styleCoachPowerMult(L[0]);
+      const who=on.map(c=>`${shortName(c.n)} (Sz ${c.sz})`).join(" · ");
+      return m>1
+        ? `most dolgozik: ${who} — a hatásuk ×${stNum(m)}`
+        : `most dolgozik: ${who} — a képesség még nincs megnyitva, a hatásuk ×1`;
+    }catch(e){return "";}};}
+
 /* ---------- 🧱 BETON VÉDELEM ---------- */
 stTrait("beton","edzett_szemek",1,"Edzett szemek",
   "A képesség-sorsolás a védekező kategóriák felé tolódik (védő és kapus).",[
@@ -64293,10 +64340,11 @@ stTrait("beton","edzett_szemek",1,"Edzett szemek",
   {fx:{skillCat:{cats:["VEDO","KAPUS"],p:0.45}},note:"45% esély"},
   {fx:{skillCat:{cats:["VEDO","KAPUS"],p:0.60}},note:"60% esély"}]);
 stTrait("beton","bastya_muhely",1,"Bástya-műhely",
-  "A védekezést támogató stábtagjaid (Bástya, Kesztyűs mester) gyorsabban gyűjtenek tapasztalatot.",[
-  {fx:{coachXp:1,coachXpTypes:["attr:ved","attr:kapus"]},note:"kétszeres tempó"},
-  {fx:{coachXp:2,coachXpTypes:["attr:ved","attr:kapus"]},note:"háromszoros tempó"},
-  {fx:{coachXp:3,coachXpTypes:["attr:ved","attr:kapus"]},note:"négyszeres tempó"}]);
+  "A védekezést támogató stábtagjaid (Bástya, Kesztyűs mester) gyorsabban gyűjtenek tapasztalatot — és HATÉKONYABBAN is dolgoznak: a képesség a MOSTANI stábtagod munkáját is felerősíti, nem csak a fejlődését gyorsítja.",[
+  {fx:{coachXp:1,coachPow:1.20,coachXpTypes:["attr:ved","attr:kapus"]},note:"kétszeres tempó · +20% hatékonyság"},
+  {fx:{coachXp:2,coachPow:1.32,coachXpTypes:["attr:ved","attr:kapus"]},note:"háromszoros tempó · +32%"},
+  {fx:{coachXp:3,coachPow:1.45,coachXpTypes:["attr:ved","attr:kapus"]},note:"négyszeres tempó · +45%"}],
+  stCoachShopCond(["attr:ved","attr:kapus"]));
 stTrait("beton","zart_kapu",2,"Zárt kapu",
   "Az ellenfél gólesélye minden mérkőzésen csökken.",[
   {fx:{oppGoalMult:0.94},note:"−6% ellenfél-gólesély"},
@@ -64466,10 +64514,11 @@ stTrait("bombazok","befejezes_iskola",1,"Befejezés-iskola",
   {fx:{skillCat:{cats:["CSATAR"],p:0.45}},note:"45% esély"},
   {fx:{skillCat:{cats:["CSATAR"],p:0.60}},note:"60% esély"}]);
 stTrait("bombazok","golvago_muhely",1,"Gólvágó-műhely",
-  "A Gólvágó-mentor stábtagod gyorsabban gyűjt tapasztalatot.",[
-  {fx:{coachXp:1,coachXpTypes:["attr:gol"]},note:"kétszeres tempó"},
-  {fx:{coachXp:2,coachXpTypes:["attr:gol"]},note:"háromszoros tempó"},
-  {fx:{coachXp:3,coachXpTypes:["attr:gol"]},note:"négyszeres tempó"}]);
+  "A Gólvágó-mentor stábtagod gyorsabban gyűjt tapasztalatot — és HATÉKONYABBAN is dolgozik: a képesség a MOSTANI stábtagod munkáját is felerősíti, nem csak a fejlődését gyorsítja.",[
+  {fx:{coachXp:1,coachPow:1.20,coachXpTypes:["attr:gol"]},note:"kétszeres tempó · +20% hatékonyság"},
+  {fx:{coachXp:2,coachPow:1.32,coachXpTypes:["attr:gol"]},note:"háromszoros tempó · +32%"},
+  {fx:{coachXp:3,coachPow:1.45,coachXpTypes:["attr:gol"]},note:"négyszeres tempó · +45%"}],
+  stCoachShopCond(["attr:gol"]));
 stTrait("bombazok","gepezet",2,"A gépezet beindul",
   "A csapatod gólesélye minden mérkőzésen nő.",[
   {fx:{ownGoalMult:1.06},note:"+6% gólesély"},
@@ -64562,10 +64611,11 @@ stTrait("harmonia","csapatkovacs",1,"Csapatkovács-műhely",
   {fx:{chemSpeed:0.35},note:"35% esély"},
   {fx:{chemSpeed:0.50},note:"50% esély"}]);
 stTrait("harmonia","egyenletes_edzes",1,"Egyenletes edzés",
-  "A Csapatkovács és a Lélekemelő stábtagjaid gyorsabban fejlődnek.",[
-  {fx:{coachXp:1,coachXpTypes:["chem","morale"]},note:"kétszeres tempó"},
-  {fx:{coachXp:2,coachXpTypes:["chem","morale"]},note:"háromszoros tempó"},
-  {fx:{coachXp:3,coachXpTypes:["chem","morale"]},note:"négyszeres tempó"}]);
+  "A Csapatkovács és a Lélekemelő stábtagjaid gyorsabban fejlődnek — és HATÉKONYABBAN is dolgoznak: a képesség a MOSTANI stábtagod munkáját is felerősíti (öltözői kémia, csapatmorál), nem csak a fejlődését gyorsítja.",[
+  {fx:{coachXp:1,coachPow:1.20,coachXpTypes:["chem","morale"]},note:"kétszeres tempó · +20% hatékonyság"},
+  {fx:{coachXp:2,coachPow:1.32,coachXpTypes:["chem","morale"]},note:"háromszoros tempó · +32%"},
+  {fx:{coachXp:3,coachPow:1.45,coachXpTypes:["chem","morale"]},note:"négyszeres tempó · +45%"}],
+  stCoachShopCond(["chem","morale"]));
 /* ---- OSZTOTT DICSŐSÉG ----
    A stílus mérőszáma és a mérföldkövei is arról szólnak, hogy SOKAN szálljanak
    be a termelésbe (különböző gólszerzők egy idényben, akik valaha betaláltak a
@@ -64665,10 +64715,11 @@ stTrait("sztar","kiszolgalas",2,"Kiszolgálás",
   {fx:{ownGoalMult:1.09},note:"+9%"},
   {fx:{ownGoalMult:1.13},note:"+13%"}]);
 stTrait("sztar","reflektorfeny",2,"Reflektorfény",
-  "A Gólvágó-mentor és a Játékmester stábtagjaid gyorsabban fejlődnek.",[
-  {fx:{coachXp:1,coachXpTypes:["attr:gol","attr:passz"]},note:"kétszeres tempó"},
-  {fx:{coachXp:2,coachXpTypes:["attr:gol","attr:passz"]},note:"háromszoros tempó"},
-  {fx:{coachXp:3,coachXpTypes:["attr:gol","attr:passz"]},note:"négyszeres tempó"}]);
+  "A Gólvágó-mentor és a Játékmester stábtagjaid gyorsabban fejlődnek — és HATÉKONYABBAN is dolgoznak: a képesség a MOSTANI stábtagod munkáját is felerősíti, nem csak a fejlődését gyorsítja.",[
+  {fx:{coachXp:1,coachPow:1.20,coachXpTypes:["attr:gol","attr:passz"]},note:"kétszeres tempó · +20% hatékonyság"},
+  {fx:{coachXp:2,coachPow:1.32,coachXpTypes:["attr:gol","attr:passz"]},note:"háromszoros tempó · +32%"},
+  {fx:{coachXp:3,coachPow:1.45,coachXpTypes:["attr:gol","attr:passz"]},note:"négyszeres tempó · +45%"}],
+  stCoachShopCond(["attr:gol","attr:passz"]));
 stTrait("sztar","a_rendszer_o",3,"A rendszer ő",
   "Ha a sztárod legalább 10 Ratinggel a kezdő 11 átlaga fölött van, a csapat csapaterőt kap.",[
   {fx:{ovrTeam:()=>stStarLead()>=10?2:0},note:"+2 csapaterő"},
@@ -64891,10 +64942,11 @@ stTrait("villam","korai_plafon",1,"Korai plafon-nyitás",
   {fx:{speedEarly:true,passiveSpeedPct:0.20},note:"+ a passzív út a születési érték +20%-áig visz"},
   {fx:{speedEarly:true,passiveSpeedPct:0.25},note:"+ a passzív út +25%-ig"}]);
 stTrait("villam","sprintmester",1,"Sprintmester-műhely",
-  "A Sprintmester stábtagod gyorsabban gyűjt tapasztalatot.",[
-  {fx:{coachXp:1,coachXpTypes:["attr:seb"]},note:"kétszeres tempó"},
-  {fx:{coachXp:2,coachXpTypes:["attr:seb"]},note:"háromszoros tempó"},
-  {fx:{coachXp:3,coachXpTypes:["attr:seb"]},note:"négyszeres tempó"}]);
+  "A Sprintmester stábtagod gyorsabban gyűjt tapasztalatot — és HATÉKONYABBAN is dolgozik: a képesség a MOSTANI stábtagod munkáját is felerősíti, nem csak a fejlődését gyorsítja.",[
+  {fx:{coachXp:1,coachPow:1.20,coachXpTypes:["attr:seb"]},note:"kétszeres tempó · +20% hatékonyság"},
+  {fx:{coachXp:2,coachPow:1.32,coachXpTypes:["attr:seb"]},note:"háromszoros tempó · +32%"},
+  {fx:{coachXp:3,coachPow:1.45,coachXpTypes:["attr:seb"]},note:"négyszeres tempó · +45%"}],
+  stCoachShopCond(["attr:seb"]));
 stTrait("villam","gyorsabb_izomzat",2,"Gyorsabb izomzat",
   "A sebesség edzés-lassítása enyhül — a gyorsaság nálad tanulható. (Alap: 1,5×)",[
   {fx:{speedDiv:1.35},note:"1,35× lassítás"},
@@ -64924,10 +64976,11 @@ stTrait("panzer","kemeny_belepok",1,"Kemény belépők",
   {fx:{skillCat:{cats:["VEDO","CSATAR"],p:0.45}},note:"45% esély"},
   {fx:{skillCat:{cats:["VEDO","CSATAR"],p:0.60}},note:"60% esély"}]);
 stTrait("panzer","edzo_kemenyseg",1,"Kőkemény iskola",
-  "A Bástya és a Gólvágó-mentor stábtagjaid gyorsabban fejlődnek.",[
-  {fx:{coachXp:1,coachXpTypes:["attr:ved","attr:gol"]},note:"kétszeres tempó"},
-  {fx:{coachXp:2,coachXpTypes:["attr:ved","attr:gol"]},note:"háromszoros tempó"},
-  {fx:{coachXp:3,coachXpTypes:["attr:ved","attr:gol"]},note:"négyszeres tempó"}]);
+  "A Bástya és a Gólvágó-mentor stábtagjaid gyorsabban fejlődnek — és HATÉKONYABBAN is dolgoznak: a képesség a MOSTANI stábtagod munkáját is felerősíti, nem csak a fejlődését gyorsítja.",[
+  {fx:{coachXp:1,coachPow:1.20,coachXpTypes:["attr:ved","attr:gol"]},note:"kétszeres tempó · +20% hatékonyság"},
+  {fx:{coachXp:2,coachPow:1.32,coachXpTypes:["attr:ved","attr:gol"]},note:"háromszoros tempó · +32%"},
+  {fx:{coachXp:3,coachPow:1.45,coachXpTypes:["attr:ved","attr:gol"]},note:"négyszeres tempó · +45%"}],
+  stCoachShopCond(["attr:ved","attr:gol"]));
 stTrait("panzer","vasfegyelem",2,"Vasfegyelem",
   "A csapatmorál nem tud egy szint alá esni. A keménység ára megmarad: a lapokat továbbra is összeszeditek.",[
   {fx:{moraleFloor:52},note:"morál-padló 52"},
@@ -65166,10 +65219,11 @@ stTrait("tikitaka","passz_sorsolas",1,"Passzra hangolt sorsolás",
             :"a pakliban most nincs passz-alapú képesség — a húzás friss példányt vesz a készletből";
   }catch(e){return "";}});
 stTrait("tikitaka","passzmester_muhely",1,"Passzmester-műhely",
-  "A Passz-attribútumot fejlesztő stábtagjaid gyorsabban gyűjtenek tapasztalatot.",[
-  {fx:{coachXp:1,coachXpTypes:["attr:passz"]},note:"kétszeres tempó"},
-  {fx:{coachXp:2,coachXpTypes:["attr:passz"]},note:"háromszoros tempó"},
-  {fx:{coachXp:3,coachXpTypes:["attr:passz"]},note:"négyszeres tempó"}]);
+  "A Passz-attribútumot fejlesztő stábtagjaid gyorsabban gyűjtenek tapasztalatot — és HATÉKONYABBAN is dolgoznak: a képesség a MOSTANI stábtagod munkáját is felerősíti, nem csak a fejlődését gyorsítja.",[
+  {fx:{coachXp:1,coachPow:1.20,coachXpTypes:["attr:passz"]},note:"kétszeres tempó · +20% hatékonyság"},
+  {fx:{coachXp:2,coachPow:1.32,coachXpTypes:["attr:passz"]},note:"háromszoros tempó · +32%"},
+  {fx:{coachXp:3,coachPow:1.45,coachXpTypes:["attr:passz"]},note:"négyszeres tempó · +45%"}],
+  stCoachShopCond(["attr:passz"]));
 /* ---- MEGFOJTJUK A MECCSET ----
    FELTÉTELES, mint a Beton „Ötös bástyá"-ja: csak akkor fizet, ha tényleg
    Labdatartással álltok fel. A logika a filozófia magja — akinél a labda van,
@@ -65623,6 +65677,33 @@ function styleCoachXp(type){
     if(types&&types.indexOf(type)<0)return;
     a+=f.coachXp;});
   return a;}
+/* ---- …ÉS A MŰHELY MÁSIK FELE: A HATÉKONYSÁG (3.7.39) ----
+   BEJELENTETT KÉRÉS: „a csapatstílus-képességeknél a stábtag erősítése ne csak
+   a tapasztalatgyűjtésre, hanem a hatékonyságra is hasson. Jelenleg az az
+   egyetlen képesség, amit sose szoktam megvenni."
+
+   MIÉRT VOLT IGAZA. A tapasztalat-szorzó csak IDŐVEL fizet, és ott is csak
+   közvetve: a plusz XP-ből szezononként legfeljebb pár Szakértelem-pont lesz
+   (COACH_XP_PER_STEP), az pedig a 0,35+0,65q görbén már alig mozdítja a
+   tényleges hatást. Ráadásul a felső határa is adott (coachSzCap: a felvételi
+   szinthez képest +COACH_SZ_GROWTH), tehát a gyorsítás nem visz magasabbra,
+   csak HAMARABB ugyanoda. Egy I. sávos képességért ez tényleg kevés volt.
+
+   MOSTANTÓL ugyanaz a szint a MOSTANI stábtagod munkáját is felerősíti:
+   +20% / +32% / +45% mindenre, amit az a típus csinál (attribútum-edzés,
+   forma-sorsolás, sérülés-védelem, skill-átadás, morál, kémia). Az első szint
+   tehát AZONNAL fizet, nem évek múlva.
+
+   CSAK A LEGJOBB SZINT ÉL (Math.max, nem összeg): a szorzók halmozása pont azt
+   a kiszámíthatatlanságot hozná be, ami ellen a coachQual plafonja is véd. */
+function styleCoachPowerMult(typeKey){
+  let m=1;
+  styleActiveFx().forEach(f=>{
+    if(!f.coachPow)return;
+    const types=f.coachXpTypes;
+    if(types&&typeKey&&types.indexOf(typeKey)<0)return;
+    if(f.coachPow>m)m=f.coachPow;});
+  return m;}
 /* A skill-sorsolás eltolása. Több képesség esetén a LEGERŐSEBB él, hogy a
    kategória-torzítás sose váljon determinisztikussá. */
 function styleSkillBias(){

@@ -1172,6 +1172,105 @@ Négy, egymásra épülő, önmagában is szállítható fázis.
 
 ---
 
+## 10b. A műhely-képességek: a stílus a MUNKÁT is erősíti (3.7.39)
+
+**A bejelentés:** *„a csapatstílus-képességeknél a stábtag erősítése ne csak a
+tapasztalatgyűjtésre, hanem a hatékonyságra is hasson. Jelenleg az az egyetlen
+képesség, amit sose szoktam megvenni. Érje meg megvenni legalább az első két
+szintjét."*
+
+### Miért volt igaza
+
+Hét stílusnak van „műhely"-képessége (Bástya-műhely, Gólvágó-műhely,
+Egyenletes edzés, Reflektorfény, Sprintmester-műhely, Kőkemény iskola,
+Passzmester-műhely). Mind ugyanazt csinálta: `coachXp` — plusz tapasztalat a
+stílushoz illő edzőtípusoknak.
+
+Ez **csak idővel fizetett, és ott is csak közvetve**:
+
+* a plusz XP-ből szezononként legfeljebb pár Szakértelem-pont lesz
+  (`COACH_XP_PER_STEP = 2`);
+* a Szakértelem a `0,35 + 0,65q` görbén hat, tehát pár pont alig mozdítja a
+  tényleges hatást;
+* és a **felső határ ettől nem tágul**: `coachSzCap` a belépéskori szinthez
+  képest `+COACH_SZ_GROWTH` (12), tehát a gyorsítás nem visz magasabbra, csak
+  **hamarabb ugyanoda**.
+
+Egy I. sávos képességért (14 pont) ez tényleg kevés volt.
+
+### Ami változott
+
+Ugyanaz a szint mostantól a **mostani** stábtagod munkáját is felerősíti —
+mindenre, amit az a típus csinál: attribútum-edzés, forma, sérülés-védelem,
+hagyaték-átadás, csapatmorál, öltözői kémia.
+
+| Szint | Ár (I. sáv) | Tapasztalat | **Hatékonyság** |
+|---|--:|---|---|
+| 1. | 14 | kétszeres tempó | **×1,20** |
+| 2. | 24 | háromszoros | **×1,32** |
+| 3. | 38 | négyszeres | **×1,45** |
+
+*(A Reflektorfény II. sávos, ott az ár 26 / 45 / 70 — a hatás ugyanez.)*
+
+**Az első szint tehát azonnal fizet, nem évek múlva** — pontosan ez volt a
+kérés.
+
+### Egy forrás, három olvasó
+
+A `0,35 + 0,65q` minőség-tag eddig **három helyen** állt kimásolva
+(`coachPower`, `coachTeamScope`, `legacyRate`). Egy szorzót három példányba
+bevezetni biztos hiba: valamelyik ág kimaradt volna. Ezért a tag egyetlen
+függvénybe került:
+
+```js
+function coachQual(c){
+  const q=clamp01((c.sz-COACH_SZ_MIN)/(COACH_SZ_MAX-COACH_SZ_MIN));
+  return Math.min(COACH_QUAL_MAX,(0.35+0.65*q)*styleCoachPowerMult(c.type));}
+```
+
+Innentől **minden** downstream hatás magától követi a szorzót, és a stáb-panel
+előnézete is — az ugyanabból a `coachPower`-ből számol, amiből a motor.
+
+**Csak a legjobb szint él** (`Math.max`, nem összeg). A `COACH_QUAL_MAX = 1,6`
+clamp így a mai értékekkel sosem kötne (1,0 × 1,45 = 1,45) — védőháló egy
+jövőbeli, összeadódó csatorna ellen.
+
+### Ami látszik is belőle
+
+* **A bolti kártyán** élő mérés (`stCoachShopCond`): *„most dolgozik: Béla
+  (Sz 75) — a hatásuk ×1,20"*, vagy ha nincs ilyen stábtagod: *„most nincs
+  Bástya / Kesztyűs mester a stábodban — a képesség addig nem fog semmin."*
+  Ez a képesség másik baja volt: aki nem tudta, hogy előbb fel kell vennie egy
+  Bástyát, annál a megvett szint némán nem csinált semmit.
+* **Az edző lapján** egy zöld sor: *„🧱 A stílus műhely-képessége ×1,20-re
+  erősíti a munkáját — az alábbi számok ezt már tartalmazzák."*
+
+### Mérés
+
+Egy **Sz 75-ös Bástya, egyetlen játékosra** fókuszálva:
+
+| | Véd-pont/meccs | lépés/szezon |
+|---|--:|--:|
+| képesség nélkül | 0,662 | **1,32** |
+| 1. szint | 0,795 | **1,59** |
+| 2. szint | 0,874 | **1,75** |
+
+**Harmónia**, Sz 75-ös Lélekemelő + Csapatkovács a teljes keretre:
+
+| | csapatmorál | öltözői kémia |
+|---|--:|--:|
+| képesség nélkül | +10,8 | +7,2 |
+| 1. szint | **+13,0** | **+8,7** |
+| 2. szint | +14,3 | +9,0 (a `COACH_CHEM_MAX` plafonon) |
+| 3. szint | +15,7 | +9,0 |
+
+**Célzottság:** a Bástya-műhely 3. szintjén `attr:ved` és `attr:kapus` **×1,45**,
+`attr:gol` **×1,00**; más stílusban (Villám) `attr:ved` is **×1,00**.
+**Plafon:** egy Sz 99-es edző alap minőség-tagja 1,00, a 3. szinttel 1,45 — a
+clamp (1,6) nem köt.
+
+---
+
 ## 11. Nyitott döntések
 
 Ezekre az implementáció előtt kell válasz — mindegyiknél megjelölve az
