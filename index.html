@@ -4692,7 +4692,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.37";
+const APP_VERSION="3.7.38";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -41975,14 +41975,34 @@ function twShowAttrPicker(){
       +`<small>${k==="seb"&&isFinite(speedCap())&&tk>=speedCap()?`plafon: ${speedCap()}`:`cél: ${ragSzam(tk)} fölött`}</small></span>`;
     b.onclick=()=>{
       const sess=twSession();
-      twAttrLeft();                 /* biztosítja, hogy a számláló létezik */
+      const left=twAttrLeft();      /* biztosítja, hogy a számláló létezik */
       if((sess.attrLeft||0)<=0){twShowCategoryPicker();return;}
-      sess.attrLeft--;
-      TW.searchMode="attr";TW.searchAttr=k;TW.category=null;TW.retries=0;
-      /* ugyanaz a zár, mint a poszt-keresésnél: elszállt keresésért nem
-         fogyhat a keresési alkalom */
-      try{twScout();}
-      catch(err){sess.attrLeft++;twScoutFailed(err,null);}};
+      /* ---- ELŐBB A KÉRDÉS, UTÁNA A KERESÉS (3.7.38) ----
+         BEJELENTETT HIBA: „képességkeresés menübe ha belépek és kiválasztom,
+         melyik képességét keresem, azonnal rákeres, nem kér megerősítést —
+         pedig abból általában 1-2 darab van csak."
+         A TESTVÉR-KÉPERNYŐ, a poszt-választó, PONTOSAN ERRE kapott megerősítőt
+         (lásd twShowCategoryPicker), ez az ág viszont kimaradt belőle. Egy
+         félrenyúlás így egy olyan tengelyre keresett, amit meg sem akartál
+         nézni — és a keretből nem jár vissza. */
+      const spendNow=()=>{
+        if((sess.attrLeft||0)<=0){twShowCategoryPicker();return;}
+        sess.attrLeft--;
+        TW.searchMode="attr";TW.searchAttr=k;TW.category=null;TW.retries=0;
+        /* ugyanaz a zár, mint a poszt-keresésnél: elszállt keresésért nem
+           fogyhat a keresési alkalom */
+        try{twScout();}
+        catch(err){sess.attrLeft++;twScoutFailed(err,null);}};
+      const after=Math.max(0,left-1);
+      askConfirm({title:"Erre a képességre keressen?",yes:"Igen, induljon a keresés",
+        html:`<div style="font-size:15px;font-weight:700">${TW_ATTR_ICON[k]||"🎯"} ${esc(ATTR_LABELS[k])}</div>
+          <div style="font-size:13px;margin-top:8px;line-height:1.55">
+            A scout <b>${TW_ATTR_RESULTS} jelöltet</b> hoz, poszttól függetlenül, `
+            +`${esc(ATTR_LABELS[k])}-értékük <b>${ragSzam(tk)} körül vagy afölött</b>.
+            <br><br>Ez <b>egy képesség-keresést</b> költ el, és a keretből <b>nem jár vissza</b>,
+            ha a jelöltek közül nem igazolsz.
+            <br><br>Utána marad: <b style="color:${after?"var(--gold)":"var(--red)"}">${after}</b> / ${twAttrMax()} keresés.</div>`,
+        onYes:spendNow});};
     grid.appendChild(b);});
   $("twBody").appendChild(grid);
   const back=document.createElement("button");back.className="btn-s stepbtn";back.style.marginTop="10px";
@@ -48513,18 +48533,35 @@ $("hubTransferEventBtn")&&($("hubTransferEventBtn").onclick=()=>{
   if(twClosedNow())return;   /* szezon közben csak nyitott ablakban */
   if(preSeasonHubMode)return;
   if(twEventLeft()<=0)return;
-  twSpendEvent();
-  TW=twWindowOpen()
-    ? {cycle:1,category:null,candidates:[],retries:0,maxCycles:1,
-       label:twWindowLabel(),fromCheckpoint:true,isHubEvent:true}
-    : {cycle:1,category:null,candidates:[],retries:0,maxCycles:1,
-       label:"Nyári átigazolási esemény",isHubEvent:true};
-  $("scHub").classList.add("hide");
-  $("scWindow").classList.remove("hide");
-  $("twPanel").classList.remove("hide");
-  $("swapPanelWrap").classList.add("hide");
-  twStartPhase2();
-  $("scWindow").scrollIntoView({behavior:"smooth"});});
+  /* ---- ELŐBB A KÉRDÉS, UTÁNA A PÖRGETÉS (3.7.38) ----
+     Ez volt a legélesebb eset az egész HUB-ban: a MENÜPONT MAGA volt a
+     művelet. A gombra koppintva a twSpendEvent() azonnal lefutott — nem volt
+     se közbenső képernyő, se ár-kiírás, se visszaút —, pedig eseményből
+     nyaranta 2 (10★ ügynökségtől 3), a szezonközi ablakban 1-2 van.
+     A menü böngészése nem költhet el egy alkalmat. */
+  const go=()=>{
+    if(twEventLeft()<=0)return;   /* elavult gomb elleni zár */
+    twSpendEvent();
+    TW=twWindowOpen()
+      ? {cycle:1,category:null,candidates:[],retries:0,maxCycles:1,
+         label:twWindowLabel(),fromCheckpoint:true,isHubEvent:true}
+      : {cycle:1,category:null,candidates:[],retries:0,maxCycles:1,
+         label:"Nyári átigazolási esemény",isHubEvent:true};
+    $("scHub").classList.add("hide");
+    $("scWindow").classList.remove("hide");
+    $("twPanel").classList.remove("hide");
+    $("swapPanelWrap").classList.add("hide");
+    twStartPhase2();
+    $("scWindow").scrollIntoView({behavior:"smooth"});};
+  const left=twEventLeft(),after=Math.max(0,left-1);
+  askConfirm({title:"Kipörgetsz egy átigazolási eseményt?",yes:"Igen, pörgessünk",
+    html:`<div style="font-size:15px;font-weight:700">🎲 Átigazolási esemény</div>
+      <div style="font-size:13px;margin-top:8px;line-height:1.55">
+        A piac dob egy váratlan fordulatot: <b>elvágyódás</b>, <b>álomigazolás</b> vagy egy <b>ikon</b>
+        felbukkanása. Hogy melyik, azt a pörgetés dönti el — és a végét nem lehet visszacsinálni.
+        <br><br>Ez <b>egy eseményt</b> költ el a keretedből, akkor is, ha a végén nem élsz a lehetőséggel.
+        <br><br>Utána marad: <b style="color:${after?"var(--gold)":"var(--red)"}">${after}</b> / ${twEventMax()} esemény.</div>`,
+    onYes:go});});
 /* ================= KARRIER MÓD — NYÁRI KLUB-SZEMLE =================
    A draft-élmény visszatér a HUB-ban: kipörgetsz egy valós klub-szezont,
    és bárkit megvehetsz belőle, aki még nem a tiéd. A pörgetések száma
@@ -51651,7 +51688,22 @@ function renderSaleOffersPanel(){
     const no=document.createElement("button");
     no.className="btn-s stepbtn";no.style.marginTop="6px";
     no.textContent="❌ Elutasítom — várok jobbat";
+    /* ---- AZ ELUTASÍTÁS IS VÉGLEGES (3.7.38) ----
+       Az ELFOGADÁS teljes megerősítőt kapott, az elutasítás nem — pedig az
+       elfogadás saját szövege mondja ki: „ez a konkrét összeg nem jön vissza".
+       Egy ajánlatra fordulókat vártál; egy félrenyúlás elviszi, és a következő
+       licit csak a következő átigazolási időszakban érkezik. */
     no.onclick=()=>{
+      askConfirm({title:"Elutasítod ezt az ajánlatot?",yes:"Igen, várok jobbat",
+        html:`<div style="font-size:15px;font-weight:700">${esc(p.n)}</div>
+          <div style="font-size:13px;margin-top:9px;line-height:1.55">
+            A <b style="color:var(--gold)">${fmtFt(rec.offer.amount)}</b>-os ajánlat <b>véglegesen elvész</b> —
+            ez a konkrét összeg nem jön vissza.<br><br>
+            Cserébe a licit-kúp csúcsa feljebb kúszik (${Math.round(agencyBidMode(rec.rejects)*100)}% →
+            <b>${Math.round(agencyBidMode((rec.rejects||0)+1)*100)}%</b>), a negyedik elutasításig.
+            <span style="color:var(--dim2)">A következő licit rendszerint a következő átigazolási
+            időszakban érkezik.</span></div>`,
+        onYes:()=>{
       /* Az ELUTASÍTOTT összeget előre elkapjuk: a saleRejectOffer már felül is
          írhatja a rec.offer-t egy azonnal érkező új licittel. */
       const was=rec.offer.amount;
@@ -51659,7 +51711,7 @@ function renderSaleOffersPanel(){
       addLine(next
         ?`📈 Elutasítottad a ${fmtFt(was)}-os ajánlatot ${esc(shortName(p.n))}-ért — azonnal jött egy új: ${fmtFt(next.amount)}.`
         :`📈 Elutasítottad a ${fmtFt(was)}-os ajánlatot ${esc(shortName(p.n))}-ért — a következő licit a következő átigazolási időszakban érkezik, és az alsó határ feljebb kúszott.`,"m life");
-      saveGame();renderSaleOffersPanel();};
+      saveGame();renderSaleOffersPanel();}});};
     box.appendChild(yes);box.appendChild(no);
     act.appendChild(box);});
   const cancel=document.createElement("button");
@@ -51699,7 +51751,21 @@ $("hubBoostTokenBtn").onclick=()=>{
     const b=document.createElement("button");b.className="btn-s stepbtn";b.style.marginTop="6px";b.style.textAlign="left";
     const label=kind==="youth"?"⚡ Ifi-boost":"🎩 Öreg csirkefogó";
     b.innerHTML=`<b>${label}:</b> ${esc(shortName(p.n))} <span style="color:var(--dim2)">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))}</span>`;
+    /* ---- ELŐBB A KÉRDÉS, UTÁNA A BEVÁLTÁS (3.7.38) ----
+       UGYANEZ A BOOST PÉNZÉRT teljes megerősítőt kap („A boost egyszeri és
+       visszavonhatatlan" — lásd a fizetős ifi- és öreg-boost panelt). A
+       token-úton viszont ugyanaz a hatás és ugyanaz a véglegesség kérdés
+       nélkül futott le, egyetlen sor-koppintásra — pedig tokenből jellemzően
+       egy van. Ugyanaz a szöveg-minta, csak a token fizet, nem a büdzsé. */
     b.onclick=()=>{
+      if((S.boostTokens||0)<=0)return;
+      const sc=youthBoostScale();
+      const rr=kind==="youth"?YOUTH_BOOST_RATING:OLD_BOOST_RATING;
+      const tt=kind==="youth"?YOUTH_BOOST_TSI:OLD_BOOST_TSI;
+      const rLo=Math.round(rr[0]*sc),rHi=Math.round(rr[1]*sc);
+      const tLo=Math.round(tt[0]*sc),tHi=Math.round(tt[1]*sc);
+      const after=Math.max(0,(S.boostTokens||0)-1);
+      const doIt=()=>{
       if((S.boostTokens||0)<=0)return;
       S.boostTokens--;
       let msg;
@@ -51714,6 +51780,15 @@ $("hubBoostTokenBtn").onclick=()=>{
       const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";ok.onclick=()=>csReturnToHub();
       $("twActions").appendChild(ok);
       drawPitch();updateBar();saveGame();};
+      askConfirm({title:"Erre a játékosra váltod be?",yes:"Igen, beváltom",
+        html:`<div style="font-size:15px;font-weight:700">${label} — ${esc(shortName(p.n))}</div>
+          <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))}</div>
+          <div style="font-size:13px;margin-top:9px;line-height:1.5">Hatása <b>+${rLo}-${rHi} Rating</b> és <b>+${tLo}-${tHi} TSI</b>`
+          +(kind==="youth"?`, és a fejlődése ezután is tovább nő.`:`, és ${OLD_BOOST_RETIRE_AGE} éves koráig a pályán tartja.`)
+          +`<br><br>A token fizeti, nem a büdzséd — de a <b>beváltás egyszeri és visszavonhatatlan</b>,
+            és csak EZT a játékost érinti.
+            <br><br>Utána marad: <b style="color:${after?"var(--gold)":"var(--red)"}">${after}</b> boost-token.</div>`,
+        onYes:doIt});};
     $("twActions").appendChild(b);};
   youths.forEach(p=>addBtn(p,"youth"));
   vets.forEach(p=>addBtn(p,"old"));
@@ -58575,7 +58650,18 @@ function renderInvestOffer(){
     grid.appendChild(b);});
   const skip=document.createElement("button");skip.className="btn-s";
   skip.textContent="Kihagyom";
-  skip.onclick=()=>{S.investPending=false;renderHub();saveGame();};
+  /* ---- A ROMBOLÓ ÁG VOLT AZ ŐRIZETLEN (3.7.38) ----
+     Az összeg-gombok mind megerősítőt kapnak („a lehetőség egyszeri"), a
+     mellettük álló, UGYANOLYAN kinézetű Kihagyom viszont egyetlen
+     koppintással véglegesen eldobta a felajánlást. Épp fordítva volt, mint
+     kellett volna: a visszafordíthatatlan lépés ment kérdés nélkül. */
+  skip.onclick=()=>{
+    askConfirm({title:"Kihagyod a befektetést?",yes:"Igen, kihagyom",
+      html:`<div style="font-size:13px;line-height:1.55">💼 A felajánlás <b>végleg eltűnik</b> —
+        ez a lehetőség egyszeri, és nem jön vissza a következő szezonzárásnál.<br><br>
+        <span style="color:var(--dim2)">Amit itt beteszel, a következő szezon elején <b>kétszeresen</b>
+        jön vissza; legfeljebb a büdzséd felét (${fmtFt(cap)}).</span></div>`,
+      onYes:()=>{S.investPending=false;renderHub();saveGame();}});};
   grid.appendChild(skip);
   box.appendChild(grid);}
 function hubShowSeasonReport(){
