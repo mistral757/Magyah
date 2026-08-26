@@ -1810,6 +1810,97 @@ ezzel a **második legtöbbet termelő** stílus lett. A három új család a k�
 
 ---
 
+### 3.2c A Beton két rendszer-képessége (3.7.37)
+
+**A bejelentés:** *„kéne Park the bus taktika ismertségét és illeszkedését
+gyorsító képesség, mint a Villámoknál a széljáték és gyors kontra. Csak
+olcsóbban adjon többet."* · *„legyen Mourinho megvásárolható edző itt,
+ugyanolyan funkciókkal, mint Guardiola a Tikitakánál."*
+
+A Beton fájának eddig **nem volt egyetlen olyan lapja sem, ami a saját
+taktikáját vitte volna előre** — pedig a filozófia legdrágább képessége (a
+„Jöhet a buszsofőr!") **csak aktív Park the bus mellett** hívható. A stílus
+tehát egy rendszerre kötötte magát, és nem adott hozzá semmit.
+
+| Képesség | Sáv | Szintek | Ár |
+|---|---|---|---|
+| 🚌 **Vérükben a busz** | I. (×0,7) | +4% / +8% / +12% begyakorlás **és** illeszkedés | 10 / 17 / 27 |
+| 🕶️ **Mourinho** | III. (×1,35) | edzőváltás + kétszeres tempó · plafon 125 · plafon 150 | 54 / 92 / 146 |
+
+#### Vérükben a busz
+
+A Villám „Vérükben a rendszer"-ének párja. A **megismerés** (a meccsenkénti
+begyakorlás) és az **illeszkedés** egyszerre gyorsul; a kettő egymásba is ér,
+mert az illeszkedés a `fitMult`-on át a begyakorlás sebességét is emeli — 12%-os
+szinten a begyakorlás nettó **~+25%**, nem +12%. Ez szándékos: a képesség
+ígérete pont az egyidejűség.
+
+**Olcsóbban többet, és ez nem kedvezmény.** A Villámé **két** rendszert visz
+(Széljáték + Gyors kontra), ez **egyet**: ugyanaz a pont fele annyi felületen
+hat, a stílus pedig egyetlen rendszerre köti magát. Ezért +4/8/12% a
++2,5/5/7,5% helyett, **0,7-es árszorzóval**: 10/17/27 pont a 14/24/38 helyett.
+
+**Két csatorna, egy összeg.** A `tacticPace` (Villám) és az új `tacticBus`
+(Beton) külön csatorna, de a fit, a begyakorlás és a panel egyetlen
+`styleTacticBoost(key)`-t olvas. Így nem lehet olyan hívási hely, ami csak az
+egyikről tud — ugyanaz az indok, amiért a pace-bónusz eleve a fit **egyetlen
+forrásában** ül, nem a hívási helyeken.
+
+**Mérve** (ved 92 · kapus 90 · passz 70 · gól 74 · seb 66 tengelyekkel): a Park
+the bus illeszkedése **86,8% → 97,2%**, a Széljátéké változatlanul 18,1%.
+
+#### Mourinho
+
+Betűre ugyanaz a szerkezet, mint Guardiolánál, csak a **Park the busra**.
+Mourinho eddig is szerepelt a `COACHES` táblában („a Special One", mesteri
+védekezés-szervező, kedvelt rendszerei: *busz · kontra · hosszú*) — tehát nem új
+embert hozunk be, hanem ugyanazt az utat nyitjuk meg hozzá, ami Guardiolához
+vezet.
+
+| Szint | Mit ad |
+|---|---|
+| 1. | **edzőváltás**: a klub leszerződteti Mourinhót · a Park the bus kétszeres tempóval gyakorlódik be |
+| 2. | a Park the bus ismertsége **125-ig** vihető (a meccshatás sapkája 2,1 → 2,88) |
+| 3. | …és **150-ig** (a sapka 3,63) |
+
+**Miért csak egy rendszernél.** Ugyanaz az érv, mint Guardiolánál: a képesség
+egy EMBERRŐL szól, aki egyetlen filozófiát visz tökélyre. Ha minden taktikára
+hatna, nem Mourinho volna, hanem egy általános plafon-emelés.
+
+**Ha eleve Mourinho az edződ, az 1. szint ingyen jár** — a Beton választásának
+pillanatától, mert nincs kit leszerződtetni (`mourinhoFreeLevel`). A szint
+**származtatott, nem mentett**, tehát a már futó karrierek is megkapják
+betöltéskor. A bolt „a teljes fa ára" sora ilyenkor levonja az 1. szint árát, a
+kártyán pedig ott áll, hogy miért nem került pontba.
+
+**Egy törzs két edzőváltásnak.** A `guardiolaTakeOver` és a `mourinhoTakeOver`
+egyetlen `styleCoachTakeOver(név, ikon, taktikakulcs)` hívása lett: a két
+függvény korábban betűre ugyanaz volt, és egy másolat mindig azt kockáztatja,
+hogy valaki csak az egyiket frissíti. A `tacticCeil` ugyanígy **kulcsra dönt,
+nem stílusra** — a `tacticLevelRate`, a `tacticEffectCap` és a taktika-panel
+sávja így magától követi mindkét kitolt plafont.
+
+**Egy csapda, amibe belefutottam:** a Mourinho-képesség először a Tiki-Taka
+`TT_SYSTEM_PRICE_MULT` konstansát használta ársúlyozásra. A Beton blokkja
+viszont a fájlban a Tiki-Taka **előtt** épül fel, tehát a `const` holt zónájából
+olvasott volna — `ReferenceError` a betöltéskor, amit sem a `node --check`, sem
+az `eslint no-undef` nem fog meg. Saját `BT_SYSTEM_PRICE_MULT` áll a helyén,
+ugyanazzal az értékkel.
+
+#### A fa utána
+
+| | előtte | utána |
+|---|--:|--:|
+| Beton képesség | 13 | **15** |
+| Beton fa ára | 1 992 | **2 338** |
+
+A mezőnyben (Harmónia 2 267 · Tiki-Taka 1 883 · Bombázók 1 857 · Villám 1 732 ·
+Sztárom a párom 1 581 · Panzer 1 440) a Beton fája lett a legnagyobb — a 3.7.36
+mérföldkő-bővítéssel együtt ez szándékos: a stílus így termel is annyit,
+amennyit elkölthet.
+
+---
+
 ### 4.3b Az ember is számít — a szerepek attribútum-szorzója (3.7.31)
 
 *(Érintett kód: `ROLE_ATTR_OF`, `ROLE_ATTR_SLOPE` / `_MIN` / `_MAX`,
