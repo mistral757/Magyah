@@ -1,9 +1,10 @@
 # Fekvő mód — a stadion-nézet, a HUB és minden más képernyő
 
-*(3.7.05–3.7.31. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
+*(3.7.05–3.7.43. Érintett kód: `body.stadium` / `body.stadium.stadiumLive` /
 `body.appFs` CSS-blokk az `index.html`-ben, `stadiumWanted`,
 `STADIUM_BLOCKERS`, `sbApplyStadium`, `stadiumSync` + a `MutationObserver`,
-`stadiumFsActive` / `stadiumFsToggle`, `#stadiumFsBtn`. A HUB oldaláról:
+`stadiumFsActive` / `stadiumFsOwned` / `stadiumFsBtnShow` /
+`stadiumFsToggle` / `fsBtnSync`, `#stadiumFsBtn` és `#fsBtn`. A HUB oldaláról:
 `body.hubLand` CSS-blokk, `hubLandWanted`, `HUBLAND_BLOCKERS`, `applyHubLand`,
 `_hubLandOpenedMenu` és a `hubMenuApply` `land`-kapuja. A 3.7.07-ből:
 `sbStadiumFits` / `SB_LAND_MIN_RATIO` / `sbViewportW`, `body.landPage`
@@ -103,7 +104,73 @@ A `body.appFs` jelzőt a `stadiumFsActive()` adja: `document.fullscreenElement`,
 `(display-mode: fullscreen)`, `(display-mode: standalone)` vagy iOS-en a
 `navigator.standalone`. A ⛶ gomb csak ott jelenik meg, ahol a teljes képernyő
 **kérhető és még nincs megadva** — a manifestből jövő teljes képernyőn nincs
-mit kérni.
+mit kérni (`stadiumFsBtnUseful`).
+
+### 5b. A fejléc ⛶ gombja (3.7.43)
+
+**A bejelentés:** *„legyen rögzített gombja a teljes képernyős módnak fenn a
+kezdőlap házikó mellett, fenn a jobb felső sarokban. Megmaradhat a régi is a
+meccs nézetnél, ott viszont a szöveget javítani kell, mert ki- és
+bekapcsolásnál is »kilépés a teljes képernyős módból« szerepel."*
+
+**A gomb.** Eddig a ⛶ **kizárólag** a fekvő stadion-nézet jobb sávjában létezett
+— tehát álló nézetben, ahol a játék ideje nagy része telik, sehogy nem lehetett
+teljes képernyőre váltani. Az új `#fsBtn` a **fejlécben** ül, közvetlenül a 🏠
+mellett (sorrend: 🏠 ⛶ 📲 ◑), így minden képernyőn egy helyről kapcsolható. A
+kezelője **ugyanaz** a `stadiumFsToggle`, tehát a két gomb egyetlen állapotot
+kapcsol, és bármelyikkel ki lehet lépni abból, amit a másik bekapcsolt.
+
+**Jelzés szín, nem jel.** A „teljes képernyő" szimbólumnak nincs általánosan
+meglévő páros, kilépő változata, ezért a jel marad ⛶, és az állapotot a `.fsOn`
+osztály mondja meg (arany keret + arany jel, ahogy az Infópult gomb is jelez).
+Mellette a `title`/`aria-label` szövege vált. Mindhárom témában mérve:
+
+| téma | KI (jel / keret) | BE (jel / keret) |
+|---|---|---|
+| sötét | `#eae7e1` / `#2b2b2e` | `#c9a233` / `#c9a233` |
+| plakát | `#1a1712` / `#c9bfa8` | `#7d5a0e` / `#7d5a0e` |
+| noir | `#cbc9c4` / `#313136` | `#f7f5ee` / `#f7f5ee` |
+
+### 5c. Két hiba, amit ez javított
+
+**1. A felirat a rossz kérdésre válaszolt.** A gomb szövegét a
+`stadiumFsActive()` adta — csakhogy az **szándékosan tág**: neki azt kell
+eldöntenie, van-e rendszersáv a képernyő tetején, ezért a **telepített**,
+standalone változatra is igazat mond. Feliratnak viszont hibás: telepítve a
+gombon **mindig** „Kilépés a teljes képernyőből" állt, bekapcsoláskor is, mert a
+standalone mód már igazzá tette, holott a document-szintű teljes képernyő még ki
+volt kapcsolva.
+
+Az új `stadiumFsOwned()` **csak azt nézi, amit a gomb maga vezérel**:
+`document.fullscreenElement`. Ezt használja a felirat, az állapotjelzés és maga
+a kapcsolás is. A `stadiumFsActive()` érintetlen — a `body.appFs` kérdése más
+kérdés, és ott a tág válasz a helyes.
+
+**2. A gomb elrejtette magát a saját bekapcsolt állapota mögé.** A mérés
+akadt fenn rajta: bekapcsolás után a `(display-mode: fullscreen)` már
+illeszkedett, a `stadiumFsBtnUseful()` hamisra fordult, és a gomb eltűnt — nem
+volt mivel kilépni belőle. A láthatóság mostantól a `stadiumFsBtnShow()`-n megy:
+*kérhető-e még*, **vagy** *mi kértük-e el*. Ez a régi stadion-gombot is
+javította.
+
+### 5d. Mérés (fejetlen böngésző, valódi Fullscreen API-val)
+
+| lépés | `fsOn` | fejléc felirata | stadion-gomb felirata |
+|---|---|---|---|
+| alap | — | Teljes képernyő | ⛶ Teljes képernyő |
+| ⛶ megnyomva | ✅ | Kilépés a teljes képernyőből | ⛶ Kilépés a teljes képernyőből |
+| ⛶ újra | — | Teljes képernyő | ⛶ Teljes képernyő |
+| kívülről kiléptetve (nem a gombbal) | — | Teljes képernyő | — |
+| **telepítést hamisítva**, kikapcsolt teljes képernyő | — | **Teljes képernyő** | **⛶ Teljes képernyő** |
+
+Az utolsó sor a bejelentett hiba: korábban ott „Kilépés…" állt volna.
+
+A kívülről (Esc, rendszer-gesztus) történő kilépés a meglévő
+`fullscreenchange` figyelőn át üt a gombokra — az `stadiumSync()`-et hívja, az
+pedig a `sbApplyStadium` → `fsBtnSync` páron át mindkettőt frissíti.
+
+**A kezdőlapon a fejléc-gomb nem érhető el** — de nem is látszik: a belépő
+képernyő (`#mpEntry`) teljes fedőréteg, ami a 🏠-t és a ◑-t is takarja.
 
 A morál sáv a rács két alsó, `auto` magasságú sora. Ha rejtve van, a két sor
 nulla magas: nem kell két külön elrendezés a két esethez.
