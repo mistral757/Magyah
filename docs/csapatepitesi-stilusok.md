@@ -1719,6 +1719,97 @@ szerkesztő, az első opcióval eleve nyitva. A döntés — a „nem" is — a 
 része, tehát egy újratöltés nem kérdezi meg újra; a keret visszahívása viszont
 eldobja a tervet, mert az átrendezett keretre épülő szabályok elavulnak.
 
+### 3.2b A Beton három hiányzó mérföldköve (3.7.36)
+
+**A bejelentés:** *„Beton védelem csapatstílusnál legyen több mérföldkő, kevés
+a pont amit lehet gyűjteni: legyen pl. olyan ami a buszsofőr behozása utáni
+kapott gól nélküli perceket számolja, olyan ami a tiszta szereléseket, olyan
+ami a védő és csatár közötti kémia kapcsolatokért ad pontot — már az első 16
+pontot érjen az alapértékeknél (lassítás nélkül)."*
+
+A 3.3.16 bővítése után is maradt egy szerkezeti hiány: a Beton **tizenhét
+sorából szinte mind ugyanarról a két dologról** beszélt — tiszta lap és kapott
+gól. A stílus három legsajátabb mozdulatáról viszont **egyetlen mérföldkő sem**
+szólt, pedig mindhárom kizárólag itt létezik: a **buszsofőr** (csak a Beton
+hívhatja be), a **tiszta szerelés** (a stílus saját közvetítés-csatornája) és a
+**hátulról induló kontra** (a védő és a csatár közti kötés).
+
+| Család | Lépcső | Pont | Mit mér |
+|---|---|---|---|
+| 🚌 **Percek a busz mögött** (`bt_busmin`) | 20 / 60 / 150 / 300 / 600 / 1000 perc | 16 / 20 / 24 / 28 / 32 / 38 | a buszsofőr behívásától a lefújásig, kapott gól nélkül |
+| 🦵 **Tiszta szerelések** (`bt_tackle`) | 1 / 3 / 8 / 15 / 30 / 50 / 80 | 16 / 18 / 22 / 26 / 30 / 34 / 40 | a három szerelés-képesség pillanatai |
+| 🤝 **Védő–csatár párkémiák** (`bt_dfchem`) | 1 / 2 / 3 / 5 / 8 | 16 / 22 / 28 / 36 / 46 | kész (5/5) kötés egy védő és egy csatár között |
+
+**Az értékgörbe itt más, és ez szándékos.** A közös lépcsők (`ST_L9`, `ST_L6`)
+**2 ponttal** nyitnak; a kérés viszont kimondta, hogy az első fokozat már 16-ot
+érjen. Ezért ez a három család saját görbét kapott. A **16 az alapérték** — a
+kiírt szám ettől még a tempó szerint szűkül (`msSpReward`), lassított tempón
+tehát kevesebb jár érte. Ez nem kivétel: minden mérföldkő így működik.
+
+#### Percek a busz mögött
+
+A buszsofőr ígérete egyetlen mondat: *innentől nem kapunk gólt.* Eddig semmi
+nem mérte, mennyire tartottad be. A számláló a **behívás pillanatától** ketyeg,
+és az **első kapott gól lezárja** az adott mérkőzés mérését — az addig
+összegyűjtött percek megmaradnak, de a busz onnantól már nem áll keresztben.
+
+A mérés a szimuláció **tick végén** fut, ahol az ötperces vödör minden gólja már
+könyvelve van; a percszám nem tickenként gyűlik, hanem a behívás óta **eltelt
+idő**, tehát egy félidőben behívott busz sem számol be fél tickkel többet. A
+**hosszabbítás fölött nem gyűjtünk tovább**: a busz ígérete a lefújásig szól, a
+ráadás pedig már új mérkőzés (semleges pálya, újraszámolt λ-k).
+
+Az első fokozat **egyetlen jól időzített busz**: félidőben behívva 45 perc is
+összejöhet, tehát a 20 perc már az első sikeres bezárkózással megvan — a stílus
+új ága nem évek múlva kezd fizetni.
+
+*Kód:* `busAtMin` / `busGA0` / `busCleanMin` / `busBreach` a mérkőzés
+closure-jében, `msNoteBusMinutes` a könyvelésre, `stBusCleanMin` a mércére,
+`S.busCleanMin` a mentésben.
+
+#### Tiszta szerelések
+
+**Ugyanazt a mérést olvassa, mint a Panzer „Kőkemény belépő" sora**
+(`stHardTackleCount`) — szándékosan. A szerelésnek **egyetlen forrása** van a
+motorban (a három szerelés-képesség saját, sűrűbb közvetítés-csatornája), és
+két párhuzamos számláló csak arra volna jó, hogy egyszer szétcsússzanak. Két
+stílus egyszerre úgysem lehet aktív, tehát **a mérce osztott, a lépcső nem**: a
+Panzeré 2 ponttal nyit és a mennyiségről szól, ez itt 16-tal, és a Beton
+műhelymunkáját fizeti meg. Mind a három képesség (`df_clean`,
+`df_steady_press`, `df_torghelle`) **VEDO** kategóriájú, tehát a hátsó sor
+gyűjti — ettől lesz ez betonos sor.
+
+#### Védő–csatár párkémiák
+
+A beton nem attól nyer meccset, hogy nem kap gólt: attól, hogy **hátulról indul
+a gól**. Ez a lépcső azt a kötést fizeti meg, amit a játék minden más rendszere
+a legnehezebben hoz össze. A posztcsoport a játékos **első posztjából** jön
+(`getCategoryFor`, ugyanaz a szabály, mint a `stTopPlayerRole`-nál), és a szám
+**élő**: a `pruneChemistry` a keretből kikerülő emberrel a kötést is eldobja —
+pontosan úgy, mint a Harmónia `hm_chem` és a Tiki-Taka `tt_pchem` soránál. Egy
+párkémia öt fázis, tehát már EGY ilyen kötés több idény munkája; ezért nyit ez
+a család a legmeredekebb görbével.
+
+*Kód:* `stChemRolePairs(ra,rb)` — általános, két posztcsoportra —, és a
+`stDefFwdChem` mint a Beton behívása.
+
+#### A mérleg utána
+
+Az **alaptábla** (Infinity-hosszabbítás nélkül, nyers `val` összeg):
+
+| | előtte | utána |
+|---|--:|--:|
+| Beton mérföldkő-fokozat | 94 | **112** |
+| Beton gyűjthető stíluspont | 1 242 | **1 734** |
+
+A hét stílus mezőnyében (ugyanezen a mércén: Tiki-Taka 2 055 · Villám 1 405 ·
+Harmónia 1 341 · Bombázók 1 202 · Panzer 996 · Sztárom a párom 802) a Beton
+ezzel a **második legtöbbet termelő** stílus lett. A három új család a közös
+`stTiers`-en megy, tehát az **Infinity-hosszabbítás magától** kiterjeszti őket
+(egyik sem fordított mércéjű).
+
+---
+
 ### 4.3b Az ember is számít — a szerepek attribútum-szorzója (3.7.31)
 
 *(Érintett kód: `ROLE_ATTR_OF`, `ROLE_ATTR_SLOPE` / `_MIN` / `_MAX`,

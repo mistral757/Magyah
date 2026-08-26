@@ -1,10 +1,11 @@
 # A HUB keretlistája — húzással csere és a görgetés
 
-*(3.7.35. Érintett kód: `hubDragInit` és a köre (`hubDragRowOf`, `hubDragLocOf`,
-`hubDragLift`, `hubDragMoveGhost`, `hubDragAutoScroll`, `hubDragDrop`,
-`hubDragClear`), a `HUBDRAG_*` konstansok, `hubStickyInset` /
-`hubScrollRowIntoView`, valamint a `.hubDragArm` / `.hubDragGhost` /
-`.hubDragSrc` / `.hubDragTo` CSS és a `body.hubDragging` jelző.)*
+*(3.7.35–3.7.36. Érintett kód: `hubDragInit` és a köre (`hubDragRowOf`,
+`hubDragLocOf`, `hubDragLift`, `hubDragMoveGhost`, `hubDragAutoScroll`,
+`hubDragDrop`, `hubDragClear`), a `HUBDRAG_*` konstansok, `hubStickyInset` /
+`hubScrollRowIntoView` / `hubRenderStay`, valamint a `.hubDragArm` /
+`.hubDragGhost` / `.hubDragSrc` / `.hubDragTo` CSS és a `body.hubDragging`
+jelző.)*
 
 ---
 
@@ -46,9 +47,47 @@ sor teteje **69 px**, a kitapadt menüsáv alja **59 px** — vagyis pontosan
 
 ---
 
+## 1b. …és MINDEN más művelet után is (3.7.36)
+
+**Bejelentett hiba:** *„miután befejeztél egy akciót, pl. megbízás módosítást
+vagy piacra tételt, az oldal tetejére görget, mint korábban a csere után.
+Maradjon a megnyitott játékoson a »cursor«."*
+
+A fenti javítás **egyetlen úton** oldotta meg ezt: a posztcsere-választón. A
+HUB-nak viszont több művelete is teljes újrarajzolással zárul, és mindnél
+ugyanaz történt:
+
+| művelet | miért csúszott a tetejére |
+|---|---|
+| 🧭 Megbízás módosítása | a választó `scrollIntoView`-val magához görgetett, a mentés után csupasz `renderHub()` jött |
+| 📈 Piacra bocsátás / levétel a piacról | megerősítő ablakból tér vissza, a `renderHub()` eldobta a régi DOM-ot |
+| 👑 Kapitányváltás | ugyanaz, mint a megbízásnál |
+| 🎓 Poszt-tanulás | teljes képernyős folyamat, a `csReturnToHub` a HUB **tetejére** görgetett vissza |
+
+**A megoldás egy függvény, két viselkedéssel** (`hubRenderStay`) — mert a két
+helyzet tényleg más:
+
+* ha a nyitva maradt sor **most is látszik** a képernyőn (piacra bocsátás: a lap
+  nem mozdult, csak egy modális ablak volt fölötte), akkor a **helyét** őrizzük
+  meg — az ujjad alatt marad, ahol volt (`hubKeepRowAnchor`);
+* ha **nem látszik** (a választópanel odagörgetett magához, vagy egy teljes
+  képernyős folyamatból jövünk vissza), akkor **odavisszük** a lapot — a helyét
+  megőrizni annyit tenne, hogy továbbra sem látszik (`hubScrollRowIntoView`).
+
+A „látszik" mérce a kitapadt sávokat is beleszámolja: a sticky menüsáv mögé
+csúszott sor nem látszik. A horgonyt a `renderHub()` **előtt** kell megmérni,
+ezért fut a függvény a rajzolás körül, nem utána.
+
+**Ha nincs nyitott lap** (a kulcs üres, vagy a sor eltűnt — például eladtad),
+akkor ez pontosan egy sima `renderHub()`: a görgetés a böngészőre marad, ahogy
+eddig. Ugyanezért maradt érintetlen a **felállásváltás**: ott a kezdő 11 teljes
+egészében átrendeződik, tehát a HUB tetejére visszaállni a helyes viselkedés.
+
+---
+
 ## 2. Húzással csere
 
-**Kérés:** *„elég legyen hosszan (1s) megnyomni egy játékos nevét a HUB-ban, és
+**Kérés:** *„elég legyen hosszan megnyomni egy játékos nevét a HUB-ban, és
 akkor elindul egy animáció, amivel lehet húzni azt a játékost fel-alá, és így
 könnyedebben lehessen cserélni."*
 
@@ -60,8 +99,8 @@ tucatszor végigjárja.
 
 | lépés | mi történik |
 |---|---|
-| nyomva tartás | a sor lassan „betölt" (`.hubDragArm`, `HUBDRAG_HOLD_MS` = 1000 ms) |
-| 1 s után | rezgés (ha van), a sor **felemelkedik**: fix pozíciójú másolat (`.hubDragGhost`) követi az ujjat, az eredeti a helyén marad halványan (`.hubDragSrc`) |
+| nyomva tartás | a sor lassan „betölt" (`.hubDragArm`, `HUBDRAG_HOLD_MS` = 500 ms) |
+| 0,5 s után | rezgés (ha van), a sor **felemelkedik**: fix pozíciójú másolat (`.hubDragGhost`) követi az ujjat, az eredeti a helyén marad halványan (`.hubDragSrc`) |
 | húzás közben | az ujj alatti sor kijelölődik (`.hubDragTo`, ⇄ jellel) — ez a csere partnere |
 | a lista szélén | magától görget (`HUBDRAG_EDGE` = 76 px, `HUBDRAG_SPEED` = 14 px/képkocka) |
 | felengedés | a két ember **helyet cserél**, a lap odagördül, ahová vitted |
@@ -70,6 +109,15 @@ tucatszor végigjárja.
 induló húzás elvenné a görgetést — a hosszú nyomás az egyetlen gesztus, ami
 egyértelműen elválik tőle. A nyomás alatti „betöltés" azért kell, hogy ne legyen
 néma a várakozás: látszik, mikor indul el.
+
+**Miért lett 1 s-ból 0,5 s (3.7.36).** *„A csere akció indításhoz elég legyen
+0,5 s nyomáshossz."* Az egy másodperc a **mérték** miatt volt hosszú, nem az
+elválasztás miatt: a görgetéstől nem az IDŐ választja el a húzást, hanem a
+`HUBDRAG_SLOP` (8 px elmozdulás alatt nyomás, fölötte görgetés). Aki görgetni
+akar, az az első képkockákban már mozdul is — a maradék félmásodperc tehát csak
+várakozás volt annak, aki tényleg húzni akart. A „betöltés" animációja együtt
+gyorsul vele: a `--hubArmMs` CSS-változót a `HUBDRAG_HOLD_MS` állítja be, tehát
+egy helyen kellett átírni.
 
 **8 px-nél nagyobb elmozdulás a nyomás alatt = görgetni akarsz**
 (`HUBDRAG_SLOP`): az időzítő elszáll, a lista a szokott módon görög. A **gyors
@@ -113,8 +161,8 @@ csak új lyukat ütnénk.
 
 | amit néztünk | eredmény |
 |---|---|
-| 300 ms nyomás | `hubDragArm` fut, ghost nincs |
-| 1000 ms után | ghost felemelve, `body.hubDragging` kitéve |
+| 200 ms nyomás | `hubDragArm` fut, ghost nincs |
+| 500 ms után | ghost felemelve, `body.hubDragging` kitéve |
 | lehúzás egy másik sorra | a célsor `hubDragTo`-t kap, a kulcsa a várt (`slot:4`) |
 | felengedés | a két játékos tényleg helyet cserélt a keretben |
 | utána | ghost eltakarítva, `body` osztály levéve |
