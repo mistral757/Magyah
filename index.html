@@ -1801,6 +1801,10 @@ body.hubDragging #hubRoster{touch-action:none}
   filter:drop-shadow(0 1px 2px rgba(0,0,0,.85));line-height:1;pointer-events:none}
 #teamBar{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:12.5px;color:var(--dim)}
 #teamOVR{font-family:'Archivo Black';font-size:19px;color:var(--gold)}
+/* AZ AKTUÁLIS CSAPATERŐ JELÖLÉSE (3.7.42): emberhátrány, kényszerű csere,
+   busz. Halvány és kicsi — a szám marad a főszereplő, ez csak megmondja,
+   MIÉRT nem a felállás ereje látszik. */
+#teamOVRNote{font-size:10.5px;color:var(--dim2);letter-spacing:.02em;white-space:nowrap}
 
 /* ---- AZ ELLENFÉL BEFAGYASZTOTT PÁLYAKÉPE (közös karrier) ----
    NEM a saját pálya átfestése, hanem egy MÁSODIK pályakép ugyanabban a
@@ -4037,7 +4041,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
     </div>
     <div id="teamBar">
       <span id="slotCount"></span>
-      <span>Csapaterő: <span id="teamOVR">–</span></span>
+      <span>Csapaterő: <span id="teamOVR">–</span><span id="teamOVRNote"></span></span>
     </div>
     <div id="tacticBar" style="display:none;font-size:12px;text-align:center;padding:5px 4px 1px;border-top:1px solid var(--line);margin-top:5px"></div>
     <div id="oppTeamBar" class="hide"></div>
@@ -4761,7 +4765,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.41";
+const APP_VERSION="3.7.42";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -27829,6 +27833,72 @@ function playerStrength(p,pos){
 function teamStrength(){
   const f=slots.filter(s=>s.player);if(!f.length)return 0;
   return f.reduce((a,s)=>a+playerStrength(s.player,s.pos),0)/f.length;}
+/* ================= AZ AKTUÁLIS CSAPATERŐ (3.7.42) =========================
+   BEJELENTETT KÉRÉS: „az aktuális csapaterő folyamatosan frissüljön meccs
+   közben is + meccs elején számítsa bele a kiállítás vagy sérülés miatt
+   behozott cserejátékost, és úgy mutassa az aktuális csapaterőt."
+
+   A `teamStrength()` a FELÁLLÁST méri: a slots tizenegyét. Ez a felállás-nézeten
+   és a gazdaságban a helyes szám — a pályára viszont nem mindig az a tizenegy
+   lép ki, ami a slotsban áll:
+
+     · MECCS ELŐTT az eltiltott/sérült kezdőt a hiányzó-panel PÓTOLJA
+       (`S.subs[idx]`). A motor ezt már tudja (buildMatchSnapshot innen épít),
+       a KIJELZETT szám viszont továbbra is a hiányzó emberrel számolt: a
+       csapaterő azt mutatta, amivel NEM játszol.
+     · MECCS KÖZBEN cserélsz, kiállítanak valakit, beáll a buszsofőr — a szám
+       viszont a kezdőrúgáskori állapoton ragadt.
+
+   EGY FORRÁS, HÁROM ÁLLAPOT. A `liveXI()` mondja meg, ki van MOST a pályán;
+   a futó mérkőzés a saját `active` tömbjét adja hozzá (MATCH_XI), meccsen
+   kívül a slots + a kényszerű cserék.
+
+   A `teamStrength()` MAGA VÁLTOZATLAN. A büdzsé, a kupamezőny, a párharc
+   hangolása és a közös kupa nevezése mind belőle dolgozik — azoknak a
+   FELÁLLÁS ereje kell, nem az, hogy a 73. percben épp ki van a pályán. */
+let MATCH_XI=null;   /* a futó mérkőzés élő tizenegye; null = nincs meccs */
+function liveXI(){
+  if(MATCH_XI){try{const a=MATCH_XI();if(a&&a.length)return a;}catch(e){}}
+  const out=[];
+  slots.forEach((sl,idx)=>{
+    const sb=(S.subs&&S.subs[idx])||null;
+    const pl=sb?sb.sub:(sl&&sl.player);
+    if(!pl)return;
+    out.push({p:pl,pos:(sl&&sl.pos)||"KKP",out:false,bus:false,forced:!!sb});});
+  return out;}
+/* A KIJELZETT „aktuális csapaterő". Ugyanaz a képlet, mint a teamStrength-é
+   (playerStrength = effektív poszt-rating + tartós módosítók), csak arra a
+   tizenegyre, aki tényleg a pályán van.
+
+   A KIÁLLÍTOTT EMBER NEM ESHET KI „INGYEN" AZ ÁTLAGBÓL. Ha csak kihagynánk,
+   a leggyengébb ember kiállítása MEGEMELNÉ a csapaterőt — ami nyilván hazugság.
+   Ezért a hiányzó helyéért a motor SAJÁT emberhátrány-tételét vonjuk le
+   (`SIM.REDMATCH`), pontosan úgy, ahogy a párharc pillanatképe is teszi.
+
+   A BUSZSOFŐR KIMARAD az átlagból: ő nem személy, nincs Ratingje, és a
+   csapaterőt a motorban sem mozdítja — a busz ára a gólesélyben van. */
+function teamStrengthNow(){
+  const xi=liveXI();
+  if(!xi.length)return 0;
+  let sum=0,n=0,down=0;
+  xi.forEach(a=>{
+    if(a.bus)return;
+    if(a.out){down++;return;}
+    sum+=playerStrength(a.p,a.pos);n++;});
+  if(!n)return 0;
+  return Math.max(0,sum/n-down*SIM.REDMATCH);}
+/* Mit érdemes ODAÍRNI a szám mellé: emberhátrány, kényszerű csere. Üres
+   sztring, ha a pályán pontosan a betervezett tizenegy van. */
+function teamStrengthNote(){
+  const xi=liveXI();
+  if(!xi.length)return "";
+  const bits=[];
+  const men=xi.filter(a=>!a.out&&!a.bus).length,bus=xi.filter(a=>a.bus).length;
+  if(xi.some(a=>a.out))bits.push(`${men+bus} emberrel`);
+  const forced=xi.filter(a=>a.forced).length;
+  if(forced)bits.push(`${forced} kényszercserével`);
+  if(bus)bits.push("busszal");
+  return bits.length?" · "+bits.join(" · "):"";}
 /* ================= A PÁRHARC MÉRCÉJE: A KERET, NEM A KEZDŐ 11 (3.7.24) ======
    A teamStrength() a MAI FELÁLLÁST méri: a kezdő tizenegyet, a posztjukon.
    Ez a MECCSRE a helyes szám — de a párharc összevetésére nem az volt:
@@ -28920,11 +28990,22 @@ function seasonBudgetParts(){
           fanRating:fanRatingNow(),
           total:Math.round(total)};}   /* egész pont — lásd a buyPrice indoklását */
 function computeSeasonBudget(){return seasonBudgetParts().total;}
+/* ---- CSAK A CSAPATERŐ-KIJELZŐ (3.7.42) ----
+   Külön, OLCSÓ frissítő: a mérkőzés minden öt perces vödöre meghívja, és
+   minden csere, kiállítás és buszbehívás után is lefut. Az updateBar() egésze
+   (taktika-sáv, oldalváltó, pályakép-szinkron) ehhez sok volna tizennyolcszor
+   egy meccsen — és nem is változik közben semmi belőle. */
+function updateStrengthBar(){
+  const el=$("teamOVR");if(!el)return;
+  const f=slots.filter(s=>s.player).length;
+  const revealNums=phase==="season"||!blind();
+  el.textContent=!revealNums?"?":(f?teamStrengthNow().toFixed(1):"–");
+  const nt=$("teamOVRNote");
+  if(nt)nt.textContent=revealNums&&f?teamStrengthNote():"";}
 function updateBar(){
   const f=slots.filter(s=>s.player).length;
   $("slotCount").textContent=`${f}/11 poszt betöltve`;
-  const revealNums=phase==="season"||!blind();
-  $("teamOVR").textContent=!revealNums?"?":(f?teamStrength().toFixed(1):"–");
+  updateStrengthBar();
   /* A felállás alatt az aktív taktika neve és szintje — a vizuális
      felállásnál is egyértelmű, milyen rendszerrel játszik a csapat. */
   const tb=$("tacticBar");
@@ -39598,8 +39679,10 @@ function playMatch(){
   const DUEL=h2hScript;h2hScript=null;
   S.playing=true;$("kickBtn").disabled=true;
   /* A csere-gomb fogantyúja csak a tick-időzítő felállása után él — addig
-     (felállás-ellenőrzés, hiányzók, korai kilépés) nincs mit megállítani. */
-  MATCH_CTL=null;updateLiveSubBar();
+     (felállás-ellenőrzés, hiányzók, korai kilépés) nincs mit megállítani.
+     Az élő tizenegy is csak a kezdőrúgástól létezik: addig a kijelző a
+     felállásból + a kényszerű cserékből számol (lásd liveXI). */
+  MATCH_CTL=null;MATCH_XI=null;updateLiveSubBar();
   /* A KUPA-KÉPERNYŐ MECCS-LOGJÁHOZ: megjelöljük, hol tart most a napló, hogy a
      meccs végén pontosan az ehhez a mérkőzéshez tartozó sorokat tudjuk átvinni
      a kupa-felületre. A napló a szezon egészére gyűlik (csak szezonkezdéskor
@@ -39653,6 +39736,11 @@ function playMatch(){
   /* A PÓTLÁSI RÉTEG FELÉPÍTÉSE — kötelezően a pillanatkép ELŐTT, mert a
      buildMatchSnapshot az S.subs-ból olvassa ki, ki van a pályán. */
   buildMatchSubs();
+  /* A PÓTLÁS AZONNAL LÁTSZIK IS. A hiányzó-panel után a kijelző még a
+     hiányzó emberrel számolt csapaterőt mutatta — vagyis azt, amivel NEM
+     játszol. A réteg felépülése után egy frissítés, és a szám már a valóban
+     pályára lépő tizenegyről szól (lásd liveXI / teamStrengthNow). */
+  try{updateStrengthBar();}catch(e){}
   const MS=buildMatchSnapshot();
   const active=MS.active;
   /* ---- KIK KEZDTEK EZEN A MECCSEN ----
@@ -40801,6 +40889,12 @@ function playMatch(){
     /* A késleltetett 90+ dráma MOST fut le — a bucket összes rendes (85-90
        perces) eseménye után, így mindig időrendben, utolsóként jelenik meg. */
     runPendingDrama();
+    /* A CSAPATERŐ-KIJELZŐ minden vödör végén utánamegy az élő tizenegynek
+       (csere, kiállítás, busz) — lásd updateStrengthBar. AUTO MÓDBAN KIMARAD:
+       ott a mérkőzés 18 ms-os ütemben pereg, és senki nem nézi a sávot — a
+       tizenegy effektív ratingjének újraszámolása vödrönként fölösleges
+       munka volna egy végigjátszott szezon 540 tickjén. */
+    if(!S.auto)try{updateStrengthBar();}catch(e){}
     /* ---- A BUSZ UTÁNI TISZTA PERCEK: EGY MÉRÉS A TICK VÉGÉN ----
        Itt már minden gól könyvelve van ebből az ötperces vödörből, tehát a
        „kaptunk-e gólt a busz óta" kérdésre pontos a válasz. A percszám nem
@@ -40826,7 +40920,9 @@ function playMatch(){
     if(min===45&&subHalftimeStopOn()&&!S.auto&&!DUEL){
       clearInterval(iv);iv=null;
       sbClockPause();
-      openHalftimeSubs(halftimeCtx(),()=>{sbClockResume();iv=setInterval(tickFn,tickMs);updateLiveSubBar();},
+      openHalftimeSubs(halftimeCtx(),()=>{sbClockResume();iv=setInterval(tickFn,tickMs);updateLiveSubBar();
+        /* a csere AZONNAL látszik a csapaterőn, nem csak a következő vödörnél */
+        try{updateStrengthBar();}catch(e){}},
         {half:true,min:45});
       return;}
     /* PÁRHARCBAN a csereszünet elmarad — de ha a kapcsoló BE van kapcsolva, a
@@ -40840,6 +40936,15 @@ function playMatch(){
      A meccsnézet alján ülő gomb innen tudja, hogy lehet-e most cserélni, hány
      csere maradt, és ezen keresztül állítja meg a közvetítést. Kívülről a
      szimuláció belsejéhez (iv, min, active) nincs más út — és nem is kell. */
+  /* ---- AZ ÉLŐ TIZENEGY A KIJELZŐNEK (3.7.42) ----
+     A motor `active` tömbje az igazság arról, ki van a pályán: a félidei és a
+     tervezett cserék, a buszsofőr és a kiállítás mind ITT látszanak. A
+     csapaterő-kijelző ezen keresztül olvassa — nem másolatból, hanem a futó
+     mérkőzés saját állapotából, tehát nem tud elavulni. */
+  MATCH_XI=()=>active.map((a,k)=>({
+    p:a.p,pos:(slots[a.idx]&&slots[a.idx].pos)||"KKP",
+    out:k===redIdx,bus:!!a.bus,forced:!!(S.subs&&S.subs[a.idx])}));
+  updateStrengthBar();
   MATCH_CTL={
     canSub:()=>halftimeSubsOn()&&!S.auto&&!DUEL,
     canPause:()=>!!iv,
@@ -40848,7 +40953,9 @@ function playMatch(){
       if(!iv)return;                       /* hosszabbítás vagy épp nyitott panel */
       clearInterval(iv);iv=null;
       sbClockPause();
-      openHalftimeSubs(halftimeCtx(),()=>{sbClockResume();iv=setInterval(tickFn,tickMs);updateLiveSubBar();},
+      openHalftimeSubs(halftimeCtx(),()=>{sbClockResume();iv=setInterval(tickFn,tickMs);updateLiveSubBar();
+        /* a csere AZONNAL látszik a csapaterőn, nem csak a következő vödörnél */
+        try{updateStrengthBar();}catch(e){}},
         {half:false,min:Math.max(1,Math.min(90,min||1))});}};
   updateLiveSubBar();
   /* ---- A TERVEZETT CSERÉK VÉGREHAJTÁSA (egyjátékos) ----
@@ -41082,8 +41189,13 @@ function playMatch(){
     if(busOn&&!_busBooked){
       _busBooked=true;
       try{msNoteBusMinutes(busCleanMin);}catch(e){}}
-    /* Lefújás: a csere-gomb fogantyúja megszűnik, a gomb magától eltűnik. */
-    MATCH_CTL=null;updateLiveSubBar();
+    /* Lefújás: a csere-gomb fogantyúja megszűnik, a gomb magától eltűnik.
+       Az élő tizenegy is elengedi a kijelzőt — a mérkőzés véget ért, innentől
+       megint a felállás ereje a kérdés. A kényszerű cserék (S.subs) még ITT
+       állnak; a lefújás utáni könyvelés üríti őket, és az akkori
+       updateBar() hívások már a tiszta állapotot rajzolják ki. */
+    MATCH_CTL=null;MATCH_XI=null;updateLiveSubBar();
+    try{updateStrengthBar();}catch(e){}
     let cls="draw";if(gf>ga)cls="win";else if(gf<ga)cls="loss";
     /* ================= KUPA-VISSZAVÁGÓ: AZ ÖSSZESÍTÉS A MÉRCE (3.5.27) =====
        Egy oda-visszavágós párharc MÁSODIK mérkőzésén a mai eredmény önmagában
