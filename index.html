@@ -130,6 +130,30 @@ body::after{
   background:var(--glow-paint,none);
   opacity:var(--glow,0);}
 body{font-family:var(--font-body);max-width:520px;margin:0 auto;padding:14px 14px 90px;min-height:100vh;font-size:14.5px;line-height:1.4}
+/* ================= SZÖVEGKIEMELÉS KI, AZ EGÉSZ JÁTÉKBAN (3.7.40) ==========
+   BEJELENTETT KÉRÉS: „sosem akarok szöveget kiemelni benne, és a cseréknél
+   bezavart, mert néha a hosszú nyomást szövegkiemelésnek érzékeli."
+
+   EZ NEM KOZMETIKA. A keretlista HÚZÁSSAL CSERE gesztusa (hubDragInit) fél
+   másodperc nyomás után indul — pontosan az az idő, amikor a mobil böngésző a
+   saját szövegkijelölését is elindítja. Amint a böngésző kijelölésbe kezd,
+   ELVESZI a pointer-eseményeket: a húzás félbemarad, és a képernyőn ott marad
+   egy kék kijelölés-folt a játékos neve fölött.
+
+   HÁROM DOLGOT KELL KIKAPCSOLNI, mert három külön böngésző-viselkedés:
+     · user-select        — maga a kijelölés (a -webkit- előtag az iOS-é),
+     · -webkit-touch-callout — a hosszú nyomásra felugró „Másolás / Kikeresés"
+       buborék (iOS Safari), ami a húzás közepén ugrik fel,
+     · -webkit-tap-highlight-color — a koppintáskor felvillanó szürke téglalap.
+   A tulajdonság ÖRÖKLŐDIK, ezért elég a body-ra tenni.
+
+   KÉT KIVÉTEL MARAD, mindkettőnél a kijelölés maga a funkció: a beviteli mezők
+   (klub- és keret-kereső, szobakód) és a MÁSOLHATÓ szobakód-kijelző. */
+body{-webkit-user-select:none;-ms-user-select:none;user-select:none;
+     -webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+input,textarea,select,[contenteditable="true"]{
+  -webkit-user-select:text;-ms-user-select:text;user-select:text;
+  -webkit-touch-callout:default}
 h1,h2,.disp{font-family:var(--font-disp);letter-spacing:.3px}
 b,strong{font-weight:700}
 
@@ -2834,7 +2858,10 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
   font-size:20px;letter-spacing:.35em;text-align:center;text-transform:uppercase}
 .mpInput:focus{outline:none;border-color:#b68235}
 .mpCode{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:58px;letter-spacing:.18em;
-  color:#b68235;text-align:center;margin:8px 0 2px;user-select:all}
+  color:#b68235;text-align:center;margin:8px 0 2px;
+  /* A SZOBAKÓD KIVÉTEL a globális kijelölés-tiltás alól (lásd a body-nál): ezt
+     a számot le kell tudni másolni, hogy elküldhesd a társadnak. */
+  -webkit-user-select:all;user-select:all;-webkit-touch-callout:default}
 .mpPlayers{display:flex;flex-direction:column;gap:9px;margin:16px 0}
 .mpPl{display:flex;justify-content:space-between;align-items:center;padding:12px 15px;
   background:rgba(250,248,244,.8);
@@ -4692,7 +4719,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.39";
+const APP_VERSION="3.7.40";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -69136,6 +69163,170 @@ async function pwaInstallClick(){
   try{
     if(window.matchMedia)window.matchMedia("(display-mode: standalone)").addEventListener("change",pwaSyncBtn);
   }catch(e){}
+})();
+/* ================= A TELEFON VISSZA GOMBJA (3.7.40) =======================
+   BEJELENTETT KÉRÉS: „hogyan lehetne megoldani, hogy a telefon vissza gombja
+   ne a játékból lépjen ki, hanem a HUB felülete felé irányítson, az aktuális
+   ablakot vagy menüfület bezárva, onnan visszafelé lépve?"
+
+   A játék EGYETLEN lap, előzmény-bejegyzés nélkül: a vissza gomb eddig
+   egyenesen kilépett a telepített alkalmazásból — a szezon közepén, egy
+   félrenyúlásból.
+
+   ── A CSAPDA ──────────────────────────────────────────────────────────────
+   Induláskor KÉT előzmény-bejegyzést tartunk (`base` és `trap`), és a
+   `trap`-en ülünk. A vissza gomb így nem a lapot hagyja el, hanem `popstate`-et
+   dob: azt elkapjuk, bezárjuk a legfelső réteget, és VISSZATOLJUK a csapdát.
+
+   ── MIÉRT NEM ÉPÍTÜNK IGAZI ELŐZMÉNY-VERMET ───────────────────────────────
+   Az „minden panel-nyitáskor pushState" megoldás azt kérné, hogy hatvan
+   megnyitási pontot instrumentáljunk — és egyetlen kihagyott ág némán
+   kilépéssé változtatná a vissza gombot. Ehelyett a kezelő a MOSTANI ÁLLAPOTOT
+   nézi meg: végigmegy a rétegeken, és az elsőt zárja be, amelyik nyitva van.
+   Egy új panel így magától bekerül a sorba, amint felveszed a listába — és ami
+   kimarad, az nem lép ki, csak nem reagál.
+
+   ── A ZÁRÁS MINDIG A MEGLÉVŐ GOMBOT NYOMJA MEG ────────────────────────────
+   Sosem rejtünk el kézzel egy panelt: a réteg SAJÁT „Mégse / Bezár" gombját
+   kattintjuk. Így pontosan az a könyvelés fut le, ami a kézi záráskor (a
+   megerősítő függő callbackje törlődik, a választó visszaáll, a görgetés
+   helyreáll), és nem tud kettéválni a kétféle út.
+
+   KÖVETKEZMÉNY, ami szándékos: ahol NINCS látható záró gomb, ott a vissza gomb
+   nem csinál semmit. Egy folyamat közepén (félidei csere, hálózati várakozás,
+   párharc-cseretervező) ez a helyes viselkedés — azt a lépést be kell fejezni.
+
+   ── KILÉPNI TOVÁBBRA IS LEHET ─────────────────────────────────────────────
+   Ha nincs mit bezárni, az első vissza egy sávot villant fel („nyomd meg még
+   egyszer"), és NEM tolja vissza a csapdát — a második vissza tehát tényleg
+   kilép. 2,5 másodperc után a csapda magától visszaáll. */
+const BACK_EXIT_MS=2500;
+/* A RÉTEGEK, LEGFELÜL LÉVŐVEL KEZDVE. `el` a réteg doboza, `btn` a saját záró
+   gombja; ahol a gombot a JS építi (nincs fix id-je), ott `btn:null`, és a
+   dobozon belül keresünk egy látható, visszalépést jelentő feliratút. */
+const BACK_LAYERS=[
+  /* megerősítő kérdések és kapuzó ablakok — ezek ülnek a legfelül */
+  {el:"hubTacticConfirmModal",btn:"hubTacticConfirmNo"},
+  {el:"sellConfirmModal",     btn:"sellConfirmNo"},
+  {el:"mstatModal",           btn:"mstatOk"},
+  {el:"saveDelModal",         btn:null},
+  {el:"storeModal",           btn:"storeCloseBtn"},
+  {el:"profileModal",         btn:"profileCloseBtn"},
+  {el:"diagModal",            btn:"diagCloseBtn"},
+  {el:"championModal",        btn:"champCloseBtn"},
+  {el:"glossaryModal",        btn:"glossaryCloseBtn"},
+  {el:"scheduleModal",        btn:"scheduleCloseBtn"},
+  {el:"hubInfoModal",         btn:"hubInfoClose"},
+  {el:"lockerModal",          btn:"lockerCloseBtn"},
+  {el:"squadModal",           btn:"squadCloseBtn"},
+  {el:"challengeModal",       btn:"challengeCloseBtn"},
+  {el:"themeModal",           btn:"themeCloseBtn"},
+  {el:"installModal",         btn:"installCloseBtn"},
+  /* a HUB saját választó-paneljei */
+  {el:"hubPositionPicker",    btn:"hubPosPickerCancel"},
+  {el:"hubMidRolePicker",     btn:"hubMidRoleCancel"},
+  {el:"hubCaptainPicker",     btn:"hubCaptainCancel"},
+  {el:"hubTacticsPicker",     btn:"hubTacticsCancel"},
+  {el:"hubFormBuilder",       btn:null},
+  {el:"hubFormationPicker",   btn:"hubFormationCancel"},
+  /* a teljes képernyős ablakok (átigazolás, scout, kupa, jutalom): a „Vissza a
+     HUB-ba" / „Mégsem" gombjukat a JS építi, ezért felirat szerint keressük */
+  {el:"scWindow",             btn:null},
+  {el:"scSkill",              btn:null},
+  {el:"scUnlock",             btn:null},
+  {el:"scEuro",               btn:null}];
+/* FOLYAMAT-PANELEK, amiket a vissza gomb NEM zárhat be. Nem azért, mert
+   nincs rajtuk kilépés — hanem mert egy félbehagyott félidei csere vagy egy
+   megszakított hálózati kézfogás sokkal többet ront, mint amennyit egy
+   kényelmi gomb ér. Amíg ezek valamelyike látszik, a vissza gomb néma. */
+const BACK_BLOCKERS=["htSubPanel","mpSubPanel","absPanel","h2hWait"];
+/* A KEZDŐLAP (mpEntry) SZÁNDÉKOSAN NEM BLOKKOLÓ. Ott a vissza gombnak KI KELL
+   tudnia lépni — az a lap gyökere, nincs mögötte semmi. Az első változatban
+   blokkolóként szerepelt, és emiatt a kezdőlapról a vissza gomb egyáltalán nem
+   reagált: nem zárt be semmit, de kilépni sem engedett. */
+/* A felirat, ami visszalépést jelent. SZÁNDÉKOSAN SZŰK, és csak SEMLEGES
+   elutasításokat enged: „Mégse", „Bezár", „Vissza", ✕. A DÖNTÉST jelentő
+   feliratok (》Kihagyom《, 》Köszönjük, idén kihagyjuk《, 》Igen, …《) KIMARADNAK —
+   a vissza gomb nem hozhat meg helyetted egy döntést, csak becsukhat egy
+   panelt. Ahol csak döntés-gombok vannak, ott a vissza gomb néma marad. */
+const BACK_BTN_RX=/^\s*(✕|✖|×|↩|Mégse|Mégsem|Bezár|Vissza)/i;
+/* LÁTHATÓSÁG: a doboz MÉRETÉBŐL, nem az offsetParent-ből. A modálisok
+   `position:fixed` elemek, azoknak az offsetParent-je MINDIG null — az első
+   változat pont ezért nem talált meg egyetlen megerősítő ablakot sem (mérve).
+   A befoglaló téglalap viszont mindkét fajtára igazat mond. */
+function backVisible(el){
+  if(!el||el.classList.contains("hide"))return false;
+  const r=el.getBoundingClientRect();
+  return r.width>0&&r.height>0;}
+/* A dobozon belüli, VISSZALÉPÉST jelentő gomb — csak ha látható és engedélyezett. */
+function backFindBtn(box){
+  return [...box.querySelectorAll("button")].find(b=>
+    b&&!b.disabled&&backVisible(b)&&BACK_BTN_RX.test(b.textContent||""))||null;}
+/* Egy lépés visszafelé. true = bezártunk valamit (vagy szándékosan nem
+   csinálunk semmit), false = nincs mit bezárni, jöhet a kilépés-kérdés. */
+function gameBackStep(){
+  /* 1. folyamat-panel: néma, de NEM kilépés */
+  for(const id of BACK_BLOCKERS)if(backVisible($(id)))return true;
+  /* 2. a legfelső nyitott réteg */
+  for(const L of BACK_LAYERS){
+    const box=$(L.el);
+    if(!backVisible(box))continue;
+    const b=L.btn?$(L.btn):backFindBtn(box);
+    if(!b||b.disabled||!backVisible(b))continue;   /* nincs kiút → menjünk tovább */
+    b.click();
+    return true;}
+  /* 3. nyitott menüfül a HUB-ban. A LÁTHATÓT keressük, nem az elsőt: a
+     Csapatstílus füle addig rejtve áll, amíg nincs stílusod, de az `open`
+     jelzőt akkor is viselheti — az első változat emiatt egy 0×0-s dobozon
+     akadt el, és a valóban nyitott fül nyitva maradt (mérve). */
+  const open=[...document.querySelectorAll("#hubActions .hubGroup.open")].find(backVisible);
+  if(open){
+    try{hubAccToggle(open);}catch(e){open.classList.remove("open");}
+    return true;}
+  return false;}
+/* A „nyomd meg még egyszer" sáv. Saját, apró elem: a játéknak eddig nem volt
+   múló üzenet-sávja, és egy modális itt pont az ellenkezőjét érné el. */
+let _backToastT=null;
+function backToast(msg){
+  let t=$("backToast");
+  if(!t){
+    t=document.createElement("div");t.id="backToast";
+    t.style.cssText="position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:990;"
+      +"background:rgba(20,18,15,.94);color:#f3ead8;border:1px solid rgba(255,210,74,.5);"
+      +"border-radius:10px;padding:9px 15px;font-size:13px;font-family:inherit;"
+      +"box-shadow:0 6px 20px rgba(0,0,0,.5);pointer-events:none;max-width:88vw;text-align:center";
+    document.body.appendChild(t);}
+  t.textContent=msg;
+  t.style.display="block";
+  if(_backToastT)clearTimeout(_backToastT);
+  _backToastT=setTimeout(()=>{try{t.style.display="none";}catch(e){}},BACK_EXIT_MS);}
+(function initBackButton(){
+  if(!window.history||!history.pushState)return;
+  let armed=false,armT=null,trapOn=false;
+  /* INDULÁSI ZÁR: néhány mobil böngésző a betöltés végén magától dob egy
+     popstate-et. Az első fél másodpercben ezért nem csinálunk semmit — csak a
+     csapdát állítjuk vissza —, különben a játék indulásakor zárnánk be egy
+     panelt, amit a felhasználó ki sem nyitott. */
+  const t0=Date.now();
+  const trap=()=>{try{history.pushState({magyah:"trap"},"");trapOn=true;}catch(e){}};
+  try{history.replaceState({magyah:"base"},"");}catch(e){}
+  trap();
+  window.addEventListener("popstate",()=>{
+    trapOn=false;
+    if(Date.now()-t0<500){trap();return;}
+    /* VAN MIT BEZÁRNI: bezárjuk, és a csapda azonnal visszaáll. */
+    if(gameBackStep()){
+      armed=false;if(armT){clearTimeout(armT);armT=null;}
+      trap();return;}
+    /* NINCS: az első vissza figyelmeztet, a második tényleg kilép. A csapdát
+       most SZÁNDÉKOSAN nem toljuk vissza — enélkül nem lehetne kilépni. */
+    if(armed){armed=false;if(armT){clearTimeout(armT);armT=null;}
+      try{history.back();}catch(e){}
+      return;}
+    armed=true;
+    backToast("Nyomd meg még egyszer a kilépéshez");
+    if(armT)clearTimeout(armT);
+    armT=setTimeout(()=>{armed=false;armT=null;if(!trapOn)trap();},BACK_EXIT_MS);});
 })();
 initSaveSystem();
 </script>
