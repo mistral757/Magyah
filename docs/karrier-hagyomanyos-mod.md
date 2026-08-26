@@ -1093,11 +1093,19 @@ egy alsóbb osztály 2. helyezettje jellemzően 2–3 Ratinggel a felsőbb oszt�
 15. helyezettje alatt van, a párharc valóban **nyitott** — ez a mód
 legdrámaibb két mérkőzése.
 
-**Egyelőre SZIMULÁLT, nem játszott.** A lejátszható osztályozóhoz a szezon
-utáni szakaszba kellene egy teljes mérkőzés-folyam (mint az európai kupáé) —
-az külön lépés. Addig a párharc a motor saját törvényei szerint dől el, és
-részletesen elbeszéljük: mindkét meccs eredménye, az összesítés és a döntés
-módja (összesítés vagy büntetők) is kiírásra kerül.
+**LE IS JÁTSZHATOD.** A szezonforduló ELŐTT megkérdezzük: kiállsz magad, vagy
+a motorra bízod. A két mérkőzés valódi — cserélsz, sérülhetsz, fejlődsz —, és
+az eredmény a szimulált párharc helyére kerül be a fordulóba
+(`pyrPoPlayedSwap`); a világ többi osztályozója és a sorsolás-folyam érintetlen
+marad. Ha a szimulációt választod (vagy auto szezont futtatsz), a párharc a
+motor saját törvényei szerint dől el, és részletesen elbeszéljük: mindkét meccs
+eredménye, az összesítés és a döntés módja (összesítés vagy büntetők) is
+kiírásra kerül.
+
+**Közös karrierben is (3.7.32).** Ott az osztályozó a **párosé**: a piramison a
+két menedzser EGY entitás, a jobbik helyezésen. Mindketten lejátsszátok a
+magatokét ugyanaz ellen az ellenfél ellen, és ha bármelyikőtök nyer, a páros
+lép. A részletek: [`kozos-karrier-szezonzaras.md` 4.1](kozos-karrier-szezonzaras.md).
 
 ## 7.2 A hegymászás vezetése
 

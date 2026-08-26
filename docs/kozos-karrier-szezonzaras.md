@@ -1,6 +1,6 @@
 # KÖZÖS KARRIER — A SZEZONZÁRÁS
 
-**Állapot:** ✅ megvalósítva · **Verzió:** 3.4.01
+**Állapot:** ✅ megvalósítva · **Verzió:** 3.4.01 – 3.7.32
 
 Ez a dokumentum a közös (két menedzseres) karrier szezonzárását írja le: hol
 állnak az **ellenőrző kapuk**, mit csinál a **hangolás**, és hogyan megy a két
@@ -272,3 +272,189 @@ hogy a lánc elsült — ehhez a társ eredménye kell.
 a saját eredményre esünk vissza — az pontosan a javítás előtti viselkedés,
 tehát nem lehet rosszabb. Ilyenkor a két karrier tényleg szétválhat, és a
 napló ezt ki is mondja.
+
+---
+
+## 4. Ami eddig NEM ért el a közös karrierbe (3.7.32)
+
+**A bejelentés:** *„van egy csomó beállítás hagyományos módban, ami nincs
+globálissá téve, és így PvP-ben nincs érvényesítve. Pl. PvP-ben nem ajánlotta
+fel szezon végén, hogy lejátsszuk az osztályozót, hanem magának leszimulálta."*
+
+A leltár három olyan hagyományos-módú funkciót talált, ami **egy sorral ki volt
+kapcsolva** közös karrierben — mindhárom ugyanazzal az indoklással („a két
+kliens világa szétcsúszna"), és mindhárom indoklás **részben** volt igaz.
+
+| Funkció | Eddig MP-ben | Mostantól |
+|---|---|---|
+| ⚔️ Lejátszható osztályozó | soha nem ajánlottuk fel | **a páros közös párharca** |
+| 🟠 Nyári felkészülési kupa | soha nem ajánlottuk fel | **közös, egyhangú nevezés** |
+| 🏅 Bajnoki egyéni díjak | soha nem osztottuk ki | **a két keret között dől el** |
+
+*(Ami szándékosan MARAD kikapcsolva: az **auto szintkövetés**. Az a SAJÁT
+kereted erejéből számol új mezőnyszintet, tehát a két kliensen külön mozdítaná
+a közös világot. A beállító képernyő ezt ki is mondja — nem hazug lakat: a
+választó ott MP-ben el is tűnik.)*
+
+---
+
+### 4.1 Az osztályozó — a páros párharca
+
+**Ami miatt ki volt zárva, és ami ebből igaz.** A két kliens világának bitre
+azonosnak kell maradnia. A **párosítás** viszont már eddig is az volt: az
+előnézet (`pyrPoPreview`) a KÖZÖS végtabellából (`mpTableNow` → `S.finalTable`)
+és a szoba seedjéből épül, tehát mindkét gépen ugyanaz az ellenfél áll, ugyanazzal
+az erővel. Egyedül a **kimenet** csúszhatna szét — és pont azt kell egyeztetni,
+nem az egész mérkőzést elvenni.
+
+**A páros EGY entitás a piramison.** A rollover a két menedzser-sort egyetlen
+csapattá vonja össze, a **jobbik helyezésen** (`pyrMyFinalOrder`) — fel- és
+lefelé is együtt mozogtok. Az osztályozó tehát nem a tiéd, hanem a **párosé**, és
+ugyanaz a szabály vonatkozik rá, ami a közös karrier többi közös döntésére:
+
+> **A jobbik eredménye viszi mindkettőt.**
+
+* mindketten lejátsszátok a saját két meccseteket **ugyanaz ellen az ellenfél
+  ellen** — a mérkőzés valódi: cserélsz, sérülsz, fejlődsz;
+* ha **bármelyikőtök** megnyeri a párharcot, a páros feljut / bennmarad;
+* aki a szimulációt választja (vagy auto szezont futtat), **nem szavaz**: ha a
+  másik lejátszotta, az az eredmény áll; ha egyikőtök sem, marad a régi,
+  szimulált út — betűre úgy, ahogy eddig volt.
+
+**A történet is közös.** A két meccs eredménye, az összesítés és a döntés módja
+EGY lejátszásból jön, determinisztikus választással: a **győztesé**, és ha
+mindketten ugyanarra jutottak (vagy csak egy játszott), a **házigazdáé**. Így a
+két képernyőn betűre ugyanaz a mondat áll, és a `pyrPoPlayedSwap` mindkét
+oldalon ugyanazt cseréli be a fordulóba.
+
+**Kulcs:** `s<szezon>pyrpo` · **kód:** `pyrPoJoint`, `mpPoResolve`, `mpPoApply`,
+`pyrPoSettle`, `pyrPoResultScreen`.
+
+#### 4.1b …és egy néma szétcsúszás, ami eddig is ott volt
+
+A szimulált osztályozó a **te élő csapaterődből** számolt
+(`teamMatchStrength`), az pedig kliensenként MÁS — vagyis a két gépen más
+gólvárhatósággal futott le ugyanaz a párharc, és a páros az egyik oldalon
+feljuthatott, a másikon nem. Ugyanaz a hibaosztály, amit a közös kupánál a
+`str` átküldése már megszüntetett, csak a piramis oldalán — és eddig
+észrevétlen maradt, mert a párharcot senki nem játszotta le.
+
+**A mérce a szezonzáró érték, nem az élő:** a rollover a nyári
+öregedés/fejlődés UTÁN fut, tehát az élő szám addigra mindkét oldalon
+elmozdult. A zárás pillanata viszont EGY közös pont, és mindkét érték el van
+téve (`S.mpMyFinal.matchStr` és a társ jelentésének `stats.matchStr` mezője).
+A páros egy csapat, a piramison a jobbik helyezés viszi mindkettőt: a
+párharcban ezért a **jobbik keret** áll ki (`pyrPairMatchOvr`).
+
+Régi mentésnél vagy régi verziójú társnál nincs meg a mező — ott a régi, helyi
+út marad, változatlanul.
+
+---
+
+### 4.2 A nyári felkészülési kupa — egyhangú nevezés
+
+A „van-e kupátok" kérdés **már eddig is közös** volt: azt a kupanevezés kapuja
+(`mpCupGate`) dönti el mindkettőtökre. A felajánlás feltétele tehát egyszerre
+igaz vagy hamis a két gépen — a tornát mégsem ajánlottuk fel.
+
+**Ami miatt ki volt zárva, és ami ebből igaz.** Egy **egyoldalú** torna tényleg
+kettéválasztaná a nyarat — és nem is elsősorban a játékidő miatt: a kampány
+lezárása állítja be a kupa utáni kapu jelzőjét (`S.mpCupSeason`), az pedig
+átbillenti, MELYIK döntési rekeszt (`…decision` vagy `…decisioncup`) használja
+a szezonzáró kapu. Ha csak az egyikőtök játszana tornát, a két kliens **két
+különböző rekeszre** várna — a szezonzárás holtpontra futna. A tiltás tehát nem
+a tornáról szólt, hanem erről.
+
+**Ezért a nevezés közös döntés, és itt EGYHANGÚ:** csak akkor indul a torna, ha
+mindketten igent mondtok.
+
+**Miért nem „a jobbik viszi mindkettőt", mint máshol?** Mert itt az igen nem
+jobb a nemnél: egy tétnélküli tornába (se trófea, se pénzdíj) nem lehet
+belerángatni azt, aki nem kért belőle — és az auto szezont futtató fél nem is
+tudná lejátszani. Így a két kliens vagy együtt lép a tornába, vagy együtt marad
+ki; a kapu-jelző sosem csúszhat szét.
+
+**Kulcs:** `s<szezon>nyk` · **kód:** `friendlyCupJoint`, `mpNykResolve`,
+`friendlyCupSettle`.
+
+---
+
+### 4.3 A bajnokság egyéni díjai — a két keret között
+
+Közös karrierben a három bajnoki díjat (gólkirály, gólpassz-király,
+kapus-király) **soha nem osztottuk ki**. A szezon egyéni teljesítménye jutalom
+nélkül maradt, és az Aranylabda szavazásából is kiesett egy egész bemenet.
+
+**Ami miatt ki volt zárva, és ami ebből igaz.** A góllövőlista két forrásból
+épül: a **két menedzser kerete** és a **gépi mezőny**. A gépi rész
+kliensenként MÁS — a CPU-k egymás elleni párosítását a helyi menetrendből
+fejtjük vissza (lásd `aiLeagueSchedule`) —, tehát a gépi góllövőlistát nem
+lehet közösen koronázni. Ez igaz, és igaz is marad.
+
+**Ami viszont igenis közös: a két menedzser kerete.** A sajátodat a saját
+tábládból ismered, a társadét a szezonzáró jelentése hozza (`topScorer` /
+`topAssist` / az új `topCS`) — és mindkét gépen ugyanaz a két jelölt áll
+egymással szemben. Közös karrierben ezért a díj a **két keret között** dől el,
+a gépi mezőny nélkül; a napló ezt ki is mondja.
+
+**A holtversenyt a név dönti**, kódpont szerint (`a.n<b.n`), **nem**
+`localeCompare` — az böngészőnként más sorrendet adhatna, és pont az a fajta
+néma szétcsúszás lenne belőle, amit el akarunk kerülni.
+
+**Régi verziójú társ:** ha a jelentésében nincs `topCS` mező, abban a
+kategóriában nem koronázunk. Inkább maradjon el a díj, mint hogy a két gépen
+más kapja.
+
+**Kód:** `lgMateTop`, `lgKingOf`, `awardLeagueKings`; a jelentés új mezője
+`stats.topCS`.
+
+---
+
+### 4.4 A kétoldali kapu közös mintája
+
+Ugyanaz a koreográfia fut a kupanevezésnél, az MK → KL láncnál, az
+Infinity-befizetésnél és a közös tabellánál: mindkét fél **feltesz** egy
+bejegyzést a szoba egy rekeszébe, **várja** a másikét, és amikor mindkettő
+megvan, egy **determinisztikus feloldó** (mindkét gépen ugyanaz a függvény,
+ugyanazon a két bejegyzésen) kiadja a közös eredményt.
+
+A két új döntés (`pyrpo`, `nyk`) ezt már nem másolja újra: az `mpBothGate`
+burkoló adja a várakozó ablakot, az elhasalt feltöltés pótlását (`mpReput`), a
+beragadt jelző feloldását (`mpWaitStuck`) és a „nem várom meg" kiutat.
+
+**A kiút mindenhol ugyanaz:** ha nem várod meg az egyeztetést, a **saját**
+döntéseddel megyünk tovább — az pontosan a javítás előtti viselkedés, tehát nem
+lehet rosszabb —, és a napló ki is mondja, hogy a két karrier ilyenkor
+szétválhat.
+
+**A meglévő négy hívó szándékosan érintetlen:** azok élesben futó, kimért
+kódok, és egy „takarítás" kedvéért nem érdemes hozzájuk nyúlni.
+
+---
+
+### 4.5 Mérés
+
+A hálózati kézfogást két kliens nélkül nem lehet élesben lefuttatni, a
+**feloldók** viszont tiszta függvények — azokat betűre ugyanazokkal a
+bejegyzésekkel futtattuk le mindkét szerepben (host és guest nézőpontból), és
+az eredménynek azonosnak kell lennie:
+
+| eset | páros eredménye | a történet forrása | a két kliens egyezik? |
+|---|---|---|---|
+| mindketten játszottak, a host nyert | feljut | a hosté | ✔ |
+| mindketten játszottak, a guest nyert | feljut | a guesté | ✔ |
+| mindketten nyertek | feljut | a hosté | ✔ |
+| mindketten vesztettek | marad | a hosté | ✔ |
+| host játszott és nyert, guest kihagyta | feljut | a hosté | ✔ |
+| host kihagyta, guest játszott és vesztett | marad | a guesté | ✔ |
+| egyikőjük sem játszott | — (marad a szimuláció) | — | ✔ |
+| VÉDŐ oldalon (`iAmCh=false`), egyikük nyert | bennmarad | a győztesé | ✔ |
+| VÉDŐ oldalon, mindketten vesztettek | kiesik | a hosté | ✔ |
+
+Egyjátékosban a feloldó **azonosságfüggvény**: ugyanazt adja vissza, amit a
+lejátszott párharc kiszámolt (`played` → saját eredmény, `skip` → `null`,
+vagyis szimuláció) — a régi út betűre változatlan.
+
+A bajnoki díjak feloldója ugyanígy: egyjátékosban a gépi gólkirály nyer (mint
+eddig), közös karrierben a két keret jobbika, régi verziójú társnál pedig a
+kapus-király elmarad.

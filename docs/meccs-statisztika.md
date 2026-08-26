@@ -1,6 +1,9 @@
 # Meccsenkénti statisztika és játékos-értékelés
 
-*(3.7.26 — a statisztika-réteg ELSŐ lépcsője; 3.7.27 — a négy befolyás.
+*(3.7.26 — a statisztika-réteg ELSŐ lépcsője; 3.7.27 — a négy befolyás;
+3.7.33 — a rövid beállás. Az utóbbihoz: `MSTAT_MIN_MIN`, `MSTAT_OUT_FLOOR`,
+`MSTAT_PULL_FLOOR`, `mstatMinutes` / `mstatRated` / `mstatMinW`,
+`pstatRatedOf`, a `.msSt0` CSS.
 Érintett kód: `mstatCompute`, `mstatRate`, `mstatMods`, `mstatSkillCh`,
 `mstatRoleCh`, `mstatFitOf`, `mstatProfileFit`, `mstatAxisZ`, `mstatPois`,
 `mstatFin`, `mstatShow` / `mstatRender` / `mstatAfterMatch` / `mstatSyncBtn`,
@@ -73,7 +76,81 @@ innen mozdul föl és le. A bemenetek:
 | **eredményesség** | — | gól (poszt szerint 1,0–2,6), gólpassz 0,7, tiszta lap 0,5–0,8, védés 0,22/db (max 1,4), labdaszerzés 0,10/db (max 0,7), kapott gól a kapusnál −0,25/db az első fölött, meccs embere +0,5 |
 | **csapat eredménye** | ±0,25 | tizenegyen nyernek, tizenegyen veszítenek |
 | **piros lap** | −2,5 | a legsúlyosabb egyéni tétel |
-| **játszott percek** | súly | nem tétel: az eredményesség a játékidő arányában számít, és a rövid beállás az alap felé húz vissza |
+| **játszott percek** | súly | nem tétel — és **15 perc alatt egyáltalán nincs értékelés**; lásd lent |
+
+### A rövid beállás (3.7.33)
+
+**Bejelentett hiba:** *„a rövid időt játszó játékosok nagyon rossz értékelést
+kapnak mindenképp."*
+
+**Miért történt.** A tételek két csoportra oszlanak: az egyik azt méri, **ki** a
+játékos és hogyan illik a rendszerbe (rating a kereten belül, poszt-illeszkedés,
+taktika, filozófia, a csapat eredménye), a másik azt, **mit csinált**
+(eredményesség). Az első csoport a percektől **függetlenül** hatott, a második
+viszont a játékidő arányában — `output *= share`. Egy cserejátékos tehát a
+teljes strukturális mínuszt megkapta (a padról beálló ember jellemzően gyengébb
+a kezdő tizenegy átlagánál: −0,9-ig), a jóváírás oldalán viszont szinte semmit
+nem tudott visszaszerezni: **húsz perc alatt szerzett gólja 1,2 helyett 0,27-et
+ért.**
+
+**A javítás két lépcsős.**
+
+**1. Tizenöt perc alatt nincs értékelés.** Nem rossz értékelés, hanem
+*semmilyen*: a táblázatban `—` áll, és a mérkőzés a forma mércéjébe sem számít
+bele. Öt perc nem elég egy ítélethez — se jóhoz, se rosszhoz. Az értékelés
+nélküli sorok a lista **végére** kerülnek (a rendezésnek nincs mihez nyúlnia), és
+a *három legjobb* közé nem kerülhetnek be.
+
+**2. A küszöb fölött a percek súlya kisebb.** A két percfüggő szorzó padlót kap,
+és a súly a **küszöbtől** számít, nem nulláról:
+
+```
+w = (percek − 15) / (90 − 15)              w ∈ [0,1]
+eredményesség           ×= 0,70 + 0,30·w   (MSTAT_OUT_FLOOR)
+az alaptól való eltérés ×= 0,75 + 0,25·w   (MSTAT_PULL_FLOOR)
+```
+
+**90 percnél mindkét szorzó pontosan 1,0** — a kezdők értékelése tehát betűre
+változatlan. Ez szándékos: a bejelentés a cserékről szólt, és egy ilyen
+javításnak nem szabad mellékesen átírnia a kezdő tizenegy értékelését.
+
+#### Mérve
+
+84-es keret, 80-as ellenfél, ugyanaz az ember, ugyanaz a mérkőzés:
+
+| eset | régi | új |
+|---|--:|--:|
+| kezdő 90', semmi | 4,0 | **4,0** |
+| kezdő 90', 1 gól | 5,0 | **5,0** |
+| kezdő 90', 2 gól | 6,0 | **6,0** |
+| kezdő 90', vereség | 3,5 | **3,5** |
+| csere 20', semmi | 4,0 | **4,0** |
+| csere 20', **1 gól** | 4,0 | **4,5** |
+| csere 20', **2 gól** | 4,0 | **5,0** |
+| csere 20', **gól + gólpassz** | 4,0 | **5,0** |
+| csere 10', 1 gól | 4,0 | **—** (nincs értékelés) |
+| gyenge csere 20', vereség | 3,0 | **3,0** |
+
+És a lényeg egy sorban — a padról beálló, posztidegen, gyengébb ember egy
+vereségben:
+
+| | 20 perc | 90 perc |
+|---|--:|--:|
+| régi | 3,0 | 3,0 |
+| új | **3,0** | **3,0** |
+
+…vagyis a **percek már semmit nem vesznek el**: ami marad, az tisztán az, hogy
+gyengébb a keret átlagánál, rossz poszton játszott, és a csapat kikapott —
+pontosan ugyanaz, amit egy kezdőként is kapna.
+
+### A forma mércéje csak az értékelt meccseket látja
+
+A 15 percnél rövidebb beállás bekerül a meccs-történetbe (a percek, a gólok és a
+gólpasszok a történet részei), de **`st` nélkül** — a forma alapvonala
+(`pformBaseline`) és a periódus-átlaga (`pformRecent`) csak az értékelt
+mérkőzéseket számolja (`pstatRatedOf`). Így egy tíz perces csere se jó, se rossz
+formajelet nem hordoz. Régebbi mentésekben minden bejegyzésnek van `st`-je,
+tehát a szűrő ott mindent átenged: a viselkedés visszamenőleg változatlan.
 
 ### Miért kettéválik a Rating-tétel
 
