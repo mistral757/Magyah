@@ -377,6 +377,55 @@ ki; a kapu-jelző sosem csúszhat szét.
 **Kulcs:** `s<szezon>nyk` · **kód:** `friendlyCupJoint`, `mpNykResolve`,
 `friendlyCupSettle`.
 
+#### 4.2b …és a torna maga is közös (3.7.36)
+
+**A bejelentés:** *„nyári kupában, amikor nincs klasszikus sorozat, csak
+felkészülési kupa, PvP módban, hagyományosban nem tett minket egy kupába."*
+
+A 3.7.32 a **nevezést** tette közössé — a **tornát** magát nem. A
+`friendlyCupStart` egyszerűen elindította a saját 32-es mezőnyét mindkét gépen:
+két külön világ lett belőle, ahol sosem találkozhattatok. Pedig a nyár épp
+attól nyár, hogy nincs más közös sorozat — ez az egyetlen, amiben
+összekerülhettetek volna.
+
+**A közös kupa gépezete készen állt, és sorozat-független.** A `mpCup` rekord
+vezeti a seedelt mezőnyt, a kalapokat, az ágrajzot, a társ csapatát a 32
+között és a kieséses ági találkozást — a `buildEuroField` és a
+`startEuroCampaign` mindezt a `comp` betűjelére nézve intézi, nem a sorozat
+fajtájára. A nyári tornát egyszerűen **nem kapcsolta bele senki**.
+
+**A javítás pontosan ennyi.** A nevezés (`s<szezon>nyk`) mostantól magával
+viszi azt a néhány számot, amiből a közös mezőny felépül — ugyanazokat a
+mezőket, mint a tétmeccses kupanevezés (`mpCupGate`):
+
+| mező | mire kell |
+|---|---|
+| `teamName` | a társ csapata valódi néven ül a mezőnyben |
+| `ovr` | a **nyers** erő: ebből dolgozik a szimuláció és a mezőny célértéke |
+| `str` | a **kijelzett** (boostos) csapaterő — csak a felületnek |
+| `v` | verzió-egyeztetés: eltérésnél a napló azonnal kimondja |
+
+A `mpNykResolve` ezért **már nem igen/nem**, hanem `null` (nem indul) vagy a két
+nevezés együtt; igazként viselkedik, tehát a régi `if(go)` ág változatlanul jó.
+Az eredményt a `mpNykJoinCup` írja be a `S.mpCup` rekeszbe (`comp:"NYK"`) —
+**átírva**, nem eldobva azt, amit a kupanevezés kapuja `comp:null`-lal hagyott
+ott, hogy a szezonra vonatkozó többi mezője érvényben maradjon.
+
+**A mezőny célértéke.** Egyjátékosban az ígéret *„a te nyers csapaterőd mínusz
+egy"* (`euroMidRating` felkészülési ága). Kettőnél ez a szám kliensenként más
+volna, márpedig a közös kupa egyetlen garanciája, hogy a két gép **bitre
+ugyanazt** a mezőnyt építi. A `mpNykSharedMid` ezért az **erősebb kerethez**
+horgonyoz (annak a nyers erejéhez mínusz egy) — ugyanaz a döntés, mint a
+tétmeccses `mpCupSharedMid`-nél: így a tornán a jobbik keretnek sincs
+sétagalopp. A nevezési képernyő közös karrierben ki is írja ezt.
+
+**Ami változatlan:** a torna továbbra sem ad semmit (se trófea, se pénzdíj, se
+Champion-kártya, se arany-díj, se karrier-történet), a nevezés továbbra is
+**egyhangú**, és a kapu-jelző (`S.mpCupSeason`) sem csúszhat szét — mindkét
+kliens ugyanazt a kampányt játssza le, tehát ugyanakkor is zárja le.
+
+**Kód:** `mpNykResolve`, `mpNykSharedMid`, `mpNykJoinCup`, `friendlyCupStart`.
+
 ---
 
 ### 4.3 A bajnokság egyéni díjai — a két keret között
