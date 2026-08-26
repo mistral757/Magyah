@@ -925,6 +925,44 @@ button.infPanel:disabled{cursor:default}
 .attrline .pri{color:var(--gold);font-weight:700}
 .attrline .sep{color:var(--dim2)}
 .hubDetail{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:2px 0 8px}
+/* ================= HÚZÁSSAL CSERE A KERETLISTÁN (3.7.35) =================
+   Egy csere eddig négy koppintás volt: sor → részletek → „Posztcsere" → a
+   jelölt kiválasztása egy külön panelen. Aki a kezdő tizenegyet rendezgeti, az
+   ezt tucatszor végigjárja. A HÚZÁS ugyanazt EGY mozdulattal adja: hosszan
+   megnyomod a sort, felemelkedik a kezed alá, és odaviszed, akivel cserélni
+   akarod.
+
+   MIÉRT HOSSZÚ NYOMÁS ÉS NEM AZONNALI HÚZÁS: a lista GÖRGETHETŐ. Egy azonnal
+   induló húzás elvenné a görgetést — a hosszú nyomás az egyetlen gesztus, ami
+   egyértelműen elválik tőle. A nyomás alatt a sor lassan „betölt" (hubDragArm):
+   így nem néma a várakozás, és látszik, mikor indul el.
+
+   A GYORS KOPPINTÁS VÁLTOZATLAN: a részletpanel ugyanúgy nyílik. */
+@keyframes hubArmFill{from{background-size:0% 100%}to{background-size:100% 100%}}
+.prow.hubDragArm{
+  background-image:linear-gradient(90deg,color-mix(in srgb,var(--gold) 24%,transparent),
+                                        color-mix(in srgb,var(--gold) 24%,transparent));
+  background-repeat:no-repeat;background-position:left center;
+  animation:hubArmFill var(--hubArmMs,1000ms) linear forwards}
+@media (prefers-reduced-motion:reduce){.prow.hubDragArm{animation:none;background-size:100% 100%;opacity:.75}}
+/* A FELEMELT MÁSOLAT követi az ujjadat. Az eredeti sor a helyén marad,
+   halványan — így végig látszik, HONNAN viszed. */
+.hubDragGhost{position:fixed;z-index:120;pointer-events:none;margin:0;
+  border-radius:12px;box-shadow:0 14px 34px rgba(0,0,0,.55),0 0 0 2px var(--gold);
+  background:var(--panel2);opacity:.97;
+  transform-origin:50% 50%;will-change:transform}
+.prow.hubDragSrc{opacity:.32;outline:2px dashed color-mix(in srgb,var(--gold) 55%,transparent);
+  outline-offset:-2px}
+/* A CÉLSOR: ide kerül, akit viszel. A nyíl a csere kétirányúságát mondja ki —
+   nem beszúrás, hanem CSERE: a két ember helyet cserél. */
+.prow.hubDragTo{outline:2px solid var(--gold);outline-offset:-2px;
+  background:color-mix(in srgb,var(--gold) 15%,transparent);position:relative}
+.prow.hubDragTo::after{content:"⇄";position:absolute;right:8px;top:50%;
+  transform:translateY(-50%);color:var(--gold);font-size:17px;font-weight:700;
+  text-shadow:0 1px 3px rgba(0,0,0,.6)}
+/* Húzás közben a lap nem görögjön az ujj alatt, és ne jelöljön ki szöveget. */
+body.hubDragging{user-select:none;-webkit-user-select:none}
+body.hubDragging #hubRoster{touch-action:none}
 .hdAttrs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
 .hdA{display:flex;justify-content:space-between;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-size:12px;color:var(--ink)}
 .hdA .v{font-family:var(--font-disp);font-size:14.5px}
@@ -4654,7 +4692,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.34";
+const APP_VERSION="3.7.35";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -31213,7 +31251,14 @@ function paceBiasTotal(){
   const m=(typeof styleSkillPaceBias==="function")?styleSkillPaceBias():0;
   if(m<=0)return t;
   const base=paceSkillBase();
-  if(base<=0||base>=1)return t;
+  /* CSAK a base>=1 a valódi kizáró ok (nullával osztanánk). A `base<=0` ág
+     KORÁBBAN IS ITT ÁLLT, és némán megölte a megvett képességet: amint a
+     pakliból elfogyott a három sebesség-képesség, a szorzó egy az egyben
+     visszaadta a taktika torzítását — vagyis a felhasználó fizetett érte, és
+     nem kapott semmit. A képlet base=0-nál is helyes: p0=t, p1=t×(1+m), és a
+     visszafejtés (p1−0)/(1−0)=p1. (A poolRefillKind óta base amúgy sem lehet
+     nulla, de a védőháló maradjon őszinte.) */
+  if(base>=1)return t;
   const p0=t+(1-t)*base;
   const p1=Math.min(PACE_TOTAL_MAX,p0*(1+m));
   return Math.max(t,Math.min(1,(p1-base)/(1-base)));}
@@ -31290,6 +31335,35 @@ const SKILL_POOL_MIN=12;
    megvenné a képességet, a panel meg azt írná, hogy „nincs mit szorozni".
    A pakli-utántöltés (SKILL_POOL_MIN) önmagában nem elég erre — egy vékony
    pool véletlenül is maradhat sebesség-képesség nélkül. */
+/* ---- …ÉS EGY FAJTA SEM FOGYHAT EL A PAKLIBÓL (3.7.35) ----
+   BEJELENTETT TÜNET: „miért nincs a poolban sebesség-képesség? eddig 2 db-ot
+   kapott a csapat… mindig kell lennie a poolban, azért működhet egy ilyen
+   csapatstílus."
+
+   A 3.2.01 a CÉLZOTT húzást már megjavította (poolTake a teljes készletből
+   pótol), a paklit magát viszont nem: 37 képességből MINDÖSSZE HÁROM sebességi
+   van, és amíg a pakli nem fogy 12 alá, egy friss pakli sem kerül mögé. A
+   három kihúzása után tehát húszon-harminc húzáson át a SORREND-ALAPÚ
+   (torzítatlan) ág egyszerűen nem tud sebesség-képességet adni — és a
+   „Sebességre hangolt sorsolás" kijelzése is joggal írta, hogy nincs mit
+   szoroznia.
+
+   EZ AZ EGY FAJTA VISSZATÖLTŐDIK. Ha a pakliban EGY sem maradt belőle, friss
+   példányokat szórunk vissza VÉLETLEN helyekre — nem a pakli elejére, mert az
+   garantálná a következő húzást, és nem is a végére, mert az sosem jönne elő.
+   A művelet KORLÁTOS: három elem, nem egy egész pakli (a 3.2.01 első
+   megoldása pont ezen bukott meg, 3877 elemesre hízott a pool).
+
+   MIÉRT NEM FOGYÓESZKÖZ EGY KÉPESSÉG: az eligibleForSkill amúgy is kizárja
+   azt, aki már bírja, tehát ugyanaz a képesség nyugodtan mehet MÁS embernek. */
+function poolRefillKind(pred){
+  if(!S.skillPool)S.skillPool=[];
+  if(S.skillPool.some(pred))return 0;
+  const add=MAIN_SKILLS.filter(pred);
+  add.forEach(sk=>{
+    const at=Math.floor(Math.random()*(S.skillPool.length+1));
+    S.skillPool.splice(at,0,sk);});
+  return add.length;}
 function poolTake(pred){
   const i=S.skillPool.findIndex(pred);
   if(i>=0)return S.skillPool.splice(i,1)[0];
@@ -31300,10 +31374,24 @@ function poolTake(pred){
      hízott. Egy példány kell, nem egy pakli. */
   const c=MAIN_SKILLS.filter(pred);
   return c.length?c[Math.floor(Math.random()*c.length)]:null;}
+/* A HÚZÁS BURKOLÓJA. A pakli-invariánst (mindig legyen benne sebesség-
+   képesség) a húzás UTÁN is helyre kell állítani, nem csak előtte: a
+   képesség-panel a két húzás KÖZÖTT olvassa ki a pakli nyers arányát
+   (paceSkillBase), és ha épp az utolsó pace-t vittük el, ott nullát látna —
+   megint azt írná ki, hogy „nincs mit szorozni". Egy burkoló egy helyen
+   intézi el, akárhány ága van a húzásnak. */
 function drawSkillFromPool(){
+  const sk=drawSkillFromPoolRaw();
+  try{poolRefillKind(isPaceSkill);}catch(e){}
+  return sk;}
+function drawSkillFromPoolRaw(){
   if(!S.skillPool)S.skillPool=[];
   if(S.skillPool.length<SKILL_POOL_MIN)
     S.skillPool=S.skillPool.concat(weightedShuffleSkills());
+  /* A SEBESSÉG-KÉPESSÉG SOSEM FOGYHAT EL A PAKLIBÓL — lásd poolRefillKind.
+     Egy egész csapatstílus (⚡ Hol jön a mennydörgés?) áll rajta, és a
+     kijelzett szorzója is a pakli nyers arányából számol. */
+  poolRefillKind(isPaceSkill);
   /* A sebesség-ág: a taktika adja az esélyt, a Villám képessége pedig SZOROZZA
      (lásd paceBiasTotal). */
   const b=paceBiasTotal();
@@ -51683,6 +51771,265 @@ function hubKeepRowAnchor(key){
   return function(){
     fix();
     if(typeof requestAnimationFrame==="function")requestAnimationFrame(fix);};}
+/* ---- …ÉS A CSERE UTÁN ODA GÖRGETÜNK, AHOL A LAP NYITVA MARADT (3.7.35) ----
+   BEJELENTETT HIBA: „miután két játékost kicseréltem a HUB-ban, mindig
+   felgörget az edző magasságába."
+   AZ OK: a posztcsere-választó kezelője csak `renderHub()`-ot hívt — horgony
+   nélkül. A választó megnyitásakor a lap ODAGÖRDÜLT a panelhez
+   (scrollIntoView), a csere után pedig a teljes HUB újraépült: a régi DOM
+   eltűnt, és a görgetés a lap tetejére csippent.
+
+   MIÉRT NEM A hubKeepRowAnchor KELL IDE. Az a sor KÉPERNYŐN elfoglalt helyét
+   őrzi meg — a lenyitásnál pontosan ez a helyes (az ujjad alatt marad a sor).
+   A cserénél viszont a sor a választóhoz görgetés miatt jellemzően KÍVÜL van a
+   képernyőn; ugyanoda visszaállítani annyit tenne, hogy továbbra sem látszik.
+   Itt tehát ODA KELL VINNI a lapot, nem megőrizni a helyét.
+
+   A KITAPADT SÁVOK ALÁ. A HUB tetején a ☰ menü sávja (és fekvő módban a
+   fejléc) `position:sticky` — ha a sort a viewport 0-jához igazítanánk, épp
+   alájuk csúszna. Ezért megmérjük, meddig érnek, és az alá tesszük.
+
+   HÁROMSZOR IGAZÍTUNK (azonnal · a következő képkockán · 60 ms múlva): a
+   lenyíló részletpanel magassága a betűtípusok és a mérők felépülésével még
+   mozdulhat, és egy egyszeri korrekció ilyenkor elcsúszna. */
+function hubStickyInset(){
+  let top=0;
+  const cand=[document.querySelector(".hubMenuWrap"),document.querySelector("header")];
+  cand.forEach(el=>{
+    if(!el||el.classList.contains("hide"))return;
+    let pos="";try{pos=getComputedStyle(el).position;}catch(e){}
+    if(pos!=="sticky"&&pos!=="fixed")return;
+    const r=el.getBoundingClientRect();
+    if(r.height<=0||r.top>40)return;      /* nincs kitapadva a lap tetejére */
+    top=Math.max(top,r.bottom);});
+  return Math.max(0,top);}
+function hubScrollRowIntoView(key,pad){
+  if(!key)return;
+  const find=()=>[...document.querySelectorAll('#scHub [data-hubkey]')]
+    .find(x=>x.getAttribute("data-hubkey")===key)||null;
+  const go=()=>{
+    const el=find();if(!el)return;
+    const sc=hubScrollerOf(el);
+    const want=hubStickyInset()+(pad==null?10:pad);
+    const d=el.getBoundingClientRect().top-want;
+    if(Math.abs(d)<2)return;
+    if(sc)sc.scrollTop+=d;else window.scrollBy(0,d);};
+  go();
+  if(typeof requestAnimationFrame==="function")requestAnimationFrame(go);
+  setTimeout(go,60);}
+/* ================= HÚZÁSSAL CSERE — A GESZTUS (3.7.35) =================
+   Kérés: „elég legyen hosszan (1s) megnyomni egy játékos nevét a HUB-ban, és
+   akkor elindul egy animáció, amivel lehet húzni azt a játékost fel-alá, és
+   így könnyedebben lehessen cserélni."
+
+   EGY DELEGÁLT FIGYELŐ, NEM SORONKÉNTI KEZELŐ. A renderHub minden művelet után
+   ÚJRAÉPÍTI a keretlistát (a sorok DOM-elemei eldobódnak), tehát egy soronként
+   felkötött kezelő minden rajzolásnál újra felkötést kérne — és egy kihagyott
+   ág némán elvenné a gesztust. A #hubRoster viszont MEGMARAD: elég rá egyszer
+   felülni, és a sorokat a `data-hubkey` alapján találjuk meg. Ugyanaz az
+   azonosító, amit a görgetés-horgony is használ.
+
+   MIÉRT POINTER EVENT: egy kódból viszi az ujjat, az egeret és a tollat. A
+   touchmove-ot külön kell némítani ({passive:false}), mert a görgetést a
+   böngésző különben elveszi tőlünk húzás közben.
+
+   A HATÁROK:
+     · 1000 ms nyomás indít — közben a sor „betölt" (hubDragArm);
+     · 8 px-nél nagyobb elmozdulás a nyomás alatt = GÖRGETNI akarsz, nem húzni:
+       az időzítő elszáll, a lista a szokott módon görög;
+     · a lista széléhez érve magától görget (HUBDRAG_EDGE / _SPEED), különben a
+       képernyőn kívüli sorra nem lehetne ráhúzni;
+     · a húzás utáni click-et elnyeljük, különben a felengedés kinyitná a
+       részletpanelt is;
+     · meccs közben (squadMoveLockReason) nincs húzás, ahogy a panelen sincs;
+     · a zárolt embert a swapPlayerLocations amúgy is visszautasítja, és ki is
+       írja, miért.
+
+   MIT JELENT A DOBÁS: CSERÉT, nem beszúrást. A két ember helyet cserél —
+   pontosan az, amit a posztcsere-panel is csinál (swapPlayerLocations), tehát
+   a poszt-illeszkedés újraszámolása és minden könyvelés változatlan úton megy.
+   EGY KIVÉTEL: az ÜRES pad-hely. Oda a tartalék-keretből be lehet HÚZNI valakit
+   (mozgatás, nem csere) — ugyanaz az ág, amit a panel `fillEmptyBench` esete
+   is jár. */
+const HUBDRAG_HOLD_MS=1000;   /* ennyi nyomás indítja a húzást */
+const HUBDRAG_SLOP=8;         /* ennyi elmozdulásig még nyomásnak számít */
+const HUBDRAG_EDGE=76;        /* a görgető szélétől ennyin belül auto-görget */
+const HUBDRAG_SPEED=14;       /* képkockánként ennyi px */
+let _hd=null;                 /* a futó gesztus állapota */
+function hubDragRowOf(el){
+  const r=el&&el.closest?el.closest("#hubRoster [data-hubkey]"):null;
+  return r||null;}
+function hubDragLocOf(row){
+  const k=row&&row.getAttribute("data-hubkey");
+  if(!k)return null;
+  const i=k.indexOf(":");
+  const t=k.slice(0,i),v=k.slice(i+1);
+  if(t==="bench")return {type:"bench",key:v};
+  return {type:t,idx:parseInt(v,10)};}
+function hubDragClear(){
+  if(!_hd)return;
+  if(_hd.timer)clearTimeout(_hd.timer);
+  if(_hd.raf&&typeof cancelAnimationFrame==="function")cancelAnimationFrame(_hd.raf);
+  if(_hd.arm)_hd.arm.classList.remove("hubDragArm");
+  if(_hd.ghost&&_hd.ghost.parentNode)_hd.ghost.parentNode.removeChild(_hd.ghost);
+  if(_hd.src)_hd.src.classList.remove("hubDragSrc");
+  if(_hd.to)_hd.to.classList.remove("hubDragTo");
+  document.body.classList.remove("hubDragging");
+  _hd=null;}
+/* A FELEMELT MÁSOLAT. Az eredeti sor méretét és helyét vesszük át, hogy a
+   felemelkedés ne ugorjon — csak a doboz-árnyék és a kis nagyítás jelzi, hogy
+   most már a kezedben van. */
+function hubDragLift(){
+  if(!_hd||_hd.dragging)return;
+  const row=_hd.src;
+  if(!row||!row.isConnected){hubDragClear();return;}
+  _hd.dragging=true;
+  if(_hd.arm){_hd.arm.classList.remove("hubDragArm");_hd.arm=null;}
+  try{if(navigator.vibrate)navigator.vibrate(15);}catch(e){}
+  const r=row.getBoundingClientRect();
+  const g=row.cloneNode(true);
+  g.className=(row.className||"")+" hubDragGhost";
+  g.style.cssText=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;
+    display:flex;align-items:center;box-sizing:border-box`;
+  document.body.appendChild(g);
+  _hd.ghost=g;_hd.gx=r.left;_hd.gy=r.top;
+  row.classList.add("hubDragSrc");
+  document.body.classList.add("hubDragging");
+  _hd.scroller=hubScrollerOf(row);
+  hubDragMoveGhost();
+  hubDragAutoScroll();}
+function hubDragMoveGhost(){
+  if(!_hd||!_hd.ghost)return;
+  const dx=_hd.x-_hd.x0,dy=_hd.y-_hd.y0;
+  /* Az oldalirányú elmozdulás CSAK jelzés (a fél erejével megy), a csere
+     függőleges — a lista is az. */
+  _hd.ghost.style.transform=`translate(${dx*0.5}px,${dy}px) scale(1.03)`;
+  /* A CÉL a ghost ALATT lévő sor. A ghost pointer-events:none, tehát az
+     elementFromPoint a valódi listát látja. */
+  let el=null;
+  try{el=document.elementFromPoint(_hd.x,_hd.y);}catch(e){}
+  const row=hubDragRowOf(el);
+  const tgt=(row&&row!==_hd.src)?row:null;
+  if(tgt!==_hd.to){
+    if(_hd.to)_hd.to.classList.remove("hubDragTo");
+    _hd.to=tgt;
+    if(tgt){tgt.classList.add("hubDragTo");
+      try{if(navigator.vibrate)navigator.vibrate(8);}catch(e){}}}}
+/* A LISTA SZÉLÉN MAGÁTÓL GÖRÖG. Enélkül csak arra a néhány sorra lehetne
+   ráhúzni, ami épp a képernyőn van — egy 28 fős keretnél ez használhatatlan. */
+function hubDragAutoScroll(){
+  if(!_hd||!_hd.dragging)return;
+  const sc=_hd.scroller;
+  let top,bot;
+  if(sc){const r=sc.getBoundingClientRect();top=r.top;bot=r.bottom;}
+  else{top=0;bot=window.innerHeight||document.documentElement.clientHeight;}
+  let d=0;
+  if(_hd.y<top+HUBDRAG_EDGE)d=-HUBDRAG_SPEED*Math.min(1,(top+HUBDRAG_EDGE-_hd.y)/HUBDRAG_EDGE);
+  else if(_hd.y>bot-HUBDRAG_EDGE)d=HUBDRAG_SPEED*Math.min(1,(_hd.y-(bot-HUBDRAG_EDGE))/HUBDRAG_EDGE);
+  if(d){
+    if(sc)sc.scrollTop+=d;else window.scrollBy(0,d);
+    hubDragMoveGhost();}
+  if(typeof requestAnimationFrame==="function")
+    _hd.raf=requestAnimationFrame(hubDragAutoScroll);}
+/* A DOBÁS. Csere (két ember helyet cserél), vagy — üres pad-helyre — mozgatás
+   a tartalék-keretből. Mindkettő ugyanazon az úton zárul, mint a panelé. */
+function hubDragDrop(){
+  if(!_hd||!_hd.dragging||!_hd.to)return false;
+  const from=hubDragLocOf(_hd.src),to=hubDragLocOf(_hd.to);
+  if(!from||!to)return false;
+  const emptyTo=_hd.to.getAttribute("data-hubempty")==="1";
+  let ok=false;
+  if(emptyTo){
+    /* ÜRES PAD-HELY: csak a tartalék-keretből tölthető be — a kezdő 11-ből
+       vagy egy másik pad-helyről áthozva csak új lyukat ütnénk máshol.
+       Ugyanaz a szabály, mint a panel fillEmptyBench ágán. */
+    if(from.type!=="extra"){
+      try{setDraftStatus&&setDraftStatus("Üres pad-helyre csak a tartalék-keretből húzhatsz valakit.");}catch(e){}
+      return false;}
+    const lock=squadMoveLockReason();
+    if(lock){try{setDraftStatus&&setDraftStatus(`⏱ ${lock}`);}catch(e){}return false;}
+    const p=extraRoster[from.idx];
+    if(!p)return false;
+    if(isBenchLocked(p.n)){
+      try{setDraftStatus&&setDraftStatus(`🔒 ${shortName(p.n)} egy szezonon át nem cserélhető (kihívás-büntetés).`);}catch(e){}
+      return false;}
+    BENCH[to.key]=extraRoster.splice(from.idx,1)[0];
+    p._arrivedAtIdx=0;ok=true;
+  }else{
+    ok=swapPlayerLocations(hubLocRef(from),hubLocRef(to))!==false;
+    if(ok){
+      const a=from.type==="slot"?(slots[from.idx]&&slots[from.idx].player):null;
+      if(a)a._arrivedAtIdx=0;
+      const b=to.type==="slot"?(slots[to.idx]&&slots[to.idx].player):null;
+      if(b)b._arrivedAtIdx=0;}}
+  if(!ok)return false;
+  /* A LAP ODA ÁLL, AHOVÁ VITTED — ugyanaz az elv, mint a panelből indított
+     cserénél: azt akarod megnézni, jól sült-e el. */
+  const backKey=hubLocKey(to);
+  renderHub();drawPitch();updateBar();saveGame();
+  hubScrollRowIntoView(backKey);
+  return true;}
+function hubDragInit(){
+  const box=$("hubRoster");
+  if(!box||box._hubDragOn)return;
+  box._hubDragOn=true;
+  const down=(e)=>{
+    if(_hd)hubDragClear();
+    if(e.button!=null&&e.button!==0)return;          /* csak a bal gomb / az ujj */
+    const row=hubDragRowOf(e.target);
+    if(!row)return;
+    /* A soron belüli SAJÁT úticélú elemek (jelvények, gombok) nem indítanak
+       húzást — azoknak külön dolguk van. */
+    if(e.target.closest&&e.target.closest("[data-go],button,select,a"))return;
+    if(squadMoveLockReason())return;                 /* meccs közben nincs átrendezés */
+    _hd={src:row,x0:e.clientX,y0:e.clientY,x:e.clientX,y:e.clientY,
+         dragging:false,ghost:null,to:null,arm:row,timer:null,raf:null,id:e.pointerId};
+    row.classList.add("hubDragArm");
+    row.style.setProperty("--hubArmMs",HUBDRAG_HOLD_MS+"ms");
+    _hd.timer=setTimeout(()=>{if(_hd)hubDragLift();},HUBDRAG_HOLD_MS);};
+  const move=(e)=>{
+    if(!_hd)return;
+    _hd.x=e.clientX;_hd.y=e.clientY;
+    if(!_hd.dragging){
+      /* Elmozdult a nyomás alatt → GÖRGETNI akar, nem húzni. */
+      if(Math.abs(e.clientX-_hd.x0)>HUBDRAG_SLOP||Math.abs(e.clientY-_hd.y0)>HUBDRAG_SLOP)
+        hubDragClear();
+      return;}
+    hubDragMoveGhost();};
+  const up=()=>{
+    if(!_hd)return;
+    const wasDrag=_hd.dragging;
+    let moved=false;
+    if(wasDrag)moved=hubDragDrop();
+    hubDragClear();
+    /* A húzás utáni click-et elnyeljük: felengedéskor különben a részletpanel
+       is kinyílna azon a soron, ahol épp elengedted.
+       IDŐRE SZÓL, NEM A KÖVETKEZŐ KATTINTÁSIG. A dobás után a renderHub
+       KICSERÉLI a lista teljes DOM-ját, tehát a felengedés helyén már más elem
+       van — click sokszor NEM is érkezik, a jelző viszont bent ragadna, és a
+       felhasználó KÖVETKEZŐ, teljesen jogos koppintását nyelné el. (Mérve: a
+       húzás után a soron következő koppintás nem nyitotta ki a lapot.) */
+    if(wasDrag){
+      _hubDragSwallow=true;
+      setTimeout(()=>{_hubDragSwallow=false;},350);}
+    return moved;};
+  box.addEventListener("pointerdown",down);
+  box.addEventListener("pointermove",move);
+  /* A felengedést és a megszakítást az ABLAKON figyeljük: az ujj könnyen
+     kicsúszik a listából, és egy ottfelejtett ghost beragadna a képernyőn. */
+  window.addEventListener("pointerup",up);
+  window.addEventListener("pointercancel",()=>{hubDragClear();});
+  /* HÚZÁS KÖZBEN A LAP NEM GÖRÖGHET AZ UJJ ALATT. A touch-action:none CSS a
+     legtöbb böngészőn elég, de a már MEGKEZDETT görgetést csak ez állítja meg. */
+  box.addEventListener("touchmove",(e)=>{
+    if(_hd&&_hd.dragging&&e.cancelable)e.preventDefault();},{passive:false});
+  /* Hosszú nyomásra a mobil böngésző szövegkijelölést/menüt kínálna. */
+  box.addEventListener("contextmenu",(e)=>{if(_hd)e.preventDefault();});
+  box.addEventListener("click",(e)=>{
+    if(!_hubDragSwallow)return;
+    _hubDragSwallow=false;
+    e.stopPropagation();e.preventDefault();},true);}
+let _hubDragSwallow=false;
 /* NYUGDÍJ-JELZÉS a keretlistában: tartósan látszik, hány szezonja maradt annak,
    aki már bejelentette a visszavonulását — a szezonjelentés egyszeri
    üzenetével szemben ez bármikor visszanézhető. */
@@ -55699,7 +56046,8 @@ function renderHub(){
    if(rd&&gameMode==="career"&&careerPool){
      const r=rosterCapParts();
      rd.textContent=`Több hely a tartalékoknak és a fiataloknak — most ${r.used}/${r.cap}`;}}
-  $("hubIntro").textContent=`A teljes kereted itt tekinthető át. Koppints egy játékosra a részletekért — ott találod a posztcserét, a poszt-tanulást és az eladást is.`
+  $("hubIntro").textContent=`A teljes kereted itt tekinthető át. Koppints egy játékosra a részletekért — ott találod a posztcserét, a poszt-tanulást és az eladást is. `
+    +`Cseréhez a gyorsabb út: tartsd nyomva a sorát egy másodpercig, és húzd oda, akivel cserélnéd.`
     +(S.tacticPrompt?` ⚙️ Új szezon: a Taktika gombnál most átállíthatod a rendszert — a váltás a szezon elején kerül a legkevesebbe.`:"");
   /* ---- A HUB-ON: CSAK A SZÁM ---- */
   $("hubBudgetChip").innerHTML=budgetChipHtml()+budgetHintHtml();
@@ -56010,7 +56358,11 @@ function renderHub(){
       row.style.cssText="display:flex;align-items:center;opacity:.72";
       row.innerHTML=`<span class="pos pc-${loc.key}">${cat.codes[0]}</span>
         <span class="main"><div class="nm" style="color:var(--dim)">${esc(cat.label)} — üres <small>(pad)</small></div>
-        <div class="trait">Koppints, és beállíthatsz ide valakit a tartalék-keretből</div></span>`;
+        <div class="trait">Koppints, vagy húzz ide valakit a tartalék-keretből</div></span>`;
+      /* AZ ÜRES HELY IS DOBÁSI CÉL — de csak a tartalék-keretből (mozgatás,
+         nem csere). A `data-hubempty` jelzi a húzás-kezelőnek, melyik ág kell. */
+      row.setAttribute("data-hubkey",hubLocKey(loc));
+      row.setAttribute("data-hubempty","1");
       row.onclick=()=>openHubPositionPicker(loc);
       rgAdd(loc,row);
       return;}
@@ -56127,6 +56479,9 @@ function renderHub(){
       restore();};
     rgAdd(loc,row);
     if(hubExpandedKey===hubLocKey(loc))rgAdd(loc,buildHubDetail(loc));});
+  /* HÚZÁSSAL CSERE: a figyelő a #hubRoster DOBOZÁN ül, ami túléli az
+     újrarajzolást — a hívás idempotens (egyszer köti fel magát). */
+  try{hubDragInit();}catch(e){}
   /* FIX: a HUB minden újrarajzolása egyben mentés is — vásárlás, eladás,
      klub-szemle, szintlépés után azonnal maradandó az állapot. */
   if(gameMode==="career")saveGame();
@@ -56224,18 +56579,24 @@ function openHubPositionPicker(loc){
       <span class="ovr">${nowOvr}</span>`;
     row.onclick=()=>{
       if(locked)return;
+      /* A CSERE UTÁN ODA GÖRGETÜNK, AHOL A LAP NYITVA MARAD. A lenyitott
+         részletpanel a HELYHEZ tartozik (hubExpandedKey), tehát a csere után
+         ugyanott áll nyitva — csak már a BEÉRKEZŐ játékossal. Épp azt akarod
+         megnézni: jól sült-e el a csere. */
+      const back=hubExpandedKey||hubLocKey(loc);
       if(fillEmptyBench){
         /* mozgatás, nem csere: a tartalékból a pad üres helyére */
         const i=extraRoster.indexOf(other.p);
-        if(i<0){$("hubPositionPicker").classList.add("hide");renderHub();return;}
+        if(i<0){$("hubPositionPicker").classList.add("hide");renderHub();hubScrollRowIntoView(back);return;}
         BENCH[loc.key]=extraRoster.splice(i,1)[0];
         other.p._arrivedAtIdx=0;
       }else{
         const ok=swapPlayerLocations(hubLocRef(loc),hubLocRef(other));
-        if(ok===false){$("hubPositionPicker").classList.add("hide");renderHub();return;}   /* elavult csere → ne mentsünk törött állapotot */
+        if(ok===false){$("hubPositionPicker").classList.add("hide");renderHub();hubScrollRowIntoView(back);return;}   /* elavult csere → ne mentsünk törött állapotot */
         loc.p._arrivedAtIdx=0;other.p._arrivedAtIdx=0;}
       $("hubPositionPicker").classList.add("hide");
-      renderHub();drawPitch();updateBar();saveGame();};
+      renderHub();drawPitch();updateBar();saveGame();
+      hubScrollRowIntoView(back);};
     box.appendChild(row);});
   if(!box.children.length)
     box.innerHTML=`<div style="font-size:12px;line-height:1.5;color:var(--dim2);padding:4px 2px">${fillEmptyBench
@@ -64018,7 +64379,11 @@ stTrait("villam","sebesseg_sorsolas",1,"Sebességre hangolt sorsolás",
   {fx:{skillPace:0.60},note:"×1,60"}],
   ()=>{try{
     const base=paceSkillBase();
-    if(base<=0)return "a poolban most nincs sebesség-képesség — nincs mit szorozni";
+    /* A pakli mostantól nem tud kiszáradni (poolRefillKind), tehát ez a sor
+       csak akkor jöhet elő, ha egyáltalán nincs még pakli — pl. a legelső
+       húzás előtt. Az „egy egész stílus nem hat" üzenet ilyenkor félrevezető
+       volna, ezért csak a hiányzó mérést mondjuk ki. */
+    if(base<=0)return "a pakli még nem épült fel — a szorzó az első sorsolástól mérhető";
     const t=paceSkillBias(),tot=paceBiasTotal();
     const p=x=>Math.round((x+(1-x)*base)*1000)/10;
     return `most ${String(p(t)).replace(".",",")}% → ${String(p(tot)).replace(".",",")}% esély sebesség-képességre`;

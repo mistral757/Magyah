@@ -1364,6 +1364,42 @@ igényel új szimulációs ágat.
   leghosszabb szünet 10 húzás; torzítás nélkül 200 húzásból 37 különböző skill,
   a leggyakoribb 6-szor — természetes ismétlődés.
 
+* **…és egy FAJTA sem fogyhat el belőle (3.7.35).** A 3.2.01 a CÉLZOTT húzást
+  javította meg, a paklit magát nem — és a bejelentés pont erről szólt: *„miért
+  nincs a poolban sebesség-képesség? eddig 2 db-ot kapott a csapat… mindig kell
+  lennie a poolban, azért működhet egy ilyen csapatstílus."*
+
+  37 képességből **három** sebességi (8,1%), és amíg a pakli nem fogy 12 alá,
+  friss pakli sem kerül mögé. A három kihúzása után tehát húszon-harminc
+  húzáson át a **sorrend-alapú** (torzítatlan) ág egyszerűen nem tudott
+  sebesség-képességet adni.
+
+  **És ami ennél is rosszabb volt: a megvett képesség NÉMÁN LEÁLLT.** A
+  `paceBiasTotal` egy `base<=0` ággal kilépett és egy az egyben visszaadta a
+  taktika torzítását — vagyis aki megvette a „Sebességre hangolt sorsolást",
+  az üres paklinál semmit nem kapott érte. A képlet base=0-nál is helyes
+  (p0 = t, p1 = t×(1+m), a visszafejtés (p1−0)/(1−0) = p1); csak a `base>=1`
+  a valódi kizáró ok, ott osztanánk nullával.
+
+  **A javítás:** `poolRefillKind(isPaceSkill)` — ha a pakliban egy sem maradt
+  a fajtából, friss példányok kerülnek vissza **véletlen helyekre** (nem az
+  elejére: az garantálná a következő húzást; nem a végére: az sosem jönne elő).
+  A művelet korlátos: három elem, nem egy pakli. A húzás **után** is lefut, nem
+  csak előtte — a képesség-panel a két húzás KÖZÖTT olvassa ki a pakli nyers
+  arányát, és ha épp az utolsót vittük el, ott megint nullát látna.
+
+  Mérve, 600 húzás:
+
+  | | régi | új |
+  |---|--:|--:|
+  | hány húzás után volt ÜRES a pace a pakliban | többször, 20-35 húzásos szünetekkel | **0** |
+  | a mért `base` minimuma | 0% | **3,2%** |
+  | torzítás nélkül húzott sebesség-képesség | hosszú szünetekkel | **67 / 600** |
+  | a pool legnagyobb mérete | — | **47** (nem hízik) |
+
+  És a megvett szorzó üres pakli mellett is hat: 7,5%-os taktikai torzítás +
+  I. szint (×1,30) → régen **7,5%** (semmi), most **9,8%**.
+
 * **A műszerek plafonja Infinityben kitolódik (3.2.01).** A végsebesség- és
   lövéserő-mérés a VALÓS futball határaihoz volt kalibrálva (38,5 km/h, 165
   km/h). Infinityben viszont már nem valós játékosok vannak: a mezőny 200-ig
