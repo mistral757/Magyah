@@ -4648,7 +4648,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.31";
+const APP_VERSION="3.7.32";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -11985,9 +11985,32 @@ function pyrDevelopWorld(order,rnd,dry){
    dől el, és RÉSZLETESEN elbeszéljük: mindkét meccs eredménye, az
    összesítés és a döntés módja is kiírásra kerül, tehát a felhasználó
    pontosan látja, mi történt vele. */
+/* ---- A PÁROS EREJE A PÁRHARCBAN (közös karrier) ----
+   HIBA, AMIT EZ JAVÍT: a szimulált osztályozó a te ÉLŐ csapaterődből számolt
+   (teamMatchStrength), az pedig kliensenként MÁS — vagyis a két gépen más
+   gólvárhatósággal futott le ugyanaz a párharc, és a páros az egyik oldalon
+   feljuthatott, a másikon nem. Ugyanaz a hibaosztály, amit a közös kupánál a
+   `str` átküldése már megszüntetett (lásd mpCupGate), csak a piramis oldalán.
+   A MÉRCE A SZEZONZÁRÓ ÉRTÉK, nem az élő: a rollover a nyári öregedés/fejlődés
+   UTÁN fut, tehát az élő szám addigra mindkét oldalon elmozdult — a zárás
+   pillanata viszont EGY közös pont, és mindkét érték el van téve
+   (S.mpMyFinal.matchStr és a társ jelentése). A páros EGY csapat, a piramison
+   a JOBBIK helyezés viszi mindkettőt: a párharcban ezért a JOBBIK keret áll ki.
+   Régi mentésnél vagy régi verziójú társnál nincs meg a mező — ott a régi,
+   helyi út marad, betűre úgy, ahogy eddig. */
+function pyrPairMatchOvr(){
+  const live=(typeof teamMatchStrength==="function")?teamMatchStrength():0;
+  if(!pyrPoJoint())return live;
+  const sn=S.seasonNumber||1;
+  const a=(S.mpMyFinal&&S.mpMyFinal.season===sn&&typeof S.mpMyFinal.matchStr==="number")
+    ?S.mpMyFinal.matchStr:null;
+  let m=null;try{m=(typeof mpMateFinal==="function")?mpMateFinal():null;}catch(e){}
+  const b=(m&&m.stats&&typeof m.stats.matchStr==="number")?m.stats.matchStr:null;
+  if(a==null||b==null)return live;
+  return Math.max(a,b);}
 function pyrEntityOvr(e){
   if(!e)return 0;
-  if(e.me)return (typeof teamMatchStrength==="function")?teamMatchStrength():0;
+  if(e.me)return pyrPairMatchOvr();
   return (e.t&&e.t.ovr)||0;}
 function pyrEntityName(e){
   if(!e)return "—";
@@ -12034,10 +12057,13 @@ function pyrPlayoffTie(ch,df,rnd,lowerDiv,k){
         szimulált eredményét erre CSERÉLI (pyrPoPlayedSwap) — a világ többi
         osztályozója és a sorsolás-folyam érintetlen marad.
 
-   HOL NEM FUT: közös karrierben (ott a két kliens világa csak akkor marad
-   együtt, ha mindkét oldalon ugyanaz a számítás fut), auto szezonban, és
-   akkor sem, ha a felhasználó a szimulációt választja. Mindhárom esetben a
-   régi, szimulált út él tovább, változatlanul. */
+   HOL NEM FUT: auto szezonban, és akkor sem, ha a felhasználó a szimulációt
+   választja — ott a régi, szimulált út él tovább, változatlanul.
+
+   KÖZÖS KARRIERBEN IGENIS FUT (3.7.32). A párosítás ott is közös (a végtabella
+   a hosté, a seed a szobáé), tehát csak a KIMENETET kell egyeztetni: a páros
+   egy entitás a piramison, és a jobbik eredménye viszi mindkettőt. A
+   részleteket a pyrPoJoint fölötti blokk írja le. */
 const PYR_PO_LEGS=2;
 /* A SAJÁT osztályod végsorrendje NÉVLISTAKÉNT — ugyanaz, amit a szezonforduló
    is átad a rollovernek (közös karrierben a páros egy entitás). */
@@ -36771,6 +36797,12 @@ function mpSeasonReport(){
        mert a párharc mérlege és a rating-hangolás is ezen a skálán megy. */
     stats:{
       strength:mpSquadStrength(),
+      /* A MECCS-SKÁLÁJÚ csapaterő is átutazik. A `strength` a top-N Rating
+         átlaga (a párharc-ítélet skálája); a motor viszont a
+         teamMatchStrength()-ből számol gólvárhatóságot, és a piramis
+         osztályozója abból dől el. Kliensenként más szám → két különböző
+         párharc. Lásd pyrPairMatchOvr. */
+      matchStr:Math.round(((typeof teamMatchStrength==="function")?teamMatchStrength():0)*10)/10,
       morale:Math.round(S.morale),
       reds:S.reds||0,injuries:S.injuries||0,
       coach:(coach&&coach.n)||"",
@@ -36778,7 +36810,11 @@ function mpSeasonReport(){
       skills:Object.values(S.skills||{}).reduce((s,a)=>s+a.length,0),
       chem:(CHEM&&CHEM.goodPairs)?CHEM.goodPairs.size:0,
       balance:S.mpBalance||0,
-      topScorer:mpTopOf(S.scorers),topAssist:mpTopOf(S.assists),topMvp:mpTopOf(S.mvps)},
+      topScorer:mpTopOf(S.scorers),topAssist:mpTopOf(S.assists),topMvp:mpTopOf(S.mvps),
+      /* A BAJNOKI TISZTA LAPOK is átutaznak: a három bajnoki díj közül a
+         kapus-királyé eddig nem volt összemérhető a társ keretével (lásd
+         awardLeagueKings). A mező hiánya = régi verziójú társ. */
+      topCS:mpTopOf(S.lgCS)},
     /* CSAK a CPU-k elleni eredmények. A hivatkozás a mezőny SORSZÁMA (i), nem a
        klubnév: a "kész klub" indulásnál a saját klubod kikerül az ellenfelek
        közül, és a helyére másik csapat lép (clubExcludeSelfFromOpponents) —
@@ -36808,7 +36844,10 @@ async function mpSyncSeasonEnd(){
   if(!node||!node[myField]){
     const rep=mpSeasonReport();
     S.mpMyFinal={season:(S.seasonNumber||1),
-      strength:(rep&&rep.stats&&rep.stats.strength)||mpSquadStrength()};
+      strength:(rep&&rep.stats&&rep.stats.strength)||mpSquadStrength(),
+      /* …és a meccs-skálájú érték is, ugyanabból a pillanatból: a piramis
+         osztályozója ebből dolgozik (pyrPairMatchOvr). */
+      matchStr:(rep&&rep.stats&&typeof rep.stats.matchStr==="number")?rep.stats.matchStr:null};
     try{await mpBk().h2hPut(MP.activeRoom,key,myField,rep);}catch(e){}
     try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}}
   if(node&&node[oppField]){
@@ -45932,13 +45971,51 @@ function leagueBoardHtml(n){
    halmozódását méri (a 2. díjtól tartós +3 Rating és kék karika) — egy
    harmadértékű hazai díjnak ugyanazt a jutalmat adni elinflálná a rendszert.
    A bajnoki díjaknak saját számlálójuk van. */
+/* ================= KÖZÖS KARRIER: A DÍJ A KÉT KERET KÖZÖTT DŐL EL (3.7.32) ==
+   HIBA, AMIT EZ JAVÍT: közös karrierben a három bajnoki díjat SOSEM osztottuk
+   ki — a gólkirály, a gólpassz-király és a kapus-király egyszerűen nem
+   létezett. A szezon egyéni teljesítménye így jutalom nélkül maradt, és az
+   Aranylabda szavazásából is kiesett egy egész bemenet.
+
+   AMI MIATT KI VOLT ZÁRVA, ÉS AMI EBBŐL IGAZ. A góllövőlista két forrásból
+   épül: a KÉT MENEDZSER kerete és a GÉPI mezőny. A gépi rész kliensenként
+   MÁS — a CPU-k egymás elleni párosítását a helyi menetrendből fejtjük vissza
+   (lásd aiLeagueSchedule és mpTableSync indoklását) —, tehát a gépi
+   góllövőlistát nem lehet közösen koronázni. Ez igaz, és igaz is marad.
+
+   AMI VISZONT IGENIS KÖZÖS: a két menedzser kerete. A sajátodat a saját
+   tábládból ismered, a társadét a szezonzáró jelentése hozza (topScorer /
+   topAssist / topCS) — és mindkét gépen UGYANAZ a két jelölt áll egymással
+   szemben. Közös karrierben ezért a díj a KÉT KERET KÖZÖTT dől el, a gépi
+   mezőny nélkül; a holtversenyt a név dönti (kódpont szerint, NEM
+   localeCompare — az böngészőnként más sorrendet adhatna).
+
+   RÉGI VERZIÓJÚ TÁRS: ha a jelentésében nincs `topCS` mező, akkor nincs mit
+   összemérni — abban a kategóriában nem koronázunk. Inkább maradjon el a díj,
+   mint hogy a két gépen más kapja. */
+function lgMateTop(field){
+  let m=null;try{m=mpMateFinal();}catch(e){}
+  const st=m&&m.stats;
+  if(!st)return undefined;
+  const key=field==="g"?"topScorer":(field==="a"?"topAssist":"topCS");
+  if(!(key in st))return undefined;      /* régi kliens: nem koronázunk */
+  const t=st[key];
+  if(!t||!t.n)return null;
+  const row={n:String(t.n),club:String(m.teamName||"a társad"),own:false,g:0,a:0,c:0};
+  row[field]=t.v|0;
+  return row;}
+function lgKingOf(list,field){
+  let joint=false;try{joint=h2hRoomActive();}catch(e){}
+  if(!joint)return (list&&list[0])||null;
+  const mineTop=(list||[]).find(r=>r&&r.own)||null;
+  const mate=lgMateTop(field);
+  if(mate===undefined)return null;
+  const rows=[mineTop,mate].filter(r=>r&&r[field]>0);
+  if(!rows.length)return null;
+  rows.sort((a,b)=>(b[field]-a[field])||(a.n<b.n?-1:(a.n>b.n?1:0)));
+  return rows[0];}
 function awardLeagueKings(){
   if(gameMode!=="career")return;
-  /* KÖZÖS KARRIER: a tabellát a HOST számolja (lásd mpTableSync), a
-     góllövőlista viszont helyben épülne — a két kliens így MÁS királyt
-     koronázna, pont az a hiba, amit a kupa-statisztikáknál egyszer már
-     megjártunk. Amíg nincs közös csere a listákra, MP-ben nem osztunk díjat. */
-  try{if(h2hRoomActive())return;}catch(e){}
   const season=S.seasonNumber||1;
   if(S.lgKingSeason===season)return;      /* idempotens: a jelentés újranyitható */
   S.lgKingSeason=season;
@@ -45948,9 +46025,15 @@ function awardLeagueKings(){
     {list:B.assists,field:"a",skillId:"lg_golden_passes",label:"Bajnoki gólpassz-király",unit:"gólpassz",title:"gólpassz-királya"},
     {list:B.cleanSheets,field:"c",skillId:"lg_golden_gloves",label:"Bajnoki kapus-király",unit:"tiszta lap",title:"kapus-királya"}];
   const mine=[];
-  defs.forEach(d=>{
-    const w=d.list&&d.list[0];
-    if(!w||!(w[d.field]>0))return;
+  /* A GYŐZTESEK ELŐBB, A MAGYARÁZAT UTÁNA: a közös karrier szűkebb mércéjét
+     csak akkor mondjuk ki, ha tényleg koronázunk valakit. */
+  const wins=defs.map(d=>({d,w:lgKingOf(d.list,d.field)}))
+    .filter(x=>x.w&&x.w[x.d.field]>0);
+  {let joint=false;try{joint=h2hRoomActive();}catch(e){}
+   if(joint&&wins.length)addLine(`🏅 <b>A bajnokság egyéni díjai</b> — közös karrierben a `
+     +`<b>két menedzser kerete</b> között dőlnek el: a gépi mezőny góllövőlistája `
+     +`kliensenként más, azt nem lehet közösen koronázni.`,"m life");}
+  wins.forEach(({d,w})=>{
     if(!w.own){
       addLine(`🏅 A bajnokság ${d.title}: ${esc(shortName(w.n))} (${esc(w.club)}) — ${w[d.field]} ${d.unit}.`,"m life");
       return;}
@@ -46358,15 +46441,182 @@ function showPyrTurnReveal(turn,next){
    Az S.pyrPo a FUTÓ párharc: kinek a helyéért megy, ki az ellenfél, hol tart.
    A mentés része, tehát egy meccs közbeni újratöltés sem veszíti el. */
 function pyrPoActive(){return !!(S.pyrPo&&S.pyrPo.stage==="play");}
-/* Lejátszható-e egyáltalán? Közös karrierben NEM (ott a két kliens világa csak
-   akkor marad együtt, ha mindkét oldalon ugyanaz a számítás fut), és auto
-   szezonban sem (ott a szezonnak magától kell végigfutnia). */
+/* Lejátszható-e egyáltalán? Auto szezonban nem (ott a szezonnak magától kell
+   végigfutnia) — KÖZÖS KARRIERBEN VISZONT IGEN, a párosra közösen (lásd a
+   pyrPoJoint fölötti blokkot). */
 function pyrPoPlayable(){
   if(!(typeof pyrOn==="function"&&pyrOn()))return false;
   if(gameMode!=="career"||!careerPool)return false;
   if(S.auto)return false;
-  if(typeof h2hRoomActive==="function"&&h2hRoomActive())return false;
   return true;}
+/* ================= KÖZÖS KARRIER: AZ OSZTÁLYOZÓ IS A PÁROSÉ (3.7.32) ========
+   HIBA, AMIT EZ JAVÍT: közös karrierben az osztályozót SOSEM ajánlottuk fel —
+   a motor némán lejátszotta helyettetek. A hagyományos mód egyetlen igazi
+   tétmérkőzése így pont ott maradt kivehetetlen a kézből, ahol a legnagyobb a
+   tétje: ketten másztok ugyanazon a piramison.
+
+   AMI MIATT KI VOLT ZÁRVA, ÉS AMI EBBŐL IGAZ. A két kliens világának BITRE
+   azonosnak kell maradnia. A PÁROSÍTÁS viszont már ma is az: az osztályozó
+   előnézete (pyrPoPreview) a KÖZÖS végtabellából (mpTableNow → S.finalTable) és
+   a szoba seedjéből épül, tehát mindkét gépen ugyanaz az ellenfél, ugyanazzal
+   az erővel. Egyedül a KIMENET csúszhatna szét — és pont ezt kell egyeztetni,
+   nem az egész mérkőzést elvenni.
+
+   A PÁROS EGY ENTITÁS A PIRAMISON. A rollover a két menedzser-sort EGYETLEN
+   csapattá vonja össze, a JOBBIK helyezésen (pyrMyFinalOrder), tehát fel- és
+   lefelé is együtt mozogtok. Az osztályozó ezért nem a tiéd, hanem a PÁROSÉ —
+   és ugyanaz a szabály vonatkozik rá, ami a közös karrier többi közös
+   döntésére (kupanevezés, MK → KL lánc): **a jobbik eredménye viszi
+   mindkettőt.**
+
+     · mindketten lejátsszátok a saját két meccseteket ugyanaz ellen az
+       ellenfél ellen — a mérkőzés valódi: cserélsz, sérülsz, fejlődsz;
+     · ha BÁRMELYIKŐTÖK megnyeri a párharcot, a páros feljut / bennmarad;
+     · aki a szimulációt választja (vagy auto szezont futtat), nem szavaz: ha a
+       másik lejátszotta, AZ az eredmény áll; ha egyikőtök sem, marad a régi,
+       szimulált út — betűre úgy, ahogy eddig volt.
+
+   A TÖRTÉNET IS KÖZÖS. A két meccs eredménye, az összesítés és a döntés módja
+   EGY lejátszásból jön, determinisztikus választással: a győztesé, és ha
+   mindketten ugyanarra jutottak (vagy csak egy játszott), a HÁZIGAZDÁÉ. Így a
+   két képernyőn betűre ugyanaz a mondat áll, és a pyrPoPlayedSwap mindkét
+   oldalon ugyanazt cseréli be a fordulóba. */
+function pyrPoJoint(){
+  return !!(typeof h2hRoomActive==="function"&&h2hRoomActive()
+    &&gameMode==="career"&&careerPool
+    &&typeof pyrOn==="function"&&pyrOn());}
+/* ================= A KÉTOLDALI KAPU — A KÖZÖS MINTA =================
+   Ugyanaz a koreográfia fut a kupanevezésnél, a Magyar Kupa → KL láncnál, az
+   Infinity-befizetésnél és a közös tabellánál: mindkét fél FELTESZ egy
+   bejegyzést a szoba egy rekeszébe, várja a másikét, és amikor mindkettő
+   megvan, egy DETERMINISZTIKUS feloldó (mindkét gépen ugyanaz a függvény,
+   ugyanazon a két bejegyzésen) kiadja a közös eredményt. A várakozó ablak, az
+   elhasalt feltöltés pótlása (mpReput), a beragadt jelző feloldása
+   (mpWaitStuck) és a „nem várom meg" kiút mindenhol azonos.
+
+   Ez a burkoló ezt az EGY mintát adja, hogy az új közös döntések (az
+   osztályozó és a nyári felkészülési kupa) ne másolják újra. A meglévő négy
+   hívó szándékosan érintetlen: azok élesben futó, kimért kódok, és egy
+   „takarítás" kedvéért nem érdemes hozzájuk nyúlni.
+
+   `solo` — mit adunk vissza, ha a felhasználó NEM várja meg az egyeztetést:
+   ilyenkor a saját döntésével megyünk tovább (ez pontosan a javítás előtti
+   viselkedés), és ezt a `giveUpNote` ki is mondja a naplóban. */
+const _mpGates={};
+function mpGateState(id){return _mpGates[id]||(_mpGates[id]={busy:false,poll:null,fb:null});}
+function mpGateAbort(id){
+  const g=mpGateState(id);
+  g.busy=false;
+  if(g.poll){clearTimeout(g.poll);g.poll=null;}
+  try{h2hWaitHide();}catch(e){}}
+function mpGateGiveUp(id){
+  const g=mpGateState(id),f=g.fb;g.fb=null;
+  mpGateAbort(id);
+  if(!f)return;
+  if(f.note){try{addLine(f.note,"m ev");}catch(e){}}
+  try{f.done(f.solo);}catch(e){}}
+function mpGateBusyId(){return Object.keys(_mpGates).find(k=>_mpGates[k].busy)||null;}
+async function mpBothGate(o){
+  const id=o.id,g=mpGateState(id);
+  if(mpWaitStuck(g.busy,g.poll))mpGateAbort(id);
+  if(g.busy)return;
+  g.busy=true;
+  const key=o.key,myField=MP.role==="host"?"host":"guest";
+  const oppField=myField==="host"?"guest":"host";
+  g.fb={done:o.done,solo:o.solo,note:o.giveUpNote};
+  const finish=r=>{g.fb=null;mpGateAbort(id);o.done(r);};
+  h2hWaitShow(o.title,o.msg,false,false,o.wait);
+  $("h2hWaitErr").textContent="";
+  try{await mpNetInit();}catch(e){}
+  if(!g.busy)return;
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+  if(!g.busy)return;
+  await mpReput(key,myField,node,o.entry);
+  if(!g.busy)return;
+  mpGateTick(o,key,myField,oppField,finish);}
+function mpGateTick(o,key,myField,oppField,finish){
+  const g=mpGateState(o.id);
+  const again=()=>{if(g.busy)g.poll=setTimeout(()=>mpGateTick(o,key,myField,oppField,finish),2500);};
+  return mpTickWrap(()=>mpGateTickRun(o,key,myField,oppField,finish),again,o.id);}
+async function mpGateTickRun(o,key,myField,oppField,finish){
+  const g=mpGateState(o.id);
+  if(!g.busy)return;
+  if(g.poll){clearTimeout(g.poll);g.poll=null;}
+  let node=null;
+  try{node=await mpBk().h2hGet(MP.activeRoom,key);}
+  catch(e){$("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";}
+  if(!g.busy)return;
+  /* elhasalt feltöltés pótlása — lásd mpReput */
+  if(!(node&&node[myField])){
+    await mpReput(key,myField,node,o.entry);
+    if(!g.busy)return;
+    try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}
+    if(!g.busy)return;}
+  const mine=node&&node[myField],mate=node&&node[oppField];
+  h2hWaitShow(o.title,$("h2hWaitMsg").innerHTML,!!mine,!!mate,o.wait);
+  if(mine&&mate){finish(o.resolve(mine,mate));return;}
+  if(g.busy)g.poll=setTimeout(()=>mpGateTick(o,key,myField,oppField,finish),2500);}
+$("h2hWaitCancelBtn")&&(function(){
+  const prev=$("h2hWaitCancelBtn").onclick;
+  $("h2hWaitCancelBtn").onclick=()=>{
+    const id=mpGateBusyId();
+    if(id){mpGateGiveUp(id);return;}
+    if(prev)prev();};})();
+const MP_WAIT_PYRPO={mine:"A te osztályozód",opp:"A társad osztályozója",
+  cancel:"✕ Nem várom meg"};
+/* A PÁROS eredménye a két bejegyzésből. NULL = egyikőtök sem játszotta le,
+   tehát marad a szimuláció. A visszaadott objektum MINDKÉT kliensen azonos. */
+function mpPoResolve(mine,mate){
+  const rows=[];
+  if(mine&&mine.played)rows.push({e:mine,mine:true,host:MP.role==="host"});
+  if(mate&&mate.played)rows.push({e:mate,mine:false,host:MP.role!=="host"});
+  if(!rows.length)return null;
+  const iAmCh=!!rows[0].e.iAmCh;
+  const won=e=>iAmCh?!!e.chWon:!e.chWon;         /* a PÁROS nyert-e ezen az ágon */
+  const pairWon=rows.some(x=>won(x.e));
+  rows.sort((a,b)=>((won(b.e)?1:0)-(won(a.e)?1:0))||((b.host?1:0)-(a.host?1:0)));
+  const src=rows[0];
+  return {chWon:iAmCh?pairWon:!pairWon,how:src.e.how,legs:src.e.legs,
+    chG:src.e.chG,dfG:src.e.dfG,iAmCh:iAmCh,
+    lowerDiv:src.e.lowerDiv,k:src.e.k,oppName:src.e.oppName,
+    both:rows.length>1,srcMine:!!src.mine};}
+/* A közös eredmény könyvelése — pontosan abban az alakban, amit a
+   pyrPoPlayedSwap vár. NULL eredménynél a régi, szimulált út marad. */
+function mpPoApply(r){
+  S.pyr=S.pyr||{};
+  if(!r){S.pyr.poSkipped=S.seasonNumber||1;return false;}
+  S.pyr.poPlayed={season:S.seasonNumber||1,lowerDiv:r.lowerDiv,k:r.k,
+    iAmChallenger:!!r.iAmCh,chWon:r.chWon,how:r.how,legs:r.legs,
+    chG:r.chG,dfG:r.dfG,played:true};
+  return true;}
+/* ---- A LEZÁRÁS EGY TOROKON ----
+   Egyjátékosban azonnal, közös karrierben a társ válaszával együtt — de a
+   KIMENET ugyanaz az egy út, tehát a könyvelés és a képernyő nem tud
+   kettéválni. Ide fut be a lejátszott párharc és a szimuláció-kérés is. */
+function pyrPoSettle(entry,pv){
+  const apply=r=>{
+    const played=mpPoApply(r);
+    try{saveGame();}catch(e){}
+    if(!played){
+      addLine("⚔️ Az osztályozót a motor játssza le — az eredményt a szezonforduló mondja el.","m ev");
+      pyrPoContinue();return;}
+    const meWon=r.iAmCh?r.chWon:!r.chWon;
+    const nm=r.oppName||(pv&&pv.oppName)||"az ellenfél";
+    addLine(`⚔️ <b>Az osztályozó lezárult:</b> ${meWon?"SIKERÜLT":"nem sikerült"} — `
+      +`${esc(nm)} ellen ${r.iAmCh?r.chG:r.dfG}–${r.iAmCh?r.dfG:r.chG} ${esc(r.how||"")}.`,
+      meWon?"m win":"m loss");
+    pyrPoResultScreen(r);};
+  if(!pyrPoJoint()){apply(mpPoResolve(entry,null));return;}
+  mpBothGate({id:"pyrpo",key:"s"+(S.seasonNumber||1)+"pyrpo",
+    title:"OSZTÁLYOZÓ",wait:MP_WAIT_PYRPO,entry:entry,
+    msg:entry.played
+      ?"Lejátszottad a párharcodat — egyeztetjük a társadéval. A páros a jobbik eredménnyel lép."
+      :"Egyeztetjük a társaddal: ha ő lejátssza az osztályozót, az ő eredménye számít a párosnak.",
+    resolve:mpPoResolve,done:apply,
+    solo:mpPoResolve(entry,null),
+    giveUpNote:"⚠️ Az osztályozó egyeztetése megszakadt — a saját eredményeddel megyünk tovább. "
+      +"Ha a társadnál más jött ki, a két piramis szétválhat."});}
 /* A most soron lévő mérkőzés — ugyanabban az alakban, amit a motor a bajnokitól
    és a kupától is kap. 1. meccs a KIHÍVÓ otthonában, a visszavágó a VÉDŐÉ. */
 function pyrPoFx(){
@@ -46415,15 +46665,12 @@ function pyrPoAfterMatch(){
     chWon=P.iAmCh?iWon:!iWon;
     how=`büntetőkkel (${P.penScore||""})`.trim();}
   P.stage="done";
-  S.pyr=S.pyr||{};
-  S.pyr.poPlayed={season:S.seasonNumber||1,lowerDiv:P.lowerDiv,k:P.k,
-    iAmChallenger:!!P.iAmCh,chWon,how,legs:[l0,l1],chG,dfG,played:true};
-  const meWon=P.iAmCh?chWon:!chWon;
-  addLine(`⚔️ <b>Az osztályozó lezárult:</b> ${meWon?"SIKERÜLT":"nem sikerült"} — `
-    +`${esc(P.opp.n)} ellen ${P.iAmCh?chG:dfG}–${P.iAmCh?dfG:chG} ${esc(how)}.`,
-    meWon?"m win":"m loss");
   try{saveGame();}catch(e){}
-  pyrPoResultScreen(meWon,chG,dfG,how);}
+  /* A SAJÁT eredményed egy BEJEGYZÉS — egyjátékosban ő maga a döntés, közös
+     karrierben a társadéval együtt adja ki a páros eredményét. */
+  pyrPoSettle({played:true,chWon,how,legs:[l0,l1],chG,dfG,
+    iAmCh:!!P.iAmCh,lowerDiv:P.lowerDiv,k:P.k,
+    oppName:String(P.opp&&P.opp.n||""),at:Date.now()});}
 /* ---- A KÉPERNYŐK (a meglévő „feloldás" felületen) ---- */
 function pyrPoScreen(){
   const P=S.pyrPo;if(!P)return;
@@ -46464,20 +46711,30 @@ function pyrPoKick(){
   if(!S.auto&&typeof unavailableStarters==="function"&&unavailableStarters().length){
     openAbsencePanel(go);return;}
   go();}
-function pyrPoResultScreen(meWon,chG,dfG,how){
-  const P=S.pyrPo;
+/* A ZÁRÓKÉP a KÖZÖS eredményből dolgozik, nem az S.pyrPo-ból: közös
+   karrierben az is előfordul, hogy nem te játszottad le a párharcot (a
+   szimulációt választottad, a társad viszont kiállt) — ilyenkor nincs saját
+   futó párharcod, a páros eredménye viszont a tiéd is. */
+function pyrPoResultScreen(r){
+  const meWon=r.iAmCh?r.chWon:!r.chWon;
+  const nm=r.oppName||"az ellenfél";
   $("scUnlock").classList.remove("hide");
   $("unlockTitle").textContent=meWon
-    ?(P.iAmCh?"⬆️ AZ OSZTÁLYOZÓ A TIÉTEK":"🛡️ MEGVÉDTÉTEK A HELYETEKET")
-    :(P.iAmCh?"⬇️ AZ OSZTÁLYOZÓ ELVESZETT":"⬇️ ELBUKOTT A BENNMARADÁS");
-  const mine=P.iAmCh?chG:dfG,his=P.iAmCh?dfG:chG;
+    ?(r.iAmCh?"⬆️ AZ OSZTÁLYOZÓ A TIÉTEK":"🛡️ MEGVÉDTÉTEK A HELYETEKET")
+    :(r.iAmCh?"⬇️ AZ OSZTÁLYOZÓ ELVESZETT":"⬇️ ELBUKOTT A BENNMARADÁS");
+  const mine=r.iAmCh?r.chG:r.dfG,his=r.iAmCh?r.dfG:r.chG;
   $("unlockBody").innerHTML=
     `<div style="font-size:13px;line-height:1.65">`
-    +`<p>Összesítésben <b>${mine}–${his}</b> ${hunAz(esc(P.opp.n))} ${esc(P.opp.n)} ellen — <b>${esc(how)}</b>.</p>`
+    +`<p>Összesítésben <b>${mine}–${his}</b> ${hunAz(esc(nm))} ${esc(nm)} ellen — <b>${esc(r.how||"")}</b>.</p>`
+    +(r.both||!r.srcMine
+      ?`<p style="color:var(--gold)">${r.srcMine
+          ?"A társad is kiállt a maga párharcára — a párost a jobbik eredmény vitte, és az a tiéd."
+          :"Ez <b>a társad párharca</b>: a páros egy entitás a piramison, tehát az ő eredménye a tiéd is."}</p>`
+      :"")
     +`<p>${meWon
-        ?(P.iAmCh?"Feljebb kerültök egy osztállyal. A szezonforduló többi része most következik."
+        ?(r.iAmCh?"Feljebb kerültök egy osztállyal. A szezonforduló többi része most következik."
                  :"Maradtok az osztályotokban. A szezonforduló többi része most következik.")
-        :(P.iAmCh?"Maradtok az osztályotokban — jövőre újra neki."
+        :(r.iAmCh?"Maradtok az osztályotokban — jövőre újra neki."
                  :"Egy osztállyal lejjebb folytatjátok.")}</p></div>`;
   const act=$("unlockActions");act.innerHTML="";
   const b=document.createElement("button");
@@ -46490,13 +46747,21 @@ function pyrPlayoffFlow(next){
   /* FÉLBEHAGYOTT PÁRHARC (újratöltés): ott folytatjuk, ahol abbamaradt. */
   if(S.pyrPo&&S.pyrPo.stage==="play"&&S.pyrPo.season===(S.seasonNumber||1)){
     _pyrPoNext=next;pyrPoScreen();return;}
-  if(!pyrPoPlayable()){next();return;}
+  const joint=pyrPoJoint();
+  if(!pyrPoPlayable()&&!joint){next();return;}
   /* Egy szezonban egyszer: ha már lejátszottad (vagy szimulációt kértél), megy tovább. */
   if(S.pyr&&S.pyr.poPlayed&&S.pyr.poPlayed.season===(S.seasonNumber||1)){next();return;}
   if(S.pyr&&S.pyr.poSkipped===(S.seasonNumber||1)){next();return;}
   const pv=pyrPoPreview();
   if(!pv){next();return;}
   _pyrPoNext=next;
+  const poEntry=extra=>Object.assign({played:false,iAmCh:!!pv.iAmCh,
+    lowerDiv:pv.lowerDiv,k:pv.k,oppName:String(pv.oppName||""),at:Date.now()},extra||{});
+  /* ---- KÖZÖS KARRIER + AUTO SZEZON: A NEMET IS KI KELL MONDANI ----
+     Auto szezonban nem állsz ki — de ha némán továbbmennénk, a társad a
+     kapunál várna a válaszodra a világ végezetéig. Ezért ilyenkor is
+     szavazunk, csak épp „nem játszom le"-vel. */
+  if(!pyrPoPlayable()){pyrPoSettle(poEntry(),pv);return;}
   $("scUnlock").classList.remove("hide");
   $("unlockTitle").textContent="⚔️ OSZTÁLYOZÓ VÁR RÁD";
   $("unlockBody").innerHTML=
@@ -46508,7 +46773,15 @@ function pyrPlayoffFlow(next){
     +`az első a kihívó otthonában, a visszavágó a védőnél. Döntetlen összesítésnél `
     +`hosszabbítás, majd büntetők.</p>`
     +`<p style="font-size:11.5px;color:var(--dim)">Lejátszhatod magad — ez ugyanolyan mérkőzés, `
-    +`mint bármelyik másik —, vagy rábízhatod a motorra, ahogy eddig volt.</p></div>`;
+    +`mint bármelyik másik —, vagy rábízhatod a motorra, ahogy eddig volt.</p>`
+    +(joint
+      ?`<p style="font-size:11.5px;color:var(--gold);line-height:1.55">⚔ <b>Közös karrier:</b> a piramison `
+       +`a páros EGY csapat, tehát ez a párharc kettőtöké. Mindketten lejátsszátok a magatokét `
+       +`ugyanez ellen az ellenfél ellen, és <b>ha bármelyikőtök nyer, a páros lép</b> — ugyanaz `
+       +`az elv, mint a közös kupanevezésnél. Ha te a szimulációt választod, a társad eredménye áll; `
+       +`ha egyikőtök sem áll ki, marad a motor döntése.</p>`
+      :"")
+    +`</div>`;
   const act=$("unlockActions");act.innerHTML="";
   const play=document.createElement("button");
   play.className="btn-y stepbtn";play.textContent="⚔️ Lejátszom a párharcot";
@@ -46523,10 +46796,8 @@ function pyrPlayoffFlow(next){
   sim.className="btn stepbtn";sim.style.marginTop="7px";
   sim.textContent="A motor döntse el (szimuláció) →";
   sim.onclick=()=>{
-    S.pyr=S.pyr||{};S.pyr.poSkipped=S.seasonNumber||1;
     $("scUnlock").classList.add("hide");
-    addLine("⚔️ Az osztályozót a motor játssza le — az eredményt a szezonforduló mondja el.","m ev");
-    pyrPoContinue();};
+    pyrPoSettle(poEntry(),pv);};
   act.appendChild(play);act.appendChild(sim);
   $("scUnlock").scrollIntoView({behavior:"smooth"});}
 function announcePyrSeason(){
@@ -57332,7 +57603,11 @@ function hubNextSeasonFlow(){
   /* NYÁRI FELKÉSZÜLÉSI KUPA: csak akkor kerül szóba, ha NINCS megszerzett
      kupaindulás — aki Európába jutott, annak a nyara amúgy is tele van. */
   if(friendlyCupOfferable()){
-    if(S.auto){friendlyCupDecline();}                 /* auto szezon: nem nevezünk */
+    if(S.auto){
+      /* Auto szezon: nem nevezünk — de közös karrierben a NEMET is ki kell
+         mondani, különben a társad a kapunál várna a válaszodra. */
+      if(friendlyCupJoint()){friendlyCupSettle(false,()=>hubNextSeasonFlow());return;}
+      friendlyCupDecline();}
     else{offerFriendlyCup(()=>hubNextSeasonFlow());return;}}
   hubShowSeasonReport();}
 /* ================= NYÁRI FELKÉSZÜLÉSI KUPA: A NEVEZÉS =================
@@ -57346,11 +57621,49 @@ function friendlyCupOfferable(){
   if(gameMode!=="career"||!careerPool)return false;
   if(euroPending()||euroActive())return false;
   if((S.friendlyCupSeason||0)===(S.seasonNumber||1))return false;
-  /* KÖZÖS KARRIER: ott a kupanevezés közös alku (mpCupGate) — egy egyoldalú
-     felkészülési torna kettéválasztaná a két világ nyarát. */
-  if(typeof h2hRoomActive==="function"&&h2hRoomActive())return false;
   if(!(S.finalTable&&S.finalTable.length))return false;
   return true;}
+/* ================= KÖZÖS KARRIER: A NYÁRI TORNA IS KÖZÖS (3.7.32) ==========
+   HIBA, AMIT EZ JAVÍT: közös karrierben a felkészülési kupát SOHA nem
+   ajánlottuk fel — a nyár egyetlen mérkőzés nélkül telt el, akkor is, ha
+   egyikőtök sem szerzett kupaindulást. Pedig a „van-e kupátok" kérdés MÁR
+   közös: azt a kupanevezés kapuja (mpCupGate) dönti el mindkettőtökre, tehát
+   a felajánlás feltétele is egyszerre igaz vagy hamis a két gépen.
+
+   AMI MIATT KI VOLT ZÁRVA, ÉS AMI EBBŐL IGAZ. Egy EGYOLDALÚ torna tényleg
+   kettéválasztaná a nyarat — és nem is elsősorban a játékidő miatt: a
+   kampány lezárása állítja be a kupa utáni kapu jelzőjét (S.mpCupSeason), az
+   pedig átbillenti, MELYIK döntési rekeszt (`…decision` vagy `…decisioncup`)
+   használja a szezonzáró kapu. Ha csak az egyikőtök játszana tornát, a két
+   kliens KÉT KÜLÖNBÖZŐ rekeszre várna — vagyis a szezonzárás holtpontra
+   futna. A tiltás tehát nem a tornáról szólt, hanem erről.
+
+   EZÉRT A NEVEZÉS KÖZÖS DÖNTÉS, és itt EGYHANGÚ: csak akkor indul a torna, ha
+   MINDKETTEN igent mondtok. A többi közös döntésnél („a jobbik eredménye viszi
+   mindkettőt") az igen JOBB a nemnél — itt viszont nem az: egy tétnélküli
+   tornába nem lehet belerángatni azt, aki nem kért belőle, és az auto szezont
+   futtató fél nem is tudná lejátszani. Így a két kliens vagy együtt lép a
+   tornába, vagy együtt marad ki — a kapu-jelző sosem csúszhat szét. */
+function friendlyCupJoint(){
+  return !!(typeof h2hRoomActive==="function"&&h2hRoomActive()&&gameMode==="career");}
+const MP_WAIT_NYK={mine:"A te nevezésed",opp:"A társad nevezése",
+  cancel:"✕ Nem várom meg"};
+function mpNykResolve(mine,mate){return !!(mine&&mine.yes&&mate&&mate.yes);}
+/* A nevezés lezárása EGY torkon: egyjátékosban azonnal, közös karrierben a
+   társ válaszával együtt. */
+function friendlyCupSettle(yes,next){
+  const apply=go=>{
+    if(go){friendlyCupStart();return;}
+    friendlyCupDecline();
+    if(typeof next==="function")next();};
+  if(!friendlyCupJoint()){apply(!!yes);return;}
+  mpBothGate({id:"nyk",key:"s"+(S.seasonNumber||1)+"nyk",
+    title:"NYÁRI KUPA",wait:MP_WAIT_NYK,
+    entry:{yes:!!yes,at:Date.now()},
+    msg:yes?"Neveztél a nyári tornára — megvárjuk a társad válaszát is. A torna csak akkor indul, ha ő is nevez."
+           :"Kihagynád a nyári tornát — megvárjuk a társad válaszát is.",
+    resolve:mpNykResolve,done:apply,solo:false,
+    giveUpNote:"⚠️ A nyári kupa egyeztetése megszakadt — idén kihagyjátok a tornát."});}
 function friendlyCupDecline(){
   S.friendlyCupSeason=S.seasonNumber||1;
   addLine("🌴 A nyár edzőtábor és pihenés marad — felkészülési kupára idén nem neveztetek.","m ev");
@@ -57380,15 +57693,19 @@ function offerFriendlyCup(next){
     +`<li>és <b>kupa-kihívások</b>: azokat itt is felveheted, és a jutalmuk jár.</li></ul>`
     +`<p style="font-size:11.5px;color:var(--dim);margin-top:9px">A sérülés és a kiállítás itt is valódi — `
     +`egy felkészülési tornán is meg lehet sérülni. A bérek és a lelátó a szokott módon számolnak el.</p>`
+    +(friendlyCupJoint()
+      ?`<p style="font-size:11.5px;color:var(--gold);line-height:1.55">⚔ <b>Közös karrier:</b> a nyár közös, `
+       +`tehát a nevezés is: a torna csak akkor indul, ha <b>mindketten</b> igent mondtok. `
+       +`Ha bármelyikőtök kihagyja, idén egyikőtök sem játszik tornát.</p>`
+      :"")
     +`</div>`;
   const act=$("unlockActions");act.innerHTML="";
   const go=document.createElement("button");
   go.className="btn-y stepbtn";go.textContent="🟠 Nevezünk — jöhet a torna!";
-  go.onclick=()=>{$("scUnlock").classList.add("hide");friendlyCupStart();};
+  go.onclick=()=>{$("scUnlock").classList.add("hide");friendlyCupSettle(true,next);};
   const no=document.createElement("button");
   no.className="btn stepbtn";no.style.marginTop="7px";no.textContent="Köszönjük, idén kihagyjuk →";
-  no.onclick=()=>{$("scUnlock").classList.add("hide");friendlyCupDecline();
-    if(typeof next==="function")next();};
+  no.onclick=()=>{$("scUnlock").classList.add("hide");friendlyCupSettle(false,next);};
   act.appendChild(go);act.appendChild(no);
   $("scUnlock").scrollIntoView({behavior:"smooth"});}
 /* ---- A NYÁRI TOVÁBBLÉPŐ GOMB FELIRATA ----
