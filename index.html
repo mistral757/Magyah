@@ -1350,6 +1350,12 @@ button.infPanel:disabled{cursor:default}
 .msN i{display:block;font-style:normal;font-size:10px;font-weight:400;color:var(--dim2);letter-spacing:.03em}
 .msSt{display:flex;align-items:center;gap:6px;white-space:nowrap}
 .msSt b{font-family:var(--font-disp);font-size:14px;color:var(--ink);min-width:1.9em;text-align:right}
+/* ÉRTÉKELÉS NÉLKÜL (15 percnél rövidebb beállás): egyetlen halvány gondolatjel
+   a csillagsor helyén. NEM nulla csillag — az ítélet volna, és pont azt
+   kerüljük el. A szélessége a csillagsoréval egyezik, hogy a sorok ne
+   ugráljanak. */
+.msSt0{display:inline-block;min-width:5.2em;text-align:right;color:var(--dim2);
+  font-family:var(--font-disp);font-size:14px}
 .msTags{grid-column:1/-1;font-size:10.5px;color:var(--dim);letter-spacing:.02em}
 /* A CSILLAGSOR. A fél csillag ugyanaz a ★, csak félig arany: a háttér-átmenet
    a betűre vágva. A `hf` osztály a WebKit-előtagos változatot is viszi, mert a
@@ -4648,7 +4654,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.32";
+const APP_VERSION="3.7.33";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -38309,6 +38315,49 @@ function mileFullTime(M,active,cleanSheet,saves,result,lastRound,ctx){
    tizenegyen veszítenek. */
 const MSTAT_STARS=7;
 const MSTAT_BASE=3.5;      /* „elvégezte a dolgát" — innen mozdul föl és le */
+/* ================= A RÖVID BEÁLLÁS (3.7.33) =================
+   BEJELENTETT HIBA: „a rövid időt játszó játékosok nagyon rossz értékelést
+   kapnak mindenképp."
+
+   MIÉRT TÖRTÉNT. Az értékelés tételei két csoportra oszlanak: az egyik azt
+   méri, KI a játékos és hogyan illik a rendszerbe (rating a kereten belül,
+   poszt-illeszkedés, taktika, filozófia, a csapat eredménye), a másik azt,
+   MIT CSINÁLT (eredményesség). Az első csoport a percektől FÜGGETLENÜL hatott,
+   a második viszont a játékidő arányában — `output *= share`. Egy cserejátékos
+   tehát a teljes strukturális mínuszt megkapta (a padról beálló ember jellemzően
+   gyengébb a kezdő tizenegy átlagánál: −0,9-ig), a jóváírás oldalán viszont
+   szinte semmit nem tudott visszaszerezni: húsz perc alatt szerzett gólja
+   1,2 helyett 0,27-et ért. Mérve, 84-es kereten, 76-os cserével, vereségnél:
+   3,0 csillag — akkor is, ha semmi rosszat nem csinált.
+
+   A JAVÍTÁS KÉT LÉPCSŐS:
+
+   1. TIZENÖT PERC ALATT NINCS ÉRTÉKELÉS. Nem rossz értékelés, hanem SEMMILYEN:
+      a táblázatban „—" áll, és a meccs nem kerül bele a forma mércéjébe sem.
+      Öt perc nem elég egy ítélethez — se jóhoz, se rosszhoz.
+
+   2. A KÜSZÖB FÖLÖTT A PERCEK SÚLYA KISEBB. A két percfüggő szorzó padlót kap,
+      és a súly a KÜSZÖBTŐL számít, nem nulláról:
+
+          w = (percek − 15) / (90 − 15)        w ∈ [0,1]
+          eredményesség  ×= 0,70 + 0,30·w
+          az alaptól való eltérés ×= 0,75 + 0,25·w
+
+      90 percnél mindkettő pontosan 1,0 — a KEZDŐK értékelése tehát BETŰRE
+      változatlan. A cserejátékosnál viszont a gól újra gólt ér: húsz perc
+      alatt 0,27 helyett 0,86-ot. */
+const MSTAT_MIN_MIN=15;      /* ennyi játszott perc ALATT nincs értékelés */
+const MSTAT_OUT_FLOOR=0.70;  /* az eredményesség percsúlyának padlója */
+const MSTAT_PULL_FLOOR=0.75; /* az alap felé húzás padlója */
+/* A JÁTSZOTT PERCEK — EGY képlet. A táblázat kiírt perce és az értékelés
+   küszöbe így nem tud elcsúszni egymástól (kerekítés!). */
+function mstatMinutes(share){
+  return Math.round(mstatClamp(share==null?1:share,0,1)*90);}
+function mstatRated(share){return mstatMinutes(share)>=MSTAT_MIN_MIN;}
+/* A percsúly a küszöbtől: 15 percnél 0, 90 percnél 1. */
+function mstatMinW(share){
+  const m=mstatMinutes(share);
+  return mstatClamp((m-MSTAT_MIN_MIN)/(90-MSTAT_MIN_MIN),0,1);}
 /* A FILOZÓFIÁK TENGELY-SÚLYAI. Ugyanabban az alakban, mint a TACTICS
    attrProfile-jai (összegük 1), hogy ugyanaz a képlet pontozhassa mindkettőt.
    A `sztar` szándékosan null: az a filozófia nem egy tengelyre épül, hanem egy
@@ -38498,6 +38547,9 @@ function mstatProfileFit(attrs,w){
    A visszatérő objektum a BONTÁST is viszi (`parts`), hogy a felület meg
    tudja indokolni a számot — és hogy egy elszálló tétel mérhető legyen. */
 function mstatRate(row,ctx){
+  /* TIZENÖT PERC ALATT NINCS ÍTÉLET. Nem rossz értékelés, hanem semmilyen —
+     a hívó ebből tudja, hogy „—"-t kell kiírnia, és a forma sem méri. */
+  if(!mstatRated(row.share))return {v:null,rated:false,parts:{}};
   const p=row.pl;
   const ent=(gameMode==="career"&&careerPool)?careerPool[p.n]:null;
   const attrs=(()=>{try{return attrsOfPlayer(p);}catch(e){return null;}})();
@@ -38553,19 +38605,23 @@ function mstatRate(row,ctx){
   if(gk&&(ctx.ga||0)>1)eR-=Math.min(1.0,((ctx.ga||0)-1)*0.25);
   if(row.mvp)eR+=0.5;
   parts.output=eR;
-  /* 5. JÁTSZOTT PERCEK — SÚLY, nem tétel: a teljesítmény a játékidő arányában
-        számít, és a rövid beállás az alap felé húz vissza. Aki tíz percet
-        játszott, se 7 csillagot, se 1-et nem kaphat. */
-  parts.output*=share;
+  /* 5. JÁTSZOTT PERCEK — SÚLY, nem tétel. A rövid beállás visszafogja az
+        eredményesség súlyát és az alap felé húz — de MÉRSÉKELTEN: a padló
+        (MSTAT_OUT_FLOOR / MSTAT_PULL_FLOOR) miatt a cserejátékos gólja is
+        gólt ér. A súly a 15 perces küszöbtől számít, nem nulláról; 90 percnél
+        pontosan 1, tehát a kezdők értékelése változatlan. Lásd a
+        MSTAT_MIN_MIN fölötti blokkot. */
+  const mw=mstatMinW(share);
+  parts.output*=MSTAT_OUT_FLOOR+(1-MSTAT_OUT_FLOOR)*mw;
   /* A CSAPAT EREDMÉNYE IS SZÍNEZ: tizenegyen nyernek, tizenegyen veszítenek. */
   parts.team=ctx.cls==="win"?0.25:(ctx.cls==="loss"?-0.25:0);
   /* A PIROS LAP a legsúlyosabb egyéni tétel — cserbenhagyta a csapatot. */
   parts.red=row.red?-2.5:0;
   let v=MSTAT_BASE;
   Object.keys(parts).forEach(k=>{v+=parts[k];});
-  v=MSTAT_BASE+(v-MSTAT_BASE)*(0.45+0.55*share);
+  v=MSTAT_BASE+(v-MSTAT_BASE)*(MSTAT_PULL_FLOOR+(1-MSTAT_PULL_FLOOR)*mw);
   v=mstatClamp(Math.round(v*2)/2,0,MSTAT_STARS);
-  return {v,parts};}
+  return {v,rated:true,parts};}
 /* ---- A MÉRKŐZÉS TELJES STATISZTIKÁJA ----
    Egy hívás, egy sorosítható objektum. A hívó (fullTime) adja át mindazt, ami
    a mérkőzés hatókörében él; ez a függvény nem nyúl a globális
@@ -38665,10 +38721,17 @@ function mstatCompute(c){
   const players=rows.map(x=>{
     const rt=mstatRate(x,ctx);
     return {n:x.pl.n,pos:x.pos,role:x.role,
-      min:Math.round(mstatClamp(x.share==null?1:x.share,0,1)*90),
+      min:mstatMinutes(x.share),
       g:x.g||0,a:x.a||0,saves:x.saves||0,tackles:x.tackles||0,
-      red:!!x.red,mvp:!!x.mvp,star:rt.v};});
-  players.sort((a,b)=>b.star-a.star||b.g-a.g||b.a-a.a||a.n.localeCompare(b.n,"hu"));
+      red:!!x.red,mvp:!!x.mvp,star:(rt.rated?rt.v:null)};});
+  /* AZ ÉRTÉKELÉS NÉLKÜLIEK A SOR VÉGÉRE. Nem „nulla csillagosak" — nincs
+     számuk, amivel rangsorolni lehetne, tehát a lista aljára kerülnek, a
+     lejátszott perceik szerint. */
+  players.sort((a,b)=>{
+    const A=(a.star==null),B=(b.star==null);
+    if(A!==B)return A?1:-1;
+    if(A)return (b.min||0)-(a.min||0)||a.n.localeCompare(b.n,"hu");
+    return b.star-a.star||b.g-a.g||b.a-a.a||a.n.localeCompare(b.n,"hu");});
   /* A HATÁSOK KIÍRVA. Nem elég, hogy a számok mögött ott van a négy rendszer —
      LÁTNI is kell, különben a felhasználó csak annyit tapasztal, hogy „valamiért
      többet birtokoltunk". Sorosítható, tehát a mentésből is visszajön. */
@@ -38730,7 +38793,11 @@ function mstatPlayerHtml(p,rank){
   return `<div class="msP${rank?" top":""}">`
     +(rank?`<span class="msRank">${rank}.</span>`:"")
     +`<span class="msN">${esc(shortName(p.n))}<i>${esc(p.pos)} · ${p.min}'</i></span>`
-    +`<span class="msSt">${mstatStarsHtml(p.star)}<b>${p.star.toFixed(1).replace(".",",")}</b></span>`
+    /* ÉRTÉKELÉS NÉLKÜL: „—" és a magyarázat, nem nulla csillag. A nulla
+       csillag ítélet volna, és pont azt kerüljük el. */
+    +(p.star==null
+      ?`<span class="msSt msSt0" title="${MSTAT_MIN_MIN} percnél kevesebb játékidő">—</span>`
+      :`<span class="msSt">${mstatStarsHtml(p.star)}<b>${p.star.toFixed(1).replace(".",",")}</b></span>`)
     +(tags.length?`<span class="msTags">${tags.join(" · ")}</span>`:"")
     +`</div>`;}
 let _mstatAllOpen=false,_mstatDone=null;
@@ -38759,15 +38826,23 @@ function mstatRender(){
     if(M.fit!=null)bits.push(`poszt-illeszkedés <b>${M.fit}%</b>`);
     if(bits.length)h+=`<div class="msDrv">${bits.join(" &nbsp;·&nbsp; ")}</div>`;}
   const ps=M.players||[];
+  /* A DOBOGÓRA CSAK ÉRTÉKELT JÁTÉKOS KERÜLHET: egy „—"-os sor a három legjobb
+     között értelmetlen volna. (A rendezés miatt ők amúgy is a lista végén
+     állnak, de ha kevesebb mint három értékelt ember van, a szűrés kell.) */
+  const rated=ps.filter(x=>x&&x.star!=null);
+  const top=rated.slice(0,3);
   h+=`<div class="msSec">A mérkőzés három legjobbja</div>`;
-  ps.slice(0,3).forEach((p,i)=>{h+=mstatPlayerHtml(p,i+1);});
-  if(_mstatAllOpen&&ps.length>3){
+  top.forEach((p,i)=>{h+=mstatPlayerHtml(p,i+1);});
+  if(!top.length)h+=`<div class="msDrv">Ezen a mérkőzésen senki nem játszott `
+    +`${MSTAT_MIN_MIN} percnél többet — értékelés nélkül maradt a keret.</div>`;
+  const restList=ps.filter(x=>top.indexOf(x)<0);
+  if(_mstatAllOpen&&restList.length){
     h+=`<div class="msSec">A teljes keret</div>`;
-    ps.slice(3).forEach(p=>{h+=mstatPlayerHtml(p,0);});}
+    restList.forEach(p=>{h+=mstatPlayerHtml(p,0);});}
   box.innerHTML=h;
   const b=$("mstatAllBtn");
   if(b){
-    b.classList.toggle("hide",ps.length<=3);
+    b.classList.toggle("hide",!restList.length);
     b.textContent=_mstatAllOpen?"▲ Csak a három legjobb":`▼ A teljes keret értékelése (${ps.length})`;}}
 /* A MEGNYITÁS. `cb` csak a mérkőzés utáni, egyszeri megjelenésnél van: ilyenkor
    a bezárás viszi tovább a folyamatot. A gombról nyitott ablaknak nincs
@@ -38885,7 +38960,11 @@ function pstatPush(M){
     /* ÚJRA-KÖNYVELÉS ELLEN: ugyanaz a szezon+forduló csak egyszer kerül be
        (egy újratöltés vagy egy idempotens újrafutás nem duplázhat). */
     if(a.some(x=>x.s===sn&&x.r===M.round))return;
-    a.push({s:sn,r:M.round,st:p.star,g:p.g||0,a:p.a||0,sv:p.saves||0,
+    /* AZ ÉRTÉKELÉS NÉLKÜLI BEÁLLÁS IS BEKERÜL — a percek, a gólok és a
+       gólpasszok a történet részei —, csak `st` nélkül: a forma mércéje így
+       nem kap se jó, se rossz jelet egy tíz perces cseréből. */
+    a.push({s:sn,r:M.round,st:(typeof p.star==="number"?p.star:null),
+      g:p.g||0,a:p.a||0,sv:p.saves||0,
       tk:p.tackles||0,m:p.min||0,res:M.cls||"draw"});
     if(a.length>PFORM_HIST)a.splice(0,a.length-PFORM_HIST);});}
 /* ---- A SAJÁT MÉRCE: AMIHEZ A FORMÁT MÉRJÜK ----
@@ -38902,17 +38981,24 @@ function pstatPush(M){
    távú átlaga (a teljes tárolt története), és a forma ehhez képest mozdul.
    Aki mindig 5,5-öt hoz, annál a jel 0 — középen marad; aki 5,5-ről 4,2-re
    esett, az hullámvölgybe kerül, akármilyen erős csapatban játszik. */
+/* ---- CSAK AZ ÉRTÉKELT MECCSEK SZÁMÍTANAK ----
+   A 15 percnél rövidebb beállás nem kap értékelést (lásd MSTAT_MIN_MIN), és a
+   formába sem szólhat bele: se jó, se rossz jelet nem hordoz. Régebbi
+   mentésekben minden bejegyzésnek van `st`-je, tehát a szűrő ott mindent
+   átenged — a viselkedés visszamenőleg változatlan. */
+function pstatRatedOf(name){
+  return (pstatState()[name]||[]).filter(x=>x&&typeof x.st==="number");}
 function pformBaseline(name){
-  const a=pstatState()[name]||[];
+  const a=pstatRatedOf(name);
   if(a.length<PFORM_BASE_MIN)return null;   /* még nincs mihez mérni */
-  let s=0;a.forEach(x=>{s+=(typeof x.st==="number"?x.st:MSTAT_BASE);});
+  let s=0;a.forEach(x=>{s+=x.st;});
   return s/a.length;}
-/* Az utolsó `n` meccs összegzése egy játékosról. */
+/* Az utolsó `n` ÉRTÉKELT meccs összegzése egy játékosról. */
 function pformRecent(name,n){
-  const a=(pstatState()[name]||[]).slice(-(n||PFORM_WINDOW));
+  const a=pstatRatedOf(name).slice(-(n||PFORM_WINDOW));
   if(!a.length)return {n:0,avg:MSTAT_BASE,g:0,as:0};
   let s=0,g=0,as=0;
-  a.forEach(x=>{s+=(typeof x.st==="number"?x.st:MSTAT_BASE);g+=x.g||0;as+=x.a||0;});
+  a.forEach(x=>{s+=x.st;g+=x.g||0;as+=x.a||0;});
   return {n:a.length,avg:s/a.length,g,as};}
 /* A CSAPAT FORMÁJA a periódusban: az utolsó `n` lejátszott mérkőzés mérlege.
    A NAGY győzelem (3+ gólos) és a SÚLYOS vereség (3+ gólos) külön súlyt kap —
@@ -39037,9 +39123,9 @@ function pformSeasonReset(){
   let roster=[];
   try{roster=msRoster().filter(p=>p&&p.n);}catch(e){}
   roster.forEach(p=>{
-    const a=(pstatState()[p.n]||[]).filter(x=>x.s===prev);
+    const a=pstatRatedOf(p.n).filter(x=>x.s===prev);
     let avg=MSTAT_BASE;
-    if(a.length){let s=0;a.forEach(x=>{s+=(typeof x.st==="number"?x.st:MSTAT_BASE);});avg=s/a.length;}
+    if(a.length){let s=0;a.forEach(x=>{s+=x.st;});avg=s/a.length;}
     F[p.n]=(avg>=MSTAT_BASE)?8:7;});
   S.pFormUpd={season:S.seasonNumber||1,round:0,reason:"season"};}
 /* ---- A HANGERŐ-SKÁLA ----
@@ -39097,8 +39183,11 @@ function pstatHistoryHtml(name){
     bits.push(`${x.m}'`);
     h+=`<div class="pmRow ${esc(x.res||"")}"><span class="pmR">${x.s}/${x.r}.</span>`
       +`<span>${bits.join(" · ")}</span>`
-      +`<span class="pmS">${(typeof x.st==="number"?x.st:MSTAT_BASE).toFixed(1).replace(".",",")}★</span></div>`;});
-  return h+`<div class="hdRow" style="color:var(--dim2);margin-top:6px">Szezon/forduló · a csillag ugyanaz az értékelés, amit a mérkőzés végi ablak is kiírt.</div>`;}
+      +`<span class="pmS">${typeof x.st==="number"
+          ?x.st.toFixed(1).replace(".",",")+"★"
+          :`<span style="color:var(--dim2)" title="${MSTAT_MIN_MIN} percnél kevesebb játékidő">—</span>`}</span></div>`;});
+  return h+`<div class="hdRow" style="color:var(--dim2);margin-top:6px">Szezon/forduló · a csillag ugyanaz az értékelés, amit a mérkőzés végi ablak is kiírt. `
+    +`A <b>${MSTAT_MIN_MIN} percnél</b> rövidebb beállás nem kap értékelést (—), és a formába sem számít bele.</div>`;}
 /* A FORMA SZÖVEGES CÍMKÉJE — a skála mellé, egy pillantásra. */
 const PFORM_LABELS=["kritikus mélyponton","mélyponton","gyenge formában","hullámvölgyben",
   "keresi önmagát","döcög","semleges","semleges","rendben van","jó formában",

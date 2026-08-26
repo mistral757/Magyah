@@ -99,6 +99,15 @@ mozdul. Aki mindig 5,5-öt hoz, annál a jel 0 — középen marad; aki 5,5-ről
 csapatnál a periódus nyolc győzelme nem jó forma, hanem a szokásos — a jel
 ezért a periódus mérlege az **idény egészéhez** képest.
 
+**A mérce csak az ÉRTÉKELT meccseket látja (3.7.33).** A 15 percnél rövidebb
+beállás nem kap csillagot (lásd
+[`meccs-statisztika.md`](meccs-statisztika.md) — „A rövid beállás"), és a
+formába sem szólhat bele: se jó, se rossz jelet nem hordoz. A `pformBaseline` és
+a `pformRecent` ezért a `pstatRatedOf` szűrőjén át olvas — a periódus-ablak is
+az utolsó `n` **értékelt** mérkőzés, nem az utolsó `n` bejegyzés. Régebbi
+mentésekben minden bejegyzésnek van értékelése, tehát ott a szűrő mindent
+átenged.
+
 ### …és nem csúszik együtt az egész keret
 
 A csapat-szintű tételek (morál, eredmények) mindenkire ugyanúgy hatnak, tehát
