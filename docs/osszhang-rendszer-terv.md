@@ -1,6 +1,6 @@
 # Összhang-rendszer — tervezet és ütemterv
 
-**Állapot:** 🟡 az F0 döntések megvannak, az **F1 kész** (3.8.00) ·
+**Állapot:** 🟡 az F0 döntések megvannak, az **F1–F2 kész** (3.8.01) ·
 **Cél-verzió:** 3.8.x · A megvalósult rész leírása: `docs/osszhang-rendszer.md`
 
 *(Ez egy TERV-dokumentum, nem leírás. Amíg a fázisok le nem futnak, a benne
@@ -298,7 +298,7 @@ külön `tools/check.sh` és külön mérés.
 |---|---|---|---|---|
 | **F0** | **Döntések** | a lenti 6 kérdés eldöntve | kód nélkül olcsó visszalépni | — |
 | **F1** ✅ | **A modell** (kész, 3.8.00) | `S.bonds`, `bondOf`, meccsenkénti gyűlés, `teamBond()`, `pruneBonds()`, mentés/betöltés + magvetés a `chemPairs`-ből. **A meccsre MÉG NEM hat.** Egy rejtett kiírás mutatja | egy szám, ami senkire nem hat, biztonságosan mérhető: lefuttatunk 5 idényt és megnézzük, hova fut | alacsony |
-| **F2** | **A meccsbe kötés** | `bondMod` a `buildMatchSnapshot`-ba **és a sorosított mezők közé** (2.4!); a `BOND_REF` beállítása; a csapaterő-sáv jelölése | itt dől el az egyensúly — előbb, mint hogy bármi UI ráépülne | **magas** |
+| **F2** ✅ | **A meccsbe kötés** (kész, 3.8.01) | `bondMod` a `buildMatchSnapshot`-ba **és a sorosított mezők közé** (2.4!); a `BOND_REF` beállítása; a csapaterő-sáv jelölése | itt dől el az egyensúly — előbb, mint hogy bármi UI ráépülne | **magas** |
 | **F3** | **A beilleszkedés** | 8 saját meccs, a 4. meccstől jelzés, beilleszkedési jelentés; **az eladási és vásárlási megerősítő kiírja az összhang-tételt** | ez a bejelentett cél („súly az igazolásoknak") — amint a szám hat, ez azonnal kell | közepes |
 | **F3b** | **Kommentár és üzenetek** | meccs közbeni kommentárok a nagyon jól / rosszul működő összhangra (páros, posztcsoport, csapat), és meccs utáni üzenet, ha egy kötés SZINTET LÉPETT | a fokozat-küszöbök az F4 skálájából jönnek, de a szöveg nem vár rá | alacsony |
 | **F4** | **Összhangtérkép** | kapcsoló a pályaképen, 7 fokozat, rajzolási küszöb (2.6) | most már van mit mutatni | közepes (rajz) |

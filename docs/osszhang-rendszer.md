@@ -1,13 +1,14 @@
 # Összhang — a modell
 
-**Állapot:** 🟡 F1 kész (a szám épül, de MÉG NEM HAT) · **Verzió:** 3.8.00
+**Állapot:** 🟡 **F1–F2 kész** — a szám épül ÉS hat a meccsre · **Verzió:** 3.8.01
 
 *(Terv és ütemterv: `docs/osszhang-rendszer-terv.md`. Érintett kód: a
 `BOND_*` konstansok, `bondKey/bondRaw/bondOf/bondSet/bondAdd/bondCapOf`,
 `bondRoleMult/bondTacticMult/bondPersonMult/bondPassMult/bondTrainMult/
 bondCatchMult/bondDamp`, `bondMatchTick`, `bondStartIntegration/bondRevealNew`,
 `bondSeedFirstSquad/bondSeedValue/bondSeedConflict`, `bondPrune`,
-`bondChemComplete`, `teamBond/bondPairWeight/playerBond`, `bondMigrate`.)*
+`bondChemComplete`, `teamBond/bondPairWeight/playerBond`, `bondMigrate`,
+`bondOvrMod/bondMoraleTerm` + a `buildMatchSnapshot` `bondMod` tagja.)*
 
 ---
 
@@ -23,15 +24,16 @@ egymást — idényekben mérhető, és csak akkor vész el, ha valaki elmegy.
 
 ---
 
-## 2. Mi az F1, és mi NEM
+## 2. Hol tart
 
-**Ez a fázis szándékosan felület nélküli.** A szám épül, mérhető, mentődik —
-de **senkire nem hat**: nincs bekötve a csapaterőbe (az az F2), nincs
-pályatérkép, nincs játékoslap-sor, nincs edzés-sáv.
+| | |
+|---|---|
+| **F1** ✅ | a modell: a kötések épülnek, mentődnek, mérhetők |
+| **F2** ✅ | a szám **hat**: nulla-középpontú tag a csapaterőben, és az összhang **átvette a morál „kémia" bemenetét** |
+| F3 · F3b · F4 · F5 · F6 · F7 · F8 | felület, kommentár, térkép, edzés-sáv, edző |
 
-Ennek oka van: egy szám, ami nem hat, **biztonságosan mérhető**. Le lehet
-futtatni több idényt és megnézni, hova fut, mielőtt bármi ráépülne. Egyetlen
-helyen látszik: a **diagnosztikában** (`── ÖSSZHANG (F1 …)` blokk).
+Felület még alig van: a **csapaterő-sáv jelölése** és az Infó-fül
+**Csapat-összhang** sora mondja ki a számot, a részletek a diagnosztikában.
 
 ---
 
@@ -282,10 +284,110 @@ Oldalhiba egyik futáson sem volt.
 
 ---
 
+## 10b. F2 — a meccsbe kötve
+
+### 10b.1 A tag
+
+```
+bondMod = clamp( (teamBond − 55) / 32 × 2,5 ,  −1,5 , +2,5 )
+```
+
+**Nulla-középpontú, és ez nem stíluskérdés.** Ha a tag egyenesen a 0–99-es
+számból jönne, minden karrier rejtett hendikeppel indulna (egy friss keret
+25–30 körül áll), és a nehézség évről évre magától csökkenne — miközben a
+ligaszint, a büdzsé és a kihívás-kalibráció mind a mai görbére van hangolva.
+A referencia (55) a „beállt" csapat: ott a tag pontosan 0, tehát egy szokásos
+keret a mai értékeken játszik.
+
+**A nagyságrend a szomszédaihoz igazodik:** a morál tagja ±2,5, a kiállítás
+2,5 (`SIM.REDMATCH`). Szétesett öltöző ≈ egy emberhátrány; tíz éve együtt
+játszó csapat ≈ egy jó edző.
+
+**A sáv aszimmetrikus, és a padló MÉRÉSSEL került a helyére.** −1,8-nál a
+friss keret együtt (a morálon át jövő résszel) −2,10-en állt: egy teljes
+emberhátrány végig az első idényben, ráadásul mellé 30%-kal több
+elvágyódás-esemény. Ez a karrier legnehezebb szakaszában sok. −1,5-tel az
+összesített padló −1,8 — érezhető, de nem tesz tönkre egy kezdést.
+
+### 10b.2 A párharc-csapda itt magától meg van oldva
+
+A tag a `buildMatchSnapshot` **`ovr` összegébe** kerül, az pedig egyetlen
+számként utazik a pillanatképben. Nincs olyan út, amin a számoló fél
+összhangja a társa csapatára ülhetne — pontosan az a hiba, ami a
+`styleOwnGoalMult()`-tal egyszer már megtörtént. A `teamBond` és a `bondMod`
+külön mezőként is megy, de csak a közvetítésnek.
+
+**Mérve:** 70-es összhangnál `ovr` 71,46, 25-ösnél 68,52 — a különbség 2,94,
+betűre a két tag különbsége. Sorosítás után változatlan.
+
+### 10b.3 A morál „kémia" bemenetét az összhang vette át
+
+A `computeMoraleTarget` eddig a `CHEM.total`-lal számolt: egy **álló szám**,
+ami a keret megalakulásakor egyszer eldőlt, és soha többé nem mozdult. Két
+öltözői szám ugyanabból a dologból táplálkozott, és az egyikük halott volt.
+
+A sáv **szűkebb**, mint a régi kémiáé (±18 helyett −10…+12): az összhang már
+közvetlenül is hat a csapaterőre, tehát a morálon át csak **hangolnia** szabad,
+nem duplán ütnie. A célérték amúgy is csak idénykezdetkor számolódik újra —
+szezononkénti pillanatkép, nem meccsről meccsre halmozódó hatás.
+
+Ugyanez a forrás hajtja az **elvágyódás- és identitásválság-kockázatot**
+(`chemMoraleRiskFactor`): egy álló kémia-számmal hajtani az események
+kockázatát, miközben a morált már az élő összhang adja, két különböző világot
+írna le ugyanarról az öltözőről.
+
+### 10b.4 A karrier íve — mérve
+
+Draft-indulás, 30 meccs/idény, végig ugyanaz a tizenegy:
+
+| idény | összhang | csapaterő-tag | morál-cél | morálból | **együtt** |
+|---|---|---|---|---|---|
+| 0 | 24,9 | −1,50 | 44 | −0,30 | **−1,80** |
+| 1 | 44,8 | −0,80 | 50 | 0,00 | **−0,80** |
+| 2 | 56,2 | +0,09 | 54 | +0,20 | **+0,29** |
+| 3 | 63,3 | +0,65 | 57 | +0,35 | **+1,00** |
+| 5 | 71,6 | +1,30 | 60 | +0,50 | **+1,80** |
+| 7 | 76,2 | +1,66 | 62 | +0,60 | **+2,26** |
+| 10 | 80,1 | +1,96 | 63 | +0,65 | **+2,61** |
+
+**A nullát a 2. idényben lépi át** — ez a szándék: az első két idény
+nehezebb a mainál, onnantól könnyebb, és a karrier egésze nagyjából ott marad,
+ahol ma van.
+
+Gólvárhatóságban (azonos erejű ellenfél ellen):
+
+| | várható gól | ellene |
+|---|---|---|
+| szétesett keret (−1,5) | 1,13 | 1,49 |
+| beállt (0) | 1,30 | 1,30 |
+| tíz éve együtt (+2,34) | 1,60 | 1,05 |
+
+### 10b.5 Ahol látszik
+
+* **A csapaterő-sáv alatt:** `· összhang 61,7 (+0,5 csapaterő)`. A sáv **számát
+  nem írja át** — a csapaterő továbbra is a tizenegy ereje —, de kimondja a
+  rejtett tagot. Enélkül a menedzser csak annyit látna, hogy a meccsek jobban
+  mennek, és nem tudná, miért.
+* **Az Infó fülön** a régi „Öltözői kémia" sor helyén a **Csapat-összhang**.
+
+**A KIJELZETT szám élő, a MECCSÉ befagy.** A motor egész `ovr`-je a
+kezdőrúgásé (a morál tagja is), a sáv viszont a pályán lévő tizenegyet
+követi. Ez így helyes: a sáv azt mutatja, hol tartasz, a meccs azzal számol,
+amivel kifutottál.
+
+### 10b.6 Ami változatlan maradt
+
+| helyzet | viselkedés |
+|---|---|
+| klasszikus mód | `bondOvrMod` = **0** — a rendszer nem létezik |
+| karrier, draft közben (nincs még elemzés) | `bondOvrMod` = **0**, a morál a **régi** `CHEM.total×1,2` ágon |
+| régi mentés, üres tárak | minden hívás lefut, hiba nélkül |
+
+---
+
 ## 11. Ami még hátravan
 
-`F2` a meccsbe kötés (nulla-középpontú tag a `buildMatchSnapshot`
-**sorosított** mezői közé) · `F3` a beilleszkedés felülete és az eladási
+`F3` a beilleszkedés felülete és az eladási
 kiírás · `F3b` **kommentárok és meccs utáni üzenetek** · `F4` az
 összhangtérkép · `F5` a játékoslap · `F6` az összhangépítés edzés-sáv ·
 `F7` az összhang-edző · `F8` az első keret képernyője · `F9` hangolás.

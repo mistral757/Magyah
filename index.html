@@ -4777,7 +4777,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.00";
+const APP_VERSION="3.8.01";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -27950,6 +27950,12 @@ function teamStrengthNote(){
   const forced=xi.filter(a=>a.forced).length;
   if(forced)bits.push(`${forced} kényszercserével`);
   if(bus)bits.push("busszal");
+  /* ÖSSZHANG (F2): a sáv számát NEM írja át — a csapaterő továbbra is a
+     tizenegy ereje —, de KIMONDJA a rejtett tagot. Enélkül a menedzser csak
+     annyit látna, hogy a meccsek jobban mennek, és nem tudná, miért. */
+  if(gameMode==="career"&&S&&S.bondsSeeded){
+    const t=teamBond(),m=bondOvrMod();
+    bits.unshift(`összhang ${String(t).replace(".",",")} (${m>=0?"+":"−"}${Math.abs(m).toFixed(1).replace(".",",")} csapaterő)`);}
   return bits.length?" · "+bits.join(" · "):"";}
 /* ================= A PÁRHARC MÉRCÉJE: A KERET, NEM A KEZDŐ 11 (3.7.24) ======
    A teamStrength() a MAI FELÁLLÁST méri: a kezdő tizenegyet, a posztjukon.
@@ -30967,7 +30973,10 @@ function computeMoraleTarget(){
   /* SZEMÉLYI EDZŐ (Lélekemelő): a meglévő tagok mellé jön be. A +14-es plafon
      a szomszédos nagyságrendekhez igazodik (clubBonus +10, hodaBonus +14,
      coach.moraleBase −3…+6) — erős, de nem uralkodó hatás. */
-  let t=50+CHEM.total*1.2+squadScore*7+(coach?coach.moraleBase:0)+hodaBonus+capExpBonus+clubBonus
+  /* AZ ÖLTÖZŐI KÉMIA HELYÉN MOSTANTÓL AZ ÖSSZHANG ÁLL (F2) — lásd
+     bondMoraleTerm. Régi mentésben és a draft közben (amíg az induló elemzés
+     nem futott le) a régi CHEM.total-os viselkedés marad. */
+  let t=50+bondMoraleTerm()+squadScore*7+(coach?coach.moraleBase:0)+hodaBonus+capExpBonus+clubBonus
         +moraleCoachBonus();
   return Math.max(10,Math.min(92,Math.round(t)));}
 /* ================= KAPITÁNY-HATÁS ELŐREJELZÉS =================
@@ -32337,6 +32346,57 @@ function teamBond(){
     sw+=w;sv+=w*bondOf(xi[i].p.n,xi[j].p.n);}
   if(!sw)return BOND_REF;
   return Math.round(sv/sw*10)/10;}
+/* ================= F2 — A MECCSBE KÖTVE (3.8.01) =========================
+   A csapatszám egyetlen additív taggal ül rá a csapaterőre, a többi rejtett
+   módosító mellé (kapitány, esemény, edző, morál, aura, egyensúly, stílus).
+
+   NULLA-KÖZÉPPONTÚ, ÉS EZ NEM STÍLUSKÉRDÉS. Ha a tag egyenesen a 0–99-es
+   számból jönne, minden karrier REJTETT HENDIKEPPEL indulna (egy friss keret
+   25–30 körül áll), és a nehézség évről évre magától csökkenne — miközben a
+   ligaszint, a büdzsé és a kihívás-kalibráció mind a mai görbére van hangolva.
+   A referencia (BOND_REF = 55) a „beállt" csapat: ott a tag pontosan 0, tehát
+   egy szokásos keret a mai értékeken játszik.
+
+   A NAGYSÁGREND a szomszédaihoz igazodik: a morál tagja ±2,5
+   ((morál−50)/50×2,5), a kiállítás 2,5 (SIM.REDMATCH). Egy szétesett öltöző
+   tehát nagyjából egy emberhátrány, egy tíz éve együtt játszó csapat egy jó
+   edző — se több, se kevesebb.
+
+   A SÁV SZÁNDÉKOSAN ASZIMMETRIKUS (−1,5 … +2,5). A rendszer építeni jutalmaz,
+   nem rombolni büntet (ugyanaz az elv, ami a kihívások jutalom/büntetés
+   arányát is szabja), és a karrier első két idénye amúgy is a legnehezebb.
+   A PADLÓ MÉRÉSSEL LETT ITT: −1,8-nál a friss keret együtt (a morálon át jövő
+   résszel) −2,10-en állt, ami egy TELJES emberhátrány végig az első idényben —
+   ráadásul mellé 30%-kal több elvágyódás-esemény is jár (chemMoraleRiskFactor).
+   Ez a karrier legnehezebb szakaszában sok. −1,5-tel az összesített padló
+   −1,8, ami még bőven érezhető, de nem tesz tönkre egy kezdést.
+
+   A PÁRHARC-CSAPDA ITT MAGÁTÓL MEG VAN OLDVA: a tag a `buildMatchSnapshot`
+   `ovr` ÖSSZEGÉBE kerül, az pedig egyetlen SZÁMKÉNT utazik a pillanatképben.
+   Nincs olyan út, amin a számoló fél összhangja a társa csapatára ülhetne. A
+   `teamBond` és a `bondMod` külön mezőként is megy — a közvetítésnek. */
+const BOND_OVR_SPAN=32;   /* ennyi összhang-pont ér egy teljes tagot */
+const BOND_OVR_MAX=2.5;
+const BOND_OVR_MIN=-1.5;
+function bondOvrMod(){
+  if(gameMode!=="career"||!S||!S.bondsSeeded)return 0;
+  const t=teamBond();
+  return Math.max(BOND_OVR_MIN,Math.min(BOND_OVR_MAX,
+    (t-BOND_REF)/BOND_OVR_SPAN*BOND_OVR_MAX));}
+/* ---- A MORÁL „KÉMIA" BEMENETÉT AZ ÖSSZHANG VESZI ÁT ----
+   A `computeMoraleTarget` eddig a `CHEM.total`-lal számolt: egy ÁLLÓ szám,
+   ami a keret megalakulásakor egyszer eldőlt, és soha többé nem mozdult. Két
+   öltözői szám ugyanabból a dologból táplálkozott, és az egyikük halott volt.
+
+   Mostantól a célértéket az ÉLŐ összhang adja — de MÉRSÉKELTEBB sávban, mint
+   a régi kémia (±18 helyett −10…+12): az összhang már közvetlenül is hat a
+   csapaterőre, tehát a morálon át csak HANGOLNIA szabad, nem duplán ütnie.
+   A célérték amúgy is csak IDÉNYKEZDETKOR számolódik újra, tehát ez egy
+   szezononkénti pillanatkép, nem meccsről meccsre halmozódó hatás. */
+function bondMoraleTerm(){
+  if(gameMode!=="career"||!S||!S.bondsSeeded)return CHEM.total*1.2;   /* régi mentés / draft közben */
+  const t=teamBond();
+  return Math.max(-10,Math.min(12,(t-BOND_REF)/30*11));}
 /* Egy JÁTÉKOS összhangja a csapattal (a pályán lévőkkel), és a három
    legerősebb személyes kötése — az F5 játékoslapjának a bemenete. */
 function playerBond(name){
@@ -35527,7 +35587,13 @@ function buildMatchSnapshot(){
      ül, a többi rejtett módosító mellett — így ugyanazokon a korlátokon megy
      át, mint minden más hatás. */
   const styleBonus=(typeof styleOvrBonus==="function")?styleOvrBonus():0;
-  const ovr=sum/11+S.capMod+S.eventMod+coach.ovrMod+moraleMod+auraBonus+capExp+chFormMalus+teamMomentumAdj()+balBonus+styleBonus;
+  /* ÖSSZHANG (F2): a KEZDŐRÚGÁSKORI állapotból, egyszer. Ugyanúgy befagy, mint
+     a morál tagja — a motor egész ovr-je a kezdőrúgásé. A KIJELZETT szám
+     ezzel szemben élő (updateStrengthBar), és ez így helyes: a sáv azt mutatja,
+     hol tartasz, a meccs azzal számol, amivel kifutottál. */
+  const bondNow=(typeof teamBond==="function")?teamBond():BOND_REF;
+  const bondMod=(typeof bondOvrMod==="function")?bondOvrMod():0;
+  const ovr=sum/11+S.capMod+S.eventMod+coach.ovrMod+moraleMod+auraBonus+capExp+chFormMalus+teamMomentumAdj()+balBonus+styleBonus+bondMod;
   const tacStyle=(S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)>=85)?TACTICS[S.tactics.active].style:null;
   const activeNames=new Set(active.map(a=>a.p.n));
   const chemPairs=completeChemPairsOnPitch(activeNames);
@@ -35548,6 +35614,9 @@ function buildMatchSnapshot(){
        utazik; ez a két szorzó egyszerűen lemaradt róla. */
     ownGoalMult:styleOwnGoalMult(),oppGoalMult:styleOppGoalMult(),
     tacticEffect:tacticEffect(),tacticStyle:tacStyle,chemPairs,
+    /* A közvetítésnek és a meccs utáni üzeneteknek — a hatás magát az ovr
+       már tartalmazza, ez a KÉT SZÁM csak elmondja, mennyi volt. */
+    teamBond:bondNow,bondMod,
     /* --- helyi (a közvetítéshez) --- */
     active,activeNames,capPlaying,gi,bi,moraleMod};}
 /* A gólvárhatóságok (λ) egy pillanatképből, egy megadott ellenfél-erő ellen.
@@ -44200,7 +44269,12 @@ function autoPlaceIcon(rawIcon){
    felhasználó döntései (kit választ kapitánynak, milyen a keret összhangja)
    így ténylegesen visszahatnak ezekre az eseményekre. */
 function chemMoraleRiskFactor(){
-  const chemNorm=Math.max(-15,Math.min(15,CHEM.total))/15;
+  /* UGYANAZ A FORRÁS, MINT A MORÁLÉ (F2). Egy ÁLLÓ kémia-számmal hajtani az
+     elvágyódás kockázatát, miközben a morált már az élő összhang adja, két
+     különböző világot írna le ugyanarról az öltözőről. */
+  const chemNorm=(gameMode==="career"&&S&&S.bondsSeeded)
+    ? Math.max(-1,Math.min(1,(teamBond()-BOND_REF)/30))
+    : Math.max(-15,Math.min(15,CHEM.total))/15;
   const moraleNorm=(S.morale-50)/50;
   return Math.max(0.4,Math.min(1.6,1-0.3*chemNorm-0.3*moraleNorm));}
 function twResolvePhase2(){
@@ -51934,7 +52008,13 @@ function infinityReportHtml(){
   if(R.bestTac)h+=infRow("Legfejlettebb taktika",`${TACTICS[R.bestTac[0]]?TACTICS[R.bestTac[0]].n:R.bestTac[0]} ${Math.round(R.bestTac[1])}`,
     R.matured>1?`${R.matured} taktika ért 85 fölé`:"");
   h+=infRow("Csapaterő most",teamStrength().toFixed(1));
-  h+=infRow("Öltözői kémia",`${CHEM.total>=0?"+":""}${CHEM.total}`);
+  /* AZ ÖLTÖZŐI KÉMIA HELYÉN AZ ÖSSZHANG (F2): a régi szám álló pillanatkép
+     volt a keret megalakulásáról, és már semmit nem hajtott. */
+  if(gameMode==="career"&&S&&S.bondsSeeded){
+    const t=teamBond(),m=bondOvrMod();
+    h+=infRow("Csapat-összhang",String(t).replace(".",","),
+      `${m>=0?"+":"−"}${Math.abs(m).toFixed(1).replace(".",",")} csapaterő · referencia ${BOND_REF}`);}
+  else h+=infRow("Öltözői kémia",`${CHEM.total>=0?"+":""}${CHEM.total}`);
 
   /* ---- 4. A JÁTÉKOSOK ---- */
   h+=infSec("A keret emberei");
