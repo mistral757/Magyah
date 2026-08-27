@@ -1,6 +1,6 @@
 # Összhang-rendszer — tervezet és ütemterv
 
-**Állapot:** 🟢 az F0 döntések megvannak, az **F1–F7 kész** (3.8.05) ·
+**Állapot:** ✅ **minden fázis kész** (F0–F9, 3.8.06) ·
 **Cél-verzió:** 3.8.x · A megvalósult rész leírása: `docs/osszhang-rendszer.md`
 
 *(Ez egy TERV-dokumentum, nem leírás. Amíg a fázisok le nem futnak, a benne
@@ -305,8 +305,8 @@ külön `tools/check.sh` és külön mérés.
 | **F5** ✅ | **A játékos lapja** (az F3-mal együtt elkészült) | csapat-összhang + top 3 személyes, a Statzone mellé | olcsó, és az F4 fokozat-skáláját újrahasználja | alacsony |
 | **F6** ✅ | **Összhangépítés** (kész, 3.8.05) | a második edzés-sáv, posztcsoport- és megbízás-párokkal | szorzó egy MŰKÖDŐ rendszerre | közepes |
 | **F7** ✅ | **Az összhang-edző** (kész, 3.8.05) | a `chem` típus átalakítása, 4-es fókusz, jogosultság | szorzó a szorzóra — legkésőbb | közepes |
-| **F8** | **Az első keret** | 0–45 skála + 60-as extra, a közös múlt nagyobb súlyával, egy összefoglaló képernyővel | ez az F1 magvetésének a *csinosabb* változata; addig a nyers magvetés is elég | alacsony |
-| **F9** | **Hangolás + dokumentáció** | mérés 10 idényen, `docs/osszhang-rendszer.md`, fogalomtár-szócikk, vezetett élmény | — | — |
+| **F8** ✅ | **Az első keret** (kész, 3.8.06) | 0–45 skála + 60-as extra, a közös múlt nagyobb súlyával, egy összefoglaló képernyővel | ez az F1 magvetésének a *csinosabb* változata; addig a nyers magvetés is elég | alacsony |
+| **F9** ✅ | **Hangolás + dokumentáció** (kész, 3.8.06) | mérés 10 idényen, `docs/osszhang-rendszer.md`, fogalomtár-szócikk, vezetett élmény | — | — |
 
 **Ha csak három fázisra van energia:** F1 + F2 + F3. Az már teljes értékű
 rendszer — épül, hat, és az igazolásnak súlya lesz. Az F4–F7 mind

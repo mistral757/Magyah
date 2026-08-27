@@ -1,7 +1,6 @@
 # Összhang — a modell
 
-**Állapot:** 🟢 **F1–F7 kész** — csak az F8 (az első keret saját képernyője)
-és az F9 (hangolás) van hátra · **Verzió:** 3.8.05
+**Állapot:** ✅ **kész — F1-től F9-ig** · **Verzió:** 3.8.06
 
 *(Terv és ütemterv: `docs/osszhang-rendszer-terv.md`. Érintett kód: a
 `BOND_*` konstansok, `bondKey/bondRaw/bondOf/bondSet/bondAdd/bondCapOf`,
@@ -38,7 +37,8 @@ egymást — idényekben mérhető, és csak akkor vész el, ha valaki elmegy.
 | **F6** ✅ | **összhangépítés** — a második menedzser-sáv az edzés mellett |
 | **F7** ✅ | **a Csapatkovács** végre azt csinálja, amiről a neve szól |
 | **kapitány** ✅ | az összhang a kapitányválasztás **negyede** — a kézi ajánlásban és az automatikus váltóban is |
-| F8 · F9 | az első keret saját képernyője, hangolás |
+| **F8** ✅ | **az induló elemzés képernyője** — a magvetés nem fut le némán |
+| **F9** ✅ | **hangolás tíz idényen**, fogalomtár-szócikk |
 
 ---
 
@@ -857,7 +857,119 @@ Enélkül a rangsor megváltozna, de a menedzser nem tudná, miért — az
 
 ---
 
+## 10k. F8 — az induló elemzés képernyője
+
+A magvetés eddig **némán** futott le a kémia-doboz „Rendben" gombjára: 55–378
+kapcsolat született, és a menedzser egyet sem látott belőlük. Márpedig ez az a
+pillanat, amikor a **keret megszületik** — és az első idény nehézségének a fele
+(a −1,5-es csapaterő-tag) itt dől el.
+
+**A kémia-doboz mostantól két lépcsős.** Először a klasszikus kémia-elemzés (ki
+kivel játszott, ki kivel feszült), utána az összhang induló képe. A kettő
+ugyanabból az adatból dolgozik, de mást mond: a kémia a **múltat**, az összhang
+a **kiindulási állapotot**. Egy képernyőre zsúfolva egyik sem érne el.
+
+```
+Összhang — a keret kiindulási állapota
+
+  A keret kiindulási állapota — 55 kapcsolat. Innentől minden közösen
+  lejátszott meccs épít rajta, és minden távozás visz el belőle.
+
+  Csapat-összhang: 46,8  (a beállt csapat referenciája 55)
+  Ez most −0,6 csapaterő. Egy frissen összeállt keret mindig innen indul.
+
+  A LEGERŐSEBB KÖTÉSEK
+  🤝 Bodnár & Komlósi   60  Összeszokott · az induló kémia
+  🤝 Mészáros & Rudolf  60  Összeszokott · az induló kémia
+  🤝 Szakály & Dombi    59  Összeszokott · az induló kémia
+
+  ⚡ Feszültség: Czvitkovics & Mészáros — köztük 40 fölé nem jut
+     az összhang, amíg a viszony áll.
+```
+
+**Legfeljebb öt kötés**, mert a 91 pár felsorolása nem információ, hanem zaj —
+és mindegyik mellett ott az **ok** (közös klub, nemzetiség vagy az induló
+kémia). A betöltés a helyes lépcsőre tér vissza: ha a magvetés már lefutott, a
+második képernyőt kapod, nem az elsőt.
+
+**Az induló kémia is közös múltnak számít** (ez az F8 igazi mechanikai
+kiegészítése). A `CHEM.goodPairs` nem csak a klubot és a nemzetiséget
+tartalmazza: benne van a **jóra fordult rivalizálás** és a **vezetői kötés**
+is (egy erős vezető felkarol valakit). Ezek pontosan olyan „már ismerjük
+egymást" viszonyok, mint a közös klub — a bejelentés is ezt kérte: az első
+keretnél nagyobb a hatása az induló kémiának.
+
+---
+
+## 10l. F9 — hangolás tíz idényen
+
+### A pad örökre a magvetett értéken ragadt
+
+A tízidényes mérés egy valódi hiányt talált. A kötés alapszabálya, hogy
+**közös pályán töltött percből** gyűlik — aki nem játszik, nem gyűjt. Ez
+helyes, de a tartalékok kötése így **soha nem mozdult**: tíz idény után is a
+kiinduló 8-10-en állt. A forgatás és a sérüléshullám aránytalanul drága lett
+volna.
+
+Az ellensúlyt a terv az összhangépítésre bízta (2.7), de az az F6-ban nem
+került bele. Most igen: **ami a sávodba esik, az az edzéspályán is épül** —
+`BOND_BENCH_RATE` = 35%-os ütemen, és **csak ott**. Ettől lesz a sáv valódi
+eszköz, nem díszlet: ez az egyetlen mód, hogy a padot bekösd a hálóba. Sáv
+nélkül a régi viselkedés marad, betűre.
+
+**Mérve** (ugyanaz a keret, 10 idény = 300 meccs, hat középhátvéd a padon):
+
+| összhangépítés | pad↔pad min | pad↔kezdő átlag | csapatszám |
+|---|---|---|---|
+| nincs sáv | **10** | 27,1 | 81,1 |
+| fő: védők egymás közt | **63** | 44,4 | 79,7 |
+
+A csapatszám cserébe 81,1-ről 79,7-re esik — a lassítás ára látszik.
+
+### A karrier íve VALÓDI keret-forgással
+
+Az F2-es mérés végig ugyanazzal a tizeneggyel futott. A valóság nem ilyen:
+idényenként egy kezdőt eladni és egy újat hozni teljesen más ívet ad.
+
+| idény | összhang | tag | mit vitt el az eladott |
+|---|---|---|---|
+| 0 | 25,5 | −1,50 | az induló elemzés (136 pár) |
+| 1 | 47,1 | −0,62 | P. Maldini (csapat-összh. 33) |
+| 3 | 57,0 | +0,16 | Platini (51) |
+| 5 | 59,4 | +0,34 | C. Ronaldo (52) |
+| 8 | 57,0 | +0,16 | Iniesta (57) |
+| 9 | 64,3 | +0,73 | *(nincs több eladás)* |
+| 10 | 66,9 | +0,93 | — |
+
+**A forgó keret 57–59 körül beáll**, és csak akkor kezd emelkedni, amikor
+abbahagyod az eladást. Az F2 méréséhez képest (80,1 / +1,96 a tizedik
+idényben) a különbség nagyjából **egy teljes OVR** — pontosan az a súly, amit
+a rendszer az igazolásoknak adni akart.
+
+### A plafon zárva maradt
+
+Tíz idény, 300 meccs, 136 kötés után **egyetlen pár sem érte el a 99-et** — a
+legmagasabb 84. A 88-as puha tető tartja magát, és a legfelső fokozathoz
+tényleg kell egy elkészült párkémia.
+
+### A kapitány-súly minden keretben 25%
+
+Három különböző kereten mérve (más személyiségekkel, más összhang-szórással) a
+tag súlya rendre **25%** volt — a többi tag szórása 29, 34 és 57 pont volt,
+tehát az arányosítás dolgozik. Egységes keretnél a tag helyesen elhalkul.
+
+### Fogalomtár
+
+Az összhang saját szócikket kapott (**Összhang**), ami egy helyen mondja el a
+teljes rendszert: mi a különbség a moráltól, hogyan ül a csapaterőre, mitől
+épül, mi a 88-as tető, a hét fokozat, az érkező nyolc meccse, a plafon, az
+edzés-sáv, a Csapatkovács és a kapitány-hatás.
+
+---
+
 ## 11. Ami még hátravan
 
-`F8` az első keret saját képernyője (ma a magvetés lefut, csak nincs hozzá
-összefoglaló) · `F9` hangolás tíz idényen.
+**Semmi — a rendszer kész.** Ami a tervből tudatosan kimaradt: az
+ellenfeleknek nincs saját összhangja (a nulla-középpontú tag ezt kiváltja, és
+a színlelt érték csak a közvetítés-szövegnek kellene), és a pályatérkép nem
+mutatja a padon ülőkkel meglévő kötéseket (azt a játékos lapja mondja el).
