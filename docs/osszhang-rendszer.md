@@ -1,6 +1,7 @@
 # Összhang — a modell
 
-**Állapot:** 🟡 **F1–F2 kész** — a szám épül ÉS hat a meccsre · **Verzió:** 3.8.01
+**Állapot:** 🟡 **F1–F2 kész** — a szám épül, hat a meccsre, és a nehézségi
+ajánlások is tudnak róla · **Verzió:** 3.8.02
 
 *(Terv és ütemterv: `docs/osszhang-rendszer-terv.md`. Érintett kód: a
 `BOND_*` konstansok, `bondKey/bondRaw/bondOf/bondSet/bondAdd/bondCapOf`,
@@ -29,7 +30,7 @@ egymást — idényekben mérhető, és csak akkor vész el, ha valaki elmegy.
 | | |
 |---|---|
 | **F1** ✅ | a modell: a kötések épülnek, mentődnek, mérhetők |
-| **F2** ✅ | a szám **hat**: nulla-középpontú tag a csapaterőben, és az összhang **átvette a morál „kémia" bemenetét** |
+| **F2** ✅ | a szám **hat**: nulla-középpontú tag a csapaterőben, az összhang **átvette a morál „kémia" bemenetét**, és bekerült a **meccs-erőbe** — így a nehézségi ajánlások is látják |
 | F3 · F3b · F4 · F5 · F6 · F7 · F8 | felület, kommentár, térkép, edzés-sáv, edző |
 
 Felület még alig van: a **csapaterő-sáv jelölése** és az Infó-fül
@@ -382,6 +383,86 @@ amivel kifutottál.
 | klasszikus mód | `bondOvrMod` = **0** — a rendszer nem létezik |
 | karrier, draft közben (nincs még elemzés) | `bondOvrMod` = **0**, a morál a **régi** `CHEM.total×1,2` ágon |
 | régi mentés, üres tárak | minden hívás lefut, hiba nélkül |
+
+---
+
+## 10c. A nehézség tud róla (3.8.02)
+
+### 10c.1 Egy sor a meccs-erőben
+
+A `hiddenMatchBonus()` a `buildMatchSnapshot` `ovr`-jének a **tükre**: ami ott
+tag, annak itt is tagnak kell lennie. Enélkül az auto szintkövetés és a
+nehézség-tanácsadó egy olyan csapatot mért volna, ami nem létezik — és a hiba
+pont a **rossz irányba** nőtt: a friss keret alá-, a tíz éve együtt játszó
+fölébecsülve.
+
+Ez az egyetlen sor teszi, hogy az **automatika**, a **kézi tanácsadó**, a
+`levelWarnState` és a **kihívás-kalibráció** mind ugyanazt az igazságot lássa.
+
+**Mérve** (92,4-es keret, „Kiegyensúlyozott" cél-sáv):
+
+| összhang | meccs-erő-bónusz | rés a 88-as mezőnyhöz | az automatika ajánlana |
+|---|---|---|---|
+| 25 | −3,23 | +0,7 | **85** |
+| 55 | −1,73 | +2,2 | 86 |
+| 70 | −0,56 | +3,3 | 87 |
+| 85 | +0,62 | +4,2 | **88** |
+
+Az érettebb csapat tehát erősebb mezőnyt kap — a rendszer nem hagyja, hogy a
+karrier magától könnyebbé váljon.
+
+### 10c.2 Az ajánlott kezdő mezőny lejjebb került
+
+Egy frissen összeállt keret 25 körüli összhanggal indul: a meccs-erőben −1,5,
+a morálon át további −0,3 — az **első idény nagyjából két rating-ponttal
+nehezebb**, mint a rendszer előtt volt. Az ajánlásnak ezt tükröznie kell,
+különben a „🎬 ajánlott" épp a legsérülékenyebb idényben hazudik.
+
+| | régi | **új** | miért |
+|---|---|---|---|
+| dinamikus · **kész klub** | 80 | **79** | az összhang-gödör |
+| dinamikus · **draft** | 84 | **82** | ott **kétszer** fizetsz: az összhang mellé a morál is alacsonyabban indul (a `computeMoraleTarget` +10-es `clubBonus`-a csak a kész klubnak jár) |
+| hagyományos (piramis) · ajánlott rés | +2 | **+3** | a mód is kész klubbal indul, tehát ugyanaz a gödör; a MÁSZÁS ígérete marad, csak nem indul kétszeres hátrányból |
+
+### 10c.3 A kézi csúszkának neve van
+
+A csúszka eddig a **liga** nevét mondta ki („84 · NB I"). Az megmondja, milyen
+szintű a mezőny — de nem azt, hogy **neked** milyen lesz ott a szezon. Egy
+84-es mezőny egy 78-as kerettel reménytelen, egy 92-essel sétagalopp; a
+csúszkán mindkettő ugyanazt a feliratot kapta.
+
+A név a **résből** jön (meccs-erő − mezőny), tehát az összhangot is
+tartalmazza. A szavak szándékosan ugyanazok, amiket az auto szintkövetés
+cél-sávjai használnak — **egy szótár, két helyen**. Ugyanez a függvény adja a
+csúszka alatti tippsort is, ami korábban egy külön, ötfokú listából dolgozott
+és el tudott csúszni tőle.
+
+| rés | név |
+|---|---|
+| ≥ +7,5 | Sétagalopp |
+| +6,5 | Megengedő |
+| +5,5 | Kényelmes |
+| +4,5 | Magabiztos |
+| +3,0 | **Kiegyensúlyozott** |
+| +1,5 | Kihívást jelent |
+| 0,0 | Szigorú |
+| −2,0 | Kemény |
+| −5,0 | Kegyetlen |
+| alatta | Reménytelen |
+
+**Mérve** (92,4-es kerettel): 76 → Sétagalopp · 84 → Magabiztos · 86 →
+Kihívást jelent · 88 → Szigorú · 90 → Kemény · 92 → Kegyetlen · 94-től
+Reménytelen.
+
+### 10c.4 Egy hiba, amit a mérés fogott meg
+
+A `diffSliderLabel` a beállító képernyő **induló feliratát** is írja, tehát
+**betöltés közben lefut** — a `gameMode` viszont a fájl legvégén deklarált
+`let`. Az első változat őrizetlenül olvasta, és ezzel `ReferenceError`-ral
+**megállította az egész szkriptet**: a lap üresen jött be. Sem a `node --check`,
+sem az `eslint no-undef` nem fogja meg az ilyet; a fejetlen böngésző igen.
+A javítás a kódbázis bevált mintája (`try/catch`, mert a `typeof` nem véd a
+holt zónában).
 
 ---
 
