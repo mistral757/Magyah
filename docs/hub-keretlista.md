@@ -119,6 +119,12 @@ várakozás volt annak, aki tényleg húzni akart. A „betöltés" animációja
 gyorsul vele: a `--hubArmMs` CSS-változót a `HUBDRAG_HOLD_MS` állítja be, tehát
 egy helyen kellett átírni.
 
+**A BÖNGÉSZŐ SZÖVEGKIJELÖLÉSE KI VAN KAPCSOLVA (3.7.40).** A fél másodperces
+nyomás pontosan az az idő, amikor a mobil böngésző a saját kijelölését is
+elindítja — és amint kijelölésbe kezd, elveszi a pointer-eseményeket: a húzás
+félbemarad. A `body`-ra tett `user-select:none` és `-webkit-touch-callout:none`
+ezt zárja ki az egész játékban; részletek: `docs/vissza-gomb-es-kijeloles.md`.
+
 **8 px-nél nagyobb elmozdulás a nyomás alatt = görgetni akarsz**
 (`HUBDRAG_SLOP`): az időzítő elszáll, a lista a szokott módon görög. A **gyors
 koppintás változatlan**: a részletpanel ugyanúgy nyílik.

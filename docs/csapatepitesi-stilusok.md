@@ -1901,6 +1901,39 @@ amennyit elkölthet.
 
 ---
 
+### 4.3c A műhely-képességek: a stábtag munkája is erősödik (3.7.39)
+
+**A bejelentés:** *„a csapatstílus-képességeknél a stábtag erősítése ne csak a
+tapasztalatgyűjtésre, hanem a hatékonyságra is hasson. Jelenleg az az egyetlen
+képesség, amit sose szoktam megvenni."*
+
+Hét stílusnak van „műhely"-képessége, és mind ugyanazt csinálta: plusz
+tapasztalatot adott a stílushoz illő edzőtípusoknak (`coachXp`). Ez **csak
+idővel fizetett, és ott is csak közvetve** — a plusz XP-ből szezononként pár
+Szakértelem-pont lesz, az pedig a `0,35+0,65q` görbén alig mozdítja a tényleges
+hatást; ráadásul a felső határ (`coachSzCap`) ettől nem tágul, tehát a
+gyorsítás nem visz magasabbra, csak **hamarabb ugyanoda**.
+
+Mostantól ugyanaz a szint a **mostani** stábtag munkáját is felerősíti:
+**×1,20 / ×1,32 / ×1,45** mindenre, amit az a típus csinál. Az első szint tehát
+azonnal fizet.
+
+| stílus | képesség | mely edzőtípusokra |
+|---|---|---|
+| 🧱 Beton | Bástya-műhely | Bástya · Kesztyűs mester |
+| ⚽ Bombázók | Gólvágó-műhely | Gólvágó-mentor |
+| ☯️ Harmónia | Egyenletes edzés | Csapatkovács · Lélekemelő |
+| ⭐ Sztárom a párom | Reflektorfény *(II. sáv)* | Gólvágó-mentor · Játékmester |
+| ⚡ Villám | Sprintmester-műhely | Sprintmester |
+| 🛡️ Panzer | Kőkemény iskola | Bástya · Gólvágó-mentor |
+| 🌀 Tiki-Taka | Passzmester-műhely | Játékmester |
+
+A részletes levezetés, a mérés és a szerkezeti indoklás (miért került a
+minőség-tag három példányból egyetlen `coachQual`-ba):
+`docs/szemelyi-edzo-rendszer.md` **10b**.
+
+---
+
 ### 4.3b Az ember is számít — a szerepek attribútum-szorzója (3.7.31)
 
 *(Érintett kód: `ROLE_ATTR_OF`, `ROLE_ATTR_SLOPE` / `_MIN` / `_MAX`,

@@ -1,7 +1,10 @@
 # Meccsenkénti statisztika és játékos-értékelés
 
 *(3.7.26 — a statisztika-réteg ELSŐ lépcsője; 3.7.27 — a négy befolyás;
-3.7.33 — a rövid beállás. Az utóbbihoz: `MSTAT_MIN_MIN`, `MSTAT_OUT_FLOOR`,
+3.7.33 — a rövid beállás; 3.7.41 — a szöveges, tizennégy fokozatú értékelés
+(`MSTAT_GRADES`, `MSTAT_MAX`, `mstatGradeIdx` / `mstatGrade` / `mstatGradeHtml`,
+`mstatUnratable`, `MSTAT_EARLY_RED`, `MSTAT_ROUT_GA`, `MSTAT_SHOUT_IDX`, a
+`.msGr` CSS és a `redMin` a sorokban). Az utóbbihoz: `MSTAT_MIN_MIN`, `MSTAT_OUT_FLOOR`,
 `MSTAT_PULL_FLOOR`, `mstatMinutes` / `mstatRated` / `mstatMinW`,
 `pstatRatedOf`, a `.msSt0` CSS.
 Érintett kód: `mstatCompute`, `mstatRate`, `mstatMods`, `mstatSkillCh`,
@@ -334,6 +337,151 @@ labdabirtoklásba, a passzpontosságba és minden értékelésbe. A csatornák e
 egy explicit `mstatFin` szűrőn mennek át: **a statisztika sosem mondhat
 „NaN%"-ot**, akkor sem, ha egy régi mentés vagy egy félbemaradt fázis-könyvelés
 sérült példányt hagyott hátra.
+
+## Szöveges értékelés — tizennégy fokozat (3.7.41)
+
+**A bejelentés:** *„unalmas, lapos a meccsértékelési rendszer, ezzel a 7,0
+csillagos maximummal. Nincsenek kiemelkedő eredmények stb. Legyen inkább
+szöveges az értékelés, az sokkal hangulatosabb."*
+
+### Két baj volt, és a második a súlyosabb
+
+1. **A csillagsor mindig ugyanúgy nézett ki.** Hét csillag, fél lépésekben — egy
+   jó meccs 5,5, egy remek 6,0. Az emlékezetes és a jó között alig volt
+   különbség, mert nem volt **szava** rá.
+
+2. **A plafon levágta a csúcsot.** A régi képlet 7-re vágott
+   (`clamp(…,0,MSTAT_STARS)`). Egy mesterhármas 3,5 + 3,0 = **6,5**-nél járt, egy
+   **mesterhatos** 3,5 + 6,0 = **9,5**-nél — de mindkettő **7,0**-t kapott. A
+   játék szó szerint nem tudta megkülönböztetni valaki élete meccsét egy jó
+   napjától. Ez a „nincsenek kiemelkedő eredmények" valódi oka: nem a skála volt
+   rossz, hanem **hiányzott a teteje**.
+
+### A szám megmarad — de belső valutának
+
+A forma-rendszer mércéje (`pformBaseline`, `pformRecent`), a meccs-történet
+(`pstatPush`) és a rangsor mind a számból dolgozik, és az jól kalibrált. Kifelé
+viszont már nem szám, hanem **mondat**. Két dolog változott a képletben:
+
+* a **plafon 7 → 12** (`MSTAT_MAX`), tehát a csúcs elfér;
+* a **fél lépésekre kerekítés megszűnik** — 0,05-ös rács. A fél lépés a
+  csillagsor kényszere volt (finomabbat nem lehetett rajzolni), és pontosan azt
+  a felbontást vitte el, amitől egyetlen labdaszerzés is számít: **0,10 egy
+  0,5-ös rácson nulla**.
+
+### A tizennégy fokozat és a horgonyai
+
+| # | fokozat | ettől | mi ér ide |
+|--:|---|--:|---|
+| 0 | **minősíthetetlen** | külön ítélet | lásd lent |
+| 1 | pocsék | 1,30 | kései piros lap · 5 kapott gól 2 labdaszerzéssel |
+| 2 | lagymatag | 2,10 | |
+| 3 | szenvedős | 2,70 | |
+| 4 | **mid** | 3,30 | **a puszta alap — semmilyen teljesítmény (3,50)** |
+| 5 | **volt már rosszabb** | 3,55 | **egy labdaszerzés, a Rating rendben (3,60)** |
+| 6 | elfogadható | 4,00 | védő tiszta lappal |
+| 7 | jó | 4,50 | egy gól |
+| 8 | nagyon jó | 5,20 | gól + a meccs embere · kapus tiszta lappal, 5 védéssel |
+| 9 | kiemelkedő | 5,90 | |
+| 10 | **rendkívüli** | 6,70 | **a MESTERHÁRMAS szintje (6,75)** |
+| 11 | fergeteges | 7,70 | 4 gól |
+| 12 | tökéletes | 8,70 | 5 gól |
+| 13 | **felfoghatatlan!** | 9,70 | **a mesterhatos fölött (10,25)** |
+
+A négy vastag sor a bejelentés horgonya, betűre. A csúcson ezért **minden
+további gól pontosan egy fokozatot lép**: 3 gól rendkívüli, 4 fergeteges,
+5 tökéletes, 6 felfoghatatlan.
+
+### A „minősíthetetlen" nem a skála alja, hanem külön ítélet
+
+A bejelentés is így fogalmaz. Két kapuja van (`mstatUnratable`), és mindkettő
+szándékosan ritka:
+
+* **nagyon korai kiállítás** — `redMin ≤ 25`: a csapatot a mérkőzés nagyobbik
+  felére hagyta emberhátrányban;
+* **öt kapott gól a hátsó sorból, minden más teljesítmény nélkül** — se gól, se
+  gólpassz, se védés, se labdaszerzés, és nem ő a meccs embere. A feltétel
+  **literális** („0 egyéb teljesítmény nélkül"): egy kapus négy védéssel
+  csinált valamit, akkor is, ha ötöt kapott.
+
+Ehhez kellett a **kiállítás perce** is: a `_rowOf` mostantól viszi (`redMin`), a
+motor mind a három piroslap-ágán feljegyezzük.
+
+### Két képlet-változás a szélekért
+
+**A piros lap a percével súlyoz.** A régi fix −2,5 a 12. és a 88. perces
+kiállítást ugyanoda tette — emiatt a „minősíthetetlen" egy hajrá-lapért is
+kijött. Mostantól `−(1,4 + 1,6 · (1 − perc/90))`: a 12. percnél −2,79, a
+80.-nál −1,58. Ismeretlen perc (régi mentés, párharc-lista) = a mérkőzés
+közepe.
+
+**A kapott gól a hátsó soré.** A régi büntetés 1,0-nál megállt, és a **védőket
+egyáltalán nem érintette**: egy 6-0-s kiütés után a hátsó sor „szenvedős"
+körül landolt, mintha csak rossz napja lett volna. A görbe most meredekebb a
+harmadik kapott gól fölött — két gólt bárki kaphat, ötöt nem lehet nem
+észrevenni —, és a kapusé a nagyobb teher: az ő posztja maga a kapott gól.
+
+### A kiemelkedő este hangot is kap
+
+A közvetítés eddig a **tetteket** mondta el (gól, mesterhármas), az **ítéletet**
+viszont csak egy ablak írta ki, amit be lehet zárni olvasatlanul. A felső három
+fokozat ezért a naplóba is bekerül (`MSTAT_SHOUT_IDX = 10`, a mesterhármas
+szintje) — azt a mondatot a szezon végén is vissza lehet olvasni. Az alatta
+lévő fokozatokat nem hirdetjük ki: attól lenne olcsó, ami most ünnep.
+
+### A címke színe a témából jön
+
+Az első változat világos betűszíneket használt (`#b6e8ac`, `#ffe09a`) — azok a
+**sötét** témán szépek, a **világoson olvashatatlanok** voltak. A végleges
+ramp csupa `color-mix(… var(--red) / var(--grass) / var(--gold) …)`: tinta-
+háttér + accent-betű, ahogy a játék többi felülete is csinálja. A két legfelső
+fokozat megfordítja a párost (arany háttér, `var(--bg)` betű) — azok az esték
+kiugranak a listából, és a fordítás mind a három témán kontrasztos (sötét,
+`paper`, `noir`).
+
+### Mérés
+
+**A horgonyok** (semleges kontextus, 90 perc):
+
+| helyzet | érték | fokozat |
+|---|--:|---|
+| semmi (alap) | 3,50 | mid |
+| 1 labdaszerzés | 3,60 | volt már rosszabb |
+| 1 gól | 4,50 | jó |
+| mesterhármas, győzelem | 6,75 | **rendkívüli** |
+| 4 gól + meccs embere | 8,25 | fergeteges |
+| 5 gól + meccs embere | 9,25 | tökéletes |
+| **mesterhatos + meccs embere** | 10,25 | **felfoghatatlan!** |
+| kapus: tiszta lap, 5 védés | 5,65 | nagyon jó |
+| kapus: 5 kapott, 3 védés | 1,90 | pocsék |
+| kapus: 5 kapott, 0 védés | 1,25 | **minősíthetetlen** |
+| védő: 5 kapott, semmi | 1,25 | **minősíthetetlen** |
+| védő: 5 kapott, 2 labdaszerzés | 1,90 | pocsék |
+| korai piros (12. perc) | 0,45 | **minősíthetetlen** |
+| kései piros (80. perc) | 1,65 | pocsék |
+
+**Az eloszlás** (400 szimulált mérkőzés, 4400 értékelt sor, 0-3 gólos
+eredményekkel, piros lap és kiütés nélkül — a széleket ezért nem éri el):
+
+```
+lagymatag            1,6%  █
+szenvedős           16,3%  ██████████████
+mid                 13,3%  ███████████
+volt már rosszabb   27,0%  ███████████████████████
+elfogadható         20,6%  █████████████████
+jó                  13,9%  ████████████
+nagyon jó            5,2%  ████
+kiemelkedő           1,6%  █
+rendkívüli           0,4%
+fergeteges           0,03%
+```
+
+Átlag 3,95, a mért szélek 2,20 és 7,90. A tömeg a középmezőnyben ül, a csúcs
+pedig **tényleg ritka** — pontosan az, ami eddig hiányzott. (A szimuláció
+karrier-pool nélkül futott, tehát a taktika-, stílus- és poszt-illeszkedési
+tételek nullák voltak: valódi karrierben a szórás ennél szélesebb.)
+
+---
 
 ## Ami a következő lépcsőkre marad
 

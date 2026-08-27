@@ -1,7 +1,10 @@
 # Két csapaterő, egy meccs — és a 6-1
 
 *(3.3.38. Érintett kód: `teamStrength` / `teamOVRbase` / `buildMatchSnapshot` /
-`matchLambdas` / `h2hSimulate`, `h2hWireSnapshot`.)*
+`matchLambdas` / `h2hSimulate`, `h2hWireSnapshot`.
+3.7.42 — az AKTUÁLIS csapaterő: `MATCH_XI`, `liveXI`, `teamStrengthNow`,
+`teamStrengthNote`, `updateStrengthBar`, a `#teamOVRNote` és a bekötések a
+`playMatch` kezdőrúgás-, vödör- és lefújás-pontjain. Lásd a 7. szakaszt.)*
 
 Ez a dokumentum egy konkrét bejelentésre született: **„magasabb nyers erővel
 kaptam ki 6-1-re otthon a párharcon."** A vizsgálat három dolgot talált —
@@ -178,6 +181,105 @@ A tábla **változatlan névsorral** mér, és ezt ki is mondja: a váltás a ke
 nagyobbat, mint maga az alak, csak az már nem a felállás ára, hanem a kereté.
 A panel a nagyságrendet is kiírja, hogy senki ne a felállást hibáztassa egy
 begyakorlatlan taktika helyett.
+
+## 7. Az AKTUÁLIS csapaterő — a pályán lévő tizenegy (3.7.42)
+
+**A bejelentés:** *„az aktuális csapaterő folyamatosan frissüljön meccs közben
+is + meccs elején számítsa bele a kiállítás vagy sérülés miatt behozott
+cserejátékost, és úgy mutassa az aktuális csapaterőt."*
+
+### Mi volt a baj
+
+A `teamStrength()` a **felállást** méri: a `slots` tizenegyét. Ez a
+felállás-nézeten és a gazdaságban a helyes szám — a pályára viszont nem mindig
+az a tizenegy lép ki:
+
+* **Meccs előtt** az eltiltott/sérült kezdőt a hiányzó-panel **pótolja**
+  (`S.subs[idx]`). A motor ezt már tudta — a `buildMatchSnapshot` innen építi az
+  `active` tömböt —, a **kijelzett szám** viszont továbbra is a hiányzó emberrel
+  számolt: a csapaterő azt mutatta, amivel **nem** játszol.
+* **Meccs közben** cserélsz, kiállítanak valakit, beáll a buszsofőr — a szám
+  viszont a kezdőrúgáskori állapoton ragadt.
+
+### Egy forrás, három állapot
+
+A `liveXI()` mondja meg, ki van **most** a pályán:
+
+| állapot | forrás |
+|---|---|
+| fut a mérkőzés | a motor saját `active` tömbje (`MATCH_XI`) |
+| meccs előtt, kényszerű cserével | `slots` + `S.subs` |
+| egyébként | `slots` |
+
+A futó mérkőzés **nem másolatot ad át**, hanem egy függvényt a saját
+állapotára — így a kijelző nem tud elavulni: a félidei és a tervezett cserék, a
+buszsofőr és a kiállítás mind ugyanabban az `active` tömbben látszanak.
+
+**A `teamStrength()` maga változatlan.** A büdzsé, a kupamezőny, a párharc
+hangolása és a közös kupa nevezése mind belőle dolgozik — azoknak a **felállás**
+ereje kell, nem az, hogy a 73. percben épp ki van a pályán.
+
+### A kiállított ember nem eshet ki „ingyen" az átlagból
+
+Ha egyszerűen kihagynánk, a **leggyengébb** ember kiállítása **megemelné** a
+csapaterőt — ami nyilván hazugság. A hiányzó helyéért ezért a motor saját
+emberhátrány-tételét vonjuk le (`SIM.REDMATCH` = 2,5), pontosan úgy, ahogy a
+párharc pillanatképe is teszi (`H.ovr − SIM.REDMATCH`).
+
+**A buszsofőr kimarad az átlagból:** ő nem személy, nincs Ratingje, és a
+csapaterőt a motorban sem mozdítja — a busz ára a gólesélyben van, nem itt.
+
+### Mit ír a szám mellé
+
+A jelölés (`teamStrengthNote`) megmondja, **miért** nem a felállás ereje
+látszik: `10 emberrel` · `1 kényszercserével` · `busszal`. Ha a pályán pontosan
+a betervezett tizenegy van, a jelölés üres.
+
+### Mikor frissül
+
+* **a hiányzó-réteg felépülése után** (`buildMatchSubs`), tehát még a
+  kezdőrúgás előtt;
+* **minden öt perces vödör végén** — ott már minden gól, csere és lap könyvelve
+  van. **Auto módban kimarad:** ott a mérkőzés 18 ms-os ütemben pereg, és senki
+  nem nézi a sávot;
+* **a csereszünet bezárásakor**, hogy a csere azonnal látszódjon, ne csak a
+  következő vödörnél;
+* **lefújáskor**, amikor az élő tizenegy elengedi a kijelzőt.
+
+Külön, olcsó frissítő (`updateStrengthBar`) csinálja, nem a teljes
+`updateBar()`: a taktika-sáv, az oldalváltó és a pályakép-szinkron ehhez sok
+volna tizennyolcszor egy meccsen — és nem is változik közben semmi belőlük.
+
+### Mérés
+
+Tizenegy 80-as játékos (a bal hátvéd 60-as), `SIM.REDMATCH` = 2,5:
+
+| lépés | aktuális erő | felállás | jelölés |
+|---|--:|--:|---|
+| alap | 78,18 | 78,18 | — |
+| kényszercsere (60 → 90) | **80,91** | 78,18 | 1 kényszercserével |
+| kezdőrúgás (élő XI) | 78,18 | 78,18 | — |
+| csere közben (60 → 95) | **81,36** | 78,18 | — |
+| kiállítás | **79,00** | 78,18 | 10 emberrel |
+| + buszsofőr | 79,17 | 78,18 | 10 emberrel · busszal |
+| lefújás után | 78,18 | 78,18 | — |
+
+A kiállításnál a szám **esik** (81,36 → 79,00), pedig egy átlagos képességű
+ember ment le: a 2,5-ös emberhátrány-tétel pontosan ezt biztosítja.
+
+### Ami kimarad, és miért
+
+**Fekvő (stadion) módban a sáv nem látszik** — a `body.stadium>section:not(#scSim)`
+szabály az egész pályakép-szekciót elrejti, hogy a mérkőzés teljes képernyőt
+kapjon. Az eredményjelzőnek sorozatonként külön hangolt színsémái vannak
+(`#sbBoard.comp-*`), ezért oda most nem tettünk új elemet.
+
+**A meccsnapi véletlen kimarad a számból.** A ±`SIM.FORM` (a napi csúcsformájú
+és a labdát nem érző ember) és a `pformMult` a szimulációban ott van, a
+kijelzőn nem — ugyanaz a döntés, ami a `teamStrength()`-nél is áll: a sáv a
+csapat **tartós** erejét mutatja, nem a mai kockadobást.
+
+---
 
 ## 6. Mit nézz meg legközelebb
 
