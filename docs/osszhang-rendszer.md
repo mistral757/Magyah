@@ -1,7 +1,8 @@
 # Összhang — a modell
 
-**Állapot:** 🟡 **F1–F2 kész** — a szám épül, hat a meccsre, és a nehézségi
-ajánlások is tudnak róla · **Verzió:** 3.8.02
+**Állapot:** 🟡 **F1–F3 kész** — a szám épül, hat a meccsre, a nehézségi
+ajánlások tudnak róla, és a döntések pillanatában meg is szólal ·
+**Verzió:** 3.8.03
 
 *(Terv és ütemterv: `docs/osszhang-rendszer-terv.md`. Érintett kód: a
 `BOND_*` konstansok, `bondKey/bondRaw/bondOf/bondSet/bondAdd/bondCapOf`,
@@ -31,10 +32,8 @@ egymást — idényekben mérhető, és csak akkor vész el, ha valaki elmegy.
 |---|---|
 | **F1** ✅ | a modell: a kötések épülnek, mentődnek, mérhetők |
 | **F2** ✅ | a szám **hat**: nulla-középpontú tag a csapaterőben, az összhang **átvette a morál „kémia" bemenetét**, és bekerült a **meccs-erőbe** — így a nehézségi ajánlások is látják |
-| F3 · F3b · F4 · F5 · F6 · F7 · F8 | felület, kommentár, térkép, edzés-sáv, edző |
-
-Felület még alig van: a **csapaterő-sáv jelölése** és az Infó-fül
-**Csapat-összhang** sora mondja ki a számot, a részletek a diagnosztikában.
+| **F3** ✅ | **megszólal a döntéseknél**: eladási és vásárlási megerősítő, beilleszkedés a keretlistán és a játékos lapján, meccs utáni jelentés (ez hozta az **F5** magját is) |
+| F3b · F4 · F6 · F7 · F8 | kommentár, pályatérkép, edzés-sáv, edző, első keret képernyője |
 
 ---
 
@@ -466,9 +465,109 @@ holt zónában).
 
 ---
 
+## 10d. F3 — amit a menedzser lát
+
+A rendszer bejelentett célja — *„komolyabb súlyt adna az új igazolásoknak"* —
+pontosan itt teljesül vagy bukik: ha a szám számol, de a **döntés
+pillanatában** nem szólal meg, akkor a menedzser továbbra is csak Ratinget és
+árat lát.
+
+### 10d.1 A hét fokozat
+
+Ugyanaz a skála, amit majd az F4 pályatérképe rajzol — itt még csak szóban.
+Egy szótár, több felület.
+
+| érték | név |
+|---|---|
+| 92+ | Elválaszthatatlan |
+| 78+ | Vakon megtalálják |
+| 63+ | Erős kötés |
+| 47+ | Összeszokott ← az „erős" küszöb |
+| 30+ | Ismerik egymást |
+| 15+ | Épülőben |
+| alatta | Idegenek |
+
+### 10d.2 Eladáskor: mi vész el vele
+
+A megerősítő eddig annyit mondott, hogy *„a felépített kémiája is elvész"* —
+szám nélkül. Márpedig egy tíz éve itt játszó ember eladása pont attól fáj,
+hogy a kötései **nem költöznek vele**: a vevő a Ratinget kapja meg, te a
+kapcsolatokat veszíted.
+
+```
+🤝 Az összhangja itt marad — nélküle. Csapat-összhangja 73,7,
+   ebből 10 erős kötés szűnik meg.
+   A legerősebbek: P. Maldini 77 · Lahm 76 · Platini 76
+   A kötés két EMBER között van: az utódnak nulláról kell felépítenie,
+   és nyolc meccsig ideiglenes értéken áll.
+```
+
+Aki még beilleszkedik, arról ezt **nem** írjuk ki — nála nincs mit elveszíteni,
+és a panel ezt ki is mondja.
+
+### 10d.3 Vásárláskor: mennyit esik a csapatszám
+
+A becslés **őszinte**: kiszámoljuk, mi lenne a csapatszám, ha a jövevény
+belépne a tizenegybe. A cserélt ember a **leggyengébb összhangú** kezdő — ez a
+legkedvezőbb eset, tehát a becslés nem ijesztget.
+
+```
+🤝 Beilleszkedés: az első 8 meccsén mindenkivel ideiglenes 15-ös összhangon
+   áll. Ha Jasin helyére áll be, a csapat-összhang 73,7 → 64,9
+   (−8,8, csapaterőben −0,69). Utána 50-ig gyorsítva zárkózik fel.
+```
+
+### 10d.4 A beilleszkedés folyamata — jelzés a 4. meccstől
+
+A nyolcadik meccs egy **szakadék**: 15-ről lehet 4-re esni. Ha a menedzser
+semmit nem lát belőle előre, az nem leleplezés, hanem csapás.
+
+**Az irány nem sorsolás:** a játékos addigi teljesítményéből (gól, gólpassz,
+együttműködés) olvassuk — amit a jelzés ígér, azt a leleplezés tartja is.
+
+```
+1–3. meccs : 🤝 beilleszkedés 0/8 … 2/8          (még nincs mit mondani)
+4–8. meccs : 🤝 beilleszkedés 4/8 · gyorsan érzi a helyét
+```
+
+Négy fokozat: *gyorsan érzi a helyét* · *kezd beilleszkedni* · *még keresi a
+helyét* · *nehezen szokik*. A jelzés a **keretlistán** ott van a forma alatt —
+ott dől el a felállítás, ott kell látni, kiről nem tudod még, mit ér a pályán
+túl.
+
+### 10d.5 A meccs utáni jelentés
+
+A nyolcadik meccs a rendszer egyik legfontosabb pillanata. Némán elintézni
+pont azt a súlyt venné el tőle, amiért az egész készült.
+
+```
+🤝 Pelé beilleszkedett — nyolc meccs után megvannak az összhang-értékei
+   (átlag 21).
+→ Legerősebb kötései: Maradona 28 · Xavi 26 · P. Maldini 24.
+→ Innentől 50-ig gyorsítva zárkózik fel a kerethez.
+```
+
+Ha valakivel **hazatalált** (közös klubmúlt), azt a sor külön kimondja.
+
+### 10d.6 A játékos lapja (az F5 magja)
+
+A **Kémia fölé** került, mert az a szűkebb fogalom: a párkémia egy-egy
+választott páros, az összhang az **egész öltözőhöz** való viszonya.
+
+Két állapot, két mondanivaló. Aki még beilleszkedik, arról a **folyamat** a
+hír (hányadik meccs, mit ígér a trend). Aki beállt, annál a **csapat-összhangja
+és a három legerősebb kötése**, fokozat-névvel:
+
+```
+Csapat-összhangja: 68,4  (a keret egészéhez mérve · a csapat referenciája 55)
+Legerősebb kötései: P. Maldini 78 (Vakon megtalálják) · Platini 77 (Erős kötés)
+                    · Xavi 77 (Erős kötés)
+```
+
+---
+
 ## 11. Ami még hátravan
 
-`F3` a beilleszkedés felülete és az eladási
-kiírás · `F3b` **kommentárok és meccs utáni üzenetek** · `F4` az
+`F3b` **kommentárok és meccs utáni üzenetek** · `F4` az
 összhangtérkép · `F5` a játékoslap · `F6` az összhangépítés edzés-sáv ·
 `F7` az összhang-edző · `F8` az első keret képernyője · `F9` hangolás.

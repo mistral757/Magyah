@@ -4777,7 +4777,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.02";
+const APP_VERSION="3.8.03";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -32253,7 +32253,23 @@ function bondMatchTick(names,posOf,ctx){
     if(!rec)return;
     rec.m=(rec.m||0)+1;
     if(rec.m>=BOND_NEW_MATCHES)revealed.push(n);});
-  revealed.forEach(n=>bondRevealNew(n));
+  /* ---- A BEILLESZKEDÉSI JELENTÉS (F3) ----
+     A nyolcadik meccs a rendszer egyik legfontosabb pillanata: itt derül ki,
+     mennyit ért az igazolás a pályán TÚL is. Némán elintézni pont azt a súlyt
+     venné el tőle, amiért az egész rendszer készült. */
+  revealed.forEach(n=>{
+    const res=bondRevealNew(n);
+    if(!res||!res.length)return;
+    try{
+      const top=res.slice(0,3).filter(x=>x.v>0)
+        .map(x=>`${esc(shortName(x.n))} <b>${x.v}</b>`).join(" · ");
+      const avg=Math.round(res.reduce((a,x)=>a+x.v,0)/res.length);
+      const home=res[0]&&res[0].v>=BOND_NEW_SCALE+3;
+      addLine(`🤝 <b>${esc(shortName(n))} beilleszkedett</b> — nyolc meccs után megvannak az összhang-értékei`
+        +` (átlag <b>${avg}</b>${home?`, és ${esc(shortName(res[0].n))}-val <b>hazatalált</b>`:""}).`
+        +(top?`<br>→ Legerősebb kötései: ${top}.`:"")
+        +`<br>→ Innentől <b>50-ig gyorsítva</b> zárkózik fel a kerethez.`,"m life");
+    }catch(e){}});
   /* A felzárkózás lekapcsolása, ha a legkisebb kötése is átlépte az 50-et —
      így a jelző nem ragad örökre egy tíz éve itt játszó emberen. */
   if(S.bondFast)Object.keys(S.bondFast).forEach(n=>{
@@ -32422,6 +32438,154 @@ function playerBond(name){
   const vals=all.map(n=>({n,v:bondOf(name,n)}));
   const team=Math.round(vals.reduce((s,x)=>s+x.v,0)/vals.length*10)/10;
   return {team,top:vals.slice().sort((a,b)=>b.v-a.v).slice(0,3)};}
+/* ================= F3 — AMIT A MENEDZSER LÁT (3.8.03) ====================
+   Az F1 a modell, az F2 a hatás. Ez a fázis az, ami MEGMONDJA. A rendszer
+   bejelentett célja — „komolyabb súlyt adna az új igazolásoknak" — pontosan
+   itt teljesül vagy bukik: ha a szám számol, de a döntés pillanatában nem
+   szólal meg, akkor a menedzser továbbra is csak Ratinget és árat lát. */
+
+/* A kötés hét fokozata. Ugyanaz a skála, amit az F4 pályatérképe rajzol majd —
+   itt még csak szóban. Egy szótár, több felület. */
+const BOND_TIERS=[
+  [92,"Elválaszthatatlan","gold"],
+  [78,"Vakon megtalálják","gold"],
+  [63,"Erős kötés","grass"],
+  [47,"Összeszokott","grass"],
+  [30,"Ismerik egymást","dim"],
+  [15,"Épülőben","dim"]];
+function bondTierName(v){
+  for(let i=0;i<BOND_TIERS.length;i++)if(v>=BOND_TIERS[i][0])return BOND_TIERS[i][1];
+  return "Idegenek";}
+function bondTierTone(v){
+  for(let i=0;i<BOND_TIERS.length;i++)if(v>=BOND_TIERS[i][0])return BOND_TIERS[i][2];
+  return "dim";}
+/* Az „erős" küszöb: innen számít egy kötés említésre méltónak (eladásnál
+   veszteségnek, meccs után hírnek). A 4. fokozat alja. */
+const BOND_STRONG=47;
+
+/* ---- ELADÁSKOR: MI VÉSZ EL VELE ----
+   A megerősítő eddig annyit mondott, hogy „a felépített kémiája is elvész" —
+   szám nélkül. Márpedig egy tíz éve itt játszó ember eladása pont attól fáj,
+   hogy a kötései nem költöznek vele: a vevő a Ratinget kapja meg, te a
+   kapcsolatokat veszíted. */
+function bondLossHtml(name){
+  if(gameMode!=="career"||!S||!S.bondsSeeded||!name)return "";
+  if(bondIntegrating(name))
+    return `<div style="font-size:12.5px;margin-top:7px;line-height:1.5;color:var(--dim2)">
+      🤝 Még be sem illeszkedett (${(S.bondNew[name].m||0)}/${BOND_NEW_MATCHES} meccs) — összhang-kötése még nincs, amit elveszíthetnél.</div>`;
+  const pb=playerBond(name);
+  const strong=bondRosterNames().filter(o=>o!==name&&bondRaw(name,o)>=BOND_STRONG).length;
+  if(!pb.top.length)return "";
+  const list=pb.top.filter(x=>x.v>0).map(x=>
+    `${esc(shortName(x.n))} <b style="color:var(--${bondTierTone(x.v)})">${x.v}</b>`).join(" · ");
+  return `<div style="font-size:12.5px;margin-top:7px;line-height:1.5;padding:7px 9px;border-radius:7px;
+      background:color-mix(in srgb,var(--red) 10%,transparent)">
+    🤝 <b>Az összhangja itt marad — nélküle.</b> Csapat-összhangja <b>${String(pb.team).replace(".",",")}</b>${
+      strong?`, ebből <b>${strong}</b> erős kötés szűnik meg`:""}.
+    ${list?`<br><span style="color:var(--dim2)">A legerősebbek:</span> ${list}`:""}
+    <br><span style="color:var(--dim2)">A kötés két EMBER között van: az utódnak nulláról kell felépítenie, és nyolc meccsig ideiglenes értéken áll.</span></div>`;}
+
+/* ---- VÁSÁRLÁSKOR: MENNYIT ESIK A CSAPATSZÁM ----
+   Az érkező nyolc meccsen át BOND_NEW_PROV-on áll mindenkivel, ami egy beállt
+   keretben jóval az átlag alatt van. Ez nem mellékhatás, hanem a rendszer
+   lényege — de csak akkor, ha a döntés PILLANATÁBAN ott van a képernyőn.
+   A becslés ŐSZINTE: kiszámoljuk, mi lenne a csapatszám, ha a jövevény
+   belépne a tizenegybe. */
+function bondArrivalHtml(name){
+  if(gameMode!=="career"||!S||!S.bondsSeeded||!name)return "";
+  const xi=(typeof liveXI==="function")?liveXI().filter(a=>a&&a.p&&!a.bus&&!a.out):[];
+  if(xi.length<2)return "";
+  const now=teamBond();
+  /* A LEGGYENGÉBB összhangú emberre cseréljük — a menedzser úgyis a kezdőbe
+     szánja, és ez a legkedvezőbb eset; a becslés így nem ijesztget. */
+  let worst=null,worstV=Infinity;
+  xi.forEach(a=>{const v=playerBondIn(a.p.n,xi);if(v<worstV){worstV=v;worst=a;}});
+  if(!worst)return "";
+  const after=teamBondWith(xi,worst.p.n,name);
+  const d=Math.round((after-now)*10)/10;
+  const ovrNow=bondOvrMod();
+  const ovrAfter=Math.max(BOND_OVR_MIN,Math.min(BOND_OVR_MAX,(after-BOND_REF)/BOND_OVR_SPAN*BOND_OVR_MAX));
+  const dOvr=Math.round((ovrAfter-ovrNow)*100)/100;
+  return `<br><span style="color:var(--gold)">🤝 Beilleszkedés:</span> az első <b>${BOND_NEW_MATCHES} meccsén</b> mindenkivel ideiglenes
+    <b>${BOND_NEW_PROV}</b>-ös összhangon áll. Ha ${esc(shortName(worst.p.n))} helyére áll be, a csapat-összhang
+    <b>${String(now).replace(".",",")} → ${String(Math.round(after*10)/10).replace(".",",")}</b>
+    <span style="color:var(--dim2)">(${d>=0?"+":"−"}${Math.abs(d).toFixed(1).replace(".",",")}, csapaterőben ${dOvr>=0?"+":"−"}${Math.abs(dOvr).toFixed(2).replace(".",",")})</span>.
+    <span style="color:var(--dim2)">Utána 50-ig gyorsítva zárkózik fel.</span>`;}
+/* Egy ember súlyozott összhangja EGY adott tizenegyen belül — ugyanazokkal a
+   súlyokkal, amikkel a teamBond számol. */
+function playerBondIn(name,xi){
+  let sw=0,sv=0;
+  const me=xi.find(a=>a.p.n===name);if(!me)return 0;
+  xi.forEach(a=>{
+    if(a.p.n===name)return;
+    const w=bondPairWeight(me,a);sw+=w;sv+=w*bondOf(name,a.p.n);});
+  return sw?sv/sw:0;}
+/* A csapatszám úgy, mintha `outName` helyén `inName` állna. Az érkező
+   BOND_NEW_PROV-val számít — pontosan úgy, ahogy a beilleszkedés alatt fog. */
+function teamBondWith(xi,outName,inName){
+  const list=xi.map(a=>a.p.n===outName?{p:{n:inName},pos:a.pos,xy:a.xy,_new:true}:a);
+  let sw=0,sv=0;
+  for(let i=0;i<list.length;i++)for(let j=i+1;j<list.length;j++){
+    const w=bondPairWeight(list[i],list[j]);
+    const v=(list[i]._new||list[j]._new)?BOND_NEW_PROV:bondOf(list[i].p.n,list[j].p.n);
+    sw+=w;sv+=w*v;}
+  return sw?sv/sw:0;}
+
+/* ---- A BEILLESZKEDÉS FOLYAMATA: JELZÉS A 4. MECCSTŐL ----
+   A nyolcadik meccs egy SZAKADÉK: 15-ről lehet 4-re esni. Ha a menedzser
+   semmit nem lát belőle előre, az nem leleplezés, hanem csapás. A negyedik
+   meccstől ezért halvány előjel jár — nem a pontos számok, csak az irány.
+   AZ IRÁNY NEM SORSOLÁS: a játékos ADDIGI teljesítményéből olvassuk, tehát
+   amit a jelzés ígér, azt a leleplezés tartja is. */
+function bondSettleTrend(name){
+  const rec=S.bondNew&&S.bondNew[name];
+  if(!rec)return null;
+  const m=rec.m||0;
+  if(m<4)return {m,txt:null,tone:"dim"};
+  const cs=(S.careerStats&&S.careerStats[name])||{};
+  const per=((cs.g||0)+(cs.a||0))/Math.max(1,m);
+  const pool=bondPool(name);
+  const coop=pool?(pool.coopI!=null?pool.coopI:2):2;
+  const sc=per*2+coop*0.35;
+  const t=sc>=1.9?["gyorsan érzi a helyét","grass"]
+    :sc>=1.0?["kezd beilleszkedni","grass"]
+    :sc>=0.55?["még keresi a helyét","dim"]
+    :["nehezen szokik","red"];
+  return {m,txt:t[0],tone:t[1]};}
+/* ---- A JÁTÉKOS LAPJA ----
+   Két állapot, két mondanivaló. Aki még beilleszkedik, arról nincs mit
+   mutatni — ott a FOLYAMAT a hír. Aki beállt, annál a csapathoz mért
+   összhangja és a három legerősebb kötése az. */
+function bondCardHtml(name){
+  if(gameMode!=="career"||!S||!S.bondsSeeded||!name)return "";
+  const head=`<div class="hdRow" style="margin:8px 0 4px"><b>🤝 Összhang</b> `
+    +`<span style="color:var(--dim2)">— mennyire ismerik egymást</span></div>`;
+  if(bondIntegrating(name)){
+    const t=bondSettleTrend(name)||{m:0};
+    const pct=Math.round(100*Math.min(1,(t.m||0)/BOND_NEW_MATCHES));
+    return head+`<div class="hdRow" style="border:1px dashed var(--gold);border-radius:7px;padding:7px 9px">
+      Még <b>beilleszkedik</b>: ${t.m||0}/${BOND_NEW_MATCHES} meccs
+      <span style="color:var(--dim2)">(${pct}%)</span>.
+      Addig mindenkivel ideiglenes <b>${BOND_NEW_PROV}</b>-ös összhangon áll.
+      ${t.txt?`<br>A jelek szerint <b style="color:var(--${t.tone})">${t.txt}</b>.`
+             :`<br><span style="color:var(--dim2)">Négy meccs után lesz mit mondani róla.</span>`}
+      <br><span style="color:var(--dim2)">A ${BOND_NEW_MATCHES}. meccs után az addigi teljesítménye alapján kapja meg a valódi értékeit, onnan 50-ig gyorsítva zárkózik.</span></div>`;}
+  const pb=playerBond(name);
+  const list=pb.top.filter(x=>x.v>0);
+  return head+`<div class="hdRow">Csapat-összhangja: <b>${String(pb.team).replace(".",",")}</b>
+    <span style="color:var(--dim2)">(a keret egészéhez mérve · a csapat referenciája ${BOND_REF})</span></div>`
+    +(list.length
+      ?`<div class="hdRow">Legerősebb kötései: `+list.map(x=>
+        `${esc(shortName(x.n))} <b style="color:var(--${bondTierTone(x.v)})">${x.v}</b> `
+        +`<span style="color:var(--dim2)">(${bondTierName(x.v)})</span>`).join(" · ")+`</div>`
+      :`<div class="hdRow" style="color:var(--dim2)">Még nincs említésre méltó kötése — az összhang közösen lejátszott meccsekből gyűlik.</div>`);}
+/* A keretlistán és a játékos lapján megjelenő rövid jelzés. */
+function bondSettleChip(name){
+  const t=bondSettleTrend(name);
+  if(!t)return "";
+  return `<span style="font-size:10.5px;color:var(--dim2)">🤝 beilleszkedés ${t.m}/${BOND_NEW_MATCHES}${
+    t.txt?` · <span style="color:var(--${t.tone})">${t.txt}</span>`:""}</span>`;}
+
 /* ---- MIGRÁCIÓ ----
    Régi mentésben nincs összhang. Nem nullázunk: a meglévő párkémiából vetünk
    magot (kész kötés 55, épülő fázisonként 8), a többi párt pedig ugyanazzal az
@@ -43729,7 +43893,7 @@ function twShowPlacement(cand,completeFn,cfg){
             ? `Ár: <b style="color:var(--gold)">${fmtFt(finalPrice)}</b><br>
                Egyenleged: ${fmtFt(S.transferBudget||0)} → <b>${fmtFt(Math.max(0,(S.transferBudget||0)-finalPrice))}</b>`
             : `<span style="color:var(--dim)">Ingyenes igazolás.</span>`}<br>
-        Ide érkezik: ${hova}.
+        Ide érkezik: ${hova}.${bondArrivalHtml(cand.n)}
         ${full?`<br><span style="color:var(--gold)">⚠ A kereted megtelt — aláírás után választhatsz: elengedsz valakit a tartalékból, vagy megveszed a keretbővítést. Ha egyiket sem, az igazolás elmarad, és nem fizetsz semmit.</span>`:""}
         <br><span style="color:var(--dim2)">Ha most elállsz, ebben a körben már nem tudod leigazolni.</span>
       </p>`;
@@ -54185,6 +54349,10 @@ function buildHubDetail(loc){
      (pályán / padon / tartalék), mert a kész kötés hatása CSAK akkor él, ha
      mindketten pályán vannak. */
   if(gameMode==="career"&&S&&S.chemPairs){
+    /* ---- ÖSSZHANG (3.8.03) ----
+       A kémia FÖLÉ kerül, mert az a szűkebb fogalom: a párkémia egy-egy
+       választott páros, az összhang az EGÉSZ öltözőhöz való viszonya. */
+    html+=bondCardHtml(p.n);
     html+=hdMark("hdChem","🔗 Kémia","kivel van kötése, és él-e",0,0);
     const onPitch=new Set(slots.filter(s=>s&&s.player).map(s=>s.player.n));
     const benchNames=new Set();
@@ -57685,6 +57853,11 @@ function renderHub(){
            kellene nyitni. A hangerő-skála elfér egy sorban, és a szám mellette
            kimondja a fokot; a részletek (hatás, honnan jön) a lapon. */
         (gameMode==="career"?`<div class="trait" style="margin-top:2px">${pformBarsHtml(pformStep(p.n))} <span style="color:var(--dim2)">forma ${pformStep(p.n)}/${PFORM_MAX} — ${esc(pformLabel(p.n))}</span></div>`:"")
+      }${
+        /* BEILLESZKEDÉS: csak az érkezőn, és csak amíg tart. A keretlista az a
+           hely, ahol a felállítást eldöntöd — ott kell látnod, kiről nem tudod
+           még, mit ér a pályán túl. */
+        (()=>{const c=bondSettleChip(p.n);return c?`<div class="trait" style="margin-top:2px">${c}</div>`:"";})()
       }${unavNote}</span>
       <span class="ovr">${ovrShown}</span>`;
     /* A jelvény koppintása NEM nyitja ki a lapot — saját úticélja van. */
@@ -57760,6 +57933,7 @@ function askSellConfirm(p,onYes){
     <div style="font-size:13px;margin-top:9px;line-height:1.5">Eladási ár: <b style="color:var(--gold)">${fmtFt(sellValue(p))}</b>.${saleMeritNote(p)}
       A játékos véglegesen kikerül a keretedből — a skilljei és a felépített kémiája is elvész vele.</div>
     ${saleBasisNote(p)}
+    ${bondLossHtml(p.n)}
     ${(skills&&styleInheritChance()>0)?`<div style="font-size:12.5px;margin-top:7px;line-height:1.5;color:var(--grass)">🎁 <b>Add tovább!</b> — a ${skills} képessége egyenként <b>${Math.round(styleInheritChance()*100)}%</b> eséllyel a klubnál marad, és te választod ki, ki viszi tovább.</div>`:""}`;
   $("sellConfirmModal").classList.remove("hide");}
 $("sellConfirmYes")&&($("sellConfirmYes").onclick=()=>{
