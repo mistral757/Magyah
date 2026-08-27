@@ -1504,14 +1504,77 @@ első szezon — `karrier-beallitasok-audit.md` 2.6).
 
 | sor | súly | mit mér |
 |---|---|---|
-| **Az élvonalba jutás üteme** | **2,5** | a TÖKÉLETES mászáshoz mérve (lásd alább) |
-| **Az első bajnoki arany üteme** | **2,5** | ua., az arany ideáljához |
+| **Az első D1-es arany üteme** | visszafelé számolt | egyetlen ütem-tétel, meccsenként könyvelve (9.2.1) |
 | **Feljutások** | 0,2 / db | tiszta jutalom |
 | **Kiesések** | — | **nem vonnak le** — a mód része, nem kudarc |
 | szezononkénti helyezés | 1,0 / 0,25 | mint ma, `runRankScore` |
 | taktika, hűség, mérföldkövek | mint ma | változatlan |
 
-#### 9.2.1 Az ütem mércéje: a tökéletes mászás (v3.5.08)
+#### 9.2.1 Az ütem: EGYETLEN számláló, meccsenként (v3.8.15)
+
+**Bejelentett kérés:** *„az élvonalba jutás üteme és az első D1 bajnoki arany
+üteme két külön számláló, nincs kettőre szükség. 1 számláló kell, ami az első
+D1 bajnoki aranyért ad pontot, méghozzá úgy, ahogyan a dinamikus módban
+felépítettük."*
+
+Három baja volt a két sornak:
+
+* **ugyanazt mérte kétszer** — aki gyorsan felér, az gyorsan is nyer odafent, a
+  két sor együtt mozgott, és 2×2,5 súllyal egyetlen szempont uralta a Run felét;
+* **túl durva volt** — szezonban mérve egy fordulónyi csúszás semmit, egy
+  szezonnyi mindent jelentett (pontosan az, amit a dinamikus módban a
+  meccsenkénti könyvelés már felváltott);
+* **és nem is tudott időben a címről** — a forrása a piramis mérő-naplója volt,
+  ami csak a KÖVETKEZŐ idény indításakor kapja meg a sorát (lásd 9.2.3).
+
+**Az új mérce a dinamikus mód mása** (`pyrTitleRefRound` / `pyrTitlePaceTick` /
+`pyrTitlePaceRow`):
+
+* **A viszonyítási pont** a legkorábbi idény **utolsó bajnoki meccse**, amelyben
+  az első D1-es arany egyáltalán lehetséges. D6-ból indulva öt feljutás kell
+  (D5…D1), tehát a hatodik idényben állsz először az élvonalban — a határ a
+  `startDiv`. idény 30. fordulója.
+
+| kezdő osztály | D1 | D2 | D3 | D4 | D5 | D6 |
+|---|---|---|---|---|---|---|
+| a határ (idény) | 1. | 2. | 3. | 4. | 5. | **6.** |
+| a határ (karrier-forduló) | 30 | 60 | 90 | 120 | 150 | **180** |
+
+* **Onnantól minden további bajnoki forduló levon**, amíg nincs meg az arany;
+  ami a határ előtt marad, **bónusz**.
+* **A tempó a dinamikus tábla FELE** (`PYR_PACE_SOFT = 0,5`) — *„nem kell olyan
+  szigorúnak lenni"*. Az oszlopot az dönti el, hol tartasz: amíg nem vagy az
+  élvonalban, a nehezebb (A) sáv fut, D1-ben már a szelídebb (B). Ugyanaz a
+  gondolat, mint a dinamikus A/B/C-nél: a nehezebb fele (felérni) drágább, mint
+  a maradék.
+
+| hol tartasz | 100-as mezőnyön | 90 | 80 | 70 |
+|---|--:|--:|--:|--:|
+| még nem vagy D1-ben (A) | 7,5 | 5,0 | 4,0 | 2,5 |
+| **D1-ben, még nincs arany (B)** | **5,0** | 4,0 | 2,5 | 1,5 |
+
+*(Run-pont / 40 meccs.)*
+
+* **A súly visszafelé számolt**, ugyanúgy, mint a dinamikus `runPaceRow`-nál: a
+  sor pontosan annyit visz vagy hoz, amennyi a leírásában áll.
+
+**Mérve** (D6-os kezdés, ~101-es mezőny, 77,5-ös átlag 11,0 összsúlyon):
+
+| eset | hatás | új átlag |
+|---|---|--:|
+| a 6. idény 25. fordulójában arany (5 meccs a határ előtt) | +0,6 | **78,1** |
+| pontosan a határra | — | 77,5 |
+| egy idény csúszás (7. idény vége) | −3,8 | **73,8** |
+| három idény csúszás (9. idény vége) | −11,3 | **66,3** |
+| 12. idény, még mindig nincs arany | −22,5 | **55,0** |
+
+**Régi mentés:** a bélyeg (`R.pyrTitleRound`) 3.8.15-tel született. Egy futó
+karrierben az arany már megvolt a piramis naplójában — onnan pótoljuk
+(`pyrTitleBackfill`), a megnyert idény **utolsó** bajnokijára téve. Ez a
+legóvatosabb becslés: a tényleges cím ennél korábban dőlt el, tehát a pótlás
+sosem ad több pontot, mint amennyi járna.
+
+#### 9.2.2 A régi mérce — ami helyébe lépett (v3.5.08, kivezetve)
 
 **Mi volt a baj.** Az ütem-sorok a fokozat **szimulált mediánjához** mértek
 (`refTop` / `refTitle`): ahhoz, amit egy átlagos futás hoz. Két hibája volt.
@@ -1555,7 +1618,60 @@ helyezése — egy hosszú karrierben a sok apró sor egyszerűen elnyelte. Az �
 **Ami kiesett a piramisban:** a „Kezdő nehézség" és a „Nehézség-belövés"
 (a mezőnyt nem te állítod be — a kezdő osztály már a plafonban van), a
 „Szezon-alapú Rating" (a piramisban kötelezően csúcsforma) és az
-**Infinity-határidő** (nincs Infinity — a helyét a két ütem-sor vette át).
+**Infinity-határidő** (nincs Infinity — a helyét a 9.2.1 ütem-sora vette át).
+
+#### 9.2.3 A cím AZONNAL bekerül, és azonnal ünnepelünk (v3.8.15)
+
+**Bejelentett hiba:** *„ezt a képet csak a megnyert bajnoki szezon után
+elindított következő szezon elején tudtam fotózni, addig 0 pont volt az első
+bajnoki arany üteme alatt — pedig azóta már BL is lement és volt szezonzárás
+is."*
+
+Az ok: az arany eddig **kizárólag** a piramis szezonfordulóján
+(`pyrSeasonTurn` → `pyrRollover`) került a mérő-naplójába, az pedig a
+**következő idény indításakor** fut. A Run tehát a kupasorozat és a
+szezonzárás alatt végig azt mondta, hogy nincs élvonalbeli arany.
+
+Mostantól a bélyeg a **cím kihirdetésének pillanatában** születik
+(`runNotePyrTitle`), mindkét úton: a matematikai bebiztosításnál
+(`afterLeagueRound`) és a végtabellánál is (utolsó forduló / gólkülönbség). A
+`pyrFirstTitle` elsődlegesen ezt olvassa, a napló a régi mentések tartaléka.
+
+**És a Run-záróképernyő is ott jön** (`runD1FinaleNow`): ha a cím a 6. idény
+25. fordulójában dől el, az ünneplés is ott van — a trófea-modál bezárása
+után, hogy a kettő ne torlódjon egymásra. A szezonjelentésbeli hívás
+(`runD1FinaleDue`) tartalék maradt: a végtabellás úton az az első alkalom.
+
+#### 9.2.4 A kihívás a SÚLYT mozdítja, nem a pontot (v3.8.15)
+
+**Bejelentett hiba:** *„a kupagyőzelmeknél… gyakorlatilag jobb lett volna nem
+nyernem, mint nyerni."*
+
+Igaz volt, és a Run **súlyozott átlag** voltából következett. Egy megszerzett
+mérföldkő sora `100 × kihívás` **pontot** kapott — egy 0,40-es szorzónál tehát
+40-et. Az átlag 77 körül állt, vagyis a BL-győzelem sora **lefelé húzta** az
+eredményt: aki meg sem nyerte, annál a sor létre sem jött, és jobban járt.
+
+| | régi | új |
+|---|---|---|
+| pontszám | `100 × kihívás` (0,40 → **40**) | **mindig 100** |
+| súly | a tétel alapsúlya | `alapsúly × (1 + (kihívás−1)/2)` |
+| 0,40-es szorzó hatása | −60% a **ponton** | −30% a **súlyon** |
+
+A százalék azért **feleződik**: a régi számok a ponton ültek, ahol egy −60%
+valóban −60% volt; a súlyon ugyanaz aránytalanul erős volna, és a Run két
+futás közti különbségét egyetlen tétel döntené el. Ugyanez a kezelés vonatkozik
+a **taktika-illeszkedés** soraira is: a pont a teljesítmény (az illeszkedés
+maga), a körülmény a súlyon ül.
+
+**És a mérföldkő elteszi az OSZTÁLYT is** (`v` mező). A bélyeg eddig csak a
+mezőnyszintet őrizte, a `pyrDivForLevel` viszont a **mai** világ
+osztályközepeihez hasonlít — a piramis világa nő, tehát egy 101-es szinten
+szerzett BL-cím néhány idény múlva a mai D6 közepe alá csúszott, és
+„hatodosztályú" szorzót kapott. Pontosan ez látszott a bejelentett képernyőn:
+*„mezőny 108 · kihívás −60%"*, holott az élvonalban született. A `runScanMilestones`
+a **már meglévő** bélyegeket is feltölti a szezontörténetből, tehát a régi
+mentések is a helyes osztályt kapják.
 
 **A kihívás-szorzó is osztály-alapú lett** (`pyrChallengeMult`): D1 ×1,00 …
 D6 ×0,40. A mai, abszolút Ratingre horgonyzott képlet egy végtelenbe növő
