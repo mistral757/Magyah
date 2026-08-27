@@ -1,8 +1,9 @@
 # A HUB keretlistája — húzással csere és a görgetés
 
-*(3.7.35–3.7.36. Érintett kód: `hubDragInit` és a köre (`hubDragRowOf`,
+*(3.7.35–3.7.36, 3.8.11. Érintett kód: `hubDragInit` és a köre (`hubDragRowOf`,
 `hubDragLocOf`, `hubDragLift`, `hubDragMoveGhost`, `hubDragAutoScroll`,
-`hubDragDrop`, `hubDragClear`), a `HUBDRAG_*` konstansok, `hubStickyInset` /
+`hubDragDrop`, `hubDragClear`, `hubDragInstant`, `hubDragFinePointer`), a
+`HUBDRAG_*` konstansok, `hubStickyInset` /
 `hubScrollRowIntoView` / `hubRenderStay`, valamint a `.hubDragArm` /
 `.hubDragGhost` / `.hubDragSrc` / `.hubDragTo` CSS és a `body.hubDragging`
 jelző.)*
@@ -97,18 +98,51 @@ tucatszor végigjárja.
 
 ### 2.1 A gesztus
 
-| lépés | mi történik |
-|---|---|
-| nyomva tartás | a sor lassan „betölt" (`.hubDragArm`, `HUBDRAG_HOLD_MS` = 500 ms) |
-| 0,5 s után | rezgés (ha van), a sor **felemelkedik**: fix pozíciójú másolat (`.hubDragGhost`) követi az ujjat, az eredeti a helyén marad halványan (`.hubDragSrc`) |
-| húzás közben | az ujj alatti sor kijelölődik (`.hubDragTo`, ⇄ jellel) — ez a csere partnere |
-| a lista szélén | magától görget (`HUBDRAG_EDGE` = 76 px, `HUBDRAG_SPEED` = 14 px/képkocka) |
-| felengedés | a két ember **helyet cserél**, a lap odagördül, ahová vitted |
+**Két bemenet, két szabály** (3.8.11 óta). A döntés **eseményenként** dől el
+(`hubDragInstant` → `e.pointerType`), nem eszközönként: egy érintőképernyős
+laptopon mindkét út él, a maga szabálya szerint.
 
-**Miért hosszú nyomás és nem azonnali húzás:** a lista görgethető. Egy azonnal
-induló húzás elvenné a görgetést — a hosszú nyomás az egyetlen gesztus, ami
-egyértelműen elválik tőle. A nyomás alatti „betöltés" azért kell, hogy ne legyen
-néma a várakozás: látszik, mikor indul el.
+| lépés | ÉRINTÉS (és toll) | EGÉR |
+|---|---|---|
+| lenyomás | a sor lassan „betölt" (`.hubDragArm`, `HUBDRAG_HOLD_MS` = 500 ms) | — semmi |
+| indítás | 0,5 s után magától | **az első 8 px-es elmozdulás** (`HUBDRAG_SLOP`) |
+| felemelkedés | rezgés (ha van), fix pozíciójú másolat (`.hubDragGhost`) követi a mutatót, az eredeti a helyén marad halványan (`.hubDragSrc`) | ugyanaz, plusz a megkezdett szövegkijelölés törlése |
+| húzás közben | a mutató alatti sor kijelölődik (`.hubDragTo`, ⇄ jellel) — ez a csere partnere | ugyanaz |
+| a lista szélén | magától görget (`HUBDRAG_EDGE` = 76 px, `HUBDRAG_SPEED` = 14 px/képkocka) | ugyanaz |
+| felengedés | a két ember **helyet cserél**, a lap odagördül, ahová vitted | ugyanaz |
+
+**Miért kell ÉRINTÉSNÉL a hosszú nyomás:** a lista görgethető, és ujjal a húzás
+meg a görgetés ugyanaz a gesztus — ujj le, ujj el. Az egyetlen, ami elválasztja
+őket, az IDŐ. A nyomás alatti „betöltés" azért kell, hogy ne legyen néma a
+várakozás: látszik, mikor indul el.
+
+**Miért NEM kell EGÉRREL (3.8.11).** *„Ha asztali böngészőn, vagy PC-n telepítve
+van megnyitva a játék, akkor a HUB-ban a játékosok cseréjénél ne kelljen 0,5 s
+hosszan nyomni a játékost, elég a hagyományos nyomva tartva húzom akció."*
+Egérrel a konfliktus **nem létezik**: a lapot a görgővel vagy a görgetősávval
+mozgatod, a bal gomb lenyomva húzása nem görget semmit. Ott tehát a várakozás
+tiszta veszteség — és szembemegy azzal, amit az asztali operációs rendszerek
+megtanítottak: megfogom, elhúzom.
+
+**Ugyanaz a küszöb, két ellentétes jelentés.** A `HUBDRAG_SLOP` (8 px) ujjal azt
+mondja, *görgetni akarsz* — a gesztus elszáll; egérrel épp ez **indítja** a
+húzást. Egy helyen, egy elágazásban dől el.
+
+**A toll szándékosan a nyomásos ágon marad:** tollal ugyanúgy görgetnek, mint
+ujjal, tehát ott az elválasztás továbbra is kell.
+
+**A kattintás mozgás nélkül változatlan**, mindkét bemeneten: a részletpanel
+ugyanúgy nyílik. Egérrel a mozgás hiánya soha nem emel — mérve: 900 ms lenyomva
+tartás mozdulás nélkül nem indított húzást.
+
+**A HUB bevezető sora is kétféle** (`hubDragFinePointer`, `(pointer:fine)`
+médialekérdezés — ez kapja el az asztali böngészőt és a PC-re telepített
+alkalmazást is, felhasználói ügynök-találgatás nélkül):
+
+```
+egérrel : Cseréhez a gyorsabb út: fogd meg a sorát az egérrel, és húzd oda, akivel cserélnéd.
+ujjal   : Cseréhez a gyorsabb út: tartsd nyomva a sorát fél másodpercig, és húzd oda, akivel cserélnéd.
+```
 
 **Miért lett 1 s-ból 0,5 s (3.7.36).** *„A csere akció indításhoz elég legyen
 0,5 s nyomáshossz."* Az egy másodperc a **mérték** miatt volt hosszú, nem az
@@ -169,6 +203,10 @@ csak új lyukat ütnénk.
 |---|---|
 | 200 ms nyomás | `hubDragArm` fut, ghost nincs |
 | 500 ms után | ghost felemelve, `body.hubDragging` kitéve |
+| **egér: 20 px elmozdulás, 0 ms várakozás** | **ghost azonnal felemelve, `hubDragging` kitéve** |
+| **egér: 900 ms lenyomva, mozdulás nélkül** | **nincs ghost — a koppintás megmarad koppintásnak** |
+| **egér: húzás a 4. sorra, felengedés** | **a két játékos tényleg helyet cserélt (Svensson ↔ Karlsson)** |
+| **egér: sima kattintás utána** | **`hubExpandedKey` a sorra áll, a lap kinyílik** |
 | lehúzás egy másik sorra | a célsor `hubDragTo`-t kap, a kulcsa a várt (`slot:4`) |
 | felengedés | a két játékos tényleg helyet cserélt a keretben |
 | utána | ghost eltakarítva, `body` osztály levéve |

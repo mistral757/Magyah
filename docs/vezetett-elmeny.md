@@ -1,6 +1,6 @@
 # Vezetett élmény — a tanítóréteg
 
-*(3.3.31. Érintett kód: `TEACH_TOPICS` + `teach*` függvények (index.html), a
+*(3.3.31, 3.8.11. Érintett kód: `TEACH_TOPICS` + `teach*` függvények (index.html), a
 `GUIDE_TIPS` tipp-tábla, `STAFF_INTRO_STEPS`. A fejlesztés menete és a
 döntések indoklása: `vezetett-elmeny-roadmap.md`.)*
 
@@ -122,6 +122,39 @@ a puszta „gyűlik a pont" nem tennivaló.
 **Ne írj olyan lépéssort, ami sosem futhat le.** A vezetés csak a HUB-ban indul
 magától, tehát a `scr:"match"` témák lépéssora dead code volna. Ott a jelzés
 „miért?" buboréka viszi az üzenetet, a `g` mezőn át a fogalomtárba.
+
+### Az ingyenes, de láthatatlan funkció — `ident:club` (3.8.11)
+
+Van egy ötödik eset, amit a többi szabály nem fed le: **ami nem hiányzik.**
+
+A klub arculata (`hubIdentityBtn`) mögött a tábla **négy legolcsóbb
+mérföldköve** ül — `ident_colors`, `ident_crest`, `ident_stadium`,
+`ident_full` —, és mind a négy **csapatstílus-pontot** fizet. Ingyenes, semmi
+nem kerül pénzbe. Csakhogy pont ezért lehet évekig észre sem venni: a
+szerkesztő a HUB menüjének Csapatépítés ágán van, semmi nem sürgeti, és a
+játék tökéletesen működik nélküle. **Egy funkció, ami ingyen ad valutát, és
+amit a felhasználó sosem nyit meg, pontosan az a hiány, amiért ez a réteg
+megszületett.**
+
+| mező | érték | miért |
+|---|---|---|
+| `grp` | `meta` | nem a keretről szól, hanem a klub arcáról — a mérföldkövek szomszédja |
+| `prio` | **56** | hátul: nem lejáró ügy, és nem dönt el semmit a pályán. A szezon-szerepek és a kihívások MÖGÖTT a helye |
+| `crit` | — | semmi nem visszafordíthatatlan benne (a szerkesztőben ott a teljes alaphelyzet gomb) |
+| `mark` | 🛡️ | a horgonya a **csukott menüben** lakik, tehát enélkül sosem kapna keretet |
+| `due()` | `!identHasAll()` | amíg a három elem bármelyike hiányzik |
+| `pre()` | `teachRevealAnchor($("hubIdentityBtn"))` | nem elég a menüt kinyitni: a gomb egy **csukott almenüben** (`accBody`) ül |
+| `g` | `arculat` | saját fogalomtár-szócikk a „Részletek" gombnak |
+
+**`sig()` szándékosan NINCS.** Egy önkifejezésre nem szabad rátelepedni: a
+három jelzés (`TEACH_GIVEUP`) után magától elhallgat, és nem indul újra attól,
+hogy közben megcsináltad a színeket, de a címert nem. Aki csak az egyiket
+akarta, azt nem nyaggatjuk a maradék kettőért.
+
+**Mérve:** a téma bekerül a `teachDueList("hub")`-ba, a menü-gomb jelvénye
+`🏋️ 🛡️` lesz, nyitott almenüvel a gomb megkapja a szaggatott keretet és a
+pöttyöt, a kétlépéses bevezető lefut — és amint `identHasAll()` igaz, a téma
+kiesik a listából.
 
 ## 6. Ami megvédi a felhasználót
 

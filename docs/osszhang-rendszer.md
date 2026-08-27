@@ -6,7 +6,7 @@ keret-szinthez mért érkező** · **Verzió:** 3.8.11
 *(Terv és ütemterv: `docs/osszhang-rendszer-terv.md`. Érintett kód: a
 `BOND_*` konstansok, `bondKey/bondRaw/bondOf/bondSet/bondAdd/bondCapOf`,
 `bondSettledBase/bondNewLevels/bondLevelsOf/bondProvOf/bondProvNow/
-bondCatchParams`,
+bondCatchParams/bondBaseAfterArrival`,
 `bondRoleMult/bondTacticMult/bondPersonMult/bondPassMult/bondTrainMult/
 bondCatchMult/bondDamp`, `bondMatchTick`, `bondStartIntegration/bondRevealNew`,
 `bondSeedFirstSquad/bondSeedValue/bondSeedConflict`, `bondPrune`,
@@ -587,11 +587,31 @@ legkedvezőbb eset, tehát a becslés nem ijesztget.
 ```
 🤝 Beilleszkedés: az első 8 meccsén mindenkivel ideiglenes 48-ös összhangon
    áll (a keret mai szintjének 66%-a). Ha J4 helyére áll be, a csapat-összhang
-   72 → 67,4 (−4,6, csapaterőben −0,36). Utána 72-ig 2,2-szeres ütemben
+   72 → 67,4 (−4,6, csapaterőben −0,36). Utána 67-ig 2,1-szeres ütemben
    zárkózik fel.
 ```
 
 *(A számok élők: ugyanez a panel egy 25-ös keretnél 16-ot és −1,5-öt ír ki.)*
+
+**A felzárkózás célja VETÍTETT szám, nem a mai keret-szint** (`bondBaseAfterArrival`).
+A mai szintet kiírni ide **túlígéret** volna: a cél a beállt tizenegy szintje —
+csakhogy a nyolcadik meccs után az érkező **maga is beleszámít**, a friss,
+alacsony értékeivel, tehát a szint alább kerül, mint ahol most áll. A panel
+ezért a **hipotetikus** tizenegyre méri a szintet, a jövevény párjainál a
+sávja közepével (`(lo+hi)/2`), ugyanazokkal a súlyokkal, amikkel a
+`bondSettledBase` fog.
+
+**Mérve** (előnézet vs. a valódi lefutás, nyolc meccs után):
+
+| keret szintje | a panel ígérete | a VALÓDI cél a 8. meccs után |
+|---|---|---|
+| 40 | 50-ig, ×1,8 | **50**, ×1,80 |
+| 55 | 50-ig, ×1,8 | **52**, ×1,80 |
+| 70 | 64-ig, ×2,0 | **64**, ×2,03 |
+| 80 | 74-ig, ×2,3 | **74**, ×2,27 |
+
+A panel tehát pontosan annyit ígér, amennyit a rendszer tart — és ahol téved,
+ott **lefelé** téved (55-nél 50-et mond 52 helyett).
 
 ### 10d.4 A beilleszkedés folyamata — jelzés a 4. meccstől
 
