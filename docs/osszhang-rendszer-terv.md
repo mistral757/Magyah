@@ -1,6 +1,6 @@
 # Összhang-rendszer — tervezet és ütemterv
 
-**Állapot:** 🟡 az F0 döntések megvannak, az **F1–F5 kész** (3.8.04) ·
+**Állapot:** 🟢 az F0 döntések megvannak, az **F1–F7 kész** (3.8.05) ·
 **Cél-verzió:** 3.8.x · A megvalósult rész leírása: `docs/osszhang-rendszer.md`
 
 *(Ez egy TERV-dokumentum, nem leírás. Amíg a fázisok le nem futnak, a benne
@@ -303,8 +303,8 @@ külön `tools/check.sh` és külön mérés.
 | **F3b** ✅ | **Kommentár és üzenetek** (kész, 3.8.04) | meccs közbeni kommentárok a nagyon jól / rosszul működő összhangra (páros, posztcsoport, csapat), és meccs utáni üzenet, ha egy kötés SZINTET LÉPETT | a fokozat-küszöbök az F4 skálájából jönnek, de a szöveg nem vár rá | alacsony |
 | **F4** ✅ | **Összhangtérkép** (kész, 3.8.04) | kapcsoló a pályaképen, 7 fokozat, rajzolási küszöb (2.6) | most már van mit mutatni | közepes (rajz) |
 | **F5** ✅ | **A játékos lapja** (az F3-mal együtt elkészült) | csapat-összhang + top 3 személyes, a Statzone mellé | olcsó, és az F4 fokozat-skáláját újrahasználja | alacsony |
-| **F6** | **Összhangépítés** | a második edzés-sáv, posztcsoport- és megbízás-párokkal | szorzó egy MŰKÖDŐ rendszerre | közepes |
-| **F7** | **Az összhang-edző** | a `chem` típus átalakítása, 4-es fókusz, jogosultság | szorzó a szorzóra — legkésőbb | közepes |
+| **F6** ✅ | **Összhangépítés** (kész, 3.8.05) | a második edzés-sáv, posztcsoport- és megbízás-párokkal | szorzó egy MŰKÖDŐ rendszerre | közepes |
+| **F7** ✅ | **Az összhang-edző** (kész, 3.8.05) | a `chem` típus átalakítása, 4-es fókusz, jogosultság | szorzó a szorzóra — legkésőbb | közepes |
 | **F8** | **Az első keret** | 0–45 skála + 60-as extra, a közös múlt nagyobb súlyával, egy összefoglaló képernyővel | ez az F1 magvetésének a *csinosabb* változata; addig a nyers magvetés is elég | alacsony |
 | **F9** | **Hangolás + dokumentáció** | mérés 10 idényen, `docs/osszhang-rendszer.md`, fogalomtár-szócikk, vezetett élmény | — | — |
 

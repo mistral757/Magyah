@@ -1,8 +1,7 @@
 # Összhang — a modell
 
-**Állapot:** 🟡 **F1–F5 kész** — a szám épül, hat a meccsre, a nehézségi
-ajánlások tudnak róla, a döntéseknél és a közvetítésben megszólal, és
-térképen is látszik · **Verzió:** 3.8.04
+**Állapot:** 🟢 **F1–F7 kész** — csak az F8 (az első keret saját képernyője)
+és az F9 (hangolás) van hátra · **Verzió:** 3.8.05
 
 *(Terv és ütemterv: `docs/osszhang-rendszer-terv.md`. Érintett kód: a
 `BOND_*` konstansok, `bondKey/bondRaw/bondOf/bondSet/bondAdd/bondCapOf`,
@@ -36,7 +35,10 @@ egymást — idényekben mérhető, és csak akkor vész el, ha valaki elmegy.
 | **F3b** ✅ | **megszólal a közvetítésben**: kezdőrúgás, gól, fokozatlépés a lefújás után |
 | **F4** ✅ | **összhangtérkép** a pályaképen, hét fokozattal |
 | **események** ✅ | átigazolási **csapatépítés** és öltözői **összhang-események** |
-| F6 · F7 · F8 | edzés-sáv, összhang-edző, az első keret képernyője |
+| **F6** ✅ | **összhangépítés** — a második menedzser-sáv az edzés mellett |
+| **F7** ✅ | **a Csapatkovács** végre azt csinálja, amiről a neve szól |
+| **kapitány** ✅ | az összhang a kapitányválasztás **negyede** — a kézi ajánlásban és az automatikus váltóban is |
+| F8 · F9 | az első keret saját képernyője, hangolás |
 
 ---
 
@@ -710,8 +712,152 @@ ritka, kellemes meglepetés.
 
 ---
 
+## 10h. F6 — összhangépítés
+
+**A második menedzser-sáv az edzés mellett**, szándékosan ugyanazzal a
+szerkezettel: fő + másodlagos, ciklusonként egy váltás, élő előnézet. A
+játékos nem tanul új felületet — ugyanazt a döntést hozza meg, csak másról.
+
+**Az ellentétel nem pénz, hanem lassítás.** A játékban már sok pénznyelő van;
+egy újabb azt jelentené, hogy az összhang a *gazdag* menedzser kiváltsága —
+pedig épp az ellenkezője a célja: a szegény klub fegyvere az, hogy együtt
+tartja a keretét. Ami nincs a két sávban, az **0,8×** ütemben épül.
+
+| | szorzó |
+|---|---|
+| fő sáv | **×1,8** |
+| másodlagos | ×1,3 |
+| minden más pár | ×0,8 |
+
+**A csoportok a pályán elfoglalt helyet nézik, nem a szerep-kategóriát.**
+Ezért lehet köztük „szélsők egymással" vagy „védők a védekező
+középpályással" — azok *megbízás*-szintű párok, amiket a
+VEDO/KOZEPPALYAS/CSATAR hármas nem tud megkülönböztetni. Következmény, ami
+szándékos: a specifikus sáv csak akkor ér valamit, ha tényleg úgy is állsz
+fel. A tervező ezért **kiírja, hány pár érintett** most a kezdőben:
+
+```
+Védők egymás közt                 6 pár     Szélsők egymással               6 pár
+Középpályások egymás közt         3 pár     Középpályások az árnyékékkel    0 pár
+Csatárok egymás közt              3 pár     Szélsők a középcsatárral        4 pár
+Kapus a védőkkel                  4 pár     Védők a védekező középpályással 8 pár
+Védők a középpályásokkal         12 pár
+Középpályások a csatárokkal       9 pár                       (4-2-3-1-ben mérve)
+```
+
+**Mérve** (40 meccs, 30-as kezdőértékről):
+
+| | véd↔véd | véd↔közép | közép↔közép |
+|---|---|---|---|
+| nincs sáv | 54 | 50 | 59 |
+| fő: védők egymás közt | **64** | 47 | 56 |
+| + másodlagos: véd↔közép | **64** | **54** | 56 |
+
+A lassítás tehát valódi: a nem edzett párok visszaesnek 50→47 és 59→56-ra.
+
+---
+
+## 10i. F7 — a Csapatkovács
+
+**Nem új típus.** Már volt egy stábtag, aki „az öltöző belső kémiáján
+dolgozik" — csakhogy a munkája egy **álló számba** (`CHEM.total`) folyt, amit
+az F2 óta már semmi nem olvas: a morált az élő összhang hajtja. A Csapatkovács
+tehát dolgozott, és a munkája a semmibe ment.
+
+Mostantól azt csinálja, amiről a neve szól: **gyorsítja a kötések épülését a
+fókuszáltjai között**. A hatás ott a legnagyobb, ahol **mindkét végpont** az ő
+fókuszában van — egy kapcsolatot nem lehet félig edzeni.
+
+**Négy ember, nem kettő.** A többi típusnál a szűk fókusz azt jelenti, hogy egy
+emberre koncentrálsz; itt viszont a fókusz tárgya egy **kapcsolat**, amihez
+ketten kellenek. Két emberrel pontosan egy párt lehetne edzeni — az annyira
+szűk, hogy a szűk fókusz értelmét vesztené. Néggyel hat pár jön ki, ami már
+egy tengely vagy egy védősor.
+
+**A jogosultsága is változott:** a pontszámába bekerült a **saját
+csapat-összhangja** (0,30 súllyal, a természete 0,50 marad a fő faktor) — aki
+játékosként mindenkivel összeszokott, az edzőként is tudja, mitől áll össze egy
+páros. Az érték a lenyomat készítésekor rögzül, mert a visszavonulás után a
+kötései már törlődnek.
+
+### Egy hiba, amit a mérés fogott meg
+
+Az első változat **felborította a stáb-rendszer alapszabályát**. Az edzőnek fix
+figyelme van, amit szétoszt: szűkebb fókusz fejenként több, összesen kevesebb.
+A `bondCoachMult` viszont csak a minőségből számolt, tehát az **egész keretre**
+állított edző ugyanazt a szorzót adta minden párra, mint a négy emberre
+állított — vagyis a széles fókusz szigorúan jobb volt. Mérve: ×1,318 mindkét
+esetben.
+
+A hígulás mostantól a Csapatkovács saját maximumához mér (4/n):
+
+| fókusz | két fókuszált közt | egy fókuszált |
+|---|---|---|
+| nincs edző | ×1,000 | ×1,000 |
+| 90-es Szakértelem, **4 védőre** | **×1,318** | ×1,104 |
+| 45-ös Szakértelem, 4 védőre | ×1,191 | ×1,063 |
+| 90-es, csak az egyikre | ×1,104 | ×1,104 |
+| 90-es, **egész keret** | ×1,116 | ×1,116 |
+
+---
+
+## 10j. Az összhang a kapitányválasztásban
+
+**Bejelentett kérés:** *„a kapitány személye szempontjából legyen jelentősége
+(legalább 25%-nyi) annak, mekkora az összhang pontszáma a választott
+kapitánynak. Ezt az autó kapitányváltó is vegye figyelembe."*
+
+### Miért nem egyszerűen `s += bond × 0,3`
+
+Az abszolút érték a **karrier szakaszáról** szólna, nem a jelöltek közti
+különbségről: az első idényben mindenki 25 körül áll (a tag mindenkinél
+ugyanannyit adna, tehát semmit nem döntene el), a tizedikben mindenki 80 körül
+— ugyanez. A kapitányválasztás viszont egy **összehasonlítás**.
+
+Ezért a tag a **kereten belüli helyzetet** méri: a jelölt a tizenegy
+összhang-sávjának melyik pontján áll. A jelölt összhangja itt a **kezdő
+tizeneggyel** vett *súlyozatlan* átlag — a kapitányi viszonynak nincs köze a
+pályatávolsághoz.
+
+### A súly a többi taghoz mérten dől el
+
+Az első változat fix 28 pontot adott — csakhogy a többi tag **tényleges**
+szórása keretenként más: elméletben 83, egy valódi tizenegyben **mérve 31** (a
+vezetői képesség ritkán szór 0-tól 4-ig, és a korok is közel esnek). Fix
+28-cal ez **47%**-os súlyt jelentett: a kért „legalább 25%" fölé lőtt, és
+már-már a vezetői képességgel vetekedett.
+
+Mostantól a tag szórása a **többi tagénak a 0,34-szerese** —
+`0,34/(1+0,34) ≈ 25%`, pontosan a kért arány, minden keretben. Mérve: **25%**.
+
+Két fék marad rajta:
+
+* a hatás a keret **tényleges** összhang-szórásával skálázódik (18 pontnál
+  teljes, alatta arányosan kisebb) — ahol a tizenegy ebben egységes, ott
+  tényleg nincs mit választani, és nem szabad zajt felnagyítani. Mérve:
+  teljesen egységes keretnél a tag szórása **0,0**;
+* a `recommendCaptainIdx` **egyszer** számolja ki a sávot, és adja át —
+  enélkül a `bondWithXI` tizenegyszer futna végig a tizenegyen minden
+  jelöltnél.
+
+### Ahol látszik
+
+Az **automatikus váltó** ugyanazt a `captainSuitability`-t hívja, tehát
+magától követi. A **kézi választóban** minden sor kiírja a jelölt összhangját
+és azt, mennyit ér vele:
+
+```
+Thierry Henry ★ ajánlott   JSZ · 94 · V·Jó · E·Imádott · T·Jámbor · 🤝 65 (+2,7)
+Cristiano Ronaldo          BSZ · 94 · V·Megfelelő · E·Kedves     · 🤝 69 (+5,5)
+Franco Baresi              KV  · 92 · V·Megfelelő · E·Kedves     · 🤝 62 (+0,3)
+```
+
+Enélkül a rangsor megváltozna, de a menedzser nem tudná, miért — az
+„ajánlott" jel indoklás nélkül maradna.
+
+---
+
 ## 11. Ami még hátravan
 
-`F6` az összhangépítés edzés-sáv (fő + másodlagos, posztcsoport- és
-megbízás-párokkal) · `F7` az összhang-edző (a Csapatkovács átalakítása, négyes
-fókusz) · `F8` az első keret saját képernyője · `F9` hangolás tíz idényen.
+`F8` az első keret saját képernyője (ma a magvetés lefut, csak nincs hozzá
+összefoglaló) · `F9` hangolás tíz idényen.
