@@ -20770,7 +20770,7 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
     if(!entry)return;
     /* challenge-büntetés: TSI-blokk — a játékos Ratingje nem NŐHET a blokk
        szezonjában (a negatív fejlődés viszont működik). */
-    const tsiBlockedNow=S.tsiBlocked[p.n]&&(S.seasonNumber||1)<=S.tsiBlocked[p.n];
+    const tsiBlockedNow=tsiBlockActive(p.n);
     /* ---- RÉSZESEDÉS (share) ----
        Aki csak a meccs egy részét játszotta (csere — akár a szünetben, akár a
        mérkőzés bármelyik percében), annak a RÉSZVÉTELI fejlődése arányosan csökken: az alap-delta, a tisztalap-bónusz, az edzéspontok,
@@ -21345,8 +21345,11 @@ function advanceCareerSeason(){
      kihívás-kiértékelés (ami a befagyást kiosztja) néhány sorral EZELŐTT fut,
      ugyanabban a függvényben, tehát a most kapott 1 szezon azonnal 0-ra
      csökkent, és a büntetés soha nem lépett életbe. */
-  /* lejárt TSI-blokkok törlése */
-  Object.keys(S.tsiBlocked||{}).forEach(n=>{if((S.seasonNumber||1)>S.tsiBlocked[n])delete S.tsiBlocked[n];});
+  /* A TSI-BLOKK LEJÁRATA SEM ITT VAN — ugyanazért, amiért az akadémia-befagyásé
+     sem (lásd a fenti bekezdést és a tsiBlockPrune feljegyzését): itt a
+     szezonszám még a záruló idényé, tehát a `sn > until` feltétel egy idényt
+     késett, és a figyelmeztetés a feloldás után is kint maradt. A takarítás a
+     hubShowSeasonReportBody() elején fut, a kihívás-kiértékelés ELŐTT. */
   /* ATTRIBÚTUM-SZINKRON: az öregedési görbe fenti Rating-változásait minden
      játékos attribútumaira 1:1-ben átvezetjük (a padon ülőkére is). */
   Object.values(careerPool).forEach(e=>syncAttrsToRating(e));
@@ -31620,8 +31623,9 @@ function applyChallengePunishment(pn){
       return `gyengébb csapatforma ${pn.amount} meccsen át`;
     case "tsiBlock":{
       if(!roster.length)return "fejlődés-blokk (nincs játékos)";
-      const p=pick(roster);S.tsiBlocked[p.n]=(S.seasonNumber||1)+1;
-      return `${shortName(p.n)} fejlődése befagyott 1 szezonra`;}
+      const p=pick(roster),until=(S.seasonNumber||1)+1;
+      S.tsiBlocked[p.n]=until;
+      return `${shortName(p.n)} fejlődése befagyott a ${until}. idény végéig`;}
     case "loseSkill":{
       const cands=roster.filter(p=>(S.skills[p.n]||[]).length>0);
       if(!cands.length)return "skill-vesztés (nincs skill)";
@@ -31772,13 +31776,60 @@ function challengePayoutText(ch){
   return challengeEarlyPayable(ch)
     ?"a jutalom a teljesítés pillanatában érkezik"
     :"a határidőnél dől el — addig ki kell húzni";}
+/* ================= A FEJLŐDÉS-BEFAGYÁS LEJÁRATA (3.8.13) =================
+   BEJELENTETT HIBA: „a befagyott fejlődés nem oldódik fel 1 szezon után —
+   a HUB-ban kiírt üzenet biztosan nem tűnt el."
+
+   KÉT KÜLÖN OKA VOLT, és mindkettő ugyanabból a hibás mintából jött.
+     1) A TÖRLÉS EGY IDÉNYT KÉSETT. A takarítás az advanceCareerSeason()-ben
+        ült, `sn > until` feltétellel — csakhogy az a szezonjelentés része, és
+        ott a szezonszám MÉG a záruló idényé. Egy N+1-ig szóló blokknál tehát
+        N+1 > N+1 hamis: a kulcs túlélte a saját lejáratát, és csak egy teljes
+        idénnyel később tűnt el. (Pontosan ez a csapda, amit az akadémia-
+        befagyásnál már egyszer kijavítottunk — lásd a frozenAcademySeasons
+        fölötti feljegyzést a hubShowSeasonReportBody-ban.)
+     2) A HUB SORA NEM IS NÉZTE A LEJÁRATOT: a nyers kulcsokat listázta, tehát
+        a figyelmeztetés még azután is kint volt, hogy a fejlődés valójában
+        már újraindult. A kettő együtt adta ki az „örök befagyás" élményt.
+
+   A JAVÍTÁS ugyanaz a minta, ami az akadémiánál bevált: a lejárat a
+   szezonjelentés ELEJÉN fut (a kihívás-kiértékelés ELŐTT, hogy egy frissen
+   kiszabott büntetést ne üssön agyon), és `sn >= until`-t néz — vagyis az a
+   blokk, ami a most záruló idényre szólt, itt jár le. A HUB pedig ugyanabból
+   az egy helyről (tsiBlockedActive) olvas, mint a fejlődési kör.
+
+   A TÁROLT ÉRTÉK JELENTÉSE: az UTOLSÓ idény száma, amelyben a blokk még él. */
+function tsiBlockActive(name){
+  const u=S.tsiBlocked&&S.tsiBlocked[name];
+  return !!u&&(S.seasonNumber||1)<=u;}
+function tsiBlockedActive(){
+  return Object.keys(S.tsiBlocked||{}).filter(tsiBlockActive);}
+/* A TAKARÍTÁS. A szezonjelentés elejéről és a mentés betöltéséből is fut — az
+   utóbbi azért, hogy a hibával készült régi mentésekben beragadt kulcsok
+   AZONNAL eltűnjenek, ne csak a következő szezonzáráskor. */
+function tsiBlockPrune(atSeasonClose){
+  if(!S.tsiBlocked)return 0;
+  const sn=S.seasonNumber||1;
+  let n=0;
+  Object.keys(S.tsiBlocked).forEach(k=>{
+    /* Szezonzáráskor a MOST záruló idényre szóló blokk is lejár (sn >= until);
+       menet közben (betöltéskor) csak a valóban elmúltakat söpörjük. */
+    if(atSeasonClose?(sn>=S.tsiBlocked[k]):(sn>S.tsiBlocked[k])){
+      delete S.tsiBlocked[k];n++;}});
+  return n;}
 /* Az aktív büntetés-állapotok látható összefoglalója — hogy a challenge
    büntetéseknek MINDIG legyen kézzelfogható nyoma a HUB-ban. */
 function activePunishmentsHtml(){
   const bits=[];
   if(S.teamFormMalus>0)bits.push(`⚠ Gyengébb csapatforma: még ${S.teamFormMalus} meccs`);
-  const blocked=Object.keys(S.tsiBlocked||{});
-  if(blocked.length)bits.push(`⚠ Befagyott fejlődés: ${blocked.map(n=>shortName(n)).join(", ")}`);
+  /* CSAK AZ ÉLŐ BLOKKOK (3.8.13). A sor korábban a nyers kulcsokat listázta,
+     lejárat-ellenőrzés nélkül — egy már feloldott befagyás figyelmeztetése így
+     a kulcs törléséig kint maradt (az meg egy idényt késett, lásd
+     tsiBlockPrune). Bejelentett hiba: „örök életre szóló befagyás". */
+  const blocked=tsiBlockedActive();
+  if(blocked.length)
+    bits.push(`⚠ Befagyott fejlődés: ${blocked.map(n=>
+      `${esc(shortName(n))} <span style="opacity:.75">(a ${S.tsiBlocked[n]}. idény végéig)</span>`).join(", ")}`);
   if(S.frozenAcademySeasons>0)bits.push(`⚠ Ifi-akadémia befagyva: ${S.frozenAcademySeasons} szezon`);
   /* A mérföldkövekből származó IDEIGLENES hatások — hogy a kommentár ígérete
      ne maradjon láthatatlan: a HUB-ban is nyoma legyen, amíg tart. */
@@ -62940,6 +62991,13 @@ function hubShowSeasonReportBody(){
      (A szezon KÖZBEN bukott rövid kihívások befagyása működött — innen a
      "néha nem fagy be".) */
   if(gameMode==="career"&&S.frozenAcademySeasons>0)S.frozenAcademySeasons--;
+  /* ---- A FEJLŐDÉS-BEFAGYÁS LEJÁRATA — UGYANITT, UGYANAZÉRT ----
+     A most záruló idényre szóló blokkok itt járnak le, MÉG a kihívás-
+     kiértékelés előtt: az alább kiszabott friss büntetés (a következő idényre
+     szól) így érintetlen marad. Lásd a tsiBlockPrune fölötti feljegyzést. */
+  if(gameMode==="career"){
+    const _tb=tsiBlockPrune(true);
+    if(_tb)addLine(`🧊 A befagyott fejlődés feloldódott — ${_tb} játékos fejlődik újra a következő idénytől.`,"m life");}
   /* CHALLENGE — SZEZONZÁRÓ KIÉRTÉKELÉS (a jelentés elején, a statok nullázása
      és a keret öregítése ELŐTT, hogy a záruló szezon utolsó meccséhez kötődjön
      és a naplóban rögtön látsszon):
@@ -71319,6 +71377,10 @@ function applySavedGame(d){
   S.lastCaptainSeen=d.S.lastCaptainSeen!==undefined?d.S.lastCaptainSeen
     :((captainIdx>=0&&slots[captainIdx]&&slots[captainIdx].player)?slots[captainIdx].player.n:null);
   S.tsiBlocked=d.S.tsiBlocked||{};
+  /* RÉGI MENTÉS: a 3.8.13 előtti takarítás egy idényt késett, tehát már
+     feloldott blokkok kulcsai beragadhattak — és a HUB azokat is kiírta.
+     A betöltés söpri őket, hogy a figyelmeztetés ne várjon a szezonzárásra. */
+  try{tsiBlockPrune(false);}catch(e){}
   S.boostTokens=d.S.boostTokens||0;
   S.freePlayerTokens=d.S.freePlayerTokens||0;
   /* INDOKOLT: BETÖLTÉS. A mentett egyenleg visszaállítása nem pénzmozgás — a
