@@ -18755,13 +18755,18 @@ function youthBoostScale(){return Math.max(1,oppTargetRating/100);}
    hangolás átlátható maradjon és ne kelljen képleteket újraírni. */
 const SCOUT_PRICE_MULT=0.75;        /* scout-fejlesztés  −25% */
 const ROSTER_EXPAND_PRICE_MULT=0.25;/* keretbővítés      −75% */
-const BOOST_PRICE_MULT=0.65;        /* ifi- és öreg-boost −35% */
+const BOOST_PRICE_MULT=0.65;        /* a boost-egység alapára −35% */
 const FORMATION_PRICE_MULT=0.5;     /* fizetős felállásváltás −50% */
-function youthBoostPrice(){
-  /* Az ifi-boost "egy topjátékos áránál" is drágább: a keret legdrágább
+/* ================= A BOOST-EGYSÉG ALAPÁRA =================
+   MINDEN boost ára ennek az egy számnak az aránya (lásd BOOST_UNIT_KIND) — az
+   egység maga az ifi-boost ára. Ez a függvény a KEDVEZMÉNYEK NÉLKÜLI alapár:
+   a kedvezmények egy helyen, a boostDiscountMult()-ban ülnek, hogy MIND A HÉT
+   fajta magától kövesse őket. */
+function boostUnitBase(){
+  /* Az egység "egy topjátékos áránál" is drágább: a keret legdrágább
      játékosának VÉTELÁRÁHOZ (nem a szerényebb piaci értékhez) van kötve, és
      egy fix szorzóval megemelve. Egy berobbantott tehetség hosszú távon egy
-     sztárnál is értékesebb, ezért az ára is prémium. Az alsó korlát is nőtt. */
+     sztárnál is értékesebb, ezért az ára is prémium. */
   /* A CSILLAG-FELÁR NÉLKÜLI vételár a mérce. A boost ára a kereted legdrágább
      emberéhez van kötve — de a fejlesztés nem ŐT veszi meg, csak hozzá méri
      magát. A felárral együtt egyetlen kinevelt legenda a boost árát is
@@ -18770,10 +18775,55 @@ function youthBoostPrice(){
   const topBuy=roster.length?Math.max(...roster.map(p=>{
     const e=careerPool[p.n];
     return e?Math.round(baseMarketValue(e)*buyMarkup()):0;})):18000;
-  /* KIHÍVÁS-HATÁS: a boost-kedvezmény jutalom itt érvényesül (az öreg-boost
-     ára ugyanezt a függvényt használja, tehát arra is hat). */
-  const disc=1-(S.boostDiscount||0);
-  return Math.round(Math.max(18000,topBuy)*1.5*youthBoostScale()*disc*BOOST_PRICE_MULT/100)*100;}
+  return Math.max(18000,topBuy)*1.5*youthBoostScale()*BOOST_PRICE_MULT;}
+/* ---- A KEZDŐ IDÉNYEK KEDVEZMÉNYE (3.8.13) ----
+   BEJELENTETT KÉRÉS: az első két idényben legyen olcsóbb az alapár. Van rá jó
+   ok is: a boost ára a kereted legdrágább emberéhez van kötve, tehát MÁR AZ
+   ELSŐ nyáron a teljes árat kéri — miközben a klub akkor a legszegényebb, és
+   pont akkor volna a legtöbb haszna egy berobbantott akadémistából (öt-hat
+   szezonon át élveznéd). A kedvezmény tehát nem ajándék, hanem az az ablak,
+   amikor a boost a leghosszabb távon fizet.
+   A számot KI IS MONDJUK — a HUB fejlesztés-sorában, a Boost-központ
+   fejlécében és a nyár nyitó naplósorában is —, különben egy határidős
+   kedvezmény pont attól veszne el, hogy nem tud róla senki. */
+const BOOST_EARLY_DISC=[0.50,0.33];   /* 1. szezon −50% · 2. szezon −33% */
+function boostEarlyDisc(){
+  const sn=(S&&S.seasonNumber)||1;
+  return BOOST_EARLY_DISC[sn-1]||0;}
+/* AZ ÖSSZES KEDVEZMÉNY EGY HELYEN. A kettő SZORZÓDIK, nem összeadódik: két
+   független engedmény (az egyik kiérdemelt, a másik időszakos), és így egyik
+   sem tudja nullára vinni az árat. */
+function boostDiscountMult(){
+  return Math.max(0.10,(1-(S.boostDiscount||0))*(1-boostEarlyDisc()));}
+/* AZ EGYSÉG TÉNYLEGES ÁRA — ez a szám hangolja mind a hét fajtát. */
+function boostUnitPrice(){
+  return Math.max(100,Math.round(boostUnitBase()*boostDiscountMult()/100)*100);}
+/* Az ifi-boost pontosan EGY egység (BOOST_UNIT_KIND.youth = 1). Külön neve
+   azért marad, mert a saját panelje és a HUB-sora erre hivatkozik. */
+function youthBoostPrice(){return boostUnitPrice();}
+/* A NAPLÓ-BEJELENTÉS. Egy határidős kedvezmény pont attól vész el, hogy nem
+   tud róla senki — ezért két pontján is megszólal az idénynek: a KEZDŐRÚGÁSNÁL
+   (hogy tudd, mi vár rád) és amikor a NYÁRI KERET megérkezik (mert akkor van
+   miből költeni). Mindkettő idényenként EGYSZER, saját jelzővel; a jelző a
+   mentésbe kerül, tehát egy újratöltés sem ismétli meg.
+   FONTOS AZ IDŐZÍTÉS: a nyári keret MÉG a lezáruló idény számán érkezik (lásd
+   a szezonjelentés `summerPaidAfterSeason` ágát), tehát az 1. idény nyári
+   ablakában is a −50% él — az idény sora a rá következő nyarat is tartalmazza,
+   ugyanúgy, ahogy az idény-mérlegben. */
+function boostEarlyAnnounce(tag){
+  if(gameMode!=="career"||!careerPool)return;
+  const d=boostEarlyDisc();
+  if(!d)return;
+  const sn=S.seasonNumber||1,key=sn+":"+(tag||"start");
+  if(S.boostEarlyToldSeason===key)return;
+  S.boostEarlyToldSeason=key;
+  const nxt=BOOST_EARLY_DISC[sn]||0;
+  addLine(`⚡ <b>Boost-kedvezmény: −${Math.round(d*100)}% a ${sn}. idényben.</b> `
+    +`MIND A HÉT boostfajta alapára ennyivel kisebb — az ifi-boost most ${fmtFt(boostUnitPrice())}, `
+    +`a legolcsóbb fajta ${fmtFt(boostPriceOf("bond"))}. `
+    +(nxt?`A ${sn+1}. idényben már csak −${Math.round(nxt*100)}%, utána teljes ár. `
+         :`A ${sn+1}. idénytől teljes ár. `)
+    +`A boost annál többet hoz, minél korábban éri a játékost — érdemes most kihasználni.`,"m life");}
 /* ---- KI SZÁMÍT AKADÉMISTÁNAK ----
    A youthBonus>0 önmagában NEM elég: az IKONOK is kapnak youthBonust a
    regisztrációkor (registerIconInPool) — ott viszont ez csak technikai horgony,
@@ -19109,7 +19159,8 @@ const BOOST_BOND_MAX=3.0;
    tagja ne essen ki teljesen a sorsolásból. */
 const BOOST_SKILL_W=1.0;      /* boostonként ennyivel nő a szorzó */
 const BOOST_SKILL_W_MAX=4;    /* …de legfeljebb ennyiszeres */
-function boostUnitPrice(){return youthBoostPrice();}
+/* Az egység árát a boostUnitPrice() adja (lásd a boostUnitBase fölött) — ott,
+   ahol a kedvezmények is ülnek, hogy mind a hét fajta magától kövesse őket. */
 function boostPriceOf(kind){
   const u=BOOST_UNIT_KIND[kind];
   if(u==null)return boostUnitPrice();
@@ -23158,7 +23209,7 @@ const GLOSSARY={
   csaladtag:{title:"Családtag",text:"Karrier mód elején egy családtagod is bekerülhet a keretbe, saját specialitással (pl. gyors reflexek, kőkemény játékos, 200 IQ). Ő sosem cserélhető le automatikusan, és ha kiemelkedő pillanata van egy meccsen, a csapat morálja jobban felnagyítva reagál rá."},
   infinity:{title:"Infinity mód",text:"A 100-as szint elérése után feloldható a végtelen mód: eltűnik a 119-es Rating-plafon, a játékosok 55 éves korig játszhatnak, az akadémia a mezőnyszinthez skálázódik, a nehézség pedig 200-ig (majd további szintekkel még feljebb) tolható. Itt már nincs Rating-hanyatlás, csak a fejlődés és a végtelen kihívás. A MEGNYITÁS PILLANATÁBAN a teljes kereted — kezdő 11, cserepad és tartalék egyaránt — egyszeri TSI-boostot kap: magasabb lesz a fejlődési plafonjuk, amibe játékkal lehet belenőni. A SZINTLÉPÉS 100 FÖLÖTT PONTOSAN UGYANAZ, mint alatta: a mezőnyt állítja, a te keretedhez nem nyúl. Ami megvéd az elavulástól, az a piac: 100 fölött a megvásárolható és a scout által talált játékosok jóval lassabban erősödnek, mint a mezőny — így a saját, felnevelt kereted marad a karriered gerince, nem a folyamatos vásárlás."},
   ifiboost:{title:"Ifi-boost",text:"A HUB-ban egy topjátékos áráért berobbanthatod egy saját akadémistád fejlődését: azonnal +6-12 Rating és jelentős TSI-ugrás, ami a hosszú távú fejlődését is felgyorsítja. Magasabb mezőnyszinten arányosan drágább, de erősebb is. Így egy ígéretes tehetség pár szezon alatt sztárrá érlelhető. Az ifi-boost a BOOST-KÖZPONT hét fajtája közül a legdrágább — lásd a Boostok szócikket."},
-  boostok:{title:"Boostok — a hét fajta",text:"A boost az az út, amin a büdzse NEM igazolásba megy, hanem abba, akid már van. Hétféle létezik, és mind a HUB Boost-központjában érhető el egy helyen. AZ ÁRAK EGYSÉGBEN ÉRTENDŐK: egy egység a legdrágább boost, az ifi-boost ára — az pedig a kereted legdrágább emberének vételárához van kötve, a mezőny szintjével skálázva, a kihívás-kedvezménnyel csökkentve. A hét fajta ennek egy arányát fizeti, tehát egyetlen szám hangolja az egészet. 💪 SIMA BOOST (0,5 egység): Rating +1-4%, TSI +15-45% — a TSI-ugrás legalább 400, legfeljebb 2500. Bárkire elsüthető, ez a kiegyensúlyozott, mindenre jó fejlesztés. 🎯 ATTRIBÚTUM BOOST (0,6): TE választod meg, melyik tengely (Védekezés, Védés, Passz, Gólszerzés, Sebesség). Azonnal +1-3%, és onnantól TARTÓSAN is épül rajta: meccsenként 0,4 pont, vagyis egy MÁSODLAGOS edzésnyi — az edzésterved MELLÉ, nem helyette. Ugyanarra a tengelyre ismételve halmozódik, másikat választva átáll. 📈 TSI BOOST (0,6): csak a TSI-t emeli, de nagyot: +33-66%, legalább 1000, legfeljebb 10 000. A Rating nem ugrik tőle — a HOSSZÚ TÁVÚ fejlődési pálya nyílik ki, és vele az eladási ár is. 🤝 ÖSSZJÁTÉK BOOST (0,33): az egész csapattal való összeszokása gyorsul, minden kötése 33-66%-kal gyorsabban épül, tartósan. A legolcsóbb, mert lassan és közvetve fizet — de egy frissen igazolt kulcsemberen ez hozza vissza leghamarabb a csapat-összhangot. Ismételhető, legfeljebb 3× ütemig. ✨ SKILL BOOST (0,4): REALISZTIKUS skill-módban nagyobb súllyal indul a képesség-sorsolásban — nagyobb eséllyel az ő képessége épül tovább, és nagyobb eséllyel esik rá a választás akkor is, amikor a csapat ÚJ képességet kap (olyankor a merítés is az ő posztcsoportjából megy). Laza módban nem csinál semmit, ezért ott nem is vásárolható. Ismételhető, legfeljebb 4× súlyig. ⚡ IFI-BOOST (1): a legdrágább és a legerősebb, de csak akadémistára — lásd a saját szócikkét. 🎩 ÖREG RÓKA (0,8): az ifi-boost tükörképe a pálya másik végén, 30 fölötti játékosra: Rating- és TSI-ugrás, plusz 41 éves korig kitolt nyugdíj; ugyanazon az emberen minden újabb boost drágább. MIND A HÉT visszavonhatatlan, ismételhető, és csak azt az EGY játékost érinti — a nyomuk pedig ott marad a játékos lapján, hogy évek múlva is látszódjon, kire mennyit fordítottál."},
+  boostok:{title:"Boostok — a hét fajta",text:"A boost az az út, amin a büdzse NEM igazolásba megy, hanem abba, akid már van. Hétféle létezik, és mind a HUB Boost-központjában érhető el egy helyen. AZ ÁRAK EGYSÉGBEN ÉRTENDŐK: egy egység a legdrágább boost, az ifi-boost ára — az pedig a kereted legdrágább emberének vételárához van kötve, a mezőny szintjével skálázva. A hét fajta ennek egy arányát fizeti, tehát egyetlen szám hangolja az egészet. KÉT KEDVEZMÉNY ÜL AZ EGYSÉG ALAPÁRÁN, és mindkettő MIND A HÉT fajtára hat. (1) A KEZDŐ IDÉNYEK ABLAKA: az 1. idényben −50%, a 2.-ban −33%, utána teljes ár. Ez nem ajándék: a boost ára a kereted legdrágább emberéhez van kötve, tehát már az első nyáron a teljes árat kérné — miközben a klub akkor a legszegényebb, és pont akkor hozná a legtöbbet egy berobbantott fiatal, akit még öt-hat szezonon át élvezel. A napló a szezon elején és a nyári keret megérkezésekor is emlékeztet rá. (2) A KIHÍVÁS-JUTALOM (\"olcsóbb boostok\"): fokozatonként −10%, legfeljebb −50%. A kettő szorzódik, nem összeadódik. 💪 SIMA BOOST (0,5 egység): Rating +1-4%, TSI +15-45% — a TSI-ugrás legalább 400, legfeljebb 2500. Bárkire elsüthető, ez a kiegyensúlyozott, mindenre jó fejlesztés. 🎯 ATTRIBÚTUM BOOST (0,6): TE választod meg, melyik tengely (Védekezés, Védés, Passz, Gólszerzés, Sebesség). Azonnal +1-3%, és onnantól TARTÓSAN is épül rajta: meccsenként 0,4 pont, vagyis egy MÁSODLAGOS edzésnyi — az edzésterved MELLÉ, nem helyette. Ugyanarra a tengelyre ismételve halmozódik, másikat választva átáll. 📈 TSI BOOST (0,6): csak a TSI-t emeli, de nagyot: +33-66%, legalább 1000, legfeljebb 10 000. A Rating nem ugrik tőle — a HOSSZÚ TÁVÚ fejlődési pálya nyílik ki, és vele az eladási ár is. 🤝 ÖSSZJÁTÉK BOOST (0,33): az egész csapattal való összeszokása gyorsul, minden kötése 33-66%-kal gyorsabban épül, tartósan. A legolcsóbb, mert lassan és közvetve fizet — de egy frissen igazolt kulcsemberen ez hozza vissza leghamarabb a csapat-összhangot. Ismételhető, legfeljebb 3× ütemig. ✨ SKILL BOOST (0,4): REALISZTIKUS skill-módban nagyobb súllyal indul a képesség-sorsolásban — nagyobb eséllyel az ő képessége épül tovább, és nagyobb eséllyel esik rá a választás akkor is, amikor a csapat ÚJ képességet kap (olyankor a merítés is az ő posztcsoportjából megy). Laza módban nem csinál semmit, ezért ott nem is vásárolható. Ismételhető, legfeljebb 4× súlyig. ⚡ IFI-BOOST (1): a legdrágább és a legerősebb, de csak akadémistára — lásd a saját szócikkét. 🎩 ÖREG RÓKA (0,8): az ifi-boost tükörképe a pálya másik végén, 30 fölötti játékosra: Rating- és TSI-ugrás, plusz 41 éves korig kitolt nyugdíj; ugyanazon az emberen minden újabb boost drágább. MIND A HÉT visszavonhatatlan, ismételhető, és csak azt az EGY játékost érinti — a nyomuk pedig ott marad a játékos lapján, hogy évek múlva is látszódjon, kire mennyit fordítottál."},
   hiresseg:{title:"Híresség (Sztárom a párom)",text:"A ⭐ Sztárom a párom filozófia saját valutája: a KIJELÖLT SZTÁR hírneve. Három forrásból gyűlik. (1) KOMMENTÁTORI MEGJEGYZÉS — 1 pont; nem a gól maga, hanem a hozzá tartozó ízesítő sor (bombagól, párkémia, díj-idézet), gólonként legfeljebb három; a 3., 4., 5. és 6+. gól saját, hangsúlyos kommentárja 3-3 pont. (2) A MECCS EMBERE — bajnokiban 1, rangadón 2, a Magyar Kupában 2, Konferencia-ligában 3, Európa-ligában 4, Bajnokok Ligájában 5; az európai kupák kieséses szakaszában ×1,5, a döntőben ×4 (a kettő nem szorzódik össze). (3) EGYÉNI DÍJ — a legritkább és a legnagyobb: bajnoki és Magyar Kupa-gólkirály/gólpasszkirály 1, KL 1,5, EL 3, BL 10, Aranylabda 15 — mindet a MEZŐNY SZINTJE szorozza (szint/5), ezért egy díj a magasabb ligában nagyságrenddel többet ér. A gyűlő pontnak két következménye van: MÉRFÖLDKŐ-lépcsőt fizet, és HÍRESSÉG-SZINTET ad (hat fokozat, Helyi kedvenctől az Élő legendáig). A szint nyitja a sztár körüli véletlen bevételeket: szurkoló-robbanás (a törzsközönség 20-250%-a, idényenként max 4), reklámszerződés (a heti lelátó 100-700%-a, idényenként 2-8 a szinttől függően) és befektető (a heti lelátó 1000-10 000%-a, idényenként max 1 — csak a 2. híresség-szinttől és legalább a második idénytől). Az ára is kiugró: a sztár bére nem a Rating-kulcsból jön, hanem a hírnevéből, és a keret-bér plafonja RÁ NEM VONATKOZIK — emiatt a csapatbér a feltételek teljesülése ellenére is túllépheti a szurkolói bevétel felét. A hírneve által hozott tömeg viszont nem drágítja vissza a saját bérét. A SZTÁR NEM CSAK AD, HANEM KÖVETEL IS — ez a stílus kockázati oldala. Az elvágyódás-esemény itt PONTOSAN KÉTSZER olyan gyakori, mint bármely más stílusban (mérve: 8,3% helyett 16,7% a váratlan fordulatokból), és ha jön, 50% eséllyel épp a SZTÁR akar menni. (Az első idényben ez is néma: ott egyetlen stílusban sincs elvágyódás.) Ezen felül két saját követeléssel állhat elő az átigazolási időszakban: GÓLONKÉNTI BÓNUSZT kér (a heti lelátó 2-10%-a minden góljáért — innentől minden találata a kasszából is fizet, és minél jobb, annál drágább), vagy BÉREMELÉST (+50-400% a meccs-bérére; a halmozott emelés hatszorosnál megáll). Mindkettő visszautasítható, de nem következmény nélkül: a sértődés 6 morált visz, és minden egyes visszautasítás FÉLSZERESÉVEL tovább emeli az elvágyódás esélyét (egy nem után 3×, kettő után 4×). A megkötött alkuk a karrier végéig élnek, és a szezonmérleg sztár-blokkjában külön sorban látszanak."},
   bajnokilistak:{title:"Bajnoki góllövő-, gólpassz- és tisztalap-lista",text:"A kupasorozatnak mindig volt egész mezőnyre szóló egyéni statisztikája; mostantól a BAJNOKSÁGNAK is. A Menetrend és tabella képernyőn, a tabella alatt látod a teljes, 16 csapatos mezőny három egyéni versenyét: góllövőlista, gólpassz-lista, tisztalap-lista. A mezőny AI-meccseinek gólszerzőit ugyanaz a súlyozás választja ki, mint a kupában (poszt + játékoserő), valódi klubkeretekből — a listán tehát igazi nevek állnak, és a számok pontosan a tabella eredményeiből jönnek. A szezon végén mindhárom lista élén álló játékos díjat kap; ha a TIÉD, tartós képességet is: a Bajnoki gólkirály, a Bajnoki gólpassz-király és a Bajnoki kapus-király a BL megfelelő arany-díjának a HARMADÁT éri. A díj beleszámít az Aranylabda szavazásába is."},
   statisztika:{title:"Statisztika",text:"A karrier során vezetjük minden játékos mindenkori teljesítményét: meccsek, gólok, gólpasszok, mesterhármasok (MH), MVP-k, bravúrok, tiszta lapok. A kártyaszintű játékosok neve a saját színükkel jelenik meg a táblázatban. A karrier lezárásakor egy összefoglaló .txt is letölthető."},
@@ -30828,7 +30879,7 @@ function genReward(scope,diff,ctx){
      kedvezményes igazolások, magasabb szezonos büdzsé. Ettől lesz értelme
      hosszú távon is kihívást vállalni. */
   pool.push({kind:"attrSpin",desc:"+1 ingyen képesség-keresés a nyáron"});
-  pool.push({kind:"boostDiscount",desc:"az ifi- és öreg-boost 10%-kal olcsóbb (tartós)"});
+  pool.push({kind:"boostDiscount",desc:"MINDEN boost 10%-kal olcsóbb — az egység alapára csökken (tartós)"});
   pool.push({kind:"buyDiscount",desc:"igazolásoknál kis eséllyel 25% kedvezmény (tartós)"});
   /* ---- A KÉT ÚJ GAZDASÁGI ÁG JUTALMAI ----
      A stílus-fa, az ügynökség és a lelátó eddig kizárólag a saját útján
@@ -31346,7 +31397,7 @@ function applyChallengeReward(rw){
       return "+1 ingyen képesség-keresés a nyáron";
     case "boostDiscount":
       S.boostDiscount=Math.min(0.5,(S.boostDiscount||0)+0.10);
-      return `az ifi- és öreg-boost ${Math.round(S.boostDiscount*100)}%-kal olcsóbb`;
+      return `MINDEN boost ${Math.round(S.boostDiscount*100)}%-kal olcsóbb (a boost-egység alapára ennyivel kisebb)`;
     case "buyDiscount":
       /* Minden igazolásnál esély 25% kedvezményre; az esély halmozódik. */
       S.buyDiscountChance=Math.min(0.5,(S.buyDiscountChance||0)+0.12);
@@ -34103,14 +34154,14 @@ function bondStatHtml(name,forcedOut){
    összhangja és a három legerősebb kötése az. */
 function bondCardHtml(name){
   if(gameMode!=="career"||!S||!S.bondsSeeded||!name)return "";
-  const head=`<div class="hdRow" style="margin:8px 0 4px"><b>🤝 Összhang</b> `
-    +`<span style="color:var(--dim2)">— mennyire ismerik egymást</span></div>`;
+  /* A FEJLÉCET 3.8.13 óta a SZAKASZ adja (hdMark „🤝 Összhang"): a blokk önálló
+     lenyíló szakaszban ül, nem a képességek végén — ezért itt nincs saját. */
   if(bondIntegrating(name)){
     const t=bondSettleTrend(name)||{m:0};
     const pct=Math.round(100*Math.min(1,(t.m||0)/BOND_NEW_MATCHES));
     const lv=bondLevelsOf(name);
     const cp=bondCatchParams();
-    return head+`<div class="hdRow" style="border:1px dashed var(--gold);border-radius:7px;padding:7px 9px">
+    return `<div class="hdRow" style="border:1px dashed var(--gold);border-radius:7px;padding:7px 9px">
       Még <b>beilleszkedik</b>: ${t.m||0}/${BOND_NEW_MATCHES} meccs
       <span style="color:var(--dim2)">(${pct}%)</span>.
       Addig mindenkivel ideiglenes <b>${lv.prov}</b>-ös összhangon áll
@@ -34121,8 +34172,7 @@ function bondCardHtml(name){
   const d=bondXIDetail(name);
   if(!d)return "";
   const top=bondTop3(name);
-  return head
-    +`<div class="hdRow">Összhangja a <b>kezdő tizeneggyel</b>: `
+  return `<div class="hdRow">Összhangja a <b>kezdő tizeneggyel</b>: `
     +`<b style="color:var(--${bondTierTone(d.avg)})">${String(d.avg).replace(".",",")}</b> `
     +`<span style="color:var(--dim2)">${bondTierName(d.avg)} · a csapat referenciája ${BOND_REF}</span></div>`
     +(d.out
@@ -34134,12 +34184,63 @@ function bondCardHtml(name){
         +top.map(x=>`${esc(shortName(x.n))} <b style="color:var(--${bondTierTone(x.v)})">${x.v}</b> `
         +`<span style="color:var(--dim2)">(${bondTierName(x.v)})</span>`).join(" · ")+`</div>`
       :`<div class="hdRow" style="color:var(--dim2)">Még nincs említésre méltó kötése — az összhang közösen lejátszott meccsekből gyűlik.</div>`);}
-/* A keretlistán és a játékos lapján megjelenő rövid jelzés. */
+/* A keretlistán és a játékos lapján megjelenő rövid jelzés — CSAK a
+   beilleszkedőnek. A beállt kereté a bondRowChip alsó ága. */
 function bondSettleChip(name){
   const t=bondSettleTrend(name);
   if(!t)return "";
   return `<span style="font-size:10.5px;color:var(--dim2)">🤝 beilleszkedés ${t.m}/${BOND_NEW_MATCHES}${
     t.txt?` · <span style="color:var(--${t.tone})">${t.txt}</span>`:""}</span>`;}
+/* ---- A KERETLISTA ÖSSZHANG-SORA (3.8.13) ----
+   BEJELENTETT KÉRÉS: „az összhang stat legyen kiemelt pozícióban, ne is kelljen
+   külön lenyitni." Eddig ezen a helyen CSAK a beilleszkedők chipje állt, a
+   beállt keret száma pedig a lenyitott lapon lapult — vagyis épp az a szám
+   hiányzott a felállítás helyéről, ami a felállításról szól.
+   MOSTANTÓL MINDENKINEK van sora, ugyanott: aki beilleszkedik, annál a folyamat,
+   akinél már van érték, ott maga az érték. A mérce ugyanaz, mint a lapon: a
+   KEZDŐ TIZENEGGYEL mért összhang (bondXIDetail) — az számít a meccsen. */
+function bondRowChip(name){
+  if(gameMode!=="career"||!S||!S.bondsSeeded||!name)return "";
+  if(bondIntegrating(name))return bondSettleChip(name);
+  const d=bondXIDetail(name);
+  if(!d)return "";
+  return `<span style="font-size:10.5px;color:var(--dim2)">🤝 összhang: `
+    +`<b style="color:var(--${bondTierTone(d.avg)});font-size:11.5px">${String(d.avg).replace(".",",")}</b>`
+    +` · ${esc(bondTierName(d.avg))}${d.inXI?"":" (ha beállna)"}</span>`;}
+/* ---- A TELJES KÖTÉS-TÉRKÉP (3.8.13) ----
+   BEJELENTETT KÉRÉS: „a lenyíló menüben lehessen részletesen megnézni, hogy
+   kivel milyen kapcsolatban van." A lap eddig csak a HÁROM legerősebbet
+   mutatta — abból nem derül ki, hol a baj: pont a GYENGE kötések azok, amiken
+   dolgozni kell, és a kezdő tizenegyen belüli szomszédságok azok, amik a
+   mérkőzésen tényleg számítanak.
+   A LISTA A TELJES KERET, egy sor mindenkivel, KÉT CSOPORTBAN: fent a kezdő
+   tizenegy (azokkal a kötésekkel számol a mérkőzés), alatta a keret többi
+   tagja — mindkettő értékben csökkenően, csoport-átlaggal. A nem kezdőnél a
+   sor kimondja, hol van (cserepad / tartalék): a kötés a pályán fizet, tehát
+   ez a döntéshez tartozik. */
+function bondAllListHtml(name){
+  const others=bondRosterNames().filter(n=>n!==name);
+  if(!others.length)return `<div class="hdRow" style="color:var(--dim2)">Egyedül van a keretben — nincs kivel összeszoknia.</div>`;
+  const onPitch=new Set(slots.filter(x=>x&&x.player).map(x=>x.player.n));
+  const bench=new Set();
+  try{BENCH_KEYS.forEach(k=>{if(BENCH[k])bench.add(BENCH[k].n);});}catch(_){}
+  const rows=others.map(n=>({n,v:bondOf(name,n),
+    xi:onPitch.has(n),bench:bench.has(n)}));
+  const where=r=>r.bench?"cserepad":"tartalék";
+  const line=r=>`<div class="hdSk" style="border-left-color:var(--${bondTierTone(r.v)})">
+      <div class="nm">${esc(shortName(r.n))}<span class="st">${r.xi?"":where(r)+" · "}<b style="color:var(--${bondTierTone(r.v)})">${r.v}</b> · ${esc(bondTierName(r.v))}</span></div>
+      <div class="hdSkBar"><i style="width:${Math.max(2,Math.min(100,Math.round(r.v)))}%"></i></div></div>`;
+  const grp=(list,title,note)=>{
+    if(!list.length)return "";
+    const avg=Math.round(list.reduce((a,x)=>a+x.v,0)/list.length*10)/10;
+    return `<div class="hdRow" style="margin-bottom:6px"><b>${title} — ${list.length} társ, átlag `
+      +`<span style="color:var(--${bondTierTone(avg)})">${String(avg).replace(".",",")}</span></b>`
+      +list.slice().sort((a,b)=>b.v-a.v).map(line).join("")
+      +(note?`<div style="margin-top:5px;color:var(--dim2)">${note}</div>`:"")+`</div>`;};
+  return grp(rows.filter(r=>r.xi),"A kezdő tizeneggyel",
+      "Ez a csoport számít a mérkőzésen: a csapat összhang-hatása a pályán lévők páronkénti átlagából jön.")
+    +grp(rows.filter(r=>!r.xi),"A keret többi tagjával",
+      "A kötés nem vész el a padon: aki egyszer összeszokott vele, azzal a következő közös meccsen is összeszokott marad.");}
 
 /* ================= F3b — A KÖZVETÍTÉS ÉS A MECCS UTÁNI HÍR (3.8.04) ======
    A szám eddig SZÁMOLT és a döntéseknél MEGSZÓLALT. Ami hiányzott: a
@@ -35319,6 +35420,7 @@ function startFirstSeason(){
      hova értél a végére. */
   S.seasonStartStrength=teamStrength();
   addLine(`Sorsolás kész. 30 forduló vár rád, ${esc(teamName)}. Edző: ${coach.n}. Sok sikert!`,"m");
+  try{boostEarlyAnnounce("start");}catch(e){}
   /* a menetrend rendje látszódjon: a felhasználó tudja, mire számíthat */
   addLine(scheduleMode()==="real"
     ? `📅 Valósághű menetrend: az első félidényben mindenkivel egyszer, a másodikban a visszavágók — hazai és idegenbeli meccsek felváltva.`
@@ -44865,7 +44967,11 @@ function playMatch(){
          meccsenkénti kivétele egyszerre esik ki. */
       try{
         const _fm=pformTick();
-        if(_fm)addLine(`📈 <b>Formafrissítés</b> — az elmúlt ${PFORM_WINDOW} mérkőzés alapján ${_fm} játékos formája mozdult. A keretlistán mindenkinél látod, hol tart.`,"m life");
+        /* A KÉT SZÁM KÜLÖN MONDATBAN — a régi szöveg csak a 8-as ABLAKOT írta
+           ki, és emiatt úgy olvasódott, mintha nyolcmeccsenként frissülne a
+           forma (bejelentett félreértés). A LÉPÉSKÖZ 5, az ABLAK 8: az egyik
+           azt mondja meg, mikor, a másik azt, miből. */
+        if(_fm)addLine(`📈 <b>Formafrissítés</b> — minden ${PFORM_EVERY}. mérkőzés után jön, és az elmúlt ${PFORM_WINDOW} mérkőzést nézi. ${_fm} játékos formája mozdult; a keretlistán mindenkinél látod, hol tart.`,"m life");
       }catch(e){}
       mstatSyncBtn();
     }catch(e){}
@@ -55428,9 +55534,21 @@ function boostOpenPanel(){
   $("twPanel").classList.remove("hide");
   $("twTitle").textContent="⚡ Boost-központ";
   const unit=boostUnitPrice();
+  /* A KÉT KEDVEZMÉNY KIÍRVA. Mindkettő az EGYSÉG ALAPÁRÁT csökkenti, tehát
+     mind a hét fajtára hat — ezt ki kell mondani, mert a régi szöveg (és a
+     kihívás-jutalom leírása) csak az ifi- és az öreg-boostot említette. */
+  const ed=boostEarlyDisc(),cd=S.boostDiscount||0;
+  const before=Math.round(boostUnitBase()/100)*100;
+  const discNote=(ed||cd)
+    ? `<br><span style="color:var(--grass)">Kedvezmény az egység alapárán: `
+      +[ed?`<b>−${Math.round(ed*100)}%</b> a ${S.seasonNumber||1}. idényben`:null,
+         cd?`<b>−${Math.round(cd*100)}%</b> kihívás-jutalomból`:null].filter(Boolean).join(" · ")
+      +` — kedvezmény nélkül ${fmtFt(before)} volna, és MIND A HÉT fajta arányosan olcsóbb.</span>`
+    +(ed?`<br><span style="color:var(--gold)">Az első két idény ablaka: 1. idény −${Math.round(BOOST_EARLY_DISC[0]*100)}%, 2. idény −${Math.round(BOOST_EARLY_DISC[1]*100)}%, utána teljes ár. Érdemes kihasználni — a boost a leghosszabb távon akkor fizet, ha korán éri a játékost.</span>`:"")
+    : "";
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
     Hétféle fejlesztés, mind a büdzséből. Az árak <b>egységben</b> értendők — egy egység a legdrágább boost,
-    az ifi-boost ára: <b style="color:var(--gold)">${fmtFt(unit)}</b>. Az egyenleged <b>${fmtFt(S.transferBudget||0)}</b>.<br>
+    az ifi-boost ára: <b style="color:var(--gold)">${fmtFt(unit)}</b>. Az egyenleged <b>${fmtFt(S.transferBudget||0)}</b>.${discNote}<br>
     Minden boost <b>visszavonhatatlan</b>, és csak azt az EGY játékost érinti.</p>`;
   $("twActions").innerHTML="";
   BOOST_KINDS.forEach(d=>{
@@ -57243,11 +57361,21 @@ function buildHubDetail(loc){
      amit a skilleknél is használunk. A partner mellett kiírjuk, hol van
      (pályán / padon / tartalék), mert a kész kötés hatása CSAK akkor él, ha
      mindketten pályán vannak. */
+  /* ---- ÖSSZHANG: SAJÁT LENYÍLÓ SZAKASZ (3.8.13) ----
+     BEJELENTETT KÉRÉS: „ne a képesség alatt legyen, hanem legyen egy saját
+     lenyíló ablaka, ott minden egyes játékossal való összhangja látszódjon."
+     Eddig ez a blokk a Képességek szakasz VÉGÉN lógott (nem volt saját
+     hdMark-ja), tehát a skillek alatt kellett keresni, és csak a három
+     legerősebb kötést mutatta. Mostantól önálló szakasz, benne a teljes
+     kötés-térkép — a kémia FÖLÖTT, mert az a szűkebb fogalom: a párkémia egy-egy
+     választott páros, az összhang az EGÉSZ öltözőhöz való viszonya. */
+  if(gameMode==="career"&&S&&S.bondsSeeded){
+    const _bc=bondCardHtml(p.n);
+    if(_bc){
+      html+=hdMark("hdBond","🤝 Összhang","kivel milyen a viszonya",0,0);
+      html+=_bc;
+      if(!bondIntegrating(p.n))html+=bondAllListHtml(p.n);}}
   if(gameMode==="career"&&S&&S.chemPairs){
-    /* ---- ÖSSZHANG (3.8.03) ----
-       A kémia FÖLÉ kerül, mert az a szűkebb fogalom: a párkémia egy-egy
-       választott páros, az összhang az EGÉSZ öltözőhöz való viszonya. */
-    html+=bondCardHtml(p.n);
     html+=hdMark("hdChem","🔗 Kémia","kivel van kötése, és él-e",0,0);
     const onPitch=new Set(slots.filter(s=>s&&s.player).map(s=>s.player.n));
     const benchNames=new Set();
@@ -60527,7 +60655,12 @@ function renderHub(){
      if(on){
        const cheapest=Math.min(...BOOST_KINDS.map(d=>boostPriceOf(d.k)));
        const ok=(S.transferBudget||0)>=cheapest;
-       bb.textContent=`⚡ Boost-központ — 7 fajta, ${fmtFtShort(cheapest)}-tól`;
+       /* A KEZDŐ IDÉNYEK KEDVEZMÉNYE A GOMBON IS OTT VAN. Egy határidős
+          engedmény akkor ér valamit, ha a felhasználó AKKOR lát róla, amikor
+          a fejlesztések közt válogat — nem egy súgó-bejegyzésben. */
+       const ed=boostEarlyDisc();
+       bb.textContent=`⚡ Boost-központ — 7 fajta, ${fmtFtShort(cheapest)}-tól`
+         +(ed?`  ·  −${Math.round(ed*100)}% (${S.seasonNumber||1}. idény)`:"");
        bb.style.opacity=ok?"1":".55";}}}
   /* ---- SZINTLÉPÉS: SZABADON, KÉT SZEZON KÖZÖTT ----
      Nincs többé cím- vagy kudarc-feltétel. Szezon KÖZBEN viszont rejtve marad
@@ -60790,10 +60923,11 @@ function renderHub(){
            kimondja a fokot; a részletek (hatás, honnan jön) a lapon. */
         (gameMode==="career"?`<div class="trait" style="margin-top:2px">${pformBarsHtml(pformStep(p.n))} <span style="color:var(--dim2)">forma ${pformStep(p.n)}/${PFORM_MAX} — ${esc(pformLabel(p.n))}</span></div>`:"")
       }${
-        /* BEILLESZKEDÉS: csak az érkezőn, és csak amíg tart. A keretlista az a
-           hely, ahol a felállítást eldöntöd — ott kell látnod, kiről nem tudod
-           még, mit ér a pályán túl. */
-        (()=>{const c=bondSettleChip(p.n);return c?`<div class="trait" style="margin-top:2px">${c}</div>`:"";})()
+        /* ÖSSZHANG: MINDENKIN, egy sorban (3.8.13). A keretlista az a hely,
+           ahol a felállítást eldöntöd — az összhang pedig pont a felállításról
+           szól, tehát nem lehet egy lenyitás mögött. Az érkezőnél a
+           beilleszkedés folyamata áll itt, mindenki másnál maga a szám. */
+        (()=>{const c=bondRowChip(p.n);return c?`<div class="trait" style="margin-top:2px">${c}</div>`:"";})()
       }${unavNote}</span>
       <span class="ovr">${ovrShown}</span>`;
     /* A jelvény koppintása NEM nyitja ki a lapot — saját úticélja van. */
@@ -62876,6 +63010,7 @@ function hubShowSeasonReportBody(){
          is könyvelünk. `fan` nélkül: ez a klub saját pénze, nem a lelátóé. */
       try{wageProbeNoteIncome(b);}catch(e){}
       addLine(`💰 Megérkezett a nyári keret: +${fmtFt(b)}. Most van itt az ideje az igazolásoknak.`,"m life");
+      try{boostEarlyAnnounce("summer");}catch(e){}
       /* BEFEKTETÉS HOZAMA: a tavalyi befektetés kétszeresen jóváíródik —
          ugyanabban a pillanatban, mint a keret, hogy egyben lehessen tervezni. */
       if(S.investReturn>0){
@@ -63342,6 +63477,7 @@ function startNextCareerSeason(){
     S.pyr.note.forEach(x=>{try{addLine(x.h,x.c);}catch(e){}});
     S.pyr.note=null;}
   addLine(`Új szezon kezdődik, ${esc(teamName)}! Edző: ${coach.n}. Sok sikert!`,"m");
+  try{boostEarlyAnnounce("start");}catch(e){}
   if(h2hRoomActive())
     addLine(`⚔ A ${H2H_ROUNDS.join(". és a ")}. fordulóban a társad ellen játszol.`,"m ev");
   announceMpOpponent();
@@ -70719,6 +70855,7 @@ function saveGame(){
         summerLooks:S.summerLooks,training:S.training,trainingChangeUsed:S.trainingChangeUsed,
         /* kihívás-rendszer tartós hatásai és nyomkövetése */
         attrSpinBonus:S.attrSpinBonus,boostDiscount:S.boostDiscount,buyDiscountChance:S.buyDiscountChance,
+        boostEarlyToldSeason:S.boostEarlyToldSeason,
         salaryMod:S.salaryMod,investPending:S.investPending,investReturn:S.investReturn,
         transfersLockedUntilSummer:S.transfersLockedUntilSummer,benchLockName:S.benchLockName,
         benchLockSeason:S.benchLockSeason,buySurcharge:S.buySurcharge,

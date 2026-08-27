@@ -1241,6 +1241,65 @@ idény lett volna — és a felzárkózás félúton, 50-nél meg is állt volna
 
 ---
 
+## 10n. Kiemelt pozíció és a teljes kötés-térkép (3.8.13)
+
+**Bejelentett kérés:** *„az összhang stat legyen kiemelt pozícióban, ne is
+kelljen külön lenyitni. Legyen ott mindenkinek, ahol most a »kezd
+beilleszkedni« van"*, és *„a lenyíló menüben lehessen részletesen megnézni,
+hogy kivel milyen kapcsolatban van — ne a képesség alatt legyen, hanem legyen
+egy saját lenyíló ablaka"*.
+
+### A keretlista sora — mindenkinek
+
+A keretlista sorában eddig **csak a beilleszkedők** chipje állt
+(`bondSettleChip`), a beállt keret száma pedig a lenyitott lapon lapult. Épp az
+a szám hiányzott a felállítás helyéről, ami a felállításról szól.
+
+`bondRowChip(név)` innentől **mindenkinek** ad sort, ugyanott:
+
+```
+🤝 összhang: 36,5 · Ismerik egymást
+🤝 összhang: 41,2 · Összeszokott (ha beállna)      ← nincs a kezdőben
+🤝 beilleszkedés 5/8 · kezd beilleszkedni          ← még érkező
+```
+
+A mérce ugyanaz, mint a lapon: a **kezdő tizeneggyel** mért összhang
+(`bondXIDetail`) — az számít a mérkőzésen. Aki nincs a kezdőben, annál a szám
+azt mondja meg, mennyi lenne, ha beállna (a legvalószínűbb áldozat kimarad az
+átlagból, lásd 10m).
+
+### Saját lenyíló szakasz, benne a teljes térkép
+
+A játékos lapján az összhang-blokk eddig a **Képességek szakasz végén** lógott
+(nem volt saját `hdMark`-ja), tehát a skillek alatt kellett keresni — és csak a
+három legerősebb kötést mutatta. Abból viszont nem derül ki, **hol a baj**: a
+gyenge kötéseken kell dolgozni, és a kezdő tizenegyen belüli szomszédságok azok,
+amik a pályán tényleg számítanak.
+
+Mostantól **önálló szakasz** (`hdMark("hdBond", "🤝 Összhang", "kivel milyen a
+viszonya")`), közvetlenül a **Kémia fölött** — az a szűkebb fogalom: a párkémia
+egy-egy választott páros, az összhang az egész öltözőhöz való viszony.
+
+A szakaszban a régi összefoglaló alatt ott a **teljes kötés-térkép**
+(`bondAllListHtml`): egy sor **minden** kerettaggal, két csoportban, mindkettő
+értékben csökkenően és csoport-átlaggal:
+
+```
+🤝 A kezdő tizeneggyel — 10 társ, átlag 44,8
+   P. Maldini      58 · Összeszokott      ▓▓▓▓▓▓░░░░
+   Mészáros        55 · Összeszokott      ▓▓▓▓▓▓░░░░
+   …
+🤝 A keret többi tagjával — 14 társ, átlag 29,1
+   Rudolf          cserepad · 34 · Ismerik egymást
+   …
+```
+
+A nem kezdőknél a sor kimondja, **hol** van a másik (cserepad / tartalék): a
+kötés a pályán fizet, tehát ez a döntéshez tartozik. A beilleszkedőnél a lista
+kimarad — ott még nincs mit mutatni, a folyamat a hír.
+
+---
+
 ## 11. Ami még hátravan
 
 **Semmi — a rendszer kész.** Ami a tervből tudatosan kimaradt: az

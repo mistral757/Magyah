@@ -1,7 +1,9 @@
 # Boostok — a hét fajta és a Boost-központ
 
-*(3.8.12. Érintett kód: `BOOST_UNIT_KIND` / `BOOST_KINDS` és a `boost*`
-függvények (`boostUnitPrice`, `boostPriceOf`, `boostKindReady`,
+*(3.8.12; 3.8.13 — a kedvezmények. Érintett kód: `BOOST_UNIT_KIND` /
+`BOOST_KINDS`, `BOOST_EARLY_DISC` és a `boost*`
+függvények (`boostUnitBase`, `boostDiscountMult`, `boostEarlyDisc`,
+`boostEarlyAnnounce`, `boostUnitPrice`, `boostPriceOf`, `boostKindReady`,
 `boostOpenPanel` / `boostPickPlayer` / `boostPickAttr` / `boostConfirm`),
 az öt új hatás (`applyPlainBoost`, `applyAttrBoost` + `boostAttrRate`,
 `applyTsiBoost`, `applyBondBoost` + `bondBoostMult`, `applySkillBoost` +
@@ -33,14 +35,14 @@ hatás egy mondatban.
 
 ## 2. Az egység — egy szám hangolja az egészet
 
-**Az egység az ifi-boost ára.** Nem új árképlet: a `youthBoostPrice()` marad a
-mérce — a keret legdrágább emberének **vételárához** kötve, a mezőny
-szintjével skálázva (`youthBoostScale`), a kihívás-kedvezménnyel csökkentve
-(`S.boostDiscount`) —, a hét fajta pedig ennek egy **arányát** fizeti.
+**Az egység az ifi-boost ára.** Nem új árképlet: a `boostUnitBase()` a mérce —
+a keret legdrágább emberének **vételárához** kötve, a mezőny szintjével
+skálázva (`youthBoostScale`) —, a hét fajta pedig ennek egy **arányát**
+fizeti. Az ifi-boost pontosan egy egység, tehát `youthBoostPrice()` = 
+`boostUnitPrice()`.
 
-Így minden meglévő hangolás (a szintskála, a boost-kedvezmény, a klub
-gazdagsága) magától érvényes mind a hétre, és **egyetlen szám hangolja az
-egészet**.
+Így minden meglévő hangolás (a szintskála, a kedvezmények, a klub gazdagsága)
+magától érvényes mind a hétre, és **egyetlen szám hangolja az egészet**.
 
 | | fajta | egység | hatás |
 |---|---|--:|---|
@@ -54,6 +56,48 @@ egészet**.
 
 **Mérve** (éles karrieren, 17 600 egységnyi belső ár mellett): 8800 · 10 600 ·
 10 600 · 5800 · 7000 · 17 600 · 14 100 — betűre a fenti arányok.
+
+### 2.1 A két kedvezmény — MIND A HÉT fajtára (3.8.13)
+
+**Bejelentett kérés:** *„olcsóbb boost tokenek általában, ne csak az ifi és
+öregboost — gyakorlatilag az 1 egység alapárát csökkentsük"*, illetve *„az
+első két szezonban csökkentsük ezek árát: 1. szezon −50%, 2. szezon −33%"*.
+
+A kedvezmények innentől **egy helyen**, a `boostDiscountMult()`-ban ülnek, és az
+**egység alapárát** szorozzák — tehát a hét fajta magától követi őket. (A
+kihívás-jutalom eddig is így hatott, csak a szövegei „az ifi- és öreg-boostról"
+beszéltek; ez félrevezető volt, és javítva lett.)
+
+| kedvezmény | mérték | forrás |
+| --- | --- | --- |
+| **kezdő idények** | 1. idény **−50%**, 2. idény **−33%**, utána 0 | `BOOST_EARLY_DISC` / `boostEarlyDisc()` |
+| **kihívás-jutalom** | fokozatonként −10%, plafon −50% | `S.boostDiscount` |
+
+A kettő **szorzódik**, nem összeadódik (`(1−a) × (1−b)`, padlózva 0,10-nél):
+két független engedmény, és így egyik sem tudja nullára vinni az árat.
+
+**Miért jár a kezdő idényeknek engedmény?** Mert az egység a kereted
+legdrágább emberének vételárához van kötve — vagyis **már az első nyáron a
+teljes árat kéri**, miközben a klub akkor a legszegényebb. Pont akkor hozná
+viszont a legtöbbet egy berobbantott fiatal: öt-hat szezonon át élveznéd. A
+kedvezmény tehát nem ajándék, hanem az az ablak, amikor a boost a leghosszabb
+távon fizet.
+
+**Az idényhatár a nyári ablakkal együtt mozog.** A nyári keret még a lezáruló
+idény számán érkezik (lásd a szezonjelentés `summerPaidAfterSeason` ágát), tehát
+az 1. idény **nyári ablakában is a −50% él** — ugyanaz a szabály, ami az
+idény-mérlegben is („az idény sora a rá következő nyári ablakot is
+tartalmazza").
+
+**Ki is mondjuk**, mert egy határidős kedvezmény pont attól vész el, hogy nem
+tud róla senki:
+
+* **napló**, idényenként kétszer (`boostEarlyAnnounce`): a kezdőrúgásnál és
+  amikor a nyári keret megérkezik — a jelző (`S.boostEarlyToldSeason`) a
+  mentésbe kerül, tehát újratöltés nem ismétli;
+* **HUB-gomb**: „⚡ Boost-központ — 7 fajta, X-tól · **−50% (1. idény)**";
+* **a Boost-központ fejléce**: mennyi lenne kedvezmény nélkül, melyik
+  engedmény mennyit visz, és mikor jár le az ablak.
 
 ### Miért százalék, és nem fix pont
 
