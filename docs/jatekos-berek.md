@@ -28,7 +28,7 @@ A klub két csatornán keres, és a meccsenkénti keret-bér bázisa **mindkett�
 
 ```
 bázis = 0,50 × a BÉRHORGONY heti bevétele
-      + 0,25 × (nyári klub-keret ÷ 34)        ← az „edzői fizetés" ága
+      + 0,25 × (a klub MŰKÖDÉSI kerete ÷ 34)  ← az „edzői fizetés" ága
       + trófeák × (a BÉRHORGONY heti bevétele ÷ 9)
 ```
 
@@ -36,9 +36,18 @@ bázis = 0,50 × a BÉRHORGONY heti bevétele
 > állt — nem a mai. Lásd a 6.1 szakaszt: ez a szám hajtja a bázist, a
 > sztár-felárat ÉS a plafont is.
 
-A klub-keret a `seasonBudgetParts().club`, vagyis a csapaterőből, az edzői
-fizetésemelésből és a tempóból álló összeg — ha kihívásból fizetésemelést kapsz,
-a bér is követi.
+A klub-keret a `seasonBudgetCore()`, vagyis a nyári keret **működési rétege**:
+a csapaterőből, a mezőny szintjéből, az edzői fizetésemelésből és a tempóból
+álló összeg — ha kihívásból fizetésemelést kapsz, a bér is követi.
+
+> **Miért a működési réteg, és nem a teljes keret? (v3.8.13)** A nyári keret
+> második rétege a **vitrin-prémium** (lásd `docs/szezonkeret.md`): a piac
+> tetejének egy százaléka, amit a megnyert trófeák nyitnak. Ha ez is a
+> bérbázisban ülne, minden megnyert kupa azonnal vissza is drágulna bérben,
+> ráadásul a bázis olyan messze kerülne a lelátótól, hogy a plafon
+> (`WAGE_CAP_OK`) tartósan rákulcsolódna — és a Rating-arányos szétosztásnak
+> nem maradna tétje. A trófea béremelését külön, mérten a `wageTitleCount` ága
+> adja (a képlet harmadik sora).
 
 ## 3. A szétosztás: Rating, a MEZŐNYHÖZ mérten
 

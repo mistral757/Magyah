@@ -733,8 +733,10 @@ A 3.1.02 előtti mentések „lemaradt" bejegyzései a betöltéskor átkerülne
 beragadt állapotba (`msMigrateMissed`), és ahol a történetből látszik, hogy a
 feltétel azóta teljesült, ott azonnal ki is fizetődnek.
 
-Az árazás a jutalmakkal azonos idiómát követi (a mindenkori éves büdzsé
-százaléka), **szorozva az edzői fizetéssel** (`msCatSalaryMult` =
+Az árazás a jutalmakkal azonos idiómát követi (a mindenkori éves keret
+**működési rétegének** — `seasonBudgetCore()` — a százaléka; a vitrin-prémium
+sem a jutalmakon, sem az árakon nem folyik át, lásd `docs/szezonkeret.md`),
+**szorozva az edzői fizetéssel** (`msCatSalaryMult` =
 `1 + S.salaryMod`, padlózva 0,5-nél). A fizetésemelés tehát kétszer számít: a
 büdzsében is, meg a program árában is — ez a fenti engedmény (a beragadt
 jutalom kiengedhető) ellensúlya. Az alábbi szorzók a fizetésemelés nélküli
