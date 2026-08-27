@@ -1,8 +1,8 @@
 # Összhang — a modell
 
-**Állapot:** 🟡 **F1–F3 kész** — a szám épül, hat a meccsre, a nehézségi
-ajánlások tudnak róla, és a döntések pillanatában meg is szólal ·
-**Verzió:** 3.8.03
+**Állapot:** 🟡 **F1–F5 kész** — a szám épül, hat a meccsre, a nehézségi
+ajánlások tudnak róla, a döntéseknél és a közvetítésben megszólal, és
+térképen is látszik · **Verzió:** 3.8.04
 
 *(Terv és ütemterv: `docs/osszhang-rendszer-terv.md`. Érintett kód: a
 `BOND_*` konstansok, `bondKey/bondRaw/bondOf/bondSet/bondAdd/bondCapOf`,
@@ -33,7 +33,10 @@ egymást — idényekben mérhető, és csak akkor vész el, ha valaki elmegy.
 | **F1** ✅ | a modell: a kötések épülnek, mentődnek, mérhetők |
 | **F2** ✅ | a szám **hat**: nulla-középpontú tag a csapaterőben, az összhang **átvette a morál „kémia" bemenetét**, és bekerült a **meccs-erőbe** — így a nehézségi ajánlások is látják |
 | **F3** ✅ | **megszólal a döntéseknél**: eladási és vásárlási megerősítő, beilleszkedés a keretlistán és a játékos lapján, meccs utáni jelentés (ez hozta az **F5** magját is) |
-| F3b · F4 · F6 · F7 · F8 | kommentár, pályatérkép, edzés-sáv, edző, első keret képernyője |
+| **F3b** ✅ | **megszólal a közvetítésben**: kezdőrúgás, gól, fokozatlépés a lefújás után |
+| **F4** ✅ | **összhangtérkép** a pályaképen, hét fokozattal |
+| **események** ✅ | átigazolási **csapatépítés** és öltözői **összhang-események** |
+| F6 · F7 · F8 | edzés-sáv, összhang-edző, az első keret képernyője |
 
 ---
 
@@ -566,8 +569,149 @@ Legerősebb kötései: P. Maldini 78 (Vakon megtalálják) · Platini 77 (Erős 
 
 ---
 
+## 10e. F3b — a közvetítés
+
+A szám eddig számolt és a döntéseknél megszólalt. Ami hiányzott: **a mérkőzés
+maga**. Egy összeszokott tizenegy másképp néz ki a pályán, mint egy frissen
+összerakott — ha erről a közvetítés egy szót sem ejt, a rendszer marad
+statisztika.
+
+Három szinten szólal meg, és mindhárom **szűkmarkúan**: a közvetítés amúgy is
+sűrű, egy negyedik állandó zajforrás elvenné a gólok súlyát.
+
+**Kezdőrúgáskor** — legfeljebb két sor, és csak a szélső eseteknél (72 fölött
+dicsér, 34 alatt aggódik). Mellé a **legjellemzőbb posztcsoport**: az,
+amelyik a legmesszebb áll a csapat átlagától (±12), mert az mond valamit — nem
+az, amelyik pont ugyanott van. És aki még beilleszkedik, azt is kimondja.
+
+```
+összhang 20 : 🤝 Sok itt még az idegen egymásnak — ez a tizenegy nem szokta meg egymást.
+összhang 55 : (semmi — ez a szándék: a középmezőnyben nincs hír)
+összhang 80 : 🤝 Ennek a csapatnak nem kell beszélnie a pályán — az évek megtették a magukét.
+védelem +   : 🤝 Külön kiemelnénk a védelmet: ők értik egymást a legjobban ebben a keretben.
+```
+
+**Gólnál** — csak „Erős kötés" (63) fölött, és **csak ha nincs köztük kész
+párkémia**: annak saját sora van, ugyanazt a párost nem mondjuk el kétszer.
+Három hangfekvés a fokozat szerint:
+
+```
+66 : → 🤝 Meglátszik a sok közös meccs: Maradona passza pont oda érkezett, ahol Messi várta.
+82 : → 🤝 Maradona hátra sem nézett, mégis pontosan tudta, hol van Messi.
+95 : → 🤝 Maradona és Messi egymás gondolatait olvassák — a védelem esélyt sem kapott.
+```
+
+**Lefújás után** — ha egy kötés **fokozatot lépett**. A hír nem a +1 pont,
+hanem hogy átléptek valamit. Csak az említésre méltókat (47 fölött), legfeljebb
+hármat, és a meccs UTÁN: menet közben a gólok közé ékelve elvenné azok súlyát.
+
+```
+🤝 Henry & C. Ronaldo — új fokozat: Összeszokott (47). Kezd összeállni köztük valami.
+```
+
+---
+
+## 10f. F4 — az összhangtérkép
+
+**Nem új képernyő és nem új rajzoló.** Ugyanaz a `#pitch`, ugyanazok a
+korongok, ugyanaz a `#pitchBonds` réteg — csak minden, ami nem a
+kapcsolatokról szól, kikapcsol: a fűsáv és a felfestés, a szezonkártyák színe
+és gyűrűje, az Aranylabda-arany, a poszt-színű keret, a kapitány-szalag, a
+sérülés- és eltiltás-jelvények. Marad a karika a Ratinggel, alatta a név, és a
+köztük futó vonalak.
+
+**A háttér semleges sötét, nem zöld:** a hét fokozat vékony és halvány vége a
+fűszínen egyszerűen nem látszott volna.
+
+| fokozat | vonal | érték |
+|---|---|---|
+| 1 | halvány, ritkán szaggatott | 1–14 |
+| 2 | halvány, sűrűbben szaggatott | 15–29 |
+| 3 | szaggatott | 30–46 |
+| 4 | folytonos | 47–62 |
+| 5 | folytonos vastag | 63–77 |
+| 6 | folytonos vastag, **két nyíllal** | 78–91 |
+| 7 | folytonos vastag, két nyíllal, **arany** | 92–99 |
+
+**A csúcs arany, nem piros.** Ebben a játékban a piros mindenhol a *rossz*
+(lap, büntetés, csökkenő érték) — a legerősebb kötés piros vonala tanult
+jelentéssel ütközne.
+
+### A hajszálgombolyag, és mit tettünk ellene
+
+Tizenegy emberen **55 pár** van, és egy beállt keretben ezek nagy része a
+4–6. fokozatba esik: 55 vastag vonal, amiből épp az nem olvasható ki, amiért a
+térkép készült. A mérés ezt azonnal meg is mutatta.
+
+A szűrő a **struktúrát** mutatja, nem a mátrixot: **fejenként a három
+legerősebb** kötés (az uniójuk), plusz **mindig a két felső fokozat** — egy
+92-es kötés nem tűnhet el csak azért, mert mindkettejüknek van három még
+erősebb. Így 55 helyett tipikusan 15–25 vonal marad, és látszik, ki a háló
+közepe. A teljes mátrix egy koppintással előhívható (**⋯ Mind az 55**).
+
+Mérve mindhárom témában, oldalhiba nélkül. A noir szándékosan monokróm — ott a
+felső három fokozatot a vastagság és a nyilak különböztetik, nem a szín.
+
+---
+
+## 10g. Az összhang mint esemény
+
+### Öltözői összhang-események
+
+Az öltözői események eddig **kizárólag a morált** mozgatták. Az összhanggal
+lett egy másik, lassabb tétjük is: ami ott két ember között történik, az a
+pályán is nyomot hagy. A morál-hatásuk szándékosan mérsékelt — a súlyuk az
+összhangban van, nem a hangulatban. A feltételeik a **meglévő
+személyiség-adatból** dolgoznak, nem új sorsolásból.
+
+| esemény | összhang | morál |
+|---|---|---|
+| edzés után ottmaradnak gyakorolni | **+9** | +2 |
+| a szárnyai alá veszi (vezér ↔ jó együttműködő) | **+12** | +1 |
+| egy szobában utaznak idegenbe | **+7** | +3 |
+| edzésmeccsen egymásnak esnek | **−8** | −2 |
+| megkérdőjelezi a vezető szerepét | **−6** | −1 |
+
+Két helyről is tüzelhet ugyanaz az esemény (a lefújás utáni közjáték és az
+átigazolási időszak öltöző-ága), ezért a hatás **egyetlen függvényben** ül
+(`applyEventBond`) — a két út nem tud szétcsúszni. A napló mindkét helyen
+kimondja, mi történt: enélkül a szám némán mozdulna.
+
+```
+🤝 C. Ronaldo & Lahm összhangja 50 → 59 (+9) — Összeszokott.
+```
+
+Aki még **beilleszkedik**, azon nem mozdítunk: az értékei a 8. meccsen dőlnek
+el, egy közbeeső lökés némán elveszne.
+
+### Csapatépítés (átigazolási esemény)
+
+Az átigazolási időszak eddig kizárólag a keret **összetételéről** szólt: ki
+jön, ki megy. Az összhang-rendszerrel a nyárnak van egy másik tétje is — az,
+ami már megvan, mennyire áll össze.
+
+Nem egy párost erősít, hanem a **keret egészét**, és pont ez a különbsége az
+öltözői eseményektől. A hatás a **meglévő** kötésekre ül rá, tehát annál
+többet ér, minél több embered van már együtt: **a csapatépítés nem pótolja a
+közös meccseket, csak gyorsítja őket.** A csillapítás és a 88-as puha tető
+érvényes rá.
+
+Négy változat (edzőtábor a hegyekben, csapatépítő hétvége, közös felkészülés,
+videós műhely), pároként +4…+7 — a **kezdő tizenegy** közti kötések a teljes
+adagot kapják, a tartalékkal kötöttek a felét.
+
+```
+Nem igazoltunk senkit — helyette videós elemző-műhely az egész kerettel.
+Az 55 kapcsolat mindegyike erősödött: a csapat-összhang 50 → 54, a morál +1.
+```
+
+A súlya (2) szándékosan a „csendes átigazolási időszak" (3) alatt van: ez a
+ritka, kellemes meglepetés.
+
+---
+
 ## 11. Ami még hátravan
 
-`F3b` **kommentárok és meccs utáni üzenetek** · `F4` az
-összhangtérkép · `F5` a játékoslap · `F6` az összhangépítés edzés-sáv ·
-`F7` az összhang-edző · `F8` az első keret képernyője · `F9` hangolás.
+`F6` az összhangépítés edzés-sáv (fő + másodlagos, posztcsoport- és
+megbízás-párokkal) · `F7` az összhang-edző (a Csapatkovács átalakítása, négyes
+fókusz) · `F8` az első keret saját képernyője · `F9` hangolás tíz idényen.
