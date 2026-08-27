@@ -4692,7 +4692,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.35";
+const APP_VERSION="3.7.36";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -49064,7 +49064,13 @@ function renderHubMidRolePicker(){
         /* a poszt-kódok és az illeszkedések változtak, tehát a pályakép és a
            keretlisták frissítése továbbra is kell */
         refreshSquadViews();
-        renderHub();saveGame();});
+        renderHub();saveGame();
+        /* A VÁLASZTÓ A LISTA ALATT ÜL, és a megnyitása ODA GÖRGETETT — a
+           nyitott játékos-lap tehát a képernyőn kívülre került, vagyis a
+           renderHub saját horgonya (hubKeepOpenRow) nem kapaszkodik bele.
+           Itt kell visszavinni a lapot arra a játékosra, akinek a megbízását
+           épp átállítottad. Ugyanaz az elv, mint a posztcserénél. */
+        hubScrollRowIntoView(hubExpandedKey);});
     box.appendChild(b);});}
 $("hubMidRoleCancel")&&($("hubMidRoleCancel").onclick=()=>{
   $("hubMidRolePicker").classList.add("hide");});
@@ -49105,7 +49111,9 @@ function renderHubCaptainPicker(){
       else btn.onclick=()=>{
         setCaptainIdx(o.i);
         $("hubCaptainPicker").classList.add("hide");
-        renderHub();drawPitch();updateBar();saveGame();};
+        renderHub();drawPitch();updateBar();saveGame();
+        /* …és a kapitányváltó is a lista alatt ül — lásd a megbízás-választót. */
+        hubScrollRowIntoView(hubExpandedKey);};
       row.appendChild(btn);
       body.appendChild(row);});}
 $("hubCaptainCancel")&&($("hubCaptainCancel").onclick=()=>{
@@ -49836,12 +49844,19 @@ function renderScoutUpgradePanel(){
   const back=document.createElement("button");back.className="btn-s stepbtn";back.style.marginTop="6px";back.textContent="Vissza";
   back.onclick=()=>renderAgencyHubPanel();
   $("twActions").appendChild(back);}
-function csReturnToHub(){
+/* `showKey` — ha a folyamat EGY KONKRÉT játékoshoz tartozott (poszt-tanulás),
+   a HUB ne a szakasz tetején fogadjon, hanem annál a játékosnál, akiről az
+   egész szólt. A hívók többsége (átigazolás, klub-szemle, stáb, Infinity) nem
+   ad kulcsot — ott a HUB teteje marad a helyes cél, ahogy eddig. */
+function csReturnToHub(showKey){
   twClearAnim();
   $("scWindow").classList.add("hide");
   $("scHub").classList.remove("hide");
   renderHub();
-  $("scHub").scrollIntoView({behavior:"smooth"});}
+  const row=showKey&&[...document.querySelectorAll('#scHub [data-hubkey]')]
+    .some(x=>x.getAttribute("data-hubkey")===showKey);
+  if(row)hubScrollRowIntoView(showKey);
+  else $("scHub").scrollIntoView({behavior:"smooth"});}
 /* ---- Keretbővítés ---- */
 const ROSTER_EXPAND_MAX=48;
 function rosterExpandPrice(cur){
@@ -51803,6 +51818,47 @@ function hubStickyInset(){
     if(r.height<=0||r.top>40)return;      /* nincs kitapadva a lap tetejére */
     top=Math.max(top,r.bottom);});
   return Math.max(0,top);}
+/* ---- …ÉS MINDEN MŰVELET UTÁN A NYITOTT LAP A HELYÉN MARAD (3.7.36) ----
+   BEJELENTETT HIBA: „miután befejeztél egy akciót, pl. megbízás-módosítást vagy
+   piacra tételt, az oldal tetejére görget, mint korábban a csere után. Maradjon
+   a megnyitott játékoson a »cursor«."
+
+   UGYANAZ AZ OK, MINT A CSERÉNÉL. A művelet végén `renderHub()` fut, ami a
+   TELJES HUB-ot újraépíti: a régi DOM eltűnik, a dokumentum egy pillanatra
+   rövidebb lesz, és a böngésző a görgetést a tetejére csippenti. A cserét
+   pontosan ezért horgonyoztuk le a 3.7.35-ben — csakhogy a HUB-on TIZENÖT
+   további művelet hívja a renderHub-ot (megbízás, poszt-tanulás, piacra
+   bocsátás, levétel a piacról, boost, kapitány, csereterv, karszalag…), és
+   mindegyiket külön lehorgonyozni törékeny volna: egy kifelejtett — vagy egy
+   JÖVŐBELI — hívási hely némán visszahozná a hibát.
+
+   EZÉRT A HORGONY MAGÁBA A renderHub-BA KERÜLT. Egy igazság, egy hely: ha van
+   nyitott játékos-lap, a rajzolás megőrzi annak a sornak a KÉPERNYŐN elfoglalt
+   helyét. A művelet-kezelőknek nincs vele dolguk, és a következőnek sem lesz.
+
+   HÁROM KAPU, hogy ne kapaszkodjunk bele olyanba, amibe nem kell:
+     · van egyáltalán nyitott lap (hubExpandedKey),
+     · látszik a HUB szakasz,
+     · és a sor a KÉPERNYŐN van — ha kívül esik (mert épp máshonnan lépünk a
+       HUB-ba, és egy régi kulcs maradt bent), a hívó dolga eldönteni, hova
+       görgessen; egy kívül eső sor helyének „megőrzése" csak megfogná a lapot.
+
+   A CSERE KIVÉTEL MARAD: ott a sor a választóhoz görgetés miatt jellemzően
+   kívül van a képernyőn, tehát ez a kapu úgysem enged át — és a swap-kezelő
+   a rajzolás UTÁN úgyis odaviszi a lapot (hubScrollRowIntoView). A kettő nem
+   üti egymást: a későbbi hívás dönt. */
+function hubKeepOpenRow(){
+  const noop=function(){};
+  if(!hubExpandedKey)return noop;
+  const sec=$("scHub");
+  if(!sec||sec.classList.contains("hide"))return noop;
+  const el=[...document.querySelectorAll('#scHub [data-hubkey]')]
+    .find(x=>x.getAttribute("data-hubkey")===hubExpandedKey);
+  if(!el)return noop;
+  const r=el.getBoundingClientRect();
+  const vh=window.innerHeight||document.documentElement.clientHeight||0;
+  if(r.bottom<0||r.top>vh)return noop;     /* nem is látszik — hagyjuk a hívóra */
+  return hubKeepRowAnchor(hubExpandedKey);}
 function hubScrollRowIntoView(key,pad){
   if(!key)return;
   const find=()=>[...document.querySelectorAll('#scHub [data-hubkey]')]
@@ -53290,7 +53346,10 @@ function openPosLearnPicker(loc){
         addLine(`🎓 Poszt-tanulás elindítva: ${esc(shortName(p.n))} elkezdte ${hunAz(pos)} ${pos} poszt tanulását (−${fmtFt(cost)}).`,"m life");
         $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">🎓 Elindítva!</div><p style="font-size:13px;margin-top:5px">${esc(shortName(p.n))} mostantól ${hunAz(pos)} <b>${pos}</b> posztot tanulja. A haladást a lenyíló játékos-panelen követheted. Szólunk, ha kész!</p>`;
         $("twActions").innerHTML="";
-        const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";ok.onclick=()=>csReturnToHub();
+        const ok=document.createElement("button");ok.className="btn-y stepbtn";ok.textContent="Vissza a HUB-ba";
+        /* A poszt-tanulás EGY konkrét játékosról szól — a HUB nála fogadjon
+           vissza, ne a szakasz tetején. */
+        ok.onclick=()=>csReturnToHub(hubLocKey(loc));
         $("twActions").appendChild(ok);
         updateBar();saveGame();}});};
   const mkBtn=(pos,rec)=>{
@@ -53314,7 +53373,7 @@ function openPosLearnPicker(loc){
     $("twActions").appendChild(sep);}
   learnable.forEach(pos=>{if(pos!==suggested)mkBtn(pos,false);});
   const cancel=document.createElement("button");cancel.className="btn-s stepbtn";cancel.style.marginTop="10px";cancel.textContent="Mégsem";
-  cancel.onclick=()=>csReturnToHub();$("twActions").appendChild(cancel);
+  cancel.onclick=()=>csReturnToHub(hubLocKey(loc));$("twActions").appendChild(cancel);
   $("scWindow").scrollIntoView({behavior:"smooth"});}
 function hubLocPosTxt(loc){
   if(loc.type==="slot")return slots[loc.idx].pos;
@@ -55848,6 +55907,9 @@ function hubRefreshMenu(){
      scHub-on (tehát a figyelő nem látja), csak újrarajzol. */
   hubMenuApply();}
 function renderHub(){
+  /* A NYITOTT JÁTÉKOS-LAP HELYÉT A RAJZOLÁS ELŐTT MÉRJÜK — lásd
+     hubKeepOpenRow. A visszaállítás a rajzolás legvégén van. */
+  const _keepOpen=hubKeepOpenRow();
   /* Ugyanaz a biztosíték, mint a teardownGameScreens-ben: a HUB-ba érve
      stadion-módnak semmiképp nem szabad élnie. */
   try{document.body.classList.remove("stadium","fa-board");}catch(e){}
@@ -56492,6 +56554,11 @@ function renderHub(){
      is rejtve van, tehát a túra fele üresen kongana. Az öt tipp egyszerre
      sorba áll, és a guideFire duplikáció-szűrője miatt a további
      újrarajzolások nem indítják újra. */
+  /* A NYITOTT LAP VISSZA A HELYÉRE. Itt, a lista és a panelek felépülése UTÁN:
+     előbb mérve a sor még a régi magasságokat látná. A vezetés buborékjai
+     `position:fixed`-ek, tehát utánuk sem tolódik el semmi — de a horgony a
+     következő képkockán úgyis korrigál. */
+  try{_keepOpen();}catch(e){}
   if(!preSeasonHubMode&&guideEnabled())
     ["hub:menu","hub:info","hub:budget","hub:challenges","hub:roster","hub:next"].forEach(guideFire);
   /* ---- 3. SZINT: HALK JELZÉSEK ----

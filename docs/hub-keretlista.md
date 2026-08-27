@@ -1,6 +1,6 @@
 # A HUB keretlistája — húzással csere és a görgetés
 
-*(3.7.35. Érintett kód: `hubDragInit` és a köre (`hubDragRowOf`, `hubDragLocOf`,
+*(3.7.35–3.7.36. Érintett kód: `hubDragInit` és a köre (`hubDragRowOf`, `hubDragLocOf`,
 `hubDragLift`, `hubDragMoveGhost`, `hubDragAutoScroll`, `hubDragDrop`,
 `hubDragClear`), a `HUBDRAG_*` konstansok, `hubStickyInset` /
 `hubScrollRowIntoView`, valamint a `.hubDragArm` / `.hubDragGhost` /
@@ -43,6 +43,55 @@ beérkező játékossal. Épp azt akarod megnézni: jól sült-e el a csere.
 **Mérve** (430×930, a slot:8 lapja nyitva, csere a panelről): a nyitva maradt
 sor teteje **69 px**, a kitapadt menüsáv alja **59 px** — vagyis pontosan
 10 px-re alatta, a képernyőn.
+
+---
+
+## 1b. …és MINDEN más művelet után is (3.7.36)
+
+**Bejelentett hiba:** *„miután befejeztél egy akciót, pl. megbízás-módosítást
+vagy piacra tételt, az oldal tetejére görget, mint korábban a csere után.
+Maradjon a megnyitott játékoson a »cursor«."*
+
+Ugyanaz az ok, mint a cserénél — csakhogy a HUB-on **tizenöt további művelet**
+hívja a `renderHub`-ot (megbízás, poszt-tanulás, piacra bocsátás, levétel a
+piacról, boost, kapitány, csereterv, karszalag…). Mindegyiket külön
+lehorgonyozni törékeny volna: egy kifelejtett — vagy egy **jövőbeli** — hívási
+hely némán visszahozná a hibát.
+
+**Ezért a horgony magába a `renderHub`-ba került** (`hubKeepOpenRow`): ha van
+nyitott játékos-lap, a rajzolás megőrzi annak a sornak a képernyőn elfoglalt
+helyét. A művelet-kezelőknek nincs vele dolguk, és a következőnek sem lesz.
+
+Három kapu, hogy ne kapaszkodjunk bele olyanba, amibe nem kell:
+
+1. van egyáltalán nyitott lap (`hubExpandedKey`),
+2. látszik a HUB szakasz,
+3. és a sor **a képernyőn van** — ha kívül esik (mert épp máshonnan lépünk a
+   HUB-ba, és egy régi kulcs maradt bent), a hívó dolga eldönteni, hova
+   görgessen; egy kívül eső sor helyének „megőrzése" csak megfogná a lapot.
+
+### A két kivétel: ami SZÁNDÉKOSAN elgörget
+
+A **megbízás-választó** (`#hubMidRolePicker`) és a **kapitányváltó**
+(`#hubCaptainPicker`) a keretlista ALATT ülnek, és a megnyitásuk odagörget —
+a nyitott játékos-lap tehát a képernyőn kívülre kerül, vagyis a 3. kapu nem
+enged át. Ott a kezelő a rajzolás UTÁN **odaviszi** a lapot
+(`hubScrollRowIntoView`), pontosan úgy, ahogy a posztcsere.
+
+A **poszt-tanulás** a `#scWindow`-ban fut, és a `csReturnToHub()` a HUB
+tetejére tett vissza. Az függvény mostantól kaphat egy `showKey`-t: ha a
+folyamat egy konkrét játékosról szólt, a HUB **nála** fogad vissza. A hívók
+többsége (átigazolás, klub-szemle, stáb, Infinity) nem ad kulcsot — ott a HUB
+teteje marad a helyes cél, ahogy eddig.
+
+### Mérve (430×930)
+
+| művelet | a sor teteje előtte | utána |
+|---|--:|--:|
+| 📈 piacra bocsátás (modálból) | 429 px | **429 px** — meg sem moccan |
+| 🧭 megbízás módosítása | −2774 px (a választóhoz görgetve) | **69 px** — a kitapadt sáv (59 px) alatt |
+| 🎓 poszt-tanulás → „Mégsem" | a `#scWindow` látszik | **69 px** — a HUB nála fogad vissza |
+| sima lenyitás (nem változott) | 428 px | **428 px** |
 
 ---
 
