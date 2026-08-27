@@ -5041,7 +5041,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.13";
+const APP_VERSION="3.8.14";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -37297,8 +37297,19 @@ function sbPaintTeams(fx){
   const mine={full:sbCleanClub(teamName),abbr:sbClubAbbr(teamName,true),
               ovr:num(typeof teamStrength==="function"?teamStrength():null),
               pos:sbTablePos(null)};
+  /* ---- A PÁRHARC ELLENFELE KÜLÖN SZÁMOT VISZ (3.8.14) ----
+     BEJELENTETT HIBA: „nem jó az ellenfél ratingjának kijelzése egymás elleni
+     meccsnél." Az ok: a CPU-mezőny `ovr`-je és a te teamStrength()-ed EGY
+     skálán van (ezért volt eddig helyes), a párharcé viszont NEM — ott az
+     `ovr` a társ NYERS csontváz-ereje (teamOVRbase, a könyveléshez kell), a
+     vele egy skálán álló szám pedig a `dispOvr` (a társ teamStrength()-e).
+     A tábla eddig az elsőt írta ki, tehát a társad rendszeresen 3-5 ponttal
+     gyengébbnek látszott, mint amilyen. Ugyanezt a hibát a kupaképernyőn és a
+     kupa-mezőnyben már javítottuk (lásd mateStr / fx.o.dispOvr) — a tábla és a
+     párharc naplósora lemaradt róla. */
+  const oppShow=(fx.o&&typeof fx.o.dispOvr==="number")?fx.o.dispOvr:(fx.o&&fx.o.ovr);
   const opp={full:sbCleanClub(fx.o&&fx.o.n),abbr:sbClubAbbr(fx.o&&fx.o.n,false),
-             ovr:num(fx.o&&fx.o.ovr),
+             ovr:num(oppShow),
              pos:sbTablePos(fx.o&&fx.o.n)};
   SB.teams={home:Object.assign({side:"hazai"},SB.usIsHome?mine:opp),
             away:Object.assign({side:"vendég"},SB.usIsHome?opp:mine)};
@@ -38333,13 +38344,33 @@ function mpTeamCard(active){
       cap:!!(capName&&r.p.n===capName)};});
   const top=players.slice().sort((a,b)=>b.r-a.r)[0]||null;
   const tk=(S.tactics&&S.tactics.active)||null;
+  /* ---- A KÁRTYA SZÁMAI PONTOSAN A KIRAJZOLT TIZENEGYRŐL SZÓLJANAK (3.8.14) ----
+     BEJELENTETT HIBA: „a felállásnál nem jó értékek vannak." Két oka volt.
+     1) A `str` a teamStrength()-ből jött, ami a SLOTS tizenegyét méri — a
+        korongokon viszont az `active` tizenegy áll (a kényszerű cserékkel).
+        Sérült/eltiltott kezdőnél tehát a sáv összege nem a kirajzolt emberekét
+        adta: a szám és a kép két különböző csapatról szólt.
+     2) A kártya csak EGY összevethető számot vitt, a KEZDŐ TIZENEGYÉT. A
+        szezonzáró összevetés viszont a KERET top-14-ét méri (mpSquadStrength),
+        és a felhasználó azt a számot ismeri — a kettő között több pont
+        különbség is lehet, és ebből lett a „nem stimmel" élmény.
+     Mostantól a `str` a kirajzolt tizenegy átlaga (tehát a korongokból
+     kiszámolható), és a `squad` mellé viszi a szezonzáró skálát is. */
+  const xiStr=players.length
+    ? Math.round(players.reduce((a2,x)=>a2+x.r,0)/players.length*10)/10
+    : Math.round(teamStrength()*10)/10;
+  let sq=0;try{sq=Math.round(mpSquadStrength()*10)/10;}catch(e){sq=0;}
   return {
     team:String(teamName||""),
-    /* NYERS csapaterő: a "csontváz" (teamOVRbase), boostok nélkül — ez az,
-       amit a szezon előtti összevetés értelmesen mér. A kijelzett (str) is
-       megy vele, mert a befagyasztott pályakép ratingjei azon a skálán állnak. */
+    /* NYERS csapaterő: a "csontváz" (teamOVRbase), boostok nélkül. */
     ovr:Math.round(teamOVRbase()*10)/10,
-    str:Math.round(teamStrength()*10)/10,
+    /* A KIRAJZOLT tizenegy átlaga — ugyanaz a skála, amit a saját
+       felállásképernyőd is mutat (playerStrength). */
+    str:xiStr,
+    /* A KERET top-14-e (mpSquadStrength) — ugyanaz a szám, amit a szezonzáró
+       összevetés és a kiegyenlítés (mpApplyBalance) használ. Régi kliens
+       kártyáján hiányzik; a felület ilyenkor egyszerűen nem írja ki. */
+    squad:sq||null,
     formLabel:(typeof FORM_LABELS!=="undefined"&&FORM_LABELS[form])||String(form||""),
     tactic:tk&&TACTICS[tk]?{n:TACTICS[tk].n,lvl:Math.round(tacticLevel(tk))}:null,
     captain:String(capName||""),
@@ -38362,6 +38393,9 @@ function mpCardClean(c){
   return {
     team:txt(c.team,40)||"A társad",
     ovr:num(c.ovr,0,120),str:num(c.str,0,120),
+    /* Régi kliens kártyáján nincs squad — akkor marad null, és a felület
+       egyszerűen nem írja ki a sort (nem hazudik nullát). */
+    squad:(c.squad==null?null:(num(c.squad,0,120)||null)),
     formLabel:txt(c.formLabel,12),
     tactic:(c.tactic&&typeof c.tactic==="object")
       ?{n:txt(c.tactic.n,28),lvl:num(c.tactic.lvl,0,99)}:null,
@@ -38394,11 +38428,18 @@ function announceMpOpponent(){
      A kártya-panel (mpCardHtml) már régóta kiírja mindkettőt; ez a sor
      lemaradt róla. A saját számod is mellé kerül, hogy legyen mihez mérni —
      ugyanabban a skálában. */
-  addLine(`&nbsp;&nbsp;• Csapaterő: <b>${(c.str!=null?c.str:c.ovr).toFixed(1)}</b>`
-    +` <span style="color:var(--dim2)">(nyers ${c.ovr.toFixed(1)})</span>`
+  addLine(`&nbsp;&nbsp;• Kezdő tizenegy: <b>${(c.str!=null?c.str:c.ovr).toFixed(1)}</b>`
     +` &nbsp;• a tiéd: <b>${teamStrength().toFixed(1)}</b>`
-    +` <span style="color:var(--dim2)">(nyers ${teamOVRbase().toFixed(1)})</span>`
+    +` <span style="color:var(--dim2)">(nyers ${c.ovr.toFixed(1)} — ${teamOVRbase().toFixed(1)})</span>`
     +(c.formLabel?`<br>&nbsp;&nbsp;• Felállás: <b>${esc(c.formLabel)}</b>`:""),"m ev");
+  /* A KERET-SZÁM (top-14) IS KIMEGY, ha a társ kliense küldte: EZ az a mérce,
+     amit a szezonzáró összevetés és a kiegyenlítés használ — enélkül a
+     felhasználó két különböző skálájú számot lát a szezon két végén, és a
+     kettő eltérését hibának olvassa. */
+  if(c.squad)
+    addLine(`&nbsp;&nbsp;• Keret (top ${MP_COMPARE_N}): <b>${c.squad.toFixed(1)}</b>`
+      +` &nbsp;• a tiéd: <b>${mpSquadStrength().toFixed(1)}</b>`
+      +` <span style="color:var(--dim2)">— ez a szezonzáró összevetés mércéje</span>`,"m ev");
   if(c.tactic&&c.tactic.n)
     addLine(`&nbsp;&nbsp;• Taktika: <b>${esc(c.tactic.n)}</b> <b style="color:${c.tactic.lvl>=85?"var(--grass)":"var(--gold)"}">${Math.round(c.tactic.lvl)}</b>`
       +(c.tactic.lvl<85?` <span style="color:var(--dim2)">(még begyakorlás alatt)</span>`:""),"m ev");
@@ -38431,6 +38472,15 @@ function mpOppSnapWhen(s){
     ? ` · ${s.res.gf}:${s.res.ga} ${s.res.gf>s.res.ga?"(győzelem)":s.res.gf<s.res.ga?"(vereség)":"(döntetlen)"}`
     : "";
   return `${sn}. szezon · ${where}${res}`;}
+/* HA RÉGI IDÉNYBŐL VALÓ, AZT KI KELL MONDANI (3.8.14). A kép szándékosan
+   túléli a szezonváltást — amit egyszer láttál, azt nem felejted el —, csakhogy
+   egy tavalyi felállás számai ma már nem a társad mai keretéről szólnak.
+   Enélkül a felhasználó a NÉZETET hiszi hibásnak, nem a kép korát. */
+function mpOppSnapStale(s){
+  const age=(S.seasonNumber||1)-(s.season||1);
+  if(age<=0)return "";
+  return ` ⚠ Ez ${age===1?"a TAVALYI":`${age} idénnyel EZELŐTTI`} állapot: azóta igazolhatott, `
+    +`fejlődhetett és öregedhetett a kerete — a számok tájékoztatóak.`;}
 function drawOppPitch(){
   const pit=$("oppPitch");
   const s=mpOppSnapNow();
@@ -38448,13 +38498,34 @@ function drawOppPitch(){
   const bar=$("oppTeamBar");
   if(bar){
     const c=s.card;
+    /* ---- KÉT SZÁM, KÉT SKÁLA — ÉS MINDKETTŐ MELLETT A TIÉD (3.8.14) ----
+       Eddig egyetlen szám állt itt, a kezdő tizenegyé, viszonyítás nélkül. A
+       felhasználó viszont a SZEZONZÁRÓ összevetés számát ismeri (a keret
+       top-14-e), és amikor a kettő nem egyezett, joggal hitte hibásnak a
+       felállás-nézetet. Mostantól mindkét mérce kint van, KIÍRT névvel, és
+       mellette a te ugyanolyan skálájú számod — így a sor magától
+       megválaszolja, mihez képest erős vagy gyenge a kép. */
+    const num=v=>(Math.round((v||0)*10)/10).toFixed(1).replace(".",",");
+    let myXI=0,mySq=0;
+    try{myXI=teamStrength();}catch(e){}
+    try{mySq=mpSquadStrength();}catch(e){}
+    const cmp=(mine,theirs)=>{
+      if(!(mine>0)||!(theirs>0))return "";
+      const d=mine-theirs;
+      return ` <span style="color:${Math.abs(d)<0.35?"var(--dim2)":(d>0?"var(--grass)":"var(--red)")}">`
+        +`(te ${num(mine)}${Math.abs(d)<0.35?"":` · ${d>0?"+":"−"}${num(Math.abs(d))}`})</span>`;};
     bar.innerHTML=`<div><span class="oppName">${esc(c.team)}</span>`
       +(c.formLabel?` · Felállás: <b>${esc(c.formLabel)}</b>`:"")
       +(c.tactic&&c.tactic.n?` · Taktika: <b>${esc(c.tactic.n)}</b> ${Math.round(c.tactic.lvl)}`:"")
+      +(c.captain?` · Kapitány: <b>${esc(c.captain)}</b>`:"")
       +`</div>
-      <div>Csapaterő: <span class="oppNum">${c.str.toFixed(1)}</span> <span style="color:var(--dim2)">(nyers ${c.ovr.toFixed(1)})</span>`
-      +(c.captain?` · Kapitány: <b>${esc(c.captain)}</b>`:"")+`</div>
-      <div class="oppFrozen">❄ Befagyasztva: ${esc(mpOppSnapWhen(s))} — a következő párharcig ez a kép marad.</div>`;}}
+      <div>Kezdő tizenegy: <span class="oppNum">${num(c.str)}</span>${cmp(myXI,c.str)}`
+      +` <span style="color:var(--dim2)">— a fenti korongok átlaga</span></div>`
+      +(c.squad?`<div>Keret (top ${MP_COMPARE_N}): <span class="oppNum">${num(c.squad)}</span>${cmp(mySq,c.squad)}`
+        +` <span style="color:var(--dim2)">— ez a szezonzáró összevetés mércéje</span></div>`:"")
+      +`<div style="color:var(--dim2)">Nyers csontváz: ${num(c.ovr)} <span style="opacity:.8">(a motor belső skálája — boostok és skill-bónuszok nélkül)</span></div>`
+      +`<div class="oppFrozen">❄ Befagyasztva: ${esc(mpOppSnapWhen(s))} — a következő párharcig ez a kép marad.`
+      +`${esc(mpOppSnapStale(s))}</div>`;}}
 /* A KAPCSOLÓ. Nem rajzol semmit a saját pályaképbe: csak azt dönti el, melyik
    réteg látszik. Ezért a drawPitch/updateBar viselkedése betűre változatlan. */
 function mpOppViewSync(){
@@ -38463,8 +38534,14 @@ function mpOppViewSync(){
   const avail=mpOppViewAvail();
   /* Ha épp interakciót vár a saját pálya (kapitányválasztás, játékos-lerakás),
      a saját nézet visszakapja a szót — különben a felhasználó egy nem
-     kattintható képre koppintgatna. */
-  if(!avail||phase==="captain"||pendingPlayer)mpOppViewOn=false;
+     kattintható képre koppintgatna.
+     ÉS FUTÓ MÉRKŐZÉS ALATT SEM MARADHAT KINT (3.8.14). Bejelentett hiba: „nem
+     működik jól az ellenfél felállásának megtekintése." Ha a kapcsoló a
+     kezdőrúgás pillanatában az ellenfél oldalán állt, a mérkőzés egy BEFAGYOTT,
+     mozdulatlan kép mögött játszódott le: a cserék, a kiállítás és az élő
+     csapaterő mind a rejtett saját pályán történtek. A meccs a saját pályát
+     illeti; a megfigyelés a lefújás után újra egy koppintás. */
+  if(!avail||phase==="captain"||pendingPlayer||S.playing)mpOppViewOn=false;
   sw.classList.toggle("hide",!avail);
   const mb=$("pitchSideMine"),ob=$("pitchSideOpp");
   if(mb){mb.classList.toggle("on",!mpOppViewOn);mb.onclick=()=>{mpOppViewOn=false;mpOppViewSync();};}
@@ -43320,7 +43397,13 @@ function playMatch(){
     addLine(`— ${ec.n.toUpperCase()} · ${stg} · ${title} —`,"mt");
   }else if(DUEL){
     addLine(`— ${S.idx+1}. FORDULÓ · ⚔ PÁRHARC · ${title} —`,"mt");
-    addLine(`A társad csapata felsorakozik: ${esc(String(DUEL.oppName))} — csapaterő ${DUEL.oppOvr.toFixed(1)}. ${DUEL.neutral?"Semleges pályán, a döntőben.":DUEL.iAmHome?"Hazai pályán fogadod.":"Idegenben, az ő közönsége előtt."}`,"m ev");
+    /* A KIJELZETT erő (a társ teamStrength()-e), nem a nyers csontváz — lásd a
+       sbPaintTeams fölötti feljegyzést. A saját számodat is odaírjuk, hogy a
+       kettő EGY skálán, egymás mellett álljon. */
+    {const _oppS=(DUEL.oppShown!=null?DUEL.oppShown:DUEL.oppOvr)||0;
+     addLine(`A társad csapata felsorakozik: ${esc(String(DUEL.oppName))} — csapaterő ${_oppS.toFixed(1)}`
+       +` <span style="color:var(--dim2)">(a tiéd ${teamStrength().toFixed(1)})</span>. `
+       +`${DUEL.neutral?"Semleges pályán, a döntőben.":DUEL.iAmHome?"Hazai pályán fogadod.":"Idegenben, az ő közönsége előtt."}`,"m ev");}
     /* A CSERETERV JELZÉSE. Hogy MELYIK szabály sül el, azt nem mondjuk meg
        előre — az a mérkőzés dolga —, de azt igen, hogy készenlétben áll. */
     try{const _P=subPlanState();
