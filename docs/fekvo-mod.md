@@ -809,3 +809,83 @@ Végigjátszva a belépőtől a draftig, mindhárom méreten:
 A kapus a 93%-os mélységből a bal szélre (7%) kerül, a jobbhátvéd a jobb szélről
 (82%) a pálya aljára — pontosan az óramutató járása szerinti negyed fordulat.
 Visszaforgatva betűre a régi kép.
+
+---
+
+## 14. A felállás-nézet a meccsképernyőről (3.8.12)
+
+**Bejelentett hiány:** *„zavaró, hogy fekvő módban a meccs nézetben meccsek
+között nincsen felállás nézet. Legyen oldalsó sávon egy felállás nézet gomb.
+Teljes képernyős legyen a felállás."*
+
+**Az ok.** Igaz volt, és nem apróság: fektetve a
+`body.stadium>section:not(#scSim)` szabály **minden** más szakaszt elrejt —
+köztük a `#scPitch`-et is. Álló nézetben a pálya a meccsképernyő fölött ott
+van a lap folyamában (a `hubMidSeasonReturn` mindkettőt felfedi), fekve viszont
+eltűnik. A felálláshoz tehát vissza kellett forgatni a telefont, vagy átmenni a
+HUB-ba és onnan újra elfektetni — pont az a körforgás, ami ellen az egész fekvő
+mód készült.
+
+### A gomb
+
+`#matchLineupBtn` a `#matchCtl` sávban, a menetrend és a ⛶ közé. **Csak
+fektetve látszik** (`body.stadium #matchLineupBtn{display:block}`): álló
+nézetben a pálya egy görgetésnyire van, ott egy újabb gomb csak zaj volna.
+
+**Élő mérkőzés alatt magától eltűnik**, mert a sáv maga tűnik el
+(`body.stadium.stadiumLive #matchCtl{display:none}`) — nem kell külön kapuzni,
+és így pontosan „meccsek között" érhető el, ahogy a bejelentés kérte.
+
+### A nézet: beköltöztetés, nem új rajzoló
+
+A `#scPitch` szakaszt **áthelyezzük** a teljes képernyős dobozba
+(`#matchLineupHost`), zárásnál pedig pontosan oda tesszük vissza, ahonnan jött.
+Ugyanaz az idióma, amivel az Infópult a gazdasági paneleket beköltözteti
+(`relocateHubMenu`).
+
+Miért így, és nem egy második pályarajzolóval:
+
+* a `drawPitch` a `#pitch`-be ír, tehát a nézet magától **ugyanaz** marad —
+  poszt-színek, kapitányszalag, sérülés-jelvények, szezonkártyák;
+* az összhangtérkép, a csapaterő-sáv és a taktika-sor a saját azonosítóikon
+  élnek, a kezelőik a DOM-mozgatást túlélik;
+* **egy második rajzoló előbb-utóbb elcsúszna az elsőtől.**
+
+**A visszahelyezés horgonya a testvér-elem, nem a szülő indexe:** közben más is
+írhat a lapba, és egy indexre visszatéve a szakasz rossz helyre kerülne. Amit
+megjegyzünk: `{parent, next, wasHidden}`.
+
+**A `hubLandPitchApply` kapuzva van** a `body.lineupOpen` jelzőre: amíg a nézet
+nyitva van, a szakasz nem a lapon ül, ott sem elrejteni, sem felfedni nem
+szabad.
+
+### Amit a nézet NEM mutat
+
+A `#scPitch` a lap folyamában **cselekvéseket** is hordoz: kezdőrúgás-gomb
+(`#simGo`), kapitány-üzenet, felkészülési jegyzet, kémia- és névadó doboz.
+Azok a saját képernyőjükön a helyükön vannak, egy „nézd meg a felállást"
+ablakban viszont zajt csinálnának — és épp a **csapaterő** sorát tolnák a
+képernyő alá. A gombjaik amúgy is ott vannak a fekvő sávban, ezért a nézetben
+el vannak rejtve.
+
+**A pálya magassága ezért `100dvh − 145px`** (a fejléc, a szegélyek és a három
+alsó sáv mért helye), nem a lap-szintű 88dvh: így a pálya, az összhangtérkép-
+kapcsoló és a **csapaterő** egy képernyőn van.
+
+### Z-index 440
+
+A lap és a fekvő meccsképernyő **fölött**, de **minden modális alatt**
+(450–520): a pályaképről nyitott megerősítő kérdés vagy a tanító-buborék így
+továbbra is fölé kerül. A vissza gomb is becsukja (`BACK_LAYERS`), mert mögötte
+ott a meccsképernyő.
+
+### Mérés
+
+| amit néztünk | eredmény |
+|---|---|
+| gomb álló nézetben | rejtve |
+| gomb fekvő nézetben, meccsen kívül | látszik, a menetrend és a ⛶ között |
+| megnyitás | `#scPitch` a hostban, `body.lineupOpen`, `landPitch` aktív, 11 korong, csapaterő 77,5 |
+| bezárás | a szakasz visszakerül a `body` alá, a rejtettsége az eredeti, `stadium` marad bekapcsolva |
+| 900×420 / 1280×720 / 740×360 | a csapaterő-sor mindhárom méreten a képernyőn van |
+| oldalhiba | nincs |

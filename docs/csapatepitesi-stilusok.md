@@ -1424,6 +1424,57 @@ igényel új szimulációs ágat.
   (`ST_INF_TOP`), a műszerek valódi, kitolt plafonjához igazítva: a
   végsebesség-lépcső 38 → 45 km/h-ig, a lövéserő 164 → 210 km/h-ig nyílik.
 
+* **AZ ÖSSZHANG-CSOMAG ÉS A MECCSEMBEREK — a Béke és harmónia öt új családja
+  (3.8.12).**
+
+  *Bejelentett kérés:* „a béke és harmónia csapatstílusnak van a legkevesebb
+  mérföldköve szerintem most. Náluk az összhang legyen egy új mérföldkőcsomag.
+  Legyenek két játékos közötti összhangokra, egyes játékosok saját összesített
+  összhang értékére, és a teljes csapat összhangjára vonatkozó mérföldkövek."
+
+  **Miért pont ez a stílus.** A filozófia egyetlen mondata az, hogy nem egy
+  sztár viszi a csapatot, hanem a keret EGYÜTT működik — az összhang meg
+  pontosan ezt méri, három szinten. A csomag tehát nem egy tetszőleges bővítés,
+  hanem a stílus saját tétjének a számszerűsítése.
+
+  | család | mit mér | küszöbök | Infinity |
+  |---|---|---|---|
+  | `hm_bondPair` | a **legerősebb páros** összhangja | 30 · 47 · 63 · 78 · 88 · 92 | 93…99 (a plafon) |
+  | `hm_bondNet` | hány páros érte el az **Erős kötést** (63) | 1 · 3 · 6 · 10 · 15 · 25 · 40 · 60 · 90 | ×1,8 (102…162) |
+  | `hm_bondMan` | egy ember összhangja a **kezdő tizeneggyel** | 30 · 47 · 63 · 78 · 85 | 87…95 |
+  | `hm_bondTeam` | a **csapat-összhang** (a `teamBond` maga) | 35 · 45 · 55 · 65 · 75 · 85 | 87…95 |
+  | `hm_mvpN` | hány **különböző** meccsembered volt | 2-10 egyesével, 20-ig kettesével | 25…50, ötösével |
+
+  **A küszöbök nem önkényesek:** mind az összhang saját HÉT FOKOZATÁBÓL
+  jönnek (`BOND_TIERS`), tehát a mérföldkő ugyanazt a nyelvet beszéli, amit a
+  játékos lapja, a pályatérkép és a közvetítés. A „78" nem egy szám, hanem a
+  *Vakon megtalálják* fokozat.
+
+  **A csúcs-küszöbök szándékosan a 88-as puha tető fölé nyúlnak.** A meccsek
+  88-ig visznek el; a maradékot csak egy elkészült **párkémia** hozhatja meg
+  (+25). A 92-es fokozat tehát a két rendszer TALÁLKOZÁSA — pontosan az a
+  „béke és harmónia", amiről a filozófia szól.
+
+  **Az Infinity-tető nem az általános ×1,8.** Az összhang skálája nem nyílik ki
+  Infinityben: a plafon 99 marad. Az általános szorzóból 166-os „összhang"
+  lenne, ami nem létezik — ezért a három ÉRTÉK-család saját tetőt kap
+  (`ST_INF_TOP`), a `hm_bondNet` viszont DARABSZÁM, ott marad a ×1,8.
+
+  **Mind az öt mérő hibatűrő és nullát ad, ha nincs mit mérni.** Ez a
+  `teamBond`-nál nem elhanyagolható: az mérhetetlen tizenegynél a *semleges*
+  55-öt adja vissza, ami mérföldkőként ingyen teljesítene három fokozatot.
+  A `stBondReady()` kapu ezért `gameMode==="career" && S.bondsSeeded` — a
+  magvetés előtt, klasszikus módban és draft közben mind a négy összhang-mérő
+  0. (Mérve: klasszikus módban és magvetés előtt 0/0/0.)
+
+  **A meccsember-lépcső a klub TELJES történetét nézi** (`careerStats`), tehát
+  egy rég eladott ember estéje is beleszámít — a mérföldkő arról szól, hányféle
+  embered volt már meghatározó, nem arról, kik vannak most itt. Ugyanaz az
+  idióma, mint a `stContributors`-é.
+
+  **A tábla ezzel 137 → 178 fokozatra nőtt** (Infinityben 256), tehát a Béke és
+  harmónia a legbőkezűbb tábla marad — ami szándékos: a fája a legdrágább is.
+
 * **Színes paletta és szivárvány — a Béke és harmónia négy új lépcsője
   (3.3.08).** A stílus eddig azt mérte, hányan találtak be egy IDÉNY alatt
   (`hm_scorersN`) és hányan szálltak be a klub történetében (`hm_contrib`). Ami

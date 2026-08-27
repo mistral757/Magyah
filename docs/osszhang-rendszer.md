@@ -1,10 +1,12 @@
 # Összhang — a modell
 
-**Állapot:** ✅ **kész — F1-től F9-ig, plusz az egyéni követés** ·
-**Verzió:** 3.8.08
+**Állapot:** ✅ **kész — F1-től F9-ig, plusz az egyéni követés és a
+keret-szinthez mért érkező** · **Verzió:** 3.8.11
 
 *(Terv és ütemterv: `docs/osszhang-rendszer-terv.md`. Érintett kód: a
 `BOND_*` konstansok, `bondKey/bondRaw/bondOf/bondSet/bondAdd/bondCapOf`,
+`bondSettledBase/bondNewLevels/bondLevelsOf/bondProvOf/bondProvNow/
+bondCatchParams/bondBaseAfterArrival`,
 `bondRoleMult/bondTacticMult/bondPersonMult/bondPassMult/bondTrainMult/
 bondCatchMult/bondDamp`, `bondMatchTick`, `bondStartIntegration/bondRevealNew`,
 `bondSeedFirstSquad/bondSeedValue/bondSeedConflict`, `bondPrune`,
@@ -40,6 +42,8 @@ egymást — idényekben mérhető, és csak akkor vész el, ha valaki elmegy.
 | **kapitány** ✅ | az összhang a kapitányválasztás **negyede** — a kézi ajánlásban és az automatikus váltóban is |
 | **F8** ✅ | **az induló elemzés képernyője** — a magvetés nem fut le némán |
 | **F9** ✅ | **hangolás tíz idényen**, fogalomtár-szócikk |
+| **egyéni követés** ✅ | a játékos száma a **kezdő tizenegyhez** mérve |
+| **keret-szint** ✅ | az érkező **minden száma arány**, nem fix — egy erős igazolás nem bünteti azt, aki jól tartotta össze a keretét |
 
 ---
 
@@ -106,7 +110,7 @@ a becserélt ember a saját helyén számít, a lecserélt azon, ahol játszott.
   × passz        a két Passz átlaga → 0,90–1,15
   × élmény       győzelem 1,25 · vereség 0,90
   × gólpassz     2,0, ha AZNAP egymásnak adtak gólpasszt
-  × felzárkózás  1,8, amíg az érkező 50 alatt van (lásd 6.2)
+  × felzárkózás  1,8–2,6, amíg az érkező a keret szintje alatt van (lásd 6.2)
   × csillapítás  ((88 − v) / 88)^1,6
 ```
 
@@ -157,41 +161,66 @@ mechanika:
 
 ## 6. Az érkező
 
+**Az érkező MINDEN száma a keret szintjéhez mért arány** (3.8.11) — a
+viszonyítás mindenhol ugyanaz: `bondSettledBase()`, azaz a **kezdő tizenegy
+súlyozott átlaga, a beilleszkedők nélkül**. A régi, fix számok mostantól a
+**padlók**. A miértje a 10n. fejezetben.
+
 ### 6.1 A nyolc meccs
 
 A `markArrived` **minden** igazolási úton lefut (vásárlás, klub-szemle, ingyen
 token, akadémia, csere), ezért a beilleszkedési ablak ott indul — nem az egyes
 vásárlási ágakban.
 
-Amíg tart, az érkező **minden** kötése egységesen **15**. Ez szándékosan a
-beállt csapat átlaga alatt van: az új ember a nyolc meccse alatt **lehúzza a
-csapatszámot**, és ez nem hiba, hanem a rendszer lényege — az igazolásnak ára
-van a pályán is.
+Amíg tart, az érkező **minden** kötése egységesen a **keret szintjének 66%-a**
+(de legalább 15). Ez szándékosan a beállt csapat átlaga alatt van: az új ember
+a nyolc meccse alatt **lehúzza a csapatszámot**, és ez nem hiba, hanem a
+rendszer lényege — az igazolásnak ára van a pályán is. Az ár viszont
+**arányos**: egy 78-as keretbe érkező 51-en áll, nem 15-ön.
 
 **A számláló az Ő meccseit számolja, nem a csapatéit.** Egy cserejátékos
 különben fél idényig az ideiglenes értéken ragadna.
 
-**Mérve** (a kezdő 11-be tett igazolás egy 90 meccset lejátszott keretbe):
+**Az érték a nyolc meccs alatt is frissül** (`bondMatchTick`): ha közben
+eladsz egy tengelyt, a keret szintje esik, és az érkező száma vele. „Az
+**aktuális** csapatösszhang 66%-a" — nem a belépéskori.
 
-```
-csapatszám előtte 64,6  →  utána 61,0        ← lehúzza, ahogy kell
-1:15* 2:15* 3:15* 4:15* 5:15* 6:15* 7:15* 8:15* 9:27
-8 meccs után a valódi értékei: 17 / 26 / 27 / 22     (sáv 0–33)
-```
+**Mérve** (a kezdő 11-be tett igazolás, ugyanaz a keret négy szinten):
+
+| keret szintje | ideiglenes | csapatszám előtte → utána | a RÉGI, fix 15-tel |
+|---|---|---|---|
+| 25 | **16** | 25 → 23,5 (−1,5) | 23,3 (−1,7) |
+| 40 | **26** | 40 → 37,7 (−2,3) | 35,9 (−4,1) |
+| 55 | **36** | 55 → 51,9 (−3,1) | 48,4 (−6,6) |
+| 70 | **46** | 70 → 66,0 (−4,0) | 60,9 (−9,1) |
+| 80 | **53** | 80 → 75,5 (−4,5) | 69,2 (−10,8) |
 
 ### 6.2 A felzárkózás
 
-A nyolcadik meccs után **50-ig 1,8-szeres ütemben** zárkózik (`S.bondFast`).
-A jelző 50 fölött magától hatástalan, és lekapcsol, amint a legkisebb kötése
-is átlépte — így nem ragad rá egy tíz éve itt játszó emberre.
+A nyolcadik meccs után gyorsítva zárkózik (`S.bondFast`) — és **a cél is, az
+ütem is a keret szintjéhez igazodik** (`bondCatchParams`):
 
-**Mérve:** nulláról 30 meccs — sima **31**, felzárkózással **45**.
+* **cél:** a keret mai szintje, de legalább **50**. Egy 78-as csapatban az
+  50-nél megálló gyorsítás félúton hagyta volna az érkezőt.
+* **ütem:** ×1,8 az 55-ös referenciáig, onnan lineárisan ×2,6-ig a 88-as
+  puha tetőnél. Egy összeszokott öltözőnek megvan a nyelve és a rendje —
+  abba gyorsabban tanul bele valaki.
+
+A jelző a cél fölött magától hatástalan, és lekapcsol, amint a legkisebb
+kötése is átlépte — így nem ragad rá egy tíz éve itt játszó emberre.
+
+**Mérve:** nulláról 30 meccs — sima **31**, felzárkózással **45**. Egy 70-es
+keretbe érkező 40 meccs alatt 34,6-ról **47,9**-re jön fel, a csapatszám
+64,2-ről **69,9**-re — vagyis a keret egy idény alatt visszaáll oda, ahol az
+igazolás előtt volt.
 
 ### 6.3 Aki hazatalál
 
 Ha a párnak **közös múltja** van (együtt játszottak egy valós klubban), a
-kezdőérték nem a 0–33-as sávból jön, hanem **50-ig** mehet. Közös nemzetiség
-a sáv felső felébe emel.
+kezdőérték nem a normál sávból jön, hanem **a keret mai szintjéig** (de
+legalább 50-ig) mehet. Közös nemzetiség a sáv felső felébe emel.
+
+**Fölé nem:** a közös múlt **behozza** őt a csapatba, nem a csapat fölé emeli.
 
 **Kész klub indulásnál a kiinduló klub NEM számít közös múltnak** — ott
 mindenki onnan jött, tehát nem mond semmit. Ugyanaz a csapda, amit a
@@ -277,6 +306,8 @@ poszt-térkép):
 2. 90 MECCS UTÁN a csapatszám: 1:28,3 · 15:39,2 · 30:47,5 · 60:58,0 · 90:64,6
 
 3. ÉRKEZŐ a kezdőbe: 64,6 → 61,0 · 8 meccs után felzárkózik · 59,6
+   (3.8.08-as mérés, a FIX 15-ös ideiglenes értékkel. A 3.8.11 óta ez a
+   szám a keret szintjéhez mért — friss mérés a 6.1-ben és a 10n.-ben)
 
 4. MENTÉS → BETÖLTÉS
    kötések száma ✅ · értékek összege ✅ · felzárkózók ✅
@@ -511,7 +542,7 @@ helyére, ezért mindkét utat kiírjuk:
 ```
 🤝 A csapat-összhang ettől VÁLTOZIK — kezdő ember.
 → Mészáros lépne a helyére a keretből: 68,7 → 62,8 (csapaterőben −0,46)
-→ igazolással: 68,7 → 59,1 (−0,75) — az érkező nyolc meccsig mindenkivel 15-ön áll
+→ igazolással: 68,7 → 64,1 (−0,36) — az érkező nyolc meccsig mindenkivel 45-ön áll
 → 10 erős kötése szűnik meg.
    A legerősebbek: Jasin 70 · Lahm 70 · Beckenbauer 70
    180 nálad lejátszott meccs épült beléjük.
@@ -554,10 +585,33 @@ belépne a tizenegybe. A cserélt ember a **leggyengébb összhangú** kezdő �
 legkedvezőbb eset, tehát a becslés nem ijesztget.
 
 ```
-🤝 Beilleszkedés: az első 8 meccsén mindenkivel ideiglenes 15-ös összhangon
-   áll. Ha Jasin helyére áll be, a csapat-összhang 73,7 → 64,9
-   (−8,8, csapaterőben −0,69). Utána 50-ig gyorsítva zárkózik fel.
+🤝 Beilleszkedés: az első 8 meccsén mindenkivel ideiglenes 48-ös összhangon
+   áll (a keret mai szintjének 66%-a). Ha J4 helyére áll be, a csapat-összhang
+   72 → 67,4 (−4,6, csapaterőben −0,36). Utána 67-ig 2,1-szeres ütemben
+   zárkózik fel.
 ```
+
+*(A számok élők: ugyanez a panel egy 25-ös keretnél 16-ot és −1,5-öt ír ki.)*
+
+**A felzárkózás célja VETÍTETT szám, nem a mai keret-szint** (`bondBaseAfterArrival`).
+A mai szintet kiírni ide **túlígéret** volna: a cél a beállt tizenegy szintje —
+csakhogy a nyolcadik meccs után az érkező **maga is beleszámít**, a friss,
+alacsony értékeivel, tehát a szint alább kerül, mint ahol most áll. A panel
+ezért a **hipotetikus** tizenegyre méri a szintet, a jövevény párjainál a
+sávja közepével (`(lo+hi)/2`), ugyanazokkal a súlyokkal, amikkel a
+`bondSettledBase` fog.
+
+**Mérve** (előnézet vs. a valódi lefutás, nyolc meccs után):
+
+| keret szintje | a panel ígérete | a VALÓDI cél a 8. meccs után |
+|---|---|---|
+| 40 | 50-ig, ×1,8 | **50**, ×1,80 |
+| 55 | 50-ig, ×1,8 | **52**, ×1,80 |
+| 70 | 64-ig, ×2,0 | **64**, ×2,03 |
+| 80 | 74-ig, ×2,3 | **74**, ×2,27 |
+
+A panel tehát pontosan annyit ígér, amennyit a rendszer tart — és ahol téved,
+ott **lefelé** téved (55-nél 50-et mond 52 helyett).
 
 ### 10d.4 A beilleszkedés folyamata — jelzés a 4. meccstől
 
@@ -570,6 +624,16 @@ együttműködés) olvassuk — amit a jelzés ígér, azt a leleplezés tartja 
 ```
 1–3. meccs : 🤝 beilleszkedés 0/8 … 2/8          (még nincs mit mondani)
 4–8. meccs : 🤝 beilleszkedés 4/8 · gyorsan érzi a helyét
+```
+
+A játékos lapja azt is kiírja, **mibe** fog beleesni — a sávot, a
+hazatalálás tetejét és a felzárkózás célját, mind a saját keretére számolva:
+
+```
+Addig mindenkivel ideiglenes 48-ös összhangon áll — a keret mai szintjének
+66%-a (72).
+A 8. meccs után az addigi teljesítménye alapján kapja meg a valódi értékeit
+(24–54, közös klubmúlttal 72-ig), onnan 72-ig gyorsítva zárkózik.
 ```
 
 Négy fokozat: *gyorsan érzi a helyét* · *kezd beilleszkedni* · *még keresi a
@@ -1065,6 +1129,115 @@ Rudolf   · 82   pad · idegen poszt (−) · 🤝 45,9
 
 Aki még **beilleszkedik**, annál mindenhol a folyamat áll a szám helyén
 (`🤝 beilleszkedik 3/8 meccs — addig mindenkivel 15`).
+
+---
+
+## 10n. A keret szintje hat az érkezőre (3.8.11)
+
+**Bejelentett kérés:** *„A csapat átlag összhangja legyen hatással az érkező
+játékos illeszkedésének sebességére, a jobb illeszkedést segíthesse ez is. Ne
+legyen az, hogy teljesen értelmetlen legyen egy erős játékost bevenni, mert
+ezzel felborul az összhang."*
+
+### A hiba, amit javít
+
+Az érkező négy száma **fix** volt: nyolc meccsig mindenkivel **15**, utána
+**0–33**, hazatalálásnál 50-ig, felzárkózás **50-ig ×1,8**. Ezek egy **friss,
+25–30-as** kerethez voltak hangolva — és ott jól is működtek.
+
+Egy **beállt** keretben viszont ugyanezek a számok szakadékká váltak. Egy
+70-es csapatnál egy igazolás **9,1 ponttal** húzta le a csapatszámot, egy
+80-asnál **10,8-cal** — függetlenül attól, milyen jó a játékos. Vagyis:
+
+> Minél jobban tartottad össze a keretedet, annál drágább lett bárkit
+> igazolni. A rendszer a saját céljával fordult szembe.
+
+Ez ráadásul **valóságellenes** is. Egy összeszokott öltöző épp hogy
+**könnyebben** vesz fel valakit: megvan a nyelve, a rendje, a hangadói. A régi
+modell ennek pont az ellenkezőjét mondta.
+
+### A megoldás: minden szám ARÁNY
+
+Egy közös viszonyítás, a `bondSettledBase()` — **a kezdő tizenegy súlyozott
+átlaga, a beilleszkedők nélkül**. Szó szerint az, amit a bejelentés kért:
+*„az átlagösszhang a kezdő 11 összhangja őnélküle."*
+
+| | arány | padló (a régi, fix érték) |
+|---|---|---|
+| ideiglenes érték (8 meccs) | **66%** | 15 |
+| a 8 meccs utáni sáv | **33–75%** | 0–33 |
+| hazatalálás | **100%** | 50 |
+| felzárkózás célja | **100%** | 50 |
+| felzárkózás üteme | ×1,8 → **×2,6** (55-től 88-ig) | ×1,8 |
+
+**Miért a beilleszkedők NÉLKÜL.** Két oka van, és mindkettő kemény:
+
+* **körkörösség** — a `teamBond` a `bondOf`-ból dolgozik, az pedig épp az
+  ideiglenes értéket adná vissza: a szám saját magától függene;
+* **kettős büntetés** — két egyszerre érkező kölcsönösen lehúzná a másik
+  kiindulási szintjét, pedig egyikük sem a keret állapotáról szól.
+
+A `bondSettledBase` ezért a `bondRaw`-ból olvas — az ideiglenes érték sehol
+nem kerül bele. **Mérve:** két egyszerre érkező egy 70-es keretbe, mindkettő
+46-on áll, egymással is 46-on (a kisebbik ideiglenes érték számít).
+
+### A régi értékek a PADLÓK, nem a középértékek
+
+Ez a változtatás legfontosabb féke. Egy gyenge (25–30-as) kerethez érkezve
+**betűre a mai viselkedést kapod**: az első idény nehézsége, a −1,5-es gödör
+és a tíz idényre hangolt karrier-ív nem mozdul. A rendszer csak **fölfelé**
+nyílik ki, ott, ahol eddig hazudott.
+
+**Mérve** (ugyanaz az érkező, ugyanaz a keret, csak a szintje más):
+
+| keret szintje | ideiglenes | sáv | haza | felzárk. cél | ütem |
+|---|---|---|---|---|---|
+| 25 | 16 | 8–33 | 50 | 50 | ×1,80 |
+| 40 | 26 | 13–33 | 50 | 50 | ×1,80 |
+| **55** *(a referencia)* | 36 | 18–41 | 55 | 55 | ×1,80 |
+| 70 | 46 | 23–52 | 70 | 70 | ×2,16 |
+| 88 *(a puha tető)* | 58 | 29–66 | 88 | 88 | ×2,60 |
+
+A padlók az 50-es keret körül adják át a helyüket az arányoknak — pontosan
+ott, ahol a keret már „beállt"-nak számít.
+
+### Az igazolásnak továbbra is ÁRA van
+
+66% < 100%: az érkező **még mindig lehúzza** a csapatszámot. Csak már nem
+aránytalanul.
+
+| keret | csapatszám előtte → utána | a RÉGI, fix 15-tel |
+|---|---|---|
+| 25 | 25 → 23,5 (**−1,5**) | 23,3 (−1,7) |
+| 55 | 55 → 51,9 (**−3,1**) | 48,4 (−6,6) |
+| 70 | 70 → 66,0 (**−4,0**) | 60,9 (−9,1) |
+| 80 | 80 → 75,5 (**−4,5**) | 69,2 (−10,8) |
+
+Az ár tehát a keret szintjével **enyhén nő** (a jobb csapatba lépni több
+ismerkedést kíván), de nem robban.
+
+### A sebesség — a bejelentés első fele
+
+**Mérve** (érkező egy 70-es keretbe, 40 meccs a leleplezés után):
+
+| | leleplezés | +8 meccs | +16 | +24 | +32 |
+|---|---|---|---|---|---|
+| J12 átlaga | 34,6 | 37,1 | 41,5 | 44,9 | **47,9** |
+| csapatszám | 64,2 | 66,1 | 67,7 | 68,9 | **69,9** |
+
+**A keret nagyjából egy idény alatt visszaáll oda, ahol az igazolás előtt
+volt.** A régi modellel (15-ös ideiglenes, 0–33-as sáv, 50-es cél) ez két-három
+idény lett volna — és a felzárkózás félúton, 50-nél meg is állt volna.
+
+### Ami VÁLTOZATLAN maradt
+
+| | viselkedés |
+|---|---|
+| az **induló elemzés** (`bondSeedFirstSquad`) | betűre a régi képlet — a `bondSeedValue` új `lo` paramétere ott üres. Mérve: 105 pár, min 10, max 34, csapatszám 21,1 |
+| **klasszikus mód** | `bondSettledBase()` = `null` → minden szám a padlón |
+| **régi mentés** (`{m:3}` rekord) | az első olvasáskor a mai keret-szintből pótoljuk és el is tesszük |
+| a **88-as puha tető**, a **plafon**, a **csillapítás** | érintetlen — a hazatalálás sem viheti a keret mai szintje fölé |
+| a **morál**, a **kapitány-súly**, a **nehézség** | ugyanabból a `teamBond`-ból dolgoznak, tehát maguktól követik |
 
 ---
 

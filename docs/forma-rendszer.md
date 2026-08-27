@@ -1,7 +1,8 @@
 # Forma-rendszer és a lenyitható játékos-panel
 
 *(3.7.28 — a forma-rendszer és a lenyitható panel; 3.7.29 — a Ritmusmester és
-a HUB görgetés-horgonya. Érintett kód: `pformRefresh`, `pformSeasonReset`, `pformOf` /
+a HUB görgetés-horgonya; 3.8.12 — az ötmeccses sűrűség. Érintett kód:
+`pformRefresh`, `pformTick`, `PFORM_EVERY`, `pformSeasonReset`, `pformOf` /
 `pformStep` / `pformPct` / `pformMult` / `pformEdge` / `pformPickMult`,
 `pformBaseline`, `pformRecent`, `pformTeamForm` / `pformTeamSignal`,
 `pstatPush` / `pstatHistoryHtml`, `pformBarsHtml` / `pformRowHtml` /
@@ -119,19 +120,53 @@ marad a csapat-hangulat jele, de a keret nem egyetlen tömbként mozog.
 Mérve a javított rendszerrel: a tizenegy forma-foka **7 és 10** között szóródott
 egy tökéletes, nyolc győzelmes periódus után is.
 
-## Az időzítés
+## Az időzítés — ötmeccsenként (3.8.12)
+
+**Bejelentett kérés:** *„Legyen gyakrabban frissítve a forma, hogy legyen
+lehetőség egy szezonon belül felkúszni egy játékosnak a max formára is akár.
+A sűrűség legyen 5 meccsenkénti."*
+
+**Ami volt.** A frissítés a kihívás-**checkpointokon** futott (8./15./23.
+forduló), vagyis egy 30 fordulós idényben **mindössze háromszor** — plusz
+kupasorozat alatt meccsenként. Három lépés a 7,5-es középről indulva még a
+legjobb sorozattal is épphogy elért a csúcs közelébe, és csak akkor, ha a
+célérték végig a plafonon állt. A csúcsforma gyakorlatilag elérhetetlen volt.
+
+**Ami lett.** Egy egyszerű számláló (`S.pFormN`), amit **minden lejátszott
+mérkőzés** léptet: bajnoki, kupa, osztályozó, felkészülési torna. Minden
+ötödiknél (`PFORM_EVERY`) fut a frissítés, a `fullTime`-ban, a `pstatPush`
+UTÁN — tehát a most lejátszott meccs értékelése már beleszámít az ablakba.
 
 | mikor | miért |
 |---|---|
-| **kihívás-periódusonként** (a 8./15./23. forduló checkpointjain) | pontosan 7-8 meccsenként jönnek, és annyi az az ablak, amiből egy forma értelmesen leolvasható |
-| **kupasorozat alatt minden mérkőzés után** | ott nincs checkpoint, és egy hat-nyolc meccses kampány egésze elférne egyetlen periódusban |
-| **szezonnyitáskor** | nullázás |
+| **minden 5. lejátszott mérkőzés után** | idényenként hat frissítés a három helyett — ennyi lépéssel a célérték felé egy tartós sorozat tényleg felviszi valakit a csúcsra |
+| **szezonnyitáskor** | nullázás — **a számláló is** (`S.pFormN = 0`), tehát az új idény első frissítése az 5. meccs után jön, nem ott, ahol a tavalyi számláló épp állt |
 
-**A frissítés az auto/kézi elágazás ELŐTT ül.** Az első próbálkozás a
-`handleCheckpoint`-ba került — az viszont csak a kézi úton fut le, az auto
-szezonlejátszás az `autoResolveCheckpoint`-ra ágazik el, tehát a forma egy
-végigjátszott idényben **soha nem mozdult volna**. A mérőn ez azonnal látszott:
-kilenc forduló után `S.pFormUpd` `null`, minden fok 8.
+**Két korábbi szabály esik ki vele.** A checkpoint-kötés a **bajnoki
+naptárhoz** kötötte a formát, holott a forma a *lejátszott meccsekről* szól,
+nem a fordulószámról. A kupasorozat meccsenkénti kivétele pedig azért kellett,
+mert a kupának nincs checkpointja — egy közös számlálóval a kivétel értelmét
+veszti.
+
+**Az ablak (`PFORM_WINDOW` = 8) szándékosan nagyobb a lépésköznél.** Az
+egymást átfedő ablakok simítanak: egyetlen rossz meccs nem fordítja meg a
+formát, egy tartós sorozat viszont minden ötödik meccsen újra megerősíti
+magát — pontosan ez viszi fel valakit a csúcsra egy idényen belül.
+
+**A véletlen magja is a számlálót viszi** (`pform:s…:i…:m…`). A régi mag a
+fordulószámból jött, az viszont **kupasorozat alatt áll** (a kupameccs nem
+lépteti az `S.idx`-et) — két egymást követő kupa-frissítés ugyanazt a
+véletlent kapta volna.
+
+**Mérve** (éles karrieren, 30 mérkőzés): a frissítés az 5., 10., 15., 20.,
+25. és 30. meccs után fut le, a szezonnyitás a számlálót nullára viszi, a
+játékos lapja pedig pontosan kiírja, hány mérkőzés van a következőig.
+
+**A frissítés az auto/kézi elágazástól függetlenül fut.** A 3.7.28-as első
+próbálkozás a `handleCheckpoint`-ba került — az viszont csak a kézi úton fut
+le, az auto szezonlejátszás az `autoResolveCheckpoint`-ra ágazik el, tehát a
+forma egy végigjátszott idényben **soha nem mozdult volna**. A `fullTime`
+mindkét úton lefut, tehát ez a csapda a 3.8.12-vel véglegesen bezárult.
 
 ## Szezononként nullázódik
 

@@ -1,7 +1,9 @@
 # Idény-mérleg — a büdzsé könyvelése
 
-*(3.3.38. Érintett kód: `LEDGER_CATS` + `ledger*` / `budget*` függvények és a
-`ledgerHtml()` panel az index.html-ben. Az őrszem: `tools/ledger-audit.sh`.)*
+*(3.3.38, 3.8.11. Érintett kód: `LEDGER_CATS` + `ledger*` / `budget*` függvények,
+a `ledgerHtml()` / `budgetBreakBoxHtml()` panelek, valamint a HUB lenyitása
+(`budgetChipHtml`, `budgetOpenHtml`, `hubBudgetToggle`, `_hubBudgetOpen`) az
+index.html-ben. Az őrszem: `tools/ledger-audit.sh`.)*
 
 ## 1. Miért kellett
 
@@ -112,11 +114,50 @@ kategóriában szerepel — különben az összeg hazudna, és a mérleg pont az
 
 ## 6. Hol látszik
 
-Infópult → **„Szezon és mérleg"** fül, a szezononkénti keret bontása alatt.
+**Két helyen, ugyanabból a függvényből.**
+
+* **Infópult → „Szezon és mérleg" fül**, a szezononkénti keret bontása alatt.
+  Itt van a teljes gazdasági kép: bontás + mérleg + Bérmérő + szurkolói doboz.
+* **A HUB-on a büdzsé-chipre koppintva** (3.8.11) — lenyílik alatta a bontás és
+  ez a mérleg.
 
 A kettő szándékosan **külön doboz**: a fenti előrejelzés („ennyi érkezik, ennyibe
 kerül a kezdő 11"), ez pedig a tény („ez történt"). Az egyiket tervezésre
 olvasod, a másikat számadásra.
+
+### 6.1 A lenyitás a HUB-on (3.8.11)
+
+**Bejelentett kérés:** *„A büdzsére rákattintva a HUB-ban nyíljon le a
+felbontása, hogy miből áll össze az aktuális évben (ne csak az infópultban
+lehessen elérni)."*
+
+**A hiba, amit javít.** A bontás annak idején (3.5.x) azért költözött az
+Infópultba, mert **négy hosszú, magyarázó doboz** állt a keretlista ELŐTT, és
+minden HUB-nyitáskor át kellett görgetni rajtuk. A tanulság helyes volt — de a
+megoldás túl messzire ment: a **szám** ott maradt a HUB-on, a **magyarázata**
+pedig két koppintásnyira, egy másik felület egyik fülén. Aki a HUB-on áll és azt
+kérdezi, *„miből jön ez a pénz"*, annak el kellett hagynia a HUB-ot.
+
+**A helyes válasz nem az átköltöztetés, hanem a lenyitás.** Csukva pontosan a mai
+HUB: egy chip, egy szám. Nyitva ott a teljes idei kép. A döntést a felhasználó
+hozza meg, nem mi.
+
+| | |
+|---|---|
+| a chip | `role="button"`, billentyűzetről is (Enter / Szóköz), ▾ nyíllal — az az egyetlen jel, ami elárulja, hogy lenyitható |
+| a tartalom | `budgetBreakBoxHtml("hubBudgetBreak") + ledgerHtml("hubLedgerBox")` |
+| az azonosítók | **sajátok**, mert ugyanezek a dobozok az Infópultban is kint vannak — két azonos id egy lapon a rosszabbik felét találná meg |
+| a glosszárium-kattintás | osztály szerint kötve (`.budgetBreak`), nem azonosító szerint — így mindkét példány működik |
+| az állapot | **nem megy a mentésbe** (`_hubBudgetOpen`): egy lenyitott panel nem a karrier állapota, hanem a mostani böngészésé. Mentve minden betöltéskor visszajönne, és pont azt a görgetést hozná vissza, ami miatt a doboz elköltözött |
+| nyitás után | a chipre görgetünk (`block:"nearest"`) — enélkül egy képernyő aljára esett chip lenyitása úgy nézne ki, mintha nem történt volna semmi |
+
+**Az Infópult nem ürül ki:** ott marad a bontás, a Bérmérő és a szurkolói doboz
+is. A lenyitás a **gyors** út, nem a kizárólagos — a chip alatti útjelző sor ezt
+ki is mondja, és a felirata a nyitott/csukott állapothoz igazodik.
+
+**Mérve:** csukva 1 bontás-doboz és 1 mérleg a lapon (az Infópulté), nyitva 2–2,
+duplikált azonosító nélkül; a `▾` megfordul, az `aria-expanded` követi; egy
+nyitva hagyott játékos-lap (`hubExpandedKey`) a lenyitástól nem csukódik be.
 
 Csak a **nem nulla** tételek kapnak sort, tehát egy csendes idény elején két-három
 sor az egész. A korábbi idények egy-egy összegző sort kapnak; a részletezés a
