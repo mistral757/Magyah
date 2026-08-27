@@ -1,6 +1,7 @@
 # Összhang — a modell
 
-**Állapot:** ✅ **kész — F1-től F9-ig** · **Verzió:** 3.8.06
+**Állapot:** ✅ **kész — F1-től F9-ig, plusz az egyéni követés** ·
+**Verzió:** 3.8.08
 
 *(Terv és ütemterv: `docs/osszhang-rendszer-terv.md`. Érintett kód: a
 `BOND_*` konstansok, `bondKey/bondRaw/bondOf/bondSet/bondAdd/bondCapOf`,
@@ -492,22 +493,58 @@ Egy szótár, több felület.
 | 15+ | Épülőben |
 | alatta | Idegenek |
 
-### 10d.2 Eladáskor: mi vész el vele
+### 10d.2 Eladáskor: mi VÁLTOZIK, és mi vész el
 
 A megerősítő eddig annyit mondott, hogy *„a felépített kémiája is elvész"* —
-szám nélkül. Márpedig egy tíz éve itt játszó ember eladása pont attól fáj,
-hogy a kötései **nem költöznek vele**: a vevő a Ratinget kapja meg, te a
-kapcsolatokat veszíted.
+szám nélkül. Az első számos változat viszont **zavaros lett**, és jogosan:
+kiírt egy „csapat-összhang" számot, ami (a) a teljes keret átlaga volt, nem a
+csapatszám, és (b) nem mondta meg, **mennyivel** lesz kevesebb. Egy **nem
+kezdő** eladásánál pedig egyenesen hazudott: a `teamBond` csak a **pályán
+lévő** tizenegyet nézi, tehát egy tartalék távozása ma semmit nem mozdít
+rajta — a szám mégis ott állt, mintha veszteség volna.
+
+**Két különböző kérdés, két különböző mondat.**
+
+**Kezdő eladásánál a szám VÁLTOZIK** — és a mértéke attól függ, ki lép a
+helyére, ezért mindkét utat kiírjuk:
 
 ```
-🤝 Az összhangja itt marad — nélküle. Csapat-összhangja 73,7,
-   ebből 10 erős kötés szűnik meg.
-   A legerősebbek: P. Maldini 77 · Lahm 76 · Platini 76
-   A kötés két EMBER között van: az utódnak nulláról kell felépítenie,
-   és nyolc meccsig ideiglenes értéken áll.
+🤝 A csapat-összhang ettől VÁLTOZIK — kezdő ember.
+→ Mészáros lépne a helyére a keretből: 68,7 → 62,8 (csapaterőben −0,46)
+→ igazolással: 68,7 → 59,1 (−0,75) — az érkező nyolc meccsig mindenkivel 15-ön áll
+→ 10 erős kötése szűnik meg.
+   A legerősebbek: Jasin 70 · Lahm 70 · Beckenbauer 70
+   180 nálad lejátszott meccs épült beléjük.
 ```
 
-Aki még beilleszkedik, arról ezt **nem** írjuk ki — nála nincs mit elveszíteni,
+Ha a keretben **nincs** azonos szerep-kategóriájú utód, azt kimondjuk, és csak
+az igazolás-ág marad. *(A mérés itt egy hibát fogott: az első változat a
+**kapus** helyére egy csatárt ajánlott, mert idegen posztról mindenki „be tud
+állni", tehát a nyers rating döntött. Most a fit ≥ azonos szerep-kategória
+kötelező.)*
+
+**Tartalék eladásánál a szám NEM változik** — és ezt ki kell mondani. Helyette
+azt mutatjuk meg, mit veszítesz: a **lehetőséget**, hogy beálljon. A puszta
+szám néma, ezért mindig kap egy értelmezést is:
+
+```
+🤝 A csapat-összhang ettől MA nem változik — nincs a kezdő tizenegyben,
+   és a szám csak a pályán lévőket méri.
+→ Amit elveszítesz, az a lehetőség: ha beállna F. Baresi helyére,
+  34,2-es összhangot hozna (a mostani csapatszám 70).
+→ Beállva LEHÚZNÁ a csapatszámot (−35,8) — de ez nagyrészt abból jön, hogy
+  nem játszik: aki nem lép pályára, nem gyűjt. Az összhangépítés sávja
+  ezen tud segíteni.
+```
+
+A három ág: **emelné** a csapatszámot (valódi tartalék-érték) · **nagyjából
+annyit hozna** (összhangban nem hiányozna) · **lehúzná** (a fenti magyarázattal,
+mert egy nem játszó ember alacsony száma nem az ő hibája).
+
+Mindkét ágon ott a közös rész: hány **erős** kötés szűnik meg, melyek ezek, és
+**hány közös meccs** épült beléjük — ez teszi a veszteséget tapinthatóvá.
+
+Aki még beilleszkedik, arról semmit nem írunk ki — nála nincs mit elveszíteni,
 és a panel ezt ki is mondja.
 
 ### 10d.3 Vásárláskor: mennyit esik a csapatszám
@@ -964,6 +1001,70 @@ Az összhang saját szócikket kapott (**Összhang**), ami egy helyen mondja el 
 teljes rendszert: mi a különbség a moráltól, hogyan ül a csapaterőre, mitől
 épül, mi a 88-as tető, a hét fokozat, az érkező nyolc meccse, a plafon, az
 edzés-sáv, a Csapatkovács és a kapitány-hatás.
+
+---
+
+## 10m. Az egyéni követés (3.8.07)
+
+**Bejelentett hiány:** *„most nem tudjuk az összhang értékeket egyénileg
+követni."* Igaz volt. A játékos lapja a **teljes keretre** átlagolt számot
+mutatta, ami két irányban is félrevezetett: egy tartaléknál a padon ülőkkel
+meglévő gyenge kötései lehúzták, egy kezdőnél pedig a soha nem játszó
+tartalékok hígították.
+
+**A helyes mérce a kezdő tizenegy** — a meccs-hatás (`teamBond`) is abból
+számol, tehát az egyéni számnak is arról kell szólnia.
+
+### Aki nincs a kezdőben: egy embert ki kell venni
+
+Ha beállna, valakinek ki kellene mennie — az ő helyét nem foglalhatja el
+önmaga mellett. A „legvalószínűbb" áldozat: **akinek a helyére a legjobban
+illeszkedik**, és ott holtversenynél **a leggyengébb**. A poszt-illeszkedés
+mindig erősebb szempont, mint a rating; a rating csak holtversenyt bont.
+
+**Mérve** (11 kezdő egymással 70-en, két tartalék 22-n, két erős kötéssel):
+
+```
+Nesta (KV)          → kit váltana: F. Baresi (KV, rating 92)
+                      — nem Beckenbauert (94), mert ő az erősebb
+  Összhangja a kezdő tizeneggyel: 28,2 · Épülőben
+  Nincs a kezdőben — a szám azt mondja meg, mennyi lenne,
+  ha F. Baresi helyére állna be.
+  Három legerősebb kötése (az EGÉSZ keretben):
+    Beckenbauer 84 (Vakon megtalálják) · F. Baresi 76 (Erős kötés) · Jasin 22
+```
+
+**A három legerősebb kötés szándékosan a TELJES keretből néz**, nem csak a
+kezdőből: egy padon ülő régi társsal meglévő 80-as kötés akkor is érték, ha ma
+épp nem játszanak együtt — és holnap újra fognak.
+
+### Ahol megjelenik
+
+| hely | ki megy ki a számításból |
+|---|---|
+| **a játékos lapja** (HUB) | a legvalószínűbb áldozat — kiírja, kicsoda és miért |
+| **Cserék a meccs alatt** (csereterv) | a szabály **saját** `outIdx`-e — ott nem kell találgatni |
+| **élő csere-panel** | a kijelölt lejövő; ha még nincs kijelölve, a legvalószínűbb |
+| **hiányzó-pótló panel** | maga a hiányzó kezdő — pontosan ismert |
+
+A csereterv és az élő panel a **kimenő** számát is odateszi, hogy a csere
+összhang-mérlege egy pillantásra látsszon:
+
+```
+🤝 35,8 a tizeneggyel — Henry helyén
+Legerősebb kötései: P. Maldini 58 · Mészáros 55 · Messi 48
+Akit lecserélsz — Henry: 68
+```
+
+A hiányzó-pótló panelen a sor végére kerül, a poszthűség mellé:
+
+```
+Mészáros · 79   pad · poszthű · 🤝 41,2
+Rudolf   · 82   pad · idegen poszt (−) · 🤝 45,9
+```
+
+Aki még **beilleszkedik**, annál mindenhol a folyamat áll a szám helyén
+(`🤝 beilleszkedik 3/8 meccs — addig mindenkivel 15`).
 
 ---
 
