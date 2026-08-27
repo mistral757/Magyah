@@ -391,6 +391,69 @@ Ebből három **kemény tervezési korlát** következik:
    után azonnal visszaáll a fölény, és a mód visszazuhan a mai „mindig nyersz"
    élménybe.
 
+### 4.0b A RÉS A HATÁSOS ERŐT MÉRI (v3.8.16)
+
+**Bejelentett hiba:** *„elkészült a csapatom, és a +3,0, amit ajánlott, végül az
+lett, hogy az ellenfél erősebb 3-mal induláskor. Csapatom 81, ellenfél közép
+84."*
+
+Igaz volt, és a hiba **szerkezeti**: a rés a keret **nyers top-11 átlagát**
+(`squadAvgOvr`) hasonlította az osztály nyers közepéhez — csakhogy a pályára
+nem az a tizenegy lép ki, és nem is azzal az erővel.
+
+| ami hiányzott | mennyi | miért |
+| --- | --- | --- |
+| **poszt-illeszkedés** | a bejelentett esetben **−6,0** | a `squadAvgOvr` a legjobb 11-et veszi, **posztra való tekintet nélkül**; a felállásban a szerkezet dönt, és aki idegen poszton áll, 0,93-as szorzót kap. Egy **draftolt** keretnél ez a legnagyobb tétel: a draft a legjobb *embereket* szedi össze, nem egy kiegyensúlyozott tizenegyet. |
+| **friss öltöző** | **−1,5** | egy most összeállt keret összhangja ~21 (`bondSeedFirstSquad`), ami a meccs-erőben a `BOND_OVR_MIN` padlót jelenti. A `hiddenMatchBonus` ezt régóta beszámítja — a rés-mérce nem tudott róla. |
+
+A bejelentett eset **pontosan reprodukálható**: nyers top-11 = 87, a kirakott XI
+`ovr × fit` átlaga = 81, a D6 nyers közepe 77.
+
+| | levonás | világ-eltolás | a mezőny | **a pályán** |
+| --- | --- | --- | --- | --- |
+| **régi**, a csúszka +3-on | — | +7,0 | 84,0 | **−4,5** |
+| **új**, a csúszka +2-n | 6,0 + 1,5 | +0,5 | 77,5 | **+2,0** |
+| **új**, a csúszka 0-n | 6,0 + 1,5 | +2,5 | 79,5 | **0,0** |
+| **új**, a csúszka −2-n | 6,0 + 1,5 | +4,5 | 81,5 | **−2,0** |
+
+**A javítás:** `pyrSquadEff(sq) = squadAvgOvr(sq) − pyrFitDrag(sq) − pyrBondDrag()`,
+és a rés ehhez mér — `pyrUpForGap`, `pyrGapRangeFor`, `pyrDivOptions`,
+`pyrHomeDivRaw` és a `pyrStart` tárolt `gap0`-ja egyaránt.
+
+* A **poszt-levonást MÉRJÜK**, ha a keret már ki van rakva (a draft után
+  pontosan ez a helyzet): a kirakott tizenegy `ovr × fit` átlagát vetjük össze
+  a nyers top-11-gyel. Kész klubnál a felállás csak a `pyrStart` **után** áll
+  össze (`clubFillSquad`), ott a `PYR_FIT_DRAG_EST = 1,2` becslés fut — a
+  preview és a valóság így ott is ugyanazt a számot használja.
+* Az **összhang-levonás nem becslés**: `−BOND_OVR_MIN`, vagyis pontosan a
+  padló, ahol egy magvetett keret áll.
+
+**Két következménye van a beállításokban:**
+
+1. **`PYR_GAP_DEFAULT` vissza +2-re.** A 3.8.02 a +2 → +3 emeléssel próbálta
+   kitölteni az összhang-gödröt; mostantól nem kell tapasz, mert a szám maga
+   helyes — egy külön +1 kétszer fizetne ugyanazért.
+2. **A `PYR_REC_GAP` célértékei változatlanok, de mást jelentenek**: hatásos
+   réseket. A régi, nyers olvasatban ugyanaz a −1,0 a pályán −8 körül volt.
+
+**A Run-plafon is ezt kapja.** A tárolt `gap0` a hatásos rés, tehát a
+`pyrGapFactor` azt a vállalást méri, ami a pályán tényleg megtörtént — a
+plafon sora ki is írja („a pályára lépő erővel"). Régi mentések `gap0`-ja
+érintetlen marad: a korabeli poszt-levonás nem rekonstruálható.
+
+**Amit a képernyő mostantól kimond:** a fejléc a „pályán" számot hirdeti (a
+nyerset zárójelben), a rés-sor pedig felsorolja a két levonást — és azt is,
+hogy **a rés a RAJTRA szól**: a mezőny a szezon alatt is fejlődik
+(D6-ban +3,5 / +4,8 / +5,3 / +5,8 idényenként a négy fokozaton), tehát egy
+egyenrangú rajt a 30. fordulóra hátránnyá válhat.
+
+> **A mezőny rejtett erősítése (`oppBuffFor`) a piramisban nem játszik ebbe
+> bele.** Ott csak a *mért* fele fut (`OPP_BUFF_MEASURED`), a dinamikus mód fix
+> `(lvl−84)×0,12` tagja szándékosan kimarad (6.1) — és a mért rész
+> `max(0, …)`, egy friss kereté pedig negatív. A dinamikus mód tanácsadója
+> viszont eddig is számolt vele: ott a `levelGap` az `oppMatchStrength`-en át
+> a buffot is látja.
+
 ### 4.1 A DRAFT-PARADOXON — a második szerkezeti akadály
 
 Egy **draftolt tizenegy mindig jóval erősebb, mint azok a klubok, amikből
