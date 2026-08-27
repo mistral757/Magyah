@@ -4777,7 +4777,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.7.43";
+const APP_VERSION="3.8.00";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -14299,6 +14299,35 @@ function mpDiagCollect(){
       L.push("  "+(Object.keys(cs).map(k=>`${k}:${Math.round(cs[k])}`).join(" · ")||"(nincs tétel)"));
       if(M.star.length)L.push(`  ⭐ ${M.row.nStar||"?"} · +${Math.round(M.starInc)} / −${Math.round(M.starExp)} → ${M.starNet>=0?"+":""}${Math.round(M.starNet)}`);}
   }catch(e){L.push("mérleg-dump hiba: "+e.message);}
+  /* ---- ÖSSZHANG (F1: még nem hat a meccsre, csak MÉRHETŐ) ----
+     Ez a fázis szándékosan felület nélküli: a szám épül, de senkire nem hat.
+     A diagnosztika az egyetlen helye — innen lehet több idény után megnézni,
+     hova fut, mielőtt az F2 bekötné a csapaterőbe. */
+  try{
+    if(gameMode==="career"&&S&&S.bondsSeeded){
+      const ks=Object.keys(S.bonds||{});
+      const vs=ks.map(k=>S.bonds[k]).sort((a,b)=>a-b);
+      const med=vs.length?vs[Math.floor(vs.length/2)]:0;
+      const avg=vs.length?Math.round(vs.reduce((a,b)=>a+b,0)/vs.length*10)/10:0;
+      const top=Object.keys(S.bonds||{}).map(k=>({k,v:S.bonds[k]}))
+        .sort((a,b)=>b.v-a.v).slice(0,5)
+        .map(x=>x.k.split("§").map(n=>shortName(n)).join("↔")+" "+x.v);
+      L.push("");L.push("── ÖSSZHANG (F1 — még nem hat a meccsre)");
+      L.push(`  csapatszám (pályán lévők): ${teamBond()}   · referencia: ${BOND_REF}`);
+      L.push(`  ${ks.length} pár · átlag ${avg} · medián ${med}`
+        +` · min ${vs[0]||0} · max ${vs[vs.length-1]||0}`);
+      L.push("  legerősebbek: "+(top.join(" · ")||"(nincs)"));
+      const nw=Object.keys(S.bondNew||{});
+      L.push("  beilleszkedés alatt: "+(nw.length
+        ?nw.map(n=>shortName(n)+" "+(S.bondNew[n].m||0)+"/"+BOND_NEW_MATCHES).join(" · ")
+        :"(senki)"));
+      const fast=Object.keys(S.bondFast||{});
+      L.push("  felzárkózik (50-ig): "+(fast.map(shortName).join(" · ")||"(senki)"));
+      const caps=Object.keys(S.bondCap||{});
+      L.push("  plafonos (feszült) párok: "+(caps.length
+        ?caps.map(k=>k.split("§").map(n=>shortName(n)).join("↔")).join(" · "):"(nincs)"));}
+    else if(gameMode==="career")L.push("\n── ÖSSZHANG: még nem futott le az induló elemzés");
+  }catch(e){L.push("összhang-dump hiba: "+e.message);}
   let keys=[];
   try{keys=Object.keys(localStorage).filter(k=>k.indexOf(SAVE_KEY)===0||k.indexOf(SAVE_KEY_MP_PREFIX)===0);}
   catch(e){L.push("localStorage nem olvasható: "+e.message);return L.join("\n");}
@@ -25087,7 +25116,7 @@ function resetGameState(){
   /* Az ÜGYNÖKSÉG is nullázódik: minden karrier egy csillagon, nulla ponttal
      indul — ez a rendszer lényege, nincs benne sorsolás és nincs örökség. */
   agency=null;
-  CHEM={total:0,notes:[],goodPairs:new Set()};
+  CHEM={total:0,notes:[],goodPairs:new Set(),badPairs:new Set()};
   /* --- vásárolt/kiérdemelt bővítések --- */
   MAX_CAREER_ROSTER=MAX_CAREER_ROSTER_BASE;
   infinityMode=false;infinityTiers=0;
@@ -26852,12 +26881,12 @@ function startClubCareer(sq){
   showChemistry();
   saveGame();}
 /* ---- kémia ---- */
-let CHEM={total:0,notes:[],goodPairs:new Set()};
+let CHEM={total:0,notes:[],goodPairs:new Set(),badPairs:new Set()};
 /* közös klub: dupla egység · közös nemzetiség: egyszeres egység ·
    rivális klub-pár: 25% jóra fordul, 75% feszültség marad */
 const CHEM_NAT=1.0, CHEM_CLUB=2.0, CHEM_RIVAL_GOOD_P=0.25, CHEM_RIVAL_GOOD=1.0, CHEM_RIVAL_BAD=-3.0, CHEM_LEAD=1.5;
 function computeChemistry(){
-  let total=0,notes=[],goodPairs=new Set();
+  let total=0,notes=[],goodPairs=new Set(),badPairs=new Set();
   for(let i=0;i<11;i++)for(let j=i+1;j<11;j++){
     const a=slots[i],b=slots[j];
     if(a.origin===b.origin){
@@ -26869,7 +26898,10 @@ function computeChemistry(){
         notes.push(`${shortName(a.player.n)} & ${shortName(b.player.n)} — örök riválisok, most közös célért (jóra fordult)`);
         goodPairs.add([a.player.n,b.player.n].sort().join("|"));}
       else{total+=CHEM_RIVAL_BAD;
-        notes.push(`${shortName(a.player.n)} & ${shortName(b.player.n)} — örök riválisok egy öltözőben, feszültség érződik`);}
+        notes.push(`${shortName(a.player.n)} & ${shortName(b.player.n)} — örök riválisok egy öltözőben, feszültség érződik`);
+        /* A FESZÜLTSÉG MOSTANTÓL EL IS VAN TÉVE. Eddig csak jegyzet volt róla;
+           az összhang-rendszer ebből állítja be a pár PLAFONJÁT (bondCapOf). */
+        badPairs.add([a.player.n,b.player.n].sort().join("|"));}
     }else if(a.player.nat&&a.player.nat===b.player.nat){
       total+=CHEM_NAT;
       notes.push(`${shortName(a.player.n)} & ${shortName(b.player.n)} — közös nemzetiség (${a.player.nat})`);
@@ -26896,7 +26928,7 @@ function computeChemistry(){
      Lélekemelő, viszont TARTÓS. */
   {const _cb=chemCoachBonus();
    if(_cb>0){total+=_cb;notes.push(`A Csapatkovács munkája összekovácsolja az öltözőt (+${_cb.toFixed(1)})`);}}
-  return {total,notes,goodPairs};}
+  return {total,notes,goodPairs,badPairs};}
 /* KÉSZ KLUB indulás: a keret egy valós csapatból jön, ezért a "közös klub"
    szabály mindenkit mindenkivel összekötne. Helyette pontosan HÁROM kötés
    indul: a legjobb védő ↔ legjobb középpályás, két véletlen középpályás, és a
@@ -26941,6 +26973,10 @@ function redisplayChemistry(){
 $("chemOk").onclick=()=>{
   $("chemBox").classList.add("hide");
   if(gameMode==="career"&&CHEM&&CHEM.goodPairs)seedBaseChemistry(CHEM.goodPairs);
+  /* ÖSSZHANG — AZ INDULÓ ELEMZÉS. A SORREND SZÁMÍT: a seedBaseChemistry UTÁN
+     fut, és csak ez kapcsolja be a bondsSeeded jelzőt — így az alapító keret
+     tagjai nem számítanak „érkezőnek" (lásd bondStartIntegration). */
+  if(gameMode==="career")try{bondSeedFirstSquad();}catch(e){}
   /* ---- KÉSZ KLUB: A NÉV ADOTT ----
      Nem a keretet válogattad össze, hanem ÁTVETTED egy valós klubot — a neve
      része annak, amit átvettél. Elnevezni azt, ami már létezik, két helyen is
@@ -27136,6 +27172,9 @@ function markArrived(p,_price,fromAcademy){
      adják át (a szabadon érkezők, az ikonok és az akadémisták nem) — épp ezt
      akarjuk mérni. */
   msNoteBuy(_price,p&&p.n);
+  /* ÖSSZHANG: a beilleszkedési ablak indítása. A markArrived MINDEN igazolási
+     úton lefut, ezért itt van, és nem az egyes vásárlási ágakban. */
+  try{bondStartIntegration(p&&p.n);}catch(e){}
   S.chSignings=(S.chSignings||0)+1;
   /* ---- A KÉSZ SKILLEK ÁTADÁSA ----
      A jelölt ajándék-skilljei (giftSkillsFor) itt költöznek be a S.skills-be,
@@ -27876,7 +27915,8 @@ function liveXI(){
     const sb=(S.subs&&S.subs[idx])||null;
     const pl=sb?sb.sub:(sl&&sl.player);
     if(!pl)return;
-    out.push({p:pl,pos:(sl&&sl.pos)||"KKP",out:false,bus:false,forced:!!sb});});
+    out.push({p:pl,pos:(sl&&sl.pos)||"KKP",xy:(sl&&sl.xy)||null,
+              out:false,bus:false,forced:!!sb});});
   return out;}
 /* A KIJELZETT „aktuális csapaterő". Ugyanaz a képlet, mint a teamStrength-é
    (playerStrength = effektív poszt-rating + tartós módosítók), csak arra a
@@ -31194,6 +31234,11 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      ajánl új párost. Az alap-kémia (közös klub/nemzet) eleve 5/5-ös párként
      kerül be a keret megalakulásakor. */
   chemPairs:{},chemInProgress:null,
+  /* ÖSSZHANG (3.8.00): bonds[kulcs]=0..99 a kötés · bondCap a feszült párok
+     plafonja · bondFrac a törtrész-átvitel · bondNew a beilleszkedés alatt
+     állók · bondsSeeded jelzi, lefutott-e az induló elemzés · bondTrain az
+     összhangépítés sávja (F6-ig mindig null). */
+  bonds:{},bondCap:{},bondFrac:{},bondNew:{},bondFast:{},bondsSeeded:false,bondTrain:null,
   /* PASSZKÉMIA (Tiki-Taka): passChem[kulcs] = {a,b,stages,need,co,gap,said} —
      a párkémiával PÁRHUZAMOS, harmadik kötésfajta. Ugyanaz az öt fázis, de
      saját tárban él: ugyanazon a páron mindkettő megépíthető, és a hatásaik
@@ -31907,7 +31952,415 @@ function pruneChemistry(){
     const pr=S.passChem[k];
     if(!pr||!inRoster.has(pr.a)||!inRoster.has(pr.b)){
       delete S.passChem[k];
-      if(S.passChemInProgress===k)S.passChemInProgress=null;}});}
+      if(S.passChemInProgress===k)S.passChemInProgress=null;}});
+  /* AZ ÖSSZHANG UGYANEZT A SORSOT OSZTJA: aki kikerül a keretből, azzal a
+     kötései is megszűnnek. Itt, és nem a hívási helyeken — egy távozási út se
+     maradhasson ki. */
+  try{bondPrune();}catch(e){}}
+/* ================= ÖSSZHANG-RENDSZER — F1: A MODELL (3.8.00) ==============
+   TERV: docs/osszhang-rendszer-terv.md
+
+   MIT MÉR. Az összhang azt írja le, MENNYIRE ISMERIK EGYMÁST a játékosaid.
+   Két ember között 0–99 közötti szám, ami KIZÁRÓLAG közösen pályán töltött
+   mérkőzésekből gyűlik, és a távozással megsemmisül.
+
+   MI EZ ÉS MI NEM. A morál azt mondja meg, hogy ÉRZIK magukat (eredményre
+   ugrál, egy rossz sorozat elviszi); az összhang azt, hogy MENNYIRE ismerik
+   egymást (idényekben mérhető, és csak akkor vész el, ha valaki elmegy).
+
+   A PÁRKÉMIA MEGMARAD, ÉS NEM OLVAD BE. Ő a SZERKESZTETT kötés: te választod
+   a párost a jutalom-soron, öt fázisban épül, és megtartja minden mai hatását
+   (gólsúly, csapat-λ, taktika-begyakorlás, kihívás, pályavonal). Az elkészülte
+   MOSTANTÓL egy nagy, egyszeri ugrást ad az adott pár összhangjába
+   (BOND_CHEM_JUMP) — a két rendszer így egymást erősíti, nem duplikálja.
+
+   EBBEN A FÁZISBAN A SZÁM MÉG SENKIRE NEM HAT. Nincs bekötve a meccsbe (az az
+   F2), nincs felülete (F3–F5). Szándékosan: egy szám, ami nem hat, biztonságosan
+   MÉRHETŐ — le lehet futtatni több idényt, és megnézni, hova fut.
+
+   KÉT KÜLÖN CSATORNA — EZ A MODELL GERINCE.
+     · ÉPÍTÉSI ÜTEM (bondMatchTick): mennyivel nő egy pár egy meccs után.
+       Ide tartozik a poszt, a taktika, a személyiség, a passz, az élmény.
+     · OLVASÁSI SÚLY (teamBond): mennyit ér az a pár a csapat-számban.
+       Ide tartozik a pályatávolság, a taktika szerep-párja és a felállás.
+   MIÉRT: ha a felállás az OLVASÁSI oldalon ül, a csapatszám AZONNAL reagál,
+   amikor két embert felcserélsz. Ha az építési oldalon ülne, a hatása három
+   hónap múlva jelenne meg — az nem visszajelzés, az zaj. */
+const BOND_MAX=99;              /* a plafon zárva marad */
+const BOND_REF=55;              /* a „szokásos", beállt csapat — az F2 nullpontja */
+const BOND_BASE=0.95;           /* meccsenkénti alapütem (a csillapítás előtt) */
+const BOND_SOFT=88;             /* ameddig a MECCSEK ELVISZNEK — lásd bondDamp */
+const BOND_CATCHUP_TO=50;       /* az érkező eddig zárkózik fel gyorsítva */
+const BOND_CATCHUP_MULT=1.8;    /* …ennyiszeres ütemben */
+const BOND_CHEM_JUMP=25;        /* egy elkészült (5/5) párkémia ugrása */
+const BOND_NEW_PROV=15;         /* az érkező ideiglenes értéke MINDENKIVEL */
+const BOND_NEW_MATCHES=8;       /* ennyi SAJÁT meccs után dől el a beilleszkedés */
+const BOND_NEW_SCALE=33;        /* az érkező sávja a 8 meccs után: 0–33 */
+const BOND_NEW_HOME=50;         /* …kivéve akivel HAZATALÁL: odáig */
+const BOND_FIRST_SCALE=45;      /* az ELSŐ keret sávja: 0–45 */
+const BOND_FIRST_HOME=60;       /* …közös múlttal: odáig */
+const BOND_CAP_CONFLICT=40;     /* rossz viszony PLAFONJA (nem negatív szám!) */
+
+/* ---- MIÉRT PLAFON, ÉS NEM NEGATÍV SZÁM ----
+   A régi kémia-elemzés ismeri a FESZÜLT párost (rivális klubokból jövők,
+   75%-ban). Egy tisztán 0–99-es pozitív skála ezt elveszítené. A megoldás nem
+   negatív összhang — az egy második előjelet vinne a rendszerbe, és a
+   csapatszám értelmezhetetlen lenne —, hanem PLAFON: a feszült pár együtt is
+   játszhat, épül is köztük valami, de 40 fölé nem jut, amíg a viszony áll.
+   Egy szám marad, a dráma megvan. */
+const BOND_ROLE_ORD={KAPUS:0,VEDO:1,KOZEPPALYAS:2,CSATAR:3};
+
+/* ---- KLUB-MÚLT ----
+   „A két játékos csapat szerinti múltja" (a bejelentés 3.ii pontja). NEM
+   építünk rá új indexet: a mérföldkő-modul `msWereTeammates` / `msAreRivals`
+   párja pontosan ezt tudja, a CLUBS_BY_NAME regiszterből. Egy adat, egy
+   forrás. (A regiszter lentebb, top-level konstansként épül fel; ezek a
+   függvények csak futásidőben hívódnak, jóval utána.)
+   2 = együtt játszottak egy valós klubban · 1 = közös nemzetiség · 0 = semmi */
+function bondHistory(a,b){
+  try{
+    const club=msWereTeammates(a,b);
+    /* KÉSZ KLUB INDULÁS: ott MINDENKI ugyanabból a klubból jött, tehát a közös
+       múlt nem mond semmit — mindenkit mindenkivel maximumra kötne. Ugyanaz a
+       csapda, amit a kémia-elemzés már egyszer megfogott (a clubStartChemPairs
+       épp ezért szűkíti három kötésre, és a CHEM.total-t 5–15-re). Ezt az EGY
+       klubot tehát nem számítjuk közös múltnak — minden MÁS közöset igen. */
+    if(club){
+      const startClub=(gameMode==="career"&&careerStart==="club"&&curSquad&&curSquad.club)||null;
+      if(club!==startClub)return 2;
+      /* keresünk másik, nem a kiinduló klubhoz tartozó közöset */
+      const ca=msClubsOf(a),cb=msClubsOf(b);
+      for(let i=0;i<ca.length;i++)
+        if(ca[i]!==startClub&&cb.indexOf(ca[i])>=0)return 2;}
+  }catch(e){}
+  const na=bondNat(a),nb=bondNat(b);
+  if(na&&nb&&na===nb)return 1;
+  return 0;}
+function bondNat(n){
+  if(NAT_BY_NAME[n])return NAT_BY_NAME[n];
+  const e=(typeof careerPool!=="undefined"&&careerPool)?careerPool[n]:null;
+  return (e&&e.nat)||null;}
+
+/* ---- A TÁR ----
+   S.bonds[kulcs]   = 0..99 · a kötés maga
+   S.bondCap[kulcs] = plafon, ha van (feszült viszony)
+   S.bondNew[név]   = {m:0} · beilleszkedés alatt, ennyi SAJÁT meccse volt
+   S.bondsSeeded    = lefutott-e már az induló elemzés (enélkül az alapító
+                      keret tagjai „érkezőnek" számítanának — lásd markArrived) */
+function bondKey(a,b){return a<b?a+"§"+b:b+"§"+a;}
+function bondStore(){return S.bonds||(S.bonds={});}
+function bondCapStore(){return S.bondCap||(S.bondCap={});}
+function bondNewStore(){return S.bondNew||(S.bondNew={});}
+function bondPool(n){return (typeof careerPool!=="undefined"&&careerPool)?(careerPool[n]||null):null;}
+/* Beilleszkedés alatt áll-e — ilyenkor MINDEN kötése az ideiglenes értéket adja. */
+function bondIntegrating(n){return !!(S.bondNew&&S.bondNew[n]);}
+/* A plafon KÉT forrásból jön, de EGY helyen olvasódik.
+     · tárolt: a feszült páros az induló elemzésből;
+     · számolt: a személyiség-ütközés (bajkeverő + lobbanékony) — ez nem
+       sorsolás, hanem a meglévő adatból következik, tehát nem kell tárolni. */
+function bondCapOf(a,b){
+  let cap=BOND_MAX;
+  const st=S.bondCap&&S.bondCap[bondKey(a,b)];
+  if(typeof st==="number")cap=Math.min(cap,st);
+  const pa=bondPool(a),pb=bondPool(b);
+  if(pa&&pb){
+    const clash=(x,y)=>(x.coopI||0)===0&&(y.aggroI||0)>=4;
+    if(clash(pa,pb)||clash(pb,pa))cap=Math.min(cap,BOND_CAP_CONFLICT);}
+  return cap;}
+/* Az ÉRKEZŐ is kaphat plafont: ha a klubmúltjaik történelmi riválisok, és nem
+   fordult jóra. Az induló elemzés ezt a keretre lefuttatja és eltárolja; egy
+   későbbi igazolásnál itt, a felvételkor sorsoljuk ugyanazzal az aránnyal
+   (CHEM_RIVAL_GOOD_P), hogy a két út ugyanazt a világot írja le. */
+function bondSeedConflict(n){
+  if(gameMode!=="career"||!n)return;
+  bondRosterNames().forEach(o=>{
+    if(o===n)return;
+    let riv=null;
+    try{riv=msAreRivals(n,o);}catch(e){}
+    if(!riv)return;
+    if(Math.random()<CHEM_RIVAL_GOOD_P)return;   /* jóra fordult */
+    bondCapStore()[bondKey(n,o)]=BOND_CAP_CONFLICT;});}
+/* A NYERS tárolt érték — a beilleszkedést NEM veszi figyelembe. */
+function bondRaw(a,b){const v=S.bonds&&S.bonds[bondKey(a,b)];return typeof v==="number"?v:0;}
+/* A HASZNÁLANDÓ érték: aki még beilleszkedik, annak minden kötése az
+   ideiglenes szám. Ez szándékosan a beállt csapat átlaga ALATT van — az új
+   ember a 8 meccse alatt LEHÚZZA a csapatszámot, és ez nem hiba, hanem a
+   rendszer lényege: az igazolásnak ára van a pályán is. */
+function bondOf(a,b){
+  if(a===b)return 0;
+  if(bondIntegrating(a)||bondIntegrating(b))return BOND_NEW_PROV;
+  return bondRaw(a,b);}
+function bondSet(a,b,v){
+  const k=bondKey(a,b);
+  bondStore()[k]=Math.max(0,Math.min(bondCapOf(a,b),Math.round(v)));}
+function bondAdd(a,b,d){bondSet(a,b,bondRaw(a,b)+d);}
+
+/* ---- SZORZÓK AZ ÉPÍTÉSI OLDALON ---- */
+function bondRoleOf(pos){
+  if(!pos)return "KOZEPPALYAS";
+  if(pos==="KP")return "KAPUS";
+  try{return roleInFormation(pos)||"KOZEPPALYAS";}catch(e){return "KOZEPPALYAS";}}
+function bondRoleMult(ra,rb){
+  const d=Math.abs((BOND_ROLE_ORD[ra]||0)-(BOND_ROLE_ORD[rb]||0));
+  return d===0?1.35:d===1?1.15:d===2?0.85:0.65;}
+/* A taktika SAJÁT szerep-párjai — ugyanaz a lista, amiből a párkémia a
+   begyakorlást gyorsítja (TACTICS[].chemRoles). Egy rendszer, egy igazság. */
+function bondTacticMult(ra,rb){
+  try{
+    const k=S.tactics&&S.tactics.active;
+    const t=k&&TACTICS[k];
+    if(!t||!t.chemRoles)return 1;
+    for(let i=0;i<t.chemRoles.length;i++){
+      const p=t.chemRoles[i];
+      if((p[0]===ra&&p[1]===rb)||(p[0]===rb&&p[1]===ra))return 1.5;}
+  }catch(e){}
+  return 1;}
+/* SZEMÉLYISÉG. A három Hattrick-tulajdonság ma gyakorlatilag dísz — itt lesz
+   belőle mechanika.
+     · Együttműködés: MINDKETTŐJÜKÉ számít, mértani középpel (egy bajkeverő
+       rontja a párt, de nem semmisíti meg).
+     · Vezetés: ASZIMMETRIKUS — elég, ha az EGYIKÜK vezéregyéniség.
+     · Temperamentum: két lobbanékony lassabban ér össze; két kiegyensúlyozott
+       a legjobb ragasztó. */
+function bondPersonMult(a,b){
+  const pa=bondPool(a),pb=bondPool(b);
+  if(!pa||!pb)return 1;
+  const co=x=>0.72+0.116*Math.max(0,Math.min(5,x.coopI||0));
+  let m=Math.sqrt(co(pa)*co(pb));
+  m*=1+0.05*Math.max(pa.leadI||0,pb.leadI||0);
+  const ag=x=>Math.max(0,Math.min(4,x.aggroI||0));
+  if(ag(pa)>=4&&ag(pb)>=4)m*=0.78;
+  else if(ag(pa)===2&&ag(pb)===2)m*=1.06;
+  return m;}
+/* PASSZ: aki jobban ad, azt könnyebb megérteni. Szűk sáv — ez ízesítő, nem fő hajtó. */
+function bondPassMult(a,b){
+  const pa=bondPool(a),pb=bondPool(b);
+  const g=x=>(x&&x.attrs&&typeof x.attrs.passz==="number")?x.attrs.passz:55;
+  const avg=(g(pa)+g(pb))/2;
+  return 0.9+0.25*Math.max(0,Math.min(1,(avg-40)/50));}
+/* ÖSSZHANGÉPÍTÉS (F6). Amíg nincs beállítva, MINDEN szorzó 1 — a rendszer
+   nélküle is teljes, a sáv csak hangol rajta. */
+function bondTrainMult(ra,rb){
+  const t=S.bondTrain;
+  if(!t)return 1;
+  const hit=e=>e&&e.group&&bondTrainGroupHit(e.group,ra,rb);
+  if(hit(t.main))return 1.8;
+  if(hit(t.sec))return 1.3;
+  return 0.8;}
+function bondTrainGroupHit(g,ra,rb){
+  if(!g)return false;
+  const p=String(g).split("_");
+  if(p.length!==2)return false;
+  return (p[0]===ra&&p[1]===rb)||(p[0]===rb&&p[1]===ra);}
+/* CSILLAPÍTÁS — EZ NEM OPCIONÁLIS, ÉS AZ ASZIMPTOTÁJA NEM A PLAFON.
+   Enélkül minden pár 99-re futna, és a szám elveszítené a jelentését: egy tíz
+   éve együtt játszó tengely ugyanannyit érne, mint egy tavaly összerakott.
+
+   A GÖRBE A BOND_SOFT-HOZ (88) TART, NEM A 99-HEZ. Ez szándékos, és ez a
+   rendszer egyik kimondható szabálya: A MECCSEK 88-IG VISZNEK EL; a maradék
+   tizenegy pontot csak a PÁRKÉMIA hozhatja meg. Így a párkémia nem díszlet a
+   folytonos rendszer mellett, hanem az egyetlen út a legfelső fokozatra.
+
+   Hangolva (átlagos szorzókkal, minden meccsen együtt játszva):
+     60 meccs (2 idény) ≈ 50 · 150 meccs (5 idény) ≈ 70 · 500 meccs ≈ 84. */
+function bondDamp(v){
+  if(v>=BOND_SOFT)return 0;
+  return Math.pow((BOND_SOFT-v)/BOND_SOFT,1.6);}
+/* ---- FELZÁRKÓZÁS (a bejelentés 10. pontja) ----
+   „miután 8 meccs után megkapja az összhang értékeket, azután neki egészen
+   50-ig gyorsabban gyűlnének az összhang pontjai."
+   A jelző a bondRevealNew-nál kerül fel, és 50 fölött MAGÁTÓL hatástalan —
+   a bondMatchTick akkor törli, amikor a legkisebb kötése is átlépte. */
+function bondCatchMult(a,b){
+  const f=S.bondFast;
+  if(!f)return 1;
+  if(!f[a]&&!f[b])return 1;
+  return bondRaw(a,b)<BOND_CATCHUP_TO?BOND_CATCHUP_MULT:1;}
+
+/* ---- A MECCS UTÁNI GYŰLÉS ----
+   A kulcs, amiért ez egyetlen függvény: a pár akkor és csak akkor épül, ha
+   MINDKETTEN pályára léptek. A padon ülő társsal töltött idő nem összhang. */
+let BOND_MATCH_AST=null;   /* a meccsen egymásnak adott gólpasszok párjai */
+function bondNoteAssist(as,sc){
+  if(!BOND_MATCH_AST||!as||!sc||as===sc)return;
+  BOND_MATCH_AST.add(bondKey(as,sc));}
+function bondMatchTick(names,posOf,ctx){
+  if(gameMode!=="career"||!S.bondsSeeded)return null;
+  const list=(names||[]).filter(Boolean);
+  if(list.length<2)return null;
+  const tempo=(typeof devTempo==="function")?devTempo():1;
+  const winM=(ctx&&ctx.win)?1.25:(ctx&&ctx.loss)?0.9:1;
+  const ast=BOND_MATCH_AST||new Set();
+  let pairs=0,sum=0;
+  for(let i=0;i<list.length;i++)for(let j=i+1;j<list.length;j++){
+    const a=list[i],b=list[j];
+    /* Aki még beilleszkedik, annak a KÖTÉSE nem épül — a 8 meccse alatt a
+       teljesítménye gyűlik, az értékeit a bondRevealNew írja majd ki. */
+    if(bondIntegrating(a)||bondIntegrating(b))continue;
+    const ra=bondRoleOf(posOf[a]),rb=bondRoleOf(posOf[b]);
+    let d=BOND_BASE*tempo
+      *bondRoleMult(ra,rb)
+      *bondTacticMult(ra,rb)
+      *bondTrainMult(ra,rb)
+      *bondPersonMult(a,b)
+      *bondPassMult(a,b)
+      *winM
+      *(ast.has(bondKey(a,b))?2:1)
+      *bondCatchMult(a,b)
+      *bondDamp(bondRaw(a,b));
+    if(d<=0)continue;
+    /* Törtrészben gyűlik, egészben tárolódik: a maradékot a pár VISZI TOVÁBB,
+       különben a kis szorzók (távoli poszt, rossz személyiség) örökre
+       elvesznének a kerekítésben. */
+    const k=bondKey(a,b);
+    const carry=(S.bondFrac||(S.bondFrac={}));
+    const tot=(carry[k]||0)+d;
+    const whole=Math.floor(tot);
+    carry[k]=tot-whole;
+    if(whole>0)bondAdd(a,b,whole);
+    pairs++;sum+=d;}
+  /* A BEILLESZKEDÉS SZÁMLÁLÓJA AZ Ő SAJÁT MECCSEIT SZÁMOLJA, nem a csapatéit:
+     egy cserejátékos különben fél idényig az ideiglenes értéken ragadna. */
+  const revealed=[];
+  list.forEach(n=>{
+    const rec=S.bondNew&&S.bondNew[n];
+    if(!rec)return;
+    rec.m=(rec.m||0)+1;
+    if(rec.m>=BOND_NEW_MATCHES)revealed.push(n);});
+  revealed.forEach(n=>bondRevealNew(n));
+  /* A felzárkózás lekapcsolása, ha a legkisebb kötése is átlépte az 50-et —
+     így a jelző nem ragad örökre egy tíz éve itt játszó emberen. */
+  if(S.bondFast)Object.keys(S.bondFast).forEach(n=>{
+    const others=bondRosterNames().filter(o=>o!==n);
+    if(!others.length)return;
+    if(others.every(o=>bondRaw(n,o)>=BOND_CATCHUP_TO))delete S.bondFast[n];});
+  BOND_MATCH_AST=new Set();
+  return {pairs,sum,revealed};}
+
+/* ---- AZ ÉRKEZŐ BEILLESZKEDÉSE ----
+   A markArrived MINDEN igazolási úton lefut (vásárlás, klub-szemle, ingyen
+   token, akadémia, csere), ezért ez az egyetlen megbízható indítási pont. */
+function bondStartIntegration(n){
+  if(gameMode!=="career"||!n)return;
+  if(!S.bondsSeeded)return;   /* az alapító keret nem „érkező" — lásd bondSeedFirstSquad */
+  bondNewStore()[n]={m:0};
+  bondSeedConflict(n);}
+/* A 8. meccs után az addigi teljesítménye alapján kap valódi értékeket.
+   A sáv 0–33 — KIVÉVE, akivel HAZATALÁL (közös klubmúlt vagy nemzetiség):
+   ott 50 is lehet. */
+function bondRevealNew(n){
+  const rec=S.bondNew&&S.bondNew[n];
+  if(!rec)return null;
+  delete S.bondNew[n];
+  const out=[];
+  bondRosterNames().forEach(o=>{
+    if(o===n)return;
+    if(bondIntegrating(o))return;   /* két érkező egymással: a másik saját ablakában dől el */
+    const v=bondSeedValue(n,o,BOND_NEW_SCALE,BOND_NEW_HOME);
+    bondSet(n,o,v);
+    out.push({n:o,v});});
+  (S.bondFast||(S.bondFast={}))[n]=1;   /* innentől 50-ig gyorsítva zárkózik */
+  out.sort((x,y)=>y.v-x.v);
+  return out;}
+/* A KEZDŐÉRTÉK KÉPLETE. Egy sávra hoz mindent, ami a találkozás pillanatában
+   IGAZ a párról: a közös múlt, a személyiség, a poszt-közelség — plusz egy
+   adag véletlen, mert két ember összeszokása nem determinisztikus. */
+function bondSeedValue(a,b,scale,homeScale){
+  const hist=bondHistory(a,b);
+  const per=Math.max(0,Math.min(1,(bondPersonMult(a,b)-0.75)/0.75));
+  let t=0.12+0.55*Math.random()+0.22*per;
+  t=Math.max(0,Math.min(1,t));
+  if(hist===2)return Math.round(homeScale*(0.62+0.38*Math.random()));
+  if(hist===1)t=Math.max(t,0.45+0.4*Math.random());
+  return Math.round(scale*t);}
+
+/* ---- AZ ELSŐ KERET ----
+   Ugyanaz az elemzés, mint az érkezőé, csak MINDENKIRE lefut, tágabb sávval
+   (0–45, közös múlttal 60-ig) — a karrier kezdetén a közös múlt sokkal többet
+   számít, mert még semmi mást nem éltek meg együtt.
+   A feszült párosok (rivális klubokból jövők, akiknél nem fordult jóra) itt
+   kapják meg a PLAFONJUKAT. */
+function bondSeedFirstSquad(){
+  if(gameMode!=="career")return 0;
+  S.bonds={};S.bondCap={};S.bondNew={};S.bondFrac={};S.bondFast={};
+  try{
+    if(CHEM&&CHEM.badPairs)CHEM.badPairs.forEach(k=>{
+      const p=String(k).split("|");
+      if(p.length===2)bondCapStore()[bondKey(p[0],p[1])]=BOND_CAP_CONFLICT;});
+  }catch(e){}
+  const names=bondRosterNames();
+  let n=0;
+  for(let i=0;i<names.length;i++)for(let j=i+1;j<names.length;j++){
+    bondSet(names[i],names[j],bondSeedValue(names[i],names[j],BOND_FIRST_SCALE,BOND_FIRST_HOME));n++;}
+  S.bondsSeeded=true;
+  return n;}
+function bondRosterNames(){
+  const out=[];
+  try{fullCareerRoster().forEach(p=>{if(p&&p.n&&out.indexOf(p.n)<0)out.push(p.n);});}catch(e){}
+  return out;}
+/* Aki kikerül a keretből, azzal minden kötése megszűnik — a párkémiával
+   azonos szabály, és ugyanabban a takarításban fut (pruneChemistry). */
+function bondPrune(){
+  if(gameMode!=="career"||!S.bonds)return;
+  const keep=new Set(bondRosterNames());
+  [["bonds",S.bonds],["bondCap",S.bondCap],["bondFrac",S.bondFrac]].forEach(([_k,store])=>{
+    if(!store)return;
+    Object.keys(store).forEach(k=>{
+      const p=k.split("§");
+      if(p.length!==2||!keep.has(p[0])||!keep.has(p[1]))delete store[k];});});
+  if(S.bondNew)Object.keys(S.bondNew).forEach(n=>{if(!keep.has(n))delete S.bondNew[n];});}
+/* Egy elkészült (5/5) párkémia nagy, egyszeri ugrást ad. A párkémia MEGMARAD
+   annak, ami volt — ez a hídja az összhang felé. */
+function bondChemComplete(pr){
+  if(!pr||gameMode!=="career"||!S.bondsSeeded)return;
+  try{bondAdd(pr.a,pr.b,BOND_CHEM_JUMP);}catch(e){}}
+
+/* ================= AZ OLVASÁSI OLDAL =================
+   A CSAPAT ÖSSZHANGJA: a pályán lévő tizenegy 55 párjának SÚLYOZOTT átlaga.
+   A súly a felállásból és a taktikából jön — ezért reagál a szám AZONNAL egy
+   cserére vagy egy poszt-váltásra. */
+function bondPairWeight(A,B){
+  let w=1;
+  if(A.xy&&B.xy){
+    const dx=A.xy[0]-B.xy[0],dy=A.xy[1]-B.xy[1];
+    const d=Math.sqrt(dx*dx+dy*dy);
+    w*=1.6-0.9*Math.max(0,Math.min(1,d/70));}
+  w*=bondTacticMult(bondRoleOf(A.pos),bondRoleOf(B.pos))>1?1.4:1;
+  return Math.max(0.1,w);}
+function teamBond(){
+  if(gameMode!=="career")return BOND_REF;
+  const xi=(typeof liveXI==="function")?liveXI().filter(a=>a&&a.p&&!a.bus&&!a.out):[];
+  if(xi.length<2)return BOND_REF;   /* nincs mit mérni — SEMLEGES, nem nulla */
+  let sw=0,sv=0;
+  for(let i=0;i<xi.length;i++)for(let j=i+1;j<xi.length;j++){
+    const w=bondPairWeight(xi[i],xi[j]);
+    sw+=w;sv+=w*bondOf(xi[i].p.n,xi[j].p.n);}
+  if(!sw)return BOND_REF;
+  return Math.round(sv/sw*10)/10;}
+/* Egy JÁTÉKOS összhangja a csapattal (a pályán lévőkkel), és a három
+   legerősebb személyes kötése — az F5 játékoslapjának a bemenete. */
+function playerBond(name){
+  const all=bondRosterNames().filter(n=>n!==name);
+  if(!all.length)return {team:0,top:[]};
+  const vals=all.map(n=>({n,v:bondOf(name,n)}));
+  const team=Math.round(vals.reduce((s,x)=>s+x.v,0)/vals.length*10)/10;
+  return {team,top:vals.slice().sort((a,b)=>b.v-a.v).slice(0,3)};}
+/* ---- MIGRÁCIÓ ----
+   Régi mentésben nincs összhang. Nem nullázunk: a meglévő párkémiából vetünk
+   magot (kész kötés 55, épülő fázisonként 8), a többi párt pedig ugyanazzal az
+   induló elemzéssel töltjük fel, mint az első keretet — így egy futó karrier
+   nem veszít, és nem is kap ingyen érett csapatot. */
+function bondMigrate(){
+  if(gameMode!=="career"||S.bondsSeeded)return 0;
+  const n=bondSeedFirstSquad();
+  try{
+    Object.values(S.chemPairs||{}).forEach(pr=>{
+      if(!pr||!pr.a||!pr.b)return;
+      const st=Math.max(0,Math.min(CHEM_PAIR_NEED,pr.stages||0));
+      const v=st>=CHEM_PAIR_NEED?55:st*8;
+      if(v>bondRaw(pr.a,pr.b))bondSet(pr.a,pr.b,v);});
+  }catch(e){}
+  return n;}
 /* ================= 🌀 PASSZKÉMIA (Tiki-Taka, 3.4.00) =================
    A HARMADIK KÖTÉSFAJTA. A jutalom-sor eddig két dolgot tudott adni: egy
    KÉPESSÉGET vagy egy PÁRKÉMIA-fázist. A Tiki-Taka nyit egy harmadikat — és
@@ -40630,6 +41083,9 @@ function playMatch(){
          3. góltól minden újabb találat 3 pontot ér. A keretes (ízesítő) sorok
          pontja ettől FÜGGETLEN, azokat az addLine számolja. */
       if(sgoals>=3)try{fameNoteHaul(scorer.n,sgoals);}catch(e){}
+      /* ÖSSZHANG: az egymásnak adott gólpassz duplázza aznap a pár építését.
+         A gólpassz-ÖSSZEG eddig is megvolt (careerStats.a) — a PÁR nem. */
+      if(asstName)try{bondNoteAssist(asstName,scorer.n);}catch(e){}
       if(asstName&&CHEM.goodPairs.has([scorer.n,asstName].sort().join("|"))){
         addLine(`→ Vakon is megtalálják egymást — ${esc(shortName(scorer.n))} és ${esc(shortName(asstName))} kémiája újra betalált`,"m skillnote",true);
         S.morale=Math.max(0,Math.min(100,S.morale+1));}
@@ -40985,7 +41441,9 @@ function playMatch(){
      mérkőzés saját állapotából, tehát nem tud elavulni. */
   MATCH_XI=()=>active.map((a,k)=>({
     p:a.p,pos:(slots[a.idx]&&slots[a.idx].pos)||"KKP",
+    xy:(slots[a.idx]&&slots[a.idx].xy)||null,
     out:k===redIdx,bus:!!a.bus,forced:!!(S.subs&&S.subs[a.idx])}));
+  BOND_MATCH_AST=new Set();   /* ÖSSZHANG: a meccs gólpassz-párjai tiszta lappal */
   updateStrengthBar();
   MATCH_CTL={
     canSub:()=>halftimeSubsOn()&&!S.auto&&!DUEL,
@@ -41434,6 +41892,18 @@ function playMatch(){
         const cs=S.careerStats[p.n]=S.careerStats[p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};
         cs.matches++;
         if(g||as){cs.g+=g;cs.a+=as;}});
+      /* ---- ÖSSZHANG: A MECCS UTÁNI GYŰLÉS ----
+         Ugyanabból a halmazból (`playedAll`), amiből a pályára lépés
+         könyvelődik — egy hely, egy igazság: aki pályára lépett, az épített.
+         A poszt-térkép a KEZDŐ helyekből indul, és a csere UTÁNI állapottal
+         (active) írja felül: így a becserélt ember a saját helyén számít, a
+         lecserélt pedig azon, ahol játszott. */
+      try{
+        const _bPos={};
+        slots.forEach(sl=>{if(sl&&sl.player)_bPos[sl.player.n]=sl.pos;});
+        active.forEach(a=>{if(a&&a.p&&slots[a.idx])_bPos[a.p.n]=slots[a.idx].pos;});
+        bondMatchTick(playedAll.map(p=>p.n),_bPos,{win:cls==="win",loss:cls==="loss"});
+      }catch(e){}
       /* ---- A HÉT ELSZÁMOLÁSA: ELŐBB A LELÁTÓ, AZTÁN A BÉR ----
          A sorrend nem mindegy: a szurkolói bevétel ELŐBB érkezik, mert abból
          fizeted a béreket. Fordítva egy szűkös hét fedezetlen bért termelne,
@@ -42098,6 +42568,7 @@ function playMatch(){
         pr.stages=Math.min(CHEM_PAIR_NEED,pr.stages+1);
       if(pr.stages>=CHEM_PAIR_NEED){
         pr.built=1;   /* FELÉPÍTETT kötés — lásd a chem:idle témát */
+        bondChemComplete(pr);   /* ÖSSZHANG: az elkészült kötés nagy ugrást ad */
         addLine(`🤝 Kémia kész: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} — összeszokott páros, most már együtt veszélyesek!`,"m life");
         S.chemInProgress=null;
       }else{
@@ -45671,6 +46142,7 @@ function advanceChemInProgressManual(){
     pr.stages=Math.min(CHEM_PAIR_NEED,pr.stages+1);
     if(pr.stages>=CHEM_PAIR_NEED){
       pr.built=1;
+      bondChemComplete(pr);   /* ÖSSZHANG: az elkészült kötés nagy ugrást ad */
       addLine(`🤝 Kémia kész: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} — összeszokott páros, most már együtt veszélyesek!`,"m life");
       S.chemInProgress=null;
     }else addLine(`🤝 Kémia épül: ${esc(shortName(pr.a))} & ${esc(shortName(pr.b))} (${pr.stages}/${CHEM_PAIR_NEED} fázis)`,"m life");
@@ -66788,7 +67260,8 @@ function saveGame(){
       extraRoster,
       drafted:[...drafted],
       captainIdx,teamName,coach,
-      CHEM:{total:CHEM.total,notes:CHEM.notes,goodPairs:[...CHEM.goodPairs]},
+      CHEM:{total:CHEM.total,notes:CHEM.notes,goodPairs:[...CHEM.goodPairs],
+            badPairs:[...(CHEM.badPairs||[])]},
       phase,draftStage,benchCatIndex,
       familyRound,familyState,
       /* A családtag-beállítások eddig NEM mentődtek: egy draft közbeni
@@ -66819,6 +67292,10 @@ function saveGame(){
         /* ÚJ KIHÍVÁS-SZÁMLÁLÓK és a piaci licitre ülő kihívás-hatások. */
         chStyleUnlocks:S.chStyleUnlocks,chDerbyWins:S.chDerbyWins,chDerbyLosses:S.chDerbyLosses,
         chSeasonBestSaleRatio:S.chSeasonBestSaleRatio,chBidFloor:S.chBidFloor,chBidMalus:S.chBidMalus,
+        /* ÖSSZHANG: a kötés-tár és a köre. Lapos, szám-értékű objektumok,
+           tehát sorosíthatók; egy 28 fős keret 378 párja néhány KB. */
+        bonds:S.bonds,bondCap:S.bondCap,bondFrac:S.bondFrac,bondNew:S.bondNew,
+        bondFast:S.bondFast,bondsSeeded:S.bondsSeeded,bondTrain:S.bondTrain,
         scorers:S.scorers,assists:S.assists,mvps:S.mvps,lgCS:S.lgCS,goodForm:S.goodForm,badForm:S.badForm,careerStats:S.careerStats,clubScoutSpinsUsed:S.clubScoutSpinsUsed,twEventUsed:S.twEventUsed,consecutiveTitles:S.consecutiveTitles,consecutiveBadSeasons:S.consecutiveBadSeasons,seasonSaves:S.seasonSaves,seasonCleanSheets:S.seasonCleanSheets,seasonMatches:S.seasonMatches,seasonNumber:S.seasonNumber,seasonHistory:S.seasonHistory,iconSeason:S.iconSeason,roles:S.roles,
         tactics:S.tactics,tacticPrompt:S.tacticPrompt,
         /* TENGELY-MÉRŐ: karrieren átívelő kalibrációs napló, ezért a mentés
@@ -67085,7 +67562,8 @@ function applySavedGame(d){
     const ref=COACHES.find(c=>c.n===coach.n);
     coach.tactics=ref&&ref.tactics?ref.tactics.slice():Object.keys(TACTICS).slice(0,3);}
   captainName=(captainIdx>=0&&slots[captainIdx]&&slots[captainIdx].player)?slots[captainIdx].player.n:null;
-  CHEM={total:d.CHEM.total,notes:d.CHEM.notes,goodPairs:new Set(d.CHEM.goodPairs||[])};
+  CHEM={total:d.CHEM.total,notes:d.CHEM.notes,goodPairs:new Set(d.CHEM.goodPairs||[]),
+        badPairs:new Set(d.CHEM.badPairs||[])};
   phase=d.phase;draftStage=d.draftStage;benchCatIndex=d.benchCatIndex;
   familyRound=d.familyRound;familyState=d.familyState;
   /* ---- ÖNJAVÍTÁS: BERAGADT DRAFT ----
@@ -67636,7 +68114,22 @@ function applySavedGame(d){
        &&typeof pyrPoScreen==="function")pyrPoScreen();
   }catch(e){}
   /* A FEJLÉC ARCULATA: a betöltött csapat neve és színei. */
-  try{applyHeaderIdentity();}catch(e){}}
+  try{applyHeaderIdentity();}catch(e){}
+  /* ---- ÖSSZHANG: ALAPÉRTÉKEK ÉS MIGRÁCIÓ ----
+     A VÉGÉN, mert a magvetéshez a KERETNEK állnia kell (fullCareerRoster).
+     Az Object.assign csak azokat a mezőket írja felül, amik a mentésben
+     szerepelnek — egy régi mentés után tehát az előző játék tárai maradnának
+     bent. Ezért itt kifejezetten a mentésből (vagy üresre) állítjuk őket.
+     Ha nincs összhang a mentésben, a bondMigrate nem nulláz: a meglévő
+     párkémiából vet magot, a többit ugyanazzal az induló elemzéssel tölti,
+     mint az első keretet. */
+  try{
+    const _d=(d&&d.S)||{};
+    S.bonds=_d.bonds||{};S.bondCap=_d.bondCap||{};S.bondFrac=_d.bondFrac||{};
+    S.bondNew=_d.bondNew||{};S.bondFast=_d.bondFast||{};S.bondsSeeded=!!_d.bondsSeeded;
+    S.bondTrain=_d.bondTrain||null;
+    bondMigrate();
+  }catch(e){}}
 function resumeUIFromSave(){
   /* A BEÁLLÍTÓ FELÜLET LEZÁRÁSA — ugyanaz az elv, mint a beginNewGame-ben, csak
      a MENTÉSBŐL VISSZALÉPÉS közös belépési pontján. A "Válassz módot" kártya a

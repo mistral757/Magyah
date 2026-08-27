@@ -1,6 +1,7 @@
 # Összhang-rendszer — tervezet és ütemterv
 
-**Állapot:** 📐 terv, kód még nincs · **Cél-verzió:** 3.8.x
+**Állapot:** 🟡 az F0 döntések megvannak, az **F1 kész** (3.8.00) ·
+**Cél-verzió:** 3.8.x · A megvalósult rész leírása: `docs/osszhang-rendszer.md`
 
 *(Ez egy TERV-dokumentum, nem leírás. Amíg a fázisok le nem futnak, a benne
 szereplő függvény- és mezőnevek javaslatok.)*
@@ -296,9 +297,10 @@ külön `tools/check.sh` és külön mérés.
 | # | fázis | mit szállít | miért itt | kockázat |
 |---|---|---|---|---|
 | **F0** | **Döntések** | a lenti 6 kérdés eldöntve | kód nélkül olcsó visszalépni | — |
-| **F1** | **A modell** | `S.bonds`, `bondOf`, meccsenkénti gyűlés, `teamBond()`, `pruneBonds()`, mentés/betöltés + magvetés a `chemPairs`-ből. **A meccsre MÉG NEM hat.** Egy rejtett kiírás mutatja | egy szám, ami senkire nem hat, biztonságosan mérhető: lefuttatunk 5 idényt és megnézzük, hova fut | alacsony |
+| **F1** ✅ | **A modell** (kész, 3.8.00) | `S.bonds`, `bondOf`, meccsenkénti gyűlés, `teamBond()`, `pruneBonds()`, mentés/betöltés + magvetés a `chemPairs`-ből. **A meccsre MÉG NEM hat.** Egy rejtett kiírás mutatja | egy szám, ami senkire nem hat, biztonságosan mérhető: lefuttatunk 5 idényt és megnézzük, hova fut | alacsony |
 | **F2** | **A meccsbe kötés** | `bondMod` a `buildMatchSnapshot`-ba **és a sorosított mezők közé** (2.4!); a `BOND_REF` beállítása; a csapaterő-sáv jelölése | itt dől el az egyensúly — előbb, mint hogy bármi UI ráépülne | **magas** |
 | **F3** | **A beilleszkedés** | 8 saját meccs, a 4. meccstől jelzés, beilleszkedési jelentés; **az eladási és vásárlási megerősítő kiírja az összhang-tételt** | ez a bejelentett cél („súly az igazolásoknak") — amint a szám hat, ez azonnal kell | közepes |
+| **F3b** | **Kommentár és üzenetek** | meccs közbeni kommentárok a nagyon jól / rosszul működő összhangra (páros, posztcsoport, csapat), és meccs utáni üzenet, ha egy kötés SZINTET LÉPETT | a fokozat-küszöbök az F4 skálájából jönnek, de a szöveg nem vár rá | alacsony |
 | **F4** | **Összhangtérkép** | kapcsoló a pályaképen, 7 fokozat, rajzolási küszöb (2.6) | most már van mit mutatni | közepes (rajz) |
 | **F5** | **A játékos lapja** | csapat-összhang + top 3 személyes, a Statzone mellé | olcsó, és az F4 fokozat-skáláját újrahasználja | alacsony |
 | **F6** | **Összhangépítés** | a második edzés-sáv, posztcsoport- és megbízás-párokkal | szorzó egy MŰKÖDŐ rendszerre | közepes |
@@ -312,18 +314,52 @@ rendszer — épül, hat, és az igazolásnak súlya lesz. Az F4–F7 mind
 
 ---
 
-## 5. Amit F0-ban el kell dönteni
+## 5. Az F0 döntései — megvannak
 
-1. **A párkémia sorsa** — a 2.1 javaslata (marad, diszkrét ugrást ad), vagy
-   teljes beolvasztás? *(A beolvasztás elveszi a `chemPairsDone` kihívást, a
-   skill-pörgetés kémia-promptját és a Tiki-Taka passzkémiát.)*
-2. **Középre állított meccs-tag?** (2.2) Ha nem, a teljes nehézségi görbét
-   újra kell kalibrálni.
-3. **Átveszi-e az összhang a morál „kémia" bemenetét?** (2.5)
-4. **A csúcs-vonal színe** — piros vagy arany? (2.6)
-5. **Van-e konfliktus-plafon a rossz viszonyra?** (2.7)
-6. **Az összhangépítés ellentétele** — a 0,8× lassítás elég fék, vagy kösse
-   pénzhez / stáb-figyelemhez?
+| # | kérdés | **döntés** |
+|---|---|---|
+| 1 | a párkémia sorsa | **marad diszkrét eseményként**, nem olvad be; minden mai értéke és hatása megmarad, és +25-öt ad az adott pár összhangjába |
+| 2 | középre állított meccs-tag | **igen** |
+| 3 | átveszi-e a morál „kémia" bemenetét | **igen** (F2-ben) |
+| 4 | a csúcs-vonal színe | **arany** |
+| 5 | konfliktus-plafon | **igen, 40** — a döntés indoklása lent |
+| 6 | az összhangépítés ellentétele | **a 0,8× lassítás, pénz nélkül** — az indoklás lent |
+
+### 5.1 Miért plafon, és miért 40 (5. kérdés)
+
+Nem negatív számmal, mert az egy **második előjelet** vinne a rendszerbe: a
+csapatszám így nem lenne értelmezhető egyetlen skálán, és a „mennyit ér a
+csapatom" kérdésre két különböző előjelű részből kellene válaszolni. A plafon
+ugyanazt a drámát adja **egy** skálán: a feszült pár együtt is játszhat, épül
+is köztük valami, de nem lesz belőlük tengely.
+
+A 40 azért ennyi, mert a **beállt csapat 55 körül jár** (`BOND_REF`): a
+plafonos pár tehát érezhetően a csapat alatt marad, de nem nulla — egy
+feszültség nem szünteti meg, hogy két profi együtt tud dolgozni.
+
+Két forrása van, **egy olvasóval**: a tárolt (rivális klubok, az induló
+elemzésből és a későbbi igazolásoknál ugyanazzal az aránnyal), és a számolt
+(Bajkeverő + Lobbanékony) — utóbbi a meglévő adatból következik, tehát nincs
+mit tárolni.
+
+### 5.2 Miért nem kerül pénzbe az összhangépítés (6. kérdés)
+
+**A 0,8× lassítás elég fék, és jobb fék, mint a pénz.**
+
+* A játékban **már sok pénznyelő van** (igazolás, bér, boost, poszt-tanulás,
+  stáb-hely, akadémia). Egy újabb azt jelentené, hogy az összhang a *gazdag*
+  menedzser kiváltsága — pedig épp az ellenkezője a célja: a szegény klub
+  fegyvere az, hogy **együtt tartja** a keretét.
+* A lassítás **valódi döntést** kényszerít: ha a védelmet edzed, a támadósor
+  lassabban ér össze. Ez ugyanaz az áldozat-szerkezet, ami az
+  attribútum-edzésnél már bevált, és a játékos **ismeri is** — nem kell új
+  fogalmat megtanulnia.
+* A stáb-figyelemhez kötés a **Csapatkovácsot** duplán terhelné: ő az F7-ben
+  amúgy is az összhang edzője lesz. Két kapu ugyanarra a rendszerre
+  átláthatatlan.
+
+Marad tehát a bevált minta: **fő + másodlagos sáv, ciklusonként egy váltás**,
+és ami kimarad, az 0,8× ütemben épül.
 
 ---
 
