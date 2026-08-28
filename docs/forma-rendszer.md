@@ -148,6 +148,12 @@ nem a fordulószámról. A kupasorozat meccsenkénti kivétele pedig azért kell
 mert a kupának nincs checkpointja — egy közös számlálóval a kivétel értelmét
 veszti.
 
+**A napló mindkét számot kimondja (3.8.13).** A frissítés sora eddig csak az
+ABLAKOT írta ki („az elmúlt 8 mérkőzés alapján"), és emiatt úgy olvasódott,
+mintha nyolcmeccsenként frissülne a forma — bejelentett félreértés. A sor
+mostantól: *„minden 5. mérkőzés után jön, és az elmúlt 8 mérkőzést nézi"*. A
+lépésköz azt mondja meg, MIKOR; az ablak azt, MIBŐL.
+
 **Az ablak (`PFORM_WINDOW` = 8) szándékosan nagyobb a lépésköznél.** Az
 egymást átfedő ablakok simítanak: egyetlen rossz meccs nem fordítja meg a
 formát, egy tartós sorozat viszont minden ötödik meccsen újra megerősíti

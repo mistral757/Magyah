@@ -507,3 +507,77 @@ vagyis szimuláció) — a régi út betűre változatlan.
 A bajnoki díjak feloldója ugyanígy: egyjátékosban a gépi gólkirály nyer (mint
 eddig), közös karrierben a két keret jobbika, régi verziójú társnál pedig a
 kapus-király elmarad.
+
+---
+
+## 5. A HÁROM SKÁLA — ÉS AHOL ÖSSZEKEVEREDTEK (3.8.14)
+
+**Bejelentett hiba:** *„nem működik jól az ellenfél felállásának megtekintése
+és az ellenfél ratingjának kijelzése egymás elleni meccsnél. A szezonzáráskor
+már stimmel a rating, a felállásnál ettől függetlenül nem jó értékek vannak."*
+
+A bejelentés pontos volt, és a két fele **ugyanabból** jött: a közös karrierben
+HÁROM különböző csapaterő-szám kering, és a párharc oldalán összekeveredtek.
+
+| szám | mit mér | hol a helye |
+|---|---|---|
+| `teamOVRbase()` | **nyers csontváz** — `ovr × poszt-illeszkedés`, boost és skill-bónusz nélkül | a motor és a **tabella** közös skálája; a meccs utáni könyvelés (óriásölés, „nagy skalp") is ezen mér |
+| `teamStrength()` | a **kezdő tizenegy** effektív ereje (`playerStrength` = poszt-effektív rating + tartós módosítók) | a felállásképernyő, az eredményjelző és a naplósorok |
+| `mpSquadStrength()` | a **keret** 14 legjobbja (`pOvrDisplay`, poszt nélkül) | a **szezonzáró** összevetés és a kiegyenlítés (lásd 2b) |
+
+### 5.1 Az eredményjelző és a párharc naplósora rossz skálát írt
+
+A párharc pillanatképe MINDKÉT számot átküldi (`dispOvr` = a társ
+`teamOVRbase()`-e a könyveléshez, `shownOvr` = a `teamStrength()`-e a
+kijelzéshez) — de a fogadó oldalon `fx.o.ovr` a nyers, és `fx.o.dispOvr` a
+kijelzett. A **kupaképernyő** és a kupa-mezőny már helyesen a `dispOvr`-t
+használta; az **eredményjelző** (`sbPaintTeams`) és a párharc **naplósora**
+lemaradt róla, és a nyerset írta ki.
+
+A hatás következetes és egyirányú: a saját oldaladon a `teamStrength()` áll, a
+társadén a nyers csontváz — **a társad rendszeresen gyengébbnek látszott, mint
+amilyen** (jellemzően 3-5 ponttal). CPU-ellenfélnél ez nem jelentkezett: ott a
+mezőny `ovr`-je *maga* a viszonyítási szint, tehát az összevetés szándékos.
+
+Mindkét hely mostantól a `dispOvr`-t használja, ha van, és a naplósor **a te
+számodat is odaírja**, hogy a kettő egymás mellett, egy skálán álljon.
+
+### 5.2 A felállás-nézet számai
+
+Két baja volt:
+
+1. **A sáv és a korongok két különböző tizenegyről szóltak.** A `str` a
+   `teamStrength()`-ből jött (a `slots` tizenegye), a korongokra viszont a
+   pillanatkép `active` tizenegye került (a kényszerű cserékkel együtt). Sérült
+   vagy eltiltott kezdőnél a kiírt átlag nem a látható emberekét adta.
+   Mostantól a `str` **pontosan a kirajzolt korongok átlaga**.
+2. **Csak egy mérce volt kint, és nem az, amit a felhasználó ismer.** A
+   szezonzáró összevetés a `mpSquadStrength()`-en megy — a felállás-nézet
+   viszont a kezdő tizenegyet írta ki, magyarázat nélkül. A két szám több
+   ponttal is eltérhet, és ebből lett a *„a szezonzáráskor stimmel, itt nem"*
+   élmény. A kártya innentől a **keret-számot is átküldi** (`squad`), a nézet
+   pedig mindkettőt kiírja, néven nevezve, és **melléteszi a te ugyanolyan
+   skálájú számodat** is. Régi kliens kártyáján nincs `squad` — akkor a sor
+   egyszerűen elmarad, nem hazudik nullát.
+
+Ugyanez a keret-szám bekerült a **szezonindító** naplóösszefoglalóba is
+(`announceMpOpponent`), hogy a szezon két végén ne két különböző skálájú számot
+láss a társadról.
+
+### 5.3 A befagyott kép kora
+
+A pillanatkép szándékosan **túléli a szezonváltást** (amit egyszer láttál, azt
+nem felejted el) — csakhogy egy tavalyi felállás számai már nem a társad mai
+keretéről szólnak. A sáv ezt eddig nem mondta ki, tehát a felhasználó a
+NÉZETET hitte hibásnak, nem a kép korát. Innentől ott a figyelmeztetés:
+*„⚠ Ez a TAVALYI állapot: azóta igazolhatott, fejlődhetett és öregedhetett a
+kerete."*
+
+### 5.4 A megfigyelő nézet nem maradhat kint mérkőzés alatt
+
+Ha a kapcsoló a kezdőrúgás pillanatában az ellenfél oldalán állt, a mérkőzés
+egy **befagyott, mozdulatlan kép mögött** játszódott le: a cserék, a kiállítás
+és az élő csapaterő mind a rejtett saját pályán történtek. A `mpOppViewSync`
+mostantól a futó mérkőzésre (`S.playing`) is visszakapcsol a saját pályára —
+ugyanúgy, ahogy a kapitányválasztásra és a játékos-lerakásra már eddig is.
+
