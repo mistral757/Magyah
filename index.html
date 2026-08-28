@@ -5041,7 +5041,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.16";
+const APP_VERSION="3.8.17";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -22586,13 +22586,19 @@ function twSession(){
   /* A CHECKPOINT-ABLAK a HUB-ban él, ezért a keretének is az S-ben kell laknia:
      a HUB-ból ki-be lépkedve (vagy újratöltés után) különben újratöltődne. */
   if(TW&&TW.fromCheckpoint&&S.twWindow)return twSessionFix(S.twWindow,1);
-  if(TW&&TW.isHubPurchase){
-    const sn=S.seasonNumber||1;
-    if(!S.summerLooks||S.summerLooks.season!==sn){
-      const L=twLooksForScout(TW_LOOKS_SUMMER_MULT);
-      S.summerLooks={season:sn,max:L,left:L,pos:{}};}
-    return twSessionFix(S.summerLooks,TW_LOOKS_SUMMER_MULT);}
+  if(TW&&TW.isHubPurchase)return twSummerLooks();
   return twSessionFix(TW,1);}
+/* ---- A NYÁR SAJÁT KVÓTA-DOBOZA ----
+   A nyári keret NEM a TW-ben lakik, hanem az S-ben, a nyár szezonszámára
+   kulcsolva. Ezért kell külön függvény: a TW egy FUTÓ átigazolás állapota
+   (újratöltéskor null, és a HUB rajzolásakor még az ELŐZŐ művelet nyoma), a
+   keret viszont a nyáré — az akkor is létezik, amikor épp nem futsz semmit. */
+function twSummerLooks(){
+  const sn=S.seasonNumber||1;
+  if(!S.summerLooks||S.summerLooks.season!==sn){
+    const L=twLooksForScout(TW_LOOKS_SUMMER_MULT);
+    S.summerLooks={season:sn,max:L,left:L,pos:{}};}
+  return twSessionFix(S.summerLooks,TW_LOOKS_SUMMER_MULT);}
 /* ================= SZEZONKÖZI ÁTIGAZOLÁS A HUB-BAN =================
    Régen a 8./15./23. forduló után egy külön képernyő (#scWindow) állította meg
    a szezont, és ott futott a scoutolás. Mostantól a checkpoint a HUB-ba
@@ -22632,6 +22638,47 @@ function twEventLeft(){
 function twSpendEvent(){
   if(twWindowOpen())S.twWindow.eventLeft=Math.max(0,(S.twWindow.eventLeft||0)-1);
   else S.twEventUsed=(S.twEventUsed||0)+1;}
+/* ================= A NYÁRI KERETEK A NYÁR ELEJÉN TÖLTŐDNEK ÚJRA =============
+   BEJELENTETT HIBA: "az átigazolási eseményre rá sem nyomtam, már eleve szürke
+   volt — elfogyott ebben a nyárban (2/2 felhasználva)".
+
+   AZ OK NEM A SZÁMOLÁS, HANEM A KERET ÉLETTARTAMA. A nyári számlálók
+   (S.twEventUsed, S.clubScoutSpinsUsed) eddig egyetlen helyen nullázódtak: a
+   startNextCareerSeason()-ben — vagyis annak a nyárnak a VÉGÉN, amelyikre
+   vonatkoztak. Így bármi, ami a nyár ELŐTT növelte őket, változatlanul ott ült
+   a nyár első pillanatában is, és a HUB pontosan azt írta ki, amit talált:
+   "elfogyott ebben a nyárban". Két ilyen út volt:
+     · a szezon előtti keret-áttekintő klub-szemléje (openPreSeasonHub) — az
+       első idény nyara már fogyasztott kerettel indult;
+     · a szezonközi zsákutcák, ahol az ablak lezárult, de a HUB nem tudott a
+       futó szezonról (lásd a twClosedNow() fölötti leírást): ott a NYÁRI
+       keretből lehetett pörgetni, és a szám a szezon végéig ott maradt.
+   Egy elszámolt szezon így egy TELJES nyarat vitt magával — pontosan azt, amit
+   a bejelentés leír: "volt még keresésem, eseményem is, de azt jelezte, hogy
+   el lett használva".
+
+   A JAVÍTÁS: a keret akkor töltődik, AMIKOR A NYÁR NYÍLIK (a szezon
+   lezárásakor), nem a következő szezon indulásakor. A stemplivel (melyik
+   nyárra töltöttünk) a művelet idempotens: a nyáron belül újratöltés,
+   ki-be lépkedés, bármi — a keret nem töltődik újra.
+   A teljes leírás: docs/nyari-atigazolasi-keretek.md */
+function twRefillSummerQuotas(){
+  S.twEventUsed=0;
+  S.clubScoutSpinsUsed=0;
+  S.summerLooks=null;              /* a felderítés + képesség-keresés doboza */
+  S.summerQuotaSeason=S.seasonNumber||1;}
+/* VÉDŐHÁLÓ A MÁR ELROMLOTT MENTÉSEKNEK. A fenti töltés a szezonzáráskor fut —
+   akinek a mentése MÁR benne áll egy nyárban, annál az a pillanat elmúlt. Ez a
+   kapu a HUB rajzolásakor kérdezi meg: nyár van-e, és kaptunk-e már erre a
+   nyárra keretet. Ha nem, most kap. Ugyanez fogadja a régi mentéseket is,
+   amikben a stempli még nincs benne — egyszer, csendben helyreáll. */
+function twSummerQuotaCheck(){
+  if(gameMode!=="career"||!careerPool)return;
+  if((S.summerQuotaSeason||0)===(S.seasonNumber||1))return;
+  /* Csak NYÁRON tölthetünk: futó szezonban (twClosedNow) és a legelső idény
+     előtti keret-áttekintőben (preSeasonHubMode) a keret nem a nyáré. */
+  if(twWindowOpen()||twClosedNow()||preSeasonHubMode)return;
+  twRefillSummerQuotas();}
 function twWindowOpen(){return !!(S.twWindow&&S.twWindow.round);}
 function twWindowLabel(){return (S.twWindow&&S.twWindow.label)||"Átigazolási időszak";}
 /* Hány lehetőség maradt — ezt írja ki a HUB az Átigazolás menü fölé. */
@@ -22845,23 +22892,48 @@ function twAttrTarget(aKey){
      · újratöltés után (TW===null) nullát adott, és a gomb TILTVA maradt —
        vagyis az ablakban egyáltalán nem lehetett képességre keresni.
    A kettéválasztás így ugyanaz, mint a klub-szemlénél (csSpinsMax/csSpinsLeft). */
-function twAttrMax(){
-  if(twWindowOpen())return S.twWindow.attrMax||0;
-  return twAttrSearchesForScout()+(S.attrSpinBonus||0);}
-function twAttrLeft(){
+/* ---- BEJELENTETT HIBA (a nyári ág): "a képesség-keresés eleve szürke volt,
+   pedig nem is kerestem" ----
+   A javítás FELE megvolt (a fenti, ablakos ág), a NYÁRI ág viszont továbbra is
+   a twSession()-ön keresztül ment, az pedig TW nélkül null-t ad. A TW-t semmi
+   nem menti (függvény-állapot, nem játékállás), tehát ÚJRATÖLTÉS UTÁN — és a
+   szezonjelentés felől a nyári HUB-ba érkezve is — mindig null volt. A
+   twAttrLeft() ilyenkor 0-t adott vissza, amit a HUB pontosan úgy írt ki,
+   mintha a keret elfogyott volna: "elfogyott ebben a nyárban (4/4
+   felhasználva)" — nulla elhasznált keresés mellett. A gomb kezelője ugyanezt
+   a nullát kérdezte, ezért koppintásra sem történt semmi: a képesség-keresés a
+   teljes nyáron elérhetetlen maradt. (Ha viszont ELŐBB a Vásárlásba léptél be,
+   a TW felállt, és onnantól a gomb működött — innen a "hol igen, hol nem".)
+   A KERET MOSTANTÓL EGY DOBOZBÓL JÖN, ami nem a TW-től függ: ablakban az
+   ablaké (S.twWindow), nyáron a nyáré (S.summerLooks) — pontosan úgy, ahogy a
+   klub-szemle is a saját, S-ben élő számlálóját olvassa. */
+function twAttrBox(){
+  /* KIHÍVÁS-JUTALOM: a megnyert extra keresések hozzáadódnak. */
+  const want=twAttrSearchesForScout()+(S.attrSpinBonus||0);
   if(twWindowOpen()){
+    /* AZ ABLAK KVÓTÁJA A SAJÁTJA (twCpExtraQuota: 1-3) — a nyári képlet itt
+       csak akkor pótol, ha az ablak még e nélkül a mező nélkül született. */
     const w=S.twWindow;
-    if(w.attrMax===undefined){w.attrMax=twAttrSearchesForScout()+(S.attrSpinBonus||0);w.attrLeft=w.attrMax;}
-    return Math.max(0,w.attrLeft||0);}
-  const sess=twSession();
-  /* Nyitott átigazolási ablak nélkül (pl. a szezon előtti keret-áttekintőben)
-     a TW még null — ilyenkor nincs mit elkölteni, és nem is szabad elszállni. */
-  if(!sess)return 0;
-  if(sess.attrMax===undefined){
-    /* KIHÍVÁS-JUTALOM: a megnyert extra keresések hozzáadódnak. */
-    sess.attrMax=twAttrSearchesForScout()+(S.attrSpinBonus||0);
-    sess.attrLeft=sess.attrMax;}
-  return sess.attrLeft||0;}
+    if(w.attrMax===undefined){w.attrMax=want;w.attrLeft=want;}
+    return twAttrFix(w);}
+  const box=twSummerLooks();
+  if(box.attrMax===undefined){box.attrMax=want;box.attrLeft=want;}
+  else if(box.attrMax!==want){
+    /* A NYÁRI keret KÖZBEN is nőhet (ügynökség-fejlesztés, kihívás-jutalom),
+       ezért az ELHASZNÁLT alkalmak száma a fix pont, és a maradék abból
+       számolódik újra: a kiírt "maradt x/y" így sosem hazudik, és egy
+       fejlesztés nem tünteti el a már elköltött kereteket. */
+    const used=Math.max(0,box.attrMax-(box.attrLeft||0));
+    box.attrMax=want;box.attrLeft=Math.max(0,want-used);}
+  return twAttrFix(box);}
+/* ÖNJAVÍTÁS: egy korábbi hiba nyomát (hiányzó, negatív vagy a keretnél nagyobb
+   maradék) itt egyenesítjük ki — ugyanaz az elv, mint a twSessionFix-ben. */
+function twAttrFix(box){
+  if(typeof box.attrLeft!=="number"||!isFinite(box.attrLeft)
+     ||box.attrLeft<0||box.attrLeft>box.attrMax)box.attrLeft=box.attrMax;
+  return box;}
+function twAttrMax(){return twAttrBox().attrMax||0;}
+function twAttrLeft(){return Math.max(0,twAttrBox().attrLeft||0);}
 let TW=null; /* az átigazolási ablak folyamat-állapota, minden megnyitáskor újraindul */
 const TRANSFER_TYPES=[
  {key:"leave",label:"Elvágyódás",weight:1},
@@ -32407,7 +32479,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      ezért a kvótái is itt: {round,label,max,left,pos,clubMax,clubLeft,
      attrMax,attrLeft}. Null = nincs nyitott ablak. */
   twWindow:null,
-  morale:50,moraleTarget:50,moraleSum:0,moraleSamples:0,scorers:{},assists:{},mvps:{},lgCS:{},goodForm:{},badForm:{},playerReds:{},playerInjuries:{},careerStats:{},clubScoutSpinsUsed:0,twEventUsed:0,consecutiveTitles:0,consecutiveBadSeasons:0,seasonSaves:{},seasonCleanSheets:{},seasonMatches:{},seasonNumber:1,seasonHistory:[],iconSeason:0,roles:null,
+  morale:50,moraleTarget:50,moraleSum:0,moraleSamples:0,scorers:{},assists:{},mvps:{},lgCS:{},goodForm:{},badForm:{},playerReds:{},playerInjuries:{},careerStats:{},clubScoutSpinsUsed:0,twEventUsed:0,summerQuotaSeason:0,consecutiveTitles:0,consecutiveBadSeasons:0,seasonSaves:{},seasonCleanSheets:{},seasonMatches:{},seasonNumber:1,seasonHistory:[],iconSeason:0,roles:null,
   grudge:new Set(),fixtures:[],playing:false,auto:false,
   mpMateFinal:null,   /* F5: a társ szezonzárása a közös tabellához */
   mpMyFinal:null,     /* a SAJÁT záró csapaterő — a végső ítélet ebből dolgozik */
@@ -45938,7 +46010,11 @@ function twShowAttrPicker(){
       +`<span class="palTx"><b>${ATTR_LABELS[k]}</b>`
       +`<small>${k==="seb"&&isFinite(speedCap())&&tk>=speedCap()?`plafon: ${speedCap()}`:`cél: ${ragSzam(tk)} fölött`}</small></span>`;
     b.onclick=()=>{
-      const sess=twSession();
+      /* A LEVONÁS UGYANABBÓL A DOBOZBÓL megy, amit a kiírás olvas (twAttrBox):
+         ablakban az ablakéból, nyáron a nyáréból. Korábban ez a twSession()-t
+         kérdezte, ami a TW-től függ — így egy elcsúszott TW-nél a kiírás és a
+         levonás két külön keretről beszélhetett. */
+      const sess=twAttrBox();
       const left=twAttrLeft();      /* biztosítja, hogy a számláló létezik */
       if((sess.attrLeft||0)<=0){twShowCategoryPicker();return;}
       /* ---- ELŐBB A KÉRDÉS, UTÁNA A KERESÉS (3.7.38) ----
@@ -52285,6 +52361,14 @@ function finish(){
       if(yourRank>8)S.consecutiveBadSeasons=(S.consecutiveBadSeasons||0)+1;
       else S.consecutiveBadSeasons=0;
       S.seasonClosed=true;
+      /* ---- ITT NYÍLIK A NYÁR: A NYÁRI KERETEK MOST TÖLTŐDNEK ----
+         A szezon lezárása az a pillanat, amikortól az átigazolás megint nyitva
+         áll (twClosedNow), tehát a nyári kereteknek is innen kell számítaniuk.
+         Enélkül bármi, ami a szezon során hozzájuk nyúlt, a nyárból vett el —
+         lásd a twRefillSummerQuotas() fölötti leírást. A blokk a
+         `!S.seasonClosed` kapun belül van, tehát szezononként pontosan
+         egyszer fut. */
+      try{twRefillSummerQuotas();}catch(e){}
       /* ---- "KI SZÁMÍT ÚJ KEZDŐNEK" — A VISZONYÍTÁSI PONT ----
          Itt, a szezon lezárásakor vesszük fel: ez a lista azokat tartalmazza,
          akik TAVALY kezdők voltak. A nyáron igazolt (vagy ifiből felhozott)
@@ -60779,6 +60863,10 @@ function renderHub(){
      használhatók. */
   /* NYITOTT CHECKPOINT-ABLAK: ilyenkor a szezon közben IS lehet igazolni — épp
      ez a lényege, hogy a scoutolás a HUB-ba költözött. */
+  /* A NYÁRI KERETEK KAPUJA. A rajzolás előtt kell futnia: a gombok feliratai
+     (maradt x/y) már a friss keretből dolgoznak. Ez fogadja azokat a
+     mentéseket is, amik még a régi, szezonindításkori nullázással készültek. */
+  if(gameMode==="career"){try{twSummerQuotaCheck();}catch(e){}}
   const twBlocked=twClosedNow()||!!preSeasonHubMode;
   const twBlockMsg=hubMidSeasonMode?"Átigazolni csak a nyári ablakban lehet"
     :"Az első szezon előtt még nincs átigazolási büdzsé — a nyári ablakban nyílik meg";
@@ -63827,7 +63915,11 @@ function startNextCareerSeason(){
   S.scorers={};S.assists={};S.mvps={};S.lgCS={};S.goodForm={};S.badForm={};S.playerReds={};S.playerInjuries={};S.seasonSaves={};S.seasonCleanSheets={};S.seasonMatches={};S.tierQuoteCount={};
   S.seasonHardTackles={};   /* a tiszta szerelések idényes gyűjtője (Beton) */
   S.grudge=new Set();S.fixtures=[];S.playing=false;
-  S.discWatch={};S.hotStreak={};S.goallessStreak={};S.unbeatenStreak=0;S.cleanSheetStreak=0;S.ratingAdj={};S.clubScoutSpinsUsed=0;S.twEventUsed=0;   /* a nyári esemény-keret is szezononként töltődik */
+  S.discWatch={};S.hotStreak={};S.goallessStreak={};S.unbeatenStreak=0;S.cleanSheetStreak=0;S.ratingAdj={};S.clubScoutSpinsUsed=0;S.twEventUsed=0;
+  /* A NYÁRI KERETEK IGAZI TÖLTÉSE MÁR MEGTÖRTÉNT — a szezon lezárásakor,
+     amikor a nyár kinyílt (twRefillSummerQuotas). Ez a sor a szezon
+     INDULÁSAKOR csak takarít: ami a nyáron elfogyott, azt a most kezdődő
+     idény ne cipelje magával. A kettő együtt zárja a kört. */
   /* RIVÁLISOK ÉS BAJNOKI NARRATÍVA: minden szezon tiszta lappal indul — új
      riválisok (a buildSeasonFixtures sorsolja), üres hírnapló, nem avatott
      bajnok. Az _aiSchedCache azért is dől, mert a menetrend teljesen új. */
@@ -71317,7 +71409,11 @@ function saveGame(){
            pótlást mutatna. A TARTÓS állapot a két alatta lévő mező. */
         unavailable:S.unavailable,replacementChoice:S.replacementChoice,
         morale:S.morale,moraleTarget:S.moraleTarget,moraleSum:S.moraleSum,moraleSamples:S.moraleSamples,
-        summerLooks:S.summerLooks,training:S.training,trainingChangeUsed:S.trainingChangeUsed,
+        summerLooks:S.summerLooks,
+        /* melyik nyárra töltöttünk már keretet (twRefillSummerQuotas) — enélkül
+           minden újratöltés újratöltené a nyári kereteket is */
+        summerQuotaSeason:S.summerQuotaSeason,
+        training:S.training,trainingChangeUsed:S.trainingChangeUsed,
         /* kihívás-rendszer tartós hatásai és nyomkövetése */
         attrSpinBonus:S.attrSpinBonus,boostDiscount:S.boostDiscount,buyDiscountChance:S.buyDiscountChance,
         boostEarlyToldSeason:S.boostEarlyToldSeason,
@@ -71808,6 +71904,11 @@ function applySavedGame(d){
      visszaállítása UTÁN fut, különben üres listából dolgozna. Lásd lentebb.) */
   S.clubScoutSpinsUsed=d.S.clubScoutSpinsUsed||0;
   S.twEventUsed=d.S.twEventUsed||0;   /* régi mentésben nincs — a nyári esemény-keret teljes */
+  /* Régi mentésben nincs stempli: a 0 azt jelenti, hogy erre a nyárra még nem
+     töltöttünk keretet — a HUB kapuja (twSummerQuotaCheck) egyszer, csendben
+     pótolja. Pontosan ez hozza helyre azokat a mentéseket, amikben a nyár
+     "elfogyott" kerettel indult. */
+  S.summerQuotaSeason=d.S.summerQuotaSeason||0;
   S.twWindow=d.S.twWindow||null;
   S.consecutiveTitles=d.S.consecutiveTitles||0;
   S.consecutiveBadSeasons=d.S.consecutiveBadSeasons||0;
