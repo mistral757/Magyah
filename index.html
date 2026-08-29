@@ -5056,7 +5056,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.24";
+const APP_VERSION="3.8.25";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -21333,6 +21333,14 @@ function advanceCareerSeason(){
         newP._arrivedAtIdx=0;
         if(loc.type==="slot"){slots[loc.idx].player=newP;slots[loc.idx].fit=fitFor(newP,slots[loc.idx]);}
         else BENCH[loc.key]=newP;
+        /* ---- A PÓTLÁS IS ÉRKEZŐ (3.8.25) ----
+           Ez az út egy VADONATÚJ embert tesz a keretbe (slotba VAGY a PADRA),
+           és nem megy át a markArrived-on — szándékosan, mert a kihívás- és
+           igazolás-számlálókba nem való. Az összhang viszont igen: enélkül
+           nulla kötéssel indult, a nyolc meccses ablaka el sem kezdődött, és
+           pár meccs után 2-5-ön állt mindenkivel. A markArrived-ból pontosan
+           EZT az egy sort kell átvinni. */
+        try{bondStartIntegration(newP.n);}catch(e){}
         report.newSignings.push({out:loc.p.n,in:repl.n});
       }
     }else{
@@ -33400,7 +33408,11 @@ function pruneChemistry(){
   /* AZ ÖSSZHANG UGYANEZT A SORSOT OSZTJA: aki kikerül a keretből, azzal a
      kötései is megszűnnek. Itt, és nem a hívási helyeken — egy távozási út se
      maradhasson ki. */
-  try{bondPrune();}catch(e){}}
+  try{bondPrune();}catch(e){}
+  /* …és aki BEKERÜLT anélkül, hogy bárki szólt volna a beilleszkedésnek, az
+     itt kapja meg az ablakát (3.8.25 — lásd bondEnsureArrivals). A takarítás
+     ugyanaz a pillanat: minden keret-változás átmegy rajta. */
+  try{bondEnsureArrivals();}catch(e){}}
 /* ================= ÖSSZHANG-RENDSZER — F1: A MODELL (3.8.00) ==============
    TERV: docs/osszhang-rendszer-terv.md
 
@@ -33865,6 +33877,10 @@ function bondNoteAssist(as,sc){
   BOND_MATCH_AST.add(bondKey(as,sc));}
 function bondMatchTick(names,posOf,ctx){
   if(gameMode!=="career"||!S.bondsSeeded)return null;
+  /* AZ UTOLSÓ VÉDVONAL a kezdőrúgás után: ha egy érkezési út kihagyta a
+     beilleszkedés indítását, itt még az ELSŐ könyvelés előtt megkapja — így
+     nem ragadhat bent egy nulla kötésű ember (3.8.25). */
+  try{bondEnsureArrivals();}catch(e){}
   const list=(names||[]).filter(Boolean);
   if(list.length<2)return null;
   const tempo=(typeof devTempo==="function")?devTempo():1;
@@ -34069,6 +34085,52 @@ function bondRosterNames(){
   const out=[];
   try{fullCareerRoster().forEach(p=>{if(p&&p.n&&out.indexOf(p.n)<0)out.push(p.n);});}catch(e){}
   return out;}
+/* ================= ÖNGYÓGYÍTÁS: AKI KIMARADT AZ ÉRKEZÉSBŐL (3.8.25) =========
+   BEJELENTETT HIBA: „ha egy új játékost először a cserepadra teszek és nem a
+   kezdőbe, akkor egyből túllesz a beszokás 8 meccses fázisán és kap egy 2-5
+   közötti összhang értéket, ami a béka segge alatt van, és használhatatlan
+   lesz a játékos."
+
+   AZ OK. A beilleszkedési ablakot EGYETLEN hely nyitja meg, a markArrived
+   (azon át a bondStartIntegration) — és van olyan útvonal, ami e nélkül tesz
+   ÚJ embert a keretbe. A legtisztább példa a szezonvégi nyugdíjazás pótlása:
+   ott a careerPlayerFromPoolEntry egy vadonatúj játékost gyárt, és egyenesen
+   a slotba vagy a PADRA teszi. Aki így kerül be, annak nincs bondNew-je,
+   tehát a rendszer KÉSZNEK látja — miközben egyetlen kötése sincs. Minden
+   párja nulláról indul, és a szokásos ütemmel pár meccs alatt kúszik 2-5-ig.
+   A nyolc meccses ablak tehát nem „lejárt": EL SEM KEZDŐDÖTT.
+
+   MÉRVE (a valódi függvényekkel, 60 meccsen érlelt, 72-es keretbe lépve):
+     szabályos érkezés (markArrived)      belépéskor 48 (ideiglenes),  8 meccs után átlag 47
+     ablak nélküli belépés (a hiba)       belépéskor  0,               8 meccs után átlag  7,2
+                                          — a 2. meccs után 1,5, vagyis a bejelentett sáv
+
+   A JAVÍTÁS NEM egy újabb hívás a hiányzó helyre. A rendszer mostantól nem
+   FELTÉTELEZI, hogy minden érkezési út szólt neki: akinek a keretben egyetlen
+   rögzített kötése sincs, és nem is illeszkedik be éppen, az ÉRKEZŐ — megkapja
+   a nyolc meccses ablakot és a keret szintjéhez mért ideiglenes értéket.
+
+   MIÉRT EGYÉRTELMŰ A JEL. A bondSet a KULCSOT akkor is létrehozza, ha az érték
+   0, az induló elemzés pedig minden párra lefut. Akinek egyetlen kulcsa sincs,
+   az bizonyosan sosem volt magvetve — nincs olyan szabályos állapot, amiben egy
+   régi kerettag így nézne ki. */
+function bondSeededNames(){
+  const out=new Set();
+  if(!S||!S.bonds)return out;
+  Object.keys(S.bonds).forEach(k=>{
+    const p=k.split("\u00a7");
+    if(p.length===2){out.add(p[0]);out.add(p[1]);}});
+  return out;}
+function bondEnsureArrivals(){
+  if(gameMode!=="career"||!S||!S.bondsSeeded)return 0;
+  const names=bondRosterNames();
+  if(names.length<2)return 0;
+  const have=bondSeededNames();
+  let n=0;
+  names.forEach(nm=>{
+    if(have.has(nm)||bondIntegrating(nm))return;
+    bondStartIntegration(nm);n++;});
+  return n;}
 /* Aki kikerül a keretből, azzal minden kötése megszűnik — a párkémiával
    azonos szabály, és ugyanabban a takarításban fut (pruneChemistry). */
 function bondPrune(){
@@ -73143,6 +73205,10 @@ function applySavedGame(d){
     S.bondNew=_d.bondNew||{};S.bondFast=_d.bondFast||{};S.bondsSeeded=!!_d.bondsSeeded;
     S.bondTrain=_d.bondTrain||null;S.bondTrainChangeUsed=!!_d.bondTrainChangeUsed;
     bondMigrate();
+    /* A MÁR ELROMLOTT MENTÉS IS MEGGYÓGYUL: aki a hiba idején ablak nélkül
+       került a keretbe, itt kapja meg — a betöltés az egyetlen pont, ahol egy
+       futó karrier múltbeli kára is javítható (3.8.25). */
+    bondEnsureArrivals();
   }catch(e){}}
 function resumeUIFromSave(){
   /* A BEÁLLÍTÓ FELÜLET LEZÁRÁSA — ugyanaz az elv, mint a beginNewGame-ben, csak

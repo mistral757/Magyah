@@ -1300,6 +1300,71 @@ kimarad — ott még nincs mit mutatni, a folyamat a hír.
 
 ---
 
+## 10n. Aki kimaradt az érkezésből (3.8.25)
+
+**BEJELENTETT HIBA:** *„ha egy új játékost először a cserepadra teszek és nem a
+kezdőbe, akkor egyből túllesz a beszokás 8 meccses fázisán és kap egy 2-5
+közötti összhang értéket, ami a béka segge alatt van, és használhatatlan lesz
+a játékos."*
+
+### Az ok — az ablak el sem kezdődött
+
+A beilleszkedési ablakot **egyetlen** hely nyitja meg: a `markArrived`, azon át
+a `bondStartIntegration`. Ez minden IGAZOLÁSI úton lefut — de van olyan
+útvonal, ami e nélkül tesz **vadonatúj** embert a keretbe. A legtisztább
+példa a **szezonvégi nyugdíjazás pótlása**: ott a `careerPlayerFromPoolEntry`
+egy új játékost gyárt, és egyenesen a slotba **vagy a padra** teszi.
+
+Aki így kerül be, annak nincs `bondNew`-je — tehát a rendszer **késznek látja**,
+miközben egyetlen kötése sincs. Minden párja nulláról indul, és a szokásos
+ütemmel pár meccs alatt kúszik 2-5-ig. A nyolc meccses ablak nem „lejárt":
+**el sem kezdődött.**
+
+### Mérve
+
+A valódi függvényekkel, egy 60 meccsen érlelt, **72-es** keretbe lépve:
+
+| eset | belépéskor | 2. meccs után | 8. meccs után | 14. meccs után |
+|---|---|---|---|---|
+| szabályos érkezés (kezdőbe) | 48 (ideiglenes) | 48 | átlag **46,9** | átlag **52,9** |
+| szabályos érkezés (padra, be is áll) | 48 (ideiglenes) | 48 | átlag **45,4** | átlag **52,7** |
+| szabályos érkezés (padra, nem játszik) | 48 (ideiglenes) | 48 | 48 (ideiglenes) | 51 (ideiglenes) |
+| **ablak nélküli belépés — a hiba** | **0** | **1,5** | átlag **7,2** | átlag **12,5** |
+| **ugyanaz, javítva** | 48 (ideiglenes) | 2/8, 48 | átlag **47,1** | átlag **54,5** |
+
+A negyedik sor második oszlopa maga a bejelentés: **1,5**, aztán 2-5 körül.
+
+### A javítás — a rendszer nem feltételez
+
+Nem egy újabb hívás a hiányzó helyre. A rendszer mostantól **nem
+feltételezi**, hogy minden érkezési út szólt neki:
+
+```js
+function bondEnsureArrivals(){
+  ...
+  const have=bondSeededNames();       /* akinek van BÁRMILYEN rögzített kötése */
+  names.forEach(nm=>{
+    if(have.has(nm)||bondIntegrating(nm))return;
+    bondStartIntegration(nm);});      /* aki kimaradt, az ÉRKEZŐ */
+}
+```
+
+**Miért egyértelmű a jel.** A `bondSet` a kulcsot akkor is létrehozza, ha az
+érték 0, az induló elemzés pedig minden párra lefut. Akinek **egyetlen kulcsa
+sincs**, az bizonyosan sosem volt magvetve — nincs olyan szabályos állapot,
+amiben egy régi kerettag így nézne ki.
+
+**Négy horgony**, mind hideg útvonal:
+
+1. `pruneChemistry()` — minden keret-változás átmegy rajta;
+2. `bondMatchTick()` eleje — az utolsó védvonal az első könyvelés előtt;
+3. a mentés betöltése — **a már elromlott karrier is meggyógyul**;
+4. és a gyökér: a nyugdíj-pótlás ága most maga indítja el az ablakot. A
+   `markArrived`-ból pontosan ezt az egy sort viszi át — a kihívás- és
+   igazolás-számlálókba a klub saját pótlása továbbra sem való.
+
+---
+
 ## 11. Ami még hátravan
 
 **Semmi — a rendszer kész.** Ami a tervből tudatosan kimaradt: az
