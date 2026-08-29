@@ -1,6 +1,8 @@
 # Meccsenkénti statisztika és játékos-értékelés
 
 *(3.7.26 — a statisztika-réteg ELSŐ lépcsője; 3.7.27 — a négy befolyás;
+3.8.22 — kontrába fordítás és pontrúgás (`COUNTER_WINDOW`, `SETPIECE_GOAL_SHARE`,
+`SETPW`, `OPPCH_CORNER`, `noteClear` / `noteDefWin`);
 3.8.20 — A HÁTSÓ SOR MECCSE: az ellenfél helyzeteinek kibontása a tickben
 (`OPPCH_*`, `oppChance` / `oppChanceDefIdx` / `oppChanceGk` / `noteSave` /
 `noteBlock`), a védés-fajták, a blokk és a gólvonal-mentés, valamint a
@@ -163,6 +165,85 @@ hétköznapi meccsük továbbra is 5 körül marad.
   lapnál — egy lyukas védelem mögött nem lehet kártyát gyűjteni.
 * **A Kesztyűs mester edző-típus** normáló sávja (0–3,2 védés/meccs) ugyanezért
   1,2–5,5-re módosult.
+
+## Kontra és pontrúgás (3.8.22)
+
+**Bejelentett kérés (a 3.8.20 folytatása):** *„a helyezkedés, az ellenfél
+támadásainak kontrára fordítása, a pontrúgás szituációk lereagálása lehetne
+fontos szempont"* a védőknél.
+
+### 1. Kontrába fordítás — a védekezés és a támadás összekötése
+
+Ha egy **védekező siker** után `COUNTER_WINDOW` (3) percen belül gólt szerzünk,
+a védő **kontraindítás**-kreditet kap: egy elő-gólpasszt. A napló ki is mondja:
+
+> ⚡ **Kontrából!** A támadást Nesta blokkja indította a 47. percben.
+
+Mi „fegyverzi élesre" a kontrát: **blokk · szöglet-tisztázás ·
+gólvonal-mentés · bravúr · ziccer-hárítás**. A sima (befogott) védés nem — ott
+a kapus megtartja a labdát. Egy védekező siker **egy** gólt indíthat: a kredit
+után a jelző törlődik.
+
+**Ehhez a helyzet-bontás a vödör ELEJÉRE került** (a saját góljaink elé). A
+motor öt perces vödrökben dolgozik, a percek pedig monoton nőnek (`gmin`) —
+így egy 47. perces tisztázás után a 49. perces gól tényleg UTÁNA esik, és a
+három perces ablak valóban teljesülhet. A régi sorrenddel (gólok előbb, majd a
+helyzetek) egy védekező sikert csak a KÖVETKEZŐ vödör gólja követhetett, ami
+mérve **negyedannyi** kontrát adott: 0,03 vs. **0,20** mérkőzésenként.
+
+### 2. Pontrúgás — mindkét irányba
+
+**Védekezésben:** új kimenetel az ellenfél helyzetei közt — *„Szöglet ellenünk —
+X fejjel tisztáz"*. Saját stat (**tisztázás**), és ez a klasszikus kontra-indító
+pillanat. A blokk-arányból vettük el (0,30 → 0,18 + 0,12 szöglet), tehát a
+helyzetek száma nem nőtt.
+
+**Támadásban:** a gólok **14%-a** (`SETPIECE_GOAL_SHARE`) mostantól
+**szögletből, fejjel** esik — és ott MÁS a súlyozás (`SETPW`): a belső védő a
+legveszélyesebb, nem a csatár.
+
+> SZÖGLET UTÁN, FEJJEL! GÓL! Maldini (Pirlo) 1:0
+
+**A gólok SZÁMA változatlan** — a Poisson dönti el, mint eddig; csak az dől el
+másképp, KI szerzi őket. Mérve, 200 000 gólon, 4-4-2-ben: a védők
+gólrészesedése **10,2% → 15,7%**. Ez az egyetlen szándékos balansz-elmozdulás
+a körben, és pontosan a bejelentés célja: a védőnek legyen saját gólforrása.
+(Párharcban kimarad: ott a gólszerzőt a közös lista adja.)
+
+### 3. Az értékelésben
+
+| tétel | súly | plafon |
+|---|--:|--:|
+| tisztázás | 0,22 | 0,80 |
+| **kontraindítás** | **0,50** | — |
+
+A kontraindítás a legértékesebb védő-tétel: elő-gólpassz, tehát a gólpassz
+(0,70) és a blokk (0,35) között a helye.
+
+### 4. Mérve
+
+Mérkőzésenkénti átlagok, 30 000 mérkőzésen:
+
+| λ (mi / ő) | védés | blokk | **tisztázás** | gólvonal | **szögletgól** | **kontraindítás** |
+|---|--:|--:|--:|--:|--:|--:|
+| 2,2 / 0,5 · fölényben | 1,98 | 0,66 | 0,44 | 0,11 | 0,31 | **0,23** |
+| 1,2 / 1,2 · kiegyenlített | 2,98 | 0,99 | 0,66 | 0,16 | 0,17 | **0,20** |
+| 0,7 / 2,5 · ostrom alatt | 4,82 | 1,60 | 1,07 | 0,27 | 0,10 | **0,18** |
+
+A kontraindítás tehát **négy-öt mérkőzésenként** egyszer szólal meg — ugyanaz a
+ritkasági osztály, mint a gólvonal-mentésé.
+
+### 5. Mit ér ez a védőnek
+
+| a védő meccse | értékelés |
+|---|--:|
+| tiszta lap, 2 labdaszerzés (semmi más) | 4,90 *jó* |
+| + 1 blokk, 1 tisztázás | 5,45 *nagyon jó* |
+| + **kontraindítás** | 5,95 *kiemelkedő* |
+| nagy nap: 4 labdaszerzés, 2 blokk, 2 tisztázás, kontra | 6,85 *rendkívüli* |
+| …és egy **szögletgól** | 8,35 *fergeteges* |
+
+---
 
 ### A védések névre szólnak
 
