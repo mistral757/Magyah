@@ -52,7 +52,7 @@ mind a hétre, és **egyetlen szám hangolja az egészet**.
 | | fajta | egység | hatás |
 |---|---|--:|---|
 | 💪 | **Sima boost** | 0,5 | Rating +1–4%, TSI +15–45% (min 400, max 2500) |
-| 🎯 | **Attribútum boost** | 0,6 | egy választott tengely +1–3%, **és tartósan edződik** |
+| 🎯 | **Attribútum boost** | 0,6 | egy választott tengely **+4–9%**, **és tartósan edződik** |
 | 📈 | **TSI boost** | 0,6 | TSI +33–66% (min 1000, max 10 000) |
 | 🤝 | **Összjáték boost** | 0,33 | az összhang-építése +33–66%, tartósan |
 | ✨ | **Skill boost** | 0,4 | nagyobb súly a realisztikus képesség-sorsolásban |
@@ -117,9 +117,40 @@ azonnal visszahúzná.
 
 Ez a fajta két dolgot csinál, és a második a lényeg:
 
-1. **azonnal** +1–3% a választott tengelyre (a tengely saját plafonjáig —
+1. **azonnal** +4–9% a választott tengelyre (a tengely saját plafonjáig —
    `attrCapFor`, a sebességé szűkebb);
 2. **tartósan** is épül rajta: meccsenként `TRAIN_SEC_PTS` (0,4) pont.
+
+#### A sáv 1–3%-ról 4–9%-ra nőtt (3.8.24)
+
+**BEJELENTETT KÉRÉS:** *„az attribútumboost + 4-9% legyen az adott
+attribútumra."*
+
+Jogos volt, és a mérés meg is mutatja, miért: az 1–3%-ot a **kerekítés**
+gyakorlatilag egyetlen pontra lapította. 20 000 sorsolás tengelyértékenként:
+
+| tengely | régi (1–3%) | új (4–9%) | fő poszton Ratingben |
+|--:|---|---|---|
+| 50 | +1–1 (átl 1,00) | +2–4 (átl 3,20) | 0,35 → **1,12** (×3,2) |
+| 60 | +1–2 (átl 1,25) | +2–5 (átl 3,90) | 0,44 → **1,37** (×3,1) |
+| 70 | +1–2 (átl 1,43) | +3–6 (átl 4,55) | 0,50 → **1,59** (×3,2) |
+| 80 | +1–2 (átl 1,57) | +3–7 (átl 5,21) | 0,55 → **1,82** (×3,3) |
+| 90 | +1–3 (átl 1,78) | +4–8 (átl 5,86) | 0,62 → **2,05** (×3,3) |
+| 100 | +1–3 (átl 2,00) | +4–9 (átl 6,50) | 0,70 → **2,27** (×3,2) |
+| 110 | +1–3 (átl 2,18) | +4–10 (átl 7,16) | 0,76 → **2,51** (×3,3) |
+
+(A Rating-oszlop az `attrDevToRating` csökkenő hozamú átváltása a fő
+attribútumon — a `posEffectiveRating` ezt látja.)
+
+**Ezzel kerül a helyére az árához képest.** A sima boost **0,5 egységért**
++1–4% Ratinget ad, MINDEN poszton (egy 80-as emberen +1–3 pont) — az
+attribútum-boost **0,6-ért** eddig ennek a harmadát adta, és csak EGY tengelyen.
+Most nagyjából egy sima boostnyi a fő poszton; cserébe továbbra is csak ott,
+viszont hozzájön a tartós csatorna és a **taktika-illeszkedésre** gyakorolt
+hatás (a `tacticFitParts` az attribútumokból pontoz).
+
+A tengely **saját plafonja** változatlanul fog: a 99-es sebességet (normál
+módban) ez a boost sem lépi át.
 
 **Miért a másodlagos edzés üteme, és nem a főé.** A fő sáv a menedzser tudatos
 döntése, amiért **máshol fizet** — a többi tengely lassulásával. Ez a boost
