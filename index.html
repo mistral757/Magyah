@@ -5041,7 +5041,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.18";
+const APP_VERSION="3.8.19";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -43015,7 +43015,11 @@ $("mstatBtn")&&($("mstatBtn").onclick=()=>mstatShow(null));
 
    MI TÁPLÁLJA (a statokkal AZONOS bázisról indulva):
      · a saját utolsó 7-8 meccsének CSILLAGÁTLAGA — ez a fő jel, és pontosan
-       az a szám, amit a meccs végi ablak is kiírt neki;
+       az a szám, amit a meccs végi ablak is kiírt neki. KÉT MÉRCÉHEZ mérjük
+       (3.8.19): a játékos SAJÁT szokásos szintjéhez (forma-csatorna) ÉS a
+       KERET mostani szintjéhez (szint-csatorna) — az első a beindulást és a
+       kihűlést fogja meg, a második azt, hogy valaki tartósan kiemelkedik.
+       Lásd a PFORM_OWN_GAIN / PFORM_LVL_SPAN fölötti indoklást;
      · a CSAPATMORÁL;
      · a CSAPAT FORMÁJA — a periódus győzelmei és vereségei, külön súllyal a
        nagy győzelmeknek és a súlyos vereségeknek;
@@ -43040,19 +43044,60 @@ $("mstatBtn")&&($("mstatBtn").onclick=()=>mstatShow(null));
    aszerint, hogy az előző idénye a 3,5-ös alap alatt vagy fölött zárult. A
    forma nem öröklődik idényről idényre; a nyár mindent újraír. */
 const PFORM_MIN=1,PFORM_MAX=14,PFORM_MID=7.5;
-const PFORM_HIST=24;        /* ennyi meccs marad meg játékosonként */
+const PFORM_HIST=32;        /* ennyi meccs marad meg játékosonként */
 const PFORM_WINDOW=8;       /* ennyi meccsből számol egy periódus */
 const PFORM_MAX_PCT=15;     /* a két szélen (1 és 14) ekkora a hatás */
 const PFORM_EDGE_PCT=3;     /* az 1-3 / 12-14 sávban az eredményesség-esély */
-const PFORM_DAMP=0.60;      /* a közös elmozdulás ekkora részét vesszük vissza */
+const PFORM_DAMP=0.35;      /* a közös elmozdulás ekkora részét vesszük vissza */
 const PFORM_BASE_MIN=6;     /* ennyi meccs alatt még nincs saját mérce */
+/* ---- A KÉT CSATORNA (3.8.19) ----
+   BEJELENTETT HIBA: „egy ilyen tényleges formában lévő játékosnak nem
+   szabadna, hogy a forma értéke ilyen alacsony legyen" — a képernyőképen egy
+   olyan ember állt 8/14-en (+0,8%), akinek az utolsó tizenegy mérkőzése
+   kiemelkedő, rendkívüli és felfoghatatlan fokozatokból állt, 7,7-es
+   csillagátlaggal.
+
+   AZ OK: a forma KIZÁRÓLAG a játékos SAJÁT mércéjéhez mért (pformBaseline), a
+   mérce pedig a tárolt története — amiben ott van maga a sorozat is. Aki
+   TARTÓSAN kimagasló, annak a mércéje is kimagasló, tehát a jele NULLA: a
+   rendszer csak a VÁLTOZÁST látta, a SZINTET nem. Mérve, a bejelentett
+   forgatókönyvvel (30 meccs 7,7-es átlaggal egy 4,5-5,5-ös keretben): a régi
+   képlet 7,1-et adott (−1,0%), az új 10,5-öt (+6,9%). Ugyanez időben: a régi
+   rendszerben a végig kimagasló ember formája VISSZAHERVADT a középre
+   (9,5 → 7,1 tizenöt meccs alatt), mert a mérce közben utolérte a sorozatot.
+
+   A JAVÍTÁS: KÉT csatorna, és mindkettő kell.
+     · FORMA-csatorna (own): a mostani ablak a SAJÁT szokásos szintjéhez mérve
+       — ez fogja meg a beindulást és a kihűlést, és poszt-igazságos (mindenki
+       a saját mércéjéhez van mérve).
+     · SZINT-csatorna (lvl): a mostani ablak a KERET mostani szintjéhez mérve —
+       ez teszi láthatóvá a tartósan kimagasló embert.
+   A SZINT-csatorna azért a KERETHEZ mér, és nem egy fix csillagértékhez, mert
+   a csillag maga is a keret erejéből származik (lásd mstatRate „rating" és
+   „edge" tételét): egy domináns csapatban MINDENKI 5,5-6,5 körül jár, tehát
+   egy fix mérce az egész keretet csúcsformába tenné — pontosan az a hiba,
+   amit a 3.7.28 kijavított. A kerethez mérve viszont a közös rész magától
+   kiesik: ha mindenki szárnyal, az a szokásos (mérve: 30 győzelem és végig
+   6,5-7,3-as értékelések után a keret átlagos foka 8,0 — a régi rendszerben
+   8,3), ha viszont EGY ember emelkedik ki, azt kimondja.
+   A válaszgörbe NÉGYZETES (PFORM_LVL_EXP): a szokásos poszt-különbségek (egy
+   csatár mindig több csillagot kap, mint egy védő) laposan mennek át rajta, a
+   valódi kiugrás viszont teljes erővel — „érződjön, ha valaki TÉNYLEG top
+   formában van". Mérve a poszt-torzítás: a régi rendszerben 0,1 fok, az újban
+   1,2 fok (6,3-as csatárok és 4,6-os védők mellett) — ennyi az ára. Lineáris
+   görbével 2 fok fölött lenne. */
+const PFORM_OWN_GAIN=3.4;   /* a saját mércéhez mért jel erősítése */
+const PFORM_OWN_CAP=4.5;    /* …és a plafonja fokban */
+const PFORM_LVL_SPAN=2.2;   /* ennyi csillaggal a keret fölött telik be a SZINT-jel */
+const PFORM_LVL_W=4.0;      /* a telített SZINT-jel ennyi fokot ér */
+const PFORM_LVL_EXP=2.0;    /* a válaszgörbe alakja — laposan indul, a végén tele */
 /* A RITMUSMESTER (formaedző) két száma. A húzás SZÁNDÉKOSAN szerény: a
    formaedző nem csúcsra tolja a keretet, hanem kiszámíthatóbbá teszi. A padló
    a KÖZÉP ALATT marad — jó formát nem garantál, csak a mélyrepülést fogja meg. */
 const PFORM_COACH_PULL=1.5;   /* teljes erővel ennyi fokkal húz fölfelé */
 const PFORM_COACH_FLOOR=6;    /* teljes erővel ez alá nem eshet a fókuszáltja */
-const PFORM_STEP=0.65;      /* a célérték felé ekkora hányadot lépünk */
-const PFORM_MAX_MOVE=4;     /* egy frissítés legfeljebb ennyit mozdíthat */
+const PFORM_STEP=0.85;      /* a célérték felé ekkora hányadot lépünk */
+const PFORM_MAX_MOVE=5;     /* egy frissítés legfeljebb ennyit mozdíthat */
 /* ---- A SŰRŰSÉG: ÖTMECCSENKÉNT (3.8.12) ----
    BEJELENTETT KÉRÉS: „legyen gyakrabban frissítve a forma, hogy legyen
    lehetőség egy szezonon belül felkúszni egy játékosnak a max formára is akár.
@@ -43143,9 +43188,15 @@ function pstatPush(M){
    az, aminek nem szabad megtörténnie.
    A FORMA DEFINÍCIÓ SZERINT RELATÍV: nem az, hogy jó vagy, hanem hogy a SAJÁT
    szokásos szintedhez képest hol tartasz. Ezért a mérce a játékos HOSSZABB
-   távú átlaga (a teljes tárolt története), és a forma ehhez képest mozdul.
-   Aki mindig 5,5-öt hoz, annál a jel 0 — középen marad; aki 5,5-ről 4,2-re
-   esett, az hullámvölgybe kerül, akármilyen erős csapatban játszik. */
+   távú átlaga, és a forma ehhez képest mozdul. Aki mindig 5,5-öt hoz, annál a
+   jel 0 — középen marad; aki 5,5-ről 4,2-re esett, az hullámvölgybe kerül,
+   akármilyen erős csapatban játszik.
+   EZ A CSATORNA ÖNMAGÁBAN KEVÉS VOLT (3.8.19): aki TARTÓSAN kimagasló, annál
+   a jel szintén 0, tehát a rendszer a valódi csúcsformát sem látta. A hiányzó
+   felét a SZINT-csatorna adja (pformSquadLevel) — az viszont a KERETHEZ mér,
+   nem egy fix csillagértékhez, tehát a fenti csapda (erős csapat = mindenki
+   csúcsformában) nem nyílik ki újra: mérve, 30 győzelem és végig 6,5-7,3-as
+   értékelések mellett a keret átlagos foka 8,0 maradt. */
 /* ---- CSAK AZ ÉRTÉKELT MECCSEK SZÁMÍTANAK ----
    A 15 percnél rövidebb beállás nem kap értékelést (lásd MSTAT_MIN_MIN), és a
    formába sem szólhat bele: se jó, se rossz jelet nem hordoz. Régebbi
@@ -43153,11 +43204,22 @@ function pstatPush(M){
    átenged — a viselkedés visszamenőleg változatlan. */
 function pstatRatedOf(name){
   return (pstatState()[name]||[]).filter(x=>x&&typeof x.st==="number");}
+/* ---- A MÉRCE NEM MÉRHETI ÖNMAGÁT (3.8.19) ----
+   A mérce eddig a TELJES tárolt történet átlaga volt — benne a most vizsgált
+   ablakkal. Egy nyolc meccses ablak a 24-es történetben a mérce HARMADA volt:
+   egy jó sorozat tehát a saját mércéjét is fölhúzta, és ezzel kioltotta a
+   jelét. A mérce mostantól az ablak ELŐTTI meccsek átlaga — „a mostani nyolc
+   ahhoz képest, ami előtte volt". (A tárolt történet ezért is nőtt 24-ről
+   32-re: így az ablak levonása után is marad ~24 meccsnyi mérce.)
+   Ha az ablak előtt még nincs elég meccs, a teljes történettel dolgozunk —
+   a régi viselkedés —, és csak azalatt marad null. */
 function pformBaseline(name){
   const a=pstatRatedOf(name);
-  if(a.length<PFORM_BASE_MIN)return null;   /* még nincs mihez mérni */
-  let s=0;a.forEach(x=>{s+=x.st;});
-  return s/a.length;}
+  const before=a.slice(0,Math.max(0,a.length-PFORM_WINDOW));
+  const use=(before.length>=PFORM_BASE_MIN)?before:(a.length>=PFORM_BASE_MIN?a:null);
+  if(!use)return null;   /* még nincs mihez mérni */
+  let s=0;use.forEach(x=>{s+=x.st;});
+  return s/use.length;}
 /* Az utolsó `n` ÉRTÉKELT meccs összegzése egy játékosról. */
 function pformRecent(name,n){
   const a=pstatRatedOf(name).slice(-(n||PFORM_WINDOW));
@@ -43165,6 +43227,24 @@ function pformRecent(name,n){
   let s=0,g=0,as=0;
   a.forEach(x=>{s+=x.st;g+=x.g||0;as+=x.a||0;});
   return {n:a.length,avg:s/a.length,g,as};}
+/* ---- A KERET MOSTANI SZINTJE (3.8.19) ----
+   A SZINT-csatorna viszonyítási pontja: mennyi most a keret átlagos
+   értékelése ugyanabban az ablakban. Ez teszi a csatornát immunissá a csapat
+   erejére — egy domináns klubban mindenki magas csillagon jár, tehát a magas
+   csillag ott a SZOKÁSOS, nem a csúcsforma.
+   Csak azok számítanak bele, akiknek van érdemi mintájuk (3 értékelt meccs):
+   egyetlen beállásból nem lehet szintet mérni, és a padon ülők egy régi, fél
+   szezonnal ezelőtti sorozata sem torzíthatja el a mai keret szintjét. */
+function pformSquadLevel(rows){
+  let s=0,k=0;
+  (rows||[]).forEach(x=>{if(x&&x.h&&x.h.n>=3){s+=x.h.avg;k++;}});
+  return k?s/k:MSTAT_BASE;}
+/* Ugyanaz a szám a KIJELZÉSHEZ, a keretből felépítve — a játékos lapja ezzel
+   mondja meg, mihez képest emelkedik ki (vagy marad le) az ember. */
+function pformSquadLevelNow(){
+  let roster=[];
+  try{roster=msRoster().filter(p=>p&&p.n);}catch(e){}
+  return pformSquadLevel(roster.map(p=>({h:pformRecent(p.n,PFORM_WINDOW)})));}
 /* A CSAPAT FORMÁJA a periódusban: az utolsó `n` lejátszott mérkőzés mérlege.
    A NAGY győzelem (3+ gólos) és a SÚLYOS vereség (3+ gólos) külön súlyt kap —
    azok emlékezetesek, és tényleg mást csinálnak egy öltözővel. */
@@ -43204,19 +43284,33 @@ function pformRefresh(reason){
   const r=rngFor("pform:s"+(S.seasonNumber||1)+":i"+(S.idx||0)+":m"+(S.pFormN||0)+":"+(reason||""));
   const morale=mstatClamp(((S.morale==null?50:S.morale)-50)/50,-1,1);
   const teamSig=pformTeamSignal();
-  /* 1. NYERS ELMOZDULÁSOK */
+  /* 1. NYERS ELMOZDULÁSOK
+        ELŐBB a keret mostani szintje: a SZINT-csatorna ehhez mér, tehát az
+        egész keretet ismerni kell, mielőtt bárkiről döntenénk. */
+  const rows=roster.map(p=>({p,old:pformOf(p.n),h:pformRecent(p.n,PFORM_WINDOW)}));
+  const sqLvl=pformSquadLevel(rows);
   const raw=[];
-  roster.forEach(p=>{
-    const old=pformOf(p.n);
-    const h=pformRecent(p.n,PFORM_WINDOW);
-    /* A SAJÁT JEL az értékelés-átlag a SAJÁT MÉRCÉJÉHEZ képest (lásd
+  rows.forEach(row=>{
+    const p=row.p,old=row.old,h=row.h;
+    /* A FORMA-CSATORNA: az értékelés-átlag a SAJÁT MÉRCÉJÉHEZ képest (lásd
        pformBaseline). Aki keveset játszott, annál gyengébb a jel — nem
        hazudunk formát két beállásból —, és amíg nincs saját mércéje, a
        közép marad a viszonyítás. */
     const play=h.n?Math.min(1,h.n/4):0;
     const base=pformBaseline(p.n);
-    const own=h.n?mstatClamp((h.avg-(base==null?MSTAT_BASE:base))*2.6,-3.6,3.6):0;
-    let target=PFORM_MID+own*play+morale*(0.5+0.5*play)*0.8+teamSig*0.8;
+    /* MÉRCE NÉLKÜL NINCS FORMA-JEL (3.8.19). A régi kód ilyenkor a fix 3,5-ös
+       alaphoz mért — ez a karrier legelső meccsein (és minden friss igazolónál)
+       az EGÉSZ keretet csúcsformába tette, hiszen egy tisztes átlag is jóval
+       3,5 fölött van. Amíg nincs saját mércéje, csak a SZINT-csatorna szól
+       róla: a kerethez mérve az elfogulatlan viszonyítás. */
+    const own=(h.n&&base!=null)
+      ?mstatClamp((h.avg-base)*PFORM_OWN_GAIN,-PFORM_OWN_CAP,PFORM_OWN_CAP):0;
+    /* A SZINT-CSATORNA: mennyivel emelkedik ki MOST a keretéből (lásd a
+       PFORM_LVL_SPAN fölötti indoklást). A görbe négyzetes, tehát a szokásos
+       poszt-különbségek laposan mennek át, a valódi kiugrás viszont teljesen. */
+    const q=h.n?mstatClamp((h.avg-sqLvl)/PFORM_LVL_SPAN,-1,1):0;
+    const lvl=(q<0?-1:1)*Math.pow(Math.abs(q),PFORM_LVL_EXP)*PFORM_LVL_W;
+    let target=PFORM_MID+own*play+lvl*play+morale*(0.5+0.5*play)*0.8+teamSig*0.8;
     /* KÉPESSÉGEK. Az Iránytű a mechanikájának megfelelően padlót ad (sosem
        rossz forma) és fölfelé húz; a többi szituatív képesség apró, de valós
        jel — aki tud valamit, könnyebben talál rá a formájára. */
@@ -43334,12 +43428,25 @@ function pformDetailHtml(name){
   let when="";
   if(upd&&upd.season===(S.seasonNumber||1))
     when=upd.reason==="season"?"a szezon nyitányán állt be":"legutóbb frissült";
+  /* ---- A KÉT MÉRCE KIÍRVA (3.8.19) ----
+     A forma két dolgot néz: a SAJÁT szokásos szintedet és a KERET mostani
+     szintjét. Ezt ki kell írni, különben a szám indokolatlannak látszik —
+     pontosan ez volt a bejelentés („nem szabadna, hogy ilyen alacsony
+     legyen"): a játékos a csillagátlagot látta, a viszonyítást nem. */
+  const num=x=>x.toFixed(1).replace(".",",");
+  const base=pformBaseline(name);
+  let sq=null;try{sq=pformSquadLevelNow();}catch(e){}
+  const cmp=[];
+  if(h.n&&base!=null)cmp.push(`a saját szokásos szintje <b>${num(base)}</b>`);
+  if(h.n&&sq!=null)cmp.push(`a keret mostani szintje <b>${num(sq)}</b>`);
   return pformRowHtml(name)
     +`<div class="hdRow" style="margin-top:6px">`
-    +(h.n?`Az elmúlt <b>${h.n}</b> mérkőzésén <b>${h.avg.toFixed(1).replace(".",",")}</b> csillag az átlaga.`
+    +(h.n?`Az elmúlt <b>${h.n}</b> mérkőzésén <b>${num(h.avg)}</b> csillag az átlaga`
+          +(cmp.length?` — ${cmp.join(", ")}.`:".")
         :`Még nincs elég mérkőzése ebben az idényben — a formája a keret közepén áll.`)
     +(when?` <span style="color:var(--dim2)">A forma ${when}; <b>${PFORM_EVERY} meccsenként</b> mozdul — a következő frissítésig ${left===1?"még EGY mérkőzés":`még <b>${left}</b> mérkőzés`} van.</span>`:"")
     +`</div>`
+    +(h.n&&cmp.length?`<div class="hdRow" style="color:var(--dim2)">A forma <b>a kettőhöz képest</b> áll be: mennyivel jobb most a saját szokásánál, és mennyire emelkedik ki a keretből. Aki tartósan a keret fölött játszik, az tartósan jó formában is van; aki a saját szintje alá esik, az hullámvölgybe kerül.</div>`:"")
     +`<div class="hdRow" style="color:var(--dim2)">A forma a MAI teljesítményt írja, nem a játékos értékét: a Rating, a piaci ár és a bér változatlan marad — a különbség a pályán jön ki.</div>`;}
 /* ---- MECCSRŐL MECCSRE ----
    Az utolsó mérkőzések értékelése és hozama, a legfrissebb elöl. Ez ugyanaz a

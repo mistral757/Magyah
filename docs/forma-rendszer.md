@@ -1,7 +1,9 @@
 # Forma-rendszer és a lenyitható játékos-panel
 
 *(3.7.28 — a forma-rendszer és a lenyitható panel; 3.7.29 — a Ritmusmester és
-a HUB görgetés-horgonya; 3.8.12 — az ötmeccses sűrűség. Érintett kód:
+a HUB görgetés-horgonya; 3.8.12 — az ötmeccses sűrűség; 3.8.19 — a KÉT
+CSATORNA és az érzékenyebb hangolás (lásd a „Két mércéhez mérünk" szakaszt).
+Érintett kód:
 `pformRefresh`, `pformTick`, `PFORM_EVERY`, `pformSeasonReset`, `pformOf` /
 `pformStep` / `pformPct` / `pformMult` / `pformEdge` / `pformPickMult`,
 `pformBaseline`, `pformRecent`, `pformTeamForm` / `pformTeamSignal`,
@@ -74,6 +76,119 @@ oldala, azt a pillanatkép `defMult`-ja viszi — a hátsó sor formaéleinek
   alá, és fölfelé is húz; a szituatív csatornák (gól-, gólpassz-, védő-súly)
   apró, de valós jel;
 * és egy **egyéni véletlen**, ami nélkül a rendszer determinisztikus volna.
+
+## Két mércéhez mérünk (3.8.19)
+
+**Bejelentett hiba:** *„A forma-rendszer nem működik még jól… egy ilyen
+tényleges formában lévő játékosnak nem szabadna, hogy a forma értéke ilyen
+alacsony legyen. Érzékenyebb kellene legyen a forma és határozottabban
+változhatna. Legyen ingadozó, de azért érződjön, ha egy játékos top formában
+van ténylegesen."*
+
+A képernyőképen egy olyan ember állt **8/14-en (+0,8%)**, akinek az utolsó
+tizenegy mérkőzése *kiemelkedő*, *rendkívüli* és *felfoghatatlan* fokozatokból
+állt, **7,7-es csillagátlaggal**.
+
+### Az ok: a mérce együtt nőtt a sorozattal
+
+A forma KIZÁRÓLAG a játékos saját mércéjéhez mért (`pformBaseline`), a mérce
+pedig a tárolt története — **amiben ott van maga a sorozat is**. Aki tartósan
+kimagasló, annak a mércéje is kimagasló, tehát a jele nulla: a rendszer csak a
+**változást** látta, a **szintet** nem. Ráadásul a nyolc meccses ablak a
+24 meccses történetben a mérce harmadát adta, vagyis a jó sorozat **a saját
+mércéjét is fölhúzta**, és ezzel kioltotta önmagát.
+
+### A javítás: két csatorna
+
+| csatorna | mihez mér | mit fog meg |
+|---|---|---|
+| **forma** (`own`) | a játékos **saját szokásos szintjéhez** (az ablak ELŐTTI meccsek átlaga) | a beindulást és a kihűlést — és poszt-igazságos, mert mindenki a saját mércéjéhez van mérve |
+| **szint** (`lvl`) | a **keret mostani szintjéhez** (ugyanaz az ablak, a teljes keretre) | a tartósan kimagasló embert |
+
+**Miért a kerethez mér a szint-csatorna, és nem egy fix csillagértékhez?** Mert
+a csillag maga is a keret erejéből származik (`mstatRate` „rating" és „edge"
+tétele): egy domináns csapatban **mindenki** 5,5–6,5 körül jár, tehát egy fix
+mérce az egész keretet csúcsformába tenné — pontosan az a hiba, amit a 3.7.28
+kijavított. A kerethez mérve a közös rész magától kiesik: ha mindenki szárnyal,
+az a szokásos; ha viszont EGY ember emelkedik ki, azt a rendszer kimondja.
+
+**A válaszgörbe négyzetes** (`PFORM_LVL_EXP` = 2): a szokásos poszt-különbségek
+(egy csatár mindig több csillagot kap, mint egy védő) laposan mennek át rajta,
+a valódi kiugrás viszont teljes erővel. Ez az ára is: mérve, egy 6,3-as
+csatárokból és 4,6-os védőkből álló keretnél a két poszt formája **1,1 fokkal**
+tér el tartósan (a régi rendszerben 0,1 fokkal). A forma-csatorna ezt
+kiegyenlíti: egy védő a SAJÁT szintjéhez képest ugyanúgy be tud indulni.
+
+### A mérce nem mérheti önmagát
+
+A `pformBaseline` mostantól az **ablak előtti** meccsekből számol („a mostani
+nyolc ahhoz képest, ami előtte volt"), és ezért nőtt a tárolt történet 24-ről
+**32** meccsre: az ablak levonása után is marad ~24 meccsnyi mérce. Ha még
+nincs elég meccs az ablak előtt, a teljes történet a mérce; ha az sincs, a
+forma-csatorna **hallgat** — a régi kód ilyenkor a fix 3,5-ös alaphoz mért, ami
+a karrier legelső meccsein az egész keretet csúcsformába tette.
+
+### Érzékenyebb és határozottabb
+
+| | régi | új |
+|---|--:|--:|
+| lépés a célérték felé (`PFORM_STEP`) | 0,65 | **0,85** |
+| egy frissítés maximuma (`PFORM_MAX_MOVE`) | 4 | **5** |
+| a forma-csatorna erősítése (`PFORM_OWN_GAIN`) | 2,6 | **3,4** |
+| …és a plafonja (`PFORM_OWN_CAP`) | 3,6 | **4,5** |
+| a közös rész visszavétele (`PFORM_DAMP`) | 0,60 | **0,35** |
+
+A csillapítás azért csökkenhetett, mert a szint-csatorna **már eleve
+kerethez mért**, vagyis a „mindenki együtt mozog" hiba ellen ő maga is véd —
+a durva közös-rész-levonásra kevesebb szükség van, és így az egyéni jel nem
+vész el benne.
+
+### Mérve
+
+A számok a valódi függvényekkel készültek (a `pform*` képletek kivágva az
+`index.html`-ből, a mérkőzés-értékelések forgatókönyvből). A vastag szám a
+sztáré, mellette a keret átlaga.
+
+| forgatókönyv | régi | **új** |
+|---|--:|--:|
+| **A** · tartósan 7,7-es sztár egy 4,5–5,5-ös keretben, 30 meccs *(a bejelentett eset)* | 7,1 (−1,0%) · keret 8,0 | **10,5 (+6,9%)** · keret 8,0 |
+| **B** · ugyanő 10 gyenge meccs után (2,9–3,3) | 4,0 (−8,0%) | **1,7 (−13,5%)** |
+| **C** · átlagos ember 10 meccsen berobban | 10,6 (+7,2%) | **13,6 (+14,0%)** |
+| **D** · az EGÉSZ keret 6,5–7,3, 30 győzelem *(elszabadulás-teszt)* | keret 8,3 | **keret 8,0** |
+| **E** · 6,3-as csatárok és 4,6-os védők, tartósan | csatárok 7,8 · védők 7,9 | csatárok 8,7 · védők 7,5 |
+
+A **D** sor a lényeg a balansz felől: a szint-csatorna **nem** tolja fel a
+keretet attól, hogy jó — csak azt emeli ki, aki a többiek fölé nő. Az **E** sor
+az ára: a poszt-különbség 0,1-ről 1,2 fokra nő (a négyzetes görbe fogja vissza;
+lineárissal 2 fok fölött lenne).
+
+### Ingadozik is — és nem hervad vissza
+
+Egy játékos formája frissítésről frissítésre (öt meccsenként), 40 mérkőzésen át,
+ugyanazokkal a mérkőzés-értékelésekkel:
+
+| | régi | **új** |
+|---|---|---|
+| végig kimagasló (7,5–8,0) | 9,5 → 9,8 → 8,3 → 7,8 → 8,0 → 7,0 → 6,8 → **7,1** | 12,5 → 13,4 → 11,4 → 11,2 → 11,6 → 10,4 → 10,4 → **11,1** |
+| hullámzó átlagos (3,5–6,5) | 9,5 → 9,5 → 8,2 → 8,0 → 8,0 → 6,6 → 6,5 → 7,0 | 9,2 → 9,1 → 7,3 → 7,9 → 7,5 → 5,5 → 5,9 → 7,0 |
+| beindul a 10. meccstől | 8,7 → 9,7 → 10,1 → 10,7 → 10,8 → 8,7 → 7,4 → **7,4** | 8,7 → 9,6 → 12,7 → 13,8 → 14,0 → 13,9 → 13,2 → **12,0** |
+| kihűl a 15. meccstől | 9,5 → 9,8 → 8,0 → 5,4 → 4,9 → 3,6 → 4,7 → **6,3** | 12,5 → 13,4 → 8,6 → 3,6 → 1,6 → 1,1 → 1,2 → **1,0** |
+
+**A régi rendszer visszahervadt.** Az első és a harmadik sor mutatja a hibát a
+legélesebben: aki VÉGIG kimagaslóan játszott, annak a formája tizenöt meccs
+alatt visszacsúszott a középre (9,5 → 7,1), mert a mérce közben utolérte a
+sorozatot. Ugyanez a beinduló emberrel: felkúszott 10,8-ig, aztán a saját
+teljesítménye lett a „szokásos", és visszaesett 7,4-re — miközben egyetlen
+gyenge meccse sem volt.
+
+### A játékos lapja kiírja a két mércét
+
+A forma-doboz mostantól nem csak a csillagátlagot mondja, hanem azt is, mihez
+mérjük: *„Az elmúlt 8 mérkőzésén 7,7 csillag az átlaga — a saját szokásos
+szintje 7,4, a keret mostani szintje 5,3."* A bejelentés fele éppen ez volt: a
+szám indokolatlannak látszott, mert a viszonyítás nem látszott.
+
+---
 
 ### MÉRT HIBA: a forma önmagát erősítette
 
