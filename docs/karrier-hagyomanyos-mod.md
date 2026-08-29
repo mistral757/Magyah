@@ -1905,6 +1905,103 @@ kliens egymás keretét.
 
 ---
 
+## 11.5 ALL-IN: OSZTÁLYUGRÁS PÉNZÉRT (v3.8.21)
+
+*(Érintett kód: `PYR_LEAP_PRICE` / `PYR_LEAP_RETURN` / `PYR_LEAP_RANK` /
+`PYR_LEAP_STEP`, `pyrLeapTarget` / `pyrLeapActive` / `pyrLeapOfferable` /
+`pyrLeapStakes` / `pyrLeapCommit` / `pyrLeapSettle` / `pyrLeapOffer` /
+`pyrLeapLabel`, a `beginNextSeasonWithChallenges` `_leap` lépése, a `finish()`
+szezonzáró blokkja, a `leap` / `leapWin` főkönyvi kategória, a
+`budgetBreakBoxHtml` vállalás-sora és az `S.pyrLeap` mentése.)*
+
+**Bejelentett kérés:** *„Hagyományos módban lehessen osztályt ugrani pénzért:
+all-in ajánlat… tedd be a mostani összes pénzedet, ha az eléri a szintugrás
+árát, és akkor pl. D6-ból nem D5-be, hanem D4-be léphetsz a következő
+szezonban. Itt mindenképp le kell neki írni, hogy milyen szintű lesz a D4
+ereje, tehát mit vállal. A vállalás lényege: a pénzt beteszed, és ha sikerül a
+szintugrás után top 3-ban végezni, akkor visszakapod másfélszeresét, ha nem,
+akkor elveszted a teljes összeget."*
+
+### Mikor jön az ajánlat
+
+A **nyár legvégén**: a fel- és kiesés eldőlte UTÁN (`pyrSeasonTurn`), a szezon
+eleji **kihívások ELŐTT**. Ez az egyetlen pillanat, ahol mind a három szám
+ismert:
+
+* **hol tartasz** — az új osztályod már megvan,
+* **mennyi pénzed van** — az átigazolások lezárultak,
+* **mit vállalnál** — a cél-osztály ereje kiszámolható.
+
+A sorrend nem mindegy: a kihívás-kalibráció a szintkülönbségből dolgozik,
+tehát az ugrásnak **előbb** kell megtörténnie, különben a vállalásaid egy
+elavult mezőnyhöz mérten születnének.
+
+### Az ár a CÉL-osztálytól függ
+
+| cél | ár |
+|---|--:|
+| **D4** · NB II | 30 Mrd Ft |
+| **D3** · NB I | 60 Mrd Ft |
+| **D2** · másodosztály | 90 Mrd Ft |
+| **D1** · premier líg | 120 Mrd Ft |
+
+A **D5-be ugrás szándékosan nincs a listán**: a legalsó két osztály közti lépés
+amúgy is egy jó szezon kérdése, és a karrier elején nincs is ekkora pénz.
+Vagyis az ajánlat pontosan a bejelentés példájával nyílik meg: **D6-ból
+feljutottál D5-be → 30 Mrd-ért rögtön a D4-ben kezdhetsz.**
+
+### A tét: csúszka a büdzsé százalékában
+
+A minimum az ugrás ára. Efölött a csúszka **10%-onként** állítható, a büdzséd
+százalékában, **100%-ról lefelé** — csak azok a fokok jelennek meg, amelyek még
+elérik az árat. Mérve, 30 Mrd-os árnál:
+
+| büdzsé | választható tétek |
+|---|---|
+| 100 Mrd | 100% · 90% · 80% · 70% · 60% · 50% · 40% · 30% |
+| 34 Mrd | 100% · 90% |
+| 30 Mrd | csak a teljes összeg |
+
+**A pénz azonnal elmegy** — a következő idényt nulla (vagy csökkentett)
+kerettel kezded, tehát igazolni sem tudsz belőle.
+
+### A vállalás: top 3 → másfélszeres
+
+A következő idény végén, a helyezés eldőltekor (`finish`, a
+`!S.seasonClosed` kapun belül, tehát szezononként pontosan egyszer):
+
+* **top 3** → a tét **1,5-szerese** visszaérkezik a kasszába (`leapWin`),
+* **bármi más** → a tét odaveszett.
+
+**Az osztály mindkét esetben a tiéd marad** — a szintet nem veszi el senki,
+csak a pénzt. A pénz a nyár ELEJÉN érkezik vissza, tehát még abban az
+átigazolási ablakban elkölthető.
+
+### A világ is elmozdul
+
+Nem elég átírni, melyik osztályban vagy: a cél-osztály **leggyengébb csapata
+lecsúszik** oda, ahonnan feljöttél. Így mindkét osztály létszáma pontosan annyi
+marad, amennyi volt (15 világ-csapat + te, illetve 16 világ-csapat) — ugyanaz a
+csere, amit a közös karrier „második ülése" is használ a rolloverben. Mérve, D5
+→ D4 ugrásnál a hat osztály létszáma 16/16/16/**15**/**16**/16 lett, a
+mezőnyszint pedig 74-ről 77-re.
+
+Az ugrás után a mezőnyszint, a fejlődési ütem és az ellenfél-lista is
+újraszámolódik (`pyrLevel` / `pyrGrowStep` / `pyrOpponents`) — pontosan az a
+négy sor, amit a rollover is futtat.
+
+### Korlátok
+
+* **Egyszerre egy vállalás** futhat (`pyrLeapActive`).
+* **Auto szezonban nincs ajánlat** — ott nincs, aki döntsön.
+* A D1-ből nincs hova ugrani, a D6-ból pedig csak a D5-be lehetne, ami nincs
+  árazva — mindkét esetben elmarad az ajánlat.
+* A futó vállalás a klub gazdaságában is látszik (a keret-bontásban egy saját
+  sor mondja, mennyi a tét és mennyi jár vissza) — enélkül egy egész idényre
+  láthatatlan maradna, mi forog kockán.
+
+---
+
 ## 12. Nyitott kérdések
 
 1. ~~Sávnyújtás vagy adatbázis-bővítés?~~ **Eldőlt** (3.1/A + 3.3): a rang
