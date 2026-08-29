@@ -119,6 +119,11 @@ csatárokból és 4,6-os védőkből álló keretnél a két poszt formája **1,
 tér el tartósan (a régi rendszerben 0,1 fokkal). A forma-csatorna ezt
 kiegyenlíti: egy védő a SAJÁT szintjéhez képest ugyanúgy be tud indulni.
 
+*(3.8.20 óta a rés magától is szűkül: a kapus és a védő végre valósághű
+értékelést kap — védés-fajták, blokk, gólvonal-mentés —, tehát a keret
+csillag-szintje kevésbé csúszik szét posztonként. Lásd
+`docs/meccs-statisztika.md`, „A hátsó sor meccse".)*
+
 ### A mérce nem mérheti önmagát
 
 A `pformBaseline` mostantól az **ablak előtti** meccsekből számol („a mostani

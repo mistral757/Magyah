@@ -5041,7 +5041,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.19";
+const APP_VERSION="3.8.20";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -21517,8 +21517,11 @@ const COACH_TYPES=[
  {key:"attr:kapus",attrKey:"kapus",ic:"🧤",n:"Kesztyűs mester",
   d:"Kapusiskola — a védés kézműves tudása.",
   gate:["KP"],
-  score:fp=>0.60*cfAttr(fp,"kapus")+0.40*cfNorm(cfPerM(fp,fp.saves),0,3.2),
-  why:fp=>cfPerM(fp,fp.saves)>=2?`${fp.saves} védés — a hálóőrzés nála szakma volt.`
+  /* A SÁV ÚJRALŐVE (3.8.20): a védés 0,2/meccsről ~3-ra nőtt, amióta minden
+     ellenfél-helyzetnek van gazdája (lásd oppChance). A régi 3,2-es normáló
+     mellett MINDEN kapusból automatikusan csúcs-Kesztyűs mester lett volna. */
+  score:fp=>0.60*cfAttr(fp,"kapus")+0.40*cfNorm(cfPerM(fp,fp.saves),1.2,5.5),
+  why:fp=>cfPerM(fp,fp.saves)>=3.2?`${fp.saves} védés — a hálóőrzés nála szakma volt.`
         :`Kiváló kapusképességek (${Math.round(fp.attrs.kapus||0)}).`},
  {key:"attr:seb",attrKey:"seb",ic:"⚡",n:"Sprintmester",
   d:"Erőnlét és robbanékonyság — a leglassabban formálható képesség.",
@@ -35333,6 +35336,21 @@ const CARD_BUMP={godlike:8,vandal:6,killer:5,mythic:4,stellar:3,diamond:2,gold:1
    a Diamond (10) egy jó védelemnek reális, a csúcsszintek viszont valóban
    kivételes idényt kérnek. */
 const CARD_CS={silver:3,gold:7,diamond:12,stellar:15,mythic:17,killer:20,vandal:24,godlike:28};
+/* ---- A VÉDÉS-KÜSZÖBÖK ÚJRALŐVE (3.8.20) ----
+   A régi számok (4/9/15/20/26/32/42/55) egy olyan világhoz készültek, ahol a
+   VÉDÉS ALIG SZÜLETETT: a bravúr a tick 5%-os hangulat-ágából jött, és csak
+   akkor, ha az adott ötpercben egyik oldal sem szerzett gólt — mérve ~0,2
+   védés/mérkőzés, vagyis ~6 egy egész idényben. A kapus tehát a védés-úton
+   SOHA nem juthatott kártyához, csak a tiszta lapokon át.
+   3.8.20 óta minden ellenfél-helyzetnek van gazdája (lásd oppChance), és a
+   védésszám valósághű: fölényben ~1,9, átlagos meccsen ~3,0, ostrom alatt
+   ~4,8 mérkőzésenként. A régi küszöbök mellett ez AUTOMATIKUS GODLIKE lett
+   volna minden kapusnak — ezért az új számok ehhez a világhoz szólnak.
+   A SÚLYOZÁS SZÁNDÉKOS: a védés VOLUMEN-stat (annál több, minél többet
+   támadják a csapatot), ezért a küszöbe szigorúbb, mint a tiszta lapé — egy
+   lyukas védelem mögött nem lehet kártyát gyűjteni. A domináns klub kapusa a
+   TISZTA LAP útján jut előre, az ostromlotté a védéseken. */
+const CARD_SV={silver:40,gold:70,diamond:100,stellar:115,mythic:130,killer:150,vandal:175,godlike:200};
 /* ================= A KÁRTYA-KÜSZÖB MECCSRE VETÍTVE =================
    A küszöbszámok (a fenti CARD_CS és a determineSeasonCards combo/mvp/saves
    értékei) mindig is EGY TELJES, 30 MECCSES BAJNOKI SZEZONRA voltak
@@ -42396,6 +42414,7 @@ const MSTAT_GRADES=[
        se gólpassz, se védés, se labdaszerzés, és nem ő a meccs embere.
    A második feltétel LITERÁLIS („0 egyéb teljesítmény nélkül"): egy kapus négy
    védéssel csinált valamit, akkor is, ha ötöt kapott. */
+const MSTAT_SAVE_CAP=3.0;   /* a kapus védés-tételének plafonja (volt: 1,4) */
 const MSTAT_SHOUT_IDX=10;   /* ettől a fokozattól („rendkívüli") a napló is kimondja */
 const MSTAT_EARLY_RED=25;   /* eddig a percig „nagyon korai" a piros lap */
 const MSTAT_ROUT_GA=5;      /* ennyi kapott góltól „kiütés" a hátsó sornak */
@@ -42403,7 +42422,7 @@ function mstatUnratable(row,ctx,role,gk){
   if(!row)return false;
   if(row.red&&row.redMin!=null&&row.redMin<=MSTAT_EARLY_RED)return true;
   if((gk||role==="VEDO")&&(ctx.ga||0)>=MSTAT_ROUT_GA
-     &&!(row.g||row.a||row.saves||row.tackles||row.mvp))return true;
+     &&!(row.g||row.a||row.saves||row.tackles||row.bl||row.lc||row.mvp))return true;
   return false;}
 /* Egy értékelés-szám → fokozat-index (0..13). A `null` (nincs értékelés) NEM
    fokozat: azt a hívó „—"-ként írja ki. */
@@ -42703,9 +42722,27 @@ function mstatRate(row,ctx){
   const gW=gk?2.6:(role==="VEDO"?1.5:(role==="KOZEPPALYAS"?1.2:1.0));
   eR+=(row.g||0)*gW;
   eR+=(row.a||0)*0.7;
-  if(ctx.cleanSheet&&(gk||role==="VEDO"))eR+=gk?0.8:0.5;
-  if(gk)eR+=Math.min(1.4,(row.saves||0)*0.22);
-  eR+=Math.min(0.7,(row.tackles||0)*0.10);
+  /* ---- A HÁTSÓ SOR IS ELÉRHETI A FELSŐ FOKOZATOKAT (3.8.20) ----
+     MÉRVE a régi súlyokkal: egy kapus ÉLETE MECCSE (tiszta lap + 12 védés)
+     6,00-t adott — pontosan ugyanannyit, mint nyolc védéssel, mert a
+     védés-tétel 1,4-nél megállt. Egy védőé (tiszta lap + 9 labdaszerzés) 5,00
+     volt. A tizennégy fokozatból a felső négy tehát szerkezetileg elérhetetlen
+     volt nekik, miközben egy csatár két góllal 5,80-nál, hárommal 6,80-nál
+     járt. A bejelentés („a kapusok nagyon nehezen kapnak jó értékelést…
+     ugyanígy a védők") ezt a plafont írta le.
+     A JAVÍTÁS KÉT FELE: (1) a védésnek FAJTÁJA lett (sima / bravúr / ziccer /
+     kivédett tizenegyes — lásd oppChance), és a fajta súlyoz; (2) a védőnek
+     új csatornái vannak (blokk, gólvonal-mentés), a plafonok pedig kinyílnak.
+     Az arány célja: egy kapus- vagy védő-hőstett annyit érjen, mint egy
+     csatár-dupla vagy -mesterhármas. */
+  if(ctx.cleanSheet&&(gk||role==="VEDO"))eR+=gk?1.0:0.8;
+  if(gk)eR+=Math.min(MSTAT_SAVE_CAP,
+    (row.saves||0)*0.16+(row.svBig||0)*0.28+(row.svSolo||0)*0.50+(row.svPen||0)*1.50);
+  eR+=Math.min(1.2,(row.tackles||0)*0.15);
+  /* A BLOKK a mezőnyjátékos „védése" — a gólvonal-mentés pedig az a pillanat,
+     amikor a kapus már verve volt. Középpályás is kaphat mindkettőt (ő is
+     odaérhet), csak ritkábban sorsolódik rá. */
+  eR+=Math.min(1.2,(row.bl||0)*0.35)+(row.lc||0)*0.90;
   /* ---- A KAPOTT GÓL A HÁTSÓ SORÉ (3.7.41) ----
      A régi büntetés 1,0-nál megállt, és a VÉDŐKET egyáltalán nem érintette:
      egy 6-0-s kiütés után a hátsó sor „szenvedős" körül landolt, mintha csak
@@ -42807,9 +42844,24 @@ function mstatCompute(c){
   let theirSaves=mstatPois(r,Math.max(0.6,(c.lf||1)*2.1*atkK));
   if(gf===0)theirSaves=Math.max(1,theirSaves);          /* gól nélkül is lőttünk kapura */
   const sot=gf+theirSaves;
-  let mySaves=Math.max(c.saveCount|0,mstatPois(r,Math.max(0.6,(c.la||1)*2.1*gkK)));
+  /* ---- A VÉDÉSEK MOSTANTÓL MÉRTEK, NEM SORSOLTAK (3.8.20) ----
+     A tick minden ellenfél-helyzetet kibont és megnevezi a gazdáját (lásd
+     oppChance), tehát a védés-oszlop már nem becslés: a mérkőzésen tényleg
+     ennyi védés hangzott el. A régi, Poisson-os ág TARTALÉK marad — annak a
+     mérkőzésnek, amit nem a tick játszott le (régi mentés visszaolvasása). */
+  const liveSv=(c.rows||[]).reduce((a,x)=>a+(x&&x.sv||0),0);
+  let mySaves=c.liveDef?liveSv
+    :Math.max(c.saveCount|0,mstatPois(r,Math.max(0.6,(c.la||1)*2.1*gkK)));
   if(ga===0)mySaves=Math.max(1,mySaves);
   const oSot=ga+mySaves;
+  /* ---- BLOKKOLT LÖVÉS ----
+     A blokk NEM kapura lövés (nem is ér a kapuig), ezért saját oszlopa van, és
+     nem rontja el a lövés/védés négyesét. A MIÉNK mért (a tickből jön); az
+     ELLENFÉLÉ ugyanabból a képletből származtatott, amiből a mi helyzeteink:
+     a saját gólvárhatóságunk × a blokk-arány — vagyis ugyanaz a szabály áll
+     mindkét oldalra. */
+  const myBlocks=(c.rows||[]).reduce((a,x)=>a+((x&&x.bl||0)+(x&&x.lc||0)),0);
+  const oBlocks=mstatPois(r,Math.max(0.3,(OPPCH_BASE+(c.lf||1)*OPPCH_RATE)*(OPPCH_BLOCK+OPPCH_LINE)));
   /* --- LABDASZERZÉSEK: aki kevesebbet birtokol, többet véd --- */
   const tk=Math.round(mstatClamp(11+(100-poss)*0.20+z.ved*1.3
     +MOD.def*1.8+(MOD.styleCh.def||0)*1.6+MOD.fitDelta*6+(r()-0.5)*4,4,40));
@@ -42838,8 +42890,13 @@ function mstatCompute(c){
     const want=(i===rows.length-1)?left:Math.round(tk*x._w/wsum);
     x.tackles=Math.max(0,Math.min(left,want));
     left-=x.tackles;});
-  /* A védések a KAPUSÉ — a mezőnyjátékos „védése" nem ugyanaz a fogalom. */
-  rows.forEach(x=>{x.saves=(x.pos==="KP")?mySaves:0;});
+  /* A VÉDÉSEK NÉVRE SZÓLNAK (3.8.20). A régi sor a poszt alapján osztott: ha
+     a kapust lecserélted, MINDKETTEN megkapták a teljes védésszámot. Most
+     mindenki azt viszi, amit a tick a nevére írt; élő könyvelés nélkül marad
+     a régi, poszt szerinti szétosztás. */
+  rows.forEach(x=>{
+    x.saves=c.liveDef?(x.sv||0):((x.pos==="KP")?mySaves:0);
+    x.blocks=(x.bl||0);x.lineClears=(x.lc||0);});
   /* --- AZ ÉRTÉKELÉSEK --- */
   /* A KERET ÁTLAGA a pályán lévőkből — ehhez mérjük az egyes embereket.
      A lecserélteket is beleszámoljuk: ők is a mai tizenegy részei voltak. */
@@ -42853,6 +42910,10 @@ function mstatCompute(c){
     return {n:x.pl.n,pos:x.pos,role:x.role,
       min:mstatMinutes(x.share),
       g:x.g||0,a:x.a||0,saves:x.saves||0,tackles:x.tackles||0,
+      /* a hátsó sor meccse: a bontás a játékos lapján és a történetben is
+         megjelenik, tehát a sorosított alakba is bekerül */
+      svBig:x.svBig||0,svSolo:x.svSolo||0,svPen:x.svPen||0,
+      bl:x.blocks||0,lc:x.lineClears||0,
       red:!!x.red,mvp:!!x.mvp,star:(rt.rated?rt.v:null)};});
   /* AZ ÉRTÉKELÉS NÉLKÜLIEK A SOR VÉGÉRE. Nem „nulla csillagosak" — nincs
      számuk, amivel rangsorolni lehetne, tehát a lista aljára kerülnek, a
@@ -42880,8 +42941,8 @@ function mstatCompute(c){
         kAtk:Math.round(atkK*100)/100,kGk:Math.round(gkK*100)/100},
     home:!!c.home,us:c.usName||teamName,them:c.oppName||"Ellenfél",
     gf,ga,cls:c.cls,
-    team:{poss,passes,acc,sot,saves:mySaves,tackles:tk},
-    opp:{poss:100-poss,passes:oPasses,acc:oAcc,sot:oSot,saves:theirSaves,tackles:oTk},
+    team:{poss,passes,acc,sot,saves:mySaves,tackles:tk,blocks:myBlocks},
+    opp:{poss:100-poss,passes:oPasses,acc:oAcc,sot:oSot,saves:theirSaves,tackles:oTk,blocks:oBlocks},
     players};}
 /* ---- A CSILLAGSOR ----
    Hét hely, fél csillag pontossággal. A fél csillagot NEM külön karakter adja
@@ -42916,7 +42977,9 @@ function mstatPlayerHtml(p,rank){
   const tags=[];
   if(p.g)tags.push(`${p.g} gól`);
   if(p.a)tags.push(`${p.a} gólpassz`);
-  if(p.saves)tags.push(`${p.saves} védés`);
+  if(p.saves)tags.push(`${p.saves} védés${p.svPen?` · ${p.svPen} kivédett tizenegyes`:""}${p.svSolo?` · ${p.svSolo} ziccer-hárítás`:""}${p.svBig?` · ${p.svBig} bravúr`:""}`);
+  if(p.bl)tags.push(`${p.bl} blokk`);
+  if(p.lc)tags.push(`${p.lc} gólvonal-mentés`);
   if(p.tackles)tags.push(`${p.tackles} labdaszerzés`);
   if(p.red)tags.push(`kiállítás`);
   if(p.mvp)tags.push(`★ a meccs embere`);
@@ -42950,6 +43013,8 @@ function mstatRender(){
   h+=mstatRowHtml("kapura lövés",t.sot,o.sot);
   h+=mstatRowHtml("labdaszerzés",t.tackles,o.tackles);
   h+=mstatRowHtml("védés",t.saves,o.saves);
+  /* A BLOKK saját sor: nem kapura lövés, tehát a fenti négyest nem érinti. */
+  if(t.blocks!=null||o.blocks!=null)h+=mstatRowHtml("blokkolt lövés",t.blocks||0,o.blocks||0);
   /* MI ALAKÍTOTTA EZEKET A SZÁMOKAT — a filozófia, a pályán lévő szerepek és
      az összesített poszt-illeszkedés. Ez a sáv köti össze a statisztikát a
      játék többi rendszerével: enélkül a számok magyarázat nélkül állnának. */
@@ -43175,6 +43240,10 @@ function pstatPush(M){
        nem kap se jó, se rossz jelet egy tíz perces cseréből. */
     a.push({s:sn,r:M.round,st:(typeof p.star==="number"?p.star:null),
       g:p.g||0,a:p.a||0,sv:p.saves||0,
+      /* a hátsó sor meccse a történetben is: a nagy védések és a blokkok
+         nélkül egy kapus-hőstett utólag ugyanolyan sornak látszana, mint egy
+         eseménytelen nulla-nullás */
+      svb:(p.svBig||0)+(p.svSolo||0)+(p.svPen||0),bl:(p.bl||0)+(p.lc||0),
       tk:p.tackles||0,m:p.min||0,res:M.cls||"draw"});
     if(a.length>PFORM_HIST)a.splice(0,a.length-PFORM_HIST);});}
 /* ---- A SAJÁT MÉRCE: AMIHEZ A FORMÁT MÉRJÜK ----
@@ -43459,7 +43528,8 @@ function pstatHistoryHtml(name){
     const bits=[];
     if(x.g)bits.push(`${x.g} gól`);
     if(x.a)bits.push(`${x.a} gólpassz`);
-    if(x.sv)bits.push(`${x.sv} védés`);
+    if(x.sv)bits.push(`${x.sv} védés${x.svb?` (${x.svb} nagy)`:""}`);
+    if(x.bl)bits.push(`${x.bl} blokk`);
     if(x.tk)bits.push(`${x.tk} labdaszerzés`);
     bits.push(`${x.m}'`);
     h+=`<div class="pmRow ${esc(x.res||"")}"><span class="pmR">${x.s}/${x.r}.</span>`
@@ -43474,6 +43544,67 @@ const PFORM_LABELS=["kritikus mélyponton","mélyponton","gyenge formában","hul
   "keresi önmagát","döcög","semleges","semleges","rendben van","jó formában",
   "remek formában","szárnyal","csúcsformában","életforma"];
 function pformLabel(name){return PFORM_LABELS[pformStep(name)-1]||"semleges";}
+/* ================= AZ ELLENFÉL HELYZETEI — A HÁTSÓ SOR MECCSE (3.8.20) =====
+   BEJELENTETT KÉRÉS: „a kapusok nagyon nehezen kapnak jó értékelést… valahogy
+   izgalmasabbá tehetnénk az ő meccsüket. Jelenleg csak a tisztalap és a bravúr
+   van nekik. Ugyanígy a védők számára is kifejezetten kevés az értékelési
+   felület, vagy ami izgalmat jelentene a meccsben."
+
+   MÉRVE, a valódi mstatRate-tel — a plafon volt a baj, nem az ízlés:
+     kapus, tiszta lap +  5 védés → 5,70 (nagyon jó)
+     kapus, tiszta lap +  8 védés → 6,00 (kiemelkedő)
+     kapus, tiszta lap + 12 védés → 6,00 (kiemelkedő)  ← ugyanaz, mint 8-nál
+     védő,  tiszta lap +  9 labdaszerzés → 5,00 (jó)   ← ez volt a maximuma
+     csatár, 2 gól + 3 gólpassz          → 7,90 (fergeteges)
+   A tizennégy fokozatból a FELSŐ NÉGY szerkezetileg elérhetetlen volt nekik:
+   a védés 0,22-t ért 1,4-es plafonnal (8 védés fölött semmit), a labdaszerzés
+   0,10-et 0,7-es plafonnal.
+
+   AMI EDDIG TÖRTÉNT A PÁLYÁN: az ellenfél gólja egy Poisson-dobás a tickben, a
+   védés és a labdaszerzés pedig UTÓLAG, statisztikailag született a lefújásnál
+   (mstatCompute). A hátsó sornak tehát nem volt MECCSE — csak egy szám a
+   táblázatban.
+
+   AMI MOSTANTÓL: az ellenfél GÓLON KÍVÜLI helyzeteit is a tick bontja ki, és
+   mindegyiknek van gazdája. Ötféle kimenetel:
+     · ziccer/szemtől szembe   — a kapus kifutva hárít
+     · bravúr                  — a nagy védés
+     · sima védés              — a napi munka
+     · blokk                   — a védő a lövés elé veti magát
+     · gólvonal-mentés         — a kapus már verve volt (ritka, drámai)
+   plusz a fölé/kapufa ág, ami eddig is volt.
+
+   A BALANSZ ÉRINTETLEN: a GÓLOK SZÁMA bitre ugyanaz marad — ezek az események
+   kizárólag a gólon KÍVÜLI helyzetekből születnek, tehát a mérkőzés
+   végeredményét nem mozdítják. A kapus és a védő minősége az ÉRTÉKELÉSBEN és
+   a FORMÁBAN jelenik meg, nem az eredményben (a védelem ereje már benne van a
+   gólvárhatóságban — ott újra beszámítani dupla könyvelés volna).
+
+   A HELYZETEK SZÁMA a gólvárhatóságból jön (OPPCH_RATE × la), ugyanabból a
+   számból, amiből eddig a védés-oszlop származott — így a statisztika négy
+   oszlopa (lövés/védés × két oldal) továbbra sem mondhat ellent egymásnak. */
+/* HÁNY HELYZET: alap + a gólvárhatósággal arányos rész. Az ALAP azért kell,
+   mert egy fölényben játszó csapat kapuja sem marad érintetlen: a valóságban
+   egy 90%-ban birtokló csapat is kap 2-3 kaput eltaláló lövést. Enélkül egy
+   domináns klub kapusának meccsenként EGY eseménye volna, vagyis a bejelentett
+   probléma megmaradna épp ott, ahol a felhasználó látta.
+   Mérve: la=0,5 → 3,7 helyzet · la=1,2 → 5,5 · la=2,5 → 8,9 (mérkőzésenként). */
+const OPPCH_BASE=2.4;        /* helyzet / mérkőzés, a gólvárhatóságtól függetlenül */
+const OPPCH_RATE=2.6;        /* …és ennyi gólvárhatóságonként */
+/* A kimenetel eloszlása. Az arányok összege 1 alatt van: a maradék a fölé lőtt
+   labda és a kapufa (a régi „Nagy helyzetet hagyott ki" ág). */
+const OPPCH_SOLO=0.06;       /* ziccer — a kapus kifutva hárít */
+const OPPCH_BIG=0.20;        /* bravúr */
+const OPPCH_SAVE=0.28;       /* sima védés */
+const OPPCH_BLOCK=0.30;      /* blokk (védő) */
+const OPPCH_LINE=0.03;       /* gólvonal-mentés (védő) */
+/* ---- A STAT SŰRŰBB, MINT A NAPLÓ ----
+   Nem minden helyzet ér külön sort: a nagy pillanatok (ziccer, bravúr,
+   gólvonal-mentés, kivédett tizenegyes) MINDIG megszólalnak, a hétköznapiak
+   (sima védés, blokk, fölé lőtt labda) csak néha. Így a védés- és blokk-szám
+   valósághű marad, a közvetítés viszont nem hígul fel — a mérkőzés főszereplője
+   továbbra is a gól. */
+const OPPCH_LOUD_SAVE=0.40, OPPCH_LOUD_BLOCK=0.50, OPPCH_LOUD_MISS=0.35;
 function playMatch(){
   /* F4/4: a párharc szkriptje EGYSZER használatos — itt vesszük át és
      nullázzuk, hogy a meccs végén már ne lógjon be a következő fordulóba. */
@@ -43818,6 +43949,11 @@ function playMatch(){
   _lastGoalMin=0;updateTTBoard(fx,0,0,0);
   const discWatchAtStart=new Set(Object.keys(S.discWatch)),hotStreakAtStart=new Set(Object.keys(S.hotStreak));
   const mScore={},mAssist={};
+  /* A HÁTSÓ SOR MECCSE (3.8.20): kinek hány védése / bravúrja / blokkja volt.
+     Névre szólnak, nem posztra — így a lecserélt kapus is a SAJÁT védéseit
+     viszi, nem a beállóét (a régi kód a lefújásnál osztotta szét a védéseket,
+     és cserénél mindkét kapus megkapta az összeset). */
+  const mSave={},mSaveBig={},mSaveSolo={},mPenSave={},mBlock={},mLineClear={};
   /* ---- PÁRHARC: A GÓLOK SZKRIPTBŐL, NEM VÉLETLENBŐL ----
      A közös eseménylistát 5 perces vödrökre osztjuk, pontosan azokra, amikkel
      a motor amúgy is dolgozik (18 tick × 5 perc). A vödör-index visszafejthető:
@@ -43929,7 +44065,18 @@ function playMatch(){
         addLine(`${gminTxt(min)}  Tizenegyesgól: ${esc(oppScorer)}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
         sbEv("them","goal",oppScorer);
         mileGkConceded(MILE,`${gminTxt(min)}  `);
-      }else addLine(`${gminTxt(min)}  Tizenegyes ellenünk — de kimarad, megmenekültünk!`,"m ev");
+      }else{
+        /* ---- KIVÉDETT TIZENEGYES (3.8.20) ----
+           A maradék 22% eddig egyben „kimarad" volt — a kapus nem is
+           szerepelt benne. Pedig ez a futball egyik legnagyobb kapus-pillanata,
+           és az értékelésben is az: a legnagyobb súlyú egyetlen védés. A
+           felosztás 12% kapus / 10% kihagyva, tehát az ESÉLYEK változatlanok
+           (a gól továbbra is 78%), csak a hárítás fele mostantól ARC ÉS NÉV. */
+        const pgk=oppChanceGk();
+        if(pgk&&Math.random()<0.55){
+          noteSave(pgk.p.n,"pen");
+          addLine(`${gminTxt(min)}  KIVÉDETT TIZENEGYES!!! <b>${esc(shortName(pgk.p.n))}</b> jó sarokba mozdul és megfogja — a stadion felrobban!`,"m mvp");
+        }else addLine(`${gminTxt(min)}  Tizenegyes ellenünk — de kimarad, megmenekültünk!`,"m ev");}
     }else if(evType==="owngoal_for"){
       gf++;
       updateTTBoard(fx,gf,ga,Math.min(90,min));
@@ -44522,6 +44669,14 @@ function playMatch(){
         if(tfl&&tfl.raw.length){tacRawShown=true;
           addLine(`→ ${tfl.raw[Math.floor(Math.random()*tfl.raw.length)]}`,"m skillnote");}}
     maxDeficit=Math.max(maxDeficit,ga-gf);maxLead=Math.max(maxLead,gf-ga);
+    /* ---- AZ ELLENFÉL GÓLON KÍVÜLI HELYZETEI (3.8.20) ----
+       A gólok MÁR eldőltek (fent, a Poisson-ból) — ez a hátsó sor meccse: a
+       védések, a blokkok és a gólvonal-mentések. A darabszám ugyanabból a
+       gólvárhatóságból jön, amiből eddig a lefújásnál a védés-oszlop született
+       (lásd az OPPCH_RATE fölötti indoklást), tehát a statisztika oszlopai
+       nem mondanak ellent egymásnak — csak most már NEVE is van mindegyiknek. */
+    {const chN=poisson((OPPCH_BASE+la*OPPCH_RATE)/18);
+     for(let c=0;c<chN;c++)oppChance(min);}
     /* PÁRHARCBAN nincs különleges esemény: a tizenegyes, az öngól és a
        VAR-döntés mind az ÁLLÁST mozgatná, azt pedig a közös lista adja.
        (A piros lap és a sérülés marad — azok nem érintik az eredményt, viszont
@@ -44653,63 +44808,32 @@ function playMatch(){
         sbEv("us","goal",sc.n);
         if(inst)addLine(`→ ${esc(inst.skill.name)}${skillProgressSuffix(inst)} — pont ezért ül a padon`,"m skillnote");
         maxDeficit=Math.max(maxDeficit,ga-gf);maxLead=Math.max(maxLead,gf-ga);}}
+    /* ---- A SZÖCSKE: A HAZÁRD KAPUS SAJÁT PILLANATA ----
+       A generikus helyzet-flavor (kapufa / bravúrvédés / falazás) 3.8.20 óta
+       az oppChance-ben él, saját statokkal — EZ az ág viszont marad, mert nem
+       flavor: a gk_grasshopper skill saját, kétélű mechanikája (bravúr vagy
+       potyagól), és a SAJÁT, ritka esélyén kell maradnia. Ha az oppChance-be
+       költözne, a potyagól kockázata a négyszeresére nőne. */
     if(g===0&&og===0&&Math.random()<fp(0.05)){
       const gk=active.find(a=>slots[a.idx].pos==="KP")||active[0];
       const grasshopperSk=playerSkills(gk.p.n).find(i=>i.skill.id==="gk_grasshopper");
       if(grasshopperSk){
-        /* A szöcske ARÁNYAI. Eredetileg 60% bravúr / 15% potyagól / 25%
-           semleges volt — a potyagól ebből túl gyakran ütött be, és a skill
-           inkább kockázatnak érződött, mint előnynek. Az új osztás
-           68 / 7 / 25: a potyagól esélye feleződik, a bravúré nő, tehát a
-           skill karaktere (hazárd kapus) megmarad, de már megéri. */
+        /* A szöcske ARÁNYAI: 68% bravúr / 7% potyagól / 25% semleges. */
         const r=Math.random();
         if(r<0.68){
-          saveCount++;S.careerStats[gk.p.n]=S.careerStats[gk.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};S.careerStats[gk.p.n].saves++;
-          S.seasonSaves[gk.p.n]=(S.seasonSaves[gk.p.n]||0)+1;
           /* a szöcske bravúrja EGYSZERRE bravúr és kapus-skill villanás */
-          clutchNoteSave(gk.p.n);clutchNoteDefUse(gk.p.n);
+          noteSave(gk.p.n,"big");try{clutchNoteDefUse(gk.p.n);}catch(e){}
           addLine(`${gminTxt(min)}  BRAVÚR! ${esc(shortName(gk.p.n))} hihetetlen vetődéssel fogja a labdát — ${esc(grasshopperSk.skill.name)}${skillProgressSuffix(grasshopperSk)}`,"m ev");
         /* PÁRHARCBAN a potyagól kimarad: KAPOTT GÓLT írna helyben, az állást
-           viszont a közös lista adja. A bravúr és a magabiztos ág marad — a
-           kapus-skill tehát a párharcban is megszólal, csak nem az eredményt
-           mozgató változatában. */
-        }else if(!DUEL&&r<0.75){   /* 0.68..0.75 = 7% potyagól (volt 15%) */
+           viszont a közös lista adja. */
+        }else if(!DUEL&&r<0.75){   /* 0.68..0.75 = 7% potyagól */
           ga++;
           updateTTBoard(fx,gf,ga,Math.min(90,min));
           addLine(`${gminTxt(min)}  Potyagól! ${esc(shortName(gk.p.n))} nagyot hibázik, könnyű gólt kap  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
           sbEv("them","goal","potyagól");
           mileGkConceded(MILE,`${gminTxt(min)}  `);
         }else addLine(`${gminTxt(min)}  ${esc(shortName(gk.p.n))} magabiztosan tartja a kaput`,"m ev");
-        runPendingDrama();
-      /* A szöcske-ág KORÁBBAN `return`-nel zárt. A szándék jó volt — ne szólaljon
-         meg utána a generikus helyzet-flavor is —, de a return nem csak azt vágta
-         le, hanem a tick teljes hátralévő részét: a FÉLIDŐ-sort és a félidei
-         csereszünetet is. Innen jött a "néha nincs csereszünet": ha a 41-45. perces
-         vödörben nem esett gól, bejött az 5%-os helyzet-dobás, és a kapusnak volt
-         szöcske-skillje, a szünet némán kimaradt. Az else-ág ugyanazt a kizárást
-         adja, de a tick vége már mindig lefut. */
-      }else{
-      const defHolder=active.find(a=>playerSkills(a.p.n).some(i=>i.skill.type==="defense"));
-      const fl=[`Kapufa! ${esc(shortName(active[weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1))].p.n))} próbálkozott`,
-        `Bravúrvédés: ${esc(shortName(gk.p.n))}`,
-        `Nagy helyzetet hagyott ki ${hunAz(fx.o.n)} ${fx.o.n}`];
-      if(defHolder){
-        const dsk=playerSkills(defHolder.p.n).find(i=>i.skill.type==="defense");
-        fl.push(`Falazás: a védelem sziklaszilárd — ${esc(shortName(defHolder.p.n))} (${esc(dsk.skill.name)}${skillProgressSuffix(dsk)}) állja a sarat`);}
-      const fi=Math.floor(Math.random()*fl.length);
-      if(fi===1){saveCount++;S.careerStats[gk.p.n]=S.careerStats[gk.p.n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};S.careerStats[gk.p.n].saves++;S.seasonSaves[gk.p.n]=(S.seasonSaves[gk.p.n]||0)+1;clutchNoteSave(gk.p.n);
-        /* „Fogd meg a söröm!” — a fal a saját bravúrjánál szólal meg. */
-        if(!clutchWallShown&&clutchPower(gk.p.n,CLUTCH_WALL_ID)>0){
-          clutchWallShown=true;
-          addLine(`→ 🍺 ${CLUTCH_WALL_TXT[Math.floor(Math.random()*CLUTCH_WALL_TXT.length)](esc(shortName(gk.p.n)))}`,"m mvp");}}
-      /* a "Falazás" a védekező skill LÁTHATÓ villanása — ez az, amit a
-         "kétszer használ védői skillt" feltétel mér */
-      if(fi===3&&defHolder)clutchNoteDefUse(defHolder.p.n);
-      addLine(`${gminTxt(min)}  ${fl[fi]}`,"m ev");
-      /* BL ARANYKESZTYŰ: bravúrvédésnél szólal meg a kapus díj-kommentárja. */
-      if(fi===1&&(S._goldQuotesThisMatch||0)<2){
-        const kq=goldQuoteFor(gk.p.n,"bl_golden_gloves");
-        if(kq){addLine(`🥇 ${kq}`,"m skillnote");S._goldQuotesThisMatch=(S._goldQuotesThisMatch||0)+1;}}}}
+        runPendingDrama();}}
     /* A késleltetett 90+ dráma MOST fut le — a bucket összes rendes (85-90
        perces) eseménye után, így mindig időrendben, utolsóként jelenik meg. */
     runPendingDrama();
@@ -44878,6 +45002,122 @@ function playMatch(){
      fájlban, és egy const itt időzített aknát jelentene (TDZ-hiba az első
      büntetőnél). A deklaráció hoistolódik, tehát bárhonnan hívható. */
   function spreadSkipGK(x){try{return slots[x.idx].pos==="KP";}catch(e){return false;}}
+  /* ================= AZ ELLENFÉL HELYZETE: KI HÁRÍTJA? (3.8.20) ============
+     A SORSOLÁS SAJÁT, EGYSZERŰ SÚLYOZÁS, és NEM a weightedPick. Az ugyanis a
+     forma szélső sávjainak eredményesség-élét viszi (pformPickMult), az pedig
+     a GÓL-oldalé: a védőké és a kapusé szándékosan a pillanatkép defMult-ján
+     át számít (lásd a weightedPick fölötti indoklást). Ha itt is a
+     weightedPick sorsolna, a hátsó sor formája kétszer könyvelődne. */
+  function oppChanceDefIdx(){
+    const w=active.map((x,i)=>{
+      if(i===redIdx||!x||x.bus)return 0;
+      const pos=(slots[x.idx]&&slots[x.idx].pos)||"KKP";
+      if(pos==="KP")return 0;
+      let role="KOZEPPALYAS";
+      try{role=roleInFormation(pos,form,x.idx)||"KOZEPPALYAS";}catch(e){}
+      const base=(role==="VEDO")?1:((role==="KOZEPPALYAS")?0.40:0.08);
+      let ved=60;try{const A=attrsOfPlayer(x.p);ved=(A&&A.ved)||60;}catch(e){}
+      /* A VÉDEKEZŐ KÉPESSÉG IS SÚLYOZ: aki tud védekezni, tényleg többször ér
+         oda. A skill-csatorna ugyanaz, amiből a labdaszerzés-szétosztás is
+         dolgozik — egy jel, két helyen, azonos irányban. */
+      let chDef=0;try{const c=mstatSkillCh(x.p.n);chDef=c.def||0;}catch(e){}
+      return base*(0.5+ved/120)*(1+Math.max(0,Math.min(1.2,chDef*0.18)));});
+    const tw=w.reduce((a,v)=>a+v,0);
+    if(!(tw>0))return -1;
+    let r=Math.random()*tw,i=0;
+    while(i<w.length-1&&r>w[i]){r-=w[i];i++;}
+    return i;}
+  /* A KAPUS, aki ÉPP a kapuban áll (a kiállított és a buszsofőr nem az). */
+  function oppChanceGk(){
+    const i=active.findIndex((x,k)=>k!==redIdx&&x&&!x.bus&&slots[x.idx]&&slots[x.idx].pos==="KP");
+    return i>=0?active[i]:null;}
+  /* EGY VÉDÉS LEKÖNYVELÉSE. Egy helyen, mert négyféle védés van (sima, bravúr,
+     ziccer, tizenegyes), és mindegyiknek ugyanaz a könyvelése: a meccs
+     számlálója, a karrier-statisztika, az idény-számláló és a „Fogd meg a
+     söröm!" clutch-mérője. */
+  function noteSave(name,kind){
+    if(!name)return;
+    saveCount++;
+    mSave[name]=(mSave[name]||0)+1;
+    if(kind==="big")mSaveBig[name]=(mSaveBig[name]||0)+1;
+    else if(kind==="solo")mSaveSolo[name]=(mSaveSolo[name]||0)+1;
+    else if(kind==="pen")mPenSave[name]=(mPenSave[name]||0)+1;
+    const cs=S.careerStats[name]=S.careerStats[name]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};
+    cs.saves++;
+    S.seasonSaves[name]=(S.seasonSaves[name]||0)+1;
+    try{clutchNoteSave(name);}catch(e){}
+    /* „Fogd meg a söröm!” és a BL Aranykesztyű hangja a saját pillanatában
+       szólal meg — ugyanott, ahol eddig a bravúrvédés-flavornél. */
+    if(!clutchWallShown&&clutchPower(name,CLUTCH_WALL_ID)>0){
+      clutchWallShown=true;
+      addLine(`→ 🍺 ${CLUTCH_WALL_TXT[Math.floor(Math.random()*CLUTCH_WALL_TXT.length)](esc(shortName(name)))}`,"m mvp");}
+    if((S._goldQuotesThisMatch||0)<2){
+      const kq=goldQuoteFor(name,"bl_golden_gloves");
+      if(kq){addLine(`🥇 ${kq}`,"m skillnote");S._goldQuotesThisMatch=(S._goldQuotesThisMatch||0)+1;}}}
+  /* EGY BLOKK / GÓLVONAL-MENTÉS LEKÖNYVELÉSE. A védő „védése" — a
+     karrier-statisztikában is saját sora van (cs.bl). */
+  function noteBlock(name,line){
+    if(!name)return;
+    if(line)mLineClear[name]=(mLineClear[name]||0)+1;
+    else mBlock[name]=(mBlock[name]||0)+1;
+    const cs=S.careerStats[name]=S.careerStats[name]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0};
+    cs.bl=(cs.bl||0)+1;
+    try{clutchNoteDefUse(name);}catch(e){}}
+  /* EGY HELYZET KIBONTÁSA. A gólok NEM itt dőlnek el — ez kizárólag a gólon
+     kívüli helyzetek sorsa, tehát az eredményt nem mozdítja. */
+  function oppChance(min){
+    const t=gminTxt(min);
+    const gk=oppChanceGk();
+    const r=Math.random();
+    const pickTxt=a=>a[Math.floor(Math.random()*a.length)];
+    let acc=OPPCH_SOLO;
+    if(gk&&r<acc){
+      noteSave(gk.p.n,"solo");
+      addLine(`${t}  ${pickTxt([
+        `ZICCER! Kettesben a kapussal… <b>${esc(shortName(gk.p.n))}</b> kifut és hárít!`,
+        `SZEMTŐL SZEMBE! <b>${esc(shortName(gk.p.n))}</b> kicsinyíti a szöget, és megfogja!`,
+        `Már csak a kapust kellett volna kicseleznie — <b>${esc(shortName(gk.p.n))}</b> viszont nem enged!`])}`,"m ev");
+      return;}
+    acc+=OPPCH_BIG;
+    if(gk&&r<acc){
+      noteSave(gk.p.n,"big");
+      addLine(`${t}  ${pickTxt([
+        `BRAVÚR! <b>${esc(shortName(gk.p.n))}</b> hihetetlen vetődéssel tolja szögletre`,
+        `BRAVÚR! A felső sarok felé tartott a lövés — <b>${esc(shortName(gk.p.n))}</b> odaér`,
+        `Óriási védés! <b>${esc(shortName(gk.p.n))}</b> a semmiből üti ki a labdát`])}`,"m ev");
+      return;}
+    acc+=OPPCH_SAVE;
+    if(gk&&r<acc){
+      noteSave(gk.p.n,"");
+      if(Math.random()>=OPPCH_LOUD_SAVE)return;
+      addLine(`${t}  ${pickTxt([
+        `Kapura lőttek — <b>${esc(shortName(gk.p.n))}</b> biztosan fogja`,
+        `<b>${esc(shortName(gk.p.n))}</b> a helyén van, nincs kiadott kipattanó`,
+        `Lövés középre, <b>${esc(shortName(gk.p.n))}</b> magához öleli a labdát`])}`,"m ev");
+      return;}
+    const di=oppChanceDefIdx();
+    const def=di>=0?active[di]:null;
+    acc+=OPPCH_BLOCK;
+    if(def&&r<acc){
+      noteBlock(def.p.n,false);
+      if(Math.random()>=OPPCH_LOUD_BLOCK)return;
+      addLine(`${t}  ${pickTxt([
+        `BLOKK! <b>${esc(shortName(def.p.n))}</b> a lövés elé veti magát`,
+        `<b>${esc(shortName(def.p.n))}</b> még beleér — a lövés a lábán csattan`,
+        `Tiszta helyzet lett volna: <b>${esc(shortName(def.p.n))}</b> az utolsó pillanatban blokkol`])}`,"m ev");
+      return;}
+    acc+=OPPCH_LINE;
+    if(def&&r<acc){
+      noteBlock(def.p.n,true);
+      addLine(`${t}  A GÓLVONALRÓL MENT! ${gk?`${esc(shortName(gk.p.n))} már verve volt, `:""}<b>${esc(shortName(def.p.n))}</b> a vonalról rúgja ki a labdát!`,"m ev");
+      return;}
+    /* FÖLÉ / KAPUFA — a régi „Nagy helyzetet hagyott ki" ág, változatlan
+       szereppel: a helyzet elszáll, senkinek nem jár érte semmi. */
+    if(Math.random()>=OPPCH_LOUD_MISS)return;
+    addLine(`${t}  ${pickTxt([
+      `Kapufa! ${esc(hunAz(fx.o.n))} ${esc(fx.o.n)} centikre volt a góltól`,
+      `Nagy helyzetet hagyott ki ${esc(hunAz(fx.o.n))} ${esc(fx.o.n)}`,
+      `Fölé! Az ellenfél a tizenhatoson belülről sem talál kaput`])}`,"m ev");}
   function weightedPick(arr,wfn,rnd,spreadSkip){
     /* A BUSZSOFŐR SOSEM JELÖLT. Egyetlen helyen mondjuk ki, mert MINDEN
        gól-, gólpassz-, tizenegyes-, szabadrúgás- és kapufa-sorsolás ezen a
@@ -45363,14 +45603,18 @@ function playMatch(){
         /* A KIÁLLÍTÁS PERCE az értékelésnek kell: a „minősíthetetlen" ítélet
            egyik kapuja a NAGYON KORAI piros lap (lásd mstatUnratable). */
         share,red:!!red,redMin:red?redMin:null,
-        g:mScore[pl.n]||0,a:mAssist[pl.n]||0,mvp:!!(_mvpN&&_mvpN===pl.n)});
+        g:mScore[pl.n]||0,a:mAssist[pl.n]||0,mvp:!!(_mvpN&&_mvpN===pl.n),
+        /* A HÁTSÓ SOR MECCSE (3.8.20): amit a napló kimondott, azt viszi a
+           sor is — védés fajtánként, blokk, gólvonal-mentés. */
+        sv:mSave[pl.n]||0,svBig:mSaveBig[pl.n]||0,svSolo:mSaveSolo[pl.n]||0,
+        svPen:mPenSave[pl.n]||0,bl:mBlock[pl.n]||0,lc:mLineClear[pl.n]||0});
       const _rows=active.filter(a=>!a.bus)
         .map(a=>_rowOf(a.p,a.idx,(a.share==null?1:a.share),active.indexOf(a)===redIdx))
         .concat(halfOut.filter(h=>h&&h.p).map(h=>_rowOf(h.p,h.idx,h.share||0,false)));
       S.lastMatch=mstatCompute({
         gf,ga,cls,home:!!fx.home,usName:teamName,oppName:(fx.o&&fx.o.n)||"Ellenfél",
         oppOvr:(fx.o&&fx.o.ovr)||oppTargetRating,
-        lf,la,diff,saveCount,
+        lf,la,diff,saveCount,liveDef:true,
         tacticKey:(S.tactics&&S.tactics.active)||null,
         /* A RENDSZER KARAKTERE AKKOR IS LÁTSZIK, HA MÉG NEM ÜL TÖKÉLETESEN.
            Az MS.tacticStyle szándékosan csak 85-ös begyakorlástól él (ott a
@@ -61843,14 +62087,14 @@ function determineSeasonCards(){
        teljesítményre — a küszöb-számok így maradnak olvashatók. */
     const _k=tempoMult()*cardMatchMult(row.m);
     const combo=row.combo*_k,mvp=row.mvp*_k,saves=row.saves*_k,cs=row.cs*_k;
-    if(!godlikeGiven&&(combo>=68||saves>=55||cs>=CARD_CS.godlike)){newTier="godlike";godlikeGiven=true;}
-    else if(!vandalGiven&&(combo>=52||saves>=42||cs>=CARD_CS.vandal)){newTier="vandal";vandalGiven=true;}
-    else if(!killerGiven&&(combo>=40||mvp>=30||saves>=32||cs>=CARD_CS.killer)){newTier="killer";killerGiven=true;}
-    else if(!mythicGiven&&(combo>=32||mvp>=24||saves>=26||cs>=CARD_CS.mythic)){newTier="mythic";mythicGiven=true;}
-    else if(stellarCount<2&&(combo>=25||mvp>=18||saves>=20||cs>=CARD_CS.stellar)){newTier="stellar";stellarCount++;}
-    else if((topBelowDiamondNames.has(row.p.n)&&combo>=18)||mvp>=12||saves>=15||cs>=CARD_CS.diamond){newTier="diamond";}
-    else if(combo>=10||mvp>=6||saves>=9||cs>=CARD_CS.gold){newTier="gold";}
-    else if(combo>=4||mvp>=3||saves>=4||cs>=CARD_CS.silver){newTier="silver";}
+    if(!godlikeGiven&&(combo>=68||saves>=CARD_SV.godlike||cs>=CARD_CS.godlike)){newTier="godlike";godlikeGiven=true;}
+    else if(!vandalGiven&&(combo>=52||saves>=CARD_SV.vandal||cs>=CARD_CS.vandal)){newTier="vandal";vandalGiven=true;}
+    else if(!killerGiven&&(combo>=40||mvp>=30||saves>=CARD_SV.killer||cs>=CARD_CS.killer)){newTier="killer";killerGiven=true;}
+    else if(!mythicGiven&&(combo>=32||mvp>=24||saves>=CARD_SV.mythic||cs>=CARD_CS.mythic)){newTier="mythic";mythicGiven=true;}
+    else if(stellarCount<2&&(combo>=25||mvp>=18||saves>=CARD_SV.stellar||cs>=CARD_CS.stellar)){newTier="stellar";stellarCount++;}
+    else if((topBelowDiamondNames.has(row.p.n)&&combo>=18)||mvp>=12||saves>=CARD_SV.diamond||cs>=CARD_CS.diamond){newTier="diamond";}
+    else if(combo>=10||mvp>=6||saves>=CARD_SV.gold||cs>=CARD_CS.gold){newTier="gold";}
+    else if(combo>=4||mvp>=3||saves>=CARD_SV.silver||cs>=CARD_CS.silver){newTier="silver";}
     if(newTier&&cardTierRank(newTier)>curRank){
       entry.cardTier=newTier;
       const bump=CARD_BUMP[newTier]||1;

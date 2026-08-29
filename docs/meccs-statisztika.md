@@ -1,6 +1,11 @@
 # Meccsenkénti statisztika és játékos-értékelés
 
 *(3.7.26 — a statisztika-réteg ELSŐ lépcsője; 3.7.27 — a négy befolyás;
+3.8.20 — A HÁTSÓ SOR MECCSE: az ellenfél helyzeteinek kibontása a tickben
+(`OPPCH_*`, `oppChance` / `oppChanceDefIdx` / `oppChanceGk` / `noteSave` /
+`noteBlock`), a védés-fajták, a blokk és a gólvonal-mentés, valamint a
+`MSTAT_SAVE_CAP` és a `CARD_SV` új küszöbei — lásd a „A hátsó sor meccse"
+szakaszt;
 3.7.33 — a rövid beállás; 3.7.41 — a szöveges, tizennégy fokozatú értékelés
 (`MSTAT_GRADES`, `MSTAT_MAX`, `mstatGradeIdx` / `mstatGrade` / `mstatGradeHtml`,
 `mstatUnratable`, `MSTAT_EARLY_RED`, `MSTAT_ROUT_GA`, `MSTAT_SHOUT_IDX`, a
@@ -56,6 +61,116 @@ szándékosan csak 85-ös begyakorlástól él (ott a szimulációs szorzókat
 kapcsolja); a labdabirtoklásnak viszont a NYERS stílus kell — egy félig
 megtanult Labdatartás is birtokol, csak kevésbé. Ezt a `grip` fejezi ki
 (a begyakorlás aránya, 0,35 padlóval).
+
+## A hátsó sor meccse (3.8.20)
+
+**Bejelentett kérés:** *„A kapusok nagyon nehezen kapnak jó értékelést… valahogy
+izgalmasabbá tehetnénk az ő meccsüket. Jelenleg csak a tisztalap és a bravúr van
+nekik. Ugyanígy a védők számára is kifejezetten kevés az értékelési felület, vagy
+ami izgalmat jelentene a meccsben."*
+
+### A mért plafon
+
+| | régi értékelés | fokozat |
+|---|--:|---|
+| kapus: tiszta lap + 5 védés | 5,70 | nagyon jó |
+| kapus: tiszta lap + 8 védés | 6,00 | kiemelkedő |
+| kapus: tiszta lap + **12** védés | **6,00** | kiemelkedő ← *ugyanaz, mint 8-nál* |
+| védő: tiszta lap + 9 labdaszerzés | **5,00** | jó ← *ez volt a maximuma* |
+| csatár: 2 gól + 3 gólpassz | 7,90 | fergeteges |
+
+A tizennégy fokozatból a **felső négy szerkezetileg elérhetetlen** volt nekik: a
+védés 0,22-t ért **1,4-es plafonnal** (nyolc védés fölött semmit), a labdaszerzés
+0,10-et 0,7-essel, a tiszta lap 0,8 / 0,5.
+
+### Az ok: a hátsó sornak nem volt MECCSE
+
+Az ellenfél gólja a tickben dőlt el (Poisson), a **védés és a labdaszerzés
+viszont utólag, statisztikailag** született a lefújásnál. A pályán semmi nem
+történt velük: a „Bravúrvédés" egy 5%-os hangulat-sor volt, ami ráadásul csak
+gólmentes ötpercekben szólalhatott meg — **mérve ~0,2 védés/mérkőzés**, vagyis
+hat egy egész idényben.
+
+### A megoldás: minden helyzetnek van gazdája
+
+Az ellenfél **gólon kívüli helyzeteit** mostantól a tick bontja ki
+(`oppChance`), és mindegyiknek neve van:
+
+| kimenetel | kié | súly az értékelésben |
+|---|---|--:|
+| ziccer / szemtől szembe | kapus | 0,50 |
+| bravúr | kapus | 0,28 |
+| sima védés | kapus | 0,16 |
+| **kivédett tizenegyes** | kapus | **1,50** |
+| blokk | védő (ritkábban középpályás) | 0,35 |
+| **gólvonal-mentés** | védő | **0,90** |
+| fölé / kapufa | senkié | — |
+
+A védés-tétel plafonja **1,4 → 3,0** (`MSTAT_SAVE_CAP`), a labdaszerzésé
+0,7 → 1,2 (és 0,10 → 0,15 darabonként), a tiszta lap 0,8 → **1,0** (kapus) és
+0,5 → **0,8** (védő).
+
+**A GÓLOK SZÁMA BITRE UGYANAZ MARAD.** Ezek az események kizárólag a gólon
+kívüli helyzetekből születnek — a mérkőzés végeredményét nem mozdítják. A kapus
+és a védő minősége az **értékelésben** és a **formában** jelenik meg, nem az
+eredményben: a védelem ereje már benne van a gólvárhatóságban, ott újra
+beszámítani dupla könyvelés volna.
+
+### Hány helyzet, és mennyi szólal meg
+
+A darabszám alap + a gólvárhatósággal arányos rész (`OPPCH_BASE` +
+`OPPCH_RATE` × λ). Az **alap** azért kell, mert egy fölényben játszó csapat
+kapuja sem marad érintetlen — enélkül épp ott maradt volna meg a probléma, ahol
+a bejelentő látta. Mérve, 20 000 mérkőzésen:
+
+| λ (ellenfél gólvárhatósága) | helyzet | védés (ebből bravúr) | blokk | gólvonal | **naplósor** |
+|---|--:|--:|--:|--:|--:|
+| 0,4 · fölényben | 3,45 | 1,87 (0,69) | 1,03 | 0,10 | **2,06** |
+| 1,2 · átlagos meccs | 5,53 | 2,99 (1,10) | 1,66 | 0,17 | **3,30** |
+| 2,5 · ostrom alatt | 8,92 | 4,81 (1,77) | 2,68 | 0,27 | **5,32** |
+
+**A stat sűrűbb, mint a napló.** A nagy pillanatok (ziccer, bravúr,
+gólvonal-mentés, kivédett tizenegyes) mindig megszólalnak, a hétköznapiak
+(sima védés, blokk, fölé lőtt labda) csak néha (`OPPCH_LOUD_*`) — így a
+számok valósághűek maradnak, a közvetítés viszont nem hígul fel.
+
+### Mit ér ez a gyakorlatban
+
+| | régi | **új** |
+|---|--:|--:|
+| kapus · fölényben, tiszta lap, 2 védés | 5,05 *jó* | **5,40** *nagyon jó* |
+| kapus · átlagos meccs, tiszta lap, 3 védés (1 bravúr) | ~5,3 *nagyon jó* | **5,55** *nagyon jó* |
+| kapus · ostrom alatt, tiszta lap, 5 védés (2 bravúr) | 5,70 *nagyon jó* | **6,15** *kiemelkedő* |
+| kapus · 12 védés, 5 bravúr, tiszta lap | 6,00 *kiemelkedő* | **7,80** *fergeteges* |
+| kapus · 6 védés + **kivédett tizenegyes** | — (nem létezett) | **7,80** *fergeteges* |
+| kapus · 3 kapott gól, 10 védés *(hősies vereség)* | 4,65 *jó* | **5,95** *kiemelkedő* |
+| védő · átlagos, tiszta lap, 2 labdaszerzés, 1 blokk | 4,50 *jó* | **5,25** *nagyon jó* |
+| védő · nagy nap: 4 labdaszerzés, 2 blokk, tiszta lap | ~4,7 *jó* | **5,90** *kiemelkedő* |
+| védő · 7 labdaszerzés, 3 blokk + **gólvonal-mentés** | 5,00 *jó* | **7,60** *rendkívüli* |
+| csatár · 3 gól *(viszonyítás, változatlan)* | 6,80 | 6,80 |
+
+A cél nem az volt, hogy a hátsó sor általában többet kapjon, hanem hogy a
+**kimagasló teljesítménye** annyit érjen, mint egy csatár-mesterhármas — a
+hétköznapi meccsük továbbra is 5 körül marad.
+
+### Két következmény, amit rendezni kellett
+
+* **A szezonkártya védés-küszöbei** (`CARD_SV`) a régi, ~0,2/meccses világhoz
+  készültek (4/9/15/…/55). Az új, valósághű védésszám mellett minden kapus
+  automatikusan GODLIKE kártyát kapott volna, ezért a küszöbök új számokat
+  kaptak (40/70/100/…/200). A súlyozás szándékos: a védés **volumen-stat**
+  (annál több, minél többet támadják a csapatot), ezért szigorúbb a tiszta
+  lapnál — egy lyukas védelem mögött nem lehet kártyát gyűjteni.
+* **A Kesztyűs mester edző-típus** normáló sávja (0–3,2 védés/meccs) ugyanezért
+  1,2–5,5-re módosult.
+
+### A védések névre szólnak
+
+A régi kód a lefújásnál, **poszt szerint** osztotta szét a védéseket — ha a
+kapust lecserélted, mindkettő megkapta a teljes védésszámot. Mostantól
+mindenki azt viszi, amit a tick a nevére írt.
+
+---
 
 ## A játékos-értékelés
 
