@@ -604,7 +604,11 @@ cserébe minden más taktikáé −CON pp.
 csúszkák nélkül — a szint ugyanis attól még értelmes szám, hogy még nem hajt
 semmit. Ez a javasolt vágás.
 
-> **ÁLLAPOT (3.8.26): az 1-4. kör KÉSZ és kiadva** — `styleLevel` / `styleSxpParts`
-> / `STYLE_RANKS`, a `styleHeroHtml` fejléc, a `.rowRole` szerep-jelvények a
-> keretlistán és a szerep-kiosztás a játékos lapján. Részletek:
-> `docs/csapatstilus-szintek.md`. Az 5-7. kör (a csúszkák) a következő.
+> **ÁLLAPOT: A TELJES TERV KÉSZ ÉS KIADVA.**
+> Az **1-4. kör (3.8.26)** — `styleLevel` / `styleSxpParts` / `STYLE_RANKS`, a
+> `styleHeroHtml` fejléc, a `.rowRole` szerep-jelvények a keretlistán és a
+> szerep-kiosztás a játékos lapján. Részletek: `docs/csapatstilus-szintek.md`.
+> Az **5-7. kör (3.8.27)** — mind a 35 csúszka, a húsz motor-csatorna, a
+> 🎚 Hangsúlyok kategória és a „háromból három" kapu. Részletek:
+> `docs/hangsuly-csuszkak.md`, benne a shippelt készlet öt eltérése ettől a
+> tervtől és annak indoka.
