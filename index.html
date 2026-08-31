@@ -5159,7 +5159,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.29";
+const APP_VERSION="3.8.30";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -14229,6 +14229,7 @@ const MP_WAIT_MK={mine:"A te hazai kupád",opp:"A társad hazai kupája",
   cancel:"✕ Nem várom meg"};
 function mpMkKey(){return "s"+(S.seasonNumber||1)+"mkkl";}
 function mpMkAbort(){
+  mpSoloClear();
   _mpMkBusy=false;
   if(_mpMkPoll){clearTimeout(_mpMkPoll);_mpMkPoll=null;}
   h2hWaitHide();}
@@ -14255,6 +14256,7 @@ async function mpMkChainGate(iWon,cb){
   const oppField=myField==="host"?"guest":"host";
   _mpMkFallback={iWon:!!iWon,cb};
   const done=fire=>{_mpMkFallback=null;mpMkAbort();cb(fire);};
+  mpSoloArm("A társad nem jelentkezik — a saját eredményemmel megyek tovább",mpMkGiveUp,"mk");
   h2hWaitShow("HAZAI KUPA",
     iWon?"Megnyertétek a Magyar Kupát — egyeztetjük a társaddal a Konferencia-liga indulást…"
         :"Egyeztetjük, nyert-e a társad a Magyar Kupában — ha igen, ti is indultok a Konferencia-ligában…",
@@ -14347,6 +14349,7 @@ let _mpCupBusy=false,_mpCupPoll=null,_mpCupSoloCb=null;
 const MP_WAIT_CUP={mine:"A te nevezésed",opp:"A társad nevezése",
   cancel:"✕ Még maradok a HUB-ban"};
 function mpCupAbort(){
+  mpSoloClear();
   _mpCupBusy=false;_mpCupSoloCb=null;
   if(_mpCupPoll){clearTimeout(_mpCupPoll);_mpCupPoll=null;}
   h2hWaitHide();}
@@ -14376,6 +14379,7 @@ async function mpCupGate(onReady){
   _mpCupSoloCb=onReady;
   const key=mpCupKey(),myField=MP.role==="host"?"host":"guest";
   const oppField=myField==="host"?"guest":"host";
+  mpSoloArm("A társad nem nevezett — indulok a saját kvalifikációmmal",()=>mpCupSolo(onReady),"cup");
   h2hWaitShow("KUPANEVEZÉS","Kapcsolódás a szobához…",false,false,MP_WAIT_CUP);
   $("h2hWaitErr").textContent="";
   try{await mpNetInit();}catch(e){}
@@ -14489,6 +14493,7 @@ let _mpGroupBusy=false,_mpGroupPoll=null;
 const MP_WAIT_GROUP={mine:"A te csoportod",opp:"A társad csoportja",
   cancel:"✕ Most nem folytatom"};
 function mpCupGroupAbort(){
+  mpSoloClear();
   _mpGroupBusy=false;
   if(_mpGroupPoll){clearTimeout(_mpGroupPoll);_mpGroupPoll=null;}
   h2hWaitHide();}
@@ -14647,11 +14652,30 @@ async function mpCupGroupTickRun(key,myField,oppField,onReady,myRows){
     mpCupGroupAbort();
     try{saveGame();}catch(e){}
     onReady();return;}
+  /* ---- A HIÁNYZÓ KIÚT (3.8.30) ----
+     Ez a kapu volt az egyetlen, aminek SEMMILYEN menedéke nem volt: se
+     időkorlát, se „egyedül folytatom" gomb. Aki ide beragadt (mert a társa be
+     sem nevezett a sorozatba), azt csak újratöltés vitte ki — és a következő
+     rajzolásnál újra itt találta magát. A kiút a MEGLÉVŐ, erre való
+     mechanizmus: az ág szétválasztása (mpCupSplitApart), ami a társat kiveszi
+     a sorozatból, és mindkettőtöket a saját tornátokon visz tovább. */
+  mpSoloArm("A társad nem nevezett be — folytatom egyedül a sorozatot",()=>{
+    try{mpCupSplitApart("group","A társad csoportköre nem érkezett meg.");}catch(e){}
+    mpCupGroupAbort();
+    try{saveGame();}catch(e){}
+    onReady();},"group");
   h2hWaitShow("SORSOLÁS",
     `<span class="h2hDot"></span>${mine?"A csoportod lezárva":"Küldés…"} — ${
       mate?"a társadé is megvan, jöhet a sorsolás…":"várunk a társadra, hogy ő is végigjátssza a csoportkörét."}
      <br><small style="color:var(--dim2)">A nyolcaddöntő párosításához mindkét csoportnak le kell zárulnia.</small>`,
     !!mine,!!(mate&&mate.rows),MP_WAIT_GROUP);
+  /* JELZŐFÉNY: ha a társ egy MÁSIK kapunál vár, ide sosem fog megérkezni. */
+  if(await mpBeaconPing("group")){
+    try{addLine(mpBeaconNote("kupa-csoportkör",mpBeaconMateGate()),"m rc");}catch(e){}
+    try{mpCupSplitApart("group","A társad egy másik kapunál vár.");}catch(e){}
+    mpCupGroupAbort();
+    try{saveGame();}catch(e){}
+    onReady();return;}
   _mpGroupPoll=setTimeout(()=>mpCupGroupTick(key,myField,oppField,onReady,myRows),2500);}
 /* ---- A TÁRS SORSA A KIESÉSES ÁGON ----
    A társ párharcát a te klienseden csak SZIMULÁLNÁNK (AI-ként), a valóságban
@@ -14940,6 +14964,7 @@ function mpTickWrap(run,again,label){
     mpWaitErr("Hiba a várakozás közben — újrapróbáljuk. Ha nem mozdul, a Vissza a kezdőlapra gomb mindig kivisz.");
     try{again&&again();}catch(_){}});}
 function mpCupTieAbort(){
+  mpSoloClear();
   _mpTieBusy=false;_mpTieWaitStart=0;_mpTieStale=false;
   if(_mpTiePoll){clearTimeout(_mpTiePoll);_mpTiePoll=null;}
   h2hWaitHide();}
@@ -15088,6 +15113,9 @@ async function mpCupTieTickRun(key,myField,oppField,round,onReady,myRec){
      <br><small style="color:var(--dim2)">Amíg mindketten versenyben vagytok, a kör végén meg kell várni egymást — így nem csúszhat szét az ág.</small>
      <br><small style="color:var(--dim2);opacity:.8">${esc(mpCupDiagText(round,!!mine,!!mate))}</small>`,
     !!mine,!!mate,MP_WAIT_TIE);
+  mpSoloArm("Nem várok tovább — folytatom egyedül",()=>{
+    const E=S.euro;if(E)E.mateOut=round;
+    mpCupTieAbort();try{saveGame();}catch(e){}onReady();},"tie");
   {const ob=$("h2hWaitOrphanBtn");
    if(ob&&(_mpTieStale||waited>=MP_TIE_FORCE_MS)){
      ob.classList.remove("hide");ob.disabled=false;
@@ -41097,6 +41125,52 @@ setInterval(mpWaitWatchdog,3000);
 /* Mikor frissült utoljára a beváró réteg? Az őr (mpWaitWatchdog) ebből tudja
    meg, hogy a mögötte lévő folyamat ÉL-e még, vagy csak egy állókép maradt. */
 let _h2hWaitAt=0;
+/* ================= A KIÚT MINDEN VÁRAKOZÁSBÓL (3.8.30) ====================
+   BEJELENTETT HIBA (a 3.8.28 UTÁN, ugyanarra az esetre): „nem oldódott meg a
+   PvP dolog, ebben a konkrét esetben még mindig stuck mindkét fél."
+
+   AMIT A 3.8.28 ELHIBÁZOTT. A jelzőfényt HÁROM kapuba tettem be (kupanevezés,
+   hazai kupa, mpBothGate) — a két fél viszont NEM ott állt. A várakozó réteget
+   TÍZ folyamat használja, és a kettő közülük épp a kimaradtak:
+     · „a nyári kupa csoportköre után"  → a CSOPORT-SZINKRON (mpCupGroupTick)
+     · „a szezonindításra várva"        → a SZEZONINDÍTÁSI ALKU (mpStartTick)
+   A csoport-szinkronnak ráadásul SEMMILYEN kiútja nem volt: se időkorlát, se
+   „egyedül folytatom" gomb — a „✕ Még maradok a HUB-ban" csak elrejtette a
+   réteget, a figyelő tovább járt. Aki oda beragadt, azt csak újratöltés vitte
+   ki, és a következő rajzolásnál újra ott találta magát.
+
+   A MEGOLDÁS NEM ÚJABB EGYEDI TAPASZ. Minden várakozó folyamat BEJELENTI a
+   saját egyedüli kiútját, és a várakozó réteg huszonöt másodperc után magától
+   felkínálja. Egy hely, egy szabály — és ami ezután épül, annak is csak egy
+   sort kell hozzátennie.
+
+   MIÉRT NEM AZONNAL. A kiút nem gomb-hiba, hanem végső menedék: a közös
+   karrier értéke épp az, hogy megvárjátok egymást. Huszonöt másodperc alatt
+   egy lassú hálózat is befut; ami annál tovább tart, az már tényleg elakadás. */
+const MP_SOLO_MS=25000;
+let _mpSoloOut=null;
+/* A FUTÓ várakozás egyedüli kiútja. A hívó a saját leállítóját és
+   folytatását adja meg — a réteg csak felkínálja. */
+function mpSoloArm(label,fn,gate){
+  if(_mpSoloOut&&_mpSoloOut.gate===gate)return;   /* ugyanaz a kör: az óra ne induljon újra */
+  _mpSoloOut={label:label||"A társad nem jelentkezik — folytatom egyedül",
+              fn,gate:gate||null,at:Date.now()};}
+function mpSoloClear(){_mpSoloOut=null;}
+/* A réteg minden megjelenítéskor megnézi, kell-e már kiút. A KONKRÉT kapuk
+   (szezonindítás, kieséses kör) ezután írhatják felül a gombot a sajátjukkal:
+   ez a sor előbb fut, tehát nem takarja el őket. */
+function mpSoloOffer(oppReady){
+  const ob=$("h2hWaitOrphanBtn");
+  if(!ob||!_mpSoloOut||oppReady)return;
+  if(Date.now()-_mpSoloOut.at<MP_SOLO_MS)return;
+  const o=_mpSoloOut;
+  ob.classList.remove("hide");
+  ob.disabled=false;
+  ob.textContent="⏭ "+o.label;
+  ob.onclick=()=>{
+    ob.disabled=true;
+    mpSoloClear();
+    try{o.fn();}catch(e){try{h2hWaitHide();}catch(_){}}};}
 function h2hWaitShow(round,msg,mine,opp,what){
   _h2hWaitAt=Date.now();
   const W=what||{mine:"A te kereted",opp:"A társad kerete",cancel:"✕ Most nem játszom le"};
@@ -41119,7 +41193,27 @@ function h2hWaitShow(round,msg,mine,opp,what){
     d.innerHTML=`<span>${txt}</span><span class="st ${ok?"":"wait"}">${ok?"KÉSZ ✓":"várakozik…"}</span>`;
     box.appendChild(d);};
   row(`${MP.role==="host"?"👑":"🤝"} ${W.mine} <b style="color:#e1ad66">(te)</b>`,!!mine);
-  row(`${MP.role==="host"?"🤝":"👑"} ${W.opp}`,!!opp);}
+  row(`${MP.role==="host"?"🤝":"👑"} ${W.opp}`,!!opp);
+  /* VÉGSŐ MENEDÉK (3.8.30): ha a futó folyamat bejelentett egyedüli kiutat, és
+     a társ huszonöt másodperce nem jelentkezik, felkínáljuk. A konkrét kapuk
+     ezután felülírhatják a gombot a sajátjukkal — ez a sor előbb fut. */
+  try{mpSoloOffer(!!opp);}catch(e){}
+  /* ---- MELYIK KAPUNÁL ÁLLSZ (3.8.30) ----
+     Az előző javítás azért nem oldotta meg a bejelentett esetet, mert a
+     jelzőfényt nem abba a kapuba tettem, ahol a két fél tényleg állt — és ez
+     a képernyőről nem derült ki. Mostantól ott a kapu neve: egy képernyőkép
+     megmondja, hol akadt el a folyamat. */
+  try{
+    const dg=$("h2hWaitErr");
+    /* MINDEN várakozó képernyő megnevezi magát — akkor is, ha a folyamat nem
+       jelentett be kiutat. Ha valaki mégis beragad, egy képernyőkép megmondja,
+       MELYIK hurokban: pontosan ez hiányzott a 3.8.28 után. */
+    if(dg&&!dg.textContent){
+      const gid=(_mpSoloOut&&_mpSoloOut.gate)||null;
+      dg.innerHTML=`<span style="color:var(--dim2);font-size:10.5px">várakozás: `
+        +`<b>${esc(gid||String(round))}</b>${gid?" · "+esc(mpGateName(gid)):""}`
+        +`${_mpSoloOut?"":" · nincs bejelentett kiút"}</span>`;}
+  }catch(e){}}
 /* A szezonzárás-várakozó feliratai. */
 const H2H_WAIT_FINAL={mine:"A te szezonzárásod",opp:"A társad szezonzárása",
   cancel:"✕ Most nem várom meg"};
@@ -41574,6 +41668,7 @@ async function mpSyncSeasonEnd(){
     return true;}
   return false;}
 function mpFinalWaitStop(){
+  mpSoloClear();
   _mpFinalBusy=false;
   if(_mpFinalPoll){clearTimeout(_mpFinalPoll);_mpFinalPoll=null;}}
 /* A verdikt előtti várakozás. Ugyanaz a réteg, mint a párharcnál — ugyanaz a
@@ -41584,6 +41679,14 @@ function mpFinalWait(onReady){
   if(mpWaitStuck(_mpFinalBusy,_mpFinalPoll))mpFinalWaitStop();
   if(_mpFinalBusy)return;
   _mpFinalBusy=true;
+  /* KIÚT (3.8.30): a szezonzárás egyeztetése nélkül a saját zárásunkkal
+     megyünk tovább — a társ zárása később úgyis megérkezik, és a közös
+     előzményt a következő egyeztetés pótolja. */
+  mpSoloArm("A társad zárása nem érkezik — folytatom egyedül",()=>{
+    mpFinalWaitStop();
+    try{h2hWaitHide();}catch(e){}
+    try{addLine("⚠️ Nem várod meg a társad szezonzárását — a sajátoddal megyünk tovább.","m ev");}catch(e){}
+    try{onReady&&onReady();}catch(e){}},"final");
   const tickRun=async()=>{
     if(!_mpFinalBusy)return;
     let ok=false;
@@ -42191,6 +42294,11 @@ async function mpStartTick(key,myField,oppField,onReady,myBidRec){
       if(before!==r.v)addLine(`✦ A mezőny újrasorsolva: ${before} → ${r.v}.`,"m life");
       try{saveGame();}catch(e){}
       onReady();};}
+  /* JELZŐFÉNY (3.8.30): a saját, időzített kiút mellé. Ha a társ egy MÁSIK
+     kapunál vár, nem kell kivárni a teljes időkorlátot — tudjuk, hogy nem jön. */
+  if(await mpBeaconPing("season")){
+    try{addLine(mpBeaconNote("szezonindítás",mpBeaconMateGate()),"m rc");}catch(e){}
+    if(ob&&!ob.classList.contains("hide")&&ob.onclick){ob.click();return;}}
   _mpStartPoll=setTimeout(()=>mpStartTick(key,myField,oppField,onReady,myBidRec),2000);}
 /* ---- A KÖZÖS ELŐZMÉNY ----
    Szezononként egy sor mindkét menedzserről. Ebből áll össze a befejezéskori
@@ -51225,6 +51333,7 @@ const MP_WAIT_TABLE={mine:"A te oldalad",opp:"A közös tabella",
   cancel:"✕ Most nem várom meg"};
 let _mpTblBusy=false,_mpTblPoll=null;
 function mpTableStop(){
+  mpSoloClear();
   _mpTblBusy=false;
   if(_mpTblPoll){clearTimeout(_mpTblPoll);_mpTblPoll=null;}}
 async function mpTableSync(round,onDone){
@@ -51246,6 +51355,13 @@ async function mpTableSync(round,onDone){
   /* GUEST: megvárja a host tabelláját. */
   if(_mpTblBusy)return;
   _mpTblBusy=true;
+  /* KIÚT (3.8.30): ha a host nem tölti fel a tabellát, a saját, helyben
+     számolt tabellánkkal megyünk tovább — az a régi, egyjátékos viselkedés. */
+  mpSoloArm("A host tabellája nem érkezik — a sajátommal megyek tovább",()=>{
+    mpTableStop();
+    try{h2hWaitHide();}catch(e){}
+    try{addLine("⚠️ A közös tabella nem érkezett meg — a helyben számolt tabellával folytatjuk.","m ev");}catch(e){}
+    onDone&&onDone();},"table");
   h2hWaitShow("TABELLA","A közös tabella a host oldalán készül…",true,false,MP_WAIT_TABLE);
   $("h2hWaitErr").textContent="";
   const tick=async()=>{
@@ -52130,6 +52246,7 @@ function pyrPoJoint(){
 const _mpGates={};
 function mpGateState(id){return _mpGates[id]||(_mpGates[id]={busy:false,poll:null,fb:null});}
 function mpGateAbort(id){
+  mpSoloClear();
   const g=mpGateState(id);
   g.busy=false;
   if(g.poll){clearTimeout(g.poll);g.poll=null;}
@@ -52150,6 +52267,7 @@ async function mpBothGate(o){
   const oppField=myField==="host"?"guest":"host";
   g.fb={done:o.done,solo:o.solo,note:o.giveUpNote};
   const finish=r=>{g.fb=null;mpGateAbort(id);o.done(r);};
+  mpSoloArm("A társad nem jelentkezik — a saját döntésemmel megyek tovább",()=>mpGateGiveUp(id),id);
   h2hWaitShow(o.title,o.msg,false,false,o.wait);
   $("h2hWaitErr").textContent="";
   try{await mpNetInit();}catch(e){}
@@ -57106,6 +57224,7 @@ async function mpInfPeek(force){
   if(changed){try{saveGame();}catch(e){}try{renderHub();}catch(e){}}}
 let _mpInfBusy=false,_mpInfPoll=null;
 function mpInfinityAbort(){
+  mpSoloClear();
   _mpInfBusy=false;
   if(_mpInfPoll){clearTimeout(_mpInfPoll);_mpInfPoll=null;}
   h2hWaitHide();}
@@ -57116,6 +57235,12 @@ async function mpInfinityBegin(){
   _mpInfBusy=true;
   const key=mpInfinityKey(),myField=MP.role==="host"?"host":"guest";
   const oppField=myField==="host"?"guest":"host";
+  /* KIÚT (3.8.30): a befizetés egyoldalúan nem old, de a képernyőn ragadni
+     még rosszabb — a réteget elengedjük, a befizetésed a szobában marad. */
+  mpSoloArm("A társad befizetése nem érkezik — visszalépek a HUB-ba",()=>{
+    mpInfinityAbort();
+    try{addLine("⚠️ Nem várod meg a társad Infinity-befizetését — a tiéd a szobában marad, később folytatható.","m ev");}catch(e){}
+  },"inf");
   h2hWaitShow("INFINITY","Kapcsolódás a szobához…",false,false,MP_WAIT_INF);
   $("h2hWaitErr").textContent="";
   try{await mpNetInit();}catch(e){}

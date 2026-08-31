@@ -136,3 +136,61 @@ gomb** mostantól nem a szobából léptet ki, hanem továbbenged (3. javítás)
 A két karrier ilyenkor egy nyárra szétválhat — ezt a naplósor ki is mondja —,
 de a **következő szezonindításnál a keretek úgyis újra egymáshoz
 hangolódnak**, tehát a közös karrier nem törik el.
+
+---
+
+# Utóirat: a 3.8.28 nem oldotta meg (3.8.30)
+
+> **BEJELENTETT HIBA, a javítás UTÁN:** „nem oldódott meg a PvP dolog. Ebben a
+> konkrét esetben még mindig stuck mindkét fél."
+
+**Az én hibám volt: rossz kapukat fedtem le.** A jelzőfényt HÁROM helyre tettem
+be (kupanevezés, hazai kupa, `mpBothGate`) — a két fél viszont nem ott állt. A
+várakozó réteget (`h2hWaitShow`) **tíz** folyamat használja, és a kettő
+közülük épp a kimaradtak:
+
+| a bejelentés szava | a tényleges hurok | volt-e kiútja? |
+|---|---|---|
+| „a nyári kupa **csoportköre után**" | `mpCupGroupTickRun` — SORSOLÁS | **semmilyen** |
+| „a **szezonindításra** várva" | `mpStartTick` — SZEZONINDÍTÁS | időzített, de jelzőfény nélkül |
+
+A csoport-szinkronnak **semmilyen** menedéke nem volt: se időkorlát, se
+„egyedül folytatom" gomb. A „✕ Még maradok a HUB-ban" csak elrejtette a
+réteget, a figyelő tovább járt, és két másodperc múlva visszahozta — onnan
+csak újratöltés vitt ki, és az sem segített, mert a következő rajzolásnál
+ugyanoda ért vissza.
+
+## A megoldás: egy szabály, nem újabb tapasz
+
+Minden várakozó folyamat **bejelenti a saját egyedüli kiútját**
+(`mpSoloArm(label, fn, gate)`), és a várakozó réteg **huszonöt másodperc
+után** magától felkínálja (`mpSoloOffer`). Egy hely, egy szabály — ami ezután
+épül, annak is csak egy sort kell hozzátennie.
+
+| hurok | kapu-azonosító | mi a kiút |
+|---|---|---|
+| SORSOLÁS (csoportkör) | `group` | `mpCupSplitApart` — az ág szétválik, mindketten a saját sorozatotokat viszitek |
+| KUPANEVEZÉS | `cup` | `mpCupSolo` — a saját kvalifikációddal |
+| HAZAI KUPA | `mk` | `mpMkGiveUp` — a saját eredményeddel |
+| KUPAKÖR (kieséses) | `tie` | a társ kiesettnek számít, a helyi ág viszi tovább |
+| TABELLA | `table` | a helyben számolt tabellával |
+| SZEZONZÁRÁS | `final` | a saját zárásoddal |
+| NYÁRI KUPA / OSZTÁLYOZÓ | `nyk` / `pyrpo` | `mpGateGiveUp` — a saját döntéseddel |
+| INFINITY | `inf` | vissza a HUB-ba, a befizetésed a szobában marad |
+| SZEZONINDÍTÁS | `season` | saját, korábbi kiútja **plusz** a jelzőfény |
+
+**Miért nem azonnal, hanem huszonöt másodperc után.** A kiút nem gomb, hanem
+végső menedék: a közös karrier értéke épp az, hogy megvárjátok egymást.
+Huszonöt másodperc alatt egy lassú hálózat is befut; ami annál tovább tart, az
+már tényleg elakadás.
+
+## És hogy legközelebb ne kelljen találgatni
+
+**Minden várakozó képernyő megnevezi magát.** A réteg alján ott a hurok
+azonosítója (`várakozás: group · kupa-csoportkör`), akkor is, ha az a folyamat
+nem jelentett be kiutat (`nincs bejelentett kiút`). Az előző javítás pontosan
+azért nem talált célba, mert a képernyőről nem derült ki, MELYIK hurokban áll
+a két fél — egy képernyőkép ezt most megmondja.
+
+A jelzőfény is bekerült a két kimaradt kapuba (`group`, `season`), tehát ha a
+társ egy másik kapunál vár, ott sem kell kivárni a huszonöt másodpercet.
