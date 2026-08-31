@@ -2330,7 +2330,17 @@ body.hubDragging #hubRoster{touch-action:none}
 #sbEvents{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;
   margin:0 -12px;padding:7px 12px 8px;min-height:32px;
   border-top:3px solid #b7c0bb;
-  background:linear-gradient(180deg,#efe9d8,#dcd5c1)}
+  background:linear-gradient(180deg,#efe9d8,#dcd5c1);
+  /* ---- A KRÓNIKA NEM EHETI MEG A KÉPERNYŐT (3.8.36) ----
+     A napló helye mostantól követi a tábla növekedését (sbSyncFeedToBoard), de
+     a követésnek van alja: a sbSizeFeed 140 px-nél nem megy tovább. Egy
+     gólzáporban (tíz-tizenöt gólszerző) a krónika enélkül átlépné ezt a
+     határt, és ugyanaz a csúszás jönne vissza, csak később. A sáv ezért a
+     képernyő ötödénél megáll, és onnan magában görget — ugyanaz az elv, ami a
+     stadion-módban már eddig is állt (ott 38%, mert ott a tábla a főszereplő).
+     A 20vh a szokásos telefonon ~10-12 krónika-sor: a valós meccsek elférnek
+     benne, a szélsőséges eredmény pedig nem tör el semmit. */
+  max-height:20vh;overflow:auto;-webkit-overflow-scrolling:touch}
 .sbEv{display:flex;align-items:baseline;gap:5px;font-family:var(--font-body);
   font-size:11px;font-weight:700;line-height:1.55;color:#221f19}
 .sbEv .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none}
@@ -5181,7 +5191,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.35";
+const APP_VERSION="3.8.36";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -39139,7 +39149,12 @@ function sbRenderEvents(){
       +`<span class="nm">${nm}</span><span class="mn">${mins}</span></div>`;};
   const lb=build(left),rb=build(right);
   L.innerHTML=lb.length?lb.map(row).join(""):`<div class="sbEv none">—</div>`;
-  R.innerHTML=rb.length?rb.map(row).join(""):`<div class="sbEv none">—</div>`;}
+  R.innerHTML=rb.length?rb.map(row).join(""):`<div class="sbEv none">—</div>`;
+  /* A tábla ettől MAGASABB lett — a napló helyét újra ki kell mérni.
+     (A ResizeObserver amúgy is elkapná; ez a azonnali, támogatástól független
+     ág. Mindkettő ugyanabba az egy, magmérő függvénybe fut, tehát nem tud
+     kétszer dolgozni — lásd sbSyncFeedToBoard.) */
+  sbSyncFeedToBoard();}
 /* ---- ÓRA ----
    A megjelenített idő NEM külön számláló, hanem a valós eltelt időből számolt
    arány: egy tick 5 meccspercet ér, tehát elteltTick × 5 perc. Így ha a böngésző
@@ -39642,6 +39657,88 @@ function sbSizeFeed(){
   if(!isFinite(h)||h<=0){feed.style.maxHeight=prev||"";return;}
   feed.style.maxHeight=Math.max(140,Math.round(h))+"px";
   feed.scrollTop=feed.scrollHeight;}   /* a friss sorok legyenek látszóban */
+/* ================= A TÁBLA NŐ — A NAPLÓ HELYE VELE (3.8.36) =================
+   BEJELENTETT HIBA: „el van csúszva az eredményjelző és a feed. nem tudom
+   minden meccsen így van-e, de többször előfordult már."
+
+   MI TÖRTÉNT. A napló magasságát a sbSizeFeed INLINE méri rá, EGYSZER: a
+   kezdőrúgáskor (sbLockView). A mérés pontos — a tábla tetejétől a kártya
+   aljáig minden beleférjen a képernyőbe. Csakhogy a TÁBLA MENET KÖZBEN NŐ: a
+   gólkrónika minden új gólszerzővel egy sorral hosszabb, egy mesterhármas
+   percei pedig több sorba tördelődnek. A mérés viszont nem futott újra.
+
+   MÉRVE (430×932-es telefonon, a bejelentett 0:8-as meccs krónikájával):
+   a tábla 185 px-ről 253-ra nőtt, a naplóra kimért 591 px viszont maradt —
+   a kártya kilógott a képernyőből, és mivel a tábla `position:sticky; top:0`,
+   lefelé görgetve RÁTAKART a napló tetejére. Pontosan 42 px-en, ahogy a
+   képernyőképen is látszik. Minél több gól esik, annál nagyobb a csúszás;
+   ezért fordult elő "többször", de nem minden meccsen.
+
+   A JAVÍTÁS: a napló helye a tábla MINDEN méretváltozását követi. Két hívó, egy
+   mérés — a magasság-őr miatt a második hívás no-op, tehát nem tud kétszer
+   dolgozni:
+     · a gólkrónika újrarajzolása (sbRenderEvents) — azonnali, mindig működik;
+     · egy ResizeObserver a táblán — ez fogja el mindazt, amit a krónika nem: a
+       tördelő csapatneveket, a párharc-összesítő sorát, a betűtípus késői
+       betöltését és minden jövőbeli táblasort.
+   A magasság-őr egyben a végtelen kör ellen is véd: ha a mérés nem mozdítja a
+   tábla magasságát (márpedig nem: a naplót állítja), a következő hívás kilép. */
+/* A tábla FOLYAMBELI teteje — a tapadás nélküli, valódi helye. A mérés idejére
+   kivesszük a stickyt, különben kitapadva mindig 0-t mérnénk (lásd a
+   sbLockView fölötti leírást: a régi képlet pontosan ebbe sétált bele). A
+   sticky nem vesz ki helyet a folyamból, tehát körülötte semmi nem mozdul. */
+function sbBoardFlowTop(wrap){
+  const w=wrap||$("sbWrap");if(!w)return 0;
+  const prev=w.style.position;
+  w.style.position="static";
+  const y=window.scrollY+w.getBoundingClientRect().top;
+  w.style.position=prev;
+  return Math.max(0,Math.round(y));}
+/* ---- A MÁSODIK FÉL: A GÖRGETÉS IS ELCSÚSZIK ----
+   A napló újramérése önmagában KEVÉS volt. Amikor a tábla megnő, a böngésző
+   görgetés-horgonya lejjebb tolja a lapot, hogy a tartalom a helyén maradjon —
+   a napló viszont közvetlenül utána ugyanannyival ÖSSZEMEGY, és a lap ott marad
+   túlgörgetve. A tábla ilyenkor kitapadva ül a képernyő tetején, és rátakar a
+   naplóra: mérve 68 px-nyi túlgörgetés, 42 px látható átfedés — pontosan a
+   bejelentett kép.
+   Élő mérkőzés alatt a helyes állapot az, amit a kezdőrúgás beállít: a tábla a
+   SAJÁT helyén, alatta a teljes napló, görgetés nélkül. Ezért ha a tábla
+   kitapadt, visszaállunk a folyambeli helyére. Ugrás nélkül (nem animálva): ez
+   nem navigáció, hanem az elrendezés helyretétele — animálva két gyors gólnál
+   egymásra futnának a görgetések. */
+function sbKeepBoardInPlace(){
+  if(!(SB.on&&SB.live))return;                      /* csak ÉLŐ meccs alatt */
+  if(document.body&&document.body.classList.contains("stadium"))return;
+  const wrap=$("sbWrap");
+  if(!wrap||wrap.classList.contains("hide"))return;
+  const top=sbBoardFlowTop(wrap);
+  if(window.scrollY<=top+1)return;                  /* nincs kitapadás */
+  try{window.scrollTo(0,top);}catch(e){}
+  const feed=$("ttLines");if(feed)feed.scrollTop=feed.scrollHeight;}
+let _sbWrapH=-1;
+function sbSyncFeedToBoard(){
+  const wrap=$("sbWrap");if(!wrap)return;
+  if(wrap.classList.contains("hide")){_sbWrapH=-1;return;}
+  const h=Math.round(wrap.getBoundingClientRect().height);
+  if(!(h>0)||Math.abs(h-_sbWrapH)<1)return;
+  const first=(_sbWrapH<0);
+  try{sbSizeFeed();}catch(e){}
+  /* A KEZDŐRÚGÁS SAJÁT, HÁROM ÜTEMŰ GÖRGETÉSÉT nem szabad félbevágni: az első
+     mérésnél (amikor a tábla előbújik) a sbLockView viszi a nézetet. Csak a
+     MENET KÖZBENI növekedést igazítjuk. */
+  if(!first)try{sbKeepBoardInPlace();}catch(e){}
+  /* A mérés UTÁNI magasságot jegyezzük fel, nem az előttit: a sbSizeFeed az
+     elrendezésen is igazít (sbApplyLiveLayout), tehát a tábla maga is
+     mozdulhat egy hajszálnyit. Így a következő hívás pontosan tudja, van-e még
+     valódi változás — és nem indul be egy oda-vissza kör. */
+  _sbWrapH=Math.round(wrap.getBoundingClientRect().height);}
+(function sbBoardResizeWatch(){
+  if(typeof ResizeObserver!=="function")return;
+  const start=()=>{
+    const wrap=$("sbWrap");if(!wrap)return;
+    try{new ResizeObserver(()=>{try{sbSyncFeedToBoard();}catch(e){}}).observe(wrap);}catch(e){}};
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);
+  else start();})();
 /* ---- A STADION-MÓD FELFEDEZHETŐSÉGE ----
    Egy funkció, amit CSAK a telefon elfordításával lehet megtalálni, gyakorlatilag
    nem létezik: senki nem forgat véletlenül a meccs közepén. Ezért az első
@@ -39682,11 +39779,7 @@ function sbLockView(){
      helyet a folyamból, tehát a körülötte lévő elrendezés nem mozdul —
      kizárólag a tábla saját festési pozíciója áll vissza a helyére. */
   const goTo=()=>{
-    const prevPos=wrap.style.position;
-    wrap.style.position="static";
-    const y=window.scrollY+wrap.getBoundingClientRect().top;
-    wrap.style.position=prevPos;
-    const top=Math.max(0,Math.round(y));
+    const top=sbBoardFlowTop(wrap);   /* a mérés kiemelve — lásd sbBoardFlowTop */
     try{window.scrollTo({top,behavior:"smooth"});}
     catch(e){window.scrollTo(0,top);}
     if(feed)feed.scrollTop=feed.scrollHeight;};
