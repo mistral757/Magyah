@@ -5172,7 +5172,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.32";
+const APP_VERSION="3.8.33";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -33538,8 +33538,11 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      _titleChanceThisMatch: a most lejátszott meccs bajnoki tétmeccs volt-e —
        ebből tudjuk, hogy vereség/döntetlen után jár-e az "elhalasztott ünnep".
      _wasLeader    : az előző forduló után éllovas voltál-e (a "visszavettétek a
-       vezetést" hírhez). */
-  rivals:null,seasonNews:{},titleWonSeason:null,runFinaleSeason:null,_titleChanceThisMatch:false,_wasLeader:null,
+       vezetést" hírhez).
+     _autoTitleAsk : melyik fordulóra ("szezon:idx") hangzott már el a
+       tétmérkőzés-felajánlás (autoTitleGate) — hogy a végigjátszás ne álljon
+       meg kétszer ugyanott. */
+  rivals:null,seasonNews:{},titleWonSeason:null,runFinaleSeason:null,_titleChanceThisMatch:false,_wasLeader:null,_autoTitleAsk:null,
   /* Az Infinity szint-követő liftjének kivezetése (2.6.023). Friss karrierben
      nincs mit migrálni, ezért itt eleve true — a RÉGI mentésekben hiányzik a
      mező, és az applySavedGame kifejezetten false-ra állítja, hogy lefusson. */
@@ -37506,10 +37509,11 @@ function updateMorale(){
 /* KÉT LÉPÉS: előbb felkészülés (felfedi az ellenfelet és a tétet), utána
    kezdőrúgás. Ahol a felkészülés nem értelmezett (kupa, párharc, osztályozó,
    auto mód), a gomb pontosan úgy viselkedik, ahogy eddig. */
-$("kickBtn").onclick=()=>{
+function kickoffTap(){
   if(S.playing||S.idx>=30)return;
   if(prepApplies()&&!prepDone()){prepArm();return;}
-  startRound();};
+  startRound();}
+$("kickBtn").onclick=kickoffTap;
 /* ---- A VÉGIGJÁTSZÁS MEGERŐSÍTÉST KÉR (3.7.25) ----
    A gomb a Kezdőrúgás ALATT ül, teljes szélességben, és eddig EGY koppintásra
    elindította a szezon hátralévő részét. Egy elcsúszott ujj így visszavonhatatlanul
@@ -37528,6 +37532,11 @@ $("autoBtn").onclick=()=>{
   const total=(S.fixtures&&S.fixtures.length)||30;
   const left=Math.max(0,total-(S.idx||0));
   const pyr=(typeof pyrOn==="function")&&pyrOn();
+  /* MÁR MOST TÉTMÉRKŐZÉS KÖVETKEZIK? Ilyenkor a kapu (autoTitleGate) nem áll
+     meg — azt magad indítod innen —, tehát a kérdésnek KI KELL MONDANIA, mibe
+     megy bele. Ez ugyanaz a mondat, amit a megállás is használ. */
+  let dec=false;
+  try{dec=isTitleDecider(titleSnapshot());}catch(e){}
   askConfirm({
     title:"Végigjátszod a szezont?",
     yes:`Igen, jöhet a ${left} forduló`,
@@ -37542,17 +37551,120 @@ $("autoBtn").onclick=()=>{
       +`<li>a nyári <b>felkészülési kupára</b> nem nevez;</li>`
       +(pyr?`<li>az <b>osztályozót nem te játszod</b> — szimuláció dönti el a fel- vagy kiesést;</li>`:"")
       +`</ul>`
+      +(dec?`<p style="font-size:12.5px;line-height:1.55;margin-top:9px;color:var(--gold)">`
+        +`🏆 <b>A KÖVETKEZŐ FORDULÓ BAJNOKI TÉTMÉRKŐZÉS</b> — ezen matematikailag bajnok `
+        +`lehetsz. Ha most indítod a végigjátszást, ezt a mérkőzést is a gép játssza le.</p>`:"")
       +`<p style="font-size:12px;line-height:1.55;margin-top:9px;color:var(--dim2)">`
       +`Ami lefutott, azt nem lehet visszacsinálni. A <b>Megállítás</b> gomb a `
-      +`következő forduló előtt állítja meg — a futó mérkőzés még végigmegy.</p>`,
+      +`következő forduló előtt állítja meg — a futó mérkőzés még végigmegy.`
+      +`<br>A gép <b>megáll magától</b> a következő bajnoki tétmérkőzés előtt, és felajánlja, `
+      +`hogy azt te játszd le.</p>`,
     onYes:()=>{
       /* Amíg a kérdés nyitva volt, a helyzet változhatott (egy másik úton
          elindult a szezon, vagy már fut egy mérkőzés) — az „igen" ilyenkor
          csak a jelzőt állítja, új fordulót nem indít. */
       if(S.auto)return;
+      /* EZT A FORDULÓT MAGAD ADTAD A GÉPNEK. Ha épp bajnoki tétmérkőzés
+         következik, a fenti figyelmeztetés kimondta — a kapu (autoTitleGate)
+         tehát nem áll meg rögtön az első fordulónál, mert az úgy nézne ki,
+         mintha a gomb elromlott volna. A KÖVETKEZŐ tétmérkőzés előtt megáll. */
+      S._autoTitleAsk=autoTitleKey();
       S.auto=true;
       $("autoBtn").textContent="Megállítás";
       if(!S.playing&&S.idx<30)startRound();}});};
+/* ================= A VÉGIGJÁTSZÁS MEGÁLL A TÉTMÉRKŐZÉS ELŐTT (3.8.33) =======
+   BEJELENTETT HIBA: „a szezon végigjátszása túlpörgetett a bajnokká avatáson,
+   nem kaptam meg a run értékelő képernyőt … nem került fel a listára a run
+   szint, pedig ez lett volna az eddigi legjobb."
+
+   MI TÖRTÉNT. A bajnokavatás (afterLeagueRound) auto módban is kiírja a
+   trófea-modált — a szezon viszont FUT TOVÁBB alatta: a meccs-végi lánc hatvan
+   ezredmásodperccel később már a következő fordulót indítja. A Run-záróképernyő
+   ezért auto módban ki volt zárva (`!S.auto&&runD1FinaleDue()`), hiszen az a
+   képernyő a közvetítést teszi félre és hozza vissza — egy magától futó szezon
+   alatt annak nincs értelme. A hagyományos karrier LEGFONTOSABB pillanata így
+   némán elszaladt: a felhasználó egy konfettit látott, a mérföldkövet nem.
+
+   A JAVÍTÁS KÉT RÉTEGŰ, és a felhasználó kérése az első:
+     1) MEGELŐZÉS — a végigjátszás MEGÁLL a bajnoki tétmérkőzés ELŐTT, és
+        felajánlja, hogy te indítsd el. A „tétmérkőzés" ugyanaz a fogalom, amit
+        a felkészülés-eligazítás is használ (isTitleDecider): olyan forduló,
+        amelyben matematikailag bajnok lehetsz.
+     2) HÁLÓ — ha a cím mégis a végigjátszás alatt dől el (te magad indítottad
+        innen, vagy más eredmények hozták össze), akkor a KIHIRDETÉS állítja meg
+        a gépet, hogy a záróképernyő ott, akkor megjöhessen. Lásd
+        afterLeagueRound.
+
+   MIÉRT NEM ELÉG A HÁLÓ ÖNMAGÁBAN: a bajnoki cím az a mérkőzés, amit az ember
+   MAGA akar lejátszani — nem az, amiről utólag értesül. */
+function autoStop(){
+  if(!S.auto)return false;
+  S.auto=false;
+  try{$("autoBtn").textContent="Szezon végigjátszása";}catch(e){}
+  return true;}
+/* Melyik fordulóra hangzott már el a felajánlás. A szezonszám is kell: az
+   S.idx minden idényben nulláról indul. */
+function autoTitleKey(){return `${S.seasonNumber||1}:${S.idx||0}`;}
+/* A KAPU. Igazat ad vissza, ha MEGÁLLÍTOTTA a végigjátszást — a hívó ilyenkor
+   nem indít fordulót. */
+function autoTitleGate(){
+  if(!S.auto)return false;
+  /* CSAK KARRIERBEN. A klasszikus 30-0 nem bajnoki cím körül forog (ott minden
+     forduló tétmérkőzés), és nincs mögötte se Run, se ranglista — egy megállás
+     ott csak útban lenne. */
+  if(gameMode!=="career")return false;
+  /* Kupa, osztályozó és a közös karrier párharca nem bajnoki forduló — ott a
+     titleSnapshot vagy null, vagy szándékosan hallgat (lásd ott). */
+  try{
+    if(typeof euroActive==="function"&&euroActive())return false;
+    if(typeof pyrPoActive==="function"&&pyrPoActive())return false;
+    if(typeof h2hRoomActive==="function"&&h2hRoomActive())return false;
+  }catch(e){}
+  /* És ami következik, az tényleg BAJNOKI forduló legyen — ugyanaz a feltétel,
+     amit a felkészülés-lépés is használ (prepApplies). */
+  if((S.idx||0)>=30)return false;
+  {const fx=(S.fixtures||[])[S.idx||0];
+   if(!fx||!fx.o||fx.duel)return false;}
+  /* Erre a fordulóra már megvolt a kérdés (vagy magad adtad a gépnek) —
+     másodszor nem állunk meg ugyanott, különben a gomb megnyomhatatlan lenne. */
+  if(S._autoTitleAsk===autoTitleKey())return false;
+  let snap=null;try{snap=titleSnapshot();}catch(e){}
+  if(!isTitleDecider(snap))return false;
+  S._autoTitleAsk=autoTitleKey();
+  autoStop();
+  try{saveGame();}catch(e){}
+  try{offerTitleDecider(snap);}catch(e){}
+  return true;}
+/* A FELAJÁNLÁS. Kimondja, MIÉRT álltunk meg, és mi múlik ezen a mérkőzésen —
+   a mérföldkő-sor csak ott, ahol tényleg van mérföldkő (hagyományos mód, D1). */
+function offerTitleDecider(snap){
+  const r=Math.min(30,(S.idx||0)+1);
+  let d1=false;
+  try{d1=(typeof pyrOn==="function"&&pyrOn()&&pyrMyDivId()===1);}catch(e){}
+  const opp=(snap&&snap.nextOppName)?` — ${esc(snap.nextOppName)} ellen`:"";
+  const how=(snap&&snap.state==="draw")?"egy <b>döntetlen is elég</b> hozzá"
+    :(snap&&snap.state==="win")?"egy <b>győzelem</b> elég hozzá"
+    :"a <b>győzelmed mellé más eredmények</b> is kellenek";
+  askConfirm({
+    title:"🏆 Bajnoki tétmérkőzés következik",
+    yes:"Rendben, én játszom le",
+    no:"Most még nem",
+    html:`<p style="font-size:13px;line-height:1.55">Megállítottam a végigjátszást a
+        <b>${r}. forduló</b> előtt${opp}: ezen a mérkőzésen <b>matematikailag bajnok
+        lehetsz</b> — ${how}.</p>`
+      +(d1
+        ? `<p style="font-size:12.5px;line-height:1.6;margin-top:9px">Ez a hagyományos karrier
+            <b>mérföldköve</b>: az élvonalbeli arannyal kerül fel a futásod a
+            <b>Run-ranglistára</b>, és ekkor jön a <b>Run-záróképernyő</b> is. Egy magától
+            futó szezon alatt ez a pillanat elszaladna melletted.</p>`
+        : `<p style="font-size:12.5px;line-height:1.6;margin-top:9px">A bajnokavatás a szezon
+            legnagyobb pillanata — kár lenne úgy megkapni, hogy közben már a következő
+            forduló fut.</p>`)
+      +`<p style="font-size:12px;line-height:1.55;margin-top:9px;color:var(--dim2)">
+          A végigjátszás mostantól <b>ki van kapcsolva</b>. Ha mégis a gépre bíznád ezt a
+          mérkőzést is, koppints újra a <b>Szezon végigjátszása</b> gombra — ezt a fordulót
+          akkor már nem kérdezi meg.</p>`,
+    onYes:()=>{try{kickoffTap();}catch(e){}}});}
 /* A néma skillekhez tartozó, hangulati közvetítés-sorok. Kulcs: skill-ID.
    Mindegyik a pályán lévő birtokos nevét kapja. Tisztán íz — nincs játékhatás,
    a statisztikai hatásukat máshol számoljuk. */
@@ -41321,6 +41433,11 @@ function closeAbsencePanel(){
   if(cb)cb();}
 $("absGoBtn")&&($("absGoBtn").onclick=()=>closeAbsencePanel());
 function startRound(){
+  /* ---- A VÉGIGJÁTSZÁS MEGÁLL A BAJNOKI TÉTMÉRKŐZÉS ELŐTT (3.8.33) ----
+     A kapu itt van, mert ez a forduló EGYETLEN belépési pontja — a kezdőrúgás,
+     az auto-lánc és a párharc is erre jön. Ha megállított, nem indul mérkőzés:
+     a felajánlás átveszi a szót. Auto módon kívül semmit nem csinál. */
+  if(autoTitleGate())return;
   /* ---- HIÁNYZÓK PANEL: A TE DÖNTÉSED, KI ÁLL BE ----
      A kapu itt van, mert ez a forduló EGYETLEN belépési pontja — a párharc és a
      sima bajnoki is erre jön. A panel a párharc-várakozás ELŐTT jön fel: a
@@ -53589,9 +53706,21 @@ function afterLeagueRound(fx,gf,ga){
        hogy a két ünneplés ne torlódjon egymásra. A jelző (runFinaleSeason)
        kizárja, hogy a szezonzárás másodszor is elővegye. */
     /* A záróképernyő MINDEN élvonalbeli címnél jár (nem csak az elsőnél) — a
-       runD1FinaleDue zárja ki, hogy egy idényen belül kétszer jöjjön. */
-    const _runFin=(!S.auto&&runD1FinaleDue());
-    if(_runFin)S.runFinaleSeason=sn;
+       runD1FinaleDue zárja ki, hogy egy idényen belül kétszer jöjjön.
+       AUTO MÓDBAN IS — 3.8.33. Korábban itt egy `!S.auto` állt: a végigjátszás
+       alatt a záróképernyő kimaradt, a szezon pedig futott tovább a trófea-modál
+       alatt, tehát a mérföldkő némán elszaladt (bejelentett hiba). Mostantól a
+       KIHIRDETÉS ÁLLÍTJA MEG a gépet: a cím ekkor már megvan, a hátralévő
+       fordulókban nincs mit elveszíteni, és a végigjátszás egy koppintással
+       folytatható. Ez a HÁLÓ a megelőzés (autoTitleGate) mögött — az az eset,
+       amikor a felhasználó maga adta a tétmérkőzést a gépnek, vagy a címet más
+       eredmények hozták össze. */
+    const _runFin=runD1FinaleDue();
+    if(_runFin){
+      S.runFinaleSeason=sn;
+      if(autoStop())
+        addLine(`⏸ A <b>végigjátszást megállítottam</b> a bajnokavatásnál — most jön a futásod `
+          +`záróképernyője. Utána egy koppintással folytathatod a szezont.`,"m ev");}
     showChampionScreen(`A cím a ${snap.played}. fordulóban dőlt el, ${snap.myRem} forduló volt még hátra.`,
       null,_runFin?runD1FinaleNow:null);
     /* A bajnoki cím a szezon legnagyobb sikere — a morált szezononként EGYSZER,
@@ -54663,9 +54792,14 @@ function askHubTacticConfirm(bodyHtml,onYes){
 function askConfirm(o){
   const box=$("hubTacticConfirmBody"),modal=$("hubTacticConfirmModal");
   if(!box||!modal){if(o&&o.onYes)o.onYes();return;}
-  const t=$("hubTacticConfirmTitle"),y=$("hubTacticConfirmYes");
+  const t=$("hubTacticConfirmTitle"),y=$("hubTacticConfirmYes"),n=$("hubTacticConfirmNo");
   if(t)t.textContent=o.title||"Biztosan módosítod?";
   if(y)y.textContent=o.yes||"Igen, módosítom";
+  /* A NEMET MONDÓ GOMB FELIRATA IS ÁLLÍTHATÓ. Nem minden kérdés "módosítás":
+     ahol a párbeszéd egy FELAJÁNLÁS (pl. a bajnoki tétmérkőzés kezdőrúgása), ott
+     a "Mégse" félrevezető — nincs mit visszavonni. A visszaállás mindig a
+     "Mégse", ha a hívó nem kér mást, tehát a többi párbeszéd változatlan. */
+  if(n)n.textContent=o.no||"Mégse";
   _hubTacticPending=o.onYes;
   box.innerHTML=o.html||"";
   modal.classList.remove("hide");}
@@ -65895,7 +66029,7 @@ function startNextCareerSeason(){
   /* RIVÁLISOK ÉS BAJNOKI NARRATÍVA: minden szezon tiszta lappal indul — új
      riválisok (a buildSeasonFixtures sorsolja), üres hírnapló, nem avatott
      bajnok. Az _aiSchedCache azért is dől, mert a menetrend teljesen új. */
-  S.rivals=null;S.seasonNews={};S.titleWonSeason=null;S.runFinaleSeason=null;S._titleChanceThisMatch=false;S._wasLeader=null;
+  S.rivals=null;S.seasonNews={};S.titleWonSeason=null;S.runFinaleSeason=null;S._titleChanceThisMatch=false;S._wasLeader=null;S._autoTitleAsk=null;
   _aiSchedCache=null;liveTableInvalidate();
   /* Mérföldkövek: az IDEIGLENES hatások és a kapus-szárazság a cleanSheetStreak
      mellé nullázódnak — új szezon, tiszta lap. A debutWatch, a youthMilestone és
@@ -74514,6 +74648,10 @@ function saveGame(){
            (runD1FinaleDue) — a dupla ünneplés és egy újratöltés utáni
            ismétlés ellen, ugyanaz az elv, mint a titleWonSeason-nél. */
         runFinaleSeason:S.runFinaleSeason,
+        /* melyik fordulóra hangzott már el a tétmérkőzés-felajánlás — enélkül
+           egy újratöltés a saját döntésedet felejtené el, és a végigjátszás
+           ugyanannál a fordulónál állna meg másodszor is (autoTitleGate) */
+        _autoTitleAsk:S._autoTitleAsk,
         seasonOppLevel:S.seasonOppLevel,   /* a szint, amire a menetrend épült */
         infLiftRetired:S.infLiftRetired,
         _titleChanceThisMatch:S._titleChanceThisMatch,_wasLeader:S._wasLeader,

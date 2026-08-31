@@ -1,5 +1,9 @@
 # A szezon végigjátszása megerősítést kér
 
+> **3.8.33 óta a végigjátszás magától is megáll** — a bajnoki tétmérkőzés
+> előtt, hogy azt te játszhasd le. Lásd
+> `docs/szezon-vegigjatszasa-tetmerkozes.md`.
+
 *(3.7.25. Érintett kód: `$("autoBtn").onclick`, `hubTacticConfirmModal`
 z-indexe. A meglévő, változatlan mechanika: `askConfirm`, és minden `S.auto`
 ág a motorban.)*
