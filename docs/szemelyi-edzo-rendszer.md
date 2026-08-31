@@ -40,10 +40,17 @@ edzőnek jelölhető(entry) ⟺
   && careerStats[n].matches >= 40      ← legalább ~1 szezonnyi közös múlt
 ```
 
-A 40 meccses küszöb a lényeg: **nem lehet edzőt vásárolni**. Nem veszel egy
-34 éves legendát azért, hogy másnap a stábba tedd — együtt kell töltenetek
-legalább egy szezont, hogy a klubod egyáltalán ismerje őt. Ez teszi a rendszert
-a *saját* öreg játékosaid megőrzéséről szólóvá, nem egy második transzferpiaccá.
+A 40 meccses küszöb a lényeg: **a saját játékosodból nem lehet edzőt vásárolni**.
+Nem veszel egy 34 éves legendát azért, hogy másnap a stábba tedd — együtt kell
+töltenetek legalább egy szezont, hogy a klubod egyáltalán ismerje őt. Ez teszi a
+rendszert a *saját* öreg játékosaid megőrzéséről szólóvá, nem egy második
+transzferpiaccá.
+
+> **3.8.34 óta van STÁBPIAC.** Külsős szakembereket — akik sosem játszottak
+> nálad — az átigazolási időszakokban lehet szerződtetni, a játékos-árak ~33%-áért.
+> Ez a fenti szabályt **nem oldja fel**: a saját játékosod útja a stábba
+> változatlanul a 40 közös meccsen át vezet, és a piac kínálatának szintjét is
+> épp ez a kör határozza meg. Lásd `docs/stabpiac.md`.
 
 ### 1.2 A két belépési út
 
