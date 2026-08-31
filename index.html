@@ -5159,7 +5159,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.30";
+const APP_VERSION="3.8.31";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -33188,7 +33188,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      plafonja · bondFrac a törtrész-átvitel · bondNew a beilleszkedés alatt
      állók · bondsSeeded jelzi, lefutott-e az induló elemzés · bondTrain az
      összhangépítés sávja (F6-ig mindig null). */
-  bonds:{},bondCap:{},bondFrac:{},bondNew:{},bondFast:{},bondsSeeded:false,
+  bonds:{},bondCap:{},bondFrac:{},bondNew:{},bondFast:{},bondSeen:{},bondsSeeded:false,
   bondTrain:null,bondTrainChangeUsed:false,
   /* PASSZKÉMIA (Tiki-Taka): passChem[kulcs] = {a,b,stages,need,co,gap,said} —
      a párkémiával PÁRHUZAMOS, harmadik kötésfajta. Ugyanaz az öt fázis, de
@@ -34584,6 +34584,9 @@ function bondSeedFirstSquad(){
     bondSet(names[i],names[j],
       bondSeedValue(names[i],names[j],BOND_FIRST_SCALE,BOND_FIRST_HOME,good));n++;}
   S.bondsSeeded=true;
+  /* Az ALAPÍTÓ KERET nem „érkező": a magvetés maga a beilleszkedésük.
+     Enélkül az első ensure-kör mindenkinek ablakot adna (3.8.31). */
+  {const seen=bondSeenStore();names.forEach(nm=>{seen[nm]=1;});}
   return n;}
 function bondRosterNames(){
   const out=[];
@@ -34625,15 +34628,54 @@ function bondSeededNames(){
     const p=k.split("\u00a7");
     if(p.length===2){out.add(p[0]);out.add(p[1]);}});
   return out;}
+/* ---- A MEGBÍZHATÓ JELÖLŐ (3.8.31) ----
+   A 3.8.25 azt kérdezte, van-e a játékosnak BÁRMILYEN rögzített kötése — ez
+   törékeny proxy volt. Elég egy elhasalt út, ami már írt egy kulcsot (egy
+   párkémia-ugrás, egy öltözői esemény, vagy csak pár meccs, amiben a kötései
+   nulláról épülni kezdtek), és a rendszer „réginek" látta azt, aki sosem
+   illeszkedett be. Pontosan ez történt a bejelentett esetben: a játékos már
+   5,6-os átlagon állt, tehát volt kulcsa — az ablaka viszont soha nem nyílt ki.
+
+   MOSTANTÓL EXPLICIT: S.bondSeen a nevek halmaza, akiket az összhang-rendszer
+   MÁR beengedett. Aki a keretben van és nincs benne, az érkező — akárhány
+   kulcsa van, és akármelyik úton került be. Egyszer fut le mindenkire. */
+function bondSeenStore(){return S.bondSeen||(S.bondSeen={});}
+/* ---- AKI SOSEM ILLESZKEDETT BE (a látható tünet gyógyítása) ----
+   Régi mentésben nincs bondSeen, tehát az első futásnál mindenkit „látottnak"
+   vennénk — a MÁR elromlott játékos így örökre a padlón maradna. Ez a mérés
+   szűri ki: aki nyolc meccsnél kevesebbet játszott nálad, ÉS a kötés-átlaga a
+   beilleszkedés sávjának ALJA alatt van, az bizonyosan nem ment át az ablakon.
+   Egy beállt kerettag sosem néz ki így: az ő értékei a sávból indultak. */
+function bondNeverIntegrated(nm,base){
+  try{
+    if(bondIntegrating(nm))return false;
+    const cs=(S.careerStats&&S.careerStats[nm])||null;
+    if(((cs&&cs.matches)||0)>=BOND_NEW_MATCHES)return false;
+    const others=bondRosterNames().filter(o=>o!==nm&&!bondIntegrating(o));
+    if(others.length<3)return false;
+    const avg=others.reduce((a,o)=>a+bondRaw(nm,o),0)/others.length;
+    const lo=bondNewLevels(base).lo;
+    return avg<Math.max(1,lo);
+  }catch(e){return false;}}
 function bondEnsureArrivals(){
   if(gameMode!=="career"||!S||!S.bondsSeeded)return 0;
   const names=bondRosterNames();
   if(names.length<2)return 0;
-  const have=bondSeededNames();
+  const seen=bondSeenStore();
+  const first=!Object.keys(seen).length;   /* régi mentés: most vezetjük be */
+  let base=null;
+  if(first){try{base=bondSettledBase();}catch(e){}}
+  const have=first?bondSeededNames():null;
   let n=0;
   names.forEach(nm=>{
-    if(have.has(nm)||bondIntegrating(nm))return;
-    bondStartIntegration(nm);n++;});
+    if(seen[nm])return;
+    if(bondIntegrating(nm)){seen[nm]=1;return;}
+    /* RÉGI MENTÉS ELSŐ FUTÁSA: aki a rendszerben már otthon van, azt
+       „látottnak" vesszük — csak az kap ablakot, akinek egyetlen kulcsa
+       sincs, vagy akin a mérés szerint sosem futott le a beilleszkedés. */
+    if(first&&have.has(nm)&&!bondNeverIntegrated(nm,base)){seen[nm]=1;return;}
+    bondStartIntegration(nm);
+    seen[nm]=1;n++;});
   return n;}
 /* Aki kikerül a keretből, azzal minden kötése megszűnik — a párkémiával
    azonos szabály, és ugyanabban a takarításban fut (pruneChemistry). */
@@ -34645,7 +34687,10 @@ function bondPrune(){
     Object.keys(store).forEach(k=>{
       const p=k.split("§");
       if(p.length!==2||!keep.has(p[0])||!keep.has(p[1]))delete store[k];});});
-  if(S.bondNew)Object.keys(S.bondNew).forEach(n=>{if(!keep.has(n))delete S.bondNew[n];});}
+  if(S.bondNew)Object.keys(S.bondNew).forEach(n=>{if(!keep.has(n))delete S.bondNew[n];});
+  /* Aki kikerült a keretből, a „már beengedtük" jelölőből is kikerül: ha
+     valaha visszatér, a kötései már megsemmisültek, tehát ÚJRA érkező (3.8.31). */
+  if(S.bondSeen)Object.keys(S.bondSeen).forEach(n=>{if(!keep.has(n))delete S.bondSeen[n];});}
 /* Egy elkészült (5/5) párkémia nagy, egyszeri ugrást ad. A párkémia MEGMARAD
    annak, ami volt — ez a hídja az összhang felé. */
 function bondChemComplete(pr){
@@ -49347,6 +49392,19 @@ function unlockRandomPlayer(){
   drafted.add(newP.n);
   extraRoster.push(newP);
   NAT_BY_NAME[newP.n]=newP.nat;
+  /* ---- A JUTALOM-JÁTÉKOS IS ÉRKEZŐ (3.8.31) ----
+     BEJELENTETT HIBA: „új játékost megkaptam, betettem kezdőbe, nincs
+     beilleszkedés, hanem kap azonnal egy összhang értéket."
+     Ez az az út: a „🔍 Új felfedezés" (mesterhármas-, nagy győzelem-,
+     meccsember-jutalom és a scoutolóhálózat véletlen találata). A játékos
+     egyenesen a tartalék-keretbe kerül, és SOHA nem ment át a markArrived-on
+     — tehát a beilleszkedési ablaka el sem kezdődött. Minden párja nulláról
+     indult, és pár meccs alatt 2-6 közé kúszott: pontosan a bejelentett
+     „azonnal kap egy összhang értéket".
+     A teljes markArrived itt SZÁNDÉKOSAN nem fut le (ez nem igazolás: nem
+     fizettél érte, és a kihívás-számlálókba sem való) — az összhang viszont
+     igen, ugyanúgy, ahogy a szezonvégi nyugdíj-pótlásnál. */
+  try{bondStartIntegration(newP.n);}catch(e){}
   return newP;}
 /* Bármikor elengedhetsz bárkit a HUB-ból. Ha a tartalék-keretből (extraRoster)
    engeded el, egyszerűen eltűnik onnan — nincs kockázat. Ha viszont kezdő
@@ -62454,6 +62512,10 @@ function renderHub(){
      stadion-módnak semmiképp nem szabad élnie. */
   try{document.body.classList.remove("stadium","fa-board");}catch(e){}
   try{applyHeaderIdentity();}catch(e){}   /* a HUB is friss fejléccel nyílik */
+  /* ÖSSZHANG: aki úgy került a keretbe, hogy senki nem szólt a beilleszkedésnek,
+     itt kapja meg az ablakát — hogy a keretlistán AZONNAL a helyes állapot
+     lássék, ne csak a következő meccs után (3.8.31). */
+  try{bondEnsureArrivals();}catch(e){}
   /* AUTO SZINTKÖVETÉS — a rajzolás LEGELEJÉN, hogy minden alatta következő
      kijelzés (mezőnyszint, meccs-erő-különbség, kihívás-panel) már a friss
      szintet lássa. Nyáron fut csak, és csak ha tényleg változna, tehát nem
@@ -74124,7 +74186,7 @@ function saveGame(){
         /* ÖSSZHANG: a kötés-tár és a köre. Lapos, szám-értékű objektumok,
            tehát sorosíthatók; egy 28 fős keret 378 párja néhány KB. */
         bonds:S.bonds,bondCap:S.bondCap,bondFrac:S.bondFrac,bondNew:S.bondNew,
-        bondFast:S.bondFast,bondsSeeded:S.bondsSeeded,
+        bondFast:S.bondFast,bondSeen:S.bondSeen,bondsSeeded:S.bondsSeeded,
         bondTrain:S.bondTrain,bondTrainChangeUsed:S.bondTrainChangeUsed,
         scorers:S.scorers,assists:S.assists,mvps:S.mvps,lgCS:S.lgCS,goodForm:S.goodForm,badForm:S.badForm,careerStats:S.careerStats,clubScoutSpinsUsed:S.clubScoutSpinsUsed,twEventUsed:S.twEventUsed,consecutiveTitles:S.consecutiveTitles,consecutiveBadSeasons:S.consecutiveBadSeasons,seasonSaves:S.seasonSaves,seasonCleanSheets:S.seasonCleanSheets,seasonMatches:S.seasonMatches,seasonNumber:S.seasonNumber,seasonHistory:S.seasonHistory,iconSeason:S.iconSeason,roles:S.roles,
         tactics:S.tactics,tacticPrompt:S.tacticPrompt,
@@ -74968,6 +75030,7 @@ function applySavedGame(d){
     const _d=(d&&d.S)||{};
     S.bonds=_d.bonds||{};S.bondCap=_d.bondCap||{};S.bondFrac=_d.bondFrac||{};
     S.bondNew=_d.bondNew||{};S.bondFast=_d.bondFast||{};S.bondsSeeded=!!_d.bondsSeeded;
+    S.bondSeen=_d.bondSeen||{};
     S.bondTrain=_d.bondTrain||null;S.bondTrainChangeUsed=!!_d.bondTrainChangeUsed;
     bondMigrate();
     /* A MÁR ELROMLOTT MENTÉS IS MEGGYÓGYUL: aki a hiba idején ablak nélkül
