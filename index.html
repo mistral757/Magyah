@@ -5191,7 +5191,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.36";
+const APP_VERSION="3.8.37";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -14660,7 +14660,10 @@ async function mpCupGroupSync(onReady){
   if(!_mpGroupBusy)return;
   /* az egyéni statisztikák ide is ráülnek — lásd mpCupOwnStatRows */
   const myRows={rows:mpCupMyGroupRows(),st:mpCupOwnStatRows(),bf:mpCupAiGroupsFingerprint(),
-                ff:mpCupFieldFingerprint(),v:APP_VERSION};
+                ff:mpCupFieldFingerprint(),v:APP_VERSION,
+                /* A VILÁG TENGELYEI (3.8.37): ha a torna szétcsúszik, ez mondja
+                   meg, MIÉRT — egy „a mezőny eltér" önmagában nem javítható. */
+                w:mpWorldAxes()};
   await mpReput(key,myField,node,myRows);
   if(!_mpGroupBusy)return;
   mpCupGroupTick(key,myField,oppField,onReady,myRows);}
@@ -14698,7 +14701,15 @@ async function mpCupGroupTickRun(key,myField,oppField,onReady,myRows){
     if(desync){
       const verEl=!!(mate.v&&mate.v!==APP_VERSION);
       const fieldEl=!!(mate.ff&&myRows.ff&&mate.ff!==myRows.ff);
-      const ok=verEl
+      /* A VILÁG TENGELYEI ELŐBB (3.8.37): ha ezek térnek el, minden más CSAK
+         következmény — a verzió és a mezőny-ujjlenyomat is. Ezt kell kimondani
+         először, mert egyedül ez javítható a felhasználó oldaláról. */
+      const axEl=(mate.w&&myRows.w)?mpWorldAxesDiff(myRows.w,mate.w):[];
+      const ok=axEl.length
+        ? `A két gép MÁS VILÁG-BEÁLLÍTÁSOKKAL fut: `
+          +axEl.map(d=>`${esc(d.n)} (nálad „${esc(d.a)}", nála „${esc(d.b)}")`).join(" · ")
+          +`. Ez a szétcsúszás oka — a következő szezonindításnál a házigazda beállításai mindkettőtöknél rögzülnek.`
+        : verEl
         ? `A két gép NEM ugyanazt a verziót futtatja (nálad v${APP_VERSION}, nála v${esc(String(mate.v))}) — töltsétek újra mindketten az oldalt.`
         : fieldEl
           ? `Már a mezőny is eltér a két gépen (nem csak az eredmények).`
@@ -14829,6 +14840,41 @@ function mpDiagCollect(){
       L.push("");L.push("── VEZETÉS (futó állapot)");
       L.push(teachDebugText());}
   }catch(e){L.push("teach-dump hiba: "+e.message);}
+  /* ---- A VILÁG TENGELYEI (3.8.37) ----
+     Közös karrierben ez a HÁROM szám dönti el, hogy a két gép ugyanazt a
+     világot futtatja-e. Egy „szétcsúszott a karrierünk" bejelentés így két
+     diagnosztika egymás mellé tételéből megválaszolható — a RÖGZÍTVE/HELYI
+     jelölés pedig megmondja, hogy a mentés őrzi-e őket, vagy a böngésző
+     preferenciájára esnek vissza (a 3.7 előtt indult közös karrierek baja). */
+  try{
+    if(gameMode==="career"){
+      const A=mpWorldAxes();
+      const lock=k=>k?"RÖGZÍTVE":"⚠ HELYI";
+      L.push("");L.push("── A VILÁG TENGELYEI"+(h2hRoomActive()?" (közös karrier)":""));
+      L.push(`  fejlődési tempó: ${A.tempo} (${(GAME_TEMPO[A.tempo]||{}).n||"?"} · k=${(GAME_TEMPO[A.tempo]||{}).k}) — ${lock(mpWorldTempo)}`);
+      L.push(`  sorsolás: ${A.sched} — ${lock(mpWorldSched)}`);
+      L.push(`  VB-válogatottak: ${A.wc?"benne":"kihagyva"} — ${lock(S.careerWc!=null)}`);
+      L.push(`  Rating-alap: ${A.basis}`);
+      /* AZ IKONRÁTA nem világ-tengely (csak a SAJÁT scoutolásod esélyét
+         szorozza, lásd scoutIconChance) — a világ determinizmusát nem viszi
+         szét. Közös karrierben viszont MÉLTÁNYOSSÁGI kérdés, ezért itt a
+         helye: két diagnosztika egymás mellett megmutatja, ha az egyikőtök
+         sűrűbben talál legendát. */
+      L.push(`  ikonráta (csak a saját scoutod): ${iconRatePref()} · ×${iconRateMult()}`);
+      L.push(`  világ-seed: ${(typeof worldSeed!=="undefined"&&worldSeed)||"nincs"}`);
+      /* A JÁTÉKOS-POOL a karrier INDULÁSAKOR épül a seedből ÉS a válogatott-
+         kapcsolóból. Ha ez a két szám eltér a két gépen, a pool már a start óta
+         más — azt utólag nem lehet helyrehozni, csak tudni róla. */
+      try{
+        if(careerPool){
+          const ks=Object.keys(careerPool).sort();
+          let h=0;for(let i=0;i<ks.length;i++){const k=ks[i];
+            for(let j=0;j<k.length;j++)h=(h*31+k.charCodeAt(j))>>>0;}
+          L.push(`  játékos-pool: ${ks.length} név · ujjlenyomat ${h.toString(36)}`);}
+      }catch(e){}
+      if(h2hRoomActive())
+        L.push(`  szoba: ${MP.activeRoom||"?"} · szerep: ${MP.role||"?"}`);}
+  }catch(e){L.push("világ-dump hiba: "+e.message);}
   /* IDÉNY-MÉRLEG. A `drift` az igazi tétel: ha nem nulla, valahol a két kapu
      MELLETT mozdult a büdzsé, és pontosan ennyivel. Egy „nekem nem stimmel a
      mérleg" bejelentés így egy sorból megválaszolható. */
@@ -26220,6 +26266,99 @@ function lockMpWorldSettings(){
   if(!(typeof MP!=="undefined"&&MP&&MP.active))return;
   mpWorldSched=p?((p.sched==="random")?"random":"real"):schedulePref();
   mpWorldTempo=p?(GAME_TEMPO[p.tempo]?p.tempo:"normal"):gameTempoPref();}
+/* ================= A VILÁG TENGELYEI — UTÓLAGOS RÖGZÍTÉS (3.8.37) ===========
+   BEJELENTETT HIBA: „teljesen szét volt csúszva a PvP hagyományos módú
+   karrierünk. BL kieséses szakaszban egyből kaptuk az üzenetet, hogy nem azonos
+   a seed, aztán nyári kupában sem kerültünk egybe. aztán hiába együtt voltunk a
+   d3-ban előző szezonban, nekem d1-re neki d2-re ajánlotta fel az ugrást…
+   lehet hogy az, hogy ez a közös karrier már vagy v3.7 óta fut."
+
+   A MEGÉRZÉS PONTOS VOLT, és a három tünetnek EGY gyökere van.
+
+   MI A HÁROM TENGELY. Van három beállítás, ami nem a karrieré, hanem a
+   BÖNGÉSZŐÉ (localStorage): a fejlődési tempó, a sorsolás rendje, és hogy a
+   VB-válogatottak benne vannak-e a mezőnyben. Közös karrierben mindhárom
+   VILÁG-TULAJDONSÁG: ha a két gépen más, a két világ más.
+
+   A RÖGZÍTÉS KÉSŐBB ÉRKEZETT, MINT A KARRIER. A `lockMpWorldSettings` (tempó,
+   sorsolás) és az `S.careerWc` (válogatottak) a karrier INDULÁSAKOR zárja le a
+   három tengelyt a mentésbe — de ezt a zárat a 3.7 UTÁN vezettük be. Egy
+   akkor indult közös karrier mentésében ezek a mezők NINCSENEK BENNE, tehát
+   betöltéskor mindhárom olvasó visszaesik a saját gép preferenciájára:
+
+     gameTempo()   = mpWorldTempo (null!) || gameTempoPref()   ← a TE beállításod
+     scheduleMode()= mpWorldSched (null!) || schedulePref()    ← a TE beállításod
+     wcOn()        = S.careerWc (nincs!)  ?: wcEnabled         ← a TE beállításod
+
+   MIÉRT EZ VISZ MINDENT. A tempó tizenhárom csatornán hat, köztük a
+   VILÁG FEJLŐDÉSÉN: a pyrAiRate a tempoMult()-tal szorozza a mezőny szezononkénti
+   lépését. Más tempó = a 96 klub mind más ratinggel áll a szezon végén = más
+   végtabella = MÁS FEL- ÉS KIESÉS. Innen a „nekem D1-re, neki D2-re ajánlotta az
+   ugrást": az ugrás célja mindig `pyrMyDivId()-1`, tehát az egyikőtök feljutott,
+   a másik nem. Ugyanez a szétcsúszott mezőny adja a kupa „nem azonos a seed"
+   üzenetét (a háttérmeccsek ujjlenyomata eltér) és azt is, hogy a nyári
+   sorozatban nem kerültetek egybe (más kvalifikáció).
+   A 3.8.32 ezt élesítette: ott az „Alap tempó" k-ja 1,00-ról 0,80-ra változott,
+   tehát aki azóta nem nyúlt a beállításhoz, az is MÁS szorzót futtat, mint aki
+   korábban választott magának valamit.
+
+   A JAVÍTÁS. A tengelyeket UTÓLAG is rögzítjük, a szezonindítási alkunál — az az
+   egyetlen pont, ahol a két kliens minden idényben úgyis beszél egymással. A
+   HÁZIGAZDA a szoba igazsága (ő állította be a világot), a vendég átveszi, és
+   MINDKETTŐ a mentésébe zárja. Egy 3.7-es karrier így a következő
+   szezonindításnál magától meggyógyul, és soha többé nem eshet vissza a helyi
+   preferenciára. Az eltérést KIMONDJUK: ami eddig némán szétvitte a világot,
+   annak látszania kell. */
+function mpWorldAxes(){
+  const out={};
+  try{out.tempo=(typeof gameTempo==="function")?gameTempo():"normal";}catch(e){out.tempo="normal";}
+  try{out.sched=(typeof scheduleMode==="function")?scheduleMode():"real";}catch(e){out.sched="real";}
+  try{out.wc=!!((typeof wcOn==="function")?wcOn():false);}catch(e){out.wc=false;}
+  /* A Rating-alap a POOL építésekor dől el, tehát utólag nem "állítható át" —
+     csak jelentjük, ha eltér. Ezért van a listában, de nem az átvételben. */
+  try{out.basis=(typeof careerRatingBasis!=="undefined")?careerRatingBasis:"peak";}catch(e){out.basis="peak";}
+  return out;}
+/* Melyik tengelyen tértek el? Nevesített lista — egy puszta „eltér" semmit nem
+   mondana arról, mit kell átállítani. */
+function mpWorldAxesDiff(a,b){
+  if(!a||!b)return [];
+  const out=[];
+  if(a.tempo!==b.tempo)out.push({k:"tempo",n:"fejlődési tempó",
+    a:(GAME_TEMPO[a.tempo]||{}).n||a.tempo,b:(GAME_TEMPO[b.tempo]||{}).n||b.tempo});
+  if(a.sched!==b.sched)out.push({k:"sched",n:"sorsolás rendje",
+    a:a.sched==="random"?"véletlen":"valósághű",b:b.sched==="random"?"véletlen":"valósághű"});
+  if(!!a.wc!==!!b.wc)out.push({k:"wc",n:"VB-válogatottak a mezőnyben",
+    a:a.wc?"benne":"kihagyva",b:b.wc?"benne":"kihagyva"});
+  if(a.basis!==b.basis)out.push({k:"basis",n:"Rating alapja",a:String(a.basis),b:String(b.basis)});
+  return out;}
+/* A HÁZIGAZDA TENGELYEINEK ÁTVÉTELE ÉS LEZÁRÁSA. Idempotens: ha már minden
+   egyezik és rögzítve van, semmit nem csinál és nem is beszél. */
+function mpAdoptWorldAxes(hostAxes,mateAxes){
+  if(!hostAxes||gameMode!=="career")return false;
+  const before=mpWorldAxes();
+  const wasLocked=!!(mpWorldTempo&&mpWorldSched&&S.careerWc!=null);
+  /* A KÉT ELTÉRŐ tengelyt akkor is kimondjuk, ha a rögzítés után úgyis
+     eltűnik: a felhasználónak tudnia kell, MI vitte szét a világot. */
+  const diff=mpWorldAxesDiff(before,mateAxes||hostAxes);
+  if(hostAxes.sched==="random"||hostAxes.sched==="real")mpWorldSched=hostAxes.sched;
+  if(GAME_TEMPO[hostAxes.tempo])mpWorldTempo=hostAxes.tempo;
+  if(hostAxes.wc!=null)S.careerWc=!!hostAxes.wc;
+  const after=mpWorldAxes();
+  const moved=mpWorldAxesDiff(before,after);
+  if(!wasLocked&&(moved.length||diff.length)){
+    addLine(`🔒 <b>A közös világ beállításai rögzültek.</b> Ez a karrier még a rögzítés bevezetése `
+      +`előtt indult, ezért mindkét gép a SAJÁT beállításait futtatta — a házigazdáé mostantól `
+      +`mindkettőtöknél érvényes, és a mentésbe is bekerül.`,"m rc");
+    if(diff.length)
+      addLine(`⚠️ <b>Eddig ezen tértetek el:</b> `
+        +diff.map(d=>`${esc(d.n)} (nálad „${esc(d.a)}", nála „${esc(d.b)}")`).join(" · ")
+        +`. Ez magyarázza a szétcsúszott mezőnyt, a kupa-eltérést és az eltérő fel-/kiesést.`,"m rc");
+    if(moved.length)
+      addLine(`✦ Nálad ez változott: `
+        +moved.map(d=>`${esc(d.n)}: „${esc(d.a)}" → <b>„${esc(d.b)}"</b>`).join(" · ")
+        +`.`,"m life");}
+  try{saveGame();}catch(e){}
+  return !!(moved.length||diff.length);}
 /* A HUB-beli sorsolás-sor újrarajzolója. A HUB-panel állítja be, amikor
    megnyílik; a kezdőképernyő választója innen frissíti, ha épp nyitva van.
    Deklarálva, nem implicit globálisként — így nem sérül, ha egyszer strict
@@ -43001,6 +43140,10 @@ async function mpStartExchange(onReady){
      nélkül tudja meg mindkettő, kivel indul neki az idénynek. */
   const myBidRec={lvl:(bid&&bid.value!=null)?bid.value:null,str:Math.round(teamStrength()),
     card:mpTeamCard(),
+    /* A VILÁG HÁROM TENGELYE utazik a javaslat mellett (3.8.37): ez az egyetlen
+       pont, ahol a két kliens minden idényben úgyis beszél egymással, tehát új
+       hálózati csatorna nélkül itt zárható le a világ. Lásd mpWorldAxes. */
+    w:mpWorldAxes(),
     season:mpUpcomingSeason(),at:Date.now()};
   if(!mpStartRecOk(node&&node[myField]))await mpReput(key,myField,null,myBidRec);
   if(!_mpStartBusy)return;
@@ -43039,6 +43182,11 @@ async function mpStartTick(key,myField,oppField,onReady,myBidRec){
   if(node&&node.final&&mpStartRecOk(node.final)){
     const v=node.final.v;
     if(typeof v==="number"){
+      /* A KÉNYSZERINDÍTÁS ÁGÁN is a világ megy előbb (3.8.37). Itt nincs két
+         rekord, tehát a „házigazda dönt" szabályt nem lehet alkalmazni — a
+         tekintély ugyanaz, mint a szintnél: AKI ELINDULT. A cél nem az, hogy a
+         házigazdának legyen igaza, hanem hogy a két világ egy legyen. */
+      try{if(node.final.w)mpAdoptWorldAxes(node.final.w,null);}catch(e){}
       const before=oppTargetRating;
       applyOppLevel(v);
       S.consecutiveTitles=0;S.consecutiveBadSeasons=0;
@@ -43048,6 +43196,16 @@ async function mpStartTick(key,myField,oppField,onReady,myBidRec){
       try{saveGame();}catch(e){}
       onReady();return;}}
   if(mine&&mate){
+    /* ---- ELŐBB A VILÁG, CSAK UTÁNA A MEZŐNY (3.8.37) ----
+       A szint alkuja a csapaterőkből dolgozik, a világ tengelyei viszont MINDENT
+       befolyásolnak — a rögzítésnek tehát meg kell előznie. A házigazda a szoba
+       igazsága: mindkét kliens az Ő rekordjából veszi át a hármat, tehát a
+       számítás után a két világ ugyanaz. */
+    try{
+      const hostRec=(myField==="host")?mine:mate;
+      const mateRec=(myField==="host")?mate:mine;
+      if(hostRec&&hostRec.w)mpAdoptWorldAxes(hostRec.w,(mateRec&&mateRec.w)||null);
+    }catch(e){}
     /* MINDKÉT KLIENS UGYANEZT SZÁMOLJA ki ugyanabból a két rekordból — ezért
        nincs szükség "döntőbíró" oldalra, és nem is csúszhat szét. */
     const r=mpResolveLevel(mine,mate);
@@ -43091,7 +43249,7 @@ async function mpStartTick(key,myField,oppField,onReady,myBidRec){
       ob.disabled=true;
       const r=mpResolveLevel(mine||{lvl:(bid&&bid.value!=null)?bid.value:null,str:Math.round(teamStrength())},null);
       try{await mpBk().h2hPut(MP.activeRoom,key,"final",
-        {v:r.v,season:mpUpcomingSeason(),at:Date.now()});}catch(e){}
+        {v:r.v,w:mpWorldAxes(),season:mpUpcomingSeason(),at:Date.now()});}catch(e){}
       const before=oppTargetRating;
       applyOppLevel(r.v);
       S.consecutiveTitles=0;S.consecutiveBadSeasons=0;
