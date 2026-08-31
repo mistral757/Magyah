@@ -1365,6 +1365,75 @@ amiben egy régi kerettag így nézne ki.
 
 ---
 
+## 10n. Utóirat: a jutalom-játékos (3.8.31)
+
+**BEJELENTETT HIBA, a 3.8.25 UTÁN:** *„megmaradt az összhang bug. Új játékost
+megkaptam, betettem kezdőbe, nincs beilleszkedés, hanem kap azonnal egy
+összhang értéket."* (A képen: `összhang: 5,6 · Idegenek`.)
+
+### Két külön dolgot rontottam el
+
+**1. Volt még egy érkezési út, amiről nem szólt senki.**
+
+```js
+function unlockRandomPlayer(){
+  …
+  drafted.add(newP.n);
+  extraRoster.push(newP);
+  NAT_BY_NAME[newP.n]=newP.nat;
+  return newP;}          ← se markArrived, se bondStartIntegration
+```
+
+Ez a **„🔍 Új felfedezés"** út: a mesterhármas-, nagy győzelem- és
+meccsember-jutalom, meg a scoutolóhálózat véletlen találata — pontosan az
+„új játékost **megkaptam**". A 3.8.25 a szezonvégi nyugdíj-pótlást javította;
+ez a második ilyen út volt, és ugyanúgy kimaradt.
+
+**2. A 3.8.25 feltétele törékeny proxy volt.**
+
+Az öngyógyítás azt kérdezte, van-e a játékosnak **bármilyen rögzített kötése**.
+Elég egy pár meccs, amiben a kötései nulláról épülni kezdtek — és a rendszer
+„réginek" látja azt, aki sosem illeszkedett be. A bejelentett játékos már
+**5,6-os átlagon** állt: volt kulcsa, tehát az öngyógyítás átlépett rajta.
+
+### A javítás
+
+**A gyökér:** a jutalom-játékos is érkező (`bondStartIntegration`). A teljes
+`markArrived` szándékosan nem fut le — ez nem igazolás: nem fizettél érte, és a
+kihívás-számlálókba sem való. Ugyanaz a döntés, mint a nyugdíj-pótlásnál.
+
+**A feltétel:** a proxy helyett **explicit jelölő**. Az `S.bondSeen` azoknak a
+neveknek a halmaza, akiket az összhang-rendszer **már beengedett**. Aki a
+keretben van és nincs benne, az érkező — akárhány kulcsa van, és akármelyik
+úton került be. Aki kikerül a keretből, a jelölőből is kikerül: ha valaha
+visszatér, a kötései már megsemmisültek, tehát **újra** érkező.
+
+**A már elromlott mentés:** régi mentésben nincs `bondSeen`, tehát az első
+futásnál mindenkit „látottnak" vennénk — a már megsérült játékos így örökre a
+padlón maradna. Egy mérés szűri ki (`bondNeverIntegrated`): aki **nyolc
+meccsnél kevesebbet** játszott nálad, **és** a kötés-átlaga a beilleszkedés
+sávjának **alja alatt** van, az bizonyosan nem ment át az ablakon. Egy beállt
+kerettag sosem néz ki így — az ő értékei a sávból indultak.
+
+**És a HUB rajzolása is gyógyít**, hogy a keretlistán azonnal a helyes állapot
+lássék, ne csak a következő meccs után.
+
+### Mérve
+
+60 meccsen érlelt keret, a jutalom-út valódi lépéseivel:
+
+| eset | belépéskor | 2. meccs | 6. meccs | 8. meccs |
+|---|--:|--:|--:|--:|
+| **a hiba** (ablak nélkül) | 0 | **1,6** | **5,8** | — |
+| javítva (a jutalom-játékos érkező) | 48 ideigl. | 2/8, 48 | — | átlag **47,3** |
+| **régi, már elromlott mentés** | 6,4 | — | — | — |
+| …a gyógyító kör után | 48 ideigl. | — | — | átlag **47,5** |
+| beállt kerettag (nem téveszthetünk) | 59,3 | — | — | 59,3 — **ablakot nem kap** |
+
+Az első sor a bejelentés: hat meccs után **5,8** — a képernyőképen 5,6.
+
+---
+
 ## 11. Ami még hátravan
 
 **Semmi — a rendszer kész.** Ami a tervből tudatosan kimaradt: az
