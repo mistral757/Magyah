@@ -1,6 +1,6 @@
 # KÖZÖS KARRIER — A SZEZONZÁRÁS
 
-**Állapot:** ✅ megvalósítva · **Verzió:** 3.4.01 – 3.7.32
+**Állapot:** ✅ megvalósítva · **Verzió:** 3.4.01 – 3.8.35
 
 Ez a dokumentum a közös (két menedzseres) karrier szezonzárását írja le: hol
 állnak az **ellenőrző kapuk**, mit csinál a **hangolás**, és hogyan megy a két
@@ -581,3 +581,93 @@ egy **befagyott, mozdulatlan kép mögött** játszódott le: a cserék, a kiál
 mostantól a futó mérkőzésre (`S.playing`) is visszakapcsol a saját pályára —
 ugyanúgy, ahogy a kapitányválasztásra és a játékos-lerakásra már eddig is.
 
+
+---
+
+## 6. A KUPA UTÁNI KAPU BERAGADT GOMBJA (3.8.35)
+
+**Bejelentett hiba:** *„kupasorozatok végén be szokott csúszni egy ilyen záró
+képernyő hiba. itt beszürkül a gomb és csak oldalfrissítéssel oldható meg."*
+
+A **🤝 Folytatjuk — hangolt kerettel** gomb koppintásra letiltódott, és utána
+semmi nem történt. A döntés valójában **rögzült** (a mentésben is) — ezért
+hozta helyre az oldalfrissítés: a friss rajzolás már a *„Elküldve: folytatjuk
+— várunk a társad válaszára"* állapotot mutatta.
+
+### A gomb kezelője
+
+```js
+const set=async(choice,btn)=>{
+  if(btn)btn.disabled=true;      // ← letiltás ELŐRE
+  await mpSendDecision(choice);  // ← ha ez nem tér vissza…
+  mpVerdictRefresh();            // ← …ez sosem fut le
+  mpDecisionLoop();};
+```
+
+A letiltás **feltétel nélkül** megtörtént, a visszaengedést viszont kizárólag
+az újrarajzolás hozhatta. Három úton maradhatott el:
+
+### a) A hiányzó kontextus — ez volt a fő ok
+
+```js
+function mpVerdictRefresh(){
+  const el=$("mpVerdictSec");
+  if(!el||!_mpVerdictCtx)return;   // ← néma visszalépés
+  …}
+```
+
+A `_mpVerdictCtx` **egyetlen** helyen íródott: a bajnoki verdikt-képernyőn
+(`finish()`). A **kupa utáni kapu** (`mpShowCupGate`) és a HUB-doboz
+(`renderHubMpDuel`) ugyanezt a szekciót rajzolja, de a kontextust nem
+állította — és a változó **nem a mentés része**.
+
+Aki tehát a bajnoki verdikt óta újratöltött, annál a kontextus `null` volt. A
+kupasorozat hosszú, a két kapu között órák-napok telhetnek: **ez a tipikus
+eset**, nem a kivétel. Ezért „szokott becsúszni" épp a kupasorozatok végén.
+
+**A javítás:** a szekció a saját rajzolásakor jegyzi fel, amiből épült —
+`mpVerdictSection` végén, egy sorban. Így minden hívó, a jövőbeliek is, magától
+helyes marad; a `finish()` külön értékadása megszűnt.
+
+### b) Az elakadt hálózati írás
+
+A `mpSendDecision` a döntést **helyben azonnal** rögzíti és menti, csak utána ír
+a szobába. A Firebase `set` viszont offline vagy akadozó vonalon **nem oldódik
+fel** (az SDK sorba állítja az írást) — az `await` tehát örökre ott állt.
+
+Mostantól a küldés **6 másodperces versenyfutás**: utána a felület továbbmegy,
+az írás a háttérben magától befut. Nem veszik el semmi — a társ válaszát amúgy
+is a lekérdező kör (`mpDecisionLoop`) hozza meg.
+
+### c) Kivétel bárhol a láncban
+
+A kezelő `async` nyíl volt, `try` nélkül: egy kivétel néma elutasított
+ígéretté vált, és a gomb ott maradt. Mostantól `try/finally` fogja körül —
+a `finally` **vagy** újrarajzol, **vagy** visszaadja a gombot
+(`mpDecButtonsEnable`).
+
+Ugyanezt kapta a **Meggondoltam magam** gomb is.
+
+### Az önvédelmi ágak
+
+A `mpVerdictRefresh` mostantól igazat/hamisat ad vissza (megtörtént-e), és
+három zsákutcát zár le: hiányzó kontextus (a helyezéseket a `mpDuelRanks`
+pótolja), üres szekció (nem töröljük a felületet, mert a törlés a gombokat is
+elvinné), és a kötés kivétele (nem viheti magával a hívó `finally` ágát).
+
+### Tesztelés
+
+Playwright, valódi karrieren, szintetikus közös szobával — a kupa utáni kapu
+úgy nyílik meg, hogy a bajnoki verdikt-képernyő **abban a lapbetöltésben nem
+futott le** (pontosan a bejelentett helyzet). Öt eset, mindegyik a **jelenlegi
+és a javítás előtti** kódon is lefuttatva:
+
+| eset | 3.8.34 | 3.8.35 |
+|---|---|---|
+| a hálózat rendben van | ✗ beragadt szürke gomb | ✓ „Elküldve — várunk a társadra" |
+| a hálózati írás **kivételt dob** | ✗ beragadt szürke gomb | ✓ ugyanaz |
+| a hálózati írás **sosem oldódik fel** | ✗ beragadt szürke gomb | ✓ 6 mp után továbbenged |
+| a társ már igent mondott | — | ✓ hangolás lefut, „Indulhat a következő szezon", a továbblépő gomb megjelenik |
+| **Befejezzük itt** | — | ✓ végső összesítő, a továbblépő gomb megjelenik |
+
+Egyetlen konzol-hiba sem keletkezett. `tools/check.sh` zöld.

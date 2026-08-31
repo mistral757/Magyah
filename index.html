@@ -5181,7 +5181,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.34";
+const APP_VERSION="3.8.35";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -43099,6 +43099,22 @@ function mpVerdictSection(yourRank,finalTeams){
       vtxt=`⚔ <b>Döntetlen közelben:</b> a két keret között ${g.toFixed(1)} OVR a különbség — a párharc eldöntéséhez <b>${MP_DUEL_WIN_GAP} OVR fölény ÉS jobb bajnoki helyezés</b> kell.`;
     box+=`<div class="vsVerdict">${vtxt}</div>`;}
   box+=mpDecisionBox();
+  /* ---- A SZEKCIÓ MAGA JEGYZI FEL, MIBŐL ÉPÜLT (3.8.35) ----
+     BEJELENTETT HIBA: „kupasorozatok végén be szokott csúszni egy ilyen záró
+     képernyő hiba: beszürkül a gomb, és csak oldalfrissítéssel oldható meg."
+     AZ EGYIK OK ITT VOLT. Az újrarajzoláshoz kell egy kontextus (_mpVerdictCtx),
+     és azt EGYETLEN helyen állítottuk be: a bajnoki verdikt-képernyőn
+     (finish()). A KUPA UTÁNI kapu (mpShowCupGate) és a HUB-doboz
+     (renderHubMpDuel) ugyanezt a szekciót rajzolja, de a kontextust nem
+     állította — és a változó nem a mentés része. Aki tehát a bajnoki verdikt óta
+     újratöltött (a kupasorozat hosszú: ez a tipikus eset), annál a kontextus
+     null volt, a mpVerdictRefresh némán visszalépett, és a MÁR LETILTOTT gomb
+     ott maradt szürkén. Az oldalfrissítés azért segített, mert a döntés helyben
+     addigra rég elmentődött — a friss rajzolás már a "várunk a társadra"
+     állapotot mutatta.
+     MOSTANTÓL a szekció a saját rajzolásakor teszi el, amiből épült. Így minden
+     hívó — a mostaniak és a jövőbeliek is — magától helyes marad. */
+  _mpVerdictCtx={rank:yourRank,teams:finalTeams||null};
   /* A FEJLÉC MONDJA MEG, MELYIK KAPUNÁL ÁLLTOK. Két azonos kinézetű doboz egy
      idényen belül különben megkülönböztethetetlen volna. */
   const hd=mpHasCupGate()?"A párharc mérlege — a kupa után":"A párharc mérlege";
@@ -43226,11 +43242,34 @@ function renderHubMpDuel(){
     +mpVerdictSection(r?r.mine:0,null);
   box.classList.remove("hide");
   try{mpBindVerdict();}catch(e){}}
+/* Újrarajzolja a párharc-szekciót a helyén. IGAZAT ad vissza, ha tényleg
+   megtörtént — a hívó ebből tudja, hogy a gombok friss, engedélyezett
+   állapotban vannak. Hamis esetén a hívónak magának kell visszaadnia a gombot.
+
+   HÁROM ÖNVÉDELMI ÁG (3.8.35), mind egy-egy néma zsákutca volt:
+     · nincs kontextus → már nem lépünk vissza: a mpVerdictSection a
+       mpDuelRanks-ból pótolja a helyezéseket, tehát a nulla is használható
+       kiindulás (a régi mentések és a jövőbeli hívók miatt marad a háló);
+     · a szekció ÜRESET adna (a társ zárása közben eltűnt) → nem töröljük a
+       felületet, mert a törlés a gombokat is elvinné, kiút nélkül;
+     · a kötés kivétele → nem viheti magával a hívó `finally` ágát. */
 function mpVerdictRefresh(){
   const el=$("mpVerdictSec");
-  if(!el||!_mpVerdictCtx)return;
-  el.outerHTML=mpVerdictSection(_mpVerdictCtx.rank,_mpVerdictCtx.teams);
-  mpBindVerdict();}
+  if(!el)return false;
+  const ctx=_mpVerdictCtx||{rank:0,teams:null};
+  let html="";
+  try{html=mpVerdictSection(ctx.rank,ctx.teams);}catch(e){html="";}
+  if(!html)return false;
+  el.outerHTML=html;
+  try{mpBindVerdict();}catch(e){}
+  return true;}
+/* A döntés-gombok visszaengedése — a legutolsó védőháló. Ha az újrarajzolás
+   bármiért nem futott le, a felhasználó akkor se maradhasson egy letiltott
+   gombbal szemben: a döntés helyben már elmentődött, tehát az újbóli koppintás
+   a legrosszabb esetben is ugyanazt küldi el újra. */
+function mpDecButtonsEnable(){
+  ["mpDecContinue","mpDecStop","mpDecUndo"].forEach(id=>{
+    const b=$(id);if(b)b.disabled=false;});}
 /* A HUB (és vele a következő szezon) csak KÖLCSÖNÖS igen után nyílik: a
    folytatás közös döntés, nem lehet egyoldalúan továbblépni.
    A KUPA UTÁNI KAPU KIVÉTEL: ott a gomb nem a következő szezonba visz, hanem a
@@ -43243,25 +43282,48 @@ function mpVerdictGateHub(){
   const go=(mpMyDecision(k)==="continue"&&mpMateDecision(k)==="continue")
     ||(k==="cup"&&(mpMyDecision(k)==="stop"||mpMateDecision(k)==="stop"||mpRunStopped()));
   $("hubGoBtn").classList.toggle("hide",!go);}
+/* ---- A HÁLÓZAT NEM TARTHATJA FOGVA A FELÜLETET (3.8.35) ----
+   A MÁSIK OK, amiért a gomb szürkén ragadhatott. A döntés HELYBEN azonnal
+   rögzül és mentődik (mpSendDecision első fele), a hálózati írás csak ezután
+   jön — a Firebase `set` viszont offline vagy akadozó vonalon akár VÉGTELENIG
+   sem oldódik fel (a SDK sorba állítja az írást). A gomb addig letiltva állt,
+   és mivel a `await` sosem tért vissza, az újrarajzolás sem futott le.
+   Mostantól legfeljebb ennyit várunk rá: utána a felület továbbmegy, az írás
+   pedig a háttérben magától befut. Nem veszik el semmi — a társ válaszát
+   amúgy is a lekérdező kör hozza meg. */
+const MP_DEC_SEND_MS=6000;
+function mpSendDecisionSoon(choice,kind){
+  return Promise.race([
+    Promise.resolve().then(()=>mpSendDecision(choice,kind)).catch(()=>{}),
+    new Promise(r=>setTimeout(r,MP_DEC_SEND_MS))]);}
 function mpBindVerdict(){
   if(!h2hRoomActive())return;
   mpVerdictGateHub();
+  /* A `finally` a lényeg: bármi történjék a küldés közben (kivétel, elakadt
+     hálózat, hiányzó szekció), a felület VAGY újrarajzolódik, VAGY a gomb
+     visszakapja magát. Néma, letiltott gomb nem maradhat a képernyőn. */
   const set=async(choice,btn)=>{
     if(btn)btn.disabled=true;
-    await mpSendDecision(choice);
-    mpVerdictRefresh();
-    mpDecisionLoop();};
+    try{await mpSendDecisionSoon(choice);}
+    catch(e){}
+    finally{
+      if(!mpVerdictRefresh())mpDecButtonsEnable();
+      try{mpDecisionLoop();}catch(e){}}};
   const c=$("mpDecContinue"),s=$("mpDecStop"),u=$("mpDecUndo");
   if(c)c.onclick=()=>set("continue",c);
   if(s)s.onclick=()=>set("stop",s);
   if(u)u.onclick=async()=>{
     u.disabled=true;
-    const k=mpGateKind();
-    const d=mpDecStateOf(k);
-    if(d)d.mine=null;
-    try{saveGame();}catch(e){}
-    try{await mpBk().h2hPut(MP.activeRoom,mpDecisionKey(k),MP.role==="host"?"host":"guest",null);}catch(e){}
-    mpVerdictRefresh();};
+    try{
+      const k=mpGateKind();
+      const d=mpDecStateOf(k);
+      if(d)d.mine=null;
+      try{saveGame();}catch(e){}
+      await Promise.race([
+        mpBk().h2hPut(MP.activeRoom,mpDecisionKey(k),MP.role==="host"?"host":"guest",null).catch(()=>{}),
+        new Promise(r=>setTimeout(r,MP_DEC_SEND_MS))]);
+    }catch(e){}
+    finally{if(!mpVerdictRefresh())mpDecButtonsEnable();}};
   /* ha már döntöttem, de a társ még nem, figyeljük — időkorlát nélkül */
   if(mpMyDecision()&&!mpMateDecision())mpDecisionLoop();}
 function mpDecisionLoop(){
@@ -54762,7 +54824,9 @@ function finish(){
   /* F6: a párharc mérlege a szezonzárás ELSŐ szekciója — a közös karrierben ez
      a tét, nem a helyezés. */
   if(gameMode==="career"&&h2hRoomActive()){
-    _mpVerdictCtx={rank:yourRank,teams:finalTeams};
+    /* A kontextust MÁR NEM ITT tesszük el: a mpVerdictSection maga jegyzi fel,
+       amiből épült — így a kupa utáni kapu és a HUB-doboz sem maradhat ki
+       belőle (3.8.35, lásd ott). */
     st+=mpVerdictSection(yourRank,finalTeams);}
   /* EURÓPAI KVALIFIKÁCIÓ — a helyezés jutalma MÉG EBBEN a szezonzárásban.
      A szöveg KÖZÖS karrierben is a valódi kvalifikációt mondja (a régi "nincs
