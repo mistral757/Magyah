@@ -4,7 +4,10 @@
 `matchLambdas` / `h2hSimulate`, `h2hWireSnapshot`.
 3.7.42 — az AKTUÁLIS csapaterő: `MATCH_XI`, `liveXI`, `teamStrengthNow`,
 `teamStrengthNote`, `updateStrengthBar`, a `#teamOVRNote` és a bekötések a
-`playMatch` kezdőrúgás-, vödör- és lefújás-pontjain. Lásd a 7. szakaszt.)*
+`playMatch` kezdőrúgás-, vödör- és lefújás-pontjain. Lásd a 7. szakaszt.
+3.8.23 — a meccs-erő a sávon: `#strengthWrap`, `#teamMatchWrap`,
+`#teamMatchOVR`, `#teamMatchDelta`, `hiddenMatchBonus`, `GLOSSARY.meccsero`.
+Lásd a 8. szakaszt.)*
 
 Ez a dokumentum egy konkrét bejelentésre született: **„magasabb nyers erővel
 kaptam ki 6-1-re otthon a párharcon."** A vizsgálat három dolgot talált —
@@ -19,7 +22,7 @@ A „csapaterő" a kódban **három különböző mennyiséget** jelent, és a h
 |---|---|---|
 | `teamOVRbase()` | `játékos.ovr × illeszkedés` — a **nyers csontváz** | büdzsé, generálás, „nagy skalp" könyvelés |
 | `teamStrength()` | `posEffectiveRating(poszt) + skill-rating-bónuszok` — **a motor képlete** | a felállásképernyő `#teamOVR`-je, a HUB, a kupa |
-| `MS.ovr` (`buildMatchSnapshot`) | a fenti **plusz** morál, kapitány, edzők, aura, csapategyensúly, stílus-bónusz, lendület, forma-dobás | sehol — ez a szimuláció belső száma |
+| `MS.ovr` (`buildMatchSnapshot`) | a fenti **plusz** morál, kapitány, edzők, aura, csapategyensúly, stílus-bónusz, lendület, forma-dobás | **3.8.23 óta a fejlécsávon is** (⚡ meccs-erő), a piramis-panelen, és belül a szimuláció |
 
 A különbség nem kozmetikai. `teamOVRbase()` a **posztra illeszkedést** egyetlen
 durva szorzóval intézi (1 vagy 0,93), miközben a motor az
@@ -291,3 +294,70 @@ csapat **tartós** erejét mutatja, nem a mai kockadobást.
 4. **A taktika-illeszkedést.** A `tacticEffect` a λ-ban ül, nem a csapaterőben:
    −? … +2,7 Rating-ekvivalens, és a fejlécen csak a SZINT látszik, az
    illeszkedés nem.
+
+---
+
+## 8. A meccs-erő a fejlécsávon (3.8.23)
+
+**BEJELENTETT KÉRÉS:** *„A meccs erő jelenleg csak itt van kijelezve szerintem,
+pedig egy elég fontos stat. szerintem ott lehetne közvetlenül a nyers csapaterő
+mellett mindig, és kéne magyarázat, hogy melyik mit jelent a konkrét meccsek
+szimulációjában (persze az nem kell mindenhol ott legyen, csak egy látható
+helyen)."*
+
+Igaz volt: a meccs-erő eddig **egyetlen helyen** látszott, a piramis-panel
+szintsorában — pont ott, ahová a játékos ritkán néz, és pont akkor nem, amikor
+a keretet állítja össze. A szimuláció viszont **kizárólag** ezt a számot
+használja; a fejlécen kiírt csapaterő csak az alapja.
+
+### Mi látszik
+
+A `#teamBar` mostantól két számot visz egymás mellett:
+
+```
+Csapaterő: 112,0 · ⚡ meccs-erő 115,7 (+3,7)
+```
+
+* a **bal** szám a régi `teamStrengthNow()` — a pályán lévő tizenegy értéke, a
+  `#teamOVRNote` jelöléseivel együtt (`10 emberrel`, `1 kényszercserével`);
+* a **jobb** szám ugyanannak a tizenegynek a **meccs-ereje**:
+  `teamStrengthNow() + hiddenMatchBonus()`. Szándékosan nem a
+  `teamMatchStrength()` (a *betervezett* XI), hogy a sáv két száma mindig
+  ugyanarról a tizenegyről szóljon — meccs közben, kiállítás után is. (A
+  rejtett tag java része nem is a tizenegytől függ: morál, edző, taktika,
+  összhang, lendület. Az aura- és védekező skillek a betervezett kerettel
+  számolnak — meccs közben tized-nagyságrendű eltérés, cserébe a szám pontosan
+  az, amit a szimuláció és a nehézség-tanácsadó is lát.);
+* zárójelben a **különbség**, előjeles színnel (zöld / piros). Ez maga a
+  „menedzsment-hozzáadott érték": morál, edző, kapitány, aura, taktika,
+  összhang, lendület.
+
+**Mikor bújik el:** ha `|hiddenMatchBonus()| < 0,05`, a blokk eltűnik — klasszik
+módban a rejtett tagok mind nullák, ott a második szám csak zaj volna. A
+számokat eltakart állapotban (`revealNums=false`) sem írjuk ki.
+
+**Telefonon** a `#teamBar` `flex-wrap:wrap` lett `2px 10px` réssel: ha a két
+szám nem fér ki, tördel, nem tolja szét a fejlécet.
+
+### A magyarázat
+
+A sáv egésze (`#strengthWrap`) kattintható, a végén egy halvány **ⓘ**-vel;
+a `GLOSSARY.meccsero` szócikket nyitja. Egy helyen van, ahogy a kérés kérte, de
+onnan minden képernyőről elérhető (a glosszárium-modál 3.7-ben a `body` alá
+került). A szócikk három dolgot mond el:
+
+1. **mit tartalmaz a csapaterő** — poszt-illeszkedés, kártyaszintek,
+   Rating-skillek, −2,5 emberhátrány; és hogy a **piac, a bérek és a büdzsé**
+   ezt látja;
+2. **mit tesz hozzá a meccs-erő** — morál, edző, kapitányrutin, aura-skillek,
+   taktika a gyakorlottságával, összhang, lendület, kihívás- és
+   esemény-módosítók, a védekező skillek **fél súllyal** (mert azok csak a
+   kapott gólok oldalán hatnak); és mi marad ki: a napi ±3-as forma-dobás, a
+   haragok, a fegyelmi figyelmeztetés;
+3. **mit csinál ezzel a szimuláció** —
+   `diff = saját meccs-erő − ellenfélé + pálya (+1,2 / −0,4)`, a gólvárakozás
+   `1,3 × e^(0,09 × diff)`, az ellenfélé a `−diff`-fel; azaz **pontonként
+   ~+9% / −9%** gólvárakozás, padló 0,15, plafon 4,5, kiállítás −2,5.
+
+Így a játékos a saját fejlécén látja, hogy a +3,7 nem dísz: az a
+`e^(0,09·3,7) ≈ 1,40`-es szorzó a saját góljain, és `0,71` az ellenfélén.
