@@ -343,15 +343,27 @@ viszont csak a 42%-a. Enélkül a „félig kihúzom" mindig szigorúan rosszabb
 mint a „kihúzom vagy nem" — vagyis a csúszka valójában kétállású kapcsoló lenne
 tíz fokozat álruhájában. Így viszont a **mértéktartás önálló stratégia**.
 
-### 4.4 A hangsúly-keret — miért nem lehet mind a hármat kihúzni
+### 4.4 A keret — hány csúszkához nyúlhatsz
 
-Három csúszka × két vég × 100% egy „mindenből a legtöbbet" gomb volna. A korlát:
+**A TESZT-KÖR SZABÁLYA (a felhasználó döntése):**
 
-> **A három csúszka kihúzásának ÖSSZEGE legfeljebb 150%.**
+> *„egyelőre a csúszkák, amíg teszteljük a működésüket, legyenek úgy, hogy mind
+> az 5 be van építve, és egyszerre 3-nál nyúlhatsz bele, 2-t 0-n kell hagyj."*
 
-Kihúzhatod az egyiket teljesen és a másikat félig; vagy mind a hármat 50%-ra.
-Ettől lesz *hangsúly*: átcsoportosítás, nem gyarapítás. A panel egy kis mérőt
-mutat — `hangsúly 120 / 150` —, és a csúszkák a keret elfogytáig húzhatók.
+Vagyis: **stílusonként mind az ÖT csúszka beépül** (a három javasolt és a két
+tartalék is), és **egyszerre legfeljebb HÁROM** állhat nullától eltérő
+állásban — kettőt középen kell hagyni. Így mind a harmincöt ötlet
+kipróbálható, de egy meccsen továbbra is csak három hangsúly él.
+
+A panel a szabályt kimondja (`3/3 használatban — előbb tegyél egy csúszkát
+középre`), és a negyedik csúszka nem mozdul, amíg egy másik nullára nem áll.
+
+**Ami emiatt EGYELŐRE kimarad:** az eredetileg tervezett 150%-os
+hangsúly-keret. A kettő ugyanazt a célt szolgálja (a csúszka legyen
+átcsoportosítás, ne gyarapítás), és két korlát egymás mellett feleslegesen
+bonyolult. A „3-ból 3" egyszerűbb és teszteléshez alkalmasabb; ha a mérés
+később azt mutatja, hogy három teljesen kihúzott csúszka túl sok, a 150%-os
+keret bármikor MELLÉ tehető.
 
 ### 4.5 Mikor állítható
 
@@ -387,6 +399,10 @@ hogy KI szerzi. Ugyanaz az elv, ami a 3.8.20 és a 3.8.22 körnél is állt.
 
 Mindegyiknél: **a két pólus**, a pólus PRO-ja, a pólus CON-ja, és a
 kapaszkodási pont.
+
+**A teszt-körben mind az öt beépül** (lásd 4.4) — a „javasolt" és a „tartalék"
+jelölés innentől csak azt mondja meg, melyik hármat szántuk a stílus
+alaphangsúlyainak.
 
 ### ⚽ Bombázók
 
@@ -579,7 +595,7 @@ cserébe minden más taktikáé −CON pp.
 | **2.** | a stílus-HUB fejléce (`styleHeroHtml`) | `styleDashboardHtml` elejére |
 | **3.** | szerep-jelvények: `roleNamesMap`, `.rowRole`, `openRolePanel`, chip | `hubRosterEntries` sor-építő + `rosterCapHtml` |
 | **4.** | szerep-kiosztás a játékos lapján | `buildHubDetail` |
-| **5.** | `STYLE_DIALS` (7×3), `dialState()`, a `🎚 Hangsúlyok` kategória | új blokk a `ROLE_DEFS` mintájára |
+| **5.** | `STYLE_DIALS` (7×**5**), `dialState()`, a `🎚 Hangsúlyok` kategória, a „3-ból 3" kapu | új blokk a `ROLE_DEFS` mintájára |
 | **6.** | a hat `dial*` szorzó bekötése | `playMatch` gólsúlyozás, `matchLambdas`, `oppChance` |
 | **7.** | mentés: `S.style.dials`, `S.style.lvlSeen` | `saveGame` + `applySavedGame` |
 | **8.** | glosszárium + `docs/csapatstilus-szintek.md` | — |
@@ -587,3 +603,8 @@ cserébe minden más taktikáé −CON pp.
 **Az 1-4. kör önmagában is kiadható** (szint + fejléc + szerep-jelvények), a
 csúszkák nélkül — a szint ugyanis attól még értelmes szám, hogy még nem hajt
 semmit. Ez a javasolt vágás.
+
+> **ÁLLAPOT (3.8.26): az 1-4. kör KÉSZ és kiadva** — `styleLevel` / `styleSxpParts`
+> / `STYLE_RANKS`, a `styleHeroHtml` fejléc, a `.rowRole` szerep-jelvények a
+> keretlistán és a szerep-kiosztás a játékos lapján. Részletek:
+> `docs/csapatstilus-szintek.md`. Az 5-7. kör (a csúszkák) a következő.
