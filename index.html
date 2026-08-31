@@ -5146,7 +5146,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.27";
+const APP_VERSION="3.8.28";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -14273,13 +14273,32 @@ async function mpMkTickRun(key,myField,oppField,myEntry,done){
     if(!_mpMkBusy)return;}
   const mine=node&&node[myField],mate=node&&node[oppField];
   h2hWaitShow("HAZAI KUPA",$("h2hWaitMsg").innerHTML,!!mine,!!mate,MP_WAIT_MK);
+  /* JELZŐFÉNY (3.8.28). Ez a kapu a legsérülékenyebb: a `chainable` feltétele
+     az OSZTÁLYODTÓL függ (cupTierFor().cupWins), tehát két különböző
+     osztályban álló menedzsernél az egyik belép ide, a másik el sem jön. */
+  if(!(mine&&mate)&&await mpBeaconPing("mk")){
+    try{addLine(mpBeaconNote("hazai kupa",mpBeaconMateGate()),"m rc");}catch(e){}
+    mpMkGiveUp();return;}
   if(mine&&mate){
     /* BÁRMELYIKŐTÖK győzelme visz — ez a „a jobbik eredménye viszi mindkettőt"
        elv a lánc oldalán. */
     const fire=!!(mine.won||mate.won);
     if(fire&&!mine.won)
       addLine(`🎫 A társad megnyerte a Magyar Kupát — az ő jogán ti is indultok a Konferencia-ligában!`,"m life");
-    done(fire);return;}}
+    done(fire);return;}
+  /* ---- A HIÁNYZÓ ÚJRAÜTEMEZÉS (3.8.28) ----
+     BEJELENTETT HIBA (a másik fele): „a másiknak végig azt írta, hogy a másik
+     playerre kell várnia."
+     Ez a kapu EGYETLEN kört pollozott, és utána megállt: a `mpTickWrap` az
+     `again()`-t csak KIVÉTEL esetén hívja meg, a sikeres — de még eredmény
+     nélküli — kör után pedig itt nem volt semmi. A jelző bent maradt
+     (_mpMkBusy=true, _mpMkPoll=null), vagyis a saját mpWaitStuck-definíciónk
+     szerint „beragadt" — csak épp nem jött senki, aki feloldja. A társ
+     bejegyzése megérkezhetett egy másodperccel később: ez a képernyő akkor
+     sem mozdult volna soha többé.
+     A másik két kapu (kupanevezés, általános mpBothGate) helyesen újraütemez;
+     ez az egy maradt ki. */
+  if(_mpMkBusy)_mpMkPoll=setTimeout(()=>mpMkTick(key,myField,oppField,myEntry,done),2500);}
 /* A közös mezőny-célérték a két csapaterőből és a két dominanciából. Ugyanaz a
    képlet, mint az euroMidRating-ben — csak az ERŐSEBB keretre horgonyozva, és
    a két dominancia ÁTLAGÁVAL. Tiszta függvény: mindkét kliens ugyanabból a
@@ -14311,11 +14330,11 @@ function mpCupSharedMid(a,b,domA,domB,comp){
      a szoba rögzített értéke (mpWorldTempo), tehát gameTempo() ugyanazt adja
      mindkét oldalon. */
   return applyCupTempoAnchor(comp,Math.max(50,Math.round(Math.max(ts,base)-edge-d)));}
-let _mpCupBusy=false,_mpCupPoll=null;
+let _mpCupBusy=false,_mpCupPoll=null,_mpCupSoloCb=null;
 const MP_WAIT_CUP={mine:"A te nevezésed",opp:"A társad nevezése",
   cancel:"✕ Még maradok a HUB-ban"};
 function mpCupAbort(){
-  _mpCupBusy=false;
+  _mpCupBusy=false;_mpCupSoloCb=null;
   if(_mpCupPoll){clearTimeout(_mpCupPoll);_mpCupPoll=null;}
   h2hWaitHide();}
 /* ---- A NEVEZÉS KAPUJA ----
@@ -14323,12 +14342,25 @@ function mpCupAbort(){
    kvalifikációját, és a JOBBIK lesz a közös sorozat. Ugyanaz a minta, mint a
    szezonindítási alkunál (mpSeasonGate): újraindítható, a képernyő elhagyható,
    időkorlát nincs. */
+/* A NEVEZÉS SZÓLÓ LEZÁRÁSA. Két út vezet ide: a jelzőfény (a társ máshol vár)
+   és a „Mégsem" gomb. Mindkettőnél a SAJÁT kvalifikációddal megyünk tovább —
+   az pontosan az egyjátékos viselkedés, tehát nem lehet rosszabb annál, mint
+   hogy örökre a kapunál állsz. A `droppedApart` megjegyzi, hogy a két karrier
+   itt vált szét; a következő szezonindításnál a keretek úgyis összeérnek. */
+function mpCupSolo(onReady){
+  mpCupAbort();
+  S.mpCup={season:(S.seasonNumber||1),comp:S.euroCurrent||null,qual:!!S.euroCurrentQual,
+    mateName:null,mateOvr:null,mateStr:null,mid:null,how:"split",
+    mineComp:S.euroCurrent||null,mateComp:null,mateVer:null,droppedApart:true};
+  try{saveGame();}catch(e){}
+  if(typeof onReady==="function")onReady();}
 async function mpCupGate(onReady){
   if(!h2hRoomActive()){onReady();return;}
   if(mpCupSettled()){onReady();return;}
   if(mpWaitStuck(_mpCupBusy,_mpCupPoll))mpCupAbort();   /* beragadt jelző feloldása */
   if(_mpCupBusy)return;
   _mpCupBusy=true;
+  _mpCupSoloCb=onReady;
   const key=mpCupKey(),myField=MP.role==="host"?"host":"guest";
   const oppField=myField==="host"?"guest":"host";
   h2hWaitShow("KUPANEVEZÉS","Kapcsolódás a szobához…",false,false,MP_WAIT_CUP);
@@ -14426,6 +14458,12 @@ async function mpCupTickRun(key,myField,oppField,onReady,myEntry){
       mate?"a társadé is megvan, számolunk…":"várunk a társadra. Nyugodtan lépj ki, a nevezésed megmarad."}
      <br><small style="color:var(--dim2)">A te kvalifikációd: <b>${S.euroCurrent?EURO_COMPS[S.euroCurrent].n:"nem kvalifikáltál"}</b></small>`,
     !!mine,!!mate,MP_WAIT_CUP);
+  /* JELZŐFÉNY (3.8.28): a társ egy másik kapunál vár — a SAJÁT kvalifikációddal
+     megyünk tovább. Ez pontosan a javítás előtti, egyjátékos viselkedés,
+     tehát nem lehet rosszabb annál, mint hogy örökre itt állsz. */
+  if(await mpBeaconPing("cup")){
+    try{addLine(mpBeaconNote("kupanevezés",mpBeaconMateGate()),"m rc");}catch(e){}
+    mpCupSolo(onReady);return;}
   _mpCupPoll=setTimeout(()=>mpCupTick(key,myField,oppField,onReady,myEntry),2000);}
 /* ---- CSOPORTTÁBLA-CSERE ----
    A csoportkör végén a te csoportod tábláját ÉLŐBEN játszottad ki, a társadét
@@ -14813,6 +14851,73 @@ function mpDiagCollect(){
 function mpWaitErr(txt){
   try{const e=$("h2hWaitErr");if(e)e.textContent=txt;}catch(_){}}
 /* Igaz, ha a jelző szerint fut a folyamat, de nincs élő köre — beragadt. */
+/* ================= JELZŐFÉNY: HOL VÁR A TÁRSAD? (3.8.28) ==================
+   BEJELENTETT HIBA: „egyikünk megnyerte a MK-t, a másik már korábban kiesett,
+   és nem is volt egymás elleni meccs. Mindketten indulni akartunk a nyári
+   kupán utána, de csak egyikünket engedte be, a másiknak végig azt írta, hogy
+   a másik playerre kell várnia, míg amaz már a nyári kupát játszotta. Most
+   mindkettő képernyő stuck."
+
+   AZ OK — KÉT KÜLÖNBÖZŐ KULCSON VÁRTATOK EGYMÁSRA. Minden közös kapu ugyanazon
+   a mintán működik: felteszem a saját mezőmet, és pollozom, amíg a társé meg
+   nem jelenik UGYANAZON A KULCSON. Ez addig jó, amíg a két kliens ugyanoda ér
+   el — a nyár útvonala viszont LOKÁLIS állapotból ágazik el:
+     · friendlyCupOfferable() → euroPending() / euroActive() / friendlyCupSeason
+     · hubNextSeasonFlow      → S.euroOptOut / mpCupSettled()
+     · endEuroCampaign        → cupTierFor().cupWins (osztályonként MÁS!)
+   Ha a két gép más ágra fut, az egyik a „nyári kupa" kulcsán vár, a másik a
+   „kupanevezés" kulcsán — és mivel egyikük sem megy oda, ahol a másik áll, a
+   várakozás ÖRÖKRE szól. Pontosan ez történt.
+
+   A JELZŐFÉNY ezt töri meg. Amíg várok, minden poll-körben kiírom, MELYIK
+   kapunál állok, és elolvasom, a társam hol áll. Ha a társam bizonyíthatóan
+   egy MÁSIK kapunál vár, akkor ide már nem fog megérkezni — abbahagyom a
+   várakozást, és a helyi tartalékkal megyünk tovább.
+
+   MIÉRT „BIZONYÍTHATÓAN". Egy ottfelejtett, régi bejegyzés nem bizonyíték: a
+   társ már rég továbbmehetett. Csak az számít, ha a jelzése MOZOG, miközben
+   nézem — a `at` mező minden poll-körben új. Így nem időbélyeget hasonlítunk
+   (a két gép órája eltérhet), hanem VÁLTOZÁST. Négy egymás utáni mozgó,
+   eltérő olvasat kell — egy átmeneti áthaladás nem téveszt meg. */
+const MP_BEACON_HITS=4;
+let _mpBeacon={gate:null,seen:null,hits:0};
+function mpBeaconKey(){return "s"+(S.seasonNumber||1)+"where";}
+function mpBeaconReset(){_mpBeacon={gate:null,seen:null,hits:0};}
+/* Igaz, ha a társ egy MÁSIK kapunál vár — a hívó ilyenkor kilép a
+   várakozásból. Hibatűrő: hálózati gond esetén false (inkább várunk tovább,
+   mint hogy tévesen szétdobjuk a két karriert). */
+async function mpBeaconPing(gate){
+  try{
+    if(!h2hRoomActive()||!gate||!MP||!MP.activeRoom)return false;
+    const key=mpBeaconKey(),myField=MP.role==="host"?"host":"guest";
+    const oppField=myField==="host"?"guest":"host";
+    if(_mpBeacon.gate!==gate)_mpBeacon={gate,seen:null,hits:0};
+    /* MINDIG felülírjuk: ez nem „egyszer felteszem", hanem élő jelzés. */
+    await mpBk().h2hPut(MP.activeRoom,key,myField,{gate,at:Date.now(),v:APP_VERSION});
+    const node=await mpBk().h2hGet(MP.activeRoom,key);
+    const mate=node&&node[oppField];
+    _mpBeacon.mate=(mate&&mate.gate)||null;
+    if(!mate||!mate.gate||mate.gate===gate){_mpBeacon.hits=0;_mpBeacon.seen=mate?mate.at:null;return false;}
+    if(_mpBeacon.seen==null){_mpBeacon.seen=mate.at;return false;}
+    if(mate.at===_mpBeacon.seen)return false;   /* nem mozog: nem vár, csak ottfelejtette */
+    _mpBeacon.seen=mate.at;
+    _mpBeacon.hits++;
+    return _mpBeacon.hits>=MP_BEACON_HITS;
+  }catch(e){return false;}}
+/* A KILÉPÉS KÖZÖS SZÖVEGE. Egy helyen, mert mind a három kapu ugyanazt
+   mondja el — és mert ez az a mondat, amiből a felhasználó megérti, miért
+   szakadt szét a két karrier. */
+function mpBeaconNote(mine,mate){
+  return `⚠️ <b>A társad máshol tart.</b> Te a(z) <b>${esc(mine)}</b> kapunál vártál, ő viszont `
+    +`a(z) <b>${esc(mate||"másik")}</b> kapunál — oda már nem fog ideérni. Ne várjunk tovább: `
+    +`a saját döntéseddel megyünk tovább. (Ha a nyaratok szétcsúszott, a következő `
+    +`szezonindításnál újra összeérnek a keretek.)`;}
+/* A kapuk emberi neve — a naplósor ebből lesz érthető. */
+const MP_GATE_NAME={cup:"kupanevezés",mk:"hazai kupa",nyk:"nyári kupa",
+  po:"osztályozó",season:"szezonindítás",decision:"szezonzáró döntés",
+  tie:"kupa-párharc",stats:"kupa-statisztika"};
+function mpGateName(id){return MP_GATE_NAME[id]||id||"másik";}
+function mpBeaconMateGate(){return mpGateName(_mpBeacon&&_mpBeacon.mate);}
 function mpWaitStuck(busy,poll){return !!busy&&!poll;}
 /* A tick burkolója. `again` a saját újraütemezője (a hívó adja meg), hogy a
    kivétel után is legyen következő kör. */
@@ -51805,12 +51910,27 @@ async function mpGateTickRun(o,key,myField,oppField,finish){
   const mine=node&&node[myField],mate=node&&node[oppField];
   h2hWaitShow(o.title,$("h2hWaitMsg").innerHTML,!!mine,!!mate,o.wait);
   if(mine&&mate){finish(o.resolve(mine,mate));return;}
+  /* JELZŐFÉNY (3.8.28): ha a társ bizonyíthatóan MÁS kapunál vár, ide már nem
+     jön — ne várjunk örökre, menjünk tovább a helyi tartalékkal. */
+  if(await mpBeaconPing(o.id)){
+    try{addLine(mpBeaconNote(mpGateName(o.id),mpBeaconMateGate()),"m rc");}catch(e){}
+    mpGateGiveUp(o.id);return;}
   if(g.busy)g.poll=setTimeout(()=>mpGateTick(o,key,myField,oppField,finish),2500);}
 $("h2hWaitCancelBtn")&&(function(){
   const prev=$("h2hWaitCancelBtn").onclick;
   $("h2hWaitCancelBtn").onclick=()=>{
     const id=mpGateBusyId();
     if(id){mpGateGiveUp(id);return;}
+    /* A KÉT SAJÁT KEZŰ KAPU (kupanevezés, hazai kupa) nem az mpBothGate
+       vázán ül, tehát a fenti sor nem látja őket — enélkül a „Mégsem" a
+       SZOBÁBÓL léptetett ki, ami sokkal drasztikusabb annál, mint amit a
+       gomb ígér. Mostantól mindkettő a saját, nem-romboló kilépőjét kapja
+       (3.8.28). */
+    if(typeof _mpMkBusy!=="undefined"&&_mpMkBusy){mpMkGiveUp();return;}
+    if(typeof _mpCupBusy!=="undefined"&&_mpCupBusy){
+      const cb=_mpCupSoloCb;
+      try{addLine(`⚠️ Nem várod meg a társad nevezését — a saját kvalifikációddal megyünk tovább.`,"m ev");}catch(e){}
+      mpCupSolo(cb||(()=>{try{hubNextSeasonFlow();}catch(e){}}));return;}
     if(prev)prev();};})();
 const MP_WAIT_PYRPO={mine:"A te osztályozód",opp:"A társad osztályozója",
   cancel:"✕ Nem várom meg"};
@@ -64279,12 +64399,27 @@ function hubNextSeasonFlow(){
     startEuroCampaign();return;}
   /* NYÁRI FELKÉSZÜLÉSI KUPA: csak akkor kerül szóba, ha NINCS megszerzett
      kupaindulás — aki Európába jutott, annak a nyara amúgy is tele van. */
+  /* ---- A NYÁRI TORNA FELAJÁNLÁSA IS KÖZÖS DÖNTÉS (3.8.28) ----
+     BEJELENTETT HIBA: „mindketten indulni akartunk a nyári kupán, de csak
+     egyikünket engedte be, a másiknak végig azt írta, hogy a másik playerre
+     kell várnia."
+     AZ OK: a friendlyCupOfferable() négy feltétele mind LOKÁLIS állapotból
+     jön (euroPending / euroActive / friendlyCupSeason / finalTable), és a
+     kódnak az a feltevése, hogy „a felajánlás feltétele egyszerre igaz vagy
+     hamis a két gépen", NEM ÁLL. Elég egy időzítési eltérés (az egyikőtök
+     kupakampánya tovább tartott) vagy egy eltérő osztály, és az egyik kliens
+     BELÉP a nyári kapuba, a másik el sem jön oda — így az első örökre vár.
+     MOSTANTÓL közös karrierben MINDIG belépünk a kapuba, és maga a
+     „felajánlható-e" kérdés is ott dől el: a nevezés viszi magával a helyi
+     választ (`offer`), és a torna csak akkor indul, ha MINDKETTŐNÉL
+     felajánlható ÉS mindketten igent mondtatok. Így a két kliens sosem
+     állhat két különböző kulcson. */
+  if(friendlyCupJoint()&&(S.friendlyCupSeason||0)!==(S.seasonNumber||1)){
+    const off=friendlyCupOfferable();
+    if(!off||S.auto){friendlyCupSettle(false,()=>hubNextSeasonFlow(),off);return;}
+    offerFriendlyCup(()=>hubNextSeasonFlow());return;}
   if(friendlyCupOfferable()){
-    if(S.auto){
-      /* Auto szezon: nem nevezünk — de közös karrierben a NEMET is ki kell
-         mondani, különben a társad a kapunál várna a válaszodra. */
-      if(friendlyCupJoint()){friendlyCupSettle(false,()=>hubNextSeasonFlow());return;}
-      friendlyCupDecline();}
+    if(S.auto)friendlyCupDecline();
     else{offerFriendlyCup(()=>hubNextSeasonFlow());return;}}
   hubShowSeasonReport();}
 /* ================= NYÁRI FELKÉSZÜLÉSI KUPA: A NEVEZÉS =================
@@ -64347,6 +64482,9 @@ const MP_WAIT_NYK={mine:"A te nevezésed",opp:"A társad nevezése",
    (`if(go)`) változatlanul jó. */
 function mpNykResolve(mine,mate){
   if(!(mine&&mine.yes&&mate&&mate.yes))return null;
+  /* A FELAJÁNLHATÓSÁG IS EGYHANGÚ (3.8.28). A régi kliens nem küld `offer`
+     mezőt — ott a hiánya IGENT jelent, tehát a régi viselkedést kapja. */
+  if(mine.offer===false||mate.offer===false)return null;
   return {yes:true,mine,mate};}
 /* A KÖZÖS NYÁRI MEZŐNY CÉLÉRTÉKE. Egyjátékosban az ígéret „a te nyers
    csapaterőd mínusz egy" (euroMidRating). Kettőnél ez a szám kliensenként más
@@ -64384,25 +64522,29 @@ function mpNykJoinCup(mine,mate){
     +`a csoportban nem kerülhettek össze, a kieséses ágon viszont igen.`,"m life");}
 /* A nevezés lezárása EGY torkon: egyjátékosban azonnal, közös karrierben a
    társ válaszával együtt. */
-function friendlyCupSettle(yes,next){
+function friendlyCupSettle(yes,next,offerable){
   const apply=go=>{
     if(go){friendlyCupStart(go);return;}
     friendlyCupDecline();
     if(typeof next==="function")next();};
   if(!friendlyCupJoint()){apply(!!yes);return;}
+  /* Az `offer` a HELYI felajánlhatóság — a kapu ebből is egyhangúságot kér
+     (lásd hubNextSeasonFlow). Ha a hívó nem adja meg, a mai állapot dönt. */
+  const off=(offerable===undefined)?friendlyCupOfferable():!!offerable;
   mpBothGate({id:"nyk",key:"s"+(S.seasonNumber||1)+"nyk",
     title:"NYÁRI KUPA",wait:MP_WAIT_NYK,
     /* A NEVEZÉS MAGÁVAL VISZI A KÖZÖS MEZŐNYHÖZ KELLŐ SZÁMOKAT is — ugyanazok
        a mezők, mint a tétmeccses kupanevezésnél (mpCupGate). A `str` a
        KIJELZÉSHEZ kell (a társ csapaterejét a felület boostokkal írja ki), az
        `ovr` a NYERS erő, amiből a szimuláció és a mezőny célértéke dolgozik. */
-    entry:{yes:!!yes,at:Date.now(),
+    entry:{yes:!!yes,offer:off,at:Date.now(),
       teamName:String(teamName||"A társad").slice(0,40),
       ovr:Math.round(teamOVRbase()),
       str:Math.round(teamStrength()),
       v:APP_VERSION},
     msg:yes?"Neveztél a nyári tornára — megvárjuk a társad válaszát is. A torna csak akkor indul, ha ő is nevez."
-           :"Kihagynád a nyári tornát — megvárjuk a társad válaszát is.",
+           :(off?"Kihagynád a nyári tornát — megvárjuk a társad válaszát is."
+                :"Nálad idén nincs nyári torna (kupasorozatod van, vagy már lement) — szólunk a társadnak, hogy ne várjon rá."),
     resolve:mpNykResolve,done:apply,solo:false,
     giveUpNote:"⚠️ A nyári kupa egyeztetése megszakadt — idén kihagyjátok a tornát."});}
 function friendlyCupDecline(){
