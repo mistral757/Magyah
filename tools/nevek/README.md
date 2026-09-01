@@ -65,3 +65,53 @@ globálisokat nézi; egy futásidejű sorrendhibát (TDZ: a `renderHdrSub()` a
 csak ez a próba fogott meg.
 
 Szükséges: `npm i playwright` (a böngésző már telepítve van).
+
+## release.py — a KIADÁSI build
+
+```bash
+python3 tools/nevek/release.py     # → dist/index.html
+```
+
+A megjelenítés magyarított, de a repóbeli `index.html` **tartalmazza** a valós
+neveket: kulcsként (`SQUADS n:`, `BIRTH_YEAR`, `HU_NAME_TABLE`, `CLUB_ABBR`), a
+klubtörténetekben (`note:`) és 2600+ kódkommentben. Egy „forrás megtekintése"
+mindet megmutatja. **A képernyő tiszta, az adat nem az.**
+
+A release-build minden valós nevet átlátszatlan azonosítóra cserél:
+
+```
+{n:"Lionel Messi",…}   →  {n:"p1a2b3c4",…}
+"Lionel Messi":1987    →  "p1a2b3c4":1987
+{club:"Real Madrid CF" →  {club:"c9f8e7d6"
+```
+
+A játék ugyanúgy működik: a kulcs kulcs marad, csak nem beszédes. Emellett
+kiüríti a klubtörténeteket, eltávolítja a kommenteket, és kikapcsolja a rejtett
+névmód-kapcsolót (azonosítókra visszaváltani értelmetlen volna).
+
+A végén ELLENŐRZI magát: ha egyetlen valós név is bent maradt, kiírja hol, és
+1-es kóddal áll meg. Az „Aston Villany"-féle téves találatokat kiszűri.
+
+### A két verzió viszonya
+
+| | családi | kiadott |
+|---|---|---|
+| fájl | `index.html` (a repóban) | `dist/index.html` (generált) |
+| nevek az adatban | valósak | azonosítók |
+| rejtett kapcsoló | `szutykoskutyus` | nincs |
+| névszerkesztő | van | van |
+
+**Két külön termék.** A mentéseik nem cserélhetők (más a kulcstér), és közös
+világot sem lehet játszani a kettő között. A `dist/` nincs verziókövetve —
+kiadás előtt kell legenerálni.
+
+## A játékos saját névátírásai
+
+Az adatbázis-ablakban („📊" a kezdőlap alján) a **✏️ Nevek átírása** fülön
+bárki átírhat bármelyik játékos-, edző- vagy klubnevet. A felülírás
+`localStorage`-ban él, a mentésnek nem része, és MINDIG nyer a beépített név
+felett. A rövid alakot a rendszer származtatja: magyar sorrendnél az első szó,
+egyébként az utolsó.
+
+A kiadott buildben a kulcs az azonosító — ott tehát a nevet **tényleg a
+felhasználó írja be**, nem mi szállítjuk hozzá.
