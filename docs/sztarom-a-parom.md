@@ -372,3 +372,28 @@ hogy elkötelezed magad valami mellett.
 **A többi stílushoz képest** ez a leggyengébb torzítás (25%, szemben a teljesen
 kiépített fák 33%-ával), cserébe viszont **irányítható**, és nem kell hozzá
 képességfa-vásárlás.
+
+---
+
+## 9. A sztár három követelése (a 3.9.00 kiegészítése)
+
+A stílus kockázati oldala. A követelés az **átigazolási esemény** egyik ága
+(`STAR_DEMAND_W` = a váratlan fordulatok 10%-a), és csak akkor, ha a sztár
+tényleg a keretben van (`starDealOn`).
+
+| követelés | mit kér | az ára, ha nemet mondasz |
+|---|---|---|
+| **Gólbónusz** | gólonként a heti lelátó 2-10%-a | morál −6 · elvágyódás ×0,5-tel tovább |
+| **Béremelés** | +50-400% a meccs-bérére (halmozva max 6×) | ugyanaz |
+| **👕 Mezszám** *(új)* | egy konkrét mezszám (7, 9, 10, 11, 17, 21, 23, 99, 8, 5, 70, 88, 30) | **négy heti bér** a következő meccs után — morált NEM visz |
+
+A mezszám a három közül az egyetlen, ami **ingyen teljesíthető**: a szám két
+koppintás az arculat-szerkesztő *Mezszámok* pontjában, és ha máshol van, a két
+játékos megcseréli a mezét. A határidő a **következő mérkőzés**; a levonás a
+lefújás után, magától megy (`starNumTick`), a szezonmérleg sztár-blokkjának
+`numStar` során.
+
+A halasztás **nem sértődés** — nem emeli az elvágyódást, nem visz morált. Csak
+ketyeg. Ettől lesz a stílus figyelem-adó, nem csak drága.
+
+Részletek: **`docs/meztervezo-es-mezszamok.md`, 6. szakasz.**
