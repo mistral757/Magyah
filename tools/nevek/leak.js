@@ -42,7 +42,11 @@ async function run(b) {
   await p.screenshot({ path: require('path').resolve(__dirname, 'leak-end.png') });
   const r = await p.evaluate(() => {
     const t = document.body.innerText;
-    return { leak: Object.keys(HU_NAME_TABLE).filter(n => n.length > 6 && t.includes(n)),
+    const leak = Object.keys(HU_NAME_TABLE).filter(n => n.length > 6 && t.includes(n));
+    // a klub- és liganevek ugyanúgy valós nevek: azokat is nézzük
+    Object.keys(HU_CLUB_TABLE).forEach(c => { if (c.length > 5 && t.includes(c)) leak.push('KLUB: ' + c); });
+    Object.keys(HU_LEAGUE_TABLE).forEach(l => { if (l.length > 5 && t.includes(l)) leak.push('LIGA: ' + l); });
+    return { leak,
              rows: [...document.querySelectorAll('.nm')].map(e => e.innerText.trim().split('\n')[0]).slice(0, 5),
              where: (document.body.innerText || '').slice(0, 120).replace(/\n/g, ' / ') };
   });

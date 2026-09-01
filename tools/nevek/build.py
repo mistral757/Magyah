@@ -12,6 +12,7 @@ D = os.path.dirname(os.path.abspath(__file__)) + "/"
 sys.path.insert(0, D)
 from rules import (POOL as POOL_ALL, hufy, given_of, pool_given, lengthen, hu_twist, PARTICLES, strip_dia, LANG)
 from manual import MANUAL
+from klubok import KLUBOK, LIGAK
 
 # ── az adat kinyerése az index.html-ből ────────────────────────────────────
 # Szándékosan itt, és nem előre gyártott data.json-ból: így a szkript akkor is
@@ -185,6 +186,43 @@ if not _pat.search(_html):
 open(SRC, "w", encoding="utf-8").write(
     _pat.sub(lambda m: m.group(1) + _tbl + m.group(2), _html, count=1))
 print(f"index.html frissítve — {len(table)} név a HU_NAME_TABLE-ben")
+
+# ── KLUB- ÉS LIGANEVEK ─────────────────────────────────────────────────────
+# A hárombetűs kódot EGYEDIVÉ tesszük: két klub azonos kódja az
+# eredményjelzőn megkülönböztethetetlen lenne. Kézzel nem kell rá figyelni,
+# de a build kiírja, hol kellett hozzányúlnia.
+_ab, _klub = {}, {}
+for _c in sorted(KLUBOK):
+    _nev, _kod = KLUBOK[_c]
+    if _kod in _ab:
+        _alap = _kod
+        for _i in range(2, 40):
+            _uj = (_kod[:2] + str(_i)) if _i < 10 else (_kod[:1] + str(_i))
+            if _uj not in _ab:
+                _kod = _uj
+                break
+        print(f"   kód-ütközés: {_c} {_alap} -> {_kod} (foglalta: {_ab[_alap]})")
+    _ab[_kod] = _c
+    _klub[_c] = (_nev, _kod)
+
+_dupn = collections.Counter(v[0] for v in _klub.values())
+_dupn = {k: c for k, c in _dupn.items() if c > 1}
+if _dupn:
+    print("!! AZONOS KLUBNÉV két klubon:", _dupn)
+
+_html = open(SRC, encoding="utf-8").read()
+for _mark, _rows in (
+    ("HU_CLUB_TABLE",
+     "\n".join(f" {_js(k)}:[{_js(_klub[k][0])},{_js(_klub[k][1])}]," for k in sorted(_klub))),
+    ("HU_LEAGUE_TABLE",
+     "\n".join(f" {_js(k)}:{_js(LIGAK[k])}," for k in sorted(LIGAK))),
+):
+    _p = re.compile(r"(const " + _mark + r"=\{\n).*?(\n\};)", re.S)
+    if not _p.search(_html):
+        raise SystemExit("nem találom a " + _mark + " blokkot")
+    _html = _p.sub(lambda m: m.group(1) + _rows + m.group(2), _html, count=1)
+open(SRC, "w", encoding="utf-8").write(_html)
+print(f"klub: {len(_klub)} · liga: {len(LIGAK)}")
 
 random.seed(11)
 for cimke, db in (("gépi", 20), ("kézi", 10)):

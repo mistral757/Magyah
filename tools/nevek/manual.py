@@ -767,3 +767,19 @@ CLEAN = {
 "David Ospina":("Ispán Dávid","Ispán"),
 }
 MANUAL.update(CLEAN)
+
+# ═══ EDZŐK — kézzel ═════════════════════════════════════════════════════════
+# Az edzőt a karrier INDÍTÁSAKOR választod ki, három közül, névvel és
+# jellemzéssel — tehát ugyanolyan hangsúlyos név, mint a keret sztárja.
+# A gépi réteg itt gyengét adott („Barótika Lali", „Storkk Bernát").
+EDZOK = {
+"Baróti Lajos":     ("Barátságos Lali", "Barátságos"),
+"Verebes József":   ("Verébfészek Jocó", "Verébfészek"),
+"Csank János":      ("Csánkos Jancsi", "Csánkos"),
+"Egervári Sándor":  ("Egricsillag Sanyi", "Egricsillag"),
+"Mezey György":     ("Mezítlábas Gyuri", "Mezítlábas"),
+"Bernd Storck":     ("Gólyás Bernát", "Gólyás"),          # Storch = gólya
+"José Mourinho":    ("Morgolódó József", "Morgolódó"),
+"Arrigo Sacchi":    ("Zsákos Ábris", "Zsákos"),           # sacco = zsák
+}
+MANUAL.update(EDZOK)
