@@ -19671,6 +19671,13 @@ function bondBoostMult(a,b){
     const ea=bondPool(a),eb=bondPool(b);
     if(ea&&ea.bondBoost>m)m=ea.bondBoost;
     if(eb&&eb.bondBoost>m)m=eb.bondBoost;
+    /* ÖSSZESZOKÁS (stílus-képesség): a sztár kötései gyorsabban épülnek.
+       Ugyanaz a szabály, mint a boostnál — a NAGYOBBIK szorzó számít, nem a
+       kettő szorzata. Egy boostolt sztár tehát nem lesz négyszeres ütemű. */
+    const st=(typeof styleState==="function")?styleState():null;
+    if(st&&st.star&&(a===st.star||b===st.star)){
+      const sm=styleFxMul("starBondMult");
+      if(sm>m)m=sm;}
   }catch(e){return 1;}
   return m;}
 /* ---- 5. SKILL BOOST ---- */
@@ -49149,7 +49156,12 @@ function pstatState(){if(!S.pStat||typeof S.pStat!=="object")S.pStat={};return S
    egy frissen igazolt ember sem jó, sem rossz formában nem érkezik. */
 function pformOf(name){
   const v=pformState()[name];
-  return (typeof v==="number"&&isFinite(v))?mstatClamp(v,PFORM_MIN,PFORM_MAX):PFORM_MID;}
+  const base=(typeof v==="number"&&isFinite(v))?v:PFORM_MID;
+  /* ÚJ CIPŐ: a sztár formájára ül rá, amíg a pár tart. A skála tetejét NEM
+     lépi át — a cipő csúcsformába visz, nem a skálán túlra. */
+  let boot=0;
+  try{boot=styleBootsForm(name);}catch(e){}
+  return mstatClamp(base+boot,PFORM_MIN,PFORM_MAX);}
 /* A KIJELZETT FOK (1-14): a hangerő-skála ennyi oszlopot gyújt ki. */
 function pformStep(name){return Math.max(1,Math.min(PFORM_MAX,Math.round(pformOf(name))));}
 /* ---- A HATÁS ----
@@ -51719,6 +51731,12 @@ function playMatch(){
          mellett: az az összegzés a lefújás ELŐTT fut, amikor az értékelés még
          nincs kiszámolva. */
       try{mstatGradeTally(S.lastMatch);}catch(e){}
+      /* A CSILLAGOZÓ a tally UTÁN fut: a most lezárt meccs értékelése már
+         benne van a számlálóban, tehát a harmadik felfoghatatlan este
+         ugyanezen a lefújáson nyit kaput. */
+      try{starTopStarTick();}catch(e){}
+      /* A CIPŐ a lefújásnál kopik — egy pár három mérkőzést bír. */
+      try{styleBootsTick();}catch(e){}
       try{
         const _best=(S.lastMatch.players||[]).find(x=>x&&x.star!=null);
         const _gi=_best?mstatGradeIdx(_best.star):null;
@@ -64501,6 +64519,23 @@ function buildHubDetail(loc){
     /* A BOOST-KATALÓGUS ÖT ÚJ FAJTÁJA (3.8.12) — ugyanaz az elv: a hatás
        beépül, de a TÉNY is látszik, mert ezekre is a büdzsé ment el. */
     html+=boostNote(e);
+    /* ÚJ CIPŐ a sztár lapján. A stílus-kártya melletti MÁSODIK belépő: aki a
+       keretlistán nézi meg a sztárt, annak ott a helye, nem három képernyővel
+       arrébb. Ugyanaz az állapot, ugyanaz a keret. */
+    try{
+      const _st=styleState();
+      if(_st&&_st.star===p.n&&styleBootsMax()){
+        const _b=styleBootsState(),_max=styleBootsMax();
+        html+=`<div class="hdRow" style="border:1px dashed var(--gold);border-radius:7px;padding:6px 9px">`
+          +(_b.left>0
+            ?`👟 <b>Új cipőben</b> — még ${_b.left} mérkőzésen át · ${_b.used}/${_max} pár az idényben`
+            :(_b.used>=_max
+              ?`👟 Az idei cipő-kereted elfogyott (${_b.used}/${_max}) — a következő idényben újratöltődik`
+              :`👟 <b>Új cipő</b> — ${_b.used}/${_max} pár fogyott az idényben`
+               +`<br><button class="btn-s" data-starboots="1" style="margin-top:6px;padding:5px 10px;font-size:12px;border-radius:7px">`
+               +`Új cipőt neki — ${STAR_BOOTS_MATCHES} mérkőzésre</button>`))
+          +`</div>`;}
+    }catch(_e){}
     /* TSI: a saját játékosodnál mindig látszik. 15 nálad játszott meccs alatt a
        scout érkezéskori becslése, utána a pontos érték — lásd tsiInfo(). */
     html+=hdMark("hdPos","🧭 Poszt, megbízás és TSI","hol otthonos, és mennyit ér ott",1,0);
@@ -64667,6 +64702,11 @@ function buildHubDetail(loc){
   info.innerHTML=hdSectionize(html);
   hdBindSections(info);
   d.appendChild(info);
+  /* A cipő-gomb a keretlistáról: ugyanaz a művelet, mint a stílus-kártyán.
+     stopPropagation, különben a sor kattintása becsukná alatta a lapot. */
+  try{info.querySelectorAll("[data-starboots]").forEach(btn=>{
+    btn.onclick=(ev)=>{ev.stopPropagation();
+      if(styleBootsBuy()){try{renderHub();}catch(x){}}};});}catch(e){}
   const swapBtn=document.createElement("button");
   swapBtn.className="btn-p stepbtn";swapBtn.textContent="↔ Posztcsere — válassz partnert";
   /* KIHÍVÁS-BÜNTETÉS: egy kijelölt játékos egy szezonon át nem mozdítható.
@@ -74469,6 +74509,10 @@ function styleBindPanel(body){
       renderStylePanel();};});
   /* SZTÁR JÓGA: képességenkénti eltolás. Ugyanígy azonnali és visszavonható —
      a mérés a kártyán rögtön mutatja az új szorzókat. */
+  /* ÚJ CIPŐ: azonnali, megerősítés nélkül — nem kerül pénzbe, és a keretet a
+     kártya ki is írja, tehát nincs mit elrontani vele. */
+  body.querySelectorAll("[data-starboots]").forEach(btn=>{
+    btn.onclick=()=>{if(styleBootsBuy())renderStylePanel();};});
   body.querySelectorAll("select.starYogaSel").forEach(sel=>{
     sel.onchange=()=>{
       styleYogaSet(sel.getAttribute("data-yoga"),sel.value);
@@ -75246,6 +75290,80 @@ function stStarGrade(field){
   if(!st||!st.star)return 0;
   const g=(S.mstatGrades&&S.mstatGrades[st.star])||null;
   return (g&&g[field])||0;}
+
+/* ================= AZ ÚJ CIPŐ (3.8.39) =================
+   Az egyetlen INGYENES képesség a fában: nem pénz a mércéje, hanem SZEZONON
+   BELÜLI KERET. Egy pár HÁROM mérkőzésen át tart, és a sztár FORMÁJÁN hat —
+   nem a Ratingjén. Ez tudatos: a forma az a csatorna, ami magától lecseng, és
+   amit a játék már mindenhol kiír (a HUB-on, a keretlistán, a meccs előtt).
+   Egy Rating-lökés ugyanezt tartósan hazudná. */
+const STAR_BOOTS_MATCHES=3;   /* egy pár ennyi mérkőzésen át tart */
+const STAR_BOOTS_FORM=3;      /* ennyi fokot ad a 14 fokú formaskálán */
+function styleBootsMax(){return styleFxMax("starBootsMax")||0;}
+function styleBootsState(){
+  const st=styleState();
+  if(!st)return {used:0,left:0,season:0};
+  if(!st.boots||typeof st.boots!=="object")st.boots={used:0,left:0,season:0};
+  /* SZEZONVÁLTÁS: a keret magától nullázódik, amint új idény száma jön. Nem
+     kell külön beakasztani a szezonfordulóba — így egy elfelejtett hívás sem
+     hagyhatja bent a tavalyi felhasználást. */
+  const sn=S.seasonNumber||1;
+  if(st.boots.season!==sn){st.boots.season=sn;st.boots.used=0;}
+  return st.boots;}
+function styleBootsCanBuy(){
+  const st=styleState();
+  if(gameMode!=="career"||!st||!st.star)return false;
+  const max=styleBootsMax();if(!max)return false;
+  const b=styleBootsState();
+  return b.used<max&&b.left<=0;}
+function styleBootsBuy(){
+  if(!styleBootsCanBuy())return false;
+  const b=styleBootsState();
+  b.used++;b.left=STAR_BOOTS_MATCHES;
+  const st=styleState();
+  try{addLine(`👟 <b>ÚJ CIPŐ</b> — ${esc(shortName(st.star))} `
+    +`${STAR_BOOTS_MATCHES} mérkőzésen át csúcsformában lép pályára `
+    +`(${b.used}/${styleBootsMax()} ebben az idényben).`,"m mvp");}catch(e){}
+  try{saveGame();}catch(e){}
+  return true;}
+/* A cipő a lefújásnál kopik. A `fullTime` hívja, a forma frissítése UTÁN. */
+function styleBootsTick(){
+  const st=styleState();
+  if(!st||!st.boots||!(st.boots.left>0))return;
+  st.boots.left--;
+  if(st.boots.left<=0){
+    try{addLine(`👟 ${esc(shortName(st.star))} cipője elkopott — `
+      +`a forma-ráadás lejárt.`,"m ev");}catch(e){}}}
+/* Mennyit ad a cipő MOST ennek az embernek a formaskáláján. */
+function styleBootsForm(name){
+  const st=styleState();
+  if(!st||!st.star||st.star!==name)return 0;
+  const b=(st.boots&&st.boots.left>0)?STAR_BOOTS_FORM:0;
+  return b;}
+/* ================= A CSILLAGOZÓ (3.8.39) =================
+   A Villám mesterhármas-kulcsának párja: ott három GÓL nyit kaput, itt három
+   FELFOGHATATLAN ESTE. Ugyanaz a mérce, amit a sz_grtop mérföldkő is néz. */
+const STAR_TOP_EVERY=3;
+function styleStarTopStar(){return styleFxMax("starTopStar");}
+function starTopStarTick(){
+  const lvl=styleStarTopStar();
+  const st=styleState();
+  if(!lvl||gameMode!=="career"||!st||!st.star)return;
+  const n=stStarGrade("top");
+  if(!n||n%STAR_TOP_EVERY!==0)return;
+  /* EGY ESTE EGY KULCS: a számláló ugyanazon az állásán csak egyszer nyitunk.
+     Enélkül egy újratöltés vagy egy második lefutás ingyen osztogatna. */
+  if(st.topStarAt===n)return;
+  st.topStarAt=n;
+  const cands=playerSkills(st.star).filter(i=>i&&i.skill&&skillComplete(i)&&!starUnlocked(i.skill.id));
+  if(!cands.length)return;
+  const inst=cands[0];
+  S.starUnlocked=S.starUnlocked||{};S.starUnlocked[inst.skill.id]=true;
+  S.starUnlockNew=S.starUnlockNew||{};S.starUnlockNew[inst.skill.id]=true;
+  try{addLine(`⭐ <b>A CSILLAG JOGÁN — CSILLAGOZÁS FELOLDVA:</b> `
+    +`${esc(shortName(st.star))} ${n}. felfoghatatlan estéje megnyitotta `
+    +`${hunAz(esc(inst.skill.name))} <b>${esc(inst.skill.name)}</b> csillagozását. `
+    +`Ingyen, az egész keretedre.`,"m mvp");}catch(e){}}
 /* Egy ember gólpasszai a FUTÓ szezonban — bajnoki és kupa együtt. */
 function stSeasonAssists(name){
   if(!name)return 0;
@@ -77202,6 +77320,53 @@ stTrait("sztar","nem_oregszik",3,"Nem öregszik!",
    Így az összhatás megmarad, csak más csatornán jön ki: a képesség nem
    erősít, hanem ÁTALAKÍT. Pontosan ezért nincs is szintenkénti erő-növekedés
    — a szint kizárólag a mozgástér nagyságát adja. */
+/* ================= HÁROM ÚJ SZTÁR-KÉPESSÉG (3.8.39) =================
+   A stílus mérföldkövei mellé a FA is kapott hármat: eddig a sztár körüli
+   ráfordítást semmi nem gyorsította vissza. Mind a három a MEGLÉVŐ motorokba
+   köt be — nincs új meccsmotor-ág. */
+/* 1. KÉMIAÉPÍTÉS GYORSÍTÓ. Ugyanarra a csatornára ül, mint az összjáték-boost
+   (bondBoostMult), és ugyanaz a szabály is érvényes rá: a PÁR szorzója a
+   nagyobbik, nem a kettő szorzata — két gyorsított ember egymással nem
+   épülhet négyszeres ütemben. */
+stTrait("sztar","kemia_gyorsito",2,"Összeszokás",
+  "A sztárod kötései gyorsabban épülnek a keret minden tagjával. Ugyanarra a csatornára ül, mint az összjáték-boost — a párnál mindig a nagyobbik szorzó számít.",[
+  {fx:{starBondMult:1.30},note:"×1,30 ütem a sztár kötéseire"},
+  {fx:{starBondMult:1.60},note:"×1,60"},
+  {fx:{starBondMult:2.00},note:"×2,00"}],
+  ()=>{const st=styleState();
+    if(!st||!st.star)return "nincs kijelölt sztárod";
+    const m=styleFxMul("starBondMult");
+    return `${shortName(st.star)} összhangja most ${Math.round(stStarBond())} — `
+      +(m>1?`a kötései ×${stNum(m)} ütemben épülnek`:"a képesség még nincs megnyitva");});
+/* 2. CSILLAGOZÓ. A Villám mesterhármas-kulcsának párja: ott a három gól nyit
+   kaput, itt a HÁROM FELFOGHATATLAN ESTE. A számláló a mstatGradeTally
+   „top" mezőjéből jön, tehát ugyanaz a mérce, amit a mérföldkő is néz. */
+stTrait("sztar","csillagozo",2,"A csillag jogán",
+  "Minden HARMADIK „felfoghatatlan!\" estéje után ingyen megnyílik a sztárod egyik képességének csillagozása — az egész keretedre.",[
+  {fx:{starTopStar:1},note:"minden 3. felfoghatatlan este után"},
+  {fx:{starTopStar:2},note:"…és a felső szinten azonnal indul is egy csillag"},
+  {fx:{starTopStar:3},note:"…minden alkalommal azonnali csillag"}],
+  ()=>{const st=styleState();
+    if(!st||!st.star)return "nincs kijelölt sztárod";
+    const n=stStarGrade("top"),k=STAR_TOP_EVERY-(n%STAR_TOP_EVERY);
+    return `${shortName(st.star)} eddig ${n} felfoghatatlan estét játszott — `
+      +`még ${k} kell a következő csillagozáshoz`;});
+/* 3. ÚJ CIPŐ. Az egyetlen INGYENES képesség a fában: nem pénz, hanem SZEZONON
+   BELÜLI KERET a mércéje — a szint azt szabja meg, hányszor válthatsz cipőt egy
+   idényben. Egy pár három mérkőzésen át tart, és a sztár formáján hat
+   (pformOf), nem a Ratingjén: a forma az a csatorna, ami magától lecseng. */
+stTrait("sztar","uj_cipo",2,"Új cipő",
+  "Szezononként ennyiszer vehetsz a sztárodnak új cipőt. Egy pár HÁROM mérkőzésen át tart, és végig formában tartja. Nem kerül pénzbe — a keret maga a korlát.",[
+  {fx:{starBootsMax:3},note:"3 pár egy idényben"},
+  {fx:{starBootsMax:4},note:"4 pár"},
+  {fx:{starBootsMax:5},note:"5 pár"}],
+  ()=>{const st=styleState();
+    if(!st||!st.star)return "nincs kijelölt sztárod";
+    const b=styleBootsState(),max=styleBootsMax();
+    if(!max)return "a képesség még nincs megnyitva";
+    return b.left>0
+      ? `most új cipőben játszik — még ${b.left} mérkőzésen át`
+      : `ebben az idényben ${b.used}/${max} párt vettél el`;});
 stTrait("sztar","sztar_joga",2,"Sztár jóga",
   "A sztárod gólszerző képességeit gólpasszadóvá alakíthatod és fordítva — képességenként külön skálán. A képesség szintje szabja, meddig tolható el a hatás.",[
   {fx:{starYoga:0.25},note:"±25%-ig tolható"},
@@ -77240,6 +77405,27 @@ function styleYogaLabel(v){
   if(!v)return "nincs eltolás — marad, ami";
   return v<0?`${Math.round(-v*100)}% → GÓLSZERZÉS felé`
             :`${Math.round(v*100)}% → GÓLPASSZ felé`;}
+/* ÚJ CIPŐ: a vásárlás a kártyán. A HUB-beli játékos-lapján ugyanez a gomb
+   megjelenik — egy állapot, két belépő. */
+stTraitCfg("sztar","uj_cipo",()=>{
+  const st=styleState(),max=styleBootsMax();
+  if(!st||!st.star)
+    return `<div class="msDesc" style="margin-top:9px;color:var(--dim2)">`
+      +`Nincs kijelölt sztárod — előbb jelölj ki valakit.</div>`;
+  if(!max)return "";
+  const b=styleBootsState();
+  let h=`<div class="msDesc" style="margin-top:9px;color:var(--gold)">`
+    +`Ebben az idényben <b>${b.used}/${max}</b> pár fogyott.</div>`;
+  if(b.left>0)
+    h+=`<div class="msDesc" style="color:var(--grass)">👟 ${esc(shortName(st.star))} `
+      +`most új cipőben játszik — még <b>${b.left}</b> mérkőzésen át.</div>`;
+  else if(b.used>=max)
+    h+=`<div class="msDesc" style="color:var(--dim2)">Az idei kereted elfogyott — `
+      +`a következő idényben újratöltődik.</div>`;
+  else
+    h+=`<button class="btn-s stepbtn" data-starboots="1" style="margin-top:7px">`
+      +`👟 Új cipőt ${esc(shortName(st.star))}nak — ${STAR_BOOTS_MATCHES} mérkőzésre</button>`;
+  return h;});
 stTraitCfg("sztar","sztar_joga",()=>{
   const max=styleYogaMax();
   const list=styleYogaSkills();
