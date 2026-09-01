@@ -48,23 +48,43 @@ def lang_of(n):
     return LANG.get((rec.get(n) or {}).get("nat", ""), "en")
 
 
+# „Jr.", „III" — ezek nem vezetéknevek. Ha a névvégi tag ilyen, a fonetika a
+# TOLDALÉKOT írta át („Steve Bruce Jr." → „Jr.ka Pista"). Levágjuk, a Jr.-ból
+# magyarul „ifj." lesz.
+SUFFIX = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "junior", "senior"}
+# Koreai (és kínai) sorrendben a VEZETÉKNÉV áll elöl: „Park Ji-sung" — a Park a
+# vezetéknév. A gépi szabály az utolsó szót vette annak, és mivel a kötőjeles
+# keresztnév szótagokra esett szét, a puszta záró szótag maradt („súng Pongrác").
+KELET = {"Dél-Korea", "Észak-Korea", "Kína"}
+
+
 def auto(n):
     """Gépi magyarítás → (teljes, rövid). Mindig MAGYAR sorrend: vezetéknév elöl."""
     lg = lang_of(n)
-    parts = [p for p in re.split(r"[\s\-]+", n) if p]
+    toks = n.split()
+    ifj = ""
+    if len(toks) > 1 and strip_dia(toks[-1].lower()) in SUFFIX:
+        if strip_dia(toks[-1].lower()).startswith("j"):
+            ifj = "ifj. "
+        toks = toks[:-1]
+    # Kelet-ázsiai sorrend csak akkor, ha a MÁSODIK tag kötőjeles: a
+    # „Woo-yeong Jeong" nyugati sorrendben szerepel, azt nem szabad megcserélni.
+    if (rec.get(n) or {}).get("nat") in KELET and len(toks) == 2 and "-" in toks[1]:
+        toks = [toks[1], toks[0]]
+    parts = [p for t in toks for p in re.split(r"[\s\-]+", t) if p]
 
     if len(parts) == 1:
         h = hufy(parts[0], lg)
         if strip_dia(h.lower()) == strip_dia(parts[0].lower()):
             h = lengthen(h)
-        return h, h
+        return ifj + h, ifj + h
 
     # a partikula a vezetéknévhez tapad: van der Sar → Vanderszár
     if strip_dia(parts[0].lower()) in PARTICLES:
         sur = cap("".join(hufy(p, lg) for p in parts))
         if strip_dia(sur.lower()) == strip_dia("".join(parts).lower()):
             sur = lengthen(sur)
-        return sur, sur
+        return ifj + sur, ifj + sur
 
     cut = len(parts) - 1
     for i in range(1, len(parts) - 1):
@@ -76,7 +96,7 @@ def auto(n):
     if strip_dia(sur.lower()) == strip_dia("".join(surw).lower()):
         sur = lengthen(sur)
     g = given_of(first) or pool_given(n)
-    return f"{sur} {g}", sur
+    return f"{ifj}{sur} {g}", ifj + sur
 
 
 def hungarian(n):
@@ -156,12 +176,21 @@ for n in sorted(table):
         _seen[full] = n
         continue
     parts = full.split()
-    for k in range(1, len(POOL_ALL) + 1):
-        g2 = POOL_ALL[(hash_seed(n) + k) % len(POOL_ALL)]
-        cand = (" ".join(parts[:-1]) + " " + g2) if len(parts) > 1 else (full + " " + g2)
-        if cand not in _seen:
-            break
-    table[n] = (cand, sh if len(parts) > 1 else cand)
+    if len(parts) > 1:
+        for k in range(1, len(POOL_ALL) + 1):
+            cand = " ".join(parts[:-1]) + " " + POOL_ALL[(hash_seed(n) + k) % len(POOL_ALL)]
+            if cand not in _seen:
+                break
+        table[n] = (cand, sh)
+    else:
+        # Egyszavas név (Sylvinho, Édmilson): keresztnevet ragasztani rá azért
+        # rossz, mert a RÖVID alak is kétszavas lenne — az eredményjelzőn a
+        # „Silvinjo Boldizsár" nem fér ki. A szót magát toldjuk meg.
+        for suf in ("ka", "cska", "ó", "us", "ci", "kó"):
+            cand = full + suf
+            if cand not in _seen:
+                break
+        table[n] = (cand, cand)
     _seen[cand] = n
 
 # ── ellenőrzések ────────────────────────────────────────────────────────────
