@@ -5199,7 +5199,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.8.37";
+const APP_VERSION="3.8.38";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -42140,6 +42140,29 @@ function sbMinTxt(m){return m>90?`90+${Math.min(10,m-90)}`:`${m}'`;}
 /* A NAPLÓSOROK perc-előtagja. Egyben húz percet (gmin) és formáz (sbMinTxt),
    hogy a 23 közvetítés-sor ne külön-külön döntse el, mi a helyes alak. */
 function gminTxt(bucket){return sbMinTxt(gmin(bucket));}
+/* ================= A MOSTANI PERC — BÉLYEG HÚZÁSA NÉLKÜL (3.8.38) ==========
+   BEJELENTETT HIBA: „továbbra is fennáll az idő probléma" — az eredményjelző
+   órája és a napló percei szétcsúsztak (85:14 a táblán, miközben a napló már
+   90+8-nál járt), a végén pedig gólok egész sora kapott „90+10" bélyeget.
+
+   A GYÖKÉR: a `gmin` MELLÉKHATÁSOS — minden hívása előrébb tolja a közös
+   elbeszélői órát (`_lastGoalMin`), mert két esemény nem kaphat azonos percet.
+   Ez a naplósoroknál helyes. Csakhogy négy helyen NEM naplósorhoz kellett a
+   perc, hanem KONTEXTUSNAK — és az egyik közülük egy `weightedPick`
+   SÚLYFÜGGVÉNYE volt, ami a pályán lévő MINDEN játékosra lefut.
+
+   MÉRVE egy valódi, 4:1-es meccsen: a gól nélküli ötperces vödrök 2 hívást
+   kaptak, a gólos vödrök viszont 14-15-öt — és a számláló egyetlen vödrön belül
+   végigsétált a 41.-től a 47. percig. Négy gólnál a legnagyobb percbélyeg így
+   99 lett (90+9); a bejelentett 10:1-es meccsen a számláló beállt a 100-as
+   plafonra, onnantól MINDEN gól „90+10" lett, a napló pedig fényévekre került
+   az órától.
+
+   A JAVÍTÁS: ami csak OLVASNI akarja a percet, az olvassa — ez a függvény
+   ugyanazt a percet adja vissza, de nem mozdít semmit. */
+function gnow(bucket){
+  const hi=Math.max(1,bucket|0),lo=Math.max(1,hi-4);
+  return Math.max(lo,Math.min(hi,_lastGoalMin||lo));}
 function gmin(bucket){
   /* egy 5-perces bucketből (pl. 50) ad egy 1-perc pontos, hihető percet a
      [bucket-4 .. bucket] sávban, monoton növekvő sorrendben az előző gólhoz
@@ -42158,11 +42181,23 @@ function gmin(bucket){
      Mostantól a következő perc szigorúan nagyobb, és ha ehhez ki kell lépni a
      vödörből, kilép: egy-két perc "előreszaladás" sokkal kisebb baj, mint két
      azonos percbélyeg. 90 fölött a ráadás sávjába csúszik át. */
-  let m=bucket-4+Math.floor(Math.random()*5);
+  const hi=Math.max(1,bucket),lo=Math.max(1,hi-4);
+  let m=lo+Math.floor(Math.random()*(hi-lo+1));
   if(m<=_lastGoalMin)m=_lastGoalMin+1;
-  if(m>90){let s2=Math.max(91,_lastGoalMin+1);_lastGoalMin=Math.min(100,s2);return _lastGoalMin;}
-  m=Math.max(1,m);
-  _lastGoalMin=m;return m;}
+  /* ---- A VÖDÖRBŐL NEM LÉPÜNK KI (3.8.38) ----
+     A „szigorúan nagyobb" szabály eddig korlátlanul vihette előre az órát: ha
+     egy ötperces vödörben több esemény volt, mint amennyi perc van benne, a
+     bélyeg egyszerűen kisétált a vödörből — és onnantól MINDEN további esemény
+     onnan folytatta. Így lett a 40-es vödörben 47. perc, a meccs végére pedig
+     beállt 100-as plafon (a „90+10"-ek sora).
+     Mostantól a vödör a plafon: ha elfogytak benne a percek, az esemény a vödör
+     UTOLSÓ percét kapja. Két esemény azonos perce sokkal kisebb baj (a valódi
+     közvetítés is így beszél), mint egy elszaladt óra.
+     AZ UTOLSÓ VÖDÖR A KIVÉTEL: ott a ráadásba átcsúszni jogos — épp attól „90+".  */
+  if(m>hi){
+    if(hi>=90){const s2=Math.max(91,_lastGoalMin+1);_lastGoalMin=Math.min(100,s2);return _lastGoalMin;}
+    m=hi;}
+  _lastGoalMin=Math.max(_lastGoalMin,m);return m;}
 /* ---- A 90+ GÓLOK HANGOLÁSA ----
    A régi szabály: 0.22 esély, KIZÁRÓLAG max 1 gólos különbségnél, és
    legfeljebb egy találat. Az új: az alap az állástól független, a szorosság
@@ -42928,18 +42963,29 @@ function sbAggGoalNote(side){
       ?`⚖️  Egyenlítés az összesítésben is — ${sc}. Ha így marad, hosszabbítás dönt.`
       :`⚖️  Kiegyenlítettek összesítésben — ${sc}. A párharc a hosszabbítás felé tart.`;}
   addLine(txt,cls);}
+/* ---- A KÉTJEGYŰ EREDMÉNY (3.8.38) ----
+   A tábla egyetlen lapot tartott oldalanként, és a számot a kiíráskor
+   9-re CSONKOLTA (`Math.min(9,hs)`). Egy 10:1-es meccs így 9:1-ként állt a
+   táblán — miközben ALATTA, ugyanannak a táblának a gólkrónikájában tíz
+   gólszerző-sor sorakozott, a napló pedig 10:0-t írt. A tábla saját magának
+   mondott ellent; a bejelentés ezt is „elcsúszásnak" látta, joggal.
+   Mostantól az oldal annyi lapot kap, ahány számjegy kell — és csak akkor épül
+   újra, ha a szélesség tényleg változott (a lapok cseréje különben minden
+   gólnál eldobná a flip-animációt). */
 function sbSetScore(gf,ga){
   SB.us=gf;SB.them=ga;
   const box=$("sbScore");if(!box)return;
-  if(!SB.scoreEls){
+  const hs=Math.max(0,SB.usIsHome?gf:ga),as=Math.max(0,SB.usIsHome?ga:gf);
+  const wl=String(hs).length,wr=String(as).length;
+  if(!SB.scoreEls||SB.scoreW!==wl+"x"+wr){
     box.innerHTML="";
-    const mk=()=>{const s=document.createElement("span");s.className="sbFlip big";s.textContent="0";return s;};
-    const l=mk(),r=mk();
+    const l=document.createElement("span"),r=document.createElement("span");
+    l.style.display=r.style.display="inline-flex";l.style.gap=r.style.gap="3px";
+    const le=sbBuildFlips(l,wl,"big"),re=sbBuildFlips(r,wr,"big");
     box.appendChild(l);box.appendChild(sbColon());box.appendChild(r);
-    SB.scoreEls=[l,r];}
-  const hs=SB.usIsHome?gf:ga,as=SB.usIsHome?ga:gf;
-  sbSetDigits([SB.scoreEls[0]],Math.min(9,hs));
-  sbSetDigits([SB.scoreEls[1]],Math.min(9,as));}
+    SB.scoreEls=le.concat(re);SB.scoreW=wl+"x"+wr;SB.scoreLeftN=wl;}
+  sbSetDigits(SB.scoreEls.slice(0,SB.scoreLeftN),String(hs));
+  sbSetDigits(SB.scoreEls.slice(SB.scoreLeftN),String(as));}
 function sbSetClock(totalSec){
   const box=$("sbClock");if(!box)return;
   if(!SB.clockEls){
@@ -43077,7 +43123,7 @@ function sbApplyCompTheme(fx){
 function sbStart(fx,tickMs,auto){
   const wrap=$("sbWrap");if(!wrap||!fx||!fx.o)return;
   _sbPreviewOn=false;   /* innentől élő mérkőzés, nem előnézet */
-  SB.on=true;SB.done=false;SB.live=!auto;SB.ev=[];SB.scoreEls=null;SB.clockEls=null;
+  SB.on=true;SB.done=false;SB.live=!auto;SB.ev=[];SB.scoreEls=null;SB.scoreW=null;SB.clockEls=null;
   $("sbBoard").classList.remove("fin");
   sbApplyCompTheme(fx);
   $("sbClockLbl").textContent="idő";
@@ -43129,7 +43175,7 @@ function sbSync(){
    szándékosan nem engedné át. */
 function sbShowPreview(fx){
   const wrap=$("sbWrap");if(!wrap||!fx||!fx.o)return;
-  SB.ev=[];SB.scoreEls=null;SB.clockEls=null;SB.done=false;
+  SB.ev=[];SB.scoreEls=null;SB.scoreW=null;SB.clockEls=null;SB.done=false;
   _sbPreviewOn=true;
   const b=$("sbBoard");if(b)b.classList.remove("fin");
   {const l=$("sbClockLbl");if(l)l.textContent="idő";}
@@ -49991,7 +50037,7 @@ function playMatch(){
     const duelMine=DUEL?(duelBkt.mine[min/5]||[]):null;
     /* HANGSÚLY-CSÚSZKA (3.8.27): az „own" csatorna — a vödör percével, az
        állással és az emberhátránnyal együtt, mert a hatások időablakosak. */
-    const _dialCtx={min:gmin(min),gf,ga,red:redIdx>=0,injured:_dialInjured};
+    const _dialCtx={min:gnow(min),gf,ga,red:redIdx>=0,injured:_dialInjured};
     let g=DUEL?duelMine.length:poisson(lf*clutchAttackMult(active,min,gf,ga)*busOwnMult()*roleOwnGoalMult(active,redIdx)*dialMul("own",_dialCtx)/18);
     /* ---- BOMBÁZÓK · GÓLÉTVÁGY ----
        Az előző ötpercben gólszerző képességgel esett gól: most dől el, jön-e a
@@ -50028,7 +50074,7 @@ function playMatch(){
       let si=setPiece
         ?weightedPick(active,(x,idx)=>idx===redIdx?0:(SETPW[slots[x.idx].pos]||1)
             *Math.max(1,pOvr(x.p)-58)*mileWeight(MILE,x.p.n),null,spreadSkipGK)
-        :weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf-1,ga)*bzChaseGoalMult(x.p.n,mScore)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga)*dialMul("goalw",{name:x.p.n,pos:slots[x.idx].pos,min:gmin(min),gf:gf-1,ga}),null,spreadSkipGK);
+        :weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf-1,ga)*bzChaseGoalMult(x.p.n,mScore)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga)*dialMul("goalw",{name:x.p.n,pos:slots[x.idx].pos,min:gnow(min),gf:gf-1,ga}),null,spreadSkipGK);
       /* Párharcban a gólszerzőt a közös lista dönti el (a súlyozást a saját
          kliensed már a pillanatkép küldésekor elvégezte). A fenti súlyozott
          választás csak TARTALÉK marad: ha a név bármiért nem található a
@@ -50293,7 +50339,7 @@ function playMatch(){
     /* PÁRHARCBAN a kapott gólok is a közös listából jönnek — és a gólszerző a
        társad VALÓDI játékosa, nem egy hangulatnév. */
     const duelOpp=DUEL?(duelBkt.opp[min/5]||[]):null;
-    let og=DUEL?duelOpp.length:poisson(la*roleOppGoalMult(active,redIdx,min,ga)*busOppMult()*dialMul("opp",{min:gmin(min),gf,ga,red:redIdx>=0,injured:_dialInjured})/18);
+    let og=DUEL?duelOpp.length:poisson(la*roleOppGoalMult(active,redIdx,min,ga)*busOppMult()*dialMul("opp",{min:gnow(min),gf,ga,red:redIdx>=0,injured:_dialInjured})/18);
     for(let k=0;k<og;k++){ga++;
       const dOpp=duelOpp?duelOpp[k]:null;
       const oppScorer=dOpp?shortName(dOpp.scorer):pickOpponentScorer(fx.o);
@@ -50413,7 +50459,7 @@ function playMatch(){
     if(!tierQuoteShown){
       const eliteN=active.filter((a,i)=>{if(i===redIdx)return false;const t=playerCardTier(a.p.n);return t&&cardTierRank(t)>=cardTierRank("killer");}).length;
       if(eliteN>0&&Math.random()<fp(0.12*eliteN)/18){
-        const tq=pickTierQuote(active,gmin(min),redIdx);
+        const tq=pickTierQuote(active,gnow(min),redIdx);
         if(tq){tierQuoteShown=true;
           const d=document.createElement("div");d.className=tq.cls;d.innerHTML=tq.txt;
           if(tq.col)d.style.color=tq.col;
