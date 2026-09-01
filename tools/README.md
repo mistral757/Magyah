@@ -30,6 +30,38 @@ kódban. Ez az ellenőrzés fordítás-szerű hálót feszít alá.
 Kipróbálva: egy szándékosan elgépelt hívásra a szkript pontos sorszámmal
 jelez, és 1-es kilépési kóddal áll meg.
 
+**3. Nyers játékos- és klubnév** (`tools/nev-audit.js`) — **jogtisztasági
+háló.** Az adatbázisban a nevek KANONIKUSAK (a valós játékos- és klubnevek); a
+felületre viszont csak a megjelenítési rétegen át kerülhetnek:
+
+| mi | min át |
+|---|---|
+| játékosnév | `fullName(...)` · `shortName(...)` |
+| klubnév (évszámos alakkal is) | `teamLabel(...)` |
+| klubnév évszám nélkül | `clubLabel(...)` |
+| liganév | `leagueLabel(...)` |
+
+Egy kimaradt burkolás **nem hiba a kód szemszögéből**: a játék fut, a
+szintaxis-ellenőrzés és a no-undef is átengedi — csak épp a valós nevet írja ki.
+A szkript ezért a *kiírási helyeket* (`esc(...)` és `${...}`) veti össze egy
+kézzel karbantartott **névforrás-listával** (`NEVFORRASOK`): ha egy ismert
+névtároló kifejezés burkolás nélkül kerül a képernyőre, jelez, sorszámmal.
+
+Ha a hely NEM kiírás — kulcs, keresés, hálózatra küldött adat —, ott a kanonikus
+név a helyes. Ilyenkor egy `/* nev-ok: <indok> */` megjegyzés némítja el, a
+soron vagy a fölötte lévő három sor bármelyikén. Az indok kötelező: az a
+bizonyíték, hogy valaki tényleg megnézte. Ugyanaz az idióma, mint a
+ledger-audit `INDOKOLT` jelölése.
+
+**Új névtároló mező → új sor a `NEVFORRASOK` listába.** A szkript pontosan
+annyit lát, amennyit felsoroltunk neki; ez nem bizonyítás, hanem háló.
+
+Külön is futtatható:
+
+```bash
+node tools/nev-audit.js
+```
+
 ## Amit szándékosan NEM néz
 
 Stílust, formázást, `no-unused-vars`-t. A kód saját, tömör formázási nyelvet

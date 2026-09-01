@@ -15,6 +15,12 @@
 #       amikor a felhasználó rákattint valamire. Ez az ellenőrzés fordítás-szerű
 #       hálót feszít alá.
 #
+#    3. NYERS JÁTÉKOS- ÉS KLUBNÉV  (tools/nev-audit.js) — jogtisztasági háló.
+#       Az adatbázisban a nevek KANONIKUSAK; a felületre viszont csak a
+#       megjelenítési rétegen át kerülhetnek (fullName / shortName / teamLabel
+#       / clubLabel / leagueLabel). Egy kimaradt burkolás nem hiba a kód
+#       szemszögéből — a játék fut, csak épp a valós nevet írja ki.
+#
 #  Használat:   ./tools/check.sh
 #  Kilépési kód 0 = minden rendben.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -61,6 +67,15 @@ else
     FAIL=1
   fi
   rm -f tools/.lint-target.js
+fi
+
+echo -n "  nyers játékos- és klubnevek … "
+if NEV=$(node tools/nev-audit.js 2>&1); then
+  echo "ok"
+else
+  echo "HIBA"
+  echo "$NEV" | tail -n +2
+  FAIL=1
 fi
 
 if [ "$FAIL" -eq 0 ]; then echo "✓ minden rendben"; else echo "✗ javítandó"; fi
