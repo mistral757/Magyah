@@ -49,12 +49,20 @@ névtároló kifejezés burkolás nélkül kerül a képernyőre, jelez, sorszá
 
 Ha a hely NEM kiírás — kulcs, keresés, hálózatra küldött adat —, ott a kanonikus
 név a helyes. Ilyenkor egy `/* nev-ok: <indok> */` megjegyzés némítja el, a
-soron vagy a fölötte lévő három sor bármelyikén. Az indok kötelező: az a
-bizonyíték, hogy valaki tényleg megnézte. Ugyanaz az idióma, mint a
-ledger-audit `INDOKOLT` jelölése.
+soron vagy a fölötte lévő **hat** sor bármelyikén (egy több sorra tördelt
+sablon belsejébe nem lehet JS-megjegyzést tenni, a jelölésnek tehát a blokk elé
+kell kerülnie). Az indok kötelező: az a bizonyíték, hogy valaki tényleg
+megnézte. Ugyanaz az idióma, mint a ledger-audit `INDOKOLT` jelölése.
 
 **Új névtároló mező → új sor a `NEVFORRASOK` listába.** A szkript pontosan
 annyit lát, amennyit felsoroltunk neki; ez nem bizonyítás, hanem háló.
+
+Egy kivétel: a **`.name` mezőben hordozott név** szabálya *deny-by-default* —
+bármi, ami `.name`-en végződik, gyanús, és a `kiveve` mintában felsorolt
+fogalmak (képesség, bolti tétel, stábtag-típus, taktika, piramis-osztály)
+esnek ki belőle. A név ugyanis nem mindig `.n`: a jutalom-lánc és a díjak
+alkalmi objektumokba pakolják `{name, …}` alakban — a „fejlesztés — jutalom"
+választója pont ezért írta ki évekig a valós neveket.
 
 Külön is futtatható:
 
