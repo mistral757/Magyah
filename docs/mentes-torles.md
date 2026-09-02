@@ -40,7 +40,13 @@ Ugyanez a pár jelenik meg:
 `openSaveDeleteFlow(key, opts)` egyetlen, mindenhonnan hívható függvény —
 egy `#saveDelModal` ablakban két lépésben fut:
 
-1. **Letöltés felkínálása.** "📄 Összegzés letöltése (.txt)" — a
+1. **Kimentés felkínálása — két külön dolog.** Elöl a
+   **"💾 Teljes mentés kimentése (.json)"** áll (3.9.03): ez maga a mentés,
+   amiből a karrier **vissza is tölthető** — lásd
+   `docs/mentes-kimentes-visszatoltes.md`. Ez az egyetlen gomb ezen a
+   képernyőn, ami után a döntés visszafordítható, ezért ez az első.
+
+   Alatta a régi **"📄 Összegzés letöltése (.txt)"** — a
    `generateCareerLegacyText()` (ami az ÉLŐ állapotból dolgozik) új párja,
    `generateCareerLegacyTextFrom(d)`, a MENTETT, nyers JSON-ból építi fel
    ugyanazt az összegzést (szezonról szezonra, jelenlegi felállás,

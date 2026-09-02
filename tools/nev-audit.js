@@ -13,11 +13,26 @@
  *  szem pedig 78 000 soron nem elég. Ez a szkript ezt a hiányt pótolja.
  *
  *  MIT NÉZ. Két dolog EGYÜTTÁLLÁSÁT keresi egy soron belül:
- *    1. KIÍRÁSI HELY  — `esc(...)` hívás vagy `${...}` behelyettesítés;
+ *    1. KIÍRÁSI HELY  — `esc(...)` hívás, `${...}` behelyettesítés, VAGY egy
+ *       közvetlen DOM-szövegírás (`…textContent = …`);
  *    2. NÉVFORRÁS     — olyan kifejezés, amiről tudjuk, hogy KANONIKUS nevet
  *       hordoz (lásd NEVFORRASOK). A lista kézzel írt és bővítendő: minden új
  *       névtároló mezőnek ide a helye.
  *  Ha a névforrás körül nincs megjelenítő függvény, a sor gyanús.
+ *
+ *  A DOM-ÍRÁS KÜLÖN OSZTÁLY, ÉS EZ EGY VALÓDI HIBÁN TANULTUK MEG. Az edző
+ *  sorsolásának kártyája így írta ki a nevet:
+ *      $("coachName").textContent = c.n;
+ *  Se `esc(`, se `${` — a háló tehát RÁ SEM NÉZETT a sorra, és az edzők valós
+ *  neve hónapokig kint volt a képernyőn. A javítás nem egy minta bővítése,
+ *  hanem egy hiányzó KIÍRÁSI ALAK felvétele: a `textContent`/`innerText`/
+ *  `innerHTML` jobb oldala ugyanúgy képernyő, mint egy sablon.
+ *
+ *  Ebben a szűk helyzetben a `.n` és a `.name` MINDENESTŐL névforrásnak
+ *  számít (nem csak a lenti, nevesített minták). Máshol ez nem járható: egy
+ *  általános `.n` szabály a kiírási helyekre 155 találatot adna, azok
+ *  túlnyomó része taktika-, képesség- és osztálynév. A DOM-írásokban viszont
+ *  összesen néhány ilyen sor van, tehát a szigor itt olcsó.
  *
  *  HAMIS RIASZTÁS. Egy névforrás nem mindig KIÍRÁS: lehet kulcs, kereső-érték
  *  vagy hálózatra küldött adat — ott a kanonikus név a HELYES. Ilyenkor a sor
@@ -48,6 +63,8 @@ const BURKOLOK=["fullName","shortName","teamLabel","clubLabel","leagueLabel",
 /* ---- A NÉVFORRÁSOK ----
    Minden bejegyzés egy kifejezés-minta, amiről TUDJUK, hogy kanonikus
    játékos- vagy klubnevet ad vissza. Új névtároló mező → új sor ide. */
+/* Meddig ér vissza egy `nev-ok:` jelölés? (Lásd a KÉZZEL IGAZOLT KIVÉTELt.) */
+const NEVOK_ABLAK=[0,1,2,3,4,5,6];
 const NEVFORRASOK=[
   /* --- klubnév: mérkőzés-ellenfél --- */
   {re:/\b(?:fx|f|nx|_fx)\.o\.n\b/g,                     mi:"a forduló ellenfelének klubneve"},
@@ -68,8 +85,33 @@ const NEVFORRASOK=[
   {re:/\b(?:oppScorer|dramaOppScorer|oppTaker)\b/g,     mi:"az ellenfél gólszerzőjének neve"},
   {re:/\b(?:captainName|oldName|starName)\b/g,          mi:"játékosnév"},
   {re:/\brec\.who\b/g,                                  mi:"a rekordot tartó játékos neve"},
+  /* --- CSERE-PÁR: {out: <távozó>, in: <érkező>} ---
+     A szezonjelentés visszavonulás-sora ilyen párokat épít (newSignings), és a
+     TÁVOZÓ neve át volt írva, az ÉRKEZŐé nem — egyetlen sorban, egymás mellett.
+     A minta TÁG, mert a mezőnév rövid és beszédes: bármi, ami `.in`-re vagy
+     `.out`-ra végződik. Mérve az egész fájlban EGYETLEN nem-név akad fenn rajta
+     (egy darabszám), az jelölést kapott. */
+  {re:/\b[A-Za-z_$][\w$]*\.(?:in|out)\b/g,              mi:"csere-pár neve (`.in` / `.out`)"},
   {re:/\bc\.captain\b/g,                                mi:"a társ csapatkapitányának neve"},
-  {re:/\bS\.grudge\b/g,                                 mi:"posztcsata-nevek halmaza"}
+  {re:/\bS\.grudge\b/g,                                 mi:"posztcsata-nevek halmaza"},
+  /* --- …ÉS A `.name` MEZŐBEN HORDOZOTT NÉV ---
+     EZ VOLT A KIMARADT OSZTÁLY. A név nem mindig `.n`: a jutalom-lánc, a
+     mérföldkövek és a díjak alkalmi objektumokba pakolják `{name, …}` alakban
+     (findIncompleteSkills, buildUpgradeCands, rosterFullChoice, a bajnoki
+     díjak listája). A `.n`-re szabott minták ezeket nem látták — a
+     „fejlesztés — jutalom" választója így írta ki évekig a valós neveket.
+     A minta ezért TÁG: bármi, ami `.name`-en végződik. Ami NEM név (képesség,
+     bolti tétel, osztály, család, taktika), azt a KIVÉTELEK zárják ki alább —
+     így egy új névtároló mező magától bekerül a hálóba, nem kell észben
+     tartani. */
+  {re:/\b[A-Za-z_$][\w$]*\.name\b/g,                    mi:"objektumban hordozott név (`.name`)",
+   /* A KIVÉTELEK. Két csoport:
+        · ami nem SZEMÉLY vagy KLUB (képesség, bolti tétel, stábtag-típus,
+          taktika, családtag-beállítás) — ott nincs mit fordítani;
+        · a PIRAMIS OSZTÁLYAI (`d` / `_d` / `home` / `cur`): a `name` mezőjük a
+          liga-fokozat kitalált magyar neve („Vármegyei liga"), nem klubnév.
+          Ezt a négy változónevet a piramis-kód végig következetesen használja. */
+   kiveve:/\b(?:skill|inst\.skill|c\.inst\.skill|o\.inst\.skill|sk|it|sp|type|def|aw|dl|st|ct|rd|familyState|coachTypeByKey\([^)]*\)|TACTICS\[[^\]]*\]|d|_d|home|cur)\.name$/}
 ];
 
 /* ---- HOL VAN A TALÁLAT? ----
@@ -112,6 +154,14 @@ function burkolt(szakasz){
   return BURKOLOK.some(b=>szakasz.includes(b+"("));
 }
 
+/* ---- A DOM-ÍRÁS MINT KIÍRÁSI HELY ----
+   `X.textContent = <kifejezés>;` — a jobb oldal a képernyőre kerül. A pontos-
+   vessző (vagy a sor vége) a határ; ez elég, mert a DOM-írások egysorosak.
+   Az `==`/`===` összehasonlítást kizárjuk: az kérdés, nem kiírás. */
+const DOM_IRAS=/\.(?:textContent|innerText)\s*=(?!=)\s*([^;]*)/g;
+/* Ebben a szűk helyzetben minden `.n` és `.name` névgyanús — lásd a fejlécet. */
+const DOM_NEV=/\b[A-Za-z_$][\w$]*\.(?:n|name)\b/g;
+
 const talalatok=[];
 for(let i=A+1;i<B;i++){
   const sor=lines[i];
@@ -123,8 +173,29 @@ for(let i=A+1;i<B;i++){
      HÁROM sor bármelyikén. Miért nem csak a soron: egy több sorra tördelt
      sablon belsejébe nem lehet JS-megjegyzést tenni (kiíródna), a nyitó sor
      pedig maga is a sablon része — a jelölésnek tehát a blokk ELÉ kell
-     kerülnie, és onnan is érvényesnek kell lennie. */
-  if([0,1,2,3].some(k=>(lines[i-k]||"").includes("nev-ok:")))continue;
+     kerülnie, és onnan is érvényesnek kell lennie. A hat sor mért érték: a
+     leghosszabb ilyen sablon a jelölés és a kifogásolt sor között öt sort
+     fog közre (a piramis osztályválasztójának gombja). */
+  if(NEVOK_ABLAK.some(k=>(lines[i-k]||"").includes("nev-ok:")))continue;
+  /* 1. ÚT — DOM-szövegírás. Ettől független a sablonos út alább: egy sor
+     lehet mindkettő (`el.innerHTML=\`…${x}…\``), és akkor mindkettő nézi. */
+  DOM_IRAS.lastIndex=0;
+  {let dm;
+   const dlatott=new Set();
+   while((dm=DOM_IRAS.exec(sor))!==null){
+     const jobb=dm[1]||"";
+     if(burkolt(jobb))continue;
+     /* Ha a jobb oldal SABLON vagy `esc(`, akkor a sablonos út (lentebb) már
+        látja, a maga pontos mintáival. Ez az ág CSAK azt a vakfoltot fedi,
+        amit az nem: a nyers, behelyettesítés nélküli DOM-írást. Enélkül a
+        `innerHTML=\`${x.n}…\`` alakú, ártalmatlan címkék tucatjai jönnének be. */
+     if(jobb.includes("${")||jobb.includes("esc("))continue;
+     DOM_NEV.lastIndex=0;
+     let nm;
+     while((nm=DOM_NEV.exec(jobb))!==null){
+       if(dlatott.has(nm[0]))continue;
+       dlatott.add(nm[0]);
+       talalatok.push({sor:i+1,mi:"DOM-szövegbe írt név",mit:nm[0],szoveg:t.slice(0,150)});}}}
   if(!sor.includes("esc(")&&!sor.includes("${"))continue;
   const latott=new Set();
   NEVFORRASOK.forEach(f=>{
@@ -133,6 +204,9 @@ for(let i=A+1;i<B;i++){
     while((m=f.re.exec(sor))!==null){
       /* A .length/.size/.has(…) nem NÉV, hanem darabszám vagy kérdés. */
       if(/^\.(length|size|has\(|add\(|indexOf|includes\()/.test(sor.slice(m.index+m[0].length)))continue;
+      /* Mintánkénti kivétel (lásd a `.name` szabályt): ami nem személy- vagy
+         klubnevet hordoz, azt nem kérjük számon. */
+      if(f.kiveve&&f.kiveve.test(m[0]))continue;
       const sz=slot(sor,m.index);
       if(sz===null)continue;                           /* nem kiírás: feltétel, kulcs, keresés */
       if(burkolt(sz))continue;

@@ -160,7 +160,27 @@ következő kiosztás ad újat.
 futásidejű pillanat, hanem az, ahogy a felhasználó látni akarja a csapatát; egy
 újratöltés nem veheti el tőle.
 
-Meznézetben a korong helyére a **hazai szerelés** kerül, közepén a mezszámmal.
+Meznézetben a korong helyére a **soron következő mérkőzés szerelése** kerül,
+közepén a mezszámmal.
+
+> **HIBA, AMIT EZ JAVÍT (3.9.04).** A pályakép sokáig MINDIG a hazai mezt adta
+> a csapatra — vagyis az idegenbeli szerelés, amit külön meg lehet tervezni,
+> soha nem került ki a pályára. (A sáv felirata is kőbe vésve „a hazai
+> szerelés"-t mondta.) Márpedig épp ez a mód lelke: a meccsek között azt látni,
+> ahogy a csapat a következő mérkőzésre öltözik.
+>
+> A választ egyetlen függvény adja (`kitAwayNow`), és a KÉP meg a FELIRAT is
+> ugyanonnan kérdezi — így a kettő nem csúszhat szét. Három menetrendet ismer,
+> a `playMatch` sorrendjében: osztályozó → kupa → bajnokság; mindhárom
+> ugyanabban az alakban hordozza a `home` mezőt. Menetrend nélkül (draft,
+> szezonon kívül, klasszikus mód) a hazai az alapértelmezés: a pálya a csapat
+> otthona.
+>
+> A forduló-index a LEFÚJÁSIG a futó meccsre mutat (az `S.idx++` csak a
+> `fullTime` legvégén jön), ezért ugyanez az egy lekérdezés szolgálja a
+> felkészülést, a mérkőzést és a két meccs közti nézelődést. A váltás
+> pillanata az `updateStanding` — az minden fordulóváltásnál lefut, sorozattól
+> függetlenül —, és csak akkor rajzol újra, ha a meznézet tényleg áll.
 
 | ami lekerül | miért |
 |---|---|

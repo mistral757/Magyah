@@ -1,9 +1,10 @@
 # 🎬 Meccsről meccsre — az auto meccsindító
 
-*(3.9.01. Az érintett kód mind az `index.html` egyetlen script-blokkjában: a
-„MECCSRŐL MECCSRE" szakasz — `immOn` / `immArm` / `immLeagueStopWhy` /
-`immAfterLeagueMatch` / `immMstatArm` / `immCupArm` —, plusz három bekötési
-pont: `mstatAfterMatch`, `proceedAfterMatch` és `euroAfterUserMatch`.)*
+*(3.9.05. Az érintett kód mind az `index.html` egyetlen script-blokkjában: a
+„MECCSRŐL MECCSRE" szakasz — `immOn` / `immArm` / `immPending` / `immStep` /
+`immLeagueStopWhy` / `immAfterLeagueMatch` / `immCupArm` —, plusz négy bekötési
+pont: a jutalom-lánc indulása (`fullTime`), `mstatAfterMatch`,
+`proceedAfterMatch` és `euroAfterUserMatch`.)*
 
 ## 0. Egy mondatban
 
@@ -33,15 +34,31 @@ marad**, csak a léptetést veszi le a kezedről.
 ```
 lefújás
   │
-  ├─ a meccs értékelése (mstat ablak)      ── 30 mp ──▶ bezárul
+  ├─ JUTALMAK, egyenként ── 3 mp ──▶ tovább
+  │     · új felfedezés · jutalom-képesség · akadémia · tipp-buborék
+  │
+  ├─ a meccs értékelése   ── 3 mp ──▶ bezárul
   │
   ├─ FELKÉSZÜLÉS (a tábla átvált, jön az eligazítás)
-  │                                        ── 15 mp ──▶ KEZDŐRÚGÁS
+  │                       ── 15 mp ──▶ KEZDŐRÚGÁS
   └─ …és kezdődik elölről
 ```
 
-**A harminc és a tizenöt nem esetleges.** Az értékelő egy *táblázat* — végig
-kell olvasni; az eligazítás egy *bekezdés* — átfutni is elég.
+**A három és a tizenöt nem esetleges.** A tudnivaló egy *mondat* — három
+másodperc alatt elolvasható, és a lánc lényege épp az, hogy ne kelljen
+koppintani érte. A felkészülés viszont az utolsó pont, ahol még beavatkozhatsz
+(csere, taktika), ezért ott bőven marad idő.
+
+> **EZ VOLT AZ EREDETI TERV HIÁNYA (3.9.05).** Az első változat csak két
+> pontot ismert: az értékelő ablakot (30 mp) és a felkészülést (15 mp). A
+> jutalmak viszont az értékelő **előtt** jönnek — a lefújás után előbb fut a
+> felfedezés, a jutalom-képesség és az akadémia (`afterAllRewards`), és csak
+> utána nyílik az értékelő. A lánc tehát épp ott fegyverkezett fel, ahol a
+> munka már véget ért: a jutalom-képernyők alatt semmi nem számolt, és a
+> képernyő-őr minden nyitott ablakra megállította a láncot — akkor is, ha az
+> ablakban semmi dolgod nem volt, csak egy „Rendben".
+>
+> Ezért a lánc ma nem egy időzítő, hanem egy **lépés-hurok** (`immStep`).
 
 A visszaszámlálás mindkét lépésnél egy **lebegő pirulán** látszik: mi
 következik, hány másodperc múlva, és mellette egy `⏹ Állj`. A pirula azért
@@ -81,6 +98,39 @@ visszatérési érték maga az indok, ahogy a naplóba is kerül.
 következő fordulótól magától folytatódik. Kikapcsolni csak a kapcsoló vagy a
 pirula `⏹ Állj` gombja tud.
 
+### Mit léptet el magától, és mit nem
+
+A hurok minden lépésnél megnézi, mi áll a képernyőn, és három dolog egyikét
+teszi:
+
+| a képernyőn | a lánc |
+|---|---|
+| **tudnivaló** — egyetlen „Rendben"-szerű gomb | 3 mp múlva megnyomja, és újra körbenéz |
+| **valódi döntés** — két vagy több választható út | **megáll**, és megmondja, min |
+| **átmeneti** — épp fut egy animáció (képesség-sorsolás) | vár, nem lép és nem áll meg |
+| **tiszta** | jöhet a felkészülés, majd a kezdőrúgás |
+
+**A döntés-felismerés nem azonosító-lista, hanem a GOMBOK SZÁMA** a képernyő
+gomb-dobozában. Ez nem trükk, hanem a kód szerkezetéből következik: ugyanaz a
+doboz (`#unlockActions`) szolgálja ki az **új felfedezést** (egy gomb:
+„Rendben") és a **tele keretet** meg az **akadémiát** (két út) — az azonosító
+tehát önmagában nem is döntené el. Ugyanez a képesség-képernyőn: a „nem te
+döntesz" ág egyetlen „Rendben"-t rak ki, a valódi kiosztás egy egész listát.
+
+Amit így nem ismerünk fel — bármi más nyitott ablak vagy képernyő —, ahhoz
+**nem nyúlunk**: a lánc megáll. Vaktában kattintgatni rosszabb, mint várni.
+
+> **Két biztosíték.** (1) Ha egy képernyő a koppintásra nem tűnik el, a hurok
+> három másodpercenként örökké pörögne — tizenkét egymást követő lépés után
+> megáll és szól (`IMM_STEP_MAX`). (2) Ha egy képernyő „átmeneti" marad
+> örökre — mert gomb nélkül ragadt bent —, húsz körülnézés (~9 mp) után
+> ugyanígy megáll (`IMM_WAIT_MAX`).
+>
+> **A NULLA GOMB NEM DÖNTÉS.** Ez nem apró részlet: a gomb-számláló szabály
+> naiv olvasata szerint a „nem egy gomb" az döntés volna — és egy épp épülő
+> vagy bent ragadt, gomb nélküli képernyőn a lánc örökre olyan kérdésre várna,
+> ami meg sem jelent. Nulla gombnál tehát VÁRUNK, nem állunk meg.
+
 ### Képernyő-őr
 
 A visszaszámlálás alatt elnavigálhatsz: átmehetsz a HUB-ba, megnyithatsz egy
@@ -96,13 +146,13 @@ ablak; ha nincs, a lánc megáll és meg is mondja, miért.
 Ugyanez fut, egy lépéssel rövidebben:
 
 ```
-lefújás ─ értékelő 30 mp ─▶ bezárul ─▶ KUPA-NÉZET ─ 15 mp ─▶ kezdőrúgás
+lefújás ─ üzenetek 3 mp-enként ─▶ KUPA-NÉZET ─ 15 mp ─▶ kezdőrúgás
 ```
 
 A kupameccs után a játék eddig is **tartott** harminc másodpercet, mielőtt a
 sorozat-nézetbe ugrott (`euroHoldStart`). Bekapcsolt móddal ez **kimarad**: a
-nézelődés ideje már megvolt (az értékelő ablak harminc másodperce), és két
-egymás utáni harmincas várakozás nem ritmus, hanem üresjárat.
+lánc épp azért van, hogy ne kelljen várni — egy harminc másodperces tartás a
+tetején nem ritmus, hanem üresjárat.
 
 ### A határ a SZAKASZ
 
@@ -139,9 +189,9 @@ elindítod a végigjátszást, a lánc lelép (`immCancel`), és amíg az fut, a
 
 ## 6. Hangoló számok
 
-`IMM_MSTAT_SEC` 30 · `IMM_PREP_SEC` 15.
+`IMM_STEP_SEC` 3 · `IMM_PREP_SEC` 15 · `IMM_STEP_MAX` 12 · `IMM_WAIT_MAX` 20.
 
-Mindkettő egy helyen áll, a szakasz tetején. A kupa-ág is a `IMM_PREP_SEC`-et
+Mind egy helyen áll, a szakasz tetején. A kupa-ág is a `IMM_PREP_SEC`-et
 használja — ott a kupa-nézet és a kezdőrúgás közti szünet ugyanaz a műfaj,
 mint a bajnoki felkészülésé.
 
@@ -156,13 +206,21 @@ a felhasználó nézni akarja a karrierjét; egy újratöltés nem veheti el tő
 Futásidőben egyetlen időzítő él (`_immT`): egy új visszaszámlálás indítása a
 régit leállítja, tehát két lánc sosem futhat egymás mellett.
 
+A hurok **idempotens**: a `_immTarget` megjegyzi, MELYIK képernyőre számolunk,
+és ha ugyanarra hívják újra, nem indítja elölről. Ez azért kell, mert az
+`immStep`-nek több hívója van — a jutalom-lánc indulása, az értékelő ablak és a
+forduló vége —, és a pirulának nem szabad visszaugrálnia attól, hogy kétszer
+kérdezünk rá ugyanarra.
+
 ---
 
 ## 8. Amit szándékosan NEM csinál
 
 * **Nem dönt helyetted.** A hiányzók panelje, a jutalom-képesség választója és
-  minden megerősítő kérdés ugyanúgy feljön — a lánc csak a *léptetést* veszi
-  le a kezedről, a döntéseket nem.
+  minden megerősítő kérdés ugyanúgy feljön, és ott a lánc MEGÁLL — csak a
+  *léptetést* veszi le a kezedről, a döntéseket nem. A tudnivalókat elléptet;
+  a választásokat érintetlenül hagyja.
+* **Nem kattint vaktában.** Amit nem ismer fel, ahhoz nem nyúl: inkább megáll.
 * **Nem gyorsítja a mérkőzést.** A közvetítés tempóját továbbra is a Tempó
   csúszka állítja; a két rendszer külön él.
 * **Nem szól bele a párharcba.** Közös karrierben a párharc-forduló megálló:
