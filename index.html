@@ -5424,7 +5424,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.05";
+const APP_VERSION="3.9.06";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -21762,6 +21762,33 @@ function maybePlanRetirement(entry,seasonNow){
   if(Math.random()>=planRetirementChance(entry))return false;
   entry.retirePlan=seasonNow+1+(Math.random()<0.5?0:1);
   return true;}
+/* ---- AZ ELSŐ SZEZON VÉGÉN SENKI NEM VONUL VISSZA (3.9.06) ----
+   BEJELENTETT HIBA: „első szezonban ne legyenek visszavonulások. ott max
+   jelentsék be az 1 szezonon belüli visszavonulást szezon végén. jelenleg
+   ugyanis láthatatlan visszavonulásként működnek."
+
+   A baj szerkezeti, és pontosan egy sorban áll: a nyugdíj-TERV kizárólag
+   szezonvégén születhet meg, tehát az ELSŐ szezonvég az első alkalom, amikor
+   bárki bejelenthetne bármit — csakhogy UGYANAZ a szezonvég már vissza is
+   vonultat. Az első idényben ezért MINDEN visszavonulás előzmény nélküli: a
+   felhasználó felállít egy keretet, lejátszik egy idényt, és egy embere szó
+   nélkül eltűnik. A későbbi szezonokban legalább van esély a figyelmeztetésre;
+   az elsőben matematikailag nincs.
+
+   A javítás nem a kockát hangolja, hanem a SORRENDET teszi helyre: az első
+   szezon végén a kocka nem visz el senkit, csak BEJELENT. Aki most menne, az
+   még egy idényt játszik — és a bejelentés kimegy a naplóba és a
+   szezonjelentésbe is. Így a visszavonulás soha nem érkezhet figyelmeztetés
+   nélkül. */
+function retireSeasonEndAllowed(seasonNow){return (seasonNow||1)>1;}
+/* A BEJELENTÉS KÖNYVELÉSE egy helyen: a szezonjelentés sora és a naplósor
+   együtt jár. Eddig a tartalék-keret ága csak a jelentésbe írt, naplóba nem —
+   ugyanaz az esemény két helyen másképp látszott. */
+function retireNoteAnnounce(entry,seasonNow,report){
+  if(!entry||!entry.retirePlan)return;
+  report.retirePlans.push({n:entry.n,age:entry.age,season:entry.retirePlan});
+  try{addLine(`⏳ ${esc(shortName(entry.n))} (${entry.age}) bejelentette: még `
+    +`${Math.max(1,entry.retirePlan-seasonNow)} szezon, és visszavonul.`,"m life");}catch(e){}}
 function shouldRetire(age,currentRating,peak,retireExtendTo){
   /* Ha az "öreg csirkefogó" boost kitolta a nyugdíjat, addig biztosan marad. */
   if(retireExtendTo&&age<retireExtendTo)return false;
@@ -21948,7 +21975,14 @@ function advanceCareerSeason(){
        hozza el a visszavonulást, esélyt adunk egy ELŐREJELZÉS beállítására. */
     const seasonNow=S.seasonNumber||1;
     const planned=entry.retirePlan&&seasonNow>=entry.retirePlan;
-    if(planned||(!entry.retirePlan&&shouldRetire(entry.age,entry.startRating,entry.peak,entry._retireExtendTo))){
+    let megy=planned||(!entry.retirePlan&&shouldRetire(entry.age,entry.startRating,entry.peak,entry._retireExtendTo));
+    /* AZ ELSŐ SZEZON VÉGÉN CSAK BEJELENTÉS (lásd retireSeasonEndAllowed). A
+       bejelentés itt NEM kocka: pont ő az, aki most abbahagyta volna, tehát
+       biztosan bejelenti — és a következő idény végén megy. */
+    if(megy&&!retireSeasonEndAllowed(seasonNow)){
+      megy=false;
+      if(!entry.retirePlan){entry.retirePlan=seasonNow+1;retireNoteAnnounce(entry,seasonNow,report);}}
+    if(megy){
       report.retired.push({n:loc.p.n,age:entry.age,coachFp:offerCoachIfEligible(entry)});
       const codes=locCodes(loc);
       const repl=Object.values(careerPool).find(e=>!draftedNow.has(e.n)&&e.pos.some(pp=>codes.includes(pp)));
@@ -21973,9 +22007,7 @@ function advanceCareerSeason(){
       loc.p.ovr=entry.startRating;loc.p.age=entry.age;loc.p.tsi=entry.tsi;
       /* NYUGDÍJ-ELŐREJELZÉS: aki marad, az bejelentheti, hogy 1-2 szezon
          múlva abbahagyja — így van idő utánpótlásról gondoskodni. */
-      if(maybePlanRetirement(entry,seasonNow)){
-        report.retirePlans.push({n:entry.n,age:entry.age,season:entry.retirePlan});
-        addLine(`⏳ ${esc(shortName(entry.n))} (${entry.age}) bejelentette: még ${Math.max(1,entry.retirePlan-seasonNow)} szezon, és visszavonul.`,"m life");}
+      if(maybePlanRetirement(entry,seasonNow))retireNoteAnnounce(entry,seasonNow,report);
     }});
   /* a tartalék-keret (extraRoster) is frissül és öregszik/visszavonulhat —
      eddig ez a szinkron kimaradt, ami a fiatal/tartalék játékosok Ratingjét
@@ -21986,13 +22018,18 @@ function advanceCareerSeason(){
     if(!entry)continue;
     const seasonNow2=S.seasonNumber||1;
     const planned2=entry.retirePlan&&seasonNow2>=entry.retirePlan;
-    if(planned2||(!entry.retirePlan&&shouldRetire(entry.age,entry.startRating,entry.peak,entry._retireExtendTo))){
+    let megy2=planned2||(!entry.retirePlan&&shouldRetire(entry.age,entry.startRating,entry.peak,entry._retireExtendTo));
+    /* ugyanaz a szabály, mint a kezdő keretnél: az első szezon végén csak
+       bejelentés — a tartalék-keret embere sem tűnhet el figyelmeztetés nélkül */
+    if(megy2&&!retireSeasonEndAllowed(seasonNow2)){
+      megy2=false;
+      if(!entry.retirePlan){entry.retirePlan=seasonNow2+1;retireNoteAnnounce(entry,seasonNow2,report);}}
+    if(megy2){
       report.retired.push({n:p.n,age:entry.age,coachFp:offerCoachIfEligible(entry)});
       extraRoster.splice(i,1);
     }else{
       p.ovr=entry.startRating;p.age=entry.age;p.tsi=entry.tsi;
-      if(maybePlanRetirement(entry,seasonNow2))
-        report.retirePlans.push({n:entry.n,age:entry.age,season:entry.retirePlan});
+      if(maybePlanRetirement(entry,seasonNow2))retireNoteAnnounce(entry,seasonNow2,report);
     }}
   const existingNames=new Set(Object.keys(careerPool));
   report.retired.forEach(()=>{
@@ -22024,7 +22061,12 @@ function advanceCareerSeason(){
   const famP=currentRoster().find(p=>p.family);
   if(famP){
     famP.age=(famP.age||generateStartAge())+1;
-    if(famP.age>=33&&shouldRetire(famP.age,famP.ovr,famP.ovr+10)){
+    /* A CSALÁDTAG BÚCSÚJA IS VISSZAVONULÁS — az első szezon végén tehát ez
+       sem jöhet (lásd retireSeasonEndAllowed). Ő a keretben marad utána is,
+       de a bejelentés attól még bejelentés: az első idény után ne érje
+       felkészületlenül a felhasználót. */
+    if(retireSeasonEndAllowed(S.seasonNumber||1)
+       &&famP.age>=33&&shouldRetire(famP.age,famP.ovr,famP.ovr+10)){
       report.familyRetired={n:famP.n,age:famP.age};
     }}
   pruneChemistry();
@@ -61623,6 +61665,7 @@ function shapeCostHtml(){
   let sh;try{sh=teamShape();}catch(e){return "";}
   if(!sh)return "";
   const st=shapeStatNow();
+  /* nev-ok: az `L.out` itt DARABSZÁM (hány ember hiányzik), nem játékosnév */
   const sor=(cim,L)=>`${cim}: <b>${L.now}/${L.base}</b> középen${L.out?` <span style="color:var(--red)">(−${L.out})</span>`:""}`;
   const free=(sh.pct<=0);
   return `<div style="margin-top:8px;border-top:1px dashed var(--line);padding-top:6px;font-size:11.5px;line-height:1.5;color:var(--dim2)">
@@ -72593,7 +72636,7 @@ function hubShowSeasonReportBody(){
     html+=`<div style="color:var(--gold);font-weight:700;font-size:12px;text-transform:uppercase;margin-bottom:5px">Visszavonulások</div>`;
     report.retired.forEach(r=>{
       const signing=report.newSignings.find(s=>s.out===r.n);
-      html+=`<div style="font-size:13px;margin-bottom:3px">${esc(fullName(r.n))} (${r.age} évesen) visszavonult${signing?` — helyette <b>${esc(signing.in)}</b> csatlakozott`:""}.`
+      html+=`<div style="font-size:13px;margin-bottom:3px">${esc(fullName(r.n))} (${r.age} évesen) visszavonult${signing?` — helyette <b>${esc(fullName(signing.in))}</b> csatlakozott`:""}.`
         /* A DÖNTÉS MAGA NEM ITT VAN: a jelentés HTML-je mentésre kerül, tehát
            az itteni gombok egy újratöltés után halottak lennének. Itt csak
            jelezzük, hogy van mit eldönteni — a kártya alatta, élőben jön. */
@@ -72618,7 +72661,7 @@ function hubShowSeasonReportBody(){
     html+=`<div style="height:8px"></div>`;}
   if(report.familyRetired){
     html+=`<div style="color:var(--purple);font-weight:700;font-size:12px;text-transform:uppercase;margin:8px 0 5px">A család búcsúzik</div>
-      <div style="font-size:13px">${esc(report.familyRetired.n)} ${report.familyRetired.age} évesen letette a cipőt. Örökre a csapat része marad — köszönjük, ${esc(report.familyRetired.n)}!</div>`;}
+      <div style="font-size:13px">${esc(fullName(report.familyRetired.n))} ${report.familyRetired.age} évesen letette a cipőt. Örökre a csapat része marad — köszönjük, ${esc(fullName(report.familyRetired.n))}!</div>`;}
   if(report.scoutImproved)html+=`<div style="font-size:13px;color:var(--gold);margin-top:8px">A scoutod fejlődött — most már ${scoutStarsLabel(scout.stars)}</div>`;
   /* ---- A SZEZON KIHÍVÁSAINAK MÉRLEGE ----
      A lezárás eddig egyetlen naplósorban történt, a szezonzárás sűrűjében —

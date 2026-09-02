@@ -85,6 +85,13 @@ const NEVFORRASOK=[
   {re:/\b(?:oppScorer|dramaOppScorer|oppTaker)\b/g,     mi:"az ellenfél gólszerzőjének neve"},
   {re:/\b(?:captainName|oldName|starName)\b/g,          mi:"játékosnév"},
   {re:/\brec\.who\b/g,                                  mi:"a rekordot tartó játékos neve"},
+  /* --- CSERE-PÁR: {out: <távozó>, in: <érkező>} ---
+     A szezonjelentés visszavonulás-sora ilyen párokat épít (newSignings), és a
+     TÁVOZÓ neve át volt írva, az ÉRKEZŐé nem — egyetlen sorban, egymás mellett.
+     A minta TÁG, mert a mezőnév rövid és beszédes: bármi, ami `.in`-re vagy
+     `.out`-ra végződik. Mérve az egész fájlban EGYETLEN nem-név akad fenn rajta
+     (egy darabszám), az jelölést kapott. */
+  {re:/\b[A-Za-z_$][\w$]*\.(?:in|out)\b/g,              mi:"csere-pár neve (`.in` / `.out`)"},
   {re:/\bc\.captain\b/g,                                mi:"a társ csapatkapitányának neve"},
   {re:/\bS\.grudge\b/g,                                 mi:"posztcsata-nevek halmaza"},
   /* --- …ÉS A `.name` MEZŐBEN HORDOZOTT NÉV ---
