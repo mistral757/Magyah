@@ -5458,7 +5458,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.19";
+const APP_VERSION="3.9.20";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -13237,6 +13237,10 @@ function pyrStart(startDiv,speed,sq,upLv){
     S.pyr={on:true,my:d0,startDiv:d0,aiSpeed:sp,divs:w.divs,spare:sp1,spare2:sp2,
            off:0,worldShift:offMp,rawMean:Math.round(rawMeanMp*10)/10,clubRaw:clubRawMp,
            clubEff:clubEffMp,startDrag:startDragMp,
+           /* A KÉRT RÉS, a szezonindító horgonynak. Ez a szoba beállításából
+              jön, tehát MINDKÉT kliensnél ugyanaz — ellentétben a gap0-val,
+              ami a saját keretedhez mért, és ezért kliensenként más. */
+           gapWantMp:(typeof pyrWantedGap==="number")?pyrWantedGap:null,
            up,upAmt:up,
            gap0:clubEffMp==null?null:Math.round((clubEffMp-rawMeanMp-up)*10)/10,
            log:[],meas:null,mp:1,v:1};
@@ -28844,6 +28848,78 @@ function pyrDiffById(id){return PYR_START_DIFF.find(x=>x.id===id)||null;}
 
    KÖZÖS KARRIERBEN KIMARAD: ott a szintet a két menedzser alkuja adja
    (mpSeasonGate), azt nem írhatja felül egy egyoldalú újramérés. */
+/* ================= A KÖZÖS HORGONY (3.9.20) =================
+   BEJELENTETT PANASZ: „a beállítás a szezon indításkori nyers erőket kellene
+   figyelembe vegye és ahhoz igazítsa a nehézségi szintet a választott
+   divízióhoz… 84-es csapattal vagyok 78-asok között."
+
+   MIÉRT NEM ELÉG A MEGLÉVŐ HORGONY. A pyrAnchorAtKickoff a SAJÁT keretedhez
+   igazítja a világot, és közös karrierben az első sorában kiszáll — jogosan:
+   ha ezt mindkét kliens megtenné a magáéhoz, a két világ szétnőne, márpedig
+   a közös karrier egész alapja, hogy bitre azonos.
+
+   A MEGOLDÁS: a horgony ne a SAJÁT keretből dolgozzon, hanem a KETTŐÉBŐL —
+   olyan számokból, amiket mindkét kliens ismer. A szezonindító kézfogás
+   (mpStartExchange) amúgy is lefut minden idény előtt, és már ma is viszi a
+   csapaterőt (`str`). Nincs szükség új hálózati csatornára.
+
+   AMI SKÁLÁT NEM HASZNÁLHATUNK, ÉS EZ A LÉNYEG. A magányos horgony a
+   levelGap()-et hajtja, az pedig oppMatchStrength()-en át tartalmazza a
+   hiddenMatchBonus()-t: a te morálod, edződ, kapitányod, taktikád. Az
+   KLIENSFÜGGŐ — abban a skálában horgonyozva a két világ garantáltan
+   szétnőne. Ezért itt MINDEN bemenet cserélt vagy közös:
+
+     avgStr   a két kicserélt csapaterő átlaga  → mindkét kliensen azonos
+     want     a szoba beállításából jött rés     → mindkét kliensen azonos
+     pyrLevel a világ saját szintje              → a közös világból számol
+
+   A cél: a KETTŐTÖK ÁTLAGA álljon pontosan a kért résre a mezőnytől. Aki
+   erősebbet hozott, annak könnyebb idénye lesz, aki gyengébbet, annak
+   nehezebb — szimmetrikusan, és kimondva. */
+const PYR_MP_ANCHOR_MAX=12;      /* ennél többet egy horgony nem tolhat */
+function pyrAnchorShared(myStr,mateStr){
+  const P=(typeof S!=="undefined"&&S)?S.pyr:null;
+  if(!P||!P.on)return null;
+  if(P.mpAnchored)return null;                    /* karrierenként egyszer */
+  if(typeof myStr!=="number"||typeof mateStr!=="number")return null;
+  if(!isFinite(myStr)||!isFinite(mateStr))return null;
+  const avg=(myStr+mateStr)/2;
+  const want=(typeof P.gapWantMp==="number"&&isFinite(P.gapWantMp))?P.gapWantMp:0;
+  const elotte=Math.round((avg-pyrLevel())*10)/10;
+  let moved=0;
+  for(let i=0;i<40;i++){
+    const err=(avg-pyrLevel())-want;
+    if(Math.abs(err)<0.15)break;
+    /* A pyrShiftWorld KIVONJA az `off`-ot, tehát a −step a világot EMELI, ha
+       ti vagytok túl erősek. A lépést vágjuk, hogy egy elszaladt szám se
+       lökje ki a világot egyetlen körben. */
+    const step=Math.max(-4,Math.min(4,err));
+    if(Math.abs(moved+step)>PYR_MP_ANCHOR_MAX)break;
+    pyrShiftWorld({divs:P.divs},-step);
+    if(P.spare)P.spare.ovr=Math.round((P.spare.ovr+step)*10)/10;
+    if(P.spare2)P.spare2.ovr=Math.round((P.spare2.ovr+step)*10)/10;
+    P.worldShift=Math.round(((P.worldShift||0)-step)*10)/10;
+    moved+=step;}
+  moved=Math.round(moved*10)/10;
+  P.mpAnchored=true;
+  if(!moved)return {moved:0,elotte,utana:elotte,avg,want};
+  /* A SZINTVÁLTÁS ÁTVEZETÉSE — ugyanaz a lánc, amit a pyrStart és a magányos
+     horgony is futtat a világ eltolása után. Egy helyről másolva, mert
+     ugyanaz a művelet. */
+  oppTargetRating=pyrLevel();
+  careerBaseRating=oppTargetRating;
+  if(gameMode==="career"&&careerPool)Object.values(careerPool).forEach(e=>{
+    if(drafted.has(e.n))return;
+    applyMarketShift(e);
+    e.startRating=Math.round(ratingAtAge(e.peak,e.age));
+    syncAttrsToRating(e);
+    if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
+  P.grow=null;
+  SEASON_OPPS=pyrOpponents();
+  pyrGrowStep();pyrOppRefresh();
+  try{pyrInfinityCheck();}catch(e){}
+  if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
+  return {moved,elotte,utana:Math.round((avg-pyrLevel())*10)/10,avg,want};}
 function pyrAnchorAtKickoff(){
   const P=(typeof S!=="undefined"&&S)?S.pyr:null;
   if(!P||!P.on||gameMode!=="career")return false;
@@ -49121,6 +49197,33 @@ async function mpStartTick(key,myField,oppField,onReady,myBidRec){
       const mateRec=(myField==="host")?mate:mine;
       if(hostRec&&hostRec.w)mpAdoptWorldAxes(hostRec.w,(mateRec&&mateRec.w)||null);
     }catch(e){}
+    /* ---- PIRAMIS: A KÖZÖS HORGONY (3.9.20) ----
+       Itt a mezőnyt nem alku adja, hanem az osztály — az applyOppLevel amúgy
+       is elutasítaná. Ami viszont EDDIG NEM TÖRTÉNT MEG: a világ igazítása a
+       TÉNYLEGES kezdő keretekhez. A két csapaterő épp most cserélt gazdát,
+       tehát mindkét kliens ugyanabból a két számból számol — lásd
+       pyrAnchorShared. Karrierenként egyszer fut (P.mpAnchored). */
+    if(typeof pyrOn==="function"&&pyrOn()){
+      let a=null;
+      try{a=pyrAnchorShared(mine&&mine.str,mate&&mate.str);}catch(e){}
+      /* A SOROZAT-SZÁMLÁLÓK nullázása a szezonindítás része — az ág, amit ez
+         a korai visszatérés kihagy, eddig is megtette. Nem viselkedést
+         váltunk, csak a mezőny beállítását cseréljük le. */
+      S.consecutiveTitles=0;S.consecutiveBadSeasons=0;
+      mpStartAbort();
+      if(a){
+        addLine(`🤝 <b>Közös horgony:</b> a te csapatod ${Math.round(mine.str)}, a társadé `
+          +`${Math.round(mate.str)} — az átlagotok ${Math.round(a.avg*10)/10}, `
+          +`a mezőny ${oppTargetRating}.`,"m life");
+        if(a.moved)
+          addLine(`✦ A mezőny a kezdő kereteitekhez igazodott: a rés `
+            +`${a.elotte>0?"+":""}${a.elotte} → ${a.utana>0?"+":""}${a.utana} `
+            +`(a vállalás ${a.want>0?"+":""}${a.want}).`,"m ev");
+        else
+          addLine(`✦ A mezőny már a helyén állt — nem kellett igazítani.`,"m ev");
+      }
+      try{saveGame();}catch(e){}
+      onReady();return;}
     /* MINDKÉT KLIENS UGYANEZT SZÁMOLJA ki ugyanabból a két rekordból — ezért
        nincs szükség "döntőbíró" oldalra, és nem is csúszhat szét. */
     const r=mpResolveLevel(mine,mate);
@@ -83831,6 +83934,12 @@ function mpCollectSettings(){
                       KÉT MEZŐ: az `upAmt` a mai, folyamatos eltolás; az `up` a
                       3.5.15 előtti kliensek 0-4 fokozata, hogy egy régi
                       verziójú társ se kapjon értelmezhetetlen számot. */
+                   /* A KÉRT RÉS IS UTAZIK (3.9.20). Eddig csak az `up` ment,
+                      és a vendég visszafejtette belőle — a visszafejtés viszont
+                      kerekít, tehát a két oldal fél ponttal elcsúszhatott. A
+                      szezonindító horgony ebből a számból dolgozik, ott pedig
+                      a fél pont is világ-eltérés. */
+                   gap:(typeof pyrWantedGap==="number")?pyrWantedGap:null,
                    upAmt:pyrUpNorm(pyrWantedUp),
                    up:Math.max(0,Math.min(4,Math.round(pyrUpNorm(pyrWantedUp)/(PYR_UP_MAX/4))))}:{on:false}};}
 function mpApplySettings(s){
@@ -83890,7 +83999,7 @@ function mpApplySettings(s){
         mint a házigazdáén, és az a RÉSBŐL számolja a világ eltolását — ha a
         rés nálunk 0 maradna, a helyi számítás némán felülírná a házigazda
         döntését. Ezért itt visszafejtjük: rés = sávközép − osztályközép − up. */
-     pyrWantedGap=pyrMpGapFromUp(pyrWantedUp);
+     pyrWantedGap=(typeof P.gap==="number")?P.gap:pyrMpGapFromUp(pyrWantedUp);
      /* ---- A KEZDÉS MÓDJA A HÁZIGAZDÁÉ, NEM A MIÉNK ----
         BEJELENTETT HIBA: „Host ágon ennél a konkrét esetnél ténylegesen draft
         volt, ahogyan a világot beállította, guest oldalon viszont kész

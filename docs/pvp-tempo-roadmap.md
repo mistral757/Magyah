@@ -318,6 +318,36 @@ az küldi az üzenetet. **Ez az, amit tényleg kértél.**
 
 ---
 
+## 4/b. A KÖZÖS HORGONY ✅ KÉSZ (3.9.20)
+
+*(Nem a három ötlet egyike — menet közben derült ki, hogy a hagyományos mód
+közös ága sosem igazította a világot a tényleges kezdő keretekhez.)*
+
+A `pyrAnchorAtKickoff` a SAJÁT keretedhez igazít, és közös karrierben az első
+sorában kiszáll — jogosan: ha ezt mindkét kliens megtenné a magáéhoz, a két
+világ szétnőne.
+
+**A megoldás:** a horgony a KETTŐTÖK adatából dolgozik. A szezonindító
+kézfogás (`mpStartExchange`) amúgy is lefut minden idény előtt, és már ma is
+viszi a csapaterőt — nem kellett új hálózati csatorna.
+
+**A skála, amit NEM lehetett használni, és ez a lényeg.** A magányos horgony a
+`levelGap()`-et hajtja, az pedig `oppMatchStrength()`-en át tartalmazza a
+`hiddenMatchBonus()`-t: a te morálod, edződ, kapitányod, taktikád.
+**Kliensfüggő** — abban a skálában horgonyozva a két világ garantáltan
+szétnőtt volna. Ezért minden bemenet cserélt vagy közös: a két kicserélt
+csapaterő átlaga, a szobából jött rés, és a világ saját `pyrLevel()`-je.
+
+Mérve (`tools/pyr-horgony-proba.js`):
+
+| próba | eredmény |
+|---|---|
+| a két kliens ugyanazt a párt fordított sorrendben látja | **bitre azonos világ** |
+| kért rés 0 · +4 · −4 (átlag 83) | mezőny 83 · 79 · 87 — pontosan |
+| kétszer lefuttatva | a második nem csinál semmit |
+| hiányzó szám (régi kliens/szoba) | nem csinál semmit |
+| abszurd bemenet (200 vs 200) | a vágás megfogja (max 12) |
+
 ## 5. Ötlet 3 — Párkereső
 
 ### 5.1 A technikai rész a könnyebbik fele
