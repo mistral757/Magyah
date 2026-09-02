@@ -82,17 +82,33 @@ kiírása elszáll** — a játék működik, de a bökés nem.
 |---|---|
 | `netlify/functions/nudge.js` | **új** — ez küldi a push-t, ez őrzi a titkos kulcsot |
 | `package.json` | **új** — kizárólag a `web-push` függőségért |
-| `netlify.toml` | **új** — kimondja, hogy nincs build (lásd lent) |
+| `netlify.toml` | **új** — kizárólag a függvények helyét mondja ki (lásd lent) |
+| `package-lock.json` | **új** — hogy a telepítés determinisztikus legyen |
 | `sw-1.js` | `push` és `notificationclick` kezelő |
 | `index.html` | a kliens-réteg, a két gomb, a fékek |
 | `tools/firebase-rules.json` | `push` + `nudgeAt` |
 
-> **MIÉRT KELLETT `netlify.toml`.** Eddig nem volt: a Netlify a repó gyökerét
-> publikálta, és kész. A `package.json` viszont **build-lépésnek látszik** — a
-> Netlify egy ilyen fájl láttán magától keresne buildet. A `netlify.toml`
-> kimondja, hogy nincs: a gyökér megy ki, változatlanul.
+> **A `netlify.toml` ELSŐ VÁLTOZATA ELRONTOTTA A DEPLOYT — és ezt itt is
+> kimondom, mert ebben a lapban álltak azok a mondatok, amik félrevezettek.**
 >
-> **Ha a deploy mégis furán viselkedne, ez az első gyanúsított.**
+> Az eredeti indoklás az volt, hogy a `package.json` „build-lépésnek látszik",
+> ezért egy `[build]` szakasszal (`command = ""`, `publish = "."`) kell
+> kimondani, hogy nincs build. **Ez az indoklás hibás volt**, a következmény
+> pedig valóságos: az első deploy **11 másodperc alatt elhasalt**, mert a
+> publikálási könyvtár így kimondva azonos lett a projekt gyökerével, és a
+> Netlify ezt a párost konfigurációs hibaként utasítja vissza.
+>
+> A Netlify **nem talál ki magának build-parancsot** egy `package.json`
+> láttán: a felületen mentett (üres) beállítás marad érvényben. A védekezésre
+> tehát nem volt szükség — és pont a védekezés tört el mindent.
+>
+> A fájlban most **nincs `[build]` szakasz**, csak a függvények könyvtára.
+> Az is csak az alapértelmezést mondja ki, hogy egy felületi átállítás se
+> vihesse el észrevétlenül.
+>
+> **Ha a deploy mégis elhasal, a napló ELSŐ hibasora mondja meg, mi az** —
+> a „publish directory / base directory" és a „build command" szavakra
+> érdemes rákeresni benne.
 
 ---
 
