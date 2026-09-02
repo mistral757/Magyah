@@ -162,12 +162,46 @@ const DOM_IRAS=/\.(?:textContent|innerText)\s*=(?!=)\s*([^;]*)/g;
 /* Ebben a szűk helyzetben minden `.n` és `.name` névgyanús — lásd a fejlécet. */
 const DOM_NEV=/\b[A-Za-z_$][\w$]*\.(?:n|name)\b/g;
 
+/* ---- AZONOSÍTÓ, AMIRE MEGJELENÍTÉSI RÉTEG KERÜLT ----
+   EZ A SZABÁLY MEGFORDÍTVA SZÓL, MINT A TÖBBI. A háló egyébként azt őrzi,
+   hogy egy név NE menjen ki burkolatlanul. Itt viszont az a baj, ha egy név
+   BURKOLVA van — olyan helyen, ahol azonosítóként olvassák vissza.
+
+   MÉRT ESET (3.9.21): a szezon-szerepek kiosztója így épült:
+       <option value="${esc(fullName(p.n))}">
+   A LÁTHATÓ szövegre a burkolás helyes; a `value`-ra nem. Azt a roleAssign
+   kapja vissza, és az a KANONIKUS nevet várja — a menüből kiosztott szerep
+   tehát egy megjelenített nevet írt a térképbe, ami soha egyetlen játékosra
+   nem illett. A kiosztás NÉMÁN elveszett, és a hiba hónapokig élt, mert a
+   felület pontosan úgy nézett ki, mint amikor működik.
+
+   Ugyanez a `data-*` attribútumokra: azok is a programnak szólnak.
+
+   A SZABÁLY: ami a FELHASZNÁLÓNAK szól, az megy a megjelenítési rétegen;
+   ami a PROGRAMNAK — `value`, `data-*`, kulcs, összehasonlítás —, az marad
+   kanonikus. */
+const AZON_ATTR=/\b(?:value|data-[a-z-]+)\s*=\s*"\$\{[^"]*?\b(fullName|shortName|teamLabel|clubLabel|leagueLabel)\s*\(/g;
+
 const talalatok=[];
+/* ---- BLOKK-KOMMENT KÖVETÉSE ----
+   A régi szűrő csak azt a sort hagyta ki, amelyik `/*`, `*` vagy `//` jellel
+   KEZDŐDIK. Egy több soros magyarázatban viszont a folytatósorok gyakran sima
+   behúzott szöveggel indulnak — azokat a háló KÓDNAK látta.
+   MÉRVE: a 3.9.21 javításához írt indoklás maga idézi a hibás mintát, és a
+   háló pontosan azt a MAGYARÁZATOT jelentette hibaként. Egy szabály, amit a
+   saját dokumentációja bukt at el, használhatatlan — a magyarázatot ugyanis
+   nem szabad az eszköz kedvéért megcsonkítani. */
+let blokkban=false;
 for(let i=A+1;i<B;i++){
   const sor=lines[i];
-  /* A tisztán megjegyzés-sorok kimaradnak: a magyarázó kommentárok gyakran
-     idézik a kifejezéseket, és azok nem kiírások. */
   const t=sor.trim();
+  {const ny=sor.lastIndexOf("/*"),za=sor.lastIndexOf("*/");
+   if(blokkban){
+     if(za>=0){blokkban=false;
+       /* A záró UTÁNI rész még lehet valódi kód — azt már nézzük. */
+       if(!sor.slice(za+2).trim())continue;
+     }else continue;
+   }else if(ny>=0&&za<ny){blokkban=true;continue;}}
   if(t.startsWith("/*")||t.startsWith("*")||t.startsWith("//"))continue;
   /* KÉZZEL IGAZOLT KIVÉTEL. A jelölés állhat a soron VAGY a fölötte lévő
      HÁROM sor bármelyikén. Miért nem csak a soron: egy több sorra tördelt
@@ -196,6 +230,15 @@ for(let i=A+1;i<B;i++){
        if(dlatott.has(nm[0]))continue;
        dlatott.add(nm[0]);
        talalatok.push({sor:i+1,mi:"DOM-szövegbe írt név",mit:nm[0],szoveg:t.slice(0,150)});}}}
+  /* 2. ÚT — azonosítóra tett megjelenítési réteg (lásd AZON_ATTR). */
+  {AZON_ATTR.lastIndex=0;
+   let am;const alatott=new Set();
+   while((am=AZON_ATTR.exec(sor))!==null){
+     const kulcs=am[0];
+     if(alatott.has(kulcs))continue;
+     alatott.add(kulcs);
+     talalatok.push({sor:i+1,mi:"azonosítóra tett megjelenítési réteg ("+am[1]+")",
+       mit:kulcs.slice(0,48),szoveg:t.slice(0,150)});}}
   if(!sor.includes("esc(")&&!sor.includes("${"))continue;
   const latott=new Set();
   NEVFORRASOK.forEach(f=>{
@@ -233,5 +276,14 @@ console.log(`
     klubnév    → teamLabel(...) (évszámos alak) vagy clubLabel(...)
     liganév    → leagueLabel(...)
   Ha a hely NEM kiírás (kulcs, keresés, hálózatra küldött adat), írj a sorra
-  egy  /* nev-ok: <indok> */  megjegyzést.`);
+  egy  /* nev-ok: <indok> */  megjegyzést.`
+  +(talalatok.some(x=>/azonosítóra tett/.test(x.mi))
+    ? `
+
+  FIGYELEM — az "azonosítóra tett megjelenítési réteg" MEGFORDÍTVA szól:
+  ott a javítás nem a burkolás HOZZÁADÁSA, hanem az ELTÁVOLÍTÁSA.
+  A `+"`value`"+` és a `+"`data-*`"+` a PROGRAMNAK szól, nem a felhasználónak: azt
+  ugyanaz a kód olvassa vissza azonosítóként, tehát kanonikus kell maradjon.
+  A látható feliratot burkold — az attribútumot soha.`
+    : ""));
 process.exit(1);
