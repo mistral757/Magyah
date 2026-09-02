@@ -1,11 +1,17 @@
 # Kiadási roadmap — mi kell ahhoz, hogy a Magyah kimenjen a Google Play-re
 
-*(3.9.02, 2026. szeptember. Ez a dokumentum a KIADÁS állapotát írja le, nem egy
+*(3.9.03, 2026. szeptember. Ez a dokumentum a KIADÁS állapotát írja le, nem egy
 rendszert. Három szálon fut: jogtisztaság · mentés-stabilitás · csomagolás.)*
 
-> **Naplózás.** 3.9.02: az **F1** (betűk önhosztolása) és az **F2** (tartós
-> tárhely) elkészült — a részletek: `docs/betuk-es-tarhely.md`. Az F2 mellékesen
-> becsukta a 2. szál 5. lyukát is (kvóta-mérés).
+> **Naplózás.**
+> **3.9.02** — **F1** (betűk önhosztolása) és **F2** (tartós tárhely) kész:
+> `docs/betuk-es-tarhely.md`. Az F2 mellékesen becsukta a 2. szál 5. lyukát is
+> (kvóta-mérés). Emellett kiderült, hogy a service worker **soha nem futott**:
+> az `index.html` a `/sw.js`-t regisztrálta, a repóban viszont `sw-1.js` van —
+> a regisztráció némán elbukott. Javítva (3.9.03), lásd a 3.7 pontot.
+> **3.9.03** — **F3** (mentés kimentése és visszatöltése) kész:
+> `docs/mentes-kimentes-visszatoltes.md`. **Ezzel a kód kiadható állapotban
+> van**; ami hátra van, az a papírmunka és a csomagolás.
 
 > **Előzmény.** Ilyen dokumentum korábban NEM létezett a repóban — végignéztem a
 > teljes git-történetet. Ami eddig volt, három külön helyen élt:
@@ -21,8 +27,12 @@ rendszert. Három szálon fut: jogtisztaság · mentés-stabilitás · csomagol�
 | szál | állapot | mi van hátra |
 |---|---|---|
 | **Jogtisztaság** | ✅ **kész** | — (a Google Fonts is megszűnt, 3.9.02) |
-| **Mentés-stabilitás** | ⚠️ **erős alap, négy lyuk** | ebből **egy kiadásblokkoló** (export/import) |
+| **Mentés-stabilitás** | ✅ **kiadható** | három nem-blokkoló minőségjavítás maradt |
 | **Csomagolás (Play)** | ❌ **nulláról** | manifest · TWA · Play Console papírok |
+
+**A KÓD KIADHATÓ ÁLLAPOTBAN VAN.** Mind a három kiadásblokkoló elkészült: a
+jogtisztaság (a nevek és a betűk), a tartós tárhely és a mentés
+export/importja. Ami hátra van, az **papír és csomagolás**.
 
 **A kritikus út nem a kód, hanem a papír.** A Play Console kötelező mezői
 (adatvédelmi tájékoztató, Data safety, IARC) egyetlen sor kódot sem igényelnek,
@@ -114,7 +124,7 @@ tanulságát hordozza:
 | # | lyuk | miért számít | méret |
 |---|---|---|---|
 | ~~**1**~~ | ~~`navigator.storage.persist()` sehol nincs meghívva~~ | ✅ **kész (3.9.02, F2).** Az első sikeres mentés után és telepítéskor kérünk, a „Mentések és tárhely" ablak mutatja az állapotot, és kézzel is újrakérhető. Lásd `docs/betuk-es-tarhely.md`. | — |
-| **2** | **nincs valódi biztonsági mentés (export/import)** | csak `.txt` összegzés van (`generateCareerLegacyTextFrom`) — az olvasásra jó, **visszatölteni nem lehet**. Telefonváltás, adatvesztés vagy egy elrontott mentés után nincs út vissza. | **közepes** |
+| ~~**2**~~ | ~~nincs valódi biztonsági mentés (export/import)~~ | ✅ **kész (3.9.03, F3).** A mentés fájlba menthető és fájlból visszatölthető, boríték-formátummal, helyválasztóval és felülírás-védelemmel. Lásd `docs/mentes-kimentes-visszatoltes.md`. | — |
 | **3** | **a séma-verzió írva van, de sosem olvasva** | a `saveGame` `v:1`-et ír, az `applySavedGame` **sosem nézi meg** a `d.v`-t. Egy jövőbeli inkompatibilis változás fél-betöltéshez és `_saveBroken`-hez vezet, világos üzenet nélkül. | **kicsi** |
 | **4** | **nincs „előző jó mentés"** | a `setItem` kulcsonként atomi, tehát fél-írás nincs — de ha maga a MENTETT állapot hibás, nincs mihez visszanyúlni. Egy második, eggyel korábbi példány (rolling backup) ezt megfogná. | **kicsi** |
 | ~~**5**~~ | ~~a kvótát nem mérjük~~ | ✅ **kész (3.9.02, F2 mellékága).** A „Mentések és tárhely" kiírja a `storage.estimate()` szerinti *felhasznált / keret* párt, és megkülönbözteti a localStorage saját 5 MB-os korlátjától. | — |
@@ -122,13 +132,15 @@ tanulságát hordozza:
 
 ### Sorrend és indoklás
 
-**Kiadásblokkoló volt 1 és 2.** Az 1. elkészült (3.9.02): a mentés már nem
-lakoltatható ki magától. **Marad a 2.** — egy Play-en kiadott játéknál, ahol a
-felhasználó tíz szezont épít, elfogadhatatlan, hogy a mentése ne legyen
-kimenthető. A többi három komoly minőségjavítás, de nélkülük is ki lehet adni.
+**Kiadásblokkoló volt 1 és 2 — mindkettő kész.** Az 1. a 3.9.02-ben (a mentés
+már nem lakoltatható ki magától), a 2. a 3.9.03-ban (a mentés kimenthető és
+visszatölthető). A megmaradt három komoly minőségjavítás, de nélkülük is ki
+lehet adni.
 
 A **3–4** apró és egymást erősíti: együtt egy „mentés-egészség" csomag
-(verzió-kapu + rollback), ami egyben tesztelhető.
+(verzió-kapu + rollback), ami egyben tesztelhető. **Az F3 óta olcsóbb is:** a
+boríték `f` mezője már egy működő formátum-kapu, a 3. lyuk (a `d.v` sosem
+olvasott) ugyanennek a mintának a mentésen belüli párja.
 
 A **6** (IndexedDB) **szándékosan a kiadás UTÁNRA** való. A tömörítés már
 megvette a szükséges levegőt; a migráció kockázata most nagyobb, mint a haszna.
@@ -208,18 +220,24 @@ igaz. Ha a cél „telepítés után net nélkül is indul", az `index.html`-t
 install-időben elő kell cache-elni — a *network-first* stratégia emellett
 változatlanul maradhat.
 
-#### 3.7 A regisztrált `/sw.js` és a repóban lévő `sw-1.js` — *tisztázandó*
+#### 3.7 A service worker soha nem futott — megoldva (3.9.03) ✅
 
-Az `index.html` a **`/sw.js`**-t regisztrálja, a repóban viszont **`sw-1.js`**
+Az `index.html` a **`/sw.js`**-t regisztrálta, a repóban viszont **`sw-1.js`**
 van, és nincs se `_redirects`, se `netlify.toml`, ami a kettőt összekötné (a
-teljes git-történetben egyetlen `sw.js` sem szerepelt). Vagyis a kiszolgálón
-futó service worker egy olyan példány, amit **nem ez a repó ad**.
+teljes git-történetben egyetlen `sw.js` sem szerepelt). A `register()` tehát
+404-be futott, a `.catch(()=>{})` pedig elnyelte: **a service worker
+soha nem regisztrálódott.**
 
-Ez nem elméleti: minden `CACHE_NAME`-léptetés és minden `STATIC_ASSETS`-bővítés
-— köztük a 3.9.02 betű-felvétele — **csak akkor ér el a felhasználókhoz**, ha
-a kiszolgálón lévő `sw.js` is frissül. A kiadás előtt el kell dönteni, melyik
-az igazság: a regisztrációt kell `sw-1.js`-re állítani, vagy a `sw-1.js`-t
-kell `sw.js` néven is kitenni.
+Ennek visszamenőleg is jelentése van: az offline mód eddig nem működött, és
+minden korábbi `CACHE_NAME`-léptetés hatástalan volt — nem volt mit léptetni.
+(Ahol a doksik „régi telepítések cache-elt manifestjéről" írnak, ott a
+következtetés helyes volt, csak a feltétele nem teljesült.)
+
+**A javítás:** a regisztráció igazodik a fájlhoz (`/sw-1.js`). A név marad —
+a doksik és a kód kommentjei erre hivatkoznak, és egy átnevezés csak
+felesleges mozgás lenne. **Az első éles feltöltés után ezt ellenőrizni kell**
+(alkalmazás → service workerek): mostantól tényleg fut, tehát a
+cache-first statikus ág is tényleg dolgozik.
 
 ---
 
@@ -229,17 +247,17 @@ kell `sw.js` néven is kitenni.
 ┌─ MOST ─────────────────────────────────────────────────────────────┐
 │ F1  Betűk önhosztolása          ✅ KÉSZ (3.9.02)                    │
 │ F2  storage.persist()           ✅ KÉSZ (3.9.02)                    │
-│ F3  Mentés export/import        ◀ ITT TARTUNK (kiadásblokkoló)     │
+│ F3  Mentés export/import        ✅ KÉSZ (3.9.03)                    │
 └────────────────────────────────────────────────────────────────────┘
-              │  ← ITT MÁR KIADHATÓ ÁLLAPOTBAN VAN A KÓD
+              │  ← ITT MÁR KIADHATÓ ÁLLAPOTBAN VAN A KÓD  ◀ ITT TARTUNK
 ┌─ PAPÍR (párhuzamosan indítható) ───────────────────────────────────┐
-│ F4  Adatvédelmi tájékoztató + Data safety + IARC                   │
+│ F4  Adatvédelmi tájékoztató + Data safety + IARC   ◀ EZ A KÖVETKEZŐ │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ CSOMAGOLÁS ───────────────────────────────────────────────────────┐
 │ F5  Manifest-kiegészítés + maskable ikon                           │
 │ F6  assetlinks.json + Bubblewrap → aláírt AAB                      │
 │ F7  Firebase-szabályok ellenőrzése + szobakód-döntés               │
-│ F8  SW: index.html precache + a /sw.js ↔ sw-1.js tisztázása (3.7)  │
+│ F8  SW: index.html precache                                        │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ KIADÁS ───────────────────────────────────────────────────────────┐
 │ F9  release.py → dist/ → deploy → belső teszt sáv → éles           │
@@ -280,6 +298,9 @@ python3 tools/nevek/release.py     # → dist/index.html, önellenőrzéssel
 - [ ] a `dist/index.html` böngészőben betöltődik, hibaüzenet nélkül;
 - [ ] a `dist`-en **nincs külső hálózati kérés** a betöltés alatt (a betűk a
       `/fonts`-ból jönnek), és a magyar ő/ű a helyes betűvel rajzolódik;
+- [ ] a service worker **tényleg regisztrál** (böngésző → alkalmazás → service
+      workerek), és a cache neve a mostani `CACHE_NAME`;
+- [ ] egy karrier **kimentése és visszatöltése** működik a `dist`-en is;
 - [ ] egy karrier a draftig végigjátszható a `dist`-en;
 - [ ] a `dist` mentése betöltődik és folytatható;
 - [ ] a telepített (TWA) példányban nincs böngésző-címsáv (= az assetlinks jó);

@@ -4927,7 +4927,23 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
          border:1px solid var(--line);border-radius:8px;background:var(--panel2)"></div>
     <div id="storeList" style="flex:1;overflow:auto;margin-top:8px"></div>
     <div id="storeMsg" style="font-size:11.5px;color:var(--dim);margin-top:5px;min-height:16px"></div>
+    <!-- BIZTONSÁGI MENTÉS — lásd openSaveImportFlow. A kimentés soronként áll
+         (a lista ⬇ gombjai), a visszatöltés itt, mert az nem egy sorhoz
+         tartozik: a fájl mondja meg, hova kerül. -->
+    <button id="storeImpBtn" class="btn-y stepbtn" style="margin-top:6px">⬆ Mentés visszatöltése fájlból</button>
+    <input type="file" id="storeImpFile" accept=".json,application/json" class="hide">
     <button id="storeCloseBtn" class="btn-s stepbtn" style="margin-top:6px">Bezár</button>
+  </div>
+</div>
+<!-- MENTÉS VISSZATÖLTÉSE — a törlés-folyamat tükörképe: előbb megmutatja, MI
+     van a fájlban, aztán hogy HOVA kerülne, és csak külön megerősítésre ír.
+     z-index 972: a "Mentések és tárhely" (960) és a törlés (970) fölött, mert
+     mindkettőből nyílhat, és a saját megerősítése nem takarható el. -->
+<div class="hide" id="saveImpModal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:972;display:flex;align-items:center;justify-content:center;padding:14px">
+  <div class="card" style="max-width:460px;width:100%;max-height:88vh;overflow-y:auto">
+    <div class="steplbl" style="color:var(--gold)" id="saveImpTitle">Mentés visszatöltése</div>
+    <div id="saveImpBody" style="margin-top:8px;font-size:13px;color:var(--dim);line-height:1.55"></div>
+    <div id="saveImpActions" style="margin-top:10px"></div>
   </div>
 </div>
 <!-- MENTÉS TÖRLÉSE — EGYETLEN, MINDENHONNAN HÍVHATÓ FOLYAMAT (lásd
@@ -5408,7 +5424,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.02";
+const APP_VERSION="3.9.03";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -63334,6 +63350,18 @@ function downloadTextFile(filename,text){
   document.body.appendChild(a);a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);}
+/* UGYANEZ, DE BOM NÉLKÜL. A .txt-nél a bájtsorrend-jel a nézőket kényszeríti
+   UTF-8-ra; egy JSON-fájl elején viszont ÁRT: a JSON.parse a vezető ﻿-en
+   elhasal, tehát a saját visszatöltőnk sem tudná beolvasni, amit kiírt. A
+   JSON amúgy is definíció szerint UTF-8, jelzés nélkül. */
+function downloadJsonFile(filename,text){
+  const blob=new Blob([text],{type:"application/json;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);}
 /* ================= UGYANEZ, DE EGY NEM BETÖLTÖTT MENTÉSBŐL =================
    A generateCareerLegacyText() az ÉLŐ állapotból (S, slots, careerPool, …)
    dolgozik — az a kezdőlapon nincs meg, ott a mentés csak egy nyers JSON
@@ -81159,6 +81187,9 @@ function saveLockAdopt(){_saveLock=saveKey();}
         fél-állapot sosem kerülhet lemezre — se ide, se máshova.
      3. A saveGame többé nem "veszi fel" a zárat, ha az üres (lásd ott). */
 let _saveBroken=false;
+/* Lásd a saveGame-beli őrt: a visszatöltés pillanatától az újratöltésig a
+   memóriában lévő játék nem írhat sehova. */
+let _saveFrozen=false;
 function loadIntoGame(d,key){
   saveLockSet(key);              /* 1. — MÉG a betöltés előtt */
   try{
@@ -81178,6 +81209,12 @@ function saveGame(){
      épet. Amíg a felhasználó nem indít új játékot vagy nem tölt be sikeresen
      egy másikat, ez a hely érintetlen marad. */
   if(_saveBroken)return;
+  /* VISSZATÖLTÉS KÖZBEN SEM ÍRUNK. A visszatöltés a fájl tartalmát beírja a
+     cél helyre, majd újratölti az oldalt — a kettő közt a memóriában még a
+     RÉGI játék áll, és ha bármi (egy időzítő, egy kattintás) menteni akarna,
+     pont az imént visszatöltött mentést írná felül. Innentől a memória
+     hallgat; az igazság már a lemezen van. */
+  if(_saveFrozen)return;
   {const k=saveKey();
    if(_saveLock&&k!==_saveLock){
      /* Nem dobunk hibát és nem állítjuk meg a játékot — csak nem írunk. */
@@ -83579,9 +83616,16 @@ function openSaveDeleteFlow(key,opts){
     body.innerHTML=(room
       ? `<p>Biztosan törlöd a <b>közös karriereteket</b> ${hunAz(esc(room))} <b>${esc(room)}</b> szobában? Ez <b>végleges</b>: a szoba megszűnik, és a társad sem tudja folytatni.</p>`
       : `<p>Biztosan törlöd ${team?`a(z) <b>${esc(team)}</b> karriert`:"ezt a karriert"}${team?` (${sn}. szezon)`:""}? Ez <b>végleges</b>.</p>`)
-      +`<p style="margin-top:8px">Előtte letöltheted a karrier eddigi összegzését szöveges fájlként (szezonok, jelenlegi felállás, mindenkori statisztika).</p>`;
+      +`<p style="margin-top:8px">Előtte kimentheted magát a mentést egy fájlba — abból bármikor <b>vissza is tölthető</b>. `
+      +`Az összegzés ezzel szemben csak olvasásra való: emlék, nem biztonsági mentés.</p>`;
     acts.innerHTML="";
-    const dlBtn=document.createElement("button");dlBtn.className="btn-y stepbtn";
+    /* A TELJES MENTÉS AZ ELSŐ. Ez az egyetlen gomb ezen a képernyőn, ami után
+       a döntés visszafordítható — az összegzés .txt-je nem az. */
+    const bkBtn=document.createElement("button");bkBtn.className="btn-y stepbtn";
+    bkBtn.textContent="💾 Teljes mentés kimentése (.json)";bkBtn.disabled=!saveHasGame(d);
+    bkBtn.onclick=()=>{if(exportSaveToFile(key))bkBtn.textContent="✓ Kimentve — ebből visszatölthető";};
+    const dlBtn=document.createElement("button");dlBtn.className="btn-s stepbtn";
+    dlBtn.style.marginTop="6px";
     dlBtn.textContent="📄 Összegzés letöltése (.txt)";dlBtn.disabled=!d;
     dlBtn.onclick=()=>{if(!d)return;
       downloadTextFile(`${(team||"karrier").replace(/[^a-zA-Z0-9áéíóöőúüűÁÉÍÓÖŐÚÜŰ]/g,"_")}_karrier_osszegzes.txt`,
@@ -83593,7 +83637,7 @@ function openSaveDeleteFlow(key,opts){
     const cancelBtn=document.createElement("button");cancelBtn.className="btn-s stepbtn";
     cancelBtn.style.marginTop="6px";cancelBtn.textContent="Mégsem";
     cancelBtn.onclick=close;
-    acts.appendChild(dlBtn);acts.appendChild(nextBtn);acts.appendChild(cancelBtn);}
+    acts.appendChild(bkBtn);acts.appendChild(dlBtn);acts.appendChild(nextBtn);acts.appendChild(cancelBtn);}
   function stepConfirm(){
     body.innerHTML=`<p style="color:var(--red)"><b>Ez nem vonható vissza.</b> `
       +(room
@@ -83617,6 +83661,226 @@ function openSaveDeleteFlow(key,opts){
   stepDownload();
   modal.classList.remove("hide");}
 $("saveDelModal")&&($("saveDelModal").onclick=(ev)=>{if(ev.target.id==="saveDelModal")ev.target.classList.add("hide");});
+$("saveImpModal")&&($("saveImpModal").onclick=(ev)=>{if(ev.target.id==="saveImpModal")ev.target.classList.add("hide");});
+/* ================= BIZTONSÁGI MENTÉS: KIMENTÉS ÉS VISSZATÖLTÉS =================
+   Eddig a karriert csak egy .txt ÖSSZEGZÉSSEL lehetett "kimenteni" — az
+   olvasásra jó, visszatölteni viszont nem lehet. Telefonváltás, egy törölt
+   böngésző-adat vagy egy elrontott mentés után nem volt út vissza. Ez az a
+   lyuk, ami egy Play-re kiadott játéknál nem maradhat nyitva.
+
+   A FÁJL. Egy JSON, borítékkal:
+
+       {magyah:"mentes", f:1, app:"3.9.02", ts:"…", kulcs:"…",
+        cimke:{team,mode,season,idx,room,slot}, mentes:{ …a nyers mentés… }}
+
+   A boríték három dolgot ad, amit a puszta mentés nem: (1) FELISMERHETŐ —
+   egy tetszőleges JSON nem téveszthető össze vele; (2) MEGMUTATHATÓ — a
+   visszatöltő ki tudja írni, MI van a fájlban, MIELŐTT bármit felülírna;
+   (3) MIGRÁLHATÓ — ha egyszer változik a formátum, az `f` megmondja, mivel
+   van dolgunk.
+
+   A LEGFONTOSABB SZABÁLY: a visszatöltés NEM ÍRJA ÁT a mentést. Ami kijött,
+   pontosan az megy vissza. Ezért nem is engedjük, hogy egy SZOBA-mentés
+   egyjátékos helyre kerüljön: a közös karrier mentése tele van olyan
+   állapottal (párharc-fordulók, a társ pillanatképe, a szoba azonosítója),
+   amit csak a szoba kontextusa tesz értelmessé — átírni kockázatosabb volna,
+   mint nem engedni. A szoba-mentés a SAJÁT szobájába kerül vissza; ha a társ
+   már nincs, a megszokott, kipróbált „Egyedül folytatom ezt a karriert" gomb
+   fordítja egyjátékossá, élő kontextusban (mpOrphanCareer).
+
+   A VISSZATÖLTÉS UTÁN ÚJRATÖLTÜNK (mpReloadWithIntent). Nem próbáljuk a futó
+   játékot menet közben lecserélni: az indulási út (initSaveSystem) már tudja,
+   hogyan kell egy mentésből megérkezni, zárral, hibakezeléssel együtt. Egy
+   második út ugyanerre csak egy második hibaforrás lenne. */
+const SAVE_FILE_TAG="magyah-mentes";
+const SAVE_FILE_V=1;
+const SAVE_FILE_MAX=12*1024*1024;   /* egy késői karrier ~250 kB; ennyi bőven fedi */
+/* ---- MELYIK ÉPÍTÉSBŐL VALÓ A FÁJL? ----
+   A kiadási build (tools/nevek/release.py) MINDEN valós nevet átlátszatlan
+   azonosítóra cserél — a nevek pedig a mentés KULCSAI (keret, pool, statisztika).
+   A két változat mentése ezért nem cserélhető: egy családi mentés a kiadott
+   verzióban ismeretlen kulcsokkal érkezne, és a karrier fele üresen jönne
+   vissza. Ezt nem elég a README-ben leírni — a visszatöltőnek fel kell ismernie
+   és MEG KELL MONDANIA, különben a felhasználó egy néma, féllábú karriert kap.
+
+   A felismerés magából az adatból jön, nem egy build-időben beírt jelzőből:
+   a kiadott verzióban a névtábla kulcsai "p"+hex alakúak. Ez a forma
+   VERZIÓFÜGGETLEN — egy fél évvel későbbi családi mentés is visszatölthető
+   marad, csak a másik termékből való nem. */
+function buildKind(){
+  let k=[];
+  try{k=Object.keys(HU_NAME_TABLE||{}).slice(0,60);}catch(e){return "csalad";}
+  if(!k.length)return "csalad";
+  const op=k.filter(x=>/^p[0-9a-f]{6,}$/.test(x)).length;
+  return (op>k.length*0.6)?"kiadott":"csalad";}
+/* Egy mentési helyről borítékot épít. `d` a nyers mentés (loadSavedGame). */
+function saveExportEnvelope(key,d){
+  const S2=(d&&d.S)||{};
+  const room=(key.indexOf(SAVE_KEY_MP_PREFIX)===0)
+    ? key.slice(SAVE_KEY_MP_PREFIX.length).replace(/-v1$/,"") : null;
+  let slot=null;
+  if(!room)for(let n=1;n<=SP_SLOT_MAX;n++)if(spSaveKeyFor(n)===key)slot=n;
+  return {magyah:SAVE_FILE_TAG,f:SAVE_FILE_V,app:APP_VERSION,epites:buildKind(),
+    ts:new Date().toISOString(),kulcs:key,
+    cimke:{team:(d&&d.teamName)||null,mode:(d&&d.gameMode)||null,phase:(d&&d.phase)||null,
+      season:S2.seasonNumber||null,idx:(S2.idx==null?null:S2.idx),room,slot},
+    mentes:d};}
+function saveFileNameFor(env){
+  const c=env.cimke||{};
+  const nev=(c.team||"karrier").replace(/[^a-zA-Z0-9áéíóöőúüűÁÉÍÓÖŐÚÜŰ]/g,"_");
+  const d=new Date();
+  const nap=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  return `magyah_${nev}${c.season?`_${c.season}szezon`:""}${c.room?`_szoba-${c.room}`:""}_${nap}.json`;}
+/* Egy mentési hely kimentése fájlba. Igazat ad vissza, ha volt mit kimenteni. */
+function exportSaveToFile(key){
+  const d=loadSavedGame(key);
+  if(!saveHasGame(d))return false;
+  const env=saveExportEnvelope(key,d);
+  downloadJsonFile(saveFileNameFor(env),JSON.stringify(env));
+  return true;}
+/* ---- A BEOLVASOTT FÁJL ELLENŐRZÉSE ----
+   Minden elutasításnak MEG KELL MONDANIA, mi a baj. Egy néma „nem jó fájl"
+   után a felhasználó nem tudja, a fájlt rontotta-e el, vagy rosszat választott. */
+function saveImportParse(text){
+  let env=null;
+  try{env=JSON.parse(text);}
+  catch(e){return {hiba:"Ez a fájl nem olvasható JSON-ként. Biztosan a Magyah által kimentett .json fájlt választottad?"};}
+  if(!env||typeof env!=="object"||Array.isArray(env))
+    return {hiba:"Ez a fájl nem egy Magyah-mentés."};
+  if(env.magyah!==SAVE_FILE_TAG)
+    return {hiba:"Ez a fájl nem Magyah-mentés — hiányzik belőle a jelölés. (Az összegzés .txt-t nem lehet visszatölteni, csak a .json mentést.)"};
+  if(typeof env.f==="number"&&env.f>SAVE_FILE_V)
+    return {hiba:`Ezt a fájlt a játék egy újabb változata írta (formátum ${env.f}, ez a verzió ${SAVE_FILE_V}-ig ismer). Frissítsd a játékot, és próbáld újra.`};
+  /* A 3.9.03 előtt kimentett fájlban nincs `epites` — azt elfogadjuk (ilyen
+     fájl csak ebből a változatból származhat). Eltérésnél viszont megállunk:
+     lásd a buildKind fölötti feljegyzést. */
+  if(env.epites&&env.epites!==buildKind())
+    return {hiba:env.epites==="csalad"
+      ? "Ez a mentés a játék CSALÁDI változatából való, ez pedig a kiadott verzió. A kettő névkulcsai mások, ezért a mentéseik nem cserélhetők."
+      : "Ez a mentés a játék KIADOTT változatából való, ez pedig a családi verzió. A kettő névkulcsai mások, ezért a mentéseik nem cserélhetők."};
+  const d=env.mentes;
+  if(!d||typeof d!=="object"||Array.isArray(d))
+    return {hiba:"A fájlból hiányzik maga a mentés."};
+  if(!saveHasGame(d))
+    return {hiba:"Ebben a fájlban nincs valódi karrier — üres mentést nem töltünk vissza."};
+  return {env,d};}
+/* ---- A VISSZATÖLTŐ ABLAK ----
+   Három lépés, ugyanazzal a logikával, mint a törlés-folyamatnál: előbb
+   megmutatjuk, MI van a fájlban, aztán hogy HOVA kerülne, és csak külön
+   megerősítésre írunk — a felülírandó karriert előtte ki is lehet menteni. */
+function openSaveImportFlow(env,d){
+  const modal=$("saveImpModal"),title=$("saveImpTitle"),body=$("saveImpBody"),acts=$("saveImpActions");
+  if(!modal||!title||!body||!acts)return;
+  const c=env.cimke||{};
+  const room=c.room||null;
+  function close(){modal.classList.add("hide");}
+  const forras=`<div style="font-size:12.5px;line-height:1.6;margin-top:8px;padding:8px 10px;
+      border:1px solid var(--line);border-radius:8px;background:var(--panel2)">
+    <div><b>${esc(c.team||"Névtelen karrier")}</b>${c.season?` · ${c.season}. szezon`:""}${
+      (c.idx!=null)?` · ${c.idx}. forduló`:""}</div>
+    <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${
+      room?`🎮 közös karrier · <b>${esc(room)}</b> szoba`:`🏠 egyjátékos karrier${c.slot?` · eredetileg ${c.slot}. hely`:""}`}
+      · ${c.mode==="career"?"karrier":"klasszikus"} mód</div>
+    <div style="color:var(--dim);font-size:11.5px;margin-top:3px">kimentve: ${
+      esc(String(env.ts||"").slice(0,10)||"—")}${env.app?` · a játék ${esc(String(env.app))} verziójával`:""}</div>
+  </div>`;
+
+  /* 1. LÉPÉS — mi van a fájlban, és hova kerülne */
+  function stepTarget(){
+    title.textContent="Mentés visszatöltése";
+    if(room){
+      /* Szoba-mentés: nincs mit választani, a saját szobájába megy vissza. */
+      body.innerHTML=`<p>Ez a fájl egy <b>közös karrier</b> mentése.</p>${forras}`
+        +`<p style="margin-top:9px">Vissza a saját szobájába kerül (<b>${esc(room)}</b>) — a kezdőlapon a szoba chipjéről folytathatod. `
+        +`Ha a társad már nincs meg, a megszokott <b>„Egyedül folytatom ezt a karriert"</b> gombbal viheted tovább egyedül.</p>`;
+      return void mkActions(mpSaveKeyFor(room));}
+    body.innerHTML=`<p>Válaszd ki, <b>melyik egyjátékos helyre</b> töltsük vissza.</p>${forras}`
+      +`<div id="saveImpSlots" style="margin-top:9px"></div>`;
+    acts.innerHTML="";
+    const cancel=document.createElement("button");
+    cancel.className="btn-s stepbtn";cancel.textContent="Mégsem";cancel.onclick=close;
+    acts.appendChild(cancel);
+    const box=$("saveImpSlots");
+    for(let n=1;n<=SP_SLOT_MAX;n++){
+      const k=spSaveKeyFor(n),cur=loadSavedGame(k),van=saveHasGame(cur);
+      const b=document.createElement("button");
+      b.className="btn-s stepbtn";b.style.marginTop=n>1?"6px":"0";
+      b.style.textAlign="left";
+      b.innerHTML=`<b>${n}. hely</b> — ${van
+        ? `<span style="color:var(--gold)">${esc(cur.teamName||"karrier")}${
+            (cur.S&&cur.S.seasonNumber)?` · ${cur.S.seasonNumber}. szezon`:""} — felülíródna</span>`
+        : `<span style="color:var(--grass)">üres</span>`}`;
+      b.onclick=()=>stepConfirm(k,n);
+      box.appendChild(b);}}
+  /* Szoba-ágon nincs helyválasztó, ezért a gombsor külön épül. */
+  function mkActions(key){
+    acts.innerHTML="";
+    const go=document.createElement("button");
+    go.className="btn-y stepbtn";go.textContent="Tovább";
+    go.onclick=()=>stepConfirm(key,null);
+    const cancel=document.createElement("button");
+    cancel.className="btn-s stepbtn";cancel.style.marginTop="6px";
+    cancel.textContent="Mégsem";cancel.onclick=close;
+    acts.appendChild(go);acts.appendChild(cancel);}
+
+  /* 2. LÉPÉS — megerősítés; ha van ott karrier, előbb ki lehet menteni */
+  function stepConfirm(key,slot){
+    const cur=loadSavedGame(key),van=saveHasGame(cur);
+    title.textContent=van?"Ez felülír egy karriert":"Visszatöltés";
+    body.innerHTML=forras
+      +(van
+        ? `<p style="margin-top:9px;color:var(--red)"><b>A cél helyen már van karrier:</b> `
+          +`${esc((cur&&cur.teamName)||"névtelen")}${(cur.S&&cur.S.seasonNumber)?` (${cur.S.seasonNumber}. szezon)`:""}. `
+          +`A visszatöltés <b>véglegesen felülírja</b>. Ha meg akarod tartani, előbb mentsd ki.</p>`
+        : `<p style="margin-top:9px">A cél hely üres — nincs mit felülírni.</p>`);
+    acts.innerHTML="";
+    if(van){
+      const dl=document.createElement("button");
+      dl.className="btn-y stepbtn";dl.textContent="💾 Előbb mentsd ki, ami ott van";
+      dl.onclick=()=>{exportSaveToFile(key);dl.textContent="✓ Kimentve — most már felülírható";};
+      acts.appendChild(dl);}
+    const go=document.createElement("button");
+    go.className="btn-s stepbtn";
+    go.style.cssText=(van?"margin-top:6px;color:var(--red);border-color:var(--red)":"");
+    go.textContent=van?"Igen, felülírom és visszatöltöm":"Visszatöltés";
+    go.onclick=()=>doImport(key,slot,go);
+    const back=document.createElement("button");
+    back.className="btn-s stepbtn";back.style.marginTop="6px";back.textContent="Mégsem";
+    back.onclick=room?close:stepTarget;
+    acts.appendChild(go);acts.appendChild(back);}
+
+  /* 3. LÉPÉS — az írás, majd újratöltés a cél helyre */
+  function doImport(key,slot,btn){
+    btn.disabled=true;btn.textContent="Visszatöltés…";
+    /* A memória innentől nem írhat sehova — lásd a saveGame őrét. */
+    _saveFrozen=true;
+    const ok=saveWrite(key,JSON.stringify(d));
+    if(!ok){
+      _saveFrozen=false;
+      btn.disabled=false;btn.textContent="Újra";
+      body.innerHTML=forras+`<p style="margin-top:9px;color:var(--red)"><b>Nem sikerült az írás</b> — `
+        +`betelt a böngésző tárhelye. Engedj el egy rég nem használt mentést, és próbáld újra.</p>`;
+      return;}
+    mpReloadWithIntent(room?{room}:{solo:true,slot:slot||1});}
+
+  stepTarget();
+  modal.classList.remove("hide");}
+/* A fájlválasztó bekötése. Külön függvény, mert két helyről is hívható. */
+function saveImportPick(){
+  const inp=$("storeImpFile");if(!inp)return;
+  inp.value="";                     /* ugyanaz a fájl másodszor is kiváltson eseményt */
+  inp.click();}
+function saveImportHandleFile(file,say){
+  if(!file)return;
+  if(file.size>SAVE_FILE_MAX){say(`Ez a fájl túl nagy (${kb(file.size)}) — nem Magyah-mentés lesz.`);return;}
+  const fr=new FileReader();
+  fr.onerror=()=>say("A fájlt nem sikerült beolvasni.");
+  fr.onload=()=>{
+    const r=saveImportParse(String(fr.result||""));
+    if(r.hiba){say(r.hiba);return;}
+    say("");
+    openSaveImportFlow(r.env,r.d);};
+  fr.readAsText(file);}
 /* ---- MENTÉSEK ÉS TÁRHELY ----
    Innen látszik, mi foglalja a helyet, és innen lehet elengedni a rég nem
    használt szoba-mentéseket. A most futó mentés SOHA nem törölhető innen. */
@@ -83678,6 +83942,10 @@ function renderStoreModal(){
         +(s.idx!=null?` · ${s.idx}. forduló`:"")
         +(s.real?"":` · <span style="color:#e08">üres</span>`);
     const tag=s.current?`<span style="color:var(--gold);font-size:11px"> — ez fut most</span>`:"";
+    /* A KIMENTÉS a FUTÓ mentésre is jár — sőt, arra a legfontosabb. Az
+       olvashatatlan sorból viszont nincs mit kimenteni. */
+    const dl=s.real?`<button class="btn-s" data-dl="${i}"
+      style="padding:4px 9px;font-size:11.5px;white-space:nowrap" title="Kimentés fájlba">⬇</button>`:"";
     const btn=s.current?"":`<button class="btn-s" data-si="${i}"
       style="padding:4px 9px;font-size:11.5px;white-space:nowrap">🗑 Adattörlés</button>`;
     return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;
@@ -83687,8 +83955,14 @@ function renderStoreModal(){
         <div style="font-size:11px;color:var(--dim)">${sub}</div>
       </div>
       <div style="display:flex;gap:7px;align-items:center;flex:0 0 auto">
-        <span style="font-size:11.5px;color:var(--dim)">${kb(s.bytes)}</span>${btn}</div>
+        <span style="font-size:11.5px;color:var(--dim)">${kb(s.bytes)}</span>${dl}${btn}</div>
     </div>`;}).join("");
+  list.querySelectorAll("button[data-dl]").forEach(b=>{
+    b.onclick=()=>{
+      const s=slots[+b.dataset.dl];if(!s)return;
+      const m=$("storeMsg");
+      if(exportSaveToFile(s.key)){if(m)m.textContent="✓ Kimentve — a fájlt tedd biztonságos helyre.";}
+      else if(m)m.textContent="Ebben a helyben nincs kimenthető karrier.";};});
   list.querySelectorAll("button[data-si]").forEach(b=>{
     b.onclick=()=>{
       const s=slots[+b.dataset.si];if(!s)return;
@@ -83697,6 +83971,10 @@ function renderStoreModal(){
         renderStoreModal();}});};});}
 $("diagStoreBtn")&&($("diagStoreBtn").onclick=()=>{const m=$("storeMsg");if(m)m.textContent="";storeOpen();});
 $("storeCloseBtn")&&($("storeCloseBtn").onclick=()=>$("storeModal").classList.add("hide"));
+$("storeImpBtn")&&($("storeImpBtn").onclick=()=>{const m=$("storeMsg");if(m)m.textContent="";saveImportPick();});
+$("storeImpFile")&&($("storeImpFile").onchange=(ev)=>{
+  const f=ev.target.files&&ev.target.files[0];
+  saveImportHandleFile(f,(txt)=>{const m=$("storeMsg");if(m)m.textContent=txt;});});
 $("saveWarnBtn")&&($("saveWarnBtn").onclick=()=>{
   const m=$("storeMsg");
   if(m)m.textContent="Engedd el a rég nem használt szoba-mentéseket — utána a játék magától újra menteni fog.";
@@ -84310,9 +84588,14 @@ function backToast(msg){
 initSaveSystem();
 </script>
 <script>
+/* A FÁJL NEVE "sw-1.js" — egy korai elírás, ami így maradt. Sokáig itt
+   "/sw.js" állt, ami a kiszolgálón NEM létezik: a regisztráció némán elbukott
+   (a .catch elnyelte), tehát a service worker valójában soha nem futott. Ezért
+   az offline-mód és minden cache-név-léptetés hatástalan volt. A név marad —
+   a doksik és a kommentek erre hivatkoznak —, a regisztráció igazodik hozzá. */
 if("serviceWorker" in navigator){
   window.addEventListener("load",()=>{
-    navigator.serviceWorker.register("/sw.js").catch(()=>{});});}
+    navigator.serviceWorker.register("/sw-1.js").catch(()=>{});});}
 </script>
 </body>
 </html>
