@@ -250,12 +250,20 @@ egyszerre több tucat nevet ment meg a kalaptól. Hiányzik például:
 `Mamadou`, `Mahamadou`, `Néstor` (→ Nesztor), `Torbjörn`.
 
 **A `-son` → `-fia` szabály** a `rules.py`-ba is beépíthető, nyelvenként:
-`pt`/`en`/`sc` végződésre. Egy sor, több száz név.
+`pt`/`en`/`sc` végződésre.
+
+> **HELYESBÍTÉS.** Ez a pont eredetileg azt írta a `-son` szabályra, hogy
+> *„egy sor, több száz név"*. **Ez becslés volt, és téves:** kimérve **67
+> név**, nem több száz. A súly a `GIVEN`-bővítésen van (748 név), nem a
+> `-son`-on. A pontos mérés: `docs/nevek-generator-minta.md`.
 
 ---
 
-## 7. A minta
+## 7. A két minta
 
-Száz konkrét javaslat, ezzel a módszerrel, olyan nevekre, amikhez nem
-nyúltál: **`docs/nevek-danisitasa-minta.md`** — beilleszthető
-`manual.py`-blokkal együtt.
+**`docs/nevek-danisitasa-minta.md`** — száz konkrét KÉZI javaslat, ezzel a
+módszerrel, olyan nevekre, amikhez nem nyúltál. *(3.9.07 óta beépítve.)*
+
+**`docs/nevek-generator-minta.md`** — a fenti két GENERÁTOR-szabály kimérve:
+mit javítana a 2696 gépi névből (790-et, 29%), beilleszthető kóddal.
+*(Mérés, még nincs beépítve.)*
