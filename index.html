@@ -5458,7 +5458,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.15";
+const APP_VERSION="3.9.16";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -83508,6 +83508,16 @@ function mpMMSS(ms){
    pont akkor NEM fut le, amikor a legfontosabb volna: összeomlott fül,
    lemerült telefon, elveszett net. Az onDisconnect a SZERVERNEK adott előre
    megbízás — ő írja be helyettünk, hogy elmentünk. */
+/* MIÉRT NEM A SZOBA ALAPREKORDJÁBAN VAN AZ `online`.
+   MÉRVE, ÉS EZ EGY SAJÁT HIBÁM VOLT: a 3.9.14 beletette a rekordba, csakhogy
+   az adatbázis-szabály a `players/$pid` alatt `$other:{".validate":false}`-t
+   tart — vagyis egyetlen ISMERETLEN mező az EGÉSZ írást elutasítja. Amíg a
+   frissített szabályfájl nincs közzétéve a Firebase Console-ban, a szoba
+   létrehozása és a csatlakozás ELSZÁLLT volna.
+   Ezért a jelenlét-mezőket KÜLÖN, best-effort írjuk (mpPresenceArm), és a
+   hibájukat elnyeljük. Ha a szabály még nem engedi őket, a szoba ettől
+   ugyanúgy működik — a jelenlét pedig a HARMADIK állapotba esik vissza
+   („nem tudjuk"), ami pontosan erre az esetre készült. */
 let _mpPresence=null;      /* {code, od} — a felfüggesztett megbízás */
 async function mpPresenceArm(code){
   if(mpNet.mode!=="fb"||!code)return;
@@ -83566,7 +83576,7 @@ function mpMateAwayMin(room){
 function mpNewRoomRecord(){
   return {code:null,mode:"hajsza",tempo:mpTempoPick(),createdAt:mpStamp(),status:"lobby",
     seed:makeWorldSeed(),   /* a közös világ magja — az F3 használja majd */
-    players:{[mpMyId()]:{role:"host",ready:false,online:true}}};}
+    players:{[mpMyId()]:{role:"host",ready:false}}};}
 /* ---- LOCAL backend (tartalék) ---- */
 function mpLRooms(){
   try{return JSON.parse(localStorage.getItem(MP_ROOMS_KEY))||{};}catch(e){return {};}}
@@ -83649,7 +83659,14 @@ const mpBackendFb={
       const snap=await F.get(ref);
       if(snap.exists())continue;
       const rec=mpNewRoomRecord();rec.code=code;
-      await F.set(ref,rec);
+      /* A `tempo` ÚJ MEZŐ. Ha a Firebase-ben még a régi szabályfájl fut, és az
+         nem engedi, a szoba létrehozása bukna el — ami sokkal rosszabb, mint
+         a tempó elvesztése. Ezért egyszer újrapróbáljuk nélküle: a szoba
+         létrejön, csak Kényelmes módban (ami az alapérték úgyis). */
+      try{await F.set(ref,rec);}
+      catch(e){
+        const alap={};Object.keys(rec).forEach(k=>{if(k!=="tempo")alap[k]=rec[k];});
+        await F.set(ref,alap);}
       await mpPresenceArm(code);
       return {ok:true,code};}
     return {ok:false,err:"Nem sikerült szabad kódot találni — próbáld újra."};},
@@ -83660,7 +83677,7 @@ const mpBackendFb={
     const room=snap.val();
     if(room.players&&room.players[mpMyId()]){await mpPresenceArm(code);return {ok:true,code};}
     if(room.players&&Object.keys(room.players).length>=2)return {ok:false,err:"Ez a szoba már betelt."};
-    await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId()),{role:"guest",ready:false,online:true});
+    await F.set(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId()),{role:"guest",ready:false});
     await mpPresenceArm(code);
     return {ok:true,code};},
   /* ÖNREGISZTRÁLÓ, és a SZEREPET IS kiírja — lásd a helyi backend indoklását.
