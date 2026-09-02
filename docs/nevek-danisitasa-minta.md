@@ -1,17 +1,29 @@
 # 🎭 Száz név — a módszer alkalmazva
 
 *(A `docs/nevek-danisitasa.md` guide gyakorlati párja. Mind a száz név
-**gépi átírású** ma, és egyikhez sem nyúltál a `bf84bde`-ben.)*
+**gépi átírású volt**, és egyikhez sem nyúltál a `bf84bde`-ben.)*
 
-## Hogyan használd
+> **✅ 3.9.07 — MINDKÉT BLOKK BE VAN ÉPÍTVE.** A lenti két `MANUAL.update`
+> blokk (a 240-es védőblokk és a száz javaslat) már a `tools/nevek/manual.py`
+> végén áll, és a `HU_NAME_TABLE` is újra van gyártva belőlük. A `MANUAL`
+> mérete 656 → 950. Ez a lap innentől **jegyzőkönyv**, nem tennivaló — a
+> blokkokat NE illeszd be újra.
 
-A táblázat alatt van egy **beilleszthető blokk** a `tools/nevek/manual.py`
-végére. Utána:
+## Hogyan lett beépítve
+
+A táblázat alatti két **blokk** a `tools/nevek/manual.py` végére került,
+ebben a sorrendben (előbb a 240-es védőblokk, utána a száz javaslat), majd:
 
 ```bash
 python3 tools/nevek/build.py     # újragyártja a HU_NAME_TABLE-t
 ./tools/check.sh                 # szintaxis · globálisok · nyers nevek
 ```
+
+Két mérés igazolta, hogy hiánytalan: a védőblokk beillesztése után a
+`git diff index.html` **üres** lett — vagyis a generátor bájtra
+visszaadta a `bf84bde` kézi állapotát, tehát a blokk pontosan fedi a
+240 javításodat. A száz név hozzáadása után pedig mind a 950 `MANUAL`
+bejegyzés egyezik a legyártott táblával (`nem egyezik: 0`).
 
 > **Nyolc sor SZERKESZTÉS, nem új sor.** Az „ifj."-es kettőzés-feloldások
 > (`Coutinho`, `Maldini`, `Baggio`, `Best`, `Charlton`, `Kopa`, `Fontaine`,
@@ -32,8 +44,9 @@ alakra**. Mérve: `Aaron Lennon` „Lenyó Áron"-ról visszament „Lénnon
 Áron"-ra, és vele a többi 239.
 
 Ez a blokk átemeli őket a `manual.py`-ba (202 új sor, 38 meglévő
-felülírása). **Ezt kell először beilleszteni**, még a lenti száz javaslat
-előtt — különben az első újragyártás elviszi a munkádat.
+felülírása). **Ez ment be először**, még a lenti száz név előtt — különben az
+első újragyártás elvitte volna a munkádat. (3.9.07 óta benne van; a
+`manual.py` a mérvadó, az `index.html` már csak a termék.)
 
 ```python
 # ── A „Nevek Danisítása lvl100” (bf84bde) MEGŐRZÉSE ───────────────────────
