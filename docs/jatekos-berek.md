@@ -13,8 +13,8 @@ nem tudott együtt haladni. Mérve a bér a szurkolói bevétel
 
 | szint | bér / szurkolói bevétel (régi) |
 |---|---|
-| induló (NB II) | ~50% |
-| NB I | ~38% |
+| induló (Magyar Másodbajnokok) | ~50% |
+| Magyar Bajnokok | ~38% |
 | Premier líg | ~13% |
 | Infinity | ~12% |
 

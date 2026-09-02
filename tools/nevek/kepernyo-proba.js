@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* ─────────────────────────────────────────────────────────────────────────────
- *  MAGYAH 30-0 — KÉPERNYŐ-PRÓBA: marad-e valós név a KÉPERNYŐN?
+ *  MAGYAH — KÉPERNYŐ-PRÓBA: marad-e valós név a KÉPERNYŐN?
  *
  *  MIÉRT VAN, HA MÁR VAN NÉVAUDIT. A `nev-audit.js` a KÓDOT nézi: kiírási
  *  helyeket és ismert névforrásokat párosít. Ez erős háló, de két dolgot nem

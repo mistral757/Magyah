@@ -462,7 +462,7 @@ különben a „🎬 ajánlott" épp a legsérülékenyebb idényben hazudik.
 
 ### 10c.3 A kézi csúszkának neve van
 
-A csúszka eddig a **liga** nevét mondta ki („84 · NB I"). Az megmondja, milyen
+A csúszka eddig a **liga** nevét mondta ki („84 · Magyar Bajnokok"). Az megmondja, milyen
 szintű a mezőny — de nem azt, hogy **neked** milyen lesz ott a szezon. Egy
 84-es mezőny egy 78-as kerettel reménytelen, egy 92-essel sétagalopp; a
 csúszkán mindkettő ugyanazt a feliratot kapta.

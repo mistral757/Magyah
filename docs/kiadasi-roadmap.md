@@ -211,22 +211,34 @@ Vagyis a **PWA már ma telepíthető**. A Play-re kerüléshez a webet egy
 
 ### Ami hiányzik
 
-#### 3.1 Manifest-kiegészítés — *kicsi*
+#### 3.1 Manifest-kiegészítés — kész (3.9.10, F5) ✅
 
-| mező | miért |
+| mező | állapot |
 |---|---|
-| **`purpose:"maskable"` ikon** | mérve: **nulla** `maskable` a manifestben. Enélkül az Android launcher fehér dobozba teszi az ikont. Kell egy külön, biztonságos zónával rajzolt 512-es változat. |
-| `id` | a Play és a böngésző ebből azonosítja az appot verziók között |
-| `description`, `lang:"hu"`, `dir:"ltr"` | a Bubblewrap/PWABuilder és a Play listázás is kéri |
-| `scope:"/"` | enélkül a TWA kiléphet a böngészőbe |
-| `categories`, `screenshots` | a Play áruházi lap képei amúgy is kötelezők |
+| **`purpose:"maskable"` ikon** | ✅ `icon-maskable-192` és `-512`. A meglévő ikon 0,74-szeresre kicsinyítve, krém teljes-kifutású háttéren — így nincs fehér doboz. **Mérve:** a legtávolabbi tinta-pixel a középtől **186,7 px**, a biztonságos zóna sugara **204,8 px** → belefér. |
+| `id` | ✅ `"/"` |
+| `description`, `lang:"hu"`, `dir:"ltr"` | ✅ |
+| `scope:"/"` | ✅ |
+| `categories`, `screenshots` | ✅ négy **valódi** 1080×1920-as kép (`icons/screenshots/`), a játékból fényképezve, tipp-buborékok nélkül |
 
-#### 3.2 Digital Asset Links — *kicsi, de kritikus*
+A manifest gépi ellenőrzése: érvényes JSON, 16 mező, **0** hiányzó kötelező
+mező, és minden hivatkozott kép létezik, a deklarált mérettel.
+
+#### 3.2 Digital Asset Links — a fájl kész (3.9.12, F6) ⚠️
+
+A `.well-known/assetlinks.json` megvan. **Két mező kitöltendő benne**, és a
+sorrend számít: előbb AAB-t töltesz fel, ONNAN olvasod ki a Play App Signing
+ujjlenyomatát, és csak utána teszed élesre. Lásd `docs/f6-f7-csomagolas.md`.
+
+<details><summary>az eredeti szakasz</summary>
+
 
 `/.well-known/assetlinks.json` az éles domainre, benne a **Play-aláírás
 SHA-256 ujjlenyomata**. Enélkül a TWA-ban ott marad a böngésző címsávja —
 vagyis nem app-nak látszik, hanem weboldalnak. Ez a leggyakoribb elrontott
 lépés.
+
+</details>
 
 #### 3.3 A burok — *közepes*
 
@@ -243,7 +255,21 @@ Bubblewrap CLI vagy PWABuilder → aláírt **AAB**. El kell dönteni és rögz�
 | **IARC tartalmi besorolás** | ❌ nincs | kérdőív, gyors |
 | célközönség, kereskedelmi státusz, áruházi lap | ❌ nincs | screenshotok, ikon, leírás |
 
-#### 3.5 Firebase — átnézés kiadás előtt — *kicsi*
+#### 3.5 Firebase — átnézve (3.9.12, F7) ✅ — a részletek: `docs/f6-f7-csomagolas.md`
+
+**A szobakód 4-ről 6 karakterre nőtt.** A 32-es ábécén ez 1 048 576 →
+1 073 741 824 kombináció, ezerszeres szorzó. *(A lenti „~1,7 millió" téves
+volt: 32⁴ = 1 048 576.)* A régi négyjegyű kódok továbbra is működnek.
+A szabályfájl ezen felül 30 napos frissesség-feltételt kapott az íráshoz, és
+a szoba gyökerében csak az ismert kulcsok írhatók.
+
+**NYITVA MARADT, ÉS EZ A LÉNYEG:** a `start` és a `h2h` továbbra sincs
+méretre korlátozva — élő Firebase nélkül egy ilyen szabályt nem lehet
+biztonságosan tesztelni, és egy rossz szabály némán megölné a kétjátékos
+módot. A védőháló addig a Console-ban beállított **költségriasztás**.
+
+<details><summary>az eredeti szakasz</summary>
+
 
 A `tools/firebase-rules.json` szigorúnak látszik (gyökéren `.read/.write:false`,
 csak 4 karakteres szobakód alatt írható, mezőnkénti `.validate`), **de a
@@ -259,13 +285,31 @@ Két érdemi kérdés marad:
 * Az `apiKey` a kliensben van — **ez rendben van**, nyilvános azonosító, a
   hozzáférést a szabályok döntik el (a kód kommentje ezt helyesen mondja).
 
-#### 3.6 Offline első betöltés — *kicsi*
+</details>
 
-A service worker a `"/"`-t cache-eli, de az `index.html` **nincs** a
-`STATIC_ASSETS`-ben, tehát az első betöltéshez net kell. TWA-nál ez ugyanígy
-igaz. Ha a cél „telepítés után net nélkül is indul", az `index.html`-t
-install-időben elő kell cache-elni — a *network-first* stratégia emellett
-változatlanul maradhat.
+#### 3.6 Offline betöltés — kész (3.9.10, F8) ✅, de nem az volt a baj
+
+**EZ A PONT TÉVES VOLT.** Azt állította, hogy az `index.html` nincs
+előcache-elve, tehát a betöltéshez net kell. A `"/"` **benne van** a
+`STATIC_ASSETS`-ben, és az kiszolgálja az `index.html`-t.
+
+Megmérve, nem következtetve: telepítés után **leállított szerverrel**, friss
+lapon a játék hiánytalanul betöltött (3646 név, mind a 10 betűszelet).
+Az offline indulás tehát eddig is működött.
+
+**A VALÓDI HIBA A KÖZELÉBEN VOLT, ÉS SÚLYOSABB.** A `cache.addAll` **atomi**:
+ha a listából egyetlen fájl 404-et ad, az egész ígéret elbukik, és a cache-be
+**semmi** nem kerül. A `.catch(() => {})` pedig ezt némán elnyelte.
+
+| mérés | előtte | utána |
+|---|---|---|
+| minden fájl elérhető | 24 bejegyzés · offline ✅ | 26 bejegyzés · offline ✅ |
+| **egy fájl 404-et ad** | **0 bejegyzés · offline ❌** | **25 bejegyzés · offline ✅** |
+
+Vagyis egyetlen elgépelt vagy törölt ikon csendben kilőtte az egész offline
+módot, miközben a telepítés sikeresnek látszott. A javítás: fájlonkénti
+`cache.add`, egyenkénti hibatűréssel — egy hiányzó darab csak önmagát viszi.
+A `CACHE_NAME` `v4`-re lépett, hogy a meglévő telepítések újratöltsék.
 
 #### 3.7 A service worker soha nem futott — megoldva (3.9.03) ✅
 
@@ -296,15 +340,15 @@ cache-first statikus ág is tényleg dolgozik.
 │ F2  storage.persist()           ✅ KÉSZ (3.9.02)                    │
 │ F3  Mentés export/import        ✅ KÉSZ (3.9.03)                    │
 └────────────────────────────────────────────────────────────────────┘
-              │  ← ITT MÁR KIADHATÓ ÁLLAPOTBAN VAN A KÓD  ◀ ITT TARTUNK
+              │  ← ITT MÁR KIADHATÓ ÁLLAPOTBAN VAN A KÓD
 ┌─ PAPÍR (párhuzamosan indítható) ───────────────────────────────────┐
-│ F4  Adatvédelmi tájékoztató + Data safety + IARC   ◀ EZ A KÖVETKEZŐ │
+│ F4  Adatvédelmi tájékoztató + Data safety + IARC   ◀ ITT TARTUNK   │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ CSOMAGOLÁS ───────────────────────────────────────────────────────┐
-│ F5  Manifest-kiegészítés + maskable ikon                           │
-│ F6  assetlinks.json + Bubblewrap → aláírt AAB                      │
-│ F7  Firebase-szabályok ellenőrzése + szobakód-döntés               │
-│ F8  SW: index.html precache                                        │
+│ F5  Manifest + maskable ikon    ✅ KÉSZ (3.9.10)                    │
+│ F6  assetlinks.json ✅ · AAB → a te gépeden (kulcs + domain kell)   │
+│ F7  Firebase-szabályok + szobakód 4→6  ✅ KÉSZ (3.9.12)             │
+│ F8  SW: offline előcache        ✅ KÉSZ (3.9.10)                    │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ KIADÁS ───────────────────────────────────────────────────────────┐
 │ F9  release.py → dist/ → deploy → belső teszt sáv → éles           │

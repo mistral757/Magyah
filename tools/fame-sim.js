@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* ─────────────────────────────────────────────────────────────────────────────
-   MAGYAH 30-0 — HÍRESSÉG-SZIMULÁCIÓ  („Sztárom a párom")
+   MAGYAH — HÍRESSÉG-SZIMULÁCIÓ  („Sztárom a párom")
 
    MIÉRT VAN. A hírességpont három forrásból jön (kommentátori megjegyzés, MVP,
    egyéni díj), és a három NEM ugyanabban a nagyságrendben termel. A mérföldkő-

@@ -102,7 +102,7 @@ Playwright, valódi végigjátszott szezon, 900×414-es fekvő ablak:
 | ugyanaz újratöltve | `hubLand` | rejtve | −32 px |
 
 Álló nézetben (430×900) a szezonzárás → HUB szintén `#scSim` rejtve, a pálya
-látszik, a HUB teteje 0 px — onnan a „🏆 Indulhat a Magyar Kupa!" gomb a
+látszik, a HUB teteje 0 px — onnan a „🏆 Indulhat a Magor Kupája!" gomb a
 kupaképernyőre visz, tehát a szezonzárás utáni útvonal végig ép.
 
 Nincs konzolhiba egyik ágon sem. `tools/check.sh` zöld.

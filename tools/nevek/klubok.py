@@ -224,6 +224,13 @@ KLUBOK = {
 # „Biszem-baszom…") és az „NB I"/„NB II" már eleve kitaláltak vagy magyarok —
 # azok szándékosan nincsenek itt. A „Válogatott" is marad.
 LIGAK = {
+# A MAGYAR ÉLVONAL. Ez volt az EGYETLEN liga, aminek nem volt megjelenítési
+# megfelelője: a leagueLabel("NB I") változatlanul adta vissza, tehát a nyers
+# név ment ki a képernyőre — és a release.py sem cserélte le az adatban.
+# A névháló ezt elvileg sem foghatta meg: ő azt őrzi, hogy a TÁBLÁBAN lévő
+# kanonikus nevek ne szivárogjanak ki; ami a táblában sincs benne, arra nem
+# néz rá. Ezért kellett a jelentés kívülről.
+"NB I":                   "Magyar Bajnokok",
 "Allsvenskan":            "Svéd Nagyliga",
 "Austrian Bundesliga":    "Osztrák Ligamix",
 "Belgian Pro League":     "Belga Profi Liga",

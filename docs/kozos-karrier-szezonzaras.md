@@ -47,7 +47,7 @@ választja, jön az összesítés és a végső ítélet.
 ### Miért kellett a második
 
 A verdikt a kupa **előtt** fut le: ott a sorozat eredménye még nem látszik, a
-csapaterő pedig még a kupa előtti. Egy megnyert Konferencia-liga viszont pénzt,
+csapaterő pedig még a kupa előtti. Egy megnyert Konföranszié Líg viszont pénzt,
 Champion-kártyát és egyéni díjakat hoz — a kép érdemben átrendeződik. Aki a
 **teljes idény** ismeretében akart dönteni, annak eddig nem volt hol.
 
@@ -247,9 +247,9 @@ tud, mert a mérce mindig kevesebbet mozdul, mint a kör.
 
 ---
 
-## 3. Magyar Kupa → Konferencia-liga, közösen (3.4.01)
+## 3. Magor Kupája → Konföranszié Líg, közösen (3.4.01)
 
-Alacsonyabb sávban (NB II) a **megnyert Magyar Kupa Konferencia-liga indulást
+Alacsonyabb sávban (Magyar Másodbajnokok) a **megnyert Magor Kupája Konföranszié Líg indulást
 ér**, és azt még ugyanabban a szezonzárásban le is játsszuk.
 
 **A hiba:** közös karrierben ez a lánc csak a **győztes** kliensén sült el. Ő
@@ -261,7 +261,7 @@ magunkkal"*.
 
 **A javítás:** a lánc is közös döntés lett, ugyanazon a mintán, mint a nevezés.
 Mindketten felteszitek, megnyertétek-e a hazai kupát (`s<szezon>mkkl`), és ha
-**bármelyikőtök** igen, **mindketten** indultok a Konferencia-ligában. A
+**bármelyikőtök** igen, **mindketten** indultok a Konföranszié Lígben. A
 vesztes oldalon a napló ki is mondja, kinek a jogán.
 
 **Miért nem elég a helyi jelző:** a kupát csak egyikőtök nyerheti meg (vagy egy

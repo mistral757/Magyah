@@ -18,7 +18,7 @@ szintkövetés, nincs Infinity-vásárlás. A tető magától nyílik.
 
 **A cél:** olyan karrier, ami megizzaszt. Ahol egy szezon el is veszhet, ahol
 egy alacsonyabb ligában lehet évekig ragadni, és ahol a BL-döntőben nem az a
-csapat vár, akivel három éve az NB II-ben szenvedtél.
+csapat vár, akivel három éve az Magyar Másodbajnokokban szenvedtél.
 
 ---
 
@@ -304,9 +304,9 @@ Az (A) és a (C) nem zárja ki egymást: bővítés után a `k` csökkenthető.
 |---|---|---|---|---|---|
 | D1 | Biszem-baszom premier líg | 84,0 – 88,0 | 86,0 | — | 1,35 |
 | D2 | Biszem-baszom másodosztály | 81,0 – 85,0 | 82,7 | −3,3 | 1,31 |
-| D3 | NB I | 78,0 – 82,0 | 80,0 | −2,7 | 1,17 |
-| D4 | NB II | 75,0 – 79,0 | 76,8 | −3,2 | 1,27 |
-| D5 | NB III | 72,0 – 76,0 | 73,9 | −2,9 | 1,42 |
+| D3 | Magyar Bajnokok | 78,0 – 82,0 | 80,0 | −2,7 | 1,17 |
+| D4 | Magyar Másodbajnokok | 75,0 – 79,0 | 76,8 | −3,2 | 1,27 |
+| D5 | Magyar Harmadbajnokok | 72,0 – 76,0 | 73,9 | −2,9 | 1,42 |
 | D6 | mennyei megyei | 69,0 – 73,0 | 71,4 | −2,5 | 1,14 |
 
 Minden lépcső a **≤3,5**-ös korlát alatt, minden szórás a **≤2,5** alatt (4.),
@@ -1051,26 +1051,26 @@ egyetlen hook-kal átvette — a `cupTierFor` ad a piramisban osztály-alapú so
 
 | oszt | liga | hazai kupa | nemzetközi | a kupagyőzelem jutalma |
 |---|---|---|---|---|
-| **D1** | premier líg | FA-kupa a top 32-ből, **selejtező nélkül** | 1–3. **BL** · 4–5. **EL** · 6. **KL**, mind selejtező nélkül | FA → **BL-selejtező**, a következő idényben |
-| **D2** | másodosztály | FA-kupa, **4 körös** selejtezővel, minden csapat | — | — |
-| **D3** | NB I | Magyar Kupa, 4. helytől bárkinek | 1. **BL-sel.** · 2. **EL-sel.** · 3. **KL-sel.** | MK → **BL-selejtező**, a következő idényben |
-| **D4** | NB II | Magyar Kupa, az első **3** helyezett | — | — |
-| **D5–D6** | NB III / megyei | — | — | — |
+| **D1** | premier líg | Fából Készült Serleg a top 32-ből, **selejtező nélkül** | 1–3. **BL** · 4–5. **EL** · 6. **KL**, mind selejtező nélkül | FA → **BL-selejtező**, a következő idényben |
+| **D2** | másodosztály | Fából Készült Serleg, **4 körös** selejtezővel, minden csapat | — | — |
+| **D3** | Magyar Bajnokok | Magor Kupája, 4. helytől bárkinek | 1. **BL-sel.** · 2. **EL-sel.** · 3. **KL-sel.** | MK → **BL-selejtező**, a következő idényben |
+| **D4** | Magyar Másodbajnokok | Magor Kupája, az első **3** helyezett | — | — |
+| **D5–D6** | Magyar Harmadbajnokok / megyei | — | — | — |
 
 Böngészőben ellenőrizve, mind a hat osztályon, helyezésenként.
 
 **Két új darab a gépezetben:**
 
-* **Az FA-kupa mint második hazai sorozat** (`EURO_COMPS.FA`). A piramis felső
+* **Az Fából Készült Serleg mint második hazai sorozat** (`EURO_COMPS.FA`). A piramis felső
   felében a hazai kupa nem szerény sorozat: a legjobb 32 játssza, és a
   győzelme BL-t ér — ezért erősebb mezőnyt kap (`oppDelta 0`, szemben az MK
   −4-ével) és a KL/EL közé árazott díjazást.
 
   **A DINAMIKUS MÓDBAN IS FUT (v3.5.01).** A két Biszem-baszom sávban eddig az
   volt a helyzet, hogy aki lecsúszott a nemzetközi helyekről, annak egyáltalán
-  nem jutott kupa (a Magyar Kupa a 79-es és 84-es sávé). Ugyanaz a sorozat
+  nem jutott kupa (a Magor Kupája a 79-es és 84-es sávé). Ugyanaz a sorozat
   ugyanoda került be: `{comp:"FA",max:99}` a `CUP_TIERS` két felső sorának a
-  végére, tehát a nemzetközi helyek után mindenki más az FA-kupát játssza.
+  végére, tehát a nemzetközi helyek után mindenki más az Fából Készült Serleget játssza.
 
   **A MEZŐNYE MOSTANTÓL ANGOL (v3.7.0).** Az `EURO_COMPS.FA.leagues` megnevezi
   a ligát (`Premier League`), és a `buildEuroField` először onnan tölt fel.
@@ -1081,21 +1081,21 @@ Böngészőben ellenőrizve, mind a hat osztályon, helyezésenként.
   forgással. Ha egyszer mégsem lenne elég angol klub, a maradék helyet a mezőny
   többi része tölti ki: a tábla soha nem törik el.
 
-  A **Magyar Kupa szándékosan NEM kap ilyen listát**: az NB I-ből kilenc klub
+  A **Magor Kupája szándékosan NEM kap ilyen listát**: az Magyar Bajnokok-ből kilenc klub
   van az adatbázisban, abból egy 32-es tábla harmada sem jönne ki.
 
   **A GYŐZELME BL-SELEJTEZŐT ÉR (v3.7.1), nem közvetlen főtáblát.** Eddig
   selejtező nélkül vitt be, és ezzel a hazai kupa erősebb belépő volt, mint a
   bajnoki dobogó: egy hetedik helyezett kupagyőztes ugyanoda jutott, ahova a
   bajnok. A selejtező megtartja a jutalmat, de van ára — ugyanaz a szabály,
-  mint a D3-ban a Magyar Kupa győztesénél (`PYR_CUPS[0].cupWins.qual`).
-  A DINAMIKUS módban az FA-kupa győzelmének továbbra sincs következő szezonra
+  mint a D3-ban a Magor Kupája győztesénél (`PYR_CUPS[0].cupWins.qual`).
+  A DINAMIKUS módban az Fából Készült Serleg győzelmének továbbra sincs következő szezonra
   szóló jutalma: ott a kvalifikáció UGYANARRA a szezonra szól (a kupa a
   bajnokság után fut), tehát egy „következő idényre" szóló nevezés más
   horgonyt kívánna.
 
   **A hírességpontokból hiányzott** (v3.5.01): sem a `FAME_AWARD_BASE`, sem a
-  `FAME_MVP_BASE` nem ismerte, ezért az FA-kupában szerzett egyéni díj a
+  `FAME_MVP_BASE` nem ismerte, ezért az Fából Készült Serlegben szerzett egyéni díj a
   BAJNOKI bázison fizetett (1), a meccs embere pedig egy sima ligameccsén.
   Az értéke ott is a két hazai kupa viszonyát követi: **díj 1,25** és
   **MVP 2,5**, vagyis MK és KL közé — pont oda, ahova a díjazása.
@@ -1104,10 +1104,10 @@ Böngészőben ellenőrizve, mind a hat osztályon, helyezésenként.
   világos lemezű tábla a játékban (`#sbBoard.comp-FA`), piros fordítós
   lapokkal. A sorozatszín ezért királykékről `#c8102e`-re váltott — egy
   sorozatot egy szín visz végig (fejléc, Champion-gyűrű, eredményjelző). A
-  Magyar Kupa szintén piros, de a kettő SOHA nem fut együtt: az MK a 79/84-es
+  Magor Kupája szintén piros, de a kettő SOHA nem fut együtt: az MK a 79/84-es
   sávé és a D3–D4-é, az FA a fölöttük lévő szinteké.
 * **A selejtező körszáma sávonként állítható** (`euroQualRounds`). Alapban
-  kettő; a D2 FA-kupája négy körrel kezd, mert onnan minden csapat nevez —
+  kettő; a D2 Fából Készült Serlege négy körrel kezd, mert onnan minden csapat nevez —
   ott a főtáblára jutás maga a szűrő.
 
 **A selejtező-lecsúszás már megvolt:** az `EURO_DROP` (BL→EL→KL) pontosan azt
@@ -1117,14 +1117,14 @@ selejtezőjébe ejt.
 **Egy útközben talált hiba.** A „következő idényre szóló indulás" ága
 (`S.euroEntry.forSeason`) **nem állította be a selejtező-jelzőt**. Eddig ez
 nem látszott, mert az ág csak régi mentéseket szolgált ki; a piramisban
-viszont ÉLŐ út, és nélküle a D3 Magyar Kupa-győztese a **BL főtábláján**
+viszont ÉLŐ út, és nélküle a D3 Magor Kupája-győztese a **BL főtábláján**
 kezdett volna, selejtező nélkül. Javítva.
 
-**Ami nyitva maradt:** a piramis felső fele FA-kupát játszik, az alsó Magyar
+**Ami nyitva maradt:** a piramis felső fele Fából Készült Serleget játszik, az alsó Magyar
 Kupát, tehát egy D2→D3 kiesés **kupát is vált**. Ez szándékos (a felső kupa
 erősebb és BL-t ér), de ha zavarónak bizonyul, elég a `PYR_CUPS` két `comp`
 mezőjét egységesíteni. A `RUN_MILESTONES` egyelőre csak az MK-t ismeri — az
-FA-kupa mérföldkövei a Run-szint lépésénél (P5) jönnek.
+Fából Készült Serleg mérföldkövei a Run-szint lépésénél (P5) jönnek.
 
 ## 7.1 Fel- és kiesés: az OSZTÁLYOZÓ
 
@@ -1850,7 +1850,7 @@ kihívás és statisztika ugyanúgy fut, mint ma.
 | **P1** | az egyszerű beállítómód + a négyoldalas belépés | önállóan is érték |
 | **P2** | ✅ **kész** — `pyrBuildWorld`, a 6 osztály, `SEASON_OPPS` átirányítás, fel-/kiesés mind a hat osztályban, mentés. **Fejlődés nélkül**: statikus piramis. Belépés: `pyrStart(6)` a konzolból | első játszható mérföldkő |
 | **P3** | ✅ **kész** — `pyrDevelopWorld`, a négy fokozat, a tempó-csatolás, az élvonali utolérés, a Rating-plafon feloldása és a beépített mérő (`S.pyr.log`) | **a mód működik** |
-| **P4** | ✅ **kész** — súlyozott draft (`pyrDraftPick` + pool-eltolás) és a teljes kuparendszer (`PYR_CUPS`, FA-kupa, sávonkénti selejtező-körszám, a kupagyőzelem jutalma a következő idényre) | |
+| **P4** | ✅ **kész** — súlyozott draft (`pyrDraftPick` + pool-eltolás) és a teljes kuparendszer (`PYR_CUPS`, Fából Készült Serleg, sávonkénti selejtező-körszám, a kupagyőzelem jutalma a következő idényre) | |
 | **P5** | ✅ **kész** — Run-plafon + a piramis teljesítmény-sorai, riválisok, Infópult-lap, és a **belépő** (a karrier fajtájának választója, osztály-csúszka, fokozat-választó, a plafon élő kiírásával) | a mód elérhető |
 | **P6** | hangolás valós runokból; a négy fokozat véglegesítése | |
 | **P7** | ✅ **kész** — a beállítóképernyő négy oldalra bontása (`karrier-beallitasok-terv.md` 7.) | |
@@ -1940,8 +1940,8 @@ elavult mezőnyhöz mérten születnének.
 
 | cél | ár |
 |---|--:|
-| **D4** · NB II | 30 Mrd Ft |
-| **D3** · NB I | 60 Mrd Ft |
+| **D4** · Magyar Másodbajnokok | 30 Mrd Ft |
+| **D3** · Magyar Bajnokok | 60 Mrd Ft |
 | **D2** · másodosztály | 90 Mrd Ft |
 | **D1** · premier líg | 120 Mrd Ft |
 
