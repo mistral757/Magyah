@@ -126,11 +126,20 @@ névanyagban két RÉGI, valódi végződésben él — a polgári **`-fi`** (Gy
 Pálfi) és a nemesi **`-ffy`** (Pálffy, Bánffy) —, és ezek adják a hangulatot,
 amit a `-fia` csak elmagyaráz.
 
-| végződés | cél | **mért** |
-|---|---|---|
-| `-fi` | 50% | **32 (48%)** |
-| `-ffy` | 33% | **24 (36%)** |
-| `-fia` | 16% | **11 (16%)** |
+| végződés | cél | a GENERÁTOR (67) | **a TELJES tábla (93)** |
+|---|---|---|---|
+| `-fi` | 50% | 32 (48%) | **49 (53%)** |
+| `-ffy` | 33% | 24 (36%) | **29 (31%)** |
+| `-fia` | 16% | 11 (16%) | **15 (16%)** |
+
+> **A JOBB SZÉLSŐ OSZLOP A LÉNYEG — a játékos AZT látja.** A generátor
+> 67 patronimja mellett a `manual.py` kézi rétegében is van 26, és a kézi
+> réteg a generátor FÖLÖTT áll. Az arányt tehát a kettő EGYÜTT adja ki.
+>
+> **Ezen a 3.9.11 igazított.** A kézi patronimok egy része még a `-fia`-s
+> korszakban íródott, és a teljes megoszlást 47 / 27 / **26**-ra húzta —
+> vagyis a `-fia` nem volt „ritka”, hanem minden negyedik. A javítás után
+> 53 / 31 / 16. Részletek: `docs/nevek-danisitasa-minta.md` 3. szakasza.
 
 ### Két megkötés, ami nem volt a kérésben, de kell
 

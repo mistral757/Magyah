@@ -1043,7 +1043,7 @@ MANUAL.update({
 # ── Feloldatlan kettőzés — „ifj.” és az egyezés
   "Coutinho": ("ifj. Kutinnyó", "ifj. Kutinnyó"), # ✏️ meglévő sor átírása
   "Cesare Maldini": ("Máldi Cézár", "Máldi"),
-  "Anderson": ("ifj. Anderfia", "ifj. Anderfia"),
+  "Anderson": ("ifj. Ánderfi", "ifj. Ánderfi"),
   "Maldini": ("ifj. Máldi", "ifj. Máldi"), # ✏️ meglévő sor átírása
   "Baggio": ("ifj. Bádzsó", "ifj. Bádzsó"), # ✏️ meglévő sor átírása
   "Best": ("ifj. Legjobb", "ifj. Legjobb"), # ✏️ meglévő sor átírása
@@ -1052,15 +1052,15 @@ MANUAL.update({
   "Fontaine": ("ifj. Fontos", "ifj. Fontos"), # ✏️ meglévő sor átírása
   "Matthäus": ("ifj. Matyó", "ifj. Matyó"), # ✏️ meglévő sor átírása
 # ── A `-son` / `-sson` / `-sen` = `-fia`
-  "John Robertson": ("Róbertfia János", "Róbertfia"),
-  "Jordan Henderson": ("Henderfia Jordán", "Henderfia"),
-  "Felipe Anderson": ("Anderfia Fülöp", "Anderfia"),
-  "Henrik Larsson": ("Larszfia Henrik", "Larszfia"),
-  "Roland Nilsson": ("Nilszfia Roland", "Nilszfia"),
-  "Ronny Johnsen": ("Jánosfia Ronni", "Jánosfia"),
+  "John Robertson": ("Róbertffy János", "Róbertffy"),
+  "Jordan Henderson": ("Henderffy Jordán", "Henderffy"),
+  "Felipe Anderson": ("Ánderfi Fülöp", "Ánderfi"),
+  "Henrik Larsson": ("Larszffy Henrik", "Larszffy"),
+  "Roland Nilsson": ("Nílsffy Roland", "Nílsffy"),
+  "Ronny Johnsen": ("Jánosfi Ronni", "Jánosfi"),
   "Éderson": ("Éderfióka", "Éderfióka"),
-  "Dean Henderson": ("Henderfia Dénes", "Henderfia"),
-  "Conny Karlsson": ("Károlyfia Konrád", "Károlyfia"),
+  "Dean Henderson": ("Henderffy Dénes", "Henderffy"),
+  "Conny Karlsson": ("Károlyfi Konrád", "Károlyfi"),
 # ── Jelentés-fordítás
   "Cristian Romero": ("Rozmaring Krisztián", "Rozmaring"),
   "Márcio Amoroso": ("Szerelmes Márció", "Szerelmes"),

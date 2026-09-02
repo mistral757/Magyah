@@ -335,9 +335,39 @@ Ugyanaz az ember kétszer szerepel. Nyolc sor a `manual.py`-ban **szerkesztendő
 | 9 | Fontaine ✏️ | Fontos | **ifj. Fontos** | Just Fontaine párja | — |
 | 10 | Matthäus ✏️ | Matyó | **ifj. Matyó** | Lothar Matthäus párja | — |
 
-## 3. A `-son` / `-sson` / `-sen` = `-fia`
+## 3. A `-son` / `-sson` / `-sen` = patronim
 
 A te Denílson→Denifia szabályod, általánosítva.
+
+> **⚠️ EZ A SZAKASZ A 3.9.07-ES ÁLLAPOTOT RÖGZÍTI. A 3.9.11 ÁTÍRTA.**
+>
+> Amikor ez a kilenc név bekerült, a végződés még egységesen `-fia` volt.
+> Azóta a kérés az lett, hogy a `-fia` legyen a RITKA alak (16%), a fő
+> alakok pedig a `-fi` (50%) és a `-ffy` (33%) — lásd
+> `docs/nevek-generator-minta.md` 2. szakaszát.
+>
+> A kézi réteg a generátor FÖLÖTT áll, tehát ez a kilenc `-fia` közvetlenül
+> rontotta az arányt: a teljes táblán a `-fia` **26%**-ra jött ki, vagyis
+> minden negyedik patronim — nem „ritkán”. Ezért át lettek írva:
+>
+> | eredeti | 3.9.07 | **3.9.11** | miért ez a végződés |
+> |---|---|---|---|
+> | John Robertson | Róbertfia János | **Róbertffy János** | a generátor is `Róbertffy`-t ad Ally és David Robertsonra |
+> | Jordan Henderson | Henderfia Jordán | **Henderffy Jordán** | a két Henderson egyezik |
+> | Dean Henderson | Henderfia Dénes | **Henderffy Dénes** | ugyanaz |
+> | Felipe Anderson | Anderfia Fülöp | **Ánderfi Fülöp** | a generátor `Ánderfi`-t ad Sonny és Viv Andersonra |
+> | Anderson *(a legenda)* | ifj. Anderfia | **ifj. Ánderfi** | ugyanaz a család |
+> | Henrik Larsson | Larszfia Henrik | **Larszffy Henrik** | — |
+> | Roland Nilsson | Nilszfia Roland | **Nílsffy Roland** | a generátor `Nílsffy`-t ad Torbjörn Nilssonra |
+> | Ronny Johnsen | Jánosfia Ronni | **Jánosfi Ronni** | fordított tő |
+> | Conny Karlsson | Károlyfia Konrád | **Károlyfi Konrád** | fordított tő |
+>
+> **A TE SAJÁT `-fia`-idhoz NEM nyúltam.** A `Denílson → Denifia`,
+> `Ederson → Éderfia`, `Edílson → Édílfia` és az `Andrew Robertson →
+> Robifia Bandi` a te kezed munkája — azok maradtak. Mérve egyébként a
+> kézi rétegben te magadtól is 9:4 arányban a `-fi`-t választottad
+> (`Krojfi`, `Vilmosfi`, `Karvalyfi`, `Sződörfi`, `Simonyifi`, `Erikfi`,
+> `Martonfi`, `Dávidfi`), tehát a mostani kérés a saját ösztönödet követi.
 
 | # | eredeti | most | **javaslat** | miért | Rating |
 |---|---|---|---|---|---|

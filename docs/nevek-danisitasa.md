@@ -261,8 +261,13 @@ egyszerre több tucat nevet ment meg a kalaptól. Hiányzik például:
 >
 > **ÉS A VÉGZŐDÉS NEM `-fia` LETT.** *„a -fia javítások jók lennének, de
 > mégsem"* — a `-fia` leírás, nem név. Helyette a két valódi magyar
-> vezetéknév-végződés: **`-fi`** (Győrfi, Pálfi) 48%, **`-ffy`** (Pálffy,
-> Bánffy) 36%, és ritkán `-fia` 16%.
+> vezetéknév-végződés: **`-fi`** (Győrfi, Pálfi) és **`-ffy`** (Pálffy,
+> Bánffy), a `-fia` pedig ritka. A teljes táblán, 93 patronimon mérve:
+> **53% / 31% / 16%** (a cél 50 / 33 / 16 volt).
+>
+> A 3.9.11 ehhez a KÉZI réteget is igazította: kilenc patronim még a
+> `-fia`-s korszakban íródott, és a teljes arányt 26%-ra húzta. Az érintett
+> nevek és az indoklás: `docs/nevek-danisitasa-minta.md` 3. szakasza.
 >
 > A pontos mérés: `docs/nevek-generator-minta.md`.
 
