@@ -58,14 +58,17 @@ ott van, csak kézi gombként.)
 * **`mpWaitWatchdog`** — 25 mp mozdulatlanság után kiírja, hogy megállt.
 * **árva-felismerés** — ha a szoba eltűnt, kimondja és elenged.
 
-### 1.4 Amiből semmi nincs
+### 1.4 Amiből semmi nem volt
 
-| hiányzik | következmény |
-|---|---|
-| **jelenlét** (`onDisconnect` nulla találat) | ma nem tudható, hogy a társ ott van-e, vagy tegnap óta nem indította el a játékot. Csak azt látod, hogy „nem kész”. |
-| **szerveridő** (`ServerValue.TIMESTAMP` nulla találat) | minden időbélyeg **helyi óra** (`Date.now()`). Két gép órája percekkel eltérhet. |
-| moderáció, jelentés, tiltás | idegenekkel való játékhoz kellene |
-| szerveroldal (Cloud Functions) | push-üzenethez kellene |
+*(A felmérés a 3.9.13-as állapotot rögzíti. Az első két sort a 3.9.14 —
+az F0 — azóta megcsinálta; lásd a 2. szakaszt.)*
+
+| hiányzott | következmény | ma |
+|---|---|---|
+| **jelenlét** (`onDisconnect`: nulla találat) | nem volt tudható, hogy a társ ott van-e, vagy tegnap óta nem indította el a játékot. Csak az látszott, hogy „nem kész”. | ✅ **kész** |
+| **szerveridő** (`ServerValue`: nulla találat) | minden időbélyeg **helyi óra** volt. Két gép órája percekkel eltérhet. | ✅ **kész** |
+| moderáció, jelentés, tiltás | idegenekkel való játékhoz kellene | ⬜ P3 |
+| szerveroldal (Cloud Functions) | push-üzenethez kellene | ⬜ P2b |
 
 ### 1.5 A történet, amit érdemes komolyan venni
 
@@ -81,11 +84,40 @@ elhagyható” **tudatos védekezés** ezekre.
 
 ---
 
-## 2. F0 — a közös előfeltétel *(kicsi, és mindhármat kiszolgálja)*
+## 2. F0 — a közös előfeltétel ✅ KÉSZ (3.9.14)
 
-Mielőtt bármelyik ötlet elkezdődne, két apróság kell. Együtt talán egy nap.
+> **BEÉPÍTVE.** `mpPresenceArm` / `mpPresenceClear` / `mpMateOnline` /
+> `mpMateAwayMin` / `mpNow` / `mpStamp`, plusz a `players/$pid/online` és
+> `seenAt` mező az adatbázis-szabályban. A szabályfájlt **közzé kell tenni a
+> Firebase Console-ban**, különben a jelenlét-írás elszáll.
 
-### 2.1 Jelenlét (`onDisconnect`)
+A P1 és a P3 innentől építhet rá.
+
+### 2.1 Jelenlét (`onDisconnect`) — kész
+
+**HÁROM állapot van, nem kettő**, és ez nem szőrszálhasogatás:
+
+| | mit jelent | mit írunk ki |
+|---|---|---|
+| `true` | ott van | „● A társad ONLINE — érdemes megvárni." |
+| `false` | nincs ott | „○ A társad most NINCS a játékban (5 perce)" + a kiút |
+| **`null`** | **nem tudjuk** | „A társad jelenléte nem ismert (régebbi szoba)." |
+
+A `null` a jelenlét bevezetése ELŐTT nyitott szobáké: ott nincs ilyen mező.
+Ezt offline-nak hazudni rosszabb volna, mint bevallani.
+
+**Két csapda, amit menet közben kellett megkerülni:**
+
+**(a) A sorrend a felhúzásnál.** Előbb az `onDisconnect`-megbízást kérjük meg,
+és csak utána írjuk ki, hogy online vagyunk. Fordítva egy azonnali szakadás
+„örökre online" állapotot hagyna hátra.
+
+**(b) A szellemszoba.** Kilépéskor a szoba TÖRLŐDIK — de ha a megbízás áll,
+a szerver a szakadáskor **visszaírja** a játékos-ágat egy már nem létező
+szobába, és ott egy szellemszoba éldegél tovább, amit senki nem takarít el.
+Ezért a `leave()` **előbb visszavonja a megbízást**, és csak utána töröl.
+
+### 2.1/b Az eredeti indoklás
 
 A Firebase RTDB-nek van rá beépített eszköze: a kliens beír egy
 `players/<id>/online: true`-t, és megmondja a szervernek, hogy kapcsolat-
@@ -100,7 +132,18 @@ Amit azonnal ad:
 * az időkorlát csak akkor indul, ha a társ **tényleg nincs ott**;
 * a párkereső csak élő ellenfelet kínál.
 
-### 2.2 Közös óra
+### 2.2 Közös óra — kész
+
+`mpNow()` = helyi óra + a `.info/serverTimeOffset`-ből olvasott eltolás.
+`mpStamp()` = **szerveroldali** időbélyeg íráskor. A szoba `createdAt`-ja már
+ezt használja.
+
+Mérve: 125 000 ms-os mesterséges eltolással az `mpNow()` pontosan 125
+másodperccel tér el a helyi órától; helyi (Firebase nélküli) módban pedig az
+`mpStamp()` **számot** ad, nem sentinelt — különben egy feloldatlan
+Firebase-objektum kerülne a `localStorage`-ba.
+
+### 2.2/b Az eredeti indoklás
 
 Minden határidő **szerveridőben** íródjon a szobába (`ServerValue.TIMESTAMP`,
 illetve `.info/serverTimeOffset` a kliens-korrekcióhoz), és a **határidő

@@ -78,7 +78,7 @@ százalék = 2% + 2% × presztízspont,   26%-nál plafon (≈12 pont)
 | bajnoki ezüst | 0,25 |
 | BL-győzelem | 1,5 |
 | EL-győzelem | 1,0 |
-| FA-kupa-győzelem | 0,6 |
+| Fából Készült Serleg-győzelem | 0,6 |
 | KL-győzelem | 0,5 |
 | Magor Kupája-győzelem | 0,35 |
 | elvesztett kupadöntő | a győzelem harmada |
@@ -128,7 +128,7 @@ szorzó a felére csökkent**:
 | Kupák Kupájának Kupája | 1,5× | **0,75×** |
 | Ojrópai Klubcsapatok Bajnoki Kupája | 1,0× | **0,5×** |
 | Konföranszié Líg | 0,5× | **0,25×** |
-| FA-kupa | 0,35× | **0,175×** |
+| Fából Készült Serleg | 0,35× | **0,175×** |
 | Magor Kupája | 0,25× | **0,125×** |
 
 Az ezüstérem továbbra is a győzelem fele, az elődöntő a negyede; a Nyári
