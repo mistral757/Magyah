@@ -224,12 +224,21 @@ Vagyis a **PWA már ma telepíthető**. A Play-re kerüléshez a webet egy
 A manifest gépi ellenőrzése: érvényes JSON, 16 mező, **0** hiányzó kötelező
 mező, és minden hivatkozott kép létezik, a deklarált mérettel.
 
-#### 3.2 Digital Asset Links — *kicsi, de kritikus*
+#### 3.2 Digital Asset Links — a fájl kész (3.9.12, F6) ⚠️
+
+A `.well-known/assetlinks.json` megvan. **Két mező kitöltendő benne**, és a
+sorrend számít: előbb AAB-t töltesz fel, ONNAN olvasod ki a Play App Signing
+ujjlenyomatát, és csak utána teszed élesre. Lásd `docs/f6-f7-csomagolas.md`.
+
+<details><summary>az eredeti szakasz</summary>
+
 
 `/.well-known/assetlinks.json` az éles domainre, benne a **Play-aláírás
 SHA-256 ujjlenyomata**. Enélkül a TWA-ban ott marad a böngésző címsávja —
 vagyis nem app-nak látszik, hanem weboldalnak. Ez a leggyakoribb elrontott
 lépés.
+
+</details>
 
 #### 3.3 A burok — *közepes*
 
@@ -246,7 +255,21 @@ Bubblewrap CLI vagy PWABuilder → aláírt **AAB**. El kell dönteni és rögz�
 | **IARC tartalmi besorolás** | ❌ nincs | kérdőív, gyors |
 | célközönség, kereskedelmi státusz, áruházi lap | ❌ nincs | screenshotok, ikon, leírás |
 
-#### 3.5 Firebase — átnézés kiadás előtt — *kicsi*
+#### 3.5 Firebase — átnézve (3.9.12, F7) ✅ — a részletek: `docs/f6-f7-csomagolas.md`
+
+**A szobakód 4-ről 6 karakterre nőtt.** A 32-es ábécén ez 1 048 576 →
+1 073 741 824 kombináció, ezerszeres szorzó. *(A lenti „~1,7 millió" téves
+volt: 32⁴ = 1 048 576.)* A régi négyjegyű kódok továbbra is működnek.
+A szabályfájl ezen felül 30 napos frissesség-feltételt kapott az íráshoz, és
+a szoba gyökerében csak az ismert kulcsok írhatók.
+
+**NYITVA MARADT, ÉS EZ A LÉNYEG:** a `start` és a `h2h` továbbra sincs
+méretre korlátozva — élő Firebase nélkül egy ilyen szabályt nem lehet
+biztonságosan tesztelni, és egy rossz szabály némán megölné a kétjátékos
+módot. A védőháló addig a Console-ban beállított **költségriasztás**.
+
+<details><summary>az eredeti szakasz</summary>
+
 
 A `tools/firebase-rules.json` szigorúnak látszik (gyökéren `.read/.write:false`,
 csak 4 karakteres szobakód alatt írható, mezőnkénti `.validate`), **de a
@@ -261,6 +284,8 @@ Két érdemi kérdés marad:
   hosszabb kód, lejárat, vagy írás-korlátozás.
 * Az `apiKey` a kliensben van — **ez rendben van**, nyilvános azonosító, a
   hozzáférést a szabályok döntik el (a kód kommentje ezt helyesen mondja).
+
+</details>
 
 #### 3.6 Offline betöltés — kész (3.9.10, F8) ✅, de nem az volt a baj
 
@@ -321,8 +346,8 @@ cache-first statikus ág is tényleg dolgozik.
 └────────────────────────────────────────────────────────────────────┘
 ┌─ CSOMAGOLÁS ───────────────────────────────────────────────────────┐
 │ F5  Manifest + maskable ikon    ✅ KÉSZ (3.9.10)                    │
-│ F6  assetlinks.json + Bubblewrap → aláírt AAB                      │
-│ F7  Firebase-szabályok ellenőrzése + szobakód-döntés               │
+│ F6  assetlinks.json ✅ · AAB → a te gépeden (kulcs + domain kell)   │
+│ F7  Firebase-szabályok + szobakód 4→6  ✅ KÉSZ (3.9.12)             │
 │ F8  SW: offline előcache        ✅ KÉSZ (3.9.10)                    │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ KIADÁS ───────────────────────────────────────────────────────────┐
