@@ -157,7 +157,52 @@ maga is adat legyen**, ne két kliens külön számolása.
 
 ---
 
-## 3. Ötlet 1 — Tempó-módok és időkorlát
+## 3. Ötlet 1 — Tempó-módok és időkorlát ✅ P1a KÉSZ (3.9.15)
+
+> **BEÉPÍTVE:** `MP_TEMPO` (három mód) · a `tempo` mező a szobában, a
+> házigazda választja · `mpDeadlineLeft` · visszaszámláló a beváró
+> képernyőn · `mpSoloArm` `auto` jelzővel · automatikus léptetés Villám
+> módban. A szabályfájl `tempo` mezővel bővült — **közzé kell tenni**.
+>
+> **AMI SZÁNDÉKOSAN NEM KÉSZÜLT EL (P1b):** a társ KORÁBBI keretével
+> lejátszott párharc. Az a lépcső dönt először KÖZÖS eredményt határidő
+> alapján — onnantól kell a szerveridő is, és onnantól tud kettéválni a két
+> világ. Külön lépés, külön kockázat.
+
+### 3.0 A megkülönböztetés, amin az egész áll
+
+**A határidő nem minden kapunál jelenti ugyanazt.**
+
+| kapu | a kiút | magától léphet? |
+|---|---|---|
+| **nyolc kapu** (kupanevezés, csoportkör, kör lezárása, szezonzárás, tabella, osztályozó, hazai kupa, döntés) | LÁGY: „a saját eredményemmel megyek tovább" | ✅ **igen** — a te oldaladon dől el, és a társad karrierjét nem csonkítja |
+| **a párharc** | `mpOrphanCareer()` — VÉGLEG leválasztja a karriert (`S.mpOrphan`) | ❌ **soha** — csak felajánl, és ott is csak szöveggel |
+
+A képernyő maga is kétszer kérdez rá arra a leválasztásra. Egy hárompercnyi
+távollét miatt automatikusan szétvágni egy közös karriert nem tempó volna,
+hanem kár. **Mérve: a kemény kapu tízperces lejárat után, három hívásból is
+nulla alkalommal lépett magától.**
+
+### 3.0/b Amit a határidő NEM tesz
+
+**Az óra csak akkor jár, ha a társ tényleg nincs ott** (F0). Aki ott ül és
+épp a keretét rendezi, azt egy háromperces határidő nem gyorsítja, hanem
+bünteti. Mérve: társ online → nincs határidő; Kényelmes mód → nincs
+határidő; és egyik esetben sem lép magától semmi.
+
+**A kiút sosem lesz KÉSŐBB elérhető, mint eddig.** A „⏭ folytatom egyedül"
+gomb továbbra is 25 másodperc után megjelenik ott, ahol eddig is — a tempó
+csak azt szabja meg, hogy MAGÁTÓL megnyomódik-e.
+
+### 3.0/c Egy időtér, nem kettő
+
+Az eltelt időt a **helyi** óra méri, szándékosan: a várakozás ugyanazon a
+gépen kezdődik, ahol véget ér, tehát a szerver-eltolás kiesik. A szerveridő
+(`mpNow`) ott nélkülözhetetlen, ahol a MÁSIK fél írta az időpontot — a
+„mióta nincs itt" számolásnál —, és ott lesz az, ahol a határidő **közös**
+eredményt dönt el: a P1b lépcsőn.
+
+### 3.1 A fal: a hiányzó játékos keretét senki nem tudja feltölteni
 
 ### 3.1 A fal: a hiányzó játékos keretét senki nem tudja feltölteni
 

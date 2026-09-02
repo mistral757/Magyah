@@ -3781,6 +3781,13 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
       <h2 class="mpH">Szoba</h2>
       <p class="mpP">Hozz létre egy szobát, vagy add meg a társad kódját.</p>
       <div class="mpBtns" style="margin-top:20px">
+        <!-- P1 — TEMPÓ. A szoba létrehozója választja, és a szobába íródik:
+             a vendég olvassa, nem írja. Két kliens két különböző határidővel
+             pont az a kettéválás volna, amit el akarunk kerülni. -->
+        <div style="text-align:left;margin-bottom:8px">
+          <div class="steplbl" style="color:var(--gold);margin-bottom:4px">⏱ Tempó</div>
+          <div id="mpTempoBox"></div>
+        </div>
         <button class="mpBtn gold" id="mpCreateBtn">Új szoba létrehozása</button>
       </div>
       <div style="margin:22px 0 0">
@@ -5451,7 +5458,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.14";
+const APP_VERSION="3.9.15";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -47844,6 +47851,33 @@ function mpPresencePaint(){
       ? '<span style="color:var(--dim2)">A társad jelenléte nem ismert (régebbi szoba).</span>'
       : "";
   }
+  /* ---- P1: A VISSZASZÁMLÁLÓ ----
+     Csak akkor, ha van mód, van mire várni, és a társ tényleg nincs ott —
+     az mpDeadlineLeft mind a hármat egyszerre nézi. A számot KIÍRJUK, mert
+     egy néma határidő rosszabb, mint a semmi: a felhasználó nem tudja, hogy
+     mire vár, és mikor lesz vége. */
+  try{
+    const T=mpTempoOf(_mpPresRoom), o=_mpSoloOut;
+    if(!T.ms)return;
+    const h=mpDeadlineLeft(o?o.at:(_h2hWaitAt||null));
+    if(h===null)return;
+    if(o&&o.auto&&T.auto){
+      el.innerHTML+=`<br><span style="color:var(--gold)">⏱ Villám tempó — `
+        +(h>0?`<b>${mpMMSS(h)}</b> múlva magától továbblép.`:`továbblépés…`)+`</span>`;
+    }else if(o){
+      el.innerHTML+=`<br><span style="color:var(--gold)">⏱ ${esc(T.n)} tempó — `
+        +(h>0?`<b>${mpMMSS(h)}</b> múlva felajánlom a továbblépést.`
+             :`a továbblépés gombja lent.`)+`</span>`;
+    }else if(h<=0){
+      /* A PÁRHARC KAPUJA. Itt nincs lágy kiút: a „folytatom egyedül" VÉGLEG
+         leválasztaná a karriert. Hárompercnyi távollét miatt ezt nem kínáljuk
+         fel gombként, és magától végképp nem lépjük meg — csak elmondjuk,
+         hogy a várakozásnak nincs értelme itt ülve. */
+      el.innerHTML+=`<br><span style="color:var(--dim2)">A határidő letelt, de a párharcot `
+        +`nem lehet nélküle lejátszani — az ő kerete kell hozzá. Lépj ki nyugodtan: `
+        +`a mérkőzés magától lefut, amint ő is elindítja ezt a fordulót.</span>`;
+    }
+  }catch(e){}
 }
 function mpPresenceTick(){
   if(mpNet.mode!=="fb"||!MP.activeRoom)return;
@@ -47907,10 +47941,16 @@ const MP_SOLO_MS=25000;
 let _mpSoloOut=null;
 /* A FUTÓ várakozás egyedüli kiútja. A hívó a saját leállítóját és
    folytatását adja meg — a réteg csak felkínálja. */
-function mpSoloArm(label,fn,gate){
+function mpSoloArm(label,fn,gate,auto){
   if(_mpSoloOut&&_mpSoloOut.gate===gate)return;   /* ugyanaz a kör: az óra ne induljon újra */
+  /* AZ `auto` JELÖLI, HOGY A LÉPÉS MAGÁTÓL IS MEGTEHETŐ-E (Villám mód).
+     A nyolc kapu kiútja LÁGY: a saját eredményemmel megyek tovább, a saját
+     kvalifikációmmal indulok, egyedül folytatom a sorozatot — mind a te
+     oldaladon dől el, és a társad karrierjét nem csonkítja.
+     A párharcé NEM ilyen: ott az mpOrphanCareer VÉGLEG leválasztja a
+     karriert (S.mpOrphan), ezért az sosem kap auto-jelölést. */
   _mpSoloOut={label:label||"A társad nem jelentkezik — folytatom egyedül",
-              fn,gate:gate||null,at:Date.now()};}
+              fn,gate:gate||null,at:Date.now(),auto:auto!==false};}
 function mpSoloClear(){_mpSoloOut=null;}
 /* A réteg minden megjelenítéskor megnézi, kell-e már kiút. A KONKRÉT kapuk
    (szezonindítás, kieséses kör) ezután írhatják felül a gombot a sajátjukkal:
@@ -47918,15 +47958,31 @@ function mpSoloClear(){_mpSoloOut=null;}
 function mpSoloOffer(oppReady){
   const ob=$("h2hWaitOrphanBtn");
   if(!ob||!_mpSoloOut||oppReady)return;
-  if(Date.now()-_mpSoloOut.at<MP_SOLO_MS)return;
   const o=_mpSoloOut;
+  /* A GOMB a régi, presence-független 25 másodperc után jelenik meg —
+     ezen a tempó nem ront: a kiút sosem lesz KÉSŐBB elérhető, mint eddig. */
+  if(Date.now()-o.at<MP_SOLO_MS)return;
   ob.classList.remove("hide");
   ob.disabled=false;
   ob.textContent="⏭ "+o.label;
-  ob.onclick=()=>{
+  const lep=()=>{
     ob.disabled=true;
     mpSoloClear();
-    try{o.fn();}catch(e){try{h2hWaitHide();}catch(_){}}};}
+    try{o.fn();}catch(e){try{h2hWaitHide();}catch(_){}}};
+  ob.onclick=lep;
+  /* VILLÁM: a lágy kiutat a határidő magától megnyomja. Csak akkor, ha
+     (1) a mód ezt kéri, (2) a lépés lágy (auto), és (3) a társ TÉNYLEG
+     nincs ott — az mpDeadlineLeft ez utóbbit is figyeli. */
+  const T=mpTempoOf(_mpPresRoom);
+  if(!T.auto||!o.auto)return;
+  const h=mpDeadlineLeft(o.at);
+  if(h===null||h>0)return;
+  if(_mpSoloFired===o)return;      /* egyszer, ne pörögjön */
+  _mpSoloFired=o;
+  try{addLine("⏱️ <b>Villám tempó:</b> a társad nem jelentkezett a határidőig — "
+    +esc(o.label.replace(/^A társad[^—]*—\s*/,""))+".","m ev");}catch(e){}
+  lep();}
+let _mpSoloFired=null;
 function h2hWaitShow(round,msg,mine,opp,what){
   _h2hWaitAt=Date.now();
   const W=what||{mine:"A te kereted",opp:"A társad kerete",cancel:"✕ Most nem játszom le"};
@@ -83374,6 +83430,73 @@ function mpMakeCode(){
   const CH="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let c="";for(let i=0;i<MP_CODE_LEN;i++)c+=CH[Math.floor(Math.random()*CH.length)];
   return c;}
+/* ================= P1 — TEMPÓ-MÓDOK =================
+   BEJELENTETT PANASZ: „jelen formájában a pvp mód nagyon lassú… a gyorsan
+   haladóba beépítenénk korlátokat, hogy mennyit lehet maradni egy adott
+   várakozó képernyőn úgy, hogy a másik már beready-zett azon."
+
+   A HATÁRIDŐ NEM MINDEN KAPURA UGYANAZT JELENTI, és ez a terv lelke.
+   Nyolc kapunál a kiút LÁGY: „a saját eredményemmel megyek tovább", „indulok
+   a saját kvalifikációmmal", „folytatom egyedül a sorozatot" — ezek a te
+   oldaladon dőlnek el, visszafordíthatók, és a társad karrierjét nem
+   csonkítják. Ezeket szabad magától elléptetni.
+
+   A PÁRHARC KAPUJA VISZONT MÁS. Ott a kiút az mpOrphanCareer(), ami VÉGLEG
+   leválasztja a karriert a szobáról (S.mpOrphan) — a képernyő maga is
+   kétszer kérdez rá. Egy hárompercnyi távollét miatt automatikusan
+   szétvágni egy közös karriert nem tempó volna, hanem kár. Ott ezért a
+   határidő csak FELAJÁNL, sosem lép magától.
+
+   És mindkettőnél: AZ ÓRA CSAK AKKOR JÁR, HA A TÁRS TÉNYLEG NINCS OTT (F0).
+   Aki ott ül és épp a keretét rendezi, azt egy háromperces határidő nem
+   gyorsítja, hanem bünteti. */
+const MP_TEMPO={
+  nyugodt:{n:"Kényelmes", ms:0,      auto:false,
+    d:"Nincs időkorlát. Napokon át elhúzódhat — ez a mai viselkedés."},
+  tempos: {n:"Tempós",    ms:180000, auto:false,
+    d:"3 perc után felajánlja a továbblépést, de te döntesz."},
+  villam: {n:"Villám",    ms:180000, auto:true,
+    d:"3 perc után magától továbblép. A párharcot sosem vágja szét — azt csak felajánlja."}};
+const MP_TEMPO_DEF="nyugodt";
+/* A HÁZIGAZDA VÁLASZTÁSA. Csak a szoba létrehozásakor számít: a vendég a
+   szobából olvassa ki, nem írhatja felül — különben a két kliens két
+   különböző határidővel járna, és az pont az a kettéválás, amit kerülünk. */
+let _mpTempoSel=MP_TEMPO_DEF;
+function mpTempoPick(){return MP_TEMPO[_mpTempoSel]?_mpTempoSel:MP_TEMPO_DEF;}
+function mpTempoRender(){
+  const box=$("mpTempoBox");if(!box)return;
+  box.innerHTML=Object.keys(MP_TEMPO).map(k=>{
+    const T=MP_TEMPO[k],on=(k===_mpTempoSel);
+    return `<button class="mpBtn${on?" gold":""}" data-tempo="${k}" `
+      +`style="text-align:left;padding:7px 10px;margin-bottom:5px">`
+      +`<b>${on?"● ":"○ "}${esc(T.n)}</b>`
+      +`<br><small style="opacity:.8;font-weight:400">${esc(T.d)}</small></button>`;}).join("");
+  box.querySelectorAll("[data-tempo]").forEach(b=>{
+    b.onclick=()=>{_mpTempoSel=b.getAttribute("data-tempo");mpTempoRender();};});}
+function mpTempoKey(room){
+  const k=room&&room.tempo;
+  return (k&&MP_TEMPO[k])?k:MP_TEMPO_DEF;}
+function mpTempoOf(room){return MP_TEMPO[mpTempoKey(room)];}
+/* Hány ms van még hátra? null = nincs határidő (nincs mód, vagy a társ ITT VAN).
+   A start a helyi „mikor kezdtem várni" pillanat; az eltelt idő mérésénél a
+   szerver-eltolás kiesik, mert ugyanazon a gépen mérünk. A SZERVERIDŐ ott
+   válik nélkülözhetetlenné, ahol a határidő KÖZÖS eredményt dönt el (a
+   roadmap P1b lépcsője, a társ korábbi keretével lejátszott párharc) — azt
+   ez a lépcső szándékosan nem csinálja meg. */
+function mpDeadlineLeft(startAt){
+  const T=mpTempoOf(_mpPresRoom);
+  if(!T.ms||!startAt)return null;
+  if(mpMateOnline(_mpPresRoom)===true)return null;   /* ott van — nem sürgetjük */
+  /* HELYI óra, szándékosan. Az ELTELT időt ugyanazon a gépen mérjük, ahol a
+     várakozás elkezdődött — ott a szerver-eltolás kiesik, tehát bevonni csak
+     zajt adna. A szerveridő (mpNow) ott nélkülözhetetlen, ahol a MÁSIK fél
+     írta az időpontot (mpMateAwayMin), és ott lesz az, ahol a határidő KÖZÖS
+     eredményt dönt el — a roadmap P1b lépcsőjén, amit ez a lépés nem csinál. */
+  return Math.max(0,startAt+T.ms-Date.now());}
+function mpMMSS(ms){
+  const t=Math.max(0,Math.round(ms/1000));
+  return Math.floor(t/60)+":"+String(t%60).padStart(2,"0");}
+
 /* ================= F0 — JELENLÉT =================
    MIÉRT KELL. A beváró képernyő eddig annyit tudott mondani, hogy „a társad
    még nem kész". Azt NEM, hogy a társad ott ül-e a telefonja fölött, vagy
@@ -83441,7 +83564,7 @@ function mpMateAwayMin(room){
   }catch(e){return null;}
 }
 function mpNewRoomRecord(){
-  return {code:null,mode:"hajsza",createdAt:mpStamp(),status:"lobby",
+  return {code:null,mode:"hajsza",tempo:mpTempoPick(),createdAt:mpStamp(),status:"lobby",
     seed:makeWorldSeed(),   /* a közös világ magja — az F3 használja majd */
     players:{[mpMyId()]:{role:"host",ready:false,online:true}}};}
 /* ---- LOCAL backend (tartalék) ---- */
@@ -84256,7 +84379,7 @@ $("homeBtn")&&($("homeBtn").onclick=()=>{
   _homeArm=setTimeout(homeBtnReset,4000);});
 /* Az MP-ágba lépéskor indul a hálózat — az SP-játékos soha nem tölt Firebase-t. */
 $("mpDuelBtn").onclick=()=>{mpShow("mpViewMode");mpNetInit();};
-$("mpModeHajsza").onclick=()=>mpShow("mpViewRoom");
+$("mpModeHajsza").onclick=()=>{mpTempoRender();mpShow("mpViewRoom");};
 document.querySelectorAll("#mpEntry .mpBack").forEach(b=>b.onclick=()=>mpShow(b.dataset.mpback));
 /* közös gomb-állapotkezelés: a hálózati műveletek alatt tiltjuk a gombot */
 async function mpBusy(btn,label,fn){
