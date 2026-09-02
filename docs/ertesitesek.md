@@ -82,33 +82,37 @@ kiírása elszáll** — a játék működik, de a bökés nem.
 |---|---|
 | `netlify/functions/nudge.js` | **új** — ez küldi a push-t, ez őrzi a titkos kulcsot |
 | `package.json` | **új** — kizárólag a `web-push` függőségért |
-| `netlify.toml` | **új** — kizárólag a függvények helyét mondja ki (lásd lent) |
 | `package-lock.json` | **új** — hogy a telepítés determinisztikus legyen |
 | `sw-1.js` | `push` és `notificationclick` kezelő |
 | `index.html` | a kliens-réteg, a két gomb, a fékek |
 | `tools/firebase-rules.json` | `push` + `nudgeAt` |
 
-> **A `netlify.toml` ELSŐ VÁLTOZATA ELRONTOTTA A DEPLOYT — és ezt itt is
-> kimondom, mert ebben a lapban álltak azok a mondatok, amik félrevezettek.**
+> **NINCS `netlify.toml` — ÉS EZ TANULT DÖNTÉS, NEM MULASZTÁS.**
 >
-> Az eredeti indoklás az volt, hogy a `package.json` „build-lépésnek látszik",
-> ezért egy `[build]` szakasszal (`command = ""`, `publish = "."`) kell
-> kimondani, hogy nincs build. **Ez az indoklás hibás volt**, a következmény
-> pedig valóságos: az első deploy **11 másodperc alatt elhasalt**, mert a
-> publikálási könyvtár így kimondva azonos lett a projekt gyökerével, és a
-> Netlify ezt a párost konfigurációs hibaként utasítja vissza.
+> A P2b eredetileg tett be egyet, azzal az indoklással, hogy a `package.json`
+> „build-lépésnek látszik", ezért egy `[build]` szakasszal (`command = ""`,
+> `publish = "."`) ki kell mondani, hogy nincs build.
 >
-> A Netlify **nem talál ki magának build-parancsot** egy `package.json`
-> láttán: a felületen mentett (üres) beállítás marad érvényben. A védekezésre
-> tehát nem volt szükség — és pont a védekezés tört el mindent.
+> **Az indoklás hibás volt.** A Netlify nem talál ki magának build-parancsot
+> egy `package.json` láttán; a felületen mentett beállítás marad érvényben.
+> A védekezésre nem volt szükség — és pont a védekezés tört el mindent.
 >
-> A fájlban most **nincs `[build]` szakasz**, csak a függvények könyvtára.
-> Az is csak az alapértelmezést mondja ki, hogy egy felületi átállítás se
-> vihesse el észrevétlenül.
+> Amit a check-történet mutat:
 >
-> **Ha a deploy mégis elhasal, a napló ELSŐ hibasora mondja meg, mi az** —
-> a „publish directory / base directory" és a „build command" szavakra
-> érdemes rákeresni benne.
+> | commit | a három Netlify-check | idő |
+> |---|---|---|
+> | a P2b ELŐTT (#35, #36) | ⚪ neutral — nincs mit jelentenie | 8 mp |
+> | P2b + P1b (`netlify.toml`-lal) | 🔴 failure | 11 mp |
+> | a `[build]` szakasz eltávolítása után | 🔴 failure | 12 mp |
+>
+> A `[build]` szakasz elvétele tehát **nem oldotta meg** — vagyis nem az volt
+> az ok. A váltás pontosan ott történt, ahol a `netlify.toml` MEGJELENT,
+> ezért az egész fájl kikerült. A `netlify/functions` amúgy is a Netlify
+> alapértelmezett függvény-könyvtára; kimondani sem kell.
+>
+> **Ha a deploy még ezután is elhasal, a napló ELSŐ hibasora dönt** — az már
+> a `package.json`-ra vagy a függvény becsomagolására mutatna, nem a
+> konfigurációra.
 
 ---
 
