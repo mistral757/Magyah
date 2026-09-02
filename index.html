@@ -5424,7 +5424,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.04";
+const APP_VERSION="3.9.05";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -46781,9 +46781,54 @@ function kickBtnLabel(){
 
    A MÓD MENTŐDIK (S.immersion): ez nem futásidejű pillanat, hanem az, ahogy a
    felhasználó nézni akarja a karrierjét — egy újratöltés nem veheti el tőle. */
-const IMM_MSTAT_SEC=30;   /* az értékelő ablak nyitva marad ennyi másodpercig */
+/* ---- A LÁNC KÉT ÜTEME (3.9.05) ----
+   BEJELENTETT HIBA: „nem működik az autoplay a meccsek között. Mindig feldob
+   plusz üzenetet a game, ha játékos-igazolás, skill adás, stb. van. És amint
+   arra rányomok, megszakad a folyamat."
+
+   Két oka volt, és mindkettő szerkezeti.
+
+   1. A JUTALMAK AZ ÉRTÉKELŐ ELŐTT JÖNNEK. A lefújás után előbb fut a
+      felfedezés, a jutalom-képesség és az akadémia (lásd afterAllRewards), és
+      CSAK UTÁNA nyílik az értékelő ablak. A lánc viszont épp ott fegyverkezett
+      fel — vagyis a jutalom-képernyők alatt semmi nem számolt. A felhasználó
+      úgy látta: „megáll".
+   2. A KÉPERNYŐ-ŐR MINDEN ABLAKRA MEGÁLLT. Egy nyitott ablak a lejárat
+      pillanatában leállította a láncot (immScreenBail) — akkor is, ha az
+      ablakban semmi dolga nem volt, csak egy „Rendben".
+
+   A MEGOLDÁS: a lánc nem egy időzítő, hanem egy LÉPÉS-HUROK. Minden lépésnél
+   megnézi, mi áll a képernyőn, és három dolog egyikét teszi:
+     · TUDNIVALÓ (egyetlen „Rendben"-szerű gomb) → IMM_STEP_SEC múlva megnyomja,
+       és újra körbenéz;
+     · VALÓDI DÖNTÉS (két vagy több választható út — kinek adjuk a képességet,
+       kit engedjünk el a tele keretből) → MEGÁLL, és megmondja, min;
+     · TISZTA KÉPERNYŐ → jöhet a felkészülés, majd IMM_PREP_SEC múlva a
+       kezdőrúgás.
+   A döntés-felismerés nem azonosító-lista, hanem a GOMBOK SZÁMA a képernyő
+   gomb-dobozában: egy gomb tudnivaló, kettő már választás. Ugyanaz a doboz
+   szolgálja ki a felfedezést (egy gomb) és a tele keretet (kettő), tehát az
+   azonosító önmagában nem is döntené el. */
+const IMM_STEP_SEC=3;     /* egy tudnivaló-képernyő ennyi ideig áll */
 const IMM_PREP_SEC=15;    /* …és ennyi ideig áll a felkészülés a kezdőrúgás előtt */
 let _immT=null,_immLeft=0,_immFn=null;
+/* Mire szól a most futó visszaszámlálás? Ettől lesz az immStep IDEMPOTENS:
+   több helyről is hívható (a jutalom-lánc, az értékelő, a forduló vége), és
+   ha már pontosan erre számolunk, nem indítja újra. */
+let _immTarget=null;
+/* HÁNY TUDNIVALÓT LÉPTETTÜNK EL EGYMÁS UTÁN? Biztosíték: ha egy képernyő a
+   koppintásra nem tűnik el (mert mégsem az a gomb zárja, vagy közben újra
+   megnyílik), a hurok 3 másodpercenként örökké pörögne. Tizenkét lépés bőven
+   fedi a legzsúfoltabb meccs utáni sort (felfedezés + több képesség +
+   akadémia + tipp + értékelő); fölötte inkább megállunk és szólunk. */
+const IMM_STEP_MAX=12;
+let _immSteps=0;
+/* MEDDIG VÁRUNK EGY ÁTMENETI ÁLLAPOTRA? A képesség-sorsolás animációja alig
+   egy másodperc, de egy bent ragadt, gomb nélküli képernyő örökre „átmeneti"
+   maradna — és a lánc némán pörögne alatta. Húsz körülnézés (~9 mp) bőven fedi
+   a leglassabb animációt is; fölötte inkább megállunk és szólunk. */
+const IMM_WAIT_MAX=20;
+let _immWaits=0;
 function immOn(){
   if(gameMode!=="career"&&gameMode!=="classic")return false;
   return !!(S&&S.immersion);}
@@ -46807,7 +46852,7 @@ function immArm(sec,txt,sub,fn){
     immPaint(txt,sub);},1000);}
 function immCancel(){
   if(_immT){clearInterval(_immT);_immT=null;}
-  _immLeft=0;_immFn=null;
+  _immLeft=0;_immFn=null;_immTarget=null;
   const p=$("immPill");if(p)p.classList.add("hide");}
 function immPaint(txt,sub){
   const p=$("immPill");if(!p)return;
@@ -46820,7 +46865,7 @@ function immPaint(txt,sub){
    hanem visszavenni az irányítást. */
 function immStopAll(quiet){
   const wasOn=immOn();
-  immCancel();
+  immCancel();_immSteps=0;_immWaits=0;
   if(S)S.immersion=false;
   immSyncRow();
   if(wasOn&&!quiet){
@@ -46831,14 +46876,17 @@ function immToggle(){
   if(immOn()){immStopAll();return;}
   S.immersion=true;
   immSyncRow();
-  try{addLine(`🎬 <b>Meccsről meccsre bekapcsolva.</b> A lefújás után ${IMM_MSTAT_SEC} mp-cel `
-    +`bezárul az értékelő, jön a felkészülés, és további ${IMM_PREP_SEC} mp múlva a kezdőrúgás. `
-    +`Rangadó, bajnoki tétmérkőzés és átigazolási időszak előtt magától megáll.`,"m life");}catch(e){}
+  try{addLine(`🎬 <b>Meccsről meccsre bekapcsolva.</b> A lefújás utáni üzeneteket — `
+    +`a felfedezést, a jutalom-képességet, az értékelőt — a lánc ${IMM_STEP_SEC} mp-enként `
+    +`lépteti, majd jön a felkészülés, és további ${IMM_PREP_SEC} mp múlva a kezdőrúgás. `
+    +`Ott áll meg, ahol dönteni kell: rangadó, bajnoki tétmérkőzés, átigazolási időszak — `
+    +`és ha egy képességet neked kell kiosztanod.`,"m life");}catch(e){}
   try{saveGame();}catch(e){}
   /* HA ÉPP KÉT MECCS KÖZÖTT ÁLLUNK, a lánc AZONNAL felveszi a fonalat — nem
      kell megvárni a következő lefújást ahhoz, hogy a kapcsoló csináljon
-     valamit. */
-  try{immAfterLeagueMatch(true);}catch(e){}}
+     valamit. A hurkot hívjuk, nem a forduló-láncot: így egy épp nyitva álló
+     üzenetet is elléptet, nem csak a tiszta képernyőről indul. */
+  try{immStep(true);}catch(e){}}
 /* A KAPCSOLÓSÁV. Csak ott látszik, ahol van mit kapcsolni: futó karrierben
    (vagy klasszikus szezonban), meccsen kívül, elkezdett szezonban. */
 function immSyncRow(){
@@ -46859,7 +46907,7 @@ function immSyncRow(){
     b.onclick=immToggle;}
   const n=$("immNote");
   if(n)n.textContent=on
-    ? `A lánc magától megy: értékelő ${IMM_MSTAT_SEC} mp → felkészülés ${IMM_PREP_SEC} mp → kezdőrúgás. Rangadó, tétmeccs és átigazolási időszak előtt megáll.`
+    ? `A lánc magától megy: üzenetek ${IMM_STEP_SEC} mp-enként → felkészülés ${IMM_PREP_SEC} mp → kezdőrúgás. Ott áll meg, ahol dönteni kell.`
     : `Dőlj hátra: a lefújás után magától jön a felkészülés és a következő kezdőrúgás.`;}
 /* ---- KÉPERNYŐ-ŐR ----
    A visszaszámlálás alatt a felhasználó elnavigálhat: átmehet a HUB-ba,
@@ -46874,10 +46922,13 @@ function immScreenReady(id){
     const el=$(id);
     if(!el||el.classList.contains("hide"))return false;
     /* Bármelyik játék-ablak nyitva van? (Az értékelő ablak KIVÉTEL: azt épp
-       ez a lánc zárja be.) */
+       ez a lánc zárja be. A DÍSZÍTŐ RÉTEGEK is kivételek — lásd immDiszit:
+       egy elsötétítő, amire koppintani sem lehet, nem „elnavigálás".) */
     const nyitva=GAME_OVERLAY_IDS.some(x=>{
       if(x==="mstatModal")return false;
-      const o=$(x);return !!(o&&!o.classList.contains("hide"));});
+      const o=$(x);
+      if(!o||o.classList.contains("hide"))return false;
+      return !immDiszit(x);});
     if(nyitva)return false;
     /* A megerősítő kérdés és a hiányzó-panel külön él, nem a listában. */
     for(const x of ["hubTacticConfirmModal","absencePanel","scWindow","scHub","scVerdict"]){
@@ -46889,6 +46940,144 @@ function immScreenBail(){
   try{addLine(`⏸️ <b>A lánc megállt</b> — közben elnavigáltál. `
     +`A „meccsről meccsre" bekapcsolva marad: indítsd el ezt a fordulót magad, `
     +`és a következőtől újra magától megy.`,"m ev");}catch(e){}}
+/* ================= A LÉPÉS-HUROK =================
+   Lásd az IMM_STEP_SEC fölötti indoklást. */
+function immVis(id){const e=$(id);return !!(e&&!e.classList.contains("hide"));}
+/* Egy gomb-doboz VALÓDI, megnyomható gombjai. A rejtett és a letiltott nem
+   számít: a képesség-képernyőn például a sorsolás alatt ott áll a „Sorsolás",
+   de tiltva — azt megnyomni nem lépés, hanem hiba volna. */
+function immBtns(id){
+  const box=$(id);if(!box)return [];
+  return [...box.querySelectorAll("button")]
+    .filter(b=>b&&!b.classList.contains("hide")&&!b.disabled&&b.offsetParent);}
+/* DÍSZÍTÉS-E EZ A RÉTEG? Se megnyomható gombja nincs, se koppintást nem fogad
+   — tehát nem várhat rád. (Lásd az 5. pont indoklását: a tipp-buborék
+   elsötétítője és a jelzés-pöttyök ilyenek.) */
+function immDiszit(id){
+  const el=$(id);if(!el)return false;
+  if(immBtns(id).length)return false;
+  try{return getComputedStyle(el).pointerEvents==="none";}catch(e){return false;}}
+/* MI ÁLL ÉPP A KÉPERNYŐN? Négy válasz lehet:
+     {id,mit,gomb} — léptethető tudnivaló
+     {id,var:1}    — átmeneti állapot (fut egy animáció): várunk
+     {dont:"…"}    — valódi döntés: a lánc megáll, és megmondja, min
+     null          — tiszta, jöhet a forduló-lánc                             */
+function immPending(){
+  try{
+    /* 1. JUTALOM-KÉPERNYŐ. Ugyanaz a doboz háromféle tartalommal: felfedezés
+       (egy „Rendben"), tele keret és akadémia (két út). A gombok száma dönt. */
+    if(immVis("scUnlock")){
+      const b=immBtns("unlockActions");
+      /* NULLA GOMB = MÉG NINCS MIT ELDÖNTENI. A képernyő épp épül (a gombokat
+         a tartalom után rakja ki), vagy egy koppintás után bent ragadt. Ez NEM
+         döntés: azt hinni annak azt jelentené, hogy a lánc egy olyan kérdésre
+         vár, ami meg sem jelent. Várunk — a `var` ág korlátos. */
+      if(!b.length)return {id:"scUnlock",var:1};
+      if(b.length===1)return {id:"scUnlock",mit:"Új felfedezés",gomb:b[0]};
+      return {dont:"a keretedről kell döntened"};}
+    /* 2. KÉPESSÉG-KÉPERNYŐ. A sorsolás animációja alatt még nincs mit
+       megnyomni (a lista csak a landolásnál épül fel) — ott VÁRUNK. Utána a
+       lista mérete dönt: egy gomb a „nem te döntesz" ág közlése („Rendben"),
+       több gomb a valódi kiosztás. */
+    if(immVis("scSkill")){
+      if(!immVis("skillAssignWrap"))return {id:"scSkill",var:1};
+      const b=immBtns("skillAssignList");
+      if(!b.length)return {id:"scSkill",var:1};   /* lásd a scUnlock nulla-gombos ágát */
+      if(b.length===1)return {id:"scSkill",mit:"Jutalom-képesség",gomb:b[0]};
+      return {dont:"neked kell eldöntened, ki kapja a képességet"};}
+    /* 3. TANÍTÓ BUBORÉKOK. Tiszta tudnivalók. A halk jelzésnél a BEZÁRÁST
+       nyomjuk, nem a „Mutasd meg"-et: az elnavigálna, és a lánc pont attól
+       állna meg, amit el akarunk kerülni. */
+    if(immVis("guideTip")){
+      const b=$("guideTipOk");
+      if(b&&!b.disabled)return {id:"guideTip",mit:"Tipp",gomb:b};}
+    if(immVis("tNudgeWhy")){
+      const b=$("tNudgeWhyX");
+      if(b&&!b.disabled)return {id:"tNudgeWhy",mit:"Jelzés",gomb:b};}
+    /* 4. AZ ÉRTÉKELŐ ABLAK. Csak akkor léptetjük, ha a lánc TÉNYLEG megy
+       tovább: egy megállónál (átigazolás, rangadó, tétmeccs) maradjon nyitva,
+       amíg a felhasználó be nem zárja — ott úgyis ő veszi át az irányítást, és
+       a mérleget látnia kell. Kupában ezt a kérdést a szakasz dönti el. */
+    if(immVis("mstatModal")){
+      let cup=false;try{cup=(typeof euroActive==="function")&&euroActive();}catch(e){}
+      if(!cup&&immLeagueStopWhy())return {id:"mstatModal",var:1,ovakodj:1};
+      const b=$("mstatOk");
+      if(b&&!b.disabled)return {id:"mstatModal",mit:"A mérkőzés értékelése",gomb:b};}
+    /* 5. BÁRMI MÁS NYITOTT ABLAK vagy képernyő: nem ismerjük, tehát nem
+       nyúlunk hozzá. A lánc megáll — ez a régi viselkedés, csak most kimondja,
+       hogy nem elnavigálás történt, hanem valami, amit nem tudunk léptetni.
+
+       DE A DÍSZÍTÉS NEM ABLAK. A tipp-buborék elsötétítője, a halk jelzés
+       pöttyei és a lépéssor árnyéka (`guideDim`, `tNudgeDots`, `tStepDim`)
+       ugyanúgy „nyitva" vannak, mint egy ablak — csak épp nem lehet rájuk
+       koppintani. MÉRVE ezen bukott el a lánc: a tipp-buborékot elléptette, de
+       a mögötte maradó elsötétítőt ablaknak hitte, és megállt.
+       A szűrő SZERKEZETI, nem azonosító-lista: ami se megnyomható gombot nem
+       tartalmaz, se koppintást nem fogad (`pointer-events:none`), az nem
+       várhat rád. Így egy jövőbeli díszítő réteg magától kimarad. */
+    for(const x of GAME_OVERLAY_IDS){
+      if(x==="mstatModal")continue;
+      if(!immVis(x))continue;
+      if(immDiszit(x))continue;
+      return {dont:"egy ablak vár rád"};}
+    for(const x of ["hubTacticConfirmModal","absencePanel","scWindow","scHub","scVerdict"])
+      if(immVis(x))return {dont:"egy döntés vár rád"};
+    return null;
+  }catch(e){return {dont:"ismeretlen állapot"};}}
+/* A MEGÁLLÁS KIMONDJA MAGÁT. A mód bekapcsolva marad: ha elintézted, amit a
+   képernyő kért, a következő lefújás újra felveszi a fonalat. */
+function immDecisionStop(mit){
+  immCancel();
+  try{addLine(`⏸️ <b>A lánc vár:</b> ${mit}. `
+    +`A „meccsről meccsre" bekapcsolva marad — ha döntöttél, a következő `
+    +`fordulótól magától folytatódik.`,"m ev");}catch(e){}}
+/* A HUROK. Idempotens: ha már pontosan erre a képernyőre számolunk, nem indul
+   újra. Ezért hívható a jutalom-láncból, az értékelőből és a forduló végéről
+   is, anélkül hogy a pirula visszaugrálna. */
+function immStep(quiet){
+  if(!immOn())return;
+  const p=immPending();
+  const cel=p?(p.dont?"__dont__":(p.id||"?")):"__tiszta__";
+  if(_immT&&_immTarget===cel)return;
+  if(p&&p.dont){
+    /* Az ÓVATOS eset (nyitva hagyott értékelő egy megálló előtt) nem hiba:
+       ott szándékosan nem csinálunk semmit, üzenet nélkül. */
+    if(quiet){immCancel();return;}
+    immDecisionStop(p.dont);return;}
+  if(p&&p.var){
+    /* Átmeneti állapot: várunk egy keveset, és újra megnézzük. Az `ovakodj`
+       ág (megálló előtti értékelő) csendben kiszáll — ott a felhasználóé a szó. */
+    if(p.ovakodj){immCancel();_immWaits=0;return;}
+    immCancel();
+    if(++_immWaits>IMM_WAIT_MAX){
+      _immWaits=0;
+      try{addLine(`⏸️ <b>A lánc megállt</b> — egy képernyő nem lépett tovább magától. `
+        +`Lépj tovább rajta; a „meccsről meccsre" bekapcsolva marad.`,"m ev");}catch(e){}
+      return;}
+    setTimeout(()=>{try{immStep();}catch(e){}},450);
+    return;}
+  _immWaits=0;
+  if(p&&p.gomb){
+    if(++_immSteps>IMM_STEP_MAX){
+      immCancel();_immSteps=0;
+      try{addLine(`⏸️ <b>A lánc megállt</b> — túl sok üzenet jött egymás után, `
+        +`és nem akarunk vaktában kattintgatni. Lépj tovább magad; a „meccsről `
+        +`meccsre" bekapcsolva marad.`,"m ev");}catch(e){}
+      return;}
+    immArm(IMM_STEP_SEC,p.mit,"a lánc magától lépteti",()=>{
+      /* A gomb közben eltűnhetett (a felhasználó megelőzött minket) — akkor
+         nem nyomunk semmit, csak újra körbenézünk. */
+      const q=immPending();
+      if(!q||!q.gomb){setTimeout(()=>{try{immStep();}catch(e){}},120);return;}
+      try{q.gomb.click();}catch(e){}
+      setTimeout(()=>{try{immStep();}catch(e){}},350);});
+    _immTarget=cel;
+    return;}
+  _immSteps=0;_immWaits=0;
+  /* Tiszta a képernyő: jöhet a forduló-lánc. A `quiet` innen megy tovább: a
+     kapcsoló bekapcsolásakor a megállás indoka fölösleges zaj volna, mert a
+     bekapcsolás sora már felsorolta, hol áll meg a lánc. */
+  immAfterLeagueMatch(quiet);}
 /* ---- MEGÁLLUNK-E A KÖVETKEZŐ BAJNOKI FORDULÓ ELŐTT? ----
    Egy helyen, mert két hívója van (az értékelő ablak és a forduló-lánc), és a
    kettő nem mondhat mást. `null` = mehet tovább; egyébként az INDOK, ahogy a
@@ -46930,21 +47119,24 @@ function immAfterLeagueMatch(quiet){
   const r=Math.min(30,(S.idx||0)+1);
   immArm(IMM_PREP_SEC,`Kezdőrúgás — ${r}. forduló`,"a felkészülés után magától indul",
     ()=>{
+      /* KÖZBEN FELJÖHETETT EGY ABLAK (egy késleltetett tipp, egy jelzés). Nem
+         állunk meg tőle: visszaadjuk a szót a huroknak, az elintézi. */
+      const p=immPending();
+      if(p){try{immStep();}catch(e){}return;}
       if(!immScreenReady("scSim")){immScreenBail();return;}
       if(immLeagueStopWhy())return;      /* közben megváltozott az állapot */
-      try{kickoffTap();}catch(e){}});}
+      try{kickoffTap();}catch(e){}});
+  _immTarget="__tiszta__";}
 /* ---- A LÁNC ELSŐ FELE: AZ ÉRTÉKELŐ ABLAK BEZÁRÁSA ----
    A mstatAfterMatch hívja, közvetlenül a megnyitás után. Csak akkor
    számlálunk, ha a lánc TÉNYLEG megy tovább: egy megállónál (átigazolás,
    rangadó) az ablak maradjon nyitva, amíg a felhasználó be nem zárja — ott
    úgyis ő veszi át az irányítást. Kupában ez a kérdés a szakaszé, lásd
    immCupAfterMatch. */
-function immMstatArm(){
-  if(!immOn())return;
-  let cup=false;try{cup=(typeof euroActive==="function")&&euroActive();}catch(e){}
-  if(!cup&&immLeagueStopWhy())return;
-  immArm(IMM_MSTAT_SEC,"A mérkőzés értékelése bezárul","utána jön a felkészülés",
-    ()=>{try{mstatClose();}catch(e){}});}
+/* Az értékelő ablak megnyitása után nincs külön teendő: a lépés-hurok
+   ugyanúgy egy léptethető képernyőnek látja, mint a jutalmakat. A név
+   megmarad, mert a mstatAfterMatch onnan hívja. */
+function immMstatArm(){try{immStep();}catch(e){}}
 /* ---- KUPA: A KÖVETKEZŐ MÉRKŐZÉS UGYANEBBEN A SZAKASZBAN ----
    Csak a szakaszon BELÜL léptet: a csoportkör fordulói között és egy kieséses
    párharc két mérkőzése között. A szakasz lezárása (csoportkör vége, párharc
@@ -46958,10 +47150,15 @@ function immCupArm(){
   if(!ok){immCancel();return;}
   immArm(IMM_PREP_SEC,"Kupa — kezdőrúgás","a sorozat magától folytatódik",
     ()=>{
+      /* ugyanaz az elv, mint a bajnoki ágon: egy közben feljött üzenetet a
+         hurok lépteti, nem állítja meg tőle a láncot */
+      const p=immPending();
+      if(p){try{immStep();}catch(e){}return;}
       if(!immScreenReady("scEuro")){immScreenBail();return;}
       const b=$("euroKickBtn");
       if(b&&!b.classList.contains("hide"))b.click();
-      else immCancel();});}
+      else immCancel();});
+  _immTarget="__kupa__";}
 /* A SZAKASZ LEZÁRULT: a lánc itt ér véget, és ezt ki is mondjuk — különben úgy
    tűnne, elromlott valami. A mód bekapcsolva marad. */
 function immCupStop(mit){
@@ -53960,6 +54157,14 @@ function playMatch(){
       else grantSkillDecide(skill,reason,stagesNeeded,()=>processSkillQueue(reasons,cb));}
     if(skillReasons.length)processSkillQueue(skillReasons,afterAllRewards);
     else afterAllRewards();
+    /* MECCSRŐL MECCSRE (3.9.05): a lánc MÁR ITT felveszi a fonalat. A
+       jutalom-képernyők (felfedezés, képesség, akadémia) az értékelő ablak
+       ELŐTT jönnek — eddig alattuk semmi nem számolt, és a felhasználó azt
+       látta, hogy a lánc megállt. A hívás KÉSLELTETETT, mert a fenti sor
+       szinkron nyitja meg az első képernyőt: előbb legyen mit megnézni.
+       A hurok idempotens, tehát ha közben már felfegyverkezett (az értékelő
+       ágán), ez a hívás nem indítja újra. */
+    try{setTimeout(()=>{try{immStep();}catch(e){}},300);}catch(e){}
   }
 }
 /* ================= ÁTIGAZOLÁS + ÉVSZAKVÁLTÁS UI ================= */
