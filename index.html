@@ -3842,6 +3842,20 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
          A kettő eddig egybemosódott, és a várakozó ebből nem tudta eldönteni,
          érdemes-e még várni. Üresen marad, amíg nincs mit mondani. -->
     <div id="h2hWaitMate" style="text-align:center;font-size:12px;margin-top:6px;min-height:16px"></div>
+    <!-- P2b: BÖKÉS. Csak akkor látszik, ha a társ OFFLINE — aki ott ül, azt
+         nem kell értesíteni, és egy fölösleges gomb csak zaj. A gomb maga
+         mondja meg, ha nem lehet vele élni (nincs beállítva, a társ nem
+         iratkozott fel, vagy még jár a fék). -->
+    <div id="h2hWaitNudgeWrap" class="hide" style="text-align:center;margin-top:6px">
+      <button id="h2hWaitNudgeBtn" class="btn-s" style="font-size:12px;padding:6px 14px">🔔 Bökd meg a társad</button>
+      <div id="h2hWaitNudgeMsg" style="font-size:11px;color:var(--dim2);margin-top:4px;min-height:14px"></div>
+    </div>
+    <!-- A MÁSIK IRÁNY: hogy TÉGED is meg lehessen bökni. Csak akkor látszik,
+         ha még nem iratkoztál fel — utána eltűnik, nem marad ott feleslegesen. -->
+    <div id="h2hWaitSubWrap" class="hide" style="text-align:center;margin-top:6px">
+      <button id="h2hWaitSubBtn" class="btn-s" style="font-size:12px;padding:6px 14px">🔔 Szóljatok, ha rám várnak</button>
+      <div id="h2hWaitSubMsg" style="font-size:11px;color:var(--dim2);margin-top:4px;min-height:14px"></div>
+    </div>
     <div class="mpErr" id="h2hWaitErr"></div>
     <div class="mpBtns" style="margin-top:4px">
       <!-- F7: csak akkor jelenik meg, ha a szoba tényleg megszűnt — ez a kiút
@@ -5458,7 +5472,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.21";
+const APP_VERSION="3.9.22";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -47975,6 +47989,7 @@ function mpPresencePaint(){
           +'jelenlétét nem látjuk.</small></span>'
         : '<span style="color:var(--dim2)">A társad jelenléte nem ismert (régebbi szoba).</span>';
   }
+  try{mpNudgePaint();}catch(e){}
   /* ---- P1: A VISSZASZÁMLÁLÓ ----
      Csak akkor, ha van mód, van mire várni, és a társ tényleg nincs ott —
      az mpDeadlineLeft mind a hármat egyszerre nézi. A számot KIÍRJUK, mert
@@ -48002,6 +48017,31 @@ function mpPresencePaint(){
         +`a mérkőzés magától lefut, amint ő is elindítja ezt a fordulót.</span>`;
     }
   }catch(e){}
+}
+/* A BÖKÉS-GOMB ÁLLAPOTA. Ugyanabban a ritmusban frissül, mint a jelenlét —
+   nem indít saját ciklust. */
+function mpNudgePaint(){
+  const w=$("h2hWaitNudgeWrap"),b=$("h2hWaitNudgeBtn"),m=$("h2hWaitNudgeMsg");
+  if(!w||!b)return;
+  /* CSAK OFFLINE TÁRSNÁL. Aki ott ül, azt nem kell értesíteni; a "nem tudjuk"
+     állapotban sem kínáljuk, mert ott a feliratkozásáról sem tudunk semmit. */
+  if(mpMateOnline(_mpPresRoom)!==false||!pushBeallitva()){w.classList.add("hide");return;}
+  w.classList.remove("hide");
+  const baj=nudgeLehet(_mpPresRoom);
+  b.disabled=!!baj;
+  if(m&&!m.dataset.tapadt)m.textContent=baj||"";
+  /* A SAJÁT feliratkozás gombja: csak amíg nincs engedélyünk. Ha már van,
+     a gomb eltűnik — egy örökké ott álló „kapcsold be" a legjobb módja
+     annak, hogy a felhasználó megtanulja átnézni rajta. */
+  const sw=$("h2hWaitSubWrap");
+  if(sw){
+    const eng=pushEngedely();
+    sw.classList.toggle("hide",!(pushBeallitva()&&eng!=="granted"));
+    const sm=$("h2hWaitSubMsg");
+    if(sm&&!sm.dataset.tapadt)
+      sm.textContent=(eng==="denied")
+        ?"Letiltottad — a böngésző beállításaiban engedélyezhető."
+        :"";}
 }
 function mpPresenceTick(){
   if(mpNet.mode!=="fb"||!MP.activeRoom)return;
@@ -48208,6 +48248,31 @@ function h2hWaitLeave(){
      lépni belőle. */
   if(!mpAbortAllWaits()){try{h2hAbortWait();}catch(e){}}
   try{h2hWaitHide();}catch(e){}}
+/* P2b — a bökés gombja. A visszajelzés RAGAD egy ideig (`tapadt`), különben a
+   3 mp-enkénti újrarajzolás azonnal letörölné az "elküldve" üzenetet, és a
+   felhasználó nem tudná meg, sikerült-e. */
+$("h2hWaitNudgeBtn")&&($("h2hWaitNudgeBtn").onclick=async()=>{
+  const b=$("h2hWaitNudgeBtn"),m=$("h2hWaitNudgeMsg");
+  b.disabled=true;
+  if(m){m.dataset.tapadt="1";m.textContent="Küldés…";m.style.color="var(--dim2)";}
+  const r=await nudgeKuld();
+  if(m){
+    m.textContent=r.ok?"🔔 Elküldve — a társad értesítést kapott.":("Nem ment el: "+r.miert);
+    m.style.color=r.ok?"#8fd99a":"#e0a0a0";
+    setTimeout(()=>{try{delete m.dataset.tapadt;}catch(e){}},8000);}
+  try{mpNudgePaint();}catch(e){}});
+$("h2hWaitSubBtn")&&($("h2hWaitSubBtn").onclick=async()=>{
+  const b=$("h2hWaitSubBtn"),m=$("h2hWaitSubMsg");
+  b.disabled=true;
+  if(m){m.dataset.tapadt="1";m.textContent="Engedély kérése…";m.style.color="var(--dim2)";}
+  const ok=await pushKozzetesz(MP.activeRoom);
+  if(m){
+    m.textContent=ok?"🔔 Kész — mostantól szólunk, ha rád várnak."
+                    :("Nem sikerült: "+(mpNet.pushErr||"ismeretlen ok"));
+    m.style.color=ok?"#8fd99a":"#e0a0a0";
+    setTimeout(()=>{try{delete m.dataset.tapadt;}catch(e){}},8000);}
+  b.disabled=false;
+  try{mpNudgePaint();}catch(e){}});
 $("h2hWaitCancelBtn")&&($("h2hWaitCancelBtn").onclick=()=>{try{h2hWaitLeave();}catch(e){h2hWaitHide();}});
 /* A KEZDŐLAP-GOMB A VÉGSŐ KIÚT — sosem bukhat el.
    Régen: `h2hWaitLeave(); goHomeScreen();`. Ha a leave BÁRHOL kivételt dobott
@@ -83599,6 +83664,142 @@ function mpMakeCode(){
   const CH="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let c="";for(let i=0;i<MP_CODE_LEN;i++)c+=CH[Math.floor(Math.random()*CH.length)];
   return c;}
+/* ================= P2b — ÉRTESÍTÉS A TÁRS ESZKÖZÉRE =================
+   BEJELENTETT KÉRÉS: „a játékban lehessen egymás eszközére értesítést
+   küldeni… ez akkor is lehetővé tenné a közös játékot, ha amúgy nem
+   ismeritek egymást és nincs lehetőséged írni a másiknak Messengeren."
+
+   MIÉRT SZABVÁNYOS WEB PUSH, ÉS NEM FIREBASE MESSAGING. A push elküldéséhez
+   szükségszerűen kell szerveroldal: a kulcsot, amivel az üzenet aláírható, a
+   kliensbe tenni annyi volna, mint kitenni az utcára — pár perc alatt
+   kiolvassák a JS-ből, és onnantól bárki küldhet bárkinek a te neveddel.
+   A Firebase-út ehhez Cloud Functiont, az pedig Blaze-csomagot (bankkártyát)
+   kívánna. A SZABVÁNYOS Web Push ugyanezt tudja VAPID-kulccsal, és
+   BÁRMELYIK szerverről küldhető — nálunk egy Netlify-függvényből, ami a
+   meglévő, ingyenes csomagban fut. Nincs új szolgáltatás és nincs számla.
+
+   A KULCS KÉT FELE: a PUBLIKUS itt áll a kliensben (ez a rendeltetése — ezzel
+   iratkozik fel a böngésző), a TITKOS soha nem kerül ide, csak a függvény
+   környezeti változójába. */
+const PUSH_VAPID_PUBLIC="";   /* ← ide jön a VAPID PUBLIKUS kulcs (lásd docs/ertesitesek.md) */
+const PUSH_SUB_KEY="30-0-push-sub-v1";   /* helyi jelző: feliratkoztunk-e ezen a gépen */
+
+function pushSupported(){
+  try{return !!("serviceWorker" in navigator&&"PushManager" in window&&
+                typeof Notification!=="undefined");}catch(e){return false;}}
+function pushBeallitva(){return !!(PUSH_VAPID_PUBLIC&&PUSH_VAPID_PUBLIC.length>20);}
+function pushEngedely(){
+  try{return pushSupported()?Notification.permission:"unsupported";}catch(e){return "unsupported";}}
+
+/* A VAPID-kulcs base64url alakból bájtokká. A böngésző csak Uint8Array-t
+   fogad el, a kulcsot viszont szövegként kapjuk — ez a kettő közti fordító. */
+function pushKulcsBajtok(b64){
+  const pad="=".repeat((4-b64.length%4)%4);
+  const alap=(b64+pad).replace(/-/g,"+").replace(/_/g,"/");
+  const nyers=atob(alap);
+  const t=new Uint8Array(nyers.length);
+  for(let i=0;i<nyers.length;i++)t[i]=nyers.charCodeAt(i);
+  return t;}
+
+/* FELIRATKOZÁS. Visszaad {ok, sub} vagy {ok:false, miert} — a felület ezt
+   mondja ki, mert a néma kudarcnál minden jobb (ugyanaz az elv, mint a
+   ranglista-feltöltésnél). */
+async function pushSubscribe(){
+  if(!pushSupported())return {ok:false,miert:"ez a böngésző nem tud értesítést fogadni"};
+  if(!pushBeallitva())return {ok:false,miert:"az értesítés még nincs beállítva (hiányzik a kulcs)"};
+  let reg=null;
+  try{reg=await navigator.serviceWorker.ready;}catch(e){}
+  if(!reg)return {ok:false,miert:"a háttérszolgáltatás nem fut"};
+  /* AZ ENGEDÉLYT CSAK ITT KÉRJÜK, a gomb megnyomásakor — sosem induláskor.
+     Egy azonnali engedélykérés a legbiztosabb módja annak, hogy örökre
+     letiltsák. */
+  let eng=Notification.permission;
+  if(eng==="default"){
+    try{eng=await Notification.requestPermission();}catch(e){eng="denied";}}
+  if(eng!=="granted")
+    return {ok:false,miert:eng==="denied"
+      ?"az értesítést letiltottad ennél a játéknál — a böngésző beállításaiban engedélyezhető"
+      :"nem kaptunk engedélyt"};
+  try{
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)
+      sub=await reg.pushManager.subscribe({
+        /* KÖTELEZŐEN LÁTHATÓ: minden push-ból értesítés lesz. A böngésző
+           enélkül nem is adna feliratkozást — és helyesen: a néma push
+           nyomkövetésre volna jó, nem erre. */
+        userVisibleOnly:true,
+        applicationServerKey:pushKulcsBajtok(PUSH_VAPID_PUBLIC)});
+    try{localStorage.setItem(PUSH_SUB_KEY,"1");}catch(e){}
+    return {ok:true,sub:JSON.parse(JSON.stringify(sub))};
+  }catch(e){return {ok:false,miert:(e&&e.message)||"a feliratkozás nem sikerült"};}}
+
+/* A FELIRATKOZÁS A SZOBÁBA — de csak a SAJÁT águnkba. Ez az, amit a társ
+   kliense kiolvas, amikor megböksz valakit.
+   MIÉRT A SZOBÁBAN ÉS NEM EGY KÖZPONTI LISTÁBAN: a szoba amúgy is a
+   hozzáférés határa (aki ismeri a kódot, az látja a szobát), tehát nem
+   nyitunk új felületet. Aki nincs a szobádban, a feliratkozásodhoz sem fér
+   hozzá — és bökni sem tud. */
+async function pushKozzetesz(code){
+  if(mpNet.mode!=="fb"||!code)return false;
+  const F=mpNet.fns;
+  if(!F||!F.update)return false;
+  const r=await pushSubscribe();
+  if(!r.ok){mpNet.pushErr=r.miert;return false;}
+  try{
+    await F.update(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId()),
+      {push:JSON.stringify(r.sub).slice(0,900)});
+    mpNet.pushErr=null;
+    return true;
+  }catch(e){mpNet.pushErr=(e&&e.message)||String(e);return false;}}
+
+/* ---- A BÖKÉS ----
+   A fék KÉT helyen áll, és ez szándékos: a kliensé az udvariasság (ne
+   nyomkodd), az adatbázis-szabályé a VÉDELEM (ne lehessen nyomkodni). Egy
+   csak-kliensoldali fék annyit ér, mint egy zárat kirajzolni az ajtóra. */
+const NUDGE_MIN_MS=120000;         /* két bökés közt legalább ennyi */
+let _nudgeAt=0;
+function nudgeLehet(room){
+  if(mpNet.mode!=="fb"||!MP.activeRoom)return "csak élő szobában";
+  if(!pushBeallitva())return "az értesítés még nincs beállítva";
+  const t=Date.now();
+  if(t-_nudgeAt<NUDGE_MIN_MS)
+    return `várj még ${Math.ceil((NUDGE_MIN_MS-(t-_nudgeAt))/1000)} mp-et`;
+  /* A TÁRS FELIRATKOZÁSA NÉLKÜL NINCS HOVA KÜLDENI. Ezt KIMONDJUK, nem
+     tesszük szürkévé némán: a felhasználó különben a saját gépét hibáztatná. */
+  const p=nudgeTarsAg(room);
+  if(!p)return "a társad még nem csatlakozott";
+  if(!p.push)return "a társad nem kapcsolta be az értesítést";
+  return "";}
+function nudgeTarsAg(room){
+  try{
+    if(!room||!room.players)return null;
+    const me=mpMyId();
+    const k=Object.keys(room.players).filter(x=>x!==me);
+    return k.length?room.players[k[0]]:null;
+  }catch(e){return null;}}
+/* A KÜLDÉS. A kliens NEM küld push-t — csak megkéri rá a függvényt, ami a
+   titkos kulcsot őrzi. A függvénynek a szobakódot adjuk át: ő maga olvassa
+   ki belőle a társ feliratkozását, tehát innen nem lehet tetszőleges címre
+   üzenetet küldeni. */
+const NUDGE_URL="/.netlify/functions/nudge";
+async function nudgeKuld(){
+  const room=_mpPresRoom;
+  const baj=nudgeLehet(room);
+  if(baj)return {ok:false,miert:baj};
+  _nudgeAt=Date.now();
+  try{
+    const v=await fetch(NUDGE_URL,{method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({code:MP.activeRoom,from:mpMyId(),
+        /* A SAJÁT csapatnevem megy át, nem a játékosnév: az értesítés a
+           társnak szól, és őt az érdekli, KI vár rá. */
+        team:String(teamName||"").slice(0,24)})});
+    if(!v.ok){
+      let m="";try{m=(await v.json()).error||"";}catch(e){}
+      return {ok:false,miert:m||("a szerver "+v.status+"-tel válaszolt")};}
+    return {ok:true};
+  }catch(e){return {ok:false,miert:(e&&e.message)||"nem sikerült elküldeni"};}}
+
 /* ================= P1 — TEMPÓ-MÓDOK =================
    BEJELENTETT PANASZ: „jelen formájában a pvp mód nagyon lassú… a gyorsan
    haladóba beépítenénk korlátokat, hogy mennyit lehet maradni egy adott
@@ -83703,6 +83904,12 @@ async function mpPresenceArm(code){
     await F.update(r,{online:true,seenAt:mpStamp()});
     _mpPresence={code,od};
     mpNet.presErr=null;
+    /* A FELIRATKOZÁS ÚJRA KIMEGY, minden szobába. Nem kérünk engedélyt —
+       csak ha MÁR megvan: a feliratkozás a szobában él, tehát egy új szoba
+       különben úgy indulna, hogy a társad nem tud megbökni, pedig te
+       engedélyezted. Ha nincs engedély, ez csendben kihagyja magát. */
+    if(pushBeallitva()&&pushEngedely()==="granted")
+      pushKozzetesz(code).catch(()=>{});
   }catch(e){
     /* A HIBÁT ELNYELJÜK, DE NEM FELEJTJÜK EL. A némaság szándékos — egy
        jelenlét-írás bukása nem törheti el a szobát —, csakhogy némán a
