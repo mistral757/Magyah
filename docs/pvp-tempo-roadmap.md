@@ -204,8 +204,6 @@ eredményt dönt el: a P1b lépcsőn.
 
 ### 3.1 A fal: a hiányzó játékos keretét senki nem tudja feltölteni
 
-### 3.1 A fal: a hiányzó játékos keretét senki nem tudja feltölteni
-
 *„Utána automatikusan megyünk tovább az aktuális állással.”* — a kérdés az,
 **mi az „aktuális állás”**, ha a társ kerete soha nem érkezett meg.
 
