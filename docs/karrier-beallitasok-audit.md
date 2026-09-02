@@ -208,7 +208,7 @@ meglévő karrierek pontszámát változtatja, tehát verzióhoz kötendő.)
   „a világ magától keményedik".
 * A **kupa-jogosultság a nehézségi sávból** jön (`CUP_TIERS`), nem a bajnoki
   helyezésből egy valódi ligarendszerben — ezért fordulhat elő, hogy egy
-  NB II-ben szenvedő ellenfél a BL-döntőben visszaköszön.
+  Magyar Másodbajnokokban szenvedő ellenfél a BL-döntőben visszaköszön.
 
 ---
 

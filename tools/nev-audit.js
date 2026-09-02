@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* ─────────────────────────────────────────────────────────────────────────────
- *  MAGYAH 30-0 — NÉVAUDIT: hol szivárog ki kanonikus játékos- vagy klubnév?
+ *  MAGYAH — NÉVAUDIT: hol szivárog ki kanonikus játékos- vagy klubnév?
  *
  *  MIÉRT VAN. A játék adatbázisában a nevek KANONIKUSAK (a valós játékos- és
  *  klubnevek), a felületen viszont sosem azok jelenhetnek meg: a megjelenítési

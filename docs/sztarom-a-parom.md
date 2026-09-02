@@ -62,14 +62,14 @@ A **3., 4., 5. és 6+. gól** saját, hangsúlyos kommentárt kap a motorban
 |---|---|
 | bajnoki | 1 |
 | bajnoki **rangadó** | 2 |
-| Magyar Kupa | 2 |
-| Konferencia-liga | 3 |
-| Európa-liga | 4 |
-| Bajnokok Ligája | 5 |
+| Magor Kupája | 2 |
+| Konföranszié Líg | 3 |
+| Ojrópai Klubcsapatok Bajnoki Kupája | 4 |
+| Kupák Kupájának Kupája | 5 |
 
 Szorzók: az **európai kupák kieséses szakaszában ×1,5**, a **döntőben ×4**.
 A kettő **nem szorzódik össze** — a döntő is kieséses, tehát a nagyobb szorzó él
-(BL-döntő = 5 × 4 = 20 pont, nem 30). A Magyar Kupa kieséses köreire nincs
+(BL-döntő = 5 × 4 = 20 pont, nem 30). A Magor Kupája kieséses köreire nincs
 szorzó: az egész sorozat kieséses, a rangját már a 2-es bázis kifejezi.
 
 ### C) Egyéni díj
@@ -77,10 +77,10 @@ szorzó: az egész sorozat kieséses, a rangját már a 2-es bázis kifejezi.
 | Díj | Bázis |
 |---|---|
 | bajnoki gólkirály / gólpasszkirály / kapus-király | 1 |
-| Magyar Kupa ugyanezek | 1 |
-| Konferencia-liga | 1,5 |
-| Európa-liga | 3 |
-| Bajnokok Ligája | 10 |
+| Magor Kupája ugyanezek | 1 |
+| Konföranszié Líg | 1,5 |
+| Ojrópai Klubcsapatok Bajnoki Kupája | 3 |
+| Kupák Kupájának Kupája | 10 |
 | **Aranylabda** | 15 |
 
 Mindet **a mezőny szintje / 5** szorozza. Egy 84-es mezőnyön ez ×16,8, egy
@@ -104,8 +104,8 @@ cím esélye tehát **mért** szám.
 
 | Forgatókönyv | gól | gp | MVP | komment | MVP-pt | díj-pt | **össz/idény** |
 |---|---|---|---|---|---|---|---|
-| NB II · feltörekvő sztár | 22,5 | 6,0 | 9,4 | 23 | 12,4 | 0,9 | **51** |
-| NB I · beérett sztár | 30,2 | 8,1 | 11,8 | 32 | 20,9 | 29,7 | **82** |
+| Magyar Másodbajnokok · feltörekvő sztár | 22,5 | 6,0 | 9,4 | 23 | 12,4 | 0,9 | **51** |
+| Magyar Bajnokok · beérett sztár | 30,2 | 8,1 | 11,8 | 32 | 20,9 | 29,7 | **82** |
 | másodosztály · kontinentális | 30,8 | 8,5 | 11,6 | 33 | 22,0 | 175 | **231** |
 | premier líg · világklasszis | 33,4 | 8,8 | 12,3 | 37 | 24,5 | 280 | **341** |
 | Infinity 120 · legenda | 35,5 | 9,6 | 12,2 | 41 | 24,5 | 455 | **521** |

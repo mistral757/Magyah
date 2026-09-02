@@ -1,4 +1,4 @@
-/* 30-0 · Service Worker
+/* MAGYAH · Service Worker
    Stratégia:
    - a FŐ HTML-oldalnál "network-first": amikor van net, mindig a legfrissebb
      verziót tölti le és menti cache-be — így egy új verzió feltöltése után

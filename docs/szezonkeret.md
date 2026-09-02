@@ -55,9 +55,9 @@ alap = 2600 + ((csapaterő − 60) / 30)² × 10500        (60–90 között, v�
   csapaterőnél is csak +28 000-et adott — a görbe gyakorlatilag megállt. A
   4,5%/pont ugyanonnan indul (90-nél mindkettő 13 100), de innentől tényleg
   követi a csapaterőt.
-* **A mezőny szorzója**: 84 (az NB II teteje) a semleges pont, fölötte
+* **A mezőny szorzója**: 84 (az Magyar Másodbajnokok teteje) a semleges pont, fölötte
   pontonként +2%, 2,2-szeresnél megáll. Ugyanaz a tizenegy többet forgat az
-  NB I-ben, mint a megyei bajnokságban. Lefelé nem büntet — az alsóbb osztályok
+  Magyar Bajnokokban, mint a megyei bajnokságban. Lefelé nem büntet — az alsóbb osztályok
   kerete betűre a régi marad.
 
 ### 3.2 Vitrin-prémium
@@ -80,11 +80,11 @@ százalék = 2% + 2% × presztízspont,   26%-nál plafon (≈12 pont)
 | EL-győzelem | 1,0 |
 | FA-kupa-győzelem | 0,6 |
 | KL-győzelem | 0,5 |
-| Magyar Kupa-győzelem | 0,35 |
+| Magor Kupája-győzelem | 0,35 |
 | elvesztett kupadöntő | a győzelem harmada |
 
 **A trófea súlya a mezőnyhöz mért** (`budgetTrophyWeight`): 70-es szinten 0,25 ·
-85-ös (NB I) szinten 1,0 · 94 fölött 1,6. Ugyanaz a trófea tehát nem ér
+85-ös (Magyar Bajnokok) szinten 1,0 · 94 fölött 1,6. Ugyanaz a trófea tehát nem ér
 ugyanannyit két különböző világban — egy megyei bajnoki cím nem tesz nagyklubbá.
 
 ### 3.3 A két szorzó a keret EGÉSZÉRE szól
@@ -125,11 +125,11 @@ szorzó a felére csökkent**:
 
 | sorozat | régi | új |
 | --- | --- | --- |
-| Bajnokok Ligája | 1,5× | **0,75×** |
-| Európa-liga | 1,0× | **0,5×** |
-| Konferencia-liga | 0,5× | **0,25×** |
+| Kupák Kupájának Kupája | 1,5× | **0,75×** |
+| Ojrópai Klubcsapatok Bajnoki Kupája | 1,0× | **0,5×** |
+| Konföranszié Líg | 0,5× | **0,25×** |
 | FA-kupa | 0,35× | **0,175×** |
-| Magyar Kupa | 0,25× | **0,125×** |
+| Magor Kupája | 0,25× | **0,125×** |
 
 Az ezüstérem továbbra is a győzelem fele, az elődöntő a negyede; a Nyári
 Felkészülési Kupa változatlanul nem fizet.

@@ -26,8 +26,8 @@ mérkőzés után levonjuk**. A bevétel és a kiadás két külön ritmuson ál
 |---|---|---|---|---|
 | kis pénz kis foci (≤74) | 1 000 | | 70 alatt | 3 000 |
 | mennyei megyei (75-79) | 3 000 | | 70-80 | 7 500 |
-| NB II (80-84) | 12 000 | | 81-90 | 15 000 |
-| NB I (85-89) | 30 000 | | 91-100 | 30 000 |
+| Magyar Másodbajnokok (80-84) | 12 000 | | 81-90 | 15 000 |
+| Magyar Bajnokok (85-89) | 30 000 | | 91-100 | 30 000 |
 | Biszem-baszom másodosztály (90-94) | 50 000 | | 100 fölött | +30 000 / 10 pont |
 | Biszem-baszom premier líg (95+) | 150 000 | | | |
 | **Infinity** | +150 000 / 10 szint | | | |
@@ -48,7 +48,7 @@ héten megjelenik.
 A mértékek a **saját liga-sávodhoz** mértek, ezért minden szinten ugyanúgy
 viselkednek:
 
-| esemény | a sávod | NB II-ben |
+| esemény | a sávod | Magyar Másodbajnokokban |
 |---|---|---|
 | győzelem | +0,6% | +72 fő |
 | rangadó-győzelem | +1,2% | +144 fő |
@@ -67,7 +67,7 @@ származtat (kupapénz, kihívás-jutalom, mérföldkő), a klub léptékét kö
 |---|---|---|---|---|---|
 | szorzó | 100% | 50% | 24% | 16% | 8% |
 
-* **Bajnokság:** a „100%" a liga-sávod **fele**. NB II-ben tehát a cím +6 000
+* **Bajnokság:** a „100%" a liga-sávod **fele**. Magyar Másodbajnokokban tehát a cím +6 000
   fő, a 2. hely +3 000, a 3. +1 440, a 4-5. +960. (A 6. helytől nem jár.)
 * **Kupa:** a „100%" a sorozat saját díja — MK 30 000 · KL 70 000 · EL 100 000
   · BL 200 000 —, és ugyanez a lépcső fokozza le a döntőst (2.), az elődöntőst
@@ -87,7 +87,7 @@ sikertelen 1 993 pont → 87,8%).
 során csúszott. A liga-sávok szurkolói alapja lépcsőzetesen ugrik (12 000 →
 30 000 → 50 000 → 150 000), a bér viszont csak a Rating exponenciális függvénye
 volt — a kettő nem tudott együtt haladni: ugyanezzel a skálával a bér a
-szurkolói bevétel ~38%-át vitte NB I-ben, ~13%-át a Premier ligában és ~12%-át
+szurkolói bevétel ~38%-át vitte Magyar Bajnokokban, ~13%-át a Premier ligában és ~12%-át
 Infinityben. Egy sikeres idény után tehát a bevétel véglegesen elhúzott a
 kiadástól.
 
@@ -105,7 +105,7 @@ bevétel, abból a lelátóé, a bér, és a `bér/lelátó` arány — ez a mé
 A szurkoló-tétek a heti gazdasághoz igazodtak: jutalomként **5-25 ezer**
 (korábban 2-4 ezer), büntetésként **3-17 ezer** (korábban 1-3 ezer) — a
 büntetés tudatosan kisebb marad a párjánál. A „növeld a táborodat N fővel"
-kihívás célszáma mostantól a **liga-sávodhoz skálázódik** (horgony az NB II):
+kihívás célszáma mostantól a **liga-sávodhoz skálázódik** (horgony az Magyar Másodbajnokok):
 egy fix 10 000 fő a megyei szinten teljesíthetetlen, a Premier ligában egyetlen
 jó hónap volna.
 
