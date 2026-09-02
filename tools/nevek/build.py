@@ -10,7 +10,8 @@ Kimenet: table.json + table.js (a beszúrható JS-tábla).
 import json, os, re, sys, collections, random
 D = os.path.dirname(os.path.abspath(__file__)) + "/"
 sys.path.insert(0, D)
-from rules import (POOL as POOL_ALL, hufy, given_of, pool_given, lengthen, hu_twist, PARTICLES, strip_dia, LANG)
+from rules import (POOL as POOL_ALL, hufy, given_of, pool_given, lengthen, hu_twist, PARTICLES, strip_dia, LANG,
+                   son_stem, son_suffix, SON_LANG)
 from manual import MANUAL
 from klubok import KLUBOK, LIGAK
 
@@ -72,9 +73,23 @@ def auto(n):
             cut = i
             break
     first, surw = parts[0], parts[cut:]
-    sur = cap("".join(hufy(w, lg) for w in surw)) if len(surw) > 1 else hufy(surw[0], lg)
-    if strip_dia(sur.lower()) == strip_dia("".join(surw).lower()):
-        sur = lengthen(sur)
+    if len(surw) == 1:
+        # PATRONIM: a -son = fia (R2). A TŐ UGYANÚGY ÁTMEGY A FONETIKÁN, mint
+        # bármely vezetéknév — enélkül nyers angol tő maradna („Johnfi”).
+        _st = son_stem(surw[0]) if lg in SON_LANG else None
+        if _st:
+            _h = hufy(_st, lg)
+            if strip_dia(_h.lower()) == strip_dia(_st.lower()):
+                _h = lengthen(_h)
+            sur = son_suffix(_h[0].upper() + _h[1:])
+        else:
+            sur = hufy(surw[0], lg)
+            if strip_dia(sur.lower()) == strip_dia(surw[0].lower()):
+                sur = lengthen(sur)
+    else:
+        sur = cap("".join(hufy(w, lg) for w in surw))
+        if strip_dia(sur.lower()) == strip_dia("".join(surw).lower()):
+            sur = lengthen(sur)
     g = given_of(first) or pool_given(n)
     return f"{sur} {g}", sur
 

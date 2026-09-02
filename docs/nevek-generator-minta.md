@@ -1,23 +1,26 @@
-# 🧬 A generátor Danisítása — a két szabály mintája
+# 🧬 A generátor Danisítása — a két szabály
 
-*(A `docs/nevek-danisitasa.md` §6 két javaslata, kimérve. Ez MINTA: sem a
-`rules.py`-t, sem a `build.py`-t nem módosítottam — a beilleszthető kód a lap
-alján áll, és a te szavadra vár.)*
+*(3.9.09. `tools/nevek/rules.py`: a `GIVEN` bővítése, `son_stem`,
+`son_suffix`, `SON_HAT`, `SON_LANG` · `tools/nevek/build.py`: az `auto()`
+egyszavas vezetéknév-ága.)*
+
+> **✅ BE VAN ÉPÍTVE ÉS LE VAN FUTTATVA.** Ez a lap már nem javaslat, hanem
+> jegyzőkönyv: a `HU_NAME_TABLE` a két szabállyal van legyártva.
 
 ## 0. Egy mondatban
 
-A két szabály a **790 gépi nevet** javítja meg a 2696-ból (**29%**) —
+A két szabály **791 gépi nevet** javított meg a 2696-ból (**29%**) —
 és a nagyobbik fele nem trükk, hanem egyetlen hiányzó szótár.
 
 | | mit javít | hány név |
 |---|---|---|
-| **A — `GIVEN`-bővítés** | a kalapból húzott keresztnév | **723** |
-| **B — `-son` → `-fia`** | a patronim vezetéknév | **67** |
-| | | **790** |
+| **A — `GIVEN`-bővítés** | a kalapból húzott keresztnév | **724** |
+| **B — patronim `-son`** | a vezetéknév végződése | **67** |
+| | | **791** |
 
-> **ELŐBB EGY HELYESBÍTÉS.** A guide §6 azt írta a `-son` szabályra, hogy
-> *„egy sor, több száz név"*. **Ez az én becslésem volt, és téves:** kimérve
-> **67 név**, nem több száz. A súly a másik szabályon van.
+> **HELYESBÍTÉS a guide-hoz.** A §6 azt írta a `-son` szabályra, hogy *„egy
+> sor, több száz név"*. **Ez az én becslésem volt, és téves:** 67 név.
+> A súly a `GIVEN`-bővítésen van.
 
 ---
 
@@ -25,43 +28,43 @@ A két szabály a **790 gépi nevet** javítja meg a 2696-ból (**29%**) —
 
 ### Miért ez a nagyobb tétel
 
-A motor a keresztnevet a `GIVEN` térképből veszi. Ha nincs benne, `pool_given`
-**kalapból húz** egy magyar nevet — a hangzáshoz semmi köze. Mérve:
+A motor a keresztnevet a `GIVEN` térképből veszi. Ha nincs benne, a
+`pool_given` **kalapból húz** egy magyar nevet — a hangzáshoz semmi köze.
 
 | | |
 |---|---|
-| kalapból húzott keresztnév ma | **1463** |
-| a bővítés után | **715** |
-| megmentve | **748 (51%)** |
+| kalapból húzott keresztnév előtte | **1463** |
+| utána | **715** |
+| megszűnt | **748 (51%)** |
 
-**És a maradék 715-ből 710 EGYSZERI keresztnév** — vagyis a térkép itt éri el
-a természetes plafonját. Ami ezen túl van, azt már nem szótárral, hanem
+**És a maradék 715-ből 710 EGYSZERI keresztnév** — vagyis a térkép itt éri
+el a természetes plafonját. Ami ezen túl van, azt már nem szótárral, hanem
 egyenként kell javítani: az a `manual.py` dolga, nem a `rules.py`-é.
 
-### A módszer a te háromlépcsős sorrended (R3)
+### A módszer a háromlépcsős sorrend (guide R3)
 
 | lépcső | mit jelent | hány bejegyzés | példa |
 |---|---|---|---|
 | 1. van magyar megfelelője | azt használjuk | **187** | `Eusebio → Özséb` · `Emerson → Imre` · `Nacho → Ignác` |
 | 2. nincs, de jól hangzik | az eredeti, magyaros írással | **47** | `Diego → Dijégó` · `Nigel → Nájdzsel` · `Aitor → Ájtor` |
-| 2/b. FORDÍTÁS | a te „Petit → Pici" vonalad | **5** | `Scott → Skót` · `Mladen → Ifjú` · `Moreno → Barna` |
-| 3. csak végül a kalap | de a hangzáshoz ILLŐ | **17** | `Trevor → Töhötöm` · `Horst → Hunor` |
+| 2/b. FORDÍTÁS | a „Petit → Pici" vonal | **5** | `Scott → Skót` · `Mladen → Ifjú` · `Moreno → Barna` |
+| 3. csak végül a kalap | de a hangzáshoz ILLŐ | **16** | `Trevor → Töhötöm` · `Horst → Hunor` |
 
 Az arány maga az érv: **a bejegyzések háromnegyedénél LÉTEZIK magyar
-megfelelő** — a mai kalap tehát nem szükségszerű, csak hiányzó szótár.
+megfelelő** — a régi kalap tehát nem szükségszerű volt, csak hiányzó szótár.
 
 ### A négy legszebb találat
 
-| eredeti | ma | javasolt | miért |
+| eredeti | előtte | utána | miért |
 |---|---|---|---|
 | **Eusebio** | Bertalan | **Özséb** | Eusebius magyar alakja létezik, csak nem volt a térképben |
 | **Emerson** | Boldizsár | **Imre** | az Emerson és az Imre ugyanaz a név |
-| **Scott** | Menyhért | **Skót** | ő maga a skót — fordítás, a te vonalad |
+| **Scott** | Menyhért | **Skót** | ő maga a skót — fordítás |
 | **Wolfgang** | Menyhért | **Farkas** | *Wolf* = farkas, és magyar keresztnév is |
 
-### Minta: a 723 érintett közül a 40 legmagasabb Ratingű
+### A 724 érintett közül a 40 legmagasabb Ratingű
 
-| játékos | OVR | ma | javasolt |
+| játékos | OVR | előtte | utána |
 |---|---|---|---|
 | Alain Giresse | 85 | Giressz Salamon | **Giressz Alán** |
 | Ally McCoist | 85 | Mkkoist Elemér | **Mkkoist Alika** |
@@ -106,10 +109,46 @@ megfelelő** — a mai kalap tehát nem szükségszerű, csak hiányzó szótár
 
 ---
 
-## 2. A szabály — `-son` → `-fia`
+## 2. A szabály — patronim `-son`
 
-A guide R2 pontja szerint a `-son` = *fia*, és te magad írtad így:
-`Denílson → Denifia`, `Ederson → Éderfia`, `Edílson → Édílfia`.
+A guide R2 pontja szerint a `-son` = *fia*: `Denílson → Denifia`,
+`Ederson → Éderfia`, `Edílson → Édílfia`.
+
+### A végződés HÁROM alakja — és miért nem a `-fia`
+
+**BEJELENTETT KÉRÉS:** *„ezek a -fia javítások jók lennének, de mégsem,
+legyen helyettük a végződés többségében -fi (50%) / -ffy (33%), és ritkán
+csak -fia (16%)"*.
+
+És ez pontos: a **`-fia` leírás, nem név**. A „Vatfia" megmagyarázza, kicsoda
+az illető, de nem hangzik vezetéknévnek. Ugyanez a jelentés a magyar
+névanyagban két RÉGI, valódi végződésben él — a polgári **`-fi`** (Győrfi,
+Pálfi) és a nemesi **`-ffy`** (Pálffy, Bánffy) —, és ezek adják a hangulatot,
+amit a `-fia` csak elmagyaráz.
+
+| végződés | cél | **mért** |
+|---|---|---|
+| `-fi` | 50% | **32 (48%)** |
+| `-ffy` | 33% | **24 (36%)** |
+| `-fia` | 16% | **11 (16%)** |
+
+### Két megkötés, ami nem volt a kérésben, de kell
+
+**1. A VÉGZŐDÉS A VEZETÉKNÉVHEZ TARTOZIK, NEM A JÁTÉKOSHOZ.** Két Wilson
+ugyanazt a nevet viseli; ha játékosonként sorsolnánk, a `Vilfi` és a
+`Vilffy` egymás mellett állna a keretben — az nem stílus volna, hanem
+hibának látszó következetlenség. Mérve: **0** olyan vezetéknév van, amelyik
+kétféle végződést kapott.
+
+**2. DETERMINISZTIKUS.** A build újrafuttatása nem írhatja át a neveket, és
+egy új keret felvétele sem mozdíthatja el a meglévőket. Ugyanaz a tő mindig
+ugyanazt a végződést adja — ugyanaz a hash, amit a `pool_given` is használ.
+
+> **AZ ARÁNY CÉL, NEM GARANCIA.** Épp mert determinisztikus, a tényleges
+> megoszlás azon múlik, milyen tövek vannak a bázisban. A felbontás ezért
+> **ezredes, nem hatodos**: a 3:2:1 hatodos osztás ilyen kis mintán (ma 52
+> különböző tő) durván félrehúz. Mérve, ugyanazon a hash-en:
+> `h % 6` → **45/42/13** · `h % 1000` → **48/36/16**. A második van beépítve.
 
 ### Amit a nyers szabály elrontott — és mi lett belőle
 
@@ -118,85 +157,85 @@ tehát mindegyik szabállyal is javítható — nem kézzel:
 
 | baj | nyers szabály | javítva | a szabály |
 |---|---|---|---|
-| a dán `-sen` elvesztette az s-t | `Jensen → Jenfia` | **Jénsfia** | `-sen`-ből csak az `en` esik le |
-| az angol egy s-re egyszerűsít | `Ferguson → Férgufia` | **Férgusfia** | ha a tő magánhangzóra végződne, visszakapja az s-t |
-| sziszegő torlódás | `Klaassen → Klaasszfia` | **Klaaszfia** | a `ssz` a `-fia` előtt `sz`-re egyszerűsödik |
+| a dán `-sen` elvesztette az s-t | `Jensen → Jenfi` | **Jénsffy** | a `-sen`-ből csak az `en` esik le |
+| az angol egy s-re egyszerűsít | `Ferguson → Férgufi` | **Férgusffy** | ha a tő magánhangzóra végződne, visszakapja az s-t |
+| sziszegő torlódás | `Klaassen → Klaasszfi` | **Klaaszfia** | a `ssz` a végződés előtt `sz`-re egyszerűsödik |
 
 És egy negyedik, ami nem a szabályból jött: **a tőnek ugyanúgy át kell mennie
-a fonetikán**, mint bármely vezetéknévnek. Enélkül `Johnson → Johnfia` lett
-volna — nyers angol tővel. Így: **Jóhnfia**.
+a fonetikán**, mint bármely vezetéknévnek. Enélkül `Johnson → Johnfi` lett
+volna — nyers angol tővel. Így: **Jóhnffy**.
 
 ### Mind a 67
 
-| játékos | ma | javasolt |
+| játékos | előtte | utána |
 |---|---|---|
-| Ally Robertson | Róbertson Bertalan | **Róbertfia Alika** |
-| Andrew Johnson | Jóhnson András | **Jóhnfia András** |
-| Atiba Hutchinson | Hutcsinson Ince | **Hutcsinfia Ince** |
-| Ben Watson | Vatson Bence | **Vatfia Bence** |
-| Benny Nielsen | Nilsen Kornél | **Nilsfia Kornél** |
-| Bo Svensson | Svensszon Töhötöm | **Svénsfia Töhötöm** |
-| Brendon Batson | Bátson Aurél | **Bátfia Aurél** |
-| Bryan Robson | Róbson Levente | **Róbfia Brián** |
-| Callum Wilson | Vilson Dezső | **Vilfia Kálmán** |
-| Christian Poulsen | Púlsen Krisztián | **Púlsfia Krisztián** |
-| Claus Jensen | Jénsen Miklós | **Jénsfia Miklós** |
-| Colin Gibson | Gíbson Tihamér | **Gíbfia Kolos** |
-| Conny Torstensson | Torstensszon Ernő | **Tórstensfia Ernő** |
+| Ally Robertson | Róbertson Bertalan | **Róbertffy Alika** |
+| Andrew Johnson | Jóhnson András | **Jóhnffy András** |
+| Atiba Hutchinson | Hutcsinson Ince | **Hutcsinfi Ince** |
+| Ben Watson | Vatson Bence | **Vatffy Bence** |
+| Benny Nielsen | Nilsen Kornél | **Nilsfi Kornél** |
+| Bo Svensson | Svensszon Töhötöm | **Svénsffy Töhötöm** |
+| Brendon Batson | Bátson Aurél | **Bátfi Aurél** |
+| Bryan Robson | Róbson Levente | **Róbfi Brián** |
+| Callum Wilson | Vilson Dezső | **Vilffy Kálmán** |
+| Christian Poulsen | Púlsen Krisztián | **Púlsffy Krisztián** |
+| Claus Jensen | Jénsen Miklós | **Jénsffy Miklós** |
+| Colin Gibson | Gíbson Tihamér | **Gíbffy Kolos** |
+| Conny Torstensson | Torstensszon Ernő | **Tórstensfi Ernő** |
 | Dan Corneliusson | Korneliusszon Levente | **Korneliusfia Dani** |
-| Daniel Jensen | Jénsen Dániel | **Jénsfia Dániel** |
-| Danny Simpson | Símpson Gedeon | **Símpfia Dani** |
-| Danny Wilson | Vilson Elemér | **Vilfia Dani** |
+| Daniel Jensen | Jénsen Dániel | **Jénsffy Dániel** |
+| Danny Simpson | Símpson Gedeon | **Símpfi Dani** |
+| Danny Wilson | Vilson Elemér | **Vilffy Dani** |
 | Dave McPherson | Mkferson Zétény | **Mkferfia Dávid** |
 | David Hodgson | Hódgson Dávid | **Hódgfia Dávid** |
-| David Robertson | Róbertson Dávid | **Róbertfia Dávid** |
-| Davy Klaassen | Klaasszen Zalán | **Klaaszfia Dávid** |
+| David Robertson | Róbertson Dávid | **Róbertffy Dávid** |
+| Davy Klaassen | Klaasszen Zalán | **Klaaszfi Dávid** |
 | Don Masson | Masszon Sebő | **Másfia Doma** |
 | Evan Ferguson | Férguson Gergő | **Férgusfia Gergő** |
-| Eyjólfur Sverrisson | Sverrisszon Bertalan | **Svérrisfia Bertalan** |
-| Frank Arnesen | Árnesen Ferenc | **Árnesfia Ferenc** |
-| Gary Megson | Mégson Farkas | **Mégfia Geri** |
-| Glen Johnson | Jóhnson Zétény | **Jóhnfia Zétény** |
-| Gudni Bergsson | Bergsszon Kálmán | **Bérgsfia Kálmán** |
+| Eyjólfur Sverrisson | Sverrisszon Bertalan | **Svérrisffy Bertalan** |
+| Frank Arnesen | Árnesen Ferenc | **Árnesfi Ferenc** |
+| Gary Megson | Mégson Farkas | **Mégfi Geri** |
+| Glen Johnson | Jóhnson Zétény | **Jóhnffy Zétény** |
+| Gudni Bergsson | Bergsszon Kálmán | **Bérgsffy Kálmán** |
 | Gustav Isaksen | Ísaksen Lehel | **Ísaksfia Lehel** |
-| Gylfi Sigurðsson | Sigurdsszon Lehel | **Sigurdsfia Lehel** |
-| Harald Nielsen | Nilsen Bendegúz | **Nilsfia Hárald** |
-| Henrik Pedersen | Pédersen Henrik | **Pédersfia Henrik** |
-| Hermann Hreiðarsson | Hreidarsszon Salamon | **Hreidarsfia Salamon** |
-| Ivan Nielsen | Nilsen János | **Nilsfia János** |
+| Gylfi Sigurðsson | Sigurdsszon Lehel | **Sigurdsfi Lehel** |
+| Harald Nielsen | Nilsen Bendegúz | **Nilsfi Hárald** |
+| Henrik Pedersen | Pédersen Henrik | **Pédersffy Henrik** |
+| Hermann Hreiðarsson | Hreidarsszon Salamon | **Hreidarsfi Salamon** |
+| Ivan Nielsen | Nilsen János | **Nilsfi János** |
 | James Morrison | Mórrison Jakab | **Mórrisfia Jakab** |
-| Jean Thissen | Tisszen János | **Tiszfia János** |
-| Jerry Carlsson | Karlsszon Menyhért | **Karlsfia Menyhért** |
-| Johnny Hansen | Hánsen Gergő | **Hánsfia Jancsi** |
-| Jon Dahl Tomasson | Tomasszon Zsigmond | **Tómasfia János** |
-| Jonatan Johansson | Johansszon Bálint | **Jóhansfia Bálint** |
-| Joris Mathijsen | Matijsen Ábel | **Matijsfia György** |
-| Jóhann Berg Guðmundsson | Gudmundsszon Menyhért | **Gudmundsfia Menyhért** |
-| Kristoffer Zachariassen | Zacsariasszen Szabolcs | **Zacsariaszfia Szabolcs** |
+| Jean Thissen | Tisszen János | **Tiszfi János** |
+| Jerry Carlsson | Karlsszon Menyhért | **Karlsfi Menyhért** |
+| Johnny Hansen | Hánsen Gergő | **Hánsfi Jancsi** |
+| Jon Dahl Tomasson | Tomasszon Zsigmond | **Tómasfi János** |
+| Jonatan Johansson | Johansszon Bálint | **Jóhansfi Bálint** |
+| Joris Mathijsen | Matijsen Ábel | **Matijsfi György** |
+| Jóhann Berg Guðmundsson | Gudmundsszon Menyhért | **Gudmundsffy Menyhért** |
+| Kristoffer Zachariassen | Zacsariasszen Szabolcs | **Zacsariaszfi Szabolcs** |
 | Lewis Ferguson | Férguson Mór | **Férgusfia Lajos** |
-| Mark Lawrenson | Lavrenson Márk | **Lavrenfia Márk** |
+| Mark Lawrenson | Lavrenson Márk | **Lavrenfi Márk** |
 | Martin Laursen | Láursen Márton | **Láursfia Márton** |
-| Michael Robinson | Róbinson Mihály | **Róbinfia Mihály** |
-| Neil Simpson | Símpson Salamon | **Símpfia Salamon** |
-| Nicolai Jørgensen | Jőrgensen Gergő | **Jőrgensfia Gergő** |
-| Nicolas Jackson | Jakkson Miklós | **Jakkfia Miklós** |
-| Nigel Pearson | Pírson Domonkos | **Pírfia Nájdzsel** |
-| Patrik Andersson | Andersszon Gyárfás | **Ándersfia Gyárfás** |
-| Paul Robinson | Róbinson Pál | **Róbinfia Pál** |
-| Peter Madsen | Mádsen Péter | **Mádsfia Péter** |
-| Rasmus Kristensen | Krístensen Benedek | **Krístensfia Benedek** |
-| Ronnie Simpson | Símpson Ince | **Símpfia Roni** |
-| Ruben Svensson | Svensszon Mór | **Svénsfia Rúben** |
+| Michael Robinson | Róbinson Mihály | **Róbinffy Mihály** |
+| Neil Simpson | Símpson Salamon | **Símpfi Salamon** |
+| Nicolai Jørgensen | Jőrgensen Gergő | **Jőrgensfi Gergő** |
+| Nicolas Jackson | Jakkson Miklós | **Jakkfi Miklós** |
+| Nigel Pearson | Pírson Domonkos | **Pírfi Nájdzsel** |
+| Patrik Andersson | Andersszon Gyárfás | **Ándersfi Gyárfás** |
+| Paul Robinson | Róbinson Pál | **Róbinffy Pál** |
+| Peter Madsen | Mádsen Péter | **Mádsfi Péter** |
+| Rasmus Kristensen | Krístensen Benedek | **Krístensfi Benedek** |
+| Ronnie Simpson | Símpson Ince | **Símpfi Roni** |
+| Ruben Svensson | Svensszon Mór | **Svénsffy Rúben** |
 | Scott Carson | Karson Menyhért | **Karfia Skót** |
-| Sonny Anderson | Ánderson Zétény | **Ánderfia Soma** |
-| Steve Watson | Vatson Pista | **Vatfia Pista** |
-| Stig Fredriksson | Fredriksszon Barnabás | **Frédriksfia Barnabás** |
-| Terry Gibson | Gíbson Töhötöm | **Gíbfia Tihamér** |
+| Sonny Anderson | Ánderson Zétény | **Ánderfi Soma** |
+| Steve Watson | Vatson Pista | **Vatffy Pista** |
+| Stig Fredriksson | Fredriksszon Barnabás | **Frédriksffy Barnabás** |
+| Terry Gibson | Gíbson Töhötöm | **Gíbffy Tihamér** |
 | Thomas Wernerson | Vernerson Tamás | **Vernerfia Tamás** |
-| Torbjörn Nilsson | Nilsszon Szabolcs | **Nílsfia Szabolcs** |
-| Viv Anderson | Ánderson Aurél | **Ánderfia Aurél** |
-| Wim Jansen | Jánsen Vilmos | **Jánsfia Vilmos** |
-| Yussuf Poulsen | Púlsen Gergő | **Púlsfia Gergő** |
+| Torbjörn Nilsson | Nilsszon Szabolcs | **Nílsffy Szabolcs** |
+| Viv Anderson | Ánderson Aurél | **Ánderfi Aurél** |
+| Wim Jansen | Jánsen Vilmos | **Jánsfi Vilmos** |
+| Yussuf Poulsen | Púlsen Gergő | **Púlsffy Gergő** |
 
 ### Ami a szabály HATÁRÁN kívül maradt
 
@@ -205,211 +244,26 @@ kell hagynia, és a kelet-ázsiai nevek amúgy is a kézi rétegbe valók (R4).
 
 ---
 
-## 3. A beilleszthető kód
+## 3. Amit a beépítés NEM tett
 
-> **⚠️ EZ MÉG NINCS BEÉPÍTVE.** A lap eddigi része mérés; ez itt a javaslat.
-> Csak akkor illeszd be, ha a fenti mintát jónak látod.
+**A KÉZI RÉTEG SÉRTETLEN.** A 950 `manual.py`-bejegyzés a generátor fölött
+áll: a build előbb a `MANUAL`-t nézi. Mérve a valódi build után: **0 sérült
+kézi bejegyzés**, és a tábla mérete változatlan (3646).
 
-### 3.1 · `tools/nevek/rules.py` — a `GIVEN` térkép végére
-
-A kulcsok már ékezet nélküli kisbetűs alakban vannak, ahogy a `given_of()`
-keresi őket.
-
-```python
-# ── 1. LÉPCSŐ: VAN MAGYAR MEGFELELŐJE ──────────────────────────────────────
- "abel":"Ábel","adrian":"Adrián","adrien":"Adrián","agustin":"Ágoston",
- "alain":"Alán","alan":"Alán","aldo":"Aladár","aleksandr":"Sándor",
- "alekszej":"Elek","allan":"Alán","ander":"Andor","andoni":"Antal",
- "andy":"Bandi","arkadiusz":"Arkád","armando":"Ármin","arthur":"Artúr",
- "axel":"Ákos","benoit":"Benedek","billy":"Vili","bobby":"Robi",
- "callum":"Kálmán","carsten":"Krisztián","cedric":"Cirjék",
- "cesar":"Császár","christoph":"Kristóf","christopher":"Kristóf",
- "colin":"Kolos","damiano":"Damján","dan":"Dani","daniele":"Dániel",
- "danny":"Dani","dario":"Dárius","dave":"Dávid","davide":"Dávid",
- "davy":"Dávid","dean":"Dénes","demetrio":"Demeter","detlef":"Detre",
- "didier":"Dezső","dieter":"Detre","domagoj":"Domonkos",
- "domenico":"Domonkos","dominique":"Domonkos","eder":"Ede","emerson":"Imre",
- "emre":"Imre","enrico":"Imre","eusebio":"Özséb","ezequiel":"Ezékiel",
- "fabian":"Fábián","fabio":"Fábián","fabio":"Fábián","federico":"Frigyes",
- "fernando":"Nándor","florent":"Flórián","francis":"Ferenc",
- "franck":"Ferkó","frederic":"Frigyes","gabi":"Gabi","gael":"Gál",
- "gelson":"Gellért","giacomo":"Jakab","giancarlo":"Jankó","giulio":"Gyula",
- "glenn":"Kelen","gordon":"Gordián","graeme":"Gerő","greg":"Gergő",
- "guido":"Vid","guilherme":"Vilmos","guillermo":"Vilmos",
- "gustavo":"Gusztáv","hector":"Hektor","heinz":"Henrik","helmut":"Kelemen",
- "herbert":"Herbert","ian":"János","ismael":"Izmael","jacques":"Jakab",
- "jason":"Jázon","javi":"Xavika","javier":"Xavér","jens":"Jenő",
- "jeremie":"Jeremiás","jeremy":"Jeremiás","jerome":"Jeromos","jim":"Jaki",
- "jimmy":"Jaki","jocelyn":"Jácint","joe":"Jocó","johnny":"Jancsi",
- "jon":"János","jorg":"György","joris":"György","josip":"József",
- "jurij":"György","justin":"Jusztin","kamil":"Kamill","karol":"Károly",
- "ken":"Kende","kenny":"Kende","konstantin":"Konstantin",
- "kostas":"Konstantin","kurt":"Konrád","leandro":"Leánder","lewis":"Lajos",
- "lilian":"Lipót","luciano":"Lucián","ludovic":"Lajos","luiz":"Lajos",
- "mamadou":"Mohács","manfred":"Manfréd","marcel":"Marcell",
- "marcelo":"Marcell","mariano":"Marián","massimo":"Miksa","matias":"Mátyás",
- "mauricio":"Móric","maurizio":"Móric","mauro":"Mór","maxence":"Miksa",
- "maxi":"Miksa","maximilian":"Miksa","michał":"Mihály","mick":"Miska",
- "mickael":"Mihály","mike":"Miska","mikel":"Mihály","mitchell":"Mihály",
- "moussa":"Mózes","nacho":"Ignác","nestor":"Nesztor","nick":"Miki",
- "nicky":"Miki","nico":"Miklós","nicolo":"Miklós","niko":"Miklós",
- "norbert":"Norbert","nuno":"Nándor","ola":"Olaf","olaf":"Olaf",
- "oleksandr":"Sándor","paco":"Ferkó","pascal":"Paszkál","pat":"Patrik",
- "piero":"Péter","piet":"Péter","radoslav":"Radó","rainer":"Rajnald",
- "renato":"Renátó","rene":"Renátó","robin":"Robi","roger":"Rezső",
- "romeo":"Romeó","ron":"Roni","ronnie":"Roni","ruben":"Rúben",
- "santiago":"Jakab","sascha":"Sanyi","sebastiano":"Sebestyén",
- "shaun":"János","sonny":"Soma","souleymane":"Salamon",
- "stanislav":"Szaniszló","stephane":"István","sylvain":"Szilveszter",
- "szergej":"Szergej","teddy":"Tivadar","tim":"Timót","timo":"Timót",
- "tobias":"Tóbiás","tommy":"Tomi","tony":"Tóni","uli":"Ulrik",
- "ulrich":"Ulrik","valerij":"Valér","vaszilij":"Vazul","vincenzo":"Vince",
- "vlagyimir":"Vladi","wes":"Vencel","willie":"Vili","wolfgang":"Farkas",
- "yann":"János","yoann":"János","ze":"Jocó","zeljko":"Zsolt",
- "zlatko":"Zalán",
-# ── 2. LÉPCSŐ: NINCS, DE MAGYAROS ÍRÁSSAL JÓL HANGZIK ──────────────────────
- "adamo":"Ádám","aitor":"Ájtor","ali":"Áli","ally":"Alika","alvaro":"Álvár",
- "angelo":"Andzseló","angelos":"Angelusz","ashley":"Esli","brad":"Brád",
- "bradley":"Brádli","brian":"Brián","bryan":"Brián","claudio":"Kolos",
- "claudio":"Kolos","corentin":"Korentin","declan":"Dékán","dejan":"Deján",
- "diego":"Dijégó","dusan":"Dusán","fatih":"Fátih","gareth":"Geret",
- "gary":"Geri","geoff":"Dzsef","goncalo":"Gonzaló","gonzalo":"Gonzaló",
- "graham":"Gréhem","harald":"Hárald","jamie":"Dzsémi","jeff":"Dzsef",
- "jeffrey":"Dzsefri","karim":"Kárim","kasper":"Kászper","keith":"Kít",
- "marvin":"Márvin","miroslav":"Miroszláv","nigel":"Nájdzsel","omar":"Omár",
- "pierluigi":"Pelbárt","rachid":"Rásid","rodrigo":"Rodrigó",
- "ronald":"Ronáld","ryan":"Rájen","salvatore":"Szalvátor",
- "stuart":"Sztuart","sultan":"Szultán","sven":"Szvén","timmy":"Timkó",
-# ── 2/b. FORDÍTÁS (a „Petit → Pici” vonal) ─────────────────────────────────
- "angel":"Angyal","mladen":"Ifjú","moreno":"Barna","morgan":"Morgó",
- "scott":"Skót",
-# ── 3. LÉPCSŐ: KALAP, DE A HANGZÁSHOZ ILLŐ ─────────────────────────────────
- "abdoulay":"Ábel","arouna":"Arnold","darren":"Dorián",
- "don":"Doma","eren":"Örs","garry":"Geri","gokhan":"Gyárfás",
- "holger":"Huba","horst":"Hunor","miodrag":"Mikó","nawaf":"Noé","roy":"Roj",
- "santi":"Szanyi","seydou":"Sebő","terry":"Tihamér","trevor":"Töhötöm",
-```
-
-> **EGY BEJEGYZÉS FELÜLÍRÁS, NEM BŐVÍTÉS.** A `christoph` ma `Krisztián`;
-> a guide R3 pontja szerint viszont `Christoph → Kristóf` (a te példád). A
-> fenti blokk ezt **átírja**. Ha nem akarod, vedd ki belőle.
-
-### 3.2 · `tools/nevek/rules.py` — a `-son` szabály
-
-```python
-HU_MGH = set("aeiouáéíóöőúüű")
-SON_LANG = {"pt", "en", "sc", "nl"}
-
-def son_stem(w):
-    """A patronim VEZETÉKNÉV töve, ha az. A -son = fia (R2).
-
-    Három írásmód, három levágás — mindhárom a kiejtésből következik:
-      -sson  a birtokos s a TŐHÖZ tartozik   Nilsson  → Nils
-      -sen   dán/norvég, az s szintén         Jensen   → Jens
-      -son   sima levágás                     Watson   → Wat
-    Az angol viszont EGY s-re egyszerűsít, ha a tő s-re végződne: a
-    Ferguson tövében ott a Fergus, a Morrisonéban a Morris — ezt onnan
-    ismerjük fel, hogy a levágott tő magánhangzóra végződne.
-    Rövid tő (3 betű alatt) nem patronim: a Son Heung-min nem valakinek
-    a fia, hanem így hívják."""
-    lw = w.lower()
-    if lw.endswith("sson"):
-        st = w[:-3]
-    elif lw.endswith("sen"):
-        st = w[:-2]
-    elif lw.endswith(("son", "zon")):
-        st = w[:-3]
-        if st and st[-1].lower() in HU_MGH:
-            st += "s"
-    else:
-        return None
-    return st if len(st) >= 3 else None
-
-
-def son_fia(stem_phon):
-    """A -fia hozzáragasztása a MÁR FONETIZÁLT tőhöz. A sziszegő véget
-       egyszerűsítjük: a „Klaasszfia” kimondhatatlan, a „Klaaszfia” nem."""
-    import re as _re
-    return _re.sub(r"ssz$", "sz", stem_phon) + "fia"
-```
-
-### 3.3 · `tools/nevek/build.py` — az `auto()` egyszavas vezetéknév-ágán
-
-```python
-    first, surw = parts[0], parts[cut:]
-    if len(surw) == 1:
-        # -son = fia (R2). A TŐ UGYANÚGY ÁTMEGY A FONETIKÁN, mint bármely
-        # vezetéknév — enélkül nyers angol maradna („Johnfia”).
-        _st = son_stem(surw[0]) if lg in SON_LANG else None
-        if _st:
-            _h = hufy(_st, lg)
-            if strip_dia(_h.lower()) == strip_dia(_st.lower()):
-                _h = lengthen(_h)
-            sur = son_fia(_h[0].upper() + _h[1:])
-        else:
-            sur = hufy(surw[0], lg)
-            if strip_dia(sur.lower()) == strip_dia(surw[0].lower()):
-                sur = lengthen(sur)
-    else:
-        sur = cap("".join(hufy(w, lg) for w in surw))
-        if strip_dia(sur.lower()) == strip_dia("".join(surw).lower()):
-            sur = lengthen(sur)
-```
-
-Az importsorba `son_stem, son_fia, SON_LANG` is kell.
+**A FUTÓ KARRIEREKBEN ÁTNEVEZŐDNEK A JÁTÉKOSOK.** A mentés a KANONIKUS néven
+kulcsol, a megjelenítés a `HU_NAME_TABLE`-ből olvas — a mentés tehát **nem
+törik el**, de akinek eddig `Kol Aurél` volt a neve, az `Kol Bandi` lett,
+karrier közben. Ez nem hiba, hanem következmény.
 
 ---
 
-## 4. Mielőtt beépítjük — három dolog
+## 4. A 791. név — az ütközés-feloldó ajándéka
 
-**1. A KÉZI RÉTEG SÉRTHETETLEN.** A 950 `manual.py`-bejegyzés a generátor
-fölött áll: a build előbb a `MANUAL`-t nézi. A két szabály tehát **egyetlen
-kézi javításodat sem írja felül** — csak a gépi 2696-ot érinti.
+`Kevin Müller: Müljer Bendegúz → Müljer Kelemen`. Ezt a szabályok maguktól
+nem magyarázzák: az **ütközés-feloldó** hozta, ami azonos teljes névnél a
+másodiktól más keresztnevet oszt. Öt Müller van a bázisban:
 
-**2. A FUTÓ KARRIEREKBEN ÁTNEVEZŐDNEK A JÁTÉKOSOK.** A mentés a KANONIKUS
-néven kulcsol, a megjelenítés pedig a `HU_NAME_TABLE`-ből olvas — a mentés
-tehát **nem törik el**, de akinek eddig `Kol Aurél` volt a neve, az a
-frissítés után `Kol Bandi` lesz, karrier közben. Ez nem hiba, hanem
-következmény; jó tudni előre.
-
-**3. A `build.py` KÖZVETLENÜL AZ `index.html`-T ÍRJA.** Nincs külön kapcsoló:
-a futtatás azonnal él. Ezért áll ez a lap mérésként, beépítés nélkül.
-
----
-
-## 5. Mit NEM old meg
-
-* **A maradék 715 kalapos nevet.** Azok egyszeri keresztnevek — szótárral nem,
-  csak egyenként javíthatók.
-* **A `Mk`-kezdetet.** `McCoist → Mkkoist`, `McPherson → Mkferfia`: a `Mc`/`Mac`
-  előtagot a motor ma nem ismeri. Ez egy HARMADIK szabály volna, és a mérés
-  szerint megérné — de nem ez a két szabály dolga.
-* **Az 1127 csak-ékezetes nevet.** Azoknál a fonetika lefutott, csak keveset
-  változtatott; az a `hufy` finomítása, nem szótárkérdés.
-
----
-
-## 6. A mérés hitelesítése — a javaslat le is futott
-
-A fenti számok nem becslések: a javasolt `rules.py`-t és `build.py`-t
-**homokozóban lefuttattam** az `index.html` egy másolatán, és összevetettem a
-mostani táblával.
-
-| | |
-|---|---|
-| a tábla mérete | 3646 → **3646** (nem vész el és nem születik név) |
-| a jóslat | 790 név változna |
-| a VALÓS build | **791** név változott |
-| a 790-ből eltérő kimenet | **0** |
-| **sérült kézi (`MANUAL`) bejegyzés** | **0** |
-
-### A 791. név — és miért jó hír
-
-`Kevin Müller: Müljer Bendegúz → Müljer Kelemen`. Ezt a mérés nem jósolta meg,
-mert nem futtatja az **ütközés-feloldót** — azt az ágat, ami azonos teljes
-névnél a másodiktól más keresztnevet oszt. Öt Müller van a bázisban:
-
-| | ma | javasolt |
+| | előtte | utána |
 |---|---|---|
 | Dieter Müller | Müljer **Kelemen** | Müljer Detre |
 | Heinz Müller | Müljer Ambrus | Müljer Henrik |
@@ -417,10 +271,20 @@ névnél a másodiktól más keresztnevet oszt. Öt Müller van a bázisban:
 | Manfred Müller | Müljer Álmos | Müljer Manfréd |
 | Patrick Müller | Müljer Patrik | Müljer Patrik |
 
-A `Kevin` **ma is** `Kelemen` a `GIVEN`-ben — csakhogy a nevet elhappolta
-előle `Dieter`, aki kalapból húzta. Amint `Dieter` megkapja a sajátját
-(`Detre`), a `Kelemen` visszakerül a jogos gazdájához, és `Kevin` nem szorul
-többé pótnévre.
+A `Kevin` **eddig is** `Kelemen` volt a `GIVEN`-ben — csakhogy a nevet
+elhappolta előle `Dieter`, aki kalapból húzta. Amint `Dieter` megkapta a
+sajátját (`Detre`), a `Kelemen` visszakerült a jogos gazdájához.
 
-**Ez a szabály másodlagos nyeresége:** minden kalapból húzott név, ami
-megszűnik, felszabadít egy nevet valakinek, akihez tényleg tartozik.
+**Ez a szabály másodlagos nyeresége:** minden megszűnő kalapos név
+felszabadít egy nevet valakinek, akihez tényleg tartozik.
+
+---
+
+## 5. Mit NEM old meg
+
+* **A maradék 715 kalapos nevet.** Azok egyszeri keresztnevek — szótárral
+  nem, csak egyenként javíthatók.
+* **A `Mk`-kezdetet.** `McCoist → Mkkoist`, `McPherson → Mkferfia`: a
+  `Mc`/`Mac` előtagot a motor ma sem ismeri. Ez egy HARMADIK szabály volna.
+* **Az 1127 csak-ékezetes nevet.** Azoknál a fonetika lefutott, csak keveset
+  változtatott; az a `hufy` finomítása, nem szótárkérdés.

@@ -124,6 +124,88 @@ GIVEN = {
  "vasil":"Vazul","vasilij":"Vazul","wassili":"Vazul",
 }
 
+
+# ── BŐVÍTÉS: a kalapból húzott keresztnév ellen ────────────────────────────
+# A motor a keresztnevet innen veszi; ami nincs benne, arra a pool_given
+# KALAPBÓL húz egy magyar nevet, aminek a hangzáshoz semmi köze. Mérve ez
+# 1463 néven futott — a bővítés ebből 748-at szüntet meg.
+# A sorrend a Danisítás-guide R3 pontja: magyar megfelelő → az eredeti
+# magyaros írással → és csak végül a kalap, de akkor a hangzáshoz illő.
+GIVEN.update({
+# 1. VAN MAGYAR MEGFELELŐJE
+ "abel":"Ábel","adrian":"Adrián","adrien":"Adrián","agustin":"Ágoston",
+ "alain":"Alán","alan":"Alán","aldo":"Aladár","aleksandr":"Sándor",
+ "alekszej":"Elek","allan":"Alán","ander":"Andor","andoni":"Antal",
+ "andy":"Bandi","arkadiusz":"Arkád","armando":"Ármin","arthur":"Artúr",
+ "axel":"Ákos","benoit":"Benedek","billy":"Vili","bobby":"Robi",
+ "callum":"Kálmán","carsten":"Krisztián","cedric":"Cirjék",
+ "cesar":"Császár","christoph":"Kristóf","christopher":"Kristóf",
+ "colin":"Kolos","damiano":"Damján","dan":"Dani","daniele":"Dániel",
+ "danny":"Dani","dario":"Dárius","dave":"Dávid","davide":"Dávid",
+ "davy":"Dávid","dean":"Dénes","demetrio":"Demeter","detlef":"Detre",
+ "didier":"Dezső","dieter":"Detre","domagoj":"Domonkos",
+ "domenico":"Domonkos","dominique":"Domonkos","eder":"Ede","emerson":"Imre",
+ "emre":"Imre","enrico":"Imre","eusebio":"Özséb","ezequiel":"Ezékiel",
+ "fabian":"Fábián","fabio":"Fábián","fabio":"Fábián","federico":"Frigyes",
+ "fernando":"Nándor","florent":"Flórián","francis":"Ferenc",
+ "franck":"Ferkó","frederic":"Frigyes","gabi":"Gabi","gael":"Gál",
+ "gelson":"Gellért","giacomo":"Jakab","giancarlo":"Jankó","giulio":"Gyula",
+ "glenn":"Kelen","gordon":"Gordián","graeme":"Gerő","greg":"Gergő",
+ "guido":"Vid","guilherme":"Vilmos","guillermo":"Vilmos",
+ "gustavo":"Gusztáv","hector":"Hektor","heinz":"Henrik","helmut":"Kelemen",
+ "herbert":"Herbert","ian":"János","ismael":"Izmael","jacques":"Jakab",
+ "jason":"Jázon","javi":"Xavika","javier":"Xavér","jens":"Jenő",
+ "jeremie":"Jeremiás","jeremy":"Jeremiás","jerome":"Jeromos","jim":"Jaki",
+ "jimmy":"Jaki","jocelyn":"Jácint","joe":"Jocó","johnny":"Jancsi",
+ "jon":"János","jorg":"György","joris":"György","josip":"József",
+ "jurij":"György","justin":"Jusztin","kamil":"Kamill","karol":"Károly",
+ "ken":"Kende","kenny":"Kende","konstantin":"Konstantin",
+ "kostas":"Konstantin","kurt":"Konrád","leandro":"Leánder","lewis":"Lajos",
+ "lilian":"Lipót","luciano":"Lucián","ludovic":"Lajos","luiz":"Lajos",
+ "mamadou":"Mohács","manfred":"Manfréd","marcel":"Marcell",
+ "marcelo":"Marcell","mariano":"Marián","massimo":"Miksa","matias":"Mátyás",
+ "mauricio":"Móric","maurizio":"Móric","mauro":"Mór","maxence":"Miksa",
+ "maxi":"Miksa","maximilian":"Miksa","michał":"Mihály","mick":"Miska",
+ "mickael":"Mihály","mike":"Miska","mikel":"Mihály","mitchell":"Mihály",
+ "moussa":"Mózes","nacho":"Ignác","nestor":"Nesztor","nick":"Miki",
+ "nicky":"Miki","nico":"Miklós","nicolo":"Miklós","niko":"Miklós",
+ "norbert":"Norbert","nuno":"Nándor","ola":"Olaf","olaf":"Olaf",
+ "oleksandr":"Sándor","paco":"Ferkó","pascal":"Paszkál","pat":"Patrik",
+ "piero":"Péter","piet":"Péter","radoslav":"Radó","rainer":"Rajnald",
+ "renato":"Renátó","rene":"Renátó","robin":"Robi","roger":"Rezső",
+ "romeo":"Romeó","ron":"Roni","ronnie":"Roni","ruben":"Rúben",
+ "santiago":"Jakab","sascha":"Sanyi","sebastiano":"Sebestyén",
+ "shaun":"János","sonny":"Soma","souleymane":"Salamon",
+ "stanislav":"Szaniszló","stephane":"István","sylvain":"Szilveszter",
+ "szergej":"Szergej","teddy":"Tivadar","tim":"Timót","timo":"Timót",
+ "tobias":"Tóbiás","tommy":"Tomi","tony":"Tóni","uli":"Ulrik",
+ "ulrich":"Ulrik","valerij":"Valér","vaszilij":"Vazul","vincenzo":"Vince",
+ "vlagyimir":"Vladi","wes":"Vencel","willie":"Vili","wolfgang":"Farkas",
+ "yann":"János","yoann":"János","ze":"Jocó","zeljko":"Zsolt",
+ "zlatko":"Zalán",
+# 2. NINCS, DE MAGYAROS ÍRÁSSAL JÓL HANGZIK
+ "adamo":"Ádám","aitor":"Ájtor","ali":"Áli","ally":"Alika","alvaro":"Álvár",
+ "angelo":"Andzseló","angelos":"Angelusz","ashley":"Esli","brad":"Brád",
+ "bradley":"Brádli","brian":"Brián","bryan":"Brián","claudio":"Kolos",
+ "claudio":"Kolos","corentin":"Korentin","declan":"Dékán","dejan":"Deján",
+ "diego":"Dijégó","dusan":"Dusán","fatih":"Fátih","gareth":"Geret",
+ "gary":"Geri","geoff":"Dzsef","goncalo":"Gonzaló","gonzalo":"Gonzaló",
+ "graham":"Gréhem","harald":"Hárald","jamie":"Dzsémi","jeff":"Dzsef",
+ "jeffrey":"Dzsefri","karim":"Kárim","kasper":"Kászper","keith":"Kít",
+ "marvin":"Márvin","miroslav":"Miroszláv","nigel":"Nájdzsel","omar":"Omár",
+ "pierluigi":"Pelbárt","rachid":"Rásid","rodrigo":"Rodrigó",
+ "ronald":"Ronáld","ryan":"Rájen","salvatore":"Szalvátor",
+ "stuart":"Sztuart","sultan":"Szultán","sven":"Szvén","timmy":"Timkó",
+# 2/b. FORDÍTÁS (a „Petit → Pici" vonal)
+ "angel":"Angyal","mladen":"Ifjú","moreno":"Barna","morgan":"Morgó",
+ "scott":"Skót",
+# 3. KALAP, DE A HANGZÁSHOZ ILLŐ
+ "abdoulay":"Ábel","arouna":"Arnold","darren":"Dorián","don":"Doma",
+ "eren":"Örs","garry":"Geri","gokhan":"Gyárfás","holger":"Huba",
+ "horst":"Hunor","miodrag":"Mikó","nawaf":"Noé","roy":"Roj",
+ "santi":"Szanyi","seydou":"Sebő","terry":"Tihamér","trevor":"Töhötöm",
+})
+
 # ── univerzális pool, ha a keresztnév nem szerepel a térképben ───────────────
 POOL = ["Ábel","Ábris","Ákos","Álmos","Ambrus","Aurél","Bálint","Barnabás","Bendegúz",
  "Benedek","Bertalan","Boldizsár","Csanád","Csongor","Dezső","Domonkos","Elemér",
@@ -224,6 +306,79 @@ def hufy(w, lang="en"):
     if not s:
         s = fold(w.lower())
     return s[0].upper() + s[1:] if cap else s
+
+
+# ── PATRONIM VEZETÉKNÉV: a -son = „fia" ─────────────────────────────────────
+# A Danisítás-guide R2 pontja: a Denílson, Ederson, Edílson végén a -son
+# annyit tesz, „fia". Ugyanez a skandináv -sson, az angol -son és a
+# dán/holland -sen.
+HU_MGH = set("aeiouáéíóöőúüű")
+SON_LANG = {"pt", "en", "sc", "nl"}
+
+def son_stem(w):
+    """A patronim vezetéknév TÖVE, ha az — különben None.
+
+    Három írásmód, három levágás, mindhárom a kiejtésből következik:
+      -sson   a birtokos s a TŐHÖZ tartozik    Nilsson → Nils
+      -sen    dán/norvég/holland, az s szintén  Jensen  → Jens
+      -son    sima levágás                      Watson  → Wat
+
+    Az angol viszont EGY s-re egyszerűsít, ha a tő maga is s-re végződne: a
+    Ferguson tövében ott a Fergus, a Morrisonéban a Morris. Ezt onnan
+    ismerjük fel, hogy a levágott tő magánhangzóra végződne.
+
+    A RÖVID TŐ NEM PATRONIM: a „Son Heung-min" nem valakinek a fia, hanem
+    így hívják — ezért kell legalább három betűnek maradnia."""
+    lw = w.lower()
+    if lw.endswith("sson"):
+        st = w[:-3]
+    elif lw.endswith("sen"):
+        st = w[:-2]
+    elif lw.endswith(("son", "zon")):
+        st = w[:-3]
+        if st and st[-1].lower() in HU_MGH:
+            st += "s"
+    else:
+        return None
+    return st if len(st) >= 3 else None
+
+
+# A VÉGZŐDÉS HÁROM ALAKJA, ÉS MIÉRT NEM EGY.
+# A „-fia" leírás, nem név: a Vatfia magyarázat, nem vezetéknév. A magyar
+# névanyagban ugyanez a jelentés két RÉGI, valódi vezetéknév-végződésben él
+# — a polgári -fi (Győrfi, Pálfi) és a nemesi -ffy (Pálffy, Bánffy) —, és
+# ezek adják a hangulatot, amit a -fia csak elmagyaráz.
+# A CÉLARÁNY 50 / 33 / 16 — a -fi a fő alak, a -ffy a második, a -fia ritka.
+# EZREDES a felbontás, nem hatodos: a hatodos osztás ilyen kis mintán (ma 52
+# különböző tő) durván félrehúz. Mérve, ugyanezen a hash-en:
+#     h % 6    → 45 / 42 / 13   (a -ffy elszalad)
+#     h % 1000 → 48 / 36 / 16   (ez van beépítve)
+# A pontos arány tehát CÉL, nem garancia: a végződés determinisztikus, ezért
+# a tényleges megoszlás azon múlik, épp milyen tövek vannak a bázisban.
+SON_HAT = ((500, "fi"), (833, "ffy"), (1000, "fia"))
+
+def son_suffix(stem_phon):
+    """A végződés a TŐBŐL sorsolódik, nem a játékosból — és determinisztikusan.
+
+    Miért a tőből: két Wilson ugyanazt a vezetéknevet viseli, tehát ugyanazt
+    a végződést is kell kapniuk. Ha játékosonként sorsolnánk, a Vilfi és a
+    Vilffy egymás mellett állna a keretben, és az nem stílus volna, hanem
+    hibának látszó következetlenség. (Mérve: 0 olyan vezetéknév van, amelyik
+    kétféle végződést kap.)
+
+    Miért determinisztikusan: a build újrafuttatása nem írhatja át a
+    neveket, és egy ÚJ KERET felvétele sem mozdíthatja el a meglévőket.
+    Ugyanaz a tő mindig ugyanazt a végződést adja — ez ugyanaz a hash, amit
+    a pool_given is használ."""
+    h = 0
+    for ch in stem_phon:
+        h = (h * 131 + ord(ch)) & 0xFFFFFFFF
+    h %= 1000
+    veg = next(v for hat, v in SON_HAT if h < hat)
+    s = re.sub(r"ssz$", "sz", stem_phon)      # Klaasszfi → Klaaszfi
+    if veg.startswith("f") and s.lower().endswith("f"):
+        s = s[:-1]                            # Graff + ffy → Graffy, nem Grafffy
+    return s + veg
 
 
 def lengthen(s):

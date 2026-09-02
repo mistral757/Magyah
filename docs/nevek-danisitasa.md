@@ -249,13 +249,22 @@ egyszerre több tucat nevet ment meg a kalaptól. Hiányzik például:
 `Bülent`, `Corentin`, `Dado`, `Darijo`, `Fikayo`, `Hidetoshi`, `Kaoru`,
 `Mamadou`, `Mahamadou`, `Néstor` (→ Nesztor), `Torbjörn`.
 
-**A `-son` → `-fia` szabály** a `rules.py`-ba is beépíthető, nyelvenként:
-`pt`/`en`/`sc` végződésre.
+**A patronim `-son` szabály** a `rules.py`-ban, nyelvenként: `pt`/`en`/`sc`/`nl`.
 
+> **✅ 3.9.09 — MINDKETTŐ BE VAN ÉPÍTVE.** Ez a szakasz innentől előzmény, nem
+> tennivaló: a `GIVEN` 616 bejegyzésre bővült, a `son_stem`/`son_suffix` pedig
+> a `rules.py`-ban áll. A két szabály együtt **791 gépi nevet** javított meg.
+>
 > **HELYESBÍTÉS.** Ez a pont eredetileg azt írta a `-son` szabályra, hogy
 > *„egy sor, több száz név"*. **Ez becslés volt, és téves:** kimérve **67
-> név**, nem több száz. A súly a `GIVEN`-bővítésen van (748 név), nem a
-> `-son`-on. A pontos mérés: `docs/nevek-generator-minta.md`.
+> név**. A súly a `GIVEN`-bővítésen van (724 név), nem a `-son`-on.
+>
+> **ÉS A VÉGZŐDÉS NEM `-fia` LETT.** *„a -fia javítások jók lennének, de
+> mégsem"* — a `-fia` leírás, nem név. Helyette a két valódi magyar
+> vezetéknév-végződés: **`-fi`** (Győrfi, Pálfi) 48%, **`-ffy`** (Pálffy,
+> Bánffy) 36%, és ritkán `-fia` 16%.
+>
+> A pontos mérés: `docs/nevek-generator-minta.md`.
 
 ---
 
@@ -264,6 +273,5 @@ egyszerre több tucat nevet ment meg a kalaptól. Hiányzik például:
 **`docs/nevek-danisitasa-minta.md`** — száz konkrét KÉZI javaslat, ezzel a
 módszerrel, olyan nevekre, amikhez nem nyúltál. *(3.9.07 óta beépítve.)*
 
-**`docs/nevek-generator-minta.md`** — a fenti két GENERÁTOR-szabály kimérve:
-mit javítana a 2696 gépi névből (790-et, 29%), beilleszthető kóddal.
-*(Mérés, még nincs beépítve.)*
+**`docs/nevek-generator-minta.md`** — a két GENERÁTOR-szabály jegyzőkönyve:
+mit javított a 2696 gépi névből (791-et, 29%). *(3.9.09 óta beépítve.)*
