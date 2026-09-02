@@ -1,7 +1,11 @@
 # Kiadási roadmap — mi kell ahhoz, hogy a Magyah kimenjen a Google Play-re
 
-*(3.9.01, 2026. szeptember. Ez a dokumentum a KIADÁS állapotát írja le, nem egy
+*(3.9.02, 2026. szeptember. Ez a dokumentum a KIADÁS állapotát írja le, nem egy
 rendszert. Három szálon fut: jogtisztaság · mentés-stabilitás · csomagolás.)*
+
+> **Naplózás.** 3.9.02: az **F1** (betűk önhosztolása) és az **F2** (tartós
+> tárhely) elkészült — a részletek: `docs/betuk-es-tarhely.md`. Az F2 mellékesen
+> becsukta a 2. szál 5. lyukát is (kvóta-mérés).
 
 > **Előzmény.** Ilyen dokumentum korábban NEM létezett a repóban — végignéztem a
 > teljes git-történetet. Ami eddig volt, három külön helyen élt:
@@ -16,8 +20,8 @@ rendszert. Három szálon fut: jogtisztaság · mentés-stabilitás · csomagol�
 
 | szál | állapot | mi van hátra |
 |---|---|---|
-| **Jogtisztaság** | ✅ **kész** | egy nyitott apróság (Google Fonts) |
-| **Mentés-stabilitás** | ⚠️ **erős alap, hat lyuk** | ebből **kettő kiadásblokkoló** |
+| **Jogtisztaság** | ✅ **kész** | — (a Google Fonts is megszűnt, 3.9.02) |
+| **Mentés-stabilitás** | ⚠️ **erős alap, négy lyuk** | ebből **egy kiadásblokkoló** (export/import) |
 | **Csomagolás (Play)** | ❌ **nulláról** | manifest · TWA · Play Console papírok |
 
 **A kritikus út nem a kód, hanem a papír.** A Play Console kötelező mezői
@@ -58,24 +62,27 @@ fájl: dist/index.html · 3,0 MB (forrás 5,3 MB)
 
 …és a `dist/index.html` böngészőben hiba nélkül betöltődik.
 
-### Az egy nyitott apróság: **Google Fonts futásidőben**
+### A Google Fonts — megoldva (3.9.02) ✅
 
-Az `index.html` fejléce öt betűcsaládot tölt a `fonts.googleapis.com`-ról
-(mérve: nulla `@font-face` a fájlban, tehát minden betű onnan jön). Ez **két
-külön problémát** okoz, és mindkettő a kiadáshoz tartozik:
+Volt egy nyitott apróság: az `index.html` fejléce öt betűcsaládot töltött a
+`fonts.googleapis.com`-ról, tehát **minden megnyitáskor** egy harmadik félhez
+került a felhasználó IP-címe, hozzájárulás nélkül — és hálózat nélkül a
+tipográfia szétesett.
 
-1. **GDPR.** A betű letöltésekor a felhasználó IP-címe egy harmadik félhez
-   kerül, hozzájárulás nélkül. EU-s kiadásnál ez konkrét, ítélettel
-   alátámasztott kockázat — és a Play Data safety űrlapján is nyilatkozni
-   kellene róla.
-2. **Offline.** Az első betöltésnél net kell a betűkhöz; hálózat nélkül a
-   játék tipográfiája szétesik, pedig a többi tartalom cache-ből jönne.
+**Elkészült (F1).** Tíz `woff2` fájl a `fonts/` könyvtárban (összesen 280 kB),
+tíz `@font-face` a stíluslap tetején, a licenc a `fonts/OFL.txt`-ben, és mind a
+tíz fájl a service worker `STATIC_ASSETS`-ében (a `CACHE_NAME` ezért lépett
+`v3`-ra). Böngészőben mérve: **nulla külső kérés** a betöltés alatt, és
+hálózat nélkül újratöltve mind az öt család a cache-ből jön.
 
-**A javítás egyszerű:** a betűket le kell tölteni, `icons/` (vagy új `fonts/`)
-mappába tenni, `@font-face`-szel bekötni, és felvenni a service worker
-`STATIC_ASSETS` listájába. Ezzel a GDPR-kérdés megszűnik, az offline élmény
-pedig teljessé válik. **Méret: kicsi. Ez a legjobb ár-érték arányú lépés az
-egész listán.**
+Részletek — köztük, hogy miért kellett a `latin-ext` szelet is (ő, ű), és
+miért nem a teljes súlytengelyt kötöttük be: **`docs/betuk-es-tarhely.md`**.
+
+> **Ami marad, más műfaj.** A PvP-ág a Firebase SDK-t a `gstatic.com`-ról
+> importálja — de csak akkor, amikor a felhasználó maga lép a közös karrier
+> felé. Ez egy hálózati funkció hálózati kérése, nem passzív nyomkövetés.
+> A Play adatbiztonsági kérdőívén viszont a **PvP-ág** adatkezelését így is
+> le kell írni (lásd 3.4).
 
 ---
 
@@ -102,26 +109,26 @@ tanulságát hordozza:
 * **„Mentések és tárhely"** lista méretekkel + törlési folyamat, ami előbb
   felkínálja a karrier `.txt` összegzésének letöltését.
 
-### A hat lyuk
+### A hat lyukból négy maradt
 
 | # | lyuk | miért számít | méret |
 |---|---|---|---|
-| **1** | **`navigator.storage.persist()` sehol nincs meghívva** | a localStorage alapból *kilakoltatható*: iOS Safariban 7 nap inaktivitás után törlődik, Androidon tárhelynyomás alatt esik ki. **Ez a legnagyobb egyedi adatvesztés-kockázat, és egy hívás.** Telepített PWA/TWA-nál a kérés általában prompt nélkül teljesül. | **kicsi** |
+| ~~**1**~~ | ~~`navigator.storage.persist()` sehol nincs meghívva~~ | ✅ **kész (3.9.02, F2).** Az első sikeres mentés után és telepítéskor kérünk, a „Mentések és tárhely" ablak mutatja az állapotot, és kézzel is újrakérhető. Lásd `docs/betuk-es-tarhely.md`. | — |
 | **2** | **nincs valódi biztonsági mentés (export/import)** | csak `.txt` összegzés van (`generateCareerLegacyTextFrom`) — az olvasásra jó, **visszatölteni nem lehet**. Telefonváltás, adatvesztés vagy egy elrontott mentés után nincs út vissza. | **közepes** |
 | **3** | **a séma-verzió írva van, de sosem olvasva** | a `saveGame` `v:1`-et ír, az `applySavedGame` **sosem nézi meg** a `d.v`-t. Egy jövőbeli inkompatibilis változás fél-betöltéshez és `_saveBroken`-hez vezet, világos üzenet nélkül. | **kicsi** |
 | **4** | **nincs „előző jó mentés"** | a `setItem` kulcsonként atomi, tehát fél-írás nincs — de ha maga a MENTETT állapot hibás, nincs mihez visszanyúlni. Egy második, eggyel korábbi példány (rolling backup) ezt megfogná. | **kicsi** |
-| **5** | **a kvótát nem mérjük** | a `navigator.storage.estimate()` elérhető (mérve: igen), de nincs használva. A „Mentések és tárhely" a saját mentések méretét mutatja, a **határt** nem — a felhasználó nem látja, mikor kerül közel. | **kicsi** |
+| ~~**5**~~ | ~~a kvótát nem mérjük~~ | ✅ **kész (3.9.02, F2 mellékága).** A „Mentések és tárhely" kiírja a `storage.estimate()` szerinti *felhasznált / keret* párt, és megkülönbözteti a localStorage saját 5 MB-os korlátjától. | — |
 | **6** | **localStorage-plafon** | a localStorage saját, ~5 MB-os origin-korlát alatt fut, **függetlenül** attól, mit ígér a `storage.estimate()` (ebben a Chromiumban 919 MB — de az az IndexedDB/Cache kvótája). Három hely + néhány szoba a plafon közelébe visz. Az igazi megoldás IndexedDB, de az nagyobb munka. | **nagy** |
 
 ### Sorrend és indoklás
 
-**Kiadásblokkoló: 1 és 2.** Egy Play-en kiadott játéknál, ahol a felhasználó
-tíz szezont épít, elfogadhatatlan, hogy a mentés (a) magától kilakoltatható és
-(b) nem menthető ki. A többi négy komoly minőségjavítás, de nélkülük is ki
-lehet adni.
+**Kiadásblokkoló volt 1 és 2.** Az 1. elkészült (3.9.02): a mentés már nem
+lakoltatható ki magától. **Marad a 2.** — egy Play-en kiadott játéknál, ahol a
+felhasználó tíz szezont épít, elfogadhatatlan, hogy a mentése ne legyen
+kimenthető. A többi három komoly minőségjavítás, de nélkülük is ki lehet adni.
 
-A **3–5** apró és egymást erősíti: együtt egy „mentés-egészség" csomag
-(verzió-kapu + rollback + kvótasáv), ami egyben tesztelhető.
+A **3–4** apró és egymást erősíti: együtt egy „mentés-egészség" csomag
+(verzió-kapu + rollback), ami egyben tesztelhető.
 
 A **6** (IndexedDB) **szándékosan a kiadás UTÁNRA** való. A tömörítés már
 megvette a szükséges levegőt; a migráció kockázata most nagyobb, mint a haszna.
@@ -201,15 +208,28 @@ igaz. Ha a cél „telepítés után net nélkül is indul", az `index.html`-t
 install-időben elő kell cache-elni — a *network-first* stratégia emellett
 változatlanul maradhat.
 
+#### 3.7 A regisztrált `/sw.js` és a repóban lévő `sw-1.js` — *tisztázandó*
+
+Az `index.html` a **`/sw.js`**-t regisztrálja, a repóban viszont **`sw-1.js`**
+van, és nincs se `_redirects`, se `netlify.toml`, ami a kettőt összekötné (a
+teljes git-történetben egyetlen `sw.js` sem szerepelt). Vagyis a kiszolgálón
+futó service worker egy olyan példány, amit **nem ez a repó ad**.
+
+Ez nem elméleti: minden `CACHE_NAME`-léptetés és minden `STATIC_ASSETS`-bővítés
+— köztük a 3.9.02 betű-felvétele — **csak akkor ér el a felhasználókhoz**, ha
+a kiszolgálón lévő `sw.js` is frissül. A kiadás előtt el kell dönteni, melyik
+az igazság: a regisztrációt kell `sw-1.js`-re állítani, vagy a `sw-1.js`-t
+kell `sw.js` néven is kitenni.
+
 ---
 
 ## 4. A javasolt sorrend
 
 ```
 ┌─ MOST ─────────────────────────────────────────────────────────────┐
-│ F1  Betűk önhosztolása          (GDPR + offline, kicsi)            │
-│ F2  storage.persist()           (a legnagyobb adatvesztés-kockázat)│
-│ F3  Mentés export/import        (kiadásblokkoló)                   │
+│ F1  Betűk önhosztolása          ✅ KÉSZ (3.9.02)                    │
+│ F2  storage.persist()           ✅ KÉSZ (3.9.02)                    │
+│ F3  Mentés export/import        ◀ ITT TARTUNK (kiadásblokkoló)     │
 └────────────────────────────────────────────────────────────────────┘
               │  ← ITT MÁR KIADHATÓ ÁLLAPOTBAN VAN A KÓD
 ┌─ PAPÍR (párhuzamosan indítható) ───────────────────────────────────┐
@@ -219,13 +239,13 @@ változatlanul maradhat.
 │ F5  Manifest-kiegészítés + maskable ikon                           │
 │ F6  assetlinks.json + Bubblewrap → aláírt AAB                      │
 │ F7  Firebase-szabályok ellenőrzése + szobakód-döntés               │
-│ F8  SW: index.html precache                                        │
+│ F8  SW: index.html precache + a /sw.js ↔ sw-1.js tisztázása (3.7)  │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ KIADÁS ───────────────────────────────────────────────────────────┐
 │ F9  release.py → dist/ → deploy → belső teszt sáv → éles           │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ UTÁNA ────────────────────────────────────────────────────────────┐
-│ F10 Mentés-egészség (verzió-kapu, rollback, kvótasáv)              │
+│ F10 Mentés-egészség (verzió-kapu, rollback)                        │
 │ F11 IndexedDB-migráció                                             │
 └────────────────────────────────────────────────────────────────────┘
 ```
@@ -250,9 +270,16 @@ node tools/nevek/leak.js           # végponti névpróba (draftig végigjátszv
 python3 tools/nevek/release.py     # → dist/index.html, önellenőrzéssel
 ```
 
+> **A `dist/` nem elég önmagában.** A `release.py` csak az `index.html`-t
+> írja ki; a kiszolgálóra mellé kell a **`fonts/`**, az **`icons/`** és a
+> service worker is. Ha a `fonts/` lemarad, a kiadott build tipográfiája
+> csendben rendszerbetűre esik vissza — hibaüzenet nélkül.
+
 …majd kézzel:
 
 - [ ] a `dist/index.html` böngészőben betöltődik, hibaüzenet nélkül;
+- [ ] a `dist`-en **nincs külső hálózati kérés** a betöltés alatt (a betűk a
+      `/fonts`-ból jönnek), és a magyar ő/ű a helyes betűvel rajzolódik;
 - [ ] egy karrier a draftig végigjátszható a `dist`-en;
 - [ ] a `dist` mentése betöltődik és folytatható;
 - [ ] a telepített (TWA) példányban nincs böngésző-címsáv (= az assetlinks jó);

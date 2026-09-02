@@ -14,9 +14,23 @@
    fullscreen) így a régi telepítéseknél sosem érne el — hacsak a cache neve nem
    változik. Új név = új install = friss addAll, az activate pedig kitakarítja a
    régit. A FŐ HTML nem érintett: az mindig "network-first". */
-const CACHE_NAME = "harminc-nulla-cache-v2";
+const CACHE_NAME = "harminc-nulla-cache-v3";
 const STATIC_ASSETS = [
   "/",
+  /* A betűk önhosztoltak (lásd az index.html @font-face blokkját). Itt kell
+     lenniük, különben offline a tipográfia szétesne: a HTML megjön a
+     cache-ből, a betűk viszont a hálózatról jönnének. Az `addAll` mind a tíz
+     szeletet előre letölti, tehát a latin-ext (magyar ő/ű) is offline van. */
+  "/fonts/archivo-latin.woff2",
+  "/fonts/archivo-latin-ext.woff2",
+  "/fonts/archivo-black-latin.woff2",
+  "/fonts/archivo-black-latin-ext.woff2",
+  "/fonts/anton-latin.woff2",
+  "/fonts/anton-latin-ext.woff2",
+  "/fonts/oswald-latin.woff2",
+  "/fonts/oswald-latin-ext.woff2",
+  "/fonts/cormorant-garamond-latin.woff2",
+  "/fonts/cormorant-garamond-latin-ext.woff2",
   "/icons/site.webmanifest",
   "/icons/favicon.ico",
   "/icons/apple-touch-icon.png",
