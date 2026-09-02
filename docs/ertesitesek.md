@@ -83,36 +83,51 @@ kiírása elszáll** — a játék működik, de a bökés nem.
 | `netlify/functions/nudge.js` | **új** — ez küldi a push-t, ez őrzi a titkos kulcsot |
 | `package.json` | **új** — kizárólag a `web-push` függőségért |
 | `package-lock.json` | **új** — hogy a telepítés determinisztikus legyen |
+| `netlify.toml` | **új** — egyetlen sor: a Firebase `apiKey` kivétele a titok-szkenner heurisztikájából (lásd lent) |
 | `sw-1.js` | `push` és `notificationclick` kezelő |
 | `index.html` | a kliens-réteg, a két gomb, a fékek |
 | `tools/firebase-rules.json` | `push` + `nudgeAt` |
 
-> **NINCS `netlify.toml` — ÉS EZ TANULT DÖNTÉS, NEM MULASZTÁS.**
+> **A DEPLOY ELHASALT — ÉS AZ OK NEM AZ VOLT, AMIT KÉTSZER IS ÁLLÍTOTTAM.**
 >
-> A P2b eredetileg tett be egyet, azzal az indoklással, hogy a `package.json`
-> „build-lépésnek látszik", ezért egy `[build]` szakasszal (`command = ""`,
-> `publish = "."`) ki kell mondani, hogy nincs build.
->
-> **Az indoklás hibás volt.** A Netlify nem talál ki magának build-parancsot
-> egy `package.json` láttán; a felületen mentett beállítás marad érvényben.
-> A védekezésre nem volt szükség — és pont a védekezés tört el mindent.
->
-> Amit a check-történet mutat:
+> A P2b eredetileg tett be egy `netlify.toml`-t, azzal az indoklással, hogy a
+> `package.json` „build-lépésnek látszik", ezért egy `[build]` szakasszal
+> (`command = ""`, `publish = "."`) ki kell mondani, hogy nincs build. Amikor
+> a deploy elbukott, előbb a `publish = "."`-t neveztem meg okként, aztán az
+> egész fájlt. **Mindkét diagnózis téves volt**, és mindkettőt nagyobb
+> bizonyossággal mondtam ki, mint amennyi mögötte volt:
 >
 > | commit | a három Netlify-check | idő |
 > |---|---|---|
 > | a P2b ELŐTT (#35, #36) | ⚪ neutral — nincs mit jelentenie | 8 mp |
 > | P2b + P1b (`netlify.toml`-lal) | 🔴 failure | 11 mp |
-> | a `[build]` szakasz eltávolítása után | 🔴 failure | 12 mp |
+> | a `[build]` szakasz elvéve | 🔴 failure | 12 mp |
+> | a `netlify.toml` teljesen elvéve | 🔴 failure | 13 mp |
 >
-> A `[build]` szakasz elvétele tehát **nem oldotta meg** — vagyis nem az volt
-> az ok. A váltás pontosan ott történt, ahol a `netlify.toml` MEGJELENT,
-> ezért az egész fájl kikerült. A `netlify/functions` amúgy is a Netlify
-> alapértelmezett függvény-könyvtára; kimondani sem kell.
+> **A NAPLÓ SZERINT MI TÖRTÉNT VALÓJÁBAN.** A telepítés hibátlan (Node 24,
+> npm 11, 17 csomag, 457 ms), a függvény becsomagolása hibátlan (220 ms).
+> Ez állította meg:
 >
-> **Ha a deploy még ezután is elhasal, a napló ELSŐ hibasora dönt** — az már
-> a `package.json`-ra vagy a függvény becsomagolására mutatna, nem a
-> konfigurációra.
+> ```
+> "AIza***" detected as a likely secret:
+>   found value at line 83718 in index.html
+> ```
+>
+> A Netlify **titok-szkennere** találta meg a Firebase `apiKey`-t. Ez a
+> szkenner csak akkor fut, ha van build — és build csak a `package.json`
+> megjelenése óta van. A kulcs évek óta ott volt; a P2b nem tette oda,
+> csak **láthatóvá tette a szkenner számára**.
+>
+> **Az `apiKey` nem titok.** Nyilvános kliens-azonosító; a Firebase
+> kifejezetten arra tervezte, hogy a kliens kódjában legyen. A hozzáférést az
+> RTDB szabályai döntik el, nem a kulcs ismerete.
+>
+> **A javítás ezért egyetlen sor**, és szándékosan a legszűkebb, ami
+> megoldja: `SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES` erre az EGY értékre.
+> Az egész szkennert **nem** kapcsoljuk ki — pont most lett rá a legnagyobb
+> szükség: a P2b óta létezik egy valódi titok (`VAPID_PRIVATE`), és a
+> szkenner a környezeti változók értékeit is keresi a kimenetben. Ha az a
+> kulcs valaha az `index.html`-be szivárogna, ez állítaná meg a deployt.
 
 ---
 
