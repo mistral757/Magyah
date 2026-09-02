@@ -1,6 +1,6 @@
 # 🎬 Meccsről meccsre — az auto meccsindító
 
-*(3.9.05. Az érintett kód mind az `index.html` egyetlen script-blokkjában: a
+*(3.9.08. Az érintett kód mind az `index.html` egyetlen script-blokkjában: a
 „MECCSRŐL MECCSRE" szakasz — `immOn` / `immArm` / `immPending` / `immStep` /
 `immLeagueStopWhy` / `immAfterLeagueMatch` / `immCupArm` —, plusz négy bekötési
 pont: a jutalom-lánc indulása (`fullTime`), `mstatAfterMatch`,
@@ -107,6 +107,7 @@ teszi:
 |---|---|
 | **tudnivaló** — egyetlen „Rendben"-szerű gomb | 3 mp múlva megnyomja, és újra körbenéz |
 | **valódi döntés** — két vagy több választható út | **megáll**, és megmondja, min |
+| **kiút** — visszalépés (`data-imm="kiut"`) | soha nem nyomja meg, mintha ott sem volna |
 | **átmeneti** — épp fut egy animáció (képesség-sorsolás) | vár, nem lép és nem áll meg |
 | **tiszta** | jöhet a felkészülés, majd a kezdőrúgás |
 
@@ -130,6 +131,43 @@ Amit így nem ismerünk fel — bármi más nyitott ablak vagy képernyő —, a
 > naiv olvasata szerint a „nem egy gomb" az döntés volna — és egy épp épülő
 > vagy bent ragadt, gomb nélküli képernyőn a lánc örökre olyan kérdésre várna,
 > ami meg sem jelent. Nulla gombnál tehát VÁRUNK, nem állunk meg.
+
+### A kémia-építés — és a gomb-számlálás határa
+
+**BEJELENTETT HIBA (3.9.08):** *„amikor kémiaépítéshez ér, akkor mindig új
+kémiát akar elkezdeni a mostanit felfüggeszteni. ha nincs user prompt, akkor
+mindig építse tovább a már folyamatban levőt."*
+
+Ez a gomb-számlálás egyetlen vakfoltja volt, és pontosan azért, mert a szabály
+**gombokat** számol. A kémia-építés képernyőjén a folytatás egy koppintható
+`.prow` **DIV** („koppints a továbblépéshez"), a kiszállás viszont igazi
+`<button>` („↩ Mégis másik párost építek"). A lánc tehát a képernyőn
+**egyetlen gombot** látott, „tudnivalónak" olvasta — és megnyomta. Mérve, a
+javítás előtt:
+
+| | javítás nélkül | javítva |
+|---|---|---|
+| mit nyomna meg | `↩ Mégis másik párost építek` | a folytató sor |
+| a páros állása utána | **3/5 → 3/5** (semmi) | 3/5 → **4/5** |
+| a lánc | megáll a megerősítő ablakon | megy tovább |
+
+Vagyis a felhasználó minden egyes kémia-jutalomnál azt kapta, hogy a játék a
+**folyamatban lévő párost akarja felfüggeszteni** — a fázis pedig nem haladt.
+
+**A javítás két fele.** Az egyik szerkezeti: a **kiút-gomb nem lépés**. Aki
+visszalépést tesz ki a képernyőre, `data-imm="kiut"`-tal jelöli, és az
+`immBtns` kihagyja — a lánc soha nem nyom meg olyan gombot, ami hátrafelé
+visz. A másik a kémia-panel saját ága: a folytató sor `#chemGoOn` azonosítót
+kapott, ezt lépteti a lánc; a párválasztó pedig `#chemPickMark`-ot, és **ott
+megáll** — ki kivel épüljön, az több szezonra szóló döntés, nem tudnivaló.
+
+Két dolog derült ki menet közben, amit senki nem jelentett:
+
+* **A passzkémia ugyanígy elromlott.** Ugyanaz a panel, ugyanaz a szerkezet,
+  ugyanaz a hiba — a javítás mindkettőre megy.
+* **A választó „↩ Mégis mást választok elsőnek" gombja is** a lánc kezébe
+  került, ha már kiválasztottad az első embert: azt nyomogatva a képernyő
+  csak újrarajzolta magát.
 
 ### Képernyő-őr
 
