@@ -14,7 +14,7 @@
    fullscreen) így a régi telepítéseknél sosem érne el — hacsak a cache neve nem
    változik. Új név = új install = friss addAll, az activate pedig kitakarítja a
    régit. A FŐ HTML nem érintett: az mindig "network-first". */
-const CACHE_NAME = "harminc-nulla-cache-v3";
+const CACHE_NAME = "harminc-nulla-cache-v4";
 const STATIC_ASSETS = [
   "/",
   /* A betűk önhosztoltak (lásd az index.html @font-face blokkját). Itt kell
@@ -43,15 +43,31 @@ const STATIC_ASSETS = [
   "/icons/icon-192x192.png",
   "/icons/icon-256x256.png",
   "/icons/icon-384x384.png",
-  "/icons/icon-512x512.png"
+  "/icons/icon-512x512.png",
+  /* Maskable ikonok: az Android launcher ezeket vágja körre/squircle-re. */
+  "/icons/icon-maskable-192x192.png",
+  "/icons/icon-maskable-512x512.png"
 ];
 
+/* MIÉRT NEM addAll.
+   MÉRVE: az `addAll` ATOMI — ha a listából EGYETLEN fájl 404-et ad, az egész
+   ígéret elbukik, és a cache-be SEMMI nem kerül be. A régi `.catch(() => {})`
+   pedig ezt némán elnyelte, tehát a hiba még csak nem is látszott: a mérés
+   szerint egyetlen hiányzó ikontól a 24 bejegyzésből 0 lett, és onnantól az
+   offline indulás nem működött volna — miközben a telepítés „sikeresnek”
+   látszik.
+
+   Ezért fájlonként tesszük el őket. Egy hiányzó darab így csak önmagát viszi,
+   a többi huszonhárom a helyén marad. Ami tényleg nem ment be, azt a fetch
+   `cache-first` ága úgyis pótolja az első online használatkor. */
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(STATIC_ASSETS))
+      .then((cache) => Promise.all(
+        STATIC_ASSETS.map((url) =>
+          cache.add(new Request(url, { cache: "reload" })).catch(() => null))))
       .then(() => self.skipWaiting())
-      .catch(() => {}) // ha egy asset épp nem elérhető, ne akadjon el a teljes telepítés
+      .catch(() => {})
   );
 });
 
