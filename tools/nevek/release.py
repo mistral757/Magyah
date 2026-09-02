@@ -105,10 +105,19 @@ for name in sorted(ren, key=len, reverse=True):
 print(f"lecserélt szövegliterál: {n_sub}")
 
 # ── 4. KLUBTÖRTÉNETEK ──────────────────────────────────────────────────────
-# Valós klubtörténetet mesélnek, valós emberek nevével. A kiadott verzióban
-# amúgy sem jelennek meg.
-s, n_note = re.subn(r'note:"(?:[^"\\]|\\.)*"', 'note:""', s)
-print(f"kiürített klubtörténet: {n_note}")
+# A 3.9.04 óta a forrásban SINCS klubleírás (valós emberek nevét sorolták),
+# tehát ez ma védőháló: ha valaki mégis visszatesz egyet, a kiadott fájlba ne
+# kerüljön bele.
+#
+# A MINTA SZŰKÍTVE — EZ EGY VALÓDI HIBA JAVÍTÁSA. A régi, csupasz
+# `note:"…"` minta MINDEN note mezőt kiürített, nem csak a klubokét: a
+# képességszintek és a stábtagok leírásait is („30% esély védekező
+# képességre", „kétszeres tempó · +20% hatékonyság"). Mérve: 556 mezőből 237
+# ilyen volt — vagyis a kiadott build üres képességleírásokkal ment volna ki,
+# és ez azért nem derült ki, mert a dist-et sosem játszotta végig senki. A
+# klubrekordot a `col:[…]` előzmény azonosítja: csak ott van színpár.
+s, n_note = re.subn(r'(col:\[[^\]]*\]),note:"(?:[^"\\]|\\.)*"', r'\1', s)
+print(f"eltávolított klubtörténet: {n_note}")
 
 # ── 5. A REJTETT NÉVMÓD-KAPCSOLÓ ───────────────────────────────────────────
 # Azonosítókra visszaváltani értelmetlen volna (p1874-et mutatna), ezért a

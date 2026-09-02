@@ -13,11 +13,26 @@
  *  szem pedig 78 000 soron nem elég. Ez a szkript ezt a hiányt pótolja.
  *
  *  MIT NÉZ. Két dolog EGYÜTTÁLLÁSÁT keresi egy soron belül:
- *    1. KIÍRÁSI HELY  — `esc(...)` hívás vagy `${...}` behelyettesítés;
+ *    1. KIÍRÁSI HELY  — `esc(...)` hívás, `${...}` behelyettesítés, VAGY egy
+ *       közvetlen DOM-szövegírás (`…textContent = …`);
  *    2. NÉVFORRÁS     — olyan kifejezés, amiről tudjuk, hogy KANONIKUS nevet
  *       hordoz (lásd NEVFORRASOK). A lista kézzel írt és bővítendő: minden új
  *       névtároló mezőnek ide a helye.
  *  Ha a névforrás körül nincs megjelenítő függvény, a sor gyanús.
+ *
+ *  A DOM-ÍRÁS KÜLÖN OSZTÁLY, ÉS EZ EGY VALÓDI HIBÁN TANULTUK MEG. Az edző
+ *  sorsolásának kártyája így írta ki a nevet:
+ *      $("coachName").textContent = c.n;
+ *  Se `esc(`, se `${` — a háló tehát RÁ SEM NÉZETT a sorra, és az edzők valós
+ *  neve hónapokig kint volt a képernyőn. A javítás nem egy minta bővítése,
+ *  hanem egy hiányzó KIÍRÁSI ALAK felvétele: a `textContent`/`innerText`/
+ *  `innerHTML` jobb oldala ugyanúgy képernyő, mint egy sablon.
+ *
+ *  Ebben a szűk helyzetben a `.n` és a `.name` MINDENESTŐL névforrásnak
+ *  számít (nem csak a lenti, nevesített minták). Máshol ez nem járható: egy
+ *  általános `.n` szabály a kiírási helyekre 155 találatot adna, azok
+ *  túlnyomó része taktika-, képesség- és osztálynév. A DOM-írásokban viszont
+ *  összesen néhány ilyen sor van, tehát a szigor itt olcsó.
  *
  *  HAMIS RIASZTÁS. Egy névforrás nem mindig KIÍRÁS: lehet kulcs, kereső-érték
  *  vagy hálózatra küldött adat — ott a kanonikus név a HELYES. Ilyenkor a sor
@@ -132,6 +147,14 @@ function burkolt(szakasz){
   return BURKOLOK.some(b=>szakasz.includes(b+"("));
 }
 
+/* ---- A DOM-ÍRÁS MINT KIÍRÁSI HELY ----
+   `X.textContent = <kifejezés>;` — a jobb oldal a képernyőre kerül. A pontos-
+   vessző (vagy a sor vége) a határ; ez elég, mert a DOM-írások egysorosak.
+   Az `==`/`===` összehasonlítást kizárjuk: az kérdés, nem kiírás. */
+const DOM_IRAS=/\.(?:textContent|innerText)\s*=(?!=)\s*([^;]*)/g;
+/* Ebben a szűk helyzetben minden `.n` és `.name` névgyanús — lásd a fejlécet. */
+const DOM_NEV=/\b[A-Za-z_$][\w$]*\.(?:n|name)\b/g;
+
 const talalatok=[];
 for(let i=A+1;i<B;i++){
   const sor=lines[i];
@@ -147,6 +170,25 @@ for(let i=A+1;i<B;i++){
      leghosszabb ilyen sablon a jelölés és a kifogásolt sor között öt sort
      fog közre (a piramis osztályválasztójának gombja). */
   if(NEVOK_ABLAK.some(k=>(lines[i-k]||"").includes("nev-ok:")))continue;
+  /* 1. ÚT — DOM-szövegírás. Ettől független a sablonos út alább: egy sor
+     lehet mindkettő (`el.innerHTML=\`…${x}…\``), és akkor mindkettő nézi. */
+  DOM_IRAS.lastIndex=0;
+  {let dm;
+   const dlatott=new Set();
+   while((dm=DOM_IRAS.exec(sor))!==null){
+     const jobb=dm[1]||"";
+     if(burkolt(jobb))continue;
+     /* Ha a jobb oldal SABLON vagy `esc(`, akkor a sablonos út (lentebb) már
+        látja, a maga pontos mintáival. Ez az ág CSAK azt a vakfoltot fedi,
+        amit az nem: a nyers, behelyettesítés nélküli DOM-írást. Enélkül a
+        `innerHTML=\`${x.n}…\`` alakú, ártalmatlan címkék tucatjai jönnének be. */
+     if(jobb.includes("${")||jobb.includes("esc("))continue;
+     DOM_NEV.lastIndex=0;
+     let nm;
+     while((nm=DOM_NEV.exec(jobb))!==null){
+       if(dlatott.has(nm[0]))continue;
+       dlatott.add(nm[0]);
+       talalatok.push({sor:i+1,mi:"DOM-szövegbe írt név",mit:nm[0],szoveg:t.slice(0,150)});}}}
   if(!sor.includes("esc(")&&!sor.includes("${"))continue;
   const latott=new Set();
   NEVFORRASOK.forEach(f=>{

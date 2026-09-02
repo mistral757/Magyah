@@ -12,6 +12,12 @@ rendszert. Három szálon fut: jogtisztaság · mentés-stabilitás · csomagol�
 > **3.9.03** — **F3** (mentés kimentése és visszatöltése) kész:
 > `docs/mentes-kimentes-visszatoltes.md`. **Ezzel a kód kiadható állapotban
 > van**; ami hátra van, az a papírmunka és a csomagolás.
+> **3.9.04** — két jogtisztasági hiányosság javítva, lásd az 1. szakaszt: az
+> **edzők valós neve** kint volt a sorsolás kártyáján (a névháló ezt az
+> alakot azóta látja), és a **klubleírások** — valós játékosok, edzők és
+> klubok nevét soroló szövegek — kikerültek az adatbázisból. Menet közben
+> kiderült, hogy a `release.py` note-ürítő mintája **túl tág** volt: a
+> képesség- és stábleírásokat is kiürítette a kiadott buildben.
 
 > **Előzmény.** Ilyen dokumentum korábban NEM létezett a repóban — végignéztem a
 > teljes git-történetet. Ami eddig volt, három külön helyen élt:
@@ -60,17 +66,58 @@ azonosítókra cserél (determinisztikus, tehát két build mentései
 kompatibilisek), kiüríti a klubtörténeteket, eltávolítja a kommenteket, és a
 végén **ellenőrzi magát**.
 
-**Mérve a jelenlegi kódon (3.9.01):**
+**Mérve a jelenlegi kódon (3.9.04):**
 
 ```
 személynév: 3650 · klub: 193 · liga: 29
-lecserélt szövegliterál: 15203 · kiürített klubtörténet: 556
-kommentek: 1 916 491 karakterrel rövidebb
-fájl: dist/index.html · 3,0 MB (forrás 5,3 MB)
+lecserélt szövegliterál: 15203 · eltávolított klubtörténet: 0 (már a forrásban sincs)
+kommentek: ~1,93 M karakterrel rövidebb
+fájl: dist/index.html · 3,0 MB (forrás 5,2 MB)
 ✓ egyetlen valós név sem maradt a kiadott fájlban
 ```
 
 …és a `dist/index.html` böngészőben hiba nélkül betöltődik.
+
+### Két hiányosság, ami a hálón kívül volt (3.9.04) ✅
+
+**1. Az edzők valós neve kint volt.** A sorsolás kártyája a nevet
+`textContent`-be ÍRTA (`$("coachName").textContent = c.n`), nem sablonba —
+se `esc(`, se `${` —, tehát a névháló **rá sem nézett a sorra**. A kártya
+azóta a megjelenítési rétegen megy, és a háló megtanulta ezt a kiírási
+alakot (lásd `tools/README.md`). Végigmérve: ez volt az egyetlen valódi
+szivárgás ebben az osztályban.
+
+**2. A saját klubod neve, kész klubos indulásnál.** A `teamName` *változó maga*
+kapta meg a klub kanonikus nevét (`IFK Göteborg`), és onnantól hatvan helyről
+íródott ki — a fejlécen, a tabellán, az eredményjelzőn, a kupában, a
+szezonzárón, a PvP-ben. **Minden kiírás szabályos volt** (`esc(teamName)`),
+ezért a statikus háló elvileg sem láthatta.
+
+A javítás nem a hatvan kiírás burkolása, hanem az, hogy **már az értékadásnál**
+a magyarított név kerül a változóba. Ez biztonságos: a `clubLabel` ismeretlen
+névre önmagát adja vissza, tehát a draftolt karrier kézzel írt neve
+változatlanul megy át rajta. A már futó karriereket a betöltés migrálja
+(`applySavedGame`), ugyanezzel az idempotens hívással.
+
+**Ebből született a `tools/nevek/kepernyo-proba.js`** — végponti próba, ami
+végigjátssza a karrier-indítást és egy mérkőzést, és megmondja, melyik
+DOM-elemben áll kanonikus név. Ez fogta meg ezt a hibát, és ez fogja meg a
+következő hasonlót.
+
+**3. A klubleírások.** A kereteknél álló `note:` mezők valós klubtörténetet
+meséltek, valós emberek nevével — „…a csapat lelke a húszéves X, akit Y a
+saját példaképének nevezett…". A megjelenítési réteg minden más nevet
+elrejt; ezek a szövegek megkerülték. **Mind a 319 kikerült az adatbázisból.**
+A mező helye megmarad, hogy egy jövőbeli, saját szövegű ízesítést be lehessen
+tenni; addig a klubkártya a klubot és az idényt mutatja.
+
+> **És egy hiba, ami emiatt derült ki.** A `release.py` note-ürítő mintája
+> csupasz `note:"…"` volt, tehát **minden** ilyen mezőt kiürített — nem csak a
+> klubokét. Mérve: 556 mezőből **237** a képességszintek és a stábtagok
+> leírása volt („30% esély védekező képességre"). A kiadott build tehát üres
+> képességleírásokkal ment volna ki, és ez azért nem derült ki, mert a
+> `dist`-et sosem játszotta végig senki. A minta most a `col:[…]` előzményhez
+> köti magát — csak a klubrekordban van színpár.
 
 ### A Google Fonts — megoldva (3.9.02) ✅
 
@@ -282,10 +329,10 @@ migráció kockázata most nagyobb, mint a haszna.
 Ezt kell végigfuttatni **minden** Play-re szánt buildnél:
 
 ```bash
-./tools/check.sh                   # szintaxis · globálisok · nyers nevek
-./tools/ledger-audit.sh            # a büdzsé könyvelése
-node tools/nevek/leak.js           # végponti névpróba (draftig végigjátszva)
-python3 tools/nevek/release.py     # → dist/index.html, önellenőrzéssel
+./tools/check.sh                       # szintaxis · globálisok · nyers nevek
+./tools/ledger-audit.sh                # a büdzsé könyvelése
+node tools/nevek/kepernyo-proba.js     # végponti névpróba (karrierindítás + egy meccs)
+python3 tools/nevek/release.py         # → dist/index.html, önellenőrzéssel
 ```
 
 > **A `dist/` nem elég önmagában.** A `release.py` csak az `index.html`-t

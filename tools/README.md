@@ -64,6 +64,56 @@ esnek ki belőle. A név ugyanis nem mindig `.n`: a jutalom-lánc és a díjak
 alkalmi objektumokba pakolják `{name, …}` alakban — a „fejlesztés — jutalom"
 választója pont ezért írta ki évekig a valós neveket.
 
+**A DOM-ÍRÁS KÜLÖN VAK FOLT VOLT, és ez is valódi hibán derült ki.** Az edző
+sorsolásának kártyája így írta ki a nevet:
+
+```js
+$("coachName").textContent = c.n;
+```
+
+Se `esc(`, se `${` — a háló tehát **rá sem nézett a sorra**, és az edzők valós
+neve hónapokig kint volt a képernyőn. A javítás nem egy minta bővítése, hanem
+egy hiányzó **kiírási alak** felvétele: a `textContent` / `innerText` jobb
+oldala ugyanúgy képernyő, mint egy sablon.
+
+Ebben a szűk helyzetben minden `.n` és `.name` névgyanús — nem csak a
+nevesített minták. Máshol ez nem járható: egy általános `.n` szabály a
+sablonos kiírási helyekre **155 találatot** adna, azok túlnyomó része
+taktika-, képesség- és osztálynév. Ezért az ág CSAK a behelyettesítés nélküli
+DOM-írást nézi (ahol a jobb oldalon van `${` vagy `esc(`, ott a sablonos út
+dolgozik, a maga pontos mintáival) — így ma összesen négy ártalmatlan sor
+kért `nev-ok:` jelölést.
+
+### A háló másik fele: `tools/nevek/kepernyo-proba.js`
+
+A `nev-audit.js` a KÓDOT nézi. Két dolgot elvileg sem tud megfogni:
+
+1. **Ami nem kiírás, hanem ÁLLAPOT.** Kész klubbal indulva a `teamName`
+   *változó maga* kapta meg a klub kanonikus nevét — onnantól hatvan helyről
+   íródott ki, mindegyik szabályosan, `esc(teamName)` alakban. A kód
+   hibátlan volt; a képernyőn mégis „IFK Göteborg" állt a fejlécen, a
+   tabellán, az eredményjelzőn és a meccs-statisztikában is.
+2. **Ami csak egy útvonalon jön elő** — egy kártya, egy ablak, egy ág.
+
+Ezért van egy **végponti próba**: saját statikus kiszolgálót indít, Chromiumban
+végigjátssza a karrier-indítást (kész klubos ágon) és egy teljes mérkőzést, és
+lépésenként megnézi, szerepel-e a képernyő szövegében a `HU_NAME_TABLE` /
+`HU_CLUB_TABLE` / `HU_LEAGUE_TABLE` bármelyik **kanonikus** kulcsa. Ha igen,
+megmondja, **melyik DOM-elemben** — nem „valahol az oldalon".
+
+```bash
+node tools/nevek/kepernyo-proba.js
+```
+
+Nem bizonyítás (nem járja be a teljes játékot), hanem próba — de pontosan azt
+az osztályt fogja meg, amit a statikus háló nem lát. Playwrightot igényel,
+ezért nem része a `check.sh`-nak; **kiadás előtt viszont futtatandó** (lásd a
+kiadási ellenőrzőlistát).
+
+> A régi `tools/nevek/leak.js` ugyanezt a célt szolgálta, de egy
+> `release-sim.html` nevű fájlt vár, ami nincs a repóban — a képernyő-próba a
+> működő utódja.
+
 Külön is futtatható:
 
 ```bash
