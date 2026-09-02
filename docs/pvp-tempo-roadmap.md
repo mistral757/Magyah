@@ -157,17 +157,22 @@ maga is adat legyen**, ne két kliens külön számolása.
 
 ---
 
-## 3. Ötlet 1 — Tempó-módok és időkorlát ✅ P1a KÉSZ (3.9.15)
+## 3. Ötlet 1 — Tempó-módok és időkorlát ✅ P1a KÉSZ (3.9.15) · ✅ P1b KÉSZ (3.9.23)
 
-> **BEÉPÍTVE:** `MP_TEMPO` (három mód) · a `tempo` mező a szobában, a
+> **P1a (3.9.15):** `MP_TEMPO` (három mód) · a `tempo` mező a szobában, a
 > házigazda választja · `mpDeadlineLeft` · visszaszámláló a beváró
 > képernyőn · `mpSoloArm` `auto` jelzővel · automatikus léptetés Villám
 > módban. A szabályfájl `tempo` mezővel bővült — **közzé kell tenni**.
 >
-> **AMI SZÁNDÉKOSAN NEM KÉSZÜLT EL (P1b):** a társ KORÁBBI keretével
-> lejátszott párharc. Az a lépcső dönt először KÖZÖS eredményt határidő
-> alapján — onnantól kell a szerveridő is, és onnantól tud kettéválni a két
-> világ. Külön lépés, külön kockázat.
+> **P1b (3.9.23):** a társ KORÁBBI keretével lejátszott párharc — a 3.2 első
+> lépcsője. `h2hMateSnapPick` (a legutóbbi keret, amit BIZONYÍTHATÓAN ő írt) ·
+> `h2hStaleSnap` · `h2hClaim` (tranzakció: csak üres rekeszbe ír) · a párharc
+> `openedAt` mezője **szerveridőben** · `mpDeadlineLeft` közös-óra ága.
+> Mérve: [3.9](#39-p1b-amit-megmértünk).
+>
+> **AMI TOVÁBBRA SEM LÉP MAGÁTÓL:** a kemény kiút (`mpOrphanCareer`, a karrier
+> végleges leválasztása). A P1b nem azt tette automatikussá — azt, hogy a
+> mérkőzés LEFUSSON. A kettő nem ugyanaz.
 
 ### 3.0 A megkülönböztetés, amin az egész áll
 
@@ -176,12 +181,17 @@ maga is adat legyen**, ne két kliens külön számolása.
 | kapu | a kiút | magától léphet? |
 |---|---|---|
 | **nyolc kapu** (kupanevezés, csoportkör, kör lezárása, szezonzárás, tabella, osztályozó, hazai kupa, döntés) | LÁGY: „a saját eredményemmel megyek tovább" | ✅ **igen** — a te oldaladon dől el, és a társad karrierjét nem csonkítja |
-| **a párharc** | `mpOrphanCareer()` — VÉGLEG leválasztja a karriert (`S.mpOrphan`) | ❌ **soha** — csak felajánl, és ott is csak szöveggel |
+| **a párharc — P1b** *(3.9.23)* | LÁGY: a társ **korábbi, saját kezűleg összeállított** keretével lejátsszuk | ✅ **igen** — közös eredményt szül, mindkét oldal ugyanazt látja, és senki karrierje nem csonkul |
+| **a párharc — kemény kiút** | `mpOrphanCareer()` — VÉGLEG leválasztja a karriert (`S.mpOrphan`) | ❌ **soha** — csak felajánl, és ott is csak szöveggel |
 
 A képernyő maga is kétszer kérdez rá arra a leválasztásra. Egy hárompercnyi
 távollét miatt automatikusan szétvágni egy közös karriert nem tempó volna,
 hanem kár. **Mérve: a kemény kapu tízperces lejárat után, három hívásból is
 nulla alkalommal lépett magától.**
+
+> **A KÉT PÁRHARC-SOR KÜLÖNBSÉGE AZ EGÉSZ P1b LÉNYEGE.** Az egyik **lejátssza
+> a mérkőzést**, a másik **felmondja a közös karriert**. A P1b előtt csak a
+> második létezett — ezért nem volt mit automatizálni a párharcnál. Most van.
 
 ### 3.0/b Amit a határidő NEM tesz
 
@@ -194,13 +204,26 @@ határidő; és egyik esetben sem lép magától semmi.
 gomb továbbra is 25 másodperc után megjelenik ott, ahol eddig is — a tempó
 csak azt szabja meg, hogy MAGÁTÓL megnyomódik-e.
 
-### 3.0/c Egy időtér, nem kettő
+### 3.0/c Két időtér, és tudni kell, melyikben vagyunk ✅ *(a P1b behozta a másodikat)*
 
-Az eltelt időt a **helyi** óra méri, szándékosan: a várakozás ugyanazon a
-gépen kezdődik, ahol véget ér, tehát a szerver-eltolás kiesik. A szerveridő
-(`mpNow`) ott nélkülözhetetlen, ahol a MÁSIK fél írta az időpontot — a
-„mióta nincs itt" számolásnál —, és ott lesz az, ahol a határidő **közös**
-eredményt dönt el: a P1b lépcsőn.
+A **lágy kapuknál** az eltelt időt a **helyi** óra méri, szándékosan: a
+várakozás ugyanazon a gépen kezdődik, ahol véget ér, tehát a szerver-eltolás
+kiesik — bevonni csak zajt adna.
+
+A **P1b-nél nem lehet így.** Ott a határidő KÖZÖS eredményt dönt el, és a
+kezdőpontot (`openedAt`) akár a MÁSIK fél írta be. Ez a mező ezért
+`serverTimestamp()`-pal megy ki, és `mpNow()`-val olvassuk vissza — a
+`mpDeadlineLeft` második paramétere választ a két időtér között.
+
+> **MÉRVE:** tízperces órahibát szimulálva ugyanarra a `openedAt`-re a közös
+> óra **lejártat** mond (0 ms), a helyi óra **még 9:40-et**. Pontosan ez a
+> különbség vált volna kettéhasadt világgá, ha a helyi órát hagyjuk itt.
+
+Két további indok, amiért a szoba hordozza a kezdőpontot, nem a képernyő:
+a **helyi óra minden újratöltéskor elölről indulna** (aki tegnap óta vár, ma
+megint hármat várna), és a **társ már órák óta lehet távol**, amikor te
+belépsz — a várakozás akkor kezdődött, amikor a párharc megnyílt, nem amikor
+te ránéztél.
 
 ### 3.1 A fal: a hiányzó játékos keretét senki nem tudja feltölteni
 
@@ -215,11 +238,18 @@ Ez nem részletkérdés: enélkül a „menjünk tovább” szónak nincs jelent
 
 ### 3.2 A tisztességes válasz — három lépcső, ebben a sorrendben
 
-| helyzet | mit tegyünk | miért ez |
-|---|---|---|
-| **van korábbi pillanatképe** (2. fordulótól) | a **legutóbbi keretével** játszik | Ő állította össze. Nem ideális, de az ő döntése, és determinisztikus. |
-| **nincs még pillanatképe** (1. forduló) | **nincs párharc**: mindkettő a saját CPU-fordulóját játssza | Nem hazudunk mérkőzést, ami nem volt. |
-| **tartósan nem jön vissza** | **`mpCupSplitApart`** — a szálak szétválnak | **Ez a minta már létezik**, és ez a becsületes vég: két külön karrier, nem egy megcsonkított közös. |
+| helyzet | mit tegyünk | miért ez | állapot |
+|---|---|---|---|
+| **van korábbi pillanatképe** (2. fordulótól) | a **legutóbbi keretével** játszik | Ő állította össze. Nem ideális, de az ő döntése, és determinisztikus. | ✅ **3.9.23** |
+| **nincs még pillanatképe** (1. forduló) | **nincs párharc**, és ezt KIMONDJUK a képernyőn | Nem hazudunk mérkőzést, ami nem volt. | ✅ **3.9.23** — a beváró megnevezi az okot; a forduló a meglévő kézi kiutakon vihető tovább |
+| **tartósan nem jön vissza** | **`mpOrphanCareer` / `mpCupSplitApart`** — a szálak szétválnak | **Ez a minta már létezik**, és ez a becsületes vég: két külön karrier, nem egy megcsonkított közös. | ✅ már megvolt — és **továbbra sem lép magától** |
+
+> **A MÁSODIK SORRÓL, PONTOSAN.** A terv eredetileg azt mondta, hogy ilyenkor
+> „mindkettő a saját CPU-fordulóját játssza". Ezt **nem** építettem be: két
+> különböző CPU-forduló két különböző bajnoki tabellát ad, vagyis pont az a
+> kettéhasadt világ jönne létre, ami ellen az egész fejezet szól. Ami
+> megvalósult: a képernyő megmondja, hogy nincs mit a helyébe tenni, és a
+> döntést a felhasználóra hagyja. Ez kevesebb, mint a terv — de igaz.
 
 > **Amit KIFEJEZETTEN NEM javaslok:** a hiányzó ellenfél keretének
 > *kitalálását* (véletlen tizenegy, „átlagos” csapat, CPU-keret az ő nevében).
@@ -261,11 +291,58 @@ időkorlát, ami a jelen lévő játékost bünteti.
 | **a régi holtpont-hibák visszatérése** | 🟠 közepes | az időkorlát a kiutak MELLÉ jön, nem helyettük |
 | a 3 perc rossz szám | 🟢 alacsony | legyen konstans, és mérjük |
 
+A 3.4 táblázat első három sorát a P1b **mérve** zárja le — lásd a 3.9-et.
+
 ### 3.5 Amit ez NEM old meg
 
 A napokig elhúzódó játék attól még elhúzódik, ha a társad **egyszerűen nem
 nyitja meg a játékot**. Az időkorlát azt oldja meg, hogy *te* ne ragadj be —
 nem azt, hogy ő jöjjön. **Arra való a 2. ötlet.**
+
+### 3.9 P1b — amit megmértünk
+
+Két próba: `tools/pvp-p1b-proba.js` (részek) és
+`tools/pvp-p1b-folyamat-proba.js` (**a valódi beváró hurok**, a saját 2,5
+másodperces ütemével, végig a mérkőzés indításáig).
+
+**A keretválasztás.** Hat szezonnyi archívumból a legutóbbit veszi elő, és
+elutasítja azt, ami nem az övé: a saját kereteimet, az üres pillanatképet, egy
+korábbi helyettesítést (különben lánc lenne belőle, egyre régebbi keretekkel),
+és azt, amin nincs `by` — a mező neve (host/guest) nem azonosít, mert
+szerep-ütközés után a két oldal mezőt cserélhet.
+
+**A négy fék, külön-külön.**
+
+| fék | mérés |
+|---|---|
+| Kényelmes mód | nem fegyverkezik, és **le sem kérdezi** az archívumot |
+| a társ ONLINE | Villám módban is **nulla** automatikus lépés |
+| Tempós mód | gomb megjelenik, **nulla** automatikus lépés; kattintásra fut le |
+| nincs korábbi keret | nem fegyverkezik, és a képernyő **megnevezi az okot** |
+
+**Az ütközés.** A helyettesítés a TÁRS rekeszébe ír. Ha a friss kerete közben
+mégis megérkezik, egy sima `set` azt felülírná a régivel — vagyis elvennénk
+tőle a saját, épp elküldött csapatát. Tranzakcióval megy: **foglalt rekeszbe
+nem írt bele**, és a benne lévő adat sértetlen maradt.
+
+**A közös eredmény.** Ugyanabból a csomópontból a két kliens szimulációja
+**bitre azonos**. A visszatérő játékos ugyanazt az eredményt kapja, és
+mindkét oldal **egy** magyarázó sort lát — az első mérés hármat adott, azt
+javítottam.
+
+**Egy wart, amit a P1b hozott be, és javítottam.** A P1b előtt eredmény csak
+két feltöltött keretből születhetett — ha te nem küldtél fel semmit, meccs sem
+volt. Most a társad lejátszhatja a fordulót nélküled; visszatérve viszont a
+program **cseretervet kért volna tőled egy már eldőlt mérkőzéshez**. Mérve:
+lefutott meccsnél most **0** kérdés, eldöntetlennél **1** — a régi viselkedés
+érintetlen.
+
+**És egy költség, amit útközben találtam.** A jelenlét-figyelő nyolc-
+másodpercenként a TELJES szobát kérte le — abban viszont ott van az összes
+eddigi párharc mindkét kerete is. Hat szezon után mérve **39 kB, újra és
+újra**, miközben a jelenlét két mezőn múlik. Most a `players` ág megy csak:
+**73 bájt**. A P1b archívum-keresése emiatt nem is a jelenlétre ül rá, hanem
+**párharconként egyszer** fut le (12 kör → **1** lekérés).
 
 ---
 
@@ -395,18 +472,23 @@ lenne félbehagyott közös karrierekkel.
 │ Önmagában is javít: „a társad most nincs online”.           │
 └─────────────────────────────────────────────────────────────┘
       │
-┌─ P1 · TEMPÓ-MÓDOK ──────────────────────────────────────────┐
+┌─ P1a · TEMPÓ-MÓDOK ────────────────────────────── ✅ 3.9.15 ┐
 │ Három mód, a Kényelmes az alapérték. 3 perc, előbb          │
 │ FELAJÁNLVA (Tempós), és csak a mérés után automatikusan.    │
-│ A hiányzó keret kezelése a 3.2 lépcsői szerint.             │
 └─────────────────────────────────────────────────────────────┘
       │
-┌─ P2a · BÖKÉS A JÁTÉKON BELÜL ───────────────────────────────┐
-│ Szerver nélkül, ingyen. Egy nap. A P2b-t is előkészíti.     │
+┌─ P1b · A TÁRS KORÁBBI KERETE ─────────────────── ✅ 3.9.23 ┐
+│ A 3.2 első lépcsője. Itt jött be a szerveridő és az első    │
+│ tranzakció — ez a lépcső dönt KÖZÖS eredményt határidőre.   │
 └─────────────────────────────────────────────────────────────┘
       │
-┌─ P2b · IGAZI PUSH ──────────────────────────────────────────┐
-│ Cloud Function + FCM. Blaze kell hozzá, költségriasztással. │
+┌─ P2a · BÖKÉS A JÁTÉKON BELÜL ─────────────────── ✅ 3.9.14 ┐
+│ Jelenlét + a beváró szövege. Szerver nélkül, ingyen.        │
+└─────────────────────────────────────────────────────────────┘
+      │
+┌─ P2b · IGAZI PUSH ────────────────────────────── ✅ 3.9.22 ┐
+│ NEM Cloud Function: szabványos Web Push + VAPID, Netlify-   │
+│ függvényből. Így Blaze-csomag SEM KELL hozzá.               │
 └─────────────────────────────────────────────────────────────┘
       │
 ┌─ P3 · PÁRKERESŐ ────────────────────────────────────────────┐
@@ -417,9 +499,16 @@ lenne félbehagyott közös karrierekkel.
 
 **Miért ez a sorrend.** Az F0 olcsó, és nélküle a P1 órája vakon jár. A P1
 önmagában megoldja a bejelentett panasz nagyobbik felét (a beragadást), és
-nem kér pénzt. A P2a ingyen próbálja ki, hogy a bökés egyáltalán segít-e,
-mielőtt Blaze-t kapcsolnánk. A P3 a legdrágább és a legkockázatosabb, és a
-P1 nélkül visszafelé sülne el.
+nem kér pénzt. A P2a ingyen próbálja ki, hogy a bökés egyáltalán segít-e.
+A P3 a legdrágább és a legkockázatosabb, és a P1 nélkül visszafelé sülne el.
+
+> **AMIBEN A TERV TÉVEDETT — a P2b javára.** Ez a doboz Cloud Functiont és
+> Blaze-csomagot mondott, költségriasztással. A megvalósítás **szabványos Web
+> Pusht** használ VAPID-kulccsal, egy Netlify-függvényből: ugyanaz a
+> szolgáltatás, **kártya nélkül**. A „Blaze kell hozzá" mondat egyszerűen nem
+> volt igaz — csak az FCM-SDK útján lett volna az.
+
+**Ami hátravan:** már csak a **P3 · Párkereső**.
 
 ---
 
