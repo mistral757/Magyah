@@ -117,6 +117,14 @@ const {spawn}=require('child_process');
         "homeSettingsBtn","homeStatsBtn","pitchSideMine","pitchSideOpp","autoBtn"]);
       const t=[...document.querySelectorAll("button")].find(x=>lat(x)&&!tilt.has(x.id));
       if(t){t.click();return false;}
+      /* A KÉPESSÉG-KIOSZTÁS LISTÁJA NEM GOMBOKBÓL ÁLL, hanem koppintható
+         sorokból — pont ezen akadt el a „meccsről meccsre" lánc is (3.9.31).
+         A rendszer ajánlatát nyomjuk meg, ha meg van jelölve; ha nincs, az
+         első sort. Így a próba menet közben a jelölést is kipróbálja. */
+      const box=document.getElementById("skillAssignList");
+      if(box&&box.offsetParent){
+        const sor=box.querySelector("[data-imm-ajanl]")||box.querySelector(".prow");
+        if(sor&&sor.offsetParent){sor.click();return false;}}
       return lat(document.getElementById("autoBtn"));});
     await p.waitForTimeout(900);
     if(kesz)break;}
