@@ -78,7 +78,7 @@ KLUBOK = {
 
 # ── Spanyolország ───────────────────────────────────────────────────────────
 "Real Madrid CF":("Királyi Gárdonyi", "GÁR"),
-"FC Barcelona":("Kazincbarszelóna", "BAR"),
+"FC Barcelona":("Kazincbarszelóna", "KAZ"),   # NEM „BAR": az a valódi klub valódi kódja
 "Atlético Madrid":         ("Atlétikus Madrigál", "ATM"),
 "Athletic Club":           ("Atlétikus Klub", "ATK"),
 "Sevilla FC":("Szevillyai Borbély", "SZB"),
