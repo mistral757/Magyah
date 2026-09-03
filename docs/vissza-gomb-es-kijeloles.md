@@ -87,11 +87,18 @@ helyreáll), és a kétféle út nem tud szétcsúszni.
 **Következmény, ami szándékos:** ahol nincs látható záró gomb, ott a vissza gomb
 nem csinál semmit. Egy folyamat közepén ez a helyes viselkedés.
 
+**A hiányzók panelje 3.9.31 óta nem blokkoló.** Bejelentett hiba volt, hogy
+*„nincs visszaút a kezdőrúgásra kattintás után, ha bedobja, hogy sérülés vagy
+eltiltás miatt cserélni kell"*: a panel csak előre engedett, a vissza gomb pedig
+— blokkolóként — néma maradt rajta. Most már van kiútja („← Mégsem indítom el"
+és „⚙️ Irány a HUB"), tehát rendes réteg lett: a vissza gomb a saját gombját
+nyomja meg, a pótlás-választások megmaradnak, a forduló nem indul el.
+
 ### 2.4 A sorrend
 
 ```
 1. FOLYAMAT-PANELEK (BACK_BLOCKERS) → néma, de NEM kilépés
-   htSubPanel · mpSubPanel · absPanel · h2hWait
+   htSubPanel · mpSubPanel · h2hWait
 2. A LEGFELSŐ NYITOTT RÉTEG (BACK_LAYERS, fentről lefelé)
    megerősítő kérdések → ablakok (Infópult, adatbázis, menetrend, …)
    → HUB-választók (posztcsere, megbízás, kapitány, taktika, felállás)

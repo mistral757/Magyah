@@ -67,13 +67,78 @@ kupa utáni kapu.
 
 ### Két őr
 
-* **A befejezés végleges.** Ha az 1. kapun bármelyikőtök a „befejezzük"-öt
-  választotta (`mpRunStopped`), a 2. kapu nem kínál folytatást — csak az
-  összesítést mutatja. Enélkül a második kapu visszavonhatná az elsőn
-  kimondott döntést.
+* **A befejezés lezárja a 2. kaput.** Ha az 1. kapun bármelyikőtök a
+  „befejezzük"-öt választotta (`mpRunStopped`), a 2. kapu nem kínál folytatást
+  — csak az összesítést mutatja. Enélkül a második kapu **véletlenül**
+  felülírhatná az elsőn kimondott döntést. *(A SZÁNDÉKOS visszavonás más
+  kérdés, és 3.9.35 óta lehetséges — lásd az 1/b pontot.)*
 * **A 2. kapu nem tud beragadni.** A gombja nem a következő szezonba visz,
   hanem a **szezonjelentésre** — a záró könyveléshez. Azt egy „befejezzük" sem
   tarthatja vissza, ezért ott a lezárult döntés is továbbenged.
+
+---
+
+## 1/b. A befejezés visszavonható (3.9.35)
+
+Bejelentett hiba: *„ha PvPben véletlenül rányomsz hogy befejezzük itt, akkor
+nincs visszaút. és nem kér megerősítést."*
+
+**Mindkettő igaz volt, és a második okozta az elsőt.** A „Meggondoltam magam"
+gomb **létezett** — csak elérhetetlen ágon. A döntés-doboz sorrendje ez volt:
+
+```
+1. mine==="continue" && mate==="continue"  → hangolás, indulhat a szezon
+2. mine==="stop" || mate==="stop"          → záró összesítés          ← itt VISSZATÉRT
+3. mine                                     → „Meggondoltam magam"     ← ide sosem jutott el
+```
+
+Aki tehát a **folytatást** választotta, kapott visszavonást; aki a
+**befejezést**, az nem. Egy sor sorrend, és a legdrágább döntés lett az
+egyetlen visszavonhatatlan.
+
+### Miért volt visszavonható egyáltalán
+
+A döntés **nem csinál semmit, csak jelöl**: `S.mpDecision = {season, mine,
+mate}`, szezonra szólóan. Nincs mit visszacsinálni — a hangolás, a
+történet-bejegyzés és a szezonléptetés mind a **kölcsönös igen** után fut. A
+visszavonás ezért betűre ugyanaz, ami a folytatás-ágon eddig is volt: a saját
+mező nullázása helyben és a szobában.
+
+### A három szabály
+
+* **A záró összesítés alatt is ott a gomb.** `mpUndoBox()` mindhárom ágra
+  odakerül, nem csak a várakozóra.
+* **A társ stopja nem akadály.** Ha ő is befejezte, a te visszavonásod
+  egymagában nem indítja újra a hajszát — de a **saját szavadat** akkor is
+  visszaveheted, és ha ő is visszavonja, a kapu újra kinyílik. Elzárni ezt azt
+  jelentené, hogy a társad hibája a te karrieredet is véglegesíti.
+* **A gomb hozza magával a kaput** (`data-gate`), nem a pillanatnyi
+  `mpGateKind()`. A kupa utáni kapun a **bajnoksági** stop is visszavonható —
+  pont ott derül ki, hogy elkattintottad —, és azt a jelen kapu kulcsával
+  nullázni néma tévedés volna: a rossz mezőt törölné, a rosszat hagyná állva.
+
+### A megerősítés
+
+A „🏁 Befejezzük itt" mostantól kérdez, és a kérdés **kimondja, mi történik és
+mi nem**: a karrier és a szoba megmarad, a döntés visszavonható. Ha a társ már
+válaszolt, azt is kiírja — külön mondattal arra, ha ő a *folytatást*
+választotta, mert ott a te igened az ő igenjét is elejti.
+
+### A már elromlott mentés
+
+A gomb tisztán **állapotból** jelenik meg, és a `phase==="verdict"` a mentés
+része: egy olyan karrier, amelyben ez a hiba már megtörtént, betöltéskor
+visszaáll a verdikt-képernyőre, és ott már ott a visszavonás. Nem kell hozzá
+külön migráció.
+
+**MÉRVE** (`tools/pvp-visszavonas-proba.js`): mind a hat döntés-állapot, a
+kupa-kapus kereszteset (`data-gate="league"`), a megerősítő (megnyílik, a
+kérdés alatt nem rögzül döntés, a „Mégsem" után sem), és hogy a visszavonás
+tényleg törli a döntést nálunk **és** a szobában (`s3decision/host=null`).
+
+Egyetlen állapot marad visszavonhatatlan: a **kölcsönös folytatás**. Ott a
+hangolás már lefutott és a következő szezon nyitva áll — az más művelet volna,
+nem ugyanennek a gombnak a párja.
 
 ---
 

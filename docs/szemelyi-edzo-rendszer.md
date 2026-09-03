@@ -40,7 +40,9 @@ edzőnek jelölhető(entry) ⟺
   && careerStats[n].matches >= 40      ← legalább ~1 szezonnyi közös múlt
 ```
 
-A 40 meccses küszöb a lényeg: **a saját játékosodból nem lehet edzőt vásárolni**.
+A küszöb a lényeg: **a saját játékosodból nem lehet edzőt vásárolni**.
+(3.9.33 óta **2000 lejátszott perc**, korábban 40 meccs — lásd
+`docs/lejatszott-percek.md`.)
 Nem veszel egy 34 éves legendát azért, hogy másnap a stábba tedd — együtt kell
 töltenetek legalább egy szezont, hogy a klubod egyáltalán ismerje őt. Ez teszi a
 rendszert a *saját* öreg játékosaid megőrzéséről szólóvá, nem egy második
@@ -210,7 +212,8 @@ kell, hogy egy 500 meccses vasember ne legyen kétszer olyan jó edző, mint egy
 
 ```js
 function rutinPont(matches){ return Math.min(20, 20*Math.pow(Math.min(1,matches/420), 0.75)); }
-//  40 meccs → 3.4  |  120 → 7.9  |  250 → 13.4  |  420+ → 20.0
+//  (3.9.33: PERCBEN, teli pont 50 000 perc)
+//  3600 perc → 2.8  |  37 800 → 16.2  |  50 000+ → 20.0
 ```
 
 *Kalibráció:* egy 19 évesen érkező, 36-ig játszó házi nevelés ≈ 500+ meccs
@@ -1092,7 +1095,7 @@ mintája szerint, `index.html:12845`), de a tervezett korlátok:
 4. **A morál-hatás plafonos** (max +14) és a kémia-hatás is (max +6).
 5. **Egy típus egyszerre egy aktív edző** (6.8).
 6. **Fókuszváltás ciklusonként egyszer** (5.2).
-7. **Nincs edző-piac.** A 40 meccses együtt-töltött küszöb (1.1) miatt az
+7. **Nincs edző-piac.** A közösen eltöltött játékidő küszöbe (1.1) miatt az
    edzőminőség nem vásárolható, csak kinevelhető.
 
 ### 9.1 Amit mérni kell implementáció után

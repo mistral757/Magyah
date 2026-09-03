@@ -30,9 +30,31 @@ SRC="index.html"
 OUT="$(mktemp -t magyah-XXXXXX.js)"
 trap 'rm -f "$OUT"' EXIT
 
-# A blokk határai: az első magában álló <script> és </script> sor.
-A=$(grep -n '^<script>$'  "$SRC" | head -1 | cut -d: -f1)
-B=$(grep -n '^</script>$' "$SRC" | head -1 | cut -d: -f1)
+# ─── A BLOKK HATÁRAI: A LEGNAGYOBB <script> … </script> ─────────────────────
+# NEM AZ ELSŐ. A 3.9.29 óta a <head>-ben is van egy magában álló <script> —
+# a téma-előfestés, harminc sor, hogy frissítéskor ne villanjon sötét. A régi
+# `head -1` attól kezdve AZT vágta ki, és a szkript SIKERT jelentett rá:
+# harminc sor szintaxisa és nulla ismeretlen globálisa valóban rendben volt,
+# csak épp a játék nyolcvanhatezer sorát nem nézte meg senki. Némán, két
+# verzión át. (Ugyanez a hiba fordult elő a release.py komment-szűrőjében is.)
+# A LEGNAGYOBB blokk a játék — és a méret-korlát ki is mondja, hogy annak kell
+# lennie: ha egyszer a nagy blokk elneveződik vagy szétesik, ez a sor megáll,
+# nem pedig zöldet jelent.
+read -r A B < <(python3 - "$SRC" <<'PY'
+import re,sys
+s=open(sys.argv[1],encoding="utf-8").read().split("\n")
+ny=[i for i,l in enumerate(s) if l=="<script>"]
+za=[i for i,l in enumerate(s) if l=="</script>"]
+blokkok=[]
+for a in ny:
+    b=next((x for x in za if x>a),None)
+    if b is not None: blokkok.append((a+1,b+1))   # 1-alapú sorszám
+if not blokkok: sys.exit("nincs")
+a,b=max(blokkok,key=lambda t:t[1]-t[0])
+if b-a-1 < 10000: sys.exit("kicsi")
+print(a,b)
+PY
+) || { echo "✗ Nem találom az index.html nagy inline <script> blokkját (vagy gyanúsan kicsi)."; exit 1; }
 if [ -z "${A:-}" ] || [ -z "${B:-}" ]; then
   echo "✗ Nem találom az inline <script> blokk határait az index.html-ben."
   exit 1

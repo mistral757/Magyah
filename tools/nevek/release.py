@@ -137,8 +137,9 @@ s, n_pass = re.subn(r'const HU_NAME_PASS="[^"]*";', 'const HU_NAME_PASS=null;', 
 if n_pass != 1:
     raise SystemExit("nem találom a HU_NAME_PASS konstanst")
 
-# A fejléc alcímének valós nevű változata sem kell.
-s = re.sub(r'const HDR_SUB_VALOS="[^"]*";', 'const HDR_SUB_VALOS=HDR_SUB_HU;', s)
+# (A fejléc alcímének valós nevű változata a 3.9.27 óta nem létezik: az alcím
+#  a megjelenítési rétegből és az adatbázisból generálódik, tehát nincs mit
+#  lecserélni rajta.)
 
 # ── 6. KOMMENTEK ───────────────────────────────────────────────────────────
 # 2600+ kommentben szerepel valós név. A kommentek eltávolítása
@@ -173,9 +174,22 @@ def strip_comments(js):
         out.append(c); i += 1
     return "".join(out)
 
-a = s.index("\n<script>\n") + len("\n<script>\n")
-b = s.index("\n</script>\n", a)
+# A FŐ SCRIPT A LEGNAGYOBB BLOKK — nem „az első".
+# MEGTÖRTÉNT: a 3.9.29 egy apró <script>-et tett a <head>-be (a téma
+# beállítása az első festés előtt), és az lett az ELSŐ — a vágó attól kezdve
+# azt a harminc sort tisztította meg, a 81 ezer sorosat pedig érintetlenül
+# hagyta. A kiadott fájlban benne maradt volna mind a 2600+ valós név a
+# kommentekben, MIKÖZBEN a build „sikeresnek" látszott.
+_blokkok = [(m.end(), s.index("\n</script>", m.end()))
+            for m in re.finditer(r"\n<script>\n", s)]
+if not _blokkok:
+    raise SystemExit("nem találom a fő <script> blokkot")
+a, b = max(_blokkok, key=lambda t: t[1] - t[0])
 js = s[a:b]
+# ŐR: a fő blokk nem lehet apró. Ha az, a keresés melléfogott.
+if len(js) < 1_000_000:
+    raise SystemExit(f"a legnagyobb <script> blokk csak {len(js)} karakter — "
+                     f"ez nem a fő script, a vágás melléfogna")
 js2 = strip_comments(js)
 print(f"kommentek: {len(js)-len(js2)} karakterrel rövidebb")
 s = s[:a] + js2 + s[b:]

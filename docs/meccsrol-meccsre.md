@@ -227,7 +227,8 @@ elindítod a végigjátszást, a lánc lelép (`immCancel`), és amíg az fut, a
 
 ## 6. Hangoló számok
 
-`IMM_STEP_SEC` 3 · `IMM_PREP_SEC` 15 · `IMM_STEP_MAX` 12 · `IMM_WAIT_MAX` 20.
+`IMM_STEP_SEC` 3 · `IMM_PREP_SEC` 15 (alap, 5–30 közt állítható) ·
+`IMM_AJANL_SEC` 5 · `IMM_TET_MULT` 2 · `IMM_STEP_MAX` 12 · `IMM_WAIT_MAX` 20.
 
 Mind egy helyen áll, a szakasz tetején. A kupa-ág is a `IMM_PREP_SEC`-et
 használja — ott a kupa-nézet és a kezdőrúgás közti szünet ugyanaz a műfaj,
@@ -252,13 +253,132 @@ kérdezünk rá ugyanarra.
 
 ---
 
+## 7/b. A rendszer ajánlata (3.9.31)
+
+Kimondott kérés: *„az auto matchplay módban ha a játékostól nem érkezik prompt
+akkor 5mp-en belül válassza azt, akit automatikusan ajánl a rendszer, hogy ez ne
+akassza meg az immerziós módot."*
+
+A lánc addig **minden** valódi döntésnél megállt. Jó okból: vaktában
+kattintgatni rosszabb, mint várni. Csakhogy a játék minden ilyen döntésre tud
+magától is válaszolni — pontosan ezt teszi a *szezon végigjátszása* (`S.auto`):
+
+| panel | a rendszer ajánlata | honnan |
+|---|---|---|
+| képesség kiosztása | a legtöbbet ígérő kezdő | `skillAssignRanked` (ebből húz az `autoAssignSkill` is) |
+| félkész képesség folytatása | ami a legkevesebb fázisra van a befejezéstől | „befejezni többet ér, mint újat kezdeni" |
+| párkémia-választó | a félbehagyott, különben a legértékesebb páros | `chemAjanlPair` (ebből indít az `autoStartChem` is) |
+| passzkémia-választó | ugyanaz az elv, a Passz-különbségre | `passChemAjanlPair` |
+| akadémiai bemutatkozás | felveszem a keretbe | ezt teszi `S.auto` is |
+| tele keret | kihagyom (ez a visszafordítható út) | ezt teszi `S.auto` is |
+| hiányzók panelje | kezdőrúgás az automatikus pótlással | a panel alapállapota |
+
+**A jelölés szerkezeti, és a DOM-ban él** — nincs modul-szintű jelző, tehát nem
+tud beragadni: ha a panel bezárul vagy újrarajzolódik, az ajánlat magától
+eltűnik vele. A panel jelöli meg a saját ajánlatát, a lánc csak elolvassa:
+
+```
+data-imm-ajanl="1"   — EZT nyomja meg, ha nem szólsz közbe
+data-imm-mit="…"     — és ezt írja ki a pirulára
+```
+
+Az `immAjanlIn(id)` ugyanazzal a szűrővel dolgozik, mint az `immBtns`: a
+rejtett és a letiltott ajánlat nem ajánlat.
+
+Ha van ajánlat, a lánc **öt másodpercet ad**, kiírja, mit fog választani, és
+utána megnyomja. Ha nincs, marad a régi viselkedés: megáll, és megmondja, min.
+
+Két dolgot ez a szakasz hozott felszínre, és mindkettő néma hiba volt:
+
+* a lánc a hiányzók paneljét **`absencePanel`** néven kereste — ilyen elem
+  viszont nincs a dokumentumban (`absPanel` a neve). A kezdőrúgás után
+  megnyíló pótlás-panel alatt tehát egyszerűen véget ért a lánc;
+* a képesség-kiosztás listája **koppintható sorokból** áll, nem gombokból. A
+  gombszámra épülő felismerés nullát látott, „átmeneti állapotnak" hitte a
+  döntést, és húsz körülnézés után adta fel.
+
+---
+
+## 7/c. A beállítások (3.9.34)
+
+Kimondott kérés: *„lehessen beállítani settinget az ifisek fogadására … és a
+skillek elosztására is … és a sorsdöntő, vagy rangadó meccsek sorsára
+vonatkozóan … és lehessen állítani, hogy a meccs indítás előtti jelenlegi 15s
+akár 5-30s közötti idő lehessen."*
+
+A kapcsolósáv **⚙** gombja nyitja. Négy döntés, a mentés része (`S.immSet`) —
+ugyanaz az érv, mint magánál a kapcsolónál: ez nem futásidejű pillanat, hanem
+az, ahogy a felhasználó nézni akarja a karrierjét.
+
+### 🌱 Akadémiai bemutatkozás — `ifi`
+
+| érték | mit tesz |
+|---|---|
+| `kerdez` *(alap)* | a lánc megáll, ahogy a 3.9.31 előtt |
+| `felvesz` | bekerül a tartalék-keretbe — ezt teszi a szezon végigjátszása is |
+| `marad` | visszaküldi az akadémiára; a **ballagásnál** ez a végleges elengedést jelenti, mert oda már nincs hova visszaküldeni |
+
+A `marad` ballagás-ága nem mellékhatás, hanem a „mindenképp" logikus vége — a
+panel opciója **szó szerint kimondja**, tehát tudatos választás, nem meglepetés.
+
+### 🎖 Ki kapja a képességet — `skill`
+
+| érték | mit tesz |
+|---|---|
+| `rendszer` *(alap)* | a legtöbbet ígérő kezdő — ugyanaz a rangsor, amiből az auto-mód húz |
+| `tsi` | a legnagyobb tehetség |
+| `rating` | a ma legerősebb ember (`pOvr`) |
+| `skill` | aki már a legtöbbet gyűjtötte |
+| `kerdez` | nincs jelölés, a lánc megáll |
+
+Az **auto-kiosztás** (`skillAssignRanked` → `autoAssignSkill`) rangsora
+**változatlan**: az a szezon végigjátszásáé, és nem a felhasználó beállítása
+vezérli. A lánc ajánlata külön függvény (`immSkillPick`), mert más a kérdés:
+nem az, hogy a gép mit tenne magától, hanem az, hogy a felhasználó mit kért.
+Döntetlent mindig a rendszer-rangsor bont, hogy a választás kiszámítható legyen.
+
+A `kerdez` a **folytatás-listát** (`showSkillCompletion`) is elnémítja: aki a
+képességekről maga akar dönteni, az a folytatásról is.
+
+### 🏆 Tétmérkőzés és rangadó — `tet`
+
+| érték | mit tesz |
+|---|---|
+| `allj` *(alap)* | megáll — ezt magad indítod, ahogy eddig |
+| `varj` | elindul, de `IMM_TET_MULT`-szor (2×) annyi időt hagy, a 30 mp-es plafonig |
+| `auto` | a lánc nem tesz különbséget |
+
+Az `immTetMatch()` dönti el, tétmeccs-e a következő forduló: bajnoki
+tétmérkőzés, rangadó **vagy hajrá-rangadó**. A többi megálló (átigazolás, kupa,
+osztályozó, párharc, szezonvég) NEM tartozik ide — azok szerkezeti határok,
+nem hangulati döntések.
+
+### ⏱ Idő a kezdőrúgásig — `prep`
+
+Csúszka, `IMM_PREP_MIN`…`IMM_PREP_MAX` = **5–30 mp**, alap 15. A vágás nem
+formalitás: a mentés kézzel is szerkeszthető, és egy 0 vagy egy 9999 ugyanúgy
+használhatatlanná tenné a láncot. A tényleges hossz egy helyen dől el
+(`immPrepFor`), mert két dolog írja — a beállítás és a `varj` ág.
+
+**MÉRVE** (`tools/imm-beallitas-proba.js`): mind a négy kapcsoló minden ága, a
+vágás mindkét iránya (1 → 5, 999 → 30, hulladék → 15), és hogy a `varj`
+tétmeccsen 30 mp-et, hétköznap 15-öt ad.
+
+---
+
 ## 8. Amit szándékosan NEM csinál
 
-* **Nem dönt helyetted.** A hiányzók panelje, a jutalom-képesség választója és
-  minden megerősítő kérdés ugyanúgy feljön, és ott a lánc MEGÁLL — csak a
-  *léptetést* veszi le a kezedről, a döntéseket nem. A tudnivalókat elléptet;
-  a választásokat érintetlenül hagyja.
+* **Nem dönt helyetted — csak amit rábíztál, és akkor is szólhatsz.** Ahol a
+  játék magától is tudna válaszolni (lásd a 7/b pontot), ott öt másodperc után
+  az ajánlatot választja, és közben végig kiírja, mit fog. MIT bíztál rá, azt a
+  ⚙ beállítások mondják meg (7/c) — alapból az ifik, a képesség-kiosztás és a
+  tétmérkőzések mind a tieid maradnak. Ahol nincs ajánlat, a lánc MEGÁLL.
 * **Nem kattint vaktában.** Amit nem ismer fel, ahhoz nem nyúl: inkább megáll.
+  A `IMM_STEP_MAX` az ajánlatokra is szól — ha egy ajánlat megnyomása nem viszi
+  tovább a képernyőt, tizenkét lépés után leáll.
+* **Nem enged el senkit helyetted.** Tele keretnél az ajánlat a *kihagyás*, nem
+  az elengedés és nem a fizetős keretbővítés: ami visszafordíthatatlan vagy
+  pénzbe kerül, az marad a te döntésed.
 * **Nem gyorsítja a mérkőzést.** A közvetítés tempóját továbbra is a Tempó
   csúszka állítja; a két rendszer külön él.
 * **Nem szól bele a párharcba.** Közös karrierben a párharc-forduló megálló:
