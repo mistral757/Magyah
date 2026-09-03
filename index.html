@@ -5691,7 +5691,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.34";
+const APP_VERSION="3.9.35";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -50476,6 +50476,52 @@ function mpMaybeApplyBalance(kind){
           +`${d.balanceInfo.gapAfter.toFixed(2)} OVR maradt — a többit a pályán kell behozni.`
         :""),"m life");
   try{saveGame();}catch(e){}}
+/* ================= A SAJÁT DÖNTÉS VISSZAVONÁSA (3.9.35) =================
+   BEJELENTETT HIBA: „ha PvPben véletlenül rányomsz hogy befejezzük itt, akkor
+   nincs visszaút. és nem kér megerősítést."
+
+   MINDKETTŐ IGAZ VOLT, és a második okozta az elsőt. A „Meggondoltam magam"
+   gomb LÉTEZETT — csak épp elérhetetlen ágon: a doboz előbb vizsgálta a
+   `mine==="stop"||mate==="stop"` esetet (ott a záró összesítést adta vissza),
+   és a visszavonó ág CSAK EZUTÁN jött. Aki tehát a befejezést választotta,
+   annak a gomb soha nem jelent meg — aki a folytatást, annak igen. Egy sor
+   sorrend, és a legdrágább döntés lett az egyetlen visszavonhatatlan.
+
+   MI TETTE VISSZAVONHATÓVÁ EGYÁLTALÁN. A döntés nem csinál semmit, csak
+   JELÖL: `S.mpDecision={season,mine,mate}`, szezonra szólóan. Nincs mit
+   visszacsinálni — a hangolás, a történet-bejegyzés és a szezonléptetés mind a
+   KÖLCSÖNÖS igen után fut. A visszavonás ezért betűre ugyanaz, ami eddig is
+   volt: a saját mező nullázása helyben és a szobában.
+
+   A TÁRS STOPJA NEM AKADÁLY. Ha ő is befejezte, a te visszavonásod egymagában
+   nem indítja újra a hajszát — de a SAJÁT szavadat akkor is visszaveheted, és
+   ha ő is visszavonja, a kapu újra kinyílik. Elzárni ezt azt jelentené, hogy a
+   társad hibája a te karrieredet is véglegesíti. */
+function mpUndoableGate(){
+  try{
+    if(!h2hRoomActive())return null;
+    const k=mpGateKind();
+    if(mpMyDecision(k))return k;
+    /* A KUPA UTÁNI KAPUN A BAJNOKSÁGI STOP IS VISSZAVONHATÓ. Pont ott derül ki,
+       hogy elkattintottad: a kupa lezárult, és a kapu néma összesítést mutat. */
+    if(k==="cup"&&mpMyDecision("league"))return "league";
+    return null;
+  }catch(e){return null;}}
+function mpUndoBox(){
+  const g=mpUndoableGate();
+  if(!g)return "";
+  const mine=mpMyDecision(g),mate=mpMateDecision(g);
+  const stop=(mine==="stop");
+  const hol=(g==="league"&&mpGateKind()==="cup")?" (a bajnokság utáni kapun mondtad ki)":"";
+  const alatt=stop
+    ? (mate==="stop"
+       ? `A társad is a befejezést választotta, tehát a te visszavonásod egymagában nem indítja újra a hajszát — de a saját szavadat visszaveheted, és ha ő is visszavonja, a kapu újra kinyílik.`
+       : `Visszavonhatod: a döntésed törlődik nálad és a szobában is, és újra ott állsz a két gomb előtt. Semmi nem veszett el — a befejezés csak jelölés, nem lépés.`)
+    : `Visszavonhatod, és újra dönthetsz.`;
+  return `<div class="vsChoice" style="margin-top:10px">
+      <button class="btn-s" id="mpDecUndo" data-gate="${g}">↩ ${stop?"Mégsem fejezzük be":"Meggondoltam magam"}${hol}</button>
+    </div>
+    <div class="vsWait">${alatt}</div>`;}
 /* A döntés doboza — a saját és a társ választása szerint négy állapota van.
    A KAPU (bajnokság vagy kupa) csak a szövegeket változtatja: a mechanika és a
    gombok azonosak, hogy a felhasználónak ne kelljen kétféle felületet
@@ -50485,7 +50531,7 @@ function mpDecisionBox(){
   /* A KUPA UTÁNI KAPU NEM NYÍLIK MEG, ha a bajnokság utánin már lezárult a
      hajsza: ott a "befejezzük" végleges, ez a doboz csak az összesítést
      mutatja. */
-  if(k==="cup"&&mpRunStopped())return mpFinalSummaryBox();
+  if(k==="cup"&&mpRunStopped())return mpFinalSummaryBox()+mpUndoBox();
   const mine=mpMyDecision(k),mate=mpMateDecision(k);
   const st=mpDuelStanding();
   const cupG=(k==="cup");
@@ -50501,10 +50547,12 @@ function mpDecisionBox(){
             ?` <b>A plafon megfogta</b> — a maradék különbséget a pályán kell behozni.`:""}`
         :`A két keret között csak ${bi.gapBefore.toFixed(1)} OVR a különbség — nem kellett hangolni.`}
       Indulhat a következő szezon.</div>`;}
-  if(mine==="stop"||mate==="stop")return mpFinalSummaryBox();
+  /* A ZÁRÓ ÖSSZESÍTÉS ALÁ IS ODAKERÜL A VISSZAVONÁS. Ez a hiba lényege: eddig
+     ez az ág feltétel nélkül visszatért, és a gomb soha nem jelent meg. */
+  if(mine==="stop"||mate==="stop")return mpFinalSummaryBox()+mpUndoBox();
   if(mine){
-    return `<div class="vsWait"><span class="h2hDot"></span>Elküldve: <b>${mine==="continue"?"folytatjuk":"befejezzük"}</b> — várunk a társad válaszára. Nyugodtan lépj ki, a döntésed megmarad.</div>
-      <div class="vsChoice"><button class="btn-s" id="mpDecUndo">Meggondoltam magam</button></div>`;}
+    return `<div class="vsWait"><span class="h2hDot"></span>Elküldve: <b>${mine==="continue"?"folytatjuk":"befejezzük"}</b> — várunk a társad válaszára. Nyugodtan lépj ki, a döntésed megmarad.</div>`
+      +mpUndoBox();}
   return `<div class="vsChoice">
       <button class="btn-y stepbtn" id="mpDecContinue">🤝 Folytatjuk — hangolt kerettel</button>
       <button class="btn-s" id="mpDecStop">🏁 Befejezzük itt</button>
@@ -50635,17 +50683,45 @@ function mpBindVerdict(){
       try{mpDecisionLoop();}catch(e){}}};
   const c=$("mpDecContinue"),s=$("mpDecStop"),u=$("mpDecUndo");
   if(c)c.onclick=()=>set("continue",c);
-  if(s)s.onclick=()=>set("stop",s);
+  /* ---- A BEFEJEZÉS MEGERŐSÍTÉST KÉR (3.9.35) ----
+     BEJELENTETT HIBA: „nem kér megerősítést." A folytatás gombja mellett ült
+     egy azonos méretű gomb, ami a közös karrier hajszáját zárta le — egy
+     félrekoppintás távolságra. A megerősítő KIMONDJA, mi történik és mi NEM:
+     a karrier és a szoba megmarad, a döntés pedig visszavonható, amíg együtt
+     át nem léptek a következő szezonba. Ettől lesz a kérdés valódi kérdés, nem
+     ijesztgetés. */
+  if(s)s.onclick=()=>{
+    const mate=mpMateDecision();
+    askConfirm({
+      title:"Befejezitek itt a hajszát?",
+      yes:"Igen, befejezzük",no:"Mégsem",
+      html:`<div style="font-size:13px;line-height:1.6">
+        Ezzel a <b>közös hajsza</b> lezárul: jön a záró összesítés, és a
+        következő szezont már nem együtt kezditek.<br><br>
+        <span style="color:var(--grass)">A karriered megmarad</span>, a szoba is
+        megmarad, és a döntés <b>visszavonható</b> — a záró összesítés alatt ott
+        lesz a „Mégsem fejezzük be" gomb.<br><br>
+        <span style="color:var(--dim)">${mate==="stop"
+          ? "A társad már a befejezést választotta — a te igened lezárja a hajszát."
+          : mate==="continue"
+            ? "A társad a FOLYTATÁST választotta. Ha most befejezed, az ő igenje is elesik."
+            : "A társad még nem döntött."}</span></div>`,
+      onYes:()=>set("stop",s)});};
   if(u)u.onclick=async()=>{
     u.disabled=true;
     try{
-      const k=mpGateKind();
+      /* A KAPUT A GOMB HOZZA MAGÁVAL, nem a pillanatnyi mpGateKind(): a kupa
+         utáni kapun a BAJNOKSÁGI stop is visszavonható, és azt a jelen kapu
+         kulcsával nullázni néma tévedés volna — a rossz mezőt törölné, a
+         rosszat hagyná állva. */
+      const k=(u.dataset&&u.dataset.gate)||mpGateKind();
       const d=mpDecStateOf(k);
       if(d)d.mine=null;
       try{saveGame();}catch(e){}
       await Promise.race([
         mpBk().h2hPut(MP.activeRoom,mpDecisionKey(k),MP.role==="host"?"host":"guest",null).catch(()=>{}),
         new Promise(r=>setTimeout(r,MP_DEC_SEND_MS))]);
+      try{addLine("↩ <b>Visszavontad a döntésedet</b> — a kapu újra nyitva áll.","m ev");}catch(e){}
     }catch(e){}
     finally{if(!mpVerdictRefresh())mpDecButtonsEnable();}};
   /* ha már döntöttem, de a társ még nem, figyeljük — időkorlát nélkül */
