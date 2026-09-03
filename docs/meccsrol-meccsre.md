@@ -227,7 +227,8 @@ elindítod a végigjátszást, a lánc lelép (`immCancel`), és amíg az fut, a
 
 ## 6. Hangoló számok
 
-`IMM_STEP_SEC` 3 · `IMM_PREP_SEC` 15 · `IMM_STEP_MAX` 12 · `IMM_WAIT_MAX` 20.
+`IMM_STEP_SEC` 3 · `IMM_PREP_SEC` 15 · `IMM_AJANL_SEC` 5 · `IMM_STEP_MAX` 12 ·
+`IMM_WAIT_MAX` 20.
 
 Mind egy helyen áll, a szakasz tetején. A kupa-ág is a `IMM_PREP_SEC`-et
 használja — ott a kupa-nézet és a kezdőrúgás közti szünet ugyanaz a műfaj,
@@ -252,13 +253,64 @@ kérdezünk rá ugyanarra.
 
 ---
 
+## 7/b. A rendszer ajánlata (3.9.31)
+
+Kimondott kérés: *„az auto matchplay módban ha a játékostól nem érkezik prompt
+akkor 5mp-en belül válassza azt, akit automatikusan ajánl a rendszer, hogy ez ne
+akassza meg az immerziós módot."*
+
+A lánc addig **minden** valódi döntésnél megállt. Jó okból: vaktában
+kattintgatni rosszabb, mint várni. Csakhogy a játék minden ilyen döntésre tud
+magától is válaszolni — pontosan ezt teszi a *szezon végigjátszása* (`S.auto`):
+
+| panel | a rendszer ajánlata | honnan |
+|---|---|---|
+| képesség kiosztása | a legtöbbet ígérő kezdő | `skillAssignRanked` (ebből húz az `autoAssignSkill` is) |
+| félkész képesség folytatása | ami a legkevesebb fázisra van a befejezéstől | „befejezni többet ér, mint újat kezdeni" |
+| párkémia-választó | a félbehagyott, különben a legértékesebb páros | `chemAjanlPair` (ebből indít az `autoStartChem` is) |
+| passzkémia-választó | ugyanaz az elv, a Passz-különbségre | `passChemAjanlPair` |
+| akadémiai bemutatkozás | felveszem a keretbe | ezt teszi `S.auto` is |
+| tele keret | kihagyom (ez a visszafordítható út) | ezt teszi `S.auto` is |
+| hiányzók panelje | kezdőrúgás az automatikus pótlással | a panel alapállapota |
+
+**A jelölés szerkezeti, és a DOM-ban él** — nincs modul-szintű jelző, tehát nem
+tud beragadni: ha a panel bezárul vagy újrarajzolódik, az ajánlat magától
+eltűnik vele. A panel jelöli meg a saját ajánlatát, a lánc csak elolvassa:
+
+```
+data-imm-ajanl="1"   — EZT nyomja meg, ha nem szólsz közbe
+data-imm-mit="…"     — és ezt írja ki a pirulára
+```
+
+Az `immAjanlIn(id)` ugyanazzal a szűrővel dolgozik, mint az `immBtns`: a
+rejtett és a letiltott ajánlat nem ajánlat.
+
+Ha van ajánlat, a lánc **öt másodpercet ad**, kiírja, mit fog választani, és
+utána megnyomja. Ha nincs, marad a régi viselkedés: megáll, és megmondja, min.
+
+Két dolgot ez a szakasz hozott felszínre, és mindkettő néma hiba volt:
+
+* a lánc a hiányzók paneljét **`absencePanel`** néven kereste — ilyen elem
+  viszont nincs a dokumentumban (`absPanel` a neve). A kezdőrúgás után
+  megnyíló pótlás-panel alatt tehát egyszerűen véget ért a lánc;
+* a képesség-kiosztás listája **koppintható sorokból** áll, nem gombokból. A
+  gombszámra épülő felismerés nullát látott, „átmeneti állapotnak" hitte a
+  döntést, és húsz körülnézés után adta fel.
+
+---
+
 ## 8. Amit szándékosan NEM csinál
 
-* **Nem dönt helyetted.** A hiányzók panelje, a jutalom-képesség választója és
-  minden megerősítő kérdés ugyanúgy feljön, és ott a lánc MEGÁLL — csak a
-  *léptetést* veszi le a kezedről, a döntéseket nem. A tudnivalókat elléptet;
-  a választásokat érintetlenül hagyja.
+* **Nem dönt helyetted — csak ha van rá rendszerajánlat, és akkor is
+  szólhatsz.** Ahol a játék magától is tudna válaszolni (lásd a 7/b pontot), ott
+  öt másodperc után az *auto-mód* válaszát választja, és közben végig kiírja,
+  mit fog. Ahol nincs ilyen ajánlat, a lánc MEGÁLL, ahogy eddig.
 * **Nem kattint vaktában.** Amit nem ismer fel, ahhoz nem nyúl: inkább megáll.
+  A `IMM_STEP_MAX` az ajánlatokra is szól — ha egy ajánlat megnyomása nem viszi
+  tovább a képernyőt, tizenkét lépés után leáll.
+* **Nem enged el senkit helyetted.** Tele keretnél az ajánlat a *kihagyás*, nem
+  az elengedés és nem a fizetős keretbővítés: ami visszafordíthatatlan vagy
+  pénzbe kerül, az marad a te döntésed.
 * **Nem gyorsítja a mérkőzést.** A közvetítés tempóját továbbra is a Tempó
   csúszka állítja; a két rendszer külön él.
 * **Nem szól bele a párharcba.** Közös karrierben a párharc-forduló megálló:

@@ -48,11 +48,21 @@ const fs=require("fs"),path=require("path");
 const SRC=path.join(__dirname,"..","index.html");
 const lines=fs.readFileSync(SRC,"utf8").split("\n");
 
-/* A vizsgált blokk: az első magában álló <script> … </script>. Ugyanaz a határ,
-   amit a check.sh is használ — a fejléc-jelölésben nincs JavaScript. */
-const A=lines.findIndex(l=>l==="<script>");
-const B=lines.findIndex(l=>l==="</script>");
-if(A<0||B<0){console.error("✗ Nem találom az inline <script> blokk határait.");process.exit(1);}
+/* A vizsgált blokk: a LEGNAGYOBB magában álló <script> … </script>. Ugyanaz a
+   határ, amit a check.sh is használ — és ugyanazért nem az ELSŐ: a 3.9.29 óta a
+   <head>-ben is áll egy harminc soros szkript (téma-előfestés), és az „első
+   blokk" szabály attól kezdve azt vizsgálta volna, sikert jelentve a játék
+   nyolcvanhatezer sorára. A méret-korlát ezt ki is mondja: ha a nagy blokk
+   egyszer szétesik, itt megállunk, nem zöldet jelentünk. */
+const _ny=[],_za=[];
+lines.forEach((l,i)=>{if(l==="<script>")_ny.push(i);if(l==="</script>")_za.push(i);});
+const _blokkok=_ny.map(a=>[a,_za.find(x=>x>a)]).filter(t=>t[1]!=null);
+if(!_blokkok.length){console.error("✗ Nem találom az inline <script> blokk határait.");process.exit(1);}
+const [A,B]=_blokkok.reduce((m,t)=>(t[1]-t[0]>m[1]-m[0]?t:m));
+if(B-A-1<10000){
+  console.error(`✗ A legnagyobb <script> blokk csak ${B-A-1} sor — ez nem a játék. `
+    +`Nézd meg az index.html szkript-blokkjait, mielőtt ez a háló zöldet jelentene.`);
+  process.exit(1);}
 
 /* ---- A MEGJELENÍTŐ RÉTEG ----
    Ha a névforrás EZEK VALAMELYIKÉN megy át, a kiírás rendben van. A
