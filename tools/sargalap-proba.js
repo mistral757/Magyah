@@ -96,8 +96,10 @@ const {spawn}=require('child_process');
   await p.evaluate(()=>{
     window.__sorok=[];
     const igazi=window.addLine;
-    window.addLine=(t,c)=>{try{window.__sorok.push(String(t).replace(/<[^>]+>/g," "));}catch(e){}
-      return igazi.apply(this,arguments);};});
+    /* NYÍLFÜGGVÉNYBEN NINCS `arguments` — a rest paraméter kell ide, különben a
+       hook minden naplósornál elszáll (mérve: „arguments is not defined"). */
+    window.addLine=(...a)=>{try{window.__sorok.push(String(a[0]).replace(/<[^>]+>/g," "));}catch(e){}
+      return igazi(...a);};});
 
   /* A karrier indulásakor tippek és a kémia-bemutató állnak az útban — ezeket
      ugyanúgy elléptetjük, ahogy a felhasználó tenné. */
@@ -115,7 +117,12 @@ const {spawn}=require('child_process');
       const tilt=new Set(["homeBtn","fsBtn","installBtn","themeToggle","bondMapBtn",
         "bondMapAllBtn","kitViewBtn","guideTipOff","guideTipMore","mpProfileBtn",
         "homeSettingsBtn","homeStatsBtn","pitchSideMine","pitchSideOpp","autoBtn"]);
-      const t=[...document.querySelectorAll("button")].find(x=>lat(x)&&!tilt.has(x.id));
+      const jo=[...document.querySelectorAll("button")].filter(x=>lat(x)&&!tilt.has(x.id));
+      /* A LEZÁRÓ GOMB ELŐBB DÖNT. A kihívás-választón öt „Elvállalom" és egy
+         „Kész — tovább" áll: az elsőt nyomkodva a próba ott körözne. A
+         mérésnek nem kell kihívás — az kell, hogy eljusson a szezonig. */
+      const zar=jo.find(x=>/Kész|tovább|Indul|Mehet/i.test(x.innerText||""));
+      const t=zar||jo[0];
       if(t){t.click();return false;}
       /* A KÉPESSÉG-KIOSZTÁS LISTÁJA NEM GOMBOKBÓL ÁLL, hanem koppintható
          sorokból — pont ezen akadt el a „meccsről meccsre" lánc is (3.9.31).
