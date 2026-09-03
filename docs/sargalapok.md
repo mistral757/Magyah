@@ -47,27 +47,27 @@ többet: ~0,26 lapot, azaz nagyjából tizenegy meccsenként eltiltást. Pont en
 kell ahhoz, hogy a temperamentumnak **ára** legyen a pályán, és ne csak egy
 szám maradjon a keretlapon.
 
-**MÉRVE, két végigjátszott idényen** (`tools/sargalap-proba.js`, a játék saját
+**MÉRVE, három végigjátszott idényen** (`tools/sargalap-proba.js`, a játék saját
 „Szezon végigjátszása" gombjával):
 
-| | 1. minta | 2. minta | együtt |
-|---|---|---|---|
-| forduló | 27 | 26 | 53 |
-| sárga lap | 42 | 32 | 74 |
-| **lap / meccs** | 1,56 | 1,23 | **1,40** |
-| eltiltás 3 lapért | 9 | 6 | **15** |
-| két sárgából kiállítás | 1 | 1 | 2 |
-| közvetlen piros | 3 | 1 | 4 |
-| mezlevétel gólöröm közben | 1 | 3 | 4 |
+| | 1. minta | 2. minta | 3. minta | együtt |
+|---|---|---|---|---|
+| forduló | 27 | 26 | 30 | 83 |
+| sárga lap | 42 | 32 | 31 | 105 |
+| **lap / meccs** | 1,56 | 1,23 | 1,03 | **1,27** |
+| eltiltás 3 lapért | 9 | 6 | 5 | **20** |
+| két sárgából kiállítás | 1 | 1 | 2 | 4 |
+| közvetlen piros | 3 | 1 | 2 | 6 |
+| mezlevétel gólöröm közben | 1 | 3 | — | 4+ |
 
-A mért 1,40 valamivel a beállított 1,20 fölött van, és ennek két oka van: a
-rangadók ×1,35-e (idényenként nyolc-tíz mérkőzés), a maradék pedig szórás — a
-két minta 1,56 és 1,23, vagyis a különbségük nagyobb, mint az eltérésük a
-céltól.
+A mért 1,27 gyakorlatilag a beállított 1,20 (+6%), és a különbözetet a rangadók
+×1,35-e adja (idényenként nyolc-tíz mérkőzés). A minták szórása jóval nagyobb
+ennél — 1,56 · 1,23 · 1,03 —, tehát hangolni nem kellett.
 
 **A KÖVETKEZMÉNY NAGYOBB, MINT AMIT ELSŐRE LEÍRTAM.** Az első változatban
-„egy-két eltiltás idényenként" állt itt; a mérés **idényenként hat-kilencet**
-mutat, ami 42 lapból három laponként aritmetikailag adódik is. Ez körülbelül
+„egy-két eltiltás idényenként" állt itt; a mérés **idényenként öt-kilencet**
+mutat (átlagosan minden negyedik fordulóra egyet), ami a lapszámból három
+laponként aritmetikailag adódik is. Ez körülbelül
 minden harmadik-negyedik fordulóra jut egy hiányzó — összemérhető a valódi
 bajnokságokkal (ott ~2 lap/csapat/meccs, öt lapos küszöb, idényenként 12-15
 eltiltás), de a 3-as küszöb szigorúbb annál. Egyetlen szám (`YELLOW_PER_MATCH`)

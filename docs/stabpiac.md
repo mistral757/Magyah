@@ -27,7 +27,8 @@ A stábpiacon **külsősök** állnak: szakemberek, akik sosem játszottak nála
 saját legendáid útja (a visszavonulás utáni, ingyenes felajánlás) érintetlen, és
 továbbra is az a jobb üzlet — annak nincs ára, ennek van.
 
-A meglévő 40 meccses kör mostantól **kettős szerepet** kap: nemcsak azt dönti
+A meglévő jogosultsági kör (3.9.33 óta **2000 lejátszott perc**, korábban 40 meccs)
+mostantól **kettős szerepet** kap: nemcsak azt dönti
 el, kiből lehet a te játékosodból edző, hanem azt is, **milyen szintű külsősöket
 kínál a piac** (lásd lentebb).
 
@@ -103,7 +104,7 @@ pusztán megvenni. Egyetlen szám a `STAFF_MARKET_FLOORS`-ban, ha feljebb kell.
 **A plafon** a saját keretedből jön:
 
 ```js
-staffSquadRefSz() = a nálad ≥40 meccset játszott játékosaid ÁTLAGA abból,
+staffSquadRefSz() = a nálad ≥2000 percet játszott játékosaid ÁTLAGA abból,
                     hogy ki HÁNYAS stábtag lenne — mindet 32 évesen mérve
 plafon            = max(padló+12, ref+8)
 ```
@@ -117,7 +118,7 @@ sérülés, személyiség) dolgozik, csak a kort és a zajt egységesíti.
 **Miért van padló+12 alsó korlát a plafonra:** egy egyetlen szintre szűkült
 piac nem piac. A kereted ezt az alapsávot csak **fölfelé** tágíthatja.
 
-**Az első idényben** még senki nem érte el a 40 meccset, tehát nincs viszonyítási
+**Az első idényben** még senki nem érte el a 2000 percet, tehát nincs viszonyítási
 alap — ott a kérés szerinti fix, szűk sáv áll: **35–50**.
 
 A panel **kiírja, melyik szabály hozta épp a plafont**. Ez nem kozmetika: a

@@ -178,7 +178,20 @@ const {spawn}=require('child_process');
       gyujtes_most:Object.entries(S.yellows||{}).filter(x=>x[1]>0).map(([n,v])=>shortName(n)+": "+v),
       karrier_yc:Object.entries(S.careerStats||{}).filter(x=>x[1].yc).length,
       eltiltottak:Object.entries(S.unavailable||{}).map(([n,i])=>shortName(n)+": "+i.reason+"/"+i.matchesLeft),
-      pelda_sorok:lap.slice(0,4).map(t=>t.trim().slice(0,120))};});
+      pelda_sorok:lap.slice(0,4).map(t=>t.trim().slice(0,120)),
+      /* ---- LEJÁTSZOTT PERCEK (3.9.33) ----
+         Ugyanez az idény a percgyűjtést is méri: a `share`-ből számolt percek
+         tényleg gyűlnek-e, és hogyan viszonyulnak a meccsszám × 90-hez. A
+         kezdő tizenegynél a kettő közel egyenlő; a cserénél jóval kevesebb —
+         pontosan ez a különbség, amiért az egész átállás történt. */
+      percek:(function(){
+        const ki=[];
+        Object.keys(S.seasonMinutes||{}).sort((a,b)=>(S.seasonMinutes[b]||0)-(S.seasonMinutes[a]||0))
+          .forEach(n=>{
+            const m=(S.seasonMatches||{})[n]||0,pc=S.seasonMinutes[n]||0;
+            ki.push(`${shortName(n)}: ${pc} perc / ${m} meccs = ${(pc/Math.max(1,m)).toFixed(1)} perc/meccs`
+              +` · karrier ${careerMinutesOf(n)} perc`);});
+        return ki;})()};});
   console.log("EGY SZEZON:",JSON.stringify(sz,null,1));
   console.log("hibák:",h.length?h.slice(0,5):"nincs");
   await b.close();srv.kill();
