@@ -8,10 +8,18 @@ kódok (RMA, BAR, JUV) ugyanúgy felismerhetők, mint a nevek, ezért azok is
 cserélődnek. ÜTKÖZÉST NEM KELL KÉZZEL KERÜLNI: a build.py egyedivé teszi
 őket, és kiírja, hol kellett hozzányúlnia.
 
-A VÁLOGATOTTAK SZÁNDÉKOSAN KIMARADNAK. Az „Anglia" vagy a „Magyarország"
-országnév, nem védjegy — a szövetségek jelzései (a címer, a becenevek) a
-kockázat, azok viszont nincsenek a játékban. Ezeket bántani csak rontana a
-játékon: a magyar 1954-es keret attól ismerhető fel, hogy Magyarország.
+A VÁLOGATOTTAK NEM ITT VANNAK, hanem lentebb, az ORSZAGOK táblában —
+a „klub" nevük országnév, és ugyanaz a tábla adja a játékosok nemzetiségét is.
+(Korábban itt az állt, hogy a válogatottak szándékosan kimaradnak, mert az
+országnév nem védjegy. Ez a jogi rész IGAZ MARAD: nem kockázat miatt kerültek
+be, hanem mert a felület nem lehet félig magyarított — „Magyahohszág" keretében
+„Magyarország" nemzetiségű játékosokkal hazudna magáról.)
+
+AMI VISZONT JOGI KÉRDÉS VOLT: a válogatott-keretek szezoncímkéje eddig
+kitüntető jelzőt hordozott — „1970 VB · a világbajnok", „1954 VB · Aranycsapat",
+„2018 VB · döntős". A NYERS adat változatlan (a mentések azon a néven
+hivatkoznak az ellenfélre), a KIÍRÁSBÓL viszont kiesik: marad az ország és az
+évszám. Lásd a seasonLabel-t az index.html-ben.
 
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  EZ A FÁJL AZ EGYETLEN FORRÁS. AZ index.html-BE KÉZZEL ÍRT KLUBNÉV       ║
@@ -265,7 +273,6 @@ LIGAK = {
 "Liga I":                 "Román Első Liga",
 "Ligue 1":                "Bagett 1",
 "MLS":                    "Tengerentúli Liga",
-"Major League Soccer":    "Tengerentúli Nagyliga",
 "Premier League":         "Szigetliga",
 "Premier Liha":           "Ukrán Élvonal",
 "Primeira Liga":          "Portói Első Liga",
@@ -280,4 +287,145 @@ LIGAK = {
 "Süper Lig":              "Török Szuperliga",
 "Vysšaja liga":           "Szovjet Felsőliga",
 "Československá liga":    "Csehszlovák Liga",
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  ORSZÁGNEVEK
+#
+#  MIÉRT VAN EZ A TÁBLA. Két helyen látszik országnév: a VÁLOGATOTT-keretek
+#  „klub" nevében (Franciaország 1998) és a játékosok nemzetiségénél. A kettő
+#  egymás mellett jelenik meg, tehát nem lehet csak az egyiket magyarítani —
+#  „Magyahohszág" keretében „Magyarország" nemzetiségű játékosokkal a felület
+#  hazudna magáról.
+#
+#  A MÓDSZER, a megrendelt tizenkettőből visszafejtve:
+#    · a „-ország" végződés „-ohszág" lesz (Magyahohszág, Fhansziaohszág),
+#    · vagy az ország SAJÁT / angol neve kerül magyar fonetikába
+#      (Szpéjn, Ítalí, Horvátszka, Gyermánia, Belgijum),
+#    · az „-ia/-a" végű nevek „-ija" alakot kapnak (Anglija, Brazílija).
+#
+#  AZ ELSŐ TIZENKETTŐ BETŰRE A MEGRENDELT ALAK. A többit ugyanezzel a
+#  módszerrel képeztem — azok JAVASLATOK, egy sorban átírhatók.
+#
+#  AMI NINCS A TÁBLÁBAN, AZ VÁLTOZATLANUL MEGY KI: a réteg egyszerű keresés,
+#  nem kényszerít. Új nemzetiség tehát nem tör el semmit.
+# ─────────────────────────────────────────────────────────────────────────────
+
+ORSZAGOK = {
+# ── a megrendelt tizenkettő ─────────────────────────────────────────────────
+"Anglia":            "Anglija",
+"Brazília":          "Brazílija",
+"Horvátország":      "Horvátszka",
+"Lengyelország":     "Ledzselohszág",
+"Németország":       "Gyermánia",
+"Franciaország":     "Fhansziaohszág",
+"Hollandia":         "Hólándia",
+"Argentína":         "Ahgentyína",
+"Magyarország":      "Magyahohszág",
+"Spanyolország":     "Szpéjn",
+"Belgium":           "Belgijum",
+"Olaszország":       "Ítalí",
+# ── a többi válogatott ──────────────────────────────────────────────────────
+"Görögország":       "Gölögohszág",
+"Portugália":        "Pohtugál",
+# ── Európa ──────────────────────────────────────────────────────────────────
+"Skócia":            "Szkótföld",
+"Wales":             "Vélsz",
+"Írország":          "Íhohszág",
+"Észak-Írország":    "Észak-Íhohszág",
+"Szerbia":           "Szehbija",
+"Oroszország":       "Ruszkija",
+"Szovjetunió":       "Szovjetunijó",
+"Törökország":       "Töhökohszág",
+"Dánia":             "Dánija",
+"Svédország":        "Svédohszág",
+"Norvégia":          "Nohvégija",
+"Finnország":        "Finnohszág",
+"Izland":            "Íszland",
+"Svájc":             "Svájcolda",
+"Ausztria":          "Ausztriják",
+"Csehország":        "Csehohszág",
+"Csehszlovákia":     "Csehszlovákija",
+"Szlovákia":         "Szlovákija",
+"Szlovénia":         "Szlovénija",
+"Románia":           "Hománija",
+"Bulgária":          "Bulgáhija",
+"Ukrajna":           "Ukhajna",
+"Fehéroroszország":  "Fehéhoroszohszág",
+"Lettország":        "Lettohszág",
+"Litvánia":          "Litvánija",
+"Észtország":        "Észtohszág",
+"Grúzia":            "Gruzija",
+"Albánia":           "Albánija",
+"Koszovó":           "Koszovóh",
+"Montenegró":        "Monteneghó",
+"Bosznia-Hercegovina":"Bosznia-Hehcegovina",
+"Bosznia":           "Bosznija",
+"Észak-Macedónia":   "Észak-Macedónija",
+"Szerbia és Montenegró":"Szehbija és Monteneghó",
+"San Marino":        "Szan Mahinó",
+"Izrael":            "Izháel",
+# ── Amerika ─────────────────────────────────────────────────────────────────
+"Uruguay":           "Uhugváj",
+"Kolumbia":          "Kolumbija",
+"Chile":             "Csilé",
+"Paraguay":          "Paragváj",
+"Peru":              "Pehu",
+"Ecuador":           "Ekvadoh",
+"Venezuela":         "Venezuéla",
+"Bolívia":           "Bolívija",
+"Mexikó":            "Mehikó",
+"Egyesült Államok":  "Egyesült Álmok",
+"USA":               "Úeszá",
+"Kanada":            "Kanadaj",
+"Costa Rica":        "Koszta Hika",
+"Honduras":          "Hondurász",
+"Jamaica":           "Dzsamajka",
+"Trinidad és Tobago":"Thinidad és Tobágó",
+"Dominikai Köztársaság":"Dominikai Köztáhsaság",
+"Curaçao":           "Kuhaszaó",
+"Suriname":          "Szuhinam",
+# ── Afrika ──────────────────────────────────────────────────────────────────
+"Nigéria":           "Nizsérija",
+"Elefántcsontpart":  "Elefántcsontpaht",
+"Marokkó":           "Mahokkó",
+"Szenegál":          "Szenegáhl",
+"Kamerun":           "Kamehun",
+"Ghána":             "Gáná",
+"Egyiptom":          "Egyiptum",
+"Mali":              "Máli",
+"Algéria":           "Alzsérija",
+"Dél-Afrika":        "Dél-Afhika",
+"Tunézia":           "Tunézija",
+"Guinea":            "Ginea",
+"Bissau-Guinea":     "Bisszau-Ginea",
+"Kongói DK":         "Kongóh",
+"Burkina Faso":      "Buhkina Faszó",
+"Mozambik":          "Mozambikk",
+"Gabon":             "Gabbon",
+"Kenya":             "Kenyah",
+"Gambia":            "Gambija",
+"Angola":            "Angóla",
+"Zambia":            "Zambija",
+"Közép-afrikai Köztársaság":"Közép-afhikai Köztáhsaság",
+"Ruanda":            "Huanda",
+"Sierra Leone":      "Sziehha Leone",
+"Zimbabwe":          "Zimbabve",
+"Libéria":           "Libéhija",
+"Namíbia":           "Namíbija",
+"Csád":              "Csádd",
+"Togo":              "Tógó",
+"Zöld-foki Köztársaság":"Zöld-foki Köztáhsaság",
+"Benin":             "Benyin",
+"Madagaszkár":       "Madagaszkáh",
+# ── Ázsia és Óceánia ────────────────────────────────────────────────────────
+"Japán":             "Nyippon",
+"Dél-Korea":         "Dél-Koheja",
+"Szaúd-Arábia":      "Szaúd-Ahábia",
+"Irán":              "Ihán",
+"Omán":              "Ohmán",
+"Ausztrália":        "Ausztrálija",
+"Új-Zéland":         "Új-Zéhland",
+"Laosz":             "Laohsz",
+"Barbados":          "Bahbadosz",
 }

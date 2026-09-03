@@ -13,7 +13,7 @@ sys.path.insert(0, D)
 from rules import (POOL as POOL_ALL, hufy, given_of, pool_given, lengthen, hu_twist, PARTICLES, strip_dia, LANG,
                    son_stem, son_suffix, SON_LANG)
 from manual import MANUAL
-from klubok import KLUBOK, LIGAK
+from klubok import KLUBOK, LIGAK, ORSZAGOK
 
 # ── az adat kinyerése az index.html-ből ────────────────────────────────────
 # Szándékosan itt, és nem előre gyártott data.json-ból: így a szkript akkor is
@@ -231,13 +231,30 @@ for _mark, _rows in (
      "\n".join(f" {_js(k)}:[{_js(_klub[k][0])},{_js(_klub[k][1])}]," for k in sorted(_klub))),
     ("HU_LEAGUE_TABLE",
      "\n".join(f" {_js(k)}:{_js(LIGAK[k])}," for k in sorted(LIGAK))),
+    # ORSZÁGNEVEK: a válogatott-keretek „klub" neve ÉS a játékosok
+    # nemzetisége ugyanabból a táblából megy ki — a kettő egymás mellett
+    # látszik, tehát nem lehet csak az egyiket magyarítani.
+    ("HU_NAT_TABLE",
+     "\n".join(f" {_js(k)}:{_js(ORSZAGOK[k])}," for k in sorted(ORSZAGOK))),
 ):
     _p = re.compile(r"(const " + _mark + r"=\{\n).*?(\n\};)", re.S)
-    if not _p.search(_html):
+    _m = _p.search(_html)
+    if not _m:
         raise SystemExit("nem találom a " + _mark + " blokkot")
+    # ── ŐR: NE NYELJEN LE FÉL FÁJLT ────────────────────────────────────────
+    # A minta `.*?`-vel keres a KÖVETKEZŐ "\n};"-ig. Ha a blokk ÜRESEN áll
+    # ("const X={\n};"), a nyitó újsort már a csoport elvitte, tehát a keresés
+    # ÁTFUT a fájl következő "};" soráig — és a csere mindent kitöröl közte.
+    # MEGTÖRTÉNT: egy üres HU_NAT_TABLE helyőrzőtől 16 452 sor tűnt el az
+    # index.html-ből. A hiba némán ment volna tovább (a szintaxis is helyes
+    # maradt), ezért itt áll meg.
+    _sorok = _m.group(0).count("\n")
+    if _sorok > max(4000, len(_rows.split("\n")) * 3 + 50):
+        raise SystemExit(f"{_mark}: a talált blokk {_sorok} sor — ez túl sok, "
+                         f"a helyőrző valószínűleg ÜRES. Tegyél bele egy sort.")
     _html = _p.sub(lambda m: m.group(1) + _rows + m.group(2), _html, count=1)
 open(SRC, "w", encoding="utf-8").write(_html)
-print(f"klub: {len(_klub)} · liga: {len(LIGAK)}")
+print(f"klub: {len(_klub)} · liga: {len(LIGAK)} · ország: {len(ORSZAGOK)}")
 
 random.seed(11)
 for cimke, db in (("gépi", 20), ("kézi", 10)):
