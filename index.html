@@ -3842,6 +3842,20 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
          A kettő eddig egybemosódott, és a várakozó ebből nem tudta eldönteni,
          érdemes-e még várni. Üresen marad, amíg nincs mit mondani. -->
     <div id="h2hWaitMate" style="text-align:center;font-size:12px;margin-top:6px;min-height:16px"></div>
+    <!-- P2b: BÖKÉS. Csak akkor látszik, ha a társ OFFLINE — aki ott ül, azt
+         nem kell értesíteni, és egy fölösleges gomb csak zaj. A gomb maga
+         mondja meg, ha nem lehet vele élni (nincs beállítva, a társ nem
+         iratkozott fel, vagy még jár a fék). -->
+    <div id="h2hWaitNudgeWrap" class="hide" style="text-align:center;margin-top:6px">
+      <button id="h2hWaitNudgeBtn" class="btn-s" style="font-size:12px;padding:6px 14px">🔔 Bökd meg a társad</button>
+      <div id="h2hWaitNudgeMsg" style="font-size:11px;color:var(--dim2);margin-top:4px;min-height:14px"></div>
+    </div>
+    <!-- A MÁSIK IRÁNY: hogy TÉGED is meg lehessen bökni. Csak akkor látszik,
+         ha még nem iratkoztál fel — utána eltűnik, nem marad ott feleslegesen. -->
+    <div id="h2hWaitSubWrap" class="hide" style="text-align:center;margin-top:6px">
+      <button id="h2hWaitSubBtn" class="btn-s" style="font-size:12px;padding:6px 14px">🔔 Szóljatok, ha rám várnak</button>
+      <div id="h2hWaitSubMsg" style="font-size:11px;color:var(--dim2);margin-top:4px;min-height:14px"></div>
+    </div>
     <div class="mpErr" id="h2hWaitErr"></div>
     <div class="mpBtns" style="margin-top:4px">
       <!-- F7: csak akkor jelenik meg, ha a szoba tényleg megszűnt — ez a kiút
@@ -5458,7 +5472,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.16";
+const APP_VERSION="3.9.24";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -13195,17 +13209,54 @@ function pyrStart(startDiv,speed,sq,upLv){
     /* A FELSKÁLÁZÁST KI KELL VONNI a pool-eltolásból: az `off` a keretedet
        viszi a világ skálájára, és ha a felskálázás is benne volna, a kereted
        EGYÜTT emelkedne a mezőnnyel — a felskálázó pontosan semmit nem érne. */
-    const offMp=Math.round((pyrMeanMp-up-rawMeanMp)*10)/10;
+    /* ---- A DRAFT SZERKEZETI PRÉMIUMA — EZ HIÁNYZOTT ----
+       BEJELENTETT HIBA: „a csapatunk draft módban indulva összeáll egy erővel
+       és végül más nehézségre kerül, mint amit becéloztunk… 84-es csapattal
+       vagyok 78-asok között."
+
+       A draftolt tizenegy SZERKEZETILEG erősebb, mint ugyanannyi klub ÁTLAGA:
+       te a legjobb tizenegyet állítod össze, a klubátlagba a tartalékok is
+       beleszámítanak. Ezt a különbséget a PYR_DRAFT_PREMIUM méri (3), és az
+       egyjátékos ág LEVONJA a világ-eltolásból — vagyis a világ ennyivel
+       feljebb kerül, hogy a rés az maradjon, amit ígértünk.
+
+       A KÖZÖS ÁG EZT SOHA NEM TETTE MEG. Mérve, azonos bemenettel (D3, tartó,
+       draft, up=0): egyjátékosban a mezőny 84, közösben 81 — a PvP-világ
+       pontosan a prémiummal gyengébb, tehát a draftolt kereted ennyivel a
+       mezőny FÖLÉ kerül, és ott is marad az egész szezonra.
+
+       A DETERMINIZMUS NEM SÉRÜL: a PYR_DRAFT_PREMIUM konstans, a careerStart
+       pedig utazik a szoba beállításai közt (mpCollectSettings), tehát a két
+       kliens ugyanazt a levonást számolja ki. */
+    const draftStartMp=!sq&&!(typeof careerStart!=="undefined"&&careerStart==="club");
+    const offMp=Math.round((pyrMeanMp-up-rawMeanMp-(draftStartMp?PYR_DRAFT_PREMIUM:0))*10)/10;
     /* ORIGÓ-CSERE: a világ jön a kerethez (lásd pyrShiftWorld). A spare-eket
        is mozgatni kell — azok a világ csapatai, csak épp kiszorultak. */
     pyrShiftWorld(w,offMp);
     if(sp1)sp1.ovr=Math.round((sp1.ovr-offMp)*10)/10;
     if(sp2)sp2.ovr=Math.round((sp2.ovr-offMp)*10)/10;
     const clubRawMp=sq?Math.round(squadAvgOvr(sq)*10)/10:null;
+    /* ---- A HATÁSOS KEZDŐ ERŐ — EZ IS HIÁNYZOTT ----
+       Az egyjátékos ág a NYERS átlag helyett a HATÁSOS erőt méri (a keret
+       illeszkedési és kötés-hátrányával csökkentve), és a `gap0` is abból
+       számol. A közös ág a nyers átlagot használta, tehát ugyanazt a keretet
+       erősebbnek látta, mint amilyen a pályán volt.
+       EZ NEM RONTJA A DETERMINIZMUST: a clubEff/startDrag CSAK könyvelés —
+       a világot az `offMp` mozgatja, az pedig végig világ-tulajdonságokból
+       (pyrMeanMp, rawMeanMp, up) és egy konstansból áll. Kész klubbal induló
+       közös karrierben a két menedzser MÁS klubot választ, tehát a saját
+       gap0-juk különbözik — ahogy kell. */
+    const clubEffMp=sq?pyrSquadEff(sq):null;
+    const startDragMp=sq?pyrStartDrag(sq):null;
     S.pyr={on:true,my:d0,startDiv:d0,aiSpeed:sp,divs:w.divs,spare:sp1,spare2:sp2,
            off:0,worldShift:offMp,rawMean:Math.round(rawMeanMp*10)/10,clubRaw:clubRawMp,
+           clubEff:clubEffMp,startDrag:startDragMp,
+           /* A KÉRT RÉS, a szezonindító horgonynak. Ez a szoba beállításából
+              jön, tehát MINDKÉT kliensnél ugyanaz — ellentétben a gap0-val,
+              ami a saját keretedhez mért, és ezért kliensenként más. */
+           gapWantMp:(typeof pyrWantedGap==="number")?pyrWantedGap:null,
            up,upAmt:up,
-           gap0:clubRawMp==null?null:Math.round((clubRawMp-rawMeanMp-up)*10)/10,
+           gap0:clubEffMp==null?null:Math.round((clubEffMp-rawMeanMp-up)*10)/10,
            log:[],meas:null,mp:1,v:1};
     oppTargetRating=pyrLevel();careerBaseRating=oppTargetRating;
     if(gameMode==="career"&&careerPool)Object.values(careerPool).forEach(e=>{
@@ -28561,8 +28612,17 @@ function pyrOpenDivPick(sq){
   pyrPickSq=sq;
   /* A NYITÓÁLLÁS EGY KÉSZ, JÁTSZHATÓ VÁLLALÁS: a klubjához illő liga, és benne
      KÖZÉPMEZŐNY (rés 0). Onnan két mozdulat visz bárhová: fent a liga, lent a
-     rajt nehézsége. */
-  pyrPickDiv=pyrRecommendDiv(sq,pyrPendingSpeed,0);
+     rajt nehézsége.
+
+     KÖZÖS KARRIERBEN VISZONT NINCS MIT AJÁNLANI: az osztály VILÁG-TULAJDONSÁG,
+     egy tabellán osztoztok, és a szoba beállításai közt utazik (pyrPendingDiv).
+     A kerethez ajánlott liga itt NÉMÁN SZÉTVITTE A KÉT VILÁGOT: a klubos ág
+     (renderClubPick) automatikusan a közös osztályt veszi, a draftos ág
+     viszont ezen a rajta ment át — vagyis a két menedzser MÁS OSZTÁLYBAN
+     indulhatott, más mezőnyszinttel, ugyanazon a szobán belül. */
+  pyrPickDiv=(pyrMpSetup()&&pyrPendingDiv)
+    ? Math.max(1,Math.min(PYR_DIVS,pyrPendingDiv))
+    : pyrRecommendDiv(sq,pyrPendingSpeed,0);
   pyrPickGap=PYR_GAP_DEFAULT;
   /* A nehézség-sor nyitóállása ugyanaz a vállalás, amit a rés-csúszka is
      hoz — a két felület egy állapotot ír (3.8.29). */
@@ -28802,6 +28862,78 @@ function pyrDiffById(id){return PYR_START_DIFF.find(x=>x.id===id)||null;}
 
    KÖZÖS KARRIERBEN KIMARAD: ott a szintet a két menedzser alkuja adja
    (mpSeasonGate), azt nem írhatja felül egy egyoldalú újramérés. */
+/* ================= A KÖZÖS HORGONY (3.9.20) =================
+   BEJELENTETT PANASZ: „a beállítás a szezon indításkori nyers erőket kellene
+   figyelembe vegye és ahhoz igazítsa a nehézségi szintet a választott
+   divízióhoz… 84-es csapattal vagyok 78-asok között."
+
+   MIÉRT NEM ELÉG A MEGLÉVŐ HORGONY. A pyrAnchorAtKickoff a SAJÁT keretedhez
+   igazítja a világot, és közös karrierben az első sorában kiszáll — jogosan:
+   ha ezt mindkét kliens megtenné a magáéhoz, a két világ szétnőne, márpedig
+   a közös karrier egész alapja, hogy bitre azonos.
+
+   A MEGOLDÁS: a horgony ne a SAJÁT keretből dolgozzon, hanem a KETTŐÉBŐL —
+   olyan számokból, amiket mindkét kliens ismer. A szezonindító kézfogás
+   (mpStartExchange) amúgy is lefut minden idény előtt, és már ma is viszi a
+   csapaterőt (`str`). Nincs szükség új hálózati csatornára.
+
+   AMI SKÁLÁT NEM HASZNÁLHATUNK, ÉS EZ A LÉNYEG. A magányos horgony a
+   levelGap()-et hajtja, az pedig oppMatchStrength()-en át tartalmazza a
+   hiddenMatchBonus()-t: a te morálod, edződ, kapitányod, taktikád. Az
+   KLIENSFÜGGŐ — abban a skálában horgonyozva a két világ garantáltan
+   szétnőne. Ezért itt MINDEN bemenet cserélt vagy közös:
+
+     avgStr   a két kicserélt csapaterő átlaga  → mindkét kliensen azonos
+     want     a szoba beállításából jött rés     → mindkét kliensen azonos
+     pyrLevel a világ saját szintje              → a közös világból számol
+
+   A cél: a KETTŐTÖK ÁTLAGA álljon pontosan a kért résre a mezőnytől. Aki
+   erősebbet hozott, annak könnyebb idénye lesz, aki gyengébbet, annak
+   nehezebb — szimmetrikusan, és kimondva. */
+const PYR_MP_ANCHOR_MAX=12;      /* ennél többet egy horgony nem tolhat */
+function pyrAnchorShared(myStr,mateStr){
+  const P=(typeof S!=="undefined"&&S)?S.pyr:null;
+  if(!P||!P.on)return null;
+  if(P.mpAnchored)return null;                    /* karrierenként egyszer */
+  if(typeof myStr!=="number"||typeof mateStr!=="number")return null;
+  if(!isFinite(myStr)||!isFinite(mateStr))return null;
+  const avg=(myStr+mateStr)/2;
+  const want=(typeof P.gapWantMp==="number"&&isFinite(P.gapWantMp))?P.gapWantMp:0;
+  const elotte=Math.round((avg-pyrLevel())*10)/10;
+  let moved=0;
+  for(let i=0;i<40;i++){
+    const err=(avg-pyrLevel())-want;
+    if(Math.abs(err)<0.15)break;
+    /* A pyrShiftWorld KIVONJA az `off`-ot, tehát a −step a világot EMELI, ha
+       ti vagytok túl erősek. A lépést vágjuk, hogy egy elszaladt szám se
+       lökje ki a világot egyetlen körben. */
+    const step=Math.max(-4,Math.min(4,err));
+    if(Math.abs(moved+step)>PYR_MP_ANCHOR_MAX)break;
+    pyrShiftWorld({divs:P.divs},-step);
+    if(P.spare)P.spare.ovr=Math.round((P.spare.ovr+step)*10)/10;
+    if(P.spare2)P.spare2.ovr=Math.round((P.spare2.ovr+step)*10)/10;
+    P.worldShift=Math.round(((P.worldShift||0)-step)*10)/10;
+    moved+=step;}
+  moved=Math.round(moved*10)/10;
+  P.mpAnchored=true;
+  if(!moved)return {moved:0,elotte,utana:elotte,avg,want};
+  /* A SZINTVÁLTÁS ÁTVEZETÉSE — ugyanaz a lánc, amit a pyrStart és a magányos
+     horgony is futtat a világ eltolása után. Egy helyről másolva, mert
+     ugyanaz a művelet. */
+  oppTargetRating=pyrLevel();
+  careerBaseRating=oppTargetRating;
+  if(gameMode==="career"&&careerPool)Object.values(careerPool).forEach(e=>{
+    if(drafted.has(e.n))return;
+    applyMarketShift(e);
+    e.startRating=Math.round(ratingAtAge(e.peak,e.age));
+    syncAttrsToRating(e);
+    if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
+  P.grow=null;
+  SEASON_OPPS=pyrOpponents();
+  pyrGrowStep();pyrOppRefresh();
+  try{pyrInfinityCheck();}catch(e){}
+  if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
+  return {moved,elotte,utana:Math.round((avg-pyrLevel())*10)/10,avg,want};}
 function pyrAnchorAtKickoff(){
   const P=(typeof S!=="undefined"&&S)?S.pyr:null;
   if(!P||!P.on||gameMode!=="career")return false;
@@ -33840,182 +33972,182 @@ const HU_NAME_TABLE={
    játékban — a magyar 1954-es keretet pedig épp az teszi felismerhetővé, hogy
    Magyarország. */
 const HU_CLUB_TABLE={
- "1. FC Heidenheim":["Hajdanlak FC","HAJ"],
- "1. FC Kaiserslautern":["Császárhangos FC","CSÁ"],
- "1. FC Köln":["1. FC Kölni","KÖL"],
- "1. FC Magdeburg":["Magdavár FC","MAG"],
+ "1. FC Heidenheim":["Hajdanlak eFCé","HAJ"],
+ "1. FC Kaiserslautern":["Császárhangos eFCé","CSÁ"],
+ "1. FC Köln":["Kölni","KÖL"],
+ "1. FC Magdeburg":["Magdavár eFCé","MAG"],
  "1. FC Nürnberg":["Nürnbergi Perec","NÜR"],
  "1. FC Union Berlin":["Berlini Unió","UNI"],
- "1. FSV Mainz 05":["Majnai 05","MAJ"],
- "1899 Hoffenheim":["1899 Reménylak","REM"],
- "AC Milan":["AC Milánkó","MIL"],
- "AC Monza":["AC Mónusz","MNZ"],
+ "1. FSV Mainz 05":["Majnai Csapi","MAJ"],
+ "1899 Hoffenheim":["1988 Reménylak","REM"],
+ "AC Milan":["ÁCsé Milánó","MIL"],
+ "AC Monza":["ÁCsé Mondsza","MNZ"],
  "ACF Fiorentina":["Virágos Firenze","VIR"],
- "AFC Ajax":["AFC Ajakos","AJA"],
- "AJ Auxerre":["Okszerre AJ","OKS"],
- "AS Bari":["AS Barika","BRI"],
- "AS Monaco":["AS Monakó","MNC"],
- "AS Nancy-Lorraine":["Nancy-Lotaringia","NAN"],
- "AS Roma":["AS Rómaiak","RÓM"],
- "AS Saint-Étienne":["Szent István AS","SZI"],
- "Aberdeen FC":["Aberdíni FC","ABE"],
- "Al Ahly SC":["Al Ahli SC","AHL"],
- "Al Nassr FC":["Al Nasszr FC","NAS"],
- "Angers SCO":["Anzsé SCO","ANZ"],
- "Arsenal FC":["Ágyúgyár FC","ÁGY"],
- "Aston Villa":["Aston Villany","AVI"],
- "Atalanta BC":["Atalanta Bekecs","ATB"],
+ "AFC Ajax":["Ajakok","AJA"],
+ "AJ Auxerre":["Okszerr","OKS"],
+ "AS Bari":["Ász Barika","BRI"],
+ "AS Monaco":["Ász Monakó","MNC"],
+ "AS Nancy-Lorraine":["Nenszi-Lorány","NAN"],
+ "AS Roma":["Ász Rómaiak","RÓM"],
+ "AS Saint-Étienne":["Ász Szent Egyén","EGY"],
+ "Aberdeen FC":["Aberdíni eFCé","ABE"],
+ "Al Ahly SC":["Haláli eSCé","AHL"],
+ "Al Nassr FC":["Alnászer eFCé","NAS"],
+ "Angers SCO":["Anzsé","ANZ"],
+ "Arsenal FC":["Ágyúgyár eFCé","ÁGY"],
+ "Aston Villa":["Asztalon Villany","AVI"],
+ "Atalanta BC":["Asztalonta BéCé","ATB"],
  "Athletic Club":["Atlétikus Klub","ATK"],
- "Atlanta United FC":["Atlantai Egyesült","ATL"],
+ "Atlanta United FC":["Atlantai Egyesültek","ATL"],
  "Atlético Madrid":["Atlétikus Madrigál","ATM"],
  "Bayer 04 Leverkusen":["Bájer Leverkúszó","LEV"],
- "Beşiktaş JK":["Besiktás JK","BES"],
- "Blackburn Rovers":["Feketevár Portyázók","FEK"],
- "Boca Juniors":["Boka Juniorok","BOK"],
- "Bologna FC":["Bolognai Szósz","BOL"],
+ "Beşiktaş JK":["Besiktás","BES"],
+ "Blackburn Rovers":["Feketénégő Portyázók","FEK"],
+ "Boca Juniors":["Boka Fiatalok","BOK"],
+ "Bologna FC":["Bonyolai Kifőzde","BOL"],
  "Bolton Wanderers":["Boltos Vándorok","BLT"],
  "Borussia Dortmund":["Borosüveg Dortmund","BOR"],
- "Borussia Mönchengladbach":["Borosüveg Möncsengladbach","MÖN"],
- "Botafogo FR":["Botosfogó FR","BOT"],
- "Brescia Calcio":["Bresciai Rúgás","BRE"],
- "Brighton & Hove Albion":["Fényesparti Albion","FÉN"],
+ "Borussia Mönchengladbach":["Borosüveg Möntyhengladbakk","MÖN"],
+ "Botafogo FR":["Botosfogó ForRíl","BOT"],
+ "Brescia Calcio":["Brossa Rúgás","BRE"],
+ "Brighton & Hove Albion":["Fényesparti Albiológusok","FÉN"],
  "Budapest Honvéd FC":["Budapesti Honfoglalók","HON"],
- "Burnley FC":["Bürnli FC","BÜR"],
- "CA Independiente":["Független CA","FÜG"],
- "CA Peñarol":["Penyarol CA","PEN"],
- "CR Flamengo":["Flamingó CR","FLA"],
+ "Burnley FC":["Bürnli eFCé","BÜR"],
+ "CA Independiente":["Független CéÁ","FÜG"],
+ "CA Peñarol":["Penyarol CéÁ","PEN"],
+ "CR Flamengo":["Flamingó CéeRr7","FLA"],
  "CSZKA Moszkva":["Cuszka Moszkva","CUS"],
  "Cagliari Calcio":["Kagylári Rúgás","KAG"],
  "Catania Calcio":["Katániai Rúgás","KAT"],
- "Celta de Vigo":["Kelta Vigó","KEL"],
- "Celtic FC":["Keltiszi FC","KTI"],
+ "Celta de Vigo":["Kelta Vigadó","KEL"],
+ "Celtic FC":["Kelta eFCé","KFC"],
  "Charlton Athletic":["Csarnoki Atlétika","CSA"],
- "Chelsea FC":["Cselszövő FC","CSE"],
+ "Chelsea FC":["Cselszövő eFCé","CSE"],
  "Chievo Verona":["Kiévó Verona","KIE"],
- "Club Brugge KV":["Brüggei Klub","BRÜ"],
- "Como 1907":["Komótos 1907","KOM"],
+ "Club Brugge KV":["Brűzsi Klubocska","BRÜ"],
+ "Como 1907":["Komótos 1970","KOM"],
  "Coventry City":["Koventri Város","KOV"],
  "Crvena zvezda":["Piros Csillag","PIR"],
- "Crystal Palace":["Kristálypalota","KRI"],
- "Debreceni VSC":["Debreceni Vasgyúró","DVS"],
+ "Crystal Palace":["Kristály Paraszt","KRI"],
+ "Debreceni VSC":["Debreceni Csillagok","DVS"],
  "Deportivo Alavés":["Sportos Alavés","ALA"],
  "Deportivo La Coruña":["Sportos Korunya","KOR"],
  "Derby County":["Dörzsölt Megye","DÖR"],
  "Dinamo Kijev":["Kijevi Dinamó","KIJ"],
  "Dinamo Moszkva":["Moszkvai Dinamó","DIN"],
  "Dinamo Tbiliszi":["Tbiliszi Dinamó","TBI"],
- "EA Guingamp":["Gingamp EA","GIN"],
+ "EA Guingamp":["Gingamp ÍÉ Szportsz","GIN"],
  "Eintracht Frankfurt":["Egyetértés Frankfurt","FRA"],
- "Everton FC":["Evezős FC","EVE"],
- "FC Augsburg":["Ágostonvár FC","ÁGO"],
- "FC Barcelona":["Bárcsakelóna","BÁR"],
- "FC Basel":["Bázeli FC","BÁZ"],
- "FC Bayern München":["Bájos Müncsi","BÁJ"],
- "FC Lorient":["Loriáni FC","LOR"],
- "FC Metz":["Meccs FC","MTZ"],
- "FC Nantes":["Nantesz FC","NNT"],
- "FC Porto":["Portói FC","PRT"],
- "FC Schalke 04":["Sálkés 04","SÁL"],
- "FC Sochaux":["Sósó FC","SCX"],
- "Fenerbahçe SK":["Fenerbahcse SK","FEN"],
- "Ferencvárosi TC":["Ferencvárosi Tekergők","FER"],
+ "Everton FC":["Evezős eFCé","EVE"],
+ "FC Augsburg":["Ágostonvár eFCé","ÁGO"],
+ "FC Barcelona":["Kazincbarszelóna","KAZ"],
+ "FC Basel":["Bázeli eFCé","BÁZ"],
+ "FC Bayern München":["Bájos Müntyhen","BÁJ"],
+ "FC Lorient":["Loriáni eFCé","LOR"],
+ "FC Metz":["Meccs eFCé","MTZ"],
+ "FC Nantes":["Nantesz eFCé","NNT"],
+ "FC Porto":["Portói eFCé","PRT"],
+ "FC Schalke 04":["eFCé Sálkés 40","SÁL"],
+ "FC Sochaux":["Sósó eFCé","SCX"],
+ "Fenerbahçe SK":["Fenerbakkcse eSKá","FEN"],
+ "Ferencvárosi TC":["eFTéCé","FER"],
  "Feyenoord Rotterdam":["Fenyőnyárd Rotterdam","FEY"],
  "Fortuna Düsseldorf":["Szerencse Düsseldorf","SZR"],
- "Fulham FC":["Fullámos FC","FUL"],
+ "Fulham FC":["Fullámos eFCé","FUL"],
  "Galatasaray SK":["Galatás Szaráj","GAL"],
- "Genoa CFC":["Genovai Szalámi","GEN"],
+ "Genoa CFC":["Dzsenovai Szalámi","DZS"],
  "Girondins de Bordeaux":["Bordói Girondisták","BOD"],
- "Grêmio FBPA":["Grémió FBPA","GRÉ"],
- "Győri ETO FC":["Győri Kekszgyár","GYŐ"],
- "Hamburger SV":["Hamburgeres SV","HAM"],
- "Hannover 96":["Hannoveri 96","HAN"],
- "Hellas Verona":["Hellász Verona","HEL"],
- "Hertha BSC":["Hertelendi BSC","HER"],
- "IFK Göteborg":["IFK Götebori","GÖT"],
- "Inter Miami CF":["Inter Miámi","MIA"],
- "Inter Milan":["Inter Milánka","INT"],
+ "Grêmio FBPA":["Brémjó","GRÉ"],
+ "Győri ETO FC":["Győri Audi Gyár Munkásai","GYŐ"],
+ "Hamburger SV":["HamburgereS Vé","HAM"],
+ "Hannover 96":["Hannó Veri 69","HAN"],
+ "Hellas Verona":["Hellász Veronka","HEL"],
+ "Hertha BSC":["Bertha HéeSCé","HER"],
+ "IFK Göteborg":["AFK Götebori","GÖT"],
+ "Inter Miami CF":["Bekem Májámi","MIA"],
+ "Inter Milan":["Milánói Ördögök","INT"],
  "Ipswich Town":["Ipszilon Város","IPS"],
- "Juventus FC":["Juharfa Tusa","JUH"],
- "KV Mechelen":["Mechelni KV","MEC"],
- "Karlsruher SC":["Károlyvár SC","KÁR"],
+ "Juventus FC":["Torinói Szarkák","JUH"],
+ "KV Mechelen":["Mechelni KáVé","MEC"],
+ "Karlsruher SC":["Károlyvár eSCé","KÁR"],
  "Kashima Antlers":["Kasmír Agancsok","KAS"],
- "Le Havre AC":["Lehavas AC","LEH"],
- "Leeds United":["Lidérc Egyesült","LID"],
+ "Le Havre AC":["Lehavas ÁCsé","LEH"],
+ "Leeds United":["Lidérc Egyesültek","LID"],
  "Legia Warszawa":["Varsói Légió","LÉG"],
- "Leicester City":["Lecsós Város","LEC"],
+ "Leicester City":["Lecsesztek a Városiak","LEC"],
  "Lille OSC":["Lillei Liliom","LIL"],
- "Liverpool FC":["Lővérpocsolya FC","LŐV"],
- "Manchester City":["Mancsvári Város","MVÁ"],
- "Manchester United":["Mancsvári Egyesült","MEG"],
- "Middlesbrough FC":["Középvár FC","KÖZ"],
- "Montpellier HSC":["Monpellér HSC","MPL"],
- "Málaga CF":["Málagai Málna","MÁL"],
- "Newcastle United":["Újvár Egyesült","ÚJV"],
- "Norwich City":["Norvégváros","NOR"],
- "Nottingham Forest":["Nottingi Erdő","ERD"],
+ "Liverpool FC":["Májpocsolya eFCé","MÁJ"],
+ "Manchester City":["Mencseszteri Városiak","MVÁ"],
+ "Manchester United":["Mencseszteri Egyesültek","MEG"],
+ "Middlesbrough FC":["Középvár eFCé","KÖZ"],
+ "Montpellier HSC":["Monpellér","MPL"],
+ "Málaga CF":["Máláhá","MÁL"],
+ "Newcastle United":["Újvári Egyesültek","ÚJV"],
+ "Norwich City":["Melyik Norvégváros","NOR"],
+ "Nottingham Forest":["Semmilyensonka Erdő","ERD"],
  "Nîmes Olympique":["Nímesi Olimpia","NIM"],
- "OGC Nice":["Nizzai OGC","NIZ"],
+ "OGC Nice":["Nájsz","NÁJ"],
  "Olympique Lyonnais":["Lyoni Olimpia","LYO"],
  "Olympique de Marseille":["Marsziliai Olimpia","MAR"],
- "PSV Eindhoven":["PSV Ejnyehoven","PSV"],
+ "PSV Eindhoven":["PéeSzVé Ejnyehoven","PSV"],
  "Paksi FC":["Paksi Atomerő","PAK"],
  "Palermo":["Palermói Pálma","PAL"],
- "Panathinaikos":["Panatinaikosz","PAN"],
- "Paris Saint-Germain":["Párizsi Szent German","PSZ"],
- "Parma AC":["Parmezán AC","PAR"],
- "Portsmouth FC":["Kikötőszáj FC","KIK"],
+ "Panathinaikos":["Puma Tin Ájkosz","PAN"],
+ "Paris Saint-Germain":["Párizsi Szent Gyermán","PSZ"],
+ "Parma AC":["Parmezán ÁCsé","PAR"],
+ "Portsmouth FC":["Kikötőszáj eFCé","KIK"],
  "Puskás Akadémia FC":["Kalasnyikov Akadémia","KAL"],
  "Queens Park Rangers":["Királynéparki Portyázók","KPP"],
- "RB Leipzig":["RB Lipcse","LIP"],
- "RB Salzburg":["Sósvár RB","SÓS"],
- "RC Lens":["Lencse RC","LEN"],
- "RC Strasbourg":["Strasbourgi RC","STR"],
+ "RB Leipzig":["eRBé Lipcsei Peti","LIP"],
+ "RB Salzburg":["Sósvár eRBé","SÓS"],
+ "RC Lens":["Lencse eRrCé","LEN"],
+ "RC Strasbourg":["Strasbourgi eRrCé","STR"],
  "RCD Espanyol":["Espanyoli Kutyus","ESP"],
- "RSC Anderlecht":["Anderlecsó RSC","AND"],
- "Rangers FC":["Portyázók FC","POR"],
- "Real Betis":["Reál Bétisz","BET"],
- "Real Madrid CF":["Reál Madrigál","RMG"],
+ "RSC Anderlecht":["Anderlecsó","AND"],
+ "Rangers FC":["Portyázók eFCé","POR"],
+ "Real Betis":["Reál Fogadisz","BET"],
+ "Real Madrid CF":["Királyi Gárdonyi","GÁR"],
  "Real Sociedad":["Reál Társaság","TÁR"],
  "Real Zaragoza":["Reál Szaragóca","SZA"],
  "River Plate":["Folyótányér","FOL"],
- "SC Freiburg":["Szabadvár SC","SZV"],
- "SL Benfica":["SL Benfika","BEN"],
- "SS Lazio":["SS Laciházi","LAC"],
- "SSC Napoli":["SSC Nápolyi","NÁP"],
+ "SC Freiburg":["Szabadvár eSCé","SZV"],
+ "SL Benfica":["Benn Fika","BEN"],
+ "SS Lazio":["Laciházi Szolgálat","LAC"],
+ "SSC Napoli":["Nápolyi","NÁP"],
  "SV Werder Bremen":["Verdai Bréma","BRÉ"],
- "Santos FC":["Szentesi FC","SZT"],
- "Sevilla FC":["Szevillai Borbély","SZB"],
+ "Santos FC":["Szántós eFCé","SZT"],
+ "Sevilla FC":["Szevillyai Borbély","SZB"],
  "Shakhtar Donetsk":["Bányász Donyeck","BÁN"],
- "Sheffield United":["Seffildi Egyesült","SEG"],
+ "Sheffield United":["Seffildi Egyesültek","SEG"],
  "Sheffield Wednesday":["Seffildi Szerda","SSZ"],
  "Slovan Bratislava":["Pozsonyi Szlovan","POZ"],
- "Southampton FC":["Délhampton FC","DÉL"],
+ "Southampton FC":["Délhampton eFCé","DÉL"],
  "Spezia Calcio":["Speciális Rúgás","SPE"],
- "Sporting CP":["Sportoló CP","SPO"],
- "Stade Brestois":["Bresti Stadion","BRS"],
- "Stade Rennais":["Rennes-i Stadion","REN"],
- "Stade de Reims":["Reimsi Stadion","REI"],
+ "Sporting CP":["Sportoló CéPé","SPO"],
+ "Stade Brestois":["Bresti Stadionbúki","BRS"],
+ "Stade Rennais":["Renni Stadionbúki","REN"],
+ "Stade de Reims":["Reimsi Stadionbúki","REI"],
  "Steaua București":["Bukaresti Csillag","STE"],
- "Stoke City":["Stokkos Város","STO"],
+ "Stoke City":["Sztokkos Város","STO"],
  "Szpartak Moszkva":["Szpártai Moszkva","SZP"],
- "São Paulo FC":["Szentpáli FC","SPA"],
+ "São Paulo FC":["Szentpáli eFCé","SPA"],
  "Torino FC":["Torinói Bikák","TOR"],
  "Tottenham Hotspur":["Tottyantó Sarkantyú","TOT"],
- "Toulouse FC":["Tuluzi FC","TUL"],
+ "Toulouse FC":["Tulúzi eFCé","TUL"],
  "UC Sampdoria":["Sampon-Dória","SAM"],
- "US Foggia":["Foggiai Fogas","FOG"],
+ "US Foggia":["Foddzsiai Fogas","FOG"],
  "US Sassuolo":["Szasszujoló","SZU"],
  "Udinese Calcio":["Udinei Rúgás","UDI"],
- "Valencia CF":["Valenciai Narancs","VAL"],
- "VfB Stuttgart":["VfB Stuttgatyó","STU"],
- "VfL Bochum":["VfL Bohókás","BOH"],
- "VfL Wolfsburg":["Farkasvár VfL","FAR"],
- "Videoton FC":["Videómagnó FC","VID"],
+ "Valencia CF":["Valensziai Narancs","VAL"],
+ "VfB Stuttgart":["Stuttgatyó","STU"],
+ "VfL Bochum":["Bohókás","BOH"],
+ "VfL Wolfsburg":["Farkasvár","FAR"],
+ "Videoton FC":["Videómagnó eFCé","VID"],
  "Villarreal CF":["Villámreál","VLR"],
  "West Bromwich Albion":["Nyugat-Bromvics","NYB"],
- "West Ham United":["Nyugat-Sonka Egyesült","SON"],
- "Wigan Athletic":["Vigan Atlétika","VIG"],
- "Wimbledon FC":["Vimbledoni FC","VIM"],
+ "West Ham United":["Nyugat-Sonkai Egyesültek","SON"],
+ "Wigan Athletic":["Vígan Atlétizál","VIG"],
+ "Wimbledon FC":["Vimbledoni eFCé","VIM"],
  "Zenit St. Petersburg":["Zenitpont Pétervár","ZEN"],
  "Újpest FC":["Újpesti Lilák","ÚJP"],
  "Újpesti Dózsa":["Újpesti Dorozsma","DOZ"],
@@ -46181,8 +46313,16 @@ function h2hWireSnapshot(){
     formName:(MS.active[MS.gi]&&MS.active[MS.gi].p.n)||null,
     weakName:(MS.active[MS.bi]&&MS.active[MS.bi].p.n)||null,
     /* KI ÍRTA — ebből derül ki, ha a két kliens ugyanabba a mezőbe ír (szerep-
-       ütközés). A h2hTick ezt látva magától átvált a másik mezőre. */
+       ütközés). A h2hTick ezt látva magától átvált a másik mezőre.
+       P1b: EZ AZONOSÍTJA a társ korábbi kereteit is. A helyettesítés csak
+       olyan pillanatképet vehet elő, amit BIZONYÍTHATÓAN ő írt — a mező neve
+       (host/guest) ehhez kevés, mert a szerepek ütközés után cserélhetnek. */
     by:mpMyId(),
+    /* MIKOR KÉSZÜLT — a HELYI órán, de mindig ugyanazon a gépen: a saját
+       pillanatképeit ez sorba rakja. A P1b ezzel dönt két, azonos rangú kulcs
+       között (ugyanannak a szezonnak két kupamérkőzése). Kulcsok közti
+       elsődleges sorrend a szezon+forduló marad — az órától független. */
+    at:Date.now(),
     /* ---- FÉLTÁVI TABELLÁHOZ: A MÉRLEG IS ÁTUTAZIK ----
        A párharc épp a 15. fordulóban megy, vagyis pontosan a féltávnál, és ez
        az EGYETLEN pont a szezon közepén, ahol a két kliens amúgy is beszél
@@ -47847,10 +47987,17 @@ function mpPresencePaint(){
   }else{
     /* null = nem tudjuk. Ezt KI IS MONDJUK: a jelenlét előtt nyitott
        szobákban nincs ilyen adat, és offline-nak hazudni rosszabb. */
-    el.innerHTML=_mpPresRoom
-      ? '<span style="color:var(--dim2)">A társad jelenléte nem ismert (régebbi szoba).</span>'
-      : "";
+    const pe=mpNet.presErr;
+    el.innerHTML=!_mpPresRoom ? ""
+      : pe
+        ? '<span style="color:#e0a0a0">A jelenlét-jelzés nem megy ki ezen a gépen '
+          +'<small>('+esc(String(pe).slice(0,44))+')</small><br>'
+          +'<small style="color:var(--dim2)">Ha ez tartós: a Firebase-szabályfájl frissített '
+          +'változata még nincs közzétéve. A játék ettől működik, csak a társad '
+          +'jelenlétét nem látjuk.</small></span>'
+        : '<span style="color:var(--dim2)">A társad jelenléte nem ismert (régebbi szoba).</span>';
   }
+  try{mpNudgePaint();}catch(e){}
   /* ---- P1: A VISSZASZÁMLÁLÓ ----
      Csak akkor, ha van mód, van mire várni, és a társ tényleg nincs ott —
      az mpDeadlineLeft mind a hármat egyszerre nézi. A számot KIÍRJUK, mert
@@ -47859,7 +48006,8 @@ function mpPresencePaint(){
   try{
     const T=mpTempoOf(_mpPresRoom), o=_mpSoloOut;
     if(!T.ms)return;
-    const h=mpDeadlineLeft(o?o.at:(_h2hWaitAt||null));
+    const h=o?mpDeadlineLeft(mpSoloStart(o),o.shared!=null)
+             :mpDeadlineLeft(_h2hWaitAt||null,false);
     if(h===null)return;
     if(o&&o.auto&&T.auto){
       el.innerHTML+=`<br><span style="color:var(--gold)">⏱ Villám tempó — `
@@ -47869,22 +48017,63 @@ function mpPresencePaint(){
         +(h>0?`<b>${mpMMSS(h)}</b> múlva felajánlom a továbblépést.`
              :`a továbblépés gombja lent.`)+`</span>`;
     }else if(h<=0){
-      /* A PÁRHARC KAPUJA. Itt nincs lágy kiút: a „folytatom egyedül" VÉGLEG
-         leválasztaná a karriert. Hárompercnyi távollét miatt ezt nem kínáljuk
-         fel gombként, és magától végképp nem lépjük meg — csak elmondjuk,
-         hogy a várakozásnak nincs értelme itt ülve. */
+      /* A PÁRHARC KAPUJA, HELYETTESÍTHETŐ KERET NÉLKÜL. A P1b azt tudja
+         felállítani, amit a társ KORÁBBAN maga küldött fel ebbe a szobába —
+         az első párharcnál ilyen még nincs. Ezt KIMONDJUK: a „nem történik
+         semmi" magyarázat nélkül úgy néz ki, mintha a program elakadt volna.
+         A kemény kiút (a karrier leválasztása) itt sem lép magától. */
       el.innerHTML+=`<br><span style="color:var(--dim2)">A határidő letelt, de a párharcot `
-        +`nem lehet nélküle lejátszani — az ő kerete kell hozzá. Lépj ki nyugodtan: `
-        +`a mérkőzés magától lefut, amint ő is elindítja ezt a fordulót.</span>`;
+        +`nem lehet nélküle lejátszani — az ő kerete kell hozzá.`
+        +(_h2hStaleWhy==="nincs"
+          ? ` Korábbi keretét sem tudjuk felállítani: ebben a szobában még egyetlen `
+            +`fordulót sem küldött fel. Kitalálni pedig nem fogunk helyette csapatot.`
+          : ``)
+        +` Lépj ki nyugodtan: a mérkőzés magától lefut, amint ő is elindítja ezt a `
+        +`fordulót.</span>`;
     }
   }catch(e){}
+}
+/* A BÖKÉS-GOMB ÁLLAPOTA. Ugyanabban a ritmusban frissül, mint a jelenlét —
+   nem indít saját ciklust. */
+function mpNudgePaint(){
+  const w=$("h2hWaitNudgeWrap"),b=$("h2hWaitNudgeBtn"),m=$("h2hWaitNudgeMsg");
+  if(!w||!b)return;
+  /* CSAK OFFLINE TÁRSNÁL. Aki ott ül, azt nem kell értesíteni; a "nem tudjuk"
+     állapotban sem kínáljuk, mert ott a feliratkozásáról sem tudunk semmit. */
+  if(mpMateOnline(_mpPresRoom)!==false||!pushBeallitva()){w.classList.add("hide");return;}
+  w.classList.remove("hide");
+  const baj=nudgeLehet(_mpPresRoom);
+  b.disabled=!!baj;
+  if(m&&!m.dataset.tapadt)m.textContent=baj||"";
+  /* A SAJÁT feliratkozás gombja: csak amíg nincs engedélyünk. Ha már van,
+     a gomb eltűnik — egy örökké ott álló „kapcsold be" a legjobb módja
+     annak, hogy a felhasználó megtanulja átnézni rajta. */
+  const sw=$("h2hWaitSubWrap");
+  if(sw){
+    const eng=pushEngedely();
+    sw.classList.toggle("hide",!(pushBeallitva()&&eng!=="granted"));
+    const sm=$("h2hWaitSubMsg");
+    if(sm&&!sm.dataset.tapadt)
+      sm.textContent=(eng==="denied")
+        ?"Letiltottad — a böngésző beállításaiban engedélyezhető."
+        :"";}
 }
 function mpPresenceTick(){
   if(mpNet.mode!=="fb"||!MP.activeRoom)return;
   const t=Date.now();
   if(t-_mpPresAt<MP_PRESENCE_MS)return;
   _mpPresAt=t;
-  try{mpBk().get(MP.activeRoom).then(r=>{_mpPresRoom=r;mpPresencePaint();}).catch(()=>{});}
+  /* ELSŐ KÖR: a teljes szoba, mert a tempó is kell belőle. UTÁNA már csak a
+     `players` ág — a tempó a szoba állandója, azt megőrizzük. Így a nyolc-
+     másodperces figyelő nem tölti le újra és újra a párharcok kereteit. */
+  const elso=!_mpPresRoom||_mpPresRoom.code!==MP.activeRoom;
+  const B=mpBk();
+  const keres=(elso||!B.presence)?B.get(MP.activeRoom):B.presence(MP.activeRoom);
+  try{keres.then(r=>{
+    if(r&&!elso&&r.tempo===undefined&&_mpPresRoom&&_mpPresRoom.tempo!==undefined)
+      r.tempo=_mpPresRoom.tempo;
+    if(r&&!r.code)r.code=MP.activeRoom;
+    _mpPresRoom=r;mpPresencePaint();}).catch(()=>{});}
   catch(e){}
 }
 function mpWaitWatchdog(){
@@ -47941,8 +48130,14 @@ const MP_SOLO_MS=25000;
 let _mpSoloOut=null;
 /* A FUTÓ várakozás egyedüli kiútja. A hívó a saját leállítóját és
    folytatását adja meg — a réteg csak felkínálja. */
-function mpSoloArm(label,fn,gate,auto){
-  if(_mpSoloOut&&_mpSoloOut.gate===gate)return;   /* ugyanaz a kör: az óra ne induljon újra */
+function mpSoloArm(label,fn,gate,auto,shared){
+  if(_mpSoloOut&&_mpSoloOut.gate===gate){
+    /* A KÖZÖS ÓRA UTÓLAG PONTOSÍTHATÓ, az arm-idő nem. A P1b első körében a
+       szoba `openedAt` mezője még nem biztos, hogy olvasható; amint az lesz,
+       átveszi a helyi becslést. Az arm-időt viszont nem indítjuk újra —
+       különben a 25 mp-es padló minden körben elölről kezdődne. */
+    if(shared!=null)_mpSoloOut.shared=shared;
+    return;}
   /* AZ `auto` JELÖLI, HOGY A LÉPÉS MAGÁTÓL IS MEGTEHETŐ-E (Villám mód).
      A nyolc kapu kiútja LÁGY: a saját eredményemmel megyek tovább, a saját
      kvalifikációmmal indulok, egyedül folytatom a sorozatot — mind a te
@@ -47950,7 +48145,13 @@ function mpSoloArm(label,fn,gate,auto){
      A párharcé NEM ilyen: ott az mpOrphanCareer VÉGLEG leválasztja a
      karriert (S.mpOrphan), ezért az sosem kap auto-jelölést. */
   _mpSoloOut={label:label||"A társad nem jelentkezik — folytatom egyedül",
-              fn,gate:gate||null,at:Date.now(),auto:auto!==false};}
+              fn,gate:gate||null,at:Date.now(),auto:auto!==false,
+              /* `shared`: SZERVERIDŐBEN mért kezdet, ha van. Ott kell, ahol a
+                 határidő KÖZÖS eredményt dönt el (P1b) — a lágy kapuknál marad
+                 a helyi `at`, mert ott a döntés a saját oldalon dől el. */
+              shared:(shared!=null?shared:null)};}
+/* A határidő kezdőpontja: a közös óra, ha van, különben a helyi arm-idő. */
+function mpSoloStart(o){return (o&&o.shared!=null)?o.shared:(o?o.at:null);}
 function mpSoloClear(){_mpSoloOut=null;}
 /* A réteg minden megjelenítéskor megnézi, kell-e már kiút. A KONKRÉT kapuk
    (szezonindítás, kieséses kör) ezután írhatják felül a gombot a sajátjukkal:
@@ -47975,12 +48176,16 @@ function mpSoloOffer(oppReady){
      nincs ott — az mpDeadlineLeft ez utóbbit is figyeli. */
   const T=mpTempoOf(_mpPresRoom);
   if(!T.auto||!o.auto)return;
-  const h=mpDeadlineLeft(o.at);
+  const h=mpDeadlineLeft(mpSoloStart(o),o.shared!=null);
   if(h===null||h>0)return;
   if(_mpSoloFired===o)return;      /* egyszer, ne pörögjön */
   _mpSoloFired=o;
-  try{addLine("⏱️ <b>Villám tempó:</b> a társad nem jelentkezett a határidőig — "
-    +esc(o.label.replace(/^A társad[^—]*—\s*/,""))+".","m ev");}catch(e){}
+  /* A PÁRHARC A SAJÁT SZAVAIVAL MONDJA EL (h2hStart), a meccs mellett, és a
+     visszatérő játékosnak is. Itt csak megismételnénk — mérve három egyforma
+     sor állt egymás alatt ugyanarról az egy lépésről. */
+  if(String(o.gate||"").indexOf("duel:")!==0)
+    try{addLine("⏱️ <b>Villám tempó:</b> a társad nem jelentkezett a határidőig — "
+      +esc(o.label.replace(/^A társad[^—]*—\s*/,""))+".","m ev");}catch(e){}
   lep();}
 let _mpSoloFired=null;
 function h2hWaitShow(round,msg,mine,opp,what){
@@ -48034,6 +48239,7 @@ const H2H_WAIT_FINAL={mine:"A te szezonzárásod",opp:"A társad szezonzárása"
 function h2hAbortWait(){
   _h2hBusy=false;
   if(_h2hPoll){clearTimeout(_h2hPoll);_h2hPoll=null;}
+  h2hStaleDisarm();   /* P1b: a párharc lágy kiútja csak a párharc alatt éljen */
   h2hForcedEnd();
   h2hWaitHide();
   $("kickBtn").disabled=false;
@@ -48084,6 +48290,31 @@ function h2hWaitLeave(){
      lépni belőle. */
   if(!mpAbortAllWaits()){try{h2hAbortWait();}catch(e){}}
   try{h2hWaitHide();}catch(e){}}
+/* P2b — a bökés gombja. A visszajelzés RAGAD egy ideig (`tapadt`), különben a
+   3 mp-enkénti újrarajzolás azonnal letörölné az "elküldve" üzenetet, és a
+   felhasználó nem tudná meg, sikerült-e. */
+$("h2hWaitNudgeBtn")&&($("h2hWaitNudgeBtn").onclick=async()=>{
+  const b=$("h2hWaitNudgeBtn"),m=$("h2hWaitNudgeMsg");
+  b.disabled=true;
+  if(m){m.dataset.tapadt="1";m.textContent="Küldés…";m.style.color="var(--dim2)";}
+  const r=await nudgeKuld();
+  if(m){
+    m.textContent=r.ok?"🔔 Elküldve — a társad értesítést kapott.":("Nem ment el: "+r.miert);
+    m.style.color=r.ok?"#8fd99a":"#e0a0a0";
+    setTimeout(()=>{try{delete m.dataset.tapadt;}catch(e){}},8000);}
+  try{mpNudgePaint();}catch(e){}});
+$("h2hWaitSubBtn")&&($("h2hWaitSubBtn").onclick=async()=>{
+  const b=$("h2hWaitSubBtn"),m=$("h2hWaitSubMsg");
+  b.disabled=true;
+  if(m){m.dataset.tapadt="1";m.textContent="Engedély kérése…";m.style.color="var(--dim2)";}
+  const ok=await pushKozzetesz(MP.activeRoom);
+  if(m){
+    m.textContent=ok?"🔔 Kész — mostantól szólunk, ha rád várnak."
+                    :("Nem sikerült: "+(mpNet.pushErr||"ismeretlen ok"));
+    m.style.color=ok?"#8fd99a":"#e0a0a0";
+    setTimeout(()=>{try{delete m.dataset.tapadt;}catch(e){}},8000);}
+  b.disabled=false;
+  try{mpNudgePaint();}catch(e){}});
 $("h2hWaitCancelBtn")&&($("h2hWaitCancelBtn").onclick=()=>{try{h2hWaitLeave();}catch(e){h2hWaitHide();}});
 /* A KEZDŐLAP-GOMB A VÉGSŐ KIÚT — sosem bukhat el.
    Régen: `h2hWaitLeave(); goHomeScreen();`. Ha a leave BÁRHOL kivételt dobott
@@ -48140,6 +48371,173 @@ function h2hResumeForced(){
   {const b=$("matchHubBtn");if(b)b.classList.add("hide");}
   {const b=$("kickBtn");if(b){b.disabled=true;b.textContent="⚔ Párharc — a kereted fent van";}}
   h2hBeginDuel();}
+/* ================= P1b — PÁRHARC A TÁRS KORÁBBI KERETÉVEL =================
+   A FAL, AMIT EZ MEGKERÜL. A párharchoz KÉT pillanatkép kell (h2hSimulate).
+   A hiányzó játékos kliense nem fut, tehát nem tud feltölteni semmit — a jelen
+   lévő pedig nem tudja, milyen tizenegyet állított volna. Enélkül a „menjünk
+   tovább” szónak nincs jelentése: nincs mit szimulálni.
+
+   A TISZTESSÉGES VÁLASZ. Nem találunk ki keretet helyette. Azt vesszük elő,
+   amit LEGUTÓBB Ő MAGA állított össze és küldött fel ebbe a szobába. Nem
+   ideális — de az ő döntése volt, determinisztikus, és visszatérve olyan
+   csapatot talál a történetében, amit tényleg ő rakott ki.
+
+   AMIT KIFEJEZETTEN NEM CSINÁLUNK: véletlen tizenegyet, „átlagos” csapatot,
+   CPU-keretet az ő nevében. Technikailag menne, és épp ezért veszélyes: a PvP
+   egyetlen valutája a bizalom, ez pedig elköltené.
+
+   NÉGY FÉK, ÉS MIND A NÉGY KELL:
+     1. a tempó nem Kényelmes (a mai viselkedés érintetlen marad),
+     2. a társ TÉNYLEG nincs ott (F0 jelenlét; „nem tudjuk” = nem lépünk),
+     3. letelt a KÖZÖS határidő (openedAt, szerveridőben) ÉS a helyi 25 mp is,
+     4. van mit a helyébe tenni — ha nincs, inkább kimondjuk.
+   A beírás tranzakcióval megy (h2hClaim): ha a friss kerete közben mégis
+   megérkezik, a helyettesítés meg sem történik.
+
+   AMI SZÁNDÉKOSAN NEM VÁLTOZIK: a párharc KEMÉNY kiútja (mpOrphanCareer, a
+   karrier végleges leválasztása) továbbra sem lép magától, sosem. Ez itt egy
+   ÚJ, LÁGY kiút: közös eredményt szül, mindkét oldal ugyanazt látja, és senki
+   karrierje nem csonkul. Ezért kaphat automatikát Villám módban. */
+
+/* A kulcsok kronológiai rangja. „s2r15” → 2. szezon 15. forduló; a kupa a
+   szezon vége (a bajnokság 30 fordulója UTÁN megy), ezért 100 fölé kerül.
+   Két azonos rangú kupameccs között a pillanatkép saját `at`-je dönt — az
+   ugyanannak a gépnek az órája, tehát önmagához képest megbízható. */
+function h2hKeyRank(k){
+  const m=/^s(\d+)(?:r(\d+)|cupd[a-z0-9]*l(\d+))$/i.exec(String(k||""));
+  if(!m)return null;
+  const sz=+m[1];
+  if(m[2]!=null)return sz*1000+Math.min(99,+m[2]);
+  return sz*1000+100+Math.min(99,+m[3]||0);}
+function h2hKeySeason(k){
+  const m=/^s(\d+)/i.exec(String(k||""));
+  return m?+m[1]:null;}
+/* Emberi felirat a kulcsból — a felhasználónak tudnia kell, MELYIK keretével
+   játszott, különben a „nem az ő csapata volt” érzés indoklás nélkül marad. */
+function h2hKeyLabel(k){
+  const m=/^s(\d+)(?:r(\d+)|cupd[a-z0-9]*l(\d+))$/i.exec(String(k||""));
+  if(!m)return String(k||"?");
+  return m[2]!=null ? `${m[1]}. szezon ${m[2]}. forduló` : `${m[1]}. szezon, kupameccs`;}
+/* A HATÁROZOTT NÉVELŐ a felirat elé. A sorszámnév KIEJTÉSE dönt, nem a
+   számjegy: „az ELSŐ", „az ÖTÖDIK", de „a MÁSODIK", „a TIZENÖTÖDIK". Enélkül
+   a képernyőn „a 1. szezon" állna — apróság, de minden párharcnál ott van. */
+function h2hKeyNevelo(k){
+  const m=/^s(\d+)/i.exec(String(k||""));
+  if(!m)return "a";
+  const n=m[1];
+  return (n==="1"||n[0]==="5")?"az":"a";}
+/* A társ azonosítója a szobából. */
+function mpMateId(room){
+  try{
+    if(!room||!room.players)return null;
+    const me=mpMyId();
+    const t=Object.keys(room.players).filter(k=>k!==me);
+    return t.length?t[0]:null;
+  }catch(e){return null;}}
+/* A LEGUTÓBBI keret, amit BIZONYÍTHATÓAN a társ írt. A mező neve (host/guest)
+   nem elég azonosításnak: szerep-ütközés után a két oldal mezőt cserélhet,
+   tehát a régi ágakon a „guest” nem feltétlenül ő. A pillanatkép `by` mezője
+   viszont az írót nevezi meg — csak azt fogadjuk el. */
+function h2hMateSnapPick(room,curKey,mateId){
+  try{
+    if(!room||!room.h2h||!mateId)return null;
+    let best=null;
+    Object.keys(room.h2h).forEach(k=>{
+      if(k===curKey)return;
+      const rank=h2hKeyRank(k);
+      if(rank==null)return;
+      const node=room.h2h[k];
+      if(!node)return;
+      ["host","guest"].forEach(f=>{
+        const s=node[f];
+        /* Csak ÉRTELMES pillanatkép: az övé, van benne keret, és nem egy
+           korábbi helyettesítés (azt nem másoljuk tovább — abból lánc lenne,
+           és egyre régebbi keretek köszönnének vissza). */
+        if(!s||s.by!==mateId||!Array.isArray(s.players)||!s.players.length)return;
+        if(s.stale)return;
+        const at=(typeof s.at==="number")?s.at:0;
+        if(!best||rank>best.rank||(rank===best.rank&&at>best.at))
+          best={snap:s,key:k,rank,at};});});
+    return best;
+  }catch(e){return null;}}
+/* MIÉRT NEM MÁSOLJUK ÁT A `standing`-ET SZEZONHATÁRON.
+   A mérleg mellett a CPU-k elleni eredmények is utaznak benne, SEASON_OPPS
+   indexekkel — azok szezononként MÁS csapatok. Egy tavalyi mérleg a féltávi
+   tabellába kerülve nem pontatlan volna, hanem hazug. Ugyanabban a szezonban
+   viszont ez tényleg az ő korábbi állása, tehát ott marad. */
+function h2hStaleSnap(pick,curKey,myId){
+  const s=Object.assign({},pick.snap);
+  if(h2hKeySeason(pick.key)!==h2hKeySeason(curKey))delete s.standing;
+  s.stale=true;s.staleFrom=pick.key;s.staleBy=myId;s.at=Date.now();
+  return s;}
+/* Miért NEM lehet most helyettesíteni? A képernyő ezt kiírja — egy néma
+   „nem történik semmi” a legrosszabb, mert a felhasználó nem tudja, vár-e még. */
+let _h2hStaleWhy=null;
+/* A KERESÉS EGYSZER FUT PÁRHARCONKÉNT, nem körönként.
+   MIÉRT SZÁMÍT. A keresés a szoba TELJES pillanatkép-archívumát nézi át: több
+   szezon után az tíz-egynéhány keret, fejenként pár kilobájt. Kétésfél
+   másodpercenként újralekérni ezt kényelmes volna, de a társ mobilnetjén és a
+   Firebase ingyenes keretén is ez a legdrágább dolog, amit a beváró képernyő
+   tehetne — miközben az eredmény a párharc alatt nem változik. */
+let _h2hStale={key:null,pick:null,kesz:false,fut:false};
+async function h2hStaleLookup(key){
+  const mate=mpMateId(_mpPresRoom);
+  if(!mate)return null;
+  let all=null;
+  try{all=await mpBk().h2hAll(MP.activeRoom);}catch(e){return null;}
+  return h2hMateSnapPick({h2h:all},key,mate);}
+function h2hStaleArm(key,myField,oppField,round,node){
+  const T=mpTempoOf(_mpPresRoom);
+  if(!T.ms){_h2hStaleWhy="tempo";return;}
+  if(_h2hStale.key!==key)_h2hStale={key,pick:null,kesz:false,fut:false};
+  if(!_h2hStale.kesz){
+    if(!_h2hStale.fut){
+      _h2hStale.fut=true;
+      h2hStaleLookup(key).then(pk=>{_h2hStale.pick=pk;_h2hStale.kesz=true;})
+        .catch(()=>{_h2hStale.kesz=true;});}
+    _h2hStaleWhy="keres";return;}
+  const pick=_h2hStale.pick;
+  if(!pick){_h2hStaleWhy="nincs";return;}
+  _h2hStaleWhy=null;
+  const shared=(node&&typeof node.openedAt==="number")?node.openedAt:null;
+  mpSoloArm(
+    `A társad nem elérhető — ${h2hKeyNevelo(pick.key)} ${h2hKeyLabel(pick.key)} keretével játszom le`,
+    ()=>{h2hStaleGo(key,myField,oppField,round,pick);},
+    "duel:"+key,true,shared);}
+function h2hStaleDisarm(){
+  if(_mpSoloOut&&String(_mpSoloOut.gate||"").indexOf("duel:")===0)mpSoloClear();}
+async function h2hStaleGo(key,myField,oppField,round,pick){
+  try{
+    if(!_h2hBusy)return;
+    if(_h2hPoll){clearTimeout(_h2hPoll);_h2hPoll=null;}
+    h2hWaitShow(round,"A társad korábbi keretét állítjuk fel…",true,false);
+    /* ÚJRAOLVASÁS a beírás előtt. Nem elegancia: a 2,5 másodperces körök közt
+       befuthatott a friss kerete vagy akár a kész eredmény is. */
+    let n=null;
+    try{n=await mpBk().h2hGet(MP.activeRoom,key);}
+    catch(e){
+      $("h2hWaitErr").textContent="Nincs kapcsolat a szobával — újrapróbáljuk.";
+      h2hTick(key,myField,oppField,round);return;}
+    if(!_h2hBusy)return;
+    if(n&&n.sim){h2hStart(n,n.sim,round);return;}
+    if(n&&n[oppField]){h2hTick(key,myField,oppField,round);return;}
+    const sub=h2hStaleSnap(pick,key,mpMyId());
+    let r=null;
+    try{r=await mpBk().h2hClaim(MP.activeRoom,key,oppField,sub);}
+    catch(e){
+      $("h2hWaitErr").textContent="A korábbi keretet nem sikerült felállítani — újrapróbáljuk.";
+      h2hTick(key,myField,oppField,round);return;}
+    if(!_h2hBusy)return;
+    /* A tranzakció elutasította: időközben MEGÉRKEZETT az igazi kerete. Ez a
+       jó vég — a rendes kör onnantól a friss pillanatképpel megy tovább. */
+    /* A tranzakció elutasította → ezt KIÍRJUK; ha sikerült, NEM írunk semmit:
+       a magyarázat a meccs mellett, a h2hStart-ban jön, ahol a visszatérő
+       játékos is látja. Itt csak duplikálnánk. */
+    if(!r||!r.ok)
+      $("h2hWaitErr").textContent="A társad kerete időközben megérkezett — azzal játszunk.";
+    h2hTick(key,myField,oppField,round);
+  }catch(e){
+    try{h2hTick(key,myField,oppField,round);}catch(_){}}}
 /* A csere levezénylése. Minden lépés ÚJRAINDÍTHATÓ: ha a böngésző félúton
    újratölt, a szobában lévő állapotból pontosan ott folytatódik. */
 async function h2hBeginDuel(){
@@ -48153,9 +48551,22 @@ async function h2hBeginDuel(){
      kérdezünk, ha ehhez a párharchoz még nem döntöttél (a döntés — a „nem" is —
      a mentés része), és csak akkor, ha a keret még nem ment fel. */
   if(gameMode==="career"&&S.subPlanAsked!==key&&!(S.h2hPending&&S.h2hPending.key===key)){
-    _h2hBusy=false;
-    openSubPlanner({duel:true,key,onDone:()=>{h2hBeginDuel();}});
-    return;}
+    /* ---- P1b: NE KÉRJÜNK TERVET EGY MÁR LEFUTOTT MECCSHEZ ----
+       A P1b előtt ez nem fordulhatott elő: eredmény csak KÉT feltöltött
+       keretből születhetett, tehát ha te nem küldtél fel semmit, meccs sem
+       volt. Most viszont a társad a te KORÁBBI kereteddel lejátszhatta a
+       fordulót, amíg nem voltál elérhető — és visszatérve előbb a
+       cseretervet kérnénk tőled egy mérkőzéshez, ami már eldőlt.
+       A lekérdezést csak akkor tesszük meg, ha a hálózat MÁR él: egy tétova
+       kapcsolódásra nem várakoztatjuk a felhasználót, ott marad a régi út. */
+    let mardontott=false;
+    if(mpNet.mode&&MP.activeRoom){
+      try{const n0=await mpBk().h2hGet(MP.activeRoom,key);mardontott=!!(n0&&n0.sim);}catch(e){}
+      if(!_h2hBusy)return;}
+    if(!mardontott){
+      _h2hBusy=false;
+      openSubPlanner({duel:true,key,onDone:()=>{h2hBeginDuel();}});
+      return;}}
   /* A végigjátszás megáll: a párharc a karrier csúcspontja, azt nézni kell. */
   if(S.auto){S.auto=false;$("autoBtn").textContent="Szezon végigjátszása";}
   $("kickBtn").disabled=true;
@@ -48202,6 +48613,14 @@ async function h2hBeginDuel(){
     try{await mpBk().h2hPut(MP.activeRoom,key,myField,h2hWireSnapshot());}
     catch(e){
       $("h2hWaitErr").textContent="A pillanatképet nem sikerült elküldeni — újrapróbáljuk.";}}
+  /* ---- P1b: MIKOR NYÍLT MEG EZ A PÁRHARC (SZERVERIDŐBEN) ----
+     A helyettesítés határideje KÖZÖS eredményt dönt el, ezért nem mérhető a
+     helyi „mikor nyitottam ki a képernyőt” pillanatból: az minden újratöltéskor
+     újraindulna, és aki tegnap óta vár, ma megint hármat várna. Egyszer íródik
+     ki — aki előbb ideér —, és onnantól mindkét kliens ugyanazt a pillanatot
+     érti alatta (mpNow). Ha nem megy ki, a P1b a helyi órára esik vissza. */
+  if(!node||node.openedAt==null){
+    try{await mpBk().h2hPut(MP.activeRoom,key,"openedAt",mpStamp());}catch(e){}}
   /* AZ ELKÖTELEZŐDÉS RÖGZÍTÉSE A MENTÉSBE. Innentől bármi történik — kilépsz a
      kezdőlapra, összeomlik a fül, elmegy a net —, a visszatérés egyenesen ide
      hoz vissza, és a keret nem tud elcsúszni a felküldött pillanatkép alól. */
@@ -48269,6 +48688,13 @@ async function h2hTickRun(key,myField,oppField,round){
     catch(e){$("h2hWaitErr").textContent="Az eredményt nem sikerült elküldeni — a társad később kapja meg.";}
     if(!_h2hBusy)return;
     h2hStart(node,sim,round);return;}
+  /* ---- P1b: LÁGY KIÚT A PÁRHARCBÓL ----
+     Csak akkor van értelme, ha ÉN már kész vagyok és ŐRÁ várunk. Ha az én
+     rekeszem üres, előbb a sajátomat kell feltölteni; ha az övé megjött,
+     nincs mit helyettesíteni — ilyenkor a felajánlást le is szereljük, hogy
+     egy elavult gomb ne maradjon a képernyőn. */
+  if(mine&&!opp)h2hStaleArm(key,myField,oppField,round,node);
+  else h2hStaleDisarm();
   /* 3) Várakozás. Nincs időkorlát, és a képernyő nyugodtan elhagyható.
      A DIAGNÓZIS is kiíródik: melyik szerepben vagy, és melyik rekesz üres.
      Enélkül egy elakadás néma volt — a felhasználó annyit látott, hogy ő kész,
@@ -48314,6 +48740,7 @@ async function h2hTickRun(key,myField,oppField,round){
           szabályok is elavulnak — a következő indításkor újra megkérdezzük. */
        h2hPendingClear();
        S.subPlanAsked=null;
+       h2hStaleDisarm();   /* P1b: a keret visszahívásával a felajánlás is tárgytalan */
        h2hForcedEnd();
        /* ---- VISSZA ODA, AHONNAN A PÁRHARC INDULT ----
           BEJELENTETT HIBA: kupa-párharcból visszahívva a képernyő a BAJNOKI
@@ -48345,8 +48772,25 @@ function h2hStart(node,sim,round){
   h2hPendingClear();
   h2hForcedEnd();
   h2hWaitHide();
+  h2hStaleDisarm();
   const oppField=MP.role==="host"?"guest":"host";
   const oppSnap=(node&&node[oppField])||{};
+  /* ---- P1b: KIMONDJUK, HA NEM AZ AKTUÁLIS KERET JÁTSZOTT ----
+     MINDKÉT OLDALON. Aki helyettesített, az tudja, mit tett; a VISSZATÉRŐNEK
+     viszont ez az egyetlen esélye megérteni, miért játszott a csapata anélkül,
+     hogy elindította volna a fordulót. Egy megmagyarázatlan meccs a
+     történetében pontosan az a bizalomveszteség, amit el akarunk kerülni. */
+  try{
+    const mySnap=(node&&node[MP.role==="host"?"host":"guest"])||{};
+    if(oppSnap.stale)
+      addLine(`⏱️ A társad nem volt elérhető a határidőig — a párharc az általa `
+        +`korábban (<b>${esc(h2hKeyLabel(oppSnap.staleFrom))}</b>) összeállított `
+        +`keretével ment le.`,"m ev");
+    else if(mySnap.stale)
+      addLine(`⏱️ Ezt a fordulót a társad indította el, amíg te nem voltál elérhető. `
+        +`A csapatod az általad korábban (<b>${esc(h2hKeyLabel(mySnap.staleFrom))}</b>) `
+        +`összeállított kerettel játszott — nem találtunk ki helyetted csapatot.`,"m ev");
+  }catch(e){}
   /* A társ csapatneve HÁLÓZATRÓL érkezik, a motor pedig több helyen nyersen
      innerHTML-be írja a fixture-ellenfél nevét (fejléc, meccs-cím). Ezért itt,
      EGYETLEN ponton tisztítjuk, hogy semmi jelölés ne juthasson át. */
@@ -49073,6 +49517,33 @@ async function mpStartTick(key,myField,oppField,onReady,myBidRec){
       const mateRec=(myField==="host")?mate:mine;
       if(hostRec&&hostRec.w)mpAdoptWorldAxes(hostRec.w,(mateRec&&mateRec.w)||null);
     }catch(e){}
+    /* ---- PIRAMIS: A KÖZÖS HORGONY (3.9.20) ----
+       Itt a mezőnyt nem alku adja, hanem az osztály — az applyOppLevel amúgy
+       is elutasítaná. Ami viszont EDDIG NEM TÖRTÉNT MEG: a világ igazítása a
+       TÉNYLEGES kezdő keretekhez. A két csapaterő épp most cserélt gazdát,
+       tehát mindkét kliens ugyanabból a két számból számol — lásd
+       pyrAnchorShared. Karrierenként egyszer fut (P.mpAnchored). */
+    if(typeof pyrOn==="function"&&pyrOn()){
+      let a=null;
+      try{a=pyrAnchorShared(mine&&mine.str,mate&&mate.str);}catch(e){}
+      /* A SOROZAT-SZÁMLÁLÓK nullázása a szezonindítás része — az ág, amit ez
+         a korai visszatérés kihagy, eddig is megtette. Nem viselkedést
+         váltunk, csak a mezőny beállítását cseréljük le. */
+      S.consecutiveTitles=0;S.consecutiveBadSeasons=0;
+      mpStartAbort();
+      if(a){
+        addLine(`🤝 <b>Közös horgony:</b> a te csapatod ${Math.round(mine.str)}, a társadé `
+          +`${Math.round(mate.str)} — az átlagotok ${Math.round(a.avg*10)/10}, `
+          +`a mezőny ${oppTargetRating}.`,"m life");
+        if(a.moved)
+          addLine(`✦ A mezőny a kezdő kereteitekhez igazodott: a rés `
+            +`${a.elotte>0?"+":""}${a.elotte} → ${a.utana>0?"+":""}${a.utana} `
+            +`(a vállalás ${a.want>0?"+":""}${a.want}).`,"m ev");
+        else
+          addLine(`✦ A mezőny már a helyén állt — nem kellett igazítani.`,"m ev");
+      }
+      try{saveGame();}catch(e){}
+      onReady();return;}
     /* MINDKÉT KLIENS UGYANEZT SZÁMOLJA ki ugyanabból a két rekordból — ezért
        nincs szükség "döntőbíró" oldalra, és nem is csúszhat szét. */
     const r=mpResolveLevel(mine,mate);
@@ -76044,7 +76515,7 @@ function styleStarPickerHtml(){
       +`<div class="msTop"><b>${esc(fullName(c.p.n))}</b><span class="msRew">Rating ${c.ovr}</span></div>`
       +`<div class="msDesc">${esc(c.p.pos.join("/"))}${e&&e.age!=null?` · ${e.age} év`:""}`
       +(cs.matches?` · ${cs.matches} meccs · ${cs.g||0} gól · ${cs.a||0} gólpassz`:` · még nem játszott nálad`)+`</div>`
-      +`<button class="btn-${_styleStarPick===c.p.n?"y":"s"} stepbtn" data-starpick="${esc(fullName(c.p.n))}" style="margin-top:7px;padding:8px">`
+      +`<button class="btn-${_styleStarPick===c.p.n?"y":"s"} stepbtn" data-starpick="${esc(c.p.n)}" style="margin-top:7px;padding:8px">`
       +(_styleStarPick===c.p.n?"✓ Kiválasztva":"Ő legyen az")+`</button></div>`;});
   h+=`</div><button class="btn-${_styleStarPick?"y":"s"} stepbtn" id="styleStarConfirm"${_styleStarPick?"":" disabled"} style="margin-top:9px">`
     +(_styleStarPick?`Megerősítem — ${esc(shortName(_styleStarPick))}`:"Előbb válassz valakit")+`</button>`
@@ -76526,12 +76997,30 @@ function roleSectionHtml(){
     /* A VÁLASZTÁSHOZ ODA KELL A SZÁM. A szerep erejét a gazda-attribútum
        szabja, tehát a listában is ott a helye — különben a felhasználónak a
        keretlistába kellene visszamennie minden egyes jelöltért. */
+    /* ---- AZ `option value` AZONOSÍTÓ, NEM FELIRAT ----
+       BEJELENTETT HIBA: „a menüben most nem lehet beállítani a szezon
+       szerepeket, csak a HUB játékosnézeteiben a konkrét játékosoknál."
+
+       Az ok egy megjelenítési réteg, ami rossz helyre került. A 8927b91
+       (magyarított nevek) ezt a sort `value="${esc(fullName(p.n))}"`-re
+       írta át — a LÁTHATÓ szövegre az helyes, a `value`-ra viszont nem: azt
+       a roleAssign kapja meg, és az a KANONIKUS nevet várja (a `cur===p.n`
+       összehasonlítás is azzal megy). A menüből kiosztott szerep tehát egy
+       megjelenített nevet írt a térképbe, ami soha egyetlen játékosra sem
+       illett — a kiosztás némán elveszett.
+
+       A játékoskártyás út azért maradt jó, mert az közvetlenül `p.n`-nel
+       hívja a roleAssign-t, felirat nélkül.
+
+       A SZABÁLY: ami a felhasználónak SZÓL, az megy a megjelenítési rétegen
+       (itt a shortName az option szövegében); ami a PROGRAMNAK szól —
+       `value`, `data-*`, kulcs, összehasonlítás —, az kanonikus marad. */
     const govA=(ROLE_ATTR_OF[key]||{}).v||null;
     cand.forEach(p=>{
       let ovr=0;try{ovr=Math.round(pOvr(p));}catch(e){}
       const mas=roleKeyOfPlayer(p.n);
       const gv=govA?Math.round(roleAttrOf(p,govA)):0;
-      h+=`<option value="${esc(fullName(p.n))}"${cur===p.n?" selected":""}>`
+      h+=`<option value="${esc(p.n)}"${cur===p.n?" selected":""}>`
         +`${esc(shortName(p.n))} · ${esc((p.pos||[]).join("/"))} · ${ovr}`
         +(gv?` · ${esc(ATTR_LABELS[govA]||govA)} ${gv}`:"")
         +(mas&&mas!==key?` (most: ${esc(ROLE_DEFS[mas].n)})`:"")+`</option>`;});
@@ -83291,7 +83780,7 @@ function mpRoomSave(code){
   if(!code)return null;
   const d=loadSavedGame(mpSaveKeyFor(code));
   return saveHasGame(d)?d:null;}
-let mpNet={mode:null,db:null,fns:null,unsub:null,initing:null,err:null,
+let mpNet={mode:null,db:null,fns:null,unsub:null,initing:null,err:null,presErr:null,
   /* F0 — A KÖZÖS ÓRA. A szerver és e gép órájának különbsége ezredmásodpercben;
      a `.info/serverTimeOffset` tölti fel, amint van kapcsolat. Amíg nincs, 0 —
      vagyis a helyi óra, ami offline úgyis az egyetlen igazság. */
@@ -83430,6 +83919,142 @@ function mpMakeCode(){
   const CH="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let c="";for(let i=0;i<MP_CODE_LEN;i++)c+=CH[Math.floor(Math.random()*CH.length)];
   return c;}
+/* ================= P2b — ÉRTESÍTÉS A TÁRS ESZKÖZÉRE =================
+   BEJELENTETT KÉRÉS: „a játékban lehessen egymás eszközére értesítést
+   küldeni… ez akkor is lehetővé tenné a közös játékot, ha amúgy nem
+   ismeritek egymást és nincs lehetőséged írni a másiknak Messengeren."
+
+   MIÉRT SZABVÁNYOS WEB PUSH, ÉS NEM FIREBASE MESSAGING. A push elküldéséhez
+   szükségszerűen kell szerveroldal: a kulcsot, amivel az üzenet aláírható, a
+   kliensbe tenni annyi volna, mint kitenni az utcára — pár perc alatt
+   kiolvassák a JS-ből, és onnantól bárki küldhet bárkinek a te neveddel.
+   A Firebase-út ehhez Cloud Functiont, az pedig Blaze-csomagot (bankkártyát)
+   kívánna. A SZABVÁNYOS Web Push ugyanezt tudja VAPID-kulccsal, és
+   BÁRMELYIK szerverről küldhető — nálunk egy Netlify-függvényből, ami a
+   meglévő, ingyenes csomagban fut. Nincs új szolgáltatás és nincs számla.
+
+   A KULCS KÉT FELE: a PUBLIKUS itt áll a kliensben (ez a rendeltetése — ezzel
+   iratkozik fel a böngésző), a TITKOS soha nem kerül ide, csak a függvény
+   környezeti változójába. */
+const PUSH_VAPID_PUBLIC="";   /* ← ide jön a VAPID PUBLIKUS kulcs (lásd docs/ertesitesek.md) */
+const PUSH_SUB_KEY="30-0-push-sub-v1";   /* helyi jelző: feliratkoztunk-e ezen a gépen */
+
+function pushSupported(){
+  try{return !!("serviceWorker" in navigator&&"PushManager" in window&&
+                typeof Notification!=="undefined");}catch(e){return false;}}
+function pushBeallitva(){return !!(PUSH_VAPID_PUBLIC&&PUSH_VAPID_PUBLIC.length>20);}
+function pushEngedely(){
+  try{return pushSupported()?Notification.permission:"unsupported";}catch(e){return "unsupported";}}
+
+/* A VAPID-kulcs base64url alakból bájtokká. A böngésző csak Uint8Array-t
+   fogad el, a kulcsot viszont szövegként kapjuk — ez a kettő közti fordító. */
+function pushKulcsBajtok(b64){
+  const pad="=".repeat((4-b64.length%4)%4);
+  const alap=(b64+pad).replace(/-/g,"+").replace(/_/g,"/");
+  const nyers=atob(alap);
+  const t=new Uint8Array(nyers.length);
+  for(let i=0;i<nyers.length;i++)t[i]=nyers.charCodeAt(i);
+  return t;}
+
+/* FELIRATKOZÁS. Visszaad {ok, sub} vagy {ok:false, miert} — a felület ezt
+   mondja ki, mert a néma kudarcnál minden jobb (ugyanaz az elv, mint a
+   ranglista-feltöltésnél). */
+async function pushSubscribe(){
+  if(!pushSupported())return {ok:false,miert:"ez a böngésző nem tud értesítést fogadni"};
+  if(!pushBeallitva())return {ok:false,miert:"az értesítés még nincs beállítva (hiányzik a kulcs)"};
+  let reg=null;
+  try{reg=await navigator.serviceWorker.ready;}catch(e){}
+  if(!reg)return {ok:false,miert:"a háttérszolgáltatás nem fut"};
+  /* AZ ENGEDÉLYT CSAK ITT KÉRJÜK, a gomb megnyomásakor — sosem induláskor.
+     Egy azonnali engedélykérés a legbiztosabb módja annak, hogy örökre
+     letiltsák. */
+  let eng=Notification.permission;
+  if(eng==="default"){
+    try{eng=await Notification.requestPermission();}catch(e){eng="denied";}}
+  if(eng!=="granted")
+    return {ok:false,miert:eng==="denied"
+      ?"az értesítést letiltottad ennél a játéknál — a böngésző beállításaiban engedélyezhető"
+      :"nem kaptunk engedélyt"};
+  try{
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)
+      sub=await reg.pushManager.subscribe({
+        /* KÖTELEZŐEN LÁTHATÓ: minden push-ból értesítés lesz. A böngésző
+           enélkül nem is adna feliratkozást — és helyesen: a néma push
+           nyomkövetésre volna jó, nem erre. */
+        userVisibleOnly:true,
+        applicationServerKey:pushKulcsBajtok(PUSH_VAPID_PUBLIC)});
+    try{localStorage.setItem(PUSH_SUB_KEY,"1");}catch(e){}
+    return {ok:true,sub:JSON.parse(JSON.stringify(sub))};
+  }catch(e){return {ok:false,miert:(e&&e.message)||"a feliratkozás nem sikerült"};}}
+
+/* A FELIRATKOZÁS A SZOBÁBA — de csak a SAJÁT águnkba. Ez az, amit a társ
+   kliense kiolvas, amikor megböksz valakit.
+   MIÉRT A SZOBÁBAN ÉS NEM EGY KÖZPONTI LISTÁBAN: a szoba amúgy is a
+   hozzáférés határa (aki ismeri a kódot, az látja a szobát), tehát nem
+   nyitunk új felületet. Aki nincs a szobádban, a feliratkozásodhoz sem fér
+   hozzá — és bökni sem tud. */
+async function pushKozzetesz(code){
+  if(mpNet.mode!=="fb"||!code)return false;
+  const F=mpNet.fns;
+  if(!F||!F.update)return false;
+  const r=await pushSubscribe();
+  if(!r.ok){mpNet.pushErr=r.miert;return false;}
+  try{
+    await F.update(F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId()),
+      {push:JSON.stringify(r.sub).slice(0,900)});
+    mpNet.pushErr=null;
+    return true;
+  }catch(e){mpNet.pushErr=(e&&e.message)||String(e);return false;}}
+
+/* ---- A BÖKÉS ----
+   A fék KÉT helyen áll, és ez szándékos: a kliensé az udvariasság (ne
+   nyomkodd), az adatbázis-szabályé a VÉDELEM (ne lehessen nyomkodni). Egy
+   csak-kliensoldali fék annyit ér, mint egy zárat kirajzolni az ajtóra. */
+const NUDGE_MIN_MS=120000;         /* két bökés közt legalább ennyi */
+let _nudgeAt=0;
+function nudgeLehet(room){
+  if(mpNet.mode!=="fb"||!MP.activeRoom)return "csak élő szobában";
+  if(!pushBeallitva())return "az értesítés még nincs beállítva";
+  const t=Date.now();
+  if(t-_nudgeAt<NUDGE_MIN_MS)
+    return `várj még ${Math.ceil((NUDGE_MIN_MS-(t-_nudgeAt))/1000)} mp-et`;
+  /* A TÁRS FELIRATKOZÁSA NÉLKÜL NINCS HOVA KÜLDENI. Ezt KIMONDJUK, nem
+     tesszük szürkévé némán: a felhasználó különben a saját gépét hibáztatná. */
+  const p=nudgeTarsAg(room);
+  if(!p)return "a társad még nem csatlakozott";
+  if(!p.push)return "a társad nem kapcsolta be az értesítést";
+  return "";}
+function nudgeTarsAg(room){
+  try{
+    if(!room||!room.players)return null;
+    const me=mpMyId();
+    const k=Object.keys(room.players).filter(x=>x!==me);
+    return k.length?room.players[k[0]]:null;
+  }catch(e){return null;}}
+/* A KÜLDÉS. A kliens NEM küld push-t — csak megkéri rá a függvényt, ami a
+   titkos kulcsot őrzi. A függvénynek a szobakódot adjuk át: ő maga olvassa
+   ki belőle a társ feliratkozását, tehát innen nem lehet tetszőleges címre
+   üzenetet küldeni. */
+const NUDGE_URL="/.netlify/functions/nudge";
+async function nudgeKuld(){
+  const room=_mpPresRoom;
+  const baj=nudgeLehet(room);
+  if(baj)return {ok:false,miert:baj};
+  _nudgeAt=Date.now();
+  try{
+    const v=await fetch(NUDGE_URL,{method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({code:MP.activeRoom,from:mpMyId(),
+        /* A SAJÁT csapatnevem megy át, nem a játékosnév: az értesítés a
+           társnak szól, és őt az érdekli, KI vár rá. */
+        team:String(teamName||"").slice(0,24)})});
+    if(!v.ok){
+      let m="";try{m=(await v.json()).error||"";}catch(e){}
+      return {ok:false,miert:m||("a szerver "+v.status+"-tel válaszolt")};}
+    return {ok:true};
+  }catch(e){return {ok:false,miert:(e&&e.message)||"nem sikerült elküldeni"};}}
+
 /* ================= P1 — TEMPÓ-MÓDOK =================
    BEJELENTETT PANASZ: „jelen formájában a pvp mód nagyon lassú… a gyorsan
    haladóba beépítenénk korlátokat, hogy mennyit lehet maradni egy adott
@@ -83441,11 +84066,16 @@ function mpMakeCode(){
    oldaladon dőlnek el, visszafordíthatók, és a társad karrierjét nem
    csonkítják. Ezeket szabad magától elléptetni.
 
-   A PÁRHARC KAPUJA VISZONT MÁS. Ott a kiút az mpOrphanCareer(), ami VÉGLEG
-   leválasztja a karriert a szobáról (S.mpOrphan) — a képernyő maga is
-   kétszer kérdez rá. Egy hárompercnyi távollét miatt automatikusan
-   szétvágni egy közös karriert nem tempó volna, hanem kár. Ott ezért a
-   határidő csak FELAJÁNL, sosem lép magától.
+   A PÁRHARC KEMÉNY KIÚTJA VISZONT MÁS. Az mpOrphanCareer() VÉGLEG leválasztja
+   a karriert a szobáról (S.mpOrphan) — a képernyő maga is kétszer kérdez rá.
+   Egy hárompercnyi távollét miatt automatikusan szétvágni egy közös karriert
+   nem tempó volna, hanem kár. AZ SOSEM LÉP MAGÁTÓL, egyetlen módban sem.
+
+   P1b ÓTA VAN A PÁRHARCNAK LÁGY KIÚTJA IS: a társ KORÁBBI, saját kezűleg
+   összeállított keretével lejátszani a mérkőzést. Az közös eredményt szül —
+   mindkét oldal ugyanazt látja —, és senki karrierjét nem csonkítja, ezért
+   Villám módban ez is elléphet magától. A kettőt nem szabad összekeverni:
+   az egyik lejátssza a meccset, a másik felmondja a közös karriert.
 
    És mindkettőnél: AZ ÓRA CSAK AKKOR JÁR, HA A TÁRS TÉNYLEG NINCS OTT (F0).
    Aki ott ül és épp a keretét rendezi, azt egy háromperces határidő nem
@@ -83454,9 +84084,9 @@ const MP_TEMPO={
   nyugodt:{n:"Kényelmes", ms:0,      auto:false,
     d:"Nincs időkorlát. Napokon át elhúzódhat — ez a mai viselkedés."},
   tempos: {n:"Tempós",    ms:180000, auto:false,
-    d:"3 perc után felajánlja a továbblépést, de te döntesz."},
+    d:"3 perc után felajánlja a továbblépést, de te döntesz. Párharcnál a társad legutóbbi keretét ajánlja fel."},
   villam: {n:"Villám",    ms:180000, auto:true,
-    d:"3 perc után magától továbblép. A párharcot sosem vágja szét — azt csak felajánlja."}};
+    d:"3 perc után magától továbblép. Párharcnál a társad legutóbbi keretével játszik — a közös karriert sosem vágja szét."}};
 const MP_TEMPO_DEF="nyugodt";
 /* A HÁZIGAZDA VÁLASZTÁSA. Csak a szoba létrehozásakor számít: a vendég a
    szobából olvassa ki, nem írhatja felül — különben a két kliens két
@@ -83478,21 +84108,21 @@ function mpTempoKey(room){
   return (k&&MP_TEMPO[k])?k:MP_TEMPO_DEF;}
 function mpTempoOf(room){return MP_TEMPO[mpTempoKey(room)];}
 /* Hány ms van még hátra? null = nincs határidő (nincs mód, vagy a társ ITT VAN).
-   A start a helyi „mikor kezdtem várni" pillanat; az eltelt idő mérésénél a
-   szerver-eltolás kiesik, mert ugyanazon a gépen mérünk. A SZERVERIDŐ ott
-   válik nélkülözhetetlenné, ahol a határidő KÖZÖS eredményt dönt el (a
-   roadmap P1b lépcsője, a társ korábbi keretével lejátszott párharc) — azt
-   ez a lépcső szándékosan nem csinálja meg. */
-function mpDeadlineLeft(startAt){
+
+   KÉT IDŐTÉR, ÉS TUDNI KELL, MELYIKBEN VAGYUNK.
+   · HELYI óra (kozos=false): a start a saját gépem „mikor kezdtem várni"
+     pillanata. Ugyanazon a gépen mérünk, tehát a szerver-eltolás kiesik —
+     bevonni csak zajt adna. A nyolc LÁGY kapu így megy: ott a döntés a te
+     oldaladon dől el, és a társad karrierjét nem érinti.
+   · SZERVERIDŐ (kozos=true): a start olyan időpont, amit a SZOBA hordoz, és
+     akár a MÁSIK fél írta (P1b: a párharc `openedAt` mezője). Két gép órája
+     percekkel eltérhet; ha mindkettő a sajátjából döntené el, letelt-e az
+     idő, ugyanarra a közös eredményre más pillanatban lépnének. */
+function mpDeadlineLeft(startAt,kozos){
   const T=mpTempoOf(_mpPresRoom);
   if(!T.ms||!startAt)return null;
   if(mpMateOnline(_mpPresRoom)===true)return null;   /* ott van — nem sürgetjük */
-  /* HELYI óra, szándékosan. Az ELTELT időt ugyanazon a gépen mérjük, ahol a
-     várakozás elkezdődött — ott a szerver-eltolás kiesik, tehát bevonni csak
-     zajt adna. A szerveridő (mpNow) ott nélkülözhetetlen, ahol a MÁSIK fél
-     írta az időpontot (mpMateAwayMin), és ott lesz az, ahol a határidő KÖZÖS
-     eredményt dönt el — a roadmap P1b lépcsőjén, amit ez a lépés nem csinál. */
-  return Math.max(0,startAt+T.ms-Date.now());}
+  return Math.max(0,startAt+T.ms-(kozos?mpNow():Date.now()));}
 function mpMMSS(ms){
   const t=Math.max(0,Math.round(ms/1000));
   return Math.floor(t/60)+":"+String(t%60).padStart(2,"0");}
@@ -83533,7 +84163,22 @@ async function mpPresenceArm(code){
     await od.update({online:false,seenAt:mpStamp()});
     await F.update(r,{online:true,seenAt:mpStamp()});
     _mpPresence={code,od};
-  }catch(e){}
+    mpNet.presErr=null;
+    /* A FELIRATKOZÁS ÚJRA KIMEGY, minden szobába. Nem kérünk engedélyt —
+       csak ha MÁR megvan: a feliratkozás a szobában él, tehát egy új szoba
+       különben úgy indulna, hogy a társad nem tud megbökni, pedig te
+       engedélyezted. Ha nincs engedély, ez csendben kihagyja magát. */
+    if(pushBeallitva()&&pushEngedely()==="granted")
+      pushKozzetesz(code).catch(()=>{});
+  }catch(e){
+    /* A HIBÁT ELNYELJÜK, DE NEM FELEJTJÜK EL. A némaság szándékos — egy
+       jelenlét-írás bukása nem törheti el a szobát —, csakhogy némán a
+       felhasználó nem tudja megkülönböztetni a „nincs közzétéve a
+       szabályfájl"-t a „nem tudjuk"-tól. A leggyakoribb ok pontosan az
+       előbbi: a players/$pid alatt `$other:false` áll, tehát az `online`
+       mező addig tilos, amíg a frissített szabály ki nem megy. */
+    mpNet.presErr=(e&&e.message)||String(e);
+  }
 }
 /* A MEGBÍZÁS VISSZAVONÁSA — és ez nem szőrszálhasogatás. Ha kilépéskor a
    szoba TÖRLŐDIK, de a megbízás áll, a szerver a szakadáskor VISSZAÍRJA a
@@ -83646,6 +84291,25 @@ const mpBackendLocal={
   async h2hGet(code,round){
     const room=mpLRooms()[code];
     return (room&&room.h2h&&room.h2h[round])||null;},
+  /* P1b — a szoba TELJES pillanatkép-archívuma, egyetlen lekéréssel. */
+  async h2hAll(code){
+    const room=mpLRooms()[code];
+    return (room&&room.h2h)||null;},
+  /* F0 — CSAK A JELENLÉT. Lásd a Firebase-oldali párját: ott ez a szűkítés
+     valódi adatforgalom, itt csak az alak egyezik. */
+  async presence(code){
+    const room=mpLRooms()[code];
+    return room?{code,players:room.players||null}:null;},
+  /* P1b — ÍRÁS CSAK AKKOR, HA A REKESZ MÉG ÜRES. Itt ez triviálisan atomi:
+     egyetlen szál fut, a beolvasás és a kiírás közé nem fér be senki. */
+  async h2hClaim(code,round,field,val){
+    const rooms=mpLRooms(),room=rooms[code];
+    if(!room)return {ok:false};
+    room.h2h=room.h2h||{};room.h2h[round]=room.h2h[round]||{};
+    if(room.h2h[round][field]!=null)return {ok:false,volt:room.h2h[round][field]};
+    room.h2h[round][field]=val;
+    mpLSave(rooms);this._notify();
+    return {ok:true};},
   subscribe(code,cb){this._code=code;this._cb=cb;this._notify();},
   unsubscribe(){this._cb=null;this._code=null;}};
 /* ---- FIREBASE backend ---- */
@@ -83719,6 +84383,45 @@ const mpBackendFb={
     const F=mpNet.fns;
     const s=await F.get(F.ref(mpNet.db,"mp/rooms/"+code+"/h2h/"+round));
     return s.exists()?s.val():null;},
+  /* P1b — a szoba TELJES pillanatkép-archívuma, egyetlen lekéréssel. Ez a
+     legdrágább olvasás a szobán (több szezon kereteivel), ezért PÁRHARCONKÉNT
+     EGYSZER fut le, nem a beváró minden körében — lásd _h2hStale. */
+  async h2hAll(code){
+    const F=mpNet.fns;
+    const s=await F.get(F.ref(mpNet.db,"mp/rooms/"+code+"/h2h"));
+    return s.exists()?s.val():null;},
+  /* ---- F0 — CSAK A JELENLÉT ----
+     MÉRT KÖLTSÉG, AMIT EZ MEGSZÜNTET. A jelenlét-figyelő eddig a TELJES
+     szobát kérte le nyolcmásodpercenként — abban viszont ott van az összes
+     eddigi párharc mindkét kerete is. Több szezon után ez tíz-egynéhány
+     pillanatkép, fejenként pár kilobájt, újra és újra, miközben a jelenlét
+     mindössze két mezőn múlik. A `players` ág önmagában töredéke ennek.
+     A `tempo` a szoba állandója: egyszer olvassuk ki (a teljes lekéréssel),
+     onnantól megőrizzük — lásd mpPresenceTick. */
+  async presence(code){
+    const F=mpNet.fns;
+    const s=await F.get(F.ref(mpNet.db,"mp/rooms/"+code+"/players"));
+    return {code,players:s.exists()?s.val():null};},
+  /* P1b — ÍRÁS CSAK AKKOR, HA A REKESZ MÉG ÜRES.
+     MIÉRT NEM ELÉG AZ "OLVASOM, ÜRES, BEÍROM". A helyettesítés a TÁRS rekeszébe
+     ír. Ha ő közben mégis feltölti a friss keretét, egy sima `set` azt
+     FELÜLÍRNÁ a régivel — vagyis a jelen lévő játékos elvenné a másiktól a
+     saját, épp elküldött csapatát. A tranzakció ezt zárja ki: a szerveren dől
+     el, üres volt-e még a rekesz, és ha nem, az írás meg sem történik.
+     A `undefined` visszaadása a Firebase-tranzakcióban azt jelenti: „mégsem". */
+  async h2hClaim(code,round,field,val){
+    const F=mpNet.fns;
+    const r=F.ref(mpNet.db,"mp/rooms/"+code+"/h2h/"+round+"/"+field);
+    if(!F.runTransaction){
+      /* Régi SDK-betöltés: marad az olvasás–írás, szűkebb, de nem nulla ablakkal.
+         Ezt KIMONDJUK a hívónak, hogy a napló ne állítson többet, mint ami igaz. */
+      const s=await F.get(r);
+      if(s.exists())return {ok:false,volt:s.val(),atomi:false};
+      await F.set(r,val);
+      return {ok:true,atomi:false};}
+    const res=await F.runTransaction(r,cur=>(cur===null?val:undefined));
+    const ok=!!(res&&res.committed);
+    return {ok,atomi:true,volt:ok?null:(res&&res.snapshot&&res.snapshot.val())};},
   subscribe(code,cb){
     this.unsubscribe();
     const F=mpNet.fns;
@@ -83774,6 +84477,12 @@ function mpCollectSettings(){
                       KÉT MEZŐ: az `upAmt` a mai, folyamatos eltolás; az `up` a
                       3.5.15 előtti kliensek 0-4 fokozata, hogy egy régi
                       verziójú társ se kapjon értelmezhetetlen számot. */
+                   /* A KÉRT RÉS IS UTAZIK (3.9.20). Eddig csak az `up` ment,
+                      és a vendég visszafejtette belőle — a visszafejtés viszont
+                      kerekít, tehát a két oldal fél ponttal elcsúszhatott. A
+                      szezonindító horgony ebből a számból dolgozik, ott pedig
+                      a fél pont is világ-eltérés. */
+                   gap:(typeof pyrWantedGap==="number")?pyrWantedGap:null,
                    upAmt:pyrUpNorm(pyrWantedUp),
                    up:Math.max(0,Math.min(4,Math.round(pyrUpNorm(pyrWantedUp)/(PYR_UP_MAX/4))))}:{on:false}};}
 function mpApplySettings(s){
@@ -83833,9 +84542,22 @@ function mpApplySettings(s){
         mint a házigazdáén, és az a RÉSBŐL számolja a világ eltolását — ha a
         rés nálunk 0 maradna, a helyi számítás némán felülírná a házigazda
         döntését. Ezért itt visszafejtjük: rés = sávközép − osztályközép − up. */
-     pyrWantedGap=pyrMpGapFromUp(pyrWantedUp);
-     /* Kész klub az egyetlen kezdés a piramisban — a vendégnél is. */
-     careerStart="club";}}
+     pyrWantedGap=(typeof P.gap==="number")?P.gap:pyrMpGapFromUp(pyrWantedUp);
+     /* ---- A KEZDÉS MÓDJA A HÁZIGAZDÁÉ, NEM A MIÉNK ----
+        BEJELENTETT HIBA: „Host ágon ennél a konkrét esetnél ténylegesen draft
+        volt, ahogyan a világot beállította, guest oldalon viszont kész
+        csapatot kellett válasszon a másik játékos."
+
+        Itt egy `careerStart="club"` állt, azzal az indoklással, hogy „kész
+        klub az egyetlen kezdés a piramisban". EZ MÁR NEM IGAZ: a
+        pyrOpenDivPickFromDraft (3.7.18) óta a draft is teljes értékű út a
+        piramisba. A sor viszont bent maradt — beragadt régi elem —, és a
+        vendégnél NÉMÁN FELÜLÍRTA a házigazda választását, amit két sorral
+        feljebb (mpApplySettings) épp az imént vettünk át.
+
+        Következmény: a két menedzser KÉT KÜLÖNBÖZŐ úton indult ugyanabba a
+        világba. A kezdés módja pedig nem ízlés kérdése — a világ ehhez
+        méretezi magát. */}}
   updateOppRatingBadge&&updateOppRatingBadge();}
 /* A házigazda publikálja az indulást. A seedet a SZOBA adja (a létrehozáskor
    született), nem a helyi seed-teszt — így garantáltan ugyanaz a két kliensen. */
@@ -84013,7 +84735,11 @@ async function mpNetInit(){
            serverTimestamp — a határidőket NEM a helyi óra adja. Két gép
              órája percekkel eltérhet; ha mindkét kliens a sajátjából dönti
              el, letelt-e az idő, az egyik továbblép, a másik nem. */
-        update:dbM.update,onDisconnect:dbM.onDisconnect,serverTimestamp:dbM.serverTimestamp};
+        update:dbM.update,onDisconnect:dbM.onDisconnect,serverTimestamp:dbM.serverTimestamp,
+        /* P1b: runTransaction — a SZERVEREN eldöntött feltételes írás. A társ
+           keretének helyettesítése csak akkor mehet be, ha a rekesze tényleg
+           üres; enélkül egy épp befutó, valódi feltöltést írnánk felül. */
+        runTransaction:dbM.runTransaction};
       /* A SZERVERIDŐ ELTOLÁSA. A Firebase ezt a speciális `.info` ágon adja
          (nem esik adatbázis-szabály alá). Ebből lesz az mpNow(): a helyi óra
          szerverre igazítva, tehát a két kliens ugyanazt a pillanatot érti. */

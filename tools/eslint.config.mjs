@@ -34,6 +34,9 @@ export default [
         requestAnimationFrame: "readonly", cancelAnimationFrame: "readonly",
         /* --- tárolás --- */
         localStorage: "readonly", sessionStorage: "readonly",
+        /* --- értesítés (P2b): a Notification a böngésző globálisa, az atob
+               pedig a VAPID-kulcs base64url → bájt fordításához kell --- */
+        Notification: "readonly", atob: "readonly", btoa: "readonly",
         /* --- hálózat és adat --- */
         fetch: "readonly", XMLHttpRequest: "readonly", URL: "readonly",
         URLSearchParams: "readonly", Blob: "readonly", FileReader: "readonly",

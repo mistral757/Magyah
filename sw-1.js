@@ -79,6 +79,52 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+/* ================= P2b — ÉRTESÍTÉS =================
+   EZ AZ EGYETLEN RÉSZ, AMI BEZÁRT JÁTÉK MELLETT IS FUT. A lap ilyenkor nem
+   létezik; a böngésző a service workert ébreszti fel, és ő rajzolja ki az
+   értesítést. Ezért van itt, és nem az index.html-ben.
+
+   SZABVÁNYOS WEB PUSH, NEM FCM-SDK. A hasznos teher egy sima JSON, amit
+   bármelyik szerver küldhet a VAPID-kulccsal — nem kell hozzá Firebase
+   Cloud Function, és vele Blaze-csomag sem.
+
+   A `waitUntil` NEM formalitás: az értesítés kirajzolása aszinkron, és
+   nélküle a böngésző elaltathatná a workert, mielőtt megjelenne. */
+self.addEventListener("push", (event) => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = {}; }
+  const cim = d.title || "MAGYAH";
+  const opts = {
+    body: d.body || "A társad vár rád.",
+    icon: "/icons/icon-192x192.png",
+    badge: "/icons/icon-96x96.png",
+    /* A CÍMKE ÖSSZEVONJA a szoba korábbi értesítéseit: három bökésből nem
+       lesz három sor az értesítési sávban, hanem egy, a legfrissebbel. */
+    tag: d.tag || "magyah-nudge",
+    renotify: true,
+    data: { url: d.url || "/" }
+  };
+  event.waitUntil(self.registration.showNotification(cim, opts));
+});
+
+/* KOPPINTÁS AZ ÉRTESÍTÉSRE. Ha a játék MÁR nyitva van valahol, azt hozzuk
+   előre — új lapot nyitni ilyenkor a legrosszabb, amit tehetünk: a
+   felhasználó két példányban találná magát, és a mentés két helyen élne.
+   Csak ha egyetlen ablak sincs, akkor nyitunk újat. */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const cel = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true })
+      .then((lista) => {
+        for (const c of lista) {
+          if ("focus" in c) return c.focus();
+        }
+        return self.clients.openWindow ? self.clients.openWindow(cel) : null;
+      })
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;

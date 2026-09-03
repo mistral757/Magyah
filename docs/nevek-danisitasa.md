@@ -280,3 +280,60 @@ módszerrel, olyan nevekre, amikhez nem nyúltál. *(3.9.07 óta beépítve.)*
 
 **`docs/nevek-generator-minta.md`** — a két GENERÁTOR-szabály jegyzőkönyve:
 mit javított a 2696 gépi névből (791-et, 29%). *(3.9.09 óta beépítve.)*
+
+---
+
+## 8. A KLUBNEVEK — és egy néma adatvesztés, amit én okoztam (3.9.24)
+
+### 8.1 Mi történt
+
+A 3.9.01 (`b1b7e03`) **119 klubnevet** írt át a te ízlésed szerint:
+Kazincbarszelóna, Májpocsolya eFCé, Torinói Szarkák, Milánói Ördögök,
+Semmilyensonka Erdő, Lecsesztek a Városiak, Puma Tin Ájkosz…
+
+Csakhogy **közvetlenül az `index.html` `HU_CLUB_TABLE` blokkjába** íródtak, a
+`tools/nevek/klubok.py`-ba nem. A 3.9.07 (`b772dd8`) pedig újraépítette a
+táblát abból a fájlból — és mind a 119 név **némán eltűnt**.
+
+> **UGYANAZ A COMMIT MENTETTE MEG A JÁTÉKOSNEVEKET.** A `b772dd8` üzenete
+> szó szerint az, hogy „a 240 kézi javítás megmentve" — a `bf84bde` kézi
+> játékosneveit tényleg átemeltem a `manual.py`-ba. A klubnevekre nem
+> gondoltam, pedig ugyanabban a fájlban, ugyanazzal a mechanizmussal
+> vesztek el. Egy generált blokk átírásakor **az egész blokkot** kell
+> megkeresni, nem csak azt a részét, amiről épp szó van.
+
+### 8.2 A javítás
+
+A 119 név visszakerült — **a `klubok.py`-ba**, nem az `index.html`-be. Ez a
+különbség az egész tanulság: ami csak a generált fájlban van, az a következő
+buildig él. A `klubok.py` fejlécében ott a figyelmeztetés, hogy ez ne
+ismétlődhessen.
+
+### 8.3 A rövidítések — a te hibalistád
+
+A visszaállított névsorban **három** klubnál maradt el a betűszó kiejtése
+(Aberdeen, Al Ahly, Al Nassr). Ezek is megkapták. A szabály mostantól ki van
+mondva a `klubok.py` fejlécében:
+
+| betűszó | kiejtve | betűszó | kiejtve |
+|---|---|---|---|
+| FC | **eFCé** | RB | **eRBé** |
+| SC | **eSCé** | RC | **eRrCé** |
+| AC | **ÁCsé** | KV | **KáVé** |
+| BC | **BéCé** | CP | **CéPé** |
+| SK | **eSKá** | CA | **CéÁ** |
+| AS | **Ász** | SV | **eS Vé** |
+
+Nem csak vicc: **a betűszó az, ami a valódi klubot azonnal felismerhetővé
+teszi.** Kimondva már magyar szó.
+
+Mérve a megjelenítési rétegen át (`tools/klubnev-proba.js`): 179 klub,
+**0** fonetizálatlan rövidítés, **0** kiszivárgó nyers név, a kódok
+egyediek és mind hárombetűsek, a réteg idempotens.
+
+### 8.4 Egy dolog, amit NEM javítottam magamtól
+
+A `FC Barcelona` kódja a te verziódban **`BAR`** — ami a valódi klub valódi
+kódja. Visszaállítottam, mert így kérted, de kimondom: ez az egy darab
+szembemegy a jogtisztasági menettel. A visszaállított névből (`Kazincbarszelóna`)
+a `KAZ` következne. Egy sor, ha kell.
