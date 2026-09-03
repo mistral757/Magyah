@@ -5650,7 +5650,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.29";
+const APP_VERSION="3.9.30";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -69245,10 +69245,114 @@ function runBoardOnPyrTitle(){
   list.push(row);
   runBoardSave(list);
   return row;}
+/* ═══════════ AZ ŐR: A MÉRFÖLDKŐ NEM VESZHET EL (3.9.30) ═══════════
+   A KÉRÉS: „abban a pillanatban, hogy elérte a D1 bajnoki győzelmet vagy a
+   dinamikus 100-as mezőny megnyerését, a Run szint legyen fenn a listán — ha
+   nem nyom rá a rendben-re, ha közben frissít, ha bármi van."
+
+   MIÉRT KELL EGYÁLTALÁN ŐR, ha a felvétel amúgy is a pillanatban történik.
+   Mert a két felvevő hívás EGY-EGY SOR egy hosszú lépéssorban: ha bármi
+   előttük kivételt dob (egy hiányzó mező egy régi mentésben, egy elszálló
+   rajzoló), a sor NEM FUT LE — és a karrier csendben lemarad a listáról.
+   A localStorage írása is elbukhat (tele van a tár), és a runBoardSave ezt
+   elnyeli. Egyik esetben sincs hibaüzenet: a felhasználó annyit lát, hogy
+   nincs fent.
+
+   AMIN AZ EGÉSZ ÁLL: A FELTÉTEL A MENTÉSBŐL OLVASHATÓ, tehát UTÓLAG IS igaz
+   marad. Nem egy elszálló eseményre hagyatkozunk:
+     · hagyományos — pyrFirstTitle(): S.run.pyrTitleSeason, vagy a piramis
+       naplójában egy div===1 & rank===1 sor,
+     · dinamikus  — S.run.infinitySeason: az Infinity megnyitásának szezonja
+       (oda a 100-as mezőny megnyerése kell).
+   Ha a feltétel igaz és nincs bejegyzés, PÓTOLJUK — és megjelöljük, hogy
+   pótlás volt, mikor.
+
+   HOL FUT: minden mentésnél és minden betöltés után. Az első megerősítés után
+   a munkamenetben már nem dolgozik (a `_rbOk` gyorsítótár miatt), tehát a
+   mentés menete nem lassul. */
+let _rbOk=null;                    /* melyik karrier-azonosítóról tudjuk már, hogy fent van */
+/* AZ ELSŐ ÉLVONALBELI ARANY SZEZONJA — AZ ADATBÓL, NEM EGY JELZŐBŐL.
+   Szándékosan NEM kérdezi meg a pyrOn()-t. Az egy állapotjelző (S.pyr.on), és
+   pont az a fajta dolog, ami egy félbemaradt betöltés után hiányozhat — ha
+   arra támaszkodnánk, a karrier „dinamikusnak" látszana, és a D1-aranyát
+   sosem vennénk észre. A piramis NAPLÓJA viszont maga a bizonyíték. */
+function runBoardPyrTitleSeason(){
+  try{
+    const R=(S&&S.run)||{};
+    if(R.pyrTitleSeason)return R.pyrTitleSeason;
+    const L=(S&&S.pyr&&S.pyr.log)||[];
+    for(let i=0;i<L.length;i++)
+      if(L[i]&&L[i].div===1&&L[i].rank===1)return L[i].s;
+  }catch(e){}
+  return null;}
+/* Teljesíti-e ez a karrier a felvétel feltételét? Kizárólag a MENTETT
+   állapotból dönt — ez az, ami egy újratöltést is túlél. */
+function runBoardEarned(){
+  try{
+    if(gameMode!=="career")return false;
+    if(runBoardPyrTitleSeason()!=null)return true;      /* D1 arany */
+    return ((S&&S.run)||{}).infinitySeason!=null;        /* 100-as mezőny */
+  }catch(e){return false;}}
+/* A mérföldkő szezonszáma — a PÓTOLT bejegyzés se hazudjon a tempóról. */
+function runBoardEarnedSeason(){
+  try{
+    const p=runBoardPyrTitleSeason();
+    if(p!=null)return p;
+    return (((S&&S.run)||{}).infinitySeason)||null;
+  }catch(e){return null;}}
+/* Melyik listára tartozik a PÓTOLT bejegyzés? Ugyanabból az adatból, mint a
+   feltétel — nem a pillanatnyi jelzőből. */
+function runBoardEarnedMode(){
+  return runBoardPyrTitleSeason()!=null?"pyr":"dyn";}
+function runBoardEnsure(honnan){
+  let id=null;
+  try{id=runBoardCareerId();}catch(e){return null;}
+  if(!id||_rbOk===id)return null;
+  if(!runBoardEarned())return null;
+  let list=[];
+  try{list=runBoardLoad();}catch(e){return null;}
+  if(list.some(x=>x&&x.id===id)){_rbOk=id;return null;}
+  /* ---- PÓTLÁS ---- */
+  let row=null;
+  try{row=runBoardRow();}catch(e){return null;}
+  if(!row)return null;
+  row.infRun=row.run;row.infLevel=row.level;
+  /* A MÉRFÖLDKŐ szezonszáma, nem a mostani: a lista a tempót is méri, és egy
+     utólagos pótlás nem tehet úgy, mintha ma értük volna el. */
+  const msn=runBoardEarnedSeason();
+  row.infSeasons=msn||row.seasons;
+  /* A MÓD IS AZ ADATBÓL. A runBoardRow a pyrOn() jelzőt kérdezi; ha az egy
+     félbemaradt betöltés után hiányzik, a D1-aranyas karrier a dinamikus
+     listára kerülne — két különböző játék egy ranglistán. */
+  row.mode=runBoardEarnedMode();
+  /* RÖGZÍTJÜK, HOGY PÓTLÁS TÖRTÉNT — a lista is tudja, és a mentés is. */
+  row.potolt=String(honnan||"ellenorzes");
+  row.potoltAt=Date.now();
+  list.push(row);
+  runBoardSave(list);
+  /* AZ ÍRÁS VISSZAOLVASVA. A runBoardSave elnyeli a hibát (tele tár, privát
+     ablak) — enélkül azt hinnénk, megvan, holott semmi nem került ki. */
+  let siker=false;
+  try{siker=runBoardLoad().some(x=>x&&x.id===id);}catch(e){}
+  if(!siker){
+    try{addLine("⚠️ A Run-szintedet nem sikerült a helyi listára írni (megtelt a tárhely?). "
+      +"A játék minden mentésnél újrapróbálja.","m ev");}catch(e){}
+    return null;}
+  _rbOk=id;
+  /* A MENTÉSBE IS BEKERÜL, MIKOR TÖRTÉNT — hogy visszakereshető legyen. */
+  try{const R=(typeof runInit==="function")?runInit():(S.run=S.run||{});
+      if(R&&!R.rbAt){R.rbAt=Date.now();R.rbHow=row.potolt;}}catch(e){}
+  try{addLine(`🏅 A Run-szinted felkerült a helyi ranglistára: <b>${String(row.run).replace(".",",")}</b> `
+    +`(pótolva — a mérföldkövet a ${row.infSeasons}. szezonban érted el).`,"m life");}catch(e){}
+  try{lbAutoUpload(row);}catch(e){}
+  return row;}
 /* A KARRIER LEZÁRÁSA — csak FELFELÉ frissít, és csak ha van már bejegyzés
-   (dinamikusban: megnyitottad az Infinityt; piramisban: nyertél az élvonalban). */
+   (dinamikusban: megnyitottad az Infinityt; piramisban: nyertél az élvonalban).
+   AZ ŐR ITT IS LEFUT ELŐBB: ha a mérföldkő megvolt, de a bejegyzés hiányzik,
+   a lezárásnak már legyen mit frissítenie. */
 function runBoardOnClose(){
   if(gameMode!=="career")return null;
+  try{runBoardEnsure("lezaras");}catch(e){}
   const list=runBoardLoad();
   const id=runBoardCareerId();
   const at=list.findIndex(x=>x.id===id);
@@ -69308,6 +69412,7 @@ function runBoardHtml(){
         <span style="font-size:12.5px;font-weight:700">${esc(x.team)}</span>
         ${x.mp?`<span style="font-size:10px;color:var(--purple)"> ⚔ közös</span>`:""}
         ${fut?`<span style="font-size:10px;color:var(--gold)"> ● fut</span>`:""}
+        ${x.potolt?`<span style="font-size:10px;color:var(--dim2)" title="A mérföldkő megvolt, de a bejegyzés hiányzott — a játék utólag pótolta."> ↺ pótolva</span>`:""}
         <br><span style="font-size:11px;color:var(--dim2)">mezőny <b style="color:var(--gold)">${level}</b> · ${seasons} szezon${
           x.titles?` · ${x.titles} bajnoki`:""}${x.ballons?` · ${x.ballons} Aranylabda`:""} · ${datum}</span>
         ${st?`<br><span style="font-size:11px;color:var(--dim)">${esc(st)}</span>`:""}
@@ -83035,7 +83140,14 @@ function saveGame(){
        elkérjük (oldalbetöltésenként egyszer). Lásd persistMaybeAsk. */
     persistMaybeAsk();
   }catch(e){/* az ÖSSZEÁLLÍTÁS hibája (nem az írásé) — azt a saveWrite jelzi */
-    saveFailNotice(e);}}
+    saveFailNotice(e);}
+  /* ---- A RUN-RANGLISTA ŐRE (3.9.30) ----
+     A MENTÉS UTÁN, saját try-ban: ha a mérföldkő megvan, de a bejegyzés
+     hiányzik, itt pótoljuk. A `_rbOk` gyorsítótár miatt karrierenként
+     legfeljebb egyszer dolgozik — a mentés menete nem lassul.
+     A blokk kívül van a fenti try-on, hogy egy itteni hiba SE a mentést, SE a
+     hibajelzését ne zavarja meg. */
+  try{runBoardEnsure("mentes");}catch(e){}}
 /* key nélkül a MOSTANI kontextus helyét olvassa (egyjátékos vagy az aktív szoba) */
 function loadSavedGame(key){
   try{
@@ -83766,6 +83878,13 @@ function applySavedGame(d){
     bondEnsureArrivals();
   }catch(e){}}
 function resumeUIFromSave(){
+  /* ---- A RUN-RANGLISTA ŐRE, BETÖLTÉS UTÁN (3.9.30) ----
+     EZ FOGJA MEG a „közben frissítettem" esetet: ha a mérföldkő megvolt, de a
+     bejegyzés bármi miatt elmaradt, a visszatéréskor pótoljuk. A feltételt a
+     MENTETT állapotból olvassuk (S.run.pyrTitleSeason / S.run.infinitySeason),
+     tehát nem függ attól, lefutott-e annak idején egy esemény vagy megnyomta-e
+     valaki a „rendben"-t. */
+  try{runBoardEnsure("betoltes");}catch(e){}
   /* A BEÁLLÍTÓ FELÜLET LEZÁRÁSA — ugyanaz az elv, mint a beginNewGame-ben, csak
      a MENTÉSBŐL VISSZALÉPÉS közös belépési pontján. A "Válassz módot" kártya a
      jelölésben NEM rejtett: az oldal betöltése mindig felfedi, a multiplayer-
