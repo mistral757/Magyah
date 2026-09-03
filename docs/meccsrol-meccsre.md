@@ -227,8 +227,8 @@ elindítod a végigjátszást, a lánc lelép (`immCancel`), és amíg az fut, a
 
 ## 6. Hangoló számok
 
-`IMM_STEP_SEC` 3 · `IMM_PREP_SEC` 15 · `IMM_AJANL_SEC` 5 · `IMM_STEP_MAX` 12 ·
-`IMM_WAIT_MAX` 20.
+`IMM_STEP_SEC` 3 · `IMM_PREP_SEC` 15 (alap, 5–30 közt állítható) ·
+`IMM_AJANL_SEC` 5 · `IMM_TET_MULT` 2 · `IMM_STEP_MAX` 12 · `IMM_WAIT_MAX` 20.
 
 Mind egy helyen áll, a szakasz tetején. A kupa-ág is a `IMM_PREP_SEC`-et
 használja — ott a kupa-nézet és a kezdőrúgás közti szünet ugyanaz a műfaj,
@@ -299,12 +299,80 @@ Két dolgot ez a szakasz hozott felszínre, és mindkettő néma hiba volt:
 
 ---
 
+## 7/c. A beállítások (3.9.34)
+
+Kimondott kérés: *„lehessen beállítani settinget az ifisek fogadására … és a
+skillek elosztására is … és a sorsdöntő, vagy rangadó meccsek sorsára
+vonatkozóan … és lehessen állítani, hogy a meccs indítás előtti jelenlegi 15s
+akár 5-30s közötti idő lehessen."*
+
+A kapcsolósáv **⚙** gombja nyitja. Négy döntés, a mentés része (`S.immSet`) —
+ugyanaz az érv, mint magánál a kapcsolónál: ez nem futásidejű pillanat, hanem
+az, ahogy a felhasználó nézni akarja a karrierjét.
+
+### 🌱 Akadémiai bemutatkozás — `ifi`
+
+| érték | mit tesz |
+|---|---|
+| `kerdez` *(alap)* | a lánc megáll, ahogy a 3.9.31 előtt |
+| `felvesz` | bekerül a tartalék-keretbe — ezt teszi a szezon végigjátszása is |
+| `marad` | visszaküldi az akadémiára; a **ballagásnál** ez a végleges elengedést jelenti, mert oda már nincs hova visszaküldeni |
+
+A `marad` ballagás-ága nem mellékhatás, hanem a „mindenképp" logikus vége — a
+panel opciója **szó szerint kimondja**, tehát tudatos választás, nem meglepetés.
+
+### 🎖 Ki kapja a képességet — `skill`
+
+| érték | mit tesz |
+|---|---|
+| `rendszer` *(alap)* | a legtöbbet ígérő kezdő — ugyanaz a rangsor, amiből az auto-mód húz |
+| `tsi` | a legnagyobb tehetség |
+| `rating` | a ma legerősebb ember (`pOvr`) |
+| `skill` | aki már a legtöbbet gyűjtötte |
+| `kerdez` | nincs jelölés, a lánc megáll |
+
+Az **auto-kiosztás** (`skillAssignRanked` → `autoAssignSkill`) rangsora
+**változatlan**: az a szezon végigjátszásáé, és nem a felhasználó beállítása
+vezérli. A lánc ajánlata külön függvény (`immSkillPick`), mert más a kérdés:
+nem az, hogy a gép mit tenne magától, hanem az, hogy a felhasználó mit kért.
+Döntetlent mindig a rendszer-rangsor bont, hogy a választás kiszámítható legyen.
+
+A `kerdez` a **folytatás-listát** (`showSkillCompletion`) is elnémítja: aki a
+képességekről maga akar dönteni, az a folytatásról is.
+
+### 🏆 Tétmérkőzés és rangadó — `tet`
+
+| érték | mit tesz |
+|---|---|
+| `allj` *(alap)* | megáll — ezt magad indítod, ahogy eddig |
+| `varj` | elindul, de `IMM_TET_MULT`-szor (2×) annyi időt hagy, a 30 mp-es plafonig |
+| `auto` | a lánc nem tesz különbséget |
+
+Az `immTetMatch()` dönti el, tétmeccs-e a következő forduló: bajnoki
+tétmérkőzés, rangadó **vagy hajrá-rangadó**. A többi megálló (átigazolás, kupa,
+osztályozó, párharc, szezonvég) NEM tartozik ide — azok szerkezeti határok,
+nem hangulati döntések.
+
+### ⏱ Idő a kezdőrúgásig — `prep`
+
+Csúszka, `IMM_PREP_MIN`…`IMM_PREP_MAX` = **5–30 mp**, alap 15. A vágás nem
+formalitás: a mentés kézzel is szerkeszthető, és egy 0 vagy egy 9999 ugyanúgy
+használhatatlanná tenné a láncot. A tényleges hossz egy helyen dől el
+(`immPrepFor`), mert két dolog írja — a beállítás és a `varj` ág.
+
+**MÉRVE** (`tools/imm-beallitas-proba.js`): mind a négy kapcsoló minden ága, a
+vágás mindkét iránya (1 → 5, 999 → 30, hulladék → 15), és hogy a `varj`
+tétmeccsen 30 mp-et, hétköznap 15-öt ad.
+
+---
+
 ## 8. Amit szándékosan NEM csinál
 
-* **Nem dönt helyetted — csak ha van rá rendszerajánlat, és akkor is
-  szólhatsz.** Ahol a játék magától is tudna válaszolni (lásd a 7/b pontot), ott
-  öt másodperc után az *auto-mód* válaszát választja, és közben végig kiírja,
-  mit fog. Ahol nincs ilyen ajánlat, a lánc MEGÁLL, ahogy eddig.
+* **Nem dönt helyetted — csak amit rábíztál, és akkor is szólhatsz.** Ahol a
+  játék magától is tudna válaszolni (lásd a 7/b pontot), ott öt másodperc után
+  az ajánlatot választja, és közben végig kiírja, mit fog. MIT bíztál rá, azt a
+  ⚙ beállítások mondják meg (7/c) — alapból az ifik, a képesség-kiosztás és a
+  tétmérkőzések mind a tieid maradnak. Ahol nincs ajánlat, a lánc MEGÁLL.
 * **Nem kattint vaktában.** Amit nem ismer fel, ahhoz nem nyúl: inkább megáll.
   A `IMM_STEP_MAX` az ajánlatokra is szól — ha egy ajánlat megnyomása nem viszi
   tovább a képernyőt, tizenkét lépés után leáll.
