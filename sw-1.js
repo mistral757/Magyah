@@ -14,7 +14,11 @@
    fullscreen) így a régi telepítéseknél sosem érne el — hacsak a cache neve nem
    változik. Új név = új install = friss addAll, az activate pedig kitakarítja a
    régit. A FŐ HTML nem érintett: az mindig "network-first". */
-const CACHE_NAME = "harminc-nulla-cache-v4";
+/* v5: ÚJ IKONKÉSZLET (3.9.25). A statikus ág „cache-first”, tehát a régi
+   telepítéseken a RÉGI ikonok maradnának örökre — pont az a rajz, amit
+   jogtisztasági okból cserélni kellett. A név léptetése az egyetlen dolog,
+   ami ezt kikényszeríti. */
+const CACHE_NAME = "harminc-nulla-cache-v5";
 const STATIC_ASSETS = [
   "/",
   /* A betűk önhosztoltak (lásd az index.html @font-face blokkját). Itt kell
@@ -34,7 +38,6 @@ const STATIC_ASSETS = [
   "/icons/site.webmanifest",
   "/icons/favicon.ico",
   "/icons/apple-touch-icon.png",
-  "/icons/kick-line.png",
   "/icons/icon-72x72.png",
   "/icons/icon-96x96.png",
   "/icons/icon-128x128.png",

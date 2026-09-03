@@ -49,10 +49,21 @@ coach_names = set(re.findall(r'\{n:"((?:[^"\\]|\\.)+)",era:', s))
 birth_names = set(re.findall(r'"((?:[^"\\]|\\.)+)":1[89]\d\d', s))
 
 clubs = set(KLUBOK) | set(re.findall(r'\{club:"((?:[^"\\]|\\.)+)",season:', s))
-# A KITALÁLT liganevek maradnak: a piramis saját osztályai és az „NB I" nem
-# valós szervezet neve, hanem a játék saját szókincse — nincs mit elrejteni.
-KITALALT = {"NB I", "NB II – Keleti csoport", "Válogatott", "kis pénz kis foci",
+# A KITALÁLT liganevek maradnak: a piramis saját osztályai a játék saját
+# szókincse — nincs mit elrejteni.
+#
+# AZ „NB I" VISZONT KIKERÜLT INNEN. Eddig itt szerepelt, azzal az indoklással,
+# hogy nem valós szervezet neve — ez tévedés volt: az a magyar élvonal valódi
+# megnevezése, és a kivétel miatt a KIADOTT fájlban NYERSEN benne maradt (a
+# tizenhét magyar klub-szezon `league:` mezőjében). A 3.9.13 a megjelenítést
+# már megoldotta (leagueLabel), a kiadási strip viszont átlépett rajta.
+#
+# A 3.9.28-ban átnevezett osztályok VISZONT idekerültek: a „Magyah Élmezőny",
+# „Magyah Másodosztály" és „Magyah Harmadosztály" a játék saját szókincse,
+# nem valós liga — enélkül az önellenőrzés valós névként jelentené őket.
+KITALALT = {"Válogatott", "kis pénz kis foci",
             "mennyei megyei", "Biszem-baszom másodosztály", "Biszem-baszom premier líg",
+            "Magyah Élmezőny", "Magyah Másodosztály", "Magyah Harmadosztály",
             "Egyéb"}
 leagues = (set(LIGAK) | set(re.findall(r'league:"((?:[^"\\]|\\.)+)"', s))) - KITALALT
 
