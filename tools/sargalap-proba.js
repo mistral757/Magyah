@@ -109,9 +109,13 @@ const {spawn}=require('child_process');
       for(const id of ["guideTipOk","tNudgeWhyX","mstatOk","chemOk","nameOk",
                        "coachSpinBtn","coachOk","capConfirmBtn","simGo"]){
         const e=document.getElementById(id);if(lat(e)){e.click();return false;}}
-      /* Ami nem kap azonosítót: az edzőválasztás és a kapitányjelölés sorai. */
-      const rx=/Őt választom|Ez lesz a nevünk|Igen, őt akarom|Irány a szezon/;
-      const t=[...document.querySelectorAll("button")].find(x=>lat(x)&&rx.test(x.innerText||""));
+      /* Ami nem kap azonosítót (edzőválasztás, kapitány, taktika): KIZÁRÁSSAL
+         haladunk, nem felirat-találgatással. Ami nem a fejléc vagy egy nézegető
+         gomb, az a továbbvivő út — a próbának mindegy, melyik edzőt kapjuk. */
+      const tilt=new Set(["homeBtn","fsBtn","installBtn","themeToggle","bondMapBtn",
+        "bondMapAllBtn","kitViewBtn","guideTipOff","guideTipMore","mpProfileBtn",
+        "homeSettingsBtn","homeStatsBtn","pitchSideMine","pitchSideOpp","autoBtn"]);
+      const t=[...document.querySelectorAll("button")].find(x=>lat(x)&&!tilt.has(x.id));
       if(t){t.click();return false;}
       return lat(document.getElementById("autoBtn"));});
     await p.waitForTimeout(900);
