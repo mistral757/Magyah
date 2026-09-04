@@ -207,6 +207,19 @@ valódi előzményének kell lennie. A próba ezt méri (determinizmus, a 30. fo
 kiválasztást, a bekötést, a közös karrier néma ágát és a névelőket — és
 képernyőképet készít mindhárom témában. Részletek: `docs/szezon-ive.md`.
 
+## kihivas-proba.js — a kihívás-katalógus
+
+```bash
+node tools/kihivas-proba.js
+```
+
+A 3.9.37-ben átszabott kihívás-típusokat méri: a kivezetettek (`msDone`,
+`subGoals`, `tacticLevel`) nem születnek újra, az újak (`msOne`, `subMinutes`,
+`subStars`, `defStars`, `tacticMatches`, sávos `renewOld`) igen, értelmes
+céllal; a haladás csak a vállalás utáni eseményeket méri; a taktika-jutalom
+60→81 és 82→86; rivális nélküli mezőnyben nincs skalp-ajánlat. Részletek:
+`docs/kihivasok-3937.md`.
+
 ## firebase-rules.json — az adatbázis szabályai
 
 A Realtime Database (`magyahok`) teljes szabályfája, érvényes JSON-ként. A
