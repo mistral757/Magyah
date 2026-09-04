@@ -194,6 +194,19 @@ Minden paraméter felülírható parancssorból:
 node tools/pyramid-sim.js speeds pace=8 step=2.5 seasons=30 runs=800
 ```
 
+## szezon-iv-proba.js — a szezonzáró helyezés-grafikon
+
+```bash
+node tools/szezon-iv-proba.js
+```
+
+A szezonzáró verdikt „A szezon íve" panelje (3.9.37) a `buildLeagueTable(upto)`
+PREFIX-tulajdonságára épül: a 7. forduló utáni állásnak a 30. forduló utáni
+valódi előzményének kell lennie. A próba ezt méri (determinizmus, a 30. forduló
+és a végtabella egyezése, szabályos 1..N rangsor minden fordulóban), plusz a
+kiválasztást, a bekötést, a közös karrier néma ágát és a névelőket — és
+képernyőképet készít mindhárom témában. Részletek: `docs/szezon-ive.md`.
+
 ## firebase-rules.json — az adatbázis szabályai
 
 A Realtime Database (`magyahok`) teljes szabályfája, érvényes JSON-ként. A

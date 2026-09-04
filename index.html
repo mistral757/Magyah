@@ -60786,6 +60786,156 @@ function renderFinalTable(teams){
       +(id<PYR_DIVS?`&nbsp; <b style="color:#e07a5f">■</b> osztályozó a bennmaradásért &nbsp; <b style="color:#e03131">■</b> kiesés`:"")
       +`</div>`;}
   return html;}
+/* ================= A SZEZON ÍVE — A HELYEZÉSEK ÚTJA (3.9.37) =================
+   KIMONDOTT KÉRÉS: „szezon végén legyen egy kis infografika, ami mutatja, hogy
+   az a 3 csapat, aki top 3-ban végzett, + te, ha nem vagy benne, hogyan
+   alakultatok aktuális helyezés szempontjából. Menő lenne megnézni egy nagy
+   comeback szezont, hogy 16. helyről a csapatod hogyan mászik fel top 3-ba."
+
+   AZ ADAT MÁR MEGVAN, CSAK SOSEM KÉRTÜK EL. A buildLeagueTable(upto) egy
+   TETSZŐLEGES fordulóra megadja az állást, és a saját kommentje mondja ki,
+   miért használható erre: „a SORREND KÖTÖTT… mert csak így lesz egy rövidebb
+   szezonrész a hosszabb valódi prefixe". A seedelt folyam (rngFor
+   "…:table") minden hívásnál ugyanonnan indul, tehát a 7. forduló utáni állás
+   tényleg a 30. forduló utáni VALÓDI ELŐZMÉNYE — nem egy másik valóság.
+   Harminc hívás kell hozzá, és kész a teljes ív. Új könyvelés SEHOL nem
+   keletkezik: a mentés nem hízik, a régi mentések is megszólalnak.
+
+   A VÉGPONTOT NEM A SORSOLÁS ADJA, HANEM A TÁBLA. A grafikon közvetlenül a
+   végtabella ALATT áll; ha a 30. forduló pontja akár egyszer is mást mondana,
+   mint a fölötte lévő sor, az ellentmondás volna a képernyőn. Ezért az utolsó
+   pont mindig a MEGJELENÍTETT végtabellából jön (az a hiteles: közös
+   karrierben a host számolja, és a mentésben is az él). A kettő
+   egyjátékosban betűre egyezik — ezt a tools/szezon-iv-proba.js méri —, az
+   anchor csak azt zárja ki, hogy valaha ELTÉRHESSENEK.
+
+   KÖZÖS KARRIERBEN HALLGAT, és ez nem hiányosság, hanem ugyanaz a szabály,
+   ami a bajnoki hajrá-narratívára is áll: ott a menet közbeni tabella
+   menthetetlenül hiányos (a társad eredményei csak a 15. és a 30. fordulónál
+   érkeznek meg), tehát fordulónkénti ívet nem lehet belőle rajzolni — csak
+   kitalálni. Két pontból pedig nem grafikon lesz, hanem félrevezetés. */
+function seasonRankTrail(maxRound){
+  const upto=Math.max(1,Math.min(30,maxRound|0)),out=[];
+  for(let r=1;r<=upto;r++){
+    const m={};
+    buildLeagueTable(r,{}).forEach((x,i)=>{m[x.n]=i+1;});
+    out.push(m);}
+  return out;}
+/* A NÉGY VONAL STÍLUSA. A színen KÍVÜL a vonalvastagság és a szaggatás is
+   megkülönbözteti őket — a játéknak van egyszínű témája is (ott a --gold, a
+   --blue és a --purple szinte azonos szürke), és egy csak-színnel kódolt
+   grafikon abban olvashatatlan volna. A TE vonalad mindig arany, vastag és
+   folytonos: a szem azt keresi. */
+const ARC_STYLES=[
+  {c:"var(--blue)",  w:1.5,d:""},
+  {c:"var(--purple)",w:1.5,d:"5 3"},
+  {c:"var(--grass)", w:1.5,d:"1.5 2.6"}];
+const ARC_MINE={c:"var(--gold)",w:2.6,d:""};
+/* A grafikonhoz kiválasztott csapatok: a dobogó, és TE, ha nem állsz rajta. */
+function seasonArcTeams(finalTeams){
+  const top=finalTeams.slice(0,3).map((t,i)=>({t,pos:i+1,st:ARC_STYLES[i]}));
+  const me=finalTeams.findIndex(t=>t.you);
+  if(me>=0&&me>2)top.push({t:finalTeams[me],pos:me+1,st:ARC_MINE});
+  top.forEach(x=>{if(x.t.you)x.st=ARC_MINE;});
+  return top;}
+function seasonArcHtml(finalTeams){
+  const halk=s=>`<div style="font-size:12.5px;color:var(--dim);line-height:1.55">${s}</div>`;
+  if(!Array.isArray(finalTeams)||finalTeams.length<4)return halk("A grafikonhoz teljes tabella kell.");
+  if(typeof h2hRoomActive==="function"&&h2hRoomActive())
+    return halk("Közös karrierben az ív hallgat: a menet közbeni tabella hiányos — a társad eredményei csak a 15. és a 30. fordulónál érkeznek meg —, tehát fordulóról fordulóra nem lehet helyezést mondani. A végtabella fölötte teljes értékű.");
+  const maxR=Math.min(30,S.idx||0);
+  if(maxR<6)return halk("Az ívhez legalább hat lejátszott forduló kell.");
+  let trail;
+  try{trail=seasonRankTrail(maxR);}catch(e){return halk("Az ív most nem rajzolható ki.");}
+  const sorok=seasonArcTeams(finalTeams);
+  /* Ha egy csapat neve bármelyik fordulóban hiányzik (elvileg lehetetlen: a
+     tabella mindig a teljes mezőnyt adja), inkább NEM rajzolunk, mint hogy egy
+     lyukas vonalat mutassunk. */
+  const adat=sorok.map(x=>{
+    const s=trail.map(m=>m[x.t.n]);
+    return s.some(v=>!v)?null:Object.assign({},x,{s});});
+  if(adat.some(x=>!x))return halk("Az ív most nem rajzolható ki.");
+  /* AZ UTOLSÓ PONT A TÁBLÁÉ — lásd a fenti indoklást. */
+  adat.forEach(x=>{x.s[maxR-1]=x.pos;});
+  const N=finalTeams.length;
+  const W=340,H=190,pl=20,pr=25,pT=12,pb=26;
+  const X=r=>pl+(W-pl-pr)*((r-1)/Math.max(1,maxR-1));
+  const Y=p=>pT+(H-pT-pb)*((p-1)/Math.max(1,N-1));
+  const f1=v=>v.toFixed(1);
+  /* A DOBOGÓ SÁVJA: a grafikon egyetlen "zónája". Enélkül a nézőnek a
+     helyszámokból kellene kikövetkeztetnie, hol van a tét. */
+  let svg=`<rect x="${pl}" y="${f1(Y(1)-5)}" width="${W-pl-pr}" height="${f1(Y(3)-Y(1)+10)}"`
+    +` fill="var(--gold)" opacity=".10"/>`;
+  [1,3,Math.ceil((3+N)/2),N].forEach(p=>{
+    svg+=`<line x1="${pl}" y1="${f1(Y(p))}" x2="${W-pr}" y2="${f1(Y(p))}" stroke="var(--line)" stroke-width="1"/>`
+      +`<text x="2" y="${f1(Y(p))}" font-size="9" fill="var(--dim2)" dominant-baseline="middle">${p}.</text>`;});
+  /* FÉLTÁV: a szezon felezőpontja, mert a fordulat helye ehhez képest olvasható. */
+  if(maxR>=16){
+    svg+=`<line x1="${f1(X(15))}" y1="${pT}" x2="${f1(X(15))}" y2="${f1(H-pb)}"`
+      +` stroke="var(--line)" stroke-width="1" stroke-dasharray="2 3"/>`
+      +`<text x="${f1(X(15))}" y="${H-14}" font-size="8.5" fill="var(--dim2)" text-anchor="middle">féltáv</text>`;}
+  adat.forEach(x=>{
+    const d=x.s.map((p,i)=>`${i?"L":"M"}${f1(X(i+1))} ${f1(Y(p))}`).join(" ");
+    svg+=`<path d="${d}" fill="none" stroke="${x.st.c}" stroke-width="${x.st.w}"`
+      +` stroke-linejoin="round" stroke-linecap="round"${x.st.d?` stroke-dasharray="${x.st.d}"`:""}/>`;});
+  /* A TE ÍVED HÁROM PONTJA: az indulás, a MÉLYPONT és a csúcs. Ez a három
+     mondja el a comebacket — a köztes 27 kör csak zaj volna. */
+  const en=adat.find(x=>x.t.you);
+  if(en){
+    const lo=Math.min.apply(null,en.s),hi=Math.max.apply(null,en.s);
+    const jel=(r,p,rr)=>`<circle cx="${f1(X(r))}" cy="${f1(Y(p))}" r="${rr}" fill="var(--gold)"/>`;
+    /* A csúcs/mélypont jelölése KIMARAD, ha a rajthoz vagy a célhoz tapad: két
+       egymásra csúszó korong nem jelöl semmit, csak elkeni a vonal végét. */
+    const kell=r=>r>2&&r<maxR-1;
+    svg+=jel(1,en.s[0],2.4)
+      +(kell(en.s.indexOf(hi)+1)?jel(en.s.indexOf(hi)+1,hi,3.2):"")
+      +(kell(en.s.indexOf(lo)+1)?jel(en.s.indexOf(lo)+1,lo,3.2):"")
+      +jel(maxR,en.pos,3.6);}
+  /* A VÉGSŐ HELYEZÉS a vonal végén, a saját színével — így a négy vonal
+     szétválik akkor is, ha a jelmagyarázatot nem olvassa el senki. */
+  adat.forEach(x=>{
+    svg+=`<text x="${W-pr+6}" y="${f1(Y(x.pos))}" font-size="9.5" fill="${x.st.c}"`
+      +` dominant-baseline="middle" font-weight="700">${x.pos}.</text>`;});
+  svg+=`<text x="${pl}" y="${H-14}" font-size="8.5" fill="var(--dim2)">1. forduló</text>`
+    +`<text x="${W-pr}" y="${H-14}" font-size="8.5" fill="var(--dim2)" text-anchor="end">${maxR}.</text>`;
+  /* ---- A MONDAT, AMI MIATT AZ EGÉSZ VAN ---- */
+  let fej="";
+  if(en){
+    const lo=Math.min.apply(null,en.s),hi=Math.max.apply(null,en.s);
+    /* A MÉLYPONT RITKÁN EGY FORDULÓ: egy rossz sorozat alatt hetekig ott állsz.
+       Egy kiragadott nap ezért félrevezetne — a SZAKASZ a valódi történet. */
+    const mikor=(a,b)=>a===b
+      ?`${hunAz(a)} <b>${a}. fordulóban</b>`
+      :`${hunAz(a)} <b>${a}–${b}. forduló</b> között`;
+    const hova=`${hunAz(en.pos)} <b>${en.pos}.</b> helyig`;
+    if(hi-en.pos>=3)
+      fej=`A mélypontod ${hunAz(hi)} <b>${hi}. hely</b> volt — ott álltál ${mikor(en.s.indexOf(hi)+1,en.s.lastIndexOf(hi)+1)}. `
+        +`Onnan <b style="color:var(--gold)">${hi-en.pos} helyet</b> léptél előre ${hova}.`;
+    else if(en.pos===1)
+      fej=`Végig fent: a leggyengébb helyezésed ${hunAz(hi)} <b>${hi}.</b> volt, és a szezont <b style="color:var(--gold)">bajnokként</b> zártad.`;
+    else if(en.pos-lo>=3)
+      fej=`A csúcsod ${hunAz(lo)} <b>${lo}. hely</b> volt — ott álltál ${mikor(en.s.indexOf(lo)+1,en.s.lastIndexOf(lo)+1)}. `
+        +`Onnan <b>${en.pos-lo} helyet</b> csúsztál vissza ${hova}.`;
+    else
+      fej=`Kiegyensúlyozott idény: ${hunAz(lo)} <b>${lo}.</b> és ${hunAz(hi)} <b>${hi}.</b> hely között mozogtál, a vége ${hunAz(en.pos)} <b>${en.pos}.</b>`;}
+  else fej=`A dobogó három csapatának útja fordulóról fordulóra.`;
+  /* ---- A JELMAGYARÁZAT EGYBEN A SZÁMTÁBLA ---- */
+  const gr="grid-template-columns:26px 1fr .5fr .5fr .5fr";
+  let tb=`<div class="stattbl" style="margin-top:8px"><div class="strow shead" style="${gr}">`
+    +`<span></span><span>Csapat</span><span>rajt</span><span>legj.</span><span>vége</span></div>`;
+  adat.forEach(x=>{
+    const lo=Math.min.apply(null,x.s);
+    tb+=`<div class="strow${x.t.you?" you":""}" style="${gr}">`
+      +`<span><svg viewBox="0 0 24 8" style="width:24px;height:8px" aria-hidden="true">`
+      +`<line x1="1" y1="4" x2="23" y2="4" stroke="${x.st.c}" stroke-width="${x.st.w}"`
+      +`${x.st.d?` stroke-dasharray="${x.st.d}"`:""} stroke-linecap="round"/></svg></span>`
+      +`<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(teamLabel(x.t.n))}${x.t.you?" (TE)":""}</span>`
+      +`<span>${x.s[0]}.</span><span>${lo}.</span><span>${x.pos}.</span></div>`;});
+  tb+=`</div>`;
+  return `<div style="font-size:13px;line-height:1.6">${fej}</div>`
+    +`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;margin-top:8px" role="img"`
+    +` aria-label="A dobogósok és a te csapatod helyezése fordulóról fordulóra">${svg}</svg>`
+    +tb;}
 /* ================= BAJNOKI GÓLLÖVŐLISTA (globális) =================
    AMI HIÁNYZOTT. A kupasorozatnak a kezdetektől van EGÉSZ MEZŐNYRE szóló
    egyéni statisztikája (S.euro.stats) — abból lesz az Aranycipő, az
@@ -63297,9 +63447,17 @@ function finish(){
     st+=vsec(`A csapatod felfedve · erő: ${teamStrength().toFixed(1)}`,
       `<div class="vplain">${slots.map(s=>`${s.pos} ${Math.round(playerStrength(s.player,s.pos))}  ${esc(fullName(s.player.n))}`).join("<br>")}</div>`);}
   st+=vsec("Végeredmény — bajnoki tabella",`<div id="verdictTableBody" style="margin-top:2px"></div>`);
+  /* AZ ÍV A TÁBLA UTÁN, NEM ELŐTTE. A tabella mondja meg, KI hol végzett; az ív
+     azt, HOGYAN jutott oda. Fordított sorrendben a négy vonalról még nem
+     tudnád, kihez tartozik. A rajzolás külön hívásban megy (mint a tábláé),
+     mert harminc tabella-újrajátszás — enélkül a `st` felépítése állna meg,
+     ha bármi elszáll benne. */
+  st+=vsec("A szezon íve — hogyan alakultak a helyezések",`<div id="verdictArcBody" style="margin-top:2px"></div>`);
   st+=vsec("Statisztikák a szezon végén",`<div id="verdictSeasonStatsBody" style="margin-top:2px"></div>`);
   $("verdictStats").innerHTML=st;
   $("verdictTableBody").innerHTML=renderFinalTable(finalTeams);
+  try{$("verdictArcBody").innerHTML=seasonArcHtml(finalTeams);}
+  catch(e){$("verdictArcBody").innerHTML='<div style="font-size:12.5px;color:var(--dim)">Az ív most nem rajzolható ki.</div>';}
   renderStatsTable("verdictSeasonStatsBody");
   $("shareBtn").onclick=()=>{
     const xi=slots.map((s,idx)=>`${s.pos}: ${fullName(s.player.n)}${idx===captainIdx?" (C)":""} (${Math.round(pOvr(s.player))})`).join("\n");
