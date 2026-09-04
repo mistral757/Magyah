@@ -4,6 +4,11 @@
 `PUSH_VAPID_PUBLIC` üres, a funkció **csendben alszik** — a játék pontosan
 úgy működik, mint eddig.)*
 
+> **A PUBLIKUS KULCS 3.9.37 ÓTA BENT VAN** (lásd 1.2). Az 1.1 megvolt, az
+> **1.3 és az 1.4 viszont még hátravan** — amíg a négy Netlify-környezeti
+> változó és a Firebase-szabályok nincsenek kint, a gombok MEGJELENNEK, de a
+> bökés a függvényen bukik el („a szerver nincs beállítva").
+
 ---
 
 ## 0. A pénzkérdés, elöl
@@ -46,16 +51,21 @@ Két kulcsot ad: egy **publikusat** és egy **titkosat**.
 > feliratkozott. A publikus fele viszont *szándékosan* nyilvános — azzal
 > iratkozik fel a böngésző.
 
-### 1.2 A publikus kulcs az `index.html`-be
-
-Keresd meg ezt a sort, és írd bele a **publikus** kulcsot:
-
-```js
-const PUSH_VAPID_PUBLIC="";   /* ← ide jön a VAPID PUBLIKUS kulcs */
-```
+### 1.2 A publikus kulcs az `index.html`-be — ✅ KÉSZ (3.9.37)
 
 Ez az egyetlen kapcsoló: amíg üres, az egész funkció alszik, és a gombok meg
-sem jelennek.
+sem jelennek. A **publikus** kulcs 3.9.37 óta bent áll:
+
+```js
+const PUSH_VAPID_PUBLIC="BE9_5SCX…IjGaNk0";   /* 87 karakter, base64url */
+```
+
+A böngésző 65 bájtos, tömörítetlen P-256 pontot vár (`0x04`-gyel kezdődik) —
+a `pushKulcsBajtok()` fordítja oda, és erre a kulcsra **mérve** helyes.
+
+> Kulcscsere esetén ide ÉS a Netlify `VAPID_PUBLIC` változójába is az ÚJ kulcs
+> kell, egyszerre. Ha a kettő eltér, a feliratkozás létrejön, de az aláírás
+> nem illik hozzá, és a push-szolgáltatás visszautasítja.
 
 ### 1.3 Négy környezeti változó a Netlifyn
 
@@ -67,6 +77,25 @@ sem jelennek.
 | `VAPID_PRIVATE` | a **titkos** kulcs |
 | `VAPID_SUBJECT` | `mailto:<a te e-mail-címed>` — a push-szolgáltatás ezt kéri, hogy legyen kihez fordulnia |
 | `RTDB_URL` | `https://magyahok-default-rtdb.europe-west1.firebasedatabase.app` |
+
+> **HA A DEPLOY EMIATT ELBUKIK.** A publikus kulcs 3.9.37 óta az
+> `index.html`-ben áll, és az 1.3 után UGYANAZ az érték ott lesz a Netlify
+> `VAPID_PUBLIC` változójában is. A titok-szkenner ALAP ága pontosan ezt
+> keresi: egy környezeti változó értékét a build kimenetében — ugyanaz a
+> mechanizmus, ami az `AIza…` kulcson egyszer már megállította a deployt,
+> csak az a SMART ág volt. Ha a napló a `VAPID_PUBLIC`-ra panaszkodik, a
+> javítás egy sor a `netlify.toml` `[build.environment]` szakaszába:
+>
+> ```toml
+> SECRETS_SCAN_OMIT_KEYS = "VAPID_PUBLIC"
+> ```
+>
+> Ez a kulcs NEVÉT veszi ki az alap-szkennelésből (a `..._SMART_DETECTION_
+> OMIT_VALUES` a másik ág, az értékek mintázat-alapú keresése — az nem erre
+> való). Csak ezt az egy nevet, és **soha ne a `VAPID_PRIVATE`-et**: annak a
+> szkennelése az egyetlen háló, ami elkapná, ha a titkos fele valaha
+> beleszivárogna a kimenetbe. Előre nem tettük be — a fájl kimondott elve,
+> hogy csak bizonyítottan szükséges kivétel kerül bele.
 
 ### 1.4 A Firebase-szabályok újbóli közzététele
 
@@ -201,8 +230,11 @@ elő — és ha már nyitva van valahol, azt az ablakot fókuszálja, nem nyit
 
 ## 6. Ha nem működik — ebben a sorrendben
 
-1. **Üres a `PUSH_VAPID_PUBLIC`?** Akkor a gombok meg sem jelennek. Ez a
-   leggyakoribb.
+1. **Üres a `PUSH_VAPID_PUBLIC`?** Akkor a gombok meg sem jelennek. (3.9.37
+   óta ki van töltve — ha a gombok mégsem látszanak, nem ez az ok.)
+   Ha a kulcs bent van, de a Netlify `VAPID_PUBLIC` változójában MÁSIK kulcs
+   áll, a feliratkozás sikerül, a küldés viszont némán elbukik: a két félnek
+   ugyanabból a párból kell jönnie.
 2. **Kimentek a Firebase-szabályok?** A feliratkozás kiírása enélkül elszáll.
    A beváró képernyő ilyenkor a jelenlét-hibát is kiírja.
 3. **Megvan mind a négy környezeti változó a Netlifyn?** Hiányzó kulcsnál a
