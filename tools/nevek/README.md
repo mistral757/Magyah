@@ -36,6 +36,27 @@ A válogatottak (Anglia, Magyarország…) SZÁNDÉKOSAN kimaradnak: az országn
 nem védjegy, és a magyar 1954-es keretet épp az teszi felismerhetővé, hogy
 Magyarország.
 
+## Az ifiakadémia névpoolja — ide a build NEM nyúl
+
+Az `index.html`-beli `HU_ACADEMY_LAST` (75 vezetéknév) és `HU_ACADEMY_FIRST`
+(30 keresztnév) a `manual.py` kézi rétegéből KÉZZEL kiválogatott névelemek —
+nem a build állítja elő, és nem is fogja felülírni. Az akadémia ezekből, a
+sima `REGEN_*` listákkal együtt sorsol (`ACADEMY_LAST` / `ACADEMY_FIRST`), így
+a felhozott tehetség neve 4550 helyett 13 775 kombinációból jön.
+
+A NÉVSORT nem vesszük át, csak a névelemeket, újrakeverve: „Kelkáposzta
+Tihamér" sehol nem áll a táblában, mégis onnan hangzik. Ahol mégis egybeesne
+egy létező magyarított névvel (13 775-ből 34 ilyen kombináció van), a
+`huFullNameTaken()` újrasorsoltatja — két különböző játékos a képernyőn nem
+állhat azonos néven.
+
+Az ikonok vezetékneve (Kalasnyikovos, Hidegkutyus, Gyorsiccs, Máldi, Krojfi,
+Zsindelyes…) SZÁNDÉKOSAN maradt ki: azok az `ACADEMY_ICON_NAMES` saját
+kacsintásai, és elmosódna, mikor jön fel tényleg ikonnevű tehetség.
+
+Új névelemet ide, az `index.html`-be kell felvenni — a `build.py` futtatása
+után is megmarad.
+
 ## Amit a build magától ellenőriz
 
 - egyetlen név sem maradhat változatlan (az elbukná a magyarítás értelmét),
