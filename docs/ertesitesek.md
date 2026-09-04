@@ -228,6 +228,35 @@ elő — és ha már nyitva van valahol, azt az ablakot fókuszálja, nem nyit
 
 ---
 
+## 5.b A feliratkozás hossza — miért 1200
+
+A böngésző feliratkozása egy JSON (`endpoint` + két kulcs), és a kliens
+**1200 karakterre vágva** írja a szobába — pontosan annyira, amennyit a
+`tools/firebase-rules.json` `push` mezője enged.
+
+A kettőnek EGYEZNIE kell. 3.9.37-ig a kliens 900-nál vágott, a szabály 1200-at
+engedett, és az eltérés néma hibát szült: egy 900 fölötti feliratkozás **csonka
+JSON-ként** került a szobába, a függvény `JSON.parse`-ja elszállt rajta, és a
+bökés „a társad feliratkozása hibás"-sal bukott — pedig a társ mindent jól
+csinált.
+
+| böngésző | a feliratkozás JSON-hossza | 900 | 1200 |
+|---|---|---|---|
+| Chrome / FCM | 365 | ✅ | ✅ |
+| Firefox | 428 | ✅ | ✅ |
+| Edge | 475 | ✅ | ✅ |
+| Safari/iOS (rövid) | 604 | ✅ | ✅ |
+| **Safari/iOS (hosszú)** | **904** | ❌ **némán elbukott** | ✅ |
+
+Épp az iOS-es társnak számít a legtöbbet a bökés — nála a legkevésbé
+nyilvánvaló, hogy várnak rá.
+
+> **HA VALAHA EMELNI KELL:** a két számot EGYÜTT kell léptetni (az
+> `index.html` `slice(0,1200)`-át és a szabályfájl `push` plafonját), és a
+> szabályt újra közzétenni. Az eltérés maga a hiba, nem a konkrét érték.
+
+---
+
 ## 6. Ha nem működik — ebben a sorrendben
 
 1. **Üres a `PUSH_VAPID_PUBLIC`?** Akkor a gombok meg sem jelennek. (3.9.37
