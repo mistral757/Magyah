@@ -45,7 +45,7 @@ const srv=http.createServer((req,rp)=>{
     const POS=["KP","JV","BV","BV","KV","VKP","KKP","TKP","JSZ","BSZ","CS"];
     slots.length=0;
     POS.forEach((pos,i)=>{
-      const n=`Teszt Játékos ${i+1}`;
+      const n=`Teszt Jatekos ${i+1}`;
       const pl={n,pos:[pos],ovr:80,age:26,tsi:9000,nat:"Magyarország"};
       careerPool[n]={n,pos:[pos],ovr:80,age:26,tsi:9000,peak:82,nat:"Magyarország",conf:0};
       slots.push({pos,player:pl,fit:1});});
@@ -121,6 +121,103 @@ const srv=http.createServer((req,rp)=>{
     const sz=applyChallengeReward({kind:"tacticFamiliar",excludeTactic:"kontra"});
     out.taktika.aktivat_nem=(S.tactics.levels.kontra===60);
 
+    /* ================= 3.9.37: A TELJES JUTALOM- ÉS BÜNTETÉS-KÉSZLET =================
+       A LÉNYEG: egy jutalom, ami nem csinál semmit, ROSSZABB, mint ha nem
+       létezne — a játékos kipipálja, és nem érti, miért nem változott semmi.
+       Ezért MINDEGYIKET elsütjük, és megnézzük, hogy a hozzá tartozó ÁLLAPOT
+       tényleg megváltozott-e. */
+    S.chFreeBoost={};S.chDealBoost=0;S.chDealMalus=0;S.chTrainBoost=0;
+    S.chYouthSell=null;S.chBidFloor90=0;S.chTacticFitPP=0;S.chSpeedOpen=null;
+    S.chHatUp=null;S.chDefRating=null;S.chYellowCut=0;S.chHealTokens=0;
+    S.chRoleFreeze=0;S.chBondSlow=0;S.chSkillPickLock=0;S.chTrainSecFreeze=0;
+    S.chBuyDiscountNext=0;
+    S.tactics={levels:{},active:"kontra"};Object.keys(TACTICS).forEach(k=>{S.tactics.levels[k]=60;});
+    const hat=(kind,extra)=>String(applyChallengeReward(Object.assign({kind},extra||{}))||"");
+    const hatP=(kind,extra)=>String(applyChallengePunishment(Object.assign({kind},extra||{}))||"");
+    out.jut={};out.bunt={};
+    hat("freeBoost",{boost:"plain"});
+    out.jut.ingyenBoost=(chFreeBoostLeft("plain")===1&&boostPriceOf("plain")===0);
+    hat("dealEasier");             out.jut.uzletKonnyebb=(S.chDealBoost===CH_DEAL_TRIES);
+    hat("trainBoost");             out.jut.edzesBoost=(S.chTrainBoost===CH_TRAIN_BOOST_M);
+    hat("youthSellable");          out.jut.ifiElado=!!S.chYouthSell&&chYouthSellMin(S.chYouthSell)===CH_YOUTH_SELL_MIN;
+    hat("askFloor");               out.jut.arPadlo=(S.chBidFloor90===CH_ASK_FLOOR_N);
+    hat("tacticFitUp",{amount:5}); out.jut.illeszkedes=(S.chTacticFitPP===5);
+    hat("tacticLevelUp");          out.jut.begyakorlas=(S.tactics.levels.kontra===61);
+    hat("speedCapOpen");           out.jut.sebPlafon=!!S.chSpeedOpen&&speedCap(S.chSpeedOpen)===attrHardCap()&&speedCap("senki")!==attrHardCap();
+    hat("hatTrickUp",{amount:5});  out.jut.mesterharmas=!!S.chHatUp&&chHatMult(S.chHatUp.n,{[S.chHatUp.n]:2})>1&&chHatMult(S.chHatUp.n,{[S.chHatUp.n]:1})===1;
+    hat("defRatingUp",{amount:40});out.jut.vedoErtekeles=!!S.chDefRating&&S.chDefRating.left===CH_DEFRATING_M;
+    {const kp=chPickKeeper(),e=kp&&careerPool[kp.n],f0=e?(e.formPoints||0):null;
+     hat("gkFormUp",{amount:3});
+     out.jut.kapusForma=!!(e&&(e.formPoints||0)===f0+3);}
+    hat("yellowDown",{amount:20}); out.jut.sargalap=(Math.abs(S.chYellowCut-0.20)<1e-9);
+    hat("healInjury");             out.jut.gyogyitas=(S.chHealTokens===1);
+    hat("buyDiscountNext");        out.jut.vasarlasKedvezmeny=(S.chBuyDiscountNext===1);
+    hatP("roleFreeze");    out.bunt.szerepFagy=(S.chRoleFreeze===CH_ROLE_FREEZE_M&&roleStyleActive()===false);
+    hatP("bondSlow");      out.bunt.osszhangLassu=(S.chBondSlow===CH_BOND_SLOW_M);
+    hatP("skillPickLock"); out.bunt.skillZar=(S.chSkillPickLock===(skillRealOn()?CH_SKILLLOCK_REAL:CH_SKILLLOCK_LAZA));
+    hatP("trainSecFreeze");out.bunt.masodlagosFagy=chTrainSecFrozen();
+    hatP("dealHarder");    out.bunt.uzletNehezebb=(S.chDealMalus===CH_DEAL_TRIES_DOWN);
+    /* --- A HÁROM „VALAMIT ELVESZÍTESZ" BÜNTETÉS: külön felállás kell hozzá --- */
+    {const st=styleState&&styleState();
+     if(st){st.traits=st.traits||{};
+       const kulcs=Object.keys(st.traits)[0]||"_proba";
+       st.traits[kulcs]=2;
+       hatP("loseStylePerk");
+       out.bunt.stilusKepesseg=((st.traits[kulcs]||0)===1);}
+     else{
+       /* Stílus nélkül a büntetésnek NINCS mit elvennie — és ezt is ki kell
+          mondania, nem némán elszállnia. */
+       out.bunt.stilusKepesseg=/elmarad/.test(hatP("loseStylePerk"));}}
+    {const L=staff();
+     L.length=0;
+     L.push({n:"Gyenge Edzo",type:"medic",sz:20,fp:{n:"Gyenge Edzo"}});
+     L.push({n:"Eros Edzo",type:"medic",sz:80,fp:{n:"Eros Edzo"}});
+     hatP("staffLeaves");
+     out.bunt.stabTavozik=(L.length===1&&L[0].n==="Eros Edzo");}
+    {const a1=slots[0].player.n,b1=slots[1].player.n;
+     S.bondsSeeded=true;
+     bondSet(a1,b1,40);
+     const elotteB=bondRaw(a1,b1);
+     const uz=hatP("bondSplit");
+     const utanaB=bondRaw(a1,b1);
+     out.bunt.elidegenedes=(Math.round(elotteB-utanaB)===CH_BOND_SPLIT);
+     out.bunt.elidegenedesUzenet=/összhang/.test(uz);}
+    const elotte={r:S.chRoleFreeze,b:S.chBondSlow,s:S.chSkillPickLock,t:S.chTrainBoost,
+                  d:S.chDefRating?S.chDefRating.left:0};
+    chModifierTick();
+    out.tick={szerep:S.chRoleFreeze===elotte.r-1,bond:S.chBondSlow===elotte.b-1,
+      skill:S.chSkillPickLock===elotte.s-1,edzes:S.chTrainBoost===elotte.t-1,
+      vedo:(S.chDefRating?S.chDefRating.left:0)===elotte.d-1};
+    const cel=slots[3].player.n;
+    S.unavailable=S.unavailable||{};S.replacementChoice=S.replacementChoice||{};
+    S.chHealTokens=1;S.unavailable[cel]={reason:"injury",matchesLeft:3};
+    out.gyogy={kinalja:chCanHeal(cel)};
+    chHealInjury(cel);
+    out.gyogy.meggyogyult=!S.unavailable[cel]&&S.chHealTokens===0;
+    S.chHealTokens=1;S.unavailable[cel]={reason:"red",matchesLeft:1};
+    out.gyogy.eltiltastNem=!chCanHeal(cel);
+    delete S.unavailable[cel];S.chHealTokens=0;
+
+    /* ---- A 3.9.37-es ÚJ KIHÍVÁSOK MEGSZÜLETNEK-E ---- */
+    S.lockerLog=[{s:1,pos:false,who:["Teszt Jatekos 5"]},{s:1,pos:false,who:["Teszt Jatekos 5"]}];
+    S.bondNew={"Teszt Jatekos 7":{m:3}};
+    S.trainingChangeUsed=false;S.bondTrainChangeUsed=false;
+    /* Két OLCSÓ tartalék: az „árusítsd ki a keret alját" kihívás legalább
+       kettőnél ajánlja fel magát (egyetlen emberért nem tét). */
+    [["Teszt Ifi",18,900],["Teszt Selejt",19,850]].forEach(([n,age,tsi])=>{
+      careerPool[n]={n,pos:["CS"],ovr:64,age,tsi,peak:70,nat:"Magyarorszag",conf:0};
+      extraRoster.push({n,pos:["CS"],ovr:64,age,tsi,nat:"Magyarorszag"});});
+    out.olcsoTartalek=chCheapReserves();
+    const uj={};
+    for(let i=0;i<1600;i++){
+      const sc=i%2?"short":"long";
+      let o=null;try{o=buildChallengeOffer(sc,challengeContext());}catch(e){}
+      if(o)uj[o.type]=(uj[o.type]||0)+1;}
+    out.ujKihivasok={};
+    ["tensionOut","youthListed","bondBoostNew","staffFromPlayer","trainFocus",
+     "integrationDone","staffBought","looksSpent","cheapReservesOut"]
+      .forEach(t=>{out.ujKihivasok[t]=uj[t]||0;});
+
     /* ---- 7. SKALP-FEDEZET ---- */
     const my=teamOVRbase();
     const gyenge=f=>{if(f&&f.o)f.o.ovr=my-20;};
@@ -153,12 +250,21 @@ const srv=http.createServer((req,rp)=>{
     ["taktika-jutalom: 82 → 86 (a 81 visszalépés volna)",r.taktika.magasrol===86],
     ["taktika-jutalom: a vállaláskori taktikát sosem emeli",r.taktika.aktivat_nem===true],
     ["skalp: rivális nélküli mezőnyben nincs ajánlat",r.skalp_gyenge_mezonyben===0],
+    ...Object.keys(r.jut).map(k=>["jutalom hat: "+k,r.jut[k]===true]),
+    ...Object.keys(r.bunt).map(k=>["büntetés hat: "+k,r.bunt[k]===true]),
+    ["a meccsenként fogyó számlálók fogynak",Object.values(r.tick).every(Boolean)],
+    ["gyógyítás: felajánlja, gyógyít, eltiltásra nem",
+      r.gyogy.kinalja&&r.gyogy.meggyogyult&&r.gyogy.eltiltastNem],
+    ["mind a kilenc új kihívás megszületik",Object.values(r.ujKihivasok).every(n=>n>0)],
     ["nincs oldalhiba",errs.length===0]];
   T.forEach(([n,ok])=>console.log((ok?"  ✓ ":"  ✗ ")+n));
   console.log("\n  született típusok ("+r.tipusok.length+"):\n   ",r.tipusok.join(" "));
   console.log("\n  az új típusok céljai:");
   Object.keys(r.uj).forEach(k=>console.log(`    ${k.padEnd(14)} ${String(r.uj[k].n).padStart(4)} db · cél ${r.uj[k].lo}…${r.uj[k].hi}`));
   console.log(`\n  msOne jelöltek (közepes): ${r.ms.jeloltek}`);
+  console.log(`  olcsó tartalék a próbakeretben: ${r.olcsoTartalek}`);
+  console.log("\n  az új kihívások előfordulása 1600 sorsolásból:");
+  Object.keys(r.ujKihivasok).forEach(k=>console.log(`    ${k.padEnd(18)} ${r.ujKihivasok[k]}`));
   if(errs.length)console.log("\noldalhiba:",errs.slice(0,4));
   const bukott=T.filter(x=>!x[1]).length;
   console.log(bukott?`\nBUKOTT: ${bukott}`:"\nminden rendben");

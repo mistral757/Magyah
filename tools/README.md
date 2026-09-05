@@ -217,7 +217,16 @@ A 3.9.37-ben átszabott kihívás-típusokat méri: a kivezetettek (`msDone`,
 `subGoals`, `tacticLevel`) nem születnek újra, az újak (`msOne`, `subMinutes`,
 `subStars`, `defStars`, `tacticMatches`, sávos `renewOld`) igen, értelmes
 céllal; a haladás csak a vállalás utáni eseményeket méri; a taktika-jutalom
-60→81 és 82→86; rivális nélküli mezőnyben nincs skalp-ajánlat. Részletek:
+60→81 és 82→86; rivális nélküli mezőnyben nincs skalp-ajánlat.
+
+A MÁSODIK KÖR a teljes jutalom- és büntetés-készletet méri: mind a 22-t
+elsütjük, és megnézzük, hogy a hozzá tartozó ÁLLAPOT tényleg megváltozott-e
+(ingyen boost ára 0, tárgyalási sáv, edzés-szorzó, ifi-kapu, ár-padló,
+illeszkedés, begyakorlás, sebességplafon, mesterhármas-szorzó, védő-értékelés,
+kapus-forma, sárgalap-esély, gyógyítás-zseton, vásárlási kedvezmény —
+illetve a szerep-fagy, összhang-lassítás, elidegenedés, skill-zár, edzés-fagy,
+tárgyalás-rontás, stílus-képesség és a távozó stábtag). Egy jutalom, ami nem
+csinál semmit, rosszabb, mint ha nem létezne. Részletek:
 `docs/kihivasok-3937.md`.
 
 ## firebase-rules.json — az adatbázis szabályai
