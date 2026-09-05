@@ -17590,6 +17590,15 @@ function bzChaseTarget(mScore){
   let t=null;
   Object.keys(mScore).forEach(n=>{if(mScore[n]===2)t=n;});
   return t;}
+/* ---- KIHÍVÁS-JUTALOM: MESTERHÁRMAS-ESÉLY (3.9.37) ----
+   „A leggólerősebb játékosod mesterhármas esélye megnövekszik +2-7%."
+   A hatás pontosan ott van, ahol a Panzer „hajszája" is: a gólsúly szorzója,
+   és CSAK a mesterhármas KÖZELÉBEN — kettőnél, amikor a harmadik a tét.
+   Egy általános gólsúly-emelés mást ígérne, mint amit a jutalom mond. */
+function chHatMult(name,mScore){
+  const h=S.chHatUp;
+  if(!h||!name||h.n!==name)return 1;
+  return ((mScore&&mScore[name])||0)>=2?1+(h.pct||0):1;}
 function bzChaseGoalMult(name,mScore){
   const lv=bzChaseLevel();
   if(!lv||!name)return 1;
@@ -18037,6 +18046,11 @@ function tacticFit(key,A0){
      állítana, mint a motor. */
   let f=Math.min(1,raw*(1+styleTacticBoost(key)));
   let bonus=0;try{bonus=roleFitBonusPP();}catch(e){}
+  /* KIHÍVÁS-JUTALOM (3.9.37): állandó +2-7 SZÁZALÉKPONT az illeszkedésre.
+     Ugyanazon a pp-csatornán megy, mint a Villám box-to-box szerepe — tehát a
+     hat olvasó rendszer mind ugyanazt a számot látja, és a panel sem mondhat
+     mást, mint a motor. */
+  bonus+=(S.chTacticFitPP||0);
   /* HANGSÚLY-CSÚSZKA (3.8.27): a „tacticfit" csatorna SZÁZALÉKPONTOT ad, mint
      a Box-to-box szerepé — ugyanide, a fit egyetlen forrásába. */
   try{bonus+=dialPP("tacticfit",{});}catch(e){}
@@ -20363,9 +20377,22 @@ const BOOST_SKILL_W_MAX=4;    /* …de legfeljebb ennyiszeres */
 /* Az egység árát a boostUnitPrice() adja (lásd a boostUnitBase fölött) — ott,
    ahol a kedvezmények is ülnek, hogy mind a hét fajta magától kövesse őket. */
 function boostPriceOf(kind){
+  /* INGYEN-ZSETON (3.9.37 kihívás-jutalom): fajtánként külön. Az ár ITT lesz
+     nulla, nem a fizetésnél — így a katalógus, a fedezet-ellenőrzés, a
+     megerősítő ablak és a levonás MIND ugyanazt a számot látja. Egy „ingyen"
+     boost, ami a megerősítőn még pénzt mutat, hibának néz ki. */
+  if(chFreeBoostLeft(kind)>0)return 0;
   const u=BOOST_UNIT_KIND[kind];
   if(u==null)return boostUnitPrice();
   return Math.max(100,Math.round(boostUnitPrice()*u/100)*100);}
+function chFreeBoostLeft(kind){return (S.chFreeBoost&&S.chFreeBoost[kind])||0;}
+/* A zsetont a VÉGREHAJTÁS pillanatában használjuk el, nem a kiválasztásnál:
+   a katalógusban való nézelődés nem kerülhet zsetonba. */
+function chFreeBoostSpend(kind){
+  if(chFreeBoostLeft(kind)<=0)return false;
+  S.chFreeBoost[kind]--;
+  if(S.chFreeBoost[kind]<=0)delete S.chFreeBoost[kind];
+  return true;}
 /* ---- 1. SIMA BOOST ---- */
 function applyPlainBoost(entry){
   const rPct=BOOST_PLAIN_R[0]+Math.random()*(BOOST_PLAIN_R[1]-BOOST_PLAIN_R[0]);
@@ -20400,7 +20427,7 @@ function applyAttrBoost(entry,key){
   const before=ap[key]||40;
   /* A TENGELY SAJÁT PLAFONJA (a sebességé szűkebb) itt is él — a boost nem
      kerülheti meg azt, amit a fejlődés se léphet át. */
-  let capk=999;try{capk=attrCapFor(key);}catch(e){capk=999;}
+  let capk=999;try{capk=attrCapFor(key,entry&&entry.n);}catch(e){capk=999;}
   const add=Math.max(0,Math.min(capk-before,Math.max(1,Math.round(before*pct/100))));
   ap[key]=before+add;
   /* A TARTÓS CSATORNA. Több boost ugyanarra a tengelyre HALMOZÓDIK (n),
@@ -20438,6 +20465,11 @@ function applyBondBoost(entry){
   const before=entry.bondBoost||1;
   entry.bondBoost=Math.min(BOOST_BOND_MAX,Math.round(before*(1+pct/100)*100)/100);
   entry.bondBoosts=(entry.bondBoosts||0)+1;
+  /* KIHÍVÁS-KÖNYVELÉS (3.9.37): „boostold az összjátékát egy ÚJ játékosodnak".
+     Új az, aki még beilleszkedés alatt áll (bondIntegrating) — ez ugyanaz a
+     kapu, amit a felület is „érkező"-nek jelöl, tehát a szabály és a
+     képernyő ugyanazt mondja. */
+  try{if(bondIntegrating(entry.n))S.chBondBoostNew=(S.chBondBoostNew||0)+1;}catch(e){}
   return {pct:Math.round(pct),mult:entry.bondBoost,capped:entry.bondBoost>=BOOST_BOND_MAX};}
 /* A PÁR ÜTEM-SZORZÓJA. A KETTŐ KÖZÜL A NAGYOBB számít, nem a szorzatuk: a
    boost azt ígéri, hogy EZ AZ EMBER szokik össze gyorsabban a csapattal — két
@@ -21393,10 +21425,15 @@ const SPEED_TRAIN_DIV=1.5;   /* ennyivel lassabban edzhető, mint a többi */
    megnyílása nem ad ingyen gyorsaságot, csak megengedi, hogy a CÉLZOTT EDZÉS
    följebb vigyen. */
 const INFINITY_SPEED_TRAIN_DIV=4;   /* 99 fölött: 0,25x a többi attribútumhoz képest */
-function speedCap(){
+function speedCap(name){
   /* CSAPATÉPÍTÉSI STÍLUS ("Korai plafon-nyitás"): a villám-stílus a plafont
      már az Infinity ELŐTT megnyithatja. A 99 fölötti negyed tempó ugyanúgy
      érvényes rá — a trait a kaput nyitja ki, nem a fejlődést gyorsítja. */
+  /* KIHÍVÁS-JUTALOM (3.9.37): EGY névre szólóan ugyanez a kapu. A jutalom
+     szövege („már most kinyílik") pontosan a stílus-trait hatását ígéri egy
+     embernek — ezért ugyanoda, ugyanarra a sorra kötjük be, nem egy külön,
+     párhuzamos szabályba. A 99 fölötti negyed tempó rá is érvényes. */
+  if(name&&S.chSpeedOpen===name)return attrHardCap();
   if(infinityMode)return attrHardCap();
   if(typeof styleSpeedEarly==="function"&&styleSpeedEarly())return attrHardCap();
   return SPEED_MAX;}
@@ -21429,7 +21466,10 @@ const SPEED_PASSIVE_RATE=0.60;   /* poszt-súllyal szorozva (csatár 1.0 … kap
 const SPEED_ROLL_SPREAD=8;   /* a kezdő kisorsolás szórása (± ennyi) */
 /* Egy attribútum plafonja. A sebesség sosem mehet 99 fölé, akkor sem, ha a
    Rating (Infinityben) elszáll. */
-function attrCapFor(key){return key==="seb"?speedCap():attrHardCap();}
+/* A `name` ELHAGYHATÓ. Enélkül minden hívó a régi, globális szabályt kapja —
+   a kihívás-jutalom („a leggyorsabb játékosodnak már most kinyílik a
+   sebességplafon") csak ott hat, ahol egy KONKRÉT emberről van szó. */
+function attrCapFor(key,name){return key==="seb"?speedCap(name):attrHardCap();}
 /* Üres attribútum-számláló — MINDIG az ATTR_KEYS-ből épül, hogy egy új
    attribútum (mint a sebesség) sehol ne maradjon ki a nullázásokból. */
 function zeroAttrs(){const o={};ATTR_KEYS.forEach(k=>o[k]=0);return o;}
@@ -21529,7 +21569,7 @@ function syncAttrsToRating(entry){
   if(d){
     /* A sebesség itt is a saját 99-es plafonjába ütközik: a Rating emelkedése
        (akár Infinityben) nem viheti fölé. */
-    ATTR_KEYS.forEach(k=>{entry.attrs[k]=Math.max(40,Math.min(attrCapFor(k),entry.attrs[k]+d));});
+    ATTR_KEYS.forEach(k=>{entry.attrs[k]=Math.max(40,Math.min(attrCapFor(k,entry.n),entry.attrs[k]+d));});
     entry._attrAnchor=entry.startRating;}}
 /* Melyik attribútumot edzi a poszton való JÁTÉK maga (részvétel, MVP stb.).
    A szélsőknél felállás-tudatos: támadó szárny a gólszerzést, középpálya-
@@ -21568,7 +21608,7 @@ function bumpAttr(entry,key,dir){
      ettől halványul el az edzés. A kemény attribútum-plafon (attrCapFor)
      változatlanul fölötte áll, tehát a sáv nem tud kitörni belőle. */
   const _ts=trainScale(entry);
-  const ceil=Math.min(attrCapFor(key),base+(prof[key]||0)+ATTR_SPEC_CEIL*_ts);
+  const ceil=Math.min(attrCapFor(key,entry&&entry.n),base+(prof[key]||0)+ATTR_SPEC_CEIL*_ts);
   const floor=Math.max(40,base+(prof[key]||0)-ATTR_SPEC_FLOOR*_ts);
   entry.attrs[key]=Math.max(floor,Math.min(ceil,entry.attrs[key]+dir));}
 /* A passzív csatorna másodlagos plafonja: a születési sebesség +15%-a (de a
@@ -21756,6 +21796,12 @@ function devCeiling(entry){
    a specializációs sáv (−10…+8) továbbra is kemény plafon, tehát az edzés
    nem tud a poszt-profiltól korlátlanul eltávolodni. */
 const TRAIN_MAIN_PTS=0.8;    /* fő edzés: pont/meccs a választott attribútumra */
+/* Kihívás-jutalom: +50% edzés-hatékonyság 15 meccsen át. */
+const CH_TRAIN_BOOST_MULT=1.5;
+/* Kihívás-büntetés: a másodlagos edzés egy SZEZONRA fagy be. A mező annak a
+   szezonnak a száma, ameddig (bezárólag) áll — így a szezonváltás magától
+   oldja fel, külön takarítás nélkül. */
+function chTrainSecFrozen(){return (S.chTrainSecFreeze||0)>=(S.seasonNumber||1);}
 const TRAIN_SEC_PTS=0.4;     /* mellék edzés: a fő fele */
 const TRAIN_SLOW=0.12;       /* a két nem edzett attribútum ennyivel lassabban gyűlik */
 /* ================= AZ EDZÉS EREJE KÖVESSE A CSAPAT SZINTJÉT =================
@@ -22076,8 +22122,17 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
       ap[key]=(ap[key]||0)+val;};
     if(_tr){
       const _ts=trainScale(entry);   /* az edzés ereje a játékos szintjével nő */
-      if(_tr.main)addA(_tr.main,TRAIN_MAIN_PTS*_ts*share,true);
-      if(_tr.sec) addA(_tr.sec, TRAIN_SEC_PTS*_ts*share,true);}
+      /* ---- KIHÍVÁS-MODOSÍTÓK AZ EDZÉSEN (3.9.37) ----
+         JUTALOM: „edzés effektivitás növelés 15 meccsen át (+50%)" — a
+         TERVEZETT edzésre hat (fő + mellék), nem az attribútum-boostra és nem
+         a passzkémiára: azok saját, más okból járó csatornák.
+         BÜNTETÉS: „másodlagos edzésed befagy egy szezonra" — a mellék sáv
+         kimarad, a fő marad. A befagyás SZEZONSZÁMRA szól, nem meccsre: a
+         szezonváltáskor magától lejár. */
+      const _tm=((S.chTrainBoost||0)>0?CH_TRAIN_BOOST_MULT:1);
+      const _secOff=chTrainSecFrozen();
+      if(_tr.main)addA(_tr.main,TRAIN_MAIN_PTS*_ts*share*_tm,true);
+      if(_tr.sec&&!_secOff)addA(_tr.sec,TRAIN_SEC_PTS*_ts*share*_tm,true);}
     /* ---- ATTRIBÚTUM BOOST: A TARTÓS CSATORNA (3.8.12) ----
        UGYANABBA a csatornába folyik, mint az edzésterv: ugyanaz a kor-görbe,
        a trainScale és a globális tempó hat rá. A MÁSODLAGOS edzés ütemén megy
@@ -22997,6 +23052,9 @@ function coachEligible(entry){
   if((entry.age||0)<COACH_MIN_AGE)return false;
   return careerMinutesOf(entry.n)>=COACH_MIN_MINUTES;}
 
+/* Melyik úton érkezik a most felvett stábtag — a hireCoach ebből könyveli a
+   kihívást. Egy hívás erejéig él, a hireCoach nullázza. */
+let _chStaffFrom=null;
 function makeCoach(fp,typeKey,seasonNow){
   const t=coachTypeByKey(typeKey);
   if(!t||!fp)return null;
@@ -23012,6 +23070,13 @@ function makeCoach(fp,typeKey,seasonNow){
 function hireCoach(c){
   if(!c||staffFull())return false;
   staff().push(c);
+  /* KIHÍVÁS-KÖNYVELÉS (3.9.37). A két út KÜLÖN számít, mert két külön
+     kihívás szól róluk: a SAJÁT, kiöregedett játékosod meghívása (c.fp a te
+     pool-bejegyzésed) és a stáb-PIACRÓL vásárolt idegen. A megkülönböztetés
+     a hívó dolga (chStaffFrom), mert a makeCoach mindkét úton fp-t kap. */
+  if(_chStaffFrom==="player")S.chStaffFromPlayer=(S.chStaffFromPlayer||0)+1;
+  else if(_chStaffFrom==="market")S.chStaffBought=(S.chStaffBought||0)+1;
+  _chStaffFrom=null;
   msNoteStaffType(c.type);   /* mérföldkő: ez a TÍPUS most nyílt-e meg először */
   addLine(`🎓 <b>ÚJ A STÁBBAN</b> — ${esc(shortName(c.n))} mostantól ${esc(coachTypeByKey(c.type).n)} (${coachStars(c.sz)} Sz ${c.sz}).`,"m life");
   /* ÖRÖKSÉG (Béke és harmónia): aki a stábba lép, a JÁTÉKOS-képességeit is
@@ -23376,6 +23441,7 @@ function staffMarketBuy(i){
   const c=staffOfferToCoach(o);
   if(!c)return false;
   budgetPay(o.price,"staff",c.n);
+  _chStaffFrom="market";
   hireCoach(c);
   list.splice(i,1);
   S.staffMarket={key:staffMarketKey(),list};
@@ -30504,7 +30570,10 @@ function markArrived(p,_price,fromAcademy){
   if(fromAcademy)S.chYoungSignings=(S.chYoungSignings||0)+1;
   if(age!=null){
     if(!fromAcademy&&age<20)S.chYoungSignings=(S.chYoungSignings||0)+1;
-    if(age<25)S.chBoughtUnder25=(S.chBoughtUnder25||0)+1;}}
+    if(age<25)S.chBoughtUnder25=(S.chBoughtUnder25||0)+1;
+    /* A FIATALÍTÁS-KIHÍVÁS SÁVJA KIHÍVÁSONKÉNT MÁS (3.9.37) — ezért az
+       ÉLETKORT tesszük el, nem egy rögzített küszöbre szűrt számlálót. */
+    S.chBoughtAges=(S.chBoughtAges||[]).concat([age]);}}
 /* ---- JAVÍTVA: A FELÁLLÁS NÉHA ELTŰNT ----
    A régi kód ELŐSZÖR kiürítette a pályát (pit.innerHTML=""), és utána, a
    cikluson belül építette fel a 11 helyet. Ha bármelyik iteráció kivételt
@@ -35853,6 +35922,14 @@ function buyPrice(entry,opts){
      forrásból jön, tehát nem tud szétcsúszni. */
   if(S.buySurcharge>0)p*=1.10;
   if(S.buyDiscountChance>0&&entry&&!(opts&&opts.noDiscount)&&chBuyDiscountHits(entry.n))p*=0.75;
+  /* GARANTÁLT KEDVEZMÉNY (3.9.37 kihívás-jutalom): „a következő vásárlás
+     −25%, a sikeres vásárlás lezárásáig érvényes". Nem esély, hanem zseton —
+     ezért a valószínűségi ág MELLETT áll, nem helyette (a kettő nem szorzódik
+     össze: aki mindkettőt megkapta, ugyanazt a 25%-ot kapja).
+     A zseton az ÁR OLVASÁSÁTÓL nem fogy: a kiírás és a fizetés ugyanezt a
+     képletet hívja, tehát itt csak KEDVEZMÉNYEZÜNK. Az elhasználás a
+     tényleges vásárlásnál történik (chBuyDiscountSpend). */
+  else if((S.chBuyDiscountNext||0)>0&&entry&&!(opts&&opts.noDiscount))p*=0.75;
   p*=giftSkillPriceMult(entry);   /* a kész skillekért fizetni kell */
   /* CSAPATÉPÍTÉSI STÍLUS ("Olcsó a jó védő"): a VÉDŐ posztcsoport olcsóbb.
      Kizárólag a VÉTELI oldal — az eladás (sellPrice) érintetlen marad,
@@ -35898,6 +35975,11 @@ function buyDiscountInfo(entry){
   }catch(e){return null;}}
 /* Determinisztikus "véletlen": a névből és a szezonból képzett hash dönti el,
    kapott-e kedvezményt ez a játékos. Így stabil marad két megjelenítés közt. */
+/* A garantált kedvezmény-zseton elhasználása — a SIKERES vásárlás lezárásakor
+   hívja a vételi út (budgetPay „buy"). Ha a tárgyalás elbukik, a zseton marad. */
+function chBuyDiscountSpend(){
+  if((S.chBuyDiscountNext||0)<=0)return false;
+  S.chBuyDiscountNext--;return true;}
 function chBuyDiscountHits(name){
   const ch=(S.buyDiscountChance||0);
   if(ch<=0)return false;
@@ -37252,6 +37334,20 @@ function challengeStatFor(name,stat){
    te csapaterődtől. Egy szám, egy helyen — a felajánlás, a kalibráló
    szimuláció, a bajnoki és a kupa-kiértékelés is ezt olvassa. */
 const CH_RIVAL_MARGIN=2;
+/* ================= A 3.9.37-es JUTALMAK ÉS BÜNTETÉSEK MÉRTÉKEI =================
+   Egy helyen, mert három szöveg olvassa mindegyiket: az ajánlat-kártya, a
+   megerősítő párbeszéd és a kifizetés naplósora. Ha bármelyik szám külön élne,
+   a panel mást ígérne, mint amit a motor csinál. */
+const CH_DEAL_TRIES=3;          /* jutalom: ennyi tárgyalás megy könnyebben */
+const CH_DEAL_TRIES_DOWN=5;     /* büntetés: ennyi megy nehezebben (a kérés szerint) */
+const CH_TRAIN_BOOST_M=15;      /* jutalom: ennyi meccsen át erősebb az edzés */
+const CH_ASK_FLOOR_N=3;         /* jutalom: ennyi piacra bocsátás kap ár-padlót */
+const CH_DEFRATING_M=10;        /* jutalom: ennyi meccsen át jobb a védő értékelése */
+const CH_ROLE_FREEZE_M=3;       /* büntetés: ennyi meccsig nem működnek a szerepek */
+const CH_BOND_SLOW_M=8;         /* büntetés: ennyi meccsen át fele ütemű az összhang */
+const CH_BOND_SPLIT=10;         /* büntetés: ennyivel esik a legerősebb pár kötése */
+const CH_SKILLLOCK_LAZA=15, CH_SKILLLOCK_REAL=30;   /* büntetés, módonként */
+const CH_YELLOW_CUT_CAP=0.40;   /* a halmozott sárgalap-kedvezmény plafonja */
 function chRivalOvrMin(myOvr){
   const my=(typeof myOvr==="number")?myOvr:teamOVRbase();
   return my-CH_RIVAL_MARGIN;}
@@ -37464,8 +37560,15 @@ function genChallenge(scope,diff,ctx){
       if(expected<0.5)return null;       /* reálisan 1 skalp sem várható */
       const szorzo=diff==="hard"?1.05:diff==="medium"?0.8:0.55;
       const target=Math.max(1,Math.min(cands.length,Math.round(expected*szorzo)));
-      return {type:"bigScalps",target,
-        desc:`Győzz le ${target} rivális erejű ellenfelet ${horizon}`,
+      return {type:"bigScalps",target,scalpCands:cands.length,
+        /* A MÉRŐ A CÍMBEN VAN, NEM A SZABÁLYBAN (3.9.37). Bejelentett panasz:
+           „sokszor van hiba, pl. hogy a határidőn belül nincs elegendő ilyen
+           ellenfél már a kihívás pillanatában sem". A jelöltszám eddig is ott
+           állt — de a szabály-szöveg VÉGÉN, ahova senki nem olvas el a vállalás
+           előtt. Mostantól a cím mellett áll, tehát a döntés pillanatában
+           látod, hány emberre lősz. A szűk fedezetet (a cél és a jelöltszám
+           közti egy-két lépés) a challengeOfferSane külön is elkapja. */
+        desc:`Győzz le ${target} rivális erejű ellenfelet ${horizon} (${cands.length} jelölt vár)`,
         rule:`Rivális erejű az az ellenfél, akinek a Ratingje legfeljebb ${hunVal(CH_RIVAL_MARGIN)} marad el a kezdő 11-ed átlagától — vagyis a nálad erősebbek MELLETT a hajszálnyival gyengébbek is számítanak (88-as csapaterőnél a 86-os ellenfél is). A kiértékelés a meccs (pontosabban a határidős kiértékelés) idején mért két erőt nézi, tehát ahogy a kereted nő, a lista fogy — most ${cands.length} tartós jelölt van a hátralévő sorsolásban.`};},
     ()=>{const target=CAL("zeroHeroWins",short?R(1,3):R(6,10));
       return {type:"zeroHeroWins",target,
@@ -37525,12 +37628,29 @@ function genChallenge(scope,diff,ctx){
        igazodik (SUBGOAL_HT_MULT). Ha menet közben kapcsolod BE, az aktív
        kihívás célja is ugyanígy megemelkedik — lásd hubHalftimeSubsBtn —,
        különben a könnyű célt lehetne utólag "megvenni". */
-    ()=>{const base=short?R(2,3):R(6,10);
-      const target=Math.round(base*(halftimeSubsOn()?SUBGOAL_HT_MULT:1));
-      return {type:"subGoals",target,htSubs:halftimeSubsOn(),
-        desc:`A CSEREEMBEREID szerezzenek ${target} gólt ${horizon}`,
-        rule:`Csak az számít, ha a gólszerző NEM volt kezdő azon a meccsen — a bármelyik percben beálló csere gólja is ilyen. Ez a keret mélységét méri.${
-          halftimeSubsOn()?" A cél magasabb, mert be van kapcsolva a félidei csere.":""}`};},
+    /* A CSEREGÓL-KIHÍVÁS TÖRÖLVE (3.9.37). Bejelentett panasz: sosem választja
+       senki. Jogos — a cseregól HÁRMAS véletlen (bejön-e, kap-e labdát,
+       betalál-e), és a menedzser döntése alig hat rá. A challengeRawValue
+       "subGoals" ága SZÁNDÉKOSAN megmaradt: a futó mentésekben már elvállalt
+       példányok a határidejükig normálisan kiértékelődnek, csak ÚJ ajánlat
+       nem születik többé. (Ugyanaz a kivezetés, mint a párkémia-kihívásnál.)
+       A HELYÉBE KÉT OLYAN KIHÍVÁS LÉP, amit a menedzser tényleg eldönt: mennyi
+       PERCET ad a padnak, és milyen embert küld be. */
+    /* --- CSEREPERCEK: a keret mélysége, döntésben mérve --- */
+    ()=>{const target=chSubMinuteTarget(diff,W);
+      return {type:"subMinutes",target,
+        desc:`A cseréid játsszanak összesen ${target} percet ${horizon}`,
+        rule:`A kezdőrúgáskori 11-en KÍVÜL pályára lépők percei adódnak össze — a félidei csere is, a 85. percben beálló is. Egy teljes félidő 45 perc, tehát ${Math.ceil(target/45)} félidőnyi csere-játékidő. A lecserélt kezdő percei NEM számítanak: ő kezdő volt.`};},
+    /* --- CSERE-CSILLAG: nem a gól, hanem a HATÁS --- */
+    ()=>{const target=Math.max(1,Math.min(3,short?R(1,2):R(2,3)));
+      return {type:"subStars",target,
+        desc:`Legyen ${target} cserejátékosod, aki KIEMELKEDŐ estét fut ${horizon}`,
+        rule:`Akkor számít, ha valaki a kezdőrúgáskori 11-en KÍVÜLRŐL állt be, és a meccs-értékelése elérte a „${MSTAT_GRADES[CH_STAR_IDX].t}" fokozatot (vagy jobbat) — ugyanazt, amit a meccs utáni ablak kiír. Ugyanaz az ember többször is számít, más-más meccsen.`};},
+    /* --- A HÁTSÓ SOR ESTÉI (a kérés szerint) --- */
+    ()=>{const target=chDefStarTarget(diff,W);
+      return {type:"defStars",target,
+        desc:`A védőid érjenek el ${target} kiemelkedő meccsértékelést ${horizon}`,
+        rule:`A védő poszton játszók (JV, BV, KV) estéi számítanak, ha elérik a „${MSTAT_GRADES[CH_STAR_IDX].t}" fokozatot vagy jobbat. Meccsenként több védő is hozhat egyet-egyet — ez a hátsó sor összteljesítményét méri, nem egyetlen emberét. A tiszta lap NEM feltétel: egy 2-2-n is lehet valaki a pálya legjobbja.`};},
     /* BRAVÚR-CÉL — MOSTANTÓL KALIBRÁLT (3.9.04). A régi, kézzel beírt sávok
        (rövid 2-3, hosszú 7-10) egy 3.8.20 ELŐTTI mérésen álltak, amikor a
        bravúr még ritka flavor-esemény volt; azóta a helyzet-modell
@@ -37605,16 +37725,28 @@ function genChallenge(scope,diff,ctx){
       return {type:"youthXI",target,
         desc:`A szezon végére legyen ${target} darab 24 év alatti a kezdő 11-edben`,
         rule:`Ez ÁLLAPOT-kihívás, nem gyűjtögetés: a HATÁRIDŐ pillanatában kell ennyi 24 év alattinak lennie a kezdő 11-ben. Közben szabadon változhat.`};},
-    /* --- 7. Új taktika felhozatala --- */
+    /* --- 7. ÚJ TAKTIKA: MECCSEKBEN MÉRVE, NEM SZÁMBAN (3.9.37) ---
+       BEJELENTETT PANASZ: „új taktika 81% fölöttire emelése" — sosem választja
+       senki. Jogos, és az ok szerkezeti: a begyakorlás lassan, a HASZNÁLATTAL
+       nő, tehát a „81 fölé" valójában egy meccsszám volt — csak épp
+       kimondatlanul, és a játékos nem tudta kiszámolni, hány meccsre vállalkozik.
+       Mostantól a kihívás AZT KÉRI, AMI A DOLGA: játssz le 15 meccset egy új
+       taktikával egy szezonban. Ez látható, számolható, és a haladás-sáv is
+       értelmes lesz (7/15).
+       A JUTALOM MAGA A BEGYAKORLÁS: a 15. meccs után a taktika 81-re ugrik —
+       ha viszont már 80 fölött állt, 86-ra, mert 81-re emelni ott büntetés
+       volna, nem jutalom. A régi típus (tacticLevel) kiértékelése SZÁNDÉKOSAN
+       megmarad a challengeRawValue-ban: a futó mentésekben már elvállalt
+       példányok a határidejükig normálisan lejárnak. */
     ()=>{if(short)return null;
       const act=S.tactics&&S.tactics.active;
-      /* ÁLLAPOT-KIHÍVÁS: a legjobb NEM aktív taktikád szintje fölé kell célozni */
-      const most=chBestOtherTacticLevel({excludeTactic:act});
-      const target=Math.max(Math.max(65,Math.min(85,Math.round(70*Math.sqrt(mult)))),most+5);
-      if(target>TACTIC_MAX-2)return null;   /* a plafon közelében nincs mit kérni */
-      return {type:"tacticLevel",target,excludeTactic:act,
-        desc:`Emelj egy ÚJ taktikát ${target} fölötti szintre ${horizon}`,
-        rule:`A vállaláskor AKTÍV taktikád nem számít — egy másikat kell felhoznod. A taktika a használatával fejlődik, tehát váltanod kell rá.`};},
+      const target=15;
+      /* Ha már van egy nem-aktív taktikád ennyi meccsel, nincs mit kérni. */
+      if(chBestOtherTacticMatches({excludeTactic:act}).n>=target)return null;
+      return {type:"tacticMatches",target,excludeTactic:act,
+        forceReward:{kind:"tacticFamiliar",excludeTactic:act},
+        desc:`Játssz ${target} meccset egy ÚJ taktikával ${horizon}`,
+        rule:`A vállaláskor AKTÍV taktikád (${(act&&TACTICS[act]&&TACTICS[act].n)||"—"}) nem számít — egy MÁSIKRA kell váltanod, és azzal lejátszanod ${target} bajnoki meccset ebben a szezonban. A szezon eddigi meccsei is beleszámítanak, ha már azzal játszottál. Jutalomként a ${target}. meccs után a begyakorlása azonnal ${TACTIC_FAM_TO}-re ugrik (ha már ${TACTIC_FAM_HI} fölött állt, ${TACTIC_FAM_TO_HI}-re).`};},
     /* --- 8. Taktikai illeszkedés --- */
     ()=>{if(short)return null;
       /* ÁLLAPOT-KIHÍVÁS: a MOSTANI illeszkedésed fölé kell célozni. Enélkül egy
@@ -37654,10 +37786,20 @@ function genChallenge(scope,diff,ctx){
         desc:`Kezdj el betanítani egy új posztot valamelyik játékosodnak`,
         rule:`Elég ELINDÍTANI a betanítást (a játékos részletpaneljén) — nem kell befejezni. Jutalomként a befizetett ár felét visszakapod, tehát a tanulás gyakorlatilag féláras lesz.`};},
     /* --- RÖVID: öreg le, fiatal fel --- */
+    /* A SÁVOK MOSTANTÓL VÉLETLENEK (3.9.37). A rögzített „32 fölött el, 25
+       alatt be" mindig ugyanaz az egy feladat volt; ugyanaz a szöveg, ugyanaz
+       a két ember a keretben. A sáv innentől sorsolt (eladás 29-32 fölött,
+       igazolás 24-28 alatt), tehát a kihívás hol a rutinos, hol a kifejezetten
+       öreg embert kéri — és néha egy 27 éves igazolás is elég hozzá.
+       A haladást a chSoldAges/chBoughtAges ÉLETKOR-listák adják, a vállaláskori
+       hosszukkal együtt: így bármelyik sávra pontosan mérhető. */
     ()=>{if(!short)return null;
-      return {type:"renewOld",target:1,
-        desc:`Adj el egy 32 év fölötti játékost, és hozz a helyére 25 év alattit`,
-        rule:`Mindkét lépés kell: egy 32 év FÖLÖTTI eladása ÉS egy 25 év ALATTI igazolása, a vállalás után. A sorrend mindegy. Az igazolás oldalán a scouthálózat ingyen felfedezése NEM számít bele — oda vásárlás, ingyen igazolás, ikon vagy akadémista kell.`};},
+      const sellAge=29+Math.floor(Math.random()*4);   /* 29 … 32 */
+      const buyAge=24+Math.floor(Math.random()*5);    /* 24 … 28 */
+      return {type:"renewOld",target:1,sellAge,buyAge,
+        startSold:(S.chSoldAges||[]).length,startBought:(S.chBoughtAges||[]).length,
+        desc:`Adj el egy ${sellAge} év fölötti játékost, és hozz a helyére ${buyAge} év alattit`,
+        rule:`Mindkét lépés kell: egy ${sellAge} év FÖLÖTTI eladása ÉS egy ${buyAge} év ALATTI igazolása, a vállalás után. A sorrend mindegy. Az igazolás oldalán a scouthálózat ingyen felfedezése NEM számít bele — oda vásárlás, ingyen igazolás, ikon vagy akadémista kell. A sávot minden ajánlatnál újrasorsoljuk, tehát legközelebb más korosztályra szólhat.`};},
     /* --- RÖVID: a leggyengébb láncszem cseréje --- */
     ()=>{if(!short)return null;
       /* A leggyengébb láncszemet a KEZDŐ 11-BŐL választjuk, nem a teljes
@@ -37673,12 +37815,25 @@ function genChallenge(scope,diff,ctx){
       return {type:"replaceWorst",target:1,targetName:worst.n,
         desc:`Találj új játékost ${shortName(worst.n)} helyére (ő a leggyengébb láncszem)`,
         rule:`Akkor teljesül, ha ${shortName(worst.n)} már NINCS a keretedben (eladtad vagy elengedted). Nem elég a padra ültetni.`};},
-    /* --- RÖVID: mérföldkövek --- */
+    /* --- RÖVID: EGY KONKRÉT, MÁR KARNYÚJTÁSNYI MÉRFÖLDKŐ (3.9.37) ---
+       BEJELENTETT PANASZ: „teljesíts x db mérföldkövet" — ezt sosem választja
+       senki. Jogos: nyolcvan mérföldkő közül a „3 darab" nem feladat, hanem
+       lottó. Semmit nem mond arról, MIT kell csinálni, és arról sem, hogy a
+       nyolc meccses ablakban egyáltalán teljesíthető-e bármelyik.
+       Mostantól a kihívás EGY, NÉVVEL MEGNEVEZETT mérföldkőre szól, és csak
+       olyat kínál fel, ami MÉRHETŐEN közel van: a haladása (msProgressOf)
+       a nehézséghez tartozó sáv fölött áll. A leírás kiírja, hol tartasz —
+       tehát látod, mit vállalsz, mielőtt igent mondasz. */
     ()=>{if(!short)return null;
-      const n=R(2,7);
-      return {type:"msDone",target:n,
-        desc:`Teljesíts ${n} mérföldkövet ${horizon}`,
-        rule:`A mérföldkövek az Infó-pult Mérföldkövek fülén állnak. Bármelyik kategóriából számít, és CSAK a vállalás után teljesítettek — a már meglévők nem.`};},
+      const cand=chNearMilestones(diff);
+      if(!cand.length)return null;
+      const x=pick(cand);
+      return {type:"msOne",target:1,msId:x.d.id,msPct:x.pct,
+        desc:`Szerezd meg ezt a mérföldkövet ${horizon}: „${x.d.t}"`,
+        rule:`Egyetlen, KONKRÉT mérföldkő — nem darabszám. Azért ez, mert már `
+          +`${Math.round(x.pct*100)}%-on állsz vele (${x.d.d}). Az Infó-pult `
+          +`Mérföldkövek fülén követheted élőben. Ha a határidőig megvan, teljesült; `
+          +`a többi mérföldkő ide nem számít bele.`};},
     /* --- RÖVID: csapatstílus-képességek --- */
     ()=>{if(!short)return null;
       if(typeof styleState!=="function"||!styleState())return null;   /* nincs stílus → nincs mit feloldani */
@@ -37739,6 +37894,72 @@ function genChallenge(scope,diff,ctx){
       return {type:"fanGrowth",target:n,
         desc:`Növeld a szurkolótáborodat ${fmtNum(n)} fővel`,
         rule:`A tábor MINDEN mérkőzés után mozdul (győzelem, rangadó-győzelem, izgalom hoz, a vereség visz), és idény végén ugrik nagyot a bajnoki helyezésből és a kupa-menetelésből. A vállaláskori létszámhoz mérünk.`};},
+    /* ================= AZ ÚJ MOTOR-ELEMEK BEGYAKORLÁSA (3.9.37) =================
+       KIMONDOTT KÉRÉS: „az új játékmotor elemek begyakorlását segítő
+       kihívások". Ezek nem az EREDMÉNYT mérik, hanem azt, hogy a menedzser
+       hozzányúl-e egy rendszerhez, amit különben sosem nyitna ki: az öltözőhöz,
+       az összhang-boosthoz, a stábhoz, az edzés-fókuszhoz, a beilleszkedéshez,
+       a felderítési kerethez és a piacra tételhez. Mind ÁLLAPOTBÓL vagy egy
+       eseményszámlálóból dolgozik — egyikhez sem kell szerencse. */
+    /* --- RÖVID: a feszültség forrása --- */
+    ()=>{if(!short)return null;
+      const t=chTensionPlayer();
+      if(!t)return null;                 /* nincs kimutatható feszültség — nincs ajánlat */
+      return {type:"tensionOut",target:1,targetName:t.n,
+        desc:`Szabadulj meg tőle: ${shortName(t.n)} feszültséget okoz az öltözőben`,
+        rule:`Az öltöző-napló ebben a szezonban ${t.db} NEGATÍV eseményben említi — ő a legtöbbször szereplő. Akkor teljesül, ha ${shortName(t.n)} már nincs a keretedben (eladtad vagy elengedted). A padra ültetés nem elég: az öltözőben ott marad.`};},
+    /* --- HOSSZÚ: az ifi a kirakatban --- */
+    ()=>{if(short)return null;
+      const y=chYouthClosest(20);
+      if(!y)return null;                 /* nincs 20 alatti a keretben */
+      return {type:"youthListed",target:1,
+        desc:`Kínáld piaci eladásra az egyik 20 év alatti játékosodat`,
+        rule:`Piacra csak az vihető, akinek legalább ${SALE_LIST_MIN_MINUTES} LEJÁTSZOTT PERCE van nálad. Érj el ${SALE_LIST_MIN_MINUTES} játékpercet az egyik ifistéddel — cseréként is behozhatod, de ha egész meccsen játszatod, gyorsan összegyűlnek. Most ${shortName(y.n)} áll a legközelebb: ${y.perc} perc. A kihívás akkor teljesül, ha egy 20 év alatti játékosod OTT ÁLL a piacon (eladni nem kell).`};},
+    /* --- RÖVID: összhang-boost egy érkezőnek --- */
+    ()=>{if(!short)return null;
+      return {type:"bondBoostNew",target:1,
+        /* A KÉRÉS HÁROM JUTALMAT SOROL FEL EHHEZ A KIHÍVÁSHOZ: pénz,
+           csapatstílus-pont, és „extra összhang tempó a konkrét játékosnak".
+           A sorsolás a három közül választ — a pénzt a szokásos, büdzséhez
+           skálázott jutalom adja. */
+        forceReward:pick([null,{kind:"stylePointsOnly"},{kind:"bondTempo"}])||undefined,
+        desc:`Boostold az összjátékát az egyik új játékosodnak`,
+        rule:`A boost-boltban az ÖSSZHANG boostot kell elsütnöd olyasvalakire, aki még BEILLESZKEDÉS alatt áll (a HUB-ban „érkező" jelzéssel, ${BOND_NEW_MATCHES} meccses ablakkal). Éppen ő az, akinél a legtöbbet ér: a boost a még ki nem alakult kötéseit gyorsítja.`};},
+    /* --- HOSSZÚ: a legenda a stábban --- */
+    ()=>{if(short)return null;
+      return {type:"staffFromPlayer",target:1,
+        desc:`Hívd meg az egyik tapasztalt játékosodat, hogy stábtag legyen`,
+        rule:`A meghívás feltétele ${COACH_MIN_MINUTES} KÖZÖS JÁTÉKPERC nálad (bő húsz végigjátszott mérkőzés) — a felajánlás magától megjelenik, amikor egy játékosod eléri. A stábpiacról VÁSÁROLT edző ide nem számít: ez a saját emberedről szól.`};},
+    /* --- RÖVID: a fókusz megváltoztatása --- */
+    ()=>{if(!short)return null;
+      /* CSAK AKKOR, HA VAN MIT VÁLTOZTATNI: ha mindkét váltás el van használva
+         ebben a ciklusban, a kihívás teljesíthetetlen volna. */
+      if(S.trainingChangeUsed&&S.bondTrainChangeUsed)return null;
+      return {type:"trainFocus",target:1,forceReward:{kind:"stylePointsOnly"},
+        desc:`Változtass az edzés vagy az összhangépítés fókuszán`,
+        rule:`Elég az EGYIKET átállítani: az attribútum-edzés fő/másodlagos sávját VAGY az összhangépítés fókuszát. Ciklusonként egy-egy váltás jár, és a nyár végén újul meg. Ha rég nem nyúltál hozzá, most van itt az ideje: a keret azóta átalakult.`};},
+    /* --- RÖVID: a teljes beilleszkedés --- */
+    ()=>{if(!short)return null;
+      return {type:"integrationDone",target:1,
+        desc:`Vidd teljes értékűre (${BOND_NEW_MATCHES}/${BOND_NEW_MATCHES}) egy játékosod beilleszkedését`,
+        rule:`Egy érkező ${BOND_NEW_MATCHES} SAJÁT meccs után kapja meg a végleges kötéseit. Játszatnod kell — a padon ülve nem telik az ablaka. Ha épp nincs érkeződ, egy igazolás vagy egy akadémista felhozatala elindítja.`};},
+    /* --- RÖVID: stábtag a piacról --- */
+    ()=>{if(!short)return null;
+      return {type:"staffBought",target:1,deadlineIdx:Math.min(30,(S.idx||0)+9),
+        desc:`Vásárolj stábtagot a következő átigazolási időszakban`,
+        rule:`A stábpiac az átigazolási időszakokban nyit ki. A határidő 9 meccs — ebbe a következő checkpoint-ablak biztosan belefér. A SAJÁT játékosodból lett edző ide nem számít: ez a piacról vásárolt szakemberről szól.`};},
+    /* --- RÖVID: a felderítési keret kimerítése --- */
+    ()=>{if(!short)return null;
+      return {type:"looksSpent",target:1,forceReward:{kind:"buyDiscountNext"},
+        desc:`Használd fel az összes rendelkezésre álló felderítést`,
+        rule:`Az átigazolási időszakban a scoutod felderítési kerete véges (a csillagerejétől függ). A kihívás akkor teljesül, ha az ÉPP NYITOTT időszak kerete elfogy — vagyis tényleg végignézed a piacot, nem az első jelöltnél állsz meg.`};},
+    /* --- HOSSZÚ: a tartalék-keret kiárusítása --- */
+    ()=>{if(short)return null;
+      const n=chCheapReserves();
+      if(n<2)return null;                /* egyetlen olcsó tartalékért nem tét */
+      return {type:"cheapReservesOut",target:0,inverse:true,cheapAtAccept:n,
+        desc:`Adj el minden tartalékot, akinek ${fmtFt(Math.round(CH_CHEAP_RESERVE_HUF/HUF_PER_POINT))} alatti a gyors eladási ára`,
+        rule:`Fordított kihívás: a határidőre EGY ilyen ember se maradjon a tartalék-keretedben. A mérce az „eladás most" ára (a kikiáltási ár negyede). Most ${n} ilyen tartalékod van. A kezdő 11 és a cserepad nem számít bele — ez a keret aljának takarításáról szól.`};},
     /* --- HOSSZÚ: veretlenség a rangadókon --- */
     ()=>{if(short)return null;
       let left=0;
@@ -37812,6 +38033,48 @@ function challengeFanAmount(scope,mult,down){
   return Math.max(500,Math.round(v/100)*100);}
 /* reward/punishment generálás — a scope és a nehézség szabja a mértéket, a
    legdurvább büntetések (játékos-vesztés) csak a hosszú+nehéz challenge-eknél. */
+/* ================= A CÉLPONT A KIFIZETÉSKOR DŐL EL (3.9.37) =================
+   A jutalmak egy része EGY emberre szól („a leggyorsabb játékosod", „a
+   legerősebb védőd", „a kapusod"). A nevet SZÁNDÉKOSAN nem a felajánláskor
+   választjuk ki, hanem a kifizetéskor: a kihívás nyolc-harminc meccsig fut,
+   közben eladhatod, kieshet, jöhet nála jobb — egy előre rögzített név gyakran
+   már nem is volna a keretben. Így a jutalom mindig arra száll, akire az
+   ígérete szól. */
+function chRoster(){
+  try{return (typeof fullCareerRoster==="function"?fullCareerRoster():[]).filter(Boolean);}
+  catch(e){return [];}}
+function chBestBy(fn,filter){
+  let best=null,bv=-Infinity;
+  chRoster().forEach(p=>{
+    const e=careerPool&&careerPool[p.n];if(!e)return;
+    if(filter&&!filter(p,e))return;
+    let v=0;try{v=fn(p,e)||0;}catch(err){v=0;}
+    if(v>bv){bv=v;best=p;}});
+  return best;}
+function chIsDefender(p){
+  try{return getCategoryFor((p.pos&&p.pos[0])||"KKP")==="VEDO";}catch(e){return false;}}
+function chIsKeeper(p){return ((p.pos&&p.pos[0])||"")==="KP";}
+function chPickFastest(){return chBestBy((p,e)=>(e.attrs&&e.attrs.seb)||0,(p)=>!chIsKeeper(p));}
+function chPickScorer(){
+  /* Az IDEI termés a mérce; ha még senki nem szerzett gólt (szezoneleji
+     kifizetés), a Gólszerzés-tengely dönt. */
+  const g=chBestBy(p=>(S.scorers&&S.scorers[p.n])||0,p=>!chIsKeeper(p));
+  if(g&&(S.scorers&&S.scorers[g.n]))return g;
+  return chBestBy((p,e)=>(e.attrs&&e.attrs.gol)||0,p=>!chIsKeeper(p));}
+function chPickDefender(){return chBestBy(p=>pOvr(p),chIsDefender);}
+function chPickKeeper(){return chBestBy(p=>pOvr(p),chIsKeeper);}
+function chPickYouth(){
+  /* A LEGFIATALABB, akinek még nincs meg az 500 perces kapuja — a jutalom
+     pont ott ér valamit. Ha mindenki átlépte, a legfiatalabb kapja. */
+  const zart=chBestBy((p,e)=>-(e.age||99),(p)=>careerMinutesOf(p.n)<SALE_LIST_MIN_MINUTES);
+  return zart||chBestBy((p,e)=>-(e.age||99));}
+function chStrongestBondPair(){
+  const ns=chRoster().map(p=>p.n);
+  let a=null,b=null,bv=-Infinity;
+  for(let i=0;i<ns.length;i++)for(let j=i+1;j<ns.length;j++){
+    let v=0;try{v=bondRaw(ns[i],ns[j])||0;}catch(e){v=0;}
+    if(v>bv){bv=v;a=ns[i];b=ns[j];}}
+  return (a&&b&&bv>0)?{a,b,v:bv}:null;}
 function genReward(scope,diff,ctx){
   const mult=challengeDiffMult(diff);
   /* A KUPA a hosszú és a rövid között áll: egyetlen sorozat, de nagy tét —
@@ -37847,6 +38110,35 @@ function genReward(scope,diff,ctx){
   {const fans=challengeFanAmount(scope,mult,false);
    pool.push({kind:"fansUp",amount:fans,desc:`+${fmtNum(fans)} szurkoló a táborba`});}
   pool.push({kind:"bidBoost",desc:"a következő licited legalább a kikiáltási ár 100%-a lesz"});
+  /* ================= A 3.9.37-es JUTALMAK =================
+     Közös bennük, hogy egyik sem PÉNZ és nem is egyszeri szám: mindegyik a
+     JÁTÉKMENET egy konkrét rendszerét mozdítja meg — a boltot, a tárgyalást,
+     az edzést, a piacot, a taktikát vagy egy nevesített játékost. A mérték a
+     nehézségi szorzóval nő, ahol van mit skálázni. */
+  ["plain","attr","bond"].forEach(k=>{
+    const d=BOOST_KINDS.find(x=>x.k===k);
+    pool.push({kind:"freeBoost",boost:k,desc:`1 INGYEN ${d?d.n.toLowerCase():k} boost`});});
+  /* A SKILL BOOST csak realisztikus skill-módban dolgozik (a laza módban a
+     sorsolási súlynak nincs mit befolyásolnia) — ott ne is ajánljuk fel. */
+  if(typeof skillRealOn==="function"&&skillRealOn())
+    pool.push({kind:"freeBoost",boost:"skill",desc:"1 INGYEN skill boost"});
+  pool.push({kind:"dealEasier",desc:`a következő ${CH_DEAL_TRIES} tárgyalásod nagyobb eséllyel köt tiszta üzletet (nem kérnek magasabb árat)`});
+  pool.push({kind:"trainBoost",desc:`az edzés hatékonysága +${Math.round((CH_TRAIN_BOOST_MULT-1)*100)}% ${CH_TRAIN_BOOST_M} meccsen át`});
+  pool.push({kind:"youthSellable",desc:`az egyik ifijátékosod már ${CH_YOUTH_SELL_MIN} perctől piacra vihető, és gyorsabban hízik a kikiáltási ára`});
+  pool.push({kind:"askFloor",desc:`a következő ${CH_ASK_FLOOR_N} piacra bocsátott játékosod kikiáltási ára legalább a teljes érték ${Math.round(CH_ASK_FLOOR_PCT*100)}%-a`});
+  {const pp=Math.round((2+Math.random()*5)*mult);
+   pool.push({kind:"tacticFitUp",amount:pp,desc:`+${pp} százalékpont taktikai illeszkedés (tartós)`});}
+  pool.push({kind:"tacticLevelUp",desc:"+1 begyakorlás az aktív taktikádnak (tartós)"});
+  pool.push({kind:"speedCapOpen",desc:"a leggyorsabb játékosodnak kinyílik a sebességplafon (tartós)"});
+  {const pct=Math.round((2+Math.random()*5)*mult);
+   pool.push({kind:"hatTrickUp",amount:pct,desc:`a leggólerősebb játékosod mesterhármas-esélye +${pct}% (tartós)`});}
+  {const pct=Math.round(25+Math.random()*25);
+   pool.push({kind:"defRatingUp",amount:pct,desc:`a legerősebb védőd meccsértékelése +${pct}% a következő ${CH_DEFRATING_M} meccsen`});}
+  {const fp=Math.round(2+Math.random()*3);
+   pool.push({kind:"gkFormUp",amount:fp,desc:`a kapusod formája +${fp} formapont`});}
+  {const pct=Math.round(15+Math.random()*10);
+   pool.push({kind:"yellowDown",amount:pct,desc:`a csapatod sárgalap-esélye −${pct}% (tartós)`});}
+  pool.push({kind:"healInjury",desc:"egy sérülés meggyógyítása — bármikor elsütheted"});
   if(scope==="long"||scope==="cup"){
     /* Fél csillag alapból, egész csillag a nehéz vállalásért. */
     const lv=(diff==="hard")?2:1;
@@ -37881,6 +38173,19 @@ function genPunishment(scope,diff,ctx){
   {const fans=challengeFanAmount(scope,mult,true);
    pool.push({kind:"fansDown",amount:fans,desc:`−${fmtNum(fans)} szurkoló a táborból`});}
   pool.push({kind:"bidMalus",desc:"a következő 3 licited kisebb eséllyel éri el a 100%-ot"});
+  /* ================= A 3.9.37-es BÜNTETÉSEK =================
+     Egyik sem csonkítja a keretet (az továbbra is a legnagyobb tét marad, és
+     csak hosszú+nehéz vállalásnál): mind a MŰKÖDÉST akadályozza — a szerepeket,
+     az összhangot, az edzést, a döntést, a tárgyalást. */
+  pool.push({kind:"roleFreeze",desc:`a csapatstílus-szerepeid ${CH_ROLE_FREEZE_M} meccsig nem működnek`});
+  pool.push({kind:"bondSlow",desc:`az összhangépítés feleódik ${CH_BOND_SLOW_M} meccsen át, az egész csapatban`});
+  pool.push({kind:"bondSplit",desc:`a két legösszeszokottabb játékosod elidegenedik egymástól (−${CH_BOND_SPLIT} összhang)`});
+  pool.push({kind:"skillPickLock",desc:`${(typeof skillRealOn==="function"&&skillRealOn())?CH_SKILLLOCK_REAL:CH_SKILLLOCK_LAZA} meccsen át nem te választod ki, ki kapja a skilleket`});
+  pool.push({kind:"trainSecFreeze",desc:"a másodlagos edzésed befagy egy szezonra"});
+  pool.push({kind:"dealHarder",desc:`a következő ${CH_DEAL_TRIES_DOWN} tárgyalásodnál kisebb eséllyel indul meg az üzletkötés`});
+  if(scope==="long"||scope==="cup"){
+    pool.push({kind:"loseStylePerk",desc:"elveszíted egy csapatstílus-képességed egy szintjét"});
+    pool.push({kind:"staffLeaves",desc:"az egyik stábtagod elköszön a csapattól"});}
   if(scope==="long"||scope==="cup")
     pool.push({kind:"agencyDown",desc:"az átigazolási ügynökség veszít egy fél csillagot"});
   if(scope==="long"||scope==="cup"){
@@ -37968,7 +38273,7 @@ function buildChallengeOffer(scope,ctx){
   const offer=Object.assign({
     id:"ch"+(++_challengeIdCtr),
     scope,difficulty:diff,
-    reward:goal.forceReward?Object.assign({},goal.forceReward,{desc:posLearnRefundDesc()}):genReward(scope,rewDiff,ctx),
+    reward:goal.forceReward?Object.assign({},goal.forceReward,{desc:chForcedRewardDesc(goal.forceReward)}):genReward(scope,rewDiff,ctx),
     punishment:genPunishment(scope,diff,ctx),
     deadline,
     startProgress:challengeCurrentValue(goal)
@@ -38016,6 +38321,22 @@ function challengeOfferSane(ch){
      nem-inverz típusokra vonatkozik. */
   if(ch.inverse)return t>=0;
   if(t<=0)return false;
+  /* ---- SKALP-FEDEZET (3.9.37) ----
+     A skalp az EGYETLEN típus, aminek a teljesíthetősége nem rajtad múlik,
+     hanem a SORSOLÁSON: ha a hátralévő meccsek közt nincs elég rivális erejű
+     ellenfél, a kihívás a vállalás pillanatában halott. A sablon már szűr
+     (a célt a jelöltek száma korlátozza), de a fedezet KÖZBEN is elfogyhat —
+     a kereted nő, és aki ma rivális, holnap alattad van. Ezért itt, közvetlenül
+     a felajánlás előtt ÚJRASZÁMOLJUK, és tartalékot is kérünk: a célnál eggyel
+     több jelölt kell (egy meccset el szabad veszíteni anélkül, hogy a kihívás
+     matematikailag lehetetlenné váljon). */
+  if(ch.type==="bigScalps"){
+    let my=0;try{my=teamOVRbase();}catch(e){return false;}
+    let list=((S.fixtures||[]).slice(S.idx||0)).filter(f=>f&&!f.duel&&f.o);
+    if(ch.deadline&&ch.deadline.kind==="round")
+      list=list.slice(0,Math.max(0,ch.deadline.value-(S.idx||0)));
+    const n=list.filter(f=>chIsRivalOvr(f.o.ovr,my)).length;
+    if(n<t+1)return false;}
   try{
     const probe=Object.assign({},ch);
     if(CH_ABSOLUTE_TYPES.includes(probe.type)){probe.startProgress=0;probe.bestSinceAccept=0;}
@@ -38044,7 +38365,19 @@ const CH_ABSOLUTE_TYPES=["unbeatenStreak","cleanStreak","bigHaul"];
 const CH_CUP_TYPES=["cupWin","cupDepth","cupGroupWin","cupGroupLoss","cupLoss",
   "cupComeback","cupKing","cupAllMatch","cupScalps","cupAwayHaul","cupHomeHaul",
   "cupAgg","cupCleanSheets","cupConceded","cupPlayerGoals"];
-const CH_STATE_TYPES=["tacticFit","youthXI","tacticLevel","diffRaise","saleRatio"].concat(CH_CUP_TYPES);
+/* A `msOne` és a `tacticMatches` is ÁLLAPOT: az első a „megvan-e ez a
+   mérföldkő" kérdésre felel (a vállalás előtti haladása épp az ok, amiért
+   felajánljuk — levonni volna hiba), a második a SZEZON meccsszámát méri egy
+   taktikával, és a szabálya ki is mondja, hogy az eddigiek beleszámítanak.
+   A `renewOld` viszont NEM állapot: a saját startSold/startBought mezőivel
+   maga vágja le a vállalás előtti üzleteket. */
+const CH_STATE_TYPES=["tacticFit","youthXI","tacticLevel","diffRaise","saleRatio",
+  "msOne","tacticMatches",
+  /* A 3.9.37-es ÁLLAPOT-kihívások: mind a MOSTANI helyzetet kérdezi
+     („ott áll-e a piacon", „elfogyott-e a keret", „maradt-e olcsó tartalék"),
+     nem a vállalás óta elért növekményt. A tensionOut is ilyen: az a kérdés,
+     hogy BENT VAN-E még, nem az, hogy hányan mentek el. */
+  "tensionOut","youthListed","looksSpent","cheapReservesOut"].concat(CH_CUP_TYPES);
 /* ---- KORÁN BEVÁLTHATÓ-E? (3.4.08) ----
    A jutalom eddig a HATÁRIDŐNÉL érkezett, akkor is, ha a cél a 6. fordulóban
    összejött. Ez két dolgot rontott el: a siker pillanata visszajelzés nélkül
@@ -38092,7 +38425,31 @@ function challengeRawValue(ch){
     case "tacticFit":    return Math.round((S.tactics&&S.tactics.active?tacticFit(S.tactics.active):0)*100);
     case "diffRaise":    return Math.max(0,(oppTargetRating||0)-(ch.baseDiff||oppTargetRating||0));
     case "posLearn":     return S.chPosLearnStarted||0;
-    case "renewOld":     return Math.min(S.chSoldOver32||0,S.chBoughtUnder25||0);
+    /* FIATALÍTÁS: a sáv kihívásonként MÁS (3.9.37), ezért nem egy előre
+       szűrt számláló, hanem a két ÉLETKOR-lista adja — a vállaláskori
+       hosszuktól kezdve. Régi (sáv nélküli) mentésekben a régi két számláló
+       az esély, hogy a futó példány ne álljon meg némán. */
+    case "renewOld":{
+      if(ch.sellAge==null||ch.buyAge==null)
+        return Math.min(S.chSoldOver32||0,S.chBoughtUnder25||0);
+      const sold=(S.chSoldAges||[]).slice(ch.startSold||0).filter(a=>a>ch.sellAge).length;
+      const bought=(S.chBoughtAges||[]).slice(ch.startBought||0).filter(a=>a<ch.buyAge).length;
+      return Math.min(sold,bought);}
+    /* ---- ÚJ TÍPUSOK (3.9.37) ---- */
+    case "msOne":        return (ch.msId&&msState().done&&msState().done[ch.msId])?1:0;
+    case "tensionOut":   return chWorstReplaced(ch);   /* ugyanaz: már nincs a keretben */
+    case "youthListed":  return chYouthListed(20)?1:0;
+    case "bondBoostNew": return S.chBondBoostNew||0;
+    case "staffFromPlayer":return S.chStaffFromPlayer||0;
+    case "staffBought":  return S.chStaffBought||0;
+    case "trainFocus":   return S.chTrainFocusChanged||0;
+    case "integrationDone":return S.chIntegrationsDone||0;
+    case "looksSpent":   return chLooksAllSpent()?1:0;
+    case "cheapReservesOut":return chCheapReserves();   /* inverz: 0-ra kell vinni */
+    case "subMinutes":   return S.chSeasonSubMinutes||0;
+    case "subStars":     return S.chSeasonSubStars||0;
+    case "defStars":     return S.chSeasonDefStars||0;
+    case "tacticMatches":return chBestOtherTacticMatches(ch).n;
     case "replaceWorst": return chWorstReplaced(ch);
     /* ---- ÚJ TÍPUSOK ---- */
     case "awayWins":     return chCountFixtures(f=>!f.home&&f.gf>f.ga);
@@ -38193,6 +38550,78 @@ function challengeLiveNote(ch){
     if(!rest.length)
       return `A hátralévő sorsolásban most nincs rivális erejű ellenfeled (küszöb: ${Math.round(th)}) — ahogy a kereted nőtt, kifogytak alólad.`;
     return `A hátralévő sorsolásban ${rest.length} rivális erejű ellenfél vár (küszöb: ${Math.round(th)}).`;}
+  /* ---- AZ ÚJ TÍPUSOK ÉLŐ MONDATA (3.9.37) ----
+     Mindegyiknél ugyanaz a kérdés: a puszta szám mit NEM mond meg. */
+  if(ch.type==="msOne"){
+    const d=MILESTONES.find(x=>x&&x.id===ch.msId);
+    if(!d)return "Ez a mérföldkő már nem létezik — a kihívás büntetés nélkül lejár.";
+    const M=msState();
+    if(M.done&&M.done[d.id])return `Megvan: ${d.t}.`;
+    if(M.pend&&M.pend[d.id])
+      return `A mérföldkő BERAGADT (zárt kategória) — amíg a kategóriát meg nem nyitod, a haladása nem mozdul.`;
+    const pr=msProgressOf(d);
+    return `${d.t}: ${Math.round(pr.pct*100)}% (${d.d}). Vállaláskor ${Math.round((ch.msPct||0)*100)}%-on állt.`;}
+  if(ch.type==="subMinutes"){
+    const now=Math.max(0,(S.chSeasonSubMinutes||0)-(ch.startProgress||0));
+    const left=Math.max(0,ch.target-now);
+    if(left<=0)return "Megvan a csere-játékidő.";
+    return `Még ${left} csereperc kell — nagyjából ${Math.ceil(left/45)} félidőnyi. `
+      +`Egy 60. perces csere ~30 percet hoz, a félidei 45-öt.`;}
+  if(ch.type==="subStars"||ch.type==="defStars"){
+    const kulcs=ch.type==="subStars"?"chSeasonSubStars":"chSeasonDefStars";
+    const now=Math.max(0,(S[kulcs]||0)-(ch.startProgress||0));
+    return `${now}/${ch.target} „${MSTAT_GRADES[CH_STAR_IDX].t}" (vagy jobb) este `
+      +(ch.type==="subStars"?"cserétől":"védőtől")+" a vállalás óta. "
+      +"A meccs utáni értékelés-ablak ugyanezt a fokozatot írja ki.";}
+  if(ch.type==="tacticMatches"){
+    const b3=chBestOtherTacticMatches(ch);
+    const act=(S.tactics&&S.tactics.active)||null;
+    if(act&&ch.excludeTactic===act)
+      return `Még a vállaláskori taktikáddal játszol (${(TACTICS[act]&&TACTICS[act].n)||act}) — `
+        +`ezek a meccsek NEM számítanak. Válts egy másikra.`;
+    if(!b3.k)return "Még egyetlen meccset sem játszottál más taktikával.";
+    return `${(TACTICS[b3.k]&&TACTICS[b3.k].n)||b3.k}: ${b3.n}/${ch.target} meccs.`;}
+  if(ch.type==="renewOld"&&ch.sellAge!=null){
+    const sold=(S.chSoldAges||[]).slice(ch.startSold||0).filter(a=>a>ch.sellAge).length;
+    const bought=(S.chBoughtAges||[]).slice(ch.startBought||0).filter(a=>a<ch.buyAge).length;
+    if(sold&&!bought)return `Az eladás megvan (${ch.sellAge} év fölötti) — még egy ${ch.buyAge} év alatti igazolás kell.`;
+    if(bought&&!sold)return `A fiatal igazolás megvan (${ch.buyAge} év alatti) — még egy ${ch.sellAge} év fölöttit kell elengedned.`;
+    if(!sold&&!bought)return `Egyik lépés sincs meg: egy ${ch.sellAge} év fölötti EL, egy ${ch.buyAge} év alatti BE.`;
+    return "Mindkét lépés megvan.";}
+  if(ch.type==="youthListed"){
+    const y=chYouthClosest(20);
+    if(chYouthListed(20))return "Egy 20 év alatti játékosod már ott áll a piacon.";
+    if(!y)return "Nincs 20 év alatti játékosod — igazolj egyet, vagy hozz fel egy akadémistát.";
+    const kell=Math.max(0,SALE_LIST_MIN_MINUTES-y.perc);
+    return kell>0
+      ? `${esc(shortName(y.n))} áll a legközelebb: ${y.perc}/${SALE_LIST_MIN_MINUTES} perc — még ${kell} kell (${Math.ceil(kell/90)} végigjátszott meccs).`
+      : `${esc(shortName(y.n))} már piacra vihető (${y.perc} perc) — csak ki kell tenned.`;}
+  if(ch.type==="looksSpent"){
+    const st=chLooksSpentState();
+    if(!st)return "Most nincs nyitott átigazolási időszak — a keret akkor kezd fogyni.";
+    return `A felderítési keret: ${st.used}/${st.max} elhasználva, ${st.left} maradt.`;}
+  if(ch.type==="cheapReservesOut"){
+    const n=chCheapReserves();
+    if(!n)return "Egyetlen olcsó tartalékod sincs — a kihívás teljesül.";
+    return `Még ${n} olyan tartalékod van, akinek a gyors eladási ára ${fmtFt(Math.round(CH_CHEAP_RESERVE_HUF/HUF_PER_POINT))} alatt van`
+      +(ch.cheapAtAccept?` (vállaláskor ${ch.cheapAtAccept} volt).`:".");}
+  if(ch.type==="integrationDone"){
+    const be=Object.keys(S.bondNew||{});
+    if(!be.length)return "Most nincs beilleszkedő játékosod — egy igazolás vagy egy akadémista elindítja az ablakot.";
+    const sor=be.map(n=>`${esc(shortName(n))} ${(S.bondNew[n].m||0)}/${BOND_NEW_MATCHES}`);
+    return `Folyamatban: ${sor.join(" · ")} — játszatnod kell őket, a padon nem telik.`;}
+  if(ch.type==="bondBoostNew"){
+    const be=Object.keys(S.bondNew||{});
+    if(!be.length)return "Most nincs érkeződ, akire elsüthetnéd — a boost csak beilleszkedés alatt állóra számít.";
+    return `Elsütheted rájuk: ${be.map(n=>esc(shortName(n))).join(", ")}.`;}
+  if(ch.type==="tensionOut"&&ch.targetName){
+    const bent=chRoster().some(p=>p.n===ch.targetName);
+    return bent?`${esc(shortName(ch.targetName))} még a keretben van.`
+               :`${esc(shortName(ch.targetName))} már távozott — teljesült.`;}
+  if(ch.type==="trainFocus"){
+    const a=!S.trainingChangeUsed,b=!S.bondTrainChangeUsed;
+    if(!a&&!b)return "Mindkét váltásod el van használva ebben a ciklusban — a nyár végén újulnak meg.";
+    return `Váltható most: ${[a?"az attribútum-edzés":null,b?"az összhangépítés":null].filter(Boolean).join(" és ")}.`;}
   if(ch.type==="newStarter"){
     const m=S.chNewStarterMatches||{};
     const rows=Object.entries(m).sort((a,b)=>b[1]-a[1]);
@@ -38226,6 +38655,147 @@ function chBestOtherTacticLevel(ch){
     const lv=tacticLevel(k);
     if(lv>best)best=lv;});
   return Math.round(best);}
+/* ---- KARNYÚJTÁSNYI MÉRFÖLDKÖVEK (3.9.37) ----
+   Melyik mérföldkövet szabad EGY kihívásba tenni? Amelyik mérhetően közel van.
+   A mérce a saját haladása (msProgressOf), és a nehézség szabja a sávot: a
+   Könnyű a majdnem-kész, a Nehéz a még odébb lévő mérföldkövet kéri.
+   AMI KIMARAD: a már teljesített, a beragadt (zárt kategóriában álló — ott a
+   haladás NEM mozdul, tehát a kihívás teljesíthetetlen volna), és a 0%-on
+   álló (arról semmit nem tudunk, meddig tart).
+   MIÉRT NEM SZIMULÁCIÓBÓL JÖN A KÜSZÖB, mint a győzelem-céloknál: a nyolcvan
+   mérföldkő nyolcvanféle mértékegységben mér (meccs, gól, pénz, szezon,
+   szurkoló) — közös modelljük nincs. A HALADÁS-SZÁZALÉK viszont mindegyiknél
+   ugyanazt jelenti, és ez a kihívás egyetlen kérdése: mennyi van hátra. */
+const CH_MS_NEAR={easy:0.85,medium:0.72,hard:0.55};
+function chNearMilestones(diff){
+  const out=[];
+  try{
+    const M=msState();
+    const lo=CH_MS_NEAR[diff]!=null?CH_MS_NEAR[diff]:0.72;
+    MILESTONES.forEach(d=>{
+      if(!d||!d.id||!d.p)return;
+      if(M.done&&M.done[d.id])return;          /* megvan */
+      if(M.pend&&M.pend[d.id])return;          /* beragadt: a haladása áll */
+      if(typeof msCatUnlocked==="function"&&d.cat&&!msCatUnlocked(d.cat))return;
+      const pr=msProgressOf(d);
+      if(!pr||!(pr.pct>=lo)||pr.pct>=1)return;
+      out.push({d,pct:pr.pct});});
+  }catch(e){return [];}
+  return out;}
+/* ---- A CSEREPERCEK CÉLJA ----
+   Ez az EGYETLEN kihívás-típus, aminek a célja NEM a kalibráló szimulációból
+   jön, és ezt ki kell mondani: a szimuláció a MOTORT modellezi (gól, védés,
+   eredmény), a csereperc viszont tisztán a MENEDZSER SZOKÁSA — hány embert
+   cserél és mikor. Erre nincs modellünk, és egy kitalált modell rosszabb
+   volna, mint egy őszinte sáv. A számok a kérésből jönnek (200-500 perc nyolc
+   meccsre), és az ablak hosszával arányosan skálázódnak: nyolc meccsnél a
+   Könnyű ~2, a Nehéz ~5 félidőnyi csere-játékidőt kér. */
+const CH_SUBMIN_PER8={easy:200,medium:340,hard:480};
+/* A PLAFON EGY EGÉSZ SZEZONRA. A lineáris skálázás 30 fordulón 1800 percet
+   kérne — meccsenként hatvan percnyi csere-játékidőt, vagyis gyakorlatilag
+   kötelező félidei kettős cserét. Az 1000 perc ugyanezen a szezonon ~33
+   perc/meccs: egy rendes, 60. perc körüli csere. Ennyi vállalható döntés,
+   nem kényszerpálya. */
+const CH_SUBMIN_CAP=1000;
+function chSubMinuteTarget(diff,rounds){
+  const base=CH_SUBMIN_PER8[diff]!=null?CH_SUBMIN_PER8[diff]:340;
+  const w=Math.max(1,rounds||8);
+  return Math.max(45,Math.min(CH_SUBMIN_CAP,Math.round(base*(w/8)/5)*5));}
+/* ---- A VÉDŐ-ESTÉK CÉLJA A SAJÁT TERMÉSEDBŐL (3.9.37) ----
+   KIMONDOTT KÉRÉS: „elérhető érték legyen az előző 7-8 meccs alapján".
+   Ezért a cél nem fix sáv, hanem a SAJÁT, ebben a szezonban mért ütemed
+   (kiemelkedő védő-este / meccs) az ablak hosszára vetítve, a nehézséggel
+   szorozva: a Könnyű a mostani ütemed háromnegyedét kéri, a Közepes pontosan
+   annyit, a Nehéz harmadával többet. Amíg nincs mérhető előzmény (a szezon
+   első néhány meccse), a kérésben megadott 6-12-es sáv a tartalék. */
+const CH_DEFSTAR_TIER={easy:0.75,medium:1.0,hard:1.3};
+function chDefStarTarget(diff,rounds){
+  const w=Math.max(1,rounds||8);
+  const k=CH_DEFSTAR_TIER[diff]!=null?CH_DEFSTAR_TIER[diff]:1;
+  const jat=S.idx||0, eddig=S.chSeasonDefStars||0;
+  let v;
+  if(jat>=4&&eddig>0)v=Math.round(eddig/jat*w*k);
+  else v=Math.round((w<=12?9:22)*k);          /* a kérés 6-12-es sávjának közepe */
+  const lo=w<=12?4:10, hi=w<=12?16:60;
+  return Math.max(lo,Math.min(hi,v));}
+/* Hány meccset játszottál ebben a szezonban EGY konkrét taktikával. */
+function chTacticMatchesFor(k){
+  return (k&&S.chTacticMatches&&S.chTacticMatches[k])||0;}
+/* A legtöbb meccset hozó, a vállaláskor NEM aktív taktika — a „játssz 15
+   meccset egy új taktikával" kihívás haladása. */
+function chBestOtherTacticMatches(ch){
+  let best=0,who=null;
+  Object.keys(S.chTacticMatches||{}).forEach(k=>{
+    if(ch&&ch.excludeTactic===k)return;
+    const n=S.chTacticMatches[k]||0;
+    if(n>best){best=n;who=k;}});
+  return {n:best,k:who};}
+/* ================= A 3.9.37-es KIHÍVÁSOK SEGÉDEI =================
+   Mind ÁLLAPOTOT olvas a meglévő rendszerekből — új könyvelés nélkül. */
+/* AKI FESZÜLTSÉGET OKOZ AZ ÖLTÖZŐBEN. Nem új fogalom: az öltöző-napló minden
+   eseménynél feljegyzi, KIK szerepeltek benne és POZITÍV volt-e (`pos`). Aki a
+   futó szezonban a legtöbb NEGATÍV eseményben szerepel, az a feszültség
+   forrása — pontosan az, amit a játékos is olvas a napló lapján. */
+function chTensionPlayer(){
+  const log=(S.lockerLog||[]).filter(r=>r&&!r.pos&&r.s===(S.seasonNumber||1));
+  if(!log.length)return null;
+  const cnt={};
+  log.forEach(r=>(r.who||[]).forEach(n=>{cnt[n]=(cnt[n]||0)+1;}));
+  const bent=new Set(chRoster().map(p=>p.n));
+  let best=null,bv=0;
+  Object.keys(cnt).forEach(n=>{if(bent.has(n)&&cnt[n]>bv){bv=cnt[n];best=n;}});
+  return (best&&bv>=2)?{n:best,db:bv}:null;}
+/* Van-e piacra bocsátott, 20 év alatti játékosod. */
+function chYouthListed(maxAge){
+  return chRoster().some(p=>{
+    const e=careerPool&&careerPool[p.n];
+    const a=e?e.age:p.age;
+    return a!=null&&a<(maxAge||20)&&saleIsListed(p.n);});}
+/* A 20 év alattiak közül a legtöbb perccel rendelkező — a kihívás élő mondata
+   ebből mondja meg, ki van a legközelebb az 500 perces kapuhoz. */
+function chYouthClosest(maxAge){
+  let best=null,bv=-1;
+  chRoster().forEach(p=>{
+    const e=careerPool&&careerPool[p.n];
+    const a=e?e.age:p.age;
+    if(a==null||a>=(maxAge||20))return;
+    const m=careerMinutesOf(p.n);
+    if(m>bv){bv=m;best={n:p.n,perc:m};}});
+  return best;}
+/* ---- ELFOGYOTT-E A FELDERÍTÉSI KERET ----
+   A keret alakja `{max,left,pos:{}}`, és KÉT dobozban él: a szezonközi
+   checkpoint-ablakban (S.twWindow) és a nyári kvótában (S.summerLooks). A
+   kihívás azt kéri, hogy az ÉPP NYITOTT időszakban fogyjon el — ezért
+   mindkettőt nézzük, és az számít, amelyikben már történt felderítés.
+   Ha egyik sem indult el, a haladás 0: ilyenkor tényleg nem használtál fel
+   semmit. */
+function chLooksSpentState(){
+  const dobozok=[];
+  try{if(S.twWindow&&S.twWindow.max)dobozok.push(S.twWindow);}catch(e){}
+  try{if(S.summerLooks&&S.summerLooks.season===(S.seasonNumber||1)&&S.summerLooks.max)
+    dobozok.push(S.summerLooks);}catch(e){}
+  let best=null;
+  dobozok.forEach(s=>{
+    const max=s.max||0,left=(s.left==null?max:s.left);
+    if(!max)return;
+    const used=max-left;
+    if(!best||used>best.used)best={max,left,used};});
+  return best;}
+function chLooksAllSpent(){
+  const st=chLooksSpentState();
+  return !!(st&&st.left<=0);}
+/* Hány OLCSÓ tartalék ül még a keretedben: akinek a gyors eladási ára a
+   megadott forint-határ alatt van. A mérce a „eladás most" ára — az, amit egy
+   koppintással kapnál érte. */
+function chCheapReserves(limitHuf){
+  const lim=limitHuf||CH_CHEAP_RESERVE_HUF;
+  let n=0;
+  (typeof extraRoster!=="undefined"?extraRoster:[]).forEach(p=>{
+    if(!p)return;
+    let v=0;try{v=pointsToHuf(sellValue(p)||0);}catch(e){v=0;}
+    if(v>0&&v<lim)n++;});
+  return n;}
+const CH_CHEAP_RESERVE_HUF=1e9;   /* „1 Mrd alatti gyors eladási ár" */
 /* Lecserélted-e a vállaláskor leggyengébb játékosodat: ha már nincs a keretben. */
 function chWorstReplaced(ch){
   if(!ch||!ch.targetName)return 0;
@@ -38281,8 +38851,40 @@ function latchChallengeIfMet(ch){
    Idempotens, tehát nyugodtan hívható többször egy meccsen belül — a jutalom-
    lánc (skill, kémia, új játékos) UTÁN is, mert az is mozgathat célszámot
    (chemPairsDone, skillsComplete). */
+/* ================= A MECCSENKÉNT FOGYÓ MODOSÍTÓK (3.9.37) =================
+   A kihívás-jutalmak és -büntetések egy része MECCSEKBEN méri magát („3
+   meccsig", „8 meccsen át", „a következő 10 meccsen"). A számlálók itt, egy
+   helyen fogynak — és SZÁNDÉKOSAN a chAfterMatchBook korai kilépője ELŐTT:
+   egy futó büntetés akkor is telik, ha épp egyetlen kihívásod sincs vállalva.
+   A régi viselkedés ezt elrontotta volna: a büntetés örökre bent ragad, amíg
+   nem vállalsz új kihívást. */
+/* A LEFÚJÁS UTÁNI GYÓGYÍTÁS-KÉRDÉS. Csak akkor szólal meg, ha VAN zseton és a
+   sérülés még áll — egy időközben lejárt vagy már meggyógyított emberre nem
+   kérdezünk rá. A „Most nem" nem költi el a zsetont: az a raktározás. */
+function chHealPrompt(){
+  const n=S.chHealAsk;S.chHealAsk=null;
+  if(!n||!chCanHeal(n))return;
+  const u=S.unavailable[n];
+  try{
+    askConfirm({title:"Meggyógyítod?",yes:"Igen, gyógyítsuk meg",no:"Most nem",
+      html:`<div style="font-size:15px;font-weight:700">⚕️ ${esc(shortName(n))}</div>
+        <div style="font-size:13px;margin-top:8px;line-height:1.55">
+          <b>${u.matchesLeft} meccset</b> hagyna ki. Van <b>${S.chHealTokens} gyógyítás-jutalmad</b> —
+          elhasználod rá?<br><br>
+          <span style="color:var(--dim2)">Ha most nemet mondasz, a lehetőség MEGMARAD: bármikor
+          elsütheted a HUB keretlistáján, a játékos „⚕ sérült" jelzésére koppintva.</span></div>`,
+      onYes:()=>{chHealInjury(n);try{renderHub();}catch(e){}}});
+  }catch(e){}}
+function chModifierTick(){
+  if(gameMode!=="career")return;
+  try{chHealPrompt();}catch(e){}
+  ["chRoleFreeze","chBondSlow","chSkillPickLock","chTrainBoost"].forEach(k=>{
+    if((S[k]||0)>0)S[k]--;});
+  const d=S.chDefRating;
+  if(d&&d.left>0&&--d.left<=0)S.chDefRating=null;}
 function chAfterMatchBook(matchGf){
   if(gameMode!=="career")return;
+  chModifierTick();
   const list=S.activeChallenges||[];
   if(!list.length)return;
   list.forEach(ch=>{
@@ -38337,6 +38939,23 @@ function posLearnTypicalCost(){
     :Math.round(clubBudgetScale()*(POS_LEARN_SHARE[0]+POS_LEARN_SHARE[1])/2);}
 function posLearnRefundDesc(){
   return `a betanítási ár fele (kb. +${fmtFt(Math.round(posLearnTypicalCost()/2))})`;}
+/* ---- A KÖTÖTT JUTALMAK FELIRATA ----
+   Néhány kihívásnak nem sorsolt, hanem RÖGZÍTETT a jutalma, mert a jutalom
+   maga a feladat értelme (a poszt-tanulás féláras lesz; az új taktika
+   begyakorlása felugrik). Egy helyen áll, hogy az ajánlat-kártya, a
+   megerősítő párbeszéd és a kifizetés ugyanazt mondja. */
+const TACTIC_FAM_HI=80;      /* efölött már nem 81 a cél — az visszalépés volna */
+const TACTIC_FAM_TO=81, TACTIC_FAM_TO_HI=86;
+function chForcedRewardDesc(rw){
+  if(!rw)return "";
+  if(rw.kind==="posLearnRefund")return posLearnRefundDesc();
+  if(rw.kind==="stylePointsOnly")return "csapatstílus-pont";
+  if(rw.kind==="buyDiscountNext")
+    return "a következő igazolásod 25%-kal olcsóbb (a sikeres vásárlásig él)";
+  if(rw.kind==="bondTempo")return "az érkeződ összhang-tempója megugrik";
+  if(rw.kind==="tacticFamiliar")
+    return `az új taktikád begyakorlása ${TACTIC_FAM_TO}-re ugrik (ha már ${TACTIC_FAM_HI} fölött állt, ${TACTIC_FAM_TO_HI}-re)`;
+  return rw.desc||"";}
 function applyChallengeReward(rw){
   if(!rw)return "";
   /* POSZT-TANULÁSI VISSZATÉRÍTÉS: a ténylegesen kifizetett ár fele. Az összeg
@@ -38437,12 +39056,104 @@ function applyChallengeReward(rw){
         S.pendingCardUps=(S.pendingCardUps||0)+1;
         return "kártya-fejlesztés — a szezonkártyák kiosztása után";}
       return applyOneCardUp()||"kártya-fejlesztés";}
+    case "tacticFamiliar":{
+      /* A JUTALOM AZT A TAKTIKÁT EMELI, AMIVEL TELJESÍTETTED — nem a
+         vállaláskorit, mert a kihívás pont azt hagyta szabadon, melyikre
+         váltasz. A 81 fölött álló taktikánál a 81 visszalépés volna, ezért ott
+         a magasabb fokozat jár. */
+      const b2=chBestOtherTacticMatches({excludeTactic:rw.excludeTactic});
+      if(!b2.k||!S.tactics||!S.tactics.levels)return "nincs mit felhozni — a jutalom elveszett";
+      const cur=tacticLevel(b2.k);
+      const to=Math.min(TACTIC_MAX,cur>=TACTIC_FAM_HI?TACTIC_FAM_TO_HI:TACTIC_FAM_TO);
+      const nm=(TACTICS[b2.k]&&TACTICS[b2.k].n)||b2.k;
+      if(cur>=to)return `${nm} begyakorlása már ${Math.round(cur)} — nincs mit emelni`;
+      S.tactics.levels[b2.k]=to;
+      return `${nm} begyakorlása ${Math.round(cur)} → ${to}`;}
     case "boostToken":
       S.boostTokens=(S.boostTokens||0)+1;
       return "1 ingyen boost-token";
     case "freePlayer":
       S.freePlayerTokens=(S.freePlayerTokens||0)+1;
       return "a következő igazolásod INGYEN (bármilyen típusú)";
+    /* ================= A 3.9.37-es JUTALMAK =================
+       Mind KIFIZETÉSKOR választ célpontot (lásd chBestBy) — a kihívás nyolc-
+       harminc meccsig fut, egy előre rögzített név addigra el is mehetne. */
+    case "freeBoost":{
+      const k=rw.boost||"plain";
+      S.chFreeBoost=S.chFreeBoost||{};
+      S.chFreeBoost[k]=(S.chFreeBoost[k]||0)+1;
+      const d=BOOST_KINDS.find(x=>x.k===k);
+      return `1 ingyen ${d?d.n.toLowerCase():k} boost — a boltban 0 Ft-ért viszed`;}
+    case "dealEasier":
+      S.chDealBoost=(S.chDealBoost||0)+CH_DEAL_TRIES;
+      return `a következő ${S.chDealBoost} tárgyalásod nagyobb eséllyel köt tiszta üzletet`;
+    case "trainBoost":
+      S.chTrainBoost=Math.max(S.chTrainBoost||0,CH_TRAIN_BOOST_M);
+      return `+${Math.round((CH_TRAIN_BOOST_MULT-1)*100)}% edzés-hatékonyság ${S.chTrainBoost} meccsen át`;
+    case "youthSellable":{
+      const y=chPickYouth();
+      if(!y)return "nincs kire — a jutalom elveszett";
+      S.chYouthSell=y.n;
+      return `${shortName(y.n)} már ${CH_YOUTH_SELL_MIN} perctől piacra vihető, és gyorsabban hízik a kikiáltási ára`;}
+    case "askFloor":
+      S.chBidFloor90=(S.chBidFloor90||0)+CH_ASK_FLOOR_N;
+      return `a következő ${S.chBidFloor90} piacra bocsátásod kikiáltási ára legalább a teljes érték ${Math.round(CH_ASK_FLOOR_PCT*100)}%-a`;
+    case "tacticFitUp":
+      S.chTacticFitPP=(S.chTacticFitPP||0)+(rw.amount||0);
+      return `taktikai illeszkedés +${rw.amount} pp (összesen +${S.chTacticFitPP} pp, tartós)`;
+    case "tacticLevelUp":{
+      const k=S.tactics&&S.tactics.active;
+      if(!k||!S.tactics.levels)return "nincs aktív taktikád — a jutalom elveszett";
+      const cur=tacticLevel(k);
+      if(cur>=TACTIC_MAX)return `${(TACTICS[k]&&TACTICS[k].n)||k} már a plafonon áll`;
+      S.tactics.levels[k]=Math.min(TACTIC_MAX,cur+1);
+      return `${(TACTICS[k]&&TACTICS[k].n)||k} begyakorlása ${Math.round(cur)} → ${S.tactics.levels[k]}`;}
+    case "speedCapOpen":{
+      const f=chPickFastest();
+      if(!f)return "nincs kire — a jutalom elveszett";
+      S.chSpeedOpen=f.n;
+      return `${shortName(f.n)} sebességplafonja kinyílt (a 99 fölötti negyed tempó rá is él)`;}
+    case "hatTrickUp":{
+      const s=chPickScorer();
+      if(!s)return "nincs kire — a jutalom elveszett";
+      S.chHatUp={n:s.n,pct:(rw.amount||0)/100};
+      return `${shortName(s.n)} mesterhármas-esélye +${rw.amount}% (két gól után nő a harmadik esélye)`;}
+    case "defRatingUp":{
+      const d2=chPickDefender();
+      if(!d2)return "nincs védőd — a jutalom elveszett";
+      S.chDefRating={n:d2.n,pct:(rw.amount||0)/100,left:CH_DEFRATING_M};
+      return `${shortName(d2.n)} meccsértékelése +${rw.amount}% a következő ${CH_DEFRATING_M} meccsen`;}
+    case "gkFormUp":{
+      const g=chPickKeeper();
+      const e=g&&careerPool&&careerPool[g.n];
+      if(!e)return "nincs kapusod — a jutalom elveszett";
+      e.formPoints=(e.formPoints||0)+(rw.amount||0);
+      return `${shortName(g.n)} +${rw.amount} formapont`;}
+    case "yellowDown":
+      S.chYellowCut=Math.min(CH_YELLOW_CUT_CAP,(S.chYellowCut||0)+(rw.amount||0)/100);
+      return `a csapat sárgalap-esélye −${Math.round(S.chYellowCut*100)}% (tartós)`;
+    case "stylePointsOnly":{
+      /* A fókusz-váltás kihívásának kötött jutalma: KIZÁRÓLAG stíluspont (a
+         kérés szerint). A mérték ugyanabból a sávból jön, mint a sorsolt
+         stíluspont-jutalomé — csak itt nincs másik lehetőség. */
+      const M=msState(),sp=Math.round(8+Math.random()*10);
+      M.sp=(M.sp||0)+sp;M.spEarned=(M.spEarned||0)+sp;
+      return `+${sp} csapatstílus-pont (most ${M.sp})`;}
+    case "buyDiscountNext":
+      S.chBuyDiscountNext=(S.chBuyDiscountNext||0)+1;
+      return `a következő ${S.chBuyDiscountNext} igazolásod 25%-kal olcsóbb`;
+    case "bondTempo":{
+      /* „Extra összhang tempó a KONKRÉT játékosnak" — ugyanaz a csatorna,
+         amit az összhang-boost is használ (entry.bondBoost), tehát a
+         kihívás jutalma és a boltban vett boost egy nyelvet beszél. */
+      const be=chRoster().map(p=>careerPool&&careerPool[p.n]).filter(e=>e&&bondIntegrating(e.n));
+      const e2=be.length?pick(be):null;
+      if(!e2)return "nincs érkeződ — a jutalom elveszett";
+      const r2=applyBondBoost(e2);
+      return `${shortName(e2.n)} összhang-tempója +${r2.pct}% (${r2.mult}×)`;}
+    case "healInjury":
+      S.chHealTokens=(S.chHealTokens||0)+1;
+      return `${S.chHealTokens} sérülés-gyógyításod van — a HUB-ban a „⚕ sérült" jelzésre koppintva sütheted el`;
   }
   return rw.desc||"";}
 /* Igaz, amíg a SZEZONZÁRÓ kihívás-kiértékelés fut — ilyenkor a
@@ -38577,6 +39288,52 @@ function applyChallengePunishment(pn){
     case "formMalus":
       S.teamFormMalus=(S.teamFormMalus||0)+pn.amount;
       return `gyengébb csapatforma ${pn.amount} meccsen át`;
+    /* ================= A 3.9.37-es BÜNTETÉSEK ================= */
+    case "roleFreeze":
+      S.chRoleFreeze=Math.max(S.chRoleFreeze||0,CH_ROLE_FREEZE_M);
+      return `a csapatstílus-szerepeid ${S.chRoleFreeze} meccsig nem működnek (a kiosztásuk megmarad)`;
+    case "bondSlow":
+      S.chBondSlow=Math.max(S.chBondSlow||0,CH_BOND_SLOW_M);
+      return `az összhangépítés fele ütemű ${S.chBondSlow} meccsen át, az egész csapatban`;
+    case "bondSplit":{
+      const pr=chStrongestBondPair();
+      if(!pr)return "nincs összeszokott pár — a büntetés elmarad";
+      try{bondAdd(pr.a,pr.b,-CH_BOND_SPLIT);}catch(e){return "az elidegenedés nem ment végbe";}
+      return `${shortName(pr.a)} és ${shortName(pr.b)} elidegenedett — −${CH_BOND_SPLIT} összhang`;}
+    case "skillPickLock":{
+      const n=(typeof skillRealOn==="function"&&skillRealOn())?CH_SKILLLOCK_REAL:CH_SKILLLOCK_LAZA;
+      S.chSkillPickLock=Math.max(S.chSkillPickLock||0,n);
+      return `${S.chSkillPickLock} meccsen át a gép választja ki, ki kapja a skilleket`;}
+    case "trainSecFreeze":{
+      /* „Egy szezonra" — de a szezon VÉGÉN kiszabott büntetés így nulla napig
+         tartana. Ezért a hajrában (25. fordulótól) a KÖVETKEZŐ szezonra száll:
+         a büntetés mindig érjen valamit. */
+      const sn=(S.seasonNumber||1)+(((S.idx||0)>=25)?1:0);
+      S.chTrainSecFreeze=Math.max(S.chTrainSecFreeze||0,sn);
+      return `a másodlagos edzésed befagy a ${S.chTrainSecFreeze}. szezon végéig`;}
+    case "dealHarder":
+      S.chDealMalus=(S.chDealMalus||0)+CH_DEAL_TRIES_DOWN;
+      return `a következő ${S.chDealMalus} tárgyalásodnál nehezebben indul meg az üzletkötés`;
+    case "loseStylePerk":{
+      const st=(typeof styleState==="function")?styleState():null;
+      const tr=st&&st.traits;
+      const own=tr?Object.keys(tr).filter(k=>(tr[k]||0)>0):[];
+      if(!own.length)return "nincs megvett stílus-képességed — a büntetés elmarad";
+      const k=pick(own);
+      tr[k]=tr[k]-1;
+      if(tr[k]<=0)delete tr[k];
+      let nm=k;try{const t=styleTraitByKey(k);if(t)nm=t.n;}catch(e){}
+      return `${nm} egy szintet visszaesett`;}
+    case "staffLeaves":{
+      /* MINDIG A LEGGYENGÉBB MEGY — de ezt SZÁNDÉKOSAN nem mondjuk ki a
+         büntetés leírásában: a „valakit elveszítesz" feszültsége a lényeg, a
+         megnyugtató „úgyis a legrosszabbat" elvenné. A kód viszont kimondja,
+         hogy a következő olvasó ne higgye véletlennek. */
+      const L=(typeof staff==="function")?staff():[];
+      if(!L.length)return "nincs stábtagod — a büntetés elmarad";
+      let wi=0;for(let i=1;i<L.length;i++)if((L[i].sz||0)<(L[wi].sz||0))wi=i;
+      const gone=L.splice(wi,1)[0];
+      return `${shortName(gone.n)} elköszönt a stábtól`;}
     case "tsiBlock":{
       if(!roster.length)return "fejlődés-blokk (nincs játékos)";
       const p=pick(roster),until=(S.seasonNumber||1)+1;
@@ -39177,6 +39934,27 @@ function addOrExtendUnavailable(playerName,duration,reason){
   addLine(`${reason==="injury"?"⚕ Sérülés":"🟥 Eltiltás"}: ${esc(shortName(playerName))} ${duration} meccset kihagy`,
     reason==="injury"?"m inj":"m rc");}
 function playerUnavailable(name){return !!(name&&S.unavailable&&S.unavailable[name]);}
+/* ================= KIHÍVÁS-JUTALOM: SÉRÜLÉS-GYÓGYÍTÁS (3.9.37) =================
+   „Meggyógyíthatsz egy sérülést. Ha megsérül egy játékosod, azonnal felajánlja:
+   őt gyógyítod meg? Lehet nem-re nyomni, és akkor elraktározódik a lehetőség.
+   Meglévő sérülésre is lehessen használni: a HUB-ban rá kell navigálni arra a
+   játékosra, és a sérülés jele legyen kattintható."
+   A ZSETON NEM JÁR LE. Ezért nem kell külön „elraktározás": a nemet mondás
+   egyszerűen nem költi el. A felajánlás a MECCS UTÁN jön (chHealAsk), nem a
+   sérülés pillanatában — egy futó közvetítés közepén felugró kérdés a
+   mérkőzést szakítaná félbe, és a döntéshez amúgy sincs mit hozzátenni.
+   CSAK SÉRÜLÉST gyógyít, eltiltást nem: egy piros lapot nem lehet
+   gyógytornával leülni (ugyanaz az elv, mint a medicHealCut-nál). */
+function chCanHeal(name){
+  const u=name&&S.unavailable&&S.unavailable[name];
+  return !!(u&&u.reason==="injury"&&(S.chHealTokens||0)>0);}
+function chHealInjury(name){
+  if(!chCanHeal(name))return false;
+  S.chHealTokens--;
+  delete S.unavailable[name];
+  try{delete S.replacementChoice[name];}catch(e){}
+  try{addLine(`⚕️ <b>${esc(shortName(name))} felépült</b> — a kihívás-jutalom gyógyítása elhasználva.`,"m win");}catch(e){}
+  return true;}
 /* A keretben (kezdő 11 + pad + tartalék) megkeressük a nevet. */
 function findRosterPlayerByName(name){
   if(!name)return null;
@@ -40578,6 +41356,9 @@ let BOND_MATCH_AST=null;   /* a meccsen egymásnak adott gólpasszok párjai */
 function bondNoteAssist(as,sc){
   if(!BOND_MATCH_AST||!as||!sc||as===sc)return;
   BOND_MATCH_AST.add(bondKey(as,sc));}
+/* Feleannyi ütem: a lassítás érezhető, de nem állítja meg az építkezést —
+   nyolc meccs alatt nagyjából négy meccsnyi haladás vész el. */
+const CH_BOND_SLOW_MULT=0.5;
 function bondMatchTick(names,posOf,ctx){
   if(gameMode!=="career"||!S.bondsSeeded)return null;
   /* AZ UTOLSÓ VÉDVONAL a kezdőrúgás után: ha egy érkezési út kihagyta a
@@ -40587,7 +41368,13 @@ function bondMatchTick(names,posOf,ctx){
   try{dialBondClear();}catch(e){}
   const list=(names||[]).filter(Boolean);
   if(list.length<2)return null;
-  const tempo=(typeof devTempo==="function")?devTempo():1;
+  let tempo=(typeof devTempo==="function")?devTempo():1;
+  /* KIHÍVÁS-BÜNTETÉS (3.9.37): „lelassul az összhangépítés 8 meccsen át a
+     teljes csapatban". A tempón megy, mert az az ÉPÍTÉSI ütem egyetlen közös
+     szorzója — a párok szintje, a plafon és a beilleszkedés érintetlen marad,
+     csak lassabban gyűlik. A számláló a meccs-könyvelés végén fogy (lásd
+     chAfterMatchBook), nem itt: a bondMatchTick többször is meghívódhat. */
+  if((S.chBondSlow||0)>0)tempo*=CH_BOND_SLOW_MULT;
   const winM=(ctx&&ctx.win)?1.25:(ctx&&ctx.loss)?0.9:1;
   const ast=BOND_MATCH_AST||new Set();
   /* A keret mai szintje — a felzárkózás célja és üteme is ebből jön. EGYSZER
@@ -40728,6 +41515,9 @@ function bondRevealNew(n){
   const rec=S.bondNew&&S.bondNew[n];
   if(!rec)return null;
   const lv=bondLevelsOf(n);
+  /* KIHÍVÁS-KÖNYVELÉS: a 8/8-ra ért beilleszkedés. Itt, a felfedés
+     pillanatában, mert ez az EGYETLEN hely, ahol egy ablak lezárul. */
+  S.chIntegrationsDone=(S.chIntegrationsDone||0)+1;
   delete S.bondNew[n];
   const out=[];
   bondRosterNames().forEach(o=>{
@@ -51697,6 +52487,10 @@ const MSTAT_GRADES=[
 const MSTAT_SAVE_CAP=3.0;   /* a kapus védés-tételének plafonja (volt: 1,4) */
 const MSTAT_SHOUT_IDX=10;   /* ettől a fokozattól („rendkívüli") a napló is kimondja */
 const MSTAT_TOP_IDX=13;     /* a „felfoghatatlan!" — a skála teteje */
+/* A KIHÍVÁSOK „KIEMELKEDŐ" KÜSZÖBE. Nem külön szám: pontosan az a fokozat,
+   amit a meccs-ablak is kiír (MSTAT_GRADES[9] = „kiemelkedő"). Így amit a
+   kihívás kér, azt a játékos a saját szemével látja a meccs után. */
+const CH_STAR_IDX=9;
 /* ---- A KIUGRÓ ESTÉK KARRIER-SZÁMLÁLÓJA (3.8.39) ----
    Két szám emberenként: hány estéje érte el a „rendkívüli" fokozatot (a
    mesterhármas szintje), és hányszor a „felfoghatatlan!"-t (a mesterhatosé).
@@ -52284,6 +53078,16 @@ function mstatCompute(c){
     styleStar:c.styleStar,cleanSheet:ga===0,ga,cls:c.cls,mod:MOD};
   const players=rows.map(x=>{
     const rt=mstatRate(x,ctx);
+    /* ---- KIHÍVÁS-JUTALOM: A LEGERŐSEBB VÉDŐ ESTÉI (3.9.37) ----
+       „A legerősebb védőd meccsértékelése feljavul +25-50%-kal a következő 10
+       meccsen." A KÉSZ értékelést emeljük, nem a bemenő tételeket: a jutalom
+       szövege az ÉRTÉKELÉSRŐL szól, és így a fokozat-küszöbök (MSTAT_GRADES) is
+       pontosan azt jelentik, amit a képernyő mutat. A számláló a
+       chModifierTick-ben fogy, meccsenként egyszer. */
+    const _dr=S.chDefRating;
+    const _star=(rt.rated
+      ?((_dr&&_dr.left>0&&_dr.n===x.pl.n)?rt.v*(1+(_dr.pct||0)):rt.v)
+      :null);
     return {n:x.pl.n,pos:x.pos,role:x.role,
       min:mstatMinutes(x.share),
       g:x.g||0,a:x.a||0,saves:x.saves||0,tackles:x.tackles||0,
@@ -52302,7 +53106,7 @@ function mstatCompute(c){
          theirSaves, ott a gól nélküli szám a helyes. */
       sh:(x.sh||0)+(x.g||0),son:(x.son||0)+(x.g||0),kp:x.kp||0,spt:x.spt||0,
       pas:x.passes||0,pac:x.passAcc||null,
-      red:!!x.red,mvp:!!x.mvp,star:(rt.rated?rt.v:null)};});
+      red:!!x.red,mvp:!!x.mvp,star:_star};});
   /* AZ ÉRTÉKELÉS NÉLKÜLIEK A SOR VÉGÉRE. Nem „nulla csillagosak" — nincs
      számuk, amivel rangsorolni lehetne, tehát a lista aljára kerülnek, a
      lejátszott perceik szerint. */
@@ -53864,7 +54668,7 @@ function playMatch(){
            vezetést jutalmazta a meglévő 1-2 gólos előny megtartása helyett).
            A clutchHeroWeight szándékosan marad a gól UTÁNI álláson: az más
            kérdésre felel (ki a hős ebben a pillanatban). */
-        const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*crossTargetMult(slots[x.idx].pos)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*roleGoalMult(x.p.n,90,gf-1,ga)*bzChaseGoalMult(x.p.n,mScore)*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
+        const si=weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*crossTargetMult(slots[x.idx].pos)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*roleGoalMult(x.p.n,90,gf-1,ga)*bzChaseGoalMult(x.p.n,mScore)*chHatMult(x.p.n,mScore)*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
         const dramaScorer=active[si].p;
         mScore[dramaScorer.n]=(mScore[dramaScorer.n]||0)+1;recordScorer(dramaScorer.n);
         /* BOMBÁZÓK: a hajrágól is gól — a képesség-számláló ezt is látja.
@@ -54006,7 +54810,7 @@ function playMatch(){
       let si=setPiece
         ?weightedPick(active,(x,idx)=>idx===redIdx?0:(SETPW[slots[x.idx].pos]||1)
             *Math.max(1,pOvr(x.p)-58)*mileWeight(MILE,x.p.n),null,spreadSkipGK)
-        :weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf-1,ga)*bzChaseGoalMult(x.p.n,mScore)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga)*dialMul("goalw",{name:x.p.n,pos:slots[x.idx].pos,min:gnow(min),gf:gf-1,ga}),null,spreadSkipGK);
+        :weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf-1,ga)*bzChaseGoalMult(x.p.n,mScore)*chHatMult(x.p.n,mScore)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga)*dialMul("goalw",{name:x.p.n,pos:slots[x.idx].pos,min:gnow(min),gf:gf-1,ga}),null,spreadSkipGK);
       /* Párharcban a gólszerzőt a közös lista dönti el (a súlyozást a saját
          kliensed már a pillanatkép küldésekor elvégezte). A fenti súlyozott
          választás csak TARTALÉK marad: ha a név bármiért nem található a
@@ -54354,7 +55158,10 @@ function playMatch(){
         *multSkillEffect(x.p.n,"discipline")
         *roleRiskMult(x.p.n));
       const _yt=_yw.reduce((a,b)=>a+b,0);
-      const _pY=YELLOW_PER_MATCH/18*(RIVAL_MOOD?1.35:1)
+      /* KIHÍVÁS-JUTALOM (3.9.37): „lecsökken a csapatod sárgalap-szerzési
+         esélye, teljes csapatra −15-25% (állandó)". A CSAPAT esélyén megy, nem
+         az eloszláson: a jutalom szövege az egész keretre szól. */
+      const _pY=YELLOW_PER_MATCH/18*(RIVAL_MOOD?1.35:1)*(1-(S.chYellowCut||0))
         *styleRedMult()*friendlyRiskMult()*dialMul("card",{injured:_dialInjured});
       if(_yt>0&&Math.random()<_pY){
         const _yi=weightedIndex(_yw);
@@ -55549,7 +56356,40 @@ function playMatch(){
          névsor a KEZDŐRÚGÁSKOR rögzült (startedNames), nem a lefújáskori
          összeállításból — így a félidőben beálló ember gólja számít bele, a
          lecserélt kezdőé viszont nem. */
-      Object.keys(mScore).forEach(n=>{if(!startedNames.has(n))S.chSeasonSubGoals=(S.chSeasonSubGoals||0)+mScore[n];});}
+      Object.keys(mScore).forEach(n=>{if(!startedNames.has(n))S.chSeasonSubGoals=(S.chSeasonSubGoals||0)+mScore[n];});
+      /* ================= A CSEREPAD ÉS A HÁTSÓ SOR MÉRŐI (3.9.37) =================
+         BEJELENTETT PANASZ: „csereembereid rúgjanak x gólt" — ezt sosem
+         választja senki. Jogos: a cseregól HÁRMAS véletlen (bejön-e, kap-e
+         labdát, betalál-e), és a menedzser döntése alig hat rá. Amit VISZONT
+         eldönt: mennyi PERCET ad a padnak, és milyen embert küld be.
+         Ez a két számláló ezért nem a szerencsét méri, hanem a döntést:
+           · a cserék össz-játékperce (a kezdőrúgáskori 11-en KÍVÜLIEKÉ),
+           · hány cseréje ért el KIEMELKEDŐ (vagy jobb) meccsértékelést.
+         A harmadik a hátsó sorra ugyanaz (lásd a védő-kihívást): a védő
+         teljesítménye eddig CSAK a tiszta lapon át számított, pedig egy 0-0-s
+         meccsen is lehet valaki a pálya legjobbja.
+         A KÜSZÖB a MSTAT_GRADES „kiemelkedő" fokozata (9-es index) — nem egy
+         külön szám, hanem pontosan az, amit a meccs-ablak is kiír. */
+      try{
+        const perc=_percThisMatch||{};
+        let sm=0;
+        Object.keys(perc).forEach(n=>{if(!startedNames.has(n))sm+=perc[n]||0;});
+        if(sm>0)S.chSeasonSubMinutes=(S.chSeasonSubMinutes||0)+sm;
+        ((S.lastMatch&&S.lastMatch.players)||[]).forEach(pl=>{
+          if(!pl||pl.star==null)return;
+          const gi=mstatGradeIdx(pl.star);
+          if(gi==null||gi<CH_STAR_IDX)return;
+          if(!startedNames.has(pl.n))S.chSeasonSubStars=(S.chSeasonSubStars||0)+1;
+          if(pl.role==="VEDO")S.chSeasonDefStars=(S.chSeasonDefStars||0)+1;});
+      }catch(e){}
+      /* MELYIK TAKTIKÁVAL hány meccset játszottál ebben a szezonban. A
+         taktika-begyakorlás eddig csak egy SZINTET mutatott; a „játssz 15
+         meccset egy új taktikával" kihíváshoz maga a meccsszám kell. */
+      try{
+        const tk=S.tactics&&S.tactics.active;
+        if(tk){S.chTacticMatches=S.chTacticMatches||{};
+          S.chTacticMatches[tk]=(S.chTacticMatches[tk]||0)+1;}
+      }catch(e){}}
       /* A KIHÍVÁS-KÖNYVELÉS (bestSinceAccept + teljesülés-retesz) SZÁNDÉKOSAN
          NEM ITT áll, hanem lejjebb, a tabella lezárása UTÁN — lásd
          chAfterMatchBook(). Itt még nem nőtt a S.idx, nem futott az
@@ -55661,6 +56501,9 @@ function playMatch(){
       addLine(`${gminTxt(min)}  ${pick(injTexts)} (${dur} forduló)`,"m inj");
       sbEv("us","inj",inm);
       if(!styleToughOnRoll(inm,"injury"))addOrExtendUnavailable(inm,dur,"injury");
+      /* GYÓGYÍTÓ-ZSETON: a kérdést a lefújás után tesszük fel (lásd chHealAsk),
+         nem itt — egy futó közvetítést nem szakítunk félbe. */
+      if((S.chHealTokens||0)>0&&S.unavailable[inm])S.chHealAsk=inm;
       injuredThisMatchName=inm;
     }
     /* A félidőben lecserélt játékosok a lista VÉGÉRE kerülnek: a gi/bi/best/
@@ -56792,7 +57635,18 @@ function twResolveSigning(cand,completeFn,retryFn,opts){
          nagyobb eséllyel talál "sima" (olcsó, gond nélküli) igazolást, és
          kisebb eséllyel akad be prémium-árba vagy bukik el a tárgyalás. */
       const q=(gameMode==="career")?scoutQuality(scout):0.3;
-      const cleanCut=0.38+q*0.22;      /* 0.38 → 0.60 */
+      /* ---- KIHÍVÁS-MÓDOSÍTÓ A TÁRGYALÁSON (3.9.37) ----
+         Jutalom: „a következő 3 próbálkozásnál nagyobb eséllyel lesz sikeres
+         üzlet, ahol nem kérnek magasabb árat" — vagyis a TISZTA kimenetel
+         sávja tágul (a prémium-ár és a bukás rovására).
+         Büntetés: „a következő 5 próbálkozásnál kisebb eséllyel indul meg az
+         üzletkötés" — a tiszta sáv szűkül, a bukásé nő.
+         A zseton itt fogy, a TÁRGYALÁS pillanatában: aki hozzákezd, azé a
+         lépés, akkor is, ha a végén nemet mond a játékos. */
+      let chShift=0;
+      if((S.chDealBoost||0)>0){S.chDealBoost--;chShift=CH_DEAL_SHIFT;}
+      else if((S.chDealMalus||0)>0){S.chDealMalus--;chShift=-CH_DEAL_SHIFT;}
+      const cleanCut=Math.max(0.10,Math.min(0.85,0.38+q*0.22+chShift));
       const premiumCut=cleanCut+0.24-q*0.06;
       const retryCut=premiumCut+0.21-q*0.10;
       if(r<cleanCut)twSigningResult(cand,"clean",completeFn,retryFn,opts);
@@ -56806,6 +57660,10 @@ function twResolveSigning(cand,completeFn,retryFn,opts){
       sb.onclick=()=>{const cf=completeFn||twCycleComplete;cf();};
       $("twActions").innerHTML="";$("twActions").appendChild(sb);}
   }}
+/* Mennyivel tolja el a tárgyalás kimenetelét egy kihívás-módosító. A 0,14 a
+   scout teljes skálájának (0,22) nagyjából a kétharmada: érezhető, de nem
+   írja felül azt, amit a scoutodba fektettél. */
+const CH_DEAL_SHIFT=0.14;
 function twSigningResult(cand,outcome,completeFn,retryFn,opts){
   completeFn=completeFn||twCycleComplete;retryFn=retryFn||twScout;
   /* opts.noRetry: nincs "Scout újraküldése" — a klub-szemlén egy játékossal
@@ -57056,6 +57914,9 @@ function twShowPlacement(cand,completeFn,cfg){
          értékét épp az mutatja meg, ha időnként emlékeztet magára. */
       const _d=buyDiscountInfo(cand);
       budgetPay(finalPrice,"buy",name);
+      /* A GARANTÁLT KEDVEZMÉNY-ZSETON a SIKERES vásárlás lezárásakor fogy —
+         egy elbukott tárgyalás nem viszi el (3.9.37 kihívás-jutalom). */
+      try{chBuyDiscountSpend();}catch(e){}
       if(_d)addLine(`🎉 <b>Kihívás-kedvezmény</b>: ${esc(shortName(name))} ${fmtFt(_d.full)} helyett <b>${fmtFt(_d.now)}</b> — ${fmtFt(_d.saved)} maradt a büdzsében.`,"m life");
     }
     /* ÜGYNÖKSÉG-PONT. A TOKENES igazolás is számít: a munkát akkor is az
@@ -58555,7 +59416,12 @@ function saleMatchesAt(p){
   return (cs&&cs.matches)||0;}
 function saleMinutesAt(p){return careerMinutesOf(p&&p.n);}
 function saleExposure(p){
-  return Math.max(0,Math.min(1,saleMinutesAt(p)/SALE_EXP_FULL_MIN));}
+  /* A KINYITOTT IFI (3.9.37 kihívás-jutalom) MÁSIK FELE: „a kikiáltási ár is
+     gyorsabban növekszik a plusz meccsekkel". A bizonyítottság küszöbe nála
+     feleannyi perc, tehát ugyanaz a játékidő kétszer annyit ér — a képlet és
+     minden olvasója (csonkítás, kártyasúly, ár-bontás szövege) változatlan. */
+  const teljes=SALE_EXP_FULL_MIN*((p&&p.n&&S.chYouthSell===p.n)?CH_YOUTH_SELL_EXP:1);
+  return Math.max(0,Math.min(1,saleMinutesAt(p)/teljes));}
 /* Az ár BONTÁSA. A kártya súlya és a csonkítás egyaránt a bizonyítottsággal
    mozog: egy meccset sem játszott embernek kártyája sincs, egy 40+ meccses
    klubembernél viszont teljes súllyal szól bele. */
@@ -58573,7 +59439,31 @@ function saleBasisParts(p){
    a TSI és a Rating. */
 function saleAskPrice(p){
   if(!p||!p.tsi||!p.age)return 0;
-  return Math.round(saleBasisParts(p).base*saleMerit(p));}
+  let v=Math.round(saleBasisParts(p).base*saleMerit(p));
+  /* ---- A KIKIÁLTÁSI ÁR PADLÓJA (3.9.37 kihívás-jutalom) ----
+     „A következő 3 licitre bocsátott játékosod kikiáltási ára minimum az
+     eladási ár 90%-áról indul (FÜGGETLENÜL A MECCSTAPASZTALATTÓL)."
+     A zárójeles fél mondja meg, mit kell kikapcsolni: a TAPASZTALAT-CSONKÍTÁST.
+     A kikiáltási ár normálisan `pot × card × cut × merit`, ahol a `cut` a
+     kevés lejátszott perc miatti visszavágás (SALE_NOEXP_CUT-ról fut fel), a
+     `card` pedig ugyanezzel az aránnyal halványul. A padló ezt a két tagot
+     TELJES értéken számolja — a többi (piaci érték, szezonkártya, életmű)
+     változatlan. Így a jutalom pontosan a fiatal, keveset játszott embernél
+     ér valamit, ahol a csonkítás fáj; egy lejátszott karrierű játékosnál a
+     padló magától nem bind-el.
+     NEM a sellValue-t hívjuk (az `saleAskPrice × 0,25`, tehát VISSZAHÍVNA
+     ide — a rekurzió a fejlesztés közben ki is derült).
+     A padló a KONKRÉT kirakathoz tapad (rec.askFloor), nem a játékoshoz: ha
+     leveszed és újra kiteszed, a zseton már elment. */
+  try{
+    const rec=saleListingOf(p.n);
+    if(rec&&rec.askFloor){
+      const b=saleBasisParts(p);
+      const teljes=b.pot*saleCardMult(p)*saleMerit(p);
+      if(teljes>0)v=Math.max(v,Math.round(teljes*CH_ASK_FLOOR_PCT));}
+  }catch(e){}
+  return v;}
+const CH_ASK_FLOOR_PCT=0.90;
 /* Egy mondat arról, MIBŐL jön az ár. Enélkül a felhasználó csak két számot lát
    két hasonló játékosnál, és találgat — pontosan az a helyzet, ami a
    bejelentést kiváltotta. */
@@ -58642,6 +59532,15 @@ function sellValue(p){
    végigjátszott mérkőzés. Húsz cameo alatt egy frissen vett ember már
    visszadobható volt a piacra — a szabály tehát nem azt mérte, amit akart. */
 const SALE_LIST_MIN_MINUTES=500;  /* ennyi lejátszott perc nálad kell a piacra tételhez */
+/* ---- KIHÍVÁS-JUTALOM: A KINYITOTT IFI (3.9.37) ----
+   „Az egyik ifijátékosod játszott 250 perctől már eladhatóvá válik, és a
+   kikiáltási ár is gyorsabban növekszik a plusz meccsekkel." Egyetlen NÉVRE
+   szól (S.chYouthSell), tehát nem a szabályt lazítja fel, hanem egy embert
+   emel ki. A gyorsulás a tapasztalat-csonkítást (SALE_EXP_FULL_MIN) felezi:
+   ugyanannyi perc nála kétszer annyit ér. */
+const CH_YOUTH_SELL_MIN=250, CH_YOUTH_SELL_EXP=0.5;
+function chYouthSellMin(n){
+  return (n&&S.chYouthSell===n)?CH_YOUTH_SELL_MIN:SALE_LIST_MIN_MINUTES;}
 const SALE_OFFER_MIN_ROUNDS=5, SALE_OFFER_MAX_ROUNDS=15;
 const SALE_BID_LO=0.60;          /* a licit alsó határa, elutasítás nélkül */
 const SALE_BID_HI=1.25;          /* a felső határ végig ennyi */
@@ -58694,8 +59593,12 @@ function saleListBlock(p){
      tele" üzenet állna, a felhasználó felszabadítana egy helyet, és a gomb
      ettől még nem nyílna ki — az indoklás mindig ERRŐL az emberről szóljon. */
   const perc=careerMinutesOf(p.n);
-  if(perc<SALE_LIST_MIN_MINUTES)
-    return {kind:"minutes",perc,need:SALE_LIST_MIN_MINUTES-perc,
+  /* KIHÍVÁS-JUTALOM (3.9.37): EGY kijelölt ifijátékos már 250 perctől
+     piacra vihető. A kapu maga marad — csak ennél az egy embernél feleződik
+     a küszöb, és a kikiáltási ára is gyorsabban hízik (lásd saleAskPrice). */
+  const kapu=chYouthSellMin(p.n);
+  if(perc<kapu)
+    return {kind:"minutes",perc,need:kapu-perc,
             m:(S.careerStats&&S.careerStats[p.n]&&S.careerStats[p.n].matches)||0};
   /* AZ ÜGYNÖKSÉG KAPACITÁSA: egyszerre ennyi ügyet tud vinni. */
   const cap=agencyMaxListings(),cnt=saleListingCount();
@@ -58707,6 +59610,10 @@ function saleListPlayer(p){
   const wait=SALE_OFFER_MIN_ROUNDS+Math.floor(Math.random()*(SALE_OFFER_MAX_ROUNDS-SALE_OFFER_MIN_ROUNDS+1));
   const rec={n:p.n,since:saleCareerRound(),due:saleCareerRound()+wait,
     rejects:0,offer:null,winKey:null,inWindow:0,pending:true};
+  /* A 90%-os padló-zseton A KITÉTEL pillanatában fogy, és ehhez a
+     kirakathoz tapad — így a jutalom pontosan azt fedi, amit ígér:
+     „a következő 3 LICITRE BOCSÁTOTT játékosod". */
+  if((S.chBidFloor90||0)>0){S.chBidFloor90--;rec.askFloor=true;}
   saleMarketState().list.push(rec);
   return rec;}
 /* ---- A LEVÉTEL EGY KOPPINTÁS VOLT, ÉS SOKBA KERÜLT ----
@@ -58875,7 +59782,8 @@ function releasePlayer(p,sell,priceOverride){
     /* KIHÍVÁS-KÖNYVELÉS: eladott érték és a 32 fölöttiek. */
     S.chSalesValue=(S.chSalesValue||0)+credit;
     const a=p.age!=null?p.age:(careerPool&&careerPool[p.n]?careerPool[p.n].age:null);
-    if(a!=null&&a>32)S.chSoldOver32=(S.chSoldOver32||0)+1;}
+    if(a!=null&&a>32)S.chSoldOver32=(S.chSoldOver32||0)+1;
+    if(a!=null)S.chSoldAges=(S.chSoldAges||[]).concat([a]);}
   if(loc.type==="extra"){
     extraRoster.splice(loc.idx,1);
     if(credit)budgetEarn(credit,"sale",p.n);
@@ -59268,6 +60176,16 @@ function skillRealPlan(){
    Innentől MINDEN kézi kiosztás ezen a kapun megy át. */
 function grantSkillDecide(skill,reason,stagesNeeded,resumeCb,stagesDone,fromName,noReal){
   const done=stagesDone||1;
+  /* ---- KIHÍVÁS-BÜNTETÉS: A CÉLZÁS ZÁRA (3.9.37) ----
+     „Laza módban 15 meccsen át, realisztikusban 30 meccsen át nem választhatod
+     ki a skillek célzottjait." Itt a helye, mert ez a rendszer EGYETLEN kapuja
+     minden kézi kiosztáshoz — a meccs utáni jutalom, a kihívás-jutalom sora és
+     a karrier első sorsolása is ezen megy át.
+     A képesség MAGA marad a hívóé (ugyanaz a merítés), csak a CÍMZETTET sorsolja
+     a gép: a skillRealAuto null célponttal a jogosultak közül húz. A büntetés
+     tehát pontosan azt veszi el, amit ígér — a döntést, nem a jutalmat. */
+  if((S.chSkillPickLock||0)>0&&!noReal){
+    skillRealAuto(skill,reason,stagesNeeded,done,null,resumeCb);return;}
   if(skillRealOn()&&!noReal){
     const plan=skillRealPlan();
     if(plan.mode==="auto"){
@@ -60786,6 +61704,156 @@ function renderFinalTable(teams){
       +(id<PYR_DIVS?`&nbsp; <b style="color:#e07a5f">■</b> osztályozó a bennmaradásért &nbsp; <b style="color:#e03131">■</b> kiesés`:"")
       +`</div>`;}
   return html;}
+/* ================= A SZEZON ÍVE — A HELYEZÉSEK ÚTJA (3.9.37) =================
+   KIMONDOTT KÉRÉS: „szezon végén legyen egy kis infografika, ami mutatja, hogy
+   az a 3 csapat, aki top 3-ban végzett, + te, ha nem vagy benne, hogyan
+   alakultatok aktuális helyezés szempontjából. Menő lenne megnézni egy nagy
+   comeback szezont, hogy 16. helyről a csapatod hogyan mászik fel top 3-ba."
+
+   AZ ADAT MÁR MEGVAN, CSAK SOSEM KÉRTÜK EL. A buildLeagueTable(upto) egy
+   TETSZŐLEGES fordulóra megadja az állást, és a saját kommentje mondja ki,
+   miért használható erre: „a SORREND KÖTÖTT… mert csak így lesz egy rövidebb
+   szezonrész a hosszabb valódi prefixe". A seedelt folyam (rngFor
+   "…:table") minden hívásnál ugyanonnan indul, tehát a 7. forduló utáni állás
+   tényleg a 30. forduló utáni VALÓDI ELŐZMÉNYE — nem egy másik valóság.
+   Harminc hívás kell hozzá, és kész a teljes ív. Új könyvelés SEHOL nem
+   keletkezik: a mentés nem hízik, a régi mentések is megszólalnak.
+
+   A VÉGPONTOT NEM A SORSOLÁS ADJA, HANEM A TÁBLA. A grafikon közvetlenül a
+   végtabella ALATT áll; ha a 30. forduló pontja akár egyszer is mást mondana,
+   mint a fölötte lévő sor, az ellentmondás volna a képernyőn. Ezért az utolsó
+   pont mindig a MEGJELENÍTETT végtabellából jön (az a hiteles: közös
+   karrierben a host számolja, és a mentésben is az él). A kettő
+   egyjátékosban betűre egyezik — ezt a tools/szezon-iv-proba.js méri —, az
+   anchor csak azt zárja ki, hogy valaha ELTÉRHESSENEK.
+
+   KÖZÖS KARRIERBEN HALLGAT, és ez nem hiányosság, hanem ugyanaz a szabály,
+   ami a bajnoki hajrá-narratívára is áll: ott a menet közbeni tabella
+   menthetetlenül hiányos (a társad eredményei csak a 15. és a 30. fordulónál
+   érkeznek meg), tehát fordulónkénti ívet nem lehet belőle rajzolni — csak
+   kitalálni. Két pontból pedig nem grafikon lesz, hanem félrevezetés. */
+function seasonRankTrail(maxRound){
+  const upto=Math.max(1,Math.min(30,maxRound|0)),out=[];
+  for(let r=1;r<=upto;r++){
+    const m={};
+    buildLeagueTable(r,{}).forEach((x,i)=>{m[x.n]=i+1;});
+    out.push(m);}
+  return out;}
+/* A NÉGY VONAL STÍLUSA. A színen KÍVÜL a vonalvastagság és a szaggatás is
+   megkülönbözteti őket — a játéknak van egyszínű témája is (ott a --gold, a
+   --blue és a --purple szinte azonos szürke), és egy csak-színnel kódolt
+   grafikon abban olvashatatlan volna. A TE vonalad mindig arany, vastag és
+   folytonos: a szem azt keresi. */
+const ARC_STYLES=[
+  {c:"var(--blue)",  w:1.5,d:""},
+  {c:"var(--purple)",w:1.5,d:"5 3"},
+  {c:"var(--grass)", w:1.5,d:"1.5 2.6"}];
+const ARC_MINE={c:"var(--gold)",w:2.6,d:""};
+/* A grafikonhoz kiválasztott csapatok: a dobogó, és TE, ha nem állsz rajta. */
+function seasonArcTeams(finalTeams){
+  const top=finalTeams.slice(0,3).map((t,i)=>({t,pos:i+1,st:ARC_STYLES[i]}));
+  const me=finalTeams.findIndex(t=>t.you);
+  if(me>=0&&me>2)top.push({t:finalTeams[me],pos:me+1,st:ARC_MINE});
+  top.forEach(x=>{if(x.t.you)x.st=ARC_MINE;});
+  return top;}
+function seasonArcHtml(finalTeams){
+  const halk=s=>`<div style="font-size:12.5px;color:var(--dim);line-height:1.55">${s}</div>`;
+  if(!Array.isArray(finalTeams)||finalTeams.length<4)return halk("A grafikonhoz teljes tabella kell.");
+  if(typeof h2hRoomActive==="function"&&h2hRoomActive())
+    return halk("Közös karrierben az ív hallgat: a menet közbeni tabella hiányos — a társad eredményei csak a 15. és a 30. fordulónál érkeznek meg —, tehát fordulóról fordulóra nem lehet helyezést mondani. A végtabella fölötte teljes értékű.");
+  const maxR=Math.min(30,S.idx||0);
+  if(maxR<6)return halk("Az ívhez legalább hat lejátszott forduló kell.");
+  let trail;
+  try{trail=seasonRankTrail(maxR);}catch(e){return halk("Az ív most nem rajzolható ki.");}
+  const sorok=seasonArcTeams(finalTeams);
+  /* Ha egy csapat neve bármelyik fordulóban hiányzik (elvileg lehetetlen: a
+     tabella mindig a teljes mezőnyt adja), inkább NEM rajzolunk, mint hogy egy
+     lyukas vonalat mutassunk. */
+  const adat=sorok.map(x=>{
+    const s=trail.map(m=>m[x.t.n]);
+    return s.some(v=>!v)?null:Object.assign({},x,{s});});
+  if(adat.some(x=>!x))return halk("Az ív most nem rajzolható ki.");
+  /* AZ UTOLSÓ PONT A TÁBLÁÉ — lásd a fenti indoklást. */
+  adat.forEach(x=>{x.s[maxR-1]=x.pos;});
+  const N=finalTeams.length;
+  const W=340,H=190,pl=20,pr=25,pT=12,pb=26;
+  const X=r=>pl+(W-pl-pr)*((r-1)/Math.max(1,maxR-1));
+  const Y=p=>pT+(H-pT-pb)*((p-1)/Math.max(1,N-1));
+  const f1=v=>v.toFixed(1);
+  /* A DOBOGÓ SÁVJA: a grafikon egyetlen "zónája". Enélkül a nézőnek a
+     helyszámokból kellene kikövetkeztetnie, hol van a tét. */
+  let svg=`<rect x="${pl}" y="${f1(Y(1)-5)}" width="${W-pl-pr}" height="${f1(Y(3)-Y(1)+10)}"`
+    +` fill="var(--gold)" opacity=".10"/>`;
+  [1,3,Math.ceil((3+N)/2),N].forEach(p=>{
+    svg+=`<line x1="${pl}" y1="${f1(Y(p))}" x2="${W-pr}" y2="${f1(Y(p))}" stroke="var(--line)" stroke-width="1"/>`
+      +`<text x="2" y="${f1(Y(p))}" font-size="9" fill="var(--dim2)" dominant-baseline="middle">${p}.</text>`;});
+  /* FÉLTÁV: a szezon felezőpontja, mert a fordulat helye ehhez képest olvasható. */
+  if(maxR>=16){
+    svg+=`<line x1="${f1(X(15))}" y1="${pT}" x2="${f1(X(15))}" y2="${f1(H-pb)}"`
+      +` stroke="var(--line)" stroke-width="1" stroke-dasharray="2 3"/>`
+      +`<text x="${f1(X(15))}" y="${H-14}" font-size="8.5" fill="var(--dim2)" text-anchor="middle">féltáv</text>`;}
+  adat.forEach(x=>{
+    const d=x.s.map((p,i)=>`${i?"L":"M"}${f1(X(i+1))} ${f1(Y(p))}`).join(" ");
+    svg+=`<path d="${d}" fill="none" stroke="${x.st.c}" stroke-width="${x.st.w}"`
+      +` stroke-linejoin="round" stroke-linecap="round"${x.st.d?` stroke-dasharray="${x.st.d}"`:""}/>`;});
+  /* A TE ÍVED HÁROM PONTJA: az indulás, a MÉLYPONT és a csúcs. Ez a három
+     mondja el a comebacket — a köztes 27 kör csak zaj volna. */
+  const en=adat.find(x=>x.t.you);
+  if(en){
+    const lo=Math.min.apply(null,en.s),hi=Math.max.apply(null,en.s);
+    const jel=(r,p,rr)=>`<circle cx="${f1(X(r))}" cy="${f1(Y(p))}" r="${rr}" fill="var(--gold)"/>`;
+    /* A csúcs/mélypont jelölése KIMARAD, ha a rajthoz vagy a célhoz tapad: két
+       egymásra csúszó korong nem jelöl semmit, csak elkeni a vonal végét. */
+    const kell=r=>r>2&&r<maxR-1;
+    svg+=jel(1,en.s[0],2.4)
+      +(kell(en.s.indexOf(hi)+1)?jel(en.s.indexOf(hi)+1,hi,3.2):"")
+      +(kell(en.s.indexOf(lo)+1)?jel(en.s.indexOf(lo)+1,lo,3.2):"")
+      +jel(maxR,en.pos,3.6);}
+  /* A VÉGSŐ HELYEZÉS a vonal végén, a saját színével — így a négy vonal
+     szétválik akkor is, ha a jelmagyarázatot nem olvassa el senki. */
+  adat.forEach(x=>{
+    svg+=`<text x="${W-pr+6}" y="${f1(Y(x.pos))}" font-size="9.5" fill="${x.st.c}"`
+      +` dominant-baseline="middle" font-weight="700">${x.pos}.</text>`;});
+  svg+=`<text x="${pl}" y="${H-14}" font-size="8.5" fill="var(--dim2)">1. forduló</text>`
+    +`<text x="${W-pr}" y="${H-14}" font-size="8.5" fill="var(--dim2)" text-anchor="end">${maxR}.</text>`;
+  /* ---- A MONDAT, AMI MIATT AZ EGÉSZ VAN ---- */
+  let fej="";
+  if(en){
+    const lo=Math.min.apply(null,en.s),hi=Math.max.apply(null,en.s);
+    /* A MÉLYPONT RITKÁN EGY FORDULÓ: egy rossz sorozat alatt hetekig ott állsz.
+       Egy kiragadott nap ezért félrevezetne — a SZAKASZ a valódi történet. */
+    const mikor=(a,b)=>a===b
+      ?`${hunAz(a)} <b>${a}. fordulóban</b>`
+      :`${hunAz(a)} <b>${a}–${b}. forduló</b> között`;
+    const hova=`${hunAz(en.pos)} <b>${en.pos}.</b> helyig`;
+    if(hi-en.pos>=3)
+      fej=`A mélypontod ${hunAz(hi)} <b>${hi}. hely</b> volt — ott álltál ${mikor(en.s.indexOf(hi)+1,en.s.lastIndexOf(hi)+1)}. `
+        +`Onnan <b style="color:var(--gold)">${hi-en.pos} helyet</b> léptél előre ${hova}.`;
+    else if(en.pos===1)
+      fej=`Végig fent: a leggyengébb helyezésed ${hunAz(hi)} <b>${hi}.</b> volt, és a szezont <b style="color:var(--gold)">bajnokként</b> zártad.`;
+    else if(en.pos-lo>=3)
+      fej=`A csúcsod ${hunAz(lo)} <b>${lo}. hely</b> volt — ott álltál ${mikor(en.s.indexOf(lo)+1,en.s.lastIndexOf(lo)+1)}. `
+        +`Onnan <b>${en.pos-lo} helyet</b> csúsztál vissza ${hova}.`;
+    else
+      fej=`Kiegyensúlyozott idény: ${hunAz(lo)} <b>${lo}.</b> és ${hunAz(hi)} <b>${hi}.</b> hely között mozogtál, a vége ${hunAz(en.pos)} <b>${en.pos}.</b>`;}
+  else fej=`A dobogó három csapatának útja fordulóról fordulóra.`;
+  /* ---- A JELMAGYARÁZAT EGYBEN A SZÁMTÁBLA ---- */
+  const gr="grid-template-columns:26px 1fr .5fr .5fr .5fr";
+  let tb=`<div class="stattbl" style="margin-top:8px"><div class="strow shead" style="${gr}">`
+    +`<span></span><span>Csapat</span><span>rajt</span><span>legj.</span><span>vége</span></div>`;
+  adat.forEach(x=>{
+    const lo=Math.min.apply(null,x.s);
+    tb+=`<div class="strow${x.t.you?" you":""}" style="${gr}">`
+      +`<span><svg viewBox="0 0 24 8" style="width:24px;height:8px" aria-hidden="true">`
+      +`<line x1="1" y1="4" x2="23" y2="4" stroke="${x.st.c}" stroke-width="${x.st.w}"`
+      +`${x.st.d?` stroke-dasharray="${x.st.d}"`:""} stroke-linecap="round"/></svg></span>`
+      +`<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(teamLabel(x.t.n))}${x.t.you?" (TE)":""}</span>`
+      +`<span>${x.s[0]}.</span><span>${lo}.</span><span>${x.pos}.</span></div>`;});
+  tb+=`</div>`;
+  return `<div style="font-size:13px;line-height:1.6">${fej}</div>`
+    +`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;margin-top:8px" role="img"`
+    +` aria-label="A dobogósok és a te csapatod helyezése fordulóról fordulóra">${svg}</svg>`
+    +tb;}
 /* ================= BAJNOKI GÓLLÖVŐLISTA (globális) =================
    AMI HIÁNYZOTT. A kupasorozatnak a kezdetektől van EGÉSZ MEZŐNYRE szóló
    egyéni statisztikája (S.euro.stats) — abból lesz az Aranycipő, az
@@ -63297,9 +64365,17 @@ function finish(){
     st+=vsec(`A csapatod felfedve · erő: ${teamStrength().toFixed(1)}`,
       `<div class="vplain">${slots.map(s=>`${s.pos} ${Math.round(playerStrength(s.player,s.pos))}  ${esc(fullName(s.player.n))}`).join("<br>")}</div>`);}
   st+=vsec("Végeredmény — bajnoki tabella",`<div id="verdictTableBody" style="margin-top:2px"></div>`);
+  /* AZ ÍV A TÁBLA UTÁN, NEM ELŐTTE. A tabella mondja meg, KI hol végzett; az ív
+     azt, HOGYAN jutott oda. Fordított sorrendben a négy vonalról még nem
+     tudnád, kihez tartozik. A rajzolás külön hívásban megy (mint a tábláé),
+     mert harminc tabella-újrajátszás — enélkül a `st` felépítése állna meg,
+     ha bármi elszáll benne. */
+  st+=vsec("A szezon íve — hogyan alakultak a helyezések",`<div id="verdictArcBody" style="margin-top:2px"></div>`);
   st+=vsec("Statisztikák a szezon végén",`<div id="verdictSeasonStatsBody" style="margin-top:2px"></div>`);
   $("verdictStats").innerHTML=st;
   $("verdictTableBody").innerHTML=renderFinalTable(finalTeams);
+  try{$("verdictArcBody").innerHTML=seasonArcHtml(finalTeams);}
+  catch(e){$("verdictArcBody").innerHTML='<div style="font-size:12.5px;color:var(--dim)">Az ív most nem rajzolható ki.</div>';}
   renderStatsTable("verdictSeasonStatsBody");
   $("shareBtn").onclick=()=>{
     const xi=slots.map((s,idx)=>`${s.pos}: ${fullName(s.player.n)}${idx===captainIdx?" (C)":""} (${Math.round(pOvr(s.player))})`).join("\n");
@@ -64578,6 +65654,7 @@ function renderCoachOffer(){
       onYes:()=>{
         if(staffFull())return;
         const c=makeCoach(fp,t.key,S.seasonNumber||1);
+        _chStaffFrom="player";
         if(!c||!hireCoach(c))return;
         dropCoachOffer(fp.n);_coachOfferPick=null;_coachOfferAll=false;
         renderCoachOffer();saveGame();
@@ -65660,6 +66737,7 @@ function renderTrainingPlanner(){
                   sec: {stat:D.sec.stat, groups:D.sec.groups.slice()},
                   setSeason:S.seasonNumber||1};
       S.trainingChangeUsed=true;   /* a következő nyár-végi ugrásnál újul meg */
+      S.chTrainFocusChanged=(S.chTrainFocusChanged||0)+1;   /* kihívás-könyvelés */
       const parts=[];
       if(D.main.stat&&D.main.groups.length)parts.push(`fő: ${trainStatName(D.main.stat)} (${D.main.groups.map(g=>TRAIN_GROUPS.find(x=>x.k===g).n).join(", ")})`);
       if(D.sec.stat&&D.sec.groups.length)parts.push(`mellék: ${trainStatName(D.sec.stat)} (${D.sec.groups.map(g=>TRAIN_GROUPS.find(x=>x.k===g).n).join(", ")})`);
@@ -65748,6 +66826,7 @@ function renderBondTrainPlanner(){
     ok.onclick=()=>{
       S.bondTrain=(D.main||D.sec)?{main:D.main||null,sec:D.sec||null}:null;
       S.bondTrainChangeUsed=true;
+      S.chTrainFocusChanged=(S.chTrainFocusChanged||0)+1;   /* kihívás-könyvelés */
       const nm=k=>{const g=bondTrainGroup(k);return g?g.n:null;};
       const parts=[];
       if(D.main)parts.push(`fő: ${nm(D.main)}`);
@@ -66916,6 +67995,9 @@ function boostConfirm(kind,p,e,price,attrKey){
       <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(price)}</b> — az egyenleged ${fmtFt(S.transferBudget||0)} → <b>${fmtFt((S.transferBudget||0)-price)}</b>.</div>`,
     onYes:()=>{
       if((S.transferBudget||0)<price)return;
+      /* Az INGYEN-ZSETON itt fogy el, a végrehajtás pillanatában (a
+         boostPriceOf ekkor már 0-t adott, tehát a budgetPay sem visz semmit). */
+      if(price===0)chFreeBoostSpend(kind);
       budgetPay(price,"boost",p.n);
       let msg="",res=null;
       if(kind==="plain"){
@@ -72626,8 +73708,12 @@ function renderHub(){
        ha nem tudod, kire nem számíthatsz. Az állapot a JÁTÉKOSHOZ tartozik,
        ezért akárhova mozgatod, vele jön. */
     const unav=S.unavailable&&S.unavailable[p.n];
+    /* A SÉRÜLÉS-JELZÉS KATTINTHATÓ, ha van gyógyítás-zsetonod (3.9.37). A jel
+       ilyenkor gombbá válik és meg is mondja magáról — egy néma, kattintható
+       címke senkinek nem jut eszébe kipróbálni. Eltiltásnál sosem. */
+    const _heal=chCanHeal(p.n);
     const unavBadge=unav
-      ?` <span style="background:${unav.reason==="injury"?"#e8892b":"var(--red)"};color:#fff;font-weight:700;font-size:9.5px;padding:1px 6px;border-radius:8px;letter-spacing:.4px;text-transform:uppercase">${unav.reason==="injury"?"⚕ sérült":"🟥 eltiltva"} · ${unav.matchesLeft}</span>`
+      ?` <span${_heal?` class="chHealBtn" data-heal="${esc(p.n)}" role="button" tabindex="0" title="Koppints: elsütöd rá a gyógyítás-jutalmadat"`:""} style="background:${unav.reason==="injury"?"#e8892b":"var(--red)"};color:#fff;font-weight:700;font-size:9.5px;padding:1px 6px;border-radius:8px;letter-spacing:.4px;text-transform:uppercase${_heal?";cursor:pointer;box-shadow:0 0 0 2px var(--gold)":""}">${unav.reason==="injury"?"⚕ sérült":"🟥 eltiltva"} · ${unav.matchesLeft}${_heal?" · ⚕️ gyógyítás!":""}</span>`
       :"";
     const unavNote=unav
       ?`<div class="trait" style="color:${unav.reason==="injury"?"#e8892b":"var(--red)"}">Nem játszhat még ${unav.matchesLeft} meccsen${
@@ -72698,6 +73784,20 @@ function renderHub(){
         (()=>{const c=bondRowChip(p.n);return c?`<div class="trait" style="margin-top:2px">${c}</div>`:"";})()
       }${unavNote}${_ycRisk}</span>
       <span class="ovr">${ovrShown}</span>`;
+    /* A GYÓGYÍTÁS-JELZÉS KOPPINTÁSA (3.9.37): megerősítést kér, és NEM nyitja
+       ki a sort — ugyanaz az elv, mint a többi jelvénynél. */
+    row.querySelectorAll("[data-heal]").forEach(el=>{
+      el.onclick=(ev)=>{
+        if(ev&&ev.stopPropagation)ev.stopPropagation();
+        const nm=el.getAttribute("data-heal");
+        if(!chCanHeal(nm))return;
+        const u=S.unavailable[nm];
+        askConfirm({title:"Meggyógyítod?",yes:"Igen, gyógyítsuk meg",no:"Mégse",
+          html:`<div style="font-size:15px;font-weight:700">⚕️ ${esc(shortName(nm))}</div>
+            <div style="font-size:13px;margin-top:8px;line-height:1.55">
+              Még <b>${u.matchesLeft} meccset</b> hagyna ki. Elhasználod rá a
+              gyógyítás-jutalmadat? <b>${S.chHealTokens}</b> áll rendelkezésre.</div>`,
+          onYes:()=>{chHealInjury(nm);try{renderHub();}catch(e){}}});};});
     /* A jelvény koppintása NEM nyitja ki a lapot — saját úticélja van. */
     row.querySelectorAll("[data-go]").forEach(el=>{
       el.onclick=(ev)=>{
@@ -75233,6 +76333,9 @@ function startNextCareerSeason(){
      elején jóváíródik (lásd hubShowSeasonReport) — itt szándékosan nincs
      pénzmozgás, különben duplán fizetnénk. */
   S.chSeasonMaxUnbeaten=0;S.chSeasonMaxCleanStreak=0;S.chSeasonComebacks=0;S.chSeasonBestHaul=0;S.chSeasonCleanSheets=0;S.chSeasonSubGoals=0;
+  S.chSeasonSubMinutes=0;S.chSeasonSubStars=0;S.chSeasonDefStars=0;S.chTacticMatches={};
+  S.chBondBoostNew=0;S.chIntegrationsDone=0;S.chStaffFromPlayer=0;S.chStaffBought=0;
+  S.chTrainFocusChanged=0;
   /* RANGADÓ-MÉRLEG és a szezon LEGJOBB ÜZLETE: szezonos mércék, tehát itt
      nullázódnak. (A stílus-feloldás számlálója NEM: az halmozó, a kihívás a
      vállalás óta eltelt növekményt nézi.) */
@@ -75256,8 +76359,15 @@ function startNextCareerSeason(){
   S.chSalesValue=0;          /* mennyi pont értékben adtál el */
   S.chRatingUpNames={};      /* mely játékosok Ratingje nőtt (poszt-számhoz) */
   S.chNewStarterMatches={};  /* új kezdő játékosok lejátszott meccsei */
-  S.chSoldOver32=0;          /* eladtál-e 32 év felettit */
-  S.chBoughtUnder25=0;       /* vettél-e 25 év alattit */
+  S.chSoldOver32=0;          /* régi mentések kedvéért marad; új kihívás nem olvassa */
+  S.chBoughtUnder25=0;
+  /* ---- A FIATALÍTÁS SÁVJA MOSTANTÓL KIHÍVÁSONKÉNT MÁS (3.9.37) ----
+     A rögzített „32 fölött el, 25 alatt be" mindig ugyanaz a feladat volt.
+     Két SZÁM helyett ezért két LISTÁT vezetünk: az idén eladott, illetve
+     igazolt játékosok ÉLETKORÁT, érkezési sorrendben. Bármelyik sávra
+     visszamenőleg megszámolható belőle a haladás, és a kihívás a vállaláskori
+     hosszakat jegyzi fel — így a vállalás ELŐTTI üzletek itt sem számítanak. */
+  S.chSoldAges=[];S.chBoughtAges=[];
   S.chPosLearnStarted=0;     /* indítottál-e poszt-tanulást */
   S.seasonEuro=null;   /* a kupa szezon-statisztikája is nullázódik */
   /* SKILL-PADLÓ: a szezonos kvóták nullázódnak, a türelem-számláló viszont
@@ -77575,7 +78685,14 @@ function openRolePanel(){
     if(typeof hubStyleSetOpen==="function")hubStyleSetOpen(true);
     if(typeof renderStylePanel==="function")renderStylePanel();
   }catch(e){}}
-function roleStyleActive(){return roleKeysForStyle().length>0;}
+function roleStyleActive(){
+  /* KIHÍVÁS-BÜNTETÉS (3.9.37): „3 meccsig nem működnek a csapatstílus
+     szerepek". EGYETLEN kapun megy, mert a szerepek MINDEN hatása (gólsúly,
+     kockázat, illeszkedés-bónusz, aura) ezen a függvényen át kérdez rá — így
+     a büntetés nem hagyhat ki egy ágat sem. A kiosztás megmarad: a szerepek
+     ott állnak a keretlistán, csak nem hatnak. */
+  if((S.chRoleFreeze||0)>0)return false;
+  return roleKeysForStyle().length>0;}
 /* A képesség szintje — stílusonként EGY képesség emeli mind a hármat. */
 function roleLevel(){
   try{return Math.max(0,Math.min(3,styleFxMax("roleLvl")||0));}catch(e){return 0;}}
@@ -84242,6 +85359,17 @@ function saveGame(){
         /* ÚJ KIHÍVÁS-SZÁMLÁLÓK és a piaci licitre ülő kihívás-hatások. */
         chStyleUnlocks:S.chStyleUnlocks,chDerbyWins:S.chDerbyWins,chDerbyLosses:S.chDerbyLosses,
         chSeasonBestSaleRatio:S.chSeasonBestSaleRatio,chBidFloor:S.chBidFloor,chBidMalus:S.chBidMalus,
+        /* ---- A 3.9.37-es JUTALOM- ÉS BÜNTETÉS-MODOSÍTÓK ----
+           Mind KARRIER-szintű: a szezonváltás NEM nullázza őket. Amelyik
+           meccsben számol, az magától fogy el; amelyik állandó, az marad.
+           A visszatöltés bulk (Object.assign(S,d.S)), ezért itt elég
+           felsorolni — minden olvasási hely ||0 / ||null védelemmel áll. */
+        chRoleFreeze:S.chRoleFreeze,chBondSlow:S.chBondSlow,chSkillPickLock:S.chSkillPickLock,
+        chTrainSecFreeze:S.chTrainSecFreeze,chDealMalus:S.chDealMalus,chDealBoost:S.chDealBoost,
+        chFreeBoost:S.chFreeBoost,chTrainBoost:S.chTrainBoost,chYouthSell:S.chYouthSell,
+        chBidFloor90:S.chBidFloor90,chTacticFitPP:S.chTacticFitPP,chHatUp:S.chHatUp,
+        chDefRating:S.chDefRating,chYellowCut:S.chYellowCut,chHealTokens:S.chHealTokens,chSpeedOpen:S.chSpeedOpen,chBuyDiscountNext:S.chBuyDiscountNext,chHealAsk:S.chHealAsk,
+
         /* ÖSSZHANG: a kötés-tár és a köre. Lapos, szám-értékű objektumok,
            tehát sorosíthatók; egy 28 fős keret 378 párja néhány KB. */
         bonds:S.bonds,bondCap:S.bondCap,bondFrac:S.bondFrac,bondNew:S.bondNew,
@@ -84307,7 +85435,7 @@ function saveGame(){
            nem volna tétje. */
         yellows:S.yellows,cupYellows:S.cupYellows,seasonYellows:S.seasonYellows,
         unbeatenStreak:S.unbeatenStreak,cleanSheetStreak:S.cleanSheetStreak,
-        chSeasonMaxUnbeaten:S.chSeasonMaxUnbeaten,chSeasonMaxCleanStreak:S.chSeasonMaxCleanStreak,chSeasonComebacks:S.chSeasonComebacks,chSeasonBestHaul:S.chSeasonBestHaul,chSeasonCleanSheets:S.chSeasonCleanSheets,chSeasonSubGoals:S.chSeasonSubGoals,
+        chSeasonMaxUnbeaten:S.chSeasonMaxUnbeaten,chSeasonMaxCleanStreak:S.chSeasonMaxCleanStreak,chSeasonComebacks:S.chSeasonComebacks,chSeasonBestHaul:S.chSeasonBestHaul,chSeasonCleanSheets:S.chSeasonCleanSheets,chSeasonSubGoals:S.chSeasonSubGoals,chSeasonSubMinutes:S.chSeasonSubMinutes,chSeasonSubStars:S.chSeasonSubStars,chSeasonDefStars:S.chSeasonDefStars,chTacticMatches:S.chTacticMatches,chSoldAges:S.chSoldAges,chBoughtAges:S.chBoughtAges,chBondBoostNew:S.chBondBoostNew,chIntegrationsDone:S.chIntegrationsDone,chStaffFromPlayer:S.chStaffFromPlayer,chStaffBought:S.chStaffBought,chTrainFocusChanged:S.chTrainFocusChanged,
         resolvedChallenges:S.resolvedChallenges,academy:S.academy,
         formationChangesThisSeason:S.formationChangesThisSeason,
         customForms:S.customForms,formsBought:S.formsBought,
@@ -84846,6 +85974,8 @@ function applySavedGame(d){
   S.ledger=(d.S.ledger&&d.S.ledger.v===LEDGER_V&&d.S.ledger.rows)?d.S.ledger:{v:LEDGER_V,rows:{}};
   S.unbeatenStreak=d.S.unbeatenStreak||0;S.cleanSheetStreak=d.S.cleanSheetStreak||0;
   S.chSeasonMaxUnbeaten=d.S.chSeasonMaxUnbeaten||0;S.chSeasonMaxCleanStreak=d.S.chSeasonMaxCleanStreak||0;S.chSeasonComebacks=d.S.chSeasonComebacks||0;S.chSeasonBestHaul=d.S.chSeasonBestHaul||0;S.chSeasonCleanSheets=d.S.chSeasonCleanSheets||0;S.chSeasonSubGoals=d.S.chSeasonSubGoals||0;
+  S.chSeasonSubMinutes=d.S.chSeasonSubMinutes||0;S.chSeasonSubStars=d.S.chSeasonSubStars||0;S.chSeasonDefStars=d.S.chSeasonDefStars||0;S.chTacticMatches=d.S.chTacticMatches||{};
+  S.chSoldAges=d.S.chSoldAges||[];S.chBoughtAges=d.S.chBoughtAges||[];
   S.resolvedChallenges=d.S.resolvedChallenges||[];
   S.academy=d.S.academy||[];
   S.formationChangesThisSeason=d.S.formationChangesThisSeason||0;
