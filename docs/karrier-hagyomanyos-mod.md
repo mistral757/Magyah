@@ -681,6 +681,123 @@ szezont. A 0,83 az a határ, ahol a fokozat még kemény, de nem zsákutca.
 | **0,83** | **73%** | **+1,18** | **1,6** |
 | 0,80 | 100% | +1,64 | 1,0 |
 
+### 5.3/b ÚJRASZABVA (3.9.38) — a modell hibája volt, nem a játék
+
+**A bejelentés.** „A jelenlegi legdurvább fejlődés legyen középen. Viszont a
+közép fölötti fejlődési nehézség után legyenek sokkal meredekebbek a felfelé
+lépkedések. Ráadásul **statikusan** kell hogy ezek megjelenjenek, nem
+igazodhat a játékos aktuális karrierjéhez, mert akkor elvész a konkrét
+nehézségi szint érzés. Legyen rá esély, hogy ha lemaradsz, akkor egy
+karriernek gyakorlatilag vége."
+
+**A statikusság kimondva.** Egy korábbi nekifutás mérő, deadbandes
+utolérés-mechanikát épített volna (a mezőny igazodik a te lemaradásodhoz).
+Ez a kérés kifejezetten **elvetette**: a fokozatnak fix, megismerhető
+szerződésnek kell lennie. Amit alább látsz, az mind konstans.
+
+#### Miért volt hibás a 3.8.32-es létra
+
+Az egész létra a `pyramid-sim.js` akkori **játékos-modelljére** épült, az
+pedig egytagú volt:
+
+```
+step = PYR_PACE × tempó × teljesítmény          (PYR_PACE = 7,0)
+```
+
+Csakhogy a `PYR_PACE` a **fejlődést** méri — azt, amit az edzés és az öregedés
+ad —, és a `pyrAiRate` a mezőny oldalán is ezzel számol. A keret-erőd viszont
+három további csatornán is nő, amiről a mezőny **semmit nem tud**, és ami a
+személyes tempótól **független**:
+
+* az **igazolás** (a vitrin-prémium a trófeákkal ugrik),
+* az **összhang** (egy évek óta együtt játszó tengely),
+* a **taktika** begyakorlása.
+
+Három lezárt karrier mérve: a legkeményebb fokozaton, **Csigatempón (×0,56)**
+a keret-erő **9,4-et** lépett idényenként. A puszta fejlődés ott
+`7,0 × 0,56 = 3,9` lett volna. A maradék **+5,5** a tempótól független rész.
+
+A javított, **kéttagú** modell:
+
+```
+step = (PACE_DEV × tempó + PACE_EXTRA) × teljesítmény × kopás
+PACE_DEV = 7,0 (tempó-érzékeny) · PACE_EXTRA = 5,5 (fix)
+```
+
+Tempó 1,0-n ez 12,5/idényt jósol, ×0,56-on 9,4-et — az utóbbi a **mért** szám.
+
+**A régi hat fokozat ezzel a modellel újramérve ÖSSZEOLVAD:**
+
+| fokozat (RÉGI érték) | élvonalba jut | első arany | nettó | vég-oszt. |
+|---|---|---|---|---|
+| 😴 Alvó 0,58/0,70 | 100% · 7,3. | 7,3. (100%) | +10,88 | 1,0 |
+| 🚶 Lassan 0,72/0,78 | 100% · 7,6. | 7,6. (100%) | +10,25 | 1,0 |
+| 🏃 Lépést tart. 0,80/0,86 | 100% · 7,6. | 7,6. (100%) | +9,69 | 1,0 |
+| 🔥 Kegyetlen 0,84/0,92 | 100% · 7,7. | 7,7. (100%) | +9,29 | 1,0 |
+| ⚔️ Könyörtelen 0,86/0,95 | 100% · 7,8. | 7,8. (100%) | +9,09 | 1,0 |
+| 💀 Végtelen menet 0,88/0,98 | 100% · 7,8. | 7,8. (100%) | +8,89 | 1,0 |
+
+Vagyis a „💀 Végtelen menet" sem volt végtelen menet — és a fenti 5.3-as
+táblázat nem a játékot írta le, hanem a modell hibáját.
+
+**Ezzel a 0,85-ös „halálspirál-korlát" is érvényét vesztette.** Ma is igaz,
+hogy egy elég nagy `share` lefelé fordítja a karriert — csak MÁS számnál, és
+mostantól **szándékosan**.
+
+#### Az új létra
+
+Az alsó két fok **változatlan** (ott a könnyű futás a cél, és az már ma is
+az). A `tarto` a **régi legkeményebb** értékeit kapja. Fölötte a lépcső nem
+finomodik, hanem meredeken nyílik.
+
+| fokozat | share / top | Δshare | élvonalba jut | első arany | nettó | vég-oszt. |
+|---|---|---|---|---|---|---|
+| 😴 Alvó mezőny | 0,58 / 0,70 | — | 100% · 7,3. | 7,3. (100%) | +10,88 | 1,0 |
+| 🚶 Lassan követnek | 0,72 / 0,78 | +0,14 | 100% · 7,6. | 7,6. (100%) | +10,25 | 1,0 |
+| 🏃 **Lépést tartanak** *(ajánlott)* | **0,88 / 0,98** | +0,16 | 100% · 7,8. | 7,8. (100%) | +8,89 | 1,0 |
+| 🔥 Kegyetlen | **1,30 / 1,55** | **+0,42** | 100% · 9,6. | 12,3. (100%) | +4,91 | 1,0 |
+| ⚔️ Könyörtelen | **1,75 / 2,10** | **+0,45** | **0%** | — **(0%)** | **−2,46** | 5,8 |
+| 💀 Végtelen menet | **2,30 / 2,70** | **+0,55** | **0%** | — **(0%)** | **−6,87** | 6,0 |
+
+Az **1-nél nagyobb share** azt jelenti, hogy a mezőny a te **fejlődésednél** is
+gyorsabban nő. A különbözetet csak a tempótól független csatornákból
+(igazolás, összhang, taktika) hozhatod be — és ha nem hozod, a karrier lefelé
+indul. Ez a kért „legyen rá esély, hogy egy karriernek gyakorlatilag vége".
+
+**Két dolgot ki kell mondani a 0%-ról.** (1) A szimulált játékos a **medián**,
+fix +5,5-ös tempófüggetlen taggal; egy valóban jól szervezett keret ennél
+többet hoz, tehát a 0% nem azt jelenti, hogy emberrel is lehetetlen — csak
+azt, hogy a hibáknak nincs bocsánata. (2) A felső két fokon a fal **az első
+idénytől** áll, nem csak a 4. idénytől: 200 futás × 3 idény mérve a feljutások
+száma 0,0. Aki az „első három idény ne ragadjon be" élményt keresi, annak a
+`tarto` (1,2 feljutás/3 idény) és a `kegyet` (0,3) való.
+
+#### A futó karriereket nem mozdítjuk
+
+Bejelentett kérés: **„a futó karrierekhez ne nyúljunk."** Egy elkezdett
+karrier a maga nehézségi szerződésével fut végig — ha a mezőny egy
+frissítéstől némán meglódulna, az nem újraszabás volna, hanem szószegés.
+
+* a régi tábla `PYR_SPEEDS_V1` néven **betűre megmarad**;
+* a `pyrStart` az induláskor `S.pyr.sv = 2` jelzőt tesz az állapotba;
+* a `pyrSpeedDef` / `pyrSpeedTable` ebből választ: `sv ≥ 2` → új létra,
+  hiányzik → régi. **Minden 3.9.38 előtt indult karrier** a régit kapja;
+* ahol nincs futó karrier (osztályválasztó, előnézet, ajánlás), ott az **új**
+  létra szól — azt a világot fogod megkapni.
+
+Ez nem elmélet: a szimulátor elsőre pont ezért mérte a régi számokat (nem
+tette bele az `sv`-t az állapotba). A `tools/pyr-fokozat-proba.js` 14 állítása
+ezt a kaput őrzi.
+
+#### Amihez NEM nyúltunk
+
+* a **Run-plafon** fokozat-súlyai (`PYR_RUN_CAP.speed`) változatlanok. A felső
+  két fok most jóval nehezebb, a plafonjuk viszont ugyanaz (0,98 / 1,00) —
+  ez felülvizsgálatra vár, de a kérésben nem szerepelt;
+* a **`PYR_REC_GAP`** (az ajánlott kezdő rés fokozatonként) változatlan;
+* a **`refTop` / `refTitle`** csak mérési adat: a Run ütem-sorai a 3.9.x óta
+  nem ebből számolnak.
+
 ### 5.4 A tempó-csatolás — ELVI HIBALEHETŐSÉG
 
 A játékos saját tempója (Alap ×1,00 … Gleccser ×0,60) **szorozza** a `P`-t.
