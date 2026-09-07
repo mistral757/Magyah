@@ -35,9 +35,9 @@ const NAPLO=[
   {s:5, div:4,to:4,rank:9, xi:82.1,sq:77.4,age:26.4,my:83.4,mean:77.0,ai:1.2,me:1.4,net:0.2},
   {s:6, div:4,to:3,rank:1, xi:85.0,sq:79.8,age:26.1,my:86.6,mean:77.0,ai:1.2,me:3.2,net:2.0},
   {s:7, div:3,to:3,rank:5, xi:87.2,sq:81.0,age:26.5,my:88.7,mean:80.0,ai:1.3,me:2.1,net:0.8},
-  {s:8, div:3,to:2,rank:2, xi:90.4,sq:83.6,age:26.8,my:92.0,mean:80.0,ai:1.3,me:3.3,net:2.0},
-  {s:9, div:2,to:2,rank:7, xi:92.8,sq:85.1,age:27.2,my:94.3,mean:83.0,ai:1.4,me:2.3,net:0.9},
-  {s:10,div:2,to:1,rank:1, xi:97.1,sq:88.0,age:27.0,my:98.9,mean:83.0,ai:1.4,me:4.6,net:3.2},
+  {s:8, div:3,to:2,rank:2, xi:90.4,sq:83.6,age:26.8,my:92.0,mean:80.0,ai:1.3,me:3.3,net:2.0,h:11.8,leap:{from:4,to:3}},
+  {s:9, div:2,to:2,rank:7, xi:92.8,sq:85.1,age:27.2,my:94.3,mean:83.0,ai:1.4,me:2.3,net:0.9,h:12.4,netM:2.1},
+  {s:10,div:2,to:1,rank:1, xi:97.1,sq:88.0,age:27.0,my:98.9,mean:83.0,ai:1.4,me:4.6,net:3.2,h:13.9,netM:4.7},
   {s:11,div:1,to:1,rank:4, xi:100.3,sq:90.2,age:27.3,my:102.1,mean:86.0,ai:1.5,me:3.2,net:1.7},
   {s:12,div:1,to:1,rank:1, xi:105.6,sq:93.4,age:27.1,my:107.4,mean:86.0,ai:1.5,me:5.3,net:3.8}];
 
@@ -86,6 +86,28 @@ const NAPLO=[
         mai_vilag_lepcsoje:PYR_STEP,
         vilag_osztalykozepei:bd.map(e=>e.mean)};})();
 
+    /* ---- 3/b. A 3.9.38 KÉT ÚJ MEZŐJE ----
+       Az osztályugrás jelölése és a rejtett bónusz oszlopa: a kettő együtt
+       teszi a naplót levezetésre alkalmassá. */
+    {const sz=szoveg();
+     out.uj_mezok={
+       ugras_mondat:/Osztályugrás a karrieredben/.test(sz),
+       /* A KIMARADÓ FOK MÉRT, nem feltételezett: a próbanaplóban a D4-et
+          VÉGIGJÁTSZOTTA (5-6. idény), tehát az ugrás ellenére sincs hiány —
+          a mondat ezt is mondja, nem hazudik kimaradt osztályt. */
+       nem_hazudik_hianyt:!/D[0-9] ezért nem szerepel/.test(sz),
+       ugras_jeloles:/🎲/.test(pyrMeterHtml()),
+       rejtett_oszlop:/rejtett/.test(sz),
+       /* a lábjegyzet MÁR NEM mondja a nyers keret-erőre, hogy meccs-erő */
+       cimke_javitva:/nőtt gyorsabban a KERET-ERŐD/.test(sz)&&!/nőtt gyorsabban a MECCS-ERŐD/.test(sz),
+       leap_nelkul_nincs_mondat:(function(){
+         const men=S.pyr.log;S.pyr.log=men.filter(x=>!x.leap);
+         const t2=szoveg();S.pyr.log=men;
+         /* A LÁBJEGYZET MINDIG tartalmazza a „🎲 = oda osztályugrással
+            kerültél" magyarázatot, ezért a kontroll a KONKRÉT jelölő-mondatra
+            megy — különben önmagán bukna el, nem a kódon. */
+         return !/Osztályugrás a karrieredben/.test(t2);})()};}
+
     /* ---- 4. A MÁSOLHATÓ SZÖVEG ---- */
     const t=pyrMeterText().split("\n");
     out.masolhato={sorok:t.length,fejlec:t[3],elso_adat:t[4],utolso_adat:t[15],
@@ -100,7 +122,7 @@ const NAPLO=[
   for(const t of ["paper","dark","noir"]){
     await p.evaluate(th=>{try{applyTheme(th);}catch(e){}},t);
     await p.waitForTimeout(300);
-    await p.screenshot({path:`/tmp/claude-0/-home-user-Magyah/ddc8dcef-432b-5dcc-960b-69c45b81a694/scratchpad/mero-${t}.png`});}
+    await p.screenshot({path:`/tmp/claude-0/-home-user-Magyah/9586ccb5-9097-5487-a2be-03724bebb2e9/scratchpad/mero-${t}.png`});}
   const tul=await p.evaluate(()=>document.documentElement.scrollWidth>430);
   console.log("vízszintes túlcsordulás:",tul);
   console.log("PAGE ERRORS:",errs.length?errs.slice(0,5):"nincs");

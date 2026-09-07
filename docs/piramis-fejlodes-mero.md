@@ -128,3 +128,84 @@ A kötés ezért a panel nyitásához költözött (`pyrMeterBind`, idempotens).
 
 *(Ugyanez a csapda a fájlban már kétszer elsült — `diffTierLabel` → `leagueLabel`,
 `heInit` → `THEMES`. Ez a harmadik.)*
+
+---
+
+## 7. A rejtett bónusz és az osztályugrás (3.9.38)
+
+Két lelet három lejátszott karrier adatából — mindkettő a mérőt tette
+használhatatlanná pont arra, amiért készült.
+
+### 7.1 A `meccs_ero` oszlop hazudott
+
+A napló `my` mezője a **`teamStrength()`**, ami *szándékosan* csak a keretet
+méri: a morált, az edzőt, a taktikát, az aurát, a kapitányt és az **összhangot**
+kihagyja. A mérő lábjegyzete és a másolható szöveg fejléce mégis
+**„meccs-erő"-nek** nevezte.
+
+Ez pont azt a mennyiséget címkézte félre, amiről a levezetés szól. Egy mért
+D1-es keretnél:
+
+| | |
+|---|---|
+| meccs-erőd | 142,4 |
+| mezőny meccs-ereje | 127,9 = osztályközép 120,0 + **0,5 × rejtett** |
+| → **rejtett bónusz** | **15,8** |
+| nyers keret-erőd | 126,6 |
+| nyers előny | +6,6 |
+| **valódi rés** | **+14,6** |
+
+A rejtett tag **15,8 pont — több mint öt osztálylépcsőnyi (5 × 3,0)**, és a
+mezőny ebből fixen csak a felét kapja vissza (`OPP_BUFF_MEASURED = 0,5`; a
+piramisban a fix tag kimarad). Ezt eddig **kézzel kellett visszafejteni** a
+képernyőn látható három számból.
+
+Mostantól a napló soronként tárolja (`h`), és a másolható szöveg három külön
+oszlopban adja: `keret_ero` · `rejtett` · `meccs_ero`. A nettó is kettévált:
+`netto_keret` (a régi, változatlan) és `netto_meccs` — **ez az, amit a
+lábjegyzet eddig ígért, de nem mért.**
+
+### 7.2 Az osztályugrás némán kihagyott egy fokot
+
+Az **osztályugrás** (`PYR_LEAP`) pénzért visz fel egy osztályt. Két mért
+karrierben ez kétszer is megtörtént, és a mérő „osztályonként" táblájából
+emiatt hiányzott a **D4** és a **D2** — miközben a tábla fölött ott áll, hogy
+*„ez a sorozat mondja meg, milyen a valódi lépcső."*
+
+Egy hiányzó fok ott **hibának látszik**, nem vásárlásnak.
+
+Mostantól:
+
+* a `pyrLeapCommit` feljegyzi az ugrást (`S.pyr.leaps`), a napló sora pedig
+  **🎲**-t kap;
+* a tábla fölött egy mondat kimondja, melyik fok maradt ki és miért.
+
+> **A kimaradó fok MÉRT, nem feltételezett.** Az ugrás a `from` osztályból visz
+> a `to`-ba, tehát a kimaradó fok a `from` — oda a feljutás már betett, csak épp
+> egy percet sem játszottál ott. **De nem mindig marad ki:** ha korábban már
+> töltöttél ott egy idényt, az osztály ott áll a táblában, és nincs mit
+> magyarázni. Az első változat vakon a `from−1`-et írta ki; a próba
+> képernyőképén azonnal látszott, hogy rossz osztályt nevez meg.
+
+### 7.3 Amit a három karrier mond a mezőnyről
+
+A `nettó` (mennyivel nőtt gyorsabban a keret-erőd, mint a mezőnyöd) két
+független karrieren betűre ugyanazt a mintát adja:
+
+| karrier | 2. idény | 3. | 4. | 5. |
+|---|---|---|---|---|
+| 1. | +3,9 | +2,1 | **+11,5** | |
+| 2. | +3,7 | +1,8 | **+11,3** | +5,7 |
+| 3. (💀 Végtelen menet) | | | | **+5,7** |
+
+A harmadik a **legkeményebb** fokozaton futott (💀 Végtelen menet,
+Csigatempó ×0,56): a mezőny 3,7-et lépett, a játékos 9,4-et. A fokozat
+szimulált mediánja `refTop: 24` — a valóságban az **5-6. idényre** ért az
+élvonalba.
+
+**Miért**: a `pyrAiRate` a `PYR_PACE`-ből (7,0, „a játékos mért üteme") számol,
+de az a szám a **fejlődést** méri. A valódi növekedés ennek a **2,4–2,7-szerese**,
+mert három csatorna adódik hozzá, amiről a mezőny semmit nem tud: az
+**igazolás** (a vitrin-prémium a trófeákkal ugrik), az **összhang** és a
+**taktika**. Ráadásul a `pyrAiRate` a **te tempódat** is beszorozza — így egy
+lassított személyes tempó a mezőnyt megfelezi, téged viszont alig fékez.
