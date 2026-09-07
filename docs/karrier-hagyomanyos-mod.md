@@ -681,6 +681,123 @@ szezont. A 0,83 az a határ, ahol a fokozat még kemény, de nem zsákutca.
 | **0,83** | **73%** | **+1,18** | **1,6** |
 | 0,80 | 100% | +1,64 | 1,0 |
 
+### 5.3/b ÚJRASZABVA (3.9.38) — a modell hibája volt, nem a játék
+
+**A bejelentés.** „A jelenlegi legdurvább fejlődés legyen középen. Viszont a
+közép fölötti fejlődési nehézség után legyenek sokkal meredekebbek a felfelé
+lépkedések. Ráadásul **statikusan** kell hogy ezek megjelenjenek, nem
+igazodhat a játékos aktuális karrierjéhez, mert akkor elvész a konkrét
+nehézségi szint érzés. Legyen rá esély, hogy ha lemaradsz, akkor egy
+karriernek gyakorlatilag vége."
+
+**A statikusság kimondva.** Egy korábbi nekifutás mérő, deadbandes
+utolérés-mechanikát épített volna (a mezőny igazodik a te lemaradásodhoz).
+Ez a kérés kifejezetten **elvetette**: a fokozatnak fix, megismerhető
+szerződésnek kell lennie. Amit alább látsz, az mind konstans.
+
+#### Miért volt hibás a 3.8.32-es létra
+
+Az egész létra a `pyramid-sim.js` akkori **játékos-modelljére** épült, az
+pedig egytagú volt:
+
+```
+step = PYR_PACE × tempó × teljesítmény          (PYR_PACE = 7,0)
+```
+
+Csakhogy a `PYR_PACE` a **fejlődést** méri — azt, amit az edzés és az öregedés
+ad —, és a `pyrAiRate` a mezőny oldalán is ezzel számol. A keret-erőd viszont
+három további csatornán is nő, amiről a mezőny **semmit nem tud**, és ami a
+személyes tempótól **független**:
+
+* az **igazolás** (a vitrin-prémium a trófeákkal ugrik),
+* az **összhang** (egy évek óta együtt játszó tengely),
+* a **taktika** begyakorlása.
+
+Három lezárt karrier mérve: a legkeményebb fokozaton, **Csigatempón (×0,56)**
+a keret-erő **9,4-et** lépett idényenként. A puszta fejlődés ott
+`7,0 × 0,56 = 3,9` lett volna. A maradék **+5,5** a tempótól független rész.
+
+A javított, **kéttagú** modell:
+
+```
+step = (PACE_DEV × tempó + PACE_EXTRA) × teljesítmény × kopás
+PACE_DEV = 7,0 (tempó-érzékeny) · PACE_EXTRA = 5,5 (fix)
+```
+
+Tempó 1,0-n ez 12,5/idényt jósol, ×0,56-on 9,4-et — az utóbbi a **mért** szám.
+
+**A régi hat fokozat ezzel a modellel újramérve ÖSSZEOLVAD:**
+
+| fokozat (RÉGI érték) | élvonalba jut | első arany | nettó | vég-oszt. |
+|---|---|---|---|---|
+| 😴 Alvó 0,58/0,70 | 100% · 7,3. | 7,3. (100%) | +10,88 | 1,0 |
+| 🚶 Lassan 0,72/0,78 | 100% · 7,6. | 7,6. (100%) | +10,25 | 1,0 |
+| 🏃 Lépést tart. 0,80/0,86 | 100% · 7,6. | 7,6. (100%) | +9,69 | 1,0 |
+| 🔥 Kegyetlen 0,84/0,92 | 100% · 7,7. | 7,7. (100%) | +9,29 | 1,0 |
+| ⚔️ Könyörtelen 0,86/0,95 | 100% · 7,8. | 7,8. (100%) | +9,09 | 1,0 |
+| 💀 Végtelen menet 0,88/0,98 | 100% · 7,8. | 7,8. (100%) | +8,89 | 1,0 |
+
+Vagyis a „💀 Végtelen menet" sem volt végtelen menet — és a fenti 5.3-as
+táblázat nem a játékot írta le, hanem a modell hibáját.
+
+**Ezzel a 0,85-ös „halálspirál-korlát" is érvényét vesztette.** Ma is igaz,
+hogy egy elég nagy `share` lefelé fordítja a karriert — csak MÁS számnál, és
+mostantól **szándékosan**.
+
+#### Az új létra
+
+Az alsó két fok **változatlan** (ott a könnyű futás a cél, és az már ma is
+az). A `tarto` a **régi legkeményebb** értékeit kapja. Fölötte a lépcső nem
+finomodik, hanem meredeken nyílik.
+
+| fokozat | share / top | Δshare | élvonalba jut | első arany | nettó | vég-oszt. |
+|---|---|---|---|---|---|---|
+| 😴 Alvó mezőny | 0,58 / 0,70 | — | 100% · 7,3. | 7,3. (100%) | +10,88 | 1,0 |
+| 🚶 Lassan követnek | 0,72 / 0,78 | +0,14 | 100% · 7,6. | 7,6. (100%) | +10,25 | 1,0 |
+| 🏃 **Lépést tartanak** *(ajánlott)* | **0,88 / 0,98** | +0,16 | 100% · 7,8. | 7,8. (100%) | +8,89 | 1,0 |
+| 🔥 Kegyetlen | **1,30 / 1,55** | **+0,42** | 100% · 9,6. | 12,3. (100%) | +4,91 | 1,0 |
+| ⚔️ Könyörtelen | **1,75 / 2,10** | **+0,45** | **0%** | — **(0%)** | **−2,46** | 5,8 |
+| 💀 Végtelen menet | **2,30 / 2,70** | **+0,55** | **0%** | — **(0%)** | **−6,87** | 6,0 |
+
+Az **1-nél nagyobb share** azt jelenti, hogy a mezőny a te **fejlődésednél** is
+gyorsabban nő. A különbözetet csak a tempótól független csatornákból
+(igazolás, összhang, taktika) hozhatod be — és ha nem hozod, a karrier lefelé
+indul. Ez a kért „legyen rá esély, hogy egy karriernek gyakorlatilag vége".
+
+**Két dolgot ki kell mondani a 0%-ról.** (1) A szimulált játékos a **medián**,
+fix +5,5-ös tempófüggetlen taggal; egy valóban jól szervezett keret ennél
+többet hoz, tehát a 0% nem azt jelenti, hogy emberrel is lehetetlen — csak
+azt, hogy a hibáknak nincs bocsánata. (2) A felső két fokon a fal **az első
+idénytől** áll, nem csak a 4. idénytől: 200 futás × 3 idény mérve a feljutások
+száma 0,0. Aki az „első három idény ne ragadjon be" élményt keresi, annak a
+`tarto` (1,2 feljutás/3 idény) és a `kegyet` (0,3) való.
+
+#### A futó karriereket nem mozdítjuk
+
+Bejelentett kérés: **„a futó karrierekhez ne nyúljunk."** Egy elkezdett
+karrier a maga nehézségi szerződésével fut végig — ha a mezőny egy
+frissítéstől némán meglódulna, az nem újraszabás volna, hanem szószegés.
+
+* a régi tábla `PYR_SPEEDS_V1` néven **betűre megmarad**;
+* a `pyrStart` az induláskor `S.pyr.sv = 2` jelzőt tesz az állapotba;
+* a `pyrSpeedDef` / `pyrSpeedTable` ebből választ: `sv ≥ 2` → új létra,
+  hiányzik → régi. **Minden 3.9.38 előtt indult karrier** a régit kapja;
+* ahol nincs futó karrier (osztályválasztó, előnézet, ajánlás), ott az **új**
+  létra szól — azt a világot fogod megkapni.
+
+Ez nem elmélet: a szimulátor elsőre pont ezért mérte a régi számokat (nem
+tette bele az `sv`-t az állapotba). A `tools/pyr-fokozat-proba.js` 14 állítása
+ezt a kaput őrzi.
+
+#### Amihez NEM nyúltunk
+
+* a **Run-plafon** fokozat-súlyai (`PYR_RUN_CAP.speed`) változatlanok. A felső
+  két fok most jóval nehezebb, a plafonjuk viszont ugyanaz (0,98 / 1,00) —
+  ez felülvizsgálatra vár, de a kérésben nem szerepelt;
+* a **`PYR_REC_GAP`** (az ajánlott kezdő rés fokozatonként) változatlan;
+* a **`refTop` / `refTitle`** csak mérési adat: a Run ütem-sorai a 3.9.x óta
+  nem ebből számolnak.
+
 ### 5.4 A tempó-csatolás — ELVI HIBALEHETŐSÉG
 
 A játékos saját tempója (Alap ×1,00 … Gleccser ×0,60) **szorozza** a `P`-t.
@@ -2033,3 +2150,171 @@ négy sor, amit a rollover is futtat.
    ellenfél-tempó a 3,0-as lépcsőhöz van kalibrálva; ha a `PYR_STEP`
    változik, a `tools/pyramid-sim.js speeds step=…` futtatásával a fokozatokat
    újra kell lőni. A kettőt sosem szabad külön hangolni.
+
+---
+
+## 13. A PIRAMIS FÖLFELÉ IS NŐ — D0, D−1, D−2 … (3.9.39)
+
+**A kérés.** „Hagyományos módban d1 győzelem után nyíljon ki a d0 és d-1, d-2
+stb. a végtelenbe, mint dinamikusan az Infinity."
+
+**Ami eddig volt.** A D1 megnyerése után a hegynek vége. A mezőny ugyan tovább
+erősödött (a fokozat üteme sosem áll meg), de a **cél** elfogyott: a karrier
+hátralévő része ugyanannak a címnek az ismétlése lett. A dinamikus mód
+Infinityje ugyanezt a problémát a másik oldalon oldja meg — ott a **szint** nő
+korlátlanul.
+
+### 13.1 A szabály
+
+A **legfelső osztály bajnoki címe** új osztályt nyit fölötte. Nem valamennyi
+idő múlva, nem pénzért: a cím a kulcs.
+
+```
+szezonzárás → [ha a legfelső osztályt MEGNYERTED: új osztály nyílik] → rollover
+```
+
+A nyitás a rollover **előtt** történik, és pontosan ezért: a fölötte nyíló
+osztályba a **szokásos úton**, a rollover feljutásával kerülsz. Nincs külön
+léptetés, és a lecserélt csapat is a megszokott módon jön le hozzád — egy
+művelet, egy szabály. (A próba ezt külön méri: `from: 1 → to: 0, kind: "up"`.)
+
+### 13.2 Az azonosítók nem csúsznak el
+
+Ez a feature legfontosabb tervezési döntése. Az új osztály a `divs` tömb
+**elejére** kerül, tehát az indexek eggyel csúsznak — az **azonosítók** viszont
+nem: a D1 marad D1, a D6 marad D6, az új osztály a D0, utána a D−1, D−2.
+
+```js
+idx = (id − 1) + above          id = (idx + 1) − above
+```
+
+`above` = hány osztály nyílt eddig az élvonal fölött (`S.pyr.above`). Régi
+mentésben nincs → 0, tehát ott **betűre** a régi viselkedés marad.
+
+**Miért így.** Ha az azonosítók csúsznának, a fejlődés-mérő naplója, a kezdő
+osztályod (`startDiv`), az osztályugrások jegyzéke és a Run-plafon
+osztály-súlyai mind visszamenőleg mást jelentenének. Egy „D4-ből indultam"
+mondat nem változhat meg attól, hogy tíz idénnyel később megnyertem az
+élvonalat.
+
+**A nulla igaz érték.** A régi `pyrMyDivId()` így nézett ki:
+
+```js
+return (S.pyr && S.pyr.my) || PYR_DIVS;      // ← a D0 hamis!
+```
+
+A szuperligák megnyitásával ez azonnal valós hibává vált: a D0-ba feljutó
+játékost a **legalsó** osztályba tette. A próba fogta meg (a feljutás után
+„most: 6" jött vissza D0 helyett). Mostantól kifejezett szám-ellenőrzés dönt.
+Ugyanez a csapda volt a `pyrLeapLabel(id)`-ben (`id||1`), az is javítva.
+
+### 13.3 Az új osztály mezőnye
+
+Egy teljes lépcsővel (`PYR_STEP` = 3,0) a mostani élvonal fölött, 16 csapattal.
+A klubok a világ **legerősebbjei**, de szándékosan **egy másik évjáratukkal**:
+a kontinens csúcsán az adatbázis nagy csapatainak egy másik, ugyanolyan rangos
+szezonja áll. Így az entitás-azonosító (`Klub (szezon)`) is különbözik a
+piramisban már szereplőtől, tehát semmi nem ütközik.
+
+Ha egy klubnak nincs szabad másik évjárata, a következő klub jön — a sorrend a
+nyers erő szerint megy. Ha végképp nincs elég szabad évjárat (a piramis nagyon
+mélyre nőtt), a már szereplő évjáratokat is elfogadjuk: **két osztály közti**
+névazonosság csak kiírásbeli furcsaság, **egy osztályon belül** viszont sosem
+engedjük meg — a tabella és a sorsolás azt olvassa.
+
+Nevek: D0 = *Ojrópai Szuperliga*, D−1 = *Világliga*, onnantól *Világliga 2, 3…*
+— a lista sosem fogyhat el, mert a piramis sem.
+
+### 13.4 Az ütem NEM extrapolál
+
+A `pyrAiRate` a `t = (PYR_DIVS − div) / (PYR_DIVS − 1)` aránnyal interpolál a
+fokozat `share` és `top` értéke közt. A szuperligákban a `div` nulla vagy
+negatív, tehát `t > 1` lenne — ezt **levágjuk** 1-re.
+
+**Miért.** A nehézséget odafent a **szint** adja (osztályonként +3,0), nem az
+ütem. Egy korlátlanul extrapolált share néhány osztály múlva értelmetlen
+számokat adna: a 3.9.38-as `vegtelen` fokozat 2,30/2,70-es értékeivel a D−5
+már `t = 2` mellett 3,1-es share-t jelentene — a mezőny háromszor gyorsabban
+nőne, mint a fejlődésed, és a piramis magától becsukná magát.
+
+### 13.5 Ami NEM változott
+
+* a **pénzért vett osztályugrás** (`PYR_LEAP`) továbbra is csak D1-ig visz: a
+  `pyrLeapTarget` a `to < 1` ágon kilép, és a `PYR_LEAP_PRICE` sem ismer D0-t.
+  A szuperligába csak bajnoki címmel lehet feljutni — ezt nem lehet megvenni;
+* a **kiesés** szabálya ugyanaz mindenütt (a 16. hely közvetlenül, a 14–15.
+  osztályozón) — a szuperligából is ki lehet esni;
+* a **Run-plafon** osztály-súlyai a `startDiv`-hez tartoznak, az pedig mindig
+  1..6 — nincs mit igazítani.
+
+### 13.6 Próba — `tools/pyr-szuperliga-proba.js`
+
+20 állítás valódi böngészőben: a kapu (csak a legfelső osztály megnyerése
+nyit), az azonosítók sértetlensége, az új osztály szintje és a **meglévő
+lépcső érintetlensége**, a mezőny épsége (16 csapat, osztályon belül egyedi
+nevek), a végtelen sorozat (D0 → D−1 → D−2), az azonosító↔index térkép, az
+ütem levágása, a feljutás a szokásos úton, a világ létszáma, és a régi
+mentések változatlansága. Plusz a 13.7 BL-padlója.
+
+### 13.7 A BL padlója: D1 + 2
+
+**A kérés.** „Hagyományos mód BL szintje legyen mindig d1 +2, d1-től kezdve
+pedig számított (hogy mindig legyen izgalmas)."
+
+A ligapiramis a **nemzet** versenyrendszere; a BL a fölötte lévő szint. Amíg
+nem értél fel az élvonalba, a BL mezőnye ne a te osztályodhoz igazodjon, hanem
+az ország legjobbjai fölé: `pyrTopLevel() + 2` (`PYR_BL_OVER_TOP`). Kevesebb,
+mint egy teljes osztálylépcső — a BL nem egy újabb osztály, hanem a nemzeti
+élvonal fölötti kontinentális szint.
+
+**Miért padló, és nem rögzített érték.** Ha kimondottan `D1+2`-t adnánk vissza,
+egy D3-ban ülő, de már 120-as kerettel bíró klub a saját élvonalánál alig
+erősebb BL-mezőnyt kapna — ingyen trófeát. A padló ezt zárja ki: a számított
+érték **bármikor átveheti**, ha az a nagyobb. És ez adja meg a kérés második
+felét is, magától: az élvonalba érve a te erődből számolt szint már fölötte
+jár, tehát onnantól végig a számított érték szól.
+
+Mérve (a próbából): 85-ös élvonal mellett egy 65-ös kerettel a BL **87** (a
+padló szól), egy 125-ös kerettel **120** (a számított vette át).
+
+**Csak a BL kap padlót.** A többi sorozat rangsorát az `EURO_EDGE` adja; ha
+mind a négy kupa padlót kapna, a hazai kupa is a BL szintjén nyílna.
+
+### 13.8 Egy csapda az `euroMidRating` körül — ami NEM hiba
+
+Fejlesztés közben úgy tűnt, hogy a BL mezőnye **gyengébb**, mint az EL-é:
+`euroMidRating("BL")` = 105, `euroMidRating("EL")` = 106. Ez félrevezetés, és
+érdemes egyszer s mindenkorra leírni, mert könnyű bedőlni neki.
+
+**A visszatérési érték nem a pályára lépő mezőny.** Az `euroMidRating` az
+`oppDelta` **nélküli** középértéket adja:
+
+```
+euroMidRating(c) = horgony + rejtett/2 − edge(c) − oppDelta(c)
+```
+
+A mezőny építése (`euroFieldFor`) pedig **visszateszi**:
+
+```
+target = euroMidRating(c) + oppDelta(c) = horgony + rejtett/2 − edge(c)
+```
+
+A két tag **kiejti egymást**. A pályára lépő mezőnyt tehát kizárólag az `edge`
+határozza meg, és annak a rangsora helyes: a BL kapja a legkisebb fölényt
+(`EURO_EDGE.add = 0`), tehát a **legerősebb** mezőnyt. Mérve, 125-ös kerettel:
+
+| sorozat | a mezőny a PÁLYÁN |
+|---|---|
+| 🔵 BL | **121** |
+| 🟢 EL | 120 |
+| 🟡 KL | 119 |
+| 🔴 MK | 118 |
+
+A rangsor tehát végig helyes volt — csak a nyers visszatérési értéken látszik
+fordítva. A kód mostantól három helyen mondja ki (a számítás, a visszatérés és
+a hívó mellett), és a próba a **végső** számot méri, nem a nyerset.
+
+**Amit viszont tényleg javítani kellett:** a 13.7-es BL-padló az `oppDelta`
+nélküli értékre került, tehát a pályán `D1+3`-at adott volna a kért `D1+2`
+helyett. A padló azóta levonja a `d`-t. Mérve: 86-os élvonal mellett a BL
+mezőnye a pályán pontosan **88**.

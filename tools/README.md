@@ -174,8 +174,23 @@ A `live` parancs ugyanígy a valódi kódot futtatja (generátor + fejlődés +
 fel-/kiesés), és egy fokozat átlőhető a játék szerkesztése nélkül:
 
 ```bash
-node tools/pyramid-sim.js live tier=kegyet share=0.84 top=0.92
+node tools/pyramid-sim.js live tier=kegyet share=1.30 top=1.55
 ```
+
+**A JÁTÉKOS-MODELL JAVÍTVA (3.9.38).** A `live` korábban egytagú modellt
+futtatott (`PYR_PACE × tempó`), csakhogy a `PYR_PACE` a FEJLŐDÉST méri, a
+keret-erőd viszont az igazolásból, az összhangból és a taktikából is nő — és
+az a rész a személyes tempótól FÜGGETLEN. A modell ezért kéttagú:
+
+```bash
+node tools/pyramid-sim.js live pace=7.0 extra=5.5     # az alapértelmezés
+```
+
+Az `extra` egyetlen mért karrierből jön (Csigatempó ×0,56 mellett 9,4/idény
+keret-erő-növekedés → 9,4 − 7,0×0,56 = 5,5), ezért felülírható, és a belőle
+számolt refTop/refTitle értékek tájékoztató átlagok. A régi, egytagú modell a
+legkeményebb fokozatra `refTop: 24`-et jósolt; a valóságban az 5-6. idényre
+megvolt az élvonal. Levezetés: `docs/karrier-hagyomanyos-mod.md` 5.3/b.
 
 **Nem a játék része** — tervezési mérőeszköz a `docs/karrier-hagyomanyos-mod.md`
 szerinti, együtt fejlődő ligapiramishoz. A bajnoki szimuláció a motor SAJÁT
@@ -228,6 +243,52 @@ illetve a szerep-fagy, összhang-lassítás, elidegenedés, skill-zár, edzés-f
 tárgyalás-rontás, stílus-képesség és a távozó stábtag). Egy jutalom, ami nem
 csinál semmit, rosszabb, mint ha nem létezne. Részletek:
 `docs/kihivasok-3937.md`.
+
+## pyr-szuperliga-proba.js — a piramis fölfelé is nő (D0, D−1, D−2 …)
+
+```bash
+node tools/pyr-szuperliga-proba.js
+```
+
+A 3.9.39-es **szuperligákat** méri: a legfelső osztály megnyerése új osztályt
+nyit fölötte, a végtelenbe. A legfontosabb állítás az AZONOSÍTÓK sértetlensége
+— a D1 marad D1, csak az indexek csúsznak (`idx = id − 1 + above`) —, mert
+ezen áll a naplód, a fejlődés-mérőd és a kezdő osztályod visszamenőleges
+érvényessége. Emellett: a kapu, az új osztály szintje és a meglévő lépcső
+érintetlensége, a mezőny épsége, a feljutás a szokásos úton, az ütem levágása
+a szuperligákban, a régi mentések változatlansága, és a **BL padlója**
+(D1 + 2, amíg nem vagy az élvonalban). Ez a próba fogott meg egy valódi hibát:
+a `pyrMyDivId()` `||`-os alapértelmezése a D0-t hamisnak látta, és a feljutó
+játékost a legalsó osztályba tette. Részletek:
+`docs/karrier-hagyomanyos-mod.md` 13.
+
+## pyr-fokozat-proba.js — az ellenfél-tempó létrája és a futó karrierek védelme
+
+```bash
+node tools/pyr-fokozat-proba.js
+```
+
+A 3.9.38-as **újraszabott fokozat-létrát** méri (az alsó két fok változatlan, a
+`tarto` a régi legkeményebb 0,88/0,98, fölötte 1,30 → 1,75 → 2,30), és — ami
+fontosabb — a **verziókaput**: egy `sv` jelző nélküli mentés (minden 3.9.38
+előtt indult karrier) betűre a RÉGI ütemet kapja, egy `sv:2`-es az újat. Ez nem
+elmélet: a `pyramid-sim.js` elsőre pont ezért mérte a régi számokat. Részletek:
+`docs/karrier-hagyomanyos-mod.md` 5.3/b.
+
+## pyr-hangolas-proba.js — a hangolás (a beragadás mentőöve)
+
+```bash
+node tools/pyr-hangolas-proba.js
+```
+
+A 3.9.38-as **hangolást** méri: a kaput (csak beragadás után, csak ha lefelé
+visz), a mércét (a meccs-erő és a keret-erő számtani közepe — két futás, morál
+20 és 95, hogy lássuk: a rejtett bónusz KIESIK), a hatást (mind a hat osztály
+együtt mozdul, a lépcső nem csúszik szét, a kereted érintetlen) és az árat
+(szorzós: 90 → 81 → 72,9). Fontos fixtúra-részlet: a kezdő 11-et be kell tenni
+a `drafted`-be, különben a piac-eltolás a saját keretedet is átskálázza — a
+valódi játékban minden leigazolt játékos bekerül. Részletek:
+`docs/rajt-nehezseg.md` 6. fejezet.
 
 ## firebase-rules.json — az adatbázis szabályai
 

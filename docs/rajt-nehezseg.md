@@ -150,3 +150,144 @@ a felhasználó ne csendben kapjon más nehézséget, mint amit lát.
 * a **dinamikus mód** auto szintkövetése érintetlen;
 * a **Run-plafon képlete** (`pyrGapFactor`, `pyrRunCap`) változatlan — csak a
   bemenete lett igaz.
+
+---
+
+## 6. A hangolás — ugyanaz a vállalás, egy idénnyel később (3.9.38)
+
+**A kérés.** „Minden szezon végén lehessen −10%-nyi Run szintért (tehát ha
+éppen 90-en voltál, akkor leesel 81-re) hangolást kérni a következő szezonra
+abban az esetben, ha nem jutottál feljebb az előző szezonban (azaz ha
+beragadnál épp). A hangolás olyan szintre hozza az ellenfelet, mint amilyen a
+kezdő beállítások szerint volt, tehát ha te úgy állítottad, hogy +2 legyél a
+mezőnyhöz, akkor olyanra hozza (a meccs erőd és a csapaterőd számtani
+közepéhez képest)."
+
+Ez pontosan a 4. fejezet művelete, csak nem a kezdőrúgáskor, hanem egy
+beragadt idény után — és nem ingyen.
+
+### 6.1 A kapu: mikor jár egyáltalán
+
+Négy feltétel, mind kötelező (`pyrRetuneOfferable`):
+
+| feltétel | miért |
+|---|---|
+| piramis mód, nem auto szezon | az auto szezonban nincs döntési pont |
+| van már lezárt idény | a napló utolsó sora nélkül nincs mihez mérni |
+| **NEM jutottál feljebb** (`pyrWentUpLast`) | ez a beragadás mentőöve, nem általános könnyítés |
+| a korrekció **lefelé** visz, legalább 0,5-tel | ha a rés amúgy is a vállalás fölött áll, a „hangolás" fölfelé tolna — az önsorsrontás volna, és a beragadásnak nem a mezőny az oka |
+
+A negyedik feltétel a fontos: a hangolás **soha nem nehezít**. Ha jobb vagy,
+mint amit vállaltál, és mégis beragadtál, akkor a probléma nem a mezőnyszint —
+az ajánlat meg sem jelenik.
+
+### 6.2 A mérce: miért a számtani közép a helyes szám
+
+A mezőny a rejtett meccs-bónuszodból (morál, edző, taktika, aura, összhang)
+**fixen a felét** kapja vissza — `OPP_BUFF_MEASURED = 0,5`. Tehát:
+
+```
+a te oldalad   meccs-erő = keret + h        keret-erő = keret
+a mezőny       valódi ereje = szint + h/2
+```
+
+A két saját szám **számtani közepe** `keret + h/2`, és a különbség így
+pontosan `keret − szint`: **a rejtett tag kiesik.** Ezért nem múlik a hangolás
+a napi formán — pont ez volt a kérés magja.
+
+Ez a szám nem új: a játék rés-mércéje, a `levelGap`, **már ez**.
+
+```
+levelGap = (keret + h) − szint − max(0,h)·OPP_BUFF_MEASURED
+```
+
+Pozitív `h`-nál ez betűre `(keret + h/2) − szint`. A `pyrRetuneMine()` tehát
+nem talál ki új aritmetikát, hanem a `levelGap` saját oldalát emeli ki.
+
+**Egy tag, amit az első nekifutás elvétett.** A `max(0, h)`: rossz morálnál
+(`h < 0`) a mezőny **semmit** nem kap vissza, tehát ott nincs mit kiejteni, és
+a helyes mérce a tiszta meccs-erő. Aki a közepet vinné oda is, az fél `h`-val
+alálőné a korrekciót. A próba ezt külön méri, két morállal (20 és 95).
+
+**Egy szándékos eltérés a `levelGap`-tól:** a mezőny oldalán a `d.mean` áll,
+nem a `pyrLevel()`. A kettő ugyanaz a mennyiség, csak a `pyrLevel` **egészre
+kerekít** — a hangolás pedig a világot folytonosan tolja, tehát a kerekített
+mércével a korrekció félmagasan állna meg, és ezen egy iteráló hurok sem
+segítene (a hiba a mércében van, nem a lépésben). A `d.mean` ugyanannak a
+tizedjegyig vitt alakja, ezért itt **egyetlen lépés** pontosan visszaállítja a
+vállalt rést — szemben a 4. fejezet iterációjával.
+
+### 6.3 A cél: a VÁLLALÁS, nem a `gap0`
+
+```js
+gapWant  →  gapWantMp  →  gap0
+```
+
+Az első a nehézségválasztón vállalt rés (`pyrConfirmDiv` teszi el), a második
+a közös karrier szobabeállítása, a harmadik a régi mentések tartaléka. A
+`gap0` szándékosan az **utolsó** hely: az a *mért* kezdő rés, ami a
+kezdőrúgáskor épp kijött — a hangolás viszont ahhoz visz vissza, amit
+**választottál**.
+
+### 6.4 A hatás
+
+A világ **egésze** mozdul, mind a hat osztály együtt (`pyrShiftWorld`), plusz a
+`spare` csapatok, amik a fel-/kiesés cseréjét adják — enélkül a lépcső
+szétcsúszna, és a csere egy másik skáláról hozna vissza csapatot. Utána
+ugyanaz a lánc fut, mint a horgony után: mezőnyszint, fejlődési ütem,
+ellenféltábla, piac. **A kereted érintetlen** — a pool-átvezetés kihagyja a
+draftoltakat.
+
+**Amihez szándékosan nem nyúl: a `careerBaseRating`.** A piramisban a piac
+eltolása (`marketPeakShift`) az `oppTargetRating − careerBaseRating`
+különbségből él, vagyis a bázis a **karrier** indulószintje. Ha a hangolás
+utánaállítaná, a piac egyetlen nyáron visszaesne a karrier eleji árakra. A
+`pyrStart` és a horgony azért állítja, mert ott még nincs mit elveszíteni.
+
+### 6.5 Az ár: szorzós, nem kivonás
+
+```js
+PYR_RETUNE_RUN_CUT = 0.10
+pyrRetuneMult() = 0.9 ^ (hangolások száma)      →  90 → 81 → 72,9 → 65,6 …
+```
+
+Minden hangolás a **maradék** tizedét viszi, tehát a második-harmadik mentőöv
+is fáj, de sosem visz nullára: a futás értéke csökken, nem semmisül meg.
+
+**Nem a Run-plafon része, hanem a teljesítményé.** A plafon tisztán a
+vállalásaidból jön (hol kezdtél, milyen tempón, mekkora réssel) — az a futás
+**előtt** eldől. A hangolás menet közben hozott döntés, tehát a kész
+pontszámot szorozza:
+
+```js
+total = perf × cap × pyrRetuneMult()
+```
+
+A Run-panel külön sorban mondja ki (`🎚️ Hangolás (2×) … ×0,81`), és a
+szorzat-sorban is ott a tényező — a „miért ennyi a Run-om" kérdésre a
+képernyőn kell hogy legyen válasz.
+
+### 6.6 Hol jön a nyári sorban
+
+```
+szezonzárás → fel-/kiesés → (fordulat-felfedés) → HANGOLÁS → all-in osztályugrás → kihívások
+```
+
+A hangolás **az osztályugrás előtt** van: a kettő ellentétes irányú döntés
+(lefelé hangolni vagy pénzért felfelé ugrani), és a „nem jutottam feljebb"
+helyzetben az első kérdés a mentőöv. Utána jönnek a kihívások, tehát a
+vállalásaid már a hangolt szinthez kalibrálódnak.
+
+### 6.7 A próba — `tools/pyr-hangolas-proba.js`
+
+14 állítás, valódi böngészőben. Amit külön érdemes kiemelni:
+
+* **a vállalt rés áll vissza (+2), nem a tárolt `gap0` (−4)** — a fixtúra a
+  kettőt szándékosan különbözőre állítja;
+* **a rejtett bónusz kiesik**: két futás, morál 20 és 95 (`h = −1,5` és
+  `h = +2,3`), a hangolás utáni valódi rés mindkettőnél a vállalt +2 (a
+  `pyrLevel` egészre kerekít, ezért fél Rating a megengedett szórás);
+* **a kereted érintetlen** — és ez fogott meg egy fixtúra-hibát: az első
+  változat nem tette be a kezdő 11-et a `drafted`-be, így a piac-eltolás a
+  saját keretedet is átskálázta. A valódi játékban minden leigazolt játékos
+  bekerül; a próbának ezt utánoznia kell.

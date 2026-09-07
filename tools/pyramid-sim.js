@@ -29,12 +29,18 @@
      node tools/pyramid-sim.js league           — a fel-/kiesés élete sok szezonon át
      node tools/pyramid-sim.js live             — A TELJES MÓD: fejlődő világ, karrier-ív
    Opciók (bárhol, kulcs=érték alakban):
-     runs=200 seasons=20 start=6 pace=7.0 step=3.0 teams=16 up=2 down=2
+     runs=200 seasons=20 start=6 pace=7.0 extra=5.5 step=3.0 teams=16 up=2 down=2
+     (a `pace` a tempó-érzékeny fejlődés, az `extra` a tempótól független rész:
+      igazolás + összhang + taktika — lásd a 8. fejezet fejlécét)
 ============================================================================ */
 "use strict";
 
 /* ---- A MOTOR SAJÁT KONSTANSAI (index.html: const SIM=...) ---- */
 const SIM={K:0.09,BASE:1.3,HOME:1.2,AWAY:-0.4,OPPSPREAD:3.5};
+/* A JÁTÉKOS TEMPÓTÓL FÜGGETLEN NÖVEKEDÉSE (3.9.38). Igazolás + összhang +
+   taktika: a mezőny egyikről sem tud. Három lezárt karrierből mérve, a
+   levezetést lásd a 8. fejezet fejlécénél. Felülírható: `extra=…`. */
+const PACE_EXTRA=5.5;
 const lam=d=>Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)));
 function poisson(l){let L=Math.exp(-l),k=0,p=1;do{k++;p*=Math.random();}while(p>L);return k-1;}
 /* durva normális: három egyenletes összege, ugyanaz a minta, amit a
@@ -316,7 +322,7 @@ function loadPyrBlock(wcOn){
   const env={SQUADS,squadAvgOvr,activeSquads,SIM,S,
     tempoMult:()=>(ARG.tempo!=null?ARG.tempo:1)};
   const names=Object.keys(env);
-  const body=src.slice(a,b)+"\nreturn {pyrBuildWorld,pyrDumpWorld,pyrSimDivision,pyrDevelopWorld,pyrAiRate,PYR_SPEEDS,PYR_PACE,PYR_DIVS,PYR_TEAMS,PYR_STEP,PYR_SPREAD,PYR_TOPMEAN,PYR_UP,PYR_DOWN,pyrDraftPick,pyrSquadOf,PYR_DRAFT_Q,PYR_DRAFT_PREMIUM,__S:S};";
+  const body=src.slice(a,b)+"\nreturn {pyrBuildWorld,pyrDumpWorld,pyrSimDivision,pyrDevelopWorld,pyrAiRate,PYR_SPEEDS,PYR_SPEEDS_V1,PYR_SPEED_V,PYR_PACE,PYR_DIVS,PYR_TEAMS,PYR_STEP,PYR_SPREAD,PYR_TOPMEAN,PYR_UP,PYR_DOWN,pyrDraftPick,pyrSquadOf,PYR_DRAFT_Q,PYR_DRAFT_PREMIUM,__S:S};";
   return new Function(...names,body)(...names.map(k=>env[k]));
 }
 /* Ugyanaz a determinisztikus, seedelhető folyam, amit a játék rngFor()-ja ad:
@@ -496,18 +502,50 @@ function reportLeague(){
    függvényeit, a valós klubokkal, valódi fel-/kieséssel.
 
    A játékost továbbra is modellezzük (a teljes karriermotort nem futtathatjuk
-   node-ból): PYR_PACE ütemmel nő, a teljesítménye ±25%-ban módosítja, és a
-   `decay` kopással. Ez a modell a hét lezárt karrierből mért ütemre van
-   illesztve (docs 5.2).
+   node-ból): a teljesítménye ±25%-ban módosítja, és a `decay` kopással.
+
+   ---- A JÁTÉKOS-MODELL JAVÍTVA (3.9.38) ----
+   A régi modell EGYETLEN tagból állt: `pace × tempó × teljesítmény`, ahol a
+   `pace` a PYR_PACE (7,0). Ez a szám a FEJLŐDÉST méri — azt, amit az edzés és
+   az öregedés ad —, és a `pyrAiRate` is ezzel számol a mezőny oldalán.
+
+   A VALÓSÁG MÁS, és három lezárt karrier mérése kimondja: a keret-erőd
+   NEM csak a fejlődésből nő. Három csatorna adódik hozzá, amiről a mezőny
+   semmit nem tud, és ami a SZEMÉLYES TEMPÓTÓL FÜGGETLEN:
+     · az IGAZOLÁS (a vitrin-prémium a trófeákkal ugrik),
+     · az ÖSSZHANG (egy évek óta együtt játszó tengely),
+     · a TAKTIKA begyakorlása.
+   A mérés: a harmadik karrier CSIGATEMPÓN (×0,56) futott, és a keret-erő
+   ennek ellenére 9,4-et lépett idényenként. A puszta fejlődés ott
+   7,0 × 0,56 = 3,9 lett volna — a maradék 5,5 a tempótól független rész.
+
+   A MODELL EZÉRT KÉTTAGÚ:
+       step = (PACE_DEV × tempó + PACE_EXTRA) × teljesítmény × kopás
+   `PACE_DEV` = a PYR_PACE (7,0, tempó-érzékeny), `PACE_EXTRA` = 5,5 (fix).
+   Tempó 1,0-n ez 12,5/idényt jósol, ×0,56-on 9,4-et — az utóbbi a MÉRT szám.
+
+   MIÉRT SZÁMÍT. A régi, egytagú modell a legkeményebb fokozatra `refTop: 24`
+   mediánt adott; a valóságban az 5-6. idényre megvolt az élvonal. A hiba
+   iránya nem véletlen: a mezőnyt a SAJÁT tempód is szorozza (`pyrAiRate`),
+   tehát egy lassított tempó a mezőnyt megfelezte, téged viszont alig fékezett
+   — pontosan azt a szakadékot, amit a modell nem látott.
+
+   EGY KALIBRÁCIÓS PONT, KIMONDVA. A `PACE_EXTRA` egyetlen mért karrierből
+   jön, és ott is a tempó-független részt FELTÉTELEZZÜK állandónak. Ezért
+   parancssorból felülírható (`extra=5.5`), és a belőle számolt refTop/refTitle
+   értékek TÁJÉKOZTATÓ mediánok, nem ígéretek.
 ============================================================================ */
 function reportLive(){
   const P0=loadPyrBlock(!!ARG.wc);
   const seasons=ARG.seasons||25, runs=ARG.runs||120;
   const start=ARG.start||6, decay=ARG.decay!=null?ARG.decay:1.0;
   const pace=ARG.pace!=null?ARG.pace:P0.PYR_PACE;
+  const extra=ARG.extra!=null?ARG.extra:PACE_EXTRA;
+  const tp=(ARG.tempo!=null?ARG.tempo:1);
   console.log(`\n=== A TELJES MÓD — ${runs} karrier × ${seasons} szezon ===`);
-  console.log(`indulás: D${start} · játékos-ütem ${pace.toFixed(1)}/szezon`
-    +(decay!==1?` (kopás ${decay})`:"")+(ARG.tempo!=null?` · tempó ×${ARG.tempo}`:"")
+  console.log(`indulás: D${start} · játékos-ütem ${(pace*tp+extra).toFixed(1)}/szezon `
+    +`(fejlődés ${pace.toFixed(1)}×${tp} + tempófüggetlen ${extra.toFixed(1)})`
+    +(decay!==1?` · kopás ${decay}`:"")
     +` · az index.html saját generátorával és fejlődésével\n`);
   console.log(String("fokozat").padStart(22)+" | élvon | mikor | bajnok| mikor |feljut|kiesés| vég- | nettó | mezőny");
   console.log(String("").padStart(22)+" | elér% | (szez)|  lett%| (szez)| db   | db   | oszt.| mászás| a végén");
@@ -521,7 +559,11 @@ function reportLive(){
     if(ARG.share!=null)P0.PYR_SPEEDS[tierKey].share=ARG.share;
     if(ARG.top!=null)P0.PYR_SPEEDS[tierKey].top=ARG.top;}
   Object.keys(P0.PYR_SPEEDS).filter(k=>!tierKey||k===tierKey).forEach(key=>{
-    P0.__S.pyr={aiSpeed:key};        /* a fokozat a valódi kódúton át hat */
+    /* A FOKOZAT A VALÓDI KÓDÚTON ÁT HAT. Az `sv` KÖTELEZŐ (3.9.38): a
+       pyrSpeedDef enélkül a RÉGI (V1) létrát adná vissza — pontosan úgy, ahogy
+       egy futó karriernek kell —, és a szimuláció némán a régi számokat mérné.
+       Elsőre pont ez történt: a hat sor betűre a régi eredményt adta. */
+    P0.__S.pyr={aiSpeed:key,sv:P0.PYR_SPEED_V};
     let top=0,topSum=0,title=0,titleSum=0,pro=0,rel=0,endD=0,netSum=0,netN=0,endMean=0;
     for(let k=0;k<runs;k++){
       const r=seededRnd("live:"+key+":"+k);
@@ -548,7 +590,9 @@ function reportLive(){
         const steps=P0.pyrDevelopWorld(order,r);
         /* a te fejlődésed: alapütem × teljesítmény × kopás */
         const perf=1.25-0.5*((rank-1)/15);
-        const step=pace*(ARG.tempo!=null?ARG.tempo:1)*perf*Math.pow(decay,s-1);
+        /* KÉTTAGÚ: a tempó-érzékeny fejlődés + a tempótól FÜGGETLEN rész
+           (igazolás, összhang, taktika). Lásd a fejezet fejlécét. */
+        const step=(pace*(ARG.tempo!=null?ARG.tempo:1)+extra)*perf*Math.pow(decay,s-1);
         my+=step;
         if(lastMy!=null){netSum+=step-steps[div-1];netN++;}
         lastMy=my;
@@ -581,8 +625,10 @@ function reportLive(){
       +" |"+f((endD/runs).toFixed(1),5)
       +" |"+f(netN?(netSum/netN).toFixed(2):"—",6)
       +" |"+f((endMean/runs).toFixed(0),7));});
-  console.log("\nCÉL: a 'Lépést tartanak' fokozat ~10-14 szezon alatt vigyen az élvonalba,");
-  console.log("legalább egy kieséssel útközben; a nettó mászás 0,8 és 3,5 közt legyen.\n");
+  console.log("\nCÉL (3.9.38-tól): a 'Lépést tartanak' a RÉGI legkeményebb fokozat — ott a");
+  console.log("felfutás gyors, a szint fölött viszont MEREDEKEN nyílik a lépcső. A felső két");
+  console.log("fokozat SZÁNDÉKOSAN lehet zsákutca (negatív nettó): a bejelentett kérés az volt,");
+  console.log("hogy 'legyen rá esély, hogy ha lemaradsz, akkor egy karriernek gyakorlatilag vége'.\n");
 }
 
 function reportMain(){
