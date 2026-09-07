@@ -497,7 +497,19 @@ Ez a javítás legfontosabb szabálya. Az `EURO_COMPS` **kulcsa** továbbra is
 A **prózában** viszont a kért generikus szó áll: „a kupa gólkirálya", „a kupa
 Aranycipője", „kupagyőzelem" — ott nincs mihez képest megkülönböztetni.
 
-### 10.3 Mi cserélődött
+### 10.3 Mi cserélődött (a 3.9.45 az EL-t és a KL-t is bevonta)
+
+| sorozat | teljes név (változatlan) | kulcs (változatlan) | rövidítés |
+|---|---|---|---|
+| 🔵 | Kupák Kupájának Kupája | `BL` | `KK` |
+| 🟢 | Ojrópai Klubcsapatok Bajnoki Kupája | `EL` | `OJK` |
+| 🟡 | Konföranszié Líg | `KL` | `KONF` |
+| 🔴 | Magor Kupája | `MK` | `MK` *(a játék saját neve — marad)* |
+
+A prózában mindhárom a **teljes nevén** vagy „kupa"-ként szerepel (a Run-bontás
+súlyai, a presztízspont-lista, a díjpont-lista, a pénzdíj-szorzók). A Run
+mérföldköveinél a rövidítés áll: `Első OJK-győzelem`, `KONF-gólkirály`.
+
 
 | hol | előtte | utána |
 |---|---|---|
@@ -528,3 +540,77 @@ tulajdonság-hivatkozás is.
 
 Így egy jövőbeli új szöveg is azonnal elbukik a próbán, ha visszacsempészné a
 rövidítést.
+
+
+---
+
+## 11. Három PvP-hiba a várakozó képernyőn (3.9.45)
+
+**A bejelentés.**
+
+> 1. „Amikor lejátszott egymás elleni meccs után bajnoki közepén tabellát
+>    várunk, kivárom a 3 percet, megnyomom a megyek továbbot, de nem megy
+>    tovább, újraindul a 3 perc számláló."
+> 2. „A megyek tovább sárga duplajobbnyilas jelölő már 3 perc előtt megjelenik
+>    itt is és máshol is (kb 10 mp után)."
+> 3. „Amikor az egymás elleni meccsre várunk, ott is megjelenik a tovább …
+>    működik a gomb, és nem kell kivárni a 3 percet, és már le is fut az egymás
+>    elleni meccs a másik játékos értesítése vagy megvárása, a 3p türelmi idő
+>    nélkül."
+
+A 2. és a 3. **ugyanaz az egy sor**; az 1. külön hiba, de ugyanabban a
+gépezetben.
+
+### 11.1 A kiút-gomb egy FIX 25 másodpercet nézett
+
+```js
+/* mpSoloOffer */
+if(Date.now()-o.at<MP_SOLO_MS)return;      // MP_SOLO_MS = 25000
+```
+
+A választott tempótól **függetlenül**. Vagyis aki Tempós vagy Villám fokozatot
+állított be, annál a türelmi idő nem három perc volt, hanem huszonöt
+másodperc — a fokozat ígéretének pont az ellenkezője.
+
+A **párharcnál** ez a legsúlyosabb: ott a gomb a társ **előző keretével**
+azonnal lejátszotta a mérkőzést, mielőtt az értesítés egyáltalán kiment volna.
+
+**Mostantól:** ha van tempó-határidő, a gomb **annak** a lejártakor jelenik meg
+— ugyanabból a `mpDeadlineLeft` számításból, amit a képernyőn futó számláló is
+mutat, tehát a kettő nem tud szétcsúszni. Ha nincs (Kényelmes mód), marad a
+régi 25 másodperc: ott ez az **egyetlen** kiút, azt nem szabad elvenni.
+
+A **kilépés** (kezdőlap, „Mégsem") végig elérhető marad — a türelmi idő a
+társad **helyett** hozott döntést késlelteti, nem a te kilépésedet.
+
+### 11.2 A tabella-kiút nem tette meg, amit ígért
+
+A felirata azt mondta: *„a sajátommal megyek tovább"*. A függvény viszont
+**soha nem számolta ki és nem tette el** a helyi tabellát — csak elrejtette a
+képernyőt és hívta az `onDone`-t.
+
+Következmény: a `mpTableNow()` továbbra sem ismerte ezt a fordulót, a folyamat
+következő lépése **újra kérte** a tabellát, a guest-ág újra beállt várni, az
+`mpSoloArm` pedig — mivel a `lep()` közben törölte a kiutat — **friss
+arm-idővel** indult újra. Innen a „nem megy tovább, újraindul a számláló".
+
+**Mostantól** a kiút pontosan azt teszi, amit a felirata mond:
+
+```js
+const sajat=buildFinalTable({half:round<30});
+mpTableStore(round,sajat);
+```
+
+— ugyanaz a két sor, amit a host-ág is futtat. Onnantól a `mpTableSync` korai
+kilépője (`cur.upto>=round`) azonnal továbbenged, és a képernyő nem tud
+visszajönni.
+
+### 11.3 Ami szándékosan maradt
+
+Kényelmes módban a párharc kiútja továbbra is 25 másodperc után jelenik meg.
+Ott nincs vállalt határidő, tehát nincs mihez igazítani — és elvenni sem
+szabad, mert az az egyetlen kiút. Aki türelmi időt akar a párharcra, annak a
+Tempós vagy a Villám fokozat való.
+
+**Próba:** `tools/mp-tempo-jelenlet-proba.js` — 26 állítás, köztük a gomb
+megjelenése kilenc idő/tempó kombinációra (helyi és szerveridős ágon is).

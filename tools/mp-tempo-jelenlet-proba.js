@@ -131,7 +131,47 @@ const srv=http.createServer((req,rp)=>{
     out.cim_nem_kupaparharc=h2hWaitTitle(31);
     S.euro=null;S.mpCup=null;MP.active=false;
 
-    /* ---- 6. A SZABÁLYFÁJL ---- */
+    /* ---- 6. A KIÚT-GOMB IDŐZÍTÉSE (3.9.45) ----
+       A „megyek tovább" gomb eddig FIX 25 mp után jelent meg, a választott
+       tempótól függetlenül — a párharcnál ez a társ előző keretével azonnal
+       lejátszotta a mérkőzést. Mostantól tempó-módban a HATÁRIDŐ dönt. */
+    const gomb=document.getElementById("h2hWaitOrphanBtn");
+    const lathato=()=>gomb&&!gomb.classList.contains("hide");
+    const felkinal=(tempo,korSec,shared)=>{
+      gomb.classList.add("hide");
+      _mpPresRoom={code:"ABCD",tempo,
+        players:{[EN]:{role:"host",ready:true,online:true},
+                 [TARS]:{role:"guest",ready:false,online:false}}};
+      _mpSoloOut={label:"proba",fn:()=>{},gate:"proba",
+                  at:Date.now()-korSec*1000,auto:true,
+                  shared:shared?mpNow()-korSec*1000:null};
+      mpSoloOffer(false);
+      return lathato();};
+    out.gomb={
+      /* Villám (180 mp): 30 mp és 170 mp után MÉG NEM, 190 mp után IGEN */
+      villam30:felkinal("villam",30),
+      villam170:felkinal("villam",170),
+      villam190:felkinal("villam",190),
+      /* Tempós: ugyanaz a határidő, csak nem lép magától */
+      tempos30:felkinal("tempos",30),
+      tempos190:felkinal("tempos",190),
+      /* Kényelmes: nincs határidő → marad a régi 25 mp-es padló */
+      nyugodt10:felkinal("nyugodt",10),
+      nyugodt30:felkinal("nyugodt",30),
+      /* szerveridős (párharc) ág is ugyanígy */
+      villam30sh:felkinal("villam",30,true),
+      villam190sh:felkinal("villam",190,true)};
+    _mpSoloOut=null;gomb.classList.add("hide");
+    out.gomb_a_hataridore=(out.gomb.villam30===false&&out.gomb.villam170===false
+      &&out.gomb.villam190===true&&out.gomb.tempos30===false&&out.gomb.tempos190===true);
+    out.gomb_nyugodtban_regi=(out.gomb.nyugodt10===false&&out.gomb.nyugodt30===true);
+    out.gomb_szerveridovel_is=(out.gomb.villam30sh===false&&out.gomb.villam190sh===true);
+
+    /* ---- 7. A TABELLA-KIÚT TÉNYLEG TÁROL (3.9.45) ---- */
+    out.tabla_kiut_tarol=/const sajat=buildFinalTable\(\{half:round<30\}\)/.test(mpTableSync.toString())
+      &&/mpTableStore\(round,sajat\)/.test(mpTableSync.toString());
+
+    /* ---- 8. A SZABÁLYFÁJL ---- */
     out.mark_forras=/waitAt:on\?mpStamp\(\):0/.test(mpWaitMark.toString());
     return out;});
 
@@ -162,12 +202,18 @@ const srv=http.createServer((req,rp)=>{
     ["a visszavágó meg is van jelölve",r.cim_vissza==="KUPA · NEGYEDDÖNTŐ · VISSZAVÁGÓ"],
     ["a döntő is a saját nevén szerepel",r.cim_donto==="KUPA · DÖNTŐ"],
     ["ha nem kupa-párharc, marad a fordulószám",r.cim_nem_kupaparharc==="31. FORDULÓ"],
+    ["a kiút-gomb a tempó HATÁRIDEJÉRE jelenik meg, nem 25 mp-re",r.gomb_a_hataridore===true],
+    ["…szerveridős (párharc) ágon is",r.gomb_szerveridovel_is===true],
+    ["Kényelmes módban marad a régi 25 mp-es padló",r.gomb_nyugodtban_regi===true],
+    ["a tabella-kiút el is TESZI a helyi tabellát (nem indul újra a várakozás)",
+      r.tabla_kiut_tarol===true],
     ["a szabályfájl engedi a waitAt / online / push / seenAt mezőket",szabalyOk===true],
     ["nincs oldalhiba",errs.length===0]];
   T.forEach(([n,ok])=>console.log((ok?"  ✓ ":"  ✗ ")+n));
   console.log("\n  számláló (online / offline / kényelmes):",
     r.szamlalo_online,"/",r.szamlalo_offline,"/",r.szamlalo_nyugodt);
   console.log("  a társ hátralévő ideje:",r.tars_var);
+  console.log("  kiút-gomb:",JSON.stringify(r.gomb));
   console.log("  fejlécek:",JSON.stringify([r.cim_bajnoki,r.cim_oda,r.cim_vissza,r.cim_donto,r.cim_nem_kupaparharc]));
   if(errs.length)console.log("\noldalhiba:",errs.slice(0,3));
   const bukott=T.filter(x=>!x[1]).length;
