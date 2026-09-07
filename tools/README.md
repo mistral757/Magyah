@@ -244,6 +244,55 @@ tárgyalás-rontás, stílus-képesség és a távozó stábtag). Egy jutalom, a
 csinál semmit, rosszabb, mint ha nem létezne. Részletek:
 `docs/kihivasok-3937.md`.
 
+## kupa-nev-proba.js — a sorozat rövidítése nem mehet ki a képernyőre
+
+```bash
+node tools/kupa-nev-proba.js
+```
+
+A 3.9.44-es cserét őrzi: az `EURO_COMPS` **kulcsa** marad `BL` (arra hivatkozik
+a mentés, a kvalifikációs tábla, a kupa-kihívás, a Run-mérföldkövek és a
+díj-skillek azonosítói), a **kiírás** viszont `KK`, a prózában pedig „kupa".
+A lényegi állítás a FORRÁST fésüli át: egyetlen sztring-literálban sem maradhat
+önálló `BL` — a kommentek, a puszta kulcs, a CSS-osztálynév és a
+`${…BL}` tulajdonság-hivatkozás kivételével. Így egy jövőbeli új szöveg is
+azonnal elbukik, ha visszacsempészné a rövidítést. Részletek:
+`docs/ertesitesek.md` 10.
+
+## mp-tempo-jelenlet-proba.js — a PvP tempó, a jelenlét és a bökés
+
+```bash
+node tools/mp-tempo-jelenlet-proba.js
+```
+
+A 3.9.41-es javításokat méri: a 3 perces ablak számlálója ONLINE társ mellett
+is fut (korábban ilyenkor a fokozat teljesen inert volt), az automatika viszont
+csak offline társnál sül el; a tempó-mező írása külön újrapróbát kap és a hibát
+kimondja; a jelenlét-bejelentkezés szívveréssé vált (korábban szobánként
+egyszer futott, az onDisconnect viszont minden szakadásnál offline-ra írt); a
+bökés-gomb a „nem tudjuk" állapotban is megjelenik; és a túloldali `waitAt`
+jelzésből a társ órája visszaszámol. A szabályfájlt is ellenőrzi.
+
+Emellett a beváró képernyő FEJLÉCÉT is (3.9.42): kupa-párharcban a sorozat és a
+kör nevét kell kiírnia (`KUPA · NEGYEDDÖNTŐ · VISSZAVÁGÓ` — sorozat-rövidítés nélkül), nem a bajnoki
+fordulószámot — a bajnokság ilyenkor már lezárult, tehát ott „31. FORDULÓ" állt,
+egy nem létező forduló. Részletek: `docs/ertesitesek.md` 7-9.
+
+## mp-kozos-beallitas-proba.js — a közös karrier beállítói
+
+```bash
+node tools/mp-kozos-beallitas-proba.js
+```
+
+A 3.9.40-es javításokat méri a KÖZÖS karrier beállító képernyőjén: a kezdő
+csapaterő csúszkája draftnál eltűnik (nincs klublista, amit szűrne), a mérce
+ilyenkor az osztály nyers közepe + a draft-prémium, a vendég zárlistája teljes
+(a régi lista a 3.5.19-ben MEGSZŰNT `#pyrBandMin`/`#pyrBandMax`-ot nevezte meg,
+a valódi csúszka nyitva maradt), az ikon-sűrűség a negyedik világ-tengely lett
+(utazik, rögzül, régi szobát nem ír felül), és a draft-ág közös karrierben nem
+nyitja meg az egyjátékos osztályválasztót. Részletek:
+`docs/kozos-vilag-tengelyei.md` — „A negyedik tengely és a lyukas zár".
+
 ## pyr-szuperliga-proba.js — a piramis fölfelé is nő (D0, D−1, D−2 …)
 
 ```bash

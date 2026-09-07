@@ -200,3 +200,98 @@ Semmit. A következő **szezonindításnál** a zár magától létrejön, és a
 megmondja, mi volt az eltérés. Ha a rögzítés előtt szeretnétek ellenőrizni,
 hogy fennáll-e a baj: mindketten nyissátok meg a 🧪 diagnosztikát a kezdőlapon,
 és hasonlítsátok össze **A VILÁG TENGELYEI** blokkot.
+
+---
+
+# A NEGYEDIK TENGELY ÉS A LYUKAS ZÁR (3.9.40)
+
+## A bejelentés
+
+> „Több gond is van a közös hagyományos mód, draft móddal.
+> 1. Itt nincs értelme a kezdő csapaterő beállítónak, azt vegyük ki.
+> 2. A guest ne állíthassa a … dolgokat, azokat is csak megtekinthesse: ikonok
+> gyakorisága, melyik divízióban akar indulni, milyen nehézségi szinttel stb.
+> Mindent a host beállításai örököltessenek a guestnek."
+
+## 1. A kezdő csapaterő draftnál semmit nem csinált
+
+A csúszka **egyetlen** dolgot csinál: kijelöli, milyen erős klubokat kínál a
+lista, amiből mindketten választotok (`renderPyrBand` → `clubPickEligible`).
+**Draftból indulva nincs klublista** — a keretedet a pörgetésekből építed. A
+csúszka tehát egy nem létező listát szűrt, és a mellé írt mondat („4
+klub-szezon esik bele") egyszerűen nem volt igaz.
+
+**Mostantól:** a blokk draftnál eltűnik, és a maradék két döntés átveszi a ①
+és ② sorszámot — egy „②-vel kezdődő" képernyő önmagában is hibának látszana.
+
+**Ami viszont kellett belőle.** A világ eltolása (a rajt nehézsége) egy
+**mércéhez** képest számol, és a mérce eddig a sáv közepe volt. Draftnál ezt
+nem lehet kézzel megadni, mert a keret még nem létezik — de nem is kell
+találgatni:
+
+```
+mérce (draft) = a választott osztály NYERS közepe + PYR_DRAFT_PREMIUM (3)
+```
+
+A `PYR_DRAFT_PREMIUM` pontosan azt a **mért** különbséget mondja meg, amennyivel
+egy draftolt keret az osztálya nyers közepe fölé kerül — és a `pyrStart`
+MP-ága is ezzel számol (`draftStartMp`). A mérce tehát ugyanaz a szám, amivel a
+világ épül, és **determinisztikus**: mindkét kliens ugyanazt kapja, mert csak a
+közös osztályból származik. A kezdőrúgás (`pyrAnchorMpAtKickoff`) ezt amúgy is
+beváltja a valódi keretekhez — ez tervezési előnézet, nem végleges szám.
+
+## 2. A zár létezett, csak lyukas volt
+
+A vendég átnézője (`mpGuestReviewShow`) mindig is zárolta a képernyőt — de a
+zárlista (`MP_GUEST_LOCK_SEL`) elavult és hiányos volt. Három csoport hiányzott:
+
+| ami kimaradt | miért baj |
+|---|---|
+| `#pyrBandMid` | a lista még a **3.5.19-ben megszűnt** `#pyrBandMin` / `#pyrBandMax`-ot nevezte meg — a valódi, egyetlen csúszka nyitva maradt |
+| `#pyrMpGap` + a három gombja, `#pyrMpDetailBtn` | a rajt nehézsége **sosem** került a listára |
+| `#iconGrid` | az ikon-sűrűség „globális beállításként" indult, ezért a szoba-csomagból is kimaradt |
+
+Ráadásul a `mpGuestReviewSync` is a megszűnt elemekre írt, tehát a vendég
+képernyőjén a csapaterő-csúszka **nem** a házigazda értékén állt — és mivel
+zárolva sem volt, a saját, véletlen állását vitte tovább.
+
+Egy zárt képernyőn egyetlen nyitva felejtett vezérlő elég ahhoz, hogy a két
+világ szétcsússzon. A lista mostantól a közös karrier **teljes**
+vezérlőkészletét felsorolja, a próba pedig egyenként végigméri őket.
+
+## 3. Az ikon-sűrűség a negyedik világ-tengely
+
+Az ingyen legendák gyakorisága a keretépítés egyik legerősebb csatornája — ha
+a két menedzsernél más, a párharcnak nincs tétje. Pontosan ugyanaz a hiba, amit
+a skill-módnál már javítottunk.
+
+A minta a meglévő három tengelyé (tempó, sorsolás, VB-válogatottak):
+
+* `mpCollectSettings` viszi (`icons`),
+* `mpApplySettings` **egy indulásra** veszi át (`_pendingMpWorld`) — a vendég
+  saját, tárolt preferenciáját nem írjuk felül,
+* `lockMpWorldSettings` rögzíti (`mpWorldIcons`), és a mentés is viszi,
+* az olvasó `iconRateNow()` a rögzített értéket adja, ha van; különben a
+  sajátot. Régi szobában (nincs `icons` mező) a saját marad — a zár nem írhat
+  felül olyat, amiről a házigazda nem nyilatkozott.
+
+## 4. A draft-ág megkerülte a közös osztályt
+
+A legsúlyosabb a három közül. A draft után **mindkét** menedzser megkapta a
+teljes egyjátékos osztályválasztót (`scPyrDiv`): kiválaszthatta, melyik ligában
+kezd és milyen nehéz legyen a rajt. Közös karrierben viszont mindkettő a szoba
+beállítása — **egy tabellán osztoztok**, tehát az osztály közös, és a világ
+eltolása is közös. Két külön választás két külön világot adott volna.
+
+A **kész klubos ág ezt már jól csinálta** (a klublista kattintója:
+`if(pyrPending&&pyrPendingDiv){…pyrConfirmDiv();}`) — a draft-ág egyszerűen
+kimaradt belőle. Mostantól ugyanaz a szabály mindkét úton: ha a szoba
+megmondta az osztályt, nincs mit választani, indulunk.
+
+## Próba — `tools/mp-kozos-beallitas-proba.js`
+
+16 állítás valódi böngészőben: a sáv láthatósága és a sorszámozás mindkét
+kezdésmódnál, a draft-mérce képlete és determinizmusa, a zárlista teljessége
+(elemenként, beleértve azt is, hogy megszűnt elemeket ne nevezzen meg), az
+ikon-tengely mind a négy állapota (csomag · rögzítés · régi szoba · egyjátékos),
+az átnéző szinkronja az élő vezérlőkre, és a draft-ág MP-kapuja.

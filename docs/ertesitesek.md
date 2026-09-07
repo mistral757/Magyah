@@ -271,3 +271,260 @@ nyilvánvaló, hogy várnak rá.
    beállítva".
 4. **A társ engedélyezte?** A gomb megmondja, ha nem.
 5. **iPhone?** Lásd az 5. pontot.
+
+---
+
+## 7. Miért nem működött SEMMI a PvP tempóból (3.9.41)
+
+**A bejelentés.**
+
+> „PvP villám és gyorsított módban ahol élnének a 3 perces tempógyorsítók, ott
+> jelenleg nem történik semmi. Az értesítések jelenleg nem működnek. Nem lehet
+> megbökni a társat, hiába van bekapcsolva mindkét oldalon. Plusz van ez a
+> »társad jelenléte nem ismert (régi szoba)« felirat úgy, hogy ez egy friss
+> test-szoba, mindkét oldal online."
+
+Négy tünet, **öt** különálló ok. Egyik sem volt „elméleti" — mind a négy tünet
+egy-egy konkrét sort takart.
+
+### 7.1 A számláló elnémult, ha a társ ONLINE volt
+
+```js
+function mpDeadlineLeft(startAt,kozos){
+  …
+  if(mpMateOnline(_mpPresRoom)===true)return null;   // ← „ott van, nem sürgetjük"
+```
+
+Jó szándék, rossz következmény. A **tipikus** eset épp az, hogy mindketten a
+képernyő előtt ültök — és akkor a Tempós/Villám fokozat **teljesen inert**
+volt: nem indult óra, nem jelent meg szám, nem lépett semmi. Aki választotta,
+egy nem működő funkciót kapott.
+
+**Mostantól** a jelenlét nem a *számlálót* némítja el, hanem az *automatikus*
+lépést finomítja (`mpAutoMehet`): a szám **mindig** kimegy, és ha a társ
+tényleg ott dolgozik, a továbblépés gomb marad, nem automatika. Egy néma
+határidő rosszabb, mint a semmi.
+
+### 7.2 A tempó némán elveszett a szoba létrehozásakor
+
+```js
+try{await F.set(ref,rec);}
+catch(e){
+  const alap={}; …ki a `tempo` mezőt…    // ← és soha nem szóltunk róla
+  await F.set(ref,alap);}
+```
+
+Ha a Firebase-ben még a **régi szabályfájl** fut, az nem engedi a `tempo`
+mezőt, tehát a szoba **Kényelmes** módban jött létre (`ms: 0`) — a 3 perces
+ablak sosem indult el, és semmi nem árulta el, hogy nem is fog.
+
+**Mostantól** külön újrapróbáljuk a `tempo` visszaírását, a hibát megjegyezzük
+(`mpNet.tempoErr`), és a beváró képernyő **kiírja**, hogy ez a szoba határidő
+nélkül fut, és mi a teendő.
+
+### 7.3 A jelenlét-bejelentkezés egyszer futott le, aztán soha
+
+`mpPresenceArm` a szoba **létrehozásakor** és a **csatlakozáskor** futott, és
+korán kilépett, ha ugyanarra a szobára már állt (`_mpPresence.code===code`).
+Csakhogy az `online:true` **nem örök**: az `onDisconnect` megbízás a szerveren
+ül, és minden szakadásnál `online:false`-ra írja. Szakadás pedig folyton van —
+a fül háttérbe megy, a telefon alszik, a wifi vált, a lap újratöltődik. És a
+játék maga bíztat a kilépésre („Vissza a kezdőlapra — a szoba megmarad").
+
+Innentől a társad **offline-nak vagy sehogy** látott — és mivel a `push`
+feliratkozás is ugyanebben a függvényben megy ki, a **bökés is elnémult**.
+Ez a magyarázata a „friss test-szoba, mindkét oldal online, mégis nem ismert"
+esetnek.
+
+**Mostantól** a függvénynek két része van, más ütemezéssel:
+
+| rész | mikor |
+|---|---|
+| a megbízás (`onDisconnect`) | szobánként **egyszer** — drága, és nem avul el |
+| a bejelentkezés (`online` + `seenAt`) | **szívverés**, 25 mp-enként, amíg a beváró képernyő nyitva van |
+| a `push` feliratkozás | 3 percenként, illetve új szobánál azonnal |
+
+Plusz: a beváró képernyő **megnyitása** azonnali bejelentkezést kér.
+
+### 7.4 A bökés-gomb csak a BIZTOSAN offline társnál jelent meg
+
+```js
+if(mpMateOnline(_mpPresRoom)!==false||!pushBeallitva()){w.classList.add("hide");return;}
+```
+
+A jelenlét **három** állapotú (`true` / `false` / `null` = nem tudjuk), a kapu
+viszont csak az egyiket engedte. A „nem tudjuk" állapotban — épp amit a 7.3
+okozott — a gomb **néma** maradt. A felhasználó ebből azt látta, hogy „nem
+lehet megbökni a társat, hiába van bekapcsolva mindkét oldalon".
+
+**Mostantól** csak azt rejtjük el, akiről **biztosan** tudjuk, hogy ott ül.
+A többinél a gomb megjelenik, és ha valami hiányzik, a `nudgeLehet` **kiírja**,
+hogy mi. Egy kiírt ok mindig jobb, mint egy néma gomb.
+
+### 7.5 A „régebbi szoba" három különböző okra ült rá
+
+A `null` állapot szövege mindig ez volt: *„A társad jelenléte nem ismert
+(régebbi szoba)."* Csakhogy a `null` háromféle helyzetből jön, és kettő friss
+szobában is előfordul:
+
+| helyzet | mit kell tenni |
+|---|---|
+| a társ **még nem csatlakozott** | várni |
+| a **mi** jelzésünk nem megy ki (`presErr`) | a szabályfájlt közzétenni |
+| ő csatlakozott, de **tőle** nincs jelzés | régi szoba, vagy az ő gépén a szabályfájl |
+
+Mostantól mind a három **külön** szöveget kap.
+
+## 8. A kért számláló és a túloldali jelzés (3.9.41)
+
+> „Legyen az ilyen kijelzőkön egy számláló is, hogy mennyit kell még várni, a
+> másik oldalon pedig … jelzés arra, hogy a másik oldalon elindult a várakozás,
+> megy a 180 másodperces számláló."
+
+**A saját oldalad** számlálóját a 7.1 hozta vissza: `⏱ Villám tempó — 2:25
+múlva magától továbblép.`
+
+**A túloldal** jelzése a saját játékos-ágadba írt `waitAt` mezőn megy át:
+
+* **hol tároljuk.** A `players/<én>/waitAt`-ban, nem a szoba gyökerében. Két
+  oka van: a jelenlét-lekérdezés **úgyis** a `players` ágat hozza le, tehát a
+  társad **ingyen** megkapja, egyetlen extra kérés nélkül; és a saját ágamba
+  írni jogosultsági kérdés nélkül szabad.
+* **szerveridőben** (`mpStamp`), mert a számláló a **túloldalon** fut le — a
+  két gép órája között nem lehet eltérés.
+* **mikor.** A jelzés a **jelenlét-körből** megy ki, nem a képernyő
+  megnyitásakor: abban a pillanatban a szoba még nincs letöltve, tehát a
+  **tempóját** sem ismerjük, és a jelzés a Kényelmes alapértékkel menne ki.
+* **mit lát a társad.** `⏳ A társad rád vár — Villám tempó, 2:25 van hátra,
+  utána a rendszer magától továbblép.`
+* **takarítás.** A képernyő zárásakor a mező nullázódik; egy régen otthagyott
+  jelzés (egy egész ablaknyival túlcsúszott) magától elnémul.
+
+**Aki nincs a játékban**, azt csak a push éri el — ezért a várakozás indulása
+**egyszer** automatikus bökést is küld. A kézi bökés fékjét (`NUDGE_MIN_MS`)
+tiszteletben tartja, tehát oda-vissza kapkodásból nem lesz értesítés-zápor, és
+ha bármi hiányzik (nincs feliratkozás, nincs engedély), **csendben** kimarad:
+egy automatikus értesítés nem kérhet semmit a felhasználótól.
+
+> **A `waitAt` mező ÚJ a szabályfájlban.** A `tools/firebase-rules.json`
+> frissített változatát **közzé kell tenni**, különben a jelzés nem megy ki —
+> ugyanúgy, ahogy az `online`, a `push` és a `tempo` sem. A 7.2–7.5 pontok
+> tünetei mind ebből is fakadhatnak; a játék mostantól ki is mondja, ha ezt
+> érzékeli.
+
+**Próba:** `tools/mp-tempo-jelenlet-proba.js` — 16 állítás.
+
+---
+
+## 9. „31. FORDULÓ" a kupában (3.9.42)
+
+**A bejelentés.** „Ugyanezen a kijelzőn szokott egy olyan hiba lenni, hogy a
+kupasorozatban 31. forduló van nagyban kiírva a várakozó kijelzőre."
+
+**A gyökér.** A párharc a beváró képernyő fejlécének a **bajnoki** fordulószámot
+adja át:
+
+```js
+const round=(S.idx||0)+1;          // h2hBeginDuel
+```
+
+Kupa-párharcban viszont a bajnokság **már lezárult**: az `S.idx` 30-on áll,
+tehát a képernyő „31. FORDULÓ"-t írt ki — egy fordulót, ami nem létezik. A
+kulcs (`h2hKey`) és a pillanatkép-felirat (`mpOppSnapWhen`) ezt már helyesen
+kezelte (`s1cupd…`, illetve „kupa-párharc"), csak ez az egy kiírás maradt ki
+belőle.
+
+**Miért a kiírásnál javítjuk.** A `round` nem csak felirat: a
+`mpFreezeOppSnap` **adatként** is elteszi, és a párharc-lánc négy pontján
+utazik tovább (`h2hTick`, `h2hStart`, `mpShowOrphanExit`). Ha ott cserélnénk
+szövegre, egy megjelenítési hiba miatt nyúlnánk az adathoz. A kiírás az
+**egyetlen** hely, ahol a szám félrevezet — tehát pontosan ott kell
+értelmezni, és így **minden hívó** megjavul egyszerre (`h2hWaitTitle`).
+
+**Mit ír ki mostantól:**
+
+| helyzet | fejléc |
+|---|---|
+| bajnoki párharc | `15. FORDULÓ` *(változatlan)* |
+| kupa-párharc, odavágó | `KUPA · NEGYEDDÖNTŐ` |
+| kupa-párharc, visszavágó | `KUPA · NEGYEDDÖNTŐ · VISSZAVÁGÓ` |
+| döntő | `KUPA · DÖNTŐ` |
+| szöveges fejléc (szezonzárás, tabella…) | változatlan |
+
+Az oda-visszavágó **második** meccsét kimondjuk: a két találkozó két külön
+párharc, két külön kerettel — tudni kell, melyiknél tartasz. Az első meccs nem
+kap jelzőt (az „odavágó" felesleges, amíg nincs mihez képest).
+
+**Csak „KUPA", nem a sorozat rövidítése.** Bejelentett kérés: *„nem használjuk
+már a BL rövidítést (jogi okokból) és nem is mindig BL lenne."* Mindkét fele
+igaz: a párharc a hazai kupában és mindhárom nemzetközi sorozatban is lehet,
+tehát egy odaírt sorozat-kód a legtöbbször **tárgyi tévedés** is volna. A KÖR
+neve (Negyeddöntő, Döntő) úgyis megmondja, hol tartasz — a sorozat neve ezen a
+képernyőn nem hordoz információt.
+
+*(Ezt a 10. fejezet vitte végig az egész játékon.)*
+
+
+---
+
+## 10. A sorozat rövidítése sehol nem megy ki a képernyőre (3.9.44)
+
+**A kérés.** *„Menjenek a cserék és ebbe vonjuk bele az egyéni díjakat is: BL
+gólkirály, gólpassz király stb."*
+
+### 10.1 A kulcs marad, csak a kiírás cserélődik
+
+Ez a javítás legfontosabb szabálya. Az `EURO_COMPS` **kulcsa** továbbra is
+`BL`, mert arra hivatkozik
+
+* a **mentés** (`S.euro.comp`, `S.euroEntry`, `S.mpCup.comp`),
+* a **kvalifikációs tábla** (`CUP_TIERS` → `{comp:"BL"}`),
+* a **kupa-kihívások** és a **Run-mérföldkövek** (`bl_win`, `bl_boot`, …),
+* a **díj-skillek azonosítói** (`bl_golden_boot`, …).
+
+Átnevezve minden futó karrier kupája, díja és mérföldköve elveszne. A `short`
+és a szövegek viszont **tiszta kiírás** — azokat szabad cserélni.
+
+### 10.2 Miért „KK", és miért nem valami más
+
+| jelölt | miért nem |
+|---|---|
+| `KKK` | a „Kupák Kupájának Kupája" kezdőbetűi — angolul viszont súlyos mellékjelentése van |
+| `K3` | rövid és egyedi, de a **legerősebb** sorozat látszana a legharmadikabbnak |
+| `KUPA` | a másik három is kupa — egy közös listában (`KUPA×2 EL×1`) nem különböztetne meg |
+| **`KK`** | **a játék saját nevéből** (Kupák Kupája), két betű, mint az `EL`/`KL`/`MK`, és a rangsort sem téveszti el |
+
+A **prózában** viszont a kért generikus szó áll: „a kupa gólkirálya", „a kupa
+Aranycipője", „kupagyőzelem" — ott nincs mihez képest megkülönböztetni.
+
+### 10.3 Mi cserélődött
+
+| hol | előtte | utána |
+|---|---|---|
+| a sorozat rövidítése | `BL` | `KK` |
+| Aranycipő leírása | „A **BL** gólkirályának járó díj…" | „A **kupa** gólkirályának…" |
+| Aranypasszok / Aranykesztyű | ugyanígy | ugyanígy |
+| bajnoki díjak kereszthivatkozása | „(A **BL** Aranycipőjének harmada.)" | „(A **kupa** Aranycipőjének harmada.)" |
+| díjkiosztás naplósora | „…a **BL** gólkirálya" | „…a **kupa** gólkirálya" |
+| kupanapló fejléce | „**BL** egyéni arany-díjak" | „**Kupa** egyéni arany-díjak" |
+| Aranylabda-jelölt díjsora | „🥇 **BL** egyéni díj" | „🥇 **Kupa** egyéni díj" |
+| arany-díjas kommentár-sorok (3 db) | „Na ilyen egy **BL** aranycipős!" | „…egy **kupa-aranycipős**!" |
+| Run-mérföldkövek (4 db) | „Első **BL**-győzelem", „**BL**-gólkirály"… | „Első **KK**-győzelem", „**KK**-gólkirály"… |
+| mérföldkő-sávok | „**BL**-győzelem a mezőny szintjéhez mérve", „**BL**-győztes +N-es mezőnyben" | „**Kupagyőzelem**…", „**Kupagyőztes**…" |
+| súgók (6 helyen) | „**BL** 1,5", „**BL** 10", „**BL** a legerősebb", „**BL** 0,75×", „**BL** Aranycipője", „**BL**-győzelem" | „**Kupák Kupája** …", illetve „**kupa** …" |
+| Aranylabda-rivális sora | „(**BL**-döntő + …)" | „(**kupadöntő** + …)" |
+| Run-bontás súlyai | „**BL** ×0,1", „egy **BL**-beli" | „**Kupák Kupája** ×0,1", „egy **KK**-beli" |
+
+### 10.4 A próba a FORRÁST fésüli át, nem egy képernyőt
+
+`tools/kupa-nev-proba.js` — 9 állítás. A lényegi az utolsó: **egyetlen
+sztring-literálban sem maradhat önálló `BL`**. Ez szándékosan nem képernyőkép
+alapján dolgozik: a kiírások szét vannak szórva (skill-leírások,
+kommentár-sorok, súgók, mérföldkövek, Run-bontás, kupanapló), egy képernyő
+sosem fogná meg mindet. A **kommentek kimaradnak** a szűrésből — ott a
+tervezési indoklás joggal nevezi néven a valódi sorozatot —, és kimarad a
+puszta `"BL"` kulcs, a `champ-BL` CSS-osztálynév és a `${…BL}`
+tulajdonság-hivatkozás is.
+
+Így egy jövőbeli új szöveg is azonnal elbukik a próbán, ha visszacsempészné a
+rövidítést.
