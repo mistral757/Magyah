@@ -256,8 +256,12 @@ csak offline társnál sül el; a tempó-mező írása külön újrapróbát kap
 kimondja; a jelenlét-bejelentkezés szívveréssé vált (korábban szobánként
 egyszer futott, az onDisconnect viszont minden szakadásnál offline-ra írt); a
 bökés-gomb a „nem tudjuk" állapotban is megjelenik; és a túloldali `waitAt`
-jelzésből a társ órája visszaszámol. A szabályfájlt is ellenőrzi. Részletek:
-`docs/ertesitesek.md` 7-8.
+jelzésből a társ órája visszaszámol. A szabályfájlt is ellenőrzi.
+
+Emellett a beváró képernyő FEJLÉCÉT is (3.9.42): kupa-párharcban a sorozat és a
+kör nevét kell kiírnia (`BL · NEGYEDDÖNTŐ · VISSZAVÁGÓ`), nem a bajnoki
+fordulószámot — a bajnokság ilyenkor már lezárult, tehát ott „31. FORDULÓ" állt,
+egy nem létező forduló. Részletek: `docs/ertesitesek.md` 7-9.
 
 ## mp-kozos-beallitas-proba.js — a közös karrier beállítói
 

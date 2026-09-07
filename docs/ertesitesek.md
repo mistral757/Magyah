@@ -413,3 +413,44 @@ egy automatikus értesítés nem kérhet semmit a felhasználótól.
 > érzékeli.
 
 **Próba:** `tools/mp-tempo-jelenlet-proba.js` — 16 állítás.
+
+---
+
+## 9. „31. FORDULÓ" a kupában (3.9.42)
+
+**A bejelentés.** „Ugyanezen a kijelzőn szokott egy olyan hiba lenni, hogy a
+kupasorozatban 31. forduló van nagyban kiírva a várakozó kijelzőre."
+
+**A gyökér.** A párharc a beváró képernyő fejlécének a **bajnoki** fordulószámot
+adja át:
+
+```js
+const round=(S.idx||0)+1;          // h2hBeginDuel
+```
+
+Kupa-párharcban viszont a bajnokság **már lezárult**: az `S.idx` 30-on áll,
+tehát a képernyő „31. FORDULÓ"-t írt ki — egy fordulót, ami nem létezik. A
+kulcs (`h2hKey`) és a pillanatkép-felirat (`mpOppSnapWhen`) ezt már helyesen
+kezelte (`s1cupd…`, illetve „kupa-párharc"), csak ez az egy kiírás maradt ki
+belőle.
+
+**Miért a kiírásnál javítjuk.** A `round` nem csak felirat: a
+`mpFreezeOppSnap` **adatként** is elteszi, és a párharc-lánc négy pontján
+utazik tovább (`h2hTick`, `h2hStart`, `mpShowOrphanExit`). Ha ott cserélnénk
+szövegre, egy megjelenítési hiba miatt nyúlnánk az adathoz. A kiírás az
+**egyetlen** hely, ahol a szám félrevezet — tehát pontosan ott kell
+értelmezni, és így **minden hívó** megjavul egyszerre (`h2hWaitTitle`).
+
+**Mit ír ki mostantól:**
+
+| helyzet | fejléc |
+|---|---|
+| bajnoki párharc | `15. FORDULÓ` *(változatlan)* |
+| kupa-párharc, odavágó | `BL · NEGYEDDÖNTŐ` |
+| kupa-párharc, visszavágó | `BL · NEGYEDDÖNTŐ · VISSZAVÁGÓ` |
+| döntő | `BL · DÖNTŐ` |
+| szöveges fejléc (szezonzárás, tabella…) | változatlan |
+
+Az oda-visszavágó **második** meccsét kimondjuk: a két találkozó két külön
+párharc, két külön kerettel — tudni kell, melyiknél tartasz. Az első meccs nem
+kap jelzőt (az „odavágó" felesleges, amíg nincs mihez képest).

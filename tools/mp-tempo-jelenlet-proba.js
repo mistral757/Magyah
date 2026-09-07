@@ -105,7 +105,31 @@ const srv=http.createServer((req,rp)=>{
       &&/jelenléte nem ismert/.test(out.szoveg.nem_ismert)
       &&!/régebbi szoba\)/.test(out.szoveg.nem_ismert);
 
-    /* ---- 5. A SZABÁLYFÁJL ---- */
+    /* ---- 5. A BEVÁRÓ FEJLÉC KUPÁBAN (3.9.42) ----
+       A bajnokság lezárult (S.idx=30), tehát a párharc a fejlécnek 31-et ad
+       át — a képernyő eddig „31. FORDULÓ"-t írt ki. */
+    S.idx=30;S.seasonNumber=1;
+    S.euro=null;
+    out.cim_bajnoki=h2hWaitTitle(15);
+    out.cim_szoveges=h2hWaitTitle("SZEZONZÁRÁS");
+    /* kupa-párharc: odavágó és visszavágó */
+    MP.active=true;MP.activeRoom="ABCD";
+    /* az mpCup() a SZEZONSZÁMOT is nézi — enélkül a kupa „nem fut" */
+    S.mpCup={comp:"BL",mateIdx:3,season:(S.seasonNumber||1)};
+    S.euro={comp:"BL",stage:"qf",idx:0,mateIdx:3,userTie:0,
+      ties:[{a:3,b:7,legs:[[0,0],[0,0]]}]};
+    out.kupa_most=mpCupDuelNow();
+    out.cim_oda=h2hWaitTitle(31);
+    S.euro.idx=1;
+    out.cim_vissza=h2hWaitTitle(31);
+    S.euro.stage="final";S.euro.idx=0;
+    out.cim_donto=h2hWaitTitle(31);
+    /* NEM kupa-párharc (a társ nincs az ágon) → marad a fordulószám */
+    S.euro.userTie=null;
+    out.cim_nem_kupaparharc=h2hWaitTitle(31);
+    S.euro=null;S.mpCup=null;MP.active=false;
+
+    /* ---- 6. A SZABÁLYFÁJL ---- */
     out.mark_forras=/waitAt:on\?mpStamp\(\):0/.test(mpWaitMark.toString());
     return out;});
 
@@ -129,12 +153,20 @@ const srv=http.createServer((req,rp)=>{
     ["Kényelmes módban nincs túloldali jelzés",r.nyugodtban_nincs_jelzes===true],
     ["a képernyő kiírja a társ óráját, perc:mp alakban",r.kiirja_a_tars_orajat===true],
     ["a diagnózis elválik: nem csatlakozott vs. nem ismert",r.diagnozis_elvalik===true],
+    ["a bajnoki forduló fejléce változatlan",r.cim_bajnoki==="15. FORDULÓ"],
+    ["a szöveges fejléc változatlan",r.cim_szoveges==="SZEZONZÁRÁS"],
+    ["kupa-párharcban a SOROZAT és a KÖR áll ott, nem a 31. forduló",
+      r.kupa_most===true&&r.cim_oda==="BL · NEGYEDDÖNTŐ"],
+    ["a visszavágó meg is van jelölve",r.cim_vissza==="BL · NEGYEDDÖNTŐ · VISSZAVÁGÓ"],
+    ["a döntő is a saját nevén szerepel",r.cim_donto==="BL · DÖNTŐ"],
+    ["ha nem kupa-párharc, marad a fordulószám",r.cim_nem_kupaparharc==="31. FORDULÓ"],
     ["a szabályfájl engedi a waitAt / online / push / seenAt mezőket",szabalyOk===true],
     ["nincs oldalhiba",errs.length===0]];
   T.forEach(([n,ok])=>console.log((ok?"  ✓ ":"  ✗ ")+n));
   console.log("\n  számláló (online / offline / kényelmes):",
     r.szamlalo_online,"/",r.szamlalo_offline,"/",r.szamlalo_nyugodt);
   console.log("  a társ hátralévő ideje:",r.tars_var);
+  console.log("  fejlécek:",JSON.stringify([r.cim_bajnoki,r.cim_oda,r.cim_vissza,r.cim_donto,r.cim_nem_kupaparharc]));
   if(errs.length)console.log("\noldalhiba:",errs.slice(0,3));
   const bukott=T.filter(x=>!x[1]).length;
   console.log(bukott?`\nBUKOTT: ${bukott}`:"\nminden rendben");
