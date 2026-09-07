@@ -244,6 +244,21 @@ tárgyalás-rontás, stílus-képesség és a távozó stábtag). Egy jutalom, a
 csinál semmit, rosszabb, mint ha nem létezne. Részletek:
 `docs/kihivasok-3937.md`.
 
+## mp-kozos-beallitas-proba.js — a közös karrier beállítói
+
+```bash
+node tools/mp-kozos-beallitas-proba.js
+```
+
+A 3.9.40-es javításokat méri a KÖZÖS karrier beállító képernyőjén: a kezdő
+csapaterő csúszkája draftnál eltűnik (nincs klublista, amit szűrne), a mérce
+ilyenkor az osztály nyers közepe + a draft-prémium, a vendég zárlistája teljes
+(a régi lista a 3.5.19-ben MEGSZŰNT `#pyrBandMin`/`#pyrBandMax`-ot nevezte meg,
+a valódi csúszka nyitva maradt), az ikon-sűrűség a negyedik világ-tengely lett
+(utazik, rögzül, régi szobát nem ír felül), és a draft-ág közös karrierben nem
+nyitja meg az egyjátékos osztályválasztót. Részletek:
+`docs/kozos-vilag-tengelyei.md` — „A negyedik tengely és a lyukas zár".
+
 ## pyr-szuperliga-proba.js — a piramis fölfelé is nő (D0, D−1, D−2 …)
 
 ```bash
