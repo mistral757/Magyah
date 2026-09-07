@@ -12619,6 +12619,11 @@ const PYR_SPREAD=4.0;  /* egy osztály teljes szélessége (a leggyengébbtől a
    hogy a legerősebb keret (88,0) a legalsó osztályban, a leggyengébb (69,0)
    pedig az élvonalban is középmezőnyt kapjon. */
 const PYR_UP_MAX=(PYR_DIVS-1)*PYR_STEP;        /* +15,0 — a D1 és a D6 közepe közti táv */
+/* Mennyivel áll a BL mezőnye az ÉLVONAL fölött a hagyományos módban (3.9.39).
+   Kevesebb, mint egy teljes osztálylépcső (PYR_STEP=3,0): a BL nem egy újabb
+   osztály, hanem a nemzeti élvonal fölötti kontinentális szint. Padlóként hat
+   — lásd euroMidRating. */
+const PYR_BL_OVER_TOP=2;
 const PYR_UP_MIN=-PYR_UP_MAX;                  /* −15,0 — ugyanennyi lefelé */
 /* ---- A RÉS SKÁLÁJA ----
    A vezérlő, amit a felhasználó állít: mennyivel legyen erősebb/gyengébb a
@@ -12745,12 +12750,13 @@ function pyrLadderHtml(){
     const done=d.id>id;                 /* ezeken már túl vagy (lentebb vannak) */
     rungs+=`<div class="pyrRung${here?" here":done?" done":""}">`
       +`<span class="n">D${d.id}</span>`
-      +`<span class="t">${d.id===1?"🏆 ":""}${esc(d.name)}</span>`
+      +`<span class="t">${d.id===pyrTopId()?"🏆 ":""}${esc(d.name)}</span>`
       +`<span>${Math.round(d.mean)}</span></div>`;});
   /* --- mi kell a következő lépcsőhöz --- */
-  const goal=id===1
-    ? `⛰️ <b>Az élvonalban vagy.</b> Feljebb nincs — innen a <b>bajnoki cím</b> a tét.`
-    : `⛰️ <b>A csúcsig ${id-1} osztály.</b> Feljutás: <b>1. hely</b> közvetlenül, `
+  const goal=pyrAtTop(id)
+    ? `⛰️ <b>A piramis tetején állsz.</b> Feljebb ma nincs — de ha megnyered, `
+      +`<b>nyílik egy új osztály fölötted</b> (D${id-1} · ${esc(pyrDivName(id-1))}).`
+    : `⛰️ <b>A csúcsig ${id-pyrTopId()} osztály.</b> Feljutás: <b>1. hely</b> közvetlenül, `
       +`<b>2–3. hely</b> osztályozón a fentebbi liga 14–15. helyezettje ellen.`;
   const risk=id<PYR_DIVS
     ? `⬇️ Kiesés: a <b>16. hely</b> közvetlenül, a <b>14–15.</b> osztályozón védekezik.`
@@ -13106,8 +13112,49 @@ const PYR_PO_N=2;             /* hány osztályozó-párharc osztálypáronként
 function pyrOn(){
   try{return !!(S&&S.pyr&&S.pyr.on);}catch(e){return false;}}
 function pyrDivs(){return (S.pyr&&S.pyr.divs)||[];}
-function pyrMyDivId(){return (S.pyr&&S.pyr.my)||PYR_DIVS;}
-function pyrMyDiv(){return pyrDivs()[pyrMyDivId()-1]||null;}
+/* ================= A PIRAMIS FÖLFELÉ IS NŐ (3.9.39) =======================
+   BEJELENTETT KÉRÉS: „hagyományos módban d1 győzelem után nyíljon ki a d0 és
+   d-1, d-2 stb. a végtelenbe, mint dinamikusan az Infinity."
+
+   AMI EDDIG VOLT: a D1 megnyerése után a hegynek vége. A mezőny ugyan tovább
+   erősödött, de a CÉL elfogyott — a karrier hátralévő része ugyanannak a
+   címnek az ismétlése lett. A dinamikus mód Infinityje pontosan ezt oldja meg
+   a másik oldalon: ott a SZINT nő korlátlanul.
+
+   AMI MOSTANTÓL VAN: a bajnoki cím megnyerése az élvonalban ÚJ OSZTÁLYT NYIT
+   FÖLÖTTE. Az azonosítók nem csúsznak el: a D1 marad D1, az új osztály a D0,
+   utána a D−1, D−2 — a végtelenbe. Így a naplód, a mérőd és a kezdő
+   osztályod számai visszamenőleg is ugyanazt jelentik, mint eddig.
+
+   HOGYAN, A KÓDBAN. A `divs` tömb elejére kerül az új osztály, tehát az
+   INDEXEK eggyel csúsznak — az AZONOSÍTÓK viszont nem. A kettőt ez a két
+   függvény kapcsolja össze, és mostantól MINDEN indexelés rajtuk megy át:
+     idx = (id − 1) + above        id = (idx + 1) − above
+   `above` = hány osztály nyílt eddig az élvonal fölött (S.pyr.above). Régi
+   mentésben nincs → 0, tehát ott betűre a régi viselkedés marad. */
+function pyrAbove(){return (S&&S.pyr&&S.pyr.above)||0;}
+function pyrTopId(){return 1-pyrAbove();}          /* a legfelső osztály azonosítója */
+function pyrDivIdx(id){return (id-1)+pyrAbove();}  /* azonosító → tömbindex */
+function pyrDivIdAt(i){return (i+1)-pyrAbove();}   /* tömbindex → azonosító */
+/* A LEGFELSŐ OSZTÁLYBAN VAGY-E — „feljebb nincs" mostantól ezt jelenti. */
+function pyrAtTop(id){return (id==null?pyrMyDivId():id)<=pyrTopId();}
+/* A SZUPERLIGÁK NEVEI. Az első kettő nevesített (a nemzeti élvonal FÖLÖTT a
+   kontinens, afölött a világ), onnantól sorszámozott — a lista sosem fogyhat
+   el, mert a piramis sem. */
+const PYR_SUPER_LEAGUES=["Ojrópai Szuperliga","Világliga"];
+function pyrDivName(id){
+  if(id>=1)return PYR_LEAGUES[id-1]||`${id}. osztály`;
+  const k=-id;                                     /* D0 → 0, D−1 → 1, … */
+  return PYR_SUPER_LEAGUES[k]||`Világliga ${k}`;}
+/* FIGYELEM, A NULLA IGAZ ÉRTÉK (3.9.39). A régi `(S.pyr&&S.pyr.my)||PYR_DIVS`
+   a D0-ban álló játékost a LEGALSÓ osztályba tette, mert a 0 hamis — a
+   szuperligák megnyitásával ez azonnal valós hiba lett (a próba fogta meg:
+   a feljutás után „most: 6" jött vissza D0 helyett). Innentől kifejezett
+   szám-ellenőrzés dönt, nem a truthiness. */
+function pyrMyDivId(){
+  const v=S&&S.pyr&&S.pyr.my;
+  return (typeof v==="number"&&isFinite(v))?v:PYR_DIVS;}
+function pyrMyDiv(){return pyrDivs()[pyrDivIdx(pyrMyDivId())]||null;}
 /* Az osztály középértéke, egészre kerekítve. EZ lesz az oppTargetRating a
    piramisban: a piac (marketPeakShift), a kupa-sáv, a nehézség-címke és a
    jelvény mind ezt olvassa, tehát a többi rendszer változtatás nélkül,
@@ -13403,7 +13450,12 @@ function pyrAiRate(div){
   /* A FUTÓ KARRIER LÉTRÁJA (3.9.38): egy elkezdett karrier a maga nehézségi
      szerződésével fut végig — lásd pyrSpeedDef. */
   const sp=pyrSpeedDef(pyrSpeedKey());
-  const t=(PYR_DIVS-div)/(PYR_DIVS-1);        /* 0 = legalsó, 1 = élvonal */
+  /* 0 = legalsó, 1 = élvonal. A SZUPERLIGÁKBAN (D0 és fölötte, 3.9.39) a
+     `div` nulla vagy negatív, tehát a lineáris képlet 1 FÖLÉ extrapolálna —
+     azt levágjuk. A nehézséget ott a SZINT adja (osztályonként +PYR_STEP),
+     nem az ütem: egy korlátlanul extrapolált share néhány osztály múlva
+     értelmetlen számokat adna. */
+  const t=Math.max(0,Math.min(1,(PYR_DIVS-div)/(PYR_DIVS-1)));
   const share=sp.share+(sp.top-sp.share)*t;
   const k=(typeof tempoMult==="function")?tempoMult():1;
   return PYR_PACE*k*share;}
@@ -13557,8 +13609,8 @@ function pyrPoPreview(){
       const base=(e.t&&e.t.ovr)||0;
       return Math.round((base+(dev.get(e.t)||0))*10)/10;};
     /* KIHÍVÓ: a 2-3. hely a fentebbi osztály 15., illetve 14. helyezettje ellen */
-    if(myId>1&&idx>=PYR_UP&&idx<PYR_UP+PYR_PO_N){
-      const k=idx-PYR_UP,upper=order[myId-2]||[];
+    if(!pyrAtTop(myId)&&idx>=PYR_UP&&idx<PYR_UP+PYR_PO_N){
+      const k=idx-PYR_UP,upper=order[pyrDivIdx(myId)-1]||[];
       const df=upper[upper.length-2-k];
       if(!df)return null;
       return {iAmCh:true,k,lowerDiv:myId-1,myRank:idx+1,
@@ -13569,7 +13621,7 @@ function pyrPoPreview(){
       const last=mine.length-1;
       const k=last-1-idx;
       if(k>=0&&k<PYR_PO_N){
-        const lower=order[myId]||[];
+        const lower=order[pyrDivIdx(myId)+1]||[];
         const ch=lower[PYR_UP+k];
         if(!ch)return null;
         return {iAmCh:false,k,lowerDiv:myId,myRank:idx+1,
@@ -13616,7 +13668,7 @@ function pyrSay(html,cls){
 function pyrBuildOrders(myOrder,r){
   const W=S.pyr;const myId=pyrMyDivId();
   return W.divs.map((d,i)=>{
-    if(i+1===myId){
+    if(pyrDivIdAt(i)===myId){
       const byName={};d.teams.forEach(t=>{byName[t.n]=t;});
       const out=[];
       (myOrder||[]).forEach(n=>{
@@ -13629,6 +13681,70 @@ function pyrBuildOrders(myOrder,r){
       if(!out.some(x=>x.me))out.push({me:true});
       return out;}
     return pyrSimDivision(d.teams,r).map(x=>({t:x.t}));});}
+/* ================= ÚJ OSZTÁLY AZ ÉLVONAL FÖLÉ (3.9.39) ====================
+   Akkor fut le, amikor a legfelső osztályt MEGNYERTED. A `divs` tömb elejére
+   tesz egy új osztályt, egy teljes lépcsővel (PYR_STEP) a mostani élvonal
+   fölé, és lépteti az `above` számlálót — onnantól a te osztályod azonosítója
+   változatlan marad, csak az indexe csúszik (lásd pyrDivIdx).
+
+   A MEZŐNYE. A világ klubjai közül a LEGERŐSEBB tizenhat, de szándékosan egy
+   MÁSIK szezonjukkal: a kontinens csúcsán az adatbázis nagy csapatainak egy
+   másik, ugyanolyan rangos évjárata áll. Így az entitás-azonosító (`n`) is
+   különbözik a piramisban már szereplőtől, tehát semmi nem ütközik.
+   Ha egy klubnak nincs szabad másik évjárata, a következő klub jön — a
+   sorrend a nyers erő szerint megy, tehát mindig a legjobbak közül merítünk.
+   Ha végképp nincs elég szabad évjárat (a piramis nagyon mélyre nőtt), a már
+   szereplő évjáratokat is elfogadjuk: két osztály közti névazonosság csak
+   kiírásbeli furcsaság, EGY osztályon belül viszont sosem engedjük meg —
+   a tabella és a sorsolás azt olvassa. */
+function pyrSuperTeams(base,rnd){
+  const r=rnd||Math.random;
+  /* mi van MÁR a világban — azt nem vesszük el onnan */
+  const used=new Set();
+  ((S.pyr&&S.pyr.divs)||[]).forEach(d=>(d.teams||[]).forEach(t=>{if(t&&t.n)used.add(t.n);}));
+  const by={};
+  activeSquads().filter(sq=>!sq.wc).forEach(sq=>{(by[sq.club]=by[sq.club]||[]).push(sq);});
+  /* klubonként a legerősebb SZABAD évjárat; a klubokat a legjobb évjáratuk
+     nyers ereje rangsorolja */
+  const cand=[];
+  Object.keys(by).forEach(club=>{
+    const list=by[club].map(sq=>({club,season:sq.season,raw:squadAvgOvr(sq),
+      n:`${club} (${sq.season})`})).sort((a,b)=>b.raw-a.raw);
+    const free=list.filter(x=>!used.has(x.n));
+    if(free.length)cand.push(free[0]);
+    else if(list.length)cand.push(Object.assign({dup:true},list[0]));});
+  /* a szabadok elöl, azon belül a legerősebbek — így a duplikátum tényleg csak
+     végszükség */
+  cand.sort((a,b)=>(a.dup?1:0)-(b.dup?1:0)||b.raw-a.raw);
+  const take=cand.slice(0,PYR_TEAMS);
+  if(take.length<PYR_TEAMS)return [];
+  const raws=take.map(x=>x.raw);
+  const lo=Math.min.apply(null,raws),hi=Math.max.apply(null,raws);
+  const span=hi-lo;
+  return take.map(x=>{
+    const pos=span>0?(x.raw-lo)/span:0.5;
+    return {n:x.n,ovr:Math.round((base+(pos-0.5)*PYR_SPREAD)*10)/10,
+      club:x.club,season:x.season,raw:Math.round(x.raw*10)/10};});}
+/* A NYITÁS. Visszaadja az új osztály azonosítóját, vagy null-t, ha nem ment. */
+function pyrOpenTopDiv(rnd){
+  const W=S&&S.pyr;
+  if(!W||!W.divs||!W.divs.length)return null;
+  const top=W.divs[0];
+  const base=((top&&top.mean)||0)+PYR_STEP;
+  let teams=[];
+  try{teams=pyrSuperTeams(base,rnd);}catch(e){teams=[];}
+  if(!teams.length)return null;
+  const ov=teams.map(t=>t.ovr);
+  const id=pyrTopId()-1;
+  W.divs.unshift({id,name:pyrDivName(id),
+    mean:Math.round(ov.reduce((a,v)=>a+v,0)/ov.length*10)/10,
+    lo:Math.min.apply(null,ov),hi:Math.max.apply(null,ov),teams});
+  W.above=pyrAbove()+1;
+  /* A NAPLÓ IS TUDJON RÓLA — ugyanaz az elv, amiért az osztályugrást is
+     feljegyezzük: a fejlődés-mérő „osztályonként" táblájában különben
+     megmagyarázatlanul bukkanna fel egy D0-s sor. */
+  (W.opened=W.opened||[]).push({s:(S.seasonNumber||1)+1,id});
+  return id;}
 function pyrRollover(myOrder,rnd){
   const W=S.pyr;if(!W||!W.divs)return null;
   const r=rnd||Math.random;
@@ -13671,14 +13787,14 @@ function pyrRollover(myOrder,rnd){
   let newMy=myId;
   next.forEach((arr,i)=>{
     W.divs[i].teams=arr.filter(x=>!x.me).map(x=>x.t);
-    if(arr.some(x=>x.me))newMy=i+1;
+    if(arr.some(x=>x.me))newMy=pyrDivIdAt(i);
     const ov=W.divs[i].teams.map(t=>t.ovr);
     if(ov.length){
       W.divs[i].mean=Math.round(ov.reduce((s,v)=>s+v,0)/ov.length*10)/10;
       W.divs[i].lo=Math.min.apply(null,ov);W.divs[i].hi=Math.max.apply(null,ov);}});
   const res={from:myId,to:newMy,
     kind:newMy<myId?"up":newMy>myId?"down":"stay",rank:_rank,
-    aiStep:_steps[myId-1],
+    aiStep:_steps[pyrDivIdx(myId)],
     /* A SAJÁT osztályozód, ha volt — a szezonzáró elbeszélés ebből dolgozik. */
     po:po.find(t=>t.mine)||null};
   W.lastPo=res.po||null;
@@ -13720,7 +13836,8 @@ function pyrRollover(myOrder,rnd){
      jobb, mint a hamis. */
   const _ok=isFinite(_myOvr)&&_myOvr>0;
   const row={s:(S.seasonNumber||1),div:myId,to:newMy,rank:_rank,
-    my:_ok?rd(_myOvr):null,mean:(W.divs[myId-1]?W.divs[myId-1].mean:null),
+    my:_ok?rd(_myOvr):null,
+    mean:(W.divs[pyrDivIdx(myId)]?W.divs[pyrDivIdx(myId)].mean:null),
     ai:_steps[myId-1],
     me:(_ok&&prev&&prev.my>0)?rd(_myOvr-prev.my):null,
     /* a mérő tisztább számai — lásd fent */
@@ -13747,7 +13864,7 @@ function pyrRollover(myOrder,rnd){
      KIHIRDETÉSEKOR születik (runNotePyrTitle), tehát a bejegyzés akkor is a
      helyes Run-szinttel megy fel, ha ez a sor később fut. A napló-sor a régi
      mentések tartaléka marad (pyrFirstTitle). */
-  if(myId===1&&_rank===1){
+  if(myId<=1&&_rank===1){
     /* A MÉRŐ ITT LETT TELJES. Ez az a pillanat, amiről a kérés szólt: „hogyan
        fejlődött a csapatom egy karrierben míg elértem a d1 wint". A szám itt
        mondható ki először hiánytalanul. */
@@ -14986,7 +15103,32 @@ function euroMidRating(comp){
   const edge=euroEdgeFor(comp||"BL",euroDominance());
   const f=anchor+hid*(1-OPP_BUFF_MEASURED)-edge;
   const d=(EURO_COMPS[comp]&&EURO_COMPS[comp].oppDelta)||0;
-  return applyCupTempoAnchor(comp,Math.max(50,Math.round(f-d)));}
+  let lv=Math.max(50,Math.round(f-d));
+  /* ---- A BL PADLÓJA A HAGYOMÁNYOS MÓDBAN: D1 + 2 (3.9.39) ----
+     BEJELENTETT KÉRÉS: „Hagyományos mód BL szintje legyen mindig d1 +2,
+     d1-től kezdve pedig számított (hogy mindig legyen izgalmas)."
+
+     MIT JELENT. A ligapiramis a NEMZET versenyrendszere; a BL a fölötte lévő
+     szint, tehát amíg nem értél fel az élvonalba, a BL mezőnye ne a te
+     osztályodhoz, hanem az ország legjobbjai FÖLÉ igazodjon. A `PYR_STEP`
+     (3,0) egy osztálylépcső, a +2 ennél kevesebb: a BL nem egy újabb teljes
+     osztállyal van feljebb, hanem másfél lépcsőnyivel.
+
+     MIÉRT PADLÓ, ÉS NEM RÖGZÍTETT ÉRTÉK. Ha kimondottan `D1+2`-t adnánk
+     vissza, akkor egy D3-ban ülő, de már 120-as kerettel bíró klub a saját
+     élvonalánál alig erősebb BL-mezőnyt kapna — ingyen trófeát. A padló ezt
+     zárja ki: a számított érték BÁRMIKOR átveheti, ha az a nagyobb. És ez
+     adja meg a kérés MÁSODIK felét is, magától: az élvonalba érve a te
+     erődből számolt szint már fölötte jár a D1+2-nek, tehát onnantól végig
+     a számított érték szól — „hogy mindig legyen izgalmas".
+
+     CSAK A BL-RE. A többi sorozat rangsorát az `oppDelta` és az `EURO_EDGE`
+     adja, és az a rangsor épp attól él, hogy a BL a legszorosabb. Ha mind a
+     négy kupa padlót kapna, a hazai kupa is a BL szintjén nyílna. */
+  if(pyrOn()&&comp==="BL"){
+    const top=pyrTopLevel();
+    if(top>0)lv=Math.max(lv,Math.round(top+PYR_BL_OVER_TOP));}
+  return applyCupTempoAnchor(comp,lv);}
 /* (A kvalifikáció a CUP_TIERS-ből jön — lásd cupEntryFor/euroQualifyFor fent.
    A régi, szintfüggetlen 1→BL / 2-3→EL / 4-5→KL szabály megszűnt: ma ez már
    csak a 100 fölötti sáv viselkedése.) */
@@ -62033,8 +62175,8 @@ function buildLeagueTable(upto,opts){
 function pyrTableZone(pos,total){
   if(!(typeof pyrOn==="function"&&pyrOn()))return null;
   const id=pyrMyDivId();
-  if(id>1&&pos<=PYR_UP)return {c:"#2ecc71",t:"feljutás"};
-  if(id>1&&pos<=PYR_UP+PYR_PO_N)return {c:"#f0bc42",t:"osztályozó"};
+  if(!pyrAtTop(id)&&pos<=PYR_UP)return {c:"#2ecc71",t:"feljutás"};
+  if(!pyrAtTop(id)&&pos<=PYR_UP+PYR_PO_N)return {c:"#f0bc42",t:"osztályozó"};
   if(id<PYR_DIVS&&pos>total-PYR_DOWN)return {c:"#e03131",t:"kiesés"};
   if(id<PYR_DIVS&&pos>total-PYR_DOWN-PYR_PO_N)return {c:"#e07a5f",t:"osztályozó"};
   return null;}
@@ -62068,7 +62210,7 @@ function renderFinalTable(teams){
   if(pyr){
     const id=pyrMyDivId();
     html+=`<div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-top:5px">`
-      +(id>1?`<b style="color:#2ecc71">■</b> feljutás &nbsp; <b style="color:#f0bc42">■</b> osztályozó a feljutásért `:"")
+      +(!pyrAtTop(id)?`<b style="color:#2ecc71">■</b> feljutás &nbsp; <b style="color:#f0bc42">■</b> osztályozó a feljutásért `:"")
       +(id<PYR_DIVS?`&nbsp; <b style="color:#e07a5f">■</b> osztályozó a bennmaradásért &nbsp; <b style="color:#e03131">■</b> kiesés`:"")
       +`</div>`;}
   return html;}
@@ -62660,6 +62802,21 @@ function pyrSeasonTurn(){
        _mateCarry={name:rows[mine[0]].n,rank:mine[0]+1,mine:mine[1]+1};
      _mo[mine[0]]=teamName;          /* a jobbik helyezés a párosé */
      _mo.splice(mine[1],1);}}        /* a rosszabbik sora kikerül */
+  /* ---- ÚJ OSZTÁLY AZ ÉLVONAL FÖLÉ (3.9.39) ----
+     A ROLLOVER ELŐTT, és pontosan ezért: ha a legfelső osztályt megnyerted, a
+     fölötte nyíló osztályba a SZOKÁSOS úton, a rollover feljutásával kerülsz —
+     nem kell külön léptetni, és a lecserélt csapat is a szokásos módon jön le
+     hozzád. Egy művelet, egy szabály.
+     A sorsolás magja a szezonhoz kötött, tehát determinisztikus. */
+  if(pyrAtTop()&&_mo&&_mo[0]===teamName){
+    try{
+      const _uj=pyrOpenTopDiv(rngFor("pyr:s"+sn+":super"));
+      if(_uj!=null)
+        pyrSay(`🌍 <b>MEGNYÍLT A D${_uj} — ${esc(pyrDivName(_uj))}.</b> `
+          +`Megnyerted a piramis addigi tetejét, és ezzel a hegy TOVÁBBNŐTT: `
+          +`egy egész osztállyal erősebb mezőny került föléd. A csúcs újra `
+          +`ott van, ahová fel kell érned.`,"m win");
+    }catch(e){}}
   let _pr=null;
   try{_pr=pyrRollover(_mo,rngFor("pyr:s"+sn+":roll"));}
   catch(e){W.note=null;throw e;}   /* a puffer sosem maradhat félig nyitva */
@@ -62674,7 +62831,7 @@ function pyrSeasonTurn(){
      így végig 96, és mindkét kliensen ugyanaz (a döntés determinisztikus:
      mindig a leggyengébb lép ki). */
   if(_pr.from!==_pr.to&&W.spare2&&(typeof h2hRoomActive==="function")&&h2hRoomActive()){
-    const from=W.divs[_pr.from-1],to=W.divs[_pr.to-1];
+    const from=W.divs[pyrDivIdx(_pr.from)],to=W.divs[pyrDivIdx(_pr.to)];
     if(from&&to){
       from.teams.push(W.spare2);
       to.teams.sort((a,b)=>b.ovr-a.ovr);
@@ -63366,7 +63523,7 @@ function pyrLeapCommit(t,stake){
     if(paid>0)budgetEarn(paid,"refund");
     return false;}
   /* ---- A CSERE: a cél-osztály leggyengébbje lecsúszik oda, ahonnan jössz ---- */
-  const from=W.divs[t.from-1],to=W.divs[t.to-1];
+  const from=W.divs[pyrDivIdx(t.from)],to=W.divs[pyrDivIdx(t.to)];
   if(from&&to&&to.teams&&to.teams.length){
     to.teams.sort((a,b)=>b.ovr-a.ovr);
     const demoted=to.teams.pop();
@@ -63401,7 +63558,11 @@ function pyrLeapCommit(t,stake){
     +`ha nem, a pénz odaveszett.`,"m life");
   try{saveGame();}catch(e){}
   return true;}
-function pyrLeapLabel(id){return PYR_LEAGUES[(id||1)-1]||`${id}. osztály`;}
+/* Ugyanaz a nulla-csapda, mint a pyrMyDivId-nél: a `(id||1)` a D0-t D1-nek
+   nevezte volna. A névadás egy helyen él (pyrDivName), a szuperligákat is
+   ismeri. */
+function pyrLeapLabel(id){
+  return pyrDivName((typeof id==="number"&&isFinite(id))?id:1);}
 /* A VÁLLALÁS ELSZÁMOLÁSA — a szezon lezárásakor, amikor a helyezés eldőlt. */
 function pyrLeapSettle(rank){
   const L=S.pyrLeap;
@@ -63632,9 +63793,10 @@ function announcePyrSeason(){
   const sn=S.seasonNumber||1;
   const start=(S.pyr&&S.pyr.startDiv)||id;
   addLine(`⛰️ <b>${sn}. IDÉNY — D${id} · ${esc(d.name)}</b> (mezőny ${oppTargetRating})`,"m ev");
-  if(id===1){
-    addLine(`&nbsp;&nbsp;🏆 <b>Az élvonalban vagy — feljebb nincs.</b> Innen egyetlen dolog a tét: `
-      +`a <b>bajnoki cím</b>. A mezőny minden idényben erősödik, tehát a cím sosem lesz formalitás.`,"m ev");
+  if(pyrAtTop(id)){
+    addLine(`&nbsp;&nbsp;🏆 <b>A piramis tetején állsz.</b> Innen egyetlen dolog a tét: `
+      +`a <b>bajnoki cím</b> — és ha megszerzed, <b>nyílik fölötted egy új osztály</b> `
+      +`(D${id-1} · ${esc(pyrDivName(id-1))}). A hegynek nincs teteje.`,"m ev");
   }else{
     addLine(`&nbsp;&nbsp;⬆️ <b>Feljutás:</b> az <b>1. hely</b> közvetlenül visz feljebb. `
       +`A <b>2–3. hely</b> osztályozót játszik a fentebbi osztály 15., illetve 14. helyezettje ellen `
@@ -63642,7 +63804,7 @@ function announcePyrSeason(){
     addLine(`&nbsp;&nbsp;⚔️ <b>Az osztályozót LE IS JÁTSZHATOD</b> — két mérkőzés, ugyanaz a motor, `
       +`ugyanaz a csereszünet, hosszabbítás és büntetők. Aki nem akarja, továbbra is `
       +`rábízhatja a szimulációra.`,"m ev");
-    addLine(`&nbsp;&nbsp;⛰️ A csúcsig <b>${id-1} osztály</b> van hátra`
+    addLine(`&nbsp;&nbsp;⛰️ A csúcsig <b>${id-pyrTopId()} osztály</b> van hátra`
       +(start!==id?` — a D${hunBol(start)} indultál.`:"."),"m ev");}
   if(id<PYR_DIVS)
     addLine(`&nbsp;&nbsp;⬇️ <b>Kiesés:</b> a <b>16. hely</b> közvetlenül esik, a <b>14–15.</b> `

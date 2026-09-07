@@ -2150,3 +2150,133 @@ négy sor, amit a rollover is futtat.
    ellenfél-tempó a 3,0-as lépcsőhöz van kalibrálva; ha a `PYR_STEP`
    változik, a `tools/pyramid-sim.js speeds step=…` futtatásával a fokozatokat
    újra kell lőni. A kettőt sosem szabad külön hangolni.
+
+---
+
+## 13. A PIRAMIS FÖLFELÉ IS NŐ — D0, D−1, D−2 … (3.9.39)
+
+**A kérés.** „Hagyományos módban d1 győzelem után nyíljon ki a d0 és d-1, d-2
+stb. a végtelenbe, mint dinamikusan az Infinity."
+
+**Ami eddig volt.** A D1 megnyerése után a hegynek vége. A mezőny ugyan tovább
+erősödött (a fokozat üteme sosem áll meg), de a **cél** elfogyott: a karrier
+hátralévő része ugyanannak a címnek az ismétlése lett. A dinamikus mód
+Infinityje ugyanezt a problémát a másik oldalon oldja meg — ott a **szint** nő
+korlátlanul.
+
+### 13.1 A szabály
+
+A **legfelső osztály bajnoki címe** új osztályt nyit fölötte. Nem valamennyi
+idő múlva, nem pénzért: a cím a kulcs.
+
+```
+szezonzárás → [ha a legfelső osztályt MEGNYERTED: új osztály nyílik] → rollover
+```
+
+A nyitás a rollover **előtt** történik, és pontosan ezért: a fölötte nyíló
+osztályba a **szokásos úton**, a rollover feljutásával kerülsz. Nincs külön
+léptetés, és a lecserélt csapat is a megszokott módon jön le hozzád — egy
+művelet, egy szabály. (A próba ezt külön méri: `from: 1 → to: 0, kind: "up"`.)
+
+### 13.2 Az azonosítók nem csúsznak el
+
+Ez a feature legfontosabb tervezési döntése. Az új osztály a `divs` tömb
+**elejére** kerül, tehát az indexek eggyel csúsznak — az **azonosítók** viszont
+nem: a D1 marad D1, a D6 marad D6, az új osztály a D0, utána a D−1, D−2.
+
+```js
+idx = (id − 1) + above          id = (idx + 1) − above
+```
+
+`above` = hány osztály nyílt eddig az élvonal fölött (`S.pyr.above`). Régi
+mentésben nincs → 0, tehát ott **betűre** a régi viselkedés marad.
+
+**Miért így.** Ha az azonosítók csúsznának, a fejlődés-mérő naplója, a kezdő
+osztályod (`startDiv`), az osztályugrások jegyzéke és a Run-plafon
+osztály-súlyai mind visszamenőleg mást jelentenének. Egy „D4-ből indultam"
+mondat nem változhat meg attól, hogy tíz idénnyel később megnyertem az
+élvonalat.
+
+**A nulla igaz érték.** A régi `pyrMyDivId()` így nézett ki:
+
+```js
+return (S.pyr && S.pyr.my) || PYR_DIVS;      // ← a D0 hamis!
+```
+
+A szuperligák megnyitásával ez azonnal valós hibává vált: a D0-ba feljutó
+játékost a **legalsó** osztályba tette. A próba fogta meg (a feljutás után
+„most: 6" jött vissza D0 helyett). Mostantól kifejezett szám-ellenőrzés dönt.
+Ugyanez a csapda volt a `pyrLeapLabel(id)`-ben (`id||1`), az is javítva.
+
+### 13.3 Az új osztály mezőnye
+
+Egy teljes lépcsővel (`PYR_STEP` = 3,0) a mostani élvonal fölött, 16 csapattal.
+A klubok a világ **legerősebbjei**, de szándékosan **egy másik évjáratukkal**:
+a kontinens csúcsán az adatbázis nagy csapatainak egy másik, ugyanolyan rangos
+szezonja áll. Így az entitás-azonosító (`Klub (szezon)`) is különbözik a
+piramisban már szereplőtől, tehát semmi nem ütközik.
+
+Ha egy klubnak nincs szabad másik évjárata, a következő klub jön — a sorrend a
+nyers erő szerint megy. Ha végképp nincs elég szabad évjárat (a piramis nagyon
+mélyre nőtt), a már szereplő évjáratokat is elfogadjuk: **két osztály közti**
+névazonosság csak kiírásbeli furcsaság, **egy osztályon belül** viszont sosem
+engedjük meg — a tabella és a sorsolás azt olvassa.
+
+Nevek: D0 = *Ojrópai Szuperliga*, D−1 = *Világliga*, onnantól *Világliga 2, 3…*
+— a lista sosem fogyhat el, mert a piramis sem.
+
+### 13.4 Az ütem NEM extrapolál
+
+A `pyrAiRate` a `t = (PYR_DIVS − div) / (PYR_DIVS − 1)` aránnyal interpolál a
+fokozat `share` és `top` értéke közt. A szuperligákban a `div` nulla vagy
+negatív, tehát `t > 1` lenne — ezt **levágjuk** 1-re.
+
+**Miért.** A nehézséget odafent a **szint** adja (osztályonként +3,0), nem az
+ütem. Egy korlátlanul extrapolált share néhány osztály múlva értelmetlen
+számokat adna: a 3.9.38-as `vegtelen` fokozat 2,30/2,70-es értékeivel a D−5
+már `t = 2` mellett 3,1-es share-t jelentene — a mezőny háromszor gyorsabban
+nőne, mint a fejlődésed, és a piramis magától becsukná magát.
+
+### 13.5 Ami NEM változott
+
+* a **pénzért vett osztályugrás** (`PYR_LEAP`) továbbra is csak D1-ig visz: a
+  `pyrLeapTarget` a `to < 1` ágon kilép, és a `PYR_LEAP_PRICE` sem ismer D0-t.
+  A szuperligába csak bajnoki címmel lehet feljutni — ezt nem lehet megvenni;
+* a **kiesés** szabálya ugyanaz mindenütt (a 16. hely közvetlenül, a 14–15.
+  osztályozón) — a szuperligából is ki lehet esni;
+* a **Run-plafon** osztály-súlyai a `startDiv`-hez tartoznak, az pedig mindig
+  1..6 — nincs mit igazítani.
+
+### 13.6 Próba — `tools/pyr-szuperliga-proba.js`
+
+20 állítás valódi böngészőben: a kapu (csak a legfelső osztály megnyerése
+nyit), az azonosítók sértetlensége, az új osztály szintje és a **meglévő
+lépcső érintetlensége**, a mezőny épsége (16 csapat, osztályon belül egyedi
+nevek), a végtelen sorozat (D0 → D−1 → D−2), az azonosító↔index térkép, az
+ütem levágása, a feljutás a szokásos úton, a világ létszáma, és a régi
+mentések változatlansága. Plusz a 13.7 BL-padlója.
+
+### 13.7 A BL padlója: D1 + 2
+
+**A kérés.** „Hagyományos mód BL szintje legyen mindig d1 +2, d1-től kezdve
+pedig számított (hogy mindig legyen izgalmas)."
+
+A ligapiramis a **nemzet** versenyrendszere; a BL a fölötte lévő szint. Amíg
+nem értél fel az élvonalba, a BL mezőnye ne a te osztályodhoz igazodjon, hanem
+az ország legjobbjai fölé: `pyrTopLevel() + 2` (`PYR_BL_OVER_TOP`). Kevesebb,
+mint egy teljes osztálylépcső — a BL nem egy újabb osztály, hanem a nemzeti
+élvonal fölötti kontinentális szint.
+
+**Miért padló, és nem rögzített érték.** Ha kimondottan `D1+2`-t adnánk vissza,
+egy D3-ban ülő, de már 120-as kerettel bíró klub a saját élvonalánál alig
+erősebb BL-mezőnyt kapna — ingyen trófeát. A padló ezt zárja ki: a számított
+érték **bármikor átveheti**, ha az a nagyobb. És ez adja meg a kérés második
+felét is, magától: az élvonalba érve a te erődből számolt szint már fölötte
+jár, tehát onnantól végig a számított érték szól.
+
+Mérve (a próbából): 85-ös élvonal mellett egy 65-ös kerettel a BL **87** (a
+padló szól), egy 125-ös kerettel **120** (a számított vette át).
+
+**Csak a BL kap padlót.** A többi sorozat rangsorát az `oppDelta` és az
+`EURO_EDGE` adja; ha mind a négy kupa padlót kapna, a hazai kupa is a BL
+szintjén nyílna.

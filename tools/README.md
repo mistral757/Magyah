@@ -244,6 +244,24 @@ tárgyalás-rontás, stílus-képesség és a távozó stábtag). Egy jutalom, a
 csinál semmit, rosszabb, mint ha nem létezne. Részletek:
 `docs/kihivasok-3937.md`.
 
+## pyr-szuperliga-proba.js — a piramis fölfelé is nő (D0, D−1, D−2 …)
+
+```bash
+node tools/pyr-szuperliga-proba.js
+```
+
+A 3.9.39-es **szuperligákat** méri: a legfelső osztály megnyerése új osztályt
+nyit fölötte, a végtelenbe. A legfontosabb állítás az AZONOSÍTÓK sértetlensége
+— a D1 marad D1, csak az indexek csúsznak (`idx = id − 1 + above`) —, mert
+ezen áll a naplód, a fejlődés-mérőd és a kezdő osztályod visszamenőleges
+érvényessége. Emellett: a kapu, az új osztály szintje és a meglévő lépcső
+érintetlensége, a mezőny épsége, a feljutás a szokásos úton, az ütem levágása
+a szuperligákban, a régi mentések változatlansága, és a **BL padlója**
+(D1 + 2, amíg nem vagy az élvonalban). Ez a próba fogott meg egy valódi hibát:
+a `pyrMyDivId()` `||`-os alapértelmezése a D0-t hamisnak látta, és a feljutó
+játékost a legalsó osztályba tette. Részletek:
+`docs/karrier-hagyomanyos-mod.md` 13.
+
 ## pyr-fokozat-proba.js — az ellenfél-tempó létrája és a futó karrierek védelme
 
 ```bash
