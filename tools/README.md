@@ -259,7 +259,7 @@ bökés-gomb a „nem tudjuk" állapotban is megjelenik; és a túloldali `waitA
 jelzésből a társ órája visszaszámol. A szabályfájlt is ellenőrzi.
 
 Emellett a beváró képernyő FEJLÉCÉT is (3.9.42): kupa-párharcban a sorozat és a
-kör nevét kell kiírnia (`BL · NEGYEDDÖNTŐ · VISSZAVÁGÓ`), nem a bajnoki
+kör nevét kell kiírnia (`KUPA · NEGYEDDÖNTŐ · VISSZAVÁGÓ` — sorozat-rövidítés nélkül), nem a bajnoki
 fordulószámot — a bajnokság ilyenkor már lezárult, tehát ott „31. FORDULÓ" állt,
 egy nem létező forduló. Részletek: `docs/ertesitesek.md` 7-9.
 

@@ -446,11 +446,27 @@ szövegre, egy megjelenítési hiba miatt nyúlnánk az adathoz. A kiírás az
 | helyzet | fejléc |
 |---|---|
 | bajnoki párharc | `15. FORDULÓ` *(változatlan)* |
-| kupa-párharc, odavágó | `BL · NEGYEDDÖNTŐ` |
-| kupa-párharc, visszavágó | `BL · NEGYEDDÖNTŐ · VISSZAVÁGÓ` |
-| döntő | `BL · DÖNTŐ` |
+| kupa-párharc, odavágó | `KUPA · NEGYEDDÖNTŐ` |
+| kupa-párharc, visszavágó | `KUPA · NEGYEDDÖNTŐ · VISSZAVÁGÓ` |
+| döntő | `KUPA · DÖNTŐ` |
 | szöveges fejléc (szezonzárás, tabella…) | változatlan |
 
 Az oda-visszavágó **második** meccsét kimondjuk: a két találkozó két külön
 párharc, két külön kerettel — tudni kell, melyiknél tartasz. Az első meccs nem
 kap jelzőt (az „odavágó" felesleges, amíg nincs mihez képest).
+
+**Csak „KUPA", nem a sorozat rövidítése.** Bejelentett kérés: *„nem használjuk
+már a BL rövidítést (jogi okokból) és nem is mindig BL lenne."* Mindkét fele
+igaz: a párharc a hazai kupában és mindhárom nemzetközi sorozatban is lehet,
+tehát egy odaírt sorozat-kód a legtöbbször **tárgyi tévedés** is volna. A KÖR
+neve (Negyeddöntő, Döntő) úgyis megmondja, hol tartasz — a sorozat neve ezen a
+képernyőn nem hordoz információt.
+
+> **Nyitott kérdés, szándékosan itt hagyva.** Az `EURO_COMPS.BL.short` értéke
+> továbbra is `"BL"`, és az még **kilenc** helyen kimegy a képernyőre: a
+> tabella-fejléc (`standing`), a kupa-kvalifikációs sáv, a trófeasor, a
+> Champion-kártya jutalma, az örök csúcsok kupa-összesítője, a kupanevezés
+> „kihagyjuk" sora és a piramis szint-magyarázata. A `short` **csak
+> kiírás** — a mentésben a kulcs (`BL`) él, azt nem érinti —, tehát egy
+> csereszó (pl. `KKK`, a „Kupák Kupájának Kupája" kezdőbetűi) egyetlen sor, és
+> visszafelé is kompatibilis. Ezt a kérés nem kérte, ezért nem nyúltam hozzá.

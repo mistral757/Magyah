@@ -107,7 +107,9 @@ const srv=http.createServer((req,rp)=>{
 
     /* ---- 5. A BEVÁRÓ FEJLÉC KUPÁBAN (3.9.42) ----
        A bajnokság lezárult (S.idx=30), tehát a párharc a fejlécnek 31-et ad
-       át — a képernyő eddig „31. FORDULÓ"-t írt ki. */
+       át — a képernyő eddig „31. FORDULÓ"-t írt ki. A sorozat RÖVIDÍTÉSE nem
+       kerülhet ki (jogi ok), és nem is mindig ugyanaz a sorozat: „KUPA" áll
+       ott, a kör neve pedig úgyis megmondja, hol tartasz. */
     S.idx=30;S.seasonNumber=1;
     S.euro=null;
     out.cim_bajnoki=h2hWaitTitle(15);
@@ -155,10 +157,10 @@ const srv=http.createServer((req,rp)=>{
     ["a diagnózis elválik: nem csatlakozott vs. nem ismert",r.diagnozis_elvalik===true],
     ["a bajnoki forduló fejléce változatlan",r.cim_bajnoki==="15. FORDULÓ"],
     ["a szöveges fejléc változatlan",r.cim_szoveges==="SZEZONZÁRÁS"],
-    ["kupa-párharcban a SOROZAT és a KÖR áll ott, nem a 31. forduló",
-      r.kupa_most===true&&r.cim_oda==="BL · NEGYEDDÖNTŐ"],
-    ["a visszavágó meg is van jelölve",r.cim_vissza==="BL · NEGYEDDÖNTŐ · VISSZAVÁGÓ"],
-    ["a döntő is a saját nevén szerepel",r.cim_donto==="BL · DÖNTŐ"],
+    ["kupa-párharcban KUPA + a kör áll ott, nem a 31. forduló",
+      r.kupa_most===true&&r.cim_oda==="KUPA · NEGYEDDÖNTŐ"],
+    ["a visszavágó meg is van jelölve",r.cim_vissza==="KUPA · NEGYEDDÖNTŐ · VISSZAVÁGÓ"],
+    ["a döntő is a saját nevén szerepel",r.cim_donto==="KUPA · DÖNTŐ"],
     ["ha nem kupa-párharc, marad a fordulószám",r.cim_nem_kupaparharc==="31. FORDULÓ"],
     ["a szabályfájl engedi a waitAt / online / push / seenAt mezőket",szabalyOk===true],
     ["nincs oldalhiba",errs.length===0]];
