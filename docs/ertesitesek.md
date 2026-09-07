@@ -271,3 +271,145 @@ nyilvánvaló, hogy várnak rá.
    beállítva".
 4. **A társ engedélyezte?** A gomb megmondja, ha nem.
 5. **iPhone?** Lásd az 5. pontot.
+
+---
+
+## 7. Miért nem működött SEMMI a PvP tempóból (3.9.41)
+
+**A bejelentés.**
+
+> „PvP villám és gyorsított módban ahol élnének a 3 perces tempógyorsítók, ott
+> jelenleg nem történik semmi. Az értesítések jelenleg nem működnek. Nem lehet
+> megbökni a társat, hiába van bekapcsolva mindkét oldalon. Plusz van ez a
+> »társad jelenléte nem ismert (régi szoba)« felirat úgy, hogy ez egy friss
+> test-szoba, mindkét oldal online."
+
+Négy tünet, **öt** különálló ok. Egyik sem volt „elméleti" — mind a négy tünet
+egy-egy konkrét sort takart.
+
+### 7.1 A számláló elnémult, ha a társ ONLINE volt
+
+```js
+function mpDeadlineLeft(startAt,kozos){
+  …
+  if(mpMateOnline(_mpPresRoom)===true)return null;   // ← „ott van, nem sürgetjük"
+```
+
+Jó szándék, rossz következmény. A **tipikus** eset épp az, hogy mindketten a
+képernyő előtt ültök — és akkor a Tempós/Villám fokozat **teljesen inert**
+volt: nem indult óra, nem jelent meg szám, nem lépett semmi. Aki választotta,
+egy nem működő funkciót kapott.
+
+**Mostantól** a jelenlét nem a *számlálót* némítja el, hanem az *automatikus*
+lépést finomítja (`mpAutoMehet`): a szám **mindig** kimegy, és ha a társ
+tényleg ott dolgozik, a továbblépés gomb marad, nem automatika. Egy néma
+határidő rosszabb, mint a semmi.
+
+### 7.2 A tempó némán elveszett a szoba létrehozásakor
+
+```js
+try{await F.set(ref,rec);}
+catch(e){
+  const alap={}; …ki a `tempo` mezőt…    // ← és soha nem szóltunk róla
+  await F.set(ref,alap);}
+```
+
+Ha a Firebase-ben még a **régi szabályfájl** fut, az nem engedi a `tempo`
+mezőt, tehát a szoba **Kényelmes** módban jött létre (`ms: 0`) — a 3 perces
+ablak sosem indult el, és semmi nem árulta el, hogy nem is fog.
+
+**Mostantól** külön újrapróbáljuk a `tempo` visszaírását, a hibát megjegyezzük
+(`mpNet.tempoErr`), és a beváró képernyő **kiírja**, hogy ez a szoba határidő
+nélkül fut, és mi a teendő.
+
+### 7.3 A jelenlét-bejelentkezés egyszer futott le, aztán soha
+
+`mpPresenceArm` a szoba **létrehozásakor** és a **csatlakozáskor** futott, és
+korán kilépett, ha ugyanarra a szobára már állt (`_mpPresence.code===code`).
+Csakhogy az `online:true` **nem örök**: az `onDisconnect` megbízás a szerveren
+ül, és minden szakadásnál `online:false`-ra írja. Szakadás pedig folyton van —
+a fül háttérbe megy, a telefon alszik, a wifi vált, a lap újratöltődik. És a
+játék maga bíztat a kilépésre („Vissza a kezdőlapra — a szoba megmarad").
+
+Innentől a társad **offline-nak vagy sehogy** látott — és mivel a `push`
+feliratkozás is ugyanebben a függvényben megy ki, a **bökés is elnémult**.
+Ez a magyarázata a „friss test-szoba, mindkét oldal online, mégis nem ismert"
+esetnek.
+
+**Mostantól** a függvénynek két része van, más ütemezéssel:
+
+| rész | mikor |
+|---|---|
+| a megbízás (`onDisconnect`) | szobánként **egyszer** — drága, és nem avul el |
+| a bejelentkezés (`online` + `seenAt`) | **szívverés**, 25 mp-enként, amíg a beváró képernyő nyitva van |
+| a `push` feliratkozás | 3 percenként, illetve új szobánál azonnal |
+
+Plusz: a beváró képernyő **megnyitása** azonnali bejelentkezést kér.
+
+### 7.4 A bökés-gomb csak a BIZTOSAN offline társnál jelent meg
+
+```js
+if(mpMateOnline(_mpPresRoom)!==false||!pushBeallitva()){w.classList.add("hide");return;}
+```
+
+A jelenlét **három** állapotú (`true` / `false` / `null` = nem tudjuk), a kapu
+viszont csak az egyiket engedte. A „nem tudjuk" állapotban — épp amit a 7.3
+okozott — a gomb **néma** maradt. A felhasználó ebből azt látta, hogy „nem
+lehet megbökni a társat, hiába van bekapcsolva mindkét oldalon".
+
+**Mostantól** csak azt rejtjük el, akiről **biztosan** tudjuk, hogy ott ül.
+A többinél a gomb megjelenik, és ha valami hiányzik, a `nudgeLehet` **kiírja**,
+hogy mi. Egy kiírt ok mindig jobb, mint egy néma gomb.
+
+### 7.5 A „régebbi szoba" három különböző okra ült rá
+
+A `null` állapot szövege mindig ez volt: *„A társad jelenléte nem ismert
+(régebbi szoba)."* Csakhogy a `null` háromféle helyzetből jön, és kettő friss
+szobában is előfordul:
+
+| helyzet | mit kell tenni |
+|---|---|
+| a társ **még nem csatlakozott** | várni |
+| a **mi** jelzésünk nem megy ki (`presErr`) | a szabályfájlt közzétenni |
+| ő csatlakozott, de **tőle** nincs jelzés | régi szoba, vagy az ő gépén a szabályfájl |
+
+Mostantól mind a három **külön** szöveget kap.
+
+## 8. A kért számláló és a túloldali jelzés (3.9.41)
+
+> „Legyen az ilyen kijelzőkön egy számláló is, hogy mennyit kell még várni, a
+> másik oldalon pedig … jelzés arra, hogy a másik oldalon elindult a várakozás,
+> megy a 180 másodperces számláló."
+
+**A saját oldalad** számlálóját a 7.1 hozta vissza: `⏱ Villám tempó — 2:25
+múlva magától továbblép.`
+
+**A túloldal** jelzése a saját játékos-ágadba írt `waitAt` mezőn megy át:
+
+* **hol tároljuk.** A `players/<én>/waitAt`-ban, nem a szoba gyökerében. Két
+  oka van: a jelenlét-lekérdezés **úgyis** a `players` ágat hozza le, tehát a
+  társad **ingyen** megkapja, egyetlen extra kérés nélkül; és a saját ágamba
+  írni jogosultsági kérdés nélkül szabad.
+* **szerveridőben** (`mpStamp`), mert a számláló a **túloldalon** fut le — a
+  két gép órája között nem lehet eltérés.
+* **mikor.** A jelzés a **jelenlét-körből** megy ki, nem a képernyő
+  megnyitásakor: abban a pillanatban a szoba még nincs letöltve, tehát a
+  **tempóját** sem ismerjük, és a jelzés a Kényelmes alapértékkel menne ki.
+* **mit lát a társad.** `⏳ A társad rád vár — Villám tempó, 2:25 van hátra,
+  utána a rendszer magától továbblép.`
+* **takarítás.** A képernyő zárásakor a mező nullázódik; egy régen otthagyott
+  jelzés (egy egész ablaknyival túlcsúszott) magától elnémul.
+
+**Aki nincs a játékban**, azt csak a push éri el — ezért a várakozás indulása
+**egyszer** automatikus bökést is küld. A kézi bökés fékjét (`NUDGE_MIN_MS`)
+tiszteletben tartja, tehát oda-vissza kapkodásból nem lesz értesítés-zápor, és
+ha bármi hiányzik (nincs feliratkozás, nincs engedély), **csendben** kimarad:
+egy automatikus értesítés nem kérhet semmit a felhasználótól.
+
+> **A `waitAt` mező ÚJ a szabályfájlban.** A `tools/firebase-rules.json`
+> frissített változatát **közzé kell tenni**, különben a jelzés nem megy ki —
+> ugyanúgy, ahogy az `online`, a `push` és a `tempo` sem. A 7.2–7.5 pontok
+> tünetei mind ebből is fakadhatnak; a játék mostantól ki is mondja, ha ezt
+> érzékeli.
+
+**Próba:** `tools/mp-tempo-jelenlet-proba.js` — 16 állítás.

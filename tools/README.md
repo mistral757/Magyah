@@ -244,6 +244,21 @@ tárgyalás-rontás, stílus-képesség és a távozó stábtag). Egy jutalom, a
 csinál semmit, rosszabb, mint ha nem létezne. Részletek:
 `docs/kihivasok-3937.md`.
 
+## mp-tempo-jelenlet-proba.js — a PvP tempó, a jelenlét és a bökés
+
+```bash
+node tools/mp-tempo-jelenlet-proba.js
+```
+
+A 3.9.41-es javításokat méri: a 3 perces ablak számlálója ONLINE társ mellett
+is fut (korábban ilyenkor a fokozat teljesen inert volt), az automatika viszont
+csak offline társnál sül el; a tempó-mező írása külön újrapróbát kap és a hibát
+kimondja; a jelenlét-bejelentkezés szívveréssé vált (korábban szobánként
+egyszer futott, az onDisconnect viszont minden szakadásnál offline-ra írt); a
+bökés-gomb a „nem tudjuk" állapotban is megjelenik; és a túloldali `waitAt`
+jelzésből a társ órája visszaszámol. A szabályfájlt is ellenőrzi. Részletek:
+`docs/ertesitesek.md` 7-8.
+
 ## mp-kozos-beallitas-proba.js — a közös karrier beállítói
 
 ```bash

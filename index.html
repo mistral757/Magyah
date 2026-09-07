@@ -5728,7 +5728,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.40";
+const APP_VERSION="3.9.41";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -50390,7 +50390,11 @@ function startRound(){
 function startRoundNow(){
   if(h2hIsDuelRound()&&!h2hScript){h2hBeginDuel();return;}
   playMatch();}
-function h2hWaitHide(){_h2hWaitAt=0;$("h2hWait").classList.add("hide");}
+function h2hWaitHide(){
+  _h2hWaitAt=0;
+  _mpWaitSignalled=false;
+  try{mpWaitMark(false);}catch(e){}   /* a jelzés lekerül a túloldalról is */
+  $("h2hWait").classList.add("hide");}
 /* ================= A KIÚT ŐRE =================
    Az utolsó védelmi vonal. Bármi történjék a beváró folyamatok alatt, EZ a két
    dolog mindig igaz kell legyen:
@@ -50425,16 +50429,56 @@ function mpPresencePaint(){
   }else{
     /* null = nem tudjuk. Ezt KI IS MONDJUK: a jelenlét előtt nyitott
        szobákban nincs ilyen adat, és offline-nak hazudni rosszabb. */
+    /* ---- MIÉRT NEM TUDJUK? (3.9.41) ----
+       BEJELENTETT HIBA: „van ez a »társad jelenléte nem ismert (régi szoba)«
+       felirat úgy, hogy ez egy friss test-szoba, mindkét oldal online."
+       Igaza volt: a „régebbi szoba" HÁROM különböző okra ült rá, és kettő
+       közülük friss szobában is előfordul. Mostantól megkülönböztetjük őket,
+       mert csak így lehet tudni, mi a teendő. */
     const pe=mpNet.presErr;
+    const _p=nudgeTarsAg(_mpPresRoom);
     el.innerHTML=!_mpPresRoom ? ""
       : pe
         ? '<span style="color:#e0a0a0">A jelenlét-jelzés nem megy ki ezen a gépen '
           +'<small>('+esc(String(pe).slice(0,44))+')</small><br>'
-          +'<small style="color:var(--dim2)">Ha ez tartós: a Firebase-szabályfájl frissített '
-          +'változata még nincs közzétéve. A játék ettől működik, csak a társad '
-          +'jelenlétét nem látjuk.</small></span>'
-        : '<span style="color:var(--dim2)">A társad jelenléte nem ismert (régebbi szoba).</span>';
+          +'<small style="color:var(--dim2)">A Firebase-szabályfájl frissített változata '
+          +'valószínűleg még nincs közzétéve (tools/firebase-rules.json). A játék ettől '
+          +'működik, csak a jelenlét és a bökés nem.</small></span>'
+        : !_p
+          ? '<span style="color:var(--dim2)">A társad még nem csatlakozott ehhez a szobához.</span>'
+          : '<span style="color:#e0a0a0">A társad jelenléte nem ismert.</span>'
+            +'<br><small style="color:var(--dim2)">Ő csatlakozott, de nem érkezik tőle '
+            +'jelenlét-jelzés. Ez vagy egy régebbi szoba, vagy az ő gépén nem megy ki a '
+            +'jelzés — utóbbinál a Firebase-szabályfájl frissítése a teendő.</small>';
   }
+  /* ---- A TÁRSAD ÓRÁJA (3.9.41) ----
+     Ha ő vár rád, azt látnod kell — és azt is, mennyi ideje van hátra. Ez a
+     kért „jelzés arra, hogy a másik oldalon elindult a várakozás". */
+  try{
+    const mw=mpMateWaitLeft(_mpPresRoom);
+    if(mw!==null){
+      const T=mpTempoOf(_mpPresRoom);
+      el.innerHTML+=`<br><span style="color:#ffb454">⏳ <b>A társad rád vár</b> — `
+        +(mw>0
+          ? `${esc(T.n)} tempó, <b>${mpMMSS(mw)}</b> van hátra`
+            +(T.auto?`, utána a rendszer magától továbblép.`:`, utána felajánlja neki a továbblépést.`)
+          : `a határideje letelt.`)
+        +`</span>`;}
+  }catch(e){}
+  /* ---- A TEMPÓ NÉMÁN ELVESZHETETT (3.9.41) ----
+     Ha a szoba létrehozásakor a `tempo` mező írása elbukott, a szoba
+     Kényelmes módban jött létre — és a felhasználó egy nem működő fokozatot
+     kapott, magyarázat nélkül. Ez volt a bejelentett „villám módban nem
+     történik semmi" egyik fele. Ha tudunk róla, KIMONDJUK. */
+  try{
+    if(mpNet.tempoErr&&!mpTempoOf(_mpPresRoom).ms)
+      el.innerHTML+=`<br><span style="color:#e0a0a0">⚠️ A választott tempó nem jutott el a `
+        +`szobába, ezért ez a szoba <b>Kényelmes</b> módban fut (nincs határidő). `
+        +`<small>(${esc(String(mpNet.tempoErr).slice(0,40))})</small><br>`
+        +`<small style="color:var(--dim2)">A Firebase-szabályfájl frissített változata még `
+        +`nincs közzétéve (tools/firebase-rules.json).</small></span>`;
+  }catch(e){}
+  try{mpWaitSignal();}catch(e){}
   try{mpNudgePaint();}catch(e){}
   /* ---- P1: A VISSZASZÁMLÁLÓ ----
      Csak akkor, ha van mód, van mire várni, és a társ tényleg nincs ott —
@@ -50448,8 +50492,11 @@ function mpPresencePaint(){
              :mpDeadlineLeft(_h2hWaitAt||null,false);
     if(h===null)return;
     if(o&&o.auto&&T.auto){
+      const auto=mpAutoMehet();
       el.innerHTML+=`<br><span style="color:var(--gold)">⏱ Villám tempó — `
-        +(h>0?`<b>${mpMMSS(h)}</b> múlva magától továbblép.`:`továbblépés…`)+`</span>`;
+        +(h>0?`<b>${mpMMSS(h)}</b> múlva ${auto?"magától továbblép":"felajánlom a továbblépést"}.`
+             :(auto?`továbblépés…`:`a továbblépés gombja lent — a társad ONLINE, ezért nem lépünk helyette magától.`))
+        +`</span>`;
     }else if(o){
       el.innerHTML+=`<br><span style="color:var(--gold)">⏱ ${esc(T.n)} tempó — `
         +(h>0?`<b>${mpMMSS(h)}</b> múlva felajánlom a továbblépést.`
@@ -50476,9 +50523,17 @@ function mpPresencePaint(){
 function mpNudgePaint(){
   const w=$("h2hWaitNudgeWrap"),b=$("h2hWaitNudgeBtn"),m=$("h2hWaitNudgeMsg");
   if(!w||!b)return;
-  /* CSAK OFFLINE TÁRSNÁL. Aki ott ül, azt nem kell értesíteni; a "nem tudjuk"
-     állapotban sem kínáljuk, mert ott a feliratkozásáról sem tudunk semmit. */
-  if(mpMateOnline(_mpPresRoom)!==false||!pushBeallitva()){w.classList.add("hide");return;}
+  /* ---- AKI NINCS BIZTOSAN ITT, AZT MEG LEHET BÖKNI (3.9.41) ----
+     ITT ÁLLT: `if(mpMateOnline(...)!==false)` — vagyis a gomb CSAK akkor
+     jelent meg, ha BIZTOSAN tudtuk, hogy a társ offline. A „nem tudjuk"
+     állapotban (régi szoba, vagy ki nem ment jelenlét-jelzés) a gomb néma
+     maradt, és a felhasználó azt látta, hogy „nem lehet megbökni a társat,
+     hiába van bekapcsolva mindkét oldalon" — pontosan a bejelentett tünet.
+     Mostantól csak azt rejtjük el, akiről BIZTOSAN tudjuk, hogy ott ül. A
+     többinél megjelenik, és ha valami hiányzik (nincs feliratkozása, még jár
+     a várakoztatás), a `nudgeLehet` KIÍRJA, hogy mi — egy kiírt ok mindig
+     jobb, mint egy néma gomb. */
+  if(mpMateOnline(_mpPresRoom)===true||!pushBeallitva()){w.classList.add("hide");return;}
   w.classList.remove("hide");
   const baj=nudgeLehet(_mpPresRoom);
   b.disabled=!!baj;
@@ -50496,9 +50551,22 @@ function mpNudgePaint(){
         ?"Letiltottad — a böngésző beállításaiban engedélyezhető."
         :"";}
 }
+/* Milyen sűrűn jelentkezünk be újra. Ritkább, mint a lekérdezés: egy írás
+   drágább, és a jelenlét nem másodpercek kérdése. A `push` feliratkozást
+   ennél is ritkábban frissítjük (lásd MP_PRES_PUSH_MS). */
+const MP_PRES_BEAT_MS=25000, MP_PRES_PUSH_MS=180000;
+let _mpBeatAt=0,_mpPushAt=0;
 function mpPresenceTick(){
   if(mpNet.mode!=="fb"||!MP.activeRoom)return;
   const t=Date.now();
+  /* A SZÍVVERÉS a lekérdezéstől FÜGGETLEN ütemben megy — enélkül egy
+     visszatérés vagy egy felébredő telefon után a társad örökre offline-nak
+     látna (3.9.41). */
+  if(t-_mpBeatAt>=MP_PRES_BEAT_MS){
+    _mpBeatAt=t;
+    const kellPush=(t-_mpPushAt>=MP_PRES_PUSH_MS);
+    if(kellPush)_mpPushAt=t;
+    try{mpPresenceArm(MP.activeRoom,kellPush?"push":true);}catch(e){}}
   if(t-_mpPresAt<MP_PRESENCE_MS)return;
   _mpPresAt=t;
   /* ELSŐ KÖR: a teljes szoba, mert a tempó is kell belőle. UTÁNA már csak a
@@ -50609,13 +50677,16 @@ function mpSoloOffer(oppReady){
     mpSoloClear();
     try{o.fn();}catch(e){try{h2hWaitHide();}catch(_){}}};
   ob.onclick=lep;
-  /* VILLÁM: a lágy kiutat a határidő magától megnyomja. Csak akkor, ha
-     (1) a mód ezt kéri, (2) a lépés lágy (auto), és (3) a társ TÉNYLEG
-     nincs ott — az mpDeadlineLeft ez utóbbit is figyeli. */
+  /* VILLÁM: a lágy kiutat a határidő magától megnyomja. Négy feltétel:
+     (1) a mód ezt kéri, (2) a lépés lágy (auto), (3) letelt a határidő, és
+     (4) a társ nem ÉPP OTT dolgozik (mpAutoMehet, 3.9.41). A negyediket
+     korábban az mpDeadlineLeft intézte — csakhogy az a SZÁMLÁLÓT is
+     elnémította, tehát a fokozat online társ mellett teljesen inert volt. */
   const T=mpTempoOf(_mpPresRoom);
   if(!T.auto||!o.auto)return;
   const h=mpDeadlineLeft(mpSoloStart(o),o.shared!=null);
   if(h===null||h>0)return;
+  if(!mpAutoMehet())return;   /* ott ül és dolgozik — a gomb a tiéd marad */
   if(_mpSoloFired===o)return;      /* egyszer, ne pörögjön */
   _mpSoloFired=o;
   /* A PÁRHARC A SAJÁT SZAVAIVAL MONDJA EL (h2hStart), a meccs mellett, és a
@@ -50628,6 +50699,14 @@ function mpSoloOffer(oppReady){
 let _mpSoloFired=null;
 function h2hWaitShow(round,msg,mine,opp,what){
   _h2hWaitAt=Date.now();
+  /* AZONNALI BEJELENTKEZÉS (3.9.41): a beváró képernyő az a pillanat, amikor
+     a társadnak a legfontosabb tudnia, hogy itt vagy. Nem várunk a következő
+     szívverésre. A `_mpBeatAt` nullázása kényszeríti a kiírást is. */
+  try{_mpBeatAt=0;_mpPresAt=0;if(MP.activeRoom)mpPresenceArm(MP.activeRoom,"push");}catch(e){}
+  /* A jelzés KIÍRÁSA nem itt történik, hanem a jelenlét-körben (mpWaitSignal):
+     ebben a pillanatban a szoba még nincs letöltve, tehát a tempóját sem
+     ismerjük — egy itt kiírt jelzés a Kényelmes alapértékkel menne ki. */
+  _mpWaitSignalled=false;
   const W=what||{mine:"A te kereted",opp:"A társad kerete",cancel:"✕ Most nem játszom le"};
   $("h2hWait").classList.remove("hide");
   $("h2hWaitOrphanBtn").classList.add("hide");   /* csak a szoba-eltűnés mutatja */
@@ -87889,8 +87968,22 @@ function mpTempoOf(room){return MP_TEMPO[mpTempoKey(room)];}
 function mpDeadlineLeft(startAt,kozos){
   const T=mpTempoOf(_mpPresRoom);
   if(!T.ms||!startAt)return null;
-  if(mpMateOnline(_mpPresRoom)===true)return null;   /* ott van — nem sürgetjük */
+  /* ---- A SZÁMLÁLÓ AKKOR IS FUT, HA A TÁRS ONLINE (3.9.41) ----
+     ITT ÁLLT: `if(mpMateOnline(...)===true)return null;` — „ott van, nem
+     sürgetjük". Jó szándék, rossz következmény: a TIPIKUS eset épp az, hogy
+     mindketten ott ültök a képernyő előtt, és akkor a Tempós/Villám fokozat
+     TELJESEN INERT volt. Aki választotta, egy nem működő funkciót kapott —
+     pontosan ez a bejelentés.
+     A jelenlét mostantól nem a SZÁMLÁLÓT némítja el, hanem az AUTOMATIKUS
+     lépést finomítja (lásd mpAutoMehet): a számot mindig kiírjuk, mert egy
+     néma határidő rosszabb, mint a semmi. */
   return Math.max(0,startAt+T.ms-(kozos?mpNow():Date.now()));}
+/* Elsülhet-e MAGÁTÓL a továbblépés? A Villám ígérete az, hogy elsül — de ha a
+   társad ÉPP OTT VAN és dolgozik, egy elavult kerettel lejátszott párharc a
+   rosszabbik vég. Ilyenkor a számláló lejár, a lépés viszont a te kezedben
+   marad: egy gombnyomás, nem automatika. Ha nem tudjuk, hol van, vagy nincs
+   ott, az automatika a vállalás szerint fut. */
+function mpAutoMehet(){return mpMateOnline(_mpPresRoom)!==true;}
 function mpMMSS(ms){
   const t=Math.max(0,Math.round(ms/1000));
   return Math.floor(t/60)+":"+String(t%60).padStart(2,"0");}
@@ -87917,26 +88010,49 @@ function mpMMSS(ms){
    ugyanúgy működik — a jelenlét pedig a HARMADIK állapotba esik vissza
    („nem tudjuk"), ami pontosan erre az esetre készült. */
 let _mpPresence=null;      /* {code, od} — a felfüggesztett megbízás */
-async function mpPresenceArm(code){
+/* ---- A JELENLÉT SZÍVVERÉSE (3.9.41) ----
+   BEJELENTETT HIBA: „van ez a »társad jelenléte nem ismert (régi szoba)«
+   felirat úgy, hogy ez egy friss test-szoba, mindkét oldal online."
+
+   A GYÖKÉR: a `mpPresenceArm` KÉTSZER futott le egy karrier alatt — a szoba
+   létrehozásakor és a csatlakozáskor —, utána soha. Az `online:true` viszont
+   nem örök: az `onDisconnect` megbízás a SZERVEREN ül, és minden szakadásnál
+   `online:false`-ra írja a mezőt. Szakadás pedig folyton van: a fül háttérbe
+   megy, a telefon alszik, a wifi vált, a lap újratöltődik. Onnantól a társad
+   téged offline-nak lát — vagy sehogy —, és mivel a `push` feliratkozás is
+   EBBEN a függvényben megy ki, a bökés is elnémul.
+
+   MOSTANTÓL a függvénynek két része van, és a kettő ütemezése más:
+     · a MEGBÍZÁS (onDisconnect) szobánként egyszer áll fel — az drága, és
+       nem is avul el;
+     · a BEJELENTKEZÉS (online + seenAt + push) SZÍVVERÉS: a beváró képernyő
+       ütemében újra kimegy. Így egy visszatérés, egy újratöltés vagy egy
+       felébredő telefon magától helyreteszi a jelenlétet.
+   A `force` az újrajelentkezést kéri anélkül, hogy a megbízáshoz nyúlnánk. */
+async function mpPresenceArm(code,force){
   if(mpNet.mode!=="fb"||!code)return;
   const F=mpNet.fns;
   if(!F||!F.onDisconnect||!F.update)return;
   try{
-    if(_mpPresence&&_mpPresence.code===code)return;   /* már áll erre a szobára */
-    await mpPresenceClear();
+    const all=!(_mpPresence&&_mpPresence.code===code);
+    if(!all&&!force)return;
     const r=F.ref(mpNet.db,"mp/rooms/"+code+"/players/"+mpMyId());
-    /* A SORREND SZÁMÍT: előbb a megbízás, utána a bejelentkezés. Fordítva egy
-       azonnali szakadás „örökre online" állapotot hagyna hátra. */
-    const od=F.onDisconnect(r);
-    await od.update({online:false,seenAt:mpStamp()});
+    if(all){
+      await mpPresenceClear();
+      /* A SORREND SZÁMÍT: előbb a megbízás, utána a bejelentkezés. Fordítva egy
+         azonnali szakadás „örökre online" állapotot hagyna hátra. */
+      const od=F.onDisconnect(r);
+      await od.update({online:false,seenAt:mpStamp()});
+      _mpPresence={code,od};}
     await F.update(r,{online:true,seenAt:mpStamp()});
-    _mpPresence={code,od};
     mpNet.presErr=null;
     /* A FELIRATKOZÁS ÚJRA KIMEGY, minden szobába. Nem kérünk engedélyt —
        csak ha MÁR megvan: a feliratkozás a szobában él, tehát egy új szoba
        különben úgy indulna, hogy a társad nem tud megbökni, pedig te
        engedélyezted. Ha nincs engedély, ez csendben kihagyja magát. */
-    if(pushBeallitva()&&pushEngedely()==="granted")
+    /* A FELIRATKOZÁS ÚJ SZOBÁNÁL MINDIG kimegy; a szívverésben csak akkor, ha
+       még nincs fent — a `push` mező nem avul el, fölöslegesen írni pazarlás. */
+    if(pushBeallitva()&&pushEngedely()==="granted"&&(all||force==="push"))
       pushKozzetesz(code).catch(()=>{});
   }catch(e){
     /* A HIBÁT ELNYELJÜK, DE NEM FELEJTJÜK EL. A némaság szándékos — egy
@@ -87974,6 +88090,87 @@ function mpMateOnline(room){
     return !!p.online;
   }catch(e){return null;}
 }
+/* ================= A VÁRAKOZÁS JELE A TÚLOLDALON (3.9.41) ==================
+   KIMONDOTT KÉRÉS: „legyen az ilyen kijelzőkön egy számláló is, hogy mennyit
+   kell még várni, a másik oldalon pedig … jelzés arra, hogy a másik oldalon
+   elindult a várakozás, megy a 180 másodperces számláló."
+
+   HOL TÁROLJUK. A SAJÁT játékos-ágamban (`players/<én>/waitAt`), nem a szoba
+   gyökerében — és ennek két oka van. Egy: a jelenlét-lekérdezés ÚGYIS a
+   `players` ágat hozza le, tehát a társad ingyen megkapja, egyetlen extra
+   kérés nélkül. Kettő: a saját ágamba írni jogosultsági kérdés nélkül szabad,
+   a szoba gyökerébe írni pedig a másik fél adatait is érintené.
+
+   SZERVERIDŐBEN. A számláló a TÚLOLDALON fut le, tehát a két gép órája
+   között nem lehet eltérés — ugyanaz az elv, amiért a párharc `openedAt`-je
+   is szerveridő (lásd mpDeadlineLeft „közös" ága). */
+function mpWaitMark(on){
+  try{
+    if(mpNet.mode!=="fb"||!MP.activeRoom)return;
+    const F=mpNet.fns;if(!F||!F.update)return;
+    const r=F.ref(mpNet.db,"mp/rooms/"+MP.activeRoom+"/players/"+mpMyId());
+    F.update(r,{waitAt:on?mpStamp():0}).catch(()=>{});
+  }catch(e){}}
+/* ---- AZ ÓRA INDULÁSA ÉRTESÍTÉST IS KÜLD (3.9.41) ----
+   KIMONDOTT KÉRÉS: „a másik oldalon pedig (bekapcsolt értesítések mellett,
+   vagy akkor ha épp játékban van a játékos) jelzés arra, hogy a másik oldalon
+   elindult a várakozás, megy a 180 másodperces számláló."
+
+   KÉT CSATORNA, KÉT HELYZET:
+     · AKI ÉPP JÁTSZIK, azt a `waitAt` mező éri el — a saját beváró képernyője
+       kiírja a társ óráját, extra kérés nélkül (lásd mpMateWaitLeft);
+     · AKI NINCS A JÁTÉKBAN, azt csak a PUSH éri el. Ezt itt küldjük, egyszer,
+       a várakozás indulásakor.
+   A KÉZI BÖKÉS FÉKJÉT (NUDGE_MIN_MS) TISZTELETBEN TARTJA — a nudgeLehet
+   ugyanazt a `_nudgeAt`-ot nézi —, tehát egy oda-vissza kapkodás nem tud
+   értesítés-záport indítani. Ha bármi hiányzik (nincs feliratkozása, nincs
+   engedély, még jár a fék), CSENDBEN kimarad: az automatikus értesítés nem
+   kérhet semmit a felhasználótól. */
+/* A JELZÉS KIÍRÁSA ÉS AZ ÉRTESÍTÉS — a jelenlét-körből hívva, mert csak ott
+   van a kezünkben a szoba (és így a TEMPÓJA). A beváró képernyő megnyitásakor
+   még nincs: ott egy Kényelmes alapértékkel dolgoznánk, és a jelzés sosem
+   menne ki. Ez a `_mpWaitSignalled` jelző szerepe — várakozásonként egyszer
+   fut le, amint az első szobaadat megérkezik. */
+let _mpWaitSignalled=false;
+function mpWaitSignal(){
+  try{
+    if(_mpWaitSignalled||!_h2hWaitAt||!_mpPresRoom)return;
+    if(!mpTempoOf(_mpPresRoom).ms)return;   /* Kényelmes: nincs mit jelezni */
+    _mpWaitSignalled=true;
+    mpWaitMark(true);
+    mpWaitPush();
+  }catch(e){}}
+let _mpWaitPushRoom=null;
+function mpWaitPush(){
+  try{
+    if(mpNet.mode!=="fb"||!MP.activeRoom)return;
+    /* Szobánként ÉS várakozásonként egyszer: a beváró képernyő újranyílhat
+       ugyanabban a fordulóban (visszatérés a kezdőlapról), abból nem lehet
+       második értesítés. */
+    const kulcs=MP.activeRoom+"|"+(S&&S.idx!=null?S.idx:0);
+    if(_mpWaitPushRoom===kulcs)return;
+    if(mpMateOnline(_mpPresRoom)===true)return;   /* ott ül — látja a képernyőn */
+    if(nudgeLehet(_mpPresRoom))return;            /* nincs mit/hova küldeni */
+    _mpWaitPushRoom=kulcs;
+    nudgeKuld().catch(()=>{});
+  }catch(e){}}
+/* Mennyi van hátra a TÁRSAD határidejéből? null = nem vár rád (vagy nincs
+   mód). A szoba tempója a közös állandó, tehát a saját oldalunkon is a
+   helyes ablakot számoljuk. */
+function mpMateWaitLeft(room){
+  try{
+    const T=mpTempoOf(room);
+    if(!T||!T.ms)return null;
+    const p=nudgeTarsAg(room);
+    const w=p&&p.waitAt;
+    if(typeof w!=="number"||w<=0)return null;
+    const h=w+T.ms-mpNow();
+    /* Egy RÉGEN otthagyott jelzés nem várakozás: ha a határidő egy egész
+       ablaknyival túlcsúszott, a társ nyilván továbblépett vagy kilépett, és
+       a mező takarítatlanul maradt. Ilyenkor inkább hallgatunk. */
+    if(h<-T.ms)return null;
+    return Math.max(0,h);
+  }catch(e){return null;}}
 /* Mióta nem láttuk? (percben, szerveridőben mérve — lásd mpNow.) */
 function mpMateAwayMin(room){
   try{
@@ -88095,10 +88292,21 @@ const mpBackendFb={
          nem engedi, a szoba létrehozása bukna el — ami sokkal rosszabb, mint
          a tempó elvesztése. Ezért egyszer újrapróbáljuk nélküle: a szoba
          létrejön, csak Kényelmes módban (ami az alapérték úgyis). */
-      try{await F.set(ref,rec);}
+      /* A `tempo` ÚJ MEZŐ (lásd fent). Ha a régi szabályfájl nem engedi, a
+         szoba létrejön nélküle — de EZT KI IS MONDJUK (3.9.41). A néma
+         visszaesés volt a bejelentett „PvP villám és gyorsított módban nem
+         történik semmi" gyökere: a szoba Kényelmes módban jött létre (ms:0),
+         tehát a 3 perces ablak SOSEM indult el, és semmi nem árulta el, hogy
+         nem is fog. Előbb megpróbáljuk a tempót külön visszaírni; ha az sem
+         megy, a hibát megjegyezzük, és a beváró képernyő kiírja. */
+      try{await F.set(ref,rec);mpNet.tempoErr=null;}
       catch(e){
         const alap={};Object.keys(rec).forEach(k=>{if(k!=="tempo")alap[k]=rec[k];});
-        await F.set(ref,alap);}
+        await F.set(ref,alap);
+        try{
+          await F.update(F.ref(mpNet.db,"mp/rooms/"+code),{tempo:rec.tempo});
+          mpNet.tempoErr=null;
+        }catch(e2){mpNet.tempoErr=(e2&&e2.message)||String(e2);}}
       await mpPresenceArm(code);
       return {ok:true,code};}
     return {ok:false,err:"Nem sikerült szabad kódot találni — próbáld újra."};},
