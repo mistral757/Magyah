@@ -161,14 +161,25 @@ const srv=http.createServer((req,rp)=>{
         nat:"Magyarorszag",conf:0,attrs:{}};
       drafted.add(n);
       slots.push({pos,player:{n,pos:[pos],ovr:70,age:26,tsi:2000,nat:"Magyarorszag"},fit:1});});
+    /* A PÁLYÁRA LÉPŐ MEZŐNY, nem a nyers visszatérési érték: az
+       euroMidRating oppDelta NÉLKÜLI középértéket ad, a sorozat eltolása a
+       mezőny építésekor kerül rá (lásd euroFieldFor). Aki a nyers számot
+       olvassa, fordított rangsort lát — a próba ezért a VÉGSŐ számot méri. */
+    const palya=c=>euroMidRating(c)+((EURO_COMPS[c]&&EURO_COMPS[c].oppDelta)||0);
     out.bl={top,
-      gyenge_BL:euroMidRating("BL"),
-      gyenge_EL:euroMidRating("EL"),
-      gyenge_MK:euroMidRating("MK"),
+      gyenge_BL:palya("BL"),
+      gyenge_EL:palya("EL"),
+      gyenge_KL:palya("KL"),
+      gyenge_MK:palya("MK"),
       keret:Math.round(teamStrength())};
     out.bl_padlo_szol=(out.bl.gyenge_BL===top+PYR_BL_OVER_TOP);
-    /* a többi sorozat NEM kap padlót — a rangsorukat az oppDelta/EURO_EDGE adja */
+    /* a többi sorozat NEM kap padlót */
     out.bl_csak_a_bl=(out.bl.gyenge_MK<top+PYR_BL_OVER_TOP);
+    /* A SOROZATOK RANGSORA A PÁLYÁN: a BL a legerősebb mezőny, a hazai kupa a
+       leggyengébb. Ezt az EURO_EDGE.add viszi; a próba azért méri, mert a
+       nyers euroMidRating-en ez FORDÍTVA látszik, és ez már félrevezetett
+       egyszer. Erős kerettel mérjük, hogy a BL-padló ne torzítson bele. */
+    out.rangsor=null;
     /* ERŐS KERET: a SZÁMÍTOTT érték veszi át */
     slots.length=0;
     ["KP","JV","BV","BV","KV","VKP","KKP","TKP","JSZ","BSZ","CS"].forEach((pos,i)=>{
@@ -178,9 +189,12 @@ const srv=http.createServer((req,rp)=>{
       drafted.add(n);
       slots.push({pos,player:{n,pos:[pos],ovr:130,age:26,tsi:20000,nat:"Magyarorszag"},fit:1});});
     S.oppBuffH=null;
-    out.bl.eros_BL=euroMidRating("BL");
+    out.bl.eros_BL=palya("BL");
     out.bl.eros_keret=Math.round(teamStrength());
     out.bl_szamitott_veszi_at=(out.bl.eros_BL>top+PYR_BL_OVER_TOP);
+    out.rangsor={BL:palya("BL"),EL:palya("EL"),KL:palya("KL"),MK:palya("MK")};
+    out.rangsor_helyes=(out.rangsor.BL>out.rangsor.EL
+      &&out.rangsor.EL>out.rangsor.KL&&out.rangsor.KL>out.rangsor.MK);
 
     /* --- 6. AZ ÜTEM NEM SZALAD EL --- */
     const sp=pyrSpeedDef(pyrSpeedKey());
@@ -210,6 +224,7 @@ const srv=http.createServer((req,rp)=>{
     ["gyenge kerettel a BL padlója szól: D1 + 2",r.bl_padlo_szol===true],
     ["…és a padló CSAK a BL-é",r.bl_csak_a_bl===true],
     ["erős kerettel a SZÁMÍTOTT érték veszi át",r.bl_szamitott_veszi_at===true],
+    ["a pályán a BL a legerősebb mezőny, a hazai kupa a leggyengébb",r.rangsor_helyes===true],
     ["nincs oldalhiba",errs.length===0]];
   T.forEach(([n,ok])=>console.log((ok?"  ✓ ":"  ✗ ")+n));
   console.log("\n  a nyitott osztályok:",JSON.stringify(r.sorozat),JSON.stringify(r.nevek));
@@ -218,6 +233,7 @@ const srv=http.createServer((req,rp)=>{
   console.log("  lépcsők:",JSON.stringify(r.lepcsok),"· az új lépcső:",r.lepcso);
   console.log("  AI-ütem:",JSON.stringify(r.utem));
   console.log("  BL-padló:",JSON.stringify(r.bl));
+  console.log("  a sorozatok mezőnye a PÁLYÁN:",JSON.stringify(r.rangsor));
   console.log("  feljutás:",JSON.stringify(r.feljutas),"· létszámok:",JSON.stringify(r.letszamok));
   if(errs.length)console.log("\noldalhiba:",errs.slice(0,3));
   const bukott=T.filter(x=>!x[1]).length;

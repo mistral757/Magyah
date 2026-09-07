@@ -2277,6 +2277,44 @@ jár, tehát onnantól végig a számított érték szól.
 Mérve (a próbából): 85-ös élvonal mellett egy 65-ös kerettel a BL **87** (a
 padló szól), egy 125-ös kerettel **120** (a számított vette át).
 
-**Csak a BL kap padlót.** A többi sorozat rangsorát az `oppDelta` és az
-`EURO_EDGE` adja; ha mind a négy kupa padlót kapna, a hazai kupa is a BL
-szintjén nyílna.
+**Csak a BL kap padlót.** A többi sorozat rangsorát az `EURO_EDGE` adja; ha
+mind a négy kupa padlót kapna, a hazai kupa is a BL szintjén nyílna.
+
+### 13.8 Egy csapda az `euroMidRating` körül — ami NEM hiba
+
+Fejlesztés közben úgy tűnt, hogy a BL mezőnye **gyengébb**, mint az EL-é:
+`euroMidRating("BL")` = 105, `euroMidRating("EL")` = 106. Ez félrevezetés, és
+érdemes egyszer s mindenkorra leírni, mert könnyű bedőlni neki.
+
+**A visszatérési érték nem a pályára lépő mezőny.** Az `euroMidRating` az
+`oppDelta` **nélküli** középértéket adja:
+
+```
+euroMidRating(c) = horgony + rejtett/2 − edge(c) − oppDelta(c)
+```
+
+A mezőny építése (`euroFieldFor`) pedig **visszateszi**:
+
+```
+target = euroMidRating(c) + oppDelta(c) = horgony + rejtett/2 − edge(c)
+```
+
+A két tag **kiejti egymást**. A pályára lépő mezőnyt tehát kizárólag az `edge`
+határozza meg, és annak a rangsora helyes: a BL kapja a legkisebb fölényt
+(`EURO_EDGE.add = 0`), tehát a **legerősebb** mezőnyt. Mérve, 125-ös kerettel:
+
+| sorozat | a mezőny a PÁLYÁN |
+|---|---|
+| 🔵 BL | **121** |
+| 🟢 EL | 120 |
+| 🟡 KL | 119 |
+| 🔴 MK | 118 |
+
+A rangsor tehát végig helyes volt — csak a nyers visszatérési értéken látszik
+fordítva. A kód mostantól három helyen mondja ki (a számítás, a visszatérés és
+a hívó mellett), és a próba a **végső** számot méri, nem a nyerset.
+
+**Amit viszont tényleg javítani kellett:** a 13.7-es BL-padló az `oppDelta`
+nélküli értékre került, tehát a pályán `D1+3`-at adott volna a kért `D1+2`
+helyett. A padló azóta levonja a `d`-t. Mérve: 86-os élvonal mellett a BL
+mezőnye a pályán pontosan **88**.
