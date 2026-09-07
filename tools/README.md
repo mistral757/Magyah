@@ -244,6 +244,21 @@ tárgyalás-rontás, stílus-képesség és a távozó stábtag). Egy jutalom, a
 csinál semmit, rosszabb, mint ha nem létezne. Részletek:
 `docs/kihivasok-3937.md`.
 
+## kupa-nev-proba.js — a sorozat rövidítése nem mehet ki a képernyőre
+
+```bash
+node tools/kupa-nev-proba.js
+```
+
+A 3.9.44-es cserét őrzi: az `EURO_COMPS` **kulcsa** marad `BL` (arra hivatkozik
+a mentés, a kvalifikációs tábla, a kupa-kihívás, a Run-mérföldkövek és a
+díj-skillek azonosítói), a **kiírás** viszont `KK`, a prózában pedig „kupa".
+A lényegi állítás a FORRÁST fésüli át: egyetlen sztring-literálban sem maradhat
+önálló `BL` — a kommentek, a puszta kulcs, a CSS-osztálynév és a
+`${…BL}` tulajdonság-hivatkozás kivételével. Így egy jövőbeli új szöveg is
+azonnal elbukik, ha visszacsempészné a rövidítést. Részletek:
+`docs/ertesitesek.md` 10.
+
 ## mp-tempo-jelenlet-proba.js — a PvP tempó, a jelenlét és a bökés
 
 ```bash

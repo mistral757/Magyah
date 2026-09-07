@@ -462,11 +462,69 @@ tehát egy odaírt sorozat-kód a legtöbbször **tárgyi tévedés** is volna. 
 neve (Negyeddöntő, Döntő) úgyis megmondja, hol tartasz — a sorozat neve ezen a
 képernyőn nem hordoz információt.
 
-> **Nyitott kérdés, szándékosan itt hagyva.** Az `EURO_COMPS.BL.short` értéke
-> továbbra is `"BL"`, és az még **kilenc** helyen kimegy a képernyőre: a
-> tabella-fejléc (`standing`), a kupa-kvalifikációs sáv, a trófeasor, a
-> Champion-kártya jutalma, az örök csúcsok kupa-összesítője, a kupanevezés
-> „kihagyjuk" sora és a piramis szint-magyarázata. A `short` **csak
-> kiírás** — a mentésben a kulcs (`BL`) él, azt nem érinti —, tehát egy
-> csereszó (pl. `KKK`, a „Kupák Kupájának Kupája" kezdőbetűi) egyetlen sor, és
-> visszafelé is kompatibilis. Ezt a kérés nem kérte, ezért nem nyúltam hozzá.
+*(Ezt a 10. fejezet vitte végig az egész játékon.)*
+
+
+---
+
+## 10. A sorozat rövidítése sehol nem megy ki a képernyőre (3.9.44)
+
+**A kérés.** *„Menjenek a cserék és ebbe vonjuk bele az egyéni díjakat is: BL
+gólkirály, gólpassz király stb."*
+
+### 10.1 A kulcs marad, csak a kiírás cserélődik
+
+Ez a javítás legfontosabb szabálya. Az `EURO_COMPS` **kulcsa** továbbra is
+`BL`, mert arra hivatkozik
+
+* a **mentés** (`S.euro.comp`, `S.euroEntry`, `S.mpCup.comp`),
+* a **kvalifikációs tábla** (`CUP_TIERS` → `{comp:"BL"}`),
+* a **kupa-kihívások** és a **Run-mérföldkövek** (`bl_win`, `bl_boot`, …),
+* a **díj-skillek azonosítói** (`bl_golden_boot`, …).
+
+Átnevezve minden futó karrier kupája, díja és mérföldköve elveszne. A `short`
+és a szövegek viszont **tiszta kiírás** — azokat szabad cserélni.
+
+### 10.2 Miért „KK", és miért nem valami más
+
+| jelölt | miért nem |
+|---|---|
+| `KKK` | a „Kupák Kupájának Kupája" kezdőbetűi — angolul viszont súlyos mellékjelentése van |
+| `K3` | rövid és egyedi, de a **legerősebb** sorozat látszana a legharmadikabbnak |
+| `KUPA` | a másik három is kupa — egy közös listában (`KUPA×2 EL×1`) nem különböztetne meg |
+| **`KK`** | **a játék saját nevéből** (Kupák Kupája), két betű, mint az `EL`/`KL`/`MK`, és a rangsort sem téveszti el |
+
+A **prózában** viszont a kért generikus szó áll: „a kupa gólkirálya", „a kupa
+Aranycipője", „kupagyőzelem" — ott nincs mihez képest megkülönböztetni.
+
+### 10.3 Mi cserélődött
+
+| hol | előtte | utána |
+|---|---|---|
+| a sorozat rövidítése | `BL` | `KK` |
+| Aranycipő leírása | „A **BL** gólkirályának járó díj…" | „A **kupa** gólkirályának…" |
+| Aranypasszok / Aranykesztyű | ugyanígy | ugyanígy |
+| bajnoki díjak kereszthivatkozása | „(A **BL** Aranycipőjének harmada.)" | „(A **kupa** Aranycipőjének harmada.)" |
+| díjkiosztás naplósora | „…a **BL** gólkirálya" | „…a **kupa** gólkirálya" |
+| kupanapló fejléce | „**BL** egyéni arany-díjak" | „**Kupa** egyéni arany-díjak" |
+| Aranylabda-jelölt díjsora | „🥇 **BL** egyéni díj" | „🥇 **Kupa** egyéni díj" |
+| arany-díjas kommentár-sorok (3 db) | „Na ilyen egy **BL** aranycipős!" | „…egy **kupa-aranycipős**!" |
+| Run-mérföldkövek (4 db) | „Első **BL**-győzelem", „**BL**-gólkirály"… | „Első **KK**-győzelem", „**KK**-gólkirály"… |
+| mérföldkő-sávok | „**BL**-győzelem a mezőny szintjéhez mérve", „**BL**-győztes +N-es mezőnyben" | „**Kupagyőzelem**…", „**Kupagyőztes**…" |
+| súgók (6 helyen) | „**BL** 1,5", „**BL** 10", „**BL** a legerősebb", „**BL** 0,75×", „**BL** Aranycipője", „**BL**-győzelem" | „**Kupák Kupája** …", illetve „**kupa** …" |
+| Aranylabda-rivális sora | „(**BL**-döntő + …)" | „(**kupadöntő** + …)" |
+| Run-bontás súlyai | „**BL** ×0,1", „egy **BL**-beli" | „**Kupák Kupája** ×0,1", „egy **KK**-beli" |
+
+### 10.4 A próba a FORRÁST fésüli át, nem egy képernyőt
+
+`tools/kupa-nev-proba.js` — 9 állítás. A lényegi az utolsó: **egyetlen
+sztring-literálban sem maradhat önálló `BL`**. Ez szándékosan nem képernyőkép
+alapján dolgozik: a kiírások szét vannak szórva (skill-leírások,
+kommentár-sorok, súgók, mérföldkövek, Run-bontás, kupanapló), egy képernyő
+sosem fogná meg mindet. A **kommentek kimaradnak** a szűrésből — ott a
+tervezési indoklás joggal nevezi néven a valódi sorozatot —, és kimarad a
+puszta `"BL"` kulcs, a `champ-BL` CSS-osztálynév és a `${…BL}`
+tulajdonság-hivatkozás is.
+
+Így egy jövőbeli új szöveg is azonnal elbukik a próbán, ha visszacsempészné a
+rövidítést.
