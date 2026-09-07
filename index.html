@@ -5706,7 +5706,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.37";
+const APP_VERSION="3.9.38";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -62865,6 +62865,173 @@ const PYR_LEAP_RETURN=1.5;      /* top 3 esetén ennyiszeresét kapod vissza */
 const PYR_LEAP_RANK=3;          /* eddig a helyezésig nyer a vállalás */
 const PYR_LEAP_STEP=10;         /* a csúszka lépésköze a büdzsé százalékában */
 /* Melyik osztályba ugranál, és mennyiért? Null = nincs ajánlat. */
+/* ================= HANGOLÁS: A BERAGADÁS MENTŐÖVE (3.9.38) =================
+   KIMONDOTT KÉRÉS: „minden szezon végén lehessen −10%-nyi Run szintért (tehát
+   ha éppen 90-en voltál, akkor leesel 81-re) hangolást kérni a következő
+   szezonra abban az esetben, ha nem jutottál feljebb az előző szezonban (azaz
+   ha beragadnál épp). A hangolás olyan szintre hozza az ellenfelet, mint
+   amilyen a kezdő beállítások szerint volt, tehát ha te úgy állítottad, hogy
+   +2 legyél a mezőnyhöz, akkor olyanra hozza (a meccs erőd és a csapaterőd
+   számtani közepéhez képest)."
+
+   MIÉRT A SZÁMTANI KÖZÉP A HELYES MÉRCE — és ez nem véletlen, hanem pontosan
+   kiejti a rendszer egyik aszimmetriáját. A mezőny a rejtett bónuszodból
+   (morál, edző, taktika, aura, összhang) FIXEN A FELÉT kapja vissza
+   (OPP_BUFF_MEASURED = 0,5), tehát a mezőny valódi ereje `szint + h/2`. A te
+   oldaladon a meccs-erő `keret + h`, a keret-erő `keret`. A kettő számtani
+   közepe `keret + h/2` — vagyis a különbség PONTOSAN `keret − szint`, a
+   rejtett tag kiesik. A hangolás így ugyanazt a rést állítja vissza, amit a
+   karrier elején vállaltál, és nem a rejtett bónusz méretén múlik.
+
+   A RUN-ÁR SZORZÓS, NEM KIVONÁS: minden hangolás a MARADÉK tizedét viszi el
+   (90 → 81 → 72,9…). Így a második, harmadik mentőöv is fáj, de sosem visz
+   nullára — a futás értéke csökken, nem semmisül meg.
+
+   A VILÁG EGÉSZE MOZDUL, nem csak a te osztályod: a piramis lépcsője egy
+   szerkezet, egyetlen osztály kimozdítása szétvágná (ugyanaz az elv, amiért
+   a pyrShiftWorld a kezdésnél is minden osztályt együtt tol). */
+const PYR_RETUNE_RUN_CUT=0.10;   /* a Run-szint ennyied része vész el hangolásonként */
+const PYR_RETUNE_MIN=0.5;        /* ennél kisebb korrekcióért nem érdemes fizetni */
+/* Hány hangolást kértél eddig — ez viszi a Run-árat. */
+function pyrRetuneCount(){return ((S&&S.run&&S.run.retunes)||0);}
+function pyrRetuneMult(){return Math.pow(1-PYR_RETUNE_RUN_CUT,pyrRetuneCount());}
+/* A CÉL-RÉS: amit a karrier elején VÁLLALTÁL. Ugyanaz a szám, amit a
+   pyrAnchorAtKickoff vált be a kezdőrúgáskor (gapWant), közös karrierben a
+   szoba beállítása (gapWantMp). Régi mentésben egyik sincs — ott a rögzített
+   kezdő rés (gap0) a legjobb, ami rendelkezésre áll. */
+function pyrRetuneWant(){
+  const P=S&&S.pyr;
+  if(!P)return null;
+  if(typeof P.gapWant==="number"&&isFinite(P.gapWant))return P.gapWant;
+  if(typeof P.gapWantMp==="number"&&isFinite(P.gapWantMp))return P.gapWantMp;
+  if(typeof P.gap0==="number"&&isFinite(P.gap0))return P.gap0;
+  return null;}
+/* A MOSTANI RÉS, UGYANAZON A SKÁLÁN, AMIN A VÁLLALÁS SZÜLETETT — vagyis
+   pontosan úgy, ahogy a levelGap méri, amit a kezdőrúgás horgonya
+   (pyrAnchorAtKickoff) is bevált.
+
+   EZ EGYBEN A KÉRT MÉRCE IS. Tagonként ugyanaz, amit a levelGap számol:
+     (keret + h) − mezőny − max(0,h)·OPP_BUFF_MEASURED
+   ami pozitív rejtett bónusznál pontosan (keret + h/2) − mezőny, vagyis a
+   MECCS-ERŐ ÉS A KERET-ERŐ SZÁMTANI KÖZEPE a mezőnyhöz mérve. Nem kellett
+   tehát új aritmetikát kitalálni: a játék rés-mércéje MÁR ez — csak a
+   pyrRetuneMine-ba kellett átemelni a levelGap két olyan tagját, amit az
+   első nekifutás elvétett (lásd ott).
+
+   EGY ELTÉRÉS A levelGap-tól, SZÁNDÉKOSAN: a mezőny oldalán a `d.mean`
+   szerepel, nem a `pyrLevel()`. A kettő ugyanaz a mennyiség, csak a pyrLevel
+   EGÉSZRE kerekít — a hangolás pedig a világot FOLYTONOSAN tolja, tehát a
+   kerekítéssel mérve a korrekció félmagasan megállna, és egy iteráló
+   hurokkal sem lehetne pontosabb (a hiba a mércében van, nem a lépésben).
+   A `d.mean` ugyanannak a tizedjegyig vitt alakja, tehát EGYETLEN lépés
+   pontosan visszaállítja a vállalt rést. A szezon közbeni mezőny-növekedést
+   (pyrGrowNow) itt szintén nem számoljuk: a vállalás a szezonINDÍTÓ
+   állapotra szólt. */
+function pyrRetuneGap(){
+  const d=pyrMyDiv();
+  if(!d||d.mean==null)return null;
+  const mine=pyrRetuneMine();
+  if(mine==null)return null;
+  const g=mine-d.mean;
+  return isFinite(g)?g:null;}
+/* A saját oldalad mércéje: az a szám, amihez a mezőnyt a vállalt réssel
+   viszonyítjuk. Pozitív rejtett bónusznál ez a MECCS-ERŐ ÉS A KERET-ERŐ
+   SZÁMTANI KÖZEPE — pontosan a kért mérce —, mert a mezőny a bónusz felét
+   visszakapja (OPP_BUFF_MEASURED), és a közép ezt kiejti.
+   NEGATÍV h-nál viszont a tiszta MECCS-ERŐ a helyes, mert az oppBuffFor
+   max(0,·)-t vesz: rossz morálból a mezőny nem kap vissza semmit, tehát ott
+   nincs mit kiejteni. Ezt az egy tagot vétette el az első nekifutás. */
+function pyrRetuneMine(){
+  let ts=0,h=0;
+  try{ts=teamStrength();}catch(e){return null;}
+  if(!(ts>0))return null;
+  try{h=hiddenMatchBonus()||0;}catch(e){h=0;}
+  return ts+h-Math.max(0,h)*OPP_BUFF_MEASURED;}
+/* Mennyivel kellene elmozdítani a világot, hogy a vállalt rés visszaálljon.
+   Pozitív `off` = a világ LEFELÉ mozdul (a pyrShiftWorld kivon). Ez a becslés
+   NEM nyúl semmihez — az ajánlat képernyője és a kapu is ezt olvassa. */
+function pyrRetuneShift(){
+  const P=S&&S.pyr;
+  if(!P||!P.divs||!P.divs.length)return null;
+  if(!pyrMyDiv())return null;
+  const want=pyrRetuneWant();
+  if(want==null)return null;
+  const res=pyrRetuneGap();
+  if(res==null)return null;
+  const mine=pyrRetuneMine();
+  if(mine==null)return null;
+  const lvl=pyrMyDiv().mean;
+  const n1=x=>Math.round(x*10)/10;
+  const off=n1(want-res);
+  return {off,want:n1(want),res:n1(res),mine:n1(mine),now:n1(lvl),cel:n1(lvl-off),gap0:n1(want)};}
+/* FELJUTOTTÁL-E A LEZÁRT IDÉNYBEN. A napló utolsó sora mondja meg: `to < div`
+   = feljebb kerültél. Ha igen, nincs mit menteni — a hangolás a BERAGADÁS
+   mentőöve, nem általános könnyítés. */
+function pyrWentUpLast(){
+  const L=(S&&S.pyr&&S.pyr.log)||[];
+  const x=L[L.length-1];
+  return !!(x&&x.to!=null&&x.div!=null&&x.to<x.div);}
+function pyrRetuneOfferable(){
+  if(gameMode!=="career"||!careerPool)return false;
+  if(!(typeof pyrOn==="function"&&pyrOn()))return false;
+  if(S.auto)return false;                   /* auto szezonban nincs döntés */
+  if(!((S&&S.pyr&&S.pyr.log)||[]).length)return false;   /* még nincs lezárt idény */
+  if(pyrWentUpLast())return false;           /* feljutottál — nem ragadtál be */
+  const r=pyrRetuneShift();
+  /* CSAK AKKOR, HA SEGÍT. Ha a rés amúgy is a vállalás FÖLÖTT áll, a
+     „hangolás" fölfelé tolná a világot — az nem mentőöv, hanem önsorsrontás.
+     Ilyenkor a beragadásnak nem a mezőny az oka. */
+  return !!(r&&r.off>=PYR_RETUNE_MIN);}
+/* A HANGOLÁS VÉGREHAJTÁSA. Ugyanaz a lánc fut le utána, mint a kezdőrúgás
+   horgonya után: a mezőnyszint, a fejlődési ütem, az ellenfél-lista és a piac
+   mind a világ skálájához tartozik.
+
+   AMIHEZ SZÁNDÉKOSAN NEM NYÚL: a `careerBaseRating`. A piramisban a piac
+   eltolása (marketPeakShift) az `oppTargetRating − careerBaseRating`
+   különbségből él, vagyis a bázis a KARRIER indulószintje — ha a hangolás
+   utánaállítaná, a piac egyetlen nyáron visszaesne a karrier eleji árakra.
+   A pyrStart és a horgony azért állítja, mert ott még nincs mit elveszíteni. */
+function pyrRetuneApply(){
+  const P=S&&S.pyr;
+  const r=pyrRetuneShift();
+  if(!P||!r||!(r.off>=PYR_RETUNE_MIN))return null;
+  const want=r.want;
+  /* EGYETLEN LÉPÉS, mert a mérce folytonos (lásd pyrRetuneGap): a világ
+     `off`-fal lejjebb tolva a rés pontosan a vállalásra áll. A `spare`-ek is
+     a világ csapatai, tehát velük kell mozdulniuk — enélkül a kiesés/feljutás
+     cseréje egy MÁSIK skáláról hozna vissza csapatot. */
+  const moved=r.off;
+  pyrShiftWorld(P,moved);
+  if(P.spare)P.spare.ovr=Math.round((P.spare.ovr-moved)*10)/10;
+  if(P.spare2)P.spare2.ovr=Math.round((P.spare2.ovr-moved)*10)/10;
+  /* A RUN-ÁR. Szorzós: minden hangolás a maradék tizedét viszi. */
+  if(!S.run)S.run={};
+  S.run.retunes=pyrRetuneCount()+1;
+  oppTargetRating=pyrLevel();
+  P.grow=null;
+  SEASON_OPPS=pyrOpponents();
+  try{pyrGrowStep();pyrOppRefresh();}catch(e){}
+  /* A PIAC IS A VILÁG SKÁLÁJÁN ÁLL — enélkül a nyáron egy másik világ árain
+     igazolnál (ugyanaz a lánc, amit a pyrStart és a horgony is futtat). A
+     SAJÁT keretedhez nem nyúl: a drafted-ben lévőket kihagyja. */
+  try{
+    if(careerPool)Object.values(careerPool).forEach(e=>{
+      if(drafted.has(e.n))return;
+      applyMarketShift(e);
+      e.startRating=Math.round(ratingAtAge(e.peak,e.age));
+      syncAttrsToRating(e);
+      if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
+  }catch(e){}
+  try{if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();}catch(e){}
+  const ut=pyrRetuneGap();
+  try{addLine(`🎚️ <b>HANGOLÁS.</b> A világ ${pyrN1(moved)} Ratinggel lejjebb került — `
+    +`az osztályod közepe ${pyrN1(r.now)} → ${pyrN1(r.cel)}, a rés `
+    +`${pyrN1(r.res)} → ${pyrN1(ut==null?want:ut)}, vagyis visszaállt a `
+    +`vállalásodra (${want>=0?"+":"−"}${pyrN1(Math.abs(want))}). `
+    +`A Run-szinted ${Math.round(PYR_RETUNE_RUN_CUT*100)}%-kal kevesebbet ér `
+    +`(${pyrRetuneCount()}. hangolás).`,"m life");}catch(e){}
+  try{saveGame();}catch(e){}
+  return Object.assign({},r,{utanRes:(ut==null?null:Math.round(ut*10)/10)});}
 function pyrLeapTarget(){
   if(gameMode!=="career"||!careerPool)return null;
   if(!(typeof pyrOn==="function"&&pyrOn()))return null;
@@ -62960,6 +63127,63 @@ function pyrLeapSettle(rank){
    osztályozó és a felkészülési kupa (#scUnlock) — egy nyári döntés, egy hely.
    A CSÚSZKA NEM RAJZOLJA ÚJRA A LAPOT: csak a számokat frissíti (a DOM
    újraépítése húzás közben elvágná magát a húzást). */
+/* A HANGOLÁS AJÁNLATA. Ugyanaz a felület (#scUnlock), mint az osztályugrásé
+   és az osztályozóé — egy nyári döntés, egy hely. A képernyő KIMONDJA az árat
+   és a hatást is: a Run-szintet nem szabad némán elvinni. */
+function pyrRetuneOffer(next){
+  const done=()=>{try{next&&next();}catch(e){}};
+  if(!pyrRetuneOfferable()){done();return;}
+  const r=pyrRetuneShift();
+  if(!r){done();return;}
+  let run=null;try{run=runBreakdown();}catch(e){run=null;}
+  /* A KONKRÉT SZÁM CSAK AKKOR, HA VAN MIT MUTATNI. Egy még be nem indult
+     futásnál a runBreakdown 0-t ad — a „0.0 → 0.0" nem magyarázna semmit,
+     csak elbizonytalanítana. Ilyenkor marad a százalékos megfogalmazás. */
+  const most=(run&&run.total>0.05)?run.total:null;
+  const utan=(most!=null)?most*(1-PYR_RETUNE_RUN_CUT):null;
+  const d=pyrMyDiv();
+  $("scUnlock").classList.remove("hide");
+  $("unlockTitle").textContent="🎚️ HANGOLÁS — VISSZA A KEZDŐ RÉSHEZ";
+  $("unlockBody").innerHTML=
+    `<div style="font-size:13px;line-height:1.65">`
+    +`<p>A legutóbbi idényben <b>nem jutottál feljebb</b>. Kérheted, hogy a világ `
+    +`igazodjon vissza ahhoz a réshez, amit a karrier elején VÁLLALTÁL — `
+    +`<b>${r.gap0>=0?"+":"−"}${pyrN1(Math.abs(r.gap0))}</b> a mezőnyhöz képest.</p>`
+    +`<div class="stattbl" style="margin:8px 0">`
+    +`<div class="strow" style="grid-template-columns:1.4fr .6fr"><span>A te mércéd `
+    +`<small style="color:var(--dim2)">(a meccs-erőd és a keret-erőd közepe)</small></span>`
+    +`<span><b>${pyrN1(r.mine)}</b></span></div>`
+    +`<div class="strow" style="grid-template-columns:1.4fr .6fr"><span>A ${d?`D${pyrMyDivId()}`:"osztályod"} közepe MOST</span>`
+    +`<span><b>${pyrN1(r.now)}</b></span></div>`
+    +`<div class="strow" style="grid-template-columns:1.4fr .6fr"><span>…hangolás után</span>`
+    +`<span><b style="color:var(--grass)">${pyrN1(r.cel)}</b></span></div>`
+    +`<div class="strow" style="grid-template-columns:1.4fr .6fr"><span>A VALÓDI rés most</span>`
+    +`<span><b style="color:var(--red)">${r.res>=0?"+":"−"}${pyrN1(Math.abs(r.res))}</b></span></div>`
+    +`</div>`
+    +`<p>A <b>teljes világ</b> ${pyrN1(r.off)} Ratinggel lejjebb kerül — mind a hat osztály `
+    +`együtt, hogy a lépcső ne csússzon szét. A kereted érintetlen.</p>`
+    +`<p style="color:var(--red)">Az ára: a <b>Run-szinted ${Math.round(PYR_RETUNE_RUN_CUT*100)}%-kal kevesebbet ér</b>`
+    +((most!=null&&utan!=null)?` — <b>${most.toFixed(1)}</b> → <b>${utan.toFixed(1)}</b>`:"")
+    +`. A hangolás bármikor újra kérhető, de mindig a MARADÉK tizedét viszi`
+    +(pyrRetuneCount()?` (eddig ${pyrRetuneCount()} volt)`:"")+`.</p>`
+    +`</div>`;
+  const act=$("unlockActions");act.innerHTML="";
+  const go=document.createElement("button");
+  go.className="btn-y stepbtn";go.textContent="🎚️ Kérem a hangolást";
+  go.onclick=()=>{
+    askConfirm({title:"Hangolás?",yes:"Igen, hangoljuk",no:"Mégse",
+      html:`<div style="font-size:13px;line-height:1.6">A világ <b>${pyrN1(r.off)}</b> Ratinggel `
+        +`lejjebb kerül, a Run-szinted pedig <b style="color:var(--red)">`
+        +`${Math.round(PYR_RETUNE_RUN_CUT*100)}%-kal</b> kevesebbet ér. Nem visszavonható.</div>`,
+      onYes:()=>{$("scUnlock").classList.add("hide");
+        try{pyrRetuneApply();}catch(e){}
+        done();}});};
+  const no=document.createElement("button");
+  no.className="btn stepbtn";no.style.marginTop="7px";
+  no.textContent="Kihagyom — megyek így tovább →";
+  no.onclick=()=>{$("scUnlock").classList.add("hide");done();};
+  act.appendChild(go);act.appendChild(no);
+  $("scUnlock").scrollIntoView({behavior:"smooth"});}
 function pyrLeapOffer(next){
   const done=()=>{try{next&&next();}catch(e){}};
   if(!pyrLeapOfferable()){done();return;}
@@ -71134,8 +71358,17 @@ function runBreakdown(){
      pyrRunCap. A mai módban nincs plafon (cap=1), ott a viselkedés változatlan. */
   const capInfo=_pyr?pyrRunCap():null;
   const cap=capInfo?capInfo.cap:1;
-  const total=Math.max(0,Math.min(100,perf*cap));
-  return {rows,total,perf,cap,capParts:capInfo?capInfo.parts:null,
+  /* ---- A HANGOLÁS ÁRA (3.9.38) ----
+     SZÁNDÉKOSAN NEM a plafon része. A plafon tisztán a VÁLLALÁSAIDBÓL jön (hol
+     kezdtél, milyen tempón, mekkora réssel) — az a futás előtt eldől. A
+     hangolás ezzel szemben MENET KÖZBEN hozott döntés, tehát a teljesítmény
+     oldalán a helye: a kész pontszámot szorozza. Minden hangolás a MARADÉK
+     tizedét viszi (90 → 81 → 72,9…), így a második-harmadik mentőöv is fáj,
+     de sosem visz nullára. */
+  const rt=_pyr?pyrRetuneMult():1;
+  const total=Math.max(0,Math.min(100,perf*cap*rt));
+  return {rows,total,perf,cap,retune:rt,retunes:_pyr?pyrRetuneCount():0,
+    capParts:capInfo?capInfo.parts:null,
     missing:Object.keys(RUN_MILESTONES).filter(k=>!R.ms[k])};}
 /* A határidő-sor előállítása. Három állapota van, és mindhárom mást mond:
      · KÉSÉSBEN — 0 pont, a súly a felgyűlt levonásból (R.paceLoss);
@@ -72624,9 +72857,20 @@ function renderRunMeter(){
           <span style="flex:1;color:${bad?"var(--dim2)":"var(--ink)"}">${esc(x.n)}</span>
           <span style="color:${x.info?"var(--dim2)":good?"var(--gold)":bad?"var(--dim2)":"var(--grass)"};font-weight:700;min-width:44px;text-align:right">${val}</span>
         </div>`;});
+      /* A HANGOLÁS ÁRA KÜLÖN SORBAN (3.9.38). Nem a plafon része — menet
+         közben hozott döntés —, de a szorzatban ott kell lennie, különben a
+         „miért ennyi a Run-om" kérdésre megint nincs válasz a képernyőn. */
+      if(B.retune!=null&&B.retune<0.999)
+        html+=`<div style="display:flex;align-items:baseline;gap:7px;font-size:12px;margin-top:6px;
+          border-top:1px dashed var(--panel2);padding-top:6px">
+          <span style="flex:1">🎚️ Hangolás${B.retunes>1?` (${B.retunes}×)`:""}
+            <small style="color:var(--dim2)">— a beragadás mentőöve</small></span>
+          <span style="color:var(--red);font-weight:700;min-width:44px;text-align:right">×${B.retune.toFixed(2)}</span>
+        </div>`;
       html+=`<div style="border-top:1px solid var(--panel2);margin-top:6px;padding-top:6px;font-size:12px">
         <b>Plafon:</b> <b style="color:${runColor(capPct)}">${capPct}</b>
-        &nbsp;→&nbsp; ${(B.perf||0).toFixed(1)} × ${(B.cap).toFixed(2)} =
+        &nbsp;→&nbsp; ${(B.perf||0).toFixed(1)} × ${(B.cap).toFixed(2)}${
+          (B.retune!=null&&B.retune<0.999)?` × ${B.retune.toFixed(2)}`:""} =
         <b style="color:${col}">${B.total.toFixed(1)}</b></div>
         <div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-top:5px">
         Ennél magasabbra ezzel a beállítással hibátlan futással sem lehet jutni —
@@ -76230,7 +76474,13 @@ function beginNextSeasonWithChallenges(){
        (tehát a vállalásaid már a megemelt szinthez kalibrálódnak). Ha nincs
        ajánlat, a pyrLeapOffer azonnal továbbenged. */
     const _leap=()=>{try{pyrLeapOffer(_offer);}catch(e){_offer();}};
-    const _after=()=>{ if(_turn&&!S.auto)showPyrTurnReveal(_turn,_leap); else _leap(); };
+    /* ---- HANGOLÁS (3.9.38) ----
+       A BERAGADÁS mentőöve, ezért az osztályugrás ELŐTT jön: a kettő ellentétes
+       irányú döntés (lefelé hangolni vagy pénzért felfelé ugrani), és a
+       „nem jutottam feljebb" helyzetben az első kérdés a mentőöv. Ha nincs
+       ajánlat, azonnal továbbenged. */
+    const _retune=()=>{try{pyrRetuneOffer(_leap);}catch(e){_leap();}};
+    const _after=()=>{ if(_turn&&!S.auto)showPyrTurnReveal(_turn,_retune); else _retune(); };
     _after();});});}
 function startNextCareerSeason(){
   phase="season";

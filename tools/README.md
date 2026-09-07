@@ -229,6 +229,21 @@ tárgyalás-rontás, stílus-képesség és a távozó stábtag). Egy jutalom, a
 csinál semmit, rosszabb, mint ha nem létezne. Részletek:
 `docs/kihivasok-3937.md`.
 
+## pyr-hangolas-proba.js — a hangolás (a beragadás mentőöve)
+
+```bash
+node tools/pyr-hangolas-proba.js
+```
+
+A 3.9.38-as **hangolást** méri: a kaput (csak beragadás után, csak ha lefelé
+visz), a mércét (a meccs-erő és a keret-erő számtani közepe — két futás, morál
+20 és 95, hogy lássuk: a rejtett bónusz KIESIK), a hatást (mind a hat osztály
+együtt mozdul, a lépcső nem csúszik szét, a kereted érintetlen) és az árat
+(szorzós: 90 → 81 → 72,9). Fontos fixtúra-részlet: a kezdő 11-et be kell tenni
+a `drafted`-be, különben a piac-eltolás a saját keretedet is átskálázza — a
+valódi játékban minden leigazolt játékos bekerül. Részletek:
+`docs/rajt-nehezseg.md` 6. fejezet.
+
 ## firebase-rules.json — az adatbázis szabályai
 
 A Realtime Database (`magyahok`) teljes szabályfája, érvényes JSON-ként. A
