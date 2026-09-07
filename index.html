@@ -1922,6 +1922,24 @@ body.hubDragging #hubRoster{touch-action:none}
 .buyDisc .bdB s{color:#bbf7d0;opacity:.85}
 .buyDisc .bdB b{font-family:var(--font-disp);font-size:15px;letter-spacing:.3px}
 .buyDisc .bdF{font-size:10.5px;color:#bbf7d0;margin-top:4px;line-height:1.4}
+/* A KEDVEZMÉNY-STACK (3.9.39): soronként egy forrás — név, százalék, forint.
+   A három oszlop fix rácson ül, hogy a számok egymás alatt olvashatók
+   legyenek; a százalék és az összeg jobbra zárt. */
+.buyDisc .bdStack{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.buyDisc .bdRow{display:grid;grid-template-columns:1fr auto auto;gap:8px;
+  align-items:baseline;font-size:12px;color:#eafff2;
+  padding:3px 7px;border-radius:7px;background:rgba(0,0,0,.18)}
+.buyDisc .bdRow .bdN{font-weight:700}
+.buyDisc .bdRow .bdP{font-family:var(--font-disp);font-size:12.5px;color:#bbf7d0}
+.buyDisc .bdRow .bdA{font-family:var(--font-disp);font-size:12.5px;min-width:74px;text-align:right}
+/* Az ÖSSZEG-sor ugyanazon a rácson ül, mint a tételek — így a százalék és a
+   forint egymás alatt marad —, csak elválasztó vonallal és erősebb súllyal. */
+.buyDisc .bdSum{display:grid;grid-template-columns:1fr auto auto;gap:8px;
+  align-items:baseline;font-size:12.5px;color:#fff;margin-top:5px;padding:5px 7px 0;
+  border-top:1px solid rgba(255,255,255,.3)}
+.buyDisc .bdSum .bdN{font-weight:800;text-transform:uppercase;letter-spacing:.5px;font-size:11px}
+.buyDisc .bdSum .bdP{font-family:var(--font-disp);font-size:14px}
+.buyDisc .bdSum .bdA{font-family:var(--font-disp);font-size:14px;min-width:74px;text-align:right}
 /* A fej marad a megszokott vízszintes sor — csak most már kinyit, nem dönt. */
 .candHead{display:flex;align-items:center;gap:10px;width:100%}
 .prow .rowGo{display:inline-flex;align-items:center;gap:3px;cursor:pointer;
@@ -5706,7 +5724,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.38";
+const APP_VERSION="3.9.39";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -30733,7 +30751,12 @@ function markArrived(p,_price,fromAcademy){
     if(age<25)S.chBoughtUnder25=(S.chBoughtUnder25||0)+1;
     /* A FIATALÍTÁS-KIHÍVÁS SÁVJA KIHÍVÁSONKÉNT MÁS (3.9.37) — ezért az
        ÉLETKORT tesszük el, nem egy rögzített küszöbre szűrt számlálót. */
-    S.chBoughtAges=(S.chBoughtAges||[]).concat([age]);}}
+    S.chBoughtAges=(S.chBoughtAges||[]).concat([age]);}
+  /* A KÖNYVELÉS UTÁN AZONNAL (3.9.39): egy igazolás nyolcféle kihívást zárhat
+     le (igazolások száma, fiatal igazolás, fiatalítás, gyenge láncszem
+     cseréje, új kezdőember, ifi a tizenegyben, összhang, kész skill). A
+     jutalomnak ott a helye, ahol még számít — a nyári piacon. */
+  try{settleEarlyChallenges();}catch(e){}}
 /* ---- JAVÍTVA: A FELÁLLÁS NÉHA ELTŰNT ----
    A régi kód ELŐSZÖR kiürítette a pályát (pit.innerHTML=""), és utána, a
    cikluson belül építette fel a 11 helyet. Ha bármelyik iteráció kivételt
@@ -36070,31 +36093,81 @@ function topMarketPrice(){
     const lift=(typeof marketBandLift==="function")?marketBandLift():0;
     return peakMarketPrice(Math.min(cap,MARKET_TOP_BASEPEAK+shift+lift));
   }catch(e){return 0;}}
+/* ================= A KEDVEZMÉNYEK ÖSSZEADÓDNAK, NEM SZORZÓDNAK (3.9.39) ====
+   BEJELENTETT KÉRÉS: „Kedvezmények az átigazolásban, amit a csapatstílus ad,
+   látszódjon a vásárláskor (különválasztva az extra, kihívásokkal szerzett
+   kedvezménytől, azaz ezek legyenek stackelhetők, és a stackben legyen
+   látható, melyik mennyit ad, és mindkettő az eredeti ár %-os értékével tegye
+   olcsóbbá: tehát ne X*0.75*0.66, hanem X − (X*0.25) − (X*0.33))."
+
+   MIÉRT SZÁMÍT. A szorzás LOPKODIK: két 25%-os kedvezmény szorozva 43,75%-ot
+   ad, nem 50%-ot — és pont a MÁSODIK kedvezmény ér kevesebbet, az, amiért
+   megdolgoztál. Ráadásul a szorzatból nem lehet visszabontani, melyik mennyit
+   adott, tehát a képernyőn sem lehet őszintén kiírni.
+   Összeadva mindkét szám azt jelenti, amit mond: a stílusod 33%-a a teljes
+   árból 33%, a kihívásé 25% ugyanabból az árból, együtt 58%.
+
+   AZ „EREDETI ÁR" (a %-ok alapja) a kedvezmények ELŐTTI ár: piaci érték ×
+   felár × a „drágább igazolás" büntetés × a kész skillek felára. Vagyis
+   minden, ami az árat FELFELÉ mozgatja, benne van — a kedvezmény abból vesz
+   le. Így a kiírt „eredetileg ennyi lenne" szám tényleg az az ár, amit
+   kedvezmények nélkül fizetnél.
+
+   A PADLÓ (BUY_DISC_CAP) ma nem kötne: a legnagyobb lehetséges összeg 33+25 =
+   58%. Azért van mégis ott, mert egy jövőbeli harmadik kedvezmény-forrás
+   csendben 100% fölé vihetné az összeget — és egy ingyen (vagy negatív árú)
+   játékos nem hangolási kérdés, hanem törött gazdaság. */
+const BUY_DISC_CAP=0.70;        /* az ár sosem eshet az eredeti 30%-a alá */
+/* A KEDVEZMÉNY-SOROK. Mindegyik az EREDETI árra vetített hányad, nevesítve —
+   ebből épül a képernyő stackje és ebből számol a buyPrice. Egy forrás, két
+   fogyasztó: a kiírt bontás és a ténylegesen fizetett összeg nem tud
+   szétcsúszni. */
+function buyDiscountParts(entry,opts){
+  const out=[];
+  try{
+    if(gameMode!=="career"||!entry||(opts&&opts.noDiscount))return out;
+    /* 1. CSAPATSTÍLUS — a Beton „Olcsó a jó védő"-je és a Tiki-Taka
+       „Olcsó a jó középpályás"-a. Egy játékos egy posztcsoportba tartozik,
+       tehát a kettő nem adódik össze egymással. */
+    const sm=styleBuyMultFor(entry);
+    if(sm<0.999){
+      let hol="a keretedre";
+      try{
+        const cat=getCategoryFor(entry.pos&&entry.pos[0]);
+        if(cat==="VEDO")hol="a védőkre";
+        else if(cat==="KOZEPPALYAS")hol="a középpályásokra";
+      }catch(e){}
+      out.push({k:"style",n:"Csapatstílus",pct:1-sm,
+        d:`A stílusfád képessége — ${hol} szól, és minden igazolásnál él.`});}
+    /* 2. KIHÍVÁS-JUTALOM. Két forrás, ugyanaz a 25%: a TARTÓS esély
+       (buyDiscountChance) és a GARANTÁLT zseton (chBuyDiscountNext). Ezek
+       egymással NEM adódnak össze — aki mindkettőt megszerezte, ugyanazt a
+       25%-ot kapja —, a stílussal viszont igen. */
+    if(S.buyDiscountChance>0&&chBuyDiscountHits(entry.n))
+      out.push({k:"ch",n:"Kihívás-kedvezmény",pct:0.25,
+        d:`Egy teljesített kihívásért — minden igazolásnál `
+          +`${Math.round((S.buyDiscountChance||0)*100)}% eséllyel jön be, és most bejött.`});
+    else if((S.chBuyDiscountNext||0)>0)
+      out.push({k:"chTok",n:"Garantált kedvezmény",pct:0.25,
+        d:`Kihívás-jutalom zseton: a következő SIKERES igazolásod −25%. `
+          +`Az ár olvasásától nem fogy, csak a megkötött üzlettől.`});
+  }catch(e){}
+  return out;}
+/* A kedvezmények ÖSSZEGE, a padlóval együtt. */
+function buyDiscountSum(entry,opts){
+  const parts=buyDiscountParts(entry,opts);
+  let s=0;parts.forEach(x=>{s+=x.pct||0;});
+  return Math.max(0,Math.min(BUY_DISC_CAP,s));}
 function buyPrice(entry,opts){
+  /* ---- AZ EREDETI ÁR: minden FELÁR, még semmi kedvezmény ---- */
   let p=marketValue(entry)*buyMarkup();
-  /* KIHÍVÁS-HATÁSOK az árban: a "drágább igazolás" büntetés felárat tesz rá,
-     a kedvezmény-jutalom pedig eséllyel levesz 25%-ot. A kedvezmény a
-     JÁTÉKOSHOZ kötött véletlen (nem minden újrarajzolásnál más), hogy a
-     kiírt ár és a ténylegesen fizetett összeg egyezzen.
-     A `noDiscount` kapcsoló a KIÍRÁSHOZ kell: hogy meg tudjuk mutatni, MENNYI
-     LENNE kedvezmény nélkül — a különbség az, ami a jutalmat érezhetővé teszi.
-     Így nem kell a képletet kettéhasítani, és a két szám ugyanabból a
-     forrásból jön, tehát nem tud szétcsúszni. */
-  if(S.buySurcharge>0)p*=1.10;
-  if(S.buyDiscountChance>0&&entry&&!(opts&&opts.noDiscount)&&chBuyDiscountHits(entry.n))p*=0.75;
-  /* GARANTÁLT KEDVEZMÉNY (3.9.37 kihívás-jutalom): „a következő vásárlás
-     −25%, a sikeres vásárlás lezárásáig érvényes". Nem esély, hanem zseton —
-     ezért a valószínűségi ág MELLETT áll, nem helyette (a kettő nem szorzódik
-     össze: aki mindkettőt megkapta, ugyanazt a 25%-ot kapja).
-     A zseton az ÁR OLVASÁSÁTÓL nem fogy: a kiírás és a fizetés ugyanezt a
-     képletet hívja, tehát itt csak KEDVEZMÉNYEZÜNK. Az elhasználás a
-     tényleges vásárlásnál történik (chBuyDiscountSpend). */
-  else if((S.chBuyDiscountNext||0)>0&&entry&&!(opts&&opts.noDiscount))p*=0.75;
+  if(S.buySurcharge>0)p*=1.10;    /* a „drágább igazolás" büntetés */
   p*=giftSkillPriceMult(entry);   /* a kész skillekért fizetni kell */
-  /* CSAPATÉPÍTÉSI STÍLUS ("Olcsó a jó védő"): a VÉDŐ posztcsoport olcsóbb.
-     Kizárólag a VÉTELI oldal — az eladás (sellPrice) érintetlen marad,
-     különben a kettő szétválna és arbitrázs nyílna. */
-  p*=styleBuyMultFor(entry);
+  /* ---- A KEDVEZMÉNYEK, ÖSSZEADVA (lásd a fenti blokkot) ----
+     A `noDiscount` kapcsoló a KIÍRÁSHOZ kell: hogy meg tudjuk mutatni, MENNYI
+     LENNE kedvezmény nélkül. MOSTANTÓL MIND A KETTŐT elhagyja (korábban csak
+     a kihívásét), tehát a kiírt „eredetileg" tényleg az eredeti ár. */
+  p*=(1-buyDiscountSum(entry,opts));
   /* EGÉSZ pontra kerekítünk (korábban 100-ra): forintban a 100 pontos lépcső
      200 M Ft-os ugrás lenne, és minden ár "…00 M Ft"-ra végződne. Így az
      összegek élethűen egyenetlenek, az érték viszont <0,5%-ot mozdul. */
@@ -36128,10 +36201,23 @@ function styleBuyMultFor(entry){
 function buyDiscountInfo(entry){
   try{
     if(gameMode!=="career"||!entry)return null;
-    if(!(S.buyDiscountChance>0)||!chBuyDiscountHits(entry.n))return null;
+    const parts=buyDiscountParts(entry);
+    if(!parts.length)return null;
     const full=buyPrice(entry,{noDiscount:true}),now=buyPrice(entry);
     if(!(full>now))return null;
-    return {full,now,saved:full-now,pct:Math.round((1-now/full)*100)};
+    /* A SOROK FORINTBAN IS. Mindegyik az EREDETI árból vett hányad, tehát a
+       sorok összege betűre a teljes megtakarítás — épp ez az összeadás
+       értelme. A kerekítés maradékát az UTOLSÓ sor viszi, hogy a kiírt
+       tételek pontosan kiadják a végösszeget (különben a felhasználó egy
+       forintnyi eltérést látna, és joggal hinné hibásnak). */
+    const rows=parts.map(x=>Object.assign({},x,{amt:Math.round(full*x.pct)}));
+    const saved=full-now;
+    if(rows.length){
+      let s=0;rows.forEach(r=>{s+=r.amt;});
+      rows[rows.length-1].amt+=saved-s;}
+    return {full,now,saved,pct:Math.round((1-now/full)*100),
+      rows,sumPct:Math.round(parts.reduce((a,x)=>a+x.pct,0)*100),
+      capped:parts.reduce((a,x)=>a+x.pct,0)>BUY_DISC_CAP+1e-9};
   }catch(e){return null;}}
 /* Determinisztikus "véletlen": a névből és a szezonból képzett hash dönti el,
    kapott-e kedvezményt ez a játékos. Így stabil marad két megjelenítés közt. */
@@ -37740,11 +37826,14 @@ function genChallenge(scope,diff,ctx){
       return {type:"teamConceded",target,inverse:true,
         desc:`Kapj LEGFELJEBB ${target} gólt ${horizon}`,
         rule:`Fordított kihívás: akkor teljesül, ha a határidőig ENNYI vagy ENNÉL KEVESEBB gólt kapsz. A vállalás előtt kapott gólok nem számítanak.`};},
-    ()=>{if(short)return null;
-      const target=diff==="hard"?0:diff==="medium"?1:2;
-      return {type:"discipline",target,inverse:true,
-        desc:`Zárd a szezont legfeljebb ${target} piros lappal`,
-        rule:`Fordított kihívás: a vállalás után kapott piros lapokat számoljuk. ${target===0?"Egyetlen kiállítás sem fér bele.":""}`};},
+    /* A PIROSLAP-KIHÍVÁS TÖRÖLVE (3.9.39). Bejelentett panasz: „erre nincs
+       ráhatása a játékosnak, vagy csak nagyon kicsi." Igaz: a kiállítás a
+       meccsmotorban sorsolt esemény (SIM.RED), amit a menedzser csak közvetve,
+       a `discipline` típusú skillek felállításba tételével befolyásol — és a
+       „legfeljebb 0 piros lap" a Nehéz fokozaton így tisztán szerencsejáték
+       volt. Egy kihívás, amit nem a döntéseid döntenek el, nem kihívás.
+       A `discipline` típus a challengeRawValue-ban SZÁNDÉKOSAN marad: a régi
+       mentésekben futó vállalások így a szokásos úton zárnak le. */
     /* --- KEZDŐ-11 JÁTÉKOS-CÉL (csak pályán lévő) --- */
     ()=>{if(!fwd.length)return null;const s=pick(fwd);const target=short?R(2,4):R(6,11);
       return {type:"playerGoals",stat:"goals",playerName:s.p.n,target,
@@ -37984,13 +38073,22 @@ function genChallenge(scope,diff,ctx){
        olyat kínál fel, ami MÉRHETŐEN közel van: a haladása (msProgressOf)
        a nehézséghez tartozó sáv fölött áll. A leírás kiírja, hol tartasz —
        tehát látod, mit vállalsz, mielőtt igent mondasz. */
-    ()=>{if(!short)return null;
-      const cand=chNearMilestones(diff);
+    /* A HOSSZÚ KIHÍVÁSOK IS KAPHATJÁK (3.9.39): egy egész szezon épp az az
+       időtáv, amin egy 60-80%-on álló mérföldkő reálisan összejön — korábban
+       ez a sablon csak az évszakra létezett, tehát a szezonos csomagban SOHA
+       nem volt mérföldkő-cél. */
+    ()=>{
+      /* A GARANCIA-ÁGON csak az 5%-on belüli legközelebbi jöhet; egyébként a
+         nehézséghez tartozó sávból, de mindig a LEGKÖZELEBBI (a lista rendezve
+         érkezik) — nem véletlen jelölt a sávon belül. */
+      const cand=_chMsForce?chNearMilestones(null,CH_MS_CLOSE):chNearMilestones(diff);
       if(!cand.length)return null;
-      const x=pick(cand);
+      const x=cand[0];
+      const kozel=x.pct>=CH_MS_CLOSE;
       return {type:"msOne",target:1,msId:x.d.id,msPct:x.pct,
         desc:`Szerezd meg ezt a mérföldkövet ${horizon}: „${x.d.t}"`,
-        rule:`Egyetlen, KONKRÉT mérföldkő — nem darabszám. Azért ez, mert már `
+        rule:`Egyetlen, KONKRÉT mérföldkő — nem darabszám. Azért ez, mert `
+          +(kozel?`már KARNYÚJTÁSNYIRA van: `:`már `)
           +`${Math.round(x.pct*100)}%-on állsz vele (${x.d.d}). Az Infó-pult `
           +`Mérföldkövek fülén követheted élőben. Ha a határidőig megvan, teljesült; `
           +`a többi mérföldkő ide nem számít bele.`};},
@@ -38379,15 +38477,35 @@ function styleCleanChal(){
 function chalDiffUp(diff,steps){
   const i=CHALLENGE_DIFFS.indexOf(diff);
   return CHALLENGE_DIFFS[Math.min(CHALLENGE_DIFFS.length-1,Math.max(0,i)+(steps||0))];}
-function buildChallengeOffer(scope,ctx){
+/* A `force` mező a felajánlás-csomag GARANCIÁIT szolgálja ki. Ma egyetlen
+   ilyen van: `msClose` — az 5%-on belüli mérföldkő (3.9.39). A kapu ugyanaz a
+   minta, mint a stílus-tiszta lapé: egy jelzőt teszünk fel, újrasorsolunk,
+   amíg a kívánt típus jön, és a jelzőt MINDIG levesszük. */
+function buildChallengeOffer(scope,ctx,force){
   let diff=pick(CHALLENGE_DIFFS);
+  let goal=null,cleanBoost=false;
+  /* ---- A GARANTÁLT, KARNYÚJTÁSNYI MÉRFÖLDKŐ (3.9.39) ----
+     Nem külön ág a lezáráshoz: csak a CÉLT állítja elő, és onnantól a
+     szokásos úton megy tovább (határidő, jutalom, büntetés, épség-ellenőrzés).
+     Egy kiút van: ha nincs 5%-on belüli jelölt, null-lal térünk vissza, és a
+     hívó a normál sorsolással folytatja. */
+  if(force&&force.msClose){
+    if(scope==="cup"||!chCloseMilestone())return null;
+    _chMsForce=true;
+    try{for(let i=0;i<20&&!goal;i++){
+      const c=genChallenge(scope,diff,ctx);
+      if(c&&c.type==="msOne")goal=c;}}
+    finally{_chMsForce=false;}
+    if(!goal)return null;
+    /* A KARNYÚJTÁSNYI CÉL KÖNNYŰ. Egy 95%-on álló mérföldkőért „Nehéz"
+       jutalmat adni félrevezetés volna — és a büntetése is aránytalan. */
+    goal.forceDiff="easy";}
   /* A KAPU: a bajnoki kihívásokra szól (a kupának saját katalógusa van). Ha a
      dobás elsül, addig sorsolunk, amíg tiszta lapos típus jön — de csak
      korlátozott számban, hogy egy szűk keretnél se akadjon meg a felajánlás.
      A könnyítés a sorsolás IDEJÉRE kapcsol be, hogy a cél már könnyítve
      szülessen (lásd _chCleanEase). */
-  const CC=(scope!=="cup")?styleCleanChal():null;
-  let goal=null,cleanBoost=false;
+  const CC=(!goal&&scope!=="cup")?styleCleanChal():null;
   if(CC&&Math.random()<CC.p){
     _chCleanEase=CC.ease;
     try{
@@ -38827,21 +38945,55 @@ function chBestOtherTacticLevel(ch){
    szurkoló) — közös modelljük nincs. A HALADÁS-SZÁZALÉK viszont mindegyiknél
    ugyanazt jelenti, és ez a kihívás egyetlen kérdése: mennyi van hátra. */
 const CH_MS_NEAR={easy:0.85,medium:0.72,hard:0.55};
-function chNearMilestones(diff){
+/* ---- „MINDIG LEGYEN EGY KARNYÚJTÁSNYI" (3.9.39) ----
+   BEJELENTETT PANASZ: „Teljesíted ezt / azt a mérföldkövet: mindig legyen egy
+   olyan, ami már közel van a teljesítéshez 5%-on belül, eddigi kihívásoknál
+   mindig elérhetetlent kaptam."
+
+   Három külön hiba adta ezt, és mind a három itt javul:
+     1. A SÁV TÚL TÁG VOLT. A Nehéz 55%-tól bármit felkínált — egy 56%-on álló
+        mérföldkő nyolc meccs alatt jellemzően nem jön össze, tehát pontosan az
+        „elérhetetlen" élményt adta.
+     2. A SORSOLÁS VAK VOLT. A sávon belül `pick`-kel VÉLETLEN jelöltet
+        választott, nem a legközelebbit — így a 95%-os és az 56%-os egyforma
+        eséllyel jött.
+     3. NEM VOLT GARANCIA. A mérföldkő-sablon csak egy volt a sok közül; ha nem
+        őt sorsolta a rendszer, a csomagban egyetlen elérhető cél sem volt.
+   Mostantól: a lista a KÖZELSÉG szerint rendezve jön vissza, és ha van 5%-on
+   belüli jelölt, a felajánlás GARANTÁLTAN felkínálja (lásd chMsForce). */
+const CH_MS_CLOSE=0.95;          /* „5%-on belül" — a kért garancia sávja */
+function chNearMilestones(diff,lowOverride){
   const out=[];
   try{
     const M=msState();
-    const lo=CH_MS_NEAR[diff]!=null?CH_MS_NEAR[diff]:0.72;
+    const lo=(lowOverride!=null)?lowOverride
+      :(CH_MS_NEAR[diff]!=null?CH_MS_NEAR[diff]:0.72);
+    /* EGY MÉRFÖLDKŐRE EGYSZERRE EGY KIHÍVÁS. Enélkül ugyanazt a mérföldkövet
+       két kihívás is kérhetné (vagy egy futó mellé újat kínálnánk), és a
+       második ingyen jutalom volna az elsőért végzett munkából. */
+    const foglalt=new Set();
+    (S.activeChallenges||[]).forEach(c=>{if(c&&c.msId)foglalt.add(c.msId);});
     MILESTONES.forEach(d=>{
       if(!d||!d.id||!d.p)return;
       if(M.done&&M.done[d.id])return;          /* megvan */
       if(M.pend&&M.pend[d.id])return;          /* beragadt: a haladása áll */
+      if(foglalt.has(d.id))return;             /* már fut rá kihívás */
       if(typeof msCatUnlocked==="function"&&d.cat&&!msCatUnlocked(d.cat))return;
       const pr=msProgressOf(d);
       if(!pr||!(pr.pct>=lo)||pr.pct>=1)return;
       out.push({d,pct:pr.pct});});
   }catch(e){return [];}
+  /* A LEGKÖZELEBBI ELÖL — erre épül a garancia és a sablon választása is. */
+  out.sort((a,b)=>b.pct-a.pct);
   return out;}
+/* A legközelebbi, 5%-on belüli mérföldkő — vagy null, ha nincs ilyen. */
+function chCloseMilestone(){
+  const c=chNearMilestones(null,CH_MS_CLOSE);
+  return c.length?c[0]:null;}
+/* A GARANCIA JELZŐJE. Amíg áll, a mérföldkő-sablon KIZÁRÓLAG az 5%-on belüli
+   legközelebbi jelöltet adja vissza, a többi sablon pedig kihagyja magát —
+   ugyanaz a minta, amit a stílus-tiszta lap kapuja (_chCleanEase) használ. */
+let _chMsForce=false;
 /* ---- A CSEREPERCEK CÉLJA ----
    Ez az EGYETLEN kihívás-típus, aminek a célja NEM a kalibráló szimulációból
    jön, és ezt ki kell mondani: a szimuláció a MOTORT modellezi (gól, védés,
@@ -39071,6 +39223,19 @@ function settleEarlyChallenges(){
   if(gameMode!=="career"||_chSettling)return;
   const list=S.activeChallenges||[];
   if(!list.length)return;
+  /* ---- A RETESZ ITT IS FELKERÜL (3.9.39) ----
+     BEJELENTETT HIBA: „amint kész, legyen azonnal jutalom, különben elbukottra
+     hozza ki a határidőnél (velem megtörtént)."
+     A gyökere ez volt: a `metLatched` reteszt KIZÁRÓLAG a meccs utáni
+     könyvelés (chAfterMatchBook) tette fel. Csakhogy a kihívások egy része
+     NEM meccsen teljesül — igazolás, eladás, mérföldkő, stílus-képesség,
+     poszt-tanulás, összhang, skill —, és ezek a számlálók a szezonváltáskor
+     nullázódnak (lásd 76944 körül). Aki nyáron teljesítette a célt, annál a
+     határidőig nem került fel a retesz, a szezonváltás pedig elvitte a
+     haladást — a kihívás elbukottként zárt, holott kész volt.
+     Mostantól minden ilyen ponton lefut ez a függvény, és MIELŐTT fizetne,
+     RETESZEL: onnantól a teljesítést semmilyen későbbi esemény nem veheti el. */
+  list.forEach(latchChallengeIfMet);
   const due=list.filter(ch=>challengeEarlyPayable(ch)&&challengeSatisfied(ch));
   if(!due.length)return;
   S.activeChallenges=list.filter(ch=>due.indexOf(ch)<0);
@@ -39195,6 +39360,10 @@ function applyChallengeReward(rw){
       if(!def){delete M.pend[ids[0]];return "a beragadt mérföldkő már nem létezik";}
       delete M.pend[def.id];
       M.done[def.id]={season:S.seasonNumber||1,held:true};
+      /* EGY MÉRFÖLDKŐ MEGSZERZÉSE PONTOSAN a msOne kihívás célja (3.9.39) —
+         a jutalomnak itt, a teljesítés pillanatában a helye. A hívás
+         idempotens és rekurzió-védett (_chSettling). */
+      try{settleEarlyChallenges();}catch(e){}
       try{msPayout(def,"held");}catch(e){}
       return `beragadt jutalom kifizetve: ${def.t}`;}
     case "bidBoost":
@@ -39772,6 +39941,16 @@ function showChallengeOffers(scope,count,resumeCb,opening,opts){
     if(n)seenPlayer.add(n);
     seenType.add(ch.type);seenDesc.add(ch.desc);_challengeOffers.push(ch);};
   const playerFree=ch=>{const n=challengeTargetPlayer(ch);return !n||!seenPlayer.has(n);};
+  /* ---- ELSŐKÉNT A KARNYÚJTÁSNYI MÉRFÖLDKŐ (3.9.39) ----
+     BEJELENTETT PANASZ: „mindig legyen egy olyan, ami már közel van a
+     teljesítéshez 5%-on belül, eddigi kihívásoknál mindig elérhetetlent
+     kaptam." Ezért ez nem a sorsolásra van bízva: ha VAN 5%-on belüli
+     mérföldkő, a csomag ELSŐ eleme az lesz. Ha nincs, a hívás null-t ad, és
+     minden megy a régi úton — a csomag mérete nem csökken. */
+  try{
+    const msOffer=buildChallengeOffer(scope,ctx,{msClose:true});
+    if(msOffer&&playerFree(msOffer))takeOffer(msOffer);
+  }catch(e){}
   for(let tries=0;tries<count*10&&_challengeOffers.length<count;tries++){
     const ch=buildChallengeOffer(scope,ctx);
     if(ch&&!seenType.has(ch.type)&&!seenDesc.has(ch.desc)&&playerFree(ch))takeOffer(ch);}
@@ -39946,6 +40125,13 @@ function challengeProgressText(ch){
    "season" (hosszú, szezonvégi). A lejárt kihívások reward/punishmentet
    osztanak, majd kikerülnek az aktív listából. */
 function evaluateDueChallenges(kind,currentValue){
+  if(!S.activeChallenges||!S.activeChallenges.length)return;
+  /* AZ UTOLSÓ ESÉLY A JUTALOMRA (3.9.39). Ha egy kihívás célja már összejött,
+     de a beváltás valamiért nem futott le (nem meccsen teljesült, és a HUB sem
+     nyílt meg közben), akkor a határidőnél MÉG MINDIG jutalommal zárjon, ne
+     bukással. A settleEarlyChallenges reteszel is, tehát a sorrend helyes:
+     előbb mentjük, ami megvan, csak utána ítélkezünk a maradék fölött. */
+  try{settleEarlyChallenges();}catch(e){}
   if(!S.activeChallenges||!S.activeChallenges.length)return;
   const remaining=[];
   S.activeChallenges.forEach(ch=>{
@@ -57742,11 +57928,20 @@ function twConfirmBuy(cand,onConfirm,onBack){
     <div style="font-size:12.5px;color:var(--dim2)">Vételár</div>
     <div style="font-family:'Archivo Black';font-size:26px;color:${afford?"var(--gold)":"var(--red)"}">${fmtFtShort(price)}</div>
     <div style="font-size:11.5px;color:var(--dim);margin-top:4px">Büdzsé: ${fmtFt(S.transferBudget)}${afford?"":" — nincs elég"}</div>
-    ${(()=>{const d=buyDiscountInfo(cand);return d?`<div class="buyDisc">
-        <div class="bdH">🎉 Kihívás-kedvezmény — most bejött!</div>
-        <div class="bdB"><s>${fmtFt(d.full)}</s> helyett · <b>${fmtFt(d.saved)}</b> a megtakarításod (−${d.pct}%)</div>
-        <div class="bdF">Ezt egy teljesített kihívásért kaptad — minden igazolásnál ${Math.round((S.buyDiscountChance||0)*100)}% eséllyel jön be.</div>
-      </div>`:"";})()}
+    ${(()=>{const d=buyDiscountInfo(cand);if(!d)return "";
+      /* A STACK. Soronként KIÍRJUK, melyik forrás mennyit ad — és mindegyik
+         az EREDETI árra vetítve, mert így adódnak össze (3.9.39). */
+      return `<div class="buyDisc">
+        <div class="bdH">🎉 ${d.rows.length>1?"Kedvezmények — összeadva":"Kedvezmény"}</div>
+        <div class="bdStack">${d.rows.map(r=>`<div class="bdRow">
+            <span class="bdN">${esc(r.n)}</span>
+            <span class="bdP">−${Math.round(r.pct*100)}%</span>
+            <span class="bdA">−${fmtFt(r.amt)}</span></div>`).join("")}</div>
+        <div class="bdSum"><span class="bdN">${d.rows.length>1?"Összesen":"Kedvezmény"}</span>
+          <span class="bdP">−${d.pct}%</span><span class="bdA">−${fmtFt(d.saved)}</span></div>
+        <div class="bdB"><s>${fmtFt(d.full)}</s> helyett <b>${fmtFt(d.now)}</b> — ${fmtFt(d.saved)} marad a büdzsében.</div>
+        <div class="bdF">${d.rows.map(r=>esc(r.d)).join(" ")}${d.capped?` A kedvezmény ${Math.round(BUY_DISC_CAP*100)}%-nál megáll — ennyi az elméleti maximum.`:""}</div>
+      </div>`;})()}
     ${tokenPays?`<div style="font-size:12px;color:var(--grass);margin-top:5px;line-height:1.45">🎁 <b>Ingyen igazolás-token</b> van nálad — ha megegyeztek, ez az igazolás <b>semmibe nem kerül</b>${S.transferBudget<price?", a büdzsé tehát nem akadály":""}.</div>`:""}</div>`;
   $("twActions").innerHTML="";
   if(afford){
@@ -58077,7 +58272,11 @@ function twShowPlacement(cand,completeFn,cfg){
       /* A GARANTÁLT KEDVEZMÉNY-ZSETON a SIKERES vásárlás lezárásakor fogy —
          egy elbukott tárgyalás nem viszi el (3.9.37 kihívás-jutalom). */
       try{chBuyDiscountSpend();}catch(e){}
-      if(_d)addLine(`🎉 <b>Kihívás-kedvezmény</b>: ${esc(shortName(name))} ${fmtFt(_d.full)} helyett <b>${fmtFt(_d.now)}</b> — ${fmtFt(_d.saved)} maradt a büdzsében.`,"m life");
+      /* A NAPLÓ IS A BONTÁST VISZI: melyik forrás mennyit adott. Egy
+         megerősítő képernyő elpattan, a napló visszanézhető. */
+      if(_d)addLine(`🎉 <b>Kedvezmény</b>: ${esc(shortName(name))} ${fmtFt(_d.full)} helyett <b>${fmtFt(_d.now)}</b> `
+        +`(${_d.rows.map(r=>`${esc(r.n)} −${Math.round(r.pct*100)}%`).join(" + ")}`
+        +`${_d.rows.length>1?` = −${_d.pct}%`:""}) — ${fmtFt(_d.saved)} maradt a büdzsében.`,"m life");
     }
     /* ÜGYNÖKSÉG-PONT. A TOKENES igazolás is számít: a munkát akkor is az
        ügynökség végezte el, csak nem a te pénzedből — a pont alapja ezért a
@@ -59927,7 +60126,16 @@ function saleRejectOffer(rec){
 /* priceOverride: a PIACI eladás (licit) a maga kialkudott összegén fizet, nem a
    „most, azonnal" áron. Minden más (napló, mérföldkő, kihívás-könyvelés)
    ugyanazon az úton megy tovább — egy eladás egy eladás. */
+/* ---- AZ ELADÁS UTÁN IS AZONNAL FIZETÜNK (3.9.39) ----
+   Az eladás öt kihívást zárhat le (eladott érték, fiatalítás, gyenge láncszem,
+   eladási arány, a 32 fölöttiek), és HÁROM külön kilépési ága van (tartalék,
+   pad, kezdő) — ezért burkoló, nem beszúrt sor: egy ágat elfelejteni pont az a
+   hiba volna, amit ez a javítás orvosol. */
 function releasePlayer(p,sell,priceOverride){
+  const r=_releasePlayerCore(p,sell,priceOverride);
+  try{if(r&&r.ok)settleEarlyChallenges();}catch(e){}
+  return r;}
+function _releasePlayerCore(p,sell,priceOverride){
   const loc=findPlayerLocation(p);
   if(!loc)return{ok:false,reason:"notfound"};
   const credit=sell?((priceOverride!=null&&isFinite(priceOverride))?Math.round(priceOverride):sellValue(p)):0;
@@ -70579,6 +70787,7 @@ function openPosLearnPicker(loc){
           if(!Object.keys(e.posDrift).length)delete e.posDrift;}
         e.posLearning={target:pos,needed:posLearnMatchesNeeded(e),progress:carry,startedSeason:S.seasonNumber||1};
         S.chPosLearnStarted=(S.chPosLearnStarted||0)+1;   /* kihívás-könyvelés */
+        try{settleEarlyChallenges();}catch(e){}           /* azonnali jutalom (3.9.39) */
         addLine(`🎓 Poszt-tanulás elindítva: ${esc(shortName(p.n))} elkezdte ${hunAz(pos)} ${pos} poszt tanulását (−${fmtFt(cost)}).`,"m life");
         $("twBody").innerHTML=`<div class="h" style="color:var(--grass)">🎓 Elindítva!</div><p style="font-size:13px;margin-top:5px">${esc(shortName(p.n))} mostantól ${hunAz(pos)} <b>${pos}</b> posztot tanulja. A haladást a lenyíló játékos-panelen követheted. Szólunk, ha kész!</p>`;
         $("twActions").innerHTML="";
@@ -85146,6 +85355,7 @@ function styleBuyTrait(key){
   st.traits=st.traits||{};
   st.traits[key]=lv+1;
   S.chStyleUnlocks=(S.chStyleUnlocks||0)+1;   /* kihívás-könyvelés */
+  try{settleEarlyChallenges();}catch(e){}     /* „oldj fel N képességet" — azonnal (3.9.39) */
   const sd=styleDef();
   try{
     addLine(`${sd?sd.ic:"🎯"} <b>${esc(t.n.toUpperCase())} — ${lv+1}. SZINT</b> · −${price} csapatstílus-pont`,"m mvp");
