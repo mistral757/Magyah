@@ -29,22 +29,28 @@ A karakterszámok mérve vannak, nem becsülve.)*
 ## 1. Rövid leírás — **80 karakter a plafon**
 
 ```
-Magyar futballmenedzser: draft, kémia, harminc forduló. Offline is játszható.
+Építsd a saját magyah csapatod, pörögj fel! Vár a mennyei megyei edzők világa!
 ```
 
-*(77 karakter — a 80-as plafon alatt.)*
+*(78 karakter — a 80-as plafon alatt.)*
 
-**Két tartalék, ha ez nem tetszik:**
+> **Miért ez a jó választás.** Ez az egyetlen változat, ami a játék SAJÁT
+> hangján szól — a „magyah" és a „mennyei megyei" a játékból való, nem egy
+> áruházi sablonból. A rövid leírás az első és sokszor egyetlen mondat, amit
+> valaki elolvas: itt a hangvétel többet mond a műfajról, mint egy pontos, de
+> semleges összefoglaló.
+
+**Két semlegesebb tartalék, ha valaha kell:**
+
+```
+Magyar futballmenedzser: draft, kémia, harminc forduló. Offline is játszható.
+```
+*(77)*
 
 ```
 Építs keretet, sorsolj edzőt, és vidd fel a klubot a megyeiből az élvonalba.
 ```
 *(76)*
-
-```
-Futballmenedzser magyarul: hat osztály, harminc forduló, egy klub — a tiéd.
-```
-*(75)*
 
 ---
 
