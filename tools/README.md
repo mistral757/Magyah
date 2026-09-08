@@ -372,6 +372,11 @@ a feliratuk a saját állásukat mondja: „még 6 hiányzik (14/20)"), és a **
 panelt**, ahol külön állítás mondja ki, hogy a panel minden sora UGYANAZT
 válaszolja, amit a felület kapui.
 
+A 6. fázisból: a lépcső osztály- és mezőnyszint-döntését (a `#scPyrDiv`
+képernyőn egyetlen választó sem maradhat), a „legalább kettő" rejtési küszöböt
+minden rácsra, és egy **végigvitt** állítást, ami a `beginNewGame` +
+`pyrConfirmDiv` teljes útján ellenőrzi, mit kap ténylegesen a karrier.
+
 **Portütközés:** a próba a 8961-es porton szerver; ha egy korábbi futás
 összeomlott, a `python3 -m http.server` folyamat ottragadhat, és a következő
 futás `EADDRINUSE`-szal áll meg. Ilyenkor `pkill -f "http.server"`.
