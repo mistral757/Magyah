@@ -94,6 +94,21 @@ const srv=http.createServer((req,rp)=>{
       return (d.querySelector("div")||d).textContent.trim().slice(0,150);};
     out.szoveg={};
     out.szoveg.comeback=mondat(seasonArcHtml(buildFinalTable()));
+    /* ---- 3b. EGY BIZTOSAN DOBOGÓN KÍVÜLI SZEZON ----
+       A comeback-fixtúra (12 vereség, majd 18 győzelem) 54 pontot ér, és az,
+       hogy ez dobogós-e, a MEZŐNY eredményeitől függ — az pedig világ-seedenként
+       más. A „nem vagy dobogón → 4 vonal" ág ezért néha nem is futott le, néha
+       meg jogos elvárásként bukott el. Ez a harmincpontos szezon minden
+       világban a mezőny alsó felében végez, tehát a négyvonalas ág MINDIG
+       lefut; a comeback-állítás pedig innentől a SZABÁLYT mondja ki, nem egy
+       konkrét helyezést. */
+    idenyt(r=>r%3===0?3:0);                     /* 10 győzelem, 30 pont */
+    S.finalTable=null;
+    {const v=buildFinalTable();
+     out.kozep={enHely:v.findIndex(x=>x.you)+1,sorok:seasonArcTeams(v).length,
+       enBenne:seasonArcTeams(v).some(x=>x.t.you)};}
+    idenyt(r=>r<=12?0:3);                       /* vissza a comeback-szezonhoz */
+    S.finalTable=null;
     idenyt(()=>3);                              /* mind a 30 győzelem */
     S.finalTable=null;
     const bajnokVeg=buildFinalTable();
@@ -146,7 +161,10 @@ const srv=http.createServer((req,rp)=>{
     ["determinista (kétszer hívva ugyanaz)",r.determinista===true],
     ["a 30. forduló = a végtabella",r.veg_egyezik===true],
     ["minden forduló szabályos 1..N rangsor",r.rangsor_hibas.length===0],
-    ["comeback: nem vagy dobogón → 4 vonal",r.comeback.sorok===4&&r.comeback.enBenne===true&&r.comeback.enHely>3],
+    ["comeback: a szabály áll (dobogón 3, azon kívül 4 vonal)",
+      r.comeback.enBenne===true&&r.comeback.sorok===(r.comeback.enHely>3?4:3)],
+    ["gyenge szezon: biztosan dobogón kívül → 4 vonal, és benne vagy",
+      r.kozep.enHely>3&&r.kozep.sorok===4&&r.kozep.enBenne===true],
     ["bajnok: dobogón vagy → 3 vonal",r.bajnok.sorok===3&&r.bajnok.enHely===1],
     ["a panel egy fő + 3-4 jelmagyarázat-SVG",r.svg_db>=4],
     ["dobogó-sáv és féltáv-jelölés kirajzolva",r.van_dobogosav&&r.van_feltav],

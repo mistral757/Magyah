@@ -255,7 +255,10 @@ a mentés, a kvalifikációs tábla, a kupa-kihívás, a Run-mérföldkövek és
 díj-skillek azonosítói), a **kiírás** viszont `KK`, a prózában pedig „kupa".
 A lényegi állítás a FORRÁST fésüli át: egyetlen sztring-literálban sem maradhat
 önálló `BL` — a kommentek, a puszta kulcs, a CSS-osztálynév és a
-`${…BL}` tulajdonság-hivatkozás kivételével. Így egy jövőbeli új szöveg is
+`${…BL}` tulajdonság-hivatkozás kivételével. A 3.9.45-től az EL (`OJK`) és a
+KL (`KONF`) is benne van — az `EL`/`KL` token ott csak akkor gyanús, ha
+sorozat-kód KÖRNYEZETÉBEN áll (szám, szorzó vagy kötőjeles rag követi), mert
+nagybetűs kiemelésben a magyar „el" szó ugyanígy néz ki. Így egy jövőbeli új szöveg is
 azonnal elbukik, ha visszacsempészné a rövidítést. Részletek:
 `docs/ertesitesek.md` 10.
 
@@ -276,7 +279,11 @@ jelzésből a társ órája visszaszámol. A szabályfájlt is ellenőrzi.
 Emellett a beváró képernyő FEJLÉCÉT is (3.9.42): kupa-párharcban a sorozat és a
 kör nevét kell kiírnia (`KUPA · NEGYEDDÖNTŐ · VISSZAVÁGÓ` — sorozat-rövidítés nélkül), nem a bajnoki
 fordulószámot — a bajnokság ilyenkor már lezárult, tehát ott „31. FORDULÓ" állt,
-egy nem létező forduló. Részletek: `docs/ertesitesek.md` 7-9.
+egy nem létező forduló. És a KIÚT-GOMB időzítését (3.9.45): a „megyek tovább"
+eddig fix 25 mp után jelent meg a választott tempótól függetlenül — a
+párharcnál ez a társ előző keretével AZONNAL lejátszotta a mérkőzést. Plusz
+a tabella-kiút, ami a feliratával ellentétben nem tette el a helyi tabellát,
+ezért a várakozás újraindult. Részletek: `docs/ertesitesek.md` 7-9. és 11.
 
 ## mp-kozos-beallitas-proba.js — a közös karrier beállítói
 
@@ -338,6 +345,43 @@ együtt mozdul, a lépcső nem csúszik szét, a kereted érintetlen) és az ár
 a `drafted`-be, különben a piac-eltolás a saját keretedet is átskálázza — a
 valódi játékban minden leigazolt játékos bekerül. Részletek:
 `docs/rajt-nehezseg.md` 6. fejezet.
+
+## lepcsok-proba.js — 🪜 Lépcsők a csúcs felé (a feloldás-rendszer)
+
+```
+node tools/lepcsok-proba.js
+```
+
+Élő böngészőben méri az egyjátékos feloldás-rendszert, `localStorage`-ba
+írt naplóval (`30-0-unlock-v1`): a három kezdő lépcső **presetjét** (mind a
+tizenkét beállítást lépcsőnként), a beállító képernyő **zárait** (mi tiltott és
+mi nem — a felállás például MINDIG a játékosé), az **üdvözlő ablakot** (csak
+egyszer jön, és a karrier csak utána indul), a kezdőlap kapuit (a lépcsőn nincs
+útválasztó; a dinamikus karrier az 5. címig zárva), a **feloldás-ablakok**
+sorrendjét, valamint a gyűjtő számlálókat (ikon, nemzeti válogatott, képesség)
+és a Run-ból származtatott fokozat-/tempó-/stílus-kapukat. A 2. fázisból: az
+egyes választások **kapuit** (Rating a szezonban, kártyánként lutri, kész klub —
+mikor nyílnak, és visszakapják-e az eredeti feliratukat), valamint az
+osztályválasztó **mélység-zárait** (D4/D5/D6, az ajánlással és a megerősítéssel
+együtt). A 3. fázisból: a Run-szint szerinti ellenfél-fokozat- és
+tempó-kapukat a felületen, a csapatstílusok kapuit, a Panzer
+jellemvonás-számlálását, és a **„már kinyitottad" jóváírást** (amit használtál,
+az a Run-küszöb alatt is a tiéd marad; amit nem, az zárva). A 4-5. fázisból: a
+gyűjtő kapukat (ikon-sűrűség, nemzeti válogatottak, realisztikus képesség-mód —
+a feliratuk a saját állásukat mondja: „még 6 hiányzik (14/20)"), és a **haladás
+panelt**, ahol külön állítás mondja ki, hogy a panel minden sora UGYANAZT
+válaszolja, amit a felület kapui.
+
+**Portütközés:** a próba a 8961-es porton szerver; ha egy korábbi futás
+összeomlott, a `python3 -m http.server` folyamat ottragadhat, és a következő
+futás `EADDRINUSE`-szal áll meg. Ilyenkor `pkill -f "http.server"`.
+
+**Fixtúra-buktató, amibe már belefutottunk:** a `careerPool` modul-szintű
+`let`, tehát a `page.evaluate`-ben **bare** névvel kell írni — a
+`window.careerPool=…` egy MÁSIK objektumot hoz létre, és a próba csendben
+nullát mér. Ugyanígy a Run-ranglista **nyers tömb**, nem `{v,list}`.
+
+Részletek: `docs/lepcsok-roadmap.md`.
 
 ## firebase-rules.json — az adatbázis szabályai
 
