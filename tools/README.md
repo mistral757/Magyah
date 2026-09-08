@@ -449,13 +449,47 @@ követi. Ha a színek vagy a betűk változnak, a kép egy paranccsal
 a woff2 meg nem érkezik, ezért a render megvárja a `document.fonts.ready`-t.
 Enélkül üres képet kapnál.
 
+## ifi-elorejelzes-proba.js — 🔮 az ifi felajánlásába épített kilátás
+
+```
+node tools/ifi-elorejelzes-proba.js
+```
+
+Azt méri, amit egy ifi felajánlásakor a játékos LÁT: hány szezonra előre
+mutatja meg a game a fiatal várható ratingjét és TSI-jét, mihez méri, és
+hogy ugyanaz a srác nem kopogtat-e be kétszer egy szezonban.
+
+**A legfontosabb állítása** az, hogy az előrejelzés és a valóság UGYANAZT a
+számtant futtatja. Az `academyMatchStep()` és a `careerAgeStepCore()` azért
+külön függvény, hogy a jóslás ne egy második, párhuzamos képlet legyen: a
+próba lejátszik egy szezont élesben, előrejelez egy szezont, és a kettőnek
+kor–rating–TSI hármasban egyeznie kell. Ha valaki holnap a fejlődési görbén
+igazít, de csak az egyik helyen, ez a sor pirosodik ki.
+
+**A mérce a LEGJOBB 11**, nem a felállított kezdő tizenegy — és nem a keret
+átlaga. A próba direkt olyan keretet állít, ahol a kettő eltér (a legjobb 11
+átlaga 85.7, a pályára küldött tizenegyé 70), és megnézi, melyik szám kerül
+a fejlécbe. Ez azért fontos, mert a felajánlás pillanatában egy taktikai
+kísérlet vagy egy sérüléshullám nem torzíthatja el azt, amihez a fiatalt
+hasonlítod.
+
+**Az egy szezon = egy ajánlat** szabályt a `rec.offerSeason` bélyeg tartja: a
+próba ugyanabban a szezonban sokszor kéri a visszatérőt, és azt várja, hogy a
+már felajánlott név ne jöjjön elő újra; a szezonváltás után viszont igen.
+A ballagás (`ACADEMY_GRADUATE_AGE`) ettől függetlenül garantált marad.
+
+**Amit a jóslás szándékosan NEM tartalmaz:** kupameccseket, boostot és
+szerencsét. A TSI-ugrás a valóságban dobókocka (`ACADEMY_TSI_CHANCE`), az
+előrejelzésben a várható értéke — így a szám determinisztikus, és inkább
+alálő, mint ígérget. A felajánlás alján ezért áll ott, hogy ez nem ígéret.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 34 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 35 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
