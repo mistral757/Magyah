@@ -119,9 +119,12 @@ const {spawn}=require('child_process');
      const zart=sel=>[...document.querySelectorAll(sel)].some(e=>e.disabled);
      return {lepcson:unlockOnLadder(), preset:unlockPreset(),
        jelzes_rejtve:document.getElementById("unlockSetupNote").classList.contains("hide"),
+       /* A LÉPCSŐ-ZÁR VÉGE ≠ MINDEN NYITVA. A rácsok visszakerülnek a
+          játékoshoz, de az EGYES kapuk (lutri, kész klub) még zárva vannak —
+          épp ez az a hiba, amit a 2. fázis javított. */
        barmi_zart:["#diffSlider","#rerollSlider","#guideGrid button","#wcToggleGrid button",
-                   "#pyrSpeedGrid button","#iconGrid button","#ratingBasisGrid button",
-                   "#careerStartGrid button"].filter(zart),
+                   "#pyrSpeedGrid button","#iconGrid button"].filter(zart),
+       kapuzott:["#ratingBasisGrid button","#careerStartGrid button"].filter(zart),
        nyitva:{diff:unlockHas("diff"),basis:unlockHas("basis"),div4:unlockHas("div4"),
                div5:unlockHas("div5"),dyn:unlockHas("dyn")}};});
    out.utvalaszto_3=await p.evaluate(()=>({
@@ -155,6 +158,43 @@ const {spawn}=require('child_process');
      unlockShow("free1");
      return {sor:l, ismetles_nem_jott:document.getElementById("unlockCard").classList.contains("hide"),
              vegso_d1:elotte};});
+   await p.close();}
+
+  /* ── 12. AZ EGYES VÁLASZTÁSOK KAPUI (2. fázis) ── */
+  out.kapuk={};
+  for(const n of [0,3,4,5]){
+    const p=await lap(n);
+    out.kapuk[n]=await p.evaluate(()=>{
+      enterCareerSetupFromHome(true);
+      const g=sel=>{const el=document.querySelector(sel);
+        return el?{tiltva:el.disabled,szurke:el.classList.contains("unlockOff"),
+                   sz:(el.querySelector("small")||{}).textContent}:null;};
+      return {
+        d1:unlockState().d1,
+        divMax:unlockDivMax(),
+        divWhy:{d3:unlockDivWhy(3),d4:unlockDivWhy(4),d5:unlockDivWhy(5),d6:unlockDivWhy(6)},
+        season:g('#ratingBasisGrid button[data-rb="season"]'),
+        wild:g('#ratingBasisGrid button[data-rb="wild"]'),
+        peak:g('#ratingBasisGrid button[data-rb="peak"]'),
+        club:g('#careerStartGrid button[data-cs="club"]'),
+        draft:g('#careerStartGrid button[data-cs="draft"]')};});
+    await p.close();}
+
+  /* ── 13. AZ OSZTÁLYVÁLASZTÓ LISTÁJA ── */
+  {const p=await lap(3);
+   out.osztalylista=await p.evaluate(()=>{
+     /* a listát a saját rajzolójával kérjük — egy valós klubkeretre */
+     const sq=SQUADS.filter(x=>!x.wc&&x.players&&x.players.length>=11)[0];
+     pyrPickSq=sq;pyrPickDiv=null;pyrPendingSpeed="tarto";pyrPickGap=0;
+     renderPyrDivPick();
+     const sorok=[...document.querySelectorAll("#pyrDivPickList button")].map(b=>({
+       tiltva:b.disabled, szurke:b.classList.contains("unlockOff"),
+       sz:b.textContent.replace(/\s+/g," ").trim().slice(0,50)}));
+     /* az ajánlás sem eshet zárt osztályra */
+     const ajanlott=pyrRecommendDiv(sq,"tarto",0);
+     /* és a megerősítés sem indíthat zárt osztályból */
+     pyrPickDiv=6;
+     return {sorok, kijelolt:pyrPickDiv, ajanlott, divMax:unlockDivMax()};});
    await p.close();}
 
   /* ── 11. A GYŰJTŐ SZÁMLÁLÓK (a kapuk a 3-4. fázisban jönnek, a GYŰJTÉS már megy) ── */
@@ -250,7 +290,9 @@ const {spawn}=require('child_process');
       ok(`${n}. lépcső: ${sel} NYITVA`, L.zar[k]===false);});
     ok(`${n}. lépcső: a felállás mindig a tiéd`, L.forma_nyitva===true);});
   ok("3 cím után: nincs preset, nincs jelzés", out.szabad.lepcson===false&&out.szabad.preset===null&&out.szabad.jelzes_rejtve);
-  ok("3 cím után: EGYETLEN vezérlő sem zárt", out.szabad.barmi_zart.length===0);
+  ok("3 cím után: a lépcső RÁCS-zárai eltűntek", out.szabad.barmi_zart.length===0);
+  ok("3 cím után: az EGYES kapuk viszont még állnak (lutri, kész klub)",
+     out.szabad.kapuzott.length===2);
   ok("3 cím után: nehézség/Rating/D4 nyitva, D5 és dinamikus még nem",
      out.szabad.nyitva.diff&&out.szabad.nyitva.basis&&out.szabad.nyitva.div4
      &&!out.szabad.nyitva.div5&&!out.szabad.nyitva.dyn);
@@ -288,6 +330,35 @@ const {spawn}=require('child_process');
   ok("Run: a csapatstílusok a Run-győzelmeket követik",
      out.run_szarmaztatas.stilus.beton&&out.run_szarmaztatas.stilus.villam
      &&!out.run_szarmaztatas.stilus.tiki&&!out.run_szarmaztatas.stilus.panzer);
+  /* --- 2. fázis: az egyes választások kapui --- */
+  ok("kapu: 0 címnél a Rating-szezon és a lutri és a kész klub is zárt",
+     out.kapuk[0].season.tiltva&&out.kapuk[0].wild.tiltva&&out.kapuk[0].club.tiltva
+     &&out.kapuk[0].season.szurke&&/🔒/.test(out.kapuk[0].club.sz));
+  ok("kapu: 3 címnél a Rating-szezon NYITVA, a lutri és a kész klub még nem",
+     out.kapuk[3].season.tiltva===false&&out.kapuk[3].wild.tiltva===true
+     &&out.kapuk[3].club.tiltva===true);
+  ok("kapu: a kinyitott gomb VISSZAKAPJA az eredeti feliratát",
+     !/🔒/.test(out.kapuk[3].season.sz)&&out.kapuk[3].season.szurke===false);
+  ok("kapu: 4 címnél a lutri is nyitva, a kész klub még nem",
+     out.kapuk[4].wild.tiltva===false&&out.kapuk[4].club.tiltva===true);
+  ok("kapu: 5 címnél minden nyitva", out.kapuk[5].wild.tiltva===false
+     &&out.kapuk[5].club.tiltva===false&&!/🔒/.test(out.kapuk[5].club.sz));
+  ok("kapu: a mindig nyitott választásokat nem bántjuk",
+     out.kapuk[0].peak.szurke===false&&out.kapuk[0].draft.szurke===false);
+  ok("osztály: a mélység a címekkel nyílik (0→D3, 3→D4, 4→D5, 5→D6)",
+     out.kapuk[0].divMax===3&&out.kapuk[3].divMax===4
+     &&out.kapuk[4].divMax===5&&out.kapuk[5].divMax===6);
+  ok("osztály: a zárt osztály megmondja, mi nyitja ki",
+     out.kapuk[0].divWhy.d3===null&&/3 bajnoki/.test(out.kapuk[0].divWhy.d4)
+     &&/5 bajnoki/.test(out.kapuk[0].divWhy.d6));
+  ok("osztálylista: hat sor, a D5 és D6 szürke és tiltott",
+     out.osztalylista.sorok.length===6
+     &&out.osztalylista.sorok.slice(0,4).every(x=>!x.tiltva)
+     &&out.osztalylista.sorok.slice(4).every(x=>x.tiltva&&x.szurke));
+  ok("osztálylista: a zárt sorra rá van írva a feltétel",
+     /🔒/.test(out.osztalylista.sorok[4].sz)&&/🔒/.test(out.osztalylista.sorok[5].sz));
+  ok("osztálylista: az ajánlás sosem esik zárt osztályra",
+     out.osztalylista.ajanlott<=out.osztalylista.divMax);
   ok("nincs futásidejű hiba", hiba.length===0);
 
   console.log(JSON.stringify(out,null,1));

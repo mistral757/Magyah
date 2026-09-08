@@ -14310,8 +14310,20 @@ function pyrRecommendDiv(sq,speed,upLv){
   const opts=pyrDivOptions(sq,speed,null,upLv);
   if(!opts.length)return PYR_DIVS;
   const target=PYR_REC_GAP[PYR_SPEEDS[speed]?speed:"tarto"];
-  let best=opts[0];
-  opts.forEach(o=>{
+  /* 🪜 AZ AJÁNLÁS SOSEM ESHET ZÁRT OSZTÁLYRA. A mélyebb osztály hosszabb út és
+     magasabb Run-plafon, ezért a régi ajánló szívesen ment le a D6-ig — egy
+     kezdő játékosnál viszont az még nincs kinyitva, és a képernyő egy nem
+     választható sort jelölt volna ki. Közös karrierben nincs kapu (a szobát a
+     házigazda állítja), ezért ott a teljes lista marad. */
+  let hasznalhato=opts;
+  try{
+    if(!(typeof MP!=="undefined"&&MP&&MP.active)&&typeof unlockDivMax==="function"){
+      const max=unlockDivMax();
+      const sz=opts.filter(o=>o.id<=max);
+      if(sz.length)hasznalhato=sz;}
+  }catch(e){}
+  let best=hasznalhato[0];
+  hasznalhato.forEach(o=>{
     const d1=Math.abs(o.gap-target),d0=Math.abs(best.gap-target);
     if(d1<d0-0.001||(Math.abs(d1-d0)<=0.001&&o.id>best.id))best=o;});
   return best.id;}
@@ -30348,6 +30360,14 @@ function renderPyrDivPick(){
   const sq=pyrPickSq;if(!sq)return;
   const box=$("pyrDivPickList");if(!box)return;
   if(!pyrPickDiv)pyrPickDiv=pyrRecommendDiv(sq,pyrPendingSpeed,0);
+  /* 🪜 A KIJELÖLÉS SEM ÁLLHAT ZÁRT OSZTÁLYON. Ide máshonnan is beeshet érték
+     (korábbi választás, a közös karrier csomagja), ezért a rajzolás elején
+     visszahúzzuk a legmélyebb NYITOTT osztályra — némán, mert a sor maga
+     kimondja, mi nyitja ki. */
+  try{
+    if(!(typeof MP!=="undefined"&&MP&&MP.active)&&pyrPickDiv>unlockDivMax())
+      pyrPickDiv=unlockDivMax();
+  }catch(e){}
   pyrSyncUpFromGap();
   /* ---- MINDEN SOR A VÁLASZTOTT RÉSSEL SZÁMOL ----
      A régi lista EGY világ-eltolással dolgozott, tehát a hat sorban hat KÜLÖNBÖZŐ
@@ -30408,10 +30428,15 @@ function renderPyrDivPick(){
   {const s1=$("pyrStep1");
    if(s1)s1.childNodes[0].nodeValue="① Melyik ligában kezdesz?\n      ";}
   box.innerHTML="";
+  /* 🪜 A ZÁRT OSZTÁLYOK. Nem tűnnek el: LÁTSZIK, hogy van lejjebb, és rá van
+     írva, hány bajnoki cím nyitja ki. Közös karrierben nincs kapu. */
+  const kapuzva=!(typeof MP!=="undefined"&&MP&&MP.active);
   opts.forEach(o=>{
-    const sel=o.id===pyrPickDiv;
+    const zarva=kapuzva?unlockDivWhy(o.id):null;
+    const sel=o.id===pyrPickDiv&&!zarva;
     const b=document.createElement("button");
-    b.className="btn-s";
+    b.className="btn-s"+(zarva?" unlockOff":"");
+    if(zarva)b.disabled=true;
     b.style.cssText="width:100%;text-align:left;margin-bottom:6px;padding:9px 11px;border-radius:8px"
       +(sel?";outline:2px solid var(--gold);outline-offset:-2px":"");
     /* nev-ok: az `o` itt a piramis OSZTÁLYA — a name a liga-fokozat neve, nem klubnév. */
@@ -30420,7 +30445,7 @@ function renderPyrDivPick(){
           <div style="font-weight:700;font-size:13.5px">D${o.id} · ${esc(o.name)}${o.id===1?" 🏆":""}
             ${o.id===rec?`<span style="font-size:10px;letter-spacing:.5px;color:var(--grass);border:1px solid var(--grass);border-radius:99px;padding:1px 6px;margin-left:5px;white-space:nowrap">🏠 ITT VAN OTTHON</span>`:""}</div>
           <div style="font-size:11.5px;color:var(--dim);margin-top:2px">
-            ${o.id===1?"<b>nincs feljebb</b>":`<b>${o.id-1} osztály</b> a csúcsig`}${
+            ${zarva?`<b>${esc(zarva)}</b>`:o.id===1?"<b>nincs feljebb</b>":`<b>${o.id-1} osztály</b> a csúcsig`}${
               _pyrDetail?` · <span style="color:var(--dim2)">a világ ${esc(pyrUpTxt(o.up))}</span>`:""}${
               o.cut?` · <span style="color:var(--red)">itt csak ${pyrFmtGap(o.want)} fér bele</span>`:""}</div>
         </div>
@@ -30429,7 +30454,7 @@ function renderPyrDivPick(){
           <div style="font-size:8.5px;letter-spacing:.6px;color:var(--dim2);margin-top:2px">RUN-PLAFON</div>
         </div>
       </div>`;
-    b.onclick=()=>{pyrPickDiv=o.id;renderPyrDivPick();};
+    if(!zarva)b.onclick=()=>{pyrPickDiv=o.id;renderPyrDivPick();};
     box.appendChild(b);});
   renderPyrGapRow();
   const cur=opts.filter(o=>o.id===pyrPickDiv)[0]||opts[opts.length-1];
@@ -30581,7 +30606,14 @@ function renderPyrDiffPick(){
     +`így amit itt vállalsz, azt a nyári igazolásaid után is pontosan azt kapod.</div>`;}
 function pyrConfirmDiv(){
   const sq=pyrPickSq;if(!sq)return;
-  const d=pyrPickDiv||PYR_DIVS;
+  let d=pyrPickDiv||PYR_DIVS;
+  /* 🪜 A KAPU ITT IS. A rajzolás már visszahúzza a kijelölést, de ez az a
+     pont, ahonnan a KARRIER ténylegesen elindul — egy zárt osztályból induló
+     karriert semmilyen úton nem szabad megkapni (a `pyrPickDiv`-be a közös
+     karrier csomagja és a régi állapot is beleírhat). */
+  try{
+    if(!(typeof MP!=="undefined"&&MP&&MP.active)&&d>unlockDivMax())d=unlockDivMax();
+  }catch(e){}
   const fromDraft=pyrPickFromDraft;
   pyrPending=false;
   pyrStart(d,pyrPendingSpeed,sq,pyrMpSetup()?pyrPendingUp:pyrPickUp);
@@ -73053,6 +73085,59 @@ const UNLOCK_LOCK_SEL={
   guide: "#guideGrid button",
   skill: "#skillModeGrid button",
   diff:  "#diffSlider,#diffModeGrid button,#aimSlider,#autoLevelGrid button,#autoAimGrid button"};
+/* ---- AZ EGYES VÁLASZTÁSOK KAPUI (2. fázis) ----
+   A LÉPCSŐ-ZÁR ÉS EZ KÉT KÜLÖN RÉTEG, és ez nem szőrszálhasogatás. A lépcső
+   az EGÉSZ rácsot zárja („még nem te állítod"), a kapu viszont EGY GOMBOT
+   („ez a lehetőség még nincs kinyitva"). A kettő különböző időpontban ér
+   véget: a lépcső a 3. bajnoki címmel, a kapuk a 4.-kel és az 5.-kel.
+
+   HIBA, AMIT EZ JAVÍT (a sajátom, a 3.9.46 első felében): a lépcső után az
+   unlockApplyLocks MINDENT feloldott — így a „kártyánként lutri" és a „kész
+   klub" használhatóvá vált, pedig az unlockHas szerint még zárva volt. A
+   feloldás-rendszernek EGY igazsága lehet.
+
+   A FELIRAT IS A GOMBRA KERÜL. Egy szürke gomb magyarázat nélkül hibának
+   látszik; a feltétellel ráírva viszont CÉL. */
+const UNLOCK_GATES=[
+  {sel:'#ratingBasisGrid button[data-rb="season"]',id:"basisSeason",
+   sz:"3 bajnoki cím kell a piramis tetején"},
+  {sel:'#ratingBasisGrid button[data-rb="wild"]',id:"lutri",
+   sz:"4 bajnoki cím kell a piramis tetején"},
+  {sel:'#careerStartGrid button[data-cs="club"]',id:"club",
+   sz:"5 bajnoki cím kell a piramis tetején"}];
+/* Egy gomb kapuzása. A feliratot a `small`-jába írjuk, és az EREDETIT
+   megőrizzük (data-unlock-sz), hogy a feloldás pillanatában visszatérjen —
+   különben a kinyitott gombon örökre a zár szövege maradna. */
+function unlockGateBtn(el,nyitva,sz){
+  if(!el)return;
+  const s=el.querySelector("small");
+  if(s){
+    if(el.dataset.unlockSz===undefined)el.dataset.unlockSz=s.textContent;
+    s.textContent=nyitva?el.dataset.unlockSz:("🔒 "+sz);}
+  el.classList.toggle("unlockOff",!nyitva);
+  if(!nyitva)el.disabled=true;}
+function unlockApplyGates(){
+  UNLOCK_GATES.forEach(g=>{
+    let nyitva=true;
+    try{nyitva=unlockHas(g.id);}catch(e){}
+    try{document.querySelectorAll(g.sel).forEach(el=>unlockGateBtn(el,nyitva,g.sz));}catch(e){}});}
+/* ---- MEDDIG MEHETSZ LE A PIRAMISBAN? ----
+   A mélyebb osztály HOSSZABB út és MAGASABB Run-plafon, ezért jutalom.
+   A D1-D3 mindig nyitva; a D4/D5/D6 a 3./4./5. bajnoki címmel jön.
+   EGY SZÁMOT ad vissza: a legmélyebb VÁLASZTHATÓ osztályt. */
+function unlockDivMax(){
+  let max=3;
+  try{
+    if(unlockHas("div4"))max=4;
+    if(unlockHas("div5"))max=5;
+    if(unlockHas("div6"))max=6;
+  }catch(e){}
+  return Math.min(PYR_DIVS,max);}
+/* Egy osztály választható-e, és ha nem, mi nyitja ki. */
+function unlockDivWhy(d){
+  if(d<=unlockDivMax())return null;
+  return `🔒 ${d===4?3:d===5?4:5} bajnoki cím kell a piramis tetején`;}
+
 /* A zárolás minden újrarajzoláskor lefut (updatePyrSetupVisibility), mert egy
    frissen megjelenített blokk vezérlői alapból engedélyezettek.
    KÖZÖS KARRIERBEN NEM NYÚLUNK SEMMIHEZ: ott a vendég-zár szabályai élnek, és
@@ -73068,10 +73153,12 @@ function unlockApplyLocks(){
     Object.keys(UNLOCK_LOCK_SEL).forEach(k=>{
       try{document.querySelectorAll(UNLOCK_LOCK_SEL[k]).forEach(el=>{el.disabled=false;});}catch(e){}});
     if(jel)jel.classList.add("hide");
+    unlockApplyGates();      /* a lépcső vége NEM nyit ki mindent — lásd UNLOCK_GATES */
     return;}
   Object.keys(UNLOCK_LOCK_SEL).forEach(k=>{
     const zart=p.zar.indexOf(k)>=0;
     try{document.querySelectorAll(UNLOCK_LOCK_SEL[k]).forEach(el=>{el.disabled=zart;});}catch(e){}});
+  unlockApplyGates();        /* a kapuk a lépcső-zár UTÁN: azok szigorúbbak */
   if(jel){
     jel.classList.remove("hide");
     jel.innerHTML=`🪜 <b>${unlockStep()}. lépcső a ${UNLOCK_STEPS}-ból.</b> `

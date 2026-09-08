@@ -359,7 +359,11 @@ mi nem — a felállás például MINDIG a játékosé), az **üdvözlő ablakot
 egyszer jön, és a karrier csak utána indul), a kezdőlap kapuit (a lépcsőn nincs
 útválasztó; a dinamikus karrier az 5. címig zárva), a **feloldás-ablakok**
 sorrendjét, valamint a gyűjtő számlálókat (ikon, nemzeti válogatott, képesség)
-és a Run-ból származtatott fokozat-/tempó-/stílus-kapukat.
+és a Run-ból származtatott fokozat-/tempó-/stílus-kapukat. A 2. fázisból: az
+egyes választások **kapuit** (Rating a szezonban, kártyánként lutri, kész klub —
+mikor nyílnak, és visszakapják-e az eredeti feliratukat), valamint az
+osztályválasztó **mélység-zárait** (D4/D5/D6, az ajánlással és a megerősítéssel
+együtt).
 
 **Fixtúra-buktató, amibe már belefutottunk:** a `careerPool` modul-szintű
 `let`, tehát a `page.evaluate`-ben **bare** névvel kell írni — a

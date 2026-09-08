@@ -150,7 +150,7 @@ A gyűjtés az **1.** Runnal indul, de a kapcsolók a **3.** Runtól nyílnak.
 | a feloldás-ablak | `UNLOCK_CARDS`, `unlockShow` / `unlockDrain`, `#unlockCard` |
 | „VB-, EB-győztes…" → **Nemzeti válogatottak** | `#wcToggleGrid` |
 
-**Próba:** `node tools/lepcsok-proba.js` — 80 állítás.
+**Próba:** `node tools/lepcsok-proba.js` — 92 állítás (1. és 2. fázis együtt).
 
 **Két döntés, amit érdemes tudni:**
 
@@ -169,10 +169,34 @@ gombokon volt, tehát egy újrarajzolás a **vendég-átnéző zárát is** csen
 leverte róla — a vendég átállíthatta volna a közös világ ellenfél-fokozatát. A
 zár mostantól a `renderPyrSpeedGrid` végén kötődik vissza, mindkét okra.
 
-### 2. fázis — a D1-lépcsők feloldásai
-* 3./4./5. győzelem: nehézség-állító, Rating-kapcsoló, Rating a szezonban,
-  D4/D5/D6, lutri mód, kész klub, dinamikus mód;
-* a feloldás-ablakok bekötése a győzelem pillanatához.
+### ✅ 2. fázis — a D1-lépcsők feloldásai *(kész: 3.9.46)*
+
+| mi | hol |
+|---|---|
+| az EGYES választások kapui (Rating a szezonban, lutri, kész klub) | `UNLOCK_GATES` → `unlockApplyGates` |
+| a piramis mélysége (D4/D5/D6) | `unlockDivMax` / `unlockDivWhy` |
+| a zárt osztály a listán — szürkén, a feltétellel | `renderPyrDivPick` |
+| az ajánlás sosem esik zárt osztályra | `pyrRecommendDiv` |
+| a megerősítés sem indíthat zárt osztályból | `pyrConfirmDiv` |
+| a dinamikus karrier | `heUnlockSync` (1. fázis) |
+| a feloldás-ablakok a győzelem pillanatában | `unlockNoteD1` (1. fázis) |
+
+**A HIBA, AMIT EZ A FÁZIS JAVÍTOTT — a sajátom, az 1. fázisból.** Az
+`unlockApplyLocks` a lépcső VÉGÉN mindent feloldott, tehát a 3. bajnoki cím
+után a „kártyánként lutri" és a „kész klub" használhatóvá vált, pedig az
+`unlockHas` szerint még zárva volt. Egy feloldás-rendszernek **egy** igazsága
+lehet. Ezért van most **két réteg**, és ez a különbség szándékos:
+
+* a **lépcső-zár** az EGÉSZ rácsot zárja („még nem te állítod be"), és a 3.
+  címmel véget ér;
+* a **kapu** EGY gombot zár („ez a lehetőség még nincs kinyitva"), és a saját
+  feltételéig áll — a 4., az 5. címig, vagy tovább.
+
+A kapu **mindig a lépcső-zár után fut**, mert az szigorúbb.
+
+**A felirat a gombra kerül.** Egy szürke gomb magyarázat nélkül hibának
+látszik; a feltétellel ráírva viszont **cél**. Az eredeti feliratot a
+`data-unlock-sz` őrzi, hogy a feloldás pillanatában visszatérjen.
 
 ### 3. fázis — a Run-alapú feloldások
 * tempó-fokozatok Run-szint szerint (3.4);
