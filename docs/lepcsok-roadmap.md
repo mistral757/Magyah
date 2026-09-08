@@ -182,7 +182,7 @@ maximuma 45 — a 14 valódi, de elérhető vállalás.
 | a feloldás-ablak | `UNLOCK_CARDS`, `unlockShow` / `unlockDrain`, `#unlockCard` |
 | „VB-, EB-győztes…" → **Nemzeti válogatottak** | `#wcToggleGrid` |
 
-**Próba:** `node tools/lepcsok-proba.js` — 160 állítás (mind a hat fázis).
+**Próba:** `node tools/lepcsok-proba.js` — 170 állítás (mind a hat fázis, a PvP-érintetlenséggel együtt).
 
 **Két döntés, amit érdemes tudni:**
 
@@ -349,10 +349,40 @@ nyílnak, amivel a kezdő nehézség és a Rating-kapcsoló (3 bajnoki cím).
 
 ---
 
+## 5b. A hatókör: KIZÁRÓLAG az egyjátékos
+
+**Közös karrierben (PvP) a feloldás-rendszer teljesen néma.** Egyetlen kapu
+dönti el, a szabályok legalján:
+
+```js
+function unlockGatesOn(){
+  if(MP&&MP.active)return false;
+  if(h2hRoomActive())return false;
+  return true;}
+```
+
+Amit ez lezár, azt semmilyen hívó nem tudja megkerülni, és egy jövőbeli új kapu
+magától helyesen viselkedik. Erre azért volt szükség, mert az első kiadásban
+**három ponton átszivárgott**: a játék-tempó rácsa (a szoba házigazdája csak az
+„Alap tempót" választhatta volna), az ellenfél-fokozat rácsa (a lépcső-zár azt is
+lefogta), és a csapatstílus-választó (a Run-kapuk ott is szűrtek). Mindhárom
+ugyanabból, hogy a hívási helyeken *külön-külön* kellett volna MP-t ellenőrizni.
+
+**Amit a kapu NEM zár le:**
+
+* a **számlálók** közös karrierben is gyűlnek — egy bajnoki cím akkor is cím, egy
+  leigazolt ikon akkor is ikon. Ez láthatatlan, semmilyen PvP-viselkedést nem
+  érint, viszont igazságtalan volna nem beszámítani egy végigvitt közös karriert;
+* a **feloldás-ablakok** viszont várnak: közös karrierben nem ugrik fel semmi, a
+  `pending` sorba kerülnek, és a **kezdőlapra visszatérve** jönnek elő. Így semmi
+  nem vész el, és közben semmi nem szól bele a közös játékba.
+
+---
+
 ## 6. Amit a rendszer NEM csinál
 
 * **Nem vesz el semmit.** Aki már játszik, annak a meglévő karrierje és
   beállításai érintetlenek — a napló csak NYIT.
-* **Nem zárja el a közös karriert.** A *Gyere 1v1* az első perctől elérhető: a
-  lépcsők az egyjátékos élményt tanítják, nem a barátodat zárják ki.
+* **Nem zárja el a közös karriert, és bele sem szól.** A *Gyere 1v1* az első
+  perctől elérhető, és a közös karrierben minden beállítás a régi — lásd 5b.
 * **Nem büntet.** Egy lépcső nem veszíthető el, és nem jár le.

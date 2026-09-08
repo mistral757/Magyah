@@ -565,6 +565,67 @@ const {spawn}=require('child_process');
      turbo:unlockTempoOk("turbo"),gyors:unlockTempoOk("gyors")}));
    await p.close();}
 
+  /* ── 20. A PVP ÉRINTETLEN (3.9.47) ────────────────────────────────────
+     KIMONDOTT KÉRÉS: „a lépcsőzős móddal bevezetett dolgok PvP-re semmilyen
+     hatással ne legyenek — ott minden a régiben kell legyen."
+     A napló SZÁNDÉKOSAN üres itt (0 cím, 0 Run): ez a legszigorúbb eset,
+     egyjátékosban minden zárva volna. */
+  {const p=await lap(0);
+   out.pvp=await p.evaluate(()=>{
+     MP.active=true;MP.role="host";MP.activeRoom="TEST";
+     const out={};
+     out.kapu=unlockGatesOn();
+     out.preset=unlockPreset();
+     /* a rácsok */
+     renderTempoGrid();renderPyrSpeedGrid();
+     out.tempo_tiltva=[...document.querySelectorAll("#tempoGrid button")].filter(x=>x.disabled).length;
+     out.speed_tiltva=[...document.querySelectorAll("#pyrSpeedGrid button")].filter(x=>x.disabled).length;
+     out.tempo_pref=gameTempoPref();
+     /* a stílusválasztó */
+     {const d=document.createElement("div");d.innerHTML=styleChooserHtml();
+      out.stilus_zart=d.querySelectorAll(".msItem.unlockOff").length;
+      out.stilus_db=d.querySelectorAll(".msItem").length;}
+     /* az egyes kapuk */
+     out.has={diff:unlockHas("diff"),lutri:unlockHas("lutri"),club:unlockHas("club"),
+              dyn:unlockHas("dyn"),wc:unlockHas("wc"),icon4:unlockHas("icon4"),
+              skillReal:unlockHas("skillReal")};
+     out.speed={alvo:unlockSpeedOk("alvo"),vegtelen:unlockSpeedOk("vegtelen")};
+     out.tempo={turbo:unlockTempoOk("turbo"),kokorszak:unlockTempoOk("kokorszak")};
+     out.stilus={tikitaka:unlockStyleOk("tikitaka"),panzer:unlockStyleOk("panzer")};
+     out.divMax=unlockDivMax();
+     out.divWhy6=unlockDivWhy(6);
+     out.locked=unlockLocked("speed");
+     /* az osztályválasztó: a teljes hatos lista, nehézségi csempékkel */
+     {const sq=SQUADS.filter(x=>!x.wc&&x.players&&x.players.length>=11)[0];
+      pyrPickSq=sq;pyrPickDiv=null;pyrPickFromDraft=true;pyrPendingSpeed="tarto";pyrPickGap=0;
+      renderPyrDivPick();
+      const lat=id=>{const e=document.getElementById(id);return !!e&&!e.classList.contains("hide");};
+      out.div_sorok=document.querySelectorAll("#pyrDivPickList button").length;
+      out.div_tiltva=[...document.querySelectorAll("#pyrDivPickList button")].filter(x=>x.disabled).length;
+      out.div_kimondas=!!document.querySelector(".unlockLadderPick");
+      out.div_nehezseg=lat("pyrDiffList");}
+     /* a beállító képernyő: se zár, se elrejtés, se lépcső-jegyzet */
+     updatePyrSetupVisibility();
+     {const lat=id=>{const e=document.getElementById(id);return !!e&&!e.classList.contains("hide");};
+      out.jegyzet=lat("unlockSetupNote");
+      out.rejtve=["tempoGrid","iconGrid","wcToggleGrid"].filter(id=>{
+        const e=document.getElementById(id);return e&&e.dataset.unlockThin;});}
+     /* és a feloldás-ablak VÁR, nem ugrik fel */
+     unlockNoteD1();
+     out.ablak_felugrott=!document.getElementById("unlockCard").classList.contains("hide");
+     out.d1_szamlalt=unlockState().d1;
+     out.varakozik=(unlockState().pending||[]).slice();
+     out.seen_step2=!!(unlockState().seen||{}).step2;
+     return out;});
+   /* …és a kezdőlapra visszatérve előjön */
+   out.pvp_utan=await p.evaluate(()=>{
+     MP.active=false;MP.activeRoom=null;
+     unlockDrainPending();
+     return {nyitva:!document.getElementById("unlockCard").classList.contains("hide"),
+       cim:document.getElementById("unlockCardTitle").textContent,
+       sor_ures:(unlockState().pending||[]).length===0};});
+   await p.close();}
+
   /* ── 10. A JOGTISZTA FELIRAT ── */
   {const p=await lap(3);
    out.valogatott=await p.evaluate(()=>{
@@ -820,6 +881,30 @@ const {spawn}=require('child_process');
       R.reroll&&R.family);}
   ok("rejtés 5: a kezdés módja is előjön (draft + kész klub)",
      out.rejtes[5].latszik.start===true);
+  /* --- 3.9.47: a PvP érintetlen --- */
+  {const V=out.pvp;
+   ok("PvP: a központi kapu zárva van, tehát nincs preset",
+      V.kapu===false&&V.preset===null&&V.locked===false);
+   ok("PvP: a tempó- és a fokozat-rács TELJESEN nyitva",
+      V.tempo_tiltva===0&&V.speed_tiltva===0&&V.tempo_pref==="normal");
+   ok("PvP: mind a hét csapatstílus választható",
+      V.stilus_db===7&&V.stilus_zart===0);
+   ok("PvP: minden egyes kapu nyitva (nehézség, lutri, kész klub, dinamikus, válogatott, ikon, skill)",
+      Object.keys(V.has).every(k=>V.has[k]===true));
+   ok("PvP: a Run- és stílus-kapuk sem szűrnek",
+      V.speed.alvo&&V.speed.vegtelen&&V.tempo.turbo&&V.tempo.kokorszak
+      &&V.stilus.tikitaka&&V.stilus.panzer);
+   ok("PvP: a piramis teljes mélysége elérhető",
+      V.divMax===6&&V.divWhy6===null);
+   ok("PvP: az osztályválasztó a régi — hat választható sor és a nehézségi csempék",
+      V.div_sorok===6&&V.div_tiltva===0&&V.div_kimondas===false&&V.div_nehezseg===true);
+   ok("PvP: a beállító képernyőn nincs lépcső-jegyzet és nincs elrejtett rács",
+      V.jegyzet===false&&V.rejtve.length===0);
+   ok("PvP: a feloldás-ablak NEM ugrik fel, de a számláló gyűlik",
+      V.ablak_felugrott===false&&V.d1_szamlalt===1
+      &&V.varakozik.join()==="step2"&&V.seen_step2===false);}
+  ok("PvP: a félretett ablak a kezdőlapon jön elő, és a sor kiürül",
+     out.pvp_utan.nyitva&&/2\. lépcső/.test(out.pvp_utan.cim)&&out.pvp_utan.sor_ures);
   ok("nincs futásidejű hiba", hiba.length===0);
 
   console.log(JSON.stringify(out,null,1));
