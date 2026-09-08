@@ -12,6 +12,15 @@ rendszert. Három szálon fut: jogtisztaság · mentés-stabilitás · csomagol�
 > **3.9.03** — **F3** (mentés kimentése és visszatöltése) kész:
 > `docs/mentes-kimentes-visszatoltes.md`. **Ezzel a kód kiadható állapotban
 > van**; ami hátra van, az a papírmunka és a csomagolás.
+> **3.9.50** — **F4 kész.** Az adatvédelmi tájékoztató három placeholderje
+> kitöltve (adatkezelő, e-mail, székhely), és bekerült a **hiányzó harmadik
+> adatkiáramlás**: a 3.9.22-es **push-értesítések**. A tájékoztató a 3.9.13-on
+> állt, a push utána érkezett — a lap tehát hiányos volt, és ez csak a
+> Play-elutasításnál derült volna ki. Új: `docs/f4b-aruhazi-lap.md` (a rövid és
+> hosszú leírás, mérve a karakterplafonokhoz), és
+> **`tools/kiadas-proba.js`** — 47 gépi állítás arról, amit a Play elutasít, ha
+> hiányzik. Ez az a háló, ami a következő ilyen elavulást elkapja: ha a kódba
+> új külső hoszt kerül, és a tájékoztató nem tud róla, a próba elbukik.
 > **3.9.04** — két jogtisztasági hiányosság javítva, lásd az 1. szakaszt: az
 > **edzők valós neve** kint volt a sorsolás kártyáján (a névháló ezt az
 > alakot azóta látja), és a **klubleírások** — valós játékosok, edzők és
@@ -34,7 +43,12 @@ rendszert. Három szálon fut: jogtisztaság · mentés-stabilitás · csomagol�
 |---|---|---|
 | **Jogtisztaság** | ✅ **kész** | — (a Google Fonts is megszűnt, 3.9.02) |
 | **Mentés-stabilitás** | ✅ **kiadható** | három nem-blokkoló minőségjavítás maradt |
-| **Csomagolás (Play)** | ❌ **nulláról** | manifest · TWA · Play Console papírok |
+| **Papírmunka (F4)** | ✅ **kész (3.9.50)** | — az adatvédelmi lap és az áruházi szövegek megvannak |
+| **Csomagolás (Play)** | ⚠️ **a te gépeden** | Play-fiók · AAB · assetlinks-ujjlenyomat · Console-űrlapok |
+
+**Gépi ellenőrzés:** `node tools/kiadas-proba.js` — **46/47**, az egyetlen
+nyitott tétel az assetlinks-ujjlenyomat, ami szándékosan csak az első
+AAB-feltöltés UTÁN tölthető ki.
 
 **A KÓD KIADHATÓ ÁLLAPOTBAN VAN.** Mind a három kiadásblokkoló elkészült: a
 jogtisztaság (a nevek és a betűk), a tartós tárhely és a mentés
@@ -250,10 +264,12 @@ Bubblewrap CLI vagy PWABuilder → aláírt **AAB**. El kell dönteni és rögz�
 
 | kötelező | állapot | megjegyzés |
 |---|---|---|
-| **adatvédelmi tájékoztató URL** | ❌ **nincs** | mérve: nulla találat „adatvédel/privacy"-re a kódban és a doksikban. Akkor is kötelező, ha semmit nem gyűjtünk — és itt **gyűjtünk valamit** (lásd lent). |
-| **Data safety űrlap** | ❌ nincs | a PvP a Firebase RTDB-be küld: szobakód, keret-pillanatkép, eredmények. Ezt deklarálni kell. |
-| **IARC tartalmi besorolás** | ❌ nincs | kérdőív, gyors |
-| célközönség, kereskedelmi státusz, áruházi lap | ❌ nincs | screenshotok, ikon, leírás |
+| **adatvédelmi tájékoztató URL** | ✅ **kész (3.9.50)** | `adatvedelem/index.html` — kitöltve, mind a **három** adatkiáramlással (ranglista, kétjátékos szoba, push) |
+| **Data safety űrlap** | ✅ **a válaszok készen** | `docs/f4-play-papirmunka.md` — a Console-ba bepötyögni |
+| **IARC tartalmi besorolás** | ✅ **a válaszok készen** | ugyanott, 3. szakasz — **enyhe trágárság: IGEN** |
+| áruházi lap (rövid/hosszú leírás) | ✅ **kész (3.9.50)** | `docs/f4b-aruhazi-lap.md`, bemásolható |
+| **funkciógrafika 1024×500** | ⬜ **hiányzik** | az egyetlen elem, amit kódból nem lehet előállítani |
+| célközönség, kereskedelmi státusz | ⬜ döntés | Play Console-ban, egy kattintás |
 
 #### 3.5 Firebase — átnézve (3.9.12, F7) ✅ — a részletek: `docs/f6-f7-csomagolas.md`
 
@@ -342,7 +358,9 @@ cache-first statikus ág is tényleg dolgozik.
 └────────────────────────────────────────────────────────────────────┘
               │  ← ITT MÁR KIADHATÓ ÁLLAPOTBAN VAN A KÓD
 ┌─ PAPÍR (párhuzamosan indítható) ───────────────────────────────────┐
-│ F4  Adatvédelmi tájékoztató + Data safety + IARC   ◀ ITT TARTUNK   │
+│ F4  Adatvédelmi tájékoztató + Data safety + IARC  ✅ KÉSZ (3.9.50) │
+│ F4b Áruházi lap szövegei                          ✅ KÉSZ (3.9.50) │
+│     …funkciógrafika 1024×500                      ⬜ grafikai munka │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ CSOMAGOLÁS ───────────────────────────────────────────────────────┐
 │ F5  Manifest + maskable ikon    ✅ KÉSZ (3.9.10)                    │
@@ -373,6 +391,7 @@ migráció kockázata most nagyobb, mint a haszna.
 Ezt kell végigfuttatni **minden** Play-re szánt buildnél:
 
 ```bash
+node tools/kiadas-proba.js             # a papírmunka és a csomagolás gépi része
 ./tools/check.sh                       # szintaxis · globálisok · nyers nevek
 ./tools/ledger-audit.sh                # a büdzsé könyvelése
 node tools/nevek/kepernyo-proba.js     # végponti névpróba (karrierindítás + egy meccs)

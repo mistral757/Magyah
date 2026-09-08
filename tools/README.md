@@ -429,6 +429,35 @@ eredményjelzőn **csak a te oldaladon** áll jelvény — oldalcsere után is (
 `sbFitTeams` gyorsítója különben odaragasztaná, mert a kulcsa nem tud az
 oldalról).
 
+## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
+
+```
+node tools/kiadas-proba.js
+```
+
+**Nem a játékot méri** (arra ott a 34 böngészős próba), hanem azt, amit a
+Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
+(nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
+felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
+worker előcache-listáját, az assetlinks.json alakját, és az áruházi szövegek
+karakterplafonjait. Böngésző nem kell hozzá.
+
+**A leghasznosabb állítása** az, ami a kódot és a papírt ÖSSZEKÖTI: kigyűjti
+az `index.html`-ben szereplő külső hosztokat, és megnézi, mindegyik szerepel-e
+a tájékoztatóban. Pontosan ez a hibaosztály maradt észrevétlenül a 3.9.22-től
+a 3.9.50-ig: a push-értesítések új adatkiáramlást hoztak, a tájékoztató viszont
+a 3.9.13-on állt — és ez csak a Play-elutasításnál derült volna ki, hetekkel
+később.
+
+**Egy tanulság az első futásból:** a keresést a **kommentek nélküli** kódon
+kell futtatni. A kód tele van olyan magyarázatokkal, amik épp azt írják le,
+miért NEM hívunk már egy szolgáltatást („korábban a fonts.googleapis.com
+töltötte be…") — a nyers szövegkeresés ezekre is rátalált, és a MEGOLDOTT
+problémát jelentette hibaként.
+
+Az **assetlinks-ujjlenyomat** szándékosan csak ⚠️ figyelmeztetés, nem bukás:
+az érték a Play Console-ból, az első AAB-feltöltés UTÁN derül ki.
+
 ## firebase-rules.json — az adatbázis szabályai
 
 A Realtime Database (`magyahok`) teljes szabályfája, érvényes JSON-ként. A
