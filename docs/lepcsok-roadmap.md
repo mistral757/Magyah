@@ -50,6 +50,8 @@ Kezdőrúgás is **kötött beállítással** indul. A kötöttség lépcsőnké
 |---|---|---|---|
 | karrier | hagyományos | hagyományos | hagyományos |
 | kezdés | draft | draft | draft |
+| **kezdő osztály** | **D3** | **D3** | **D3** |
+| **a mezőny Ratingje** | **78** | **80** | **80** |
 | nemzeti válogatottak | **nincs** | nincs | nincs |
 | Rating | csúcson | csúcson | csúcson |
 | családtag | **nincs** | nincs | nincs |
@@ -63,6 +65,19 @@ Kezdőrúgás is **kötött beállítással** indul. A kötöttség lépcsőnké
 
 A lépcsőt egy **D1-győzelem** lépteti. A harmadik után nyílik a szabad
 beállítás első köre.
+
+**A „78-as kezdő nehézség" a MEZŐNY Ratingje, nem a rés.** A kérés szó szerint
+így szólt: *„78-as nehézségi szint (nem a követési távolság, hanem mindenképp
+78-as kezdő nehézség)"*. A világ eltolását ezért a kívánt mezőnyszintből
+számoljuk vissza (`unlockUpForField`), és a rés abból következik, milyen keretet
+draftoltál — nem fordítva.
+
+**Az osztályt és a rajt nehézségét a lépcső dönti el, nem az ajánló.** Ez a
+kettő nem a beállító képernyőn lakik, hanem a draft utáni külön képernyőn
+(`#scPyrDiv`) — az első kiadásban kimaradt a zárból, és az osztályt ott az
+ajánló választotta (a D2-t). A lépcsőn ez a képernyő **nem kérdez**: a
+választók helyett egy kimondás áll (mit kaptál és miért), a magyarázó szöveg
+pedig marad, mert egy először induló embernek épp az kell.
 
 ---
 
@@ -167,7 +182,7 @@ maximuma 45 — a 14 valódi, de elérhető vállalás.
 | a feloldás-ablak | `UNLOCK_CARDS`, `unlockShow` / `unlockDrain`, `#unlockCard` |
 | „VB-, EB-győztes…" → **Nemzeti válogatottak** | `#wcToggleGrid` |
 
-**Próba:** `node tools/lepcsok-proba.js` — 132 állítás (mind az öt fázis).
+**Próba:** `node tools/lepcsok-proba.js` — 170 állítás (mind a hat fázis, a PvP-érintetlenséggel együtt).
 
 **Két döntés, amit érdemes tudni:**
 
@@ -284,6 +299,38 @@ magyarázat nélkül. A képesség-módnál két út vezet ugyanoda (10 egy embe
 100 összesen), ezért ott az **állapotváltást** figyeljük, nem egy konkrét
 számot.
 
+### ✅ 6. fázis — az első játékmenet visszajelzései *(kész: 3.9.47)*
+
+Négy hiba egy valódi első szezonból, és mind ugyanabból a családból: **a
+lépcsők a beállító képernyőt zárták, a többi felületet nem.**
+
+| mi | hol |
+|---|---|
+| az osztály és a mezőny Ratingje a lépcső döntése | `UNLOCK_PRESETS.div/.field` → `unlockLadderApplyDiv`, `unlockUpForField` |
+| az osztályválasztó a lépcsőn nem kérdez | `renderPyrDivPick` (a `_lepcso` ág) |
+| a KIÍRT rés megy a horgonyba, nem a legközelebbi csempe kerek száma | `pyrConfirmDiv` |
+| a gyorsítások is feloldások | `UNLOCK_TEMPO_FAST` → `unlockTempoOk` |
+| amiből nincs mit választani, az ne is látsszon | `UNLOCK_THIN` → `unlockHideThin` |
+
+**A „legalább kettő" küszöb felülírja a 2-4. fázis döntését.** Ott azt mondtam
+ki, hogy *„a szürke vezérlő cél, a hiányzó nem az"* — és ez igaz ott, ahol a
+többi fokozat között már tényleg lehet válogatni: akkor a szürke csempe a
+következő lépcsőt mutatja. De ahol **egy** dolog választható, ott nincs
+választás, csak egy rács tele lakatokkal — az nem cél, hanem zaj. Egy rács
+ezért akkor jelenik meg, amikor a **második** lehetőség is kinyílt benne;
+onnantól a még zárt csempék maradnak szürkén, a feltétellel.
+
+**Ami nem látszik, azt ki kell mondani.** Az elrejtéssel a játékos nem tudná,
+mit kapott — a lépcső-jegyzet ezért felsorolja a döntéseket (kezdő osztály, a
+mezőny Ratingje, az ellenfél-fokozat, az újrapörgetés), nem vezérlőként, hanem
+tényként. Ugyanezért igazodik a 3. oldal bevezetője és a Run-plafon jegyzete is:
+a lépcsőn egyik sem ígérhet olyan választást, ami ott még nincs.
+
+**A gyorsítások miért kaptak kaput.** A lassítások a Run-szinthez kötve álltak,
+a könnyítések viszont az első perctől szabadon — pedig a gyorsabb fejlődés is
+beállítás, méghozzá olyan, ami **könnyebbé** teszi a játékot. Azzal a körrel
+nyílnak, amivel a kezdő nehézség és a Rating-kapcsoló (3 bajnoki cím).
+
 ### ✅ 5. fázis — csiszolás *(kész: 3.9.46)*
 
 * **A „mi van még hátra" panel** — `unlockProgressGroups` / `unlockProgressHtml`.
@@ -302,10 +349,40 @@ számot.
 
 ---
 
+## 5b. A hatókör: KIZÁRÓLAG az egyjátékos
+
+**Közös karrierben (PvP) a feloldás-rendszer teljesen néma.** Egyetlen kapu
+dönti el, a szabályok legalján:
+
+```js
+function unlockGatesOn(){
+  if(MP&&MP.active)return false;
+  if(h2hRoomActive())return false;
+  return true;}
+```
+
+Amit ez lezár, azt semmilyen hívó nem tudja megkerülni, és egy jövőbeli új kapu
+magától helyesen viselkedik. Erre azért volt szükség, mert az első kiadásban
+**három ponton átszivárgott**: a játék-tempó rácsa (a szoba házigazdája csak az
+„Alap tempót" választhatta volna), az ellenfél-fokozat rácsa (a lépcső-zár azt is
+lefogta), és a csapatstílus-választó (a Run-kapuk ott is szűrtek). Mindhárom
+ugyanabból, hogy a hívási helyeken *külön-külön* kellett volna MP-t ellenőrizni.
+
+**Amit a kapu NEM zár le:**
+
+* a **számlálók** közös karrierben is gyűlnek — egy bajnoki cím akkor is cím, egy
+  leigazolt ikon akkor is ikon. Ez láthatatlan, semmilyen PvP-viselkedést nem
+  érint, viszont igazságtalan volna nem beszámítani egy végigvitt közös karriert;
+* a **feloldás-ablakok** viszont várnak: közös karrierben nem ugrik fel semmi, a
+  `pending` sorba kerülnek, és a **kezdőlapra visszatérve** jönnek elő. Így semmi
+  nem vész el, és közben semmi nem szól bele a közös játékba.
+
+---
+
 ## 6. Amit a rendszer NEM csinál
 
 * **Nem vesz el semmit.** Aki már játszik, annak a meglévő karrierje és
   beállításai érintetlenek — a napló csak NYIT.
-* **Nem zárja el a közös karriert.** A *Gyere 1v1* az első perctől elérhető: a
-  lépcsők az egyjátékos élményt tanítják, nem a barátodat zárják ki.
+* **Nem zárja el a közös karriert, és bele sem szól.** A *Gyere 1v1* az első
+  perctől elérhető, és a közös karrierben minden beállítás a régi — lásd 5b.
 * **Nem büntet.** Egy lépcső nem veszíthető el, és nem jár le.

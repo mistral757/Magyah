@@ -477,6 +477,155 @@ const {spawn}=require('child_process');
      return document.getElementById("profileBody").innerHTML.indexOf("unlockProg")>=0;});
    await p.close();}
 
+  /* ── 17. AZ OSZTÁLYVÁLASZTÓ A LÉPCSŐN (3.9.47) ── */
+  out.lepcso_osztaly={};
+  for(const n of [1,2,3]){
+    const p=await lap(n-1);
+    out.lepcso_osztaly[n]=await p.evaluate(()=>{
+      enterCareerSetupFromHome(true);
+      const sq=SQUADS.filter(x=>!x.wc&&x.players&&x.players.length>=11)[0];
+      document.getElementById("scPyrDiv").classList.remove("hide");
+      pyrPickSq=sq;pyrPickDiv=null;pyrPickFromDraft=true;
+      pyrPendingSpeed=pyrWantedSpeed;pyrPickGap=0;
+      renderPyrDivPick();
+      const lat=id=>{const e=document.getElementById(id);
+        return !!e&&!e.classList.contains("hide");};
+      return {div:pyrPickDiv,
+        mezony:pyrDivMeanFor(pyrPickDiv,pyrPickUp),
+        /* a VÁLASZTÓK egyike sem látszik */
+        lista_valaszto:document.querySelectorAll("#pyrDivPickList button").length,
+        kimondas:!!document.querySelector(".unlockLadderPick"),
+        nehezseg_lathato:lat("pyrDiffList"), step1:lat("pyrStep1"), step2:lat("pyrStep2"),
+        reszletes:lat("pyrDetailWrap"), reszletes_gomb:lat("pyrDetailBtn"),
+        vissza_gomb:lat("pyrDivBackBtn"),
+        /* és amit a karrier ténylegesen megkap */
+        gap:Math.round((pyrPickGap||0)*10)/10, up:pyrPickUp};});
+    await p.close();}
+  /* 17b. A LÉPCSŐ UTÁN visszatér a teljes választó */
+  {const p=await lap(3);
+   out.osztaly_szabad=await p.evaluate(()=>{
+     enterCareerSetupFromHome(true);
+     const sq=SQUADS.filter(x=>!x.wc&&x.players&&x.players.length>=11)[0];
+     document.getElementById("scPyrDiv").classList.remove("hide");
+     pyrPickSq=sq;pyrPickDiv=null;pyrPickFromDraft=true;pyrPendingSpeed="lassu";pyrPickGap=0;
+     renderPyrDivPick();
+     const lat=id=>{const e=document.getElementById(id);return !!e&&!e.classList.contains("hide");};
+     return {sorok:document.querySelectorAll("#pyrDivPickList button").length,
+       kimondas:!!document.querySelector(".unlockLadderPick"),
+       nehezseg_lathato:lat("pyrDiffList")};});
+   await p.close();}
+
+  /* ── 17c. VÉGIG, A KARRIER TÉNYLEGES INDÍTÁSÁIG ────────────────────────
+     A rajzolás állapota nem elég: az a kérdés, mit KAP a karrier. Ez az egyetlen
+     állítás, ami a beginNewGame + pyrConfirmDiv teljes útját végigviszi. */
+  {const p=await lap(0);
+   out.e2e=await p.evaluate(()=>{
+     enterCareerSetupFromHome(true);
+     rerolls=parseInt(document.getElementById("rerollSlider").value,10);
+     beginNewGame();
+     const sq=SQUADS.filter(x=>!x.wc&&x.players&&x.players.length>=11)[0];
+     pyrPickSq={club:"A drafton összeállított kereted",season:"",players:sq.players.slice(0,15)};
+     pyrPickFromDraft=true;pyrPickDiv=null;pyrPendingSpeed=pyrWantedSpeed;
+     renderPyrDivPick();
+     showChemistry=()=>{};      /* a kémia-képernyő kész keretet vár — nem ez a tárgy */
+     pyrConfirmDiv();
+     return {div:pyrMyDivId(), nev:pyrMyDiv()?pyrMyDiv().name:null,
+       mezony:pyrLevel(), fokozat:pyrSpeedKey(),
+       gapWant:S.pyr?S.pyr.gapWant:null, tempo:gameTempo(), ikon:iconRateNow(),
+       wc:!!S.careerWc, skillReal:!!S.skillReal, rerolls};});
+   await p.close();}
+
+  /* ── 18. AMIBŐL NINCS MIT VÁLASZTANI, AZ NE IS LÁTSSZON ── */
+  out.rejtes={};
+  for(const n of [0,3,5]){
+    const p=await lap(n);
+    out.rejtes[n]=await p.evaluate(()=>{
+      enterCareerSetupFromHome(true);
+      const lat=id=>{const e=document.getElementById(id);
+        return !!e&&!e.classList.contains("hide");};
+      const nyit=sel=>[...document.querySelectorAll(sel)].filter(b=>!b.disabled).length;
+      return {
+        latszik:{tempo:lat("tempoGrid"),speed:lat("pyrSpeedWrap"),ikon:lat("iconGrid"),
+                 wc:lat("wcToggleGrid"),skill:lat("skillModeGrid"),basis:lat("ratingBasisWrap"),
+                 start:lat("careerStartGrid"),guide:lat("guideGrid"),
+                 family:lat("familyToggleGrid"),reroll:lat("rerollSetupWrap")},
+        nyitva:{tempo:nyit("#tempoGrid button"),speed:nyit("#pyrSpeedGrid button"),
+                ikon:nyit("#iconGrid button"),guide:nyit("#guideGrid button")}};});
+    await p.close();}
+
+  /* ── 19. A KÖNNYÍTŐ TEMPÓK IS KAPUZOTTAK ── */
+  {const p=await lap(0);
+   out.gyorsitas=await p.evaluate(()=>({
+     nulla:{turbo:unlockTempoOk("turbo"),gyors:unlockTempoOk("gyors"),
+            normal:unlockTempoOk("normal")},
+     miert:unlockTempoWhy("turbo")}));
+   await p.close();}
+  {const p=await lap(3);
+   out.gyorsitas3=await p.evaluate(()=>({
+     turbo:unlockTempoOk("turbo"),gyors:unlockTempoOk("gyors")}));
+   await p.close();}
+
+  /* ── 20. A PVP ÉRINTETLEN (3.9.47) ────────────────────────────────────
+     KIMONDOTT KÉRÉS: „a lépcsőzős móddal bevezetett dolgok PvP-re semmilyen
+     hatással ne legyenek — ott minden a régiben kell legyen."
+     A napló SZÁNDÉKOSAN üres itt (0 cím, 0 Run): ez a legszigorúbb eset,
+     egyjátékosban minden zárva volna. */
+  {const p=await lap(0);
+   out.pvp=await p.evaluate(()=>{
+     MP.active=true;MP.role="host";MP.activeRoom="TEST";
+     const out={};
+     out.kapu=unlockGatesOn();
+     out.preset=unlockPreset();
+     /* a rácsok */
+     renderTempoGrid();renderPyrSpeedGrid();
+     out.tempo_tiltva=[...document.querySelectorAll("#tempoGrid button")].filter(x=>x.disabled).length;
+     out.speed_tiltva=[...document.querySelectorAll("#pyrSpeedGrid button")].filter(x=>x.disabled).length;
+     out.tempo_pref=gameTempoPref();
+     /* a stílusválasztó */
+     {const d=document.createElement("div");d.innerHTML=styleChooserHtml();
+      out.stilus_zart=d.querySelectorAll(".msItem.unlockOff").length;
+      out.stilus_db=d.querySelectorAll(".msItem").length;}
+     /* az egyes kapuk */
+     out.has={diff:unlockHas("diff"),lutri:unlockHas("lutri"),club:unlockHas("club"),
+              dyn:unlockHas("dyn"),wc:unlockHas("wc"),icon4:unlockHas("icon4"),
+              skillReal:unlockHas("skillReal")};
+     out.speed={alvo:unlockSpeedOk("alvo"),vegtelen:unlockSpeedOk("vegtelen")};
+     out.tempo={turbo:unlockTempoOk("turbo"),kokorszak:unlockTempoOk("kokorszak")};
+     out.stilus={tikitaka:unlockStyleOk("tikitaka"),panzer:unlockStyleOk("panzer")};
+     out.divMax=unlockDivMax();
+     out.divWhy6=unlockDivWhy(6);
+     out.locked=unlockLocked("speed");
+     /* az osztályválasztó: a teljes hatos lista, nehézségi csempékkel */
+     {const sq=SQUADS.filter(x=>!x.wc&&x.players&&x.players.length>=11)[0];
+      pyrPickSq=sq;pyrPickDiv=null;pyrPickFromDraft=true;pyrPendingSpeed="tarto";pyrPickGap=0;
+      renderPyrDivPick();
+      const lat=id=>{const e=document.getElementById(id);return !!e&&!e.classList.contains("hide");};
+      out.div_sorok=document.querySelectorAll("#pyrDivPickList button").length;
+      out.div_tiltva=[...document.querySelectorAll("#pyrDivPickList button")].filter(x=>x.disabled).length;
+      out.div_kimondas=!!document.querySelector(".unlockLadderPick");
+      out.div_nehezseg=lat("pyrDiffList");}
+     /* a beállító képernyő: se zár, se elrejtés, se lépcső-jegyzet */
+     updatePyrSetupVisibility();
+     {const lat=id=>{const e=document.getElementById(id);return !!e&&!e.classList.contains("hide");};
+      out.jegyzet=lat("unlockSetupNote");
+      out.rejtve=["tempoGrid","iconGrid","wcToggleGrid"].filter(id=>{
+        const e=document.getElementById(id);return e&&e.dataset.unlockThin;});}
+     /* és a feloldás-ablak VÁR, nem ugrik fel */
+     unlockNoteD1();
+     out.ablak_felugrott=!document.getElementById("unlockCard").classList.contains("hide");
+     out.d1_szamlalt=unlockState().d1;
+     out.varakozik=(unlockState().pending||[]).slice();
+     out.seen_step2=!!(unlockState().seen||{}).step2;
+     return out;});
+   /* …és a kezdőlapra visszatérve előjön */
+   out.pvp_utan=await p.evaluate(()=>{
+     MP.active=false;MP.activeRoom=null;
+     unlockDrainPending();
+     return {nyitva:!document.getElementById("unlockCard").classList.contains("hide"),
+       cim:document.getElementById("unlockCardTitle").textContent,
+       sor_ures:(unlockState().pending||[]).length===0};});
+   await p.close();}
+
   /* ── 10. A JOGTISZTA FELIRAT ── */
   {const p=await lap(3);
    out.valogatott=await p.evaluate(()=>{
@@ -687,6 +836,75 @@ const {spawn}=require('child_process');
    ok("panel: kiírja, hogy a tempó-kapcsolók a 3. lezárt karriertől nyílnak",
       P.lezart_jelzes===true);
    ok("panel: a Profil tényleg kirajzolja", P.profilban===true);}
+  /* --- 3.9.47: az osztályválasztó a lépcsőn --- */
+  [1,2,3].forEach(n=>{
+    const O=out.lepcso_osztaly[n];
+    ok(`${n}. lépcső: a kezdő osztály a D3, nem az ajánló választása`, O.div===3);
+    ok(`${n}. lépcső: a mezőny Ratingje pontosan ${n===1?78:80}`,
+       Math.abs(O.mezony-(n===1?78:80))<0.15);
+    ok(`${n}. lépcső: EGYETLEN választó sincs a képernyőn`,
+       O.lista_valaszto===0&&O.nehezseg_lathato===false&&O.step1===false
+       &&O.step2===false&&O.reszletes===false&&O.reszletes_gomb===false);
+    ok(`${n}. lépcső: a képernyő KIMONDJA, mit kaptál`, O.kimondas===true);
+    ok(`${n}. lépcső: a draftból jövet nincs „másik klub" gomb`, O.vissza_gomb===false);});
+  {const E=out.e2e;
+   ok("végig: a karrier tényleg a D3-ban indul, 78-as mezőnnyel",
+      E.div===3&&Math.abs(E.mezony-78)<0.15&&/Élmezőny/.test(E.nev||""));
+   ok("végig: a lépcső minden döntése átér a karrierbe",
+      E.fokozat==="lassu"&&E.tempo==="normal"&&E.ikon==="teljes"
+      &&E.wc===false&&E.skillReal===false&&E.rerolls===5);
+   ok("végig: a KIÍRT rés megy a horgonyba, nem a legközelebbi csempe kerek száma",
+      Math.abs(E.gapWant)>0.01&&Math.abs(E.gapWant)<1);}
+  ok("a lépcső után visszatér a teljes osztályválasztó",
+     out.osztaly_szabad.sorok===6&&out.osztaly_szabad.nehezseg_lathato===true
+     &&out.osztaly_szabad.kimondas===false);
+  /* --- 3.9.47: a könnyítő tempók --- */
+  ok("gyorsítás: a Villám- és Gyors fejlődés is zárva az elején",
+     out.gyorsitas.nulla.turbo===false&&out.gyorsitas.nulla.gyors===false
+     &&out.gyorsitas.nulla.normal===true);
+  ok("gyorsítás: megmondja, mi nyitja ki", /3 bajnoki cím/.test(out.gyorsitas.miert));
+  ok("gyorsítás: 3 bajnoki címmel nyílik, a szabad beállítással együtt",
+     out.gyorsitas3.turbo===true&&out.gyorsitas3.gyors===true);
+  /* --- 3.9.47: a ritka rácsok elrejtése --- */
+  {const R=out.rejtes[0].latszik,N=out.rejtes[0].nyitva;
+   ok("rejtés 0: a lépcsőn EGYETLEN rács sem látszik (mind kötött)",
+      !R.tempo&&!R.speed&&!R.ikon&&!R.wc&&!R.skill&&!R.basis&&!R.start&&!R.guide
+      &&!R.family&&!R.reroll);
+   ok("rejtés 0: és tényleg nincs is bennük választható elem",
+      N.tempo<2&&N.speed<2&&N.ikon<2&&N.guide<2);}
+  {const R=out.rejtes[3].latszik,N=out.rejtes[3].nyitva;
+   ok("rejtés 3: a tempó-, a vezetés- és a Rating-rács előjön (2+ választással)",
+      R.tempo&&R.guide&&R.basis&&N.tempo>=3&&N.guide===4);
+   ok("rejtés 3: amiből még mindig egy van, az rejtve marad (ikon, válogatott, skill, fokozat)",
+      !R.ikon&&!R.wc&&!R.skill&&!R.speed);
+   ok("rejtés 3: az újrapörgetés és a családtag viszont már a tiéd",
+      R.reroll&&R.family);}
+  ok("rejtés 5: a kezdés módja is előjön (draft + kész klub)",
+     out.rejtes[5].latszik.start===true);
+  /* --- 3.9.47: a PvP érintetlen --- */
+  {const V=out.pvp;
+   ok("PvP: a központi kapu zárva van, tehát nincs preset",
+      V.kapu===false&&V.preset===null&&V.locked===false);
+   ok("PvP: a tempó- és a fokozat-rács TELJESEN nyitva",
+      V.tempo_tiltva===0&&V.speed_tiltva===0&&V.tempo_pref==="normal");
+   ok("PvP: mind a hét csapatstílus választható",
+      V.stilus_db===7&&V.stilus_zart===0);
+   ok("PvP: minden egyes kapu nyitva (nehézség, lutri, kész klub, dinamikus, válogatott, ikon, skill)",
+      Object.keys(V.has).every(k=>V.has[k]===true));
+   ok("PvP: a Run- és stílus-kapuk sem szűrnek",
+      V.speed.alvo&&V.speed.vegtelen&&V.tempo.turbo&&V.tempo.kokorszak
+      &&V.stilus.tikitaka&&V.stilus.panzer);
+   ok("PvP: a piramis teljes mélysége elérhető",
+      V.divMax===6&&V.divWhy6===null);
+   ok("PvP: az osztályválasztó a régi — hat választható sor és a nehézségi csempék",
+      V.div_sorok===6&&V.div_tiltva===0&&V.div_kimondas===false&&V.div_nehezseg===true);
+   ok("PvP: a beállító képernyőn nincs lépcső-jegyzet és nincs elrejtett rács",
+      V.jegyzet===false&&V.rejtve.length===0);
+   ok("PvP: a feloldás-ablak NEM ugrik fel, de a számláló gyűlik",
+      V.ablak_felugrott===false&&V.d1_szamlalt===1
+      &&V.varakozik.join()==="step2"&&V.seen_step2===false);}
+  ok("PvP: a félretett ablak a kezdőlapon jön elő, és a sor kiürül",
+     out.pvp_utan.nyitva&&/2\. lépcső/.test(out.pvp_utan.cim)&&out.pvp_utan.sor_ures);
   ok("nincs futásidejű hiba", hiba.length===0);
 
   console.log(JSON.stringify(out,null,1));

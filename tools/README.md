@@ -372,6 +372,17 @@ a feliratuk a saját állásukat mondja: „még 6 hiányzik (14/20)"), és a **
 panelt**, ahol külön állítás mondja ki, hogy a panel minden sora UGYANAZT
 válaszolja, amit a felület kapui.
 
+A 6. fázisból: a lépcső osztály- és mezőnyszint-döntését (a `#scPyrDiv`
+képernyőn egyetlen választó sem maradhat), a „legalább kettő" rejtési küszöböt
+minden rácsra, és egy **végigvitt** állítást, ami a `beginNewGame` +
+`pyrConfirmDiv` teljes útján ellenőrzi, mit kap ténylegesen a karrier.
+
+Külön szakasz méri, hogy a rendszer **PvP-re semmilyen hatással nincs**: a napló
+szándékosan üres (0 cím, 0 Run) — egyjátékosban minden zárva volna —, és a próba
+végigmegy a rácsokon, a kapukon, az osztályválasztón és a beállító képernyőn,
+majd azt is, hogy a feloldás-ablak nem ugrik fel, de a számláló gyűlik, és a
+félretett ablak a kezdőlapon jön elő.
+
 **Portütközés:** a próba a 8961-es porton szerver; ha egy korábbi futás
 összeomlott, a `python3 -m http.server` folyamat ottragadhat, és a következő
 futás `EADDRINUSE`-szal áll meg. Ilyenkor `pkill -f "http.server"`.
@@ -382,6 +393,24 @@ futás `EADDRINUSE`-szal áll meg. Ilyenkor `pkill -f "http.server"`.
 nullát mér. Ugyanígy a Run-ranglista **nyers tömb**, nem `{v,list}`.
 
 Részletek: `docs/lepcsok-roadmap.md`.
+
+## boost-kedvezmeny-proba.js — ⚡ a kezdő idények boost-ablaka
+
+```
+node tools/boost-kedvezmeny-proba.js
+```
+
+Méri a kedvezmény mértékét idényenként (1. −50%, 2. −33%, 3.-tól semmi), hogy
+mind a hét boostfajta árát arányosan viszi-e le (az egység alapárán ül), hogy a
+két kedvezmény **szorzódik** és nem megy a 0,10-es padló alá, a napló-bejelentés
+két pontját (idényenként egyszer), a HUB-gomb és a Boost-központ feliratát, a ⚡
+jelzést a HUB-on, a lépéssor **élő** számait, és hogy közös karrierben ugyanúgy
+él — ez nem feloldás-rendszer.
+
+**Két fixtúra-buktató:** a jelzés-motor csak bekapcsolt vezetéssel szól
+(`teachSetMode("hard")`) ÉS csak a drafton kívül (`phase="hub"`), a boost-árak
+pedig a klub éves bevételéből jönnek — egy üres vázlat-karrierben az a padlón
+áll, és ott a 100 Ft-os kerekítés elnyomná az arányokat.
 
 ## firebase-rules.json — az adatbázis szabályai
 
