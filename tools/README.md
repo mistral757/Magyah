@@ -412,6 +412,23 @@ jelzést a HUB-on, a lépéssor **élő** számait, és hogy közös karrierben 
 pedig a klub éves bevételéből jönnek — egy üres vázlat-karrierben az a padlón
 áll, és ott a 100 Ft-os kerekítés elnyomná az arányokat.
 
+## arculat-proba.js — 🛡️ az arculat láthatósága és a meccs alaptempója
+
+```
+node tools/arculat-proba.js
+```
+
+Két dolgot mér. Egy: a közvetítés **alap-tempója 0,25×** friss telepítésen (a
+csúszkák, a felirat és a tényleges ütem is), de a **már beállított érték
+túléli** — a kapcsoló csak az alapértelmezést mozdítja el, senki beállítását nem
+írja felül. Kettő: az **arculat** eljut-e oda, ahol látszik — a címer-SVG kapja-e
+meg a fényt, a mélységet és a belső keretet (és a `flat:true` elhagyja-e mind a
+hármat, változatlan formával), a klub-banner viseli-e a nevet, a stadiont és a
+két klubszínt, ott van-e a HUB tetején és a bajnokavatás képernyőjén, és hogy az
+eredményjelzőn **csak a te oldaladon** áll jelvény — oldalcsere után is (a
+`sbFitTeams` gyorsítója különben odaragasztaná, mert a kulcsa nem tud az
+oldalról).
+
 ## firebase-rules.json — az adatbázis szabályai
 
 A Realtime Database (`magyahok`) teljes szabályfája, érvényes JSON-ként. A
