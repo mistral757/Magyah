@@ -102,6 +102,8 @@ const {spawn}=require('child_process');
         speed:pyrWantedSpeed, tempo:gameTempoPref(), icons:iconRatePref(),
         guide:guideWantedMode, skill:skillModeWanted,
         diff:oppTargetRating, alap:careerBaseRating,
+        gift_speed:unlockGiftHas("speed",pyrWantedSpeed),
+        gift_tempo:unlockGiftHas("tempo",gameTempoPref()),
         csuszka_diff:+document.getElementById("diffSlider").value,
         jelzes:!document.getElementById("unlockSetupNote").classList.contains("hide"),
         jelzes_szoveg:document.getElementById("unlockSetupNote").textContent.trim().slice(0,80),
@@ -123,7 +125,9 @@ const {spawn}=require('child_process');
           játékoshoz, de az EGYES kapuk (lutri, kész klub) még zárva vannak —
           épp ez az a hiba, amit a 2. fázis javított. */
        barmi_zart:["#diffSlider","#rerollSlider","#guideGrid button","#wcToggleGrid button",
-                   "#pyrSpeedGrid button","#iconGrid button"].filter(zart),
+                   "#iconGrid button"].filter(zart),
+       /* a fokozat- és tempó-rács a RUN-kapuk alatt marad — más réteg */
+       run_kapuzott:["#pyrSpeedGrid button","#tempoGrid button"].filter(zart),
        kapuzott:["#ratingBasisGrid button","#careerStartGrid button"].filter(zart),
        nyitva:{diff:unlockHas("diff"),basis:unlockHas("basis"),div4:unlockHas("div4"),
                div5:unlockHas("div5"),dyn:unlockHas("dyn")}};});
@@ -243,6 +247,120 @@ const {spawn}=require('child_process');
              tiki:unlockHas("styleTiki"),panzer:unlockHas("stylePanzer")}}));
    await p.close();}
 
+  /* ── 14. A RUN-KAPUK A FELÜLETEN (3. fázis) ── */
+  /* Egy lap, megadott Run-előzménnyel. */
+  async function runLap(lista,extra){
+    const p=await b.newPage({viewport:{width:390,height:844}});
+    p.on('pageerror',e=>hiba.push(e.message));
+    p.on('console',m=>{if(m.type()==='error')hiba.push(m.text());});
+    await p.goto('http://localhost:8977/index.html',{waitUntil:'domcontentloaded'});
+    await p.evaluate(a=>{
+      try{localStorage.clear();}catch(e){}
+      try{localStorage.setItem("30-0-runboard-v1",JSON.stringify(a.lista));}catch(e){}
+      /* A LÉPCSŐN KÍVÜL mérünk: 3 bajnoki cím, hogy a rács-zár ne takarja el a
+         Run-kapukat — a kettő két külön réteg, és itt a másodikat vizsgáljuk. */
+      try{localStorage.setItem("30-0-unlock-v1",JSON.stringify(
+        {v:1,d1:3,runs:0,bestRun:0,icons:0,nat:0,skills:0,maxSkills:0,
+         panzer:false,gift:{},seen:{welcome:1},at:1}));}catch(e){}
+      if(a.extra)Object.keys(a.extra).forEach(k=>{
+        try{localStorage.setItem(k,a.extra[k]);}catch(e){}});
+    },{lista,extra:extra||null});
+    await p.goto('http://localhost:8977/index.html',{waitUntil:'networkidle'});
+    await p.waitForTimeout(2400);
+    return p;}
+
+  /* 14a. FRISS TELEPÍTÉS: nulla Run — csak az alapfokozat és az alap tempó */
+  {const p=await runLap([]);
+   out.run_kapu_0=await p.evaluate(()=>{
+     enterCareerSetupFromHome(true);
+     const sp=[...document.querySelectorAll("#pyrSpeedGrid button")].map(b=>({
+       tiltva:b.disabled,szurke:b.classList.contains("unlockOff"),
+       sel:b.classList.contains("sel"),
+       sz:(b.querySelector("small")||{}).textContent||""}));
+     const tp=[...document.querySelectorAll("#tempoGrid button")].map(b=>({
+       id:b.dataset.tempo,tiltva:b.disabled,
+       sz:(b.querySelector("small")||{}).textContent||""}));
+     return {fokozatok:sp, tempok:tp, valasztott:pyrWantedSpeed,
+       ok:{lassu:unlockSpeedOk("lassu"),tarto:unlockSpeedOk("tarto"),
+           alvo:unlockSpeedOk("alvo"),kegyet:unlockSpeedOk("kegyet")},
+       stilus:{beton:unlockStyleOk("beton"),bombazok:unlockStyleOk("bombazok"),
+               harmonia:unlockStyleOk("harmonia"),villam:unlockStyleOk("villam"),
+               sztar:unlockStyleOk("sztar"),tikitaka:unlockStyleOk("tikitaka"),
+               panzer:unlockStyleOk("panzer")},
+       miert:{villam:unlockStyleWhy("villam"),panzer:unlockStyleWhy("panzer"),
+              tarto:unlockSpeedWhy("tarto"),kegyet:unlockSpeedWhy("kegyet"),
+              csiga:unlockTempoWhy("csiga")}};});
+   await p.close();}
+
+  /* 14b. HÁROM LEZÁRT KARRIER, 62-es csúcs — a táblázat közepe */
+  {const p=await runLap([{run:62,style:"villam"},{run:31},{run:12}]);
+   out.run_kapu_62=await p.evaluate(()=>{
+     enterCareerSetupFromHome(true);
+     return {runs:unlockState().runs, best:unlockState().bestRun,
+       speed:{lassu:unlockSpeedOk("lassu"),tarto:unlockSpeedOk("tarto"),
+              alvo:unlockSpeedOk("alvo"),kegyet:unlockSpeedOk("kegyet"),
+              konyortelen:unlockSpeedOk("konyortelen"),vegtelen:unlockSpeedOk("vegtelen")},
+       tempo:{normal:unlockTempoOk("normal"),komotos:unlockTempoOk("komotos"),
+              csiga:unlockTempoOk("csiga"),gleccser:unlockTempoOk("gleccser"),
+              jegkorszak:unlockTempoOk("jegkorszak"),kokorszak:unlockTempoOk("kokorszak")},
+       stilus:{villam:unlockStyleOk("villam"),sztar:unlockStyleOk("sztar"),
+               tikitaka:unlockStyleOk("tikitaka")},
+       tempo_valasztott:gameTempoPref()};});
+   await p.close();}
+
+  /* 14c. A JÓVÁÍRÁS: a tárolt tempó és a Run-lista stílusa/fokozata azonnal jár */
+  {const p=await runLap([{run:5,style:"tikitaka",speed:"vegtelen"}],
+                        {"harminc_nulla_tempo_v1":"kokorszak"});
+   out.jovairas=await p.evaluate(()=>({
+     runs:unlockState().runs, best:unlockState().bestRun,
+     gift:unlockState().gift,
+     /* MIND A HÁROM messze a Run-küszöb ALATT van — mégis nyitva, mert
+        használatban volt */
+     kokorszak:unlockTempoOk("kokorszak"),
+     vegtelen:unlockSpeedOk("vegtelen"),
+     tikitaka:unlockStyleOk("tikitaka"),
+     /* amit NEM használt, az továbbra is zárva */
+     jegkorszak:unlockTempoOk("jegkorszak"),
+     konyortelen:unlockSpeedOk("konyortelen"),
+     sztar:unlockStyleOk("sztar"),
+     /* és a választó a jóváírt tempón áll, nem esik vissza az alapra */
+     valasztott:gameTempoPref()}));
+   await p.close();}
+
+  /* 14d. A PANZER FELTÉTELE */
+  {const p=await runLap([]);
+   out.panzer=await p.evaluate(()=>{
+     const jo=n=>({leadI:0,coopI:0,aggroI:4});   /* 3 negatív jellemvonás */
+     const semmi=()=>({leadI:4,coopI:5,aggroI:0});
+     const r={};
+     r.egy_ember=unlockBadTraits(jo());
+     r.tiszta=unlockBadTraits(semmi());
+     r.kell=UNLOCK_PANZER_NEED;
+     /* 4 nehéz ember = 12 vonás — még nem elég */
+     r.negy=unlockNoteDraft([jo(),jo(),jo(),jo()]);
+     r.zarva_12=unlockStyleOk("panzer")===false;
+     /* 5 nehéz ember = 15 — megvan */
+     r.ot=unlockNoteDraft([jo(),jo(),jo(),jo(),jo(),semmi()]);
+     r.nyilt=unlockStyleOk("panzer")===true;
+     r.naplo=unlockState().panzer;
+     r.ablak=!document.getElementById("unlockCard").classList.contains("hide");
+     r.ablak_cim=document.getElementById("unlockCardTitle").textContent;
+     return r;});
+   await p.close();}
+
+  /* 14e. A STÍLUSVÁLASZTÓ LISTÁJA */
+  {const p=await runLap([{run:20}]);   /* 1 lezárt karrier → a 2. fut */
+   out.stiluslista=await p.evaluate(()=>{
+     const h=styleChooserHtml?styleChooserHtml():"";
+     const d=document.createElement("div");d.innerHTML=h;
+     const sorok=[...d.querySelectorAll(".msItem")].map(x=>({
+       nev:(x.querySelector(".msTop b")||{}).textContent||"",
+       zart:x.classList.contains("unlockOff"),
+       gomb:(x.querySelector("button")||{}).textContent||"",
+       felirat:x.textContent.indexOf("karrieredtől")>=0||x.textContent.indexOf("jellemvonás")>=0}));
+     return {sorok, runs:unlockState().runs};});
+   await p.close();}
+
   /* ── 10. A JOGTISZTA FELIRAT ── */
   {const p=await lap(3);
    out.valogatott=await p.evaluate(()=>{
@@ -274,6 +392,8 @@ const {spawn}=require('child_process');
     ok(`${n}. lépcső: Rating a csúcson`, L.basis==="peak");
     ok(`${n}. lépcső: kezdő nehézség ${V.diff}`, L.diff===V.diff&&L.alap===V.diff&&L.csuszka_diff===V.diff);
     ok(`${n}. lépcső: ellenfél-fokozat ${V.speed}`, L.speed===V.speed);
+    ok(`${n}. lépcső: a preset JÓVÁÍRJA, amit rád ad`,
+       L.gift_speed===true&&L.gift_tempo===true);
     ok(`${n}. lépcső: alap tempó, megszokott ikonok, laza skillek`,
        L.tempo==="normal"&&L.icons==="teljes"&&L.skill==="loose");
     if(V.rerolls!=null)ok(`${n}. lépcső: ${V.rerolls} újrapörgetés`,
@@ -291,6 +411,8 @@ const {spawn}=require('child_process');
     ok(`${n}. lépcső: a felállás mindig a tiéd`, L.forma_nyitva===true);});
   ok("3 cím után: nincs preset, nincs jelzés", out.szabad.lepcson===false&&out.szabad.preset===null&&out.szabad.jelzes_rejtve);
   ok("3 cím után: a lépcső RÁCS-zárai eltűntek", out.szabad.barmi_zart.length===0);
+  ok("3 cím után: a fokozat- és tempó-rács a RUN-kapuk alatt marad",
+     out.szabad.run_kapuzott.length===2);
   ok("3 cím után: az EGYES kapuk viszont még állnak (lutri, kész klub)",
      out.szabad.kapuzott.length===2);
   ok("3 cím után: nehézség/Rating/D4 nyitva, D5 és dinamikus még nem",
@@ -324,12 +446,12 @@ const {spawn}=require('child_process');
      out.run_szarmaztatas.lassu&&out.run_szarmaztatas.tarto
      &&out.run_szarmaztatas.kegyet&&out.run_szarmaztatas.konyortelen
      &&!out.run_szarmaztatas.vegtelen);
-  ok("Run: a játék-tempó lassításai a Run-szintet követik (80 kell a kőkorszakhoz)",
+  ok("Run: a játék-tempó lassításai a Run-szintet követik (71 → csiga igen, jégkorszak nem)",
      out.run_szarmaztatas.tempo_normal&&out.run_szarmaztatas.tempo_csiga
-     &&out.run_szarmaztatas.tempo_jegkorszak&&!out.run_szarmaztatas.tempo_kokorszak);
-  ok("Run: a csapatstílusok a Run-győzelmeket követik",
+     &&!out.run_szarmaztatas.tempo_jegkorszak&&!out.run_szarmaztatas.tempo_kokorszak);
+  ok("Run: a csapatstílusok a futásaidat követik (3 lezárt → a 4. fut → tiki-taka is)",
      out.run_szarmaztatas.stilus.beton&&out.run_szarmaztatas.stilus.villam
-     &&!out.run_szarmaztatas.stilus.tiki&&!out.run_szarmaztatas.stilus.panzer);
+     &&out.run_szarmaztatas.stilus.tiki&&!out.run_szarmaztatas.stilus.panzer);
   /* --- 2. fázis: az egyes választások kapui --- */
   ok("kapu: 0 címnél a Rating-szezon és a lutri és a kész klub is zárt",
      out.kapuk[0].season.tiltva&&out.kapuk[0].wild.tiltva&&out.kapuk[0].club.tiltva
@@ -359,6 +481,54 @@ const {spawn}=require('child_process');
      /🔒/.test(out.osztalylista.sorok[4].sz)&&/🔒/.test(out.osztalylista.sorok[5].sz));
   ok("osztálylista: az ajánlás sosem esik zárt osztályra",
      out.osztalylista.ajanlott<=out.osztalylista.divMax);
+  /* --- 3. fázis: a Run-kapuk --- */
+  {const K=out.run_kapu_0;
+   ok("Run-kapu 0: az alapfokozat nyitva, a többi zárt",
+      K.ok.lassu===true&&K.ok.tarto===false&&K.ok.alvo===false&&K.ok.kegyet===false);
+   ok("Run-kapu 0: a fokozat-rács öt zárt gombja szürke, a feltétellel",
+      K.fokozatok.filter(x=>x.tiltva).length===5
+      &&K.fokozatok.filter(x=>x.tiltva).every(x=>x.szurke&&/🔒/.test(x.sz)));
+   ok("Run-kapu 0: a feliratok magyarul toldalékolnak (40-es, 60-as, 75-ös)",
+      K.fokozatok.some(x=>/40-es/.test(x.sz))&&K.fokozatok.some(x=>/60-as/.test(x.sz))
+      &&K.fokozatok.some(x=>/75-ös/.test(x.sz)));
+   ok("Run-kapu 0: a kijelölés a nyitott fokozatra esik vissza",
+      K.valasztott==="lassu"&&K.fokozatok.filter(x=>x.sel).length===1);
+   ok("Run-kapu 0: a tempó-rács három gyorsítója nyitva, öt lassítása zárt",
+      K.tempok.filter(x=>!x.tiltva).map(x=>x.id).sort().join()==="gyors,normal,turbo");
+   ok("Run-kapu 0: a stílusok közül három nyitva (beton, bombázók, harmónia)",
+      K.stilus.beton&&K.stilus.bombazok&&K.stilus.harmonia
+      &&!K.stilus.villam&&!K.stilus.sztar&&!K.stilus.tikitaka&&!K.stilus.panzer);
+   ok("Run-kapu 0: minden zár MEGMONDJA, mi nyitja ki",
+      /2\. karriered/.test(K.miert.villam)&&/negatív jellemvonás/.test(K.miert.panzer)
+      &&/2\. lezárt karriered/.test(K.miert.tarto)&&/40/.test(K.miert.kegyet)
+      &&/50/.test(K.miert.csiga));}
+  {const K=out.run_kapu_62;
+   ok("Run-kapu 62: a fokozatok a táblázat szerint (+3-ig, +4 még nem)",
+      K.runs===3&&K.best===62&&K.speed.tarto&&K.speed.alvo&&K.speed.kegyet
+      &&K.speed.konyortelen&&!K.speed.vegtelen);
+   ok("Run-kapu 62: a tempó a táblázat szerint (−2-ig, −3 még nem)",
+      K.tempo.normal&&K.tempo.komotos&&K.tempo.csiga
+      &&!K.tempo.gleccser&&!K.tempo.jegkorszak&&!K.tempo.kokorszak);
+   ok("Run-kapu 62: a 4. futásodban a tiki-taka is nyitva",
+      K.stilus.villam&&K.stilus.sztar&&K.stilus.tikitaka);}
+  {const J=out.jovairas;
+   ok("jóváírás: amit HASZNÁLTÁL, az a Run-küszöb alatt is a tiéd marad",
+      J.runs===1&&J.best===5&&J.kokorszak===true&&J.vegtelen===true&&J.tikitaka===true);
+   ok("jóváírás: amit NEM használtál, az továbbra is zárva",
+      J.jegkorszak===false&&J.konyortelen===false&&J.sztar===false);
+   ok("jóváírás: a választó a jóváírt tempón marad, nem esik vissza",
+      J.valasztott==="kokorszak");}
+  {const P=out.panzer;
+   ok("Panzer: a három negatív jellemvonás számolása",
+      P.egy_ember===3&&P.tiszta===0&&P.kell===14);
+   ok("Panzer: 12 vonás még kevés, 15 már elég",
+      P.negy===12&&P.zarva_12&&P.ot===15&&P.nyilt&&P.naplo===15);
+   ok("Panzer: a feloldás pillanatában ablak jön", P.ablak&&/Panzer/.test(P.ablak_cim));}
+  {const L=out.stiluslista;
+   ok("stíluslista: a 2. futásban négy stílus nyitva, három zárt (sztár, tiki, Panzer)",
+      L.runs===1&&L.sorok.length===7&&L.sorok.filter(x=>x.zart).length===3);
+   ok("stíluslista: a zárt sor gombja „Még zárva”, és RÁ VAN ÍRVA a feltétel",
+      L.sorok.filter(x=>x.zart).every(x=>/Még zárva/.test(x.gomb)&&x.felirat));}
   ok("nincs futásidejű hiba", hiba.length===0);
 
   console.log(JSON.stringify(out,null,1));

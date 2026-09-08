@@ -95,28 +95,45 @@ beállítás első köre.
 
 A gyűjtés az **1.** Runnal indul, de a kapcsolók a **3.** Runtól nyílnak.
 
-| Run-szint | mi nyílik ki |
-|---|---|
-| *(2. megnyert Run)* | ellenfél-tempó **+1** (Lépést tartanak) |
-| 30 | játék-tempó **−1** · ellenfél-tempó **+1** |
-| 40 | ellenfél-tempó **−1** és **+2** |
-| 50 | játék-tempó **−2** · ellenfél-tempó **+2** |
-| 60 | ellenfél-tempó **+3** |
-| 70 | játék-tempó **−3** |
-| 75 | ellenfél-tempó **+4** |
-| 80 | játék-tempó **−4** |
-| 90 | játék-tempó **−5** |
+| Run-szint | mi nyílik ki | kulcs |
+|---|---|---|
+| *(2. lezárt karrier)* | ellenfél-tempó **+1** (Lépést tartanak) | `tarto` |
+| 30 | játék-tempó **−1** (Komótos) | `komotos` |
+| 40 | ellenfél-tempó **−1** (Alvó) és **+2** (Kegyetlen) | `alvo`, `kegyet` |
+| 50 | játék-tempó **−2** (Csigatempó) | `csiga` |
+| 60 | ellenfél-tempó **+3** (Könyörtelen) | `konyortelen` |
+| 70 | játék-tempó **−3** (Gleccser) | `gleccser` |
+| 75 | ellenfél-tempó **+4** (Végtelen menet) | `vegtelen` |
+| 80 | játék-tempó **−4** (Jégkorszak) | `jegkorszak` |
+| 90 | játék-tempó **−5** (Kőkorszak) | `kokorszak` |
 
-### 3.5 Run-győzelmek → csapatstílusok
+Az **alapfokozat** (Lassan követnek) és a **gyorsítások** (Alap tempó, Gyors,
+Villámfejlődés) nem kapnak kaput — azok mindig a játékoséi.
 
-| Run | stílus |
+### 3.5 A hányadik karriered → csapatstílusok
+
+| karrier | stílus |
 |---|---|
 | 1. | 🧱 Beton védelem · ⚽ Bombázók |
 | 2. | ⚡ Hol jön a mennydörgés? |
 | 3. | ⭐ Sztárom a párom |
 | 4. | 🌀 Tiki-Taka |
 | — | ☯️ Béke és harmónia *(a meglévő szabály szerint)* |
-| **külön** | 🛡️ **Panzerkampfwagen**: a kezdő draftodban legyen **14 negatív tulajdonság**. Szürkén, a feltétellel ráírva látszik. |
+| **külön** | 🛡️ **Panzerkampfwagen**: a kezdő draftodban legyen **14 negatív jellemvonás**. Szürkén, a feltétellel ráírva látszik. |
+
+**Az „N. Run" olvasata.** A kérés úgy szólt, hogy „1. Run csapatstílusok
+nyitva: bombázók, betonvédelem". Ezt úgy értelmezzük, hogy **a te N-edik
+futásodban** — nem úgy, hogy N *lezárt* futás kell hozzá. A másik olvasat
+szerint az első karrierben egyetlen stílus sem volna választható, pedig a
+stílusválasztó már az első idény végén elém áll: az nem lépcső volna, hanem
+fal. A kódban ezért `runs >= N−1` (a `runs` a lezárt futásokat számolja).
+
+**Mi számít negatív jellemvonásnak.** Nem új fogalom: pontosan az a három
+állapot, amit a játék saját öltözői eseményrendszere (`PERSONALITY_EVENTS`) is
+negatívként kezel — vezetői képesség *Gyenge* (`leadI===0`), társas alkat
+*Bajkeverő/Öntörvényű* (`coopI<=1`), temperamentum *Temperamentumos/Lobbanékony*
+(`aggroI>=3`). Egy emberen mindhárom meglehet, tehát a 15 fős kezdő keret elvi
+maximuma 45 — a 14 valódi, de elérhető vállalás.
 
 ---
 
@@ -150,7 +167,7 @@ A gyűjtés az **1.** Runnal indul, de a kapcsolók a **3.** Runtól nyílnak.
 | a feloldás-ablak | `UNLOCK_CARDS`, `unlockShow` / `unlockDrain`, `#unlockCard` |
 | „VB-, EB-győztes…" → **Nemzeti válogatottak** | `#wcToggleGrid` |
 
-**Próba:** `node tools/lepcsok-proba.js` — 92 állítás (1. és 2. fázis együtt).
+**Próba:** `node tools/lepcsok-proba.js` — 114 állítás (1-3. fázis együtt).
 
 **Két döntés, amit érdemes tudni:**
 
@@ -198,10 +215,49 @@ A kapu **mindig a lépcső-zár után fut**, mert az szigorúbb.
 látszik; a feltétellel ráírva viszont **cél**. Az eredeti feliratot a
 `data-unlock-sz` őrzi, hogy a feloldás pillanatában visszatérjen.
 
-### 3. fázis — a Run-alapú feloldások
-* tempó-fokozatok Run-szint szerint (3.4);
-* csapatstílusok Run-győzelem szerint (3.5);
-* a Panzer külön feltétele + a szürke csempe felirata.
+### ✅ 3. fázis — a Run-alapú feloldások *(kész: 3.9.46)*
+
+| mi | hol |
+|---|---|
+| ellenfél-fokozatok Run-szint szerint | `UNLOCK_SPEED_RUN` → `unlockSpeedOk` / `unlockSpeedWhy` |
+| játék-tempó Run-szint szerint | `UNLOCK_TEMPO_RUN` → `unlockTempoOk` / `unlockTempoWhy` |
+| csapatstílusok a hányadik karriered szerint | `UNLOCK_STYLE_RUN` → `unlockStyleOk` / `unlockStyleWhy` |
+| a Panzer külön feltétele | `UNLOCK_PANZER_NEED`, `unlockBadTraits`, `unlockNoteDraft` ← `placeBench` |
+| a **„már kinyitottad" jóváírás** | `unlockGift` / `unlockMigrate` / `unlockGiftFromSave` |
+| magyar toldalék a számokhoz | `huTold` / `huSzam` |
+
+**A JÓVÁÍRÁS — ez a fázis legfontosabb döntése.** A kapuk olyan vezérlőkre
+kerültek, amiket eddig bárki szabadon használt, a roadmap 6. pontja viszont
+kimondja: a rendszer **nem vesz el semmit**. A kettő csak úgy fér össze, ha
+akinél egy fokozat **már használatban volt**, az véglegesen megkapja — akkor
+is, ha a Run-szintje még nem érne el odáig. Ez nem kivétel, hanem a szabály
+másik fele: a jóváírás ugyanolyan végleges, mint bármelyik kiérdemelt
+feloldás, csak más okból jár.
+
+Három forrásból gyűlik:
+
+1. **egyszeri átállás** (`unlockMigrate`, `seen.migrate`) — a tárolt
+   játék-tempó és a Run-ranglista bejegyzéseinek stílusa/fokozata;
+2. **minden mentés-betöltéskor** (`unlockGiftFromSave`) — ez fogja meg azt, aki
+   épp egy karrier közepén tart és még semmit nem zárt le;
+3. **a lépcsők presetje** (`unlockApplyPreset`) — amit a játék maga adott rád
+   egy egész karrierre, azt nem veheti el utána. Enélkül a 3. lépcső „Lépést
+   tartanak" fokozata és a Run-kapu egymásnak feszülne.
+
+A Run-bejegyzés mostantól a **fokozatot** is viszi (`speed`), hogy a jóváírás
+egy régebbi futásból is felismerje, mit használt valaki.
+
+**Két hiba, amit ez a fázis kihozott:**
+
+* A **kapu-azonosítót string-műtéttel képeztem** (`"tikitaka"` →
+  `"styleTikitaka"`), a szabály viszont `"styleTiki"` néven állt — a kapu
+  csendben átengedte a Tiki-Takát. Egy string-műtét nem lehet a kapu igazsága;
+  most egy táblázat dönt, kulcsra.
+* A **tempó-rács a szkript elején rajzolódik ki**, a feloldás-napló viszont a
+  szkript végén áll fel: az első rajzoláskor a napló konstansai még a TDZ-ben
+  vannak, a kapu-kérdés kivételt dob, a `try/catch` elnyeli — és a rács **zár
+  nélkül** maradt ott, ahol a felhasználó tényleg dönt. A kapuk ezért
+  mostantól újrarajzolják a rácsokat (`unlockRefreshGrids`).
 
 ### 4. fázis — a gyűjtő feloldások
 * ikon-sűrűség lépcsői (10/20/22);

@@ -1944,6 +1944,11 @@ body.hubDragging #hubRoster{touch-action:none}
    mivel nyílik ki. Egy rejtett funkció nem cél; egy látható zár igen. */
 .unlockOff{opacity:.45;filter:grayscale(.85);cursor:not-allowed}
 .unlockOff:hover{opacity:.45}
+/* A ZÁRT STÍLUS-KÁRTYA KIVÉTEL: ott a feltétel maga a lényeg, azt EL KELL
+   TUDNI OLVASNI. Az elhalványítás ezért enyhébb, és a színt sem vesszük el —
+   a zárat a gomb és a rá írt mondat közli, nem a láthatatlanság. */
+.msItem.unlockOff{opacity:.78;filter:grayscale(.55);cursor:default}
+.msItem.unlockOff:hover{opacity:.78}
 /* 🪜 AZ ÜDVÖZLŐ ABLAK. Ugyanaz a nyelv, mint a feloldás-ablaké (ugyanaz a
    rendszer szólal meg), de HOSSZABB és GÖRGETHETŐ: ez az egyetlen hely, ahol
    egy teljesen ismeretlen embernek elmondjuk, mibe fog. */
@@ -27386,13 +27391,28 @@ function pyrMpSetup(){
 function renderPyrSpeedGrid(){
   const g=$("pyrSpeedGrid");if(!g)return;
   g.innerHTML="";
+  /* 🪜 A RUN-KAPUK. Közös karrierben nincs kapu: a szobát a házigazda állítja,
+     és a vendég naplója nem szólhat bele a közös világba. */
+  const kapuz=!(typeof MP!=="undefined"&&MP&&MP.active);
   Object.keys(PYR_SPEEDS).forEach(k=>{
     const sp=PYR_SPEEDS[k];
     const b=document.createElement("button");
-    if(k===pyrWantedSpeed)b.classList.add("sel");
-    b.innerHTML=`${sp.n}<small>${esc(sp.d)}</small>`;
-    b.onclick=()=>{pyrWantedSpeed=k;renderPyrSpeedGrid();renderPyrCapNote();};
+    let miert=null;
+    if(kapuz)try{miert=unlockSpeedWhy(k);}catch(e){}
+    if(k===pyrWantedSpeed&&!miert)b.classList.add("sel");
+    if(miert){b.classList.add("unlockOff");b.disabled=true;}
+    b.innerHTML=`${sp.n}<small>${esc(miert||sp.d)}</small>`;
+    if(!miert)b.onclick=()=>{pyrWantedSpeed=k;renderPyrSpeedGrid();renderPyrCapNote();};
     g.appendChild(b);});
+  /* A KIJELÖLÉS SEM ÁLLHAT ZÁRT FOKOZATON. Ide alapértékből is beeshet
+     (pyrWantedSpeed="tarto"), amit egy első karrier még nem nyitott ki. */
+  if(kapuz)try{
+    if(!unlockSpeedOk(pyrWantedSpeed)){
+      const nyitott=Object.keys(PYR_SPEEDS).filter(unlockSpeedOk);
+      if(nyitott.length&&nyitott.indexOf(pyrWantedSpeed)<0){
+        pyrWantedSpeed=nyitott.indexOf("lassu")>=0?"lassu":nyitott[0];
+        renderPyrSpeedGrid();return;}}
+  }catch(e){}
   /* ---- A ZÁRAK ÚJRAKÖTÉSE ----
      EZ AZ EGYETLEN RÁCS, AMI TELJESEN ÚJRAÉPÜL (innerHTML="", majd új gombok).
      A `disabled` a RÉGI gombokon volt — az újakon alapból nincs, tehát mindkét
@@ -28106,16 +28126,26 @@ const TEMPO_NOTE={
   jegkorszak:"nagyon lassú — egy Ratingért négyszer annyi idő, mint a leggyorsabb fokozaton",
   kokorszak:"a leglassabb — a Run-szinten ez a legtöbbet érő vállalás"};
 function renderTempoGrid(){
-  const cur=gameTempoPref();
+  let cur=gameTempoPref();
+  /* 🪜 A KIJELÖLÉS SEM ÁLLHAT ZÁRT FOKOZATON. Egy régi preferencia zárt
+     lassításra mutathat — az „már kinyitottad" jóváírás ezt általában eleve
+     megoldja, de ha mégsem, az alapra esünk vissza, némán. */
+  try{if(!unlockTempoOk(cur)){setGameTempo("normal");cur="normal";}}catch(e){}
   document.querySelectorAll("#tempoGrid button").forEach(b=>{
     const id=b.dataset.tempo;
-    b.classList.toggle("sel",id===cur);
+    let miert=null;
+    try{miert=unlockTempoWhy(id);}catch(e){}
+    b.classList.toggle("sel",id===cur&&!miert);
+    b.classList.toggle("unlockOff",!!miert);
+    b.disabled=!!miert;
     const sm=b.querySelector("small");
     if(sm){
+      if(miert){sm.textContent=miert;return;}
       const p=tempoRelPct(id);
       sm.textContent=(p===0?"az alap":(p>0?`+${p}%`:`${p}%`)+" az alaphoz képest")
         +" — "+(TEMPO_NOTE[id]||"");}});}
 document.querySelectorAll("#tempoGrid button").forEach(b=>b.onclick=()=>{
+  if(b.disabled)return;
   setGameTempo(b.dataset.tempo);renderTempoGrid();
   /* a saját tempó a piramis Run-plafonjának része — a kiírás kövesse */
   try{if(typeof renderPyrCapNote==="function")renderPyrCapNote();}catch(e){}});
@@ -29618,6 +29648,11 @@ function placeBench(p){
   if(benchCatIndex<DRAFT_BENCH_CATS.length){updateRound();}
   else{
     $("scDraft").classList.add("hide");
+    /* 🪜 A PANZER FELTÉTELE. ITT és sehol máshol: a „kezdő draft" ebben a
+       pillanatban áll össze utoljára — az első igazolás után már nem
+       rekonstruálható, hány nehéz emberrel indultál. */
+    try{if(typeof unlockNoteDraft==="function")
+      unlockNoteDraft(slots.map(x=>x&&x.player).concat(BENCH_KEYS.map(k=>BENCH[k])).filter(Boolean));}catch(e){}
     /* HAGYOMÁNYOS (PIRAMIS) KARRIER, DRAFTTAL: a felállás most készült el,
        az osztályt viszont csak MOST, a kész kereted ismeretében választod —
        lásd pyrOpenDivPickFromDraft és az updatePyrSetupVisibility fenti
@@ -72617,6 +72652,9 @@ function runBoardRow(){
     inf:!!infinityMode,
     mode:runBoardMode(),
     style:runBoardStyleKey(),
+    /* 🪜 AZ ELLENFÉL-FOKOZAT. A stílus mellé: az „már kinyitottad" jóváírás
+       ebből ismeri fel, mit használt valaki egy régebbi futásban. */
+    speed:(function(){try{return (S.pyr&&S.pyr.aiSpeed)||null;}catch(e){return null;}})(),
     mp:!!(MP&&MP.active&&MP.activeRoom),
     /* a felkerülés (Infinity) és a lezárás dátuma külön — a lista mindkettőt
        meg tudja mutatni, és látszik, mennyi idő telt el közben */
@@ -72925,6 +72963,7 @@ function unlockBlank(){
     skills:0,      /* hány képességet szereztél meg összesen */
     maxSkills:0,   /* a legtöbb képesség EGY játékoson */
     panzer:false,  /* volt-e 14 negatív tulajdonság a kezdő draftodban */
+    gift:{},       /* a „már kinyitottad" jóváírás — lásd unlockGift */
     seen:{},       /* melyik feloldás-ablakot mutattuk már meg */
     at:0};}
 let _unlockCache=null;
@@ -72938,6 +72977,7 @@ function unlockState(){
   const alap=unlockBlank();
   Object.keys(alap).forEach(k=>{if(u[k]===undefined)u[k]=alap[k];});
   if(!u.seen||typeof u.seen!=="object")u.seen={};
+  if(!u.gift||typeof u.gift!=="object")u.gift={};
   _unlockCache=u;
   /* ---- A RUN-SZÁMOK SZÁRMAZTATOTTAK, NEM KÖNYVELTEK ----
      A lezárt karrierek amúgy is egy tartós listán állnak (runBoardLoad). Ha
@@ -72945,7 +72985,76 @@ function unlockState(){
      lezárt futásokat ismerné el — vagyis aki eddig tíz karriert vitt végig,
      nulláról indulna. Származtatva a napló VISSZAMENŐLEG is helyes. */
   try{unlockSyncRuns(u);}catch(e){}
+  try{unlockMigrate(u);}catch(e){}
   return u;}
+/* ================= A „MÁR KINYITOTTAD" JÓVÁÍRÁS ==========================
+   A 3. fázis KAPUKAT tesz olyan vezérlőkre, amiket eddig bárki szabadon
+   használt. A roadmap 6. pontja viszont kimondja: a rendszer NEM VESZ EL
+   SEMMIT. A kettő csak úgy fér össze, ha akinél egy fokozat MÁR használatban
+   volt, az véglegesen megkapja — akkor is, ha a Run-szintje még nem érne el
+   odáig.
+
+   EZ NEM KIVÉTEL, HANEM A SZABÁLY MÁSIK FELE. A jóváírás ugyanabban a
+   naplóban, ugyanolyan végleges, mint bármelyik kiérdemelt feloldás; a
+   különbség csak az, MIÉRT jár. Aki egy fokozatot már megszokott, annak azt
+   elvenni büntetés volna azért, mert korábban kezdett játszani.
+
+   A JÓVÁÍRÁS FAJTÁI: "speed" (ellenfél-fokozat), "tempo" (játék-tempó),
+   "style" (csapatstílus). Kulcsonként egy jelző. */
+function unlockGiftHas(faj,kulcs){
+  const g=unlockState().gift||{};
+  return !!(g[faj]&&g[faj][kulcs]);}
+/* Felírja a jóváírást, ha még nincs. Igazat ad, ha MOST került fel — a hívó
+   ebből tudja, érdemes-e szólni róla. */
+function unlockGift(faj,kulcs){
+  if(!faj||!kulcs)return false;
+  const u=unlockState();
+  if(!u.gift[faj])u.gift[faj]={};
+  if(u.gift[faj][kulcs])return false;
+  u.gift[faj][kulcs]=Date.now();
+  unlockSave();
+  return true;}
+/* ---- AZ EGYSZERI ÁTÁLLÁS ----
+   A napló első olvasásakor fut le, egyszer (`seen.migrate`). Két forrásból
+   dolgozik, mert csak ez a kettő elérhető a mentés megnyitása NÉLKÜL:
+     · a TÁROLT játék-tempó (localStorage) — ez a gépé, nem a karrieré;
+     · a Run-ranglista bejegyzéseinek stílusa és (az újabbaknál) fokozata.
+   A futó karrier értékeit ezen felül a mentés betöltése írja jóvá
+   (unlockGiftFromSave) — az fogja meg azt, aki épp játszik, de még nem zárt
+   le egyetlen karriert sem. */
+function unlockMigrate(u){
+  if(u.seen&&u.seen.migrate)return;
+  u.seen.migrate=Date.now();
+  if(!u.gift.speed)u.gift.speed={};
+  if(!u.gift.tempo)u.gift.tempo={};
+  if(!u.gift.style)u.gift.style={};
+  try{
+    let t=null;try{t=localStorage.getItem(TEMPO_KEY);}catch(e){}
+    if(t&&GAME_TEMPO[t])u.gift.tempo[t]=1;
+  }catch(e){}
+  try{
+    (runBoardLoad()||[]).forEach(r=>{
+      if(r&&r.style)u.gift.style[r.style]=1;
+      if(r&&r.speed)u.gift.speed[r.speed]=1;});
+  }catch(e){}
+  try{u.at=Date.now();localStorage.setItem(UNLOCK_KEY,JSON.stringify(u));}catch(e){}}
+/* ---- A FUTÓ KARRIER JÓVÁÍRÁSA ----
+   A mentés betöltése hívja. Az az egyetlen pont, ahol egy MÁR ELKEZDETT
+   karrier tényleges beállításai láthatók — enélkül az kapná a legrosszabbul,
+   aki épp a közepén tart. */
+function unlockGiftFromSave(){
+  try{
+    const sp=(S&&S.pyr&&S.pyr.aiSpeed)||null;
+    if(sp&&PYR_SPEEDS[sp])unlockGift("speed",sp);
+  }catch(e){}
+  try{
+    const st=(S&&S.style&&S.style.key)||null;
+    if(st)unlockGift("style",st);
+  }catch(e){}
+  try{
+    const t=gameTempoPref();
+    if(t&&GAME_TEMPO[t])unlockGift("tempo",t);
+  }catch(e){}}
 /* A Run-ranglistából frissíti a két Run-mezőt. Csak akkor ír, ha valóban
    változott — különben minden olvasás localStorage-írást hozna magával. */
 function unlockSyncRuns(u){
@@ -73038,10 +73147,16 @@ function unlockApplyPreset(){
     try{const s=$("rerollSlider"),l=$("rerollSliderVal");
       if(s)s.value=String(p.rerolls);
       if(l)l.textContent=String(p.rerolls);}catch(e){}}
+  /* AMIT A LÉPCSŐ RÁD AD, AZ A TIÉD IS MARAD. A 3. lépcső „Lépést tartanak"
+     fokozata a Run-kapu szerint még zárva volna (2 lezárt karrier kell hozzá) —
+     a két szabály így egymásnak feszülne, és a rács visszaállítaná az alapra
+     azt, amit a lépcső épp előírt. A jóváírás oldja fel: amit a játék MAGA
+     adott rád egy egész karrierre, azt nem veheti el utána. */
   if(p.speed&&PYR_SPEEDS[p.speed]){
+    try{unlockGift("speed",p.speed);}catch(e){}
     pyrWantedSpeed=p.speed;
     try{renderPyrSpeedGrid();renderPyrCapNote();}catch(e){}}
-  if(p.tempo)try{setGameTempo(p.tempo);renderTempoGrid();}catch(e){}
+  if(p.tempo)try{unlockGift("tempo",p.tempo);setGameTempo(p.tempo);renderTempoGrid();}catch(e){}
   if(p.icons)try{setIconRate(p.icons);renderIconGrid();}catch(e){}
   if(p.guide){
     guideWantedMode=(p.guide==="full")?"hard":p.guide;
@@ -73116,7 +73231,19 @@ function unlockGateBtn(el,nyitva,sz){
     s.textContent=nyitva?el.dataset.unlockSz:("🔒 "+sz);}
   el.classList.toggle("unlockOff",!nyitva);
   if(!nyitva)el.disabled=true;}
+/* ---- A KAPUZOTT RÁCSOK ÚJRARAJZOLÁSA ----
+   HIBA, AMIT EZ JAVÍT: a tempó-rács a szkript ELEJÉN rajzolódik ki
+   (renderTempoGrid a saját blokkja végén), a feloldás-napló viszont a szkript
+   VÉGÉN áll fel. Az első rajzoláskor tehát a napló konstansai még a TDZ-ben
+   vannak, a kapu-kérdés kivételt dob, a try/catch elnyeli — és a rács ZÁR
+   NÉLKÜL marad ott, ahol a felhasználó tényleg dönt.
+   A megoldás nem a sorrend átrendezése (a rácsok a saját moduljukhoz
+   tartoznak), hanem hogy a kapuk MINDEN alkalmazásakor újrarajzoljuk őket. */
+function unlockRefreshGrids(){
+  try{if(typeof renderTempoGrid==="function")renderTempoGrid();}catch(e){}
+  try{if(typeof renderPyrSpeedGrid==="function")renderPyrSpeedGrid();}catch(e){}}
 function unlockApplyGates(){
+  unlockRefreshGrids();
   UNLOCK_GATES.forEach(g=>{
     let nyitva=true;
     try{nyitva=unlockHas(g.id);}catch(e){}
@@ -73192,28 +73319,70 @@ function unlockHas(id){
     case "icon4":       return (u.icons||0)>=22;
     case "wc":          return (u.nat||0)>=20;
     case "skillReal":   return (u.maxSkills||0)>=10||(u.skills||0)>=100;
-    /* --- Run-alapú feloldások (3. fázis) --- */
+    /* --- Run-alapú feloldások (3. fázis) ---
+       A KÉRÉS: „1. Run csapatstílusok nyitva: bombázók, betonvédelem / 2. Run:
+       + hol jön a mennydörgés / 3. Run: sztárom a párom / 4. Run: tiki-taka".
+       AZ „N. RUN" AZT JELENTI: a te N-EDIK futásod — nem N lezárt futás. A
+       másik olvasat szerint az ELSŐ karrierben egyetlen stílus sem volna
+       választható, pedig a stílusválasztó már az első idény végén elém áll: az
+       nem lépcső volna, hanem fal. A `runs` a LEZÁRT futásokat számolja, tehát
+       az „1. Run" = 0 lezárt.
+       A BÉKE ÉS HARMÓNIA a meglévő szabálya szerint marad — nem kap kaput. */
     case "styleBeton":
-    case "styleBombazok": return (u.runs||0)>=1;
-    case "styleVillam":   return (u.runs||0)>=2;
-    case "styleSztar":    return (u.runs||0)>=3;
-    case "styleTiki":     return (u.runs||0)>=4;
-    case "stylePanzer":   return !!u.panzer;
+    case "styleBombazok":
+    case "styleHarmonia": return unlockStyleOk("beton");
+    case "styleVillam":   return unlockStyleOk("villam");
+    case "styleSztar":    return unlockStyleOk("sztar");
+    case "styleTiki":     return unlockStyleOk("tikitaka");
+    case "stylePanzer":   return unlockStyleOk("panzer");
   }
   return true;   /* amiről nem rendelkezünk, az nyitva van */}
 /* Egy ellenfél-tempó fokozat nyitva van-e. A `lassu` és az alatta lévő mindig;
    a többit a Run-szint nyitja (lásd docs/lepcsok-roadmap.md 3.4). */
+/* AZ ALAPFOKOZAT a „Lassan követnek" (a kezdő lépcsők ezen indulnak) — az
+   mindig nyitva. A többi a KÉRÉS táblázata szerint:
+     +1 (Lépést tartanak)  a 2. megnyert Run
+     −1 (Alvó mezőny)      40-es Run
+     +2 (Kegyetlen)        40-es Run
+     +3 (Könyörtelen)      60-as Run
+     +4 (Végtelen menet)   75-ös Run
+   A 30-as sor „+1 level"-je szándékosan nincs itt: azt a 2. Run már kinyitotta
+   (a kérés maga mondja ki zárójelben). */
+/* ---- MAGYAR TOLDALÉK A SZÁMOKHOZ ----
+   „40-es Run-szint", de „60-as" és „75-ös". Egy `-es`-re rögzített sablon
+   minden második mondatban hibás magyart írna, és ez a rendszer végig
+   szövegekkel tanít — ott a nyelvhelyesség nem kozmetika.
+   A toldalék a szám KIMONDOTT alakjának végéhez igazodik. */
+const HU_TOLD_EGYES=["","-es","-es","-as","-es","-ös","-os","-es","-as","-es"];
+const HU_TOLD_TIZES=["","-es","-as","-as","-es","-es","-as","-es","-as","-es"];
+function huTold(n){
+  const v=Math.abs(Math.round(+n||0));
+  const e=v%10;
+  if(e!==0)return HU_TOLD_EGYES[e];
+  const t=Math.floor(v/10)%10;
+  if(t!==0)return HU_TOLD_TIZES[t];
+  return "-as";}                       /* 100, 1000 … */
+function huSzam(n){return `${Math.round(+n||0)}${huTold(n)}`;}
+const UNLOCK_SPEED_RUN={alvo:40,kegyet:40,konyortelen:60,vegtelen:75};
 function unlockSpeedOk(key){
+  if(key==="lassu")return true;              /* az alapfokozat mindig */
+  if(unlockGiftHas("speed",key))return true; /* „már kinyitottad" */
   const u=unlockState(),runs=u.runs||0,best=u.bestRun||0;
-  const i=Object.keys(PYR_SPEEDS).indexOf(key);
-  if(i<0)return false;
-  if(i<=1)return true;                       /* Alvó, Lassan — mindig */
+  if(!PYR_SPEEDS[key])return false;
   if(key==="tarto")return runs>=2;           /* +1: a 2. megnyert Run nyitja */
-  if(runs<3)return false;                    /* a többi a 3. Runtól gyűlik */
-  if(key==="kegyet")return best>=40;         /* +2 */
-  if(key==="konyortelen")return best>=60;    /* +3 */
-  if(key==="vegtelen")return best>=75;       /* +4 */
-  return false;}
+  const kell=UNLOCK_SPEED_RUN[key];
+  if(kell==null)return true;
+  if(runs<3)return false;                    /* a kapcsolók a 3. Runtól nyílnak */
+  return best>=kell;}
+/* Mi nyitja ki — egy mondatban, a gombra írva. */
+function unlockSpeedWhy(key){
+  if(unlockSpeedOk(key))return null;
+  if(key==="tarto")return "🔒 a 2. lezárt karriered nyitja ki";
+  const kell=UNLOCK_SPEED_RUN[key];
+  if(kell==null)return "🔒 még nincs kinyitva";
+  const u=unlockState(),runs=u.runs||0;
+  if(runs<3)return `🔒 3 lezárt karrier és ${huSzam(kell)} Run-szint kell (most ${runs} karriered van)`;
+  return `🔒 ${huSzam(kell)} Run-szint kell (a legjobbad ${Math.round(u.bestRun||0)})`;}
 /* ================= A FELOLDÁS-ABLAK (3.9.46) ===============================
    KIMONDOTT KÉRÉS: „Ezekről a kinyílásokról külön ablakokban kapjon üzenetet a
    játékos a D1-es győzelem pillanatában. Mindig arról, hogy éppen mit nyitott
@@ -73245,6 +73414,12 @@ const UNLOCK_CARDS={
     mit:"D5 · kártyánként lutri",
     sz:"Az ötödik osztály és a legkockázatosabb Rating-mód is a tiéd. Minél "
       +"mélyebbről indulsz, annál magasabbra érhet a Run-szinted."},
+  panzer:{ic:"🛡️",cim:"Panzerkampfwagen",
+    mit:"Új csapatstílus",
+    sz:"A kezdő kereted tele van nehéz emberekkel — gyenge vezetőkkel, "
+      +"öntörvényűekkel, lobbanékonyakkal. Pontosan ez a Panzer alapanyaga: "
+      +"a stílus a lapokból és a sérülésekből épít, nem szenved tőlük. "
+      +"A csapatstílus-választónál mostantól a tiéd."},
   d6:{ic:"🏟️",cim:"Minden út megnyílt",
     mit:"D6 · kész klubos indulás · dinamikus karrier",
     sz:"Öt bajnoki cím. A megyei bajnokságtól a kész klub átvételéig minden "
@@ -73348,13 +73523,76 @@ function unlockWelcomeShow(kesz){
   el.classList.remove("hide");
   return true;}
 
-const UNLOCK_TEMPO_RUN={komotos:30,csiga:40,gleccser:50,jegkorszak:70,kokorszak:80};
+const UNLOCK_TEMPO_RUN={komotos:30,csiga:50,gleccser:70,jegkorszak:80,kokorszak:90};
 function unlockTempoOk(key){
-  const u=unlockState();
   const kell=UNLOCK_TEMPO_RUN[key];
-  if(kell==null)return true;                 /* turbo, gyors, normal */
+  if(kell==null)return true;                 /* turbo, gyors, normal — mindig */
+  if(unlockGiftHas("tempo",key))return true; /* „már kinyitottad" */
+  const u=unlockState();
   if((u.runs||0)<3)return false;
   return (u.bestRun||0)>=kell;}
+function unlockTempoWhy(key){
+  if(unlockTempoOk(key))return null;
+  const kell=UNLOCK_TEMPO_RUN[key],u=unlockState(),runs=u.runs||0;
+  if(runs<3)return `🔒 3 lezárt karrier és ${huSzam(kell)} Run-szint kell (most ${runs} karriered van)`;
+  return `🔒 ${huSzam(kell)} Run-szint kell (a legjobbad ${Math.round(u.bestRun||0)})`;}
+/* ---- A CSAPATSTÍLUSOK KAPUJA ----
+   EGY TÁBLÁZAT, a STÍLUS SAJÁT KULCSÁVAL. Az első változat a kulcsból KÉPEZTE
+   a kapu azonosítóját ("tikitaka" → "styleTikitaka"), a szabály viszont
+   "styleTiki" néven állt — így a kapu csendben átengedte a Tiki-Takát. Egy
+   string-műtét nem lehet a kapu igazsága: a táblázat KULCSRA dönt, tehát nem
+   tud elcsúszni, és ami nincs benne, az nyitva van.
+   AZ ÉRTÉK: hányadik karrieredtől választható (a `runs` a LEZÁRT futásokat
+   számolja, tehát az N. karrier = N−1 lezárt). */
+const UNLOCK_STYLE_RUN={villam:2,sztar:3,tikitaka:4};
+function unlockStyleOk(key){
+  if(unlockGiftHas("style",key))return true;
+  if(key==="panzer")return !!unlockState().panzer;
+  const n=UNLOCK_STYLE_RUN[key];
+  if(!n)return true;                         /* beton, bombázók, harmónia, új stílus */
+  return (unlockState().runs||0)>=n-1;}
+/* ---- A PANZER KÜLÖN FELTÉTELE ----
+   KIMONDOTT KÉRÉS: „Panzer akkor nyílik ki, ha a kezdő draftodban van 14
+   negatív tulajdonság (legyen szürke az a csapatstílus, és legyen ráírva, hogy
+   mivel nyitható ki)."
+
+   MI SZÁMÍT NEGATÍV JELLEMVONÁSNAK. Nem új fogalom: pontosan az a három
+   állapot, amit a játék SAJÁT öltözői eseményrendszere (PERSONALITY_EVENTS) is
+   negatívként kezel —
+     · vezetői képesség: Gyenge          (leadI === 0)
+     · társas alkat:     Bajkeverő / Öntörvényű  (coopI <= 1)
+     · temperamentum:    Temperamentumos / Lobbanékony (aggroI >= 3)
+   Egy emberen mindhárom meglehet, tehát a kezdő keret (11 + 4 csere) elvi
+   maximuma 45 — a 14 valódi, de elérhető vállalás. */
+const UNLOCK_PANZER_NEED=14;
+function unlockBadTraits(p){
+  if(!p)return 0;
+  let n=0;
+  if(p.leadI===0)n++;
+  if(p.coopI!=null&&p.coopI<=1)n++;
+  if(p.aggroI!=null&&p.aggroI>=3)n++;
+  return n;}
+/* A KÉSZ KEZDŐ DRAFT megmérése. A draft LEZÁRÁSAKOR fut le, egyszer: a keret
+   később átalakul, tehát utólag ez a szám már nem létezik. */
+function unlockNoteDraft(keret){
+  try{
+    let db=0;
+    (keret||[]).forEach(p=>{db+=unlockBadTraits(p);});
+    if(db>=UNLOCK_PANZER_NEED&&!unlockState().panzer){
+      const u=unlockState();u.panzer=db;unlockSave();
+      unlockShow("panzer");}
+    return db;
+  }catch(e){return 0;}}
+function unlockStyleWhy(key){
+  if(unlockStyleOk(key))return null;
+  if(key==="panzer")
+    return "🔒 Egy olyan karrierrel nyílik ki, ahol a kezdő draftodban "
+      +`legalább ${UNLOCK_PANZER_NEED} negatív jellemvonás van `
+      +"(gyenge vezető · bajkeverő vagy öntörvényű · temperamentumos vagy lobbanékony).";
+  const n=UNLOCK_STYLE_RUN[key];
+  if(!n)return "🔒 még nincs kinyitva";
+  const runs=unlockState().runs||0;
+  return `🔒 A ${n}. karrieredtől választható — most a ${runs+1}. fut.`;}
 const PROFILE_KEY="30-0-profile-v1";
 const PROFILE_NICK_MAX=20, PROFILE_NICK_MIN=2;
 /* ---- EGYSZERŰ NÉVSZŰRŐ ----
@@ -80906,10 +81144,14 @@ function styleChooserHtml(){
     h+=`<div class="msWarn" style="margin-top:8px">Az idény lezárult — <b>most dől el a klub filozófiája</b>. `
       +`A választás után a HUB-ban vár az <b>„Irány a pályára →"</b> gomb, és indulhat a következő szezon.</div>`;}
   h+=`<div class="msList" style="margin-top:9px">`;
+  /* 🪜 EGYSZER kérdezzük le, stílusonként — a lista rajzolása alatt a napló
+     nem változik, és a `zar` így egy helyen olvasható. */
+  const zar={};
+  STYLES.forEach(sd=>{try{zar[sd.key]=unlockStyleWhy(sd.key);}catch(e){zar[sd.key]=null;}});
   STYLES.forEach(sd=>{
     const forms=(sd.forms||[]).map(f=>(typeof FORM_LABELS!=="undefined"&&FORM_LABELS[f])||f).join(" · ");
     const tacs=(sd.tactics||[]).map(t=>(TACTICS[t]&&TACTICS[t].n)||t).join(" · ");
-    h+=`<div class="msItem" style="border-left:3px solid ${sd.col}">`
+    h+=`<div class="msItem${zar[sd.key]?" unlockOff":""}" style="border-left:3px solid ${sd.col}">`
       +`<div class="msTop"><b>${sd.ic} ${esc(sd.n)}</b></div>`
       +`<div class="msDesc" style="font-style:italic;color:var(--gold)">„${esc(sd.tag)}”</div>`
       +`<div class="msDesc">${esc(sd.d)}</div>`
@@ -80926,8 +81168,16 @@ function styleChooserHtml(){
         ?`<div class="msDesc" style="color:var(--grass)">🕶️ Morgolódó József az edződ — a `
          +`<b>Morgolódó-képesség 1. szintje ingyen jár</b>, és a választás pillanatától él `
          +`(a Park the bus kétszeres tempóval gyakorlódik be).</div>`:"")
-      +`<button class="btn-${can?"y":"s"} stepbtn" data-style="${sd.key}"${can?"":" disabled"} style="margin-top:8px;padding:9px">`
-      +(can?`Ezt választom`:`Még nem választható`)+`</button></div>`;});
+      /* 🪜 A RUN-KAPUK. A zárt stílus NEM tűnik el — szürkén, a feltétellel
+         ott marad, mert az egy CÉL. (Kimondott kérés a Panzernél: „legyen
+         szürke az a csapatstílus, és legyen ráírva, hogy mivel nyitható ki".
+         Ugyanez a nyelv jár a többinek is.) */
+      +(zar[sd.key]
+        ?`<div class="msDesc" style="color:var(--dim2);margin-top:6px">${esc(zar[sd.key])}</div>`
+        :"")
+      +`<button class="btn-${(can&&!zar[sd.key])?"y":"s"} stepbtn" data-style="${sd.key}"`
+      +((can&&!zar[sd.key])?"":" disabled")+` style="margin-top:8px;padding:9px">`
+      +((can&&!zar[sd.key])?`Ezt választom`:zar[sd.key]?`Még zárva`:`Még nem választható`)+`</button></div>`;});
   return h+`</div></div>`;}
 /* ---- A SZTÁR-VÁLASZTÓ (csak a „Sztárom a párom" stílusnál) ---- */
 function styleStarPickerHtml(){
@@ -81582,6 +81832,9 @@ function styleBindPanel(body){
     b.onclick=()=>{
       const k=b.getAttribute("data-style"),sd=styleByKey(k);
       if(!sd)return;
+      /* 🪜 A KAPU ITT IS. A gomb tiltva van, de a választás VÉGLEGES — egy
+         zárt stílusra semmilyen úton nem szabad ráfutni. */
+      try{if(typeof unlockStyleOk==="function"&&!unlockStyleOk(k))return;}catch(_e){}
       /* A sztáros stílus előbb a jelölést kéri — a megerősítő csak utána jön. */
       if(sd.star){
         _styleStarPick=null;
@@ -86953,6 +87206,10 @@ function loadIntoGame(d,key){
   try{
     applySavedGame(d);
     _saveBroken=false;
+    /* 🪜 A „MÁR KINYITOTTAD" JÓVÁÍRÁS. Ez az EGYETLEN pont, ahol egy már
+       elkezdett karrier tényleges fokozatai és stílusa láthatók — enélkül az
+       járna a legrosszabbul, aki épp egy karrier közepén tart. */
+    try{if(typeof unlockGiftFromSave==="function")unlockGiftFromSave();}catch(_e){}
     return true;
   }catch(e){
     _saveBroken=true;            /* 2. — innentől nem írunk sehova */

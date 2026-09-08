@@ -363,7 +363,10 @@ sorrendjét, valamint a gyűjtő számlálókat (ikon, nemzeti válogatott, kép
 egyes választások **kapuit** (Rating a szezonban, kártyánként lutri, kész klub —
 mikor nyílnak, és visszakapják-e az eredeti feliratukat), valamint az
 osztályválasztó **mélység-zárait** (D4/D5/D6, az ajánlással és a megerősítéssel
-együtt).
+együtt). A 3. fázisból: a Run-szint szerinti ellenfél-fokozat- és
+tempó-kapukat a felületen, a csapatstílusok kapuit, a Panzer
+jellemvonás-számlálását, és a **„már kinyitottad" jóváírást** (amit használtál,
+az a Run-küszöb alatt is a tiéd marad; amit nem, az zárva).
 
 **Fixtúra-buktató, amibe már belefutottunk:** a `careerPool` modul-szintű
 `let`, tehát a `page.evaluate`-ben **bare** névvel kell írni — a
