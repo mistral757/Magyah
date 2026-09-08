@@ -46,7 +46,7 @@ rendszert. Három szálon fut: jogtisztaság · mentés-stabilitás · csomagol�
 | **Papírmunka (F4)** | ✅ **kész (3.9.50)** | — az adatvédelmi lap és az áruházi szövegek megvannak |
 | **Csomagolás (Play)** | ⚠️ **a te gépeden** | Play-fiók · AAB · assetlinks-ujjlenyomat · Console-űrlapok |
 
-**Gépi ellenőrzés:** `node tools/kiadas-proba.js` — **46/47**, az egyetlen
+**Gépi ellenőrzés:** `node tools/kiadas-proba.js` — **49/50**, az egyetlen
 nyitott tétel az assetlinks-ujjlenyomat, ami szándékosan csak az első
 AAB-feltöltés UTÁN tölthető ki.
 
@@ -268,7 +268,7 @@ Bubblewrap CLI vagy PWABuilder → aláírt **AAB**. El kell dönteni és rögz�
 | **Data safety űrlap** | ✅ **a válaszok készen** | `docs/f4-play-papirmunka.md` — a Console-ba bepötyögni |
 | **IARC tartalmi besorolás** | ✅ **a válaszok készen** | ugyanott, 3. szakasz — **enyhe trágárság: IGEN** |
 | áruházi lap (rövid/hosszú leírás) | ✅ **kész (3.9.50)** | `docs/f4b-aruhazi-lap.md`, bemásolható |
-| **funkciógrafika 1024×500** | ⬜ **hiányzik** | az egyetlen elem, amit kódból nem lehet előállítani |
+| **funkciógrafika 1024×500** | ✅ **kész (3.9.51)** | `icons/play/feature-1024x500.png` — **mégis kódból**: `node tools/grafika/render.js`, a játék saját betűivel és színeivel |
 | célközönség, kereskedelmi státusz | ⬜ döntés | Play Console-ban, egy kattintás |
 
 #### 3.5 Firebase — átnézve (3.9.12, F7) ✅ — a részletek: `docs/f6-f7-csomagolas.md`
@@ -360,7 +360,7 @@ cache-first statikus ág is tényleg dolgozik.
 ┌─ PAPÍR (párhuzamosan indítható) ───────────────────────────────────┐
 │ F4  Adatvédelmi tájékoztató + Data safety + IARC  ✅ KÉSZ (3.9.50) │
 │ F4b Áruházi lap szövegei                          ✅ KÉSZ (3.9.50) │
-│     …funkciógrafika 1024×500                      ⬜ grafikai munka │
+│     …funkciógrafika 1024×500                      ✅ KÉSZ (3.9.51) │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ CSOMAGOLÁS ───────────────────────────────────────────────────────┐
 │ F5  Manifest + maskable ikon    ✅ KÉSZ (3.9.10)                    │
@@ -369,7 +369,8 @@ cache-first statikus ág is tényleg dolgozik.
 │ F8  SW: offline előcache        ✅ KÉSZ (3.9.10)                    │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ KIADÁS ───────────────────────────────────────────────────────────┐
-│ F9  release.py → dist/ → deploy → belső teszt sáv → éles           │
+│ F9  release.py → dist/ → deploy → zárt teszt → éles                │
+│     ▶ LÉPÉSRŐL LÉPÉSRE: docs/f9-kiadas-lepesrol-lepesre.md         │
 └────────────────────────────────────────────────────────────────────┘
 ┌─ UTÁNA ────────────────────────────────────────────────────────────┐
 │ F10 Mentés-egészség (verzió-kapu, rollback)                        │

@@ -429,6 +429,26 @@ eredményjelzőn **csak a te oldaladon** áll jelvény — oldalcsere után is (
 `sbFitTeams` gyorsítója különben odaragasztaná, mert a kulcsa nem tud az
 oldalról).
 
+## grafika/render.js — 🎨 a Play áruházi grafikái
+
+```
+node tools/grafika/render.js
+```
+
+A Play **funkciógrafikája** (1024×500) az egyetlen kötelező grafikai elem,
+amit nem lehet a játékból kifényképezni. Ez a szkript **előállítja**: a
+`tools/grafika/feature-graphic.html` a játék saját betűivel (`/fonts`), saját
+színeivel és saját ikonjával rajzolja meg, a render pedig pontos
+pixelméretben menti (`deviceScaleFactor:1` — a Play nem retinát vár).
+
+**Miért kódból, és nem egy grafikai eszközből:** így a kép a játék arculatát
+követi. Ha a színek vagy a betűk változnak, a kép egy paranccsal
+újragenerálható — nem avul el egy külső eszközben ottfelejtett fájlként.
+
+**Egy buktató:** a `font-display:block` miatt a szöveg addig láthatatlan, amíg
+a woff2 meg nem érkezik, ezért a render megvárja a `document.fonts.ready`-t.
+Enélkül üres képet kapnál.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```

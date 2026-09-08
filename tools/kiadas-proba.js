@@ -142,6 +142,20 @@ if(lap){
      /Nincs hirdetés/i.test(kb[3])&&/vásárlás/i.test(kb[3]));
 }
 
+/* ════════ 6b. ÁRUHÁZI GRAFIKA ════════
+   A funkciógrafika a Play EGYETLEN kötelező grafikai eleme, amit nem lehet a
+   játékból kifényképezni — ezért generáljuk (tools/grafika/render.js). A
+   MÉRETE PONTOS kell legyen: 1024×500, se több, se kevesebb. */
+{const fg="icons/play/feature-1024x500.png";
+ ok("a funkciógrafika létezik",van(fg),"tools/grafika/render.js állítja elő");
+ if(van(fg)){
+   /* PNG-fejléc: a 16. bájttól 4-4 bájt a szélesség és a magasság. */
+   const buf=fs.readFileSync(path.join(GYOKER,fg));
+   const w=buf.readUInt32BE(16),h=buf.readUInt32BE(20);
+   ok("a funkciógrafika pontosan 1024×500",w===1024&&h===500,`${w}×${h}`);
+   ok("a funkciógrafika mérete a Play korlátja alatt (15 MB)",buf.length<15*1024*1024,
+      `${(buf.length/1024).toFixed(0)} kB`);}}
+
 /* ════════ 7. AMI A KIADOTT BUILDBE MEGY ════════ */
 ok("a release-építő megvan",van("tools/nevek/release.py"));
 ok("a betűk önhosztoltak (nincs Google Fonts a kódban)",
