@@ -58,6 +58,24 @@ const KOD_MINTAK=[
   /\b(BL|EL|KL)\s*[×0-9]/,
   /\b(BL|EL|KL)-(?:gól|kapus|győz|nyer|indul|selejt|dönt|beli|szint|mez|cím|ben\b|be\b|é\b|t\b)/i,
   /(?:^|\s)(?:Első|első)\s+(BL|EL|KL)\b/];
+/* ---- ÉS AMI EDDIG HIÁNYZOTT: A VALÓS SOROZATNEVEK ----
+   A fenti szűrő a KÓDOKAT keresi (BL/EL/KL), a 3.9.51-es hiba viszont nem kód
+   volt, hanem egy KIÍRT VALÓS NÉV: a trófea-képernyőn `E.comp==="BL"` esetén
+   egy bedrótozott „BAJNOKOK LIGÁJA!" állt, ami megkerülte az egész átnevezést.
+   A kód-szűrő ezt elvileg sem láthatta — más hibaosztály.
+   Ez a lista a valós sorozat- és szövetségneveket fogja. Szándékosan SZŰK: a
+   generikus szavak („kupa", „liga", „bajnokság") a játék sajátjai is. */
+const VALOS_NEVEK=[
+  /bajnokok\s+lig[aá]j/i,
+  /(?:^|\W)eur[oó]pa[-\s]?lig[aá]/i,
+  /konferencia[-\s]?lig/i,
+  /\bUEFA\b/i,
+  /champions\s+league/i,
+  /europa\s+league/i];
+const valosNev=sztringek(src).filter(x=>{
+  const marad=x.s.replace(/\$\{[^}]*\}/g," ");
+  return VALOS_NEVEK.some(re=>re.test(marad));});
+
 const gyanus=sztringek(src).filter(x=>{
   const t=x.s.trim();
   if(t==="BL"||t==="EL"||t==="KL")return false;      /* a KULCS maga — kell */
@@ -134,11 +152,15 @@ const srv=http.createServer((req,rp)=>{
     ["az egyéni díjak leírásában nincs BL",r.dijak_tisztak===true],
     ["a Run-mérföldkövek kiírt nevében sincs",r.run_nevek_tisztak===true],
     ["EGYETLEN sztring-literálban sem maradt sorozat-kód (BL/EL/KL)",gyanus.length===0],
+    ["EGYETLEN sztring-literálban sincs VALÓS sorozatnév (3.9.51)",valosNev.length===0],
     ["nincs oldalhiba",errs.length===0]];
   T.forEach(([n,ok])=>console.log((ok?"  ✓ ":"  ✗ ")+n));
   console.log("\n  rövidítések:",r.short,"·",JSON.stringify(r.tobbi_short));
   console.log("  díjak:",JSON.stringify(r.dijak.boot.slice(0,46)),"…");
   console.log("  Run-nevek:",JSON.stringify(r.run_nevek));
+  if(valosNev.length){
+    console.log("\n  VALÓS SOROZATNÉV A KIÍRÁSBAN:");
+    valosNev.slice(0,10).forEach(x=>console.log(`    ${x.line}: ${x.s.replace(/\s+/g," ").slice(0,110)}`));}
   if(gyanus.length){
     console.log("\n  MARADT SOROZAT-KÓD A KIÍRÁSBAN:");
     gyanus.slice(0,10).forEach(x=>console.log(`    ${x.line}: ${x.s.replace(/\s+/g," ").slice(0,110)}`));}

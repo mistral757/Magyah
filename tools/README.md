@@ -412,6 +412,106 @@ jelzést a HUB-on, a lépéssor **élő** számait, és hogy közös karrierben 
 pedig a klub éves bevételéből jönnek — egy üres vázlat-karrierben az a padlón
 áll, és ott a 100 Ft-os kerekítés elnyomná az arányokat.
 
+## arculat-proba.js — 🛡️ az arculat láthatósága és a meccs alaptempója
+
+```
+node tools/arculat-proba.js
+```
+
+Két dolgot mér. Egy: a közvetítés **alap-tempója 0,25×** friss telepítésen (a
+csúszkák, a felirat és a tényleges ütem is), de a **már beállított érték
+túléli** — a kapcsoló csak az alapértelmezést mozdítja el, senki beállítását nem
+írja felül. Kettő: az **arculat** eljut-e oda, ahol látszik — a címer-SVG kapja-e
+meg a fényt, a mélységet és a belső keretet (és a `flat:true` elhagyja-e mind a
+hármat, változatlan formával), a klub-banner viseli-e a nevet, a stadiont és a
+két klubszínt, ott van-e a HUB tetején és a bajnokavatás képernyőjén, és hogy az
+eredményjelzőn **csak a te oldaladon** áll jelvény — oldalcsere után is (a
+`sbFitTeams` gyorsítója különben odaragasztaná, mert a kulcsa nem tud az
+oldalról).
+
+## grafika/render.js — 🎨 a Play áruházi grafikái
+
+```
+node tools/grafika/render.js
+```
+
+A Play **funkciógrafikája** (1024×500) az egyetlen kötelező grafikai elem,
+amit nem lehet a játékból kifényképezni. Ez a szkript **előállítja**: a
+`tools/grafika/feature-graphic.html` a játék saját betűivel (`/fonts`), saját
+színeivel és saját ikonjával rajzolja meg, a render pedig pontos
+pixelméretben menti (`deviceScaleFactor:1` — a Play nem retinát vár).
+
+**Miért kódból, és nem egy grafikai eszközből:** így a kép a játék arculatát
+követi. Ha a színek vagy a betűk változnak, a kép egy paranccsal
+újragenerálható — nem avul el egy külső eszközben ottfelejtett fájlként.
+
+**Egy buktató:** a `font-display:block` miatt a szöveg addig láthatatlan, amíg
+a woff2 meg nem érkezik, ezért a render megvárja a `document.fonts.ready`-t.
+Enélkül üres képet kapnál.
+
+## ifi-elorejelzes-proba.js — 🔮 az ifi felajánlásába épített kilátás
+
+```
+node tools/ifi-elorejelzes-proba.js
+```
+
+Azt méri, amit egy ifi felajánlásakor a játékos LÁT: hány szezonra előre
+mutatja meg a game a fiatal várható ratingjét és TSI-jét, mihez méri, és
+hogy ugyanaz a srác nem kopogtat-e be kétszer egy szezonban.
+
+**A legfontosabb állítása** az, hogy az előrejelzés és a valóság UGYANAZT a
+számtant futtatja. Az `academyMatchStep()` és a `careerAgeStepCore()` azért
+külön függvény, hogy a jóslás ne egy második, párhuzamos képlet legyen: a
+próba lejátszik egy szezont élesben, előrejelez egy szezont, és a kettőnek
+kor–rating–TSI hármasban egyeznie kell. Ha valaki holnap a fejlődési görbén
+igazít, de csak az egyik helyen, ez a sor pirosodik ki.
+
+**A mérce a LEGJOBB 11**, nem a felállított kezdő tizenegy — és nem a keret
+átlaga. A próba direkt olyan keretet állít, ahol a kettő eltér (a legjobb 11
+átlaga 85.7, a pályára küldött tizenegyé 70), és megnézi, melyik szám kerül
+a fejlécbe. Ez azért fontos, mert a felajánlás pillanatában egy taktikai
+kísérlet vagy egy sérüléshullám nem torzíthatja el azt, amihez a fiatalt
+hasonlítod.
+
+**Az egy szezon = egy ajánlat** szabályt a `rec.offerSeason` bélyeg tartja: a
+próba ugyanabban a szezonban sokszor kéri a visszatérőt, és azt várja, hogy a
+már felajánlott név ne jöjjön elő újra; a szezonváltás után viszont igen.
+A ballagás (`ACADEMY_GRADUATE_AGE`) ettől függetlenül garantált marad.
+
+**Amit a jóslás szándékosan NEM tartalmaz:** kupameccseket, boostot és
+szerencsét. A TSI-ugrás a valóságban dobókocka (`ACADEMY_TSI_CHANCE`), az
+előrejelzésben a várható értéke — így a szám determinisztikus, és inkább
+alálő, mint ígérget. A felajánlás alján ezért áll ott, hogy ez nem ígéret.
+
+## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
+
+```
+node tools/kiadas-proba.js
+```
+
+**Nem a játékot méri** (arra ott a 35 böngészős próba), hanem azt, amit a
+Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
+(nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
+felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
+worker előcache-listáját, az assetlinks.json alakját, és az áruházi szövegek
+karakterplafonjait. Böngésző nem kell hozzá.
+
+**A leghasznosabb állítása** az, ami a kódot és a papírt ÖSSZEKÖTI: kigyűjti
+az `index.html`-ben szereplő külső hosztokat, és megnézi, mindegyik szerepel-e
+a tájékoztatóban. Pontosan ez a hibaosztály maradt észrevétlenül a 3.9.22-től
+a 3.9.50-ig: a push-értesítések új adatkiáramlást hoztak, a tájékoztató viszont
+a 3.9.13-on állt — és ez csak a Play-elutasításnál derült volna ki, hetekkel
+később.
+
+**Egy tanulság az első futásból:** a keresést a **kommentek nélküli** kódon
+kell futtatni. A kód tele van olyan magyarázatokkal, amik épp azt írják le,
+miért NEM hívunk már egy szolgáltatást („korábban a fonts.googleapis.com
+töltötte be…") — a nyers szövegkeresés ezekre is rátalált, és a MEGOLDOTT
+problémát jelentette hibaként.
+
+Az **assetlinks-ujjlenyomat** szándékosan csak ⚠️ figyelmeztetés, nem bukás:
+az érték a Play Console-ból, az első AAB-feltöltés UTÁN derül ki.
+
 ## firebase-rules.json — az adatbázis szabályai
 
 A Realtime Database (`magyahok`) teljes szabályfája, érvényes JSON-ként. A
