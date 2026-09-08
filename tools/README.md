@@ -366,7 +366,15 @@ osztályválasztó **mélység-zárait** (D4/D5/D6, az ajánlással és a meger�
 együtt). A 3. fázisból: a Run-szint szerinti ellenfél-fokozat- és
 tempó-kapukat a felületen, a csapatstílusok kapuit, a Panzer
 jellemvonás-számlálását, és a **„már kinyitottad" jóváírást** (amit használtál,
-az a Run-küszöb alatt is a tiéd marad; amit nem, az zárva).
+az a Run-küszöb alatt is a tiéd marad; amit nem, az zárva). A 4-5. fázisból: a
+gyűjtő kapukat (ikon-sűrűség, nemzeti válogatottak, realisztikus képesség-mód —
+a feliratuk a saját állásukat mondja: „még 6 hiányzik (14/20)"), és a **haladás
+panelt**, ahol külön állítás mondja ki, hogy a panel minden sora UGYANAZT
+válaszolja, amit a felület kapui.
+
+**Portütközés:** a próba a 8961-es porton szerver; ha egy korábbi futás
+összeomlott, a `python3 -m http.server` folyamat ottragadhat, és a következő
+futás `EADDRINUSE`-szal áll meg. Ilyenkor `pkill -f "http.server"`.
 
 **Fixtúra-buktató, amibe már belefutottunk:** a `careerPool` modul-szintű
 `let`, tehát a `page.evaluate`-ben **bare** névvel kell írni — a

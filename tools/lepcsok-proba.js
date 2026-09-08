@@ -15,7 +15,7 @@ const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const {spawn}=require('child_process');
 
 (async()=>{
-  const srv=spawn('python3',['-m','http.server','8977'],{cwd:'/home/user/Magyah',stdio:'ignore'});
+  const srv=spawn('python3',['-m','http.server','8961'],{cwd:'/home/user/Magyah',stdio:'ignore'});
   await new Promise(r=>setTimeout(r,1200));
   const b=await chromium.launch({args:["--no-sandbox"]});
   const hiba=[],out={};
@@ -26,14 +26,14 @@ const {spawn}=require('child_process');
     const p=await b.newPage({viewport:{width:390,height:844}});
     p.on('pageerror',e=>hiba.push(e.message));
     p.on('console',m=>{if(m.type()==='error')hiba.push(m.text());});
-    await p.goto('http://localhost:8977/index.html',{waitUntil:'domcontentloaded'});
+    await p.goto('http://localhost:8961/index.html',{waitUntil:'domcontentloaded'});
     await p.evaluate(n=>{
       try{localStorage.clear();}catch(e){}
       if(n>0)try{localStorage.setItem("30-0-unlock-v1",
         JSON.stringify({v:1,d1:n,runs:0,bestRun:0,icons:0,nat:0,skills:0,
           maxSkills:0,panzer:false,seen:{welcome:1},at:Date.now()}));}catch(e){}
     },d1);
-    await p.goto('http://localhost:8977/index.html',{waitUntil:'networkidle'});
+    await p.goto('http://localhost:8961/index.html',{waitUntil:'networkidle'});
     await p.waitForTimeout(2400);
     return p;}
 
@@ -124,10 +124,12 @@ const {spawn}=require('child_process');
        /* A LÉPCSŐ-ZÁR VÉGE ≠ MINDEN NYITVA. A rácsok visszakerülnek a
           játékoshoz, de az EGYES kapuk (lutri, kész klub) még zárva vannak —
           épp ez az a hiba, amit a 2. fázis javított. */
-       barmi_zart:["#diffSlider","#rerollSlider","#guideGrid button","#wcToggleGrid button",
-                   "#iconGrid button"].filter(zart),
-       /* a fokozat- és tempó-rács a RUN-kapuk alatt marad — más réteg */
+       barmi_zart:["#diffSlider","#rerollSlider","#guideGrid button"].filter(zart),
+       /* A FOKOZAT- ÉS TEMPÓ-RÁCS a RUN-kapuk alatt, az IKON- ÉS
+          VÁLOGATOTT-RÁCS a GYŰJTŐ kapuk alatt marad — mindkettő MÁS RÉTEG,
+          mint a lépcső rács-zára, és a 3. bajnoki cím nem old fel egyiket sem. */
        run_kapuzott:["#pyrSpeedGrid button","#tempoGrid button"].filter(zart),
+       gyujto_kapuzott:["#iconGrid button","#wcToggleGrid button"].filter(zart),
        kapuzott:["#ratingBasisGrid button","#careerStartGrid button"].filter(zart),
        nyitva:{diff:unlockHas("diff"),basis:unlockHas("basis"),div4:unlockHas("div4"),
                div5:unlockHas("div5"),dyn:unlockHas("dyn")}};});
@@ -253,7 +255,7 @@ const {spawn}=require('child_process');
     const p=await b.newPage({viewport:{width:390,height:844}});
     p.on('pageerror',e=>hiba.push(e.message));
     p.on('console',m=>{if(m.type()==='error')hiba.push(m.text());});
-    await p.goto('http://localhost:8977/index.html',{waitUntil:'domcontentloaded'});
+    await p.goto('http://localhost:8961/index.html',{waitUntil:'domcontentloaded'});
     await p.evaluate(a=>{
       try{localStorage.clear();}catch(e){}
       try{localStorage.setItem("30-0-runboard-v1",JSON.stringify(a.lista));}catch(e){}
@@ -265,7 +267,7 @@ const {spawn}=require('child_process');
       if(a.extra)Object.keys(a.extra).forEach(k=>{
         try{localStorage.setItem(k,a.extra[k]);}catch(e){}});
     },{lista,extra:extra||null});
-    await p.goto('http://localhost:8977/index.html',{waitUntil:'networkidle'});
+    await p.goto('http://localhost:8961/index.html',{waitUntil:'networkidle'});
     await p.waitForTimeout(2400);
     return p;}
 
@@ -361,6 +363,120 @@ const {spawn}=require('child_process');
      return {sorok, runs:unlockState().runs};});
    await p.close();}
 
+  /* ── 15. A GYŰJTŐ KAPUK A FELÜLETEN (4. fázis) ── */
+  async function gyujtoLap(u,extra){
+    const p=await b.newPage({viewport:{width:390,height:844}});
+    p.on('pageerror',e=>hiba.push(e.message));
+    p.on('console',m=>{if(m.type()==='error')hiba.push(m.text());});
+    await p.goto('http://localhost:8961/index.html',{waitUntil:'domcontentloaded'});
+    await p.evaluate(a=>{
+      try{localStorage.clear();}catch(e){}
+      try{localStorage.setItem("30-0-unlock-v1",JSON.stringify(Object.assign(
+        {v:1,d1:5,runs:0,bestRun:0,icons:0,nat:0,skills:0,maxSkills:0,
+         panzer:false,gift:{},seen:{welcome:1,migrate:1},at:1},a.u)));}catch(e){}
+      if(a.extra)Object.keys(a.extra).forEach(k=>{
+        try{localStorage.setItem(k,a.extra[k]);}catch(e){}});
+    },{u,extra:extra||null});
+    await p.goto('http://localhost:8961/index.html',{waitUntil:'networkidle'});
+    await p.waitForTimeout(2400);
+    return p;}
+  async function gyujtoOlvas(p){
+    return p.evaluate(()=>{
+      enterCareerSetupFromHome(true);
+      const g=sel=>{const el=document.querySelector(sel);
+        return el?{tiltva:el.disabled,sz:(el.querySelector("small")||{}).textContent||""}:null;};
+      return {
+        ritka:g('#iconGrid button[data-icon="ritka"]'),
+        nagyonritka:g('#iconGrid button[data-icon="nagyonritka"]'),
+        ki:g('#iconGrid button[data-icon="ki"]'),
+        teljes:g('#iconGrid button[data-icon="teljes"]'),
+        wc:g('#wcToggleGrid button[data-wc="on"]'),
+        real:g('#skillModeGrid button[data-sk="real"]'),
+        laza:g('#skillModeGrid button[data-sk="loose"]'),
+        beallitas:{ikon:iconRatePref(),wcEnabled:wcEnabled}};});}
+
+  {const p=await gyujtoLap({});                 out.gyujto_0=await gyujtoOlvas(p);await p.close();}
+  {const p=await gyujtoLap({icons:12,nat:8});   out.gyujto_12=await gyujtoOlvas(p);await p.close();}
+  {const p=await gyujtoLap({icons:22,nat:20,maxSkills:10});
+   out.gyujto_teli=await gyujtoOlvas(p);await p.close();}
+  /* 15b. A JÓVÁÍRÁS: aki ma ritkább ikonokkal és válogatottakkal játszik, azt
+     a kapu nem veheti el — a MIGRÁCIÓ kell hozzá, ezért `migrate` nélkül. */
+  {const p=await b.newPage({viewport:{width:390,height:844}});
+   p.on('pageerror',e=>hiba.push(e.message));
+   await p.goto('http://localhost:8961/index.html',{waitUntil:'domcontentloaded'});
+   await p.evaluate(()=>{
+     try{localStorage.clear();}catch(e){}
+     try{localStorage.setItem("harminc_nulla_ikon_v1","nagyonritka");
+         localStorage.setItem("harminc_nulla_wc_v1","on");
+         localStorage.setItem("30-0-unlock-v1",JSON.stringify(
+           {v:1,d1:5,runs:0,bestRun:0,icons:0,nat:0,skills:0,maxSkills:0,
+            panzer:false,gift:{},seen:{welcome:1},at:1}));}catch(e){}});
+   await p.goto('http://localhost:8961/index.html',{waitUntil:'networkidle'});
+   await p.waitForTimeout(2400);
+   out.gyujto_jovairas=await gyujtoOlvas(p);
+   await p.close();}
+  /* 15c. A KÜSZÖB ÁTLÉPÉSE ABLAKOT NYIT */
+  {const p=await gyujtoLap({icons:9,nat:19});
+   out.gyujto_ablak=await p.evaluate(()=>{
+     careerPool={"Ikon":{isIcon:true,skillsEver:[]}};
+     const natNev=[...unlockNatNames()][0];
+     careerPool[natNev]={skillsEver:[]};
+     const r={};
+     unlockNoteSigning("Ikon");
+     r.icon_cim=document.getElementById("unlockCardTitle").textContent;
+     r.icon_nyit=!document.getElementById("unlockCard").classList.contains("hide");
+     unlockCardClose();
+     unlockNoteSigning(natNev);
+     r.wc_cim=document.getElementById("unlockCardTitle").textContent;
+     r.szamlalok={icons:unlockState().icons,nat:unlockState().nat};
+     return r;});
+   await p.close();}
+
+  /* ── 16. A HALADÁS PANEL (5. fázis) ── */
+  {const p=await b.newPage({viewport:{width:390,height:844}});
+   p.on('pageerror',e=>hiba.push(e.message));
+   await p.goto('http://localhost:8961/index.html',{waitUntil:'domcontentloaded'});
+   await p.evaluate(()=>{
+     try{localStorage.clear();
+       localStorage.setItem("30-0-unlock-v1",JSON.stringify(
+         {v:1,d1:4,runs:2,bestRun:44,icons:13,nat:6,skills:41,maxSkills:6,
+          panzer:false,gift:{},seen:{welcome:1,migrate:1},at:1}));
+       localStorage.setItem("30-0-runboard-v1",JSON.stringify(
+         [{run:44,team:"Első",seasons:6,level:92,mode:"pyr"},
+          {run:22,team:"Második",seasons:4,level:84,mode:"pyr"}]));
+     }catch(e){}});
+   await p.goto('http://localhost:8961/index.html',{waitUntil:'networkidle'});
+   await p.waitForTimeout(2400);
+   out.panel=await p.evaluate(()=>{
+     const G=unlockProgressGroups();
+     const h=unlockProgressHtml();
+     const d=document.createElement("div");d.innerHTML=h;
+     const sorok=[...d.querySelectorAll(".upRow")];
+     /* A PANEL ÉS A FELÜLET UGYANAZT MONDJA-E: minden sor a saját szabályát
+        kérdezi vissza, tehát a kettőnek egyeznie KELL. */
+     const egyezik=G.every(g=>g.sorok.every(r=>{
+       if(/Kezdő nehézség/.test(r.n))return r.ok===unlockHas("diff");
+       if(/^D5/.test(r.n))return r.ok===unlockHas("div5");
+       if(/ritkábban/.test(r.n))return r.ok===unlockHas("icon2");
+       if(/Nemzeti válogatottak/.test(r.n))return r.ok===unlockHas("wc");
+       if(/Kegyetlen/.test(r.n))return r.ok===unlockSpeedOk("kegyet");
+       if(/Csigatempó/.test(r.n))return r.ok===unlockTempoOk("csiga");
+       if(/Tiki-Taka/.test(r.n))return r.ok===unlockStyleOk("tikitaka");
+       return true;}));
+     return {csoportok:G.length, sorok:sorok.length,
+       kesz:sorok.filter(x=>x.classList.contains("ok")).length,
+       fejlec:(d.querySelector(".upHead")||{}).textContent||"",
+       egyezik,
+       /* a zárt sorok MEGMONDJÁK, mi nyitja ki */
+       mind_indokolt:sorok.filter(x=>!x.classList.contains("ok"))
+         .every(x=>((x.querySelector(".upW")||{}).textContent||"").trim().length>3),
+       lezart_jelzes:/3\. lezárt karriered/.test(h)};});
+   /* és a Profil tényleg kirajzolja */
+   out.panel.profilban=await p.evaluate(()=>{
+     renderProfileModal();
+     return document.getElementById("profileBody").innerHTML.indexOf("unlockProg")>=0;});
+   await p.close();}
+
   /* ── 10. A JOGTISZTA FELIRAT ── */
   {const p=await lap(3);
    out.valogatott=await p.evaluate(()=>{
@@ -413,6 +529,8 @@ const {spawn}=require('child_process');
   ok("3 cím után: a lépcső RÁCS-zárai eltűntek", out.szabad.barmi_zart.length===0);
   ok("3 cím után: a fokozat- és tempó-rács a RUN-kapuk alatt marad",
      out.szabad.run_kapuzott.length===2);
+  ok("3 cím után: az ikon- és válogatott-rács a GYŰJTŐ kapuk alatt marad",
+     out.szabad.gyujto_kapuzott.length===2);
   ok("3 cím után: az EGYES kapuk viszont még állnak (lutri, kész klub)",
      out.szabad.kapuzott.length===2);
   ok("3 cím után: nehézség/Rating/D4 nyitva, D5 és dinamikus még nem",
@@ -529,6 +647,46 @@ const {spawn}=require('child_process');
       L.runs===1&&L.sorok.length===7&&L.sorok.filter(x=>x.zart).length===3);
    ok("stíluslista: a zárt sor gombja „Még zárva”, és RÁ VAN ÍRVA a feltétel",
       L.sorok.filter(x=>x.zart).every(x=>/Még zárva/.test(x.gomb)&&x.felirat));}
+  /* --- 4. fázis: a gyűjtő kapuk --- */
+  {const G=out.gyujto_0;
+   ok("gyűjtő 0: a három ikon-fokozat és a válogatottak és a realisztikus skill zárt",
+      G.ritka.tiltva&&G.nagyonritka.tiltva&&G.ki.tiltva&&G.wc.tiltva&&G.real.tiltva);
+   ok("gyűjtő 0: a mindig nyitott választásokat nem bántjuk",
+      G.teljes.tiltva===false&&G.laza.tiltva===false);
+   ok("gyűjtő 0: a felirat a SAJÁT ÁLLÁSÁT mondja, nem csak a küszöböt",
+      /0\/10/.test(G.ritka.sz)&&/még 10 hiányzik/.test(G.ritka.sz)
+      &&/0\/20/.test(G.wc.sz));}
+  {const G=out.gyujto_12;
+   ok("gyűjtő 12 ikon: az első fokozat nyílik, a többi még nem",
+      G.ritka.tiltva===false&&G.nagyonritka.tiltva===true&&G.ki.tiltva===true);
+   ok("gyűjtő 12 ikon: a hátralévő szám pontos (még 8 a 20-ig)",
+      /12\/20/.test(G.nagyonritka.sz)&&/még 8 hiányzik/.test(G.nagyonritka.sz));
+   ok("gyűjtő 12 ikon: a kinyitott gomb VISSZAKAPJA az eredeti feliratát",
+      !/🔒/.test(G.ritka.sz)&&/45%/.test(G.ritka.sz));}
+  {const G=out.gyujto_teli;
+   ok("gyűjtő teli: mind az öt gyűjtő kapu nyitva",
+      !G.ritka.tiltva&&!G.nagyonritka.tiltva&&!G.ki.tiltva&&!G.wc.tiltva&&!G.real.tiltva);}
+  {const G=out.gyujto_jovairas;
+   ok("jóváírás: aki ma ritkább ikonokkal játszik, megtartja — a LÉTRA alsó foka is",
+      G.ritka.tiltva===false&&G.nagyonritka.tiltva===false
+      &&G.beallitas.ikon==="nagyonritka");
+   ok("jóváírás: amit nem használt, az továbbra is zárva (ikonok: kikapcsolva)",
+      G.ki.tiltva===true);
+   ok("jóváírás: a bekapcsolt válogatottak megmaradnak",
+      G.wc.tiltva===false&&G.beallitas.wcEnabled===true);}
+  {const A=out.gyujto_ablak;
+   ok("gyűjtő: a 10. ikon és a 20. válogatott a PILLANATBAN ablakot nyit",
+      A.icon_nyit&&/Tíz legenda/.test(A.icon_cim)&&/Húsz válogatott/.test(A.wc_cim)
+      &&A.szamlalok.icons===10&&A.szamlalok.nat===20);}
+  /* --- 5. fázis: a haladás panel --- */
+  {const P=out.panel;
+   ok("panel: öt csoport, 22 sor, hat kész", P.csoportok===5&&P.sorok===22&&P.kesz===6);
+   ok("panel: a fejléc a haladást mondja", /6\/22/.test(P.fejlec));
+   ok("panel: minden sor UGYANAZT mondja, amit a felület kapui", P.egyezik===true);
+   ok("panel: minden zárt sor megmondja, mi nyitja ki", P.mind_indokolt===true);
+   ok("panel: kiírja, hogy a tempó-kapcsolók a 3. lezárt karriertől nyílnak",
+      P.lezart_jelzes===true);
+   ok("panel: a Profil tényleg kirajzolja", P.profilban===true);}
   ok("nincs futásidejű hiba", hiba.length===0);
 
   console.log(JSON.stringify(out,null,1));

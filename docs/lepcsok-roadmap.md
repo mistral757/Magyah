@@ -167,7 +167,7 @@ maximuma 45 — a 14 valódi, de elérhető vállalás.
 | a feloldás-ablak | `UNLOCK_CARDS`, `unlockShow` / `unlockDrain`, `#unlockCard` |
 | „VB-, EB-győztes…" → **Nemzeti válogatottak** | `#wcToggleGrid` |
 
-**Próba:** `node tools/lepcsok-proba.js` — 114 állítás (1-3. fázis együtt).
+**Próba:** `node tools/lepcsok-proba.js` — 132 állítás (mind az öt fázis).
 
 **Két döntés, amit érdemes tudni:**
 
@@ -259,15 +259,46 @@ egy régebbi futásból is felismerje, mit használt valaki.
   nélkül** maradt ott, ahol a felhasználó tényleg dönt. A kapuk ezért
   mostantól újrarajzolják a rácsokat (`unlockRefreshGrids`).
 
-### 4. fázis — a gyűjtő feloldások
-* ikon-sűrűség lépcsői (10/20/22);
-* nemzeti válogatottak (20 játékos);
-* realisztikus skill (10 egy emberen / 100 összesen).
+### ✅ 4. fázis — a gyűjtő feloldások *(kész: 3.9.46)*
 
-### 5. fázis — csiszolás
-* a HUB-ban egy „mi van még hátra" panel;
-* a feloldások visszanézhetők a Profil alatt;
-* próba a teljes lépcsősorra.
+| mi | feltétel | hol |
+|---|---|---|
+| ikon-sűrűség 2/3/4. szintje | 10 / 20 / 22 leigazolt ikon | `UNLOCK_GATES` + `UNLOCK_GATE_COUNTS` |
+| nemzeti válogatottak a draftban | 20 válogatottbeli játékos | ugyanott |
+| realisztikus képesség-mód | 10 egy emberen **vagy** 100 összesen | ugyanott |
+
+**A felirat a saját állását mondja, nem a küszöböt.** „Még 6 hiányzik (14/20)"
+sokkal többet mond, mint „20 ikon kell" — a `UNLOCK_GATE_COUNTS` ezért a
+számlálót is megnevezi, nem csak a határt.
+
+**A jóváírás itt is jár, és a létrát is figyeli.** Az ikon-sűrűség négy
+fokozata *létra*: aki ma a harmadikat használja, annak a második is jár
+(`UNLOCK_ICON_GATE_OF`) — máskülönben a jóváírás egy olyan állapotot hagyna,
+amiből nincs visszaút a köztes fokozatra. A válogatott-kapcsoló a boot-kor
+`localStorage`-ból áll be, a kapunál **korábban**, ezért a kapu külön visszaveszi,
+ha nincs jóváírva.
+
+**A küszöb átlépése a pillanatban szól** (`unlockNoteSigning` /
+`unlockNoteSkill` → `unlockShow`), nem a következő beállító képernyőn,
+magyarázat nélkül. A képesség-módnál két út vezet ugyanoda (10 egy emberen vagy
+100 összesen), ezért ott az **állapotváltást** figyeljük, nem egy konkrét
+számot.
+
+### ✅ 5. fázis — csiszolás *(kész: 3.9.46)*
+
+* **A „mi van még hátra" panel** — `unlockProgressGroups` / `unlockProgressHtml`.
+  A felugró feloldás-ablak a *pillanatot* ünnepli; ez a panel a **térkép**,
+  amit bármikor újra elő lehet venni: öt csoport, minden sor pipa vagy lakat,
+  a feltétel jobbra.
+  **A HUB helyett a Profil alatt van** (a roadmap eredetileg a HUB-ot mondta):
+  a HUB *karrier*-felület, a feloldások viszont a **játékoshoz** tartoznak — ott
+  laknak a Run-ranglista és az örök csúcsok is, ugyanabból az okból.
+  **A lista a szabályokból származik**, nem kézzel írt névsor: minden sor
+  ugyanazt a kérdést teszi fel (`unlockHas` / `unlockSpeedOk` / `unlockTempoOk`
+  / `unlockStyleOk`), amit maga a felület — a próba külön állítja, hogy a kettő
+  egyezik. Egy kézzel vezetett másolat pontosan attól avulna el, hogy a szabály
+  változik, és akkor a panel épp arról hazudna, amiről tájékoztatnia kéne.
+* **Próba a teljes lépcsősorra** — `tools/lepcsok-proba.js`, 132 állítás.
 
 ---
 
