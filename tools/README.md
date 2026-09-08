@@ -346,6 +346,28 @@ a `drafted`-be, különben a piac-eltolás a saját keretedet is átskálázza �
 valódi játékban minden leigazolt játékos bekerül. Részletek:
 `docs/rajt-nehezseg.md` 6. fejezet.
 
+## lepcsok-proba.js — 🪜 Lépcsők a csúcs felé (a feloldás-rendszer)
+
+```
+node tools/lepcsok-proba.js
+```
+
+Élő böngészőben méri az egyjátékos feloldás-rendszert, `localStorage`-ba
+írt naplóval (`30-0-unlock-v1`): a három kezdő lépcső **presetjét** (mind a
+tizenkét beállítást lépcsőnként), a beállító képernyő **zárait** (mi tiltott és
+mi nem — a felállás például MINDIG a játékosé), az **üdvözlő ablakot** (csak
+egyszer jön, és a karrier csak utána indul), a kezdőlap kapuit (a lépcsőn nincs
+útválasztó; a dinamikus karrier az 5. címig zárva), a **feloldás-ablakok**
+sorrendjét, valamint a gyűjtő számlálókat (ikon, nemzeti válogatott, képesség)
+és a Run-ból származtatott fokozat-/tempó-/stílus-kapukat.
+
+**Fixtúra-buktató, amibe már belefutottunk:** a `careerPool` modul-szintű
+`let`, tehát a `page.evaluate`-ben **bare** névvel kell írni — a
+`window.careerPool=…` egy MÁSIK objektumot hoz létre, és a próba csendben
+nullát mér. Ugyanígy a Run-ranglista **nyers tömb**, nem `{v,list}`.
+
+Részletek: `docs/lepcsok-roadmap.md`.
+
 ## firebase-rules.json — az adatbázis szabályai
 
 A Realtime Database (`magyahok`) teljes szabályfája, érvényes JSON-ként. A
