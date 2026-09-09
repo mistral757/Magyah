@@ -514,13 +514,50 @@ ez a javítás másik fele. A fölényt te építed; a Run-plafon pedig továbbr
 valódi rést mér, csak a kezdőrúgáskor mértet. Részletek:
 `docs/rajt-nehezseg.md` 7. fejezet.
 
+## csucs-alap-proba.js — ⭐ a rating–TSI–életkor hármas a csúcs-alapon
+
+```
+node tools/csucs-alap-proba.js
+```
+
+A **teljes adatbázison** mér (3439 játékos, 4626 kártya, 319 klub), nem
+mintán — a kérés is a teljes adatbázisra szólt.
+
+**Az első három állítás magát az ELVET őrzi:** egy seedhez pontosan egy Messzi
+tartozik, bármelyik klubból nyitod ki; az az ember a LEGJOBB kártyája; és az
+egyben a LEGERŐSEBB instantja is. A harmadik azért külön sor, mert a kód nem
+generálja le mind a hány instantot, hogy aztán a legerősebbet válassza — a
+legmagasabb kártya-Ratingű megjelenést veszi. A kettő egyenértékű (a TSI a
+kártya Ratingjében monoton), de ez nem magától értetődő, ezért a próba a
+játékos **minden** kártyájára lefuttatja a számolást és összeveti.
+
+**A legérdekesebb állítás viszont a korokról szól.** Az adatbázis 65%-ánál
+ismerjük a születési évet, 35%-ánál nem — ott a kor becslés. A próba a két
+csoport kor-eloszlását **egymáshoz** méri: a torzítás 0,5 évnél kisebb kell
+legyen, és a mediánnak meg a két szélső tizednek egyeznie kell. Ez fogta meg a
+régi becslés hibáját is: az a 2240 ismert eseten +2,0 évvel öregebbnek mondta a
+játékosokat a valóságnál, mert a „Ratinggel összeférő sáv" egy csúcskártyán a
+26-30-as platóra szorul, miközben a valós csúcskorok 31%-a 24 év alatt van.
+
+A 15%-os TSI-rátétet is a teljes adatbázison ellenőrzi (arány 1,150 ± 0,005),
+és külön azt, hogy **a csúcs is követi** a megemelt TSI-t — enélkül a scout
+nagyobb számot mutatna, a játékos viszont ugyanoda nőne fel. A Ratingnek
+eközben egyetlen játékosnál sem szabad elmozdulnia.
+
+Két regressziós ág zárja: a szezon-alap mind a 4181 klub-kártyáján változatlan
+TSI-t ad, és kétszer hívva minden bitre ugyanaz. Részletek: `docs/csucs-alap.md`.
+
+**Egy fixtúra-buktató, amibe elsőre beleestem:** a `cardBasisOn()` a
+`gameMode`-ot is nézi. `gameMode="career"` nélkül a `careerDraftPlayer` a
+kanonikus pool-bejegyzést adja vissza, és a próba a semmit méri — zölden.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 36 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 37 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

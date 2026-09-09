@@ -5974,7 +5974,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.53";
+const APP_VERSION="3.9.54";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -20312,6 +20312,71 @@ function careerBestCardFor(name){
   const e=CAREER_BEST_CARD[name];
   if(!e)return null;
   return (wcOn()?(e.any||e.club):(e.club||e.any))||null;}
+/* ================= HÁNY ÉVES VALAKI A SAJÁT CSÚCSKÁRTYÁJÁN? (3.9.54) =========
+   BEJELENTETT KÉRÉS: „a teljes adatbázisra a ténylegesen legenerált, beillesztett
+   születési évekből számított életkorok és ratingok alapján számítsunk TSI-t és
+   életkort."
+
+   AZ ADAT NEM TELJES, ÉS EZ MÉRHETŐ. A 3439 pool-játékosból 2240-nél (65%)
+   ismerjük a születési évet — ott a csúcskártya kora VALÓS, nem becslés. A
+   maradék 1199-nél (35%, szinte kizárólag 82 alatti kártyák) a kor eddig egy
+   SZINTETIKUS haranggörbéből jött: a Ratinggel összeférő korsávra húzva, a
+   poszt csúcskora felé tolva.
+
+   MÉRVE, a 2240 ISMERT eseten (vagyis ott, ahol tudjuk az igazságot, és
+   megnézzük, mit mondott volna a becslés):
+     · átlagos hiba 3,4 év, medián 3, a felső tized 7 fölött,
+     · és — ez a lényeg — a torzítás +2,0 év: a becslés RENDSZERESEN
+       ÖREGEBBNEK mondta a játékost a valóságnál,
+     · a "Ratinggel összeférő sáv" a valós kort az esetek 54%-ában BE SEM FOGTA.
+
+   MIÉRT TORZÍT. A sáv alja az a legfiatalabb kor, ahol a kor-görbe még kiadja a
+   kártya Ratingjét. Egy CSÚCSKÁRTYÁN viszont a Rating majdnem egyenlő a
+   csúccsal, tehát a sáv a 26-30-as platóra szorul — miközben a valóságban a
+   játékosok 31%-a 24 ÉVES VAGY FIATALABB volt a legjobb idényében.
+
+   A MEGOLDÁS a kérés szó szerinti olvasata: a becslés ne egy kitalált görbéből
+   dolgozzon, hanem abból a 2240 VALÓS életkorból, amit a beillesztett születési
+   évek adnak. Posztonként eltesszük a rendezett listát (a csúcskártya valós
+   kora), és az ismeretlen játékos ebből húz — nevesített, seedelt folyammal,
+   tehát determinisztikusan és MP-azonosan.
+
+   MIÉRT POSZTONKÉNT, ÉS MIÉRT NEM RATING SZERINT. Mérve: a valós csúcskor a
+   kártya Ratingjétől alig függ (74-77: 25,7 · 82-85: 26,7 · 90+: 27,0), a
+   POSZTTÓL viszont érdemben (balszélső 25,3 · kapus 28,3). A rating szerinti
+   bontás tehát zajt adna, a poszt szerinti jelet.
+
+   ÖNKARBANTARTÓ: a tábla a BIRTH_YEAR-ból épül. Minden új születési év, amit
+   valaha beírunk, egyszerre javítja a saját játékosát ÉS a becslést mindenki
+   másra. */
+const _peakAgeEmp={};
+function peakAgeEmpiric(){
+  const kulcs=wcOn()?"wc":"club";
+  if(_peakAgeEmp[kulcs])return _peakAgeEmp[kulcs];
+  const posztok={},mind=[];
+  Object.keys(CAREER_BEST_CARD).forEach(n=>{
+    const by=BIRTH_YEAR[n];
+    if(by==null)return;
+    const best=careerBestCardFor(n);
+    if(!best||!best.squad)return;
+    const y=seasonYear(best.squad.season);
+    if(y==null)return;
+    const kor=Math.max(16,Math.min(41,y-by));
+    const k=(best.sp.pos&&best.sp.pos[0])||"?";
+    (posztok[k]=posztok[k]||[]).push(kor);
+    mind.push(kor);});
+  mind.sort((a,b)=>a-b);
+  Object.keys(posztok).forEach(k=>posztok[k].sort((a,b)=>a-b));
+  return (_peakAgeEmp[kulcs]={posztok,mind});}
+/* Egy húzás a valós korokból. A VÉKONY POSZTOKAT az összesített listára ejtjük
+   vissza (30 minta alatt a saját eloszlása már inkább zaj, mint alak). */
+function peakAgeDraw(pos,r){
+  const E=peakAgeEmpiric();
+  if(!E||!E.mind.length)return null;
+  const k=Array.isArray(pos)?pos[0]:pos;
+  const lista=(E.posztok[k]&&E.posztok[k].length>=30)?E.posztok[k]:E.mind;
+  const i=Math.min(lista.length-1,Math.max(0,Math.floor(r()*lista.length)));
+  return lista[i];}
 
 /* ================= KARRIER MÓD — TSI ÉS FEJLŐDÉSI GÖRBE =================
    Ez a réteg még nincs bekötve semmilyen UI-ba (az a 3. lépés lesz, a
@@ -21865,7 +21930,8 @@ function seasonBasisAgeBand(peak,rating){
    ugyanazt adja — a kor és a scout becslése is nevesített, seedelt folyamból
    jön, tehát a draftban látott becslés és a leigazolás utáni valóság sosem tér
    el, és két MP-kliens is ugyanazt kapja. */
-function seasonBasisFor(entry,squadPlayer,squad){
+function seasonBasisFor(entry,squadPlayer,squad,opts){
+  const csucsKartya=!!(opts&&opts.peakCard);
   const ovr=Math.round(squadPlayer.ovr);
   const ref=CAREER_REF_BY_NAME[entry.n]||{};
   const refYear=entry.refYear!=null?entry.refYear:(ref.refYear!=null?ref.refYear:null);
@@ -21900,6 +21966,19 @@ function seasonBasisFor(entry,squadPlayer,squad){
        képtelenséget adna (ez a −5 és 61 éves korokat szűrte ki korábban). */
     age=primeAgeFor(squadPlayer.pos)+(y-refYear);
     age=Math.max(band.lo,Math.min(band.hi,age));
+  }else if(csucsKartya&&peakAgeDraw(squadPlayer.pos,r)!=null){
+    /* ---- A CSÚCS-ALAP SAJÁT BECSLÉSE: A VALÓS KOROK ELOSZLÁSÁBÓL (3.9.54) ----
+       Itt TUDUNK valamit, amit a szezon-alap nem: ez a kártya a játékos LEGJOBB
+       idénye. Arra a kérdésre pedig, hogy „hány éves valaki a csúcsidényében",
+       az adatbázis 2240 VALÓS válasszal felel (lásd peakAgeEmpiric) — nem kell
+       görbét találgatni.
+       A SÁVRA ITT SZÁNDÉKOSAN NEM VÁGUNK RÁ. A sáv a valós kort az ismert
+       eseteknek csak az 54%-ában fogta be, és pont lefelé vágott: emiatt lett a
+       régi becslés átlagosan 2 évvel öregebb a valóságnál. Ugyanaz az indok,
+       amiért az ismert születési évet sem engedjük át a sávon — ha az adat és a
+       görbe ellentmond, a görbe téved. A kilógást a youthBonus kezeli
+       (commitSeasonBasis), pontosan úgy, mint a 18 éves Messi 82-es kártyáján. */
+    age=peakAgeDraw(squadPlayer.pos,r);
   }else{
     /* NINCS TÁMPONT (egyetlen idényben szerepel, vagy épp a csúcsidényét
        draftolod): a kor a lehetséges sávon belül haranggörbével sorsolódik.
@@ -21974,10 +22053,41 @@ function wildBasisFor(entry,squadPlayer,squad){
      · a TSI és a peak ugyanazon a szabályon, mint a szezon-alapnál,
      · és tényleg MINDEGY, melyik klubból nyitod ki: a kártya ugyanaz.
    A mód ígérete így először teljesül szó szerint. */
+/* ---- A CSÚCS-ALAP TSI-RÁTÉTE (3.9.54) ----
+   KIMONDOTT KÉRÉS: „csaljunk kicsit ebben a módban és toljuk feljebb egy
+   15%-kal a várható kiosztott TSI-t a teljes adatbázisra (így születhetnek
+   olyan őrülten erős játékosok is, mint amilyenek jelenleg csak a lutri módban
+   születnek néha)."
+
+   HOL HAT. A szorzó a KÉSZ TSI-re megy, nem a sorsolás közepére — így a
+   várható érték pontosan 15%-kal nő, az eloszlás alakja pedig változatlan
+   marad. Ez azért fontos, mert a csúcs-alapon a játékosok 73%-ánál nem is
+   sorsolás dönt: ott a TSI a kártya Ratingjéből számolt PADLÓ
+   (`peakToTsi(peak)`), amire a rátét ugyanúgy ráül.
+
+   A CSÚCS IS KÖVETI. TSI-t emelni magában félrevezetés lenne: a scout 👁 nagyobb
+   számot mutatna, a játékos viszont ugyanoda nőne fel. A `peak` ezért a megemelt
+   TSI-ből számolva is legalább akkora lesz, mint volt — a rátét tehát valódi
+   fejlődési tartalék, nem díszlet.
+
+   EGY HATÁR, AMIT KI KELL MONDANI: a `tsiToPeakOvr` normál módban 96-nál
+   telítődik (5650-es TSI fölött a csúcs már nem nő). A 15% ezért a legjobbaknál
+   már csak a TSI-számban és az árban látszik, a fejlődési plafonban nem.
+   Infinityben nincs telítődés, ott a csúcs is együtt megy. */
+const PEAK_TSI_BONUS=1.15;
 function peakBasisFor(entry){
   const best=careerBestCardFor(entry.n);
   if(!best)return null;
-  const b=seasonBasisFor(entry,best.sp,best.squad);
+  const b=seasonBasisFor(entry,best.sp,best.squad,{peakCard:true});
+  if(b){
+    b.tsi=Math.round(b.tsi*PEAK_TSI_BONUS/10)*10;
+    b.peak=Math.max(b.peak,Math.round(tsiToPeakOvr(b.tsi)));
+    /* A BECSLÉS A MEGEMELT SZÁMRA VONATKOZIK. Külön nevesített folyam, hogy a
+       draftban látott becslés és a leigazolás utáni valóság se most, se később
+       ne térhessen el (ugyanaz a szerződés, mint a seasonBasisFor-nál). */
+    b.estimatedTSI=(typeof scout!=="undefined"&&scout)
+      ? estimateTSI(b.tsi,scout.stars,rngFor("peakbonus:"+entry.n))
+      : b.tsi;}
   /* A KOR SÁVJA: a csúcskártya valós életkora néha a pályafutás legvégéről jön
      (pl. akinek egyetlen, kései csúcsidénye van). A mód ígérete viszont az,
      hogy a top játékos HASZNÁLHATÓ állapotban érkezik — ezért a 30 fölötti kort
@@ -25873,7 +25983,7 @@ const GLOSSARY={
   serules:{title:"Sérülés, sárga lap és eltiltás",text:"PIROS LAP: a kiállított 1 meccset kihagy. SÁRGA LAP: minden mérkőzésen esnek sárga lapok is — csapatonként átlagosan bő egy. Aki HÁROM sárgát gyűjt össze a bajnokságban, egy mérkőzést kihagy; a kupasorozatban KETTŐ is elég, és a kupa lapjai külön számlálón futnak (egy kupában kapott lap nem visz közelebb a bajnoki eltiltáshoz). Aki EGY mérkőzésen kap kettőt, azonnal mehet le, és a következő meccset is kihagyja — a két lapja ilyenkor nem gyűlik tovább, azokat a piros elhasználta. A számláló az eltiltás kiszabásakor nullázódik, a bajnoki lapok az idény fordulóján, a kupa lapjai pedig az új sorozat indulásakor törlődnek. KI KAPJA: a temperamentum a legerősebb tényező (a lobbanékony sokszorosát kapja a higgadtnak), és a fegyelem-képességek (\"Labda vót spori!\", \"Sepregető\") csökkentik. A lap OKA is a személyiségből jön: a reklamálás a bajkeverő és az öntörvényű sajátja, a szóváltás és a durva belépő a lobbanékonyé, időhúzásért pedig csak vezetésnél, a hajrában jár lap. A HUB keretlistája szól, ha valaki egyetlen lapra van az eltiltástól. Párharcban nincs sárga lap: ott az eredményt a két menedzser közös eseménylistája adja, egy helyben sorsolt lap pedig a két képernyőn mást hozna ki. SÉRÜLÉS: minden meccsen van rá esély (2–4 forduló kiesés). Elsőként a megfelelő posztú cserejátékos lép be; ha nincs, egy gyengébb tartalék."},
   skillek:{title:"Jutalom-skillek és kártyaszintek",text:"A skillek 2-4 fázisban épülnek fel — sosem kész egy skill azonnal, mindig fokozatosan erősödik. Mesterhármas, nagy győzelem, MVP-sorozat és más teljesítmények adnak esélyt új skillre vagy fejlesztésére. A kiemelkedő szezonteljesítmény ezen felül KÁRTYASZINTET is adhat: Ezüst → Arany → Gyémánt → Stellar → Mitikus → Gyilkos → Vadista szandál → GODLIKE. Minden szint tartós Rating-emelést ad, a magasabbak külön színnel és kommentátori figyelemmel járnak."},
   vakmod:{title:"Vak mód",text:"Draft közben nem látod a pontos Ratingeket, csak posztot és néhány támpontot — vakon kell bíznod a megérzésedben. A szezon alatt viszont már minden adat láthatóvá válik."},
-  ratingalap:{title:"A Rating alapja (könnyű / közepes / nehéz)",text:"Draftos karrier-indulásnál választható, HÁROM fokozatú beállítás. Nem a mezőny erejét állítja (azt a nehézségi csúszka teszi), hanem azt, MENNYIRE MEGBÍZHATÓ, amit a draftban látsz. KÖNNYŰ — Rating a csúcson: minden játékos a saját, adatbázisbeli LEGJOBB megjelenéséből indul, és egy seedhez pontosan egy Messzi tartozik: mindegy, melyik klub keretéből nyitod ki, ugyanazt az embert kapod. A kor sorsolt, de minél jobb valaki, annál nagyobb eséllyel érkezik a 20-27-es sávban — vagyis a top játékos használható állapotban van. KÖZEPES — Rating a szezonban: a játékos pontosan azt tudja, amit ABBAN a klub-szezonban tudott, és a kora is a kártya idényéhez igazodik (a csúcsidényét 27 évesen érte el). A tehetség-plafonja sosem kevesebb, mint amit épp tud: a kártya megmondja, mit tud MOST, a scout 👁 becslése pedig azt, mennyi van még benne. NEHÉZ — kártyánkénti lutri: itt megszűnik a kanonikus személy. Minden klub-szezon kártya SAJÁT kort és SAJÁT TSI-t sorsol, egymástól függetlenül — ugyanaz a név két klubból két különböző ember. A TSI középpontja marad a kártya Ratingje (tehát a jobb klub még mindig jobb esély), de a szórás drasztikus, és nincs alsó padló: egy csúcsformájú kártya kaphat 2000 körüli TSI-t és 34 évet (a játékos el van rontva), egy 84-es öregedő védő pedig 6000 fölöttit és 23 évet (top player lesz belőle). Amit itt a draftban látsz, az MÁR a sorsolás eredménye — a scout becslése az egyetlen fogódzód. MINDHÁROM FOKOZAT CSAK A KEZDŐ KERETRE hat: az átigazolási piac, a scout ajánlatai, az ikonok és az akadémia a karrier további részében ugyanúgy a csúcsforma-referenciájú kínálattal dolgoznak. Kész klubbal indulva nincs választás: ott mindig a szezon-alap fut."},
+  ratingalap:{title:"A Rating alapja (könnyű / közepes / nehéz)",text:"Draftos karrier-indulásnál választható, HÁROM fokozatú beállítás. Nem a mezőny erejét állítja (azt a nehézségi csúszka teszi), hanem azt, MENNYIRE MEGBÍZHATÓ, amit a draftban látsz. KÖNNYŰ — Rating a csúcson: minden játékos a saját, adatbázisbeli LEGJOBB megjelenéséből indul, és egy seedhez pontosan egy Messzi tartozik: mindegy, melyik klub keretéből nyitod ki, ugyanazt az embert kapod. A KOR a legjobb idényének VALÓS életkora, a beírt születési évből — akinél nem ismerjük, ott a többi 2240 játékos valós csúcskorának eloszlásából húzunk, posztonként (nem görbéből találgatunk). A 30 fölöttit visszahúzzuk, hogy a legenda használható maradjon. EZ A FOKOZAT CSAL EGYET: a kiosztott TSI 15%-kal nagyobb a szokásosnál az egész adatbázison — a csúcs is követi, tehát valódi fejlődési tartalék. Így itt is megszülethetnek azok a ritka szörnyetegek, amilyenek egyébként csak a lutriban. KÖZEPES — Rating a szezonban: a játékos pontosan azt tudja, amit ABBAN a klub-szezonban tudott, és a kora is a kártya idényéhez igazodik (a csúcsidényét 27 évesen érte el). A tehetség-plafonja sosem kevesebb, mint amit épp tud: a kártya megmondja, mit tud MOST, a scout 👁 becslése pedig azt, mennyi van még benne. NEHÉZ — kártyánkénti lutri: itt megszűnik a kanonikus személy. Minden klub-szezon kártya SAJÁT kort és SAJÁT TSI-t sorsol, egymástól függetlenül — ugyanaz a név két klubból két különböző ember. A TSI középpontja marad a kártya Ratingje (tehát a jobb klub még mindig jobb esély), de a szórás drasztikus, és nincs alsó padló: egy csúcsformájú kártya kaphat 2000 körüli TSI-t és 34 évet (a játékos el van rontva), egy 84-es öregedő védő pedig 6000 fölöttit és 23 évet (top player lesz belőle). Amit itt a draftban látsz, az MÁR a sorsolás eredménye — a scout becslése az egyetlen fogódzód. MINDHÁROM FOKOZAT CSAK A KEZDŐ KERETRE hat: az átigazolási piac, a scout ajánlatai, az ikonok és az akadémia a karrier további részében ugyanúgy a csúcsforma-referenciájú kínálattal dolgoznak. Kész klubbal indulva nincs választás: ott mindig a szezon-alap fut."},
   nehezseg:{title:"Ellenfelek erőssége",text:"Csúszkával, szabadon választod ki az ellenfél-mezőny célerejét 70-től felfelé. A magas szinteknek saját nevük van (Túlvilági, Halálos, Isteni...). A szintet KÉT SZEZON KÖZÖTT BÁRMIKOR átállíthatod, fel és le is — nincs hozzá feltétel. Ez fontos, mert a csapatod folyamatosan fejlődik, a mezőny viszont nem: ha a kereted messze a mezőny fölé nő, a szezonok tét nélkülivé válnak, ráadásul a sok gól miatt a fejlődésed is felgyorsul, így a különbség magától tovább tágul. A HUB Nehézség-gombja ezért mutatja, hány ponttal vagy a mezőny fölött vagy alatt: ha jóval fölé kerülsz, a gomb színt vált és figyelmeztet. A csúszka mozgatásakor élőben látod, milyen lesz a szezon a beállított értékkel (kiegyensúlyozott, kihívást jelentő, tét nélküli...). A szint állításakor a piac azonnal felzárkózik: a scout onnantól az új szinthez mérten keres igazolásokat."},
   kihivasok:{title:"Kihívások",text:"Vállalható célok, amiket a játék felajánl — elvállalni SOHA nem kötelező, de amit elvállaltál, annak a büntetése akkor is lecsap, ha közben meggondolod magad. Két fajta van: az ÉVSZAK-kihívás egy 8 meccses ablakra szól, a SZEZON-kihívás egy teljes idényre (némelyik anyagi cél többre is). Mindkettőből egyszerre legfeljebb 2 lehet aktív. A JUTALOM A TELJESÍTÉS PILLANATÁBAN ÉRKEZIK, nem a határidőnél: amint a cél összejött, a kihívás lezárul, kifizet, és a helye azonnal felszabadul — így egy jól sikerült első félidény nem köti le a helyeidet a szezon második felére. Két fajta kihívás kivétel, és mindkettőnél ugyanaz az ok — a hátralévő idő még elveheti, amit elértél: a FORDÍTOTT kihívás („kapj legfeljebb 8 gólt”) a lejáratig bármikor elromolhat, az ÁLLAPOT-kihívás („álljon a taktikád 3. szinten”) pedig a határidő pillanatában mért állást nézi. Ezek a határidőnél dőlnek el, és az ajánlat-kártyán ki is van írva, melyik hogyan fizet. A nehézség nem képletből jön, hanem MÉRÉSBŐL: vállaláskor a játék lefuttat 300 szezont a te aktuális szintkülönbségeddel a meccsmotor saját gólmodelljével, és a célszámot arra a percentilisre teszi, ahol a kívánt teljesítési arány kijön — a Könnyű kb. 72%, a Közepes 48%, a Nehéz 26%. Ezért egy „Nehéz\" nagyjából ugyanolyan nehéz sereghajtóként és bajnokesélyesként is. A jutalom lehet egyszeri (pénz, morál, TSI, skill, scout-csillag, keretméret, kártya-fejlesztés (a fokozatlépés MELLETT egységesen +2 Rating, akkor is, ha a kártya már a csúcson van), CSAPATSTÍLUS-PONT, SZURKOLÓ a táborba, egy BERAGADT MÉRFÖLDKŐ azonnali kifizetése, vagy egy garantáltan 100%-os LICIT a piacon álló játékosodra) vagy TARTÓS, ami a karriered ívét alakítja (olcsóbb boostok, kedvezményes igazolások, edzői fizetésemelés, ingyen igazolás, befektetés). A büntetés ritkán csonkítja a keretet — inkább a mozgásteret szűkíti: zárt átigazolási ablak, drágább vásárlás, gyengébb scout, befagyott akadémia, cserezár egy játékosra. A legkeményebbek (skill-vesztés, távozó játékos) csak a hosszú, nehéz kihívásoknál jönnek elő. A SZURKOLÓ-TÉT NEM FIX SZÁM, hanem a klubod méretéhez mért: a mércéje a ligád sávja és a tényleges táborod közül a nagyobbik (a tábor legfeljebb a sáv két és félszereséig számít bele). Ebből egy 8 meccses évszak-kihívás nagyjából 5%-ot ér, a kupa-kihívás 10%-ot, egy egész szezonos vállalás 14%-ot — a nehézség pedig ezt szorozza (0,85 / 1,05 / 1,25). Így a jutalom a karrier elején és egy 300 ezres lelátónál is ugyanazt JELENTI, és a legnagyobb tét sem éri el a bajnoki cím szurkoló-hozamát. A büntetés ennek a kétharmada. A haladást a HUB kihívás-paneljén bármikor visszanézheted. AZ ÚJ TÉTEK a gazdasági ágakhoz kötnek: jutalomként 8-24 csapatstílus-pont, SZURKOLÓ a táborba, fél vagy egész csillag az ÁTIGAZOLÁSI ÜGYNÖKSÉGNEK; büntetésként 4-16 stíluspont, szurkoló-veszteség, fél csillag ügynökség-veszteség, vagy három olyan licit, ami kisebb eséllyel éri el a 100%-ot. A büntetések tudatosan kisebbek a párjuknál: a rendszer építeni jutalmaz, nem rombolni büntet. A TELJESÍTETT KIHÍVÁSOK A KARRIER EGÉSZÉRE IS GYŰLNEK: az Infó fül mérföldkövei közt van egy „Kihívások” sáv, ami a teljesítések SZÁMÁT méri (1, 2, 3, 5, 7, 9, 10, 12, 15, 17, 20, 25, 30, 35, 40, 45, 50, onnan tízesével 100-ig), és minden fokozatnál PÉNZ jár érte. Ez a kihívás saját jutalmán FELÜL van, nem helyette; a számláló a karrierhez tartozik, a szezonváltás nem nullázza. Csak a teljesített kihívás számít bele — az elbukott és az érvénytelenített nem."},
   taktika:{title:"Taktikák",text:"Az edződ 3 kedvelt taktikával érkezik (80/76/70-es szintről indulnak, a többi 60-ról). A HUB Taktika-paneljén aktiválhatsz egyet: 85-ös szint FÖLÖTT előnyt ad és stílust kap a csapat (a busz zárt meccseket, a kontra az erősebb ellenfelek ellen él, a labdatartás elveszi a labdát...), ALATTA még begyakorolatlan és visszahúz. Minden taktika MÁS csapat-attribútumokra épül: a Park the bus a Védekezésre és a Védésre, a Labdatartás a Passzra, a Hosszú labdák a Gólszerzésre, a Széljáték pedig a Sebességre és a Gólszerzésre. A kezdő 11 ÖT tengelyét (Védekezés, Védés, Passz, Gólszerzés, Sebesség) NÉGY réteg adja össze, és a Taktika-panel mind a négyet külön kiírja: (1) a POSZT — a pályán lévők attribútumai, poszt szerint súlyozva (egy védő sokat tesz a Védekezéshez, keveset a Gólszerzéshez); (2) a FELÁLLÁS ALAKJA — ugyanaz a tizenegy ember más rendszerben mást ér: a 4-4-2-höz mérve az 5-4-1 +1,3 Védekezést és −1,3 Gólszerzést ad, a 4-5-1 +0,5-öt véd és +0,6-ot passzol, a 4-3-3 −0,5 véd / +0,8 gól, a 3-4-3 −1,3 / +1,3, egy saját 3-6-1 pedig +1,4 Passz. A felállás-választóban táblázatban látod, melyik alak mit ad; (3) a MEGBÍZÁSOK — minden védekező középpályás +3 attribútumpontot tesz a Védekezéshez a Gólszerzés rovására, a támadó pontosan fordítva, a klasszikus és a szélső semleges (a hatás a felállás saját alapbeállításához mérten értendő); (4) a SKILLEK — a pályán lévők megszerzett képességei (pl. a kupa Aranycipője a Gólszerzés-tengelyt tolja meg). A SEBESSÉG külön eset: nem a Ratingből jön, egyénibb a többinél (a kisorsolása szélesebb sávban szór), 1,5x lassabban edzhető, és 99-nél kemény plafonja van — ez a plafon az Infinity megnyitásakor feloldódik, de fölötte a fejlődés a többi attribútum negyedére lassul. Maga a JÁTÉK is gyorsít valamennyit — a poszt sprint-igénye szerint (a csatár a legtöbbet, a kapus alig) —, de ez a passzív út a SZÜLETÉSI érték +15%-ánál megáll. Efölé kizárólag célzott edzésterv visz. Vagyis a gyorsaság alapvetően veleszületett adottság: aki lassúnak született, játékkal csak korlátozottan javul — cserébe a Széljáték és a Gyors kontra szinte ezen áll vagy bukik. Az így kapott illeszkedés kétszeresen számít: gyorsítja a begyakorlást, és skálázza a meccs-hatást is — a jól illeszkedő rendszer előnye nagyobb, a rosszul illeszkedő begyakorlatlanságának büntetése mélyebb. A panelen tengelyenként látod, hol állsz, és melyik erősséged emeli vagy melyik gyengeséged húzza vissza az egyes rendszereket. Egy ERŐS keret (85 fölötti csapaterő) gyorsabban vesz fel egy új rendszert: a begyakorlás 90-es szintig fokozatosan gyorsul a csapaterővel, 90 fölött viszont a mesteri csiszolás mindenkinek ugyanannyi munka. Így egy átformálódó nagy csapat gyorsan felhozhat egy másik taktikát."},
@@ -28564,7 +28674,7 @@ renderSchedGrid();
    a sorsolás-választónál). A láthatóságot ezért a módválasztó és a
    kezdés-választó gombjai frissítik, futásidőben. */
 const RATING_BASIS_HINT={
-  peak:"A legkiszámíthatóbb indulás: amit a kártyán látsz, az a játékos legjobb önmaga. A klubválasztás csak azt dönti el, KI kerül eléd, nem azt, milyen állapotban.",
+  peak:"A legkiszámíthatóbb indulás: amit a kártyán látsz, az a játékos legjobb önmaga, a kora pedig az, amennyi a legjobb idényében VALÓBAN volt. A klubválasztás csak azt dönti el, KI kerül eléd, nem azt, milyen állapotban. Ez a fokozat ráadásul CSAL is egy kicsit: a TSI-k 15%-kal nagyobbak a szokásosnál, tehát itt születhetnek a ritka szörnyetegek.",
   season:"A történelemhez kell igazodnod: egy 2005-ös Messzi tényleg fiatal és fejlődő, egy késői Méridonna tényleg a hanyatló ágon van. A csúcs (a scout 👁 becslése) továbbra sem lehet kevesebb, mint amit épp tud.",
   wild:"⚠️ A legkockázatosabb: itt a kártya Ratingje csak a sorsolás KÖZÉPPONTJA. Ugyanaz a név két klubból két különböző ember, és se a kor, se a TSI nem következik a Ratingből — a scout becslése az egyetlen fogódzód. Az átigazolási piac ettől függetlenül a szokásos Prime-kínálattal dolgozik."};
 function renderRatingBasisGrid(){
