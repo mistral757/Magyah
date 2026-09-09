@@ -584,13 +584,99 @@ esemény kiválasztható a megfelelő kerettel; a régi mentés szélsőségei
 szélsőségek maradnak; és sehol nem maradt `leadI`/`coopI`/`aggroI` mező.
 Részletek: `docs/jellem-es-moral.md`.
 
+## kommentar-ikon-proba.js — 💬 a közvetítés típusjelei
+
+```
+node tools/kommentar-ikon-proba.js
+```
+
+A napló szürke sorai kis ikont kapnak a perc után (🧤 védés · 🛡️ blokk ·
+🥅 kapufa · ↗️ mellé · 🚩 pontrúgás · 👟 kidolgozás · ⚪ tizenegyes ·
+📺 VAR · 💢 összecsapás · 🎯 lövés). Az ikon **nem a hívási helyeken**
+születik, hanem egy besoroló függvényben, a kész sor szövegéből — különben a
+következő új kommentár-mondat némán ikon nélkül maradna.
+
+**Ennek az ára, hogy a próbának a FORRÁSBÓL kell dolgoznia.** Két helyről
+szedi össze a sablonokat: a `pickTxt([...])` tömbökből (a közvetítés zöme) és
+a perc-bélyeggel induló, `m ev` osztályú `addLine`-hívásokból (az egyedi
+pillanatok), majd mindegyiket átfuttatja az élő besorolón. Ha valaki holnap ír
+egy új mondatot, és az egyik mintára sem illik, ez a sor pirosodik ki.
+
+**Három hibát fogott meg már az első futáson**, és mindhárom néma lett volna:
+
+* a *„BRAVÚR! … tolja **szögletre**"* sor pontrúgás-jelet kapott, pedig az
+  kapusvédés — a szöglet csak a következménye. Innen a szabály: a besorolásban
+  a **kimenetel erősebb, mint az eredet**;
+* a saját `↗️` jelünk (U+2197, a NYILAK blokkból) kicsúszott a kézzel írt
+  emoji-tartományból, ezért egy kétszer feldolgozott sor **két ikont** kapott.
+  A tartomány helyére `\p{Extended_Pictographic}` került, az idempotencia-fék
+  pedig magát a jelölőt nézi, nem a szöveget;
+* az „összecsapás" kategória üresen maradt — nem a kategória volt fölösleges,
+  hanem a merítés hiányos: az a sor nincs `pickTxt`-ben. Ettől lett a
+  forrás-bejárás kétágú.
+
+Emellett azt is állítja, amihez **nem** szabad nyúlni: a perc-bélyeg nélküli
+sorok (szezon-összegzők, piramis-jegyzetek — ugyanaz az `ev` osztály, de nem
+események), a saját hangulatjellel induló sorok (🌀 tiki-taka, 🔥 a padról), és
+a hangsúlyos osztályok (gól, lap, élet), amiknek már van saját jelük.
+
+## szezonzaras-lezaras-proba.js — 🏆 a szezonzárás kapuja
+
+```
+node tools/szezonzaras-lezaras-proba.js
+```
+
+A közös karrier szezonzárásánál a határidő után **nincs továbblépés** — csak
+egyetlen dolog nyílik ki: lezárhatod a párharcot azzal, hogy te nyertél, mert a
+társad nem ért ide időben.
+
+**Miért kell rá külön próba.** A nyolc várakozó kapu EGY rétegen osztozik
+(`mpSoloArm`/`mpSoloOffer`), és a kiútjuk lágy: a saját eredményemmel megyek
+tovább, a társad karrierje sértetlen. A szezonzárásé most már nem lágy — a te
+oldaladon LEZÁRJA a közös karriert. Egy ilyen kivételt könnyű elrontani a közös
+rétegen, ezért a próba **mindkettőt** méri: hogy a szezonzárás kapuja sosem lép
+magától (Villám módban sem) és megerősítést kér, ÉS hogy a többi kapu
+továbbra is automatikus és továbblépést kínál.
+
+A lezárás útját végigviszi: a győzelem könyvelve a szezonra szólóan, a közös
+karrier leválik (`h2hRoomActive()` hamis lesz, tehát a `finish()` nem áll meg
+újra ezen a kapun), a szezonzárás folytatódik a jelentés felé, és a mentés
+viszi. Részletek: `docs/kozos-karrier-szezonzaras.md`.
+
+## szezonzaras-or-proba.js — ⛔🏆 a szezonzárás őre és a két kupa
+
+```
+node tools/szezonzaras-or-proba.js
+```
+
+17 állítás, két bejelentett hibára — ugyanaz a rendszer sérült mindkettőben.
+
+**Az őr.** A szezon 8. fordulójánál egy ottragadt `hubreport` fázis a HUB
+gombjának az „Irány a pályára →" szerepet adta, és az a szezon KÖZEPÉN
+indított új idényt (öregedés, fel-/kiesés, kihívás-bukás). Ezt egyszer már
+javítottuk — a `hubNextSeasonFlow()` elején —, csakhogy a gomb HÁROM kezelőt
+kaphat, és a zár csak az egyiken ült. A próba ezért mind a három romboló
+műveletet (`hubShowSeasonReport`, `beginNextSeasonWithChallenges`,
+`startEuroCampaign` üres ága) külön futtatja le a 8. fordulónál, és azt méri,
+hogy a szezonszám és a fordulószám **egyáltalán nem mozdul** — plusz hogy a
+beragadt fázis meggyógyul, és lezárt szezonban mind a három átenged.
+
+**A két kupa.** Az „Fából készült Kupa után jöjjön a BL" két külön okból nem
+működött: a lánc `pyrOn()`-nál azonnal visszafordult (a piramis viszont pont
+az a mód, ahol az FA létezik), a tartalék-út pedig — a „következő idényre
+szóló" nevezés — a következő szezon `finish()`-ében némán felülíródott a
+bajnoki helyezésből járó indulással, MIELŐTT a kupa lejátszódott volna. A
+próba mind a négy osztályra és a sík módra megnézi, mit ad a lánc, és külön
+méri, hogy a kiharcolt BL túléli a gyengébb helyezést. Részletek:
+`docs/szezonzaras-or-es-ket-kupa.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 38 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 41 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

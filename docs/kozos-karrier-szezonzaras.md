@@ -736,3 +736,67 @@ futott le** (pontosan a bejelentett helyzet). Öt eset, mindegyik a **jelenlegi
 | **Befejezzük itt** | — | ✓ végső összesítő, a továbblépő gomb megjelenik |
 
 Egyetlen konzol-hiba sem keletkezett. `tools/check.sh` zöld.
+
+
+---
+
+## A KAPU NEM TOVÁBBLÉPÉST NYIT KI (3.9.58)
+
+> **BEJELENTETT KÉRÉS:** „itt 3p után se lehessen továbblépni, csak az legyen
+> bekapcsolva, hogy ha akarod itt 3p után lezárhatod a közös karriert azzal,
+> hogy te nyertél, mert a másik játékos nem ért ide időben."
+
+### Miért volt rossz a régi kiút
+
+A közös karrier nyolc várakozó kapuja egy réteget használ (`mpSoloArm` /
+`mpSoloOffer`), és a kiútjuk **lágy**: a saját eredményemmel megyek tovább, a
+saját kvalifikációmmal indulok, egyedül folytatom a sorozatot. Mind a te
+oldaladon dől el, és a társad karrierjét nem csonkítja.
+
+**A szezonzárás nem ilyen kapu.** A helyezésed a KÖZÖS mezőnyben dől el, és
+abból jön a szezontörténet, az európai kvalifikáció és a párharc ítélete is.
+„Tovább" itt azt jelentette volna, hogy egy hiányos, 15 csapatos tabellán
+véglegesítünk egy rangsort — a párharc pedig **eldöntetlen marad, örökre**.
+
+### Ami a határidő után kinyílik
+
+Egyetlen dolog, és az nem továbblépés, hanem **lezárás**: megnyered a
+párharcot, mert a társad nem ért ide. Három fék van rajta:
+
+* **sosem fut le magától** — `auto:false`, tehát a Villám tempó sem nyomja meg
+  helyetted. Ez az egyetlen pont, ahol egy közös karrier a társad megkérdezése
+  nélkül ér véget; ilyet a rendszer nem tesz meg magától;
+* **megerősítést kér**, és tételesen elmondja, mi történik (megnyered · a közös
+  karrier itt véget ér · a párharc fordulóit a mezőnybe visszakerülő csapat
+  veszi át · ez végleges);
+* **a határidő addig fut, ameddig a választott tempó ígéri** — ugyanabból a
+  számításból, amit a képernyőn futó számláló is mutat.
+
+Amíg nem nyomod meg, a képernyő vár. A kilépés (kezdőlap, „Most nem várom
+meg") végig elérhető, és ott a szoba, a szezonzárása és a karriered is
+megmarad.
+
+### Mi történik a lezáráskor
+
+A sorrend számít: előbb a győzelem **könyvelése** (`S.mpForfeit` — amíg a szoba
+még él és tudjuk, ki volt a társ), utána a **leválasztás** (`mpOrphanCareer`).
+A leválasztás ugyanaz a művelet, mint amikor a társ végleg elhagyja a szobát: a
+párharc fordulói visszakerülnek a mezőnyhöz, a lejátszott eredmények
+megmaradnak, és a karrier egyjátékosként fut tovább.
+
+Ettől lesz a `h2hRoomActive()` hamis, tehát a `finish()` innentől a rendes,
+egyjátékos ágon zárja a szezont — **nem áll meg újra ezen a kapun**. A
+győzelem a szezonjelentés tetején külön blokkot kap, mert egy naplósor
+elgörögne a szezonzárás sűrűjében.
+
+### A visszaszámláló is a helyes dolgot ígéri
+
+A kiút mostantól megnevezi, **mit** nyit ki a határidő (`offer`), és a
+számláló ezt írja ki. Enélkül a képernyő továbbra is „**felajánlom a
+továbblépést**" feliratot mutatott volna egy olyan kapunál, ahol nincs
+továbblépés — a legrosszabb fajta hazugság, mert pontosan a kérdésre válaszol
+rosszul.
+
+Mérés: `tools/szezonzaras-lezaras-proba.js` — 11 állítás, köztük az, hogy a
+**többi kapu viselkedése nem változott** (lágy, automatikus, továbblépést
+kínál).
