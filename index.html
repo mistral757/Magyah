@@ -6004,7 +6004,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.58";
+const APP_VERSION="3.9.59";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -53192,6 +53192,51 @@ function mpLevelLocked(){return false;}
    Ezért egyetlen kérdés dönt mindenhol: fut-e szezon. */
 function seasonInProgress(){
   return phase==="season"&&!S.seasonClosed;}
+/* ================= A SZEZONZÁRÁS EGYETLEN ŐRE (3.9.59) =================
+   BEJELENTETT HIBA (másodszor): „szezon 8. fordulója után bedobott az előző
+   szezon záróképére … de úgy, mintha ez az aktuális szezon zárása lett volna,
+   mert értékelte az első 8 meccs alatt teljesített dolgokat, mindenkinek
+   előrehaladt a fejlődése, elbuktam a szezonos kihívásokat, mindenki 1 évvel
+   öregebb lett."
+
+   EZT MÁR JAVÍTOTTUK EGYSZER — ÉS ROSSZ HELYEN. A 3.7-es javítás a
+   `hubNextSeasonFlow()` ELEJÉRE tett egy zárat („amíg phase==='season', nincs
+   mit lezárni"). Csakhogy az csak EGY ajtó a háromból, és a bejelentett eset
+   nem is azon jött be: a HUB továbbléptető gombja `phase==="hubreport"`
+   állapotban „Irány a pályára →" feliratot és a KÖVETKEZŐ SZEZONT INDÍTÓ
+   kezelőt kapja (beginNextSeasonWithChallenges) — ha a fázis egy megszakadt
+   nyárzárásból ottragadt, a gomb a szezon KÖZEPÉN indít új idényt.
+
+   A TANULSÁG: az őrnek nem a gombnál a helye, hanem a ROMBOLÓ MŰVELETEKNÉL.
+   Három ilyen van, és mind a három visszafordíthatatlan:
+     · hubShowSeasonReport   — kiértékeli a kihívásokat, megöregíti a keretet,
+     · beginNextSeasonWithChallenges — szintet lép, fel-/kiesést dönt,
+     · startEuroCampaign     — kupa nélkül azonnal a szezonjelentésbe esik.
+   Mind a három innentől ezt az EGY kérdést teszi fel.
+
+   A MÉRCE `S.seasonClosed`, mert az a legmegbízhatóbb jel: a finish() állítja
+   igazra, amikor mind a 30 forduló lement, és a startNextCareerSeason() ejti
+   vissza hamisra. A `phase` nem alkalmas mércének — épp az romlott el. */
+function seasonCloseAllowed(){
+  if(gameMode!=="career")return true;   /* klasszikus módban nincs mit védeni */
+  return !!S.seasonClosed;}
+/* Fut-e ÉPP egy szezon, félbehagyva? Ez az az állapot, amiben a nyárzáró
+   fázisok („hubreport", „verdict") fogalmilag nem létezhetnek. */
+function seasonMidFlight(){
+  const i=S.idx||0;
+  return gameMode==="career"&&!S.seasonClosed&&i>0&&i<30
+    &&!!(S.fixtures&&S.fixtures.length);}
+/* A BERAGADT FÁZIS ÖNGYÓGYÍTÁSA. Egy elrontott `phase` önmagában is elég a
+   bajhoz: a gomb rossz szerepet kap, és a felhasználó nem tud belőle kilépni.
+   Ezért ha nyárzáró fázist találunk egy FUTÓ szezon közepén, visszaállítjuk —
+   és kimondjuk, mert egy néma javítás nem tanít semmit. */
+function seasonPhaseRepair(){
+  if(!seasonMidFlight())return false;
+  if(phase!=="hubreport"&&phase!=="verdict")return false;
+  phase="season";
+  try{addLine("✦ A nyárzáró képernyő ottragadt egy futó szezonban — visszaállítottam a "
+    +"szezonra. Semmi nem veszett el: a "+((S.idx||0)+1)+". forduló következik.","m ev");}catch(e){}
+  return true;}
 /* ---- SZEZON KÖZBEN ZÁRVA AZ ÁTIGAZOLÁS ----
    EGY predikátum a négy átigazolási művelethez (vásárlás, klub-szemle,
    képesség-keresés, esemény). Üres/false = szabad.
@@ -66671,10 +66716,36 @@ function finish(){
          kupa. Bajnoki címmel sem. A sávok (CUP_TIERS) egyjátékosban és
          közös karrierben AZONOSAK; a különbség csak annyi, hogy a kettőtök
          közül a JOBBIK kvalifikáció lesz a közös sorozat (mpResolveCup). */
+      /* ---- A MÁR MEGSZERZETT INDULÁST NEM SZABAD FELÜLÍRNI (3.9.59) ----
+         BEJELENTETT HIBA egyik fele: a hazai kupa győztese „a KÖVETKEZŐ
+         idényre" kap nevezést (pyrCupWinNote → S.euroEntry, forSeason=N+1),
+         amit a szezonindítás át is emel az `S.euroCurrent`-be. Csakhogy a
+         kupák a szezon VÉGÉN futnak, és idáig eljutva ez a három sor a
+         bajnoki helyezésből számolt indulással FELÜLÍRTA ugyanazt a mezőt —
+         mielőtt a megígért sorozat egyáltalán elindulhatott volna. A jutalom
+         tehát némán elveszett, minden alkalommal.
+
+         MOSTANTÓL A JOBBIK NYER. Ugyanaz a rangsor, amivel a pyrCupWinNote is
+         dolgozik: a BL a legerősebb, a hazai kupa a leggyengébb. Ha a
+         helyezésből járó indulás gyengébb, mint ami már a kezünkben van, a
+         meglévő marad — és ezt ki is mondjuk a naplóban, mert egy csendben
+         megtartott jutalom épp olyan zavarba ejtő, mint egy csendben elvett. */
       const ce=cupEntryFor(yourRank);
-      S.euroEntry=ce?{comp:ce.comp,qual:ce.qual,forSeason:(S.seasonNumber||1)}:null;
-      if(ce){S.euroCurrent=ce.comp;S.euroCurrentQual=ce.qual;S.euroOptOut=false;}
-      else{S.euroCurrent=null;S.euroCurrentQual=false;}
+      {const RANK={BL:3,EL:2,KL:1,FA:0,MK:0};
+       const meglevo=S.euroCurrent&&EURO_COMPS[S.euroCurrent]
+         ?{comp:S.euroCurrent,qual:!!S.euroCurrentQual}:null;
+       const ujJobb=!meglevo||(ce&&(RANK[ce.comp]||0)>(RANK[meglevo.comp]||0));
+       if(meglevo&&!ujJobb){
+         /* marad a meglévő — csak a napló szólal meg, ha tényleg volt mit védeni */
+         if(ce&&ce.comp!==meglevo.comp)
+           addLine(`🎫 A helyezésedből ${hunAz(esc(EURO_COMPS[ce.comp].n))} ${esc(EURO_COMPS[ce.comp].n)} járna, `
+             +`de a korábban kiharcolt <b>${esc(EURO_COMPS[meglevo.comp].n)}</b>-indulás erősebb — az marad.`,"m life");
+         S.euroEntry={comp:meglevo.comp,qual:meglevo.qual,forSeason:(S.seasonNumber||1)};
+         S.euroOptOut=false;
+       }else{
+         S.euroEntry=ce?{comp:ce.comp,qual:ce.qual,forSeason:(S.seasonNumber||1)}:null;
+         if(ce){S.euroCurrent=ce.comp;S.euroCurrentQual=ce.qual;S.euroOptOut=false;}
+         else{S.euroCurrent=null;S.euroCurrentQual=false;}}}
     }
     phase="verdict";S.playing=false;S.auto=false;
     saveGame();
@@ -78034,16 +78105,45 @@ function euroCampaignEndNow(kind){
 /* Áll-e a hazai kupa → Konföranszié Líg lánc ÉPP MOST? Egy helyen felelünk rá,
    mert három dolog függ tőle: a záró gomb felirata, az ünneplő képernyő
    szövege és maga a láncindítás. */
-function euroMkChainPending(){
+/* ---- EGY SZEZONBAN KÉT KUPA (3.9.59) ----
+   BEJELENTETT HIBA: „sokszor próbáltuk már beépíteni, hogy Fából készült Kupa
+   után még jöjjön a BL ha azt megnyerte a csapat. ez még mindig nem működik.
+   nem tud lefutni 2 kupa."
+
+   MIÉRT NEM MŰKÖDÖTT — KÉT KÜLÖN OKBÓL, ÉS EZ AZ ÉRDEKES BENNE.
+
+   (1) A LÁNC KI VOLT ZÁRVA A PIRAMISBÓL. A `euroMkChainPending` első sorai
+   azt mondták: piramisban nincs azonnal induló lánc, a hazai kupa jutalma a
+   KÖVETKEZŐ idényre szól (pyrCupWinNote). A ligapiramis viszont pont az a mód,
+   ahol az Fából Készült Serleg egyáltalán létezik — vagyis a lánc soha, egyetlen
+   karrierben sem futhatott le rá.
+
+   (2) ÉS A „KÖVETKEZŐ IDÉNYRE SZÓLÓ" JUTALOM SEM ÉRT EL SOHA A PÁLYÁIG. A
+   nevezést (`S.euroEntry`, forSeason = N+1) a szezonindítás átemeli
+   `S.euroCurrent`-be — csakhogy a KÖVETKEZŐ szezon `finish()`-e a bajnoki
+   helyezésből számolt indulással FELÜLÍRJA ugyanezt a mezőt, MIELŐTT a kupa
+   lejátszódna. A kupák ugyanis a szezon VÉGÉN futnak: mire sorra kerülne, a
+   BL-nevezés már nincs sehol. Vagyis a jutalom mindkét úton elveszett — az
+   egyiken el sem indult, a másikon némán törlődött.
+
+   A JAVÍTÁS MINDKETTŐRE: a lánc mostantól a `cupTierFor().cupWins`-ből
+   dolgozik (osztályonként MÁS: D1/D2 FA→BL, D3 MK→BL, a sík módban MK→KL), és
+   AZONNAL indul, ugyanabban a szezonban — pontosan ezt kérte a bejelentés. A
+   „következő idényre szóló" ág megmarad tartaléknak arra az esetre, ha a lánc
+   nem tud elsülni (szezononként egyszer süthet el), és a felülírás ellen a
+   finish() külön védve van. */
+function cupChainNext(){
   const E=S.euro;
-  if(!E||E.result!=="win")return false;
-  const tier=cupTierFor();
-  /* PIRAMIS: a hazai kupa jutalma a KÖVETKEZŐ idényre szól (a specifikáció
-     szerint "a következő idényben játszhat BL-selejtezőt"), tehát itt nincs
-     azonnal induló lánc — a nevezést a pyrCupWinNote teszi el. */
-  if(typeof pyrOn==="function"&&pyrOn())return false;
-  if(E.comp!=="MK")return false;
-  return !!(tier&&tier.mkWinsKL)&&!S.mkToKLDone;}
+  if(!E||E.result!=="win")return null;
+  if(S.mkToKLDone)return null;          /* szezononként EGY lánc */
+  const t=cupTierFor()||{};
+  /* PIRAMIS és a felső sávok: az osztály saját szabálya, {comp,gives,qual}. */
+  if(t.cupWins&&t.cupWins.comp===E.comp&&EURO_COMPS[t.cupWins.gives])
+    return {gives:t.cupWins.gives,qual:!!t.cupWins.qual};
+  /* SÍK MÓD, 80-84-es sáv: a Magor Kupája megnyerése KL-indulást ér. */
+  if(t.mkWinsKL&&E.comp==="MK")return {gives:"KL",qual:false};
+  return null;}
+function euroMkChainPending(){return !!cupChainNext();}
 /* ---- A HAZAI KUPA GYŐZTESE A KÖVETKEZŐ IDÉNYBEN INDULHAT ----
    A piramisban a hazai kupa nem azonnali láncot indít, hanem a KÖVETKEZŐ
    szezonra szóló nevezést ad (D1: Fából Készült Serleg → BL-selejtező; D3: Magor Kupája →
@@ -78427,23 +78527,29 @@ function cupChallengeResolve(){
    különben egy megnyert KL újabb sorozatot indítana a végtelenségig. */
 function endEuroCampaign(){
   const E=S.euro;
-  const wonMK=!!(E&&E.comp==="MK"&&E.result==="win");
-  const tier=cupTierFor();
-  /* ---- A HAZAI KUPA → KONFERENCIA-LIGA LÁNC ----
+  /* ---- A HAZAI KUPA → A NEKI JÁRÓ SOROZAT LÁNCA ----
      Egyjátékosban a saját győzelem indítja. KÖZÖS KARRIERBEN viszont KÖZÖS
      döntés: ha bármelyikőtök megnyerte a hazai kupát, MINDKETTEN indultok —
      ez ugyanaz az elv, amin a nevezés is áll (a jobbik eredménye viszi a
      kettőt). Ezért a lánc-ág akkor is meghívódik, ha ÉN nem nyertem: a
      társam győzelme az én oldalamon is elsütheti. */
-  /* PIRAMIS: a kupagyőzelem jutalma a következő idényre szól — itt tesszük el. */
-  try{pyrCupWinNote();}catch(e){}
-  const chainable=!!(E&&E.comp==="MK"&&tier.mkWinsKL&&!S.mkToKLDone
-                     &&!(typeof pyrOn==="function"&&pyrOn()));
+  /* A KÖVETKEZŐ IDÉNYRE SZÓLÓ NEVEZÉS csak TARTALÉK: ha a lánc most elsül,
+     ugyanazt a jutalmat kétszer adnánk oda. Ezért a jelzőt előbb nézzük meg. */
+  const chain=cupChainNext();
+  if(!chain)try{pyrCupWinNote();}catch(e){}
+  const chainable=!!chain;
+  /* A KÖZÖS KAPU kérdése: ÉN megnyertem-e azt a hazai kupát, amiből lánc lesz.
+     (Régen ez `E.comp==="MK"`-ra szűkült; a piramisban viszont az Fából Készült
+     Serleg a hazai kupa, tehát a szűkítés ott mindig hamisat adott.) */
+  const wonMK=chainable;
   const fireChain=()=>{
+    const c=chain||{gives:"KL",qual:false};
     S.mkToKLDone=true;
-    S.euro=null;S.euroCurrent="KL";S.euroCurrentQual=false;S.euroOptOut=false;
+    S.euro=null;S.euroCurrent=c.gives;S.euroCurrentQual=!!c.qual;S.euroOptOut=false;
     $("scEuro").classList.add("hide");
-    addLine(`🎫 A Magor Kupája megnyerésével kiharcoltátok a Konföranszié Líg indulást — a sorozat MOST következik!`,"m life");
+    addLine(`🎫 ${hunAzC(esc(EURO_COMPS[E.comp].n))} ${esc(EURO_COMPS[E.comp].n)} megnyerésével kiharcoltátok `
+      +`${hunAz(esc(EURO_COMPS[c.gives].n))} <b>${esc(EURO_COMPS[c.gives].n)}</b> indulást — a sorozat MOST következik`
+      +`${c.qual?", a selejtezőtől":""}!`,"m life");
     startEuroCampaign();saveGame();};
   if(chainable&&h2hRoomActive()&&gameMode==="career"){
     mpMkChainGate(wonMK,fire=>{
@@ -78468,7 +78574,19 @@ function endEuroCampaign(){
    opt.path / opt.stats — lecsúszásnál átemelt menetelés-napló és statisztika. */
 function startEuroCampaign(opt){
   opt=opt||{};
-  const comp=S.euroCurrent;if(!comp||!EURO_COMPS[comp]){hubShowSeasonReport();return;}
+  /* NINCS SOROZAT → a szezonjelentés jön. Ez az ág FUTÓ szezonban is
+     meghívódhat (egy ottragadt kupa-állapot gyógyítása után), ezért az őr itt
+     is megszólal — a hubShowSeasonReport magától is visszafordulna, de akkor
+     a felhasználó egy indoklás nélküli semmit látna. */
+  const comp=S.euroCurrent;
+  if(!comp||!EURO_COMPS[comp]){
+    if(!seasonCloseAllowed()){
+      try{addLine("⛔ Nincs futó kupasorozat, a szezonzárás pedig nem indulhat el: "
+        +"még fut a szezon ("+((S.idx||0))+"/30 forduló).","m ev");}catch(e){}
+      try{seasonPhaseRepair();}catch(e){}
+      try{setHubNextSeasonBtn();}catch(e){}
+      return;}
+    hubShowSeasonReport();return;}
   guideFire("ev:euro");   /* GUIDE: az ELSŐ európai kupa INDULÁSAKOR */
   /* A KUPA SÁRGA LAPJAI SOROZATONKÉNT GYŰLNEK, és minden új sorozat tiszta
      lappal indul — ahogy a valóságban is. A kettes határ csak így igazságos:
@@ -79277,6 +79395,10 @@ function openStylePickFromReport(){
     if(h&&h.scrollIntoView)h.scrollIntoView({behavior:"smooth",block:"start"});},80);}
 function setHubNextSeasonBtn(){
   const b=$("hubNextSeasonBtn");if(!b)return;
+  /* MINDEN gombállítás előtt megnézzük, nem ragadt-e ott egy nyárzáró fázis
+     egy futó szezonban. Ez a KÖZÖS TOROK: minden képernyő ide fut be, tehát a
+     javítás minden úton megtörténik, nem csak ott, ahol most gyanakszunk. */
+  try{seasonPhaseRepair();}catch(e){}
   if(_chOfferDetour){
     /* kihívás-felajánlásból kitérve: a gomb visszavisz a listához */
     b.textContent="← Vissza a kihívásokhoz";b.onclick=reopenChallengeOffers;
@@ -79369,6 +79491,14 @@ function renderInvestOffer(){
   grid.appendChild(skip);
   box.appendChild(grid);}
 function hubShowSeasonReport(){
+  /* AZ ŐR (3.9.59). Ez a függvény öregít, kiértékel és szezont vált — futó
+     szezonban egyetlen úton sem szabad elindulnia. Lásd seasonCloseAllowed. */
+  if(!seasonCloseAllowed()){
+    try{addLine("⛔ A szezonzárás nem indulhat el: még fut a szezon "
+      +"("+((S.idx||0))+"/30 forduló). Semmi nem változott.","m ev");}catch(e){}
+    try{seasonPhaseRepair();}catch(e){}
+    try{setHubNextSeasonBtn();}catch(e){}
+    return;}
   /* A D1-ES BAJNOKI CÍM ZÁRÓKÉPERNYŐJE — RÖGTÖN, MIELŐTT BÁRMI MÁS TÖRTÉNNE.
      Lásd runD1FinaleDue a pontos indoklásért. A "Tovább →" gomb a lenti,
      változatlan jelentés-összeállítást folytatja — a felhasználó semmit nem
@@ -79644,6 +79774,15 @@ function hubShowSeasonReportBody(){
      koppintás, és a HUB ott van mögötte érintetlenül. */
   hubInfoShow("rep");}
 function beginNextSeasonWithChallenges(){
+  /* AZ ŐR (3.9.59). Pontosan ez az ajtó volt a bejelentett eset: a HUB gombja
+     egy ottragadt „hubreport" fázisban ezt a kezelőt kapta, és a szezon
+     közepén indított új idényt (szintlépés, fel-/kiesés, öregedés). */
+  if(!seasonCloseAllowed()){
+    try{addLine("⛔ Új idény nem indulhat: még fut a szezon "
+      +"("+((S.idx||0))+"/30 forduló). Semmi nem változott.","m ev");}catch(e){}
+    try{seasonPhaseRepair();}catch(e){}
+    try{setHubNextSeasonBtn();}catch(e){}
+    return;}
   /* Szezon eleji hosszú kihívások: 5 felajánlás, mielőtt a pályára lépünk.
      Auto-módban automatikusan kezeljük, kézi módban választ a felhasználó.
      A JELÖLÉS fontos: az itt vállalt kihívások MÉG a régi szezonszámon

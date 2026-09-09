@@ -643,13 +643,40 @@ karrier leválik (`h2hRoomActive()` hamis lesz, tehát a `finish()` nem áll meg
 újra ezen a kapun), a szezonzárás folytatódik a jelentés felé, és a mentés
 viszi. Részletek: `docs/kozos-karrier-szezonzaras.md`.
 
+## szezonzaras-or-proba.js — ⛔🏆 a szezonzárás őre és a két kupa
+
+```
+node tools/szezonzaras-or-proba.js
+```
+
+17 állítás, két bejelentett hibára — ugyanaz a rendszer sérült mindkettőben.
+
+**Az őr.** A szezon 8. fordulójánál egy ottragadt `hubreport` fázis a HUB
+gombjának az „Irány a pályára →" szerepet adta, és az a szezon KÖZEPÉN
+indított új idényt (öregedés, fel-/kiesés, kihívás-bukás). Ezt egyszer már
+javítottuk — a `hubNextSeasonFlow()` elején —, csakhogy a gomb HÁROM kezelőt
+kaphat, és a zár csak az egyiken ült. A próba ezért mind a három romboló
+műveletet (`hubShowSeasonReport`, `beginNextSeasonWithChallenges`,
+`startEuroCampaign` üres ága) külön futtatja le a 8. fordulónál, és azt méri,
+hogy a szezonszám és a fordulószám **egyáltalán nem mozdul** — plusz hogy a
+beragadt fázis meggyógyul, és lezárt szezonban mind a három átenged.
+
+**A két kupa.** Az „Fából készült Kupa után jöjjön a BL" két külön okból nem
+működött: a lánc `pyrOn()`-nál azonnal visszafordult (a piramis viszont pont
+az a mód, ahol az FA létezik), a tartalék-út pedig — a „következő idényre
+szóló" nevezés — a következő szezon `finish()`-ében némán felülíródott a
+bajnoki helyezésből járó indulással, MIELŐTT a kupa lejátszódott volna. A
+próba mind a négy osztályra és a sík módra megnézi, mit ad a lánc, és külön
+méri, hogy a kiharcolt BL túléli a gyengébb helyezést. Részletek:
+`docs/szezonzaras-or-es-ket-kupa.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 40 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 41 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
