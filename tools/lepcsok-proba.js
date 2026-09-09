@@ -531,7 +531,8 @@ const {spawn}=require('child_process');
      pyrConfirmDiv();
      return {div:pyrMyDivId(), nev:pyrMyDiv()?pyrMyDiv().name:null,
        mezony:pyrLevel(), fokozat:pyrSpeedKey(),
-       gapWant:S.pyr?S.pyr.gapWant:null, tempo:gameTempo(), ikon:iconRateNow(),
+       gapWant:S.pyr?S.pyr.gapWant:null, fieldWant:S.pyr?S.pyr.fieldWant:null,
+       tempo:gameTempo(), ikon:iconRateNow(),
        wc:!!S.careerWc, skillReal:!!S.skillReal, rerolls};});
    await p.close();}
 
@@ -853,8 +854,15 @@ const {spawn}=require('child_process');
    ok("végig: a lépcső minden döntése átér a karrierbe",
       E.fokozat==="lassu"&&E.tempo==="normal"&&E.ikon==="teljes"
       &&E.wc===false&&E.skillReal===false&&E.rerolls===5);
-   ok("végig: a KIÍRT rés megy a horgonyba, nem a legközelebbi csempe kerek száma",
-      Math.abs(E.gapWant)>0.01&&Math.abs(E.gapWant)<1);}
+   /* MEGFORDÍTOTT ÁLLÍTÁS (3.9.53). Eddig azt mértük, hogy a lépcsőn a KIÍRT
+      RÉS megy a horgonyba. Az élesben kiderült, hogy maga a mérce volt rossz:
+      a lépcső nem rést, hanem MEZŐNYSZINTET ígér („rögzített 80-as mezőny"),
+      a rést horgonyozva viszont a világ a kereted után jött — pont az
+      ígéretet rontotta el. Innentől a `fieldWant` megy a horgonyba, és a
+      `gapWant` szándékosan ÜRES: a rés következmény, nem vállalás.
+      Részletes mérés: tools/lepcso-mezony-proba.js */
+   ok("végig: a lépcsőn a MEZŐNY megy a horgonyba, a rés nem vállalás",
+      E.fieldWant===78&&E.gapWant==null);}
   ok("a lépcső után visszatér a teljes osztályválasztó",
      out.osztaly_szabad.sorok===6&&out.osztaly_szabad.nehezseg_lathato===true
      &&out.osztaly_szabad.kimondas===false);

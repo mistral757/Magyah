@@ -291,3 +291,106 @@ vállalásaid már a hangolt szinthez kalibrálódnak.
   változat nem tette be a kezdő 11-et a `drafted`-be, így a piac-eltolás a
   saját keretedet is átskálázta. A valódi játékban minden leigazolt játékos
   bekerül; a próbának ezt utánoznia kell.
+
+---
+
+## 7. A LÉPCSŐ KIVÉTELE — ott a mezőny a vállalás (3.9.53)
+
+> **BEJELENTETT HIBA:** „A lépcsős módban rögzített nehézségi szinteket
+> ígérünk az első 3 d1-es winig. Pl most egy karriert indítottam, 2. lépcső:
+> rögzített 80-as mezőny, D3 kellene legyen, de amint indítok, felveszi a
+> tempót velem a koma, és feljön kiegyenlítettbe, 84-es mezőnyre, mert én
+> 85-ös csapatot építettem. **Ez a működés akkor oké lenne, ha már nyitva
+> lennének a beállítások** és én kiegyenlített módban akarok indulni. Akkor
+> pont ezt a viselkedést várjuk el. De itt ennek nem kéne bekapcsolnia…"
+
+### 7.1 A hiba nem a horgonyban volt, hanem a mércéjében
+
+Amit a fenti fejezetek leírnak, az **helyes** — a szabad karrierben. Ott a
+nehézségi csempével egy **rést** vállalsz, és a horgony pontosan azt váltja
+be: ha a nyár alatt erősödtél, a világ utánad jön. Ez ott nem mellékhatás,
+hanem *a* funkció.
+
+A lépcső viszont **másik ígéretet** tesz. A képernyője szó szerint azt írja
+ki, hogy „rögzített 80-as mezőny" — nem rést, hanem **szintet**. Ugyanaz a
+horgony ezen az ígéreten pont fordítva sült el: minél jobb keretet
+draftoltál, annál feljebb húzta a világot, hogy a rés megmaradjon.
+
+**Mérve** (`tools/lepcso-mezony-proba.js` fixtúrája, 2. lépcső, ígért mezőny 80):
+
+| kereterő | mezőny a javítás ELŐTT | mezőny a javítás UTÁN |
+|---|---|---|
+| 78 | 80 | 80 |
+| 82 | **84** | 80 |
+| 85 | **87** | 80 |
+| 88 | **91** | 80 |
+| 92 | **94** | 80 |
+
+A bejelentésben szereplő „84-es mezőny" tehát nem egyedi eset, hanem a
+képlet: a 82-es kereterő pontosan 84-et adott vissza.
+
+### 7.2 Egy második, csendesebb hiba: két skála, egy szám
+
+A lépcső a `pyrPickGap`-et tette el `gapWant`-nak. Az **nyers Rating**
+különbség (`pyrSquadEff − osztályközép − eltolás`), a horgony viszont
+`levelGap()`-ben mér, ami **meccs-erő**: benne a rejtett bónusz — morál,
+edző, kapitány, taktika. A két szám nem ugyanazon a vonalzón áll, tehát a
+világ akkor is elmozdult volna, ha a kereted egy jottányit sem változik.
+
+### 7.3 A javítás
+
+A lépcső mostantól a **mezőnyszintet** teszi el, és a `gapWant` szándékosan
+üresen marad:
+
+```js
+S.pyr.fieldWant=unlockLadderDiv().field;   /* 78 / 80 / 80 */
+delete S.pyr.gapWant;
+```
+
+A `pyrAnchorAtKickoff` egy közös hibafüggvényre állt át — mindkét ág azt adja
+vissza, **mennyivel kell a világot emelni**:
+
+```js
+const hiba=()=>{
+  if(mezoWant!=null){
+    const m=pyrMyDivMeanRaw();
+    return m==null?0:(mezoWant-m);}
+  return levelGap()-want;};
+```
+
+A `pyrMyDivMeanRaw()` új: a `pyrLevel()` **kerekítés nélküli** párja. A világot
+folytonosan toljuk, ezért egy egészre kerekített mércén a ráállás fél
+Ratingnyi hibával megállt volna; a `pyrLevel()` mostantól ennek a kerekítése,
+tehát nincs két igazság.
+
+### 7.4 Ami VÁLTOZATLAN
+
+* **a szabad karrier** — nincs `fieldWant`, marad a rés-horgony, és a próba
+  külön méri, hogy a világ ott **továbbra is követi** a keretedet (78→78,
+  85→85, 92→92);
+* **a közös karrier** — ott a `pyrAnchorShared` dolgozik, a kezdőrúgás horgonya
+  az első sorában kiszáll;
+* **a régi mentések** — nincs bennük `fieldWant`, tehát betűre a régi ág fut.
+
+### 7.5 A rés ettől nem tűnik el — csak átkerül a másik oldalra
+
+A Run-plafon továbbra is **valódi rést** mér (`P.gap0`), csak most a
+kezdőrúgáskor mért valódit:
+
+| kereterő | 78 | 82 | 85 | 88 | 92 |
+|---|---|---|---|---|---|
+| `gap0` a 2. lépcsőn | −2 | +2 | +5 | +8 | +12 |
+
+Ez a javítás másik fele, és kimondva is szerepel a képernyőn: **a fölényt te
+építed, nem a világ adja vissza.** Ezért lett a lépcső szövege is pontosabb —
+„Ez a szám **fix**: a mezőny nem jön utánad, ha a kezdésig még erősödsz —
+akkor a rajt lesz könnyebb, nem a világ nehezebb" —, és ezért mondja meg a
+Run-plafon sora, hogy a kiírt szám előzetes, a végleges a kezdőrúgáskor dől el.
+
+### 7.6 Amit az ígéret NEM jelent
+
+A rögzítés a **rajtra** szól, nem az egész lépcsőre. A világ a szezonok során
+a lépcső által kötött ellenfél-tempóval (`lassu`) tovább nő, és te osztályokat
+lépsz feljebb — ez a piramis, nem a nehézség. A `fieldWant` horgony
+**karrierenként egyszer** fut le (`P.anchored`), pontosan úgy, ahogy a
+rés-horgony is.

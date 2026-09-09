@@ -483,13 +483,44 @@ szerencsét. A TSI-ugrás a valóságban dobókocka (`ACADEMY_TSI_CHANCE`), az
 előrejelzésben a várható értéke — így a szám determinisztikus, és inkább
 alálő, mint ígérget. A felajánlás alján ezért áll ott, hogy ez nem ígéret.
 
+## lepcso-mezony-proba.js — 🪜 a lépcső rögzített mezőnye
+
+```
+node tools/lepcso-mezony-proba.js
+```
+
+Egyetlen kérdést mér, öt kereterővel: a lépcső **ott hagyja-e a mezőnyt**,
+ahol ígérte. A bejelentés szerint nem hagyta ott — „2. lépcső: rögzített
+80-as mezőny… amint indítok, felveszi a tempót velem a koma, és feljön
+84-esre, mert én 85-ös csapatot építettem".
+
+**A mérőfej trükkje:** a kezdőrúgás horgonya a `teamMatchStrength()`-et
+olvassa, ezért a kereterőt egyetlen számmal állítjuk be (78, 82, 85, 88, 92),
+és minden méréshez **friss világ** épül a rendes úton (`beginNewGame` →
+`renderPyrDivPick` → `pyrConfirmDiv`). Így a próba nem a képernyőt nézi,
+hanem azt, mi történik a világgal.
+
+**A legfontosabb sora nem a javítás, hanem ami VÁLTOZATLAN.** A szabad
+karrierben a mezőnynek KÖTELESSÉGE követni a keretedet — ott a rést vállalod,
+és a horgony épp azt váltja be. A próba ezért külön ágon méri a 3 címmel
+induló, szabad karriert, és azt várja, hogy ott a 78→78, 85→85, 92→92 sor
+kijöjjön. Egy „javítás", ami ezt is kilapítja, itt bukik el.
+
+A harmadik ág a közös karrier: ott a kezdőrúgás horgonya az első sorában
+kiszáll (a `pyrAnchorShared` dolgozik helyette), tehát a mezőny mozdulatlan.
+
+Mellékesen azt is méri, hogy a **rés a kereteddel nő** (`gap0`: −2 → +12) —
+ez a javítás másik fele. A fölényt te építed; a Run-plafon pedig továbbra is
+valódi rést mér, csak a kezdőrúgáskor mértet. Részletek:
+`docs/rajt-nehezseg.md` 7. fejezet.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 35 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 36 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

@@ -5974,7 +5974,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.52";
+const APP_VERSION="3.9.53";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -13409,12 +13409,19 @@ function pyrMyDiv(){return pyrDivs()[pyrDivIdx(pyrMyDivId())]||null;}
    piramisban: a piac (marketPeakShift), a kupa-sáv, a nehézség-címke és a
    jelvény mind ezt olvassa, tehát a többi rendszer változtatás nélkül,
    értelmes horgonnyal működik tovább. */
-function pyrLevel(){
+/* UGYANAZ A SZÁM, KEREKÍTÉS NÉLKÜL. A pyrLevel egészre kerekít, a világot
+   viszont folytonosan toljuk — egy kerekített mércére horgonyozva a
+   ráállás fél Ratingnyi hibával megállna. Aki a MEZŐNYT állítja be
+   (pyrAnchorAtKickoff a lépcsőn), ezt a nyers átlagot olvassa. */
+function pyrMyDivMeanRaw(){
   const d=pyrMyDiv();
-  if(!d)return 84;
+  if(!d)return null;
   const t=d.teams||[];
-  if(!t.length)return 84;
-  return Math.round(t.reduce((s,x)=>s+x.ovr,0)/t.length);}
+  if(!t.length)return null;
+  return t.reduce((s,x)=>s+x.ovr,0)/t.length;}
+function pyrLevel(){
+  const m=pyrMyDivMeanRaw();
+  return m==null?84:Math.round(m);}
 /* ---- A PIRAMIS TETEJE ----
    Ugyanaz a szám, mint a pyrLevel, csak MINDIG az élvonalra (D1). Két helyen
    kell: a KUPA mezőnyéhez (a hazai kupa nemzeti, tehát az élvonal is benne
@@ -30590,18 +30597,50 @@ function pyrAnchorShared(myStr,mateStr){
   try{pyrInfinityCheck();}catch(e){}
   if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
   return {moved,elotte,utana:Math.round((avg-pyrLevel())*10)/10,avg,want};}
+/* ---- A LÉPCSŐ MÁS ÍGÉRETET TESZ, EZÉRT MÁST IS HORGONYOZ (3.9.53) ----
+   BEJELENTETT HIBA: „2. lépcső: rögzített 80-as mezőny, D3 kellene legyen, de
+   amint indítok, felveszi a tempót velem a koma, és feljön kiegyenlítettbe,
+   84-es mezőnyre, mert én 85-ös csapatot építettem."
+
+   A KÉT ÍGÉRET NEM UGYANAZ. A szabad karrierben a nehézségi csempével egy
+   RÉST vállalsz („legyek másfél Ratinggel a mezőny fölött"), és a horgony
+   pontosan ezt váltja be: ha a nyár alatt erősödtél, a világ utánad jön, hogy
+   a vállalt rés megmaradjon. Ez ott helyes viselkedés — sőt, ez A funkció.
+
+   A lépcsőn viszont nem rést, hanem MEZŐNYSZINTET ígérünk: „rögzített 80-as
+   mezőny". Ott ugyanaz a horgony pont az ígéretet rontja el, mert a mezőnyt a
+   kereted után húzza. Ezért a lépcső a `fieldWant`-ot teszi el, és a horgony
+   ehhez áll rá: a világ MARAD ott, ahol a lépcső ígérte, a rés pedig
+   következmény — annyival leszel jobb, amennyit felépítettél.
+
+   MÉG EGY OK, AMIÉRT A RÉS ITT ROSSZ MÉRCE VOLT: a `pyrPickGap` NYERS Rating
+   különbség, a `levelGap()` viszont meccs-erőben mér (benne a rejtett bónusz:
+   morál, edző, kapitány, taktika). A lépcső tehát egy másik skálán vett
+   számot adott át a horgonynak — a világ akkor is elmozdult volna, ha a
+   kereted egy jottányit sem változik.
+
+   AMI VÁLTOZATLAN: a szabad karrier (nincs fieldWant), a közös karrier (ott a
+   pyrAnchorShared dolgozik), és a régi mentések. */
 function pyrAnchorAtKickoff(){
   const P=(typeof S!=="undefined"&&S)?S.pyr:null;
   if(!P||!P.on||gameMode!=="career")return false;
   if(P.anchored)return false;
   if(typeof h2hRoomActive==="function"&&h2hRoomActive()){P.anchored=true;return false;}
+  const mezoWant=(typeof P.fieldWant==="number"&&isFinite(P.fieldWant))?P.fieldWant:null;
   const want=(typeof P.gapWant==="number"&&isFinite(P.gapWant))?P.gapWant:null;
-  if(want==null){P.anchored=true;return false;}
+  if(mezoWant==null&&want==null){P.anchored=true;return false;}
   let before=0,after=0,moved=0;
   try{
-    before=levelGap();
+    /* A KÉT MÓD KÖZÖS HIBAFÜGGVÉNYE. Mindkettő azt adja vissza, MENNYIVEL
+       KELL A VILÁGOT EMELNI — így a lépés és a napló egy ágon fut tovább. */
+    const hiba=()=>{
+      if(mezoWant!=null){
+        const m=pyrMyDivMeanRaw();
+        return m==null?0:(mezoWant-m);}
+      return levelGap()-want;};
+    before=mezoWant!=null?(pyrMyDivMeanRaw()||0):levelGap();
     for(let i=0;i<40;i++){
-      const err=levelGap()-want;
+      const err=hiba();
       if(Math.abs(err)<0.15)break;
       /* pyrShiftWorld KIVONJA az `off`-ot, tehát a −err a világot EMELI, ha
          túl erős vagy. A lépést vágjuk, hogy egy elszaladt mérés se lökje ki
@@ -30612,7 +30651,7 @@ function pyrAnchorAtKickoff(){
       P.worldShift=Math.round(((P.worldShift||0)-step)*10)/10;
       moved+=step;
       oppTargetRating=pyrLevel();}
-    after=levelGap();
+    after=mezoWant!=null?(pyrMyDivMeanRaw()||0):levelGap();
     moved=Math.round(moved*10)/10;
     /* ---- A SZINTVÁLTÁS ÁTVEZETÉSE ----
        Ugyanaz a lánc, amit a pyrStart futtat a világ eltolása után: a
@@ -30627,12 +30666,28 @@ function pyrAnchorAtKickoff(){
       syncAttrsToRating(e);
       if(scout)e.estimatedTSI=estimateTSI(e.tsi,scout.stars);});
     P.grow=null;
-    P.gap0=Math.round(after*10)/10;   /* a Run-plafon a TÉNYLEGES vállalást mérje */
+    /* A RUN-PLAFON MINDIG RÉST MÉR — a lépcsőn is. Ott a mezőny a vállalás,
+       a rés pedig a következménye, tehát itt külön le kell olvasni: az
+       `after` odafent a MEZŐNYT tartja, nem a rést. */
+    P.gap0=Math.round((mezoWant!=null?levelGap():after)*10)/10;
     SEASON_OPPS=pyrOpponents();
     pyrGrowStep();pyrOppRefresh();
     if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
   }catch(e){}
   P.anchored=true;
+  /* A LÉPCSŐN NINCS MIT BEJELENTENI: ott a mezőny pont ott maradt, ahol a
+     lépcső ígérte. Ha a ráállás mégis mozdított (sodródás a világ
+     felépítése és a kezdőrúgás között), azt KIMONDJUK — de a lépcső
+     nyelvén: mezőnyszintben, nem nehézségi csempében. */
+  if(mezoWant!=null){
+    if(Math.abs(moved)>=0.2)try{
+      addLine(`🎚 <b>A mezőny a helyére állt.</b> A lépcső <b>${Math.round(mezoWant)}</b>-es `
+        +`mezőnyt ígér, ezért a világ <b>${moved>0?"+":"−"}${Math.abs(moved).toFixed(1).replace(".",",")}</b> `
+        +`Ratinggel ${moved>0?"feljebb":"lejjebb"} került. A rés nem vállalás: `
+        +`annyival vagy jobb náluk, amennyit felépítettél.`,"m mvp");
+    }catch(e){}
+    try{saveGame();}catch(e){}
+    return true;}
   if(Math.abs(moved)>=0.2){
     const d=pyrDiffForGap(want);
     try{
@@ -30869,17 +30924,20 @@ function renderPyrDivPick(){
       +`<div class="ulpRow"><span>Kezdő osztály</span><b>D${pyrPickDiv} · ${esc(pyrDivName?pyrDivName(pyrPickDiv):("D"+pyrPickDiv))}</b></div>`
       +`<div class="ulpRow"><span>A mezőny Ratingje</span><b>${mez==null?"—":nm(mez)}</b></div>`
       +`<div class="ulpRow"><span>A kereted a pályán</span><b>${nm(pyrSquadEff(sq))}</b></div>`
-      +`<div class="ulpRow"><span>A rajt</span><b style="color:${pyrGapZone(g).c}">${esc(pyrGapLabel(g))}</b></div>`
-      +`<div class="ulpTx">A harmadik osztályból indulsz, egy <b>${p.field}</b> körüli mezőnyben — `
-      +`innen három feljutás vezet az élvonalba. A <b>${UNLOCK_STEPS-unlockStep()+1}. bajnoki cím</b> `
+      +`<div class="ulpRow"><span>A rajt most</span><b style="color:${pyrGapZone(g).c}">${esc(pyrGapLabel(g))}</b></div>`
+      +`<div class="ulpTx">A harmadik osztályból indulsz, egy <b>${p.field}</b>-es mezőnyben — `
+      +`innen három feljutás vezet az élvonalba. Ez a szám <b>fix</b>: a mezőny nem jön `
+      +`utánad, ha a kezdésig még erősödsz — akkor a rajt lesz könnyebb, nem a világ `
+      +`nehezebb. A <b>${UNLOCK_STEPS-unlockStep()+1}. bajnoki cím</b> `
       +`a piramis tetején nyitja meg, hogy ezt te állítsd be: melyik ligából indulsz, és `
       +`mennyire legyen nehéz.</div></div>`;
     /* A RUN-PLAFON a lépcsőn is látszik — csak nem a részletes blokk
        jegyzetében (az rejtve van), hanem itt, a kimondás alatt. */
     const cur2=(opts.filter(o=>o.id===pyrPickDiv)[0])||opts[opts.length-1];
     if(cur2)box.querySelector(".unlockLadderPick").insertAdjacentHTML("beforeend",
-      `<div class="ulpTx">🏁 A Run-szinted plafonja ezzel a vállalással: `
-      +`<b style="color:${runColor(cur2.cap)}">${cur2.cap}</b>. `
+      `<div class="ulpTx">🏁 A Run-szinted plafonja ezzel a rajttal: `
+      +`<b style="color:${runColor(cur2.cap)}">${cur2.cap}</b> — a végleges számot `
+      +`a kezdőrúgáskor mért rés adja, tehát ha addig még erősödsz, ez lejjebb csúszik. `
       +`A mélyebb osztály és a nehezebb rajt magasabbra viszi — mindkettő a `
       +`következő lépcsőkkel nyílik ki.</div>`);
     const go2=$("pyrDivGoBtn");
@@ -31091,13 +31149,25 @@ function pyrConfirmDiv(){
   try{
     const _df=pyrDiffById(pyrPickDiffId);
     if(S.pyr&&_df&&!(typeof h2hRoomActive==="function"&&h2hRoomActive())){
-      /* 🪜 A LÉPCSŐN A PONTOS RÉS SZÁMÍT, nem a hozzá legközelebbi csempe. A
-         képernyő a kiszámolt értéket írja ki (pl. −0,3), a kezdőrúgás pedig
-         ehhez horgonyoz — ha itt a csempe kerek számát tennénk el, a játék
-         mást csinálna, mint amit egy sorral feljebb ígért. */
+      /* 🪜 A LÉPCSŐN A MEZŐNY A VÁLLALÁS, NEM A RÉS (3.9.53). A lépcső szövege
+         szó szerint „rögzített 80-as mezőnyt" ígér, tehát a kezdőrúgás
+         horgonya is EZT kapja meg — és a `gapWant` szándékosan üresen marad.
+         Két oka van, hogy nem a rést tesszük el:
+           1. a rés a kereted következménye; ha azt horgonyoznánk, a mezőny a
+              kereted után jönne, és pont az ígéretet rontaná el,
+           2. a `pyrPickGap` NYERS Rating-különbség, a horgony viszont
+              meccs-erőben mér — két skála, egy szám.
+         A `pyrRetuneWant` üres gapWant esetén a `gap0`-ra esik vissza, ami a
+         horgony UTÁN mért valódi rés: pont a helyes mérce. */
       const _lep=(typeof unlockLadderDiv==="function")&&unlockLadderDiv()
                  &&!(typeof MP!=="undefined"&&MP&&MP.active);
-      S.pyr.gapWant=_lep?Math.round((pyrPickGap||0)*10)/10:_df.gap;
+      const _mezo=_lep?unlockLadderDiv().field:null;
+      if(_lep&&typeof _mezo==="number"&&isFinite(_mezo)){
+        S.pyr.fieldWant=_mezo;
+        delete S.pyr.gapWant;
+      }else{
+        delete S.pyr.fieldWant;
+        S.pyr.gapWant=_df.gap;}
       S.pyr.diffId=_df.id;S.pyr.anchored=false;}
   }catch(e){}
   $("scPyrDiv").classList.add("hide");
