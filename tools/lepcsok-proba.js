@@ -332,8 +332,10 @@ const {spawn}=require('child_process');
   /* 14d. A PANZER FELTÉTELE */
   {const p=await runLap([]);
    out.panzer=await p.evaluate(()=>{
-     const jo=n=>({leadI:0,coopI:0,aggroI:4});   /* 3 negatív jellemvonás */
-     const semmi=()=>({leadI:4,coopI:5,aggroI:0});
+     /* 3.9.56: az új, hosszabb jellemskálák. A „nehéz ember" mindhárom
+        tengelyen a rossz végponton áll, a „tiszta" mindhármon a jón. */
+     const jo=n=>({karI:0,kapI:0,verI:VER_LEVELS.length-1});   /* 3 negatív jellemvonás */
+     const semmi=()=>({karI:KAR_LEVELS.length-1,kapI:KAP_LEVELS.length-1,verI:0});
      const r={};
      r.egy_ember=unlockBadTraits(jo());
      r.tiszta=unlockBadTraits(semmi());

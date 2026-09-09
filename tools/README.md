@@ -551,13 +551,46 @@ POT-t ad, és kétszer hívva minden bitre ugyanaz. Részletek: `docs/csucs-alap
 `gameMode`-ot is nézi. `gameMode="career"` nélkül a `careerDraftPlayer` a
 kanonikus pool-bejegyzést adja vissza, és a próba a semmit méri — zölden.
 
+## jellem-proba.js — 🙂 a három jellemtengely és a morál-smiley
+
+```
+node tools/jellem-proba.js
+```
+
+25 állítás. A karizma (7 fokozat), a kapcsolódás (9) és a vérmérséklet (9)
+átállása után azt méri, amit a kérés utolsó mondata kért: *„ahol több
+tulajdonságszintet soroltam mint amennyi régen volt, ott integráld az új
+szintekhez tartozó változókat a rendszerbe."*
+
+**A két legfontosabb sora arról szól, ami NÉMÁN tört volna el.** A régi kód
+két módon kötődött a fokozatok SZÁMÁHOZ: hard-kódolt küszöbökkel
+(`aggroI>=3` az ötös skálán a felső kettő volt, a kilencesen már a nyugodt
+felet is elkapná) és ÖTELEMŰ súlytömbökkel (`[0.2,0.5,1,2,3][aggroI]` — a
+hatodik fokozattól `undefined` → `NaN` → nulla súly, vagyis a legforróbb fejek
+egyáltalán nem kapnának piros lapot). A próba ezért külön állítja, hogy
+**minden fokozatra véges, pozitív, monoton növő** a lap-súly, és hogy a
+**végpontok meg a közép betűre a régiek** (0,2 · 1,0 · 3,0).
+
+**A sávok népessége is állítás, nyolc sorban.** A skála finomabb lett, de a
+keret összetétele nem változhat: a próba a teljes adatbázison méri, hogy a
+„vezéralkat", a „forró fej" és a többi hat sáv aránya ±3 ponton belül maradt
+a régihez képest. Enélkül a felbontás növelése csendben nehézséget állított
+volna.
+
+Emellett: a kapitány-pontszám monoton a karizmában és a forró vérmérséklet
+**csak levon**; mind a 10 smiley-fokozat elérhető a jellemből, és az öltözői
+események tényleg mozdítják (de ±0,8-nál megállnak); mind a 17 öltözői
+esemény kiválasztható a megfelelő kerettel; a régi mentés szélsőségei
+szélsőségek maradnak; és sehol nem maradt `leadI`/`coopI`/`aggroI` mező.
+Részletek: `docs/jellem-es-moral.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 37 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 38 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
