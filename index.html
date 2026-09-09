@@ -6004,7 +6004,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.57";
+const APP_VERSION="3.9.58";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -29427,7 +29427,7 @@ function beginNewGame(){
      egy korábbi szoba kiegyenlítése átszivárogna az újba. */
   S.oppBuffH=null;   /* friss karrier → a rejtett erősítés az 1. szezon elején születik */
   S.mpBalance=0;S.mpBalanceP={};S.mpDecision=null;S.mpDecisionCup=null;S.mpCupSeason=0;
-  S.mpMateFinal=null;S.mpSummerRef=null;S.mpCup=null;S.mpHistory=[];S.mpDuelLog=[];S.mpOrphan=false;
+  S.mpMateFinal=null;S.mpSummerRef=null;S.mpCup=null;S.mpHistory=[];S.mpDuelLog=[];S.mpOrphan=false;S.mpForfeit=null;
   S.mpOppStart=null;S.mpOppSnap=null;   /* az ellenfél csapatlapja és befagyasztott felállása */
   ensureWorldSeed();
   S.skillPool=weightedShuffleSkills(rngFor("skillpool"));
@@ -51812,13 +51812,13 @@ function mpPresencePaint(){
     if(o&&o.auto&&T.auto){
       const auto=mpAutoMehet();
       el.innerHTML+=`<br><span style="color:var(--gold)">⏱ Villám tempó — `
-        +(h>0?`<b>${mpMMSS(h)}</b> múlva ${auto?"magától továbblép":"felajánlom a továbblépést"}.`
-             :(auto?`továbblépés…`:`a továbblépés gombja lent — a társad ONLINE, ezért nem lépünk helyette magától.`))
+        +(h>0?`<b>${mpMMSS(h)}</b> múlva ${auto?"magától továbblép":`felajánlom ${esc(o.offer||"a továbblépést")}`}.`
+             :(auto?`továbblépés…`:`a gomb lent — a társad ONLINE, ezért nem lépünk helyette magától.`))
         +`</span>`;
     }else if(o){
       el.innerHTML+=`<br><span style="color:var(--gold)">⏱ ${esc(T.n)} tempó — `
-        +(h>0?`<b>${mpMMSS(h)}</b> múlva felajánlom a továbblépést.`
-             :`a továbblépés gombja lent.`)+`</span>`;
+        +(h>0?`<b>${mpMMSS(h)}</b> múlva felajánlom ${esc(o.offer||"a továbblépést")}.`
+             :`a gomb lent.`)+`</span>`;
     }else if(h<=0){
       /* A PÁRHARC KAPUJA, HELYETTESÍTHETŐ KERET NÉLKÜL. A P1b azt tudja
          felállítani, amit a társ KORÁBBAN maga küldött fel ebbe a szobába —
@@ -51954,7 +51954,10 @@ const MP_SOLO_MS=25000;
 let _mpSoloOut=null;
 /* A FUTÓ várakozás egyedüli kiútja. A hívó a saját leállítóját és
    folytatását adja meg — a réteg csak felkínálja. */
-function mpSoloArm(label,fn,gate,auto,shared){
+/* Az `offer` azt mondja meg, MIT nyit ki a határidő — a visszaszámláló ezt
+   írja ki. Alapból a továbblépést; a szezonzárás kapuja viszont NEM lép
+   tovább, ott a párharc lezárása nyílik ki (lásd mpFinalWait). */
+function mpSoloArm(label,fn,gate,auto,shared,offer){
   if(_mpSoloOut&&_mpSoloOut.gate===gate){
     /* A KÖZÖS ÓRA UTÓLAG PONTOSÍTHATÓ, az arm-idő nem. A P1b első körében a
        szoba `openedAt` mezője még nem biztos, hogy olvasható; amint az lesz,
@@ -51970,6 +51973,7 @@ function mpSoloArm(label,fn,gate,auto,shared){
      karriert (S.mpOrphan), ezért az sosem kap auto-jelölést. */
   _mpSoloOut={label:label||"A társad nem jelentkezik — folytatom egyedül",
               fn,gate:gate||null,at:Date.now(),auto:auto!==false,
+              offer:offer||"a továbblépést",
               /* `shared`: SZERVERIDŐBEN mért kezdet, ha van. Ott kell, ahol a
                  határidő KÖZÖS eredményt dönt el (P1b) — a lágy kapuknál marad
                  a helyi `at`, mert ott a döntés a saját oldalon dől el. */
@@ -52009,7 +52013,11 @@ function mpSoloOffer(oppReady){
    }else if(Date.now()-o.at<MP_SOLO_MS)return;}
   ob.classList.remove("hide");
   ob.disabled=false;
-  ob.textContent="⏭ "+o.label;
+  /* A ⏭ ELŐTAG CSAK A TOVÁBBLÉPÉSÉ. A szezonzárás kapuja nem továbblép, hanem
+     LEZÁR — ott a saját jele (🏆) áll a felirat elején, és egy „ugorj tovább"
+     nyíl elé ragasztva félrevezetne. Aki maga hozza a jelét, azt tiszteletben
+     tartjuk. */
+  ob.textContent=/^\p{Extended_Pictographic}/u.test(o.label)?o.label:("⏭ "+o.label);
   const lep=()=>{
     ob.disabled=true;
     mpSoloClear();
@@ -52820,6 +52828,49 @@ function mpFinalWaitStop(){
   mpSoloClear();
   _mpFinalBusy=false;
   if(_mpFinalPoll){clearTimeout(_mpFinalPoll);_mpFinalPoll=null;}}
+/* ---- A HATÁRIDŐS GYŐZELEM: MEGKÉRDEZZÜK, MIELŐTT LEZÁRJUK ----
+   Ez az egyetlen pont, ahol egy közös karrier a TÁRSAD MEGKÉRDEZÉSE NÉLKÜL ér
+   véget, ezért a párbeszéd tételesen elmondja, mi történik — utána már nincs
+   visszaút. */
+function mpFinalForfeitAsk(onReady){
+  const T=mpTempoOf(_mpPresRoom);
+  askConfirm({
+    title:"Lezárod a párharcot?",
+    yes:"🏆 Igen, megnyertem",
+    no:"Mégis megvárom",
+    html:`<div style="font-size:13px;line-height:1.6">`
+      +`A társad <b>${esc(T.n)} tempóban</b> sem zárta le a szezonját, tehát a közös `
+      +`tabella nem tud összeállni. Ha most lezárod:`
+      +`<div style="margin-top:8px">• <b>te nyered a párharcot</b> — a társad nem ért ide időben;</div>`
+      +`<div>• a <b>közös karrier itt véget ér</b>, a tiéd egyjátékosként folytatódik;</div>`
+      +`<div>• a párharc fordulóit a mezőnybe visszakerülő csapat veszi át, a már `
+      +`lejátszott eredmények megmaradnak;</div>`
+      +`<div style="margin-top:8px;color:var(--dim)">Ez <b>végleges</b>. Amíg nem nyomod meg, `
+      +`a szoba és a szezonzárása is nyitva marad neki.</div></div>`,
+    onYes:()=>mpFinalForfeitDo(onReady)});}
+/* A tényleges lezárás. A sorrend számít: előbb a győzelem KÖNYVELÉSE (amíg a
+   szoba még él és tudjuk, ki volt a társ), utána a leválasztás. */
+function mpFinalForfeitDo(onReady){
+  mpFinalWaitStop();
+  try{h2hWaitHide();}catch(e){}
+  try{
+    /* A TÁRSAD NEVE, amíg még tudjuk: a leválasztás után a szoba adatai már
+       nem érhetők el, a szezonjelentés viszont ki akarja írni, ki ellen dőlt
+       el a hajsza. */
+    S.mpForfeit={season:S.seasonNumber||1,at:Date.now(),
+                 mate:mpSkippedOppName()||null,
+                 tempo:(mpTempoOf(_mpPresRoom)||{}).n||null};
+  }catch(e){}
+  try{addLine("🏆 <b>Megnyerted a párharcot.</b> A társad a vállalt határidőn belül nem "
+    +"zárta le a szezonját — a hajsza ezzel eldőlt a te javadra.","m win");}catch(e){}
+  /* A LEVÁLASZTÁS ugyanaz a művelet, mint amikor a társ végleg elhagyja a
+     szobát: a párharc fordulói visszakerülnek a mezőnyhöz, a lejátszott
+     eredmények megmaradnak, és a karrier egyjátékosként fut tovább. Ettől lesz
+     a h2hRoomActive() hamis, tehát a finish() innentől a rendes, egyjátékos
+     ágon zárja a szezont — nem áll meg újra ezen a kapun. */
+  try{mpOrphanCareer();}catch(e){}
+  try{saveGame();}catch(e){}
+  try{onReady&&onReady();}catch(e){}}
 /* A verdikt előtti várakozás. Ugyanaz a réteg, mint a párharcnál — ugyanaz a
    két kiút is: kezdőlap (a szoba és a karrier megmarad) vagy megszakítás. */
 function mpFinalWait(onReady){
@@ -52828,14 +52879,30 @@ function mpFinalWait(onReady){
   if(mpWaitStuck(_mpFinalBusy,_mpFinalPoll))mpFinalWaitStop();
   if(_mpFinalBusy)return;
   _mpFinalBusy=true;
-  /* KIÚT (3.8.30): a szezonzárás egyeztetése nélkül a saját zárásunkkal
-     megyünk tovább — a társ zárása később úgyis megérkezik, és a közös
-     előzményt a következő egyeztetés pótolja. */
-  mpSoloArm("A társad zárása nem érkezik — folytatom egyedül",()=>{
-    mpFinalWaitStop();
-    try{h2hWaitHide();}catch(e){}
-    try{addLine("⚠️ Nem várod meg a társad szezonzárását — a sajátoddal megyünk tovább.","m ev");}catch(e){}
-    try{onReady&&onReady();}catch(e){}},"final");
+  /* ---- A SZEZONZÁRÁS KAPUJA NEM „TOVÁBBLÉPÉS" (3.9.58) ----
+     BEJELENTETT KÉRÉS: „itt 3p után se lehessen továbblépni, csak az legyen
+     bekapcsolva, hogy ha akarod itt 3p után lezárhatod a közös karriert azzal,
+     hogy te nyertél, mert a másik játékos nem ért ide időben."
+
+     MIÉRT VOLT ROSSZ A RÉGI KIÚT. A többi kapunál a „folytatom egyedül" LÁGY:
+     a saját eredményemmel megyek tovább, a társad karrierje sértetlen, és a
+     közös előzményt a következő egyeztetés pótolja. A SZEZONZÁRÁS viszont nem
+     ilyen: a helyezésed a KÖZÖS mezőnyben dől el, abból jön a szezontörténet,
+     az európai kvalifikáció és a párharc ítélete is. „Tovább" itt annyit
+     jelentett volna, hogy egy hiányos, 15 csapatos tabellán véglegesítünk egy
+     rangsort — a párharc pedig eldöntetlen marad, örökre.
+
+     MOSTANTÓL EGYETLEN DOLOG NYÍLIK KI a határidő után, és az nem továbblépés,
+     hanem LEZÁRÁS: megnyered a párharcot, mert a társad nem ért ide. Ez
+     VÉGLEGES és ASZIMMETRIKUS (a te oldaladon zárja le a közös karriert),
+     ezért három fék van rajta:
+       · SOSEM fut le magától — `auto:false`, tehát Villám módban sem,
+       · megerősítést kér, kimondva, mi történik,
+       · és a határidő addig fut, ameddig a választott tempó ígéri.
+     Amíg nem nyomod meg, a képernyő vár — a kilépés (kezdőlap, „Most nem
+     várom meg") végig elérhető, és ott a szoba és a karrier is megmarad. */
+  mpSoloArm("🏆 Lezárom a párharcot — én nyertem",()=>mpFinalForfeitAsk(onReady),
+            "final",false,null,"a párharc lezárását");
   const tickRun=async()=>{
     if(!_mpFinalBusy)return;
     let ok=false;
@@ -79484,6 +79551,21 @@ function hubShowSeasonReportBody(){
      jelentésben most külön blokkot kap, egyértelmű ✓/✗ jelzéssel, a konkrét
      jutalommal vagy büntetéssel (a szöveg a kedvezményezett nevét is
      tartalmazza, ahol van ilyen), és a végállással. */
+  /* ---- A HATÁRIDŐS PÁRHARC-GYŐZELEM (3.9.58) ----
+     A naplósor elgörög a szezonzárás sűrűjében, pedig ez a közös karrier
+     VÉGE — ezért a jelentésben is ott a helye, a szezon tetején. Csak abban a
+     szezonban jelenik meg, amelyikben megtörtént. */
+  try{
+    const _ff=S.mpForfeit;
+    if(_ff&&_ff.season===(S.seasonNumber||1))
+      html=`<div style="border-left:3px solid var(--grass);padding:8px 10px;margin-bottom:10px;`
+        +`background:color-mix(in srgb,var(--grass) 10%,transparent);border-radius:8px">`
+        +`<div style="color:var(--grass);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.8px">🏆 Megnyerted a párharcot</div>`
+        +`<div style="font-size:13px;margin-top:4px">A társad${_ff.mate?` (${esc(teamLabel(_ff.mate))})`:""} `
+        +`${_ff.tempo?`<b>${esc(_ff.tempo)} tempóban</b> sem`:"nem"} zárta le a szezonját a határidőn belül, `
+        +`ezért a hajsza a te javadra dőlt el. A közös karrier itt véget ért — a tiéd `
+        +`egyjátékosként folytatódik.</div></div>`+html;
+  }catch(e){}
   html+=seasonChallengeSummaryHtml();
   html+=cardResultsHtml(cardResults);
   if(cardUps.length)
@@ -88996,7 +89078,7 @@ function saveGame(){
         oppBuffH:S.oppBuffH,
         mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,pendingCardUps:S.pendingCardUps,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,mpTable:S.mpTable,seasonDrama:S.seasonDrama,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpBalanceP:S.mpBalanceP,
         mpDecision:S.mpDecision,mpDecisionCup:S.mpDecisionCup,mpCupSeason:S.mpCupSeason,
-        mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,
+        mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,mpForfeit:S.mpForfeit,
         mpOppStart:S.mpOppStart,mpOppSnap:S.mpOppSnap,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen,
         /* a keretlista lenyitott csoportjai — a nézet állapota is a mentés
@@ -89669,6 +89751,9 @@ function applySavedGame(d){
   S.mpDecision=d.S.mpDecision||null;
   S.mpHistory=d.S.mpHistory||[];
   S.mpDuelLog=d.S.mpDuelLog||[];
+  /* HATÁRIDŐS GYŐZELEM: régi mentésben nincs — ott üresen marad, ami pontosan
+     az igazság: nem volt ilyen párharc. */
+  S.mpForfeit=d.S.mpForfeit||null;
   /* Az ellenfél csapatlapja. Régi mentésben nincs — a szezonindulói
      összefoglaló a következő szezonkezdésnél, a befagyasztott felállás a
      következő párharcnál jön meg magától. */

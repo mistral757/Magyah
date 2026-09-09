@@ -620,13 +620,36 @@ sorok (szezon-összegzők, piramis-jegyzetek — ugyanaz az `ev` osztály, de ne
 események), a saját hangulatjellel induló sorok (🌀 tiki-taka, 🔥 a padról), és
 a hangsúlyos osztályok (gól, lap, élet), amiknek már van saját jelük.
 
+## szezonzaras-lezaras-proba.js — 🏆 a szezonzárás kapuja
+
+```
+node tools/szezonzaras-lezaras-proba.js
+```
+
+A közös karrier szezonzárásánál a határidő után **nincs továbblépés** — csak
+egyetlen dolog nyílik ki: lezárhatod a párharcot azzal, hogy te nyertél, mert a
+társad nem ért ide időben.
+
+**Miért kell rá külön próba.** A nyolc várakozó kapu EGY rétegen osztozik
+(`mpSoloArm`/`mpSoloOffer`), és a kiútjuk lágy: a saját eredményemmel megyek
+tovább, a társad karrierje sértetlen. A szezonzárásé most már nem lágy — a te
+oldaladon LEZÁRJA a közös karriert. Egy ilyen kivételt könnyű elrontani a közös
+rétegen, ezért a próba **mindkettőt** méri: hogy a szezonzárás kapuja sosem lép
+magától (Villám módban sem) és megerősítést kér, ÉS hogy a többi kapu
+továbbra is automatikus és továbblépést kínál.
+
+A lezárás útját végigviszi: a győzelem könyvelve a szezonra szólóan, a közös
+karrier leválik (`h2hRoomActive()` hamis lesz, tehát a `finish()` nem áll meg
+újra ezen a kapun), a szezonzárás folytatódik a jelentés felé, és a mentés
+viszi. Részletek: `docs/kozos-karrier-szezonzaras.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 39 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 40 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
