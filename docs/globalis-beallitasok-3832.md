@@ -70,7 +70,7 @@ európai kupák tempója.
 > jutalmazza."
 
 **Ami közben történt.** A négy fokozat mérése (docs 5.3) a 3.4-es kód alapján
-készült. Azóta bejött a szezonkártya-TSI, a hangsúly-csúszkák, a
+készült. Azóta bejött a szezonkártya-POT, a hangsúly-csúszkák, a
 kontra/pontrúgás-rendszer, a szerep-attribútumok és az összhang — mind a **jól
 szervezett** csapatot jutalmazza, és mind a felhasználó oldalán. A mezőny
 ütemén viszont semmi nem változott: a régi „Lépést tartanak" ma annyit ér, mint
@@ -133,7 +133,7 @@ fejlesztés ezen a csatornán gyakorlatilag nem látszott.
 | 10★ | 2 → **6** |
 
 **A kezdő scout plafonja 3,5★.** Eddig 5-ig sorsolhatott, és egy 4,5-ös kezdés
-fél karriernyi előnyt adott ingyen: pontosabb TSI-becslés, jobb akadémia, több
+fél karriernyi előnyt adott ingyen: pontosabb POT-becslés, jobb akadémia, több
 felderítés, sűrűbb ikon — és mostantól több esemény is. A scout fejleszthető,
 tehát ez nem elvesz, hanem a fejlesztést teszi érdemivé.
 

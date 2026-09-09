@@ -1,18 +1,18 @@
-/* ⭐ A CSÚCS-ALAP (Rating a csúcson) — a rating–TSI–életkor hármas mérése (3.9.54)
+/* ⭐ A CSÚCS-ALAP (Rating a csúcson) — a rating–POT–életkor hármas mérése (3.9.54)
 
    KIMONDOTT ELV, amit a próba ŐRIZ:
      „minden játékos, aki több instantban is benne van az adatbázisban, kap egy
-      életkor-TSI kombót mindegyik instantban (akárcsak a rating a szezonban
+      életkor-POT kombót mindegyik instantban (akárcsak a rating a szezonban
       módban, ami gyakorlatilag ennek a módnak az alapja), és bármelyik
       instantjában nyitod ki azt a játékost tartalmazó csapatot, te azt az
       instantját fogod megkapni, amelyik az összes instant közül a legerősebb
       volt ennél a generálásnál"
 
    ÉS A KÉT KÉRT VÁLTOZTATÁS:
-     1. „toljuk feljebb egy 15%-kal a várható kiosztott TSI-t a teljes
+     1. „toljuk feljebb egy 15%-kal a várható kiosztott POT-t a teljes
         adatbázisra",
      2. „a teljes adatbázisra a ténylegesen legenerált, beillesztett születési
-        évekből számított életkorok és ratingok alapján számítsunk TSI-t és
+        évekből számított életkorok és ratingok alapján számítsunk POT-t és
         életkort".
 
    A próba a TELJES adatbázison mér (3439 játékos, 4626 kártya, 319 klub), nem
@@ -62,22 +62,22 @@ const {spawn}=require('child_process');
       /* ugyanaz a személy MINDEN klubjából? */
       for(let i=1;i<lapok.length;i++){
         const m=careerDraftPlayer(e,lapok[i].sq);
-        if(m.ovr!==elso.ovr||m.age!==elso.age||m.tsi!==elso.tsi||m.peak!==elso.peak){elter++;break;}}
+        if(m.ovr!==elso.ovr||m.age!==elso.age||m.pot!==elso.pot||m.peak!==elso.peak){elter++;break;}}
       /* és tényleg a LEGJOBB kártyája? */
       const maxOvr=Math.max(...lapok.map(x=>Math.round(x.sp.ovr)));
       if(elso.ovr!==maxOvr)nemLegjobb++;
       /* és tényleg a LEGERŐSEBB instant? (minden kártyájára lefuttatva) */
-      let legTsi=-1,legOvr=-1;
+      let legPot=-1,legOvr=-1;
       lapok.forEach(x=>{
         const bb=seasonBasisFor(e,x.sp,x.sq,{peakCard:true});
-        if(bb){legTsi=Math.max(legTsi,Math.round(bb.tsi*PEAK_TSI_BONUS/10)*10);
+        if(bb){legPot=Math.max(legPot,Math.round(bb.pot*PEAK_POT_BONUS/10)*10);
                legOvr=Math.max(legOvr,bb.ovr);}});
-      if(elso.tsi<legTsi-0.5||elso.ovr<legOvr-0.5)nemLegerosebb++;
-      if(pelda.length<3)pelda.push({n,klubok:lapok.length,ovr:elso.ovr,age:elso.age,tsi:elso.tsi});});
+      if(elso.pot<legPot-0.5||elso.ovr<legOvr-0.5)nemLegerosebb++;
+      if(pelda.length<3)pelda.push({n,klubok:lapok.length,ovr:elso.ovr,age:elso.age,pot:elso.pot});});
     o.kanonikus={elter,nemLegjobb,nemLegerosebb,pelda};
 
     /* ── 2. A 15%-OS RÁTÉT A TELJES ADATBÁZISON ─────────────────────────── */
-    let sTsi=0,sNyers=0,sEst=0,csucsNemKoveti=0,ovrElter=0,n2=0;
+    let sPot=0,sNyers=0,sEst=0,csucsNemKoveti=0,ovrElter=0,n2=0;
     const kor_ismert=[],kor_becsult=[];
     nevek.forEach(n=>{
       const e=pool[n];
@@ -86,13 +86,13 @@ const {spawn}=require('child_process');
       const kesz=peakBasisFor(e);
       if(!nyers||!kesz)return;
       n2++;
-      sNyers+=nyers.tsi;sTsi+=kesz.tsi;sEst+=kesz.estimatedTSI;
-      if(tsiToPeakOvr(kesz.tsi)>kesz.peak+0.5)csucsNemKoveti++;
+      sNyers+=nyers.pot;sPot+=kesz.pot;sEst+=kesz.estimatedPOT;
+      if(potToPeakOvr(kesz.pot)>kesz.peak+0.5)csucsNemKoveti++;
       if(kesz.ovr!==Math.round(best.sp.ovr))ovrElter++;
       (BIRTH_YEAR[n]!=null?kor_ismert:kor_becsult).push(kesz.age);});
     const atl=a=>a.reduce((s,v)=>s+v,0)/a.length;
-    o.ratet={db:n2,arany:Math.round(sTsi/sNyers*1000)/1000,
-      becsles_arany:Math.round(sEst/sTsi*1000)/1000,
+    o.ratet={db:n2,arany:Math.round(sPot/sNyers*1000)/1000,
+      becsles_arany:Math.round(sEst/sPot*1000)/1000,
       csucsNemKoveti,ovrElter};
 
     /* ── 3. AZ ÉLETKOR FORRÁSA ─────────────────────────────────────────── */
@@ -122,15 +122,15 @@ const {spawn}=require('child_process');
      const best=careerBestCardFor(nevek[0]);
      const sz=seasonBasisFor(e,best.sp,best.squad);            /* peakCard NÉLKÜL */
      const cs=seasonBasisFor(e,best.sp,best.squad,{peakCard:true});
-     o.szezon_erintetlen={tsi_azonos:sz.tsi===cs.tsi,peak_azonos:sz.peak===cs.peak};}
+     o.szezon_erintetlen={pot_azonos:sz.pot===cs.pot,peak_azonos:sz.peak===cs.peak};}
     /* szezon-alap a TELJES adatbázison: nincs rajta rátét */
     {let el=0,n3=0;
      SQUADS.forEach(sq=>{if(sq.wc)return;sq.players.forEach(sp=>{
        const e=pool[sp.n];if(!e)return;n3++;
        const bb=seasonBasisFor(e,sp,sq);
-       const alap=Math.max(e.tsi||0,peakToTsi(Math.min(ratingCap(),
+       const alap=Math.max(e.pot||0,peakToPot(Math.min(ratingCap(),
          Math.max(Math.round(sp.ovr),e.refOvr!=null?e.refOvr:Math.round(sp.ovr),Math.round(e.peak||0)))));
-       if(bb.tsi!==alap)el++;});});
+       if(bb.pot!==alap)el++;});});
      o.szezon_teljes={kartya:n3,elter:el};}
 
     /* ── 5. DETERMINIZMUS ──────────────────────────────────────────────── */
@@ -151,9 +151,9 @@ const {spawn}=require('child_process');
   console.log("  minta: "+JSON.stringify(r.kanonikus.pelda));
 
   console.log("\n=== 2. a 15%-os rátét a TELJES adatbázison ===");
-  ok("a kiosztott TSI 15%-kal feljebb (teljes adatbázis, ±0,5%)",
+  ok("a kiosztott POT 15%-kal feljebb (teljes adatbázis, ±0,5%)",
      Math.abs(r.ratet.arany-1.15)<0.005,r.ratet.arany);
-  ok("a CSÚCS is követi a TSI-t (nincs üres ígéret)",r.ratet.csucsNemKoveti===0,
+  ok("a CSÚCS is követi a POT-t (nincs üres ígéret)",r.ratet.csucsNemKoveti===0,
      r.ratet.csucsNemKoveti);
   ok("a scout becslése a MEGEMELT számra vonatkozik",
      Math.abs(r.ratet.becsles_arany-1)<0.02,r.ratet.becsles_arany);
@@ -176,7 +176,7 @@ const {spawn}=require('child_process');
 
   console.log("\n=== 4. a másik két fokozat érintetlen ===");
   ok("a szezon-alap se rátétet, se csúcskártya-kort nem kap",
-     r.szezon_erintetlen.tsi_azonos&&r.szezon_erintetlen.peak_azonos,r.szezon_erintetlen);
+     r.szezon_erintetlen.pot_azonos&&r.szezon_erintetlen.peak_azonos,r.szezon_erintetlen);
   ok("és ez a TELJES adatbázis minden kártyájára igaz",
      r.szezon_teljes.elter===0,r.szezon_teljes);
 

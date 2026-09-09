@@ -167,8 +167,8 @@ Az ifi-boost eddig kizárólag akadémistára ment (`youthBonus > 0` **és**
 legfeljebb 23 éves) — a kinevelt sztár pont akkor esett ki belőle, amikor a klub
 köré épült. A képesség egy emberre kinyitja. **Három** helyen dönt ugyanaz a
 predikátum (`canYouthBoost`): a HUB gombjánál, a jelöltlistánál és a
-**TSI-plafonnál**. Az utolsó a fontos: a boost ajándéka a TSI-ugrás, és a
-felnőtt `TSI_SOFT_CAP` némán elnyelné.
+**POT-plafonnál**. Az utolsó a fontos: a boost ajándéka a POT-ugrás, és a
+felnőtt `POT_SOFT_CAP` némán elnyelné.
 
 ### Fejlődés gyorsítás
 

@@ -28,7 +28,7 @@ tétje: minden a kupán múlt, a nyári keret pedig kerekítési hiba volt melle
 
 A keret a csapaterő **telítődő** görbéjén ült: 90 fölött fix +700 pont
 Rating-pontonként. A játékosárak viszont **konvexek** — a csillag-felár
-(`starValueMult`) 6000 TSI fölött külön kitevőt kap, mert a világ legjobbjából
+(`starValueMult`) 6000 POT fölött külön kitevőt kap, mert a világ legjobbjából
 nincs másik.
 
 Egy telítődő és egy konvex görbe szükségszerűen szétnyílik. Minél előrébb tart a

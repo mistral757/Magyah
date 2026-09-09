@@ -125,7 +125,7 @@ játékban: a teljes csapategyensúly-jutalom maximuma +2,00, a legerősebb
 aura-skill (Motor) +2,0, a telt házas morál nagyjából ugyanennyi. A `+5` a
 `teamStrength` képletébe **közvetlenül** ül be (`ovr = sum/11 + … + styleBonus`),
 és a bérszámfejtés horgonya szerint a csapaterő minden pontja ~525 pontnyi
-keretnek felel meg 90 fölött — vagyis ez a képesség egymaga **~2 600 TSI-nyi
+keretnek felel meg 90 fölött — vagyis ez a képesség egymaga **~2 600 POT-nyi
 keretet ér**. A **Nélküle nem megy III.** (±4) rátehető: együtt **+9**.
 
 **Dobogó alatt:** Kiosztott szerepek III. (Bombázók, ×3,7 gólsúly) ·

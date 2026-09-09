@@ -1,6 +1,6 @@
 /* 🔮 AZ AKADÉMIAI ELŐREJELZÉS + A SZEZONONKÉNTI EGYSZERI AJÁNLAT — élő mérés.
    Amit néz:
-     1. az előrejelzés a KEZDŐ TSI-t, a KORT és a KEZDŐ RATINGET is figyelembe
+     1. az előrejelzés a KEZDŐ POT-t, a KORT és a KEZDŐ RATINGET is figyelembe
         veszi (más tehetség → más pálya),
      2. a jóslat DETERMINISZTIKUS — kétszer hívva bitre ugyanaz,
      3. nem ír bele az élő állapotba (a pool-bejegyzés érintetlen marad),
@@ -33,16 +33,16 @@ const {spawn}=require('child_process');
     const o={};
     gameMode="career";careerPool=careerPool||{};infinityMode=false;
     S.seasonNumber=3;
-    const mk=(n,age,rating,tsi)=>{
+    const mk=(n,age,rating,pot)=>{
       careerPool[n]={n,pos:["CS"],nat:"Magyarország",conf:0,age,startRating:rating,
-        peak:tsiToPeakOvr(tsi),basePeak:tsiToPeakOvr(tsi),tsi,
-        youthBonus:0,youthBonusStartAge:age,formPoints:0,estimatedTSI:tsi};
+        peak:potToPeakOvr(pot),basePeak:potToPeakOvr(pot),pot,
+        youthBonus:0,youthBonusStartAge:age,formPoints:0,estimatedPOT:pot};
       return careerPool[n];};
 
     /* ---- 1. A HÁROM BEMENET SZÁMÍT ---- */
     const alap=mk("Alap",17,66,5200);
     o.alap=academyProject(alap,3);
-    o.tehetsegesebb=academyProject(mk("Tehets",17,66,7600),3);   /* csak a TSI más */
+    o.tehetsegesebb=academyProject(mk("Tehets",17,66,7600),3);   /* csak a POT más */
     o.idosebb    =academyProject(mk("Idos",   20,66,5200),3);    /* csak a kor más */
     o.jobbRating =academyProject(mk("JobbR",  17,74,5200),3);    /* csak a Rating más */
 
@@ -51,10 +51,10 @@ const {spawn}=require('child_process');
                b:JSON.stringify(academyProject(alap,3))};
 
     /* ---- 3. NEM ÍR AZ ÉLŐ ÁLLAPOTBA ---- */
-    const elotte=JSON.stringify({age:alap.age,r:alap.startRating,tsi:alap.tsi,
+    const elotte=JSON.stringify({age:alap.age,r:alap.startRating,pot:alap.pot,
       peak:alap.peak,fp:alap.formPoints});
     academyProject(alap,3);
-    o.tiszta=elotte===JSON.stringify({age:alap.age,r:alap.startRating,tsi:alap.tsi,
+    o.tiszta=elotte===JSON.stringify({age:alap.age,r:alap.startRating,pot:alap.pot,
       peak:alap.peak,fp:alap.formPoints});
 
     /* ---- 4. A BALLAGÁS HATÁRA ---- */
@@ -88,12 +88,12 @@ const {spawn}=require('child_process');
     /* ---- 10. A MAG EGYEZIK A VALÓDI JÁTÉKKAL ---- */
     const e1=mk("Valos",17,66,5200), e2=mk("Jos",17,66,5200);
     /* „valódi": ugyanaz a két mag, de a LIVE úton (kockadobás nélkül nem
-       hasonlítható, ezért a TSI-ágat mindkettőnél a várható értékre kérjük) */
+       hasonlítható, ezért a POT-ágat mindkettőnél a várható értékre kérjük) */
     for(let m=0;m<30;m++)academyMatchStep(e1,true);
     careerAgeStepCore(e1,false);
     const jos=academyProject(e2,1)[0];
-    o.mag_egyezik={valos:{kor:e1.age,r:Math.round(e1.startRating),tsi:Math.round(e1.tsi)},
-                   jos:{kor:jos.kor,r:jos.rating,tsi:jos.tsi}};
+    o.mag_egyezik={valos:{kor:e1.age,r:Math.round(e1.startRating),pot:Math.round(e1.pot)},
+                   jos:{kor:jos.kor,r:jos.rating,pot:jos.pot}};
     return o;}));
 
   /* ---- 6-9. AZ AJÁNLAT-FÉK ---- */
@@ -102,8 +102,8 @@ const {spawn}=require('child_process');
     gameMode="career";S.seasonNumber=5;S.idx=0;S.auto=false;
     S.frozenAcademySeasons=0;
     const mk=(n,age)=>{careerPool[n]={n,pos:["CS"],nat:"Magyarország",conf:0,age,
-      startRating:70,peak:tsiToPeakOvr(4000),basePeak:tsiToPeakOvr(4000),tsi:4000,
-      youthBonus:0,youthBonusStartAge:age,formPoints:0,estimatedTSI:4000};
+      startRating:70,peak:potToPeakOvr(4000),basePeak:potToPeakOvr(4000),pot:4000,
+      youthBonus:0,youthBonusStartAge:age,formPoints:0,estimatedPOT:4000};
       drafted.add(n);return careerPool[n];};
     mk("Ifi1",18);mk("Ifi2",18);mk("Ifi3",18);
     S.academy=[{n:"Ifi1",leftAge:17,leftRating:66,leftSeason:4,times:1},
@@ -136,8 +136,8 @@ const {spawn}=require('child_process');
     gameMode="career";S.seasonNumber=3;
     const n="Ballagó Béla";
     careerPool[n]={n,pos:["CS"],nat:"Magyarország",conf:0,age:21,startRating:74,
-      peak:tsiToPeakOvr(4200),basePeak:tsiToPeakOvr(4200),tsi:4200,
-      youthBonus:0,youthBonusStartAge:21,formPoints:0,estimatedTSI:4200};
+      peak:potToPeakOvr(4200),basePeak:potToPeakOvr(4200),pot:4200,
+      youthBonus:0,youthBonusStartAge:21,formPoints:0,estimatedPOT:4200};
     const pr=careerPlayerFromPoolEntry(careerPool[n]);
     const rec={n,leftAge:17,leftRating:64,leftSeason:1,times:3};
     showAcademyReveal(pr,()=>{},rec,true);
@@ -150,7 +150,7 @@ const {spawn}=require('child_process');
 
   const A=[],ok=(n,f,mit)=>A.push({n,ok:!!f,mit:mit||""});
   const r=s=>s.map(x=>x.rating).join("→");
-  ok("a TEHETSÉG (TSI) számít — nagyobb TSI, magasabb pálya",
+  ok("a TEHETSÉG (POT) számít — nagyobb POT, magasabb pálya",
      r(out.tehetsegesebb)!==r(out.alap),`${r(out.alap)} vs ${r(out.tehetsegesebb)}`);
   ok("a KOR számít — az idősebb kevesebb szezont kap",
      out.idosebb.length<out.alap.length,`${out.alap.length} vs ${out.idosebb.length} szezon`);

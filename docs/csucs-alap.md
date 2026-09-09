@@ -1,13 +1,13 @@
-# ⭐ A csúcs-alap — rating, TSI és életkor (3.9.54)
+# ⭐ A csúcs-alap — rating, POT és életkor (3.9.54)
 
 *(Érintett kód: `CAREER_BEST_CARD` / `careerBestCardFor` · `peakAgeEmpiric` /
 `peakAgeDraw` · `seasonBasisFor` (`opts.peakCard`) · `peakBasisFor` ·
-`PEAK_TSI_BONUS` · `commitSeasonBasis`. Mérés: `tools/csucs-alap-proba.js`.)*
+`PEAK_POT_BONUS` · `commitSeasonBasis`. Mérés: `tools/csucs-alap-proba.js`.)*
 
 ## 1. Az elv, kimondva és ellenőrizve
 
 > „minden játékos, aki több instantban is benne van az adatbázisban, kap egy
-> életkor-TSI kombót mindegyik instantban (akárcsak a rating a szezonban
+> életkor-POT kombót mindegyik instantban (akárcsak a rating a szezonban
 > módban, ami gyakorlatilag ennek a módnak az alapja), és bármelyik
 > instantjában nyitod ki azt a játékost tartalmazó csapatot, választod ki azt a
 > játékost, te azt az instantját fogod megkapni, amelyik az összes instant közül
@@ -27,7 +27,7 @@ megfogalmazás sugallja: **nem** generálja le mind a hány instantot, hogy azt�
 a legerősebbet válassza, hanem a legmagasabb kártya-Ratingű megjelenést veszi
 (`CAREER_BEST_CARD`) és azon futtatja végig a szezon-alapot. A kettő
 **egyenértékű**, mert a kártyánként változó egyetlen bemenet a kártya
-Ratingje, és a TSI abban monoton — de ez nem magától értetődő, ezért a próba a
+Ratingje, és a POT abban monoton — de ez nem magától értetődő, ezért a próba a
 játékos MINDEN kártyájára lefuttatja a számolást, és összeveti.
 
 Két pontosítás az elvhez:
@@ -46,7 +46,7 @@ A kérés második fele így szólt:
 
 > „mindenképpen a rating a szezonban legyen az alapja ennek a módnak, tehát a
 > teljes adatbázisra a ténylegesen legenerált, beillesztett születési évekből
-> számított életkorok és ratingok alapján számítsunk TSI-t és életkort"
+> számított életkorok és ratingok alapján számítsunk POT-t és életkort"
 
 A szezon-alap tényleg a szülő mód, és a születési év tényleg felülír mindent —
 **de nem a teljes adatbázisra**, mert az adat maga nem teljes:
@@ -76,8 +76,8 @@ kiadja a kártya Ratingjét. Egy *csúcskártyán* a Rating majdnem egyenlő a
 csúccsal, tehát a sáv a 26-30-as platóra szorul — miközben a valóságban a
 játékosok **31%-a 24 éves vagy fiatalabb** volt a legjobb idényében.
 
-Ez a +2 év pontosan az a fajta hiba, ami a „rating-TSI-életkor hármast"
-kellemetlenné teszi: a kártya jó, a TSI rendben, de az ember két évvel közelebb
+Ez a +2 év pontosan az a fajta hiba, ami a „rating-POT-életkor hármast"
+kellemetlenné teszi: a kártya jó, a POT rendben, de az ember két évvel közelebb
 van a hanyatláshoz, mint kellene.
 
 ## 3. A javítás: a becslés a VALÓS korokból tanul
@@ -120,18 +120,18 @@ mindkét szélső tizedben egyezik.
 amit valaha beírunk, egyszerre javítja a saját játékosát ÉS a becslést
 mindenki másra.
 
-## 4. A 15%-os TSI-rátét
+## 4. A 15%-os POT-rátét
 
 > „csaljunk kicsit ebben a módban és toljuk feljebb egy 15%-kal a várható
-> kiosztott TSI-t a teljes adatbázisra"
+> kiosztott POT-t a teljes adatbázisra"
 
-`PEAK_TSI_BONUS = 1.15`, a **kész** TSI-re — nem a sorsolás közepére. Így a
+`PEAK_POT_BONUS = 1.15`, a **kész** POT-re — nem a sorsolás közepére. Így a
 várható érték pontosan 15%-kal nő, az eloszlás alakja pedig változatlan marad.
 Ez azért számít, mert a csúcs-alapon a játékosok háromnegyedénél nem is sorsolás
-dönt: ott a TSI a kártya Ratingjéből számolt **padló** (`peakToTsi(peak)`),
+dönt: ott a POT a kártya Ratingjéből számolt **padló** (`peakToPot(peak)`),
 amire a rátét ugyanúgy ráül.
 
-**A csúcs is követi** (`peak = max(peak, tsiToPeakOvr(tsi))`). TSI-t emelni
+**A csúcs is követi** (`peak = max(peak, potToPeakOvr(pot))`). POT-t emelni
 magában félrevezetés lenne: a scout 👁 nagyobb számot mutatna, a játékos viszont
 ugyanoda nőne fel. A mérés szerint a rátét a 3439-ből **3432-nél** tényleg
 emelte a csúcsot is.
@@ -140,7 +140,7 @@ Mérve, a teljes adatbázison:
 
 | | előtte | utána |
 |---|---|---|
-| TSI átlag | 1588 | **1823** (×1,150) |
+| POT átlag | 1588 | **1823** (×1,150) |
 | medián | 1420 | 1630 |
 | p90 | 2680 | 3250 |
 | p99 | 4570 | 5260 |
@@ -154,8 +154,8 @@ csúcsformája marad a csúcsforma, a rátét a *tehetségben* jelenik meg.
 
 ### 4.1 Egy határ, amit ki kell mondani
 
-A `tsiToPeakOvr` normál módban **96-nál telítődik** (5650-es TSI fölött a csúcs
-már nem nő). A legjobbaknál a 15% ezért csak a TSI-számban, a scout becslésében
+A `potToPeakOvr` normál módban **96-nál telítődik** (5650-es POT fölött a csúcs
+már nem nő). A legjobbaknál a 15% ezért csak a POT-számban, a scout becslésében
 és az árban látszik, a fejlődési plafonban nem. Ez 24 játékost érint (akik a
 csúcs 96-on állnak). Infinityben nincs telítődés, ott a csúcs is együtt megy.
 
@@ -173,12 +173,12 @@ is, mint amilyenek jelenleg csak a lutri módban születnek néha". A 15% ezt
 | 8000 fölött | 1 | 40 |
 
 Az ok szerkezeti, nem hangolási: a lutri **log-sávot** használ
-(`TSI_SPREAD.wild.log = 3,2`, arányban szimmetrikus szorzó), a csúcs-alap
+(`POT_SPREAD.wild.log = 3,2`, arányban szimmetrikus szorzó), a csúcs-alap
 pedig a szűk `ref` sávot (`half = 0,30`), amit épp azért szűkítettünk, hogy a
 mód ígérete („a kártya csúcsformája tényleg megvalósul") teljesüljön. Egy
 15%-os eltolás a *középpontot* mozgatja, a *farkat* nem.
 
-Ha a cél tényleg a lutri-szerű szörnyetegek, az a `TSI_SPREAD.ref` szórásán
+Ha a cél tényleg a lutri-szerű szörnyetegek, az a `POT_SPREAD.ref` szórásán
 múlik, nem a szorzón — és az a mód másik ígéretével áll szemben. Ez tudatos
 döntési pont, nem elfelejtett munka.
 
@@ -186,7 +186,7 @@ döntési pont, nem elfelejtett munka.
 
 * **a szezon-alap és a lutri** — a `peakCard` kapcsoló nélkül a `seasonBasisFor`
   betűre a régi; a próba a teljes adatbázis mind a 4181 klub-kártyájára méri,
-  hogy a TSI ott változatlan;
+  hogy a POT ott változatlan;
 * **az átigazolási piac, a scout ajánlatai, az ikonok és az akadémia** — azok a
   karrier további részében ugyanúgy a kanonikus pool-ból dolgoznak. A fokozat
   egy INDULÁSI PILLANATKÉP, nem a világ szabálya;

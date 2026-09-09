@@ -456,14 +456,14 @@ node tools/ifi-elorejelzes-proba.js
 ```
 
 Azt méri, amit egy ifi felajánlásakor a játékos LÁT: hány szezonra előre
-mutatja meg a game a fiatal várható ratingjét és TSI-jét, mihez méri, és
+mutatja meg a game a fiatal várható ratingjét és POT-jét, mihez méri, és
 hogy ugyanaz a srác nem kopogtat-e be kétszer egy szezonban.
 
 **A legfontosabb állítása** az, hogy az előrejelzés és a valóság UGYANAZT a
 számtant futtatja. Az `academyMatchStep()` és a `careerAgeStepCore()` azért
 külön függvény, hogy a jóslás ne egy második, párhuzamos képlet legyen: a
 próba lejátszik egy szezont élesben, előrejelez egy szezont, és a kettőnek
-kor–rating–TSI hármasban egyeznie kell. Ha valaki holnap a fejlődési görbén
+kor–rating–POT hármasban egyeznie kell. Ha valaki holnap a fejlődési görbén
 igazít, de csak az egyik helyen, ez a sor pirosodik ki.
 
 **A mérce a LEGJOBB 11**, nem a felállított kezdő tizenegy — és nem a keret
@@ -479,7 +479,7 @@ már felajánlott név ne jöjjön elő újra; a szezonváltás után viszont ig
 A ballagás (`ACADEMY_GRADUATE_AGE`) ettől függetlenül garantált marad.
 
 **Amit a jóslás szándékosan NEM tartalmaz:** kupameccseket, boostot és
-szerencsét. A TSI-ugrás a valóságban dobókocka (`ACADEMY_TSI_CHANCE`), az
+szerencsét. A POT-ugrás a valóságban dobókocka (`ACADEMY_POT_CHANCE`), az
 előrejelzésben a várható értéke — így a szám determinisztikus, és inkább
 alálő, mint ígérget. A felajánlás alján ezért áll ott, hogy ez nem ígéret.
 
@@ -514,7 +514,7 @@ ez a javítás másik fele. A fölényt te építed; a Run-plafon pedig továbbr
 valódi rést mér, csak a kezdőrúgáskor mértet. Részletek:
 `docs/rajt-nehezseg.md` 7. fejezet.
 
-## csucs-alap-proba.js — ⭐ a rating–TSI–életkor hármas a csúcs-alapon
+## csucs-alap-proba.js — ⭐ a rating–POT–életkor hármas a csúcs-alapon
 
 ```
 node tools/csucs-alap-proba.js
@@ -527,7 +527,7 @@ mintán — a kérés is a teljes adatbázisra szólt.
 tartozik, bármelyik klubból nyitod ki; az az ember a LEGJOBB kártyája; és az
 egyben a LEGERŐSEBB instantja is. A harmadik azért külön sor, mert a kód nem
 generálja le mind a hány instantot, hogy aztán a legerősebbet válassza — a
-legmagasabb kártya-Ratingű megjelenést veszi. A kettő egyenértékű (a TSI a
+legmagasabb kártya-Ratingű megjelenést veszi. A kettő egyenértékű (a POT a
 kártya Ratingjében monoton), de ez nem magától értetődő, ezért a próba a
 játékos **minden** kártyájára lefuttatja a számolást és összeveti.
 
@@ -539,13 +539,13 @@ régi becslés hibáját is: az a 2240 ismert eseten +2,0 évvel öregebbnek mon
 játékosokat a valóságnál, mert a „Ratinggel összeférő sáv" egy csúcskártyán a
 26-30-as platóra szorul, miközben a valós csúcskorok 31%-a 24 év alatt van.
 
-A 15%-os TSI-rátétet is a teljes adatbázison ellenőrzi (arány 1,150 ± 0,005),
-és külön azt, hogy **a csúcs is követi** a megemelt TSI-t — enélkül a scout
+A 15%-os POT-rátétet is a teljes adatbázison ellenőrzi (arány 1,150 ± 0,005),
+és külön azt, hogy **a csúcs is követi** a megemelt POT-t — enélkül a scout
 nagyobb számot mutatna, a játékos viszont ugyanoda nőne fel. A Ratingnek
 eközben egyetlen játékosnál sem szabad elmozdulnia.
 
 Két regressziós ág zárja: a szezon-alap mind a 4181 klub-kártyáján változatlan
-TSI-t ad, és kétszer hívva minden bitre ugyanaz. Részletek: `docs/csucs-alap.md`.
+POT-t ad, és kétszer hívva minden bitre ugyanaz. Részletek: `docs/csucs-alap.md`.
 
 **Egy fixtúra-buktató, amibe elsőre beleestem:** a `cardBasisOn()` a
 `gameMode`-ot is nézi. `gameMode="career"` nélkül a `careerDraftPlayer` a

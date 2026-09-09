@@ -108,7 +108,7 @@ guide-motor létezik — nincs közös prioritás, nincs cooldown, nincs kikapcs
 ### 1.4 A fogalomtár
 
 42 bejegyzés (`draft`, `posztfit`, `megbizas`, `kemia`, `taktika`, `edzesterv`,
-`tsi`, `scout`, `ugynokseg`, `akademia`, `budzse`, `szezonkartya`, `runszint`,
+`pot`, `scout`, `ugynokseg`, `akademia`, `budzse`, `szezonkartya`, `runszint`,
 `cserek`, `skillek`, `kihivasok`, …). **A tananyag java megvan** — a hiány az
 időzítés és a kiemelés, nem a szöveg. A tartalomcsomagoknál ezt kell
 kihasználni: rövid „miért most" a buborékban, mély magyarázat a fogalomtárból.
@@ -119,9 +119,9 @@ A kért témák közül **11-nek van ma valamilyen tippje, 14-nek semmi**, és
 mindössze 3 rendelkezik halk jelzéssel:
 
 * **Van L1 tipp:** megbízás/árnyékék, kihívások, skillek, kémia (csak a draft
-  utáni elemzés), TSI, Run szint, szezonkártya, poszt-tanulás, mérföldkövek
+  utáni elemzés), POT, Run szint, szezonkártya, poszt-tanulás, mérföldkövek
   (közvetve, az Infópult-tippen át), csapatstílus (csak a menü-tippben egy
-  félmondat), scout (csak a TSI-tipp mellékmondatában).
+  félmondat), scout (csak a POT-tipp mellékmondatában).
 * **Nincs semmi:** felállás módosítása, taktika **átállítása** (csak a
   kezdőválasztásra van tipp), igazolás utáni becserélés, ifi felvétele vagy
   akadémián tartása, edzésterv, csere meccs közben, stílus-kategóriák
@@ -236,7 +236,7 @@ nyereség), **C** = optimalizálás.
 | 18 | Skillek | első skill megszerzése; félbemaradt fázisok | játékoslap | L1 ✅ | B |
 | 19 | Kémia építése | induló párkémia (`chemPairs`) | keretlista | L1 részben | B |
 | 20 | Pro/kontra a skill-csoportosításban | 3+ azonos kategóriájú skill egy emberen | játékoslap | — | C |
-| 21 | TSI jelentősége | első felderítetlen TSI | 👁 jel | L1 ✅ | B |
+| 21 | POT jelentősége | első felderítetlen POT | 👁 jel | L1 ✅ | B |
 | 22 | Run szint | első lezárt szezon | `hubRunMeter` | L1 ✅ | C |
 | 23 | Szezonkártyák szerzése | valaki kártya-küszöb közelében | keretlista | L1 ✅ | C |
 | 24 | Öltöző | új bejegyzés a `lockerLog`-ban | `lockerBtn` | — | B |
@@ -383,7 +383,7 @@ buborékszöveg, 2–4 lépéses vezetés, nudge-felirat, `GLOSSARY`-kötés.
 **A C csomag két megjegyzése:**
 
 6. **Nem minden témából lesz jelzés — és ez nem hiány.** A hosszú távú témák
-   zöme (TSI, skillek alapjai, szezonkártya) *felismerés*, nem elintézetlenség:
+   zöme (POT, skillek alapjai, szezonkártya) *felismerés*, nem elintézetlenség:
    nincs mit „megcsinálni" tőlük, tehát nincs mire villogni. Ezek a **tipp**
    szinten maradtak, ott is vannak jól. A csomagból csak kettőből lett jelzés —
    a parlagon álló kész párkémiából és a meg nem nyitott Run-mérőből —, mert

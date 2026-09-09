@@ -51,7 +51,7 @@ const srv=http.createServer((req,rp)=>{
     const jatekos=(n,m,perc,age)=>{
       S.careerStats[n]={g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:m,min:perc};
       careerPool[n]={n,age:age||34,attrs:{},pos:["CS"],peak:80,leadI:2,coopI:2,aggroI:2};
-      return {n,tsi:5000,age:age||34,pos:["CS"]};};
+      return {n,pot:5000,age:age||34,pos:["CS"]};};
 
     /* (a) SZÁZ ÖTPERCES BEÁLLÁS — a régi szabály szerint rég piacra vihető
            volt (100 ≥ 20 meccs) ÉS edző is lehetett volna (100 ≥ 40). */
@@ -91,7 +91,7 @@ const srv=http.createServer((req,rp)=>{
        A pótlás percre pontosan meccsszám×90, tehát a `m90` betűre a régi
        meccsszám. Ezt közvetlenül ellenőrizzük a bontásból. */
     careerPool["Régi Dani"]={n:"Régi Dani",age:30,attrs:{},pos:["CS"],peak:80};
-    const regi={n:"Régi Dani",tsi:9000,age:30,pos:["CS"]};
+    const regi={n:"Régi Dani",pot:9000,age:30,pos:["CS"]};
     const mp=saleMeritParts(regi);
     out.regi_ar={m90:mp.m90,meccs:mp.matches,perc:mp.perc,
       egyezik:Math.abs(mp.m90-mp.matches)<1e-9,
@@ -101,7 +101,7 @@ const srv=http.createServer((req,rp)=>{
     const expAt=perc=>{
       S.careerStats["Ráta Dani"]={g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:Math.round(perc/90),min:perc};
       careerPool["Ráta Dani"]={n:"Ráta Dani",age:28,attrs:{},pos:["CS"],peak:80};
-      return +saleExposure({n:"Ráta Dani",tsi:5000,age:28,pos:["CS"]}).toFixed(3);};
+      return +saleExposure({n:"Ráta Dani",pot:5000,age:28,pos:["CS"]}).toFixed(3);};
     out.bizonyitottsag={
       "3600 perc (a régi 40 meccs)":expAt(3600),   /* régen 1,000 volt */
       "5000 perc":expAt(5000),

@@ -314,14 +314,14 @@ vagy egy idempotens újrafutás nem duplázhat.
 
 ## A lenyitható játékos-panel
 
-A panel egyetlen, több képernyőnyi folyammá nőtt — attribútumok, edzés, TSI,
+A panel egyetlen, több képernyőnyi folyammá nőtt — attribútumok, edzés, POT,
 poszt-térkép, Statzone, skillek, kémia, személyiség —, és a keresett dolog
 mindig valahol a közepén volt. Innentől:
 
 ```
 (mindig látszik)  az attribútum-dobozok
 🏋 Edzés és fejlődés
-🧭 Poszt, megbízás és TSI
+🧭 Poszt, megbízás és POT
 📊 Statisztikák
    └ 📈 Forma
    └ 🗂 Statzone

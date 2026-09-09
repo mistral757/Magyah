@@ -46,8 +46,8 @@ const srv=http.createServer((req,rp)=>{
     slots.length=0;
     POS.forEach((pos,i)=>{
       const n=`Teszt Jatekos ${i+1}`;
-      const pl={n,pos:[pos],ovr:80,age:26,tsi:9000,nat:"Magyarország"};
-      careerPool[n]={n,pos:[pos],ovr:80,age:26,tsi:9000,peak:82,nat:"Magyarország",conf:0};
+      const pl={n,pos:[pos],ovr:80,age:26,pot:9000,nat:"Magyarország"};
+      careerPool[n]={n,pos:[pos],ovr:80,age:26,pot:9000,peak:82,nat:"Magyarország",conf:0};
       slots.push({pos,player:pl,fit:1});});
     S.idx=0;S.fixtureResults=[];
 
@@ -204,9 +204,9 @@ const srv=http.createServer((req,rp)=>{
     S.trainingChangeUsed=false;S.bondTrainChangeUsed=false;
     /* Két OLCSÓ tartalék: az „árusítsd ki a keret alját" kihívás legalább
        kettőnél ajánlja fel magát (egyetlen emberért nem tét). */
-    [["Teszt Ifi",18,900],["Teszt Selejt",19,850]].forEach(([n,age,tsi])=>{
-      careerPool[n]={n,pos:["CS"],ovr:64,age,tsi,peak:70,nat:"Magyarorszag",conf:0};
-      extraRoster.push({n,pos:["CS"],ovr:64,age,tsi,nat:"Magyarorszag"});});
+    [["Teszt Ifi",18,900],["Teszt Selejt",19,850]].forEach(([n,age,pot])=>{
+      careerPool[n]={n,pos:["CS"],ovr:64,age,pot,peak:70,nat:"Magyarorszag",conf:0};
+      extraRoster.push({n,pos:["CS"],ovr:64,age,pot,nat:"Magyarorszag"});});
     out.olcsoTartalek=chCheapReserves();
     const uj={};
     for(let i=0;i<1600;i++){
