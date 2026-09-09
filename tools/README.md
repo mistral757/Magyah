@@ -584,13 +584,49 @@ esemény kiválasztható a megfelelő kerettel; a régi mentés szélsőségei
 szélsőségek maradnak; és sehol nem maradt `leadI`/`coopI`/`aggroI` mező.
 Részletek: `docs/jellem-es-moral.md`.
 
+## kommentar-ikon-proba.js — 💬 a közvetítés típusjelei
+
+```
+node tools/kommentar-ikon-proba.js
+```
+
+A napló szürke sorai kis ikont kapnak a perc után (🧤 védés · 🛡️ blokk ·
+🥅 kapufa · ↗️ mellé · 🚩 pontrúgás · 👟 kidolgozás · ⚪ tizenegyes ·
+📺 VAR · 💢 összecsapás · 🎯 lövés). Az ikon **nem a hívási helyeken**
+születik, hanem egy besoroló függvényben, a kész sor szövegéből — különben a
+következő új kommentár-mondat némán ikon nélkül maradna.
+
+**Ennek az ára, hogy a próbának a FORRÁSBÓL kell dolgoznia.** Két helyről
+szedi össze a sablonokat: a `pickTxt([...])` tömbökből (a közvetítés zöme) és
+a perc-bélyeggel induló, `m ev` osztályú `addLine`-hívásokból (az egyedi
+pillanatok), majd mindegyiket átfuttatja az élő besorolón. Ha valaki holnap ír
+egy új mondatot, és az egyik mintára sem illik, ez a sor pirosodik ki.
+
+**Három hibát fogott meg már az első futáson**, és mindhárom néma lett volna:
+
+* a *„BRAVÚR! … tolja **szögletre**"* sor pontrúgás-jelet kapott, pedig az
+  kapusvédés — a szöglet csak a következménye. Innen a szabály: a besorolásban
+  a **kimenetel erősebb, mint az eredet**;
+* a saját `↗️` jelünk (U+2197, a NYILAK blokkból) kicsúszott a kézzel írt
+  emoji-tartományból, ezért egy kétszer feldolgozott sor **két ikont** kapott.
+  A tartomány helyére `\p{Extended_Pictographic}` került, az idempotencia-fék
+  pedig magát a jelölőt nézi, nem a szöveget;
+* az „összecsapás" kategória üresen maradt — nem a kategória volt fölösleges,
+  hanem a merítés hiányos: az a sor nincs `pickTxt`-ben. Ettől lett a
+  forrás-bejárás kétágú.
+
+Emellett azt is állítja, amihez **nem** szabad nyúlni: a perc-bélyeg nélküli
+sorok (szezon-összegzők, piramis-jegyzetek — ugyanaz az `ev` osztály, de nem
+események), a saját hangulatjellel induló sorok (🌀 tiki-taka, 🔥 a padról), és
+a hangsúlyos osztályok (gól, lap, élet), amiknek már van saját jelük.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 38 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 39 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
