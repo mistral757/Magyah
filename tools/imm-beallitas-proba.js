@@ -5,7 +5,7 @@
      2. AKADÉMIA: melyik gombot jelöli meg a panel a három beállításnál — és
         hogy a ballagásnál a „marad" tényleg az elengedést jelöli;
      3. KÉPESSÉG: az öt beállítás tényleg más embert választ-e (a próbakeretet
-        úgy állítjuk össze, hogy a TSI-, a Rating- és a skill-győztes HÁROM
+        úgy állítjuk össze, hogy a POT-, a Rating- és a skill-győztes HÁROM
         KÜLÖNBÖZŐ ember legyen — különben a mérés semmit nem bizonyítana);
      4. TÉTMÉRKŐZÉS: megáll-e a lánc, és mennyi ideig áll a felkészülés;
      5. A FELKÉSZÜLÉS HOSSZA: az 5-30 mp-es vágás mindkét irányban. */
@@ -46,8 +46,8 @@ const srv=http.createServer((req,rp)=>{
     /* ---- 2. AKADÉMIA ---- */
     const akad=(mod,isFinal)=>{
       immSet().ifi=mod;
-      const pr={n:"Ifi Dani",pos:["CS"],age:19,ovr:60,estimatedTSI:4000,tsi:4000};
-      careerPool["Ifi Dani"]={n:"Ifi Dani",age:19,attrs:{},pos:["CS"],startRating:60,tsi:4000};
+      const pr={n:"Ifi Dani",pos:["CS"],age:19,ovr:60,estimatedPOT:4000,pot:4000};
+      careerPool["Ifi Dani"]={n:"Ifi Dani",age:19,attrs:{},pos:["CS"],startRating:60,pot:4000};
       try{showAcademyReveal(pr,()=>{},null,isFinal);}catch(e){return "HIBA: "+e.message;}
       const el=$("unlockActions").querySelector("[data-imm-ajanl]");
       const q=immPending();
@@ -62,17 +62,17 @@ const srv=http.createServer((req,rp)=>{
       marad_ballagaskor:akad("marad",true)};
 
     /* ---- 3. KÉPESSÉG-KIOSZTÁS ----
-       HÁROM KÜLÖNBÖZŐ GYŐZTES: a TSI-é a padon ülő tehetség, a Ratingé a
+       HÁROM KÜLÖNBÖZŐ GYŐZTES: a POT-é a padon ülő tehetség, a Ratingé a
        kezdő erős ember, a skilleké a harmadik. Ha a három egybeesne, a mérés
        akkor is „működik"-et mutatna, amikor a kapcsoló nem csinál semmit. */
     const keret=[
       {n:"Tehetség Dani",pos:["CS"],ovr:70,age:19,aggroI:2},
       {n:"Erős Dani",    pos:["CS"],ovr:92,age:27,aggroI:2},
       {n:"Skilles Dani", pos:["CS"],ovr:75,age:25,aggroI:2}];
-    keret.forEach(x=>{careerPool[x.n]={n:x.n,age:x.age,attrs:{},pos:x.pos,startRating:x.ovr,tsi:0};});
-    careerPool["Tehetség Dani"].tsi=30000;
-    careerPool["Erős Dani"].tsi=6000;
-    careerPool["Skilles Dani"].tsi=9000;
+    keret.forEach(x=>{careerPool[x.n]={n:x.n,age:x.age,attrs:{},pos:x.pos,startRating:x.ovr,pot:0};});
+    careerPool["Tehetség Dani"].pot=30000;
+    careerPool["Erős Dani"].pot=6000;
+    careerPool["Skilles Dani"].pot=9000;
     slots.length=0;
     keret.forEach((x,i)=>slots.push({pos:"CS",player:x}));
     S.skills={"Skilles Dani":[{skill:{id:"x1",cat:"CSATAR",name:"A"},stagesNeeded:3,stagesCompleted:1},
@@ -83,7 +83,7 @@ const srv=http.createServer((req,rp)=>{
     for(let i=0;i<400&&!sk;i++){const c=drawSkillFromPool();if(c&&eligibleForSkill(c).length>=3)sk=c;}
     out.kepesseg_alap={skill:sk&&sk.name,jeloltek:sk?eligibleForSkill(sk).map(x=>x.n):null,
       ratingek:keret.map(x=>x.n+": "+Math.round(pOvr(x))),
-      tsik:keret.map(x=>x.n+": "+careerPool[x.n].tsi)};
+      potok:keret.map(x=>x.n+": "+careerPool[x.n].pot)};
     const kiosztas=mod=>{
       immSet().skill=mod;
       if(!sk)return "nincs próbaképesség";
@@ -99,7 +99,7 @@ const srv=http.createServer((req,rp)=>{
         lanc_ajanl:!!(q&&q.ajanl),lanc_dont:q&&q.dont,lanc_var:!!(q&&q.var)};};
     out.kepesseg={
       rendszer:kiosztas("rendszer"),
-      tsi:kiosztas("tsi"),
+      pot:kiosztas("pot"),
       rating:kiosztas("rating"),
       skill:kiosztas("skill"),
       kerdez:kiosztas("kerdez")};

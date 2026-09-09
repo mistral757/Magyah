@@ -1,7 +1,7 @@
 # Szezonkártyák — mit ad egy kiemelkedő idény
 
-*(3.8.21 — a TSI-ajándék és a szint megtartása. Érintett kód: `CARD_BUMP`,
-`CARD_TSI` / `CARD_TSI_REPEAT` / `cardApplyTsi`, `CARD_CS`, `CARD_SV`,
+*(3.8.21 — a POT-ajándék és a szint megtartása. Érintett kód: `CARD_BUMP`,
+`CARD_POT` / `CARD_POT_REPEAT` / `cardApplyPot`, `CARD_CS`, `CARD_SV`,
 `determineSeasonCards`, `cardResultsHtml`, `cardSeasonStats` /
 `cardMatchMult`.)*
 
@@ -32,13 +32,13 @@ kihagyó ember sem esélytelen, és a sokat játszó sem kap ingyen kártyát.
 | | mit mozdít |
 |---|---|
 | **Rating-bónusz** (`CARD_BUMP`: 1–8) | a MOSTANI erőt — azonnal jobb játékos |
-| **TSI-ajándék** (`CARD_TSI`) | a HOSSZÚ TÁVÚ pályát — a peak a `tsiToPeakOvr`-en át követi, és vele az eladási ár is |
+| **POT-ajándék** (`CARD_POT`) | a HOSSZÚ TÁVÚ pályát — a peak a `potToPeakOvr`-en át követi, és vele az eladási ár is |
 
-**Bejelentett kérés:** *„A szezonkártyák adjanak TSI boostot is — ezüst 5-7% ⇒
-Gyilkos 25-33, Vadista 50-75, GODLIKE 90-125% TSI. A köztesek is kapjanak ezen
+**Bejelentett kérés:** *„A szezonkártyák adjanak POT boostot is — ezüst 5-7% ⇒
+Gyilkos 25-33, Vadista 50-75, GODLIKE 90-125% POT. A köztesek is kapjanak ezen
 az íven."*
 
-| fokozat | Rating | **TSI-ajándék** |
+| fokozat | Rating | **POT-ajándék** |
 |---|--:|--:|
 | ezüst | +1 | **5–7%** |
 | arany | +1 | 8–11% |
@@ -52,30 +52,30 @@ az íven."*
 A felső két fokozat szándékosan szakad el a többitől: azok idényenként
 **egy-egy** embernek járnak.
 
-A mechanika betűre ugyanaz, mint a megvásárolható TSI-boosté (`applyTsiBoost`):
-a **Rating nem ugrik** a TSI-től, csak a fejlődési pálya nyílik ki, és az
-ajándékot kizárólag az abszolút mennyezet fogja (`boostGiftTsi`).
+A mechanika betűre ugyanaz, mint a megvásárolható POT-boosté (`applyPotBoost`):
+a **Rating nem ugrik** a POT-től, csak a fejlődési pálya nyílik ki, és az
+ajándékot kizárólag az abszolút mennyezet fogja (`boostGiftPot`).
 
-**Mérve** (a valódi `cardApplyTsi`-vel, 4000-es TSI-nél):
+**Mérve** (a valódi `cardApplyPot`-vel, 4000-es POT-nél):
 
-| fokozat | TSI-nyereség | a peak ezzel |
+| fokozat | POT-nyereség | a peak ezzel |
 |---|--:|---|
 | ezüst | +200…+280 | 91,2 → 91,9…92,1 |
 | gyémánt | +480…+640 | 91,2 → 92,7…93,2 |
 | Gyilkos | +1000…+1320 | 91,2 → 94,2…95,1 |
 | GODLIKE | +3601…+5000 | 91,2 → 96,0 (a görbe teteje) |
 
-*(A `tsiToPeakOvr` normál módban 96-nál telítődik — a plafon fölött az ajándék a
+*(A `potToPeakOvr` normál módban 96-nál telítődik — a plafon fölött az ajándék a
 piaci értékben és az eladási árban jelenik meg, a fejlődési pálya viszont már
 nem tud tovább nyílni. Infinityben a telítődés feloldódik. Ugyanez áll a
-megvásárolt TSI-boostra is.)*
+megvásárolt POT-boostra is.)*
 
 ---
 
 ## 3. A szint MEGTARTÁSA is ér valamit (3.8.21)
 
 **Bejelentett kérés:** *„Ha egy idény után nem fejlődik a szezonkártya, de
-ugyanazt a szintet megüti a játékos, akkor a megfelelő TSI boost felét kapja
+ugyanazt a szintet megüti a játékos, akkor a megfelelő POT boost felét kapja
 meg. Ha alacsonyabb színvonalú idénye van, mint a kártyája, akkor nem kap
 semmit."*
 
@@ -85,26 +85,26 @@ kártya a csúcson állt, tehát a szezonja nyom nélkül múlt el.
 
 | az idény szintje a kártyához képest | mi jár |
 |---|---|
-| **magasabb** | a kártya lép + teljes Rating-bónusz + **teljes** TSI-ajándék |
-| **ugyanaz** | a kártya marad, Rating-bónusz nincs, **fél** TSI-ajándék (`CARD_TSI_REPEAT`) |
+| **magasabb** | a kártya lép + teljes Rating-bónusz + **teljes** POT-ajándék |
+| **ugyanaz** | a kártya marad, Rating-bónusz nincs, **fél** POT-ajándék (`CARD_POT_REPEAT`) |
 | **alacsonyabb** | semmi — a kártya viszont megmarad |
 
 A kártya tehát **cím**, nem évente újraosztott jelvény: elveszíteni nem lehet,
-de megtartani is munka. Mérve, 4000-es TSI-nél: egy megismételt GODLIKE-idény
-+2427 TSI-t hoz (60,7%), egy megismételt Gyilkos +610-et (15,3%).
+de megtartani is munka. Mérve, 4000-es POT-nél: egy megismételt GODLIKE-idény
++2427 POT-t hoz (60,7%), egy megismételt Gyilkos +610-et (15,3%).
 
 **Egy szándékos következmény:** a felső fokozatok idényenkénti egy-egy helye
 akkor is elfogy, ha a jelöltje már azon a szinten áll (a `godlikeGiven` /
 `vandalGiven` jelző ott is bebillen). Ez így helyes: **ő** teljesítette a
 GODLIKE-idényt, tehát az adott idény GODLIKE-ja az övé — csak épp kártya
-helyett a fél TSI-ajándékot kapja érte.
+helyett a fél POT-ajándékot kapja érte.
 
 ---
 
 ## 4. Amit a szezonzáró jelentés kiír
 
 A „Szezon kártyák" doboz mostantól **mindkét ajándékot** kimondja
-(`+2 Rating · +640 TSI`), és a megtartott szintnek saját mondata van:
+(`+2 Rating · +640 POT`), és a megtartott szintnek saját mondata van:
 *„Megtartotta a szintjét — a kártyája marad, a fejlődési pályája viszont tovább
 nyílt."* Enélkül a fél ajándék néma maradna, és a felhasználó azt látná, hogy
 a kiemelkedő idénye nem ért semmit.

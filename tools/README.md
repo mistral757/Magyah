@@ -456,14 +456,14 @@ node tools/ifi-elorejelzes-proba.js
 ```
 
 Azt méri, amit egy ifi felajánlásakor a játékos LÁT: hány szezonra előre
-mutatja meg a game a fiatal várható ratingjét és TSI-jét, mihez méri, és
+mutatja meg a game a fiatal várható ratingjét és POT-jét, mihez méri, és
 hogy ugyanaz a srác nem kopogtat-e be kétszer egy szezonban.
 
 **A legfontosabb állítása** az, hogy az előrejelzés és a valóság UGYANAZT a
 számtant futtatja. Az `academyMatchStep()` és a `careerAgeStepCore()` azért
 külön függvény, hogy a jóslás ne egy második, párhuzamos képlet legyen: a
 próba lejátszik egy szezont élesben, előrejelez egy szezont, és a kettőnek
-kor–rating–TSI hármasban egyeznie kell. Ha valaki holnap a fejlődési görbén
+kor–rating–POT hármasban egyeznie kell. Ha valaki holnap a fejlődési görbén
 igazít, de csak az egyik helyen, ez a sor pirosodik ki.
 
 **A mérce a LEGJOBB 11**, nem a felállított kezdő tizenegy — és nem a keret
@@ -479,9 +479,110 @@ már felajánlott név ne jöjjön elő újra; a szezonváltás után viszont ig
 A ballagás (`ACADEMY_GRADUATE_AGE`) ettől függetlenül garantált marad.
 
 **Amit a jóslás szándékosan NEM tartalmaz:** kupameccseket, boostot és
-szerencsét. A TSI-ugrás a valóságban dobókocka (`ACADEMY_TSI_CHANCE`), az
+szerencsét. A POT-ugrás a valóságban dobókocka (`ACADEMY_POT_CHANCE`), az
 előrejelzésben a várható értéke — így a szám determinisztikus, és inkább
 alálő, mint ígérget. A felajánlás alján ezért áll ott, hogy ez nem ígéret.
+
+## lepcso-mezony-proba.js — 🪜 a lépcső rögzített mezőnye
+
+```
+node tools/lepcso-mezony-proba.js
+```
+
+Egyetlen kérdést mér, öt kereterővel: a lépcső **ott hagyja-e a mezőnyt**,
+ahol ígérte. A bejelentés szerint nem hagyta ott — „2. lépcső: rögzített
+80-as mezőny… amint indítok, felveszi a tempót velem a koma, és feljön
+84-esre, mert én 85-ös csapatot építettem".
+
+**A mérőfej trükkje:** a kezdőrúgás horgonya a `teamMatchStrength()`-et
+olvassa, ezért a kereterőt egyetlen számmal állítjuk be (78, 82, 85, 88, 92),
+és minden méréshez **friss világ** épül a rendes úton (`beginNewGame` →
+`renderPyrDivPick` → `pyrConfirmDiv`). Így a próba nem a képernyőt nézi,
+hanem azt, mi történik a világgal.
+
+**A legfontosabb sora nem a javítás, hanem ami VÁLTOZATLAN.** A szabad
+karrierben a mezőnynek KÖTELESSÉGE követni a keretedet — ott a rést vállalod,
+és a horgony épp azt váltja be. A próba ezért külön ágon méri a 3 címmel
+induló, szabad karriert, és azt várja, hogy ott a 78→78, 85→85, 92→92 sor
+kijöjjön. Egy „javítás", ami ezt is kilapítja, itt bukik el.
+
+A harmadik ág a közös karrier: ott a kezdőrúgás horgonya az első sorában
+kiszáll (a `pyrAnchorShared` dolgozik helyette), tehát a mezőny mozdulatlan.
+
+Mellékesen azt is méri, hogy a **rés a kereteddel nő** (`gap0`: −2 → +12) —
+ez a javítás másik fele. A fölényt te építed; a Run-plafon pedig továbbra is
+valódi rést mér, csak a kezdőrúgáskor mértet. Részletek:
+`docs/rajt-nehezseg.md` 7. fejezet.
+
+## csucs-alap-proba.js — ⭐ a rating–POT–életkor hármas a csúcs-alapon
+
+```
+node tools/csucs-alap-proba.js
+```
+
+A **teljes adatbázison** mér (3439 játékos, 4626 kártya, 319 klub), nem
+mintán — a kérés is a teljes adatbázisra szólt.
+
+**Az első három állítás magát az ELVET őrzi:** egy seedhez pontosan egy Messzi
+tartozik, bármelyik klubból nyitod ki; az az ember a LEGJOBB kártyája; és az
+egyben a LEGERŐSEBB instantja is. A harmadik azért külön sor, mert a kód nem
+generálja le mind a hány instantot, hogy aztán a legerősebbet válassza — a
+legmagasabb kártya-Ratingű megjelenést veszi. A kettő egyenértékű (a POT a
+kártya Ratingjében monoton), de ez nem magától értetődő, ezért a próba a
+játékos **minden** kártyájára lefuttatja a számolást és összeveti.
+
+**A legérdekesebb állítás viszont a korokról szól.** Az adatbázis 65%-ánál
+ismerjük a születési évet, 35%-ánál nem — ott a kor becslés. A próba a két
+csoport kor-eloszlását **egymáshoz** méri: a torzítás 0,5 évnél kisebb kell
+legyen, és a mediánnak meg a két szélső tizednek egyeznie kell. Ez fogta meg a
+régi becslés hibáját is: az a 2240 ismert eseten +2,0 évvel öregebbnek mondta a
+játékosokat a valóságnál, mert a „Ratinggel összeférő sáv" egy csúcskártyán a
+26-30-as platóra szorul, miközben a valós csúcskorok 31%-a 24 év alatt van.
+
+A 15%-os POT-rátétet is a teljes adatbázison ellenőrzi (arány 1,150 ± 0,005),
+és külön azt, hogy **a csúcs is követi** a megemelt POT-t — enélkül a scout
+nagyobb számot mutatna, a játékos viszont ugyanoda nőne fel. A Ratingnek
+eközben egyetlen játékosnál sem szabad elmozdulnia.
+
+Két regressziós ág zárja: a szezon-alap mind a 4181 klub-kártyáján változatlan
+POT-t ad, és kétszer hívva minden bitre ugyanaz. Részletek: `docs/csucs-alap.md`.
+
+**Egy fixtúra-buktató, amibe elsőre beleestem:** a `cardBasisOn()` a
+`gameMode`-ot is nézi. `gameMode="career"` nélkül a `careerDraftPlayer` a
+kanonikus pool-bejegyzést adja vissza, és a próba a semmit méri — zölden.
+
+## jellem-proba.js — 🙂 a három jellemtengely és a morál-smiley
+
+```
+node tools/jellem-proba.js
+```
+
+25 állítás. A karizma (7 fokozat), a kapcsolódás (9) és a vérmérséklet (9)
+átállása után azt méri, amit a kérés utolsó mondata kért: *„ahol több
+tulajdonságszintet soroltam mint amennyi régen volt, ott integráld az új
+szintekhez tartozó változókat a rendszerbe."*
+
+**A két legfontosabb sora arról szól, ami NÉMÁN tört volna el.** A régi kód
+két módon kötődött a fokozatok SZÁMÁHOZ: hard-kódolt küszöbökkel
+(`aggroI>=3` az ötös skálán a felső kettő volt, a kilencesen már a nyugodt
+felet is elkapná) és ÖTELEMŰ súlytömbökkel (`[0.2,0.5,1,2,3][aggroI]` — a
+hatodik fokozattól `undefined` → `NaN` → nulla súly, vagyis a legforróbb fejek
+egyáltalán nem kapnának piros lapot). A próba ezért külön állítja, hogy
+**minden fokozatra véges, pozitív, monoton növő** a lap-súly, és hogy a
+**végpontok meg a közép betűre a régiek** (0,2 · 1,0 · 3,0).
+
+**A sávok népessége is állítás, nyolc sorban.** A skála finomabb lett, de a
+keret összetétele nem változhat: a próba a teljes adatbázison méri, hogy a
+„vezéralkat", a „forró fej" és a többi hat sáv aránya ±3 ponton belül maradt
+a régihez képest. Enélkül a felbontás növelése csendben nehézséget állított
+volna.
+
+Emellett: a kapitány-pontszám monoton a karizmában és a forró vérmérséklet
+**csak levon**; mind a 10 smiley-fokozat elérhető a jellemből, és az öltözői
+események tényleg mozdítják (de ±0,8-nál megállnak); mind a 17 öltözői
+esemény kiválasztható a megfelelő kerettel; a régi mentés szélsőségei
+szélsőségek maradnak; és sehol nem maradt `leadI`/`coopI`/`aggroI` mező.
+Részletek: `docs/jellem-es-moral.md`.
 
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
@@ -489,7 +590,7 @@ alálő, mint ígérget. A felajánlás alján ezért áll ott, hogy ez nem íg�
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 35 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 38 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

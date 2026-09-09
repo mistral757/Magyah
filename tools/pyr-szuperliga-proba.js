@@ -157,10 +157,10 @@ const srv=http.createServer((req,rp)=>{
     slots.length=0;
     ["KP","JV","BV","BV","KV","VKP","KKP","TKP","JSZ","BSZ","CS"].forEach((pos,i)=>{
       const n=`Gyenge ${i+1}`;
-      careerPool[n]={n,pos:[pos],ovr:70,age:26,tsi:2000,peak:71,startRating:70,
+      careerPool[n]={n,pos:[pos],ovr:70,age:26,pot:2000,peak:71,startRating:70,
         nat:"Magyarorszag",conf:0,attrs:{}};
       drafted.add(n);
-      slots.push({pos,player:{n,pos:[pos],ovr:70,age:26,tsi:2000,nat:"Magyarorszag"},fit:1});});
+      slots.push({pos,player:{n,pos:[pos],ovr:70,age:26,pot:2000,nat:"Magyarorszag"},fit:1});});
     /* A PÁLYÁRA LÉPŐ MEZŐNY, nem a nyers visszatérési érték: az
        euroMidRating oppDelta NÉLKÜLI középértéket ad, a sorozat eltolása a
        mezőny építésekor kerül rá (lásd euroFieldFor). Aki a nyers számot
@@ -184,10 +184,10 @@ const srv=http.createServer((req,rp)=>{
     slots.length=0;
     ["KP","JV","BV","BV","KV","VKP","KKP","TKP","JSZ","BSZ","CS"].forEach((pos,i)=>{
       const n=`Eros ${i+1}`;
-      careerPool[n]={n,pos:[pos],ovr:130,age:26,tsi:20000,peak:131,startRating:130,
+      careerPool[n]={n,pos:[pos],ovr:130,age:26,pot:20000,peak:131,startRating:130,
         nat:"Magyarorszag",conf:0,attrs:{}};
       drafted.add(n);
-      slots.push({pos,player:{n,pos:[pos],ovr:130,age:26,tsi:20000,nat:"Magyarorszag"},fit:1});});
+      slots.push({pos,player:{n,pos:[pos],ovr:130,age:26,pot:20000,nat:"Magyarorszag"},fit:1});});
     S.oppBuffH=null;
     out.bl.eros_BL=palya("BL");
     out.bl.eros_keret=Math.round(teamStrength());

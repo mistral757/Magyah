@@ -269,7 +269,7 @@ innen mozdul föl és le. A bemenetek:
 |---|--:|---|
 | **rating a kereten belül** | ±0,9 | a saját kijelzett Ratingje a mai tizenegy átlagához mérve |
 | **a csapat éle** | ±0,5 | a keret átlaga az ellenfél erejéhez mérve |
-| **fejlődési szakasz** | ±0,4 | az életkor-görbe éves meredeksége (`ratingAtAge`) — a TSI a csúcson (`peak`) keresztül szól bele |
+| **fejlődési szakasz** | ±0,4 | az életkor-görbe éves meredeksége (`ratingAtAge`) — a POT a csúcson (`peak`) keresztül szól bele |
 | **taktikához illő attribútumok** | ±0,6 | a saját tengelyei a taktika súlyprofiljához, a lapos 1/5-höz mérve |
 | **csapatstílushoz illő attribútumok** | ±0,4 | ugyanez a filozófiád tengelyeivel (`MSTAT_STYLE_W`) |
 | **eredményesség** | — | gól (poszt szerint 1,0–2,6), gólpassz 0,7, tiszta lap 0,5–0,8, védés 0,22/db (max 1,4), labdaszerzés 0,10/db (max 0,7), kapott gól a kapusnál −0,25/db az első fölött, meccs embere +0,5 |

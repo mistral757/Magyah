@@ -72,6 +72,15 @@ beállítás első köre.
 számoljuk vissza (`unlockUpForField`), és a rés abból következik, milyen keretet
 draftoltál — nem fordítva.
 
+**És a kezdőrúgás sem írhatja felül (3.9.53).** A kívánt mezőnyszintből
+visszaszámolt világ csak a fele a munkának: a kezdőrúgás horgonya
+(`pyrAnchorAtKickoff`) a szabad karrierben a vállalt **rést** tartja, vagyis a
+világot a keretedhez húzza. A lépcsőn ez pont az ígéretet rontotta el — egy
+85-ös kerettel a „rögzített 80-as mezőny" 87-re szaladt fel. A lépcső ezért a
+`fieldWant`-ot teszi el a `gapWant` helyett, és a horgony ehhez áll rá: **a
+mezőny marad, a rés következmény.** A szabad karrierben minden a régi. Mérés:
+`tools/lepcso-mezony-proba.js`, magyarázat: `docs/rajt-nehezseg.md` 7. fejezet.
+
 **Az osztályt és a rajt nehézségét a lépcső dönti el, nem az ajánló.** Ez a
 kettő nem a beállító képernyőn lakik, hanem a draft utáni külön képernyőn
 (`#scPyrDiv`) — az első kiadásban kimaradt a zárból, és az osztályt ott az

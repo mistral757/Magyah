@@ -17,7 +17,7 @@ kerete és a draft —, és mindháromban ugyanaz volt a szerkezet:
   └──────────────────────────────────────────────┘
 ```
 
-A sor koppintása **azonnal** az ajánlatot indította. A felmérés (a TSI
+A sor koppintása **azonnal** az ajánlatot indította. A felmérés (a POT
 megnézése) pedig egy ~20 px-es `👁` jelen lógott a sor **jobb szélén**, közvetlenül
 a nagyobb tét mellett.
 
@@ -37,7 +37,7 @@ semmi — nem derült ki, hogy szabály állt az útba, csak hogy „nem működ
   │ [BV]  Juan Bernat                         ?  │  ← koppintás = KINYIT
   │       25 év                                  │
   ├──────────────────────────────────────────────┤
-  │  👁 Felmérés — nézzük meg a TSI-jét          │
+  │  👁 Felmérés — nézzük meg a POT-jét          │
   │     ingyen · a scoutod még 2 jelöltet enged  │
   ├──────────────────────────────────────────────┤
   │  📝 Átigazolási ajánlat                      │  → ár-képernyő,
@@ -61,8 +61,8 @@ A `candRevealBtn` három állapota — a régi néma `👁` helyett:
 
 | Állapot | Felirat |
 |---|---|
-| még nem mérted fel | `👁 Felmérés — nézzük meg a TSI-jét` · *ingyen · a scoutod még N jelöltet enged megnézni* |
-| már felmérted | `👁 Felmérve — TSI ~1320` · *a scoutod becslése erről a játékosról* (tiltva) |
+| még nem mérted fel | `👁 Felmérés — nézzük meg a POT-jét` · *ingyen · a scoutod még N jelöltet enged megnézni* |
+| már felmérted | `👁 Felmérve — POT ~1320` · *a scoutod becslése erről a játékosról* (tiltva) |
 | elfogyott a keret | `👁 Felmérés` · *elfogyott a scoutod megtekintési kerete* (tiltva) |
 
 **A doboz a kinyitáskor épül újra** (`buildDet` / `buildDetBody`): a felmérési
@@ -79,7 +79,7 @@ mondania, nem a lista rajzolásakorit.
   nyílik.
 * **A klub-szemlén a felmérés átér az ár-képernyőre.** Korábban a
   `showCsSquad` csak a `revealedNames` halmazba tett bele, a `twConfirmBuy`
-  viszont a `cand._tsiRevealed` jelzőt olvassa — így a megnézett TSI épp a
+  viszont a `cand._potRevealed` jelzőt olvassa — így a megnézett POT épp a
   döntés pillanatában tűnt el. Most a jelző is felkerül.
 
 ## 5. Amit szándékosan NEM csináltunk

@@ -59,7 +59,7 @@ stáb ára magától követi.
 ### Miért nem a nyers „Sz = Rating" megfeleltetés
 
 A Szakértelem (20–99) ugyanaz a **nyelv**, mint a Rating, de nem ugyanaz a
-**piac**. A játékos-ár a `peakToTsi` négyzetes görbéjén ül, ami 60 alatt teljesen
+**piac**. A játékos-ár a `peakToPot` négyzetes görbéjén ül, ami 60 alatt teljesen
 lapos. Mérve, a nyers megfeleltetéssel:
 
 | Sz | 35 | 40 | 50 | 60 | 70 | 80 | 99 |

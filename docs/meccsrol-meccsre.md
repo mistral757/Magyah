@@ -326,7 +326,7 @@ panel opciója **szó szerint kimondja**, tehát tudatos választás, nem meglep
 | érték | mit tesz |
 |---|---|
 | `rendszer` *(alap)* | a legtöbbet ígérő kezdő — ugyanaz a rangsor, amiből az auto-mód húz |
-| `tsi` | a legnagyobb tehetség |
+| `pot` | a legnagyobb tehetség |
 | `rating` | a ma legerősebb ember (`pOvr`) |
 | `skill` | aki már a legtöbbet gyűjtötte |
 | `kerdez` | nincs jelölés, a lánc megáll |

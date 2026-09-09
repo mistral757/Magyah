@@ -5,7 +5,7 @@ Kimondott kérés:
 > „az egyik junior developerrel beszélgetve jött fel az ifik kérdése. vele
 > beszélgetve jutott ez eszembe: építsük be és legyen benne az ifit felajánló
 > üzenetben is az adott játékos potenciálja ilyen szezonokra bontva,
-> figyelembe véve a kezdő TSIt, kort, kezdő ratingot. és egy játékost egy
+> figyelembe véve a kezdő POT-ot, kort, kezdő ratingot. és egy játékost egy
 > szezonban csak egyszer ajánljon fel visszatérőként"
 
 és rögtön utána, a mérce pontosítása:
@@ -30,7 +30,7 @@ Ehelyett a két számtani mag **kikerült külön függvénybe**:
 
 | függvény | mit csinál | ki hívja |
 |---|---|---|
-| `academyMatchStep(entry, tsiVarhato)` | egy meccsnyi akadémiai edzés | az éles fejlődés ÉS a jóslás |
+| `academyMatchStep(entry, potVarhato)` | egy meccsnyi akadémiai edzés | az éles fejlődés ÉS a jóslás |
 | `careerAgeStepCore(entry, ageSkipped)` | egy szezonnyi öregedés + csúcskorrekció | a szezonváltás ÉS a jóslás |
 
 Az `academyProject(entry, szezonok)` így nem *becsül*, hanem **előrejátszik**:
@@ -39,15 +39,15 @@ utána egy öregedési lépést — szezononként, legfeljebb háromszor, vagy a
 ballagásig (`ACADEMY_GRADUATE_AGE`).
 
 A `tools/ifi-elorejelzes-proba.js` pont ezt az egyezést őrzi: lejátszik egy
-szezont élesben, előrejelez egy szezont, és a kettőnek kor–rating–TSI hármasban
+szezont élesben, előrejelez egy szezont, és a kettőnek kor–rating–POT hármasban
 egyeznie kell.
 
 ## 2. Miért determinisztikus
 
-Az egyetlen pont, ahol a jóslás eltér az élestől, a TSI-ugrás. Élesben ez
-dobókocka: `ACADEMY_TSI_CHANCE` (3%) eséllyel 200–800 pont. Az előrejelzésben
-ugyanennek a **várható értéke** megy be (`ACADEMY_TSI_AVG`, 500), tehát a
-`tsiVarhato` kapcsoló nem külön logika, csak a kocka kikapcsolása.
+Az egyetlen pont, ahol a jóslás eltér az élestől, a POT-ugrás. Élesben ez
+dobókocka: `ACADEMY_POT_CHANCE` (3%) eséllyel 200–800 pont. Az előrejelzésben
+ugyanennek a **várható értéke** megy be (`ACADEMY_POT_AVG`, 500), tehát a
+`potVarhato` kapcsoló nem külön logika, csak a kocka kikapcsolása.
 
 Enélkül ugyanaz a fiatal minden újranyitáskor mást mutatna — és egy jóslat,
 ami villog, rosszabb, mint a semmi.
@@ -80,10 +80,10 @@ A felajánló kártya alján egy blokk (`.acProj`), fejlécében a mérce:
 ```
 HA AZ AKADÉMIÁN HAGYOD · a legjobb 11-ed átlaga 75.8
 
-most         66 · 17 év · TSI 5600
-+1 szezon    70  +4 · 18 év · TSI 6050 · még messze
-+2 szezon    76 +10 · 19 év · TSI 6500 · legjobb 11-es szint
-+3 szezon    81 +15 · 20 év · TSI 6950 · a legjobb 11-ed fölött
+most         66 · 17 év · POT 5600
++1 szezon    70  +4 · 18 év · POT 6050 · még messze
++2 szezon    76 +10 · 19 év · POT 6500 · legjobb 11-es szint
++3 szezon    81 +15 · 20 év · POT 6950 · a legjobb 11-ed fölött
 ```
 
 A blokk csak a **felajánláskor** jelenik meg — a ballagási (`isFinal`)
@@ -93,7 +93,7 @@ kártyán nem, mert ott már nincs mit eldönteni.
 
 - **kupameccseket** — csak a bajnoki menetrend hosszával számol,
 - **boostot** — az a te pénzed, nem a fiatal adottsága,
-- **szerencsét** — a TSI-ugrás várható értéke megy be, nem egy jó sorozat.
+- **szerencsét** — a POT-ugrás várható értéke megy be, nem egy jó sorozat.
 
 Mindhárom kihagyás **ugyanabba az irányba** hibázik: a valóság inkább lesz
 jobb, mint a szám. Ezért áll a blokk alján, hogy ez **nem ígéret** — egy

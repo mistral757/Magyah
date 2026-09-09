@@ -113,7 +113,7 @@ Mindegyik ugyanazon a vázon áll:
 - **Illeszkedés** — melyik felállás és taktika a természetes otthona.
 
 A traitek szándékosan **a meglévő motorokba kötnek be** (skill-pörgetés,
-attribútum-fejlődés, morál, sérülés, stáb, kártyák, TSI), nem mellettük futnak.
+attribútum-fejlődés, morál, sérülés, stáb, kártyák, POT), nem mellettük futnak.
 Egyetlen új meccsmotor-ág sincs a tervben.
 
 ---
@@ -146,7 +146,7 @@ kapus a klub legjobb embere, a kapitány és az aranylabdás is innen kerül ki.
 | I | **Edzett szemek** | +40% esély, hogy a skill-pörgetés VÉDŐ-kategóriájú képességet hoz |
 | I | **Bástya-műhely** | a védekezést támogató stábtagok (Bástya, Kesztyűs mester) 1,5× tempóval gyűjtenek tapasztalatot |
 | II | **Csillagozható pajzs** | megnyílik egy csillagozható védő-skill — a sorsdöntő hős-skillekhez hasonlóan ismételt teljesítménnyel ★-ot gyűjt |
-| II | **Az év embere hátul** | szezononként egy védőd TSI-boostot kap |
+| II | **Az év embere hátul** | szezononként egy védőd POT-boostot kap |
 | III | **A tizenegyedik ember** | ha a kapusod a keret legjobb Ratingű játékosa, az egész védelem +2 Rating |
 | III | **Kifulladás** | a 70. perctől az ellenfél gólesélye 12%-kal csökken |
 

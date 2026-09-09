@@ -60,7 +60,7 @@ const NAPLO=[
     out.ures_keret={xi:pyrXiAvg(),sq:pyrSquadAvg(),age:pyrXiAge()};
     const ker=[{n:"A Dani",pos:["CS"],ovr:80,age:24},{n:"B Dani",pos:["KKP"],ovr:90,age:28},
                {n:"C Dani",pos:["KV"],ovr:70,age:32}];
-    ker.forEach(x=>{careerPool[x.n]={n:x.n,age:x.age,attrs:{},pos:x.pos,startRating:x.ovr,tsi:5000};});
+    ker.forEach(x=>{careerPool[x.n]={n:x.n,age:x.age,attrs:{},pos:x.pos,startRating:x.ovr,pot:5000};});
     ker.forEach(x=>slots.push({pos:x.pos[0],player:x}));
     out.harom_ember={xi:pyrXiAvg(),age:pyrXiAge(),
       varhato_xi:(80+90+70)/3,varhato_kor:(24+28+32)/3};

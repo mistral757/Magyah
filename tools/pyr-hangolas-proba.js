@@ -47,8 +47,8 @@ const srv=http.createServer((req,rp)=>{
     careerPool={};slots.length=0;
     POS.forEach((pos,i)=>{
       const n=`Teszt ${i+1}`;
-      const pl={n,pos:[pos],ovr:100,age:26,tsi:9000,nat:"Magyarorszag"};
-      careerPool[n]={n,pos:[pos],ovr:100,age:26,tsi:9000,peak:102,startRating:100,
+      const pl={n,pos:[pos],ovr:100,age:26,pot:9000,nat:"Magyarorszag"};
+      careerPool[n]={n,pos:[pos],ovr:100,age:26,pot:9000,peak:102,startRating:100,
         nat:"Magyarorszag",conf:0,attrs:{}};
       /* a valódi játékban a leigazolt játékos MINDIG bekerül a drafted-be —
          ez tartja távol tőle a piac-eltolást (applyMarketShift) */

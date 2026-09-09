@@ -86,7 +86,7 @@ szándékosan nem képeznek rekordot.
 | 🛡️ | Legtöbb tiszta lap | `careerStats.cs` |
 | 📈 | Legmagasabb Rating | `pOvrDisplay` (amit a kártyán is látsz) |
 | 💪 | Legmagasabb attribútum | `careerPool[].attrs` (mind az öt tengely) |
-| 💎 | Legmagasabb TSI | `careerPool[].tsi` |
+| 💎 | Legmagasabb POT | `careerPool[].pot` |
 | ✦ | Legtöbb képesség | `S.skills[név].length` |
 | 📣 | Legmagasabb híresség | `famePoints()` — csak ⭐ Sztárom a párom stílusban |
 | 📥 | Legdrágább igazolás | `ledgerNote("buy")` |
@@ -130,7 +130,7 @@ Playwright, headless Chromium:
   klubválasztás → kémia → edző → kapitány → képesség → **egy valódi lejátszott
   mérkőzés** (3-0 győzelem). A rekordok maguktól megjelentek a valós
   hookokból: gól 2 · Tord Holmgren, gólpassz 1, meccs 1, MVP 1, bravúr 1,
-  Rating 84, attribútum 88, TSI 4629, képesség 1, csapaterő 77,7, tábor 8038,
+  Rating 84, attribútum 88, POT 4629, képesség 1, csapaterő 77,7, tábor 8038,
   büdzsé 4909 pont, mezőny 76, veretlenség 1, taktika 80 · Totális futball.
   A még nem létező rekordok (stílus, híresség, lezárt szezon, igazolás,
   eladás) helyesen hiányoztak.

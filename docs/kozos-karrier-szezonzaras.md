@@ -163,10 +163,10 @@ A kör **tizenöt ember**:
 | | kik |
 |---|---|
 | **11** | a szezont vagy a kupasorozatot **lezáró kezdő tizenegy** |
-| **+4** | posztonként egy-egy csere: a keretben **maradt legjobb TSI-jű** kapus, védő, középpályás és támadó |
+| **+4** | posztonként egy-egy csere: a keretben **maradt legjobb POT-jű** kapus, védő, középpályás és támadó |
 
-**Miért a TSI, és nem a Rating.** A Rating a pillanatnyi forma és a boostok
-összege (kártya, díj, épp futó eltolás), a TSI viszont a játékos tartós piaci
+**Miért a POT, és nem a Rating.** A Rating a pillanatnyi forma és a boostok
+összege (kártya, díj, épp futó eltolás), a POT viszont a játékos tartós piaci
 értéke — az mondja meg, ki a keret következő embere azon a poszton. Ráadásul a
 Rating **már tartalmazza** a korábbi hangolásokat, tehát önmagára hivatkozna:
 aki egyszer bekerült a körbe, azt a saját eltolása tartaná bent.
@@ -253,21 +253,21 @@ előzménybe (`mpRecordHistory`) és a nyári igazolási referenciába
 
 ### A kör: a 11 legnagyobb potenciálú játékos
 
-A régi kör a záró kezdő tizenegy volt + posztonként a legjobb TSI-jű csere.
+A régi kör a záró kezdő tizenegy volt + posztonként a legjobb POT-jű csere.
 Ez **menet közben mozgó névsort** adott (egy csere a 30. fordulóban átírta,
 kit érint a hangolás), és a keret **öregedő végére** is rátolta az eltolást,
 ahol a következő idényre már nem marad belőle semmi.
 
 A kör mostantól a keret `MP_TUNE_N` = **11 legnagyobb potenciálú** játékosa.
 A `playerPotential` egy számba fogja, mennyit ér a játékos MÉG EZUTÁN: a még
-elérhető Rating-emelkedést (a fő tag), a nyers tehetséget (TSI) és a
+elérhető Rating-emelkedést (a fő tag), a nyers tehetséget (POT) és a
 fiatalságot. Vagyis pontosan azt a tizenegyet adja, aki a karriert **tovább
 fogja vinni** — és ez a helyes cél, mert a hangolás nem a lezárult idényről
 szól, hanem a következőről.
 
 **Miért nem a Rating.** Változatlan az indok: a Rating már tartalmazza a
 korábbi hangolásokat, tehát önmagára hivatkozna. A potenciál a `careerPool`
-bejegyzéséből számol (peak, TSI, kor), amit a hangolás **nem ír** — a rangsor
+bejegyzéséből számol (peak, POT, kor), amit a hangolás **nem ír** — a rangsor
 tehát stabil.
 
 **A kör és a mérce ÁTFED, de nem azonos**, és ez szándékos: a boost oda megy,

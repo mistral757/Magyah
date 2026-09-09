@@ -7,7 +7,7 @@ függvények (`boostUnitBase`, `boostDiscountMult`,
 `boostUnitPrice`, `boostPriceOf`, `boostKindReady`,
 `boostOpenPanel` / `boostPickPlayer` / `boostPickAttr` / `boostConfirm`),
 az öt új hatás (`applyPlainBoost`, `applyAttrBoost` + `boostAttrRate`,
-`applyTsiBoost`, `applyBondBoost` + `bondBoostMult`, `applySkillBoost` +
+`applyPotBoost`, `applyBondBoost` + `bondBoostMult`, `applySkillBoost` +
 `boostSkillWeight` / `boostSkillPick`), a jelölések (`boostTagsOf`,
 `boostNote`), a `#hubBoostBtn` gomb, valamint a bekötések: a fejlődési kör
 `addA`-ága, a `bondMatchTick` két szorzósora és a `skillRealEarner` /
@@ -51,9 +51,9 @@ mind a hétre, és **egyetlen szám hangolja az egészet**.
 
 | | fajta | egység | hatás |
 |---|---|--:|---|
-| 💪 | **Sima boost** | 0,5 | Rating +1–4%, TSI +15–45% (min 400, max 2500) |
+| 💪 | **Sima boost** | 0,5 | Rating +1–4%, POT +15–45% (min 400, max 2500) |
 | 🎯 | **Attribútum boost** | 0,6 | egy választott tengely **+4–9%**, **és tartósan edződik** |
-| 📈 | **TSI boost** | 0,6 | TSI +33–66% (min 1000, max 10 000) |
+| 📈 | **POT boost** | 0,6 | POT +33–66% (min 1000, max 10 000) |
 | 🤝 | **Összjáték boost** | 0,33 | az összhang-építése +33–66%, tartósan |
 | ✨ | **Skill boost** | 0,4 | nagyobb súly a realisztikus képesség-sorsolásban |
 | ⚡ | **Ifi-boost** | 1 | változatlan — a legdrágább, mert a legtöbbet adja |
@@ -98,8 +98,8 @@ fix +6–12 Ratingjét pont ezért kell a mezőny szintjével skálázni. Az öt
 fajta **egyenesen arányos** azzal, amijük már van, tehát a karrier egészén
 ugyanazt éri.
 
-**A TSI-nél ez önmagában elszaladna** (egy 40 000-es TSI 45%-a 18 000), ezért
-ott **abszolút korlátok** fogják közre a százalékot. Mérve: 500-as TSI-nél a
+**A POT-nél ez önmagában elszaladna** (egy 40 000-es POT 45%-a 18 000), ezért
+ott **abszolút korlátok** fogják közre a százalékot. Mérve: 500-as POT-nél a
 sima boost a 400-as padlót adja, 40 000-esnél a 2500-as tetőt.
 
 ---
@@ -109,7 +109,7 @@ sima boost a 400-as padlót adja, 40 000-esnél a 2500-as tetőt.
 ### 💪 Sima boost
 
 A klasszikus, kiegyensúlyozott fejlesztés, **bárkire** elsüthető. A Rating és
-a TSI is nő, és a **peak követi a boostolt Ratinget** — ugyanaz az indok, mint
+a POT is nő, és a **peak követi a boostolt Ratinget** — ugyanaz az indok, mint
 az ifi-boostnál: enélkül a többlet „peak fölötti" maradna, és a fejlődés
 azonnal visszahúzná.
 
@@ -161,10 +161,10 @@ kor-görbe, `trainScale` és globális tempó hat rá. Ugyanarra a tengelyre
 ismételve **halmozódik** (`n`), másikat választva **átáll** — egy embernek egy
 irányba érdemes építeni, és így a döntésnek súlya van.
 
-### 📈 TSI boost
+### 📈 POT boost
 
-Csak a TSI-t emeli, de nagyot. A Rating nem ugrik tőle: a **hosszú távú
-fejlődési pálya** nyílik ki (`peak` a `tsiToPeakOvr`-en át), és vele az
+Csak a POT-t emeli, de nagyot. A Rating nem ugrik tőle: a **hosszú távú
+fejlődési pálya** nyílik ki (`peak` a `potToPeakOvr`-en át), és vele az
 eladási ár is.
 
 ### 🤝 Összjáték boost
@@ -229,13 +229,13 @@ Mind a hét fajta **visszavonhatatlan**, ismételhető, és a hatás a
 
 A **tény** is látszik: a játékos lapján (`boostNote`) és a jelöltlistán
 (`boostTagsOf`) ott áll, mit és hányszor kapott. Ugyanaz az elv, amiért az
-ifi-boostnak is van könyvelése: a hatás beépül a Ratingbe és a TSI-be, de a
+ifi-boostnak is van könyvelése: a hatás beépül a Ratingbe és a POT-be, de a
 tény enélkül nyomtalanul eltűnne — pedig ezekre a büdzsé ment el.
 
 ```
-💪 Sima boost — összesen +1 Rating és +1710 TSI
+💪 Sima boost — összesen +1 Rating és +1710 POT
 🎯 Attribútum boost — Passz, tartósan +0,4 pont/meccs
-📈 TSI boost — összesen +3915 TSI
+📈 POT boost — összesen +3915 POT
 🤝 Összjáték boost — az összhangja 1,37× ütemben épül
 ✨ Skill boost — csak realisztikus skill-módban dolgozik
 ```
@@ -247,9 +247,9 @@ tény enélkül nyomtalanul eltűnne — pedig ezekre a büdzsé ment el.
 | amit néztünk | eredmény |
 |---|---|
 | árak az egységhez mérve | 0,5 · 0,6 · 0,6 · 0,33 · 0,4 · 1 · 0,8 — betűre |
-| sima boost egy 80-as / 6000 TSI-s emberen (20 sorsolás) | Rating +1…3, TSI +1333…2500 |
-| sima boost korlátai | 500-as TSI → +400 (padló) · 40 000-es → +2500 (tető) |
-| TSI boost korlátai | 1000 → +1000 (padló) · 60 000 → +10 000 (tető) |
+| sima boost egy 80-as / 6000 POT-s emberen (20 sorsolás) | Rating +1…3, POT +1333…2500 |
+| sima boost korlátai | 500-as POT → +400 (padló) · 40 000-es → +2500 (tető) |
+| POT boost korlátai | 1000 → +1000 (padló) · 60 000 → +10 000 (tető) |
 | attribútum boost halmozása | 84 → 85 → 87, ütem 0,4 → 0,8 pont/meccs |
 | attribútum boost átállítása | az új tengely ütemet kap, a régié nullára esik |
 | összjáték boost ismételve | 1,47 → 2,05 → 2,81 → **3,0** (tető) |

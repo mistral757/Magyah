@@ -120,7 +120,7 @@ osztály skálájára — a sorrend attól nem változik.
 
 **1. A DINAMIKUS MÓDBAN NINCS ELTÉRÉS.** Mind a 15 játékos pontosan a
 kártya-Ratinggel érkezik (Δ = 0). A `seasonBasisFor` `ovr`-je a kártya értéke,
-és a TSI-sorsolás nem nyúl hozzá — a kor is a valós születési évből jön, csak
+és a POT-sorsolás nem nyúl hozzá — a kor is a valós születési évből jön, csak
 ott sorsol, ahol nincs adat. Ez a viselkedés a kívánt, és már megvolt.
 
 **2. A PIRAMISBAN EGY EGYSÉGES ELTOLÁS FUT** (`pyrScaleClubPlayer` →
@@ -133,7 +133,7 @@ A rés nem változik tőle: a mezőny közepe ugyanennyivel mozdul.
 **3. A PÁLYÁN POSZT-EFFEKTÍV SZÁM LÁTSZIK** (`playerStrength`), nem a játékos
 saját Ratingje. Ez adja a látszólagos „egyenetlenséget": ugyanabban a mérésben
 Haaland (középcsatár a helyén) −6-ot, Hwang Hee-chan (csatár BALSZÉLEN) **−10**-et
-mutat. A különbség a poszt-illeszkedés, nem TSI-lutri.
+mutat. A különbség a poszt-illeszkedés, nem POT-lutri.
 
 **AZ ELSŐ NEKIFUTÁS (v3.5.11) CSAK KIÍRTA az eltolást a döntési képernyőn.
 Megbukott:** a felhasználó továbbra is 84-es Haalandot választott és 78-asat
@@ -142,7 +142,7 @@ kapott. Egy magyarázó mondat nem tesz igazzá egy hamis számot.
 ### 2.3b A VILÁG JÖN A KERETHEZ — origó-csere (v3.5.12)
 
 **A döntés:** *„azt kapjuk, ami az adatbázisban van, csak hozzátársítunk egy
-TSI-t random"* — és a plusz-Rating problémára ott a **felskálázó**.
+POT-t random"* — és a plusz-Rating problémára ott a **felskálázó**.
 
 Nem a 2. pont eltolását szüntetjük meg (arra szükség van), hanem az
 **előjelét fordítjuk meg**: ugyanazt a különbséget a VILÁGRA alkalmazzuk.
@@ -169,7 +169,7 @@ mezőny így **közvetlenül összevethető**, magyarázat nélkül.
 
 **A pool és a piac is a nyers skálán marad** (`pyrPoolOffset() = 0`), tehát a
 kereted és az igazolható játékosok ugyanazt a nyelvet beszélik — korábban a
-kereted el volt tolva, a piac árazása (TSI-alapú) viszont nem.
+kereted el volt tolva, a piac árazása (POT-alapú) viszont nem.
 
 **AMIT KÜLÖN SEMLEGESÍTENI KELLETT: a büdzsé.** A `seasonBudgetParts` fix
 60-90-es ablakra hangolt, NÉGYZETES görbével árazik (`(teamR−60)/30`), tehát a
@@ -177,7 +177,7 @@ puszta átcímkézés a hatodosztálynak **+42%** keretet adott volna (2835 → 
 — olyan változás, amit senki nem kért. A `pyrWorldShift()` visszaadja az
 eltolást a büdzsé-számításnak, és ezzel a keret **bitre a 3.5.12 előtti**
 (mérve: 2835 = 2835). A többi gazdasági ág érintetlen: a szurkolótábor tárolt
-számláló, az árazás pedig TSI- és kor-alapú, amiket az eltolás sosem mozgatott.
+számláló, az árazás pedig POT- és kor-alapú, amiket az eltolás sosem mozgatott.
 
 **RÉGI MENTÉS: érintetlen.** A világ a mentésben él a maga eltolásával és a
 nem nulla `S.pyr.off`-fal; a `pyrScaleClubPlayer` ott változatlanul fut. Új
@@ -1307,7 +1307,7 @@ helyen mondjuk ki:
 A **6.1b** feloldotta a Rating-plafont a piramisban, mert enélkül a mód
 szerkezeti zsákutca volna. A többi Infinity-határ viszont ott maradt, és
 pontosan ugyanaz a logika vonatkozik rájuk: a sebesség 99-es plafonja, a kor
-miatti hanyatlás, a 32 éves visszavonulás, az akadémia sávja, a TSI- és
+miatti hanyatlás, a 32 éves visszavonulás, az akadémia sávja, a POT- és
 attribútum-plafon, a stílus-mérföldkövek teteje. Egy végtelenbe növő világban
 mindegyik ugyanúgy megfogja a karriert.
 
@@ -1321,7 +1321,7 @@ egy párhuzamos predikátumból előbb-utóbb kimaradna egy hívási hely. Mérv
 3. szezonfordulón, 104-es mezőnynél: sebesség-plafon 99 → feloldva,
 visszavonulás 32 → 55, stílus-mérföldkövek +444 új fokozat.
 
-**Amit NEM ad meg:** a megnyitás egyszeri ajándékait — a keret ×TSI-boostját
+**Amit NEM ad meg:** a megnyitás egyszeri ajándékait — a keret ×POT-boostját
 (az a 100 milliárdos ár ellentételezése; ingyen odaadva a mért fejlődési
 egyensúlyt billentené fel) és a 119-re csonkolt basePeak-ek helyreállítását
 (tárgytalan: itt a plafon sosem csonkolt). A **határok** nyílnak ki, nem az
