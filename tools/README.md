@@ -691,13 +691,32 @@ lezárt kihívás teljesített MARAD. Külön ág méri, hogy egy elszállt kere
 visszatérítése a jelet is leveszi — különben egy hibába futott felderítés
 „teljesítené" a kihívást. Részletek: `docs/kihivasok-3937.md`.
 
+## stilus-edzok-proba.js — 🎩 filozófus-edző mind a hét stílushoz
+
+```
+node tools/stilus-edzok-proba.js
+```
+
+10 állítás arról, hogy a tikitaka Guardiolája és a beton Mourinhója után a
+többi öt stílus is kap egy **funkcióban azonos** edzővásárlós képességet. A
+két kézzel írt `stTrait`-blokk helyére egy tábla (`STYLE_COACHES`) és egy
+generátor került — pont az, amit a kód saját 3.7.37-es megjegyzése
+előrejelzett —, így a hét sor nem tud szétcsúszni egymástól.
+
+**A próba azt méri, ami egy generátornál elcsúszhat**: mind a hét sor III.
+szintű, ára ugyanaz a `[54, 92, 146]`, a taktikaplafon `99 → 99 → 125 → 150`,
+az edzőtempó 1. szinttől `1× → 2×`, és az ingyenes szint mind a hétnél
+működik. A legfontosabb állítás a **keresztszennyeződés**: csak a `hosszu`
+taktikát osztja meg két stílus (bombázók + panzer), és egy Panzer 3. szint
+KIZÁRÓLAG a `hosszu`-t viszi 150-re — a `labdatartas` és a `busz` 99 marad.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 42 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 43 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
