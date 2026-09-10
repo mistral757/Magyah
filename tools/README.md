@@ -670,13 +670,34 @@ próba mind a négy osztályra és a sík módra megnézi, mit ad a lánc, és k
 méri, hogy a kiharcolt BL túléli a gyengébb helyezést. Részletek:
 `docs/szezonzaras-or-es-ket-kupa.md`.
 
+## felderites-kihivas-proba.js — 🔍 „használd fel minden felderítésedet"
+
+```
+node tools/felderites-kihivas-proba.js
+```
+
+12 állítás egyetlen kihívásra, mert a hibája egy egész típuscsalád
+besorolásáról szólt. A `looksSpent` az ÁLLAPOT-kihívások között ült
+(`CH_STATE_TYPES`) — azok a mostani helyzetet kérdezik. Csakhogy az
+„elfogyott a felderítési keret" nem tartós állapot, hanem pillanatnyi
+esemény, amit a következő ablak feltöltése visszacsinál; a besorolástól
+viszont se reteszt nem kapott, se korán nem lehetett kifizetni, tehát
+KIZÁRÓLAG a határidőnél dőlt el — amikorra a keret újratelt, és elbukott.
+
+**A próba magja nem az, hogy „egyszer igaz volt-e"**, hanem pontosan a
+bejelentett sorrend, lépésről lépésre: elfogy a keret → teljesül → AZONNAL
+lezár (kikerül az aktív listából, jutalommal) → a keret újratelik → és a
+lezárt kihívás teljesített MARAD. Külön ág méri, hogy egy elszállt keresés
+visszatérítése a jelet is leveszi — különben egy hibába futott felderítés
+„teljesítené" a kihívást. Részletek: `docs/kihivasok-3937.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 41 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 42 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

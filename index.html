@@ -6004,7 +6004,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.59";
+const APP_VERSION="3.9.60";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -25710,13 +25710,15 @@ function twSpendLook(sess,key){
   sess.pos=sess.pos||{};
   sess.left=Math.max(0,sess.left-1);
   sess.pos[key]=before.used+1;
+  try{chLooksTouch();}catch(e){}   /* elfogyott? — a kihívás MOST jegyzi meg */
   return before;}
 function twRefundLook(sess,key,before){
   if(!sess||!before)return;
   sess.left=before.left;
   if(!sess.pos)return;
   if(before.used)sess.pos[key]=before.used;
-  else delete sess.pos[key];}   /* nulla használat ne hagyjon maga után nyomot */
+  else delete sess.pos[key];    /* nulla használat ne hagyjon maga után nyomot */
+  try{chLooksTouch();}catch(e){}}   /* a visszaadott keret a jelet is leveszi */
 /* ================= ATTRIBÚTUM-KERESÉS (4. fázis) =================
    A pozíciós felderítés mellett egy MÁSIK keresési mód: nem posztra, hanem
    egy konkrét KÉPESSÉGRE keresel, poszttól függetlenül. A találatok között a
@@ -39988,10 +39990,24 @@ const CH_CUP_TYPES=["cupWin","cupDepth","cupGroupWin","cupGroupLoss","cupLoss",
 const CH_STATE_TYPES=["tacticFit","youthXI","tacticLevel","diffRaise","saleRatio",
   "msOne","tacticMatches",
   /* A 3.9.37-es ÁLLAPOT-kihívások: mind a MOSTANI helyzetet kérdezi
-     („ott áll-e a piacon", „elfogyott-e a keret", „maradt-e olcsó tartalék"),
-     nem a vállalás óta elért növekményt. A tensionOut is ilyen: az a kérdés,
-     hogy BENT VAN-E még, nem az, hogy hányan mentek el. */
-  "tensionOut","youthListed","looksSpent","cheapReservesOut"].concat(CH_CUP_TYPES);
+     („ott áll-e a piacon", „maradt-e olcsó tartalék"), nem a vállalás óta
+     elért növekményt. A tensionOut is ilyen: az a kérdés, hogy BENT VAN-E még,
+     nem az, hogy hányan mentek el.
+
+     A `looksSpent` KIKERÜLT INNEN (3.9.60), és ez volt a hibája.
+     BEJELENTETT HIBA: „nem működik a használd fel minden felderítésedet
+     kihívás… mindig elbukod, hiába teljesítetted, mert a következő meccs
+     elindítása idejére már feltöltődik a lehetőségek slot és azt érzékeli
+     hogy egyet sem használtál el."
+
+     A besorolás azt feltételezte, hogy az „elfogyott a keret" ugyanolyan
+     tartós állapot, mint a „maradt-e olcsó tartalék". Nem az: PILLANATNYI
+     ESEMÉNY, amit a következő ablak feltöltése VISSZACSINÁL. Az
+     állapot-besorolásnak pedig két olyan következménye volt, ami együtt
+     garantálta a bukást: a `latchChallengeIfMet` nem tehetett rá reteszt, a
+     `challengeEarlyPayable` pedig nem engedte korán kifizetni — vagyis a
+     kihívás CSAK a határidőnél dőlt el, amikorra a keret már rég újratelt. */
+  "tensionOut","youthListed","cheapReservesOut"].concat(CH_CUP_TYPES);
 /* ---- KORÁN BEVÁLTHATÓ-E? (3.4.08) ----
    A jutalom eddig a HATÁRIDŐNÉL érkezett, akkor is, ha a cél a 6. fordulóban
    összejött. Ez két dolgot rontott el: a siker pillanata visszajelzés nélkül
@@ -40058,7 +40074,9 @@ function challengeRawValue(ch){
     case "staffBought":  return S.chStaffBought||0;
     case "trainFocus":   return S.chTrainFocusChanged||0;
     case "integrationDone":return S.chIntegrationsDone||0;
-    case "looksSpent":   return chLooksAllSpent()?1:0;
+    /* A RETESZ ELŐBB: a keret azóta újratelhetett, de ami megtörtént, az
+       megtörtént (lásd chLooksTouch). */
+    case "looksSpent":   return (ch.looksSpentDone||chLooksAllSpent())?1:0;
     case "cheapReservesOut":return chCheapReserves();   /* inverz: 0-ra kell vinni */
     case "subMinutes":   return S.chSeasonSubMinutes||0;
     case "subStars":     return S.chSeasonSubStars||0;
@@ -40211,6 +40229,8 @@ function challengeLiveNote(ch){
       ? `${esc(shortName(y.n))} áll a legközelebb: ${y.perc}/${SALE_LIST_MIN_MINUTES} perc — még ${kell} kell (${Math.ceil(kell/90)} végigjátszott meccs).`
       : `${esc(shortName(y.n))} már piacra vihető (${y.perc} perc) — csak ki kell tenned.`;}
   if(ch.type==="looksSpent"){
+    if(ch.looksSpentDone||ch.metLatched)
+      return "A keret elfogyott — a kihívás teljesült. (A következő ablak feltöltése ezen már nem változtat.)";
     const st=chLooksSpentState();
     if(!st)return "Most nincs nyitott átigazolási időszak — a keret akkor kezd fogyni.";
     return `A felderítési keret: ${st.used}/${st.max} elhasználva, ${st.left} maradt.`;}
@@ -40432,6 +40452,31 @@ function chLooksSpentState(){
 function chLooksAllSpent(){
   const st=chLooksSpentState();
   return !!(st&&st.left<=0);}
+/* ---- A KIÜRÜLÉS PILLANATÁNAK MEGJEGYZÉSE (3.9.60) ----
+   A felderítési keret kiürülése nem tartós állapot: a következő ablak
+   feltölti. Ezért abban a pillanatban, amikor az utolsó felderítés elfogy,
+   RÁÜTJÜK a jelet a futó kihívásra — onnantól a feltöltés nem veheti el.
+
+   A VISSZATÉRÍTÉS IS IDE TARTOZIK. A felderítés akkor és csak akkor fogy, ha
+   tényleg le is futott; ha a scoutolás elszáll, a `twRefundLook` visszaadja a
+   keretet. Ilyenkor a jelet is le kell venni — különben egy elszállt keresés
+   „teljesítené" a kihívást. Ezért ugyanaz a függvény fut mindkét oldalon, és
+   az ÉLŐ állapotból dönt; a már kifizetett (metLatched) kihívást viszont nem
+   bántja, mert azt már lezártuk. */
+function chLooksTouch(){
+  if(gameMode!=="career")return;
+  const kesz=chLooksAllSpent();
+  (S.activeChallenges||[]).forEach(ch=>{
+    if(!ch||ch.type!=="looksSpent"||ch.metLatched)return;
+    if(kesz)ch.looksSpentDone=true;
+    else delete ch.looksSpentDone;});}
+/* A LEZÁRÁS. Külön lépés, mert a hívónak előbb be kell fejeznie a saját
+   műveletét (a felderítés lefutását vagy a visszatérítést) — csak utána
+   dőlhet el, hogy a keret tényleg elfogyott-e. Utána viszont AZONNAL zárunk:
+   a jutalom ott van, ahol még számít. */
+function chLooksSettle(){
+  try{chLooksTouch();}catch(e){}
+  try{settleEarlyChallenges();}catch(e){}}
 /* Hány OLCSÓ tartalék ül még a keretedben: akinek a gyors eladási ára a
    megadott forint-határ alatt van. A mérce a „eladás most" ára — az, amit egy
    koppintással kapnál érte. */
@@ -59332,7 +59377,10 @@ function twShowCategoryPicker(){
         try{twScout();}
         catch(err){
           if(limited)twRefundLook(sess,c.key,before);
-          twScoutFailed(err,c.key);}};
+          twScoutFailed(err,c.key);}
+        /* A MŰVELET LEZÁRULT (lefutott vagy visszatérült) — most, és csak most
+           dőlhet el, elfogyott-e a keret. Ha igen, a kihívás azonnal zár. */
+        if(limited)try{chLooksSettle();}catch(e){}};
       if(!limited){spendNow();return;}   /* klasszikus mód: nincs mit elkölteni */
       const leftAfter=Math.max(0,sess.left-1);
       const posAfter=TW_LOOKS_PER_POS-(used+1);
