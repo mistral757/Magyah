@@ -732,13 +732,34 @@ pedig a gomb LÁTSZIK, és megmondja az okot. Külön ág méri a másik oldalt:
 még nem döntött, látja, hogy rá várnak — de egy régen ottfelejtett jelzés nem
 várakozás. Részletek: `docs/kozos-karrier-szezonzaras.md`.
 
+## sztar-utodlas-proba.js — ⭐ ha a sztár elmegy: a trón és az utódlás
+
+```
+node tools/sztar-utodlas-proba.js
+```
+
+28 állítás a „Sztárom a párom" legdrágább kérdéséről: mi történik, ha a
+kijelölt sztár kikerül a keretből. Eddig a válasz az volt, hogy **semmi** — a
+név be volt égetve, a szerep pedig némán meghalt vele: a mérföldkövek nullán
+álltak, a hírességpont nem gyűlt tovább, a sztárhoz kötött képességek sosem
+teljesültek, és a játék egy szót sem szólt róla.
+
+**A próba magja ezért nem a gomb, hanem a néma halál**: kiderül-e a hiány (az
+őr minden távozási úton lecsap), áll-e a stílus a hiány alatt (a fa és a
+teljesített mérföldkövek megmaradnak), és átveszi-e az utód a szerepet. Külön
+ág méri, hogy az ár a TÁVOZÁSKOR dől el, nem a kinevezéskor (60% marad eladás,
+85% visszavonulás után), hogy a személyhez szólt alkuk mind elévülnek, hogy a
+sztár a keretben LÉVE nem cserélhető, és hogy egy régi mentésben talált hiányzó
+sztár átvezetése ingyenes — egy régi kárért nem büntetünk utólag. Részletek:
+`docs/sztar-utodlas.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 44 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 45 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

@@ -168,11 +168,19 @@ const {spawn}=require('child_process');
   ok("a BECSÜLT korok eloszlása egyezik a VALÓSAKÉVAL (torzítás < 0,5 év)",
      Math.abs(r.kor.torzitas)<0.5,{torzitas:r.kor.torzitas,
        ismert:r.kor.ismert,becsult:r.kor.becsult});
-  ok("a medián és a két szélső tized is egyezik",
-     r.kor.ismert.med===r.kor.becsult.med&&r.kor.ismert.p10===r.kor.becsult.p10
-     &&r.kor.ismert.p90===r.kor.becsult.p90,
-     {ismert:[r.kor.ismert.p10,r.kor.ismert.med,r.kor.ismert.p90],
-      becsult:[r.kor.becsult.p10,r.kor.becsult.med,r.kor.becsult.p90]});
+  /* EGY ÉV A TŰRÉS, ÉS EZ NEM LAZASÁG (3.9.63). A becslés SORSOLÁS az
+     empirikus tábláról: a medián és a két tized ±1 évet természetes módon
+     ingadozik mintáról mintára (mérve: 6 futásból 3-nál mozdult egyet). A
+     BITRE EGYEZÉST követelő állítás ezért nem a becslőt mérte, hanem a
+     szerencsét — és épp azt tanította, hogy a piros pipát figyelmen kívül
+     lehet hagyni. Az eloszlás egyezését az alatta/fölötte lévő két állítás
+     (torzítás < 0,5 év, és ez a három pont ±1 éven belül) együtt mondja ki. */
+  {const el=(a,b)=>Math.abs(a-b)<=1;
+   ok("a medián és a két szélső tized is egyezik (±1 év)",
+      el(r.kor.ismert.med,r.kor.becsult.med)&&el(r.kor.ismert.p10,r.kor.becsult.p10)
+      &&el(r.kor.ismert.p90,r.kor.becsult.p90),
+      {ismert:[r.kor.ismert.p10,r.kor.ismert.med,r.kor.ismert.p90],
+       becsult:[r.kor.becsult.p10,r.kor.becsult.med,r.kor.becsult.p90]});}
 
   console.log("\n=== 4. a másik két fokozat érintetlen ===");
   ok("a szezon-alap se rátétet, se csúcskártya-kort nem kap",
