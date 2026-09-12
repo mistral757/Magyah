@@ -710,13 +710,35 @@ működik. A legfontosabb állítás a **keresztszennyeződés**: csak a `hosszu
 taktikát osztja meg két stílus (bombázók + panzer), és egy Panzer 3. szint
 KIZÁRÓLAG a `hosszu`-t viszi 150-re — a `labdatartas` és a `busz` 99 marad.
 
+## kapu-ertesites-proba.js — 🔔 „szólok neki, hogy rá várok"
+
+```
+node tools/kapu-ertesites-proba.js
+```
+
+22 állítás a szezonzáró döntés-kapujáról, ahol a bejelentés szerint „nincsen
+lehetőség arra hogy értesítsük az ellenfelünket arról hogy várakozunk". A
+bökés megvolt a játékban — csak a beváró réteghez volt szegezve KÉT ponton: a
+gombja abban a rétegben ül, a jelenlét-kör pedig kizárólag addig futott, amíg
+az a réteg nyitva volt.
+
+**A próba magja ezért nem a gomb, hanem a KÖR**: zárt beváró réteg mellett is
+fut-e a jelenlét, amíg a kapu nyitva (e nélkül a bökésnek a szoba példánya
+sincs meg, amiből a társ feliratkozását kiolvasná), és leáll-e, amint a kapu
+lezárult. Mellette a doboz mind a négy állapota: az automata jelzés kapunként
+csak egyszer megy ki, a fék ideje alatt a gomb nem él és a doboz kimondja,
+hogy már szóltunk, az ONLINE társat nem bökjük meg, a feliratkozás nélkülinél
+pedig a gomb LÁTSZIK, és megmondja az okot. Külön ág méri a másik oldalt: aki
+még nem döntött, látja, hogy rá várnak — de egy régen ottfelejtett jelzés nem
+várakozás. Részletek: `docs/kozos-karrier-szezonzaras.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 43 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 44 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
