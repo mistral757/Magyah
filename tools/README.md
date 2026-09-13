@@ -794,13 +794,37 @@ SZABÁLYFÁJLLAL veti össze: a méretplafon ugyanaz a két oldalon, és a 24 ó
 lejáratot az adatbázis-szabály tartja be, nem a kliens. Részletek:
 `docs/atviteli-kod.md`.
 
+## nevmod-boot-proba.js — 🧨 a névmód nem törheti el a betöltést
+
+```
+node tools/nevmod-boot-proba.js
+```
+
+13 állítás, és egyik sem a névmódról szól: a BETÖLTÉSRŐL. A bejelentés szerint
+a profil aljára beírt kulcsszó után „befagy a játék, és onnantól nem működik az
+app" — és ez igaz volt, a 3.9.61 óta.
+
+**A ok egy TDZ-hiba**: a `careerPool` modul-szintű `let`, a `natOfName` viszont
+föntebb olvasná, és a `typeof` NEM véd a temporal dead zone ellen (ott dob,
+nem „undefined"-ot ad). A 3.9.61 filozófus-edző generátora modul-szinten hív
+`shortName()`-et: magyarított módban a név a táblából jön és a hívás sosem jut
+odáig, valós nevekre viszont lefut — és attól a sortól a fájl hátralévő hatezer
+sora nem fut le.
+
+**A próba magja ezért nem a „nincs hiba"**, hanem hogy a fájl VÉGÉN álló
+függvények is léteznek — ez az egyetlen jel, ami elárulja, hogy a script
+végigfutott. Mindhárom állapotot felhúzza (magyarított, valós, beállítás
+nélkül), méri a hét edző rövid nevét (magyar névsorrendnél az ELSŐ szó), és
+külön ágon a váltás pillanatát ÉS az újratöltést utána. Részletek:
+`docs/nevmod-tdz-hiba.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 47 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 48 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
