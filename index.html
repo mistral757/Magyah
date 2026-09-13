@@ -6007,7 +6007,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.66";
+const APP_VERSION="3.9.67";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -21361,7 +21361,11 @@ function oldBoostNote(entry){
 
    AMI MIND A HÉTRE IGAZ: ismételhető, visszavonhatatlan, és a hatás a
    `careerPool`-bejegyzésben él — tehát a mentés magától viszi. */
-const BOOST_UNIT_KIND={plain:0.5,attr:0.6,pot:0.6,bond:0.33,skill:0.4,youth:1,old:0.8};
+const BOOST_UNIT_KIND={plain:0.5,attr:0.6,pot:0.6,bond:0.33,skill:0.4,youth:1,old:0.8,
+  /* EGYENLÍTŐ (3.9.67): egyszerre 2-5 emberre hat, ezért az ifi-boost
+     közelében árazzuk — és a szintenkénti darabszám fölött duplázódik
+     (lásd eqPriceMult). */
+  equal:0.9};
 /* SIMA BOOST: Rating +1-4%, POT +15-45% — de a POT-t abszolút korlátok fogják
    közre, különben egy nagy POT-jű játékosnál ugyanaz az ár sokszorosát adná. */
 const BOOST_PLAIN_R=[1,4];
@@ -21421,12 +21425,22 @@ function chFreeBoostSpend(kind){
   if(S.chFreeBoost[kind]<=0)delete S.chFreeBoost[kind];
   return true;}
 /* ---- 1. SIMA BOOST ---- */
-function applyPlainBoost(entry){
+/* ---- TERV ÉS VÉGREHAJTÁS SZÉTVÁLASZTVA (3.9.67) ----
+   A TÖMEG-BOOSTHOZ tudni kell, MENNYIT adna a boost — mielőtt bárkire
+   elsülne —, hogy az összeget szét lehessen osztani. A sorsolás ezért külön
+   függvénybe került; az egyszemélyes út betűre ugyanaz maradt, csak most a
+   tervet kéri el előbb. Egy igazság, két hívó. */
+function plainBoostPlan(entry){
   const rPct=BOOST_PLAIN_R[0]+Math.random()*(BOOST_PLAIN_R[1]-BOOST_PLAIN_R[0]);
   const tPct=BOOST_PLAIN_T[0]+Math.random()*(BOOST_PLAIN_T[1]-BOOST_PLAIN_T[0]);
-  const rWant=Math.max(1,Math.round((entry.startRating||60)*rPct/100));
-  const tWant=Math.max(BOOST_PLAIN_T_MIN,
-    Math.min(BOOST_PLAIN_T_MAX,Math.round((entry.pot||0)*tPct/100)));
+  return {
+    r:Math.max(1,Math.round((entry.startRating||60)*rPct/100)),
+    t:Math.max(BOOST_PLAIN_T_MIN,
+      Math.min(BOOST_PLAIN_T_MAX,Math.round((entry.pot||0)*tPct/100)))};}
+function applyPlainBoost(entry){return applyPlainDelta(entry,plainBoostPlan(entry));}
+function applyPlainDelta(entry,plan){
+  const rWant=Math.max(0,Math.round((plan&&plan.r)||0));
+  const tWant=Math.max(0,Math.round((plan&&plan.t)||0));
   const potBefore=entry.pot,ratBefore=entry.startRating;
   entry.pot=boostGiftPot(entry.pot,tWant);
   entry.startRating=boostRaise(entry.startRating,rWant,ratingCap());
@@ -21445,17 +21459,22 @@ function applyPlainBoost(entry){
   entry.plainBoostT=(entry.plainBoostT||0)+tGot;
   return {rBoost:rGot,tBoost:tGot};}
 /* ---- 2. ATTRIBÚTUM BOOST ---- */
-function applyAttrBoost(entry,key){
+function applyAttrBoost(entry,key,addFix){
   if(ATTR_KEYS.indexOf(key)<0)return null;
   let ap=null;
   try{ap=initPlayerAttrs(entry);}catch(e){ap=entry.attrs||null;}
   if(!ap)return null;
-  const pct=BOOST_ATTR_PCT[0]+Math.random()*(BOOST_ATTR_PCT[1]-BOOST_ATTR_PCT[0]);
+  /* `addFix`: kész pontszám a tömeg-boost osztásából (3.9.67). Ha megvan, a
+     sorsolás kimarad — a mennyiséget már a szétosztás eldöntötte. */
+  const pct=(addFix!=null)?null
+    : BOOST_ATTR_PCT[0]+Math.random()*(BOOST_ATTR_PCT[1]-BOOST_ATTR_PCT[0]);
   const before=ap[key]||40;
   /* A TENGELY SAJÁT PLAFONJA (a sebességé szűkebb) itt is él — a boost nem
      kerülheti meg azt, amit a fejlődés se léphet át. */
   let capk=999;try{capk=attrCapFor(key,entry&&entry.n);}catch(e){capk=999;}
-  const add=Math.max(0,Math.min(capk-before,Math.max(1,Math.round(before*pct/100))));
+  const nyers=(pct==null)?Math.max(0,Math.round(addFix))
+                        :Math.max(1,Math.round(before*pct/100));
+  const add=Math.max(0,Math.min(capk-before,nyers));
   ap[key]=before+add;
   /* A TARTÓS CSATORNA. Több boost ugyanarra a tengelyre HALMOZÓDIK (n),
      másik tengelyre pedig ÁTÁLL — egy embernek egy irányba érdemes építeni,
@@ -21467,15 +21486,25 @@ function applyAttrBoost(entry,key){
   return {key,add,after:ap[key],n:entry.attrBoost.n};}
 /* A TARTÓS CSATORNA ÜTEME — a fejlődési kör kérdezi meg meccsenként.
    0, ha nincs boostja: a hívó ilyenkor semmit nem ad hozzá. */
+/* Az attribútum-boost TERVE: mennyi pontot adna ezen a tengelyen (3.9.67). */
+function attrBoostPlan(entry,key){
+  let ap=null;
+  try{ap=initPlayerAttrs(entry);}catch(e){ap=entry&&entry.attrs||null;}
+  const before=(ap&&ap[key])||40;
+  const pct=BOOST_ATTR_PCT[0]+Math.random()*(BOOST_ATTR_PCT[1]-BOOST_ATTR_PCT[0]);
+  return {a:Math.max(1,Math.round(before*pct/100))};}
 function boostAttrRate(entry,key){
   const b=entry&&entry.attrBoost;
   if(!b||b.key!==key)return 0;
   return TRAIN_SEC_PTS*(b.n||1);}
 /* ---- 3. POT BOOST ---- */
-function applyPotBoost(entry){
+function potBoostPlan(entry){
   const pct=BOOST_POT_T[0]+Math.random()*(BOOST_POT_T[1]-BOOST_POT_T[0]);
-  const want=Math.max(BOOST_POT_T_MIN,
-    Math.min(BOOST_POT_T_MAX,Math.round((entry.pot||0)*pct/100)));
+  return {t:Math.max(BOOST_POT_T_MIN,
+    Math.min(BOOST_POT_T_MAX,Math.round((entry.pot||0)*pct/100)))};}
+function applyPotBoost(entry){return applyPotDelta(entry,potBoostPlan(entry));}
+function applyPotDelta(entry,plan){
+  const want=Math.max(0,Math.round((plan&&plan.t)||0));
   const before=entry.pot;
   entry.pot=boostGiftPot(entry.pot,want);
   entry.peak=boostLift(entry.peak,potToPeakOvr(entry.pot),ratingCap());
@@ -21487,8 +21516,10 @@ function applyPotBoost(entry){
   entry.potBoostT=(entry.potBoostT||0)+got;
   return {tBoost:got};}
 /* ---- 4. ÖSSZJÁTÉK BOOST ---- */
-function applyBondBoost(entry){
-  const pct=BOOST_BOND_PCT[0]+Math.random()*(BOOST_BOND_PCT[1]-BOOST_BOND_PCT[0]);
+function bondBoostPlan(){
+  return {pct:BOOST_BOND_PCT[0]+Math.random()*(BOOST_BOND_PCT[1]-BOOST_BOND_PCT[0])};}
+function applyBondBoost(entry,pct0){
+  const pct=(pct0!=null)?pct0:bondBoostPlan().pct;
   const before=entry.bondBoost||1;
   entry.bondBoost=Math.min(BOOST_BOND_MAX,Math.round(before*(1+pct/100)*100)/100);
   entry.bondBoosts=(entry.bondBoosts||0)+1;
@@ -21525,6 +21556,215 @@ function boostSkillWeight(nameOrEntry){
   if(typeof nameOrEntry==="string"){try{e=(careerPool&&careerPool[nameOrEntry])||null;}catch(x){e=null;}}
   const n=(e&&e.skillBoost)||0;
   return n?Math.min(BOOST_SKILL_W_MAX,1+BOOST_SKILL_W*n):1;}
+/* ================= BÉKE ÉS HARMÓNIA: A KÉT CSOPORTOS BOOST (3.9.67) ======
+   A stílus-egyensúly diagnózisa (docs/stilus-egyensuly-diagnozis.md) azt mérte
+   ki, hogy a Béke és harmónia célja — a KIS SZÓRÁS — ellen a játék minden más
+   rendszere dolgozik: az átigazolás, a szezonkártyák, az ifi-boost, az ikonok
+   és a POT-vezérelt fejlődés MIND a szórást növeli. A filozófiának eddig nem
+   volt egyetlen eszköze sem, amivel a saját célját elő tudta volna állítani.
+
+   EZ A KETTŐ AZ AZ ESZKÖZ. Mindkettő a boost-központban él, mert ott dől el a
+   keret alakja — és mindkettő POSZTCSOPORTON BELÜL dolgozik: a kapusok, a
+   védők, a középpályások és a támadók külön világok.
+
+   POSZTCSOPORT = AMIT A JÁTÉKOS TUD, nem amit ma játszik. Egy KV+VKP ember a
+   védőkkel ÉS a középpályásokkal is boostolható, egy TKP+ÁÉ a középpályásokkal
+   és a támadókkal — és a MEGTANULT poszt is számít, mert a posLearnFinish az
+   entry.pos-ba írja. Két játékos akkor boostolható együtt, ha a
+   posztcsoport-halmazuk metszete nem üres. */
+function boostPosCats(entry){
+  const out=[];
+  try{
+    ((entry&&entry.pos)||[]).forEach(pz=>{
+      const c=getCategoryFor(pz);
+      if(c&&out.indexOf(c)<0)out.push(c);});
+  }catch(e){}
+  return out;}
+function boostSameGroup(a,b){
+  if(!a||!b)return false;
+  const A=boostPosCats(a),B=boostPosCats(b);
+  return A.some(c=>B.indexOf(c)>=0);}
+/* A kijelöléshez: kivel boostolható EGYÜTT a már kiválasztottak halmaza? Az
+   ELSŐ kijelölt ember szabja meg a kört (ő a horgony) — így egy két-csoportos
+   játékos nem tud két idegen csoportot egymáshoz kötni. */
+function boostGroupMates(anchorName){
+  const out=[];
+  try{
+    const a=careerPool&&careerPool[anchorName];
+    if(!a)return out;
+    (fullCareerRoster()||[]).forEach(p=>{
+      const e=careerPool&&careerPool[p.n];
+      if(!e||p.n===anchorName)return;
+      if(boostSameGroup(a,e))out.push(p.n);});
+  }catch(e){}
+  return out;}
+
+/* ---------- 1. EGYENLÍTŐ ----------
+   2-5 egy posztcsoportba tartozó játékos Ratingjét EGY számra hozza. A cél
+   nem az átlag, hanem az átlag és a LEGJOBB közti rés egy hányada: a szint
+   dönti el, mennyire húzza fel a mezőnyt a csúcshoz.
+
+     átlag = a kijelöltek átlag-Ratingje
+     rés   = a legjobb − átlag
+     cél   = átlag + rés × {33% | 50% | 75%}
+
+   PÉLDA (3. szint, 80 és 120): átlag 100, rés 20, 75% = 15 → MINDKETTŐ 115
+   lesz. A gyengébb nyer 35-öt, az erősebb veszít 5-öt — a csapat összesen
+   30-cal erősebb. Ez a filozófia üzlete: a kiugró ember lead valamennyit
+   azért, hogy a mezőny felzárkózzon.
+
+   A CSÚCS NEM VÉSZ EL VÉGLEG. Aki LEJJEBB kerül, annak a peakjéhez (a
+   pályafutás görbéjéhez) és a POT-jához NEM nyúlunk: a jelen osztódik szét,
+   nem a jövő — ő a következő idényekben visszanő a saját pályájára. Aki
+   FELJEBB kerül, annál a peak követi az új Ratinget, ahogy minden más
+   boostnál is: különben a fejlődés azonnal visszahúzná.
+
+   AZ ÁR FÉKE: szintenként adott darab megy alapáron (5/4/3), utána MINDEN
+   további egyenlítő a duplája az előzőnek. A magasabb szint erősebb, de
+   kevesebbszer olcsó — és a nyolcadik-tizedik egyenlítő már csak a nagyon
+   gazdag klubnak fér bele. */
+const EQ_MIN=2, EQ_MAX=5;
+const EQ_PCT=[0.33,0.50,0.75];      /* a rés hányada szintenként */
+const EQ_FREE=[5,4,3];              /* ennyi megy alapáron szintenként */
+function eqLevel(){try{return Math.max(0,Math.min(3,styleFxMax("equalizer")||0));}catch(e){return 0;}}
+function eqOn(){return gameMode==="career"&&eqLevel()>0;}
+function eqUsed(){return S.eqBoostsUsed||0;}
+function eqFreeLeft(){return Math.max(0,(EQ_FREE[eqLevel()-1]||0)-eqUsed());}
+/* Az ÁR SZORZÓJA: az alapáron járó darabokig 1, utána folyamatosan duplázódik. */
+function eqPriceMult(){
+  const free=EQ_FREE[eqLevel()-1]||0;
+  const over=eqUsed()-free;
+  return over<0?1:Math.pow(2,over+1);}
+function eqPrice(){
+  const alap=boostPriceOf("equal");
+  return Math.max(100,Math.round(alap*eqPriceMult()/100)*100);}
+/* A CÉLSZÁM. Nyersen (kerekítés nélkül) is elkérhető — a felület ebből írja ki,
+   mi történne. */
+function eqTargetOf(entries,lvl){
+  const rs=(entries||[]).map(e=>(e&&e.startRating)||0).filter(x=>x>0);
+  if(rs.length<EQ_MIN)return null;
+  const avg=rs.reduce((a,b)=>a+b,0)/rs.length;
+  const max=Math.max.apply(null,rs);
+  const res=Math.max(0,max-avg);
+  const pct=EQ_PCT[Math.max(0,Math.min(EQ_PCT.length-1,(lvl||1)-1))];
+  return avg+res*pct;}
+/* A VÉGREHAJTÁS. Visszaad soronként {n,elotte,utana} — a felület ebből mondja
+   el, ki mit nyert és ki mit adott le. */
+function applyEqualizeBoost(names,lvl){
+  const es=(names||[]).map(n=>careerPool&&careerPool[n]).filter(Boolean);
+  const cel0=eqTargetOf(es,lvl);
+  if(cel0==null)return null;
+  const cap=ratingCap();
+  const cel=Math.max(1,Math.min(cap,Math.round(cel0)));
+  const sorok=[];
+  es.forEach(e=>{
+    const elotte=e.startRating||0;
+    e.startRating=cel;
+    if(cel>elotte){
+      /* FELFELÉ: a peak követi — ugyanaz az indok, mint a sima boostnál. */
+      e.peak=boostLift(e.peak,e.startRating,cap);
+      if(e.basePeak!=null)e.basePeak=Math.max(e.basePeak,e.peak);}
+    try{syncAttrsToRating(e);}catch(x){}
+    e.eqBoosts=(e.eqBoosts||0)+1;
+    e.eqBoostR=(e.eqBoostR||0)+(cel-elotte);
+    /* A PÁLYÁN/PADON lévő példány is kövesse — a keretlista és a motor onnan
+       olvas (ugyanaz a lépés, mint a sima boost után). */
+    try{
+      const pl=(currentRoster().find(x=>x.n===e.n))||(extraRoster.find(x=>x.n===e.n));
+      if(pl)pl.ovr=e.startRating;
+    }catch(x){}
+    sorok.push({n:e.n,elotte,utana:cel});});
+  S.eqBoostsUsed=(S.eqBoostsUsed||0)+1;
+  return {cel,sorok};}
+
+/* ---------- 2. TÖMEG-BOOST ----------
+   2-5 egy posztcsoportba tartozó játékos EGYÜTTES boostolása, bármelyik
+   fajtával. A szabály egyetlen mondat:
+
+     a boost annyit ad ÖSSZESEN, amennyit a kijelöltek LEGJOBBJÁNAK adott
+     volna — szintenként megszorozva (×1 · ×4/3 · ×5/3) —, és ezt osztjuk szét.
+
+   PÉLDA (sima boost, 3 emberre, a legjobbnak +2 Rating és +1800 POT járna):
+     1. szint: +2/3 → kerekítve +1 Rating, és +600 POT fejenként;
+     2. szint: ×4/3 → +8/9 → +1 Rating, +800 POT;
+     3. szint: ×5/3 → +10/9 → +1 Rating, +1000 POT.
+
+   A RATINGNÁL KEREKÍTÜNK, ÉS SOSEM ADUNK +1-NÉL KEVESEBBET. Ez tudatosan
+   nagyvonalú: egy háromfelé osztott +2 Rating így 3-at ad összesen. A
+   filozófia épp ezt ígéri — a sok kicsi többet ér, mint az egy nagy.
+
+   AZ ALAP A LEGJOBB RATINGŰ kijelölt ember terve. Nem a legjobb POT-ú, nem a
+   legjobb tengelyű: EGY horgony van, és az a kártyán is ki van írva. */
+const MASS_MIN=2, MASS_MAX=5;
+const MASS_MULT=[1,4/3,5/3];
+/* Melyik fajta megy tömegben? A két saját panelű (ifi, öreg róka) és az
+   egyenlítő nem: az ifi/öreg saját jogosultsági köre van, az egyenlítő pedig
+   ELEVE csoportos. */
+const MASS_KINDS=["plain","attr","pot","bond","skill"];
+function massLevel(){try{return Math.max(0,Math.min(3,styleFxMax("massBoost")||0));}catch(e){return 0;}}
+function massOn(kind){
+  return gameMode==="career"&&massLevel()>0&&MASS_KINDS.indexOf(kind)>=0;}
+function massMult(){return MASS_MULT[Math.max(0,massLevel()-1)]||1;}
+/* A horgony: a kijelöltek közül a legjobb Ratingű (döntetlennél a nagyobb POT). */
+function massAnchor(names){
+  let best=null,bv=-1,bt=-1;
+  (names||[]).forEach(n=>{
+    const e=careerPool&&careerPool[n];
+    if(!e)return;
+    const r=e.startRating||0,t=e.pot||0;
+    if(r>bv||(r===bv&&t>bt)){best=e;bv=r;bt=t;}});
+  return best;}
+/* A SZÉTOSZTÁS. Visszaad egy fejenkénti adagot a fajta saját mértékegységében.
+   A `plan` a horgonyra szóló TELJES hatás; ezt szorozzuk a szint szorzójával,
+   és osztjuk a létszámmal. */
+function massShare(plan,n){
+  const m=massMult(),db=Math.max(1,n|0);
+  const oszt=v=>{
+    const x=((v||0)*m)/db;
+    return x>0?Math.max(1,Math.round(x)):0;};
+  return {r:oszt(plan.r),t:oszt(plan.t),a:oszt(plan.a),
+          /* a nem egész mértékegységek nem kerekítenek 1-re: egy összhang-
+             szorzó vagy egy sorsolási súly törtrésze is értelmes. */
+          pct:((plan.pct||0)*m)/db,
+          w:((plan.w||0)*m)/db};}
+/* A horgony terve fajtánként — EGY helyen, hogy a felület és a végrehajtás
+   ugyanazt a számot lássa. */
+function massPlanFor(kind,anchor,attrKey){
+  if(kind==="plain")return plainBoostPlan(anchor);
+  if(kind==="pot")  return potBoostPlan(anchor);
+  if(kind==="attr") return attrBoostPlan(anchor,attrKey);
+  if(kind==="bond") return bondBoostPlan();
+  if(kind==="skill")return {w:1};
+  return {};}
+/* A VÉGREHAJTÁS. A `share` a fejenkénti adag (massShare), tehát a sorsolás
+   ITT MÁR NEM FUT LE — mindenki pontosan ugyanazt kapja. */
+function applyMassBoost(kind,names,share,attrKey){
+  const sorok=[];
+  (names||[]).forEach(n=>{
+    const e=careerPool&&careerPool[n];
+    if(!e)return;
+    let res=null,txt="";
+    if(kind==="plain"){
+      res=applyPlainDelta(e,{r:share.r,t:share.t});
+      try{const pl=(currentRoster().find(x=>x.n===n))||(extraRoster.find(x=>x.n===n));
+          if(pl)pl.ovr=e.startRating;}catch(x){}
+      txt=`+${res.rBoost} Rating · +${res.tBoost} POT`;
+    }else if(kind==="pot"){
+      res=applyPotDelta(e,{t:share.t});
+      txt=`+${res.tBoost} POT`;
+    }else if(kind==="attr"){
+      res=applyAttrBoost(e,attrKey,share.a);
+      txt=res?`${ATTR_LABELS[attrKey]||attrKey} +${res.add} (${res.after})`:"—";
+    }else if(kind==="bond"){
+      res=applyBondBoost(e,share.pct);
+      txt=`összhang ${String(res.mult).replace(".",",")}×`;
+    }else if(kind==="skill"){
+      e.skillBoost=(e.skillBoost||0)+(share.w||0);
+      res={n:e.skillBoost,w:boostSkillWeight(e)};
+      txt=`sorsolási súly ${String(Math.round(res.w*100)/100).replace(".",",")}×`;}
+    e.massBoosts=(e.massBoosts||0)+1;
+    sorok.push({n,txt});});
+  return sorok;}
 /* VAN-E BOOSTOLT EMBERED, ÉS HA IGEN, KI. A realisztikus mód „magától megy"
    ága ebből választ CÍMZETTET: onnantól a sorsolás az Ő posztcsoportjából
    húz (skillRealDrawFor) — pontosan a bejelentés második fele.
@@ -70915,6 +71155,16 @@ const BOOST_KINDS=[
    short:()=>`akadémistára: a fejlődés berobban`,
    long:()=>`A legdrágább és a legerősebb: egy saját akadémistád fejlődése berobban — nagy Rating- és POT-ugrás, ami a hosszú távú pályáját is felgyorsítja. Csak akadémistára (és a „Boooooost!" képességgel a kijelölt sztárodra).`,
    go:()=>{const b=$("hubYouthBoostBtn");if(b&&b.onclick)b.onclick();}},
+  /* EGYENLÍTŐ (3.9.67) — csak a Béke és harmónia képességével létezik; a
+     katalógus kihagyja a sorát, ha nincs meg (boostOpenPanel). */
+  {k:"equal",ic:"⚖️",n:"Egyenlítő",col:"#8fd99a",
+   short:()=>`2-${EQ_MAX} ember Ratingje EGY számra`,
+   long:()=>`A Béke és harmónia saját boostja: <b>2-${EQ_MAX} egy posztcsoportba tartozó</b> játékos `
+     +`Ratingje egy közös számra jön. A cél az átlag és a LEGJOBB közti rés `
+     +`<b>${Math.round(EQ_PCT[Math.max(0,eqLevel()-1)]*100)}%-a</b> az átlag fölött — a gyengébbek `
+     +`felzárkóznak, a kiugró ember lead valamennyit. Aki lejjebb kerül, annak a <b>POT-ja és a `
+     +`pályafutás-görbéje érintetlen</b>: a jelen osztódik szét, nem a jövő. `
+     +`Alapáron ${EQ_FREE[Math.max(0,eqLevel()-1)]} megy szintenként, utána minden további a duplája.`},
   {k:"old",ic:"🎩",n:"Öreg róka boost",col:"#d9b98a",
    short:()=>`30 fölött: rutin és kitolt nyugdíj`,
    long:()=>`Az ifi-boost tükörképe a pálya másik végén: egy 30 fölötti játékosod Ratingje és POT-je ugrik, és <b>${OLD_BOOST_RETIRE_AGE} éves koráig</b> nem vonul vissza. Ugyanazon az emberen minden újabb boost drágább.`,
@@ -70925,11 +71175,13 @@ function boostKindDef(k){return BOOST_KINDS.find(x=>x.k===k)||null;}
    MÓDHOZ kötött: laza skill-módban semmit nem csinálna, ezért ott nem is
    kínáljuk fel (a katalógusban látszik, de kimondjuk, miért nem elérhető). */
 function boostKindReady(k){
+  if(k==="equal")return eqOn();
   if(k==="skill")return skillRealOn();
   if(k==="youth")return fullCareerRoster().some(p=>canYouthBoost(careerPool[p.n]));
   if(k==="old")  return fullCareerRoster().some(p=>isVeteranBoostable(careerPool[p.n]));
   return true;}
 function boostKindBlockedWhy(k){
+  if(k==="equal")return "A Béke és harmónia „Egyenlítő” képességével nyílik meg.";
   if(k==="skill")return "Csak REALISZTIKUS skill-módban dolgozik — a karriered a lazát futtatja.";
   if(k==="youth")return "Most nincs a keretedben akadémista, akire elsülhetne.";
   if(k==="old")  return "Most nincs a keretedben 30 fölötti játékos, akire elsülhetne.";
@@ -70966,22 +71218,35 @@ function boostOpenPanel(){
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
     Hétféle fejlesztés, mind a büdzséből. Az árak <b>egységben</b> értendők — egy egység a legdrágább boost,
     az ifi-boost ára: <b style="color:var(--gold)">${fmtFt(unit)}</b>. Az egyenleged <b>${fmtFt(S.transferBudget||0)}</b>.${discNote}<br>
-    Minden boost <b>visszavonhatatlan</b>, és csak azt az EGY játékost érinti.${scaleNote}</p>`;
+    Minden boost <b>visszavonhatatlan</b>.${(massLevel()>0||eqOn())
+      ? ` A Béke és harmónia képességeivel egy boost <b>több emberre</b> is elsüthető — `
+        +`a fajta sorában ott a jelzés.`
+      : ` Egy boost csak azt az EGY játékost érinti.`}${scaleNote}</p>`;
   $("twActions").innerHTML="";
   BOOST_KINDS.forEach(d=>{
-    const price=boostPriceOf(d.k),ready=boostKindReady(d.k),afford=(S.transferBudget||0)>=price;
+    /* AZ EGYENLÍTŐ CSAK AKKOR LÉTEZIK, ha a Béke és harmónia képessége megvan
+       (3.9.67) — más filozófiánál nincs mit felajánlani. */
+    if(d.k==="equal"&&!eqOn())return;
+    const price=(d.k==="equal")?eqPrice():boostPriceOf(d.k);
+    const ready=boostKindReady(d.k),afford=(S.transferBudget||0)>=price;
     const b=document.createElement("button");
     b.className="btn-s stepbtn";b.style.marginTop="6px";b.style.textAlign="left";
     if(!ready||!afford)b.style.opacity=".55";
     b.innerHTML=`<b style="color:${d.col}">${d.ic} ${esc(d.n)}</b> `
       +`<span style="color:var(--dim2)">— ${d.short()}</span>`
       +`<br><span style="font-size:11.5px;color:${afford?"var(--gold)":"var(--red)"}">`
-      +`${fmtFt(price)} <span style="color:var(--dim2)">(${String(BOOST_UNIT_KIND[d.k]).replace(".",",")} egység)</span></span>`
-      +(!ready?`<br><span style="font-size:11px;color:var(--red)">${esc(boostKindBlockedWhy(d.k))}</span>`:"");
+      +`${fmtFt(price)} <span style="color:var(--dim2)">(${String(BOOST_UNIT_KIND[d.k]).replace(".",",")} egység`
+      +((d.k==="equal"&&eqPriceMult()>1)?` · ×${eqPriceMult()} — az alapáras darabok elfogytak`
+        :(d.k==="equal"?` · még ${eqFreeLeft()} alapáron`:""))+`)</span></span>`
+      +(!ready?`<br><span style="font-size:11px;color:var(--red)">${esc(boostKindBlockedWhy(d.k))}</span>`:"")
+      +((massOn(d.k))?`<br><span style="font-size:11px;color:#22c55e">🤝 tömegben is elsüthető (2-${MASS_MAX} fő)</span>`:"");
     b.onclick=()=>{
       if(!ready)return;
       if(d.go){d.go();return;}
       if((S.transferBudget||0)<price)return;
+      if(d.k==="equal"){boostMultiPick("equal",null);return;}
+      /* TÖMEG-BOOST: a fajta kiválasztása után jön a kérdés (3.9.67). */
+      if(massOn(d.k)){boostAskCount(d.k);return;}
       boostPickPlayer(d.k);};
     $("twActions").appendChild(b);});
   const cancel=document.createElement("button");
@@ -71037,6 +71302,206 @@ function boostPickAttr(p,e,price){
   back.className="btn-s stepbtn";back.style.marginTop="10px";back.textContent="← Vissza a jelöltekhez";
   back.onclick=()=>boostPickPlayer("attr");
   $("twActions").appendChild(back);}
+/* ================= EGY VAGY TÖBB? (3.9.67) =========================
+   A Béke és harmónia „Tömeg-boost" képessége után minden boost-fajtánál ez a
+   kérdés jön előbb. Aki egyet választ, pontosan a régi utat kapja. */
+function boostAskCount(kind){
+  const d=boostKindDef(kind);if(!d)return;
+  const price=boostPriceOf(kind);
+  $("twTitle").textContent=`${d.ic} ${d.n}`;
+  $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
+    ${d.long()}<br><br>Ára <b style="color:${d.col}">${fmtFt(price)}</b> — egy boost ára, akárhány emberre süt el.</p>`;
+  $("twActions").innerHTML="";
+  const mk=(cls,html,fn)=>{
+    const b=document.createElement("button");b.className=cls+" stepbtn";
+    b.style.marginTop="6px";b.style.textAlign="left";b.innerHTML=html;b.onclick=fn;
+    $("twActions").appendChild(b);};
+  mk("btn-y",`👤 <b>Egy játékos</b><small>a teljes hatás egyvalakire — a megszokott út</small>`,
+    ()=>boostPickPlayer(kind));
+  mk("btn-p",`🤝 <b>Több játékos</b> <span style="color:var(--dim2)">(2-${MASS_MAX} fő, egy posztcsoportból)</span>`
+    +`<small>a hatás szétosztva: a legjobb kijelölt emberre szóló teljes érték `
+    +`×${String(Math.round(massMult()*100)/100).replace(".",",")}, elosztva a létszámmal · `
+    +`a Ratingnél sosem kevesebb, mint +1 fejenként</small>`,
+    ()=>boostMultiPick(kind,null));
+  const back=document.createElement("button");
+  back.className="btn-s stepbtn";back.style.marginTop="10px";back.textContent="← Vissza a katalógushoz";
+  back.onclick=boostOpenPanel;
+  $("twActions").appendChild(back);}
+/* ---- A KIJELÖLŐ ----
+   Az ELSŐ kijelölt ember a HORGONY: tőle számít a posztcsoport, és aki nem
+   fér bele, az szürkén ott marad — nem tűnik el. Egy eltűnő név azt sugallná,
+   hogy nincs is a keretben; a szürke azt mondja, amit kell: ő igen, de nem
+   ebbe a csoportba. */
+let _boostSel=[];
+function boostMultiPick(kind,attrKey){
+  _boostSel=[];
+  boostMultiRender(kind,attrKey);}
+function boostMultiRender(kind,attrKey){
+  const egyen=(kind==="equal");
+  const d=egyen?boostKindDef("equal"):boostKindDef(kind);
+  const price=egyen?eqPrice():boostPriceOf(kind);
+  const max=egyen?EQ_MAX:MASS_MAX, min=egyen?EQ_MIN:MASS_MIN;
+  const horgony=_boostSel[0]||null;
+  const kor=horgony?boostGroupMates(horgony):null;
+  $("twTitle").textContent=`${d.ic} ${d.n} — kiket?`;
+  const es=_boostSel.map(n=>careerPool&&careerPool[n]).filter(Boolean);
+  let elonezet="";
+  if(egyen&&es.length>=EQ_MIN){
+    const cel=Math.round(eqTargetOf(es,eqLevel()));
+    const sorok=es.map(e=>`${esc(shortName(e.n))} ${e.startRating}→<b>${cel}</b>`).join(" · ");
+    elonezet=`<div style="margin-top:8px;padding:8px 10px;background:var(--panel2);border-radius:8px;
+      font-size:12.5px;line-height:1.6">🎯 <b>Közös Rating: ${cel}</b><br>${sorok}</div>`;
+  }else if(!egyen&&es.length>=MASS_MIN){
+    const a=massAnchor(_boostSel);
+    const terv=massPlanFor(kind,a,attrKey||"gol");
+    const sh=massShare(terv,es.length);
+    const mit=[];
+    if(kind==="plain")mit.push(`+${sh.r} Rating · +${sh.t} POT`);
+    if(kind==="pot")mit.push(`+${sh.t} POT`);
+    if(kind==="attr")mit.push(`+${sh.a} a választott tengelyen`);
+    if(kind==="bond")mit.push(`összhang +${Math.round(sh.pct)}%`);
+    if(kind==="skill")mit.push(`sorsolási súly +${String(Math.round(sh.w*100)/100).replace(".",",")}`);
+    elonezet=`<div style="margin-top:8px;padding:8px 10px;background:var(--panel2);border-radius:8px;
+      font-size:12.5px;line-height:1.6">🤝 <b>Fejenként: ${mit.join(" · ")}</b>
+      <br><span style="color:var(--dim2)">a horgony ${esc(shortName(a.n))} (a legjobb kijelölt) · `
+      +`a sorsolás a MEGERŐSÍTÉSKOR dől el, ez egy példa</span></div>`;}
+  $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
+    ${egyen
+      ? `A kijelöltek Ratingje EGY számra jön: az átlag és a legjobb közti rés `
+        +`<b>${Math.round(EQ_PCT[Math.max(0,eqLevel()-1)]*100)}%-áig</b>. Aki lejjebb kerül, annak a POT-ja és a `
+        +`pályafutás-görbéje érintetlen marad.`
+      : `A hatás szétosztva, a legjobb kijelölt emberre szóló teljes értékből.`}
+    <br>Jelölj ki <b>${min}-${max} embert</b> — az elsőnek kijelölt ember szabja meg a posztcsoportot.
+    <br>Ára <b style="color:${d.col}">${fmtFt(price)}</b>, az egyenleged ${fmtFt(S.transferBudget||0)}.</p>${elonezet}`;
+  $("twActions").innerHTML="";
+  fullCareerRoster().forEach(p=>{
+    const e=careerPool&&careerPool[p.n];
+    if(!e)return;
+    const kijelolt=_boostSel.indexOf(p.n)>=0;
+    const beleferne=!horgony||kijelolt||(kor&&kor.indexOf(p.n)>=0);
+    const tele=!kijelolt&&_boostSel.length>=max;
+    const b=document.createElement("button");
+    b.className="btn-"+(kijelolt?"y":"s")+" stepbtn";
+    b.style.marginTop="6px";b.style.textAlign="left";
+    if(!beleferne||tele)b.style.opacity=".4";
+    b.disabled=!beleferne||tele;
+    b.innerHTML=`${kijelolt?"✓ ":""}<b>${esc(shortName(p.n))}</b> `
+      +`<span style="color:var(--dim2)">${e.pos.join("/")} · Rating ${Math.round(pOvr(p))} · ${potTag(p.n)||("POT "+e.pot)}</span>`
+      +(!beleferne?`<br><span style="font-size:11px;color:var(--dim2)">más posztcsoport</span>`:"");
+    b.onclick=()=>{
+      const i=_boostSel.indexOf(p.n);
+      if(i>=0)_boostSel.splice(i,1);
+      else if(_boostSel.length<max)_boostSel.push(p.n);
+      boostMultiRender(kind,attrKey);};
+    $("twActions").appendChild(b);});
+  const kesz=document.createElement("button");
+  kesz.className="btn-y stepbtn";kesz.style.marginTop="10px";
+  kesz.textContent=`Tovább — ${_boostSel.length} kijelölve`;
+  kesz.disabled=_boostSel.length<min||(S.transferBudget||0)<price;
+  if(kesz.disabled)kesz.style.opacity=".5";
+  kesz.onclick=()=>{
+    if(_boostSel.length<min)return;
+    if(egyen){boostEqConfirm(_boostSel.slice());return;}
+    if(kind==="attr"){boostMassAttr(_boostSel.slice());return;}
+    boostMassConfirm(kind,_boostSel.slice(),null);};
+  $("twActions").appendChild(kesz);
+  const back=document.createElement("button");
+  back.className="btn-s stepbtn";back.style.marginTop="6px";back.textContent="← Vissza a katalógushoz";
+  back.onclick=boostOpenPanel;
+  $("twActions").appendChild(back);}
+/* A tömeges attribútum-boost tengely-választója: a horgony értékeit mutatja. */
+function boostMassAttr(names){
+  const a=massAnchor(names);
+  $("twTitle").textContent=`🎯 Melyik tengely? (${names.length} fő)`;
+  $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
+    A választott tengely MINDEGYIK kijelöltnél ugyanaz lesz. A pontszám a horgony
+    (<b>${esc(shortName(a.n))}</b>) tervéből jön, szétosztva.</p>`;
+  $("twActions").innerHTML="";
+  ATTR_KEYS.forEach(k=>{
+    let v=40;try{v=(initPlayerAttrs(a)||{})[k]||40;}catch(x){}
+    const sh=massShare(attrBoostPlan(a,k),names.length);
+    const b=document.createElement("button");
+    b.className="btn-s stepbtn";b.style.marginTop="6px";b.style.textAlign="left";
+    b.innerHTML=`<b>${esc(ATTR_LABELS[k]||k)}</b> `
+      +`<span style="color:var(--dim2)">a horgonynál most ${Math.round(v)} · fejenként kb. +${sh.a}</span>`;
+    b.onclick=()=>boostMassConfirm("attr",names,k);
+    $("twActions").appendChild(b);});
+  const back=document.createElement("button");
+  back.className="btn-s stepbtn";back.style.marginTop="10px";back.textContent="← Vissza a kijelöléshez";
+  back.onclick=()=>boostMultiRender("attr",null);
+  $("twActions").appendChild(back);}
+/* ---- AZ EGYENLÍTŐ MEGERŐSÍTÉSE ---- */
+function boostEqConfirm(names){
+  const es=names.map(n=>careerPool&&careerPool[n]).filter(Boolean);
+  const lvl=eqLevel();
+  const cel=Math.round(eqTargetOf(es,lvl));
+  const price=eqPrice();
+  const sorok=es.map(e=>{
+    const d=cel-(e.startRating||0);
+    const szin=d>0?"var(--grass)":(d<0?"var(--red)":"var(--dim2)");
+    return `<div style="font-size:12.5px;margin-top:3px">${esc(shortName(e.n))} `
+      +`<span style="color:var(--dim2)">${e.startRating} →</span> <b>${cel}</b> `
+      +`<span style="color:${szin}">${d>0?"+":""}${d}</span></div>`;}).join("");
+  askConfirm({title:"Elsütöd az egyenlítőt?",yes:"Igen, egyenlítek",
+    html:`<div style="font-size:15px;font-weight:700">⚖️ Közös Rating: ${cel}</div>
+      <div style="font-size:12.5px;color:var(--dim);margin-top:3px">`
+      +`${names.length} játékos · a rés ${Math.round(EQ_PCT[lvl-1]*100)}%-áig</div>
+      <div style="margin-top:8px">${sorok}</div>
+      <div style="font-size:12.5px;margin-top:9px;line-height:1.5;color:var(--dim)">
+        Aki lejjebb kerül, annak a <b>POT-ja és a pályafutás-görbéje érintetlen</b> — ő a következő
+        idényekben visszanő a saját pályájára. Aki feljebb, annál a görbe követi az új Ratinget.</div>
+      <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(price)}</b>
+        — az egyenleged ${fmtFt(S.transferBudget||0)} → <b>${fmtFt((S.transferBudget||0)-price)}</b>.
+        ${eqFreeLeft()>0?`Ez a(z) ${eqUsed()+1}. egyenlítőd, alapáron.`
+          :`Az alapáras darabok elfogytak — ez ×${eqPriceMult()} áron megy.`}</div>`,
+    onYes:()=>{
+      if((S.transferBudget||0)<price)return;
+      budgetPay(price,"boost",names[0]);
+      const res=applyEqualizeBoost(names,lvl);
+      if(!res)return;
+      const txt=res.sorok.map(x=>`${esc(shortName(x.n))} ${x.elotte}→${x.utana}`).join(" · ");
+      addLine(`⚖️ <b>Egyenlítő:</b> ${names.length} játékos közös Ratingje <b>${res.cel}</b> — ${txt}.`,"m life");
+      boostDoneScreen("⚖️","var(--grass)",
+        `<b>Közös Rating: ${res.cel}</b><br>${txt}`);}});}
+/* ---- A TÖMEG-BOOST MEGERŐSÍTÉSE ---- */
+function boostMassConfirm(kind,names,attrKey){
+  const d=boostKindDef(kind);if(!d)return;
+  const price=boostPriceOf(kind);
+  const a=massAnchor(names);
+  askConfirm({title:"Elsütöd a boostot?",yes:`Igen, ${names.length} emberre`,
+    html:`<div style="font-size:15px;font-weight:700">${d.ic} ${esc(d.n)} — ${names.length} játékos</div>
+      <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${names.map(n=>esc(shortName(n))).join(" · ")}</div>
+      ${attrKey?`<div style="font-size:12.5px;color:var(--gold);margin-top:4px">🎯 Tengely: <b>${esc(ATTR_LABELS[attrKey]||attrKey)}</b></div>`:""}
+      <div style="font-size:13px;margin-top:9px;line-height:1.5">
+        A hatás alapja a horgony (<b>${esc(shortName(a.n))}</b>) teljes boostja, megszorozva
+        <b>×${String(Math.round(massMult()*100)/100).replace(".",",")}</b>-szeresére, és elosztva ${names.length} felé.
+        A Ratingnél kerekítünk, és sosem adunk +1-nél kevesebbet.</div>
+      <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(price)}</b>
+        — az egyenleged ${fmtFt(S.transferBudget||0)} → <b>${fmtFt((S.transferBudget||0)-price)}</b>.</div>`,
+    onYes:()=>{
+      if((S.transferBudget||0)<price)return;
+      if(price===0)chFreeBoostSpend(kind);
+      budgetPay(price,"boost",names[0]);
+      const terv=massPlanFor(kind,a,attrKey);
+      const sh=massShare(terv,names.length);
+      const sorok=applyMassBoost(kind,names,sh,attrKey);
+      const txt=sorok.map(x=>`${esc(shortName(x.n))}: ${x.txt}`).join(" · ");
+      addLine(`${d.ic} <b>${esc(d.n)} — ${names.length} emberre:</b> ${txt}.`,"m life");
+      boostDoneScreen(d.ic,d.col,txt);}});}
+/* A záróképernyő — a három csoportos út közös vége. */
+function boostDoneScreen(ic,col,txt){
+  $("twBody").innerHTML=`<div class="h" style="color:${col}">${ic} Megvan!</div>`
+    +`<p style="font-size:13px;margin-top:5px;line-height:1.55">${txt}</p>`;
+  $("twActions").innerHTML="";
+  const more=document.createElement("button");
+  more.className="btn-s stepbtn";more.textContent="⚡ Még egy boost";
+  more.onclick=boostOpenPanel;
+  $("twActions").appendChild(more);
+  const ok=document.createElement("button");
+  ok.className="btn-y stepbtn";ok.style.marginTop="6px";ok.textContent="Vissza a HUB-ba";
+  ok.onclick=()=>csReturnToHub();
+  $("twActions").appendChild(ok);
+  try{drawPitch();updateBar();saveGame();}catch(e){}}
 /* 3. LÉPÉS — MEGERŐSÍTÉS, majd a hatás. */
 function boostConfirm(kind,p,e,price,attrKey){
   const d=boostKindDef(kind);if(!d)return;
@@ -87234,6 +87699,38 @@ stTrait("harmonia","add_tovabb",3,"Add tovább!",
   {fx:{inheritP:0.20},note:"20% esély képességenként"},
   {fx:{inheritP:0.30},note:"30% esély"},
   {fx:{inheritP:0.50},note:"50% esély"}]);
+/* ---- A KÉT CSOPORTOS BOOST (3.9.67) ----
+   A diagnózis szerint a filozófia baja nem a nehézség, hanem hogy a CÉLJÁHOZ
+   (kis szórás, egyenletes keret) nem volt eszköze. Ez a kettő az eszköz — és
+   szándékosan II. SÁVBAN, nem a III.-ban: a harmónia fája amúgy is a legdrágább
+   a hétből (14 képességből 7 volt III. sávos), és egy újabb két III. sávos
+   képesség pont azt a bajt mélyítené, amit orvosolni akarunk. */
+stTrait("harmonia","egyenlito",2,"Egyenlítő",
+  "Új boost a Boost-központban: <b>2-5 egy posztcsoportba tartozó</b> játékos Ratingjét EGY számra hozza. "
+  +"A cél az átlag és a legjobb közti RÉS egy hányada — a gyengébbek felzárkóznak, a kiugró ember lead valamennyit. "
+  +"Aki lejjebb kerül, annak a POT-jához és a pályafutás-görbéjéhez NEM nyúlunk: a jelen osztódik szét, nem a jövő."
+  +"<br><br>Szintenként "+EQ_FREE.join("/")+" egyenlítő megy ALAPÁRON; minden további a duplája az előzőnek.",[
+  {fx:{equalizer:1},note:"a rés 33%-áig · 5 db alapáron"},
+  {fx:{equalizer:2},note:"50%-áig · 4 db alapáron"},
+  {fx:{equalizer:3},note:"75%-áig · 3 db alapáron"}],
+  ()=>{
+    const lv=eqLevel();
+    if(!lv)return "a Boost-központban jelenik meg, amint megveszed";
+    return `most a ${lv}. szint fut (a rés ${Math.round(EQ_PCT[lv-1]*100)}%-a) · `
+      +`alapáron még ${eqFreeLeft()} egyenlítő · a következő ára ${fmtFt(eqPrice())}`;});
+stTrait("harmonia","tomeg_boost",2,"Tömeg-boost",
+  "Mostantól minden boostnál megkérdezzük: EGY vagy TÖBB játékos? Többnél <b>2-5 egy posztcsoportba tartozó</b> "
+  +"embert jelölsz ki, és a boost annyit ad ÖSSZESEN, amennyit a kijelöltek legjobbjának adott volna — szétosztva. "
+  +"A Ratingnél kerekítünk, és sosem adunk +1-nél kevesebbet, tehát a szétosztás önmagában is nyereség."
+  +"<br><br>Az ifi- és az öreg róka-boost marad egyszemélyes (saját jogosultsági körük van).",[
+  {fx:{massBoost:1},note:"a teljes hatás szétosztva"},
+  {fx:{massBoost:2},note:"…és a szétosztott érték +33%"},
+  {fx:{massBoost:3},note:"…+66%"}],
+  ()=>{
+    const lv=massLevel();
+    if(!lv)return "a boost-választásnál jelenik meg, amint megveszed";
+    return `most a ${lv}. szint fut — a szétosztott érték ×`
+      +String(Math.round(massMult()*100)/100).replace(".",",");});
 stTrait("harmonia","nincs_gyenge",3,"Nincs gyenge láncszem",
   "Ha a csapategyensúlyod 80 fölött áll, a csapat csapaterőt kap — a meglévő egyensúly-jutalom FÖLÉ.",[
   {fx:{ovrTeam:()=>{const b=teamBalance();return (b.ok&&b.score*100>=80)?1:0;}},note:"+1 csapaterő"},
@@ -90073,6 +90570,8 @@ function saveGame(){
         chRoleFreeze:S.chRoleFreeze,chBondSlow:S.chBondSlow,chSkillPickLock:S.chSkillPickLock,
         chTrainSecFreeze:S.chTrainSecFreeze,chDealMalus:S.chDealMalus,chDealBoost:S.chDealBoost,
         chFreeBoost:S.chFreeBoost,chTrainBoost:S.chTrainBoost,chYouthSell:S.chYouthSell,
+        /* EGYENLÍTŐ (3.9.67): hány ment el eddig — ebből számol az ár. */
+        eqBoostsUsed:S.eqBoostsUsed,
         chBidFloor90:S.chBidFloor90,chTacticFitPP:S.chTacticFitPP,chHatUp:S.chHatUp,
         chDefRating:S.chDefRating,chYellowCut:S.chYellowCut,chHealTokens:S.chHealTokens,chSpeedOpen:S.chSpeedOpen,chBuyDiscountNext:S.chBuyDiscountNext,chHealAsk:S.chHealAsk,
 

@@ -818,13 +818,33 @@ nélkül), méri a hét edző rövid nevét (magyar névsorrendnél az ELSŐ sz�
 külön ágon a váltás pillanatát ÉS az újratöltést utána. Részletek:
 `docs/nevmod-tdz-hiba.md`.
 
+## harmonia-boost-proba.js — ⚖️🤝 az egyenlítő és a tömeg-boost
+
+```
+node tools/harmonia-boost-proba.js
+```
+
+18 állítás a Béke és harmónia két új, csoportos boostjáról — és a próba a
+SZÁMTANT méri, a bejelentés saját példáival: az egyenlítő 3. szintjén 80 és 120
+mindkettője 115 lesz, a tömeg-boost pedig egy +2 Rating / +1800 POT-os tervet 3
+emberre így oszt szét: ×1 → +1/+600, ×4/3 → +1/+800, ×5/3 → +1/+1000.
+
+**A három kényes pont külön ágon**: (1) a posztcsoport — a kétlaki (KV+VKP)
+ember mindkét körbe befér, a védő és a középpályás viszont nem boostolható
+együtt, és a MEGTANULT poszt is számít; (2) az egyenlítő aszimmetriája — aki
+feljebb kerül, annál a pályafutás-görbe követi, aki lejjebb, annak a görbéje és
+a POT-ja érintetlen marad; (3) az ár féke — szintenként 5/4/3 megy alapáron,
+utána a szorzó 2, 4, 8, 16. Plusz: képesség nélkül egyik sem létezik, és a
+tömeg-boost az ifire, az öregre és magára az egyenlítőre sosem megy.
+Részletek: `docs/harmonia-csoportos-boost.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 48 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 49 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
