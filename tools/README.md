@@ -774,13 +774,33 @@ Külön ág méri a nehezítést: a másodlagos mérföldköve harmadannyit fize
 tempó-szorzó UTÁN, 1 pontos padlóval —, és hogy a pásztázás mindkét táblát
 futtatja, egy közös tárcába. Részletek: `docs/masodlagos-stilus.md`.
 
+## atviteli-kod-proba.js — ☁ mentés másik eszközre, fiók nélkül
+
+```
+node tools/atviteli-kod-proba.js
+```
+
+22 állítás az átviteli kódról: a mentés egy 8 karakteres kód alá kerül fel, és
+a másik eszközön ugyanazzal a kóddal jön le — e-mail, jelszó és regisztráció
+nélkül.
+
+**A próba magja: a felhő NEM KAP KÜLÖN JOGOT.** A lehozott mentés pontosan
+abba a kérdező folyamatba fut (`openSaveImportFlow`), amelyik a fájlból
+visszatöltöttet fogadja — kóddal sem lehet némán felülírni egy sokszezonos
+karriert. Mellette a kód ábécéje (a próba találta meg, hogy az `L` még benne
+állt, pedig a hibaüzenet már kizárta), a gzip oda-vissza bitre, a hálózat
+nélküli ág kimondott hibája, és két olyan állítás, ami a KLIENST a
+SZABÁLYFÁJLLAL veti össze: a méretplafon ugyanaz a két oldalon, és a 24 órás
+lejáratot az adatbázis-szabály tartja be, nem a kliens. Részletek:
+`docs/atviteli-kod.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 46 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 47 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

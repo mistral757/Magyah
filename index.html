@@ -5491,6 +5491,9 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
          tartozik: a fájl mondja meg, hova kerül. -->
     <button id="storeImpBtn" class="btn-y stepbtn" style="margin-top:6px">⬆ Mentés visszatöltése fájlból</button>
     <input type="file" id="storeImpFile" accept=".json,application/json" class="hide">
+    <!-- ÁTVITELI KÓD (3.9.65): eszközök közötti átvitel fiók és e-mail nélkül.
+         A sorok ☁ gombja ad kódot, ez hozza le vele a mentést. -->
+    <button id="storeXferBtn" class="btn-s stepbtn" style="margin-top:6px">☁ Behozatal átviteli kóddal</button>
     <!-- ADATKEZELÉS — ITT, és nem egy külön menüpontban. Ez az az ablak, ahol
          a felhasználó a saját adatairól dönt (mentés, tárhely, kimentés,
          törlés); a „mi hagyja el a készüléket" kérdés ide tartozik, nem egy
@@ -6004,7 +6007,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.64";
+const APP_VERSION="3.9.65";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -93544,6 +93547,253 @@ function saveImportHandleFile(file,say){
     say("");
     openSaveImportFlow(r.env,r.d);};
   fr.readAsText(file);}
+/* ================= ÁTVITELI KÓD — A MENTÉS MÁSIK ESZKÖZRE (3.9.65) ========
+   KÉRÉS: eszközök közötti átvitel — fiók és e-mail nélkül.
+
+   MIÉRT EZ, ÉS NEM BEJELENTKEZÉS. Az e-mailes fiók három dolgot hoz magával,
+   amiből egyik sem a kért funkció: személyes adatot (tehát tájékoztató-
+   átvezetést), Play-kötelezettséget (alkalmazáson belüli fióktörlés ÉS egy
+   nyilvános törlés-kérő URL), és egy jelszó- vagy levél-folyamatot. Az
+   ÁTVITEL maga egyikbe sem kerül: a mentés egy kód alatt átmegy a másik
+   eszközre, és kész.
+
+   A GÉPEZET NAGY RÉSZE MEGVOLT. A boríték (saveExportEnvelope), a felismerése
+   (saveImportParse) és a visszatöltés kérdező folyamata (openSaveImportFlow)
+   a fájlos kimentéshez épült — pontosan ugyanaz kell ide is. Ez a blokk
+   ANNYIT tesz hozzá, hogy a boríték fájl helyett egy KÓD alá kerül fel, és
+   onnan jön vissza. A beolvasó ág betűre ugyanaz: a felhő sem írhat felül
+   semmit kérdés nélkül.
+
+   A KÓD MAGA A KULCS. Aki ismeri, hozzáfér a mentéshez — ugyanaz az elv, mint
+   a szobakódnál. Ezért HÁROM védelem van rajta:
+     · 8 karakter a félreolvashatatlan ábécéből (nincs 0/O, 1/I/L): 32^8 ≈
+       1,1 ezermilliárd lehetőség, végigpróbálni nem lehet;
+     · 24 ÓRA UTÁN LEJÁR, és a lejáratot az ADATBÁZIS-SZABÁLY tartja be, nem a
+       kliens: a lejárt bejegyzés olvashatatlan, akkor is, ha valaki a kódot
+       megszerezte;
+     · sikeres behozatal után a kliens azonnal törli a bejegyzést.
+
+   TÖMÖRÍTVE MEGY. Mérve: a pakolt karrier-készlet 254 kB, gzippel 91 kB —
+   a base64-esítés után is a harmada. Ahol a böngésző nem ismeri a
+   CompressionStream-et, nyersen megy fel; a rekord megmondja, melyik (z).
+
+   A MÉRETPLAFON KÉT HELYEN ÁLL, ÉS EGYÜTT KELL MOZDULNIUK: itt és a
+   tools/firebase-rules.json `xfer` ágában. A kettő eltérése némán hibás
+   feltöltést szülne — pontosan az a hiba, ami a push-feliratkozás 900/1200-as
+   eltéréséből már egyszer megvolt. */
+const XFER_PATH="mp/xfer";   /* a szabályfa mp-ága alatt — lásd tools/firebase-rules.json */
+const XFER_LEN=8;
+/* NINCS BENNE 0, O, 1, I és L. Az L-t a próba találta meg: a hibaüzenet már
+   kimondta, hogy nem szerepelhet, az ábécében viszont még ott állt — egy
+   ilyen eltérés pont a telefonba diktált kódnál bosszulja meg magát.
+   31 karakter, 8 hosszan: 8,5·10^11 lehetőség. */
+const XFER_ALPHABET="ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const XFER_TTL_MS=86400000;          /* 24 óra — a szabályfájl is ezt tartja */
+const XFER_MAX_CHARS=1500000;        /* = tools/firebase-rules.json xfer/$code/d */
+const XFER_TIMEOUT=20000;
+function xferNewCode(){
+  let s="";
+  const A=XFER_ALPHABET;
+  try{
+    const b=new Uint8Array(XFER_LEN);
+    crypto.getRandomValues(b);
+    for(let i=0;i<XFER_LEN;i++)s+=A[b[i]%A.length];
+  }catch(e){
+    for(let i=0;i<XFER_LEN;i++)s+=A[Math.floor(Math.random()*A.length)];}
+  return s;}
+/* KIÍRÁSRA kötőjellel (XXXX-XXXX), BEOLVASÁSKOR minden elválasztó nélkül. A
+   felhasználó úgyis kötőjellel, szóközzel vagy kisbetűvel írja be. */
+function xferPretty(c){
+  const x=String(c||"").toUpperCase();
+  return x.length===XFER_LEN?x.slice(0,4)+"-"+x.slice(4):x;}
+function xferNormalize(c){
+  /* Csak a nagybetűsítés és az elválasztók eldobása. SZÁNDÉKOSAN nem
+     „javítunk" hasonló karaktereket: az ábécében nincs 0/O és 1/I/L, tehát
+     egy beírt 0-ra nincs helyes csere — találgatni rosszabb, mint kimondani,
+     hogy az a karakter nem szerepelhet a kódban. */
+  return String(c||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,XFER_LEN);}
+function xferCodeValid(c){
+  return !xferCodeWhy(c);}
+/* MIÉRT nem jó a kód? Üres = jó. A hívó ezt írja ki — egy néma „hibás kód"
+   után a felhasználó nem tudja, hol nézzen. */
+function xferCodeWhy(c){
+  const x=String(c||"");
+  if(!x)return "Írd be a kódot.";
+  if(x.length!==XFER_LEN)
+    return `A kód ${XFER_LEN} karakter, ez ${x.length} — ellenőrizd, jól gépelted-e be.`;
+  for(let i=0;i<x.length;i++)
+    if(XFER_ALPHABET.indexOf(x[i])<0)
+      return `A kódban nem szerepelhet „${x[i]}" — a kódban nincs 0, O, 1, I és L, `
+        +`épp azért, hogy ne lehessen félreolvasni.`;
+  return "";}
+/* ---- TÖMÖRÍTÉS ----
+   A base64 nagy tömbre nem írható egy hívással (String.fromCharCode(...t) egy
+   negyedmilliós tömbön vermet borít), ezért darabokban megy. */
+function xferB64(bytes){
+  let s="";
+  const CH=0x8000;
+  for(let i=0;i<bytes.length;i+=CH)
+    s+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));
+  return btoa(s);}
+function xferUnB64(b64){
+  const bin=atob(String(b64||""));
+  const t=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)t[i]=bin.charCodeAt(i);
+  return t;}
+async function xferPack(text){
+  if(typeof CompressionStream==="undefined")return {z:0,d:text};
+  try{
+    const cs=new CompressionStream("gzip");
+    const ab=await new Response(new Blob([text]).stream().pipeThrough(cs)).arrayBuffer();
+    return {z:1,d:xferB64(new Uint8Array(ab))};
+  }catch(e){return {z:0,d:text};}}
+async function xferUnpack(rec){
+  if(!rec||typeof rec.d!=="string")return null;
+  if(!rec.z)return rec.d;
+  if(typeof DecompressionStream==="undefined")return null;
+  const ds=new DecompressionStream("gzip");
+  const blob=new Blob([xferUnB64(rec.d)]);
+  return await new Response(blob.stream().pipeThrough(ds)).text();}
+/* ---- A HÁLÓZAT ----
+   A kétjátékos ág kapcsolatát használja (mpNetInit): ugyanaz az adatbázis,
+   ugyanaz a bejelentkezés nélküli mód. Új példányt nyitni fölösleges volna. */
+async function xferNet(){
+  let mode=null;
+  try{mode=await mpNetInit();}catch(e){}
+  if(mode!=="fb"||!mpNet.db||!mpNet.fns)
+    return {ok:false,miert:"nincs kapcsolat az adatbázissal — próbáld újra hálózat mellett"};
+  return {ok:true,db:mpNet.db,F:mpNet.fns};}
+/* A LEGGYAKORIBB ELSŐ HIBA: a frissített szabályfájl még nincs közzétéve. A
+   Firebase ilyenkor PERMISSION_DENIED-et dob — ezt KIMONDJUK, mert ez az
+   egyetlen hiba, amit nem a felhasználó tud megoldani, és a ház visszatérő
+   néma hibája (lásd a tempó- és a push-mező történetét). */
+function xferHibaSzoveg(e){
+  const t=(e&&e.message)||String(e||"");
+  if(/permission|denied/i.test(t))
+    return "az adatbázis visszautasította — a frissített szabályfájl "
+      +"(tools/firebase-rules.json) valószínűleg még nincs közzétéve";
+  return t||"ismeretlen hiba";}
+function xferTimeout(pr,ms){
+  return Promise.race([pr,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error("időtúllépés")),ms||XFER_TIMEOUT))]);}
+/* FELTÖLTÉS. Visszaad {ok,kod,bytes} vagy {ok:false,miert} — néma hibába
+   sosem esik: a felület kimondja, mi történt. */
+async function xferUpload(key){
+  const d=loadSavedGame(key);
+  if(!saveHasGame(d))return {ok:false,miert:"ebben a helyben nincs kimenthető karrier"};
+  const env=saveExportEnvelope(key,d);
+  const text=JSON.stringify(env);
+  const pk=await xferPack(text);
+  if(pk.d.length>XFER_MAX_CHARS)
+    return {ok:false,miert:`ez a mentés túl nagy az átvitelhez (${kb(pk.d.length)}) — mentsd ki fájlba`};
+  const N=await xferNet();
+  if(!N.ok)return N;
+  const kod=xferNewCode();
+  try{
+    await xferTimeout(N.F.set(N.F.ref(N.db,XFER_PATH+"/"+kod),
+      {v:1,at:N.F.serverTimestamp(),z:pk.z,d:pk.d}));
+  }catch(e){return {ok:false,miert:"a feltöltés nem sikerült — "+xferHibaSzoveg(e)};}
+  return {ok:true,kod,bytes:pk.d.length,nyers:text.length,z:pk.z};}
+/* LEHOZATAL. A kódon kívül semmit nem kér — a boríték mondja meg, mi az és
+   hova való, és onnantól a FÁJLOS úttal azonos folyamat dönt. */
+async function xferDownload(kodNyers){
+  const kod=xferNormalize(kodNyers);
+  {const baj=xferCodeWhy(kod);
+   if(baj)return {ok:false,miert:baj};}
+  const N=await xferNet();
+  if(!N.ok)return {ok:false,miert:N.miert};
+  let snap=null;
+  try{snap=await xferTimeout(N.F.get(N.F.ref(N.db,XFER_PATH+"/"+kod)));}
+  catch(e){return {ok:false,miert:"a letöltés nem sikerült — "+xferHibaSzoveg(e)};}
+  const rec=(snap&&snap.exists&&snap.exists())?snap.val():null;
+  if(!rec)
+    return {ok:false,miert:"Ehhez a kódhoz nincs mentés. Vagy elgépelted, vagy már lejárt (a kód 24 óráig él)."};
+  let text=null;
+  try{text=await xferUnpack(rec);}catch(e){}
+  if(!text)
+    return {ok:false,miert:"A csomagot nem sikerült kibontani ezen a böngészőn."};
+  const r=saveImportParse(text);
+  if(r.hiba)return {ok:false,miert:r.hiba};
+  return {ok:true,env:r.env,d:r.d,kod};}
+/* SIKERES BEHOZATAL UTÁN TAKARÍTUNK. Nem kötelező (a szabály úgyis lejáratja),
+   de egy behozott mentés kódja ne maradjon élőben huszonnégy órán át. */
+async function xferBurn(kod){
+  try{
+    const N=await xferNet();
+    if(!N.ok)return false;
+    await xferTimeout(N.F.remove(N.F.ref(N.db,XFER_PATH+"/"+xferNormalize(kod))),8000);
+    return true;
+  }catch(e){return false;}}
+/* ---- A KÉT KÉPERNYŐ ----
+   A visszatöltés ablakát (saveImpModal) használják: ugyanaz a doboz, ugyanaz
+   a nyelv. Új felületet tanulni egy kódmásoláshoz nem kell. */
+function xferShowCode(key){
+  const modal=$("saveImpModal"),title=$("saveImpTitle"),body=$("saveImpBody"),acts=$("saveImpActions");
+  if(!modal||!title||!body||!acts)return;
+  title.textContent="Átviteli kód";
+  body.innerHTML=`<p>Feltöltés…</p>`;
+  acts.innerHTML="";
+  modal.classList.remove("hide");
+  const close=()=>modal.classList.add("hide");
+  xferUpload(key).then(r=>{
+    if(!r.ok){
+      body.innerHTML=`<p style="color:#e0a0a0">Nem sikerült: ${esc(r.miert||"ismeretlen ok")}</p>`
+        +`<p style="margin-top:8px">A fájlos kimentés (⬇) hálózat nélkül is működik, és `
+        +`ugyanúgy visszatölthető.</p>`;
+      acts.innerHTML="";
+      const b=document.createElement("button");b.className="btn-s stepbtn";
+      b.textContent="Bezár";b.onclick=close;acts.appendChild(b);
+      return;}
+    body.innerHTML=`<p>A mentés feltöltve. A MÁSIK eszközön nyisd meg a `
+      +`<b>Mentések és tárhely</b> ablakot, és írd be ezt a kódot:</p>`
+      +`<div style="text-align:center;margin:12px 0;padding:12px;border:1px dashed var(--gold);`
+      +`border-radius:10px;background:var(--panel2)">`
+      +`<div style="font-family:'Archivo Black',monospace;font-size:26px;letter-spacing:3px;`
+      +`color:var(--gold)">${esc(xferPretty(r.kod))}</div></div>`
+      +`<p style="font-size:12px;color:var(--dim2)">A kód <b>24 óráig</b> él, utána magától `
+      +`lejár. Aki ismeri, le tudja tölteni ezt a mentést — csak magadnak add meg. `
+      +`Feltöltve: ${kb(r.bytes)}${r.z?" (tömörítve)":""}.</p>`;
+    acts.innerHTML="";
+    const cp=document.createElement("button");cp.className="btn-y stepbtn";
+    cp.textContent="📋 Kód másolása";
+    cp.onclick=async()=>{
+      try{await navigator.clipboard.writeText(xferPretty(r.kod));cp.textContent="✓ Kimásolva";}
+      catch(e){cp.textContent="A másolás nem ment — írd le kézzel";}};
+    const b=document.createElement("button");b.className="btn-s stepbtn";
+    b.style.marginTop="6px";b.textContent="Kész";b.onclick=close;
+    acts.appendChild(cp);acts.appendChild(b);});}
+function xferAskCode(){
+  const modal=$("saveImpModal"),title=$("saveImpTitle"),body=$("saveImpBody"),acts=$("saveImpActions");
+  if(!modal||!title||!body||!acts)return;
+  title.textContent="Behozatal átviteli kóddal";
+  body.innerHTML=`<p>Írd be a MÁSIK eszközön kapott kódot. A kód 24 óráig él.</p>`
+    +`<input id="xferIn" type="text" inputmode="text" autocapitalize="characters" `
+    +`autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX" `
+    +`style="width:100%;margin-top:10px;padding:11px;text-align:center;font-size:20px;`
+    +`letter-spacing:3px;text-transform:uppercase;background:var(--panel2);color:var(--ink);`
+    +`border:1px solid var(--line);border-radius:9px">`
+    +`<div id="xferMsg" style="font-size:12px;color:#e0a0a0;margin-top:7px;min-height:16px"></div>`;
+  acts.innerHTML="";
+  const go=document.createElement("button");go.className="btn-y stepbtn";
+  go.textContent="⬇ Mentés lehozása";
+  const no=document.createElement("button");no.className="btn-s stepbtn";
+  no.style.marginTop="6px";no.textContent="Mégsem";
+  no.onclick=()=>modal.classList.add("hide");
+  acts.appendChild(go);acts.appendChild(no);
+  const say=t=>{const m=$("xferMsg");if(m)m.textContent=t||"";};
+  go.onclick=async()=>{
+    const inp=$("xferIn");
+    go.disabled=true;say("");
+    const eredeti=go.textContent;go.textContent="Letöltés…";
+    const r=await xferDownload(inp?inp.value:"");
+    go.disabled=false;go.textContent=eredeti;
+    if(!r.ok){say(r.miert);return;}
+    /* INNENTŐL A FÁJLOS ÚT: ugyanaz a kérdező folyamat dönt arról, hova
+       kerül és mit ír felül. A felhő nem kap külön jogot. */
+    openSaveImportFlow(r.env,r.d);
+    xferBurn(r.kod);};
+  modal.classList.remove("hide");
+  try{const inp=$("xferIn");if(inp)setTimeout(()=>inp.focus(),60);}catch(e){}}
 /* ---- MENTÉSEK ÉS TÁRHELY ----
    Innen látszik, mi foglalja a helyet, és innen lehet elengedni a rég nem
    használt szoba-mentéseket. A most futó mentés SOHA nem törölhető innen. */
@@ -93609,6 +93859,10 @@ function renderStoreModal(){
        olvashatatlan sorból viszont nincs mit kimenteni. */
     const dl=s.real?`<button class="btn-s" data-dl="${i}"
       style="padding:4px 9px;font-size:11.5px;white-space:nowrap" title="Kimentés fájlba">⬇</button>`:"";
+    /* ÁTVITELI KÓD (3.9.65) — ugyanahhoz a sorhoz, a fájlos kimentés mellé:
+       az egyik a saját gépedre ment, a másik a másik eszközödre viszi át. */
+    const xf=s.real?`<button class="btn-s" data-xf="${i}"
+      style="padding:4px 9px;font-size:11.5px;white-space:nowrap" title="Átvitel másik eszközre">☁</button>`:"";
     const btn=s.current?"":`<button class="btn-s" data-si="${i}"
       style="padding:4px 9px;font-size:11.5px;white-space:nowrap">🗑 Adattörlés</button>`;
     return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;
@@ -93618,7 +93872,7 @@ function renderStoreModal(){
         <div style="font-size:11px;color:var(--dim)">${sub}</div>
       </div>
       <div style="display:flex;gap:7px;align-items:center;flex:0 0 auto">
-        <span style="font-size:11.5px;color:var(--dim)">${kb(s.bytes)}</span>${dl}${btn}</div>
+        <span style="font-size:11.5px;color:var(--dim)">${kb(s.bytes)}</span>${dl}${xf}${btn}</div>
     </div>`;}).join("");
   list.querySelectorAll("button[data-dl]").forEach(b=>{
     b.onclick=()=>{
@@ -93626,6 +93880,11 @@ function renderStoreModal(){
       const m=$("storeMsg");
       if(exportSaveToFile(s.key)){if(m)m.textContent="✓ Kimentve — a fájlt tedd biztonságos helyre.";}
       else if(m)m.textContent="Ebben a helyben nincs kimenthető karrier.";};});
+  list.querySelectorAll("button[data-xf]").forEach(b=>{
+    b.onclick=()=>{
+      const s=slots[+b.dataset.xf];if(!s)return;
+      const m=$("storeMsg");if(m)m.textContent="";
+      xferShowCode(s.key);};});
   list.querySelectorAll("button[data-si]").forEach(b=>{
     b.onclick=()=>{
       const s=slots[+b.dataset.si];if(!s)return;
@@ -93635,6 +93894,7 @@ function renderStoreModal(){
 $("diagStoreBtn")&&($("diagStoreBtn").onclick=()=>{const m=$("storeMsg");if(m)m.textContent="";storeOpen();});
 $("storeCloseBtn")&&($("storeCloseBtn").onclick=()=>$("storeModal").classList.add("hide"));
 $("storeImpBtn")&&($("storeImpBtn").onclick=()=>{const m=$("storeMsg");if(m)m.textContent="";saveImportPick();});
+$("storeXferBtn")&&($("storeXferBtn").onclick=()=>{const m=$("storeMsg");if(m)m.textContent="";xferAskCode();});
 $("storeImpFile")&&($("storeImpFile").onchange=(ev)=>{
   const f=ev.target.files&&ev.target.files[0];
   saveImportHandleFile(f,(txt)=>{const m=$("storeMsg");if(m)m.textContent=txt;});});
