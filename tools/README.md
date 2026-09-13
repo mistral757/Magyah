@@ -670,13 +670,117 @@ próba mind a négy osztályra és a sík módra megnézi, mit ad a lánc, és k
 méri, hogy a kiharcolt BL túléli a gyengébb helyezést. Részletek:
 `docs/szezonzaras-or-es-ket-kupa.md`.
 
+## felderites-kihivas-proba.js — 🔍 „használd fel minden felderítésedet"
+
+```
+node tools/felderites-kihivas-proba.js
+```
+
+12 állítás egyetlen kihívásra, mert a hibája egy egész típuscsalád
+besorolásáról szólt. A `looksSpent` az ÁLLAPOT-kihívások között ült
+(`CH_STATE_TYPES`) — azok a mostani helyzetet kérdezik. Csakhogy az
+„elfogyott a felderítési keret" nem tartós állapot, hanem pillanatnyi
+esemény, amit a következő ablak feltöltése visszacsinál; a besorolástól
+viszont se reteszt nem kapott, se korán nem lehetett kifizetni, tehát
+KIZÁRÓLAG a határidőnél dőlt el — amikorra a keret újratelt, és elbukott.
+
+**A próba magja nem az, hogy „egyszer igaz volt-e"**, hanem pontosan a
+bejelentett sorrend, lépésről lépésre: elfogy a keret → teljesül → AZONNAL
+lezár (kikerül az aktív listából, jutalommal) → a keret újratelik → és a
+lezárt kihívás teljesített MARAD. Külön ág méri, hogy egy elszállt keresés
+visszatérítése a jelet is leveszi — különben egy hibába futott felderítés
+„teljesítené" a kihívást. Részletek: `docs/kihivasok-3937.md`.
+
+## stilus-edzok-proba.js — 🎩 filozófus-edző mind a hét stílushoz
+
+```
+node tools/stilus-edzok-proba.js
+```
+
+10 állítás arról, hogy a tikitaka Guardiolája és a beton Mourinhója után a
+többi öt stílus is kap egy **funkcióban azonos** edzővásárlós képességet. A
+két kézzel írt `stTrait`-blokk helyére egy tábla (`STYLE_COACHES`) és egy
+generátor került — pont az, amit a kód saját 3.7.37-es megjegyzése
+előrejelzett —, így a hét sor nem tud szétcsúszni egymástól.
+
+**A próba azt méri, ami egy generátornál elcsúszhat**: mind a hét sor III.
+szintű, ára ugyanaz a `[54, 92, 146]`, a taktikaplafon `99 → 99 → 125 → 150`,
+az edzőtempó 1. szinttől `1× → 2×`, és az ingyenes szint mind a hétnél
+működik. A legfontosabb állítás a **keresztszennyeződés**: csak a `hosszu`
+taktikát osztja meg két stílus (bombázók + panzer), és egy Panzer 3. szint
+KIZÁRÓLAG a `hosszu`-t viszi 150-re — a `labdatartas` és a `busz` 99 marad.
+
+## kapu-ertesites-proba.js — 🔔 „szólok neki, hogy rá várok"
+
+```
+node tools/kapu-ertesites-proba.js
+```
+
+22 állítás a szezonzáró döntés-kapujáról, ahol a bejelentés szerint „nincsen
+lehetőség arra hogy értesítsük az ellenfelünket arról hogy várakozunk". A
+bökés megvolt a játékban — csak a beváró réteghez volt szegezve KÉT ponton: a
+gombja abban a rétegben ül, a jelenlét-kör pedig kizárólag addig futott, amíg
+az a réteg nyitva volt.
+
+**A próba magja ezért nem a gomb, hanem a KÖR**: zárt beváró réteg mellett is
+fut-e a jelenlét, amíg a kapu nyitva (e nélkül a bökésnek a szoba példánya
+sincs meg, amiből a társ feliratkozását kiolvasná), és leáll-e, amint a kapu
+lezárult. Mellette a doboz mind a négy állapota: az automata jelzés kapunként
+csak egyszer megy ki, a fék ideje alatt a gomb nem él és a doboz kimondja,
+hogy már szóltunk, az ONLINE társat nem bökjük meg, a feliratkozás nélkülinél
+pedig a gomb LÁTSZIK, és megmondja az okot. Külön ág méri a másik oldalt: aki
+még nem döntött, látja, hogy rá várnak — de egy régen ottfelejtett jelzés nem
+várakozás. Részletek: `docs/kozos-karrier-szezonzaras.md`.
+
+## sztar-utodlas-proba.js — ⭐ ha a sztár elmegy: a trón és az utódlás
+
+```
+node tools/sztar-utodlas-proba.js
+```
+
+28 állítás a „Sztárom a párom" legdrágább kérdéséről: mi történik, ha a
+kijelölt sztár kikerül a keretből. Eddig a válasz az volt, hogy **semmi** — a
+név be volt égetve, a szerep pedig némán meghalt vele: a mérföldkövek nullán
+álltak, a hírességpont nem gyűlt tovább, a sztárhoz kötött képességek sosem
+teljesültek, és a játék egy szót sem szólt róla.
+
+**A próba magja ezért nem a gomb, hanem a néma halál**: kiderül-e a hiány (az
+őr minden távozási úton lecsap), áll-e a stílus a hiány alatt (a fa és a
+teljesített mérföldkövek megmaradnak), és átveszi-e az utód a szerepet. Külön
+ág méri, hogy az ár a TÁVOZÁSKOR dől el, nem a kinevezéskor (60% marad eladás,
+85% visszavonulás után), hogy a személyhez szólt alkuk mind elévülnek, hogy a
+sztár a keretben LÉVE nem cserélhető, és hogy egy régi mentésben talált hiányzó
+sztár átvezetése ingyenes — egy régi kárért nem büntetünk utólag. Részletek:
+`docs/sztar-utodlas.md`.
+
+## masodlagos-stilus-proba.js — 🎯 a második filozófia
+
+```
+node tools/masodlagos-stilus-proba.js
+```
+
+20 állítás a 3. lezárt szezon után felvehető MÁSODIK csapatstílusról. Ez a ház
+legveszélyesebb változtatása: a rendszer eddig egyetlen függvénnyel
+(`styleState`) válaszolt három különböző kérdésre — mi hat a pályán, melyiket
+nézem, és melyik stílusé ez az adat. Egy stílusnál a három egybeesett; kettőnél
+szétválik, és minden hívási hely eldöntheti magát rosszul.
+
+**A próba ezért a hármat KÜLÖN méri**: a hatások unióját (mindkét fa képességei
+élnek, de a két tár nem keveredik — a `szerepek` kulcs négy filozófiában is
+szerepel), a nézet függetlenségét a játékmenettől (a váltás nem mozdít sem a
+hatás-listán, sem a hat szezon-szerepen), és az adat gazdáját (a sztár, a
+híresség és az alkuk akkor is működnek, ha a sztáros filozófia a MÁSODLAGOS).
+Külön ág méri a nehezítést: a másodlagos mérföldköve harmadannyit fizet — a
+tempó-szorzó UTÁN, 1 pontos padlóval —, és hogy a pásztázás mindkét táblát
+futtatja, egy közös tárcába. Részletek: `docs/masodlagos-stilus.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 41 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 46 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

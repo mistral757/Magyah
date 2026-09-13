@@ -800,3 +800,71 @@ rosszul.
 Mérés: `tools/szezonzaras-lezaras-proba.js` — 11 állítás, köztük az, hogy a
 **többi kapu viselkedése nem változott** (lágy, automatikus, továbblépést
 kínál).
+
+---
+
+## „Szólok neki, hogy rá várok" — a kapu értesítése (3.9.62)
+
+Bejelentett hiány: *„ezen a képernyőn nincsen lehetőség arra hogy értesítsük az
+ellenfelünket arról hogy várakozunk."*
+
+### Miért nem volt ott, pedig a bökés megvolt
+
+A megjegyzés a **döntés-kapura** vonatkozott (a „folytatjuk / befejezzük"
+képernyő, miután a saját szavad elment). A bökés (`nudgeKuld`) régóta része a
+játéknak — csak a **beváró réteghez** (`h2hWait`) volt szegezve, és nem egy,
+hanem **két** független ponton:
+
+1. **a gombja** abban a rétegben ül (`h2hWaitNudgeWrap`), tehát máshol
+   egyszerűen nincs a lapon;
+2. **a jelenlét-kör** kizárólag addig futott, amíg az a réteg nyitva volt — a
+   `mpWaitWatchdog` első sora elrejtett rétegnél `_mpPresRoom=null`-t állít.
+
+A második a súlyosabb. A `nudgeKuld` a szoba pillanatnyi példányából
+(`_mpPresRoom`) olvassa ki a társ push-feliratkozását; e nélkül **nem tudja,
+hova küldjön**. Egy odatett gomb önmagában tehát nem oldotta volna meg a hibát:
+a kapun a szoba példánya sem létezett.
+
+Az irónia, hogy épp itt a leghosszabb a várakozás. A fordulóra percekig vársz,
+a társad szezonzáró döntésére **napokig** — és pont ott nem lehetett szólni.
+
+### Három csatorna, egy dobozban
+
+| kit akarunk elérni | mivel | mikor |
+|---|---|---|
+| aki **nincs a játékban** | push-értesítés | egyszer magától, amint a döntésed elment és látjuk, hogy nincs ott; utána kézzel, a gombbal |
+| aki **játszik** | a szoba `waitAt` mezője | a túloldalon a még el nem döntött kapu kiírja: „⏳ A társad rád vár" |
+| **téged** | a „Szóljatok, ha rám várnak" gomb | amíg nincs értesítési engedélyed |
+
+A doboz **mindkét oldalon** megjelenik, de nem ugyanazt mutatja: aki vár, az
+bökés-gombot kap; aki még nem döntött, az a jelenlétet és a társ óráját látja.
+Lezárt kapunál a doboz eltűnik — nincs mit mondani.
+
+### Miért a `waitAt`, és miért nem új mező
+
+A közzétett Firebase-szabály a játékos-ág ismeretlen kulcsait **eldobja**
+(`"$other": {".validate": false}`). Egy `decAt` mező tehát némán elveszne
+mindaddig, amíg a frissített szabályfájl nincs kirakva — ez a ház visszatérő
+néma hibája (lásd a tempó- és a push-mező történetét). A `waitAt` jelentése
+szó szerint ugyanez („egy kapunál várok rád"), és már át van engedve.
+
+A `h2hWaitHide()` ugyanezt a mezőt törli, amikor a beváró réteg bezárul —
+ezért ott a kapu saját jelzője (`_mpDecMarked`) is elavul, különben
+legközelebb némán kimaradna a kiírás.
+
+### A fék közös, és ki is mondjuk
+
+Az automata jelzés ugyanazt a féket nézi, mint a kézi bökés
+(`NUDGE_MIN_MS`, `_nudgeAt`), tehát egy oda-vissza kapkodás nem tud
+értesítés-záport indítani. És mivel az automata jelzés **a festés előtt** fut,
+a gomb nem marad egy körig élőnek: rögtön a valódi állapotát mutatja, alatta
+azzal, hogy *„🔔 Már szóltunk neki, hogy rá vársz — újra 118 mp múlva."* Egy
+indoklás nélkül szürke gomb a felhasználóval a saját gépét hibáztatná.
+
+Aki **biztosan online**, azt nem bökjük meg — a kérdést látnia kell a
+képernyőn. Akiről nem tudjuk, azt igen: a „nem tudjuk" nem offline, de nem is
+ok a hallgatásra.
+
+Mérés: `tools/kapu-ertesites-proba.js` — 22 állítás, köztük a hiba magja: zárt
+beváró réteg mellett is fut-e a jelenlét-kör, amíg a kapu nyitva, és leáll-e,
+amint lezárult.

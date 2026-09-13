@@ -230,3 +230,68 @@ jobb — egy előre rögzített név gyakran már nem is volna a keretben.
 tartozó állapot tényleg megváltozott-e.** Egy jutalom, ami nem csinál semmit,
 rosszabb, mint ha nem létezne: a játékos kipipálja, és nem érti, miért nem
 változott semmi.
+
+
+---
+
+## A „használd fel minden felderítésedet" kihívás (3.9.60)
+
+> **BEJELENTETT HIBA:** „nem működik a használd fel minden felderítésedet
+> kihívás. abban a pillanatban, hogy teljesítetté válik, azonnal le kéne
+> zárjon. most nem zár le és mindig elbukod, hiába teljesítetted, mert a
+> következő meccs elindítása idejére már feltöltődik a lehetőségek slot és azt
+> érzékeli hogy egyet sem használtál el."
+
+### A gyökér egy besorolás volt
+
+A `looksSpent` a **`CH_STATE_TYPES`** listán ült, az *állapot-kihívások*
+között. Azok a MOSTANI helyzetet kérdezik — „ott áll-e a piacon egy fiatal",
+„maradt-e olcsó tartalék" —, és ez a besorolás jó indokkal létezik: náluk
+tényleg a határidőkori állapot a kérdés, nem az, hogy egyszer igaz volt.
+
+Csakhogy **az „elfogyott a felderítési keret" nem tartós állapot, hanem
+pillanatnyi esemény**, amit a következő ablak feltöltése visszacsinál. A
+besorolásnak két következménye volt, és együtt garantálták a bukást:
+
+| következmény | hol | mit okozott |
+|---|---|---|
+| `latchChallengeIfMet` kihagyja az állapot-típusokat | `if(CH_STATE_TYPES.includes(ch.type))return;` | nem került rá retesz |
+| `challengeEarlyPayable` hamis rájuk | `return !CH_STATE_TYPES.includes(ch.type);` | nem lehetett korán kifizetni |
+
+Vagyis a kihívás **kizárólag a határidőnél** dőlt el — amikorra a keret már
+rég újratelt, a `chLooksAllSpent()` hamisat adott, és a kihívás elbukott.
+Pontosan úgy, ahogy a bejelentés leírja.
+
+### A javítás
+
+1. **A típus kikerült a `CH_STATE_TYPES`-ból.** Ettől reteszelhető lett és
+   korán kifizethető — a rendszer meglévő két mechanizmusa innentől magától
+   dolgozik rajta.
+2. **A kiürülés pillanatát megjegyezzük** (`chLooksTouch`): amikor az utolsó
+   felderítés elfogy, a futó kihívás megkapja a `looksSpentDone` jelet. A
+   nyers érték innentől a jelet nézi először, a feltöltés tehát nem veheti el.
+3. **És azonnal zárunk** (`chLooksSettle`): a felhasználói művelet végén — nem
+   a következő meccsnél, nem a határidőnél.
+
+### A visszatérítés is idetartozik
+
+A felderítés akkor és csak akkor fogy, ha tényleg le is futott; ha a scoutolás
+elszáll, a `twRefundLook` visszaadja a keretet. Ilyenkor a **jelet is le kell
+venni**, különben egy elszállt keresés „teljesítené" a kihívást. Ezért ugyanaz
+a függvény fut mindkét oldalon (`twSpendLook` és `twRefundLook`), és az ÉLŐ
+állapotból dönt — a lezárás pedig csak a művelet **után** jön, amikor már
+eldőlt, megállt-e a levonás.
+
+### Mérés
+
+`tools/felderites-kihivas-proba.js` — 12 állítás. A magja nem az, hogy
+„egyszer igaz volt-e", hanem pontosan a bejelentett sorrend:
+
+```
+vállalva      progress 0   kész: nem
+1/3           progress 0   kész: nem
+2/3           progress 0   kész: nem
+3/3 elfogyott progress 1   kész: IGEN   jel: felkerült
+lezárás után  aktív: 0     lezárt: 1    teljesítve: IGEN
+a keret újratelt   élő állapot: hamis   →   teljesítve MARAD
+```
