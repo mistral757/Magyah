@@ -753,13 +753,34 @@ sztár a keretben LÉVE nem cserélhető, és hogy egy régi mentésben talált 
 sztár átvezetése ingyenes — egy régi kárért nem büntetünk utólag. Részletek:
 `docs/sztar-utodlas.md`.
 
+## masodlagos-stilus-proba.js — 🎯 a második filozófia
+
+```
+node tools/masodlagos-stilus-proba.js
+```
+
+20 állítás a 3. lezárt szezon után felvehető MÁSODIK csapatstílusról. Ez a ház
+legveszélyesebb változtatása: a rendszer eddig egyetlen függvénnyel
+(`styleState`) válaszolt három különböző kérdésre — mi hat a pályán, melyiket
+nézem, és melyik stílusé ez az adat. Egy stílusnál a három egybeesett; kettőnél
+szétválik, és minden hívási hely eldöntheti magát rosszul.
+
+**A próba ezért a hármat KÜLÖN méri**: a hatások unióját (mindkét fa képességei
+élnek, de a két tár nem keveredik — a `szerepek` kulcs négy filozófiában is
+szerepel), a nézet függetlenségét a játékmenettől (a váltás nem mozdít sem a
+hatás-listán, sem a hat szezon-szerepen), és az adat gazdáját (a sztár, a
+híresség és az alkuk akkor is működnek, ha a sztáros filozófia a MÁSODLAGOS).
+Külön ág méri a nehezítést: a másodlagos mérföldköve harmadannyit fizet — a
+tempó-szorzó UTÁN, 1 pontos padlóval —, és hogy a pásztázás mindkét táblát
+futtatja, egy közös tárcába. Részletek: `docs/masodlagos-stilus.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 45 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 46 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
