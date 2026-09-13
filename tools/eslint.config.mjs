@@ -40,6 +40,8 @@ export default [
         /* --- hálózat és adat --- */
         fetch: "readonly", XMLHttpRequest: "readonly", URL: "readonly",
         URLSearchParams: "readonly", Blob: "readonly", FileReader: "readonly",
+        /* Az átviteli kód tömörítése (3.9.65) — a böngészők natív gzip-je. */
+        CompressionStream: "readonly", DecompressionStream: "readonly", Response: "readonly",
         TextEncoder: "readonly", TextDecoder: "readonly",
         structuredClone: "readonly",
         /* --- párbeszédek (a játék használ néhányat) --- */
