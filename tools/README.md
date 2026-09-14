@@ -759,7 +759,7 @@ sztár átvezetése ingyenes — egy régi kárért nem büntetünk utólag. Ré
 node tools/masodlagos-stilus-proba.js
 ```
 
-20 állítás a 3. lezárt szezon után felvehető MÁSODIK csapatstílusról. Ez a ház
+30 állítás a MÁSODIK csapatstílusról. Ez a ház
 legveszélyesebb változtatása: a rendszer eddig egyetlen függvénnyel
 (`styleState`) válaszolt három különböző kérdésre — mi hat a pályán, melyiket
 nézem, és melyik stílusé ez az adat. Egy stílusnál a három egybeesett; kettőnél
@@ -772,7 +772,16 @@ hatás-listán, sem a hat szezon-szerepen), és az adat gazdáját (a sztár, a
 híresség és az alkuk akkor is működnek, ha a sztáros filozófia a MÁSODLAGOS).
 Külön ág méri a nehezítést: a másodlagos mérföldköve harmadannyit fizet — a
 tempó-szorzó UTÁN, 1 pontos padlóval —, és hogy a pásztázás mindkét táblát
-futtatja, egy közös tárcába. Részletek: `docs/masodlagos-stilus.md`.
+futtatja, egy közös tárcába.
+
+**A kapu (3.9.69) külön ág.** A választás két úton nyílik, és amelyik előbb ér
+oda, az nyit: a 3. idény 15. fordulója után, VAGY amint az elsődleges filozófia
+eléri a 6. szintet. A próba idény/forduló párokon lépked
+(`[[2,10],[3,0],[3,14],[3,15],[3,29],[4,0]]`), és külön méri a szint-utat: 4-en
+és 5-ön zárva, 6-on és 7-en nyitva — még a 2. idényben is. Zárt kapunál nem a
+„nem" a mérce, hanem hogy a mondat KIMONDJA, mi hiányzik. A két feloldás-kártya
+(🏛 elsődleges, 🎯 másodlagos) is itt mérődik: felugrik, és másodszorra már nem.
+Részletek: `docs/masodlagos-stilus.md`.
 
 ## atviteli-kod-proba.js — ☁ mentés másik eszközre, fiók nélkül
 

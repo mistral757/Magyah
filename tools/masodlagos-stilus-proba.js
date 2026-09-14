@@ -41,14 +41,23 @@ const {spawn}=require('child_process');
     S.ms={done:{},seen:{},sp:0,spEarned:0,cash:0,log:[],t:{},cats:{},missed:{},pend:{}};
     S.style=null;S.style2=null;S.styleView=1;
 
-    /* ── 1. A KAPU ── */
+    /* ── 1. A KAPU (3.9.69: előrehozva) ── */
     S.style={key:"beton",chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null};
+    const eredetiLevel=window.styleLevel;
+    window.styleLevel=()=>1;                     /* a szint-út zárva */
     const kapuk=[];
-    [1,2,3,4].forEach(n=>{
-      S.seasonNumber=n;S.seasonClosed=true;
-      kapuk.push({szezon:n,zart:styleSeasonsClosed(),lehet:style2CanChoose()});});
+    [[2,10],[3,0],[3,14],[3,15],[3,29],[4,0]].forEach(([sn,idx])=>{
+      S.seasonNumber=sn;S.idx=idx;S.seasonClosed=false;
+      kapuk.push({sn,idx,lehet:style2CanChoose(),miert:style2GateWhy()});});
     o.kapu=kapuk;
-    S.seasonNumber=4;S.seasonClosed=true;
+    /* a GYORSÍTOTT út: a 2. idény elején is nyílik, ha az elsődleges elérte a 6-ot */
+    S.seasonNumber=2;S.idx=3;
+    const szintUt=[];
+    [4,5,6,7].forEach(L=>{window.styleLevel=()=>L;
+      szintUt.push({L,lehet:style2CanChoose()});});
+    o.szintUt=szintUt;
+    window.styleLevel=eredetiLevel;
+    S.seasonNumber=4;S.idx=0;S.seasonClosed=true;
 
     /* ── 2. A VÁLASZTÁS ── */
     o.ugyanaz=chooseStyle2("beton");
@@ -148,6 +157,26 @@ const {spawn}=require('child_process');
       meccsek:stStarMatches(),
       fameVan:!!fameState()};
 
+    /* ── 6c. A FELUGRÓ KÁRTYÁK (3.9.69) ── */
+    o.kartya={
+      van1:!!UNLOCK_CARDS.style1,van2:!!UNLOCK_CARDS.style2,
+      /* karrierenként EGYSZER: a jelző a MENTÉSBEN él, nem a localStorage-ban */
+      /* AZ ABLAK AZONNAL KI IS NYÍLIK (az unlockDrain rögtön kiveszi a sorból),
+         ezért a MEGJELENÉST mérjük, nem a sor hosszát. */
+      elso:(()=>{S.styleCardSeen={};_unlockQueue.length=0;
+        try{unlockCardClose();}catch(e){}
+        styleCardShow("style2");
+        const el=document.getElementById("unlockCard");
+        return {nyitva:!!(el&&!el.classList.contains("hide")),
+          cim:document.getElementById("unlockCardTitle").textContent,
+          jelzo:!!S.styleCardSeen.style2};})(),
+      masodszor:(()=>{try{unlockCardClose();}catch(e){}
+        styleCardShow("style2");
+        const el=document.getElementById("unlockCard");
+        return !!(el&&!el.classList.contains("hide"));})()};
+    _unlockQueue.length=0;
+    try{unlockCardClose();}catch(e){}
+
     /* ── 7. MENTÉS (még a sztáros díszlettel) ── */
     o.mentes=(()=>{try{
       const d=JSON.parse(JSON.stringify({S:{style:S.style,style2:S.style2,styleView:S.styleView}}));
@@ -176,10 +205,15 @@ const {spawn}=require('child_process');
 
     return o;});
 
-  console.log("=== a kapu ===");
-  ok("a 3. lezárt szezon előtt zárva, attól kezdve nyitva",
-     r.kapu[0].lehet===false&&r.kapu[1].lehet===false&&r.kapu[2].lehet===true
-     &&r.kapu[3].lehet===true,r.kapu);
+  console.log("=== a kapu (3.9.69: előrehozva) ===");
+  ok("a 3. idény 15. fordulója ELŐTT zárva, utána (a téli ablakban) nyitva",
+     r.kapu[0].lehet===false&&r.kapu[1].lehet===false&&r.kapu[2].lehet===false
+     &&r.kapu[3].lehet===true&&r.kapu[4].lehet===true&&r.kapu[5].lehet===true,r.kapu);
+  ok("és amíg zárva van, KIMONDJA, mire vár",
+     /fordul/.test(r.kapu[0].miert)&&/6\. szintet/.test(r.kapu[0].miert),r.kapu[0]);
+  ok("a GYORSÍTOTT út: a 6. stílus-szinten már a 2. idényben nyílik",
+     r.szintUt[0].lehet===false&&r.szintUt[1].lehet===false
+     &&r.szintUt[2].lehet===true&&r.szintUt[3].lehet===true,r.szintUt);
 
   console.log("\n=== a választás ===");
   ok("ugyanazt a filozófiát nem lehet kétszer felvenni",r.ugyanaz.ok===false,r.ugyanaz);
@@ -240,6 +274,15 @@ const {spawn}=require('child_process');
   console.log("\n=== a szint ===");
   ok("mindkét filozófiának SAJÁT szintje van",
      r.szint.elso>=1&&r.szint.masodik>=1&&r.szint.alap===r.szint.elso,r.szint);
+
+  console.log("\n=== a felugró kártyák ===");
+  ok("mindkét kapunak van saját kártyája",
+     r.kartya.van1===true&&r.kartya.van2===true,r.kartya);
+  ok("az ablak felugrik, a saját címével, és a jelző a MENTÉSBEN marad",
+     r.kartya.elso.nyitva===true&&/második filoz/i.test(r.kartya.elso.cim)
+     &&r.kartya.elso.jelzo===true,r.kartya.elso);
+  ok("és karrierenként CSAK EGYSZER — másodszorra már nem",
+     r.kartya.masodszor===false,r.kartya);
 
   console.log("\n=== a mentés ===");
   ok("a másodlagos filozófia (a sztárjával együtt) mentésbe kerül",r.mentes===true);
