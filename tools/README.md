@@ -867,13 +867,38 @@ plafont külön ágon. A Rettegés tíz szintjét, a csapatstílus-szint kapujá
 1. szint a 4.-en még zárva, az 5.-en nyílik) és a +20-as sapkát, ami akkor is
 fog, ha a félelem szint elszáll. Részletek: `docs/panzer-felelem-es-rettenet.md`.
 
+## panzer-nulladik-proba.js — 🛡️ a nulladik szint
+
+```
+node tools/panzer-nulladik-proba.js
+```
+
+23 állítás a Panzer NULLADIK szintjéről: aki 12+ negatív személyiségvonással
+(a vezetői képességet nem számolva) indul, már a legelső szezon előtt
+felvállalhatja a filozófiát — de csak három dolgot kap belőle.
+
+**A próba gerince a TAGADÁS.** Egy felvett filozófia a játékban eddig MINDIG
+teljes erővel hatott; a nulladik szint az egyetlen kivétel, tehát minden
+csatornát külön kell megmérni, hogy tényleg néma-e: a szintet (0 marad), a
+hangolást, a képességfát (csak a Fordított jellem vehető), a filozófus-edző
+INGYEN járó szintjét (ez a legkönnyebben átcsúszó ág — a szűrő ezért nem a
+vásárlásnál van, hanem a hatásoknál), a félelmet, a meccs-ujjlenyomatot és a
+barátságos torna Panzer-szabályát, ami HÁTRÁNY: azt sem szabad korán
+kiosztani.
+
+A másik fele az idényzárás: ott a felgyűlt mérföldköveknek EGYSZERRE kell
+életbe lépniük — a próba azt méri, hogy a klub nem az 1. szintről indul. A
+számláló külön ág: a vezetői képesség itt NEM számít, szemben a Panzer
+feloldásának 14-es számlálójával — a kettőt a próba egymás mellett méri.
+Részletek: `docs/panzer-nulladik-szint.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 50 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott az 51 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
