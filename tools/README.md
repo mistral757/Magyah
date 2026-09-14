@@ -963,13 +963,41 @@ hogy a választott út a MA élő szabályokkal is járható, tehát egy későb
 szabály-átrendezés nem tudja némán elrontani. Részletek:
 `docs/pvp-jatekbeli-ertesites.md`.
 
+## rettenet-meccs-proba.js — ☠️ győzelem erősebb ellen + a meccs mérlege
+
+```
+node tools/rettenet-meccs-proba.js
+```
+
+15 állítás a 3.9.74-es tételről: a nyers erőben erősebb csapat legyőzése is
+rettenetet fizet, a klasszikus óriásölésnél pedig a MECCSEN KAPHATÓ TELJES
+pontot.
+
+**A gerince a „mindegy, milyen eseményekre kapott még pontot" állítás**:
+óriásölésnél a meccs pontosan a plafont fizeti — üresen is, és tizenkét
+eseménnyel is. A skála másik vége ugyanilyen fontos: vereségnél, döntetlennél
+és gyengébb ellenfélnél NULLA.
+
+Külön ág a feed: minden HANGOS tétel saját sort kap közvetlenül az esemény
+után, a néma tételek (védekező villanás, kezdőrúgáskori fölény) viszont nem —
+azokból tucatnyi van meccsenként —, és a meccs végi összesítő az egyetlen
+hely, ahol a mérleg teljes (tételes bontás + a plafon szerepe mindkét
+irányban).
+
+**És egy ág a BETÖLTÉSRŐL.** A tétel küszöbe az óriásölésé (`MS_GIANT_GAP`),
+ami a fájlban negyvenezer sorral lejjebb születik meg: egy modul-szintű
+`const` ott a saját TDZ-jébe futna, és megállítaná a teljes script
+betöltését — se a `node --check`, se a no-undef nem látja. A próba méri, hogy
+a küszöb hoistolódó függvényen át jön, és egyezik a `MS_GIANT_GAP`-pal.
+Részletek: `docs/panzer-felelem-es-rettenet.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott az 54 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott az 55 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

@@ -126,3 +126,127 @@ félbemaradt kijelölés se csúsztathasson be friss igazolást.
 Mérve: 80 + 120 + egy 200-as újonc (100 perc) → a cél **115**, nem 183.
 
 Mérés: `tools/panzer-felelem-proba.js` — 22 állítás.
+
+---
+
+# Győzelem erősebb ellen + a meccs mérlege a feedben (3.9.74)
+
+## A kérés
+
+> „Rettenet pont járjon azért is, ha magasabb nyers erővel rendelkező csapat
+> ellen nyerünk. Max pont akkor, ha klasszikus óriás-ölés a meccs (amiért az
+> óriásölés morál boost és mérföldkő is jár). Itt a max pont az, hogy az egy
+> meccsen kapható max rettenet pont legyen megadva, mindegy milyen
+> eseményekre kapott még pontot a csapat. És legyen rettenet pontjelző a
+> feedben. Az érintett események után közvetlenül, és a meccs végén egy
+> összesítő."
+
+## 1. Az új tétel
+
+A mérce a **nyers erő-különbség**, és pontosan ugyanaz a szám, amiből az
+óriásölés morál-jutalma és mérföldköve is dolgozik:
+
+```js
+ovrGap = fx.o.ovr - teamOVRbase()
+```
+
+Egy fogalom, egy szám, **három jutalom** (morál · mérföldkő · rettenet).
+
+| feltétel | mit ad |
+|---|---|
+| vereség vagy döntetlen | **0** |
+| győzelem, de nem vagyunk alul | **0** |
+| győzelem `ovrGap > 0` mellett | a meccsplafon `ovrGap / 8` része |
+| **győzelem `ovrGap ≥ 8`** (klasszikus óriásölés) | **a TELJES meccsplafon** |
+
+### Miért a plafon arányában, és nem fix pontban
+
+A kérés szerint az óriásölésnél „a max pont" jár — az egy meccsen kapható
+teljes rettenet. Ha a tétel a **plafon arányában** számol, akkor az óriásölés
+önmagában kiadja a plafont; a többi tétel mellé adva a plafon dönt, tehát a
+*„mindegy, milyen eseményekre kapott még pontot a csapat"* **magától
+teljesül**, külön kivétel-ág nélkül. Ráadásul együtt nő a félelem szinttel,
+ahogy minden más a rendszerben.
+
+Egy 120-as félelem szintnél (12-es meccsplafon):
+
+| nyers hátrány | rettenet |
+|---|---|
+| 2 | 3,0 |
+| 4 | 6,0 |
+| **8+** | **12,0 — a teljes plafon** |
+
+### Miért marad meg a régi fölény-tétel
+
+A kérés „azért **is**" — új forrás, nem csere. A kettő nem ugyanazt méri:
+
+| | mit néz | mikor |
+|---|---|---|
+| régi (`gap`) | a **meccserőt**, rejtett bónuszokkal (köztük a Rettegésével) | kezdőrúgáskor, az eredménytől függetlenül |
+| új (`win`/`giant`) | a **nyers keretet** és a **végeredményt** | lefújáskor |
+
+Egy rettegett Panzer épp lehet papíron gyengébb és a pályán erősebb — ilyenkor
+mindkettő jár, és ez a filozófia poénja, nem hiba.
+
+### Hol fut le
+
+A lefújásnál, **még a mérleg lezárása előtt**. Ez azért nem mindegy: az
+óriásölés morál-blokkja a mérleg lezárása UTÁN fut, tehát a tételt a
+`fearMatchEnd()` elé kellett könyvelni — különben egy meccset késne.
+
+## 2. A jelző a feedben
+
+### Az esemény után közvetlenül
+
+```
+🟥 PIROS LAP! Vandál Viktor lassan, egyenes háttal sétál le.
+☠️ +2 rettenet — piros lap
+```
+
+**Néma tételek.** A védekező villanásból (`tackle`, 0,1 pont) egy mérkőzésen
+tucatnyi is akad, és nincs saját sora a közvetítésben, amihez oda lehetne
+írni. A kezdőrúgáskori meccserő-fölény ugyanilyen. Ezek **csak az
+összesítőben** jelennek meg: egy külön sor tizenkétszer egy tizedpontról nem
+jelzés volna, hanem zaj.
+
+### A meccs végén
+
+```
+☠️ RETTENET — a mérkőzés mérlege: +12 pont
+→ sárga lap (0,5) · piros lap (2) · mesterhármas (1) · kemény belépő (0,5)
+  · védekező villanás ×9 (0,9) · ÓRIÁSÖLÉS (12)
+→ a meccs 16,9-et hozott, de a 120-as félelem szinted 12-et enged
+  meccsenként — a klub rettenet-egyenlege 153,5.
+```
+
+A **tételes bontás** nem ismétlés: a közvetítés közbeni jelzők nem adják ki a
+végösszeget (a néma tételek ott nem szerepelnek, a plafon pedig lefaraghatja
+az egészet). Az összesítő az egyetlen hely, ahol a mérleg **teljes** — és
+kimondja azt is, fogott-e a plafon, mindkét irányban.
+
+## 3. Egy betöltést megállító hiba, ami nem jutott ki
+
+A tétel küszöbe az óriásölésé (`MS_GIANT_GAP`), csakhogy az a fájlban
+**negyvenezer sorral lejjebb** születik meg. Az első változat így írta:
+
+```js
+const DREAD_WIN_GIANT = MS_GIANT_GAP;   /* ❌ */
+```
+
+Ez a saját TDZ-jébe fut, és **megállítja a teljes script betöltését** — se a
+`node --check`, se a `no-undef` nem látja. A boot-próbán mérve: a hiba után
+minden ott alatt deklarált `const` elérhetetlen marad (a próba
+`PROFILE_NICK_MAX`-on hasalt el), vagyis az app **egyáltalán nem indul**.
+Pontosan ez a hibaosztály okozta a 3.9.61–3.9.65 közti fagyást (lásd
+`docs/nevmod-tdz-hiba.md`).
+
+A javítás ugyanaz a minta, mint a 3.9.70-es `pz0Ability()`-nél: **hoistolódó
+függvény**, tartalékértékkel.
+
+```js
+function dreadWinGiant(){
+  try{return (typeof MS_GIANT_GAP==="number")?MS_GIANT_GAP:8;}catch(e){return 8;}}
+```
+
+Mérés: `tools/rettenet-meccs-proba.js` — 15 állítás, köztük egy külön ág arra,
+hogy a küszöb függvényen át jön és egyezik a `MS_GIANT_GAP`-pal.
