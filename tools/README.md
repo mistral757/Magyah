@@ -939,13 +939,37 @@ mezőnyt már nem kap), a két indulásmód különbsége, hogy a NEM-ág és az
 egyjátékos út változatlan, és hogy egy „nem" továbbra is kizárja a közös
 tornát. Részletek: `docs/nyari-kupa-solo.md`.
 
+## pvp-ertesites-proba.js — 💬 játékon belüli értesítés a társnak
+
+```
+node tools/pvp-ertesites-proba.js
+```
+
+22 állítás a 3.9.73-as csatornáról: ha a társad ONLINE, tíz hangulatjel közül
+eggyel szólhatsz neki, és nála felül beugrik egy klasszikus lebegő értesítés.
+
+**Két oldalt mér külön.** A küldőnél a tíz jelet, a kaput (csak online
+társnál, saját fékkel) és azt, hogy a csík a 🔔 bökés ELLENKEZŐ esetében
+jelenik meg — a kettő sosem látszik együtt. A fogadónál a sáv beugrását (felül,
+fixen, becsúszva), a három műveletet (ugrás · bezárás · 15 perces némítás,
+ami túléli az újratöltést), és hogy sem a saját, sem a régi, sem a már látott
+jelzés nem ugrik be.
+
+**Külön ág a CSATORNA, és ez a legfontosabb állítása.** A jelzés a `h2h` ág
+alá megy, nem a `players/$pid` alá: az utóbbi szabálya `$other:false`, tehát
+oda új mezőt írni csak frissített, KÖZZÉTETT szabályfájllal lehetne — a ház
+visszatérő néma hibája. A próba a `tools/firebase-rules.json`-ből ellenőrzi,
+hogy a választott út a MA élő szabályokkal is járható, tehát egy későbbi
+szabály-átrendezés nem tudja némán elrontani. Részletek:
+`docs/pvp-jatekbeli-ertesites.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott az 53 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott az 54 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
