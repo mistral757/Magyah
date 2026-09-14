@@ -892,13 +892,36 @@ számláló külön ág: a vezetői képesség itt NEM számít, szemben a Panze
 feloldásának 14-es számlálójával — a kettőt a próba egymás mellett méri.
 Részletek: `docs/panzer-nulladik-szint.md`.
 
+## panzer-merfoldko-proba.js — 🛡️ a tábla felzárkózása
+
+```
+node tools/panzer-merfoldko-proba.js
+```
+
+22 állítás a Panzer mérföldkő-tábláját ért 3.9.71-es bővítésről: kilenc új
+család, +1113 pont, 996-ról **2109**-re — a mezőny utolsójából az elsője.
+
+**Az első állítás szándékosan ÖSSZEHASONLÍTÓ, nem abszolút.** Nem azt méri,
+hogy a Panzer elér-e egy kézzel beírt számot, hanem hogy eléri-e a mezőny
+mindenkori legjobbját — így a szabály akkor is érvényes marad, ha bármelyik
+másik filozófia táblája változik. Mellette azt is nézi, hogy a pont nem egy-két
+nagy tételből jön, hanem SOK LÉPCSŐBŐL (a sorok és a családok száma is).
+
+A többi ág az új számlálókat méri élesben: a sárga lap három szintjét
+(karrier · idény · EGY mérkőzés — az utolsó kettőhöz új nyomkövető kellett),
+a rettenet-gazdaság két számát, a sérülést, az óriásölést és a Hosszú labdák
+ismertségét. Külön ág, hogy az idény sárgája nem esik vissza idényfordulón,
+hogy a lépcső tényleg lépcső (az első fokozat befut, a következő nem), hogy a
+mérők üres állapoton is számot adnak és nem hibát, és hogy egyetlen `pz_` sor
+sem szivárgott át másik filozófiába. Részletek: `docs/panzer-merfoldkovek.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott az 51 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott az 52 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
