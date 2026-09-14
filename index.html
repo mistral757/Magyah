@@ -6007,7 +6007,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.71";
+const APP_VERSION="3.9.72";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -29846,7 +29846,7 @@ function beginNewGame(){
   /* F6: friss karrier — a párharc tartós állapota is nulláról indul, különben
      egy korábbi szoba kiegyenlítése átszivárogna az újba. */
   S.oppBuffH=null;   /* friss karrier → a rejtett erősítés az 1. szezon elején születik */
-  S.mpBalance=0;S.mpBalanceP={};S.mpDecision=null;S.mpDecisionCup=null;S.mpCupSeason=0;
+  S.mpBalance=0;S.mpBalanceP={};S.mpDecision=null;S.mpDecisionCup=null;S.mpCupSeason=0;S.friendlySolo=0;
   S.mpMateFinal=null;S.mpSummerRef=null;S.mpCup=null;S.mpHistory=[];S.mpDuelLog=[];S.mpOrphan=false;S.mpForfeit=null;
   S.mpOppStart=null;S.mpOppSnap=null;   /* az ellenfél csapatlapja és befagyasztott felállása */
   ensureWorldSeed();
@@ -42613,6 +42613,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      mpDecision / mpDecisionCup: a bajnokság utáni és a kupa utáni kapu döntése;
      mpCupSeason: melyik idényben zárult le kupasorozat (a második kapu kapuja). */
   mpBalance:0,mpBalanceP:{},mpDecision:null,mpDecisionCup:null,mpCupSeason:0,
+  friendlySolo:0,      /* egyedül játszott nyári torna: kihagyja a kupa utáni kaput (3.9.72) */
   /* A LEGUTÓBBI MÉRKŐZÉS STATISZTIKÁJA (3.7.26) — kész, sorosított számok,
      nem képlet: az ablak egy újratöltés után is ugyanazt mutatja. Egy mérkőzés
      él belőle egyszerre; a következő lefújás felülírja. */
@@ -55067,6 +55068,16 @@ function mpDecisionLoop(){
 let _mpCupGateCb=null;
 function mpCupGatePending(){return !!_mpCupGateCb;}
 function mpShowCupGate(cb){
+  /* EGYEDÜL LEJÁTSZOTT NYÁRI TORNA (3.9.72): SEM a kapu, SEM a jelzője. Ez a
+     kapu a KÖZÖS sorozat utáni közös döntés — egy féloldalas, jutalom nélküli
+     felkészülési tornának nincs mit egyeztetnie. A jelző pedig egyenesen
+     ÁRTANA: átbillentené a szezonzáró döntés rekeszét (…decision →
+     …decisioncup), és a társ, aki nem játszott tornát, a másik rekeszre
+     várna. Ez volt az egyetlen ok, amiért a féloldalas torna tilos volt. */
+  if((S.friendlySolo||0)===(S.seasonNumber||1)){
+    S.friendlySolo=0;
+    try{saveGame();}catch(e){}
+    cb();return;}
   /* A jelző FÜGGETLEN a kaputól: attól, hogy a társ zárása épp nincs meg,
      a kupasorozat akkor is lezárult — a mpGateKind ebből dolgozik. */
   S.mpCupSeason=(S.seasonNumber||1);
@@ -65802,6 +65813,12 @@ function mpGateGiveUp(id){
   const g=mpGateState(id),f=g.fb;g.fb=null;
   mpGateAbort(id);
   if(!f)return;
+  /* ELŐBB A SZOBA, UTÁNA A SAJÁT ÚT (3.9.72). Ha a kiút nem egyszerű
+     „kihagyom", hanem a saját döntésem VÉGREHAJTÁSA, akkor a társnak tudnia
+     kell róla — különben ő később ugyanabból a két bejegyzésből KÖZÖS
+     eseményt olvasna ki, miközben én már egyedül léptem tovább. A hívó ezért
+     kaphat egy horgot, ami a szobát még a lezárás előtt megjelöli. */
+  if(f.pre){try{f.pre();}catch(e){}}
   if(f.note){try{addLine(f.note,"m ev");}catch(e){}}
   try{f.done(f.solo);}catch(e){}}
 function mpGateBusyId(){return Object.keys(_mpGates).find(k=>_mpGates[k].busy)||null;}
@@ -65812,9 +65829,13 @@ async function mpBothGate(o){
   g.busy=true;
   const key=o.key,myField=MP.role==="host"?"host":"guest";
   const oppField=myField==="host"?"guest":"host";
-  g.fb={done:o.done,solo:o.solo,note:o.giveUpNote};
+  g.fb={done:o.done,solo:o.solo,note:o.giveUpNote,pre:o.onSolo||null};
   const finish=r=>{g.fb=null;mpGateAbort(id);o.done(r);};
-  mpSoloArm("A társad nem jelentkezik — a saját döntésemmel megyek tovább",()=>mpGateGiveUp(id),id);
+  /* A KIÚT FELIRATA A KAPUÉ (3.9.72). Az általános mondat ott igaz, ahol a
+     kiút tényleg a saját döntésemet hajtja végre; ahol MÁST tesz, ott a
+     hívónak ki kell mondania, mit. Egy hazug gomb rosszabb, mint egy szűk. */
+  mpSoloArm(o.soloLabel||"A társad nem jelentkezik — a saját döntésemmel megyek tovább",
+            ()=>mpGateGiveUp(id),id);
   h2hWaitShow(o.title,o.msg,false,false,o.wait);
   $("h2hWaitErr").textContent="";
   try{await mpNetInit();}catch(e){}
@@ -80599,6 +80620,13 @@ function mpNykResolve(mine,mate){
   /* A FELAJÁNLHATÓSÁG IS EGYHANGÚ (3.8.28). A régi kliens nem küld `offer`
      mezőt — ott a hiánya IGENT jelent, tehát a régi viselkedést kapja. */
   if(mine.offer===false||mate.offer===false)return null;
+  /* HA VALAMELYIKŐTÖK MÁR EGYEDÜL ELINDULT (3.9.72), akkor KÖZÖS tornát már
+     nem lehet építeni — ő a saját 32-es mezőnyében játszik. A későn érkező
+     fél ilyenkor NEM marad ki: ő is elindul egyedül. Így mindketten
+     játszotok, és — ami a szezonzárás szempontjából a lényeg — egyikőtök sem
+     lép be a kupa utáni kapuba, tehát a két kliens ugyanazon a döntési
+     rekeszen marad. */
+  if(mine.solo||mate.solo)return {solo:true};
   return {yes:true,mine,mate};}
 /* A KÖZÖS NYÁRI MEZŐNY CÉLÉRTÉKE. Egyjátékosban az ígéret „a te nyers
    csapaterőd mínusz egy" (euroMidRating). Kettőnél ez a szám kliensenként más
@@ -80656,11 +80684,50 @@ function friendlyCupSettle(yes,next,offerable){
       ovr:Math.round(teamOVRbase()),
       str:Math.round(teamStrength()),
       v:APP_VERSION},
-    msg:yes?"Neveztél a nyári tornára — megvárjuk a társad válaszát is. A torna csak akkor indul, ha ő is nevez."
+    msg:yes?"Neveztél a nyári tornára — megvárjuk a társad válaszát is. A KÖZÖS torna (ahol az ő csapata is ott van a 32 között) csak akkor indul, ha ő is nevez. Ha nem várod meg, egyedül indulsz: a mezőny a sajátod lesz."
            :(off?"Kihagynád a nyári tornát — megvárjuk a társad válaszát is."
                 :"Nálad idén nincs nyári torna (kupasorozatod van, vagy már lement) — szólunk a társadnak, hogy ne várjon rá."),
-    resolve:mpNykResolve,done:apply,solo:false,
-    giveUpNote:"⚠️ A nyári kupa egyeztetése megszakadt — idén kihagyjátok a tornát."});}
+    resolve:mpNykResolve,done:apply,
+    /* ---- A KIÚT VÉGRE AZT TESZI, AMIT ÍGÉR (3.9.72) ----
+       BEJELENTETT HIBA: „indítottam nyári kupát PvP-ben. Nem akartam megvárni
+       a társamat, és mondta hogy mehetek a saját választásommal. Rányomtam, és
+       a nyár végére ugrott, semmi kupa."
+
+       IGAZ VOLT, ÉS A GOMB HAZUDOTT. A kapu vázának kiútja azt írta ki, hogy
+       „a saját döntésemmel megyek tovább", a nyári torna viszont `solo:false`
+       tartalékkal hívta — vagyis a kiút MINDIG a NEM-et hajtotta végre, akkor
+       is, ha az imént mondtál igent. A nevezés egyhangú (egy tétnélküli
+       tornába nem lehet belerángatni azt, aki nem kért belőle), de ebből NEM
+       következik, hogy aki egyedül marad, annak ki kell maradnia: a torna
+       jutalom nélküli, tehát egyedül lejátszva sem billenti el a közös
+       karriert, a keretek pedig az idényzáró kapunál úgyis újra egymáshoz
+       hangolódnak.
+
+       AMI MIATT EDDIG TILOS VOLT, ÉS AMI EBBŐL IGAZ. Egy féloldalas torna
+       tényleg szétcsúsztatta volna a szezonzárást: a kampány lezárása
+       átbillenti a kupa utáni kapu jelzőjét (S.mpCupSeason), és onnantól a
+       két kliens KÉT KÜLÖNBÖZŐ döntési rekeszre várna. Ezt nem a tiltás
+       oldja meg, hanem az, hogy az EGYEDÜL játszott torna nem billenti át a
+       jelzőt (lásd S.friendlySolo és mpShowCupGate). */
+    solo:(yes?{solo:true}:false),
+    soloLabel:(yes?"A társad nem jelentkezik — egyedül nevezek a tornára"
+                  :"A társad nem jelentkezik — kihagyom a tornát"),
+    /* A SZOBÁT MÉG A LEZÁRÁS ELŐTT MEGJELÖLJÜK. Enélkül a később megérkező
+       társ ugyanabból a két igenből KÖZÖS tornát olvasna ki, miközben én már
+       a sajátomat játszom — lásd mpNykResolve. */
+    onSolo:(yes?()=>{try{
+      mpBk().h2hPut(MP.activeRoom,"s"+(S.seasonNumber||1)+"nyk",
+        MP.role==="host"?"host":"guest",
+        Object.assign({},{yes:true,offer:off,at:Date.now(),
+          teamName:String(teamName||"A társad").slice(0,40),
+          ovr:Math.round(teamOVRbase()),str:Math.round(teamStrength()),
+          v:APP_VERSION},{solo:true}));
+    }catch(e){}}:null),
+    giveUpNote:(yes
+      ?"⚠️ Nem vártad meg a társad nevezését — <b>egyedül indulsz</b> a nyári tornán. "
+        +"A mezőny a sajátod, a társad csapata nem lesz benne. Ha ő később mégis nevez, "
+        +"ő is egyedül játssza le a magáét."
+      :"⚠️ A nyári kupa egyeztetése megszakadt — idén kihagyjátok a tornát.")});}
 function friendlyCupDecline(){
   S.friendlyCupSeason=S.seasonNumber||1;
   addLine("🌴 A nyár edzőtábor és pihenés marad — felkészülési kupára idén nem neveztetek.","m ev");
@@ -80668,6 +80735,14 @@ function friendlyCupDecline(){
 function friendlyCupStart(joint){
   S.friendlyCupSeason=S.seasonNumber||1;
   S.euroCurrent="NYK";S.euroCurrentQual=false;S.euroOptOut=false;
+  /* EGYEDÜL LEJÁTSZOTT NYÁRI TORNA (3.9.72). A jelző egyetlen dolgot tesz: a
+     kampány végén KIHAGYJA a kupa utáni kaput, hogy a két kliens ugyanazon a
+     döntési rekeszen maradjon (mpShowCupGate). Idényre szól. */
+  S.friendlySolo=(joint&&joint.solo&&friendlyCupJoint())?(S.seasonNumber||1):0;
+  if(S.friendlySolo)
+    addLine("🟠 <b>Egyedül indulsz a nyári tornán.</b> A mezőny a sajátod — a torna "
+      +"jutalom nélküli, tehát a közös karrier mérlegét nem billenti el, és az "
+      +"idényzárásnál a keretek úgyis újra egymáshoz hangolódnak.","m life");
   /* KÖZÖS KARRIER: a torna a kettőtöké. A `joint` a mpNykResolve eredménye —
      egyjátékosban egyszerű `true`, ott nincs mit beírni. */
   if(joint&&joint.mine&&joint.mate&&friendlyCupJoint())
@@ -91552,6 +91627,8 @@ function saveGame(){
         oppBuffH:S.oppBuffH,
         mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,pendingCardUps:S.pendingCardUps,mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,mpTable:S.mpTable,seasonDrama:S.seasonDrama,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpBalanceP:S.mpBalanceP,
         mpDecision:S.mpDecision,mpDecisionCup:S.mpDecisionCup,mpCupSeason:S.mpCupSeason,
+        /* EGYEDÜL játszott nyári torna (3.9.72): a kupa utáni kaput kihagyja. */
+        friendlySolo:S.friendlySolo,
         mpHistory:S.mpHistory,mpDuelLog:S.mpDuelLog,mpOrphan:S.mpOrphan,mpForfeit:S.mpForfeit,
         mpOppStart:S.mpOppStart,mpOppSnap:S.mpOppSnap,
         run:S.run,runOpen:S.runOpen,runGuideOpen:S.runGuideOpen,
@@ -91898,6 +91975,7 @@ function applySavedGame(d){
   S.mpBalanceP=d.S.mpBalanceP||{};
   S.mpDecisionCup=d.S.mpDecisionCup||null;
   S.mpCupSeason=d.S.mpCupSeason||0;
+  S.friendlySolo=(d.S&&d.S.friendlySolo)||0;
   S.ttGoals=d.S.ttGoals||0;S.ttBest=d.S.ttBest||0;S.ttFutile=d.S.ttFutile||0;
   /* CHALLENGE-állapot visszatöltése — régi mentéseknél (a rendszer előttről)
      biztonságos alapértékek, hogy semmi ne törjön el. Az egyszerűsítés ELŐTTI

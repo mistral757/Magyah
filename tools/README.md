@@ -915,13 +915,37 @@ hogy a lépcső tényleg lépcső (az első fokozat befut, a következő nem), h
 mérők üres állapoton is számot adnak és nem hibát, és hogy egyetlen `pz_` sor
 sem szivárgott át másik filozófiába. Részletek: `docs/panzer-merfoldkovek.md`.
 
+## nyari-kupa-solo-proba.js — 🟠 a nyári torna kiútja PvP-ben
+
+```
+node tools/nyari-kupa-solo-proba.js
+```
+
+17 állítás arról a 3.9.72-es javításról, ahol a közös döntések kapujának
+kiútja HAZUDOTT: a gomb azt írta, „a saját döntésemmel megyek tovább", a
+nyári torna viszont `solo:false` tartalékkal hívta — vagyis a kiút mindig a
+NEM-et hajtotta végre, akkor is, ha az imént mondtál igent.
+
+**A próba előbb a RÉGI hibát játssza újra** (igen + kiút → elindul-e a
+torna), és ellenőrizhetően meg is fogja: a javítás előtti kódon `kampany:0` és
+`tovabb:1` jön ki — betűre az, amit a bejelentő látott („a nyár végére ugrott,
+semmi kupa").
+
+A másik fele azt méri, ami miatt a féloldalas torna eddig tilos volt: hogy az
+egyedül lejátszott torna NEM billenti át a kupa utáni kapu jelzőjét, tehát a
+két kliens ugyanazon a döntési rekeszen marad (`s3decision`, nem
+`s3decisioncup`). Külön ág a későn érkező társ (ő sem marad ki, de közös
+mezőnyt már nem kap), a két indulásmód különbsége, hogy a NEM-ág és az
+egyjátékos út változatlan, és hogy egy „nem" továbbra is kizárja a közös
+tornát. Részletek: `docs/nyari-kupa-solo.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott az 52 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott az 53 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
