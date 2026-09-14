@@ -759,7 +759,7 @@ sztár átvezetése ingyenes — egy régi kárért nem büntetünk utólag. Ré
 node tools/masodlagos-stilus-proba.js
 ```
 
-20 állítás a 3. lezárt szezon után felvehető MÁSODIK csapatstílusról. Ez a ház
+30 állítás a MÁSODIK csapatstílusról. Ez a ház
 legveszélyesebb változtatása: a rendszer eddig egyetlen függvénnyel
 (`styleState`) válaszolt három különböző kérdésre — mi hat a pályán, melyiket
 nézem, és melyik stílusé ez az adat. Egy stílusnál a három egybeesett; kettőnél
@@ -772,7 +772,16 @@ hatás-listán, sem a hat szezon-szerepen), és az adat gazdáját (a sztár, a
 híresség és az alkuk akkor is működnek, ha a sztáros filozófia a MÁSODLAGOS).
 Külön ág méri a nehezítést: a másodlagos mérföldköve harmadannyit fizet — a
 tempó-szorzó UTÁN, 1 pontos padlóval —, és hogy a pásztázás mindkét táblát
-futtatja, egy közös tárcába. Részletek: `docs/masodlagos-stilus.md`.
+futtatja, egy közös tárcába.
+
+**A kapu (3.9.69) külön ág.** A választás két úton nyílik, és amelyik előbb ér
+oda, az nyit: a 3. idény 15. fordulója után, VAGY amint az elsődleges filozófia
+eléri a 6. szintet. A próba idény/forduló párokon lépked
+(`[[2,10],[3,0],[3,14],[3,15],[3,29],[4,0]]`), és külön méri a szint-utat: 4-en
+és 5-ön zárva, 6-on és 7-en nyitva — még a 2. idényben is. Zárt kapunál nem a
+„nem" a mérce, hanem hogy a mondat KIMONDJA, mi hiányzik. A két feloldás-kártya
+(🏛 elsődleges, 🎯 másodlagos) is itt mérődik: felugrik, és másodszorra már nem.
+Részletek: `docs/masodlagos-stilus.md`.
 
 ## atviteli-kod-proba.js — ☁ mentés másik eszközre, fiók nélkül
 
@@ -858,13 +867,85 @@ plafont külön ágon. A Rettegés tíz szintjét, a csapatstílus-szint kapujá
 1. szint a 4.-en még zárva, az 5.-en nyílik) és a +20-as sapkát, ami akkor is
 fog, ha a félelem szint elszáll. Részletek: `docs/panzer-felelem-es-rettenet.md`.
 
+## panzer-nulladik-proba.js — 🛡️ a nulladik szint
+
+```
+node tools/panzer-nulladik-proba.js
+```
+
+23 állítás a Panzer NULLADIK szintjéről: aki 12+ negatív személyiségvonással
+(a vezetői képességet nem számolva) indul, már a legelső szezon előtt
+felvállalhatja a filozófiát — de csak három dolgot kap belőle.
+
+**A próba gerince a TAGADÁS.** Egy felvett filozófia a játékban eddig MINDIG
+teljes erővel hatott; a nulladik szint az egyetlen kivétel, tehát minden
+csatornát külön kell megmérni, hogy tényleg néma-e: a szintet (0 marad), a
+hangolást, a képességfát (csak a Fordított jellem vehető), a filozófus-edző
+INGYEN járó szintjét (ez a legkönnyebben átcsúszó ág — a szűrő ezért nem a
+vásárlásnál van, hanem a hatásoknál), a félelmet, a meccs-ujjlenyomatot és a
+barátságos torna Panzer-szabályát, ami HÁTRÁNY: azt sem szabad korán
+kiosztani.
+
+A másik fele az idényzárás: ott a felgyűlt mérföldköveknek EGYSZERRE kell
+életbe lépniük — a próba azt méri, hogy a klub nem az 1. szintről indul. A
+számláló külön ág: a vezetői képesség itt NEM számít, szemben a Panzer
+feloldásának 14-es számlálójával — a kettőt a próba egymás mellett méri.
+Részletek: `docs/panzer-nulladik-szint.md`.
+
+## panzer-merfoldko-proba.js — 🛡️ a tábla felzárkózása
+
+```
+node tools/panzer-merfoldko-proba.js
+```
+
+22 állítás a Panzer mérföldkő-tábláját ért 3.9.71-es bővítésről: kilenc új
+család, +1113 pont, 996-ról **2109**-re — a mezőny utolsójából az elsője.
+
+**Az első állítás szándékosan ÖSSZEHASONLÍTÓ, nem abszolút.** Nem azt méri,
+hogy a Panzer elér-e egy kézzel beírt számot, hanem hogy eléri-e a mezőny
+mindenkori legjobbját — így a szabály akkor is érvényes marad, ha bármelyik
+másik filozófia táblája változik. Mellette azt is nézi, hogy a pont nem egy-két
+nagy tételből jön, hanem SOK LÉPCSŐBŐL (a sorok és a családok száma is).
+
+A többi ág az új számlálókat méri élesben: a sárga lap három szintjét
+(karrier · idény · EGY mérkőzés — az utolsó kettőhöz új nyomkövető kellett),
+a rettenet-gazdaság két számát, a sérülést, az óriásölést és a Hosszú labdák
+ismertségét. Külön ág, hogy az idény sárgája nem esik vissza idényfordulón,
+hogy a lépcső tényleg lépcső (az első fokozat befut, a következő nem), hogy a
+mérők üres állapoton is számot adnak és nem hibát, és hogy egyetlen `pz_` sor
+sem szivárgott át másik filozófiába. Részletek: `docs/panzer-merfoldkovek.md`.
+
+## nyari-kupa-solo-proba.js — 🟠 a nyári torna kiútja PvP-ben
+
+```
+node tools/nyari-kupa-solo-proba.js
+```
+
+17 állítás arról a 3.9.72-es javításról, ahol a közös döntések kapujának
+kiútja HAZUDOTT: a gomb azt írta, „a saját döntésemmel megyek tovább", a
+nyári torna viszont `solo:false` tartalékkal hívta — vagyis a kiút mindig a
+NEM-et hajtotta végre, akkor is, ha az imént mondtál igent.
+
+**A próba előbb a RÉGI hibát játssza újra** (igen + kiút → elindul-e a
+torna), és ellenőrizhetően meg is fogja: a javítás előtti kódon `kampany:0` és
+`tovabb:1` jön ki — betűre az, amit a bejelentő látott („a nyár végére ugrott,
+semmi kupa").
+
+A másik fele azt méri, ami miatt a féloldalas torna eddig tilos volt: hogy az
+egyedül lejátszott torna NEM billenti át a kupa utáni kapu jelzőjét, tehát a
+két kliens ugyanazon a döntési rekeszen marad (`s3decision`, nem
+`s3decisioncup`). Külön ág a későn érkező társ (ő sem marad ki, de közös
+mezőnyt már nem kap), a két indulásmód különbsége, hogy a NEM-ág és az
+egyjátékos út változatlan, és hogy egy „nem" továbbra is kizárja a közös
+tornát. Részletek: `docs/nyari-kupa-solo.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 50 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott az 53 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
