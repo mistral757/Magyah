@@ -838,13 +838,33 @@ utána a szorzó 2, 4, 8, 16. Plusz: képesség nélkül egyik sem létezik, és
 tömeg-boost az ifire, az öregre és magára az egyenlítőre sosem megy.
 Részletek: `docs/harmonia-csoportos-boost.md`.
 
+## panzer-felelem-proba.js — ☠️ fordított jellem, félelem, rettenet
+
+```
+node tools/panzer-felelem-proba.js
+```
+
+22 állítás a Panzer három új rendszeréről (és az egyenlítő 250 perces
+belépőjéről). A filozófia eddig a legkevésbé választott volt; ez a három adja
+meg neki a saját gazdaságát.
+
+**A próba a számtant és a HATÁRT méri.** A fordítás két ágát szintenként (a „jó
+fej" ember hatás-oldali értéke 0,375 → 0,55 → 0,75, vagyis a 2. szinttől
+átfordul pozitívba), és külön azt, ami NEM fordul: a karizmát és a
+lapkockázatot. A félelem szint két tényezőjét (a keret negatív jellemei × a
+stílus-szint 0,5-től 2,0-ig), a meccsenkénti 10%-os plafont — és hogy aki
+eladja a szörnyeteget, annak azonnal esik. A rettenet-tételeket egyenként, a
+plafont külön ágon. A Rettegés tíz szintjét, a csapatstílus-szint kapuját (az
+1. szint a 4.-en még zárva, az 5.-en nyílik) és a +20-as sapkát, ami akkor is
+fog, ha a félelem szint elszáll. Részletek: `docs/panzer-felelem-es-rettenet.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 49 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 50 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

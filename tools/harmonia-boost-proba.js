@@ -37,14 +37,20 @@ const {spawn}=require('child_process');
     S.transferBudget=1e15;S.eqBoostsUsed=0;
     /* A díszlet: hat játékos, három posztcsoportban, köztük egy kétlaki. */
     careerPool={};
-    const mk=(n,pos,ovr,pot)=>{careerPool[n]={n,pos,nat:"Magyarország",startRating:ovr,
-      peak:ovr,pot,attrs:null,age:26};return careerPool[n];};
+    /* A 250 PERCES BELÉPŐ (3.9.68) MIATT a díszlet perceket is ad: enélkül az
+       egyenlítő jogosan utasítaná vissza az egész keretet. */
+    S.careerStats={};
+    const mk=(n,pos,ovr,pot,perc)=>{careerPool[n]={n,pos,nat:"Magyarország",startRating:ovr,
+      peak:ovr,pot,attrs:null,age:26};
+      S.careerStats[n]={matches:10,min:(perc==null?900:perc),g:0,a:0};
+      return careerPool[n];};
     mk("Alfa Aladár",["KV"],80,3000);
     mk("Béta Bálint",["KV"],120,9000);
     mk("Gamma Gábor",["JV"],90,4000);
     mk("Delta Dénes",["CS"],100,5000);
     mk("Epszilon Elek",["KV","VKP"],95,4500);   /* kétlaki: védő ÉS középpályás */
     mk("Zéta Zoltán",["VKP"],85,3500);
+    mk("Friss Ferenc",["KV"],130,9000,100);   /* 100 perc — nem vehet részt */
     window.fullCareerRoster=()=>Object.keys(careerPool).map(n=>({n,pos:careerPool[n].pos,
       ovr:careerPool[n].startRating}));
     window.currentRoster=()=>[];
@@ -74,6 +80,12 @@ const {spawn}=require('child_process');
       lvl1:Math.round(eqTargetOf(par,1)),
       lvl2:Math.round(eqTargetOf(par,2)),
       lvl3:Math.round(eqTargetOf(par,3))};
+    /* A BELÉPŐ ITT IS: a frissen igazolt 130-as ember nem húzhatja fel a célt. */
+    o.perc={
+      regi:eqEligible("Alfa Aladár"),friss:eqEligible("Friss Ferenc"),
+      celFrissel:Math.round(eqTargetOf(
+        ["Alfa Aladár","Béta Bálint","Friss Ferenc"].filter(eqEligible)
+          .map(n=>careerPool[n]),3))};
     /* ── 3. AZ EGYENLÍTŐ VÉGREHAJTÁSA ── */
     S.style={key:"harmonia",chosenSeason:1,traits:{egyenlito:3},ms:{done:{},seen:{},t:{}},star:null};
     S.style2=null;S.styleView=1;
@@ -140,7 +152,7 @@ const {spawn}=require('child_process');
   ok("a védő és a középpályás viszont nem boostolható együtt",
      r.csoport.vedoKozep===false);
   ok("a horgony köre a SAJÁT csoportja (a kétlaki mindkettőben ott van)",
-     r.csoport.korAlfa.join("|")==="Béta Bálint|Epszilon Elek|Gamma Gábor"
+     r.csoport.korAlfa.join("|")==="Béta Bálint|Epszilon Elek|Friss Ferenc|Gamma Gábor"
      &&r.csoport.korZeta.join("|")==="Epszilon Elek",r.csoport);
   ok("a MEGTANULT poszt is számít",r.csoport.tanultUtan===true);
 
@@ -156,6 +168,9 @@ const {spawn}=require('child_process');
      r.egyenlito.alfa.peak>=115,r.egyenlito.alfa);
   ok("aki LEJJEBB, annak a görbéje és a POT-ja érintetlen marad",
      r.egyenlito.beta.peak===120&&r.egyenlito.beta.pot===9000,r.egyenlito.beta);
+
+  ok("a 250 perc alatti ember nem vehet részt (3.9.68) — a cél nem csúszik fel",
+     r.perc.regi===true&&r.perc.friss===false&&r.perc.celFrissel===115,r.perc);
 
   console.log("\n=== az ár féke ===");
   ok("3. szinten 3 megy alapáron, utána duplázódik",
