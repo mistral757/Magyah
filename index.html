@@ -6082,7 +6082,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.77";
+const APP_VERSION="3.9.78";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -48304,6 +48304,8 @@ function sbMinTxt(m){return m>90?`90+${Math.min(10,m-90)}`:`${m}'`;}
 /* A NAPLÓSOROK perc-előtagja. Egyben húz percet (gmin) és formáz (sbMinTxt),
    hogy a 23 közvetítés-sor ne külön-külön döntse el, mi a helyes alak. */
 function gminTxt(bucket){return sbMinTxt(gmin(bucket));}
+/* EGY ÚJ ESEMÉNY perce, formázva (lásd gminNew). */
+function gminNewTxt(bucket){return sbMinTxt(gminNew(bucket));}
 /* ================= A MOSTANI PERC — BÉLYEG HÚZÁSA NÉLKÜL (3.8.38) ==========
    BEJELENTETT HIBA: „továbbra is fennáll az idő probléma" — az eredményjelző
    órája és a napló percei szétcsúsztak (85:14 a táblán, miközben a napló már
@@ -48327,41 +48329,92 @@ function gminTxt(bucket){return sbMinTxt(gmin(bucket));}
 function gnow(bucket){
   const hi=Math.max(1,bucket|0),lo=Math.max(1,hi-4);
   return Math.max(lo,Math.min(hi,_lastGoalMin||lo));}
+/* ================= EGY ESEMÉNY = EGY PERC (3.9.78) =======================
+   BEJELENTETT HIBA: „Valamiért beakadt a játéknak, hogy 5-tel osztható
+   percekben vannak nagyobb eséllyel az események, és ami még nagyobb gond,
+   hogy ugyanabban a percben több esemény is tud lenni, ami a legrosszabb,
+   hogy több gól is."
+
+   A GYÖKÉR: a régi `gmin` MINDEN HÍVÁSNÁL új percet foglalt a vödörből, és
+   monoton nőtt — a vödörben viszont csak ÖT perc van. Amint elfogytak, a
+   függvény a vödör UTOLSÓ percére csonkolt, tehát mindenki ugyanazt a
+   (5-tel osztható) percet kapta.
+
+   MÉRVE (4000 vödör, a régi szabály újraépítve — lásd percbelyeg-proba.js):
+
+     hívás/vödör | a látott perc 5-tel osztható | ismétlődő perc a vödörben
+          1      |            21,4%             |          0%
+          2      |            36,5%             |         20,6%
+          3      |            50,2%             |         50,5%
+          4      |            61,8%             |         80,3%
+          5      |            69,9%             |         96,5%
+          6      |            74,6%             |        100%
+
+   A 20% a VÉLETLEN szintje (minden ötödik perc osztható öttel) — tehát már
+   HÁROM hívás után a duplája, és a vödrök felében ismétlődött egy perc.
+
+   ÉS HÁROM-NÉGY HÍVÁS A NORMÁLIS VOLT. Egyetlen piros lap kettőt fogyasztott
+   (a naplósor és a mérföldkő-előtag), egy kapott gól szintén kettőt (a gólsor
+   és a kapus-mérföldköve) — ráadásul a RÉGI kódban ugyanannak az eseménynek a
+   két fele KÜLÖNBÖZŐ percet kapott, mert mindkét hívás lépett egyet.
+
+   A JAVÍTÁS EGY ELVBŐL KÖVETKEZIK: a perc az ESEMÉNYÉ, nem a naplósoré.
+     · `gmin(vödör)`  — a vödör MOSTANI perce. Egy vödrön belül MINDIG
+       ugyanaz: a kommentár, a mérföldkő-előtag és az esemény második fele
+       ugyanarról a pillanatról beszél, tehát ugyanazt a percet kapja. Nem
+       foglal, nem léptet, nem tud telítődni.
+     · `gminNew(vödör)` — egy ÚJ esemény perce. A vödör ELSŐ eseménye a sáv
+       bármelyik percét megkaphatja, egyenletesen; a további események az
+       előző UTÁN következnek. Ezt hívja a gól, a lap, a sérülés, a helyzet —
+       vagyis minden, ami önálló sorként megjelenik a közvetítésben.
+
+   UGYANEZZEL A MÉRÉSSEL, AZ ÚJ KÓDDAL: 1-5 esemény/vödörnél a percek 20%
+   körül oszthatók öttel (19,8 / 20,3 / 23,6 / 24,2 / 20,0%), és NULLA
+   ismétlődő perc. Egy végigjátszott idényen élesben 17,4% — a vödör ötödik
+   perce lett a LEGRITKÁBB a leggyakoribb helyett.
+
+   A SZIMULÁCIÓ RÁCSA ÉRINTETLEN: a motor továbbra is öt perces vödrökben
+   pereg (min+=5), a gólmatek, a valószínűségek és a balansz egy szemernyit
+   sem mozdulnak. Csak a KIÍRT perc lett becsületes. */
+let _gbB=0,_gbCur=0,_gbLo=0;
+function gbEnsure(bucket){
+  if(_gbB===bucket)return;
+  _gbB=bucket;_gbCur=0;
+  const hi=Math.max(1,bucket),lo=Math.max(1,hi-4);
+  /* AZ IDŐ NEM UGORHAT VISSZA az előző vödör utolsó perce alá — ez egyben a
+     FÉK is az előre csúszásra: bármennyit csúszott az előző vödör, ez a sor
+     visszaránt a mostani vödör tetejére, tehát az óra nem tud elszaladni.
+     A vödör első perce SZÁNDÉKOSAN nincs itt kisorsolva: az első esemény a
+     teljes [lo..hi] sávot megkapja. */
+  _gbLo=Math.min(hi,Math.max(lo,(_lastGoalMin||0)+1));}
+/* EGY ÚJ ESEMÉNY PERCE. */
+function gminNew(bucket){
+  if(bucket>90)return gmin(bucket);
+  gbEnsure(bucket);
+  const hi=Math.max(1,bucket);
+  /* A VÖDÖR ELSŐ ESEMÉNYE a sáv BÁRMELYIK percét megkaphatja, egyenletesen —
+     innen jön, hogy a percek nem az 5-tel oszthatókra torlódnak.
+     A TOVÁBBI ESEMÉNYEK az előző UTÁN következnek, tehát két esemény soha nem
+     kap azonos percet, és az idő sem lép visszafelé. Ha a vödörből kifutunk
+     (négy-öt esemény ugyanabban az öt percben), legfeljebb egy vödörnyit
+     csúszunk előre; a következő vödör ezt a fenti fékkel nyeli le. */
+  const m=_gbCur?Math.min(_gbCur+1,hi+4)
+                :_gbLo+Math.floor(Math.random()*(hi-_gbLo+1));
+  _gbCur=m;
+  _lastGoalMin=Math.max(_lastGoalMin,m);
+  return m;}
 function gmin(bucket){
-  /* egy 5-perces bucketből (pl. 50) ad egy 1-perc pontos, hihető percet a
-     [bucket-4 .. bucket] sávban, monoton növekvő sorrendben az előző gólhoz
-     képest, hogy ne "ugorjon vissza" az idő két gól között */
   /* 90 FÖLÖTT a ráadás saját eloszlásából húzunk (lásd stoppageMin), nem a
      rácsból — így a "90+N" hiteles: általában 1-4, ritkán tovább. */
   if(bucket>90){
     let s=90+stoppageMin();
     if(s<=_lastGoalMin)s=Math.min(100,_lastGoalMin+1);
     _lastGoalMin=s;return s;}
-  /* HIBA, AMIT EZ JAVÍT (jelentett): két gól kaphatta UGYANAZT a percet.
-     A régi sor a vödör tetejére csonkolt: Math.min(bucket, _lastGoalMin+1).
-     Ha az előző gól épp a vödör UTOLSÓ percére esett (pl. az 50-es vödörben az
-     50.-re), akkor a következőnél _lastGoalMin+1 = 51, a min() viszont
-     visszavágta 50-re — vagyis megint ugyanaz a perc.
-     Mostantól a következő perc szigorúan nagyobb, és ha ehhez ki kell lépni a
-     vödörből, kilép: egy-két perc "előreszaladás" sokkal kisebb baj, mint két
-     azonos percbélyeg. 90 fölött a ráadás sávjába csúszik át. */
-  const hi=Math.max(1,bucket),lo=Math.max(1,hi-4);
-  let m=lo+Math.floor(Math.random()*(hi-lo+1));
-  if(m<=_lastGoalMin)m=_lastGoalMin+1;
-  /* ---- A VÖDÖRBŐL NEM LÉPÜNK KI (3.8.38) ----
-     A „szigorúan nagyobb" szabály eddig korlátlanul vihette előre az órát: ha
-     egy ötperces vödörben több esemény volt, mint amennyi perc van benne, a
-     bélyeg egyszerűen kisétált a vödörből — és onnantól MINDEN további esemény
-     onnan folytatta. Így lett a 40-es vödörben 47. perc, a meccs végére pedig
-     beállt 100-as plafon (a „90+10"-ek sora).
-     Mostantól a vödör a plafon: ha elfogytak benne a percek, az esemény a vödör
-     UTOLSÓ percét kapja. Két esemény azonos perce sokkal kisebb baj (a valódi
-     közvetítés is így beszél), mint egy elszaladt óra.
-     AZ UTOLSÓ VÖDÖR A KIVÉTEL: ott a ráadásba átcsúszni jogos — épp attól „90+".  */
-  if(m>hi){
-    if(hi>=90){const s2=Math.max(91,_lastGoalMin+1);_lastGoalMin=Math.min(100,s2);return _lastGoalMin;}
-    m=hi;}
-  _lastGoalMin=Math.max(_lastGoalMin,m);return m;}
+  gbEnsure(bucket);
+  /* Amíg a vödörben nem történt esemény, a vödör legkorábbi megengedett perce
+     a "most" — utána viszont a LEGUTÓBBI esemény perce, hogy a kommentár és a
+     mérföldkő-előtag ugyanarról a pillanatról beszéljen. Nem foglal percet. */
+  return _gbCur||_gbLo;}
 /* ---- A 90+ GÓLOK HANGOLÁSA ----
    A régi szabály: 0.22 esély, KIZÁRÓLAG max 1 gólos különbségnél, és
    legfeljebb egy találat. Az új: az alap az állástól független, a szorosság
@@ -53836,6 +53889,10 @@ function duelGmin(m){
   let x=Math.max(1,m|0);
   if(x<=_lastGoalMin)x=_lastGoalMin+1;
   _lastGoalMin=x;
+  /* A VÖDÖR ÓRÁJÁT IS ELŐRE ÁLLÍTJA (3.9.78): a párharcgól perce a közös
+     listából jön, nem a gminNew-ból — enélkül az ugyanebben a vödörben utána
+     szóló kommentár a gól ELŐTTI percet kapná. */
+  if(_gbB&&x>=_gbB-4&&x<=_gbB)_gbCur=Math.max(_gbCur,x);
   return x;}
 /* ================= F5 — SZEZONZÁRÁS-CSERE =================
    A közös végtabellához nem elég a saját szezonod: a 14 CPU-csapat mindkét
@@ -57721,7 +57778,7 @@ function playMatch(){
   /* az eredményjelző MÉG az első kiírás előtt áll fel: onnantól a
      updateTTBoard minden hívása őt is frissíti */
   sbStart(fx,tickMs,!!S.auto);
-  _lastGoalMin=0;updateTTBoard(fx,0,0,0);
+  _lastGoalMin=0;_gbB=0;_gbCur=0;_gbLo=0;updateTTBoard(fx,0,0,0);
   const discWatchAtStart=new Set(Object.keys(S.discWatch)),hotStreakAtStart=new Set(Object.keys(S.hotStreak));
   const mScore={},mAssist={};
   /* SÁRGA LAPOK EZEN A MECCSEN (név → darab). A meccs végén ebből gyűlik a
@@ -57797,9 +57854,12 @@ function playMatch(){
     if(k<0)return;
     redIdx=k;redMin=min;S.reds++;
     try{fearNote("red");}catch(e){}
-    addLine(`${gminTxt(min)}  ${redCardLine(active[redIdx].p.n)}`,"m rc");
+    /* EGY ESEMÉNY = EGY PERC: a naplósor és a mérföldkő-előtag ugyanarról a
+       pillanatról beszél, tehát ugyanazt a bélyeget kapja (3.9.78). */
+    const _drt=gminNewTxt(min);
+    addLine(`${_drt}  ${redCardLine(active[redIdx].p.n)}`,"m rc");
     sbEv("us","red",active[redIdx].p.n);
-    mileRed(MILE,active[redIdx].p.n,`${gminTxt(min)}  `);
+    mileRed(MILE,active[redIdx].p.n,`${_drt}  `);
     diff-=dialRedMatch();lf=lam(diff);la=lam(-diff)*defenseMult()*styleRedOppGoalMult();
     intimidationNote(min);
     rivalTune();
@@ -57830,9 +57890,12 @@ function playMatch(){
     redIdx=idx;redMin=perc;
     S.reds++;
     try{fearNote("red");}catch(e){}
-    addLine(sor||`${gminTxt(perc)}  ${redCardLine(nev)}`,"m rc");
+    /* Ha `sor` jött (második sárga), a perc bélyegét MÁR a hívó húzta ki —
+       akkor a mérföldkő-előtagnak ugyanaz kell, nem egy újabb (3.9.78). */
+    const _krt=sor?sbMinTxt(gmin(perc)):gminNewTxt(perc);
+    addLine(sor||`${_krt}  ${redCardLine(nev)}`,"m rc");
     sbEv("us","red",nev);
-    mileRed(MILE,nev,`${gminTxt(perc)}  `);
+    mileRed(MILE,nev,`${_krt}  `);
     diff-=dialRedMatch();lf=lam(diff);la=lam(-diff)*defenseMult()*styleRedOppGoalMult();
     intimidationNote(perc);
     rivalTune();   /* a rangadó-torzítás az emberhátrány újraszámolása után is él */
@@ -57851,10 +57914,10 @@ function playMatch(){
     mYellow[nev]=(mYellow[nev]||0)+1;
     if(mYellow[nev]>=2){
       mSecondYellow=nev;
-      kiallit(idx,perc,`${gminTxt(perc)}  🟨🟨 MÁSODIK SÁRGA — ${esc(shortName(nev))}: `
+      kiallit(idx,perc,`${gminNewTxt(perc)}  🟨🟨 MÁSODIK SÁRGA — ${esc(shortName(nev))}: `
         +`${YELLOW_OK_TXT[ok]||"újabb szabálytalanság"}. Megkapja a másodikat, és ezzel mehet le. Tízen maradtunk.`);
       return;}
-    addLine(`${gminTxt(perc)}  ${yellowLine(nev,ok)}`,"m rc");
+    addLine(`${gminNewTxt(perc)}  ${yellowLine(nev,ok)}`,"m rc");
     try{fearNote("yellow");}catch(e){}          /* rettenet-pont (3.9.68) */
     sbEv("us","yellow",nev,gnow(perc));}
   /* ---- GÓLÖRÖM KÖZBEN LEVESZI A MEZÉT ----
@@ -57902,10 +57965,10 @@ function playMatch(){
       const specTxt=spec?` — ${esc(spec.inst.skill.name)}${skillProgressSuffix(spec.inst)}`:"";
       if(Math.random()<hit){
         gf++;mScore[taker.n]=(mScore[taker.n]||0)+1;recordScorer(taker.n);
-        /* A percet ELŐRE húzzuk (gminTxt(x) ≡ sbMinTxt(gmin(x))), mert a Villám
-           ritmus-mérője PONTOS percet kér — egy 5 perces vödör egy 15 perces
-           ablakon már érdemben torzítana. */
-        const _pgm=gmin(min);
+        /* A percet ELŐRE húzzuk, mert a Villám ritmus-mérője PONTOS percet
+           kér — egy 5 perces vödör egy 15 perces ablakon már érdemben
+           torzítana —, és mert a naplósor ugyanezt a bélyeget viseli. */
+        const _pgm=gminNew(min);
         try{vlNoteGoal(_pgm,taker.n,null);}catch(e){}
         updateTTBoard(fx,gf,ga,Math.min(90,min));
         addLine(`${sbMinTxt(_pgm)}  TIZENEGYES! ${esc(shortName(taker.n))} magabiztosan értékesíti  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
@@ -57916,15 +57979,16 @@ function playMatch(){
           ?`Jéghideg a legnagyobb pillanatban${specTxt}`
           :`Meg sem rezzent a keze${specTxt}`}`,"m skillnote");
         updateGoallessStreak(taker.n,true);
-      }else addLine(`${gminTxt(min)}  Tizenegyes! ${esc(shortName(taker.n))} kihagyja — a kapufát találja el`,"m ev");
+      }else addLine(`${gminNewTxt(min)}  Tizenegyes! ${esc(shortName(taker.n))} kihagyja — a kapufát találja el`,"m ev");
     }else if(evType==="penalty_against"){
       if(Math.random()<0.78){
         ga++;
         const oppScorer=pickOpponentScorer(fx.o);
         updateTTBoard(fx,gf,ga,Math.min(90,min));
-        addLine(`${gminTxt(min)}  Tizenegyesgól: ${esc(shortName(oppScorer))}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+        const _pat=gminNewTxt(min);
+        addLine(`${_pat}  Tizenegyesgól: ${esc(shortName(oppScorer))}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
         sbEv("them","goal",oppScorer);
-        mileGkConceded(MILE,`${gminTxt(min)}  `);
+        mileGkConceded(MILE,`${_pat}  `);
       }else{
         /* ---- KIVÉDETT TIZENEGYES (3.8.20) ----
            A maradék 22% eddig egyben „kimarad" volt — a kapus nem is
@@ -57935,35 +57999,37 @@ function playMatch(){
         const pgk=oppChanceGk();
         if(pgk&&Math.random()<0.55){
           noteSave(pgk.p.n,"pen");
-          addLine(`${gminTxt(min)}  KIVÉDETT TIZENEGYES!!! <b>${esc(shortName(pgk.p.n))}</b> jó sarokba mozdul és megfogja — a stadion felrobban!`,"m mvp");
-        }else addLine(`${gminTxt(min)}  Tizenegyes ellenünk — de kimarad, megmenekültünk!`,"m ev");}
+          addLine(`${gminNewTxt(min)}  KIVÉDETT TIZENEGYES!!! <b>${esc(shortName(pgk.p.n))}</b> jó sarokba mozdul és megfogja — a stadion felrobban!`,"m mvp");
+        }else addLine(`${gminNewTxt(min)}  Tizenegyes ellenünk — de kimarad, megmenekültünk!`,"m ev");}
     }else if(evType==="owngoal_for"){
       gf++;
       updateTTBoard(fx,gf,ga,Math.min(90,min));
-      addLine(`${gminTxt(min)}  ÖNGÓL! Az ellenfél védője a saját kapujába lövi  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+      addLine(`${gminNewTxt(min)}  ÖNGÓL! Az ellenfél védője a saját kapujába lövi  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
       sbEv("us","goal","öngól");
     }else if(evType==="owngoal_against"){
       ga++;
       const culprit=pick(onPitch().filter(a=>!a.p.family));
       updateTTBoard(fx,gf,ga,Math.min(90,min));
-      addLine(`${gminTxt(min)}  ÖNGÓL! ${esc(shortName(culprit.p.n))} saját kapujába talál  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+      const _ogt=gminNewTxt(min);
+      addLine(`${_ogt}  ÖNGÓL! ${esc(shortName(culprit.p.n))} saját kapujába talál  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
       sbEv("them","goal",culprit.p.n);
-      mileGkConceded(MILE,`${gminTxt(min)}  `);
+      mileGkConceded(MILE,`${_ogt}  `);
       applyDisciplineDip(culprit.p.n);
     }else if(evType==="fight"){
       const op=onPitch();const p1=pick(op),others=op.filter(a=>a!==p1),p2=pick(others);
-      addLine(`${gminTxt(min)}  Összecsapás a pályán: ${esc(shortName(p1.p.n))} és ${esc(shortName(p2.p.n))} között — a játékvezető szétválasztja őket`,"m ev");
+      addLine(`${gminNewTxt(min)}  Összecsapás a pályán: ${esc(shortName(p1.p.n))} és ${esc(shortName(p2.p.n))} között — a játékvezető szétválasztja őket`,"m ev");
       if(redIdx<0&&Math.random()<0.3){
         const victim=Math.random()<0.5?p1:p2;
         redIdx=active.indexOf(victim);redMin=min;S.reds++;
-        addLine(`${gminTxt(min)}  ${redCardLine(victim.p.n)}`,"m rc");
+        const _frt=gminNewTxt(min);
+        addLine(`${_frt}  ${redCardLine(victim.p.n)}`,"m rc");
         sbEv("us","red",victim.p.n);
-        mileRed(MILE,victim.p.n,`${gminTxt(min)}  `);
+        mileRed(MILE,victim.p.n,`${_frt}  `);
         diff-=dialRedMatch();lf=lam(diff);la=lam(-diff)*defenseMult()*styleRedOppGoalMult();
         intimidationNote(min);}
     }else if(evType==="var_overturn"){
       const nearScorer=pick(onPitch());
-      addLine(`${gminTxt(min)}  VAR-ellenőrzés... a gólt nem adják meg! ${esc(shortName(nearScorer.p.n))} csalódottan a fejéhez kap`,"m ev");
+      addLine(`${gminNewTxt(min)}  VAR-ellenőrzés... a gólt nem adják meg! ${esc(shortName(nearScorer.p.n))} csalódottan a fejéhez kap`,"m ev");
     }else if(evType==="free_kick_goal"){
       const si=weightedPick(active,(x,idx)=>{
         if(idx===redIdx)return 0;
@@ -57983,7 +58049,7 @@ function playMatch(){
            kódja megvolt (SHOT_SKILL_BONUS.mf_fk=4), csak sosem fért ki. */
         openGoalNotes(GOAL_NOTE_BUDGET,taker.n);
         gf++;mScore[taker.n]=(mScore[taker.n]||0)+1;recordScorer(taker.n);
-        const _fgm=gmin(min);
+        const _fgm=gminNew(min);
         try{vlNoteGoal(_fgm,taker.n,null);}catch(e){}
         const fkSk=playerSkills(taker.n).find(i=>i.skill.id==="mf_fk"||i.skill.id==="df_cannon");
         updateTTBoard(fx,gf,ga,Math.min(90,min));
@@ -57999,7 +58065,7 @@ function playMatch(){
           `→ Huszonöt méterről, csavarva, a kapufa tövébe. ${_tn} ezt a rúgást ezerszer elgyakorolta.`];
         addLine(fkGoalTxt[Math.floor(Math.random()*fkGoalTxt.length)],"m skillnote",true);
         /* a szabadrúgásgól a lövéserő-mérő természetes helye */
-        tryShotMeasure(taker.n,`${gminTxt(min)}  `);
+        tryShotMeasure(taker.n,`${sbMinTxt(_fgm)}  `);
         updateGoallessStreak(taker.n,true);
       }else{
         const fkMissTxt=[
@@ -58008,7 +58074,7 @@ function playMatch(){
           `Szabadrúgás — ${_tn} a kapufa mellé tekeri, centiken múlt`,
           `Szabadrúgás — ${_tn} lövését a kapus bravúrral tolja szögletre`,
           `Szabadrúgás — ${_tn} a sorfal alá lövi, de ott áll egy láb az útjában`];
-        addLine(`${gminTxt(min)}  ${fkMissTxt[Math.floor(Math.random()*fkMissTxt.length)]}`,"m ev");}
+        addLine(`${gminNewTxt(min)}  ${fkMissTxt[Math.floor(Math.random()*fkMissTxt.length)]}`,"m ev");}
     }}
   /* A tick-függvényt NÉV szerint tartjuk, mert a félidei csere megállítja és
      újraindítja az órát — a ciklus tartalma ettől betűre változatlan. */
@@ -58203,7 +58269,7 @@ function playMatch(){
        ESEMÉNY: azt is kimondjuk, mert a filozófia lényege maga a passzsor. */
     while(TT_PLAN.length&&TT_PLAN[0].bucket<=min){
       const _tt=TT_PLAN.shift();
-      const _tmin=gmin(min);
+      const _tmin=gminNew(min);
       /* A MEGSZAKADT NEKIFUTÁS: három passz alatt nincs se gól, se befejező —
          csak egy elveszített labda, névvel. Ugyanaz a pályán-lét szabály áll rá,
          mint a befejezőre: ha az, akinél elveszett, időközben lekerült, az
@@ -58299,7 +58365,7 @@ function playMatch(){
       const duelGoal=DUEL?duelMine[k]:null;
       if(duelGoal){const _i=active.findIndex(a=>a.p.n===duelGoal.scorer);if(_i>=0)si=_i;}
       const scorer=active[si].p;
-      const goalMin=duelGoal?duelGmin(duelGoal.min):gmin(min);
+      const goalMin=duelGoal?duelGmin(duelGoal.min):gminNew(min);
       /* ---- GÓLONKÉNTI KOMMENTÁR-KERET ----
          Egy gólra korábban akár 5-6 ízesítő sor is rárakódott (kártyaszint-
          idézet + kapufa-flavor + skill-note-ok + taktika-íz + sebesség-íz),
@@ -58563,7 +58629,7 @@ function playMatch(){
     for(let k=0;k<og;k++){ga++;
       const dOpp=duelOpp?duelOpp[k]:null;
       const oppScorer=dOpp?dOpp.scorer:pickOpponentScorer(fx.o);
-      const oppMin=dOpp?duelGmin(dOpp.min):gmin(min);
+      const oppMin=dOpp?duelGmin(dOpp.min):gminNew(min);
       updateTTBoard(fx,gf,ga,Math.min(90,min));
       /* A klubnév KIKERÜLT a gólszerző mellől: a fejlécen és az eredményjelzőn
          ott áll, melyik meccs megy, tehát a zárójel csak zajt vitt a sorba.
@@ -58594,7 +58660,7 @@ function playMatch(){
       titleLiveNotes++;
       const _o=gf>ga?3:(gf===ga?1:0);
       const _ok=titleClinchedWith(_TITLE.teams,_TITLE.myPts,_o,(fx.o&&fx.o.n)||null);
-      addLine(`${gminTxt(min)}  🎙 ${_ok?pickLineNoRepeat(TITLE_LIVE_LINES,"titleLive"):pickLineNoRepeat(TITLE_LIVE_SLIP,"titleSlip")}`,
+      addLine(`${gminNewTxt(min)}  🎙 ${_ok?pickLineNoRepeat(TITLE_LIVE_LINES,"titleLive"):pickLineNoRepeat(TITLE_LIVE_SLIP,"titleSlip")}`,
         _ok?"m win":"m ev");}
     /* RANGADÓ: forróbb a hangulat — nagyobb eséllyel és akár KÉTSZER is
        történhet különleges esemény (tizenegyes, öngól, verekedés, VAR). A
@@ -58672,7 +58738,7 @@ function playMatch(){
     /* A CSAPATSTÍLUS HANGJA — meccsenként egyszer. */
     if(g===0&&og===0&&!styleLineShown&&Math.random()<fp(0.14)/18){
       const sl=pickStyleMatchLine();
-      if(sl){styleLineShown=true;addLine(`${gminTxt(min)}  ${sl}`,"m ev");}}
+      if(sl){styleLineShown=true;addLine(`${gminNewTxt(min)}  ${sl}`,"m ev");}}
     if(g===0&&og===0&&!skillFlavorShown&&Math.random()<fp(0.12)/18){
       const line=pickSkillFlavor(active,min,slots);
       if(line){
@@ -58718,7 +58784,7 @@ function playMatch(){
       if(sc&&!scInUse&&playerSkills(sc.n).some(i=>i.skill.id==="fw_supersub")&&Math.random()<0.05/18*(min>=75?1.8:1)){
         supersubStruck=true;gf++;
         mScore[sc.n]=(mScore[sc.n]||0)+1;recordScorer(sc.n);
-        const _sgm=gmin(min);
+        const _sgm=gminNew(min);
         try{vlNoteGoal(_sgm,sc.n,null);}catch(e){}
         updateGoallessStreak(sc.n,true);
         const inst=playerSkills(sc.n).find(i=>i.skill.id==="fw_supersub");
@@ -58742,16 +58808,17 @@ function playMatch(){
         if(r<0.68){
           /* a szöcske bravúrja EGYSZERRE bravúr és kapus-skill villanás */
           noteSave(gk.p.n,"big");try{clutchNoteDefUse(gk.p.n);}catch(e){}
-          addLine(`${gminTxt(min)}  BRAVÚR! ${esc(shortName(gk.p.n))} hihetetlen vetődéssel fogja a labdát — ${esc(grasshopperSk.skill.name)}${skillProgressSuffix(grasshopperSk)}`,"m ev");
+          addLine(`${gminNewTxt(min)}  BRAVÚR! ${esc(shortName(gk.p.n))} hihetetlen vetődéssel fogja a labdát — ${esc(grasshopperSk.skill.name)}${skillProgressSuffix(grasshopperSk)}`,"m ev");
         /* PÁRHARCBAN a potyagól kimarad: KAPOTT GÓLT írna helyben, az állást
            viszont a közös lista adja. */
         }else if(!DUEL&&r<0.75){   /* 0.68..0.75 = 7% potyagól */
           ga++;
           updateTTBoard(fx,gf,ga,Math.min(90,min));
-          addLine(`${gminTxt(min)}  Potyagól! ${esc(shortName(gk.p.n))} nagyot hibázik, könnyű gólt kap  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
+          const _pot=gminNewTxt(min);
+          addLine(`${_pot}  Potyagól! ${esc(shortName(gk.p.n))} nagyot hibázik, könnyű gólt kap  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m oppgoal");
           sbEv("them","goal","potyagól");
-          mileGkConceded(MILE,`${gminTxt(min)}  `);
-        }else addLine(`${gminTxt(min)}  ${esc(shortName(gk.p.n))} magabiztosan tartja a kaput`,"m ev");
+          mileGkConceded(MILE,`${_pot}  `);
+        }else addLine(`${gminNewTxt(min)}  ${esc(shortName(gk.p.n))} magabiztosan tartja a kaput`,"m ev");
         runPendingDrama();}}
     /* A késleltetett 90+ dráma MOST fut le — a bucket összes rendes (85-90
        perces) eseménye után, így mindig időrendben, utolsóként jelenik meg. */
@@ -59012,7 +59079,7 @@ function playMatch(){
     /* A PERC SZÁMKÉNT IS KELL (3.8.22): a kontraindítás abból számol, hány
        perccel a védekező siker UTÁN esett a gól. A gminTxt ugyanezt hívja
        belül, csak eldobja a számot. */
-    const at=gmin(min),t=sbMinTxt(at);
+    const at=gminNew(min),t=sbMinTxt(at);
     const gk=oppChanceGk();
     const r=Math.random();
     const pickTxt=a=>a[Math.floor(Math.random()*a.length)];
@@ -59106,7 +59173,7 @@ function playMatch(){
      Az oppChance tükörképe. A GÓLOKAT NEM ÉRINTI: azok a Poissonból jönnek,
      ez kizárólag a gólon kívüli támadásokat meséli el és könyveli. */
   function ourChance(min){
-    const at=gmin(min),t=sbMinTxt(at);
+    const at=gminNew(min),t=sbMinTxt(at);
     const r=Math.random();
     const pickTxt=a=>a[Math.floor(Math.random()*a.length)];
     const loud=()=>Math.random()<OURCH_LOUD;
@@ -60000,7 +60067,7 @@ function playMatch(){
         `⚕ SÉRÜLÉS! ${esc(shortName(inm))} megfeszül és sántikálva jelzi, hogy nem tudja folytatni`,
         `⚕ SÉRÜLÉS! Rossz mozdulat — ${esc(shortName(inm))} a combjához kap, hordágy jön be`,
         `⚕ SÉRÜLÉS! ${esc(shortName(inm))} egy ütközés után nem tud lábra állni — le kell cserélni`];
-      addLine(`${gminTxt(min)}  ${pick(injTexts)} (${dur} forduló)`,"m inj");
+      addLine(`${gminNewTxt(min)}  ${pick(injTexts)} (${dur} forduló)`,"m inj");
       sbEv("us","inj",inm);
       if(!styleToughOnRoll(inm,"injury"))addOrExtendUnavailable(inm,dur,"injury");
       /* GYÓGYÍTÓ-ZSETON: a kérdést a lefújás után tesszük fel (lásd chHealAsk),

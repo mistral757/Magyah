@@ -1074,13 +1074,42 @@ betűre változatlan. Részletek: `docs/edzovaltas-es-taktika.md`.
 
 
 
+## percbelyeg-proba.js — ⏱ egy esemény, egy perc
+
+```
+node tools/percbelyeg-proba.js
+```
+
+A 3.9.78 mérése. A bejelentés kettős volt: „5-tel osztható percekben vannak
+nagyobb eséllyel az események", és „ugyanabban a percben több esemény is tud
+lenni, ami a legrosszabb, hogy több gól is". Ugyanaz a sor okozta mindkettőt.
+
+A próba ELŐSZÖR ÚJRAÉPÍTI A RÉGI SZABÁLYT, és a kettőt egymás mellett méri
+4000 vödrön — nem emlékezetből hasonlítunk. A régi `gmin` minden hívásnál új
+percet foglalt egy ötperces vödörből, majd a vödör tetejére csonkolt: három
+hívásnál 50,2% lett 5-tel osztható (a véletlen szintje 20%), és a vödrök
+50,5%-ában ismétlődött egy perc. Az új kódnál ugyanez 23,6% és **0%**.
+
+Amit még mér: hogy a `gmin` MÁR NEM FOGYASZT (húsz hívás egy vödrön belül
+ugyanazt adja — ettől nem csúszik szét a naplósor és a mérföldkő-előtag), hogy
+utána az ESEMÉNY percét adja vissza, hogy öt esemény öt külön, növekvő percet
+kap, hogy az idő SOHA nem lép visszafelé, és hogy a 90 fölötti ág érintetlen
+(a „90+N" továbbra is a ráadás saját eloszlásából jön).
+
+A végén ÉLES MÉRÉS: kész klubbal indít egy ligapiramis-karriert, végigjátszatja
+a 30 fordulót, és a naplóból olvassa vissza a percbélyegeket. Egy idényen
+17,4% lett 5-tel osztható (a vödör ötödik perce a LEGRITKÁBB, nem a
+leggyakoribb), és nulla olyan meccs volt, ahol két gól ugyanabba a percbe
+esett. Részletek: `docs/percbelyeg.md`.
+
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott az 58 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott az 59 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
