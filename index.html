@@ -6082,7 +6082,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.76";
+const APP_VERSION="3.9.77";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -91084,6 +91084,64 @@ function guardiolaTakeOver(){return styleCoachTakeOver("Pep Guardiola","🎩",TT
    mindkettőt: egy jövőbeli harmadik filozófus-edző így nem tud elcsúszni
    attól, hogy valaki a másolatot felejtette el frissíteni. */
 function mourinhoTakeOver(){return styleCoachTakeOver("José Mourinho","🕶️",BT_BUS_TACTIC);}
+/* ================= AZ ÚJ EDZŐ A SAJÁT ISMERTSÉGÉRŐL INDUL (3.9.77) ========
+   BEJELENTETT HIBA: „Amikor a csapatstílusunk edzőjét megvesszük, akkor ő a
+   saját taktika ismertségéről indítja azt a taktikát […] vagy onnan folytatja,
+   ahol az előző edző szintje volt? Ha onnan folytatja, akkor rosszul van így.
+   Saját alap értékeiről kell induljon, kivéve ha a main taktikáját […] már
+   jobban ismerte 80-asnál az előző edzővel a csapat."
+
+   ONNAN FOLYTATTA. A styleCoachTakeOver eddig CSAK az edző-objektumot
+   cserélte ki (`coach=c`), az S.tactics.levels-hez hozzá sem nyúlt — a klub
+   tehát megtartotta az előző edzővel bedrillezett rendszereket, mintha
+   semmi nem történt volna. A karrier-indításnál ugyanez a kérdés MINDIG is
+   helyesen működött (initTacticsForCoach a választott edző 80/76/70-esével
+   indít); az edzőVÁLTÁS maradt ki belőle.
+
+   MOSTANTÓL az új edző a saját alapértékeiről indul: a három kedvelt
+   rendszere 80/76/70, minden más 60.
+
+   AZ EGYETLEN KIVÉTEL a kérés szerint a FILOZÓFIA SAJÁT RENDSZERE (az, amit a
+   képesség kétszeres tempóval gyakoroltat — Guardiolánál a Labdatartás,
+   Dárdainál a Hosszú labdák). Ha azt a csapat MÁR 80 FÖLÖTT ismerte, a
+   magasabb szint megmarad: azt a tudást épp ezért a filozófiáért építetted,
+   és egy filozófus-edző érkezése nem törölheti el.
+
+   A KÜSZÖB A TACTIC_START_LIKED[0], nem egy beírt 80-as: a kivétel azt
+   mondja ki, hogy „jobban ismerte, mint amennyire az ÚJ edző a sajátját
+   hozza" — ha az a szám valaha változik, a szabály vele mozdul.
+
+   AZ AKTÍV RENDSZERHEZ NEM NYÚLUNK. Az edző hozza a maga tudását, de hogy
+   MIT játszotok, az a menedzser döntése marad — egy néma rendszer-váltás a
+   kezdőrúgás előtt sokkal nagyobb meglepetés volna, mint a szintek mozgása.
+   Cserébe a napló kimondja, mi hova került. */
+function styleCoachReseedTactics(c,tacticKey){
+  const elotte=Object.assign({},(S.tactics&&S.tactics.levels)||{});
+  const uj={};
+  Object.keys(TACTICS).forEach(k=>{uj[k]=TACTIC_START_OTHER;});
+  (c&&c.tactics||[]).forEach((k,i)=>{
+    if(uj[k]!==undefined)
+      uj[k]=(TACTIC_START_LIKED[i]!==undefined?TACTIC_START_LIKED[i]:TACTIC_START_OTHER);});
+  const regi=(elotte[tacticKey]!=null)?elotte[tacticKey]:TACTIC_START_OTHER;
+  let megtartva=false;
+  if(tacticKey&&uj[tacticKey]!==undefined&&regi>TACTIC_START_LIKED[0]){
+    uj[tacticKey]=regi;megtartva=true;}
+  S.tactics=S.tactics||{};
+  S.tactics.levels=uj;
+  return {elotte,utana:uj,megtartva,regi};}
+/* A VÁLTOZÁS KIMONDVA. Csak az mozdult rendszerek, a nagyobb változással
+   elöl — egy hét soros, teljes lista a napló alján senkit nem érdekel. */
+function styleCoachTacticNote(r,tacticKey){
+  const sorok=Object.keys(r.utana)
+    .filter(k=>r.utana[k]!==(r.elotte[k]!=null?r.elotte[k]:TACTIC_START_OTHER))
+    .map(k=>({k,a:(r.elotte[k]!=null?r.elotte[k]:TACTIC_START_OTHER),b:r.utana[k]}))
+    .sort((x,y)=>Math.abs(y.b-y.a)-Math.abs(x.b-x.a));
+  if(!sorok.length)return "";
+  return sorok.slice(0,4).map(x=>{
+    const n=(TACTICS[x.k]&&TACTICS[x.k].n)||x.k;
+    const fel=x.b>x.a;
+    return `${esc(n)} <b style="color:${fel?"var(--grass)":"var(--red)"}">${x.a}→${x.b}</b>`;
+  }).join(" · ")+(sorok.length>4?` <span style="color:var(--dim2)">(+${sorok.length-4} további)</span>`:"");}
 function styleCoachTakeOver(name,ic,tacticKey){
   const c=COACHES.find(x=>x.n===name);
   if(!c)return false;
@@ -91095,10 +91153,30 @@ function styleCoachTakeOver(name,ic,tacticKey){
     return false;}
   const old=coach?coach.n:"";
   coach=c;
+  /* A SAJÁT ISMERTSÉGÉRŐL INDUL (3.9.77) — a csere UTÁN, hogy a napló
+     sorrendje kövesse a történést: előbb megjön, aztán átrendezi az edzéseket. */
+  let _r=null;try{_r=styleCoachReseedTactics(c,tacticKey);}catch(e){}
   addLine(`${ic} <b>EDZŐVÁLTÁS — MEGJÖTT ${esc(String(name).toUpperCase())}.</b>`
     +(old?` ${esc(old)} elköszön a klubtól.`:""),"m mvp");
   addLine(`→ ${esc(c.tag)} · játékerő +${c.ovrMod} · morál ${c.moraleBase>=0?"+":""}${c.moraleBase}. `
     +`${esc(tn)} mostantól <b>kétszeres tempóval</b> gyakorlódik be.`,"m skillnote");
+  if(_r){
+    const _v=styleCoachTacticNote(_r,tacticKey);
+    addLine(`→ <b>Az edzések újraindulnak a saját rendszerein:</b> `
+      +`a három kedvelt taktikája ${TACTIC_START_LIKED.join("/")}-ről, a többi `
+      +`${TACTIC_START_OTHER}-ról. Az előző edzővel bedrillezett rutin nem `
+      +`öröklődik át.`,"m skillnote");
+    if(_r.megtartva)
+      addLine(`→ <span style="color:var(--grass)">${esc(tn)} viszont MEGMARAD `
+        +`<b>${_r.regi}</b>-en</span> — azt a tudást épp ezért a filozófiáért `
+        +`építetted, 80 fölé.`,"m skillnote");
+    if(_v)addLine(`→ ${_v}`,"m skillnote");
+    try{const akt=S.tactics&&S.tactics.active;
+      if(akt&&TACTICS[akt]&&akt!==tacticKey)
+        addLine(`→ <span style="color:var(--dim2)">A beállított rendszered `
+          +`(${esc(TACTICS[akt].n)}) marad — azt te döntöd el, nem az edző. `
+          +`Most <b>${tacticLevel(akt)}</b>-en áll.</span>`,"m skillnote");
+    }catch(e){}}
   try{updateBar();}catch(e){}
   try{drawPitch();}catch(e){}
   return true;}

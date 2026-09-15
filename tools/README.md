@@ -1046,6 +1046,32 @@ továbbra is árat mutatnak, és hogy az „ingyen igazolás" zseton a vételi �
 magától vált be — menü-gomb nélkül is. Részletek:
 `docs/boost-kozpont-egyesites.md`.
 
+## edzovaltas-taktika-proba.js — 🎩 az új edző a saját ismertségéről indul
+
+```
+node tools/edzovaltas-taktika-proba.js
+```
+
+17 állítás a 3.9.77-es javításról. A bejelentés KÉRDÉS volt („a saját
+ismertségéről indítja, vagy onnan folytatja, ahol az előző edző szintje
+volt?"), és a válasz az lett, hogy ONNAN FOLYTATTA: a `styleCoachTakeOver`
+csak az edző-objektumot cserélte, az `S.tactics.levels`-hez hozzá sem nyúlt.
+A karrier-INDÍTÁSNÁL ugyanez mindig helyes volt (`initTacticsForCoach`) — az
+edzőVÁLTÁS maradt ki az elvből.
+
+**A próba mind a hét filozófus-edzőt végigméri**, és ezzel egy aszimmetriát is
+kimond: a „main taktika" HATNÁL a saját első kedvencük, DÁRDAINÁL viszont a
+HARMADIK. Nála a kivétel és az alapérték szétválik — a Hosszú labdák 95-ön
+megmarad (pedig az ő alapja ott 70), a Kontra viszont 99-ről 80-ra esik. A
+kettő nem csúszhat össze, ezért külön ág méri.
+
+Külön állítás a küszöbre: az SZIGORÚAN 80 FÖLÖTT véd (pontosan 80-on nincs mit
+megvédeni, az új edző úgyis annyit hozna), és a kódban `TACTIC_START_LIKED[0]`,
+nem beírt szám. Végül: a BEÁLLÍTOTT rendszerhez nem nyúlunk (az a menedzser
+döntése), aki már az edző, ott nincs átrendezés, és a karrier-indítás útja
+betűre változatlan. Részletek: `docs/edzovaltas-es-taktika.md`.
+
+
 
 
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
@@ -1054,7 +1080,7 @@ magától vált be — menü-gomb nélkül is. Részletek:
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott az 57 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott az 58 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
