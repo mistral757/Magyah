@@ -939,13 +939,148 @@ mezőnyt már nem kap), a két indulásmód különbsége, hogy a NEM-ág és az
 egyjátékos út változatlan, és hogy egy „nem" továbbra is kizárja a közös
 tornát. Részletek: `docs/nyari-kupa-solo.md`.
 
+## pvp-ertesites-proba.js — 💬 játékon belüli értesítés a társnak
+
+```
+node tools/pvp-ertesites-proba.js
+```
+
+22 állítás a 3.9.73-as csatornáról: ha a társad ONLINE, tíz hangulatjel közül
+eggyel szólhatsz neki, és nála felül beugrik egy klasszikus lebegő értesítés.
+
+**Két oldalt mér külön.** A küldőnél a tíz jelet, a kaput (csak online
+társnál, saját fékkel) és azt, hogy a csík a 🔔 bökés ELLENKEZŐ esetében
+jelenik meg — a kettő sosem látszik együtt. A fogadónál a sáv beugrását (felül,
+fixen, becsúszva), a három műveletet (ugrás · bezárás · 15 perces némítás,
+ami túléli az újratöltést), és hogy sem a saját, sem a régi, sem a már látott
+jelzés nem ugrik be.
+
+**Külön ág a CSATORNA, és ez a legfontosabb állítása.** A jelzés a `h2h` ág
+alá megy, nem a `players/$pid` alá: az utóbbi szabálya `$other:false`, tehát
+oda új mezőt írni csak frissített, KÖZZÉTETT szabályfájllal lehetne — a ház
+visszatérő néma hibája. A próba a `tools/firebase-rules.json`-ből ellenőrzi,
+hogy a választott út a MA élő szabályokkal is járható, tehát egy későbbi
+szabály-átrendezés nem tudja némán elrontani. Részletek:
+`docs/pvp-jatekbeli-ertesites.md`.
+
+## rettenet-meccs-proba.js — ☠️ győzelem erősebb ellen + a meccs mérlege
+
+```
+node tools/rettenet-meccs-proba.js
+```
+
+15 állítás a 3.9.74-es tételről: a nyers erőben erősebb csapat legyőzése is
+rettenetet fizet, a klasszikus óriásölésnél pedig a MECCSEN KAPHATÓ TELJES
+pontot.
+
+**A gerince a „mindegy, milyen eseményekre kapott még pontot" állítás**:
+óriásölésnél a meccs pontosan a plafont fizeti — üresen is, és tizenkét
+eseménnyel is. A skála másik vége ugyanilyen fontos: vereségnél, döntetlennél
+és gyengébb ellenfélnél NULLA.
+
+Külön ág a feed: minden HANGOS tétel saját sort kap közvetlenül az esemény
+után, a néma tételek (védekező villanás, kezdőrúgáskori fölény) viszont nem —
+azokból tucatnyi van meccsenként —, és a meccs végi összesítő az egyetlen
+hely, ahol a mérleg teljes (tételes bontás + a plafon szerepe mindkét
+irányban).
+
+**És egy ág a BETÖLTÉSRŐL.** A tétel küszöbe az óriásölésé (`MS_GIANT_GAP`),
+ami a fájlban negyvenezer sorral lejjebb születik meg: egy modul-szintű
+`const` ott a saját TDZ-jébe futna, és megállítaná a teljes script
+betöltését — se a `node --check`, se a no-undef nem látja. A próba méri, hogy
+a küszöb hoistolódó függvényen át jön, és egyezik a `MS_GIANT_GAP`-pal.
+Részletek: `docs/panzer-felelem-es-rettenet.md`.
+
+## varakozo-kepernyo-proba.js — ⏳ a várakozó képernyők nyelve
+
+```
+node tools/varakozo-kepernyo-proba.js
+```
+
+18 állítás a 3.9.75-ös rendbetételről: a PvP „tempó" sebességgé lett (Laza ·
+Tempós · Villám), a lágy kiút felirata nem vált személyt mondat közben, a
+kezdőlap-gomb kimondja, hogy a keret MENTVE, és az apró betűs rész egy
+ℹ️ Részletek gomb mögé került.
+
+**A legfontosabb állítása FORRÁS-SZINTŰ**: egyetlen `h2hWaitShow`-hívásban se
+maradjon `<small>`. A DOM-ból ezt nem lehet megmérni (mind a huszonöt hívás
+más folyamat mélyén ül), a forrásból viszont igen — így egy később hozzáadott
+képernyő sem csúszhat vissza a régi mintába.
+
+**A színekre külön ág van, és valódi hibát fogott meg.** Az infó-doboz első
+változata téma-változókat használt, csakhogy ez a réteg MINDIG sötét
+(`#h2hWait` háttere `rgba(20,18,15,.95)`): világos témában az `--ink` majdnem
+fekete, vagyis a kiemelt szöveg eltűnt volna. A próba mindkét témában megméri
+a tényleges színeket, és állítja, hogy a doboz stílusában egyetlen
+téma-változó sincs.
+
+A fokozat-nevekre a mérce az ÖNÁLLÓ „tempó" szó: a „Tempós sebesség" jó, a
+„Tempós tempó" nem — a próba regexe ezt a kettőt megkülönbözteti. Részletek:
+`docs/varakozo-kepernyok.md`.
+
+## boost-kozpont-proba.js — ⚡ minden boost egy helyen
+
+```
+node tools/boost-kozpont-proba.js
+```
+
+17 állítás a 3.9.76-os egyesítésről: az ifi- és az öreg-boost saját HUB-gombja
+és a „Kihívás-jutalmak" almenü megszűnt, mindkettő a Boost-központ egy-egy
+sora lett, és a kihívás-jutalom ott, a katalógus árában látszik (INGYEN).
+
+**A legfontosabb ága a RÉGI HIBÁT méri.** Két külön „ingyen boost" jutalom
+létezett: a fajtánkénti (`chFreeBoost`) hatott a katalógus árára, az általános
+(`boostTokens`) viszont NEM — annak saját menüpontja és saját képernyője volt,
+ahol ingyen ment, miközben a Boost-központ ugyanazt teljes áron kínálta.
+Ugyanaz a jutalom két úton, két árral. A próba mindkét zsetont megméri, és azt
+is, hogy a szűkebb (fajtánkénti) fogy előbb.
+
+**Külön állítás az ifi-boost árára**, mert az egy önálló hiba volt: a
+`youthBoostPrice()` a nyers egységárat adta, megkerülve a `boostPriceOf`-ot —
+így a fajtánkénti zseton a katalógusban 0 Ft-ot mutatott, az ifi-panel viszont
+teljes árat kért. A próba állítja, hogy a két szám mostantól egyezik.
+
+A többi ág: a menüből eltűnt elemek hiánya, hogy a katalógus sora a saját
+paneljét nyitja (azoknak saját jelölt-logikájuk van), hogy a fizetős sorok
+továbbra is árat mutatnak, és hogy az „ingyen igazolás" zseton a vételi úton
+magától vált be — menü-gomb nélkül is. Részletek:
+`docs/boost-kozpont-egyesites.md`.
+
+## edzovaltas-taktika-proba.js — 🎩 az új edző a saját ismertségéről indul
+
+```
+node tools/edzovaltas-taktika-proba.js
+```
+
+17 állítás a 3.9.77-es javításról. A bejelentés KÉRDÉS volt („a saját
+ismertségéről indítja, vagy onnan folytatja, ahol az előző edző szintje
+volt?"), és a válasz az lett, hogy ONNAN FOLYTATTA: a `styleCoachTakeOver`
+csak az edző-objektumot cserélte, az `S.tactics.levels`-hez hozzá sem nyúlt.
+A karrier-INDÍTÁSNÁL ugyanez mindig helyes volt (`initTacticsForCoach`) — az
+edzőVÁLTÁS maradt ki az elvből.
+
+**A próba mind a hét filozófus-edzőt végigméri**, és ezzel egy aszimmetriát is
+kimond: a „main taktika" HATNÁL a saját első kedvencük, DÁRDAINÁL viszont a
+HARMADIK. Nála a kivétel és az alapérték szétválik — a Hosszú labdák 95-ön
+megmarad (pedig az ő alapja ott 70), a Kontra viszont 99-ről 80-ra esik. A
+kettő nem csúszhat össze, ezért külön ág méri.
+
+Külön állítás a küszöbre: az SZIGORÚAN 80 FÖLÖTT véd (pontosan 80-on nincs mit
+megvédeni, az új edző úgyis annyit hozna), és a kódban `TACTIC_START_LIKED[0]`,
+nem beírt szám. Végül: a BEÁLLÍTOTT rendszerhez nem nyúlunk (az a menedzser
+döntése), aki már az edző, ott nincs átrendezés, és a karrier-indítás útja
+betűre változatlan. Részletek: `docs/edzovaltas-es-taktika.md`.
+
+
+
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott az 53 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott az 58 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
