@@ -991,13 +991,41 @@ betöltését — se a `node --check`, se a no-undef nem látja. A próba méri,
 a küszöb hoistolódó függvényen át jön, és egyezik a `MS_GIANT_GAP`-pal.
 Részletek: `docs/panzer-felelem-es-rettenet.md`.
 
+## varakozo-kepernyo-proba.js — ⏳ a várakozó képernyők nyelve
+
+```
+node tools/varakozo-kepernyo-proba.js
+```
+
+18 állítás a 3.9.75-ös rendbetételről: a PvP „tempó" sebességgé lett (Laza ·
+Tempós · Villám), a lágy kiút felirata nem vált személyt mondat közben, a
+kezdőlap-gomb kimondja, hogy a keret MENTVE, és az apró betűs rész egy
+ℹ️ Részletek gomb mögé került.
+
+**A legfontosabb állítása FORRÁS-SZINTŰ**: egyetlen `h2hWaitShow`-hívásban se
+maradjon `<small>`. A DOM-ból ezt nem lehet megmérni (mind a huszonöt hívás
+más folyamat mélyén ül), a forrásból viszont igen — így egy később hozzáadott
+képernyő sem csúszhat vissza a régi mintába.
+
+**A színekre külön ág van, és valódi hibát fogott meg.** Az infó-doboz első
+változata téma-változókat használt, csakhogy ez a réteg MINDIG sötét
+(`#h2hWait` háttere `rgba(20,18,15,.95)`): világos témában az `--ink` majdnem
+fekete, vagyis a kiemelt szöveg eltűnt volna. A próba mindkét témában megméri
+a tényleges színeket, és állítja, hogy a doboz stílusában egyetlen
+téma-változó sincs.
+
+A fokozat-nevekre a mérce az ÖNÁLLÓ „tempó" szó: a „Tempós sebesség" jó, a
+„Tempós tempó" nem — a próba regexe ezt a kettőt megkülönbözteti. Részletek:
+`docs/varakozo-kepernyok.md`.
+
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott az 55 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott az 56 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
