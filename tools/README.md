@@ -1018,6 +1018,35 @@ A fokozat-nevekre a mérce az ÖNÁLLÓ „tempó" szó: a „Tempós sebesség"
 „Tempós tempó" nem — a próba regexe ezt a kettőt megkülönbözteti. Részletek:
 `docs/varakozo-kepernyok.md`.
 
+## boost-kozpont-proba.js — ⚡ minden boost egy helyen
+
+```
+node tools/boost-kozpont-proba.js
+```
+
+17 állítás a 3.9.76-os egyesítésről: az ifi- és az öreg-boost saját HUB-gombja
+és a „Kihívás-jutalmak" almenü megszűnt, mindkettő a Boost-központ egy-egy
+sora lett, és a kihívás-jutalom ott, a katalógus árában látszik (INGYEN).
+
+**A legfontosabb ága a RÉGI HIBÁT méri.** Két külön „ingyen boost" jutalom
+létezett: a fajtánkénti (`chFreeBoost`) hatott a katalógus árára, az általános
+(`boostTokens`) viszont NEM — annak saját menüpontja és saját képernyője volt,
+ahol ingyen ment, miközben a Boost-központ ugyanazt teljes áron kínálta.
+Ugyanaz a jutalom két úton, két árral. A próba mindkét zsetont megméri, és azt
+is, hogy a szűkebb (fajtánkénti) fogy előbb.
+
+**Külön állítás az ifi-boost árára**, mert az egy önálló hiba volt: a
+`youthBoostPrice()` a nyers egységárat adta, megkerülve a `boostPriceOf`-ot —
+így a fajtánkénti zseton a katalógusban 0 Ft-ot mutatott, az ifi-panel viszont
+teljes árat kért. A próba állítja, hogy a két szám mostantól egyezik.
+
+A többi ág: a menüből eltűnt elemek hiánya, hogy a katalógus sora a saját
+paneljét nyitja (azoknak saját jelölt-logikájuk van), hogy a fizetős sorok
+továbbra is árat mutatnak, és hogy az „ingyen igazolás" zseton a vételi úton
+magától vált be — menü-gomb nélkül is. Részletek:
+`docs/boost-kozpont-egyesites.md`.
+
+
 
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
@@ -1025,7 +1054,7 @@ A fokozat-nevekre a mérce az ÖNÁLLÓ „tempó" szó: a „Tempós sebesség"
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott az 56 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott az 57 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
