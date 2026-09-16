@@ -1249,3 +1249,57 @@ MANUAL.update({
 # ── Dánia 1992 EB ──────────────────────────────────────────────────────────
   "Brian Laudrup":          ("Ládrupp Brián", "Ládrupp"),
 })
+
+
+MANUAL.update({
+# ═══ A 31. KÖTEG DANISÍTÁSA ═══════════════════════════════════════════════
+# A RÖVID ALAK a VEZETÉKNÉV, akkor is, ha két szóból áll (Hám Sík, Járd El,
+# Kér Kéz, Pin-Tó) — ugyanaz a szabály, mint a „Karvaly Jó Dániel"-nél.
+
+# ── Liverpool 2026/27 ──────────────────────────────────────────────────────
+  "Kostas Tsimikas":        ("Cimikás Konstantin", "Cimikás"),
+  # MAGYAR SORRENDŰ NÉV (magyar válogatott): a vezetéknév áll elöl.
+  "Kerkez Milos":           ("Kér Kéz Milliós", "Kér Kéz"),
+  "Giorgi Mamardashvili":   ("Mamár-Dasvili György", "Mamár-Dasvili"),
+  "Ronald Araújo":          ("Áráúzsó Ronáld", "Áráúzsó"),
+
+# ── Napoli 12/13 és 15/16 ──────────────────────────────────────────────────
+  "Marek Hamšík":           ("Hám Sík Márk", "Hám Sík"),
+  "Kalidou Koulibaly":      ("Kúlibali Kalidú", "Kúlibali"),
+  # R2 — a név JELENT valamit: „dries" = szárít.
+  "Dries Mertens":          ("Mertensz Megszárít", "Mertensz"),
+  "José Callejón":          ("Kaljehón József", "Kaljehón"),
+
+# ── Liverpool 2013/14 ──────────────────────────────────────────────────────
+  "Daniel Sturridge":       ("Sztáridzs Dániel", "Sztáridzs"),
+  "Simon Mignolet":         ("Minyolé Simon", "Minyolé"),
+
+# ── Tottenham 2010/11 és West Ham 2005/06 ─────────────────────────────────
+  "Rafael van der Vaart":   ("Fanderfing Rafael", "Fanderfing"),
+  "Nigel Reo-Coker":        ("Rejó-Kokker Nájdzsel", "Rejó-Kokker"),
+
+# ── Newcastle 1993/94 ──────────────────────────────────────────────────────
+  "Pavel Srníček":          ("Szrnícsek Pál", "Szrnícsek"),
+
+# ── Anglia 1996 EB ─────────────────────────────────────────────────────────
+  "Tony Adams":             ("Ádamosi Tóni", "Ádamosi"),
+  "Stuart Pearce":          ("Bírsz Sztyuárt", "Bírsz"),
+  # R2 — Seaman = sea man = tengerész/tengerember.
+  "David Seaman":           ("Tengerember Dávid", "Tengerember"),
+  # R2 — Anderton = an-other-ton → „másik tonhal".
+  "Darren Anderton":        ("Másiktonhal Dorián", "Másiktonhal"),
+
+# ── Németország 1974 VB ────────────────────────────────────────────────────
+  "Hans-Georg Schwarzenbeck": ("Svarcenbekk János-György", "Svarcenbekk"),
+  "Wolfgang Overath":       ("Óverát Farkas", "Óverát"),
+  "Bernd Hölzenbein":       ("Hölszenbájn Bernát", "Hölszenbájn"),
+
+# ── Sporting CP 2002/03 ────────────────────────────────────────────────────
+  "Mário Jardel":           ("Járd El Márió", "Járd El"),
+  "Hugo Viana":             ("Vájáná Hugó", "Vájáná"),
+  # A KÉT PINTO. A vezetéknevük SZÁNDÉKOSAN azonos — ők ketten tényleg
+  # névrokonok. A rövid alak ezért ütközik, és épp ezért JÓ: az ütközés-feloldó
+  # mindkettőt TELJES néven küldi ki, tehát a képernyőn sosem keverhetők össze.
+  "João Manuel Pinto":      ("Pin-Tó János", "Pin-Tó"),
+  "Ricardo Sá Pinto":       ("Pin-Tó SzaRikárd", "Pin-Tó"),
+})

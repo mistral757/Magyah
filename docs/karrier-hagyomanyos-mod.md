@@ -247,12 +247,12 @@ azaz a hirdetett −1,4-es rés valóban teljesül.
 `node tools/pyramid-sim.js bands`:
 
 ```
-klub-szezon: 344 · egyedi klub: 194 · sáv: 71,1 … 88,0
+klub-szezon: 350 · egyedi klub: 194 · sáv: 71,1 … 88,0
 
 csapat/oszt |  teljes sáv  | D1        | D2        | D3        | D4        | D5        | D6
-         16 | 79,8…88,0    | 85,5-88,0 | 83,3-85,1 | 82,1-83,0 | 81,5-82,0 | 80,4-81,5 | 79,8-80,3
-         15 | 79,9…88,0    | 85,6-88,0 | 83,4-85,5 | 82,5-83,3 | 81,7-82,5 | 80,5-81,6 | 79,9-80,5
-         12 | 80,7…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,8 | 81,7-82,0 | 80,7-81,6
+         16 | 79,9…88,0    | 85,5-88,0 | 83,3-85,1 | 82,1-83,0 | 81,5-82,0 | 80,5-81,5 | 79,9-80,4
+         15 | 80,0…88,0    | 85,6-88,0 | 83,4-85,5 | 82,5-83,3 | 81,7-82,5 | 80,5-81,6 | 80,0-80,5
+         12 | 80,8…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,8 | 81,7-82,0 | 80,8-81,6
 ```
 
 **A tervezett 71–91-es piramis nyers Ratingekből NEM építhető meg.** A 90
@@ -284,7 +284,12 @@ mezőny FELSŐ közepét sűríti: a Milan 2004/05 (86,5), a Real Madrid 2021/22
 90 közé esik. A hatás mégis egyetlen szám: a D2 alsó széle 83,0-ról 83,3-ra
 jött fel (16 csapat/osztály). A D1 alja (85,5), a tető (88,0) és a legjobb 90
 sávszélessége (8,1) NEM mozdult, a teljes medián pedig 80,64-ről 80,77-re —
-ennyit visz tizenkét, zömmel elit keret 344-ből. Tehát két szomszédos osztály
+ennyit visz tizenkét, zömmel elit keret 344-ből.
+
+A 32. KÖTEG (hat keret a név szerint kért játékosokhoz) a mezőny KÖZEPÉN és
+alatta ül (78,9-től 83,9-ig), tehát a mediánt megint nem mozdította (80,77,
+most 350 keret). A sávtáblából csak a LEGALSÓ osztály szélei csúsztak egy
+tizedet feljebb (79,8 → 79,9). Tehát két szomszédos osztály
 közé csak ~1,5–2 pont jut — nem 2-pontos lépcső 8 pont széles sávokkal, ahogy
 a terv szólt, hanem 1,5-es lépcső 2 pont széles sávokkal. Ráadásul **88 fölött egyetlen csapat sincs**: a legerősebb a
 Barcelona 2010/11 (88,0), és mindössze két klub éri el a 87-et.
