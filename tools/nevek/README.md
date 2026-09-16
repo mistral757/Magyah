@@ -12,6 +12,7 @@ jelenne meg — pontosan az, amit a magyarítás el akar kerülni.
 
 ```bash
 python3 tools/nevek/build.py      # beolvassa az index.html-t és felül is írja
+python3 tools/nevek/kettozes.py   # ugyanaz az ember két néven? (lásd lentebb)
 ./tools/check.sh                  # utána mindig
 ```
 
@@ -65,6 +66,31 @@ után is megmarad.
 - trágár alak szűrése (a fonetika `Fazio`-ból „Faszio"-t csinált).
 
 Ha a build panaszkodik, a javítás helye a `manual.py`.
+
+## kettozes.py — ugyanaz az ember két néven
+
+```bash
+python3 tools/nevek/kettozes.py      # kilépési kód 1, ha talált
+```
+
+**Új köteg után ezt is futtasd, a build.py mellett.** Az adatbázisban egy valódi
+ember több klub-szezonban is szerepel — ez szándékos, és a karrier-regiszter a
+NÉVRE kulcsolva fűzi őket egyetlen személlyé. Ha viszont ugyanaz az ember KÉT
+kanonikus néven kerül be, a regiszter két külön embernek látja: két POT, két kor,
+két karrier, és egyszerre lehet mindkettő a keretedben.
+
+**A build.py ezt nem fogja meg.** Az azt nézi, hogy két különböző kanonikus név
+ne kapjon azonos magyar nevet; itt fordítva történik: a két írásmód két
+KÜLÖNBÖZŐ magyar nevet kap, tehát a build elégedett. Így került be az adatbázisba
+egyszerre `Andrij Sevcsenko` (Milan 2002/03) és `Andriy Shevchenko` (Chelsea
+2006/07) — és ugyanígy `Miodrag Belodedici`/`Belodedić`, `Edmílson`/`Édmilson`,
+`Alejandro Gómez`/`Papu Gómez`. Mind a négy egy-egy ember volt.
+
+A szkript azonos **születési év + nemzetiség + hangzásra egyező vezetéknév**
+hármasra keres (a vezetéknév helyét a nemzetiség dönti: magyar névnél elöl).
+Az ismert, valódi névrokonok — ikrek és azonos évjáratú névtársak — a fájl
+`NEVROKON` listájában állnak, indoklással. Új ilyet oda kell felvenni, hogy a
+szkript tiszta maradjon: egy zajos háló ugyanannyit ér, mint a semmi.
 
 ## leak.js — a végponti próba
 

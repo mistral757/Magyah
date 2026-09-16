@@ -987,14 +987,17 @@ MANUAL.update({
   "Xherdan Shaqiri": ("Zserdány Zsagiri", "Zserdány Zsagiri"),
   "Yohan Cabaye": ("Kabáj Tas", "Kabáj"),
   "Ze Roberto": ("iZé Robi", "iZé"),
-  "Édmilson": ("Édmílsonka", "Édmílsonka"),
+  "Edmílson": ("Édmílsonka", "Édmílsonka"),
   "Alan Shearer": ("Sír E. A. Lány", "Sírealány"),
   "Alessandro Costacurta": ("Aztakurva Sándor", "Aztakurva"),
   "Alessandro Nesta": ("Nesztea Sándor", "Nesztea"),
   "Alexis Mac Allister": ("Makelliszter Sándor", "Makelliszter"),
   "Alfredo Di Stéfano": ("Disztefános Alfréd", "Distefános"),
   "Alisson Becker": ("Aluszékony Bekker", "Aluszékony"),
-  "Andrij Sevcsenko": ("Sebcselló Bandi", "Sebcselló"),
+  # EGY EMBER, EGY KULCS (3.9.81): a 29. köteg Chelsea-kártyája is ide
+  # mutat. A „Sebcselló Andris" a frissen kapott alak — a korábbi
+  # „Sebcselló Bandi" ugyanerre a személyre szólt.
+  "Andrij Sevcsenko": ("Sebcselló Andris", "Sebcselló"),
   "Andrés Iniesta": ("Ínyenc Pista Bandi", "Ínyenc Pista"),
   "Batistuta": ("ifj. Bátyuska", "ifj. Bátyuska"),
   "Bebeto": ("Baba-tó", "Baba-tó"),
@@ -1135,4 +1138,82 @@ MANUAL.update({
   "Gervinho": ("Zservinyó", "Zservinyó"),
   "Joelinton": ("Zsoelintonka", "Zsoelintonka"),
   "Piazza": ("Piactér", "Piactér"),
+})
+
+
+MANUAL.update({
+# ═══ A 29. KÖTEG DANISÍTÁSA — kézi nevek a hiányzó csúcsformák kereteihez ═══
+# A köteg 40 új nevet hozott (Juventus 97/98, Liverpool 04/05, Chelsea 06/07,
+# Inter 08/09, Ajax 86/87, Dortmund 20/21, Manchester City 10/11). Ezek a
+# projektgazda kézi átiratai — a szabálymotor gépi alakja helyett.
+#
+# A RÖVID ALAK a VEZETÉKNÉV, akkor is, ha az több szóból áll („Karvaly Jó
+# Dániel" → „Karvaly Jó" mintájára). Ahol a vezetéknévben kezdőbetű is van,
+# a rövid alak elhagyja („Dínótál E. Antal" → „Dínótál"), KIVÉVE ha épp a
+# kezdőbetű hordozza a poént.
+
+# ── Liverpool 2004/05 — Isztambul ──────────────────────────────────────────
+  "Jerzy Dudek":            ("Dudika Dzserzi", "Dudika"),
+  "Sami Hyypiä":            ("Hippija Samu", "Hippija"),
+  "Steve Finnan":           ("Finnyás Sztivi", "Finnyás"),
+  "Djimi Traoré":           ("Trajoré Jim", "Trajoré"),
+  "John Arne Riise":        ("Ríííze János", "Ríííze"),
+  "Milan Baroš":            ("Balos Milán", "Balos"),
+  "Djibril Cissé":          ("Szisszé Dzsibrill", "Szisszé"),
+  "Harry Kewell":           ("Kjúúl Bálint", "Kjúúl"),
+  # A Josemi EGYNEVŰ — a rövid alak ugyanaz, mint a teljes.
+  "Josemi":                 ("Józsimi", "Józsimi"),
+
+# ── Chelsea 2006/07 — Drogba 33 gólos idénye ───────────────────────────────
+  "John Obi Mikel":         ("Mikell Obiból János", "Mikell Obiból"),
+  # KÖTŐJELES VEZETÉKNÉV: a kötőjeles egész a vezetéknév (R4), tehát a rövid
+  # alak is az marad — a gépi „Filjips János" a Wright felét egyszerűen
+  # eldobta volna.
+  "Shaun Wright-Phillips":  ("Vrájt-Filipszilonos János", "Vrájt-Filipszilonos"),
+  "Khalid Boulahrouz":      ("Búlahrúz Bertalan", "Búlahrúz"),
+
+# ── Juventus 1997/98 — Zidane és Inzaghi egy kártyán ───────────────────────
+  "Mark Iuliano":           ("Júlianő Márk", "Júlianő"),
+  "Alessandro Birindelli":  ("Birindelji Sándor", "Birindelji"),
+  "Nicola Amoruso":         ("Ámorűző Miklós", "Ámorűző"),
+
+# ── AFC Ajax 1986/87 — KEK, van Basten 31 góllal ───────────────────────────
+  "Stanley Menzo":          ("Mendzó Levente", "Mendzó"),
+  "Sonny Silooy":           ("Silúi Soma", "Silúi"),
+  "Ronald Spelbos":         ("Spélbos Ronáld", "Spélbos"),
+  "Jan Wouters":            ("Vúters János", "Vúters"),
+  "Rob Witschge":           ("Vicsge Robi", "Vicsge"),
+  # Az aposztróf a vezetéknév része marad (van 't Schip → Fan'csip).
+  "John van 't Schip":      ("Fan\'csip János", "Fan\'csip"),
+  # R2 — a név JELENT valamit: Bosman = „főnök-ember".
+  "John Bosman":            ("Főnökember János", "Főnökember"),
+
+# ── Borussia Dortmund 2020/21 — Haaland 41 gólja ───────────────────────────
+  "Roman Bürki":            ("Bürkí Román", "Bürkí"),
+  # A poén a kezdőbetűvel EGYÜTT áll össze („viccel az Axel"), ezért a rövid
+  # alak itt csak a vezetéknév — az „A. Xszel" a keresztnév.
+  "Axel Witsel":            ("Viccel A. Xszel", "Viccel"),
+  "Thomas Delaney":         ("Deláni Tamás", "Deláni"),
+  "Julian Brandt":          ("Brándt Gyula", "Brándt"),
+  "Giovanni Reyna":         ("Rejna János", "Rejna"),
+  "Jadon Sancho":           ("Száncsók Dzsédön", "Száncsók"),
+  "Thorgan Hazard":         ("Házard Torgyán", "Házard"),
+
+# ── Manchester City 2010/11 — Tévez gólkirályi idénye ──────────────────────
+  # R2 — Hart = szív.
+  "Joe Hart":               ("Szív Dzsó", "Szív"),
+  "Micah Richards":         ("Ricsardsz Miká", "Ricsardsz"),
+  # A teljes vezetéknév maga a poén („zabál e tán?"), ezért a rövid alak sem
+  # vághatja le a kezdőbetűt — ugyanaz a kivétel, mint az „Albi Átiratás"-nál.
+  "Pablo Zabaleta":         ("Zabál E. Tán Pabló", "Zabál E. Tán"),
+  "Joleon Lescott":         ("Leszokott Dzsóleon", "Leszokott"),
+  "Nigel de Jong":          ("Déjó N. G. Nájdzsel", "Déjó"),
+  "Gareth Barry":           ("Barika Geret", "Barika"),
+  "James Milner":           ("Mílner Jakab", "Mílner"),
+
+# ── És két régi adós, akinek eddig csak gépi neve volt ─────────────────────
+  "Vincent Kompany":        ("Koppány Vince", "Koppány"),
+  # NYUGATOS SORREND: itt a keresztnév áll elöl (Jaja = Yaya), tehát a rövid
+  # alak az UTOLSÓ tag — a kezdőbetűvel együtt, mert az a poén fele.
+  "Yaya Touré":             ("Jaja Túr É.", "Túr É."),
 })
