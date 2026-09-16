@@ -247,11 +247,11 @@ azaz a hirdetett −1,4-es rés valóban teljesül.
 `node tools/pyramid-sim.js bands`:
 
 ```
-klub-szezon: 319 · egyedi klub: 192 · sáv: 71,1 … 88,0
+klub-szezon: 326 · egyedi klub: 192 · sáv: 71,1 … 88,0
 
 csapat/oszt |  teljes sáv  | D1        | D2        | D3        | D4        | D5        | D6
-         16 | 79,6…88,0    | 85,1-88,0 | 83,0-85,0 | 82,1-83,0 | 81,5-82,0 | 80,3-81,5 | 79,6-80,3
-         15 | 79,9…88,0    | 85,5-88,0 | 83,4-85,1 | 82,5-83,3 | 81,7-82,5 | 80,5-81,6 | 79,9-80,5
+         16 | 79,6…88,0    | 85,5-88,0 | 83,0-85,1 | 82,1-83,0 | 81,5-82,0 | 80,3-81,5 | 79,6-80,3
+         15 | 79,9…88,0    | 85,6-88,0 | 83,4-85,5 | 82,5-83,3 | 81,7-82,5 | 80,5-81,6 | 79,9-80,5
          12 | 80,6…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,7 | 81,7-82,0 | 80,6-81,6
 ```
 
@@ -262,7 +262,16 @@ volt a 90-es sáv (76,7 … 88,0), a 10. köteg után 9,8, a 11-12. köteg után
 a 13. után 9,3, a 14-15. köteg után 8,7, a topliga-kötegek (16-26.) után 8,1.
 A 27. és a 28. köteg ezen érdemben nem változtatott (8,1): a sáv a legjobb 90
 klubból számol, és a két köteg tizennégy keretéből egy sem éri el azt — a
-bővítés a MEZŐNYT sűríti, a tetőt nem emeli. Tehát két szomszédos osztály
+bővítés a MEZŐNYT sűríti, a tetőt nem emeli.
+
+A 29. KÖTEG AZ ELSŐ, AMELYIK BELENYÚL — és csak a D1 alsó szélébe. A hét új
+keret a nyolc kért játékos csúcsidénye, tehát definíció szerint elit: a
+Chelsea 06/07 (85,7) és a Juventus 97/98 (84,1) beér a legjobb 90 közé, és az
+élmezőnyt sűríti. A D1 alja ezért 85,1-ről 85,5-re jött fel (16 csapat / osztály
+esetén), a D2 teteje 85,0-ről 85,1-re — a TETŐ viszont maradt 88,0, mert a
+kötegben nincs 88-as keret, és a legjobb 90 sávszélessége is 8,1 maradt.
+A teljes adatbázis medián top11-e SEM mozdult: 80,64 → 80,64 (326 keret).
+Tehát két szomszédos osztály
 közé csak ~1,5–2 pont jut — nem 2-pontos lépcső 8 pont széles sávokkal, ahogy
 a terv szólt, hanem 1,5-es lépcső 2 pont széles sávokkal. Ráadásul **88 fölött egyetlen csapat sincs**: a legerősebb a
 Barcelona 2010/11 (88,0), és mindössze két klub éri el a 87-et.
