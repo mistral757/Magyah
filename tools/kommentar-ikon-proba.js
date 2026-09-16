@@ -43,7 +43,10 @@ function sablonok(){
     const arr=blokk(s,m.index+m[0].length-1,'[',']');
     let k;lit.lastIndex=0;
     while((k=lit.exec(arr))){const t=tisztit(k[1]);if(t.length>8)ki.push(t);}}
-  const PERC=/addLine\(\s*`\$\{(?:t|gminTxt\([^)]*\)|minTxt|sbMinTxt\([^)]*\)|emin|e\.min)\}/;
+  /* A PERC-BÉLYEG ALAKJAI. A gminNewTxt a 3.9.78-cal jött (egy ÚJ esemény
+     perce) — nélküle a VAR, a tizenegyes és az összecsapás sorai kiestek a
+     gyűjtésből, és a próba üres kategóriákat jelentett. */
+  const PERC=/addLine\(\s*`\$\{(?:t|gminTxt\([^)]*\)|gminNewTxt\([^)]*\)|minTxt|sbMinTxt\([^)]*\)|emin|e\.min)\}/;
   const al=/addLine\(/g;
   while((m=al.exec(s))){
     const call=blokk(s,m.index+m[0].length-1,'(',')');

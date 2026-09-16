@@ -247,12 +247,12 @@ azaz a hirdetett −1,4-es rés valóban teljesül.
 `node tools/pyramid-sim.js bands`:
 
 ```
-klub-szezon: 319 · egyedi klub: 192 · sáv: 71,1 … 88,0
+klub-szezon: 350 · egyedi klub: 194 · sáv: 71,1 … 88,0
 
 csapat/oszt |  teljes sáv  | D1        | D2        | D3        | D4        | D5        | D6
-         16 | 79,6…88,0    | 85,1-88,0 | 83,0-85,0 | 82,1-83,0 | 81,5-82,0 | 80,3-81,5 | 79,6-80,3
-         15 | 79,9…88,0    | 85,5-88,0 | 83,4-85,1 | 82,5-83,3 | 81,7-82,5 | 80,5-81,6 | 79,9-80,5
-         12 | 80,6…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,7 | 81,7-82,0 | 80,6-81,6
+         16 | 79,9…88,0    | 85,5-88,0 | 83,3-85,1 | 82,1-83,0 | 81,5-82,0 | 80,5-81,5 | 79,9-80,4
+         15 | 80,0…88,0    | 85,6-88,0 | 83,4-85,5 | 82,5-83,3 | 81,7-82,5 | 80,5-81,6 | 80,0-80,5
+         12 | 80,8…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,8 | 81,7-82,0 | 80,8-81,6
 ```
 
 **A tervezett 71–91-es piramis nyers Ratingekből NEM építhető meg.** A 90
@@ -262,7 +262,34 @@ volt a 90-es sáv (76,7 … 88,0), a 10. köteg után 9,8, a 11-12. köteg után
 a 13. után 9,3, a 14-15. köteg után 8,7, a topliga-kötegek (16-26.) után 8,1.
 A 27. és a 28. köteg ezen érdemben nem változtatott (8,1): a sáv a legjobb 90
 klubból számol, és a két köteg tizennégy keretéből egy sem éri el azt — a
-bővítés a MEZŐNYT sűríti, a tetőt nem emeli. Tehát két szomszédos osztály
+bővítés a MEZŐNYT sűríti, a tetőt nem emeli.
+
+A 29. KÖTEG AZ ELSŐ, AMELYIK BELENYÚL — és csak a D1 alsó szélébe. A hét új
+keret a nyolc kért játékos csúcsidénye, tehát definíció szerint elit: a
+Chelsea 06/07 (85,7) és a Juventus 97/98 (84,1) beér a legjobb 90 közé, és az
+élmezőnyt sűríti. A D1 alja ezért 85,1-ről 85,5-re jött fel (16 csapat / osztály
+esetén), a D2 teteje 85,0-ről 85,1-re — a TETŐ viszont maradt 88,0, mert a
+kötegben nincs 88-as keret, és a legjobb 90 sávszélessége is 8,1 maradt.
+A teljes adatbázis medián top11-e SEM mozdult: 80,64 → 80,64 (326 keret).
+
+A 30. KÖTEG (hat keret: Milan 50/51, Blackpool 52/53, Feyenoord 69/70, Dinamo
+Kijev 74/75, Dánia 1992, Argentína 1978) szintén a mezőny alá-körül esik
+(79,5-től 82,7-ig), a mediánt megint nem mozdította (80,64, most 332 keret), és
+a D1 sem mozdult — csak a legalsó osztály alsó széle jött fel 79,6-ról 79,8-ra,
+mert a köteg legyengébb kerete is 79,5 fölött van.
+
+A 31. KÖTEG (tizenkét keret a név szerint kért játékosokhoz) az első, amelyik a
+mezőny FELSŐ közepét sűríti: a Milan 2004/05 (86,5), a Real Madrid 2021/22
+(85,8), a Németország 1974 (85,5) és a mostani Liverpool (85,2) mind a legjobb
+90 közé esik. A hatás mégis egyetlen szám: a D2 alsó széle 83,0-ról 83,3-ra
+jött fel (16 csapat/osztály). A D1 alja (85,5), a tető (88,0) és a legjobb 90
+sávszélessége (8,1) NEM mozdult, a teljes medián pedig 80,64-ről 80,77-re —
+ennyit visz tizenkét, zömmel elit keret 344-ből.
+
+A 32. KÖTEG (hat keret a név szerint kért játékosokhoz) a mezőny KÖZEPÉN és
+alatta ül (78,9-től 83,9-ig), tehát a mediánt megint nem mozdította (80,77,
+most 350 keret). A sávtáblából csak a LEGALSÓ osztály szélei csúsztak egy
+tizedet feljebb (79,8 → 79,9). Tehát két szomszédos osztály
 közé csak ~1,5–2 pont jut — nem 2-pontos lépcső 8 pont széles sávokkal, ahogy
 a terv szólt, hanem 1,5-es lépcső 2 pont széles sávokkal. Ráadásul **88 fölött egyetlen csapat sincs**: a legerősebb a
 Barcelona 2010/11 (88,0), és mindössze két klub éri el a 87-et.

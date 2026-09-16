@@ -47,6 +47,9 @@ KLUBOK = {
 "Arsenal FC":("Ágyúgyár eFCé", "ÁGY"),
 "Aston Villa":("Asztalon Villany", "AVI"),
 "Blackburn Rovers":("Feketénégő Portyázók", "FEK"),
+# A LIVERPOOL POÉNJÁNAK A PÁRJA: „Liverpool" = máj + pocsolya → Májpocsolya;
+# a „Blackpool" ugyanannak a szónak a másik fele, tehát Feketepocsolya.
+"Blackpool FC":("Feketepocsolya eFCé", "BLK"),
 "Bolton Wanderers":        ("Boltos Vándorok", "BLT"),
 "Brighton & Hove Albion":("Fényesparti Albiológusok", "FÉN"),
 "Burnley FC":("Bürnli eFCé", "BÜR"),

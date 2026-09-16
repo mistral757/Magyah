@@ -1074,13 +1074,134 @@ betűre változatlan. Részletek: `docs/edzovaltas-es-taktika.md`.
 
 
 
+## percbelyeg-proba.js — ⏱ egy esemény, egy perc
+
+```
+node tools/percbelyeg-proba.js
+```
+
+A 3.9.78 mérése. A bejelentés kettős volt: „5-tel osztható percekben vannak
+nagyobb eséllyel az események", és „ugyanabban a percben több esemény is tud
+lenni, ami a legrosszabb, hogy több gól is". Ugyanaz a sor okozta mindkettőt.
+
+A próba ELŐSZÖR ÚJRAÉPÍTI A RÉGI SZABÁLYT, és a kettőt egymás mellett méri
+4000 vödrön — nem emlékezetből hasonlítunk. A régi `gmin` minden hívásnál új
+percet foglalt egy ötperces vödörből, majd a vödör tetejére csonkolt: három
+hívásnál 50,2% lett 5-tel osztható (a véletlen szintje 20%), és a vödrök
+50,5%-ában ismétlődött egy perc. Az új kódnál ugyanez 23,6% és **0%**.
+
+Amit még mér: hogy a `gmin` MÁR NEM FOGYASZT (húsz hívás egy vödrön belül
+ugyanazt adja — ettől nem csúszik szét a naplósor és a mérföldkő-előtag), hogy
+utána az ESEMÉNY percét adja vissza, hogy öt esemény öt külön, növekvő percet
+kap, hogy az idő SOHA nem lép visszafelé, és hogy a 90 fölötti ág érintetlen
+(a „90+N" továbbra is a ráadás saját eloszlásából jön).
+
+A végén ÉLES MÉRÉS: kész klubbal indít egy ligapiramis-karriert, végigjátszatja
+a 30 fordulót, és a naplóból olvassa vissza a percbélyegeket. Egy idényen
+17,4% lett 5-tel osztható (a vödör ötödik perce a LEGRITKÁBB, nem a
+leggyakoribb), és nulla olyan meccs volt, ahol két gól ugyanabba a percbe
+esett. Részletek: `docs/percbelyeg.md`.
+
+
+## legendas-magyahok-proba.js — 🇭🇺 a magyar boost kapcsolója
+
+```
+node tools/legendas-magyahok-proba.js
+```
+
+A 3.9.80-as kapcsoló mérése. A kérés két hatást mondott ki: a magyar játékosok
+kezdő Ratingje sávosan emelkedik (80 alatt 81-85 közé, 80-85 közt +4…+8, 85
+fölött +3…+6), és a POT-juk padlója 2200 lesz **minden** Rating-alapon.
+
+A próba a sávokat BETŰRE méri, bemenetenként 600 KÜLÖNBÖZŐ névvel — a szórás
+névre seedelt folyamból jön, egyetlen név egyetlen számot adna. Külön állítás a
+determinizmusra (ugyanaz a név ötvenszer ugyanazt adja: közös karrierben a két
+kliensnek bitre egyeznie kell), a Rating-plafonra, és arra, hogy a boost lefelé
+sosem visz.
+
+A POT-padlót mind a három alapon ellenőrzi (csúcs, szezon, lutri) EGY valódi
+magyar játékoson, bekapcsolva és kikapcsolva egymás mellett — és arra is, hogy a
+`peak` sosem marad a megemelt Rating alatt (különben a következő szezonváltás a
+kor-görbe mentén visszahúzná).
+
+A KÉSZ KLUB ZÁRJA két állítás: a kapcsoló rejtve van, ÉS a zár akkor sem engedi
+be, ha a localStorage-preferencia bekapcsolva áll — egy beragadt érték így sem
+szivárog át.
+
+Végül egy VALÓDI karrier-pool, ugyanazzal a seeddel, be- és kikapcsolva: a 134
+magyar minimum Ratingje 56 → 81, a minimum POT 210 → 2200, az átlag 75,5 → 88,5
+— miközben a mezőny másik 3338 játékosa betűre változatlan. Részletek:
+`docs/legendas-magyahok.md`.
+
+
+## panzer-lap-proba.js — 🃏 a lap épít, nem rombol
+
+```
+node tools/panzer-lap-proba.js
+```
+
+A 3.9.85-ös fordítás mérése. A bejelentett ellentmondás az volt, hogy a Panzer
+egész gazdasága a lapokból él (rettenet-pont, `pz_ycall`, `pz_ycmatch`,
+`pz_redwinN`), miközben ugyanaz a lap a másik oldalon a FORMÁT húzta le.
+
+A büntetés három helyen ült, és a próba mind a hármat külön méri: a
+csillagtétel (`mstatRate` → `parts.red`), a „minősíthetetlen" ítélet
+(`mstatUnratable`, 25. perc előtti piros) és a fegyelmi visszaesés
+(`applyDisciplineDip` → `pOvr` −2). A sárga lapnak eddig SEMMILYEN formahatása
+nem volt — erre külön állítás van, mert ott a Panzernél nulláról indul egy
+pozitív tétel, nem megfordul egy negatív.
+
+A görbe TÜKÖR: hét percen végigmérve a régi tétel mindenütt negatív
+(−2,911 … −1,418), az új mindenütt pozitív (+2,139 … +1,112), és a KORAI lap ér
+a legtöbbet — ahogy a büntetés is a koraiért volt a legnagyobb. A Fordított
+jellem mindkét tételt ugyanazon a lépcsőn feszíti (×1 / ×1,35 / ×1,70 / ×2,10),
+és a filozófia MÁSODLAGOS slotban is számít.
+
+Két állítás a határokra: az öngólból eredő fegyelmi visszaesés Panzerrel is
+−2 marad (az öngól nem lap), és lap nélkül a két filozófia értékelése betűre
+azonos — a fordítás nem szivárog. Részletek: `docs/panzer-lap-epit.md`.
+
+## pvp-parharc-rendszerek-proba.js — ⚔ ami ki volt véve a párharcból
+
+```
+node tools/pvp-parharc-rendszerek-proba.js
+```
+
+A párharc eredményét egy KÖZÖS, seedelt eseménylista adja — ettől látja a két
+játékos bitre ugyanazt a mérkőzést. Ami helyben sorsolódna, az szétvinné a két
+képernyőt, ezért volt kikapcsolva a sárga lap (teljesen), és ezért maradt néma
+a megfélemlítés, az emberhátrány-csúszka és a hangsúly-csúszkák egésze. A
+3.9.86 ezeket viszi be a listába (v3) és a pillanatképbe.
+
+A próba a szintetikus pillanatképeken méri a szimulációt: 400 mérkőzésen a
+sárga lapok száma csapatonként 1,24 (a várt `YELLOW_PER_MATCH` 1,2), minden
+második sárgához tartozik egy `y2`-es piros (hogy egy RÉGEBBI kliens is
+ugyanúgy tízre fogyjon), oldalanként legfeljebb egy kiállítás van, és az
+idővonal monoton.
+
+A VÉLETLEN-FOLYAM a szerződés része, ezért külön állítás: 200 magon nulla
+eltérés a régi (mezők nélküli) és a semleges értékekkel kitöltött pillanatkép
+eseménylistája között — a `rollYellow` egyetlen `R()` hívást sem fogyaszt, ha
+nincs `yellowP`.
+
+Külön ág a megfélemlítés (600 magon 1,372 → 0,712 az ellenfél gólátlaga, a
+sajátunk érintetlen), az oldalanként saját emberhátrány-tétel, és a
+csúszka-szűrők mind a hat fajtája (`minFrom`, `minTo`, `lead`, `red`, `gaMin`,
+`gaMax`) külön-külön.
+
+Végül egy VALÓDI, végigjátszott párharc: kézzel írt eseménylistával (két sárga
+ugyanannak az embernek, egy harmadik másnak) végigfut a `playMatch`, és a
+napló („MÁSODIK SÁRGA", nem a semmiből jött piros), a lapgyűjtés, az eltiltás
+és a kiállítás-számláló mind azt mutatja, amit egyjátékosban mutatna.
+Részletek: `docs/pvp-parharc-rendszerek.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott az 58 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 62 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

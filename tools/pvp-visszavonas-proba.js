@@ -33,7 +33,14 @@ const srv=http.createServer((req,rp)=>{
   const p=await (await b.newContext({viewport:{width:430,height:900}})).newPage();
   const errs=[];p.on("pageerror",e=>errs.push(String(e)));
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
-  await p.waitForTimeout(1200);
+  /* NEM FIX VÁRAKOZÁS. A „load" akkor tüzel, amikor az erőforrások megvannak —
+     a hatmegányi inline szkript KIÉRTÉKELÉSE ezután fut le. Egy fix 1200 ms
+     terhelt gépen (a regresszió a próbákat egymás után indítja) kevés lehet,
+     és akkor a page.evaluate egy még nem létező globálisra hivatkozik:
+     „careerPool is not defined". Ez fordult elő élesben, egyetlen futáson.
+     Mostantól MAGÁRA A GLOBÁLISRA várunk, amit a próba használni fog. */
+  await p.waitForFunction(()=>typeof careerPool!=="undefined"
+    &&typeof S!=="undefined"&&typeof mpBothGate==="function",null,{timeout:30000});
 
   const r=await p.evaluate(async()=>{
     const out={};
