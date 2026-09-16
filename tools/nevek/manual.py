@@ -1303,3 +1303,47 @@ MANUAL.update({
   "João Manuel Pinto":      ("Pin-Tó János", "Pin-Tó"),
   "Ricardo Sá Pinto":       ("Pin-Tó SzaRikárd", "Pin-Tó"),
 })
+
+
+MANUAL.update({
+# ═══ A 32. KÖTEG DANISÍTÁSA ═══════════════════════════════════════════════
+
+# ── Barcelona 1951/52 — a Cinc Copes ──────────────────────────────────────
+  # MAGYAR SORRENDŰ NÉV: a vezetéknév áll elöl.
+  "Kubala László":          ("Q-Balla Lackó", "Q-Balla"),
+  "Antoni Ramallets":       ("Rámajetsz Tóni", "Rámajetsz"),
+  "Estanislau Basora":      ("Básora Szabolcs", "Básora"),
+  "Gustau Biosca":          ("Blocska Gusztáv", "Blocska"),
+  "Joan Segarra":           ("Szegárá Jóvan", "Szegárá"),
+
+# ── Tottenham 1998/99 ──────────────────────────────────────────────────────
+  # R2 — a név JELENT valamit: walker = gyalogos.
+  "Ian Walker":             ("Gyalogos Ájen", "Gyalogos"),
+  # R2 — armstrong = erős kar.
+  "Chris Armstrong":        ("Erőskarú Krisztián", "Erőskarú"),
+  "Colin Calderwood":       ("Kaldervúd Kóli", "Kaldervúd"),
+
+# ── Dortmund 2008/09 ───────────────────────────────────────────────────────
+  "Nuri Şahin":             ("Sanyin Núri", "Sanyin"),
+  "Roman Weidenfeller":     ("Vájdenfeller Román", "Vájdenfeller"),
+
+# ── Roma 2021/22 ───────────────────────────────────────────────────────────
+  "Nicolò Zaniolo":         ("Zanyóló Nick", "Zanyóló"),
+  "Tammy Abraham":          ("Ábraham Tomi", "Ábraham"),
+  "Henrikh Mkhitaryan":     ("Mikitalján Henrik", "Mikitalján"),
+  "Bryan Cristante":        ("Kristály Brájen", "Kristály"),
+  "Roger Ibañez":           ("Ibányez Rodzser", "Ibányez"),
+  "Sérgio Oliveira":        ("Oli-Vera Szerdzsó", "Oli-Vera"),
+
+# ── Fenerbahçe 2021/22 ─────────────────────────────────────────────────────
+  "Altay Bayındır":         ("Baj-Andi Altaj", "Baj-Andi"),
+  "Marcel Tisserand":       ("Tisszerán Marcell", "Tisszerán"),
+  "Nazım Sangaré":          ("Szanga-Ré Nacika", "Szanga-Ré"),
+
+# ── Zenit 2014/15 ──────────────────────────────────────────────────────────
+  # EGYNEVŰ: a rövid alak ugyanaz, mint a teljes.
+  "Danny":                  ("Danika", "Danika"),
+  "Domenico Criscito":      ("Krisszító Domonkos", "Krisszító"),
+  "Nicolás Lombaerts":      ("Lombba-Erc Niki", "Lombba-Erc"),
+  "Yuri Lodygin":           ("Lódi-Dzsin Jurika", "Lódi-Dzsin"),
+})

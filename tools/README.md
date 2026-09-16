@@ -1134,13 +1134,40 @@ magyar minimum Ratingje 56 → 81, a minimum POT 210 → 2200, az átlag 75,5 �
 `docs/legendas-magyahok.md`.
 
 
+## panzer-lap-proba.js — 🃏 a lap épít, nem rombol
+
+```
+node tools/panzer-lap-proba.js
+```
+
+A 3.9.85-ös fordítás mérése. A bejelentett ellentmondás az volt, hogy a Panzer
+egész gazdasága a lapokból él (rettenet-pont, `pz_ycall`, `pz_ycmatch`,
+`pz_redwinN`), miközben ugyanaz a lap a másik oldalon a FORMÁT húzta le.
+
+A büntetés három helyen ült, és a próba mind a hármat külön méri: a
+csillagtétel (`mstatRate` → `parts.red`), a „minősíthetetlen" ítélet
+(`mstatUnratable`, 25. perc előtti piros) és a fegyelmi visszaesés
+(`applyDisciplineDip` → `pOvr` −2). A sárga lapnak eddig SEMMILYEN formahatása
+nem volt — erre külön állítás van, mert ott a Panzernél nulláról indul egy
+pozitív tétel, nem megfordul egy negatív.
+
+A görbe TÜKÖR: hét percen végigmérve a régi tétel mindenütt negatív
+(−2,911 … −1,418), az új mindenütt pozitív (+2,139 … +1,112), és a KORAI lap ér
+a legtöbbet — ahogy a büntetés is a koraiért volt a legnagyobb. A Fordított
+jellem mindkét tételt ugyanazon a lépcsőn feszíti (×1 / ×1,35 / ×1,70 / ×2,10),
+és a filozófia MÁSODLAGOS slotban is számít.
+
+Két állítás a határokra: az öngólból eredő fegyelmi visszaesés Panzerrel is
+−2 marad (az öngól nem lap), és lap nélkül a két filozófia értékelése betűre
+azonos — a fordítás nem szivárog. Részletek: `docs/panzer-lap-epit.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 60 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 61 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
