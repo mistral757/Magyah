@@ -4672,6 +4672,15 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
     <button data-wc="off" class="sel">Csak klubcsapatok<small>a klasszikus draft-pool</small></button>
     <button data-wc="on">Nemzeti válogatottak<small>a torna-győztes és a legendás nemzeti keretek, teljes értékű draft-forrásként</small></button>
   </div>
+  <!-- LEGENDÁS MAGYAHOK — csak DRAFTOS karrier-indulásnál. Kész klubnál a
+       klubválasztó listája az adott keret valós átlagerejét hirdeti, és abból
+       számol a piramis kezdő rése; egy néma magyar-boost ott pont azt a számot
+       hazudná meg. A láthatóságot az updateMagyahVisibility() dönti, a
+       tényleges zárat a lockCareerMagyah(). -->
+  <div class="optgrid two hide" id="magyahToggleGrid" style="margin-top:8px">
+    <button data-mgy="off" class="sel">Szokásos mezőny<small>mindenki a saját, valós erejével</small></button>
+    <button data-mgy="on">🇭🇺 Legendás magyahok<small>az adattár MINDEN magyar játékosa erősebb kezdő Ratinggel és legalább 2200-as POT-tal indul — érdemes lesz magyarokkal feltölteni a draftot</small></button>
+  </div>
   <!-- A RATING ALAPJA — globális beállítás, csak a DRAFTOS karrier-induláshoz.
        HÁROM FOKOZAT: nem a mezőny erejét állítja (azt a nehézségi csúszka teszi),
        hanem azt, mennyire megbízható, amit a draftban látsz.
@@ -6082,7 +6091,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.79";
+const APP_VERSION="3.9.80";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16832,6 +16841,7 @@ function mpDiagCollect(){
       L.push(`  fejlődési tempó: ${A.tempo} (${(GAME_TEMPO[A.tempo]||{}).n||"?"} · k=${(GAME_TEMPO[A.tempo]||{}).k}) — ${lock(mpWorldTempo)}`);
       L.push(`  sorsolás: ${A.sched} — ${lock(mpWorldSched)}`);
       L.push(`  Nemzeti válogatottak: ${A.wc?"benne":"kihagyva"} — ${lock(S.careerWc!=null)}`);
+      L.push(`  Legendás magyahok: ${A.mgy?"BE":"ki"} — ${lock(S.careerMagyah!=null)}`);
       L.push(`  Rating-alap: ${A.basis}`);
       /* AZ IKONRÁTA nem világ-tengely (csak a SAJÁT scoutolásod esélyét
          szorozza, lásd scoutIconChance) — a világ determinizmusát nem viszi
@@ -22661,6 +22671,85 @@ function potNote(name){
     ?`<span style="color:var(--dim2)">${t.matches} meccset játszott nálad — ennyi idő után már pontosan tudod, mi van benne.</span>`
     :`<span style="color:var(--dim2)">a scoutod becslése az érkezésekor · még ${t.need} meccs, és pontosan látod (${t.matches}/${POT_EXACT_MATCHES})</span>`;
   return `<div class="hdRow" style="border-left:3px solid ${col};padding-left:8px">${head} · ${why}</div>`;}
+/* ================= LEGENDÁS MAGYAHOK (3.9.80) =========================
+   KIMONDOTT KÉRÉS: „Legyen egy kapcsoló aminek a lényege: érdemes legyen
+   magyar játékosokkal feltölteni a draftodat (kész csapat módban nem lehet
+   bekapcsolni). Neve: Legendás magyahok."
+
+   MIT CSINÁL. Bekapcsolva az adatbázis MINDEN magyar játékosa két dolgot kap,
+   arra az egy karrierre:
+
+     1. KEZDŐ RATING — a karrier indításának pillanatában, sávosan:
+          80 alatt   →  81-85 közé emelve („minden 80 alatti minimum 80 fölé")
+          80-85      →  +4…+8
+          85 fölött  →  +3…+6
+        A 80 alatti sáv SZÁNDÉKOSAN tartomány, nem fix 81: egy fix padlónál a
+        79-es légiós 81 lett volna, a 80-as meg 84-88 — a kapcsoló pont ott
+        büntetett volna, ahol segíteni akar.
+
+     2. POT-PADLÓ — minden magyar játékos POT-ja legalább MAGYAH_POT_MIN.
+        MINDHÁROM Rating-alapon (csúcs, szezon, lutri), mert a kérés külön
+        kimondta. 2200 POT ≈ 84,3-as fejlődési csúcs: tehát nincs az a magyar
+        játékos, akiből ne lehetne kinevelni egy bajnokcsapatba való embert.
+
+   A CSÚCS IS KÖVETI. POT-t vagy Ratinget emelni magában félrevezetés lenne: a
+   kor-görbe (ratingAtAge) a peak-ből számol, tehát egy megemelt startRating a
+   következő szezonváltáskor magától visszaesne. Ezért mindkét hatás a `peak`-et
+   is felhúzza — ugyanaz a boostLift-minta, mint a boltban vett boostoknál.
+
+   DETERMINISZTIKUS. A sávon belüli szórás NEVESÍTETT, seedelt folyamból jön
+   (rngFor("magyah:"+név)), nem Math.random-ból — így a közös karrier két
+   kliense bitre ugyanazt a magyar keretet látja, és az F1 seed-azonosság sem
+   sérül.
+
+   KÉSZ KLUBNÁL NEM KAPCSOLHATÓ BE. A kérés kimondta, és van is oka: ott a
+   klubválasztó listában az adott keret VALÓS átlagereje szerepel, abból számol
+   a piramis kezdő rése és a Run-plafon. Egy néma magyar-boost ott pontosan azt
+   a számot hazudná meg. A zárat a lockCareerMagyah() teszi, nem csak a
+   képernyő elrejtése — egy beragadt localStorage-érték így sem tud átszivárogni.
+
+   A KAPCSOLÓ A KARRIER INDULÁSAKOR RÖGZÜL, ugyanazon a mintán, mint a
+   válogatott-kapcsoló (S.careerWc): a mentés viszi, tehát egy újratöltés nem
+   ejti vissza a localStorage-preferenciára, és közös karrierben sem tud
+   kettéválni a pool. */
+const MAGYAH_NAT="Magyarország";
+const MAGYAH_POT_MIN=2200;        /* ≈ 84,3-as fejlődési csúcs */
+const MAGYAH_LO_MIN=81, MAGYAH_LO_MAX=85;   /* a 80 alatti sáv új helye */
+const MAGYAH_MID_MIN=4, MAGYAH_MID_MAX=8;   /* 80-85 közt ennyit ad */
+const MAGYAH_HI_MIN=3,  MAGYAH_HI_MAX=6;    /* 85 fölött ennyit ad */
+/* A FUTÓ karrierre érvényes érték. Ugyanaz a try/catch, mint a wcOn()-nál: ez
+   a függvény a fájlban KORÁBBAN is hívható, mint ahol az S deklarálva van, és
+   egy `const` a deklarációja előtt `typeof`-fal kérdezve is ReferenceError. */
+function magyahOn(){
+  try{if(S&&S.careerMagyah!=null)return !!S.careerMagyah;}catch(e){}
+  return false;}
+function isMagyah(natOrPlayer){
+  if(!natOrPlayer)return false;
+  return (typeof natOrPlayer==="string"?natOrPlayer:natOrPlayer.nat)===MAGYAH_NAT;}
+/* A megemelt kezdő Rating. `nev` a seed címkéje — ugyanaz a játékos mindig
+   ugyanazt az emelést kapja, futástól és sorrendtől függetlenül. */
+function magyahRating(ovr,nev){
+  const c=ratingCap(),o=Math.round(ovr||0);
+  const r=rngFor("magyah:"+(nev||""));
+  const koz=(lo,hi)=>lo+Math.floor(r()*(hi-lo+1));
+  let uj;
+  if(o<80)uj=koz(MAGYAH_LO_MIN,MAGYAH_LO_MAX);
+  else if(o<=85)uj=o+koz(MAGYAH_MID_MIN,MAGYAH_MID_MAX);
+  else uj=o+koz(MAGYAH_HI_MIN,MAGYAH_HI_MAX);
+  return Math.max(o,Math.min(c,uj));}   /* lefelé sosem visz */
+/* A POT-padló. Minden alapon ugyanez az egy sor fut. */
+function magyahPot(pot){return Math.max(pot||0,MAGYAH_POT_MIN);}
+/* EGY KÁRTYA-ALAP MEGEMELÉSE — a seasonBasisFor és a wildBasisFor közös
+   kijárata. A sorrend számít: előbb a POT-padló (abból jön a csúcs alsó
+   határa), aztán a Rating, végül a csúcs, hogy egyik se maradjon a másik
+   alatt. A `from` és a becslés érintetlen; a becslést a hívó számolja újra. */
+function magyahLiftBasis(b,nev,nat){
+  if(!b||!magyahOn()||!isMagyah(nat))return b;
+  b.pot=magyahPot(b.pot);
+  b.ovr=magyahRating(b.ovr,nev);
+  b.peak=Math.min(ratingCap(),
+    Math.max(b.peak||0,b.ovr,Math.round(potToPeakOvr(b.pot))));
+  return b;}
 /* A teljes karrier-játékospool: minden valós személy fix életkora, POT-je,
    csúcsa és kezdő Ratingje EGYSZER generálódik a karrier indításakor — a
    scout becslése is ekkor rögzül mindenkire, nem sorsolódik újra minden
@@ -22673,7 +22762,11 @@ function initCareerPlayerPool(scout){
        nem számít, a név címkéz. Két kliens (vagy két azonos-seedű run) így
        bitre azonos POT-t, kort, személyiséget és attribútumokat ad. */
     const r=rngFor("pool:"+p.n);
-    const pot=generatePOT(p.refOvr,r);
+    /* LEGENDÁS MAGYAHOK: a POT-padló MÁR ITT hat, mert innen származik a csúcs
+       és azon át a kezdő Rating — a kanonikus bejegyzés szolgálja ki a piacot,
+       a scoutot és az akadémiát is. */
+    const pot=magyahOn()&&isMagyah(p.nat)?magyahPot(generatePOT(p.refOvr,r))
+                                         :generatePOT(p.refOvr,r);
     const peak=potToPeakOvr(pot);
     /* A SZINTHEZ IGAZODÓ KOR CSAK A KÖNNYŰ FOKOZATON fut: ott ígérjük azt, hogy
        a draftban tényleg használható állapotú top játékosok jönnek szembe (lásd
@@ -22690,6 +22783,13 @@ function initCareerPlayerPool(scout){
       refOvr:p.refOvr,refYear:p.refYear,
       estimatedPOT:estimatePOT(pot,scout.stars,r),
       karI,kapI,verI,formPoints:0};
+    /* …és a Rating-emelés a kész bejegyzésre. A csúcs vele megy: enélkül a
+       következő szezonváltás a kor-görbe mentén visszahúzná. */
+    if(magyahOn()&&isMagyah(p.nat)){
+      const e=pool[p.n];
+      e.startRating=magyahRating(e.startRating,p.n);
+      e.peak=boostLift(e.peak,e.startRating,ratingCap());
+      e.estimatedPOT=estimatePOT(e.pot,scout.stars,r);}
     initPlayerAttrs(pool[p.n],r);});
   return pool;}
 /* Egy pool-bejegyzésből a motor által elvárt, teljes játékos-alakú objektumot
@@ -22894,8 +22994,11 @@ function seasonBasisFor(entry,squadPlayer,squad,opts){
     age=Math.round(mid+(prime-(band.lo+band.hi)/2)*0.6);
     age=Math.max(band.lo,Math.min(band.hi,age));}
   const pot=Math.max(entry.pot||0,peakToPot(peak));
-  const est=(typeof scout!=="undefined"&&scout)?estimatePOT(pot,scout.stars,r):pot;
-  return {ovr,age,peak,pot,estimatedPOT:est,from:squad?`${squad.club} (${squad.season})`:null};}   /* nev-ok: kanonikus eredet-azonosító; a kiírás clubLabel-en megy */
+  /* LEGENDÁS MAGYAHOK: a kártya-alapra is ráül, mielőtt a becslés elkészül —
+     különben a scout 👁 a padló ELŐTTI számot mutatná. */
+  const b=magyahLiftBasis({ovr,age,peak,pot},entry.n,entry.nat||squadPlayer.nat);
+  const est=(typeof scout!=="undefined"&&scout)?estimatePOT(b.pot,scout.stars,r):b.pot;
+  return {ovr:b.ovr,age:b.age,peak:b.peak,pot:b.pot,estimatedPOT:est,from:squad?`${squad.club} (${squad.season})`:null};}   /* nev-ok: kanonikus eredet-azonosító; a kiírás clubLabel-en megy */
 /* ---- A NEHÉZ ALAP: KÁRTYÁNKÉNTI, SZABAD SORSOLÁS ----
    Ugyanaz a szerződés, mint a seasonBasisFor-nál (tiszta függvény, nevesített
    seedelt folyam a (játékos, klub, idény) hármasra), csak a szabályok mások:
@@ -22923,8 +23026,13 @@ function wildBasisFor(entry,squadPlayer,squad){
   const peak=potToPeakOvr(pot);
   const age=17+Math.floor(r()*22);          /* 17…38, egyenletesen */
   const ovr=Math.max(40,Math.min(ratingCap(),ratingAtAge(peak,age)));
-  const est=(typeof scout!=="undefined"&&scout)?estimatePOT(pot,scout.stars,r):pot;
-  return {ovr,age,peak:Math.round(peak),pot,estimatedPOT:est,
+  /* LEGENDÁS MAGYAHOK: a lutri-alapon is. A kérés külön kimondta, hogy a
+     POT-padló „minden fajta módban" érvényes — a lutri a legnagyobb szórású,
+     tehát ott ér a legtöbbet. */
+  const b=magyahLiftBasis({ovr,age,peak:Math.round(peak),pot},
+    entry.n,entry.nat||squadPlayer.nat);
+  const est=(typeof scout!=="undefined"&&scout)?estimatePOT(b.pot,scout.stars,r):b.pot;
+  return {ovr:b.ovr,age:b.age,peak:b.peak,pot:b.pot,estimatedPOT:est,
     from:squad?`${squad.club} (${squad.season})`:null};}   /* nev-ok: kanonikus eredet-azonosító; a kiírás clubLabel-en megy */
 /* Draft-jelölt egy KONKRÉT keret-kártyáról. KÖNNYŰ fokozaton ez pontosan a régi
    careerPlayerFromPoolEntry (kanonikus, kártyafüggetlen ember); KÖZEPESEN és
@@ -26752,7 +26860,7 @@ function applyTransfer(type){
 }
 
 /* ================= ÁLLAPOT ================= */
-let form="442",mode="classic",oppTargetRating=82,familyEnabled=false,wcEnabled=false,slots=[],rerolls=1,curSquad=null,pendingPlayer=null;
+let form="442",mode="classic",oppTargetRating=82,familyEnabled=false,wcEnabled=false,magyahEnabled=false,slots=[],rerolls=1,curSquad=null,pendingPlayer=null;
 /* ÖSSZHANGTÉRKÉP (F4): a pályakép másik olvasata. Futásidejű nézet-állapot,
    NEM a mentés része — egy térkép-mód, ami újratöltés után visszaáll. */
 let bondMapOn=false;
@@ -29192,6 +29300,7 @@ function setCareerStart(v){
   updateFamilySetupVisibility();   /* kész klubnál nincs draft → nincs családtag-kör */
   updateRatingBasisVisibility();   /* …és nincs választható Rating-alap sem */
   updateRerollVisibility();        /* …és nincs mit újrapörgetni */
+  updateMagyahVisibility();        /* …és a Legendás magyahok sem kapcsolható */
   const nb=$("oppNextBtn");if(nb)nb.textContent=v==="club"?"Irány a klubválasztás →":"Irány a draft →";
   /* ---- AZ AJÁNLOTT KIINDULÁS (3.8.02) ----
      Kész klubbal indulva a keretet nem te válogatod össze, ezért az ajánlott
@@ -29242,6 +29351,34 @@ document.querySelectorAll("#wcToggleGrid button").forEach(b=>b.onclick=()=>{
   setWcEnabled(b.dataset.wc==="on");
   renderWcGrid();
   showSquadCount();});
+/* ---- LEGENDÁS MAGYAHOK: A BEÁLLÍTÁS ÁLLAPOTA ----
+   Ugyanaz a három réteg, mint a válogatott-kapcsolónál:
+     · magyahEnabled  — a globális PREFERENCIA (localStorage, túléli a
+       újratöltést, a KÖVETKEZŐ karriert állítja);
+     · S.careerMagyah — a FUTÓ karrierre rögzített érték (a mentés viszi);
+     · magyahOn()     — az olvasó, ami a kettő közül a helyeset adja.
+   A kapcsoló DRAFTOS indulásnál látszik; a zárat a lockCareerMagyah teszi. */
+const MAGYAH_KEY="harminc_nulla_magyah_v1";
+function setMagyahEnabled(on){
+  magyahEnabled=!!on;
+  try{localStorage.setItem(MAGYAH_KEY,magyahEnabled?"on":"off");}catch(e){}}
+function renderMagyahGrid(){
+  document.querySelectorAll("#magyahToggleGrid button").forEach(b=>
+    b.classList.toggle("sel",(b.dataset.mgy==="on")===magyahEnabled));}
+/* CSAK DRAFTOS KARRIER-INDULÁSNÁL. A kész klub kizárása kimondott kérés volt;
+   karrieren kívül (klasszikus, párharc) nincs karrier-pool, amire hatna. */
+function magyahSetupAvailable(){
+  return gameMode==="career"&&careerStart!=="club";}
+function updateMagyahVisibility(){
+  const g=$("magyahToggleGrid");
+  if(g)g.classList.toggle("hide",!magyahSetupAvailable());}
+(function initMagyahToggle(){
+  let v=null;try{v=localStorage.getItem(MAGYAH_KEY);}catch(e){}
+  magyahEnabled=(v==="on");
+  renderMagyahGrid();})();
+document.querySelectorAll("#magyahToggleGrid button").forEach(b=>b.onclick=()=>{
+  setMagyahEnabled(b.dataset.mgy==="on");
+  renderMagyahGrid();});
 /* ---- A SORSOLÁS RENDJE: A BEÁLLÍTÁS ÁLLAPOTA ----
    Szándékosan ITT áll, a kezdőképernyő kezelői KÖZÖTT, nem a sorsoló motor
    mellett: a választót már a szkript betöltésekor ki kell rajzolni, és ha az
@@ -29348,6 +29485,7 @@ function mpWorldAxes(){
   try{out.tempo=(typeof gameTempo==="function")?gameTempo():"normal";}catch(e){out.tempo="normal";}
   try{out.sched=(typeof scheduleMode==="function")?scheduleMode():"real";}catch(e){out.sched="real";}
   try{out.wc=!!((typeof wcOn==="function")?wcOn():false);}catch(e){out.wc=false;}
+  try{out.mgy=!!((typeof magyahOn==="function")?magyahOn():false);}catch(e){out.mgy=false;}
   /* A Rating-alap a POOL építésekor dől el, tehát utólag nem "állítható át" —
      csak jelentjük, ha eltér. Ezért van a listában, de nem az átvételben. */
   try{out.basis=(typeof careerRatingBasis!=="undefined")?careerRatingBasis:"peak";}catch(e){out.basis="peak";}
@@ -29363,6 +29501,8 @@ function mpWorldAxesDiff(a,b){
     a:a.sched==="random"?"véletlen":"valósághű",b:b.sched==="random"?"véletlen":"valósághű"});
   if(!!a.wc!==!!b.wc)out.push({k:"wc",n:"Nemzeti válogatottak a mezőnyben",
     a:a.wc?"benne":"kihagyva",b:b.wc?"benne":"kihagyva"});
+  if(!!a.mgy!==!!b.mgy)out.push({k:"mgy",n:"Legendás magyahok",
+    a:a.mgy?"bekapcsolva":"kikapcsolva",b:b.mgy?"bekapcsolva":"kikapcsolva"});
   if(a.basis!==b.basis)out.push({k:"basis",n:"Rating alapja",a:String(a.basis),b:String(b.basis)});
   return out;}
 /* A HÁZIGAZDA TENGELYEINEK ÁTVÉTELE ÉS LEZÁRÁSA. Idempotens: ha már minden
@@ -29377,6 +29517,7 @@ function mpAdoptWorldAxes(hostAxes,mateAxes){
   if(hostAxes.sched==="random"||hostAxes.sched==="real")mpWorldSched=hostAxes.sched;
   if(GAME_TEMPO[hostAxes.tempo])mpWorldTempo=hostAxes.tempo;
   if(hostAxes.wc!=null)S.careerWc=!!hostAxes.wc;
+  if(hostAxes.mgy!=null)S.careerMagyah=!!hostAxes.mgy;
   const after=mpWorldAxes();
   const moved=mpWorldAxesDiff(before,after);
   if(!wasLocked&&(moved.length||diff.length)){
@@ -30100,6 +30241,10 @@ function beginNewGame(){
      karrierben pedig egy újratöltés kettéválasztotta a pool-t. Innentől a
      mentés viszi. Lásd a wcOn() fölötti indoklást. */
   S.careerWc=!!wcEnabled;
+  /* LEGENDÁS MAGYAHOK (3.9.80) — a negyedik ilyen tengely, ugyanazon a mintán.
+     A KÉSZ KLUB ZÁRJA ITT VAN, nem csak a képernyő elrejtésében: egy beragadt
+     localStorage-érték így sem tud átszivárogni egy kész klubos indulásba. */
+  S.careerMagyah=!!(magyahEnabled&&gameMode==="career"&&careerStart!=="club");
   /* ---- A LIGAPIRAMIS: ITT MÉG NEM INDUL ----
      ELŐZMÉNY. A világ korábban ITT született meg, mert az oppTargetRating-et
      (és vele a kupasávot, a piac horgonyát, a nehézség-címkét) az OSZTÁLYOD
@@ -30279,6 +30424,10 @@ function renderSetupRecap(){
   if(gameMode==="career"&&careerStart==="draft"){
     const RBN={peak:"Könnyű — csúcsforma",season:"Közepes — szezon",wild:"Nehéz — lutri"};
     add("Rating alapja",RBN[ratingBasis()]||ratingBasis(),1);}
+  /* A Legendás magyahok ugyanoda kerül, ahova a kapcsolója: a draftos
+     karrier-indulás sajátja (lásd magyahSetupAvailable). */
+  if(magyahSetupAvailable())
+    add("Legendás magyahok",magyahEnabled?"🇭🇺 Be":"Ki",1);
   if(!(gameMode==="career"&&careerStart==="club"))
     add("Családtag",familyEnabled?"Igen":"Nem",1);
   {const el=$("rerollSlider");
@@ -43030,6 +43179,9 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      null = még nincs rögzítve → a globális preferencia él, ahogy a mérő
      bevezetése előtti mentésekben. */
   careerWc:null,
+  /* A LEGENDÁS MAGYAHOK ugyanígy (lásd magyahOn()). null = nincs rögzítve →
+     a kapcsoló KI van, mert a boost csak kimondott választásra jár. */
+  careerMagyah:null,
   /* F6: a párharc tartós állapota. A mpBalance a kiegyenlítő rating-eltolás,
      a mpHistory és a mpDuelLog pedig SZEZONOKON ÁTÍVELŐ — nem nullázódik. */
   oppBuffH:null,   /* a szezonra rögzített rejtett ellenfél-erősítés */
@@ -92142,6 +92294,11 @@ function saveGame(){
         /* A karrierre rögzített válogatott-kapcsoló. NÉLKÜLE egy újratöltés a
            globális preferenciára ejtette vissza a futó világot — lásd wcOn(). */
         careerWc:S.careerWc,
+        /* …és a Legendás magyahok. Enélkül egy újratöltés közepén a piac és a
+           scout visszaesne a boost NÉLKÜLI POT-padlóra, a már leigazolt magyar
+           játékosaid viszont megtartanák a magasabb értéküket — a világ
+           kettéválna a kereteden belül. */
+        careerMagyah:S.careerMagyah,
         /* A LIGAPIRAMIS teljes állapota: a hat osztály összetétele, hol állsz
            benne, és a fel-/kiesés naplója. ~6 kB, tehát elfér a careerPool
            mellett. Enélkül egy újratöltés az egész világot elveszítené. */
@@ -92975,6 +93132,12 @@ function applySavedGame(d){
      értékre, ami ÉPP MOST érvényes: ez pontosan az, amivel a karrier eddig is
      futott, tehát a viselkedés nem változik — csak megszűnik a sodródás. */
   if(S.careerWc==null)S.careerWc=!!wcEnabled;
+  /* UGYANEZ A LEGENDÁS MAGYAHOKRA, de FORDÍTOTT alapértékkel: a rögzítés
+     előtti mentésekben a kapcsoló nem is létezett, tehát az a karrier
+     bizonyosan boost NÉLKÜL futott. Ha itt a globális preferenciára esnénk
+     vissza, egy bekapcsolt kapcsoló visszamenőleg megemelné egy régi karrier
+     egész piacát — pont az a sodródás, amit a wcOn()-nál megszüntettünk. */
+  if(S.careerMagyah==null)S.careerMagyah=false;
   /* ---- PIRAMIS: A SZINT MINDIG AZ OSZTÁLYODÉ ----
      Az oppTargetRating külön mezőként is mentődik, a piramisban viszont
      SZÁRMAZTATOTT érték (az osztályod középértéke). Ha a kettő valaha
@@ -94512,6 +94675,12 @@ function mpCollectSettings(){
        beállítását látja, közben a sajátja élt. A házigazdánál mindig működött. */
     skillMode:(skillModeWanted==="real")?"real":"loose",
     oppTargetRating,careerBaseRating,rerolls,
+    /* A LEGENDÁS MAGYAHOK IS VILÁG-TULAJDONSÁG, nem ízlés (3.9.80): az egész
+       adattár magyar játékosainak a Ratingjét és a POT-padlóját állítja,
+       vagyis a KÖZÖS pool-t. Ha nem utazna, a két menedzser más piacról
+       igazolna, és a párharcnak nem volna tétje — ugyanaz az eset, mint a
+       válogatott-kapcsolónál és a skill-módnál. */
+    magyahEnabled,
     wcEnabled,familyEnabled,familyNameMode,
     familyCustomNames:(familyCustomNames||[]).slice(),
     slotRoles:JSON.parse(JSON.stringify(slotRoles||{})),
@@ -94572,6 +94741,11 @@ function mpApplySettings(s){
   careerBaseRating=s.careerBaseRating!=null?s.careerBaseRating:oppTargetRating;
   rerolls=s.rerolls!=null?s.rerolls:1;
   wcEnabled=!!s.wcEnabled;
+  /* Régi szobában nincs mező — ott a kapcsoló KI van, ahogy eddig is. A vendég
+     saját, tárolt preferenciáját szándékosan felülírjuk a modulszintű
+     változóban: a beginNewGame innen zárja le az S.careerMagyah-t, és a közös
+     világban a házigazda döntése az igazság. */
+  magyahEnabled=!!s.magyahEnabled;
   familyEnabled=!!s.familyEnabled;
   familyNameMode=s.familyNameMode||"default";
   familyCustomNames=Array.isArray(s.familyCustomNames)?s.familyCustomNames.slice():[];

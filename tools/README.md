@@ -1103,13 +1103,44 @@ leggyakoribb), és nulla olyan meccs volt, ahol két gól ugyanabba a percbe
 esett. Részletek: `docs/percbelyeg.md`.
 
 
+## legendas-magyahok-proba.js — 🇭🇺 a magyar boost kapcsolója
+
+```
+node tools/legendas-magyahok-proba.js
+```
+
+A 3.9.80-as kapcsoló mérése. A kérés két hatást mondott ki: a magyar játékosok
+kezdő Ratingje sávosan emelkedik (80 alatt 81-85 közé, 80-85 közt +4…+8, 85
+fölött +3…+6), és a POT-juk padlója 2200 lesz **minden** Rating-alapon.
+
+A próba a sávokat BETŰRE méri, bemenetenként 600 KÜLÖNBÖZŐ névvel — a szórás
+névre seedelt folyamból jön, egyetlen név egyetlen számot adna. Külön állítás a
+determinizmusra (ugyanaz a név ötvenszer ugyanazt adja: közös karrierben a két
+kliensnek bitre egyeznie kell), a Rating-plafonra, és arra, hogy a boost lefelé
+sosem visz.
+
+A POT-padlót mind a három alapon ellenőrzi (csúcs, szezon, lutri) EGY valódi
+magyar játékoson, bekapcsolva és kikapcsolva egymás mellett — és arra is, hogy a
+`peak` sosem marad a megemelt Rating alatt (különben a következő szezonváltás a
+kor-görbe mentén visszahúzná).
+
+A KÉSZ KLUB ZÁRJA két állítás: a kapcsoló rejtve van, ÉS a zár akkor sem engedi
+be, ha a localStorage-preferencia bekapcsolva áll — egy beragadt érték így sem
+szivárog át.
+
+Végül egy VALÓDI karrier-pool, ugyanazzal a seeddel, be- és kikapcsolva: a 134
+magyar minimum Ratingje 56 → 81, a minimum POT 210 → 2200, az átlag 75,5 → 88,5
+— miközben a mezőny másik 3338 játékosa betűre változatlan. Részletek:
+`docs/legendas-magyahok.md`.
+
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott az 59 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 60 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
