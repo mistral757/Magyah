@@ -247,12 +247,12 @@ azaz a hirdetett −1,4-es rés valóban teljesül.
 `node tools/pyramid-sim.js bands`:
 
 ```
-klub-szezon: 326 · egyedi klub: 192 · sáv: 71,1 … 88,0
+klub-szezon: 332 · egyedi klub: 194 · sáv: 71,1 … 88,0
 
 csapat/oszt |  teljes sáv  | D1        | D2        | D3        | D4        | D5        | D6
-         16 | 79,6…88,0    | 85,5-88,0 | 83,0-85,1 | 82,1-83,0 | 81,5-82,0 | 80,3-81,5 | 79,6-80,3
+         16 | 79,8…88,0    | 85,5-88,0 | 83,0-85,1 | 82,1-83,0 | 81,5-82,0 | 80,4-81,5 | 79,8-80,3
          15 | 79,9…88,0    | 85,6-88,0 | 83,4-85,5 | 82,5-83,3 | 81,7-82,5 | 80,5-81,6 | 79,9-80,5
-         12 | 80,6…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,7 | 81,7-82,0 | 80,6-81,6
+         12 | 80,7…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,7 | 81,7-82,0 | 80,7-81,6
 ```
 
 **A tervezett 71–91-es piramis nyers Ratingekből NEM építhető meg.** A 90
@@ -271,7 +271,12 @@ Chelsea 06/07 (85,7) és a Juventus 97/98 (84,1) beér a legjobb 90 közé, és 
 esetén), a D2 teteje 85,0-ről 85,1-re — a TETŐ viszont maradt 88,0, mert a
 kötegben nincs 88-as keret, és a legjobb 90 sávszélessége is 8,1 maradt.
 A teljes adatbázis medián top11-e SEM mozdult: 80,64 → 80,64 (326 keret).
-Tehát két szomszédos osztály
+
+A 30. KÖTEG (hat keret: Milan 50/51, Blackpool 52/53, Feyenoord 69/70, Dinamo
+Kijev 74/75, Dánia 1992, Argentína 1978) szintén a mezőny alá-körül esik
+(79,5-től 82,7-ig), a mediánt megint nem mozdította (80,64, most 332 keret), és
+a D1 sem mozdult — csak a legalsó osztály alsó széle jött fel 79,6-ról 79,8-ra,
+mert a köteg legyengébb kerete is 79,5 fölött van. Tehát két szomszédos osztály
 közé csak ~1,5–2 pont jut — nem 2-pontos lépcső 8 pont széles sávokkal, ahogy
 a terv szólt, hanem 1,5-es lépcső 2 pont széles sávokkal. Ráadásul **88 fölött egyetlen csapat sincs**: a legerősebb a
 Barcelona 2010/11 (88,0), és mindössze két klub éri el a 87-et.
