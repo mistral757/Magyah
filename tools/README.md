@@ -1161,13 +1161,47 @@ Két állítás a határokra: az öngólból eredő fegyelmi visszaesés Panzerr
 −2 marad (az öngól nem lap), és lap nélkül a két filozófia értékelése betűre
 azonos — a fordítás nem szivárog. Részletek: `docs/panzer-lap-epit.md`.
 
+## pvp-parharc-rendszerek-proba.js — ⚔ ami ki volt véve a párharcból
+
+```
+node tools/pvp-parharc-rendszerek-proba.js
+```
+
+A párharc eredményét egy KÖZÖS, seedelt eseménylista adja — ettől látja a két
+játékos bitre ugyanazt a mérkőzést. Ami helyben sorsolódna, az szétvinné a két
+képernyőt, ezért volt kikapcsolva a sárga lap (teljesen), és ezért maradt néma
+a megfélemlítés, az emberhátrány-csúszka és a hangsúly-csúszkák egésze. A
+3.9.86 ezeket viszi be a listába (v3) és a pillanatképbe.
+
+A próba a szintetikus pillanatképeken méri a szimulációt: 400 mérkőzésen a
+sárga lapok száma csapatonként 1,24 (a várt `YELLOW_PER_MATCH` 1,2), minden
+második sárgához tartozik egy `y2`-es piros (hogy egy RÉGEBBI kliens is
+ugyanúgy tízre fogyjon), oldalanként legfeljebb egy kiállítás van, és az
+idővonal monoton.
+
+A VÉLETLEN-FOLYAM a szerződés része, ezért külön állítás: 200 magon nulla
+eltérés a régi (mezők nélküli) és a semleges értékekkel kitöltött pillanatkép
+eseménylistája között — a `rollYellow` egyetlen `R()` hívást sem fogyaszt, ha
+nincs `yellowP`.
+
+Külön ág a megfélemlítés (600 magon 1,372 → 0,712 az ellenfél gólátlaga, a
+sajátunk érintetlen), az oldalanként saját emberhátrány-tétel, és a
+csúszka-szűrők mind a hat fajtája (`minFrom`, `minTo`, `lead`, `red`, `gaMin`,
+`gaMax`) külön-külön.
+
+Végül egy VALÓDI, végigjátszott párharc: kézzel írt eseménylistával (két sárga
+ugyanannak az embernek, egy harmadik másnak) végigfut a `playMatch`, és a
+napló („MÁSODIK SÁRGA", nem a semmiből jött piros), a lapgyűjtés, az eltiltás
+és a kiállítás-számláló mind azt mutatja, amit egyjátékosban mutatna.
+Részletek: `docs/pvp-parharc-rendszerek.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 61 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 62 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

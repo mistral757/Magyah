@@ -6091,7 +6091,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.85";
+const APP_VERSION="3.9.86";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -51702,6 +51702,82 @@ function mpWireRedWeights(active){
       *(x.p.family&&(x.p.familySpecialty==="kutya"||x.p.familySpecialty==="tank")?1.4:1)
       *roleRiskMult(x.p.n);
     return {base,w:clutchIsBackline(active,k)?base*wall:base};});}
+/* ---- ÉS UGYANEZ A SÁRGA LAPRA (3.9.86) ----
+   A párharcban eddig EGYÁLTALÁN nem volt sárga lap. Az ok nem elvi volt, hanem
+   determinizmus: „egy helyben sorsolt lap a két kliensen mást hozna ki". A
+   piros lapnál ugyanez a gond állt fenn, és ugyanez a válasz oldotta meg (v2):
+   a súlyok és az esély a pillanatképpel utaznak, a DOBÁS pedig a közös,
+   seedelt szimulációba költözik.
+   A KÉPLET BETŰRE a playMatch-beli `_yw`: vérmérséklet-alapú lap-hajlam, a
+   fegyelem-skillek szorzója, a szezon-szerep kockázata. A padon ülő, a
+   kiállított és az eltiltott ember súlya nulla. A piroséval szemben NINCS
+   `clutchWallFactor` — a sárgánál a helyi ág sem használja. */
+function mpWireYellowWeights(active){
+  return active.map(x=>(x.bus||playerUnavailable(x.p.n))?0:
+    yellowRiskOf(x.p)
+    *multSkillEffect(x.p.n,"discipline")
+    *roleRiskMult(x.p.n));}
+/* ---- A HANGSÚLY-CSÚSZKÁK A PÁRHARCBAN (3.9.86) ----
+   A csúszkák (docs/hangsuly-csuszkak.md) a párharcban NEM hatottak: a közös
+   szimuláció a pillanatképből dolgozik, abba pedig egyetlen csúszka-csatorna
+   sem utazott. A megoldás csatornánként más, mert a SZŰRŐIK mások:
+
+     · goalw / assistw — minden szűrőjük JÁTÉKOS-STATIKUS (poszt, kategória,
+       képesség, életkor, „a legjobb"/„a sztár"). Semmi nem függ a perctől vagy
+       az állástól, tehát a szorzó a kezdőrúgáskor kiszámolható, és egyszerűen
+       BELESZOROZHATÓ a drótra fűzött gól- és gólpassz-súlyba;
+     · card / redmatch — feltétel nélküliek, tehát egyetlen szám;
+     · own / opp — MECCS-KÖZBENI szűrőik vannak (perc, vezetés, kapott gól,
+       emberhátrány). Ezek a `roles` mintáját követik: a KIÉRTÉKELT szorzó és a
+       NYERS szűrők utaznak, a feltételt pedig a szimuláció dönti el — az tudja
+       a percet, az állást és a piros lapot.
+
+   A NEVESÍTETT FELTÉTELEK (cond) közül három a kezdő tizenegy ténye
+   (coldStriker, starOff, condOff), azokat itt értékeljük ki. A negyedik
+   (afterInjury) meccs közbeni sérülésre vár — az a jelzés viszont a MAI
+   motorban is csak a lefújás után áll elő (lásd _dialInjured), tehát a
+   párharcban sem veszít semmit. */
+function h2hWireDial(ch){
+  const out=[];
+  try{
+    dialEach(ch,(ef,v,L)=>{
+      /* A kezdőrúgáskor eldönthető feltételek: ami most hamis, az a párharc
+         alatt sem válik igazzá — azt ki sem küldjük. */
+      if(ef.cond){
+        if(ef.cond==="afterInjury")return;
+        if(!dialCond(ef.cond,{}))return;}
+      const f=dialFactor(ef,v,L);
+      if(!(f>0)||f===1)return;
+      const e={f};
+      if(ef.minFrom!=null)e.mf=ef.minFrom;
+      if(ef.minTo!=null)e.mt=ef.minTo;
+      if(ef.lead)e.ld=ef.lead;
+      if(ef.red)e.rd=1;
+      if(ef.gaMin!=null)e.gmin=ef.gaMin;
+      if(ef.gaMax!=null)e.gmax=ef.gaMax;
+      out.push(e);});
+  }catch(e){}
+  return out;}
+/* A drótra fűzött csúszka-lista kiértékelése a szimulációban. A szűrők
+   jelentése betűre a dialMatch-é — csak a mezőnevek rövidebbek, mert ez a
+   lista a hálón utazik. */
+function h2hDialMul(list,c){
+  if(!list||!list.length)return 1;
+  const ctx=c||{};
+  let m=1;
+  for(let i=0;i<list.length;i++){
+    const e=list[i];
+    if(e.mf!=null&&!(ctx.min>=e.mf))continue;
+    if(e.mt!=null&&!(ctx.min<=e.mt))continue;
+    if(e.ld){
+      const d=(ctx.gf||0)-(ctx.ga||0);
+      if(e.ld==="up"&&!(d>0))continue;
+      if(e.ld==="down"&&!(d<0))continue;}
+    if(e.rd&&!ctx.red)continue;
+    if(e.gmin!=null&&!((ctx.ga||0)>=e.gmin))continue;
+    if(e.gmax!=null&&!((ctx.ga||0)<=e.gmax))continue;
+    m*=e.f;}
+  return m;}
 /* ================= A CSERETERVEZŐ FELÜLETE =================
    A kezdőrúgás előtt, felsőbb rétegen. Előbb egyetlen kérdés (akarsz-e
    cserét), és csak igenre nyílik meg a szerkesztő — így aki nem él vele, két
@@ -51950,6 +52026,20 @@ function h2hWireSnapshot(){
      playMatch-ben (rangadó-hangulat nélkül: párharcban az nincs). */
   const _redW=mpWireRedWeights(MS.active);
   const _redT0=_redW.reduce((a,x)=>a+x.base,0),_redT1=_redW.reduce((a,x)=>a+x.w,0);
+  /* A SÁRGALAP-SÚLYOK és a csapatszintű esély (3.9.86) — ugyanaz a képlet,
+     mint a playMatch-ben, rangadó-hangulat nélkül (párharcban az nincs). */
+  const _yelW=mpWireYellowWeights(MS.active);
+  /* A CSÚSZKÁK FELTÉTEL NÉLKÜLI CSATORNÁI: egy-egy szám. */
+  let _dCard=1,_dRedMatch=SIM.REDMATCH;
+  try{_dCard=dialMul("card",{});}catch(e){}
+  try{_dRedMatch=dialRedMatch();}catch(e){}
+  /* OSZTOTT DICSŐSÉG (3.9.86): a gól- és gólpassz-súlyok lapítása a párharcban
+     is él. A KAPUS kimarad, pontosan úgy, ahogy a helyi sorsolásnál
+     (spreadSkipGK) — a gólsúlya nagyságrenddel kisebb, az átlagra keverés
+     kapusgólok tucatját szülné. A lapítás a KÉSZ súlyokon megy, tehát minden
+     más módosító (skill, párkémia, szerep, csúszka) már benne van. */
+  const _spreadSkip=MS.active.map(a=>((slots[a.idx]&&slots[a.idx].pos)==="KP"));
+  const _spread=w=>{try{return styleSpreadWeights(w,_spreadSkip);}catch(e){return w;}};
   /* A CSERETERV drótra fűzött alakja. Csak az ÉRVÉNYES szabályok mennek fel, és
      legfeljebb annyi, amennyi a cserekeretbe belefér — a sorrend a rangsor. */
   const _P=subPlanState();
@@ -51982,14 +52072,24 @@ function h2hWireSnapshot(){
        a szám is kell. Két mező, két feladat. */
     shownOvr:teamStrength(),
     tacticEffect:MS.tacticEffect,tacticStyle:MS.tacticStyle,chemPairs:MS.chemPairs,
-    players:MS.active.map((a,k)=>{
-      const pos=slots[a.idx]?slots[a.idx].pos:"KKP";
-      return {n:a.p.n,pos,
-        gw:(GOALW[pos]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"goalw")
-           *chemGoalMultForPlayer(a.p.n,MS.activeNames),
-        aw:(ASSTW[pos]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"assistw"),
+    players:(()=>{
+      const _pos=MS.active.map(a=>(slots[a.idx]?slots[a.idx].pos:"KKP"));
+      /* A CSÚSZKÁK gól- és gólpassz-csatornája játékos-statikus (lásd
+         h2hWireDial) — itt, a kezdőrúgáskor pontosan kiszámolható. */
+      const _dg=MS.active.map((a,k)=>{
+        try{return dialMul("goalw",{name:a.p.n,pos:_pos[k]});}catch(e){return 1;}});
+      const _da=MS.active.map((a,k)=>{
+        try{return dialMul("assistw",{name:a.p.n,pos:_pos[k]});}catch(e){return 1;}});
+      const _gw=_spread(MS.active.map((a,k)=>
+        (GOALW[_pos[k]]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"goalw")
+        *chemGoalMultForPlayer(a.p.n,MS.activeNames)*_dg[k]));
+      const _aw=_spread(MS.active.map((a,k)=>
+        (ASSTW[_pos[k]]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"assistw")*_da[k]));
+      return MS.active.map((a,k)=>({n:a.p.n,pos:_pos[k],gw:_gw[k],aw:_aw[k],
         /* PIROSLAP-SÚLY: a szimuláció ebből választ, ha a lap eldördül. */
-        rw:_redW[k]?_redW[k].w:1};}),
+        rw:_redW[k]?_redW[k].w:1,
+        /* …és a SÁRGÁÉ (3.9.86). */
+        yw:_yelW[k]||0}));})(),
     /* ---- ELŐRE BEÁLLÍTOTT CSERÉK ÉS A PIROS LAP ----
        A terv és a piroslap-esély a pillanatképpel utazik, mert a szimulációnak
        KELL tudnia róluk: a csere megváltoztatja, ki lőhet gólt, a piros lap
@@ -52001,7 +52101,19 @@ function h2hWireSnapshot(){
        A kockázati feléjük (roleRiskMult a piroslap-súlyban, roleRiskTeamP a
        redP-ben) már itt van; ez a gólos felük útja. Lásd h2hWireRoles. */
     roles:h2hWireRoles(),
-    redP:SIM.REDP/18*(_redT0>0?_redT1/_redT0:1)*styleRedMult()*friendlyRiskMult()*roleRiskTeamP(MS.active,-1),
+    redP:SIM.REDP/18*(_redT0>0?_redT1/_redT0:1)*styleRedMult()*friendlyRiskMult()*roleRiskTeamP(MS.active,-1)*_dCard,
+    /* ---- A SÁRGA LAP, A MEGFÉLEMLÍTÉS ÉS A CSÚSZKÁK (3.9.86) ----
+       Mind a négy mező HIÁNYOZHAT (régi kliens pillanatképe): a szimuláció
+       ilyenkor a mai viselkedést adja — nincs sárga lap, nincs megfélemlítés,
+       a csúszkák semlegesek, az emberhátrány a régi fix tétel. */
+    yellowP:YELLOW_PER_MATCH/18*(1-(S.chYellowCut||0))*styleRedMult()*friendlyRiskMult()*_dCard,
+    /* MEGFÉLEMLÍTÉS: a kiállítás UTÁNI percekre az ELLENFÉL gólesélyének
+       szorzója. Eddig a párharcban néma volt: a naplósor megjelent, de a közös
+       lista gólrátáján semmi nem változott. */
+    redOppMult:styleRedOppGoalMult(),
+    /* AZ EMBERHÁTRÁNY TÉTELE a „tízzel is támadunk" csúszkával együtt. */
+    redMatch:_dRedMatch,
+    dials:{own:h2hWireDial("own"),opp:h2hWireDial("opp")},
     formName:(MS.active[MS.gi]&&MS.active[MS.gi].p.n)||null,
     weakName:(MS.active[MS.bi]&&MS.active[MS.bi].p.n)||null,
     /* KI ÍRTA — ebből derül ki, ha a két kliens ugyanabba a mezőbe ír (szerep-
@@ -52208,7 +52320,17 @@ function h2hSimulate(home,away,rnd,neutral){
     _auraLit:false,
     /* Régi kliens pillanatképében nincs redP — ilyenkor NEM dobunk, tehát a
        véletlen-folyam betűre a régi marad, és a piros lap helyben fut tovább. */
-    redP:(typeof sn.redP==="number"&&sn.redP>0)?sn.redP:0});
+    redP:(typeof sn.redP==="number"&&sn.redP>0)?sn.redP:0,
+    /* ---- A SÁRGA LAP ÉS A KÖRÜLÖTTE LÉVŐ RENDSZEREK (3.9.86) ----
+       Mind hiányozhat: régi kliens pillanatképénél a sárga lap NEM dördül el
+       (yellowP=0 → egyetlen R() hívás sem), a megfélemlítés semleges, az
+       emberhátrány a régi fix tétel, a csúszkák pedig nem szólnak bele.
+       A véletlen-folyam így betűre a régi marad — ez a szerződés. */
+    yellowP:(typeof sn.yellowP==="number"&&sn.yellowP>0)?sn.yellowP:0,
+    yc:{},                                   /* név → eddigi sárga lapjai */
+    redOppMult:(typeof sn.redOppMult==="number"&&sn.redOppMult>0)?sn.redOppMult:1,
+    redMatch:(typeof sn.redMatch==="number"&&sn.redMatch>0)?sn.redMatch:SIM.REDMATCH,
+    dials:(sn.dials&&typeof sn.dials==="object")?sn.dials:null});
   const H=mkSide(home),A=mkSide(away);
   const busOwn=x=>x.bus?BUS_OWN_MULT[Math.min(3,x.bus)-1]:1;
   const busOpp=x=>x.bus?BUS_OPP_MULT[Math.min(3,x.bus)-1]:1;
@@ -52228,11 +52350,19 @@ function h2hSimulate(home,away,rnd,neutral){
      közben mozdítja a képletet, a buszsofőr pedig a két kész λ-t szorozza —
      a saját oldalét visszafogja, az ellenfélét bezárja. */
   function recalc(){
-    const ho=H.ovr-(H.redName?SIM.REDMATCH:0),ao=A.ovr-(A.redName?SIM.REDMATCH:0);
+    /* AZ EMBERHÁTRÁNY TÉTELE oldalanként a sajátja (3.9.86): a „tízzel is
+       támadunk" csúszka a saját csapatod büntetését enyhíti, nem a társadét. */
+    const ho=H.ovr-(H.redName?H.redMatch:0),ao=A.ovr-(A.redName?A.redMatch:0);
     const Lh=matchLambdas(Object.assign({},home,{ovr:ho}),ao,neutral?0:SIM.HOME);
     const La=matchLambdas(Object.assign({},away,{ovr:ao}),ho,neutral?0:SIM.AWAY);
     lamHome=CL(CL((Lh.lf+La.la)/2)*busOwn(H)*busOpp(A));
-    lamAway=CL(CL((La.lf+Lh.la)/2)*busOwn(A)*busOpp(H));}
+    lamAway=CL(CL((La.lf+Lh.la)/2)*busOwn(A)*busOpp(H));
+    /* MEGFÉLEMLÍTÉS (3.9.86): akit kiállítottak, annak az ELLENFELE lő
+       kevesebbet. A szorzó a KIÁLLÍTOTT oldalé — ő vette meg a képességet —,
+       és a MÁSIK oldal λ-ján ül. Eddig a párharcban néma volt: a naplósor
+       megjelent, a gólráta viszont nem mozdult. */
+    if(H.redName&&H.redOppMult!==1)lamAway=CL(lamAway*H.redOppMult);
+    if(A.redName&&A.redOppMult!==1)lamHome=CL(lamHome*A.redOppMult);}
   recalc();
   const ev=[];let hg=0,ag=0;
   ev.push({min:0,type:"start",home:home.teamName,away:away.teamName});
@@ -52272,6 +52402,39 @@ function h2hSimulate(home,away,rnd,neutral){
     X.redName=who.n;who.gw=0;who.aw=0;
     ev.push({min,type:"red",side:sideKey,who:who.n});
     recalc();}
+  /* ---- ÉS A SÁRGA LAP IS (3.9.86) ----
+     Eddig a párharcban EGYÁLTALÁN nem volt sárga lap. Nem elvből: a helyben
+     dobott lap a két kliensen mást hozott volna ki, a második sárgából
+     született kiállítás pedig már az állást is szétvitte volna. A piros lapnál
+     ugyanez a gond állt fenn, és ugyanez a válasz oldja meg — a dobás a közös,
+     seedelt listába költözik.
+
+     A MÁSODIK SÁRGA KIÁLLÍTÁS, és ezt A SZIMULÁCIÓ mondja ki: a λ-ra is hat
+     (emberhátrány), tehát nem hagyható a lejátszásra. Ilyenkor a lista MINDKÉT
+     eseményt viszi — a sárgát ÉS a pirosat (`y2:true`) —, mert egy régebbi
+     kliens a sárgát nem ismeri, a pirosat viszont igen: így ő is ugyanúgy
+     tízre fogy, csak a lap útját nem látja.
+
+     RÉGI PILLANATKÉPNÉL (nincs yellowP) egyetlen R() hívás sem történik, tehát
+     a véletlen-folyam betűre a régi marad. */
+  function rollYellow(X,sideKey,min){
+    /* EGY KIÁLLÍTÁS CSAPATONKÉNT: a motor egyetlen `redIdx`-et ismer, tehát a
+       második sárgából született piros nem fér el egy meglévő mellé. Ezért ha
+       az oldal már tízre fogyott, a sárga sem dördül el többé — inkább ne
+       legyen lap, mint olyan lap, amit a lejátszás nem tud végigvinni. */
+    if(!X.yellowP||X.redName)return;
+    if(R()>=X.yellowP)return;
+    const cand=X.players.filter(p=>(p.yw||0)>0);
+    if(!cand.length)return;
+    const who=h2hPick(cand,"yw",R);
+    const n=(X.yc[who.n]||0)+1;
+    X.yc[who.n]=n;
+    const masodik=n>=2;
+    ev.push({min,type:"yellow",side:sideKey,who:who.n,y2:masodik});
+    if(!masodik)return;
+    X.redName=who.n;who.gw=0;who.aw=0;who.yw=0;
+    ev.push({min,type:"red",side:sideKey,who:who.n,y2:true});
+    recalc();}
   for(let t=1;t<=18;t++){
     const min=t*5;
     /* A tick ELEJÉN dől el, ki van a pályán — utána esnek a gólok. A csere a
@@ -52282,6 +52445,10 @@ function h2hSimulate(home,away,rnd,neutral){
        a saját kapunkat — a hazai oldalnak tehát az idegenbeli gólszám. */
     rollRed(H,"home",min,ag);
     rollRed(A,"away",min,hg);
+    /* A LAPOK SORRENDJE a playMatch-ét követi: előbb a piros, aztán a sárga.
+       Régi pillanatképnél mindkettő azonnal visszalép, véletlent sem fogyaszt. */
+    rollYellow(H,"home",min);
+    rollYellow(A,"away",min);
     const side=(who,lamTot,isHome)=>{
       const g=poisson(lamTot/18,R);
       for(let k=0;k<g;k++){
@@ -52313,8 +52480,23 @@ function h2hSimulate(home,away,rnd,neutral){
        a buszsofőr két szorzója (busOwn/busOpp) a két kész λ-n.
        Az `ag` / `hg` itt a védekező fél által KAPOTT gól: az Árok feltétele
        ebből olvassa, hogy makulátlan-e még a kapu. Nem fogyaszt véletlent. */
-    const lamH=CL(lamHome*h2hRoleOwnMult(H)*h2hRoleOppMult(A,min,hg));
-    const lamA=CL(lamAway*h2hRoleOwnMult(A)*h2hRoleOppMult(H,min,ag));
+    /* ---- A HANGSÚLY-CSÚSZKÁK (3.9.86) ----
+       Két csatorna szól bele a gólvárhatóságba, és a kettő MÁS OLDALÉ, épp
+       úgy, ahogy a helyi motorban: a TÁMADÓ fél „own" csúszkája a saját
+       gólrátáját mozdítja, a VÉDEKEZŐ fél „opp" csúszkája pedig azt, amennyit
+       kap. A környezet (perc, állás, emberhátrány) mindkettőnél a SAJÁT
+       nézőpontjából áll össze — a „vezetünk" a hazainak hg>ag, a vendégnek
+       fordítva. */
+    const _dl=(X,gfX,gaX,red)=>X.dials
+      ?h2hDialMul(X.dials.own,{min,gf:gfX,ga:gaX,red})
+      :1;
+    const _dlOpp=(X,gfX,gaX,red)=>X.dials
+      ?h2hDialMul(X.dials.opp,{min,gf:gfX,ga:gaX,red})
+      :1;
+    const lamH=CL(lamHome*h2hRoleOwnMult(H)*h2hRoleOppMult(A,min,hg)
+      *_dl(H,hg,ag,!!H.redName)*_dlOpp(A,ag,hg,!!A.redName));
+    const lamA=CL(lamAway*h2hRoleOwnMult(A)*h2hRoleOppMult(H,min,ag)
+      *_dl(A,ag,hg,!!A.redName)*_dlOpp(H,hg,ag,!!H.redName));
     side(H,lamH,true);
     side(A,lamA,false);
     /* A félidő a 9. tick VÉGÉN: ekkor van kész az 1-45. perc. */
@@ -52324,7 +52506,7 @@ function h2hSimulate(home,away,rnd,neutral){
      percre eső eseményeknél a TÍPUS dönt: kezdőrúgás → csere/lap → gól →
      félidő → vége. Enélkül egy pontosan 45. perces gól a FÉLIDŐ-sor UTÁN
      jelenhetne meg. A gól/félidő/vége EGYMÁSHOZ mért sorrendje változatlan. */
-  const ord=e=>e.type==="start"?0:(e.type==="sub"||e.type==="red")?1
+  const ord=e=>e.type==="start"?0:(e.type==="sub"||e.type==="yellow"||e.type==="red")?1
     :e.type==="goal"?2:e.type==="half"?3:4;
   ev.sort((a,b)=>a.min-b.min||ord(a)-ord(b));
   duelSpreadBuckets(ev);
@@ -52337,9 +52519,9 @@ function h2hSimulate(home,away,rnd,neutral){
     if(e.type==="goal"){if(e.side==="home")h++;else a2++;}
     if(e.type==="goal"||e.type==="half"||e.type==="end"){e.hg=h;e.ag=a2;}});
   /* A LISTA VERZIÓJA. v>=2 azt jelenti: a cserék és a piros lapok ITT dőlnek
-     el, tehát a lejátszásnak nem szabad saját lapot dobnia. Régi (verzió
-     nélküli) listánál minden marad a régiben. */
-  return {v:2,events:ev,hg,ag,lam:{home:lamHome,away:lamAway}};}
+     el, tehát a lejátszásnak nem szabad saját lapot dobnia. v>=3: a SÁRGA
+     lapok is (3.9.86). Régi (verzió nélküli) listánál minden marad a régiben. */
+  return {v:3,events:ev,hg,ag,lam:{home:lamHome,away:lamAway}};}
 /* ================= EGY VÖDÖRBEN CSAK AZ EGYIK CSAPAT GÓLJA =================
    BEJELENTETT HIBA: a párharc naplójában a 74. percben esett a saját gól, és
    utána a 73. percben az ellenfél egyenlítése — vagyis az idő VISSZAFELÉ ugrott.
@@ -58949,7 +59131,7 @@ function playMatch(){
      pontosan azt követi, ami a pályán történt. A közös listában a MÁSIK oldal
      cseréi is ott vannak, azokkal viszont nincs dolgunk: az ő keretét nem
      vezetjük. */
-  const duelSubBkt={},duelRedBkt={};
+  const duelSubBkt={},duelRedBkt={},duelYelBkt={};
   const _duelMine=e=>((e.side==="home")===DUEL.iAmHome);
   if(DUEL)(DUEL.sim.events||[]).forEach(e=>{
     const b=Math.max(1,Math.min(18,Math.ceil((e.min||1)/5)));
@@ -58958,7 +59140,8 @@ function playMatch(){
       (box[b]=box[b]||[]).push(e);return;}
     if(!_duelMine(e))return;
     if(e.type==="sub")(duelSubBkt[b]=duelSubBkt[b]||[]).push(e);
-    else if(e.type==="red")(duelRedBkt[b]=duelRedBkt[b]||[]).push(e);});
+    else if(e.type==="red")(duelRedBkt[b]=duelRedBkt[b]||[]).push(e);
+    else if(e.type==="yellow")(duelYelBkt[b]=duelYelBkt[b]||[]).push(e);});
   /* A közös lista vezeti a piros lapot? (v>=2). Ha igen, a helyi dobás
      elmarad — különben kétszer születne kiállítás ugyanazon a mérkőzésen. */
   const duelRedFromList=!!(DUEL&&(DUEL.sim.v||0)>=2);
@@ -58972,6 +59155,25 @@ function playMatch(){
     const ctx=halftimeCtx();
     const inP=(ctx.bench()||[]).find(b=>b.n===e.in);
     if(inP)ctx.doSub(k,inP);}
+  /* ---- A SÁRGA LAP A KÖZÖS LISTÁBÓL (3.9.86) ----
+     A következmények betűre ugyanazok, mint a helyben dobott lapnál: a
+     lapgyűjtés számlálója, a rettenet-pont, az eredményjelző és a Panzer
+     mérföldkövei mind ugyanazon az úton mennek tovább.
+     A MÁSODIK SÁRGÁT NEM ITT ÁLLÍTJUK KI: azt a lista külön `red` eseménye
+     hozza (y2:true), mert az emberhátrány már a KÖZÖS gólrátába is beleszólt.
+     Itt csak megjegyezzük a nevet (mSecondYellow), hogy a lefújás utáni
+     lapgyűjtés-könyvelés ugyanúgy hagyja ki, mint egyjátékosban. */
+  function duelApplyYellow(e){
+    const k=active.findIndex(a=>!a.bus&&a.p.n===e.who);
+    if(k<0)return;
+    const nev=active[k].p.n;
+    mYellow[nev]=(mYellow[nev]||0)+1;
+    if(e.y2){
+      mSecondYellow=nev;
+      return;}   /* a kiállítás sorát a párja, a red esemény írja ki */
+    addLine(`${gminNewTxt(min)}  ${yellowLine(nev,yellowReasonFor(nev,{min:gnow(min),gf,ga,scored:!!mScore[nev]}))}`,"m rc");
+    try{fearNote("yellow");}catch(err){}
+    sbEv("us","yellow",nev,gnow(min));}
   /* A kiállítás a közös listából. A következmények betűre ugyanazok, mint a
      helyben dobott lapnál — csak az esemény FORRÁSA más. */
   function duelApplyRed(e){
@@ -58983,7 +59185,12 @@ function playMatch(){
     /* EGY ESEMÉNY = EGY PERC: a naplósor és a mérföldkő-előtag ugyanarról a
        pillanatról beszél, tehát ugyanazt a bélyeget kapja (3.9.78). */
     const _drt=gminNewTxt(min);
-    addLine(`${_drt}  ${redCardLine(active[redIdx].p.n)}`,"m rc");
+    /* MÁSODIK SÁRGÁÉRT (3.9.86) más a szöveg — ugyanaz, amit egyjátékosban a
+       `sargat` ír ki, hogy a napló ne egy a semmiből jött pirosat mutasson. */
+    addLine(e.y2
+      ?`${_drt}  🟨🟨 MÁSODIK SÁRGA — ${esc(shortName(active[redIdx].p.n))}: `
+        +`újabb szabálytalanság. Megkapja a másodikat, és ezzel mehet le. Tízen maradtunk.`
+      :`${_drt}  ${redCardLine(active[redIdx].p.n)}`,"m rc");
     sbEv("us","red",active[redIdx].p.n);
     mileRed(MILE,active[redIdx].p.n,`${_drt}  `);
     diff-=dialRedMatch();lf=lam(diff);la=lam(-diff)*defenseMult()*styleRedOppGoalMult();
@@ -59292,6 +59499,9 @@ function playMatch(){
     if(DUEL){
       const _b=Math.max(1,Math.min(18,Math.ceil(min/5)));
       (duelSubBkt[_b]||[]).forEach(duelApplySub);
+      /* A SÁRGA a piros ELŐTT: a második sárga párja egy red esemény, és a
+         napló csak akkor olvasható, ha a lap előbb szól, mint a kiállítás. */
+      (duelYelBkt[_b]||[]).forEach(duelApplyYellow);
       (duelRedBkt[_b]||[]).forEach(duelApplyRed);}
     /* ---- EGYJÁTÉKOS: A TERVEZETT CSERÉK ----
        Ugyanaz a szabálylista, mint a párharcban — csak itt nem a közös
