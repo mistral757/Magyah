@@ -149,14 +149,28 @@ for c in coaches:
         src[c] = "gépi"
 
 # ── DURVA SZÓ SZŰRŐJE ──────────────────────────────────────────────────────
-# A fonetikus szabályok véletlenül trágár alakot is kidobhatnak (Fazio →
-# „Faszio"). Ez a szűrő elkapja őket; a találatokat a manual.py CLEAN blokkja
-# írja felül kézzel. Ha ez a lista nem üres, a build hangosan szól.
+# MIT AKAR ELKAPNI. A fonetikus szabályok VÉLETLENÜL trágár alakot is
+# kidobhatnak (Fazio → „Faszio"). Az ilyet a manual.py-ban kell felülírni.
+#
+# AMIT VISZONT NEM HIBA. A kézi réteg SZÁNDÉKOSAN tartalmaz vaskos neveket
+# („Aztakurva Sándor", „Seggborotváló András", „Faszerella Dániel") — azok a
+# projektgazda döntései, nem a motor melléfogásai.
+#
+# EZ A KETTŐ SOKÁIG EGY LISTÁBAN VOLT, és a build minden futásnál ugyanarra a
+# három-négy SZÁNDÉKOS névre kiabált. Egy riasztás, ami sosem tud kitisztulni,
+# megtanít arra, hogy ne nézz rá — és akkor a következő VALÓDI „Faszio" is
+# átcsúszik. Ezért a szűrő mostantól a FORRÁST is nézi: a gépi találatra
+# hangosan szól, a kézit csak halkan nyugtázza.
 DURVA = ["fasz", "picsa", "kurva", "segg", "geci", "buzi", "köcsög", "pina"]
 _durva = [(n, table[n][0]) for n in table
           if any(w in table[n][0].lower() for w in DURVA)]
-if _durva:
-    print("!! DURVA ALAK, kézi felülírás kell:", _durva)
+_durva_gepi = [x for x in _durva if src.get(x[0]) != "kézi"]
+_durva_kezi = [x for x in _durva if src.get(x[0]) == "kézi"]
+if _durva_gepi:
+    print("!! DURVA ALAK A SZABÁLYMOTORBÓL, kézi felülírás kell:", _durva_gepi)
+if _durva_kezi:
+    print(f"   (szándékos vaskos kézi név: {len(_durva_kezi)} db — "
+          + ", ".join(x[1] for x in sorted(_durva_kezi, key=lambda y: y[1])) + ")")
 
 # ── AZONOS TELJES NÉV FELOLDÁSA ────────────────────────────────────────────
 # A DB több névütközést SZÁNDÉKOSAN szétválasztva tárol (Pedro Mendes és

@@ -1217,3 +1217,35 @@ MANUAL.update({
   # alak az UTOLSÓ tag — a kezdőbetűvel együtt, mert az a poén fele.
   "Yaya Touré":             ("Jaja Túr É.", "Túr É."),
 })
+
+
+MANUAL.update({
+# ═══ A 30. KÖTEG DANISÍTÁSA — a hiányzó évtizedek nevei ═══════════════════
+# A köteg 66 új nevet hozott (Milan 50/51, Blackpool 52/53, Feyenoord 69/70,
+# Dinamo Kijev 74/75, Dánia 1992, Argentína 1978). Ezek a projektgazda kézi
+# átiratai; a többi név a szabálymotoré maradt.
+
+# ── Blackpool 1952/53 — a „Matthews-döntő" ─────────────────────────────────
+  "Stanley Matthews":       ("Mettyúz Csongor", "Mettyúz"),
+  "Stan Mortensen":         ("Mórtensffy Jenő", "Mórtensffy"),
+
+# ── AC Milan 1950/51 — a Gre-No-Li ─────────────────────────────────────────
+  # R2 — a név JELENT valamit: a svéd „gren" ág/zöld hangzására.
+  "Gunnar Gren":            ("Ződ Gúnár", "Ződ"),
+  # NYUGATOS SORREND: itt a keresztnév áll elöl, tehát a rövid alak az UTOLSÓ
+  # tag — ugyanaz a szerkezet, mint a „Jaja Túr É."-nél.
+  "Gunnar Nordahl":         ("Nórdal Gúnár", "Nórdal"),
+  "Nils Liedholm":          ("Lídólm Miklós", "Lídólm"),
+
+# ── Feyenoord 1969/70 — az első holland BEK ────────────────────────────────
+  "Coen Moulijn":           ("Múlíjn Kohén", "Múlíjn"),
+  "Ove Kindvall":           ("Kindvál Óve", "Kindvál"),
+
+# ── Argentína 1978 VB ──────────────────────────────────────────────────────
+  "Mario Kempes":           ("Kempesz Márió", "Kempesz"),
+  "Daniel Passarella":      ("Faszerella Dániel", "Faszerella"),
+  "Ubaldo Fillol":          ("Filioli Zsombor", "Filioli"),
+
+# ── Dánia 1992 EB ──────────────────────────────────────────────────────────
+  "Brian Laudrup":          ("Ládrupp Brián", "Ládrupp"),
+})

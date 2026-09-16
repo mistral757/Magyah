@@ -247,12 +247,12 @@ azaz a hirdetett −1,4-es rés valóban teljesül.
 `node tools/pyramid-sim.js bands`:
 
 ```
-klub-szezon: 332 · egyedi klub: 194 · sáv: 71,1 … 88,0
+klub-szezon: 344 · egyedi klub: 194 · sáv: 71,1 … 88,0
 
 csapat/oszt |  teljes sáv  | D1        | D2        | D3        | D4        | D5        | D6
-         16 | 79,8…88,0    | 85,5-88,0 | 83,0-85,1 | 82,1-83,0 | 81,5-82,0 | 80,4-81,5 | 79,8-80,3
+         16 | 79,8…88,0    | 85,5-88,0 | 83,3-85,1 | 82,1-83,0 | 81,5-82,0 | 80,4-81,5 | 79,8-80,3
          15 | 79,9…88,0    | 85,6-88,0 | 83,4-85,5 | 82,5-83,3 | 81,7-82,5 | 80,5-81,6 | 79,9-80,5
-         12 | 80,7…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,7 | 81,7-82,0 | 80,7-81,6
+         12 | 80,7…88,0    | 85,8-88,0 | 83,7-85,8 | 82,8-83,7 | 82,1-82,8 | 81,7-82,0 | 80,7-81,6
 ```
 
 **A tervezett 71–91-es piramis nyers Ratingekből NEM építhető meg.** A 90
@@ -276,7 +276,15 @@ A 30. KÖTEG (hat keret: Milan 50/51, Blackpool 52/53, Feyenoord 69/70, Dinamo
 Kijev 74/75, Dánia 1992, Argentína 1978) szintén a mezőny alá-körül esik
 (79,5-től 82,7-ig), a mediánt megint nem mozdította (80,64, most 332 keret), és
 a D1 sem mozdult — csak a legalsó osztály alsó széle jött fel 79,6-ról 79,8-ra,
-mert a köteg legyengébb kerete is 79,5 fölött van. Tehát két szomszédos osztály
+mert a köteg legyengébb kerete is 79,5 fölött van.
+
+A 31. KÖTEG (tizenkét keret a név szerint kért játékosokhoz) az első, amelyik a
+mezőny FELSŐ közepét sűríti: a Milan 2004/05 (86,5), a Real Madrid 2021/22
+(85,8), a Németország 1974 (85,5) és a mostani Liverpool (85,2) mind a legjobb
+90 közé esik. A hatás mégis egyetlen szám: a D2 alsó széle 83,0-ról 83,3-ra
+jött fel (16 csapat/osztály). A D1 alja (85,5), a tető (88,0) és a legjobb 90
+sávszélessége (8,1) NEM mozdult, a teljes medián pedig 80,64-ről 80,77-re —
+ennyit visz tizenkét, zömmel elit keret 344-ből. Tehát két szomszédos osztály
 közé csak ~1,5–2 pont jut — nem 2-pontos lépcső 8 pont széles sávokkal, ahogy
 a terv szólt, hanem 1,5-es lépcső 2 pont széles sávokkal. Ráadásul **88 fölött egyetlen csapat sincs**: a legerősebb a
 Barcelona 2010/11 (88,0), és mindössze két klub éri el a 87-et.
