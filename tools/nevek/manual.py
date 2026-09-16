@@ -1347,3 +1347,74 @@ MANUAL.update({
   "Nicolás Lombaerts":      ("Lombba-Erc Niki", "Lombba-Erc"),
   "Yuri Lodygin":           ("Lódi-Dzsin Jurika", "Lódi-Dzsin"),
 })
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  33. KÖR (3.9.87) — A GÉPI NEVEK FELÜLÍRÁSA
+#
+#  Nem új keret: a MEGLÉVŐ adatbázis olyan nevei, ahol a szabálymotor fonetikus
+#  átírást adott, pedig ott ült egy magyar szó. A szabálymotor ezt nem is
+#  láthatja — ő hangzást másol, nem jelentést keres. Ez a kör harminckét ilyet
+#  vesz kézbe.
+#
+#  NÉGY ÜTKÖZÉST fel kellett oldani, mert a kért rövid alak MÁR FOGLALT volt.
+#  A rövid alak az, amit a napló és a keretlista mutat — két „Fontos" a
+#  képernyőn két különböző embert jelentene ugyanazzal a névvel. A poén
+#  mindegyiknél megmarad, csak a szó ragozódik egyet.
+# ═══════════════════════════════════════════════════════════════════════════
+MANUAL.update({
+
+# ── A név JELENT valamit ───────────────────────────────────────────────────
+  # kehl → kehely
+  "Sebastian Kehl":         ("Kehely Sebestyén", "Kehely"),
+  # karembeu → karambol
+  "Christian Karembeu":     ("Karambol Krisztián", "Karambol"),
+  # candela = gyertya → kandalló
+  "Vincent Candela":        ("Kandalló Vince", "Kandalló"),
+  # cabrini → kabrió
+  "Antonio Cabrini":        ("Kabrió Antal", "Kabrió"),
+  # glik → glükóz
+  "Kamil Glik":             ("Glükóz Kamill", "Glükóz"),
+  # reuter → Rejtő (Jenő)
+  "Stefan Reuter":          ("Rejtő István", "Rejtő"),
+  # ÜTKÖZÉS FELOLDVA: a „Barátságos" már Baróti Lajosé („Barátságos Lali"),
+  # ezért freund = barát → barátkozó.
+  "Steffen Freund":         ("Barátkozó István", "Barátkozó"),
+  # schwarz → svarcol, és a „bekk" a posztja is volt
+  "Georg Schwarzenbeck":    ("Svarcol-Bekk György", "Svarcol-Bekk"),
+  # fuchs = róka → fuxos
+  "Christian Fuchs":        ("Fuxos Krisztián", "Fuxos"),
+  # ranocchia = béka → rántotta
+  "Andrea Ranocchia":       ("Rántotta András", "Rántotta"),
+
+# ── Magyar szó a hangzás mögött ────────────────────────────────────────────
+  "Neven Subotić":          ("Szubotics Nesztor", "Szubotics"),
+  "Álvaro Morata":          ("Morotva Alvár", "Morotva"),
+  "Lorenzo Pellegrini":     ("Pellengér Lőrinc", "Pellengér"),
+  "Rick Karsdorp":          ("Kardos Richárd", "Kardos"),
+  "Joe Gomez":              ("Gombos Jocó", "Gombos"),
+  # ÜTKÖZÉS FELOLDVA: a „Fontos" már Just Fontaine-é („Fontos Jusztin").
+  "José Fonte":             ("Fontoskodó József", "Fontoskodó"),
+  "Fernando Couto":         ("Kutyó Nándor", "Kutyó"),
+  "Iván Córdoba":           ("Kordbársony Iván", "Kordbársony"),
+  # ÜTKÖZÉS FELOLDVA: a „Matyó" már Lothar Matthäusé („Matyó Lotár").
+  "Jérémy Mathieu":         ("Matyóka Jeremiás", "Matyóka"),
+  "Teddy Sheringham":       ("Sör-Innám Tivadar", "Sör-Innám"),
+  "Paolo Di Canio":         ("Dikánya Pál", "Dikánya"),
+  "Sulley Muntari":         ("Munt-Aranyos Szüli", "Munt-Aranyos"),
+  "Branislav Ivanović":     ("Iványi Branyiszló", "Iványi"),
+  # ÜTKÖZÉS FELOLDVA: a „Subás" már Luis Suárezé („Subás Lajos").
+  "Danijel Subašić":        ("Subások Dániel", "Subások"),
+  # young = fiatal, és az „ifj." rá is tesz egy lapáttal. A rövid alak VISZI
+  # az „ifj."-t, ahogy minden más ilyen sor (lásd „ifj. Brusz", „ifj. Fontos").
+  "Ashley Young":           ("ifj. Fiatal Áron", "ifj. Fiatal"),
+  # small = kicsi
+  "Chris Smalling":         ("Kicsiző Krisztián", "Kicsiző"),
+  "Alessio Tacchinardi":    ("Tacskónárdi Elek", "Tacskónárdi"),
+  "Corentin Tolisso":       ("Tolató Kornél", "Tolató"),
+  "Lionel Scaloni":         ("Skálázó Leó", "Skálázó"),
+  "Nwankwo Kanu":           ("Kenu Van Q", "Kenu"),
+
+# ── EGYNEVŰEK: a rövid alak ugyanaz, mint a teljes ─────────────────────────
+  "Willian":                ("Villám", "Villám"),
+  "Costinha":               ("Kosztinnya", "Kosztinnya"),
+})
