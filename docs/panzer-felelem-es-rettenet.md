@@ -55,7 +55,8 @@ Panzernél épp ellentétes irányba mutat — és pont ez a filozófia poénja.
 
 ## 3. Rettenet pont
 
-Meccsenként a félelem szint **10%-a** gyűjthető. A tételek:
+Meccsenként a félelem szint **10%-a** gyűjthető. A tételek (az **alaptarifa**,
+ami a 100-as félelem szintig érvényes — lásd alább):
 
 | esemény | pont |
 |---|---|
@@ -65,6 +66,47 @@ Meccsenként a félelem szint **10%-a** gyűjthető. A tételek:
 | mesterhármas | 1 |
 | kemény belépő | 0,5 |
 | védekező villanás | 0,1 |
+
+### A tarifa 100 fölött a szinttel arányos (3.9.90)
+
+> **BEJELENTETT KÉRÉS:** „A meccsen kapható rettenet pontok is legyenek
+> arányosítva a félelem szinttel 100as szint felett. Addig legyen a mostani
+> rögzített tarifa."
+
+A **plafon** a szint 10%-a, tehát a szinttel együtt nőtt — a **tarifa** viszont
+fix volt. Egy tipikus Panzer-est (3 sárga, 1 piros, 1 mesterhármas, 2 kemény
+belépő, 8 védekező villanás, +5 meccserő-fölény) **11,3** nyers pontot hozott,
+akármekkora volt a félelem szint. A plafon ettől elszakadt:
+
+| félelem szint | plafon | a régi nyers hozam | a plafon hány %-a |
+|--:|--:|--:|--:|
+| 50 | 5 | 11,3 | 226% |
+| 100 | 10 | 11,3 | 113% |
+| 200 | 20 | 11,3 | 57% |
+| 500 | 50 | 11,3 | 23% |
+| 1000 | 100 | 11,3 | 11% |
+| 2000 | 200 | 11,3 | **6%** |
+
+Vagyis a rettenet-gazdaság pont ott állt meg, ahol a legjobban kellett volna
+pörögnie: a plafon elérhetetlenné vált, és a saját 10%-os ígéretét sem tudta
+beváltani.
+
+```
+szorzó = (félelem szint > 100) ? félelem szint / 100 : 1
+```
+
+A 100-as szintig tehát **betűre a régi** tarifa fut; fölötte minden tétel
+arányosan nő, a meccserő-fölényt is beleértve. Mérve, ugyanazzal a tipikus
+esttel: a nyers hozam a plafon **113%-a marad minden szinten** 100 fölött —
+azaz a plafon ugyanúgy fog, mint eddig a 100-as szinten.
+
+**Ami NEM szorzódik:** a *győzelem erősebb ellen* és az *óriásölés*. Azok már
+eleve a plafonból számolnak (`plafon × arány`), tehát a félelem szinttel
+együtt nőnek — még egyszer megszorozni őket dupla könyvelés volna. A próba ezt
+külön méri: az óriásölés minden szinten pontosan a plafont adja.
+
+A felület tarifa-sora a **skálázott** számokat mutatja, és 100 fölött ki is
+írja a szorzót.
 
 **A „sima szerelés" a motorban nem külön esemény**: a szerelés a
 védekezés-szorzóban van elrejtve, kimondott eseménye csak a kemény belépőnek

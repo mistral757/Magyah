@@ -98,8 +98,16 @@ const {spawn}=require('child_process');
     /* ---- 4. A MECCS VÉGI ÖSSZESÍTŐ ---- */
     const ossz=sorok.filter(t=>/RETTENET — a mérkőzés mérlege/.test(t));
     const bontas=sorok.filter(t=>/^→ /.test(t)&&/védekező villanás/.test(t));
+    /* A VÁRT ÖSSZEG SZÁMOLVA, nem beírva: a tarifa a 100-as félelem szint
+       fölött a szinttel arányos (3.9.90), és ez a jelenet 120-on fut. A
+       győzelmi tétel NEM skálázódik — az eleve a plafonból számol. */
+    const vartEsemeny=(DREAD_PTS.yellow+DREAD_PTS.red+DREAD_PTS.hat
+      +DREAD_PTS.hard+2*DREAD_PTS.tackle)*dreadScale();
+    const vartGyozelem=Math.round(fearMatchCap()*Math.min(1,4/dreadWinGiant())*10)/10;
     o.osszesito={
       van:ossz.length===1,
+      vart:Math.round((vartEsemeny+vartGyozelem)*10)/10,
+      skala:dreadScale(),
       szoveg:ossz[0]||"",
       /* a NÉMA tételek is benne vannak — ez az egyetlen hely, ahol a mérleg teljes */
       bontasVan:bontas.length===1,
@@ -163,10 +171,14 @@ const {spawn}=require('child_process');
      r.feed.szereles===0,r.feed);
 
   console.log("\n=== a meccs végi összesítő ===");
-  /* 0,5 + 2 + 1 + 0,5 + 2×0,1 + 6 = 10,2 — a plafon (12) alatt, tehát a
-     teljes összeg jár. Az összesítő a MECCS EGÉSZÉT mondja, nem egy tételt. */
-  ok("pontosan egy összesítő, és a meccs TELJES összegét mondja (10,2)",
-     r.osszesito.van===true&&/\+10,2 pont/.test(r.osszesito.szoveg),
+  /* Az esemény-tételek (0,5 + 2 + 1 + 0,5 + 2×0,1) a félelem szint szerint
+     skálázódnak 100 fölött — ez a jelenet 120-on fut, tehát ×1,2 —, a
+     győzelmi tétel (a plafon fele) viszont nem. Az összeg a plafon (12) alatt
+     marad, tehát a teljes jár. Az összesítő a MECCS EGÉSZÉT mondja, nem egy
+     tételt. */
+  ok(`pontosan egy összesítő, és a meccs TELJES összegét mondja (${String(r.osszesito.vart).replace(".",",")}, a tarifa ×${r.osszesito.skala})`,
+     r.osszesito.van===true
+     &&new RegExp("\\+"+String(r.osszesito.vart).replace(".",",")+" pont").test(r.osszesito.szoveg),
      {szoveg:r.osszesito.szoveg});
   ok("a tételes bontásban a NÉMA tételek is ott vannak — ez az egyetlen teljes mérleg",
      r.osszesito.bontasVan===true&&/védekező villanás ×2/.test(r.osszesito.bontas),

@@ -6091,7 +6091,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.89";
+const APP_VERSION="3.9.90";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -39684,6 +39684,27 @@ const DREAD_PRICE_KAR=80;          /* Háború istene — kétszer annyi */
 const DREAD_PTS={yellow:0.5,red:2,hat:1,hard:0.5,tackle:0.1};
 const DREAD_GAP_FULL=5;            /* +5 meccserő fölött jár a teljes 5 pont */
 const DREAD_GAP_MAX=5;
+/* ---- A TARIFA A FÉLELEM SZINTTEL SKÁLÁZÓDIK 100 FÖLÖTT (3.9.90) ----
+   KIMONDOTT KÉRÉS: „A meccsen kapható rettenet pontok is legyenek arányosítva
+   a félelem szinttel 100as szint felett. Addig legyen a mostani rögzített
+   tarifa."
+
+   MIÉRT KELLETT. A meccsenkénti PLAFON a félelem szint 10%-a (fearMatchCap),
+   tehát a szinttel együtt nőtt — a TARIFA viszont fix volt (sárga 0,5, piros
+   2, mesterhármas 1, kemény belépő 0,5, védekező villanás 0,1). Egy 1000-es
+   félelem szintnél a plafon 100 pont, egy tipikus mérkőzés viszont a fix
+   tarifával néhány pontot hozott: a plafon ELÉRHETETLENNÉ vált, és a
+   rettenet-gazdaság pont ott állt meg, ahol a legjobban kellett volna
+   pörögnie. A 100-as szint ALATT a tarifa betűre a régi — ott a plafon
+   (10 pont) amúgy is fogott.
+
+   AMI NEM SZORZÓDIK: a győzelem erősebb ellen és az óriásölés (fearNoteWin).
+   Azok MÁR a plafonból számolnak (cap × arány), tehát a félelem szinttel eleve
+   együtt nőnek — még egyszer megszorozni őket dupla könyvelés volna. */
+const DREAD_SCALE_FROM=100;        /* eddig a szintig fix a tarifa */
+function dreadScale(){
+  let L=0;try{L=fearLevel();}catch(e){L=0;}
+  return L>DREAD_SCALE_FROM?L/DREAD_SCALE_FROM:1;}
 /* ---- A TÉTELEK NEVE A KÖZVETÍTÉSBEN (3.9.74) ----
    KIMONDOTT KÉRÉS: „legyen rettenet pontjelző a feedben. Az érintett
    események után közvetlenül, és a meccs végén egy összesítő."
@@ -39781,12 +39802,14 @@ function fearMatchStart(){
   try{
     const g=levelGap();
     if(g>0){
-      _dreadGap=Math.min(DREAD_GAP_MAX,DREAD_GAP_MAX*Math.min(1,g/DREAD_GAP_FULL));
+      /* A FÖLÉNY IS FIX TARIFA VOLT (max 5 pont), tehát ugyanúgy skálázódik. */
+      const nyers=Math.min(DREAD_GAP_MAX,DREAD_GAP_MAX*Math.min(1,g/DREAD_GAP_FULL));
+      _dreadGap=Math.round(nyers*dreadScale()*100)/100;
       if(_dreadGap>0)dreadBook("gap",_dreadGap);}
   }catch(e){}}
 function fearNote(kind,db){
   if(!fearOn())return;
-  const pont=(DREAD_PTS[kind]||0)*(db||1);
+  const pont=Math.round((DREAD_PTS[kind]||0)*(db||1)*dreadScale()*100)/100;
   if(!pont)return;
   _dreadRaw+=pont;
   dreadBook(kind,pont);
@@ -86754,10 +86777,16 @@ function fearSectionHtml(){
     +`<div class="msNote">A <b>félelem szint</b> nem gyűlik, hanem VAN: a kereted negatív `
     +`jellemeiből számol, és a csapatstílus-szinted nagyítja fel. Ez mondja meg, mennyi `
     +`rettenet fér egy meccsbe: <b>${String(cap).replace(".",",")} pont</b> (a szint ${Math.round(FEAR_MATCH_PCT*100)}%-a).`
-    +`<br><span style="color:var(--dim2)">Rettenet jár: sárga lap ${String(DREAD_PTS.yellow).replace(".",",")} · `
-    +`piros lap ${DREAD_PTS.red} · meccserő-fölény max ${DREAD_GAP_MAX} (+${DREAD_GAP_FULL} fölött a teljes) · `
-    +`mesterhármas ${DREAD_PTS.hat} · kemény belépő ${String(DREAD_PTS.hard).replace(".",",")} · `
-    +`védekező villanás ${String(DREAD_PTS.tackle).replace(".",",")}</span></div>`
+    +(szint>DREAD_SCALE_FROM
+      ? `<br>A tarifa a <b>${DREAD_SCALE_FROM}</b>-as szint fölött a félelem szinttel arányos: `
+        +`most <b>×${dreadNum(dreadScale())}</b>.`
+      : `<br><span style="color:var(--dim2)">A tarifa a ${DREAD_SCALE_FROM}-as félelem szintig `
+        +`rögzített; fölötte a szinttel arányosan nő.</span>`)
+    +`<br><span style="color:var(--dim2)">Rettenet jár: sárga lap ${dreadNum(DREAD_PTS.yellow*dreadScale())} · `
+    +`piros lap ${dreadNum(DREAD_PTS.red*dreadScale())} · meccserő-fölény max ${dreadNum(DREAD_GAP_MAX*dreadScale())} `
+    +`(+${DREAD_GAP_FULL} meccserő fölött a teljes) · `
+    +`mesterhármas ${dreadNum(DREAD_PTS.hat*dreadScale())} · kemény belépő ${dreadNum(DREAD_PTS.hard*dreadScale())} · `
+    +`védekező villanás ${dreadNum(DREAD_PTS.tackle*dreadScale())}</span></div>`
     +`<div class="msList" style="margin-top:9px">`;
   /* ---- A HÁROM JELLEM-MÓDOSÍTÓ ---- */
   const tetel=(kulcs,ic,nev,leiras,ar)=>{

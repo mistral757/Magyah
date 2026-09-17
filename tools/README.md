@@ -1249,13 +1249,39 @@ az üres esetet, és hogy a FIZETŐS megnyitás változatlanul beragaszt.
 (a nehézség-lépcsők miatt), tehát egy „nem kész" csonknak a küszöb ALÁ kell
 mennie, nem nullára. Részletek: `docs/merfoldko-kategoria-jutalom.md`.
 
+## rettenet-skala-proba.js — ☠️ a tarifa a félelem szinttel skálázódik
+
+```
+node tools/rettenet-skala-proba.js
+```
+
+A 3.9.90-es arányosítás mérése. A meccsenkénti PLAFON a félelem szint 10%-a,
+tehát a szinttel együtt nőtt — a TARIFA viszont fix volt (sárga 0,5, piros 2,
+meccserő-fölény max 5, …). Egy tipikus Panzer-est 11,3 nyers pontot hozott,
+akármekkora volt a szint, így a plafon elszakadt tőle: 2000-es félelem szinten
+a hozam a plafon 6%-a volt.
+
+A próba a `fearLevel` kötését cseréli (a `dreadScale` ezen át olvas, tehát a
+mérés a valódi úton megy), és tételenként méri: a 100-as szintig BETŰRE a régi
+számok jönnek vissza, fölötte pontosan szint/100 arányban nőnek — a
+meccserő-fölényt is beleértve.
+
+Külön ág arra, hogy a GYŐZELEM ERŐSEBB ELLEN és az ÓRIÁSÖLÉS nem szorzódik
+kétszer: azok már eleve a plafonból számolnak, és a próba szerint minden
+szinten pontosan a plafont adják.
+
+Végül a teljes kép ugyanazon a tipikus esten, 50-től 2000-es félelem szintig: a
+régi arány 226% → 6%-ra omlott, most 100 fölött állandó 113% — vagyis a plafon
+ugyanúgy fog, mint eddig a 100-as szinten.
+Részletek: `docs/panzer-felelem-es-rettenet.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 64 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 65 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
