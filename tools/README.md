@@ -1224,13 +1224,90 @@ Végül a teljes mezőny (3609 játékos): az átlagos öltözői fokozat a szin
 monoton nő (4,97 → 5,83 → 6,33 → 6,76), filozófia nélkül pedig 5,97 — a skála
 közepén, nem a szélén. Részletek: `docs/panzer-jellem-fordulat.md`.
 
+## merfoldko-kategoria-jutalom-proba.js — 🗺️ egy egész kategória feloldása
+
+```
+node tools/merfoldko-kategoria-jutalom-proba.js
+```
+
+A 3.9.89-es jutalom mérése. A hosszú és a kupa-kihívások `msUnstick` jutalma
+eddig EGYETLEN beragadt fokozatot fizetett ki; mostantól egy egész
+mérföldkő-kategóriát old fel.
+
+Két ága van, mert beragadt fokozat csak MÁR NYITOTT kategóriában létezik (a
+zárás alatt teljesült fokozat a MEGNYITÁS pillanatában ragad be): ha van még
+zárt kategória, azt nyitja meg ingyen, azonnali fizetéssel; ha már minden
+nyitva, a legtöbb beragadtat tartó kategória összes beragadt jutalma folyik be.
+
+A próba a mérföldkő-tábla `p()` függvényeit cseréli, hogy pontosan tudja, mi
+„kész", és így méri a kategóriaválasztást (a legtöbb kész fokozat, döntetlennél
+a drágább), az ingyenességet (a büdzsé nem mozdul), a nulla beragadást, a
+második ág célzottságát (a kiválasztott kategória kiürül, a többi érintetlen),
+az üres esetet, és hogy a FIZETŐS megnyitás változatlanul beragaszt.
+
+**Egy csapda, ha hasonlót írsz:** a mérföldkövek küszöbe lehet 0 vagy negatív is
+(a nehézség-lépcsők miatt), tehát egy „nem kész" csonknak a küszöb ALÁ kell
+mennie, nem nullára. Részletek: `docs/merfoldko-kategoria-jutalom.md`.
+
+## rettenet-skala-proba.js — ☠️ a tarifa a félelem szinttel skálázódik
+
+```
+node tools/rettenet-skala-proba.js
+```
+
+A 3.9.90-es arányosítás mérése. A meccsenkénti PLAFON a félelem szint 10%-a,
+tehát a szinttel együtt nőtt — a TARIFA viszont fix volt (sárga 0,5, piros 2,
+meccserő-fölény max 5, …). Egy tipikus Panzer-est 11,3 nyers pontot hozott,
+akármekkora volt a szint, így a plafon elszakadt tőle: 2000-es félelem szinten
+a hozam a plafon 6%-a volt.
+
+A próba a `fearLevel` kötését cseréli (a `dreadScale` ezen át olvas, tehát a
+mérés a valódi úton megy), és tételenként méri: a 100-as szintig BETŰRE a régi
+számok jönnek vissza, fölötte pontosan szint/100 arányban nőnek — a
+meccserő-fölényt is beleértve.
+
+Külön ág arra, hogy a GYŐZELEM ERŐSEBB ELLEN és az ÓRIÁSÖLÉS nem szorzódik
+kétszer: azok már eleve a plafonból számolnak, és a próba szerint minden
+szinten pontosan a plafont adják.
+
+Végül a teljes kép ugyanazon a tipikus esten, 50-től 2000-es félelem szintig: a
+régi arány 226% → 6%-ra omlott, most 100 fölött állandó 113% — vagyis a plafon
+ugyanúgy fog, mint eddig a 100-as szinten.
+Részletek: `docs/panzer-felelem-es-rettenet.md`.
+
+## egyenlito-idenykeret-proba.js — ⚖️ az alapáras keret idényenként töltődik
+
+```
+node tools/egyenlito-idenykeret-proba.js
+```
+
+Tesztelői hibajelentés (3.9.91): „a béke és harmónia féle boost ára nem
+nullázódik szezonról szezonra". Igaz volt — az `S.eqBoostsUsed` csak nőtt, a
+mentés vitte, és sehol nem nullázódott. A szintenkénti 5/4/3 alapáras darab így
+nem idényes keret volt, hanem egy egész karrierre szóló, utána az ár véglegesen
+duplázódni kezdett.
+
+A próba méri, hogy az idényen BELÜLI létra változatlan (5/4/3 alapáron, majd
+×2 ×4 ×8 ×16), hogy a nyár nyílása nulláz, és hogy ez a nyári átigazolási
+keretekkel EGY hívásban történik — a töltés helye szándékosan a nyár nyílása,
+nem a szezon indulása, mert a boost-központ nyári szerszám.
+
+Külön ág a régi mentések EGYSZERI pótlására: aki a régi szabály alatt több idény
+keretét égette el, egyszer visszakapja (`eqSeasonMig` jelző), egy mai mentést
+viszont a pótlás nem nyúl meg. A stub ugyanazt a két lépést járja, mint a
+`loadGame` (bulk visszatöltés, majd jelző-vizsgálat), és a próba a FORRÁSSORT is
+ellenőrzi, hogy a stub ne csúszhasson el a valóditól.
+
+Végül mind az öt felületi ára-sor: kimondják-e, hogy a keret idényenkénti.
+Részletek: `docs/harmonia-csoportos-boost.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 63 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 66 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

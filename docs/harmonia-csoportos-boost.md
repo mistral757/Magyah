@@ -51,7 +51,7 @@ sztártól — és épp ezért kell neki ár-fék.
 
 ### Az ár féke
 
-| szint | a rés | alapáron |
+| szint | a rés | alapáron, **idényenként** |
 |---|---|---|
 | 1 | 33% | 5 db |
 | 2 | 50% | 4 db |
@@ -60,6 +60,33 @@ sztártól — és épp ezért kell neki ár-fék.
 Utána **minden további a duplája az előzőnek** (×2, ×4, ×8, ×16…). A magasabb
 szint erősebb, de kevesebbszer olcsó — a nyolcadik-tizedik egyenlítő már csak a
 nagyon gazdag klubnak fér bele.
+
+### A keret a NYÁR NYÍLÁSAKOR töltődik (3.9.91)
+
+> **BEJELENTETT HIBA** (tesztelőtől): „Úgy tűnik a béke és harmónia féle boost
+> ára nem nullázódik szezonról szezonra. A szezon előtt már dupla áru volt, és
+> a szezon kezdetén is ugyanúgy az maradt."
+
+Igaz volt. Az `S.eqBoostsUsed` **csak nőtt**, a mentés vitte, és sehol nem
+nullázódott. A szintenkénti 5/4/3 alapáras darab tehát nem idényes keret volt,
+hanem **egy egész karrierre szóló** — utána az ár végleg duplázódni kezdett
+(×2, ×4, ×8…). Egy hosszú karrierben ez a Béke és harmónia **fő eszközét**
+ellehetetlenítette: a filozófia, aminek az egyenlítő a válasza a saját
+problémájára, néhány idény után nem engedhette meg magának.
+
+A töltés helye a **nyár nyílása** (`twRefillSummerQuotas`), nem a szezon
+indulása — pontosan azért, amiért a nyári átigazolási keretek töltése is oda
+került (lásd `docs/nyari-atigazolasi-keretek.md`): a boost-központ **nyári
+szerszám**, és egy szezonkezdetkor érkező keret pont a legfontosabb ablakot
+hagyná ki. Egy hívás tölti a nyári eseményt, a klub-szemlét és az egyenlítőt is.
+
+**Régi mentések:** aki a régi szabály alatt több idény keretét égette el,
+egyszer, csendben visszakapja (`eqSeasonMig` jelző a mentésben). A pótlás
+pontosan egyszer fut, és egy mai mentést már nem nyúl meg.
+
+A felület minden ára-sora kimondja, hogy a keret **idényenkénti**: a képesség
+leírása, a boost-katalógus sora, a megerősítő ablak és a képesség élő mérősora
+is.
 
 ## 2. Tömeg-boost
 
