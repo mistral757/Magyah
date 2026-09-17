@@ -6091,7 +6091,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.88";
+const APP_VERSION="3.9.89";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -28534,7 +28534,7 @@ const TEACH_TOPICS={
        x:"A mérföldkövek hat kategóriába rendeződnek, és nem mind áll nyitva. Egy zárt kategóriában a fokozatokat <b>teljesítheted</b> — de a jutalom <b>beragad</b>, amíg ki nem nyitod.<br><br>A megnyitás a büdzsédből megy, és a klub méretéhez igazodik."},
       {a:"hubInfoFab",
        t:"A beragadt jutalom nem vész el",
-       x:"Amit zárt kategóriában teljesítettél, az a megnyitáskor <b>egyszerre fizet ki</b> — tehát nem baj, ha később nyitod ki.<br><br>Egy dologra figyelj: ahol már semmi nem teljesíthető, ott a megnyitás sávonként csak a <b>legmagasabb</b> fokozatot fizeti. Azt a kategóriát érdemes előbb kinyitni, amiben még van hova nőnöd."}]},
+       x:"Amit zárt kategóriában teljesítettél, az a megnyitáskor <b>beragad</b>, nem vész el: ahogy ugyanazon a sávon elérsz egy új fokozatot, az és alatta minden beragadt fokozat <b>egyszerre fizet</b>.<br><br>Egy dologra figyelj: ahol már semmi nem teljesíthető, ott a megnyitás sávonként csak a <b>legmagasabb</b> fokozatot fizeti. Azt a kategóriát érdemes előbb kinyitni, amiben még van hova nőnöd.<br><br>A hosszú és a kupa-kihívások egyik jutalma egy egész kategóriát <b>ingyen</b> old fel — és ott semmi nem ragad be, minden azonnal fizet."}]},
   "chal:read":{n:"Kihívások",grp:"meta",scr:"hub",prio:58,quiet:1,
     a:"hubChallengePanel",g:"kihivasok",
     why:"Fut egy elvállalt kihívásod — a haladása itt követhető.",
@@ -41873,7 +41873,7 @@ function genReward(scope,diff,ctx){
     /* Fél csillag alapból, egész csillag a nehéz vállalásért. */
     const lv=(diff==="hard")?2:1;
     pool.push({kind:"agencyUp",amount:lv,desc:`+${lv===2?"1":"fél"} csillag az átigazolási ügynökségnek`});
-    pool.push({kind:"msUnstick",desc:"egy beragadt mérföldkő jutalma azonnal befolyik"});}
+    pool.push({kind:"msUnstick",desc:"egy egész mérföldkő-kategória feloldása — a benne álló fokozatok azonnal fizetnek"});}
   if(scope==="long"||scope==="cup"){
     pool.push({kind:"freePlayer",desc:"a következő igazolásod INGYEN"});
     pool.push({kind:"salaryUp",desc:"edzői fizetésemelés: +10% szezonos büdzsé (tartós)"});
@@ -42865,22 +42865,34 @@ function applyChallengeReward(rw){
       fanAdd(rw.amount||0,"Kihívás-jutalom");
       return `+${fmtNum(rw.amount||0)} szurkoló — a tábor most ${fmtNum(fanBase())}`;
     case "msUnstick":{
-      /* A LEGRÉGEBBEN beragadt fokozat szabadul fel: a msPayout ugyanazon az
-         úton fizet, mint a szokásos felszabadulás, tehát a napló, a napló-sor
-         és a stíluspont-könyvelés is a helyén marad. */
-      const M=msState();
-      const ids=Object.keys(M.pend||{}).filter(id=>M.pend[id]);
-      if(!ids.length)return "nincs beragadt mérföldkő — a jutalom elveszett";
-      const def=MILESTONES.find(d=>d&&d.id===ids[0]);
-      if(!def){delete M.pend[ids[0]];return "a beragadt mérföldkő már nem létezik";}
-      delete M.pend[def.id];
-      M.done[def.id]={season:S.seasonNumber||1,held:true};
-      /* EGY MÉRFÖLDKŐ MEGSZERZÉSE PONTOSAN a msOne kihívás célja (3.9.39) —
-         a jutalomnak itt, a teljesítés pillanatában a helye. A hívás
-         idempotens és rekurzió-védett (_chSettling). */
-      try{settleEarlyChallenges();}catch(e){}
-      try{msPayout(def,"held");}catch(e){}
-      return `beragadt jutalom kifizetve: ${def.t}`;}
+      /* ---- EGY EGÉSZ KATEGÓRIA, NEM EGY FOKOZAT (3.9.89) ----
+         BEJELENTETT KÉRÉS: „Az a jutalom ami egy beragadt mérföldkő jutalmát
+         oldja fel az változzon meg arra hogy az egyik stílusmérföldkő
+         csoportot ... egy az egyben feloldja."
+
+         Két ág, mert a „beragadt fokozat" csak MÁR NYITOTT kategóriában
+         létezik (a zárás alatt teljesült fokozat a megnyitás pillanatában
+         ragad be, lásd msUnlockCat):
+           1. ha van még ZÁRT kategória, azt nyitjuk meg ingyen — és ami benne
+              áll, az nem ragad be, hanem azonnal fizet (msGrantCat);
+           2. ha már minden nyitva, akkor a legtöbb beragadt fokozatot tartó
+              kategória ÖSSZES beragadt jutalma egyszerre folyik be.
+         A kulcs (`msUnstick`) szándékosan a régi: egy FUTÓ kihívás jutalma a
+         mentésben is ezzel a névvel ül, és így a régi vállalás is az új,
+         nagyobb jutalmat kapja meg — migráció nélkül. */
+      /* A legtöbbet érő zárt kategória: ahol a legtöbb kész fokozat vár (a
+         fizetős úton pont azok ragadnának be); holtversenynél a drágább. */
+      const zart=MS_STYLE_CATS.filter(c=>!msCatUnlocked(c.key));
+      if(zart.length){
+        zart.sort((a,b)=>msCatWouldHold(b.key).length-msCatWouldHold(a.key).length
+                       ||msCatPrice(b.key)-msCatPrice(a.key));
+        const r=msGrantCat(zart[0].key);
+        if(r)return r.paid
+          ?`feloldva: ${r.cat.n} — a benne álló ${r.paid} fokozat azonnal fizetett`
+          :`feloldva: ${r.cat.n}`;}
+      const r2=msReleaseBestCat();
+      if(r2)return `${r2.cat?r2.cat.n:"egy kategória"} — ${r2.paid} beragadt jutalom egyszerre kifizetve`;
+      return "minden kategória nyitva, és nincs beragadt jutalom — a jutalom elveszett";}
     case "bidBoost":
       S.chBidFloor=(S.chBidFloor||0)+1;
       return "a következő licited legalább 100%-os lesz";
@@ -83859,6 +83871,54 @@ function msUnlockCat(k){
   }catch(e){}
   const sw=dead?msSweepDead(k):{paid:0,lost:0};
   return {ok:true,price,held:held.length,paid:sw.paid,lost:sw.lost};}
+/* ---- A KATEGÓRIA AJÁNDÉKBA (3.9.89) ----
+   A kihívás-jutalom útja, és két ponton tér el a fizetős megnyitástól:
+     · nem a büdzséből megy,
+     · és ami a zárás alatt már teljesült, az NEM ragad be, hanem azonnal,
+       teljes értéken fizet.
+   Ez a kettő együtt a „egy az egyben feloldja": a kategória kinyílik, és ami
+   benne áll, az ugyanabban a pillanatban be is folyik. Beragadt jutalom így
+   nem keletkezik, tehát a halott-kategória elszámolásának (msSweepDead) sincs
+   mit veszítenie — a fizetős úton ez az egyetlen hely, ahol a rendszer veszít. */
+function msGrantCat(k){
+  const c=msCatByKey(k);
+  if(!c||msCatUnlocked(k))return null;
+  const M=msState();
+  const kesz=msCatWouldHold(k);
+  M.cats=M.cats||{};
+  M.cats[k]={season:S.seasonNumber||1,price:0,granted:1};
+  try{
+    addLine(`🔓 <b>MEGNYITVA — ${esc(c.n)}</b> · kihívás-jutalom, ingyen. `
+      +`Innentől ez a terület csapatstílus-pontot termel.`,"m life");
+    if(kesz.length)
+      addLine(`→ ${kesz.length} fokozat már a zárás alatt teljesült — és most nem ragad be, `
+        +`hanem azonnal fizet.`,"m skillnote");
+  }catch(e){}
+  /* A TELJESÍTÉS ELŐBB, a kifizetés utána: a mérföldkő-kihívások (msOne) a
+     done-ból olvasnak, és a naplóban is előbb legyen a hír, mint a pénz. */
+  kesz.forEach(d=>{M.done[d.id]={season:S.seasonNumber||1,held:true};});
+  try{settleEarlyChallenges();}catch(e){}
+  kesz.forEach(d=>{try{msPayout(d,"held");}catch(e){}});
+  return {cat:c,paid:kesz.length};}
+/* A MÁSIK ÁG: ha már MINDEN kategória nyitva van, akkor a legtöbb beragadt
+   fokozatot tartó kategória ÖSSZES beragadt jutalma folyik be egyszerre. */
+function msReleaseBestCat(){
+  const M=msState();
+  const perCat={};
+  Object.keys(M.pend||{}).forEach(id=>{
+    if(!M.pend[id])return;
+    const def=MILESTONES.find(d=>d&&d.id===id);
+    if(!def){delete M.pend[id];return;}
+    (perCat[def.cat]=perCat[def.cat]||[]).push(def);});
+  const kulcsok=Object.keys(perCat);
+  if(!kulcsok.length)return null;
+  kulcsok.sort((a,b)=>perCat[b].length-perCat[a].length);
+  const k=kulcsok[0],lista=perCat[k];
+  lista.forEach(d=>{delete M.pend[d.id];M.done[d.id]={season:S.seasonNumber||1,held:true};});
+  try{settleEarlyChallenges();}catch(e){}
+  lista.forEach(d=>{try{msPayout(d,"held");}catch(e){}});
+  return {cat:msCatByKey(k),paid:lista.length};}
+
 /* ================= A MÉRFÖLDKÖVEK TÁBLÁJA =================
    Egy bejegyzés: {id, grp, t (cím), d (leírás), kind, val, p (haladás), n (cél), cat}
      kind "cash" → val = a százalék (5-30% között), cat NINCS (mindig aktív)

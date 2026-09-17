@@ -1224,13 +1224,38 @@ Végül a teljes mezőny (3609 játékos): az átlagos öltözői fokozat a szin
 monoton nő (4,97 → 5,83 → 6,33 → 6,76), filozófia nélkül pedig 5,97 — a skála
 közepén, nem a szélén. Részletek: `docs/panzer-jellem-fordulat.md`.
 
+## merfoldko-kategoria-jutalom-proba.js — 🗺️ egy egész kategória feloldása
+
+```
+node tools/merfoldko-kategoria-jutalom-proba.js
+```
+
+A 3.9.89-es jutalom mérése. A hosszú és a kupa-kihívások `msUnstick` jutalma
+eddig EGYETLEN beragadt fokozatot fizetett ki; mostantól egy egész
+mérföldkő-kategóriát old fel.
+
+Két ága van, mert beragadt fokozat csak MÁR NYITOTT kategóriában létezik (a
+zárás alatt teljesült fokozat a MEGNYITÁS pillanatában ragad be): ha van még
+zárt kategória, azt nyitja meg ingyen, azonnali fizetéssel; ha már minden
+nyitva, a legtöbb beragadtat tartó kategória összes beragadt jutalma folyik be.
+
+A próba a mérföldkő-tábla `p()` függvényeit cseréli, hogy pontosan tudja, mi
+„kész", és így méri a kategóriaválasztást (a legtöbb kész fokozat, döntetlennél
+a drágább), az ingyenességet (a büdzsé nem mozdul), a nulla beragadást, a
+második ág célzottságát (a kiválasztott kategória kiürül, a többi érintetlen),
+az üres esetet, és hogy a FIZETŐS megnyitás változatlanul beragaszt.
+
+**Egy csapda, ha hasonlót írsz:** a mérföldkövek küszöbe lehet 0 vagy negatív is
+(a nehézség-lépcsők miatt), tehát egy „nem kész" csonknak a küszöb ALÁ kell
+mennie, nem nullára. Részletek: `docs/merfoldko-kategoria-jutalom.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 63 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 64 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
