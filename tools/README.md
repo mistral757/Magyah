@@ -1195,13 +1195,42 @@ napló („MÁSODIK SÁRGA", nem a semmiből jött piros), a lapgyűjtés, az el
 és a kiállítás-számláló mind azt mutatja, amit egyjátékosban mutatna.
 Részletek: `docs/pvp-parharc-rendszerek.md`.
 
+## panzer-jellem-fordulat-proba.js — 🔄 a jellem-fordítás két vége
+
+```
+node tools/panzer-jellem-fordulat-proba.js
+```
+
+A 3.9.88-as javítás mérése. A `traitFlip` minden skálán azt hitte, hogy a nagy
+érték a jó — csakhogy a két tengely ellentétes: a kapcsolódásnál a 0 a rossz
+vég (szorongó), a vérmérsékletnél az 1 (vandál). A vandál így a „jó fej"
+embereknek szánt, a szinttel GYENGÜLŐ ágra került, és a Fordított jellem minden
+megvett szintje ROSSZABBÁ tette őt az öltözőben (7/10 → 6 → 6 → 5/10).
+
+A második hiba a 0..1-es vágás volt: a képesség +10/+25/+33%-ot ígér az erősödő
+ágon, a szélső embereknél viszont a tükör már a skála végén landolt, és a vágás
+pontosan azt nyelte el, amit a képesség elad. A folytonos morál-számítás ezért a
+vágatlan alakot kapja (`kapER`/`verER`), a sávindexek a vágottat.
+
+A próba a két tengely polaritását a 0. ÉS a 3. szinten külön méri, mert a
+szerződés a kettőn más: nulladikon tiszta tükör, maxon a rossz vég túlfut a
+skálán, a jó vég pedig visszafordul pozitívba (ezt ígéri a leírás). Külön
+állítás a kemény ember monoton javuló létrájára, a jó fej ember
+visszafordulására, az öltözői sávokra (a vandál a hiba előtt maxolt fordítás
+mellett is „forró" volt), és arra, hogy Betonnal meg filozófia nélkül betűre a
+nyers jellemérték jön vissza.
+
+Végül a teljes mezőny (3609 játékos): az átlagos öltözői fokozat a szinttel
+monoton nő (4,97 → 5,83 → 6,33 → 6,76), filozófia nélkül pedig 5,97 — a skála
+közepén, nem a szélén. Részletek: `docs/panzer-jellem-fordulat.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 62 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 63 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
