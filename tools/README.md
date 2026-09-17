@@ -1275,13 +1275,39 @@ régi arány 226% → 6%-ra omlott, most 100 fölött állandó 113% — vagyis 
 ugyanúgy fog, mint eddig a 100-as szinten.
 Részletek: `docs/panzer-felelem-es-rettenet.md`.
 
+## egyenlito-idenykeret-proba.js — ⚖️ az alapáras keret idényenként töltődik
+
+```
+node tools/egyenlito-idenykeret-proba.js
+```
+
+Tesztelői hibajelentés (3.9.91): „a béke és harmónia féle boost ára nem
+nullázódik szezonról szezonra". Igaz volt — az `S.eqBoostsUsed` csak nőtt, a
+mentés vitte, és sehol nem nullázódott. A szintenkénti 5/4/3 alapáras darab így
+nem idényes keret volt, hanem egy egész karrierre szóló, utána az ár véglegesen
+duplázódni kezdett.
+
+A próba méri, hogy az idényen BELÜLI létra változatlan (5/4/3 alapáron, majd
+×2 ×4 ×8 ×16), hogy a nyár nyílása nulláz, és hogy ez a nyári átigazolási
+keretekkel EGY hívásban történik — a töltés helye szándékosan a nyár nyílása,
+nem a szezon indulása, mert a boost-központ nyári szerszám.
+
+Külön ág a régi mentések EGYSZERI pótlására: aki a régi szabály alatt több idény
+keretét égette el, egyszer visszakapja (`eqSeasonMig` jelző), egy mai mentést
+viszont a pótlás nem nyúl meg. A stub ugyanazt a két lépést járja, mint a
+`loadGame` (bulk visszatöltés, majd jelző-vizsgálat), és a próba a FORRÁSSORT is
+ellenőrzi, hogy a stub ne csúszhasson el a valóditól.
+
+Végül mind az öt felületi ára-sor: kimondják-e, hogy a keret idényenkénti.
+Részletek: `docs/harmonia-csoportos-boost.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 65 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 66 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
