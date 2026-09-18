@@ -1365,6 +1365,43 @@ a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
 Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
 az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
 
+## kiallitas-rendszer-proba.js — 🟥 a kiállítás négy ügye
+
+```
+node tools/kiallitas-rendszer-proba.js
+```
+
+Négy bejelentés, egy tőről: a kiállított percei, a „tízen maradtunk" a
+második lapnál is, a hiányzó mérföldkövek, és az ötödik kiállítás szabálya.
+
+**A közös gyökér:** a motor EGYETLEN kiállítást ismert egy mérkőzésen — a
+`redIdx` egy szám volt, és a második felülírta az elsőt. Emiatt a 24. percben
+kiállított ember a 80.-ban még gólt lőhetett, az eltiltását sem könyvelte el
+senki, és azt sem lehetett megmondani, hány kiállítást kaptunk. A javítás
+gerince ezért egy kiállítás-HALMAZ, a régi aláírásokat pedig a `redHas`
+tartja életben (szám VAGY halmaz).
+
+A próba 1-5. szakasza egységeket mér (percek, értékelés Panzerrel és anélkül,
+a magyar létszám-szavak, a `redHas` mindkét alakja, a két új mérföldkő-család).
+A **6-7. szakasz viszont valódi mérkőzéseket játszik le** felhúzott
+piroslap-eséllyel — a refaktor kockázata a motorban van, nem az egységekben —,
+és azt nézi, hogy mind az öt kiállítás el van-e könyvelve, mindegyikük
+kap-e eltiltást, a napló létszám-szavai lépésről lépésre fogynak-e, és hogy
+az ötödiknél tényleg lefújják-e a meccset 0:3-ra.
+
+A **8. szakasz megméri a balansz árát**: a régi „egy közvetlen piros
+meccsenként" kapu eltávolítása valódi változás, tehát nem tippelni kell. Egy
+teljes szezon: 30 meccs, 4 kiállítás, 0,133/meccs — a kiállítás ritka maradt,
+a kapu csak a farkat fogta le.
+
+**Amit a próba írása fogott meg:** az első kapum `menLeft()>MATCH_MIN_MEN`
+volt, vagyis „amíg legalább nyolcan vagyunk" — ez EGY EMBERREL elvétette a
+szabályt. Hét emberrel még jár a lap; épp az az ötödik kiállítás, ami után a
+mérkőzés véget ér. A gátam mellett az ötödik lap sosem született meg, és a
+negyedik kérés néma maradt volna. Két állításom is rossz volt: a percsúly az
+ALAP felé húz (tehát egy kiállított embernél FELFELÉ), és a mérföldkő
+plafonja nem négy, hanem öt. Részletek: `docs/kiallitas-rendszer.md`.
+
 ## osztalyugras-terv-proba.js — 🎲 mire tarts félre a nyáron
 
 ```
@@ -1469,7 +1506,7 @@ Részletek: `docs/eladas-kihivas-elso-licit.md`.
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 71 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 72 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
