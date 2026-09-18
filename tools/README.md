@@ -1365,6 +1365,35 @@ a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
 Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
 az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
 
+## osztalyugras-terv-proba.js — 🎲 mire tarts félre a nyáron
+
+```
+node tools/osztalyugras-terv-proba.js
+```
+
+Az all-in osztályugrás régóta megvan, de a hibája **időzítési** volt: az ajánlat
+a nyár legvégén jön, a fel-/kiesés eldőlte után — vagyis akkor, amikor az
+átigazolásaid MÁR lementek. Aki nem tudta előre, hogy létezik, az a nyarat
+végigköltötte, és az ajánlat egy üres kasszát ért.
+
+A 3.9.96-tól a nyári HUB **tetején** áll egy doboz, ami a költés ELŐTT mondja
+meg, mennyibe kerülne és mekkora mezőnyt vállalnál vele.
+
+**A nehéz rész, amit a próba főleg mér:** a piramis fordulója a nyár UTÁN fut,
+tehát a nyári HUB-ban a `pyrMyDivId()` még a MOSTANI osztályod — az ugrás árát
+viszont a KÖVETKEZŐ osztályod szabja. A doboznak ezért a végtabellából kell
+előre vezetnie az osztályt, ugyanazzal a három szabállyal, amit a `pyrRollover`
+alkalmaz (közvetlen feljutás · osztályozó · közvetlen kiesés). A próba mind a
+négy helyezés-sávot végigjárja, a végtabellát kézzel állítva — a bajnok ága
+pontosan a kérésben szereplő **„D4-ről egyből D2"** esetet reprodukálja, az
+osztályozós helyezés pedig MINDKÉT ágat kiírja, ár és cél-osztály szerint.
+
+A 6. szakasz a felületet méri: hogy a doboz tényleg a Run-mérő FÖLÖTT áll
+(`compareDocumentPosition`), hogy szezon közben, élő vállalásnál és az
+élvonalban elbújik, és hogy a mezőnyerő magyar tizedesvesszővel áll — ez
+utóbbi külön állítás, mert a valódi ajánlatban eddig angol pont volt.
+Részletek: `docs/osztalyugras-terv.md`.
+
 ## passzkemia-osszeeres-proba.js — 🌀 a tört attribútum és a meg nem induló közös fejlődés
 
 ```
@@ -1440,7 +1469,7 @@ Részletek: `docs/eladas-kihivas-elso-licit.md`.
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 70 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 71 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
