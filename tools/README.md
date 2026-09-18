@@ -1301,13 +1301,77 @@ ellenőrzi, hogy a stub ne csúszhasson el a valóditól.
 Végül mind az öt felületi ára-sor: kimondják-e, hogy a keret idényenkénti.
 Részletek: `docs/harmonia-csoportos-boost.md`.
 
+## sajat-stabtag-proba.js — 🎓 olcsóbb és gyorsabban érő saját nevelés
+
+```
+node tools/sajat-stabtag-proba.js
+```
+
+A 3.9.92-es buff mérése: a saját játékosból nevelt stábtag ára a teljes skálán
+feleannyi (60/40% → 30/20%, a köztes meredekséggel együtt), a Szakértelme pedig
+három összeszorzódó szorzóval épül — +50% alap, +25% a saját posztjához tartozó
+segédedzői területen, +33% ott, ahol a mezőnyhöz képest tényleg kiemelkedő.
+
+A gyorsítás a NYERS típus-pontszámon megy, nem a kész Szakértelmen: így a
+20-99-es skála teteje és a SZAK 55 pontos maximuma a helyén marad. A próba ezt
+külön méri (a csúcsprofil 89-en áll, nem 99-en), és a „kiemelkedő" küszöbre is,
+hogy a NYERS pontszámot kapja — a szorzott érték átbillentené.
+
+A küszöb típusonként külön, MÉRT szám (a populáció ~85. percentilise, 1500
+profilon). Egyetlen közös küszöb nem működne: a Kesztyűs mester legjobb mért
+pontszáma 0,638, a Csapatkovács 75. percentilise viszont már 0,625.
+
+A legfontosabb ág a STÁBPIAC: a próba 300 piaci ajánlatra ellenőrzi, hogy a
+Szakértelmük BETŰRE a gyorsítás előtti képletet adja (a piac generátora
+visszafelé számol a Szakértelemből, egy szorzó ott a célzott sávot borítaná) —
+és fordítva, hogy a saját nevelésé tényleg magasabb, különben a próba egy néma
+no-opot igazolna.
+
+Végül 900 valódi pályafutás-profil: a legjobb ajánlat átlagos Szakértelme
+54,5 → 72,5, a maximum 77 → 86, és senki nem tapad a plafonra.
+Részletek: `docs/szemelyi-edzo-rendszer.md`.
+
+## gegenpressing-proba.js — 🧲 a nyolcadik filozófia
+
+```
+node tools/gegenpressing-proba.js
+```
+
+A 3.9.93-as új csapatstílus teljes mérése. A Gegenpressing az első filozófia,
+ami nem a labdáról szól, hanem arról a pillanatról, amikor nincs nálad — ezért
+saját motor-csatornát kapott: a LABDASZERZÉST AZ ELLENFÉL TÉRFELÉN. Ez a
+csatorna eddig nem létezett (a motor a szerelést a védekezés-szorzóban rejtette
+el), és a stílus egész gazdasága erre ül.
+
+A próba először a REGISZTRÁCIÓT járja végig — a stílus minden táblában ott
+van-e (STYLES, filozófus-edző nemzetiséggel, mstat-súlyok 1-re összegezve,
+tengely-eltolás, öt rang, feloldási szint, három szerep, öt csúszka) —, majd a
+kilenc képességet és a szintjeiket a kimondott számokkal (pressing 2,0/2,8/3,6
+meccsenként; büntetés 25%/2, 33%/2, 50%/3).
+
+Külön ág a filozófia ALKUJÁRA („Nem kell nekünk labda"): a próba MINDKÉT felét
+méri, mert a kérés épp azt mondta ki, hogy a motorból hiányzik a második — a
+birtoklás tényleg lemegy, ÉS az ellenfél gólesélye tényleg felmegy tőle
+(+10% / +6% / +2,5%), tehát a magasabb szint jobb üzlet.
+
+A saját skill (Nyomás!) zárolt: a próba ellenőrzi, hogy a fán megvett képesség
+NÉLKÜL nincs a pakliban, utána viszont bekerül. Ez nem kozmetika — enélkül más
+stílusnál is kihúzhatná a sorsolás, és a jutalom némán elveszne.
+
+A gyilkos páros teljes életciklusa: összeérés a közös mérkőzésekből, a
+sebesség kiegyenlítődése a jobbik FÖLÉ, a kölcsönös fejlődés-gyorsítás, és hogy
+a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
+
+Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
+az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 66 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 68 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

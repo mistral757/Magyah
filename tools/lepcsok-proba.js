@@ -362,7 +362,14 @@ const {spawn}=require('child_process');
        zart:x.classList.contains("unlockOff"),
        gomb:(x.querySelector("button")||{}).textContent||"",
        felirat:x.textContent.indexOf("karrieredtől")>=0||x.textContent.indexOf("jellemvonás")>=0}));
-     return {sorok, runs:unlockState().runs};});
+     /* A VÁRT SZÁMOK A TÁBLÁKBÓL, nem beírva — így egy új filozófia nem
+        rontja el az állítást (lásd a 3.9.93-as Gegenpressinget). Zárt az,
+        aminek van UNLOCK_STYLE_RUN sora, plusz a Panzer (saját feltétel). */
+     const zartVart=Object.keys(UNLOCK_STYLE_RUN)
+       .filter(k=>(UNLOCK_STYLE_RUN[k]||0)>(unlockState().runs||0)+1).length
+       +(unlockState().panzer?0:1);
+     return {sorok, runs:unlockState().runs,
+       osszes:STYLES.length, zartVart};});
    await p.close();}
 
   /* ── 15. A GYŰJTŐ KAPUK A FELÜLETEN (4. fázis) ── */
@@ -587,7 +594,8 @@ const {spawn}=require('child_process');
      /* a stílusválasztó */
      {const d=document.createElement("div");d.innerHTML=styleChooserHtml();
       out.stilus_zart=d.querySelectorAll(".msItem.unlockOff").length;
-      out.stilus_db=d.querySelectorAll(".msItem").length;}
+      out.stilus_db=d.querySelectorAll(".msItem").length;
+      out.stilus_osszes=STYLES.length;}
      /* az egyes kapuk */
      out.has={diff:unlockHas("diff"),lutri:unlockHas("lutri"),club:unlockHas("club"),
               dyn:unlockHas("dyn"),wc:unlockHas("wc"),icon4:unlockHas("icon4"),
@@ -795,8 +803,13 @@ const {spawn}=require('child_process');
       P.negy===12&&P.zarva_12&&P.ot===15&&P.nyilt&&P.naplo===15);
    ok("Panzer: a feloldás pillanatában ablak jön", P.ablak&&/Panzer/.test(P.ablak_cim));}
   {const L=out.stiluslista;
-   ok("stíluslista: a 2. futásban négy stílus nyitva, három zárt (sztár, tiki, Panzer)",
-      L.runs===1&&L.sorok.length===7&&L.sorok.filter(x=>x.zart).length===3);
+   /* A DARABSZÁM A TÁBLÁBÓL JÖN, nem beírva: minden új filozófia (3.9.93: a
+      Gegenpressing a nyolcadik) különben elrontaná ezt az állítást, pedig
+      semmi baj nem történt. A ZÁRT stílusok az UNLOCK_STYLE_RUN sorai plusz a
+      Panzer (annak saját feltétele van). */
+   ok(`stíluslista: a 2. futásban ${L.osszes-L.zartVart} stílus nyitva, ${L.zartVart} zárt`,
+      L.runs===1&&L.sorok.length===L.osszes&&L.sorok.filter(x=>x.zart).length===L.zartVart,
+      {sorok:L.sorok.length,osszes:L.osszes,zart:L.sorok.filter(x=>x.zart).length,vart:L.zartVart});
    ok("stíluslista: a zárt sor gombja „Még zárva”, és RÁ VAN ÍRVA a feltétel",
       L.sorok.filter(x=>x.zart).every(x=>/Még zárva/.test(x.gomb)&&x.felirat));}
   /* --- 4. fázis: a gyűjtő kapuk --- */
@@ -832,8 +845,12 @@ const {spawn}=require('child_process');
       &&A.szamlalok.icons===10&&A.szamlalok.nat===20);}
   /* --- 5. fázis: a haladás panel --- */
   {const P=out.panel;
-   ok("panel: öt csoport, 22 sor, hat kész", P.csoportok===5&&P.sorok===22&&P.kesz===6);
-   ok("panel: a fejléc a haladást mondja", /6\/22/.test(P.fejlec));
+   /* A SORSZÁM SZINTÉN SZÁMOLVA: a lépcső-panel annyi sorból áll, amennyi kapu
+      van — egy új filozófia egy új sort jelent. */
+   ok(`panel: öt csoport, ${P.sorok} sor, hat kész`,
+      P.csoportok===5&&P.sorok>=22&&P.kesz===6,{sorok:P.sorok,kesz:P.kesz});
+   ok("panel: a fejléc a haladást mondja",
+      new RegExp(`${P.kesz}\\/${P.sorok}`).test(P.fejlec),{fejlec:P.fejlec});
    ok("panel: minden sor UGYANAZT mondja, amit a felület kapui", P.egyezik===true);
    ok("panel: minden zárt sor megmondja, mi nyitja ki", P.mind_indokolt===true);
    ok("panel: kiírja, hogy a tempó-kapcsolók a 3. lezárt karriertől nyílnak",
@@ -897,8 +914,9 @@ const {spawn}=require('child_process');
       V.kapu===false&&V.preset===null&&V.locked===false);
    ok("PvP: a tempó- és a fokozat-rács TELJESEN nyitva",
       V.tempo_tiltva===0&&V.speed_tiltva===0&&V.tempo_pref==="normal");
-   ok("PvP: mind a hét csapatstílus választható",
-      V.stilus_db===7&&V.stilus_zart===0);
+   ok(`PvP: mind a ${V.stilus_db} csapatstílus választható`,
+      V.stilus_db===V.stilus_osszes&&V.stilus_zart===0,
+      {db:V.stilus_db,osszes:V.stilus_osszes,zart:V.stilus_zart});
    ok("PvP: minden egyes kapu nyitva (nehézség, lutri, kész klub, dinamikus, válogatott, ikon, skill)",
       Object.keys(V.has).every(k=>V.has[k]===true));
    ok("PvP: a Run- és stílus-kapuk sem szűrnek",
