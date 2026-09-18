@@ -1331,13 +1331,47 @@ Végül 900 valódi pályafutás-profil: a legjobb ajánlat átlagos Szakértelm
 54,5 → 72,5, a maximum 77 → 86, és senki nem tapad a plafonra.
 Részletek: `docs/szemelyi-edzo-rendszer.md`.
 
+## gegenpressing-proba.js — 🧲 a nyolcadik filozófia
+
+```
+node tools/gegenpressing-proba.js
+```
+
+A 3.9.93-as új csapatstílus teljes mérése. A Gegenpressing az első filozófia,
+ami nem a labdáról szól, hanem arról a pillanatról, amikor nincs nálad — ezért
+saját motor-csatornát kapott: a LABDASZERZÉST AZ ELLENFÉL TÉRFELÉN. Ez a
+csatorna eddig nem létezett (a motor a szerelést a védekezés-szorzóban rejtette
+el), és a stílus egész gazdasága erre ül.
+
+A próba először a REGISZTRÁCIÓT járja végig — a stílus minden táblában ott
+van-e (STYLES, filozófus-edző nemzetiséggel, mstat-súlyok 1-re összegezve,
+tengely-eltolás, öt rang, feloldási szint, három szerep, öt csúszka) —, majd a
+kilenc képességet és a szintjeiket a kimondott számokkal (pressing 2,0/2,8/3,6
+meccsenként; büntetés 25%/2, 33%/2, 50%/3).
+
+Külön ág a filozófia ALKUJÁRA („Nem kell nekünk labda"): a próba MINDKÉT felét
+méri, mert a kérés épp azt mondta ki, hogy a motorból hiányzik a második — a
+birtoklás tényleg lemegy, ÉS az ellenfél gólesélye tényleg felmegy tőle
+(+10% / +6% / +2,5%), tehát a magasabb szint jobb üzlet.
+
+A saját skill (Nyomás!) zárolt: a próba ellenőrzi, hogy a fán megvett képesség
+NÉLKÜL nincs a pakliban, utána viszont bekerül. Ez nem kozmetika — enélkül más
+stílusnál is kihúzhatná a sorsolás, és a jutalom némán elveszne.
+
+A gyilkos páros teljes életciklusa: összeérés a közös mérkőzésekből, a
+sebesség kiegyenlítődése a jobbik FÖLÉ, a kölcsönös fejlődés-gyorsítás, és hogy
+a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
+
+Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
+az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 67 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 68 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

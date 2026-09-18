@@ -106,15 +106,22 @@ const {spawn}=require('child_process');
      egy(ceil)&&ceil[0]==="99-99-125-150",ceil[0]);
   ok("a kétszeres tempó mindegyiknél az 1. szinttől él",
      egy(tempo)&&tempo[0]==="1/2",tempo[0]);
-  ok("és az INGYEN járó 1. szint is mind a hétnél működik (szint 1, tempó 2×)",
-     egy(ingyen)&&ingyen[0]==="1/99/2",ingyen[0]);
+  ok(`és az INGYEN járó 1. szint is mind a ${r.sorok.length}-nél működik (szint 1, tempó 2×)`,
+     egy(ingyen)&&ingyen[0]==="1/99/2",
+     {ertekek:r.sorok.map(x=>`${x.stilus}: ${x.ingyen}/${x.ingyenCeil}/${x.ingyenTempo}`)});
   ok("a leírásban a saját, helyes tárgyesetű neve áll",nev.every(Boolean),
      r.sorok.filter(x=>!x.leirasban_a_nev).map(x=>x.kepesseg));
 
   console.log("\n=== a taktika-osztozás ártalmatlan ===");
   console.log("  "+JSON.stringify(r.osztozas));
-  ok("csak a Hosszú labdákon osztozik két stílus",
-     r.osztozas.length===1&&r.osztozas[0].taktika==="hosszu",r.osztozas);
+  /* HAT TAKTIKA, NYOLC FILOZÓFIA (3.9.93 óta) — az osztozás matematikai
+     kényszer, nem hiba. A kód ki is mondja: „egyszerre csak EGY stílus él egy
+     karrierben, tehát a plafont mindig legfeljebb egy edző mozdítja". Amit
+     tényleg meg kell követelni: HÁRMAN ne osztozzanak egy rendszeren (onnantól
+     a filozófiák elveszítenék a saját arcukat), és az osztozás ÁRTALMATLAN
+     legyen — ezt a következő két állítás méri. */
+  ok(`a taktika-osztozás legfeljebb kettesével megy (${r.osztozas.length} osztott rendszer)`,
+     r.osztozas.every(x=>x.stilusok.length===2),r.osztozas);
   ok("a Panzer 3. szintje CSAK a saját rendszerét emeli",
      r.keresztbe.panzer_hosszu===150&&r.keresztbe.panzer_labdatartas===99
      &&r.keresztbe.panzer_busz===99,r.keresztbe);

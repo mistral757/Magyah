@@ -6091,7 +6091,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.92";
+const APP_VERSION="3.9.93";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -15819,6 +15819,326 @@ function pzDiscBoost(name){
   const n=1+Math.floor(Math.random()*2);
   try{setNextMatchOvr(name,Math.round(PZ_CARD_OVR*pzCardLift()),n);}catch(e){}
   return n;}
+/* ================= 🧲 GEGENPRESSING (3.9.93) =============================
+   A NYOLCADIK FILOZÓFIA MOTORJA. A stílus egyetlen új fogalomra épül, ami
+   eddig nem létezett a motorban: a LABDASZERZÉS AZ ELLENFÉL TÉRFELÉN.
+
+   MIÉRT KELLETT ÚJ CSATORNA. A motor eddig kétféle védekezést ismert: a
+   VÉDEKEZÉS-SZORZÓT (defMult — mennyi gólt kapunk, egyetlen számban elrejtve)
+   és a VÉDEKEZŐ VILLANÁST (blokk, szerelés, tisztázás — a hátsó sor
+   eseményei, a saját tizenhatos környékén). A pressinggel szerzett labda
+   egyik sem: az ELÖL történik, és nem azt mondja meg, mennyit kapunk, hanem
+   azt, hányszor kerülünk gólhelyzetbe a semmiből.
+
+   A KÖNYVELÉS NÉVRE SZÓL (mPress), pontosan úgy, mint a védéseké és a
+   szereléseké — a mérföldkövek, a meccsértékelés és a szerepek mind ebből
+   olvasnak.
+
+   A GÓLLÁ VÁLTÁS (Büntetés) PÁRHARCBAN NEM SÜL EL. A labdaszerzés maga
+   igen — az nem mozdítja az állást, tehát a két kliens nem csúszhat szét —,
+   de a belőle születő GÓL már az eredmény, azt pedig a közös eseménylista
+   adja (lásd a v3-as listát). Ugyanaz az elv, mint a tizenegyesnél, a
+   supersubnál és a 90+ drámánál. */
+const GP_SKILL_ID="gp_press";
+function gpOn(){try{return gameMode==="career"&&styleHasKey("gegen");}catch(e){return false;}}
+/* Egy képesség megvett szintje (0-3). Mind a hat saját csatornán ugyanígy. */
+function gpLv(ch){try{return Math.max(0,Math.min(3,styleFxMax(ch)||0));}catch(e){return 0;}}
+function gpPressLv(){return gpLv("gpPress");}    /* Nyomásgyakorlás */
+function gpPunishLv(){return gpLv("gpPunish");}  /* Büntetés */
+function gpDuoLv(){return gpLv("gpDuo");}        /* Gyilkos páros */
+function gpBothLv(){return gpLv("gpBoth");}      /* Felfutások, visszazárások */
+function gpErrLv(){return gpLv("gpErr");}        /* Kikényszerített hiba */
+function gpNoBallLv(){return gpLv("gpNoBall");}  /* Nem kell nekünk labda */
+
+/* ---- A NYOMÁSGYAKORLÁS SZÁMTANA ----
+   A VÁRHATÓ labdaszerzés MÉRKŐZÉSENKÉNT, szintenként. A számok szándékosan
+   szerények: a Büntetés ebből csinál gólt (25-50%), tehát egy 3,6-os
+   várható érték a 3. szinten ~1,8 extra gólhelyzetet jelent — annyit, amennyi
+   egy filozófia fő fegyverének jár, de nem annyit, ami elviszi a mérkőzést. */
+const GP_PRESS_PER_MATCH=[0,2.0,2.8,3.6];
+/* A VÉDEKEZŐ KÉPESSÉGEK RÁADÁSA a 2-3. szinten (a kimondott +33% / +66%). */
+const GP_PRESS_SKILL_MULT=[1,1,1.33,1.66];
+/* A Büntetés: ennyi eséllyel lesz gól, és ennyi fér egy mérkőzésbe. */
+const GP_PUNISH_P=[0,0.25,0.33,0.50];
+const GP_PUNISH_CAP=[0,2,2,3];
+/* Felfutások, visszazárások — mindkét irányba ugyanaz a szám. */
+const GP_BOTH_PCT=[0,0.05,0.075,0.10];
+/* Kikényszerített hiba: az ELLENFÉL öngóljának súlyszorzója (+100/300/1000%). */
+const GP_ERR_MULT=[1,2,4,11];
+/* Nem kell nekünk labda: a saját gólesély szorzója, és HÁNY SZÁZALÉKPONT
+   labdatartást adunk érte cserébe. A magasabb szint jobb ÜZLET: többet ad és
+   kevesebbet kér. */
+const GP_NOBALL_OWN =[1,1.05,1.12,1.20];
+const GP_NOBALL_POSS=[0,20,12,5];
+/* ---- ÉS AMIT A MOTOR EDDIG NEM TUDOTT ----
+   A kevesebb labda TÖBB ELLENFÉL-HELYZET. A motorban ez a kapcsolat nem
+   létezett: a labdatartás a statisztikai képernyő száma volt, a gólvárhatóság
+   meg tőle függetlenül futott. A Gegenpressing alkuja viszont pontosan erről
+   szól, tehát itt meg kell születnie.
+   AZ ÁTVÁLTÁS: minden ELADOTT labdatartás-százalékpont fél százalékkal emeli
+   az ellenfél gólvárhatóságát. Húsz pont eladása tehát +10% kapott gól — az
+   1. szinten ez ROSSZ ÜZLET (+5% saját gólesélyért), a 3.-on jó (+20%-ért
+   mindössze +2,5%). Ez a görbe a képesség lelke. */
+const GP_POSS_TO_OPP=0.5;
+function gpNoBallOwnMult(){return gpOn()?(GP_NOBALL_OWN[gpNoBallLv()]||1):1;}
+function gpPossDrop(){return gpOn()?(GP_NOBALL_POSS[gpNoBallLv()]||0):0;}
+function gpNoBallOppMult(){
+  const d=gpPossDrop();
+  return d?1+d/100*GP_POSS_TO_OPP:1;}
+
+/* ---- KI SZEREZ LABDÁT ODAFENT ----
+   A súly három dologból áll: a VÉDEKEZÉS és a SEBESSÉG attribútuma (a pressing
+   pont a kettő metszete), a védekező KÉPESSÉGEI (a 2-3. szint ráadásával), és
+   a szerepek. A KAPUS kimarad: ő nem presszingel az ellenfél térfelén.
+   A POSZT is számít, de fordítva, mint a védekezésnél: elöl és a középpályán
+   ér többet a megszerzett labda, mert onnan rövid az út a kapuig. */
+const GP_POS_W={CS:1.35,"ÁÉ":1.30,JSZ:1.25,BSZ:1.25,TKP:1.20,KKP:1.05,VKP:0.90,
+  JV:0.70,BV:0.70,KV:0.55,KP:0};
+function gpPlayerWeight(p,pos){
+  if(!p||pos==="KP")return 0;
+  let a=null;try{a=attrsOfPlayer(p);}catch(e){}
+  const ved=(a&&a.ved)||60, seb=(a&&a.seb)||60;
+  let w=(GP_POS_W[pos]!=null?GP_POS_W[pos]:1)*Math.max(0.2,(ved*0.5+seb*0.5-45)/40);
+  /* A VÉDEKEZŐ KÉPESSÉGEK RÁADÁSA — ez a Nyomásgyakorlás 2-3. szintje. */
+  try{
+    const db=playerSkills(p.n).filter(i=>i.skill&&i.skill.type==="defense").length;
+    if(db)w*=1+(GP_PRESS_SKILL_MULT[gpPressLv()]-1)*Math.min(1,db/2);
+  }catch(e){}
+  /* A SAJÁT SKILL külön is számít, bármely poszton. */
+  try{if(playerSkills(p.n).some(i=>i.skill&&i.skill.id===GP_SKILL_ID))w*=1+GP_SKILL_PRESS;}catch(e){}
+  /* FELFUTÁSOK, VISSZAZÁRÁSOK: a középpályások és a támadók bekapcsolódnak. */
+  try{
+    const r=roleInFormation(pos);
+    if(r==="KOZEPPALYAS"||r==="CSATAR")w*=1+(GP_BOTH_PCT[gpBothLv()]||0);
+  }catch(e){}
+  return Math.max(0,w);}
+/* A csapat VÁRHATÓ labdaszerzése egy mérkőzésen — a szerepek és a gyilkos
+   párosok szorzóival együtt. A hívó ezt osztja el 18 ütemre. */
+function gpPressPerMatch(active,min){
+  const lv=gpPressLv();
+  if(!gpOn()||!lv)return 0;
+  let m=GP_PRESS_PER_MATCH[lv];
+  try{m*=gpRoleTeamMult(active);}catch(e){}
+  try{m*=gpDuoTeamMult(active);}catch(e){}
+  /* HANGSÚLY-CSÚSZKA (3.9.93): a „gppress" csatorna a filozófia SAJÁT
+     csúszkáié — a vonalmagasság, a ritmus, a belépő keménysége és a terhelés
+     mind ezen mozdít. A perc azért kell, mert a ritmus-csúszka IDŐABLAKRA
+     szól (első 45 perc vs. hajrá). */
+  try{m*=dialMul("gppress",{min:(min==null?45:min)});}catch(e){}
+  return Math.max(0,m);}
+/* ---- A SAJÁT SKILL: „NYOMÁS!" ----
+   Az egyetlen skill a játékban, amit NEM a poszt kategóriája szab meg: a
+   pressing nem poszt, hanem hozzáállás. Három dolgot ad, és mind a három a
+   filozófia magja köré épül. */
+const GP_SKILL_PRESS=0.50;     /* +50% labdaszerzés az ellenfél térfelén */
+const GP_SKILL_SPEED=0.50;     /* +50% a SEBESSÉG attribútum fejlődésére */
+const GP_SKILL_PACE =0.25;     /* +25% a gyorsasági skillek hatására */
+function gpHasSkill(name){
+  try{return playerSkills(name).some(i=>i.skill&&i.skill.id===GP_SKILL_ID);}catch(e){return false;}}
+/* Nyitva van-e a „Nyomás!" képesség? A fán megvett „Nyomás skill" nyitja —
+   enélkül a pakliban sincs benne (lásd LOCKED_SKILL_IDS / skillDeck). */
+function gpSkillOn(){return gpOn()&&gpLv("gpSkill")>0;}
+/* A SEBESSÉG FEJLŐDÉSÉNEK SZORZÓJA egy emberre. Két forrásból jöhet, és a
+   kettő ÖSSZESZORZÓDIK: a saját „Nyomás!" képessége, és a GYILKOS PÁROSA —
+   ami az egyiket gyorsítja, az a másikat is viszi. */
+function gpSpeedDevMult(name){
+  if(!gpOn()||!name)return 1;
+  let m=1;
+  if(gpSkillOn()&&gpHasSkill(name))m*=1+GP_SKILL_SPEED;
+  /* A PÁR ÁTVESZI A TÁRSA GYORSÍTÁSÁT — ez a „együtt fejlődik" kimondott
+     jelentése: nem külön-külön, hanem közösen. */
+  try{
+    const t=gpDuoPartner(name);
+    if(t&&gpSkillOn()&&gpHasSkill(t))m*=1+GP_SKILL_SPEED;
+  }catch(e){}
+  return m;}
+/* A GYORSASÁGI KÉPESSÉGEK ERŐSÍTÉSE: aki „Nyomás!"-t visel, annál a pace-
+   skillek hatása +25%. A hívó a kész szorzót kapja. */
+function gpPaceSkillMult(name){
+  return (gpSkillOn()&&gpHasSkill(name))?1+GP_SKILL_PACE:1;}
+
+/* ---- AZ IRÁNYÍTÓ: A NYOMÁSGYAKORLÁS ERŐSÍTŐJE ----
+   A csapatszintű szorzó — csak akkor él, ha az embere tényleg a pályán van.
+   Ugyanaz az elv, mint a Beton védekező szerepeinél (roleOppGoalMult). */
+function gpRoleTeamMult(active){
+  if(!gpOn()||!roleStyleActive())return 1;
+  const nm=roleOf("iranyito");
+  if(!nm)return 1;
+  const on=!active||active.some(x=>x&&x.p&&x.p.n===nm);
+  return on?roleVal("iranyito"):1;}
+/* A LESI PUSKÁS: a Büntetés gólesélyének szorzója, és a SAJÁT ráadása. */
+function gpPunishP(active){
+  const lv=gpPunishLv();
+  if(!gpOn()||!lv)return 0;
+  let pp=GP_PUNISH_P[lv];
+  try{
+    const nm=roleOf("lesipuskas");
+    if(nm&&(!active||active.some(x=>x&&x.p&&x.p.n===nm)))pp*=roleVal("lesipuskas");
+  }catch(e){}
+  return Math.max(0,Math.min(0.95,pp));}
+function gpPunishCap(){return gpOn()?(GP_PUNISH_CAP[gpPunishLv()]||0):0;}
+/* A MÉRGEZETT EGÉR súly-szorzója a SAJÁT labdaszerzésére, félidőnként. A 70.
+   perctől már nem a súly nő, hanem a sérülés-veszély (lásd gpMouseInjMult). */
+const GP_MOUSE_H1=[1,1.9,2.3,2.8];
+const GP_MOUSE_H2=[1,1.25,1.40,1.55];
+const GP_MOUSE_INJ=[1,1.5,1.8,2.2];
+const GP_MOUSE_TIRED_MIN=70;
+function gpMouseOwnMult(name,min){
+  if(!gpOn()||!roleStyleActive())return 1;
+  if(roleOf("mergezett")!==name)return 1;
+  const lv=roleLevel("mergezett");
+  return (min<=45?GP_MOUSE_H1[lv]:GP_MOUSE_H2[lv])||1;}
+/* A HAJRÁ ÁRA: aki a 70. perctől is így hajt, azt jobban fenyegeti a sérülés.
+   A lefújás utáni sérülés-sorsolás súlyán megy (cardInjuryMult mintájára). */
+function gpMouseInjMult(name,redIdx,active){
+  if(!gpOn()||!roleStyleActive())return 1;
+  if(roleOf("mergezett")!==name)return 1;
+  /* Csak akkor, ha tényleg a pályán VOLT a hajrában — a lecserélt ember nem
+     fáradt bele. A hívó a kezdő tizenegyet adja át. */
+  try{if(active&&!active.some(x=>x&&x.p&&x.p.n===name))return 1;}catch(e){}
+  return GP_MOUSE_INJ[roleLevel("mergezett")]||1;}
+/* ---- FELFUTÁSOK, VISSZAZÁRÁSOK: a VÉDŐK elülső fele ----
+   A pressing másik iránya. A védő gól- és gólpassz-súlyát emeli — ugyanazon a
+   weightedPick-en, ahol minden más súly-szorzó ül. */
+function gpBackUpMult(pos){
+  if(!gpOn())return 1;
+  const lv=gpBothLv();
+  if(!lv)return 1;
+  try{if(roleInFormation(pos)!=="VEDO")return 1;}catch(e){return 1;}
+  return 1+(GP_BOTH_PCT[lv]||0);}
+/* KIKÉNYSZERÍTETT HIBA: az ELLENFÉL öngóljának súlyszorzója a különleges
+   események sorsolásában. */
+function gpErrMult(){return gpOn()?(GP_ERR_MULT[gpErrLv()]||1):1;}
+
+/* ================= GYILKOS PÁROS (3.9.93) =================
+   A NEGYEDIK KÖTÉSFAJTA, a képesség-kötés, a párkémia és a passzkémia mellé.
+   Két TÁMADÓ-KÖZÉPPÁLYÁS ember köt párt, és a kötés két dolgot ad:
+
+     · EGYÜTT PRESSZINGELNEK — ha mindketten a pályán vannak, a csapat
+       nyomásgyakorlása erősödik (+5% / +8% / +10%);
+     · EGYÜTT GYORSULNAK — a kiépülés pillanatában a SEBESSÉG-attribútumuk
+       kiegyenlítődik (a jobbikra), mindketten kapnak rá egy azonnali ráadást
+       (+2% / +4% / +6%), és onnantól EGYÜTT fejlődik: ami az egyiket gyorsítja
+       (edzés, személyi edző, boost), az a másikat is viszi.
+
+   A TÁROLÁS a passzkémia mintáját követi: névpárra kulcsolt bejegyzés a
+   mentésben, közös meccsek számlálójával. */
+const GP_DUO_PRESS=[0,0.05,0.08,0.10];
+const GP_DUO_BUMP =[0,0.02,0.04,0.06];
+const GP_DUO_RIPE =[0,15,12,8];       /* ennyi közös meccs az összeérés */
+function gpDuoOn(){return gpOn()&&gpDuoLv()>0;}
+function gpDuoState(){
+  if(!S.gpDuo||typeof S.gpDuo!=="object")S.gpDuo={};
+  return S.gpDuo;}
+function gpDuoKey(a,b){return [String(a||""),String(b||"")].sort().join("||");}
+/* Jelölhető-e erre a kötésre? A kimondott kapu: TÁMADÓ-KÖZÉPPÁLYÁS ember. */
+function gpDuoEligible(name){
+  try{
+    const e=(careerPool&&careerPool[name])||null;
+    const pos=((e&&e.pos)||[])[0]||"KKP";
+    const c=getCategoryFor(pos);
+    return c==="KOZEPPALYAS"||c==="CSATAR";
+  }catch(e){return false;}}
+function gpDuoRipeNeed(){return GP_DUO_RIPE[gpDuoLv()]||15;}
+function gpDuoDone(){
+  const D=gpDuoState();
+  return Object.keys(D).filter(k=>D[k]&&D[k].done).length;}
+/* Kész kötés-e a kettő között? */
+function gpDuoIsDone(a,b){
+  const r=gpDuoState()[gpDuoKey(a,b)];
+  return !!(r&&r.done);}
+/* KI A PÁRJA? A közös sebesség-fejlődés ezen olvas. */
+function gpDuoPartner(name){
+  if(!gpDuoOn()||!name)return null;
+  const D=gpDuoState();
+  const ks=Object.keys(D);
+  for(let i=0;i<ks.length;i++){
+    const r=D[ks[i]];
+    if(!r||!r.done)continue;
+    const two=ks[i].split("||");
+    if(two[0]===name)return two[1];
+    if(two[1]===name)return two[0];}
+  return null;}
+/* A CSAPAT nyomásgyakorlás-szorzója a KÉSZ párosokból — csak azokból,
+   amelyeknek MINDKÉT tagja a pályán van. Ez a kimondott feltétel. */
+function gpDuoTeamMult(active){
+  if(!gpDuoOn()||!active)return 1;
+  const D=gpDuoState(),lv=gpDuoLv();
+  const pitch=new Set();
+  active.forEach(x=>{if(x&&x.p&&!x.bus)pitch.add(x.p.n);});
+  let m=1;
+  Object.keys(D).forEach(k=>{
+    if(!D[k]||!D[k].done)return;
+    const two=k.split("||");
+    if(pitch.has(two[0])&&pitch.has(two[1]))m*=1+(GP_DUO_PRESS[lv]||0);});
+  return m;}
+/* ---- A MECCS UTÁNI LÉPTETÉS ----
+   Egyszer fut mérkőzésenként, a fejlődés UTÁN — ugyanott, ahol a passzkémiáé
+   (passChemTick). Két ember akkor épít kötést, ha EGYÜTT játszottak, és
+   mindketten támadó-középpályások. A kötés MAGÁTÓL épül, nem külön
+   felajánlásból: a gyilkos páros nem jutalom, hanem együtt töltött idő.
+
+   A KÉSZ PÁROSOK SZÁMA KORLÁTOS (GP_DUO_MAX). Enélkül a nyomásgyakorlás
+   szorzója korlátlanul halmozódna: öt kész páros a 3. szinten már másfélszeres
+   pressinget adna, és a filozófia egyetlen számmá zsugorodna. */
+const GP_DUO_MAX=3;
+function gpDuoTick(activeNames){
+  if(!gpDuoOn()||!activeNames)return;
+  const D=gpDuoState(),need=gpDuoRipeNeed();
+  const nev=Array.from(activeNames).filter(gpDuoEligible).sort();
+  /* A MEGLÉVŐ, MÉG ÉPÜLŐ kötések léptetése előbb — azok már elkezdődtek. */
+  let kesz=gpDuoDone();
+  Object.keys(D).forEach(k=>{
+    const r=D[k];if(!r||r.done)return;
+    const two=k.split("||");
+    if(!activeNames.has(two[0])||!activeNames.has(two[1]))return;
+    r.n=(r.n||0)+1;
+    if(r.n>=need&&kesz<GP_DUO_MAX){
+      const out=gpDuoComplete(two[0],two[1]);
+      kesz++;
+      try{
+        addLine(`🧲 <b>GYILKOS PÁROS!</b> ${esc(shortName(two[0]))} és ${esc(shortName(two[1]))} `
+          +`összeszokott — együtt presszingelnek, és innentől a sebességük is együtt fejlődik.`,"m mvp");
+        if(out)addLine(`→ a sebességük kiegyenlítődött: `
+          +`${esc(shortName(out.a))} ${out.elotteA} → ${out.utanaA} · `
+          +`${esc(shortName(out.b))} ${out.elotteB} → ${out.utanaB}`,"m skillnote");
+      }catch(e){}}});
+  /* ÚJ KÖTÉS csak akkor indul, ha van még hely — és mindig a legkevesebb
+     kötéssel rendelkező pár kapja, hogy ne egy ember gyűjtse be mindet. */
+  if(kesz>=GP_DUO_MAX)return;
+  const epul=Object.keys(D).filter(k=>D[k]&&!D[k].done).length;
+  if(epul>=GP_DUO_MAX)return;
+  for(let i=0;i<nev.length;i++)for(let j=i+1;j<nev.length;j++){
+    const k=gpDuoKey(nev[i],nev[j]);
+    if(D[k])continue;
+    /* Aki már tagja egy kötésnek, nem kezd újat — egy ember egy páros. */
+    if(Object.keys(D).some(x=>x.split("||").indexOf(nev[i])>=0||x.split("||").indexOf(nev[j])>=0))continue;
+    D[k]={n:1};
+    return;}}
+/* A KÖTÉS KIÉPÜLÉSE: a sebesség kiegyenlítődik a jobbikra, és mindketten
+   kapnak rá egy azonnali ráadást. Innentől a gpDuoPartner köti össze őket. */
+function gpDuoComplete(a,b){
+  const D=gpDuoState(),k=gpDuoKey(a,b);
+  const r=D[k]||(D[k]={n:0});
+  if(r.done)return null;
+  r.done=1;r.season=S.seasonNumber||1;
+  let out=null;
+  try{
+    const ea=careerPool&&careerPool[a], eb=careerPool&&careerPool[b];
+    if(ea&&eb&&ea.attrs&&eb.attrs){
+      const cel=Math.max(ea.attrs.seb||0,eb.attrs.seb||0);
+      const bump=1+(GP_DUO_BUMP[gpDuoLv()]||0);
+      const uj=Math.round(cel*bump);
+      const elotteA=Math.round(ea.attrs.seb||0), elotteB=Math.round(eb.attrs.seb||0);
+      /* A PLAFON UGYANAZ, mint minden más attribútum-emelésnél: a Ratinghez
+         kötött kemény korlát (attrHardCap) — a kötés nem nyit új teret. */
+      const capA=(typeof attrHardCap==="function")?attrHardCap(ea):999;
+      const capB=(typeof attrHardCap==="function")?attrHardCap(eb):999;
+      ea.attrs.seb=Math.min(capA,uj);
+      eb.attrs.seb=Math.min(capB,uj);
+      out={a,b,elotteA,elotteB,utanaA:Math.round(ea.attrs.seb),utanaB:Math.round(eb.attrs.seb)};}
+  }catch(e){}
+  return out;}
 function kapE(p){return panzerAbsOn()?traitFlip(kapN(p),false):kapN(p);}
 function verE(p){return panzerAbsOn()?traitFlip(verN(p),true):verN(p);}
 /* A VÁGATLAN pár — csak a folytonos morál-számítás használja (lásd fent). */
@@ -15978,6 +16298,12 @@ const COACHES=[
   tag:"Karizmatikus polarizáló, mesteri védekezés-szervező",moraleBase:-3,ovrMod:2,bias:-1,tactics:["busz","kontra","hosszu"]},
  {n:"Johan Cruyff",era:"1988–1996 · Kazincbarszelóna, a „Dream Team” építője",
   tag:"Filozófus edző, a totális futball továbbvivője",moraleBase:4,ovrMod:2,bias:1,tactics:["totalis","labdatartas","szeljatek"]},
+ /* 🧲 A GEGENPRESSING FILOZÓFUS-EDZŐJE (3.9.93). Ide is be kell kerülnie, nem
+    csak a STYLE_COACHES táblába: az INGYEN járó 1. szint (styleCoachFreeLevel)
+    azt nézi, hogy ELEVE Ő-E az edződ — ha a listából hiányzik, sosem lehet az,
+    és a filozófus-edző képessége némán feleannyit érne. */
+ {n:"Jürgen Klopp",era:"XXI. század · Majnai Erdőklub, Májpocsolya — a heavy metal futball",
+  tag:"Lobbanékony motivátor, a gegenpressing prófétája",moraleBase:7,ovrMod:1,bias:2,tactics:["kontra","totalis","szeljatek"]},
  {n:"Arrigo Sacchi",era:"1987–1991 · ÁCsé Milánó, a modern zónázó védekezés atyja",
   tag:"Forradalmi rendszerépítő, a pressing filozófusa",moraleBase:1,ovrMod:2,bias:0,tactics:["totalis","kontra","busz"]}
 ];
@@ -16104,7 +16430,11 @@ const STYLE_COACHES={
   /* PANZER — „vasfegyelmű, harcos vezéregyéniség". A busz a Betoné, marad a
      Hosszú labdák: a direkt, testes futball. */
   panzer:  {fx:"dardai",   name:"Dárdai Pál",     ic:"⚒️", tactic:"hosszu",
-            trait:"Dárdavető",acc:"Dárdavető Palit"}
+            trait:"Dárdavető",acc:"Dárdavető Palit"},
+  /* GEGENPRESSING — a Gyors kontra a pressing természetes folytatása: azért
+     szerzed meg odafent a labdát, hogy azonnal mehess vele. */
+  gegen:   {fx:"klopp",    name:"Jürgen Klopp",   ic:"⏱️", tactic:"kontra",
+            trait:"Kloppanós",acc:"Kloppanós Gyurit"}
 };
 /* AZ EDZŐK NEMZETISÉGE, kézzel (3.9.66). Két dolgot ad: a rövid alak a helyes
    szabály szerint képződik (magyar névsorrendnél az ELSŐ szó — „Csank János"
@@ -16114,7 +16444,7 @@ const STYLE_COACH_NAT={
   "Pep Guardiola":"Spanyolország","José Mourinho":"Portugália",
   "Csank János":"Magyarország","Johan Cruyff":"Hollandia",
   "Guttmann Béla":"Magyarország","Verebes József":"Magyarország",
-  "Dárdai Pál":"Magyarország"};
+  "Dárdai Pál":"Magyarország","Jürgen Klopp":"Németország"};
 const STYLE_COACH_CEIL=[99,99,125,150];
 /* A MOSTANI stílushoz tartozó edző-leírás (vagy null). */
 function styleCoachDef(styleK){
@@ -19504,8 +19834,14 @@ function skillAxisBonus(){
       /* félkész (több lépcsős) skill arányosan kevesebbet ad */
       const prog=skillProgOf(inst);
       const types=[sk.type].concat(sk.combo?sk.combo.map(c=>c.type):[]);
+      /* GEGENPRESSING (3.9.93): a „Nyomás!" viselőjénél a GYORSASÁGI képességek
+         hatása +25%. A tengely-hozam az, amit egy pace-skill valójában ad
+         (innen megy tovább a taktikai illeszkedésen a meccsre), tehát itt van
+         a helye — nem egy külön, párhuzamos csatornában. */
+      let _gp=1;
+      try{if(isPaceSkill(sk))_gp=gpPaceSkillMult(sl.player.n);}catch(e){}
       types.forEach(t=>{
-        if(SKILL_AXIS[t])b[SKILL_AXIS[t]]+=SKILL_AXIS_UNIT*prog;
+        if(SKILL_AXIS[t])b[SKILL_AXIS[t]]+=SKILL_AXIS_UNIT*prog*(SKILL_AXIS[t]==="seb"?_gp:1);
         else if(SKILL_AXIS_SPREAD.indexOf(t)>=0)ATTR_KEYS.forEach(k=>{b[k]+=SKILL_AXIS_UNIT*0.33*prog;});});});});
   ATTR_KEYS.forEach(k=>{b[k]=Math.min(SKILL_AXIS_CAP,b[k]);});
   return b;}
@@ -21359,6 +21695,17 @@ const SKILLS=[
  {id:"sp_queen",cat:"VEDO",onPitchCat:"VEDO",name:"Villámbeck Queen",desc:"Villámgyors felfutásaival hátulról nyitja meg a védelmeket: jóval nagyobb gólpassz-esély, és megtolja a csapat Sebesség-tengelyét. Csak védő kaphatja meg — natívan, tanult poszton, vagy aki épp védő helyen áll a pályán.",type:"combo",combo:[{type:"pace",val:1},{type:"assistw",val:2.5}]},
  {id:"sp_flank",cat:"KOZEPPALYAS",cat2:"CSATAR",name:"Húzd meg a szélét!",desc:"A szélen egyszerűen elhúz a védője mellett: nagyobb gól- és gólpassz-esély, és megtolja a csapat Sebesség-tengelyét.",type:"combo",combo:[{type:"pace",val:1},{type:"goalw",val:1.55},{type:"assistw",val:1.55}]},
  {id:"sp_bolt",cat:"CSATAR",cat2:"KOZEPPALYAS",name:"Usain Bolt",desc:"Tiszta sprint: a leshatáron elindulva senki sem éri utol. Kimagasló gólszerzési esély, és megtolja a csapat Sebesség-tengelyét.",type:"combo",combo:[{type:"pace",val:1},{type:"goalw",val:3.3}]},
+ /* ---- 🧲 A GEGENPRESSING SAJÁT KÉPESSÉGE (3.9.93) ----
+    Az EGYETLEN skill a játékban, amit nem a poszt kategóriája szab meg
+    (`anyCat`): a pressing nem poszt, hanem hozzáállás. Zárolt — a filozófia
+    fáján megvett „Nyomás skill" nyitja meg (lásd LOCKED_SKILL_IDS), addig a
+    pakliban sincs benne.
+    A HÁROM HATÁSÁBÓL EGY sem fér a meglévő `type` csatornákba: a sebesség
+    FEJLŐDÉSE, a labdaszerzés az ellenfél térfelén és a gyorsasági skillek
+    erősítése mind a Gegenpressing saját motorján megy (gpHasSkill). Ezért a
+    `type:"pace"` csak a Sebesség-tengely megtolását adja — a többit a
+    filozófia olvassa ki. */
+ {id:"gp_press",cat:"KOZEPPALYAS",anyCat:true,name:"Nyomás!",desc:"Nem hagyja gondolkodni az ellenfelet: az ellenfél térfelén jóval nagyobb eséllyel szerez labdát (+50%), a SEBESSÉG attribútuma 50%-kal gyorsabban fejlődik, és a gyorsasági képességek hatását is felerősíti (+25%). Bármely poszton megkapható.",type:"pace",val:1},
  {id:"bl_golden_gloves",cat:"KAPUS",name:"🥇 Aranykesztyű",desc:"A kupa kapus-királyának járó díj: erősen csökkenti az ellenfél gólesélyét, és állandó csapaterő-bónuszt ad.",type:"combo",combo:[{type:"defense",val:0.82},{type:"aura",val:2.5}]},
  /* ===== BAJNOKI EGYÉNI DÍJAK — A BL-DÍJAK HARMADA =====
     A bajnokság most kapott először egész mezőnyre szóló egyéni versenyt (lásd
@@ -21399,6 +21746,22 @@ const AWARD_ONLY_SKILL_IDS=new Set(["bl_golden_boot","bl_golden_passes","bl_gold
   "clutch_hero","clutch_wall"]);
 /* A jutalom-rendszer MINDEN véletlen húzása ebből a szűkített poolból megy. */
 const MAIN_SKILLS=SKILLS.filter(sk=>!AWARD_ONLY_SKILL_IDS.has(sk.id));
+/* ---- ZÁROLT KÉPESSÉGEK (3.9.93) ----
+   Van, ami csak egy FILOZÓFIÁVAL létezik. A „Nyomás!" a Gegenpressing saját
+   képessége: a fáján megvett „Nyomás skill" nyitja meg, és addig a pakliban
+   sem szabad benne lennie — különben más stílusnál is kihúzhatná a sorsolás,
+   és mivel senki nem volna rá jogosult, a jutalom NÉMÁN elveszne
+   (autoAssignSkill üres jelöltlistára visszalép).
+   Ezért a húzások nem a nyers MAIN_SKILLS-ből mennek, hanem ezen a kapun át. */
+const LOCKED_SKILL_IDS=new Set(["gp_press"]);
+function skillUnlocked(sk){
+  if(!sk||!LOCKED_SKILL_IDS.has(sk.id))return true;
+  if(sk.id==="gp_press"){try{return gpSkillOn();}catch(e){return false;}}
+  return false;}
+/* AZ ÉLŐ PAKLI. Minden véletlen húzás ezen megy át. */
+function skillDeck(){
+  if(!LOCKED_SKILL_IDS.size)return MAIN_SKILLS;
+  return MAIN_SKILLS.filter(skillUnlocked);}
 /* A klub-szezon KEZDŐ ÉVE a season szövegből: "1986/87" → 1986, "2005/06" →
    2005, "2026 VB" → 2026, "2020 EB (2021)" → 2020. Az első négyjegyű szám
    mindig az idény kezdete, ezért elég ennyi. A szezon-alapú Rating (lásd
@@ -24518,6 +24881,10 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
          FŐ attribútuma gyorsabban gyűlik. Ugyanaz a közös csatorna, ugyanaz a
          szabály: csak a POZITÍV fejlődést szorozza. */
       if(val>0)val*=passChemAttrMult(p.n,key);
+      /* GEGENPRESSING (3.9.93): a „Nyomás!" képesség a SEBESSÉG fejlődését
+         gyorsítja (+50%) — és a GYILKOS PÁROS a társáét is viszi. Ugyanaz a
+         közös csatorna, ugyanaz a szabály: csak a POZITÍV fejlődést szorozza. */
+      if(val>0&&key==="seb")val*=gpSpeedDevMult(p.n);
       /* a lassítás VESZTESÉGÉT is a mérlegbe könyveljük, hogy a játékos lássa,
          mibe került neki az edzésterv */
       if(_slow&&_slow.has(key)&&val>0){const loss=val*TRAIN_SLOW;val-=loss;_tlog.pts[key]-=loss;}
@@ -24613,7 +24980,8 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
      SZÁNDÉKOSAN a fejlődési ciklus UTÁN: a felzárkózás a FRISS Passz-értékekhez
      méri a hiányt, tehát azt is beszámítja, amit a vezető ezen a mérkőzésen
      szerzett. Egyszer fut meccsenként. */
-  try{passChemTick(_pcNames);}catch(e){}}
+  try{passChemTick(_pcNames);}catch(e){}
+  try{gpDuoTick(_pcNames);}catch(e){}}
 /* A cserepadon ülők és a tartalék-keret sem áll meg — kisebb, de valódi
    "edzés-alapú" fejlődést kapnak minden meccs után, teljesítmény-bónuszok
    nélkül (hiszen nem játszottak), ugyanazzal a kor-görbével súlyozva. Így
@@ -42949,7 +43317,7 @@ function applyChallengeReward(rw){
       /* A kihívásért járó skillt NEM osztjuk ki véletlenszerűen: sorba tesszük,
          és a legközelebbi alkalmas pillanatban TE választod ki, ki kapja
          (ugyanaz a választó-képernyő, mint a meccs-jutalmaknál). */
-      const skill=pick(MAIN_SKILLS);
+      const skill=pick(skillDeck());
       if(!S.pendingRewardSkills)S.pendingRewardSkills=[];
       S.pendingRewardSkills.push({skillId:skill.id,stagesNeeded:rollStagesNeeded()});
       return `${skill.name} skill — te választod ki, kié legyen`;}
@@ -44007,7 +44375,7 @@ function buildMatchSubs(){
    bele — azok kizárólag a BL egyéni díjaival szerezhetők meg. */
 function weightedShuffleSkills(rnd){
   const _r=rnd||Math.random;
-  const pool=MAIN_SKILLS.map((sk,idx)=>({sk,weight:idx<16?1:2.5}));
+  const pool=skillDeck().map((sk,idx)=>({sk,weight:idx<16?1:2.5}));
   const result=[];
   while(pool.length){
     const totalW=pool.reduce((s,x)=>s+x.weight,0);
@@ -44580,7 +44948,7 @@ const SKILL_POOL_MIN=12;
 function poolRefillKind(pred){
   if(!S.skillPool)S.skillPool=[];
   if(S.skillPool.some(pred))return 0;
-  const add=MAIN_SKILLS.filter(pred);
+  const add=skillDeck().filter(pred);
   add.forEach(sk=>{
     const at=Math.floor(Math.random()*(S.skillPool.length+1));
     S.skillPool.splice(at,0,sk);});
@@ -44593,7 +44961,7 @@ function poolTake(pred){
      paklit fűzött mögé, és mivel a sebesség-ág gyakran sül el, de paklinként
      csak három sebesség-képesség van, a pool 600 húzás alatt 3877 elemre
      hízott. Egy példány kell, nem egy pakli. */
-  const c=MAIN_SKILLS.filter(pred);
+  const c=skillDeck().filter(pred);
   return c.length?c[Math.floor(Math.random()*c.length)]:null;}
 /* A HÚZÁS BURKOLÓJA. A pakli-invariánst (mindig legyen benne sebesség-
    képesség) a húzás UTÁN is helyre kell állítani, nem csak előtte: a
@@ -57558,7 +57926,11 @@ const MSTAT_STYLE_W={
   sztar:    null,
   villam:   {ved:.10,kapus:.04,passz:.12,gol:.14,seb:.60},
   panzer:   {ved:.50,kapus:.16,passz:.10,gol:.16,seb:.08},
-  tikitaka: {ved:.08,kapus:.04,passz:.62,gol:.18,seb:.08}
+  tikitaka: {ved:.08,kapus:.04,passz:.62,gol:.18,seb:.08},
+  /* GEGENPRESSING: a sebesség és a védekezés EGYÜTT — a pressing pont a kettő
+     metszete. A kapus súlya a legkisebb az egész táblában: ebben a
+     filozófiában a kapu előtti munka nem érdem, mert oda el sem kellene jutni. */
+  gegen:    {ved:.30,kapus:.04,passz:.10,gol:.22,seb:.34}
 };
 /* A TAKTIKA STÍLUSA A LABDABIRTOKLÁSBAN. Ugyanaz a hat `style` kód, amit a
    matchLambdas is használ — egy rendszer, egy szótár. */
@@ -57621,7 +57993,10 @@ const MSTAT_ROLE_CH={
   /* Beton    */ fal:{def:1.2}, arok:{def:1.0}, kereszttuz:{def:0.6,atk:0.4},
   /* Villám   */ b2b:{pass:0.8,def:0.6}, legolas:{atk:0.8}, robben:{atk:1.2},
   /* Tiki-Taka*/ stabil:{pass:1.2}, latnok:{pass:1.6}, aura:{pass:0.4,def:0.4},
-  /* Harmónia */ peace:{def:0.5}, egyensuly:{pass:0.5,def:0.5}, agy:{pass:1.4}
+  /* Harmónia */ peace:{def:0.5}, egyensuly:{pass:0.5,def:0.5}, agy:{pass:1.4},
+  /* Gegenpressing: az Irányító a rendszert tartja (passz+védekezés), a Lesi
+     Puskás tisztán támadó, a Mérgezett egér tisztán védekező munkát végez. */
+  iranyito:{pass:0.8,def:0.8}, lesipuskas:{atk:1.2}, mergezett:{def:1.2}
 };
 /* A FILOZÓFIÁK a három csatornán. Ugyanaz a hét kulcs, mint a MSTAT_STYLE_W-ben
    — ott az EGYÉNI attribútum-illeszkedést súlyozza, itt a CSAPAT képét tolja.
@@ -57634,7 +58009,10 @@ const MSTAT_STYLE_CH={
   sztar:    {poss:0,  pass:+0.2, atk:+0.6, def:0},
   villam:   {poss:-4, pass:+0.2, atk:+0.8, def:-0.2},
   panzer:   {poss:-3, pass:-0.2, atk:0,    def:+1.0},
-  tikitaka: {poss:+8, pass:+1.4, atk:-0.2, def:-0.2}
+  tikitaka: {poss:+8, pass:+1.4, atk:-0.2, def:-0.2},
+  /* A LEGNAGYOBB NEGATÍV LABDATARTÁS az egész táblában, és ez szándékos: a
+     Gegenpressing nem akarja a labdát, a visszaszerzés pillanatát akarja. */
+  gegen:    {poss:-10,pass:-0.2, atk:+0.9, def:+0.6}
 };
 /* AZ ÖSSZESÍTETT POSZT-ILLESZKEDÉS HORGONYA. Az attrPosFit skálája:
    1,0 = elsődleges posztja · 0,6 = további sajátja · 0,35 = rokonposzt ·
@@ -57924,9 +58302,14 @@ function mstatCompute(c){
      a FILOZÓFIA szándéka (a Beton átengedi, a Tiki-Taka megtartja), a keret
      PASSZ-CSATORNÁJA (skillek + szerepek), és az ÖSSZESÍTETT POSZT-
      ILLESZKEDÉS — aki nem a helyén áll, gyakrabban veszti el a labdát. */
+  /* 🧲 NEM KELL NEKÜNK LABDA (3.9.93): a Gegenpressing ELADJA a labdatartást
+     gólesélyért. A drop a kijelzett birtoklásból megy le — és ugyanez a szám
+     emeli az ellenfél gólvárhatóságát a motorban (gpNoBallOppMult), hogy az
+     alku mindkét fele igaz legyen, ne csak a jutalom fele. */
   const poss=Math.round(mstatClamp(
     50+(MSTAT_POSS_SHIFT[stl]||0)*grip+z.passz*1.6+mstatClamp(c.diff,-12,12)*0.8
-    +(MOD.styleCh.poss||0)+MOD.pass*1.6+MOD.fitDelta*14+(r()-0.5)*6,20,80));
+    +(MOD.styleCh.poss||0)+MOD.pass*1.6+MOD.fitDelta*14+(r()-0.5)*6
+    -((typeof gpPossDrop==="function")?gpPossDrop():0),20,80));
   /* --- PASSZOK: a birtoklás az elsődleges hajtó, a rendszer szorzó --- */
   /* A NAGYSÁGREND MÉRT: egy 90 perces mérkőzésen egy csapat 350-600 passzt
      ad, a birtoklás arányában. A 430-as alap az 50%-hoz tartozik. */
@@ -59257,6 +59640,9 @@ function playMatch(){
   const mSave={},mSaveBig={},mSaveSolo={},mPenSave={},mBlock={},mLineClear={};
   /* 3.8.22: szöglet-tisztázás · kontraindítás · szögletgól */
   const mClear={},mCounter={},mSetPiece={};
+  /* 🧲 GEGENPRESSING (3.9.93): labdaszerzés az ellenfél térfelén, névre szólóan
+     — és hány ilyenből lett gól (a Büntetés meccsenkénti plafonja ezt nézi). */
+  const mPress={};let mPressGoals=0;
   /* AZ ELÜLSŐ SOR MECCSE (3.9.04): lövés · kapura lövés · helyzetkidolgozás ·
      elvégzett pontrúgás. A hátsó sor maptérképeinek pontos párja — lásd az
      OURCH_* konstansokat. Névre szólnak, mint ott. */
@@ -59444,7 +59830,10 @@ function playMatch(){
        különleges eseményeknek csak 13.0%-a volt szabadrúgás (15/115), ami egy
        Szabadrúgás-mestert nevelő játékosnak alig adott alkalmat. Az új súllyal
        19.4% (24/124) — érezhetően több, de nem nyomja el a többi eseményt. */
-    const evType=["penalty_for","penalty_against","owngoal_for","owngoal_against","fight","var_overturn","free_kick_goal"][weightedIndex([22,18,10,8,17,25,24])];
+    /* 🧲 KIKÉNYSZERÍTETT HIBA (3.9.93): az ELLENFÉL öngóljának súlya nő — ez az
+       „owngoal_for" ág. A többi tétel súlya változatlan, tehát a szorzó a
+       teljes mezőnyön belül tolja el az arányt, nem ad új eseményt. */
+    const evType=["penalty_for","penalty_against","owngoal_for","owngoal_against","fight","var_overturn","free_kick_goal"][weightedIndex([22,18,10*gpErrMult(),8,17,25,24])];
     if(evType==="penalty_for"){
       /* RÚGÓ-ELSŐBBSÉG: az ICE COLD / COOL súlya megemeli az esélyt, hogy ő
          álljon a labda mögé — a gólszerzési súly mellett, nem helyette. */
@@ -59853,7 +60242,7 @@ function playMatch(){
       let si=setPiece
         ?weightedPick(active,(x,idx)=>idx===redIdx?0:(SETPW[slots[x.idx].pos]||1)
             *Math.max(1,pOvr(x.p)-58)*mileWeight(MILE,x.p.n),null,spreadSkipGK)
-        :weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf-1,ga)*bzChaseGoalMult(x.p.n,mScore)*chHatMult(x.p.n,mScore)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga)*dialMul("goalw",{name:x.p.n,pos:slots[x.idx].pos,min:gnow(min),gf:gf-1,ga}),null,spreadSkipGK);
+        :weightedPick(active,(x,idx)=>idx===redIdx?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf-1,ga)*bzChaseGoalMult(x.p.n,mScore)*chHatMult(x.p.n,mScore)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga)*gpBackUpMult(slots[x.idx].pos)*dialMul("goalw",{name:x.p.n,pos:slots[x.idx].pos,min:gnow(min),gf:gf-1,ga}),null,spreadSkipGK);
       /* Párharcban a gólszerzőt a közös lista dönti el (a súlyozást a saját
          kliensed már a pillanatkép küldésekor elvégezte). A fenti súlyozott
          választás csak TARTALÉK marad: ha a név bármiért nem található a
@@ -59894,7 +60283,7 @@ function playMatch(){
       let atxt="",asstSk=null,asstName=null;
       /* Párharcban a gólpassz ténye és adója is a közös listából jön. */
       if(duelGoal?!!duelGoal.assist:Math.random()<crossAssistChance(0.75)){
-        let ai;do{ai=weightedPick(active,(x,idx)=>idx===redIdx?0:(ASSTW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"assistw")*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*mileWeight(MILE,x.p.n)*roleAssistMult(x.p.n)*roleAssistTargetMult(x.p.n,scorer.n)*bzChaseAssistMult(x.p.n,slots[x.idx].pos,mScore)*dialMul("assistw",{name:x.p.n,pos:slots[x.idx].pos}),null,spreadSkipGK);}while(ai===si);
+        let ai;do{ai=weightedPick(active,(x,idx)=>idx===redIdx?0:(ASSTW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"assistw")*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*mileWeight(MILE,x.p.n)*roleAssistMult(x.p.n)*roleAssistTargetMult(x.p.n,scorer.n)*bzChaseAssistMult(x.p.n,slots[x.idx].pos,mScore)*gpBackUpMult(slots[x.idx].pos)*dialMul("assistw",{name:x.p.n,pos:slots[x.idx].pos}),null,spreadSkipGK);}while(ai===si);
         if(duelGoal){const _a=active.findIndex(a=>a.p.n===duelGoal.assist);if(_a>=0&&_a!==si)ai=_a;}
         const asst=active[ai].p;
         mAssist[asst.n]=(mAssist[asst.n]||0)+1;recordAssist(asst.n);
@@ -60210,6 +60599,40 @@ function playMatch(){
         const _yi=weightedIndex(_yw);
         const _yn=active[_yi].p.n;
         sargat(_yi,min,yellowReasonFor(_yn,{min:gnow(min),gf,ga,scored:!!mScore[_yn]}));}}
+    /* ---- 🧲 GEGENPRESSING: LABDASZERZÉS AZ ELLENFÉL TÉRFELÉN (3.9.93) ----
+       A stílus saját motor-csatornája. MAGA A LABDASZERZÉS PÁRHARCBAN IS FUT:
+       nem mozdítja az állást, tehát a két kliens nem csúszhat szét tőle — a
+       belőle születő GÓL viszont már az eredmény, azt pedig a közös
+       eseménylista adja, ezért az (és csak az) párharcban elmarad. */
+    {const _gpM=gpPressPerMatch(active,gnow(min));
+     if(_gpM>0&&Math.random()<_gpM/18){
+       const _gw=active.map((x,k)=>(x.bus||k===redIdx)?0:
+         gpPlayerWeight(x.p,slots[x.idx].pos)*gpMouseOwnMult(x.p.n,gnow(min)));
+       if(_gw.reduce((a,b)=>a+b,0)>0){
+         const _gi=weightedIndex(_gw),_gn=active[_gi].p.n;
+         mPress[_gn]=(mPress[_gn]||0)+1;
+         const _gt=gminNewTxt(min);
+         /* A BÜNTETÉS: lesz-e belőle gól? A plafon a képesség szintjéé. */
+         const _gp=(!DUEL&&mPressGoals<gpPunishCap()&&Math.random()<gpPunishP(active));
+         if(_gp){
+           mPressGoals++;gf++;
+           mScore[_gn]=(mScore[_gn]||0)+1;recordScorer(_gn);
+           try{vlNoteGoal(gnow(min),_gn,null);}catch(e){}
+           updateGoallessStreak(_gn,true);
+           updateTTBoard(fx,gf,ga,Math.min(90,min));
+           addLine(`${_gt}  🧲 <b>ELVETTÉK ODAFENT — ÉS GÓL!</b> ${esc(shortName(_gn))} `
+             +`az ellenfél térfelén csapott le a labdára, és a kapus még mozdulni sem tudott.  `
+             +`${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+           sbEv("us","goal",_gn);
+           maxDeficit=Math.max(maxDeficit,ga-gf);maxLead=Math.max(maxLead,gf-ga);
+           try{mileEffective(MILE,_gn,"goal",`${_gt}  `);}catch(e){}
+         }else{
+           addLine(`${_gt}  🧲 <b>Elvették odafent!</b> ${esc(shortName(_gn))} `
+             +`nem hagyta kijátszani magát az ellenfél térfelén — megvan a labda.`,"m skillnote");
+           /* A pressinggel szerzett labda KONTRÁT indít: ha percen belül gól
+              esik, a szerzője elő-gólpasszt kap (ugyanaz a csatorna, mint a
+              blokké és a tisztázásé). */
+           lastWin={n:_gn,min:gnow(min),how:"pressinggel"};}}}}
     /* ---- SZÍNES SKILL-KÖZVETÍTÉS ----
        Percenként kis eséllyel egy, a pályán lévő skillhez kötött hangulat-sor.
        Eddig csak a góloknál/gólpassznál/kapusnál látszottak skillek — a védés,
@@ -61272,6 +61695,8 @@ function playMatch(){
         sv:mSave[pl.n]||0,svBig:mSaveBig[pl.n]||0,svSolo:mSaveSolo[pl.n]||0,
         svPen:mPenSave[pl.n]||0,bl:mBlock[pl.n]||0,lc:mLineClear[pl.n]||0,
         cl:mClear[pl.n]||0,ct:mCounter[pl.n]||0,sp:mSetPiece[pl.n]||0,
+        /* 🧲 a pressinggel szerzett labdák (3.9.93) */
+        pr:mPress[pl.n]||0,
         /* AZ ELÜLSŐ SOR MECCSE (3.9.04) — lásd az OURCH_* szakaszt. */
         sh:mShot[pl.n]||0,son:mShotOn[pl.n]||0,sbk:mShotBlk[pl.n]||0,
         kp:mKeyPass[pl.n]||0,spt:mSetTaken[pl.n]||0});
@@ -61540,6 +61965,30 @@ function playMatch(){
           let _db=0;Object.keys(mYellow).forEach(n=>{_db+=mYellow[n]||0;});
           if(_db>0){const t=msT();t.maxMatchYc=Math.max(t.maxMatchYc||0,_db);}}
       }catch(e){}
+      /* ---- 🧲 GEGENPRESSING KÖNYVELÉSE (3.9.93) ----
+         Négy szám, és mind a négy más kérdésre felel: mennyi a klub
+         történetében, mennyi EBBEN az idényben, mennyi volt a legjobb
+         MÉRKŐZÉS, és hány gól lett belőle. A mérföldkövek ezekből olvasnak.
+         A játékosonkénti bontás a careerStats-ba megy (pr), ahogy a védéseké
+         és a lapoké is — onnan látszik, KI a klub pressing-gépe. */
+      try{
+        if(gameMode==="career"){
+          let _pr=0;
+          Object.keys(mPress).forEach(n=>{
+            const v=mPress[n]||0;if(!v)return;
+            _pr+=v;
+            const cs=S.careerStats[n]=S.careerStats[n]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0,min:0};
+            cs.pr=(cs.pr||0)+v;});
+          if(_pr>0||mPressGoals>0){
+            const t=msT();
+            t.gpAll=(t.gpAll||0)+_pr;
+            t.gpSeason=(t.gpSeason||0)+_pr;
+            t.gpMatch=Math.max(t.gpMatch||0,_pr);
+            t.gpGoals=(t.gpGoals||0)+mPressGoals;
+            /* „A kapusnak nem volt dolga": győzelem kapott gól nélkül, legalább
+               három odafent szerzett labdával. A filozófia ideális estéje. */
+            if(_pr>=3&&ga===0&&gf>ga)t.gpCleanPress=(t.gpCleanPress||0)+1;}}
+      }catch(e){}
     }
     /* --- sérülés-kockázat --- */
     let injuredThisMatchName=null;
@@ -61551,6 +62000,9 @@ function playMatch(){
       let cand=[...Array(11).keys()].filter(i=>!(active[i]&&active[i].bus));
       if(redIdx>=0)cand=cand.filter(i=>i!==redIdx);
       const w=cand.map(i=>cardInjuryMult(active[i].p.n)
+        /* 🧲 MÉRGEZETT EGÉR (3.9.93): aki a hajrában is így hajt, jobban ki van
+           téve a sérülésnek. Ez a szerep kimondott ára. */
+        *gpMouseInjMult(active[i].p.n,redIdx,active)
         /* SKILL-KOCKÁZAT (injrisk): aki a szabályok határán szerel, nagyobb
            eséllyel ő bánja. A csapat sérülés-ESÉLYÉT nem emeli, csak azon
            belül tolja el, KI sérül meg. */
@@ -65140,6 +65592,7 @@ function skillRealLevel(){
      az a saját, valódi értékéből olvassa vissza a szintet. */
   if(!p){try{p=styleSkillPaceBias()?0.45:0;}catch(e){}}
   if(!p){try{p=styleSkillPassBias()||0;}catch(e){}}
+  if(!p){try{p=styleSkillGpBias()||0;}catch(e){}}
   return p>=0.60?3:p>=0.45?2:p>0?1:0;}
 /* MEKKORA ESÉLLYEL NEM TE DÖNTESZ. A Panzer keményebb kezű, a Béke és
    harmónia az EGYETLEN, amelyik ezt az arányt egyáltalán mozdítani tudja. */
@@ -65172,6 +65625,10 @@ function skillRealStyleBias(k,p){
   if(k==="harmonia")return {p,test:sk=>sk.type==="assistw"};
   if(k==="villam")  return {p,test:sk=>PACE_SKILL_IDS.indexOf(sk.id)>=0};
   if(k==="tikitaka")return {p,test:sk=>isPassSkill(sk)};
+  /* GEGENPRESSING: a kimondott KÉT képesség — a Motor és a Nyomás!. Azért
+     ilyen szűk a kör, mert a képesség szövege is ezt ígéri, és mert a
+     „Nyomás!" amúgy is csak ezzel a filozófiával létezik. */
+  if(k==="gegen")   return {p,test:sk=>sk.id===GP_SKILL_ID||sk.id==="mf_engine"};
   return null;}   /* Panzer: nem a sorsolást tolja, hanem az arányt */
 /* Hány meccs múlva választhat újra a sztár-stílus. 0 = most is lehet. */
 /* Karrier-szintű meccsszámláló. Ugyanaz a képlet, amit a piaci türelmi idők és
@@ -65224,16 +65681,16 @@ function skillRealDrawFor(name){
   }catch(e){cat=null;}
   const has=(S.skills&&S.skills[name])||[];
   const owned=id=>has.some(i=>i.skill&&i.skill.id===id);
-  let pool=MAIN_SKILLS.filter(sk=>!owned(sk.id));
+  let pool=skillDeck().filter(sk=>!owned(sk.id));
   if(cat){const c=pool.filter(sk=>sk.cat===cat);if(c.length)pool=c;}
-  return pool.length?pick(pool):pick(MAIN_SKILLS);}
+  return pool.length?pick(pool):pick(skillDeck());}
 /* A SORSOLÁS a "nem te döntesz" ágon, a stílus-torzítással. */
 function skillRealDrawBiased(){
   const b=skillRealBias();
   if(b&&Math.random()<b.p){
-    const pool=MAIN_SKILLS.filter(b.test);
+    const pool=skillDeck().filter(b.test);
     if(pool.length)return pick(pool);}
-  return pick(MAIN_SKILLS);}
+  return pick(skillDeck());}
 /* A DÖNTÉS. Visszaadja, mi történjék ezzel a jutalommal:
      {mode:"auto",   skill, target}  — magától megy, csak bejelentjük
      {mode:"who",    skill}          — te választod, ki kapja
@@ -65398,7 +65855,7 @@ function showSkillTypePick(reason,stagesNeeded,done,resumeCb){
   $("skillDesc").textContent="Előbb a típust választod, utána azt, ki kapja.";
   const box=$("skillAssignList");box.innerHTML="";
   SKR_CATS.forEach(c=>{
-    const pool=MAIN_SKILLS.filter(sk=>sk.cat===c.k);
+    const pool=skillDeck().filter(sk=>sk.cat===c.k);
     if(!pool.length)return;
     const b=document.createElement("button");
     b.className="btn-s stepbtn";b.style.marginBottom="6px";
@@ -65452,6 +65909,17 @@ function eligibleForSkill(skill){
      tisztességesebb, mint a merev poszt-szűrés (a hátrahúzott középpályás
      tényleg védőt játszik). A "Villámbeck Queen" használja. */
   const onPitchDef=skill.onPitchCat?ROLE_CATS.find(c=>c.key===skill.onPitchCat):null;
+  /* ---- KÉT ÚJ KAPU A GEGENPRESSING MIATT (3.9.93) ----
+     `anyCat`: a képesség NEM posztfüggő — a „Nyomás!" bármely poszton
+     megkapható, mert a pressing hozzáállás, nem poszt.
+     `gpDefOpen`: a NYOMÁSGYAKORLÁS 1. szintje kinyitja a VÉDEKEZŐ képességeket
+     a középpályásoknak és a csatároknak is. Ez a képesség kimondott lényege —
+     „középpályások és csatárok is kaphatnak védekező skillt" —, és pontosan
+     az a skill-kör, amit utána a 2-3. szint fel is erősít. */
+  const anyCat=!!skill.anyCat;
+  const gpDefOpen=(()=>{try{
+    return skill.cat==="VEDO"&&skill.type==="defense"&&gpOn()&&gpPressLv()>0;
+  }catch(e){return false;}})();
   /* A keret-kategória az alap. Kiegészítés: egy pályán lévő szélső, aki az
      aktuális felállásban TÁMADÓ szerepű (pl. 4-3-3 szárny), a CSATAR-skillekre
      is jogosult — a szerepe szerinti skillt kaphatja, ne csak középpályásat. */
@@ -65462,6 +65930,8 @@ function eligibleForSkill(skill){
        skilltől. A szűrés ITT van, a közös forrásnál, ezért a kézi kiosztásra
        (renderSkillAssign) és az automatikusra (autoAssignSkill) egyaránt áll. */
     if((S.skills[p.n]||[]).some(i=>i.skill&&i.skill.id===skill.id))return false;
+    /* A posztfüggetlen képesség (anyCat) itt lép ki: nála nincs mit szűrni. */
+    if(anyCat)return true;
     /* a pillanatnyi hely ELŐBB dönt, mint a poszt-kizárás: aki most tényleg
        ott áll, azt nem a keretlapja zárhatja ki */
     if(onPitchDef){
@@ -65473,6 +65943,14 @@ function eligibleForSkill(skill){
     if(skill.cat==="CSATAR"&&p.pos.some(pp=>pp==="JSZ"||pp==="BSZ")){
       const onPitch=slots.some(s=>s.player&&s.player.n===p.n);
       if(onPitch&&(WINGER_IS_ATTACKING[form]))return true;}
+    /* NYOMÁSGYAKORLÁS: a védekező képességek megnyílnak a középpálya és a
+       támadósor felé is. A legutolsó kapu, hogy minden korábbi szabály
+       (kétszeres birtoklás, kizárt poszt) előbb érvényesüljön. */
+    if(gpDefOpen){
+      try{
+        const c=getCategoryFor((p.pos&&p.pos[0])||"KKP");
+        if(c==="KOZEPPALYAS"||c==="CSATAR")return true;
+      }catch(e){}}
     return false;});}
 function renderSkillAssign(skill,stagesNeeded,stagesDone){
   const done=Math.max(1,Math.min(stagesNeeded||1,stagesDone||1));
@@ -77964,6 +78442,7 @@ function unlockHas(id){
     case "styleSztar":    return unlockStyleOk("sztar");
     case "styleTiki":     return unlockStyleOk("tikitaka");
     case "stylePanzer":   return unlockStyleOk("panzer");
+    case "styleGegen":    return unlockStyleOk("gegen");
   }
   return true;   /* amiről nem rendelkezünk, az nyitva van */}
 /* Egy ellenfél-tempó fokozat nyitva van-e. A `lassu` és az alatta lévő mindig;
@@ -78359,7 +78838,7 @@ function unlockTempoWhy(key){
    tud elcsúszni, és ami nincs benne, az nyitva van.
    AZ ÉRTÉK: hányadik karrieredtől választható (a `runs` a LEZÁRT futásokat
    számolja, tehát az N. karrier = N−1 lezárt). */
-const UNLOCK_STYLE_RUN={villam:2,sztar:3,tikitaka:4};
+const UNLOCK_STYLE_RUN={villam:2,sztar:3,tikitaka:4,gegen:5};
 function unlockStyleOk(key){
   if(!unlockGatesOn())return true;           /* közös karrierben nincs kapu */
   if(unlockGiftHas("style",key))return true;
@@ -84879,6 +85358,11 @@ function msNoteSeasonClose(){
     /* …és ugyanez a sárga lapokból (3.9.71), a Panzer mérföldköveihez. */
     {let _y=0;try{Object.values(S.seasonYellows||{}).forEach(v=>{_y+=v||0;});}catch(e){}
      t.maxSeasonYc=Math.max(t.maxSeasonYc||0,_y);}
+    /* 🧲 GEGENPRESSING (3.9.93): az IDÉNYES pressing-csúcs. A gpSeason a
+       mérkőzésenként gyűlő szám; itt jegyezzük fel a legjobb idényt, és itt
+       nullázzuk a következőre. Ugyanaz a minta, mint a piros lapoknál. */
+    t.gpSeasonBest=Math.max(t.gpSeasonBest||0,t.gpSeason||0);
+    t.gpSeason=0;
     /* A legkevesebb kapott gól egy lezárt idényben. */
     if((S.seasonMatches&&Object.keys(S.seasonMatches).length)||S.idx>=25)
       t.minSeasonGA=(t.minSeasonGA==null)?(S.GA||0):Math.min(t.minSeasonGA,S.GA||0);
@@ -85341,7 +85825,27 @@ const STYLES=[
   {key:"tikitaka", ic:"🌀", n:"Tiki-Taka",
    tag:"A labda nem fárad el. Ti igen — ezért járassátok őt.",
    d:"A passz a mindenük. A mérföldkövek a passzkémiákat, a keret Passz-attribútumát, a gólpasszokat és a Labdatartás ismertségét mérik. A képességfa három saját rendszert nyit meg: a PASSZKÉMIÁT (két ember egymáshoz igazodik és együtt gyorsul), a PASSZREKORDOT (a hosszú passzsorból születő gólt) és GUARDIOLÁT, akivel a Labdatartás 99 fölé is fejleszthető.",
-   forms:["433","4231"], tactics:["labdatartas","totalis"], col:"#7c5cbf"}
+   forms:["433","4231"], tactics:["labdatartas","totalis"], col:"#7c5cbf"},
+  /* ---- 🧲 GEGENPRESSING (3.9.93) ----
+     A NYOLCADIK filozófia, és az első, ami nem a LABDÁRÓL szól, hanem arról a
+     pillanatról, amikor NINCS nálad. A többi stílus a saját játékát méri (gól,
+     tiszta lap, passz, sebesség); ez azt, hogy mit csinálsz a labdavesztés
+     utáni öt másodpercben.
+
+     EZÉRT KAP SAJÁT MOTOR-CSATORNÁT: a labdaszerzést az ELLENFÉL TÉRFELÉN
+     (gpPress*). Ez a csatorna eddig nem létezett — a motor a szerelést a
+     védekezés-szorzóban rejtette el —, és a stílus egész gazdasága erre ül:
+     a Büntetés ebből csinál gólt, a szerepek ezt erősítik, a mérföldkövek ezt
+     számolják.
+
+     ÉS EZ AZ EGYETLEN FILOZÓFIA, AMI TUDATOSAN ROSSZABBUL JÁTSZIK EGY
+     MUTATÓBAN: a „Nem kell nekünk labda" ELADJA a labdatartást gólesélyért —
+     és a kevesebb labda tényleg megemeli az ellenfél gólesélyét is. Ez nem
+     mellékhatás, hanem a filozófia alkuja. */
+  {key:"gegen", ic:"🧲", n:"Gegenpressing",
+   tag:"A legjobb játékszervező a labdaszerzés.",
+   d:"Az öt másodperc, ami a labdavesztés után jön. A csapat nem hátrál rendezni, hanem azonnal ráugrik a labdára — az ellenfél térfelén. A mérföldkövek az ott szerzett labdákat, az abból esett gólokat és a keret sebességét mérik. A képességfa saját skillt (Nyomás!), saját kötésfajtát (gyilkos páros) és három saját szerepet nyit meg — cserébe a labdatartásodat eladja gólesélyért.",
+   forms:["4231","433"], tactics:["kontra","totalis"], col:"#d1495b"}
 ];
 function styleByKey(k){return STYLES.find(x=>x.key===k)||null;}
 /* Az állapot. Csak akkor jön létre, ha tényleg választottál — a `null` maga is
@@ -85531,7 +86035,34 @@ const ROLE_DEFS={
     d:"A keret esze. Amíg a pályán van, nagyobb eséllyel az ő lába indítja a gólt.",
     v:[1.03,1.05,1.07,1.09],
     u:"gólpassz-súly, amíg a pályán van",
-    who:"átlagon felüli Passz a keretben"}};
+    who:"átlagon felüli Passz a keretben"},
+  /* ---- 🧲 GEGENPRESSING ----
+     A nyolcadik stílus szerepei, és mind a három a SAJÁT motor-csatornájára
+     (a labdaszerzés az ellenfél térfelén) köt rá — ez az első szerep-hármas,
+     ami nem a gólt vagy a kapott gólt mozgatja, hanem azt, ami odáig vezet.
+
+     Az IRÁNYÍTÓ az egyetlen szerep a játékban, aminek a gazdája nem egy
+     attribútum, hanem a RATING ÉS A KARIZMA együtt (lásd roleAttrOf
+     „ovrkar"): aki látja, hogyan kell tolódni, és akire hallgatnak is.
+
+     A MÉRGEZETT EGÉR az egyetlen szerep, aminek ÁRA van a mérkőzés végén: aki
+     a 70. perctől is így hajt, azt jobban fenyegeti a sérülés. A belépője a
+     legszűkebb az egész játékban — a keret HÁROM leggyorsabb embere. */
+  iranyito:{style:"gegen",ic:"🎛️",n:"Irányító",
+    d:"Ő látja, merre kell tolódnia az egész csapatnak. Amíg a pályán van, erősödik a NYOMÁSGYAKORLÁS képességed hatása, és a taktikai illeszkedés is javul — a rendszer az ő fejében van meg.",
+    v:[1.06,1.12,1.18,1.25],v2:[1,2,3,4],
+    u:"a nyomásgyakorlás hatása, amíg a pályán van",
+    who:"védekező középpályás (VKP) vagy védő — minél magasabb a Ratingje és a karizmája, annál jobban"},
+  lesipuskas:{style:"gegen",ic:"🎣",n:"Lesi Puskás",
+    d:"Ott áll, ahol a labda vissza fog pattanni. Az ellenfél térfelén szerzett labdák java részét ő váltja gólra: erősíti a BÜNTETÉS képességed gólesélyét, és az ilyen gólokra külön saját ráadást is kap.",
+    v:[1.10,1.20,1.30,1.40],v2:[1,1.5,1.75,2],
+    u:"a büntetés gólesélye, amíg a pályán van",
+    who:"bárki — a SEBESSÉG és a GÓLSZERZÉS attribútum átlaga dönt"},
+  mergezett:{style:"gegen",ic:"🐁",n:"Mérgezett egér",
+    d:"Sosem áll meg, mindig fut a labda után. Az ELSŐ FÉLIDŐBEN jóval nagyobb eséllyel ő szerzi meg a labdát odafent, a másodikban már kevésbé — és ha a 70. perctől is a pályán van, megnő a sérülés-veszélye. Ez a szerep ára.",
+    v:[1.9,2.3,2.8,2.8],v2:[1.5,1.8,2.2,2.2],
+    u:"saját labdaszerzés az első félidőben",
+    who:"a keret HÁROM leggyorsabb embere közül valaki"}};
 /* ---- AZ EGYENSÚLY-SZEREP SZÁMTANA ----
    A hatás SZÁZALÉK, három tényező szorzata:
      alap (3) × közelség-szorzó × a képesség-szint szorzója (roleVal).
@@ -85576,7 +86107,8 @@ function roleBalEasePct(){
 const ROLE_AURA_MULT=2, ROLE_AURA_RISK=1.5;
 const ROLE_KEYS_OF={bombazok:["nyito","befejezo","talalo"],beton:["fal","arok","kereszttuz"],
   villam:["b2b","legolas","robben"],tikitaka:["stabil","latnok","aura"],
-  harmonia:["peace","egyensuly","agy"]};
+  harmonia:["peace","egyensuly","agy"],
+  gegen:["iranyito","lesipuskas","mergezett"]};
 /* ---- A BELÉPŐ ----
    A Bombázók és a Beton szerepeire bárki jelölhető (a kapust kivéve); a
    Villáméira NEM. Itt a szerep maga egy alkati kérdés — egy lassú szélső nem
@@ -85630,7 +86162,30 @@ function roleEligible(key,p){
     const jp=(e&&e.karI!=null)?e:p;
     return trKapGond(jp)||trVerForro(jp);}
   if(key==="agy")return rolePassOf(p)>roleAvgPass();
+  /* ---- 🧲 GEGENPRESSING ----
+     Az IRÁNYÍTÓ posztkapu: védekező középpályás vagy védő. A LESI PUSKÁSRA
+     bárki jelölhető (ott nem kapu van, hanem lejtő: a sebesség-gól átlag
+     maga fejezi ki, mennyire illik rá). A MÉRGEZETT EGÉR belépője a
+     legszűkebb az egész játékban: a keret HÁROM leggyorsabb embere. */
+  if(key==="iranyito"){
+    const e=(careerPool&&careerPool[p.n])||null;
+    const pos=((e&&e.pos)||p.pos||[]);
+    return pos.indexOf("VKP")>=0||cat==="VEDO";}
+  if(key==="mergezett")return roleTopSpeedSet().has(p.n);
   return true;}
+/* A KERET HÁROM LEGGYORSABB EMBERE — a Mérgezett egér belépője. Halmazt ad,
+   mert a kiosztó minden jelöltre külön kérdez rá; a számolás egy körben megy. */
+const GP_MOUSE_TOP=3;
+function roleTopSpeedSet(){
+  const out=new Set();
+  try{
+    msRoster().filter(x=>x&&x.n)
+      .map(x=>({n:x.n,v:roleSpeedOf(x)}))
+      .sort((a,b)=>b.v-a.v)
+      .slice(0,GP_MOUSE_TOP)
+      .forEach(x=>{if(x.v>0)out.add(x.n);});
+  }catch(e){}
+  return out;}
 /* A keret ATTRIBÚTUM-ÁTLAGA. A kapust is beleszámítjuk: ő is a keret tagja, és
    a saját értékével ugyanúgy húzza az átlagot, mint bárki más. A nullát viszont
    kihagyjuk — az „nincs adat", nem „gyenge". */
@@ -85645,6 +86200,22 @@ function roleAvgPass(){return roleAvgAttr("passz");}
 /* EGY JÁTÉKOS EGY ATTRIBÚTUMA, hibatűrően. Innen olvas a szerepek minden
    attribútum-alapú mércéje: a belépők, a keret-átlagok és az attribútum-szorzó. */
 function roleAttrOf(p,k){
+  /* ---- KÉT SZÁRMAZTATOTT GAZDA (3.9.93) ----
+     A szerep-rendszer eddig egy-egy NYERS attribútumot ismert gazdaként. A
+     Gegenpressing két szerepe nem ilyen: az Irányítóé a Rating és a karizma
+     EGYÜTT, a Lesi Puskásé két attribútum ÁTLAGA. Itt a helyük, mert innen
+     olvas a belépő, a keret-átlag és az attribútum-szorzó is — így a kártyán
+     megjelenő „miért" ugyanaz a szám marad, ami a motorban hat. */
+  if(k==="ovrkar"){
+    try{
+      const e=(careerPool&&careerPool[p.n])||p;
+      /* A karizma 0..1-es értéke a Ratinget SKÁLÁZZA (semleges karizmánál
+         ×1,25) — így a két mérce egyetlen, arányban értelmes számmá áll össze,
+         és a keret-átlaghoz mérés (roleAvgAttr) változatlanul működik. */
+      return Math.max(0,pOvr(p)*(1+karN(e)*0.5));
+    }catch(e){return 0;}}
+  if(k==="sebgol"){
+    try{const a=attrsOfPlayer(p);return (((a&&a.seb)||0)+((a&&a.gol)||0))/2;}catch(e){return 0;}}
   try{const a=attrsOfPlayer(p);return (a&&a[k])||0;}catch(e){return 0;}}
 function rolePassOf(p){return roleAttrOf(p,"passz");}
 /* A posztterület legjobb passzolója — a Stabil kezdés belépője. A kapust
@@ -85781,7 +86352,11 @@ const ROLE_ATTR_OF={
   b2b:{v:"passz",v2:"ved"}, legolas:{v:"seb",v2:"seb"},
   robben:{v:"gol",v2:"seb"},
   /* HARMÓNIA — a Peace on you! haragja gólban, a védése védekezésben mérhető. */
-  peace:{v:"gol",v2:"ved"}, agy:{v:"passz"}};
+  peace:{v:"gol",v2:"ved"}, agy:{v:"passz"},
+  /* GEGENPRESSING — az Irányítóé a Rating és a karizma EGYÜTT („ovrkar"), a
+     Lesi Puskásé a sebesség és a gólszerzés átlaga („sebgol"), a Mérgezett
+     egéré tisztán a sebesség. */
+  iranyito:{v:"ovrkar"}, lesipuskas:{v:"sebgol",v2:"sebgol"}, mergezett:{v:"seb",v2:"seb"}};
 const ROLE_ATTR_SLOPE=3, ROLE_ATTR_MIN=0.6, ROLE_ATTR_MAX=1.45;
 /* A SZÁMOLÁS DRÁGA, A VÁLASZ RITKÁN VÁLTOZIK. A roleVal a mérkőzés-motor egyik
    legforgalmasabb hívása (percenként, játékosonként), a keret-átlag viszont
@@ -87137,10 +87712,18 @@ function roleSectionHtml(){
      szerepei a meccs egy SZAKASZÁRA szólnak; a Villáméi addig élnek, amíg az
      ember a pályán van. Ugyanaz a mondat a másodikra egyszerűen hamis volna. */
   const whole=(sk==="villam"),mixed=(sk==="tikitaka"),peace=(sk==="harmonia");
+  const gegen=(sk==="gegen");
   let h=`<div class="infoCard" style="margin-top:12px">`
     +`<div class="msNote">Minden idényben <b>három embert</b> jelölsz ki három feladatra. `
     +`A szerep nem képesség és nem poszt: `
-    +(peace
+    +(gegen
+      ?`itt mind a három UGYANARRA a rendszerre köt rá — a labdaszerzésre az `
+       +`ellenfél térfelén. Az <b>Irányító</b> a nyomásgyakorlást erősíti, amíg a `
+       +`pályán van, a <b>Lesi Puskás</b> az abból születő GÓLT, a <b>Mérgezett `
+       +`egér</b> pedig maga szerzi a labdát — az első félidőben jóval `
+       +`gyakrabban, mint a másodikban. Övé az egyetlen szerep a játékban, `
+       +`aminek ÁRA is van: a 70. perctől nő a sérülés-veszélye.`
+      :peace
       ?`itt mind a három MÁSHOL fog. A <b>Peace on you!</b> egyetlen pillanatra vár — az első `
        +`KAPOTT gólra —, és onnantól a lefújásig él; az <b>Egyensúly</b> a mérkőzésen kívül, a `
        +`csapategyensúly-mérőn dolgozik; az <b>Agy</b> pedig végig, amíg a pályán van.`
@@ -87690,6 +88273,24 @@ function stXISpeedAvg(){
     const a=attrsOfPlayer(o.sl.player);
     return (a&&a.seb)||0;}).filter(x=>x>0);
   return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;}
+/* 🧲 A LEGGYORSABB POSZTCSOPORT a kezdő 11-ben a KÖZÉPPÁLYA-e? A Gegenpressing
+   mérföldköve: a pressing motorja a középpálya, nem a támadósor. A kapus
+   kimarad — az ő sebessége nem posztcsoport-kérdés. */
+function stFastestLineIsMid(){
+  const sum={},n={};
+  try{
+    stXI().forEach(o=>{
+      const pos=o.sl&&o.sl.pos;if(!pos||pos==="KP")return;
+      let c=null;try{c=roleInFormation(pos);}catch(e){}
+      if(!c)return;
+      const a=attrsOfPlayer(o.sl.player);
+      const v=(a&&a.seb)||0;if(!v)return;
+      sum[c]=(sum[c]||0)+v;n[c]=(n[c]||0)+1;});
+  }catch(e){return false;}
+  const ks=Object.keys(sum);
+  if(ks.length<2||!n.KOZEPPALYAS)return false;
+  const avg=k=>sum[k]/n[k];
+  return ks.every(k=>k==="KOZEPPALYAS"||avg("KOZEPPALYAS")>=avg(k));}
 function stMaxSpeed(){
   let m=0;msRoster().forEach(p=>{
     const a=attrsOfPlayer(p);if(a&&a.seb>m)m=a.seb;});
@@ -89711,6 +90312,97 @@ stDef("tikitaka","tt_s_assist","Osztogatás",
 stDef("tikitaka","tt_s_fit","Kezd összeállni",
   "Érd el a 70%-os illeszkedést a stílusod otthonos taktikájában.",4,()=>stHomeTacticFit("tikitaka"),70);
 
+/* ---------- 🧲 GEGENPRESSING MÉRŐI ---------- */
+function gpAll(){try{return msT().gpAll||0;}catch(e){return 0;}}
+function gpSeasonNow(){try{const t=msT();return Math.max(t.gpSeason||0,t.gpSeasonBest||0);}catch(e){return 0;}}
+function gpMatchBest(){try{return msT().gpMatch||0;}catch(e){return 0;}}
+function gpGoalsAll(){try{return msT().gpGoals||0;}catch(e){return 0;}}
+/* A keret leggyorsabb emberének SEBESSÉG-attribútuma. A kapus is beleszámít:
+   ebben a filozófiában a kapus is fut — a magas védelem mögött ő a söprögető. */
+function gpTopSpeed(){
+  let m=0;
+  try{msRoster().forEach(p=>{const v=roleSpeedOf(p);if(v>m)m=v;});}catch(e){}
+  return Math.round(m);}
+/* A KEZDŐ 11 sebesség-átlaga — a Villáméval AZONOS mérce (stXISpeedAvg),
+   szándékosan: két filozófia mérheti ugyanazt, ha mindkettőnek számít. */
+/* Hány emberednél van meg a saját képesség? */
+function gpSkillCount(){
+  try{return msRoster().filter(x=>x&&gpHasSkill(x.n)).length;}catch(e){return 0;}}
+/* A klub történetében FELÉPÜLT gyilkos párosok — az eladás nem vesz el belőle. */
+function gpDuoCareer(){
+  try{const D=gpDuoState();return Object.keys(D).filter(k=>D[k]&&D[k].done).length;}catch(e){return 0;}}
+
+/* ---- A GERINC: AZ ODAFENT SZERZETT LABDA ----
+   Ez a tábla lelke. A felső fokozatok egy egész karrier gyűjtései, és a
+   nagyságrend a mért rátából jön: a 3. szintű Nyomásgyakorlás ~3,6 labdát hoz
+   mérkőzésenként, ami egy 38 meccses idényben ~137. */
+stTiers("gegen","gp_all",th=>`${th} labdaszerzés az ellenfél térfelén`,
+  th=>`Szerezzetek összesen ${th} labdát az ellenfél térfelén a karrier során. `
+     +`Ez a filozófia egyetlen igazi mércéje: nem a gól, hanem ami odáig vezet.`,
+  ST_PEAK,[20,60,140,280,480,750,1100,1500,2000,2600,3300,4200],gpAll);
+stTiers("gegen","gp_season",th=>`${th} labdaszerzés egy idényben`,
+  th=>`Szerezzetek ${th} labdát az ellenfél térfelén egyetlen szezonban.`,
+  ST_L6,[30,55,85,115,145,180],gpSeasonNow);
+stTiers("gegen","gp_match",th=>`${th} labdaszerzés egy mérkőzésen`,
+  th=>`Szerezzetek ${th} labdát az ellenfél térfelén EGYETLEN mérkőzésen. `
+     +`Ilyen estéken az ellenfél a saját tizenhatosáig sem jut el.`,
+  ST_L3,[5,7,9],gpMatchBest);
+/* ---- ÉS AMI GÓL LETT BELŐLE ----
+   A Büntetés terméke. Külön lépcső, mert a kettő KÉT döntés: az egyik a
+   nyomás, a másik az, hogy megfizeted-e a gólra váltását. */
+stTiers("gegen","gp_goals",th=>`${th} pressinggól`,
+  th=>`Lőjetek ${th} gólt közvetlenül az ellenfél térfelén szerzett labdából. `
+     +`Más filozófiában ez nem is létező góltípus.`,
+  ST_PEAK,[1,3,7,14,25,40,60,85,115,150,200,260],gpGoalsAll);
+/* ---- A SEBESSÉG: A PRESSING ÜZEMANYAGA ----
+   A Villám ugyanezt méri, és ez nem ütközés: egyszerre csak EGY filozófia él
+   egy karrierben. A pressinghez kell a láb — a mérce tehát jogos itt is. */
+stTiers("gegen","gp_speed",th=>`${hunS(th)} sebesség egy játékosnál`,
+  th=>`Legyen egy játékosod, akinek a SEBESSÉG attribútuma eléri ${hunRa(th)}.`,
+  ST_PEAK,[80,85,88,91,94,96,98,99,104,110,116,122],gpTopSpeed);
+stTiers("gegen","gp_avg",th=>`${hunS(th)} sebesség-átlag a kezdőben`,
+  th=>`A kezdő 11 Sebesség-átlaga érje el ${hunRa(th)}.`,
+  ST_L6,[72,76,80,84,88,92],()=>Math.round(stXISpeedAvg()));
+/* ---- A SAJÁT KÉPESSÉG ÉS A SAJÁT KÖTÉS ---- */
+stTiers("gegen","gp_skill",th=>`${th} Nyomás! a keretben`,
+  th=>`Legyen ${th} olyan játékosod, akinél megvan a Nyomás! képesség. `
+     +`A képesség CSAK ezzel a filozófiával létezik — a fáján kell megnyitnod.`,
+  ST_L6,[1,2,3,5,7,9],gpSkillCount);
+stTiers("gegen","gp_duo",th=>`${th} gyilkos páros`,
+  th=>`Építs ${th} kész gyilkos párost a klub történetében. Minden páros egyszer `
+     +`számít, az eladás nem vesz el belőle.`,
+  ST_L9,[1,2,3,5,8,12,17,23,30],gpDuoCareer);
+/* ---- EGYSZERI, NAGY PILLANATOK ---- */
+stDef("gegen","gp_fit","A rendszer működik",
+  "Érd el a 90%-os illeszkedést a stílusod otthonos taktikájában.",
+  10,()=>stHomeTacticFit("gegen"),90);
+stDef("gegen","gp_line","A középpálya a leggyorsabb",
+  "A kezdő 11-edben a középpálya legyen a legmagasabb Sebesség-átlagú posztcsoport.",
+  8,()=>stFastestLineIsMid()?1:0,1);
+stDef("gegen","gp_nokeeper","A kapusnak nem volt dolga",
+  "Nyerjetek meg egy mérkőzést úgy, hogy legalább HÁROM labdát szereztetek az "
+  +"ellenfél térfelén, és közben kapott gól nélkül maradtatok.",
+  9,()=>msT().gpCleanPress||0,1);
+/* ---- A HÁROM SZEREP ---- */
+stDef("gegen","gp_roles","Mind a három ember megvan",
+  "Oszd ki egyszerre mind a három szezon-szerepet: Irányító, Lesi Puskás, Mérgezett egér.",
+  6,()=>{try{const m=roleState().map;
+    return (m.iranyito&&m.lesipuskas&&m.mergezett)?1:0;}catch(e){return 0;}},1);
+
+/* ---- A KEZDŐ FOKOZATOK ----
+   Ugyanaz a szerep, mint a többi stílusnál: az első idényben is legyen mit
+   teljesíteni, hogy a fa elinduljon. */
+stDef("gegen","gp_s_first","Az első elvett labda",
+  "Szerezzetek egyetlen labdát az ellenfél térfelén.",3,gpAll,1);
+stDef("gegen","gp_s_ten","Kezd rátapadni a csapat",
+  "Szerezzetek összesen 10 labdát az ellenfél térfelén.",3,gpAll,10);
+stDef("gegen","gp_s_goal","Az első pressinggól",
+  "Lőjetek egy gólt közvetlenül az ellenfél térfelén szerzett labdából.",4,gpGoalsAll,1);
+stDef("gegen","gp_s_fit","Kezd összeállni",
+  "Érd el a 70%-os illeszkedést a stílusod otthonos taktikájában.",4,()=>stHomeTacticFit("gegen"),70);
+stDef("gegen","gp_s_speed","Van, aki fut",
+  "Legyen egy játékosod 80-as Sebesség-attribútummal.",3,gpTopSpeed,80);
+
 /* ================= A STÍLUS-KIÉRTÉKELŐ =================
    Ugyanaz a minta, mint a msScan: minden nem teljesített mérföldkövet
    végigfuttat, saját try-ban, és a jutalmat ugyanabba a stíluspont-tárcába
@@ -91176,6 +91868,94 @@ stTrait("tikitaka","passzrekord",3,"Passzrekord",
     return `eddig ${S.ttGoals||0} tiki-taka gólotok van (${S.ttFutile||0} meddő passzolgatás mellett), `
       +`a leghosszabb gólig vezető sor ${S.ttBest||0} passz · a labdajáratás hajtóereje most ${d}%`;},
   TT_SYSTEM_PRICE_MULT);
+/* ---------- 🧲 GEGENPRESSING (3.9.93) ----------
+   A KILENC KÉPESSÉG a kimondott kérés sorrendjében. A filozófia magja a
+   NYOMÁSGYAKORLÁS (a saját motor-csatorna megnyitása) és a BÜNTETÉS (abból
+   gól); minden más ezt a kört szolgálja ki. Ezért a kettő I., illetve II.
+   sávban áll: az egyik nélkül a másiknak nincs mit megfizetnie. */
+stTrait("gegen","nyomasgyakorlas",1,"Nyomásgyakorlás",
+  "Megnyílik a filozófia SAJÁT motor-csatornája: a csapat labdát szerez az ELLENFÉL TÉRFELÉN. Az 1. szint egyben kinyitja a VÉDEKEZŐ képességeket a középpályásoknak és a csatároknak is — eddig csak védő kaphatta meg őket. A 2-3. szinten ezek a képességek tovább növelik a labdaszerzés esélyét.",[
+  {fx:{gpPress:1},note:"~2,0 labdaszerzés meccsenként · a védekező skillek megnyílnak elöl is"},
+  {fx:{gpPress:2},note:"~2,8 · a védekező skillek +33%-kal többet érnek"},
+  {fx:{gpPress:3},note:"~3,6 · +66%"}],
+  ()=>{const lv=gpPressLv();
+    return lv?`most ~${String(GP_PRESS_PER_MATCH[lv]).replace(".",",")} labdaszerzés `
+              +`várható mérkőzésenként (a szerepek és a gyilkos párosok ezen felül szoroznak)`
+             :"";});
+stTrait("gegen","buntetes",2,"Büntetés",
+  "Az odafent szerzett labdából GÓL lesz. A mérkőzésenkénti plafon azért van, mert ez a filozófia fő fegyvere — enélkül egyetlen jól sikerült este elvinné a szezont.<br><br>PÁRHARCBAN a labdaszerzés fut, a belőle születő gól NEM: az eredményt a közös eseménylista adja, egy helyben sorsolt gól szétvinné a két képernyőt.",[
+  {fx:{gpPunish:1},note:"25% esély · legfeljebb 2 ilyen gól meccsenként"},
+  {fx:{gpPunish:2},note:"33% · 2 gól"},
+  {fx:{gpPunish:3},note:"50% · 3 gól"}],
+  ()=>{const lv=gpPunishLv();
+    return lv?`most ${Math.round(GP_PUNISH_P[lv]*100)}% esély, legfeljebb ${GP_PUNISH_CAP[lv]} gól `
+              +`mérkőzésenként — a Lesi Puskás szerep ezen felül szoroz`:"";});
+stTrait("gegen","gyilkos_paros",3,"Gyilkos páros",
+  "Megnyílik a NEGYEDIK kötésfajta. Két TÁMADÓ-KÖZÉPPÁLYÁS ember összeszokik, és a kötés két dolgot ad: együtt presszingelnek (ha MINDKETTEN pályán vannak, erősödik a nyomásgyakorlás), és a SEBESSÉGÜK is együtt fejlődik — a kiépülés pillanatában kiegyenlítődik a jobbikra, mindketten kapnak rá egy azonnali ráadást, és onnantól ami az egyiket gyorsítja, az a másikat is viszi.<br><br>A kötés magától épül a közösen lejátszott mérkőzésekből; egyszerre legfeljebb három lehet kész.",[
+  {fx:{gpDuo:1},note:"a rendszer megnyílik · +5% pressing párosonként · +2% azonnali sebesség · 15 közös meccs"},
+  {fx:{gpDuo:2},note:"+8% · +4% · 12 közös meccs"},
+  {fx:{gpDuo:3},note:"+10% · +6% · 8 közös meccs"}],
+  ()=>{if(!gpDuoOn())return "";
+    const D=gpDuoState();
+    const kesz=gpDuoDone(),epul=Object.keys(D).filter(k=>D[k]&&!D[k].done).length;
+    return `most ${kesz} kész gyilkos párosod van (${epul} épül) — az összeérés `
+      +`${gpDuoRipeNeed()} közös mérkőzés`;});
+stTrait("gegen","felfutasok",2,"Felfutások, visszazárások",
+  "A pressing MINDKÉT iránya. A támadást a védők is segítik: nő a gólszerzési és gólpassz-esélyük. A védekezésbe pedig a középpálya és a támadósor is bekapcsolódik: nő a labdaszerzési esélyük odafent.",[
+  {fx:{gpBoth:1},note:"+5% mindkét irányba"},
+  {fx:{gpBoth:2},note:"+7,5%"},
+  {fx:{gpBoth:3},note:"+10%"}]);
+stTrait("gegen","kikenyszeritett_hiba",2,"Kikényszerített hiba",
+  "A folyamatos nyomás alatt az ellenfél védője elrontja. Nő az esélye, hogy az ELLENFÉL öngólt vét. Az alapesély szándékosan alacsony — a szorzó ezért lehet ekkora anélkül, hogy a mérkőzést elvinné.",[
+  {fx:{gpErr:1},note:"+100% öngól-esély az ellenfélnél"},
+  {fx:{gpErr:2},note:"+300%"},
+  {fx:{gpErr:3},note:"+1000%"}],
+  ()=>{const m=gpErrMult();
+    return m>1?`most ${m}× az ellenfél öngóljának súlya a különleges események közt`:"";});
+stTrait("gegen","nem_kell_labda",2,"Nem kell nekünk labda",
+  "A filozófia ALKUJA, és a játék egyetlen képessége, ami TUDATOSAN ront egy mutatón. Eladjátok a labdatartást gólesélyért: nő a saját gólvárhatóságotok, cserébe csökken a birtoklás — és a kevesebb labda az ELLENFÉL gólesélyét is megemeli.<br><br>A magasabb szint JOBB ÜZLET: többet ad és kevesebbet kér. Az 1. szinten a csere rossz (+5% gólesélyért 20 pont birtoklás), a 3.-on kifejezetten jó (+20%-ért mindössze 5 pont).",[
+  {fx:{gpNoBall:1,ownGoalMult:1.05,oppGoalMult:1.10},note:"+5% saját gólesély · −20 pont birtoklás · +10% ellenfél-gólesély"},
+  {fx:{gpNoBall:2,ownGoalMult:1.12,oppGoalMult:1.06},note:"+12% · −12 pont · +6%"},
+  {fx:{gpNoBall:3,ownGoalMult:1.20,oppGoalMult:1.025},note:"+20% · −5 pont · +2,5%"}],
+  ()=>{const d=gpPossDrop();
+    return d?`most ${d} százalékpont birtoklást adtok el — az ellenfél gólesélye `
+             +`${Math.round((gpNoBallOppMult()-1)*100)}%-kal nagyobb tőle`:"";});
+stTrait("gegen","nyomas_skill",2,"Nyomás skill",
+  "Megnyílik a filozófia SAJÁT képessége: a <b>Nyomás!</b> — az egyetlen a játékban, amit BÁRMELY poszton játszó ember megkaphat. Három dolgot ad a viselőjének: 50%-kal gyorsabban fejlődik a SEBESSÉG attribútuma, 50%-kal nagyobb eséllyel szerez labdát az ellenfél térfelén, és 25%-kal erősebben hatnak rajta a gyorsasági képességek.",[
+  {fx:{gpSkill:1},note:"a Nyomás! bekerül a pakliba"},
+  {fx:{gpSkill:2},note:"a csillagozása azonnal nyitva áll"},
+  {fx:{gpSkill:3},note:"a csillagozás hatása is felerősödik"}],
+  ()=>{if(!gpSkillOn())return "";
+    let n=0;try{n=msRoster().filter(x=>x&&gpHasSkill(x.n)).length;}catch(e){}
+    return n?`most ${n} emberednél van Nyomás!`:"a Nyomás! benne van a pakliban — még senkinél sincs meg";});
+stTrait("gegen","sorsolas",1,"Nyomásra hangolt sorsolás",
+  "A képesség-sorsolás a MOTOR és a NYOMÁS! felé tolódik — az a két képesség, amire ez a filozófia épül.",[
+  {fx:{gpDraw:0.30},note:"30% esély a két képesség valamelyikére"},
+  {fx:{gpDraw:0.45},note:"45% esély"},
+  {fx:{gpDraw:0.60},note:"60% esély"}],
+  ()=>{try{
+    const pool=S.skillPool||[];
+    if(!pool.length)return "";
+    const n=pool.filter(sk=>sk&&(sk.id===GP_SKILL_ID||sk.id==="mf_engine")).length;
+    return n?`most ${n} ilyen képesség van a pakliban`
+            :"a pakliban most nincs ilyen — a húzás friss példányt vesz a készletből";
+  }catch(e){return "";}});
+stTrait("gegen","csillagozhato_nyomas",3,"Csillagozható nyomás",
+  "A kiépült képességeidet nagyobb eséllyel ajánlja fel csillagozásra a jutalom-sor.",[
+  {fx:{starOffer:0.12},note:"+12 százalékpont csillag-esély"},
+  {fx:{starOffer:0.22},note:"+22 pp"},
+  {fx:{starOffer:0.32},note:"+32 pp"}]);
+stTrait("gegen","nyomas_iskola",2,"Nyomás-iskola",
+  "A GYORSASÁGI és a VÉDEKEZŐ képességek csillagozásának feloldása olcsóbb.",
+  stStarDiscLevels(sk=>((typeof isPaceSkill==="function")&&isPaceSkill(sk))||(sk&&sk.type==="defense")));
+stTrait("gegen","szerepek",3,"Kiosztott szerepek",
+  "Az Irányító, a Lesi Puskás és a Mérgezett egér szezon-szerep egyszerre erősödik. A kiosztás a nyárról átjön az új idényre, de bármikor átírhatod.",[
+  {fx:{roleLvl:1},note:"irányító ×1,12 pressing · lesi Puskás ×1,20 büntetés · egér ×2,3 az első félidőben"},
+  {fx:{roleLvl:2},note:"×1,18 · ×1,30 · ×2,8"},
+  {fx:{roleLvl:3},note:"×1,25 · ×1,40 — és a Lesi Puskás saját ráadása megduplázódik"}],
+  ()=>{const m=roleState().map,k=roleKeysForStyle().filter(x=>m[x]);
+    return k.length?`most kiosztva: ${k.map(x=>`${ROLE_DEFS[x].n} — ${shortName(m[x])}`).join(" · ")}`
+                   :"még egy szerep sincs kiosztva — a képesség így nem hat";});
 /* A GÁRDISTA-KÉPESSÉG innen ELKÖLTÖZÖTT (3.9.61) — ugyanoda, ahova a
    Morgolódó: a STYLE_COACHES tábla mind a hét filozófus-edzőt egy helyen
    gyártja le. A kulcs („guardiola"), az ár és a három szint változatlan. */
@@ -91306,7 +92086,8 @@ const STYLE_RANKS={
   sztar:    ["Felfedezve","Címlapon","Reflektorfény","Ikon","Legenda"],
   villam:   ["Első sprint","Szélsebes","Villámcsapás","Hangsebesség","Mennydörgés"],
   panzer:   ["Nyers vas","Páncélzat","Ék","Falka","Áttörhetetlen"],
-  tikitaka: ["Első passzok","Járatás","Körhinta","Labirintus","A labda nem fárad"]};
+  tikitaka: ["Első passzok","Járatás","Körhinta","Labirintus","A labda nem fárad"],
+  gegen:    ["Első lépés","Rátapadás","Öt másodperc","Fojtogatás","Nincs kiút"]};
 function styleRankName(L,k){
   const r=STYLE_RANKS[k||styleKey()];
   if(!r||!L)return "";
@@ -91744,6 +92525,66 @@ const STYLE_DIALS={
        fx:[{ch:"inj",m:"pro",d:-1},
            {ch:"morale",m:"pro",d:1},
            {ch:"dev",m:"con",d:-1}]}}],
+  /* ---------- 🧲 GEGENPRESSING ---------- */
+  gegen:[
+   {k:"vonalmagassag",n:"Védelmi vonal magassága",
+    L:{n:"Mélyebben indulunk",
+       pro:"az ellenfél gólvárhatósága — nincs mögöttetek tér",
+       con:"a labdaszerzés odafent és a saját gólvárhatóság",
+       fx:[{ch:"opp",m:"pro",d:-1},
+           {ch:"gppress",m:"con",d:-1},
+           {ch:"own",m:"con",d:-1}]},
+    R:{n:"Magasan letámadva",
+       pro:"a labdaszerzés az ellenfél térfelén",
+       con:"az ellenfél gólvárhatósága — a hátatok mögé indított labda",
+       fx:[{ch:"gppress",m:"pro",d:1},
+           {ch:"opp",m:"con",d:1}]}},
+   {k:"pressing_ritmus",n:"A pressing ritmusa",
+    L:{n:"Az első félidőre",
+       pro:"a labdaszerzés az első 45 percben",
+       con:"a gólvárhatóság a 70. perctől — elfogy a láb",
+       fx:[{ch:"gppress",m:"pro",d:1,minTo:45},
+           {ch:"own",m:"con",d:-1,minFrom:70}]},
+    R:{n:"Kitartás a hajrára",
+       pro:"a gólvárhatóság a 70. perctől",
+       con:"a labdaszerzés az első 45 percben",
+       fx:[{ch:"own",m:"pro",d:1,minFrom:70},
+           {ch:"gppress",m:"con",d:-1,minTo:45}]}},
+   {k:"belepo_kemenysege",n:"Belépő keménysége",res:true,
+    L:{n:"Tiszta labdaszerzés",
+       pro:"a lapok esélye csökken",
+       con:"a labdaszerzés az ellenfél térfelén",
+       fx:[{ch:"card",m:"pro",d:-1},
+           {ch:"gppress",m:"con",d:-1}]},
+    R:{n:"Bele a lábába",
+       pro:"a labdaszerzés az ellenfél térfelén",
+       con:"a lapok esélye",
+       fx:[{ch:"gppress",m:"pro",d:1},
+           {ch:"card",m:"con",d:1}]}},
+   {k:"ki_fejezze_be",n:"Ki fejezze be?",res:true,
+    L:{n:"Aki elvette",
+       pro:"a középpályások gólsúlya",
+       con:"a csatárok gólsúlya",
+       fx:[{ch:"goalw",m:"pro",d:1,cat:["KOZEPPALYAS"]},
+           {ch:"goalw",m:"con",d:-1,cat:["CSATAR"]}]},
+    R:{n:"Aki a lesen áll",
+       pro:"a csatárok gólsúlya — és ennyivel a Lesi Puskás szorzója",
+       con:"a középpályások gólsúlya",
+       fx:[{ch:"goalw",m:"pro",d:1,cat:["CSATAR"]},
+           {ch:"role",m:"pro",d:1,id:"lesipuskas"},
+           {ch:"goalw",m:"con",d:-1,cat:["KOZEPPALYAS"]}]}},
+   {k:"mennyit_birunk",n:"Mennyit bírunk?",
+    L:{n:"Kíméljük őket",
+       pro:"a sérülés esélye csökken",
+       con:"a labdaszerzés az ellenfél térfelén",
+       fx:[{ch:"inj",m:"pro",d:-1},
+           {ch:"gppress",m:"con",d:-1}]},
+    R:{n:"Kifutjuk a lelkünket",
+       pro:"a labdaszerzés az ellenfél térfelén és a sebesség fejlődése",
+       con:"a sérülés esélye",
+       fx:[{ch:"gppress",m:"pro",d:1},
+           {ch:"dev",m:"pro",d:1},
+           {ch:"inj",m:"con",d:1}]}}],
   /* ---------- 🌀 TIKI-TAKA ---------- */
   tikitaka:[
    {k:"passzsor",n:"Passzsor",
@@ -92452,6 +93293,10 @@ function styleSkillPaceBias(){return styleFxMax("skillPace");}
    csatorna a kategóriástól, ugyanazon az indokon, mint a sebességé: a passzos
    képességek minden posztkategóriában ott vannak. 0 = nincs megvéve. */
 function styleSkillPassBias(){return styleFxMax("skillPass");}
+/* A sorsolás eltolása a MOTOR és a NYOMÁS! felé (Gegenpressing). Ugyanaz a
+   szerkezeti indok, mint a sebesség- és a passz-ágnál: a két képesség nem egy
+   posztkategóriában ül. 0 = nincs megvéve. */
+function styleSkillGpBias(){return styleFxMax("gpDraw");}
 /* BOMBÁZÓK: a gólzápor izgalom-jutalma. {add,floor} vagy null. */
 function styleExciteBoost(){
   let best=null;
@@ -93401,6 +94246,9 @@ function saveGame(){
         chRoleFreeze:S.chRoleFreeze,chBondSlow:S.chBondSlow,chSkillPickLock:S.chSkillPickLock,
         chTrainSecFreeze:S.chTrainSecFreeze,chDealMalus:S.chDealMalus,chDealBoost:S.chDealBoost,
         chFreeBoost:S.chFreeBoost,chTrainBoost:S.chTrainBoost,chYouthSell:S.chYouthSell,
+        /* 🧲 GYILKOS PÁROS (3.9.93): a kötés-tár. Lapos, szám-értékű objektum;
+           a visszatöltés bulk (Object.assign(S,d.S)). */
+        gpDuo:S.gpDuo,
         /* EGYENLÍTŐ (3.9.67): hány ment el EBBEN AZ IDÉNYBEN — ebből számol az
            ár. A keret a nyár nyílásakor töltődik (twRefillSummerQuotas); az
            eqSeasonMig a 3.9.91-es egyszeri pótlás jelzője. */
