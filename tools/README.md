@@ -1301,13 +1301,43 @@ ellenőrzi, hogy a stub ne csúszhasson el a valóditól.
 Végül mind az öt felületi ára-sor: kimondják-e, hogy a keret idényenkénti.
 Részletek: `docs/harmonia-csoportos-boost.md`.
 
+## sajat-stabtag-proba.js — 🎓 olcsóbb és gyorsabban érő saját nevelés
+
+```
+node tools/sajat-stabtag-proba.js
+```
+
+A 3.9.92-es buff mérése: a saját játékosból nevelt stábtag ára a teljes skálán
+feleannyi (60/40% → 30/20%, a köztes meredekséggel együtt), a Szakértelme pedig
+három összeszorzódó szorzóval épül — +50% alap, +25% a saját posztjához tartozó
+segédedzői területen, +33% ott, ahol a mezőnyhöz képest tényleg kiemelkedő.
+
+A gyorsítás a NYERS típus-pontszámon megy, nem a kész Szakértelmen: így a
+20-99-es skála teteje és a SZAK 55 pontos maximuma a helyén marad. A próba ezt
+külön méri (a csúcsprofil 89-en áll, nem 99-en), és a „kiemelkedő" küszöbre is,
+hogy a NYERS pontszámot kapja — a szorzott érték átbillentené.
+
+A küszöb típusonként külön, MÉRT szám (a populáció ~85. percentilise, 1500
+profilon). Egyetlen közös küszöb nem működne: a Kesztyűs mester legjobb mért
+pontszáma 0,638, a Csapatkovács 75. percentilise viszont már 0,625.
+
+A legfontosabb ág a STÁBPIAC: a próba 300 piaci ajánlatra ellenőrzi, hogy a
+Szakértelmük BETŰRE a gyorsítás előtti képletet adja (a piac generátora
+visszafelé számol a Szakértelemből, egy szorzó ott a célzott sávot borítaná) —
+és fordítva, hogy a saját nevelésé tényleg magasabb, különben a próba egy néma
+no-opot igazolna.
+
+Végül 900 valódi pályafutás-profil: a legjobb ajánlat átlagos Szakértelme
+54,5 → 72,5, a maximum 77 → 86, és senki nem tapad a plafonra.
+Részletek: `docs/szemelyi-edzo-rendszer.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 66 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 67 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

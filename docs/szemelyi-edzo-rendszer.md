@@ -76,8 +76,89 @@ döntés útja: egy 33 éves, még játszó, de már romló vezérből most csin
 
 **A KÉT ÚT KÖZTI KÜLÖNBSÉG A PÉNZ.** Az A út ingyen van — már úgyis befejezte,
 csak igent mond. A B úton viszont **kártalanítanod kell** a félbehagyott
-pályafutásáért: az **igazolási ára 40–60%-át**, és az arány a hátralévő
-pályafutással skálázódik, mert minél fiatalabb, annál többet veszel el tőle.
+pályafutásáért: az **igazolási ára 20–30%-át** (3.9.92 előtt 40–60%), és az
+arány a hátralévő pályafutással skálázódik, mert minél fiatalabb, annál többet
+veszel el tőle.
+
+### 1.2.1 Olcsóbb és gyorsabban érő saját nevelés (3.9.92)
+
+> **KIMONDOTT KÉRÉS:** „Jelentősen olcsóbbá és erősebbé kellene tenni a saját
+> játékosból nevelt stábtagokat. Az ár a teljes skálán legyen feleannyi, mint
+> eddig. Az értékelés, amivel felveszed, 50%-kal gyorsabban emelkedjen mint
+> eddig, és a saját pozíciójához tartozó segédedzői területen kapjon még
+> további 25% gyorsítást. Azon a területen, ahol pedig ténylegesen a
+> többiekhez képest kiemelkedő statisztikái vannak, ott további 33% boostot
+> kapjon."
+
+**Az ár** a teljes skálán feleannyi, és a **görbe alakja változatlan** — nem
+csak a két végpont feleződik, hanem a köztes meredekség is:
+
+| kor | 32 | 34 | 36 | 38+ |
+|---|---|---|---|---|
+| régen | 60% | 53,3% | 46,7% | 40% |
+| most | **30%** | **26,7%** | **23,3%** | **20%** |
+
+**A gyorsítás a NYERS típus-pontszámon megy** (0…1), nem a kész Szakértelmen.
+Ez a különbség lényeges: a 20–99-es skála teteje, az ALAP (kor + rutin) súlya
+és a csillag-fokozatok jelentése így mind a helyén marad — ugyanaz a
+pályafutás csak **előbb ér fel ugyanoda**. A SZAK plafonja (55 pont)
+érintetlen.
+
+| szorzó | mikor | érték |
+|---|---|---|
+| `COACH_GROW_MULT` | minden saját nevelésre | **×1,50** |
+| `COACH_POS_MULT` | a saját posztjához tartozó területen | **×1,25** |
+| `COACH_STAR_MULT` | ahol a mezőnyhöz képest kiemelkedő | **×1,33** |
+
+A három **összeszorzódik**: a legjobb eset ×2,494.
+
+**A poszt-egyezés a típus `gate`-je** — az mondja meg, mely posztokról indulhat
+az adott segédedzői terület (a Bástya védőkről, a Kesztyűs mester kapusról). A
+mindenkinek nyitott típusoknál (Sprintmester, Iskolateremtő, Lélekemelő,
+Csapatkovács, Ritmusmester, Gyógyító kéz) nincs „saját poszt", ott ez a szorzó
+nem jár.
+
+**A „kiemelkedő" küszöb típusonként külön áll, és MÉRT szám:** a populáció
+~85. percentilise az adott területen, 1500 hihető pályafutás-profilon mérve (a
+játék saját `staffRealismPass` realizmus-passzával).
+
+| típus | küszöb | | típus | küszöb |
+|---|--:|---|---|--:|
+| Gólvágó-mentor | 0,63 | | Iskolateremtő | 0,60 |
+| Játékmester | 0,55 | | Lélekemelő | 0,59 |
+| Bástya | 0,63 | | Csapatkovács | 0,66 |
+| Kesztyűs mester | 0,59 | | Ritmusmester | 0,66 |
+| Sprintmester | 0,53 | | Gyógyító kéz | 0,52 |
+
+Egyetlen közös küszöb nem működne: a Kesztyűs mester **legjobb mért
+pontszáma** 0,638, a Csapatkovács 75. percentilise viszont már 0,625 — egy fix
+0,65 tehát a kapusoknál **sosem** sülne el, a csapatkovácsoknál meg a mezőny
+negyedének járna.
+
+A küszöböt a **nyers** pontszám méri, a szorzók **előtt** — különben a másik
+két gyorsítás magától áttolna mindenkit fölötte.
+
+**A stábpiac külsőseit egyik szorzó sem érinti.** Ez nem mulasztás: a kérés a
+saját nevelésről szólt, a piac ajánlat-generátora ráadásul **visszafelé számol**
+a Szakértelemből (`staffMakeFp` bináris keresése), tehát egy itteni szorzó ott
+a célzott sávot borítaná fel. A megkülönböztetés a lenyomaton ül: a
+`careerFingerprint` `own:1`-et ír, a `staffMakeFp` nem.
+
+**Mérve** (900 valódi pályafutás-profil, a legjobb ajánlat Szakértelme):
+
+| | átlag | max |
+|---|--:|--:|
+| régen | 54,5 | 77 |
+| most | **72,5** | **86** |
+
+Fokozatban: „Elismert szakember" (48+) → „Mestere a szakmának" (61+) és
+„Iskolateremtő tekintély" (74+) közé. **Senki nem tapad a 99-es plafonra**, a
+skálának maradt hova nőnie.
+
+**Régi mentések:** a már felvett saját nevelésű stábtagok egyszer újraszámolják
+az alapjukat a tárolt lenyomatból (a számítás determinisztikus), a kiérdemelt
+fejlődésüket (`sz − szBase`) érintetlenül megtartva. A `staffGrowMig` jelző a
+mentésbe kerül, tehát ez egyszer fut; a `hired` külsősöket nem nyúlja meg.
 
 ```js
 const COACH_OFFER_PCT_MAX=0.60, COACH_OFFER_PCT_MIN=0.40;
