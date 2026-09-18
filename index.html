@@ -6091,7 +6091,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.94";
+const APP_VERSION="3.9.95";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -24321,7 +24321,15 @@ function ensureAllAttrs(){
        különben a top-játékos "elmaradónak" látszana és a meccs-hatás büntetné. */
     ATTR_KEYS.forEach(k=>{
       const exp=attrExpected(e,k);
-      if(e.attrs[k]===99&&exp>99)e.attrs[k]=exp;});});}
+      if(e.attrs[k]===99&&exp>99)e.attrs[k]=exp;});
+    /* TÖRT ATTRIBÚTUM-MIGRÁCIÓ (3.9.95). A régi mentésekben ott ülhet egy
+       tört érték — a sáv törtre nyíló végéről (lásd attrBandOf). Egyszer
+       visszakerekítjük a sávba; a bumpAttr onnantól nem tud újat csinálni. */
+    ATTR_KEYS.forEach(k=>{
+      const v=e.attrs[k];
+      if(typeof v!=="number"||!isFinite(v)||Number.isInteger(v))return;
+      const b=attrBandOf(e,k);
+      e.attrs[k]=Math.max(b.lo,Math.min(b.hi,Math.round(v)));});});}
 /* A Rating→attribútum horgony-szinkron: a startRating MINDEN elmozdulása
    (öregedési görbe, ifi-/öreg-boost, kártya, meccs-fejlődés) 1:1-ben eltolja
    mind a négy attribútumot — ez garantálja, hogy az attribútumok PONTOSAN a
@@ -24365,18 +24373,43 @@ function ageScaleAttr(age,v){
    Így egy 130-as passzú középpályás valódi passzmester lesz — a Labdatartás
    miatta működik —, de a Ratingje nem szalad el, mert "csak passzolgat". */
 const ATTR_SPEC_CEIL=30, ATTR_SPEC_FLOOR=12;
+/* ---- A SPECIALIZÁCIÓS SÁV KÉT VÉGE — ÉS MIÉRT KELL EGÉSZNEK LENNIE ----
+   BEJELENTETT HIBA (3.9.95): a játékoslapon „Passz 112.375" állt.
+
+   A SÁV IS SKÁLÁZÓDIK (lásd a trainScale indoklását): egy abszolút ±30/12-es
+   tér a 130-as Ratingű játékosnál arányosan feleakkora, mint a 65-ösnél —
+   ettől halványul el az edzés. A kemény attribútum-plafon (attrCapFor)
+   változatlanul fölötte áll, tehát a sáv nem tud kitörni belőle.
+
+   CSAKHOGY a trainScale TÖRT (89/80 = 1,1125), tehát a sáv két vége is tört
+   lett: egy 89-es KV Passz-plafonja pontosan 89 − 10 + 30×1,1125 = 112,375.
+   Amint egy attribútum nekifeszült ennek a plafonnak, a clamp RÁÍRTA a
+   törtet magára az attribútumra — és onnantól a mentésben is tört ült.
+
+   Három baj folyt belőle, és mind a hármat jelentették:
+     · a játékoslap és a keretlista tört számot mutatott;
+     · a PASSZKÉMIA összeérését EGYENLŐSÉG dönti el (passChemRipe), egy tört
+       érték viszont sosem lesz egyenlő a társa egész értékével — a kötés
+       örökre a felzárkózás szakaszában ragadt, a közös fejlődés el sem indult;
+     · a két fél emiatt ÁTUGRÁLTA egymást: minden meccsen a másik lett a
+       „gyengébb", és a felzárkózás újraindult — ez a „fura állásokon elakad".
+
+   A sáv két vége innentől KEREKÍTVE egész. A kerekítés (nem csonkítás) azért
+   helyes, mert a trainScale doksija is kerekített értéket ígér (130-as
+   Ratingnél „+49-re tágul": 30×1,625 = 48,75). Így a clamp sem tud többé
+   törtet írni, és a régi mentésekben ülő törteket az ensureAllAttrs hozza
+   vissza a sávba. */
+function attrBandOf(entry,key){
+  const prof=ATTR_PROFILE[(entry&&entry.pos&&entry.pos[0])||"KKP"]||ATTR_PROFILE.KKP;
+  const base=(entry&&entry.startRating)||70;
+  const _ts=trainScale(entry);
+  return {
+    hi:Math.round(Math.min(attrCapFor(key,entry&&entry.n),base+(prof[key]||0)+ATTR_SPEC_CEIL*_ts)),
+    lo:Math.round(Math.max(40,base+(prof[key]||0)-ATTR_SPEC_FLOOR*_ts))};}
 function bumpAttr(entry,key,dir){
   if(!entry.attrs)initPlayerAttrs(entry);
-  const prof=ATTR_PROFILE[(entry.pos&&entry.pos[0])||"KKP"]||ATTR_PROFILE.KKP;
-  const base=entry.startRating||70;
-  /* A SÁV IS SKÁLÁZÓDIK (lásd a trainScale indoklását): egy abszolút ±30/12-es
-     tér a 130-as Ratingű játékosnál arányosan feleakkora, mint a 65-ösnél —
-     ettől halványul el az edzés. A kemény attribútum-plafon (attrCapFor)
-     változatlanul fölötte áll, tehát a sáv nem tud kitörni belőle. */
-  const _ts=trainScale(entry);
-  const ceil=Math.min(attrCapFor(key,entry&&entry.n),base+(prof[key]||0)+ATTR_SPEC_CEIL*_ts);
-  const floor=Math.max(40,base+(prof[key]||0)-ATTR_SPEC_FLOOR*_ts);
-  entry.attrs[key]=Math.max(floor,Math.min(ceil,entry.attrs[key]+dir));}
+  const b=attrBandOf(entry,key);
+  entry.attrs[key]=Math.max(b.lo,Math.min(b.hi,entry.attrs[key]+dir));}
 /* A passzív csatorna másodlagos plafonja: a születési sebesség +15%-a (de a
    kemény plafont sosem lépi át). Ha nincs rögzített születési érték
    (régi mentés), a jelenlegit vesszük alapnak — így a migráció nem büntet.
@@ -44560,7 +44593,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      összhangépítés sávja (F6-ig mindig null). */
   bonds:{},bondCap:{},bondFrac:{},bondNew:{},bondFast:{},bondSeen:{},bondsSeeded:false,
   bondTrain:null,bondTrainChangeUsed:false,
-  /* PASSZKÉMIA (Tiki-Taka): passChem[kulcs] = {a,b,stages,need,co,gap,said} —
+  /* PASSZKÉMIA (Tiki-Taka): passChem[kulcs] = {a,b,stages,need,co,gap,said,ripe} —
      a párkémiával PÁRHUZAMOS, harmadik kötésfajta. Ugyanaz az öt fázis, de
      saját tárban él: ugyanazon a páron mindkettő megépíthető, és a hatásaik
      külön csatornán futnak. A `co` a KÖZÖS meccsek száma a kötés elkészülte
@@ -46779,9 +46812,19 @@ function bondMigrate(){
    EGYÜTT vannak a pályán. Aki a padon ül, az nem passzolgat a társával.
 
    A FELZÁRKÓZÁS A bumpAttr-en megy, tehát a specializációs sávot (ATTR_SPEC_
-   CEIL/FLOOR) tiszteletben tartja: ha a gyengébb fél a saját plafonján áll, ott
-   megáll. Ez nem hiba, hanem a szabály — a passzkémia nem ír felül határokat,
-   csak az odáig vezető utat rövidíti le. */
+   CEIL/FLOOR) tiszteletben tartja: a passzkémia nem ír felül határokat, csak
+   az odáig vezető utat rövidíti le.
+
+   MI SZÁMÍT ÖSSZEÉRÉSNEK (3.9.95, bejelentett hibából). Eddig kizárólag a
+   PILLANATNYI egyenlőség — és ez két sebből vérzett. Egy középvédő Passz-
+   plafonja az irányítóé ALATT is lehet: ilyenkor felért, ameddig felérhetett,
+   a rendszer mégis örökre a felzárkózás szakaszában tartotta, tehát a közös
+   fejlődés (a kötés fele haszna) EL SEM INDULT. A másik: az egyenlőséget a
+   legelső eltérés visszabontotta, vagyis még a sikeres összeérés sem tartott
+   ki. Mostantól a felzárkózás akkor is lezárul, ha a gyengébb fél a SAJÁT
+   plafonjára ért, és az összeérés VÉGLEGES (pr.ripe). A felzárkózás lépése
+   ettől függetlenül fut tovább: ha a gyengébb fél plafonja később megnő,
+   onnan kapaszkodik tovább a társa után. */
 const PASS_CHEM_NEED=5;
 /* Az összeérési idő KÖZÖS MECCSBEN, a képesség megvett szintje szerint.
    A [0] a "nincs megvéve" eset — ott a rendszer sem létezik, de a tömb így
@@ -46889,10 +46932,45 @@ function passChemPassOf(name){
     if(!e.attrs)initPlayerAttrs(e);
     return e.attrs.passz||0;
   }catch(err){return 0;}}
-/* ÖSSZEÉRT-E A KÖTÉS? Az EGYENLŐSÉG a mérce, nem a "legalább": amíg a
-   gyengébb fél nem ért fel pontosan, még a felzárkózás szakasza tart. */
+/* A Passz-sáv TETEJE ennél a játékosnál — a felzárkózás valódi határa.
+   Ugyanaz a sáv, amiben a bumpAttr is mozog (attrBandOf), tehát a kettő nem
+   tud elcsúszni egymástól. */
+function passChemPassCeil(name){
+  try{
+    const e=msEntry(name);
+    if(!e)return Infinity;
+    if(!e.attrs)initPlayerAttrs(e);
+    return attrBandOf(e,"passz").hi;
+  }catch(err){return Infinity;}}
+/* ---- ÖSSZEÉRT-E A KÖTÉS? ----
+   BEJELENTETT HIBA (3.9.95): „Nem is éri el a szintjét, főleg nem megy vele
+   együtt onnan."
+
+   Eddig KIZÁRÓLAG az egyenlőség számított összeérésnek. Ez két helyzetben is
+   elérhetetlen volt:
+     · a gyengébb fél SAJÁT Passz-plafonja a társáé ALATT lehet (egy középvédő
+       sávja szűkebb, mint egy irányítóé) — ilyenkor felért, ameddig felérhet,
+       a rendszer mégis örökre a felzárkózás szakaszában tartotta;
+     · és mivel a mérce a PILLANATNYI egyenlőség volt, a legelső eltérés (egy
+       gólpassz, egy edzéslépés) vissza is dobta a párt oda, ahonnan jött —
+       vagyis a közös, gyorsított fejlődés, a kötés fele haszna, még akkor sem
+       tartott ki, amikor egyszer tényleg összeértek.
+
+   MOSTANTÓL kettő változik. A felzárkózás akkor is LEZÁRUL, ha a gyengébb fél
+   a SAJÁT plafonjára ért: megtette, amit megtehetett. És az összeérés VÉGLEGES
+   (pr.ripe) — ez a „innentől EGYÜTT fejlődnek tovább" ígéret betartása.
+
+   AMIT NEM CSINÁL: a plafont továbbra sem írjuk felül. A passzkémia nem lép át
+   határokat, csak az odáig vezető utat rövidíti le — és ha a gyengébb fél
+   plafonja később megnő (mert a Ratingje nőtt), a felzárkózás magától folytatja
+   fölfelé, hiszen az a lépés a pr.ripe-tól függetlenül fut. */
 function passChemRipe(pr){
-  return !!pr&&passChemPassOf(pr.a)===passChemPassOf(pr.b);}
+  if(!pr)return false;
+  if(pr.ripe)return true;
+  const pa=passChemPassOf(pr.a),pb=passChemPassOf(pr.b);
+  if(pa===pb)return true;
+  const loN=pa<pb?pr.a:pr.b;
+  return passChemPassOf(loN)>=passChemPassCeil(loN);}
 /* Jár-e ennek az embernek a GYORSÍTOTT passzfejlődés ezen a mérkőzésen? Csak
    ÖSSZEÉRT kötésre, és csak ha a társa is a pályán van — a kötés attól él,
    hogy együtt játszanak. Több kötésnél is EGY adag jár. */
@@ -46911,34 +46989,47 @@ function passChemTick(activeNames){
   Object.values(passChemStore()).forEach(pr=>{
     if(!pr||(pr.stages||0)<PASS_CHEM_NEED)return;
     if(!activeNames.has(pr.a)||!activeNames.has(pr.b))return;
+    /* RÉGI MENTÉS: a `said` akkoriban is csak összeéréskor került fel, tehát
+       pontosan azt jelenti, amit ma a `ripe` — a párok nem esnek vissza. */
+    if(pr.said)pr.ripe=1;
     pr.co=(pr.co||0)+1;
     const pa=passChemPassOf(pr.a),pb=passChemPassOf(pr.b);
-    if(pa===pb)return;                     /* összeértek — innen együtt mennek */
-    const loN=pa<pb?pr.a:pr.b;
-    const gapVal=Math.abs(pa-pb);
-    const e=msEntry(loN);
-    if(!e)return;
-    /* A LÉPÉSKÖZ MINDIG A HÁTRALÉVŐ MECCSEKRE OSZTOTT HIÁNY. Így a határidő
-       akkor is tartható, ha a vezető közben tovább fejlődik — és ha a
-       határidő letelt, a maradék egy lépésben zárul. */
-    const left=Math.max(1,need-(pr.co||0)+1);
-    pr.gap=(pr.gap||0)+gapVal/left;
-    let guard=0;
-    while(pr.gap>=1&&guard++<60){
-      pr.gap-=1;
-      const before=passChemPassOf(loN);
-      bumpAttr(e,"passz",1);
-      /* Ha a plafon megállította, nincs értelme tovább pörgetni: a maradék
-         egyenleget eldobjuk, különben a következő meccsen ugyanide futnánk. */
-      if(passChemPassOf(loN)<=before){pr.gap=0;break;}
-      if(passChemPassOf(loN)>=Math.max(pa,pb))break;}
-    /* AZ ÖSSZEÉRÉS PILLANATÁT KIMONDJUK. Egy némán befejeződő, több szezonos
-       folyamat nem visszajelzés. */
-    if(passChemRipe(pr)&&!pr.said){
-      pr.said=1;
-      try{addLine(`🌀 <b>Összeértek!</b> ${esc(shortName(pr.a))} és ${esc(shortName(pr.b))} passza `
-        +`egy szintre került (${passChemPassOf(pr.a)}) — innentől EGYÜTT fejlődnek tovább, `
-        +`gyorsított tempóval.`,"m life");}catch(err){}}});}
+    /* ---- A FELZÁRKÓZÁS LÉPÉSE ----
+       Akkor is fut, ha a pár MÁR összeért: ha a gyengébb fél plafonja közben
+       megnőtt, innen tud tovább kapaszkodni a társa után. */
+    if(pa!==pb){
+      const loN=pa<pb?pr.a:pr.b;
+      const gapVal=Math.abs(pa-pb);
+      const e=msEntry(loN);
+      if(e){
+        /* A LÉPÉSKÖZ MINDIG A HÁTRALÉVŐ MECCSEKRE OSZTOTT HIÁNY. Így a
+           határidő akkor is tartható, ha a vezető közben tovább fejlődik — és
+           ha a határidő letelt, a maradék egy lépésben zárul. */
+        const left=Math.max(1,need-(pr.co||0)+1);
+        pr.gap=(pr.gap||0)+gapVal/left;
+        let guard=0;
+        while(pr.gap>=1&&guard++<60){
+          pr.gap-=1;
+          const before=passChemPassOf(loN);
+          bumpAttr(e,"passz",1);
+          /* Ha a plafon megállította, nincs értelme tovább pörgetni: a maradék
+             egyenleget eldobjuk, különben a következő meccsen ugyanide futnánk. */
+          if(passChemPassOf(loN)<=before){pr.gap=0;break;}
+          if(passChemPassOf(loN)>=Math.max(pa,pb))break;}}}
+    /* AZ ÖSSZEÉRÉS PILLANATÁT KIMONDJUK, ÉS VÉGLEGESÍTJÜK. Egy némán
+       befejeződő, több szezonos folyamat nem visszajelzés — és egy olyan
+       összeérés, ami a következő meccsen visszabomlik, nem összeérés. */
+    if(!pr.ripe&&passChemRipe(pr)){
+      pr.ripe=1;pr.said=1;
+      const _a=passChemPassOf(pr.a),_b=passChemPassOf(pr.b);
+      const _loN=_a<=_b?pr.a:pr.b;
+      try{
+        addLine(`🌀 <b>Összeértek!</b> `
+          +(_a===_b
+            ? `${esc(shortName(pr.a))} és ${esc(shortName(pr.b))} passza egy szintre került (${_a})`
+            : `${esc(shortName(_loN))} a saját Passz-plafonjára ért (${Math.min(_a,_b)}) — `
+              +`feljebb már nem jut, de a felzárkózás ezzel lezárult`)
+          +` — innentől EGYÜTT fejlődnek tovább, gyorsított tempóval.`,"m life");}catch(err){}}});}
 
 /* ================= 🌀 PASSZREKORD — A TIKI-TAKA GÓL (3.4.00) =================
    ÚJ GÓLSZERZÉSI TECHNIKA, és a játék egyetlen olyan gólja, amit nem a

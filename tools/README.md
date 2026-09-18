@@ -1365,6 +1365,42 @@ a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
 Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
 az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
 
+## passzkemia-osszeeres-proba.js — 🌀 a tört attribútum és a meg nem induló közös fejlődés
+
+```
+node tools/passzkemia-osszeeres-proba.js
+```
+
+Egy bejelentés, három egymásra épülő hiba. A képernyőképen `Passz 112.375`
+állt, miközben minden más attribútum kerek egész volt — és a jelentés annyi
+volt, hogy „bugos a passzkémiánál az együtt fejlődés… fura állásokon elakad".
+
+A **gyökér**: a specializációs sáv két vége a `trainScale`-lel skálázódik, az
+pedig tört (89/80 = 1,1125), tehát a plafon maga is tört lett — 89 − 10 +
+30×1,1125 = **112,375** —, és amint egy attribútum nekifeszült, a clamp ráírta
+a törtet magára az attribútumra. Onnantól a mentésben is tört ült.
+
+Ebből folyt a **második**: a passzkémia összeérését EGYENLŐSÉG dönti el, egy
+tört érték viszont sosem lesz egyenlő a társa egészével. A kötés örökre a
+felzárkózás szakaszában ragadt, a két fél pedig átugrálta egymást — minden
+meccsen a másik lett a „gyengébb". A közös, gyorsított fejlődés, vagyis a
+kötés FELE HASZNA, el sem indult.
+
+A **harmadik** ettől független: a gyengébb fél saját plafonja a társáé alatt is
+lehet (egy középvédő Passz-sávja szűkebb, mint egy irányítóé), tehát az
+egyenlőség akkor is elérhetetlen volt, ha a számok történetesen egészek.
+
+A próba 18 állítása mind a hármat lefedi. A legbeszédesebb az első: **pontosan
+a bejelentett esetet** állítja elő (89-es Ratingű középvédő), és azt méri, hogy
+a plafon ma 112, nem 112,375.
+
+**Amit a próba írása tanított:** a `passChemPassCeil` a `msEntry`-n keresztül
+néz, a próba pedig azt stubolja — a plafon-mérést tehát MÉG a stub alatt kell
+elvégezni, különben `Infinity` jön vissza (és JSON-ban `null`-ként landol egy
+állításban, ami emiatt hamisan bukik). Azóta a próba mindkét úton megméri a
+plafont, és külön állítja, hogy a kötés ugyanazt a sávot látja, mint a
+`bumpAttr`. Részletek: `docs/passzkemia-osszeeres.md`.
+
 ## eladas-kihivas-proba.js — 💸 a határidő maga a legelső licit
 
 ```
@@ -1404,7 +1440,7 @@ Részletek: `docs/eladas-kihivas-elso-licit.md`.
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 69 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 70 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
