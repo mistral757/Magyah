@@ -1365,13 +1365,111 @@ a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
 Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
 az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
 
+## osztalyugras-terv-proba.js — 🎲 mire tarts félre a nyáron
+
+```
+node tools/osztalyugras-terv-proba.js
+```
+
+Az all-in osztályugrás régóta megvan, de a hibája **időzítési** volt: az ajánlat
+a nyár legvégén jön, a fel-/kiesés eldőlte után — vagyis akkor, amikor az
+átigazolásaid MÁR lementek. Aki nem tudta előre, hogy létezik, az a nyarat
+végigköltötte, és az ajánlat egy üres kasszát ért.
+
+A 3.9.96-tól a nyári HUB **tetején** áll egy doboz, ami a költés ELŐTT mondja
+meg, mennyibe kerülne és mekkora mezőnyt vállalnál vele.
+
+**A nehéz rész, amit a próba főleg mér:** a piramis fordulója a nyár UTÁN fut,
+tehát a nyári HUB-ban a `pyrMyDivId()` még a MOSTANI osztályod — az ugrás árát
+viszont a KÖVETKEZŐ osztályod szabja. A doboznak ezért a végtabellából kell
+előre vezetnie az osztályt, ugyanazzal a három szabállyal, amit a `pyrRollover`
+alkalmaz (közvetlen feljutás · osztályozó · közvetlen kiesés). A próba mind a
+négy helyezés-sávot végigjárja, a végtabellát kézzel állítva — a bajnok ága
+pontosan a kérésben szereplő **„D4-ről egyből D2"** esetet reprodukálja, az
+osztályozós helyezés pedig MINDKÉT ágat kiírja, ár és cél-osztály szerint.
+
+A 6. szakasz a felületet méri: hogy a doboz tényleg a Run-mérő FÖLÖTT áll
+(`compareDocumentPosition`), hogy szezon közben, élő vállalásnál és az
+élvonalban elbújik, és hogy a mezőnyerő magyar tizedesvesszővel áll — ez
+utóbbi külön állítás, mert a valódi ajánlatban eddig angol pont volt.
+Részletek: `docs/osztalyugras-terv.md`.
+
+## passzkemia-osszeeres-proba.js — 🌀 a tört attribútum és a meg nem induló közös fejlődés
+
+```
+node tools/passzkemia-osszeeres-proba.js
+```
+
+Egy bejelentés, három egymásra épülő hiba. A képernyőképen `Passz 112.375`
+állt, miközben minden más attribútum kerek egész volt — és a jelentés annyi
+volt, hogy „bugos a passzkémiánál az együtt fejlődés… fura állásokon elakad".
+
+A **gyökér**: a specializációs sáv két vége a `trainScale`-lel skálázódik, az
+pedig tört (89/80 = 1,1125), tehát a plafon maga is tört lett — 89 − 10 +
+30×1,1125 = **112,375** —, és amint egy attribútum nekifeszült, a clamp ráírta
+a törtet magára az attribútumra. Onnantól a mentésben is tört ült.
+
+Ebből folyt a **második**: a passzkémia összeérését EGYENLŐSÉG dönti el, egy
+tört érték viszont sosem lesz egyenlő a társa egészével. A kötés örökre a
+felzárkózás szakaszában ragadt, a két fél pedig átugrálta egymást — minden
+meccsen a másik lett a „gyengébb". A közös, gyorsított fejlődés, vagyis a
+kötés FELE HASZNA, el sem indult.
+
+A **harmadik** ettől független: a gyengébb fél saját plafonja a társáé alatt is
+lehet (egy középvédő Passz-sávja szűkebb, mint egy irányítóé), tehát az
+egyenlőség akkor is elérhetetlen volt, ha a számok történetesen egészek.
+
+A próba 18 állítása mind a hármat lefedi. A legbeszédesebb az első: **pontosan
+a bejelentett esetet** állítja elő (89-es Ratingű középvédő), és azt méri, hogy
+a plafon ma 112, nem 112,375.
+
+**Amit a próba írása tanított:** a `passChemPassCeil` a `msEntry`-n keresztül
+néz, a próba pedig azt stubolja — a plafon-mérést tehát MÉG a stub alatt kell
+elvégezni, különben `Infinity` jön vissza (és JSON-ban `null`-ként landol egy
+állításban, ami emiatt hamisan bukik). Azóta a próba mindkét úton megméri a
+plafont, és külön állítja, hogy a kötés ugyanazt a sávot látja, mint a
+`bumpAttr`. Részletek: `docs/passzkemia-osszeeres.md`.
+
+## eladas-kihivas-proba.js — 💸 a határidő maga a legelső licit
+
+```
+node tools/eladas-kihivas-proba.js
+```
+
+A „gyenge láncszem" kihívás (`replaceWorst`) az egyetlen vállalás, ami egy
+NÉVRE szól: add el ezt az embert. A határideje mégis ugyanaz a nyolc meccses
+ablak volt, mint mindenki másé — csakhogy **eladni nem rajtad múlik**. A licit
+akkor jön, amikor jön, szezonközben ablakonként egy; nyolc meccs alatt simán
+előfordult, hogy egyetlen ajánlat sem született. Ilyenkor a kihívás nem nehéz
+volt, hanem **teljesíthetetlen**, és az egyetlen kiút az INGYEN elengedés
+maradt — ami nem eladás, hanem veszteség.
+
+A 3.9.94-től a határidő maga a **legelső licit**. A próba tizenhárom állítása
+ezt járja körbe: a `firstBid` határidő-fajta és a három kiírt szöveg; hogy sem
+a fordulós, sem a szezonos lejárat-kiértékelő nem nyúl hozzá (az idő múlása
+tehát nem viheti el); hogy pontosan az **ELSŐ** licit visszautasítása bukik, a
+második már nem, és más játékosé sem érinti; hogy a piacról levétel **váró**
+licittel ugyanaz a bukás, licit nélkül viszont nem; és hogy a többi kihívás
+határideje változatlanul meccsszám.
+
+**A legfontosabb ág** a sikeres eladásé, mert ott két dolog is elromolhatna:
+a jutalomnak az ELADÁS pillanatában kell érkeznie, és a sale belső
+piac-levétele **nem** eshet a bukás-ágba. A próba ezért a valódi úton megy
+végig (`saleAcceptOffer` → `releasePlayer` → `settleEarlyChallenges`), nem
+kézzel tünteti el a játékost.
+
+**Amit a próba írása tanított:** a kezdő tizenegyből eladni csak PÓTLÁSSAL
+lehet, ezért az első változat `noreplacement`-tel bukott — és nem a kihívást
+mérte, hanem a keret-szabályt. A próba azóta tesz valakit a tartalék-keretbe.
+Részletek: `docs/eladas-kihivas-elso-licit.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 68 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 71 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
