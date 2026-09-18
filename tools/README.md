@@ -1365,13 +1365,46 @@ a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
 Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
 az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
 
+## eladas-kihivas-proba.js — 💸 a határidő maga a legelső licit
+
+```
+node tools/eladas-kihivas-proba.js
+```
+
+A „gyenge láncszem" kihívás (`replaceWorst`) az egyetlen vállalás, ami egy
+NÉVRE szól: add el ezt az embert. A határideje mégis ugyanaz a nyolc meccses
+ablak volt, mint mindenki másé — csakhogy **eladni nem rajtad múlik**. A licit
+akkor jön, amikor jön, szezonközben ablakonként egy; nyolc meccs alatt simán
+előfordult, hogy egyetlen ajánlat sem született. Ilyenkor a kihívás nem nehéz
+volt, hanem **teljesíthetetlen**, és az egyetlen kiút az INGYEN elengedés
+maradt — ami nem eladás, hanem veszteség.
+
+A 3.9.94-től a határidő maga a **legelső licit**. A próba tizenhárom állítása
+ezt járja körbe: a `firstBid` határidő-fajta és a három kiírt szöveg; hogy sem
+a fordulós, sem a szezonos lejárat-kiértékelő nem nyúl hozzá (az idő múlása
+tehát nem viheti el); hogy pontosan az **ELSŐ** licit visszautasítása bukik, a
+második már nem, és más játékosé sem érinti; hogy a piacról levétel **váró**
+licittel ugyanaz a bukás, licit nélkül viszont nem; és hogy a többi kihívás
+határideje változatlanul meccsszám.
+
+**A legfontosabb ág** a sikeres eladásé, mert ott két dolog is elromolhatna:
+a jutalomnak az ELADÁS pillanatában kell érkeznie, és a sale belső
+piac-levétele **nem** eshet a bukás-ágba. A próba ezért a valódi úton megy
+végig (`saleAcceptOffer` → `releasePlayer` → `settleEarlyChallenges`), nem
+kézzel tünteti el a játékost.
+
+**Amit a próba írása tanított:** a kezdő tizenegyből eladni csak PÓTLÁSSAL
+lehet, ezért az első változat `noreplacement`-tel bukott — és nem a kihívást
+mérte, hanem a keret-szabályt. A próba azóta tesz valakit a tartalék-keretbe.
+Részletek: `docs/eladas-kihivas-elso-licit.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 68 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 69 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service

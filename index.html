@@ -6091,7 +6091,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.93";
+const APP_VERSION="3.9.94";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -42007,8 +42007,21 @@ function genChallenge(scope,diff,ctx){
       roster.forEach(pl=>{if(!worst||pOvr(pl)<pOvr(worst))worst=pl;});
       if(!worst)return null;
       return {type:"replaceWorst",target:1,targetName:worst.n,
-        desc:`Találj új játékost ${shortName(worst.n)} helyére (ő a leggyengébb láncszem)`,
-        rule:`Akkor teljesül, ha ${shortName(worst.n)} már NINCS a keretedben (eladtad vagy elengedted). Nem elég a padra ültetni.`};},
+        /* ---- A HATÁRIDŐ NEM MECCSSZÁM, HANEM A LEGELSŐ LICIT (3.9.94) ----
+           BEJELENTETT KÉRÉS: „Csak azzal a kitétellel, hogy az első adandó
+           alkalommal el kell adja. És csak akkor kapja meg a teljesített
+           kihívás jutalmat, amikor már ténylegesen eladta. És akkor a határidő
+           ilyenkor nem a 8 meccs, hanem a legelső licit pillanata."
+
+           MIÉRT VOLT ROSSZ A NYOLC MECCS. Eladni nem rajtad múlik: a licit
+           akkor jön, amikor jön, és szezonközben ablakonként EGY érkezik
+           (saleMarketTick). Nyolc meccs alatt simán előfordul, hogy EGYETLEN
+           ajánlat sem születik — ilyenkor a kihívás nem nehéz volt, hanem
+           teljesíthetetlen, és az egyetlen kiút az INGYEN elengedés maradt.
+           Az pedig nem eladás, hanem veszteség. */
+        deadlineKind:"firstBid",
+        desc:`Add el ${shortName(worst.n)}-t az első adandó alkalommal (ő a leggyengébb láncszem)`,
+        rule:`Akkor teljesül, ha ${shortName(worst.n)} már NINCS a keretedben — és a jutalom AKKOR érkezik, amikor tényleg eladtad. Nem elég a padra ültetni.<br><br>NINCS MECCS-HATÁRIDEJE: addig vár, amíg jön rá licit. A határidő maga a LEGELSŐ LICIT — ha azt visszautasítod, a kihívás elbukik. Ha azonnal eladod („eladás most"), az is teljesítés.`};},
     /* --- RÖVID: EGY KONKRÉT, MÁR KARNYÚJTÁSNYI MÉRFÖLDKŐ (3.9.37) ---
        BEJELENTETT PANASZ: „teljesíts x db mérföldkövet" — ezt sosem választja
        senki. Jogos: nyolcvan mérföldkő közül a „3 darab" nem feladat, hanem
@@ -42483,8 +42496,14 @@ function buildChallengeOffer(scope,ctx,force){
     /* A sablon SAJÁT határidőt is megadhat (deadlineIdx). A rangadó-kihívás
        ezzel él: ott az ablakot nem meccsszám, hanem a kijelölt RANGADÓ
        fordulója szabja — az általános 8 meccses ablak ott értelmetlen volna. */
-    deadline={kind:"round",value:Math.min(30,
-      (goal.deadlineIdx!=null)?goal.deadlineIdx:((S.idx||0)+shortChallengeWindow()))};
+    /* A SABLON SAJÁT HATÁRIDŐ-FAJTÁT is kérhet (3.9.94). A „firstBid" nem
+       fordulóhoz és nem szezonhoz kötött: addig él, amíg meg nem jön az első
+       licit — azt viszont el KELL fogadni. Az evaluateDueChallenges csak
+       „round" és „season" fajtára ítélkezik, tehát ez magától sosem jár le. */
+    deadline=(goal.deadlineKind==="firstBid")
+      ?{kind:"firstBid"}
+      :{kind:"round",value:Math.min(30,
+        (goal.deadlineIdx!=null)?goal.deadlineIdx:((S.idx||0)+shortChallengeWindow()))};
   }else{
     deadline={kind:"season",value:(S.seasonNumber||1)+1};
   }
@@ -43804,6 +43823,8 @@ function acceptChallenge(ch){
 function challengeDeadlineText(ch){
   if(!ch.deadline)return "";
   if(ch.deadline.kind==="cup")return "a sorozat végéig";
+  /* 3.9.94: az eladós kihívás határideje a LEGELSŐ LICIT, nem meccsszám. */
+  if(ch.deadline.kind==="firstBid")return "az első licitig";
   if(ch.deadline.kind==="round"){
     const left=ch.deadline.value-(S.idx||0);
     if(left<=0)return "lejárt";
@@ -43821,6 +43842,8 @@ function challengeDeadlineText(ch){
    olyan, aminek a végéig ki kell húzni. Egy mondat, két helyen (ajánlat-kártya
    és megerősítő), a settleEarlyChallenges szabályából levezetve. */
 function challengePayoutText(ch){
+  if(ch&&ch.deadline&&ch.deadline.kind==="firstBid")
+    return "a jutalom az ELADÁS pillanatában érkezik";
   return challengeEarlyPayable(ch)
     ?"a jutalom a teljesítés pillanatában érkezik"
     :"a határidőnél dől el — addig ki kell húzni";}
@@ -44127,6 +44150,34 @@ function challengeProgressText(ch){
   /* Inverz kihívásnál a szám azt mutatja, mennyit "használtál el" a keretből —
      ezért a max jelöléssel írjuk ki, hogy egyértelmű legyen az irány. */
   return ch.inverse?`${f(prog)}/${f(ch.target)} (max)`:`${f(prog)}/${f(ch.target)}`;}
+/* ---- AZ ELSŐ LICIT VISSZAUTASÍTÁSA (3.9.94) ----
+   Az „add el az első adandó alkalommal" kihívás EGYETLEN bukási módja. Nem a
+   határidő jár le (annak nincs meccsszáma), hanem a vállalás lényege sérül: a
+   licit megjött, és te nemet mondtál rá.
+
+   A BÜNTETÉS A RENDES ÚTON megy (resolveChallenge), tehát a napló, a
+   könyvelés és a büntetés-kiosztás mind a helyén marad — csak a KIVÁLTÓ
+   esemény más, mint máshol. */
+function chSaleRefused(name){
+  if(!name||!S.activeChallenges||!S.activeChallenges.length)return 0;
+  let db=0;
+  const marad=[];
+  S.activeChallenges.forEach(ch=>{
+    const ez=ch&&ch.deadline&&ch.deadline.kind==="firstBid"
+      &&ch.targetName===name;
+    if(!ez){marad.push(ch);return;}
+    /* Ha időközben MÁR teljesült (pl. közben mégis elment a klubtól), a
+       rendes út fizet — a resolveChallenge elsőként a teljesülést nézi. */
+    try{
+      addLine(`⛔ <b>KIHÍVÁS ELBUKVA</b> — „${esc(ch.desc)}”: visszautasítottad az első licitet `
+        +`${esc(shortName(name))}-ért, pedig a vállalás arról szólt, hogy az első adandó `
+        +`alkalommal eladod.`,"m loss");
+    }catch(e){}
+    try{resolveChallenge(ch);}catch(e){}
+    db++;});
+  S.activeChallenges=marad;
+  if(db){try{saveGame();}catch(e){}}
+  return db;}
 /* Kiértékeli a lejárt challenge-eket. kind: "round" (rövid, évszakvégi) vagy
    "season" (hosszú, szezonvégi). A lejárt kihívások reward/punishmentet
    osztanak, majd kikerülnek az aktív listából. */
@@ -65186,7 +65237,15 @@ function askSaleUnlist(name,after){
         ${rec.offer?`<br><br>📬 <b style="color:var(--gold)">Most is vár rá egy ajánlat (${fmtFt(rec.offer.amount)})</b> — az is elszáll vele.`
                    :(due?`<br><br>⏳ A következő ajánlat <b>${due} forduló</b> múlva volna esedékes.`:"")}
         <br><br>Az ügynökséged egy helye viszont felszabadul.</div>`,
-    onYes:()=>{saleUnlist(name);if(after)after();}});}
+    onYes:()=>{
+      /* 3.9.94: ha VÁR rá egy licit, és ez az ELSŐ, akkor a piacról levétel
+         ugyanaz, mint a visszautasítás — a megerősítő ki is mondja, hogy „az
+         is elszáll vele". A kihívás szempontjából tehát bukás.
+         A jelző itt a FELHASZNÁLÓ döntése: a saleAcceptOffer belső
+         saleUnlist-je nem ezen az úton megy, tehát egy sikeres eladást ez
+         sosem büntethet meg. */
+      try{if(rec&&rec.offer&&(rec.rejects||0)===0)chSaleRefused(name);}catch(e){}
+      saleUnlist(name);if(after)after();}});}
 function saleUnlist(name){
   const st=saleMarketState();
   const i=st.list.findIndex(x=>x&&x.n===name);
@@ -65293,6 +65352,14 @@ function saleAcceptOffer(rec){
   saleUnlist(rec.n);
   return {ok:true,credit:res.credit,replacedBy:res.replacedBy};}
 function saleRejectOffer(rec){
+  /* ---- AZ ELSŐ LICIT A HATÁRIDŐ (3.9.94) ----
+     Az „add el az első adandó alkalommal" kihívásnál a visszautasítás MAGA a
+     bukás. Az ELSŐ licitre szól (rejects===0): ha arra nemet mondasz, a
+     vállalás értelmét vesztette. A későbbi licitek már nem bántják — a
+     kihívás ekkor már lezárult.
+     A SORREND FONTOS: előbb a bukás, aztán a visszautasítás könyvelése, hogy
+     a `rejects` még nulla legyen, amikor megkérdezzük. */
+  try{if((rec.rejects||0)===0)chSaleRefused(rec.n);}catch(e){}
   rec.rejects=(rec.rejects||0)+1;
   rec.offer=null;
   rec.pending=true;
