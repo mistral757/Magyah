@@ -1365,6 +1365,36 @@ a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
 Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
 az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
 
+## masodlagos-sztar-proba.js — ⭐ a sztáros filozófia a MÁSODIK sloton
+
+```
+node tools/masodlagos-sztar-proba.js
+```
+
+A bejelentés két képességről szólt („se a sztár jóga, se az összhangot javító
+képesség… mindkettő nullán áll"), a gyökér viszont **tizenhárom függvényt**
+érintett: a 3.9.64-es másodlagos filozófiával megszületett a `starStyle()` —
+ami megtalálja a sztáros stílust akármelyik slotban —, de a hívók átvezetése
+FÉLBEMARADT. A többi továbbra is az ELSŐDLEGES stílusból olvasott, ott pedig
+nincs `.star`, tehát mind nullát adott: az összhang, a kötés-párosok, a bér- és
+ár-arány, a karrier-statisztikák, a „nem öregszik", az attribútum-gyorsítás és
+a teljes Sztár jóga.
+
+**Nem a szint volt rossz** — az a `styleActiveFx()`-en megy, az pedig mindkét
+slotot bejárja. A képesség meg volt véve, csak nem volt mihez alkalmazni.
+És a jóga **hatása** is halott volt, nem csak a kijelzése.
+
+**A mérés módja a lényeg:** a próba nem abszolút számokat rögzít — azok a
+balansz változásával elavulnának —, hanem azt, hogy UGYANAZ A FILOZÓFIA
+UGYANAZT ADJA, akárhol áll. Tizennégy mérő fut le mindkét sloton, és a kettőnek
+egyeznie kell. Egy új sztár-mérőt elég felvenni a próba táblázatába, és máris
+védve van.
+
+Két őr teszi értelmessé: az egyik azt állítja, hogy az értékek NEM nullák
+(különben a „két nulla egyenlő" is zölden átmenne), a másik azt, hogy sztáros
+filozófia nélkül viszont tényleg nullák. A javítás előtti kódon a próba
+**14 ponton bukik**. Részletek: `docs/masodlagos-sztar.md`.
+
 ## imm-kupa-kapcsolo-proba.js — 🎬 a meccsről meccsre kapcsolója a kupában
 
 ```
@@ -1534,7 +1564,7 @@ Részletek: `docs/eladas-kihivas-elso-licit.md`.
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 73 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 74 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
