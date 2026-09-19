@@ -207,11 +207,15 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(elo.sok.maxMatchRed===elo.sok.kiallDb,
      "a mérföldkő-tracker a meccs kiállítás-számát látja",elo.sok);
   {const R=["tizenegyen","tízen","kilencen","nyolcan","heten","hatan"];
-   /* A napló létszám-szavai CSÖKKENŐ sorrendben kell kövessék egymást, és
-      egyik sem lehet „tízen" az első kiállítás után. */
+   /* A LÉTSZÁM SOSEM NŐHET VISSZA — ez a valódi invariáns, nem a szigorú
+      csökkenés. Két oka van, és mindkettő szándékos:
+        · nem minden piroslap-sor mond létszámot (a Panzer-készlet például
+          sosem), tehát a sorozat UGORHAT: tízen → nyolcan;
+        · a LEFÚJÁS sora megismétli az ötödik kiállításét („hatan maradtatok"),
+          tehát ugyanaz a szám kétszer is szerepelhet egymás után. */
    const idx=elo.sok.letszamok.map(w=>R.indexOf(w));
-   ok(idx.every((v,i)=>v>0&&(i===0||v>idx[i-1])),
-      "a napló létszám-szavai lépésről lépésre FOGYNAK (tízen → kilencen → …)",
+   ok(idx.every((v,i)=>v>0&&(i===0||v>=idx[i-1])),
+      "a napló létszám-szavai SOSEM nőnek vissza (tízen → kilencen → …)",
       elo.sok.letszamok);
    ok(elo.sok.letszamok.filter(w=>w==="tízen").length<=1,
       "a „tízen” legfeljebb EGYSZER hangzik el — az első lapnál",elo.sok.letszamok);}

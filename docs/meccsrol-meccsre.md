@@ -383,5 +383,72 @@ tétmeccsen 30 mp-et, hétköznap 15-öt ad.
   csúszka állítja; a két rendszer külön él.
 * **Nem szól bele a párharcba.** Közös karrierben a párharc-forduló megálló:
   azt a két menedzser együtt indítja.
-* **Nem fut a draft alatt vagy szezonon kívül.** A kapcsolósáv is csak
-  `phase === "season"` mellett, meccsen kívül látszik.
+* **Nem fut a draft alatt vagy szezonon kívül.** A kapcsolósáv csak futó
+  szezonban vagy futó kupasorozatban, meccsen kívül látszik (lásd a 9. pontot).
+
+---
+
+## 9. A kapcsoló a kupasorozatban (3.9.98)
+
+### A bejelentés
+
+> „A meccsről meccsre módnak nincsen látható kapcsológombja kupasorozatban.
+> Lehetne a kupa HUB-ban egy jól látható helyen. És a szokásos helyen is.
+> Jelenleg nem lehet bekapcsolni pedig useful lenne."
+
+### Három hiány volt, nem egy
+
+**1. A megszokott sáv eltűnt.** Az `immSyncRow` kapuja `phase === "season"`
+volt — a kupasorozat viszont a szezon **lezárása után** fut, ott a fázis már
+nem `"season"`. A sáv tehát pontosan ott tűnt el, ahol a mérkőzések a
+leggyorsabban jönnek egymás után. A kapu mostantól:
+
+```js
+(phase==="season") || euroActive()
+```
+
+**2. A kupa HUB-ban nem volt kapcsoló.** Pedig a sorozat mérkőzései között az
+a képernyő az otthonod — a `scEuro`, nem a meccsnézet. Az új `#immRowEuro`
+közvetlenül a **Kezdőrúgás fölött** áll, aranykeretes dobozban: ott nincs
+eredményjelző, ami horgonyozná, tehát a saját kerete adja a súlyát.
+
+**3. És ha valaki mégis bekapcsolta, a lánc nem indult el.** Ez volt a
+„jelenleg nem lehet bekapcsolni" valódi tartalma: az `immStep` hurka **mindig**
+a bajnoki ágon zárult (`immAfterLeagueMatch`), az pedig a kupában azonnal
+megáll („a lánc megáll: kupasorozat"). A mód bekapcsolt, a sorozat állt — amíg
+a felhasználó magától el nem indította a következő mérkőzést.
+
+```js
+if(euroActive() && immVis("scEuro") && S.euro && (S.euro.fixtures||[])[S.euro.idx]){
+  if(_immT && _immTarget==="__kupa__") return;   /* már fut a visszaszámlálás */
+  immCupArm(); return;}
+immAfterLeagueMatch(quiet);
+```
+
+A feltétel **szándékosan szűk**: csak a láthatóan álló kupa-nézeten, csak ha
+van soron következő mérkőzés. Minden más képernyőn (élő mérkőzés, HUB,
+értékelő ablak) a viselkedés betűre a régi.
+
+### Egy gomb, két hely — és miért nem két másolat
+
+A kinézetet egyetlen festő adja (`immPaintToggle`), a szöveget egyetlen
+szövegíró (`immNoteText(kupa)`), a CSS pedig **osztály** lett (`.immRow`) az
+azonosító helyett. A két sáv így nem tud szétcsúszni: az `immSyncRow` első
+dolga a kupa-sáv frissítése, tehát minden meglévő hívó (a kapcsoló, a
+leállítás, a mérkőzés-nézet rajzolása) egyszerre tartja szinkronban a kettőt.
+
+A **szöveg viszont más**, mert a ritmus is más: a kupa-ágban a lefújás utáni
+tartás kimarad, és a határ nem a forduló, hanem a **szakasz**.
+
+| | szöveg |
+|---|---|
+| bajnokság | „Üzenetek 3 mp-enként → felkészülés 15 mp → kezdőrúgás." |
+| kupa | „A következő kupamérkőzés 15 mp múlva indul innen. A szakasz végén (csoportkör, párharc, selejtező) megáll." |
+
+A ⚙ beállítás-panel ugyanaz, és a kupa-sávból is elérhető.
+
+### Próba
+
+`tools/imm-kupa-kapcsolo-proba.js` (9055-ös port), 22 állítás — a DOM-beli
+helytől (a Kezdőrúgás **fölött**) a láthatóság öt esetén át addig, hogy a
+kapcsoló megnyomására tényleg elindul-e a **kupa**-lánc.

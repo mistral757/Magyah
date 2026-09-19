@@ -1365,6 +1365,34 @@ a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
 Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
 az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
 
+## imm-kupa-kapcsolo-proba.js — 🎬 a meccsről meccsre kapcsolója a kupában
+
+```
+node tools/imm-kupa-kapcsolo-proba.js
+```
+
+A bejelentés úgy szólt, hogy a módnak „nincsen látható kapcsológombja
+kupasorozatban… jelenleg nem lehet bekapcsolni". **Három hiány volt, nem egy**,
+és a harmadik volt a legfontosabb:
+
+1. a megszokott sáv `phase==="season"`-re volt kapuzva — a kupasorozat viszont
+   a szezon LEZÁRÁSA után fut, tehát a sáv pont ott tűnt el, ahol a mérkőzések
+   a leggyorsabban jönnek egymás után;
+2. a kupa HUB-ban (scEuro) egyáltalán nem volt kapcsoló;
+3. **és ha valaki mégis bekapcsolta, a lánc nem indult el**: az `immStep`
+   hurka mindig a bajnoki ágon zárult, az pedig a kupában azonnal megáll.
+   A mód bekapcsolt, a sorozat állt.
+
+A próba mind a hármat méri. A 6. szakasz a lényeg: megnyomja a kapcsolót a
+kupa-nézeten, és azt nézi, elindul-e a visszaszámlálás — **és hogy a KUPA-lánc
+indul-e el, nem a bajnoki**. Külön állítja azt is, hogy más képernyőről NEM
+indít kupa-láncot: a feltétel szándékosan szűk, hogy minden más útvonal
+viselkedése betűre a régi maradjon.
+
+Az 1. és 3. szakasz a szétcsúszás ellen mér: hogy a két sáv közös CSS-osztályt
+visel, és hogy a kupa-gomb felirata mindig ugyanaz, mint a megszokotté — egy
+hívás tartja szinkronban a kettőt. Részletek: `docs/meccsrol-meccsre.md` 9. pont.
+
 ## kiallitas-rendszer-proba.js — 🟥 a kiállítás négy ügye
 
 ```
@@ -1506,7 +1534,7 @@ Részletek: `docs/eladas-kihivas-elso-licit.md`.
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 72 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 73 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
