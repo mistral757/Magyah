@@ -1389,6 +1389,12 @@ az összlétszámot nem változtatja, idempotens, determinisztikus, és
 egyjátékosban más a célszám. Külön állítás mondja ki, hogy hiányzó
 világ-csapatot **nem találunk ki**, csak szólunk róla.
 
+Egy külön szakasz **állításként köti le az alapszabályt**: egy osztály 16
+csapat, egy szezon 30 forduló — közös karrierben 14 CPU + te + a társad, azaz
+14×2 + 2 párharc, egyjátékosban 15 CPU + te, azaz 15×2. Ebből az is
+következik, hogy ép világban a tabella-létszám páros, tehát a fenti üres hely
+sosem lép működésbe: az háló, nem a normál működés.
+
 **A legfontosabb szakasz a hatodik.** Elkap egy VALÓDI mentés-payloadot,
 elrontja pontosan úgy, ahogy a beküldött (32 forduló), és `applySavedGame`-mel
 betölti. Ez fogta meg, hogy a 3.9.101 menetrend-helyreállítása az
