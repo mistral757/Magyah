@@ -1365,6 +1365,36 @@ a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
 Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
 az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
 
+## sztar-piac-proba.js — ⭐ az átigazolás, ami a saját sávod FÖLÉ mutat
+
+```
+node tools/sztar-piac-proba.js
+```
+
+A meglévő keresések mind az ALAP SÁVBÓL dolgoznak (`signingBand`), az pedig a
+klubbal EGYÜTT nő: bármilyen nagy is leszel, a piac mindig „magadfajtát"
+kínál. A sztár piac az egyetlen csatorna, ami ezen túlmutat — ezért áll két
+kapu mögött (110 nyers csapaterő + 4★ ügynökség) és ezért csak nyáron.
+
+A próba a **két létrát** méri először, tiszta függvényként: a keresés-szám
+huszonöt töréspontját a kérés táblázatával szemben, és a gap-létra három
+rögzített pontját a köztes félcsillagokkal. Külön állítás mondja ki, hogy a
+gap tényleg FÉLCSILLAGONKÉNT lép, nem folytonosan — 4,2★ és 4,0★ ugyanaz,
+4,4★ és 4,5★ ugyanaz, de a kettő nem egyenlő.
+
+Utána karrierben: a két kapu külön-külön és együtt (a 109,9-es csapaterő még
+nem elég), a négy „csak nyáron" eset a gomb feliratával együtt, a keret teljes
+életciklusa (fogy, nullán megáll, a közbeni fejlesztés nem tünteti el az
+elköltött alkalmakat, új nyáron tiszta lap), egy ÉLŐ keresés, és hogy mind a
+négy módban — alap, piramis, Infinity, közös karrier — betűre ugyanaz jön ki.
+
+**Amit a próba fogott meg:** a szerepenkénti szűrés először a `BENCH_CATS`
+kódlistáiból dolgozott, azok viszont ÁTFEDNEK — a `JSZ`/`BSZ` egyszerre
+szerepel a `KOZEPPALYAS` és a `CSATAR` szerepnél. A „középpályás" helyre így
+szélső csatár került (`["KAPUS","VEDO","CSATAR","CSATAR"]`). A szűrés azóta a
+`getCategoryFor`-on megy, amiből a listasor címkéje is jön: a kiválasztás és a
+kiírás egy igazságból dolgozik. Részletek: `docs/sztar-piac.md`.
+
 ## masodlagos-sztar-proba.js — ⭐ a sztáros filozófia a MÁSODIK sloton
 
 ```
@@ -1564,7 +1594,7 @@ Részletek: `docs/eladas-kihivas-elso-licit.md`.
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 74 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 75 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
