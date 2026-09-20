@@ -1365,6 +1365,38 @@ a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
 Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
 az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
 
+## osztalyletszam-proba.js — 🧮 egy elcsúszott osztálylétszám, három tünet
+
+```
+node tools/osztalyletszam-proba.js
+```
+
+A beküldött mentésben a piramis D1-e **15 világ-csapatot tartott 14 helyett**
+(a világ összlétszáma, 94, stimmelt — csak az eloszlás csúszott el eggyel).
+Ebből az EGY hibából nőtt ki mind a három bejelentett tünet: a menetrend 32
+fordulós lett, a tabella-létszám páratlan (15 + te + a társad = 17), és emiatt
+az `aiLeagueSchedule` régi `n%2!==0` kapuja **harminc üres fordulót** adott
+vissza — tehát „az ellenfelek pontszámai megszűntek", csak a két menedzser
+elleni meccseik maradtak.
+
+A próba előbb reprodukálja a páratlan alakot és kimondja, hogy a RÉGI kapu
+pontosan ott ütött be, majd méri az üres helyes (bye) körmódszert: 30 forduló,
+egyetlen üres forduló nélkül, minden CPU 24-26 meccsel. Páros mezőnnyel semmi
+nem változik.
+
+A `pyrDivSizeRepair` mindkét irányban megy (15/15 → 14/16 és 13/17 → 14/16),
+az összlétszámot nem változtatja, idempotens, determinisztikus, és
+egyjátékosban más a célszám. Külön állítás mondja ki, hogy hiányzó
+világ-csapatot **nem találunk ki**, csak szólunk róla.
+
+**A legfontosabb szakasz a hatodik.** Elkap egy VALÓDI mentés-payloadot,
+elrontja pontosan úgy, ahogy a beküldött (32 forduló), és `applySavedGame`-mel
+betölti. Ez fogta meg, hogy a 3.9.101 menetrend-helyreállítása az
+`Object.assign(S,d.S)` ELŐTT futott — vagyis nem a betöltött menetrenden
+dolgozott, és `h2hRoomActive()===false` mellett a párharcokat is kitörölte
+volna. A régi sorrenddel a menetrend 32 marad, az újjal 30 lesz. Részletek:
+`docs/osztalyletszam-es-paratlan-mezony.md`.
+
 ## parharc-menetrend-proba.js — ⚔ a 22. fordulóban megállt a szezon
 
 ```

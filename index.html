@@ -6132,7 +6132,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.101";
+const APP_VERSION="3.9.102";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -14312,6 +14312,87 @@ function pyrTopLevel(){
 function pyrOpponents(){
   const d=pyrMyDiv();
   return d?d.teams.map(t=>({n:t.n,ovr:t.ovr,ovrBase:t.ovr})):[];}
+/* ================= AZ OSZTÁLYLÉTSZÁMOK RENDBETÉTELE (3.9.102) =============
+   BEJELENTETT HIBA GYÖKERE. A beküldött, 6. szezonban járó közös mentésben a
+   piramis D1-e 15 világ-csapatot tartott 14 helyett, a D2 pedig 15-öt 16
+   helyett. A világ ÖSSZLÉTSZÁMA stimmelt (94 = 6×16 − a páros két helye),
+   csak az eloszlás csúszott el eggyel. Ebből az egy elcsúszásból nőtt ki
+   MINDEN bejelentett tünet:
+
+     · a mezőny 15 ellenfél lett 14 helyett → a menetrend 32 fordulós
+       (a párharcokkal együtt), a szezon nem ér véget a 30. fordulón;
+     · n = 15 + te + a társad = 17, vagyis PÁRATLAN → az aiLeagueSchedule
+       régi kapuja üres naptárat adott, tehát „az ellenfelek pontszámai
+       megszűntek";
+     · a másik kliensen ugyanez másfelé csúszott el (ott 10 ellenfél lett),
+       onnan jött a 22. fordulóra került párharc.
+
+   HONNAN A CSÚSZÁS: a páros KÉT helyet foglal a saját osztályában, és
+   fel-/lejutáskor ezt a második ülést egy külön csere költözteti (a spare2
+   a pyrSeasonTurn-ben). Ha ez a csere valaha kimarad — régi mentés, félbe-
+   hagyott szezonforduló —, a létszám eltolódik, és onnantól úgy is marad.
+
+   A HELYREÁLLÍTÁS SZABÁLYA, és miért determinisztikus. Felülről lefelé
+   haladunk. Amelyik osztályban TÖBB csapat van a kelleténél, onnan a
+   LEGGYENGÉBB lép eggyel lejjebb; amelyikben KEVESEBB, oda a lenti osztály
+   LEGERŐSEBBJE lép föl. Mindkét döntés egyértelmű (ovr szerinti szélsőérték),
+   tehát ugyanaz a szabály ugyanabból az állapotból mindkét gépen ugyanazt
+   adja. CSAPATOT NEM TALÁLUNK KI és nem dobunk el: ha a világ összlétszáma
+   maga hibás, a legalsó osztály marad rossz, és ezt ki is mondjuk — inkább
+   legyen látható maradék hiba, mint kitalált mezőny.
+
+   MIKOR FUT: a szezonfordulón (ott a világ amúgy is újraépül, és még semmi
+   nem mutat a mezőnyre), illetve betöltéskor, de CSAK ha nincs futó szezon.
+   Futó szezonban a menetrend a mezőnyre hivatkozik — azt menet közben
+   átrendezni többet ártana, mint használna; ott a fixturesRepair és az
+   üres-helyes körmódszer tartja életben a szezont. */
+function pyrDivNeed(id){
+  /* A SAJÁT osztályodban te is ülsz — közös karrierben a társaddal együtt
+     kettő helyet foglaltok. A többi osztály tele van világ-csapattal. */
+  if(id!==pyrMyDivId())return PYR_TEAMS;
+  return PYR_TEAMS-((typeof h2hRoomActive==="function"&&h2hRoomActive())?2:1);}
+function pyrDivRecalc(d){
+  const ov=(d&&d.teams||[]).map(t=>t.ovr);
+  if(!d||!ov.length)return;
+  d.mean=Math.round(ov.reduce((x,v)=>x+v,0)/ov.length*10)/10;
+  d.lo=Math.min.apply(null,ov);d.hi=Math.max.apply(null,ov);}
+function pyrDivSizeRepair(honnan){
+  if(!pyrOn())return 0;
+  const D=pyrDivs();
+  if(!D.length)return 0;
+  const baj=[];
+  let mozgatott=0;
+  for(let i=0;i<D.length;i++){
+    const d=D[i],id=pyrDivIdAt(i),kell=pyrDivNeed(id);
+    if(!d||!Array.isArray(d.teams))continue;
+    const lent=D[i+1];
+    while(d.teams.length>kell&&lent&&Array.isArray(lent.teams)){
+      d.teams.sort((a,b)=>b.ovr-a.ovr);
+      lent.teams.push(d.teams.pop());          /* a leggyengébb lép lejjebb */
+      mozgatott++;}
+    while(d.teams.length<kell&&lent&&Array.isArray(lent.teams)&&lent.teams.length){
+      lent.teams.sort((a,b)=>b.ovr-a.ovr);
+      d.teams.push(lent.teams.shift());        /* a lenti legerősebb lép föl */
+      mozgatott++;}
+    if(d.teams.length!==kell)baj.push(`D${id}: ${d.teams.length} (kell ${kell})`);}
+  if(!mozgatott&&!baj.length)return 0;
+  D.forEach(pyrDivRecalc);
+  /* A MEZŐNY ÉS AZ ARRA ÉPÜLŐ SZÁMOK ÚJRA. A menetrend ilyenkor nem futó
+     szezoné (lásd a hívási helyeket), tehát nyugodtan újraszámolható. */
+  try{SEASON_OPPS=pyrOpponents();}catch(e){}
+  try{oppTargetRating=pyrLevel();}catch(e){}
+  try{pyrGrowStep();pyrOppRefresh();}catch(e){}
+  try{_aiSchedCache=null;liveTableInvalidate();}catch(e){}
+  try{
+    if(mozgatott)
+      addLine(`🛠 <b>Osztálylétszámok rendbe téve</b> (${esc(honnan||"ellenőrzés")}) — `
+        +`${mozgatott} csapat került a helyére. A te osztályodban mostantól `
+        +`${pyrDivNeed(pyrMyDivId())} világ-csapat áll, ahogy kell.`,"m ev");
+    if(baj.length)
+      addLine(`⚠️ A világ létszáma maga is hibás: ${esc(baj.join(", "))}. `
+        +`Csapatot nem találunk ki — szólj a fejlesztőnek a diagnosztikával.`,"m loss");
+  }catch(e){}
+  return mozgatott;}
 /* ================= A MEZŐNY FORDULÓRÓL FORDULÓRA FEJLŐDIK =================
    MIÉRT. Te minden héten fejlődsz — edzés, képességek, igazolások —, a mezőny
    viszont évente EGYSZER, egyetlen ugrással lépett. Ez az aszimmetria a mód
@@ -17916,7 +17997,12 @@ function mpDiagCollect(){
       const lyuk=fx.filter(f=>!f||(!f.duel&&!f.o)).length;
       const potolt=fx.filter(f=>f&&f.filler).length;
       if(lyuk||potolt)L.push(`  ⚠ üres forduló: ${lyuk} · pótolt párosítás: ${potolt}`);
-      L.push(`  mezőny: SEASON_OPPS ${(SEASON_OPPS||[]).length} · ellenfél a menetrendhez ${leagueOpps().length}`);
+      {const _n=leagueOpps().length+1+(h2hRoomActive()?1:0);
+       L.push(`  mezőny: SEASON_OPPS ${(SEASON_OPPS||[]).length} · ellenfél a menetrendhez ${leagueOpps().length}`
+         +` · tabella-létszám ${_n}${_n%2?" ⚠ PÁRATLAN (üres hellyel megy)":""}`);}
+      if(S.mpTable)
+        L.push(`  közös tabella: ${S.mpTable.season}. szezon, ${S.mpTable.upto}. forduló után`
+          +` · ${(S.mpTable.teams||[]).length} sor · ${mpTableSane(S.mpTable)?"ép":"⚠ HIBÁS (félretéve)"}`);
       if(pyrOn()){
         const my=pyrMyDivId();
         L.push(`  piramis: D${my} · fölötte nyitva ${pyrAbove()} · tartalék: `
@@ -67664,19 +67750,41 @@ function aiLeagueSchedule(){
     +((S.fixtures||[]).map(f=>f.duel?"*":((f&&f.o&&f.o.n)||"?")).join("~"));
   if(_aiSchedCache&&_aiSchedCache.key===key)return _aiSchedCache.rounds;
   const out={key,rounds:[]};
-  if(n<4||n%2!==0){
-    /* Nem építhető szabályos menetrend (hiányos állapot) — üres naptár, a
-       tabella ilyenkor csak a valós eredményekből áll össze. */
+  if(n<4){
+    /* Nem építhető menetrend (hiányos állapot) — üres naptár, a tabella
+       ilyenkor csak a valós eredményekből áll össze. */
     for(let r=0;r<30;r++)out.rounds.push([]);
     _aiSchedCache=out;return out.rounds;}
-  const CR=circleRoundPairs(n);          /* n−1 = 15 kör */
-  const half=CR.length;                  /* 15 */
+  /* ---- PÁRATLAN MEZŐNY: EGY ÜRES HELY PIHEN (3.9.102) ----
+     BEJELENTETT HIBA: „az ellenfelek pontszámai megszűntek, csak az ellenünk
+     játszott meccsek vannak nekik."
+
+     AZ OK: itt egy `n%2!==0` kapu állt, ami páratlan mezőnynél HARMINC ÜRES
+     FORDULÓT adott vissza. A CPU-k egymás elleni meccsei ilyenkor egyáltalán
+     nem futottak le, tehát a tabellában csak az a két meccsük maradt, amit a
+     két menedzser ellen játszottak — 0 ponttal, 1-2 lejátszott meccsel.
+     A beküldött mentésben pontosan ez történt: a piramis D1-e 15 világ-
+     csapatot tartott 14 helyett, tehát n = 15 + te + a társad = 17.
+
+     A kapu védekezés volt (a körmódszer páros létszámot kíván), de rossz
+     fajta: a hibát ELNYELTE ahelyett, hogy kikerülte volna. A körmódszer
+     szabványos megoldása egy ÜRES HELY: páratlan létszámnál felveszünk egy
+     plusz széket, és aki azzal „játszik", az abban a körben pihen. Az üres
+     hely sosem kap csapatot, a vele alkotott párokat a lenti szűrő eldobja.
+
+     Az illeszkedés ilyenkor nem tökéletes (lásd a véletlen menetrendről szóló
+     bekezdést fent) — de egy kicsit pontatlan tabella nagyságrendekkel jobb,
+     mint egy olyan, amiben a mezőny nem is játszott. A létszám valódi
+     rendbetétele a pyrDivSizeRepair dolga. */
+  const N=n+(n%2);                       /* páratlan mezőny → +1 üres hely */
+  const CR=circleRoundPairs(N);          /* N−1 kör */
+  const half=CR.length;
   /* melyik hely játszik a 0. hellyel (veled) az r. körben */
   const userSlot=CR.map(pairs=>{
     const p=pairs.find(pr=>pr[0]===0||pr[1]===0);
     return p[0]===0?p[1]:p[0];});
   /* hely → CPU-index ("me" = te, "mate" = a társad) */
-  const slotTeam=new Array(n).fill(undefined);
+  const slotTeam=new Array(N).fill(undefined);
   slotTeam[0]="me";
   let ok=true;
   const byName={};opps.forEach((o,i)=>{byName[o.n]=i;});
@@ -67695,12 +67803,12 @@ function aiLeagueSchedule(){
   if(!ok){
     /* Tartalék leképezés (véletlen menetrend, félbehagyott állapot): a helyek
        sorban kapják a csapatokat. A mezőny így is teljes oda-visszavágót
-       játszik, csak a fordulónkénti illeszkedés nem tökéletes. */
-    for(let s=1;s<n;s++)slotTeam[s]=undefined;
+       játszik, csak a fordulónkénti illeszkedés nem tökéletes.
+       Páratlan mezőnynél a LEGVÉGÉN marad az üres hely — az pihen körönként. */
+    for(let s=1;s<N;s++)slotTeam[s]=undefined;
     let k=0;
-    for(let s=1;s<n;s++){
-      if(mp&&s===n-1){slotTeam[s]="mate";continue;}
-      slotTeam[s]=k++;}}
+    for(let s=1;s<N&&k<opps.length;s++)slotTeam[s]=k++;
+    if(mp)slotTeam[opps.length+1]="mate";}
   for(let r=0;r<30;r++){
     const pairs=CR[r%half],list=[];
     pairs.forEach(([a,b])=>{
@@ -67757,9 +67865,45 @@ function mpTableStore(round,teams){
   try{saveGame();}catch(e){}}
 /* A most érvényes közös tabella, vagy null. A szezonszám védi attól, hogy egy
    tavalyi állás átcsússzon az új idénybe. */
+/* ---- A BERAGADT, HIBÁSAN SZÁMOLT PILLANATKÉP (3.9.102) ----
+   A közös tabellát a host EGYSZER számolja ki és teszi el. Ha abban a
+   pillanatban a mezőny saját naptára üres volt (lásd az aiLeagueSchedule
+   páratlan-mezőny hibáját), akkor a pillanatkép a CPU-soroknál CSAK a két
+   menedzser elleni meccseket tartalmazza — a beküldött mentésben 1-2
+   lejátszott meccs és 0 pont, miközben a két menedzser 15-nél tart. Ez a
+   pillanatkép a 30. forduló új számításáig ott ragadna a képernyőn.
+
+   Ezért mostantól van egy épség-ellenőrzés. NEM javítja a pillanatképet
+   (a közös tabella igazsága a hosté, azt nem írjuk felül helyben), hanem
+   ÉRVÉNYTELENNEK tekinti: innentől nincs közös tabella, és a felület a
+   szokásos hiányos-állás jelzéssel a helyi élő tabellát mutatja, ami a
+   javított naptárral újra helyes számokat ad. A következő kézfogáson
+   (a 30. forduló) a host amúgy is újat számol.
+
+   A KÜSZÖB szándékosan durva: csak az ordas esetet fogja meg (a CPU-mezőny
+   legjobbja sem ér el a menedzserek meccsszámának a feléig). Egy ép
+   pillanatképet nem dobhat el. */
+function mpTableSane(t){
+  const rows=(t&&t.teams)||[];
+  if(!rows.length)return true;
+  const db=x=>((x.w|0)+(x.d|0)+(x.l|0));
+  const hum=rows.filter(x=>x&&x.player).map(db);
+  const cpu=rows.filter(x=>x&&!x.player).map(db);
+  if(!hum.length||!cpu.length)return true;
+  const h=Math.max.apply(null,hum),c=Math.max.apply(null,cpu);
+  if(h<4)return true;                 /* a szezon elején még nincs mit mérni */
+  return c*2>=h;}
 function mpTableNow(){
   const t=S.mpTable;
-  return (t&&t.season===(S.seasonNumber||1)&&Array.isArray(t.teams)&&t.teams.length)?t:null;}
+  if(!(t&&t.season===(S.seasonNumber||1)&&Array.isArray(t.teams)&&t.teams.length))return null;
+  if(!mpTableSane(t)){
+    if(!S._mpTblWarned){
+      S._mpTblWarned=1;
+      try{addLine(`⚠️ A közös tabella eltett pillanatképe hibás volt (a mezőny `
+        +`egymás elleni meccsei hiányoztak belőle) — félretettem. A helyi állást `
+        +`látod, amíg a következő kézfogáson a host újat nem számol.`,"m ev");}catch(e){}}
+    return null;}
+  return t;}
 /* ---- A KÉZFOGÁS ----
    HOST: kiszámolja és felteszi. GUEST: megvárja és beolvassa.
    A host oldalán ez azonnal kész (nincs mire várni), a guestnél a szokásos
@@ -68680,6 +68824,14 @@ function pyrSeasonTurn(){
   /* AZ ÜTEM AZ ÚJ OSZTÁLYODHOZ TARTOZIK: feljebb gyorsabban fejlődik a mezőny.
      A nullázás után a pyrGrowStep számolja újra. */
   W.grow=null;
+  /* ---- ÉS MIELŐTT A MEZŐNY ELÁLL: A LÉTSZÁMOK RENDBE (3.9.102) ----
+     A fenti spare2-csere az EGY lépésre való; ha egy korábbi idényben
+     kimaradt (régi mentés, félbehagyott szezonforduló), az eltolódás itt
+     örökre bennragadna. A szezonforduló az egyetlen pillanat, amikor a
+     létszám büntetlenül helyre tehető: a világ most épült újra, és még
+     semmi — se menetrend, se tabella — nem mutat a mezőnyre.
+     Lásd pyrDivSizeRepair. */
+  try{pyrDivSizeRepair("szezonforduló");}catch(e){}
   SEASON_OPPS=pyrOpponents();
   pyrGrowStep();pyrOppRefresh();
   if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
@@ -95665,13 +95817,6 @@ function applySavedGame(d){
      visszamenőleg NEM kapcsolódik be: a keret már régen összeállt. */
   careerRatingBasis=normRatingBasis(d.careerRatingBasis);
   ensureAllAttrs();   /* régi mentések migrációja: hiányzó attribútumok pótlása */
-  /* ---- A MENETREND HELYREÁLLÍTÁSA (3.9.101) ----
-     Bejelentett hiba: a párharc a 22. fordulóra került, és onnan nem lehetett
-     továbblépni. A javítás a jövő menetrendjeit már az építésnél védi; ez az
-     ág a MÁR elromlott mentéseket menti meg, a lejátszott fordulók
-     érintése nélkül. Sosem dobhat: egy hibás helyreállítás nem akaszthatja
-     meg a betöltést. */
-  try{fixturesRepair();}catch(e){}
   /* ---- A BOOST-HIBA HELYREÁLLÍTÁSA ----
      A plafonra vágás korábban LEFELÉ is hatott (lásd boostRaise): a plafon
      fölött álló játékosoktól az „ajándék" elvett. A könyvelt negatív nyereség
@@ -95844,6 +95989,36 @@ function applySavedGame(d){
      így a mezőny és a menetrend a betöltés után is ugyanazt mutatja, és nem
      számít, hogy a JSON-körút szétválasztotta-e a két oldalt. */
   try{pyrOppRefresh();}catch(e){}
+  /* ---- A MENETREND HELYREÁLLÍTÁSA ----
+     Bejelentett hiba: a párharc a 22. fordulóra került, és onnan nem lehetett
+     továbblépni. A javítás a jövő menetrendjeit már az építésnél védi; ez az
+     ág a MÁR elromlott mentéseket menti meg, a lejátszott fordulók érintése
+     nélkül.
+
+     A HELYE NEM MINDEGY, ÉS ELŐSZÖR ROSSZ VOLT (3.9.102). A hívás a
+     3.9.101-ben az `ensureAllAttrs()` mellett állt — vagyis az
+     `Object.assign(S,d.S)` ELŐTT. Ott az `S.fixtures` még a betöltés előtti
+     állapot (hideg indításnál üres, mentésváltásnál az ELŐZŐ karrieré), az
+     `MP.activeRoom` pedig még nincs visszaállítva. A javítás így nemhogy nem
+     hatott a betöltött menetrendre, de `h2hRoomActive()===false` mellett a
+     párharc-fordulókat is szabálytalannak látta volna, és kitörölte volna
+     őket. Mostantól itt fut: az `S` teljes, a szoba ismert, a mezőny
+     (SEASON_OPPS) a helyén van.
+
+     Sosem dobhat: egy hibás helyreállítás nem akaszthatja meg a betöltést.
+     Ha hozzányúlt a menetrendhez, a mezőny saját naptára és az élő tabella
+     is újraépül belőle. */
+  try{
+    if(fixturesRepair()){_aiSchedCache=null;liveTableInvalidate();}
+  }catch(e){}
+  /* ---- AZ OSZTÁLYLÉTSZÁMOK RENDBETÉTELE ----
+     Csak a szezonon KÍVÜL: futó szezonban a menetrend a mezőnyre mutat, azt
+     menet közben átrendezni többet ártana, mint használna. Lásd
+     pyrDivSizeRepair. */
+  try{
+    if(!(phase==="season"&&Array.isArray(S.fixtures)&&S.fixtures.length))
+      pyrDivSizeRepair("betöltés");
+  }catch(e){}
   /* KÖZÖS PIRAMIS: a szoba döntései (közös osztály, klub-sáv) a mentésből
      élednek újra — enélkül egy újratöltés a klubválasztó előtt elveszítené a
      sávot, és a két menedzser más listából választana. */
