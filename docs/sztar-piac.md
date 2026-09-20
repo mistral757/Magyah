@@ -185,6 +185,15 @@ hajszállal.
 megy a scout minőségéből; a próba külön állítással méri, hogy a 4★-os és a
 20★-os ügynökség között ott egyetlen határ sem mozdul.
 
+### Egy szivárgás, amit a bekötés hozott
+
+A tárgyalás a `TW.searchMode==="star"` jelzőből tudja, hogy sztár piaci
+üzletről van szó. A **klub-szemle** viszont (`startClubScouting`) a *meglévő*
+`TW`-t használja tovább, ha van — tehát egy sztár piaci keresés **után**
+indított klub-szemle is a kedvezőbb eséllyel ment volna, pedig az egy másik
+csatorna, ahol a scout dönt. A jelzőt ezért a klub-szemle indulásakor
+kifejezetten letöröljük, és a próba állítással is rögzíti ezt.
+
 ### Hol látszik
 
 A HUB megerősítő dobozában (a keresés indítása előtt) és a találati lista
