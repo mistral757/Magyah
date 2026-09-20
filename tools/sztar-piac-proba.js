@@ -265,6 +265,154 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
    ok(t.modok.alap.nyitva===true&&t.modok.alap.runs>0,
       "…és nem úgy, hogy mindenhol zárva van",t.modok.alap);}
 
+  /* ================= 8. AZ ÜZLETKÖTÉS ESÉLYE (3.9.103) =================
+     KIMONDOTT KÉRÉS: „4 csillagnál 66% esély ==> 10 csillag már 90% és innen
+     szépen lassan tart a 99% felé, amit 30 csillagnál már elér."
+
+     Két rétegben mérünk. Előbb a LÉTRÁT, tiszta függvényként; utána azt,
+     hogy a tárgyalás TÉNYLEG ebből a számból dolgozik — determinisztikusan,
+     rögzített véletlennel, a négy kimenetel határai körül. */
+  const uzl=await p.evaluate(async()=>{
+    const ki={};
+    const pc=x=>Math.round(starMarketDeal(x)*1000)/10;
+    /* A kérés három rögzített pontja. */
+    ki.pontok={s4:pc(4),s10:pc(10),s30:pc(30)};
+    /* A lineáris szakasz: egész csillagonként +4 pont. */
+    ki.also=[4,5,6,7,8,9,10].map(s=>({s,p:pc(s)}));
+    /* A felső szakasz és a plafon. */
+    ki.felso=[11,12,15,17.5,20,25,28,30,35,50].map(s=>({s,p:pc(s)}));
+    /* A padló: a piac négy csillag alatt nincs nyitva, az érték nem eshet le. */
+    ki.alatta=[0,1,2,3,3.5].map(s=>({s,p:pc(s)}));
+    /* MONOTON és SOSEM LÉPI TÚL a plafont. */
+    {let elozo=-1,mono=true,plafon=true;
+     for(let s=4;s<=60;s+=0.5){const v=starMarketDeal(s);
+       if(v<elozo-1e-9)mono=false;
+       if(v>0.99+1e-9)plafon=false;
+       elozo=v;}
+     ki.monoton=mono;ki.plafonTart=plafon;}
+    /* LASSUL-E? A 10 fölötti félcsillagos lépések nem nőhetnek. */
+    {let lassul=true,elozoLepes=Infinity;
+     for(let s=10.5;s<=30;s+=0.5){
+       const l=starMarketDeal(s)-starMarketDeal(s-0.5);
+       if(l>elozoLepes+1e-9)lassul=false;
+       elozoLepes=l;}
+     ki.lassul=lassul;}
+    /* FÉLCSILLAGONKÉNT LÉP, mint a másik két létra. */
+    ki.lepcso={_4_2:pc(4.2),_4_0:pc(4.0),_4_4:pc(4.4),_4_5:pc(4.5)};
+
+    /* ---- ÉS AMI A LÉNYEG: A TÁRGYALÁS TÉNYLEG EBBŐL DOLGOZIK ----
+       A `land()` egyetlen Math.random()-ot használ; a `pick` véletlenjét
+       kiiktatjuk, a pörgetés hosszát nullázzuk. Így minden futás EGY
+       előre megadott r értékkel dől el, tehát a határok pontosan mérhetők. */
+    const _pick=pick,_spin=spinLen,_res=twSigningResult,_rnd=Math.random;
+    const _agency=agencyStars;
+    let ASTARS=4;
+    window.agencyStars=()=>ASTARS;
+    const agencySet=v=>{ASTARS=v;};
+    if(!scout)scout=generateScout();
+    let kimenet=null;
+    window.pick=a=>a[0];
+    window.spinLen=()=>0;
+    window.twSigningResult=(c,o)=>{kimenet=o;};
+    const fut=async(r,mode)=>{
+      kimenet=null;
+      Math.random=()=>r;
+      TW={busy:false,iv:null,searchMode:mode,searchAttr:null,category:null,retries:0};
+      twResolveSigning({n:"Teszt Elek",pos:["CS"],age:26,ovr:120});
+      for(let i=0;i<40&&kimenet===null;i++)await new Promise(x=>setTimeout(x,25));
+      return kimenet;};
+    const q=scoutQuality(scout);
+    ki.q=Math.round(q*1000)/1000;
+    /* Négy csillagnál: p=0,66 → a „nem" a 0,66 fölött kezdődik. */
+    agencySet(4);
+    ki.p4=Math.round(starMarketDeal()*1000)/1000;
+    const hatarClean=ki.p4*(0.62+0.16*q);
+    ki.h4={clean:Math.round(hatarClean*1000)/1000};
+    ki.minta4=[
+      {r:0.01,          vart:"clean"},
+      {r:hatarClean-0.01,vart:"clean"},
+      {r:hatarClean+0.01,vart:"premium"},
+      {r:ki.p4-0.01,     vart:"premium"},
+      {r:ki.p4+0.01,     vart:"retry"},
+      {r:0.995,          vart:"fail"}];
+    for(const m of ki.minta4)m.kapott=await fut(m.r,"star");
+    /* Húsz csillagnál ugyanez: a „nem" jóval feljebb csúszik. */
+    agencySet(20);
+    ki.p20=Math.round(starMarketDeal()*1000)/1000;
+    ki.minta20=[
+      {r:ki.p4+0.01, vart:"premium"},   /* ami 4★-nál már NEM volt */
+      {r:ki.p20-0.01,vart:"premium"},
+      {r:ki.p20+0.002,vart:"retry"}];
+    for(const m of ki.minta20)m.kapott=await fut(m.r,"star");
+    /* ÉS A RENDES KERESÉS VÁLTOZATLAN: ott a scout dönt, nem az ügynökség.
+       A régi képlet határai q-ból jönnek — a 4★-os és a 20★-os ügynökség
+       között itt SEMMI nem mozdulhat. */
+    const regiClean=Math.max(0.10,Math.min(0.85,0.38+q*0.22));
+    ki.regi={clean:Math.round(regiClean*1000)/1000};
+    agencySet(4);
+    ki.rendes4=await fut(regiClean-0.01,"pos");
+    ki.rendes4b=await fut(regiClean+0.01,"pos");
+    agencySet(20);
+    ki.rendes20=await fut(regiClean-0.01,"pos");
+    ki.rendes20b=await fut(regiClean+0.01,"pos");
+    /* ---- ÉS A JELZŐ NEM SZIVÁROGHAT ÁT A KLUB-SZEMLÉRE ----
+       A startClubScouting a MEGLÉVŐ TW-t használja tovább, ha van. Ha a
+       sztár piac „star" jelzője ottragadna, a klub-szemle is a kedvezőbb
+       eséllyel menne. Itt sztár piaci TW-vel indítjuk a klub-szemlét, és
+       megnézzük, mi marad a jelzőből — majd a tárgyalás is a RÉGI határ
+       szerint dől el. */
+    agencySet(20);
+    TW={busy:false,iv:null,searchMode:"star",searchAttr:null,category:null,retries:0};
+    try{startClubScouting();}catch(e){ki.szemleDob=String(e);}
+    ki.szemleMode=(TW&&TW.searchMode)||null;
+    {const _b=TW.busy,_i=TW.iv;
+     TW.busy=false;TW.iv=null;
+     kimenet=null;Math.random=()=>regiClean+0.01;
+     twResolveSigning({n:"Teszt Elek",pos:["CS"],age:26,ovr:120});
+     for(let i=0;i<40&&kimenet===null;i++)await new Promise(x=>setTimeout(x,25));
+     ki.szemleKimenet=kimenet;
+     TW.busy=_b;TW.iv=_i;}
+    window.pick=_pick;window.spinLen=_spin;window.twSigningResult=_res;Math.random=_rnd;
+    window.agencyStars=_agency;
+    return ki;});
+
+  console.log("=== 8. az üzletkötés esélye — a létra ===");
+  ok(uzl.pontok.s4===66,"4★ → 66%",uzl.pontok.s4);
+  ok(uzl.pontok.s10===90,"10★ → 90%",uzl.pontok.s10);
+  ok(uzl.pontok.s30===99,"30★ → 99%",uzl.pontok.s30);
+  {const rossz=uzl.also.filter((x,i)=>x.p!==66+i*4);
+   ok(rossz.length===0,"4★-tól 10★-ig egész csillagonként +4 pont",uzl.also.map(x=>x.p));}
+  ok(uzl.felso.filter(x=>x.s>=30).every(x=>x.p===99),
+    "30★ fölött 99% a plafon — nincs biztos üzlet",uzl.felso.filter(x=>x.s>=30));
+  ok(uzl.felso.find(x=>x.s===20).p>93&&uzl.felso.find(x=>x.s===20).p<98,
+    "…és a 20★ szépen a kettő közé esik",uzl.felso.find(x=>x.s===20));
+  ok(uzl.alatta.every(x=>x.p===66),"négy csillag alatt a padló 66% (ott a piac zárva)",uzl.alatta);
+  ok(uzl.monoton===true&&uzl.plafonTart===true,"monoton nő és sosem lépi túl a 99%-ot");
+  ok(uzl.lassul===true,"10★ fölött a lépések EGYRE KISEBBEK — ez a „szépen lassan”");
+  ok(uzl.lepcso._4_2===uzl.lepcso._4_0&&uzl.lepcso._4_4===uzl.lepcso._4_5
+     &&uzl.lepcso._4_0!==uzl.lepcso._4_5,"félcsillagonként lép",uzl.lepcso);
+
+  console.log("=== 8b. és a tárgyalás tényleg ebből dolgozik ===");
+  {const rossz=uzl.minta4.filter(m=>m.kapott!==m.vart);
+   ok(rossz.length===0,`4★ (p=${uzl.p4}): mind a hat határpont a helyén`,
+     uzl.minta4.map(m=>({r:Math.round(m.r*1000)/1000,v:m.vart,k:m.kapott})));}
+  {const rossz=uzl.minta20.filter(m=>m.kapott!==m.vart);
+   ok(rossz.length===0,`20★ (p=${uzl.p20}): az igen-sáv feljebb csúszott`,
+     uzl.minta20.map(m=>({r:Math.round(m.r*1000)/1000,v:m.vart,k:m.kapott})));}
+  ok(uzl.p20>uzl.p4,"20★-nál nagyobb az esély, mint 4★-nál",{p4:uzl.p4,p20:uzl.p20});
+  console.log("--- a RENDES keresésben semmi nem változott ---");
+  ok(uzl.rendes4==="clean"&&uzl.rendes4b==="premium",
+    "a régi képlet határa a helyén (4★-os ügynökséggel)",
+    {alatta:uzl.rendes4,folotte:uzl.rendes4b});
+  ok(uzl.rendes20==="clean"&&uzl.rendes20b==="premium",
+    "…és a 20★-os ügynökség ott SEMMIT nem mozdít",
+    {alatta:uzl.rendes20,folotte:uzl.rendes20b});
+  ok(!uzl.szemleMode,"a klub-szemle letörli a sztár piac jelzőjét",
+    {mode:uzl.szemleMode,dob:uzl.szemleDob});
+  ok(uzl.szemleKimenet==="premium",
+    "…tehát a klub-szemle a RÉGI határ szerint tárgyal, 20★ mellett is",
+    {kimenet:uzl.szemleKimenet});
+
   console.log("=== hibák a konzolon ===");
   ok(errs.length===0,"nincs futásidejű hiba",errs.slice(0,2));
 

@@ -115,6 +115,82 @@ A `ROLE_CATS` kódlistái viszont **diszjunktak**, és pontosan azt olvassa a
 `getCategoryFor` is, ami a listasor címkéjét adja. A szűrés azóta ezen megy:
 a **kiválasztás** és a **kiírás** ugyanabból az egy igazságból dolgozik.
 
+## Az üzletkötés esélye (3.9.103)
+
+KIMONDOTT KÉRÉS: *„A sztár igazolásnál növeljük meg az üzletkötés esélyét.
+Itt egy saját rendszer legyen. 4 csillagnál 66% esély ==> 10 csillag már 90%
+és innen szépen lassan tart a 99% felé, amit 30 csillagnál már elér."*
+
+### Miért saját rendszer
+
+A rendes tárgyalás kimenetelét a **scout** minősége tolja (`scoutQuality`). A
+sztár piacot viszont nem a scout nyitja meg, hanem az **ügynökség**, és a
+másik két létrája (gap, keresésszám) is a csillagaiból jön. Logikátlan volna,
+hogy a húszcsillagos ügynökség olyan embert talál, akit aztán ugyanakkora
+eséllyel veszítesz el, mint a legelsőt: az ügynökség egész értelme az, hogy
+**tárgyalni is tud**.
+
+### A görbe
+
+Két szakaszból áll, pontosan a kérés szerint. A lépcső itt is
+félcsillagonként megy, mint a másik két létránál, és a padló a nyitó négy
+csillag.
+
+| ügynökség | üzletkötés |
+|---|---|
+| 4★ | **66%** |
+| 5★ | 70% |
+| 6★ | 74% |
+| 7★ | 78% |
+| 8★ | 82% |
+| 9★ | 86% |
+| 10★ | **90%** |
+| 12★ | 92,3% |
+| 15★ | 93,9% |
+| 20★ | 95,9% |
+| 25★ | 97,6% |
+| 30★ | **99%** |
+| 30★ fölött | 99% |
+
+* **4★ → 10★: lineáris.** Egész csillagonként +4 pont, félcsillagonként +2 —
+  kerek, fejben követhető számok.
+* **10★ → 30★: lassuló közelítés.** Az elején még érezhetően nő, aztán
+  ellaposodik: ez a „szépen lassan tart a 99% felé". A hiányzó kilenc pont
+  kétharmada az út feléig megvan, a maradék harmad tényleg a legvégére marad.
+* **A 99% plafon, és a maradék egy százalék szándékosan megmarad.** Nincs
+  olyan ügynökség, amelyik mellett biztos az üzlet — különben a tárgyalás
+  képernyője üres szertartássá válna.
+
+A 66-os kezdőérték nem véletlen: nagyjából ott van, ahol a rendes tárgyalás
+egy közepes scouttal áll. A sztár piac tehát **a megszokott eséllyel indul**,
+és onnan javul — nem egy külön, eleve kegyesebb csatorna.
+
+### Mi lesz a maradékból
+
+A `p` az esély, hogy a játékos **igent mond** — akár sima, akár prémium áron.
+A maradék oszlik meg az „egyelőre nem" (újraküldheted a scoutot) és a
+végleges nem között.
+
+**A scout nem esik ki, csak más a dolga.** Azt színezi, hogy az igen
+sima-e vagy magasabb árral jár, és hogy a nem után marad-e még egy
+próbálkozás. Vagyis a **scout a tárgyalás minőségét** viszi, az **ügynökség a
+kimenetelét** — a kettő nem ugyanarra a számra nyom.
+
+A kihívás-zseton (`chDealBoost` / `chDealMalus`) itt is hat, különben a
+jutalom épp a legdrágább igazolásoknál volna hatástalan. A felső korlát
+99,5%: a 99%-os tető fölé csak egy jutalom emelhet, és az is csak egy
+hajszállal.
+
+**A rendes keresésben semmi nem változott.** Ott továbbra is a régi képlet
+megy a scout minőségéből; a próba külön állítással méri, hogy a 4★-os és a
+20★-os ügynökség között ott egyetlen határ sem mozdul.
+
+### Hol látszik
+
+A HUB megerősítő dobozában (a keresés indítása előtt) és a találati lista
+fejlécében is ott az aktuális szám, egyetlen forrásból
+(`starMarketDealPct()`).
+
 ## Próba
 
 `tools/sztar-piac-proba.js` (9063-as port). Huszonöt töréspont a
@@ -126,3 +202,16 @@ sáv fölött), és hogy mind a négy módban ugyanaz jön ki.
 A gap-létránál külön állítás méri, hogy tényleg **félcsillagonként lép**, nem
 folytonosan: 4,2★ és 4,0★ ugyanazt adja, 4,4★ és 4,5★ ugyanazt — de a kettő
 nem egyenlő egymással.
+
+A **8. szakasz** az üzletkötés-létrát méri: a kérés három rögzített pontját, a
+lineáris szakasz mind a hét fokát, a plafont 30 fölött, a padlót 4 alatt, és
+két szerkezeti tulajdonságot — hogy a görbe **monoton** és hogy 10★ fölött a
+lépések **egyre kisebbek** (ez a „szépen lassan").
+
+A **8b. szakasz** azt méri, hogy a tárgyalás tényleg ebből a számból dolgozik.
+A `land()` egyetlen `Math.random()`-ot használ, tehát a `pick` véletlenjét
+kiiktatva és a pörgetést nullázva minden futás **egy előre megadott értékkel**
+dől el: a próba a négy kimenetel határai köré lő (4★-nál hat pontot, 20★-nál
+hármat), és megnézi, hogy mindegyik a helyére esik-e. Ugyanez a mérés mondja
+ki, hogy a **rendes** keresés határai az ügynökség csillagától függetlenül
+állnak.

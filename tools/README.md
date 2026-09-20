@@ -1457,6 +1457,15 @@ nem elég), a négy „csak nyáron" eset a gomb feliratával együtt, a keret t
 elköltött alkalmakat, új nyáron tiszta lap), egy ÉLŐ keresés, és hogy mind a
 négy módban — alap, piramis, Infinity, közös karrier — betűre ugyanaz jön ki.
 
+A 8. szakasz (3.9.103) az **üzletkötés-létrát** méri: 4★ → 66%, 10★ → 90%,
+30★ → 99%, közte a lineáris szakasz mind a hét foka, a plafon, a padló, és két
+szerkezeti tulajdonság — hogy a görbe monoton, és hogy 10★ fölött a lépések
+egyre kisebbek („szépen lassan tart a 99% felé"). A 8b. szakasz pedig azt
+bizonyítja, hogy a TÁRGYALÁS is ebből dolgozik: a `land()` egyetlen
+`Math.random()`-ját rögzítve a próba a négy kimenetel határai köré lő, és
+megnézi, hogy mindegyik a helyére esik — plusz hogy a RENDES keresés határai
+az ügynökség csillagától függetlenül állnak.
+
 **Amit a próba fogott meg:** a szerepenkénti szűrés először a `BENCH_CATS`
 kódlistáiból dolgozott, azok viszont ÁTFEDNEK — a `JSZ`/`BSZ` egyszerre
 szerepel a `KOZEPPALYAS` és a `CSATAR` szerepnél. A „középpályás" helyre így
