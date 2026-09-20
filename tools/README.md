@@ -1365,6 +1365,37 @@ a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
 Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
 az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
 
+## parharc-menetrend-proba.js — ⚔ a 22. fordulóban megállt a szezon
+
+```
+node tools/parharc-menetrend-proba.js
+```
+
+Egy tesztelő képernyőképe: a 22. forduló ellenfele „⚔ A TÁRSAD", az állás
+„21/30", és onnan nem lehet továbblépni. Az ok egyetlen sorban állt: a két
+párharcot egy nyers `splice(r-1,0,…)` tette a helyére, a `splice` pedig
+CSENDBEN A VÉGÉRE CSÚSZTAT, ha az index túllóg a tömbön. Kisebb mezőnnyel a
+második párharc nem a 30. fordulóra került — 10 ellenféllel pontosan a
+22.-re, és a szezon is 22 fordulós lett a harminc helyett.
+
+A próba először a **régi kódot is lefuttatja** ugyanazokon a mezőnyméreteken,
+és kimondja, hogy 10 ellenféllel betűre a bejelentett képet adta — enélkül
+nem lehetne megkülönböztetni a javítást egy nem-változástól. Utána az új
+illesztést méri: 10/13/14/15/16 ellenféllel **mindig 30 forduló**, a
+párharcok **mindig a 15. és a 30.**, lyuk nélkül, és a pótlás
+determinisztikus (a két kliens ugyanazt kapja).
+
+A helyreállítás a két VALÓDI alakon megy: a beküldött mentés 32 fordulós
+menetrendjén és a tesztelő kliensének 22 fordulós, 22.-en álló párharcot
+tartó listáján. Mindkettőnél állítás mondja ki, hogy a **lejátszott
+fordulókhoz nem nyúlt** — és hogy az ÉP menetrendhez hozzá sem nyúl.
+
+Végül a szellemmeccs elleni zár (nem indul hamis mérkőzés egy 0-s erejű
+helyfoglaló ellen), és a második kérés: a bajnoki képernyő a **társad**
+címénél is jár, ha csak ő előz meg — pontosan egyszer, és a saját
+könyveléshez (`consecutiveTitles`, `titleWonSeason`) nem nyúlva. Részletek:
+`docs/parharc-menetrend.md`.
+
 ## sztar-piac-proba.js — ⭐ az átigazolás, ami a saját sávod FÖLÉ mutat
 
 ```

@@ -6132,7 +6132,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.100";
+const APP_VERSION="3.9.101";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -17897,6 +17897,37 @@ function mpDiagCollect(){
       if(h2hRoomActive())
         L.push(`  szoba: ${MP.activeRoom||"?"} · szerep: ${MP.role||"?"}`);}
   }catch(e){L.push("világ-dump hiba: "+e.message);}
+  /* ---- MENETREND ÉS OSZTÁLYLÉTSZÁMOK (3.9.101) ----
+     A bejelentett „22. fordulóban ⚔ A TÁRSAD, és nem megy tovább" hiba pont
+     ebből a két számból volt kiolvasható: a menetrend hossza nem 30, és a
+     párharcok nem a 15./30. fordulón álltak. A mögötte álló ok pedig az
+     osztálylétszám elcsúszása volt (a te osztályodban 14 világ-csapatnak kell
+     állnia a páros két helye mellett, a többiben 16-nak). A menetrend
+     mostantól nem függ a mezőny méretétől, de ha a létszám mégis elmozdul,
+     ITT látszik — egy képernyőképből, konzol nélkül. */
+  try{
+    if(gameMode==="career"){
+      L.push("");L.push("── MENETREND ÉS LÉTSZÁMOK");
+      const fx=S.fixtures||[];
+      const par=fx.map((f,i)=>f&&f.duel?i+1:0).filter(Boolean);
+      L.push(`  menetrend: ${fx.length} forduló (kell: ${SEASON_ROUNDS}) · most a ${(S.idx||0)+1}.`
+        +(h2hRoomActive()?` · párharcok: ${par.join(", ")||"nincs"} (kell: ${H2H_ROUNDS.join(", ")})`
+                         :` · párharc: ${par.length?"⚠ "+par.join(", "):"nincs (helyes)"}`));
+      const lyuk=fx.filter(f=>!f||(!f.duel&&!f.o)).length;
+      const potolt=fx.filter(f=>f&&f.filler).length;
+      if(lyuk||potolt)L.push(`  ⚠ üres forduló: ${lyuk} · pótolt párosítás: ${potolt}`);
+      L.push(`  mezőny: SEASON_OPPS ${(SEASON_OPPS||[]).length} · ellenfél a menetrendhez ${leagueOpps().length}`);
+      if(pyrOn()){
+        const my=pyrMyDivId();
+        L.push(`  piramis: D${my} · fölötte nyitva ${pyrAbove()} · tartalék: `
+          +`${(S.pyr&&S.pyr.spare)?"van":"nincs"} / ${(S.pyr&&S.pyr.spare2)?"van":"nincs"}`);
+        const sorok=pyrDivs().map((d,i)=>{
+          const id=pyrDivIdAt(i),n=(d&&d.teams||[]).length;
+          const kell=(id===my)?(PYR_TEAMS-(h2hRoomActive()?2:1)):PYR_TEAMS;
+          return `D${id}:${n}${n===kell?"":"⚠(kell "+kell+")"}`;});
+        L.push(`  osztálylétszámok: ${sorok.join(" · ")}`);
+        L.push(`  világ összesen: ${pyrDivs().reduce((a,d)=>a+((d&&d.teams||[]).length),0)} csapat`);}}
+  }catch(e){L.push("menetrend-dump hiba: "+e.message);}
   /* IDÉNY-MÉRLEG. A `drift` az igazi tétel: ha nem nulla, valahol a két kapu
      MELLETT mozdult a büdzsé, és pontosan ennyivel. Egy „nekem nem stimmel a
      mérleg" bejelentés így egy sorból megválaszolható. */
@@ -44955,6 +44986,9 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
        tétmérkőzés-felajánlás (autoTitleGate) — hogy a végigjátszás ne álljon
        meg kétszer ugyanott. */
   rivals:null,seasonNews:{},titleWonSeason:null,runFinaleSeason:null,_titleChanceThisMatch:false,_wasLeader:null,_autoTitleAsk:null,
+  /* mpMateTitleSeason: melyik szezonban ünnepeltük már meg a TÁRSAD címét
+     (ugyanaz az elv, mint a titleWonSeason-nél — a dupla konfetti ellen). */
+  mpMateTitleSeason:null,
   /* Az Infinity szint-követő liftjének kivezetése (2.6.023). Friss karrierben
      nincs mit migrálni, ezért itt eleve true — a RÉGI mentésekben hiányzik a
      mező, és az applySavedGame kifejezetten false-ra állítja, hogy lefusson. */
@@ -48022,6 +48056,99 @@ function buildRoundRobinFixtures(opps,rnd){
      minden ellenféllel pontosan félidőnyi szünet van a két meccs között */
   const second=first.map(f=>({o:f.o,home:!f.home}));
   return first.concat(second);}
+/* A SZEZON HOSSZA. A kód máshol évek óta nyers 30-ast ír; ez a menetrend
+   saját neve ugyanarra a számra, hogy a lenti képletek olvashatók legyenek. */
+const SEASON_ROUNDS=30;
+/* ---- A MENETREND ILLESZTÉSE A SZEZONHOZ (3.9.101) ----
+   Egy helyen dől el, hány forduló a szezon, hol állnak a párharcok, és mi
+   történik, ha a mezőny nem pont akkora, amekkorának lennie kéne.
+   A `rnd` a szezonhoz kötött, seedelt folyam — a pótlás is determinisztikus,
+   tehát a két kliens ugyanazt kapja. */
+function fixturesFitToSeason(list,rnd){
+  const R=(typeof rnd==="function")?rnd:Math.random;
+  let out=(list||[]).filter(f=>f&&f.o);
+  const duelRounds=h2hRoomActive()?H2H_ROUNDS.slice():[];
+  /* 1. A PÁRHARCOK HELYE FOGLALT — a CPU-meccsekből ennyi fér a szezonba. */
+  const cpuNeed=SEASON_ROUNDS-duelRounds.length;
+  /* 2. TÚL HOSSZÚ: a fölösleg lemarad. Eddig is lemaradt, csak a lista
+        végéről és némán; így legalább a sorrend eleje marad érintetlen. */
+  if(out.length>cpuNeed)out=out.slice(0,cpuNeed);
+  /* 3. TÚL RÖVID: feltöltjük a meglévő párosítások ismétlésével. Nem szép, de
+        a szezon így játszható marad, a párharcok a helyükön állnak, és a
+        napló kimondja, hogy a mezőny hiányos volt. */
+  if(out.length<cpuNeed&&out.length){
+    const hiany=cpuNeed-out.length;
+    for(let i=0;i<hiany;i++){
+      const src=out[Math.floor(R()*out.length)]||out[i%out.length];
+      out.push({o:src.o,home:!src.home,filler:true});}
+    try{addLine(`⚠️ A mezőny ${out.length-hiany} párosítást adott ki a szükséges ${cpuNeed} helyett — `
+      +`a hiányzó ${hiany} fordulót ismételt párosításokkal töltöttük fel, hogy a szezon `
+      +`${SEASON_ROUNDS} fordulós maradjon.`,"m ev");}catch(e){}}
+  /* 4. A PÁRHARCOK A SAJÁT FORDULÓJUKRA. Növekvő sorrendben szúrjuk be, és
+        MINDIG érvényes indexre — a splice csendes véghez-csúsztatása pont ez
+        a hiba volt. */
+  duelRounds.slice().sort((a,b)=>a-b).forEach(r=>{
+    const i=Math.max(0,Math.min(out.length,r-1));
+    out.splice(i,0,{duel:true,round:r,home:false,o:{n:"⚔ A társad",ovr:0}});});
+  return out.slice(0,SEASON_ROUNDS);}
+/* ---- A MÁR ELROMLOTT MENETRENDEK HELYREÁLLÍTÁSA (3.9.101) ----
+   A fenti illesztés a JÖVŐ menetrendjeit védi; ez a meglévő mentéseket menti
+   meg. Két bajt ismer föl, és csak a LE NEM JÁTSZOTT részhez nyúl:
+
+     · a menetrend nem SEASON_ROUNDS hosszú (a beküldött mentésben 32; a
+       társ kliensén 22 — ott a szezon egyszerűen elfogyott a 22. forduló
+       után, és onnan nem lehetett továbblépni);
+     · párharc-helyfoglaló áll olyan fordulón, ami nem párharc-forduló (a
+       h2hIsDuelRound a FORDULÓSZÁMBÓL dönt, tehát ott rendes meccs indulna
+       egy 0-s erejű szellemcsapat ellen).
+
+   A LEJÁTSZOTT FORDULÓKHOZ NEM NYÚL: azok eredménye megvan, a tabella rájuk
+   épül. Ami előttünk van, azt viszont helyre tudjuk tenni. */
+function fixturesRepair(){
+  if(gameMode!=="career"||!Array.isArray(S.fixtures))return 0;
+  const idx=Math.max(0,S.idx||0);
+  const duelRounds=h2hRoomActive()?H2H_ROUNDS.slice():[];
+  const kellDuel=r=>duelRounds.indexOf(r)>=0;
+  let baj=[];
+  if(S.fixtures.length!==SEASON_ROUNDS)baj.push(`a menetrend ${S.fixtures.length} fordulós ${SEASON_ROUNDS} helyett`);
+  S.fixtures.forEach((f,i)=>{
+    if(!f)return;
+    const r=i+1;
+    if(f.duel&&!kellDuel(r))baj.push(`párharc a ${r}. fordulón`);
+    else if(!f.duel&&kellDuel(r)&&i>=idx)baj.push(`hiányzó párharc a ${r}. fordulón`);});
+  if(!baj.length)return 0;
+  /* A LEJÁTSZOTT ELEJE VÁLTOZATLAN, a maradékot újraillesztjük. A pótlás
+     ugyanabból a seedelt folyamból dolgozik, mint az építés. */
+  const rnd=rngFor("s"+(S.seasonNumber||1)+":fixrepair");
+  const fej=S.fixtures.slice(0,idx);
+  /* A hátralévő CPU-párosítások: ami maradt, párharc nélkül. */
+  let farok=S.fixtures.slice(idx).filter(f=>f&&f.o&&!f.duel);
+  const cpuKell=SEASON_ROUNDS-fej.length-duelRounds.filter(r=>r-1>=idx).length;
+  /* HA A FAROK ÜRES, a pótlásnak nincs miből dolgoznia (a while-ciklus a
+     `farok.length` miatt azonnal kilép, és a menetrend rövid maradna). Ilyenkor
+     a mezőnyből, végső soron a már lejátszott fordulók ellenfeleiből építünk. */
+  if(!farok.length&&cpuKell>0){
+    let mag=[];
+    try{mag=(leagueOpps()||[]).map((o,i)=>({o,home:i%2===0}));}catch(e){mag=[];}
+    if(!mag.length)mag=fej.filter(f=>f&&f.o&&!f.duel).map(f=>({o:f.o,home:!f.home}));
+    farok=mag.slice(0,cpuKell);}
+  if(farok.length>cpuKell)farok=farok.slice(0,cpuKell);
+  while(farok.length<cpuKell&&farok.length){
+    const src=farok[Math.floor(rnd()*farok.length)];
+    farok.push({o:src.o,home:!src.home,filler:true});}
+  const out=fej.concat(farok);
+  /* A párharcok a saját fordulójukra — de csak azok, amik még előttünk vannak. */
+  duelRounds.slice().sort((a,b)=>a-b).forEach(r=>{
+    if(r-1<idx)return;
+    const i=Math.max(0,Math.min(out.length,r-1));
+    out.splice(i,0,{duel:true,round:r,home:false,o:{n:"⚔ A társad",ovr:0}});});
+  S.fixtures=out.slice(0,SEASON_ROUNDS);
+  try{assignFixtureDates();}catch(e){}
+  try{addLine(`🛠 <b>Menetrend helyreállítva</b> — ${baj.slice(0,3).join(", ")}`
+    +(baj.length>3?` (+${baj.length-3} további)`:"")
+    +`. A lejátszott fordulókhoz nem nyúltunk; a hátralévő rész és a párharcok `
+    +`a helyükre kerültek.`,"m ev");}catch(e){}
+  return baj.length;}
 function buildSeasonFixtures(){
   S.fixtures=[];
   const opps=leagueOpps();
@@ -48040,15 +48167,31 @@ function buildSeasonFixtures(){
   }else{
     opps.forEach(o=>{S.fixtures.push({o,home:true});S.fixtures.push({o,home:false});});
     S.fixtures=shuffleArr(S.fixtures,rnd);}
-  /* A párharc két HELYE. Maga a meccs nem innen dolgozik (a playMatch a társ
-     pillanatképéből épít fixture-t), de a helyfoglalás nélkül elcsúsznának a
-     fordulószámok: a 16. forduló a 16. CPU-meccsre mutatna, a végén pedig
-     kifutnánk a listából.
-     Valósághű renddel ez pontosan illeszkedik: 14 CPU-ellenfél + 1 párharc = 15
-     forduló az első félben, ugyanennyi a másodikban. */
-  if(h2hRoomActive())
-    H2H_ROUNDS.forEach(r=>S.fixtures.splice(r-1,0,
-      {duel:true,round:r,home:false,o:{n:"⚔ A társad",ovr:0}}));
+  /* ---- A PÁRHARC KÉT HELYE — ÉS MIÉRT NEM ELÉG EGY SPLICE (3.9.101) ----
+     A helyfoglalás nélkül elcsúsznának a fordulószámok: a 16. forduló a 16.
+     CPU-meccsre mutatna. Valósághű renddel ez pontosan illeszkedik: 14
+     CPU-ellenfél + 1 párharc = 15 forduló az első félben, ugyanennyi a
+     másodikban.
+
+     BEJELENTETT HIBA: egy közös karrierben a 22. fordulóra került a párharc,
+     és onnan nem lehetett továbblépni („többször frissítettem, hogy hátha
+     megjavul"). AZ OK: a régi sor egy nyers `splice(r-1,...)` volt, a
+     `splice` pedig CSENDBEN A VÉGÉRE CSÚSZTAT, ha az index túllóg a tömbön.
+     Ha a mezőny a vártnál kisebb, a MÁSODIK párharc nem a 30. fordulóra
+     kerül, hanem a lista végére — mérve: 10 ellenféllel pontosan a 22.-re,
+     és a szezon is 22 fordulós lesz a harminc helyett. A `h2hIsDuelRound()`
+     viszont a FORDULÓSZÁMBÓL dönt (15 vagy 30), tehát a 22. fordulón nem
+     párharcot indít, hanem rendes meccset egy 0-s erejű szellemcsapat ellen
+     — vagy semmit, mert a lista ott véget ér.
+
+     A MEZŐNY TÉNYLEG ELCSÚSZHAT: a beküldött mentésben a piramis D1-e 15
+     világ-csapatot tartott 14 helyett (a páros KÉT helyet foglal), a D2 pedig
+     15-öt 16 helyett. A menetrend ezért innentől NEM bízik a mezőny méretében:
+     a szezon mindig pontosan SEASON_ROUNDS forduló, a párharcok pedig mindig
+     a saját fordulójukon állnak. Ha a mezőny hosszabb, a fölös meccsek
+     lemaradnak (eddig is lemaradtak, csak a lista VÉGÉRŐL, némán); ha
+     rövidebb, a hiányzó fordulókat feltöltjük, és ezt ki is mondjuk. */
+  S.fixtures=fixturesFitToSeason(S.fixtures,rnd);
   /* A NAPTÁR a kész menetrendre kerül rá: minden fordulónak lesz napja és
      kezdési időpontja (lásd assignFixtureDates). Innentől a menetrend és az
      öltözői jelentés is dátumban tud beszélni, nem csak sorszámban. */
@@ -55018,6 +55161,36 @@ function startRound(){
     return;}
   startRoundNow();}
 function startRoundNow(){
+  /* ---- A SZELLEMMECCS ELLENI ZÁR (3.9.101) ----
+     A motor KÉT forrásból tudja, párharc-e a forduló: a FORDULÓSZÁMBÓL
+     (h2hIsDuelRound) és a MENETRENDBŐL (fx.duel). Amíg a kettő egyezik,
+     minden rendben; ha valaha szétcsúsznak, a régi kód szó nélkül lejátszott
+     egy rendes bajnokit a „⚔ A társad" nevű, 0-s erejű helyfoglaló ellen —
+     biztos nagy győzelem, hamis sor a tabellában, és az igazi párharc
+     elmarad. Épp ez történt a bejelentett esetben.
+     Innentől a szétcsúszást HELYREÁLLÍTJUK, nem lejátsszuk. */
+  {const fx=(S.fixtures||[])[S.idx||0];
+   const kell=h2hIsDuelRound();
+   if(!fx||(!!(fx&&fx.duel))!==kell){
+     let j=0;try{j=fixturesRepair();}catch(e){}
+     const fx2=(S.fixtures||[])[S.idx||0];
+     if(!fx2||(!!fx2.duel)!==kell){
+       try{addLine(`⛔ <b>A ${(S.idx||0)+1}. forduló menetrendje hibás</b> — `
+         +`${!fx2?"nincs hozzá mérkőzés":"a párharc és a forduló nem egyezik"}. `
+         +`A mérkőzés nem indul el, hogy ne kerüljön hamis eredmény a tabellába. `
+         +`Szólj a fejlesztőnek a mentéssel együtt.`,"m loss");}catch(e){}
+       return;}
+     if(j){
+       /* A HELYREÁLLÍTÁS MEGTÖRTÉNT — de az ellenfeled közben MÁS lett, mint
+          amit a kezdőrúgás előtt láttál. Ezért nem indítjuk el magunktól: a
+          gomb felirata frissül, a napló elmondja, mi történt, és te döntöd el,
+          mikor fújsz kezdést. */
+       try{const b=$("kickBtn");if(b){b.disabled=false;b.textContent=kickBtnLabel();}}catch(e){}
+       try{addLine(`▶ A ${(S.idx||0)+1}. forduló ellenfele a helyreállítás után `
+         +`változhatott — nézd meg a gombot, és indítsd újra a kezdőrúgást.`,"m ev");}catch(e){}
+       try{saveGame();}catch(e){}
+       return;}
+   }}
   if(h2hIsDuelRound()&&!h2hScript){h2hBeginDuel();return;}
   playMatch();}
 function h2hWaitHide(){
@@ -69990,6 +70163,37 @@ function showChampionScreen(how,teams,onClose){
       ? `${S.seasonNumber||1}. szezon · ${me.w} győzelem, ${me.d} döntetlen, ${me.l} vereség · <b>${me.pts} pont</b> · ${me.gf}:${me.ga}`
         +(how?`<br>${esc(how)}`:"")
       : (how?esc(how):"")});}
+/* ================= A TÁRSAD CÍME IS ÜNNEP (3.9.101) =================
+   BEJELENTETT KÉRÉS: „PvP-ben D1-ben ne csak akkor kapd meg a győztes
+   kijelzőt, ha megnyered a D1-et, hanem akkor is, ha csak a társad előz meg,
+   azaz úgy leszel 2., hogy a társad az 1."
+
+   A közös karrier egy SZOBA teljesítménye: ha az aranyat a társad viszi, és
+   közvetlenül mögötte te állsz, a bajnokságot ketten uraltátok — ezt a
+   képernyő is elismerje. „Csak a társad előz meg" betű szerint azt jelenti,
+   hogy a fölötted álló EGYETLEN csapat a társad: ő 1., te 2.
+
+   AMI NEM VÁLTOZIK: a SAJÁT könyvelésed. A consecutiveTitles, a
+   msNoteTitleGap, a runNotePyrTitle, a Run-záróképernyő, a bajnoki morállökés
+   és a trófea mind a te ELSŐ helyedhez marad kötve — a társad címe nem írja
+   föl a te karrier-rekordjaidat, és nem emeli a te öltöződ hangulatát sem
+   (a te csapatod második lett). Ez a képernyő elismerés, nem könyvelés. */
+function mateFinalRank(teams){
+  return ((teams||[]).findIndex(t=>t&&t.mate))+1;}
+function showMateChampionScreen(teams){
+  const _sh=(!teams&&h2hRoomActive())?mpTableNow():null;
+  const t=teams||(_sh?_sh.teams:liveLeagueTable())||[];
+  const me=t.find(x=>x&&x.you),mate=t.find(x=>x&&x.mate);
+  const mn=mate?teamLabel(mate.n):"A társad";
+  showTrophyScreen({theme:"LEAGUE",
+    kicker:"A SZOBA ARANYA",title:"MEGCSINÁLTÁTOK!",
+    sub:`<b>${esc(mn)}</b> a bajnok — és közvetlenül mögötte <b>${esc(teamName)}</b> zárt. `
+       +`A mezőnyben senki más nem fért közétek.`,
+    note:"A cím a társadé; az ezüstöd hozta hozzá a hajszát.",
+    meta:me
+      ? `${S.seasonNumber||1}. szezon · ${me.w} győzelem, ${me.d} döntetlen, ${me.l} vereség · <b>${me.pts} pont</b> · ${me.gf}:${me.ga}`
+        +(mate?`<br>${esc(mn)}: <b>${mate.pts} pont</b> · ${mate.gf}:${mate.ga}`:"")
+      : ""});}
 /* A RUN-ZÁRÓKÉPERNYŐ MENET KÖZBEN. A szezonjelentésbeli hívással szemben itt a
    közvetítés-képernyő fut, ezért azt félre kell tenni, és a „Tovább →" után
    vissza is kell hozni — különben a felhasználó két egymásra rétegzett
@@ -70699,6 +70903,20 @@ function finish(){
        a hangulattal játsszátok. */
     applyTitleMorale();
     showChampionScreen("A cím az utolsó fordulóig nyitva volt — annál édesebb.",finalTeams);}
+  /* ---- ÉS AMIKOR A TÁRSAD A BAJNOK, TE PEDIG MÖGÖTTE ----
+     Lásd a showMateChampionScreen fölötti leírást: a szoba aranyát a
+     képernyő elismeri, a saját könyvelésed viszont érintetlen marad. A
+     jelző szezonra szól, tehát egy újratöltés nem indítja újra a konfettit.
+     Ide a közös tabella MÁR megérkezett: a fenti F5-kapu (mpMateFinal)
+     addig meg sem engedi a szezonzárást. */
+  if(h2hRoomActive()&&yourRank===2&&mateFinalRank(finalTeams)===1
+     &&S.mpMateTitleSeason!==(S.seasonNumber||1)){
+    S.mpMateTitleSeason=S.seasonNumber||1;
+    const _mt=finalTeams.find(t=>t&&t.mate);
+    addLine(`🏆  <b>A társad a bajnok!</b> ${esc(_mt?teamLabel(_mt.n):"A társad")} nyerte a `
+      +`${S.seasonNumber||1}. szezont, ${esc(teamName)} pedig közvetlenül mögötte, a 2. helyen zárt `
+      +`— a bajnokságot ketten uraltátok.`,"m win");
+    showMateChampionScreen(finalTeams);}
   if(gameMode==="career"){
     S.finalTable=finalTeams;
     if(!S.seasonClosed){
@@ -84507,7 +84725,7 @@ function startNextCareerSeason(){
   /* RIVÁLISOK ÉS BAJNOKI NARRATÍVA: minden szezon tiszta lappal indul — új
      riválisok (a buildSeasonFixtures sorsolja), üres hírnapló, nem avatott
      bajnok. Az _aiSchedCache azért is dől, mert a menetrend teljesen új. */
-  S.rivals=null;S.seasonNews={};S.titleWonSeason=null;S.runFinaleSeason=null;S._titleChanceThisMatch=false;S._wasLeader=null;S._autoTitleAsk=null;
+  S.rivals=null;S.seasonNews={};S.titleWonSeason=null;S.mpMateTitleSeason=null;S.runFinaleSeason=null;S._titleChanceThisMatch=false;S._wasLeader=null;S._autoTitleAsk=null;
   _aiSchedCache=null;liveTableInvalidate();
   /* Mérföldkövek: az IDEIGLENES hatások és a kapus-szárazság a cleanSheetStreak
      mellé nullázódnak — új szezon, tiszta lap. A debutWatch, a youthMilestone és
@@ -95282,6 +95500,8 @@ function saveGame(){
         finalTable:S.finalTable,seasonClosed:S.seasonClosed,hubReportHtml:S.hubReportHtml,
         /* rivális-rendszer és bajnoki narratíva (szezononként új) */
         rivals:S.rivals,seasonNews:S.seasonNews,titleWonSeason:S.titleWonSeason,
+        /* a TÁRSAD címének ünnepe — szezonra szóló jelző, lásd freshS */
+        mpMateTitleSeason:S.mpMateTitleSeason,
         /* D1-es piramis-cím: melyik szezonban ment már el a Run-záróképernyő
            (runD1FinaleDue) — a dupla ünneplés és egy újratöltés utáni
            ismétlés ellen, ugyanaz az elv, mint a titleWonSeason-nél. */
@@ -95445,6 +95665,13 @@ function applySavedGame(d){
      visszamenőleg NEM kapcsolódik be: a keret már régen összeállt. */
   careerRatingBasis=normRatingBasis(d.careerRatingBasis);
   ensureAllAttrs();   /* régi mentések migrációja: hiányzó attribútumok pótlása */
+  /* ---- A MENETREND HELYREÁLLÍTÁSA (3.9.101) ----
+     Bejelentett hiba: a párharc a 22. fordulóra került, és onnan nem lehetett
+     továbblépni. A javítás a jövő menetrendjeit már az építésnél védi; ez az
+     ág a MÁR elromlott mentéseket menti meg, a lejátszott fordulók
+     érintése nélkül. Sosem dobhat: egy hibás helyreállítás nem akaszthatja
+     meg a betöltést. */
+  try{fixturesRepair();}catch(e){}
   /* ---- A BOOST-HIBA HELYREÁLLÍTÁSA ----
      A plafonra vágás korábban LEFELÉ is hatott (lásd boostRaise): a plafon
      fölött álló játékosoktól az „ajándék" elvett. A könyvelt negatív nyereség
@@ -95985,6 +96212,10 @@ function applySavedGame(d){
   /* A közös kupanevezés. Régi mentésben nincs → a nyári kapu kialkudja. */
   S.mpCup=d.S.mpCup||null;
   S.mpRanks=d.S.mpRanks||null;
+  /* Régi mentésben nincs → null. Ha a társ címe egy korábbi szezonban esett
+     meg, az ünnep nem jön elő visszamenőleg: a jelző csak az AKTUÁLIS
+     szezonszámmal összevetve számít (lásd a szezonzárás ágát). */
+  S.mpMateTitleSeason=d.S.mpMateTitleSeason||null;
   S.mpMateChampLvl=d.S.mpMateChampLvl||0;
   S.infPledged=!!d.S.infPledged;
   S.mpInfMatePaid=!!d.S.mpInfMatePaid;
