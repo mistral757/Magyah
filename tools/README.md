@@ -1365,6 +1365,101 @@ a pressing-szorzó CSAK akkor jár, ha mindketten pályán vannak.
 Végül a legfontosabb ág: Panzerrel és filozófia nélkül minden szám semleges —
 az új stílus nem szivárog a többibe. Részletek: `docs/gegenpressing.md`.
 
+## masodlagos-sztar-proba.js — ⭐ a sztáros filozófia a MÁSODIK sloton
+
+```
+node tools/masodlagos-sztar-proba.js
+```
+
+A bejelentés két képességről szólt („se a sztár jóga, se az összhangot javító
+képesség… mindkettő nullán áll"), a gyökér viszont **tizenhárom függvényt**
+érintett: a 3.9.64-es másodlagos filozófiával megszületett a `starStyle()` —
+ami megtalálja a sztáros stílust akármelyik slotban —, de a hívók átvezetése
+FÉLBEMARADT. A többi továbbra is az ELSŐDLEGES stílusból olvasott, ott pedig
+nincs `.star`, tehát mind nullát adott: az összhang, a kötés-párosok, a bér- és
+ár-arány, a karrier-statisztikák, a „nem öregszik", az attribútum-gyorsítás és
+a teljes Sztár jóga.
+
+**Nem a szint volt rossz** — az a `styleActiveFx()`-en megy, az pedig mindkét
+slotot bejárja. A képesség meg volt véve, csak nem volt mihez alkalmazni.
+És a jóga **hatása** is halott volt, nem csak a kijelzése.
+
+**A mérés módja a lényeg:** a próba nem abszolút számokat rögzít — azok a
+balansz változásával elavulnának —, hanem azt, hogy UGYANAZ A FILOZÓFIA
+UGYANAZT ADJA, akárhol áll. Tizennégy mérő fut le mindkét sloton, és a kettőnek
+egyeznie kell. Egy új sztár-mérőt elég felvenni a próba táblázatába, és máris
+védve van.
+
+Két őr teszi értelmessé: az egyik azt állítja, hogy az értékek NEM nullák
+(különben a „két nulla egyenlő" is zölden átmenne), a másik azt, hogy sztáros
+filozófia nélkül viszont tényleg nullák. A javítás előtti kódon a próba
+**14 ponton bukik**. Részletek: `docs/masodlagos-sztar.md`.
+
+## imm-kupa-kapcsolo-proba.js — 🎬 a meccsről meccsre kapcsolója a kupában
+
+```
+node tools/imm-kupa-kapcsolo-proba.js
+```
+
+A bejelentés úgy szólt, hogy a módnak „nincsen látható kapcsológombja
+kupasorozatban… jelenleg nem lehet bekapcsolni". **Három hiány volt, nem egy**,
+és a harmadik volt a legfontosabb:
+
+1. a megszokott sáv `phase==="season"`-re volt kapuzva — a kupasorozat viszont
+   a szezon LEZÁRÁSA után fut, tehát a sáv pont ott tűnt el, ahol a mérkőzések
+   a leggyorsabban jönnek egymás után;
+2. a kupa HUB-ban (scEuro) egyáltalán nem volt kapcsoló;
+3. **és ha valaki mégis bekapcsolta, a lánc nem indult el**: az `immStep`
+   hurka mindig a bajnoki ágon zárult, az pedig a kupában azonnal megáll.
+   A mód bekapcsolt, a sorozat állt.
+
+A próba mind a hármat méri. A 6. szakasz a lényeg: megnyomja a kapcsolót a
+kupa-nézeten, és azt nézi, elindul-e a visszaszámlálás — **és hogy a KUPA-lánc
+indul-e el, nem a bajnoki**. Külön állítja azt is, hogy más képernyőről NEM
+indít kupa-láncot: a feltétel szándékosan szűk, hogy minden más útvonal
+viselkedése betűre a régi maradjon.
+
+Az 1. és 3. szakasz a szétcsúszás ellen mér: hogy a két sáv közös CSS-osztályt
+visel, és hogy a kupa-gomb felirata mindig ugyanaz, mint a megszokotté — egy
+hívás tartja szinkronban a kettőt. Részletek: `docs/meccsrol-meccsre.md` 9. pont.
+
+## kiallitas-rendszer-proba.js — 🟥 a kiállítás négy ügye
+
+```
+node tools/kiallitas-rendszer-proba.js
+```
+
+Négy bejelentés, egy tőről: a kiállított percei, a „tízen maradtunk" a
+második lapnál is, a hiányzó mérföldkövek, és az ötödik kiállítás szabálya.
+
+**A közös gyökér:** a motor EGYETLEN kiállítást ismert egy mérkőzésen — a
+`redIdx` egy szám volt, és a második felülírta az elsőt. Emiatt a 24. percben
+kiállított ember a 80.-ban még gólt lőhetett, az eltiltását sem könyvelte el
+senki, és azt sem lehetett megmondani, hány kiállítást kaptunk. A javítás
+gerince ezért egy kiállítás-HALMAZ, a régi aláírásokat pedig a `redHas`
+tartja életben (szám VAGY halmaz).
+
+A próba 1-5. szakasza egységeket mér (percek, értékelés Panzerrel és anélkül,
+a magyar létszám-szavak, a `redHas` mindkét alakja, a két új mérföldkő-család).
+A **6-7. szakasz viszont valódi mérkőzéseket játszik le** felhúzott
+piroslap-eséllyel — a refaktor kockázata a motorban van, nem az egységekben —,
+és azt nézi, hogy mind az öt kiállítás el van-e könyvelve, mindegyikük
+kap-e eltiltást, a napló létszám-szavai lépésről lépésre fogynak-e, és hogy
+az ötödiknél tényleg lefújják-e a meccset 0:3-ra.
+
+A **8. szakasz megméri a balansz árát**: a régi „egy közvetlen piros
+meccsenként" kapu eltávolítása valódi változás, tehát nem tippelni kell. Egy
+teljes szezon: 30 meccs, 4 kiállítás, 0,133/meccs — a kiállítás ritka maradt,
+a kapu csak a farkat fogta le.
+
+**Amit a próba írása fogott meg:** az első kapum `menLeft()>MATCH_MIN_MEN`
+volt, vagyis „amíg legalább nyolcan vagyunk" — ez EGY EMBERREL elvétette a
+szabályt. Hét emberrel még jár a lap; épp az az ötödik kiállítás, ami után a
+mérkőzés véget ér. A gátam mellett az ötödik lap sosem született meg, és a
+negyedik kérés néma maradt volna. Két állításom is rossz volt: a percsúly az
+ALAP felé húz (tehát egy kiállított embernél FELFELÉ), és a mérföldkő
+plafonja nem négy, hanem öt. Részletek: `docs/kiallitas-rendszer.md`.
+
 ## osztalyugras-terv-proba.js — 🎲 mire tarts félre a nyáron
 
 ```
@@ -1469,7 +1564,7 @@ Részletek: `docs/eladas-kihivas-elso-licit.md`.
 node tools/kiadas-proba.js
 ```
 
-**Nem a játékot méri** (arra ott a 71 böngészős próba), hanem azt, amit a
+**Nem a játékot méri** (arra ott a 74 böngészős próba), hanem azt, amit a
 Google Play **elutasít, ha hiányzik**: az adatvédelmi tájékoztató teljességét
 (nincs kitöltetlen placeholder, van adatkezelő, e-mail, székhely, jogalap,
 felügyeleti hatóság), a manifestet és minden hivatkozott képét, a service
