@@ -29,7 +29,9 @@
      5. mpTableSane: a hibás pillanatképet félreteszi, az épet nem bántja;
      6. ÉS A LEGFONTOSABB: a betöltéskori menetrend-javítás a BETÖLTÖTT
         menetrenden dolgozik — a 3.9.101-ben az Object.assign(S,d.S) ELŐTT
-        futott, tehát halott kód volt. */
+        futott, tehát halott kód volt;
+     7. az ALAPSZABÁLY, lekötve: egy osztály 16 csapat, egy szezon 30
+        forduló — mindkét módban, a levezetéssel együtt. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT="/home/user/Magyah", PORT=9073;
@@ -318,6 +320,68 @@ const BOOT=`(()=>{
   ok(bet.parharcok.join()==="15,30","a párharcok a helyükön MARADTAK",
     {p:bet.parharcok});
   ok(bet.szolt===true,"és a napló elmondja, hogy helyreállítás történt");}
+
+  /* ================= 7. AZ ALAPSZABÁLY: 16 CSAPAT → 30 FORDULÓ =============
+     Ez a szakasz nem egy hibát mér, hanem egy ÍGÉRETET köt le. A mezőny
+     minden osztályban 16 csapat, tehát a szezon minden módban pontosan 30
+     forduló — és a két szám nem sodródhat el egymástól egy későbbi
+     változtatásban sem. A levezetés mindkét módban kijön:
+
+       közös karrier:  14 CPU + te + a társad = 16 ülés
+                       14 CPU × 2 meccs = 28, + 2 párharc (15. és 30.) = 30
+       egyjátékos:     15 CPU + te         = 16 ülés
+                       15 CPU × 2 meccs                                = 30
+
+     És mivel a tabella-létszám mindkét esetben 16, vagyis PÁROS, a 2.
+     szakaszban bevezetett üres hely SOSEM lép működésbe egy ép világban —
+     az tisztán háló, nem a normál működés része. */
+  const inv=await p.evaluate(()=>{
+    const ki={};
+    const _h=h2hRoomActive;
+    ki.PYR_TEAMS=PYR_TEAMS;
+    ki.SEASON_ROUNDS=SEASON_ROUNDS;
+    S.pyr={on:true,my:1,above:0,divs:[]};
+    window.h2hRoomActive=()=>true;
+    ki.kellSajatSzoba=pyrDivNeed(1);      /* a saját osztályod világ-csapatai */
+    ki.kellMas=pyrDivNeed(2);             /* egy idegen osztály */
+    window.h2hRoomActive=()=>false;
+    ki.kellSajatSolo=pyrDivNeed(1);
+    ki.ulesSzoba=ki.kellSajatSzoba+2;     /* + te + a társad */
+    ki.ulesSolo=ki.kellSajatSolo+1;       /* + te */
+    /* És amit ebből a menetrend csinál. */
+    const lista=n=>{const a=[];
+      for(let i=0;i<n;i++)a.push({o:{n:"C"+i,ovr:70},home:true});
+      for(let i=0;i<n;i++)a.push({o:{n:"C"+i,ovr:70},home:false});return a;};
+    const mer=out=>({hossz:out.length,
+      p:out.map((f,i)=>f&&f.duel?i+1:0).filter(Boolean),
+      lyuk:out.filter(f=>!f||(!f.duel&&!f.o)).length,
+      potolt:out.filter(f=>f&&f.filler).length});
+    window.h2hRoomActive=()=>true;
+    ki.szoba=mer(fixturesFitToSeason(lista(ki.kellSajatSzoba),Math.random));
+    ki.szobaN=ki.kellSajatSzoba+1+1;      /* tabella-létszám */
+    window.h2hRoomActive=()=>false;
+    ki.solo=mer(fixturesFitToSeason(lista(ki.kellSajatSolo),Math.random));
+    ki.soloN=ki.kellSajatSolo+1;
+    window.h2hRoomActive=_h;S.pyr=null;
+    return ki;});
+
+  console.log("=== 7. az alapszabály: 16 csapat → 30 forduló ===");
+  ok(inv.PYR_TEAMS===16,"egy osztály 16 csapat (PYR_TEAMS)",{v:inv.PYR_TEAMS});
+  ok(inv.SEASON_ROUNDS===30,"egy szezon 30 forduló (SEASON_ROUNDS)",{v:inv.SEASON_ROUNDS});
+  ok(inv.kellMas===16,"idegen osztály: 16 világ-csapat",{v:inv.kellMas});
+  ok(inv.ulesSzoba===16,"közös karrier: 14 CPU + te + a társad = 16 ülés",
+    {cpu:inv.kellSajatSzoba,ules:inv.ulesSzoba});
+  ok(inv.ulesSolo===16,"egyjátékos: 15 CPU + te = 16 ülés",
+    {cpu:inv.kellSajatSolo,ules:inv.ulesSolo});
+  ok(inv.szoba.hossz===30&&inv.szoba.p.join()==="15,30"
+     &&inv.szoba.lyuk===0&&inv.szoba.potolt===0,
+    "közös karrier: 14×2 + 2 párharc = 30 forduló, pótlás nélkül",inv.szoba);
+  ok(inv.solo.hossz===30&&inv.solo.p.length===0
+     &&inv.solo.lyuk===0&&inv.solo.potolt===0,
+    "egyjátékos: 15×2 = 30 forduló, párharc és pótlás nélkül",inv.solo);
+  ok(inv.szobaN===16&&inv.soloN===16,
+    "a tabella-létszám mindkét módban 16 — PÁROS, tehát ép világban nincs üres hely",
+    {szoba:inv.szobaN,solo:inv.soloN});
 
   const sulyos=errs.filter(e=>!/favicon|manifest|sw\.js|ServiceWorker/i.test(e));
   ok(sulyos.length===0,"nincs oldalhiba",sulyos.slice(0,4));

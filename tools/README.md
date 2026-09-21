@@ -1389,6 +1389,12 @@ az összlétszámot nem változtatja, idempotens, determinisztikus, és
 egyjátékosban más a célszám. Külön állítás mondja ki, hogy hiányzó
 világ-csapatot **nem találunk ki**, csak szólunk róla.
 
+Egy külön szakasz **állításként köti le az alapszabályt**: egy osztály 16
+csapat, egy szezon 30 forduló — közös karrierben 14 CPU + te + a társad, azaz
+14×2 + 2 párharc, egyjátékosban 15 CPU + te, azaz 15×2. Ebből az is
+következik, hogy ép világban a tabella-létszám páros, tehát a fenti üres hely
+sosem lép működésbe: az háló, nem a normál működés.
+
 **A legfontosabb szakasz a hatodik.** Elkap egy VALÓDI mentés-payloadot,
 elrontja pontosan úgy, ahogy a beküldött (32 forduló), és `applySavedGame`-mel
 betölti. Ez fogta meg, hogy a 3.9.101 menetrend-helyreállítása az
@@ -1450,6 +1456,15 @@ nem elég), a négy „csak nyáron" eset a gomb feliratával együtt, a keret t
 életciklusa (fogy, nullán megáll, a közbeni fejlesztés nem tünteti el az
 elköltött alkalmakat, új nyáron tiszta lap), egy ÉLŐ keresés, és hogy mind a
 négy módban — alap, piramis, Infinity, közös karrier — betűre ugyanaz jön ki.
+
+A 8. szakasz (3.9.103) az **üzletkötés-létrát** méri: 4★ → 66%, 10★ → 90%,
+30★ → 99%, közte a lineáris szakasz mind a hét foka, a plafon, a padló, és két
+szerkezeti tulajdonság — hogy a görbe monoton, és hogy 10★ fölött a lépések
+egyre kisebbek („szépen lassan tart a 99% felé"). A 8b. szakasz pedig azt
+bizonyítja, hogy a TÁRGYALÁS is ebből dolgozik: a `land()` egyetlen
+`Math.random()`-ját rögzítve a próba a négy kimenetel határai köré lő, és
+megnézi, hogy mindegyik a helyére esik — plusz hogy a RENDES keresés határai
+az ügynökség csillagától függetlenül állnak.
 
 **Amit a próba fogott meg:** a szerepenkénti szűrés először a `BENCH_CATS`
 kódlistáiból dolgozott, azok viszont ÁTFEDNEK — a `JSZ`/`BSZ` egyszerre

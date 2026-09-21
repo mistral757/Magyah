@@ -163,10 +163,31 @@ külön jelzi, ha páratlan, valamint a közös tabella pillanatképének állap
   osztálylétszámok: D1:15⚠(kell 14) · D2:15⚠(kell 16) · D3:16 · D4:16 · D5:16 · D6:16
 ```
 
-## 7. Mérés
+## 7. Az alapszabály, lekötve
 
-`node tools/osztalyletszam-proba.js` — 6 szakasz: a páratlan alak
+**Egy osztály 16 csapat, tehát egy szezon 30 forduló.** Mindkét módban
+kijön, és a próba 7. szakasza ezt állításként is rögzíti, hogy egy későbbi
+változtatás ne sodorhassa el a két számot egymástól:
+
+| | ülések | menetrend |
+|---|---|---|
+| közös karrier | 14 CPU + te + a társad = **16** | 14×2 = 28, + 2 párharc (15., 30.) = **30** |
+| egyjátékos | 15 CPU + te = **16** | 15×2 = **30** |
+
+Mivel a tabella-létszám mindkét esetben 16, vagyis **páros**, a 2.2 pontban
+bevezetett üres hely ép világban **sosem lép működésbe** — az tisztán háló,
+nem a normál működés része. Ugyanígy a menetrend-pótlás: ép mezőnnyel nincs
+egyetlen pótolt párosítás sem.
+
+## 8. Mérés
+
+`node tools/osztalyletszam-proba.js` — 7 szakasz: a páratlan alak
 reprodukciója, az új naptár (és hogy a régi kapu pontosan itt adott üreset),
 a `pyrDivSizeRepair` mindkét iránya determinizmussal és idempotenciával, a
-hiányzó csapat esete, az `mpTableSane`, és a betöltési sorrend valódi
-mentés-payloaddal.
+hiányzó csapat esete, az `mpTableSane`, a betöltési sorrend valódi
+mentés-payloaddal, végül a 7. pont alapszabálya.
+
+Mellette a `tools/parharc-menetrend-proba.js` (3.9.101) méri, hogy a
+menetrend 10, 13, 14, 15 és 16 ellenféllel is pontosan 30 forduló marad — a
+30 tehát két oldalról van lekötve: a mezőny HELYES létszámából (ez a
+szakasz), és arra az esetre is, ha a létszám mégis elcsúszna.
