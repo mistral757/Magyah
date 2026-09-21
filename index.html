@@ -6132,7 +6132,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.104";
+const APP_VERSION="3.9.105";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -18672,13 +18672,17 @@ function recordScorer(name){
   else S.scorers[name]=(S.scorers[name]||0)+1;
   /* A SZTÁR GÓLBÓNUSZA. Azért ITT és nem a gólblokkban: ez a közös csatorna,
      tehát a tizenegyes, a szabadrúgás, a csere-gól és a kupameccs is fizet. */
-  try{starGoalBonusPay(name);}catch(e){}}
+  try{starGoalBonusPay(name);}catch(e){}
+  /* KÖZÖS JELZŐRENDSZER (3.9.105): ugyanezen az EGY csatornán szólal meg a
+     többi stílus gazdasága is — lásd engGoalNote. */
+  try{engGoalNote(name);}catch(e){}}
 function recordAssist(name){
   try{roleAuraNote(name,"assist");}catch(e){}
   if(euroActive()){euroAddStat("assists",name,teamName,true);
     try{euroChalMark(name);}catch(e){}
     const b=seasonEuroBucket();b.assists[name]=(b.assists[name]||0)+1;}
-  else S.assists[name]=(S.assists[name]||0)+1;}
+  else S.assists[name]=(S.assists[name]||0)+1;
+  try{engAssistNote();}catch(e){}}
 /* ---- E3: EGYENES KIESÉSES SZAKASZ ----
    Nyolcaddöntő → negyeddöntő → elődöntő ODA-VISSZAVÁGÓVAL, a döntő EGY meccs
    semleges pályán. Párharcban az összesített eredmény dönt; egyenlőségnél az
@@ -40781,6 +40785,274 @@ function dreadModApply(name,mit){
   }catch(x){}
   const TAB=(mit==="ver")?VER_LEVELS:(mit==="kap")?KAP_LEVELS:KAR_LEVELS;
   return {ok:true,cimke,elotte:TAB[elotte],utana:TAB[utana],ar};}
+/* ================= A KÖZÖS JELZŐRENDSZER-MOTOR (3.9.105) =================
+   KIMONDOTT KÉRÉS: „Mindegyik csapatstílus kapjon egy olyan rendszert, mint a
+   panzerkampfwagen a félelem-rettenet-tel. A skálák hasonlók legyenek, viszont
+   a reward legyen alacsonyabb. A panzerkampfwagené legyen a legerősebb, mert
+   minden másban az a legkevésbé kifizetődő választás."
+
+   AMIT A PANZER FELTALÁLT, és amit itt ÁLTALÁNOSÍTUNK — a kettéválasztás:
+
+     · az ÁLLAPOT (Panzernél a félelem szint) nem gyűjtött érték, hanem VAN:
+       a keretből számol, és a stílus szintje nagyítja fel. Aki eladja azt az
+       embert, akire épül, annak azonnal esik;
+     · a VALUTA (Panzernél a rettenet pont) meccsenként gyűlik, és az ÁLLAPOT
+       mondja meg, mennyi fér bele egy meccsbe (10%);
+     · a SZINT (Panzernél a Rettegés) a valutából vásárolható, és az állapot
+       egyre nagyobb százalékát fordítja MECCSERŐVÉ, egy plafonig.
+   Ettől lesz minden stílus gazdasága önmagát hajtó kör — és ettől lesz
+   összehasonlítható is, mert mind a három lépcső ugyanazon a skálán áll.
+
+   MIÉRT NEM ÍRJUK ÁT A PANZERT ERRE. A félelem-rettenet mélyen be van kötve
+   (bolt, mérföldkövek, közvetítés, mentés), és a felhasználó SZERETI, ahogy
+   van. Egy refaktor ott tiszta kockázat lenne, haszon nélkül. Ezért a Panzer
+   marad a REFERENCIA-MEGVALÓSÍTÁS, ez a motor pedig a TÖBBI stílusé — a
+   számok szándékosan ugyanabban az alakban állnak, hogy a kettő
+   összemérhető maradjon (lásd a lenti táblázat megjegyzéseit).
+
+   A JUTALOM ALACSONYABB, és ez a kérés lényege. A Panzer szintenkénti
+   százalék-létrája [0 … 0,15], a plafonja +20 meccserő. A többi stílusé
+   ennek a 0,6-szerese: [0 … 0,09], plafon +12. A két létra ARÁNYA végig
+   pontosan 0,6, tehát a Panzer bármelyik szinten félelemre-vetítve
+   ugyanannyival ver rá a többire — a rés nem szűkül és nem tágul menet
+   közben. (A projektgazda a „b" utat választotta: a Panzer +20-a MARAD.)
+
+   A SZINTHEZ TARTOZÓ CSAPATSTÍLUS-SZINT és az ÁRLÉTRA betűre a Panzeré: az
+   első szint az ötödik stílusszinten nyílik, és ugyanannyi pontba kerül.
+   Ugyanaz a munka, kisebb jutalom — pontosan ez a kért viszony. */
+const ENG_MATCH_PCT=0.10;          /* meccsenként az állapot ennyi %-a gyűjthető */
+const ENG_MAX=10;                  /* ennyi szint van */
+const ENG_OVR_CAP=12;              /* a Panzer +20-ának a 0,6-szerese */
+/* A Panzer RETTEGES_PCT-jének a 0,6-szerese, szintről szintre. */
+const ENG_PCT=[0,0.012,0.021,0.030,0.039,0.048,0.057,0.066,0.075,0.084,0.090];
+const ENG_PRICE=[0,150,260,420,640,920,1280,1700,2200,2800,3500];   /* = RETTEGES_PRICE */
+function engNeedLevel(n){return 4+n;}                               /* = rettegesNeedLevel */
+const ENG_SCALE_FROM=100;          /* eddig az állapot-szintig fix a tarifa */
+/* ---- A STÍLUSOK TÁBLÁJA ----
+   Minden bejegyzés ugyanazt a négy dolgot mondja el: hogy hívják a három
+   lépcsőt, miből számol az ÁLLAPOT, és mit fizet egy mérkőzés.
+   A `base` a NYERS bázis (a szorzó nélkül); a `scale` a stílusszint
+   nagyítása, ami betűre a Panzeré (az 1. szinten fél, a 20.-on kétszeres). */
+const ENG_DEFS={
+  /* ---- ⚡ HOL JÖN A MENNYDÖRGÉS? ----
+     Az ÁLLAPOT itt a SEBESSÉG — az egyetlen attribútum kemény plafonnal,
+     tehát a rendszer épp azt a tengelyt tolja, amit másképp nem lehet.
+     A bázis a keret ELSŐ TIZENEGY leggyorsabb emberéből jön, nem a
+     kiállított kezdőből: így nem lehet egyetlen felállással kijátszani, de
+     aki eladja a gyorsait, annak azonnal esik — pontosan úgy, ahogy a
+     Panzernél a vandál eladása. Emberenként legfeljebb 3 egység, ahogy ott
+     is: a 70-es sebesség nulla, a 100-as a maximum. */
+  villam:{ic:"⚡",n:"Vihar",
+    stateN:"viharszint",ptsN:"villámpont",lvlN:"Villámcsapás",
+    lvlD:"A viharszinted ekkora része válik meccserővé.",
+    scaleFrom:70,perMan:3,perStep:10,men:11,baseScale:10,
+    tariff:{early:1.0,goal:0.35,assist:0.25,speedster:0.6,sweep:1.0},
+    label:{early:"korai gól",goal:"gól",assist:"gólpassz",
+      speedster:"villámláb gólja",sweep:"háromgólos győzelem",
+      gap:"meccserő-fölény",win:"győzelem erősebb ellen",giant:"ÓRIÁSÖLÉS"},
+    /* NÉMA tételek: van saját soruk a közvetítésben, vagy túl sűrűek ahhoz,
+       hogy külön jelzést kapjanak — azokat csak az összesítő mondja ki. */
+    quiet:{goal:1,assist:1}}};
+function engDef(k){return (k&&ENG_DEFS[k])||null;}
+/* MELYIK MOTOR AKTÍV. A stílus-slotokból (elsődleges + másodlagos) az ELSŐ,
+   amelyikhez tartozik motor. Egyszerre csak egy fut: két gazdaság párhuzamos
+   pörgetése kétszeres meccserőt adna ugyanazért a munkáért. */
+function engKey(){
+  if(gameMode!=="career")return null;
+  try{
+    for(const k of Object.keys(ENG_DEFS)){
+      const st=styleStateFor(k);
+      if(st&&styleLive(st))return k;}
+  }catch(e){}
+  return null;}
+function engStyle(k){try{return styleStateFor(k||engKey());}catch(e){return null;}}
+function engOn(k){const kk=k||engKey();return !!(kk&&engStyle(kk));}
+/* AZ ÁLLAPOT TÁROLÓJA a stílus-állapotban lakik, mint a Panzernél a `fear` —
+   így a mentés magától viszi, és egy stílusváltás sem keveri össze a kettőt. */
+function engState(k){
+  const kk=k||engKey();
+  const st=engStyle(kk);
+  if(!st)return null;
+  if(!st.eng)st.eng={pts:0,earned:0,spent:0,lvl:0};
+  const E=st.eng;
+  if(E.pts==null)E.pts=0;
+  if(E.lvl==null)E.lvl=0;
+  return E;}
+/* ---- A NYERS BÁZIS ----
+   Egyelőre egyetlen alakja van (attribútum-küszöb a keret N legjobbjánál), de
+   a tábla `base` mezőjével bármelyik stílus hozhat sajátot. */
+function engBaseRaw(k){
+  const d=engDef(k);
+  if(!d)return 0;
+  if(typeof d.base==="function"){try{return d.base()||0;}catch(e){return 0;}}
+  let v=[];
+  try{
+    (fullCareerRoster()||[]).forEach(pl=>{
+      const e=(careerPool&&careerPool[pl.n])||null;
+      if(!e)return;
+      let sp=0;
+      try{sp=(e.attrs&&e.attrs.seb)||0;}catch(x){sp=0;}
+      v.push(sp);});
+  }catch(e){}
+  v.sort((a,b)=>b-a);
+  let s=0;
+  v.slice(0,d.men).forEach(sp=>{
+    s+=Math.max(0,Math.min(d.perMan,(sp-d.scaleFrom)/d.perStep));});
+  return s*d.baseScale;}
+/* A STÍLUS SZINTJE NAGYÍTJA — betűre a Panzer fearScale()-je. */
+function engScale(k){
+  let L=1;
+  try{L=Math.max(1,Math.min(STYLE_LVL_MAX,styleLevel(engStyle(k))||1));}catch(e){L=1;}
+  return 0.5+1.5*(L-1)/Math.max(1,STYLE_LVL_MAX-1);}
+function engLevel(k){const kk=k||engKey();return engOn(kk)?Math.round(engBaseRaw(kk)*engScale(kk)):0;}
+function engMatchCap(k){return Math.round(engLevel(k)*ENG_MATCH_PCT*10)/10;}
+/* A TARIFA az állapot-szinttel skálázódik 100 fölött — ugyanaz a szabály és
+   ugyanaz az ok, mint a Panzernél (dreadScale): a plafon a szinttel nő, tehát
+   a fix tarifa idővel elérhetetlenné tenné. */
+function engScaleT(k){const L=engLevel(k);return L>ENG_SCALE_FROM?L/ENG_SCALE_FROM:1;}
+function engNum(x){return String(Math.round(x*10)/10).replace(".",",");}
+/* ---- A MECCS MÉRLEGE ----
+   Ugyanaz a szerkezet, mint a rettenetnél: a nyers pont a mérkőzés alatt
+   gyűlik, a könyvelés a lefújásnál történik, a meccsenkénti plafonnal. A futó
+   meccs adatai NEM a mentés részei — egy félbehagyott mérkőzés nem hagy maga
+   után fél pontot. */
+let _engRaw=0,_engGap=0,_engBy=null,_engMin=0;
+function engBook(kind,pont){
+  if(!_engBy)_engBy={};
+  const r=_engBy[kind]||(_engBy[kind]={db:0,p:0});
+  r.db++;r.p=Math.round((r.p+pont)*100)/100;}
+function engMatchStart(){
+  _engRaw=0;_engGap=0;_engBy=null;_engMin=0;
+  const k=engKey();
+  if(!k)return;
+  /* A MECCSERŐ-FÖLÉNY a kezdőrúgáskor dől el — ugyanabból a számból, amit a
+     nehézség-tanácsadó is mutat (lásd fearMatchStart). */
+  try{
+    const g=levelGap();
+    if(g>0){
+      const nyers=Math.min(DREAD_GAP_MAX,DREAD_GAP_MAX*Math.min(1,g/DREAD_GAP_FULL));
+      _engGap=Math.round(nyers*engScaleT(k)*100)/100;
+      if(_engGap>0)engBook("gap",_engGap);}
+  }catch(e){}}
+function engNote(kind,db){
+  const k=engKey();
+  if(!k)return;
+  const d=engDef(k);
+  const pont=Math.round(((d.tariff||{})[kind]||0)*(db||1)*engScaleT(k)*100)/100;
+  if(!pont)return;
+  _engRaw+=pont;
+  engBook(kind,pont);
+  if((d.quiet||{})[kind])return;
+  try{
+    addLine(`${d.ic} <b>+${engNum(pont)}</b> ${esc(d.ptsN)} `
+      +`<span style="color:var(--dim2)">— ${esc((d.label||{})[kind]||kind)}</span>`,"m skillnote");
+  }catch(e){}}
+/* ---- A GÓL KÖZÖS CSATORNÁJA ----
+   A recordScorer minden találaton átfut (tizenegyes, szabadrúgás, csere-gól,
+   hosszabbítás), tehát ez az EGY hely, ahonnan minden stílus tarifája
+   megszólalhat — nem kell nyolc gólblokkot külön bekötni. */
+function engGoalNote(name){
+  const k=engKey();
+  if(!k)return;
+  const d=engDef(k);
+  const T=d.tariff||{};
+  if(T.goal)engNote("goal");
+  /* KORAI GÓL: a félidők első negyedórája, amikor a védelem még hideg. Az
+     `_engMin` a futó ötperces vödör (lásd a tickFn-t). */
+  if(T.early&&((_engMin>0&&_engMin<=15)||(_engMin>45&&_engMin<=60)))engNote("early");
+  /* VILLÁMLÁB: a gólszerző sebessége a felső sávban. */
+  if(T.speedster){
+    let sp=0;
+    try{const e=careerPool&&careerPool[name];sp=(e&&e.attrs&&e.attrs.seb)||0;}catch(e){sp=0;}
+    if(sp>=95)engNote("speedster");}}
+function engAssistNote(){
+  const k=engKey();
+  if(!k)return;
+  if((engDef(k).tariff||{}).assist)engNote("assist");}
+/* A LEFÚJÁS: a győzelem-bónuszok (ugyanaz az elv, mint a fearNoteWin-nél: a
+   plafonból számolnak, tehát az állapottal eleve együtt nőnek — nem
+   szorozzuk meg még egyszer), majd a könyvelés. */
+function engNoteWin(won,ovrGap,gf,ga){
+  const k=engKey();
+  if(!k)return 0;
+  const d=engDef(k),T=d.tariff||{};
+  const cap=engMatchCap(k);
+  if(T.sweep&&won&&(gf-ga)>=3)engNote("sweep");
+  if(!won||!(ovrGap>0)||!(cap>0))return 0;
+  const arany=Math.min(1,ovrGap/Math.max(1,dreadWinGiant()));
+  const pont=Math.round(cap*arany*10)/10;
+  if(!(pont>0))return 0;
+  const orias=(ovrGap>=dreadWinGiant());
+  _engRaw+=pont;
+  engBook(orias?"giant":"win",pont);
+  try{
+    addLine(`${d.ic} <b>+${engNum(pont)}</b> ${esc(d.ptsN)} `
+      +`<span style="color:var(--dim2)">— ${orias?"ÓRIÁSÖLÉS: a meccsen kapható TELJES keret"
+        :`győzelem ${engNum(ovrGap)} nyers erővel erősebb csapat ellen`}</span>`,"m skillnote");
+  }catch(e){}
+  return pont;}
+function engMatchEnd(){
+  const k=engKey();
+  if(!k)return 0;
+  const E=engState(k);
+  if(!E)return 0;
+  const d=engDef(k);
+  const nyers=Math.round((_engRaw+_engGap)*10)/10;
+  const cap=engMatchCap(k);
+  const kap=Math.max(0,Math.round(Math.min(nyers,cap)*10)/10);
+  const konyv=_engBy;
+  _engRaw=0;_engGap=0;_engBy=null;_engMin=0;
+  if(!(kap>0))return 0;
+  E.pts=Math.round((E.pts+kap)*10)/10;
+  E.earned=Math.round(((E.earned||0)+kap)*10)/10;
+  try{
+    const tetel=Object.keys(konyv||{})
+      .map(kk=>`${esc((d.label||{})[kk]||kk)} ×${konyv[kk].db} (${engNum(konyv[kk].p)})`)
+      .join(" · ");
+    addLine(`${d.ic} <b>${esc(d.ptsN.toUpperCase())} — a mérkőzés mérlege: +${engNum(kap)}</b>`,"m mvp");
+    if(tetel)addLine(`&nbsp;&nbsp;${tetel}`,"m skillnote");
+    addLine(`&nbsp;&nbsp;${nyers>cap
+        ? `a nyers ${engNum(nyers)}-ből a plafon ${engNum(cap)}-et engedett`
+        : `a plafon (${engNum(cap)}) nem fogott`}`
+      +` — a klub egyenlege <b>${engNum(E.pts)}</b>.`,"m skillnote");
+  }catch(e){}
+  return kap;}
+/* ---- A SZINT: az állapot meccserővé válik ---- */
+function engLvl(k){const E=engState(k);return E?Math.max(0,Math.min(ENG_MAX,E.lvl||0)):0;}
+function engOvrBonus(){
+  const k=engKey();
+  if(!k)return 0;
+  const lv=engLvl(k);
+  if(!lv)return 0;
+  return Math.min(ENG_OVR_CAP,Math.round(engLevel(k)*(ENG_PCT[lv]||0)*10)/10);}
+function engNextPrice(k){const lv=engLvl(k);return lv>=ENG_MAX?null:ENG_PRICE[lv+1];}
+function engNextWhy(k){
+  const kk=k||engKey();
+  if(!kk)return "ehhez a stílushoz nincs jelzőrendszer";
+  const d=engDef(kk),lv=engLvl(kk);
+  if(lv>=ENG_MAX)return `a ${d.lvlN} a tetején áll`;
+  const kell=engNeedLevel(lv+1);
+  let L=0;try{L=styleLevel(engStyle(kk))||0;}catch(e){}
+  if(L<kell)return `a ${lv+1}. szinthez ${kell}. csapatstílus-szint kell (most ${L}.)`;
+  const ar=engNextPrice(kk),E=engState(kk);
+  if(E&&E.pts<ar)return `${engNum(ar-E.pts)} ${d.ptsN} hiányzik`;
+  return "";}
+function engBuyLevel(k){
+  const kk=k||engKey();
+  if(!kk||engNextWhy(kk))return false;
+  const E=engState(kk),ar=engNextPrice(kk);
+  if(!E||ar==null||E.pts<ar)return false;
+  E.pts=Math.round((E.pts-ar)*10)/10;
+  E.spent=Math.round(((E.spent||0)+ar)*10)/10;
+  E.lvl=Math.min(ENG_MAX,(E.lvl||0)+1);
+  const d=engDef(kk);
+  try{
+    addLine(`${d.ic} <b>${esc(d.lvlN)} ${E.lvl}. szint!</b> A ${esc(d.stateN)} `
+      +`<b>${Math.round((ENG_PCT[E.lvl]||0)*1000)/10}%-a</b> mostantól meccserő: `
+      +`<b>+${engNum(engOvrBonus())}</b>.`,"m mvp");
+  }catch(e){}
+  try{saveGame();}catch(e){}
+  return true;}
 /* ================= A SZTÁR KÖVETELÉSEI — a filozófia ÁRA =================
    A „Sztárom a párom" eddig egyoldalú alku volt: a sztár kiugró bért vitt, de
    cserébe csak adott (hírnév, reklám, tömeg). Ez a blokk teszi mellé a
@@ -60061,6 +60333,7 @@ function playMatch(){
      meccserő-fölény — a kezdőrúgás állapotából, ahogy a nehézség-tanácsadó is
      méri. Egy félbehagyott mérkőzés így nem hagy maga után fél rettenetet. */
   try{fearMatchStart();}catch(e){}
+  try{engMatchStart();}catch(e){}
   /* A csere-gomb fogantyúja csak a tick-időzítő felállása után él — addig
      (felállás-ellenőrzés, hiányzók, korai kilépés) nincs mit megállítani.
      Az élő tizenegy is csak a kezdőrúgástól létezik: addig a kijelző a
@@ -60856,6 +61129,11 @@ function playMatch(){
        tucat félbehagyott ág. */
     if(forfeited){clearInterval(iv);fullTime();return;}
     min+=5;
+    /* A KÖZÖS JELZŐRENDSZER futó perce (3.9.105). A gól közös csatornája
+       (recordScorer) nem látja a tick `min`-jét, a „korai gól" tarifához
+       viszont kell — ezért itt tesszük le. Ötperces vödör, ami a
+       negyedóra-határokhoz bőven elég pontos. */
+    _engMin=min;
     /* az óra a fejlécben az aktuális 5-perces bucketet mutatja (a gólok saját,
        1-perc pontos bélyeget kapnak a gmin()-től) */
     updateTTBoard(fx,gf,ga,Math.min(90,min));
@@ -62379,6 +62657,8 @@ function playMatch(){
       Object.keys(mScore||{}).forEach(n=>{if((mScore[n]||0)>=3)fearNote("hat");});
       try{fearNoteWin(gf>ga,(fx&&fx.o)?(fx.o.ovr-teamOVRbase()):0);}catch(e){}
       fearMatchEnd();
+      try{engNoteWin(gf>ga,(fx&&fx.o)?(fx.o.ovr-teamOVRbase()):0,gf,ga);}catch(e){}
+      try{engMatchEnd();}catch(e){}
     }catch(e){}
     if(gameMode==="career"){
       playedAll.forEach(p=>{
@@ -73635,6 +73915,7 @@ function hiddenMatchBonus(){
      A motor NEM ezt a függvényt hívja (ott a styleOvrBonus áll), tehát ez
      nem kettőzi meg. */
   b+=(typeof fearOvrBonus==="function")?fearOvrBonus():0;
+  b+=(typeof engOvrBonus==="function")?engOvrBonus():0;
   return b;}
 /* A csapat VALÓDI meccs-ereje: a keret + a rejtett szituatív tagok. Ez a
    nehézség-tanácsadó és az auto szintkövetés alapja. */
@@ -88701,6 +88982,16 @@ function styleDashboardHtml(st,def){
       `${String(fearState().pts).replace(".",",")} pont`,
       fearOvrBonus()?`+${String(fearOvrBonus()).replace(".",",")} meccserő`:"",
       ()=>fearSectionHtml(),false);
+  /* ---- A KÖZÖS JELZŐRENDSZER (3.9.105) ----
+     Ugyanaz a hely, ugyanaz a nyelv, mint a Panzer rettenetjénél — csak a
+     nevek jönnek a stílus saját tábláján át (ENG_DEFS). Ha a stílushoz nincs
+     motor, a szakasz meg sem születik. */
+  {const _ek=engKey(),_ed=engDef(_ek);
+   if(_ek&&_ed&&st.key===_ek&&engState(_ek))
+     h+=styleSecHtml("eng",`${_ed.ic} ${esc(_ed.n)}`,
+       `${engNum(engState(_ek).pts)} ${esc(_ed.ptsN)}`,
+       engOvrBonus()?`+${engNum(engOvrBonus())} meccserő`:"",
+       ()=>engSectionHtml(),false);}
   /* A HÍRESSÉG csak a sztáros filozófiánál létezik, és csak ha van kijelölt
      ember — enélkül a szakasz üresen állna. */
   if(fameStarName())
@@ -88834,6 +89125,45 @@ function fearSectionHtml(){
       +`<button class="btn-${baj?"s":"y"} stepbtn" id="dreadRetteges"${baj?" disabled":""} style="margin-top:7px;padding:8px">`
       +(baj?esc(baj):`Megveszem — ${ar} pont`)+`</button></div>`;}
   return h+`</div></div>`;}
+/* ================= A KÖZÖS JELZŐRENDSZER SZAKASZA (3.9.105) ==============
+   Egy szakasz MINDEN stílusnak, ami motort kapott. A szöveg a tábla neveiből
+   épül, tehát új stílus felvételéhez itt nem kell hozzányúlni semmihez. */
+function engSectionHtml(){
+  const k=engKey(),d=engDef(k),E=engState(k);
+  if(!k||!d||!E)return "";
+  const szint=engLevel(k),cap=engMatchCap(k);
+  const lv=engLvl(k),pct=ENG_PCT[lv]||0,bonusz=engOvrBonus();
+  const ar=engNextPrice(k),baj=engNextWhy(k);
+  let h=`<div class="infoCard"><div class="infoCardH">${d.ic} ${esc(d.n)}</div>`
+    +`<div class="msDesc" style="margin-bottom:8px">`
+    +`A <b>${esc(d.stateN)}</b> egy ÁLLAPOT: a keretedből számol, és a filozófia szintje `
+    +`nagyítja fel — nem gyűjtöd, hanem VAN. A <b>${esc(d.ptsN)}</b> ezzel szemben VALUTA: `
+    +`meccsenként gyűlik, és a ${esc(d.stateN)} mondja meg, mennyi fér bele egy mérkőzésbe.`
+    +`</div>`
+    +`<div class="msList">`
+    +`<div class="msItem"><div class="msTop"><b>${d.ic} ${esc(d.stateN)}</b>`
+    +`<span class="msRew">${engNum(szint)}</span></div>`
+    +`<div class="msDesc">Meccsenként legfeljebb <b>${engNum(cap)}</b> ${esc(d.ptsN)} `
+    +`gyűjthető (a ${esc(d.stateN)} ${Math.round(ENG_MATCH_PCT*100)}%-a). `
+    +`A klub egyenlege: <b>${engNum(E.pts)}</b> — eddig összesen `
+    +`<b>${engNum(E.earned||0)}</b> gyűlt, ebből <b>${engNum(E.spent||0)}</b> elköltve.</div></div>`
+    /* ---- A SZINT ---- */
+    +`<div class="msItem"><div class="msTop"><b>${d.ic} ${esc(d.lvlN)}</b>`
+    +`<span class="msRew">${lv}/${ENG_MAX}${ar?` · ${ar} pont`:""}</span></div>`
+    +`<div class="msDesc">${esc(d.lvlD)} Most <b>${Math.round(pct*1000)/10}%</b>`
+    +(lv?` = +${engNum(bonusz)} meccserő`:"")
+    +`, a következő szinten <b>${Math.round((ENG_PCT[Math.min(ENG_MAX,lv+1)]||0)*1000)/10}%</b>. `
+    +`A plafon <b>+${ENG_OVR_CAP}</b>.`
+    +`<br><span style="color:var(--dim2)">A ${lv+1}. szinthez ${engNeedLevel(lv+1)}. csapatstílus-szint kell. `
+    +`A Panzer félelem-rendszere ugyanezen a létrán jár, de +${FEAR_OVR_CAP}-ig — `
+    +`ez a filozófia ára ott, és a jutalma itt.</span></div>`
+    +`<button class="btn-${baj?"s":"y"} stepbtn" id="engBuyLvl"${baj?" disabled":""} style="margin-top:7px;padding:8px">`
+    +(baj?esc(baj):`Megveszem — ${ar} pont`)+`</button></div>`;
+  return h+`</div></div>`;}
+function engSectionBind(body){
+  if(!body)return;
+  const b=body.querySelector("#engBuyLvl");
+  if(b)b.onclick=()=>{if(engBuyLevel())renderStylePanel();};}
 function fearSectionBind(body){
   if(!body)return;
   body.querySelectorAll("[data-dread]").forEach(b=>{
@@ -89345,6 +89675,7 @@ function styleBindPanel(body){
           renderStylePanel();
           try{renderHub();refreshSquadViews();saveGame();}catch(e){}}});};});
   try{fearSectionBind(body);}catch(e){}
+  try{engSectionBind(body);}catch(e){}
   /* A KÉT FILOZÓFIA GOMBJAI (3.9.64). */
   {const pk=$("style2Pick");
    if(pk)pk.onclick=()=>{
@@ -94364,7 +94695,9 @@ function styleFxOn(ch){
 function styleOvrBonus(){
   /* A RETTEGÉS (3.9.68) ugyanide fut be: a félelem szint százaléka, +20-as
      plafonnal. Itt van a helye, mert a motor ebből az EGY számból dolgozik. */
-  return styleFxAdd("ovrTeam")+((typeof fearOvrBonus==="function")?fearOvrBonus():0);}
+  return styleFxAdd("ovrTeam")
+    +((typeof fearOvrBonus==="function")?fearOvrBonus():0)
+    +((typeof engOvrBonus==="function")?engOvrBonus():0);}
 function styleOppGoalMult(){return styleFxMul("oppGoalMult");}
 function styleOwnGoalMult(){return styleFxMul("ownGoalMult");}
 function styleRedMult(){return styleFxMul("redMult");}

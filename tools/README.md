@@ -1403,6 +1403,29 @@ dolgozott, és `h2hRoomActive()===false` mellett a párharcokat is kitörölte
 volna. A régi sorrenddel a menetrend 32 marad, az újjal 30 lesz. Részletek:
 `docs/osztalyletszam-es-paratlan-mezony.md`.
 
+## stilus-motor-proba.js — ⚙️ egy motor, hat gazdaság
+
+```
+node tools/stilus-motor-proba.js
+```
+
+A Panzer félelem-rettenetje azért erős, mert KETTÉVÁLASZTJA az ÁLLAPOTOT (a
+keretből számol, nem gyűjtöd) és a VALUTÁT (meccsenként gyűlik, az állapot
+10%-áig). Ez a motor ugyanezt adja a többi stílusnak — egy táblázat-sorral
+stílusonként, nem hat külön rendszerrel.
+
+A próba első két szakasza a KÉT LÉTRA VISZONYÁT méri, mert a kérés lényege ez
+volt: a százalék-létra **minden szinten pontosan 0,6-szerese** a Panzerének
+(plafon +12 vs +20), miközben az árlétra és a szintküszöb **betűre** a
+Panzeré. Ugyanaz a munka, kisebb jutalom.
+
+Utána a Villám gazdasága élőben: a viharszint mint állapot (a 70-es
+sebességnél kezdődő skála, a stílusszint négyszeres nagyítása, és hogy egy
+gyors ember eladása AZONNAL leviszi), a 10%-os meccskeret, a szint → meccserő
+átváltás, majd egy teljes mérkőzés tarifája és könyvelése. Az utolsó szakasz
+azt zárja le, hogy Panzernél a motor NÉMA — a két gazdaság nem adódhat össze.
+Részletek: `docs/stilus-jelzorendszer-motor.md`.
+
 ## pvp-meccsero-proba.js — ⚡ a szám, amiből a párharc tényleg eldől
 
 ```
