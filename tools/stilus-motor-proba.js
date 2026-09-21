@@ -195,6 +195,55 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(t.panzer.nema===true,"…és egy mérkőzés sem ír jóvá semmit");
   ok(t.masodlagos==="villam","de MÁSODLAGOS sloton is fut",{k:t.masodlagos});
 
+  /* ================= 8. NYOLCVAN PERC — A SEBESSÉG ÁRA =================
+     A Villám eddig tiszta nyereség volt. A fáradás adja az ellenjátékot: a
+     70. perctől esik a gólesélyetek és nő az ellenfélé, annál jobban, minél
+     magasabb a viharszint — és minden megvett szint a tizedét tünteti el. */
+  const fade=await p.evaluate(()=>{
+    const ki={};
+    S.style={key:"villam",traits:{}};S.style2=null;
+    const roster=fullCareerRoster()||[];
+    const setSeb=v=>{roster.forEach(pl=>{
+      const e=careerPool&&careerPool[pl.n];
+      if(e){if(!e.attrs)initPlayerAttrs(e);e.attrs.seb=v;}});};
+    const E=engState("villam");
+    setSeb(100);E.lvl=0;
+    const _sl=styleLevel;window.styleLevel=()=>20;
+    ki.szint=engLevel("villam");
+    /* A PERC-KAPU */
+    ki.percek=[0,30,65,69,70,75,90].map(m=>({m,
+      own:Math.round(villamFadeOwn(m)*10000)/10000,
+      opp:Math.round(villamFadeOpp(m)*10000)/10000}));
+    /* A KIVÁSÁRLÁS: szintenként a tized */
+    ki.szintek=[0,1,5,9,10].map(lv=>{E.lvl=lv;
+      return {lv,pct:villamFadePct(90)};});
+    E.lvl=0;
+    /* ALACSONY VIHARSZINTEN nincs hatás */
+    setSeb(70);ki.gyenge=villamFadePct(90);
+    setSeb(100);
+    window.styleLevel=_sl;
+    /* MÁS STÍLUSNÁL egyáltalán nem létezik */
+    S.style={key:"panzer",traits:{}};
+    ki.panzer=villamFadePct(90);
+    S.style={key:"villam",traits:{}};
+    return ki;});
+  console.log("=== 8. Nyolcvan perc — a sebesség ára ===");
+  {const k=fade.percek;
+   ok(k.filter(x=>x.m<70).every(x=>x.own===1&&x.opp===1),
+     "a 70. perc ELŐTT semmi hatás",k.filter(x=>x.m<70));
+   ok(k.filter(x=>x.m>=70).every(x=>x.own<1&&x.opp>1),
+     "a 70. perctől a saját esély esik, az ellenfélé nő",k.filter(x=>x.m>=70));
+   const h=k.find(x=>x.m===90);
+   ok(Math.abs((1-h.own)-(h.opp-1))<1e-9,
+     "és pontosan ugyanannyival mindkét irányba",{own:h.own,opp:h.opp});}
+  ok(fade.szintek[0].pct>0,"szint nélkül van fáradás",fade.szintek[0]);
+  {const csokken=fade.szintek.every((x,i)=>i===0||x.pct<=fade.szintek[i-1].pct);
+   ok(csokken,"minden megvett szint csökkenti",fade.szintek);}
+  ok(fade.szintek[fade.szintek.length-1].pct===0,
+    "a 10. szinten a hátrány ELTŰNIK",fade.szintek[fade.szintek.length-1]);
+  ok(fade.gyenge===0,"alacsony viharszinten nincs mit fizetni",{pct:fade.gyenge});
+  ok(fade.panzer===0,"és más stílusnál nem létezik",{pct:fade.panzer});
+
   const sulyos=errs.filter(e=>!/favicon|manifest|sw\.js|ServiceWorker/i.test(e));
   ok(sulyos.length===0,"nincs oldalhiba",sulyos.slice(0,4));
   await b.close();srv.close();

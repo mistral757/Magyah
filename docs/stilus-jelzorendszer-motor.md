@@ -113,16 +113,40 @@ motor **néma** — de másodlagos sloton a Villám így is fut.
 
 ## 7. Mérés
 
-`node tools/stilus-motor-proba.js` (9077-es port) — hét szakasz: a két létra
+`node tools/stilus-motor-proba.js` (9077-es port) — nyolc szakasz: a két létra
 viszonya (**minden szinten 0,6**), az azonos ár- és küszöblétra, a viharszint
 mint állapot (a skála alja, a stílusszint nagyítása, az eladás azonnali
 hatása), a 10%-os meccskeret, a szint → meccserő átváltás a +12-es plafonnal,
 egy **élő mérkőzés** teljes tarifája és könyvelése, végül hogy a motor csak a
 saját stílusánál fut.
 
-## 8. Ami még jön ebben a lépésben
+## 8. ⏳ „Nyolcvan perc" — a sebesség ára
 
-* **„Nyolcvan perc"** — a sebesség becsületes ára: a 70. perctől enyhén esik a
-  meccserő, amíg az állóképesség-tengely nincs fejlesztve; a bolt kivásárolja.
+A Villám eddig **tiszta nyereség** volt: a gyors keret jobb, és kész. Egy
+filozófiának viszont két oldala kell, különben nem választás, hanem bezárás —
+a Panzernél ezt a szerepet a rossz jellem tölti be (a félelem szintet emelő
+vandálok a pályán kívül is vandálok).
+
+**A Villám ára az, ami a valóságban is: a nagyon gyors csapat elfárad.** A
+**70. perctől** a csapat gólesélye esik, az ellenfélé pontosan ugyanannyival
+nő — annál jobban, minél magasabb a viharszint.
+
+| | |
+|---|---|
+| mikortól | 70. perc |
+| mennyi | legfeljebb **±6%** a gólesélyen (~0,7 meccserőnyi tétel) |
+| mitől függ | a viharszint: 70 alatt semmi, 300-nál a teljes mérték |
+| hogyan tűnik el | **minden megvett Villámcsapás-szint a tizedét** — a 10. szinten a hátrány nulla |
+
+Ez nem büntetés, hanem **ív**: az elején fizetsz a sebességért, a végén már
+nem. És ez teszi értelmessé a „korai gól" tarifát is — a rendszer mindkét
+fele ugyanazt mondja: **siess**.
+
+A hatás szorzó, nem meccserő, tehát a `roleOwnGoalMult` / `roleOppGoalMult`
+mellett ül, ugyanazon a két ponton.
+
+## 9. Ami még hátra van ebből a lépésből
+
 * **Szárny-kémia** — a passzkémia mintájára, sebességre: azonos szárnyon
-  játszó, hasonló sebességű páros közös percekből köt.
+  játszó, hasonló sebességű páros közös percekből köt, és a kontrák
+  gólesélyét emeli az adott oldalon.

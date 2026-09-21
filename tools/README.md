@@ -1422,8 +1422,13 @@ Panzeré. Ugyanaz a munka, kisebb jutalom.
 Utána a Villám gazdasága élőben: a viharszint mint állapot (a 70-es
 sebességnél kezdődő skála, a stílusszint négyszeres nagyítása, és hogy egy
 gyors ember eladása AZONNAL leviszi), a 10%-os meccskeret, a szint → meccserő
-átváltás, majd egy teljes mérkőzés tarifája és könyvelése. Az utolsó szakasz
-azt zárja le, hogy Panzernél a motor NÉMA — a két gazdaság nem adódhat össze.
+átváltás, majd egy teljes mérkőzés tarifája és könyvelése. Egy szakasz azt
+zárja le, hogy Panzernél a motor NÉMA — a két gazdaság nem adódhat össze.
+
+A nyolcadik szakasz a stílus ÁRÁT méri („Nyolcvan perc"): a 70. perc előtt
+semmi hatás, utána a saját gólesély pontosan annyival esik, amennyivel az
+ellenfélé nő, minden megvett szint a tizedét tünteti el, a 10.-en a hátrány
+nulla — és más stílusnál nem is létezik.
 Részletek: `docs/stilus-jelzorendszer-motor.md`.
 
 ## pvp-meccsero-proba.js — ⚡ a szám, amiből a párharc tényleg eldől
