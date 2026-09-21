@@ -1403,6 +1403,101 @@ dolgozott, és `h2hRoomActive()===false` mellett a párharcokat is kitörölte
 volna. A régi sorrenddel a menetrend 32 marad, az újjal 30 lesz. Részletek:
 `docs/osztalyletszam-es-paratlan-mezony.md`.
 
+## panzer-sztar-szerep-proba.js — 🛡️⭐ a két hiányzó szereptrió
+
+```
+node tools/panzer-sztar-szerep-proba.js
+```
+
+Öt filozófiának volt szezon-szerepe, kettőnek nem. A Panzer hármasa ugyanarra
+az egy mondatra épül („a piros lap minket nem rettent el"), de HÁROM KÜLÖN
+csatornán — a próba pont ezt méri: a Mészáros az ellenfél gólesélyét viszi le
+és lappal fizet, a Vezér a kiállítás MECCSERŐ-ÁRÁT fogja vissza (és ha őt
+magát állítják ki, nem véd), a Falka pedig csak EMBERHÁTRÁNYBAN hat.
+
+A Sztár hármasa az egyetlen a játékban, ahol a hatás NEM a kijelölt emberen
+jelenik meg. Ezért a Testőrnél külön állítás méri, hogy a `roleRiskMult`
+bővített aláírása visszafelé kompatibilis: kontextus nélkül hívva a régi
+viselkedés marad. A Szolgálónál azt, hogy tényleg ELVESZ a viselőjétől (az
+egyetlen ilyen szerep), az Örökösnél pedig azt, hogy a tanulás véget ér, ha a
+sztár elhagyja a klubot.
+
+Az utolsó szakasz a kihívás-büntetést („3 meccsig nem működnek a szerepek")
+futtatja rá mind a hatra. Részletek: `docs/panzer-sztar-szerepek.md`.
+
+## stilus-motor-proba.js — ⚙️ egy motor, hat gazdaság (a nyolcból)
+
+```
+node tools/stilus-motor-proba.js
+```
+
+A Panzer félelem-rettenetje azért erős, mert KETTÉVÁLASZTJA az ÁLLAPOTOT (a
+keretből számol, nem gyűjtöd) és a VALUTÁT (meccsenként gyűlik, az állapot
+10%-áig). Ez a motor ugyanezt adja a többi stílusnak — egy táblázat-sorral
+stílusonként, nem hat külön rendszerrel.
+
+A próba első két szakasza a KÉT LÉTRA VISZONYÁT méri, mert a kérés lényege ez
+volt: a százalék-létra **minden szinten pontosan 0,6-szerese** a Panzerének
+(plafon +12 vs +20), miközben az árlétra és a szintküszöb **betűre** a
+Panzeré. Ugyanaz a munka, kisebb jutalom.
+
+Utána a Villám gazdasága élőben: a viharszint mint állapot (a 70-es
+sebességnél kezdődő skála, a stílusszint négyszeres nagyítása, és hogy egy
+gyors ember eladása AZONNAL leviszi), a 10%-os meccskeret, a szint → meccserő
+átváltás, majd egy teljes mérkőzés tarifája és könyvelése. Egy szakasz azt
+zárja le, hogy Panzernél a motor NÉMA — a két gazdaság nem adódhat össze.
+
+A nyolcadik szakasz a stílus ÁRÁT méri („Nyolcvan perc"): a 70. perc előtt
+semmi hatás, utána a saját gólesély pontosan annyival esik, amennyivel az
+ellenfélé nő, minden megvett szint a tizedét tünteti el, a 10.-en a hátrány
+nulla — és más stílusnál nem is létezik.
+
+A tizenegyedik szakasz zárja le a sort: Beton, Harmónia, Tiki-taka,
+Gegenpressing. Itt már nem az a kérdés, elbírja-e a motor a stílusok
+HASONLÓSÁGÁT, hanem hogy elbírja-e a KÜLÖNBSÉGÜKET. Három bázis-alak
+(egy tengely · a kettő közül a nagyobbik · a kettő átlaga) és négy
+tarifa-nyelv. A legélesebb két állítás: a Betonnál a kapus VÉDÉSE pontosan
+annyit ér, mint egy hátvéd védekezése, a Harmóniánál pedig EGY EMBER HÁROM
+GÓLJA NULLA PONT — ott nem a gól számít, hanem hogy hányan szerezték. A
+Harmónia egyébként az egyetlen stílus, aminek az állapota nem egy tengely
+magassága, hanem a keret egyenletessége: egyenletes keret 660, széthúzott 0.
+
+A tizedik szakasz a BOMBÁZÓKÉ — és egyben a motor próbája: a gazdaság ott
+EGY táblázatsor, a bázis ugyanaz a szerkezet, csak a GÓLSZERZÉS attribútumon
+(a próba külön állítja, hogy a 100-as sebesség ott semmit nem ér). Mellette a
+két aláírás-mechanika: A Kilences önmagát gerjesztő gólsúlya a hárommal
+záródó plafonnal és a „hajrában hátrányban nem jár" záradékkal, illetve A
+rekord kötelez latchelő csapatszorzója és a lefújáskori könyvelés (a csúcs
+felmegy, de sosem le).
+
+A kilencedik a SZÁRNY-KÉMIA: a stílusszint három fokozata, a párosítás négy
+nemleges esete (más oldal · nem szárny · azonos poszt · és a legfontosabb: ha
+a két ember SEBESSÉGE elszakadt egymástól), az összeérés lépésről lépésre, a
+fölfelé kiegyenlítődő sebesség, és hogy a gólesély-szorzó csak akkor jár, ha
+mindketten a pályán vannak — a kiállított nem számít.
+Részletek: `docs/stilus-jelzorendszer-motor.md`.
+
+## pvp-meccsero-proba.js — ⚡ a szám, amiből a párharc tényleg eldől
+
+```
+node tools/pvp-meccsero-proba.js
+```
+
+A motor a párharcot MINDIG is a meccs-erőből számolta — a felület viszont a
+nyers keretet mutatta. A két menedzser tehát nem azon mérte magát, amiből a
+mérkőzés eldőlt (a beküldött beszélgetésben 173,3 vs 158,5, miközben a
+képernyőn másik számpár állt).
+
+A próba méri, hogy a csapatlap `mstr` mezője PONTOSAN a `teamMatchStrength()`,
+hogy a hálózati tisztítás átengedi a 120 fölötti értéket (a meccs-erő simán
+170 fölé megy), a hiányzót null-ra teszi és az irreálisat levágja — és hogy az
+eredményjelző párharcban mindkét oldalon a meccs-erőt mutatja, villám-jelzéssel.
+
+**A fele az állításoknak arról szól, hol NEM szabad változnia semminek:**
+bajnokiban, kupában és régi kliens ellen betűre a régi szám áll — utóbbinál
+azért, mert két KÜLÖNBÖZŐ skálájú szám egymás mellett rosszabb volna, mint két
+régi. Részletek: `docs/pvp-meccsero.md`.
+
 ## parharc-menetrend-proba.js — ⚔ a 22. fordulóban megállt a szezon
 
 ```
