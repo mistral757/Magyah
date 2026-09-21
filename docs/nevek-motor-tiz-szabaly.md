@@ -1,4 +1,4 @@
-# 🧬 A névmotor tíz szabályhiánya (3.9.113)
+# 🧬 A névmotor szabályhiányai (3.9.113 → 3.9.119)
 
 ## 0. Egy mondatban
 
@@ -136,3 +136,120 @@ nincs meg. Ez nem újdonság — a `Ronáldó Krisztián` és a `Názári Ronál
 Mind a nyolc **egyedi**: egyik rövid alak sem ütközik a tábla többi 3831
 nevével, tehát egyik sem esik vissza a `HU_SHORT_DISAMBIG`-on a teljes
 névre (azon a kettőn kívül, ahol ezt kifejezetten akartuk).
+
+
+---
+
+# II. rész — az őrjelek és a maradék tíz szabály (3.9.118–119)
+
+## 10. A meta-hiba: egy hibaosztály, tizenháromszor
+
+A 3.9.113 tíz javításából **három** nem hiányzó szabály volt, hanem rossz
+sorrend. Az utólagos söprés kiderítette, hogy ez nem véletlen: **ugyanaz a
+séma tizenháromszor ül a motorban.** Egy korai lépés beír egy magyar
+kétjegyű betűt, egy későbbi pedig belemar, mert csak **betűket** lát, nem
+**hangokat**.
+
+| a korai lépés | a későbbi lépés | eredmény |
+|---|---|---|
+| `ez$ → esz` | `z → sz` (es) | Rodríguessz |
+| `ß → sz` | `z → c` (de) | Häßler → **Haskler** |
+| `ž → zs` | `z → c` (de) | Džemaili → **Dcsemájli** |
+| `ñ → ny` | `y → j` | Núñez → **Núnjesz** |
+| `gn → ny` | `y → j` | Signori → **Sinjori** |
+| `gli → lyi` | `y → j` | Pagliuca → **Paljiuka** |
+| `ç → cs` | `c → dzs` (tr) | Selçuk → **Seldzssuk** |
+| `ã → a` | `ão$ → án` sosem fut | Militão → **Mílitao** |
+| `tz → c` | `c → k` | Großkreutz → **Groszkrojk** |
+| `z → c` (de) | `c → k` | Schulz → **Sulk** |
+| `ss → ssz` | `z → c` (de) | Sparwasser → **Sparvasscer** |
+| `ski$ → szki` | `z → c` (de) | Milewski → **Milevscki** |
+| `w → v` | `v → f` (de) | Weiß → **Fájsz** (helyesen Vájsz) |
+
+**Az utolsó öt nem a mérésből jött**: az őrjelek bevezetése *közben* bukkant
+elő. Ez a legjobb érv a megoldás mellett — a rendszer a saját hibáit is
+előhozta.
+
+### A megoldás nem folt
+
+Az eldöntött kétjegyű betűk mostantól **egyetlen láthatatlan karakterként**
+utaznak végig a soron, és csak a legvégén bomlanak vissza:
+
+```python
+S_NY, S_ZS, S_CS, S_LY, S_SZ, S_AO, S_C, S_DZS = "\x01" … "\x08"
+S_SSZ, S_CCS, S_S                              = "\x09", "\x0a", "\x0b"
+
+def desent(s):                    # a fonetika UTOLSÓ lépése
+    for k, v in SENT.items():
+        s = s.replace(k, v)
+    return s
+```
+
+A levezetett szabály, ami a kódban is ott áll:
+
+> **Ha egy csere magyar kétjegyű betűt ír, őrjelet kell írnia.** Nem azért,
+> mert ma elromlana, hanem mert a következő nyelvi szabály már nem tudja,
+> hogy az ott egy döntés eredménye volt.
+
+### Bizonyíték, hogy az OKOT szünteti meg
+
+A 3.9.116-ban beépített `^s(?!z)` őr (a `Szzapata` foltja) **fölöslegessé
+vált** — a `z → sz` most őrjelet ír, azon a csere nem talál `s`-t —, és el is
+hagytuk. Egy folt, amit nem megkerültünk, hanem **kidobtunk**.
+
+Három őrjel (`S_SSZ`, `S_CCS`, `S_S`) pedig már a bevezetés *közben* előjött
+hibákból született: a hosszú `ssz`/`ccs` első betűjébe (Nilsson → Nilszszon,
+Bucci → Bukcsi), illetve a valódi sh hangot jelölő `s`-be (Xeka → Szeka)
+martak bele az új nyelvi ágak.
+
+## 11. A maradék tíz szabály (3.9.119)
+
+| # | szabály | mit javít |
+|---|---|---|
+| A | angol szóvégi `-s` → sz | Péters → **Petersz**, Bírtles → **Birtlesz** |
+| B | francia néma szóvégi `-t/-d/-s/-x/-z` | Ámoros → **Amoro**, Zsonket → **Zsonké** |
+| C | skandináv `s` → sz | Bástrup → **Basztrup**, Nílsffy → **Nilszffy** |
+| D | török `s` → sz, a `ş` marad s | Sivok → **Szivok**, Baştürk → **Bastürk** |
+| E | görög `s` → sz | Dómazos → **Domazosz**, Mánolas → **Manolasz** |
+| F | `-ović` megtartja az „ov"-ot | Jics → **Jovics**, Csurkics → **Csurkovics** |
+| G | lengyel `sz/cz/rz/ch/ni` | Piszcsek → **Piscsek**, Bonik → **Bonyek** |
+| H | olasz `c` e/i előtt mindig cs | Manszini → **Mancsini**, Bucszi → **Buccsi** |
+| I | olasz `s` + mássalhangzó → sz | Anastazi → **Anasztazi** |
+| J | portugál `x` → s | Aleikszo → **Aleiso**, Kszeka → **Seka** |
+
+Két nyelv saját kódot kapott: **lengyel** (`pl`) és **görög** (`gr`) — eddig
+a közös szláv kosárban, illetve ág nélkül ültek.
+
+**A lengyel a latin szabályok ELŐTT fut**, mert *helyesírás*, nem fonetika:
+az általános `ie → i` különben előbb enné meg a „nie"-t (Boniek → Bonik).
+Ugyanez az elv, mint a holland/német `v → f`-nél.
+
+**Az angol `-s` szándékosan egységesen `sz`**, nem zöngésség szerint: a
+Francis /s/, a Giles /z/, és a kettőt csak a szó jelentése dönti el — egy
+névtáblából nem. Az „sh" viszont **mindig** hibás, tehát a biztos felét
+javítjuk: a hangot, nem a zöngésségét.
+
+## 12. Összesítés
+
+A 3.9.117-es állapothoz mérve **421 gépi név** változott, **kézi egy sem**.
+
+| nemzetiség | db | | nemzetiség | db |
+|---|---|---|---|---|
+| Németország | 72 | | Görögország | 27 |
+| Olaszország | 45 | | Brazília | 27 |
+| Anglia | 44 | | Lengyelország | 12 |
+| Franciaország | 39 | | Szerbia | 12 |
+| Dánia | 31 | | Svédország | 10 |
+
+Feloldatlan őrjel a táblában: **0**. Változatlanul maradt név: **0**.
+Az ütköző rövid alakok száma 198 → **196**.
+
+## 13. Ami tudva marad hátra
+
+- **Szláv `s` + mássalhangzó**: a Stojkovics még „Shtojkovics"-nak
+  olvasódik. Ezért kézi a `Sztojkovics Pongrác` és a `Jugovics Vladi`
+  (36. köteg) — a szabály maga még nincs meg.
+- **Francia orrhangok**: a Vincent „Vinszent" marad, nem „Vensan". Az
+  `-ent/-ant/-in/-on` kezelése külön munka.
+- **Német `ä`**: a PRE nem viszi (Matthäus → Mattaus); a németben `e`.
+- **Angol `g`/`j` = dzs**: Giles → „Gilesz", nem „Dzsájlz".

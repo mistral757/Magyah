@@ -1528,3 +1528,14 @@ MANUAL.update({
   # A keresztnév a becenévből: Mimis → Mimi.
   "Mimis Domazos":          ("Dómazos Mimi", "Dómazos"),
 })
+
+# ══ 36. KÖTEG — a -ović párja (3.9.119) ═══════════════════════════════════
+# A 3.9.118 motorszabálya visszaadta a kiesett „ov"-ot (Jugics → Jugovics),
+# a szerb szókezdő „st" viszont továbbra is magyar „s" (sht) marad: a
+# Stojkovics „Shtojkovics"-nak olvasódik. A szláv `s + mássalhangzó → sz`
+# szabály még nincs a motorban, ezért ez a kettő kézi — a felhasználó
+# kifejezetten így kérte.
+MANUAL.update({
+  "Vladimir Jugović":       ("Jugovics Vladi", "Jugovics"),
+  "Dragan Stojković":       ("Sztojkovics Pongrác", "Sztojkovics"),
+})

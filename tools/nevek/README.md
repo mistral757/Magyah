@@ -84,6 +84,23 @@ Háromnál a sorrend volt a hiba, nem a szabály — és a kód ezt ki is mondja
 Belgium 3.9.113 óta saját nyelvkód (`be`), ág nélkül: az ország kétnyelvű,
 és a flamand `g → h` a francia ajkú neveken (Gillet → „Hillet") rombolna.
 
+**3.9.118–119 — az őrjelek.** A tíz javításból három nem hiányzó szabály
+volt, hanem rossz sorrend, és kiderült, hogy ugyanez a séma TIZENHÁROMSZOR
+ül a motorban: egy korai lépés beír egy magyar kétjegyű betűt, egy későbbi
+belemar. Mostantól az eldöntött kétjegyű betűk egyetlen láthatatlan
+karakterként utaznak végig (`S_NY`, `S_ZS`, `S_CS`, `S_LY`, `S_SZ`, `S_C`,
+`S_DZS`, `S_SSZ`, `S_CCS`, `S_S`, `S_AO`), és csak a `desent()` bontja
+vissza őket.
+
+> **ÚJ NYELVI SZABÁLY ÍRÁSAKOR: ha magyar kétjegyű betűt írsz, őrjelet írj.**
+> Nem azért, mert ma elromlana, hanem mert a következő szabály már nem
+> tudja, hogy az ott egy döntés volt.
+
+Ezzel együtt bejött a maradék tíz szabály is (angol/skandináv/görög/török
+`s`, francia néma szóvégi mássalhangzó, `-ović`, lengyel helyesírás, olasz
+`c` e/i előtt és `s` + mássalhangzó, portugál `x`), valamint két új
+nyelvkód: `pl` és `gr`. Összesen 421 további gépi név, kézi egy sem.
+
 Részletes magyarázat: `docs/nevek-motor-tiz-szabaly.md`.
 
 ## kettozes.py — ugyanaz az ember két néven
