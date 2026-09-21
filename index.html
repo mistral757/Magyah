@@ -6132,7 +6132,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.121";
+const APP_VERSION="3.9.122";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -33475,6 +33475,15 @@ function pyrAnchorAtKickoff(){
   const mezoWant=(typeof P.fieldWant==="number"&&isFinite(P.fieldWant))?P.fieldWant:null;
   const want=(typeof P.gapWant==="number"&&isFinite(P.gapWant))?P.gapWant:null;
   if(mezoWant==null&&want==null){P.anchored=true;return false;}
+  /* ---- A NEVEZÉSI MECCS-ERŐ ABLAKA (3.9.122) ----
+     Innentől a `levelGap()` a NEVEZÉSI meccs-erővel számol: ha a mostani
+     kerettel legalább 2,5%-kal jobb felállás is kiállítható, a mezőny a
+     mostani és a maximum számtani közepéhez áll be. A hurok negyvenszer
+     olvassa a meccs-erőt, ezért a keresés eredménye gyorsítótárba kerül —
+     a keret közben úgysem változik. Lásd msPotential. */
+  const _msR=msRatedBegin();
+  try{msRatedNote(_msR);}catch(e){}
+  try{
   let before=0,after=0,moved=0;
   try{
     /* A KÉT MÓD KÖZÖS HIBAFÜGGVÉNYE. Mindkettő azt adja vissza, MENNYIVEL
@@ -33546,7 +33555,8 @@ function pyrAnchorAtKickoff(){
         +`<b>${after>=0?"−":"+"}${Math.abs(after).toFixed(1).replace(".",",")}</b>).`,"m mvp");
     }catch(e){}}
   try{saveGame();}catch(e){}
-  return true;}
+  return true;
+  }finally{msRatedEnd();}}
 
 function pyrDiffForGap(g){
   let best=PYR_START_DIFF[3],d=Infinity;
@@ -58021,7 +58031,14 @@ async function mpStartExchange(onReady){
   /* A `str` a NYERS keret (visszafelé kompatibilis, a régi kliens ezt olvassa),
      a `mstr` a MECCS-ERŐ (3.9.104) — a szint alkujánál is ez a beszédes szám,
      mert a mezőnyt ehhez mérve állítjátok be. */
-  let myMS=0;try{myMS=Math.round(teamMatchStrength()*10)/10;}catch(e){myMS=0;}
+  /* A CSERÉLT MECCS-ERŐ IS NEVEZÉSI SZÁM (3.9.122): a szuperligák közös
+     kalibrációja ebből dolgozik, tehát ugyanaz a lebutítás itt is nyitva
+     állna. A társ ugyanezt a szabályt futtatja a maga keretén. */
+  let myMS=0,_msPot=null;
+  try{_msPot=msRatedBegin();myMS=Math.round(teamMatchStrength()*10)/10;}
+  catch(e){myMS=0;}
+  finally{try{msRatedEnd();}catch(e){}}
+  try{msRatedNote(_msPot);}catch(e){}
   const myBidRec={lvl:(bid&&bid.value!=null)?bid.value:null,str:Math.round(teamStrength()),
     mstr:myMS||null,
     card:mpTeamCard(),
@@ -74502,7 +74519,224 @@ function hiddenMatchBonus(){
   return b;}
 /* A csapat VALÓDI meccs-ereje: a keret + a rejtett szituatív tagok. Ez a
    nehézség-tanácsadó és az auto szintkövetés alapja. */
-function teamMatchStrength(){return teamStrength()+hiddenMatchBonus();}
+/* ================= A POTENCIÁLIS MECCS-ERŐ (3.9.122) ======================
+   BEJELENTETT KÉRÉS: „a meccs-erő most sok-sok helyen egy fontos szám. Hogy
+   ne lehessen befolyásolni túlzottan dolgokat azzal, hogy az aktuális
+   meccs-erődet a mérésnél direkt alacsonyra állítod: legyen mindig egy
+   számítás arra, hogy az aktuális kerettel mi a maximális meccs-erő, ami
+   explicit összehozható (nem csak elméletben, hanem ténylegesen, akkor, ha
+   átszerveznéd a csapatot cserékkel, csapatkapitány-váltással,
+   felállás-váltással stb.). És amennyiben ezzel a számítással egy min
+   2,5%-kal jobb meccs-erő összehozható, abban az esetben a számított
+   potenciális max meccs-erő és az aktuális nevezési meccs-erő számtani
+   közepével kell számolni, és ezt jelezni is kell a játékosnak."
+
+   A KIHASZNÁLHATÓ RÉS. A 3.9.112 óta a szuperligák mezőnye a KEZDŐRÚGÁSKOR
+   mért meccs-erődhöz áll be, PvP-ben a kettőtök átlagához. A meccs-erő
+   viszont a felállásból, a kapitányból és a taktikából is áll — vagyis a
+   mérés pillanatában szándékosan rossz tizenegyet kiállítva gyenge mezőnyt
+   lehetett kérni, majd a rajt után visszarendezni. A mérőszám ezzel a
+   SZÁNDÉK mérésévé vált, nem a keretévé.
+
+   AMIT EZ A BLOKK CSINÁL. Megkeresi, mi a LEGJOBB meccs-erő, amit a mostani
+   kerettel TÉNYLEGESEN ki lehet állítani, és nem elméletben: minden lépése
+   egy valódi, felvehető felállás. Ha a talált maximum legalább 2,5%-kal
+   jobb a nevezettnél, a kalibráció a kettő számtani közepével dolgozik — és
+   a napló ki is mondja, mennyivel.
+
+   MIÉRT A KÖZÉP, ÉS NEM A MAXIMUM. Mert a rossz felállás nem mindig csalás:
+   lehet sérülés-kímélés, fiatal beépítése, tudatos kockázat. A közép
+   megőrzi a döntés súlyát (rosszabb keret = valóban könnyebb mezőny), de
+   elveszi a haszon felét — a szándékos lebutítás így már nem éri meg.
+
+   AMIT NEM VÁLTOZTAT MEG. A kijelzett meccs-erő, a nehézség-tanácsadó, a
+   jelvény, a figyelmeztetések és maga a MÉRKŐZÉS mind az ÉLŐ számmal
+   dolgozik tovább — ez a rendszer kizárólag a KALIBRÁCIÓS pillanatokban
+   kapcsol be (MS_RATED). Aki tényleg gyengébb kerettel akar játszani, azt
+   nem büntetjük: csak a mezőny kiszámítását nem bízzuk rá. */
+const MS_POT_MIN_GAIN=0.025;   /* ennél kisebb nyereség nem számít lebutításnak */
+const MS_POT_CANDS=12;         /* slotonként ennyi cserejelöltet nézünk végig */
+const MS_POT_PASSES=2;         /* a helyi keresés körei */
+
+let MS_RATED=false;      /* BE: a kalibrációs pillanatokban — lásd msRatedBegin */
+let _msProbing=false;    /* a keresés ALATT sosem a nevezési szám kell */
+let _msPotCache=null;
+
+function msPotInvalidate(){_msPotCache=null;}
+/* A nyers, élő meccs-erő — a keresés ezt maximalizálja. */
+function msRaw(){
+  try{return teamStrength()+hiddenMatchBonus();}catch(e){return 0;}}
+/* ---- A KERESÉS SOSEM HAGY NYOMOT ----
+   A globálisokhoz (slots, form, captainIdx, aktív taktika) hozzá KELL nyúlni,
+   mert a meccs-erő minden tagja azokból olvas. A `finally` ág ezért
+   feltétel nélküli: kivétel, korai visszatérés, bármi — a felállás,
+   a kapitány és a taktika pontosan úgy áll utána, ahogy előtte.
+   A padot és a tartalékot nem mutáljuk (az arrangeSlotsFor tiszta függvény),
+   de a visszaállításuk ott van, mert egy jövőbeli bővítés már mutálhatná. */
+function msWithRestore(fn){
+  const sv={slots:slots,form:form,cap:captainIdx,
+            bench:Object.assign({},BENCH),extra:extraRoster.slice(),
+            tac:(typeof S!=="undefined"&&S&&S.tactics)?S.tactics.active:null};
+  const pr=_msProbing;_msProbing=true;
+  try{return fn();}
+  catch(e){return null;}
+  finally{
+    slots=sv.slots;form=sv.form;captainIdx=sv.cap;
+    Object.keys(BENCH).forEach(k=>{delete BENCH[k];});
+    Object.keys(sv.bench).forEach(k=>{BENCH[k]=sv.bench[k];});
+    extraRoster=sv.extra;
+    if(typeof S!=="undefined"&&S&&S.tactics)S.tactics.active=sv.tac;
+    _msProbing=pr;}}
+/* ---- A KERESÉS ----
+   Négy tengely, mindegyik VALÓDI menedzseri lépés:
+     1. FELÁLLÁS   — minden ismert felállás, a kerettel feltöltve
+     2. CSERÉK     — slotonként a keret legjobb kimaradt embere
+     3. KAPITÁNY   — a kapitányi rutinbónusz csak a pályán lévőre jár
+     4. TAKTIKA    — a váltás a játékban is ingyenes, tehát itt is szabad
+   Nem teljes optimum (az 11-ből kiválasztás kombinatorikusan robbanna),
+   hanem HELYI keresés — és pontosan ezért tisztességes: minden köztes
+   állapota egy ténylegesen felvehető felállás, nem elméleti felső korlát.
+   A jelöltlistát a nyers Rating szerinti legjobb MS_POT_CANDS emberre
+   vágjuk: egy 30 fős keretnél ez a futásidőt harmadolja, a találatot pedig
+   a mérés szerint nem rontja (a 13. legjobb tartalék sosem javított). */
+function msBestConfig(){
+  if(typeof FORMS!=="object"||!slots||!slots.length)return null;
+  const pool=((typeof fullCareerRoster==="function")?fullCareerRoster():[]).filter(Boolean);
+  if(pool.length<11)return null;
+  const rank=pool.slice().sort((a,b)=>{
+    let x=0,y=0;try{x=pOvr(a);}catch(e){}try{y=pOvr(b);}catch(e){}return y-x;});
+  const rank0=rank;
+  const tacs=(typeof TACTICS==="object")?Object.keys(TACTICS):[];
+  /* ---- A JELÖLT FELÁLLÁSOK ----
+     AZ ELSŐ MINDIG A MOSTANI, és ez nem formalitás: egy szűk, posztokban
+     hiányos keretnél az arrangeSlotsFor EGYETLEN felállást sem tud
+     hiánytalanul feltölteni (mérve: 11 fős kerettel mind a nyolc felállás
+     8–9 slotnál megáll), és a keresés némán NULL-t adott — vagyis a
+     lebutítás-védelem pont a legszűkebb keretnél kapcsolt ki magától.
+     A mostani felállás viszont definíció szerint kiállítható: ott áll a
+     pályán. A slotokat MÁSOLJUK, hogy a keresés az eredetihez ne nyúljon.
+     A többi felállásnál a maradék helyeket a keret legjobb szabad
+     emberével töltjük — ugyanúgy, ahogy az applyFormationChange utolsó
+     köre teszi, tehát ez is TÉNYLEGESEN felvehető állapot. */
+  const jeloltek=[{f:form,slots:slots.map(s=>({pos:s.pos,xy:s.xy,player:s.player,
+                                               fit:s.fit,origin:s.origin}))}];
+  Object.keys(FORMS).forEach(f=>{
+    let arr=null;try{arr=arrangeSlotsFor(f,pool);}catch(e){return;}
+    if(!arr||!arr.slots)return;
+    const used=new Set(arr.slots.map(x=>x.player).filter(Boolean));
+    arr.slots.forEach(sl=>{
+      if(sl.player)return;
+      let bp=null,bv=-1;
+      rank0.forEach(p=>{if(used.has(p))return;
+        let v=0;try{v=pOvr(p);}catch(e){}
+        if(v>bv){bv=v;bp=p;}});
+      if(bp){sl.player=bp;sl.fit=fitFor(bp,sl);used.add(bp);}});
+    if(arr.slots.some(s=>!s.player))return;      /* tényleg nem áll ki */
+    jeloltek.push({f,slots:arr.slots});});
+  let best=null;
+  jeloltek.forEach(j=>{
+    if(j.slots.some(s=>!s.player))return;
+    const f=j.f;
+    form=f;slots=j.slots;
+    for(let pass=0;pass<MS_POT_PASSES;pass++){
+      let moved=false;
+      for(let i=0;i<slots.length;i++){
+        const used=new Set(slots.map(s=>s.player));
+        let bv=msRaw(),bp=null;
+        let seen=0;
+        for(let r=0;r<rank.length&&seen<MS_POT_CANDS;r++){
+          const p=rank[r];
+          if(used.has(p))continue;
+          seen++;
+          const op=slots[i].player,of=slots[i].fit;
+          slots[i].player=p;slots[i].fit=fitFor(p,slots[i]);
+          const v=msRaw();
+          slots[i].player=op;slots[i].fit=of;
+          if(v>bv+1e-9){bv=v;bp=p;}}
+        if(bp){slots[i].player=bp;slots[i].fit=fitFor(bp,slots[i]);moved=true;}}
+      if(!moved)break;}
+    /* KAPITÁNY: a rutinbónusz csak akkor jár, ha a kapitány a kezdőben van —
+       a csereberélés után tehát új ember is lehet a legjobb választás. */
+    {let bc=captainIdx,bv=msRaw();
+     for(let i=0;i<slots.length;i++){
+       const o=captainIdx;captainIdx=i;const v=msRaw();captainIdx=o;
+       if(v>bv+1e-9){bv=v;bc=i;}}
+     captainIdx=bc;}
+    /* TAKTIKA: a szint a begyakorlásból jön, az illeszkedés a MOSTANI
+       tizenegyből — ezért a csereberélés UTÁN mérjük. */
+    if(typeof S!=="undefined"&&S&&S.tactics&&tacs.length){
+      let bt=S.tactics.active,bv=msRaw();
+      tacs.forEach(k=>{
+        const o=S.tactics.active;S.tactics.active=k;const v=msRaw();S.tactics.active=o;
+        if(v>bv+1e-9){bv=v;bt=k;}});
+      S.tactics.active=bt;}
+    const fin=msRaw();
+    if(!best||fin>best.v)
+      best={v:fin,form:f,cap:captainIdx,
+            tac:(typeof S!=="undefined"&&S&&S.tactics)?S.tactics.active:null,
+            xi:slots.map(s=>(s.player&&s.player.n)||null)};});
+  return best;}
+/* A NEVEZÉSI ÉS A POTENCIÁLIS SZÁM, PLUSZ AMIVEL SZÁMOLUNK.
+   Az eredmény a kalibráció idejére gyorsítótárba kerül: a horgony hurka
+   akár negyvenszer olvassa a meccs-erőt, a keret viszont közben nem
+   változik — újraszámolni pazarlás volna. */
+function msPotential(){
+  if(_msPotCache)return _msPotCache;
+  if(typeof gameMode!=="undefined"&&gameMode!=="career")return null;
+  const now=msRaw();
+  if(!(now>0))return null;
+  const b=msWithRestore(msBestConfig);
+  if(!b||!(b.v>0))return null;
+  const pot=Math.max(b.v,now);
+  const gain=(pot-now)/now;
+  const on=gain>=MS_POT_MIN_GAIN;
+  const n1=x=>Math.round(x*10)/10;
+  _msPotCache={now:n1(now),pot:n1(pot),gain,on,
+               used:on?(now+pot)/2:now,
+               form:b.form,cap:b.cap,tac:b.tac,xi:b.xi};
+  return _msPotCache;}
+/* ---- A KALIBRÁCIÓS ABLAK ----
+   Csak e két hívás között él a „nevezési" szám. Mindenhol máshol — a
+   kijelzésben, a tanácsadóban, a mérkőzésen — az ÉLŐ meccs-erő marad. */
+function msRatedBegin(){
+  msPotInvalidate();
+  MS_RATED=true;
+  try{msPotential();}catch(e){}
+  return _msPotCache;}
+function msRatedEnd(){MS_RATED=false;msPotInvalidate();}
+/* A BEJELENTÉS. Egyszer szólal meg kalibrációnként, és megmondja, MIVEL
+   lehetne jobb — enélkül a felhasználó csak egy megmagyarázatlan számot
+   látna. A felállás/kapitány/taktika hármasból csak azt soroljuk fel,
+   ami tényleg MÁS, mint a mostani. */
+function msRatedNote(r){
+  if(!r||!r.on)return false;
+  const mi=[];
+  try{
+    if(r.form&&r.form!==form)mi.push(`felállás <b>${esc(r.form)}</b>`);
+    if(r.cap!=null&&r.cap!==captainIdx)mi.push("másik kapitány");
+    if(r.tac&&(!S.tactics||r.tac!==S.tactics.active)&&TACTICS[r.tac])
+      mi.push(`taktika <b>${esc(TACTICS[r.tac].n)}</b>`);
+    const most=new Set(slots.map(s=>s.player&&s.player.n).filter(Boolean));
+    const cs=(r.xi||[]).filter(n=>n&&!most.has(n)).length;
+    if(cs)mi.push(`<b>${cs}</b> csere a kezdőben`);
+  }catch(e){}
+  const n1=x=>Math.round(x*10)/10;
+  try{
+    addLine(`⚖️ <b>A nevezési meccs-erő nem a maximum.</b> Most <b>${n1(r.now)}</b>, `
+      +`a mostani kerettel viszont <b>${n1(r.pot)}</b> is kiállítható `
+      +`(<b>+${Math.round(r.gain*1000)/10}%</b>${mi.length?` — ${mi.join(", ")}`:""}). `
+      +`A mezőny ezért a kettő <b>számtani közepével</b> (<b>${n1(r.used)}</b>) kalibrálódik.`,"m ev");
+    addLine(`→ Nem büntetés: a gyengébb felállás továbbra is könnyebb mezőnyt hoz, `
+      +`csak a felét. Ha tényleg a legjobbat állítod ki, ez a sor el sem hangzik.`,"m skillnote");
+  }catch(e){}
+  return true;}
+function teamMatchStrength(){
+  const live=teamStrength()+hiddenMatchBonus();
+  /* A NEVEZÉSI SZÁM CSAK A KALIBRÁCIÓS ABLAKBAN MÁS (3.9.122). A keresés
+     alatt (_msProbing) mindig az élő érték kell, különben önmagát hívná. */
+  if(!MS_RATED||_msProbing)return live;
+  let r=null;try{r=msPotential();}catch(e){r=null;}
+  return (r&&r.on)?r.used:live;}
 function levelGap(lvl){return teamMatchStrength()-oppMatchStrength(lvl);}
 /* ================= AZ AUTOMATIKA A KIÉRDEMELT ERŐT MÉRI =====================
    TÖRTÉNET. Amíg a szintlépés Infinityben a SAJÁT keretedet is emelte

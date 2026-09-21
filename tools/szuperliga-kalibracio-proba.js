@@ -59,6 +59,17 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
   const t=await p.evaluate(()=>{
     const ki={};
     const n1=x=>Math.round(x*10)/10;
+    /* A HORGONY A NEVEZÉSI RÉST ÁLLÍTJA BE (3.9.122). Ha a kerettel
+       legalább 2,5%-kal jobb felállás is kiállítható, a kalibráció a
+       mostani és a maximum KÖZEPÉVEL dolgozik — az ÉLŐ rés tehát
+       szándékosan a fél-különbséggel alacsonyabb marad. A mérésnek
+       ezért ugyanabban az ablakban kell olvasnia, amiben a horgony
+       dolgozott, különben a saját szabályunkat mérnénk hibának. */
+    const resNevezesi=()=>{
+      let v=null;
+      try{msRatedBegin();v=n1(levelGap());}catch(e){}
+      finally{try{msRatedEnd();}catch(e){}}
+      return v;};
     gameMode="career";
     enterCareerSetupFromHome(true);
     beginNewGame();
@@ -112,7 +123,8 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
     ki.resElotte=n1(levelGap());
     const r1=pyrSuperKickoff();
     ki.r1={ok:!!(r1&&r1.ok),want:r1&&r1.want,mp:r1&&r1.mp};
-    ki.resUtana=n1(levelGap());
+    ki.resUtana=resNevezesi();
+    ki.resUtanaElo=n1(levelGap());
 
     /* ---- 4. IDÉNYENKÉNT EGYSZER ---- */
     const szintUtana=pyrLevel();
@@ -130,7 +142,7 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
     ki.resNoves=n1(levelGap());
     const r2=pyrSuperKickoff();
     ki.r2ok=!!(r2&&r2.ok);
-    ki.resUtana2=n1(levelGap());
+    ki.resUtana2=resNevezesi();
 
     /* ---- 6. A LÉPCSŐ MEZŐNY-ÍGÉRETE ELTŰNIK ---- */
     S.seasonNumber=3;S.idx=0;
@@ -213,7 +225,11 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
   console.log("\n3. MAGÁNYOS KEZDŐRÚGÁS");
   ok(t.resElotte<-8,"a világ tényleg elszaladt a keret fölé",t.resElotte);
   ok(t.r1.ok===true&&t.r1.mp===false,"a magányos ág futott le",t.r1);
-  ok(kozel(t.resUtana,2,0.3),"a rés a vállalt +2-re állt",{elotte:t.resElotte,utana:t.resUtana});
+  ok(kozel(t.resUtana,2,0.3),"a NEVEZÉSI rés a vállalt +2-re állt",
+     {elotte:t.resElotte,utana:t.resUtana});
+  ok(t.resUtanaElo<=t.resUtana+0.05,
+     "…az ÉLŐ rés pedig legfeljebb ennyi (a lebutítás fele elveszett)",
+     {nevezesi:t.resUtana,elo:t.resUtanaElo});
 
   console.log("\n4. IDÉNYENKÉNT EGYSZER");
   ok(t.masodik===null,"ugyanabban az idényben nem fut újra",t.masodik);
@@ -224,7 +240,8 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
      {elotte:t.msElotte,utana:t.msUtana});
   ok(Math.abs(t.resNoves-2)>1.5,"…és ezzel elcsúszott a rés is",t.resNoves);
   ok(t.r2ok===true,"az új idény kezdőrúgása lefutott");
-  ok(kozel(t.resUtana2,2,0.3),"…és a rés újra pontosan +2",{elotte:t.resNoves,utana:t.resUtana2});
+  ok(kozel(t.resUtana2,2,0.3),"…és a nevezési rés újra pontosan +2",
+     {elotte:t.resNoves,utana:t.resUtana2});
 
   console.log("\n6. A LÉPCSŐ ÍGÉRETE");
   ok(t.fieldWantTorolve===true,"a fieldWant eltűnt — a D0 fölött rés a vállalás");

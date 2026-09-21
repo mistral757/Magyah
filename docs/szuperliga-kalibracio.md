@@ -189,6 +189,14 @@ legfeljebb 4 Rating**. Ez a kettőt szimmetrikussá is teszi.
 PvP-ben egy sorral több: a két meccs-erő, az átlaguk, és hogy a világ merre
 mozdult.
 
-## 9. A próba
+## 9. Egy áthatás (3.9.122)
+
+A kalibráció mostantól a **nevezési** meccs-erővel dolgozik: ha a kerettel
+legalább 2,5%-kal jobb felállás is kiállítható, a mezőny a mostani és a
+maximum számtani közepéhez áll be (`docs/meccsero-potencial.md`).
+Lebutított felállásnál az **élő** rés ezért szándékosan alacsonyabb marad a
+vállaltnál — pontosan a különbség felével.
+
+## 10. A próba
 
 `tools/szuperliga-kalibracio-proba.js` (13 szakasz) — lásd `tools/README.md`.

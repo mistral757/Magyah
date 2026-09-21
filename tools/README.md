@@ -1818,6 +1818,38 @@ tökéletesen működő kalibráció is zöldet adna.
 
 Részletes magyarázat: `docs/szuperliga-kalibracio.md`.
 
+## meccsero-potencial-proba.js — ⚖️ a lebutított felállás fele annyit ér
+
+```bash
+node tools/meccsero-potencial-proba.js
+```
+
+**A rés.** A szuperligák mezőnye a KEZDŐRÚGÁSKOR mért meccs-erőhöz áll be,
+PvP-ben a kettőtök átlagához. A meccs-erőt viszont a mérés pillanatában
+állítani lehet: csere, felállás, kapitány, taktika. Szándékosan rossz
+tizenegyet kiállítva gyenge mezőnyt lehetett kérni, majd visszarendezni.
+
+**Amit a próba állít.** 3.9.122 óta a kalibráció megkeresi, mi a legjobb
+meccs-erő, ami a kerettel TÉNYLEGESEN kiállítható; ha az legalább 2,5%-kal
+jobb, a mezőny a kettő számtani közepéhez áll be, és a napló kimondja.
+
+Tizenhat állítás, köztük a három legfontosabb:
+
+| # | mit igazol |
+|---|---|
+| 1 | a keresés NEM hagy nyomot — felállás, kapitány, taktika, pad, keret bitre ugyanaz utána, **kivétel esetén is** |
+| 7 | a talált konfiguráció VALÓDI: létező felállás, 11 slot tele, senki kétszer, kapitány a pályán, ismert taktika — nem elméleti felső korlát |
+| 4 | a használt szám PONTOSAN a két érték számtani közepe |
+| 2 | ép kerettel nincs hamis riasztás (a nyereség a küszöb alatt marad) |
+| 6 | `MS_RATED` nélkül a `teamMatchStrength` az ÉLŐ számot adja — a kijelzés, a tanácsadó és a mérkőzés nem változik |
+
+**A próba kapta el a legsúlyosabb hibát:** az első változat szűk keretnél
+némán kikapcsolt, mert az `arrangeSlotsFor` egyetlen felállást sem tudott
+feltölteni (11 fős kerettel mind a nyolc 8–9 slotnál megállt). Azóta a
+MOSTANI felállás mindig jelölt — az definíció szerint kiállítható.
+
+Részletes magyarázat: `docs/meccsero-potencial.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
