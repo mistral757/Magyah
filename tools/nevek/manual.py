@@ -1487,3 +1487,44 @@ MANUAL.update({
   "Virgilio Maroso":        ("Marozo Máté", "Marozo"),
   "Andy Cole":              ("Kol Bandi", "Kol"),
 })
+
+# ══ 35. KÖTEG — a második adag kézbe vett neve (3.9.117) ═══════════════════
+# A 3.9.116 utáni mérés harminc gépi nevet tett a felhasználó elé; ebből
+# tizenhetet írt át. A javítások fele PONTOSAN az, amit a még be nem épített
+# motorszabályok is adnának (Snájder, Sulc, Nyúnyez, Sinyóri, Zágorakisz,
+# Manolász, Pítörsz) — a másik fele viszont poén, amit szabály sosem hozna.
+MANUAL.update({
+  # ── AMIT EGY SZABÁLY IS MEGADNA (de itt már döntés) ──────────────────────
+  # A német ß = ssz. A motor „Haskler"-t adott: a PRE ß → „sz"-t ír, a német
+  # ág `z → c`-je pedig belemart — ugyanaz a sorrend-csapda, mint a
+  # Rodríguessz-nél.
+  "Thomas Häßler":          ("Hesszler Tamás", "Hesszler"),
+  # A `sch` sosem jutott el a saját szabályáig: a ch-blokk hamarabb fut.
+  "Bernd Schneider":        ("Snájder Bernát", "Snájder"),
+  "Christian Schulz":       ("Sulc Krisztián", "Sulc"),
+  # A PRE `ñ → ny`-t ír, az y-szabály pedig nj-vé vágja (Núnjesz, Sinjori).
+  "Darwin Núñez":           ("Nyúnyez Kelemen", "Nyúnyez"),
+  "Giuseppe Signori":       ("Sinyóri József", "Sinyóri"),
+  # A görög nevek MIND -s-re végződnek, és a magyar „s" a sh hangot jelöli.
+  "Theodoros Zagorakis":    ("Zágorakisz Teó", "Zágorakisz"),
+  "Kostas Manolas":         ("Manolász Kostás", "Manolász"),
+  # Angol szóvégi -s, ugyanez.
+  "Martin Peters":          ("Pítörsz Márton", "Pítörsz"),
+  # A skandináv s is sz — a „-son = fia" poén (ffy) megmarad fölötte.
+  "Torbjörn Nilsson":       ("Nílszffy Szabolcs", "Nílszffy"),
+  # A holland „aa" hosszú á; az általános `ay → éj` itt félrement.
+  "Roy Makaay":             ("Makáj Roj", "Makáj"),
+  # ── A -ović: visszakerül a kiesett „ov" ──────────────────────────────────
+  # A motor `ovi[cć]$ → ics` szabálya a TŐBŐL is levágott: a Jovićból „Jics"
+  # maradt, három betű.
+  "Luka Jović":             ("Jovics Lukács", "Jovics"),
+  "Dejan Stanković":        ("Sztankovics Deján", "Sztankovics"),
+  # ── POÉN: amit szabály sosem hozna ───────────────────────────────────────
+  "Harald Schumacher":      ("Sumákoló Herold", "Sumákoló"),
+  "Jack Grealish":          ("Girhes Jakab", "Girhes"),
+  # Kétszavas rövid alak, mint a „Kér Kéz" (Kerkez) és a „Pali Lyuka".
+  "Pablo Ibáñez":           ("Ibán Yessz Pál", "Ibán Yessz"),
+  "Pietro Anastasi":        ("Ananász Tázi Péter", "Ananász Tázi"),
+  # A keresztnév a becenévből: Mimis → Mimi.
+  "Mimis Domazos":          ("Dómazos Mimi", "Dómazos"),
+})
