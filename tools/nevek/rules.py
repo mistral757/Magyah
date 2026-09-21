@@ -232,11 +232,56 @@ KEEP = set("áéíóöőúüűÁÉÍÓÖŐÚÜŰ")
 def fold(s):
     return "".join(c if c in KEEP else strip_dia(c) for c in s)
 
+# ══ ŐRJELEK: A KÉTJEGYŰ BETŰ EGY BETŰ (3.9.118) ════════════════════════════
+# A MEGISMÉTLŐDŐ HIBA. A motorban ötször fordult elő ugyanaz: egy KORAI lépés
+# beír egy magyar kétjegyű betűt, egy KÉSŐBBI pedig annak az egyik felébe mar
+# bele, mert csak betűket lát, nem hangokat.
+#
+#   ez$ → esz    utána  z → sz (spanyol)   →  Rodríguessz   (3.9.113-ban javítva)
+#   ß  → sz      utána  z → c  (német)     →  Häßler → Haskler, Weiß → Fájsk
+#   ž  → zs      utána  z → c  (német)     →  Džemaili → Dcsemájli
+#   ñ  → ny      utána  y → j              →  Núñez → Núnjesz
+#   gn → ny      utána  y → j              →  Burgnich → Burnjik, Signori → Sinjori
+#   gli→ lyi     utána  y → j              →  Pagliuca → Paljiuka
+#   ç  → cs      utána  c → dzs (török)    →  Selçuk → Seldzssuk
+#   ã  → a       ezért  ão$ → án SOSEM fut →  Militão → Mílitao
+#   tz → c       utána  c → k              →  Großkreutz → Groszkrojk
+#   z  → c (de)  utána  c → k              →  Schulz → Sulk
+#   w  → v       utána  v → f  (német)     →  Weiß → Fájsz (helyesen Vájsz)
+#   ss → ssz     utána  z → c  (német)     →  Sparwasser → Sparvasscer
+#   ski$→ szki   utána  z → c  (német)     →  Milewski → Milevscki
+#
+# AZ UTOLSÓ HÁROM A LEGBESZÉDESEBB: ezeket már az őrjelek BEVEZETÉSE KÖZBEN
+# találtam meg — vagyis a rendszer a saját hibáit is előhozta. Az egybetűs
+# `c`-nek is kell őrjel, mert a `c → k` szabály nem tudja, hogy az a c egy
+# MÁSIK szabály döntése volt; a német v/w pedig ugyanaz a csere-sorrend,
+# amit a holland ágnál már egyszer megoldottunk.
+#
+# A SZABÁLY, AMIT EBBŐL LEVEZETÜNK: ha egy csere MAGYAR KÉTJEGYŰ BETŰT ír
+# (ny, zs, cs, ly, sz, c, dzs), őrjelet kell írnia. Nem azért, mert ma
+# elromlana, hanem mert a következő nyelvi szabály már nem tudja, hogy az
+# ott egy döntés eredménye volt.
+#
+# A FOLTOZÁS NEM MEGOLDÁS: minden új nyelvi szabály újra megnyitná. Ezért a
+# már ELDÖNTÖTT kétjegyű betűk mostantól EGYETLEN, láthatatlan karakterként
+# utaznak végig a soron, és csak a legvégén bomlanak vissza. Ami őrjel, azon
+# egyetlen későbbi csere sem fog — a hatodik ilyen hiba nem tud megszületni.
+S_NY, S_ZS, S_CS, S_LY, S_SZ, S_AO, S_C, S_DZS = ("\x01", "\x02", "\x03", "\x04",
+                                                  "\x05", "\x06", "\x07", "\x08")
+SENT = {S_NY: "ny", S_ZS: "zs", S_CS: "cs", S_LY: "ly", S_SZ: "sz",
+        S_AO: "án", S_C: "c", S_DZS: "dzs"}
+
+def desent(s):
+    """Az őrjelek feloldása — a fonetika UTOLSÓ lépése."""
+    for k, v in SENT.items():
+        s = s.replace(k, v)
+    return s
+
 PRE = str.maketrans({
- "ć":"cs","č":"cs","ç":"cs","š":"s","ș":"s","ş":"s","ž":"zs","ź":"zs","ż":"zs",
- "ř":"rzs","ñ":"ny","ń":"ny","ø":"ő","å":"ó","æ":"e","ł":"l","đ":"gy","ð":"d",
+ "ć":S_CS,"č":S_CS,"ç":S_CS,"š":"s","ș":"s","ş":"s","ž":S_ZS,"ź":S_ZS,"ż":S_ZS,
+ "ř":"r"+S_ZS,"ñ":S_NY,"ń":S_NY,"ø":"ő","å":"ó","æ":"e","ł":"l","đ":"gy","ð":"d",
  "þ":"t","ě":"e","ė":"e","ę":"e","ą":"a","ů":"ú","ı":"i","ğ":"","ý":"i","ÿ":"i",
- "ß":"sz","õ":"ó","ã":"a","â":"á","ê":"é","î":"i","ô":"ó","û":"u","ë":"e","ï":"i",
+ "ß":S_SZ,"õ":"ó","ã":"a","â":"á","ê":"é","î":"i","ô":"ó","û":"u","ë":"e","ï":"i",
 })
 
 def hufy(w, lang="en"):
@@ -256,26 +301,64 @@ def hufy(w, lang="en"):
         _rest = hufy(w[2 + len(_mc.group(1)):], lang)
         return _pre + _rest.lower()
     cap = w[0].isupper()
-    s = w.lower().translate(PRE)
+    _lw = w.lower()
+    # A PORTUGÁL -ão MÉG A PRE ELŐTT (3.9.118). A PRE a hullámot lekoptatja
+    # (`ã → a`), ezért a lenti `ão$ → án` szabály SOSEM talált semmit —
+    # a Militãóból „Mílitao" lett, nem „Militán".
+    if lang == "pt":
+        _lw = re.sub(r"ão", S_AO, _lw)
+    s = _lw.translate(PRE)
 
-    # ── A HOLLAND v MÁR ITT f LESZ (3.9.113) ───────────────────────────────
+    # ── A HOLLAND ÉS NÉMET v MÁR ITT f LESZ (3.9.113 · 3.9.118) ────────────
     # A sorrend miatt áll ilyen korán: lentebb az általános lista `w → v`-t
     # cserél, és ha a `v → f` UTÁNA futna, a Wijnaldumból Fájnaldum lenne.
-    # A holland w ejtése v, a v-é viszont f — a kettőt tehát el kell
+    # Mindkét nyelvben a w ejtése v, a v-é viszont f — a kettőt tehát el kell
     # választani, mielőtt egybeolvadnak. Lásd van Bommel → Fánbommel.
-    if lang == "nl":
+    # A NÉMET 3.9.118 ÓTA VAN ITT: addig a de-ág a `w → v` UTÁN cserélt
+    # v → f-et, és ezért lett a Weißből „Fájsz" (helyesen Vájsz), a
+    # Wagnerből „Fágner". Ugyanaz a csere-sorrend, csak egy nyelvvel odébb.
+    if lang in ("nl", "de"):
         s = s.replace("v", "f")
 
     # végződések
-    s = re.sub(r"(ovi[cć]|ovich|ovics)$", "ics", s)
-    s = re.sub(r"(sky|ski)$", "szki", s)
-    s = re.sub(r"(escu)$", "eszku", s)
+    # ── A -ović MEGTARTJA AZ „ov"-OT (3.9.118) ─────────────────────────────
+    # Volt itt egy `-ović → -ics`, ami magyaros vezetéknevet csinált az
+    # apanévből (Ivanović → Ivanics). Rövid tövön viszont végzetes: a
+    # Jovićból „Jics" lett, HÁROM betű. A felhasználó döntése a teljes alak
+    # (Jovics, Sztojkovics), és így a három írásmód is egyformán viselkedik —
+    # eddig a „-ovich" és a „-ović" MÁS eredményt adott.
+    s = re.sub(r"ovi(?:c|ch|cs|" + S_CS + r")$", "ovi" + S_CS, s)
+    s = re.sub(r"(sky|ski)$", S_SZ + "ki", s)
+    s = re.sub(r"(escu)$", "e" + S_SZ + "ku", s)
     # A SPANYOL -ez NEM KAP KÜLÖN SZABÁLYT (3.9.113). Volt itt egy
     # `ez$ → esz`, és pont az rontotta el: lentebb az `es` ág amúgy is
     # elvégzi a `z → sz` cserét, ami a MOST beírt `sz`-ből `ssz`-t csinált —
     # innen jött a Rodríguessz, Gómessz, Fernándessz (51 név). A `z → sz`
     # egymagában helyesen hoz Rodrígeszt és Gómeszt, a Zapata → Szapata pedig
     # mindig is bizonyította, hogy a cserével nincs baj.
+
+    # ── A sch SOSEM JUTOTT EL A SAJÁT SZABÁLYÁIG (3.9.118) ─────────────────
+    # A `sch → s` az általános listában állt, az viszont a ch-blokk UTÁN fut:
+    # mire odaért, a ch már k vagy cs lett (Schneider → Sknájder, Schulz →
+    # Scsulk, Schumacher → Scsumacser). Ezért került ELŐRE.
+    # OLASZUL KIVÉTEL: ott a `sch` = sk (Schiavone → Skiavone), és ezt a
+    # ch-blokk `chi → ki` ága adja helyesen — tehát olaszul nem nyúlunk hozzá.
+    if lang != "it":
+        s = s.replace("sch", "s")
+    s = s.replace("sh", "s")
+
+    # A „gn" CSAK AZ ÚJLATIN NYELVEKBEN ny (3.9.118). Az általános listában
+    # állt, ezért a németre is lefutott: a Wagnerből „Vanyer" lett (azelőtt
+    # „Vanjer"), az Illgnerből „Ilnyer". Németül, angolul, hollandul a gn
+    # egyszerűen g+n. Olaszul (Insigne) és franciául (Sagnol) viszont ny —
+    # a guide R1 sora is így mondja.
+    if lang in ("it", "fr"):
+        s = s.replace("gn", S_NY)
+
+    # AZ OLASZ „gli" EGYETLEN HANG (3.9.118): a Pagliuca „pa-lyú-ka", nem
+    # „pa-lyi-uka". Magánhangzó előtt tehát nem marad utána i.
+    s = re.sub(r"gli(?=[aeiouáéíóú])", S_LY, s)
+    s = s.replace("gli", S_LY + "i")
 
     # ch — a legerősebben nyelvfüggő hang
     if lang in ("it",):
@@ -290,7 +373,7 @@ def hufy(w, lang="en"):
 
     # a baszk/katalán „tx" magyarul cs (Goikoetxea → Goikocsea). Az x→ksz
     # szabály elé kell, különben kiejthetetlen mássalhangzó-torlódás lesz.
-    s = s.replace("tx", "cs").replace("tz", "c")
+    s = s.replace("tx", S_CS).replace("tz", S_C)
 
     # ── A qu NYELVFÜGGŐ (3.9.113) ──────────────────────────────────────────
     # Volt az általános listában egy `qu → kv`, ami az újlatin nyelveken
@@ -298,11 +381,11 @@ def hufy(w, lang="en"):
     # Quique → Kike), nem kv. Az olaszban és az angolban viszont TÉNYLEG kv
     # (quattro, queen), tehát ott marad.
     s = s.replace("qu", "k" if lang in ("fr", "es", "pt") else "kv")
-    for a, b in [("sch","s"),("sh","s"),("cz","cs"),("th","t"),("ph","f"),
-                 ("ck","kk"),("gh","g"),("gn","ny"),("gli","lyi"),
+    for a, b in [("cz","cs"),("th","t"),("ph","f"),
+                 ("ck","kk"),("gh","g"),
                  ("ee","í"),("oo","ú"),("ou","ú"),("ea","í"),("oa","ó"),
                  ("ai","áj"),("ay","éj"),("ey","i"),("ie","i"),
-                 ("ss","ssz"),("x","ksz"),("w","v"),("q","k")]:
+                 ("ss","s"+S_SZ),("x","k"+S_SZ),("w","v"),("q","k")]:
         s = s.replace(a, b)
 
 
@@ -312,11 +395,10 @@ def hufy(w, lang="en"):
         # Stracsan „Shtrachan"-nak olvasódott. Angolul ez a hang /s/.
         # A NÉMET SZÁNDÉKOSAN KIMARAD: ott a szó eleji st/sp TÉNYLEG „sht"
         # (Stefan), és a lenti de-ág ezt külön meg is védi.
-        s = re.sub(r"s(?=[ptkmnlw])", "sz", s)
+        s = re.sub(r"s(?=[ptkmnlw])", S_SZ, s)
     elif lang == "de":
-        s = s.replace("ei", "áj").replace("eu", "oj").replace("z", "c")
+        s = s.replace("ei", "áj").replace("eu", "oj").replace("z", S_C)
         s = re.sub(r"^s(?=[pt])", "s", s)
-        s = re.sub(r"v", "f", s)
     elif lang == "fr":
         s = re.sub(r"j", "zs", s)
         # A FRANCIA G i/e/y ELŐTT ZS (3.9.113) — Gignac → Zsinyak,
@@ -328,25 +410,26 @@ def hufy(w, lang="en"):
     elif lang == "es":
         s = re.sub(r"j", "h", s)
         s = re.sub(r"^h", "", s)
-        s = s.replace("z", "sz")
+        s = s.replace("z", S_SZ)
         # A SZÓKEZDŐ S SPANYOLUL SZ (3.9.113). A magyar „s" a sh hangot
         # jelöli, tehát a Santamaría eddig „Shantamaria"-ként olvasódott.
         # A `z → sz` UTÁN áll, különben a frissen beírt sz z-jét is
         # újracserélné (ugyanaz a csapda, ami a Rodríguessz-t okozta).
-        # …ÉS EZÉRT KELL A (?!z) ŐR IS (3.9.116). Az utána-állás egy MÁSIK
-        # csapdát nyitott: a Zapata a `z → sz` után már „szapata", aminek az
-        # eleje `s` — a szabály tehát RÁ IS lefutott, és „Szzapata" lett
-        # belőle (6 név). Spanyolul szó eleji `sz` nem létezik, tehát a
-        # „nem követi z" feltétel pontosan a gépi eredetű sz-t zárja ki.
-        s = re.sub(r"^s(?!z)", "sz", s)
+        # …ÉS 3.9.116-BAN MÉG EGY ŐR KELLETT IDE: a Zapata a `z → sz` után
+        # már „szapata", aminek az eleje `s`, tehát a szabály RÁ IS lefutott
+        # („Szzapata", 6 név). 3.9.118 ÓTA AZ ŐR FÖLÖSLEGES: a `z → sz`
+        # őrjelet ír, azon pedig ez a csere már nem talál `s`-t. Ez a
+        # legtisztább bizonyíték rá, hogy az őrjelek nem egy foltot
+        # váltottak ki, hanem a folt OKÁT.
+        s = re.sub(r"^s", S_SZ, s)
     elif lang == "pt":
         s = re.sub(r"ão$", "án", s)
-        s = s.replace("nh", "ny").replace("lh", "ly")
-        s = re.sub(r"^s(?!z)", "sz", s)   # Sousa → Szúza, Salas → Szálas
+        s = s.replace("nh", S_NY).replace("lh", S_LY)
+        s = re.sub(r"^s", S_SZ, s)        # Sousa → Szúza, Salas → Szálas
     elif lang == "it":
         s = re.sub(r"ci(?=[aou])", "cs", s)
-        s = re.sub(r"gi(?=[aou])", "dzs", s)
-        s = s.replace("ge", "dzse").replace("gi", "dzsi")
+        s = re.sub(r"gi(?=[aou])", S_DZS, s)
+        s = s.replace("ge", S_DZS + "e").replace("gi", S_DZS + "i")
         # MAGÁNHANGZÓK KÖZT AZ OLASZ s ZÖNGÉS (3.9.113): Maroso → Marozo,
         # Baresi → Barezi, Ambrosini → Ambrozini. A kettőzött ss-t nem
         # érinti (az fölötte már ssz lett), és ez a helyes: a Cassano
@@ -361,7 +444,7 @@ def hufy(w, lang="en"):
         s = s.replace("ij", "áj").replace("ei", "áj")
         s = re.sub(r"(?<!n)g", "h", s)
     elif lang == "tr":
-        s = s.replace("c", "dzs")
+        s = s.replace("c", S_DZS)
 
     # ── A KETTŐZÖTT L NYELVFÜGGŐ (3.9.113) ─────────────────────────────────
     # Volt a fenti listában egy `ll → ly`, ami a lenti y-szabályon át `lj`-vé
@@ -383,7 +466,7 @@ def hufy(w, lang="en"):
         s = s.replace("ll", "l")
 
     # c ejtése (ami eddig megmaradt)
-    s = re.sub(r"c(?=[eiéí])", "sz", s)
+    s = re.sub(r"c(?=[eiéí])", S_SZ, s)
     s = re.sub(r"c(?![sz])", "k", s)
     # y
     s = re.sub(r"y(?=[aeiouáéíóú])", "j", s)
@@ -391,8 +474,12 @@ def hufy(w, lang="en"):
     # néma szóvégi e (angol/francia) — de a 2-3 betűs szavakból nem, mert
     # abból nem marad semmi („Le" → „L")
     if lang in ("en", "fr") and len(s) > 3:
-        s = re.sub(r"(?<=[a-zíóúűő])e$", "", s)
+        # AZ ŐRJELEK IS BETŰK: a visszatekintésnek látnia kell őket, különben
+        # a „Giresse" (gires+⟨sz⟩+e) néma e-je bennmarad — Zsiressze.
+        s = re.sub(r"(?<=[a-zíóúűő\x01-\x08])e$", "", s)
 
+    # AZ ŐRJELEK ITT BOMLANAK VISSZA — minden csere után, semmi nem fog rajtuk.
+    s = desent(s)
     s = fold(s)
     s = re.sub(r"(.)\1{2,}", r"\1\1", s)      # hármas betűzés összevonása
     if not s:
