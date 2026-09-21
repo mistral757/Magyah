@@ -244,6 +244,97 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(fade.gyenge===0,"alacsony viharszinten nincs mit fizetni",{pct:fade.gyenge});
   ok(fade.panzer===0,"és más stílusnál nem létezik",{pct:fade.panzer});
 
+  /* ================= 9. SZÁRNY-KÉMIA =================
+     A harmadik kötésfajta a passzkémia és a gyilkos páros mellé. Azonos
+     oldal, KÜLÖNBÖZŐ poszt (védő + szélső), és a sebességük legfeljebb
+     SZARNY_GAP-pel térhet el — utóbbi a lényeg: ez teszi keretépítési
+     döntéssé, nem automatikus jutalommá. */
+  const sz=await p.evaluate(()=>{
+    const ki={};
+    S.style={key:"villam",traits:{}};S.style2=null;
+    S.szarny={};
+    const _sl=styleLevel;
+    /* --- A KAPU: stílusszint --- */
+    window.styleLevel=()=>1;  ki.lvl1={tier:szarnyTier(),on:szarnyOn()};
+    window.styleLevel=()=>3;  ki.lvl3={tier:szarnyTier(),on:szarnyOn()};
+    window.styleLevel=()=>8;  ki.lvl8=szarnyTier();
+    window.styleLevel=()=>14; ki.lvl14=szarnyTier();
+    window.styleLevel=()=>20; ki.lvl20=szarnyTier();
+
+    /* --- A PÁROSÍTÁS SZABÁLYAI --- */
+    const mk=(n,pos,seb)=>{careerPool[n]={n,pos:[pos],attrs:{seb},age:26,ovr:90,pot:5000};};
+    mk("Jobbhátvéd Jenő","JV",92);
+    mk("Jobbszélső József","JSZ",94);   /* azonos oldal, más poszt, 2 eltérés → OK */
+    mk("Lassú Lajos","JV",80);          /* azonos oldal, de 14 eltérés → nem */
+    mk("Balhátvéd Béla","BV",88);
+    mk("Balszélső Bence","BSZ",89);
+    mk("Középső Károly","KV",93);       /* nem szárny */
+    mk("Másik Szélső","JSZ",93);        /* azonos poszt → nem */
+    ki.parok={
+      jo:szarnyPairOk("Jobbhátvéd Jenő","Jobbszélső József"),
+      lassu:szarnyPairOk("Lassú Lajos","Jobbszélső József"),
+      masOldal:szarnyPairOk("Jobbhátvéd Jenő","Balszélső Bence"),
+      nemSzarny:szarnyPairOk("Középső Károly","Jobbszélső József"),
+      azonosPoszt:szarnyPairOk("Másik Szélső","Jobbszélső József"),
+      bal:szarnyPairOk("Balhátvéd Béla","Balszélső Bence")};
+
+    /* --- AZ ÉPÜLÉS ÉS AZ ÖSSZEÉRÉS --- */
+    window.styleLevel=()=>20;
+    const need=szarnyRipeNeed();
+    ki.need=need;
+    const jatszott=new Set(["Jobbhátvéd Jenő","Jobbszélső József",
+      "Balhátvéd Béla","Balszélső Bence","Középső Károly"]);
+    const naplo=[];const _a=addLine;addLine=x=>naplo.push(String(x));
+    szarnyTick(jatszott);
+    ki.elsoTick={kotesek:Object.keys(S.szarny).length,
+      indult:naplo.filter(x=>/Szárny épül/.test(x)).length};
+    for(let i=0;i<need+2;i++)szarnyTick(jatszott);
+    addLine=_a;
+    ki.utana={kesz:szarnyDone(),osszes:Object.keys(S.szarny).length,
+      osszeert:naplo.filter(x=>/ÖSSZESZOKOTT SZÁRNY/.test(x)).length};
+    ki.sebesseg={
+      jv:Math.round(careerPool["Jobbhátvéd Jenő"].attrs.seb),
+      jsz:Math.round(careerPool["Jobbszélső József"].attrs.seb)};
+
+    /* --- A GÓLESÉLY-SZORZÓ --- */
+    const act=nevek=>nevek.map(n=>({p:{n},bus:0}));
+    ki.szorzo={
+      mindketto:Math.round(szarnyGoalMult(act(["Jobbhátvéd Jenő","Jobbszélső József"]),new Set())*10000)/10000,
+      egyik:Math.round(szarnyGoalMult(act(["Jobbhátvéd Jenő"]),new Set())*10000)/10000,
+      ketPar:Math.round(szarnyGoalMult(act(["Jobbhátvéd Jenő","Jobbszélső József",
+        "Balhátvéd Béla","Balszélső Bence"]),new Set())*10000)/10000,
+      kiallitva:Math.round(szarnyGoalMult(act(["Jobbhátvéd Jenő","Jobbszélső József"]),new Set([0]))*10000)/10000};
+    /* --- MÁS STÍLUSNÁL SEMMI --- */
+    S.style={key:"panzer",traits:{}};
+    ki.panzer={on:szarnyOn(),
+      szorzo:szarnyGoalMult(act(["Jobbhátvéd Jenő","Jobbszélső József"]),new Set())};
+    S.style={key:"villam",traits:{}};
+    window.styleLevel=_sl;
+    return ki;});
+
+  console.log("=== 9. szárny-kémia ===");
+  ok(sz.lvl1.tier===0&&!sz.lvl1.on,"a 3. stílusszint alatt nem létezik",sz.lvl1);
+  ok(sz.lvl3.tier===1&&sz.lvl3.on,"a 3.-tól nyílik",sz.lvl3);
+  ok(sz.lvl8===2&&sz.lvl14===3&&sz.lvl20===3,"három fokozat, 8-nál és 14-nél lép",
+    {l8:sz.lvl8,l14:sz.lvl14,l20:sz.lvl20});
+  ok(sz.parok.jo&&sz.parok.bal,"JV+JSZ és BV+BSZ közeli sebességgel: páros",sz.parok);
+  ok(!sz.parok.lassu,"…de ha a sebesség elszakad, NEM (ez a keretépítési döntés)");
+  ok(!sz.parok.masOldal&&!sz.parok.nemSzarny&&!sz.parok.azonosPoszt,
+    "más oldal / nem szárny / azonos poszt: nem páros",sz.parok);
+  ok(sz.elsoTick.kotesek===2&&sz.elsoTick.indult===2,
+    "az első közös meccsen mindkét szárny elindul",sz.elsoTick);
+  ok(sz.utana.kesz===2&&sz.utana.osszeert===2,
+    `${sz.need} közös meccs után mindkettő összeér`,sz.utana);
+  ok(sz.sebesseg.jv===sz.sebesseg.jsz&&sz.sebesseg.jv>94,
+    "és a sebességük FÖLFELÉ egyenlítődik ki",sz.sebesseg);
+  ok(sz.szorzo.mindketto>1&&sz.szorzo.egyik===1,
+    "a szorzó csak akkor jár, ha MINDKETTŐ a pályán van",sz.szorzo);
+  ok(Math.abs(sz.szorzo.ketPar-sz.szorzo.mindketto*sz.szorzo.mindketto)<1e-6,
+    "két kész páros szorzata halmozódik",sz.szorzo);
+  ok(sz.szorzo.kiallitva===1,"a kiállított nem számít",{v:sz.szorzo.kiallitva});
+  ok(sz.panzer.on===false&&sz.panzer.szorzo===1,
+    "más stílusnál nem létezik",sz.panzer);
+
   const sulyos=errs.filter(e=>!/favicon|manifest|sw\.js|ServiceWorker/i.test(e));
   ok(sulyos.length===0,"nincs oldalhiba",sulyos.slice(0,4));
   await b.close();srv.close();

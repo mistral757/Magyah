@@ -1429,6 +1429,12 @@ A nyolcadik szakasz a stílus ÁRÁT méri („Nyolcvan perc"): a 70. perc előt
 semmi hatás, utána a saját gólesély pontosan annyival esik, amennyivel az
 ellenfélé nő, minden megvett szint a tizedét tünteti el, a 10.-en a hátrány
 nulla — és más stílusnál nem is létezik.
+
+A kilencedik a SZÁRNY-KÉMIA: a stílusszint három fokozata, a párosítás négy
+nemleges esete (más oldal · nem szárny · azonos poszt · és a legfontosabb: ha
+a két ember SEBESSÉGE elszakadt egymástól), az összeérés lépésről lépésre, a
+fölfelé kiegyenlítődő sebesség, és hogy a gólesély-szorzó csak akkor jár, ha
+mindketten a pályán vannak — a kiállított nem számít.
 Részletek: `docs/stilus-jelzorendszer-motor.md`.
 
 ## pvp-meccsero-proba.js — ⚡ a szám, amiből a párharc tényleg eldől

@@ -113,7 +113,7 @@ motor **néma** — de másodlagos sloton a Villám így is fut.
 
 ## 7. Mérés
 
-`node tools/stilus-motor-proba.js` (9077-es port) — nyolc szakasz: a két létra
+`node tools/stilus-motor-proba.js` (9077-es port) — kilenc szakasz: a két létra
 viszonya (**minden szinten 0,6**), az azonos ár- és küszöblétra, a viharszint
 mint állapot (a skála alja, a stílusszint nagyítása, az eladás azonnali
 hatása), a 10%-os meccskeret, a szint → meccserő átváltás a +12-es plafonnal,
@@ -145,8 +145,56 @@ fele ugyanazt mondja: **siess**.
 A hatás szorzó, nem meccserő, tehát a `roleOwnGoalMult` / `roleOppGoalMult`
 mellett ül, ugyanazon a két ponton.
 
-## 9. Ami még hátra van ebből a lépésből
+## 9. ⚡ Szárny-kémia (3.9.107)
 
-* **Szárny-kémia** — a passzkémia mintájára, sebességre: azonos szárnyon
-  játszó, hasonló sebességű páros közös percekből köt, és a kontrák
-  gólesélyét emeli az adott oldalon.
+A **harmadik kötésfajta** a passzkémia és a gyilkos páros mellé — és a
+harmadik, ami nem felajánlásból jön, hanem **együtt töltött időből**.
+
+### Mit köt össze
+
+Egy **szárnyat**: a szélső védőt és az előtte játszó szélsőt, ugyanazon az
+oldalon — **JV+JSZ** vagy **BV+BSZ**. A magyar futballnyelv erre azt mondja:
+*„összeszokott szárny"* — és pontosan ez a Villám lelke, mert a szélen nem a
+technika dönt, hanem hogy a kettő **egyszerre indul-e meg**.
+
+### A belépő szigorú, és ez a lényeg
+
+A kettő **sebessége legfeljebb 3-mal térhet el**. Ha a védő lassabb, mint a
+szélső, a labda kifut alóla — nincs mit összeszokni. Így a kötés nem jár
+automatikusan mindenkinek, hanem egy **keretépítési döntés** jutalma.
+
+A posztkódból döntünk, nem a slotból — ugyanúgy, ahogy a gyilkos párosnál:
+a tick csak neveket kap, és a játékos **saját posztja** mondja meg, melyik
+szárny embere.
+
+**Legfeljebb kettő** lehet belőle, és ezt nem külön korlát mondja ki, hanem
+maga a szerkezet: két oldal van.
+
+### A fokozatok
+
+| stílusszint | fokozat | összeérés | gólesély / páros | sebesség-ugrás |
+|---|---|---|---|---|
+| < 3 | — | nincs | — | — |
+| 3–7 | 1 | 14 közös meccs | +3,0% | +2% |
+| 8–13 | 2 | 11 közös meccs | +4,5% | +3% |
+| 14+ | 3 | 8 közös meccs | +6,0% | +4% |
+
+A szorzó csak akkor jár, ha **mindketten a pályán vannak** (a kiállított
+nem) — ugyanaz a szabály, mint a gyilkos páros presszing-szorzójánál. Két
+kész párossal a kettő **szorzódik** (mérve: 1,06 × 1,06 = 1,1236).
+
+Az összeéréskor a **sebességük fölfelé kiegyenlítődik** a nagyobbikhoz, egy
+kis ráadással, a keményplafonig (`attrHardCap`) — a kötés nem nyit új teret,
+csak felzárkóztat.
+
+### Miért a stílusszint a kapu
+
+A gyilkos párost egy **képesség** nyitja, mert a Gegenpressing fáján van neki
+hely. A Villám fájára nem akartunk új képességet tolni egy olyan körben, ami
+amúgy is három rendszert hoz — itt ezért maga a filozófia szintje a lépcső.
+
+### Hol lakik
+
+`S.szarny` (a mentés része), a léptetés a `passChemTick` / `gpDuoTick`
+mellett fut a fejlődési ciklus után, a szorzó pedig a `roleOwnGoalMult`
+csatornáján megy.
