@@ -333,11 +333,16 @@ def hufy(w, lang="en"):
         # jelöli, tehát a Santamaría eddig „Shantamaria"-ként olvasódott.
         # A `z → sz` UTÁN áll, különben a frissen beírt sz z-jét is
         # újracserélné (ugyanaz a csapda, ami a Rodríguessz-t okozta).
-        s = re.sub(r"^s", "sz", s)
+        # …ÉS EZÉRT KELL A (?!z) ŐR IS (3.9.116). Az utána-állás egy MÁSIK
+        # csapdát nyitott: a Zapata a `z → sz` után már „szapata", aminek az
+        # eleje `s` — a szabály tehát RÁ IS lefutott, és „Szzapata" lett
+        # belőle (6 név). Spanyolul szó eleji `sz` nem létezik, tehát a
+        # „nem követi z" feltétel pontosan a gépi eredetű sz-t zárja ki.
+        s = re.sub(r"^s(?!z)", "sz", s)
     elif lang == "pt":
         s = re.sub(r"ão$", "án", s)
         s = s.replace("nh", "ny").replace("lh", "ly")
-        s = re.sub(r"^s", "sz", s)      # Sousa → Szúza, Salas → Szálas
+        s = re.sub(r"^s(?!z)", "sz", s)   # Sousa → Szúza, Salas → Szálas
     elif lang == "it":
         s = re.sub(r"ci(?=[aou])", "cs", s)
         s = re.sub(r"gi(?=[aou])", "dzs", s)
