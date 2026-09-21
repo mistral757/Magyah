@@ -1418,3 +1418,34 @@ MANUAL.update({
   "Willian":                ("Villám", "Villám"),
   "Costinha":               ("Kosztinnya", "Kosztinnya"),
 })
+
+# ══ 33. KÖTEG — a motorjavítás UTÁN maradt nyolc név (3.9.114) ═════════════
+# A 3.9.113 tíz motorszabálya 412 nevet hozott helyre; a huszonhét
+# legláthatóbb közül tizenkilencre a felhasználó rábólintott, nyolcat pedig
+# kézbe vett. Ezek innentől NEM a szabálymotorból jönnek: a poén (és a
+# „Q. P.") olyan döntés, amit egy fonetikai szabály sosem hozna meg.
+MANUAL.update({
+  # A német W ejtése v, a tz pedig c — a gépi „Firk" hangzásban is,
+  # jelentésben is melléfogott, ráadásul ÉLŐ sztárról van szó.
+  "Florian Wirtz":          ("Virc Flóri", "Virc"),
+  # A motor „Mekleis"-t hozott; a skót „ei" itt hosszú í.
+  "Alex McLeish":           ("Meklís Sanyi", "Meklís"),
+  # A „gli" = lj szabály technikailag jó volt (Paljuka), de a NÉV kínálta a
+  # szétvágást. A kétszavas rövid alak nem újdonság: lásd Kerkez Milos
+  # („Kér Kéz Milliós" / „Kér Kéz") és Iniesta („Ínyenc Pista").
+  "Gianluca Pagliuca":      ("Pali Lyuka Lukács", "Pali Lyuka"),
+  # A gépi „Korso" magyarul „korsó"-nak olvasódott; a Korzózó ugyanazt a
+  # szótagot viszi tovább, csak szándékosan.
+  "Mario Corso":            ("Korzózó Márijó", "Korzózó"),
+  # A spanyol -ay = -áj szabály „Garáj"-t adott volna; a Garai valódi magyar
+  # vezetéknév, és ugyanúgy szól.
+  "Ezequiel Garay":         ("Garai Ezékiel", "Garai"),
+  # Betűnév — a Coupet kiejtése (kú-pé) magyarul két betű neve.
+  "Grégory Coupet":         ("Q. P. Gergely", "Q. P."),
+  # A RÖVID ALAK IT A TELJES NÉV, mert a poén a két szó EGYÜTT (ahogy a
+  # „Ronáldó Krisztián" és a „Názári Ronáldó" sem vágható félbe).
+  "Radja Nainggolan":       ("Ragyás Nyálgollam", "Ragyás Nyálgollam"),
+  # Ugyanaz: a vicc a szóhatár elcsúsztatása (Dwight Yorke → Dwáj Tyork),
+  # tehát félbevágva nincs értelme.
+  "Dwight Yorke":           ("Dwáj Tyork", "Dwáj Tyork"),
+})

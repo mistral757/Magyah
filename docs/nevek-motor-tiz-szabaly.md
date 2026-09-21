@@ -110,10 +110,29 @@ tiszta.
 > (az edzők rövid neve) már a változtatás ELŐTT is bukott — ellenőrizve a
 > változtatás előtti `index.html`-en. Nem ehhez a kötegez tartozik.
 
-## 7. Ami tudatosan maradt
+## 7. A kézi utómunka (3.9.114)
 
-Ezek egyedi, kézi döntést kívánnak (`manual.py`), nem motorszabályt:
-`Wirtz → Firk` (német W), `Boniek → Bonik`, `Mihajlović → Mihajlics`,
-`Belodedici → Belodediszi`, `Garay → Garéh`, `Bacigalupo → Baszigalupo`,
-`Pagliuca → Paljiuka`, `Corso → Korso`, `Nainggolan → Nájnggolan`,
-`Militão → Mílitao`, `Sá → Szá`, `Coupet → Kúpet`.
+A motorjavítás után a huszonhét legláthatóbb névből **tizenkilenc** már
+jó volt; **nyolcat** a felhasználó kézbe vett. Ezek a `manual.py` 33.
+kötegében állnak, mert olyan döntések, amiket egy fonetikai szabály sosem
+hozna meg:
+
+| kanonikus | motor (3.9.113) | kézi (3.9.114) | miért |
+|---|---|---|---|
+| Florian Wirtz | Firk Barnabás | **Virc Flóri** | német `W`=v, `tz`=c — és élő sztár |
+| Alex McLeish | Mekleis Sándor | **Meklís Sanyi** | a skót `ei` itt hosszú í |
+| Gianluca Pagliuca | Paljuka Lukács | **Pali Lyuka Lukács** | a név kínálta a szétvágást |
+| Mario Corso | Korso Márió | **Korzózó Márijó** | a „korsó" most szándékos |
+| Ezequiel Garay | Garáj Ezékiel | **Garai Ezékiel** | valódi magyar vezetéknév, ugyanaz a hangzás |
+| Grégory Coupet | Kúpet Gergely | **Q. P. Gergely** | betűnév: a kú-pé magyarul két betű neve |
+| Radja Nainggolan | Nájngolan Dezső | **Ragyás Nyálgollam** | a poén a két szó EGYÜTT |
+| Dwight Yorke | Jork Gedeon | **Dwáj Tyork** | a szóhatár elcsúsztatása |
+
+**Két név rövid alakja a TELJES név** (Nainggolan, Yorke): a vicc félbevágva
+nincs meg. Ez nem újdonság — a `Ronáldó Krisztián` és a `Názári Ronáldó` is
+így áll. A `Pali Lyuka` pedig kétszavas rövid alak, mint a `Kér Kéz`
+(Kerkez Milos) és az `Ínyenc Pista` (Iniesta).
+
+Mind a nyolc **egyedi**: egyik rövid alak sem ütközik a tábla többi 3831
+nevével, tehát egyik sem esik vissza a `HU_SHORT_DISAMBIG`-on a teljes
+névre (azon a kettőn kívül, ahol ezt kifejezetten akartuk).
