@@ -1449,3 +1449,41 @@ MANUAL.update({
   # tehát félbevágva nincs értelme.
   "Dwight Yorke":           ("Dwáj Tyork", "Dwáj Tyork"),
 })
+
+# ══ 34. KÖTEG — VÉDŐBLOKK: a jóváhagyott tizenkilenc (3.9.115) ═════════════
+# EZ A BLOKK NEM VÁLTOZTAT SEMMIT. Betűre azt rögzíti, amit a 3.9.113
+# szabálymotorja MA is ad — a felhasználó ezt a tizenkilenc nevet nézte át és
+# hagyta jóvá.
+#
+# MIÉRT KELL MÉGIS. Pontosan ez a hibaosztály esett meg a `bf84bde`-vel: 240
+# kézi javítás élt a gépi rétegen, és egy motorfrissítés némán elmozdította
+# volna őket — utólag kellett védőblokkal megmenteni (lásd
+# docs/nevek-danisitasa-minta.md §0). Egy jóváhagyott név innentől DÖNTÉS,
+# nem a szabályok mellékterméke: ha holnap finomodik az olasz `ci` vagy a
+# holland `g`, ezek a sorok akkor is állnak.
+#
+# ÚJ MOTORSZABÁLY ÍRÁSAKOR tehát ezek a nevek NEM fognak javulni maguktól —
+# ha egy szabály miatt itt is változtatni kell, ezt a blokkot kell átírni.
+MANUAL.update({
+  "Geoff Hurst":            ("Hurszt Dzsef", "Hurszt"),
+  "Billy McNeill":          ("Mekneil Vili", "Mekneil"),
+  "Ally McCoist":           ("Mekkoiszt Alika", "Mekkoiszt"),
+  # A felhasználó ezt így hagyta jóvá. A motor szerint az olasz `ci`
+  # mássalhangzó előtt is „csi" volna (Bacsigalúpó) — a döntés az övé.
+  "Valerio Bacigalupo":     ("Baszigalupo Gergő", "Baszigalupo"),
+  "Robert Jonquet":         ("Zsonket Róbert", "Zsonket"),
+  "Zbigniew Boniek":        ("Bonik Barnabás", "Bonik"),
+  "Siniša Mihajlović":      ("Mihajlics Pongrác", "Mihajlics"),
+  "Miodrag Belodedici":     ("Belodediszi Mikó", "Belodediszi"),
+  "Éder Militão":           ("Mílitao Ede", "Mílitao"),
+  "Francisco Sá":           ("Szá Ferenc", "Szá"),
+  "Emerson Ferreira":       ("Férreira Imre", "Férreira"),
+  "Wim van Hanegem":        ("Fanhanehem Vilmos", "Fanhanehem"),
+  "Hans van Breukelen":     ("Fanbrökelen János", "Fanbrökelen"),
+  "Piet Keizer":            ("Kájzer Péter", "Kájzer"),
+  "Rudi Völler":            ("Föler Rudi", "Föler"),
+  "Willie Miller":          ("Miler Vili", "Miler"),
+  "Vincenzo Montella":      ("Montela Vince", "Montela"),
+  "Virgilio Maroso":        ("Marozo Máté", "Marozo"),
+  "Andy Cole":              ("Kol Bandi", "Kol"),
+})
