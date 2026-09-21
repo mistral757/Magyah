@@ -1452,6 +1452,18 @@ semmi hatás, utána a saját gólesély pontosan annyival esik, amennyivel az
 ellenfélé nő, minden megvett szint a tizedét tünteti el, a 10.-en a hátrány
 nulla — és más stílusnál nem is létezik.
 
+A tizenkettedik két kérést mér. Az egyik a FEED SŰRŰSÉGE: a mérce a Panzer
+néma halmaza (csak a védekező villanás és a fölény néma), és most a motor is
+eszerint hallgat — néma csak az marad, amiből tucatnyi jön egy meccsen (a
+Beton villanása, a Gegenpressing labdaszerzése). A gól és a gólpassz
+mostantól beszél. Külön állítás nézi, hogy MINDEN tarifa-tételnek van magyar
+címkéje, tehát a feed sosem ír kulcsnevet.
+
+A másik a MÁSODLAGOS HARMADOLÁSA: a próba méri, hogy pontosan harmadannyi
+gyűlik, hogy a meccsenkénti PLAFON viszont változatlan (nem kevesebb fér
+bele, lassabban gyűlik), és hogy ugyanez a RETTENETRE is áll — enélkül a
+„Panzer másodlagosnak" lett volna a legjobb választás.
+
 A tizenegyedik szakasz zárja le a sort: Beton, Harmónia, Tiki-taka,
 Gegenpressing. Itt már nem az a kérdés, elbírja-e a motor a stílusok
 HASONLÓSÁGÁT, hanem hogy elbírja-e a KÜLÖNBSÉGÜKET. Három bázis-alak
