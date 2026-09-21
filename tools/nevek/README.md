@@ -101,6 +101,15 @@ Ezzel együtt bejött a maradék tíz szabály is (angol/skandináv/görög/tör
 `c` e/i előtt és `s` + mássalhangzó, portugál `x`), valamint két új
 nyelvkód: `pl` és `gr`. Összesen 421 további gépi név, kézi egy sem.
 
+**3.9.120 — a nyelvtérkép lyukai.** A `LANG`-ból 53 nemzetiség hiányzott,
+összesen 292 néven — és a hiányzó bejegyzés NEM semleges: a `lang_of`
+ilyenkor `"en"`-t ad. A japán, a szovjet és az egész frankofón Afrika angol
+kiejtést kapott. **Új nemzetiség felvételekor a `LANG`-ot is bővítsd.**
+
+Új kódok: `jp` (japán), `pl`, `gr`, és `af` — ez utóbbi a frankofón Afrika
+és a Maghreb: francia HELYESÍRÁS, de teljes kiejtés, mert ott a szóvégi
+mássalhangzó nem néma (Bennacer → Bennaszer, nem „Bennaszé").
+
 Részletes magyarázat: `docs/nevek-motor-tiz-szabaly.md`.
 
 ## kettozes.py — ugyanaz az ember két néven

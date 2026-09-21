@@ -1,4 +1,4 @@
-# 🧬 A névmotor szabályhiányai (3.9.113 → 3.9.119)
+# 🧬 A névmotor szabályhiányai (3.9.113 → 3.9.120)
 
 ## 0. Egy mondatban
 
@@ -253,3 +253,92 @@ Az ütköző rövid alakok száma 198 → **196**.
   `-ent/-ant/-in/-on` kezelése külön munka.
 - **Német `ä`**: a PRE nem viszi (Matthäus → Mattaus); a németben `e`.
 - **Angol `g`/`j` = dzs**: Giles → „Gilesz", nem „Dzsájlz".
+
+
+---
+
+# III. rész — a nyelvtérkép lyukai (3.9.120)
+
+## 14. A legnagyobb egyetlen hiba: 292 név rossz nyelven
+
+A `LANG` térkép a nemzetiséget köti kiejtési nyelvhez. Hiányzó bejegyzésnél
+a `lang_of` **nem semlegeset ad, hanem `"en"`-t** — vagyis a japán, a
+szovjet és az egész frankofón Afrika **angol** kiejtést kapott.
+
+**53 nemzetiség hiányzott, összesen 292 néven.** A legnagyobbak: Szovjetunió
+(40), Nigéria (32), Elefántcsontpart (32), Japán (28), Szenegál (27),
+Kamerun (27), Marokkó (26), Ghána (22), Grúzia (17), Egyiptom (17).
+
+Ez eddig **néma** hiba volt: az angol ág jóformán csak ékezetet tett. A
+3.9.119 `s$ → sz`-e és a most beépülő `j → dzs` viszont már aktívan rontott
+volna rajtuk — ezért ez a köteg **első** lépése, nem a ráadása.
+
+A besorolás a **névírás hagyományát** követi, nem a földrajzot.
+
+## 15. Az „af" kód — és a hiba, ami kikényszerítette
+
+Első nekifutásra a frankofón Afrikát és a Maghrebet egyszerűen `"fr"`-be
+tettem. A mérés azonnal megmutatta, hogy ez rossz:
+
+| név | „fr"-rel | helyesen |
+|---|---|---|
+| Bennacer | Bennaszé | **Bennaszer** |
+| Naybet | Nézsbé | **Nájbet** |
+| Ziyech | Zijé | **Zijes** |
+
+Ezek a nevek **francia helyesírással** érkeznek, de **nem franciául ejtik**
+őket: a szóvégi mássalhangzó nem néma, és az `-er` sem `-é`.
+
+Innen az `"af"` kód: ugyanaz a helyesírás (`ch` = s, `j` = zs, `g` e/i előtt
+zs, `qu` = k, `ou` = ú), de a néma végződések nélkül.
+
+## 16. A többi négy szabály
+
+| szabály | mit javít |
+|---|---|
+| szláv `s` + mássalhangzó → sz | Krstajics → **Krsztajics**, Kostics → **Kosztics** |
+| francia néma szóvég `n` után | Vinszent → **Vinszen**, Lénormand → **Lenorman** |
+| `ä → e` | Sar → **Ser**, Saffer → **Seffer** |
+| angol `j` → dzs | Jonesz → **Dzsonesz**, Johnszton → **Dzsohnszton** |
+| japán ág (`s`=sz, `j`=dzs, `ts`=c) | Sibasaki → **Sibaszaki**, Ogasavara → **Ogaszavara** |
+
+### Két szándékos megszorítás
+
+**A szláv `s` csak mássalhangzó előtt** cserélődik. Oka van: a szovjet nevek
+az adatbázisban **már magyar átírásban** állnak (`Csiszlenko`, `Kezsman`),
+és ott egy általános `s → sz` a `cs`/`zs` MÁSODIK betűjébe marna bele
+(`Kezsman → Kezszman` — ezt a mérés el is kapta). Ezért a szabály
+`(?<![cz])s(?=[ptkmnlvr])`: a kétjegyű-betű-hiba itt a **forrás**
+helyesírásában ül, ahol őrjel nem véd meg.
+
+**Az angol `g` e/i előtt kimaradt.** Angolul kiszámíthatatlan: a Gerrard
+dzs, a Gibson és a Gemmill kemény g — egy névtáblából nem dönthető el.
+Inkább marad hibátlanul semleges.
+
+## 17. Az őrjelrendszer megint dolgozott
+
+Két új példány, mindkettőt a saját új szabályaim okozták:
+
+- `ay → éj` + az új angol `j → dzs` → **Gray → Grédzs**. Ezért kapott
+  őrjelet egy **egybetűs** hang is (`S_J`): nem a betű hossza számít,
+  hanem hogy **döntés** eredménye-e.
+- És ugyanez visszamenőleg megjavította a spanyolt is, ahol a `j → h`
+  ette meg ugyanazt a j-t: **Ayala → Éhala → Éjala**, Gaitán → Gáhtán →
+  **Gájtán**, Nayim → Néhim → **Néjim**.
+
+## 18. Összesítés
+
+**94 gépi név** változott, **kézi egy sem**. Feloldatlan őrjel: 0.
+Változatlanul maradt név: 0.
+
+A 3.9.113 óta összesen: **412 + 421 + 94 = 927 gépi név**, plusz 46 kézbe
+vett név (33–36. köteg) és 19 védőblokkos.
+
+## 19. Ami továbbra is hátra van
+
+- **Francia orrhangok**: a Vinszen nem „Vensan". A magánhangzó
+  orrhangúságát nem próbáljuk visszaadni — az a szó ismeretét kívánná.
+- **Angol magánhangzók**: a James „Dzsamesz", nem „Dzsémsz".
+- **Arab `ay`**: a Naybet „Néjbet", nem „Nájbet" (az `ay → éj` angol
+  szabály fut rá).
+- **Albán `xh`/`q`**, **görög `b/d/g`** (mb = b, nt = d): kis tételek.
