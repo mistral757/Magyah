@@ -1403,6 +1403,28 @@ dolgozott, és `h2hRoomActive()===false` mellett a párharcokat is kitörölte
 volna. A régi sorrenddel a menetrend 32 marad, az újjal 30 lesz. Részletek:
 `docs/osztalyletszam-es-paratlan-mezony.md`.
 
+## panzer-sztar-szerep-proba.js — 🛡️⭐ a két hiányzó szereptrió
+
+```
+node tools/panzer-sztar-szerep-proba.js
+```
+
+Öt filozófiának volt szezon-szerepe, kettőnek nem. A Panzer hármasa ugyanarra
+az egy mondatra épül („a piros lap minket nem rettent el"), de HÁROM KÜLÖN
+csatornán — a próba pont ezt méri: a Mészáros az ellenfél gólesélyét viszi le
+és lappal fizet, a Vezér a kiállítás MECCSERŐ-ÁRÁT fogja vissza (és ha őt
+magát állítják ki, nem véd), a Falka pedig csak EMBERHÁTRÁNYBAN hat.
+
+A Sztár hármasa az egyetlen a játékban, ahol a hatás NEM a kijelölt emberen
+jelenik meg. Ezért a Testőrnél külön állítás méri, hogy a `roleRiskMult`
+bővített aláírása visszafelé kompatibilis: kontextus nélkül hívva a régi
+viselkedés marad. A Szolgálónál azt, hogy tényleg ELVESZ a viselőjétől (az
+egyetlen ilyen szerep), az Örökösnél pedig azt, hogy a tanulás véget ér, ha a
+sztár elhagyja a klubot.
+
+Az utolsó szakasz a kihívás-büntetést („3 meccsig nem működnek a szerepek")
+futtatja rá mind a hatra. Részletek: `docs/panzer-sztar-szerepek.md`.
+
 ## stilus-motor-proba.js — ⚙️ egy motor, hat gazdaság
 
 ```

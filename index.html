@@ -6132,7 +6132,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.108";
+const APP_VERSION="3.9.109";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -25275,6 +25275,10 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
          FŐ attribútuma gyorsabban gyűlik. Ugyanaz a közös csatorna, ugyanaz a
          szabály: csak a POZITÍV fejlődést szorozza. */
       if(val>0)val*=passChemAttrMult(p.n,key);
+      /* SZTÁR · AZ ÖRÖKÖS (3.9.109): amíg a sztár a klubnál van, a kijelölt
+         fiatal gyorsabban fejlődik mellette. Ugyanaz a közös csatorna,
+         ugyanaz a szabály: csak a POZITÍV fejlődést szorozza. */
+      if(val>0)val*=roleHeirDevMult(p.n);
       /* GEGENPRESSING (3.9.93): a „Nyomás!" képesség a SEBESSÉG fejlődését
          gyorsítja (+50%) — és a GYILKOS PÁROS a társáét is viszi. Ugyanaz a
          közös csatorna, ugyanaz a szabály: csak a POZITÍV fejlődést szorozza. */
@@ -53344,7 +53348,7 @@ function mpWireRedWeights(active){
     const base=redRiskOf(x.p)
       *multSkillEffect(x.p.n,"discipline")
       *(x.p.family&&(x.p.familySpecialty==="kutya"||x.p.familySpecialty==="tank")?1.4:1)
-      *roleRiskMult(x.p.n);
+      *roleRiskMult(x.p.n,active,-1);
     return {base,w:clutchIsBackline(active,k)?base*wall:base};});}
 /* ---- ÉS UGYANEZ A SÁRGA LAPRA (3.9.86) ----
    A párharcban eddig EGYÁLTALÁN nem volt sárga lap. Az ok nem elvi volt, hanem
@@ -53360,7 +53364,7 @@ function mpWireYellowWeights(active){
   return active.map(x=>(x.bus||playerUnavailable(x.p.n))?0:
     yellowRiskOf(x.p)
     *multSkillEffect(x.p.n,"discipline")
-    *roleRiskMult(x.p.n));}
+    *roleRiskMult(x.p.n,active,-1));}
 /* ---- A HANGSÚLY-CSÚSZKÁK A PÁRHARCBAN (3.9.86) ----
    A csúszkák (docs/hangsuly-csuszkak.md) a párharcban NEM hatottak: a közös
    szimuláció a pillanatképből dolgozik, abba pedig egyetlen csúszka-csatorna
@@ -60998,7 +61002,8 @@ function playMatch(){
       :`${_drt}  ${redCardLine(active[redIdx].p.n,menLeft())}`,"m rc");
     sbEv("us","red",active[redIdx].p.n);
     mileRed(MILE,active[redIdx].p.n,`${_drt}  `);
-    diff-=dialRedMatch();lf=lam(diff);la=lam(-diff)*defenseMult()*styleRedOppGoalMult();
+    diff-=dialRedMatch()*roleRedCostMult(active,redIdxs);
+    lf=lam(diff);la=lam(-diff)*defenseMult()*styleRedOppGoalMult();
     intimidationNote(min,menLeft());
     rivalTune();
     applyDisciplineDip(active[redIdx].p.n,true);
@@ -61044,7 +61049,8 @@ function playMatch(){
     addLine(sor||`${_krt}  ${redCardLine(nev,menLeft())}`,"m rc");
     sbEv("us","red",nev);
     mileRed(MILE,nev,`${_krt}  `);
-    diff-=dialRedMatch();lf=lam(diff);la=lam(-diff)*defenseMult()*styleRedOppGoalMult();
+    diff-=dialRedMatch()*roleRedCostMult(active,redIdxs);
+    lf=lam(diff);la=lam(-diff)*defenseMult()*styleRedOppGoalMult();
     intimidationNote(perc,menLeft());
     rivalTune();   /* a rangadó-torzítás az emberhátrány újraszámolása után is él */
     applyDisciplineDip(nev,true);
@@ -61878,7 +61884,7 @@ function playMatch(){
         redRiskOf(x.p)
         *multSkillEffect(x.p.n,"discipline")
         *(x.p.family&&(x.p.familySpecialty==="kutya"||x.p.familySpecialty==="tank")?1.4:1)
-        *roleRiskMult(x.p.n)
+        *roleRiskMult(x.p.n,active,redIdxs)
         /* HARMÓNIA: a Peace on you! — csak akkor, ha már kaptunk gólt. */
         *roleRedMult(x.p.n,ga));
       const _wallF=clutchWallFactor(active);
@@ -61899,7 +61905,7 @@ function playMatch(){
       const _yw=active.map((x,k)=>(x.bus||isRed(k)||playerUnavailable(x.p.n))?0:
         yellowRiskOf(x.p)
         *multSkillEffect(x.p.n,"discipline")
-        *roleRiskMult(x.p.n));
+        *roleRiskMult(x.p.n,active,redIdxs));
       const _yt=_yw.reduce((a,b)=>a+b,0);
       /* KIHÍVÁS-JUTALOM (3.9.37): „lecsökken a csapatod sárgalap-szerzési
          esélye, teljes csapatra −15-25% (állandó)". A CSAPAT esélyén megy, nem
@@ -87790,6 +87796,73 @@ const ROLE_DEFS={
     v:[1.035,1.07,1.10,1.15],v2:[1.015,1.03,1.05,1.07],
     u:"a saját gólsúlya, amíg a pályán van",
     who:"középcsatár, 90-es sebesség fölött"},
+  /* ---- 🛡️ PANZERKAMPFWAGEN (3.9.109) ----
+     A Panzernek eddig NEM volt szezon-szerepe — pedig neki van a legerősebb
+     gazdasága, és épp az ő filozófiája szól arról, hogy a mérkőzés nem a
+     labdáról szól. A három szerep ugyanannak az egy mondatnak a három fele:
+     „a piros lap minket nem rettent el."
+
+       · A MÉSZÁROS a KÖLTSÉG oldala. Amit ad (kevesebb ellenfél-gólesély),
+         azért lappal és sérüléssel fizet — csakhogy a Panzernél a lap NEM
+         tiszta veszteség: minden sárga és piros RETTENET PONTOT hoz
+         (DREAD_PTS). Ez a játék egyetlen szerepe, aminek az ÁRA egyben
+         BEVÉTEL is. Külön kódot nem kell hozzá írni: a fearNote már ott van
+         a lap-csatornán.
+       · A VEZÉR a KÖVETKEZMÉNY oldala: amíg a pályán van, egy kiállítás
+         kevesebb meccserőt visz. A stílus leírása szó szerint ezt ígéri
+         („a sérült bajtárs csak még jobban összekovácsolja a keretet") —
+         eddig csak szöveg volt, innentől szám.
+       · A FALKA a HASZON oldala: emberhátrányban TOVÁBB esik az ellenfél
+         gólesélye. A Panzer megfélemlítése (styleRedOppGoalMult) eddig a
+         stílus automatikus hatása volt; a Falka az, aki felerősíti.
+
+     A kettő (Vezér + Falka) ugyanarra a pillanatra szól, de MÁS CSATORNÁRA:
+     az egyik a meccserő ÁRÁT fogja vissza, a másik az ellenfél GÓLESÉLYÉT.
+     Együtt pontosan azt adják, amiért ezt a filozófiát választja az ember. */
+  /* ---- ⭐ SZTÁROM A PÁROM (3.9.109) ----
+     A másik stílus, aminek eddig nem volt szezon-szerepe. A grammatikája
+     adott: „egy ember, a többi kiszolgálja" — tehát MIND A HÁROM szerep a
+     SZTÁRRÓL szól, nem a viselőjéről. Ez az egyetlen szereptrió a játékban,
+     ahol a hatás nem azon az emberen jelenik meg, akit kijelöltél.
+
+       · A SZOLGÁLÓ tálal, nem fejez be: nő a gólpassz-súlya, ESIK a saját
+         gólsúlya. Ő az egyetlen szerep, ami kifejezetten ELVESZ a viselőjétől.
+       · A TESTŐR a SZTÁR lap- és sérülés-kockázatát viszi le, amíg a pályán
+         van. A filozófia legnagyobb kockázata az, hogy az egy ember kidől —
+         ez az a szerep, ami ez ellen dolgozik.
+       · AZ ÖRÖKÖS a jövő: amíg a sztár a klubnál van, a fiatal gyorsabban
+         fejlődik mellette. A hírnév öröklését a stílus utód-mechanikája már
+         intézi (styleStarPickerHtml „heir" ága) — ez a szerep azt készíti
+         elő, hogy legyen KIRE hagyni. */
+  szolgalo:{style:"sztar",ic:"🤝",n:"A Szolgáló",
+    d:"Tálal, nem fejez be. Jóval nagyobb eséllyel övé a gólpassz — cserébe a saját gólesélye visszaesik. A csapat egy emberért játszik, és ő az, aki ezt a legkomolyabban veszi.",
+    v:[1.12,1.22,1.35,1.5],v2:[0.85,0.75,0.65,0.55],
+    u:"gólpassz-súly, amíg a pályán van",
+    who:"a sztáron kívül bárki"},
+  testor:{style:"sztar",ic:"🛡️",n:"A Testőr",
+    d:"Amíg a pályán van, a SZTÁR lap- és sérülés-kockázata csökken. A filozófia legnagyobb veszélye az, hogy az egy ember kidől — ő az, aki vigyáz rá.",
+    v:[0.88,0.80,0.72,0.62],
+    u:"a sztár lap- és sérülés-kockázata",
+    who:"védő vagy középpályás, a sztáron kívül"},
+  orokos:{style:"sztar",ic:"👑",n:"Az Örökös",
+    d:"Amíg a sztár a klubnál van, a kijelölt fiatal gyorsabban fejlődik mellette. A hírnevet egyszer majd tőle veszi át — addig tanul.",
+    v:[1.15,1.25,1.4,1.6],
+    u:"attribútum-fejlődés, amíg a sztár a klubnál van",
+    who:"legfeljebb 23 éves, a sztáron kívül"},
+  meszaros:{style:"panzer",ic:"🪓",n:"A Mészáros",
+    d:"Amíg a pályán van, csökken az ellenfél gólesélye — cserébe jóval nagyobb eséllyel kapja ő a lapot és sérül meg. Panzernél ez nem csak ár: minden lapja rettenet pontot hoz.",
+    v:[0.965,0.945,0.92,0.895],v2:[1.4,1.7,2.1,2.6],
+    u:"ellenfél-gólesély, amíg a pályán van",
+    who:"védő vagy középpályás"},
+  vezer:{style:"panzer",ic:"🎖️",n:"A Vezér",
+    d:"Amíg a pályán van, egy kiállítás jóval kevesebb meccserőt visz. A csapat nem esik szét emberhátrányban, hanem összezár.",
+    v:[0.80,0.68,0.55,0.42],
+    u:"a kiállítás meccserő-ára, amíg a pályán van",
+    who:"a keret legmagasabb karizmájú embere"},
+  falka:{style:"panzer",ic:"🐺",n:"A Falka",
+    d:"Amíg a pályán van ÉS emberhátrányban vagytok, tovább csökken az ellenfél gólesélye. A kiállított bajtárs nem gyengíti a csapatot — feltüzeli.",
+    v:[0.96,0.93,0.90,0.86],
+    u:"ellenfél-gólesély emberhátrányban"},
   kereszttuz:{style:"beton",ic:"⚔️",n:"Kereszttűz",
     d:"Keményebben megy bele: nő a piros lap és a sérülés esélye — cserébe amíg pályán van, a félidő környékén (35-60. perc) csökken az ellenfél gólesélye, és neki magának enyhe gólpassz-előnye van.",
     v:[0.975,0.955,0.93,0.90],v2:[1.15,1.3,1.5,1.75],v3:[1.1,1.2,1.35,1.5],
@@ -87924,7 +87997,9 @@ const ROLE_AURA_MULT=2, ROLE_AURA_RISK=1.5;
 const ROLE_KEYS_OF={bombazok:["nyito","befejezo","talalo"],beton:["fal","arok","kereszttuz"],
   villam:["b2b","legolas","robben"],tikitaka:["stabil","latnok","aura"],
   harmonia:["peace","egyensuly","agy"],
-  gegen:["iranyito","lesipuskas","mergezett"]};
+  gegen:["iranyito","lesipuskas","mergezett"],
+  panzer:["meszaros","vezer","falka"],
+  sztar:["szolgalo","testor","orokos"]};
 /* ---- A BELÉPŐ ----
    A Bombázók és a Beton szerepeire bárki jelölhető (a kapust kivéve); a
    Villáméira NEM. Itt a szerep maga egy alkati kérdés — egy lassú szélső nem
@@ -87988,7 +88063,43 @@ function roleEligible(key,p){
     const pos=((e&&e.pos)||p.pos||[]);
     return pos.indexOf("VKP")>=0||cat==="VEDO";}
   if(key==="mergezett")return roleTopSpeedSet().has(p.n);
+  /* ---- 🛡️ PANZER ----
+     A MÉSZÁROS posztkapu: védő vagy középpályás — csatárból nem lesz
+     mészáros, mert nem ő találkozik a labdával a saját térfelén.
+     A VEZÉR belépője RELATÍV, mint a Stabil kezdésé és az Agyé: a keret
+     legmagasabb KARIZMÁJÚ embere. Így a feltétel a karrier minden
+     szakaszában ugyanazt jelenti, és pontosan EGY embert enged át.
+     A FALKÁRA bárki jelölhető (a kapust a kiosztó amúgy is kizárja): ott
+     nem kapu van, hanem lejtő — a védekezés-attribútuma maga fejezi ki,
+     mennyire illik rá. */
+  if(key==="meszaros")return cat==="VEDO"||cat==="KOZEPPALYAS";
+  if(key==="vezer")return roleKarLeader()===p.n;
+  /* ---- ⭐ SZTÁR ----
+     Mindhárom szerep a sztárról szól, tehát MAGA A SZTÁR egyikre sem
+     jelölhető: a saját magát kiszolgáló, saját magát őrző és saját magát
+     öröklő ember értelmetlen. Az Örökös belépője a KOR. */
+  if(key==="szolgalo"||key==="testor"||key==="orokos"){
+    let star=null;try{star=fameStarName();}catch(e){}
+    if(star&&p.n===star)return false;}
+  if(key==="testor")return cat==="VEDO"||cat==="KOZEPPALYAS";
+  if(key==="orokos"){
+    const e=(careerPool&&careerPool[p.n])||null;
+    const kor=(e&&e.age!=null)?e.age:(p.age!=null?p.age:99);
+    return kor<=ROLE_HEIR_MAXAGE;}
   return true;}
+const ROLE_HEIR_MAXAGE=23;
+/* A KERET LEGMAGASABB KARIZMÁJÚ EMBERE — a Vezér belépője. Egy név, hogy a
+   kiosztó minden jelöltre ugyanazt a választ adja; holtversenynél a névsor
+   dönt, tehát a döntés determinisztikus. */
+function roleKarLeader(){
+  let best=null,bv=-Infinity;
+  try{
+    msRoster().filter(x=>x&&x.n).forEach(x=>{
+      const e=(careerPool&&careerPool[x.n])||null;
+      let v=0;try{v=karN(e||x);}catch(err){v=0;}
+      if(v>bv||(v===bv&&best&&String(x.n)<String(best))){bv=v;best=x.n;}});
+  }catch(e){}
+  return best;}
 /* A KERET HÁROM LEGGYORSABB EMBERE — a Mérgezett egér belépője. Halmazt ad,
    mert a kiosztó minden jelöltre külön kérdez rá; a számolás egy körben megy. */
 const GP_MOUSE_TOP=3;
@@ -88078,8 +88189,9 @@ function roleKeysOfView(){return ROLE_KEYS_OF[styleViewKey()]||[];}
    („🔓 Nyitó", „🧱 Fal"), nem egy általános címke — egy „szerepben van" felirat
    pont azt hallgatná el, ami a lényeg: MELYIK szerepről van szó.
 
-   A KAPU a roleStyleActive(): ha a stílusnak nincs szerepe (Panzer, Sztár), a
-   jelölés hazudna. */
+   A KAPU a roleStyleActive(): ha a stílusnak nincs szerepe, a jelölés hazudna.
+   (3.9.109 óta a Panzernek és a Sztárnak IS van hármasa — a kapu maradt, mert
+   a kihívás-büntetés is rajta megy: „3 meccsig nem működnek a szerepek".) */
 function roleNamesMap(){
   const out=new Map();
   try{
@@ -88172,7 +88284,16 @@ const ROLE_ATTR_OF={
   /* GEGENPRESSING — az Irányítóé a Rating és a karizma EGYÜTT („ovrkar"), a
      Lesi Puskásé a sebesség és a gólszerzés átlaga („sebgol"), a Mérgezett
      egéré tisztán a sebesség. */
-  iranyito:{v:"ovrkar"}, lesipuskas:{v:"sebgol",v2:"sebgol"}, mergezett:{v:"seb",v2:"seb"}};
+  iranyito:{v:"ovrkar"}, lesipuskas:{v:"sebgol",v2:"sebgol"}, mergezett:{v:"seb",v2:"seb"},
+  /* PANZER — a Mészárosé és a Falkáé a védekezés, a Vezéré a Rating és a
+     karizma együtt (ugyanaz a gazda, mint a Gegenpressing Irányítójánál):
+     egy vezért nem a lába tesz vezérré. */
+  meszaros:{v:"ved",v2:"ved"}, vezer:{v:"ovrkar"}, falka:{v:"ved"},
+  /* SZTÁR — a Szolgálóé a passz (a gólsúly-csökkenése is az ő tálaló
+     képességéből fakad), a Testőré a védekezés. Az Örökösnél SZÁNDÉKOSAN
+     nincs attribútum-gazda: ott a szerep a KOR-ról szól, nem egy tengelyről —
+     egy 18 éves tehetség attól még örökös, hogy ma még gyenge. */
+  szolgalo:{v:"passz",v2:"passz"}, testor:{v:"ved"}};
 const ROLE_ATTR_SLOPE=3, ROLE_ATTR_MIN=0.6, ROLE_ATTR_MAX=1.45;
 /* A SZÁMOLÁS DRÁGA, A VÁLASZ RITKÁN VÁLTOZIK. A roleVal a mérkőzés-motor egyik
    legforgalmasabb hívása (percenként, játékosonként), a keret-átlag viszont
@@ -88325,12 +88446,17 @@ function roleGoalMult(name,min,gf,ga){
   m*=roleAuraMult(name);
   /* HARMÓNIA: a Peace on you! CSAK a kapott gól után él — addig alszik. */
   if(ga>=1&&roleOf("peace")===name)m*=roleVal("peace");
+  /* SZTÁR: …és ez az ÁRA. A Szolgáló az egyetlen szerep, ami ELVESZ a
+     viselőjétől: nem ő fejez be, hanem a sztár. */
+  if(roleOf("szolgalo")===name)m*=roleVal("szolgalo","v2");
   return m;}
 function roleAssistMult(name){
   if(!name||!roleStyleActive())return 1;
   let m=1;
   if(roleOf("talalo")===name)m*=roleVal("talalo");
   if(roleOf("kereszttuz")===name)m*=roleVal("kereszttuz","v3");
+  /* SZTÁR: a Szolgáló tálal — ez a jutalma. */
+  if(roleOf("szolgalo")===name)m*=roleVal("szolgalo");
   /* TIKI-TAKA: a karmester gólpassz-előnye és az Aurafarmer önerősítése. */
   if(roleOf("latnok")===name)m*=roleVal("latnok");
   if(roleOf("stabil")===name)m*=roleVal("stabil","v2");
@@ -88461,7 +88587,36 @@ function roleOppGoalMult(active,redIdx,min,ga){
   /* HARMÓNIA: a Peace on you! védekező fele. Nincs időablaka — a kapott gól
      nyitja ki, és a lefújásig tart. */
   if(ga>=1&&on(roleOf("peace")))m*=roleVal("peace","v2");
+  /* ---- 🛡️ PANZER ----
+     A MÉSZÁROS végig hat, ablak nélkül (mint a Box-to-box) — ezért is
+     szerényebb a szorzója a Falénál vagy az Árokénál.
+     A FALKA csak EMBERHÁTRÁNYBAN: a kiállítás pillanatától a lefújásig.
+     A `redIdx` 3.9.97 óta halmaz is lehet — a létszámot ebből olvassuk. */
+  if(on(roleOf("meszaros")))m*=roleVal("meszaros");
+  {const down=(redIdx&&typeof redIdx.size==="number")?redIdx.size>0:(redIdx>=0);
+   if(down&&on(roleOf("falka")))m*=roleVal("falka");}
   return m;}
+/* ---- 🛡️ A VEZÉR: A KIÁLLÍTÁS MECCSERŐ-ÁRA ----
+   Szorzó a `dialRedMatch()`-re. A Vezérnek MAGÁNAK a pályán kell lennie —
+   ha épp ŐT állították ki, a szerep nem véd (a `redHas` a frissen felvett
+   indexet is látja, tehát a sorrend helyes). */
+/* ---- ⭐ AZ ÖRÖKÖS FEJLŐDÉS-SZORZÓJA ----
+   Feltétele, hogy a SZTÁR MÉG A KLUBNÁL legyen: a szerep arról szól, hogy
+   mellette tanul. Ha a sztár távozott, a tanulás véget ért — és a hírnév
+   öröklését onnantól a stílus utód-mechanikája intézi. */
+function roleHeirDevMult(name){
+  if(!name||!roleStyleActive())return 1;
+  if(roleOf("orokos")!==name)return 1;
+  let star=null;try{star=fameStarName();}catch(e){}
+  if(!star)return 1;
+  try{if(!(fullCareerRoster()||[]).some(x=>x&&x.n===star))return 1;}catch(e){return 1;}
+  return roleVal("orokos");}
+function roleRedCostMult(active,redIdx){
+  if(!roleStyleActive()||!active)return 1;
+  const nm=roleOf("vezer");
+  if(!nm)return 1;
+  const on=active.some((x,i)=>!redHas(redIdx,i)&&x.p&&x.p.n===nm);
+  return on?roleVal("vezer"):1;}
 /* KERESZTTŰZ: a piros lap és a sérülés súlyszorzója erre az egy emberre.
    TIKI-TAKA: ugyanezen a csatornán fizet az Aurafarmer is — de csak MIUTÁN
    kigyulladt. Amíg nem írta be magát, semmivel nem kockáztat többet. */
@@ -88483,9 +88638,23 @@ function roleRedTeamP(active,redIdx,ga){
   const nm=roleOf("peace");
   if(!nm||!active.some((x,i)=>!redHas(redIdx,i)&&x.p&&x.p.n===nm))return 1;
   return 1+(roleVal("peace","v3")-1)/11;}
-function roleRiskMult(name){
+/* ---- A SZEREP-KOCKÁZAT ----
+   `active`/`redIdx` OPCIONÁLIS, és csak a Testőrnek kell (3.9.109): az
+   egyetlen szerep, aminek a hatása MÁS emberen jelenik meg, tehát tudni kell,
+   hogy a viselője épp a pályán van-e. A régi, kétparaméter nélküli hívás
+   viselkedése betűre változatlan — ott a Testőr egyszerűen nem hat. */
+function roleRiskMult(name,active,redIdx){
   if(!name||!roleStyleActive())return 1;
+  /* SZTÁR · TESTŐR: a SZTÁR kockázatát viszi le, amíg ő maga a pályán van. */
+  {const g=roleOf("testor");
+   if(g&&active){
+     let star=null;try{star=fameStarName();}catch(e){}
+     if(star&&name===star
+        &&active.some((x,i)=>!redHas(redIdx==null?-1:redIdx,i)&&x.p&&x.p.n===g))
+       return roleVal("testor");}}
   if(roleOf("kereszttuz")===name)return roleVal("kereszttuz","v2");
+  /* PANZER: a Mészáros ára — és egyben a rettenet-gazdaság bevétele. */
+  if(roleOf("meszaros")===name)return roleVal("meszaros","v2");
   if(roleOf("aura")===name&&_roleAuraLit)return ROLE_AURA_RISK;
   return 1;}
 /* A CSAPAT ÖSSZ-kockázata is nő, nem csak az eloszlás. A súlyszorzó önmagában
@@ -88497,6 +88666,9 @@ function roleRiskTeamP(active,redIdx){
   const on=nm=>!!nm&&active.some((x,i)=>!redHas(redIdx,i)&&x.p&&x.p.n===nm);
   let m=1;
   if(on(roleOf("kereszttuz")))m*=1+(roleVal("kereszttuz","v2")-1)/11;
+  /* PANZER: ugyanaz a becsületes számtan a Mészárosnál — egy ember a
+     tizenegyből, tehát a többletsúlyának a tizenegyed része. */
+  if(on(roleOf("meszaros")))m*=1+(roleVal("meszaros","v2")-1)/11;
   /* AURAFARMER: ugyanaz a becsületes számtan. A súlyszorzó önmagában csak
      ÁTTOLNÁ a sérülést őrá, a szerep viszont valódi árat kér — tehát a forduló
      esélye is nő, egy ember a tizenegyből arányában (+4,5%). Csak akkor, ha
@@ -89691,6 +89863,22 @@ function roleCandidates(key){
       const sp=roleBalSpread(p);
       return sp==null?0:roleBalProx(sp)*1000+ovr/10;}
     if(key==="agy")return rolePassOf(p)+(c.a||0)/m*100+ovr/10;
+    /* 🛡️ PANZER: a Mészárosnál és a Falkánál a VÉDEKEZÉS a rendező (a hatás
+       gazdája is az), a Vezérnél a karizma — a belépő ott úgyis egy emberre
+       szűkít, de a lista így is a maga nyelvén beszél. */
+    if(key==="meszaros"||key==="falka")return roleAttrOf(p,"ved")+ovr/10;
+    if(key==="vezer"){let kv=0;try{kv=karN(msEntry(p.n)||p);}catch(e){}
+      return kv*1000+ovr/10;}
+    /* ⭐ SZTÁR: a Szolgálónál a PASSZ és a gólpassz-termés, a Testőrnél a
+       védekezés, az Örökösnél a FIATALSÁG és a potenciál — ott nem az számít,
+       ki a legjobb ma, hanem kiből lesz valaki. */
+    if(key==="szolgalo")return rolePassOf(p)+(c.a||0)/m*100+ovr/10;
+    if(key==="testor")return roleAttrOf(p,"ved")+ovr/10;
+    if(key==="orokos"){
+      const e=msEntry(p.n);
+      const kor=(e&&e.age!=null)?e.age:24;
+      let pot=0;try{pot=playerPotential(e||p)||0;}catch(err){pot=0;}
+      return (ROLE_HEIR_MAXAGE-kor)*100+pot;}
     return (c.g||0)/m*100+ovr;};
   return pool.slice().sort((a,b)=>score(b)-score(a)).slice(0,24);}
 /* ---- A HANGSÚLYOK KATEGÓRIA (3.8.27) ----
