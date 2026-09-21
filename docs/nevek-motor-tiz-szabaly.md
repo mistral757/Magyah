@@ -1,4 +1,4 @@
-# 🧬 A névmotor szabályhiányai (3.9.113 → 3.9.120)
+# 🧬 A névmotor szabályhiányai (3.9.113 → 3.9.121)
 
 ## 0. Egy mondatban
 
@@ -342,3 +342,70 @@ vett név (33–36. köteg) és 19 védőblokkos.
 - **Arab `ay`**: a Naybet „Néjbet", nem „Nájbet" (az `ay → éj` angol
   szabály fut rá).
 - **Albán `xh`/`q`**, **görög `b/d/g`** (mb = b, nt = d): kis tételek.
+
+
+---
+
+# IV. rész — francia orrhangok és angol magánhangzók (3.9.121)
+
+## 20. A francia orrhang
+
+`an/am/en/em` → **an** · `in/im/ain/ein/yn` → **en** · `on/om` → on ·
+`un/um` → **ön** — csak mássalhangzó vagy szóvég előtt, és nem kettőzött
+n/m előtt (Bonne = Bonn, nem orrhang).
+
+| | előtte | utána |
+|---|---|---|
+| Vincent | Vinszen | **Venszan** |
+| Herbin | Hérbin | **Herben** |
+| Fontaine | Fontájn | **Fonten** |
+| Henry | Henri | **Hanri** |
+| Mendy | Mendi | **Mandi** |
+| Blanc | Blank | **Blan** |
+
+**A blokk a c- és y-szabályok UTÁN áll**, és ennek oka van: az orrhang
+átírja a magánhangzót, és ezzel elrontaná a `ce → sze` környezetét — a
+Vincentből „Venkant" lenne.
+
+**Az eredeti n/m megmarad**, csak a magánhangzó változik: franciául az
+orrhangot b és p előtt m-mel írják (Lacombe), és a magyar átírás is azt
+követi. Az első nekifutásom „Lakonb"-ot csinált.
+
+**És négy új őrjel kellett hozzá**, mert az `ain → en` kimenetét a
+következő sorban álló `en → an` azonnal újra elkapta: Fontaine → **Fontan**.
+Pontosan az a hiba, amit az őrjelek megszüntettek — csak most a saját új
+szabályaim között.
+
+## 21. Angol magánhangzók — csak a kivétel nélküli minták
+
+Az angol helyesírás kaotikus, ezért **csak azt vesszük, amit minden angolul
+tanuló az első héten megkap**:
+
+| minta | példa |
+|---|---|
+| néma e: `a_e` = éj | Blake → **Bléjk** |
+| `i_e` = áj | Rice → **Rájsz** |
+| `o_e` = ó | Kol → **Kól** |
+| `u_e` = ú | Brusz → **Brúsz** |
+| `igh` = áj, `eigh` = éj | Vrigt → **Vrájt**, Leigton → **Léjton** |
+| `ir`/`ur` = ör | Burnsz → **Börnsz**, Hirszt → **Hörszt** |
+| `ai` = éj (nem áj) | Bájli → **Béjli** |
+| `wh` = v | Vhit → **Vájt**, Vhelan → **Velan** |
+
+**Az `u_e` sima ú, nem jú**: az angol itt megoszlik (Duke = djúk, de Bruce =
+brúsz), és a „Brjúsz" rosszabb hiba, mint a „Dúk".
+
+Két minta a latin lista ELÉ került (`igh`, `ai`): a `gh → g` különben előbb
+elvinné a h-t („Vrigt"), az `ai → áj` pedig a német mintát adná.
+
+## 22. Összesítés
+
+**80 gépi név** változott (Franciaország 28, Anglia 27, Skócia 12),
+**kézi egy sem**. Feloldatlan őrjel: 0. Változatlanul maradt név: 0.
+
+A 3.9.113 óta összesen **1007 gépi név**.
+
+Ami továbbra is hátra van: francia `ai` = e (Lemaire → „Lemájr", helyesen
+Lemer), angol magánhangzók a néma e nélkül (James → „Dzsamesz"), arab `ay`,
+albán `xh`/`q`, görög `mb`/`nt`, német intervokális `s` = z (Kaiser →
+„Kájser", helyesen Kájzer).

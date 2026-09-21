@@ -309,9 +309,15 @@ S_NY, S_ZS, S_CS, S_LY, S_SZ, S_AO, S_C, S_DZS = ("\x01", "\x02", "\x03", "\x04"
 # j-t az új angol `j → dzs` szabály elvitte: Gray → Gréj → „Grédzs".
 # Nem a betű HOSSZA számít tehát, hanem hogy DÖNTÉS eredménye-e.
 S_SSZ, S_CCS, S_S, S_J = "\x09", "\x0a", "\x0b", "\x0c"
+# A NÉGY FRANCIA ORRHANG IS ŐRJEL (3.9.121). Az „ain → en" kimenetét a
+# következő sorban álló „en → an" azonnal újra elkapná (Fontaine → Fontan),
+# és a hiba pontosan az, amit az őrjelek megszüntettek. Ugyanaz a szabály:
+# ami DÖNTÉS eredménye, azt a következő csere ne lássa.
+S_AN, S_EN, S_ON, S_UN = "\x0d", "\x0e", "\x0f", "\x10"
 SENT = {S_NY: "ny", S_ZS: "zs", S_CS: "cs", S_LY: "ly", S_SZ: "sz",
         S_AO: "án", S_C: "c", S_DZS: "dzs",
-        S_SSZ: "ssz", S_CCS: "ccs", S_S: "s", S_J: "j"}
+        S_SSZ: "ssz", S_CCS: "ccs", S_S: "s", S_J: "j",
+        S_AN: "a", S_EN: "e", S_ON: "o", S_UN: "ö"}
 
 def desent(s):
     """Az őrjelek feloldása — a fonetika UTOLSÓ lépése."""
@@ -361,6 +367,17 @@ def hufy(w, lang="en"):
     # Wagnerből „Fágner". Ugyanaz a csere-sorrend, csak egy nyelvvel odébb.
     if lang in ("nl", "de"):
         s = s.replace("v", "f")
+    if lang == "en":
+        # ── KÉT ANGOL MINTA, AMIT AZ ÁLTALÁNOS LISTA SZÉTVÁGNA (3.9.121) ────
+        # `igh` = áj (Wright, Knight) — a listában lévő `gh → g` különben
+        # előbb elvinné a h-t, és „Vrigt" maradna.
+        # `ai` = éj, nem áj: az áj a német/holland minta (Kaiser), az angol
+        # Bailey viszont „Béjli".
+        # `wh` = v (a h néma): White → Vájt, nem „Vhájt".
+        # `eigh` = éj (Leighton), `igh` = áj (Wright) — az `eigh` ELŐBB,
+        # különben az `igh` kettévágná.
+        s = s.replace("wh", "v").replace("eigh", "é" + S_J)
+        s = s.replace("igh", "á" + S_J).replace("ai", "é" + S_J)
     if lang == "pl":
         # ── LENGYEL HELYESÍRÁS (3.9.119) ──────────────────────────────────
         # Eddig a közös szláv kosárban ült. Ez ITT áll, a latin szabályok
@@ -464,6 +481,27 @@ def hufy(w, lang="en"):
         # (Gerrard dzs, de Gibson és Gemmill kemény g), és egy névtáblából
         # nem dönthető el. Inkább marad hibátlanul semleges.
         s = s.replace("j", S_DZS)
+        # ── ANGOL MAGÁNHANGZÓK (3.9.121) ───────────────────────────────────
+        # Az angol helyesírás kaotikus, ezért CSAK a kivétel nélküli
+        # mintákat vesszük — amit minden angolul tanuló első héten megkap:
+        #   néma e („magic e"):  a_e = éj   i_e = áj   o_e = ó   u_e = jú
+        #   igh = áj  ·  ir/ur = ö  ·  ai = éj (nem áj, az a német)
+        # A SORREND: a néma e-t itt még LÁTJUK, lentebb a néma-e szabály
+        # levágja — tehát a magánhangzót előbb kell megfejteni.
+        # A kettőzött mássalhangzó ELŐTT nincs magic e (Gemmell), ezért
+        # pontosan EGY mássalhangzó állhat közte.
+        s = re.sub(r"a([^aeiouáéíóú" + S_J + r"])e$", "é" + S_J + r"\1e", s)
+        s = re.sub(r"i([^aeiouáéíóú" + S_J + r"])e$", "á" + S_J + r"\1e", s)
+        s = re.sub(r"o([^aeiouáéíóú" + S_J + r"])e$", r"ó\1e", s)
+        # Az `u_e` SIMA ú, nem jú: az angol itt megoszlik (Duke = djúk, de
+        # Bruce = brúsz), és a „Brjúsz" rosszabb hiba, mint a „Dúk".
+        s = re.sub(r"u([^aeiouáéíóú" + S_J + r"])e$", r"ú\1e", s)
+        s = s.replace("igh", "á" + S_J)
+        # Az `ir`/`ur` magyar füllel „ör" (Burns → Börnsz, Hurst → Hörszt).
+        # Az r MEGMARAD: a magyar átírás hagyománya kiírja, még ha az RP
+        # nem is ejti.
+        s = re.sub(r"[iu]r(?![aeiouáéíóú])", "ör", s)
+        s = s.replace("á" + S_J + S_J, "á" + S_J)
     elif lang == "de":
         s = s.replace("ei", "áj").replace("eu", "oj").replace("z", S_C)
         s = re.sub(r"^s(?=[pt])", "s", s)
@@ -503,7 +541,7 @@ def hufy(w, lang="en"):
             # ORRHANGÚSÁGÁT nem próbáljuk visszaadni (az „en" marad „en",
             # nem lesz „an"): az már a szó ismeretét kívánná, a néma
             # végződés viszont kivétel nélküli szabály.
-            s = re.sub(r"(?<=n)[tds]$", "", s)
+            s = re.sub(r"(?<=n)[tdsc]$", "", s)
     elif lang == "es":
         s = re.sub(r"j", "h", s)
         s = re.sub(r"^h", "", s)
@@ -630,7 +668,28 @@ def hufy(w, lang="en"):
     if lang in ("en", "fr", "af") and len(s) > 3:
         # AZ ŐRJELEK IS BETŰK: a visszatekintésnek látnia kell őket, különben
         # a „Giresse" (gires+⟨sz⟩+e) néma e-je bennmarad — Zsiressze.
-        s = re.sub(r"(?<=[a-zíóúűő\x01-\x0c])e$", "", s)
+        s = re.sub(r"(?<=[a-zíóúűő\x01-\x10])e$", "", s)
+
+    # ── FRANCIA ORRHANGOK (3.9.121) ────────────────────────────────────────
+    # A c- és y-szabályok UTÁN áll, és ennek oka van: az orrhang átírja a
+    # magánhangzót, és ezzel elrontaná a `ce → sze` környezetét. A Vincent
+    # így lesz Venszan, nem „Venkant".
+    #   an/am/en/em → an  ·  in/im/ain/ein/yn → en  ·  on/om → on  ·  un/um → ön
+    # CSAK mássalhangzó vagy szóvég előtt, és NEM kettőzött n/m előtt
+    # (Bonne = bon, nem orrhang). Az őrjel mássalhangzónak számít, ahogy kell.
+    if lang == "fr":
+        _V = "aeiouáéíóúöőüűmn"
+        # ELŐSZÖR a már ÁTÍRT alak: az általános lista az `ai`-ból „áj"-t
+        # csinált, tehát a Fontaine itt már „fontájne" — az `ain` mintát
+        # így kell elkapni, különben „Fontájn" maradna.
+        # AZ EREDETI n/m MEGMARAD: franciául az orrhangot b és p előtt
+        # m-mel írják (Lacombe), és a magyar átírás is azt követi — a
+        # „Lakonb" csúnya és felesleges. Csak a MAGÁNHANGZÓ változik.
+        s = re.sub("[áé]" + S_J + r"([nm])(?![" + _V + r"])", S_EN + r"\1", s)
+        s = re.sub(r"(?:ai|ei|ai|ei)([nm])(?![" + _V + r"])", S_EN + r"\1", s)
+        s = re.sub(r"[ae]([nm])(?![" + _V + r"])", S_AN + r"\1", s)
+        s = re.sub(r"[iy]([nm])(?![" + _V + r"])", S_EN + r"\1", s)
+        s = re.sub(r"u([nm])(?![" + _V + r"])", S_UN + r"\1", s)
 
     # AZ ŐRJELEK ITT BOMLANAK VISSZA — minden csere után, semmi nem fog rajtuk.
     s = desent(s)
