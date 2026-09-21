@@ -6132,7 +6132,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.103";
+const APP_VERSION="3.9.104";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -51291,8 +51291,22 @@ function sbPaintTeams(fx){
   /* A 0 nem erő, hanem HIÁNY (üres keret, ovr nélküli ellenfél) — olyankor a
      sor egyszerűen nem születik meg, nem egy hazug „0,0" áll a név alatt. */
   const num=v=>(typeof v==="number"&&isFinite(v)&&v>0)?v:null;
+  /* ---- PÁRHARCBAN A MECCS-ERŐ AZ EREDMÉNYJELZŐN (3.9.104) ----
+     KIMONDOTT KÉRÉS: „Meccs erő legyen a PvP-ben a reprezentatív. Az mérje
+     egymáshoz a játékosokat. Az látszódjon az eredményjelzőn meccs előtt,
+     közben."
+     CSAK A PÁRHARCBAN váltunk. A bajnokiban és a kupában a te teamStrength()-ed
+     és a CPU `ovr`-je EGY skálán van, tehát ott a mostani pár a helyes — a
+     párharcnál viszont épp az a baj, hogy a kiírt szám NEM az, amiből a meccs
+     számol. A `matchOvr` a társ pillanatképéből jön (lásd DUEL.oppMatch); ha
+     hiányzik (régi kliens), mindkét oldal marad a régi számon, hogy soha ne
+     kerüljön két KÜLÖNBÖZŐ skálájú szám egymás mellé. */
+  const duelMS=!!(fx&&fx.duel&&fx.o&&typeof fx.o.matchOvr==="number");
+  const myShow=duelMS
+    ?((typeof teamMatchStrength==="function")?teamMatchStrength():null)
+    :((typeof teamStrength==="function")?teamStrength():null);
   const mine={full:sbCleanClub(teamName),abbr:sbClubAbbr(teamName,true),
-              ovr:num(typeof teamStrength==="function"?teamStrength():null),
+              ovr:num(myShow),
               pos:sbTablePos(null)};
   /* ---- A PÁRHARC ELLENFELE KÜLÖN SZÁMOT VISZ (3.8.14) ----
      BEJELENTETT HIBA: „nem jó az ellenfél ratingjának kijelzése egymás elleni
@@ -51304,13 +51318,15 @@ function sbPaintTeams(fx){
      gyengébbnek látszott, mint amilyen. Ugyanezt a hibát a kupaképernyőn és a
      kupa-mezőnyben már javítottuk (lásd mateStr / fx.o.dispOvr) — a tábla és a
      párharc naplósora lemaradt róla. */
-  const oppShow=(fx.o&&typeof fx.o.dispOvr==="number")?fx.o.dispOvr:(fx.o&&fx.o.ovr);
+  const oppShow=duelMS?fx.o.matchOvr
+    :((fx.o&&typeof fx.o.dispOvr==="number")?fx.o.dispOvr:(fx.o&&fx.o.ovr));
   /* A KIÍRT név magyarított, a KERESETT név kanonikus: az sbTablePos a
      tabellában keresi meg a sort a név alapján, tehát oda a nyers fx.o.n megy.
      Az sbClubAbbr a clubAbbr()-en keresztül maga vált kódot. */
   const opp={full:sbCleanClub(teamLabel(fx.o&&fx.o.n)),abbr:sbClubAbbr(fx.o&&fx.o.n,false),
              ovr:num(oppShow),
              pos:sbTablePos(fx.o&&fx.o.n)};
+  if(duelMS){mine.ms=true;opp.ms=true;}
   SB.teams={home:Object.assign({side:"hazai"},SB.usIsHome?mine:opp),
             away:Object.assign({side:"vendég"},SB.usIsHome?opp:mine)};
   const H=$("sbHomeName"),A=$("sbAwayName");
@@ -51369,7 +51385,7 @@ function sbFitTeams(force){
     /* A HELYEZÉS is a kulcs része: a tabella fordulóról fordulóra átrendeződik,
        és egy csak névre+erőre épülő kulcs a régi helyezést hagyná a táblán. */
     const w=el.clientWidth,key=t.full+"|"+t.side+"|"+(t.ovr==null?"":t.ovr.toFixed(1))
-      +"|"+(t.pos==null?"":t.pos);
+      +"|"+(t.pos==null?"":t.pos)+"|"+(t.ms?"m":"");
     const st=_sbFitState[id];
     if(!force&&st&&st.w===w&&st.key===key)return;
     _sbFitState[id]={w,key};
@@ -51377,7 +51393,10 @@ function sbFitTeams(force){
        hiányzik, a másik magában áll — elválasztó nélkül. */
     const bits=[];
     if(t.pos!=null)bits.push(`<span class="sbPos">${t.pos}.</span>`);
-    if(t.ovr!=null)bits.push(esc(t.ovr.toFixed(1).replace(".",",")));
+    /* A VILLÁM jelzi, hogy ez a MECCS-ERŐ, nem a nyers keret (3.9.104) —
+       párharcban ez a szám áll itt, és a kettő simán 10-20 pontra van
+       egymástól. Jelzés nélkül ugyanaz a hely két különböző dolgot mondana. */
+    if(t.ovr!=null)bits.push((t.ms?"⚡":"")+esc(t.ovr.toFixed(1).replace(".",",")));
     /* ---- A KLUB JELVÉNYE A TE OLDALADON (3.9.49) ----
        Ez a képernyő az, amit a legtöbbet nézel — és eddig a saját csapatod
        ugyanolyan névsor volt rajta, mint az ellenfél. A jelvény a NÉV FÖLÉ
@@ -52468,8 +52487,20 @@ function mpTeamCard(active){
     ? Math.round(players.reduce((a2,x)=>a2+x.r,0)/players.length*10)/10
     : Math.round(teamStrength()*10)/10;
   let sq=0;try{sq=Math.round(mpSquadStrength()*10)/10;}catch(e){sq=0;}
+  /* ---- ÉS A MECCS-ERŐ, AMI A LÉNYEG (3.9.104) ----
+     KIMONDOTT KÉRÉS: „Meccs erő legyen a PvP-ben a reprezentatív. Az mérje
+     egymáshoz a játékosokat."
+     A kártya eddig három számot vitt — nyers csontváz, kirajzolt tizenegy,
+     top-14 keret —, és EGYIK SEM az, amiből a mérkőzés gólvárhatósága
+     számol. A meccs-erő (keret + morál + edző + taktika + aura + összhang +
+     lendület) rendszeresen 10-20 ponttal elmozdul a nyers kerettől, és épp az
+     a rész, amit a MENEDZSELÉS tesz hozzá. Ha a két menedzser ezen méri
+     magát, azt méri, ami a pályán dönt. Régi kliens kártyáján hiányzik →
+     null, és a felület ilyenkor egyszerűen nem írja ki. */
+  let ms=0;try{ms=Math.round(teamMatchStrength()*10)/10;}catch(e){ms=0;}
   return {
     team:String(teamName||""),
+    mstr:ms||null,
     /* NYERS csapaterő: a "csontváz" (teamOVRbase), boostok nélkül. */
     ovr:Math.round(teamOVRbase()*10)/10,
     /* A KIRAJZOLT tizenegy átlaga — ugyanaz a skála, amit a saját
@@ -52504,6 +52535,10 @@ function mpCardClean(c){
     /* Régi kliens kártyáján nincs squad — akkor marad null, és a felület
        egyszerűen nem írja ki a sort (nem hazudik nullát). */
     squad:(c.squad==null?null:(num(c.squad,0,120)||null)),
+    /* A meccs-erő a boostokkal és a rejtett tagokkal EGYÜTT áll elő, tehát
+       simán 120 fölé mehet (a beküldött párharcban 173,3 volt) — a felső
+       korlát ezért itt tágabb, mint a keret-alapú számoknál. */
+    mstr:(c.mstr==null?null:(num(c.mstr,0,400)||null)),
     formLabel:txt(c.formLabel,12),
     tactic:(c.tactic&&typeof c.tactic==="object")
       ?{n:txt(c.tactic.n,28),lvl:num(c.tactic.lvl,0,99)}:null,
@@ -52622,12 +52657,18 @@ function drawOppPitch(){
       const d=mine-theirs;
       return ` <span style="color:${Math.abs(d)<0.35?"var(--dim2)":(d>0?"var(--grass)":"var(--red)")}">`
         +`(te ${num(mine)}${Math.abs(d)<0.35?"":` · ${d>0?"+":"−"}${num(Math.abs(d))}`})</span>`;};
+    /* A MECCS-ERŐ VEZET (3.9.104). Ez az a szám, amiből a mérkőzés
+       gólvárhatósága számol — a másik három a háttér. A saját oldalunkon
+       élőben olvassuk, a társét a kártya hozza. */
+    let myMS=0;try{myMS=Math.round(teamMatchStrength()*10)/10;}catch(e){myMS=0;}
     bar.innerHTML=`<div><span class="oppName">${esc(teamLabel(c.team))}</span>`
       +(c.formLabel?` · Felállás: <b>${esc(c.formLabel)}</b>`:"")
       +(c.tactic&&c.tactic.n?` · Taktika: <b>${esc(c.tactic.n)}</b> ${Math.round(c.tactic.lvl)}`:"")
       +(c.captain?` · Kapitány: <b>${esc(shortName(c.captain))}</b>`:"")
-      +`</div>
-      <div>Kezdő tizenegy: <span class="oppNum">${num(c.str)}</span>${cmp(myXI,c.str)}`
+      +`</div>`
+      +(c.mstr?`<div style="font-weight:700">⚡ Meccs-erő: <span class="oppNum">${num(c.mstr)}</span>${cmp(myMS,c.mstr)}`
+        +` <span style="color:var(--dim2);font-weight:400">— EBBŐL számol a mérkőzés</span></div>`:"")
+      +`<div>Kezdő tizenegy: <span class="oppNum">${num(c.str)}</span>${cmp(myXI,c.str)}`
       +` <span style="color:var(--dim2)">— a fenti korongok átlaga</span></div>`
       +(c.squad?`<div>Keret (top ${MP_COMPARE_N}): <span class="oppNum">${num(c.squad)}</span>${cmp(mySq,c.squad)}`
         +` <span style="color:var(--dim2)">— ez a szezonzáró összevetés mércéje</span></div>`:"")
@@ -56393,7 +56434,21 @@ function h2hStart(node,sim,round){
        teamStrength()-skála — ugyanaz a szám-fajta, mint a saját csapaterőd.
        Régi kliens pillanatképében nincs shownOvr: ott marad a régi viselkedés. */
     oppOvr:(oppSnap.dispOvr!=null?oppSnap.dispOvr:(oppSnap.ovr||0)),
-    oppShown:(typeof oppSnap.shownOvr==="number")?oppSnap.shownOvr:null};
+    oppShown:(typeof oppSnap.shownOvr==="number")?oppSnap.shownOvr:null,
+    /* ---- A HARMADIK SZÁM: A MECCS-ERŐ (3.9.104) ----
+       KIMONDOTT KÉRÉS: „Meccs erő legyen a PvP-ben a reprezentatív. […] Az
+       látszódjon az eredményjelzőn meccs előtt, közben."
+       A pillanatkép `ovr`-je PONTOSAN az, amiből a szimuláció a gólvárhatóságot
+       számolja (buildMatchSnapshot: keret + morál + edző + aura + kapitány +
+       lendület + összhang + stílus), a `tacticEffect` pedig a motorban külön
+       adódik hozzá — a kettő együtt áll egy skálán a te teamMatchStrength()-eddel.
+       A másik két mező marad, mert más a dolguk: az `oppOvr` (nyers csontváz) a
+       meccs utáni könyvelésé (óriásölés, „nagy skalp"), az `oppShown` a régi
+       kijelzésé. Három mező, három feladat.
+       Régi kliens pillanatképében nincs → null, és az eredményjelző ilyenkor
+       a megszokott számot mutatja. */
+    oppMatch:(typeof oppSnap.ovr==="number")
+      ?Math.round((oppSnap.ovr+(oppSnap.tacticEffect||0))*10)/10:null};
   playMatch();}
 /* A párharc góljának perce a KÖZÖS listából jön, tehát mindkét kliens ugyanazt
    a számot írja ki — a lista egyszer készül el, és a vödör-szétválasztás
@@ -57136,7 +57191,12 @@ async function mpStartExchange(onReady){
   /* A CSAPATLAP a javaslat mellé ül: ez az EGYETLEN pillanat a szezon előtt,
      amikor a két kliens amúgy is beszél egymással — így új hálózati csatorna
      nélkül tudja meg mindkettő, kivel indul neki az idénynek. */
+  /* A `str` a NYERS keret (visszafelé kompatibilis, a régi kliens ezt olvassa),
+     a `mstr` a MECCS-ERŐ (3.9.104) — a szint alkujánál is ez a beszédes szám,
+     mert a mezőnyt ehhez mérve állítjátok be. */
+  let myMS=0;try{myMS=Math.round(teamMatchStrength()*10)/10;}catch(e){myMS=0;}
   const myBidRec={lvl:(bid&&bid.value!=null)?bid.value:null,str:Math.round(teamStrength()),
+    mstr:myMS||null,
     card:mpTeamCard(),
     /* A VILÁG HÁROM TENGELYE utazik a javaslat mellett (3.8.37): ez az egyetlen
        pont, ahol a két kliens minden idényben úgyis beszél egymással, tehát új
@@ -60023,7 +60083,8 @@ function playMatch(){
     ?{o:{n:DUEL.oppName,ovr:DUEL.oppOvr,
          /* a KIJELZETT erő külön mezőben — a fx.o.dispOvr-t a kupaképernyő és a
             kupa-kihívás könyvelése is ismeri, tehát új útvonal nem kell hozzá */
-         ...(DUEL.oppShown!=null?{dispOvr:DUEL.oppShown}:{})},
+         ...(DUEL.oppShown!=null?{dispOvr:DUEL.oppShown}:{}),
+         ...(DUEL.oppMatch!=null?{matchOvr:DUEL.oppMatch}:{})},
        home:!DUEL.neutral&&!!DUEL.iAmHome,duel:true}
     /* OSZTÁLYOZÓ: saját, két meccses menetrend — ugyanabban az alakban. */
     :(pyrPoActive()?pyrPoFx():(euroActive()?S.euro.fixtures[S.euro.idx]:S.fixtures[S.idx]));

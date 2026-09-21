@@ -1403,6 +1403,27 @@ dolgozott, és `h2hRoomActive()===false` mellett a párharcokat is kitörölte
 volna. A régi sorrenddel a menetrend 32 marad, az újjal 30 lesz. Részletek:
 `docs/osztalyletszam-es-paratlan-mezony.md`.
 
+## pvp-meccsero-proba.js — ⚡ a szám, amiből a párharc tényleg eldől
+
+```
+node tools/pvp-meccsero-proba.js
+```
+
+A motor a párharcot MINDIG is a meccs-erőből számolta — a felület viszont a
+nyers keretet mutatta. A két menedzser tehát nem azon mérte magát, amiből a
+mérkőzés eldőlt (a beküldött beszélgetésben 173,3 vs 158,5, miközben a
+képernyőn másik számpár állt).
+
+A próba méri, hogy a csapatlap `mstr` mezője PONTOSAN a `teamMatchStrength()`,
+hogy a hálózati tisztítás átengedi a 120 fölötti értéket (a meccs-erő simán
+170 fölé megy), a hiányzót null-ra teszi és az irreálisat levágja — és hogy az
+eredményjelző párharcban mindkét oldalon a meccs-erőt mutatja, villám-jelzéssel.
+
+**A fele az állításoknak arról szól, hol NEM szabad változnia semminek:**
+bajnokiban, kupában és régi kliens ellen betűre a régi szám áll — utóbbinál
+azért, mert két KÜLÖNBÖZŐ skálájú szám egymás mellett rosszabb volna, mint két
+régi. Részletek: `docs/pvp-meccsero.md`.
+
 ## parharc-menetrend-proba.js — ⚔ a 22. fordulóban megállt a szezon
 
 ```
