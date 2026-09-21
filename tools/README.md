@@ -1430,6 +1430,14 @@ semmi hatás, utána a saját gólesély pontosan annyival esik, amennyivel az
 ellenfélé nő, minden megvett szint a tizedét tünteti el, a 10.-en a hátrány
 nulla — és más stílusnál nem is létezik.
 
+A tizedik szakasz a BOMBÁZÓKÉ — és egyben a motor próbája: a gazdaság ott
+EGY táblázatsor, a bázis ugyanaz a szerkezet, csak a GÓLSZERZÉS attribútumon
+(a próba külön állítja, hogy a 100-as sebesség ott semmit nem ér). Mellette a
+két aláírás-mechanika: A Kilences önmagát gerjesztő gólsúlya a hárommal
+záródó plafonnal és a „hajrában hátrányban nem jár" záradékkal, illetve A
+rekord kötelez latchelő csapatszorzója és a lefújáskori könyvelés (a csúcs
+felmegy, de sosem le).
+
 A kilencedik a SZÁRNY-KÉMIA: a stílusszint három fokozata, a párosítás négy
 nemleges esete (más oldal · nem szárny · azonos poszt · és a legfontosabb: ha
 a két ember SEBESSÉGE elszakadt egymástól), az összeérés lépésről lépésre, a

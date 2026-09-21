@@ -335,6 +335,113 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(sz.panzer.on===false&&sz.panzer.szorzo===1,
     "más stílusnál nem létezik",sz.panzer);
 
+  /* ================= 10. BOMBÁZÓK: A MOTOR MÁSODIK STÍLUSA =================
+     Itt derül ki, ér-e valamit a közös motor: a Bombázók gazdasága EGY
+     táblázatsor. A bázis ugyanaz a szerkezet, csak másik attribútumon (gol),
+     a tarifa viszont másról szól — a Villámé a MIKOR, a Bombázóké a MENNYI. */
+  const bz=await p.evaluate(async()=>{
+    const ki={};
+    S.style={key:"bombazok",traits:{}};S.style2=null;
+    S.bz9=null;S.recGoalsMatch=0;
+    const roster=fullCareerRoster()||[];
+    const setA=(kulcs,v)=>{roster.forEach(pl=>{
+      const e=careerPool&&careerPool[pl.n];
+      if(e){if(!e.attrs)initPlayerAttrs(e);e.attrs[kulcs]=v;}});};
+    ki.kulcs=engKey();
+    /* --- A BÁZIS a GÓLSZERZÉSBŐL, nem a sebességből --- */
+    setA("gol",70);setA("seb",100);
+    ki.gol70={gol:engLevel("bombazok")};
+    setA("gol",95);
+    ki.gol95={gol:engLevel("bombazok")};
+    const _sl=styleLevel;window.styleLevel=()=>20;
+    ki.allapot=engLevel("bombazok");
+    /* --- A TARIFA: mesterhármas, gólzápor, klubrekord --- */
+    const E=engState("bombazok");E.pts=0;
+    const naplo=[];const _a=addLine;addLine=x=>naplo.push(String(x));
+    engMatchStart();
+    S.recGoalsMatch=3;
+    engFullTimeNote({"A":3,"B":1},5);     /* 1 mesterhármas + 5 gól + rekord (3→5) */
+    const kap=engMatchEnd();
+    addLine=_a;
+    ki.tarifa={kap,
+      hat:naplo.some(x=>/mesterhármas/.test(x)),
+      zapor:naplo.some(x=>/gólzápor/.test(x)),
+      rekord:naplo.some(x=>/ÚJ KLUBREKORD/.test(x))};
+    /* --- A KILENCES --- */
+    window.styleLevel=()=>1;  ki.n9lvl1={tier:bzTier(),nev:bz9Name()};
+    window.styleLevel=()=>20;
+    /* A KERETBEN nem garantált, hogy van CSATÁR-kategóriás ember (a 9.
+       szakasz posztokat is átírt) — ezért itt kijelölünk egyet mindkét
+       szerepre. A posztkód a careerPool-ban lakik, onnan olvas a bz9Eligible. */
+    careerPool[roster[0].n].pos=["CS"];
+    careerPool[roster[1].n].pos=["KV"];
+    const csatar=roster[0],vedo=roster[1];
+    ki.jelolhet={csatar:bz9Eligible(csatar.n),vedo:bz9Eligible(vedo.n)};
+    ki.jelol={csatar:bz9Set(csatar&&csatar.n),vedo:bz9Set(vedo&&vedo.n)};
+    bz9Set(csatar&&csatar.n);
+    const N=csatar&&csatar.n;
+    ki.kilences={
+      nullaGol:bz9GoalMult(N,30,1,0,{}),
+      egyGol:Math.round(bz9GoalMult(N,30,1,0,{[N]:1})*1000)/1000,
+      haromGol:Math.round(bz9GoalMult(N,30,3,0,{[N]:3})*1000)/1000,
+      otGol:Math.round(bz9GoalMult(N,30,5,0,{[N]:5})*1000)/1000,
+      masik:bz9GoalMult(vedo&&vedo.n,30,1,0,{[vedo&&vedo.n]:2}),
+      hajraHatrany:bz9GoalMult(N,75,1,2,{[N]:3}),
+      hajraVezetes:Math.round(bz9GoalMult(N,75,2,1,{[N]:3})*1000)/1000};
+    /* --- A REKORD KÖTELEZ --- */
+    S.recGoalsMatch=4;
+    bzRecReset();
+    ki.rekord={
+      messze:Math.round(bzRecGoalMult(1)*1000)/1000,
+      egyre:Math.round(bzRecGoalMult(3)*1000)/1000,
+      latch:Math.round(bzRecGoalMult(0)*1000)/1000};   /* latchelt → marad */
+    bzRecReset();
+    S.recGoalsMatch=1;
+    ki.rekordKicsi=bzRecGoalMult(0);                    /* 2 alatti csúcsnál nincs */
+    /* --- A LEFÚJÁS KÖNYVELI A CSÚCSOT --- */
+    S.recGoalsMatch=3;bzRecFullTime(6);ki.ujRekord=S.recGoalsMatch;
+    bzRecFullTime(2);ki.nemEsik=S.recGoalsMatch;
+    /* --- MÁS STÍLUSNÁL SEMMI --- */
+    S.style={key:"villam",traits:{}};
+    bzRecReset();S.recGoalsMatch=4;
+    ki.villamnal={rek:bzRecGoalMult(3),nine:bz9Name(),
+      kilences:bz9GoalMult(N,30,1,0,{[N]:3})};
+    window.styleLevel=_sl;
+    S.style={key:"bombazok",traits:{}};
+    return ki;});
+
+  console.log("=== 10. Bombázók — a motor második stílusa ===");
+  ok(bz.kulcs==="bombazok","a motor a Bombázóknál is aktív",{k:bz.kulcs});
+  ok(bz.gol70.gol===0&&bz.gol95.gol>0,
+    "a bázis a GÓLSZERZÉSBŐL jön (a 100-as sebesség nem számít)",
+    {gol70:bz.gol70,gol95:bz.gol95});
+  ok(bz.tarifa.hat&&bz.tarifa.zapor&&bz.tarifa.rekord,
+    "mesterhármas · gólzápor · klubrekord — mind külön tétel",bz.tarifa);
+  ok(bz.tarifa.kap>0,"és a lefújás jóvá is írja",{kap:bz.tarifa.kap});
+  console.log("--- A Kilences ---");
+  ok(bz.n9lvl1.tier===0&&bz.n9lvl1.nev===null,"a 3. stílusszint alatt nincs",bz.n9lvl1);
+  ok(bz.jelolhet.csatar===true&&bz.jelolhet.vedo===false,
+    "a jelölhetőség CSATÁR-kategóriához kötött",bz.jelolhet);
+  ok(bz.jelol.csatar===true&&bz.jelol.vedo===false,
+    "…és a kijelölés is csak neki megy át",bz.jelol);
+  ok(bz.kilences.nullaGol===1,"gól nélkül nincs bónusz");
+  ok(bz.kilences.egyGol>1&&bz.kilences.haromGol>bz.kilences.egyGol,
+    "és minden gólja emeli a következő esélyét",bz.kilences);
+  ok(bz.kilences.otGol===bz.kilences.haromGol,
+    "…de legfeljebb háromszor (a plafon fog)",{harom:bz.kilences.haromGol,ot:bz.kilences.otGol});
+  ok(bz.kilences.masik===1,"másra nem hat");
+  ok(bz.kilences.hajraHatrany===1&&bz.kilences.hajraVezetes>1,
+    "a 70. perctől HÁTRÁNYBAN nem jár — frontember, nem megmentő",bz.kilences);
+  console.log("--- A rekord kötelez ---");
+  ok(bz.rekord.messze===1,"a csúcstól messze nincs bónusz",{v:bz.rekord.messze});
+  ok(bz.rekord.egyre>1,"egy gólra tőle felizzik",{v:bz.rekord.egyre});
+  ok(bz.rekord.latch===bz.rekord.egyre,"és a mérkőzés végéig marad (latch)",bz.rekord);
+  ok(bz.rekordKicsi===1,"2 alatti csúcsnál nincs mit megközelíteni");
+  ok(bz.ujRekord===6&&bz.nemEsik===6,"a lefújás felviszi a csúcsot, de nem viszi le",
+    {uj:bz.ujRekord,utana:bz.nemEsik});
+  ok(bz.villamnal.rek===1&&bz.villamnal.nine===null&&bz.villamnal.kilences===1,
+    "más stílusnál egyik sem létezik",bz.villamnal);
+
   const sulyos=errs.filter(e=>!/favicon|manifest|sw\.js|ServiceWorker/i.test(e));
   ok(sulyos.length===0,"nincs oldalhiba",sulyos.slice(0,4));
   await b.close();srv.close();

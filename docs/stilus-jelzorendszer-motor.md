@@ -1,4 +1,4 @@
-# A közös jelzőrendszer-motor, és a Villám gazdasága (3.9.105)
+# A közös jelzőrendszer-motor: Villám és Bombázók (3.9.105–3.9.108)
 
 ## 1. Miért
 
@@ -111,16 +111,7 @@ adja, amelyikhez tartozik motor. Két gazdaság párhuzamos pörgetése kétszer
 meccserőt adna ugyanazért a munkáért. A próba külön állítja, hogy Panzernél a
 motor **néma** — de másodlagos sloton a Villám így is fut.
 
-## 7. Mérés
-
-`node tools/stilus-motor-proba.js` (9077-es port) — kilenc szakasz: a két létra
-viszonya (**minden szinten 0,6**), az azonos ár- és küszöblétra, a viharszint
-mint állapot (a skála alja, a stílusszint nagyítása, az eladás azonnali
-hatása), a 10%-os meccskeret, a szint → meccserő átváltás a +12-es plafonnal,
-egy **élő mérkőzés** teljes tarifája és könyvelése, végül hogy a motor csak a
-saját stílusánál fut.
-
-## 8. ⏳ „Nyolcvan perc" — a sebesség ára
+## 7. ⏳ „Nyolcvan perc" — a sebesség ára
 
 A Villám eddig **tiszta nyereség** volt: a gyors keret jobb, és kész. Egy
 filozófiának viszont két oldala kell, különben nem választás, hanem bezárás —
@@ -145,7 +136,7 @@ fele ugyanazt mondja: **siess**.
 A hatás szorzó, nem meccserő, tehát a `roleOwnGoalMult` / `roleOppGoalMult`
 mellett ül, ugyanazon a két ponton.
 
-## 9. ⚡ Szárny-kémia (3.9.107)
+## 8. ⚡ Szárny-kémia (3.9.107)
 
 A **harmadik kötésfajta** a passzkémia és a gyilkos páros mellé — és a
 harmadik, ami nem felajánlásból jön, hanem **együtt töltött időből**.
@@ -198,3 +189,77 @@ amúgy is három rendszert hoz — itt ezért maga a filozófia szintje a lépcs
 `S.szarny` (a mentés része), a léptetés a `passChemTick` / `gpDuoTick`
 mellett fut a fejlődési ciklus után, a szorzó pedig a `roleOwnGoalMult`
 csatornáján megy.
+## 9. ⚽ Bombázók — a motor második stílusa (3.9.108)
+
+Itt derül ki, ér-e valamit a közös motor: **a Bombázók gazdasága egy
+táblázatsor.** Ugyanaz a bázis-szerkezet, csak másik attribútumon.
+
+| | Villám | Bombázók |
+|---|---|---|
+| állapot | viharszint (`seb`) | **gólterhelés** (`gol`) |
+| valuta | villámpont | **gólpont** |
+| szint | Villámcsapás | **Gólözön** |
+
+A tarifa viszont másról szól — **a Villámé a MIKOR, a Bombázóké a MENNYI**:
+
+| tétel | pont |
+|---|---|
+| gól | 0,4 |
+| gólpassz | 0,2 |
+| **mesterhármas** | 1,0 |
+| **gólzápor** (4+ gól egy meccsen) | 1,5 |
+| **új klubrekord** | 2,5 |
+
+### ⚽ A Kilences
+
+Kijelölsz egy **csatárt**, és onnantól **minden gólja megemeli a következő
+gólesélyét**. A gólzápor így szó szerint önmagát gerjeszti: aki egyszer
+betalált, azt keresi a labda.
+
+| stílusszint | gólonként | max |
+|---|---|---|
+| 3–7 | +35% | ×2,05 |
+| 8–13 | +50% | ×2,50 |
+| 14+ | +70% | ×3,10 |
+
+**Az ellentétel élesen tematikus, és ez teszi választássá:** a **70. perctől,
+ha hátrányban vagytok, a bónusz eltűnik**. A Kilences **frontember, nem
+megmentő** — akkor öl, amikor már megy a csapatnak. Enélkül ez egy
+univerzális gólsúly-buff volna, nem karakter.
+
+A szorzó a gólsúly csatornáján megy (`roleGoalMult` mellett), tehát a
+tizenegyen **belül** oszt újra — nem emeli a csapat gólvárhatóságát.
+
+### ⚽ A rekord kötelez
+
+A klub őrzi az **egymeccses gólcsúcsát** (`S.recGoalsMatch`). Ha **egy gólra
+vagytok tőle**, az egész csapat gólesélye megnő a mérkőzés végéig — érzik,
+hogy történik valami.
+
+| stílusszint | a csapat gólesélye |
+|---|---|
+| 3–7 | +4,0% |
+| 8–13 | +6,0% |
+| 14+ | +8,0% |
+
+A jelző a meccsen belül **latchelődik**: ha egyszer felizzott, a hátralévő
+percekre marad, akkor is, ha közben átléptétek a rekordot. A csúcs a
+lefújásnál könyvelődik — **a tarifa UTÁN**, hogy a „megdőlt" tétel a régi
+csúcshoz mérten szülessen, és ne üsse agyon önmagát. A csúcs sosem csökken.
+2 alatti rekordnál nincs mit megközelíteni.
+
+### Párharcban egyik sem fut
+
+Ott a **közös, seedelt eseménylista** dönti el, ki mikor talál be — ugyanaz a
+szabály, ami a helyben dobott lapokra és a bemondott vereségre is áll. Egy
+helyben módosított gólsúly azonnal szétvinné a két kliens nézetét.
+
+## 10. Mérés
+
+`node tools/stilus-motor-proba.js` (9077-es port) — tíz szakasz: a két létra
+viszonya (**minden szinten 0,6**), az azonos ár- és küszöblétra, a viharszint
+mint állapot (a skála alja, a stílusszint nagyítása, az eladás azonnali
+hatása), a 10%-os meccskeret, a szint → meccserő átváltás a +12-es plafonnal,
+egy **élő mérkőzés** teljes tarifája és könyvelése, végül hogy a motor csak a
+saját stílusánál fut.
+
