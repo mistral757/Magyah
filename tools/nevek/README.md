@@ -67,6 +67,25 @@ után is megmarad.
 
 Ha a build panaszkodik, a javítás helye a `manual.py`.
 
+## A motor tíz szabályhiánya (3.9.113)
+
+A gépi réteg tíz ponton a saját guide-ját (`docs/nevek-danisitasa.md`)
+sértette: `ll → lj` nyelvfüggetlenül (124 név), szókezdő spanyol `S-` (69),
+`-ez → -essz` (50), `Mc- → Mk-` magánhangzó nélkül (21), `qu → kv`
+újlatinul (22), a holland `v`/`g`/`ij` (41), angol `s` + mássalhangzó (18),
+olasz magánhangzók közti `s` (15), francia `G` i/e előtt (6). Összesen
+**412 név** javult, kézi név **egy sem** változott.
+
+Háromnál a sorrend volt a hiba, nem a szabály — és a kód ezt ki is mondja
+(a spanyol `j → h` felülírná az `ll → j`-t; a `w → v` felülírná a holland
+`v → f`-et; a `z → sz` kétszer cserélt a `-ez`-ben). **Új nyelvi szabály
+írásakor előbb nézd meg, mi fut utána.**
+
+Belgium 3.9.113 óta saját nyelvkód (`be`), ág nélkül: az ország kétnyelvű,
+és a flamand `g → h` a francia ajkú neveken (Gillet → „Hillet") rombolna.
+
+Részletes magyarázat: `docs/nevek-motor-tiz-szabaly.md`.
+
 ## kettozes.py — ugyanaz az ember két néven
 
 ```bash
