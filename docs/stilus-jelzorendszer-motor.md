@@ -1,4 +1,4 @@
-# A közös jelzőrendszer-motor: Villám és Bombázók (3.9.105–3.9.108)
+# A közös jelzőrendszer-motor — mind a nyolc filozófia (3.9.105–3.9.110)
 
 ## 1. Miért
 
@@ -254,9 +254,58 @@ Ott a **közös, seedelt eseménylista** dönti el, ki mikor talál be — ugyan
 szabály, ami a helyben dobott lapokra és a bemondott vereségre is áll. Egy
 helyben módosított gólsúly azonnal szétvinné a két kliens nézetét.
 
-## 10. Mérés
+## 10. A maradék négy stílus (3.9.110)
 
-`node tools/stilus-motor-proba.js` (9077-es port) — tíz szakasz: a két létra
+Ezzel **mind a nyolc filozófiának van kamatozó gazdasága.** Kettőnek saját
+(Panzer: félelem-rettenet · Sztár: híresség), hatnak a közös motor.
+
+| stílus | állapot | bázis | valuta | szint |
+|---|---|---|---|---|
+| ⚡ Villám | viharszint | `seb` | villámpont | Villámcsapás |
+| ⚽ Bombázók | gólterhelés | `gol` | gólpont | Gólözön |
+| 🧱 Beton | betonszint | **max(`ved`, `kapus`)** | betonpont | Bunker |
+| ☯️ Harmónia | harmóniaszint | **az egyenletesség** | harmóniapont | Egyensúly |
+| 🌀 Tiki-taka | passzterhelés | `passz` | passzpont | Körforgás |
+| 🧲 Gegenpressing | nyomásszint | **átlag(`seb`, `ved`)** | presszpont | Fojtás |
+
+### Három bázis-alak, hogy mindenki a saját nyelvén mérhessen
+
+* **`attr`** — egy tengely (Villám, Bombázók, Tiki-taka).
+* **`attrMax`** — a kettő közül a nagyobbik. A Betonnál a kapus a **védését**
+  adja, a mezőnyjátékos a **védekezését** — egy skálán. Mérve: 95-ös védéssel
+  a kapus pontosan annyit ér, mint egy 95-ös védekezésű hátvéd.
+* **`attrAvg`** — a kettő átlaga. A Gegenpressingnél presszingelni **lábbal
+  ÉS szereléssel** lehet; aki csak az egyikkel bír, nem presszingel. Mérve:
+  100 sebesség + 70 védekezés = pontosan annyi, mintha mindkettő 85 lenne.
+
+### ☯️ És egy negyedik, ami kilóg — szándékosan
+
+A Harmónia az **egyetlen** stílus, aminek az állapota nem egy tengely
+**magassága**, hanem a keret **egyenletessége**. A filozófia szó szerint ezt
+mondja: *„nincs kiemelkedő ember, és nincs gyenge láncszem sem."* Egy
+sztárcsapat itt **rosszul jár** — és ez a lényeg.
+
+A tizenegy legjobb Ratingű ember átlagához mérünk: mindenki annál többet ad,
+minél közelebb áll hozzá; 12 Rating eltérésnél már nulla. Mérve: egy
+tökéletesen egyenletes keret **660**, egy 120/80-ra széthúzott **0**.
+
+### Négy tarifa-nyelv
+
+| stílus | mit fizet |
+|---|---|
+| 🧱 Beton | **tiszta lap 2,0** · lezárt meccs (győzelem ≤1 kapott góllal) 0,8 · védekező villanás 0,15 |
+| ☯️ Harmónia | **három gólszerző 1,5** · négy vagy több +1,0 · gólpassz 0,35 · gól 0,15 |
+| 🌀 Tiki-taka | **gólpassz 0,5** (a motor legtöbbet fizető rendes tétele) · csapatjáték (3+ gólpassz) 1,5 · gól 0,2 |
+| 🧲 Gegenpressing | **elhódított labda elöl 0,45** · tiszta lap 1,0 · gól 0,2 |
+
+A Harmóniánál a próba külön állítja, hogy **egy ember három gólja nulla
+pontot ér** — ott nem a gól számít, hanem hogy hányan szerezték. A
+Gegenpressing `press` tétele a motor egyetlen olyan tarifája, ami nem gólból,
+lapból vagy eredményből jön: a stílus saját motor-csatornájából (`mPress`).
+
+## 11. Mérés
+
+`node tools/stilus-motor-proba.js` (9077-es port) — tizenegy szakasz: a két létra
 viszonya (**minden szinten 0,6**), az azonos ár- és küszöblétra, a viharszint
 mint állapot (a skála alja, a stílusszint nagyítása, az eladás azonnali
 hatása), a 10%-os meccskeret, a szint → meccserő átváltás a +12-es plafonnal,

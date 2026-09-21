@@ -1425,7 +1425,7 @@ sztár elhagyja a klubot.
 Az utolsó szakasz a kihívás-büntetést („3 meccsig nem működnek a szerepek")
 futtatja rá mind a hatra. Részletek: `docs/panzer-sztar-szerepek.md`.
 
-## stilus-motor-proba.js — ⚙️ egy motor, hat gazdaság
+## stilus-motor-proba.js — ⚙️ egy motor, hat gazdaság (a nyolcból)
 
 ```
 node tools/stilus-motor-proba.js
@@ -1451,6 +1451,16 @@ A nyolcadik szakasz a stílus ÁRÁT méri („Nyolcvan perc"): a 70. perc előt
 semmi hatás, utána a saját gólesély pontosan annyival esik, amennyivel az
 ellenfélé nő, minden megvett szint a tizedét tünteti el, a 10.-en a hátrány
 nulla — és más stílusnál nem is létezik.
+
+A tizenegyedik szakasz zárja le a sort: Beton, Harmónia, Tiki-taka,
+Gegenpressing. Itt már nem az a kérdés, elbírja-e a motor a stílusok
+HASONLÓSÁGÁT, hanem hogy elbírja-e a KÜLÖNBSÉGÜKET. Három bázis-alak
+(egy tengely · a kettő közül a nagyobbik · a kettő átlaga) és négy
+tarifa-nyelv. A legélesebb két állítás: a Betonnál a kapus VÉDÉSE pontosan
+annyit ér, mint egy hátvéd védekezése, a Harmóniánál pedig EGY EMBER HÁROM
+GÓLJA NULLA PONT — ott nem a gól számít, hanem hogy hányan szerezték. A
+Harmónia egyébként az egyetlen stílus, aminek az állapota nem egy tengely
+magassága, hanem a keret egyenletessége: egyenletes keret 660, széthúzott 0.
 
 A tizedik szakasz a BOMBÁZÓKÉ — és egyben a motor próbája: a gazdaság ott
 EGY táblázatsor, a bázis ugyanaz a szerkezet, csak a GÓLSZERZÉS attribútumon

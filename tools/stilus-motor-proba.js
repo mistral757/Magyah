@@ -442,6 +442,128 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(bz.villamnal.rek===1&&bz.villamnal.nine===null&&bz.villamnal.kilences===1,
     "más stílusnál egyik sem létezik",bz.villamnal);
 
+  /* ================= 11. A MARADÉK NÉGY STÍLUS =================
+     Beton · Harmónia · Tiki-taka · Gegenpressing. Mindegyik EGY táblázatsor —
+     de nem ugyanaz a sor: háromféle bázis-alak és négyféle tarifa-nyelv.
+     Itt derül ki, elbírja-e a motor a stílusok KÜLÖNBSÉGÉT is, nem csak a
+     hasonlóságukat. */
+  const negy=await p.evaluate(()=>{
+    const ki={};
+    ki.kulcsok=Object.keys(ENG_DEFS).sort();
+    /* Melyik stílusnak NINCS motorja, és miért? */
+    ki.nincs=STYLES.map(x=>x.key).filter(k=>!ENG_DEFS[k]).sort();
+    const roster=fullCareerRoster()||[];
+    const setA=(o)=>{roster.forEach(pl=>{
+      const e=careerPool&&careerPool[pl.n];
+      if(e){if(!e.attrs)initPlayerAttrs(e);Object.keys(o).forEach(k=>{e.attrs[k]=o[k];});}});};
+    const _sl=styleLevel;window.styleLevel=()=>20;
+    const allapot=(kulcs)=>{S.style={key:kulcs,traits:{}};S.style2=null;return engLevel(kulcs);};
+
+    /* --- A HÁROM BÁZIS-ALAK --- */
+    setA({ved:0,kapus:95,seb:0,gol:0,passz:0});
+    ki.betonKapus=allapot("beton");          /* attrMax: a VÉDÉS is számít */
+    setA({ved:95,kapus:0,seb:0,gol:0,passz:0});
+    ki.betonVedo=allapot("beton");
+    setA({seb:100,ved:70,kapus:0,gol:0,passz:0});
+    ki.gegenAtlag=allapot("gegen");          /* attrAvg → mintha 85 lenne */
+    setA({seb:85,ved:85,kapus:0,gol:0,passz:0});
+    ki.gegenEgyenlo=allapot("gegen");
+    setA({passz:95,ved:0,kapus:0,seb:0,gol:0});
+    ki.tikiPassz=allapot("tikitaka");
+    ki.tikiNemVed=(()=>{setA({passz:0,ved:95,kapus:0,seb:0,gol:0});
+      return allapot("tikitaka");})();
+
+    /* --- ☯️ A HARMÓNIA: AZ EGYENLETESSÉG A BÁZIS --- */
+    const _po=pOvr;
+    const sorrend=roster.map(x=>x.n);
+    /* egyenletes keret */
+    window.pOvr=(p2)=>{const n=(p2&&p2.n)||p2;return sorrend.indexOf(n)>=0?100:0;};
+    ki.harmEgyenletes=allapot("harmonia");
+    /* széthúzott keret: fele 120, fele 80 */
+    window.pOvr=(p2)=>{const n=(p2&&p2.n)||p2;const i=sorrend.indexOf(n);
+      return i<0?0:(i%2===0?120:80);};
+    ki.harmSzethuzott=allapot("harmonia");
+    window.pOvr=_po;
+
+    /* --- A TARIFÁK --- */
+    const teszt=(kulcs,fn)=>{
+      S.style={key:kulcs,traits:{}};S.style2=null;
+      const E=engState(kulcs);E.pts=0;E.lvl=0;
+      const naplo=[];const _a=addLine;addLine=x=>naplo.push(String(x));
+      engMatchStart();fn();const kap=engMatchEnd();
+      addLine=_a;
+      return {kap,naplo:naplo.join(" | ")};};
+    setA({ved:95,kapus:95,seb:95,gol:95,passz:95});
+    ki.beton={
+      tisztaLap:teszt("beton",()=>{engNote("tackle");engNote("tackle");
+        engFullTimeNote({A:1},1,0,{});}),
+      lezart:teszt("beton",()=>{engFullTimeNote({A:2},2,1,{});}),
+      kapottKetto:teszt("beton",()=>{engFullTimeNote({A:1},1,2,{});})};
+    ki.harmonia={
+      harman:teszt("harmonia",()=>{engFullTimeNote({A:1,B:1,C:1},3,0,{});}),
+      negyen:teszt("harmonia",()=>{engFullTimeNote({A:1,B:1,C:1,D:1},4,0,{});}),
+      egyedul:teszt("harmonia",()=>{engFullTimeNote({A:3},3,0,{});})};
+    ki.tiki={
+      csapatjatek:teszt("tikitaka",()=>{engFullTimeNote({A:3},3,0,{X:2,Y:1});}),
+      keves:teszt("tikitaka",()=>{engFullTimeNote({A:3},3,0,{X:2});})};
+    ki.gegen={
+      press:teszt("gegen",()=>{for(let i=0;i<4;i++)engNote("press");
+        engFullTimeNote({A:1},1,0,{});})};
+    /* --- ÉS TOVÁBBRA IS CSAK EGY MOTOR FUT --- */
+    S.style={key:"beton",traits:{}};S.style2={key:"tikitaka",traits:{}};
+    ki.egyMotor=engKey();
+    S.style={key:"panzer",traits:{}};S.style2=null;
+    ki.panzerNincs=engKey();
+    window.styleLevel=_sl;
+    S.style={key:"villam",traits:{}};
+    return ki;});
+
+  console.log("=== 11. a maradék négy stílus ===");
+  ok(negy.kulcsok.join()==="beton,bombazok,gegen,harmonia,tikitaka,villam",
+    "hat stílusnak van motorja",negy.kulcsok);
+  ok(negy.nincs.join()==="panzer,sztar",
+    "és pontosan kettőnek nincs — nekik SAJÁT rendszerük van (rettenet / híresség)",
+    negy.nincs);
+  console.log("--- a három bázis-alak ---");
+  ok(negy.betonKapus>0&&negy.betonKapus===negy.betonVedo,
+    "🧱 attrMax: a kapus VÉDÉSE ugyanannyit ér, mint a mezőnyjátékos védekezése",
+    {kapus:negy.betonKapus,vedo:negy.betonVedo});
+  ok(negy.gegenAtlag===negy.gegenEgyenlo,
+    "🧲 attrAvg: 100 seb + 70 ved = mintha mindkettő 85 lenne",
+    {atlag:negy.gegenAtlag,egyenlo:negy.gegenEgyenlo});
+  ok(negy.tikiPassz>0&&negy.tikiNemVed===0,
+    "🌀 a Tiki-taka CSAK a passzt nézi",{passz:negy.tikiPassz,ved:negy.tikiNemVed});
+  console.log("--- ☯️ a harmónia: az egyenletesség a bázis ---");
+  ok(negy.harmEgyenletes>negy.harmSzethuzott,
+    "az EGYENLETES keret többet ér, mint a széthúzott — ez az egyetlen ilyen bázis",
+    {egyenletes:negy.harmEgyenletes,szethuzott:negy.harmSzethuzott});
+  ok(negy.harmSzethuzott===0,
+    "…és 20 Rating szórásnál már nulla (12-nél elfogy)",{v:negy.harmSzethuzott});
+  console.log("--- a négy tarifa-nyelv ---");
+  ok(/TISZTA LAP/.test(negy.beton.tisztaLap.naplo)&&negy.beton.tisztaLap.kap>0,
+    "🧱 a tiszta lap a legnagyobb tétel",{kap:negy.beton.tisztaLap.kap});
+  ok(/lezárt meccs/.test(negy.beton.lezart.naplo),
+    "🧱 …és az egygólos győzelem is fizet");
+  ok(negy.beton.kapottKetto.kap===0,
+    "🧱 két kapott gólnál semmi",{kap:negy.beton.kapottKetto.kap});
+  ok(/három gólszerző/.test(negy.harmonia.harman.naplo),
+    "☯️ három gólszerző külön tétel");
+  ok(/négy vagy több/.test(negy.harmonia.negyen.naplo)
+     &&negy.harmonia.negyen.kap>negy.harmonia.harman.kap,
+    "☯️ négy még többet ér",
+    {harom:negy.harmonia.harman.kap,negy:negy.harmonia.negyen.kap});
+  ok(negy.harmonia.egyedul.kap===0,
+    "☯️ …de egy ember három gólja SEMMIT (nem a gól számít, hanem hányan)",
+    {kap:negy.harmonia.egyedul.kap});
+  ok(/csapatjáték/.test(negy.tiki.csapatjatek.naplo)
+     &&!/csapatjáték/.test(negy.tiki.keves.naplo),
+    "🌀 a csapatjáték-tétel 3 gólpassztól jár",
+    {harom:negy.tiki.csapatjatek.kap,ketto:negy.tiki.keves.kap});
+  ok(negy.gegen.press.kap>0,
+    "🧲 az elhódított labda tölti a presszpontot",{kap:negy.gegen.press.kap});
+  ok(negy.egyMotor==="beton","két motoros stílusból is csak EGY fut",{k:negy.egyMotor});
+  ok(negy.panzerNincs===null,"Panzernél továbbra is néma");
+
   const sulyos=errs.filter(e=>!/favicon|manifest|sw\.js|ServiceWorker/i.test(e));
   ok(sulyos.length===0,"nincs oldalhiba",sulyos.slice(0,4));
   await b.close();srv.close();
