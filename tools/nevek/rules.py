@@ -23,13 +23,47 @@ LANG = {
  "Bolívia":"es","Costa Rica":"es","Honduras":"es","Kuba":"es",
  "Brazília":"pt","Portugália":"pt","Angola":"pt","Zöld-foki Köztársaság":"pt",
  "Olaszország":"it","Svájc":"de","Németország":"de","Ausztria":"de",
- "Franciaország":"fr","Belgium":"nl","Hollandia":"nl","Suriname":"nl",
- "Lengyelország":"sl","Csehország":"sl","Szlovákia":"sl","Oroszország":"sl",
+ "Franciaország":"fr","Hollandia":"nl","Suriname":"nl",
+ # BELGIUM SZÁNDÉKOSAN NEM „nl" (3.9.113). Az ország kétnyelvű: a névsor
+ # nagyjából fele francia ajkú (Gillet, Chevalier), a másik fele flamand.
+ # Amíg a nemzetiség az egyetlen fogódzónk, az ERŐS holland szabályokat
+ # (g → h, v → f) nem szabad ráengedni — Gillet-ből „Hillet" lenne. A „be"
+ # kód ezért ágat nem kap: betűre az marad, ami ma van.
+ "Belgium":"be",
+ "Lengyelország":"pl","Csehország":"sl","Szlovákia":"sl","Oroszország":"sl",
  "Ukrajna":"sl","Horvátország":"sl","Szerbia":"sl","Bosznia-Hercegovina":"sl",
  "Szlovénia":"sl","Montenegró":"sl","Észak-Macedónia":"sl","Bulgária":"sl",
  "Fehéroroszország":"sl","Törökország":"tr","Görögország":"gr",
  "Svédország":"sc","Norvégia":"sc","Dánia":"sc","Izland":"sc","Finnország":"sc",
  "Magyarország":"hu","Románia":"ro",
+ # ── AMI EDDIG KIMARADT (3.9.120) ──────────────────────────────────────────
+ # 53 nemzetiség hiányzott a térképből, összesen 292 néven — és a hiányzó
+ # bejegyzés nem „semleges": a `lang_of` ilyenkor "en"-t ad, tehát a japán,
+ # a szovjet és a nyugat-afrikai nevek mind ANGOL kiejtést kaptak. Amíg az
+ # angol ág csak ékezetet tett, ez néma maradt; a 3.9.119 `s$ → sz`-e és az
+ # alábbi `j → dzs` viszont már aktívan rontana rajtuk. Ezért ez a blokk a
+ # mostani köteg ELSŐ lépése, nem a ráadása.
+ #
+ # A besorolás a NÉVÍRÁS hagyományát követi, nem a földrajzot: a frankofón
+ # Afrika nevei francia helyesírással érkeznek (Drogba, Keïta, Eto'o), az
+ # angolofón Afrikáé angollal (Okocha, Essien).
+ "Szovjetunió":"sl","Grúzia":"sl","Örményország":"sl","Litvánia":"sl",
+ "Lettország":"sl","Szerbia és Montenegró":"sl","Bosznia":"sl",
+ "Albánia":"sl","Koszovó":"sl","Észtország":"sc",
+ "Japán":"jp",
+ # „af" = francia HELYESÍRÁS, de teljes kiejtés (nincs néma szóvég) — lásd
+ # a hufy fr/af ágát. A Maghreb és a frankofón Afrika ide tartozik.
+ "Elefántcsontpart":"af","Szenegál":"af","Kamerun":"af","Marokkó":"af",
+ "Mali":"af","Algéria":"af","Tunézia":"af","Guinea":"af","Kongói DK":"af",
+ "Gabon":"af","Burkina Faso":"af","Csád":"af","Togo":"af","Benin":"af",
+ "Madagaszkár":"af","Ruanda":"af","Közép-afrikai Köztársaság":"af",
+ "Nigéria":"en","Ghána":"en","Dél-Afrika":"en","Kenya":"en","Zambia":"en",
+ "Zimbabwe":"en","Gambia":"en","Sierra Leone":"en","Libéria":"en",
+ "Namíbia":"en","Új-Zéland":"en","Trinidad és Tobago":"en","Barbados":"en",
+ "Egyiptom":"en","Szaúd-Arábia":"en","Omán":"en","Irán":"en","Izrael":"en",
+ "Dél-Korea":"en","Laosz":"en",
+ "Mozambik":"pt","Bissau-Guinea":"pt",
+ "Dominikai Köztársaság":"es","San Marino":"it","Curaçao":"nl",
 }
 
 # ── keresztnév-térkép ───────────────────────────────────────────────────────
@@ -226,81 +260,439 @@ KEEP = set("áéíóöőúüűÁÉÍÓÖŐÚÜŰ")
 def fold(s):
     return "".join(c if c in KEEP else strip_dia(c) for c in s)
 
+# ══ ŐRJELEK: A KÉTJEGYŰ BETŰ EGY BETŰ (3.9.118) ════════════════════════════
+# A MEGISMÉTLŐDŐ HIBA. A motorban ötször fordult elő ugyanaz: egy KORAI lépés
+# beír egy magyar kétjegyű betűt, egy KÉSŐBBI pedig annak az egyik felébe mar
+# bele, mert csak betűket lát, nem hangokat.
+#
+#   ez$ → esz    utána  z → sz (spanyol)   →  Rodríguessz   (3.9.113-ban javítva)
+#   ß  → sz      utána  z → c  (német)     →  Häßler → Haskler, Weiß → Fájsk
+#   ž  → zs      utána  z → c  (német)     →  Džemaili → Dcsemájli
+#   ñ  → ny      utána  y → j              →  Núñez → Núnjesz
+#   gn → ny      utána  y → j              →  Burgnich → Burnjik, Signori → Sinjori
+#   gli→ lyi     utána  y → j              →  Pagliuca → Paljiuka
+#   ç  → cs      utána  c → dzs (török)    →  Selçuk → Seldzssuk
+#   ã  → a       ezért  ão$ → án SOSEM fut →  Militão → Mílitao
+#   tz → c       utána  c → k              →  Großkreutz → Groszkrojk
+#   z  → c (de)  utána  c → k              →  Schulz → Sulk
+#   w  → v       utána  v → f  (német)     →  Weiß → Fájsz (helyesen Vájsz)
+#   ss → ssz     utána  z → c  (német)     →  Sparwasser → Sparvasscer
+#   ski$→ szki   utána  z → c  (német)     →  Milewski → Milevscki
+#
+# AZ UTOLSÓ HÁROM A LEGBESZÉDESEBB: ezeket már az őrjelek BEVEZETÉSE KÖZBEN
+# találtam meg — vagyis a rendszer a saját hibáit is előhozta. Az egybetűs
+# `c`-nek is kell őrjel, mert a `c → k` szabály nem tudja, hogy az a c egy
+# MÁSIK szabály döntése volt; a német v/w pedig ugyanaz a csere-sorrend,
+# amit a holland ágnál már egyszer megoldottunk.
+#
+# A SZABÁLY, AMIT EBBŐL LEVEZETÜNK: ha egy csere MAGYAR KÉTJEGYŰ BETŰT ír
+# (ny, zs, cs, ly, sz, c, dzs), őrjelet kell írnia. Nem azért, mert ma
+# elromlana, hanem mert a következő nyelvi szabály már nem tudja, hogy az
+# ott egy döntés eredménye volt.
+#
+# A FOLTOZÁS NEM MEGOLDÁS: minden új nyelvi szabály újra megnyitná. Ezért a
+# már ELDÖNTÖTT kétjegyű betűk mostantól EGYETLEN, láthatatlan karakterként
+# utaznak végig a soron, és csak a legvégén bomlanak vissza. Ami őrjel, azon
+# egyetlen későbbi csere sem fog — a hatodik ilyen hiba nem tud megszületni.
+S_NY, S_ZS, S_CS, S_LY, S_SZ, S_AO, S_C, S_DZS = ("\x01", "\x02", "\x03", "\x04",
+                                                  "\x05", "\x06", "\x07", "\x08")
+# A HOSSZÚ ALAKOK ÉS A VÉDETT s KÜLÖN ŐRJEL (3.9.119). A hosszú sz magyarul
+# „ssz", a hosszú cs „ccs" — vagyis az ELSŐ betűjük egy sima s, illetve c,
+# amibe a nyelvi ágak belemarnak (Nilsson → Nilszszon, Bucci → Bukcsi).
+# Az S_S pedig az az `s`, ami TÉNYLEG az sh hangot jelöli (sch, sh, török ş,
+# portugál x) — enélkül a „szókezdő s → sz" szabályok ezt is átírnák.
+# UGYANEZÉRT KAPOTT ŐRJELET A `ch → cs` IS: az új angol „szóvégi s → sz"
+# szabály a Ziyech cs-jébe mart bele (Zijecs → Zijeksz), mert a c-t egy
+# külön szabály k-vá tette, miután az s-t elvitték mellőle. A tanulság
+# ugyanaz, harmadszor: ami kétjegyű betűt ír, őrjelet írjon.
+# S_J: EGYBETŰS, MÉGIS ŐRJEL (3.9.120). Az `ai → áj`, `ay → éj` által ÍRT
+# j-t az új angol `j → dzs` szabály elvitte: Gray → Gréj → „Grédzs".
+# Nem a betű HOSSZA számít tehát, hanem hogy DÖNTÉS eredménye-e.
+S_SSZ, S_CCS, S_S, S_J = "\x09", "\x0a", "\x0b", "\x0c"
+# A NÉGY FRANCIA ORRHANG IS ŐRJEL (3.9.121). Az „ain → en" kimenetét a
+# következő sorban álló „en → an" azonnal újra elkapná (Fontaine → Fontan),
+# és a hiba pontosan az, amit az őrjelek megszüntettek. Ugyanaz a szabály:
+# ami DÖNTÉS eredménye, azt a következő csere ne lássa.
+S_AN, S_EN, S_ON, S_UN = "\x0d", "\x0e", "\x0f", "\x10"
+SENT = {S_NY: "ny", S_ZS: "zs", S_CS: "cs", S_LY: "ly", S_SZ: "sz",
+        S_AO: "án", S_C: "c", S_DZS: "dzs",
+        S_SSZ: "ssz", S_CCS: "ccs", S_S: "s", S_J: "j",
+        S_AN: "a", S_EN: "e", S_ON: "o", S_UN: "ö"}
+
+def desent(s):
+    """Az őrjelek feloldása — a fonetika UTOLSÓ lépése."""
+    for k, v in SENT.items():
+        s = s.replace(k, v)
+    return s
+
 PRE = str.maketrans({
- "ć":"cs","č":"cs","ç":"cs","š":"s","ș":"s","ş":"s","ž":"zs","ź":"zs","ż":"zs",
- "ř":"rzs","ñ":"ny","ń":"ny","ø":"ő","å":"ó","æ":"e","ł":"l","đ":"gy","ð":"d",
+ "ć":S_CS,"č":S_CS,"ç":S_CS,"š":S_S,"ș":S_S,"ş":S_S,"ž":S_ZS,"ź":S_ZS,"ż":S_ZS,
+ "ř":"r"+S_ZS,"ñ":S_NY,"ń":S_NY,"ø":"ő","å":"ó","æ":"e","ł":"l","đ":"gy","ð":"d",
  "þ":"t","ě":"e","ė":"e","ę":"e","ą":"a","ů":"ú","ı":"i","ğ":"","ý":"i","ÿ":"i",
- "ß":"sz","õ":"ó","ã":"a","â":"á","ê":"é","î":"i","ô":"ó","û":"u","ë":"e","ï":"i",
+ "ß":S_SZ,"õ":"ó","ã":"a","ä":"e","â":"á","ê":"é","î":"i","ô":"ó","û":"u","ë":"e","ï":"i",
 })
 
 def hufy(w, lang="en"):
     """Egy szó magyaros fonetikus átirata, nyelvfüggő kiejtéssel."""
     if not w:
         return w
+    # ── A Mc- ÉS Mac- ELŐTAG (3.9.113) ─────────────────────────────────────
+    # A motor a `c`-t `k`-ra írta, magánhangzó nélkül: McNeill → Mkneili,
+    # McCoist → Mkkoist, McFarland → Mkfarland. Ez nem stílus, hanem
+    # KIMONDHATATLAN — a magyar szótag nem kezdődhet `mk`-val.
+    # A gael előtag jelentése „fia", ejtése /mək/ ~ /mæk/, magyar fülnek a
+    # McDonald's óta „mek": innen a Mek- (Mc) és Mak- (Mac). A tövet külön
+    # írjuk át, hogy a saját nyelvének szabályai vonatkozzanak rá.
+    _mc = re.match(r"^M(a?)c([A-Z])", w)
+    if _mc:
+        _pre = "Mak" if _mc.group(1) else "Mek"
+        _rest = hufy(w[2 + len(_mc.group(1)):], lang)
+        return _pre + _rest.lower()
     cap = w[0].isupper()
-    s = w.lower().translate(PRE)
+    _lw = w.lower()
+    # A PORTUGÁL -ão MÉG A PRE ELŐTT (3.9.118). A PRE a hullámot lekoptatja
+    # (`ã → a`), ezért a lenti `ão$ → án` szabály SOSEM talált semmit —
+    # a Militãóból „Mílitao" lett, nem „Militán".
+    if lang == "pt":
+        _lw = re.sub(r"ão", S_AO, _lw)
+    s = _lw.translate(PRE)
+
+    # ── A HOLLAND ÉS NÉMET v MÁR ITT f LESZ (3.9.113 · 3.9.118) ────────────
+    # A sorrend miatt áll ilyen korán: lentebb az általános lista `w → v`-t
+    # cserél, és ha a `v → f` UTÁNA futna, a Wijnaldumból Fájnaldum lenne.
+    # Mindkét nyelvben a w ejtése v, a v-é viszont f — a kettőt tehát el kell
+    # választani, mielőtt egybeolvadnak. Lásd van Bommel → Fánbommel.
+    # A NÉMET 3.9.118 ÓTA VAN ITT: addig a de-ág a `w → v` UTÁN cserélt
+    # v → f-et, és ezért lett a Weißből „Fájsz" (helyesen Vájsz), a
+    # Wagnerből „Fágner". Ugyanaz a csere-sorrend, csak egy nyelvvel odébb.
+    if lang in ("nl", "de"):
+        s = s.replace("v", "f")
+    if lang == "en":
+        # ── KÉT ANGOL MINTA, AMIT AZ ÁLTALÁNOS LISTA SZÉTVÁGNA (3.9.121) ────
+        # `igh` = áj (Wright, Knight) — a listában lévő `gh → g` különben
+        # előbb elvinné a h-t, és „Vrigt" maradna.
+        # `ai` = éj, nem áj: az áj a német/holland minta (Kaiser), az angol
+        # Bailey viszont „Béjli".
+        # `wh` = v (a h néma): White → Vájt, nem „Vhájt".
+        # `eigh` = éj (Leighton), `igh` = áj (Wright) — az `eigh` ELŐBB,
+        # különben az `igh` kettévágná.
+        s = s.replace("wh", "v").replace("eigh", "é" + S_J)
+        s = s.replace("igh", "á" + S_J).replace("ai", "é" + S_J)
+    if lang == "pl":
+        # ── LENGYEL HELYESÍRÁS (3.9.119) ──────────────────────────────────
+        # Eddig a közös szláv kosárban ült. Ez ITT áll, a latin szabályok
+        # ELŐTT, mert HELYESÍRÁS, nem fonetika: az általános `ie → i`
+        # különben előbb megenné a „nie"-t (Boniek → Bonik, helyesen Bonyek).
+        #   sz → s   cz → cs   rz → zs   ch → h   ni+mgh → ny
+        # A SORREND: az `sz` a `cz`/`rz` előtt, különben a „szcz"
+        # (Piszczek) kettévágódna. A `ł → l`, `ś/ź/ż`, `ą/ę` a PRE dolga.
+        s = s.replace("sz", S_S).replace("cz", S_CS).replace("rz", S_ZS)
+        s = s.replace("ch", "h")
+        s = re.sub(r"ni(?=[aeou])", S_NY, s)
 
     # végződések
-    s = re.sub(r"(ovi[cć]|ovich|ovics)$", "ics", s)
-    s = re.sub(r"(sky|ski)$", "szki", s)
-    s = re.sub(r"(escu)$", "eszku", s)
-    if lang == "es":
-        s = re.sub(r"ez$", "esz", s)
+    # ── A -ović MEGTARTJA AZ „ov"-OT (3.9.118) ─────────────────────────────
+    # Volt itt egy `-ović → -ics`, ami magyaros vezetéknevet csinált az
+    # apanévből (Ivanović → Ivanics). Rövid tövön viszont végzetes: a
+    # Jovićból „Jics" lett, HÁROM betű. A felhasználó döntése a teljes alak
+    # (Jovics, Sztojkovics), és így a három írásmód is egyformán viselkedik —
+    # eddig a „-ovich" és a „-ović" MÁS eredményt adott.
+    s = re.sub(r"ovi(?:c|ch|cs|" + S_CS + r")$", "ovi" + S_CS, s)
+    s = re.sub(r"(sky|ski)$", S_SZ + "ki", s)
+    s = re.sub(r"(escu)$", "e" + S_SZ + "ku", s)
+    # A SPANYOL -ez NEM KAP KÜLÖN SZABÁLYT (3.9.113). Volt itt egy
+    # `ez$ → esz`, és pont az rontotta el: lentebb az `es` ág amúgy is
+    # elvégzi a `z → sz` cserét, ami a MOST beírt `sz`-ből `ssz`-t csinált —
+    # innen jött a Rodríguessz, Gómessz, Fernándessz (51 név). A `z → sz`
+    # egymagában helyesen hoz Rodrígeszt és Gómeszt, a Zapata → Szapata pedig
+    # mindig is bizonyította, hogy a cserével nincs baj.
+
+    # ── A sch SOSEM JUTOTT EL A SAJÁT SZABÁLYÁIG (3.9.118) ─────────────────
+    # A `sch → s` az általános listában állt, az viszont a ch-blokk UTÁN fut:
+    # mire odaért, a ch már k vagy cs lett (Schneider → Sknájder, Schulz →
+    # Scsulk, Schumacher → Scsumacser). Ezért került ELŐRE.
+    # OLASZUL KIVÉTEL: ott a `sch` = sk (Schiavone → Skiavone), és ezt a
+    # ch-blokk `chi → ki` ága adja helyesen — tehát olaszul nem nyúlunk hozzá.
+    if lang != "it":
+        s = s.replace("sch", S_S)
+    s = s.replace("sh", S_S)
+
+    # A „gn" CSAK AZ ÚJLATIN NYELVEKBEN ny (3.9.118). Az általános listában
+    # állt, ezért a németre is lefutott: a Wagnerből „Vanyer" lett (azelőtt
+    # „Vanjer"), az Illgnerből „Ilnyer". Németül, angolul, hollandul a gn
+    # egyszerűen g+n. Olaszul (Insigne) és franciául (Sagnol) viszont ny —
+    # a guide R1 sora is így mondja.
+    if lang in ("it", "fr", "af"):
+        s = s.replace("gn", S_NY)
+
+    # AZ OLASZ „gli" EGYETLEN HANG (3.9.118): a Pagliuca „pa-lyú-ka", nem
+    # „pa-lyi-uka". Magánhangzó előtt tehát nem marad utána i.
+    s = re.sub(r"gli(?=[aeiouáéíóú])", S_LY, s)
+    s = s.replace("gli", S_LY + "i")
 
     # ch — a legerősebben nyelvfüggő hang
     if lang in ("it",):
         s = s.replace("chi", "ki").replace("che", "ke").replace("ch", "k")
-    elif lang == "fr":
-        s = s.replace("ch", "s")
+    elif lang in ("fr", "af"):
+        s = s.replace("ch", S_S)
     elif lang == "es":
-        s = s.replace("ch", "cs")
+        s = s.replace("ch", S_CS)
     else:
         s = re.sub(r"ch(?=[bcdfgklmnprstvz])", "k", s)   # Chris → Krisz
-        s = s.replace("ch", "cs")
+        s = s.replace("ch", S_CS)
 
     # a baszk/katalán „tx" magyarul cs (Goikoetxea → Goikocsea). Az x→ksz
     # szabály elé kell, különben kiejthetetlen mássalhangzó-torlódás lesz.
-    s = s.replace("tx", "cs").replace("tz", "c")
-    for a, b in [("sch","s"),("sh","s"),("cz","cs"),("th","t"),("ph","f"),
-                 ("ck","kk"),("gh","g"),("qu","kv"),("gn","ny"),("gli","lyi"),
+    s = s.replace("tx", S_CS).replace("tz", S_C)
+
+    # ── A qu NYELVFÜGGŐ (3.9.113) ──────────────────────────────────────────
+    # Volt az általános listában egy `qu → kv`, ami az újlatin nyelveken
+    # hibás: a francia és a spanyol qu egyetlen k hang (Jacquet → Zsaké,
+    # Quique → Kike), nem kv. Az olaszban és az angolban viszont TÉNYLEG kv
+    # (quattro, queen), tehát ott marad.
+    s = s.replace("qu", "k" if lang in ("fr", "af", "es", "pt") else "kv")
+    for a, b in [("cz",S_CS),("th","t"),("ph","f"),
+                 ("ck","kk"),("gh","g"),
                  ("ee","í"),("oo","ú"),("ou","ú"),("ea","í"),("oa","ó"),
-                 ("ai","áj"),("ay","éj"),("ey","i"),("ie","i"),
-                 ("ss","ssz"),("ll","ly"),("x","ksz"),("w","v"),("q","k")]:
+                 ("ai","á"+S_J),("ay","é"+S_J),("ey","i"),("ie","i"),
+                 ("ss",S_SSZ),("x","k"+S_SZ),("w","v"),("q","k")]:
         s = s.replace(a, b)
 
-    if lang == "de":
-        s = s.replace("ei", "áj").replace("eu", "oj").replace("z", "c")
+
+    if lang == "en":
+        # ── AZ ANGOL s MÁSSALHANGZÓ ELŐTT SZ (3.9.113) ─────────────────────
+        # A magyar „s" a sh hangot jelöli: a Húrst eddig „Húrsht"-nak, a
+        # Stracsan „Shtrachan"-nak olvasódott. Angolul ez a hang /s/.
+        # A NÉMET SZÁNDÉKOSAN KIMARAD: ott a szó eleji st/sp TÉNYLEG „sht"
+        # (Stefan), és a lenti de-ág ezt külön meg is védi.
+        s = re.sub(r"s(?=[ptkmnlw])", S_SZ, s)
+        # ── ANGOL SZÓVÉGI -s (3.9.119) ─────────────────────────────────────
+        # Szintén nem sh: a Petersz, a Hurszt. EGYSÉGESEN sz, nem z: az
+        # angol szóvégi -s hol /s/, hol /z/ (Francis vs. Giles), és a kettőt
+        # csak a szó jelentése dönti el — egy névtáblából nem. Az „sh"
+        # viszont MINDIG hibás, tehát a biztos felét javítjuk: a hangot,
+        # nem a zöngésségét.
+        s = re.sub(r"s$", S_SZ, s)
+        # ── AZ ANGOL J MINDIG dzs (3.9.120) ────────────────────────────────
+        # Jones → Dzsonesz, Johnston → Dzsonszton. A többi nagy nyelv j-je
+        # már rég a helyén volt (francia zs, spanyol h, most japán dzs) — az
+        # angol maradt ki, és épp az a leggyakoribb.
+        # A `g` e/i előtt SZÁNDÉKOSAN kimarad: angolul kiszámíthatatlan
+        # (Gerrard dzs, de Gibson és Gemmill kemény g), és egy névtáblából
+        # nem dönthető el. Inkább marad hibátlanul semleges.
+        s = s.replace("j", S_DZS)
+        # ── ANGOL MAGÁNHANGZÓK (3.9.121) ───────────────────────────────────
+        # Az angol helyesírás kaotikus, ezért CSAK a kivétel nélküli
+        # mintákat vesszük — amit minden angolul tanuló első héten megkap:
+        #   néma e („magic e"):  a_e = éj   i_e = áj   o_e = ó   u_e = jú
+        #   igh = áj  ·  ir/ur = ö  ·  ai = éj (nem áj, az a német)
+        # A SORREND: a néma e-t itt még LÁTJUK, lentebb a néma-e szabály
+        # levágja — tehát a magánhangzót előbb kell megfejteni.
+        # A kettőzött mássalhangzó ELŐTT nincs magic e (Gemmell), ezért
+        # pontosan EGY mássalhangzó állhat közte.
+        s = re.sub(r"a([^aeiouáéíóú" + S_J + r"])e$", "é" + S_J + r"\1e", s)
+        s = re.sub(r"i([^aeiouáéíóú" + S_J + r"])e$", "á" + S_J + r"\1e", s)
+        s = re.sub(r"o([^aeiouáéíóú" + S_J + r"])e$", r"ó\1e", s)
+        # Az `u_e` SIMA ú, nem jú: az angol itt megoszlik (Duke = djúk, de
+        # Bruce = brúsz), és a „Brjúsz" rosszabb hiba, mint a „Dúk".
+        s = re.sub(r"u([^aeiouáéíóú" + S_J + r"])e$", r"ú\1e", s)
+        s = s.replace("igh", "á" + S_J)
+        # Az `ir`/`ur` magyar füllel „ör" (Burns → Börnsz, Hurst → Hörszt).
+        # Az r MEGMARAD: a magyar átírás hagyománya kiírja, még ha az RP
+        # nem is ejti.
+        s = re.sub(r"[iu]r(?![aeiouáéíóú])", "ör", s)
+        s = s.replace("á" + S_J + S_J, "á" + S_J)
+    elif lang == "de":
+        s = s.replace("ei", "áj").replace("eu", "oj").replace("z", S_C)
         s = re.sub(r"^s(?=[pt])", "s", s)
-        s = re.sub(r"v", "f", s)
-    elif lang == "fr":
+    elif lang in ("fr", "af"):
+        # ── FRANCIA HELYESÍRÁS, KÉT KIEJTÉSSEL (3.9.120) ───────────────────
+        # A frankofón Afrika és a Maghreb nevei FRANCIA HELYESÍRÁSSAL
+        # érkeznek, de nem franciául ejtik őket: ott a szóvégi mássalhangzó
+        # NEM néma, és az `-er` sem `-é`. Az első nekifutásom egyszerűen
+        # "fr"-be tette őket, és ez azonnal meg is látszott:
+        #   Bennacer → „Bennaszé"  (helyesen Bennaszer)
+        #   Naybet   → „Nézsbé"    (helyesen Nájbet)
+        #   Ziyech   → „Zijé"      (helyesen Zijes)
+        # Ezért az „af" kód: ugyanaz a HELYESÍRÁS (ch = s, j = zs, g e/i
+        # előtt zs, qu = k, ou = ú), de a néma végződések nélkül.
         s = re.sub(r"j", "zs", s)
+        # A FRANCIA G i/e/y ELŐTT ZS (3.9.113) — Gignac → Zsinyak,
+        # Giresse → Zsiressz. A `gn → ny` és a `gh → g` már lefutott
+        # fölötte, a `gu` (Guivarc'h) pedig nem érintett: ott u áll a g után.
+        s = re.sub(r"g(?=[eiéíy])", "zs", s)
         s = re.sub(r"(ault|aud|aut)$", "ó", s)
-        s = re.sub(r"er$", "é", s)
+        if lang == "fr":
+            s = re.sub(r"er$", "é", s)
+        # ── A NÉMA SZÓVÉGI MÁSSALHANGZÓ (3.9.119) ──────────────────────────
+        # A guide R1 sora: „francia szóvégi -t, -s néma" (Rabiot → Rábijó).
+        # Ugyanez a -d, -x, -z. NEM néma az -r (Giresse melletti Lemar), a
+        # -c, az -l és az -f, ezért azokhoz nem nyúlunk. Rövid szót nem
+        # csonkítunk (Le, Sax), és magánhangzó kell elé, különben a
+        # mássalhangzó-torlódás marad (Vincent → Vinszan, nem Vinsz).
+        if lang == "fr" and len(s) > 3:
+            # ELŐBB az „e + néma mássalhangzó", ami é-vé olvad (Jonquet →
+            # Zsonké). Enélkül a lenti néma-e szabály a puszta e-t is
+            # levágná, és „Zsonk" maradna.
+            s = re.sub(r"e[tdsxz]$", "é", s)
+            s = re.sub(r"(?<=[aiouáíóú])[tdsxz]$", "", s)
+            # ORRHANG UTÁN IS NÉMA (3.9.120): a Vincent „Vinszen", a
+            # Le Normand „Lenorman", a Martins „Martin". A magánhangzó
+            # ORRHANGÚSÁGÁT nem próbáljuk visszaadni (az „en" marad „en",
+            # nem lesz „an"): az már a szó ismeretét kívánná, a néma
+            # végződés viszont kivétel nélküli szabály.
+            s = re.sub(r"(?<=n)[tdsc]$", "", s)
     elif lang == "es":
         s = re.sub(r"j", "h", s)
         s = re.sub(r"^h", "", s)
-        s = s.replace("z", "sz")
+        s = s.replace("z", S_SZ)
+        # A SZÓKEZDŐ S SPANYOLUL SZ (3.9.113). A magyar „s" a sh hangot
+        # jelöli, tehát a Santamaría eddig „Shantamaria"-ként olvasódott.
+        # A `z → sz` UTÁN áll, különben a frissen beírt sz z-jét is
+        # újracserélné (ugyanaz a csapda, ami a Rodríguessz-t okozta).
+        # …ÉS 3.9.116-BAN MÉG EGY ŐR KELLETT IDE: a Zapata a `z → sz` után
+        # már „szapata", aminek az eleje `s`, tehát a szabály RÁ IS lefutott
+        # („Szzapata", 6 név). 3.9.118 ÓTA AZ ŐR FÖLÖSLEGES: a `z → sz`
+        # őrjelet ír, azon pedig ez a csere már nem talál `s`-t. Ez a
+        # legtisztább bizonyíték rá, hogy az őrjelek nem egy foltot
+        # váltottak ki, hanem a folt OKÁT.
+        s = re.sub(r"^s", S_SZ, s)
     elif lang == "pt":
         s = re.sub(r"ão$", "án", s)
-        s = s.replace("nh", "ny").replace("lh", "ly")
+        s = s.replace("nh", S_NY).replace("lh", S_LY)
+        # A PORTUGÁL x NEM ksz, hanem s (3.9.119): Aleixo → Aleisu,
+        # Xeka → Seka. Az általános lista `x → ksz`-e fut fölötte, ezért
+        # azt kell visszabontani.
+        s = s.replace("k" + S_SZ, S_S)
+        s = re.sub(r"^s", S_SZ, s)        # Sousa → Szúza, Salas → Szálas
     elif lang == "it":
-        s = re.sub(r"ci(?=[aou])", "cs", s)
-        s = re.sub(r"gi(?=[aou])", "dzs", s)
-        s = s.replace("ge", "dzse").replace("gi", "dzsi")
+        s = re.sub(r"ci(?=[aou])", S_CS, s)
+        s = re.sub(r"gi(?=[aou])", S_DZS, s)
+        s = s.replace("ge", S_DZS + "e").replace("gi", S_DZS + "i")
+        # ── AZ OLASZ c e/i ELŐTT MINDIG cs (3.9.119) ───────────────────────
+        # A `ci(?=[aou])` ág csak a magánhangzós esetet fogta; mássalhangzó
+        # előtt és szóvégen a lenti általános `c(?=[eiéí]) → sz` vitte el:
+        # Mancini → Manszini, Bucci → Bucszi, Radice → Radisze.
+        s = re.sub(r"cc(?=[eiéí])", S_CCS, s)
+        s = re.sub(r"c(?=[eiéí])", S_CS, s)
+        # ── OLASZ s + MÁSSALHANGZÓ (3.9.119) ───────────────────────────────
+        # Ugyanaz, mint az angolnál: a magyar „s" a sh hangot jelöli, az
+        # olasz st/sp/sc viszont szt/szp/szk (Anastasi, Castigliano).
+        s = re.sub(r"s(?=[ptk])", S_SZ, s)
+        # MAGÁNHANGZÓK KÖZT AZ OLASZ s ZÖNGÉS (3.9.113): Maroso → Marozo,
+        # Baresi → Barezi, Ambrosini → Ambrozini. A kettőzött ss-t nem
+        # érinti (az fölötte már ssz lett), és ez a helyes: a Cassano
+        # tényleg Kasszánó.
+        s = re.sub(r"(?<=[aeiouáéíóúöőüű])s(?=[aeiouáéíóúöőüű])", "z", s)
+    elif lang == "nl":
+        # ── A HOLLAND MAGÁNHANGZÓ-PÁROK ÉS A TORKOS G (3.9.113) ────────────
+        # A guide R1 sora: ui → öj, ij/ei → áj, oe → ú, g → h.
+        # A g-nél egy kivétel kell: az „ng" egyetlen orrhang (Jongbloed),
+        # ott a g nem torokhang, tehát marad.
+        s = s.replace("oe", "ú").replace("ui", "öj").replace("uy", "öj").replace("eu", "ö")
+        s = s.replace("ij", "áj").replace("ei", "áj")
+        s = re.sub(r"(?<!n)g", "h", s)
     elif lang == "tr":
-        s = s.replace("c", "dzs")
+        # ── TÖRÖK (3.9.119) ────────────────────────────────────────────────
+        # A `c` dzs (Kahveci → Kahvedzsi) — ez eddig is megvolt. Ami hiányzott:
+        # a `ş` PRE-ben `s` lesz, ami magyarul épp a helyes sh hang, DE a
+        # sima `s` törökül sz (Baştürk → Bastürk, helyesen Bastürk marad,
+        # viszont Sivok → Szivok). A `ğ` néma, az `ı` i — ezeket a PRE viszi.
+        s = s.replace("c", S_DZS)
+        s = s.replace("s", S_SZ)
+    elif lang == "sc":
+        # ── SKANDINÁV (3.9.119) ────────────────────────────────────────────
+        # A guide R1 sora: „skandináv `s` → sz" (Sørloth → Szőrló, Isaksson →
+        # Iszaksszon). Ág eddig nem volt hozzá, csak a patronim -son/-sen
+        # kezelése — a hang maga végig magyar „s" (sh) maradt: Bastrup,
+        # Hisén, Nilsen.
+        s = s.replace("s", S_SZ)
+    elif lang == "gr":
+        # ── GÖRÖG (3.9.119) ────────────────────────────────────────────────
+        # A görögben nincs sh hang: minden `s` sz. És mivel a görög
+        # vezetéknevek DÖNTŐ TÖBBSÉGE -s-re végződik (-akis, -idis, -as,
+        # -os), ág híján gyakorlatilag MIND rosszul olvasódott:
+        # Dómazos, Zágorakis, Mánolas.
+        s = s.replace("s", S_SZ)
+        s = s.replace("b", "v").replace("d", "d")
+    elif lang == "pl":
+        pass          # a lengyel helyesírás a latin szabályok ELŐTT futott
+    elif lang == "sl":
+        # ── SZLÁV s + MÁSSALHANGZÓ (3.9.120) ──────────────────────────────
+        # A szláv `s` /s/, vagyis magyarul sz — a Stojković „Shtojkovics"-nak
+        # olvasódott. CSAK mássalhangzó előtt cseréljük, és ennek oka van: a
+        # szovjet nevek az adatbázisban MÁR magyar átírásban állnak
+        # („Csiszlenko"), ott egy általános `s → sz` a `cs`-be marna bele.
+        # Mássalhangzó előtt ilyen ütközés nincs — a „cs" után mindig
+        # magánhangzó vagy szóvég áll.
+        # A `cs`/`zs` ELŐTAG KIZÁRVA: a Kežman az adatbázisban „Kezsman",
+        # és ott az s a zs MÁSODIK betűje — a csere „Kezszman"-t csinált
+        # belőle. Ugyanaz a kétjegyű-betű-hiba, csak most a FORRÁS
+        # helyesírásában, ahol őrjel nem véd meg.
+        s = re.sub(r"(?<![cz])s(?=[ptkmnlvr])", S_SZ, s)
+    elif lang == "jp":
+        # ── JAPÁN (3.9.120) ───────────────────────────────────────────────
+        # A romaji betűnként olvasandó, de nem angolul: `s` = sz (Morisawa →
+        # Moriszava), `j` = dzs (Kenji → Kendzsi), `ts` = c (Matsui →
+        # Macui). Az `sh` = s és a `ch` = cs már fönt eldőlt (őrjellel), a
+        # `y → j` és a `w → v` az általános listából jön.
+        s = s.replace("ts", S_C).replace("j", S_DZS).replace("s", S_SZ)
+
+    # ── A KETTŐZÖTT L NYELVFÜGGŐ (3.9.113) ─────────────────────────────────
+    # Volt a fenti listában egy `ll → ly`, ami a lenti y-szabályon át `lj`-vé
+    # vált — nyelvtől függetlenül. Ez 125 néven szólt bele, és a többségén
+    # HIBÁS: a Montella nem Montelja, a Völler nem Följer, a Miller nem
+    # Miljer. Az `lj` hang csak a délszláv nevekben van otthon, ott viszont
+    # nem `ll`-ből jön (Ljungberg), tehát itt nincs mit megvédeni.
+    #   spanyol      ll = j     Gallardo → Gajardo, Gordillo → Gordijo
+    #   francia      ill = ij   Gillet → Zsijé;  minden más ll = l
+    #   mindenki más ll = l     Montela, Föler, Miler, Zagalo
+    # A NYELVI ÁGAK UTÁN ÁLL, SZÁNDÉKOSAN: a spanyol ág `j → h`-t cserél
+    # (Juan → Huan), tehát egy korábban beírt `j` Gahardóvá romlana. A
+    # francia ág `j → zs`-je ugyanígy Gizset csinálna a Gijet-ből.
+    if lang == "es":
+        s = s.replace("ll", "j")
+    elif lang == "fr":
+        s = s.replace("ill", "ij").replace("ll", "l")
+    else:
+        s = s.replace("ll", "l")
 
     # c ejtése (ami eddig megmaradt)
-    s = re.sub(r"c(?=[eiéí])", "sz", s)
+    s = re.sub(r"c(?=[eiéí])", S_SZ, s)
     s = re.sub(r"c(?![sz])", "k", s)
     # y
     s = re.sub(r"y(?=[aeiouáéíóú])", "j", s)
     s = s.replace("y", "i")
     # néma szóvégi e (angol/francia) — de a 2-3 betűs szavakból nem, mert
     # abból nem marad semmi („Le" → „L")
-    if lang in ("en", "fr") and len(s) > 3:
-        s = re.sub(r"(?<=[a-zíóúűő])e$", "", s)
+    if lang in ("en", "fr", "af") and len(s) > 3:
+        # AZ ŐRJELEK IS BETŰK: a visszatekintésnek látnia kell őket, különben
+        # a „Giresse" (gires+⟨sz⟩+e) néma e-je bennmarad — Zsiressze.
+        s = re.sub(r"(?<=[a-zíóúűő\x01-\x10])e$", "", s)
 
+    # ── FRANCIA ORRHANGOK (3.9.121) ────────────────────────────────────────
+    # A c- és y-szabályok UTÁN áll, és ennek oka van: az orrhang átírja a
+    # magánhangzót, és ezzel elrontaná a `ce → sze` környezetét. A Vincent
+    # így lesz Venszan, nem „Venkant".
+    #   an/am/en/em → an  ·  in/im/ain/ein/yn → en  ·  on/om → on  ·  un/um → ön
+    # CSAK mássalhangzó vagy szóvég előtt, és NEM kettőzött n/m előtt
+    # (Bonne = bon, nem orrhang). Az őrjel mássalhangzónak számít, ahogy kell.
+    if lang == "fr":
+        _V = "aeiouáéíóúöőüűmn"
+        # ELŐSZÖR a már ÁTÍRT alak: az általános lista az `ai`-ból „áj"-t
+        # csinált, tehát a Fontaine itt már „fontájne" — az `ain` mintát
+        # így kell elkapni, különben „Fontájn" maradna.
+        # AZ EREDETI n/m MEGMARAD: franciául az orrhangot b és p előtt
+        # m-mel írják (Lacombe), és a magyar átírás is azt követi — a
+        # „Lakonb" csúnya és felesleges. Csak a MAGÁNHANGZÓ változik.
+        s = re.sub("[áé]" + S_J + r"([nm])(?![" + _V + r"])", S_EN + r"\1", s)
+        s = re.sub(r"(?:ai|ei|ai|ei)([nm])(?![" + _V + r"])", S_EN + r"\1", s)
+        s = re.sub(r"[ae]([nm])(?![" + _V + r"])", S_AN + r"\1", s)
+        s = re.sub(r"[iy]([nm])(?![" + _V + r"])", S_EN + r"\1", s)
+        s = re.sub(r"u([nm])(?![" + _V + r"])", S_UN + r"\1", s)
+
+    # AZ ŐRJELEK ITT BOMLANAK VISSZA — minden csere után, semmi nem fog rajtuk.
+    s = desent(s)
     s = fold(s)
     s = re.sub(r"(.)\1{2,}", r"\1\1", s)      # hármas betűzés összevonása
     if not s:
@@ -313,7 +705,7 @@ def hufy(w, lang="en"):
 # annyit tesz, „fia". Ugyanez a skandináv -sson, az angol -son és a
 # dán/holland -sen.
 HU_MGH = set("aeiouáéíóöőúüű")
-SON_LANG = {"pt", "en", "sc", "nl"}
+SON_LANG = {"pt", "en", "sc", "nl", "be"}
 
 def son_stem(w):
     """A patronim vezetéknév TÖVE, ha az — különben None.

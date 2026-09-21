@@ -564,6 +564,114 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(negy.egyMotor==="beton","két motoros stílusból is csak EGY fut",{k:negy.egyMotor});
   ok(negy.panzerNincs===null,"Panzernél továbbra is néma");
 
+  /* ================= 12. A FEED ÉS A MÁSODLAGOS HARMADOLÁS =================
+     KIMONDOTT KÉRÉS 1: „ahogyan a rettenetnek vannak meccs közben feedben
+     visszajelzései, mi mennyi pontot ért éppen, úgy legyen a többi
+     csapatstílusnál is ilyen."
+     KIMONDOTT KÉRÉS 2: „harmadoljuk a mértéküket a másodlagos
+     csapatstílusnál."
+
+     A mérce mindkettőnél a Panzer: a néma halmaz az övé (csak a tucatnyiszor
+     előforduló tétel néma), a harmadolás száma pedig a mérföldköveké
+     (STYLE2_MS_DIV). */
+  const fd=await p.evaluate(()=>{
+    const ki={};
+    /* --- A NÉMA HALMAZOK A PANZERÉHEZ MÉRVE --- */
+    ki.panzerNema=Object.keys(DREAD_QUIET).sort();
+    ki.nemak=Object.keys(ENG_DEFS).map(k=>({k,
+      nema:Object.keys(ENG_DEFS[k].quiet||{}).sort().join(",")||"—"}));
+    ki.kozosNema=Object.keys(ENG_QUIET_ALL).sort();
+    /* Minden tarifa-tételnek van-e CÍMKÉJE? Címke nélkül a feed „goal"-t írna. */
+    ki.cimkeHiany=Object.keys(ENG_DEFS).map(k=>({k,
+      hiany:Object.keys(ENG_DEFS[k].tariff||{})
+        .filter(t=>!(ENG_DEFS[k].label||{})[t])}))
+      .filter(x=>x.hiany.length);
+
+    const roster=fullCareerRoster()||[];
+    const setA=(o)=>{roster.forEach(pl=>{
+      const e=careerPool&&careerPool[pl.n];
+      if(e){if(!e.attrs)initPlayerAttrs(e);Object.keys(o).forEach(k=>{e.attrs[k]=o[k];});}});};
+    setA({ved:95,kapus:95,seb:95,gol:95,passz:95});
+    const _sl=styleLevel;window.styleLevel=()=>20;
+
+    /* --- A GÓL ÉS A GÓLPASSZ MOSTANTÓL BESZÉL --- */
+    const meccs=(elsodleges,masodlagos)=>{
+      S.style={key:elsodleges,traits:{}};
+      S.style2=masodlagos?{key:masodlagos,traits:{}}:null;
+      const k=engKey();
+      const E=engState(k);E.pts=0;E.lvl=0;
+      const naplo=[];const _a=addLine;addLine=x=>naplo.push(String(x));
+      engMatchStart();
+      _engMin=10;engGoalNote(roster[0].n);
+      engAssistNote();
+      const kap=engMatchEnd();
+      addLine=_a;
+      return {k,kap,sorok:naplo.filter(x=>/\+.*<\/b>/.test(x)).length,
+        naplo:naplo.join(" | ")};};
+    ki.villam=meccs("villam",null);
+    ki.tiki=meccs("tikitaka",null);
+    ki.harm=meccs("harmonia",null);
+
+    /* --- ÉS UGYANEZ MÁSODLAGOSKÉNT: HARMADÁRON --- */
+    ki.villamMasod=meccs("beton","villam");
+    ki.arany=Math.round(ki.villam.kap/Math.max(0.0001,ki.villamMasod.kap)*100)/100;
+    ki.masodSzolt=/harmadáron gyűlik/.test(ki.villamMasod.naplo);
+    ki.elsodlegesNemSzolt=!/harmadáron gyűlik/.test(ki.villam.naplo);
+    /* A PLAFON VÁLTOZATLAN — nem az fér kevesebb, hanem lassabban gyűlik. */
+    S.style={key:"villam",traits:{}};S.style2=null;
+    const capElso=engMatchCap("villam");
+    S.style={key:"beton",traits:{}};S.style2={key:"villam",traits:{}};
+    ki.cap={elso:capElso,masod:engMatchCap("villam")};
+
+    /* --- ÉS A RETTENET IS --- */
+    const dread=(masodlagos)=>{
+      S.style=masodlagos?{key:"villam",traits:{}}:{key:"panzer",traits:{}};
+      S.style2=masodlagos?{key:"panzer",traits:{}}:null;
+      const F=fearState();if(F){F.pts=0;F.retteges=0;}
+      const naplo=[];const _a=addLine;addLine=x=>naplo.push(String(x));
+      fearMatchStart();fearNote("red");fearNote("yellow");
+      const kap=fearMatchEnd();
+      addLine=_a;
+      return {kap,naplo:naplo.join(" | ")};};
+    ki.dreadElso=dread(false);
+    ki.dreadMasod=dread(true);
+    ki.dreadArany=Math.round(ki.dreadElso.kap/Math.max(0.0001,ki.dreadMasod.kap)*100)/100;
+    window.styleLevel=_sl;
+    S.style={key:"villam",traits:{}};S.style2=null;
+    return ki;});
+
+  console.log("=== 12. a feed sűrűsége ===");
+  ok(fd.panzerNema.join()==="gap,tackle",
+    "a Panzernél csak a védekező villanás és a fölény néma",fd.panzerNema);
+  ok(fd.kozosNema.join()==="gap","a fölény a motorban is néma",fd.kozosNema);
+  {const beszedes=fd.nemak.filter(x=>x.nema==="—").map(x=>x.k);
+   ok(beszedes.length===4,"négy stílusnál MINDEN tétel megszólal",beszedes);
+   const nemaK=fd.nemak.filter(x=>x.nema!=="—");
+   ok(nemaK.every(x=>x.nema==="tackle"||x.nema==="press"),
+     "és néma csak az marad, amiből tucatnyi jön egy meccsen",nemaK);}
+  ok(fd.cimkeHiany.length===0,
+    "minden tarifa-tételnek van magyar címkéje (a feed nem ír kulcsnevet)",
+    fd.cimkeHiany);
+  ok(fd.villam.sorok>=2&&fd.tiki.sorok>=2&&fd.harm.sorok>=2,
+    "egy gól + egy gólpassz mostantól mindhárom stílusnál TÖBB feed-sort ad",
+    {villam:fd.villam.sorok,tiki:fd.tiki.sorok,harm:fd.harm.sorok});
+  ok(/gólpassz/.test(fd.tiki.naplo),"🌀 a gólpassz ki is mondja magát");
+
+  console.log("=== 12b. a másodlagos harmadolása ===");
+  ok(Math.abs(fd.arany-3)<0.15,
+    "a másodlagos filozófia PONTOSAN harmadannyit gyűjt",
+    {elsodleges:fd.villam.kap,masodlagos:fd.villamMasod.kap,arany:fd.arany});
+  ok(fd.cap.elso===fd.cap.masod,
+    "…de a meccsenkénti PLAFON változatlan (nem kevesebb fér bele, lassabban gyűlik)",
+    fd.cap);
+  ok(fd.masodSzolt&&fd.elsodlegesNemSzolt,
+    "az összesítő kimondja, ha másodlagosként gyűjtesz — és csak akkor");
+  ok(Math.abs(fd.dreadArany-3)<0.15,
+    "és a RETTENET is harmadáron gyűlik másodlagosként",
+    {elsodleges:fd.dreadElso.kap,masodlagos:fd.dreadMasod.kap,arany:fd.dreadArany});
+  ok(/harmadáron gyűlik/.test(fd.dreadMasod.naplo),
+    "…és ott is kimondja az összesítő");
+
   const sulyos=errs.filter(e=>!/favicon|manifest|sw\.js|ServiceWorker/i.test(e));
   ok(sulyos.length===0,"nincs oldalhiba",sulyos.slice(0,4));
   await b.close();srv.close();

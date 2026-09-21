@@ -1452,6 +1452,18 @@ semmi hatás, utána a saját gólesély pontosan annyival esik, amennyivel az
 ellenfélé nő, minden megvett szint a tizedét tünteti el, a 10.-en a hátrány
 nulla — és más stílusnál nem is létezik.
 
+A tizenkettedik két kérést mér. Az egyik a FEED SŰRŰSÉGE: a mérce a Panzer
+néma halmaza (csak a védekező villanás és a fölény néma), és most a motor is
+eszerint hallgat — néma csak az marad, amiből tucatnyi jön egy meccsen (a
+Beton villanása, a Gegenpressing labdaszerzése). A gól és a gólpassz
+mostantól beszél. Külön állítás nézi, hogy MINDEN tarifa-tételnek van magyar
+címkéje, tehát a feed sosem ír kulcsnevet.
+
+A másik a MÁSODLAGOS HARMADOLÁSA: a próba méri, hogy pontosan harmadannyi
+gyűlik, hogy a meccsenkénti PLAFON viszont változatlan (nem kevesebb fér
+bele, lassabban gyűlik), és hogy ugyanez a RETTENETRE is áll — enélkül a
+„Panzer másodlagosnak" lett volna a legjobb választás.
+
 A tizenegyedik szakasz zárja le a sort: Beton, Harmónia, Tiki-taka,
 Gegenpressing. Itt már nem az a kérdés, elbírja-e a motor a stílusok
 HASONLÓSÁGÁT, hanem hogy elbírja-e a KÜLÖNBSÉGÜKET. Három bázis-alak
@@ -1760,6 +1772,83 @@ kézzel tünteti el a játékost.
 lehet, ezért az első változat `noreplacement`-tel bukott — és nem a kihívást
 mérte, hanem a keret-szabályt. A próba azóta tesz valakit a tartalék-keretbe.
 Részletek: `docs/eladas-kihivas-elso-licit.md`.
+
+## szuperliga-kalibracio-proba.js — ⛰ a D0 fölött a nehézség nem szalad el
+
+```bash
+node tools/szuperliga-kalibracio-proba.js
+```
+
+**A hibaosztály.** A ligapiramis addig önszabályozó, amíg van hova feljebb
+menni. A D1 fölött ez elfogy: az új szuperliga ereje a RÉGI tetőhöz van kötve
+(`pyrOpenTopDiv`: a legfelső osztály közepe + `PYR_STEP`), nem a te
+keretedhez. Egy jól menedzselt karrierben a keret idényenként többet lép, mint
+a lépcső — vagyis a hegy csúcsa lesz a legkönnyebb szakasz.
+
+**Amit a próba állít.** 3.9.112 óta a D0 megnyílásától minden idény kalibrált
+kezdőrúgással indul: a szezon kezdetének pillanatában a világ oda áll, ahol a
+karrier elején vállalt rés újra kijön — magányos karrierben a **te**
+meccs-erődhöz, közös karrierben a **kettőtök átlagához** mérve.
+
+Tizenhárom szakasz:
+
+| # | mit igazol |
+|---|---|
+| 1 | a kapu: D0 alatt a kalibráció nem létezik és nem is mozdít semmit |
+| 2 | a vállalt rés befagy (`superWant`), és nem kergeti önmagát a `gap0`-n át |
+| 3 | magányos ág: egy −19-re elszaladt világot pontosan a vállalt +2-re állít |
+| 4 | idényenként EGYSZER fut (a `superFor` bélyeg) |
+| 5 | a **morál** zuhanása elviszi a meccs-erőt → a következő idény újra beáll |
+| 6 | a lépcső mezőny-ígérete (`fieldWant`) eltűnik |
+| 7 | szintugrási felajánlás nincs többé |
+| 8 | hangolási felajánlás sincs (a kalibráció úgyis felülírná) |
+| 9 | a páros négy száma: átlagolt meccs-erő és átlagolt rejtett bónusz, régi kliensnél a nyers keretre visszaesve |
+| 10 | PvP: a páros átlaga áll a vállalt résre, a mezőny oldalán a `levelGap` tükrével |
+| 11 | elmaradt kézfogás (tavalyi bélyeg) → nem találgatunk, a világ érintetlen |
+| 12 | a kalibráció nem változtatja meg az osztálylétszámot |
+| 13 | **a bekötés**: a `startNextCareerSeason` tényleg hívja, méghozzá a `buildSeasonFixtures()` ELŐTT; a kézfogás tényleg elteszi a páros számait; a két felajánlás kapuja tényleg ismeri a szuperligákat |
+
+Az 5. szakasz a legbeszédesebb: **a morált** mozgatja, nem a keretet. Ha a
+horgony a nyers keretre nézne, az a szakasz meg sem moccanna — így viszont
+pontosan azt méri, amit a felhasználó kért („meccs erőhöz igazítva").
+
+A 13. szakasz `Function.prototype.toString()`-gel néz rá a hívási pontokra.
+A többi szakasz a függvényeket közvetlenül hívja; enélkül egy bekötetlen, de
+tökéletesen működő kalibráció is zöldet adna.
+
+Részletes magyarázat: `docs/szuperliga-kalibracio.md`.
+
+## meccsero-potencial-proba.js — ⚖️ a lebutított felállás fele annyit ér
+
+```bash
+node tools/meccsero-potencial-proba.js
+```
+
+**A rés.** A szuperligák mezőnye a KEZDŐRÚGÁSKOR mért meccs-erőhöz áll be,
+PvP-ben a kettőtök átlagához. A meccs-erőt viszont a mérés pillanatában
+állítani lehet: csere, felállás, kapitány, taktika. Szándékosan rossz
+tizenegyet kiállítva gyenge mezőnyt lehetett kérni, majd visszarendezni.
+
+**Amit a próba állít.** 3.9.122 óta a kalibráció megkeresi, mi a legjobb
+meccs-erő, ami a kerettel TÉNYLEGESEN kiállítható; ha az legalább 2,5%-kal
+jobb, a mezőny a kettő számtani közepéhez áll be, és a napló kimondja.
+
+Tizenhat állítás, köztük a három legfontosabb:
+
+| # | mit igazol |
+|---|---|
+| 1 | a keresés NEM hagy nyomot — felállás, kapitány, taktika, pad, keret bitre ugyanaz utána, **kivétel esetén is** |
+| 7 | a talált konfiguráció VALÓDI: létező felállás, 11 slot tele, senki kétszer, kapitány a pályán, ismert taktika — nem elméleti felső korlát |
+| 4 | a használt szám PONTOSAN a két érték számtani közepe |
+| 2 | ép kerettel nincs hamis riasztás (a nyereség a küszöb alatt marad) |
+| 6 | `MS_RATED` nélkül a `teamMatchStrength` az ÉLŐ számot adja — a kijelzés, a tanácsadó és a mérkőzés nem változik |
+
+**A próba kapta el a legsúlyosabb hibát:** az első változat szűk keretnél
+némán kikapcsolt, mert az `arrangeSlotsFor` egyetlen felállást sem tudott
+feltölteni (11 fős kerettel mind a nyolc 8–9 slotnál megállt). Azóta a
+MOSTANI felállás mindig jelölt — az definíció szerint kiállítható.
+
+Részletes magyarázat: `docs/meccsero-potencial.md`.
 
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 

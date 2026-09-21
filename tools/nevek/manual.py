@@ -1418,3 +1418,124 @@ MANUAL.update({
   "Willian":                ("Villám", "Villám"),
   "Costinha":               ("Kosztinnya", "Kosztinnya"),
 })
+
+# ══ 33. KÖTEG — a motorjavítás UTÁN maradt nyolc név (3.9.114) ═════════════
+# A 3.9.113 tíz motorszabálya 412 nevet hozott helyre; a huszonhét
+# legláthatóbb közül tizenkilencre a felhasználó rábólintott, nyolcat pedig
+# kézbe vett. Ezek innentől NEM a szabálymotorból jönnek: a poén (és a
+# „Q. P.") olyan döntés, amit egy fonetikai szabály sosem hozna meg.
+MANUAL.update({
+  # A német W ejtése v, a tz pedig c — a gépi „Firk" hangzásban is,
+  # jelentésben is melléfogott, ráadásul ÉLŐ sztárról van szó.
+  "Florian Wirtz":          ("Virc Flóri", "Virc"),
+  # A motor „Mekleis"-t hozott; a skót „ei" itt hosszú í.
+  "Alex McLeish":           ("Meklís Sanyi", "Meklís"),
+  # A „gli" = lj szabály technikailag jó volt (Paljuka), de a NÉV kínálta a
+  # szétvágást. A kétszavas rövid alak nem újdonság: lásd Kerkez Milos
+  # („Kér Kéz Milliós" / „Kér Kéz") és Iniesta („Ínyenc Pista").
+  "Gianluca Pagliuca":      ("Pali Lyuka Lukács", "Pali Lyuka"),
+  # A gépi „Korso" magyarul „korsó"-nak olvasódott; a Korzózó ugyanazt a
+  # szótagot viszi tovább, csak szándékosan.
+  "Mario Corso":            ("Korzózó Márijó", "Korzózó"),
+  # A spanyol -ay = -áj szabály „Garáj"-t adott volna; a Garai valódi magyar
+  # vezetéknév, és ugyanúgy szól.
+  "Ezequiel Garay":         ("Garai Ezékiel", "Garai"),
+  # Betűnév — a Coupet kiejtése (kú-pé) magyarul két betű neve.
+  "Grégory Coupet":         ("Q. P. Gergely", "Q. P."),
+  # A RÖVID ALAK IT A TELJES NÉV, mert a poén a két szó EGYÜTT (ahogy a
+  # „Ronáldó Krisztián" és a „Názári Ronáldó" sem vágható félbe).
+  "Radja Nainggolan":       ("Ragyás Nyálgollam", "Ragyás Nyálgollam"),
+  # Ugyanaz: a vicc a szóhatár elcsúsztatása (Dwight Yorke → Dwáj Tyork),
+  # tehát félbevágva nincs értelme.
+  "Dwight Yorke":           ("Dwáj Tyork", "Dwáj Tyork"),
+})
+
+# ══ 34. KÖTEG — VÉDŐBLOKK: a jóváhagyott tizenkilenc (3.9.115) ═════════════
+# EZ A BLOKK NEM VÁLTOZTAT SEMMIT. Betűre azt rögzíti, amit a 3.9.113
+# szabálymotorja MA is ad — a felhasználó ezt a tizenkilenc nevet nézte át és
+# hagyta jóvá.
+#
+# MIÉRT KELL MÉGIS. Pontosan ez a hibaosztály esett meg a `bf84bde`-vel: 240
+# kézi javítás élt a gépi rétegen, és egy motorfrissítés némán elmozdította
+# volna őket — utólag kellett védőblokkal megmenteni (lásd
+# docs/nevek-danisitasa-minta.md §0). Egy jóváhagyott név innentől DÖNTÉS,
+# nem a szabályok mellékterméke: ha holnap finomodik az olasz `ci` vagy a
+# holland `g`, ezek a sorok akkor is állnak.
+#
+# ÚJ MOTORSZABÁLY ÍRÁSAKOR tehát ezek a nevek NEM fognak javulni maguktól —
+# ha egy szabály miatt itt is változtatni kell, ezt a blokkot kell átírni.
+MANUAL.update({
+  "Geoff Hurst":            ("Hurszt Dzsef", "Hurszt"),
+  "Billy McNeill":          ("Mekneil Vili", "Mekneil"),
+  "Ally McCoist":           ("Mekkoiszt Alika", "Mekkoiszt"),
+  # A felhasználó ezt így hagyta jóvá. A motor szerint az olasz `ci`
+  # mássalhangzó előtt is „csi" volna (Bacsigalúpó) — a döntés az övé.
+  "Valerio Bacigalupo":     ("Baszigalupo Gergő", "Baszigalupo"),
+  "Robert Jonquet":         ("Zsonket Róbert", "Zsonket"),
+  "Zbigniew Boniek":        ("Bonik Barnabás", "Bonik"),
+  "Siniša Mihajlović":      ("Mihajlics Pongrác", "Mihajlics"),
+  "Miodrag Belodedici":     ("Belodediszi Mikó", "Belodediszi"),
+  "Éder Militão":           ("Mílitao Ede", "Mílitao"),
+  "Francisco Sá":           ("Szá Ferenc", "Szá"),
+  "Emerson Ferreira":       ("Férreira Imre", "Férreira"),
+  "Wim van Hanegem":        ("Fanhanehem Vilmos", "Fanhanehem"),
+  "Hans van Breukelen":     ("Fanbrökelen János", "Fanbrökelen"),
+  "Piet Keizer":            ("Kájzer Péter", "Kájzer"),
+  "Rudi Völler":            ("Föler Rudi", "Föler"),
+  "Willie Miller":          ("Miler Vili", "Miler"),
+  "Vincenzo Montella":      ("Montela Vince", "Montela"),
+  "Virgilio Maroso":        ("Marozo Máté", "Marozo"),
+  "Andy Cole":              ("Kol Bandi", "Kol"),
+})
+
+# ══ 35. KÖTEG — a második adag kézbe vett neve (3.9.117) ═══════════════════
+# A 3.9.116 utáni mérés harminc gépi nevet tett a felhasználó elé; ebből
+# tizenhetet írt át. A javítások fele PONTOSAN az, amit a még be nem épített
+# motorszabályok is adnának (Snájder, Sulc, Nyúnyez, Sinyóri, Zágorakisz,
+# Manolász, Pítörsz) — a másik fele viszont poén, amit szabály sosem hozna.
+MANUAL.update({
+  # ── AMIT EGY SZABÁLY IS MEGADNA (de itt már döntés) ──────────────────────
+  # A német ß = ssz. A motor „Haskler"-t adott: a PRE ß → „sz"-t ír, a német
+  # ág `z → c`-je pedig belemart — ugyanaz a sorrend-csapda, mint a
+  # Rodríguessz-nél.
+  "Thomas Häßler":          ("Hesszler Tamás", "Hesszler"),
+  # A `sch` sosem jutott el a saját szabályáig: a ch-blokk hamarabb fut.
+  "Bernd Schneider":        ("Snájder Bernát", "Snájder"),
+  "Christian Schulz":       ("Sulc Krisztián", "Sulc"),
+  # A PRE `ñ → ny`-t ír, az y-szabály pedig nj-vé vágja (Núnjesz, Sinjori).
+  "Darwin Núñez":           ("Nyúnyez Kelemen", "Nyúnyez"),
+  "Giuseppe Signori":       ("Sinyóri József", "Sinyóri"),
+  # A görög nevek MIND -s-re végződnek, és a magyar „s" a sh hangot jelöli.
+  "Theodoros Zagorakis":    ("Zágorakisz Teó", "Zágorakisz"),
+  "Kostas Manolas":         ("Manolász Kostás", "Manolász"),
+  # Angol szóvégi -s, ugyanez.
+  "Martin Peters":          ("Pítörsz Márton", "Pítörsz"),
+  # A skandináv s is sz — a „-son = fia" poén (ffy) megmarad fölötte.
+  "Torbjörn Nilsson":       ("Nílszffy Szabolcs", "Nílszffy"),
+  # A holland „aa" hosszú á; az általános `ay → éj` itt félrement.
+  "Roy Makaay":             ("Makáj Roj", "Makáj"),
+  # ── A -ović: visszakerül a kiesett „ov" ──────────────────────────────────
+  # A motor `ovi[cć]$ → ics` szabálya a TŐBŐL is levágott: a Jovićból „Jics"
+  # maradt, három betű.
+  "Luka Jović":             ("Jovics Lukács", "Jovics"),
+  "Dejan Stanković":        ("Sztankovics Deján", "Sztankovics"),
+  # ── POÉN: amit szabály sosem hozna ───────────────────────────────────────
+  "Harald Schumacher":      ("Sumákoló Herold", "Sumákoló"),
+  "Jack Grealish":          ("Girhes Jakab", "Girhes"),
+  # Kétszavas rövid alak, mint a „Kér Kéz" (Kerkez) és a „Pali Lyuka".
+  "Pablo Ibáñez":           ("Ibán Yessz Pál", "Ibán Yessz"),
+  "Pietro Anastasi":        ("Ananász Tázi Péter", "Ananász Tázi"),
+  # A keresztnév a becenévből: Mimis → Mimi.
+  "Mimis Domazos":          ("Dómazos Mimi", "Dómazos"),
+})
+
+# ══ 36. KÖTEG — a -ović párja (3.9.119) ═══════════════════════════════════
+# A 3.9.118 motorszabálya visszaadta a kiesett „ov"-ot (Jugics → Jugovics),
+# a szerb szókezdő „st" viszont továbbra is magyar „s" (sht) marad: a
+# Stojkovics „Shtojkovics"-nak olvasódik. A szláv `s + mássalhangzó → sz`
+# szabály még nincs a motorban, ezért ez a kettő kézi — a felhasználó
+# kifejezetten így kérte.
+MANUAL.update({
+  "Vladimir Jugović":       ("Jugovics Vladi", "Jugovics"),
+  "Dragan Stojković":       ("Sztojkovics Pongrác", "Sztojkovics"),
+})

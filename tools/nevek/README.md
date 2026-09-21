@@ -67,6 +67,51 @@ után is megmarad.
 
 Ha a build panaszkodik, a javítás helye a `manual.py`.
 
+## A motor tíz szabályhiánya (3.9.113)
+
+A gépi réteg tíz ponton a saját guide-ját (`docs/nevek-danisitasa.md`)
+sértette: `ll → lj` nyelvfüggetlenül (124 név), szókezdő spanyol `S-` (69),
+`-ez → -essz` (50), `Mc- → Mk-` magánhangzó nélkül (21), `qu → kv`
+újlatinul (22), a holland `v`/`g`/`ij` (41), angol `s` + mássalhangzó (18),
+olasz magánhangzók közti `s` (15), francia `G` i/e előtt (6). Összesen
+**412 név** javult, kézi név **egy sem** változott.
+
+Háromnál a sorrend volt a hiba, nem a szabály — és a kód ezt ki is mondja
+(a spanyol `j → h` felülírná az `ll → j`-t; a `w → v` felülírná a holland
+`v → f`-et; a `z → sz` kétszer cserélt a `-ez`-ben). **Új nyelvi szabály
+írásakor előbb nézd meg, mi fut utána.**
+
+Belgium 3.9.113 óta saját nyelvkód (`be`), ág nélkül: az ország kétnyelvű,
+és a flamand `g → h` a francia ajkú neveken (Gillet → „Hillet") rombolna.
+
+**3.9.118–119 — az őrjelek.** A tíz javításból három nem hiányzó szabály
+volt, hanem rossz sorrend, és kiderült, hogy ugyanez a séma TIZENHÁROMSZOR
+ül a motorban: egy korai lépés beír egy magyar kétjegyű betűt, egy későbbi
+belemar. Mostantól az eldöntött kétjegyű betűk egyetlen láthatatlan
+karakterként utaznak végig (`S_NY`, `S_ZS`, `S_CS`, `S_LY`, `S_SZ`, `S_C`,
+`S_DZS`, `S_SSZ`, `S_CCS`, `S_S`, `S_AO`), és csak a `desent()` bontja
+vissza őket.
+
+> **ÚJ NYELVI SZABÁLY ÍRÁSAKOR: ha magyar kétjegyű betűt írsz, őrjelet írj.**
+> Nem azért, mert ma elromlana, hanem mert a következő szabály már nem
+> tudja, hogy az ott egy döntés volt.
+
+Ezzel együtt bejött a maradék tíz szabály is (angol/skandináv/görög/török
+`s`, francia néma szóvégi mássalhangzó, `-ović`, lengyel helyesírás, olasz
+`c` e/i előtt és `s` + mássalhangzó, portugál `x`), valamint két új
+nyelvkód: `pl` és `gr`. Összesen 421 további gépi név, kézi egy sem.
+
+**3.9.120 — a nyelvtérkép lyukai.** A `LANG`-ból 53 nemzetiség hiányzott,
+összesen 292 néven — és a hiányzó bejegyzés NEM semleges: a `lang_of`
+ilyenkor `"en"`-t ad. A japán, a szovjet és az egész frankofón Afrika angol
+kiejtést kapott. **Új nemzetiség felvételekor a `LANG`-ot is bővítsd.**
+
+Új kódok: `jp` (japán), `pl`, `gr`, és `af` — ez utóbbi a frankofón Afrika
+és a Maghreb: francia HELYESÍRÁS, de teljes kiejtés, mert ott a szóvégi
+mássalhangzó nem néma (Bennacer → Bennaszer, nem „Bennaszé").
+
+Részletes magyarázat: `docs/nevek-motor-tiz-szabaly.md`.
+
 ## kettozes.py — ugyanaz az ember két néven
 
 ```bash

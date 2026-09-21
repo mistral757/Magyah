@@ -303,9 +303,64 @@ pontot ér** — ott nem a gól számít, hanem hogy hányan szerezték. A
 Gegenpressing `press` tétele a motor egyetlen olyan tarifája, ami nem gólból,
 lapból vagy eredményből jön: a stílus saját motor-csatornájából (`mPress`).
 
-## 11. Mérés
+## 11. A feed és a másodlagos harmadolása (3.9.111)
 
-`node tools/stilus-motor-proba.js` (9077-es port) — tizenegy szakasz: a két létra
+### Minden stílus beszél a közvetítésben
+
+KIMONDOTT KÉRÉS: *„ahogyan a rettenetnek vannak meccs közben feedben
+visszajelzései, mi mennyi pontot ért éppen, úgy legyen a többi
+csapatstílusnál is ilyen."*
+
+A mérce a Panzeré. Ott a néma halmaz (`DREAD_QUIET`) **mindössze kettő**: a
+védekező villanás és a meccserő-fölény. A sárga lap, a piros, a mesterhármas
+és a kemény belépő mind megszólal — pedig sárgából is jön több egy
+mérkőzésen.
+
+Ugyanez a küszöb áll most a motorban is: **néma csak az, amiből tucatnyi jön
+egy meccsen.**
+
+| stílus | mi néma |
+|---|---|
+| ⚡ Villám · ⚽ Bombázók · ☯️ Harmónia · 🌀 Tiki-taka | **semmi** |
+| 🧱 Beton | védekező villanás |
+| 🧲 Gegenpressing | elhódított labda elöl |
+| *mind* | meccserő-fölény (`ENG_QUIET_ALL`) |
+
+A gól és a gólpassz eddig néma volt mind a négy stílusnál — **mostantól
+beszél**. Mérve: egy gól + egy gólpassz a Villámnál 5, a Tiki-takánál és a
+Harmóniánál 3 feed-sort ad. A próba azt is állítja, hogy **minden
+tarifa-tételnek van magyar címkéje**, tehát a feed sosem ír kulcsnevet.
+
+### A másodlagos filozófia harmadáron gyűjt
+
+KIMONDOTT KÉRÉS: *„ahogyan a csapatstílus pontgyűjtését, úgy ezeket a pont
+gyűjtéseket is csökkentsük: harmadoljuk a mértéküket a másodlagos
+csapatstílusnál."*
+
+Ugyanaz a szám és ugyanaz az elv, mint a mérföldköveknél
+(`STYLE2_MS_DIV = 3`). Két döntés, ami nem magától értetődő:
+
+* **A harmadolás a TARIFÁN megy, nem a jóváíráson.** Így minden szám, amit a
+  feedben látsz, **igaz szám** — nem a teljes tételt írjuk ki, hogy aztán a
+  végén némán elharmadoljuk.
+* **A meccsenkénti plafon változatlan.** Nem azt szűkítjük, mennyi *fér* bele
+  egy meccsbe, hanem azt, milyen *gyorsan* gyűlik: a plafon továbbra is az
+  állapot 10%-a, csak háromszor annyi mérkőzés kell hozzá. (Mérve: elsődleges
+  12,1 · másodlagos 4,0 · a plafon mindkettőnél 55.)
+
+A lefújás összesítője kimondja: *„másodlagos filozófia: harmadáron gyűlik."*
+
+### És a rettenet is
+
+A kérés a *többi* stílus jelzőrendszereiről szólt, de a Panzeré **ugyanolyan
+meccsenként gyűlő valuta**. Ha csak a többit harmadolnánk, a „Panzer
+másodlagosnak" azonnal a legjobb választás lenne — épp azt a rést nyitva,
+amit a harmadolás be akar zárni. Ezért a `fearNote`, a `fearNoteWin` és a
+fölény-tétel is osztódik, ugyanazzal a számmal és ugyanazon az elven.
+
+## 12. Mérés
+
+`node tools/stilus-motor-proba.js` (9077-es port) — tizenkét szakasz: a két létra
 viszonya (**minden szinten 0,6**), az azonos ár- és küszöblétra, a viharszint
 mint állapot (a skála alja, a stílusszint nagyítása, az eladás azonnali
 hatása), a 10%-os meccskeret, a szint → meccserő átváltás a +12-es plafonnal,
