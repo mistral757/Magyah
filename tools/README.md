@@ -1883,6 +1883,38 @@ mindhárom sávra) és az, hogy a **klasszikus kupa bitre változatlan**.
 
 Részletes magyarázat: `docs/hiper-szuper-kupa.md`.
 
+## piac-horgony-proba.js — 🧭 a scout, a piac és a HSZ mezőnye
+
+```bash
+node tools/piac-horgony-proba.js
+```
+
+**Bejelentett hiba:** „170-es mezőnyben vagyok, és nem talál semmit az
+attribútum-kereső, a sztár-kereső 100 körülieket akar nekem eladni, a scout
+is beakadt."
+
+**Az ok.** A piac emelkedése az `oppTargetRating − careerBaseRating`
+különbségből él. A piramis horgonyai a világ eltolása után
+`careerBaseRating = oppTargetRating`-et írtak — ami KARRIERENKÉNT EGYSZER
+futva helyes, de a 3.9.112 szuperliga-kalibrációja minden idényben
+`P.anchored=false`-ot ír, tehát a horgony minden szezonban a mostani
+szintre ugrott, és a pool a nyers 85–100-on ragadt.
+
+**A hibaosztály már ismert volt**: a betöltés-javító szó szerint ezt írja
+le — csakhogy az betöltéskor fut egyszer, a szezonforduló pedig utána
+rontotta el újra.
+
+**Az invariáns:** `pyrSetMarketAnchor()` — a horgony soha nem emelkedhet a
+karrier indulószintje (`S.run.baseDiff`) fölé. Nem `min()`: kieséskor a
+világ a horgony alá eshet, és egy lejjebb húzott horgony felfújná a piacot.
+
+A régi kódon a próba **11 állításon bukik** (horgony 78 → 178, piac-emelkedés
+0, pool 108-on ragad 177-es világban). A 6–8. szakasz a HSZ mezőnyét méri:
+a BELÉPÉSKORI meccs-erőhöz kell mérnie, nem a szezonindítóhoz — a bejelentés
+szerint 192-es kerettel 178-as mezőny jött.
+
+Részletes magyarázat: `docs/piac-horgony-hiba.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```

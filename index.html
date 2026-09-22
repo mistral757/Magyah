@@ -6132,7 +6132,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.124";
+const APP_VERSION="3.9.125";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -17262,8 +17262,24 @@ function applyCupTempoAnchor(comp,level){
    mentésben nincs — ott a mostani meccs-erőre esünk vissza. */
 function hszMid(){
   const P=(typeof S!=="undefined"&&S)?S.pyr:null;
-  let base=(P&&typeof P.msKick==="number"&&isFinite(P.msKick))?P.msKick:null;
-  if(base==null){try{base=teamMatchStrength();}catch(e){base=null;}}
+  /* ---- A HORGONY A BELÉPÉSKORI MECCS-ERŐ (3.9.125) ----
+     BEJELENTETT HIBA: „a meccs-erőm 192 és 178-as mezőnyt csinált nekem,
+     pedig D0-ban 190-eset kellett volna."
+     A 3.9.123 a SZEZONINDÍTÓ meccs-erőt (msKick) tette meg horgonynak, azzal
+     az indokkal, hogy a kupa a szezon végén fut. Csakhogy a kupa mezőnye így
+     egy fél évvel korábbi kerethez méretett: 179-es rajt után 192-es
+     kerettel is 178-as mezőny jött. A kérés egyértelmű — a sorozat ahhoz a
+     kerethez mérje magát, AMIVEL nekivágsz.
+     A LEBUTÍTÁS-VÉDELEM ITT IS HAT: a mérés nevezési ablakban megy
+     (msRatedBegin), tehát a kupa kedvéért sem éri meg rossz tizenegyet
+     kiállítani. Az msKick csak tartalék, ha a mérés nem megy. */
+  let base=null;
+  if(typeof MS_RATED!=="undefined"&&MS_RATED){
+    try{base=teamMatchStrength();}catch(e){base=null;}
+  }else{
+    try{msRatedBegin();base=teamMatchStrength();}catch(e){base=null;}
+    finally{try{msRatedEnd();}catch(e){}}}
+  if(!(base>0)&&P&&typeof P.msKick==="number"&&isFinite(P.msKick))base=P.msKick;
   if(!(base>0))return null;
   const ab=(typeof pyrAbove==="function")?pyrAbove():0;
   return Math.max(50,Math.min(ratingCap(),Math.round(base+ab-2)));}
@@ -22757,6 +22773,47 @@ const MARKET_INF_SCALE=0.75;   /* 0.55 volt — lásd a marketPeakShift indoklá
    pár ponttal a mezőny alatt ül, tehát erősítésnek jó, azonnali felülírásnak nem. */
 const MARKET_INF_MAX_LAG=8;      /* a piac teteje ennyivel maradhat a mezőny mögött */
 const MARKET_TOP_BASEPEAK=96;    /* a pool legjobb basePeak-je (a potToPeakOvr telítése) */
+/* ================= A PIAC HORGONYA CSAK LEFELÉ MOZDULHAT (3.9.125) =========
+   BEJELENTETT HIBA: „egy 170-es mezőnyben vagyok, és nem talál semmit az
+   attribútum-kereső, a sztár-kereső 100 körülieket akar nekem eladni, a
+   scout is beakadt."
+
+   AZ OK, ÉS HOGY MIÉRT ÉPP MOST. A piac emelkedése a
+   `marketPeakShift() = pyrPoolOffset() + (oppTargetRating − careerBaseRating)`
+   különbségből él. A piramis horgonyai (pyrAnchorAtKickoff, pyrAnchorShared,
+   pyrSuperAnchorShared) a világ eltolása után ezt futtatták:
+
+       oppTargetRating = pyrLevel();
+       careerBaseRating = oppTargetRating;     // ← a különbség NULLÁRA esik
+
+   Amíg ez KARRIERENKÉNT EGYSZER futott (a kezdőrúgáskor, a `P.anchored`
+   őrrel), addig helyes volt: ott a horgony tényleg a karrier indulószintje.
+   A 3.9.112 szuperliga-kalibrációja viszont minden idényben `P.anchored=false`-ot
+   ír, tehát a horgony MINDEN SZEZONBAN újra a mostani szintre ugrott — a piac
+   emelkedése örökre nullázódott, és a pool a nyers adatbázis szintjén
+   (85–100) ragadt, miközben a világ 170-en járt.
+
+   EZ A HIBAOSZTÁLY MÁR ISMERT VOLT. A betöltés-javító (lásd
+   `S.run.baseDiff`) szó szerint ezt írja le: „121-es mezőnyön is 85-95-ös
+   jelöltek jöttek, és az attribútum-keresés sem talált 100 fölötti értéket".
+   Csakhogy az BETÖLTÉSKOR fut egyszer — a szezonforduló utána rontotta el
+   újra, tehát a javítás egy újraindításig tartott.
+
+   A MEGOLDÁS NEM FOLT, HANEM INVARIÁNS: a horgony SOHA nem emelkedhet a
+   karrier indulószintje (`S.run.baseDiff`) fölé. A Run-mérő ezt a draft
+   lezárásakor, bármely szintváltás ELŐTT teszi el, tehát ez a karrier
+   igazsága. Aki hívja, mostantól ezen az egy függvényen át hívja. */
+function pyrSetMarketAnchor(){
+  const b=(typeof S!=="undefined"&&S&&S.run&&S.run.baseDiff!=null)?S.run.baseDiff:null;
+  if(b!=null){
+    /* CSAK LEFELÉ, ÉS CSAK A KARRIER INDULÓSZINTJÉIG. Nem `min(b, szint)`:
+       kieséskor a világ a horgony ALÁ eshet, és egy lejjebb húzott horgony
+       a piacot FELFÚJNÁ (a különbség nő). A szabály tehát pontosan az, amit
+       a betöltés-javító is mond: a horgony sosem lehet magasabb a karrier
+       indulószintjénél — lejjebb pedig nincs oka menni. */
+    if(careerBaseRating>b)careerBaseRating=b;
+    return;}
+  careerBaseRating=oppTargetRating||0;}
 function marketPeakShift(){
   /* ---- A PIRAMIS SAJÁT SKÁLÁJA ----
      Két dolgot hordoz egyszerre. (1) A világ Ratingjei normalizáltak, a
@@ -33613,7 +33670,7 @@ function pyrAnchorShared(myStr,mateStr){
      horgony is futtat a világ eltolása után. Egy helyről másolva, mert
      ugyanaz a művelet. */
   oppTargetRating=pyrLevel();
-  careerBaseRating=oppTargetRating;
+  pyrSetMarketAnchor();
   if(gameMode==="career"&&careerPool)Object.values(careerPool).forEach(e=>{
     if(drafted.has(e.n))return;
     applyMarketShift(e);
@@ -33701,7 +33758,7 @@ function pyrAnchorAtKickoff(){
        mezőnyszint, a horgony, a piac, az attribútumok, az ellenféltábla és a
        növekedési ütem. Egy helyről másolva, mert ugyanaz a művelet. */
     oppTargetRating=pyrLevel();
-    careerBaseRating=oppTargetRating;
+    pyrSetMarketAnchor();
     if(careerPool)Object.values(careerPool).forEach(e=>{
       if(drafted.has(e.n))return;
       applyMarketShift(e);
@@ -33832,8 +33889,14 @@ function pyrSuperReanchor(){
   P.anchored=false;
   let ok=false;
   try{ok=pyrAnchorAtKickoff();}catch(e){ok=false;}
+  /* A JELENTETT RÉS A NEVEZÉSI, nem az élő (3.9.125). A horgony a nevezési
+     meccs-erőt állította a vállalt résre; ha lebutított felállással mérünk,
+     az ÉLŐ rés szándékosan alacsonyabb — azt kiírni félrevezető volna, mert
+     nem az a szám, amihez a mezőny beállt. */
   let utana=null;
-  try{utana=Math.round(levelGap()*10)/10;}catch(e){utana=null;}
+  try{msRatedBegin();utana=Math.round(levelGap()*10)/10;}
+  catch(e){utana=null;}
+  finally{try{msRatedEnd();}catch(e){}}
   return {ok,want,utana,mp:false};}
 /* ---- A CSERÉLT SZÁMOK KÖZÖS KARRIERBEN ----
    A szezonindító kézfogás (mpStartExchange) minden idény előtt lefut, és
@@ -33919,7 +33982,7 @@ function pyrSuperAnchorShared(){
     /* A SZINTVÁLTÁS ÁTVEZETÉSE — ugyanaz a lánc, amit a pyrStart, a magányos
        horgony és a közös horgony is futtat a világ eltolása után. */
     oppTargetRating=pyrLevel();
-    careerBaseRating=oppTargetRating;
+    pyrSetMarketAnchor();
     if(gameMode==="career"&&careerPool)Object.values(careerPool).forEach(e=>{
       if(drafted.has(e.n))return;
       applyMarketShift(e);
