@@ -99,8 +99,15 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.d0Qual=(()=>{const tt=cupTierFor(pyrMyDiv()?pyrMyDiv().mean:null);return !!tt.qual;})();
     ki.d0Min=(()=>{const e=cupEntryFor(16,pyrMyDiv()?pyrMyDiv().mean:null);return e?e.comp:null;})();
 
-    /* ---- 2. A MEZŐNY ERŐSSÉGE ---- */
+    /* ---- 2. A MEZŐNY ERŐSSÉGE ----
+       3.9.125 óta a horgony a BELÉPÉSKORI (nevezési) meccs-erő, nem a
+       szezonindító: a bejelentés szerint egy 192-es kerettel 178-as mezőny
+       jött, mert az msKick egy fél évvel korábbi állapotot őrzött. Az
+       msKick-et szándékosan egy ELAVULT értékre állítjuk, hogy kiderüljön,
+       tényleg nem abból számol. */
     S.pyr.msKick=100;
+    let _ms=0;try{msRatedBegin();_ms=teamMatchStrength();}finally{msRatedEnd();}
+    ki.ms=Math.round(_ms*10)/10;
     ki.mid={d0:hszMid()};
     S.pyr.above=2;ki.mid.dm1=hszMid();
     S.pyr.above=3;ki.mid.dm2=hszMid();
@@ -189,11 +196,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(t.d0Min==="HSZ","…a 16. helyezettnek is (mindenki nevez)",t.d0Min);
   ok(t.d0Qual===false,"…és nincs selejtező");
 
-  console.log("\n2. A MEZŐNY ERŐSSÉGE (kezdő meccs-erő = 100)");
-  ok(t.mid.d0===99,"D0: kezdő meccs-erő −1",t.mid.d0);
-  ok(t.mid.dm1===100,"D−1: ±0",t.mid.dm1);
-  ok(t.mid.dm2===101,"D−2: +1",t.mid.dm2);
-  ok(t.mid.dm5===104,"D−5: +4 (a sorozat magától nő föléd)",t.mid.dm5);
+  console.log("\n2. A MEZŐNY ERŐSSÉGE");
+  const v0=Math.round(t.ms)-1;
+  ok(Math.abs(t.mid.d0-v0)<=1,"D0: a BELÉPÉSKORI meccs-erő −1",{ms:t.ms,d0:t.mid.d0});
+  ok(t.mid.d0!==99,"…nem az elavult msKick-ből (az 99-et adna)",t.mid.d0);
+  ok(t.mid.dm1===t.mid.d0+1,"D−1: +1 a D0-hoz képest (±0 a kerethez)",t.mid.dm1);
+  ok(t.mid.dm2===t.mid.d0+2,"D−2: +2 (a kerethez +1)",t.mid.dm2);
+  ok(t.mid.dm5===t.mid.d0+5,"D−5: +5 (a sorozat magától nő föléd)",t.mid.dm5);
 
   console.log("\n3-4. A LIGASZAKASZ MENETRENDJE");
   ok(t.sched.fordulok===8&&t.sched.parok===16,"nyolc forduló, fordulónként 16 pár",t.sched);
