@@ -6132,7 +6132,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.125";
+const APP_VERSION="3.9.126";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -17155,6 +17155,14 @@ function euroQualifyFor(rank,level){const e=cupEntryFor(rank,level);return e?e.c
           nem világklasszis a keret, akármit is mutat a bajnoki szint.
    A súlyozás a bizonyítéknak ad a legtöbbet (0.45), a vállalásnak és az
    abszolút szintnek kevesebbet. */
+/* ---- A DOMINANCIA SZÁNDÉKOSAN NYERS MARAD (3.9.126) ----
+   A 3.9.125-ös audit ezt is a váltandók közé sorolta, a MÉRÉS viszont
+   felülírta. A dominancia a kereted és a MEZŐNYSZINT (oppTargetRating)
+   különbségéből dolgozik — az pedig nyers skálájú szám. Meccs-erőre váltva
+   a különbség a rejtett bónusszal együtt nőne, a dominancia felszaladna, az
+   `edge` vele, és a kupa fölénye ÚJRA a rejtett bónusztól függene — pontosan
+   az a sodródás, amit az euroMidRating váltása most megszüntetett.
+   A két oldalnak tehát AZONOS skálán kell állnia, és itt az a nyers. */
 function euroDominance(){
   const base=oppTargetRating||84;
   const ts=(typeof teamStrength==="function")?teamStrength():0;
@@ -17203,14 +17211,34 @@ function euroDominance(){
    Az add veszi át azt a szerepet, amit korábban az oppDelta játszott — a
    középérték ugyanis pontosan a kívánt mezőnyre old meg, tehát az oppDelta
    kiesne a képletből (lásd euroMidRating). */
-const EURO_EDGE={BL:{add:0,cap:4.5},EL:{add:1,cap:6},
-                 KL:{add:2,cap:7.5},MK:{add:3,cap:9}};
+/* ---- ÚJRAHANGOLVA A MECCS-ERŐS MÉRÉSHEZ (3.9.126) ----
+   A régi értékek egy olyan képlethez tartoztak, ami a rejtett bónusz FELÉT
+   adta a mezőnynek: a tényleges fölényed `edge + rejtett/2` volt. A meccs-erős
+   mérésnél a fölény PONTOSAN az edge, tehát a régi számokkal a kupa egy
+   csapásra fojtogatóvá vált volna (KK-ban 1,4-es résre).
+   AZ ÚJ ALAPÉRTÉK LEVEZETVE, nem tippelve. Az `oppDelta` a fölénybe NEM
+   szól bele: a euroMidRating `round(f − d)`-t ad vissza, a hívó pedig
+   `+ d`-t tesz rá — a kettő kiejti egymást, a sorozatok rangsorát tisztán
+   az `EURO_EDGE.add` viszi. (A mérőeszközöm első változata épp ezt vétette
+   el, és ezért adott hamis, hárompontos lépcsőt.)
+       régi fölény = edge_régi + rejtett/2
+       új fölény   = edge_új
+   A cél a mai, KÖZÉPSŐ karrierszakasz (rejtett ≈ +10) megőrzése, ahol a
+   régi hozzáadás +5 volt:
+       base_új = base_régi + 5 = 1,2 + 5 = 6,2
+   Így a fölény sorozatonként (dom 0,2-nél): KK 6,9 · OJK 7,9 · KONF 8,9 ·
+   MK 9,9 — és ami a lényeg, MINDEN karrierszakaszban ugyanennyi.
+   A PLAFONOK tágultak, mert a régiek (4,5–9) az új alapértéknél már a
+   kiindulásnál aktívak lettek volna; az új értékek teljes dominanciánál
+   fognak csak. */
+const EURO_EDGE={BL:{add:0,cap:9.5},EL:{add:1,cap:10.5},
+                 KL:{add:2,cap:12},MK:{add:3,cap:13.5}};
 function euroEdgeFor(comp,dom){
   const e=EURO_EDGE[comp]||EURO_EDGE.BL;
   return Math.min(EURO_BASE_EDGE+EURO_DOM_EDGE*dom+e.add,e.cap);}
 /* Mindenki kap egy alap-fölényt (különben a 13 meccses menetelés reménytelen),
    a dominancia pedig efölé tesz — a sorozat padlójáig. */
-const EURO_BASE_EDGE=1.2, EURO_DOM_EDGE=3.5;
+const EURO_BASE_EDGE=6.2, EURO_DOM_EDGE=3.5;
 /* ---- A MEZŐNY A TÉNYLEGES FÖLÉNYBŐL SZÁMOLÓDIK VISSZA ----
    Nem a mezőny szintjét találgatjuk, hanem megmondjuk, MEKKORA FÖLÉNYT
    akarunk adni, és abból oldjuk meg a mezőnyt. Így a kiírt szám pontosan azt
@@ -17315,12 +17343,36 @@ function euroMidRating(comp){
   const base=pyrOn()
     ? Math.max(pyrTopLevel(),oppTargetRating||0)
     : (oppTargetRating||84);
-  const ts=(typeof teamStrength==="function")?teamStrength():0;
-  if(!(ts>0))return Math.max(50,Math.round(base));
-  const anchor=Math.max(ts,base);
-  const hid=(typeof seasonHiddenBonus==="function")?seasonHiddenBonus():0;
+  /* ---- A HORGONY A NEVEZÉSI MECCS-ERŐ (3.9.126) ----
+     MÉRÉS, AMI EZT KIKÉNYSZERÍTETTE. A régi képlet
+     `max(nyers, mezőnyszint) + befagyasztott_rejtett/2 − edge` volt: a
+     mezőny a NYERS kerethez mért, és a rejtett bónusznak csak a FELÉT látta.
+     Mivel a rejtett bónusz a karrier során +4-ről +30 fölé nő, a kupa
+     nehézsége teljesen ettől függött — ami sosem volt tervezői döntés:
+
+         rejtett:        +4     +10     +20     +30
+         rés (KK):      1,4  →  4,4  →  9,4  →  14,4
+
+     Vagyis a karrier elején fojtogató, a végén séta. A meccs-erőre váltva a
+     rés ÁLLANDÓ lesz (2,4 … 4,1 a KK-ban), és a sorozatok közti rangsort
+     tisztán az `oppDelta` és az `EURO_EDGE` viszi — ahogy tervezve volt.
+
+     A NEVEZÉSI SZÁM, nem az élő: a 3.9.122 lebutítás-védelme itt is hat,
+     tehát a kupa kedvéért sem éri meg a mérés pillanatában rossz tizenegyet
+     kiállítani. A `seasonHiddenBonus` fele KIKERÜLT a képletből — az most
+     már teljes egészében a meccs-erőben ül. */
+  let ms=0;
+  if(typeof MS_RATED!=="undefined"&&MS_RATED){
+    try{ms=teamMatchStrength();}catch(e){ms=0;}
+  }else{
+    try{msRatedBegin();ms=teamMatchStrength();}catch(e){ms=0;}
+    finally{try{msRatedEnd();}catch(e){}}}
+  if(!(ms>0)){const _t=(typeof teamStrength==="function")?teamStrength():0;
+              ms=_t>0?_t:0;}
+  if(!(ms>0))return Math.max(50,Math.round(base));
+  const anchor=Math.max(ms,base);
   const edge=euroEdgeFor(comp||"BL",euroDominance());
-  const f=anchor+hid*(1-OPP_BUFF_MEASURED)-edge;
+  const f=anchor-edge;
   const d=(EURO_COMPS[comp]&&EURO_COMPS[comp].oppDelta)||0;
   /* ---- FIGYELEM: EZ MÉG NEM A VÉGSŐ MEZŐNY ----
      A visszatérési érték az `oppDelta` NÉLKÜLI középérték: a hívó (a
@@ -17806,6 +17858,10 @@ function mpCupSharedMid(a,b,domA,domB,comp){
   const base=(typeof pyrOn==="function"&&pyrOn())
     ? Math.max(pyrTopLevel(),oppTargetRating||0)
     : (oppTargetRating||84);
+  /* 3.9.126: a két CSERÉLT MECCS-ERŐ (mstr) az erősebb oldalon — ugyanaz a
+     skála, amin az egyjátékos euroMidRating is mér. A hívó ezért mstr-t ad
+     át, nem nyers csapaterőt; régi kliensnél a nyers marad, és a mezőny
+     annyival lesz könnyebb — jobb, mint két külön skálán számolni. */
   const ts=Math.max((typeof a==="number"?a:0),(typeof b==="number"?b:0));
   if(!(ts>0))return Math.max(50,Math.round(base));
   const dom=Math.max(0,Math.min(1,
@@ -17919,7 +17975,8 @@ async function mpCupTickRun(key,myField,oppField,onReady,myEntry){
       /* A KÖZÖS mezőny-célérték: ugyanaz a képlet, mint az euroMidRating-ben,
          de az ERŐSEBB keretre horgonyozva. Így a két kliens azonos mezőnyt
          épít, és a sorozat egyikőtöknek sem lesz sétagalopp. */
-      mid:mpCupSharedMid(mine.str,mate.str,mine.dom,mate.dom,r?r.comp:null),
+      mid:mpCupSharedMid(mine.mstr||mine.str,mate.mstr||mate.str,
+                         mine.dom,mate.dom,r?r.comp:null),
       how:r?r.how:null,mineComp:r?r.mineComp:null,mateComp:r?r.mateComp:null,
       mateVer:mate.v?String(mate.v).slice(0,16):null};
     /* ---- VERZIÓ-ELTÉRÉS: AZONNAL KIMONDJUK ----
@@ -58180,7 +58237,10 @@ function mpResolveLevel(mine,mate){
   if(a!=null&&b!=null)return{v:Math.round((a+b)/2),how:"both",a,b};
   if(a!=null)return{v:a,how:"mine",a,b};
   if(b!=null)return{v:b,how:"mate",a,b};
-  const sa=(mine&&mine.str)||0,sb=(mate&&mate.str)||0;
+  /* 3.9.126: ha egyikőtök sem ad javaslatot, a gép a két MECCS-ERŐ átlagánál
+     eggyel erősebb mezőnyt sorsol — nem a nyers keretekéből. Ugyanaz a skála,
+     amin a nehézség-tanácsadó és a horgonyok mérnek. Régi kliensnél a nyers. */
+  const sa=(mine&&(mine.mstr||mine.str))||0,sb=(mate&&(mate.mstr||mate.str))||0;
   return{v:Math.round((sa+sb)/2)+1,how:"auto",a,b,sa,sb};}
 async function mpPushLevel(){
   if(!MP.active||MP.role!=="host"||!MP.activeRoom)return;
@@ -58367,7 +58427,15 @@ async function mpStartTick(key,myField,oppField,onReady,myBidRec){
        pyrAnchorShared. Karrierenként egyszer fut (P.mpAnchored). */
     if(typeof pyrOn==="function"&&pyrOn()){
       let a=null;
-      try{a=pyrAnchorShared(mine&&mine.str,mate&&mate.str);}catch(e){}
+      /* 3.9.126: a KÖZÖS HORGONY IS MECCS-ERŐN. Eddig a nyers keretek
+         átlagára állt, miközben az egyjátékos horgony (pyrAnchorAtKickoff)
+         és a szuperliga-kalibráció (3.9.112) már meccs-erőben mér — a
+         karrier eleje és a D0 fölötti része tehát KÉT KÜLÖNBÖZŐ skálán
+         kalibrált. Az `mstr` 3.9.104 óta utazik a kézfogásban, és a
+         3.9.122 óta nevezési szám, tehát a lebutítás-védelem is hat rá.
+         Régi kliensnél a nyers marad — az az eddigi viselkedés. */
+      try{a=pyrAnchorShared(mine&&(mine.mstr||mine.str),
+                            mate&&(mate.mstr||mate.str));}catch(e){}
       /* ---- A SZUPERLIGÁK KALIBRÁCIÓJÁHOZ A NÉGY SZÁM (3.9.112) ----
          Itt még NEM hangolunk: a fel- és kiesés csak ezután dől el
          (pyrSeasonTurn), a kalibrációnak pedig az ÚJ osztályodat kell mérnie.

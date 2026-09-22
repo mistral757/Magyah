@@ -1915,6 +1915,36 @@ szerint 192-es kerettel 178-as mezőny jött.
 
 Részletes magyarázat: `docs/piac-horgony-hiba.md`.
 
+## kupa-meccsero-proba.js — 🏆 a kupamezőny nem sodródhat el
+
+```bash
+node tools/kupa-meccsero-proba.js     # próba
+node tools/kupa-mezony-meres.js       # MÉRŐESZKÖZ (mindig 0-val lép ki)
+```
+
+**A hiba.** A kupamezőny `max(nyers, szint) + befagyasztott_rejtett/2 − edge`
+alapon épült, tehát a fölényed `edge + rejtett/2` volt. A rejtett bónusz a
+karrier során +4-ről +30 fölé nő, így a kupa nehézsége TELJESEN ettől
+függött: KK-ban 4,9 → 17,9. A karrier elején fojtogató, a végén séta.
+
+**Az új alapérték levezetve**: `base = 1,2 + 5 = 6,2`, ahol az 5 a
+közép-karrier (rejtett ≈ +10) régi hozzáadása. A +10-es ponton a régi és az
+új fölény BITRE azonos mind a négy sorozatban — máshol viszont megszűnt a
+sodródás.
+
+**Két tanulság a mérőeszközről.** (1) Az első változata kétszer alkalmazta
+az `oppDelta`-t, és hamis, hárompontos lépcsőt mutatott — a kód valójában
+kiejti (`round(f−d)` majd a hívó `+d`). (2) A lebutítás-próbája a kiszoruló
+erős játékosokat a semmibe dobta slot-felülírással; a valódi játékban egy
+csere nem TÖRLI a játékost, ezért a tartalékba kell tenni őket.
+
+**Amit a mérés felülírt a terven:** az `euroDominance` NEM válthat
+meccs-erőre — a mezőnyszinthez hasonlítja magát, tehát meccs-erőn a
+dominancia a rejtett bónusszal együtt nőne, és visszatérne ugyanaz a
+sodródás.
+
+Részletes magyarázat: `docs/kupa-meccsero.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
