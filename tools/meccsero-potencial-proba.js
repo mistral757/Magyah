@@ -190,9 +190,13 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
      {ep:t.ep.now,buta:t.buta.now});
   ok(t.buta.on===true,"a keresés visszatalál, a nyereség a küszöb fölött",t.buta);
   ok(t.buta.gain>=2.5,"…legalább 2,5%",t.buta.gain);
-  ok(kozel(t.buta.used,t.butaKozep,0.05),"a használt szám a KÉT ÉRTÉK SZÁMTANI KÖZEPE",
+  /* A TŰRÉS 0,1: a `now` és a `pot` egy tizedesre kerekítve utazik, a `used`
+     viszont a NYERS értékekből számol — egy .x5 közép a két úton
+     ellentétesen kerekedhet (mérve: 86,75 → 86,7 és 86,8). Fél tizedes
+     eltérés tehát a mérésé, nem a szabályé. */
+  ok(kozel(t.buta.used,t.butaKozep,0.1),"a használt szám a KÉT ÉRTÉK SZÁMTANI KÖZEPE",
      {used:t.buta.used,kozep:t.butaKozep,now:t.buta.now,pot:t.buta.pot});
-  ok(kozel(t.ablakban,t.butaKozep,0.05),"és az ablakban a teamMatchStrength ezt adja",
+  ok(kozel(t.ablakban,t.butaKozep,0.1),"és az ablakban a teamMatchStrength ezt adja",
      {ablakban:t.ablakban,kozep:t.butaKozep});
 
   console.log("\n8. A BEKÖTÉS");
