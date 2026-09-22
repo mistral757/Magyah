@@ -1,45 +1,48 @@
-/* 🛒 A BONTOTT ÁLLAPOT ÉS A STÍLUSBOLT (3.9.127).
+/* 🛒 A HAT PIAC és a bontott állapot (3.9.128).
 
-   KIMONDOTT KÉRÉS: „Tegyük mindegyik csapatstílusnál kidolgozottabbá ezt a
-   részt… Legyen jobban elmagyarázva, milyen tényezők adják ki a fő guiding
-   pontszámot (esetünkben a viharszint) — itt ötletem: a top 3 leggyorsabb
-   sebességattribútumainak összereje az egyik faktor, másik a szélsők
-   (védők, középpályások, csatárok) közötti összjáték értékek, sebesség
-   skillek… És lehessen mindegyik ilyen stílusnál vásárolni mást is, ne csak
-   csapaterőt. Pl itt a villámoknál: sprint mester stábtagnak konkrét
-   tapasztalati szintlépést, leglassabb kezdő 11-ben lévő játékosnak extra
-   gyorsítást a sebesség edzésre, 1 meccsre szóló sebesség növelő tokent
-   (legolcsóbb), ami egy adott posztcsoportban minden játékos sebesség
-   attribútumát 5%-kal növeli egy meccs erejéig."
+   KIMONDOTT KÉRÉS (a 3.9.127 javítása): „Ennél nem azt vártam tőled, hogy egy
+   az egyben valósítsd meg a villám saját bolti termékeit… hanem hogy azt és a
+   panzert vásárlási lehetőségeit MINTAKÉNT véve dolgozz ki
+   csapatstílusonként EGY-EGY SPECIÁLIS PIACOT, 3-3 termékkel… De így
+   rendkívül egyhangú lenne."
 
    Amit mér:
-     A) A BONTÁS
-      1. mind a hat motoros stílusnak négy tényezője van, és az összegük
-         betűre az engBaseRaw;
-      2. a MÉLYSÉG a régi képlet — külön újraszámolva ugyanaz jön ki;
-      3. az ÉL a 85-ös küszöbtől mér, és emberenként/összesen tetőzött;
-      4. az ÖSSZJÁTÉK CSAK a stílus kulcsposztjain álló embereket nézi
-         (a Villámnál: JV · BV · JSZ · BSZ), és legfeljebb ötöt;
-      5. a KÉPESSÉG-tétel a tengely-térképet követi és tetőzött;
-      6. ☯️ a Harmónia éle FORDÍTOTT (a rés szűkülése fizet);
-      7. EGYIK TÉNYEZŐ SEM FÜGG A FELÁLLÁSTÓL — a slotok felforgatása után
-         bitre ugyanaz a szám (ezen áll vagy bukik a keresés gyorsítótára);
-     B) A BOLT
-      8. mind a hat stílusnak van mind a három tétele, mindnek pozitív árral;
-      9. az árak az engScaleT-tel nőnek (a szint ára viszont NEM);
-     10. 🎓 a stábtag-szintlépés a MEGFELELŐ típusnak jár, és pontosan egy
-         lépcsőt ad (COACH_XP_PER_STEP), a plafonját tiszteletben tartva;
-     11. rossz típusú stábtagra nem fizet;
-     12. 🏃 az edzés-gyorsítás a kezdő 11 LEGLASSABB emberét találja meg
-         (a kapust a Villámnál kihagyva), és a szorzó csak RÁ és csak a
-         saját tengelyén él;
-     13. a fokozatok tetőznek (ENG_TRAIN_MAX), fölötte a gomb megmondja, miért nem;
-     14. ⏱️ a token a VÁLASZTOTT posztcsoportot emeli, mást nem, más tengelyt
-         nem — és tényleg átjön a csapat tengelyére (teamAttrStrengths);
-     15. egyszerre egy token él, és a lefújás elfogyasztja;
-     16. a pontok könyvelése (pts / spent) mindhárom tételnél stimmel;
-     17. a panel kirajzolja a négy tényezőt és a három tételt;
-     18. nincs oldalhiba. */
+     A) A BONTOTT ÁLLAPOT (3.9.127, változatlanul)
+      1. négy nevesített tényező, az összegük betűre az engBaseRaw;
+      2. a MÉLYSÉG a régi képlet (külön újraszámolva);
+      3. az ÉL a 85-ös küszöbtől mér, tetőzve;
+      4. az ÖSSZJÁTÉK csak a stílus kulcsposztjairól válogat;
+      5. a KÉPESSÉG-tétel a tengely-térképet követi, idegen tengely nem számít;
+      6. a Harmónia éle FORDÍTOTT;
+      7. EGYIK tényező sem függ a felállástól.
+     B) HOGY TÉNYLEG HAT PIAC, NEM EGY SABLON HATSZOR
+      8. mind a hat stílusnak van SAJÁT NEVŰ piaca, 3-3 termékkel;
+      9. a tizennyolc termék azonosítója egyedi;
+     10. legalább hétféle HATÁSFAJTA szerepel köztük (nem egy sablon);
+     11. stílusonként pontosan EGY egymeccses tétel van, és az a legolcsóbb;
+     12. az árak a tarifával nőnek, a SZINT ára viszont fix.
+     C) A TIZENEGY HATÁSFAJTA, EGYENKÉNT
+     13. 🔥 fx1 (ownGoalMult) tényleg megjelenik a stílus fx-listáján, és a
+         lefújás elfogyasztja;
+     14. 🌧️ fx1 (oppGoalMult) csökkenti az ellenfél gólesélyét;
+     15. ☕ fx1 (moraleFloor) megemeli a morál-padlót;
+     16. 🩹 fxN (injMult) HALMOZÓDIK, és a max-nál megáll;
+     17. 📕 tune (recNear) kijjebb tolja a rekordhajrá határát;
+     18. 🔟 tune (nineSteps) több lépcsőt enged a Kilencesnek;
+     19. 🧠 tune (pcOffer) növeli a passzkémia ajánlkozását — a plafonig;
+     20. 👟 tune (duoRipe) rövidíti a gyilkos páros érését, 4 meccsig;
+     21. 🥅 tune (errMul) szorozza a kikényszerített hibát;
+     22. 🧊 trait a Panzer TÜKÖRKÉPE: a vérmérséklet HIGGADTABB felé megy,
+         a pályán lévő példány is követi, a szélén álló embert tiltja;
+     23. 🤝 bond két ember összhangját emeli;
+     24. 🔗 passchem egy lépcsőt lép;
+     25. ⚖️ rating a kezdő 11 leggyengébbjét emeli, tetőzve;
+     26. ⏱️ token · Villám: SZÁZALÉK egy posztcsoportra;
+     27. 🎯 token · Tiki-taka: LAPOS ráadás az EGÉSZ tizenegyre (más alak!);
+     28. 🎓 coach: egy Szakértelem-lépcső, rossz típusra nem fizet;
+     29. a könyvelés (pts / spent) mindenhol stimmel;
+     30. mind a hat piac kirajzolódik a panelen;
+     31. nincs oldalhiba. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT="/home/user/Magyah", PORT=9101;
@@ -65,11 +68,12 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
   await p.waitForTimeout(1200);
   let van=true;
   try{await p.waitForFunction(()=>typeof engBaseParts==="function"
-      &&typeof engBuyCoach==="function"&&typeof engBuyTrain==="function"
-      &&typeof engBuyToken==="function"&&typeof engTokenMult==="function"
-      &&typeof engTrainMult==="function"&&typeof engShopPrice==="function",
+      &&typeof engShopList==="function"&&typeof engShopBuy==="function"
+      &&typeof engShopFx==="function"&&typeof engTune==="function"
+      &&typeof engTokenApply==="function"&&typeof engTraitApply==="function"
+      &&typeof engBuyPair==="function"&&typeof engBuyRating==="function",
       null,{timeout:15000});}catch(e){van=false;}
-  ok(van,"a bontás és a bolt függvényei léteznek");
+  ok(van,"a bontás és a hat piac függvényei léteznek");
   if(!van){await b.close();srv.close();console.log("\n✗ 1 hiba");process.exit(1);}
 
   const t=await p.evaluate(()=>{
@@ -96,241 +100,332 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
     if(!scout)scout=generateScout();
     phase="season";S.idx=0;S.morale=80;
     try{buildSeasonFixtures();}catch(e){}
-    /* A KERET a careerPool-ban: minden kiállított embernek legyen bejegyzése,
-       hogy a tengelyértékek valódiak legyenek. */
     slots.forEach(sl=>{
       if(!sl.player)return;
       if(!careerPool[sl.player.n])careerPool[sl.player.n]={n:sl.player.n,pos:sl.player.pos.slice(),age:26};
       const e=careerPool[sl.player.n];
       if(!e.pos)e.pos=sl.player.pos.slice();
       if(!e.attrs)initPlayerAttrs(e);});
-    /* ---- A FILOZÓFIA: ⚡ VILLÁM ---- */
-    S.style={key:"villam",chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null};
-    S.style2=null;
-    ki.engKey=engKey();
+    const setStyle=k=>{
+      S.style={key:k,chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null};
+      S.style2=null;
+      const E=engState(k);
+      E.pts=100000;E.earned=100000;E.spent=0;E.lvl=0;
+      delete E.buy;delete E.tok;delete E.fx1;delete E.tb;
+      return E;};
+    const buyById=(k,id,extra)=>{
+      const it=engShopItem(k,id);
+      if(!it)return null;
+      if(it.kind==="coach")return engBuyCoach(k,it,extra);
+      if(it.kind==="trait")return engTraitApply(k,it,extra);
+      if(it.kind==="bond"||it.kind==="passchem")return engBuyPair(k,it,extra[0],extra[1]);
+      if(it.kind==="token"&&it.grp)return engBuyToken(k,it,extra);
+      return engShopBuy(k,it);};
 
-    /* ---- 1-2. A NÉGY TÉNYEZŐ ÉS A MÉLYSÉG ---- */
+    /* ================= A) A BONTOTT ÁLLAPOT ================= */
+    setStyle("villam");
+    ki.engKey=engKey();
     const P=engBaseParts("villam");
     ki.partIds=P.map(x=>x.id);
     ki.osszeg=n1(P.reduce((a,x)=>a+x.v,0));
     ki.baseRaw=engBaseRaw("villam");
-    {/* a régi képlet újraszámolva */
-     const d=ENG_DEFS.villam,v=[];
-     fullCareerRoster().forEach(pl=>{
-       const e=careerPool[pl.n];if(!e)return;
+    {const d=ENG_DEFS.villam,v=[];
+     fullCareerRoster().forEach(pl=>{const e=careerPool[pl.n];if(!e)return;
        v.push((e.attrs&&e.attrs.seb)||0);});
      v.sort((a,b)=>b-a);
      let s=0;
      v.slice(0,d.men).forEach(sp=>{s+=Math.max(0,Math.min(d.perMan,(sp-d.scaleFrom)/d.perStep));});
-     ki.regiMelyseg=n1(s*d.baseScale);
-     ki.ujMelyseg=P[0].v;}
-
-    /* ---- 3. AZ ÉL ---- */
-    {const nev=fullCareerRoster().map(x=>x.n);
-     const ment={};nev.forEach(n=>{ment[n]=careerPool[n].attrs.seb;});
+     ki.regiMelyseg=n1(s*d.baseScale);ki.ujMelyseg=P[0].v;}
+    {const nev=fullCareerRoster().map(x=>x.n),ment={};
+     nev.forEach(n=>{ment[n]=careerPool[n].attrs.seb;});
      nev.forEach(n=>{careerPool[n].attrs.seb=80;});
-     ki.elNulla=engElRaw("villam");                 /* 85 alatt mindenki → 0 */
+     ki.elNulla=engElRaw("villam");
      nev.slice(0,3).forEach(n=>{careerPool[n].attrs.seb=200;});
-     ki.elTeto=engElRaw("villam");                  /* emberenként 10, hárman → 30 */
-     nev.forEach(n=>{careerPool[n].attrs.seb=ment[n];});
-     ki.elVissza=engElRaw("villam");}
-
-    /* ---- 4. AZ ÖSSZJÁTÉK KULCSPOSZTJAI ---- */
+     ki.elTeto=engElRaw("villam");
+     nev.forEach(n=>{careerPool[n].attrs.seb=ment[n];});}
     {const nevek=engChemNames("villam");
-     ki.chemN=nevek.length;
      ki.chemPosztok=nevek.map(n=>((careerPool[n]&&careerPool[n].pos)||[])[0]||"?");
-     ki.chemMax=ENG_CHEM_MAX;
-     ki.chemErtek=engChemRaw("villam");}
-
-    /* ---- 5. A KÉPESSÉG-TÉTEL ---- */
+     ki.chemN=nevek.length;}
     {const nev=fullCareerRoster().map(x=>x.n);
      ki.skillNulla=engSkillRaw("villam");
-     /* tíz kész sebesség-képesség: a tengely-térkép szerint "pace" → seb */
-     const pace=SKILLS.filter(sk=>sk.type==="pace"
-       ||(sk.combo||[]).some(c=>c.type==="pace"))[0];
-     ki.paceVan=!!pace;
+     const pace=SKILLS.filter(sk=>sk.type==="pace"||(sk.combo||[]).some(c=>c.type==="pace"))[0];
      if(pace)nev.slice(0,10).forEach(n=>{S.skills[n]=[{skillId:pace.id,skill:pace}];});
      ki.skillTeto=engSkillRaw("villam");
-     /* és egy MÁSIK tengelyé nem számít bele */
      nev.slice(0,10).forEach(n=>{delete S.skills[n];});
      const gol=SKILLS.filter(sk=>sk.type==="goalw")[0];
      if(gol)nev.slice(0,10).forEach(n=>{S.skills[n]=[{skillId:gol.id,skill:gol}];});
      ki.skillIdegen=engSkillRaw("villam");
      nev.slice(0,10).forEach(n=>{delete S.skills[n];});}
-
-    /* ---- 6. ☯️ A HARMÓNIA FORDÍTOTT ÉLE ---- */
-    ki.harmEl=(typeof harmoniaEngEl==="function")?harmoniaEngEl():null;
     ki.harmElFv=(typeof ENG_DEFS.harmonia.el==="function");
-    ki.harmSkillAxis=ENG_DEFS.harmonia.skillAxis;
-
-    /* ---- 7. FELÁLLÁS-FÜGGETLENSÉG ---- */
-    {const elotte=engBaseRaw("villam");
-     const ment=slots.map(sl=>sl.player);
+    ki.harmEl=harmoniaEngEl();
+    {const elotte=engBaseRaw("villam"),ment=slots.map(sl=>sl.player);
      slots.forEach((sl,i)=>{sl.player=ment[(i+5)%ment.length];});
      const kozben=engBaseRaw("villam");
      slots.forEach((sl,i)=>{sl.player=ment[i];});
-     const utana=engBaseRaw("villam");
-     ki.fuggetlen=[elotte,kozben,utana];}
+     ki.fuggetlen=[elotte,kozben,engBaseRaw("villam")];}
 
-    /* ---- 8-9. A BOLT TÉTELEI ÉS AZ ÁRAK ---- */
-    ki.boltok={};
+    /* ================= B) HAT PIAC, NEM EGY SABLON ================= */
+    ki.piacok={};ki.idk=[];ki.fajtak={};
     Object.keys(ENG_DEFS).forEach(kk=>{
-      const B=ENG_DEFS[kk].buy||{};
-      ki.boltok[kk]={coach:!!(B.coach&&B.coach.length),train:!!B.trainN,tok:!!B.tokN,
-        part:!!ENG_DEFS[kk].partD};});
-    ki.arSorrend=[engShopPrice("villam","token"),engShopPrice("villam","train"),
-                  engShopPrice("villam","coach")];
-    {/* az ár a tarifával nő: az állapot-szintet megemelve újramérünk */
-     const elotte=engShopPrice("villam","token"),sc0=engScaleT("villam");
+      const d=ENG_DEFS[kk],L=engShopList(kk);
+      L.forEach(it=>{ki.idk.push(it.id);ki.fajtak[it.kind]=(ki.fajtak[it.kind]||0)+1;});
+      const arak=L.map(it=>it.ar);
+      ki.piacok[kk]={nev:d.shopN||null,db:L.length,
+        egymeccs:L.filter(it=>it.tag==="egy meccs").length,
+        legolcsobb:arak.length?(Math.min.apply(null,arak)===L.filter(it=>it.tag==="egy meccs").map(it=>it.ar)[0]):false,
+        savok:arak.slice().sort((a,b)=>a-b)};});
+    ki.idEgyedi=(new Set(ki.idk)).size===ki.idk.length;
+    ki.fajtaDb=Object.keys(ki.fajtak).length;
+    {setStyle("villam");
+     const it=engShopItem("villam","gyujto");
+     const e1=engShopPrice("villam",it),s0=engScaleT("villam");
      const ment=ENG_DEFS.villam.baseScale;
      ENG_DEFS.villam.baseScale=ment*4;
-     const utana=engShopPrice("villam","token"),sc1=engScaleT("villam");
+     const e2=engShopPrice("villam",it),s1=engScaleT("villam");
      ENG_DEFS.villam.baseScale=ment;
-     ki.arSkala=[elotte,utana,n1(sc0),n1(sc1)];
+     ki.arSkala=[e1,e2,n1(s0),n1(s1)];
      ki.szintArFix=[ENG_PRICE[1],engNextPrice("villam")];}
 
-    /* ---- 10-11. 🎓 A STÁBTAG-SZINTLÉPÉS ---- */
-    const E=engState("villam");
-    E.pts=100000;E.spent=0;
-    S.staff=[{n:"Gyors Géza",type:"attr:seb",sz:50,szBase:50,xp:0,age:40,since:1,attrKey:"seb"},
-             {n:"Kapus Kázmér",type:"attr:kapus",sz:50,szBase:50,xp:0,age:40,since:1,attrKey:"kapus"}];
-    ki.coachLista=engCoachList("villam").map(x=>x.c.n);
-    {const elottePts=E.pts,ar=engShopPrice("villam","coach");
-     const r=engBuyCoach("villam",0);
-     ki.coachVesz={n:r&&r.n,elotte:r&&r.elotte,utana:r&&r.utana,
-       xp:S.staff[0].xp,koltseg:n1(elottePts-E.pts),ar:ar,spent:E.spent};}
-    {const elottePts=E.pts;
-     const r=engBuyCoach("villam",1);     /* rossz típus */
-     ki.coachRossz={r:r,valtozatlan:E.pts===elottePts,sz:S.staff[1].sz};}
-    {/* a plafon: annyi lépcsőt veszünk, hogy elérje */
-     for(let i=0;i<40;i++)engBuyCoach("villam",0);
-     ki.coachTeto=[S.staff[0].sz,coachSzCap(S.staff[0])];}
-
-    /* ---- 12-13. 🏃 AZ EDZÉS-GYORSÍTÁS ---- */
-    E.pts=100000;E.spent=0;delete E.tb;
-    {/* a kapust tesszük a leglassabbá — a Villámnál mégsem őt kell választania */
+    /* ================= C) A HATÁSFAJTÁK, EGYENKÉNT ================= */
+    /* 🔥 fx1 · ownGoalMult (Bombázók) */
+    {const E=setStyle("bombazok");
+     const elotte=styleOwnGoalMult();
+     buyById("bombazok","etvagy");
+     const utana=styleOwnGoalMult();
+     /* A MÁSODIK VÉTEL MÉG A LEFÚJÁS ELŐTT: amíg egy egymeccses tétel él,
+        nem lehet mellé venni egy másikat. */
+     const ketto=!!engShopBuy("bombazok",engShopItem("bombazok","etvagy"));
+     const baj=engShopWhy("bombazok",engShopItem("bombazok","etvagy"));
+     const elfogy=engMatchSpend().map(x=>x.n);
+     /* …a lefújás UTÁN viszont már igen — a tétel elfogyott. */
+     const ujra=!!engShopBuy("bombazok",engShopItem("bombazok","etvagy"));
+     engMatchSpend();
+     ki.fxOwn={elotte:n1(elotte),utana:n1(utana),spent:E.spent,
+       elfogy:elfogy.length,marad:n1(styleOwnGoalMult()),ketto:ketto,baj:baj,ujra:ujra};}
+    /* 📕 tune · recNear + 🔟 tune · nineSteps (Bombázók) */
+    {const E=setStyle("bombazok");
+     ki.recNear=[engTune("recNear")];
+     buyById("bombazok","rekordkonyv");buyById("bombazok","rekordkonyv");
+     ki.recNear.push(engTune("recNear"));
+     buyById("bombazok","rekordkonyv");buyById("bombazok","rekordkonyv");
+     ki.recNear.push(engTune("recNear"),engShopItem("bombazok","rekordkonyv").max);
+     /* A HATÁS A MOTORBAN. A bzRecGoalMult a BZ9_TIERS kapuja mögött van
+        (3. csapatstílus-szint), tehát a próbának fel kell húznia a szintet —
+        különben a tétel „hatástalannak" látszana, pedig csak zárva van. */
+     {const M=styleMsStateIn(S.style);
+      (STYLE_MILESTONES.bombazok||[]).forEach(d=>{M.done[d.id]=1;M.seen[d.id]=1;});}
+     ki.recSzint=[styleLevel(S.style),bzTier()];
+     S.recGoalsMatch=5;bzRecReset();
+     ki.recHat=[bzRecGoalMult(3)>1];      /* 3 gól, 3-mal kijjebb tolt határ → armol */
+     bzRecReset();delete E.buy;
+     ki.recHat.push(bzRecGoalMult(3)>1);  /* a tétel nélkül 3 gólnál még nem */
+     bzRecReset();
+     ki.recHat.push(bzRecGoalMult(4)>1);  /* …4 gólnál viszont igen, magától is */
+     /* Kilences-lépcsők */
+     delete E.buy;E.pts=100000;
+     ki.nine=[engTune("nineSteps")];
+     buyById("bombazok","kilencesetrend");
+     ki.nine.push(engTune("nineSteps"));
+     buyById("bombazok","kilencesetrend");buyById("bombazok","kilencesetrend");
+     ki.nine.push(engTune("nineSteps"),engShopItem("bombazok","kilencesetrend").max);}
+    /* 🌧️ fx1 · oppGoalMult + 🧊 trait + 🩹 fxN (Beton) */
+    {const E=setStyle("beton");
+     const e0=styleOppGoalMult();
+     buyById("beton","vizespalya");
+     ki.fxOpp=[n1(e0),n1(styleOppGoalMult())];
+     engMatchSpend();
+     /* 🧊 HIDEGVÉR: a Panzer tükörképe */
+     const nev=slots.find(sl=>sl.player).player.n;
+     const e=careerPool[nev];
+     e.verI=6;                                  /* türelmetlen */
+     const r=engTraitApply("beton",engShopItem("beton","hidegver"),nev);
+     const pl=currentRoster().find(x=>x.n===nev)||extraRoster.find(x=>x.n===nev);
+     ki.trait={n:r&&r.n,elotte:r&&r.elotte,utana:r&&r.utana,uj:e.verI,
+       peldany:pl?pl.verI:null,irany:e.verI===5};
+     e.verI=0;
+     ki.traitSzel=[engTraitEnd(engShopItem("beton","hidegver"),nev),
+       engTraitApply("beton",engShopItem("beton","hidegver"),nev)];
+     /* 🩹 ÉJSZAKAI GYÚRÓ: halmozódik */
+     E.pts=100000;delete E.buy;
+     ki.inj=[n1(styleInjMult())];
+     buyById("beton","gyuro");ki.inj.push(n1(styleInjMult()));
+     buyById("beton","gyuro");buyById("beton","gyuro");ki.inj.push(n1(styleInjMult()));
+     buyById("beton","gyuro");ki.inj.push(n1(styleInjMult()),engBought("beton","gyuro"));}
+    /* ☕ fx1 · moraleFloor + 🤝 bond + ⚖️ rating (Harmónia) */
+    {const E=setStyle("harmonia");
+     const m0=styleMoraleFloor();
+     buyById("harmonia","reggeli");
+     ki.morale=[m0,styleMoraleFloor()];
+     engMatchSpend();
+     const a=slots[1].player.n,b2=slots[2].player.n;
+     let b0=0;try{b0=Math.round(bondOf(a,b2));}catch(e){}
+     const r=engBuyPair("harmonia",engShopItem("harmonia","vacsora"),a,b2);
+     ki.bond={elotte:r&&r.elotte,utana:r&&r.utana,no:r&&(r.utana>r.elotte),b0:b0};
+     /* ⚖️ FELZÁRKÓZTATÁS */
+     E.pts=100000;delete E.buy;S.ratingAdj={};
+     const cel=engRatingTarget();
+     const r2=engBuyRating("harmonia",engShopItem("harmonia","felzarkoztatas"));
+     ki.rating={cel:cel&&cel.n,kapta:r2&&r2.n,adj:S.ratingAdj[cel&&cel.n]||0};
+     for(let i=0;i<6;i++)engBuyRating("harmonia",engShopItem("harmonia","felzarkoztatas"));
+     ki.ratingTeto=[engBought("harmonia","felzarkoztatas"),
+       engShopItem("harmonia","felzarkoztatas").max,
+       engShopWhy("harmonia",engShopItem("harmonia","felzarkoztatas"))];}
+    /* 🎯 token flat + 🔗 passchem + 🧠 pcOffer (Tiki-taka) */
+    {const E=setStyle("tikitaka");
+     const p0=teamAttrStrengths().passz,s0=teamAttrStrengths().seb;
+     buyById("tikitaka","otvenpassz");
+     const p1=teamAttrStrengths().passz,s1=teamAttrStrengths().seb;
+     ki.flatTok={passzNo:n1(p1-p0),sebNo:n1(s1-s0),
+       csapat:engShopItem("tikitaka","otvenpassz").grp===false,
+       mod:engShopItem("tikitaka","otvenpassz").mode};
+     engMatchSpend();
+     ki.flatUtan=n1(teamAttrStrengths().passz-p0);
+     /* 🔗 KETTŐS FALAZÁS */
+     E.pts=100000;
+     const a=slots[3].player.n,b2=slots[4].player.n;
+     const r=engBuyPair("tikitaka",engShopItem("tikitaka","kettosfalazas"),a,b2);
+     ki.pc={elotte:r&&r.elotte,utana:r&&r.utana,tenyleg:passChemStages(a,b2)};
+     /* 🧠 RONDÓ-TRÉNING */
+     delete E.buy;E.pts=100000;
+     ki.pcOffer=[engTune("pcOffer")];
+     buyById("tikitaka","rondotrening");buyById("tikitaka","rondotrening");
+     ki.pcOffer.push(engTune("pcOffer"));}
+    /* 🫁 fx1 · gpPressMult + 👟 duoRipe + 🥅 errMul (Gegenpressing) */
+    {const E=setStyle("gegen");
+     const g0=styleFxMul("gpPressMult");
+     buyById("gegen","laktat");
+     ki.gpPress=[n1(g0),n1(styleFxMul("gpPressMult"))];
+     engMatchSpend();
+     ki.gpPressUtan=n1(styleFxMul("gpPressMult"));
+     E.pts=100000;delete E.buy;
+     const ripe0=gpDuoRipeNeed(),err0=gpErrMult();
+     buyById("gegen","kozosfutas");
+     const ripe1=gpDuoRipeNeed();
+     buyById("gegen","kozosfutas");buyById("gegen","kozosfutas");
+     buyById("gegen","kozosfutas");
+     ki.duoRipe=[ripe0,ripe1,gpDuoRipeNeed(),engBought("gegen","kozosfutas")];
+     buyById("gegen","hibakenyszer");
+     ki.errMul=[n1(err0),n1(gpErrMult())];}
+    /* ⏱️ token pct + 🏃 train + 🎓 coach (Villám) */
+    {const E=setStyle("villam");
+     S.staff=[{n:"Gyors Géza",type:"attr:seb",sz:50,szBase:50,xp:0,age:40,since:1,attrKey:"seb"},
+              {n:"Kapus Kázmér",type:"attr:kapus",sz:50,szBase:50,xp:0,age:40,since:1,attrKey:"kapus"}];
+     const s0=teamAttrStrengths().seb;
+     buyById("villam","gyujto","VEDO");
+     ki.pctTok={no:teamAttrStrengths().seb>s0,
+       csoport:engShopItem("villam","gyujto").grp===true,
+       mod:engShopItem("villam","gyujto").mode,
+       vedoSeb:n1(engTokenApply("JV","seb",100)),
+       vedoGol:n1(engTokenApply("JV","gol",100)),
+       csatarSeb:n1(engTokenApply("CS","seb",100))};
+     engMatchSpend();
+     /* 🏃 */
      slots.forEach(sl=>{if(sl.player&&careerPool[sl.player.n])careerPool[sl.player.n].attrs.seb=90;});
      const gk=slots.find(sl=>sl.pos==="KP");
      if(gk&&gk.player)careerPool[gk.player.n].attrs.seb=10;
      const lassu=slots.filter(sl=>sl.player&&sl.pos!=="KP")[3];
      if(lassu)careerPool[lassu.player.n].attrs.seb=55;
      const cel=engTrainTarget("villam");
-     ki.trainCel={cel:cel&&cel.n,kell:lassu&&lassu.player.n,key:cel&&cel.key,
-       kapus:gk&&gk.player.n};
-     const r=engBuyTrain("villam");
-     ki.trainVesz={n:r&&r.n,lvl:r&&r.lvl,spent:E.spent,ar:r&&r.ar};
-     ki.trainSzorzo=[
-       engTrainMult(cel.n,"seb"),                       /* 1.25 */
-       engTrainMult(cel.n,"gol"),                       /* 1 — más tengely */
-       engTrainMult(gk&&gk.player.n,"seb")];            /* 1 — más ember */
-     for(let i=0;i<6;i++)engBuyTrain("villam");
-     ki.trainTeto=[E.tb.lvl,ENG_TRAIN_MAX,engTrainMult(cel.n,"seb")];
-     ki.trainBaj=engTrainWhy("villam");}
+     const r=engShopBuy("villam",engShopItem("villam","rajtblokk"));
+     ki.train={cel:cel&&cel.n,kell:lassu&&lassu.player.n,kapus:gk&&gk.player.n,
+       lvl:r&&r.lvl,szorzo:engTrainMult(cel.n,"seb"),mas:engTrainMult(cel.n,"gol")};
+     for(let i=0;i<6;i++)engShopBuy("villam",engShopItem("villam","rajtblokk"));
+     ki.trainTeto=[E.tb.lvl,ENG_TRAIN_MAX,engShopWhy("villam",engShopItem("villam","rajtblokk"))];
+     /* 🎓 */
+     E.pts=100000;E.spent=0;
+     const it=engShopItem("villam","sprintkurzus");
+     ki.coachLista=engCoachList("villam",it).map(x=>x.c.n);
+     const ar=engShopPrice("villam",it);
+     const rc=engBuyCoach("villam",it,0);
+     ki.coach={n:rc&&rc.n,elotte:rc&&rc.elotte,utana:rc&&rc.utana,xp:S.staff[0].xp,
+       ar:ar,spent:E.spent};
+     const p0=E.pts;
+     ki.coachRossz=[engBuyCoach("villam",it,1),E.pts===p0,S.staff[1].sz];}
 
-    /* ---- 14-15. ⏱️ A TOKEN ---- */
-    E.pts=100000;E.spent=0;delete E.tok;
-    {const csop=ENG_TOKEN_GROUPS.map(g=>g.k);
-     ki.tokCsoportok=csop;
-     const r=engBuyToken("villam","VEDO");
-     ki.tokVesz={g:r&&r.g,ar:r&&r.ar,spent:E.spent};
-     ki.tokSzorzo={
-       vedoSeb:engTokenMult("JV","seb"),        /* 1.05 */
-       vedoGol:engTokenMult("JV","gol"),        /* 1 — nem a stílus tengelye */
-       csatarSeb:engTokenMult("CS","seb"),      /* 1 — más posztcsoport */
-       kapusSeb:engTokenMult("KP","seb")};      /* 1 — a kapus nem védő-csoport */
-     ki.tokMasodik=engBuyToken("villam","CSATAR");   /* null: egyszerre egy */
-     ki.tokBaj=engTokenWhy("villam","CSATAR");
-     /* a csapat tengelyére tényleg átjön */
-     delete E.tok;
-     const nelkul=teamAttrStrengths().seb;
-     engBuyToken("villam","VEDO");
-     const vele=teamAttrStrengths().seb;
-     ki.tengely=[n1(nelkul),n1(vele),vele>nelkul];
-     /* a lefújás elfogyasztja */
-     ki.tokElfogy=[engTokenSpend(),engTokenSpend(),!!engTokenState()];}
-
-    /* ---- 16. A PANEL ---- */
-    {const html=engSectionHtml();
-     ki.panel={melyseg:html.indexOf("Mélység")>=0,
-       el:html.indexOf(ENG_DEFS.villam.elN)>=0,
-       chem:html.indexOf(ENG_DEFS.villam.chemN)>=0,
-       skill:html.indexOf(ENG_DEFS.villam.skillN)>=0,
-       coach:html.indexOf(ENG_DEFS.villam.buy.coachN)>=0,
-       train:html.indexOf(ENG_DEFS.villam.buy.trainN)>=0,
-       tok:html.indexOf(ENG_DEFS.villam.buy.tokN)>=0,
-       gomb:html.indexOf('data-engshop="train"')>=0};}
+    /* ================= A PANEL, MIND A HAT PIACON ================= */
+    ki.panel=[];
+    Object.keys(ENG_DEFS).forEach(kk=>{
+      setStyle(kk);
+      const d=ENG_DEFS[kk];
+      let h="";
+      try{h=engSectionHtml();}catch(e){ki.panel.push(kk+": "+e.message);return;}
+      if(h.indexOf("undefined")>=0||h.indexOf("NaN")>=0)ki.panel.push(kk+": undefined/NaN");
+      if(h.indexOf(d.shopN)<0)ki.panel.push(kk+": nincs piac-név");
+      if(h.indexOf(d.elN)<0)ki.panel.push(kk+": nincs él-sor");
+      engShopList(kk).forEach(it=>{if(h.indexOf(it.n)<0)ki.panel.push(kk+"/"+it.id);});});
     return ki;});
 
-  console.log("\n— A BONTÁS —");
-  ok(t.engKey==="villam","a ⚡ Villám motorja fut",t.engKey);
+  console.log("\n— A) A BONTOTT ÁLLAPOT —");
   ok(JSON.stringify(t.partIds)===JSON.stringify(["melyseg","el","chem","skill"]),
-     "négy nevesített tényező, ebben a sorrendben",t.partIds);
-  ok(kozel(t.osszeg,t.baseRaw,0.11),"a négy tényező összege = engBaseRaw",[t.osszeg,t.baseRaw]);
+     "négy nevesített tényező",t.partIds);
+  ok(kozel(t.osszeg,t.baseRaw,0.11),"az összegük = engBaseRaw",[t.osszeg,t.baseRaw]);
   ok(kozel(t.ujMelyseg,t.regiMelyseg,0.11),"a MÉLYSÉG betűre a régi képlet",[t.ujMelyseg,t.regiMelyseg]);
-  ok(t.elNulla===0,"az ÉL nulla, ha senki sincs 85 fölött",t.elNulla);
-  ok(kozel(t.elTeto,30,0.01),"az ÉL tetőzött: 3 ember × 10 egység",t.elTeto);
-  ok(t.chemN>0&&t.chemN<=5,"az ÖSSZJÁTÉK legfeljebb öt embert néz",t.chemN);
-  ok(t.chemPosztok.every(x=>["JV","BV","JSZ","BSZ"].indexOf(x)>=0),
-     "…és CSAK a Villám kulcsposztjairól",t.chemPosztok);
-  ok(t.chemErtek>=0&&t.chemErtek<=t.chemMax,"az ÖSSZJÁTÉK a saját plafonján belül",[t.chemErtek,t.chemMax]);
-  ok(t.paceVan&&t.skillTeto>t.skillNulla,"a KÉPESSÉG-tétel nő a tengelyre eső skillektől",
-     [t.skillNulla,t.skillTeto]);
-  ok(t.skillTeto<=18.01,"…és tetőzött (ENG_SKILL_MAX)",t.skillTeto);
-  ok(t.skillIdegen===t.skillNulla,"…idegen tengely skilljei nem számítanak",
-     [t.skillNulla,t.skillIdegen]);
-  ok(t.harmElFv&&t.harmEl!==null,"☯️ a Harmóniának saját, fordított éle van",t.harmEl);
-  ok(t.harmSkillAxis==="*","☯️ …és nem válogat tengelyt a képességeknél",t.harmSkillAxis);
+  ok(t.elNulla===0&&kozel(t.elTeto,30,0.01),"az ÉL a 85-ös küszöbtől mér, tetőzve",[t.elNulla,t.elTeto]);
+  ok(t.chemN>0&&t.chemN<=5&&t.chemPosztok.every(x=>["JV","BV","JSZ","BSZ"].indexOf(x)>=0),
+     "az ÖSSZJÁTÉK csak a kulcsposztokról válogat",t.chemPosztok);
+  ok(t.skillTeto>t.skillNulla&&t.skillTeto<=18.01&&t.skillIdegen===t.skillNulla,
+     "a KÉPESSÉG-tétel a tengely-térképet követi, tetőzve",[t.skillNulla,t.skillTeto,t.skillIdegen]);
+  ok(t.harmElFv&&t.harmEl!==null,"☯️ a Harmónia éle fordított",t.harmEl);
   ok(t.fuggetlen[0]===t.fuggetlen[1]&&t.fuggetlen[1]===t.fuggetlen[2],
      "EGYIK tényező sem függ a felállástól",t.fuggetlen);
 
-  console.log("\n— A BOLT —");
-  {const hianyzo=Object.keys(t.boltok).filter(k=>!(t.boltok[k].coach&&t.boltok[k].train
-      &&t.boltok[k].tok&&t.boltok[k].part));
-   ok(hianyzo.length===0,"mind a hat stílusnak megvan a bontása és a három tétele",hianyzo);}
-  ok(t.arSorrend[0]<t.arSorrend[1]&&t.arSorrend[1]<t.arSorrend[2],
-     "a token a legolcsóbb, a stábtag a legdrágább",t.arSorrend);
-  ok(t.arSkala[1]>t.arSkala[0]&&t.arSkala[3]>t.arSkala[2],
-     "a bolt ára a tarifával együtt nő (engScaleT)",t.arSkala);
-  ok(t.szintArFix[0]===t.szintArFix[1],"…a SZINT ára viszont fix marad",t.szintArFix);
+  console.log("\n— B) HAT PIAC, NEM EGY SABLON —");
+  {const rossz=Object.keys(t.piacok).filter(k=>!t.piacok[k].nev||t.piacok[k].db!==3);
+   ok(rossz.length===0,"mind a hat stílusnak SAJÁT NEVŰ piaca van, 3-3 termékkel",
+      Object.keys(t.piacok).map(k=>`${k}: ${t.piacok[k].nev} (${t.piacok[k].db})`));}
+  ok(t.idEgyedi,"a tizennyolc termék azonosítója egyedi",t.idk.length);
+  ok(t.fajtaDb>=7,"legalább hétféle HATÁSFAJTA szerepel köztük",t.fajtak);
+  {const rossz=Object.keys(t.piacok).filter(k=>t.piacok[k].egymeccs!==1||!t.piacok[k].legolcsobb);
+   ok(rossz.length===0,"stílusonként pontosan EGY egymeccses tétel, és az a legolcsóbb",rossz);}
+  ok(t.arSkala[1]>t.arSkala[0]&&t.szintArFix[0]===t.szintArFix[1],
+     "az árak a tarifával nőnek, a SZINT ára fix",[t.arSkala,t.szintArFix]);
 
-  console.log("\n— 🎓 STÁBTAG-SZINTLÉPÉS —");
-  ok(t.coachLista.length===1&&t.coachLista[0]==="Gyors Géza",
-     "csak a stílushoz illő típus kerül a listára",t.coachLista);
-  ok(t.coachVesz.utana===t.coachVesz.elotte+1&&t.coachVesz.xp===2,
-     "egy vásárlás = egy Szakértelem-lépcső (COACH_XP_PER_STEP)",t.coachVesz);
-  ok(kozel(t.coachVesz.koltseg,t.coachVesz.ar,0.01)&&kozel(t.coachVesz.spent,t.coachVesz.ar,0.01),
-     "…és pontosan az ára fogy, könyvelve",t.coachVesz);
-  ok(t.coachRossz.r===null&&t.coachRossz.valtozatlan&&t.coachRossz.sz===50,
-     "rossz típusú stábtagra nem fizet",t.coachRossz);
-  ok(t.coachTeto[0]===t.coachTeto[1],"…és a belépéskori plafont tiszteletben tartja",t.coachTeto);
-
-  console.log("\n— 🏃 EDZÉS-GYORSÍTÁS —");
-  ok(t.trainCel.cel===t.trainCel.kell,"a kezdő 11 LEGLASSABB emberét találja meg",t.trainCel);
-  ok(t.trainCel.cel!==t.trainCel.kapus&&t.trainCel.key==="seb",
-     "…a kapust kihagyva, a stílus tengelyén",t.trainCel);
-  ok(kozel(t.trainSzorzo[0],1.25,0.001),"egy fokozat = +25% fejlődés",t.trainSzorzo[0]);
-  ok(t.trainSzorzo[1]===1&&t.trainSzorzo[2]===1,
-     "…és CSAK rá, CSAK a saját tengelyén",t.trainSzorzo);
-  ok(t.trainTeto[0]===t.trainTeto[1]&&kozel(t.trainTeto[2],2,0.001),
-     "a fokozatok tetőznek (ENG_TRAIN_MAX)",t.trainTeto);
-  ok(!!t.trainBaj,"…és a gomb megmondja, miért nem megy tovább",t.trainBaj);
-
-  console.log("\n— ⏱️ AZ EGY MECCSRE SZÓLÓ TOKEN —");
-  ok(JSON.stringify(t.tokCsoportok)===JSON.stringify(["KAPUS","VEDO","KOZEPPALYAS","CSATAR"]),
-     "négy posztcsoport választható",t.tokCsoportok);
-  ok(t.tokVesz.g==="VEDO"&&kozel(t.tokVesz.spent,t.tokVesz.ar,0.01),
-     "a vétel könyvelve",t.tokVesz);
-  ok(kozel(t.tokSzorzo.vedoSeb,1.05,0.001),"a választott csoport sebessége +5%",t.tokSzorzo.vedoSeb);
-  ok(t.tokSzorzo.vedoGol===1&&t.tokSzorzo.csatarSeb===1&&t.tokSzorzo.kapusSeb===1,
-     "…más tengelyre és más csoportra nem hat",t.tokSzorzo);
-  ok(t.tokMasodik===null&&!!t.tokBaj,"egyszerre EGY token él",t.tokBaj);
-  ok(t.tengely[2],"a token tényleg átjön a csapat sebesség-tengelyére",t.tengely);
-  ok(t.tokElfogy[0]==="VEDO"&&t.tokElfogy[1]===null&&t.tokElfogy[2]===false,
-     "a lefújás elfogyasztja, és csak egyszer",t.tokElfogy);
+  console.log("\n— C) A HATÁSFAJTÁK —");
+  ok(t.fxOwn.utana>t.fxOwn.elotte,"🔥 fx1 · a csapat gólesélye nő",[t.fxOwn.elotte,t.fxOwn.utana]);
+  ok(t.fxOwn.elfogy===1&&t.fxOwn.marad===t.fxOwn.elotte,"…és a lefújás elfogyasztja",t.fxOwn);
+  ok(t.fxOwn.ketto===false&&!!t.fxOwn.baj,"…egyszerre EGY egymeccses tétel él",
+     [t.fxOwn.ketto,t.fxOwn.baj]);
+  ok(t.fxOwn.ujra===true,"…a lefújás után viszont újra vehető",t.fxOwn.ujra);
+  ok(t.fxOpp[1]<t.fxOpp[0],"🌧️ fx1 · az ellenfél gólesélye csökken",t.fxOpp);
+  ok(t.morale[1]>t.morale[0]&&t.morale[1]===68,"☕ fx1 · a morál-padló megemelkedik",t.morale);
+  ok(t.inj[1]<t.inj[0]&&t.inj[2]<t.inj[1]&&t.inj[3]===t.inj[2]&&t.inj[4]===3,
+     "🩹 fxN · a sérülés-esély HALMOZÓDIK, és a max-nál megáll",t.inj);
+  ok(t.recNear[1]===2&&t.recNear[2]===3&&t.recNear[3]===3,
+     "📕 tune · a rekordhajrá határa kijjebb tolódik, tetőzve",t.recNear);
+  ok(t.recSzint[1]>0,"…a rekord-hajrá kapuja nyitva a méréshez (stílusszint)",t.recSzint);
+  ok(t.recHat[0]===true&&t.recHat[1]===false&&t.recHat[2]===true,
+     "…és a motorban tényleg hamarabb armol",t.recHat);
+  ok(t.nine[1]===1&&t.nine[2]===2&&t.nine[3]===2,"🔟 tune · a Kilences több lépcsőt kap",t.nine);
+  ok(t.pcOffer[1]===2,"🧠 tune · a passzkémia ajánlkozása nő",t.pcOffer);
+  ok(t.duoRipe[1]===t.duoRipe[0]-3&&t.duoRipe[2]>=4&&t.duoRipe[3]===3,
+     "👟 tune · a gyilkos páros érése rövidül, 4 meccsig",t.duoRipe);
+  ok(t.errMul[1]>t.errMul[0],"🥅 tune · a kikényszerített hiba nő",t.errMul);
+  ok(t.trait.irany&&t.trait.uj===5&&t.trait.peldany===5,
+     "🧊 trait · a vérmérséklet a HIGGADTABB felé megy (a Panzer tükörképe)",t.trait);
+  ok(t.traitSzel[0]===true&&t.traitSzel[1]===null,"…és a szélén álló emberre nem fizet",t.traitSzel);
+  ok(t.bond.no,"🤝 bond · két ember összhangja nő",t.bond);
+  ok(t.pc.utana===t.pc.elotte+1&&t.pc.tenyleg===t.pc.utana,"🔗 passchem · egy lépcsőt lép",t.pc);
+  ok(t.rating.cel===t.rating.kapta&&t.rating.adj===1,
+     "⚖️ rating · a kezdő 11 leggyengébbje kapja",t.rating);
+  ok(t.ratingTeto[0]===t.ratingTeto[1]&&!!t.ratingTeto[2],"…és tetőzik, a gomb megmondja",t.ratingTeto);
+  ok(t.pctTok.csoport&&t.pctTok.mod==="pct"&&kozel(t.pctTok.vedoSeb,105,0.01)
+     &&t.pctTok.vedoGol===100&&t.pctTok.csatarSeb===100,
+     "⏱️ token · Villám: SZÁZALÉK egy posztcsoportra",t.pctTok);
+  ok(t.flatTok.csapat&&t.flatTok.mod==="flat"&&t.flatTok.passzNo>0&&t.flatTok.sebNo===0,
+     "🎯 token · Tiki-taka: LAPOS ráadás, más alak, csak a Passzra",t.flatTok);
+  ok(t.flatUtan===0,"…és a lefújás ezt is elfogyasztja",t.flatUtan);
+  ok(t.train.cel===t.train.kell&&t.train.cel!==t.train.kapus
+     &&kozel(t.train.szorzo,1.25,0.001)&&t.train.mas===1,
+     "🏃 train · a leglassabb ember, a saját tengelyén",t.train);
+  ok(t.trainTeto[0]===t.trainTeto[1]&&!!t.trainTeto[2],"…és tetőzik",t.trainTeto);
+  ok(t.coachLista.length===1&&t.coach.utana===t.coach.elotte+1&&t.coach.xp===2
+     &&kozel(t.coach.spent,t.coach.ar,0.01),
+     "🎓 coach · egy Szakértelem-lépcső, könyvelve",t.coach);
+  ok(t.coachRossz[0]===null&&t.coachRossz[1]&&t.coachRossz[2]===50,
+     "…rossz típusú stábtagra nem fizet",t.coachRossz);
 
   console.log("\n— A PANEL —");
-  {const h=Object.keys(t.panel).filter(k=>!t.panel[k]);
-   ok(h.length===0,"a panel kirajzolja a négy tényezőt és a három tételt",h);}
+  ok(t.panel.length===0,"mind a hat piac kirajzolódik, minden termékével",t.panel);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
 
   await b.close();srv.close();

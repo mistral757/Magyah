@@ -1,4 +1,4 @@
-# 🛒 A bontott állapot és a stílusbolt (3.9.127)
+# 🛒 A bontott állapot és a hat piac (3.9.127 · 3.9.128)
 
 ## A kérés
 
@@ -73,82 +73,137 @@ kívül nincs gyorsítótár: ott a szám mindig friss.
 
 ---
 
-## II. A stílusbolt — három rövid döntés
+## II. A hat piac (3.9.128)
 
-A szint (Villámcsapás, Gólözön, Bunker…) eddig az **egyetlen** dolog volt,
-amire a stíluspont elmehetett, és az is csak meccserőt adott. A gazdaság így
-egyetlen hosszú létra volt: gyűjts 150-et, nyomd meg a gombot, várj a
-következő stílusszintre.
+> „Ennél nem azt vártam tőled, hogy egy az egyben valósítsd meg a villám saját
+> bolti termékeit… hanem hogy azt és a panzert vásárlási lehetőségeit
+> **mintaként véve** dolgozz ki csapatstílusonként **egy-egy speciális
+> piacot**, 3-3 termékkel… De így rendkívül egyhangú lenne."
 
-| Tétel | Ár | Mit csinál |
-|-------|----|-----------|
-| ⏱️ **Token** | **25** | egy választott **posztcsoport** (kapusok / védők / középpályások / csatárok) minden emberének a stílus tengelye **+5%** — **egyetlen** mérkőzésre |
-| 🏃 **Edzés-gyorsítás** | 90 | a kezdő 11 **leggyengébb** embere a tengelyen tartós **+25%** fejlődést kap, fokozatonként, legfeljebb **4** fokozat (= +100%) |
-| 🎓 **Stábtag-szintlépés** | 140 | a stílushoz illő típusú stábtagod (⚡ = **Sprintmester**) azonnal kap egy **tapasztalati lépcsőt** |
+**Igaza volt.** A 3.9.127 egyetlen sablont — stábtag-lépcső · edzés-gyorsítás ·
+posztcsoport-token — másolt hatszor, csak más tengellyel. Az nem hat piac,
+hanem egy piac hat festéssel.
 
-### 🎓 A stábtag-szintlépés
+A **minta** nem a konkrét termék, hanem az **alak**: cím · ár · magyarázat ·
+gomb, és egy tétel vagy **emberre** szól, vagy a **klubra**, vagy **egy
+mérkőzésre**. Ezt hozza a Panzer rettenet-boltja és a Villám három tétele.
 
-Nem kerülő út: ugyanaz a `c.xp` mező, ugyanaz a `COACH_XP_PER_STEP` (2) lépcső
-és ugyanaz a `coachSzCap` plafon (a belépéskori szint + 12), amit a
-**ledolgozott szezon** is ad. Csak most **meg lehet venni az idő egy részét**.
-Aki már a plafonján áll, az is a listán van, de a gombja letiltva — a panel
-nem hazudik.
+### 🔧 A boksz — ⚡ Villám
 
-Melyik típus melyik stílusé: ⚡ Sprintmester · ⚽ Gólvágó-mentor ·
-🧱 Bástya vagy Kesztyűs mester · ☯️ Csapatkovács vagy Lélekemelő ·
-🌀 Játékmester · 🧲 Sprintmester vagy Bástya.
+*Tempó: emberre, stábra és egyetlen mérkőzésre szabva.* Ez a három tétel a
+projektgazda saját kérése, betűre — a többi piac ehhez és a Panzerhez méri
+magát.
 
-### 🏃 Az edzés-gyorsítás
+| | Ár | Mit csinál |
+|---|---|---|
+| ⏱️ **Gyújtózsinór** | 25 | egy **posztcsoport** sebessége **+5%**, egy mérkőzésre |
+| 🏃 **Rajtblokk** | 90 | a kezdő 11 **leglassabb** embere +25%/fokozat sebesség-edzés, max 4 |
+| 🎓 **Sprintmester-kurzus** | 140 | egy **Sprintmester** stábtag egy tapasztalati lépcsőt kap |
 
-**A célpontot a rendszer választja, nem a menedzser.** Mindig a kezdő tizenegy
-leggyengébb embere a stílus tengelyén — a Villámnál a kapust kihagyva (a kapus
-sebessége sosem lesz a Villám ügye), a Betonnál viszont bent van, mert ott az
-`attrMax` épp őt méri a Védésével. Ez a tétel a **keretet húzza föl**, nem a
-sztárt tolja tovább.
+### 📈 A gólbörze — ⚽ Bombázók
 
-A szorzó ugyanabba a **közös fejlődés-csatornába** megy be (`addA`), mint az
-edzésterv, a személyi edző, a passzkémia és a Gegenpressing „Nyomás!"-a — és
-ugyanaz a szabálya: **csak a pozitív fejlődést szorozza, a büntetést nem.**
-A padon is jár: ha a felzárkóztatandó ember kiszorul a kezdőből, pont akkor van
-rá a legnagyobb szükség.
+*Semmi védekezés.* Mind a három tétel a stílus **saját gépezetére** köt be —
+a klubrekord szívóerejére és a Kilencesre.
 
-Ha a rendszer **új** leggyengébbet talál (mert az előző felzárkózott), a
-gyorsítás átkerül rá, és nulláról indul. A tétel mindig a *pillanatnyi*
-leggyengébb láncszemről szól.
+| | Ár | Mit csinál |
+|---|---|---|
+| 🔥 **Étvágy** | 30 | a **csapat gólesélye +7%**, egy mérkőzésre (`ownGoalMult`) |
+| 📕 **Rekordkönyv** | 110 | a rekordhajrá alapból **egy gólra** a csúcstól indul — ez **kijjebb tolja** (max 3×, `bzRecGoalMult`) |
+| 🔟 **A Kilences étrendje** | 170 | a Kilences gólonkénti lépcsőzése **3 → 4 → 5** (`bz9GoalMult`) |
 
-☯️ A Harmóniánál nincs saját tengely: mindenki a **saját posztja fő tengelyén**
-gyorsul (`attrTrainedBy`). Ez a Harmónia egyetlen mondata pénzzé váltva.
+### 🧰 A szertár — 🧱 Beton
 
-### ⏱️ A token
+*Nem gólt vesz, hanem nyugalmat.* A **Hidegvér** szándékosan a Panzer „This is
+Sparta!"-jának a **pontos tükörképe**: ugyanaz a jellem-tengely, ugyanaz a
+vásárlási alak, ellenkező irány. A két filozófia boltja így beszélget egymással.
 
-**Hol hat.** Egyetlen helyen: a csapat tengelyeit számoló
-`teamAttrStrengths()`-ben, a játékos attribútum-értékén. Onnan megy tovább a
-taktika-illeszkedésre, a mérkőzésre, és — mivel a `tacticEffect` a rejtett
-meccs-erő tagja — a **kijelzett meccserődbe** is.
+| | Ár | Mit csinál |
+|---|---|---|
+| 🌧️ **Vizes pálya** | 30 | az **ellenfél gólesélye −8%**, egy mérkőzésre (`oppGoalMult`) |
+| 🧊 **Hidegvér** | 100 | egy játékos **vérmérséklete egy fokozattal HIGGADTABB** felé |
+| 🩹 **Éjszakai gyúró** | 180 | **sérülés-esély −10%**, tartósan, max 3×, egymásra szorzódva (`injMult`) |
 
-**Amit NEM csinál:** nem írja át a `careerPool` attribútumait. Egy mentés vagy
-egy félbehagyott mérkőzés így sosem rögzítheti a megemelt értéket.
+### 🍽️ A közös asztal — ☯️ Harmónia
 
-**Elfogy.** A lefújásnál (`engMatchEnd`), feltétel nélkül — akkor is, ha a
-mérkőzésen egy pont sem gyűlt, és akkor is, ha a posztcsoportból senki nem
-játszott. **A tétel a nevezésre szól, nem a percekre**, különben át lehetne
-vinni a hatást a következő meccsre. Egyszerre **egy** token él.
+*Az egyetlen piac, ahol nem lehet **egy** embert megvenni.* A vacsora két
+emberé, a reggeli az egész öltözőé, a felzárkóztatás célpontját pedig a
+rendszer választja. A **Felzárkóztatás** közvetlenül azt a rést szűkíti, amit a
+Harmónia saját **Kiegyenlítettség**-tényezője mér — a bolt és az állapot
+ugyanarról a mondatról szól.
 
-☯️ A Harmónia tokenje itt is más: mindenki a **saját** posztja fő tengelyén kap
-+5%-ot, nem egy közösön.
+| | Ár | Mit csinál |
+|---|---|---|
+| ☕ **Csapatreggeli** | 30 | **morál-padló 68**, egy mérkőzésre (`moraleFloor`) |
+| 🤝 **Közös vacsora** | 85 | **két** kiválasztott játékos **összhangja +8** (`bondAdd`) |
+| ⚖️ **Felzárkóztatás** | 150 | a kezdő 11 **leggyengébbje +1 Rating**, tartósan, max 3× |
 
-### Az árak a tarifával együtt nőnek
+### 🔄 A rondó — 🌀 Tiki-taka
 
-`engShopPrice = ár × engScaleT()` — ugyanaz az érv, ami a tarifánál (3.9.111):
-a bevétel az állapot-szinttel nő, tehát a **fix** ár idővel ingyenné válna. Így
-a három tétel a karrier végén is pontosan annyi **meccsnyi munkába** kerül,
-mint az elején.
+*Minden a passzról, három különböző időtávon.* A token itt szándékosan **más
+alakú**, mint a Villámé: **lapos ráadás az egész tizenegyre**, nem százalék egy
+posztcsoportra.
 
-**A szint (`ENG_PRICE`) ára viszont fix marad.** Az a *hosszú* létra, és annak
-épp az a dolga, hogy a karrier előrehaladtával könnyebb legyen. A bolt a
-*rövid* döntés; a kettő szándékosan másképp viselkedik.
+| | Ár | Mit csinál |
+|---|---|---|
+| 🎯 **Ötven passz** | 30 | a csapat **Passz-tengelye +8** (lapos, egész XI), egy mérkőzésre |
+| 🔗 **Kettős falazás** | 95 | **két** játékos **passzkémiája egy lépcsőt lép** (`addPassChemPair`) |
+| 🧠 **Rondó-tréning** | 160 | a passzkémia **+25%-kal gyakrabban ajánlkozik**, max 3× (`passChemOfferP`) |
+
+### 🧪 A laboratórium — 🧲 Gegenpressing
+
+*Méréssel dolgozik, nem ihlettel.* Mind a három tétel a presszing **saját
+motorcsatornáira** köt be — ezeket rajta kívül egyetlen filozófia sem tudja
+megvenni.
+
+| | Ár | Mit csinál |
+|---|---|---|
+| 🫁 **Laktátpuffer** | 30 | **labdaszerzés az ellenfél térfelén +20%**, egy mérkőzésre (`gpPressPerMatch`) |
+| 👟 **Közös futás** | 95 | a **gyilkos páros** érése **−3 meccs**, max 3×, négy meccsig (`gpDuoRipeNeed`) |
+| 🥅 **Hibakényszer** | 165 | a **kikényszerített hiba +15%**, max 3×, egymásra szorzódva (`gpErrMult`) |
 
 ---
+
+### Ami a hat piacban KÖZÖS
+
+**A három árszint.** Mindenhol egy **olcsó, egy mérkőzésre szóló** tétel
+(25-30), egy **közepes tartós** (85-110) és egy **drága tartós** (140-180). Így
+a hat piac összemérhető marad, pedig teljesen mást árulnak.
+
+**Az árak a tarifával nőnek** (`engScaleT`) — ugyanaz az érv, mint a
+tarifánál: a bevétel az állapot-szinttel nő, tehát a fix ár idővel ingyenné
+válna. A **szint** (`ENG_PRICE`) ára viszont **fix marad**: az a hosszú létra,
+és annak épp az a dolga, hogy a karrier előrehaladtával könnyebb legyen.
+
+**Tizennyolc termék, tíz hatásfajta.** Csak a Villám három tétele ismétlődik
+máshol — és az szándékos: az a kérés szó szerinti teljesítése.
+
+| Fajta | Hol | Mit jelent |
+|-------|-----|-----------|
+| `fx1` | ×4 | egy mérkőzésre szóló hatás a stílus fx-csatornáján |
+| `fxN` | ×1 | tartós, halmozódó hatás ugyanott |
+| `tune` | ×5 | egyetlen szám a stílus **saját** gépezetében |
+| `token` | ×2 | tengely-emelés egy mérkőzésre (százalék **vagy** lapos) |
+| `trait` | ×1 | jellem-módosító, a Panzer mintájára |
+| `bond` / `passchem` | ×2 | két ember kötése |
+| `rating` / `train` / `coach` | ×3 | tartós fejlődés emberre, ill. stábra |
+
+**Egy hely a motorban.** Az `fx1` és az `fxN` tételek **nem kapnak saját
+motor-ágat**: beleolvadnak abba a listába, amiből a képességfa hatásai is
+jönnek (`styleActiveFx` ← `engShopFx`). Így a motor összes meglévő csatornája
+(`ownGoalMult`, `oppGoalMult`, `injMult`, `moraleFloor`, `gpPressMult`)
+azonnal használható a boltból is, és a szorzós/összeadódó szabály magától
+ugyanaz marad. A `tune` tételek pedig egyetlen sorral hívnak be a stílus saját
+függvényébe — a bolt nem párhuzamos rendszer, hanem ugyanannak a gépnek egy
+csavarja.
+
+**A gomb sosem hazudik.** Ha egy tétel nem vehető meg, a gomb felirata
+megmondja, miért nem (`engShopWhy`) — ugyanaz a minta, mint a szintnél.
+
+**Ami egy mérkőzésre szólt, elfogy** a lefújásnál (`engMatchSpend`), feltétel
+nélkül: akkor is, ha a mérkőzésen egy pont sem gyűlt, és akkor is, ha a
+posztcsoportból senki nem játszott. A tétel a **nevezésre** szól, nem a
+percekre — különben át lehetne vinni a hatást a következő meccsre. Egyszerre
+**egy** egymeccses tétel él.
 
 ## III. Mi hol lakik
 
@@ -158,34 +213,55 @@ mint az elején.
 | a Harmónia fordított éle | `harmoniaEngEl` |
 | a keret tengelyértékei | `engAxisRows` · `engAxisVal` |
 | a gyorsítótár | `_engPartsCache` · `engPartsCacheClear` (a `msWithRestore` nyitja/zárja) |
-| a bolt árai | `ENG_SHOP_PRICE` · `engShopPrice` · `engPay` |
-| 🎓 | `engCoachList` · `engBuyCoach` |
-| 🏃 | `engTrainKeyFor` · `engTrainTarget` · `engTrainWhy` · `engBuyTrain` · **`engTrainMult`** |
-| ⏱️ | `ENG_TOKEN_GROUPS` · `engBuyToken` · `engTokenWhy` · **`engTokenMult`** · `engTokenSpend` |
-| a panel | `engPartRow` · `engShopHtml` · `engSectionHtml` · `engSectionBind` |
-| a stílus-táblázat új mezői | `ENG_DEFS[*].elN/chemN/skillN/chemPos/skillAxis/skillNeed/partD/buy` |
+| a hat piac táblája | `ENG_DEFS[*].shopN / shopIc / shopD / shop[]` |
+| ár, fizetés, számláló | `engShopPrice` · `engPay` · `engBought` · `engBump` |
+| a közös kapu | `engShopWhy` · `engShopPicks` · `engShopBuy` |
+| `fx1` / `fxN` | **`engShopFx`** → `styleActiveFx` |
+| `tune` | **`engTune`** ← `bzRecGoalMult` · `bz9GoalMult` · `passChemOfferP` · `gpDuoRipeNeed` · `gpErrMult` |
+| `token` | `engTokenState` · **`engTokenApply`** (← `teamAttrStrengths`) · `engBuyToken` |
+| `trait` | `engTraitApply` · `engTraitEnd` |
+| `bond` / `passchem` | `engBuyPair` |
+| `rating` | `engRatingTarget` · `engBuyRating` |
+| `train` | `engTrainKeyFor` · `engTrainTarget` · **`engTrainMult`** (← `addA`) · `engBuyTrain` |
+| `coach` | `engCoachList` · `engBuyCoach` |
+| a lejárat | `engMatchSpend` (← `engMatchEnd`) |
+| a panel | `engPartRow` · `engShopHtml` · `engShopStateTxt` · `engShopPickHtml` · `engSectionBind` |
 
-**A mentés magától viszi:** minden új adat (`E.tb`, `E.tok`) a stílus-állapot
-`eng` rekeszében lakik, az pedig a `S.style` / `S.style2` része — ugyanott,
-ahol eddig a pont és a szint.
+**A mentés magától viszi:** minden új adat (`E.buy`, `E.tb`, `E.tok`, `E.fx1`)
+a stílus-állapot `eng` rekeszében lakik, az pedig a `S.style` / `S.style2`
+része — ugyanott, ahol eddig a pont és a szint.
 
 ---
 
 ## IV. A próba
 
-`tools/stilusbolt-proba.js` (9101-es port, 38 állítás). A legfontosabbak:
+`tools/stilusbolt-proba.js` (9101-es port, 32 állítás). Három blokkban:
 
-* a négy tényező **összege betűre az `engBaseRaw`**, és a mélység betűre a régi
-  képlet (külön újraszámolva);
-* az él a 85-ös küszöbtől mér, és emberenként/összesen tetőzött;
-* az összjáték **csak** a stílus kulcsposztjain álló embereket nézi;
-* a képesség-tétel a tengely-térképet követi — **idegen tengely skilljei nem
-  számítanak**;
-* **a felállás felforgatása után mind a négy szám bitre ugyanaz** (ezen áll
-  vagy bukik a gyorsítótár helyessége);
-* a stábtag-vétel pontosan egy lépcsőt ad, rossz típusra nem fizet, a plafont
-  tartja;
-* az edzés-gyorsítás a kezdő 11 leglassabb emberét találja meg (a kapust
-  kihagyva), és a szorzó **csak rá, csak a saját tengelyén** él;
-* a token a választott csoportot emeli, mást nem, más tengelyt nem, tényleg
-  átjön a csapat tengelyére, és a lefújás elfogyasztja — **egyszer**.
+**A) A bontott állapot.** A négy tényező **összege betűre az `engBaseRaw`**, a
+mélység betűre a régi képlet (külön újraszámolva), az él a 85-ös küszöbtől mér
+és tetőzik, az összjáték csak a kulcsposztokról válogat, a képesség-tétel a
+tengely-térképet követi (idegen tengely **nem** számít), a Harmónia éle
+fordított — és **a felállás felforgatása után mind a négy szám bitre ugyanaz**
+(ezen áll vagy bukik a gyorsítótár helyessége).
+
+**B) Hogy tényleg hat piac, nem egy sablon hatszor.** Mind a hatnak **saját
+nevű** piaca van 3-3 termékkel, a tizennyolc azonosító **egyedi**, legalább
+**hétféle hatásfajta** szerepel köztük (ma tíz), stílusonként pontosan **egy**
+egymeccses tétel van és az a legolcsóbb, az árak a tarifával nőnek, a szint ára
+fix.
+
+**C) A tíz hatásfajta, egyenként.** Minden termékfajtának saját állítása van:
+az `fx1`-ek tényleg megjelennek a stílus fx-listáján és a lefújás elfogyasztja
+őket (egyszerre csak egy él, utána újra vehető); az `fxN` halmozódik és a
+max-nál megáll; mind az öt `tune` a **motorban** is mérhető (a rekord-hajrá
+tényleg hamarabb armol, a páros érése tényleg rövidül…); a `trait` a **Panzer
+tükörképe** és a pályán lévő példány is követi; a `bond`, a `passchem` és a
+`rating` a helyes célponton hat, tetőzve; a Villám tokenje **százalék egy
+posztcsoportra**, a Tiki-takáé **lapos ráadás az egész tizenegyre** — a próba
+mindkét alakot külön méri.
+
+**Amit a próbának meg kellett tanulnia.** A `bzRecGoalMult` a `BZ9_TIERS`
+kapuja mögött ül (3. csapatstílus-szint), tehát az első mérés „hatástalannak"
+látta a Rekordkönyvet, pedig csak zárva volt. A próba azóta felhúzza a
+stílusszintet a méréshez, és külön állítja, hogy a kapu nyitva van — enélkül
+egy valódi elromlás is átcsúszna rajta.
