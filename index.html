@@ -6132,7 +6132,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.126";
+const APP_VERSION="3.9.128";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16079,6 +16079,10 @@ function gpPressPerMatch(active,min){
      mind ezen mozdít. A perc azért kell, mert a ritmus-csúszka IDŐABLAKRA
      szól (első 45 perc vs. hajrá). */
   try{m*=dialMul("gppress",{min:(min==null?45:min)});}catch(e){}
+  /* 🧪 LABORATÓRIUM · „Laktátpuffer": egy mérkőzésre +20%. A stílus fx-
+     csatornáján jön (engShopFx → styleActiveFx), tehát ugyanúgy viselkedik,
+     mint bármelyik képességfa-hatás. */
+  try{m*=styleFxMul("gpPressMult");}catch(e){}
   return Math.max(0,m);}
 /* ---- A SAJÁT SKILL: „NYOMÁS!" ----
    Az egyetlen skill a játékban, amit NEM a poszt kategóriája szab meg: a
@@ -16162,7 +16166,12 @@ function gpBackUpMult(pos){
   return 1+(GP_BOTH_PCT[lv]||0);}
 /* KIKÉNYSZERÍTETT HIBA: az ELLENFÉL öngóljának súlyszorzója a különleges
    események sorsolásában. */
-function gpErrMult(){return gpOn()?(GP_ERR_MULT[gpErrLv()]||1):1;}
+function gpErrMult(){
+  if(!gpOn())return 1;
+  let m=GP_ERR_MULT[gpErrLv()]||1;
+  /* 🧪 LABORATÓRIUM · „Hibakényszer": +15% példányonként, egymásra szorzódva. */
+  try{m*=Math.pow(1.15,engTune("errMul"));}catch(e){}
+  return m;}
 
 /* ================= GYILKOS PÁROS (3.9.93) =================
    A NEGYEDIK KÖTÉSFAJTA, a képesség-kötés, a párkémia és a passzkémia mellé.
@@ -16193,7 +16202,12 @@ function gpDuoEligible(name){
     const c=getCategoryFor(pos);
     return c==="KOZEPPALYAS"||c==="CSATAR";
   }catch(e){return false;}}
-function gpDuoRipeNeed(){return GP_DUO_RIPE[gpDuoLv()]||15;}
+function gpDuoRipeNeed(){
+  const alap=GP_DUO_RIPE[gpDuoLv()]||15;
+  /* 🧪 LABORATÓRIUM · „Közös futás": példányonként 3 meccsel rövidebb érés,
+     négy meccsig — a kötés maga változatlan, csak hamarabb szólal meg. */
+  let le=0;try{le=3*engTune("duoRipe");}catch(e){le=0;}
+  return Math.max(4,alap-le);}
 function gpDuoDone(){
   const D=gpDuoState();
   return Object.keys(D).filter(k=>D[k]&&D[k].done).length;}
@@ -20536,7 +20550,12 @@ function teamAttrStrengths(){
     ATTR_KEYS.forEach(k=>{
       const w=(ROLE_AXIS_W[k]&&ROLE_AXIS_W[k][role])||0;
       if(w<=0)return;
-      const v=(a[k]||0)*fit, r=slotAxisShift(sl.pos,defPos,k)*fit;
+      /* STÍLUSBOLT · TENGELY-TOKEN (3.9.128): a Villám százalékos,
+         posztcsoportra szóló tokenje és a Tiki-taka lapos, egész csapatra
+         szóló ráadása is IDE fut be. EZ AZ EGYETLEN HELY, ahol hatnak — a
+         nyers attribútumot nem írja át senki. */
+      const _av=(typeof engTokenApply==="function")?engTokenApply(sl.pos,k,a[k]||0):(a[k]||0);
+      const v=_av*fit, r=slotAxisShift(sl.pos,defPos,k)*fit;
       if(k==="seb"){sebPool.push({v,r,w});return;}
       if(k==="passz"){passPool.push({v,r,w,n:sl.player.n});return;}
       acc[k]+=v*w;accRole[k]+=r*w;wsum[k]+=w;});});
@@ -25580,6 +25599,10 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
          gyorsítja (+50%) — és a GYILKOS PÁROS a társáét is viszi. Ugyanaz a
          közös csatorna, ugyanaz a szabály: csak a POZITÍV fejlődést szorozza. */
       if(val>0&&key==="seb")val*=gpSpeedDevMult(p.n);
+      /* STÍLUSBOLT · EDZÉS-GYORSÍTÁS (3.9.127): a megvett fokozatok a
+         KIJELÖLT ember KIJELÖLT tengelyén gyorsítanak. Ugyanaz a közös
+         csatorna, ugyanaz a szabály: csak a POZITÍV fejlődést szorozza. */
+      if(val>0)val*=engTrainMult(p.n,key);
       /* a lassítás VESZTESÉGÉT is a mérlegbe könyveljük, hogy a játékos lássa,
          mibe került neki az edzésterv */
       if(_slow&&_slow.has(key)&&val>0){const loss=val*TRAIN_SLOW;val-=loss;_tlog.pts[key]-=loss;}
@@ -25910,7 +25933,12 @@ function processBenchDevelopment(){
       const tl=trainLogFor(entry);
       const add=(key,v)=>{
         if(key==="seb")v=v/speedTrainDiv(entry);   /* a sebesség lassabban formálható */
-        const val=ageScaleAttr(entry.age,v)*mult*devTempo();
+        let val=ageScaleAttr(entry.age,v)*mult*devTempo();
+        /* STÍLUSBOLT · EDZÉS-GYORSÍTÁS (3.9.127): a padon is jár. A tétel a
+           keret leggyengébb emberéről szól — ha kiszorul a kezdőből, attól
+           még ő a felzárkóztatandó, és pont ilyenkor van rá a legnagyobb
+           szükség. Itt is CSAK a pozitív fejlődést szorozza. */
+        if(val>0)val*=engTrainMult(p.n,key);
         tl.pts[key]+=val;ap[key]=(ap[key]||0)+val;};
       if(tr.main)add(tr.main,TRAIN_MAIN_PTS);
       if(tr.sec) add(tr.sec, TRAIN_SEC_PTS);
@@ -41559,6 +41587,29 @@ const ENG_DEFS={
     stateN:"viharszint",ptsN:"villámpont",lvlN:"Villámcsapás",
     lvlD:"A viharszinted ekkora része válik meccserővé.",
     attr:"seb",scaleFrom:70,perMan:3,perStep:10,men:11,baseScale:10,
+    /* A BONTÁS (3.9.127). Az ÉL a három leggyorsabb, az ÖSSZJÁTÉK a SZÉLSŐ
+       posztok kötései — szó szerint az, amit a kérés mond: „a szélsők
+       (védők, középpályások, csatárok) közötti összjáték értékek". */
+    elN:"Csúcssebesség",chemN:"Szárny-összjáték",skillN:"Sebesség-képességek",
+    chemPos:["JV","BV","JSZ","BSZ"],
+    partD:{el:"a keret HÁROM leggyorsabb emberének a csúcsa. A mélység a 70-es sebességtől mér, ez a 85-östől: külön fizet azért, ha van három IGAZI rakétád, nem csak egy egyenletesen fürge tizenegy.",
+      chem:"a SZÉLSŐ posztokon (JV · BV · JSZ · BSZ) álló öt leggyorsabb embered egymás közti kötései. Két gyors ember, aki nem ismeri egymást, még nem szárny — a Villámnál az összjáték nem díszítés, hanem alkatrész.",
+      skill:"a keret kész SEBESSÉG-képességei. Nem külön lista: a tengely-térkép (SKILL_AXIS) mondja meg, mi számít sebesség-képességnek — ugyanaz, ami a taktikai sebesség-tengelyt is tolja."},
+    /* ---- 🛒 A BOKSZ ----
+       A Villám piaca a szerelőaknáról szól. A három tétel a projektgazda
+       SAJÁT kérése, betűre: stábtag-lépcső, edzés-gyorsítás a leglassabbnak,
+       és a legolcsóbb, egy meccsre szóló posztcsoport-token. */
+    shopN:"A boksz",shopIc:"🔧",
+    shopD:"A Villám piaca a szerelőaknáról szól: itt nem taktikát veszel, hanem <b>tempót</b> — emberre, stábra és egyetlen mérkőzésre szabva.",
+    shop:[
+     {id:"gyujto",ic:"⏱️",n:"Gyújtózsinór",ar:25,kind:"token",tag:"egy meccs",
+      mode:"pct",pct:0.05,grp:true,
+      d:"EGY posztcsoport minden emberének a <b>sebessége +5%</b> — egyetlen mérkőzés erejéig. A csapat sebesség-tengelyén át hat, tehát a taktika-illeszkedésen keresztül a meccsre is, és a meccserődben is látszik."},
+     {id:"rajtblokk",ic:"🏃",n:"Rajtblokk",ar:90,kind:"train",tag:"tartós",
+      d:"A kezdő tizenegyed <b>LEGLASSABB</b> embere tartós sebesség-edzés gyorsítást kap. Nem te választod ki, kit: a rendszer mindig a leggyengébb láncszemre teszi — ez a tétel a keretet HÚZZA FÖL, nem a sztárodat tolja tovább."},
+     {id:"sprintkurzus",ic:"🎓",n:"Sprintmester-kurzus",ar:140,kind:"coach",tag:"tartós",
+      types:["attr:seb"],
+      d:"Egy <b>Sprintmester</b> stábtagod azonnal kap egy tapasztalati lépcsőt — pontosan annyit, amennyit egy LEDOLGOZOTT SZEZON adna neki. A belépéskori szintje fölötti plafon (+12) itt is áll."}],
     tariff:{early:1.0,goal:0.35,assist:0.25,speedster:0.6,sweep:1.0},
     label:{early:"korai gól",goal:"gól",assist:"gólpassz",
       speedster:"villámláb gólja",sweep:"háromgólos győzelem",
@@ -41584,6 +41635,27 @@ const ENG_DEFS={
     stateN:"gólterhelés",ptsN:"gólpont",lvlN:"Gólözön",
     lvlD:"A gólterhelésed ekkora része válik meccserővé.",
     attr:"gol",scaleFrom:70,perMan:3,perStep:10,men:11,baseScale:10,
+    elN:"Befejező-él",chemN:"Támadó-összjáték",skillN:"Gól-képességek",
+    chemPos:["CS","JSZ","BSZ","TKP"],
+    partD:{el:"a keret HÁROM legjobb befejezőjének a csúcsa. Egy gólzáporhoz nem elég a jó átlag: kell három ember, aki bármelyik helyzetből betalál.",
+      chem:"a TÁMADÓ posztokon (CS · JSZ · BSZ · TKP) álló öt legjobb befejeződ egymás közti kötései. A gólterhelés akkor működik, ha tudják egymásról, hova fognak befutni.",
+      skill:"a keret kész GÓL-képességei a tengely-térkép szerint — minden gólsúly, ami a Gólszerzés-tengelyt tolja."},
+    /* ---- 🛒 A GÓLBÖRZE ----
+       Semmi védekezés. Mind a három tétel ugyanannak az EGY mondatnak a
+       más-más időtávja, és mind a három a Bombázók SAJÁT gépezetére köt be
+       (bzRecGoalMult, bz9GoalMult) — nem egy általános sablon átfestése. */
+    shopN:"A gólbörze",shopIc:"📈",
+    shopD:"A Bombázók piacán nincs védekezés. Mind a három tétel ugyanazt a mondatot mélyíti — <b>lőjetek eggyel többet, mint ők</b> —, csak más időtávon: az egyik a csapat étvágyát, a másik a klubrekord szívóerejét, a harmadik a Kilencest.",
+    shop:[
+     {id:"etvagy",ic:"🔥",n:"Étvágy",ar:30,kind:"fx1",tag:"egy meccs",
+      fx:{ownGoalMult:1.07},
+      d:"Egyetlen mérkőzésre a <b>csapat gólesélye +7%</b>. Nem egy emberé, nem egy posztcsoporté: mindenkié, aki a pályán van."},
+     {id:"rekordkonyv",ic:"📕",n:"Rekordkönyv",ar:110,kind:"tune",tag:"tartós",
+      tune:"recNear",step:1,max:3,
+      d:"A klub egymeccses gólcsúcsa akkor kezdi húzni a csapatot, ha <b>egy gólra</b> vagytok tőle. Ez a tétel <b>eggyel kijjebb tolja</b> ezt a határt — majd kettővel, hárommal: a rekordhajrá hamarabb indul, és tovább tart."},
+     {id:"kilencesetrend",ic:"🔟",n:"A Kilences étrendje",ar:170,kind:"tune",tag:"tartós",
+      tune:"nineSteps",step:1,max:2,
+      d:"A Kilences gólonként emelkedő gólesélye alapból <b>háromszor</b> lépcsőzhet egy mérkőzésen. Ez a tétel <b>egy további lépcsőt</b> enged, majd még egyet. Csak akkor ér valamit, ha van kijelölt Kilencesed — és ha tényleg sorozatban lő."}],
     tariff:{goal:0.4,assist:0.2,hat:1.0,zapor:1.5,rekord:2.5},
     label:{goal:"gól",assist:"gólpassz",hat:"mesterhármas",
       zapor:"gólzápor (4+ gól)",rekord:"ÚJ KLUBREKORD",
@@ -41599,6 +41671,27 @@ const ENG_DEFS={
     stateN:"betonszint",ptsN:"betonpont",lvlN:"Bunker",
     lvlD:"A betonszinted ekkora része válik meccserővé.",
     attrMax:["ved","kapus"],scaleFrom:70,perMan:3,perStep:10,men:11,baseScale:10,
+    elN:"A fal csúcsa",chemN:"Védelmi összjáték",skillN:"Védő-képességek",
+    chemPos:["KP","JV","BV","KV"],
+    partD:{el:"a keret HÁROM legjobb védekezőjének a csúcsa (a kapusnál a Védés számít). Egy tiszta lap ritkán az átlagon múlik — azon, hogy van-e három ember, aki egyedül is megold egy helyzetet.",
+      chem:"a VÉDELMI posztokon (KP · JV · BV · KV) álló öt legjobb védőd egymás közti kötései. A védelem az egyetlen csapatrész, ahol egy félreértés azonnal gól — itt az összjáték nem kényelem, hanem a rendszer alapja.",
+      skill:"a keret kész VÉDŐ- és KAPUS-képességei a tengely-térkép szerint."},
+    /* ---- 🛒 A SZERTÁR ----
+       A HIDEGVÉR szándékosan a Panzer „This is Sparta!"-jának a PONTOS
+       tükörképe: ugyanaz a jellem-tengely, ugyanaz a vásárlási alak, ellenkező
+       irány. A két filozófia boltja így beszélget egymással. */
+    shopN:"A szertár",shopIc:"🧰",
+    shopD:"A Beton piaca nem gólt vesz, hanem <b>nyugalmat</b>: kevesebb kapott gólt, hidegebb fejeket és épebb védőket. Mind a három tétel ugyanazt mondja — aki nem kap gólt, az nem veszít.",
+    shop:[
+     {id:"vizespalya",ic:"🌧️",n:"Vizes pálya",ar:30,kind:"fx1",tag:"egy meccs",
+      fx:{oppGoalMult:0.92},
+      d:"Egyetlen mérkőzésre az <b>ellenfél gólesélye −8%</b>. A legolcsóbb tiszta lap, amit pénzen lehet venni."},
+     {id:"hidegver",ic:"🧊",n:"Hidegvér",ar:100,kind:"trait",tag:"tartós",
+      trait:"ver",dir:-1,
+      d:"Egy játékosod <b>vérmérséklete</b> egy fokozattal a HIGGADTABB irány felé tolódik. Ez a Panzer „This is Sparta!\u201d-jának a pontos tükörképe: ott a durvább irány a jutalom, itt a nyugodtabb — a tizenhatoson belül egy indulatos belépő nem bátorság, hanem tizenegyes."},
+     {id:"gyuro",ic:"🩹",n:"Éjszakai gyúró",ar:180,kind:"fxN",tag:"tartós",
+      fx:{injMult:0.90},max:3,
+      d:"A klub <b>sérülés-esélye −10%</b>, tartósan; háromszor megvehető, egymásra szorzódva. A Beton az egyetlen filozófia, aminek a védelmi négyese nem cserélhető alkatrész: aki együtt zár be, az együtt is marad."}],
     tariff:{tackle:0.15,clean:2.0,lock:0.8},
     label:{tackle:"védekező villanás",clean:"TISZTA LAP",lock:"lezárt meccs",
       gap:"meccserő-fölény",win:"győzelem erősebb ellen",giant:"ÓRIÁSÖLÉS"},
@@ -41614,6 +41707,35 @@ const ENG_DEFS={
     stateN:"harmóniaszint",ptsN:"harmóniapont",lvlN:"Egyensúly",
     lvlD:"A harmóniaszinted ekkora része válik meccserővé.",
     base:function(){return harmoniaEngBase();},
+    /* ☯️ A HARMÓNIA BONTÁSA IS FORDÍTOTT. Az ÉL máshol a CSÚCS, itt a
+       KÖZELSÉG: a legjobb és a tizenegyedik ember közti rés. Az összjáték a
+       KERET GERINCÉÉ (nincs kulcsposzt — a Harmóniának mindenki kulcs), a
+       képesség-tétel pedig NEM VÁLOGAT TENGELYT: `skillAxis:"*"`. Cserébe
+       több kell belőle (skillNeed), különben azonnal a plafonon ülne. */
+    el:function(){return harmoniaEngEl();},
+    elN:"Kiegyenlítettség",chemN:"A keret összjátéka",skillN:"Képesség-lefedettség",
+    chemPos:null,skillAxis:"*",skillNeed:14,
+    partD:{el:"a tizenegy legjobb embered közül a LEGJOBB és a TIZENEGYEDIK közti rés. Máshol a csúcs fizet, itt a közelség: nulla résnél teljes, 12 Ratingnél már nulla. A Harmóniánál a kiugró ember ugyanannyira probléma, mint a gyenge láncszem.",
+      chem:"a keret gerincének (a tizenegy legjobb ember) egymás közti kötései. Nincs kulcsposzt — a Harmóniánál mindenki az.",
+      skill:"a keret ÖSSZES kész képessége, tengelytől függetlenül. Egyetlen stílus, ami nem válogat: a Harmónia szerint a sokszínű keret az erős keret."},
+    /* ---- 🛒 A KÖZÖS ASZTAL ----
+       AZ EGYETLEN BOLT, AHOL NEM LEHET EGY EMBERT MEGVENNI. A vacsora két
+       emberé, a reggeli az egész öltözőé, a felzárkóztatás célpontját pedig a
+       rendszer választja. A FELZÁRKÓZTATÁS közvetlenül azt a rést szűkíti,
+       amit a Harmónia saját KIEGYENLÍTETTSÉG-tényezője mér — a bolt és az
+       állapot ugyanarról a mondatról szól. */
+    shopN:"A közös asztal",shopIc:"🍽️",
+    shopD:"A Harmónia piacán nem lehet egy embert megvenni. Mind a három tétel a KÖZÖSSÉGRŐL szól: a hangulatról, a kötésekről és a leszakadó emberről — mert a harmóniaszint pontosan attól nő, ha szűkül a rés.",
+    shop:[
+     {id:"reggeli",ic:"☕",n:"Csapatreggeli",ar:30,kind:"fx1",tag:"egy meccs",
+      fx:{moraleFloor:68},
+      d:"Egyetlen mérkőzésre a <b>morál-padló 68</b>: akármi történt a héten, rossz hangulatban senki nem lép pályára."},
+     {id:"vacsora",ic:"🤝",n:"Közös vacsora",ar:85,kind:"bond",tag:"tartós",
+      add:8,
+      d:"KÉT kiválasztott játékosod <b>összhangja +8</b>, azonnal. Az egyetlen tétel a boltban, ami két embert érint egyszerre — és pontosan az a szám nő tőle, amiből a harmóniaszint ÖSSZJÁTÉK-tényezője is számol."},
+     {id:"felzarkoztatas",ic:"⚖️",n:"Felzárkóztatás",ar:150,kind:"rating",tag:"tartós",
+      add:1,max:3,
+      d:"A kezdő tizenegyed <b>leggyengébb</b> embere tartós <b>+1 Ratinget</b> kap. A célpontot a rendszer választja, és ez a lényeg: a Harmónia nem a csúcsot emeli, hanem a szakadékot tünteti el — közvetlenül azt a rést szűkíti, amit a saját KIEGYENLÍTETTSÉG-tényezője mér."}],
     tariff:{goal:0.15,assist:0.35,share:1.5,share4:1.0},
     label:{goal:"gól",assist:"gólpassz",share:"három gólszerző",
       share4:"négy vagy több gólszerző",
@@ -41628,6 +41750,27 @@ const ENG_DEFS={
     stateN:"passzterhelés",ptsN:"passzpont",lvlN:"Körforgás",
     lvlD:"A passzterhelésed ekkora része válik meccserővé.",
     attr:"passz",scaleFrom:70,perMan:3,perStep:10,men:11,baseScale:10,
+    elN:"Passz-él",chemN:"Középpálya-összjáték",skillN:"Passz-képességek",
+    chemPos:["VKP","KKP","TKP"],
+    partD:{el:"a keret HÁROM legjobb passzolójának a csúcsa. A körforgás egy-két ember lábán fordul meg — ha nincs, aki eltalálja a harmadik embert, a labdatartásból nem lesz helyzet.",
+      chem:"a KÖZÉPPÁLYÁS posztokon (VKP · KKP · TKP) álló öt legjobb passzolód egymás közti kötései. A Tiki-takánál ez a legfontosabb kiegészítő tétel: az egyérintős játék szó szerint az összeszokottságból él.",
+      skill:"a keret kész PASSZ-képességei a tengely-térkép szerint."},
+    /* ---- 🛒 A RONDÓ ----
+       Minden a PASSZRÓL szól, de három különböző időtávon: egy mérkőzésnyi
+       labdatartás, egy kész kötés, és a kötések SZÜLETÉSÉNEK a tempója. A
+       token itt szándékosan MÁS ALAKÚ, mint a Villámé: lapos ráadás az egész
+       tizenegyre, nem százalék egy posztcsoportra. */
+    shopN:"A rondó",shopIc:"🔄",
+    shopD:"A Tiki-taka piacán minden a PASSZRÓL szól, de három különböző időtávon: egy mérkőzésnyi labdatartás, egy kész kötés, és a kötések születésének a tempója.",
+    shop:[
+     {id:"otvenpassz",ic:"🎯",n:"Ötven passz",ar:30,kind:"token",tag:"egy meccs",
+      mode:"flat",add:8,key:"passz",grp:false,
+      d:"Egyetlen mérkőzésre a csapat <b>Passz-tengelye +8</b> — nem százalék és nem posztcsoport, hanem az EGÉSZ tizenegy, egy lapos ráadással. Épp elég, hogy egy határon billegő taktika-illeszkedés átforduljon."},
+     {id:"kettosfalazas",ic:"🔗",n:"Kettős falazás",ar:95,kind:"passchem",tag:"tartós",
+      d:"KÉT kiválasztott játékosod <b>passzkémiája egy lépcsőt lép</b>. Nem varázsütés: a kötés ugyanúgy épül tovább, mint eddig — csak egy meccsnyi közös munkát megspóroltál nekik."},
+     {id:"rondotrening",ic:"🧠",n:"Rondó-tréning",ar:160,kind:"tune",tag:"tartós",
+      tune:"pcOffer",step:1,max:3,
+      d:"A passzkémia-párok <b>+25%-kal gyakrabban ajánlkoznak</b>, háromszor megvehető. Nem a kész kötést veszed meg, hanem azt, hogy több esélyed legyen rá."}],
     tariff:{goal:0.2,assist:0.5,team:1.5},
     label:{goal:"gól",assist:"gólpassz",team:"csapatjáték (3+ gólpassz)",
       gap:"meccserő-fölény",win:"győzelem erősebb ellen",giant:"ÓRIÁSÖLÉS"},
@@ -41642,6 +41785,28 @@ const ENG_DEFS={
     stateN:"nyomásszint",ptsN:"presszpont",lvlN:"Fojtás",
     lvlD:"A nyomásszinted ekkora része válik meccserővé.",
     attrAvg:["seb","ved"],scaleFrom:70,perMan:3,perStep:10,men:11,baseScale:10,
+    elN:"Presszelő-él",chemN:"A nyomás összjátéka",skillN:"Presszelő-képességek",
+    chemPos:["VKP","KKP","TKP","JSZ","BSZ"],
+    partD:{el:"a keret HÁROM legjobb presszelőjének a csúcsa (a sebesség és a védekezés átlagán mérve). A letámadást hárman indítják; ha ők nem érnek oda, a mögöttük lévő nyolc ember hiába fut.",
+      chem:"a PRESSZELŐ posztokon (VKP · KKP · TKP · JSZ · BSZ) álló öt legjobb embered egymás közti kötései. A Gegenpressing a legösszehangoltabb stílus a készletben: aki egy másodperccel később indul, az lyukat nyit.",
+      skill:"a keret kész SEBESSÉG- és VÉDŐ-képességei a tengely-térkép szerint — presszingelni lábbal ÉS szereléssel lehet."},
+    /* ---- 🛒 A LABORATÓRIUM ----
+       Mind a három tétel a Gegenpressing SAJÁT motorcsatornáira köt be: a
+       labdaszerzésre (gpPressPerMatch), a gyilkos páros érésére
+       (gpDuoRipeNeed) és a kikényszerített hibára (gpErrMult). Ezeket rajta
+       kívül egyetlen filozófia sem tudja megvenni. */
+    shopN:"A laboratórium",shopIc:"🧪",
+    shopD:"A Gegenpressing piaca méréssel dolgozik, nem ihlettel: laktátszint, közös futómunka, és az ellenfél hibaszázaléka. Mind a három ugyanazt a kérdést feszegeti — meddig bírjátok?",
+    shop:[
+     {id:"laktat",ic:"🫁",n:"Laktátpuffer",ar:30,kind:"fx1",tag:"egy meccs",
+      fx:{gpPressMult:1.20},
+      d:"Egyetlen mérkőzésre a csapat <b>labdaszerzése az ellenfél térfelén +20%</b>. A stílus saját motorcsatornáján megy — ez az a tétel, amit rajtad kívül senki nem tud megvenni."},
+     {id:"kozosfutas",ic:"👟",n:"Közös futás",ar:95,kind:"tune",tag:"tartós",
+      tune:"duoRipe",step:1,max:3,
+      d:"A <b>gyilkos páros</b> összeérése <b>3 meccsel rövidül</b>, háromszor megvehető (négy meccsig). A kötés ugyanaz marad — csak hamarabb szólal meg."},
+     {id:"hibakenyszer",ic:"🥅",n:"Hibakényszer",ar:165,kind:"tune",tag:"tartós",
+      tune:"errMul",step:1,max:3,
+      d:"Az ellenfél <b>kikényszerített hibájának</b> esélye <b>+15%</b>, háromszor megvehető, egymásra szorzódva. A presszing legszebb gólja az, amit nem is te rúgsz."}],
     tariff:{press:0.45,goal:0.2,clean:1.0},
     label:{press:"elhódított labda elöl",goal:"gól",clean:"TISZTA LAP",
       gap:"meccserő-fölény",win:"győzelem erősebb ellen",giant:"ÓRIÁSÖLÉS"},
@@ -41694,38 +41859,204 @@ function engState(k){
   if(E.pts==null)E.pts=0;
   if(E.lvl==null)E.lvl=0;
   return E;}
-/* ---- A NYERS BÁZIS ----
-   Egyelőre egyetlen alakja van (attribútum-küszöb a keret N legjobbjánál), de
-   a tábla `base` mezőjével bármelyik stílus hozhat sajátot. */
-function engBaseRaw(k){
-  const d=engDef(k);
-  if(!d)return 0;
-  if(typeof d.base==="function"){try{return d.base()||0;}catch(e){return 0;}}
-  let v=[];
+/* ================= A BONTOTT ÁLLAPOT (3.9.127) =========================
+   BEJELENTETT KÉRÉS: „Legyen jobban elmagyarázva, milyen tényezők adják ki a
+   fő guiding pontszámot (esetünkben a viharszint) — itt ötletem: a top 3
+   leggyorsabb sebességattribútumainak összereje az egyik faktor, másik a
+   szélsők (védők, középpályások, csatárok) közötti összjáték értékek,
+   sebesség skillek."
+
+   AZ ÁLLAPOT EDDIG EGYETLEN SZÁM VOLT: a keret N legjobbja a stílus
+   tengelyén. Igaz szám, de NÉMA — a panel kiírta, a játékos pedig nem tudta,
+   mit kezdjen vele. Mostantól NÉGY NEVESÍTETT TÉNYEZŐ adja össze, és mind a
+   négy külön sorban, saját magyarázattal látszik a panelen:
+
+     1. MÉLYSÉG    — a RÉGI szám, betűre változatlanul: a keret N legjobbja a
+                     tengelyen, emberenként korlátozva. Ez marad a törzs, és
+                     továbbra is ez a legnagyobb tétel. Aki eladja a
+                     gyorsait, annak azonnal esik.
+     2. ÉL         — a HÁROM legjobb ember csúcsa. A mélység a 70-es
+                     küszöbtől mér, az él a 85-östől: külön fizet azért, ha
+                     van három IGAZI kiugró embered.
+     3. ÖSSZJÁTÉK  — a stílus KULCSPOSZTJAIN álló emberek egymás közti
+                     kötései (bondOf). A Villámnál ez szó szerint a szélsők
+                     összjátéka, a Betonnál a védelmi négyesé.
+     4. KÉPESSÉGEK — a keret KÉSZ képességei a stílus tengelyén. Nem külön
+                     lista: a meglévő tengely-térkép (SKILL_AXIS) mondja meg,
+                     mi tartozik hova — ugyanaz, ami a taktikai tengelyt is
+                     tolja.
+
+   MIÉRT MARAD A MÉLYSÉG A TÖRZS. A másik három tényező TETŐZÖTT (30 + 24 +
+   18 = legfeljebb 72 egység), a mélységé 330 — vagyis a kiegészítők a
+   legjobb esetben is a törzs alig ötödét adják hozzá. Ez szándékos: az
+   állapot ugyanarról szól, mint eddig, csak most MEGINDOKOLJA magát, és ad
+   három új, konkrét fogódzót annak, aki tolni akarja.
+
+   ⚠️ EGYIK TÉNYEZŐ SEM FÜGG A FELÁLLÁSTÓL. Mind a TELJES keretből számol,
+   pontosan úgy, ahogy a mélység eddig is. Ez nem szépészeti döntés: az
+   állapot a rejtett meccs-erő tagja (engOvrBonus → hiddenMatchBonus), a
+   potenciál-kereső (msBestConfig) pedig felállásokat, cseréket és
+   kapitányokat próbálgat rajta. Ha az állapot a kiállított tizenegytől
+   függne, a kereső önmagát kergetné — és a gyorsítás-gyorsítótár (lentebb)
+   sem lenne helyes. */
+const ENG_EL_N=3;          /* hány ember adja az ÉLT */
+const ENG_EL_FROM=85;      /* ez alatt nulla (a mélység küszöbe 70) */
+const ENG_EL_STEP=1.5;     /* ennyi attribútum-pont egy egység */
+const ENG_EL_PER=10;       /* emberenként legfeljebb ennyi */
+const ENG_CHEM_N=5;        /* hány kulcsposztos ember kötéseit mérjük */
+const ENG_CHEM_MAX=24;
+const ENG_SKILL_NEED=6;    /* ennyi kész, tengelyre eső képességnél a maximum */
+const ENG_SKILL_MAX=18;
+/* A stílus TENGELYÉRTÉKE egy emberre — a tábla három alakja (attr/attrMax/
+   attrAvg) egyetlen helyen, hogy a négy tényező ugyanazt a számot lássa. */
+function engAxisVal(d,e){
+  if(!d||!e)return 0;
+  try{
+    const A=e.attrs||{};
+    if(d.attrMax)return Math.max.apply(null,d.attrMax.map(x=>A[x]||0));
+    if(d.attrAvg)return d.attrAvg.reduce((x2,x)=>x2+(A[x]||0),0)/d.attrAvg.length;
+    return A[d.attr||"seb"]||0;
+  }catch(x){return 0;}}
+/* A keret tengelyértékei csökkenő sorrendben — a MÉLYSÉG, az ÉL és az
+   ÖSSZJÁTÉK közös nyersanyaga, hogy háromszor ne járjuk végig a keretet. */
+function engAxisRows(k){
+  const d=engDef(k),out=[];
+  if(!d)return out;
   try{
     (fullCareerRoster()||[]).forEach(pl=>{
       const e=(careerPool&&careerPool[pl.n])||null;
       if(!e)return;
-      /* HÁROM BÁZIS-ALAK, hogy minden stílus a SAJÁT nyelvén mérhessen:
-         `attr`    — egy tengely (Villám: seb · Bombázók: gol · Tiki-taka: passz)
-         `attrMax` — a kettő közül a NAGYOBBIK (Beton: a kapus a védését adja,
-                     a mezőnyjátékos a védekezését — egy skálán)
-         `attrAvg` — a kettő ÁTLAGA (Gegenpressing: a pressinghez láb IS kell,
-                     szerelés IS — aki csak az egyikkel bír, nem presszingel) */
-      let sp=0;
-      try{
-        const A=(e.attrs)||{};
-        if(d.attrMax)sp=Math.max.apply(null,d.attrMax.map(k=>A[k]||0));
-        else if(d.attrAvg)sp=d.attrAvg.reduce((x2,k)=>x2+(A[k]||0),0)/d.attrAvg.length;
-        else sp=A[d.attr||"seb"]||0;
-      }catch(x){sp=0;}
-      v.push(sp);});
+      out.push({n:pl.n,v:engAxisVal(d,e),e:e});});
+  }catch(e){}
+  out.sort((a,b)=>b.v-a.v);
+  return out;}
+/* ---- 1. MÉLYSÉG: a RÉGI bázis, betűre ----
+   Ami eddig az egész állapot volt, az most az első tényező. A `base`
+   függvényt hozó stílus (Harmónia) itt is a sajátját adja. */
+function engTrunkRaw(k,rows){
+  const d=engDef(k);
+  if(!d)return 0;
+  if(typeof d.base==="function"){try{return d.base()||0;}catch(e){return 0;}}
+  let s=0;
+  (rows||engAxisRows(k)).slice(0,d.men).forEach(r=>{
+    s+=Math.max(0,Math.min(d.perMan,(r.v-d.scaleFrom)/d.perStep));});
+  return Math.round(s*d.baseScale*10)/10;}
+/* ---- 2. ÉL: a három legjobb csúcsa ---- */
+function engElRaw(k,rows){
+  const d=engDef(k);
+  if(!d)return 0;
+  if(typeof d.el==="function"){try{return d.el()||0;}catch(e){return 0;}}
+  let s=0;
+  (rows||engAxisRows(k)).slice(0,ENG_EL_N).forEach(r=>{
+    s+=Math.max(0,Math.min(ENG_EL_PER,(r.v-ENG_EL_FROM)/ENG_EL_STEP));});
+  return Math.round(s*10)/10;}
+/* ☯️ A HARMÓNIA ÉLE: nem a csúcs, hanem a KÖZELSÉG. A tizenegy legjobb
+   Ratingű ember közül a legjobb és a tizenegyedik közti rés — nulla résnél a
+   teljes él, HARM_SPREAD_ZERO (12) résnél nulla. Ugyanaz a szám és ugyanaz az
+   érv, mint a Harmónia mélységénél: aki kilóg, az nem a csapat része. */
+function harmoniaEngEl(){
+  let v=[];
+  try{
+    (fullCareerRoster()||[]).forEach(pl=>{
+      let o=0;try{o=pOvr(pl)||0;}catch(x){o=0;}
+      if(o>0)v.push(o);});
   }catch(e){}
   v.sort((a,b)=>b-a);
+  v=v.slice(0,11);
+  if(v.length<11)return 0;
+  const res=v[0]-v[v.length-1];
+  return Math.round(ENG_EL_N*ENG_EL_PER*Math.max(0,1-res/HARM_SPREAD_ZERO)*10)/10;}
+/* ---- 3. ÖSSZJÁTÉK: a kulcsposztok kötései ----
+   Kik számítanak: akiknek a FŐ posztja a stílus kulcsposzt-listáján van, a
+   tengelyük szerinti öt legjobb. Akinek nincs kulcsposzt-listája (Harmónia),
+   ott a keret gerince (a tengely szerinti tizenegy legjobb).
+   A skála a kötések bevett nullpontja és teteje: BOND_REF (55) a „beállt
+   csapat" — ott a tétel nulla —, BOND_SOFT (88) a maximum. */
+function engChemNames(k,rows){
+  const d=engDef(k);
+  if(!d)return [];
+  const src=rows||engAxisRows(k);
+  if(!d.chemPos)return src.slice(0,11).map(r=>r.n);
+  const out=[];
+  for(let i=0;i<src.length&&out.length<ENG_CHEM_N;i++){
+    let po="";
+    try{po=((src[i].e&&src[i].e.pos)||[])[0]||"";}catch(x){po="";}
+    if(d.chemPos.indexOf(po)>=0)out.push(src[i].n);}
+  return out;}
+function engChemRaw(k,rows){
+  const names=engChemNames(k,rows);
+  if(names.length<2)return 0;
+  let s=0,n=0;
+  for(let i=0;i<names.length;i++)for(let j=i+1;j<names.length;j++){
+    let b=BOND_REF;
+    try{b=bondOf(names[i],names[j]);}catch(e){b=BOND_REF;}
+    s+=b;n++;}
+  if(!n)return 0;
+  const t=Math.max(0,Math.min(1,(s/n-BOND_REF)/Math.max(1,BOND_SOFT-BOND_REF)));
+  return Math.round(ENG_CHEM_MAX*t*10)/10;}
+/* ---- 4. KÉPESSÉGEK: a tengelyre eső kész skillek ----
+   A cél-tengelyt a tábla mondja meg, de alapból NEM kell külön megadni: a
+   `skillAxis` hiányában a bázis tengelye (attr/attrMax/attrAvg) a cél. A
+   `"*"` mindent elfogad (Harmónia). A félkész, több lépcsős képesség
+   arányosan számít — ugyanaz a skillProgOf, mint a tengely-bónusznál. */
+function engSkillAxisHit(cel,ax){
+  if(!cel||!ax)return false;
+  if(cel==="*")return true;
+  if(Array.isArray(cel))return cel.indexOf(ax)>=0;
+  return cel===ax;}
+function engSkillRaw(k){
+  const d=engDef(k);
+  if(!d)return 0;
+  const cel=(d.skillAxis!==undefined)?d.skillAxis
+           :(d.attrMax||d.attrAvg||d.attr||null);
+  if(!cel)return 0;
+  let n=0;
+  try{
+    (fullCareerRoster()||[]).forEach(pl=>{
+      (playerSkills(pl.n)||[]).forEach(inst=>{
+        const sk=inst&&inst.skill;
+        if(!sk)return;
+        const types=[sk.type].concat(sk.combo?sk.combo.map(c=>c.type):[]);
+        let hit=false;
+        types.forEach(t=>{if(engSkillAxisHit(cel,SKILL_AXIS[t]))hit=true;});
+        if(!hit)return;
+        let pr=1;try{pr=skillProgOf(inst);}catch(x){pr=1;}
+        n+=Math.max(0,Math.min(1,pr));});});
+  }catch(e){}
+  const kell=d.skillNeed||ENG_SKILL_NEED;
+  return Math.round(ENG_SKILL_MAX*Math.min(1,n/kell)*10)/10;}
+/* ---- A NÉGY TÉNYEZŐ EGYÜTT ----
+   A GYORSÍTÓTÁR csak a potenciál-keresés alatt (_msProbing) él, és pontosan
+   azért helyes, amiért a tényezők felállásfüggetlenek: a kereső a slotokat, a
+   padot, a kapitányt és a taktikát mozgatja, a KERET HALMAZÁT nem — a
+   msWithRestore a extraRoster-t is visszaállítja. Amit a négy tényező olvas
+   (keret, attribútumok, kötések, képességek), az tehát egy keresés alatt
+   állandó. A keresésen kívül nincs gyorsítótár: ott a szám mindig friss. */
+let _engPartsCache=null;
+function engPartsCacheClear(){_engPartsCache=null;}
+function engBaseParts(k){
+  const d=engDef(k);
+  if(!d)return [];
+  if(_msProbing&&_engPartsCache&&_engPartsCache[k])return _engPartsCache[k];
+  const rows=engAxisRows(k),P=d.partD||{};
+  const out=[
+    {id:"melyseg",ic:"📐",n:"Mélység",v:engTrunkRaw(k,rows),max:null,
+     d:P.melyseg||(typeof d.base==="function"
+       ?"a keret EGYENLETESSÉGE — a tizenegy legjobb ember, mindenki annál többet ad, minél közelebb áll a csapat átlagához."
+       :`a keret ${d.men} legjobb embere a tengelyen: emberenként legfeljebb ${d.perMan} egység, a ${d.scaleFrom}-es érték nulla. Ez az állapot törzse — és továbbra is a legnagyobb tétel.`)},
+    {id:"el",ic:"🔺",n:d.elN||"Él",v:engElRaw(k,rows),max:ENG_EL_N*ENG_EL_PER,
+     d:P.el||""},
+    {id:"chem",ic:"🤝",n:d.chemN||"Összjáték",v:engChemRaw(k,rows),max:ENG_CHEM_MAX,
+     d:P.chem||""},
+    {id:"skill",ic:"✨",n:d.skillN||"Képességek",v:engSkillRaw(k),max:ENG_SKILL_MAX,
+     d:P.skill||""}];
+  if(_msProbing){if(!_engPartsCache)_engPartsCache={};_engPartsCache[k]=out;}
+  return out;}
+function engBaseRaw(k){
+  if(!engDef(k))return 0;
   let s=0;
-  v.slice(0,d.men).forEach(sp=>{
-    s+=Math.max(0,Math.min(d.perMan,(sp-d.scaleFrom)/d.perStep));});
-  return s*d.baseScale;}
+  engBaseParts(k).forEach(p=>{s+=p.v||0;});
+  return Math.round(s*10)/10;}
 /* A STÍLUS SZINTJE NAGYÍTJA — betűre a Panzer fearScale()-je. */
 function engScale(k){
   let L=1;
@@ -41872,6 +42203,11 @@ function engMatchEnd(){
   const kap=Math.max(0,Math.round(Math.min(nyers,cap)*10)/10);
   const konyv=_engBy;
   _engRaw=0;_engGap=0;_engBy=null;_engMin=0;
+  /* AMI EGY MECCSRE SZÓLT, ELFOGY. A pont-mérleg ELŐTT, feltétel nélkül:
+     akkor is, ha a mérkőzésen egy pont sem gyűlt — egy meccs, egy tétel. */
+  engMatchSpend().forEach(x=>{
+    try{addLine(`${d.ic} <b>${esc(x.n)}</b>${x.g?` (${esc(engTokenGroupName(x.g))})`:""} `
+      +`— a mérkőzésre szóló tétel elhasználódott.`,"m skillnote");}catch(e){}});
   if(!(kap>0))return 0;
   E.pts=Math.round((E.pts+kap)*10)/10;
   E.earned=Math.round(((E.earned||0)+kap)*10)/10;
@@ -41924,6 +42260,417 @@ function engBuyLevel(k){
   }catch(e){}
   try{saveGame();}catch(e){}
   return true;}
+/* ================= A HAT PIAC (3.9.128) ================================
+   BEJELENTETT KÉRÉS (a 3.9.127 javítása): „Ennél nem azt vártam tőled, hogy
+   egy az egyben valósítsd meg a villám saját bolti termékeit… hanem hogy azt
+   és a panzert vásárlási lehetőségeit MINTAKÉNT véve dolgozz ki
+   csapatstílusonként EGY-EGY SPECIÁLIS PIACOT, 3-3 termékkel… De így
+   rendkívül egyhangú lenne."
+
+   IGAZA VOLT. A 3.9.127 egyetlen sablont (stábtag-lépcső · edzés-gyorsítás ·
+   posztcsoport-token) másolt hatszor, csak más tengellyel. Ez nem hat piac,
+   hanem egy piac hat festéssel.
+
+   A KÉT MINTA, amiből dolgozunk:
+     · a PANZER rettenet-boltja — jellem-módosítók névre szólóan, plusz a
+       félelmet meccserővé váltó szint;
+     · a VILLÁM három tétele — a projektgazda saját kérése, betűre.
+   A minta NEM a konkrét termék, hanem az ALAK: cím · ár · magyarázat · gomb,
+   és egy tétel vagy EMBERRE szól, vagy a KLUBRA, vagy EGY MÉRKŐZÉSRE.
+
+   A HAT PIAC ÉS AMI MEGKÜLÖNBÖZTETI ŐKET:
+     🔧 A BOKSZ (Villám) ......... tempó: stáb, edzés, egy meccsnyi gyorsítás
+     📈 A GÓLBÖRZE (Bombázók) .... a KLUBREKORD szívóereje és a KILENCES
+                                   étvágya — a stílus saját gépezete
+     🧰 A SZERTÁR (Beton) ........ nyugalom: hidegvér (a Panzer tükörképe),
+                                   épebb védők, vizes pálya
+     🍽️ A KÖZÖS ASZTAL (Harmónia)  az EGYETLEN piac, ahol nem lehet EGY embert
+                                   megvenni: kötés, morál, felzárkóztatás
+     🔄 A RONDÓ (Tiki-taka) ...... a PASSZKÉMIA három időtávja
+     🧪 A LABORATÓRIUM (Gegen) ... a presszing saját csatornái: labdaszerzés,
+                                   páros-érés, kikényszerített hiba
+
+   TIZENNYOLC TERMÉK, TIZENEGY HATÁSFAJTA. Csak a Villám három tétele
+   ismétlődik máshol — és az szándékos: az a kérés szó szerinti teljesítése.
+
+   AZ ÁRAK mindenhol a tarifával nőnek (engScaleT), és mindenhol ugyanaz a
+   három árszint: egy OLCSÓ, egy meccsre szóló tétel (25-30), egy KÖZEPES
+   tartós (85-110) és egy DRÁGA tartós (140-180). Így a hat piac
+   összemérhető marad, pedig teljesen mást árulnak.
+   A SZINT (ENG_PRICE) ára viszont fix marad: az a hosszú létra. */
+const ENG_TOKEN_PCT=0.05;      /* a Villám tokenjének tengely-emelése */
+const ENG_TRAIN_STEP=0.25;     /* egy fokozat edzés-gyorsítás */
+const ENG_TRAIN_MAX=4;         /* és legfeljebb ennyi fokozat egy emberen */
+const ENG_TOKEN_GROUPS=[
+  {k:"KAPUS",ic:"🧤",n:"Kapusok"},{k:"VEDO",ic:"🛡",n:"Védők"},
+  {k:"KOZEPPALYAS",ic:"🎩",n:"Középpályások"},{k:"CSATAR",ic:"🎯",n:"Csatárok"}];
+function engShopList(k){
+  const d=engDef(k||engKey());
+  return (d&&Array.isArray(d.shop))?d.shop:[];}
+function engShopItem(k,id){
+  return engShopList(k).find(x=>x.id===id)||null;}
+/* AZ ÁR A TARIFÁVAL NŐ. Ugyanaz az érv, ami az engScaleT-nél: a bevétel az
+   állapot-szinttel nő, tehát a FIX ár idővel ingyenné válna. */
+function engShopPrice(k,it){
+  const kk=k||engKey();
+  if(!kk||!it)return 0;
+  return Math.max(5,Math.round((it.ar||0)*engScaleT(kk)));}
+/* A KÖZÖS FIZETÉS — egy helyen, hogy a könyvelés (`spent`) soha ne csússzon
+   szét a tizennyolc termék között. */
+function engPay(k,ar){
+  const E=engState(k);
+  if(!E||!(ar>0)||E.pts<ar)return false;
+  E.pts=Math.round((E.pts-ar)*10)/10;
+  E.spent=Math.round(((E.spent||0)+ar)*10)/10;
+  return true;}
+/* HÁNYSZOR VETTED MEG? A halmozható tételek (tune, fxN, rating) számlálója. */
+function engBought(k,id){
+  const E=engState(k);
+  return (E&&E.buy&&E.buy[id])||0;}
+function engBump(k,id){
+  const E=engState(k);
+  if(!E)return 0;
+  if(!E.buy)E.buy={};
+  E.buy[id]=(E.buy[id]||0)+1;
+  return E.buy[id];}
+/* ---- A HANGOLÓK ----
+   Egy `tune` tétel egyetlen SZÁMOT told el, amit a stílus SAJÁT gépezete
+   olvas. Az olvasók (bzRecGoalMult, bz9GoalMult, passChemOfferP,
+   gpDuoRipeNeed, gpErrMult) egyetlen sorral hívnak ide — így a bolt nem
+   párhuzamos rendszer, hanem ugyanannak a gépnek egy csavarja. */
+function engTune(nev){
+  if(gameMode!=="career")return 0;
+  const k=engKey();
+  if(!k)return 0;
+  let n=0;
+  engShopList(k).forEach(it=>{
+    if(it.kind==="tune"&&it.tune===nev)n+=engBought(k,it.id)*(it.step||1);});
+  return n;}
+/* ---- A MEGVETT HATÁSOK A STÍLUS FX-CSATORNÁJÁN ----
+   A `fx1` (egy meccsre) és az `fxN` (tartós, halmozódó) tételek NEM kapnak
+   saját motor-ágat: beleolvadnak abba a listába, amiből a képességfa hatásai
+   is jönnek (styleActiveFx). Egyetlen hely, és a motor összes meglévő
+   csatornája (ownGoalMult, oppGoalMult, injMult, moraleFloor…) azonnal
+   használható a boltból is. */
+function engShopFx(){
+  if(gameMode!=="career")return [];
+  const k=engKey();
+  if(!k)return [];
+  const E=engState(k);
+  if(!E)return [];
+  const out=[];
+  /* EGY MECCSRE SZÓLÓ: a lefújásig él (engMatchEnd fogyasztja el). */
+  if(E.fx1&&E.fx1.id){
+    const it=engShopItem(k,E.fx1.id);
+    if(it&&it.fx)out.push(it.fx);}
+  /* TARTÓS, HALMOZÓDÓ: ahányszor megvetted, annyiszor a listán — a szorzós
+     csatorna így magától szorozza egymásra, az összeadódó összeadja. */
+  engShopList(k).forEach(it=>{
+    if(it.kind!=="fxN"||!it.fx)return;
+    const n=Math.min(it.max||1,engBought(k,it.id));
+    for(let i=0;i<n;i++)out.push(it.fx);});
+  return out;}
+/* ---- 🎓 STÁBTAG-SZINTLÉPÉS (Villám) ---- */
+function engCoachList(k,it){
+  const kk=k||engKey();
+  const tip=(it&&it.types)||null;
+  if(!tip)return [];
+  const out=[];
+  try{
+    (staff()||[]).forEach((c,i)=>{
+      if(!c||tip.indexOf(c.type)<0)return;
+      out.push({i:i,c:c,teto:(c.sz||0)>=coachSzCap(c)});});
+  }catch(e){}
+  return out;}
+function engBuyCoach(k,it,idx){
+  const kk=k||engKey();
+  if(!kk||!it)return null;
+  const c=(staff()||[])[idx];
+  if(!c||(it.types||[]).indexOf(c.type)<0)return null;
+  const ar=engShopPrice(kk,it);
+  if(!engPay(kk,ar))return null;
+  /* UGYANAZ A LÉPCSŐ, AMIT A MUNKA AD: a szezonzárás COACH_XP_PER_STEP xp-ért
+     ad +1 Szakértelmet, és a coachSzCap plafon itt is áll. */
+  c.xp=(c.xp||0)+COACH_XP_PER_STEP;
+  const cap=coachSzCap(c),elotte=c.sz||0;
+  const want=Math.min(cap,(c.szBase||c.sz)+Math.floor(c.xp/COACH_XP_PER_STEP));
+  if(want>c.sz)c.sz=want;
+  try{saveGame();}catch(e){}
+  return {n:c.n,elotte:elotte,utana:c.sz||0,teto:(c.sz||0)>=cap,ar:ar};}
+/* ---- 🏃 EDZÉS-GYORSÍTÁS (Villám) ----
+   A CÉLPONT: a kezdő tizenegy LEGGYENGÉBB embere a stílus tengelyén. Az
+   eltárolt kulcs a vásárlás pillanatában dől el (E.tb.key), nem futásidőben:
+   így egy poszt-csere vagy stílusváltás után sem csúszik át más tengelyre. */
+function engTrainKeyFor(k,pl){
+  const d=engDef(k);
+  if(!d)return null;
+  if(!d.attr&&!d.attrMax&&!d.attrAvg){
+    let po="KKP";
+    try{po=(pl&&pl.pos&&pl.pos[0])||"KKP";}catch(e){po="KKP";}
+    try{return attrTrainedBy(po);}catch(e){return "passz";}}
+  if(d.attrMax){
+    let po="";try{po=(pl&&pl.pos&&pl.pos[0])||"";}catch(e){po="";}
+    return po==="KP"?d.attrMax[1]:d.attrMax[0];}
+  if(d.attrAvg)return d.attrAvg[0];
+  return d.attr||"seb";}
+function engTrainTarget(k){
+  const kk=k||engKey(),d=engDef(kk);
+  if(!d)return null;
+  const gkOut=!d.attrMax;   /* a kapus csak ott számít, ahol a tengelye is az övé */
+  let best=null;
+  try{
+    (slots||[]).forEach(sl=>{
+      if(!sl||!sl.player)return;
+      if(gkOut&&sl.pos==="KP")return;
+      const e=(careerPool&&careerPool[sl.player.n])||null;
+      if(!e)return;
+      const key=engTrainKeyFor(kk,sl.player);
+      const v=(e.attrs&&e.attrs[key])||0;
+      if(!best||v<best.v)best={n:sl.player.n,v:v,key:key,pl:sl.player};});
+  }catch(e){}
+  return best;}
+function engBuyTrain(k,it){
+  const kk=k||engKey(),E=engState(kk),t=engTrainTarget(kk);
+  if(!kk||!it||!E||!t)return null;
+  const meg=(E.tb&&E.tb.n===t.n&&E.tb.key===t.key)?(E.tb.lvl||0):0;
+  if(meg>=ENG_TRAIN_MAX)return null;
+  const ar=engShopPrice(kk,it);
+  if(!engPay(kk,ar))return null;
+  /* EGY EMBER EGYSZERRE: ha a rendszer új leggyengébbet talál (mert az előző
+     felzárkózott), a gyorsítás ÁTKERÜL rá, és nulláról indul. */
+  if(!E.tb||E.tb.n!==t.n||E.tb.key!==t.key)E.tb={n:t.n,key:t.key,lvl:0};
+  E.tb.lvl=Math.min(ENG_TRAIN_MAX,(E.tb.lvl||0)+1);
+  try{saveGame();}catch(e){}
+  return {n:t.n,key:t.key,lvl:E.tb.lvl,ar:ar};}
+/* A KÖZÖS FEJLŐDÉS-CSATORNA TAGJA — ugyanaz a szabály, mint a többi
+   szorzónál: CSAK a pozitív fejlődést szorozza, a büntetést nem. */
+function engTrainMult(name,key){
+  if(gameMode!=="career")return 1;
+  const k=engKey();
+  if(!k)return 1;
+  const E=engState(k);
+  if(!E||!E.tb||E.tb.n!==name||E.tb.key!==key)return 1;
+  const lv=Math.max(0,Math.min(ENG_TRAIN_MAX,E.tb.lvl||0));
+  return 1+lv*ENG_TRAIN_STEP;}
+/* ---- ⏱️ TENGELY-TOKEN (Villám: százalék egy posztcsoportra ·
+        Tiki-taka: LAPOS ráadás az egész tizenegyre) ----
+   HOL HAT. Egyetlen helyen: a csapat tengelyeit számoló
+   teamAttrStrengths()-ben, a játékos attribútum-értékén. Onnan megy tovább a
+   taktika-illeszkedésre, a mérkőzésre, és — mivel a tacticEffect a rejtett
+   meccs-erő tagja — a kijelzett meccserődbe is.
+   AMIT NEM CSINÁL: nem írja át a careerPool attribútumait. Egy mentés vagy
+   egy félbehagyott meccs így sosem rögzítheti a megemelt értéket. */
+function engTokenState(){
+  const k=engKey();
+  if(!k)return null;
+  const E=engState(k);
+  if(!E||!E.tok||!E.tok.id)return null;
+  const it=engShopItem(k,E.tok.id);
+  return it?{it:it,g:E.tok.g||null}:null;}
+function engTokenAxisHit(k,pos,key,it){
+  const d=engDef(k);
+  if(!d||!it)return false;
+  if(it.key)return it.key===key;
+  if(!d.attr&&!d.attrMax&&!d.attrAvg){
+    let kk2=null;try{kk2=attrTrainedBy(pos||"KKP");}catch(e){kk2=null;}
+    return kk2===key;}
+  if(d.attrMax)return d.attrMax.indexOf(key)>=0;
+  if(d.attrAvg)return d.attrAvg.indexOf(key)>=0;
+  return (d.attr||"seb")===key;}
+/* SZORZÓ (pct) és RÁADÁS (flat) egyben: a hívó az értéket `v`-ként adja be, és
+   a megemelt értéket kapja vissza. Két alak, egy hely — így a Villám és a
+   Tiki-taka tokenje soha nem tud szétcsúszni. */
+function engTokenApply(pos,key,v){
+  if(gameMode!=="career"||!(v>0))return v;
+  const T=engTokenState();
+  if(!T)return v;
+  const k=engKey();
+  if(!engTokenAxisHit(k,pos,key,T.it))return v;
+  if(T.it.grp){
+    let grp="CSATAR";
+    try{grp=getCategoryFor(pos||"KKP");}catch(e){grp="CSATAR";}
+    if(grp!==T.g)return v;}
+  if(T.it.mode==="flat")return v+(T.it.add||0);
+  return v*(1+(T.it.pct||ENG_TOKEN_PCT));}
+function engBuyToken(k,it,grp){
+  const kk=k||engKey();
+  if(!kk||!it)return null;
+  if(engTokenState())return null;                   /* egyszerre egy token él */
+  if(it.grp&&!ENG_TOKEN_GROUPS.some(g=>g.k===grp))return null;
+  const ar=engShopPrice(kk,it);
+  if(!engPay(kk,ar))return null;
+  engState(kk).tok={id:it.id,g:it.grp?grp:null};
+  try{saveGame();}catch(e){}
+  return {id:it.id,g:it.grp?grp:null,ar:ar};}
+function engTokenGroupName(g){
+  const x=ENG_TOKEN_GROUPS.find(y=>y.k===g);
+  return x?x.n:g;}
+/* ---- 🔥🌧️☕🫁 EGY MECCSRE SZÓLÓ HATÁS (fx1) ---- */
+function engFx1State(){
+  const k=engKey();
+  if(!k)return null;
+  const E=engState(k);
+  if(!E||!E.fx1||!E.fx1.id)return null;
+  return engShopItem(k,E.fx1.id);}
+function engBuyFx1(k,it){
+  const kk=k||engKey();
+  if(!kk||!it||engFx1State())return null;
+  const ar=engShopPrice(kk,it);
+  if(!engPay(kk,ar))return null;
+  engState(kk).fx1={id:it.id};
+  try{saveGame();}catch(e){}
+  return {id:it.id,ar:ar};}
+/* ---- 🩹 TARTÓS, HALMOZÓDÓ HATÁS (fxN) és 📕🔟🧠👟🥅 HANGOLÓ (tune) ---- */
+function engBuyCount(k,it){
+  const kk=k||engKey();
+  if(!kk||!it)return null;
+  const max=it.max||3;
+  if(engBought(kk,it.id)>=max)return null;
+  const ar=engShopPrice(kk,it);
+  if(!engPay(kk,ar))return null;
+  const n=engBump(kk,it.id);
+  try{saveGame();}catch(e){}
+  return {id:it.id,n:n,max:max,ar:ar};}
+/* ---- 🧊 JELLEM-MÓDOSÍTÓ (Beton) ----
+   A Panzer dreadModApply-jának a tükörképe: ugyanaz a tengely, ugyanaz a
+   pályán/padon lévő példány-szinkron, ellenkező irány. */
+function engTraitApply(k,it,name){
+  const kk=k||engKey();
+  if(!kk||!it||!name)return null;
+  const e=careerPool&&careerPool[name];
+  if(!e)return null;
+  const dir=it.dir||1;
+  let elotte,utana,TAB,cimke;
+  if(it.trait==="ver"){
+    elotte=verI(e);TAB=VER_LEVELS;cimke="vérmérséklet";
+  }else if(it.trait==="kap"){
+    elotte=kapI(e);TAB=KAP_LEVELS;cimke="kapcsolódás";
+  }else{
+    elotte=karI(e);TAB=KAR_LEVELS;cimke="karizma";}
+  utana=elotte+dir;
+  if(utana<0||utana>TAB.length-1)return null;
+  const ar=engShopPrice(kk,it);
+  if(!engPay(kk,ar))return null;
+  if(it.trait==="ver")e.verI=utana;
+  else if(it.trait==="kap")e.kapI=utana;
+  else e.karI=utana;
+  /* A PÁLYÁN/PADON lévő példány is kövesse — a keretlista onnan olvas. */
+  try{
+    const pl=(currentRoster().find(x=>x.n===name))||(extraRoster.find(x=>x.n===name));
+    if(pl){pl.karI=e.karI;pl.kapI=e.kapI;pl.verI=e.verI;}
+  }catch(x){}
+  try{saveGame();}catch(e2){}
+  return {n:name,cimke:cimke,elotte:TAB[elotte],utana:TAB[utana],ar:ar};}
+function engTraitEnd(it,name){
+  const e=careerPool&&careerPool[name];
+  if(!e||!it)return true;
+  const dir=it.dir||1;
+  const i=(it.trait==="ver")?verI(e):(it.trait==="kap")?kapI(e):karI(e);
+  const TAB=(it.trait==="ver")?VER_LEVELS:(it.trait==="kap")?KAP_LEVELS:KAR_LEVELS;
+  return (i+dir<0)||(i+dir>TAB.length-1);}
+/* ---- 🤝 KÖTÉS-ADÁS és 🔗 PASSZKÉMIA-LÉPCSŐ (Harmónia · Tiki-taka) ----
+   A boltban EZ A KETTŐ az egyetlen tétel, ami KÉT embert kér. */
+function engBuyPair(k,it,a,b){
+  const kk=k||engKey();
+  if(!kk||!it||!a||!b||a===b)return null;
+  const ar=engShopPrice(kk,it);
+  let elotte=0,utana=0;
+  if(it.kind==="bond"){
+    try{elotte=Math.round(bondOf(a,b));}catch(e){elotte=0;}
+    if(!engPay(kk,ar))return null;
+    try{bondAdd(a,b,it.add||8);utana=Math.round(bondOf(a,b));}catch(e){utana=elotte;}
+  }else{
+    try{elotte=passChemStages(a,b);}catch(e){elotte=0;}
+    if(elotte>=PASS_CHEM_NEED)return null;
+    if(!engPay(kk,ar))return null;
+    try{addPassChemPair(a,b,elotte+1);utana=passChemStages(a,b);}catch(e){utana=elotte;}}
+  try{saveGame();}catch(e){}
+  return {a:a,b:b,elotte:elotte,utana:utana,ar:ar};}
+/* ---- ⚖️ FELZÁRKÓZTATÁS (Harmónia) ----
+   A célpont a kezdő tizenegy leggyengébb embere RATING szerint — nem
+   tengelyen, mert a Harmóniának nincs tengelye: neki a RÉS a tengelye. */
+function engRatingTarget(){
+  let best=null;
+  try{
+    (slots||[]).forEach(sl=>{
+      if(!sl||!sl.player)return;
+      let o=0;try{o=pOvr(sl.player)||0;}catch(e){o=0;}
+      if(!best||o<best.o)best={n:sl.player.n,o:o};});
+  }catch(e){}
+  return best;}
+function engBuyRating(k,it){
+  const kk=k||engKey();
+  if(!kk||!it)return null;
+  const max=it.max||3;
+  if(engBought(kk,it.id)>=max)return null;
+  const t=engRatingTarget();
+  if(!t)return null;
+  const ar=engShopPrice(kk,it);
+  if(!engPay(kk,ar))return null;
+  if(!S.ratingAdj)S.ratingAdj={};
+  S.ratingAdj[t.n]=(S.ratingAdj[t.n]||0)+(it.add||1);
+  engBump(kk,it.id);
+  try{saveGame();}catch(e){}
+  return {n:t.n,elotte:t.o,add:(it.add||1),ar:ar,n2:engBought(kk,it.id),max:max};}
+/* ---- A KÖZÖS KAPU: MIÉRT NEM MEGY? ----
+   A gomb SOSEM hazudik: ha nem megy, a felirat megmondja az okát. Ugyanaz a
+   minta, mint a szintnél (engNextWhy). Üres szöveg = mehet. */
+function engShopWhy(k,it){
+  const kk=k||engKey();
+  if(!kk||!it)return "ehhez a stílushoz nincs piac";
+  const E=engState(kk);
+  if(!E)return "ehhez a stílushoz nincs piac";
+  if(it.kind==="token"&&engTokenState())return "egy token már él a következő meccsre";
+  if(it.kind==="fx1"&&engFx1State())return "egy meccsre szóló tétel már él";
+  if(it.kind==="fxN"||it.kind==="tune"||it.kind==="rating"){
+    if(engBought(kk,it.id)>=(it.max||3))return "ez a tétel a tetején áll";}
+  if(it.kind==="train"){
+    const t=engTrainTarget(kk);
+    if(!t)return "előbb állítsd össze a kezdő tizenegyet";
+    const meg=(E.tb&&E.tb.n===t.n&&E.tb.key===t.key)?(E.tb.lvl||0):0;
+    if(meg>=ENG_TRAIN_MAX)return `${shortName(t.n)} már a gyorsítás tetején áll`;}
+  if(it.kind==="rating"&&!engRatingTarget())return "előbb állítsd össze a kezdő tizenegyet";
+  if(it.kind==="coach"&&!engCoachList(kk,it).length)return "nincs ilyen típusú stábtagod";
+  const ar=engShopPrice(kk,it);
+  if(E.pts<ar)return `${engNum(ar-E.pts)} ${engDef(kk).ptsN} hiányzik`;
+  return "";}
+/* VÁLASZTÓS-E A TÉTEL? (aki igen, annak a gombja listát nyit, nem vesz.) */
+function engShopPicks(it){
+  if(!it)return null;
+  if(it.kind==="coach")return "coach";
+  if(it.kind==="token"&&it.grp)return "grp";
+  if(it.kind==="trait")return "who";
+  if(it.kind==="bond"||it.kind==="passchem")return "pair";
+  return null;}
+/* A KÖZVETLEN (választás nélküli) vásárlás. */
+function engShopBuy(k,it){
+  const kk=k||engKey();
+  if(!kk||!it||engShopWhy(kk,it))return null;
+  if(it.kind==="train")return engBuyTrain(kk,it);
+  if(it.kind==="fx1")return engBuyFx1(kk,it);
+  if(it.kind==="rating")return engBuyRating(kk,it);
+  if(it.kind==="fxN"||it.kind==="tune")return engBuyCount(kk,it);
+  if(it.kind==="token"&&!it.grp)return engBuyToken(kk,it,null);
+  return null;}
+/* ---- A LEFÚJÁS: AMI EGY MECCSRE SZÓLT, ELFOGY ----
+   Feltétel nélkül, akkor is, ha a mérkőzésen egy pont sem gyűlt, és akkor is,
+   ha a posztcsoportból senki nem játszott: a tétel a NEVEZÉSRE szól, nem a
+   percekre — különben át lehetne vinni a hatást a következő meccsre. */
+function engMatchSpend(){
+  const k=engKey();
+  if(!k)return [];
+  const E=engState(k);
+  if(!E)return [];
+  const el=[];
+  if(E.tok&&E.tok.id){
+    const it=engShopItem(k,E.tok.id);
+    el.push({n:(it&&it.n)||E.tok.id,g:E.tok.g||null});
+    delete E.tok;}
+  if(E.fx1&&E.fx1.id){
+    const it=engShopItem(k,E.fx1.id);
+    el.push({n:(it&&it.n)||E.fx1.id,g:null});
+    delete E.fx1;}
+  return el;}
 /* ================= A SZTÁR KÖVETELÉSEI — a filozófia ÁRA =================
    A „Sztárom a párom" eddig egyoldalú alku volt: a sztár kiugró bért vitt, de
    cserébe csak adott (hírnév, reklám, tömeg). Ez a blokk teszi mellé a
@@ -48375,7 +49122,10 @@ function passChemOfferP(){
   const m=PASS_CHEM_OFFER[passChemLevel()]||0;
   if(m<=0)return 0;
   let grip=0;try{grip=ttTacticGrip();}catch(e){}
-  return Math.min(PASS_CHEM_MAX_P,PASS_CHEM_BASE_P*m*(1+PASS_CHEM_GRIP_BOOST*grip));}
+  /* 🔄 RONDÓ · „Rondó-tréning": +25% ajánlkozási esély példányonként. A
+     PASS_CHEM_MAX_P plafon itt is áll — a bolt nem nyitja ki. */
+  let bolt=1;try{bolt=1+0.25*engTune("pcOffer");}catch(e){bolt=1;}
+  return Math.min(PASS_CHEM_MAX_P,PASS_CHEM_BASE_P*m*(1+PASS_CHEM_GRIP_BOOST*grip)*bolt);}
 function passChemStore(){if(!S.passChem)S.passChem={};return S.passChem;}
 function passChemKey(a,b){return [a,b].sort().join("§");}
 function passChemPairOf(a,b){return passChemStore()[passChemKey(a,b)]||null;}
@@ -74897,6 +75647,9 @@ function msWithRestore(fn){
             bench:Object.assign({},BENCH),extra:extraRoster.slice(),
             tac:(typeof S!=="undefined"&&S&&S.tactics)?S.tactics.active:null};
   const pr=_msProbing;_msProbing=true;
+  /* A bontott állapot gyorsítótára a keresés idejére nyílik ki, és a keresés
+     végén bezárul — kívül sosem él (lásd engBaseParts). */
+  if(!pr)engPartsCacheClear();
   try{return fn();}
   catch(e){return null;}
   finally{
@@ -74905,7 +75658,8 @@ function msWithRestore(fn){
     Object.keys(sv.bench).forEach(k=>{BENCH[k]=sv.bench[k];});
     extraRoster=sv.extra;
     if(typeof S!=="undefined"&&S&&S.tactics)S.tactics.active=sv.tac;
-    _msProbing=pr;}}
+    _msProbing=pr;
+    if(!pr)engPartsCacheClear();}}
 /* ---- A KERESÉS ----
    Négy tengely, mindegyik VALÓDI menedzseri lépés:
      1. FELÁLLÁS   — minden ismert felállás, a kerettel feltöltve
@@ -90572,7 +91326,10 @@ function bz9GoalMult(name,min,gf,ga,mScore){
   if(!nine||name!==nine)return 1;
   /* A FRONTEMBER-ZÁRADÉK: hajrában hátrányban nem ő a megoldás. */
   if(min>=BZ9_FADE_MIN&&gf<ga)return 1;
-  const db=Math.min(BZ9_MAX_STEPS,(mScore&&mScore[name])||0);
+  /* 📈 GÓLBÖRZE · „A Kilences étrendje": a megvett lépcsők ide jönnek. */
+  let _max=BZ9_MAX_STEPS;
+  try{_max+=engTune("nineSteps");}catch(e){}
+  const db=Math.min(_max,(mScore&&mScore[name])||0);
   if(db<=0)return 1;
   return 1+(BZ9_STEP[bzTier()]||0)*db;}
 /* ---- A REKORD KÖTELEZ ---- */
@@ -90585,7 +91342,11 @@ function bzRecGoalMult(gf){
   const t=bzTier();
   if(!t)return 1;
   const rec=S.recGoalsMatch||0;
-  if(rec>=2&&gf>=rec-1)_bzRecArmed=true;
+  /* 📈 GÓLBÖRZE · „Rekordkönyv": a hajrá alapból egy gólra a csúcstól indul;
+     minden megvett példány eggyel kijjebb tolja ezt a határt. */
+  let _nyit=1;
+  try{_nyit+=engTune("recNear");}catch(e){}
+  if(rec>=2&&gf>=rec-_nyit)_bzRecArmed=true;
   if(!_bzRecArmed)return 1;
   return 1+(BZREC_BUMP[t]||0);}
 /* A LEFÚJÁS: a rekord könyvelése. Egy helyen — a tarifa (engFullTimeNote) már
@@ -90597,6 +91358,20 @@ function bzRecFullTime(gf){
   if(regi>=2){
     try{addLine(`⚽ <b>ÚJ KLUBREKORD!</b> ${gf} gól egy mérkőzésen — a régi csúcs `
       +`${regi} volt.`,"m mvp");}catch(e){}}}
+/* Melyik bolt-tétel választólistája van nyitva. Ugyanaz a minta, mint a
+   Panzer rettenet-boltjánál (_dreadOpen): a panel egyszerre egy listát mutat,
+   és a gomb maga zárja be. Játékmeneti hatása nincs, a mentés nem viszi. */
+let _engShopOpen=null;
+/* Egy tényező-sor a bontásban. A `max` nélküli sornál (Mélység) nincs csík:
+   annak nincs tetőzése, és egy hamis „tele" csík félrevezetne. */
+function engPartRow(p){
+  const tele=p.max?Math.max(0,Math.min(100,Math.round((p.v/p.max)*100))):0;
+  return `<div class="msItem"><div class="msTop"><b>${p.ic} ${esc(p.n)}</b>`
+    +`<span class="msRew">${engNum(p.v)}${p.max?` / ${p.max}`:""}</span></div>`
+    +(p.max?`<div style="height:6px;background:var(--panel2);border-radius:4px;`
+      +`margin:6px 0 4px;overflow:hidden"><div style="height:100%;width:${tele}%;`
+      +`background:var(--gold)"></div></div>`:"")
+    +`<div class="msDesc">${p.d}</div></div>`;}
 function engSectionHtml(){
   const k=engKey(),d=engDef(k),E=engState(k);
   if(!k||!d||!E)return "";
@@ -90615,7 +91390,23 @@ function engSectionHtml(){
     +`<div class="msDesc">Meccsenként legfeljebb <b>${engNum(cap)}</b> ${esc(d.ptsN)} `
     +`gyűjthető (a ${esc(d.stateN)} ${Math.round(ENG_MATCH_PCT*100)}%-a). `
     +`A klub egyenlege: <b>${engNum(E.pts)}</b> — eddig összesen `
-    +`<b>${engNum(E.earned||0)}</b> gyűlt, ebből <b>${engNum(E.spent||0)}</b> elköltve.</div></div>`
+    +`<b>${engNum(E.earned||0)}</b> gyűlt, ebből <b>${engNum(E.spent||0)}</b> elköltve.</div></div>`;
+  /* ---- A BONTÁS (3.9.127): miből jön a szám, tényezőnként ---- */
+  {const P=engBaseParts(k);
+   h+=`<div class="msNote" style="margin:9px 0 2px">A <b>${esc(d.stateN)}</b> `
+     +`<b>négy tényezőből</b> áll össze. Az első a törzs — a másik három tetőzött, `
+     +`és együtt sem visz többet, mint a törzs ötöde: nem helyettesítik a keretet, `
+     +`hanem MEGINDOKOLJÁK, és adnak három konkrét fogódzót ahhoz, aki tolni akarja.`
+     +`<br><span style="color:var(--dim2)">Egyik tényező sem a kiállított kezdő `
+     +`tizenegyből számol, hanem a TELJES keretből — felállással nem lehet kijátszani.</span></div>`;
+   P.forEach(x=>{h+=engPartRow(x);});
+   const _L=styleLevel(engStyle(k))||1;
+   h+=`<div class="msNote" style="margin:2px 0 9px">Összesen: `
+     +`<b>${engNum(engBaseRaw(k))}</b> nyers. Ezt ${(_L===1||_L===5)?"az":"a"} `
+     +`<b>${_L}.</b> csapatstílus-szinted <b>×${engNum(engScale(k))}</b>-re skálázza `
+     +`(az 1. szinten fél, a ${STYLE_LVL_MAX}.-on kétszeres), így lesz belőle `
+     +`<b>${engNum(szint)}</b> ${esc(d.stateN)}.</div>`;}
+  h+=""
     /* ---- A SZINT ---- */
     +`<div class="msItem"><div class="msTop"><b>${d.ic} ${esc(d.lvlN)}</b>`
     +`<span class="msRew">${lv}/${ENG_MAX}${ar?` · ${ar} pont`:""}</span></div>`
@@ -90692,13 +91483,210 @@ function engSectionHtml(){
       +(rec<2?`<br><span style="color:var(--dim2)">Legalább 2 gólos csúcs kell hozzá — `
          +`addig nincs mit megközelíteni.</span>`:"")
       +`</div></div>`;}
+  h+=engShopHtml(k,d,E);
   return h+`</div></div>`;}
+/* ================= A PIAC KIRAJZOLÁSA (3.9.128) ========================
+   Egyetlen renderelő MIND A HAT piacra: a tábla `shop` tömbjéből épül, tehát
+   egy új termék felvételéhez itt nem kell hozzányúlni semmihez. A tételek
+   alakja a Panzer rettenet-boltjáé — cím · ár · magyarázat · gomb —, a gomb
+   viszont SOSEM hazudik: ha nem megy, a felirat megmondja, miért nem.
+
+   NÉGYFÉLE GOMB VAN, és a tétel fajtája dönti el, melyik:
+     · azonnali vétel (fx1, fxN, tune, train, rating, csapatszintű token)
+     · „Kinek?"  — stábtag-lista (coach) vagy keret-lista (trait)
+     · „Melyik posztcsoportnak?" — a négy poszt-csoport (token, grp)
+     · „Kik ketten?" — kétlépcsős páros-választás (bond, passchem) */
+let _engPairA=null;    /* a páros-tételnél az ELSŐ kiválasztott ember */
+function engShopStateTxt(k,it,E){
+  /* MIT MOND EL A TÉTEL MAGÁRÓL: hányszor vetted meg, kin fut, mikor jár le. */
+  if(it.kind==="fxN"||it.kind==="tune"){
+    const n=engBought(k,it.id),max=it.max||3;
+    return n?`<span style="color:var(--grass)">Megvéve: <b>${n}/${max}</b></span>`
+            :`<span style="color:var(--dim2)">Még nincs megvéve (legfeljebb ${max}×)</span>`;}
+  if(it.kind==="rating"){
+    const n=engBought(k,it.id),max=it.max||3,t=engRatingTarget();
+    return (n?`<span style="color:var(--grass)">Megvéve: <b>${n}/${max}</b></span> · `:"")
+      +(t?`<span style="color:var(--dim2)">A mostani célpont: <b>${esc(shortName(t.n))}</b> `
+          +`(Rating ${Math.round(t.o)})</span>`
+         :`<span style="color:var(--dim2)">Nincs kiállított kezdő tizenegy.</span>`);}
+  if(it.kind==="train"){
+    const t=engTrainTarget(k),meg=(E.tb&&(E.tb.lvl||0))?E.tb:null;
+    return (t?`<span style="color:var(--dim2)">A mostani célpont: <b>${esc(shortName(t.n))}</b> — `
+        +`${esc(ATTR_LABELS[t.key]||t.key)} ${Math.round(t.v)}.</span>`
+       :`<span style="color:var(--dim2)">Nincs kiállított kezdő tizenegy.</span>`)
+      +(meg?`<br><span style="color:var(--grass)">Fut: <b>${esc(shortName(meg.n))}</b> · `
+        +`${esc(ATTR_LABELS[meg.key]||meg.key)} · ${meg.lvl}/${ENG_TRAIN_MAX}. fokozat `
+        +`(+${Math.round(meg.lvl*ENG_TRAIN_STEP*100)}%)</span>`:"");}
+  if(it.kind==="token"){
+    const T=engTokenState();
+    return (T&&T.it.id===it.id)
+      ?`<span style="color:var(--grass)">Él${T.g?`: <b>${esc(engTokenGroupName(T.g))}</b>`:""} `
+       +`— a következő mérkőzésen. A lefújásnál elhasználódik.</span>`:"";}
+  if(it.kind==="fx1"){
+    const F=engFx1State();
+    return (F&&F.id===it.id)
+      ?`<span style="color:var(--grass)">Él — a következő mérkőzésen. `
+       +`A lefújásnál elhasználódik.</span>`:"";}
+  return "";}
+function engShopHtml(k,d,E){
+  const lista=engShopList(k);
+  if(!lista.length)return "";
+  let h=`<div class="msNote" style="margin:12px 0 4px">${d.shopIc||"🛒"} `
+    +`<b>${esc(d.shopN||"A piac")}.</b> ${d.shopD||""}`
+    +`<br><span style="color:var(--dim2)">Az árak a tarifával együtt nőnek `
+    +`(most <b>×${engNum(engScaleT(k))}</b>), tehát a karrier végén is pontosan annyi `
+    +`MECCSNYI munkába kerülnek, mint az elején. A ${esc(d.lvlN)} ára ezzel szemben `
+    +`fix: az a hosszú létra, ez a rövid döntés.</span></div>`;
+  lista.forEach(it=>{
+    const ar=engShopPrice(k,it),baj=engShopWhy(k,it),pick=engShopPicks(it);
+    const nyitva=_engShopOpen===it.id;
+    const all=engShopStateTxt(k,it,E);
+    h+=`<div class="msItem${nyitva?" fresh":""}"><div class="msTop">`
+      +`<b>${it.ic} ${esc(it.n)}</b><span class="msRew">${ar} pont</span></div>`
+      +`<div class="msDesc">`
+      +`<span style="color:var(--dim2)">${it.tag==="egy meccs"?"⏱️ EGY MÉRKŐZÉSRE":"♾️ TARTÓS"}</span><br>`
+      +it.d+(all?`<br>${all}`:"")+`</div>`;
+    /* A GOMB. Választós tételnél listát nyit; egyébként azonnal vesz. */
+    if(baj&&!nyitva){
+      h+=`<button class="btn-s stepbtn" disabled style="margin-top:7px;padding:8px">`
+        +esc(baj)+`</button>`;
+    }else if(!pick){
+      h+=`<button class="btn-y stepbtn" data-engbuy="${it.id}" style="margin-top:7px;padding:8px">`
+        +`Megveszem — ${ar} pont</button>`;
+    }else{
+      const felirat=(pick==="grp")?"Melyik posztcsoportnak?"
+                   :(pick==="pair")?"Kik ketten?":"Kinek?";
+      h+=`<button class="btn-${nyitva?"y":"s"} stepbtn" data-engopen="${it.id}" `
+        +`style="margin-top:7px;padding:8px">`+(nyitva?"Mégsem":felirat)+`</button>`;
+      if(nyitva)h+=engShopPickHtml(k,it,pick);}
+    h+=`</div>`;});
+  return h;}
+/* ---- A VÁLASZTÓLISTÁK ---- */
+function engShopPickHtml(k,it,pick){
+  let x=`<div style="margin-top:7px">`;
+  if(pick==="grp"){
+    ENG_TOKEN_GROUPS.forEach(g=>{
+      x+=`<button class="btn-s stepbtn" data-enggrp="${it.id}|${g.k}" `
+        +`style="margin-top:5px;text-align:left;padding:7px">`
+        +`${g.ic} <b>${esc(g.n)}</b></button>`;});
+  }else if(pick==="coach"){
+    engCoachList(k,it).forEach(c=>{
+      x+=`<button class="btn-s stepbtn" data-engcoach="${it.id}|${c.i}"${c.teto?" disabled":""} `
+        +`style="margin-top:5px;text-align:left;padding:7px">`
+        +`<b>${esc(shortName(c.c.n))}</b> <span style="color:var(--dim2)">`
+        +`Szakértelem ${c.c.sz||0}`+(c.teto?" · a saját plafonján áll":"")+`</span></button>`;});
+  }else if(pick==="who"){
+    const TAB=(it.trait==="ver")?VER_LEVELS:(it.trait==="kap")?KAP_LEVELS:KAR_LEVELS;
+    (fullCareerRoster()||[]).forEach(pl=>{
+      const e=careerPool&&careerPool[pl.n];
+      if(!e)return;
+      const i=(it.trait==="ver")?verI(e):(it.trait==="kap")?kapI(e):karI(e);
+      const vege=engTraitEnd(it,pl.n);
+      x+=`<button class="btn-s stepbtn" data-engwho="${it.id}|${esc(pl.n)}"${vege?" disabled":""} `
+        +`style="margin-top:5px;text-align:left;padding:7px">`
+        +`<b>${esc(shortName(pl.n))}</b> <span style="color:var(--dim2)">${esc(TAB[i]||"—")}`
+        +(vege?" · a szélén áll":"")+`</span></button>`;});
+  }else if(pick==="pair"){
+    /* KÉTLÉPCSŐS: előbb az egyik ember, aztán a másik. A már kiválasztott
+       ember sora kiemelve marad, hogy lássad, kivel párosítasz. */
+    if(_engPairA)x+=`<div class="msDesc" style="margin-bottom:5px">Első ember: `
+      +`<b style="color:var(--gold)">${esc(shortName(_engPairA))}</b> — most válaszd ki a párját.</div>`;
+    (fullCareerRoster()||[]).forEach(pl=>{
+      if(_engPairA===pl.n)return;
+      let jel="";
+      if(_engPairA){
+        if(it.kind==="bond"){
+          let b=0;try{b=Math.round(bondOf(_engPairA,pl.n));}catch(e){b=0;}
+          jel=`összhang ${b}`;
+        }else{
+          let st=0;try{st=passChemStages(_engPairA,pl.n);}catch(e){st=0;}
+          jel=`passzkémia ${st}/${PASS_CHEM_NEED}`;}}
+      x+=`<button class="btn-s stepbtn" data-engpair="${it.id}|${esc(pl.n)}" `
+        +`style="margin-top:5px;text-align:left;padding:7px">`
+        +`<b>${esc(shortName(pl.n))}</b>`
+        +(jel?` <span style="color:var(--dim2)">${jel}</span>`:"")+`</button>`;});}
+  return x+`</div>`;}
 function engSectionBind(body){
   if(!body)return;
   const b=body.querySelector("#engBuyLvl");
   if(b)b.onclick=()=>{if(engBuyLevel())renderStylePanel();};
   const n=body.querySelector("#bz9Pick");
-  if(n)n.onchange=()=>{bz9Set(n.value||null);renderStylePanel();};}
+  if(n)n.onchange=()=>{bz9Set(n.value||null);renderStylePanel();};
+  /* ---- A PIAC (3.9.128) ---- */
+  const k=engKey(),d=engDef(k);
+  if(!k||!d)return;
+  const jel=(txt)=>{try{addLine(`${d.ic} ${txt}`,"m life");}catch(e){}};
+  const frissit=()=>{
+    _engShopOpen=null;_engPairA=null;
+    renderStylePanel();
+    try{renderHub();refreshSquadViews();}catch(e){}};
+  const arTxt=r=>`<span style="color:var(--dim2)">(−${r.ar} ${esc(d.ptsN)})</span>`;
+  body.querySelectorAll("[data-engopen]").forEach(btn=>{
+    btn.onclick=()=>{
+      const id=btn.getAttribute("data-engopen");
+      _engShopOpen=(_engShopOpen===id)?null:id;
+      _engPairA=null;
+      renderStylePanel();};});
+  body.querySelectorAll("[data-engbuy]").forEach(btn=>{
+    btn.onclick=()=>{
+      const it=engShopItem(k,btn.getAttribute("data-engbuy"));
+      const r=engShopBuy(k,it);
+      if(!r)return;
+      if(it.kind==="train")
+        jel(`<b>${esc(it.n)}</b> — <b>${esc(shortName(r.n))}</b> `
+          +`${esc(ATTR_LABELS[r.key]||r.key)}-fejlődése <b>+${Math.round(r.lvl*ENG_TRAIN_STEP*100)}%</b> `
+          +`<span style="color:var(--dim2)">(${r.lvl}/${ENG_TRAIN_MAX}. fokozat)</span> ${arTxt(r)}`);
+      else if(it.kind==="rating")
+        jel(`<b>${esc(it.n)}</b> — <b>${esc(shortName(r.n))}</b> Ratingje `
+          +`<b>+${r.add}</b> <span style="color:var(--dim2)">(${r.n2}/${r.max})</span> ${arTxt(r)}`);
+      else if(it.kind==="fx1")
+        jel(`<b>${esc(it.n)}</b> — a KÖVETKEZŐ mérkőzésen él. ${arTxt(r)}`);
+      else if(it.kind==="token")
+        jel(`<b>${esc(it.n)}</b> — a KÖVETKEZŐ mérkőzésen él. ${arTxt(r)}`);
+      else
+        jel(`<b>${esc(it.n)}</b> — megvéve (<b>${r.n}/${r.max}</b>). ${arTxt(r)}`);
+      frissit();};});
+  body.querySelectorAll("[data-enggrp]").forEach(btn=>{
+    btn.onclick=()=>{
+      const two=btn.getAttribute("data-enggrp").split("|");
+      const it=engShopItem(k,two[0]);
+      const r=engBuyToken(k,it,two[1]);
+      if(!r)return;
+      jel(`<b>${esc(it.n)}</b> — <b>${esc(engTokenGroupName(r.g))}</b>, `
+        +`a következő mérkőzésen. ${arTxt(r)}`);
+      frissit();};});
+  body.querySelectorAll("[data-engcoach]").forEach(btn=>{
+    btn.onclick=()=>{
+      const two=btn.getAttribute("data-engcoach").split("|");
+      const it=engShopItem(k,two[0]);
+      const r=engBuyCoach(k,it,parseInt(two[1],10));
+      if(!r)return;
+      jel(`<b>${esc(it.n)}</b> — <b>${esc(shortName(r.n))}</b> Szakértelme `
+        +(r.utana>r.elotte?`${r.elotte} → <b>${r.utana}</b>`
+          :`${r.utana} maradt (a tapasztalat gyűlik, a plafonja fogja)`)+` ${arTxt(r)}`);
+      frissit();};});
+  body.querySelectorAll("[data-engwho]").forEach(btn=>{
+    btn.onclick=()=>{
+      const two=btn.getAttribute("data-engwho");
+      const i=two.indexOf("|");
+      const it=engShopItem(k,two.slice(0,i));
+      const r=engTraitApply(k,it,two.slice(i+1));
+      if(!r)return;
+      jel(`<b>${esc(it.n)}</b> — <b>${esc(shortName(r.n))}</b> ${esc(r.cimke)}e: `
+        +`${esc(r.elotte)} → <b>${esc(r.utana)}</b> ${arTxt(r)}`);
+      frissit();};});
+  body.querySelectorAll("[data-engpair]").forEach(btn=>{
+    btn.onclick=()=>{
+      const raw=btn.getAttribute("data-engpair");
+      const i=raw.indexOf("|");
+      const id=raw.slice(0,i),nev=raw.slice(i+1);
+      if(!_engPairA){_engPairA=nev;renderStylePanel();return;}
+      const it=engShopItem(k,id);
+      const r=engBuyPair(k,it,_engPairA,nev);
+      if(!r){_engPairA=null;renderStylePanel();return;}
+      jel(`<b>${esc(it.n)}</b> — <b>${esc(shortName(r.a))}</b> + `
+        +`<b>${esc(shortName(r.b))}</b>: ${r.elotte} → <b>${r.utana}</b> ${arTxt(r)}`);
+      frissit();};});}
 function fearSectionBind(body){
   if(!body)return;
   body.querySelectorAll("[data-dread]").forEach(b=>{
@@ -96210,6 +97198,12 @@ function styleActiveFx(){
       if(pre&&t.key!==pz0Ability())return;
       const lv=styleTraitLevelIn(st,t.key);
       if(lv>0&&t.lv[lv-1])out.push(t.lv[lv-1].fx||{});});});
+  /* A STÍLUSBOLTBAN MEGVETT HATÁSOK (3.9.128). Nem kapnak saját motor-ágat:
+     ugyanebbe a listába kerülnek, mint a képességfa hatásai — így a motor
+     összes meglévő csatornája (ownGoalMult, oppGoalMult, injMult,
+     moraleFloor, gpPressMult) azonnal használható a boltból is, és a
+     szorzós/összeadódó szabály is magától ugyanaz marad. */
+  try{engShopFx().forEach(f=>{if(f)out.push(f);});}catch(e){}
   return out;}
 /* SZORZÓS csatorna: a képességek hatása összeszorzódik.
    AZ ÉRTÉK ITT IS LEHET FÜGGVÉNY — ugyanúgy, mint az összeadódó csatornán. A
