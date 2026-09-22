@@ -207,3 +207,32 @@ egyébként az utolsó.
 
 A kiadott buildben a kulcs az azonosító — ott tehát a nevet **tényleg a
 felhasználó írja be**, nem mi szállítjuk hozzá.
+
+## A 37. köteg — négy kiejtési rés, méréssel (3.9.129)
+
+A mérés az **élő `HU_NAME_TABLE`-ön** futott, és négy nyitott szabályt
+mutatott meg. Mindegyiknél kevés a találat, ezért a **kézi réteg** az olcsóbb
+és biztosabb út — a motorba nyúlni értük több kockázat lenne, mint haszon.
+
+| Rés | Példa | Db |
+|-----|-------|----|
+| német: két magánhangzó közti `s` = **z** | Kruse → **Krúze** | 5 |
+| svájci-francia, németnek nézve | Chapuisat → **Sapüizá** | 1 |
+| francia `ai` = **e**, nem „áj" | Vairelles → **Verell** | 3 |
+| maghrebi `s` = **sz** (francia helyesírás) | Saihi → **Szájhi** | 1 |
+
+Az `af` (maghrebi/afrikai, francia **helyesírással**) nevek helyesen maradnak
+„aj"-osak — ott az `ai` tényleg két hang (Haidara, Zairi). A keresztnevek a
+gépi kiosztásból maradnak; csak a vezetéknév változik.
+
+### ⚠️ `table.json` — poros, ne higgy neki
+
+A mappában lévő `tools/nevek/table.json` **2026. szeptember 4-i**, azóta
+~1000 néven elavult, és a `build.py` docstringje **tévesen** állítja, hogy ő
+írja: a build már közvetlenül az `index.html` `HU_NAME_TABLE`-jét írja felül,
+a `table.json`-t nem érinti.
+
+Ez egy valódi csapda: a 37. köteg első mérése ezen a fájlon futott, és **hamis
+hibákat** mutatott (`Wiese → Fise`, `McFarland → Mkfarland`) — mindkettő rég
+javítva van az élő táblában. **Mérni mindig az `index.html`-ből kell.**
+

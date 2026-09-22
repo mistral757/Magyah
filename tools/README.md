@@ -1972,10 +1972,17 @@ tételeket **a motorban** méri, nem a számlálón: a Rekordkönyv után a
 rekord-hajrá tényleg hamarabb armol, a Közös futás után a gyilkos páros érése
 tényleg rövidebb.
 
-**Amit a próbának meg kellett tanulnia.** A `bzRecGoalMult` a `BZ9_TIERS`
+**Az ár RÖGZÍTETT** (3.9.129), mint a Panzer boltjában. A próba ezt két
+állítással őrzi: az állapot-szint negyvenszeres felnagyítása sem mozdítja az
+árat, és mind a tizennyolc ár betűre a tábla száma.
+
+**Amit a próbának meg kellett tanulnia.** (1) A `bzRecGoalMult` a `BZ9_TIERS`
 kapuja mögött ül (3. csapatstílus-szint), tehát az első mérés „hatástalannak"
-látta a Rekordkönyvet, pedig csak zárva volt. A próba azóta felhúzza a
-stílusszintet, és külön állítja, hogy a kapu nyitva van.
+látta a Rekordkönyvet, pedig csak zárva volt — a próba azóta felhúzza a
+stílusszintet, és külön állítja, hogy a kapu nyitva van. (2) Az ár-kontroll
+először ×4-gyel nagyított, és az véletlenszerűen NEM vitte az állapotot az
+`ENG_SCALE_FROM` (100) fölé — a „nem mozdul" állítás így néha semmit nem
+bizonyított. Most ×40, garantáltan.
 
 Részletes magyarázat: `docs/stilusbolt.md`.
 

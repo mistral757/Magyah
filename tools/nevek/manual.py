@@ -1539,3 +1539,35 @@ MANUAL.update({
   "Vladimir Jugović":       ("Jugovics Vladi", "Jugovics"),
   "Dragan Stojković":       ("Sztojkovics Pongrác", "Sztojkovics"),
 })
+
+# ══ 37. KÖTEG — négy kiejtési rés, méréssel megtalálva (3.9.129) ═══════════
+# A mérés az ÉLŐ HU_NAME_TABLE-ön futott (nem a poros table.json-on), és négy
+# nyitott szabályt mutatott meg. Mindegyiknél kevés a találat, ezért a kézi
+# réteg az olcsóbb és biztosabb út — a motorba nyúlni értük több kockázat
+# lenne, mint haszon.
+#
+#   1. NÉMET: két magánhangzó közti `s` = z (Kruse → Krúze). Öt név.
+#   2. SVÁJCI-FRANCIA, németnek nézve: a Chapuisat nem német, hanem francia
+#      kiejtésű — a nemzetiség szerinti nyelvválasztás itt egyszerűen téved.
+#   3. FRANCIA `ai` = e, nem „áj" (Vairelles → Verell). Három név. Az `af`
+#      (maghrebi/afrikai, francia HELYESÍRÁSSAL) nevek helyesen maradnak
+#      „aj"-osak — ott az `ai` tényleg két hang.
+#   4. MAGHREBI `s` = sz: a Saihi francia helyesírású, tehát az `S` nem „s".
+#
+# A KERESZTNEVEK a gépi kiosztásból maradnak — csak a vezetéknév változik.
+MANUAL.update({
+  # ── 1. német: magánhangzók közti s = z ───────────────────────────────────
+  "Max Kruse":              ("Krúze Ákos", "Krúze"),
+  "Tim Wiese":              ("Víze Timót", "Víze"),
+  "Robin Gosens":           ("Gózensz Robi", "Gózensz"),
+  "Kay Voser":              ("Fószer Gyárfás", "Fószer"),
+  "Franz Hasil":            ("Házil Ferenc", "Házil"),
+  # ── 2. svájci-francia, nem német ─────────────────────────────────────────
+  "Stéphane Chapuisat":     ("Sapüizá István", "Sapüizá"),
+  # ── 3. francia ai = e ────────────────────────────────────────────────────
+  "Tony Vairelles":         ("Verell Tóni", "Verell"),
+  "Pierre Laigle":          ("Legöl Péter", "Legöl"),
+  "Flavien Tait":           ("Té Zétény", "Té"),
+  # ── 4. maghrebi: a francia helyesírás s-e = sz ───────────────────────────
+  "Jamel Saihi":            ("Szájhi Csongor", "Szájhi"),
+})

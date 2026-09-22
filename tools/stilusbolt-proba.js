@@ -177,13 +177,23 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
     ki.idEgyedi=(new Set(ki.idk)).size===ki.idk.length;
     ki.fajtaDb=Object.keys(ki.fajtak).length;
     {setStyle("villam");
+     /* AZ ÁR RÖGZÍTETT (3.9.128, javítva): az állapot-szint négyszerezése sem
+        mozdíthatja el — pontosan úgy, ahogy a Panzer boltjában sem. */
      const it=engShopItem("villam","gyujto");
      const e1=engShopPrice("villam",it),s0=engScaleT("villam");
      const ment=ENG_DEFS.villam.baseScale;
-     ENG_DEFS.villam.baseScale=ment*4;
+     /* ×40, nem ×4: a kontrollnak GARANTÁLTAN át kell vinnie az állapotot az
+        ENG_SCALE_FROM (100) fölé, különben a tarifa-szorzó 1 marad, és a
+        „nem mozdul" állítás önmagában semmit nem bizonyítana. */
+     ENG_DEFS.villam.baseScale=ment*40;
      const e2=engShopPrice("villam",it),s1=engScaleT("villam");
      ENG_DEFS.villam.baseScale=ment;
-     ki.arSkala=[e1,e2,n1(s0),n1(s1)];
+     ki.arFix=[e1,e2,it.ar,n1(s0),n1(s1)];
+     /* …és a tizennyolc ár MIND a tábla száma, sehol semmi szorzó. */
+     ki.arElter=[];
+     Object.keys(ENG_DEFS).forEach(kk=>{
+       engShopList(kk).forEach(x=>{
+         if(engShopPrice(kk,x)!==x.ar)ki.arElter.push(kk+"/"+x.id);});});
      ki.szintArFix=[ENG_PRICE[1],engNextPrice("villam")];}
 
     /* ================= C) A HATÁSFAJTÁK, EGYENKÉNT ================= */
@@ -377,8 +387,10 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
   ok(t.fajtaDb>=7,"legalább hétféle HATÁSFAJTA szerepel köztük",t.fajtak);
   {const rossz=Object.keys(t.piacok).filter(k=>t.piacok[k].egymeccs!==1||!t.piacok[k].legolcsobb);
    ok(rossz.length===0,"stílusonként pontosan EGY egymeccses tétel, és az a legolcsóbb",rossz);}
-  ok(t.arSkala[1]>t.arSkala[0]&&t.szintArFix[0]===t.szintArFix[1],
-     "az árak a tarifával nőnek, a SZINT ára fix",[t.arSkala,t.szintArFix]);
+  ok(t.arFix[0]===t.arFix[1]&&t.arFix[0]===t.arFix[2]&&t.arFix[4]>t.arFix[3],
+     "az ár RÖGZÍTETT: az állapot-szint felnagyítása sem mozdítja",t.arFix);
+  ok(t.arElter.length===0,"…és mind a tizennyolc ár betűre a tábla száma",t.arElter);
+  ok(t.szintArFix[0]===t.szintArFix[1],"a SZINT ára szintén fix",t.szintArFix);
 
   console.log("\n— C) A HATÁSFAJTÁK —");
   ok(t.fxOwn.utana>t.fxOwn.elotte,"🔥 fx1 · a csapat gólesélye nő",[t.fxOwn.elotte,t.fxOwn.utana]);

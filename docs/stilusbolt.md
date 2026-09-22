@@ -1,4 +1,4 @@
-# 🛒 A bontott állapot és a hat piac (3.9.127 · 3.9.128)
+# 🛒 A bontott állapot és a hat piac (3.9.127 · 3.9.128 · 3.9.129)
 
 ## A kérés
 
@@ -169,10 +169,17 @@ megvenni.
 (25-30), egy **közepes tartós** (85-110) és egy **drága tartós** (140-180). Így
 a hat piac összemérhető marad, pedig teljesen mást árulnak.
 
-**Az árak a tarifával nőnek** (`engScaleT`) — ugyanaz az érv, mint a
-tarifánál: a bevétel az állapot-szinttel nő, tehát a fix ár idővel ingyenné
-válna. A **szint** (`ENG_PRICE`) ára viszont **fix marad**: az a hosszú létra,
-és annak épp az a dolga, hogy a karrier előrehaladtával könnyebb legyen.
+**Az árak RÖGZÍTETTEK** (3.9.129) — betűre úgy, ahogy a Panzer
+rettenet-boltjában (`DREAD_PRICE_MOD`, `DREAD_PRICE_KAR`, `RETTEGES_PRICE`).
+
+A 3.9.128 első változata a tarifával skálázta őket (`engScaleT`), azzal az
+érvvel, hogy a bevétel az állapot-szinttel nő, tehát a fix ár idővel ingyenné
+válna. **A projektgazda ezt elutasította:** *„nem jó, hogy scalelnek az árak
+itt. Legyenek rögzített árak, akárcsak a panzerkampfwagennél."* És igaza van a
+referencia-megvalósításon túl is: a skálázás pont azt a jutalmat vette el,
+amiért az ember a filozófiát építi. A Panzernél egy jellem-módosító a
+huszadik szinten is ugyanannyiba kerül — csak ott már kevesebb meccs kell
+hozzá. **Ez** a fejlődés érzete. A szint (`ENG_PRICE`) ára ugyanígy fix.
 
 **Tizennyolc termék, tíz hatásfajta.** Csak a Villám három tétele ismétlődik
 máshol — és az szándékos: az a kérés szó szerinti teljesítése.
