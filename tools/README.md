@@ -1850,6 +1850,39 @@ MOSTANI felállás mindig jelölt — az definíció szerint kiállítható.
 
 Részletes magyarázat: `docs/meccsero-potencial.md`.
 
+## hiper-szuper-kupa-proba.js — 🟣 a szuperligák saját sorozata
+
+```bash
+node tools/hiper-szuper-kupa-proba.js
+```
+
+**Egy néma hiba, amit a feature kitakart.** A `PYR_CUPS` kvalifikációs tábla
+a D1-ig ért; D0-tól az index negatív lett, a `PYR_CUPS[-1]` undefined, és a
+`||` a LEGALSÓ osztály sorát adta vissza — a világ tetején a piramis
+legkisebb kupája futott. Nem elírás, hanem hiányzó sor.
+
+**A sorozat.** D0-tól mindenki a Hiper Szuper Kupát játssza, selejtező
+nélkül. A mezőnye a SZEZONINDÍTÓ meccs-erődhöz mérve épül (`msKick`), nem az
+élőhöz: a kupa a szezon végén fut, és élő méréssel a sorozat önmagát húzná
+maga után. D0-n −1, és osztályonként eggyel feljebb.
+
+**A lefolyás** svájci: egy 32-es tabella, nyolc forduló, majd 1–8 egyenesen
+a nyolcaddöntőbe, 9–24 rájátszás, 25–32 kiesik. A gépezet három függvényen
+át látja a különbséget (`compGroups` / `compGroupSize` / `compSchedule`),
+ezért a sorsolás, a forduló-szimuláció és a felület változatlan.
+
+**A menetrend lánc-javítása** külön figyelmet érdemel: a mohó
+hazai-pálya-kiosztás 3/4/5-re állt be, és egyszerű páronkénti fordítás sem
+vitte 4-re (a túlterhelt és az alulterhelt csapat gyakran nem játszik
+egymással). Egy irányított lánc (BFS) a legtöbbtől a legkevesebbig
+megoldja: a lánc minden párját megfordítva egy hazai pálya vándorol át, a
+közbülsők mérlege változatlan. Mérve: mindenkinek pontosan 4 hazai.
+
+Harminc állítás, köztük a **három út végigjárva** (`euroFinishGroupStage`
+mindhárom sávra) és az, hogy a **klasszikus kupa bitre változatlan**.
+
+Részletes magyarázat: `docs/hiper-szuper-kupa.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
