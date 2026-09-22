@@ -1945,6 +1945,37 @@ sodródás.
 
 Részletes magyarázat: `docs/kupa-meccsero.md`.
 
+## stilusbolt-proba.js — 🛒 a bontott állapot és a stílusbolt
+
+```bash
+node tools/stilusbolt-proba.js
+```
+
+**A kérés.** „Legyen jobban elmagyarázva, milyen tényezők adják ki a fő
+guiding pontszámot… És lehessen mindegyik ilyen stílusnál vásárolni mást is,
+ne csak csapaterőt."
+
+**Két rendszer egy próbában.** (1) Az állapot mostantól **négy nevesített
+tényezőből** áll össze — mélység (a régi képlet, betűre), él (a 3 legjobb
+csúcsa), összjáték (a kulcsposztok kötései), képességek (a tengelyre eső
+skillek). (2) A stíluspont három új tételre költhető: stábtag-szintlépés,
+edzés-gyorsítás a leggyengébb láncszemnek, és egy meccsre szóló +5%-os
+posztcsoport-token.
+
+**A próba legfontosabb állítása** nem a számok nagysága, hanem hogy **a
+felállás felforgatása után mind a négy tényező bitre ugyanaz**. Ezen áll vagy
+bukik a keresés gyorsítótára: az állapot a rejtett meccs-erő tagja, a
+potenciál-kereső (3.9.122) pedig felállásokat próbálgat rajta — ha az állapot
+a kiállított tizenegytől függne, a kereső önmagát kergetné.
+
+**Amit külön ellenőriz, mert csendben tudna elromlani:** a mélység betűre a
+RÉGI képlet (a próba újraszámolja); idegen tengely skilljei nem számítanak;
+a szorzók CSAK a kijelölt emberre és CSAK a saját tengelyén élnek; a token a
+választott csoportot emeli és tényleg átjön a `teamAttrStrengths`-ig; és a
+lefújás **egyszer** fogyasztja el.
+
+Részletes magyarázat: `docs/stilusbolt.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
