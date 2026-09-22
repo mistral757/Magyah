@@ -128,7 +128,19 @@ mindkét kliensen ugyanaz.
 ## 7. A díjazás
 
 A HSZ a legnagyobb: `champBoost:5`, `tacticBoost:4`, pénzdíj a KK
-**másfélszerese** (`win:1.0`). A színe lila-arany.
+**másfélszerese** (`win:1.0`).
+
+## 7/a. A szín
+
+**Lila, végig** (`#a855f7`): a fejléc, az eredményjelző, a kupa-képernyő és
+a Champion-kártya gyűrűje is. A győzelmi sorok világosabb árnyalata
+(`winCol`) szintén lila (`#d8b4fe`).
+
+Kétszínű gyűrűje **szándékosan nincs**. Az FA azért kapott piros-fehéret,
+mert a Magor Kupája is piros, és a 42 pixeles korongon a két árnyalat
+ránézésre ugyanaz volt. Lilából viszont **egyetlen** sorozat van, tehát
+nincs mit megkülönböztetni — egy arany második sáv csak elvenne a
+színből.
 
 ## 8. A próba
 
