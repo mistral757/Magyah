@@ -2032,6 +2032,25 @@ a legnehezebb egyéb beállításokkal **tényleg** 2,0 lesz.
 
 Részletes magyarázat mindkettőhöz: `docs/papirforma-es-nehezsegi-letra.md`.
 
+## gegen-pontrendszer-proba.js — 🧲 minden stílus gazdasága fut
+
+```bash
+node tools/gegen-pontrendszer-proba.js
+```
+
+**A bejelentés:** „A gegenpressing nem kapott olyan pontrendszert, mint az
+összes többi." **Az ok:** az `engKey()` a tábla sorrendjén ment végig (nem a
+slotokon), és egyszerre csak egy motor futott — a tábla utolsó sorában álló
+Gegen minden más motoros stílus mellett vesztett, elsődlegesként is.
+
+**A próba gerince a harminc pár:** minden motoros stílus minden más motoros
+stílus mellett, mindkét sorrendben — mindkét gazdaságnak élnie kell,
+slot-sorrendben. Emellett méri, hogy a két gazdaság két külön mérleget,
+plafont és egyenleget visz, és hogy a meccserő-hozamuk EGYÜTT sem megy +12
+fölé (ez volt az eredeti „csak egy fut" szabály egyetlen jogos oka).
+
+Részletes magyarázat: `docs/gegen-pontrendszer-hiba.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
