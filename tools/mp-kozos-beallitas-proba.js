@@ -117,14 +117,22 @@ const srv=http.createServer((req,rp)=>{
     careerStart="club";
     pyrWanted=true;pyrWantedDiv=3;pyrWantedBand=[85,87];pyrWantedGap=-1.5;
     out.sync_hiba=null;
-    try{mpGuestReviewSync(Object.assign({},csomag,{icons:"ritka"}));}
+    try{mpApplySettings(Object.assign({},csomag,{icons:"ritka",magyahEnabled:true}));
+        pyrWantedDiv=3;pyrWantedBand=[85,87];pyrWantedGap=-1.5;careerStart="club";
+        mpGuestReviewSync(Object.assign({},csomag,{icons:"ritka",magyahEnabled:true}));}
     catch(e){out.sync_hiba=String(e);}
     out.sync={band:($("pyrBandMid")||{}).value,div:($("pyrMpDiv")||{}).value,
-      gap:($("pyrMpGap")||{}).value,
+      /* 3.9.132 óta a csúszka a LÉTRA LÉPCSŐ-INDEXÉT viszi — a próba a
+         lépcsőt olvassa vissza belőle, nem a nyers értéket. */
+      gap:(()=>{const v=parseInt(($("pyrMpGap")||{}).value,10);
+        const L=pyrMpDiffAllowed();return (L[v]!=null)?String(L[v]/10):null;})(),
+      mgy:[...document.querySelectorAll("#magyahToggleGrid button")]
+        .filter(x=>x.classList.contains("sel")).map(x=>x.dataset.mgy)[0],
       ikon:[...document.querySelectorAll("#iconGrid button")]
         .filter(x=>x.classList.contains("sel")).map(x=>x.dataset.icon)[0]};
     out.sync_ok=(out.sync_hiba===null&&out.sync.band==="86"
-      &&out.sync.div==="3"&&out.sync.gap==="-1.5"&&out.sync.ikon==="ritka");
+      &&out.sync.div==="3"&&out.sync.gap==="-1.5"&&out.sync.ikon==="ritka"
+      &&out.sync.mgy==="on");
     MP.active=false;
 
     /* --- 5. KÖZÖS + DRAFT: nincs osztályválasztó --- */

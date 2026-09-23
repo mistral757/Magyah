@@ -2032,6 +2032,46 @@ a legnehezebb egyéb beállításokkal **tényleg** 2,0 lesz.
 
 Részletes magyarázat mindkettőhöz: `docs/papirforma-es-nehezsegi-letra.md`.
 
+## gegen-pontrendszer-proba.js — 🧲 minden stílus gazdasága fut
+
+```bash
+node tools/gegen-pontrendszer-proba.js
+```
+
+**A bejelentés:** „A gegenpressing nem kapott olyan pontrendszert, mint az
+összes többi." **Az ok:** az `engKey()` a tábla sorrendjén ment végig (nem a
+slotokon), és egyszerre csak egy motor futott — a tábla utolsó sorában álló
+Gegen minden más motoros stílus mellett vesztett, elsődlegesként is.
+
+**A próba gerince a harminc pár:** minden motoros stílus minden más motoros
+stílus mellett, mindkét sorrendben — mindkét gazdaságnak élnie kell,
+slot-sorrendben. Emellett méri, hogy a két gazdaság két külön mérleget,
+plafont és egyenleget visz, és hogy a meccserő-hozamuk EGYÜTT sem megy +12
+fölé (ez volt az eredeti „csak egy fut" szabály egyetlen jogos oka).
+
+Részletes magyarázat: `docs/gegen-pontrendszer-hiba.md`.
+
+## pvp-beallitas-letra-proba.js — 🤝 a létra és a Legendás magyahok PvP-ben
+
+```bash
+node tools/pvp-beallitas-letra-proba.js
+```
+
+**A bejelentés:** „ezek nem globálisak. PvP indításában nem voltak ott."
+A próba a házigazda VALÓDI gombjával (`#mpStartBtn`) nyitja a beállítást, és
+méri, hogy a 🇭🇺 kapcsoló látszik; hogy a vendégnél zárva van és a házigazda
+döntését mutatja; hogy a közös választó a létrán jár, a házigazda nyitott
+fokaiig.
+
+**A legfontosabb állítás:** a VENDÉG oldalán nincs kapu. Ha a vendég a saját
+(még +2,5-ös) határára vágná vissza a házigazda +1,9-ét, a két gép két
+különböző világot építene — pontosan az a szétcsúszás, amit a szoba-szinkron
+máshol már megszüntetett.
+
+**Amit a próbának (ismét) meg kellett tanulnia:** a Run-előnézet nem 200 a
+−1,0-n, mert a fokozat és a tempó is szoroz — a helyes állítás az ARÁNY
+(a −1,0 a 0,0 kétszerese). Ugyanez a hiba a 3.9.130-as próbában is előjött.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
