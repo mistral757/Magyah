@@ -1972,12 +1972,65 @@ tételeket **a motorban** méri, nem a számlálón: a Rekordkönyv után a
 rekord-hajrá tényleg hamarabb armol, a Közös futás után a gyilkos páros érése
 tényleg rövidebb.
 
-**Amit a próbának meg kellett tanulnia.** A `bzRecGoalMult` a `BZ9_TIERS`
+**Az ár RÖGZÍTETT** (3.9.129), mint a Panzer boltjában. A próba ezt két
+állítással őrzi: az állapot-szint negyvenszeres felnagyítása sem mozdítja az
+árat, és mind a tizennyolc ár betűre a tábla száma.
+
+**Amit a próbának meg kellett tanulnia.** (1) A `bzRecGoalMult` a `BZ9_TIERS`
 kapuja mögött ül (3. csapatstílus-szint), tehát az első mérés „hatástalannak"
-látta a Rekordkönyvet, pedig csak zárva volt. A próba azóta felhúzza a
-stílusszintet, és külön állítja, hogy a kapu nyitva van.
+látta a Rekordkönyvet, pedig csak zárva volt — a próba azóta felhúzza a
+stílusszintet, és külön állítja, hogy a kapu nyitva van. (2) Az ár-kontroll
+először ×4-gyel nagyított, és az véletlenszerűen NEM vitte az állapotot az
+`ENG_SCALE_FROM` (100) fölé — a „nem mozdul" állítás így néha semmit nem
+bizonyított. Most ×40, garantáltan.
 
 Részletes magyarázat: `docs/stilusbolt.md`.
+
+## papirforma-proba.js — ⚖️ a papírforma és az óriásölés skálája
+
+```bash
+node tools/papirforma-proba.js
+```
+
+**A bejelentett képernyő:** „Csapaterő: 164,7 — 191,6 · papíron 26,9-del
+gyengébb vagy" — miközben a meccs-erő 191 körül állt. A mérce mostantól a
+nyers csapaterő és a meccs-erő **közepe**, a kezdőrúgáskor befagyasztva, és az
+óriásölés küszöbe a papírforma **10%-a** (a régi fix 8 pont 80-as csapatnál).
+
+**A legfontosabb állítás:** 80-on az új szabály **minden döntése bitre a
+régi** (−20…+20 pont, félpontonként) — a skála csak fölötte kezd el mást
+mondani. **A legbeszédesebb mérés:** egy emulált késői karrierben (+28 rejtett
+bónusz, a mezőny a meccs-erőhöz horgonyozva) a régi szabály **15-ből 15**
+ellenfelet tett óriássá, az új **egyet sem**.
+
+**Amit a próbának meg kellett tanulnia.** Az első fixture poszt-idegen
+tizenegyet állított ki, ahol a kijelzett csapaterő 7-10 ponttal a csontváz-erő
+alá esett — és az a régi-új összevetést zajossá tette (az egyik futásban 0/15,
+a másikban 8/15). A próba azóta a játék saját kiosztási szabályával
+(`arrangeSlotsFor`) állítja fel a keretet.
+
+## nehezsegi-letra-proba.js — 🪜 a nehézségi létra
+
+```bash
+node tools/nehezsegi-letra-proba.js
+```
+
++6,0 … +2,0 fél, alatta tized lépcsők; a kezdő határ +2,5; minden megnyert
+karrier a nyerés fokától két lépcsőt nyit, 0,0-ig; a 0,0-n aratott győzelem a
+mínuszos sávot, onnan egész számonként. A Run-görbe jóval meredekebb (+2,5:
+0,89 → 0,65), mínuszban a tető tizedenként +10.
+
+**A nyitás szabályát a próba a kérés SAJÁT PÉLDÁIVAL méri**: 2,5 → 2,0 és 1,9 ·
+1,9 → 1,8 és 1,7 · 0,1 → csak 0,0 · 0,0 → a 0…−1 sáv · −1 → −1…−2 — és a két
+„semmi új" esetet is (könnyebb fokon, illetve egy sávon belül nyerve).
+
+**Amit a próbának meg kellett tanulnia.** Az első változat azt állította, hogy
+a −1,0-s karrier plafonja 100 fölé megy — de a plafon a többi tényezővel
+(kezdő osztály, két tempó) SZOROZ, és egy D1-es, lassú mezőnyű karrierben
+0,70 marad. A helyes két állítás: a −1,0 **pontosan kétszerese** a 0,0-nak, és
+a legnehezebb egyéb beállításokkal **tényleg** 2,0 lesz.
+
+Részletes magyarázat mindkettőhöz: `docs/papirforma-es-nehezsegi-letra.md`.
 
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 

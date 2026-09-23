@@ -12,7 +12,12 @@
    mesterhármas és szerelések is jöttek. A skála másik vége ugyanilyen fontos:
    vereségnél és gyengébb ellenfélnél NULLA.
 
-   KÜLÖN ÁG A BETÖLTÉS. A tétel küszöbe az óriásölésé (MS_GIANT_GAP), ami a
+   A MÉRTÉKEGYSÉG 3.9.130 ÓTA SZÁZALÉK: a győzelmi tétel a papírforma-
+   hátrányt kapja (az ellenfél a nyers csapaterőd és a meccs-erőd közepéhez
+   mérve), a küszöb a papírforma 10%-a. A régi 2/4/8 pontos jelenetek itt
+   2,5/5/10%-ként futnak — a 80-as horgonyon pontosan ugyanaz a három pont.
+
+   KÜLÖN ÁG A BETÖLTÉS. A tétel küszöbe az óriásölésé (MS_GIANT_PCT), ami a
    fájlban negyvenezer sorral LEJJEBB születik meg — egy modul-szintű
    `const` ott a saját TDZ-jébe futna, és a BETÖLTÉST állítaná meg (ezt se a
    node --check, se a no-undef nem látja). A próba méri, hogy a küszöb
@@ -51,7 +56,7 @@ const {spawn}=require('child_process');
     ujStilus();
     o.alap={on:fearOn(),cap:fearMatchCap(),kuszob:dreadWinGiant(),
       /* a küszöb UGYANAZ a szám, amiből az óriásölés morálja és mérföldköve dolgozik */
-      egyezik:dreadWinGiant()===MS_GIANT_GAP};
+      egyezik:dreadWinGiant()===MS_GIANT_PCT};
 
     /* ---- 1. A SKÁLA ---- */
     const meccs=(won,gap,extra)=>{
@@ -65,21 +70,21 @@ const {spawn}=require('child_process');
       vereseg:meccs(false,12,[]).kap,
       gyengebb:meccs(true,-5,[]).kap,
       egyenlo:meccs(true,0,[]).kap,
-      gap2:meccs(true,2,[]).kap,
-      gap4:meccs(true,4,[]).kap,
-      gap8:meccs(true,8,[]).kap,
+      gap2:meccs(true,2.5,[]).kap,
+      gap4:meccs(true,5,[]).kap,
+      gap8:meccs(true,10,[]).kap,
       gap20:meccs(true,20,[]).kap};
 
     /* ---- 2. ÓRIÁSÖLÉSNÉL A TELJES PLAFON, BÁRMI MÁS TÖRTÉNT ---- */
     const sok=["yellow","yellow","yellow","red","hat","hard","hard",
                "tackle","tackle","tackle","tackle","tackle"];
-    const m1=meccs(true,8,sok);
+    const m1=meccs(true,10,sok);
     const m2=meccs(true,30,sok);
-    o.orias={csakOlés:meccs(true,8,[]).kap,sokEsemeny:m1.kap,hatalmas:m2.kap,
+    o.orias={csakOlés:meccs(true,10,[]).kap,sokEsemeny:m1.kap,hatalmas:m2.kap,
       cap:fearMatchCap()};
 
     /* ---- 3. A FEED-JELZŐK ---- */
-    const m3=meccs(true,4,["yellow","red","hat","hard","tackle","tackle"]);
+    const m3=meccs(true,5,["yellow","red","hat","hard","tackle","tackle"]);
     const sorok=m3.naplo.map(x=>x.t);
     const jelzo=sorok.filter(t=>/☠️ <b>\+/.test(t));
     o.feed={
@@ -103,7 +108,7 @@ const {spawn}=require('child_process');
        győzelmi tétel NEM skálázódik — az eleve a plafonból számol. */
     const vartEsemeny=(DREAD_PTS.yellow+DREAD_PTS.red+DREAD_PTS.hat
       +DREAD_PTS.hard+2*DREAD_PTS.tackle)*dreadScale();
-    const vartGyozelem=Math.round(fearMatchCap()*Math.min(1,4/dreadWinGiant())*10)/10;
+    const vartGyozelem=Math.round(fearMatchCap()*Math.min(1,5/dreadWinGiant())*10)/10;
     o.osszesito={
       van:ossz.length===1,
       vart:Math.round((vartEsemeny+vartGyozelem)*10)/10,
@@ -123,7 +128,7 @@ const {spawn}=require('child_process');
 
     /* ---- 5. A MÉRLEG NULLÁZÓDIK KÉT MECCS KÖZÖTT ---- */
     ujStilus();
-    fearMatchStart();fearNote("red");fearNoteWin(true,8);
+    fearMatchStart();fearNote("red");fearNoteWin(true,10);
     const e1=fearMatchEnd();
     fearMatchStart();                       /* új meccs, semmi esemény */
     const e2=fearMatchEnd();
@@ -146,15 +151,15 @@ const {spawn}=require('child_process');
 
   console.log("=== az alap ===");
   ok("a küszöb az ÓRIÁSÖLÉSÉ, és függvényen át jön (nem modul-szintű const, ami a betöltést állítaná meg)",
-     r.alap.kuszob===8&&r.alap.egyezik===true,r.alap);
+     r.alap.kuszob===10&&r.alap.egyezik===true,r.alap);
   ok("a 120-as félelem szint 12-es meccsplafont ad",r.alap.on===true&&r.alap.cap===12,r.alap);
 
   console.log("\n=== a skála ===");
   ok("vereségnél és gyengébb (vagy egyenlő) ellenfélnél NULLA",
      r.skala.vereseg===0&&r.skala.gyengebb===0&&r.skala.egyenlo===0,r.skala);
-  ok("a győzelem a nyers hátránnyal arányosan fizet: 2→3 · 4→6 a 12-es plafonból",
+  ok("a győzelem a papírforma-hátránnyal arányosan fizet: 2,5%→3 · 5%→6 a 12-es plafonból",
      r.skala.gap2===3&&r.skala.gap4===6,r.skala);
-  ok("és a 8-as óriásölésnél a TELJES plafon — fölötte sem több",
+  ok("és a 10%-os óriásölésnél a TELJES plafon — fölötte sem több",
      r.skala.gap8===12&&r.skala.gap20===12,r.skala);
 
   console.log("\n=== „mindegy, milyen eseményekre kapott még pontot” ===");
