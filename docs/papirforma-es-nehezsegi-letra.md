@@ -184,11 +184,53 @@ tényező (kezdő osztály, ellenfél-tempó, saját tempó) is a maximumon van.
 * **Futó karrierek Run-szintje nem mozdul.** Az új görbe csak ott él, ahol a
   karrier már az új választóval indult (`S.pyr.diffT`); a régiek a régi, mért
   réssel (`gap0`) és a régi görbén maradnak.
-* **Közös karrier (PvP)** változatlan: ott a nehézséget a két menedzser alkuja
-  adja, nincs kapu, a saját fél lépcsős vezérlője és a régi Run-görbe marad.
-  (A mínuszos tető-emelés ott nem jár — kapu nélkül bárki −8-at választhatna.)
+* ~~Közös karrier (PvP) változatlan~~ — **a 3.9.132 óta a PvP is a létrán
+  jár**, lásd lent a „Közös karrier" szakaszt.
 
 ---
+
+## II/b. Közös karrier (3.9.132)
+
+> „Az új nehézségi szint állító, amit most építettünk nagyon aprólékosan,
+> plusz a legendás magyarok kapcsoló: ezek nem globálisak. PvP indításában
+> nem voltak ott / nem voltak updatelve."
+
+A 3.9.130-ban szándékosan hagytam ki a PvP-t (ott a szoba alkuja dönt, és
+nincs kapu) — **ez rossz döntés volt**: a létra a játék egyik fő tengelye, és
+egy közös karriert ugyanúgy kell tudni hangolni.
+
+| | Most |
+|---|---|
+| **a választó** | ugyanaz a létra: +2 fölött fél, alatta tized lépcsők; a csúszka lépcső-indexet visz, a gombok egy fokot lépnek, az alap **+2,5** |
+| **ki állít** | a **házigazda** — a SAJÁT naplójának nyitott fokaiig |
+| **a vendég** | nem állít, csak átveszi a szoba számát — nála **nincs kapu**: egy vendég-oldali vágás a házigazda döntését írná felül, és a két világ szétcsúszna (a próba ezt külön méri) |
+| **a Run** | a szoba foka (`S.pyr.diffT`) mindkét kliensen ugyanaz → az új görbe és a mínuszos tető |
+| **a győzelem** | egy közösen megnyert karrier **mindkét** menedzser saját naplóját lépteti — ugyanaz az elv, amiért a feloldás-számlálók is gyűlnek PvP-ben |
+
+A régi (3.9.132 előtt indult) közös karrierekben nincs `diffT`: azok a régi
+görbén maradnak, ahogy az egyjátékos régi karrierek is.
+
+### 🇭🇺 A Legendás magyahok kapcsoló
+
+A szoba már eddig is vitte a házigazda döntését (`magyahEnabled`), és a
+szezonindító alku is egyeztette — **csak a kapcsoló nem látszott**:
+
+* a láthatóságát kizárólag a kezdésmód-választó KATTINTÁSA frissítette
+  (`setCareerStart`); egyjátékosban a kezdő lépcső presetje ezt véletlenül
+  elvégezte, a PvP házigazdája viszont a `careerStart="draft"` közvetlen
+  beírásával érkezik — a kapcsoló az alap `hide`-ban maradt;
+* a vendég átnéző képernyője nem zárta (hiányzott a zár-listáról), és a
+  vendég SAJÁT tárolt preferenciáját mutatta a házigazdáé helyett.
+
+Mostantól a beállító képernyő minden belépéskor frissíti, a vendégnél zárva
+van, és a házigazda döntését mutatja.
+
+### Egy rejtett hiba, amit ez hozott elő
+
+A vendég átnéző-szinkronja a **nyers** rés-számot írta a csúszkára — a
+3.9.132 óta viszont a csúszka a **lépcső-indexet** viszi. A képernyőn nem
+látszott (a rákövetkező újrarajzolás felülírta), de egy −1,5-ös rés egy
+index-csúszkán értelmetlen. Most indexként kerül be.
 
 ## III. Mi hol lakik
 
@@ -200,6 +242,7 @@ tényező (kezdő osztály, ellenfél-tempó, saját tempó) is a maximumon van.
 | a határ és a nyitás | `diffFront` · `diffOpenT` · `diffNoteWin` · `diffCareerWin` · `diffCareerT` |
 | a Run | `diffRunFactor` · `diffRunTop` · `pyrRunCap` (`top`) · `runBreakdown` (`top`) |
 | a választó | `pyrDiffAllowed` · `pyrDiffSetT` · `pyrDiffStep` · `renderPyrDiffPick` · `pyrGapClamp` |
+| a közös karrier | `diffFrontOwn` · `diffMpGateT` · `pyrMpDiffAllowed` · `pyrMpDiffStep` · `renderPyrMpGap` · `pyrMpRunCap` |
 
 ## IV. A próbák
 
