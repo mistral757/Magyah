@@ -2115,6 +2115,37 @@ számlálója mutatja meg.
 
 Részletek: `docs/nyomas-es-meccsero.md`.
 
+## akademia-evek-proba.js — 🎓 az akadémiai évek mércéje
+
+```bash
+node tools/akademia-evek-proba.js
+```
+
+**A terv:** a visszatérő tehetség az akadémián töltött évei szerint a kezdő
+11 nyers erejéhez mért sávban jön vissza, a POT dönti el, hol:
+
+| év | sáv |
+|---|---|
+| 1 | −12…−8 |
+| 2 | −8…−5 |
+| 3 | −4…−2 |
+| 4 | ±1 |
+
+**Mit mér (24 állítás):**
+
+- mind a négy sáv alját (gyenge POT) és tetejét (erős POT);
+- a bejelentett esetet (2 év, POT 3025, 77 → most a −8…−5 sávban);
+- hogy a szabály padló: aki fölötte jár, marad;
+- hogy a mérce a MAI kezdő 11;
+- a további utat: öt szezonváltás, sosem esik vissza, a csúcs korlátos;
+- a jóslat-dobozt;
+- egy valódi `tryAcademyOpportunity`-felajánlást, a képernyővel és a naplóval.
+
+**A tanulság:** a csúcsot nem szabad a kor-görbe inverzéből számolni. Egy
+16 évesnél az 58%-os görbe-arány 150+-os csúcsot adna, és a túlteljesítés-
+szabály minden nyáron tovább pumpálná. A rés helyes eszköze az ifi-bónusz.
+Részletek: `docs/akademiai-evek.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```

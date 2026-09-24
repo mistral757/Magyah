@@ -6141,7 +6141,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.133";
+const APP_VERSION="3.9.134";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -26003,25 +26003,36 @@ function academyBest11Avg(){
     if(!top.length)return null;
     return top.reduce((a,v)=>a+v,0)/top.length;
   }catch(e){return null;}}
-/* A sor SZÖVEGE a LEGJOBB 11-hez mérve — a kérés megfogalmazását követi:
+/* 3.9.134 óta a hívó a KEZDŐ 11 nyers erejét adja (academyRefXI) — a
+   felajánlás szabálya is ahhoz mér, a doboz nem beszélhet két mércéről.
+   A sor SZÖVEGE eredetileg a LEGJOBB 11-hez mérve — a kérés megfogalmazását követi:
    „a legjobb 11 átlaga −2-es szint", „átlag-szint", „átlag fölötti szint",
    mert a döntés tényleg ezen múlik: bekerülne-e valaha a legjobb tizenegybe. */
 function academyProjTag(rating,xi){
   if(xi==null)return null;
   const d=rating-xi;
-  if(d>=3)  return {t:"a legjobb 11-ed fölött",c:"var(--grass)"};
-  if(d>=-1) return {t:"legjobb 11-es szint",c:"var(--gold)"};
-  if(d>=-4) return {t:"a legjobb 11-ed alatt",c:"var(--dim)"};
+  if(d>=3)  return {t:"a kezdő 11-ed fölött",c:"var(--grass)"};
+  if(d>=-1) return {t:"kezdő 11-es szint",c:"var(--gold)"};
+  if(d>=-4) return {t:"a kezdő 11-ed alatt",c:"var(--dim)"};
   return {t:"még messze",c:"var(--dim2)"};}
 /* A teljes doboz HTML-je — az ajánló képernyő és a ballagás is ezt teszi ki. */
 function academyProjHtml(entry){
   let sorok=[];
   try{sorok=academyProject(entry,ACADEMY_PROJ_MAX);}catch(e){sorok=[];}
   if(!sorok.length)return "";
-  const xi=academyBest11Avg();
+  /* 3.9.134: a mérce a KEZDŐ 11 NYERS ereje (academyRefXI), és a sorok
+     az akadémiai évek sávját is tartalmazzák — ugyanazt a szabályt, ami a
+     következő felajánláskor ténylegesen lefut (academyReturnLift). A mérce a
+     MAI kezdő 11: ha a csapatod közben erősödik, a cél vele együtt nő. */
+  const xi=academyRefXI();
   const most=Math.round(entry.startRating);
+  const rec=(S.academy||[]).find(r=>r&&r.n===entry.n);
+  const ev0=rec?Math.max(0,(entry.age||0)-(rec.leftAge||entry.age||0)):0;
+  sorok.forEach(r=>{
+    const c=(xi!=null)?academyTargetFor(ev0+r.szezon,xi,r.pot):null;
+    if(c&&c.target>r.rating){r.rating=c.target;r.sav=true;}});
   let h=`<div class="acProj"><div class="apH">🔮 Ha az akadémián hagyod`
-    +(xi!=null?` <span class="apXi">a legjobb 11-ed átlaga <b>${xi.toFixed(1)}</b></span>`:"")
+    +(xi!=null?` <span class="apXi">a kezdő 11-ed nyers ereje <b>${xi.toFixed(1).replace(".",",")}</b></span>`:"")
     +`</div>`
     +`<div class="apRow now"><span class="apSz">most</span>`
     +`<span class="apR">${most}</span><span class="apT">${entry.age} év · POT ${Math.round(entry.pot||0)}</span></div>`;
@@ -26033,9 +26044,119 @@ function academyProjHtml(entry){
       +(tag?` · <b style="color:${tag.c}">${esc(tag.t)}</b>`:"")
       +(r.ballagas?` · <b style="color:var(--gold)">ballagás</b>`:"")+`</span></div>`;});
   h+=`<div class="apNote">Várható pálya a mai tehetségéből (POT), korából és `
-    +`Ratingjéből — <b>nem ígéret</b>. A kupameccsek és egy ifi-boost még `
-    +`hozzáadnak; a szerencse mindkét irányba mozdíthat.</div></div>`;
+    +`Ratingjéből. Az akadémián töltött évek a kezdő 11-edhez mérve adnak padlót `
+    +`(1 év −12…−8 · 2 év −8…−5 · 3 év −4…−2 · 4 év −1…+1, a sávon belül a POT dönt) — `
+    +`a mérce a MAI kezdő 11, tehát ha a csapatod erősödik, a cél is vele nő. `
+    +`Ez <b>nem ígéret</b>: a felajánlás véletlenen múlik, és a ballagás 21 évesen jön.</div></div>`;
   return h;}
+/* ================= 🎓 AZ AKADÉMIAI ÉVEK MÉRCÉJE (3.9.134) ===================
+   A TERV, AMI EDDIG CSAK TERV VOLT: „az ifiseket megéri majd az akadémián
+   hagyni, mert 1 év után a meghívás pillanatában lévő kezdő 11 nyers ereje
+   −8…−12, 2 év után −8…−5, 3 év után −4…−2, 4 év után −1/+1 az, amivel
+   felhozható, és közben a POT is fejlődik. […] mindig a felajánláskor
+   vizsgáljuk meg, milyen a POT és mennyi az aktuális nyers ereje a kezdő
+   11-nek, hogy ahhoz lehessen igazítani."
+
+   AMI EDDIG TÖRTÉNT: a visszatérő tehetség csak a szokásos akadémiai
+   fejlődési görbét járta (meccsenként ~0,5 Rating-pont, a kor-görbe mentén) —
+   a kereted erejétől teljesen függetlenül. A piramisban, ahol a kezdő 11 a
+   100 fölé nő, egy két éve bent hagyott 64-es fiú 77-tel jött vissza egy
+   100,7-es tizenegyhez: 24 ponttal lemaradva, vagyis az akadémián hagyás
+   soha nem érte meg. A döntésnek, amiről a képernyő szól, nem volt tétje.
+
+   A SZABÁLY. A visszatérés (és a ballagás) pillanatában:
+     · MÉRCE: a kezdő 11 NYERS ereje, most — teamStrength(), ugyanaz a
+       „Csapaterő", amit a felállásképernyő mutat. Nem egy rögzített szám:
+       a csapatod közben fejlődik, és a tehetséget AHHOZ kell mérni, amihez
+       be kellene törnie.
+     · SÁV: az akadémián töltött évek szerint (ACADEMY_YEAR_BANDS).
+     · HELY A SÁVON BELÜL: a POT dönti el. A mérce az a POT, amelynek a
+       görbéje épp a kezdő 11 szintjéig ér (peakToPot(mérce)); ennek 40%-a
+       alatt a sáv alja, 100%-a fölött a teteje, közte egyenesen. Így egy
+       gyenge POT-ú fiú is kap valamit az évekért, de a tehetség dönt.
+     · CSAK FELFELÉ: ha a természetes fejlődése már a cél fölött jár, az
+       marad. A szabály padló, nem plafon.
+     · A CSÚCS IS VELE MEGY: a peak (és a basePeak) úgy emelkedik, hogy a
+       mostani kora szerinti görbe épp a célra essen — különben a felhozott
+       fiú a saját plafonjába ütközne, és egy Rating-pontot sem fejlődne
+       tovább. A POT-hoz NEM nyúlunk: az a tehetség mércéje, és az akadémia
+       a maga módján (ACADEMY_POT_*) amúgy is növeli. */
+const ACADEMY_YEAR_BANDS=[null,[-12,-8],[-8,-5],[-4,-2],[-1,1]];
+const ACADEMY_POT_T_LO=0.40, ACADEMY_POT_T_HI=1.00;
+function academyYearBand(ev){
+  const y=Math.max(0,Math.floor(ev||0));
+  if(y<1)return null;
+  return ACADEMY_YEAR_BANDS[Math.min(4,y)];}
+/* A mérce: a kezdő 11 nyers ereje. Ha épp nincs felállás (üres slotok),
+   a legjobb 11 átlaga a tartalék. */
+function academyRefXI(){
+  let x=null;
+  try{x=teamStrength();}catch(e){x=null;}
+  if(!(x>0))try{x=academyBest11Avg();}catch(e){x=null;}
+  return (x>0)?x:null;}
+/* A POT helye a sávban, 0 (alja) … 1 (teteje). */
+function academyPotT(pot,xi){
+  const ref=peakToPot(xi);
+  if(!(ref>0))return 0.5;
+  const r=(pot||0)/ref;
+  return Math.max(0,Math.min(1,(r-ACADEMY_POT_T_LO)/(ACADEMY_POT_T_HI-ACADEMY_POT_T_LO)));}
+/* A cél-Rating adott évszámra, mércére és POT-ra — a jóslat is ezt kérdezi. */
+function academyTargetFor(ev,xi,pot){
+  const b=academyYearBand(ev);
+  if(!b||!(xi>0))return null;
+  const t=academyPotT(pot,xi);
+  return {band:b,t,target:Math.round(xi+b[0]+(b[1]-b[0])*t)};}
+/* ---- A FELHOZOTT FIÚ TOVÁBBI ÚTJA ----
+   A kézenfekvő megoldás — a csúcsot a kor-görbe inverzéből számolni — HIBÁS:
+   a görbe egy 16 évest a csúcsa 58%-ára tesz, tehát egy 90-re felhozott
+   16 éves 155-ös csúcsot kapna, és a szezonváltás túlteljesítés-szabálya
+   (a különbség 30%-a a csúcsba épül) minden nyáron tovább pumpálná.
+   A játék erre már ismeri a helyes eszközt: az IFI-BÓNUSZT. Az pont a
+   „görbe fölötti Rating", ami 26 éves korig fokozatosan kifut, és a
+   szezonváltás számol vele — így nincs túlteljesítés, nincs pumpálás.
+   A csúcs ezért csak KORLÁTOSAN nő: a cél fölé annyival, amennyi a 26 éves
+   korig hátralévő évekre évente 0,8 (gyenge POT) … 2,0 (erős POT) pont.
+   Egy 19 éves, sáv-aljú fiú így ~5 ponttal a felhozott szintje fölött
+   érik be, egy kiugró tehetség ~14-gyel — a POT itt is dönt. */
+const ACADEMY_GROW_LO=0.8, ACADEMY_GROW_HI=2.0;
+/* A SZABÁLY ALKALMAZÁSA a felajánlás pillanatában. Visszaadja, mi történt
+   (a képernyő és a napló ebből ír), vagy null-t, ha nincs mit mérni. */
+function academyReturnLift(rec){
+  if(!rec||gameMode!=="career"||!careerPool)return null;
+  const e=careerPool[rec.n];
+  if(!e)return null;
+  const ev=Math.max(0,(e.age||0)-(rec.leftAge||e.age||0));
+  const xi=academyRefXI();
+  const c=academyTargetFor(ev,xi,e.pot);
+  if(!c)return null;
+  const before=Math.round(e.startRating);
+  const out={ev,xi,band:c.band,t:c.t,target:c.target,before,after:before,lifted:false};
+  if(c.target<=before)return out;          /* a természetes fejlődés már ott jár */
+  const cap=ratingCap();
+  const tgt=Math.min(cap,c.target);
+  const age=e.age||17;
+  const H=Math.max(0,26-age)*(ACADEMY_GROW_LO+(ACADEMY_GROW_HI-ACADEMY_GROW_LO)*c.t);
+  const peak=Math.min(cap,Math.max(e.peak||0,tgt+H));
+  e.peak=peak;
+  e.basePeak=Math.max(e.basePeak!=null?e.basePeak:0,peak);
+  /* az ifi-bónusz MOSTANTÓL fut ki: a görbe és a cél közti rés, 26-ig */
+  e.youthBonus=Math.max(0,tgt-ratingAtAge(peak,age));
+  e.youthBonusStartAge=age;
+  e.startRating=tgt;
+  try{syncAttrsToRating(e);}catch(err){}
+  out.after=Math.round(tgt);out.lifted=true;
+  return out;}
+/* A képernyő mondata a szabályról — hogy a döntés ne vakon szülessen. */
+function academyLiftHtml(L){
+  if(!L)return "";
+  const b=L.band,sz=v=>(v>0?"+":v<0?"−":"")+Math.abs(v);
+  const hely=L.t>=0.67?"a sáv tetejére":L.t>=0.34?"a sáv közepére":"a sáv aljára";
+  return `<p style="font-size:12px;margin-top:8px;line-height:1.5;color:var(--dim)">`
+    +`📐 <b>${L.ev} év</b> az akadémián → a kezdő 11-ed nyers erejéhez (<b>${L.xi.toFixed(1).replace(".",",")}</b>) `
+    +`mérve <b>${sz(b[0])}…${sz(b[1])}</b> a sáv; a tehetsége ${hely} teszi: <b>${L.target}</b>. `
+    +(L.lifted?`Az akadémia ${L.before}-${hunHarm(L.before,"ról","ről")} <b>${L.after}</b>-${hunHarm(L.after,"ra","re")} hozta fel.`
+              :`A saját fejlődése már e fölött jár — az marad.`)
+    +`</p>`;}
 /* Egy tehetség az akadémián marad: eltároljuk, hogy később visszatérhessen. */
 function academyKeep(prospect,rec){
   if(!S.academy)S.academy=[];
@@ -32764,7 +32885,7 @@ function showCareerCapReached(resumeCb,generatorFn){
       resumeCb();},
     onSkip:()=>{$("scUnlock").classList.add("hide");resumeCb();}});
   $("scUnlock").scrollIntoView({behavior:"smooth"});}
-function showAcademyReveal(prospect,resumeCb,rec,isFinal){
+function showAcademyReveal(prospect,resumeCb,rec,isFinal,lift){
   const e=careerPool[prospect.n];
   /* GUIDE: az akadémiai döntés PILLANATÁBAN. Ez nem tartós tennivaló, hanem egy
      itt-és-most választás — nincs mire villogni utána, tehát a tipp-szint a
@@ -32779,7 +32900,7 @@ function showAcademyReveal(prospect,resumeCb,rec,isFinal){
        Az akadémia dolgozott vele: a Ratingje <b>${rec.leftRating}</b>-${hunHarm(rec.leftRating,"ról","ről")} <b>${nowR}</b>-${hunHarm(nowR,"ra","re")} nőtt, a tehetsége (POT) most <b>${e?e.pot:"?"}</b>.
        ${isFinal
          ? `<br><br><b style="color:var(--gold)">Lejárt az akadémiai ideje.</b> Ez az utolsó alkalom, hogy felhozd — ha most nem kell, végleg elhagyja a klubot.`
-         : `Felhozod végre az első csapat keretébe?`}${rec.times>1?`<br><span style="color:var(--dim2);font-size:12px">(Már ${rec.times}. alkalommal jelentkezik.)</span>`:""}</p>`
+         : `Felhozod végre az első csapat keretébe?`}${rec.times>1?`<br><span style="color:var(--dim2);font-size:12px">(Már ${rec.times}. alkalommal jelentkezik.)</span>`:""}</p>`+academyLiftHtml(lift)
     : `<p style="font-size:13px;margin-top:10px;line-height:1.5">Az akadémia nevelte ki — jelenleg még szerény (${ragSzam(prospect.ovr)} Rating), de a scoutok szerint kiugróan magas a potenciálja. Felhozod az első csapat keretébe?</p>`;
   /* 🔮 AZ ELŐREJELZÉS. A BALLAGÁSNÁL NINCS: ott már nincs „még egy szezon",
      a döntés felveszed-vagy-elmegy — egy jövőbeli pálya odaírva csak
@@ -32838,8 +32959,10 @@ function tryAcademyOpportunity(cb){
   /* 1) BALLAGÁS ELŐSZÖR: akinek lejárt az akadémiai ideje, az garantáltan sorra
      kerül — nem véletlen-esélyen múlik, hogy megkapod-e az utolsó ajánlatot. */
   const grads=academyGraduates();
+  let lift=null;
   if(grads.length){
     rec=grads[0];isFinal=true;
+    try{lift=academyReturnLift(rec);}catch(e){lift=null;}
     prospect=careerPlayerFromPoolEntry(careerPool[rec.n]);}
   /* 2) különben a szokásos, egyre valószínűbb visszatérés a mentettek közül.
      ---- SZEZONONKÉNT EGYSZER (3.9.52) ----
@@ -32859,7 +32982,13 @@ function tryAcademyOpportunity(cb){
     if(szabad.length&&Math.random()<Math.min(ACADEMY_RETURN_MAX,szabad.length*ACADEMY_RETURN_STEP)){
       rec=pick(szabad);
       rec.offerSeason=szezon;
+      /* 🎓 AZ ÉVEK MÉRCÉJE (3.9.134) — a prospect már a felhozott Ratinggel
+         épül, tehát a képernyő, az auto-felvétel és a keret ugyanazt látja. */
+      try{lift=academyReturnLift(rec);}catch(e){lift=null;}
       prospect=careerPlayerFromPoolEntry(careerPool[rec.n]);}}
+  if(lift&&lift.lifted)
+    addLine(`🎓 Akadémia: ${esc(fullName(rec.n))} ${lift.ev} év után ${lift.before} → <b>${lift.after}</b> Rating `
+      +`(a kezdő 11 nyers ereje ${lift.xi.toFixed(1).replace(".",",")})`,"m life");
   if(!prospect){rec=null;isFinal=false;prospect=generateAcademyPlayer();}
   if(fullCareerRoster().length>=MAX_CAREER_ROSTER){
     /* Lejárt akadémiai idő + tele keret = végleg elmegy. A "most vagy soha"
@@ -32878,7 +33007,7 @@ function tryAcademyOpportunity(cb){
     if(rec)S.academy=(S.academy||[]).filter(r=>r.n!==prospect.n);
     addLine(`${rec?"🎓":"🌱"} Akadémia: ${esc(fullName(prospect.n))} (${prospect.age} év) csatlakozott a tartalék-kerethez`,"m life");
     cb();return;}
-  showAcademyReveal(prospect,cb,rec,isFinal);}
+  showAcademyReveal(prospect,cb,rec,isFinal,lift);}
 /* ---- ellenfél-tábla sorsolása ---- */
 $("oppSpinBtn").onclick=()=>{
   $("oppSpinBtn").disabled=true;
