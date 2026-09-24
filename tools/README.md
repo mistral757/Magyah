@@ -2146,6 +2146,33 @@ node tools/akademia-evek-proba.js
 szabály minden nyáron tovább pumpálná. A rés helyes eszköze az ifi-bónusz.
 Részletek: `docs/akademiai-evek.md`.
 
+## fejlesztes-arak-proba.js — 💰 a fejlesztések ára
+
+```bash
+node tools/fejlesztes-arak-proba.js
+```
+
+A kérés: a felállásváltás, a stáb-bővítés, a scout- és az ügynökség-fejlesztés
+kövesse a klub büdzséjét, ahogy a poszt-tanulás. Mind az öt kapja meg a boostok
+1. / 2. idénybeli −50% / −33%-át.
+
+**Mit mér (33 állítás):**
+
+- a 10 000-es referencia-büdzsénél, a 3. idényben a régi fix ár;
+- az arányosságot (×2 és ×0,5 büdzsé);
+- a kedvezményt mindkét idényben;
+- az ingyenes első felállásváltást;
+- a képernyők címkéjét.
+
+**Két tanulság a próba első futásából:**
+
+- A stáb-hely régi ára kerekítetlen volt (30 625), az új 500-ra kerekít. Ezért
+  a tűrés ±1%.
+- Az ügynökség ára NEM a scout csillagszintjén vett scout-ár kétszerese, hanem
+  a SAJÁT szintjén vetté. A „scout ×2” összehasonlítás hamis hibát jelzett.
+
+Részletek: `docs/fejlesztes-arak.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```

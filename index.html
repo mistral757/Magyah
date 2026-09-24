@@ -6141,7 +6141,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.134";
+const APP_VERSION="3.9.135";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -23153,6 +23153,44 @@ function boostEarlyLeft(){
   return Math.max(0,BOOST_EARLY_DISC.length-sn+1);}
 function boostDiscountMult(){
   return Math.max(0.10,(1-(S.boostDiscount||0))*(1-boostEarlyDisc()));}
+/* ================= A FEJLESZTÉSEK ÁRA: BÜDZSÉHEZ MÉRVE, KEZDŐ KEDVEZMÉNNYEL (3.9.135) =====
+   KIMONDOTT KÉRÉS: „A felállás módosítás is scalelődjön árban, akárcsak a
+   pozíció tanulás. És a stáb bővítés is, a scout erősítés, az átigazolási
+   ügynökség fejlesztés. Mindenen legyen ott az 50 és 33% kedvezmény 1. és
+   2. szezonban, mint a boostokon."
+
+   AMI EDDIG VOLT: a négy tétel FIX pontáron állt (felállásváltás 5000, stáb-
+   hely 10 000·1,75ⁿ, scout 5000…100 000 exponenciálisan, ügynökség a scout
+   kétszerese). Az 1. idényben, egy ~4000 pontos (8 Mrd) éves kerettel egy
+   stáb-hely két és fél évnyi bevételbe került; a piramis felső osztályaiban,
+   ötvenezres keretnél aprópénz volt — ugyanaz a hiba, amit a poszt-tanulásnál
+   a 3.8.18 már kijavított.
+
+   A SZABÁLY: a régi ár pontosan egy REFERENCIA-büdzsénél marad érvényes
+   (PRICE_BUDGET_REF = 10 000 pont = 20 Mrd, egy ~90-es csapat éves kerete),
+   és a klub éves bevételével (clubBudgetScale) ARÁNYOSAN mozog. Az árak
+   ALAKJA így érintetlen: a stáb-helyek 1,75-ös lépcsője és a scout
+   exponenciális görbéje ugyanaz, csak a léptéke követi a klubot.
+   KEDVEZMÉNY: ugyanaz a függvény, ami a boostokat viszi (boostEarlyDisc) —
+   1. idény −50%, 2. idény −33%. Egy kedvezmény, egy igazság: ha valaha
+   változik, mindenhol egyszerre változik.
+   A PADLÓ 100 pont, ahogy a poszt-tanulásnál: egy nullára futó ár rosszabb,
+   mint egy szerény. */
+const PRICE_BUDGET_REF=10000;
+function budgetPriceScale(){
+  let b=PRICE_BUDGET_REF;
+  try{b=clubBudgetScale();}catch(e){b=PRICE_BUDGET_REF;}
+  return Math.max(0.05,b/PRICE_BUDGET_REF);}
+/* Egy régi, fix pontár mai ára: büdzséhez mérve, a kezdő kedvezménnyel. */
+function scaledUpgradePrice(basePts,round){
+  const r=round||100;
+  let d=0;try{d=boostEarlyDisc();}catch(e){d=0;}
+  return Math.max(100,Math.round(basePts*budgetPriceScale()*(1-d)/r)*r);}
+/* A képernyők közös címkéje: ha él a kezdő kedvezmény, az ár mellé kiírjuk. */
+function earlyDiscTag(){
+  let d=0;try{d=boostEarlyDisc();}catch(e){d=0;}
+  if(!d)return "";
+  return ` <span style="color:var(--grass);white-space:nowrap">−${Math.round(d*100)}% (${(S&&S.seasonNumber)||1}. idény)</span>`;}
 /* AZ EGYSÉG TÉNYLEGES ÁRA — ez a szám hangolja mind a hét fajtát. */
 function boostUnitPrice(){
   return Math.max(100,Math.round(boostUnitBase()*boostDiscountMult()/100)*100);}
@@ -23183,6 +23221,8 @@ function boostEarlyAnnounce(tag){
     +`a legolcsóbb fajta ${fmtFt(boostPriceOf("bond"))}. `
     +(nxt?`A ${sn+1}. idényben már csak −${Math.round(nxt*100)}%, utána teljes ár. `
          :`A ${sn+1}. idénytől teljes ár. `)
+    +`Ugyanennyi jár a <b>poszt-tanulásra, a fizetős felállásváltásra, a stáb-bővítésre, `
+    +`a scout- és az ügynökség-fejlesztésre</b> is. `
     +`A boost annál többet hoz, minél korábban éri a játékost — érdemes most kihasználni.`,"m life");}
 /* ---- KI SZÁMÍT AKADÉMISTÁNAK ----
    A youthBonus>0 önmagában NEM elég: az IKONOK is kapnak youthBonust a
@@ -24238,7 +24278,11 @@ function scoutUpgradePrice(stars){
   const b=Math.log(20)/8, a=5000/Math.exp(b);
   const base=a*Math.exp(b*stars);
   const bump=1+0.28*Math.exp(-Math.pow((stars-4.5)/2.4,2));
-  return Math.round(base*bump*SCOUT_PRICE_MULT/500)*500;}
+  /* 3.9.135: a görbe alakja marad, a léptéke a klub büdzséje, és az első két
+     idényben kedvezmény jár. Az ügynökség ára ennek a kétszerese, tehát
+     MAGÁTÓL örökli mindkettőt (lásd agencyUpgradePrice) — ott nem szorzunk
+     még egyszer. */
+  return scaledUpgradePrice(base*bump*SCOUT_PRICE_MULT,500);}
 function generateScout(){
   /* F1 — a kezdeti scout a világ része (a terv listáján szerepel): seedelt. */
   const r=rngFor("scout:initial");
@@ -24409,6 +24453,7 @@ function agencyBidMode(rejects,starsOverride){
    megvenni drágább, mint kivárni. A pontok NEM vesznek el: a megvásárolt szint
    után a meglévő pontok a KÖVETKEZŐ szint felé számítanak tovább. */
 function agencyUpgradePrice(){
+  /* a scout-ár már büdzséhez mért és kedvezményes — itt csak a ×2 (3.9.135) */
   return Math.round(scoutUpgradePrice(agencyStars())*2/500)*500;}
 function agencyBuyLevel(){
   const a=agencyState();
@@ -25549,7 +25594,9 @@ function posLearnCost(entry){
   const lvl=(typeof oppTargetRating==="number"&&oppTargetRating>0)?oppTargetRating:84;
   const t=Math.max(0,Math.min(1,(r-(lvl-10))/40));
   const share=POS_LEARN_SHARE[0]+t*(POS_LEARN_SHARE[1]-POS_LEARN_SHARE[0]);
-  return Math.max(100,Math.round(clubBudgetScale()*share/100)*100);}
+  /* 3.9.135: a kezdő idények kedvezménye (−50% / −33%) ide is jár. */
+  let d=0;try{d=boostEarlyDisc();}catch(e){d=0;}
+  return Math.max(100,Math.round(clubBudgetScale()*share*(1-d)/100)*100);}
 /* ================= A TANULÁS TEMPÓJA: EGY BÁZIS, KÉT ÚT =================
    MEGVÁSÁROLVA a bázis MINDENKINÉL 12 lejátszott meccs. Korábban a kor és a
    POT szabta (9-20 meccs), és ezt cseréljük le: a tempó-különbséget mostantól
@@ -26698,10 +26745,14 @@ const COACH_RETIRE_FROM=66;    /* az edző maga is kiöregszik — de csak soká
 /* A slot-ár: 20 Mrd Ft = 10 000 pont (HUF_PER_POINT=2e6). SZUPERLINEÁRIS,
    szemben a keretbővítés lineáris árával: a 6. edző ugyanolyan erős, mint az
    1., tehát a hatás multiplikatív, és lineáris ár mellett a teljes kiépítés
-   túl olcsó lenne. 3→4: 20 Mrd, 4→5: 35 Mrd, 5→6: 61,25 Mrd. */
+   túl olcsó lenne. 3→4: 20 Mrd, 4→5: 35 Mrd, 5→6: 61,25 Mrd — 3.9.135 óta
+   EZ A REFERENCIA-büdzsénél (20 Mrd/idény) érvényes ár; a tényleges a klub
+   éves bevételével arányos, és az első két idényben kedvezményes. */
 function coachSlotPrice(cur){
   const step=Math.max(0,(cur||COACH_SLOTS_BASE)-COACH_SLOTS_BASE);
-  return Math.round(10000*Math.pow(1.75,step));}
+  /* 3.9.135: a lépcső alakja marad, a léptéke a klub büdzséje (és az első
+     két idényben kedvezmény) — lásd scaledUpgradePrice. */
+  return scaledUpgradePrice(10000*Math.pow(1.75,step),500);}
 function coachSlots(){return S.coachSlots||COACH_SLOTS_BASE;}
 function staff(){return S.staff||(S.staff=[]);}
 function staffFull(){return staff().length>=coachSlots();}
@@ -29966,7 +30017,8 @@ const TEACH_TOPICS={
            +`az 1. idényben −${Math.round(BOOST_EARLY_DISC[0]*100)}%, a 2.-ban `
            +`−${Math.round(BOOST_EARLY_DISC[1]*100)}%, utána teljes ár. `
            +`Most a <b>${sn}. idényben</b> jársz, tehát <b>−${Math.round(boostEarlyDisc()*100)}%</b> `
-           +`jár — mind a hét fajtára.<br><br>`
+           +`jár — mind a hét fajtára, és ugyanennyi a poszt-tanulásra, a fizetős `
+           +`felállásváltásra, a stáb-bővítésre, a scout- és az ügynökség-fejlesztésre is.<br><br>`
            +(nxt?`A következő idényben már csak −${Math.round(nxt*100)}%, utána semmi.`
                 :`Ez az <b>utolsó</b> idény, amiben él.`);}},
       {a:"hubBoostBtn",
@@ -67832,10 +67884,14 @@ let extraRoster=[]; /* karrier módban a 15 aktív fölötti, MAX_CAREER_ROSTER-
    Az új felállás új poszt-struktúrát ad. A meglévő kezdő 11-et AUTOMATIKUSAN
    újrarendezzük az új posztokra (elsődlegesen a fő posztra, aztán rokonposztra),
    a kiszorulók a padra/tartalékba kerülnek, az üresen maradt slotokat a
-   pad/tartalék tölti. Szezononként az első váltás ingyen, utána 10 000. */
+   pad/tartalék tölti. Szezononként az első váltás ingyen, utána 10 000·0,5 pont
+   a referencia-büdzsénél — 3.9.135 óta a klub bevételével arányosan, az első
+   két idényben kedvezménnyel (formationChangeCost). */
 const FORMATION_CHANGE_COST=Math.round(10000*FORMATION_PRICE_MULT);
 function formationChangeCost(){
-  return (S.formationChangesThisSeason||0)<1?0:FORMATION_CHANGE_COST;}
+  /* 3.9.135: a fizetős váltás a klub büdzséjéhez mért, kezdő kedvezménnyel
+     (lásd scaledUpgradePrice). Az idei első váltás továbbra is ingyenes. */
+  return (S.formationChangesThisSeason||0)<1?0:scaledUpgradePrice(FORMATION_CHANGE_COST,100);}
 /* ================= FELÁLLÁS-BOLT ÉS SAJÁT FELÁLLÁSOK =================
    A hét alap-felállás eddig a teljes kínálat volt, és a felállás így egy
    ELŐRE MEGÍRT lista volt, nem építkezés: a keretedet a meglévő alakokhoz
@@ -74530,7 +74586,7 @@ function renderAgencyHubPanel(){
       <div style="font-size:13.5px;font-weight:700">🤝 Átigazolási ügynökség <span style="color:var(--gold)">${agencyStarsLabel()}</span></div>
       <div style="font-size:11.5px;color:var(--dim2);margin-top:3px;line-height:1.45">
         Pontok: <b style="color:var(--ink)">${have.toFixed(1)} / ${need}</b> a következő fél csillagig · ${a.deals||0} lezárt üzlet<br>
-        Egyszerre ${agencyMaxListings()} játékos a piacon · a licit-kúp csúcsa ${Math.round(agencyBidMode(0)*100)}% · a következő fél csillag ${fmtFt(aPrice)}<br>
+        Egyszerre ${agencyMaxListings()} játékos a piacon · a licit-kúp csúcsa ${Math.round(agencyBidMode(0)*100)}% · a következő fél csillag ${fmtFt(aPrice)}${earlyDiscTag()}<br>
         Piacra az vihető, akinek már ${SALE_LIST_MIN_MINUTES} lejátszott perce van nálad — a kapacitás csak a felett számít.</div>
       <div style="position:relative;height:6px;background:var(--panel);border-radius:3px;margin-top:6px">
         <span style="position:absolute;left:0;top:0;height:6px;border-radius:3px;background:var(--gold);width:${Math.max(0,Math.min(100,have/need*100)).toFixed(1)}%"></span>
@@ -74564,7 +74620,7 @@ function renderAgencyUpgradePanel(){
     · egyszerre piacon tartható játékos: <b>${curList} → ${nList}</b><br>
     · a licit-kúp csúcsa: <b>${curMode}% → ${nMode}%</b> (a sáv marad ${Math.round(SALE_BID_LO*100)}-${Math.round(SALE_BID_HI*100)}%)<br>
     · tárgyalások, felderítés, klub-szemle: <b>${nEquiv.toFixed(1)}★</b> scout-egyenérték<br>
-    Ára: <b style="color:#ffd24a">${fmtFt(price)}</b> (a scout-fejlesztés kétszerese).<br>
+    Ára: <b style="color:#ffd24a">${fmtFt(price)}</b>${earlyDiscTag()} (a scout-fejlesztés kétszerese).<br>
     ${affordable?"":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget||0)}).</span>`}</p>`;
   const act=$("twActions");act.innerHTML="";
   if(affordable){
@@ -74751,7 +74807,7 @@ function renderFormationPicker(){
   const free=cost===0;
   $("hubFormationHint").innerHTML=`Jelenlegi felállás: <b>${FORM_LABELS[form]||form}</b>. A kezdő 11-et a rendszer automatikusan újrarendezi az új posztokra; a kiszorulók a padra/tartalékba kerülnek. `+
     (free?`Az idei első váltás <b style="color:var(--grass)">ingyenes</b>.`
-         :`Ára: <b>${fmtFt(cost)}</b> (egyenleg: ${fmtFt(S.transferBudget||0)}).`)+
+         :`Ára: <b>${fmtFt(cost)}</b>${earlyDiscTag()} (egyenleg: ${fmtFt(S.transferBudget||0)}).`)+
     /* Itt a felállás ALAKJÁT állítod. A MEGBÍZÁSOK — hogy egy középpályás hely
        védekező/klasszikus/támadó legyen-e, és hogy egy támadó helyen
        csatár vagy árnyékék álljon — az adott JÁTÉKOS lapján dőlnek el a
@@ -75743,7 +75799,7 @@ function renderStaffPanel(){
   h+=`<div style="border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-bottom:9px">
     <div style="font-size:12.5px;line-height:1.55">Stáb-helyek: <b style="color:var(--gold)">${arr.length}/${max}</b> (max ${COACH_SLOTS_MAX}).<br>`
     +(atMax?`<span style="color:var(--grass)">A stábod elérte a maximumot.</span>`
-      :`Bővítés <b>${max} → ${max+1}</b>: <b style="color:#ffd24a">${fmtFt(price)}</b>.`
+      :`Bővítés <b>${max} → ${max+1}</b>: <b style="color:#ffd24a">${fmtFt(price)}</b>${earlyDiscTag()}.`
        +(S.transferBudget>=price?"":`<br><span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget||0)}).</span>`))
     +`</div></div>`;
   /* ---- STÁB-CSARNOK ----
@@ -75876,7 +75932,7 @@ function renderScoutUpgradePanel(){
     ${atMax
       ? `<span style="color:var(--grass)">A scoutod elérte a maximumot (${SCOUT_MAX_STARS}★) — pontosabb már nem lehet.</span>`
       : `Fejlesztés <b>${scout.stars}★ → ${nextStars}★</b>: a tévedés <b>${curPct}% → ${nextPct}%</b>-ra csökken.<br>
-         Ára: <b style="color:#ffd24a">${fmtFt(price)}</b>.<br>
+         Ára: <b style="color:#ffd24a">${fmtFt(price)}</b>${earlyDiscTag()}.<br>
          ${affordable?"":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget)}).</span>`}`}
   </p>
   ${twEventScoutNote()}`;
@@ -80387,7 +80443,7 @@ function openPosLearnPicker(loc){
      mindig gyorsít, sosem lassít. */
   const carryOf=pos=>Math.min(needed,posDriftProgress(e,pos)/POS_DRIFT_MULT);
   const leftOf=pos=>Math.max(1,Math.ceil(needed-carryOf(pos)));
-  let body=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">${esc(shortName(p.n))} (Rating ${Math.round(pOvr(p))}, ${e.age} év) új posztot tanulhat. A tanulás <b>meccsenként</b> halad (kb. <b>${needed}</b> lejátszott meccs — a jó teljesítmény gyorsítja). Ha kész, teljes értékűen otthon lesz az új poszton.<br><br>Fizetés nélkül is <b>beszokik</b> minden posztot, ahol játszik, csak <b>${POS_DRIFT_MULT}× lassabban</b> (kb. ${posDriftMatchesNeeded(e)} meccs) — amit így már összeszedett, azt a megvásárolt tanulásba <b>beszámítjuk</b>.<br><br>Ára: <b>${fmtFt(cost)}</b>. Egyenleged: ${fmtFt(S.transferBudget||0)}.</p>`;
+  let body=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">${esc(shortName(p.n))} (Rating ${Math.round(pOvr(p))}, ${e.age} év) új posztot tanulhat. A tanulás <b>meccsenként</b> halad (kb. <b>${needed}</b> lejátszott meccs — a jó teljesítmény gyorsítja). Ha kész, teljes értékűen otthon lesz az új poszton.<br><br>Fizetés nélkül is <b>beszokik</b> minden posztot, ahol játszik, csak <b>${POS_DRIFT_MULT}× lassabban</b> (kb. ${posDriftMatchesNeeded(e)} meccs) — amit így már összeszedett, azt a megvásárolt tanulásba <b>beszámítjuk</b>.<br><br>Ára: <b>${fmtFt(cost)}</b>${earlyDiscTag()}. Egyenleged: ${fmtFt(S.transferBudget||0)}.</p>`;
   $("twBody").innerHTML=body;
   $("twActions").innerHTML="";
   if((S.transferBudget||0)<cost){
