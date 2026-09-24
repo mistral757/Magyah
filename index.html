@@ -6141,7 +6141,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.138";
+const APP_VERSION="3.9.139";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -13941,7 +13941,22 @@ function pyrLadderHtml(){
   const g=levelGap();
   const u=underdogFactor(),uLbl=underdogLabel(u,oppMatchStrength()-teamMatchStrength());
   const start=(S.pyr&&S.pyr.startDiv)||id;
-  /* --- a létra: fentről lefelé, az aktuális fok kiemelve --- */
+  /* --- a létra: fentről lefelé, az aktuális fok kiemelve ---
+     3.9.139 — BEJELENTÉS: „nem updatelődik folyamatosan az osztályok
+     erőssége. Így félrevezető, hol járok erőben." Igaz volt: a fokok az
+     osztályközepet (a szezon alatt MOZDULATLAN világ-szintet) írták, a
+     három doboz viszont a mezőny MOSTANI meccs-erejét (növekedés + a
+     rejtett bónuszod visszakapott fele). A kettő egy képernyőn két
+     különböző skála volt — a D4 „113"-a mellett a doboz 132,8-at mutatott.
+     MOSTANTÓL minden fok ugyanazon a skálán áll, amin a „mezőny most" doboz
+     és a te meccs-erőd: az osztály közepe + az ő SAJÁT idénybeli növekedése
+     (pyrAiRate — minden osztály a saját ütemében erősödik) + a rejtett
+     erősítés. Halványan mellette az osztályközép marad, tájékoztatásul. */
+  const most=d=>{
+    try{
+      if(d.id===id)return oppMatchStrength();
+      return oppMatchStrength(d.mean+pyrAiRate(d.id)*(S.idx||0)/30);
+    }catch(e){return d.mean;}};
   let rungs="";
   D.forEach(d=>{
     const here=d.id===id;
@@ -13949,7 +13964,7 @@ function pyrLadderHtml(){
     rungs+=`<div class="pyrRung${here?" here":done?" done":""}">`
       +`<span class="n">D${d.id}</span>`
       +`<span class="t">${d.id===pyrTopId()?"🏆 ":""}${esc(d.name)}</span>`
-      +`<span>${Math.round(d.mean)}</span></div>`;});
+      +`<span><b>${pyrN1(most(d))}</b> <small style="opacity:.6">${Math.round(d.mean)}</small></span></div>`;});
   /* --- mi kell a következő lépcsőhöz --- */
   const goal=pyrAtTop(id)
     ? `⛰️ <b>A piramis tetején állsz.</b> Feljebb ma nincs — de ha megnyered, `
@@ -13964,7 +13979,8 @@ function pyrLadderHtml(){
       <span class="pyrLadderName">${esc((pyrMyDiv()||{}).name||"")}</span>
       <span class="pyrLadderLvl" title="Az osztály közepe a világban — a szezon alatt nem mozdul. Amivel MOST szembeállsz, az alatta, a három dobozban áll.">osztályközép ${oppTargetRating}</span>
     </div>
-    <div style="margin-top:9px">${rungs}</div>
+    <div style="margin-top:7px;font-size:10.5px;color:var(--dim2);text-align:right">a mezőny meccs-ereje MOST · <span style="opacity:.7">halványan az osztályközép</span></div>
+    <div style="margin-top:3px">${rungs}</div>
     <div class="pyrLadderGoal">${goal}<br>${risk}</div>
     ${pyrNowHtml(g)}
     <div class="pyrLadderMeta">📈 A mezőnyöd ${S.idx||0} forduló alatt `
@@ -20241,6 +20257,10 @@ function ultraIdx(f){
   if(!u||u.f!==key||bzCsLvl()<3)return -1;
   try{if(effectiveSlotPos(key,u.i)!=="CS")return -1;}catch(e){return -1;}
   return u.i;}
+/* A CSAPAT enyhe ráadása (3.9.139, kimondott kérés): amíg ultra csatár áll
+   elöl, a csapat saját gólesélye +5%. Az ár (+3…+10% kapott gól) marad. */
+const ULTRA_TEAM_OWN=1.05;
+function ultraOwnMult(){try{return ultraIdx()>=0?ULTRA_TEAM_OWN:1;}catch(e){return 1;}}
 function ultraGoalMult(idx){
   if(idx==null||idx<0)return 1;
   return idx===ultraIdx()?ULTRA_GOALW:1;}
@@ -42310,14 +42330,52 @@ function rettegesLevel(){const F=fearState();return F?Math.max(0,Math.min(RETTEG
    a saját állapota százalékát adja, csak hamarabb ér a (felezett) tetejére.
    Az állapot maga amúgy is harmadáron gyűlik (STYLE2_MS_DIV). */
 const STYLE2_OVR_DIV=2;
+/* ================= A STÍLUS-MECCSERŐ ÍVE ÉS TETEJE (3.9.139) =================
+   KIMONDOTT KÉRÉS:
+     „A csapatstílusok saját speciális meccserő-boostjai túl gyorsan
+      kiépíthetők maxra (12 és 20 meccserő pont), már kb. lvl 4-5 körül elérjük
+      velük a maxot. Ezt át kell scalelni."
+     „Ugyanezeknek a teteje nyíljon ki és lehessen 12 és 20 fölé vinni,
+      amennyiben az adott csapatstílus eléri a lvl15-öt. Onnantól kezdve
+      lvl-enként +25%, azaz 12 ⇒ 15, 18, 21, 24, 27, 30. 20-ról pedig
+      szintenként +20%: 24, 28, 32, 36, 40, 44."
+   AZ OK, MÉRVE: a hozam = állapot × a megvett szint százaléka. A százalékokat
+   ~130-as állapotra hangoltuk, a valódi állapot viszont egy középkarrieres
+   keretnél már 300 fölött van (a bejelentett panelen 329) — így a 4. szint
+   3,9%-a már 12,8-at adott, vagyis a plafont.
+   A MEGOLDÁS KÉT RÉSZE:
+     1. AZ ÍV: az n. megvett szint legfeljebb a plafon n/10-ét adhatja (Panzer:
+        +2 szintenként, a többiek: +1,2). A teljes plafon tehát CSAK a 10.
+        szinten nyílik meg — amihez 14-es csapatstílus-szint kell. Az állapot ×
+        százalék továbbra is számít: egy gyenge keret a saját ívét sem éri el.
+     2. A TETEJE: 15-ös csapatstílus-szinttől szintenként nő (Panzer +4, a
+        többiek +3), 20-on +44, illetve +30. A másodlagos filozófia mindkettő
+        FELÉT kapja (3.9.137). */
+const FEAR_CAP_STEP=4, ENG_CAP_STEP=3, STYLE_CAP_OPEN=15;
+function styleCapLevelOf(st){
+  let L=1;try{L=Math.max(1,Math.min(STYLE_LVL_MAX,styleLevel(st)||1));}catch(e){L=1;}
+  return L;}
+/* A tető a stílus szintje szerint: 14-ig az alap, onnan szintenként nő. */
+function styleCapFor(base,step,st){
+  const L=styleCapLevelOf(st);
+  return base+step*Math.max(0,L-(STYLE_CAP_OPEN-1));}
 function fearOvrCap(){
   let sec=false;try{sec=styleIsSecondary(fearStyle());}catch(e){sec=false;}
-  return sec?FEAR_OVR_CAP/STYLE2_OVR_DIV:FEAR_OVR_CAP;}
+  const c=styleCapFor(FEAR_OVR_CAP,FEAR_CAP_STEP,fearStyle());
+  return sec?c/STYLE2_OVR_DIV:c;}
+function fearSec(){try{return styleIsSecondary(fearStyle());}catch(e){return false;}}
+function engSecK(k){try{return styleIsSecondary(engStyle(k));}catch(e){return false;}}
+/* Az ív: a megvett szint mennyit ENGED (a 10. szintig arányosan). */
+function styleRampCap(base,lv,sec){
+  const b=sec?base/STYLE2_OVR_DIV:base;
+  return lv>=10?Infinity:b*lv/10;}
 function fearOvrBonus(){
   if(!fearOn())return 0;
   const lv=rettegesLevel();
   if(!lv)return 0;
-  return Math.min(fearOvrCap(),Math.round(fearLevel()*(RETTEGES_PCT[lv]||0)*10)/10);}
+  let sec=false;try{sec=styleIsSecondary(fearStyle());}catch(e){sec=false;}
+  const nyers=Math.round(fearLevel()*(RETTEGES_PCT[lv]||0)*10)/10;
+  return Math.round(Math.min(fearOvrCap(),styleRampCap(FEAR_OVR_CAP,lv,sec),nyers)*10)/10;}
 function rettegesNextPrice(){
   const lv=rettegesLevel();
   return lv>=RETTEGES_MAX?null:RETTEGES_PRICE[lv+1];}
@@ -43135,13 +43193,16 @@ function engLvl(k){const E=engState(k);return E?Math.max(0,Math.min(ENG_MAX,E.lv
 /* Egy stílus plafonja: elsődlegesként +12, MÁSODLAGOSKÉNT +6 (3.9.137). */
 function engOvrCapK(k){
   let sec=false;try{sec=styleIsSecondary(engStyle(k));}catch(e){sec=false;}
-  return sec?ENG_OVR_CAP/STYLE2_OVR_DIV:ENG_OVR_CAP;}
-/* EGY stílus szintjének meccserő-hozama — a saját plafonjával. */
+  const c=styleCapFor(ENG_OVR_CAP,ENG_CAP_STEP,engStyle(k));
+  return sec?c/STYLE2_OVR_DIV:c;}
+/* EGY stílus szintjének meccserő-hozama — a tetővel ÉS az ívvel (3.9.139). */
 function engOvrBonusK(k){
   if(!engLive(k))return 0;
   const lv=engLvl(k);
   if(!lv)return 0;
-  return Math.min(engOvrCapK(k),Math.round(engLevel(k)*(ENG_PCT[lv]||0)*10)/10);}
+  let sec=false;try{sec=styleIsSecondary(engStyle(k));}catch(e){sec=false;}
+  const nyers=Math.round(engLevel(k)*(ENG_PCT[lv]||0)*10)/10;
+  return Math.round(Math.min(engOvrCapK(k),styleRampCap(ENG_OVR_CAP,lv,sec),nyers)*10)/10;}
 /* AZ ÖSSZES: a két gazdaság hozama ÖSSZEADÓDIK — 3.9.137 óta közös plafon
    nélkül. A 3.9.131-es „együtt sem +12 fölé" szabály a másodlagos filozófia
    meccserejét gyakorlatilag lenullázta (a kiépített elsődleges már a +12-n
@@ -55332,7 +55393,7 @@ function buildMatchSnapshot(){
        determinizmust törve, amiért a seedelt véletlen van.
        A defMult-nak ugyanez a sorsa volt, és az már rég a pillanatképben
        utazik; ez a két szorzó egyszerűen lemaradt róla. */
-    ownGoalMult:styleOwnGoalMult(),oppGoalMult:styleOppGoalMult(),
+    ownGoalMult:styleOwnGoalMult()*ultraOwnMult(),oppGoalMult:styleOppGoalMult(),
     tacticEffect:tacticEffect(),tacticStyle:tacStyle,chemPairs,
     /* A közvetítésnek és a meccs utáni üzeneteknek — a hatás magát az ovr
        már tartalmazza, ez a KÉT SZÁM csak elmondja, mennyi volt. */
@@ -72935,9 +72996,20 @@ function pyrLeapOffer(next){
   if(!stakes.length){done();return;}
   let si=0;                                  /* 0 = a 100%-os tét */
   const fromD=pyrDivs()[t.from-1],toD=pyrDivs()[t.to-1];
+  /* ---- MECCS-ERŐ A MECCS-ERŐVEL (3.9.139) ----
+     BEJELENTÉS: „nem a meccs erőmmel hasonlítja össze az ellenfél erejét."
+     Eddig a cél-osztály KÖZEPÉT (a világ-szintet) mérte a NYERS kereted
+     erejéhez — két különböző skála: a mezőny a rejtett bónuszod felét
+     visszakapja (oppBuffFor), te a meccs-erődben az egészet viszed. A HUB
+     osztály-doboza (pyrNowHtml) már meccs-erőt mér meccs-erőhöz; ez a panel
+     most ugyanazt teszi: a te teamMatchStrength()-ed a cél-osztály
+     oppMatchStrength(közép)-je ellen — a szezon ELEJÉN (a kezdő mezőny, még
+     növekedés nélkül). A nyers szám zárójelben marad, tájékoztatásul. */
   const myOvr=(typeof teamStrength==="function")?teamStrength():0;
-  const toMean=toD?toD.mean:null,fromMean=fromD?fromD.mean:null;
-  const gap=(toMean!=null&&myOvr)?(toMean-myOvr):null;
+  let myMs=null;try{myMs=teamMatchStrength();}catch(e){myMs=null;}
+  const msOf=m=>{if(m==null)return null;try{return oppMatchStrength(m);}catch(e){return m;}};
+  const toMean=toD?msOf(toD.mean):null,fromMean=fromD?msOf(fromD.mean):null;
+  const gap=(toMean!=null&&myMs)?(toMean-myMs):null;
   $("scUnlock").classList.remove("hide");
   $("unlockTitle").textContent="🎲 ALL-IN — OSZTÁLYUGRÁS PÉNZÉRT";
   $("unlockBody").innerHTML=
@@ -72947,9 +73019,10 @@ function pyrLeapOffer(next){
     +`<b>D${t.to} · ${esc(pyrLeapLabel(t.to))}</b> mezőnyében indulsz.</p>`
     /* MIT VÁLLALSZ — a bejelentés kifejezetten kérte, hogy a cél-osztály ereje
        ki legyen írva, a saját keretedhez mérve. */
-    +`<p><b>Mit vállalsz?</b> A D${t.to} átlagereje <b>${toMean!=null?pyrN1(toMean):"—"}</b>`
+    +`<p><b>Mit vállalsz?</b> A D${t.to} mezőnyének meccs-ereje <b>${toMean!=null?pyrN1(toMean):"—"}</b>`
     +(fromMean!=null?` <span style="color:var(--dim2)">(a D${t.from}-é ${pyrN1(fromMean)})</span>`:"")
-    +`, a te kereted <b>${myOvr?pyrN1(myOvr):"—"}</b>. `
+    +`, a te meccs-erőd <b>${myMs?pyrN1(myMs):"—"}</b>`
+    +(myOvr?` <span style="color:var(--dim2)">(nyers kereted ${pyrN1(myOvr)})</span>`:"")+`. `
     +(gap==null?""
       :gap<=0
         ?`<span style="color:var(--grass)">A mezőny fölött vagy — ez vállalható.</span>`
@@ -75508,7 +75581,8 @@ function renderHubMidRolePicker(){
     u.className="mrOpt"+(most?" cur":"");
     u.innerHTML=`<span class="mrDot" style="background:var(--red)"></span>
       <span class="mrTx"><span class="mrNm">⚡ Ultra csatár${most?" — BEKAPCSOLVA":""}</span>
-        <span class="mrDs">Semmit nem véd, csak a kapura megy: a gólsúlya <b>${Math.round((ULTRA_GOALW-1)*100)}%-kal</b> nagyobb. `
+        <span class="mrDs">Semmit nem véd, csak a kapura megy: a gólsúlya <b>${Math.round((ULTRA_GOALW-1)*100)}%-kal</b> nagyobb, `
+        +`és a csapat gólesélye is <b>+${Math.round((ULTRA_TEAM_OWN-1)*100)}%</b>. `
         +`Egyszerre egy embered lehet ilyen.</span>
         <span class="mrFx">${elo?`Ára: az ellenfél gólesélye <b style="color:var(--red)">+${Math.round(elo.cost*100)}%</b> — `
           +`${p?esc(shortName(p.n)):"ő"} Védekezése ${Math.round(elo.ved)}, a többiek átlaga ${Math.round(elo.avg)} `
@@ -92556,9 +92630,10 @@ function fearSectionHtml(){
       +`<div class="msDesc">A félelem szinted <b>százaléka</b> meccserővé válik. Most `
       +`<b>${Math.round(pct*1000)/10}%</b>`+(lv?` = +${String(bonusz).replace(".",",")} meccserő`:"")
       +`, a következő szinten <b>${Math.round((RETTEGES_PCT[Math.min(RETTEGES_MAX,lv+1)]||0)*1000)/10}%</b>. `
-      +`A plafon <b>+${fearOvrCap()}</b>`
-      +(fearOvrCap()<FEAR_OVR_CAP?` <span style="color:var(--dim2)">(másodlagos filozófiaként a +${FEAR_OVR_CAP} fele)</span>`:"")
-      +` — afölé a legmagasabb félelem szint sem visz.`
+      +`Ezen a szinten legfeljebb <b>+${String(Math.round(Math.min(fearOvrCap(),styleRampCap(FEAR_OVR_CAP,Math.max(1,lv),fearSec()))*10)/10).replace(".",",")}</b>`
+      +` (a 10. szintig szintenként +${FEAR_OVR_CAP/10*(fearSec()?0.5:1)}), a teljes plafon most <b>+${String(fearOvrCap()).replace(".",",")}</b>`
+      +(fearSec()?` <span style="color:var(--dim2)">(másodlagos filozófiaként a fele)</span>`:"")
+      +`. <span style="color:var(--dim2)">A ${STYLE_CAP_OPEN}. csapatstílus-szinttől szintenként +${FEAR_CAP_STEP} (a 20.-on +${FEAR_OVR_CAP+FEAR_CAP_STEP*6}).</span>`
       +`<br><span style="color:var(--dim2)">Az ${lv+1}. szinthez ${rettegesNeedLevel(lv+1)}. csapatstílus-szint kell.</span></div>`
       +`<button class="btn-${baj?"s":"y"} stepbtn" id="dreadRetteges"${baj?" disabled":""} style="margin-top:7px;padding:8px">`
       +(baj?esc(baj):`Megveszem — ${ar} pont`)+`</button></div>`;}
@@ -92716,10 +92791,12 @@ function engSectionHtml(k0){
     +`<div class="msDesc">${esc(d.lvlD)} Most <b>${Math.round(pct*1000)/10}%</b>`
     +(lv?` = +${engNum(bonusz)} meccserő`:"")
     +`, a következő szinten <b>${Math.round((ENG_PCT[Math.min(ENG_MAX,lv+1)]||0)*1000)/10}%</b>. `
-    +`A plafon <b>+${engOvrCapK(k)}</b>`
-    +(engOvrCapK(k)<ENG_OVR_CAP?` <span style="color:var(--dim2)">(másodlagos filozófiaként a +${ENG_OVR_CAP} fele)</span>`:"")+`.`
+    +`Ezen a szinten legfeljebb <b>+${engNum(Math.min(engOvrCapK(k),styleRampCap(ENG_OVR_CAP,Math.max(1,lv),engSecK(k))))}</b>`
+    +` (a 10. szintig szintenként +${engNum(ENG_OVR_CAP/10*(engSecK(k)?0.5:1))}), a teljes plafon most <b>+${engNum(engOvrCapK(k))}</b>`
+    +(engSecK(k)?` <span style="color:var(--dim2)">(másodlagos filozófiaként a fele)</span>`:"")
+    +`. <span style="color:var(--dim2)">A ${STYLE_CAP_OPEN}. csapatstílus-szinttől szintenként +${ENG_CAP_STEP} (a 20.-on +${ENG_OVR_CAP+ENG_CAP_STEP*6}).</span>`
     +`<br><span style="color:var(--dim2)">A ${lv+1}. szinthez ${engNeedLevel(lv+1)}. csapatstílus-szint kell. `
-    +`A Panzer félelem-rendszere ugyanezen a létrán jár, de +${FEAR_OVR_CAP}-ig — `
+    +`A Panzer félelem-rendszere ugyanezen a létrán jár, de +${FEAR_OVR_CAP}-ig (20-as szinten +${FEAR_OVR_CAP+FEAR_CAP_STEP*6}-ig) — `
     +`ez a filozófia ára ott, és a jutalma itt.</span></div>`
     +(k==="villam"?`<div class="msDesc" style="color:var(--dim2);margin-top:5px">`
       +`⏳ <b>Nyolcvan perc:</b> a nagyon gyors csapat elfárad — a 70. perctől `
@@ -97249,7 +97326,7 @@ stTrait("bombazok","olcso_totalis",2,"Olcsó totális futball",
    posztos tábla CS marad; csak a gólsúlya (ULTRA_GOALW) és a csapat kapott
    gól-esélye (ultraCost → teamShape) változik. */
 stTrait("bombazok","csupa_ek",3,"Csupa ék",
-  "A támadósor szélső helyei KÖZÉPCSATÁR-megbízást is kaphatnak. A 3. szinten megnyílik az ULTRA CSATÁR: egyetlen embered, aki semmit nem véd — a gólesélye jelentősen nő, de a csapat kapott gól-esélye is (+3…+10%, annál jobban, minél jobb védekező volt a többiekhez képest).",[
+  "A támadósor szélső helyei KÖZÉPCSATÁR-megbízást is kaphatnak. A 3. szinten megnyílik az ULTRA CSATÁR: egyetlen embered, aki semmit nem véd — a gólesélye jelentősen nő, a csapaté enyhén (+5%), de a csapat kapott gól-esélye is (+3…+10%, annál jobban, minél jobb védekező volt a többiekhez képest).",[
   {fx:{bzCsLvl:1},note:"3 támadóból 2, 4-ből 3 lehet középcsatár"},
   {fx:{bzCsLvl:2},note:"a teljes támadósor lehet középcsatár"},
   {fx:{bzCsLvl:3},note:"megnyílik az ULTRA CSATÁR (1 fő)"}],

@@ -88,17 +88,12 @@ játszik tovább.
 
 Ez megfelel a ×1,8-as súlynak (várható ≈ 27%).
 
-## Egy tervezési döntés, amit érdemes tudni
+## A csapat ráadása (3.9.139)
 
-A kérés az ultra csatár **saját** gólesélyéről szól („gólesély jelentősen nő
-neki”). Ezért a csapat teljes gólvárhatósága NEM nő, csak az arány tolódik
-felé. A csere tehát:
-
-- **nyer:** több gól egy embertől, ami a Bombázók egyéni gólrekord-, mesterhármas-
-  és gólkirály-mérföldköveinek jó;
-- **fizet:** több kapott gól.
-
-Ha a csapat gólvárhatóságára is kellene egy kis ráadás (pl. +5%), az egy sor.
+Eredetileg csak az ultra **saját** gólesélye nőtt, a csapat gólvárhatósága
+nem. Kérésre mostantól **enyhe csapatszintű ráadás** is jár: amíg ultra csatár
+áll elöl, a csapat saját gólesélye **+5%** (`ULTRA_TEAM_OWN`). Az ár (+3…+10%
+kapott gól) változatlan.
 
 ## Próba
 

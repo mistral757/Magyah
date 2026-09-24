@@ -225,14 +225,12 @@ Az `af` (maghrebi/afrikai, francia **helyesírással**) nevek helyesen maradnak
 „aj"-osak — ott az `ai` tényleg két hang (Haidara, Zairi). A keresztnevek a
 gépi kiosztásból maradnak; csak a vezetéknév változik.
 
-### ⚠️ `table.json` — poros, ne higgy neki
+### `table.json` — törölve (3.9.139)
 
-A mappában lévő `tools/nevek/table.json` **2026. szeptember 4-i**, azóta
-~1000 néven elavult, és a `build.py` docstringje **tévesen** állítja, hogy ő
-írja: a build már közvetlenül az `index.html` `HU_NAME_TABLE`-jét írja felül,
-a `table.json`-t nem érinti.
-
-Ez egy valódi csapda: a 37. köteg első mérése ezen a fájlon futott, és **hamis
-hibákat** mutatott (`Wiese → Fise`, `McFarland → Mkfarland`) — mindkettő rég
-javítva van az élő táblában. **Mérni mindig az `index.html`-ből kell.**
+A mappában volt egy `tools/nevek/table.json`, 2026. szeptember 4-i állapotban.
+Azóta ~1000 néven elavult, mert a `build.py` már közvetlenül az `index.html`
+`HU_NAME_TABLE`-jét írja felül, a JSON-t nem érintette. Csapda volt: a 37.
+köteg első mérése ezen futott, és **hamis hibákat** mutatott (`Wiese → Fise`,
+`McFarland → Mkfarland`), pedig mindkettő rég javítva volt az élő táblában.
+A fájl ezért törölve lett. **Mérni mindig az `index.html`-ből kell.**
 

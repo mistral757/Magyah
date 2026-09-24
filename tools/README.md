@@ -2237,6 +2237,31 @@ jelöltről.
 **Módosult:** a `gegenpressing-proba.js` 7b-szakasza a kötést már nem a
 meccsekből építi, hanem fázisokkal. A meccsek csak az összeérést viszik.
 
+## stilus-meccsero-iv-proba.js — 📈 a stílus-meccserő íve, teteje és a piramis mércéi
+
+```bash
+node tools/stilus-meccsero-iv-proba.js
+```
+
+**Négy bejelentés (21 állítás):**
+
+- **Az ív:** a stílus-meccserő 4-5. szinten már maxon volt. Most az n.
+  szint legfeljebb n/10 × plafon, a bejelentett 329-es állapot 4. szintjén
+  +4,8.
+- **A tető:** 15-ös stílusszinttől nyílik (12 → 30, Panzer 20 → 44), a
+  másodlagos mindkettő felét kapja.
+- **Az All-in:** meccs-erőt mér meccs-erőhöz. A próba a VALÓDI panelt nyitja
+  meg, rögzített céllal és téttel.
+- **A létra:** a saját fok betűre a „mezőny most” szám.
+
+Mellé az ultra csatár +5%-os csapat-ráadása.
+
+A stílusszintet és az állapotot a próba felülírt függvényekkel rögzíti
+(`styleLevel`, `engLevel`, `fearLevel`). Így a mérés független attól, mekkora
+állapotot hoz ki egy friss fixtúra-keret.
+
+Részletek: `docs/stilus-meccsero-iv.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
