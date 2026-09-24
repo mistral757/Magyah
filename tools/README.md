@@ -2173,6 +2173,33 @@ kövesse a klub büdzséjét, ahogy a poszt-tanulás. Mind az öt kapja meg a bo
 
 Részletek: `docs/fejlesztes-arak.md`.
 
+## csupa-ek-proba.js — 🎯 Csupa ék és a 4-2-4 a Bombázóknál
+
+```bash
+node tools/csupa-ek-proba.js
+```
+
+**Mit mér (26 állítás):**
+
+- **a költözés:** az „Olcsó totális futball” a Bombázók fáján van, a
+  Villámban megvett szintek pontja egyszer visszajár;
+- **a középcsatár-korlát** szintenként: 4-3-3-ban 1 → 2 → 3, 4-2-4-ben
+  2 → 3 → 4, és képesség nélkül visszaáll;
+- **az ultra csatár:** csak a 3. szinten él, csak középcsatár-helyen; ×1,8
+  gólsúly; +3% / +10% a Védekezés-arány két végén; benne van az alakzat
+  szorzójában; a választó felkínálja.
+
+**A valódi-meccs rész tanulsága:** a gólarányra épített állítás 14 meccsen
+hamisan bukott. Ugyanaz a csatár ultra nélkül 21% és 44% között szórt. A bukó
+állítás ezért determinisztikus: megszámolja, hogy a meccsmotor
+gólszerző-választása hányszor kapott ×1,8-at, és hogy csak az ultra helyre-e.
+A gólarány (40 + 40 meccs) csak tájékoztató sor.
+
+A gólokat a `recordScorer` burkolásával számolja: a saját gólok egyetlen
+csatornája ez. A `S.lastMatch` nem tartalmaz gólszerzőnkénti bontást.
+
+Részletek: `docs/csupa-ek.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```

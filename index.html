@@ -6141,7 +6141,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.135";
+const APP_VERSION="3.9.136";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -19922,7 +19922,12 @@ function slotRoleOptions(f,i){
   /* TÁMADÓ HELY: a saját alapkódja ⇄ árnyékék. A középcsatárnak a CS, a
      támadó szélsőnek a JSZ/BSZ marad a "maradj, ahol vagy" opciója — egy
      szélsőt nem lehet középcsatárrá tenni, mert az már alakzat-kérdés. */
-  if(isAtkRoleSlot(f,i))return [def,SHADOW_POS];
+  if(isAtkRoleSlot(f,i)){
+    /* 🎯 CSUPA ÉK (3.9.136): a TÁMADÓ szélső hely középcsatár is lehet. A
+       darabszám-korlátot nem itt, hanem az érvényesítésben tartjuk
+       (wingCsAccepted) — itt a kérdés csak az, hogy EGYÁLTALÁN választható-e. */
+    if(def!=="CS"&&bzCsLvl()>=1)return [def,"CS",SHADOW_POS];
+    return [def,SHADOW_POS];}
   const ex=(SLOT_ROLE_EXTRA[f]&&SLOT_ROLE_EXTRA[f][i])||[];
   if(isMidRoleSlot(f,i))return MID_ROLE_CODES.concat(ex);
   /* KÖZÉPPÁLYÁS SZÉLSŐ HELY: maradhat kint, vagy behúzódhat a középpálya
@@ -19974,7 +19979,92 @@ function effectiveSlotPos(f,i){
   const def=F.slots[i];
   if(!isRoleSlot(f,i))return def;
   const ov=slotRoles&&slotRoles[f]&&slotRoles[f][i];
+  /* a szélsőből lett középcsatár csak a szint korlátjáig érvényes */
+  if(ov==="CS"&&def!=="CS")return wingCsAccepted(f).has(i)?"CS":def;
   return slotRoleOptions(f,i).includes(ov)?ov:def;}
+/* ================= 🎯 CSUPA ÉK: A KÖZÉPCSATÁR-SOR (3.9.136) =================
+   A „támadósor" a támadó helyek összessége: minden középcsatár-hely és minden
+   olyan szélső, amit a felállás TÁMADÓKÉNT súlyoz (isAttackingWingSlot). A
+   középpályás szélsők (4-4-2, 3-5-2) nem tartoznak ide.
+   A KORLÁT: 1. szinten a sor egy híján (3-ból 2, 4-ből 3), 2. szinttől a
+   teljes sor — de sosem kevesebb, mint amennyi középcsatár-helyet a felállás
+   eleve ad. A számolás a NYERS megbízásokból megy (nem az
+   effectiveSlotPos-ból), mert az maga is ezt kérdezi. */
+function bzCsLvl(){
+  try{return gameMode==="career"?Math.max(0,Math.min(3,styleFxMax("bzCsLvl")||0)):0;}catch(e){return 0;}}
+function atkLineSlots(f){
+  const F=FORMS[f];
+  if(!F)return [];
+  const out=[];
+  F.slots.forEach((p,i)=>{if(p==="CS"||isAttackingWingSlot(f,i))out.push(i);});
+  return out;}
+function atkCsMax(f){
+  const F=FORMS[f];
+  if(!F)return 0;
+  const L=atkLineSlots(f),base=L.filter(i=>F.slots[i]==="CS").length,lv=bzCsLvl();
+  if(lv>=2)return L.length;
+  if(lv>=1)return Math.max(base,L.length-1);
+  return base;}
+/* A szélső helyek közül azok, amelyeknek a középcsatár-megbízása ÉRVÉNYES —
+   index-sorrendben, a korlátig. A felállás eredeti középcsatár-helyei előbb
+   számítanak (hacsak árnyékékre nem állítottad őket). */
+function wingCsAccepted(f){
+  const acc=new Set();
+  const F=FORMS[f];
+  if(!F||bzCsLvl()<1)return acc;
+  const R=(slotRoles&&slotRoles[f])||{};
+  const L=atkLineSlots(f);
+  let cs=L.filter(i=>F.slots[i]==="CS"&&R[i]!==SHADOW_POS).length;
+  const max=atkCsMax(f);
+  L.forEach(i=>{if(F.slots[i]!=="CS"&&R[i]==="CS"&&cs<max){acc.add(i);cs++;}});
+  return acc;}
+/* Jelenleg hány középcsatár áll elöl — a választó ezzel dönti el, felkínálja-e
+   a következőt. */
+function atkCsNow(f){
+  const F=FORMS[f];
+  if(!F)return 0;
+  const R=(slotRoles&&slotRoles[f])||{};
+  return atkLineSlots(f).filter(i=>F.slots[i]==="CS"&&R[i]!==SHADOW_POS).length+wingCsAccepted(f).size;}
+/* ---- ⚡ AZ ULTRA CSATÁR ----
+   Egy hely jelzője: S.ultraSlot = {f: felállás, i: slot-index}. Csak akkor
+   él, ha a képesség 3. szintje megvan, a jelzett felállás az aktuális, és a
+   hely épp KÖZÉPCSATÁR — bármelyik feltétel elesik, némán kikapcsol (a jelző
+   megmarad, egy visszaváltás visszahozza). A hely a szerep, nem az ember: aki
+   cserével beáll a helyére, ultraként játszik tovább. */
+const ULTRA_GOALW=1.8;                       /* a gólsúly szorzója */
+const ULTRA_COST_MIN=0.03, ULTRA_COST_MAX=0.10;
+const ULTRA_RATIO_LO=0.5, ULTRA_RATIO_HI=1.5; /* a Védekezés aránya a többiekhez */
+function ultraIdx(f){
+  const key=f||form,u=S&&S.ultraSlot;
+  if(!u||u.f!==key||bzCsLvl()<3)return -1;
+  try{if(effectiveSlotPos(key,u.i)!=="CS")return -1;}catch(e){return -1;}
+  return u.i;}
+function ultraGoalMult(idx){
+  if(idx==null||idx<0)return 1;
+  return idx===ultraIdx()?ULTRA_GOALW:1;}
+/* AZ ÁRA: az ő Védekezés-attribútuma a pályán lévő többi MEZŐNYJÁTÉKOS
+   átlagához mérve. A fele vagy kevesebb → +3%; másfélszerese vagy több →
+   +10%; közte egyenesen. Egy tipikus csatár (a csapatátlag 60-70%-a) így
+   +4…+5%, egy visszahúzódni is tudó, jól védekező támadó a sáv teteje felé. */
+function ultraCost(f){
+  const key=f||form;
+  if(key!==form)return null;
+  const i=ultraIdx(key);
+  if(i<0||!slots[i])return null;
+  const sb=(S.subs&&S.subs[i])?S.subs[i].sub:null;
+  const pl=sb||slots[i].player;
+  if(!pl)return null;
+  const ved=p=>{try{const a=attrsOfPlayer(p);return (a&&a.ved)||50;}catch(e){return 50;}};
+  const mine=ved(pl);
+  const tobbi=[];
+  slots.forEach((sl,j)=>{
+    if(j===i||!sl||sl.pos==="KP")return;
+    const q=(S.subs&&S.subs[j])?S.subs[j].sub:sl.player;
+    if(q)tobbi.push(ved(q));});
+  const avg=tobbi.length?tobbi.reduce((a,v)=>a+v,0)/tobbi.length:mine;
+  const ratio=avg>0?mine/avg:1;
+  const t=Math.max(0,Math.min(1,(ratio-ULTRA_RATIO_LO)/(ULTRA_RATIO_HI-ULTRA_RATIO_LO)));
+  return {i,name:pl.n,ved:mine,avg,ratio,cost:ULTRA_COST_MIN+(ULTRA_COST_MAX-ULTRA_COST_MIN)*t};}
 /* ================= AZ ALAKZAT ÁRA =================
    A megbízások eddig INGYEN voltak. Kiküldhettél két középpályást a szélre és
    két középhátvédet a szárnyra, és a motor csak a jó oldalukat látta: a
@@ -20031,8 +20121,11 @@ function teamShape(f){
   const def=shapeLine(key,"def"),mid=shapeLine(key,"mid");
   const ease=styleShapeEase();
   if(ease>0){def.cost*=(1-ease);mid.cost*=(1-ease);}
-  const mult=1+def.cost+mid.cost;
-  return {def,mid,ease,mult,pct:Math.round((mult-1)*100)};}
+  /* ⚡ AZ ULTRA CSATÁR ÁRA (3.9.136) — nem enyhíti a Villám szélesség-
+     képessége: ez nem a szélesség ára, hanem egy ember védekezéséé. */
+  let ultra=null;try{ultra=ultraCost(key);}catch(e){ultra=null;}
+  const mult=1+def.cost+mid.cost+(ultra?ultra.cost:0);
+  return {def,mid,ease,ultra,mult,pct:Math.round((mult-1)*100)};}
 /* A motor EGYETLEN belépési pontja — a panel és a szimuláció ugyanabból a
    számból dolgozik, tehát nem tud elcsúszni. */
 function shapeOppMult(){
@@ -20184,7 +20277,10 @@ function slotXYRaw(f,i){
      return [inwardX(f,i),Math.min(96,xy[1]+INWARD_Y_DROP)];
    /* középpályás szélső → belső középpályás */
    if((def==="JSZ"||def==="BSZ")&&MID_ROLE_CODES.indexOf(eff)>=0)
-     return [inwardX(f,i),xy[1]];}
+     return [inwardX(f,i),xy[1]];
+   /* 🎯 támadó szélső → középcsatár: beljebb, a kapu elé (3.9.136) */
+   if((def==="JSZ"||def==="BSZ")&&eff==="CS")
+     return [Math.round(xy[0]+(50-xy[0])*0.6),Math.max(4,xy[1]-2)];}
   if(effectiveSlotPos(f,i)!==SHADOW_POS)return xy.slice();
   const def=F.slots[i];
   const wide=(def==="JSZ"||def==="BSZ");
@@ -20199,6 +20295,8 @@ function effectiveSlotList(f){
    marad, és a mentés nem hízik fölöslegesen. */
 function setSlotRole(f,i,code){
   if(!isRoleSlot(f,i)||!slotRoleOptions(f,i).includes(code))return false;
+  /* 🎯 a szélsőből lett középcsatár a szint korlátjáig (3.9.136) */
+  if(code==="CS"&&FORMS[f].slots[i]!=="CS"&&!wingCsAccepted(f).has(i)&&atkCsNow(f)>=atkCsMax(f))return false;
   if(!slotRoles[f])slotRoles[f]={};
   if(code===FORMS[f].slots[i])delete slotRoles[f][i];
   else slotRoles[f][i]=code;
@@ -20246,7 +20344,8 @@ function atkRoleCounts(f){
   return c;}
 function atkRoleText(f){
   const m=atkRoleCounts(f);
-  const out=ATK_ROLE_ORDER.filter(c=>m[c]>0).map(c=>`${m[c]} ${MID_ROLE_LABEL[c]}`).join(" · ");
+  let out=ATK_ROLE_ORDER.filter(c=>m[c]>0).map(c=>`${m[c]} ${MID_ROLE_LABEL[c]}`).join(" · ");
+  try{if(ultraIdx(f)>=0)out+=` (ebből 1 ⚡ ultra csatár)`;}catch(e){}
   return out||"nincs támadó hely";}
 /* ---- SKILL → TENGELY ----
    Melyik skill-típus melyik csapat-attribútumot erősíti. A "szórt" típusok
@@ -55474,7 +55573,7 @@ function mpSubWireRule(r,activeNames){
   if(!inP)return null;
   const fit=subFreeFit(inP,sl)?1:0.93;
   return Object.assign(base,{
-    gw:(GOALW[pos]||1)*Math.max(1,pOvr(inP)-58)*multSkillEffect(inP.n,"goalw")
+    gw:(GOALW[pos]||1)*ultraGoalMult(r.outIdx)*Math.max(1,pOvr(inP)-58)*multSkillEffect(inP.n,"goalw")
        *chemGoalMultForPlayer(inP.n,activeNames),
     aw:(ASSTW[pos]||1)*Math.max(1,pOvr(inP)-58)*multSkillEffect(inP.n,"assistw"),
     dOvr:(pOvrDisplay(inP)*fit-pOvrDisplay(outP)*(sl.fit||1))/11,
@@ -55894,7 +55993,7 @@ function h2hWireSnapshot(){
       const _da=MS.active.map((a,k)=>{
         try{return dialMul("assistw",{name:a.p.n,pos:_pos[k]});}catch(e){return 1;}});
       const _gw=_spread(MS.active.map((a,k)=>
-        (GOALW[_pos[k]]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"goalw")
+        (GOALW[_pos[k]]||1)*ultraGoalMult(a.idx)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"goalw")
         *chemGoalMultForPlayer(a.p.n,MS.activeNames)*_dg[k]));
       const _aw=_spread(MS.active.map((a,k)=>
         (ASSTW[_pos[k]]||1)*Math.max(1,pOvr(a.p)-58)*multSkillEffect(a.p.n,"assistw")*_da[k]));
@@ -63633,7 +63732,7 @@ function playMatch(){
            vezetést jutalmazta a meglévő 1-2 gólos előny megtartása helyett).
            A clutchHeroWeight szándékosan marad a gól UTÁNI álláson: az más
            kérdésre felel (ki a hős ebben a pillanatban). */
-        const si=weightedPick(active,(x,idx)=>isRed(idx)?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*crossTargetMult(slots[x.idx].pos)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*roleGoalMult(x.p.n,90,gf-1,ga)*bz9GoalMult(x.p.n,90,gf-1,ga,mScore)*bzChaseGoalMult(x.p.n,mScore)*chHatMult(x.p.n,mScore)*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
+        const si=weightedPick(active,(x,idx)=>isRed(idx)?0:(GOALW[slots[x.idx].pos]||1)*ultraGoalMult(x.idx)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*crossTargetMult(slots[x.idx].pos)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*roleGoalMult(x.p.n,90,gf-1,ga)*bz9GoalMult(x.p.n,90,gf-1,ga,mScore)*bzChaseGoalMult(x.p.n,mScore)*chHatMult(x.p.n,mScore)*clutchHeroWeight(x.p,90,mScore[x.p.n]||0,gf,ga),null,spreadSkipGK);
         const dramaScorer=active[si].p;
         mScore[dramaScorer.n]=(mScore[dramaScorer.n]||0)+1;recordScorer(dramaScorer.n);
         /* BOMBÁZÓK: a hajrágól is gól — a képesség-számláló ezt is látja.
@@ -63775,7 +63874,7 @@ function playMatch(){
       let si=setPiece
         ?weightedPick(active,(x,idx)=>isRed(idx)?0:(SETPW[slots[x.idx].pos]||1)
             *Math.max(1,pOvr(x.p)-58)*mileWeight(MILE,x.p.n),null,spreadSkipGK)
-        :weightedPick(active,(x,idx)=>isRed(idx)?0:(GOALW[slots[x.idx].pos]||1)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf-1,ga)*bz9GoalMult(x.p.n,min,gf-1,ga,mScore)*bzChaseGoalMult(x.p.n,mScore)*chHatMult(x.p.n,mScore)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga)*gpBackUpMult(slots[x.idx].pos)*dialMul("goalw",{name:x.p.n,pos:slots[x.idx].pos,min:gnow(min),gf:gf-1,ga}),null,spreadSkipGK);
+        :weightedPick(active,(x,idx)=>isRed(idx)?0:(GOALW[slots[x.idx].pos]||1)*ultraGoalMult(x.idx)*Math.max(1,pOvr(x.p)-58)*multSkillEffect(x.p.n,"goalw")*chemGoalMultForPlayer(x.p.n,chemActiveNames)*(x.p.family&&x.p.familySpecialty==="kutya"?1.6:1)*(x.p.family&&x.p.familySpecialty==="airsanyi"?2.2:1)*((S.hotStreak[x.p.n]||0)>0?1.6:1)*(min>=85&&playerSkills(x.p.n).some(i=>i.skill.id==="fw_lateshow")?3.5:1)*supersubGoalMult(x.p.n,cameOnAsSub(x))*mileWeight(MILE,x.p.n)*roleGoalMult(x.p.n,min,gf-1,ga)*bz9GoalMult(x.p.n,min,gf-1,ga,mScore)*bzChaseGoalMult(x.p.n,mScore)*chHatMult(x.p.n,mScore)*clutchHeroWeight(x.p,min,mScore[x.p.n]||0,gf,ga)*gpBackUpMult(slots[x.idx].pos)*dialMul("goalw",{name:x.p.n,pos:slots[x.idx].pos,min:gnow(min),gf:gf-1,ga}),null,spreadSkipGK);
       /* Párharcban a gólszerzőt a közös lista dönti el (a súlyozást a saját
          kliensed már a pillanatkép küldésekor elvégezte). A fenti súlyozott
          választás csak TARTALÉK marad: ha a név bármiért nem található a
@@ -74711,6 +74810,7 @@ function shapeCostHtml(){
           :`<b style="color:var(--red)">+${sh.pct}%</b> az ellenfél gólesélyére.`}
     ${sh.ease>0?`<br><span style="color:var(--grass)">⚡ A filozófiád <b>${Math.round(sh.ease*100)}%-kal</b> enyhíti ezt az árat.</span>`:""}
     <br>${sor("Védelem",sh.def)} · ${sor("Középpálya",sh.mid)}
+    ${sh.ultra?`<br>⚡ Ultra csatár: <b>${esc(shortName(sh.ultra.name))}</b> — <b style="color:var(--red)">+${Math.round(sh.ultra.cost*100)}%</b> (Védekezése ${Math.round(sh.ultra.ved)}, a többiek átlaga ${Math.round(sh.ultra.avg)}).`:""}
     ${st?`<br>Az idényben eddig <b>${st.xga.toFixed(1).replace(".",",")}</b> kapott gólt kért ez a döntés (${st.matches} mérkőzésen, átlagos ár +${Math.round((st.sumMult/st.matches-1)*100)}%).`:""}
     <br><span style="color:var(--dim)">Aki megbízásból a szélre megy, hiányzik középről: az ellenfél könnyebben játszik át rajta. A támadósor nem számít bele — az árnyékék befelé húz, nem kifelé.</span>
   </div>`;}
@@ -75033,6 +75133,8 @@ const MID_ROLE_DESC={
    MID_ROLE_DESC az elsőt írja le; a támadó helyen ez félrevezető lenne, ezért
    ott ez a tábla szólal meg. */
 const ATK_WING_DESC={
+  /* 🎯 Csupa ék (3.9.136): a szélső helyről középcsatár */
+  CS:"Behúzódik a szélről a kapu elé, és KÖZÉPCSATÁRKÉNT játszik: a játék legnagyobb gólsúlya (5,0) az övé, a gólpasszban szerényebb (2,5). A csapat ezen az oldalon elveszíti a szélességet — a Bombázók „Csupa ék\" képessége nyitja.",
   JSZ:"Marad a jobb szélen, támadó szélsőként: szélességet ad, kifelé húzza az ellenfél védelmét, és onnan tör be a kapu felé.",
   BSZ:"Marad a bal szélen, támadó szélsőként: szélességet ad, kifelé húzza az ellenfél védelmét, és onnan tör be a kapu felé."};
 const ATK_WING_SHADOW_DESC="Behúzódik a szélről a középső sávba, a védők és a középpálya közé — a pályaképen is beljebb és hátrébb kerül. A csapat így elveszíti a szélességet ezen az oldalon, cserébe egy plusz emberrel játszik a belső sávban. Kevesebb gól (3,5 a szélső 3,0-e mellett alig több), viszont a játék legnagyobb gólpassz-súlya (5,0 a 4,0 helyett).";
@@ -75126,7 +75228,15 @@ function renderHubMidRolePicker(){
       <span class="mrTx"><span class="mrNm">${MID_ROLE_FULL[c]}</span>
         <span class="mrDs">${ds}</span>
         <span class="mrFx">${fx}</span></span>`;
-    if(c===cur)b.disabled=true;
+    /* 🎯 A KORLÁT LÁTSZIK (3.9.136): ha a támadósor már annyi középcsatárt
+       visel, amennyit a „Csupa ék" szintje enged, az opció ott van, de zárva —
+       és megmondja, miért. */
+    const csTele=(c==="CS"&&def!=="CS"&&c!==cur&&!wingCsAccepted(form).has(i)&&atkCsNow(form)>=atkCsMax(form));
+    if(csTele){
+      b.disabled=true;b.style.opacity=".55";
+      b.querySelector(".mrFx").insertAdjacentHTML("beforeend",
+        `<br><span style="color:var(--red)">A támadósorban már ${atkCsNow(form)} középcsatár áll — a „Csupa ék" mostani szintje ennyit enged. A 2. szint a teljes sort megnyitja.</span>`);}
+    if(c===cur||csTele){if(c===cur)b.disabled=true;}
     else b.onclick=()=>askHubTacticConfirm(
       `<div style="font-size:13px;line-height:1.5">${p?`<b>${esc(shortName(p.n))}</b> megbízása`:"A hely megbízása"}: `
       +`<b>${MID_ROLE_LABEL[cur]}</b> → <b>${MID_ROLE_LABEL[c]}</b>.<br>`
@@ -75144,7 +75254,35 @@ function renderHubMidRolePicker(){
            idehozta a görgetést magához, egy csupasz renderHub() pedig a HUB
            tetejére dobná vissza (lásd hubRenderStay). */
         hubRenderStay();saveGame();});
-    box.appendChild(b);});}
+    box.appendChild(b);});
+  /* ---- ⚡ AZ ULTRA CSATÁR KAPCSOLÓJA (3.9.136) ----
+     Csak középcsatár-helyen, és csak a „Csupa ék" 3. szintjével. Egyszerre
+     EGY ultra lehet: egy másik helyen bekapcsolva az előző kikapcsol. A
+     gomb előre megmondja az árát — a Védekezés-arány a mostani tizenegyből
+     jön, tehát azt mutatja, amit a következő meccs kérni fog. */
+  if(atk&&cur==="CS"&&bzCsLvl()>=3){
+    const most=ultraIdx(form)===i;
+    let elo=null;
+    try{
+      const reg=S.ultraSlot;S.ultraSlot={f:form,i};
+      elo=ultraCost(form);S.ultraSlot=reg;}catch(e){elo=null;}
+    const u=document.createElement("button");
+    u.className="mrOpt"+(most?" cur":"");
+    u.innerHTML=`<span class="mrDot" style="background:var(--red)"></span>
+      <span class="mrTx"><span class="mrNm">⚡ Ultra csatár${most?" — BEKAPCSOLVA":""}</span>
+        <span class="mrDs">Semmit nem véd, csak a kapura megy: a gólsúlya <b>${Math.round((ULTRA_GOALW-1)*100)}%-kal</b> nagyobb. `
+        +`Egyszerre egy embered lehet ilyen.</span>
+        <span class="mrFx">${elo?`Ára: az ellenfél gólesélye <b style="color:var(--red)">+${Math.round(elo.cost*100)}%</b> — `
+          +`${p?esc(shortName(p.n)):"ő"} Védekezése ${Math.round(elo.ved)}, a többiek átlaga ${Math.round(elo.avg)} `
+          +`(minél jobb védekező, annál többet hiányzik hátulról: +3…+10%).`:""}</span></span>`;
+    u.onclick=()=>{
+      S.ultraSlot=most?null:{f:form,i};
+      addLine(most?`⚡ Ultra csatár kikapcsolva.`
+        :`⚡ Ultra csatár: ${p?esc(shortName(p.n)):"a hely"} — +${Math.round((ULTRA_GOALW-1)*100)}% gólsúly, `
+          +`+${elo?Math.round(elo.cost*100):"?"}% ellenfél-gólesély.`,"m life");
+      $("hubMidRolePicker").classList.add("hide");
+      refreshSquadViews();hubRenderStay();saveGame();};
+    box.appendChild(u);}}
 $("hubMidRoleCancel")&&($("hubMidRoleCancel").onclick=()=>{
   $("hubMidRolePicker").classList.add("hide");});
 $("hubFormationCancel")&&($("hubFormationCancel").onclick=()=>{
@@ -96655,11 +96793,7 @@ stTrait("villam","gyorsabb_izomzat",2,"Gyorsabb izomzat",
   {fx:{speedDiv:1.35},note:"1,35× lassítás"},
   {fx:{speedDiv:1.25},note:"1,25×"},
   {fx:{speedDiv:1.15},note:"1,15×"}]);
-stTrait("villam","olcso_totalis",2,"Olcsó totális futball",
-  "A bolti felállások (4-2-4) olcsóbbak.",[
-  {fx:{formDiscount:0.80},note:"−20% ár"},
-  {fx:{formDiscount:0.65},note:"−35%"},
-  {fx:{formDiscount:0.50},note:"−50%"}]);
+/* „Olcsó totális futball" — 3.9.136 óta a BOMBÁZÓKÉ (lásd ott). */
 stTrait("villam","utolerhetetlen",3,"Utolérhetetlen",
   "Ha a kezdő 11 Sebesség-átlaga eléri a 90-et, a csapat csapaterőt kap.",[
   {fx:{ovrTeam:()=>stXISpeedAvg()>=90?1.5:0},note:"+1,5 csapaterő"},
@@ -96849,6 +96983,40 @@ function artilleryCondTxt(){
     if(best>=0)got.push(`${sk.name}${best?" "+"★".repeat(best):""}`);else none++;});
   if(!got.length)return `a keretedben még egyik lövő-képesség sincs kiépítve — a három jog listaára ${price} stíluspont`;
   return `kiépítve: ${got.join(" · ")}${none?` · még ${none} hiányzik`:" — mind a három megvan"}`;}
+/* ---- A 4-2-4 KINYITÁSA A BOMBÁZÓKHOZ KÖLTÖZÖTT (3.9.136) ----
+   KIMONDOTT KÉRÉS: „A 4-2-4 kinyitás képességét a bombázók csapatstílushoz
+   tegyük át." A négy támadós totális futball a gólzápor-filozófia saját
+   felállása, nem a sebességé. A KULCS ugyanaz maradt (olcso_totalis), hogy a
+   betöltéskori átköltöztetés (styleTraitMoveMigrate) a Villámban megvett
+   szinteket megtalálja és a pontjukat visszatérítse. */
+stTrait("bombazok","olcso_totalis",2,"Olcsó totális futball",
+  "A 4-2-4 (totális futball) felállás megvásárlása olcsóbb — a négy támadós alak a gólzápor filozófiájának saját rendszere.",[
+  {fx:{formDiscount:0.80},note:"−20% ár"},
+  {fx:{formDiscount:0.65},note:"−35%"},
+  {fx:{formDiscount:0.50},note:"−50%"}]);
+/* ---- 🎯 CSUPA ÉK (3.9.136) ----
+   KIMONDOTT KÉRÉS: „lvl1 lehetővé teszi, hogy 3 támadóból 2 középcsatár
+   legyen, 4-ből pedig 3, lvl2 3-ból 3 és 4-ből 4, lvl3 kinyílik az ultra
+   csatár pozíció: 1 csatárod lehet ilyen pozícióban, gólesély jelentősen nő
+   neki, de a csapat elleni gólesély is nő, minél magasabb annak a játékosnak
+   a védekezési attribútuma (arányaiban a többiekhez képest) annál jobban,
+   hiszen kikerül a védelemből az ő száma. Max +10% min. +3%."
+   A MEGBÍZÁSON megy: a TÁMADÓ szélső helyek opciói közé bekerül a
+   középcsatár (lásd slotRoleOptions / wingCsAccepted), a darabszámot pedig
+   a szint korlátozza (atkCsMax). Az ULTRA CSATÁR egy hely jelzője
+   (S.ultraSlot), nem új posztkód — az illeszkedés, a Rating és minden
+   posztos tábla CS marad; csak a gólsúlya (ULTRA_GOALW) és a csapat kapott
+   gól-esélye (ultraCost → teamShape) változik. */
+stTrait("bombazok","csupa_ek",3,"Csupa ék",
+  "A támadósor szélső helyei KÖZÉPCSATÁR-megbízást is kaphatnak. A 3. szinten megnyílik az ULTRA CSATÁR: egyetlen embered, aki semmit nem véd — a gólesélye jelentősen nő, de a csapat kapott gól-esélye is (+3…+10%, annál jobban, minél jobb védekező volt a többiekhez képest).",[
+  {fx:{bzCsLvl:1},note:"3 támadóból 2, 4-ből 3 lehet középcsatár"},
+  {fx:{bzCsLvl:2},note:"a teljes támadósor lehet középcsatár"},
+  {fx:{bzCsLvl:3},note:"megnyílik az ULTRA CSATÁR (1 fő)"}],
+  ()=>{const u=ultraCost();
+    if(u)return `ultra csatár: ${shortName(u.name)} — ${Math.round((ULTRA_GOALW-1)*100)}%-kal nagyobb gólsúly, `
+      +`+${Math.round(u.cost*100)}% kapott gól-esély (védekezése a többiek ${Math.round(u.ratio*100)}%-a)`;
+    let n=0,m=0;try{n=atkRoleCounts(form).CS||0;m=atkCsMax(form);}catch(e){}
+    return m?`most ${n} középcsatár a támadósorban, legfeljebb ${m} lehet`:"";});
 stTrait("bombazok","tuzerseg",1,"Tüzérség",
   "Az Ágyúgolyó, a Szitálós és a Szabadrúgás-mester csillagozását EGYSZERRE nyitja meg — mindhárom lövő-képességét, poszttól függetlenül. A második szinttől ráadásul ezeknél többet is ér egy csillag.",[
   {fx:{starFree:ARTILLERY_SKILLS},
@@ -98711,6 +98879,32 @@ function styleSpendable(){
   const v={sp:sp,items:items,cheapest:cheapest,sec:sec||"trait"};
   _styleSpendMemo={key:key,v:v};
   return v;}
+/* ---- ÁTKÖLTÖZÖTT KÉPESSÉGEK (3.9.136) ----
+   Az „Olcsó totális futball" a Villámtól a Bombázókhoz került. Aki a Villám
+   fájában már megvette, annak a szintjei ott elvesznének (a képesség már nem
+   része a Villám fájának) — ezért a betöltéskor VISSZATÉRÍTJÜK a rá költött
+   csapatstílus-pontot a közös tárcába, és a naplóban szólunk. Egyszer fut,
+   a jelző a mentés része. Ha a klubnak a Bombázók is filozófiája, ott a
+   képesség újra megvehető. */
+const STYLE_TRAIT_MOVES=[{key:"olcso_totalis",from:"villam",to:"bombazok"}];
+function styleTraitMoveMigrate(){
+  if(!S)return;
+  S.traitMoveDone=S.traitMoveDone||{};
+  STYLE_TRAIT_MOVES.forEach(mv=>{
+    if(S.traitMoveDone[mv.key])return;
+    S.traitMoveDone[mv.key]=true;
+    [S.style,S.style2].forEach(st=>{
+      if(!st||st.key!==mv.from||!st.traits)return;
+      const v=st.traits[mv.key];
+      const lv=(v===true)?1:(typeof v==="number"?Math.max(0,Math.min(3,v)):0);
+      delete st.traits[mv.key];
+      if(!lv)return;
+      const t=styleTraitList(mv.to).find(x=>x.key===mv.key);
+      if(!t)return;
+      let vissza=0;for(let k=0;k<lv;k++)vissza+=(t.lv[k]&&t.lv[k].price)||0;
+      const W=msState();W.sp=(W.sp||0)+vissza;
+      try{addLine(`↩️ Az <b>${esc(t.n)}</b> képesség a ${esc((styleByKey(mv.to)||{}).n||mv.to)} filozófiához költözött — `
+        +`a Villámban megvett ${lv}. szintjéért <b>${vissza}</b> csapatstílus-pontot visszakaptál.`,"m life");}catch(e){}});});}
 function styleBuyTrait(key){
   /* A VÁSÁRLÁS A NÉZETT filozófia fájába megy (3.9.64) — a pont viszont a
      KÖZÖS tárcából. Ez a kért szabadság: a másodlagoson gyűjtött pontot az
@@ -99547,6 +99741,9 @@ function saveGame(){
         chSeasonMaxUnbeaten:S.chSeasonMaxUnbeaten,chSeasonMaxCleanStreak:S.chSeasonMaxCleanStreak,chSeasonComebacks:S.chSeasonComebacks,chSeasonBestHaul:S.chSeasonBestHaul,chSeasonCleanSheets:S.chSeasonCleanSheets,chSeasonSubGoals:S.chSeasonSubGoals,chSeasonSubMinutes:S.chSeasonSubMinutes,chSeasonSubStars:S.chSeasonSubStars,chSeasonDefStars:S.chSeasonDefStars,chTacticMatches:S.chTacticMatches,chSoldAges:S.chSoldAges,chBoughtAges:S.chBoughtAges,chBondBoostNew:S.chBondBoostNew,chIntegrationsDone:S.chIntegrationsDone,chStaffFromPlayer:S.chStaffFromPlayer,chStaffBought:S.chStaffBought,chTrainFocusChanged:S.chTrainFocusChanged,
         resolvedChallenges:S.resolvedChallenges,academy:S.academy,moodMark:S.moodMark,
         formationChangesThisSeason:S.formationChangesThisSeason,
+        /* ⚡ az ultra csatár helye (3.9.136) */
+        ultraSlot:S.ultraSlot||null,
+        traitMoveDone:S.traitMoveDone||null,
         customForms:S.customForms,formsBought:S.formsBought,
         ms:S.ms,   /* mérföldkövek: teljesítések, jutalom-mérleg, nyomkövetők */
         /* PÁRHARC-ELKÖTELEZŐDÉS: melyik fordulóra ment fel már a keretem. Ettől
@@ -100260,6 +100457,9 @@ function applySavedGame(d){
      a panel a 3. lezárt szezon után felajánlja. */
   S.style2=(d.S&&d.S.style2)||null;
   S.styleView=(d.S&&d.S.styleView===2&&S.style2)?2:1;
+  S.ultraSlot=(d.S&&d.S.ultraSlot&&typeof d.S.ultraSlot.i==="number")?d.S.ultraSlot:null;
+  S.traitMoveDone=(d.S&&d.S.traitMoveDone)||null;
+  try{styleTraitMoveMigrate();}catch(e){}
   try{styleLvlCacheClear();}catch(e){}
   /* A TRÓN ŐRE (3.9.63): a betöltés utáni ELSŐ kör ingyenes — ha a sztár
      már nincs a keretben, azt nem MOST veszítetted el, tehát nem büntetjük. */

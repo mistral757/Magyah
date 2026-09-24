@@ -185,6 +185,8 @@ kapus a klub legjobb embere, a kapitány és az aranylabdás is innen kerül ki.
 | II | **A hajrá embere** | a 75. perctől a csapat gólesélye 12%-kal nő |
 | III | **Kettős veszély** | ha két 90+ Ratingű csatár van a kezdőben, mindkettő +2 Gólszerzés |
 | III | **Nincs kegyelem** | kétgólos vezetésnél a csapat gólesélye nem esik vissza (ma visszafog) |
+| II | **Olcsó totális futball** *(3.9.136 óta itt, a Villámtól költözött)* | a 4-2-4 felállás −20 / −35 / −50%-kal olcsóbban megvehető |
+| III | **Csupa ék** *(3.9.136)* | 1. szint: a támadósor szélső helyei középcsatárrá tehetők (3-ból 2, 4-ből 3) · 2. szint: a teljes támadósor · 3. szint: ⚡ ULTRA CSATÁR — egy ember +80% gólsúllyal, cserébe az ellenfél gólesélye +3…+10% (a Védekezése a többiekhez mérve dönt). Részletek: `docs/csupa-ek.md` |
 
 **Illeszkedés:** 4-2-4, 3-4-3, saját 3-2-5 · Hosszú labdák, Széljáték
 
@@ -347,7 +349,7 @@ tengelyt teszi meg fő mércének.
 | I | **Sprintmester-műhely** | a Sprintmester stábtag 1,5× tempóval fejlődik |
 | II | **Gyorsabb izomzat** | a sebesség edzés-osztója 1,5 helyett 1,2 (99 alatt) |
 | II | **Szélesebb passzív út** | a passzív sebesség-plafon a születési érték +15%-a helyett +25% |
-| II | **Olcsó totális futball** | a 4-2-4 felállás fele áráért megvehető (75 → 37,5 Mrd) |
+| ~~II~~ | ~~**Olcsó totális futball**~~ | 3.9.136 óta a Bombázóké — a Villámban megvett szintek pontja betöltéskor visszajár |
 | III | **Villámkontra** | a Gyors kontra és a Széljáték illeszkedés-bónusza kétszeres |
 | III | **Utolérhetetlen** | ha a kezdő 11 Sebesség-átlaga 10-zel meghaladja az ellenfelét, +3 Rating |
 
