@@ -2051,6 +2051,17 @@ fölé (ez volt az eredeti „csak egy fut" szabály egyetlen jogos oka).
 
 Részletes magyarázat: `docs/gegen-pontrendszer-hiba.md`.
 
+**3.9.137 óta:** a „két szint együtt sem megy +12 fölé” állítás helyett a
+próba azt méri, hogy:
+
+- a két szint hozama közös plafon nélkül összeadódik;
+- a másodlagos a saját, felezett plafonjáig ad (+6);
+- a Panzer plafonja elsődlegesként +20, másodlagosként +10.
+
+Lásd `docs/masodlagos-meccsero-plafon.md`. Egy tanulság: a plafon-ellenőrzés a
+fixtúra VÉGÉN fut. Egy új `par(...)` hívás friss stílus-állapotokat hoz létre,
+és a közepén elvágta volna a piac-szakasz régi hivatkozásait.
+
 ## pvp-beallitas-letra-proba.js — 🤝 a létra és a Legendás magyahok PvP-ben
 
 ```bash
