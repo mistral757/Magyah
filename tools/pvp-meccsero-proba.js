@@ -16,9 +16,11 @@
      2. a hálózati tisztítás megtartja, tág sávval — a meccs-erő 120 fölé megy;
      3. régi kliens kártyáján nincs → null, és a felület nem hazudik nullát;
      4. az EREDMÉNYJELZŐ párharcban a meccs-erőt mutatja, villám-jelöléssel;
-     5. …bajnokiban és kupában viszont betűre a régi számot;
-     6. és ha a társ kliense régi (nincs matchOvr), MINDKÉT oldal a régi
-        számon marad — sosem kerül két KÜLÖNBÖZŐ skálájú szám egymás mellé. */
+     5. 3.9.133 ÓTA bajnokiban és kupában IS („minden meccsnél a meccs erő
+        látszódjon az eredményjelzőn is") — a csapaterő sora mindenhol
+        megmarad fölötte, a meccs-erő saját sort kap;
+     6. és ha a társ kliense régi (nincs matchOvr), MINDKÉT oldalról elmarad
+        a meccs-erő — sosem kerül két KÜLÖNBÖZŐ skálájú szám egymás mellé. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT="/home/user/Magyah", PORT=9075;
@@ -88,8 +90,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       const h=SB.teams&&SB.teams.home,a=SB.teams&&SB.teams.away;
       const me=(h&&h.full===sbCleanClub(teamName))?h:a;
       const opp=(me===h)?a:h;
-      return {enSzam:me&&me.ovr==null?null:Math.round(me.ovr*10)/10,enMs:!!(me&&me.ms),
-              oSzam:opp&&opp.ovr==null?null:Math.round(opp.ovr*10)/10,oMs:!!(opp&&opp.ms)};};
+      const r=v=>v==null?null:Math.round(v*10)/10;
+      return {enSzam:r(me&&me.ovr),enMs:r(me&&me.ms),
+              oSzam:r(opp&&opp.ovr),oMs:r(opp&&opp.ms)};};
     SB.usIsHome=true;
     /* PÁRHARC, új kliens: a társ pillanatképéből jött matchOvr */
     sbPaintTeams({duel:true,home:true,o:{n:"Társ FC",ovr:101.5,dispOvr:112.2,matchOvr:158.5}});
@@ -103,6 +106,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* KUPA (dispOvr-rel): szintén a régi */
     sbPaintTeams({home:false,o:{n:"Kupa FC",ovr:100.1,dispOvr:118.4}});
     ki.kupa=kep();
+    ki.buff=Math.round(matchHiddenOppBuff()*1000)/1000;
     return ki;});
 
   console.log("=== 1. a csapatlap viszi a meccs-erőt ===");
@@ -118,19 +122,23 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(t.clean.tulnagy===400,"az irreális érték a felső korlátra vágódik",{v:t.clean.tulnagy});
 
   console.log("=== 4. párharc: a meccs-erő áll az eredményjelzőn ===");
-  ok(t.parharc.enSzam===t.elo,"a te oldaladon a meccs-erőd",
-    {kiirt:t.parharc.enSzam,elo:t.elo});
-  ok(t.parharc.oSzam===158.5,"a társ oldalán az ő meccs-ereje",{kiirt:t.parharc.oSzam});
-  ok(t.parharc.enMs&&t.parharc.oMs,"és MINDKÉT oldal villám-jelölést kap");
+  ok(t.parharc.enMs===t.elo,"a te oldaladon a meccs-erőd",
+    {kiirt:t.parharc.enMs,elo:t.elo});
+  ok(t.parharc.oMs===158.5,"a társ oldalán az ő meccs-ereje",{kiirt:t.parharc.oMs});
+  ok(t.parharc.enSzam===t.nyers&&t.parharc.oSzam===112.2,
+    "a csapaterő sora mindkét oldalon megmarad (3.9.133)",t.parharc);
 
-  console.log("=== 5-6. és ahol nem szabad változnia ===");
+  console.log("=== 5-6. bajnoki, kupa, régi társ ===");
   ok(t.regiTars.enSzam===t.nyers&&t.regiTars.oSzam===112.2
-     &&!t.regiTars.enMs&&!t.regiTars.oMs,
-    "régi kliens ellen MINDKÉT oldal a régi számon marad (nincs kevert skála)",t.regiTars);
-  ok(t.bajnoki.enSzam===t.nyers&&t.bajnoki.oSzam===104.7&&!t.bajnoki.enMs,
-    "bajnoki: betűre a régi",t.bajnoki);
-  ok(t.kupa.enSzam===t.nyers&&t.kupa.oSzam===118.4&&!t.kupa.enMs,
-    "kupa: betűre a régi",t.kupa);
+     &&t.regiTars.enMs===null&&t.regiTars.oMs===null,
+    "régi kliens ellen MINDKÉT oldalról elmarad a meccs-erő (nincs kevert skála)",t.regiTars);
+  const kozel=(a,b)=>typeof a==="number"&&Math.abs(a-b)<=0.051;
+  ok(t.bajnoki.enSzam===t.nyers&&t.bajnoki.oSzam===104.7
+     &&t.bajnoki.enMs===t.elo&&kozel(t.bajnoki.oMs,104.7+t.buff),
+    "bajnoki: csapaterő a régi, ALATTA mindkét meccs-erő (a CPU-é = ovr + rejtett erősítés)",Object.assign({buff:t.buff},t.bajnoki));
+  ok(t.kupa.enSzam===t.nyers&&t.kupa.oSzam===118.4&&t.kupa.enMs===t.elo
+     &&kozel(t.kupa.oMs,100.1+t.buff),
+    "kupa: a kijelzett erő a dispOvr, a meccs-erő a motor ovr-jéből",t.kupa);
 
   const sulyos=errs.filter(e=>!/favicon|manifest|sw\.js|ServiceWorker/i.test(e));
   ok(sulyos.length===0,"nincs oldalhiba",sulyos.slice(0,4));

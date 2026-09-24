@@ -75,13 +75,19 @@ const {spawn}=require('child_process');
                  {n:"Tart 4",pos:["CS"],ovr:82,age:26}];
     o.legjobb11=academyBest11Avg();
     o.kezdo11_atlaga=70;
-    const B=o.legjobb11;
+    /* 3.9.134: a doboz mércéje a KEZDŐ 11 NYERS EREJE (academyRefXI =
+       teamStrength) — a kimondott terv („a meghívás pillanatában lévő kezdő
+       11 nyers ereje") így szól, és a felajánlás szabálya is ehhez mér. A
+       legjobb 11 átlaga csak tartalék, ha nincs felállás. */
+    o.mérce=academyRefXI();
+    o.kezdo11=teamStrength();
+    const B=o.mérce;
     o.tagek={felette:academyProjTag(B+4,B).t,szinten:academyProjTag(B,B).t,
              alatta:academyProjTag(B-3,B).t,messze:academyProjTag(B-9,B).t,
              nincsXi:academyProjTag(80,null)};
     const html=academyProjHtml(alap);
     o.doboz={van:html.indexOf("acProj")>=0,
-      xi_kiirva:/legjobb 11-ed átlaga/.test(html),
+      xi_kiirva:/kezdő 11-ed nyers ereje/.test(html),
       sorok:(html.match(/apRow/g)||[]).length,          /* 1 „most" + 3 szezon */
       figyelmeztet:/nem ígéret/.test(html)};
 
@@ -164,12 +170,12 @@ const {spawn}=require('child_process');
   ok("a már 21 évesnél nincs mit jósolni", out.mar_ballagott.length===0);
   /* A LEGJOBB 11 a teljes keretből: 4 tartalék (88,87,84,82) + 7 pad (86) =
      11 fő, mind a gyenge kezdő 11 (70) FÖLÖTT. Átlag = (88+87+84+82+7×86)/11. */
-  ok("a mérce a LEGJOBB 11, nem a felállított kezdő 11",
-     out.legjobb11!=null&&out.legjobb11>out.kezdo11_atlaga+10,
-     `legjobb 11: ${out.legjobb11&&out.legjobb11.toFixed(2)} · kezdő 11: ${out.kezdo11_atlaga}`);
+  ok("a mérce a KEZDŐ 11 nyers ereje (3.9.134), a legjobb 11 csak tartalék",
+     out.mérce!=null&&Math.abs(out.mérce-out.kezdo11)<1e-9&&out.legjobb11>out.mérce+10,
+     `mérce: ${out.mérce&&out.mérce.toFixed(2)} · kezdő 11: ${out.kezdo11&&out.kezdo11.toFixed(2)} · legjobb 11: ${out.legjobb11&&out.legjobb11.toFixed(2)}`);
   ok("a besorolás négy fokozata helyes",
-     /legjobb 11-ed fölött/.test(out.tagek.felette)&&/legjobb 11-es szint/.test(out.tagek.szinten)
-     &&/legjobb 11-ed alatt/.test(out.tagek.alatta)&&/messze/.test(out.tagek.messze)
+     /kezdő 11-ed fölött/.test(out.tagek.felette)&&/kezdő 11-es szint/.test(out.tagek.szinten)
+     &&/kezdő 11-ed alatt/.test(out.tagek.alatta)&&/messze/.test(out.tagek.messze)
      &&out.tagek.nincsXi===null);
   ok("a doboz kirajzolódik: 1 mostani + 3 szezon sor, figyelmeztetéssel",
      out.doboz.van&&out.doboz.sorok===4&&out.doboz.figyelmeztet);
