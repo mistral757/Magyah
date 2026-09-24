@@ -6141,7 +6141,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.137";
+const APP_VERSION="3.9.138";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16336,9 +16336,63 @@ const GP_DUO_PRESS=[0,0.05,0.08,0.10];
 const GP_DUO_BUMP =[0,0.02,0.04,0.06];
 const GP_DUO_RIPE =[0,15,12,8];       /* ennyi közös meccs az összeérés */
 function gpDuoOn(){return gpOn()&&gpDuoLv()>0;}
+/* ================= A GYILKOS PÁROS ÉPÍTÉSE (3.9.138) =====================
+   BEJELENTÉS: „Nem igazán lehet jól követni a gegenpressing kémia építését.
+   Automatikusan épül? Nekem kell építeni? Szerintem sokkal hatásosabb lenne,
+   ha épp úgy épülne, mint a passzkémia, vagy a sima kémia. Hogy felajánlja a
+   rendszer és te dönthetsz kik között építed, és minden körnél te építed
+   tovább. Jelenleg semmi ilyen nincs."
+   A BEJELENTÉS PONTOS VOLT: a kötés NÉMÁN indult (a meccs utáni léptetés az
+   ábécében első jogosult párt vette fel, szó nélkül), és csak a kész
+   pillanatában szólalt meg. Se választás, se látható haladás.
+
+   MOSTANTÓL PONTOSAN ÚGY ÉPÜL, MINT A PASSZKÉMIA:
+     · a JUTALMAK egy része gyilkospáros-építés lesz (saját dobás a párkémia
+       és a passzkémia után — gpDuoOfferP);
+     · ha nincs épülő páros, a rendszer FELAJÁNL egyet, de te választasz
+       bárki kettő közül (támadó vagy középpályás, aki még nincs kész
+       párosban); ha van, azt építed tovább egy fázissal — vagy váltasz, és a
+       megkezdett fázisok megmaradnak;
+     · GP_DUO_NEED (5) fázis után a páros KÉSZ: onnantól együtt
+       presszingelnek (ha mindketten pályán vannak), és a sebességük együtt
+       fejlődik.
+   AZ ÖSSZEÉRÉS MARAD, CSAK LÁTHATÓ: a kész páros a képesség szintje szerinti
+   15 / 12 / 8 közös meccs (a Laboratórium „Közös futás"-a rövidíti) után ÉR
+   ÖSSZE — ekkor egyenlítődik ki a sebességük a jobbikra, a ráadással együtt.
+   A napló minden fázist és az összeérést is kimondja.
+
+   A TÁR MEZŐI: stages (0..5), built (kész), n (közös meccs a kész óta),
+   done (összeért). RÉGI MENTÉS: a kész (done) párok built+5/5 lesznek; a
+   némán indult, félkész párok a haladásukkal arányos fázist kapnak, és a
+   választóból folytathatók. */
+const GP_DUO_NEED=5;
+const GP_DUO_OFFER=[0,1,1.25,1.33];
 function gpDuoState(){
   if(!S.gpDuo||typeof S.gpDuo!=="object")S.gpDuo={};
-  return S.gpDuo;}
+  const D=S.gpDuo;
+  if(!S.gpDuoMig){
+    S.gpDuoMig=1;
+    Object.keys(D).forEach(k=>{
+      const r=D[k];if(!r)return;
+      if(r.done){r.built=1;r.stages=GP_DUO_NEED;r.n=Math.max(r.n||0,0);return;}
+      if(r.stages==null){
+        r.stages=Math.max(1,Math.min(GP_DUO_NEED-1,Math.round((r.n||0)/15*GP_DUO_NEED)));
+        r.n=0;}});}
+  return D;}
+/* Kész-e (5/5) — ez kapcsolja be a pressinget és a közös sebesség-fejlődést. */
+function gpDuoActive(r){return !!(r&&(r.built||r.done));}
+function gpDuoStages(a,b){const r=gpDuoState()[gpDuoKey(a,b)];return r?(r.stages||0):0;}
+/* Tagja-e már egy KÉSZ párosnak? Egy ember egy páros. */
+function gpDuoInActive(name){
+  const D=gpDuoState();
+  return Object.keys(D).some(k=>gpDuoActive(D[k])&&k.split("||").indexOf(name)>=0);}
+/* A felajánlás esélye: a passzkémia alapja, a képesség szintje szerint. */
+function gpDuoOfferP(){
+  const m=GP_DUO_OFFER[gpDuoLv()]||0;
+  if(m<=0)return 0;
+  return Math.min(PASS_CHEM_MAX_P,PASS_CHEM_BASE_P*m);}
+/* Van-e még mit építeni (kevesebb kész páros, mint a plafon)? */
+function gpDuoRoom(){return gpDuoDone()<GP_DUO_MAX;}
 function gpDuoKey(a,b){return [String(a||""),String(b||"")].sort().join("||");}
 /* Jelölhető-e erre a kötésre? A kimondott kapu: TÁMADÓ-KÖZÉPPÁLYÁS ember. */
 function gpDuoEligible(name){
@@ -16356,11 +16410,10 @@ function gpDuoRipeNeed(){
   return Math.max(4,alap-le);}
 function gpDuoDone(){
   const D=gpDuoState();
-  return Object.keys(D).filter(k=>D[k]&&D[k].done).length;}
+  return Object.keys(D).filter(k=>gpDuoActive(D[k])).length;}
 /* Kész kötés-e a kettő között? */
 function gpDuoIsDone(a,b){
-  const r=gpDuoState()[gpDuoKey(a,b)];
-  return !!(r&&r.done);}
+  return gpDuoActive(gpDuoState()[gpDuoKey(a,b)]);}
 /* KI A PÁRJA? A közös sebesség-fejlődés ezen olvas. */
 function gpDuoPartner(name){
   if(!gpDuoOn()||!name)return null;
@@ -16368,7 +16421,7 @@ function gpDuoPartner(name){
   const ks=Object.keys(D);
   for(let i=0;i<ks.length;i++){
     const r=D[ks[i]];
-    if(!r||!r.done)continue;
+    if(!gpDuoActive(r))continue;
     const two=ks[i].split("||");
     if(two[0]===name)return two[1];
     if(two[1]===name)return two[0];}
@@ -16382,7 +16435,7 @@ function gpDuoTeamMult(active){
   active.forEach(x=>{if(x&&x.p&&!x.bus)pitch.add(x.p.n);});
   let m=1;
   Object.keys(D).forEach(k=>{
-    if(!D[k]||!D[k].done)return;
+    if(!gpDuoActive(D[k]))return;
     const two=k.split("||");
     if(pitch.has(two[0])&&pitch.has(two[1]))m*=1+(GP_DUO_PRESS[lv]||0);});
   return m;}
@@ -16397,38 +16450,27 @@ function gpDuoTeamMult(active){
    pressinget adna, és a filozófia egyetlen számmá zsugorodna. */
 const GP_DUO_MAX=3;
 function gpDuoTick(activeNames){
+  /* 3.9.138: a léptetés MÁR NEM INDÍT párt — azt a felajánlás és a te
+     választásod teszi (lásd showGpDuoBuild). Itt csak a KÉSZ párosok
+     összeérése halad: közös meccsenként egy lépés, és a pillanat ki van
+     mondva. */
   if(!gpDuoOn()||!activeNames)return;
   const D=gpDuoState(),need=gpDuoRipeNeed();
-  const nev=Array.from(activeNames).filter(gpDuoEligible).sort();
-  /* A MEGLÉVŐ, MÉG ÉPÜLŐ kötések léptetése előbb — azok már elkezdődtek. */
-  let kesz=gpDuoDone();
   Object.keys(D).forEach(k=>{
-    const r=D[k];if(!r||r.done)return;
+    const r=D[k];
+    if(!r||!r.built||r.done)return;
     const two=k.split("||");
     if(!activeNames.has(two[0])||!activeNames.has(two[1]))return;
     r.n=(r.n||0)+1;
-    if(r.n>=need&&kesz<GP_DUO_MAX){
-      const out=gpDuoComplete(two[0],two[1]);
-      kesz++;
-      try{
-        addLine(`🧲 <b>GYILKOS PÁROS!</b> ${esc(shortName(two[0]))} és ${esc(shortName(two[1]))} `
-          +`összeszokott — együtt presszingelnek, és innentől a sebességük is együtt fejlődik.`,"m mvp");
-        if(out)addLine(`→ a sebességük kiegyenlítődött: `
-          +`${esc(shortName(out.a))} ${out.elotteA} → ${out.utanaA} · `
-          +`${esc(shortName(out.b))} ${out.elotteB} → ${out.utanaB}`,"m skillnote");
-      }catch(e){}}});
-  /* ÚJ KÖTÉS csak akkor indul, ha van még hely — és mindig a legkevesebb
-     kötéssel rendelkező pár kapja, hogy ne egy ember gyűjtse be mindet. */
-  if(kesz>=GP_DUO_MAX)return;
-  const epul=Object.keys(D).filter(k=>D[k]&&!D[k].done).length;
-  if(epul>=GP_DUO_MAX)return;
-  for(let i=0;i<nev.length;i++)for(let j=i+1;j<nev.length;j++){
-    const k=gpDuoKey(nev[i],nev[j]);
-    if(D[k])continue;
-    /* Aki már tagja egy kötésnek, nem kezd újat — egy ember egy páros. */
-    if(Object.keys(D).some(x=>x.split("||").indexOf(nev[i])>=0||x.split("||").indexOf(nev[j])>=0))continue;
-    D[k]={n:1};
-    return;}}
+    if(r.n<need)return;
+    const out=gpDuoComplete(two[0],two[1]);
+    try{
+      addLine(`🧲 <b>ÖSSZEÉRT A GYILKOS PÁROS!</b> ${esc(shortName(two[0]))} és ${esc(shortName(two[1]))} `
+        +`${need} közös meccs után egy ritmusban mozog.`,"m mvp");
+      if(out)addLine(`→ a sebességük kiegyenlítődött: `
+        +`${esc(shortName(out.a))} ${out.elotteA} → ${out.utanaA} · `
+        +`${esc(shortName(out.b))} ${out.elotteB} → ${out.utanaB}`,"m skillnote");
+    }catch(e){}});}
 /* A KÖTÉS KIÉPÜLÉSE: a sebesség kiegyenlítődik a jobbikra, és mindketten
    kapnak rá egy azonnali ráadást. Innentől a gpDuoPartner köti össze őket. */
 function gpDuoComplete(a,b){
@@ -16453,6 +16495,166 @@ function gpDuoComplete(a,b){
       out={a,b,elotteA,elotteB,utanaA:Math.round(ea.attrs.seb),utanaB:Math.round(eb.attrs.seb)};}
   }catch(e){}
   return out;}
+/* ---- A FÁZIS-BEJELENTÉS (3.9.138) ----
+   Egy helyen, hogy a kézi, az auto és a választó ugyanazt mondja. */
+function gpDuoAnnounce(a,b){
+  const D=gpDuoState(),k=gpDuoKey(a,b),r=D[k];
+  if(!r)return;
+  if(r.stages>=GP_DUO_NEED&&!r.built){
+    r.built=1;r.n=r.n||0;r.builtSeason=S.seasonNumber||1;
+    if(S.gpDuoInProgress===k)S.gpDuoInProgress=null;
+    addLine(`🧲 <b>Gyilkos páros kész:</b> ${esc(shortName(a))} &amp; ${esc(shortName(b))} — `
+      +`innentől együtt presszingelnek (+${Math.round((GP_DUO_PRESS[gpDuoLv()]||0)*100)}% nyomás, ha mindketten pályán vannak), `
+      +`és ${gpDuoRipeNeed()} közös meccs után a sebességük is összeér.`,"m life");}
+  else if(!r.built){
+    S.gpDuoInProgress=k;
+    addLine(`🧲 Gyilkos páros épül: ${esc(shortName(a))} &amp; ${esc(shortName(b))} (${r.stages}/${GP_DUO_NEED} fázis)`,"m life");}}
+/* Egy fázis hozzáadása (új párnál ez indítja). */
+function gpDuoAddStage(a,b){
+  const D=gpDuoState(),k=gpDuoKey(a,b);
+  const r=D[k]||(D[k]={stages:0,n:0});
+  if(r.built)return r;
+  r.stages=Math.min(GP_DUO_NEED,(r.stages||0)+1);
+  gpDuoAnnounce(a,b);
+  return r;}
+/* Jelölhető pár: mindketten támadó vagy középpályás, egyikük sincs kész
+   párosban, és a kettő még nem kész páros. A kapus és a védő kimarad. */
+function gpDuoPairOk(a,b){
+  if(!a||!b||a===b)return false;
+  if(!gpDuoEligible(a)||!gpDuoEligible(b))return false;
+  if(gpDuoInActive(a)||gpDuoInActive(b))return false;
+  return true;}
+function gpDuoSeb(name){
+  try{const e=careerPool&&careerPool[name];return Math.round((e&&e.attrs&&e.attrs.seb)||0);}catch(e){return 0;}}
+/* A RENDSZER AJÁNLATA: a pályán lévő jelölhetők közül. A félkész pár előnyt
+   kap (befejezni többet ér, mint újat kezdeni); egyébként a nagyobb
+   sebesség-rés (azt az összeérés hozza be) és a gyorsabb tag. */
+function gpDuoAjanlPair(jitter){
+  const on=slots.filter(s=>s.player).map(s=>s.player.n).filter(n=>gpDuoEligible(n)&&!gpDuoInActive(n));
+  let best=null;
+  for(let i=0;i<on.length;i++)for(let j=i+1;j<on.length;j++){
+    const a=on[i],b=on[j];
+    if(!gpDuoPairOk(a,b))continue;
+    const cur=gpDuoStages(a,b);
+    const sa=gpDuoSeb(a),sb=gpDuoSeb(b);
+    const score=Math.abs(sa-sb)+Math.max(sa,sb)/10+(cur>0?100+cur:0)+(jitter?Math.random():0);
+    if(!best||score>best.score)best={a,b,score,cur};}
+  return best;}
+function autoStartGpDuo(){
+  const best=gpDuoAjanlPair(true);
+  if(!best)return false;
+  gpDuoAddStage(best.a,best.b);
+  return true;}
+let gpDuoPickFirst=null;
+function gpDuoCommitPair(first,mate){
+  gpDuoAddStage(first,mate);
+  gpDuoPickFirst=null;
+  $("scSkill").classList.add("hide");
+  const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();}
+function advanceGpDuoManual(){
+  const k=S.gpDuoInProgress,r=k&&gpDuoState()[k];
+  if(r){const two=k.split("||");gpDuoAddStage(two[0],two[1]);}
+  $("scSkill").classList.add("hide");
+  const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();}
+/* A KÉPERNYŐ — a passzkémiáé mintájára: ugyanaz a panel, ugyanazok a lánc-
+   jelölők (chemGoOn / chemPickMark / immAjanl), tehát a „meccsről meccsre"
+   lánc is ugyanúgy kezeli. */
+function showGpDuoBuild(resumeCb){
+  skillResumeCb=resumeCb;
+  gpDuoPickFirst=null;
+  $("scSkill").classList.remove("hide");
+  $("skillSpinBtn").classList.add("hide");
+  $("skillSpinName").textContent="🧲";
+  $("skillAssignWrap").classList.remove("hide");
+  const k=S.gpDuoInProgress,inProg=(k&&gpDuoState()[k]&&!gpDuoState()[k].built)?gpDuoState()[k]:null;
+  if(inProg){
+    const two=k.split("||");
+    $("skillTitle").textContent=`Gyilkos páros (${inProg.stages}/${GP_DUO_NEED} fázis)`;
+    $("skillDesc").textContent=`${shortName(two[0])} & ${shortName(two[1])} párosa épül tovább. `
+      +`A teljes ${GP_DUO_NEED}/${hunNal(GP_DUO_NEED)} kész: onnantól együtt presszingelnek, a sebességük együtt fejlődik, `
+      +`és ${gpDuoRipeNeed()} közös meccs után ki is egyenlítődik a gyorsabbikra.`;
+    const box=$("skillAssignList");box.innerHTML="";
+    const row=document.createElement("div");row.className="prow";
+    row.id="chemGoOn";
+    row.innerHTML=`<span class="pos pc-KOZEPPALYAS">${inProg.stages}/${GP_DUO_NEED}</span>`
+      +`<span class="main"><div class="nm">${esc(shortName(two[0]))} (Seb ${gpDuoSeb(two[0])}) &amp; ${esc(shortName(two[1]))} (Seb ${gpDuoSeb(two[1])})</div>`
+      +`<div class="trait">koppints a továbbépítéshez</div></span>`;
+    row.onclick=()=>{advanceGpDuoManual();};
+    box.appendChild(row);
+    const sw=document.createElement("button");
+    sw.className="btn-s stepbtn";sw.style.marginTop="8px";
+    sw.dataset.imm="kiut";
+    sw.textContent="↩ Mégis másik párost építek";
+    sw.onclick=()=>{
+      askConfirm({title:"Másik párosra váltasz?",yes:"Igen, másikat választok",
+        html:`<div style="font-size:13px;line-height:1.55">
+          <b>${esc(shortName(two[0]))} &amp; ${esc(shortName(two[1]))}</b> párosa félbemarad
+          <b>${inProg.stages}/${GP_DUO_NEED}</b> fázisnál.<br><br>
+          <span style="color:var(--grass)">A megszerzett fázisok megmaradnak</span> — ez a páros később, a választóból bármikor folytatható.</div>`,
+        onYes:()=>{
+          S.gpDuoInProgress=null;gpDuoPickFirst=null;
+          try{saveGame();}catch(e){}
+          showGpDuoBuild(skillResumeCb);}});};
+    box.appendChild(sw);
+    $("scSkill").scrollIntoView({behavior:"smooth"});
+    return;}
+  $("skillTitle").textContent="Gyilkos páros — válassz párost!";
+  $("skillDesc").textContent=`Két támadó vagy középpályás, aki együtt presszingel. A kötés ${GP_DUO_NEED} fázisban épül fel. `
+    +`Kész állapotban, ha mindketten pályán vannak, erősebb a csapat nyomásgyakorlása, és a sebességük együtt fejlődik; `
+    +`${gpDuoRipeNeed()} közös meccs után pedig a lassabbik felér a gyorsabbikhoz, ráadással. `
+    +`Egy ember egy párosban lehet, és egyszerre legfeljebb ${GP_DUO_MAX} kész páros élhet.`;
+  renderGpDuoPick();
+  $("scSkill").scrollIntoView({behavior:"smooth"});}
+function renderGpDuoPick(){
+  const box=$("skillAssignList");box.innerHTML="";
+  const mark=document.createElement("i");mark.id="chemPickMark";mark.hidden=true;
+  box.appendChild(mark);
+  if(gpDuoPickFirst){
+    const info=document.createElement("div");
+    info.style.cssText="font-size:12px;color:#cfd6ff;margin-bottom:5px";
+    info.textContent=`Első játékos: ${shortName(gpDuoPickFirst)} (Seb ${gpDuoSeb(gpDuoPickFirst)}) — válaszd ki a párját:`;
+    box.appendChild(info);
+    const back=document.createElement("button");
+    back.className="btn-s";back.style.cssText="width:100%;font-size:12px;padding:5px 0;margin-bottom:7px";
+    back.dataset.imm="kiut";
+    back.textContent="↩ Mégis mást választok elsőnek";
+    back.onclick=()=>{gpDuoPickFirst=null;renderGpDuoPick();};
+    box.appendChild(back);}
+  else{
+    const aj=gpDuoAjanlPair(false);
+    if(aj){
+      const kov=Math.min(GP_DUO_NEED,aj.cur+1);
+      const r=document.createElement("div");r.className="prow";
+      r.dataset.immAjanl="1";
+      r.dataset.immMit=`${shortName(aj.a)} & ${shortName(aj.b)} gyilkos párosa`;
+      r.innerHTML=`<span class="pos pc-KOZEPPALYAS">🧲</span><span class="main">`
+        +`<div class="nm">${esc(shortName(aj.a))} (Seb ${gpDuoSeb(aj.a)}) &amp; ${esc(shortName(aj.b))} (Seb ${gpDuoSeb(aj.b)}) `
+        +`<span class="msBadge">AJÁNLOTT</span></div>`
+        +`<div class="trait">a rendszer választása · ${aj.cur}/${GP_DUO_NEED} → ${kov}/${GP_DUO_NEED} · egy koppintás, és elindul</div></span>`;
+      r.onclick=()=>gpDuoCommitPair(aj.a,aj.b);
+      box.appendChild(r);}}
+  currentRoster().forEach(p=>{
+    if(!p||!gpDuoEligible(p.n)||gpDuoInActive(p.n))return;
+    if(gpDuoPickFirst&&(p.n===gpDuoPickFirst||!gpDuoPairOk(gpDuoPickFirst,p.n)))return;
+    const row=document.createElement("div");row.className="prow";
+    const existing=gpDuoPickFirst?gpDuoStages(gpDuoPickFirst,p.n):0;
+    row.innerHTML=`<span class="pos pc-${getCategoryFor(p.pos[0])}">${p.pos.join("/")}</span>`
+      +`<span class="main"><div class="nm">${esc(shortName(p.n))} `
+      +`<small style="color:var(--gold)">Seb ${gpDuoSeb(p.n)}</small>`
+      +`${existing?` <small>(már ${existing}/${GP_DUO_NEED})</small>`:""}</div></span>`;
+    row.onclick=()=>{
+      if(!gpDuoPickFirst){gpDuoPickFirst=p.n;renderGpDuoPick();return;}
+      const f=gpDuoPickFirst,m=p.n,cur=gpDuoStages(f,m),kov=Math.min(GP_DUO_NEED,cur+1);
+      const sa=gpDuoSeb(f),sb=gpDuoSeb(m);
+      askConfirm({title:cur?"Tovább építed ezt a párost?":"Elindítod ezt a párost?",
+        yes:cur?"Igen, tovább építem":"Igen, ezt a párost építem",
+        html:`<div style="font-size:13px;line-height:1.6">
+          <b>${esc(shortName(f))}</b> (Seb ${sa}) &amp; <b>${esc(shortName(m))}</b> (Seb ${sb})<br>
+          Készültség: <b>${cur}/${GP_DUO_NEED}</b> → <b style="color:var(--gold)">${kov}/${GP_DUO_NEED}</b><br><br>
+          Kész állapotban együtt presszingelnek, és <b>${gpDuoRipeNeed()} közös meccs</b> után a sebességük
+          kiegyenlítődik a gyorsabbikra (<b>${Math.max(sa,sb)}</b>), ráadással.</div>`,
+        onYes:()=>gpDuoCommitPair(f,m)});};
+    box.appendChild(row);});}
 /* ================= ⚡ SZÁRNY-KÉMIA (3.9.107) =============================
    A harmadik kötésfajta a passzkémia és a gyilkos páros mellé — és a
    harmadik, ami NEM felajánlásból jön, hanem együtt töltött időből.
@@ -66172,6 +66374,26 @@ function playMatch(){
           showPassChemBuild(()=>processSkillQueue(reasons,cb));
           return;}
       }
+      /* ---- 🧲 GYILKOS PÁROS (Gegenpressing, 3.9.138) ----
+         Ugyanaz a minta, mint a passzkémiáé: saját dobás, a türelem-jutalmat
+         kihagyja, és csak akkor, ha van még hely egy kész párosnak. */
+      if(reason!=="pity"&&gpDuoOn()&&gpDuoRoom()
+         &&Math.random()<gpDuoOfferP()*(1+underdogFactor()*0.8)){
+        let _k=S.gpDuoInProgress,_r=_k&&gpDuoState()[_k];
+        /* ha az épülő pár egyik tagja közben elment, a pár félbemarad (a
+           fázisai megmaradnak), és új választás jön */
+        if(_r&&!_k.split("||").every(n=>currentRoster().some(p=>p&&p.n===n))){
+          S.gpDuoInProgress=null;_k=null;_r=null;}
+        if(_r&&!_r.built){
+          if(S.auto){const _t=_k.split("||");gpDuoAddStage(_t[0],_t[1]);processSkillQueue(reasons,cb);}
+          else showGpDuoBuild(()=>processSkillQueue(reasons,cb));
+          return;}
+        if(S.auto){
+          if(autoStartGpDuo()){processSkillQueue(reasons,cb);return;}
+        }else if(gpDuoAjanlPair(false)||currentRoster().filter(p=>p&&gpDuoEligible(p.n)&&!gpDuoInActive(p.n)).length>=2){
+          showGpDuoBuild(()=>processSkillQueue(reasons,cb));
+          return;}
+      }
       const incompleteCands=buildUpgradeCands();
       /* A folytatás esélye a hátralék méretével nő — így a rendszer önmagát
          egyensúlyban tartja: kevés félkész skillnél inkább újak jönnek,
@@ -95684,7 +95906,7 @@ function gpSkillCount(){
   try{return msRoster().filter(x=>x&&gpHasSkill(x.n)).length;}catch(e){return 0;}}
 /* A klub történetében FELÉPÜLT gyilkos párosok — az eladás nem vesz el belőle. */
 function gpDuoCareer(){
-  try{const D=gpDuoState();return Object.keys(D).filter(k=>D[k]&&D[k].done).length;}catch(e){return 0;}}
+  try{const D=gpDuoState();return Object.keys(D).filter(k=>gpDuoActive(D[k])).length;}catch(e){return 0;}}
 
 /* ---- A GERINC: AZ ODAFENT SZERZETT LABDA ----
    Ez a tábla lelke. A felső fokozatok egy egész karrier gyűjtései, és a
@@ -97275,15 +97497,21 @@ stTrait("gegen","buntetes",2,"Büntetés",
     return lv?`most ${Math.round(GP_PUNISH_P[lv]*100)}% esély, legfeljebb ${GP_PUNISH_CAP[lv]} gól `
               +`mérkőzésenként — a Lesi Puskás szerep ezen felül szoroz`:"";});
 stTrait("gegen","gyilkos_paros",3,"Gyilkos páros",
-  "Megnyílik a NEGYEDIK kötésfajta. Két TÁMADÓ-KÖZÉPPÁLYÁS ember összeszokik, és a kötés két dolgot ad: együtt presszingelnek (ha MINDKETTEN pályán vannak, erősödik a nyomásgyakorlás), és a SEBESSÉGÜK is együtt fejlődik — a kiépülés pillanatában kiegyenlítődik a jobbikra, mindketten kapnak rá egy azonnali ráadást, és onnantól ami az egyiket gyorsítja, az a másikat is viszi.<br><br>A kötés magától épül a közösen lejátszott mérkőzésekből; egyszerre legfeljebb három lehet kész.",[
-  {fx:{gpDuo:1},note:"a rendszer megnyílik · +5% pressing párosonként · +2% azonnali sebesség · 15 közös meccs"},
-  {fx:{gpDuo:2},note:"+8% · +4% · 12 közös meccs"},
-  {fx:{gpDuo:3},note:"+10% · +6% · 8 közös meccs"}],
+  "Megnyílik a NEGYEDIK kötésfajta. Két TÁMADÓ-KÖZÉPPÁLYÁS ember összeszokik, és a kötés két dolgot ad: együtt presszingelnek (ha MINDKETTEN pályán vannak, erősödik a nyomásgyakorlás), és a SEBESSÉGÜK is együtt fejlődik — ami az egyiket gyorsítja, az a másikat is viszi, és az ÖSSZEÉRÉS után (közös meccsek) kiegyenlítődik a gyorsabbikra, azonnali ráadással.<br><br>ÚGY ÉPÜL, MINT A PASSZKÉMIA: a jutalmak egy része gyilkospáros-építés lesz, a rendszer felajánl egy párt, de te választod ki, kik között építed — és minden felajánlásnál te építed tovább, öt fázison át. Egy ember egy párosban lehet; egyszerre legfeljebb három kész páros élhet.",[
+  {fx:{gpDuo:1},note:"a rendszer megnyílik · +5% pressing párosonként · +2% sebesség-ráadás · 15 közös meccs az összeérés"},
+  {fx:{gpDuo:2},note:"+8% · +4% · 12 közös meccs · 25%-kal gyakoribb felajánlás"},
+  {fx:{gpDuo:3},note:"+10% · +6% · 8 közös meccs · 33%-kal gyakoribb felajánlás"}],
   ()=>{if(!gpDuoOn())return "";
-    const D=gpDuoState();
-    const kesz=gpDuoDone(),epul=Object.keys(D).filter(k=>D[k]&&!D[k].done).length;
-    return `most ${kesz} kész gyilkos párosod van (${epul} épül) — az összeérés `
-      +`${gpDuoRipeNeed()} közös mérkőzés`;});
+    const D=gpDuoState(),need=gpDuoRipeNeed();
+    const sor=[];
+    Object.keys(D).forEach(k=>{
+      const r=D[k];if(!r)return;
+      const t=k.split("||").map(x=>shortName(x)).join(" & ");
+      if(r.done)sor.push(`${t}: összeért`);
+      else if(r.built)sor.push(`${t}: kész, összeérés ${r.n||0}/${need} közös meccs`);
+      else if(r.stages)sor.push(`${t}: ${r.stages}/${GP_DUO_NEED} fázis${S.gpDuoInProgress===k?" (épül)":""}`);});
+    return (sor.length?sor.join(" · "):"még nincs páros — a következő felajánlásnál választhatsz")
+      +` · a jutalmak ${Math.round(gpDuoOfferP()*100)}%-a lehet gyilkospáros-építés`;});
 stTrait("gegen","felfutasok",2,"Felfutások, visszazárások",
   "A pressing MINDKÉT iránya. A támadást a védők is segítik: nő a gólszerzési és gólpassz-esélyük. A védekezésbe pedig a középpálya és a támadósor is bekapcsolódik: nő a labdaszerzési esélyük odafent.",[
   {fx:{gpBoth:1},note:"+5% mindkét irányba"},
@@ -99669,7 +99897,7 @@ function saveGame(){
         chFreeBoost:S.chFreeBoost,chTrainBoost:S.chTrainBoost,chYouthSell:S.chYouthSell,
         /* 🧲 GYILKOS PÁROS (3.9.93): a kötés-tár. Lapos, szám-értékű objektum;
            a visszatöltés bulk (Object.assign(S,d.S)). */
-        gpDuo:S.gpDuo,
+        gpDuo:S.gpDuo,gpDuoInProgress:S.gpDuoInProgress||null,gpDuoMig:S.gpDuoMig||0,
         szarny:S.szarny,   /* ⚡ szárny-kémia (3.9.107) */
         bz9:S.bz9,recGoalsMatch:S.recGoalsMatch,   /* ⚽ A Kilences és a klubrekord (3.9.108) */
         /* EGYENLÍTŐ (3.9.67): hány ment el EBBEN AZ IDÉNYBEN — ebből számol az

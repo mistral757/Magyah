@@ -66,20 +66,44 @@ jó. Ez a görbe a képesség lelke.
 
 ### c) Gyilkos páros — a negyedik kötésfajta
 
-A képesség-kötés, a párkémia és a passzkémia mellé. Két **támadó-középpályás**
-ember összeszokik a közösen lejátszott mérkőzésekből (15 / 12 / 8 meccs), és a
-kész kötés kettőt ad:
+A képesség-kötés, a párkémia és a passzkémia mellé. Két **támadó vagy
+középpályás** ember köti.
 
-* **együtt presszingelnek** — ha *mindketten* pályán vannak, a csapat
-  nyomásgyakorlása erősödik (+5 / 8 / 10%);
-* **együtt gyorsulnak** — a kiépülés pillanatában a sebességük kiegyenlítődik a
-  jobbikra, mindketten kapnak rá egy azonnali ráadást (+2 / 4 / 6%), és
-  onnantól **ami az egyiket gyorsítja, az a másikat is viszi** (edzés, személyi
-  edző, boost, a saját „Nyomás!" képessége).
+**Az építés (3.9.138 óta, a passzkémia mintájára).** A korábbi változat
+NÉMÁN indította a párt: a meccs utáni léptetés az ábécében első jogosult párt
+vette fel, és csak a kész pillanatában szólalt meg. Bejelentés: „Nem igazán
+lehet jól követni… Automatikusan épül? Nekem kell építeni?” Mostantól:
 
-Egyszerre legfeljebb **három** kész páros lehet (`GP_DUO_MAX`). Enélkül a
-pressing-szorzó korlátlanul halmozódna, és a filozófia egyetlen számmá
-zsugorodna.
+1. **Az ajánlat:** a jutalmak egy része gyilkospáros-építés lesz. Ez saját
+   dobás a párkémia és a passzkémia után (`gpDuoOfferP`): a passzkémia 26%-os
+   alapja × 1 / 1,25 / 1,33 a képesség szintje szerint.
+2. **A választás:** ha nincs épülő páros, a rendszer felajánl egyet (egy
+   koppintás), de bárki kettőt kiválaszthatsz a jelöltek közül.
+3. **A továbbépítés:** ha van épülő páros, azt építed tovább egy fázissal,
+   vagy váltasz. A megkezdett fázisok megmaradnak, és a választóból
+   folytathatók.
+4. **5 fázis után a páros KÉSZ:**
+   * **együtt presszingelnek:** ha *mindketten* pályán vannak, a csapat
+     nyomásgyakorlása erősödik (+5 / 8 / 10%);
+   * **együtt gyorsulnak:** ami az egyiket gyorsítja, az a másikat is viszi
+     (edzés, személyi edző, boost, a „Nyomás!” képesség).
+5. **Az összeérés:** a kész páros 15 / 12 / 8 közös meccs után ÉR ÖSSZE (a
+   Laboratórium „Közös futás”-a rövidíti). Ekkor a sebességük kiegyenlítődik
+   a jobbikra, azonnali ráadással (+2 / 4 / 6%).
+
+A napló minden fázist, a kész állapotot és az összeérést is kimondja. A
+képesség kártyája páronként mutatja, hol tart.
+
+**A korlátok:**
+
+- egy ember egy párosban lehet;
+- egyszerre legfeljebb **három** kész páros élhet (`GP_DUO_MAX`), és ha ez
+  betelt, nincs több felajánlás. Enélkül a pressing-szorzó korlátlanul
+  halmozódna.
+
+**Régi mentés:** a kész pár kész marad. A némán indult félkész pár a
+haladásával arányos fázist kap (15 közös meccs = 5 fázis), és a választóból
+folytatható.
 
 ### g) „Nyomás!" — az egyetlen posztfüggetlen képesség
 

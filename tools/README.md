@@ -2211,6 +2211,32 @@ csatornája ez. A `S.lastMatch` nem tartalmaz gólszerzőnkénti bontást.
 
 Részletek: `docs/csupa-ek.md`.
 
+## gyilkos-paros-epites-proba.js — 🧲 a gyilkos páros a passzkémia mintájára
+
+```bash
+node tools/gyilkos-paros-epites-proba.js
+```
+
+**A bejelentés:** a Gegenpressing kötése némán, automatikusan épült, se
+választás, se látható haladás. A próba méri:
+
+- hogy a meccs utáni léptetés már nem indít párt;
+- a választót: ajánlott pár + kézi, két lépéses választás;
+- a továbbépítést és a váltást (a fázisok megmaradnak);
+- az 5/5 kész állapotot (a pressing-szorzó csak együtt él);
+- a közös meccsekből haladó összeérést a sebesség-kiegyenlítéssel;
+- az „egy ember egy páros” szabályt;
+- a régi mentés átalakítását;
+- **és a jutalom-sort egy valódi auto-szezonban:** a felajánlás útja tényleg
+  bekötött.
+
+**Tanulság:** a fixtúrában eredetileg csak három jelölhető állt, és a „másik
+pár” észrevétlenül átfedett az elsővel. A próba ezért maga gondoskodik hat
+jelöltről.
+
+**Módosult:** a `gegenpressing-proba.js` 7b-szakasza a kötést már nem a
+meccsekből építi, hanem fázisokkal. A meccsek csak az összeérést viszik.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
