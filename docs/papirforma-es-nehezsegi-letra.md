@@ -89,6 +89,42 @@ szólt. Ha azokat is át akarod állítani, egy sor.
 
 ---
 
+### 3.9.140 — a küszöb a felére (10% → 5%)
+
+> „Az óriásölést rossz irányba harmonizáltuk legutóbb. Pont hogy az új
+> számítással szűkebb rating különbségre is kéne adjunk óriásölést. Kb.
+> konkrétan a felére, mint most."
+
+**Miért rossz irány a 10%:** a 80-as horgonyon azonos volt a régi 8 ponttal.
+Fölötte viszont a pont-küszöb a csapattal együtt NŐTT: egy 130-as mércén már
+13 pont volt. Minél előrébb jársz a karrierben, annál ritkább lett az
+óriásölés.
+
+**Most `MS_GIANT_PCT = 5`**, vagyis 80-on 4 pont, 130-on 6,5, 190-en 9,5. Ami
+erre a számra ül, mind együtt mozdul:
+
+- a morál-jutalom (a képlete változatlan: ×1,04 százalékonként, max 18);
+- az óriásölés-számláló mérföldköve;
+- a rettenet és a stílus-motor óriásölés-tétele (`dreadWinGiant`);
+- a Beton stílus-mérföldköve;
+- a meccs előtti „Papírforma” sor.
+
+**A „legnagyobb óriásölés” lépcsői** is a felére kerültek: 12 / 17 / 22 / 27 /
+32% → **6 / 9 / 11 / 14 / 16%**.
+
+- **A régi mentések:** a lépcső-azonosító az értéket hordozza (`giantgap_12` …).
+  Ezért a már teljesített fokozatok sorszám szerint átköltöznek az új
+  azonosítókra, egyszer. Így egy kifizetett fokozat nem fizet kétszer.
+- **Ami nem változott:** a „kínos eredmény” (a sokkal gyengébb ellenfél elleni
+  pontvesztés, 12,5%). A kérés az óriásölésről szólt.
+
+**Próbák:**
+
+- a `papirforma-proba` a 80-as horgonyon a 4 pontos küszöböt méri, és az
+  átköltözést is;
+- a `rettenet-meccs-proba` helyzetei a küszöbhöz mérve futnak (¼, ½, 1×, 2×),
+  így a konstanstól függetlenül ugyanazt az ívet mérik.
+
 ## II. A nehézségi létra
 
 > „az ellenfél erejének választásában legyen egy sokkal differenciáltabb sáv,
