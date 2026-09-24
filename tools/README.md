@@ -2072,6 +2072,49 @@ máshol már megszüntetett.
 −1,0-n, mert a fokozat és a tempó is szoroz — a helyes állítás az ARÁNY
 (a −1,0 a 0,0 kétszerese). Ugyanez a hiba a 3.9.130-as próbában is előjött.
 
+## nyomas-es-meccsero-proba.js — 🧲 Nyomásgyakorlás, kalap, presszpont, ⚡ meccs-erő
+
+```bash
+node tools/nyomas-es-meccsero-proba.js
+```
+
+**Hat bejelentés, egy próba (31 állítás):**
+
+1. A „Gyors kontra” és minden VÉDŐ-képesség kiosztható elöl a
+   Nyomásgyakorlás 1. szintjén, de csak ott. A Villámbeck Queen zárva marad.
+2. A feloldott „Nyomás!” a MÁR MEGKEVERT pakliba is bekerül, egyszer. Zárolva
+   kikerül, és a jelzője a mentésben utazik.
+3. A „Nyomásra hangolt sorsolás” a hagyományos húzásban is hat
+   (600 húzáson 5% → 64%).
+4. A labdaszerzés sora kiírja a presszpontot, és a kommentár változatos.
+5. Az eredményjelző minden meccsen kiírja mindkét ⚡ meccs-erőt. A CPU-é
+   betűre az, amivel a motor számol.
+6. **Valódi meccsen** a kiállítás élőben lejjebb viszi a kiírt számot, és egy
+   utána jövő csere nem adja vissza az emberhátrányt.
+7. A társ arculata fehérlistán megy át: rosszindulatú szín vagy tinta
+   kiesik, és a címere a táblán áll.
+
+**A régi kódon** hét állítás bukik. Mindhárom bejelentett hiba visszajön
+belőlük:
+
+- a Gyors kontra elöl 0/3;
+- a Nyomás! nem kerül a pakliba;
+- a hangolt sorsolás 3,7% a hangolatlan 4,2% mellett.
+
+**A valódi meccs trükkje.** A kiállítás és a csere sorrendjét nem lehet
+véletlenre bízni:
+
+- a piroslap-esélyt addig tartjuk fent, amíg az első kiállítás meg nem
+  történik;
+- akkor a `MATCH_CTL.open()` megállítja a meccset;
+- a felülírt `openHalftimeSubs` elvégzi a cserét.
+
+A motor belső `diff`-je kívülről nem látszik. Azt, hogy a csere tényleg újra
+alkalmazza a kiállítás képletét, a `styleRedOppGoalMult` hívásának
+számlálója mutatja meg.
+
+Részletek: `docs/nyomas-es-meccsero.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
