@@ -2292,6 +2292,31 @@ felülírva), mert a fixtúra-keretnek nincs tábora.
 
 Részletek: `docs/talizmanok.md`, a teljes terv: `docs/talizmanok-terv.md`.
 
+## talizman-f3-proba.js — 🧿 Talizmánok F3: a hat gazdasági alaphatás
+
+```bash
+node tools/talizman-f3-proba.js
+```
+
+**Öt blokk (31 állítás, ~15 mp):**
+
+- **Semleges:** talizmán nélkül, és csak nem ható kategóriákkal (Bank, Joker,
+  Morál, Meccs) is minden kapaszkodó BITRE a régi számot adja.
+- **Csökkenő hozam és plafon:** erő szerint 1 · 0,85 · 0,85²; a Tiszta
+  ×1,25; a special-os lapon nincs szorzó; a 8 pp-es plafon.
+- **A 13 kapaszkodó.** A tárgyalás a valódi `twResolveSigning`-gel, a licit a
+  valódi `saleRollOffer`-rel fut, rögzített dobással: ugyanaz a dobás a
+  talizmánnal tiszta üzlet vagy nagyobb licit, nélküle nem. A begyakorlás a
+  valódi `tacticTrainAfterMatch`. A stílus-fánál a kijelzett ÉS a levont ár
+  is kedvezményes. A kedvezmény seedelt, és nem adódik össze a
+  kihívás-kedvezménnyel.
+- **A felület:** ⚡ a lapon; a menü aktív hatásai a plafonnal, a nem ható
+  kategóriák nélkül.
+- **Az eseménycsomag:** 2 jó + 1 rossz, a lapon látszik, a választás a
+  paklihoz adja, és nincs ismétlés.
+
+Részletek: `docs/talizmanok.md` (3.9.142).
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```

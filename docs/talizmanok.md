@@ -222,3 +222,86 @@ Szerencse fia) is F6-ban kapcsolnak be — most a kínálat 3 lap, a plafon 6.
 `node tools/talizman-proba.js` (9153-as port, ~40 mp) — 44 állítás, köztük
 egy teljes, valódi végigjátszott idény és egy kézi mérkőzés, ahol a
 húzás-ablaknak a lánc végén elénk kell kerülnie.
+
+---
+
+# 3.9.142 — F3: a hat gazdasági kategória alaphatása él
+
+> „Szuperek a példák, légy egy kicsit még kreatívabb. […] a pro mindig illik a
+> kártyához, de a contra lehet más témájú. […] Mehet az f3”
+
+## A számítás: egy helyen (`talAlapMind`)
+
+1. Egy kategória talizmánjai **erő (E) szerint csökkenő** sorba állnak.
+2. A k-adik talizmán a **0,85^k-szorosát** éri. Az 1. teljes, a 2. 85%, a 3.
+   72%, a 10. 23%.
+3. Minden talizmán a **saját változatához** adja a csökkentett erejét, és a
+   változat összege a saját egységében (%, pp) **a plafonnál megáll**.
+4. A memó kulcsa a gyűjtemény sorszáma és mérete. A `devTempo`, a
+   `tacticFit` és a `coachQual` meccsenként százszor is kérdez, ezért kell.
+
+| változat | 1 E | plafon | kapaszkodó |
+|---|--:|--:|---|
+| 🔭 Bővebb lista | +12% esély a 4. jelöltre | 100% | `twScout` (`want`) |
+| 🔭 Nyitott kapu | +15% esély akadémiai ajánlatra a köztes fordulóban | 100% | `tryAcademyOpportunity` (`idx%4===2`) |
+| 🎭 Olcsóbb fa | −3% képesség- és csillagozás-ár | 30% | `styleTraitNextPrice` (kijelzés ÉS levonás), `starUnlockPrice` |
+| 🎭 Mérföldkő-prémium | +4% | 40% | `msCashReward`, `msSpReward` |
+| 📋 Jobb illeszkedés | +0,8 pp | 8 pp | `tacticFit` (ugyanaz a pp-csatorna) |
+| 📋 Gyorsabb tanulás | +6% | 50% | `tacticTrainAfterMatch` |
+| 🤝 Tiszta üzlet | +2,5 pp | 20 pp | `twResolveSigning` (`chShift`) |
+| 🤝 Kedvezmény-szerencse | 4% esély −25%-ra | 35% | `buyDiscountParts` (seedelt, a kihívás-kedvezménnyel nem adódik) |
+| 🤝 Licitfelhajtó | a licit-kúp csúcsa +2 pp | 15 pp | `saleRollOffer` |
+| 🌱 Gyorsabb érés | +2,5% | 20% | `devTempo` (a játék saját „fejlődési tempója”: fejlődés, begyakorlás, párkémia) |
+| 🌱 Hatékony edzés | +5% | 40% | a tervezett edzés `_tm` szorzója |
+| 🎓 Jobb szakemberek | +4% | 35% | `coachQual` (a plafon UTÁN) |
+| 🎓 Olcsóbb stáb | −5% | 40% | `staffPrice`, `coachSlotPrice` |
+
+**Talizmán nélkül egyetlen bit sem mozdul.** Semleges állapotban minden olvasó
+0-t vagy ×1-et ad. Ahol a kerekítés vagy egy véletlenhívás eltérést okozhatna,
+ott a kód ki is kerüli az ágat (`m>=1 ? régi : új`, `p>0 && Math.random()`).
+A próba ezt két gyűjteményen méri: egy üresen, és egy olyanon, amelyben csak
+a még nem ható kategóriák állnak.
+
+## A felület
+
+* **A lapon** a „⚡ az alaphatás él” / „⏳ később kapcsol be” sor jelzi,
+  mi hat már.
+* **A menüben** külön blokk van: ⚡ **Aktív alaphatások**. Pontosan azt a
+  számot mutatja, amit a játék használ, a plafonnal és azzal együtt, hogy
+  mennyit érne a következő talizmán abban a kategóriában. A még nem ható
+  változatok itt nem jelennek meg.
+
+## A második hullám: 20 új special
+
+Mindegyik egy kis történet, egy döntés vagy egy kockázat. A kontra sokszor
+egészen más világból jön: a szülők ügyvédje, az adóhivatal, a sajtó
+címlapja, a lelátó zaja. Összesen **82 special**. A teljes lista:
+`docs/talizmanok-terv.md` 9.11.
+
+## 📦 A Joker eseménycsomagja
+
+Új Joker-változat. **2 új jó és 1 új rossz** eseményt tesz az átigazolási
+pakliba, és a csomag tartalma **már a lapon látszik**, a választás előtt. Egy
+esemény csak egyszer kerülhet a pakliba, és a kínálat három lapja sem
+ismételhet. A ritkaság a súlyt viszi (×1 / ×1,3 / ×1,6 / ×2).
+
+A tár: **9 jó** (az ifjúság forrása, igazgatósági ülés, mezszponzor,
+sztárvilág, a tékozló fiú, edzőtábor, nyílt nap, ázsiai túra, egy legenda
+kopogtat) és **7 rossz** (hírnév-mámor, öltözői botrány, rivális csábítás,
+adóellenőrzés, ügynökháború, balszerencsés edzés, pályazár). Az első ötöt a
+kérés hozta. A választott csomag a menüben is látszik („📦 Az átigazolási
+paklidba került…”). **Az események maguk az F4-ben kapcsolnak be.** A
+részletes tervük (az igazgatósági ülés elvárásai, a szponzor-szerződések)
+a `docs/talizmanok-terv.md` 9.12-ben van.
+
+## A próba
+
+`node tools/talizman-f3-proba.js` (9159-es port, ~15 mp), 31 állítás:
+
+* a semleges bit-azonosság;
+* a csökkenő hozam és a plafon;
+* mind a 13 kapaszkodó, köztük a **valódi** tárgyalás (`twResolveSigning`)
+  és a **valódi** licit (`saleRollOffer`) rögzített dobással, valamint a
+  valódi meccs utáni begyakorlás;
+* a menü és a lap jelzései;
+* az eseménycsomag.

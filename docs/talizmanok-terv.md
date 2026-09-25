@@ -1,8 +1,10 @@
 # 🧿 Talizmánok — a kártyarendszer tervezete
 
-**Állapot:** 🟡 **F0–F2 kész (3.9.141)** — a váz él: a talizmánok születnek,
-húzhatók, gyűlnek és látszanak, de még **nem hatnak**. A megvalósult rész
-leírása: `docs/talizmanok.md`. Következik az F3 (alaphatások 1–6).
+**Állapot:** 🟡 **F0–F3 kész (3.9.142)** — a talizmánok születnek, húzhatók,
+gyűlnek és látszanak, és a **hat gazdasági kategória alaphatása él**
+(Scout, Csapatstílus, Taktika, Igazolások, Fejlődés, Stáb). A megvalósult
+rész leírása: `docs/talizmanok.md`. Következik az F4 (Joker — az
+eseménycsomagokkal —, Morál, Bank).
 
 **Név:** *Talizmán* — a döntés megszületett (lásd 19. pont). A dokumentum
 eredetileg „Sorslap” munkanéven készült; ahol a szövegben **lap** áll, az
@@ -676,6 +678,113 @@ is „másik terület”, és itt ez a természetes.)*
 
 ---
 
+### 9.11 A második hullám — 20 új special (3.9.142)
+
+> *„Szuperek a példák, légy egy kicsit még kreatívabb. Mármint a mostaniak
+> maradhatnak, de adhatsz meg bele izgalmat. […] a pro mindig illik a
+> kártyához, de a contra lehet más témájú.”*
+
+Az első hullám speciáljai jórészt egy-egy szám eltolásai. Ezek **történetek,
+döntések és kockázatok**. A kontra sokszor egészen más világból jön: a szülők
+ügyvédje, az adóhivatal, a sajtó címlapja, a lelátó zaja. A pötty ilyenkor azt
+a játékrendszert mutatja, amelyiket a kontra valójában üti.
+
+| kategória | special | min. | ✦ pro | ✖ kontra (terület) |
+|---|---|---|---|---|
+| 🔭 | **Álomgyár** | nagyon ritka | idényenként egyszer egy „csodagyerek”: induló POT 5000 fölött (holo: 6000) | minden elutasított akadémista után a heti lelátó 30%-a — a szülők ügyvédet fogadnak *(Bank)* |
+| 🔭 | **Kémhálózat** | ritka | minden felderítés első jelöltje 10%-kal olcsóbb — tudjuk a fájdalomküszöbét | ablakonként 10% eséllyel lebukik: −5 morál, és a sajtó címlapján vagy *(Morál)* |
+| 🎭 | **Filozófiai vita** | ritka | a másodlagos stílus a mérföldköveiből fél / kétharmad / teljes pontot kap a harmad helyett | a morál célértéke −1 — az öltöző nem tudja, kinek higgyen *(Morál)* |
+| 🎭 | **Mérföldkő-láz** | nagyon ritka | minden 5. (holo: 4.) mérföldkő dupla jutalmat fizet | ha egy gól hiányzik egy mérföldkőhöz, a gólpassz-súly −10% — mindenki maga akarja *(Meccs)* |
+| 📋 | **Titkos fegyver** | nagyon ritka | idényenként 3 (holo: 4) meccsen előhúzható: aznap +4% saját gólvárhatóság | a titkolózás ára: nyáron 1-gyel kevesebb felderítés *(Scout)* |
+| 📋 | **Ellenfél-elemző** | ritka | rangadón és esélytelenként +2 pp illeszkedés | az elemzőstáb bére: meccsenként a heti lelátó 3%-a *(Bank)* |
+| 🤝 | **Utolsó perces bomba** | nagyon ritka | minden ablak zárásakor 30% eséllyel sztár-ajánlat −30%-os áron | az így érkező −3 morállal kezd — az öltöző irigy *(Morál)* |
+| 🤝 | **Visszavásárlási záradék** | ritka | az eladottakat két idényen belül az eladási ár 80%-áért visszavásárolhatod | minden eladás −5% — a záradéknak ára van *(Bank)* |
+| 🌱 | **Második tavasz** | legendás | idényenként egy 30 feletti játékos Ratingje +3 | a stábtagok Szakértelme idényenként −1 — minden figyelem az öregeké *(Stáb)* |
+| 🌱 | **Versenyszellem** | ritka | posztonként a két legjobb fejlődése +12%, ha egymás riválisai | a padon ülő rivális morál-jele −1 *(Morál)* |
+| 🎓 | **A nagy öreg** | nagyon ritka | a legidősebb stábtag idényenként átad egy képességet egy fiatalnak | ragaszkodik a régi rendszerhez: új taktika begyakorlása −10% *(Taktika)* |
+| 🎓 | **Nemzetközi konferencia** | ritka | idényenként egy stábtag +3 Szakértelem | idényenként a heti lelátó 60%-a — a repülőjegy nem olcsó *(Bank)* |
+| 🃏 | **Pénzfeldobás** | ritka | idényenként 5 (nagyon ritkától 7) meccs előtt érmét dobhatsz: fej → +4% gólvárhatóság | írás → −3%, és két írás egymás után −2 morál *(Morál)* |
+| 🃏 | **Tükörvilág** | legendás | karrierenként egyszer: egy idényre minden kontrád PRO-ként hat | a következő idényben minden pro fele erővel *(a talizmánok maguk)* |
+| ❤️ | **Bulinegyed** | ritka | 3+ győzelmes sorozatnál +2 morál-cél | a buli utáni edzés −10% a következő meccsig *(Fejlődés)* |
+| ❤️ | **A pszichológus** | nagyon ritka | a morál sosem esik 30 (holo: 40) alá | elfoglal egy stábhelyet — a kanapénak is kell a hely *(Stáb)* |
+| 💰 | **Tőzsdei bevezetés** | legendás | idényzáráskor a helyezés szerint −5% … +20% hozam a büdzsére | a részvényesek figyelnek: minden vereség −1 extra morál *(Morál)* |
+| 💰 | **Szurkolói kötvény** | ritka | most azonnal a heti lelátó 500%-a | két idényen át vereség után −2 morál — a kötvényesek elvárnak *(Morál)* |
+| ⚽ | **A 12. játékos** | nagyon ritka | hazai meccsen +2% gólvárhatóság, és az ellenfél piroslap-esélye +20% | a jegyárengedmény ára: a hazai lelátó-bevétel −8% *(Bank)* |
+| ⚽ | **Az utolsó szó** | ritka | a 85. perctől, döntetlen állásnál +10% gólvárhatóság | ha ezután mégis kikapsz, −3 morál *(Morál)* |
+
+### 9.12 📦 A Joker eseménycsomagjai (3.9.142 — a katalógusban; hatás: F4)
+
+> *„új események, amik bekerülhetnek az átigazolási esemény pakliban […]
+> Ezek csomagokban jönnek amikor ilyen talizmánt választasz, tehát mindig van
+> benne 2 új jó és egy új rossz.”*
+
+**A mechanika.** Új Joker alaphatás-változat, az **Eseménycsomag**. A lap
+kidobásakor két jó és egy rossz esemény kerül rá a tárból. Kizárólag olyanok,
+amelyek még **nincsenek** a paklidban, és nincsenek a kínálat másik lapján
+sem. A csomag tartalma **a lapon látszik**, tehát tudod, mit engedsz be a
+piacra. Választás után a három esemény a `TRANSFER_TYPES` mellé kerül, a
+ritkaság szerinti súllyal (×1 / ×1,3 / ×1,6 / ×2). Egy esemény csak egyszer
+kerülhet a paklidba, és ha a tár kifogy, a csomag kisebb.
+
+**A tár: 9 jó, 7 rossz.** Az első öt a kérésből való, a többi kiegészítés.
+
+| | esemény | mi történik (F4-ben) |
+|---|---|---|
+| ✦ | ⏳ **Az ifjúság forrása** | a klublegenda (a legmagasabb értékelésű 32 feletti, legalább 500 perccel nálad) **10 évet fiatalodik**: az életkora −10, a csúcsa marad, és a hanyatlási görbéje újraindul |
+| ✦ | 🏛️ **Igazgatósági ülés** | lásd alább |
+| ✦ | 🎽 **Mezszponzor** | lásd alább |
+| ✦ | 🌟 **Sztárvilág** | a Sztárom a párom **összes eseménye** a klub arcára (a legmagasabb értékelésű kerettag), akkor is, ha nem ez a stílusod: szurkoló-robbanás, reklámszerződés, befektető — **és a követelések is** (gólbónusz, béremelés, mezszám). A híresség-pont a meglévő gépezeten gyűlik |
+| ✦ | 🔁 **A tékozló fiú** | egy korábban eladott játékosod haza akar jönni, az eladási ára feléért |
+| ✦ | ⛰️ **Edzőtábor az Alpokban** | a keret összhangja ugrik (a `bondcamp` kétszerese), és 5 meccsen át jobb a forma |
+| ✦ | 🚪 **Nyílt nap** | egy környékbeli 16 éves besétál: ingyen, és nagyobb POT-tal, mint bárki az akadémián |
+| ✦ | ✈️ **Nyári túra Ázsiában** | a heti lelátó 400–900%-a és +5% szurkoló — cserébe az első két meccsen −3% gólvárhatóság (fáradtság) |
+| ✦ | 🎩 **Egy legenda kopogtat** | egy visszavonult világklasszis stábtagnak jelentkezik, fél áron (a stábpiac legjobb szintjén) |
+| ✖ | 🥂 **Hírnév-mámor** | egy 21 alatti, nagy POT-ú játékos lecsúszik: 10 meccsen át −30% fejlődés, nagyobb forma-szórás, −1 morál-jel. **Kigyógyítható**: ha 3 meccsre a padra ülteted, magához tér |
+| ✖ | 📸 **Öltözői botrány** | −8 morál, és egy elégedetlen kerettag eladását kéri (elvágyódás-szerű döntés) |
+| ✖ | 🧲 **Rivális csábítás** | egy riválisod a legjobb emberedet csábítja: megtartási díj (a kikiáltási ár 15%-a), vagy elmegy a kikiáltási áron |
+| ✖ | 🧾 **Adóellenőrzés** | a büdzsé 4–10%-a bírság (az ügynökség csillaga csökkenti) |
+| ✖ | 💼 **Ügynökháború** | egy ügynök +50% bért követel a védencének; ha nem kapja meg, a játékos 10 meccsen át elégedetlen (−2 morál-jel) |
+| ✖ | 🩹 **Balszerencsés edzés** | a legjobb embered edzésen sérül meg, 2–5 meccsre |
+| ✖ | 🔒 **Pályazár** | két hazai meccs zárt kapuk mögött: nincs hazai előny, és nincs lelátó-bevétel |
+
+#### 🏛️ Igazgatósági ülés — a tulajdonosok megbízása
+
+Egy idényre szóló megbízás, **legfeljebb 3 elvárással**, ebből a hét fajtából:
+
+| elvárás | a mérce | hogyan kalibrálunk |
+|---|---|---|
+| **kupasorozat** | legalább egy adott kör (pl. elődöntő) | a mezőny- és a keret-erőből, ahogy a kupa-kihívásoknál |
+| **bajnoki helyezés** | legalább X. hely | a kihívás-rendszer 300 idényes mérésével, a te erőviszonyodra |
+| **szurkolótábor** | +Y% a tábor az idény végére | a mostani tábor és a ligasáv szerint |
+| **büdzsé** | idényvégi egyenleg legalább Z | a szezonkeret arányában |
+| **morál** | az idény átlaga legalább M | a mostani morál-célérték alapján |
+| **gólszám** | legalább G bajnoki gól | a gólvárhatóságodból |
+| **izgalom** | legalább I átlagos izgalom | az izgalom-mutatóból |
+
+**A teljesítés szintje** elvárásonként: ⭐ *kiváló* (a cél 120%-a), ✓
+*teljesítve*, ✗ *elbukva*. A jutalom elvárásonként a szezonkeret 4 / 8%-a
+(teljesítve / kiváló), a büntetés a 5%-a. Ha mindhárom teljesül: **„a
+tulajdonosok bizalma”**, +10% szezonkeret a következő idényben. Ha mindhárom
+elbukik: **bizalmi szavazás**, −10% szezonkeret és −10 morál. A megbízás a
+HUB-ban a kihívások mellett látszik, élő állással.
+
+#### 🎽 Mezszponzor — a klub arculata eladó
+
+Három ajánlat közül választasz, és mindegyik a **meglévő arculat-szerkesztőn**
+(címer, klubszínek) keresztül jelenik meg:
+
+| ajánlat | mit kér | mit fizet |
+|---|---|---|
+| **Logó a címerben** | egy adott emoji a címereden (pl. 🍺, 🛞, 📱) | hetente a heti lelátó 6–12%-a |
+| **Szponzorszín** | a mez egyik színe a szponzoré | ablakonként egy összegben a heti lelátó 150–300%-a |
+| **Stadionnév** | a stadion a szponzor nevét viseli (a mostani név zárójelben marad) | idényenként egyszer a heti lelátó 800–1500%-a |
+
+A szerződés 1–3 idényre szól. **Korai felbontás** esetén a hátralévő összeg
+fele a kötbér. A szurkolók ízlése is számít: a „tradicionális” klubokon
+(régi, sok trófea) a szponzor idényenként −1–3% szurkolót visz.
+
+---
+
 ## 10. A számok egy pillantásra — egy lap élete
 
 **Példa: „Az Aranytojás” (legendás Bank, special-lel, dobás: sáv 72%)**
@@ -909,7 +1018,7 @@ Durva becslés egy átlagos karrierre (~4 húzás/idény, a döntések ésszerű
 | **F0** ✅ | Leltár és mérés: a pénzes mérföldkövek száma idényenként (12 → 5 → 3 → 3) → a csere-szabály; a ritka-esemény jelöltek helye (`docs/talizmanok.md`) | a mérés a `talizman-proba.js` valódi idényében él tovább |
 | **F1** ✅ | Adatmodell, generátor (ritkaság, dobás, special-sorsolás, Tiszta talizmán), seedelt kínálat, mentés, migráció — **hatás nélkül** | `talizman-proba.js` 1–3., 7. blokk |
 | **F2** ✅ | Ütemező (3 húzás, harmadokban), mérföldkő-csere, plafon; a húzás-ablak (fordulás, 3-ból 1, passz, később); a Talizmánok menü (irány, sáv, gyűjtemény); HUB-gomb és jelzés | `talizman-proba.js` 4–6., 8. blokk |
-| **F3** | Alaphatások 1–6: Scout, Stílus, Taktika, Igazolás, Fejlődés, Stáb | minden alaphatás: hatás nélkül BITRE a régi, lappal a várt eltolás |
+| **F3** ✅ | Alaphatások 1–6: Scout, Stílus, Taktika, Igazolás, Fejlődés, Stáb — a csökkenő hozammal és a plafonnal (a 7.1–7.2 ide előrehozva); a 2. hullám 20 speciálja és a Joker eseménycsomagja a katalógusban | `talizman-f3-proba.js`: hatás nélkül BITRE a régi, talizmánnal a várt eltolás, valódi tárgyalás és licit |
 | **F4** | Joker (jegyzék + `ritkaP` + esemény-keret), Morál (jó légkör + jellemhullám), Bank (bevétel-szorzó + **hitel** + három ledger-sor) | a hitel-életciklus (felvétel → törlesztés → hátralék → zár); a hullám Panzerrel és nélküle |
 | **F5** | Meccskártyák: tíz tengely, pillanatkép-mezők, meccserő-sor, eredményjelző | **párharc-determinizmus**: ugyanaz a meccs mindkét gépen ugyanaz |
 | **F6** | A special-katalógus (~60 tétel) kötegekben, kategóriánként | tételenként egy pro- és egy kontra-állítás |
