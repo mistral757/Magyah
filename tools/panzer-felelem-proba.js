@@ -120,10 +120,12 @@ const {spawn}=require('child_process');
       F.retteges=i;
       ivek.push({lv:i,pct:Math.round((RETTEGES_PCT[i])*1000)/10,ovr:fearOvrBonus()});}
     o.retteges.ivek=ivek;
-    /* a +20-as plafon */
-    window.styleLevel=()=>20;
+    /* a plafon: 14-es stílusszintig +20, onnan szintenként +4 → 20-on +44 (3.9.139) */
     const eredetiBase=window.fearBase;
     window.fearBase=()=>100000;
+    window.styleLevel=()=>14;
+    o.retteges.plafon14=fearOvrBonus();
+    window.styleLevel=()=>20;
     o.retteges.plafon=fearOvrBonus();
     window.fearBase=eredetiBase;
     window.styleLevel=eredetiLevel;
@@ -205,8 +207,8 @@ const {spawn}=require('child_process');
   ok("mind a 10 szint megvehető, és a százalék nő",
      r.retteges.ivek.length===10&&r.retteges.ivek[9].pct===15
      &&r.retteges.ivek[0].pct===2,r.retteges.ivek);
-  ok("a meccserő SOSEM megy +20 fölé, akármekkora a félelem",
-     r.retteges.plafon===20,r.retteges.plafon);
+  ok("a meccserő 14-es stílusszintig +20-nál áll meg, a 20.-on +44-nél (3.9.139)",
+     r.retteges.plafon14===20&&r.retteges.plafon===44,{L14:r.retteges.plafon14,L20:r.retteges.plafon});
 
   console.log("\n=== a bolt ===");
   ok("This is Sparta! egy fokozattal durvítja a vérmérsékletet",

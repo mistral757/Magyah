@@ -66,14 +66,18 @@ const {spawn}=require('child_process');
       fearNoteWin(won,gap);
       const kap=fearMatchEnd();
       return {kap,naplo:naplo.slice()};};
+    /* A HELYZETEK A KÜSZÖBHÖZ MÉRVE (3.9.140): ¼, ½, 1× és 2× — így a próba
+       ugyanazt az ÍVET méri, akármekkora a küszöb (3.9.130: 10%, most 5%). */
+    const K=dreadWinGiant();
+    o.K=K;
     o.skala={
-      vereseg:meccs(false,12,[]).kap,
+      vereseg:meccs(false,K*1.2,[]).kap,
       gyengebb:meccs(true,-5,[]).kap,
       egyenlo:meccs(true,0,[]).kap,
-      gap2:meccs(true,2.5,[]).kap,
-      gap4:meccs(true,5,[]).kap,
-      gap8:meccs(true,10,[]).kap,
-      gap20:meccs(true,20,[]).kap};
+      gap2:meccs(true,K/4,[]).kap,
+      gap4:meccs(true,K/2,[]).kap,
+      gap8:meccs(true,K,[]).kap,
+      gap20:meccs(true,K*2,[]).kap};
 
     /* ---- 2. ÓRIÁSÖLÉSNÉL A TELJES PLAFON, BÁRMI MÁS TÖRTÉNT ---- */
     const sok=["yellow","yellow","yellow","red","hat","hard","hard",
@@ -84,7 +88,7 @@ const {spawn}=require('child_process');
       cap:fearMatchCap()};
 
     /* ---- 3. A FEED-JELZŐK ---- */
-    const m3=meccs(true,5,["yellow","red","hat","hard","tackle","tackle"]);
+    const m3=meccs(true,K/2,["yellow","red","hat","hard","tackle","tackle"]);
     const sorok=m3.naplo.map(x=>x.t);
     const jelzo=sorok.filter(t=>/☠️ <b>\+/.test(t));
     o.feed={
@@ -108,7 +112,7 @@ const {spawn}=require('child_process');
        győzelmi tétel NEM skálázódik — az eleve a plafonból számol. */
     const vartEsemeny=(DREAD_PTS.yellow+DREAD_PTS.red+DREAD_PTS.hat
       +DREAD_PTS.hard+2*DREAD_PTS.tackle)*dreadScale();
-    const vartGyozelem=Math.round(fearMatchCap()*Math.min(1,5/dreadWinGiant())*10)/10;
+    const vartGyozelem=Math.round(fearMatchCap()*Math.min(1,(K/2)/dreadWinGiant())*10)/10;
     o.osszesito={
       van:ossz.length===1,
       vart:Math.round((vartEsemeny+vartGyozelem)*10)/10,
@@ -151,15 +155,15 @@ const {spawn}=require('child_process');
 
   console.log("=== az alap ===");
   ok("a küszöb az ÓRIÁSÖLÉSÉ, és függvényen át jön (nem modul-szintű const, ami a betöltést állítaná meg)",
-     r.alap.kuszob===10&&r.alap.egyezik===true,r.alap);
+     r.alap.kuszob===5&&r.alap.egyezik===true,r.alap);
   ok("a 120-as félelem szint 12-es meccsplafont ad",r.alap.on===true&&r.alap.cap===12,r.alap);
 
   console.log("\n=== a skála ===");
   ok("vereségnél és gyengébb (vagy egyenlő) ellenfélnél NULLA",
      r.skala.vereseg===0&&r.skala.gyengebb===0&&r.skala.egyenlo===0,r.skala);
-  ok("a győzelem a papírforma-hátránnyal arányosan fizet: 2,5%→3 · 5%→6 a 12-es plafonból",
+  ok(`a győzelem a papírforma-hátránnyal arányosan fizet: ${r.K/4}%→3 · ${r.K/2}%→6 a 12-es plafonból`,
      r.skala.gap2===3&&r.skala.gap4===6,r.skala);
-  ok("és a 10%-os óriásölésnél a TELJES plafon — fölötte sem több",
+  ok(`és a ${r.K}%-os óriásölésnél a TELJES plafon — fölötte sem több`,
      r.skala.gap8===12&&r.skala.gap20===12,r.skala);
 
   console.log("\n=== „mindegy, milyen eseményekre kapott még pontot” ===");

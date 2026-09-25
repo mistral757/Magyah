@@ -2051,6 +2051,17 @@ fölé (ez volt az eredeti „csak egy fut" szabály egyetlen jogos oka).
 
 Részletes magyarázat: `docs/gegen-pontrendszer-hiba.md`.
 
+**3.9.137 óta:** a „két szint együtt sem megy +12 fölé” állítás helyett a
+próba azt méri, hogy:
+
+- a két szint hozama közös plafon nélkül összeadódik;
+- a másodlagos a saját, felezett plafonjáig ad (+6);
+- a Panzer plafonja elsődlegesként +20, másodlagosként +10.
+
+Lásd `docs/masodlagos-meccsero-plafon.md`. Egy tanulság: a plafon-ellenőrzés a
+fixtúra VÉGÉN fut. Egy új `par(...)` hívás friss stílus-állapotokat hoz létre,
+és a közepén elvágta volna a piac-szakasz régi hivatkozásait.
+
 ## pvp-beallitas-letra-proba.js — 🤝 a létra és a Legendás magyahok PvP-ben
 
 ```bash
@@ -2145,6 +2156,141 @@ node tools/akademia-evek-proba.js
 16 évesnél az 58%-os görbe-arány 150+-os csúcsot adna, és a túlteljesítés-
 szabály minden nyáron tovább pumpálná. A rés helyes eszköze az ifi-bónusz.
 Részletek: `docs/akademiai-evek.md`.
+
+## fejlesztes-arak-proba.js — 💰 a fejlesztések ára
+
+```bash
+node tools/fejlesztes-arak-proba.js
+```
+
+A kérés: a felállásváltás, a stáb-bővítés, a scout- és az ügynökség-fejlesztés
+kövesse a klub büdzséjét, ahogy a poszt-tanulás. Mind az öt kapja meg a boostok
+1. / 2. idénybeli −50% / −33%-át.
+
+**Mit mér (33 állítás):**
+
+- a 10 000-es referencia-büdzsénél, a 3. idényben a régi fix ár;
+- az arányosságot (×2 és ×0,5 büdzsé);
+- a kedvezményt mindkét idényben;
+- az ingyenes első felállásváltást;
+- a képernyők címkéjét.
+
+**Két tanulság a próba első futásából:**
+
+- A stáb-hely régi ára kerekítetlen volt (30 625), az új 500-ra kerekít. Ezért
+  a tűrés ±1%.
+- Az ügynökség ára NEM a scout csillagszintjén vett scout-ár kétszerese, hanem
+  a SAJÁT szintjén vetté. A „scout ×2” összehasonlítás hamis hibát jelzett.
+
+Részletek: `docs/fejlesztes-arak.md`.
+
+## csupa-ek-proba.js — 🎯 Csupa ék és a 4-2-4 a Bombázóknál
+
+```bash
+node tools/csupa-ek-proba.js
+```
+
+**Mit mér (26 állítás):**
+
+- **a költözés:** az „Olcsó totális futball” a Bombázók fáján van, a
+  Villámban megvett szintek pontja egyszer visszajár;
+- **a középcsatár-korlát** szintenként: 4-3-3-ban 1 → 2 → 3, 4-2-4-ben
+  2 → 3 → 4, és képesség nélkül visszaáll;
+- **az ultra csatár:** csak a 3. szinten él, csak középcsatár-helyen; ×1,8
+  gólsúly; +3% / +10% a Védekezés-arány két végén; benne van az alakzat
+  szorzójában; a választó felkínálja.
+
+**A valódi-meccs rész tanulsága:** a gólarányra épített állítás 14 meccsen
+hamisan bukott. Ugyanaz a csatár ultra nélkül 21% és 44% között szórt. A bukó
+állítás ezért determinisztikus: megszámolja, hogy a meccsmotor
+gólszerző-választása hányszor kapott ×1,8-at, és hogy csak az ultra helyre-e.
+A gólarány (40 + 40 meccs) csak tájékoztató sor.
+
+A gólokat a `recordScorer` burkolásával számolja: a saját gólok egyetlen
+csatornája ez. A `S.lastMatch` nem tartalmaz gólszerzőnkénti bontást.
+
+Részletek: `docs/csupa-ek.md`.
+
+## gyilkos-paros-epites-proba.js — 🧲 a gyilkos páros a passzkémia mintájára
+
+```bash
+node tools/gyilkos-paros-epites-proba.js
+```
+
+**A bejelentés:** a Gegenpressing kötése némán, automatikusan épült, se
+választás, se látható haladás. A próba méri:
+
+- hogy a meccs utáni léptetés már nem indít párt;
+- a választót: ajánlott pár + kézi, két lépéses választás;
+- a továbbépítést és a váltást (a fázisok megmaradnak);
+- az 5/5 kész állapotot (a pressing-szorzó csak együtt él);
+- a közös meccsekből haladó összeérést a sebesség-kiegyenlítéssel;
+- az „egy ember egy páros” szabályt;
+- a régi mentés átalakítását;
+- **és a jutalom-sort egy valódi auto-szezonban:** a felajánlás útja tényleg
+  bekötött.
+
+**Tanulság:** a fixtúrában eredetileg csak három jelölhető állt, és a „másik
+pár” észrevétlenül átfedett az elsővel. A próba ezért maga gondoskodik hat
+jelöltről.
+
+**Módosult:** a `gegenpressing-proba.js` 7b-szakasza a kötést már nem a
+meccsekből építi, hanem fázisokkal. A meccsek csak az összeérést viszik.
+
+## stilus-meccsero-iv-proba.js — 📈 a stílus-meccserő íve, teteje és a piramis mércéi
+
+```bash
+node tools/stilus-meccsero-iv-proba.js
+```
+
+**Négy bejelentés (21 állítás):**
+
+- **Az ív:** a stílus-meccserő 4-5. szinten már maxon volt. Most az n.
+  szint legfeljebb n/10 × plafon, a bejelentett 329-es állapot 4. szintjén
+  +4,8.
+- **A tető:** 15-ös stílusszinttől nyílik (12 → 30, Panzer 20 → 44), a
+  másodlagos mindkettő felét kapja.
+- **Az All-in:** meccs-erőt mér meccs-erőhöz. A próba a VALÓDI panelt nyitja
+  meg, rögzített céllal és téttel.
+- **A létra:** a saját fok betűre a „mezőny most” szám.
+
+Mellé az ultra csatár +5%-os csapat-ráadása.
+
+A stílusszintet és az állapotot a próba felülírt függvényekkel rögzíti
+(`styleLevel`, `engLevel`, `fearLevel`). Így a mérés független attól, mekkora
+állapotot hoz ki egy friss fixtúra-keret.
+
+Részletek: `docs/stilus-meccsero-iv.md`.
+
+## talizman-proba.js — 🧿 Talizmánok: a váz (F0–F2)
+
+```bash
+node tools/talizman-proba.js
+```
+
+**Nyolc blokk (49 állítás, ~40 mp):**
+
+- **A katalógus:** 10 kategória, 62 special. Mindegyik kategóriának van
+  átlagos szinten elérhető speciálja, minden kontra másik területet üt, és
+  egyik szöveg sem hagy benne `{v}`-t, NaN-t vagy undefined-ot.
+- **A generátor (10 000 talizmán):** a ritkaság 58/28/11/3%, a special ~67%,
+  az erő a sávban marad, a Tiszta talizmán pontosan ×1,25.
+- **A kínálat:** ismerős / új irány / vad; a tanító első húzás; a
+  szerencse-számláló; a seedelt determinizmus a mentés útja után is.
+- **Az ütemezés:** harmadonként egy húzás, és a 30. fordulóra pontosan 3.
+- **A mérföldkő-csere:** nincs pénz, a napló kimondja, kiértékelésenként 1,
+  idényenként 2, a beragadt jutalom nem cserél, a plafon fog.
+- **A felület:** választás, passz, „Később döntök”, menü, HUB-gomb, jelzés.
+- **A mentés:** a `tal` mező, és a régi mentés futó idénye.
+- **Valódi idény:** egy végigjátszott idény (3 ütemezett + legfeljebb 2
+  csere, a gép nem dönt helyetted), és egy kézi mérkőzés. Ennek láncában a
+  próba úgy lépteti tovább a közbeeső képernyőket (jutalom-képesség,
+  felfedezés), ahogy a játékos tenné, amíg a húzás-ablak elé nem kerül.
+
+A passz összegét a próba rögzített heti bevétellel méri (`fanWeeklyIncome`
+felülírva), mert a fixtúra-keretnek nincs tábora.
+
+Részletek: `docs/talizmanok.md`, a teljes terv: `docs/talizmanok-terv.md`.
 
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 

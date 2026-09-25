@@ -5,7 +5,7 @@ Két réteg:
   KÉZI  — a felismerhető nevek, a manual.py-ban, kézzel írva.
   GÉPI  — minden más, a rules.py szabályaiból, a nemzetiség szerinti kiejtéssel.
 
-Kimenet: table.json + table.js (a beszúrható JS-tábla).
+Kimenet: közvetlenül az index.html HU_NAME_TABLE-je (a régi table.json 3.9.139-ben törölve).
 """
 import json, os, re, sys, collections, random
 D = os.path.dirname(os.path.abspath(__file__)) + "/"

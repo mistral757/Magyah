@@ -153,8 +153,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       ea.attrs.seb=70;eb.attrs.seb=84;
       const ripe=gpDuoRipeNeed();
       const nevek=new Set([a,b]);
+      /* 3.9.138: a kötés a FELAJÁNLÁSBÓL épül (5 fázis, te választod) — a
+         meccsek csak a KÉSZ pár összeérését viszik. A felajánlás útját a
+         gyilkos-paros-epites-proba méri; itt a fázisokat közvetlenül adjuk. */
+      const _add=addLine;addLine=()=>{};
+      try{while(gpDuoStages(a,b)<GP_DUO_NEED)gpDuoAddStage(a,b);}finally{addLine=_add;}
       let lepes=0;
-      for(let i=0;i<ripe+3&&!gpDuoIsDone(a,b);i++){gpDuoTick(nevek);lepes++;}
+      for(let i=0;i<ripe+3&&!(S.gpDuo[gpDuoKey(a,b)]||{}).done;i++){gpDuoTick(nevek);lepes++;}
       const parA=gpDuoPartner(a),parB=gpDuoPartner(b);
       return {ripe,lepes,kesz:gpDuoIsDone(a,b),
         sebA:Math.round(ea.attrs.seb),sebB:Math.round(eb.attrs.seb),
@@ -252,8 +257,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   if(d.err){ok(false,"a kötés nem volt mérhető",d);}
   else{
     console.log(`  ${d.lepes} közös meccs (az összeérés ${d.ripe}) · sebesség 70/84 → ${d.sebA}/${d.sebB}`);
-    ok(d.kesz===true,"a kötés kiépül a közös mérkőzésekből");
-    ok(d.lepes<=d.ripe,"pontosan az összeérési idő alatt",{lepes:d.lepes,ripe:d.ripe});
+    ok(d.kesz===true,"a kötés kiépül (5 fázis a felajánlásból, 3.9.138)");
+    ok(d.lepes<=d.ripe,"és pontosan az összeérési idő alatt összeér",{lepes:d.lepes,ripe:d.ripe});
     ok(d.sebA===d.sebB,"a sebességük KIEGYENLÍTŐDIK",[d.sebA,d.sebB]);
     ok(d.sebA>84,"…a jobbik FÖLÉ, az azonnali ráadással",d.sebA);
     ok(d.parA&&d.parB,"egymás párjaként tartja őket nyilván");

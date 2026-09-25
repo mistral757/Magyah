@@ -10,7 +10,7 @@
    Amit mér:
      1. a mérce a nyers csapaterő és a meccs-erő KÖZEPE;
      2. a kezdőrúgáskor BEFAGY: a lefújáskori állapot nem írja át;
-     3. a 80-AS HORGONYON az új szabály BITRE a régi: 10% = 8 pont, a
+     3. a 80-AS HORGONYON (3.9.140 óta) az óriásölés 5% = 4 pont; a
         morál-jutalom és a kínos-büntetés képlete ugyanazt adja;
      4. PÁRHARCBAN a társ is a saját középével szerepel;
      5. EGY VALÓDI KARRIER ELEJÉN (piramis, D3) mérve a régi és az új
@@ -100,7 +100,11 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
     ki.befagy={kick:n1(r0),elo:n1(rLive),olvas:n1(rKick)};
 
     /* ---- 3. A 80-AS HORGONY: bitre a régi szabály ---- */
-    {const regi=(gap)=>({giant:gap>=8,bonus:Math.min(18,Math.round(gap*1.3)),
+    /* 3.9.140: az óriásölés küszöbe a FELÉRE ment (10% → 5%), tehát a 80-as
+       horgonyon 4 pont a régi 8 helyett — a „régi" szabály itt ezért a felezett
+       pont-küszöb. A morál-jutalom képlete és a kínos eredmény (10 pont =
+       12,5%) változatlan, azok BITRE a régiek maradnak. */
+    {const regi=(gap)=>({giant:gap>=4,bonus:Math.min(18,Math.round(gap*1.3)),
         kinos:-gap>=10,pen:Math.min(14,Math.round(-gap*0.9))});
      const uj=(pct)=>({giant:pct>=MS_GIANT_PCT,bonus:Math.min(18,Math.round(pct*1.04)),
         kinos:-pct>=12.5,pen:Math.min(14,Math.round(-pct*0.72))});
@@ -166,9 +170,14 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
 
     /* ---- 8. A MÉRFÖLDKŐ ---- */
     {const T=msT();T.giantMax=30;delete T.giantMaxPct;T.giantKills=0;
-     msNoteGiantKill(9.9);const a=[T.giantKills,T.giantMaxPct||0];
+     msNoteGiantKill(MS_GIANT_PCT-0.1);const a=[T.giantKills,T.giantMaxPct||0];
      msNoteGiantKill(14.2);
-     ki.ms={alatta:a,folotte:[T.giantKills,T.giantMaxPct],regiMarad:T.giantMax};}
+     ki.ms={alatta:a,folotte:[T.giantKills,T.giantMaxPct],regiMarad:T.giantMax};
+     /* 3.9.140: a régi lépcső-azonosítók (giantgap_12, _17) sorszám szerint
+        az új értékekre költöznek — kétszer nem fizet */
+     const M=msState();M.done.giantgap_12=3;M.done.giantgap_17=4;delete M.giantMig140;
+     msState();
+     ki.migr={uj6:M.done.giantgap_6,uj9:M.done.giantgap_9,regi12:M.done.giantgap_12,uj11:M.done.giantgap_11};}
     return ki;});
 
   console.log("\n— A MÉRCE —");
@@ -178,9 +187,9 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
      "a kezdőrúgáskor befagy — a meccs közbeni morál-zuhanás nem írja át",t.befagy);
 
   console.log("\n— A SKÁLA —");
-  ok(t.horgony.elter.length===0,"a 80-as horgonyon BITRE a régi szabály (−20…+20, félpontonként)",t.horgony.elter);
-  ok(kozel(t.horgony.kuszob80,8,0.01)&&kozel(t.horgony.kuszob190,19,0.01),
-     "a küszöb a papírforma 10%-a: 80-on 8 pont, 190-en 19",[t.horgony.kuszob80,t.horgony.kuszob190]);
+  ok(t.horgony.elter.length===0,"a 80-as horgonyon: óriásölés 4 ponttól (a régi 8 fele, 3.9.140), a morál-képlet és a kínos eredmény bitre a régi (−20…+20, félpontonként)",t.horgony.elter);
+  ok(kozel(t.horgony.kuszob80,4,0.01)&&kozel(t.horgony.kuszob190,9.5,0.01),
+     "a küszöb a papírforma 5%-a: 80-on 4 pont, 190-en 9,5",[t.horgony.kuszob80,t.horgony.kuszob190]);
 
   console.log("\n— PÁRHARC —");
   ok(t.pvp.cpu===150&&t.pvp.tars===175&&t.pvp.csakKijelzett===150,
@@ -204,9 +213,11 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
   ok(t.sor.van&&t.sor.kozep,"a meccs előtti sor a KÖZEPET írja ki",t.sor.szoveg);
 
   console.log("\n— A MÉRFÖLDKŐ —");
-  ok(t.ms.alatta[0]===0&&t.ms.alatta[1]===0,"10% alatt nem számít óriásölésnek",t.ms.alatta);
+  ok(t.ms.alatta[0]===0&&t.ms.alatta[1]===0,"a küszöb (5%) alatt nem számít óriásölésnek",t.ms.alatta);
   ok(t.ms.folotte[0]===1&&t.ms.folotte[1]===14.2,"fölötte az ÚJ, százalékos mezőbe ír",t.ms.folotte);
   ok(t.ms.regiMarad===30,"…a régi, pontos `giantMax`-hoz nem nyúl",t.ms.regiMarad);
+  ok(t.migr.uj6===3&&t.migr.uj9===4&&t.migr.regi12===undefined&&t.migr.uj11===undefined,
+     "a régi lépcsők (12%, 17%) sorszám szerint a 6%-ra és 9%-ra költöznek — kétszer nem fizetnek",t.migr);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
 
   await b.close();srv.close();

@@ -128,7 +128,9 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
 
     /* ---- 5. A MECCSERŐ ---- */
     Eg.lvl=10;Ev.lvl=10;
-    ki.meccsero={g:engOvrBonusK("gegen"),v:engOvrBonusK("villam"),ossz:engOvrBonus(),cap:ENG_OVR_CAP};
+    ki.meccsero={g:engOvrBonusK("gegen"),v:engOvrBonusK("villam"),ossz:engOvrBonus(),cap:ENG_OVR_CAP,
+      capG:engOvrCapK("gegen"),capV:engOvrCapK("villam")};
+
     Eg.lvl=0;Ev.lvl=0;
     ki.meccsero0={ossz:engOvrBonus()};
 
@@ -141,6 +143,10 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
     const el=engMatchSpend();
     ki.fogy={db:el.length,keys:el.map(x=>x.k).sort(),utana:[!!engTokenState("villam"),!!engFx1State("gegen")]};
 
+    /* 3.9.137: a másodlagos plafonja a fele — a Panzeré is */
+    par("panzer","gegen");ki.plafon={fearElso:fearOvrCap(),gegenMasod:engOvrCapK("gegen")};
+    par("gegen","panzer");ki.plafon.fearMasod=fearOvrCap();ki.plafon.gegenElso=engOvrCapK("gegen");
+    par("gegen","villam");
     /* ---- 7. A PANEL ---- */
     par("gegen","villam");
     S.styleView=1;
@@ -167,9 +173,13 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
      "…mindkettőt a SAJÁT meccsplafonjával",t.konyv);
 
   console.log("\n— A MECCSERŐ —");
-  ok(t.meccsero.g>0&&t.meccsero.v>0&&t.meccsero.ossz<=t.meccsero.cap
-     &&kozel(t.meccsero.ossz,Math.min(t.meccsero.cap,t.meccsero.g+t.meccsero.v),0.11),
-     "a két szint hozama összeadódik, de EGYÜTT sem megy +12 fölé",t.meccsero);
+  /* 3.9.137: a közös +12-es plafon MEGSZŰNT; a másodlagos saját plafonja a fele */
+  ok(t.meccsero.capG===12&&t.meccsero.capV===6,"az elsődleges plafonja +12, a másodlagosé +6",t.meccsero);
+  ok(t.meccsero.g>0&&t.meccsero.v>0&&t.meccsero.v<=6
+     &&kozel(t.meccsero.ossz,t.meccsero.g+t.meccsero.v,0.11),
+     "a két szint hozama összeadódik, közös plafon nélkül (a másodlagos a saját +6-jáig)",t.meccsero);
+  ok(t.plafon.fearElso===20&&t.plafon.fearMasod===10&&t.plafon.gegenElso===12&&t.plafon.gegenMasod===6,
+     "a Panzer plafonja elsődlegesként +20, másodlagosként +10; a Gegené +12 / +6",t.plafon);
   ok(t.meccsero0.ossz===0,"szint nélkül nincs meccserő",t.meccsero0);
 
   console.log("\n— A PIACOK —");
