@@ -2330,8 +2330,10 @@ node tools/talizman-f3-proba.js
   valódi `tacticTrainAfterMatch`. A stílus-fánál a kijelzett ÉS a levont ár
   is kedvezményes. A kedvezmény seedelt, és nem adódik össze a
   kihívás-kedvezménnyel.
-- **A felület:** ⚡ a lapon; a menü aktív hatásai a plafonnal, a még nem ható
-  kategória (3.9.144 óta a Meccs) nélkül.
+- **A felület:** ⚡ a lapon; a menü aktív hatásai a plafonnal. 3.9.148 óta
+  mind a tíz kategória hat: a Meccs a meccserő- és tengely-sorával jelenik
+  meg, a „⏳ még nem hat” jelzést pedig egy ideiglenesen kikapcsolt tengely
+  méri.
 - **Az eseménycsomag:** 2 jó + 1 rossz, a lapon látszik, a választás a
   paklihoz adja, és nincs ismétlés.
 
@@ -2461,6 +2463,33 @@ node tools/talizman-f4c-proba.js
 A `MROOT` környezeti változóval másik munkakönyvtárra is futtatható.
 
 Részletek: `docs/talizmanok.md` (3.9.146).
+
+## talizman-f5-proba.js — 🧿 Talizmánok F5: a Meccs tíz tengelye
+
+```bash
+node tools/talizman-f5-proba.js
+```
+
+**34 állítás, nyolc blokkban:**
+
+1. **Semleges:** minden olvasó 1 / 0, és a `matchLambdas` a mezőkkel és
+   nélkülük BITRE ugyanaz.
+2. **Összeszámolás:** tengelyenkénti E a csökkenő hozammal.
+3. **A λ:** a tengelyek súlyai, a ±8%-os plafon, és a `matchLambdas` pontos
+   szorzója; a párkémia többlete.
+4. **Vágás:** a társtól jött hamis érték is a sávban marad.
+5. **Meccserő:** a `hiddenMatchBonus` és a ⚡ `teamMatchStrength` pontosan a
+   pakli OVR-egyenértékével nő.
+6. **Mind a nyolc másodlagos csatorna** a `dialMul`-on át, valamint a
+   birtoklás, a helyzetszám és a szabadrúgás a motorban.
+7. **Párharc:**
+   - a valódi `h2hWireSnapshot` viszi a mezőket;
+   - a valódi `h2hSimulate` ugyanabból a magból bitre ugyanazt adja;
+   - a benne hívott `matchLambdas` pontosan a talizmán szorzójával tolja a
+     λ-t (a hívást a próba elkapja — nem statisztika, hanem egyenlőség).
+8. **A menü sorai.**
+
+Részletek: `docs/talizmanok.md` (3.9.148).
 
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 

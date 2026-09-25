@@ -1,11 +1,10 @@
 # 🧿 Talizmánok — a kártyarendszer tervezete
 
-**Állapot:** 🟡 **F0–F4 kész (3.9.146)** — a talizmánok születnek, húzhatók,
-gyűlnek és látszanak, **kilenc kategória alaphatása él** (Scout,
-Csapatstílus, Taktika, Igazolások, Fejlődés, Stáb, Joker, Morál, Bank), és a
-Joker eseménycsomagjainak **mind a 16 eseménye** működik az átigazolási
-pakliban. A megvalósult rész leírása: `docs/talizmanok.md`. Következik az
-F5: a Meccs tíz tengelye.
+**Állapot:** 🟡 **F0–F5 kész (3.9.148)** — a talizmánok születnek, húzhatók,
+gyűlnek és látszanak, **mind a tíz kategória alaphatása él** (a Meccs tíz
+tengelye a gólvárhatóságon és a saját csatornáján, a párharcban is), és a
+Joker eseménycsomagjainak **mind a 16 eseménye** működik. A megvalósult rész
+leírása: `docs/talizmanok.md`. Következik az F6: a specialok.
 
 **Név:** *Talizmán* — a döntés megszületett (lásd 19. pont). A dokumentum
 eredetileg „Sorslap” munkanéven készült; ahol a szövegben **lap** áll, az
@@ -1025,7 +1024,7 @@ Durva becslés egy átlagos karrierre (~4 húzás/idény, a döntések ésszerű
 | **F4a** ✅ | Joker (Vad idény: a ritka események szorzója a meccsen és a piacon; Mozgalmas piac), Morál (jó légkör + jellemhullám irányválasztóval), Bank (bevétel-szorzó + **hitel** + három ledger-sor); a „zár” a hátralék behajtásával valósul meg (12. pont) | `talizman-f4a-proba.js`: a hitel-életciklus (felvétel → törlesztés → hátralék → behajtás → előtörlesztés → zár); a hullám a valódi húzás-ablakból |
 | **F4b** ✅ | A Joker eseménycsomagjainak 13 eseménye az átigazolási pakliban (9.12): kilenc azonnali és négy döntéses, kézi és automatikus ablakban is | `talizman-f4b-proba.js`: eseményenként a valódi sorsolásból, a döntések a valódi képernyőn |
 | **F4c** ✅ | Igazgatósági ülés (idényes megbízás, idényvégi értékelés), Mezszponzor (arculat + bevétel), Sztárvilág (a Sztárom a párom eseményei stíluson kívül) | `talizman-f4c-proba.js`: az értékelés minden kimenete; a szponzor-szerződés életciklusa; a sztárvilág plafonjai |
-| **F5** | Meccskártyák: tíz tengely, pillanatkép-mezők, meccserő-sor, eredményjelző | **párharc-determinizmus**: ugyanaz a meccs mindkét gépen ugyanaz |
+| **F5** ✅ | Meccskártyák: tíz tengely (λ a pillanatképben ±8%-os sávval, a másodlagos csatornák a csúszkák útján), meccserő (⚡) és menü-sor | `talizman-f5-proba.js`: **párharc-determinizmus** — a valódi h2hSimulate bitre ugyanazt adja, és a λ pontosan a szorzóval tolódik |
 | **F6** | A special-katalógus (~60 tétel) kötegekben, kategóriánként | tételenként egy pro- és egy kontra-állítás |
 | **F7** | Összhatás fül, csökkenő hozam, rezonancia, fúzió, égetés, archetípus-cím | a csökkenő hozam táblája (7.1) betűre |
 | **F8** | Kártyatár (`localStorage`), öröklap, trófea-húzás, új mérföldkő-sáv („Pakli”: lapok száma, legendások, rezonanciák) | |

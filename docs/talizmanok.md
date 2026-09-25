@@ -657,3 +657,106 @@ négy hírnév-eseménye meccsenként dobódik rá, idényenkénti plafonnal:
 
 Az F4b próbája 3.9.146 óta a „még nem bekötött esemény kimarad” szabályt egy
 ideiglenesen kikapcsolt eseménnyel méri.
+
+---
+
+# 3.9.148 — F5: a Meccs tíz tengelye
+
+**Mind a tíz kategória alaphatása él.** A Meccs talizmán nem nyúl
+attribútumhoz vagy taktikához. Csak a **mérkőzésen** tol egy tengelyt, két
+úton.
+
+## 1. A gólvárhatóság (λ) — a pillanatképben
+
+A `buildMatchSnapshot` három új mezőt kap: `talOwn`, `talOpp` és
+`talChem`. A `matchLambdas` ezekből olvas, így ugyanaz a képlet fut a
+CPU-meccsen és a **párharcban** is. A párharcban a `h2hWireSnapshot` viszi a
+mezőket, a `h2hSimulate` a nyers pillanatképből hívja a `matchLambdas`-t, és
+a két gép ugyanabból a két számból számol.
+
+A fogadó oldal a **±8%-os sávba vágja** az értéket, tehát a társ gépéről jött
+hamis szám (100, szöveg) sem torzíthat. A hiányzó mező (régi kliens,
+talizmán nélkül) = 1, és akkor a képlet bitre a régi.
+
+| tengely | a λ-ban (1 E) |
+|---|---|
+| 🧤 Kapus | ellenfél −1,2% |
+| 🛡️ Védők | ellenfél −1,0% |
+| 🎩 Középpályások | saját +0,5%, ellenfél −0,5% |
+| ⚡ Csatárok | saját +1,0% |
+| ✋ Védések | ellenfél −0,6% |
+| ⚽ Gólok | saját +0,8% |
+| 🎯 Gólpasszok | a párkémia pár-bónusza 3% → 3% + 0,5% × E |
+
+A saját és az ellenfél oldal összege **±8%-nál megáll**. Ez a SIM.K = 0,09
+mellett ≈ ±0,85 OVR: egy „meccsre épített” pakli annyit ér, mint egy jó
+edző. Érezhető, de nem borít.
+
+**Párharcban a hatás fele érvényesül.** A gazda gép a két nézet
+(„mennyit lő a hazai” és „mennyit kap a vendég”) átlagával számol. Ez
+ugyanúgy igaz a védekező skillekre és a stílus-szorzókra is: a párharcban
+mindkét oldal munkája beszámít.
+
+## 2. A másodlagos csatornák — a hangsúly-csúszkák útján
+
+A `dialMul` a csúszkák szorzója mellé a `talMeccsCsat(ch,ctx)`-et is
+beszorozza. Az own/opp λ nem itt megy, hanem a pillanatképben, így nincs
+kettőzés.
+
+| tengely | csatorna | 1 E |
+|---|---|---|
+| ⚡ Csatárok | `goalw` (csak csatár poszton) | a gólsúly +3% |
+| 🎯 Gólpasszok | `assistw` (középpálya: VKP, KKP, TKP, JSZ, BSZ) | a gólpassz-súly +4% |
+| 🌀 Szabadrúgások | `setpiece`; a különleges események súlya; a belövés | +12%, +12%, +2 pp |
+| 🧲 Labdaszerzések | `counter` (a kontra-ablak); `gppress` | +1 perc, +8% |
+| ✋ Védések | `chance`: solo, big (ziccer-hárítás, bravúr) | +6% |
+| 🛡️ Védők | `chance`: block, line (blokk, gólvonal-mentés) | +5% |
+| 🔄 Labdatartás | a birtoklás; az ellenfél helyzetszáma | +1 pp, −2% |
+| ⚽ Gólok | `chHatMult` (a két gólos játékos harmadik gólja) | +3% |
+
+* **Párharcban:** a gól- és gólpassz-súly a tulajdonos gépén sül bele a
+  pillanatképbe (ahogy a csúszkáké), tehát ott is hat.
+* **CPU-meccsen:** a többi csatorna a CPU-meccs saját motorjában él,
+  ugyanúgy, mint a csúszkák.
+* **Semlegesen:** a szorzó pontosan 1, és a `dialMul` ilyenkor a régi
+  értéket adja vissza.
+
+## 3. Látszik a meccserőben
+
+A `talMeccsOvr()` a λ-szorzók OVR-egyenértéke: ln(m) / K. A védekező
+skillekhez hasonlóan **fél súllyal** számít, mert csak a mérkőzés egyik
+oldalán hat. Ez a `hiddenMatchBonus`-ba kerül, tehát:
+
+* benne van a **⚡ meccserőben** (az eredményjelzőn is);
+* a nehézség-követés és a mezőny kiegyenlítése is számol vele, ahogy minden
+  más rejtett erőnél.
+
+A Talizmánok menü „Aktív alaphatások” blokkja kiírja:
+
+* az összesített sort (⚽ +x meccserő, saját és ellenfél gólvárhatóság, a
+  plafon, a következő lap értéke);
+* tengelyenként a pontos számot a csökkenő hozam után.
+
+## Az összeszámolás
+
+A `talAlapMind` a Meccs kategóriát is összegzi: a lapok erő szerint sorba
+állnak, és a k-adik a 0,85^k-szorosát éri, mint minden kategóriában. Az
+összeg **tengelyenkénti E**. Az egységet a fogyasztó adja, mert egy
+tengelynek több hatása is van.
+
+## A próba
+
+`node tools/talizman-f5-proba.js` (9175-ös port, ~15 mp), 34 állítás:
+
+* a semleges bit-azonosság (a `matchLambdas` a mezőkkel és nélkülük is);
+* az összeszámolás, a λ-súlyok, a plafon, a párkémia többlete;
+* a vágás (hamis értékek a társtól);
+* a meccserő pontos növekedése;
+* mind a nyolc másodlagos csatorna;
+* **a párharc:** a valódi `h2hWireSnapshot` viszi a mezőket, a valódi
+  `h2hSimulate` ugyanabból a magból bitre ugyanazt adja, és a benne hívott
+  `matchLambdas` pontosan a talizmán szorzójával tolja a λ-t;
+* a menü.
+
+Az F3 próbája 3.9.148 óta a „⏳ még nem hat” jelzést egy ideiglenesen
+kikapcsolt tengellyel méri, mert már nincs nem ható kategória.

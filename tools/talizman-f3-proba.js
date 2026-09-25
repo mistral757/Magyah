@@ -271,11 +271,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.sorok=document.querySelectorAll("#talHatas .talHatRow").length;
     ki.lapok=[...document.querySelectorAll("#talGrid .talStat")].map(x=>x.textContent);
     talMenuClose();
+    /* 3.9.148 óta mind a tíz kategória hat — a „⏳ később" szabályt egy
+       ideiglenesen kikapcsolt tengellyel mérjük */
+    const _A=TAL_MECCS_AL.find(a=>a.k==="gol");delete _A.f3;
+    try{talMenuOpen();ki.lapokKi=[...document.querySelectorAll("#talGrid .talStat")].map(x=>x.textContent);talMenuClose();}
+    finally{_A.f3=1;}
     return ki;});
   console.log("\n— 4. A FELÜLET —");
-  ok(/Aktív alaphatások/.test(u.blokk)&&/taktika-illeszkedés/.test(u.blokk)&&/plafon 8 pp/.test(u.blokk)&&/72%-ot ér/.test(u.blokk)&&!/NaN/.test(u.blokk)&&u.sorok===1,
-     "a menü kiírja az aktív hatást, a plafont és a következő talizmán hatékonyságát — a még nem ható Meccset nem",{blokk:u.blokk,sorok:u.sorok});
-  ok(u.lapok.filter(t=>/⚡/.test(t)).length===2&&u.lapok.filter(t=>/⏳/.test(t)).length===1,"a lapon ⚡ jelzi, ha az alaphatás él (Meccs: még ⏳)",u.lapok);
+  ok(/Aktív alaphatások/.test(u.blokk)&&/taktika-illeszkedés/.test(u.blokk)&&/plafon 8 pp/.test(u.blokk)&&/72%-ot ér/.test(u.blokk)&&!/NaN/.test(u.blokk)&&u.sorok===3&&/meccserő/.test(u.blokk)&&/Gólok/.test(u.blokk),
+     "a menü kiírja az aktív hatást, a plafont és a következő talizmán hatékonyságát — a Meccs (3.9.148 óta) a meccserővel és a tengelyével",{blokk:u.blokk,sorok:u.sorok});
+  ok(u.lapok.filter(t=>/⚡/.test(t)).length===3&&u.lapok.filter(t=>/⏳/.test(t)).length===0
+     &&u.lapokKi.filter(t=>/⏳/.test(t)).length===1,"a lapon ⚡ jelzi, ha az alaphatás él — és ⏳, ha még nem",{be:u.lapok,ki:u.lapokKi});
 
   /* ---- 5. A JOKER ESEMÉNYCSOMAGJA ---- */
   const j=await p.evaluate(()=>{
