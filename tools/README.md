@@ -1915,6 +1915,26 @@ szerint 192-es kerettel 178-as mezőny jött.
 
 Részletes magyarázat: `docs/piac-horgony-hiba.md`.
 
+## kupa-lanc-szoveg-proba.js — 🎫 a hazai kupa utáni lánc azt mondja, ami jön
+
+```bash
+node tools/kupa-lanc-szoveg-proba.js
+```
+
+A bejelentett hiba ez volt: a Fából Készült Serleg megnyerése után a képernyő
+Magor Kupáját és Konföranszié Líget írt, utána pedig a Kupák Kupájának Kupája
+indult.
+
+A próba a VALÓDI ünneplő képernyőt (`euroMaybeCelebrate`) és a valódi láncot
+(`cupChainNext`) futtatja három osztály-szabállyal:
+
+- D1/D2: FA → KK, selejtezővel;
+- D3: MK → KK, selejtezővel;
+- sík mód: MK → KONF, selejtező nélkül.
+
+Mindháromnál ellenőrzi, hogy a megjegyzés, az ünneplő gomb és a záró gomb
+ugyanazt mondja, mint a lánc. A már elsült láncnál nincs láncszöveg.
+
 ## kupa-meccsero-proba.js — 🏆 a kupamezőny nem sodródhat el
 
 ```bash

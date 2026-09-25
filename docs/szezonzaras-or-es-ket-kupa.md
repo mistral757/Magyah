@@ -150,3 +150,34 @@ szóló" nevezés nem születik meg. A kettő egymás alternatívája, nem kieg�
 * a lánc mind a négy osztályon és a sík módban is a helyes sorozatot adja;
 * szezononként egy lánc, és vesztes kupa nem indít láncot;
 * a kiharcolt BL túléli a gyengébb helyezést, de egy jobb helyezés felülírhatja.
+
+---
+
+## 3.9.147 — a lánc SZÖVEGE is a lánchoz igazodik
+
+> „fából készült serleget megnyertem. Kiírta, hogy ez még nem vége, mert a
+> magor kupájának megnyerésével neveztem a konföranszié lígbe. Aztán indult a
+> kupák kupájának kupája..."
+
+**A lánc maga helyes volt.** D1-ben és D2-ben a Fából Készült Serleg
+győztese ugyanabban a szezonzárásban a Kupák Kupájának Kupája selejtezőjébe
+jut. A hiba a szövegekben volt: öt kiírás a régi, sík módú
+**Magor Kupája → Konföranszié Líg** láncra volt bedrótozva:
+
+* az ünneplő képernyő megjegyzése;
+* az ünneplő képernyő gombja;
+* a kupaképernyő záró gombja;
+* a közös karrier várakozó üzenete;
+* a „társad nyert” naplósor és a megszakadt egyeztetés sora.
+
+**A javítás: egy forrás.** A `cupChainNevek()` a láncot a valódi
+`cupChainNext()`-ből olvassa, vagy ha a társ nyert, az osztály
+`cupWins`-szabályából. A **forrás** a most megnyert hazai kupa, a **cél** a
+következő sorozat, a `qual` a selejtező. A gomb a `cupChainGomb()`, és
+mindenhol ugyanazt mondja: „Kezdhetjük: ‹cél› →”.
+
+A tárgyragozás helyett szerkezet áll („…az indulást a ‹cél› sorozatban”,
+„a hazai kupát (‹forrás›)”), így bármelyik sorozatnévvel helyes marad.
+
+A próba `tools/kupa-lanc-szoveg-proba.js`: a valódi ünneplő képernyővel méri
+mindhárom láncot (FA → KK, MK → KK, MK → KONF) és a már elsült láncot.
