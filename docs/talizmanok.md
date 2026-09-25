@@ -461,3 +461,86 @@ Minden további Hitelkeret-lap egy lépcsővel feljebb visz. A keret alapja a
 * a bevételi kivételek;
 * a hitel teljes életciklusa (felvétel → törlesztés → hátralék → behajtás →
   előtörlesztés → lezárás), a menü gombjával és a három ledger-sorral.
+
+---
+
+# 3.9.145 — F4b: a Joker eseménycsomagjai élnek
+
+> „új események, amik bekerülhetnek az átigazolási esemény pakliban […]
+> mindig van benne 2 új jó és egy új rossz.”
+
+## Hol dobódnak
+
+A `twResolvePhase2` **hátsó, súlyozott sávjában**: ugyanott, ahol az
+álomigazolás, a kölcsönjátékos és az akadémia. A pakli
+(`talEsemenyPakli()`) a súlyozott tömb **végére** fűződik.
+
+* Egy csomag-esemény alapsúlya **1**, ugyanannyi, mint az Elvágyódásé. Ezt a
+  ritkaság szorozza: ×1 / ×1,3 / ×1,6 / ×2 / ×2,5.
+* Egy esemény **idényenként legfeljebb egyszer** jön ki.
+* Ha épp nincs kire lesújtania (nincs 32 fölötti legendád, nincs 21 alatti
+  játékosod, üres a kassza), **nem jön ki és nem is ég el**. A sorsolás
+  ilyenkor a csendes kimenetre esik.
+* **Talizmán nélkül a pakli üres tömb**, tehát a sorsolás betűre a régi.
+  Ugyanannyi véletlenszámot fogyaszt, és ugyanazt adja. Az olvasás nem hozza
+  létre a talizmán-állapotot.
+
+## A 13 működő esemény
+
+**Azonnaliak.** Ugyanaz a kimenet a kézi és az automatikus ablakban.
+
+| | esemény | mi történik | kapaszkodó |
+|---|---|---|---|
+| ✦ | ⏳ Az ifjúság forrása | a legmagasabb Ratingű, legalább 32 éves, legalább 500 perces kerettag **10 évet fiatalodik**. A Rating nem esik: a különbséget az akadémia `youthBonus`-a fogja, ami 26 éves korig kifut. A hanyatlás újraindul, a visszavonulási terv elszáll | `careerPool[n].age` |
+| ✦ | ⛰️ Edzőtábor az Alpokban | a csapatépítés **kétszerese** (a `bondcamp` mintájára), és a kezdő 11 **+2 Rating, 5 meccsre** | `bondAdd`, `setNextMatchOvr` |
+| ✦ | 🚪 Nyílt nap | egy 16 éves érkezik **ingyen**. A POT-ja nagyobb, mint bárkié az akadémián vagy a 19 év alatti kereted tagjai közt | `generateAcademyPlayer` + POT-emelés |
+| ✦ | ✈️ Nyári túra Ázsiában | a heti lelátó **4–9-szerese** és **+5% szurkoló**; cserébe **2 meccs −1 csapaterő** (jetlag) | `budgetEarn("talEsemeny")`, `setTeamMomentum` |
+| ✖ | 🥂 Hírnév-mámor | a legnagyobb POT-ú, 21 év alatti játékos 10 meccsen át **−30% fejlődést** kap (pályán és padon), a formája ingadozik (−3…+1), és romlik a jele az öltözőben. **Három meccs egymás után a padon kigyógyítja** | `talMamorDev`, `talEsemenyTick` |
+| ✖ | 📸 Öltözői botrány | **−8 morál**, és ha van jelölt, jön az **elvágyódás alkuja**. Ugyanaz a képernyő, fölötte a botrány szövegével | `__LEAVE_PENDING__` + `pre` |
+| ✖ | 🧾 Adóellenőrzés | a büdzsé **4–10%-a** bírság | `budgetPay("talEsemenyKi")` |
+| ✖ | 🩹 Balszerencsés edzés | a legjobb, épp elérhető kezdőd **2–5 meccsre** kidől | `addOrExtendUnavailable` |
+| ✖ | 🔒 Pályazár | **két hazai meccs zárt kapuk mögött**: nincs hazai előny, és nincs lelátó-bevétel (a tábor ettől még mozog). A párharcban nem hat | `playMatch` (`_talZart`), `fanMatchTick({zart})` |
+
+**Döntések.** A kézi ablakban gombok vannak, és mindkét gombon ott a
+következmény. A nem választható gomb tiltva van, az oka ki van írva. A
+végigjátszásban a gép azt választja, amit egy elfogadó menedzser.
+
+| | esemény | a két gomb | a gép |
+|---|---|---|---|
+| ✦ | 🎩 Egy legenda kopogtat | a stábpiac legjobb sávja fölötti (legfeljebb +10) Szakértelmű szakember **fél áron** — vagy nem | felveszi, ha van hely és pénz |
+| ✦ | 🔁 A tékozló fiú | a legjobb, legfeljebb 35 éves, korábban eladott játékosod hazajön **az eladási ára feléért** (az eladott játékos a világban tovább öregszik, de nem vonul vissza — ezért a korhatár) — vagy nem | hazahozza, ha van hely és pénz |
+| ✖ | 🧲 Rivális csábítás | a legjobb nem-kapitány kezdőd: **megtartási díj** (a kikiáltási ár 15%-a), vagy **elengeded** a kikiáltási áron (a kezdő 11-be pótlás érkezik) | megtartja, ha van rá pénz |
+| ✖ | 💼 Ügynökháború | **+50% bér** az idény végéig — vagy **nem**: 10 meccs −1 Rating, és romlik a jele az öltözőben | igent mond |
+
+**Még nem (F4c):** 🏛️ Igazgatósági ülés, 🎽 Mezszponzor, 🌟 Sztárvilág.
+Mindhárom saját alrendszert kér: idényvégi értékelést, az arculat-szerkesztőt
+és a hírnév-gépezetet. A paklidba bekerülhetnek, de nem húzhatók. A lapon és
+a menüben ⏳ jelzi őket.
+
+## A felület
+
+* **A kézi ablak:** `showTalEsemeny(h)`. Címe „📦 <esemény>”, alatta „🧿 a
+  Joker-csomagodból”. A döntés után a szöveg és egy „Tovább” gomb jön (a
+  várólista itt kapja meg a kiutat).
+* **A menü** („Aktív alaphatások”) mutatja a paklit (✓ = idén már kijött,
+  ⏳ = később kapcsol be) és a futó hatásokat: mámor (hátralévő meccsek,
+  pad-sorozat 0–3), pályazár, béremelés.
+* **A lap:** az Eseménycsomag alaphatása ⚡ él. A még nem működő esemény
+  mellett ⏳ áll.
+* **Könyvelés:** két új sor, a `talEsemeny` (+, 📦) és a `talEsemenyKi`
+  (−, 📦). A többi pénzmozgás a meglévő sorain megy (stáb, igazolás,
+  megtartási díj, eladás).
+
+## A próba
+
+`node tools/talizman-f4b-proba.js` (9169-es port, ~20 mp), 38 állítás:
+
+* a semleges állapot;
+* a pakli: súly, idényenként egyszer, a még nem működő kimarad;
+* mind a kilenc azonnali esemény a **valódi** `twResolvePhase2`-n keresztül;
+* a mámor a meccseken át, a gyógyulás és a lejárat;
+* a pályazár: lelátó és fogyás;
+* a négy döntés a **valódi** képernyőn, mindkét ággal és a tiltással;
+* a kézi ablak (`twStartPhase2` → `land`) és az automatikus
+  (`autoResolveCheckpoint`) ablak;
+* a menü és a lap.

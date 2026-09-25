@@ -120,9 +120,16 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(g.egyediId,"a special-azonosítók egyediek");
   ok(g.rosszSzoveg.length===0,"egyik special szövege sem hagy benne {v}/NaN/undefined-ot, egyik ritkaságon sem",g.rosszSzoveg.slice(0,5));
   console.log("\n— 2. A GENERÁTOR (10 000 talizmán) —");
-  ok(Math.abs(g.rang[0]-58)<1.5&&Math.abs(g.rang[1]-28)<1.5&&Math.abs(g.rang[2]-11)<1&&Math.abs(g.rang[3]-3)<0.6,
+  /* A TŰRÉS ~4,2 σ (3.9.145). A minta a karrier VÉLETLEN seedjéből jön, tehát
+     futásonként más: 10 000 lapnál a binomiális szórás 58%-nál 0,49, 28%-nál
+     0,45, 11%-nál 0,31, 3%-nál 0,17, 67%-nál 0,47 pont — 300 seeden MÉRVE a
+     special-arány átlaga 67,00, szórása 0,48 (a generátor és a talRng rendben).
+     A régi ±1,5 / ±1 / ±0,6 csak ~3 σ volt: a próba nagyjából minden 200–300.
+     futáson ok nélkül bukott (egyszer mérve: 65,2%). A 4,2 σ egy valódi,
+     1-2 pontos eltolódást továbbra is azonnal jelez. */
+  ok(Math.abs(g.rang[0]-58)<2.1&&Math.abs(g.rang[1]-28)<1.9&&Math.abs(g.rang[2]-11)<1.3&&Math.abs(g.rang[3]-3)<0.75,
      "a ritkaság 58 / 28 / 11 / 3%",g.rang);
-  ok(Math.abs(g.spec-67)<1.5,"a talizmánok ~67%-án van special",g.spec);
+  ok(Math.abs(g.spec-67)<2.0,"a talizmánok ~67%-án van special",g.spec);
   ok(g.rosszAlap===0,"minden alapszöveg, sáv és név ép",g.rosszAlap);
   ok(g.eKint===0,"az erő a ritkaság sávjának 85–115%-án belül marad",g.eKint);
   ok(g.tisztaOk,"a Tiszta talizmán alapja pontosan ×1,25");

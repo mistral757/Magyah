@@ -2388,6 +2388,34 @@ A régi kódon a próba elhasal, mert az F4a olvasói még nem léteznek.
 
 Részletek: `docs/talizmanok.md` (3.9.144).
 
+## talizman-f4b-proba.js — 🧿 Talizmánok F4b: az eseménycsomagok eseményei
+
+```bash
+node tools/talizman-f4b-proba.js
+```
+
+**38 állítás, nyolc blokkban.** A legtöbb a VALÓDI sorsoláson megy át
+(`twResolvePhase2`, a hátsó sávra kényszerítve: a `TRANSFER_TYPES` súlya 0, a
+véletlen 0,99):
+
+1. **Semleges:** talizmán nélkül a pakli üres, és az olvasás nem hoz létre
+   állapotot.
+2. **A pakli:** súly, idényenként egyszer, a még nem működő kimarad.
+3. **Kilenc azonnali esemény**, mindegyik a várt nyomával. Ha nincs kire
+   lesújtania, nem ég el.
+4. **Hírnév-mámor** a meccseken át: három padon töltött meccs kigyógyít, és
+   a hossza végén magától is elmúlik.
+5. **Pályazár:** nincs lelátó-bevétel, és hazai meccsenként fogy.
+6. **Négy döntés** a valódi képernyőn (`showTalEsemeny`), mindkét ággal, a
+   tiltott gombbal és a gép választásával.
+7. **Ablakok:** a kézi ablak (`twStartPhase2` → `land`) és az automatikus
+   rövid ablak (`autoResolveCheckpoint(8)`).
+8. **Menü és lap:** ✓ / ⏳ és a futó hatások.
+
+A régi kódon a próba elhasal, mert az F4b függvényei még nem léteznek.
+
+Részletek: `docs/talizmanok.md` (3.9.145).
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
