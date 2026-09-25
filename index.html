@@ -2685,6 +2685,7 @@ body.hubDragging #hubRoster{touch-action:none}
 .sbTeam .sbMs{display:block;font-family:var(--font-body);font-size:10.5px;font-weight:800;
   letter-spacing:1px;color:#cfe3d6;margin-top:1px;text-shadow:none}
 .sbTeam.me .sbMs{color:#ffe0a0}
+.sbTeam .sbMs .sbKieg{font-weight:700;opacity:.75;white-space:nowrap}
 #sbBoard.comp-FA .sbTeam .sbMs{color:#1c1b19}
 #sbBoard.comp-FA .sbTeam.me .sbMs{color:#c8102e}
 #sbBoard.rival .sbTeam .sbMs{color:#e6dcc0}
@@ -6239,7 +6240,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.142";
+const APP_VERSION="3.9.143";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16770,8 +16771,9 @@ function renderGpDuoPick(){
         onYes:()=>gpDuoCommitPair(f,m)});};
     box.appendChild(row);});}
 /* ================= ⚡ SZÁRNY-KÉMIA (3.9.107) =============================
-   A harmadik kötésfajta a passzkémia és a gyilkos páros mellé — és a
-   harmadik, ami NEM felajánlásból jön, hanem együtt töltött időből.
+   A harmadik kötésfajta a passzkémia és a gyilkos páros mellé. 3.9.107-ben
+   még magától, együtt töltött időből épült; 3.9.143 óta ugyanúgy
+   felajánlásból és a te választásodból, mint a másik kettő (lásd lent).
 
    MIT KÖT ÖSSZE. Egy SZÁRNYAT: a szélső védőt és az előtte játszó szélsőt,
    ugyanazon az oldalon (JV+JSZ vagy BV+BSZ). A magyar futballnyelv erre azt
@@ -16805,10 +16807,32 @@ function renderGpDuoPick(){
 const SZARNY_NEED_LVL=3;              /* ettől a stílusszinttől létezik */
 const SZARNY_TIERS=[3,8,14];          /* a három fokozat stílusszint-küszöbe */
 const SZARNY_GAP=3;                   /* ennyi sebesség-eltérés fér bele */
-const SZARNY_RIPE=[0,14,11,8];        /* ennyi közös meccs az összeérés */
+const SZARNY_RIPE=[0,14,11,8];        /* KÉSZ pár után ennyi közös meccs az összeérés */
 const SZARNY_GOAL=[0,0.03,0.045,0.06];/* kész párosonként a csapat gólesélye */
 const SZARNY_BUMP=[0,0.02,0.03,0.04]; /* és ennyivel ugrik a közös sebesség */
 const SZARNY_SIDES={J:["JV","JSZ"],B:["BV","BSZ"]};
+/* ================= ⚡ A SZÁRNY-KÉMIA ÚJ ÉPÍTÉSE (3.9.143) =================
+   BEJELENTETT HIBA ÉS KÉRÉS: „A szárny kémia ugyanúgy láthatatlanul épül,
+   ráadásul egy első szezonbeli páros épül, amit rég lecseréltem, ezért
+   elakadt, de beragadt. Legyen ez is olyan, mint minden más kémia építés.
+   Minden mechanikát ültessünk át."
+   A KÉT HIBA EGY GYÖKÉRBŐL JÖTT. A 3.9.107-es szárny MAGÁTÓL indult (a meccs
+   utáni tick az első két jelöltet párba állította), és oldalanként az ELSŐ
+   pár örökre lefoglalta a szárnyat — akkor is, ha a tagjai közben elmentek
+   vagy a padra kerültek. Egy ilyen pár sosem ért össze, és mást sem engedett.
+   MOSTANTÓL PONTOSAN ÚGY ÉPÜL, mint a gyilkos páros (3.9.138) és a passzkémia:
+     · FELAJÁNLÁS a meccs utáni jutalom-sorban (saját dobás, a stílusszint
+       fokozatával nő); · TE VÁLASZTASZ párt (a rendszer ajánl is egyet);
+     · FÁZISONKÉNT épül (5 fázis), minden felajánlásnál TE építed tovább;
+     · ÁTVÁLTHATSZ másik párra — a megszerzett fázisok megmaradnak;
+     · végigjátszásnál a gép lép (a félkész párat építi tovább, vagy az ajánlottat indítja);
+     · 5/5-nél KÉSZ: onnantól él a gólesély-bónusz, és a közös meccsek
+       ÖSSZEÉRÉST hoznak (a sebesség fölfelé kiegyenlítődik) — ahogy eddig.
+   A BELÉPŐ ugyanaz a szigorú szárny-szabály: azonos oldal, védő + szélső,
+   legfeljebb SZARNY_GAP sebesség-eltérés. És szárnyanként egy ÉLŐ kész pár:
+   ha egy tagja elhagyja a klubot, a szárny FELSZABADUL. */
+const SZARNY_NEED=5;
+const SZARNY_OFFER=[0,1,1.25,1.33];
 function szarnyOn(){return engLive("villam")&&szarnyTier()>0;}
 function szarnyTier(){
   let L=0;
@@ -16816,11 +16840,26 @@ function szarnyTier(){
   let t=0;
   SZARNY_TIERS.forEach((need,i)=>{if(L>=need)t=i+1;});
   return t;}
+/* A RÉGI (3.9.107–3.9.142) MENTÉS átültetése, egyszer: a kész pár kész
+   marad; a magától indult, félkész pár a közös meccseiből fázist kap — így
+   a befektetett idő nem vész el, de a folytatás mostantól a TE döntésed. */
 function szarnyState(){
   if(!S.szarny||typeof S.szarny!=="object")S.szarny={};
-  return S.szarny;}
+  const D=S.szarny;
+  if(!S.szarnyMig){
+    S.szarnyMig=1;
+    Object.keys(D).forEach(k=>{
+      const r=D[k];if(!r)return;
+      if(r.done){r.built=1;r.stages=SZARNY_NEED;return;}
+      if(r.stages==null){
+        r.stages=Math.max(1,Math.min(SZARNY_NEED-1,Math.round((r.n||0)/14*SZARNY_NEED)));
+        r.n=0;}});
+    S.szarnyInProgress=null;}
+  return D;}
 function szarnyKey(a,b){return [String(a||""),String(b||"")].sort().join("||");}
 function szarnyRipeNeed(){return SZARNY_RIPE[szarnyTier()]||14;}
+function szarnyActive(r){return !!(r&&(r.built||r.done));}
+function szarnyStages(a,b){const r=szarnyState()[szarnyKey(a,b)];return r?(r.stages||0):0;}
 /* Melyik szárny embere? "J", "B" vagy null. */
 function szarnySideOf(name){
   try{
@@ -16840,21 +16879,45 @@ function szarnyPosOf(name){
 function szarnySeb(name){
   try{
     const e=(careerPool&&careerPool[name])||null;
-    return (e&&e.attrs&&e.attrs.seb)||0;
+    return Math.round((e&&e.attrs&&e.attrs.seb)||0);
   }catch(e){return 0;}}
-/* Alkothat-e a kettő szárny-párost? Azonos oldal, KÜLÖNBÖZŐ poszt, és a
-   sebességük a megengedett sávon belül. */
-function szarnyPairOk(a,b){
+/* Klubnál van-e még (a keret vagy a tartalék) — a félbemaradt pár ettől
+   „alszik", és nem foglal szárnyat. */
+function szarnyAtClub(name){
+  try{return fullCareerRoster().some(p=>p&&p.n===name);}catch(e){return false;}}
+function szarnyPairLive(k){
+  const two=k.split("||");return szarnyAtClub(two[0])&&szarnyAtClub(two[1]);}
+/* A szárny oldala foglalt-e ÉLŐ kész párral? */
+function szarnySideTaken(sd){
+  const D=szarnyState();
+  return Object.keys(D).some(k=>szarnyActive(D[k])&&szarnyPairLive(k)&&szarnySideOf(k.split("||")[0])===sd);}
+function szarnyInActive(name){
+  const D=szarnyState();
+  return Object.keys(D).some(k=>szarnyActive(D[k])&&k.split("||").indexOf(name)>=0);}
+/* A szárny-szabály: azonos oldal, KÜLÖNBÖZŐ poszt, a sebesség a sávon belül. */
+function szarnyFit(a,b){
   const sa=szarnySideOf(a),sb=szarnySideOf(b);
   if(!sa||sa!==sb)return false;
   if(szarnyPosOf(a)===szarnyPosOf(b))return false;
   return Math.abs(szarnySeb(a)-szarnySeb(b))<=SZARNY_GAP;}
+/* Jelölhető-e a pár MOST: a szárny-szabály, egyikük sincs kész párban, és az
+   oldal nincs foglalva élő kész párral. */
+function szarnyPairOk(a,b){
+  if(!a||!b||a===b)return false;
+  if(!szarnyFit(a,b))return false;
+  if(szarnyInActive(a)||szarnyInActive(b))return false;
+  return !szarnySideTaken(szarnySideOf(a));}
+/* A kész (és ÉLŐ) szárnyak száma — a kijelzés és a hely ebből számol. */
 function szarnyDone(){
   const D=szarnyState();
-  return Object.keys(D).filter(k=>D[k]&&D[k].done).length;}
-/* A CSAPAT GÓLESÉLY-SZORZÓJA. Csak azok a párosok számítanak, ahol MINDKETTŐ
-   a pályán van (a kiállított nem) — ugyanaz a szabály, mint a gyilkos páros
-   presszing-szorzójánál. */
+  return Object.keys(D).filter(k=>szarnyActive(D[k])&&szarnyPairLive(k)).length;}
+function szarnyRoom(){return !szarnySideTaken("J")||!szarnySideTaken("B");}
+function szarnyOfferP(){
+  const m=SZARNY_OFFER[szarnyTier()]||0;
+  if(m<=0)return 0;
+  return Math.min(PASS_CHEM_MAX_P,PASS_CHEM_BASE_P*m);}
+/* A CSAPAT GÓLESÉLY-SZORZÓJA. Csak a KÉSZ párosok számítanak, és csak ha
+   MINDKETTŐ a pályán van (a kiállított nem). */
 function szarnyGoalMult(active,redIdx){
   if(!szarnyOn()||!active)return 1;
   const D=szarnyState(),t=szarnyTier();
@@ -16862,16 +16925,16 @@ function szarnyGoalMult(active,redIdx){
   active.forEach((x,i)=>{if(x&&x.p&&!x.bus&&!redHas(redIdx,i))pitch.add(x.p.n);});
   let m=1;
   Object.keys(D).forEach(k=>{
-    if(!D[k]||!D[k].done)return;
+    if(!szarnyActive(D[k]))return;
     const two=k.split("||");
     if(pitch.has(two[0])&&pitch.has(two[1]))m*=1+(SZARNY_GOAL[t]||0);});
   return m;}
 /* ---- AZ ÖSSZEÉRÉS ----
-   A sebességük a nagyobbikhoz igazodik, egy kis ráadással — pontosan úgy,
-   ahogy a gyilkos párosnál (gpDuoComplete). A plafon ugyanaz a keményplafon. */
+   A sebességük a nagyobbikhoz igazodik, egy kis ráadással. A plafon a
+   Ratinghez kötött kemény korlát (attrHardCap) — a kötés nem nyit új teret. */
 function szarnyComplete(a,b){
   const D=szarnyState(),k=szarnyKey(a,b);
-  const r=D[k]||(D[k]={n:0});
+  const r=D[k]||(D[k]={n:0,stages:SZARNY_NEED,built:1});
   if(r.done)return null;
   r.done=1;r.season=S.seasonNumber||1;
   let out=null;
@@ -16881,60 +16944,194 @@ function szarnyComplete(a,b){
       const cel=Math.max(ea.attrs.seb||0,eb.attrs.seb||0);
       const uj=Math.round(cel*(1+(SZARNY_BUMP[szarnyTier()]||0)));
       const elotteA=Math.round(ea.attrs.seb||0), elotteB=Math.round(eb.attrs.seb||0);
-      const cap=(typeof attrHardCap==="function")?attrHardCap():999;
-      ea.attrs.seb=Math.min(cap,uj);
-      eb.attrs.seb=Math.min(cap,uj);
+      const capA=(typeof attrHardCap==="function")?attrHardCap(ea):999;
+      const capB=(typeof attrHardCap==="function")?attrHardCap(eb):999;
+      ea.attrs.seb=Math.min(capA,uj);
+      eb.attrs.seb=Math.min(capB,uj);
       out={a,b,elotteA,elotteB,utanaA:Math.round(ea.attrs.seb),utanaB:Math.round(eb.attrs.seb)};}
   }catch(e){}
   return out;}
 /* ---- A MECCS UTÁNI LÉPTETÉS ----
-   Ugyanott fut, ahol a passzkémiáé és a gyilkos párosé, a fejlődés UTÁN. */
+   3.9.143: a tick MÁR NEM INDÍT párt — azt a felajánlás és a te választásod
+   teszi (showSzarnyBuild). Itt csak a KÉSZ párok összeérése halad: közös
+   meccsenként egy lépés. A SEBESSÉG-SÁV menet közben is számít: ha a kettő
+   közben elszakadt egymástól, az összeérés vár — de nem vész el. */
 function szarnyTick(activeNames){
   if(!szarnyOn()||!activeNames)return;
-  const D=szarnyState();
-  const need=szarnyRipeNeed();
-  /* 1. A MÁR ÉPÜLŐ kötések léptetése. */
+  const D=szarnyState(),need=szarnyRipeNeed();
   Object.keys(D).forEach(k=>{
-    const r=D[k];if(!r||r.done)return;
+    const r=D[k];
+    if(!r||!r.built||r.done)return;
     const two=k.split("||");
     if(!activeNames.has(two[0])||!activeNames.has(two[1]))return;
-    /* A SEBESSÉG-SÁV MENET KÖZBEN IS SZÁMÍT: ha a kettő közben elszakadt
-       egymástól, a kötés nem épül tovább — de nem is vész el. */
-    if(!szarnyPairOk(two[0],two[1]))return;
+    if(!szarnyFit(two[0],two[1]))return;
     r.n=(r.n||0)+1;
-    if(r.n>=need){
-      const out=szarnyComplete(two[0],two[1]);
-      try{
-        addLine(`⚡ <b>ÖSSZESZOKOTT SZÁRNY!</b> ${esc(shortName(two[0]))} és `
-          +`${esc(shortName(two[1]))} egyszerre indul meg — amíg mindketten a pályán `
-          +`vannak, nő a csapat gólesélye.`,"m mvp");
-        if(out)addLine(`→ a sebességük kiegyenlítődött: `
-          +`${esc(shortName(out.a))} ${out.elotteA} → ${out.utanaA} · `
-          +`${esc(shortName(out.b))} ${out.elotteB} → ${out.utanaB}`,"m skillnote");
-      }catch(e){}}});
-  /* 2. ÚJ KÖTÉS — szárnyanként legfeljebb egy, és aki már tagja egynek, nem
-        kezd másikat. A névsor rendezett, tehát a választás determinisztikus. */
-  const nev=Array.from(activeNames).filter(szarnySideOf).sort();
-  const foglalt=new Set();
-  const oldalKesz={};
-  Object.keys(D).forEach(k=>{
-    const two=k.split("||");
-    foglalt.add(two[0]);foglalt.add(two[1]);
-    const sd=szarnySideOf(two[0]);
-    if(sd)oldalKesz[sd]=true;});
-  for(let i=0;i<nev.length;i++)for(let j=i+1;j<nev.length;j++){
-    const A=nev[i],B=nev[j];
-    if(foglalt.has(A)||foglalt.has(B))continue;
-    if(!szarnyPairOk(A,B))continue;
-    const sd=szarnySideOf(A);
-    if(oldalKesz[sd])continue;
-    D[szarnyKey(A,B)]={n:1};
-    oldalKesz[sd]=true;foglalt.add(A);foglalt.add(B);
+    if(r.n<need)return;
+    const out=szarnyComplete(two[0],two[1]);
     try{
-      addLine(`⚡ <b>Szárny épül:</b> ${esc(shortName(A))} és ${esc(shortName(B))} `
-        +`kezdik megszokni egymást a ${sd==="J"?"jobb":"bal"} oldalon — `
-        +`${need} közös mérkőzés kell az összeéréshez.`,"m skillnote");
-    }catch(e){}}}
+      addLine(`⚡ <b>ÖSSZEÉRT A SZÁRNY!</b> ${esc(shortName(two[0]))} és `
+        +`${esc(shortName(two[1]))} ${need} közös meccs után egyszerre indul meg.`,"m mvp");
+      if(out)addLine(`→ a sebességük kiegyenlítődött: `
+        +`${esc(shortName(out.a))} ${out.elotteA} → ${out.utanaA} · `
+        +`${esc(shortName(out.b))} ${out.elotteB} → ${out.utanaB}`,"m skillnote");
+    }catch(e){}});}
+/* ---- A FÁZIS-BEJELENTÉS ---- egy helyen: kézi, auto és választó ugyanazt mondja. */
+function szarnyAnnounce(a,b){
+  const D=szarnyState(),k=szarnyKey(a,b),r=D[k];
+  if(!r)return;
+  const sd=szarnySideOf(a)==="J"?"jobb":"bal";
+  if(r.stages>=SZARNY_NEED&&!r.built){
+    r.built=1;r.n=r.n||0;r.builtSeason=S.seasonNumber||1;
+    if(S.szarnyInProgress===k)S.szarnyInProgress=null;
+    addLine(`⚡ <b>Szárny kész:</b> ${esc(shortName(a))} &amp; ${esc(shortName(b))} a ${sd} oldalon — `
+      +`amíg mindketten pályán vannak, a csapat gólesélye +${Math.round((SZARNY_GOAL[szarnyTier()]||0)*1000)/10}%, `
+      +`és ${szarnyRipeNeed()} közös meccs után a sebességük is összeér.`,"m life");}
+  else if(!r.built){
+    S.szarnyInProgress=k;
+    addLine(`⚡ Szárny épül: ${esc(shortName(a))} &amp; ${esc(shortName(b))}, ${sd} oldal (${r.stages}/${SZARNY_NEED} fázis)`,"m life");}}
+function szarnyAddStage(a,b){
+  const D=szarnyState(),k=szarnyKey(a,b);
+  const r=D[k]||(D[k]={stages:0,n:0});
+  if(r.built)return r;
+  r.stages=Math.min(SZARNY_NEED,(r.stages||0)+1);
+  szarnyAnnounce(a,b);
+  return r;}
+/* A RENDSZER AJÁNLATA a keret szárny-emberei közül: a félkész pár előnyt kap
+   (befejezni többet ér), egyébként a gyorsabb, kisebb résű pár. */
+function szarnyJeloltek(){
+  return currentRoster().filter(p=>p&&szarnySideOf(p.n)&&!szarnyInActive(p.n)&&!szarnySideTaken(szarnySideOf(p.n))).map(p=>p.n);}
+function szarnyAjanlPair(jitter){
+  const on=szarnyJeloltek();
+  let best=null;
+  for(let i=0;i<on.length;i++)for(let j=i+1;j<on.length;j++){
+    const a=on[i],b=on[j];
+    if(!szarnyPairOk(a,b))continue;
+    const cur=szarnyStages(a,b);
+    const sa=szarnySeb(a),sb=szarnySeb(b);
+    const score=Math.max(sa,sb)/10-Math.abs(sa-sb)+(cur>0?100+cur:0)+(jitter?Math.random():0);
+    if(!best||score>best.score)best={a,b,score,cur};}
+  return best;}
+function autoStartSzarny(){
+  const best=szarnyAjanlPair(true);
+  if(!best)return false;
+  szarnyAddStage(best.a,best.b);
+  return true;}
+let szarnyPickFirst=null;
+function szarnyCommitPair(first,mate){
+  szarnyAddStage(first,mate);
+  szarnyPickFirst=null;
+  $("scSkill").classList.add("hide");
+  const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();}
+function advanceSzarnyManual(){
+  const k=S.szarnyInProgress,r=k&&szarnyState()[k];
+  if(r){const two=k.split("||");szarnyAddStage(two[0],two[1]);}
+  $("scSkill").classList.add("hide");
+  const cb=skillResumeCb;skillResumeCb=null;if(cb)cb();}
+/* A KÉPERNYŐ — a gyilkos párosé és a passzkémiáé mintájára: ugyanaz a panel,
+   ugyanazok a lánc-jelölők (chemGoOn / chemPickMark / immAjanl). */
+function showSzarnyBuild(resumeCb){
+  skillResumeCb=resumeCb;
+  szarnyPickFirst=null;
+  $("scSkill").classList.remove("hide");
+  $("skillSpinBtn").classList.add("hide");
+  $("skillSpinName").textContent="⚡";
+  $("skillAssignWrap").classList.remove("hide");
+  const k=S.szarnyInProgress,inProg=(k&&szarnyState()[k]&&!szarnyState()[k].built)?szarnyState()[k]:null;
+  if(inProg){
+    const two=k.split("||");
+    $("skillTitle").textContent=`Szárny-kémia (${inProg.stages}/${SZARNY_NEED} fázis)`;
+    $("skillDesc").textContent=`${shortName(two[0])} & ${shortName(two[1])} szárnya épül tovább. `
+      +`A teljes ${SZARNY_NEED}/${hunNal(SZARNY_NEED)} kész: amíg mindketten pályán vannak, nő a csapat gólesélye, `
+      +`és ${szarnyRipeNeed()} közös meccs után a sebességük is összeér.`;
+    const box=$("skillAssignList");box.innerHTML="";
+    const row=document.createElement("div");row.className="prow";
+    row.id="chemGoOn";
+    row.innerHTML=`<span class="pos pc-VEDO">${inProg.stages}/${SZARNY_NEED}</span>`
+      +`<span class="main"><div class="nm">${esc(shortName(two[0]))} (Seb ${szarnySeb(two[0])}) &amp; ${esc(shortName(two[1]))} (Seb ${szarnySeb(two[1])})</div>`
+      +`<div class="trait">koppints a továbbépítéshez</div></span>`;
+    row.onclick=()=>{advanceSzarnyManual();};
+    box.appendChild(row);
+    const sw=document.createElement("button");
+    sw.className="btn-s stepbtn";sw.style.marginTop="8px";
+    sw.dataset.imm="kiut";
+    sw.textContent="↩ Mégis másik szárnyat építek";
+    sw.onclick=()=>{
+      askConfirm({title:"Másik szárnyra váltasz?",yes:"Igen, másikat választok",
+        html:`<div style="font-size:13px;line-height:1.55">
+          <b>${esc(shortName(two[0]))} &amp; ${esc(shortName(two[1]))}</b> szárnya félbemarad
+          <b>${inProg.stages}/${SZARNY_NEED}</b> fázisnál.<br><br>
+          <span style="color:var(--grass)">A megszerzett fázisok megmaradnak</span> — ez a szárny később, a választóból bármikor folytatható.</div>`,
+        onYes:()=>{
+          S.szarnyInProgress=null;szarnyPickFirst=null;
+          try{saveGame();}catch(e){}
+          showSzarnyBuild(skillResumeCb);}});};
+    box.appendChild(sw);
+    $("scSkill").scrollIntoView({behavior:"smooth"});
+    return;}
+  $("skillTitle").textContent="Szárny-kémia — válassz szárnyat!";
+  $("skillDesc").textContent=`A szélső védő és az előtte játszó szélső ugyanazon az oldalon (JV+JSZ vagy BV+BSZ), `
+    +`legfeljebb ${SZARNY_GAP} sebesség-eltéréssel. A kötés ${SZARNY_NEED} fázisban épül fel. `
+    +`Kész állapotban, amíg mindketten pályán vannak, a csapat gólesélye +${Math.round((SZARNY_GOAL[szarnyTier()]||0)*1000)/10}%, `
+    +`és ${szarnyRipeNeed()} közös meccs után a sebességük fölfelé kiegyenlítődik. Szárnyanként egy kész pár élhet.`;
+  renderSzarnyPick();
+  $("scSkill").scrollIntoView({behavior:"smooth"});}
+function renderSzarnyPick(){
+  const box=$("skillAssignList");box.innerHTML="";
+  const mark=document.createElement("i");mark.id="chemPickMark";mark.hidden=true;
+  box.appendChild(mark);
+  if(szarnyPickFirst){
+    const info=document.createElement("div");
+    info.style.cssText="font-size:12px;color:#cfd6ff;margin-bottom:5px";
+    info.textContent=`Első játékos: ${shortName(szarnyPickFirst)} (Seb ${szarnySeb(szarnyPickFirst)}) — válaszd ki a párját ugyanazon az oldalon:`;
+    box.appendChild(info);
+    const back=document.createElement("button");
+    back.className="btn-s";back.style.cssText="width:100%;font-size:12px;padding:5px 0;margin-bottom:7px";
+    back.dataset.imm="kiut";
+    back.textContent="↩ Mégis mást választok elsőnek";
+    back.onclick=()=>{szarnyPickFirst=null;renderSzarnyPick();};
+    box.appendChild(back);}
+  else{
+    const aj=szarnyAjanlPair(false);
+    if(aj){
+      const kov=Math.min(SZARNY_NEED,aj.cur+1);
+      const r=document.createElement("div");r.className="prow";
+      r.dataset.immAjanl="1";
+      r.dataset.immMit=`${shortName(aj.a)} & ${shortName(aj.b)} szárnya`;
+      r.innerHTML=`<span class="pos pc-VEDO">⚡</span><span class="main">`
+        +`<div class="nm">${esc(shortName(aj.a))} (Seb ${szarnySeb(aj.a)}) &amp; ${esc(shortName(aj.b))} (Seb ${szarnySeb(aj.b)}) `
+        +`<span class="msBadge">AJÁNLOTT</span></div>`
+        +`<div class="trait">a rendszer választása · ${aj.cur}/${SZARNY_NEED} → ${kov}/${SZARNY_NEED} · egy koppintás, és elindul</div></span>`;
+      r.onclick=()=>szarnyCommitPair(aj.a,aj.b);
+      box.appendChild(r);}}
+  const jel=szarnyJeloltek();
+  if(!jel.length){
+    const none=document.createElement("div");
+    none.style.cssText="font-size:12px;color:var(--dim);margin:6px 0";
+    none.textContent="Most nincs olyan szárny-embered (szélső védő vagy szélső), akinek szabad az oldala.";
+    box.appendChild(none);}
+  currentRoster().forEach(p=>{
+    if(!p||jel.indexOf(p.n)<0)return;
+    if(szarnyPickFirst&&(p.n===szarnyPickFirst||!szarnyPairOk(szarnyPickFirst,p.n)))return;
+    const row=document.createElement("div");row.className="prow";
+    const existing=szarnyPickFirst?szarnyStages(szarnyPickFirst,p.n):0;
+    const sd=szarnySideOf(p.n)==="J"?"jobb":"bal";
+    row.innerHTML=`<span class="pos pc-${getCategoryFor(p.pos[0])}">${p.pos.join("/")}</span>`
+      +`<span class="main"><div class="nm">${esc(shortName(p.n))} `
+      +`<small style="color:var(--gold)">Seb ${szarnySeb(p.n)}</small> <small>· ${sd} oldal</small>`
+      +`${existing?` <small>(már ${existing}/${SZARNY_NEED})</small>`:""}</div></span>`;
+    row.onclick=()=>{
+      if(!szarnyPickFirst){szarnyPickFirst=p.n;renderSzarnyPick();return;}
+      const f=szarnyPickFirst,m=p.n,cur=szarnyStages(f,m),kov=Math.min(SZARNY_NEED,cur+1);
+      const sa=szarnySeb(f),sb=szarnySeb(m);
+      askConfirm({title:cur?"Tovább építed ezt a szárnyat?":"Elindítod ezt a szárnyat?",
+        yes:cur?"Igen, tovább építem":"Igen, ezt a szárnyat építem",
+        html:`<div style="font-size:13px;line-height:1.6">
+          <b>${esc(shortName(f))}</b> (Seb ${sa}) &amp; <b>${esc(shortName(m))}</b> (Seb ${sb}) — ${sd} oldal<br>
+          Készültség: <b>${cur}/${SZARNY_NEED}</b> → <b style="color:var(--gold)">${kov}/${SZARNY_NEED}</b><br><br>
+          Kész állapotban, amíg mindketten pályán vannak, nő a csapat gólesélye, és <b>${szarnyRipeNeed()} közös meccs</b>
+          után a sebességük kiegyenlítődik a gyorsabbikra (<b>${Math.max(sa,sb)}</b>), ráadással.</div>`,
+        onYes:()=>szarnyCommitPair(f,m)});};
+    box.appendChild(row);});}
 function kapE(p){return panzerAbsOn()?traitFlip(kapN(p),false):kapN(p);}
 function verE(p){return panzerAbsOn()?traitFlip(verN(p),true):verN(p);}
 /* A VÁGATLAN pár — csak a folytonos morál-számítás használja (lásd fent). */
@@ -54421,10 +54618,10 @@ function sbPaintTeams(fx){
   const myRaw=(typeof teamStrength==="function")?teamStrength():null;
   let myMs=null;try{myMs=teamMatchStrength();}catch(e){myMs=null;}
   const oppRaw=(fx.o&&typeof fx.o.dispOvr==="number")?fx.o.dispOvr:(fx.o&&fx.o.ovr);
-  let oppMs=null;
+  let oppMs=null,oppKieg=0;
   if(fx&&fx.duel)oppMs=(fx.o&&typeof fx.o.matchOvr==="number")?fx.o.matchOvr:null;
   else if(fx.o&&typeof fx.o.ovr==="number"){
-    try{oppMs=fx.o.ovr+matchHiddenOppBuff();}catch(e){oppMs=null;}}
+    try{oppKieg=matchHiddenOppBuff()||0;oppMs=fx.o.ovr+oppKieg;}catch(e){oppMs=null;oppKieg=0;}}
   if(num(myMs)==null||num(oppMs)==null){myMs=null;oppMs=null;}
   const mine={full:sbCleanClub(teamName),abbr:sbClubAbbr(teamName,true),
               ovr:num(myRaw),ms:num(myMs),
@@ -54439,6 +54636,8 @@ function sbPaintTeams(fx){
      Az sbClubAbbr a clubAbbr()-en keresztül maga vált kódot. */
   const opp={full:sbCleanClub(teamLabel(fx.o&&fx.o.n)),abbr:sbClubAbbr(fx.o&&fx.o.n,false),
              ovr:num(oppRaw),ms:num(oppMs),
+             /* ⚖ A NEHÉZSÉGI KIEGYENLÍTÉS KÜLÖN (3.9.143) — lásd a kirajzolásnál */
+             kieg:(num(oppMs)!=null&&oppKieg>0.05)?oppKieg:0,
              pos:sbTablePos(fx.o&&fx.o.n),
              /* A TÁRS ARCULATA (3.9.133): párharcban a pillanatképéből jött,
                 megtisztított címer és színpár — lásd mpCleanIdent. */
@@ -54517,8 +54716,23 @@ function sbFitTeams(force){
        keret — a kettő simán 10-20 pontra lehet egymástól, és jelzés nélkül
        két szám egymás mellett nem mondaná meg, melyik melyik. Külön sor, hogy
        a keskeny mezőben (≈105 px) se törjön szét a helyezés–erő sor. */
+    /* ---- ⚖ AZ ELLENFÉL SAJÁT EREJE ÉS A KIEGYENLÍTÉS KÜLÖN (3.9.143) ----
+       BEJELENTETT KÉRÉS: „az ellenfélhez beírt meccs erő az nem valós […] az
+       csak ugyanúgy az én meccs erő boostom rátéve az övére". A döntés: a
+       motor marad (a bajnokin a mezőny a TE rejtett meccs-bónuszod felét
+       kapja, hogy egy kiépült keretnél se legyen tét nélküli az idény), de
+       a kijelzés ŐSZINTE: a ⚡ az ellenfél SAJÁT ereje, mellette ⚖ a
+       nehézségi kiegyenlítés. A kettő összege az, amivel a motor számol. */
+    /* A KÉT RÉSZ ÖSSZEGE PONTOSAN A KIÍRT EGÉSZ: előbb az egészet és a
+       kiegyenlítést kerekítjük, a saját erő a különbségük — különben a
+       toFixed a 1,65-öt 1,6-ra, a 79,25-öt 79,3-ra vinné, és a kettő nem
+       adna ki egymást. */
+    const r1=v=>Math.round(v*10)/10;
+    const hu1=v=>esc(r1(v).toFixed(1).replace(".",","));
     const msSor=(t.ms!=null)
-      ?`<span class="sbMs" title="meccs-erő — ezzel számol a motor">⚡${esc(t.ms.toFixed(1).replace(".",","))}</span>`:"";
+      ?(t.kieg>0
+        ?`<span class="sbMs" title="az ellenfél saját meccs-ereje — mellette a nehézségi kiegyenlítés: a TE rejtett meccs-bónuszod (morál, taktika, aura, kapitány, edző) egy része. A motor a kettő összegével (${hu1(t.ms)}) számol.">⚡${hu1(r1(t.ms)-r1(t.kieg))} <span class="sbKieg">⚖+${hu1(t.kieg)}</span></span>`
+        :`<span class="sbMs" title="meccs-erő — ezzel számol a motor">⚡${hu1(t.ms)}</span>`):"";
     /* ---- A KLUB JELVÉNYE A TE OLDALADON (3.9.49) ----
        Ez a képernyő az, amit a legtöbbet nézel — és eddig a saját csapatod
        ugyanolyan névsor volt rajta, mint az ellenfél. A jelvény a NÉV FÖLÉ
@@ -66585,6 +66799,26 @@ function playMatch(){
           if(autoStartGpDuo()){processSkillQueue(reasons,cb);return;}
         }else if(gpDuoAjanlPair(false)||currentRoster().filter(p=>p&&gpDuoEligible(p.n)&&!gpDuoInActive(p.n)).length>=2){
           showGpDuoBuild(()=>processSkillQueue(reasons,cb));
+          return;}
+      }
+      /* ---- ⚡ SZÁRNY-KÉMIA (Villám, 3.9.143) ----
+         Ugyanaz a minta, mint a gyilkos párosé: saját dobás, a türelem-
+         jutalmat kihagyja, és csak akkor, ha van még szabad szárny. A félkész
+         pár, amelynek egy tagja közben elhagyta a klubot, félbemarad (a
+         fázisai megmaradnak), és új választás jön — ez volt a beragadás oka. */
+      if(reason!=="pity"&&szarnyOn()&&szarnyRoom()
+         &&Math.random()<szarnyOfferP()*(1+underdogFactor()*0.8)){
+        let _k=S.szarnyInProgress,_r=_k&&szarnyState()[_k];
+        if(_r&&(!_k.split("||").every(n=>currentRoster().some(p=>p&&p.n===n))||!szarnyPairOk(..._k.split("||")))){
+          S.szarnyInProgress=null;_k=null;_r=null;}
+        if(_r&&!_r.built){
+          if(S.auto){const _t=_k.split("||");szarnyAddStage(_t[0],_t[1]);processSkillQueue(reasons,cb);}
+          else showSzarnyBuild(()=>processSkillQueue(reasons,cb));
+          return;}
+        if(S.auto){
+          if(autoStartSzarny()){processSkillQueue(reasons,cb);return;}
+        }else if(szarnyAjanlPair(false)){
+          showSzarnyBuild(()=>processSkillQueue(reasons,cb));
           return;}
       }
       const incompleteCands=buildUpgradeCands();
@@ -93928,20 +94162,26 @@ function engSectionHtml(k0){
   if(k==="villam"){
     const t=szarnyTier(),kesz=szarnyDone();
     const D=szarnyState();
-    const epul=Object.keys(D).filter(x=>D[x]&&!D[x].done).length;
+    /* 3.9.143: a kijelzés a valódi állapotot mondja — fázis, kész, összeérés,
+       és a félbemaradt pár is kiderül (ki nincs már a klubnál). */
+    const epul=Object.keys(D).filter(x=>D[x]&&!szarnyActive(D[x])&&szarnyPairLive(x)).length;
     const sorok=Object.keys(D).map(x=>{
       const two=x.split("||"),r=D[x];
-      return `${esc(shortName(two[0]))} + ${esc(shortName(two[1]))} — `
-        +(r.done?`<b style="color:var(--grass)">összeszokott</b>`
-                :`épül (${r.n||0}/${szarnyRipeNeed()} közös meccs)`);}).join("<br>");
+      const nincs=two.filter(n=>!szarnyAtClub(n));
+      const nev=`${esc(shortName(two[0]))} + ${esc(shortName(two[1]))} — `;
+      if(nincs.length)return nev+`<i>félbemaradt: ${nincs.map(n=>esc(shortName(n))).join(" és ")} már nincs a klubnál</i>`;
+      if(r.done)return nev+`<b style="color:var(--grass)">összeért</b>`;
+      if(szarnyActive(r))return nev+`<b style="color:var(--grass)">kész</b> · összeérés ${r.n||0}/${szarnyRipeNeed()} közös meccs`;
+      return nev+`épül (${r.stages||0}/${SZARNY_NEED} fázis)${S.szarnyInProgress===x?" · ⚡ ezt építed":""}`;}).join("<br>");
     h+=`<div class="msItem"><div class="msTop"><b>⚡ Szárny-kémia</b>`
-      +`<span class="msRew">${kesz}/2${epul?` · ${epul} épül`:""}</span></div>`
+      +`<span class="msRew">${kesz}/2 kész${epul?` · ${epul} épül`:""}</span></div>`
       +`<div class="msDesc">`
       +(t?`Az <b>összeszokott szárny</b>: a szélső védő és az előtte játszó szélső `
          +`ugyanazon az oldalon (JV+JSZ vagy BV+BSZ), ha a <b>sebességük legfeljebb `
-         +`${SZARNY_GAP}-mal tér el</b>. <b>${szarnyRipeNeed()}</b> közös mérkőzés az összeérés. `
-         +`Amíg mindketten a pályán vannak, a csapat gólesélye `
-         +`<b>+${Math.round((SZARNY_GOAL[t]||0)*1000)/10}%</b> — és az összeéréskor a `
+         +`${SZARNY_GAP}-mal tér el</b>. A meccs utáni felajánlásból épül, mint a többi kémia: `
+         +`<b>${SZARNY_NEED} fázis</b>, és minden felajánlásnál te építed tovább. Kész állapotban, `
+         +`amíg mindketten a pályán vannak, a csapat gólesélye `
+         +`<b>+${Math.round((SZARNY_GOAL[t]||0)*1000)/10}%</b>, és <b>${szarnyRipeNeed()}</b> közös meccs után a `
          +`sebességük fölfelé kiegyenlítődik.`
         :`A <b>${SZARNY_NEED_LVL}. csapatstílus-szinttől</b> nyílik: az összeszokott szárny `
          +`a szélső védőt és az előtte játszó szélsőt köti össze.`)
@@ -94108,15 +94348,23 @@ function engShopPickHtml(k,it,pick){
   return x+`</div>`;}
 function engSectionBind(body){
   if(!body)return;
-  const b=body.querySelector("#engBuyLvl");
-  if(b)b.onclick=()=>{if(engBuyLevel())renderStylePanel();};
-  const n=body.querySelector("#bz9Pick");
-  if(n)n.onchange=()=>{bz9Set(n.value||null);renderStylePanel();};
-  /* ---- A PIAC (3.9.128) ----
-     A NÉZETT stílus piaca (3.9.131) — két motoros filozófiánál a gombok a
-     látott panel gazdaságából fizetnek, nem az elsődlegeséből. */
+  /* ---- A NÉZETT stílus gazdasága (3.9.131) — két motoros filozófiánál a
+     gombok a látott panel gazdaságából fizetnek, nem az elsődlegeséből. ----
+     BEJELENTETT HIBA (3.9.143): „nem lehet megvenni továbbra sem a
+     másodlagos meccserő növelőjét. Rányomok és nem veszi el a pénzt. Pedig
+     meg van a keret." A PIAC gombjai már a nézett stílus kulcsát kapták, a
+     SZINTVÁSÁRLÓ gomb viszont kimaradt: az engBuyLevel() paraméter nélkül az
+     ELSŐDLEGES motorra (engKey) nézett. A másodlagos Fojtás gombja így az
+     elsődleges motor feltételét kérdezte — ott más volt az ár, a szint és a
+     pontkeret —, és a válasz némán „nem" lett. Most ugyanazt a kulcsot kapja,
+     mint a piac. */
   let k=null;try{k=styleViewKey();}catch(e){k=null;}
   if(!engLive(k))k=engKey();
+  const b=body.querySelector("#engBuyLvl");
+  if(b)b.onclick=()=>{if(engBuyLevel(k))renderStylePanel();};
+  const n=body.querySelector("#bz9Pick");
+  if(n)n.onchange=()=>{bz9Set(n.value||null);renderStylePanel();};
+  /* ---- A PIAC (3.9.128) ---- */
   const d=engDef(k);
   if(!k||!d)return;
   const jel=(txt)=>{try{addLine(`${d.ic} ${txt}`,"m life");}catch(e){}};
@@ -101101,6 +101349,7 @@ function saveGame(){
            kínálat ebből dobódik, tehát a visszatöltés nem pörget újra. */
         tal:S.tal||null,
         szarny:S.szarny,   /* ⚡ szárny-kémia (3.9.107) */
+        szarnyInProgress:S.szarnyInProgress||null,szarnyMig:S.szarnyMig||0,   /* 3.9.143 */
         bz9:S.bz9,recGoalsMatch:S.recGoalsMatch,   /* ⚽ A Kilences és a klubrekord (3.9.108) */
         /* EGYENLÍTŐ (3.9.67): hány ment el EBBEN AZ IDÉNYBEN — ebből számol az
            ár. A keret a nyár nyílásakor töltődik (twRefillSummerQuotas); az

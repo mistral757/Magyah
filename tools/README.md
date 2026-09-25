@@ -2317,6 +2317,47 @@ node tools/talizman-f3-proba.js
 
 Részletek: `docs/talizmanok.md` (3.9.142).
 
+## szarny-kemia-epites-proba.js — ⚡ a szárny-kémia úgy épül, mint minden más kémia
+
+```bash
+node tools/szarny-kemia-epites-proba.js
+```
+
+**Hét blokk, 20 állítás.**
+
+- **A régi mentés átültetése:** a kész pár kész marad, a félkész pár fázist
+  kap, és nincs futó pár.
+- **A beragadás oka:** a félbemaradt pár nem foglal szárnyat; az élő kész pár
+  igen, de csak amíg a tagja a klubnál van.
+- **A tick** magától nem indít párt.
+- **A VALÓDI meccs utáni lánc:** választó ajánlattal, indítás (1/5),
+  továbbépítés (2/5), váltás a fázisok megtartásával.
+- **Végigjátszásnál** a pár elkészül.
+- **A kész pár:** a gólesély-szorzó és az összeérés.
+- **A panel és a mentés.**
+
+A láncban a párkémia 15%-os dobása elviheti a jutalom-okot. Ilyenkor a próba
+a következő meccset játssza le (legfeljebb hatot). A közbeeső képernyőket úgy
+lépteti tovább, ahogy a játékos tenné.
+
+## masodlagos-motor-vasarlas-proba.js — 🧲 a másodlagos meccserő-szint megvehető
+
+```bash
+node tools/masodlagos-motor-vasarlas-proba.js
+```
+
+A VALÓDI motor-szakaszt rajzolja ki és köti be, és a valódi „Megveszem”
+gombot nyomja meg. **Öt állítás:**
+
+- másodlagos Gegen nézetében a gomb a Gegen szintjét veszi, a Gegen pontjaiból;
+- akkor is, ha az elsődleges Villámnak van pontja — a Villám érintetlen;
+- az elsődleges nézetében a gomb az elsődlegest veszi;
+- nincs oldalhiba.
+
+A régi kódon a próba pontosan a bejelentett hibát adja vissza.
+
+Részletek: `docs/szarny-kemia-epites.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
