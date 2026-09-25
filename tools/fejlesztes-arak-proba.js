@@ -105,15 +105,20 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   k.forEach(x=>ok(Math.abs(t.ref[x]/t.regi[x]-1)<=0.01,`${x}: 10 000-es büdzsénél, 3. idényben a régi ár (±1% kerekítés)`,{most:t.ref[x],regi:t.regi[x]}));
   ok(t.ref.agency===t.ref.agencyVart,"az ügynökség a (saját csillagszintjén vett) scout-ár kétszerese",{a:t.ref.agency,vart:t.ref.agencyVart});
 
+  /* A KEREKÍTÉS TŰRÉSE: az árak 100-ra (a stáb és a scout 500-ra) kerekítenek,
+     tehát egy 3000 körüli árnál a 3% alatti arány-eltérés is kijöhet pusztán
+     a kerekítésből (mérve: ref 3000 → dupla 5900, 1,967×). Az arány-tűrés
+     mellé ezért egy abszolút is áll: a két kerekítés összege. */
+  const kozel=(a,cel,rel)=>Math.abs(a/cel-1)<rel||Math.abs(a-cel)<=150;
   console.log("\n— 2. A BÜDZSÉVEL ARÁNYOS —");
   k.concat(["agency","pos"]).forEach(x=>{
-    ok(Math.abs(t.dupla[x]/t.ref[x]-2)<0.03,`${x}: kétszeres büdzsé → kétszeres ár`,{ref:t.ref[x],dupla:t.dupla[x]});
-    ok(Math.abs(t.fel[x]/t.ref[x]-0.5)<0.03,`${x}: fele büdzsé → fele ár`,{ref:t.ref[x],fel:t.fel[x]});});
+    ok(kozel(t.dupla[x],2*t.ref[x],0.015),`${x}: kétszeres büdzsé → kétszeres ár`,{ref:t.ref[x],dupla:t.dupla[x]});
+    ok(kozel(t.fel[x],0.5*t.ref[x],0.06),`${x}: fele büdzsé → fele ár`,{ref:t.ref[x],fel:t.fel[x]});});
 
   console.log("\n— 3. A KEZDŐ KEDVEZMÉNY —");
   k.concat(["agency","pos"]).forEach(x=>{
-    ok(Math.abs(t.sz1[x]/t.ref[x]-0.50)<0.03,`${x}: 1. idény −50%`,{sz1:t.sz1[x],teljes:t.ref[x]});
-    ok(Math.abs(t.sz2[x]/t.ref[x]-0.67)<0.03,`${x}: 2. idény −33%`,{sz2:t.sz2[x],teljes:t.ref[x]});});
+    ok(kozel(t.sz1[x],0.5*t.ref[x],0.06),`${x}: 1. idény −50%`,{sz1:t.sz1[x],teljes:t.ref[x]});
+    ok(kozel(t.sz2[x],0.67*t.ref[x],0.045),`${x}: 2. idény −33%`,{sz2:t.sz2[x],teljes:t.ref[x]});});
 
   console.log("\n— 4-5. INGYENES VÁLTÁS, KÉPERNYŐK —");
   ok(t.sz1.formIngyen===0&&t.ref.formIngyen===0,"az idei első felállásváltás ingyenes marad",{sz1:t.sz1.formIngyen,sz3:t.ref.formIngyen});

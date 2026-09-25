@@ -1,7 +1,18 @@
-# 🃏 Sorslapok — a kártyarendszer tervezete
+# 🧿 Talizmánok — a kártyarendszer tervezete
 
-**Állapot:** 📝 TERV — egyetlen sor sincs még belőle a kódban.
-**Munkanév:** *Sorslap* (a névválasztás indoka a 2.1 pontban; a döntés a tiéd).
+**Állapot:** 🟡 **F0–F2 kész (3.9.141)** — a váz él: a talizmánok születnek,
+húzhatók, gyűlnek és látszanak, de még **nem hatnak**. A megvalósult rész
+leírása: `docs/talizmanok.md`. Következik az F3 (alaphatások 1–6).
+
+**Név:** *Talizmán* — a döntés megszületett (lásd 19. pont). A dokumentum
+eredetileg „Sorslap” munkanéven készült; ahol a szövegben **lap** áll, az
+innentől a **talizmánt** jelenti, a „pakli” pedig a talizmán-gyűjteményt.
+
+> **A 3.9.141-es döntések** (a felhasználó szavaival): *„Talizmán név jó, 3-ból
+> 1, nem vak, minden másban is egyet értek veled. Joker erősíti a negatív
+> alacsony eséllyel dolgokat is.”* A 19. pont minden javaslata elfogadva; a
+> Joker alaphatása ettől **a jó ÉS a rossz** ritka eseményeket is tolja
+> (9.7, 11. pont).
 
 *(Ez TERV-dokumentum, nem leírás. A benne szereplő függvény- és mezőnevek
 javaslatok; a meglévő kódra mutató nevek — `dialMul`, `buyDiscountParts`,
@@ -72,7 +83,7 @@ három különböző dolog lesz ugyanazon a néven. **Javaslat:** külön név.
 | Talizmán | egyedi, a meglévő szótárral nem ütközik | nem húzásra, hanem birtoklásra utal |
 | Ereklye | a roguelite-ok (Slay the Spire) szava | komolykodó, nem fociszó |
 
-A terv innentől **Sorslap / pakli / húzás** szavakat használ.
+A terv eredetileg a **Sorslap / pakli / húzás** szavakat használta; a döntés **Talizmán** lett (lásd a fejlécet).
 
 ### 2.2 Tizenöt idény alatt 60–80 lap gyűlik — a halmozódást meg kell fogni
 
@@ -122,7 +133,8 @@ A kódban több száz `Math.random()<p` van; egy globális szorzó ezeket
 válogatás nélkül eltolná (a sérüléseket és a kiállítást is). **Megoldás:** egy
 központi jegyzék (`RITKA_ESEMENYEK`, 11. pont) — kulcs, alap-esély, jó/rossz
 jelölés, és egyetlen segéd (`ritkaP(kulcs, p)`). A Joker csak a jegyzékben
-szereplő, **jó** eseményeket tolja; a rosszakat egyetlen lap, a Káosz-elmélet.
+szereplő eseményeket tolja — **a 3.9.141-es döntés óta a jókat ÉS a rosszakat
+is**; a Káosz-elmélet mindkét oldalt tovább erősíti.
 
 ### 2.8 A kedvezmények már rétegesek — a lap nem kerülheti meg a padlót
 
@@ -256,8 +268,15 @@ látszik („🍀 szerencse: 11/16”) — ez maga is a várakozás része.
 | forrás | mikor | mennyi |
 |---|---|---|
 | **Ütemezett húzás** | az idény harmadaiban (1–10., 11–20., 21–30. forduló) egy-egy **véletlen** fordulóban, a meccs utáni jutalom-sorban | **3 / idény, garantált** |
-| **Mérföldkő** | egy FRISSEN teljesített, pénzt fizető mérföldkő a pénz helyett húzást ad — **p = 20%** | átlagosan ~1–1,5 / idény *(F0-ban mérjük, hány pénzes mérföldkő esik egy idényre, és a p-t úgy állítjuk, hogy ez jöjjön ki)* |
+| **Mérföldkő** | egy FRISSEN teljesített, pénzt fizető mérföldkő a pénz helyett húzást ad — **p = 25%**, egy kiértékelésből legfeljebb 1, idényenként legfeljebb 2 | az F0 mérése szerint (lásd alább) ~1–2 / idény |
 | **Különleges alkalmak** | bajnoki cím · kupagyőzelem · osztályugrás · egy legendás játékos visszavonulása (5.4) | alkalmanként 1 |
+
+**Az F0 mérése (3.9.141):** négy végigjátszott idényben a friss, pénzes
+mérföldkövek száma **12 → 5 → 3 → 3** volt. Egy fix 20%-os csere így az első
+idényben ~2,4, a harmadikban ~0,6 húzást adott volna — túl nagy szórás. Ezért
+lett **25% + idényenként legfeljebb 2 + kiértékelésenként legfeljebb 1** (az
+első idény elején négy illeszkedés-mérföldkő egyetlen kiértékelésben
+teljesül). Egy valódi végigjátszott idényben: 3 ütemezett + 2 csere.
 
 **A plafon: 6 húzás / idény, mindegy honnan.** Ha a plafon betelt, a mérföldkő
 pénzt fizet (ahogy ma), a különleges alkalom pedig **a következő idény első
@@ -331,9 +350,17 @@ plafonban. Szándékosan gyenge kárpótlás: a passz vészkijárat, nem straté
 
 ### 6.4 Mikor fut le?
 
-A meglévő meccs utáni jutalom-sorban (`processSkillQueue` — kémia 15% →
-passzkémia → gyilkos páros → **sorslap**), tehát a képernyők nem ütköznek. A
-húzás **nem halasztható** meccsről meccsre (ahogy a skill sem): ott dől el.
+**Ahogy megvalósult (3.9.141):** a meccs utáni lánc végén, a jutalom-képesség,
+a felfedezés és az akadémiai ajánlat UTÁN, a mérkőzés-értékelő előtt
+(`afterAllRewards` → … → `tryAcademyOpportunity` → **`talPostMatch`** →
+`mstatAfterMatch`). Így a képernyők nem ütköznek.
+
+A terv eredetileg azt mondta, hogy a húzás nem halasztható. A megvalósítás
+ennél engedékenyebb: van **„Később döntök”** gomb, mert a húzás
+**végigjátszásnál** úgyis vár (a talizmán döntés, a gép nem hozza meg
+helyetted). A várakozó húzás a Talizmánok menüben ugyanazzal a kínálattal
+folytatható, és a HUB 🧿 jelzéssel figyelmeztet rá. A kínálat seedelt, ezért a
+halasztás nem ad új esélyt.
 
 ---
 
@@ -549,7 +576,7 @@ dobja, 50–50) **· kapaszkodási pont · a specialok katalógusa.** A számok 
 
 | alap-változat | a ritkaság szerint | kapaszkodás |
 |---|---|---|
-| **Szerencsés csillagzat** | a jegyzék JÓ ritka eseményei (11. pont) ×1,08 / ×1,14 / ×1,22 / ×1,34 | `ritkaP()` |
+| **Vad idény** *(3.9.141 döntés: a rosszakat is)* | a jegyzék MINDEN ritka eseménye — a jók ÉS a rosszak — ×1,08 / ×1,14 / ×1,22 / ×1,34 | `ritkaP()` |
 | **Mozgalmas piac** | +1 átigazolási esemény: átlagos **1** ablakban (a nyáriban), ritka **a két rövidben**, nagyon ritka **3** ablakban (nyár + két rövid), legendás **mind a 4-ben** | `twEventMax` |
 
 A második változat az egyetlen alaphatás, ami nem E-vel, hanem **lépcsőben**
@@ -562,7 +589,7 @@ nő — pontosan a kérés példája szerint. Halmozva ablakonként legfeljebb +
 | **Kétélű penge** | ritka | minden új lap pro-dobása a jobbik 2-ből | minden új lap kontra-dobása a rosszabbik 2-ből *(a pakli maga)* |
 | **Fekete bárány** | ritka | papírforma alatti győzelemnél (óriásölés) a jutalmak ×1,5 | esélyesként saját λ −2% *(Meccs)* |
 | **Kaszinó** | nagyon ritka | minden húzáson 4 lap közül választasz | minden húzás a heti lelátó 50%-ába kerül *(Bank)* |
-| **Káosz-elmélet** | legendás | a jegyzék JÓ ritka eseményei ×1,5 | …és a ROSSZAK is ×1,3 (sérülés, kiállítás, öngól, elvágyódás) *(minden)* |
+| **Káosz-elmélet** | legendás | a JÓ ritka események további +50% | …és a ROSSZAK is további +50% (sérülés, kiállítás, öngól, elvágyódás) *(Meccs)* |
 | **Szerencse fia** | átlagos | a szerencse-számláló 16 → 10 húzás | az átlagos lapok mindig a sáv aljáról dobnak *(a pakli maga)* |
 
 **A Befektetők részletei.** A meglévő befektető-kifizetést hívja (Sztárom a
@@ -679,7 +706,7 @@ const RITKA_ESEMENYEK={
   befekteto:     {hol:"sztár-befektető",                         jo:1},
   szurkolorobbanas:{hol:"sztár-szurkolórobbanás",                jo:1},
   mezleveszes:   {hol:"mezLeveszes (25% a hajrában)",            jo:1},  // a játékosok szerint vicces, nem jó — lásd F0
-  /* csak a Káosz-elmélet tolja ezeket: */
+  /* a Joker alaphatása ezeket is tolja (3.9.141 döntés), a Káosz-elmélet még jobban: */
   tizenegyes_ellenunk:{hol:"penalty_against (18)",               jo:0},
   ongol_ellenunk:{hol:"owngoal_against (8)",                     jo:0},
   verekedes:     {hol:"fight (17)",                              jo:0},
@@ -845,7 +872,7 @@ S.pakli={
   hazai, idegen}` — csupa szám, a régi kliens hiánya = semleges.
 * A társad csapatlapján (`mpTeamCard`) látszik a **menedzser-archetípusod**
   és a domináns szín — az identitás a párharc része.
-* **Beállítás** a karrier-beállításokban: „Sorslapok: be / ki”, és külön „a
+* **Beállítás** a karrier-beállításokban: „Talizmánok: be / ki”, és külön „a
   párharcban is”. Alapból mindkettő **be** (egyenlő esély mindkét félnek).
 
 ---
@@ -879,9 +906,9 @@ Durva becslés egy átlagos karrierre (~4 húzás/idény, a döntések ésszerű
 
 | fázis | tartalom | próba |
 |---|---|---|
-| **F0** | Leltár: a ritka-esemény jelöltek; a pénzes mérföldkövek száma idényenként (a p=20% hangolásához); a meglévő ár-láncok listája | `sorslap-leltar-proba.js` — csak mér |
-| **F1** | Adatmodell, lap-generátor (ritkaság, dobás, special-sorsolás, Tiszta lap), mentés/betöltés, migráció — **hatás nélkül** | a generátor eloszlása 10 000 lapon; mentés-visszatöltés után azonos kínálat |
-| **F2** | Ütemező (3 húzás, harmadokban), mérföldkő-csere, plafon; a húzás-képernyő (fordulás, 3-ból 1, passz); a Pakli menü Gyűjtemény füle | a harmadok, a plafon, a visszatöltés-állóság |
+| **F0** ✅ | Leltár és mérés: a pénzes mérföldkövek száma idényenként (12 → 5 → 3 → 3) → a csere-szabály; a ritka-esemény jelöltek helye (`docs/talizmanok.md`) | a mérés a `talizman-proba.js` valódi idényében él tovább |
+| **F1** ✅ | Adatmodell, generátor (ritkaság, dobás, special-sorsolás, Tiszta talizmán), seedelt kínálat, mentés, migráció — **hatás nélkül** | `talizman-proba.js` 1–3., 7. blokk |
+| **F2** ✅ | Ütemező (3 húzás, harmadokban), mérföldkő-csere, plafon; a húzás-ablak (fordulás, 3-ból 1, passz, később); a Talizmánok menü (irány, sáv, gyűjtemény); HUB-gomb és jelzés | `talizman-proba.js` 4–6., 8. blokk |
 | **F3** | Alaphatások 1–6: Scout, Stílus, Taktika, Igazolás, Fejlődés, Stáb | minden alaphatás: hatás nélkül BITRE a régi, lappal a várt eltolás |
 | **F4** | Joker (jegyzék + `ritkaP` + esemény-keret), Morál (jó légkör + jellemhullám), Bank (bevétel-szorzó + **hitel** + három ledger-sor) | a hitel-életciklus (felvétel → törlesztés → hátralék → zár); a hullám Panzerrel és nélküle |
 | **F5** | Meccskártyák: tíz tengely, pillanatkép-mezők, meccserő-sor, eredményjelző | **párharc-determinizmus**: ugyanaz a meccs mindkét gépen ugyanaz |
@@ -896,11 +923,16 @@ dolgoznánk.
 
 ---
 
-## 19. Nyitott döntések — a te szavad kell
+## 19. Döntések — ✅ mind elfogadva (3.9.141)
 
-| # | kérdés | javaslatom |
+A felhasználó a Talizmán nevet választotta, a 3-ból 1 húzást, és „minden
+másban” egyetértett a javaslattal. Egy kiegészítés: **a Joker a negatív, kis
+eséllyel bekövetkező eseményeket is erősíti** (9.7). A 9. kérdés (a
+mérföldkő-csere) az F0 mérése alapján: 25%, idényenként legfeljebb 2.
+
+| # | kérdés | a döntés |
 |--:|---|---|
-| 1 | **Név:** Sorslap / Talizmán / maradjon „kártya”? | **Sorslap** (2.1) |
+| 1 | **Név:** Sorslap / Talizmán / maradjon „kártya”? | **Talizmán** |
 | 2 | **3-ból 1**, vagy vak húzás (egy lap, el kell fogadni)? | **3-ból 1** (2.3) — e nélkül nincs specializáció |
 | 3 | A Tiszta lap kapjon **×1,25**-ös alapot? | igen (4.4) |
 | 4 | A 6-os plafonba a trófea- és öröklap is beleszámít? | igen, de ami kiszorul, a következő idény elejére tolódik (5.1) |

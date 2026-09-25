@@ -2262,6 +2262,36 @@ A stílusszintet és az állapotot a próba felülírt függvényekkel rögzíti
 
 Részletek: `docs/stilus-meccsero-iv.md`.
 
+## talizman-proba.js — 🧿 Talizmánok: a váz (F0–F2)
+
+```bash
+node tools/talizman-proba.js
+```
+
+**Nyolc blokk (49 állítás, ~40 mp):**
+
+- **A katalógus:** 10 kategória, 62 special. Mindegyik kategóriának van
+  átlagos szinten elérhető speciálja, minden kontra másik területet üt, és
+  egyik szöveg sem hagy benne `{v}`-t, NaN-t vagy undefined-ot.
+- **A generátor (10 000 talizmán):** a ritkaság 58/28/11/3%, a special ~67%,
+  az erő a sávban marad, a Tiszta talizmán pontosan ×1,25.
+- **A kínálat:** ismerős / új irány / vad; a tanító első húzás; a
+  szerencse-számláló; a seedelt determinizmus a mentés útja után is.
+- **Az ütemezés:** harmadonként egy húzás, és a 30. fordulóra pontosan 3.
+- **A mérföldkő-csere:** nincs pénz, a napló kimondja, kiértékelésenként 1,
+  idényenként 2, a beragadt jutalom nem cserél, a plafon fog.
+- **A felület:** választás, passz, „Később döntök”, menü, HUB-gomb, jelzés.
+- **A mentés:** a `tal` mező, és a régi mentés futó idénye.
+- **Valódi idény:** egy végigjátszott idény (3 ütemezett + legfeljebb 2
+  csere, a gép nem dönt helyetted), és egy kézi mérkőzés. Ennek láncában a
+  próba úgy lépteti tovább a közbeeső képernyőket (jutalom-képesség,
+  felfedezés), ahogy a játékos tenné, amíg a húzás-ablak elé nem kerül.
+
+A passz összegét a próba rögzített heti bevétellel méri (`fanWeeklyIncome`
+felülírva), mert a fixtúra-keretnek nincs tábora.
+
+Részletek: `docs/talizmanok.md`, a teljes terv: `docs/talizmanok-terv.md`.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```
