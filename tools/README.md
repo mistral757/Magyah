@@ -2416,6 +2416,32 @@ A régi kódon a próba elhasal, mert az F4b függvényei még nem léteznek.
 
 Részletek: `docs/talizmanok.md` (3.9.145).
 
+## talizman-f4c-proba.js — 🧿 Talizmánok F4c: igazgatóság, szponzor, sztárvilág
+
+```bash
+node tools/talizman-f4c-proba.js
+```
+
+**32 állítás, öt blokkban:**
+
+1. **A cél-idény:** meccs nélkül a mostani, egyébként a következő idény.
+2. **🏛️ Igazgatóság:** a valódi sorsolásból 3 elvárás, a tavalyi idényből
+   kalibrálva; a morál-átlag gyűlése; a mind kiváló, mind elbukik, vegyes és
+   elmaradt kupa eset pontos pénzzel; a bizalmi szavazás −10 morálja
+   egyszer; a két kapaszkodó (`finish`, `startNextCareerSeason`).
+3. **🎽 Szponzor:** a valódi képernyő; logó a fejlécben és meccsenkénti
+   fizetés; a szín és a lejárata; a stadionnév (a saját-stadion mérföldkő
+   érintetlen, a saját név zárójelben; idényenként egyszer fizet); a NYÁRON
+   aláírt egyidényes szerződés a következő idényt fedi; a felbontás
+   kötbére; a gép választása; egyszerre egy szerződés.
+4. **🌟 Sztárvilág:** a klub arca, a négy esemény plafonja, a +25% bér;
+   Sztárom a párom stílusban nem jön ki, és a futó sem dupláz.
+5. **Mind a 16 esemény működik**, és a menü sorai.
+
+A `MROOT` környezeti változóval másik munkakönyvtárra is futtatható.
+
+Részletek: `docs/talizmanok.md` (3.9.146).
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```

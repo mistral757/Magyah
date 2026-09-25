@@ -24,7 +24,7 @@
      9. nincs oldalhiba. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
-const ROOT="/home/user/Magyah", PORT=9169;
+const ROOT=process.env.MROOT||"/home/user/Magyah", PORT=9169;
 const {chromium}=require("/opt/node22/lib/node_modules/playwright");
 const TYPES={".html":"text/html; charset=utf-8",".js":"text/javascript",".css":"text/css",
   ".woff2":"font/woff2",".png":"image/png",".ico":"image/x-icon",".webmanifest":"application/manifest+json"};
@@ -105,17 +105,19 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const ki={};
     const T=_pakli(["fiatalodas","hirnevmamor","igazgatosag"]);
     T.esemenyek.fiatalodas.suly=2;
+    /* egy még nem bekötött esemény — 3.9.146 óta mind a 16 működik, ezért a
+       szűrőt egy ideiglenesen „kikapcsolt" eseménnyel mérjük */
+    const _ig=TAL_ES_IMPL.igazgatosag;delete TAL_ES_IMPL.igazgatosag;
     ki.elotte=talEsemenyPakli().map(x=>x.tal+":"+x.weight);
+    TAL_ES_IMPL.igazgatosag=_ig;
     T.esemenyek.fiatalodas.utolso=3;
     ki.utana=talEsemenyPakli().map(x=>x.tal);
-    ki.mukodik=["igazgatosag","szponzor","sztarvilag"].map(talEsemenyMukodik)
-      .concat(["fiatalodas","edzotabor","nyiltnap","turne","legendakopog","tekozlo","hirnevmamor","botrany",
-               "csabitas","ado","ugynokhaboru","edzessereules","palyazar"].map(talEsemenyMukodik));
+    ki.mukodik=TAL_ESEMENY.map(e=>talEsemenyMukodik(e.id));
     return ki;});
   console.log("\n— 2. A PAKLI —");
-  ok(pk.elotte.join()==="fiatalodas:2,hirnevmamor:1","a működő események a súlyukkal; az Igazgatósági ülés (még nem működik) kimarad",pk.elotte);
-  ok(pk.utana.join()==="hirnevmamor","ami idén már kijött, az idényre kiesik",pk.utana);
-  ok(pk.mukodik.slice(0,3).every(x=>!x)&&pk.mukodik.slice(3).every(x=>x),"13 esemény működik, 3 (igazgatóság, szponzor, sztárvilág) az F4c-ben",pk.mukodik);
+  ok(pk.elotte.join()==="fiatalodas:2,hirnevmamor:1","a működő események a súlyukkal; egy még nem bekötött esemény kimarad",pk.elotte);
+  ok(pk.utana.join()==="hirnevmamor,igazgatosag","ami idén már kijött, az idényre kiesik",pk.utana);
+  ok(pk.mukodik.length===16&&pk.mukodik.every(x=>x),"mind a 16 esemény működik (3.9.146 óta az igazgatóság, a szponzor és a sztárvilág is)",pk.mukodik);
 
   /* ---- 3. A VALÓDI SORSOLÁS — AZONNALI ESEMÉNYEK ---- */
   const az=await p.evaluate(()=>{
@@ -332,17 +334,22 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const T=_pakli(["hirnevmamor","igazgatosag","ado"]);
     T.esemenyek.ado.utolso=3;
     T.esHat={mamor:{n:_xi()[3].n,hatra:7,pad:1,m:0},palyazar:1,ber:{[_xi()[4].n]:{m:1.5,szezon:3}}};
+    const _ig=TAL_ES_IMPL.igazgatosag,_sp=TAL_ES_IMPL.szponzor;
+    delete TAL_ES_IMPL.igazgatosag;delete TAL_ES_IMPL.szponzor;
     talMenuOpen();
     ki.t=$("talHatas").textContent;
     talMenuClose();
     const L={uid:9,kat:"joker",valt:"csomag",rang:2,dobas:0.5,spec:null,csomag:["tekozlo","turne","szponzor"]};
     ki.lap=talAlapSzoveg(L);
+    TAL_ES_IMPL.igazgatosag=_ig;TAL_ES_IMPL.szponzor=_sp;
+    ki.lapMind=talAlapSzoveg(L);
     ki.aktiv=talAlapAktiv(L);
     return ki;});
   console.log("\n— 8. MENÜ ÉS LAP —");
   ok(/Igazgatósági ülés ⏳/.test(mn.t)&&/Adóellenőrzés ✓/.test(mn.t)&&/idén már kijött/.test(mn.t),"a menüben: ✓ idén már kijött, ⏳ később kapcsol be",mn.t.slice(0,300));
   ok(/Hírnév-mámor/.test(mn.t)&&/1\/3/.test(mn.t)&&/Pályazár: még 1/.test(mn.t)&&/bére \+50%/.test(mn.t),"a futó hatások a menüben: mámor (pad 1/3), pályazár, béremelés",mn.t.slice(-400));
   ok(/Mezszponzor ⏳/.test(mn.lap)&&!/tékozló fiú ⏳/.test(mn.lap)&&mn.aktiv,"a lapon a még nem működő esemény ⏳ — és az Eseménycsomag alaphatása él",mn.lap);
+  ok(!/⏳/.test(mn.lapMind),"ha mind működik, a lapon nincs ⏳",mn.lapMind);
 
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();

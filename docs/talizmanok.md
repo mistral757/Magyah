@@ -544,3 +544,116 @@ a menüben ⏳ jelzi őket.
 * a kézi ablak (`twStartPhase2` → `land`) és az automatikus
   (`autoResolveCheckpoint`) ablak;
 * a menü és a lap.
+
+---
+
+# 3.9.146 — F4c: az igazgatóság, a szponzor és a sztárvilág
+
+A csomag utolsó három eseménye. **Mind a 16 működik.** Mindhárom egy teljes
+**idényre** szól, és a céljuk közös szabállyal dől el (`talCelSzezon`):
+
+* ha az idényben még nem játszottál meccset, a mostani idényre szól (ez az
+  első idény előtti HUB);
+* a nyárban és menet közben a **következő** idényre. A nyári HUB a
+  szezonváltás *előtt* fut, ott a szezonszám még a lezárult idényé.
+
+Egy félig lejátszott idényre adott megbízás nem volna fair.
+
+## 🏛️ Igazgatósági ülés
+
+**Három elvárás** a hét fajtából. A **kupasorozat** csak akkor lehet köztük,
+ha a megbízott idényre van nemzetközi kampány. A célok a **megbízott idény
+elején** kalibrálódnak, az akkor ismert számokból (`talIgazgIndit`):
+
+| elvárás | a cél | a mérés |
+|---|---|---|
+| 🏆 bajnoki helyezés | a tavalyi helyezés −2 (a dobogósoké marad) | a végtabella |
+| 🎺 szurkolótábor | +4…8% | a tábor a bajnokság végén, a megbízás kezdetéhez mérve |
+| 💰 büdzsé | a szezonkeret 25%-a | az egyenleg a bajnokság végén |
+| ❤️ morál | a morál-cél (45–75) | az idény meccseinek átlagos morálja (meccsenként gyűlik) |
+| ⚽ gólszám | a tavalyi gólszám +5% (legalább 30) | a bajnoki gólok |
+| 🎢 izgalom | a tavalyi átlag +3 (legalább 35) | a meccsértékelések átlaga |
+| 🌍 kupasorozat | a 2. kieséses kör | `cupDepthNow(S.euro)` |
+
+**Ütemezés:**
+
+* **Mérés:** pillanatkép a szezonzáráskor (`talIgazgZaro`, a
+  szezontörténet bejegyzése után).
+* **Értékelés:** a szezonváltáskor (`talIgazgErtekel`, a szezonszám
+  növelése *előtt*). Addigra a kupa-kampány is lement.
+* **Elmaradt kupa:** ha a kampány elmaradt, az az elvárás nem számít.
+
+**Jutalom** (a szezonkeret %-ában), elvárásonként:
+
+* kiváló (a cél 120%-a; helyezésnél 2 hellyel jobb): **+8%**;
+* teljesítve: **+4%**;
+* elbukva: **−5%**.
+
+**Az idény egészére:**
+
+* mind teljesül → **a tulajdonosok bizalma**, +10%;
+* egy sem → **bizalmi szavazás**, −10%, és −10 morál az új idény első
+  meccse után;
+* vegyes eredmény → egyik sem.
+
+## 🎽 Mezszponzor
+
+Három ajánlat a kézi ablakban, egy választható, vagy egyik sem. Egyszerre
+egy szerződés futhat. A futamidő 1–3 idény, és ugyanúgy számít, mint a többi
+idényes eseménynél (`talCelSzezon`):
+
+* **nyáron** aláírva a **következő** idénytől fut, tehát egy egyidényes
+  szerződés nem jár le a szezonváltáskor, mielőtt egyetlen meccset látna;
+* **menet közben** aláírva a mostani idény maradéka **ráadás**.
+
+A szerződés az `elso`–`utolso` idénypárral él. A stadionnév díját a
+`fizetve` mező őrzi: egy idényért egyszer fizet.
+
+| ajánlat | hol látszik | mit fizet |
+|---|---|---|
+| **Logó a címerben** (🍺 🛞 📱 🍕 🥤 🛒 🎰 🚜) | a fejléc címerének sarkában | meccsenként a heti lelátó 6–12%-a |
+| **Szponzorszín** | a klubszínpár **második** színe (`teamColors`) | a szezonközi ablakokban (8., 15., 23. forduló) a heti lelátó 150–300%-a |
+| **Stadionnév** | a kiírásban elöl, a saját név zárójelben (`identStadiumKiir`) | idényenként egyszer (az első idényé aláíráskor, a többi a szezonváltáskor) a heti lelátó 800–1500%-a |
+
+* **Korai felbontás** (a menüben): a hátralévő érték fele a kötbér.
+* **Lejáratkor** az arculat magától visszaáll.
+* **A saját arculat mérföldkövei** (címer, színek, stadion) a szponzortól
+  **nem** teljesülnek: az `identHasStadium` / `colorsOwn` érintetlen, csak a
+  kiírás változik.
+* **A gép** a szerződés teljes értékében a legtöbbet érőt választja.
+
+## 🌟 Sztárvilág
+
+A klub **arca** a legjobb (legmagasabb Ratingű) kerettag. A Sztárom a párom
+négy hírnév-eseménye meccsenként dobódik rá, idényenkénti plafonnal:
+
+| esemény | esély / meccs | plafon | hatás |
+|---|--:|--:|---|
+| szurkoló-robbanás | 8% | 2 | +2–5% szurkoló |
+| reklám | 10% | 3 | a heti lelátó 50–150%-a |
+| befektető | 4% | 1 | a szezonkeret 5–10%-a |
+| követelés | 6% | 1 | **+25% bér** az idény végéig |
+
+* **Csak ha a stílusod NEM a Sztárom a párom.** Így szólt a kérés, és
+  abban a stílusban a saját hírnév-gépezet már a sztárodon fut. Ott az
+  esemény nem jön ki, és nem is ég el.
+* **Ha menet közben váltasz arra a stílusra,** a futó sztárvilág szünetel,
+  így nincs dupla esemény.
+* **Ha az arc elhagyja a klubot,** az események elmaradnak.
+
+## A próba
+
+`node tools/talizman-f4c-proba.js` (9171-es port, ~15 mp), 32 állítás:
+
+* a cél-idény szabálya;
+* az igazgatóság: a valódi sorsolás, a kalibrálás, a morál-átlag, a mind
+  kiváló / mind elbukik / vegyes / elmaradt kupa eset, a következő idényre
+  szóló megbízás, és a két kapaszkodó;
+* a szponzor: a valódi képernyő; a logó a fejlécben és meccsenként; a szín
+  és a lejárata; a stadion (a mérföldkő érintetlen, a saját név
+  zárójelben); a felbontás és a gép választása;
+* a sztárvilág plafonjai, a követelés, és hogy Sztárom a párom stílusban nem jön ki;
+* mind a 16 esemény és a menü.
+
+Az F4b próbája 3.9.146 óta a „még nem bekötött esemény kimarad” szabályt egy
+ideiglenesen kikapcsolt eseménnyel méri.
