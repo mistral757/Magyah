@@ -6245,7 +6245,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.148";
+const APP_VERSION="3.9.149";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -42519,8 +42519,12 @@ function paperRefNow(){
   let raw=0,ms=0;
   try{raw=teamStrength()||0;}catch(e){raw=0;}
   try{ms=teamMatchStrength();}catch(e){ms=raw;}
+  /* párharcban a meccs-erőd a pillanatképedből — ugyanaz, amiből a társad a
+     te papírformádat számolja (paperOppOf), tehát a mérce szimmetrikus */
+  if(_duelMyMs!=null&&isFinite(_duelMyMs))ms=_duelMyMs;
   if(!isFinite(ms))ms=raw;
   return (raw+ms)/2;}
+let _duelMyMs=null;
 function paperRefKickoff(){
   try{_paperRefKick=paperRefNow();}catch(e){_paperRefKick=null;}}
 function paperRef(){
@@ -54655,7 +54659,10 @@ function sbPaintTeams(fx){
   let myMs=null;try{myMs=teamMatchStrength();}catch(e){myMs=null;}
   const oppRaw=(fx.o&&typeof fx.o.dispOvr==="number")?fx.o.dispOvr:(fx.o&&fx.o.ovr);
   let oppMs=null,oppKieg=0;
-  if(fx&&fx.duel)oppMs=(fx.o&&typeof fx.o.matchOvr==="number")?fx.o.matchOvr:null;
+  if(fx&&fx.duel){
+    oppMs=(fx.o&&typeof fx.o.matchOvr==="number")?fx.o.matchOvr:null;
+    /* 3.9.149: a sajátod is a pillanatképből — ugyanaz a szám, amit a társad lát */
+    if(typeof fx.myMatch==="number"&&isFinite(fx.myMatch))myMs=fx.myMatch;}
   else if(fx.o&&typeof fx.o.ovr==="number"){
     try{oppKieg=matchHiddenOppBuff()||0;oppMs=fx.o.ovr+oppKieg;}catch(e){oppMs=null;oppKieg=0;}}
   if(num(myMs)==null||num(oppMs)==null){myMs=null;oppMs=null;}
@@ -55686,7 +55693,14 @@ function buildMatchSnapshot(){
   const badW=active.map((a,i)=>i===gi?0:((hasFormlock(a.p.n)||cardBadFormImmune(a.p.n))?0
     :Math.max(0.25,1-COACH_FORM_W*coachTypePower("form",a.p.n))));
   const bi=weightedIndex(badW);
-  const moraleMod=(S.morale-50)/50*2.5;
+  /* ---- A MORÁL MECCS-HATÁSA A CSÚSZKÁVAL EGYÜTT (3.9.149) ----
+     HIBA VOLT: a „morale" csúszka-csatorna (pl. „Hagyd a legjobbat": ára a
+     csapatmorál; „Béke": haszna a morál) CSAK a kijelzett meccserőben hatott
+     (moraleToOvr), a motor itt a csúszka nélküli képlettel számolt — a
+     beállított hatás a pályán nem létezett, a kijelzés pedig mást mutatott,
+     mint amivel a meccs számolt. Mostantól EGY képlet: csúszka nélkül
+     (dialMul=1) betűre a régi (m−50)/50×2,5. */
+  const moraleMod=moraleToOvr(S.morale);
   let sum=0,auraBonus=0;
   active.forEach((a,k)=>{
     let contrib;
@@ -59875,7 +59889,18 @@ function h2hStart(node,sim,round){
        Régi kliens pillanatképében nincs → null, és az eredményjelző ilyenkor
        a megszokott számot mutatja. */
     oppMatch:(typeof oppSnap.ovr==="number")
-      ?Math.round((oppSnap.ovr+(oppSnap.tacticEffect||0))*10)/10:null};
+      ?Math.round((oppSnap.ovr+(oppSnap.tacticEffect||0))*10)/10:null,
+    /* ---- A SAJÁT MECCS-ERŐD UGYANABBÓL A KÉPLETBŐL (3.9.149) ----
+       BEJELENTETT HIBA: „Nálam azt mutatta, hogy a meccs erőd 98" — a társ
+       gépén a TE ⚡-od a te pillanatképedből jött (ovr + taktika: pontosan
+       amivel a szimuláció számol), a te gépeden viszont a helyi BECSLÉSBŐL
+       (teamMatchStrength), ami a napi és a tartós formát, az egyensúly-
+       bónuszt és a stílus csapaterő-traitjét nem tartalmazza. Ugyanannak a
+       csapatnak két képernyőn két száma volt. Mostantól a párharcban MINDKÉT
+       oldal a pillanatképből, ugyanazzal a képlettel — a két gép ugyanazt
+       mutatja, és az a szám az, amivel a meccs valóban lement. */
+    myMatch:(()=>{const my=(node&&node[MP.role==="host"?"host":"guest"])||{};
+      return (typeof my.ovr==="number")?Math.round((my.ovr+(my.tacticEffect||0))*10)/10:null;})()};
   playMatch();}
 /* A párharc góljának perce a KÖZÖS listából jön, tehát mindkét kliens ugyanazt
    a számot írja ki — a lista egyszer készül el, és a vödör-szétválasztás
@@ -63509,6 +63534,8 @@ function playMatch(){
   /* F4/4: a párharc szkriptje EGYSZER használatos — itt vesszük át és
      nullázzuk, hogy a meccs végén már ne lógjon be a következő fordulóba. */
   const DUEL=h2hScript;h2hScript=null;
+  /* a párharc saját meccsereje a papírformához (paperRefNow) — lásd h2hStart */
+  _duelMyMs=(DUEL&&typeof DUEL.myMatch==="number")?DUEL.myMatch:null;
   S.playing=true;$("kickBtn").disabled=true;
   /* PANZER (3.9.68): a meccs rettenet-mérlege ITT nullázódik, és itt rögzül a
      meccserő-fölény — a kezdőrúgás állapotából, ahogy a nehézség-tanácsadó is
@@ -63544,6 +63571,7 @@ function playMatch(){
          ...(DUEL.oppShown!=null?{dispOvr:DUEL.oppShown}:{}),
          ...(DUEL.oppMatch!=null?{matchOvr:DUEL.oppMatch}:{}),
          ...(DUEL.oppIdent?{ident:DUEL.oppIdent}:{})},
+       ...(DUEL.myMatch!=null?{myMatch:DUEL.myMatch}:{}),
        home:!DUEL.neutral&&!!DUEL.iAmHome,duel:true}
     /* OSZTÁLYOZÓ: saját, két meccses menetrend — ugyanabban az alakban. */
     :(pyrPoActive()?pyrPoFx():(euroActive()?S.euro.fixtures[S.euro.idx]:S.fixtures[S.idx]));

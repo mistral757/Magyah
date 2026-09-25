@@ -37,7 +37,7 @@ const srv=http.createServer((req,rp)=>{
 let hiba=0;
 const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSON.stringify(d):""));if(!c)hiba++;};
 const TAC_OK=["kontra","labdatartas","totalis","busz","hosszu","szeljatek"];
-const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
+const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e+1e-9;   /* a lebegőpontos kivonás (86,7−86,6 = 0,10000000000000853) ne bukjon a határon */
 (async()=>{
   await new Promise(r=>srv.listen(PORT,"127.0.0.1",r));
   const b=await chromium.launch({args:["--no-sandbox"]});

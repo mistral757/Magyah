@@ -2491,6 +2491,27 @@ node tools/talizman-f5-proba.js
 
 Részletek: `docs/talizmanok.md` (3.9.148).
 
+## meccsero-egyezes-proba.js — ⚡ ugyanannak a csapatnak ugyanaz a meccs-ereje mindkét gépen
+
+```bash
+node tools/meccsero-egyezes-proba.js
+```
+
+A bejelentett hiba ez volt: párharcban a saját eredményjelződön ⚡95,2 állt,
+a társadén ugyanerre a csapatra ⚡98.
+
+A próba a következőket méri:
+
+- a VALÓDI `h2hStart`-ot mindkét szerepből (gazda és vendég): a két gép
+  ugyanazt a számpárt adja;
+- a valódi eredményjelzőt (`sbPaintTeams`): párharcban a sajátod a
+  pillanatképből jön, nem a helyi becslésből, és az élő frissítés is erről
+  indul;
+- a papírformát: párharcban szimmetrikus;
+- a morál-csúszkát: a motorban is hat, csúszka nélkül bitre a régi.
+
+A régi kódon a próba pontosan a bejelentett eltérést adja vissza.
+
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
 ```

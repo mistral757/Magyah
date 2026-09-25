@@ -177,3 +177,46 @@ rossz tinta esetén csak a címer, a név marad.
 **Módosított próba:** a `tools/pvp-meccsero-proba.js` mostantól a meccs-erőt a
 bajnokiban és a kupában is elvárja, saját sorban. A csapaterő sora mindenhol
 változatlan.
+
+---
+
+## 3.9.149 — ugyanannak a csapatnak ugyanaz a meccs-ereje mindkét gépen
+
+> *„Nálam azt mutatta, hogy a meccs erőd 98”* — a te eredményjelződön
+> ugyanez a csapat ⚡95,2 volt.
+
+**Az ok: két képlet.** A párharcban a társ gépe a te ⚡-odat a te
+**pillanatképedből** számolta (`ovr` + taktika). Pontosan ezzel a számmal
+számol a szimuláció is. A te géped viszont a helyi **becslést**
+(`teamMatchStrength` = csapaterő + `hiddenMatchBonus`) írta ki. A becslésből
+hiányzik:
+
+* a napi forma (két kisorsolt játékos ±);
+* a **tartós forma** (játékosonként ±15% a skála két szélén);
+* a **csapategyensúly-bónusz** (legfeljebb +2);
+* a stílus csapaterő-traitje (`ovrTeam`).
+
+**A javítás.**
+
+* **A párharcban mindkét oldal a pillanatképből, ugyanazzal a képlettel.**
+  A `h2hStart` a saját pillanatképedből is kiszámolja a `myMatch`-et. Az
+  eredményjelző ezt írja ki, és az élő frissítés (csere, kiállítás) is erről
+  indul. A két gép így ugyanazt a számpárt mutatja, és az a szám az, amivel
+  a meccs valóban lement.
+* **A papírforma is szimmetrikus.** A saját papírformád (óriásölés,
+  kihívások) ugyanabból a számból jön, amiből a társad gépe a tiédet
+  számolja.
+* **Motorhiba: a morál-csúszka.** A „morale” csúszka-csatorna (például
+  „Hagyd a legjobbat”: ára a csapatmorál; „Béke”: haszna a morál) eddig CSAK
+  a kijelzett meccserőben hatott, a motor a csúszka nélküli képlettel
+  számolt. Mostantól a `buildMatchSnapshot` is a `moraleToOvr`-t hívja.
+  Csúszka nélkül bitre a régi.
+
+**Ami nem változott.** A CPU-meccsek ⚡-ja és a nehézség-követés továbbra is
+a becslésből dolgozik. A három hiányzó tag (tartós forma, egyensúly-bónusz,
+stílus-trait) beemelése a becslésbe a CPU-mezőny kiegyenlítését is
+emelné, tehát ez balance-döntés, nem hibajavítás. Nyitott kérdés.
+
+Próba: `tools/meccsero-egyezes-proba.js`. A valódi `h2hStart` mindkét
+szerepből, a valódi eredményjelző, a papírforma és a morál-csúszka. A régi
+kódon pontosan a bejelentett eltérést adja vissza (nálad 95,2, a társnál 98).
