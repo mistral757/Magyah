@@ -138,6 +138,8 @@ mellett ül, ugyanazon a két ponton.
 
 ## 8. ⚡ Szárny-kémia (3.9.107)
 
+> **3.9.143 óta** a szárny nem magától indul: felajánlásból, választásból és fázisonként épül, mint a gyilkos páros. Lásd `docs/szarny-kemia-epites.md`.
+
 A **harmadik kötésfajta** a passzkémia és a gyilkos páros mellé — és a
 harmadik, ami nem felajánlásból jön, hanem **együtt töltött időből**.
 

@@ -222,3 +222,438 @@ Szerencse fia) is F6-ban kapcsolnak be — most a kínálat 3 lap, a plafon 6.
 `node tools/talizman-proba.js` (9153-as port, ~40 mp) — 44 állítás, köztük
 egy teljes, valódi végigjátszott idény és egy kézi mérkőzés, ahol a
 húzás-ablaknak a lánc végén elénk kell kerülnie.
+
+---
+
+# 3.9.142 — F3: a hat gazdasági kategória alaphatása él
+
+> „Szuperek a példák, légy egy kicsit még kreatívabb. […] a pro mindig illik a
+> kártyához, de a contra lehet más témájú. […] Mehet az f3”
+
+## A számítás: egy helyen (`talAlapMind`)
+
+1. Egy kategória talizmánjai **erő (E) szerint csökkenő** sorba állnak.
+2. A k-adik talizmán a **0,85^k-szorosát** éri. Az 1. teljes, a 2. 85%, a 3.
+   72%, a 10. 23%.
+3. Minden talizmán a **saját változatához** adja a csökkentett erejét, és a
+   változat összege a saját egységében (%, pp) **a plafonnál megáll**.
+4. A memó kulcsa a gyűjtemény sorszáma és mérete. A `devTempo`, a
+   `tacticFit` és a `coachQual` meccsenként százszor is kérdez, ezért kell.
+
+| változat | 1 E | plafon | kapaszkodó |
+|---|--:|--:|---|
+| 🔭 Bővebb lista | +12% esély a 4. jelöltre | 100% | `twScout` (`want`) |
+| 🔭 Nyitott kapu | +15% esély akadémiai ajánlatra a köztes fordulóban | 100% | `tryAcademyOpportunity` (`idx%4===2`) |
+| 🎭 Olcsóbb fa | −3% képesség- és csillagozás-ár | 30% | `styleTraitNextPrice` (kijelzés ÉS levonás), `starUnlockPrice` |
+| 🎭 Mérföldkő-prémium | +4% | 40% | `msCashReward`, `msSpReward` |
+| 📋 Jobb illeszkedés | +0,8 pp | 8 pp | `tacticFit` (ugyanaz a pp-csatorna) |
+| 📋 Gyorsabb tanulás | +6% | 50% | `tacticTrainAfterMatch` |
+| 🤝 Tiszta üzlet | +2,5 pp | 20 pp | `twResolveSigning` (`chShift`) |
+| 🤝 Kedvezmény-szerencse | 4% esély −25%-ra | 35% | `buyDiscountParts` (seedelt, a kihívás-kedvezménnyel nem adódik) |
+| 🤝 Licitfelhajtó | a licit-kúp csúcsa +2 pp | 15 pp | `saleRollOffer` |
+| 🌱 Gyorsabb érés | +2,5% | 20% | `devTempo` (a játék saját „fejlődési tempója”: fejlődés, begyakorlás, párkémia) |
+| 🌱 Hatékony edzés | +5% | 40% | a tervezett edzés `_tm` szorzója |
+| 🎓 Jobb szakemberek | +4% | 35% | `coachQual` (a plafon UTÁN) |
+| 🎓 Olcsóbb stáb | −5% | 40% | `staffPrice`, `coachSlotPrice` |
+
+**Talizmán nélkül egyetlen bit sem mozdul.** Semleges állapotban minden olvasó
+0-t vagy ×1-et ad. Ahol a kerekítés vagy egy véletlenhívás eltérést okozhatna,
+ott a kód ki is kerüli az ágat (`m>=1 ? régi : új`, `p>0 && Math.random()`).
+A próba ezt két gyűjteményen méri: egy üresen, és egy olyanon, amelyben csak
+a még nem ható kategóriák állnak.
+
+## A felület
+
+* **A lapon** a „⚡ az alaphatás él” / „⏳ később kapcsol be” sor jelzi,
+  mi hat már.
+* **A menüben** külön blokk van: ⚡ **Aktív alaphatások**. Pontosan azt a
+  számot mutatja, amit a játék használ, a plafonnal és azzal együtt, hogy
+  mennyit érne a következő talizmán abban a kategóriában. A még nem ható
+  változatok itt nem jelennek meg.
+
+## A második hullám: 20 új special
+
+Mindegyik egy kis történet, egy döntés vagy egy kockázat. A kontra sokszor
+egészen más világból jön: a szülők ügyvédje, az adóhivatal, a sajtó
+címlapja, a lelátó zaja. Összesen **82 special**. A teljes lista:
+`docs/talizmanok-terv.md` 9.11.
+
+## 📦 A Joker eseménycsomagja
+
+Új Joker-változat. **2 új jó és 1 új rossz** eseményt tesz az átigazolási
+pakliba, és a csomag tartalma **már a lapon látszik**, a választás előtt. Egy
+esemény csak egyszer kerülhet a pakliba, és a kínálat három lapja sem
+ismételhet. A ritkaság a súlyt viszi (×1 / ×1,3 / ×1,6 / ×2).
+
+A tár: **9 jó** (az ifjúság forrása, igazgatósági ülés, mezszponzor,
+sztárvilág, a tékozló fiú, edzőtábor, nyílt nap, ázsiai túra, egy legenda
+kopogtat) és **7 rossz** (hírnév-mámor, öltözői botrány, rivális csábítás,
+adóellenőrzés, ügynökháború, balszerencsés edzés, pályazár). Az első ötöt a
+kérés hozta. A választott csomag a menüben is látszik („📦 Az átigazolási
+paklidba került…”). **Az események maguk az F4-ben kapcsolnak be.** A
+részletes tervük (az igazgatósági ülés elvárásai, a szponzor-szerződések)
+a `docs/talizmanok-terv.md` 9.12-ben van.
+
+## A próba
+
+`node tools/talizman-f3-proba.js` (9159-es port, ~15 mp), 31 állítás:
+
+* a semleges bit-azonosság;
+* a csökkenő hozam és a plafon;
+* mind a 13 kapaszkodó, köztük a **valódi** tárgyalás (`twResolveSigning`)
+  és a **valódi** licit (`saleRollOffer`) rögzített dobással, valamint a
+  valódi meccs utáni begyakorlás;
+* a menü és a lap jelzései;
+* az eseménycsomag.
+
+---
+
+# 3.9.144 — F4a: Joker, Morál, Bank
+
+> „Joker erősíti a negatív alacsony eséllyel dolgokat is.” · „Okés mehet az f4”
+
+Kilenc kategória alaphatása él. A Meccs (F5), a Joker **eseménycsomagjainak
+tartalma** (F4b) és a specialok (F6) hiányoznak még. A számítás ugyanaz, mint
+az F3-ban (`talAlapMind`): a talizmánok erő szerint sorba állnak, a k-adik
+0,85^k-t ér, és minden változatnak saját plafonja van. **Talizmán nélkül
+egyetlen bit sem mozdul**, ezt a próba 1. blokkja betűre méri.
+
+## 🃏 Joker
+
+| változat | 1 E | plafon | kapaszkodó |
+|---|--:|--:|---|
+| **Vad idény** | minden ritka esemény +8% eséllyel | +60% | `talRitkaMult(DUEL)` |
+| **Mozgalmas piac** | +esemény az átigazolási ablakokban (ritkaság szerint) | ablakonként +2 | `talPiacExtra(kind)` |
+| **Eseménycsomag** | 2 jó + 1 rossz esemény a pakliba | — | az F4b-ben kapcsol be |
+
+A **Vad idény** a meccsen és a piacon is hat:
+
+* a meccs-motor különleges eseménye (`_sevP`, jó és rossz egyaránt);
+* a mez leveszése (legfeljebb 50%);
+* a piros lap (`_pRed`);
+* az átigazolási sorsolás, ahol a „csendes” sáv súlya a szorzóval
+  **osztódik**. Így minden valódi esemény (álom, sztár-igény, távozás,
+  csúcsforma…) arányosan gyakoribb lesz, a súlyuk pedig nem változik.
+
+A **párharcban (PvP) semleges**: a két gép ugyanazt a meccset játssza, egy
+csak az egyik oldalon élő szorzó szétválasztaná őket.
+
+A **Mozgalmas piac** ablakai:
+
+| ritkaság | nyár | rövid (8., 23.) | téli (15.) |
+|---|:-:|:-:|:-:|
+| átlagos | +1 | | |
+| ritka | | +1 | |
+| nagyon ritka | +1 | +1 | |
+| legendás | +1 | +1 | +1 |
+| Mítosz | +2 | +2 | +2 |
+
+Több lap összeadódik, de ablakonként legfeljebb **+2**. A plusz a kézi
+ablaknál az `eventMax`-ba kerül (`twOpenCheckpointWindow`, nyáron a
+`twSummerEventMax()`). Az automatikus ablakok ugyanennyivel több
+`resolveOneEvent`-et futtatnak.
+
+## ❤️ Morál
+
+| változat | 1 E | plafon | kapaszkodó |
+|---|--:|--:|---|
+| **Jó légkör** | a morál célértéke +0,8 pont; a mélypontról 10%-kal gyorsabb visszatérés | +8 pont (×2 visszatérés) | a meccs utáni morál-húzás (`_tc`, `_tv`) |
+| **Jellemhullám** | lépések a keret jellemén, a választott irányba | — | `talHullamTick()` a `talPostMatch` elején |
+
+### 🌊 Jellemhullám
+
+A választás után a húzás-ablak **irányválasztóvá** alakul, öt gombbal:
+
+1. Karizma ↑
+2. Kapcsolódás ↑
+3. Kapcsolódás ↓
+4. Vérmérséklet ↓
+5. Vérmérséklet ↑
+
+A „kemény” irányok (a Kapcsolódás ↓ és a Vérmérséklet ↑) Panzerben, a
+Fordított jellemmel, erőt jelentenek. Ha a „Később döntök” gombot nyomod, a
+Talizmánok menüben egy „Irányt választok” gomb vár.
+
+| ritkaság | lépés | forduló |
+|---|--:|--:|
+| átlagos | 2 | 10 |
+| ritka | 3 | 12 |
+| nagyon ritka | 5 | 15 |
+| legendás | 8 | 20 |
+| Mítosz | 12 | 25 |
+
+**Egy lépés** egy véletlen kerettag jellemét viszi egy fokkal arra, amerre
+a hullám fúj. Csak olyan játékos jöhet szóba, akinél a skálán még van hova
+lépni, és aki ebben a hullámban még nem lépett kettőt. A pool-bejegyzés és a
+pályán lévő példány **együtt** mozdul, a napló pedig minden lépést kimond.
+
+Fordulónként legfeljebb egy lépés jön. Az esélye: a hátralévő lépések száma
+osztva a hátralévő fordulókéval. A hullám így a hossza végére minden lépését
+megteszi, de hogy pontosan mikor, az véletlen.
+
+**Nem ragad be.** Ha a hossza lejárt, és a keretben már senkit nem lehet
+abba az irányba vinni (például mindenki a karizma tetején áll), a hullám
+**elül**, a napló kimondja, és eltűnik a menüből.
+
+## 💰 Bank
+
+| változat | 1 E | plafon | kapaszkodó |
+|---|--:|--:|---|
+| **Jobb üzletmenet** | minden bevétel +1,5% | +15% | `budgetEarn` — egyetlen szorzó |
+| **Hitelkeret** | kölcsön a szezonkeret egy részéig | 5. lépcső | `talHitel*` |
+
+A Jobb üzletmenet szorzója **nem vonatkozik** a játékos-eladásra (a sima és
+a sztár-eladásra sem), a visszatérítésre, a talizmán-passzra és a
+hitel-folyósításra (`TAL_BANK_KIVETEL`).
+
+### 🏦 A hitel
+
+| legjobb Hitelkeret-lap | keret | kamat | futamidő |
+|---|--:|--:|--:|
+| átlagos | a szezonkeret 15%-a | 20% | 15 meccs |
+| ritka | 25% | 15% | 15 meccs |
+| nagyon ritka | 35% | 10% | 20 meccs |
+| legendás | 50% | 6% | 30 meccs |
+| 5. lépcső | 60% | 5% | 30 meccs |
+
+Minden további Hitelkeret-lap egy lépcsővel feljebb visz. A keret alapja a
+`seasonBudgetCore()`, százasra kerekítve.
+
+* **Felvétel:** csak átigazolási ablakban, a menü „Felveszem” gombjával.
+  Egyszerre egy hitel futhat. A folyósítás `loanIn` sorral kerül a
+  büdzsébe, szorzó nélkül.
+* **Törlesztés:** minden lejátszott meccs után, a bérrel együtt
+  (`chargeMatchWages`), egyenlő részletben. Két sor könyvelődik: a tőke
+  `loanPay`, a kamat `loanInt`.
+* **Ha a kassza nem fedezi a részletet:** a büdzsé nem megy mínuszba. Ami
+  kifér, azt kifizeti, a többi **hátralék** lesz, fordulónként +2% késedelmi
+  kamattal. **Minden bejövő pénz** (a folyósítás kivételével) előbb a
+  hátralékot viszi (`talHitelBehajt`).
+* **A „zár” így valósul meg.** Hátralék csak üres kasszánál keletkezik, és
+  minden bevétel előbb azt fizeti. Ezért amíg van hátralék, a büdzsé nullán
+  áll, és **semmit nem lehet belőle venni** (igazolás, boost, stáb). A terv
+  7. döntésének a hatása ez, csak nem egy külön tiltás, hanem maga a pénz
+  mondja ki. Így egy elfelejtett ág sem nyithatja ki véletlenül.
+* **Előtörlesztés:** bármikor. A hátralévő tőkét és a hátralékot kell
+  kifizetni, a még hátralévő kamat elmarad.
+* **Lezárás:** ha a tőke, a hátralék és a részletek mind elfogytak. A napló
+  kimondja, és új hitel a következő ablakban vehető fel.
+
+## A felület
+
+* A **menü „Aktív alaphatások”** blokkja a F4a sorait is mutatja: a vad
+  szorzót, a piac ablakonkénti pluszát, a morál-célt, a futó hullámokat
+  (lépés, hátralévő forduló, irány) és a hitelt (a keret, vagy a futó
+  hitel részlete, hátraléka és az előtörlesztés gombja).
+* A **súgó** (`GLOSSARY.talizman`) kimondja a kilenc élő kategóriát.
+
+## A próba
+
+`node tools/talizman-f4a-proba.js` (9167-es port, ~15 mp), 35 állítás:
+
+* a semleges bit-azonosság;
+* a **valódi** átigazolási sorsolás a Vad idénnyel (a csendes sáv szűkül,
+  a többi súlya marad);
+* a meccs-motor három ritka eseménye;
+* a Mozgalmas piac a valódi ablaknyitásban;
+* a morál-húzás;
+* a jellemhullám a **valódi** húzás-ablakból végig, és az „elül”-eset;
+* a bevételi kivételek;
+* a hitel teljes életciklusa (felvétel → törlesztés → hátralék → behajtás →
+  előtörlesztés → lezárás), a menü gombjával és a három ledger-sorral.
+
+---
+
+# 3.9.145 — F4b: a Joker eseménycsomagjai élnek
+
+> „új események, amik bekerülhetnek az átigazolási esemény pakliban […]
+> mindig van benne 2 új jó és egy új rossz.”
+
+## Hol dobódnak
+
+A `twResolvePhase2` **hátsó, súlyozott sávjában**: ugyanott, ahol az
+álomigazolás, a kölcsönjátékos és az akadémia. A pakli
+(`talEsemenyPakli()`) a súlyozott tömb **végére** fűződik.
+
+* Egy csomag-esemény alapsúlya **1**, ugyanannyi, mint az Elvágyódásé. Ezt a
+  ritkaság szorozza: ×1 / ×1,3 / ×1,6 / ×2 / ×2,5.
+* Egy esemény **idényenként legfeljebb egyszer** jön ki.
+* Ha épp nincs kire lesújtania (nincs 32 fölötti legendád, nincs 21 alatti
+  játékosod, üres a kassza), **nem jön ki és nem is ég el**. A sorsolás
+  ilyenkor a csendes kimenetre esik.
+* **Talizmán nélkül a pakli üres tömb**, tehát a sorsolás betűre a régi.
+  Ugyanannyi véletlenszámot fogyaszt, és ugyanazt adja. Az olvasás nem hozza
+  létre a talizmán-állapotot.
+
+## A 13 működő esemény
+
+**Azonnaliak.** Ugyanaz a kimenet a kézi és az automatikus ablakban.
+
+| | esemény | mi történik | kapaszkodó |
+|---|---|---|---|
+| ✦ | ⏳ Az ifjúság forrása | a legmagasabb Ratingű, legalább 32 éves, legalább 500 perces kerettag **10 évet fiatalodik**. A Rating nem esik: a különbséget az akadémia `youthBonus`-a fogja, ami 26 éves korig kifut. A hanyatlás újraindul, a visszavonulási terv elszáll | `careerPool[n].age` |
+| ✦ | ⛰️ Edzőtábor az Alpokban | a csapatépítés **kétszerese** (a `bondcamp` mintájára), és a kezdő 11 **+2 Rating, 5 meccsre** | `bondAdd`, `setNextMatchOvr` |
+| ✦ | 🚪 Nyílt nap | egy 16 éves érkezik **ingyen**. A POT-ja nagyobb, mint bárkié az akadémián vagy a 19 év alatti kereted tagjai közt | `generateAcademyPlayer` + POT-emelés |
+| ✦ | ✈️ Nyári túra Ázsiában | a heti lelátó **4–9-szerese** és **+5% szurkoló**; cserébe **2 meccs −1 csapaterő** (jetlag) | `budgetEarn("talEsemeny")`, `setTeamMomentum` |
+| ✖ | 🥂 Hírnév-mámor | a legnagyobb POT-ú, 21 év alatti játékos 10 meccsen át **−30% fejlődést** kap (pályán és padon), a formája ingadozik (−3…+1), és romlik a jele az öltözőben. **Három meccs egymás után a padon kigyógyítja** | `talMamorDev`, `talEsemenyTick` |
+| ✖ | 📸 Öltözői botrány | **−8 morál**, és ha van jelölt, jön az **elvágyódás alkuja**. Ugyanaz a képernyő, fölötte a botrány szövegével | `__LEAVE_PENDING__` + `pre` |
+| ✖ | 🧾 Adóellenőrzés | a büdzsé **4–10%-a** bírság | `budgetPay("talEsemenyKi")` |
+| ✖ | 🩹 Balszerencsés edzés | a legjobb, épp elérhető kezdőd **2–5 meccsre** kidől | `addOrExtendUnavailable` |
+| ✖ | 🔒 Pályazár | **két hazai meccs zárt kapuk mögött**: nincs hazai előny, és nincs lelátó-bevétel (a tábor ettől még mozog). A párharcban nem hat | `playMatch` (`_talZart`), `fanMatchTick({zart})` |
+
+**Döntések.** A kézi ablakban gombok vannak, és mindkét gombon ott a
+következmény. A nem választható gomb tiltva van, az oka ki van írva. A
+végigjátszásban a gép azt választja, amit egy elfogadó menedzser.
+
+| | esemény | a két gomb | a gép |
+|---|---|---|---|
+| ✦ | 🎩 Egy legenda kopogtat | a stábpiac legjobb sávja fölötti (legfeljebb +10) Szakértelmű szakember **fél áron** — vagy nem | felveszi, ha van hely és pénz |
+| ✦ | 🔁 A tékozló fiú | a legjobb, legfeljebb 35 éves, korábban eladott játékosod hazajön **az eladási ára feléért** (az eladott játékos a világban tovább öregszik, de nem vonul vissza — ezért a korhatár) — vagy nem | hazahozza, ha van hely és pénz |
+| ✖ | 🧲 Rivális csábítás | a legjobb nem-kapitány kezdőd: **megtartási díj** (a kikiáltási ár 15%-a), vagy **elengeded** a kikiáltási áron (a kezdő 11-be pótlás érkezik) | megtartja, ha van rá pénz |
+| ✖ | 💼 Ügynökháború | **+50% bér** az idény végéig — vagy **nem**: 10 meccs −1 Rating, és romlik a jele az öltözőben | igent mond |
+
+**Még nem (F4c):** 🏛️ Igazgatósági ülés, 🎽 Mezszponzor, 🌟 Sztárvilág.
+Mindhárom saját alrendszert kér: idényvégi értékelést, az arculat-szerkesztőt
+és a hírnév-gépezetet. A paklidba bekerülhetnek, de nem húzhatók. A lapon és
+a menüben ⏳ jelzi őket.
+
+## A felület
+
+* **A kézi ablak:** `showTalEsemeny(h)`. Címe „📦 <esemény>”, alatta „🧿 a
+  Joker-csomagodból”. A döntés után a szöveg és egy „Tovább” gomb jön (a
+  várólista itt kapja meg a kiutat).
+* **A menü** („Aktív alaphatások”) mutatja a paklit (✓ = idén már kijött,
+  ⏳ = később kapcsol be) és a futó hatásokat: mámor (hátralévő meccsek,
+  pad-sorozat 0–3), pályazár, béremelés.
+* **A lap:** az Eseménycsomag alaphatása ⚡ él. A még nem működő esemény
+  mellett ⏳ áll.
+* **Könyvelés:** két új sor, a `talEsemeny` (+, 📦) és a `talEsemenyKi`
+  (−, 📦). A többi pénzmozgás a meglévő sorain megy (stáb, igazolás,
+  megtartási díj, eladás).
+
+## A próba
+
+`node tools/talizman-f4b-proba.js` (9169-es port, ~20 mp), 38 állítás:
+
+* a semleges állapot;
+* a pakli: súly, idényenként egyszer, a még nem működő kimarad;
+* mind a kilenc azonnali esemény a **valódi** `twResolvePhase2`-n keresztül;
+* a mámor a meccseken át, a gyógyulás és a lejárat;
+* a pályazár: lelátó és fogyás;
+* a négy döntés a **valódi** képernyőn, mindkét ággal és a tiltással;
+* a kézi ablak (`twStartPhase2` → `land`) és az automatikus
+  (`autoResolveCheckpoint`) ablak;
+* a menü és a lap.
+
+---
+
+# 3.9.146 — F4c: az igazgatóság, a szponzor és a sztárvilág
+
+A csomag utolsó három eseménye. **Mind a 16 működik.** Mindhárom egy teljes
+**idényre** szól, és a céljuk közös szabállyal dől el (`talCelSzezon`):
+
+* ha az idényben még nem játszottál meccset, a mostani idényre szól (ez az
+  első idény előtti HUB);
+* a nyárban és menet közben a **következő** idényre. A nyári HUB a
+  szezonváltás *előtt* fut, ott a szezonszám még a lezárult idényé.
+
+Egy félig lejátszott idényre adott megbízás nem volna fair.
+
+## 🏛️ Igazgatósági ülés
+
+**Három elvárás** a hét fajtából. A **kupasorozat** csak akkor lehet köztük,
+ha a megbízott idényre van nemzetközi kampány. A célok a **megbízott idény
+elején** kalibrálódnak, az akkor ismert számokból (`talIgazgIndit`):
+
+| elvárás | a cél | a mérés |
+|---|---|---|
+| 🏆 bajnoki helyezés | a tavalyi helyezés −2 (a dobogósoké marad) | a végtabella |
+| 🎺 szurkolótábor | +4…8% | a tábor a bajnokság végén, a megbízás kezdetéhez mérve |
+| 💰 büdzsé | a szezonkeret 25%-a | az egyenleg a bajnokság végén |
+| ❤️ morál | a morál-cél (45–75) | az idény meccseinek átlagos morálja (meccsenként gyűlik) |
+| ⚽ gólszám | a tavalyi gólszám +5% (legalább 30) | a bajnoki gólok |
+| 🎢 izgalom | a tavalyi átlag +3 (legalább 35) | a meccsértékelések átlaga |
+| 🌍 kupasorozat | a 2. kieséses kör | `cupDepthNow(S.euro)` |
+
+**Ütemezés:**
+
+* **Mérés:** pillanatkép a szezonzáráskor (`talIgazgZaro`, a
+  szezontörténet bejegyzése után).
+* **Értékelés:** a szezonváltáskor (`talIgazgErtekel`, a szezonszám
+  növelése *előtt*). Addigra a kupa-kampány is lement.
+* **Elmaradt kupa:** ha a kampány elmaradt, az az elvárás nem számít.
+
+**Jutalom** (a szezonkeret %-ában), elvárásonként:
+
+* kiváló (a cél 120%-a; helyezésnél 2 hellyel jobb): **+8%**;
+* teljesítve: **+4%**;
+* elbukva: **−5%**.
+
+**Az idény egészére:**
+
+* mind teljesül → **a tulajdonosok bizalma**, +10%;
+* egy sem → **bizalmi szavazás**, −10%, és −10 morál az új idény első
+  meccse után;
+* vegyes eredmény → egyik sem.
+
+## 🎽 Mezszponzor
+
+Három ajánlat a kézi ablakban, egy választható, vagy egyik sem. Egyszerre
+egy szerződés futhat. A futamidő 1–3 idény, és ugyanúgy számít, mint a többi
+idényes eseménynél (`talCelSzezon`):
+
+* **nyáron** aláírva a **következő** idénytől fut, tehát egy egyidényes
+  szerződés nem jár le a szezonváltáskor, mielőtt egyetlen meccset látna;
+* **menet közben** aláírva a mostani idény maradéka **ráadás**.
+
+A szerződés az `elso`–`utolso` idénypárral él. A stadionnév díját a
+`fizetve` mező őrzi: egy idényért egyszer fizet.
+
+| ajánlat | hol látszik | mit fizet |
+|---|---|---|
+| **Logó a címerben** (🍺 🛞 📱 🍕 🥤 🛒 🎰 🚜) | a fejléc címerének sarkában | meccsenként a heti lelátó 6–12%-a |
+| **Szponzorszín** | a klubszínpár **második** színe (`teamColors`) | a szezonközi ablakokban (8., 15., 23. forduló) a heti lelátó 150–300%-a |
+| **Stadionnév** | a kiírásban elöl, a saját név zárójelben (`identStadiumKiir`) | idényenként egyszer (az első idényé aláíráskor, a többi a szezonváltáskor) a heti lelátó 800–1500%-a |
+
+* **Korai felbontás** (a menüben): a hátralévő érték fele a kötbér.
+* **Lejáratkor** az arculat magától visszaáll.
+* **A saját arculat mérföldkövei** (címer, színek, stadion) a szponzortól
+  **nem** teljesülnek: az `identHasStadium` / `colorsOwn` érintetlen, csak a
+  kiírás változik.
+* **A gép** a szerződés teljes értékében a legtöbbet érőt választja.
+
+## 🌟 Sztárvilág
+
+A klub **arca** a legjobb (legmagasabb Ratingű) kerettag. A Sztárom a párom
+négy hírnév-eseménye meccsenként dobódik rá, idényenkénti plafonnal:
+
+| esemény | esély / meccs | plafon | hatás |
+|---|--:|--:|---|
+| szurkoló-robbanás | 8% | 2 | +2–5% szurkoló |
+| reklám | 10% | 3 | a heti lelátó 50–150%-a |
+| befektető | 4% | 1 | a szezonkeret 5–10%-a |
+| követelés | 6% | 1 | **+25% bér** az idény végéig |
+
+* **Csak ha a stílusod NEM a Sztárom a párom.** Így szólt a kérés, és
+  abban a stílusban a saját hírnév-gépezet már a sztárodon fut. Ott az
+  esemény nem jön ki, és nem is ég el.
+* **Ha menet közben váltasz arra a stílusra,** a futó sztárvilág szünetel,
+  így nincs dupla esemény.
+* **Ha az arc elhagyja a klubot,** az események elmaradnak.
+
+## A próba
+
+`node tools/talizman-f4c-proba.js` (9171-es port, ~15 mp), 32 állítás:
+
+* a cél-idény szabálya;
+* az igazgatóság: a valódi sorsolás, a kalibrálás, a morál-átlag, a mind
+  kiváló / mind elbukik / vegyes / elmaradt kupa eset, a következő idényre
+  szóló megbízás, és a két kapaszkodó;
+* a szponzor: a valódi képernyő; a logó a fejlécben és meccsenként; a szín
+  és a lejárata; a stadion (a mérföldkő érintetlen, a saját név
+  zárójelben); a felbontás és a gép választása;
+* a sztárvilág plafonjai, a követelés, és hogy Sztárom a párom stílusban nem jön ki;
+* mind a 16 esemény és a menü.
+
+Az F4b próbája 3.9.146 óta a „még nem bekötött esemény kimarad” szabályt egy
+ideiglenesen kikapcsolt eseménnyel méri.

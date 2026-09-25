@@ -161,10 +161,19 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
     const tx=id=>{const e=document.querySelector("#"+id+" .sbMs");return e?e.textContent:null;};
     const me=fx.home?"sbHomeName":"sbAwayName",them=fx.home?"sbAwayName":"sbHomeName";
     const szam=s=>s==null?null:parseFloat(String(s).replace("⚡","").replace(",","."));
-    ki.tabla={en:szam(tx(me)),o:szam(tx(them)),
+    /* 3.9.143: az ellenfél sora KÉT szám — a saját ereje (⚡) és a nehézségi
+       kiegyenlítés (⚖) —, a motor a kettő összegével számol */
+    const kiegEl=document.querySelector("#"+them+" .sbKieg");
+    const kieg=kiegEl?parseFloat(kiegEl.textContent.replace("⚖","").replace("+","").replace(",",".")):0;
+    ki.tabla={en:szam(tx(me)),o:Math.round((szam(tx(them))+kieg)*10)/10,sajat:szam(tx(them)),kieg,
       varEn:Math.round(teamMatchStrength()*10)/10,
       varO:Math.round((fx.o.ovr+matchHiddenOppBuff())*10)/10,
+      varSajat:Math.round(fx.o.ovr*10)/10,varKieg:Math.round(matchHiddenOppBuff()*10)/10,
       ovrSor:!!document.querySelector("#"+them+" .sbOvr")};
+    /* kiegyenlítés nélkül nincs ⚖ */
+    {const _m=matchHiddenOppBuff;matchHiddenOppBuff=()=>0;sbShowPreview(fx);
+     ki.tabla.nincsKieg=!document.querySelector("#"+them+" .sbKieg");
+     matchHiddenOppBuff=_m;sbShowPreview(fx);}
     sbSetMyMs(-2.5);
     ki.tabla.elo=szam(tx(me));
     return ki;});
@@ -205,6 +214,9 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
   console.log("\n— 5. AZ EREDMÉNYJELZŐ —");
   ok(kozel(t.tabla.en,t.tabla.varEn,0.051),"a saját ⚡ meccs-erő a táblán",t.tabla);
   ok(kozel(t.tabla.o,t.tabla.varO,0.051),"a CPU ⚡ meccs-ereje = ovr + a motor rejtett erősítése",t.tabla);
+  ok(kozel(t.tabla.sajat,t.tabla.varSajat,0.051)&&(t.tabla.varKieg>0.05?kozel(t.tabla.kieg,t.tabla.varKieg,0.051):t.tabla.kieg===0),
+     "3.9.143: a ⚡ az ellenfél SAJÁT ereje, a ⚖ külön a nehézségi kiegyenlítés",t.tabla);
+  ok(t.tabla.nincsKieg,"kiegyenlítés nélkül nincs ⚖ a sorban");
   ok(t.tabla.ovrSor,"a csapaterő sora is megmarad",t.tabla.ovrSor);
   ok(kozel(t.tabla.elo,Math.round((t.tabla.varEn-2.5)*10)/10,0.051),"az élő frissítés átírja a számot",t.tabla);
 
