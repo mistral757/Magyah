@@ -2491,6 +2491,42 @@ node tools/talizman-f5-proba.js
 
 Részletek: `docs/talizmanok.md` (3.9.148).
 
+## talizman-f6a-proba.js — 🧿 Talizmánok F6a: a Scout, a Stílus és a Taktika speciáljai
+
+```bash
+node tools/talizman-f6a-proba.js
+```
+
+**55 állítás, öt blokkban:**
+
+0. **Semleges:** talizmán nélkül minden olvasó 1 / 0 / a régi konstans
+   (osztók, csúszka-kapu, plafon), és a pillanatképben nincs új mező.
+1. **🔭 Scout — nyolc special, pro és kontra:**
+   - a valódi `twScout` jelöltjei (Ködoszlató, Külföldi iroda, Kémhálózat);
+   - a valódi `buyPrice` és a kedvezmény-stack;
+   - a valódi akadémiai generátor és a „marad még” gomb;
+   - a valódi szezonközi ablak és a pad-fejlődés;
+   - a szezonváltás tartásdíja.
+2. **🎭 Stílus — nyolc special:**
+   - a stíluspont (`msSpReward`, `styleMsRewardFor`);
+   - a másodlagos osztók, a csúszka-kapu és a kár-oldal (`dialPct`);
+   - a beragadt jutalom és a kategória ára;
+   - a valódi `roleVal` és `roleAssign`;
+   - a csillagozás ára és a licit-kúp (a `saleRollOffer`-ből kiolvasva);
+   - a morál-cél és a mérföldkő-láz ötödik duplája.
+3. **📋 Taktika — nyolc special:**
+   - a valódi begyakorlás (Tábla és kréta, Gyors tanuló);
+   - a felállásváltás ára;
+   - a meccs-csatornák és a sárgalap;
+   - a plafon és a stábhatás;
+   - a Titkos fegyver a menü gombjától a pillanatképig;
+   - az Ellenfél-elemző illeszkedése és bére.
+4. **A kártya és a menü:** „✦ a special él”; mind a 24 él, a többi még nem;
+   a menü sora.
+
+A régi kódon nem indul el (nincs `talSpecV`). Részletek:
+`docs/talizmanok.md` (3.9.150).
+
 ## meccsero-egyezes-proba.js — ⚡ ugyanannak a csapatnak ugyanaz a meccs-ereje mindkét gépen
 
 ```bash

@@ -760,3 +760,137 @@ tengelynek több hatása is van.
 
 Az F3 próbája 3.9.148 óta a „⏳ még nem hat” jelzést egy ideiglenesen
 kikapcsolt tengellyel méri, mert már nincs nem ható kategória.
+
+---
+
+# 3.9.150 — F6a: a specialok — Scout, Stílus, Taktika
+
+Ez az első special-köteg: **a három első kategória mind a 24 speciálja él**.
+A pro a kártya témájához illik. A kontra a pötty színe szerinti **másik**
+rendszert üti. A többi hét kategória speciálja a saját kötegében jön
+(F6b: Igazolás, Fejlődés, Stáb · F6c: Joker, Morál, Bank · F6d: Meccs). Addig
+a kártyájuk „a special később” jelet visel, az élőké „✦ a special él”-t.
+
+## A szám forrása
+
+A hatás ugyanazt a számot használja, amit a kártya kiír (`talSpecSzam`): a
+`min` ritkaságon a táblázat értéke, fölötte a `TAL_RANG` pro/con skálája,
+és a `cap` plafonja. A `talSpecV(id, side)` a birtokolt, nem égetett lap
+számát adja, talizmán nélkül 0-t. Ha egy special kétszer volna meg, a
+magasabb ritkaságú dönt; a duplikátum a fúzió dolga (F7).
+
+A speciálok saját állapota (idényes keretek, számlálók) az `S.tal.spAll`-ban
+él, és a mentés viszi.
+
+## 🔭 Scout
+
+| special | pro | kontra |
+|---|---|---|
+| Ködoszlató | a lefedett posztcsoport jelöltjeinek **valódi** POT-ja látszik, a felmérési keret nélkül. Egy csoport, amit a talizmán dobása rögzít; legendáson mind a négy. | minden vételár +3% |
+| Visszatérő fiúk | az akadémiai visszatérés célja +1 Rating | szezonváltáskor az akadémián hagyott fiatalok után fejenként a heti lelátó 20%-a |
+| Tehetségvásár | a nyári klub-szemle +1 (3+ ritkaságon +2) | a stábpiacon 3 ajánlat a 4 helyett |
+| Faluról a nagyvárosba | az akadémiai felfedezett POT-ja +6% (a csúcs is ebből számol) | a 24 év felettiek pozitív fejlődése −4% |
+| Megfigyelő a lelátón | minden szezonközi ablakban +1 felderítés | a nyári átigazolási esemény-keret −1 |
+| Külföldi iroda | a poszt-felderítés **első** jelöltje egy osztállyal feljebbről jön (lásd lent) | az ő ára +10% |
+| Álomgyár | az idény első új felfedezettje csodagyerek: 5000+ POT (legendáson 6000+) | minden „marad még” / „elengedem” a heti lelátó 30%-ába kerül |
+| Kémhálózat | minden felderítés első jelöltje −10% (a kedvezmény-stackben, névvel) | ablakonként 10% eséllyel lebukik: −5 morál |
+
+**A Külföldi iroda sávja.** Az igazolási sáv közepe három szám átlaga
+(mezőny, kereted nyers ereje, legjobb embered). A mezőny cseréje tehát csak
+egyharmad osztálynyit tolna. Ezért a special a **teljes** sávot tolja el a
+feljebbi osztály és a mostani mezőny különbségével. Az élvonalban (és sík
+módban) nincs feljebb: ott egy 6 pontos lépcső.
+
+A felderítés listáján a jelölt sora kimondja, mi történt vele:
+🌍 külföldi iroda · 🕵️ kémhálózat · 🔭 köd nélkül.
+
+## 🎭 Stílus
+
+| special | pro | kontra |
+|---|---|---|
+| Egy úr, egy út | az elsődleges stílus minden forrásból +8% stíluspontot kap (mérföldkő, kihívás). A másodlagos saját mérföldköve nem. | taktikaváltás után 5 meccsig −2 pp illeszkedés |
+| Két hazát szolgál | a másodlagos stílus meccserő-osztója 2 → 1,6 / 1,45 / 1,3 | fejlődési tempó −3% |
+| Hangsúly-virtuóz | 4 csúszka mozdítható a 3 helyett | minden csúszka kár-oldala +10% |
+| Beragadt kincs | a legnagyobb beragadt mérföldkő-jutalom 25%-a azonnal. Talizmánonként egyszer; ha nincs beragadt jutalom, az első olyan meccs után fizet, amikor már van. A jutalom maga beragadva marad. | a mérföldkő-kategóriák nyitási ára +15% |
+| Szerepjáték | a stílusszerepek hatása +6% (a `roleVal` egyetlen torkán) | akit a kiosztás lecserél, −4 morál-jelet kap |
+| A mester jegyzetei | a csillagozás-jog ára −20% (legfeljebb −60%) | a licit-kúp csúcsa −3 pp |
+| Filozófiai vita | a másodlagos stílus mérföldköve harmad helyett fél (3: kétharmad, 4: teljes) pontot fizet | a morál célértéke −1 |
+| Mérföldkő-láz | minden 5. (legendáson 4.) **friss** teljesítés duplán fizet. A beragadt és a halott jutalom nem számít bele. | ha egy gól hiányzik egy gól-mérföldkőhöz, a gólpassz-súly −10% (a kezdőrúgáskor mérve) |
+
+## 📋 Taktika
+
+| special | pro | kontra |
+|---|---|---|
+| Tábla és kréta | a második legbegyakorlottabb rendszer inaktívan is tanul, az aktív lépésének 20%-ával | a másodlagos edzés −15% (a kezdőkön és a padon is) |
+| Kaméleon | +1 (3+ ritkaságon +2) ingyen felállásváltás idényenként | minden fizetős váltás −3 morál |
+| Pontrúgás-labor | a pontrúgás súlya +20% | a kontra-ablak −2 perc |
+| Vasfegyelem | a sárgalap-esély −10% | a 75. perctől −3% saját gólvárhatóság |
+| Gyors tanuló | 72-es szint alatt +30% begyakorlás | a téli ablakban 1-gyel kevesebb felderítés |
+| Mesterszint | +2 a taktika-plafonon (a hatás-plafon is vele nő) | a stábhatás −5% |
+| Titkos fegyver | idényenként 3 (legendáson 4) előhúzás a Talizmánok menüből; az élesített meccsen +4% saját gólvárhatóság | nyáron 1-gyel kevesebb felderítés |
+| Ellenfél-elemző | rangadón és papírforma szerint esélytelenként +2 pp illeszkedés — csak a meccs alatt | meccsenként a heti lelátó 3%-a |
+
+**A Titkos fegyver a párharcban is hat.** A pillanatképben **külön mezőben**
+utazik (`talTitkos`), saját sávval (1 … 1,04). Az F5 ±8%-os λ-sávja így
+érintetlen marad, és a társ gépéről jött hamis érték sem lóghat ki belőle.
+A meccserő (⚡) is mutatja.
+
+**Ami a párharcban nem hat:** a CPU-motor saját csatornái. Ide tartozik a
+pontrúgás, a kontra-ablak, a késői gólvárhatóság és a sárgalap, pontosan úgy,
+mint az F5 másodlagos csatornáinál. Nem hat a meccs alatti illeszkedés sem
+(Ellenfél-elemző), mert a párharc pillanatképe a kezdőrúgás előtt készül.
+
+## Hol hat — a kapaszkodók
+
+Minden kapaszkodó hibatűrő, és talizmán nélkül a semleges értéket adja:
+
+* **Felderítés:** `twScout`, `buyPrice`, `buyDiscountParts`.
+* **Akadémia:** `generateAcademyPlayer`, `academyTargetFor`, `showAcademyReveal`.
+* **Keretek:** `twOpenCheckpointWindow`, `twSummerLooks`, `twSummerEventMax`,
+  `twRefillSummerQuotas`, `csSpinsMax`/`csSpinsLeft`, `staffMarketList`.
+* **Fejlődés és edzés:** a kezdő és a pad fejlődése, a `devTempo`, a
+  másodlagos edzés.
+* **Stílus:** `msSpReward`, `styleMsRewardFor`, a kihívás-jutalmak, a
+  `STYLE2_OVR_DIV` három helye, `dialCanSet`/`dialPct`, `msCatPrice`,
+  `roleVal`/`roleAssign`, `starUnlockPrice`, `saleRollOffer`,
+  `computeMoraleTarget`, `msPayout`, `styleScanSlot`.
+* **Taktika:** `tacticTrainAfterMatch`, `tacticCeil`, `tacticFit`,
+  `formationChangeCost` és a váltás ága.
+* **Motor és meccs:** a `talMeccsCsat` (setpiece, counter, own, assistw), a
+  sárgalap-esély, a `coachQual`, a pillanatkép és a `matchLambdas`.
+* **Életciklus:** a kezdőrúgás (`talMeccsKezdes`), a meccs után
+  (`talSpecMeccsUtan`), a szezonváltás (`talSpecSzezonvaltas`), a felvétel
+  (Beragadt kincs).
+
+A pénzes kontrák új könyvelési sora: **🧿 Talizmán-special** (`talSpecKi`).
+
+## A menü
+
+Az „Aktív alaphatások” doboz alján minden élő special egy sort kap, a
+kártya számával: pro · − kontra. A Titkos fegyver sorában gomb van:
+„🗝️ Előhúzom (x/y)”. Élesítve a sor azt írja: „élesítve — a következő
+meccsen”.
+
+## A próba
+
+`node tools/talizman-f6a-proba.js` (9179-es port, ~40 mp), 55 állítás:
+
+* talizmán nélkül minden olvasó semleges, a pillanatképben nincs új mező;
+* mind a 24 special pro- és kontra-állítása. Ahol lehet, a **valódi**
+  hívási helyen:
+  - a valódi felderítés (`twScout`) jelöltjei és a vételár;
+  - a valódi akadémiai generátor és a képernyő gombja;
+  - a valódi szezonközi ablak és a pad-fejlődés;
+  - a begyakorlás, a `roleVal` és a `roleAssign`;
+  - a licit-kúp a `saleRollOffer`-ből kiolvasva;
+  - a mérföldkő-kifizetés és a pillanatkép;
+* a kártya jele, a menü sora, a Titkos fegyver gombja.
+
+A régi kódon a próba nem indul el (nincs `talSpecV`).
+
+**Két régi próba stabilabb lett:**
+
+* A `talizman-proba` mérföldkő-arányát 20 karrier-seed átlaga adja. Egy
+  seeden a véges lista binomiális szórása időnként 15% alá vitte.
+* A felület-blokk nem Jellemhullámot választ. Annál az irányválasztó jön a
+  második húzás előtt, és ez a blokk azt a láncot nem méri.

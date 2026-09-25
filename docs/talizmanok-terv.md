@@ -1,10 +1,12 @@
 # 🧿 Talizmánok — a kártyarendszer tervezete
 
-**Állapot:** 🟡 **F0–F5 kész (3.9.148)** — a talizmánok születnek, húzhatók,
-gyűlnek és látszanak, **mind a tíz kategória alaphatása él** (a Meccs tíz
-tengelye a gólvárhatóságon és a saját csatornáján, a párharcban is), és a
-Joker eseménycsomagjainak **mind a 16 eseménye** működik. A megvalósult rész
-leírása: `docs/talizmanok.md`. Következik az F6: a specialok.
+**Állapot:** 🟡 **F0–F5 és F6a kész (3.9.150)** — a talizmánok születnek,
+húzhatók, gyűlnek és látszanak, **mind a tíz kategória alaphatása él** (a
+Meccs tíz tengelye a gólvárhatóságon és a saját csatornáján, a párharcban
+is), a Joker eseménycsomagjainak **mind a 16 eseménye** működik, és a
+Scout, a Stílus és a Taktika **24 speciálja** él. A megvalósult rész
+leírása: `docs/talizmanok.md`. Következik az F6b: az Igazolás, a Fejlődés és
+a Stáb speciáljai.
 
 **Név:** *Talizmán* — a döntés megszületett (lásd 19. pont). A dokumentum
 eredetileg „Sorslap” munkanéven készült; ahol a szövegben **lap** áll, az
@@ -1025,7 +1027,8 @@ Durva becslés egy átlagos karrierre (~4 húzás/idény, a döntések ésszerű
 | **F4b** ✅ | A Joker eseménycsomagjainak 13 eseménye az átigazolási pakliban (9.12): kilenc azonnali és négy döntéses, kézi és automatikus ablakban is | `talizman-f4b-proba.js`: eseményenként a valódi sorsolásból, a döntések a valódi képernyőn |
 | **F4c** ✅ | Igazgatósági ülés (idényes megbízás, idényvégi értékelés), Mezszponzor (arculat + bevétel), Sztárvilág (a Sztárom a párom eseményei stíluson kívül) | `talizman-f4c-proba.js`: az értékelés minden kimenete; a szponzor-szerződés életciklusa; a sztárvilág plafonjai |
 | **F5** ✅ | Meccskártyák: tíz tengely (λ a pillanatképben ±8%-os sávval, a másodlagos csatornák a csúszkák útján), meccserő (⚡) és menü-sor | `talizman-f5-proba.js`: **párharc-determinizmus** — a valódi h2hSimulate bitre ugyanazt adja, és a λ pontosan a szorzóval tolódik |
-| **F6** | A special-katalógus (~60 tétel) kötegekben, kategóriánként | tételenként egy pro- és egy kontra-állítás |
+| **F6a** ✅ | A Scout, a Stílus és a Taktika 24 speciálja (pro + kontra), a menü sora, a Titkos fegyver gombja | `talizman-f6a-proba.js`: tételenként egy pro- és egy kontra-állítás, ahol lehet a valódi hívási helyen |
+| **F6b–d** | Igazolás, Fejlődés, Stáb · Joker, Morál, Bank · Meccs — a maradék 58 special | tételenként egy pro- és egy kontra-állítás |
 | **F7** | Összhatás fül, csökkenő hozam, rezonancia, fúzió, égetés, archetípus-cím | a csökkenő hozam táblája (7.1) betűre |
 | **F8** | Kártyatár (`localStorage`), öröklap, trófea-húzás, új mérföldkő-sáv („Pakli”: lapok száma, legendások, rezonanciák) | |
 | **F9** | Egyensúly-mérés (100 szezon), hangolás, súgó-bejegyzés, doksi, teljes regresszió | a 17. pont két korlátja |
