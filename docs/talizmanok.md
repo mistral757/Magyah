@@ -305,3 +305,159 @@ a `docs/talizmanok-terv.md` 9.12-ben van.
   valódi meccs utáni begyakorlás;
 * a menü és a lap jelzései;
 * az eseménycsomag.
+
+---
+
+# 3.9.144 — F4a: Joker, Morál, Bank
+
+> „Joker erősíti a negatív alacsony eséllyel dolgokat is.” · „Okés mehet az f4”
+
+Kilenc kategória alaphatása él. A Meccs (F5), a Joker **eseménycsomagjainak
+tartalma** (F4b) és a specialok (F6) hiányoznak még. A számítás ugyanaz, mint
+az F3-ban (`talAlapMind`): a talizmánok erő szerint sorba állnak, a k-adik
+0,85^k-t ér, és minden változatnak saját plafonja van. **Talizmán nélkül
+egyetlen bit sem mozdul**, ezt a próba 1. blokkja betűre méri.
+
+## 🃏 Joker
+
+| változat | 1 E | plafon | kapaszkodó |
+|---|--:|--:|---|
+| **Vad idény** | minden ritka esemény +8% eséllyel | +60% | `talRitkaMult(DUEL)` |
+| **Mozgalmas piac** | +esemény az átigazolási ablakokban (ritkaság szerint) | ablakonként +2 | `talPiacExtra(kind)` |
+| **Eseménycsomag** | 2 jó + 1 rossz esemény a pakliba | — | az F4b-ben kapcsol be |
+
+A **Vad idény** a meccsen és a piacon is hat:
+
+* a meccs-motor különleges eseménye (`_sevP`, jó és rossz egyaránt);
+* a mez leveszése (legfeljebb 50%);
+* a piros lap (`_pRed`);
+* az átigazolási sorsolás, ahol a „csendes” sáv súlya a szorzóval
+  **osztódik**. Így minden valódi esemény (álom, sztár-igény, távozás,
+  csúcsforma…) arányosan gyakoribb lesz, a súlyuk pedig nem változik.
+
+A **párharcban (PvP) semleges**: a két gép ugyanazt a meccset játssza, egy
+csak az egyik oldalon élő szorzó szétválasztaná őket.
+
+A **Mozgalmas piac** ablakai:
+
+| ritkaság | nyár | rövid (8., 23.) | téli (15.) |
+|---|:-:|:-:|:-:|
+| átlagos | +1 | | |
+| ritka | | +1 | |
+| nagyon ritka | +1 | +1 | |
+| legendás | +1 | +1 | +1 |
+| Mítosz | +2 | +2 | +2 |
+
+Több lap összeadódik, de ablakonként legfeljebb **+2**. A plusz a kézi
+ablaknál az `eventMax`-ba kerül (`twOpenCheckpointWindow`, nyáron a
+`twSummerEventMax()`). Az automatikus ablakok ugyanennyivel több
+`resolveOneEvent`-et futtatnak.
+
+## ❤️ Morál
+
+| változat | 1 E | plafon | kapaszkodó |
+|---|--:|--:|---|
+| **Jó légkör** | a morál célértéke +0,8 pont; a mélypontról 10%-kal gyorsabb visszatérés | +8 pont (×2 visszatérés) | a meccs utáni morál-húzás (`_tc`, `_tv`) |
+| **Jellemhullám** | lépések a keret jellemén, a választott irányba | — | `talHullamTick()` a `talPostMatch` elején |
+
+### 🌊 Jellemhullám
+
+A választás után a húzás-ablak **irányválasztóvá** alakul, öt gombbal:
+
+1. Karizma ↑
+2. Kapcsolódás ↑
+3. Kapcsolódás ↓
+4. Vérmérséklet ↓
+5. Vérmérséklet ↑
+
+A „kemény” irányok (a Kapcsolódás ↓ és a Vérmérséklet ↑) Panzerben, a
+Fordított jellemmel, erőt jelentenek. Ha a „Később döntök” gombot nyomod, a
+Talizmánok menüben egy „Irányt választok” gomb vár.
+
+| ritkaság | lépés | forduló |
+|---|--:|--:|
+| átlagos | 2 | 10 |
+| ritka | 3 | 12 |
+| nagyon ritka | 5 | 15 |
+| legendás | 8 | 20 |
+| Mítosz | 12 | 25 |
+
+**Egy lépés** egy véletlen kerettag jellemét viszi egy fokkal arra, amerre
+a hullám fúj. Csak olyan játékos jöhet szóba, akinél a skálán még van hova
+lépni, és aki ebben a hullámban még nem lépett kettőt. A pool-bejegyzés és a
+pályán lévő példány **együtt** mozdul, a napló pedig minden lépést kimond.
+
+Fordulónként legfeljebb egy lépés jön. Az esélye: a hátralévő lépések száma
+osztva a hátralévő fordulókéval. A hullám így a hossza végére minden lépését
+megteszi, de hogy pontosan mikor, az véletlen.
+
+**Nem ragad be.** Ha a hossza lejárt, és a keretben már senkit nem lehet
+abba az irányba vinni (például mindenki a karizma tetején áll), a hullám
+**elül**, a napló kimondja, és eltűnik a menüből.
+
+## 💰 Bank
+
+| változat | 1 E | plafon | kapaszkodó |
+|---|--:|--:|---|
+| **Jobb üzletmenet** | minden bevétel +1,5% | +15% | `budgetEarn` — egyetlen szorzó |
+| **Hitelkeret** | kölcsön a szezonkeret egy részéig | 5. lépcső | `talHitel*` |
+
+A Jobb üzletmenet szorzója **nem vonatkozik** a játékos-eladásra (a sima és
+a sztár-eladásra sem), a visszatérítésre, a talizmán-passzra és a
+hitel-folyósításra (`TAL_BANK_KIVETEL`).
+
+### 🏦 A hitel
+
+| legjobb Hitelkeret-lap | keret | kamat | futamidő |
+|---|--:|--:|--:|
+| átlagos | a szezonkeret 15%-a | 20% | 15 meccs |
+| ritka | 25% | 15% | 15 meccs |
+| nagyon ritka | 35% | 10% | 20 meccs |
+| legendás | 50% | 6% | 30 meccs |
+| 5. lépcső | 60% | 5% | 30 meccs |
+
+Minden további Hitelkeret-lap egy lépcsővel feljebb visz. A keret alapja a
+`seasonBudgetCore()`, százasra kerekítve.
+
+* **Felvétel:** csak átigazolási ablakban, a menü „Felveszem” gombjával.
+  Egyszerre egy hitel futhat. A folyósítás `loanIn` sorral kerül a
+  büdzsébe, szorzó nélkül.
+* **Törlesztés:** minden lejátszott meccs után, a bérrel együtt
+  (`chargeMatchWages`), egyenlő részletben. Két sor könyvelődik: a tőke
+  `loanPay`, a kamat `loanInt`.
+* **Ha a kassza nem fedezi a részletet:** a büdzsé nem megy mínuszba. Ami
+  kifér, azt kifizeti, a többi **hátralék** lesz, fordulónként +2% késedelmi
+  kamattal. **Minden bejövő pénz** (a folyósítás kivételével) előbb a
+  hátralékot viszi (`talHitelBehajt`).
+* **A „zár” így valósul meg.** Hátralék csak üres kasszánál keletkezik, és
+  minden bevétel előbb azt fizeti. Ezért amíg van hátralék, a büdzsé nullán
+  áll, és **semmit nem lehet belőle venni** (igazolás, boost, stáb). A terv
+  7. döntésének a hatása ez, csak nem egy külön tiltás, hanem maga a pénz
+  mondja ki. Így egy elfelejtett ág sem nyithatja ki véletlenül.
+* **Előtörlesztés:** bármikor. A hátralévő tőkét és a hátralékot kell
+  kifizetni, a még hátralévő kamat elmarad.
+* **Lezárás:** ha a tőke, a hátralék és a részletek mind elfogytak. A napló
+  kimondja, és új hitel a következő ablakban vehető fel.
+
+## A felület
+
+* A **menü „Aktív alaphatások”** blokkja a F4a sorait is mutatja: a vad
+  szorzót, a piac ablakonkénti pluszát, a morál-célt, a futó hullámokat
+  (lépés, hátralévő forduló, irány) és a hitelt (a keret, vagy a futó
+  hitel részlete, hátraléka és az előtörlesztés gombja).
+* A **súgó** (`GLOSSARY.talizman`) kimondja a kilenc élő kategóriát.
+
+## A próba
+
+`node tools/talizman-f4a-proba.js` (9167-es port, ~15 mp), 35 állítás:
+
+* a semleges bit-azonosság;
+* a **valódi** átigazolási sorsolás a Vad idénnyel (a csendes sáv szűkül,
+  a többi súlya marad);
+* a meccs-motor három ritka eseménye;
+* a Mozgalmas piac a valódi ablaknyitásban;
+* a morál-húzás;
+* a jellemhullám a **valódi** húzás-ablakból végig, és az „elül”-eset;
+* a bevételi kivételek;
+* a hitel teljes életciklusa (felvétel → törlesztés → hátralék → behajtás →
+  előtörlesztés → lezárás), a menü gombjával és a három ledger-sorral.

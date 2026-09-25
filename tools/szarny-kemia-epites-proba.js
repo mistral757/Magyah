@@ -206,11 +206,15 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     S.szarny={};S.szarnyMig=1;S.szarnyInProgress=null;
     const _add=addLine;addLine=()=>{};
     const _atg=autoTitleGate;autoTitleGate=()=>false;
+    /* minden meccs után jár jutalom-kör: a szárny a jutalom-sorban épül, és a
+       sorsolt jutalom-körökkel 12 fordulóban az 5 fázis csak ÁLTALÁBAN jött
+       össze (a próba így véletlenszerűen bukott) */
+    const _bst=balanceSkillTick;balanceSkillTick=()=>true;
     try{
       S.auto=true;S.idx=0;buildSeasonFixtures();
       playMatch();
       for(let i=0;i<1500&&S.idx<12;i++)await new Promise(r=>setTimeout(r,50));
-    }finally{S.auto=false;addLine=_add;autoTitleGate=_atg;}
+    }finally{S.auto=false;addLine=_add;autoTitleGate=_atg;balanceSkillTick=_bst;}
     await new Promise(r=>setTimeout(r,400));
     const D=szarnyState();
     ki.parok=Object.keys(D).map(k=>({st:D[k].stages,built:!!D[k].built}));

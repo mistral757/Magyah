@@ -1,10 +1,10 @@
 # 🧿 Talizmánok — a kártyarendszer tervezete
 
-**Állapot:** 🟡 **F0–F3 kész (3.9.142)** — a talizmánok születnek, húzhatók,
-gyűlnek és látszanak, és a **hat gazdasági kategória alaphatása él**
-(Scout, Csapatstílus, Taktika, Igazolások, Fejlődés, Stáb). A megvalósult
-rész leírása: `docs/talizmanok.md`. Következik az F4 (Joker — az
-eseménycsomagokkal —, Morál, Bank).
+**Állapot:** 🟡 **F0–F4a kész (3.9.144)** — a talizmánok születnek, húzhatók,
+gyűlnek és látszanak, és **kilenc kategória alaphatása él** (Scout,
+Csapatstílus, Taktika, Igazolások, Fejlődés, Stáb, Joker, Morál, Bank). A
+megvalósult rész leírása: `docs/talizmanok.md`. Következik az F4b: a Joker
+eseménycsomagjainak 16 eseménye az átigazolási pakliban.
 
 **Név:** *Talizmán* — a döntés megszületett (lásd 19. pont). A dokumentum
 eredetileg „Sorslap” munkanéven készült; ahol a szövegben **lap** áll, az
@@ -854,7 +854,9 @@ A kódban ma nincs hitel. A Bank-lap „Hitelkeret” változata nyitja meg.
 * előtörlesztés bármikor, díj nélkül;
 * **ha a büdzsé nem fedezi a részletet:** a hiány +2%/forduló késedelmi
   kamattal görgetődik, és amíg van hátralék, **minden vásárlás zárva**
-  (igazolás, boost, stáb). Mínusz büdzsé nincs (2.9);
+  (igazolás, boost, stáb). Mínusz büdzsé nincs (2.9). *Megvalósítás
+  (3.9.144): minden bejövő pénz előbb a hátralékot viszi — így a büdzsé a
+  hátralék végéig nullán áll, és ez maga a zár;*
 * könyvelés: három új ledger-sor — `loanIn` („🏦 Hitel-folyósítás”, bevétel),
   `loanPay` („🏦 Hiteltörlesztés”), `loanInt` („🏦 Kamat”). Az idény-mérleg
   így kimondja, mennyibe került a pénz.
@@ -1019,7 +1021,8 @@ Durva becslés egy átlagos karrierre (~4 húzás/idény, a döntések ésszerű
 | **F1** ✅ | Adatmodell, generátor (ritkaság, dobás, special-sorsolás, Tiszta talizmán), seedelt kínálat, mentés, migráció — **hatás nélkül** | `talizman-proba.js` 1–3., 7. blokk |
 | **F2** ✅ | Ütemező (3 húzás, harmadokban), mérföldkő-csere, plafon; a húzás-ablak (fordulás, 3-ból 1, passz, később); a Talizmánok menü (irány, sáv, gyűjtemény); HUB-gomb és jelzés | `talizman-proba.js` 4–6., 8. blokk |
 | **F3** ✅ | Alaphatások 1–6: Scout, Stílus, Taktika, Igazolás, Fejlődés, Stáb — a csökkenő hozammal és a plafonnal (a 7.1–7.2 ide előrehozva); a 2. hullám 20 speciálja és a Joker eseménycsomagja a katalógusban | `talizman-f3-proba.js`: hatás nélkül BITRE a régi, talizmánnal a várt eltolás, valódi tárgyalás és licit |
-| **F4** | Joker (jegyzék + `ritkaP` + esemény-keret), Morál (jó légkör + jellemhullám), Bank (bevétel-szorzó + **hitel** + három ledger-sor) | a hitel-életciklus (felvétel → törlesztés → hátralék → zár); a hullám Panzerrel és nélküle |
+| **F4a** ✅ | Joker (Vad idény: a ritka események szorzója a meccsen és a piacon; Mozgalmas piac), Morál (jó légkör + jellemhullám irányválasztóval), Bank (bevétel-szorzó + **hitel** + három ledger-sor); a „zár” a hátralék behajtásával valósul meg (12. pont) | `talizman-f4a-proba.js`: a hitel-életciklus (felvétel → törlesztés → hátralék → behajtás → előtörlesztés → zár); a hullám a valódi húzás-ablakból |
+| **F4b** | A Joker eseménycsomagjainak 16 eseménye az átigazolási pakliban (9.12): kézi és automatikus ablakban is | eseményenként egy állítás; az igazgatósági ülés idényvégi értékelése |
 | **F5** | Meccskártyák: tíz tengely, pillanatkép-mezők, meccserő-sor, eredményjelző | **párharc-determinizmus**: ugyanaz a meccs mindkét gépen ugyanaz |
 | **F6** | A special-katalógus (~60 tétel) kötegekben, kategóriánként | tételenként egy pro- és egy kontra-állítás |
 | **F7** | Összhatás fül, csökkenő hozam, rezonancia, fúzió, égetés, archetípus-cím | a csökkenő hozam táblája (7.1) betűre |

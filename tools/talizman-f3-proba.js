@@ -6,7 +6,7 @@
    Amit mér:
      1. TALIZMÁN NÉLKÜL SEMMI NEM MOZDUL: minden kapaszkodó pontosan a régi
         számot adja — üres gyűjteménnyel ÉS olyan gyűjteménnyel is, amiben csak
-        a még nem ható kategóriák (Joker, Morál, Bank, Meccs) állnak;
+        más kategóriák (Joker, Morál, Bank, Meccs) talizmánjai állnak;
      2. A CSÖKKENŐ HOZAM ÉS A PLAFON: egy kategória talizmánjai erő szerint
         0,85^k-szorosan adódnak, és a változat plafonja fog;
      3. MIND A 13 VÁLTOZAT a saját kapaszkodóján: a stílus-fa és a csillagozás
@@ -95,7 +95,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return ki;});
   console.log("\n— 1. TALIZMÁN NÉLKÜL SEMMI NEM MOZDUL —");
   ok(n.semleges,"üres gyűjteménnyel minden olvasó semleges (0 / ×1)",n.ures.jel);
-  ok(n.azonos,"csak nem ható kategóriákkal (Bank, Joker, Morál, Meccs) minden kapaszkodó bitre ugyanaz",{ures:n.ures,masik:n.masik});
+  ok(n.azonos,"csak más kategóriák talizmánjaival (Bank, Joker, Morál, Meccs) az F3 minden kapaszkodója bitre ugyanaz",{ures:n.ures,masik:n.masik});
 
   /* ---- 2. CSÖKKENŐ HOZAM ÉS PLAFON ---- */
   const h=await p.evaluate(()=>{
@@ -265,16 +265,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   /* ---- 4. A FELÜLET ---- */
   const u=await p.evaluate(()=>{
     const ki={};
-    _pakli([_lap("taktika","fit",3,0.5),_lap("taktika","fit",1,0.5),_lap("bank","bevetel",2,0.5)]);
+    _pakli([_lap("taktika","fit",3,0.5),_lap("taktika","fit",1,0.5),{kat:"meccs",al:"gol",rang:2,dobas:0.5,spec:null}]);
     talMenuOpen();
     ki.blokk=$("talHatas").textContent;
+    ki.sorok=document.querySelectorAll("#talHatas .talHatRow").length;
     ki.lapok=[...document.querySelectorAll("#talGrid .talStat")].map(x=>x.textContent);
     talMenuClose();
     return ki;});
   console.log("\n— 4. A FELÜLET —");
-  ok(/Aktív alaphatások/.test(u.blokk)&&/taktika-illeszkedés/.test(u.blokk)&&/plafon 8 pp/.test(u.blokk)&&/72%-ot ér/.test(u.blokk)&&!/NaN/.test(u.blokk)&&!/Jobb üzletmenet/.test(u.blokk),
-     "a menü kiírja az aktív hatást, a plafont és a következő talizmán hatékonyságát — a még nem ható Bankot nem",u.blokk);
-  ok(u.lapok.filter(t=>/⚡/.test(t)).length===2&&u.lapok.filter(t=>/⏳/.test(t)).length===1,"a lapon ⚡ jelzi, ha az alaphatás él (Bank: még ⏳)",u.lapok);
+  ok(/Aktív alaphatások/.test(u.blokk)&&/taktika-illeszkedés/.test(u.blokk)&&/plafon 8 pp/.test(u.blokk)&&/72%-ot ér/.test(u.blokk)&&!/NaN/.test(u.blokk)&&u.sorok===1,
+     "a menü kiírja az aktív hatást, a plafont és a következő talizmán hatékonyságát — a még nem ható Meccset nem",{blokk:u.blokk,sorok:u.sorok});
+  ok(u.lapok.filter(t=>/⚡/.test(t)).length===2&&u.lapok.filter(t=>/⏳/.test(t)).length===1,"a lapon ⚡ jelzi, ha az alaphatás él (Meccs: még ⏳)",u.lapok);
 
   /* ---- 5. A JOKER ESEMÉNYCSOMAGJA ---- */
   const j=await p.evaluate(()=>{

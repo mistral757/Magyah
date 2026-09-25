@@ -2300,8 +2300,8 @@ node tools/talizman-f3-proba.js
 
 **Öt blokk (31 állítás, ~15 mp):**
 
-- **Semleges:** talizmán nélkül, és csak nem ható kategóriákkal (Bank, Joker,
-  Morál, Meccs) is minden kapaszkodó BITRE a régi számot adja.
+- **Semleges:** talizmán nélkül, és csak más kategóriák talizmánjaival (Bank,
+  Joker, Morál, Meccs) is az F3 minden kapaszkodója BITRE a régi számot adja.
 - **Csökkenő hozam és plafon:** erő szerint 1 · 0,85 · 0,85²; a Tiszta
   ×1,25; a special-os lapon nincs szorzó; a 8 pp-es plafon.
 - **A 13 kapaszkodó.** A tárgyalás a valódi `twResolveSigning`-gel, a licit a
@@ -2310,8 +2310,8 @@ node tools/talizman-f3-proba.js
   valódi `tacticTrainAfterMatch`. A stílus-fánál a kijelzett ÉS a levont ár
   is kedvezményes. A kedvezmény seedelt, és nem adódik össze a
   kihívás-kedvezménnyel.
-- **A felület:** ⚡ a lapon; a menü aktív hatásai a plafonnal, a nem ható
-  kategóriák nélkül.
+- **A felület:** ⚡ a lapon; a menü aktív hatásai a plafonnal, a még nem ható
+  kategória (3.9.144 óta a Meccs) nélkül.
 - **Az eseménycsomag:** 2 jó + 1 rossz, a lapon látszik, a választás a
   paklihoz adja, és nincs ismétlés.
 
@@ -2357,6 +2357,36 @@ gombot nyomja meg. **Öt állítás:**
 A régi kódon a próba pontosan a bejelentett hibát adja vissza.
 
 Részletek: `docs/szarny-kemia-epites.md`.
+
+## talizman-f4a-proba.js — 🧿 Talizmánok F4a: Joker, Morál, Bank
+
+```bash
+node tools/talizman-f4a-proba.js
+```
+
+**35 állítás, hét blokkban:**
+
+1. **Talizmán nélkül** minden F4a-olvasó semleges, a bevételi kapu és a
+   nyári esemény-keret betűre a régi.
+2. **Vad idény:** a szorzó, a plafon, és hogy a párharcban semleges. A
+   **valódi** `twResolvePhase2` sorsolásában a csendes sáv szűkül, a többi
+   súlya marad. A meccs-motor három ritka eseménye (különleges esemény,
+   piros lap, mez) viszi a szorzót.
+3. **Mozgalmas piac:** ritkaság szerinti ablakok, ablakonként legfeljebb +2,
+   és a valódi ablaknyitásban is megjelenik.
+4. **Jó légkör:** a morál-cél és a visszatérés.
+5. **Jellemhullám** a valódi húzás-ablakból: irányválasztó, végigfutás, a
+   skálán belül, egy ember legfeljebb kettőt. A pool és a pályán lévő példány
+   együtt mozdul. Ha már senkit nem lehet az irányba vinni, a hullám elül. A
+   „Később döntök” után a menüből indítható.
+6. **Jobb üzletmenet:** a szorzó és a kivételek.
+7. **Hitel:** a lépcsők, az ablak-feltétel, és a teljes életciklus:
+   felvétel → törlesztés → hátralék a késedelmi kamattal → behajtás →
+   előtörlesztés → lezárás. A menü gombjával és a három ledger-sorral.
+
+A régi kódon a próba elhasal, mert az F4a olvasói még nem léteznek.
+
+Részletek: `docs/talizmanok.md` (3.9.144).
 
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 
