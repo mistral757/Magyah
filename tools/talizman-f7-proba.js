@@ -111,6 +111,11 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     const T2=_pakli([["meccs",4,"betonfal","kapus"]]);
     T2.varo=[{id:"fz2",forras:"utem",n:1,szezon:3,fordulo:5,kinalat:[{kat:"meccs",rang:4,dobas:0.2,spec:"betonfal",al:"kapus",cimke:"x"}]}];
     const M=talValaszt(0,{fuzio:true});ki.mitosz=M.rang;ki.mitoszJel=TAL_RANG[5].n;ki.mitoszSzam=talSpecV("betonfal","pro");
+    /* 3.9.162: a legendás gyűjt — az első nem legendás fúzió után még legendás, a második után Mítosz */
+    const T4=_pakli([["stab",4,"mentor"]]);
+    const kor=r=>{T4.varo=[{id:"fz4"+r,forras:"utem",n:1,szezon:3,fordulo:5,kinalat:[{kat:"stab",rang:r,dobas:0.3,spec:"mentor",valt:"hatas",cimke:"x"}]}];
+      return talValaszt(0,{fuzio:true}).rang;};
+    ki.gyujt=[kor(2),kor(1)];
     /* a húzás-ablak: a fúzió-gomb és a „külön lapként" */
     const T3=_pakli([["stab",2,"mentor"]]);
     T3.varo=[{id:"fz3",forras:"utem",n:1,szezon:3,fordulo:5,kinalat:[{kat:"stab",rang:3,dobas:0.4,spec:"mentor",valt:"hatas",cimke:"x"},{kat:"bank",rang:1,dobas:0.4,spec:null,valt:"bevetel",cimke:"y"}]}];
@@ -125,9 +130,10 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     ki.ablakUtan={lapok:talState().lapok.length,rang:talState().lapok[0].rang};
     return ki;});
   console.log("\n— 2. FÚZIÓ —");
-  ok(fu.dupArany>0.01&&fu.dupArany<0.2&&fu.seedelt,"a kínálat kis eséllyel birtokolt speciált hoz, és seedelt marad",{a:fu.dupArany,s:fu.seedelt});
+  ok(fu.dupArany>0.01&&fu.dupArany<0.4&&fu.seedelt,"a kínálat kis eséllyel birtokolt speciált hoz, és seedelt marad",{a:fu.dupArany,s:fu.seedelt});
   ok(fu.fuz.rang===3&&kozel(fu.fuz.dobas,0.9)&&fu.fuz.db===0&&fu.fuz.fuzio===1,"ritka + ritka → nagyon ritka, a jobbik dobással, új lap nélkül",fu.fuz);
   /* a Betonfal ritkától él: a Mítosz pro-ja 3 × 3,9 / 1,4 */
+  ok(fu.gyujt[0]===4&&fu.gyujt[1]===5,"a legendás gyűjt: az első nem legendás fúzió után legendás marad, a második után Mítosz",fu.gyujt);
   ok(fu.mitosz===5&&fu.mitoszJel==="Mítosz"&&kozel(fu.mitoszSzam,3*3.9/1.4,1e-9),"két legendás → Mítosz (a special a Mítosz-skálán)",fu);
   /* a meglévő ritka (2) és a kínált nagyon ritka (3): a nagyobbik + 1 = legendás */
   ok(fu.gombLatszik&&/legendás/.test(fu.gombSzoveg)&&fu.tag&&fu.masikNincs&&fu.ablakUtan.lapok===1&&fu.ablakUtan.rang===4,

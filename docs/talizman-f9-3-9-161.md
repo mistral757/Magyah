@@ -24,6 +24,27 @@ Mindkét korlát tart, hangolni nem kellett. Amit a mérés még mutat:
 * **Méret:** átlagosan 47 lap és 8 legendás 10 idény alatt.
 * **Mítosz:** 100 idény alatt egy sem született. Ahhoz két legendás lap kell **ugyanazzal a speciállal**. A terv „egy karrierben jó esetben egy-kettőt” írt. Ha ez kevés, a fúzió-esély (`TAL_FUZIO_P`, most 12%) a legendás helyeken emelhető. Ez hangolási döntés, nem hiba.
 
+## 3.9.162 — gyakoribb fúzió, elérhető Mítosz
+
+> „Emeljük a fúzió esélyét."
+
+Két változás:
+
+* **A fúzió-esély 12% → 35%** (`TAL_FUZIO_P`), kínálati helyenként.
+* **A legendás gyűjt.** Eddig csak két legendás adott Mítoszt, a legendás ritkasága (3%) miatt ez gyakorlatilag nem jött össze. Mostantól ha egy legendásba egyszer már beolvasztottál egy nem legendás lapot, a következő fúzió (bármilyen ritkaságú lappal) Mítosz. Két legendás továbbra is azonnal Mítosz.
+
+Mérve (10 karrier × 10 idény, specializáló stratégia):
+
+| fúzió-esély | fúzió / 10 idény | Mítosz / 10 idény | meccserő-hozam |
+|---|---|---|---|
+| 12% (régi szabály) | 2,8 | 0 | +0,51 |
+| 25% | 6,0 | 0,5 | +0,58 |
+| **35%** | **8,5** | **0,8** | **+0,52** |
+| 50% | 11,4 | 1,9 | +0,39 |
+
+A 35% egy 15 idényes karrierben körülbelül egy-két Mítoszt ad, ahogy a terv
+írta. Az egyensúly-korlátok továbbra is bőven tartanak.
+
 ## 🔘 A kapcsoló
 
 A Talizmánok menü alján két kapcsoló áll.
