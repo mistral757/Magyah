@@ -200,6 +200,9 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     _lap("versenyszellem",2);
     const a=xi[1],b2=xi[2];a.pos=["KV"];b2.pos=["KV"];a.startRating=85;b2.startRating=83;
     xi.forEach((x,i)=>{if(i!==1&&i!==2)x.pos=["P"+i];});
+    /* 3.9.158: a TELJES keret posztja egyedi — a kispadon ülő, véletlenül szintén
+       KV-s és erősebb játékos különben „ellopta" a rivális-párt (véletlen bukás) */
+    fullCareerRoster().forEach((p,i)=>{const e=careerPool[p.n];if(e&&e!==a&&e!==b2)e.pos=["X"+i];});
     _talRivMemo=null;
     ki.riv=[talRivalis(a.n),talRivalis(b2.n),talKorDev(26,a.n)];
     S.staff=[];

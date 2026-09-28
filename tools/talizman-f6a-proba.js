@@ -403,7 +403,8 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     return {el:/a special él/.test(h),db:lista.length,mind:lista.every(s=>talSpecMukodik(s.id)),
       /* 3.9.154: az F6b (igazolás, fejlődés, stáb) is él; 3.9.156: az F6c (joker,
          morál, bank) is — a „többi" már csak a Meccs */
-      tobbi:TAL_SPEC.filter(s=>["scout","stilus","taktika","igazolas","fejlodes","stab","joker","moral","bank"].indexOf(s.k)<0).every(s=>!talSpecMukodik(s.id)),
+      /* 3.9.158: a Meccs is él (F6d) — mind a tíz kategória speciálja kész */
+      tobbi:TAL_SPEC.every(s=>talSpecMukodik(s.id)),
       menu:/Pontrúgás-labor/.test(menu)};});
   console.log("\n— 4. A KÁRTYA ÉS A MENÜ —");
   ok(ui.el,"a kártya „✦ a special él” jelet kap");

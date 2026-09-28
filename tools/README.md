@@ -2544,6 +2544,27 @@ node tools/talizman-f6c-proba.js
 
 Részletek: `docs/talizman-f6c-3-9-156.md`.
 
+## talizman-f6d-proba.js — 🧿 3.9.158: a Meccs speciáljai
+
+```bash
+node tools/talizman-f6d-proba.js
+```
+
+**19 állítás, öt blokkban:**
+
+0. **Semleges:** nincs új pillanatkép-mező, az időfüggő olvasó mindenhol 1.
+1. **A kilenc special:** pro és kontra a valódi olvasókon — időablak
+   vödörre pontosan, pálya a matchLambdas-on, lapok a pillanatképen, a
+   tizenegyes a különleges-esemény ágon, a lelátó a heti tickben.
+2. **A párharc-determinizmus:** a hét új mező a h2hWireSnapshot-ban; öt magon
+   BITRE ugyanaz; a vödrönkénti λ pontosan a szorzóval tolódik (0–15., 75+.,
+   a vendégé a Villámrajt-kontrával); a 12. játékos lapja a vendég
+   piroslap-esélyén.
+3. **A meccserő-tükör:** a helyi és a pillanatkép meccserője ugyanannyit mozdul.
+4. **Katalógus:** mind a 82 special él; nincs oldalhiba.
+
+Részletek: `docs/talizman-f6d-3-9-158.md`.
+
 ## javitasok-3-9-157-proba.js — 🔧 3.9.157: a forma a meccs-erő mellett, csapatlap, nyári kupa
 
 ```bash

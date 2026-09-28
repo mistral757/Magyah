@@ -366,9 +366,10 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
   const k=await p.evaluate(()=>{
     const F6C=TAL_SPEC.filter(s=>["joker","moral","bank"].indexOf(s.k)>=0);
     const meccs=TAL_SPEC.filter(s=>s.k==="meccs");
-    return {db:F6C.length,mind:F6C.every(s=>talSpecMukodik(s.id)),meccsNem:meccs.every(s=>!talSpecMukodik(s.id))};});
+    /* 3.9.158 óta a Meccs speciáljai is élnek (F6d) — a teljes katalógus */
+    return {db:F6C.length,mind:F6C.every(s=>talSpecMukodik(s.id)),meccsNem:meccs.every(s=>talSpecMukodik(s.id))};});
   console.log("\n— 6. A KATALÓGUS —");
-  ok(k.db===25&&k.mind&&k.meccsNem,"a Joker, a Morál és a Bank mind a 25 speciálja él, a Meccs speciáljai még nem",k);
+  ok(k.db===25&&k.mind&&k.meccsNem,"a Joker, a Morál és a Bank mind a 25 speciálja él (és 3.9.158 óta a Meccséi is)",k);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,5));
 
   await b.close();srv.close();
