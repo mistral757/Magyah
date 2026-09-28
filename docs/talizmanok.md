@@ -894,3 +894,26 @@ A régi kódon a próba nem indul el (nincs `talSpecV`).
   seeden a véges lista binomiális szórása időnként 15% alá vitte.
 * A felület-blokk nem Jellemhullámot választ. Annál az irányválasztó jön a
   második húzás előtt, és ez a blokk azt a láncot nem méri.
+
+
+---
+
+# A folytatás: F6b–F9 (3.9.153–3.9.161)
+
+Ez a fájl az F0–F6a munkanaplója. A későbbi fázisok saját lapot kaptak — itt
+a tartalomjegyzékük, időrendben.
+
+| verzió | tartalom | lap |
+|---|---|---|
+| 3.9.153 | a meccserő a motor tükre, és a **színhűség** (3 / 5 / 8 lap egy színben: az alaphatás ×1,10 / ×1,20 / ×1,35) | `egyensuly-3-9-153.md` |
+| 3.9.154 | **F6b** — Igazolás, Fejlődés, Stáb (24 special); a morál-jel kontrák valódi ára | `talizman-f6b-3-9-154.md` |
+| 3.9.155 | a Lojális stáb scout-felára kis áraknál | `talizman-f6b-3-9-154.md` (a végén) |
+| 3.9.156 | **F6c** — Joker, Morál, Bank (25 special); a meccsre ható számok a pillanatképben; a Tükörvilág | `talizman-f6c-3-9-156.md` |
+| 3.9.157 | a tartós forma a meccs-erő mellett (📈), a párharc-csapatlap plafonja, a nyári kupa gyorsítása | `javitasok-3-9-157.md` |
+| 3.9.158 | **F6d** — Meccs (9 special); időfüggő λ a két motorban, párharc-determinizmus | `talizman-f6d-3-9-158.md` |
+| 3.9.159 | **F7** — égetés, fúzió és Mítosz, rezonancia és Mesterlap, Polihisztor-díj, archetípus, Összhatás | `talizman-f7-3-9-159.md` |
+| 3.9.160 | **F8** — Kártyatár, öröklap, trófea-húzás, Pakli-mérföldkövek, hátlap; a forma hatása a felére | `talizman-f8-3-9-160.md` |
+| 3.9.161 | **F9** — egyensúly-mérés, be/ki kapcsoló, súgó, lezárás | `talizman-f9-3-9-161.md` |
+
+A terv ütemterve (`talizmanok-terv.md`, 18. pont) mind a kilenc fázist ✅-nak
+mutatja.

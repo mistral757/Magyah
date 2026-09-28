@@ -2544,6 +2544,60 @@ node tools/talizman-f6c-proba.js
 
 Részletek: `docs/talizman-f6c-3-9-156.md`.
 
+## talizman-egyensuly-proba.js — ⚖️ 3.9.161: a pakli egyensúlya (100 idény)
+
+```bash
+node tools/talizman-egyensuly-proba.js
+```
+
+* 10 karrier × 10 idény, a valódi kínálattal és választással, két stratégiával.
+* Méri a terv két korlátját: a meccserő-hozam a 10. idényben legfeljebb +1,5 OVR, a bevételi hozam legfeljebb +15%.
+* Kiírja a színhűség, a morál-jel kontrák, az Ingyen ember és a Bővített stáb előfordulását.
+
+Részletek: `docs/talizman-f9-3-9-161.md`.
+
+## talizman-f9-proba.js — 🧿 3.9.161: a kapcsoló, a párharc-tisztítás, a súgó
+
+```bash
+node tools/talizman-f9-proba.js
+```
+
+1. **Be / ki:** kikapcsolva nincs húzás és nincs hatás, a gyűjtemény megmarad; a HUB és a menü elérhető; visszakapcsolható.
+2. **A párharcban is:** kikapcsolva a társhoz menő pillanatképből a talizmán-mezők kikerülnek.
+3. **A HUB:** a bomba-ajánlat jelzése.
+4. **A súgó:** új szöveg; a Lojális stáb javított kiírása.
+
+## talizman-f7-proba.js — 🧿 3.9.159: égetés, fúzió, rezonancia, Összhatás
+
+```bash
+node tools/talizman-f7-proba.js
+```
+
+1. **Égetés:** csak nyáron, idényenként egyszer; a pro és a kontra megszűnik, +3 szerencse; a lap áthúzva marad.
+2. **Fúzió:** a kínálat ritkán birtokolt speciált hoz, seedelten; az összeolvasztás eggyel ritkább lapot ad; két legendásból Mítosz; a húzás-ablak két gombja.
+3. **Rezonancia:** mind a 10 képesség a valódi olvasón.
+4. **Mesterlap:** 7 lapnál egy legendás a következő kínálatban, egyszer.
+5. **Polihisztor-díj:** tíz színnél egyszer.
+6. **Archetípus:** a szezonzáró jelentésben és a párharc-csapatlapon, megtisztítva.
+7. **Fülek és szűrő:** Összhatás a területenkénti mérleggel, Rezonancia, szín- és ritkaság-szűrő.
+
+Részletek: `docs/talizman-f7-3-9-159.md`.
+
+## talizman-f8-proba.js — 🧿 3.9.160: Kártyatár, öröklap, trófea-húzás, hátlap
+
+```bash
+node tools/talizman-f8-proba.js
+```
+
+1. **Kártyatár:** a látott, a felvett és a fuzionált speciál a tárba kerül; egy új karrier nem nullázza; saját fül és profil-sor.
+2. **Öröklap:** csak 5+ idény és 85+ csúcs után; a lap a poszt színében, idézettel; a pro a poszt fejlődésén, a kontra a mezszámon hat.
+3. **Trófea-húzás:** egyszer; betelt plafonnál a következő idény elejére tolódik.
+4. **A Pakli-sáv:** a négy új mérföldkő-család a valódi számlálókkal.
+5. **„Pakliba ment”:** tájékoztató sor az idény-mérlegben, a könyvelés egyezik.
+6. **Hátlap:** címeres hátlap, a legendás csillan.
+
+Részletek: `docs/talizman-f8-3-9-160.md`.
+
 ## talizman-f6d-proba.js — 🧿 3.9.158: a Meccs speciáljai
 
 ```bash

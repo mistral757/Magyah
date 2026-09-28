@@ -1028,10 +1028,12 @@ Durva becslés egy átlagos karrierre (~4 húzás/idény, a döntések ésszerű
 | **F4c** ✅ | Igazgatósági ülés (idényes megbízás, idényvégi értékelés), Mezszponzor (arculat + bevétel), Sztárvilág (a Sztárom a párom eseményei stíluson kívül) | `talizman-f4c-proba.js`: az értékelés minden kimenete; a szponzor-szerződés életciklusa; a sztárvilág plafonjai |
 | **F5** ✅ | Meccskártyák: tíz tengely (λ a pillanatképben ±8%-os sávval, a másodlagos csatornák a csúszkák útján), meccserő (⚡) és menü-sor | `talizman-f5-proba.js`: **párharc-determinizmus** — a valódi h2hSimulate bitre ugyanazt adja, és a λ pontosan a szorzóval tolódik |
 | **F6a** ✅ | A Scout, a Stílus és a Taktika 24 speciálja (pro + kontra), a menü sora, a Titkos fegyver gombja | `talizman-f6a-proba.js`: tételenként egy pro- és egy kontra-állítás, ahol lehet a valódi hívási helyen |
-| **F6b–d** | Igazolás, Fejlődés, Stáb · Joker, Morál, Bank · Meccs — a maradék 58 special | tételenként egy pro- és egy kontra-állítás |
-| **F7** | Összhatás fül, csökkenő hozam, rezonancia, fúzió, égetés, archetípus-cím | a csökkenő hozam táblája (7.1) betűre |
-| **F8** | Kártyatár (`localStorage`), öröklap, trófea-húzás, új mérföldkő-sáv („Pakli”: lapok száma, legendások, rezonanciák) | |
-| **F9** | Egyensúly-mérés (100 szezon), hangolás, súgó-bejegyzés, doksi, teljes regresszió | a 17. pont két korlátja |
+| **F6b** ✅ | Igazolás, Fejlődés, Stáb — 24 special (3.9.154) | `talizman-f6b-proba.js` |
+| **F6c** ✅ | Joker, Morál, Bank — 25 special; a meccsre ható számok a pillanatképben (3.9.156) | `talizman-f6c-proba.js` |
+| **F6d** ✅ | Meccs — 9 special; időfüggő λ mindkét motorban (3.9.158) | `talizman-f6d-proba.js`: **párharc-determinizmus** öt magon, vödrönkénti λ |
+| **F7** ✅ | Összhatás fül, rezonancia (a 3.9.153-as színhűség MELLETT: 5 lapos képesség, 7 lapos Mesterlap), Polihisztor-díj, fúzió és Mítosz, égetés, archetípus-cím, szűrő (3.9.159) | `talizman-f7-proba.js` |
+| **F8** ✅ | Kártyatár (`localStorage`), öröklap, trófea-húzás, új mérföldkő-sáv („Pakli”: lapok száma, legendások, rezonanciák, fúziók), a hátlap, a „pakliba ment” sor (3.9.160) | `talizman-f8-proba.js` |
+| **F9** ✅ | Egyensúly-mérés (100 idény), be/ki kapcsoló („a párharcban is”), súgó-bejegyzés, doksi, teljes regresszió (3.9.161) | `talizman-egyensuly-proba.js`: a 17. pont két korlátja |
 
 A **F1–F2 önmagában is játszható**: lapok jönnek, gyűlnek, látszanak — csak
 még nem hatnak. Ott már kiderül, jó-e a *ritmus*, mielőtt a számokon
