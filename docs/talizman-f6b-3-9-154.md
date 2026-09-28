@@ -101,3 +101,10 @@ Versenyszellem, Fókuszcsoport.
 `tools/talizman-f6b-proba.js` (port 9193, 27 állítás). A
 `talizman-f6a-proba.js` „a többi még nem él” állítása mostantól a maradék
 négy kategóriára szól.
+
+## 3.9.155 — javítás
+
+A Lojális stáb kontrája kis scout-áraknál +10% helyett +20%-ot adott: az ár
+500-as lépcsőre kerekedett. 10 000 pont alatt mostantól 100-as a lépcső. A
+teljes regresszióban a `talizman-f6b-proba` véletlen scout-csillagszámmal
+fogta meg.
