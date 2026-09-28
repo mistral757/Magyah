@@ -111,8 +111,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(v.csendes&&Math.abs(v.csendes.w-3/v.m)<1e-9&&v.alom&&v.alom.w===3,"a valódi átigazolási sorsolásban a „csendes” sáv szűkül, a többi súlya marad",v);
   const src=fs.readFileSync(path.join(ROOT,"index.html"),"utf8");
   ok(/_sevP=\(RIVAL_MOOD\?0\.26:0\.10\)\/18\*talRitkaMult\(DUEL\)/.test(src),"a meccs-motor: a különleges esemény (jó ÉS rossz) viszi a szorzót");
-  ok(/dialMul\("card",\{injured:_dialInjured\}\)\*talRitkaMult\(DUEL\);/.test(src),"…a piros lap is (a rossz ritka esemény)");
-  ok(/Math\.random\(\)>=Math\.min\(0\.5,0\.25\*talRitkaMult\(DUEL\)\)/.test(src),"…és a mez leveszése is");
+  /* 3.9.156: a Káosz-elmélet óta a hívás megmondja, jó vagy rossz eseményről van szó */
+  ok(/dialMul\("card",\{injured:_dialInjured\}\)\*talRitkaMult\(DUEL(,"rossz")?\)/.test(src),"…a piros lap is (a rossz ritka esemény)");
+  ok(/Math\.random\(\)>=Math\.min\(0\.5,0\.25\*talRitkaMult\(DUEL(,"jo")?\)\)/.test(src),"…és a mez leveszése is");
 
   /* ---- 3. MOZGALMAS PIAC ---- */
   const pi=await p.evaluate(()=>{
@@ -139,7 +140,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return {cel:talMoralCel(),vissza:talMoralVissza()};});
   console.log("\n— 4. ❤️ JÓ LÉGKÖR —");
   ok(Math.abs(m.cel-0.8*2.7*1.25)<1e-9&&Math.abs(m.vissza-(1+0.1*2.7*1.25))<1e-9,"a morál-cél +2,7 pont, a visszatérés ×1,34",m);
-  ok(/const _tc=Math\.min\(100,S\.moraleTarget\+talMoralCel\(\)(\+talMoralJelCel\(\))?\);/.test(src)&&/\*_tv\)\);\}/.test(src),"a meccs utáni morál-húzás a célt és a szorzót is viszi");
+  ok(/const _tc=Math\.min\(100,S\.moraleTarget\+talMoralCel\(\)(\+talMoralJelCel\(\))?(\+talBuliCel\(\))?\);/.test(src)&&/\*_tv\)\);\}/.test(src),"a meccs utáni morál-húzás a célt és a szorzót is viszi");
 
   /* ---- 5. JELLEMHULLÁM ---- */
   const h=await p.evaluate(async()=>{

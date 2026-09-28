@@ -2513,6 +2513,37 @@ node tools/talizman-f6b-proba.js
 
 Részletek: `docs/talizman-f6b-3-9-154.md`.
 
+## talizman-f6c-proba.js — 🧿 3.9.156: talizmán-speciálok — Joker, Morál, Bank
+
+```bash
+node tools/talizman-f6c-proba.js
+```
+
+**35 állítás, hét blokkban:**
+
+0. **Semleges:** talizmán nélkül minden új olvasó 1-et / 0-t ad, és a meccs
+   pillanatképében nincs új mező.
+1. **Joker (9):** befektetők (a hátsó eseménysáv 10%-a, saját könyvelési
+   sor), talizmán-eső (+1 ütemezés, plafon 7, nincs Tiszta), kétélű penge
+   (külön pro- és kontra-dobás, a kiírt szám a hatóval egyezik), fekete bárány,
+   kaszinó (4 lap, húzás-díj), káosz-elmélet, szerencse fia, pénzfeldobás,
+   tükörvilág (a kontra előjelet vált, utána fél erejű pro).
+2. **Morál (8):** király, emlékezet, rangadó-láz, családias légkör,
+   vasakarat, lélekbúvár (irányváltás), bulinegyed, pszichológus (padló és
+   fantom stábhely).
+3. **Bank (8):** takarékbetét (plafonnal), szponzor, stadion (hazai előny a
+   különbségben), kötvénypiac, bérplafon, aranytojás, tőzsde (két irányú
+   könyvelés), szurkolói kötvény.
+4. **A párharc:** a három új mező (talSpOwn, talFav, talHome) a valódi
+   h2hWireSnapshot-ban; a h2hSimulate ugyanabból a magból BITRE ugyanazt adja;
+   a λ pontosan a szorzóval tolódik.
+5. **A felület:** a négy lapos húzás-ablak a díjjal; az érme és a tükör
+   gombja a menüben.
+6. **Katalógus:** a Joker, a Morál és a Bank mind a 25 speciálja él, a Meccs
+   speciáljai még nem; nincs oldalhiba.
+
+Részletek: `docs/talizman-f6c-3-9-156.md`.
+
 ## egyensuly-3-9-153-proba.js — ⚖️ 3.9.153: D0, nyári kupa, árazás, csapategyensúly, poszt-tudás, színhűség
 
 ```bash

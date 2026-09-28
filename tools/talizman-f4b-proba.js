@@ -93,7 +93,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.csomagNelkul=talEsemenyPakli().length;
     const x=_xi()[1];
     ki.olvasok=[talMamorDev(x.n),talBerSzorzo(x.n),talPalyazarAktiv()];
-    ki.forras=/\.concat\(_talEs\)\);/.test(twResolvePhase2.toString());
+    /* 3.9.156: a tömb a Befektetők miatt külön változóban épül (a lap tétele a
+       pakli UTÁN jön, és csak a lap birtokában) — a pakli ugyanúgy a végére fűződik */
+    ki.forras=/\.concat\(_talEs\)\)?;/.test(twResolvePhase2.toString());
     return ki;});
   console.log("\n— 1. SEMLEGES —");
   ok(n.ures===0&&n.talNincs&&n.csomagNelkul===0,"talizmán és csomag nélkül a pakli üres, és az olvasás nem hoz létre állapotot",n);
