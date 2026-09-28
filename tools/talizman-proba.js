@@ -179,7 +179,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(k.ismOk===k.N,"az ismerős hely mindig a domináns színből jön (itt: Bank)",{ism:k.ismOk,N:k.N});
   ok(k.ujOk===k.N,"az „új irány” olyan területről jön, amiből 0–1 talizmánod van",{uj:k.ujOk,N:k.N});
   ok(k.kulonb===k.N,"mindig három különböző kategória",k.kulonb);
-  ok(k.birtok===0,"birtokolt special nem jön újra (a duplikátum a fúzióé lesz)",k.birtok);
+  /* 3.9.159 (F7): a birtokolt special csak fúzió-esélyként jön újra — ritkán */
+  ok(k.birtok<60,"birtokolt special csak ritkán, fúzió-esélyként jön újra",k.birtok);
   ok(k.dom.k==="bank"&&k.dom.cim==="A Bankár","a domináns szín címet ad",k.dom);
   ok(k.pity===50,"16 legendás nélküli húzás után a kínálatban mindig van legendás",k.pity);
   ok(k.pity0<50,"…nélküle nem mindig",k.pity0);
