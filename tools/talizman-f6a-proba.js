@@ -401,11 +401,12 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     const lista=TAL_SPEC.filter(s=>["scout","stilus","taktika"].indexOf(s.k)>=0);
     talMenuOpen();const menu=$("talHatas").textContent;talMenuClose();
     return {el:/a special él/.test(h),db:lista.length,mind:lista.every(s=>talSpecMukodik(s.id)),
-      tobbi:TAL_SPEC.filter(s=>["scout","stilus","taktika"].indexOf(s.k)<0).every(s=>!talSpecMukodik(s.id)),
+      /* 3.9.154: az F6b (igazolás, fejlődés, stáb) is él — a „többi" a maradék négy kategória */
+      tobbi:TAL_SPEC.filter(s=>["scout","stilus","taktika","igazolas","fejlodes","stab"].indexOf(s.k)<0).every(s=>!talSpecMukodik(s.id)),
       menu:/Pontrúgás-labor/.test(menu)};});
   console.log("\n— 4. A KÁRTYA ÉS A MENÜ —");
   ok(ui.el,"a kártya „✦ a special él” jelet kap");
-  ok(ui.db===24&&ui.mind&&ui.tobbi,"a három kategória mind a 24 speciálja él, a többi még nem",ui);
+  ok(ui.db===24&&ui.mind&&ui.tobbi,"a három kategória mind a 24 speciálja él, a még nem kész kategóriáké nem",ui);
   ok(ui.menu,"a menüben a special sora (pro és kontra) áll");
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();

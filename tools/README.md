@@ -2491,6 +2491,28 @@ node tools/talizman-f5-proba.js
 
 Részletek: `docs/talizmanok.md` (3.9.148).
 
+## talizman-f6b-proba.js — 🧿 3.9.154: talizmán-speciálok — Igazolás, Fejlődés, Stáb
+
+```bash
+node tools/talizman-f6b-proba.js
+```
+
+**27 állítás, öt blokkban:**
+
+0. **Semleges:** talizmán nélkül minden új olvasó 1-et / 0-t ad.
+1. **Igazolás (8):** alkusz, háló, zsákbamacska, hűség, villámzár, ingyen
+   ember, visszavásárlás, utolsó perces bomba — pro és kontra, a valódi
+   függvényeken (licit-kúp, keresési keret, szezonkeret, kedvezmény,
+   kikiáltási ár, token, menü-gomb, ajánlat és aláírás).
+2. **Fejlődés (8):** titánok, késői virágzás (tíz idény öregedés),
+   specialista, kemény edzés, vatta, csodagyerek, második tavasz,
+   versenyszellem.
+3. **Stáb (8):** bővített, mentor, lojális, tapasztalatcsere, fókusz,
+   legenda, a nagy öreg, konferencia.
+4. **Katalógus:** a három kategória mind a 24 speciálja él; nincs oldalhiba.
+
+Részletek: `docs/talizman-f6b-3-9-154.md`.
+
 ## egyensuly-3-9-153-proba.js — ⚖️ 3.9.153: D0, nyári kupa, árazás, csapategyensúly, poszt-tudás, színhűség
 
 ```bash

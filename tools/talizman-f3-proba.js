@@ -260,7 +260,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
 
   /* a két véletlenen múló, UI-mélyi kapaszkodó: a képlet bekötése */
   const src=fs.readFileSync(path.join(ROOT,"index.html"),"utf8");
-  ok(/const _tm=\(\(S\.chTrainBoost\|\|0\)>0\?CH_TRAIN_BOOST_MULT:1\)\*talEdzesMult\(\);/.test(src),"Hatékony edzés: a tervezett edzés szorzója a talizmánt is viszi");
+  ok(/const _tm=\(\(S\.chTrainBoost\|\|0\)>0\?CH_TRAIN_BOOST_MULT:1\)\*talEdzesMult\(\)(\*talEdzHatMult\(\))?;/.test(src),"Hatékony edzés: a tervezett edzés szorzója a talizmánt is viszi");
   ok(/:3\+\(\(\(\)=>\{const p=talScout4P\(\);return p>0&&Math\.random\(\)<p\?1:0;\}\)\(\)\);/.test(src),"Bővebb lista: a poszt-felderítés jelöltszáma 3 + talizmán-dobás");
 
   /* ---- 4. A FELÜLET ---- */
