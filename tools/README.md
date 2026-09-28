@@ -2491,6 +2491,28 @@ node tools/talizman-f5-proba.js
 
 Részletek: `docs/talizmanok.md` (3.9.148).
 
+## hibak-3-9-151-proba.js — 🔧 3.9.151: bejelentett hibák és kérések
+
+```bash
+node tools/hibak-3-9-151-proba.js
+```
+
+**16 állítás, hat blokkban:**
+
+1. **A társ ⚡-je élőben:** a közös lista a csere erő-változását viszi, és a
+   valódi eredményjelző (`sbSetOppMs`) pontosan annyit mozdítja a társ
+   meccs-erejét; a kiállítás a saját emberhátrány-tételével.
+2. **A tervezett csere időzítése:** a „45. perctől” a félidő után (46.), a
+   „70. perctől” a 71. percben — a közös szimulációban és a helyi motorban is.
+3. **Akadémiai tehetség:** a valódi `applyTransfer` 18–22 éveseket hoz.
+4. **Kihívás-jutalmak:** a két rossz nincs a kalapban, a három új igen (ha van
+   mire hatnia), és a valódi kiváltásuk működik.
+5. **Kiírások:** a morál és a kapitány meccserője a motor képletével; a
+   játékoslap a származási klubot mutatja.
+6. **A Hiper Szuper Kupa lila táblája.**
+
+Részletek: `docs/javitasok-3-9-151.md`.
+
 ## talizman-f6a-proba.js — 🧿 Talizmánok F6a: a Scout, a Stílus és a Taktika speciáljai
 
 ```bash
