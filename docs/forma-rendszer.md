@@ -53,6 +53,11 @@ ott kell látni) és a játékos lapján, a hatás számával együtt.
 Lineáris a két szél között: `(v − 7,5) / 6,5 × 15`. A félskálák közepén (4 és
 11) ez pontosan a kért ±8%.
 
+> **3.9.160: a hatás a felére csökkent.** A két szélen ±7,5%, a félskálák
+> közepén ±4%, az eredményesség ±1,5% (`PFORM_MAX_PCT = 7,5`,
+> `PFORM_EDGE_PCT = 1,5`). A fenti táblázat a 3.9.160 előtti értékeket
+> mutatja.
+
 **A teljesítmény-szorzó a `contrib`-on ül, nem a `pOvr`-ben.** A forma a MAI
 teljesítményt írja, nem a játékos értékét: a keretlistán, a piacon, a
 szerződésnél tehát ugyanaz a Rating marad — a különbség a pályán jön ki.
@@ -435,3 +440,6 @@ A **±15% a két szélen szándékosan erős**. Egy tökéletes periódus után 
 csapatszintű hatás +2,0 meccs-erő — ez „a csapat szárnyal" érzés ára, és a
 divergencia-csillapítás tartja ennyiben. Ha a játékon ez soknak bizonyul, egyetlen
 konstans (`PFORM_MAX_PCT`) állítja az egészet.
+
+**3.9.160:** soknak bizonyult („túl sokat ad a forma a meccs erőhöz"). A
+`PFORM_MAX_PCT` 15 → 7,5, a `PFORM_EDGE_PCT` 3 → 1,5, mindkét irányban.
