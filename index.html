@@ -4305,6 +4305,12 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
   #talDrawModal #talDrawOk,#talDrawModal .talBtnRow>button{padding:6px 10px;min-height:0;font-size:13px;margin-top:4px}
   #talDrawModal .talBtnRow{margin-top:4px}}
 @media (prefers-reduced-motion:reduce){.talCard.r4{animation:none;--talAng:40deg}.talFlip{animation:none}.talPickBtn{transition:none}}
+/* 🔊 3.9.163 — hang és zene */
+.hangSor{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:13px;flex-wrap:wrap}
+.hangSor label{min-width:92px;display:flex;align-items:center;gap:6px}
+.hangSor input[type=range]{flex:1;min-width:120px;accent-color:var(--gold)}
+.hangSor select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.hangMegj{font-size:11.5px;color:var(--dim);line-height:1.45;margin-top:6px}
 </style>
 </head>
 <body>
@@ -4717,6 +4723,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
          nyitóképernyőről. JS rejti el, ha a játék már telepítve fut. -->
     <button id="installBtn" class="hide" title="Telepítés a kezdőképernyőre" style="font-size:14px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer;line-height:1">📲</button>
     <button id="themeToggle" title="Téma váltása" style="font-size:14px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer;line-height:1">◑</button>
+    <button id="hangToggle" title="Hang" aria-label="Hang be/ki" style="font-size:14px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer;line-height:1">🔊</button>
     <span class="badge-version" id="versionBadge"></span>
   </div>
 </header>
@@ -5780,6 +5787,8 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
     <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-top:16px">Megjelenés</div>
     <p style="font-size:12px;color:var(--dim);margin-top:2px">Válassz témát — a mintasáv mutatja az alapot, a panelt, a kiemelést és a szöveget.</p>
     <div id="themeModalBody" style="margin-top:10px"></div>
+    <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-top:16px">🔊 Hang és zene</div>
+    <div id="hangModalBody" style="margin-top:8px"></div>
     <button id="themeCloseBtn" class="btn-s stepbtn">Bezár</button>
   </div>
 </div>
@@ -6388,7 +6397,365 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.162";
+const APP_VERSION="3.9.163";
+/* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
+   KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
+   folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
+   lenne az igazán menő, ha a csapatstílusoknak is lenne saját dallama… és
+   mindegyiknek jó lenne egy kis saját signal szerű rövid verziója."
+
+   EGY RÉGI KONZOL, KÓDBÓL. Minden hang a böngésző WebAudio-jában születik
+   (square, triangle, 8-bites „LFSR" zaj) — nincs letöltendő fájl, a játék mérete
+   nem nő, és offline is szól.
+     · HANGEFFEKTEK: a gombok, a meccs eseményei (sípszó, gól, lapok, kapufa,
+       bravúr, sérülés, VAR, félidő, lefújás…), az értesítések és a talizmánok.
+     · ZENE: három választható menüdal. Meccs közben elhalkul.
+     · CSAPATSTÍLUSOK: mind a nyolcnak saját DALLAMA (a stílus-menüben szól, ha
+       már két filozófiád van) és rövid SZIGNÁLJA (meccsenként egyszer, amikor a
+       stílus a pályán működésbe lép — és meccsek között is egyszer, ha
+       odaillő dolgot kapsz, pl. egy passzkémia épül).
+   A BEÁLLÍTÁS globális (localStorage, mint a téma): hangok be/ki, hangerő,
+   zene be/ki, zene-hangerő, dal. A fejléc 🔊 gombja gyors váltó.
+   A BÖNGÉSZŐ SZABÁLYA: hang csak az első érintés után szólhat — addig a motor
+   csendben vár, semmi nem hibázik.
+   VÉGIGJÁTSZÁSNÁL (S.auto) a meccs hangjai hallgatnak: ott nem a közvetítést
+   nézed. A táblák `var`-ral: a hívások a szkript elejéről is jöhetnek, a `const`
+   ott még TDZ-hibát dobna. */
+var HANG_KEY="30-0-hang-v1";
+var _hangBeall=null,_hangCtx=null,_hangBus=null,_hangNoise=null,_hangUtolsoKlikk=0;
+var _hangNaplo=[];                 /* az utolsó hangok azonosítója — a próba ebből olvas */
+var _hangJelVolt={};               /* a stílus-szignál kulcsai (meccsenként / meccsek között egyszer) */
+var _hangZene=null;                /* {dal, lep, kov, timer} — a futó zene */
+var _hangStilusDal=null;           /* a futó stílus-dallam vége (időbélyeg) */
+function hangBeall(){
+  if(_hangBeall)return _hangBeall;
+  const alap={on:true,sfx:70,zene:true,zeneVol:40,dal:"fo"};
+  try{const x=JSON.parse(localStorage.getItem(HANG_KEY)||"null");
+    _hangBeall=Object.assign(alap,(x&&typeof x==="object")?x:{});}catch(e){_hangBeall=alap;}
+  if(!HANG_DALOK_NEV[_hangBeall.dal])_hangBeall.dal="fo";
+  return _hangBeall;}
+function hangMent(){try{localStorage.setItem(HANG_KEY,JSON.stringify(hangBeall()));}catch(e){}}
+var HANG_DALOK_NEV={fo:"Öltözői főcím",taktika:"Taktikai tábla",meccsnap:"Meccsnap"};
+/* ---- A HANGKÁRTYA ---- */
+function hangAc(){
+  if(_hangCtx)return _hangCtx;
+  /* Automatizált böngészőben (a próbák) néma: tucatnyi párhuzamos, zenélő
+     böngésző leterhelné a gépet. A hang-próba külön engedélyt ad. */
+  try{if(navigator.webdriver&&!window.HANG_TESZT)return null;}catch(e){}
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;
+  try{_hangCtx=new AC();}catch(e){return null;}
+  const m=_hangCtx.createGain(),s=_hangCtx.createGain(),z=_hangCtx.createGain();
+  s.connect(m);z.connect(m);m.connect(_hangCtx.destination);
+  _hangBus={master:m,sfx:s,zene:z};
+  hangHangero();
+  return _hangCtx;}
+function hangHangero(){
+  if(!_hangBus)return;
+  const B=hangBeall();
+  _hangBus.sfx.gain.value=B.on?(B.sfx/100)*0.55:0;
+  _hangBus.zene.gain.value=(B.on&&B.zene)?(B.zeneVol/100)*0.45:0;}
+/* az első érintés feloldja a hangot (a böngésző szabálya) */
+function hangFelold(){
+  const ac=hangAc();if(!ac)return;
+  if(ac.state==="suspended")try{ac.resume();}catch(e){}
+  hangZeneIgazit();}
+function hangKesz(){return !!(_hangCtx&&_hangCtx.state==="running"&&hangBeall().on);}
+/* ---- A HANGSZEREK ---- */
+function hangHz(n){return 440*Math.pow(2,(n-69)/12);}
+function hangTon(t,o,bus){
+  const ac=_hangCtx,osc=ac.createOscillator(),g=ac.createGain();
+  const dur=o.dur,vol=o.vol==null?.25:o.vol,att=o.att||.005,rel=o.rel==null?.06:o.rel;
+  osc.type=o.type||"square";osc.frequency.setValueAtTime(o.f,t);
+  if(o.f2)osc.frequency.exponentialRampToValueAtTime(o.f2,t+dur);
+  if(o.vib){const l=ac.createOscillator(),lg=ac.createGain();l.frequency.value=o.vib;lg.gain.value=o.f*.02;l.connect(lg);lg.connect(osc.frequency);l.start(t);l.stop(t+dur+rel);}
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+att);
+  g.gain.setValueAtTime(vol,t+Math.max(att,dur-rel));g.gain.linearRampToValueAtTime(0,t+dur);
+  osc.connect(g);g.connect(o.dest||bus||_hangBus.sfx);osc.start(t);osc.stop(t+dur+.02);}
+function hangZaj(t,o,bus){
+  const ac=_hangCtx;
+  if(!_hangNoise){_hangNoise=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate);const d=_hangNoise.getChannelData(0);
+    let v=0;for(let i=0;i<d.length;i++){if(i%4===0)v=Math.random()*2-1;d[i]=v;}}
+  const s=ac.createBufferSource(),g=ac.createGain();s.buffer=_hangNoise;
+  let n=s;
+  if(o.hp){const f=ac.createBiquadFilter();f.type="highpass";f.frequency.value=o.hp;n.connect(f);n=f;}
+  if(o.lp){const f=ac.createBiquadFilter();f.type="lowpass";f.frequency.value=o.lp;n.connect(f);n=f;}
+  const vol=o.vol==null?.2:o.vol;
+  g.gain.setValueAtTime(0,t);
+  if(o.swell){g.gain.linearRampToValueAtTime(vol,t+o.dur*.35);g.gain.linearRampToValueAtTime(0,t+o.dur);}
+  else{g.gain.linearRampToValueAtTime(vol,t+(o.att||.002));g.gain.exponentialRampToValueAtTime(.001,t+o.dur);}
+  n.connect(g);g.connect(o.dest||bus||_hangBus.sfx);s.start(t);s.stop(t+o.dur+.02);}
+function hangVisszhang(bus){
+  const ac=_hangCtx,d=ac.createDelay(),fb=ac.createGain(),w=ac.createGain(),inp=ac.createGain();
+  d.delayTime.value=.14;fb.gain.value=.33;w.gain.value=.42;
+  d.connect(fb);fb.connect(d);d.connect(w);w.connect(bus||_hangBus.sfx);inp.connect(bus||_hangBus.sfx);inp.connect(d);return inp;}
+/* ---- HANGJEGYEK SZÖVEGBŐL: „E5 . D5 E5 - C5" — pont = szünet, kötőjel = kitartás ---- */
+var _hangHJ={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+function hangJegy(s){
+  const m=/^([A-G])([#b]?)(-?\d)$/.exec(s);if(!m)return null;
+  return 12*(+m[3]+1)+_hangHJ[m[1]]+(m[2]==="#"?1:m[2]==="b"?-1:0);}
+function hangSor(str){
+  const out=[];String(str).split(/\s+/).filter(x=>x&&x!=="|").forEach(tk=>{
+    if(tk===".")out.push(null);
+    else if(tk==="-"){let j=out.length-1;while(j>=0&&out[j]&&out[j].tart)j--;
+      if(j>=0&&out[j])out[j].len++;out.push({tart:1});}
+    else out.push({n:hangJegy(tk),len:1});});
+  return out;}
+/* ---- A HANGEFFEKTEK ---- */
+var HANG_SFX={
+  klikk(t){hangTon(t,{f:880,dur:.03,vol:.13});hangTon(t+.03,{f:1320,dur:.035,vol:.11});},
+  sip(t){[0,.18].forEach(d=>hangTon(t+d,{f:2350,dur:.12,type:"triangle",vol:.26,vib:28}));
+    hangTon(t+.42,{f:2350,dur:.7,type:"triangle",vol:.28,vib:30,rel:.15});},
+  felido(t){[0,.2].forEach(d=>hangTon(t+d,{f:2300,dur:.3,type:"triangle",vol:.24,vib:26,rel:.1}));},
+  vege(t){[0,.22,.44].forEach((d,i)=>hangTon(t+d,{f:2300,dur:i===2?.75:.16,type:"triangle",vol:.26,vib:28,rel:i===2?.2:.04}));},
+  gol(t){[60,64,67,72,76].forEach((n,i)=>hangTon(t+i*.07,{f:hangHz(n),dur:i===4?.55:.09,vol:.2,rel:i===4?.3:.03}));
+    hangTon(t+.28,{f:hangHz(48),dur:.6,type:"triangle",vol:.28});hangZaj(t,{dur:1.9,vol:.14,lp:1400,swell:true});},
+  golKapott(t){[67,63,60].forEach((n,i)=>hangTon(t+i*.13,{f:hangHz(n),dur:.16,type:"triangle",vol:.22}));
+    hangTon(t+.4,{f:hangHz(48),f2:hangHz(43),dur:.5,type:"triangle",vol:.22,rel:.2});hangZaj(t,{dur:.8,vol:.05,lp:700,swell:true});},
+  sarga(t){hangTon(t,{f:hangHz(76),dur:.1,vol:.18});hangTon(t+.12,{f:hangHz(72),dur:.14,vol:.16});},
+  piros(t){hangTon(t,{f:hangHz(64),dur:.16,vol:.24});hangTon(t+.18,{f:hangHz(58),f2:hangHz(52),dur:.34,vol:.24,rel:.12});hangZaj(t,{dur:.08,vol:.1,hp:3000});},
+  serules(t){hangTon(t,{f:140,f2:60,dur:.18,type:"triangle",vol:.35});hangTon(t+.2,{f:hangHz(62),f2:hangHz(55),dur:.4,type:"square",vol:.1,rel:.2});},
+  kapufa(t){hangTon(t,{f:1560,dur:.28,type:"square",vol:.1,rel:.25});hangTon(t,{f:2090,dur:.24,type:"triangle",vol:.12,rel:.22});hangZaj(t,{dur:.05,vol:.12,hp:5000});},
+  bravur(t){hangTon(t,{f:300,f2:1600,dur:.16,type:"square",vol:.12});hangZaj(t+.05,{dur:.12,vol:.08,hp:4000});
+    hangTon(t+.18,{f:hangHz(79),dur:.18,type:"triangle",vol:.2});},
+  tizenegyes(t){for(let i=0;i<8;i++)hangZaj(t+i*.06,{dur:.05,vol:.05+i*.012,hp:1500});hangTon(t+.5,{f:hangHz(69),dur:.2,type:"triangle",vol:.2});},
+  var(t){hangTon(t,{f:hangHz(72),dur:.12,type:"square",vol:.12});hangTon(t+.15,{f:hangHz(72),dur:.12,type:"square",vol:.12});hangTon(t+.3,{f:hangHz(79),dur:.22,type:"triangle",vol:.16});},
+  mesterharmas(t){const e=hangVisszhang();[72,76,79,84,79,84,88].forEach((n,i)=>hangTon(t+i*.075,{f:hangHz(n),dur:.1,vol:.16,dest:e}));hangZaj(t,{dur:1.4,vol:.1,lp:1600,swell:true});},
+  gyozelem(t){const e=hangVisszhang();[[72,0],[76,.12],[79,.24],[84,.36]].forEach(([n,d])=>hangTon(t+d,{f:hangHz(n),dur:d===.36?.6:.12,vol:.17,dest:e,rel:d===.36?.3:.03}));
+    hangTon(t+.36,{f:hangHz(48),dur:.6,type:"triangle",vol:.26});},
+  vereseg(t){[[64,0],[62,.2],[60,.4],[55,.6]].forEach(([n,d])=>hangTon(t+d,{f:hangHz(n),dur:d===.6?.6:.18,type:"triangle",vol:.2,rel:d===.6?.3:.04}));},
+  dontetlen(t){hangTon(t,{f:hangHz(67),dur:.18,type:"triangle",vol:.2});hangTon(t+.22,{f:hangHz(67),dur:.3,type:"triangle",vol:.18,rel:.15});},
+  ertesit(t){const e=hangVisszhang();[76,83,88].forEach((n,i)=>hangTon(t+i*.09,{f:hangHz(n),dur:.14,type:"triangle",vol:.2,dest:e}));},
+  penz(t){hangTon(t,{f:hangHz(83),dur:.06,vol:.12});hangTon(t+.07,{f:hangHz(88),dur:.18,vol:.12,rel:.1});},
+  huzas(t){hangTon(t,{f:220,f2:1760,dur:.28,type:"square",vol:.1,rel:.05});hangZaj(t,{dur:.3,vol:.08,hp:4000});
+    const e=hangVisszhang();hangTon(t+.3,{f:hangHz(84),dur:.12,type:"triangle",vol:.18,dest:e});hangTon(t+.38,{f:hangHz(91),dur:.2,type:"triangle",vol:.16,dest:e});},
+  legendas(t){const e=hangVisszhang();[72,76,79,84,88,91,96].forEach((n,i)=>hangTon(t+i*.045,{f:hangHz(n),dur:.1,type:i%2?"triangle":"square",vol:.12,dest:e}));
+    hangZaj(t+.1,{dur:.5,vol:.06,hp:6000,swell:true});hangTon(t+.36,{f:hangHz(96),dur:.6,type:"triangle",vol:.14,vib:8,dest:e,rel:.3});},
+  fuzio(t){hangTon(t,{f:hangHz(60),f2:hangHz(84),dur:.45,type:"square",vol:.08,rel:.1});hangTon(t,{f:hangHz(67),f2:hangHz(91),dur:.45,type:"triangle",vol:.12,rel:.1});
+    const e=hangVisszhang();hangTon(t+.48,{f:hangHz(96),dur:.4,type:"triangle",vol:.16,vib:6,dest:e,rel:.2});},
+  eget(t){hangZaj(t,{dur:.9,vol:.14,lp:2500,swell:true});hangTon(t,{f:hangHz(55),f2:hangHz(43),dur:.8,type:"triangle",vol:.16,rel:.3});}};
+/* A LEJÁTSZÁS. A napló MINDIG ír (a próba ebből olvas), a hang csak ha lehet. */
+function hang(id){
+  try{
+    _hangNaplo.push(id);if(_hangNaplo.length>60)_hangNaplo.shift();
+    if(!HANG_SFX[id]||!hangKesz())return false;
+    if(id==="klikk"){const most=Date.now();if(most-_hangUtolsoKlikk<70)return false;_hangUtolsoKlikk=most;}
+    HANG_SFX[id](_hangCtx.currentTime+.01);
+    return true;}catch(e){return false;}}
+/* A meccs hangjai csak NÉZETT meccsen szólnak (végigjátszásnál nem). */
+function hangMeccsNezett(){
+  try{return typeof S!=="undefined"&&!!S&&!!S.playing&&!S.auto;}catch(e){return false;}}
+function hangMeccs(id){return hangMeccsNezett()?hang(id):false;}
+/* A lefújás: a hármas sípszó, majd az eredmény dallama. */
+function hangLefujas(cls){
+  if(!hangMeccsNezett())return false;
+  hang("vege");
+  const id=cls==="win"?"gyozelem":cls==="loss"?"vereseg":"dontetlen";
+  setTimeout(()=>{try{hang(id);}catch(e){}},1150);
+  return true;}
+/* ---- A ZENE: 16-od lépéses szekvenszer, előretekintő ütemezéssel ---- */
+var HANG_DALOK={
+  fo:{bpm:132,ch:[[57,60,64],[53,57,60],[48,52,55],[55,59,62]],lead:
+    "E5 . D5 E5 . C5 . A4 C5 . D5 . E5 . . . F5 . E5 D5 . C5 . A4 C5 . . . A4 . C5 . "
+   +"E5 . G5 . E5 D5 . C5 D5 . E5 . D5 . C5 . B4 . C5 D5 . B4 . G4 A4 . . . . . . . "
+   +"E5 . D5 E5 . C5 . A4 C5 . D5 . E5 . G5 . A5 . G5 F5 . E5 . D5 E5 . . . C5 . D5 . "
+   +"E5 . D5 C5 . A4 . C5 B4 . A4 . G4 . E4 . G4 . A4 B4 . D5 . B4 A4 . . . . . . .",
+   leadType:"square",leadVol:.1,bass:"nyolcad",dob:"alap"},
+  taktika:{bpm:96,ch:[[50,53,57],[46,50,53],[53,57,60],[48,52,55]],lead:
+    "D5 - - . F5 - E5 - D5 - - . A4 - - . Bb4 - - . D5 - C5 - Bb4 - A4 - F4 - - . "
+   +"A4 - - . C5 - D5 - F5 - - . E5 - - . E5 - D5 - C5 - - . G4 - - . - - . . "
+   +"D5 - - . F5 - A5 - G5 - F5 - E5 - - . F5 - - . D5 - Bb4 - C5 - - . A4 - - . "
+   +"G4 - A4 - C5 - - . E5 - D5 - C5 - - . D5 - - - - - - . . . . . . . . .",
+   leadType:"triangle",leadVol:.16,bass:"negyed",dob:"halk"},
+  meccsnap:{bpm:152,ch:[[52,55,59],[48,52,55],[55,59,62],[50,54,57]],lead:
+    "E5 E5 . G5 . E5 D5 . E5 . B4 . D5 . E5 . C5 C5 . E5 . G5 . E5 D5 . C5 . B4 . A4 . "
+   +"B4 B4 . D5 . G5 . D5 B4 . D5 . G5 . A5 . F#5 . E5 D5 . F#5 . A5 . F#5 . D5 . E5 . . "
+   +"E5 E5 . G5 . B5 . A5 G5 . E5 . G5 . E5 . C5 . E5 G5 . C6 . B5 A5 . G5 . E5 . C5 . "
+   +"D5 . G5 . B5 . A5 G5 . F#5 . E5 . D5 . F#5 . A5 . D6 . C6 . B5 . A5 . F#5 . D5 . .",
+   leadType:"square",leadVol:.1,bass:"futo",dob:"eros"}};
+function hangLepes(D,lep,t,bus){
+  const lead=D._lead||(D._lead=hangSor(D.lead));
+  const nL=lead.length,s=lep%16,bar=Math.floor(lep/16)%Math.max(1,Math.floor(nL/16)),ch=D.ch[bar%D.ch.length];
+  const STEP=60/D.bpm/4;
+  const x=lead[lep%nL];
+  if(x&&x.n!=null)hangTon(t,{f:hangHz(x.n),dur:STEP*(x.len||1)*.95,vol:D.leadVol,type:D.leadType,rel:.04},bus);
+  /* basszus */
+  if(D.bass==="nyolcad"&&s%2===0)hangTon(t,{f:hangHz(ch[0]-24+(s%8===4?12:0)),dur:STEP*1.8,type:"triangle",vol:.28,rel:.03},bus);
+  if(D.bass==="negyed"&&s%4===0)hangTon(t,{f:hangHz(ch[0]-24),dur:STEP*3.6,type:"triangle",vol:.28,rel:.1},bus);
+  if(D.bass==="futo"&&s%2===0)hangTon(t,{f:hangHz(ch[(s>>1)%3]-24),dur:STEP*1.6,type:"triangle",vol:.28,rel:.02},bus);
+  /* kíséret */
+  if(s%4===2)hangTon(t,{f:hangHz(ch[(s>>2)%3]),dur:STEP*.9,vol:.045,type:"square"},bus);
+  /* dob */
+  if(D.dob==="alap"){if(s===0||s===8)hangTon(t,{f:160,f2:45,dur:.12,type:"triangle",vol:.42},bus);
+    if(s===4||s===12)hangZaj(t,{dur:.12,vol:.12,hp:1500},bus);if(s%2===1)hangZaj(t,{dur:.03,vol:.045,hp:7000},bus);}
+  else if(D.dob==="halk"){if(s===0)hangTon(t,{f:140,f2:45,dur:.14,type:"triangle",vol:.3},bus);
+    if(s===8)hangZaj(t,{dur:.1,vol:.06,hp:2000},bus);if(s%4===2)hangZaj(t,{dur:.03,vol:.03,hp:7000},bus);}
+  else if(D.dob==="eros"){if(s%4===0)hangTon(t,{f:170,f2:45,dur:.11,type:"triangle",vol:.45},bus);
+    if(s===4||s===12)hangZaj(t,{dur:.13,vol:.15,hp:1400},bus);if(s%2===1)hangZaj(t,{dur:.025,vol:.05,hp:7500},bus);}}
+function hangZeneInditas(dal){
+  if(!hangKesz())return false;
+  const D=HANG_DALOK[dal];if(!D)return false;
+  hangZeneAllj();
+  const Z={dal,lep:0,kov:_hangCtx.currentTime+.08,timer:null};
+  Z.timer=setInterval(()=>{
+    try{const STEP=60/D.bpm/4;
+      while(Z.kov<_hangCtx.currentTime+.12){hangLepes(D,Z.lep,Z.kov,_hangBus.zene);Z.kov+=STEP;Z.lep++;}}catch(e){}},25);
+  _hangZene=Z;return true;}
+function hangZeneAllj(){if(_hangZene){clearInterval(_hangZene.timer);_hangZene=null;}}
+/* A ZENE RENDEZŐJE: menüben szól, meccs közben és stílus-dallam alatt hallgat. */
+function hangZeneKell(){
+  const B=hangBeall();
+  if(!B.on||!B.zene||!hangKesz())return false;
+  try{if(document.hidden)return false;}catch(e){}
+  try{if(typeof S!=="undefined"&&S&&S.playing)return false;}catch(e){}
+  if(_hangStilusDal&&Date.now()<_hangStilusDal)return false;
+  return true;}
+function hangZeneIgazit(){
+  const kell=hangZeneKell(),B=hangBeall();
+  if(kell&&(!_hangZene||_hangZene.dal!==B.dal))hangZeneInditas(B.dal);
+  else if(!kell&&_hangZene)hangZeneAllj();}
+/* ---- A CSAPATSTÍLUSOK: DALLAM ÉS SZIGNÁL ----
+   Mindegyik a stílus karakteréből: a Beton nehéz induló, a Villám száguldó
+   futam, a Tiki-Taka apró, oda-vissza passzolgatás… A szignál a dallam első
+   gondolata, egy-két másodperc. */
+var HANG_STILUS={
+  beton:{bpm:88,ch:[[45,48,52],[41,45,48],[43,47,50],[40,44,47]],lead:
+    "A3 - . A3 C4 - . E4 D4 - - - C4 - . . F3 - . F3 A3 - . C4 B3 - - - A3 - . . "
+   +"G3 - . G3 B3 - . D4 C4 - B3 - A3 - . . E3 - . E3 G#3 - . B3 A3 - - - - - . .",
+   leadType:"square",leadVol:.12,bass:"negyed",dob:"alap",jel:"A2 . A2 . E3 - - -"},
+  bombazok:{bpm:160,ch:[[48,52,55],[53,57,60],[55,59,62],[48,52,55]],lead:
+    "C5 E5 G5 C6 . G5 E5 . C5 E5 G5 C6 . - . . F5 A5 C6 F6 . C6 A5 . F5 A5 C6 . A5 . . . "
+   +"G5 B5 D6 G6 . D6 B5 . G5 B5 D6 . B5 G5 . . C6 . G5 . E5 . C5 . C6 - - - . . . .",
+   leadType:"square",leadVol:.1,bass:"futo",dob:"eros",jel:"C5 E5 G5 C6 - - . .",robban:1},
+  harmonia:{bpm:100,ch:[[53,57,60],[50,53,57],[46,50,53],[48,52,55]],lead:
+    "F5 - A5 - C6 - A5 - G5 - - . F5 - - . D5 - F5 - A5 - G5 - F5 - D5 - C5 - - . "
+   +"Bb4 - D5 - F5 - D5 - C5 - - . D5 - - . C5 - E5 - G5 - - . F5 - - - - - . .",
+   leadType:"triangle",leadVol:.16,bass:"negyed",dob:"halk",jel:"F5 A5 C6 - F6 - - -"},
+  sztar:{bpm:120,ch:[[50,54,57],[55,59,62],[57,61,64],[50,54,57]],lead:
+    "D5 . D5 D5 A5 - - . F#5 - A5 - D6 - - . B5 . B5 B5 G5 - - . B5 - D6 - G6 - - . "
+   +"A5 . A5 A5 E6 - - . C#6 - A5 - E5 - - . D6 - A5 - F#5 - D5 - D6 - - - - - . .",
+   leadType:"square",leadVol:.11,bass:"nyolcad",dob:"alap",jel:"D5 . D5 D5 A5 - - -",csillog:1},
+  villam:{bpm:172,ch:[[52,55,59],[48,52,55],[50,54,57],[47,51,54]],lead:
+    "E5 G5 B5 E6 B5 G5 E5 G5 B5 E6 G6 E6 B5 . . . C5 E5 G5 C6 G5 E5 C5 E5 G5 C6 E6 C6 G5 . . . "
+   +"D5 F#5 A5 D6 A5 F#5 D5 F#5 A5 D6 F#6 D6 A5 . . . B4 D#5 F#5 B5 D#6 F#6 B6 - - - . . . . . .",
+   leadType:"square",leadVol:.09,bass:"futo",dob:"eros",jel:"E5 G5 B5 E6 G6 B6 - .",villan:1},
+  panzer:{bpm:80,ch:[[38,41,45],[39,43,46],[38,41,45],[36,40,43]],lead:
+    "D3 - - . D3 - Eb3 - D3 - - . C3 - - . D3 - - . F3 - Eb3 - D3 - - . A2 - - . "
+   +"D3 - - . G3 - F3 - Eb3 - - . D3 - - . C3 - Eb3 - D3 - - . - - - - . . . .",
+   leadType:"square",leadVol:.14,bass:"negyed",dob:"alap",jel:"D2 . D2 . Eb2 D2 - -",nehez:1},
+  tikitaka:{bpm:132,ch:[[55,59,62],[52,55,59],[48,52,55],[50,54,57]],lead:
+    "G5 . D5 . G5 . B5 . A5 . F#5 . A5 . D6 . E5 . B4 . E5 . G5 . F#5 . D5 . F#5 . B5 . "
+   +"C5 . E5 . G5 . E5 . D5 . F#5 . A5 . F#5 . G5 . B5 . D6 . B5 . G5 . . . . . . .",
+   leadType:"square",leadVol:.1,bass:"nyolcad",dob:"alap",jel:"G5 D5 G5 B5 A5 D6 . ."},
+  gegen:{bpm:148,ch:[[47,50,54],[43,47,50],[45,49,52],[42,46,49]],lead:
+    "B4 . B4 D5 . B4 F#5 . B4 . B4 D5 . E5 F#5 . G4 . G4 B4 . G4 D5 . G4 . G4 B4 . C5 D5 . "
+   +"A4 . A4 C#5 . A4 E5 . A4 . A4 C#5 . D5 E5 . F#4 . F#4 A#4 . C#5 F#5 . A#5 - - . F#5 . . .",
+   leadType:"square",leadVol:.1,bass:"futo",dob:"eros",jel:"B4 . D5 F#5 . B5 - ."}};
+/* A DALLAM: egyszer lejátszva, a menüzene közben hallgat. */
+function hangStilusDallam(key){
+  const D=HANG_STILUS[key];if(!D)return false;
+  _hangNaplo.push("dal:"+key);
+  if(!hangKesz())return false;
+  hangZeneAllj();
+  const lead=D._lead||(D._lead=hangSor(D.lead));
+  const STEP=60/D.bpm/4,t0=_hangCtx.currentTime+.06;
+  for(let i=0;i<lead.length;i++)hangLepes(D,i,t0+i*STEP,_hangBus.sfx);
+  if(D.robban)hangZaj(t0+lead.length*STEP-STEP*8,{dur:.6,vol:.12,lp:1800});
+  const hossz=lead.length*STEP;
+  _hangStilusDal=Date.now()+hossz*1000+400;
+  setTimeout(()=>{try{hangZeneIgazit();}catch(e){}},hossz*1000+500);
+  return true;}
+/* A SZIGNÁL: stílusonként meccsenként EGYSZER (és meccsek között egyszer) — a
+   kulcs a stílus, a forduló, és hogy épp meccs van-e. */
+function hangJelKulcs(){
+  try{const e=(typeof euroActive==="function"&&euroActive())?"e"+((S.euro&&S.euro.idx)||0):"";
+    return `${S.playing?"m":"k"}:${S.seasonNumber||1}:${S.idx||0}${e}`;}catch(err){return "x";}}
+function hangStilusJel(key){
+  try{
+    if(!HANG_STILUS[key])return false;
+    if(typeof S!=="undefined"&&S&&S.auto)return false;
+    const k=hangJelKulcs()+":"+key;
+    if(_hangJelVolt[k])return false;
+    _hangJelVolt[k]=1;
+    _hangNaplo.push("jel:"+key);
+    if(!hangKesz())return false;
+    const D=HANG_STILUS[key],jel=hangSor(D.jel),STEP=60/D.bpm/4,t0=_hangCtx.currentTime+.02;
+    const e=hangVisszhang();
+    jel.forEach((x,i)=>{if(x&&x.n!=null)hangTon(t0+i*STEP,{f:hangHz(x.n),dur:STEP*(x.len||1)*.95,vol:.15,type:D.leadType,rel:.05,dest:e});});
+    if(D.nehez)hangTon(t0,{f:120,f2:40,dur:.3,type:"triangle",vol:.45});
+    if(D.villan)hangZaj(t0+STEP*5,{dur:.25,vol:.1,hp:5000});
+    if(D.csillog)hangZaj(t0+STEP*4,{dur:.4,vol:.06,hp:6500,swell:true});
+    if(D.robban)hangZaj(t0+STEP*4,{dur:.5,vol:.12,lp:1600});
+    return true;}catch(e){return false;}}
+/* A stílus-menübe lépve: a NÉZETT filozófia dallama — csak ha már kettő van. */
+function hangStilusMenu(){
+  try{if(!(S&&S.style&&S.style2))return false;return hangStilusDallam(styleViewKey());}catch(e){return false;}}
+/* Meccsek közti „odaillő" jutalom: a stílus szignálja, ha ez a stílusod. */
+function hangStilusJutalom(key){
+  try{const van=(typeof styleSlots==="function")&&styleSlots().some(st=>st&&st.key===key);
+    return van?hangStilusJel(key):false;}catch(e){return false;}}
+/* A NAPLÓSOROK APRÓSÁGAI: néhány ritkább meccsesemény (kapufa, kivédett és
+   megítélt tizenegyes, VAR, mesterhármas) a szövegéből ismerhető fel — egy
+   szűrő a naplóban biztosabb, mint szétszórt horgok. Csak nézett meccsen. */
+var HANG_SOR=[[/Kapufa!|kapufán csattan|kapufát találja/,"kapufa"],[/KIVÉDETT TIZENEGYES/,"bravur"],
+  [/Tizenegyes!|TIZENEGYES!/,"tizenegyes"],[/VAR-ellenőrzés/,"var"],[/MESTERHÁRMAS!!!/,"mesterharmas"]];
+function hangSorFigyel(html){
+  try{
+    if(!hangMeccsNezett())return;
+    const t=String(html||"");
+    for(const [re,id] of HANG_SOR){if(re.test(t)){hang(id);return;}}}catch(e){}}
+/* ---- A FELÜLET: a beállító ablak szakasza és a fejléc gombja ---- */
+function hangBeallHtml(){
+  const B=hangBeall();
+  const dal=Object.keys(HANG_DALOK_NEV).map(k=>`<option value="${k}"${B.dal===k?" selected":""}>${HANG_DALOK_NEV[k]}</option>`).join("");
+  return `<div class="hangSor"><label><input type="checkbox" id="hangOn"${B.on?" checked":""}> Hangok</label>`
+    +`<input type="range" id="hangSfx" min="0" max="100" value="${B.sfx}" aria-label="Hangerő"${B.on?"":" disabled"}></div>`
+    +`<div class="hangSor"><label><input type="checkbox" id="hangZene"${B.zene?" checked":""}${B.on?"":" disabled"}> Zene</label>`
+    +`<input type="range" id="hangZeneVol" min="0" max="100" value="${B.zeneVol}" aria-label="Zene hangereje"${B.on&&B.zene?"":" disabled"}></div>`
+    +`<div class="hangSor"><label for="hangDal">Menüdal</label><select id="hangDal"${B.on&&B.zene?"":" disabled"}>${dal}</select>`
+    +`<button type="button" class="btn-s" id="hangProba">▶ Belehallgatok</button></div>`
+    +`<p class="hangMegj">Minden hang a böngészőben születik, fájl nélkül. Meccs közben a zene elhalkul; végigjátszásnál a meccs hangjai hallgatnak. `
+    +`Minden csapatstílusnak saját dallama van (a stílus-menüben szól, ha már két filozófiád van) és rövid szignálja, ami meccsenként egyszer szólal meg.</p>`;}
+function hangBeallRender(){
+  const box=document.getElementById("hangModalBody");if(!box)return;
+  box.innerHTML=hangBeallHtml();
+  const B=hangBeall(),upd=()=>{hangMent();hangHangero();hangZeneIgazit();hangBeallRender();hangFejlec();};
+  const on=document.getElementById("hangOn");if(on)on.onchange=()=>{hangFelold();B.on=on.checked;upd();};
+  const z=document.getElementById("hangZene");if(z)z.onchange=()=>{hangFelold();B.zene=z.checked;upd();};
+  const sv=document.getElementById("hangSfx");if(sv)sv.oninput=()=>{B.sfx=+sv.value;hangMent();hangHangero();};
+  if(sv)sv.onchange=()=>hang("klikk");
+  const zv=document.getElementById("hangZeneVol");if(zv)zv.oninput=()=>{B.zeneVol=+zv.value;hangMent();hangHangero();};
+  const d=document.getElementById("hangDal");if(d)d.onchange=()=>{B.dal=d.value;hangMent();hangZeneAllj();hangZeneIgazit();};
+  const p=document.getElementById("hangProba");if(p)p.onclick=()=>{hangFelold();hangZeneAllj();hangZeneInditas(B.dal);};}
+/* A fejléc gombja: minden szól → csak effektek → csend → minden szól. */
+function hangFejlec(){
+  const b=document.getElementById("hangToggle");if(!b)return;
+  const B=hangBeall();
+  b.textContent=!B.on?"🔇":(B.zene?"🔊":"🔉");
+  b.title=!B.on?"Hang: ki":(B.zene?"Hang: effektek és zene":"Hang: csak effektek");}
+function hangFejlecKattint(){
+  hangFelold();
+  const B=hangBeall();
+  if(B.on&&B.zene)B.zene=false;
+  else if(B.on&&!B.zene)B.on=false;
+  else{B.on=true;B.zene=true;}
+  hangMent();hangHangero();hangZeneIgazit();hangFejlec();hangBeallRender();}
+/* ---- AZ INDULÁS: a feloldó, a gomb-hang és a zene rendezője ---- */
+(function hangInit(){
+  try{
+    const felold=()=>{try{hangFelold();}catch(e){}};
+    document.addEventListener("pointerdown",felold,true);
+    document.addEventListener("keydown",felold,true);
+    /* minden gomb halk kattanást ad — a letiltott nem */
+    document.addEventListener("click",ev=>{
+      try{const b=ev.target&&ev.target.closest&&ev.target.closest("button");
+        if(b&&!b.disabled&&b.id!=="hangToggle")hang("klikk");}catch(e){}},true);
+    document.addEventListener("visibilitychange",()=>{try{hangZeneIgazit();}catch(e){}});
+    setInterval(()=>{try{hangZeneIgazit();}catch(e){}},1000);
+    const run=()=>{try{hangFejlec();const t=document.getElementById("hangToggle");if(t)t.onclick=hangFejlecKattint;}catch(e){}};
+    if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",run);else run();
+  }catch(e){}})();
+/* A meccsen működésbe lépő stílus szignálja — csak nézett meccsen. */
+function hangStilusMeccs(key){return hangMeccsNezett()?hangStilusJel(key):false;}
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -16764,6 +17131,7 @@ function gpDuoAnnounce(a,b){
   const D=gpDuoState(),k=gpDuoKey(a,b),r=D[k];
   if(!r)return;
   if(r.stages>=GP_DUO_NEED&&!r.built){
+    try{hangStilusJutalom("gegen");}catch(e){}   /* 🔊 3.9.163 */
     r.built=1;r.n=r.n||0;r.builtSeason=S.seasonNumber||1;
     if(S.gpDuoInProgress===k)S.gpDuoInProgress=null;
     addLine(`🧲 <b>Gyilkos páros kész:</b> ${esc(shortName(a))} &amp; ${esc(shortName(b))} — `
@@ -17129,6 +17497,7 @@ function szarnyAnnounce(a,b){
   if(!r)return;
   const sd=szarnySideOf(a)==="J"?"jobb":"bal";
   if(r.stages>=SZARNY_NEED&&!r.built){
+    try{hangStilusJutalom("villam");}catch(e){}   /* 🔊 3.9.163 */
     r.built=1;r.n=r.n||0;r.builtSeason=S.seasonNumber||1;
     if(S.szarnyInProgress===k)S.szarnyInProgress=null;
     addLine(`⚡ <b>Szárny kész:</b> ${esc(shortName(a))} &amp; ${esc(shortName(b))} a ${sd} oldalon — `
@@ -43120,6 +43489,7 @@ function fearNote(kind,db){
      saját sor a közvetítésben, amihez oda lehetne írni — azok az összesítőben
      jelennek meg. */
   if(DREAD_QUIET[kind])return;
+  try{hangStilusMeccs("panzer");}catch(e){}   /* 🔊 3.9.163 */
   try{
     addLine(`☠️ <b>+${dreadNum(pont)}</b> rettenet `
       +`<span style="color:var(--dim2)">— ${esc(DREAD_LABEL[kind]||kind)}</span>`,"m skillnote");
@@ -43927,6 +44297,7 @@ function engNoteK(k,kind,db){
   engAcc(k).raw+=pont;
   engBook(k,kind,pont);
   if((d.quiet||{})[kind]||ENG_QUIET_ALL[kind])return pont;
+  try{hangStilusMeccs(k);}catch(e){}   /* 🔊 3.9.163 — a stílus szignálja, meccsenként egyszer */
   try{
     addLine(`${d.ic} <b>+${engNum(pont)}</b> ${esc(d.ptsN)} `
       +`<span style="color:var(--dim2)">— ${esc((d.label||{})[kind]||kind)}</span>`,"m skillnote");
@@ -44931,6 +45302,7 @@ function fameAdd(pts,why,kind){
   F.season=Math.round((F.season+p)*10)/10;
   if(kind&&F.src[kind]!=null)F.src[kind]=Math.round((F.src[kind]+p)*10)/10;
   if(why&&p>=FAME_LOG_MIN){
+    try{hangStilusMeccs("sztar");}catch(e){}   /* 🔊 3.9.163 */
     try{addLine(`⭐ Híresség: <b>+${fameNum(p)}</b> pont — ${why}. `
       +`Összesen ${fameNum(F.pts)}.`,"m skillnote");}catch(e){}}
   const afterLvl=fameLevelIdx(F.pts);
@@ -48131,6 +48503,7 @@ let _chOfferDetour=false;
    reopenChallengeOffers ebből állítja vissza a képernyőt. */
 let _chOfferScreens=null;
 function showChallengeOffers(scope,count,resumeCb,opening,opts){
+  try{hang("ertesit");}catch(e){}   /* 🔊 3.9.163 */
   const ctx=challengeContext();
   /* A HUB-KITÉRŐ MOSTANTÓL AZ ALAPÉRTELMEZÉS, nem a kivétel: felelősen dönteni
      csak úgy lehet, ha közben megnézheted a keretedet. Aki mégis ki akarja
@@ -52611,6 +52984,7 @@ function evDecorate(html,cls){
   return String(html).replace(/^(\s*(?:\d{1,2}'|90\+\d{1,2}'?))/,
     `$1 <span class="evIc">${ic}</span>`);}
 function addLine(html,cls,budgeted){
+  try{hangSorFigyel(html);}catch(e){}   /* 🔊 3.9.163 — kapufa, tizenegyes, VAR, mesterhármas */
   try{html=evDecorate(html,cls);}catch(e){}
   if(budgeted){
     if(goalNoteLeft<=0)return;
@@ -55518,6 +55892,8 @@ function sbEv(side,kind,name,min,txt){
   /* a done is átengedi: a sérülés-sorsolás a lefújás UTÁN fut le a motorban,
      de a táblán ott a helye a többi esemény mellett */
   if(!SB.on&&!SB.done)return;
+  /* 🔊 3.9.163 — a tábla eseményeinek hangja */
+  try{hangMeccs(kind==="goal"?(side==="us"?"gol":"golKapott"):kind==="red"?"piros":kind==="yellow"?"sarga":kind==="inj"?"serules":"");}catch(e){}
   /* txt: ELŐRE formázott perc-felirat. A hosszabbítás percei (91-120) valódi
      percek, nem ráadás — ott "105'" a helyes, nem "90+15". Az eseményhez
      kötve tároljuk, mert az újrarajzolás később már nem tudná eldönteni. */
@@ -59879,6 +60255,7 @@ function mpSoloClear(){_mpSoloOut=null;}
    (szezonindítás, kieséses kör) ezután írhatják felül a gombot a sajátjukkal:
    ez a sor előbb fut, tehát nem takarja el őket. */
 function mpSoloOffer(oppReady){
+  try{hang("ertesit");}catch(e){}   /* 🔊 3.9.163 */
   const ob=$("h2hWaitOrphanBtn");
   if(!ob||!_mpSoloOut||oppReady)return;
   const o=_mpSoloOut;
@@ -64319,6 +64696,7 @@ function playMatch(){
   /* a párharc saját meccsereje a papírformához (paperRefNow) — lásd h2hStart */
   _duelMyMs=(DUEL&&typeof DUEL.myMatch==="number")?DUEL.myMatch:null;
   S.playing=true;$("kickBtn").disabled=true;
+  try{hangZeneIgazit();hangMeccs("sip");}catch(e){}   /* 🔊 3.9.163 — kezdőrúgás, a zene elhalkul */
   /* PANZER (3.9.68): a meccs rettenet-mérlege ITT nullázódik, és itt rögzül a
      meccserő-fölény — a kezdőrúgás állapotából, ahogy a nehézség-tanácsadó is
      méri. Egy félbehagyott mérkőzés így nem hagy maga után fél rettenetet. */
@@ -65918,7 +66296,7 @@ function playMatch(){
        félidő-sor a 10. tick elején állt — ugyanaz a pillanat, de az óra addigra
        már 50:00-ra ugrott, ezért tűnt 50. percesnek.)
        A sor és a csereszünet EGYÜTT áll itt, hogy a kettő ne csúszhasson szét. */
-    if(min===45)addLine(`FÉLIDŐ  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m draw");
+    if(min===45){addLine(`FÉLIDŐ  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m draw");try{hangMeccs("felido");}catch(e){}}
     /* A feltételben KORÁBBAN egy `&&iv` is állt. Az óra a 45. percben mindig jár,
        tehát nem védett semmi ellen — viszont ha valaha mégis null lett volna, a
        csereszünet NÉMÁN maradt volna ki, jelzés nélkül. A clearInterval(null)
@@ -66114,6 +66492,7 @@ function playMatch(){
     if(kind==="big")mSaveBig[name]=(mSaveBig[name]||0)+1;
     else if(kind==="solo")mSaveSolo[name]=(mSaveSolo[name]||0)+1;
     else if(kind==="pen")mPenSave[name]=(mPenSave[name]||0)+1;
+    if(kind==="big"||kind==="solo")try{hangMeccs("bravur");}catch(e){}   /* 🔊 3.9.163 */
     const cs=S.careerStats[name]=S.careerStats[name]||{g:0,a:0,mvp:0,rc:0,inj:0,saves:0,cs:0,matches:0,min:0};
     cs.saves++;
     S.seasonSaves[name]=(S.seasonSaves[name]||0)+1;
@@ -67315,6 +67694,7 @@ function playMatch(){
        buli, szponzor, tőzsde, kötvény. A párharcban is (a morál helyi). */
     try{talF6cEredmeny(cls,!!(_talKtx&&_talKtx.derby));}catch(e){}
     try{talUtolsoSzoVege(cls);}catch(e){}   /* ⚽ F6d — Az utolsó szó (kontra) */
+    try{hangLefujas(cls);}catch(e){}   /* 🔊 3.9.163 — lefújás és az eredmény dallama */
     /* ---- MÉRFÖLDKÖVEK: A MECCS MARADANDÓ SZÁMAI ----
        Mind a négy olyan érték, amit a szezonváltás vagy a következő mérkőzés
        felülír — utólag visszakereshetetlenek, ezért a csúcsukat itt tesszük
@@ -68620,6 +69000,7 @@ function twCandLine(cand){
   if(r!=null)bits.push(`Rating <b>${r}</b>`);
   return bits.length?` <span style="color:var(--dim)">(${bits.join(", ")})</span>`:"";}
 function twShowPremiumOffer(cand,completeFn,opts){
+  try{hang("ertesit");}catch(e){}   /* 🔊 3.9.163 */
   completeFn=completeFn||twCycleComplete;
   const basePrice=gameMode==="career"?buyPrice(cand):0;
   const premiumPrice=Math.round(basePrice*(1.3+Math.random()*0.3));
@@ -69165,6 +69546,7 @@ function showStarNumDemand(deal){
       finish(`<span style="color:var(--gold)">🕒 Függőben</span>`,txt);});}
 /* ---- ELVÁGYÓDÁS-KÉPERNYŐ: HÁROM VÁLASZ ---- */
 function showLeaveOffer(cand){
+  try{hang("ertesit");}catch(e){}   /* 🔊 3.9.163 */
   const p=cand.leaver,e=careerPool&&careerPool[p.n];
   const budget=S.transferBudget||0;
   const canPayNow=budget>=cand.fee;
@@ -69215,6 +69597,7 @@ function showLeaveOffer(cand){
    elutasítani, és elfogadás után is szabadon választható, hogy konkrétan
    kit vált le, vagy inkább a tartalékba kerüljön az érkező. */
 function showDreamOffer(cand){
+  try{hang("ertesit");}catch(e){}   /* 🔊 3.9.163 */
   $("twBody").innerHTML=`<div class="h" style="color:var(--gold)">✦ ÁLOMIGAZOLÁS AJÁNLAT ✦</div>
     <p style="font-size:13px;margin-top:6px;line-height:1.6">Nagy dobásra készültök:<br>
       <b>${esc(fullName(cand.repl.n))}</b>${twCandLine(cand.repl)} érkezne,<br>
@@ -69241,6 +69624,7 @@ function showDreamOffer(cand){
    és elfogadás után a tartalék-keretbe érkezik, mint minden más igazolás —
    onnan a HUB-ban teszed a helyére. */
 function showIconOffer(rawIcon){
+  try{hang("ertesit");}catch(e){}   /* 🔊 3.9.163 */
   const icon=normalizeIconPlayer(rawIcon);
   $("twBody").innerHTML=`<div class="h" style="color:var(--gold)">✦ IKONIKUS AJÁNLAT ✦</div>
     <p style="font-size:13px;margin-top:6px;line-height:1.6">Hihetetlen bejelentés járja be az országot:<br>
@@ -71924,6 +72308,7 @@ function advancePassChemManual(){
 function passChemAnnounce(pr){
   if(!pr)return;
   if(pr.stages>=PASS_CHEM_NEED){
+    try{hangStilusJutalom("tikitaka");}catch(e){}   /* 🔊 3.9.163 */
     pr.built=1;
     passChemRecord(passChemKey(pr.a,pr.b));
     if(S.passChemInProgress===passChemKey(pr.a,pr.b))S.passChemInProgress=null;
@@ -92072,6 +92457,7 @@ function talEget(uid){
   _talAlapMemo=null;_talSpecMemo=null;_talElMemo=null;
   try{addLine(`🔥 <b>ELÉGETVE — ${esc(talLapNev(L))}</b>: a pro és a kontra megszűnt, +${TAL_EGET_LUCK} szerencse. `
     +`A lap a gyűjteményben marad, halványan — a run története.`,"m life");}catch(e){}
+  try{hang("eget");}catch(e){}   /* 🔊 3.9.163 */
   return {ok:true,L};}
 /* ---- 🧬 FÚZIÓ ---- */
 /* A birtokolt (nem égetett, nem Mítosz) lap ugyanazzal a speciállal. */
@@ -92097,6 +92483,7 @@ function talFuzioVegrehajt(O,L,kin,v){
   if(O.dp!=null||L.dp!=null)O.dp=Math.max(O.dp||0,L.dp||0);
   if(O.dk!=null||L.dk!=null)O.dk=Math.min(O.dk==null?1:O.dk,L.dk==null?1:L.dk);
   O.fuzio=(O.fuzio||0)+1;O.fFriss=1;
+  try{hang("fuzio");}catch(e){}   /* 🔊 3.9.163 */
   T.seq++;_talAlapMemo=null;_talSpecMemo=null;_talElMemo=null;
   talLatott(kin);talSzerencseLep(kin,false);talMesterLezar(kin);
   T.huzas=(T.huzas||0)+1;T.varo.shift();
@@ -93424,6 +93811,7 @@ function talDrawOpen(cb){
     box.appendChild(b);});
   $("talDrawPass").textContent=`Passz (+${TAL_PASSZ_LUCK} szerencse${talPasszOsszeg()>0?`, +${fmtFt(talPasszOsszeg())}`:""})`;
   talDrawSync();
+  try{hang(kin.some(L=>L.rang>=4)?"legendas":"huzas");}catch(e){}   /* 🔊 3.9.163 */
   $("talDrawModal").classList.remove("hide");}
 /* A húzás-ablak gombjai és címe — az irányválasztó elrejti, a húzás visszaadja. */
 function talDrawGombok(huzas){
@@ -97558,7 +97946,8 @@ function hubStyleSetOpen(v){
 function hubStyleToggle(open){
   const willOpen=open!==undefined?open:!hubStyleOpen();
   hubStyleSetOpen(willOpen);
-  renderStylePanel();}
+  renderStylePanel();
+  if(willOpen&&open===undefined)try{hangStilusMenu();}catch(e){}}   /* 🔊 3.9.163 — a nézett filozófia dallama */
 /* A sáv és a törzs rajzolása. Három állapota van, és mindhárom mást mond:
      · MÉG NEM VÁLASZTHATÓ — mikor és miért nyílik meg,
      · VÁLASZTHATÓ         — a hat stílus kártyája (a jelvény hívja fel rá a
@@ -99046,6 +99435,7 @@ function styleBindPanel(body){
    if(sw)sw.onclick=()=>{
      styleViewSet(styleViewIdx()===2?1:2);
      renderStylePanel();
+     try{hangStilusMenu();}catch(e){}   /* 🔊 3.9.163 */
      try{saveGame();}catch(e){}};}
   body.querySelectorAll("[data-style2]").forEach(b=>{
     b.onclick=()=>{
@@ -101701,6 +102091,7 @@ function styleScanSlot(st){
   earned.forEach(def=>{
     const W=msState();
     const sp=styleMsRewardFor(st,def.val)*(talMfLazDupla()?2:1);   /* 🔥 F6a — Mérföldkő-láz */
+    try{hangStilusJel(st.key);}catch(e){}   /* 🔊 3.9.163 */
     W.sp=(W.sp||0)+sp;
     W.spEarned=(W.spEarned||0)+sp;
     const who=msWhoText(def);
@@ -104782,6 +105173,7 @@ function styleBuyTrait(key){
         addLine(`⭐ → Megnyílt a csillagozásuk: <b>${esc(fresh.join(" · "))}</b>. `
           +`A legközelebbi fejlesztés-jutalomnál rögtön felajánljuk őket.`,"m skillnote");
     }catch(e){}}
+  try{hangStilusJel(st.key);}catch(e){}   /* 🔊 3.9.163 */
   return {ok:true,level:lv+1};}
 /* ---- AZ EDZŐVÁLTÁS ----
    A klub kirúgja az addigi szakvezetőt, és leszerződteti Pep Guardiolát. Az
@@ -109892,6 +110284,7 @@ function renderFfModal(){
     box.appendChild(row);});}
 function renderThemeModal(){
   renderFfModal();
+  try{hangBeallRender();}catch(e){}
   const box=$("themeModalBody");if(!box)return;
   const cur=document.documentElement.getAttribute("data-theme")||"dark";
   box.innerHTML="";

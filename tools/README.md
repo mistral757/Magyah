@@ -2811,3 +2811,18 @@ Mit véd: a gyökér zárva, az `/mp` csak 4 karakteres szobakódra nyílik
 (bejelentkezés nélkül, ahogy az MP-kód dolgozik), a `/lb` pedig bárkinek
 olvasható, de **kizárólag a saját bejegyzését** írhatja mindenki, séma- és
 tartomány-ellenőrzéssel. Részletes magyarázat: `docs/profil-es-ranglista.md`.
+
+## hang-proba.js — 🔊 3.9.163: hang és zene
+
+```bash
+node tools/hang-proba.js
+```
+
+1. **Felület:** a fejléc 🔊 gombja és a beállító ablak hang-szakasza (hang, hangerő, zene, zene-hangerő, dalválasztó).
+2. **Beállítás:** alapértékek, a fejléc-gomb körbeváltása, mentés.
+3. **Hangkártya:** az érintés után fut; minden hangeffekt, a 3 menüdal és a 8 stílus-dallam hiba nélkül szól.
+4. **Hangjegyek:** minden dal egész ütemekből áll, minden hangjegy értelmes.
+5. **Zene:** a menüben szól, meccs közben hallgat.
+6. **Meccs:** sípszó, gól, kapott gól, lapok, sérülés, kapufa, kivédett tizenegyes, VAR, mesterhármas; végigjátszásnál csend.
+7. **Szignál:** stílusonként meccsenként egyszer; meccsek között csak a saját stílus jutalma.
+8. **Stílus-menü:** a nézett filozófia dallama, csak két filozófiánál.
