@@ -2491,6 +2491,28 @@ node tools/talizman-f5-proba.js
 
 Részletek: `docs/talizmanok.md` (3.9.148).
 
+## kenyelem-3-9-152-proba.js — 🧰 3.9.152: cseretervek, fejlődési görbe, fekvő talizmán, értesítés, ranglista
+
+```bash
+node tools/kenyelem-3-9-152-proba.js
+```
+
+**19 állítás, öt blokkban:**
+
+1. **Cseretervek:** mentés névvel (akárhány), betöltés MÁSOLATKÉNT, felülírás,
+   törlés; a kikapcsolás és a párharc „nem cserélek" gombja megtartja a tervet
+   (a párharcnál csak arra a meccsre marad ki a drótról).
+2. **Fejlődési görbe:** pont csak változáskor, korlátos tömb, a távozók
+   törlése, a valódi meccs utáni lánc, az SVG a valódi játékoslapon.
+3. **Fekvő telefon (844×390):** a talizmán-menü két oszlop, a gyűjtemény
+   vízszintes polc, a húzás három lapja egymás mellett.
+4. **Értesítés:** valódi iPhone- és Messenger-user-agenttel a `pushSubscribe`
+   a teendőt mondja; a régi, callback-es engedélykérés átmegy.
+5. **Ranglista:** a határnap előtti futás nem megy fel és nem látszik; a havi
+   fül; az `ach` mező és a visszaesés a régi szabályfájlra.
+
+Részletek: `docs/kenyelem-3-9-152.md`.
+
 ## hibak-3-9-151-proba.js — 🔧 3.9.151: bejelentett hibák és kérések
 
 ```bash
