@@ -2544,6 +2544,26 @@ node tools/talizman-f6c-proba.js
 
 Részletek: `docs/talizman-f6c-3-9-156.md`.
 
+## javitasok-3-9-157-proba.js — 🔧 3.9.157: a forma a meccs-erő mellett, csapatlap, nyári kupa
+
+```bash
+node tools/javitasok-3-9-157-proba.js
+```
+
+**9 állítás, öt blokkban:**
+
+1. **A tartós forma:** semleges formánál a HUB ⚡ = a pillanatkép ⚡, és a
+   forma-tag 0; jó és rossz formánál a HUB ⚡ + a 📈 forma pontosan a
+   pillanatkép ⚡-ja; a sáv kiírja.
+2. **A párharc-csapatlap:** a 150-es csapaterő és a 161-es Rating nem vágódik
+   120-ra.
+3. **A nyári kupa:** a nevezési lánc egy keresést futtat, nem hármat;
+   ugyanarra a keretre nincs új keresés; ha a kezdő változik, van.
+4. **Az előszűrő:** ugyanaz a legjobb felállás, kevesebb teljes számítással.
+5. Nincs oldalhiba.
+
+Részletek: `docs/javitasok-3-9-157.md`.
+
 ## egyensuly-3-9-153-proba.js — ⚖️ 3.9.153: D0, nyári kupa, árazás, csapategyensúly, poszt-tudás, színhűség
 
 ```bash
