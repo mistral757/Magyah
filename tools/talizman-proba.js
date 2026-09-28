@@ -211,9 +211,15 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     S.tal=null;S.seasonNumber=1;S.idx=5;talSzezon();
     const M=msState();
     const cash=MILESTONES.filter(d=>d.kind==="cash");
+    /* AZ ARÁNY 20 KARRIER-SEED ÁTLAGA: egyetlen seed a véges mérföldkő-listán
+       (binomiális szórás) időnként a sávon kívülre esett — ez a mérés zaja
+       volt, nem a szabályé. A többi állítás az utolsó seeden fut. */
+    let _ossz=0;
+    for(let i=0;i<20;i++){S.tal=null;talState();_ossz+=cash.filter(d=>talRng("ms",d.id)()<TAL_MS_P).length/cash.length;}
+    S.tal=null;S.seasonNumber=1;S.idx=5;talSzezon();
     const nyer=cash.filter(d=>talRng("ms",d.id)()<TAL_MS_P);
     const veszt=cash.filter(d=>talRng("ms",d.id)()>=TAL_MS_P);
-    ki.arany=Math.round(nyer.length/cash.length*100);
+    ki.arany=Math.round(_ossz/20*100);
     const _add=addLine;const napl=[];addLine=h=>napl.push(String(h));
     try{
       S.transferBudget=100000;
@@ -268,9 +274,12 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.gombok=document.querySelectorAll("#talDrawCards .talPickBtn").length;
     ki.okTiltva=$("talDrawOk").disabled;
     ki.forras=$("talDrawSrc").textContent;
-    document.querySelectorAll("#talDrawCards .talPickBtn")[1].click();
+    /* NEM Jellemhullám: annál az irányválasztó jön a második húzás előtt
+       (3.9.144), és a lánc másik ágát ez a blokk nem méri */
+    const _ki=T.varo[0].kinalat.findIndex(L=>!(L.kat==="moral"&&L.valt==="hullam"));
+    document.querySelectorAll("#talDrawCards .talPickBtn")[_ki].click();
     ki.okEngedve=!$("talDrawOk").disabled;
-    const valasztott=T.varo[0].kinalat[1];
+    const valasztott=T.varo[0].kinalat[_ki];
     $("talDrawOk").click();
     ki.lapok=T.lapok.length;ki.uid=T.lapok[0]&&T.lapok[0].uid;
     ki.egyezik=T.lapok[0]&&T.lapok[0].kat===valasztott.kat&&T.lapok[0].rang===valasztott.rang&&(T.lapok[0].spec||null)===(valasztott.spec||null);

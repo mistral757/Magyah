@@ -1571,3 +1571,180 @@ MANUAL.update({
   # ── 4. maghrebi: a francia helyesírás s-e = sz ───────────────────────────
   "Jamel Saihi":            ("Szájhi Csongor", "Szájhi"),
 })
+
+
+# ══ 36. KÖTEG — minden eddigi, jóváhagyott javaslat (3.9.147) ═══════════════
+# A felhasználó: „Minden névjavaslatod jó. Elfogadom az összes eddigit."
+# Öt csoport: a legutóbbi kör, a kiejtési körök, a Hiúz-kör, és az angol
+# „a" hang szerinti átírás (a korábban 64-esnek becsült csomag, szemenként
+# átnézve: a szándékos magyarosító szójátékok — Vatffy, Lavrenfi, Karfia,
+# Pírfi — és a nem angol eredetű vezetéknevek — Lallana, Zamora, Tarkowski,
+# Salako, Cremaschi — kimaradtak). A keresztnév a gépi kiosztásból marad.
+MANUAL.update({
+  # ── A mostani kör (3.9.146 utáni javaslatok) ──
+  "Oliver Kahn": ("Kánya Olivér", "Kánya"),  # Kán Olivér
+  "Xavi": ("Csávó", "Csávó"),  # Csávi
+  "Pavel Nedvěd": ("Páva Nedves", "Nedves"),  # Páva Nedv
+  "Kevin Gameiro": ("Gémeskút Kelemen", "Gémeskút"),  # Gámeiro Kelemen
+  "Aldo Serena": ("Szerény Aladár", "Szerény"),  # Sérena Aladár
+  "Peter Dobing": ("Dobogó Péter", "Dobogó"),  # Dóbing Péter
+  "Marcel Halstenberg": ("Halsütő Marcell", "Halsütő"),  # Hálstenberg Marcell
+  "Renaud Ripart": ("Ripacs Salamon", "Ripacs"),  # Rípart Salamon
+  "André Pinto": ("Pinty András", "Pinty"),  # Pínto András
+  "Bruno Ecuele Manga": ("Mangó Brunó", "Mangó"),  # Mánga Brunó
+  # ── Kiejtés: Dabrowski, Trochowski, Moulijn, van Duijnhoven ──
+  "Christoph Dabrowski": ("Dabrovszki Kristóf", "Dabrovszki"),  # Dobrovszki Kristóf
+  "Piotr Trochowski": ("Trohovszki Péter", "Trohovszki"),  # Trocsovszki Péter
+  "Coen Moulijn": ("Múlejn Kohén", "Múlejn"),  # Múlíjn Kohén
+  "Rein van Duijnhoven": ("Fandöjnhofen Zétény", "Fandöjnhofen"),  # Fandöjjnhofen Zétény
+  # ── Névrokonok egységesítése és kiejtés (Hőnyes-kör) ──
+  "Dieter Hoeneß": ("Hőnyes Detre", "Hőnyes"),  # Hoenesz Detre
+  "Jaime Magalhães": ("Magaláj Jakab", "Magaláj"),  # Magalyaes Jakab
+  "Ludo Coeck": ("Kukk Vajk", "Kukk"),  # Koekk Vajk
+  "Paul Jaeckel": ("Jekkel Pál", "Jekkel"),  # Jaekkel Pál
+  "Markel Susaeta": ("Szuszaeta Bertalan", "Szuszaeta"),  # Szusaeta Bertalan
+  "Daler Kuzyaev": ("Kuzjajev Boldizsár", "Kuzjajev"),  # Kuzjaev Boldizsár
+  # ── Hiúz-kör: névrokonok és holland/baszk/angol kiejtés ──
+  "Aaron Hughes": ("Hiúz Áron", "Hiúz"),  # Hugesz Áron
+  "John Hughes": ("Hiúz János", "Hiúz"),  # Hugesz János
+  "Ken McNaught": ("Meknót Kende", "Meknót"),  # Meknaugt Kende
+  "Christian Synaeghel": ("Színágel Krisztián", "Színágel"),  # Sinaezsel Krisztián
+  "Paul Verhaegh": ("Ferhách Pál", "Ferhách"),  # Ferhaeh Pál
+  "Andoni Goikoetxea": ("Gojkoecsea Antal", "Gojkoecsea"),  # Goikoecsí Antal
+  "Leo Clijsters": ("Klejszters Leó", "Klejszters"),  # Klijsters Leó
+  "Dean Huijsen": ("Höjszen Dénes", "Höjszen"),  # Uihsen Dénes
+  "Jan-Arie van der Heijden": ("Fanderhejden János", "Fanderhejden"),  # Fanderheájden János
+  "Piet Romeijn": ("Romejn Péter", "Romejn"),  # Romeájn Péter
+  # ── Angol „a”: /æ/ és hangsúlytalan /ə/ → e, /ɑː/ → á, /ɔː/ → ó, /eɪ/ → éj ──
+  "Andy Goram": ("Górem Bandi", "Górem"),  # Góram Bandi
+  "Gordon Strachan": ("Sztrahen Gordián", "Sztrahen"),  # Sztracsan Gordián
+  "John Wark": ("Vók János", "Vók"),  # Vark János
+  "Laurie Cunningham": ("Kanningem Kálmán", "Kanningem"),  # Kunningam Kálmán
+  "Ronnie Whelan": ("Vílen Roni", "Vílen"),  # Velan Roni
+  "David Platt": ("Plett Dávid", "Plett"),  # Plátt Dávid
+  "Jack Butland": ("Batlend Jakab", "Batlend"),  # Bútland Jakab
+  "Gordon Cowans": ("Kauensz Gordián", "Kauensz"),  # Kovansz Gordián
+  "Alan Durban": ("Dörben Alán", "Dörben"),  # Dörban Alán
+  "Alan Kernaghan": ("Körnehen Alán", "Körnehen"),  # Kernagan Alán
+  "Alan Pardew": ("Párdjú Alán", "Párdjú"),  # Pardev Alán
+  "Allan Clarke": ("Klárk Alán", "Klárk"),  # Klark Alán
+  "John Clark": ("Klárk János", "Klárk"),  # Klark János
+  "Lee Clark": ("Klárk Kelemen", "Klárk"),  # Klark Kelemen
+  "Anton Ferdinand": ("Fördinend Antal", "Fördinend"),  # Férdinand Antal
+  "Ashley Barnes": ("Bárnsz Esli", "Bárnsz"),  # Barnesz Esli
+  "Harvey Barnes": ("Bárnsz Dezső", "Bárnsz"),  # Barnesz Dezső
+  "Ashley Williams": ("Viljemsz Esli", "Viljemsz"),  # Viliamsz Esli
+  "Gary Williams": ("Viljemsz Geri", "Viljemsz"),  # Viliamsz Geri
+  "Ben Davies": ("Déjvisz Bence", "Déjvisz"),  # Davisz Bence
+  "Kevin Davies": ("Déjvisz Kelemen", "Déjvisz"),  # Davisz Kelemen
+  "Tom Davies": ("Déjvisz Tomi", "Déjvisz"),  # Davisz Tomi
+  "Sean Davis": ("Déjvisz János", "Déjvisz"),  # Davisz János
+  "Steven Davis": ("Déjvisz István", "Déjvisz"),  # Davisz István
+  "Billy Sharp": ("Sárp Vili", "Sárp"),  # Sarp Vili
+  "Lee Sharpe": ("Sárp Benedek", "Sárp"),  # Sarp Benedek
+  "Callum McManaman": ("Mekmenemen Kálmán", "Mekmenemen"),  # Mekmanaman Kálmán
+  "Steve McManaman": ("Mekmenemen Pista", "Mekmenemen"),  # Mekmanaman Pista
+  "Carlton Palmer": ("Pámer Ince", "Pámer"),  # Pálmer Ince
+  "Charlie Gallagher": ("Geleher Karcsi", "Geleher"),  # Galager Karcsi
+  "Chris Basham": ("Besem Krisztián", "Besem"),  # Basam Krisztián
+  "Danny Drinkwater": ("Drinkvótör Dani", "Drinkvótör"),  # Drinkvater Dani
+  "Danny Gabbidon": ("Gebiden Dani", "Gebiden"),  # Gábbidon Dani
+  "Dave Beasant": ("Bízent Dávid", "Bízent"),  # Bísant Dávid
+  "Dave Thomas": ("Tomesz Dávid", "Tomesz"),  # Tomasz Dávid
+  "Geoff Thomas": ("Tomesz Dzsef", "Tomesz"),  # Tomasz Dzsef
+  "Mitchell Thomas": ("Tomesz Mihály", "Tomesz"),  # Tomasz Mihály
+  "David Batty": ("Betti Dávid", "Betti"),  # Batti Dávid
+  "David Harvey": ("Hárvi Dávid", "Hárvi"),  # Harvi Dávid
+  "David James": ("Dzséjmsz Dávid", "Dzséjmsz"),  # Dzsamesz Dávid
+  "David Needham": ("Nídem Dávid", "Nídem"),  # Nídham Dávid
+  "David Sadler": ("Szedler Dávid", "Szedler"),  # Sádler Dávid
+  "Dean Ashton": ("Esten Dénes", "Esten"),  # Aston Dénes
+  "Derek Statham": ("Sztéjtem Ödön", "Sztéjtem"),  # Sztatam Ödön
+  "Eric Black": ("Blekk Erik", "Blekk"),  # Blakk Erik
+  "Eric Gates": ("Géjtsz Erik", "Géjtsz"),  # Gatesz Erik
+  "Gary Cahill": ("Kéjhil Geri", "Kéjhil"),  # Kahil Geri
+  "Gary Caldwell": ("Kóldvel Geri", "Kóldvel"),  # Kaldvel Geri
+  "Gary Mabbutt": ("Mebet Geri", "Mebet"),  # Mábbutt Geri
+  "Gary Pallister": ("Pelisztör Geri", "Pelisztör"),  # Paliszter Geri
+  "Gary Shaw": ("Só Geri", "Só"),  # Sav Geri
+  "George Eastham": ("Ísztem György", "Ísztem"),  # Ísztam György
+  "Gerry Francis": ("Fránszisz Aurél", "Fránszisz"),  # Franszisz Aurél
+  "Trevor Francis": ("Fránszisz Töhötöm", "Fránszisz"),  # Franszisz Töhötöm
+  "Graeme Le Saux": ("Löszó Gerő", "Löszó"),  # Lesauksz Gerő
+  "Ian Durrant": ("Darent János", "Darent"),  # Dörrant János
+  "Ian Gillard": ("Gilárd János", "Gilárd"),  # Gilard János
+  "Jackie Marsh": ("Márs Csanád", "Márs"),  # Mars Csanád
+  "Jamaal Lascelles": ("Leszelsz Csanád", "Leszelsz"),  # Lasszelesz Csanád
+  "James McCarthy": ("Mekárti Jakab", "Mekárti"),  # Mekkarti Jakab
+  "Jim Standen": ("Sztenden Jaki", "Sztenden"),  # Sztanden Jaki
+  "Jimmy Ryan": ("Rájen Jaki", "Rájen"),  # Rjan Jaki
+  "Joe Allen": ("Elen Jocó", "Elen"),  # Alen Jocó
+  "Malcolm Allen": ("Elen Boldizsár", "Elen"),  # Alen Boldizsár
+  "Paul Allen": ("Elen Pál", "Elen"),  # Alen Pál
+  "Joe Jordan": ("Dzsórden Jocó", "Dzsórden"),  # Dzsordan Jocó
+  "John Aston": ("Eszten János", "Eszten"),  # Aszton János
+  "John Egan": ("Ígen János", "Ígen"),  # Égan János
+  "John Fallon": ("Felen János", "Felen"),  # Falon János
+  "John Fashanu": ("Fesenú János", "Fesenú"),  # Fasanu János
+  "John Lundstram": ("Landsztrem János", "Landsztrem"),  # Lundsztram János
+  "John Mahoney": ("Máheni János", "Máheni"),  # Mahoni János
+  "John McMaster": ("Mekmásztör János", "Mekmásztör"),  # Mekmaszter János
+  "John Sheridan": ("Seriden János", "Seriden"),  # Seridan János
+  "Jon Flanagan": ("Flenegen János", "Flenegen"),  # Flánagan János
+  "Kevin Nolan": ("Nólen Kelemen", "Nólen"),  # Nólan Kelemen
+  "Kevin O'Callaghan": ("O'kelehen Kelemen", "O'kelehen"),  # O'kalagan Kelemen
+  "Lee Cattermole": ("Kettermól Vazul", "Kettermól"),  # Kattermól Vazul
+  "Len Cantello": ("Kentelló Gedeon", "Kentelló"),  # Kantelo Gedeon
+  "Lloyd McGrath": ("Mekgrá Bertalan", "Mekgrá"),  # Mekgrat Bertalan
+  "Marc Albrighton": ("Ólbrájten Márk", "Ólbrájten"),  # Albrájton Márk
+  "Mark Atkins": ("Etkinsz Márk", "Etkinsz"),  # Atkinsz Márk
+  "Mark Hateley": ("Héjtli Márk", "Héjtli"),  # Hateli Márk
+  "Marlon Harewood": ("Hérvúd Elemér", "Hérvúd"),  # Harevúd Elemér
+  "Matt Holland": ("Holend Zsigmond", "Holend"),  # Holand Zsigmond
+  "Mike Bernard": ("Börnerd Miska", "Börnerd"),  # Bérnard Miska
+  "Owen Hargreaves": ("Hárgrívsz Huba", "Hárgrívsz"),  # Hargrívesz Huba
+  "Pat Crerand": ("Krerend Patrik", "Krerend"),  # Krerand Patrik
+  "Paul Bracewell": ("Bréjszvel Pál", "Bréjszvel"),  # Braszevel Pál
+  "Paul Lambert": ("Lembert Pál", "Lembert"),  # Lámbert Pál
+  "Paul Madeley": ("Méjdli Pál", "Méjdli"),  # Madeli Pál
+  "Paul Stewart": ("Sztjúert Pál", "Sztjúert"),  # Sztevart Pál
+  "Paul Walsh": ("Vóls Pál", "Vóls"),  # Vals Pál
+  "Paul Warhurst": ("Vóhörszt Pál", "Vóhörszt"),  # Varhörszt Pál
+  "Peter Brabrook": ("Bréjbrúk Péter", "Bréjbrúk"),  # Brabrúk Péter
+  "Phil Jagielka": ("Dzsegelka Fülöp", "Dzsegelka"),  # Dzsagilka Fülöp
+  "Phil Parkes": ("Párksz Fülöp", "Párksz"),  # Parkesz Fülöp
+  "Ray Parlour": ("Párlör Vajk", "Párlör"),  # Parlúr Vajk
+  "Rob Newman": ("Nyúmen Robi", "Nyúmen"),  # Nevman Robi
+  "Robbie Brady": ("Bréjdi Robika", "Bréjdi"),  # Bradi Robika
+  "Roy McFarland": ("Mekfárlend Roj", "Mekfárlend"),  # Mekfarland Roj
+  "Russell Osman": ("Ozmen Nándor", "Ozmen"),  # Oszman Nándor
+  "Ryan Bertrand": ("Börtrend Rájen", "Börtrend"),  # Bértrand Rájen
+  "Ryan Shawcross": ("Sókrossz Rájen", "Sókrossz"),  # Savkrossz Rájen
+  "Ryan Yates": ("Jéjtsz Rájen", "Jéjtsz"),  # Jatesz Rájen
+  "Scott Sellars": ("Szelersz Skót", "Szelersz"),  # Selarsz Skót
+  "Seamus Coleman": ("Kólmen Pongrác", "Kólmen"),  # Koleman Pongrác
+  "Sean Haslegrave": ("Héjzelgréjv János", "Héjzelgréjv"),  # Haszlegréjv János
+  "Sean Longstaff": ("Longsztáf János", "Longsztáf"),  # Longsztaff János
+  "Shaun Maloney": ("Melóni János", "Melóni"),  # Maloni János
+  "Solly March": ("Márcs Ince", "Márcs"),  # Marcs Ince
+  "Stephen Carr": ("Kár István", "Kár"),  # Karr István
+  "Stephen Ward": ("Vód István", "Vód"),  # Vard István
+  "Steve Lomas": ("Lómesz Pista", "Lómesz"),  # Lomasz Pista
+  "Steve McCall": ("Mekól Pista", "Mekól"),  # Mekkal Pista
+  "Stuart McCall": ("Mekól Sztuart", "Mekól"),  # Mekkal Sztuart
+  "Stevie Chalmers": ("Csámersz Tihamér", "Csámersz"),  # Csalmersz Tihamér
+  "Stuart Parnaby": ("Párnebi Sztuart", "Párnebi"),  # Parnabi Sztuart
+  "Terry Phelan": ("Fílen Tihamér", "Fílen"),  # Felan Tihamér
+  "Terry Yorath": ("Jóret Tihamér", "Jóret"),  # Jorat Tihamér
+  "Theo Walcott": ("Vólket Tivadar", "Vólket"),  # Valkott Tivadar
+  "Timmy Chandler": ("Csendler Timkó", "Csendler"),  # Csandler Timkó
+  "Tommy Garrett": ("Geret Tomi", "Geret"),  # Gárrett Tomi
+  "Vinny Samways": ("Szemvéjsz Boldizsár", "Szemvéjsz"),  # Samvéjsz Boldizsár
+  "Warren Barton": ("Bárten Kelemen", "Bárten"),  # Bárton Kelemen
+  "Willie Wallace": ("Volisz Vili", "Volisz"),  # Valéjsz Vili
+  "Conor Bradley": ("Bredli Töhötöm", "Bredli"),  # Bradli Töhötöm
+  "Allan Evans": ("Evensz Alán", "Evensz"),  # Evansz Alán
+  "Jonny Evans": ("Evensz Tihamér", "Evensz"),  # Evansz Tihamér
+  "Bertie Auld": ("Óld Ábris", "Óld"),  # Áuld Ábris
+  "Drake Callender": ("Kelender Mór", "Kelender"),  # Kalender Mór
+})

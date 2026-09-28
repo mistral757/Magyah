@@ -1915,6 +1915,26 @@ szerint 192-es kerettel 178-as mezőny jött.
 
 Részletes magyarázat: `docs/piac-horgony-hiba.md`.
 
+## kupa-lanc-szoveg-proba.js — 🎫 a hazai kupa utáni lánc azt mondja, ami jön
+
+```bash
+node tools/kupa-lanc-szoveg-proba.js
+```
+
+A bejelentett hiba ez volt: a Fából Készült Serleg megnyerése után a képernyő
+Magor Kupáját és Konföranszié Líget írt, utána pedig a Kupák Kupájának Kupája
+indult.
+
+A próba a VALÓDI ünneplő képernyőt (`euroMaybeCelebrate`) és a valódi láncot
+(`cupChainNext`) futtatja három osztály-szabállyal:
+
+- D1/D2: FA → KK, selejtezővel;
+- D3: MK → KK, selejtezővel;
+- sík mód: MK → KONF, selejtező nélkül.
+
+Mindháromnál ellenőrzi, hogy a megjegyzés, az ünneplő gomb és a záró gomb
+ugyanazt mondja, mint a lánc. A már elsült láncnál nincs láncszöveg.
+
 ## kupa-meccsero-proba.js — 🏆 a kupamezőny nem sodródhat el
 
 ```bash
@@ -2310,8 +2330,10 @@ node tools/talizman-f3-proba.js
   valódi `tacticTrainAfterMatch`. A stílus-fánál a kijelzett ÉS a levont ár
   is kedvezményes. A kedvezmény seedelt, és nem adódik össze a
   kihívás-kedvezménnyel.
-- **A felület:** ⚡ a lapon; a menü aktív hatásai a plafonnal, a még nem ható
-  kategória (3.9.144 óta a Meccs) nélkül.
+- **A felület:** ⚡ a lapon; a menü aktív hatásai a plafonnal. 3.9.148 óta
+  mind a tíz kategória hat: a Meccs a meccserő- és tengely-sorával jelenik
+  meg, a „⏳ még nem hat” jelzést pedig egy ideiglenesen kikapcsolt tengely
+  méri.
 - **Az eseménycsomag:** 2 jó + 1 rossz, a lapon látszik, a választás a
   paklihoz adja, és nincs ismétlés.
 
@@ -2441,6 +2463,184 @@ node tools/talizman-f4c-proba.js
 A `MROOT` környezeti változóval másik munkakönyvtárra is futtatható.
 
 Részletek: `docs/talizmanok.md` (3.9.146).
+
+## talizman-f5-proba.js — 🧿 Talizmánok F5: a Meccs tíz tengelye
+
+```bash
+node tools/talizman-f5-proba.js
+```
+
+**34 állítás, nyolc blokkban:**
+
+1. **Semleges:** minden olvasó 1 / 0, és a `matchLambdas` a mezőkkel és
+   nélkülük BITRE ugyanaz.
+2. **Összeszámolás:** tengelyenkénti E a csökkenő hozammal.
+3. **A λ:** a tengelyek súlyai, a ±8%-os plafon, és a `matchLambdas` pontos
+   szorzója; a párkémia többlete.
+4. **Vágás:** a társtól jött hamis érték is a sávban marad.
+5. **Meccserő:** a `hiddenMatchBonus` és a ⚡ `teamMatchStrength` pontosan a
+   pakli OVR-egyenértékével nő.
+6. **Mind a nyolc másodlagos csatorna** a `dialMul`-on át, valamint a
+   birtoklás, a helyzetszám és a szabadrúgás a motorban.
+7. **Párharc:**
+   - a valódi `h2hWireSnapshot` viszi a mezőket;
+   - a valódi `h2hSimulate` ugyanabból a magból bitre ugyanazt adja;
+   - a benne hívott `matchLambdas` pontosan a talizmán szorzójával tolja a
+     λ-t (a hívást a próba elkapja — nem statisztika, hanem egyenlőség).
+8. **A menü sorai.**
+
+Részletek: `docs/talizmanok.md` (3.9.148).
+
+## talizman-f6b-proba.js — 🧿 3.9.154: talizmán-speciálok — Igazolás, Fejlődés, Stáb
+
+```bash
+node tools/talizman-f6b-proba.js
+```
+
+**27 állítás, öt blokkban:**
+
+0. **Semleges:** talizmán nélkül minden új olvasó 1-et / 0-t ad.
+1. **Igazolás (8):** alkusz, háló, zsákbamacska, hűség, villámzár, ingyen
+   ember, visszavásárlás, utolsó perces bomba — pro és kontra, a valódi
+   függvényeken (licit-kúp, keresési keret, szezonkeret, kedvezmény,
+   kikiáltási ár, token, menü-gomb, ajánlat és aláírás).
+2. **Fejlődés (8):** titánok, késői virágzás (tíz idény öregedés),
+   specialista, kemény edzés, vatta, csodagyerek, második tavasz,
+   versenyszellem.
+3. **Stáb (8):** bővített, mentor, lojális, tapasztalatcsere, fókusz,
+   legenda, a nagy öreg, konferencia.
+4. **Katalógus:** a három kategória mind a 24 speciálja él; nincs oldalhiba.
+
+Részletek: `docs/talizman-f6b-3-9-154.md`.
+
+## egyensuly-3-9-153-proba.js — ⚖️ 3.9.153: D0, nyári kupa, árazás, csapategyensúly, poszt-tudás, színhűség
+
+```bash
+node tools/egyensuly-3-9-153-proba.js
+```
+
+**32 állítás, hét blokkban:**
+
+1. **A meccs-erő a motor tükre:** a helyi meccs-erő és a motor pillanatképéből
+   számolt ugyanaz — stílus nélkül, stílussal, kémiával; a Zárt kapu, a
+   „gépezet", az egyensúly-bónusz és egy kész párkémia pontosan annyit mozdít
+   rajta, amennyit a motorban; a párharc ⚡-je a közös képletből.
+2. **Egyensúly-plafon:** 100 fölött 10-esével +1 (110 → 3, 180 → 10), a
+   bónusz ebből számol.
+3. **Sokoldalú képzés:** −20%/−50% meccsigény (a beszokás is), −25%/−55%
+   ár, a futó tanulás is rövidül.
+4. **Poszt-tudás mérföldkövek:** a három család és a mérők; a 11 posztos
+   lépcső nem nyúlik Infinityben.
+5. **Színhűség:** 2 lap szorzó nélkül, 3/5/8 lap ×1,10/×1,20/×1,35, a
+   bejelentés, a menü.
+6. **Ár és ifi POT:** a bejelentett pár megfordul, a fiatal tehetség ára
+   változatlan, a kifutotté enyhén a Rating felé húz; a POT-felzárkózás
+   csak ≤23 évesnél és csak fölfelé.
+7. **Nyári kupa:** a mezőny a pályán a meccs-erőd mínusz egy; közös tornán a
+   nehezebb célérték, régi kliensnél a régi szabály.
+
+Részletek: `docs/egyensuly-3-9-153.md`.
+
+## kenyelem-3-9-152-proba.js — 🧰 3.9.152: cseretervek, fejlődési görbe, fekvő talizmán, értesítés, ranglista
+
+```bash
+node tools/kenyelem-3-9-152-proba.js
+```
+
+**19 állítás, öt blokkban:**
+
+1. **Cseretervek:** mentés névvel (akárhány), betöltés MÁSOLATKÉNT, felülírás,
+   törlés; a kikapcsolás és a párharc „nem cserélek" gombja megtartja a tervet
+   (a párharcnál csak arra a meccsre marad ki a drótról).
+2. **Fejlődési görbe:** pont csak változáskor, korlátos tömb, a távozók
+   törlése, a valódi meccs utáni lánc, az SVG a valódi játékoslapon.
+3. **Fekvő telefon (844×390):** a talizmán-menü két oszlop, a gyűjtemény
+   vízszintes polc, a húzás három lapja egymás mellett.
+4. **Értesítés:** valódi iPhone- és Messenger-user-agenttel a `pushSubscribe`
+   a teendőt mondja; a régi, callback-es engedélykérés átmegy.
+5. **Ranglista:** a határnap előtti futás nem megy fel és nem látszik; a havi
+   fül; az `ach` mező és a visszaesés a régi szabályfájlra.
+
+Részletek: `docs/kenyelem-3-9-152.md`.
+
+## hibak-3-9-151-proba.js — 🔧 3.9.151: bejelentett hibák és kérések
+
+```bash
+node tools/hibak-3-9-151-proba.js
+```
+
+**16 állítás, hat blokkban:**
+
+1. **A társ ⚡-je élőben:** a közös lista a csere erő-változását viszi, és a
+   valódi eredményjelző (`sbSetOppMs`) pontosan annyit mozdítja a társ
+   meccs-erejét; a kiállítás a saját emberhátrány-tételével.
+2. **A tervezett csere időzítése:** a „45. perctől” a félidő után (46.), a
+   „70. perctől” a 71. percben — a közös szimulációban és a helyi motorban is.
+3. **Akadémiai tehetség:** a valódi `applyTransfer` 18–22 éveseket hoz.
+4. **Kihívás-jutalmak:** a két rossz nincs a kalapban, a három új igen (ha van
+   mire hatnia), és a valódi kiváltásuk működik.
+5. **Kiírások:** a morál és a kapitány meccserője a motor képletével; a
+   játékoslap a származási klubot mutatja.
+6. **A Hiper Szuper Kupa lila táblája.**
+
+Részletek: `docs/javitasok-3-9-151.md`.
+
+## talizman-f6a-proba.js — 🧿 Talizmánok F6a: a Scout, a Stílus és a Taktika speciáljai
+
+```bash
+node tools/talizman-f6a-proba.js
+```
+
+**55 állítás, öt blokkban:**
+
+0. **Semleges:** talizmán nélkül minden olvasó 1 / 0 / a régi konstans
+   (osztók, csúszka-kapu, plafon), és a pillanatképben nincs új mező.
+1. **🔭 Scout — nyolc special, pro és kontra:**
+   - a valódi `twScout` jelöltjei (Ködoszlató, Külföldi iroda, Kémhálózat);
+   - a valódi `buyPrice` és a kedvezmény-stack;
+   - a valódi akadémiai generátor és a „marad még” gomb;
+   - a valódi szezonközi ablak és a pad-fejlődés;
+   - a szezonváltás tartásdíja.
+2. **🎭 Stílus — nyolc special:**
+   - a stíluspont (`msSpReward`, `styleMsRewardFor`);
+   - a másodlagos osztók, a csúszka-kapu és a kár-oldal (`dialPct`);
+   - a beragadt jutalom és a kategória ára;
+   - a valódi `roleVal` és `roleAssign`;
+   - a csillagozás ára és a licit-kúp (a `saleRollOffer`-ből kiolvasva);
+   - a morál-cél és a mérföldkő-láz ötödik duplája.
+3. **📋 Taktika — nyolc special:**
+   - a valódi begyakorlás (Tábla és kréta, Gyors tanuló);
+   - a felállásváltás ára;
+   - a meccs-csatornák és a sárgalap;
+   - a plafon és a stábhatás;
+   - a Titkos fegyver a menü gombjától a pillanatképig;
+   - az Ellenfél-elemző illeszkedése és bére.
+4. **A kártya és a menü:** „✦ a special él”; mind a 24 él, a többi még nem;
+   a menü sora.
+
+A régi kódon nem indul el (nincs `talSpecV`). Részletek:
+`docs/talizmanok.md` (3.9.150).
+
+## meccsero-egyezes-proba.js — ⚡ ugyanannak a csapatnak ugyanaz a meccs-ereje mindkét gépen
+
+```bash
+node tools/meccsero-egyezes-proba.js
+```
+
+A bejelentett hiba ez volt: párharcban a saját eredményjelződön ⚡95,2 állt,
+a társadén ugyanerre a csapatra ⚡98.
+
+A próba a következőket méri:
+
+- a VALÓDI `h2hStart`-ot mindkét szerepből (gazda és vendég): a két gép
+  ugyanazt a számpárt adja;
+- a valódi eredményjelzőt (`sbPaintTeams`): párharcban a sajátod a
+  pillanatképből jön, nem a helyi becslésből, és az élő frissítés is erről
+  indul;
+- a papírformát: párharcban szimmetrikus;
+- a morál-csúszkát: a motorban is hat, csúszka nélkül bitre a régi.
+
+A régi kódon a próba pontosan a bejelentett eltérést adja vissza.
 
 ## kiadas-proba.js — 🏪 kiadás-előtti ellenőrző
 

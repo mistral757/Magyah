@@ -9,7 +9,10 @@
      1. a referencia-büdzsénél (10 000 pont), a 3. idényben a régi fix árak
         BETŰRE megmaradnak (felállás 5000, stáb 10 000·1,75ⁿ, scout görbe,
         ügynökség ×2);
-     2. a kétszeres büdzsé kétszeres árat ad, a fele felét — mind a négynél;
+     2. a referencia ALATT arányos (fele büdzsé → fele ár); FÖLÖTTE a gyöke
+        szerint nő (3.9.151): négyszeres büdzsé → kétszeres, százszoros →
+        tízszeres ár — a régi tizede. A poszt-tanulás (a büdzsé RÉSZE)
+        továbbra is arányos. A keretbővítés is ezen a kapun megy;
      3. az 1. idényben −50%, a 2.-ban −33%, a 3.-tól teljes ár — mind az
         ötnél (a poszt-tanulás is);
      4. az idei első felállásváltás továbbra is ingyenes;
@@ -70,16 +73,20 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       S.formationChangesThisSeason=1;
       const o={form:formationChangeCost(),stab3:coachSlotPrice(3),stab5:coachSlotPrice(5),
         scout:scoutUpgradePrice(3.5),agency:agencyUpgradePrice(),pos:posLearnCost(ent),
-        agencyVart:Math.round(scoutUpgradePrice(agencyStars())*2/500)*500};
+        agencyVart:Math.round(scoutUpgradePrice(agencyStars())*2/500)*500,
+        roster:rosterExpandPrice(30)};
       S.formationChangesThisSeason=0;o.formIngyen=formationChangeCost();
       return o;};
     /* régi (fix) árak a referenciánál */
     const regiScout=(()=>{const st=3.5,bb=Math.log(20)/8,a=5000/Math.exp(bb);
       return Math.round(a*Math.exp(bb*st)*(1+0.28*Math.exp(-Math.pow((st-4.5)/2.4,2)))*SCOUT_PRICE_MULT/500)*500;})();
-    ki.regi={form:FORMATION_CHANGE_COST,stab3:10000,stab5:Math.round(10000*1.75*1.75),scout:regiScout};
+    ki.regi={form:FORMATION_CHANGE_COST,stab3:10000,stab5:Math.round(10000*1.75*1.75),scout:regiScout,
+      roster:Math.round((20000+10000)*ROSTER_EXPAND_PRICE_MULT/500)*500};
     S.seasonNumber=3;
     ki.ref=arak();
     B=20000;ki.dupla=arak();
+    B=40000;ki.negy=arak();
+    B=1000000;ki.szaz=arak();
     B=5000;ki.fel=arak();
     B=10000;
     S.seasonNumber=1;ki.sz1=arak();
@@ -109,11 +116,15 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      tehát egy 3000 körüli árnál a 3% alatti arány-eltérés is kijöhet pusztán
      a kerekítésből (mérve: ref 3000 → dupla 5900, 1,967×). Az arány-tűrés
      mellé ezért egy abszolút is áll: a két kerekítés összege. */
-  const kozel=(a,cel,rel)=>Math.abs(a/cel-1)<rel||Math.abs(a-cel)<=150;
-  console.log("\n— 2. A BÜDZSÉVEL ARÁNYOS —");
-  k.concat(["agency","pos"]).forEach(x=>{
-    ok(kozel(t.dupla[x],2*t.ref[x],0.015),`${x}: kétszeres büdzsé → kétszeres ár`,{ref:t.ref[x],dupla:t.dupla[x]});
+  /* 3.9.151: az 500-ra kerekítő keretbővítésnél egy kerekítés maga 250 */
+  const kozel=(a,cel,rel)=>Math.abs(a/cel-1)<rel||Math.abs(a-cel)<=250;
+  console.log("\n— 2. A BÜDZSÉHEZ MÉRVE: ALATTA ARÁNYOS, FÖLÖTTE A GYÖKE —");
+  k.concat(["agency","roster"]).forEach(x=>{
+    ok(kozel(t.negy[x],2*t.ref[x],0.015),`${x}: négyszeres büdzsé → kétszeres ár`,{ref:t.ref[x],negy:t.negy[x]});
+    ok(kozel(t.szaz[x],10*t.ref[x],0.015),`${x}: százszoros büdzsé → tízszeres ár (a régi tizede)`,{ref:t.ref[x],szaz:t.szaz[x]});
     ok(kozel(t.fel[x],0.5*t.ref[x],0.06),`${x}: fele büdzsé → fele ár`,{ref:t.ref[x],fel:t.fel[x]});});
+  ok(kozel(t.dupla.pos,2*t.ref.pos,0.015)&&kozel(t.fel.pos,0.5*t.ref.pos,0.06),"pos: a poszt-tanulás a büdzsé része — arányos marad",{ref:t.ref.pos,dupla:t.dupla.pos,fel:t.fel.pos});
+  ok(t.ref.roster===t.regi.roster,"keretbővítés: a referencián és a 3. idényben a régi fix ár",{most:t.ref.roster,regi:t.regi.roster});
 
   console.log("\n— 3. A KEZDŐ KEDVEZMÉNY —");
   k.concat(["agency","pos"]).forEach(x=>{
