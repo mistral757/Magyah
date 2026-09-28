@@ -103,7 +103,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* három Jobb illeszkedés: E = 2,7 / 1,7 / 1,0 (dobás 0,5 → ×1,0) + Tiszta ×1,25 */
     _pakli([_lap("taktika","fit",1,0.5),_lap("taktika","fit",3,0.5),_lap("taktika","fit",2,0.5)]);
     const E=[2.7,1.7,1.0].map(x=>x*1.25);
-    ki.vart=0.8*(E[0]+E[1]*0.85+E[2]*0.85*0.85);
+    /* 3.9.153: három lap egy színben a színhűség első fokozata (×1,10) */
+    ki.vart=0.8*(E[0]+E[1]*0.85+E[2]*0.85*0.85)*talStackMult(3);
     ki.mert=talFitPP();
     ki.kov=talAlapMind()._hat.taktika;
     /* egy special-os talizmán NEM kapja a Tiszta ×1,25-öt */
@@ -117,7 +118,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.ar=talAlap("stab","ar");ki.hatas=talAlap("stab","hatas");
     return ki;});
   console.log("\n— 2. CSÖKKENŐ HOZAM ÉS PLAFON —");
-  ok(Math.abs(h.mert-h.vart)<1e-9,"három talizmán erő szerint, 1 · 0,85 · 0,85² súllyal adódik",{vart:h.vart,mert:h.mert});
+  ok(Math.abs(h.mert-h.vart)<1e-9,"három talizmán erő szerint, 1 · 0,85 · 0,85² súllyal adódik (× a színhűség 1,10-e)",{vart:h.vart,mert:h.mert});
   ok(Math.abs(h.kov-Math.pow(0.85,3))<1e-9,"a következő talizmán hatékonysága 0,85³",h.kov);
   ok(Math.abs(h.spec-0.8*1.7)<1e-9,"special-os talizmán: nincs Tiszta-szorzó",h.spec);
   ok(h.plafon===8,"a plafon fog (Jobb illeszkedés: 8 pp)",h.plafon);
@@ -268,7 +269,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     _pakli([_lap("taktika","fit",3,0.5),_lap("taktika","fit",1,0.5),{kat:"meccs",al:"gol",rang:2,dobas:0.5,spec:null}]);
     talMenuOpen();
     ki.blokk=$("talHatas").textContent;
-    ki.sorok=document.querySelectorAll("#talHatas .talHatRow").length;
+    /* a színhűség-sor (3.9.153) külön számít — itt a hatás-sorok kellenek */
+    ki.sorok=[...document.querySelectorAll("#talHatas .talHatRow")].filter(r=>!/Színhűség/.test(r.textContent)).length;
     ki.lapok=[...document.querySelectorAll("#talGrid .talStat")].map(x=>x.textContent);
     talMenuClose();
     /* 3.9.148 óta mind a tíz kategória hat — a „⏳ később" szabályt egy

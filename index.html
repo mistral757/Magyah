@@ -4176,6 +4176,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
 .talSp{display:grid;gap:3px;border-top:1px solid rgba(255,255,255,.14);padding-top:5px}
 .talPro{color:#9be3a6}
 .talCon{color:#ff9a8b}
+.talStack{font-size:10px;color:var(--gold);letter-spacing:-1px;margin-left:2px}
 .talDot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:0;box-shadow:0 0 0 1px rgba(255,255,255,.55)}
 .talClean{border-top:1px solid rgba(255,255,255,.14);padding-top:5px;color:#f4efe2}
 .talFoot{display:flex;justify-content:space-between;gap:6px;font-size:.78em;color:#a9bdb2;border-top:1px solid rgba(255,255,255,.08);padding-top:4px}
@@ -6315,7 +6316,7 @@ body.stadium #tNudgeWhy .tnBox,body.hubLand #tNudgeWhy .tnBox,body.landPage #tNu
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.152";
+const APP_VERSION="3.9.153";
 /* ================= JÁTÉKOS-ADATBÁZIS ================= */
 /* Minden klub 3 betűs rövidítése — a fejléc-eredményjelzőn ez jelenik meg,
    hogy mindig kiférjen. Felismerhető, valós kódok (RMA, BAR, JUV...). */
@@ -18059,6 +18060,34 @@ function hszMid(){
   if(!(base>0))return null;
   const ab=(typeof pyrAbove==="function")?pyrAbove():0;
   return Math.max(50,Math.min(ratingCap(),Math.round(base+ab-2)));}
+/* ---- A NYÁRI KUPA MEZŐNYE A MECCS-ERŐHÖZ MÉR (3.9.153) ----
+   BEJELENTETT KÉRÉS: „Nyári kupa nehézségi szintjét hangolni, ott még nem
+   működik jól."
+   A MÉRT HIBA ugyanaz, amit a többi kupánál a 3.9.126 már kijavított: a
+   mezőny a NYERS csapaterő −1-re állt, a meccsen viszont csak a rejtett
+   bónuszod FELÉT kapta meg (matchHiddenOppBuff). A pályán tehát a rés
+   `1 + rejtett/2` volt — a karrier elején (+4) még 3, egy kiépült keretnél
+   (+30) már 16 pont: séta, nem felkészülés.
+   A SORZAT ÍGÉRETE VÁLTOZATLAN — „magadhoz mért, egy hajszálnyival könnyebb
+   mezőny" —, csak most a PÁLYÁN igaz: a csapatok meccs-ereje (a névleges
+   átlag + a rejtett bónuszod fele, amit a motor ráad) a nevezési
+   meccs-erőd mínusz egy. A nevezési szám a 3.9.122 lebutítás-védelmével jön. */
+function nykMidFor(ms,hb){
+  if(!(typeof ms==="number"&&isFinite(ms)&&ms>0))return null;
+  const h=Math.max(0,(typeof hb==="number"&&isFinite(hb))?hb:0)*OPP_BUFF_MEASURED;
+  return Math.max(50,Math.min(ratingCap(),Math.round(ms-1-h)));}
+function nykRatedMs(){
+  let ms=0;
+  if(typeof MS_RATED!=="undefined"&&MS_RATED){
+    try{ms=teamMatchStrength();}catch(e){ms=0;}
+  }else{
+    try{msRatedBegin();ms=teamMatchStrength();}catch(e){ms=0;}
+    finally{try{msRatedEnd();}catch(e){}}}
+  return ms>0?ms:null;}
+function nykMidMine(){
+  if(gameMode!=="career")return null;
+  let hb=0;try{hb=seasonHiddenBonus();}catch(e){hb=0;}
+  return nykMidFor(nykRatedMs(),hb);}
 function euroMidRating(comp){
   if(compSwiss(comp)){
     const m=hszMid();
@@ -18069,6 +18098,8 @@ function euroMidRating(comp){
      csapatereje mínusz egy. Ez a sorozat ígérete — magadhoz mért, egy
      hajszálnyival könnyebb mezőny, amin a fiatalok is játékidőt kapnak. */
   if(compFriendly(comp)){
+    const m=nykMidMine();
+    if(m!=null)return m;
     const raw=(typeof teamOVRbase==="function")?teamOVRbase():0;
     const ts=(typeof teamStrength==="function")?teamStrength():0;
     const src=raw>0?raw:(ts>0?ts:(oppTargetRating||84));
@@ -26465,7 +26496,9 @@ function posLearnCost(entry){
   const share=POS_LEARN_SHARE[0]+t*(POS_LEARN_SHARE[1]-POS_LEARN_SHARE[0]);
   /* 3.9.135: a kezdő idények kedvezménye (−50% / −33%) ide is jár. */
   let d=0;try{d=boostEarlyDisc();}catch(e){d=0;}
-  return Math.max(100,Math.round(clubBudgetScale()*share*(1-d)/100)*100);}
+  /* ☯️ 3.9.153 — a Béke és harmónia „Sokoldalú képzés" képessége (1 = nincs). */
+  let h=1;try{h=stylePosLearnCostMult();}catch(e){h=1;}
+  return Math.max(100,Math.round(clubBudgetScale()*share*(1-d)*h/100)*100);}
 /* ================= A TANULÁS TEMPÓJA: EGY BÁZIS, KÉT ÚT =================
    MEGVÁSÁROLVA a bázis MINDENKINÉL 12 lejátszott meccs. Korábban a kor és a
    POT szabta (9-20 meccs), és ezt cseréljük le: a tempó-különbséget mostantól
@@ -26494,7 +26527,17 @@ const POS_DRIFT_MULT=3;
    nyitva (edzés helyett átképzés). A meccsigény a szorzóval OSZTVA nő. */
 function posLearnMatchesNeeded(entry){
   const k=(typeof tempoMult==="function")?tempoMult():1;
-  return Math.max(POS_LEARN_BASE,Math.round(POS_LEARN_BASE/Math.max(0.2,k)));}
+  const base=Math.max(POS_LEARN_BASE,Math.round(POS_LEARN_BASE/Math.max(0.2,k)));
+  /* ☯️ 3.9.153 — a „Sokoldalú képzés" a meccsigényt vágja; a beszokás a
+     háromszorosából számol, tehát az is ugyanennyivel gyorsul. */
+  let f=1;try{f=stylePosLearnSpeedMult();}catch(e){f=1;}
+  return Math.max(3,Math.round(base*f));}
+/* A FUTÓ tanulás igénye: az induláskor rögzített szám, de ha azóta olcsóbb
+   lett (megvetted a képességet), a kisebb él — a már fizetett tanulás se
+   maradjon le a gyorsításról. */
+function posLearnNeededNow(entry){
+  const L=entry&&entry.posLearning;if(!L)return 0;
+  return Math.min(L.needed||POS_LEARN_BASE,posLearnMatchesNeeded(entry));}
 /* …és mennyi a fizetés nélküli beszokáshoz. */
 function posDriftMatchesNeeded(entry){
   return Math.round(posLearnMatchesNeeded(entry)*POS_DRIFT_MULT);}
@@ -26527,7 +26570,7 @@ function stepPosLearning(entry,perfBoost,share){
   const L=entry.posLearning;
   if(!L)return;
   L.progress=(L.progress||0)+(share==null?1:share)+(perfBoost||0);
-  if(L.progress>=L.needed){
+  if(L.progress>=posLearnNeededNow(entry)){
     delete entry.posLearning;
     posLearnFinish(entry,L.target,false);}}
 /* ---- BESZOKÁS: A FIZETÉS NÉLKÜLI TANULÁS EGY MECCSNYI LÉPÉSE ----
@@ -27450,6 +27493,9 @@ function advanceCareerSeason(){
        arra az esetre, ha a kijelzés még egyszer sem futott le az érkezése óta. */
     if(entry.potEstMul==null&&entry.estimatedPOT!=null&&entry.pot>0)
       entry.potEstMul=Math.round((entry.estimatedPOT/entry.pot)*1e4)/1e4;
+    /* 🌱 3.9.153: a fiatal POT-ja felzárkózik a Ratingjéhez (az arány már
+       befagyott, tehát a becslés vele mozdul) */
+    try{const d=youthPotAlign(entry);if(d>0)(report.potAligned=report.potAligned||[]).push({n:entry.n,d,pot:entry.pot});}catch(e){}
     if(scout)entry.estimatedPOT=estimatePOT(entry.pot,scout.stars);});
   const rosterSlots=[];
   /* A családtag is szerepel: a Ratingje/kora frissül a pool-bejegyzésből.
@@ -30205,7 +30251,7 @@ const GLOSSARY={
   megbizas:{title:"Középpályás megbízás",text:"A felállás megadja, HÁNY középpályással játszol — a megbízás azt, hogy ezek közül ki MIT csinál. A kezdő 11 középső középpályás helyei háromféle megbízást kaphatnak: VÉDEKEZŐ (a védelem előtt szerez labdát és rendez), KLASSZIKUS (kétirányú motor) és TÁMADÓ (a támadók mögött készít elő). A megbízás MINDKÉT IRÁNYBAN működik: a belső helyek közül a sor két legszélsője SZÉLSŐRE is állítható (a hely attól még középpályás marad, nem lesz belőle támadó szélső), a felállás által eleve SZÉLRE tett középpályás hely pedig BEFELÉ húzható — védekező, klasszikus vagy támadó középpályásnak. Így egy négyes középpályát fel lehet állítani négy szélessel és négy belsővel is, ugyanazon a felálláson belül. Ugyanez áll a védősorra: a középhátvéd kimehet szélsővédőnek, a szélsővédő pedig behúzódhat középhátvédnek. UGYANEZ A GOMB A TÁMADÓKNÁL mást kérdez: a középcsatár álljon-e legelöl és a támadó szélső maradjon-e kint, vagy ÁRNYÉKÉK húzódjon be mögéjük (lásd a saját bejegyzését). A megbízást a HUB keretlistájában állítod: koppints a középpályásra, és a lapján ott a Megbízás módosítása gomb a posztcsere és a poszt-tanulás mellett. Ingyenes, bármikor átállítható, és SENKI nem mozdul tőle a helyéről — csak a hely poszt-kódja és az illeszkedés változik, a kézzel összerakott csapatod a helyén marad. Hatása a csapat tengelyein érződik, mindig a felállás saját alapbeállításához képest: a védekező megbízás 3 attribútumpontot tesz a Védekezés-tengelyre a Gólszerzés rovására, a támadó pontosan fordítva, a klasszikus semleges. Ez a taktikád illeszkedésén is látszik — a Park the bus a Védekezésre épül, a Hosszú labdák a Gólszerzésre —, de szándékosan gyengébb eszköz, mint maga a rendszerválasztás: hangolni lehet vele, felülírni nem."},
   osszhang:{title:"Összhang",text:"Azt méri, MENNYIRE ISMERIK EGYMÁST a játékosaid: két ember között 0-99, ami kizárólag KÖZÖSEN PÁLYÁN TÖLTÖTT mérkőzésekből gyűlik, és a távozással megsemmisül. NEM ugyanaz, mint a morál: a morál azt mondja meg, hogy ÉRZIK magukat (eredményre ugrál, egy rossz sorozat elviszi), az összhang azt, hogy mennyire ismerik egymást (idényekben mérhető, és csak akkor vész el, ha valaki elmegy). A morál célértékét egyébként MA MÁR az összhang adja — a régi, álló kémia-szám helyett. A CSAPAT SZÁMA a pályán lévő tizenegy 55 párjának súlyozott átlaga: a súly a pályatávolságból és a taktika szerep-párjából jön, ezért a szám AZONNAL reagál, ha két embert felcserélsz. Ez a szám egyetlen additív tagként ül a csapaterőre, NULLA-KÖZÉPPONTTAL: az 55-ös referencia a „beállt” csapat, ott a tag pontosan 0 — egy szétesett öltöző −1,5, egy tíz éve együtt játszó +2,5, vagyis nagyjából egy emberhátrány, illetve egy jó edző. MITŐL ÉPÜL: a poszt-közelség, a taktika saját szerep-párjai, a jellem (kapcsolódás mértani középpel, karizma aszimmetrikusan, két forró fej lassabban), a passz-attribútum, a győzelem, az egymásnak adott gólpassz — és a csillapítás miatt egyre lassabban. A MECCSEK 88-IG VISZNEK EL: a maradék tizenegy pontot csak egy elkészült PÁRKÉMIA hozhatja meg (az +25-öt ad), tehát a legfelső fokozathoz a két rendszer együtt kell. A HÉT FOKOZAT: Idegenek, Épülőben, Ismerik egymást, Összeszokott, Erős kötés, Vakon megtalálják, Elválaszthatatlan — a felállás alatti kapcsolóval PÁLYATÉRKÉPRE is váltható, ahol a vonalak vastagsága és színe mutatja őket. AZ ÉRKEZŐ MINDEN SZÁMA A KERET SZINTJÉHEZ MÉRT ARÁNY — vagyis a kezdő tizenegy összhangjához ŐNÉLKÜLE. Nyolc SAJÁT meccsen át mindenkivel ideiglenes, a keret szintjének 66%-át érő összhangon áll (ez még mindig lehúzza a csapatszámot — az igazolásnak ára van a pályán is —, de arányosan: egy 78-as keretben 51-en áll, nem 15-ön). Utána az addigi teljesítménye alapján kap a keret szintjének 33-75%-a közti értékeket, közös klubmúlttal akár a keret mai szintjéig, majd gyorsítva zárkózik fel — a felzárkózás célja is a keret szintje, és az ÜTEME is vele nő (×1,8-tól ×2,6-ig). MINDEZEK PADLÓJA a régi, fix érték (ideiglenes 15, sáv 0-33, hazatalálás 50, felzárkózás 50-ig ×1,8): egy gyenge keretben betűre a régi viselkedés fut, csak fölfelé nyílik ki a rendszer. Így egy összeszokott öltözőbe erős játékost igazolni nem büntetés — egy beállt csapat könnyebben vesz fel valakit, mert megvan a nyelve és a rendje. A negyedik meccstől a keretlista jelzi az irányt. FESZÜLT VISZONY esetén (rivális klubokból jövők, vagy bajkeverő + lobbanékony páros) nincs negatív szám, hanem PLAFON: 40 fölé nem jut a kötés, amíg a viszony áll. AZ ÖSSZHANGÉPÍTÉS a második menedzser-sáv az edzés mellett: fő (×1,8) és másodlagos (×1,3) csoport, minden más pár ×0,8 — az ellentétel nem pénz, hanem lassítás. A sávba eső párok az EDZÉSPÁLYÁN is épülnek (35% ütemen), akkor is, ha nem játszottak együtt: ez az egyetlen mód, hogy a tartalékokat bekösd a hálóba. A CSAPATKOVÁCS stábtag a fókuszáltjai KÖZÖTT gyorsítja a kötéseket (a legnagyobb hatás ott, ahol mindkét végpont a fókuszában van), és nála négy ember is beállítható. A KAPITÁNYVÁLASZTÁS nagyjából negyedét az összhang adja — a kereten belüli helyzet, nem az abszolút szám —, és ezt az automatikus kapitányváltó is figyelembe veszi. Az öltözői események és az átigazolási CSAPATÉPÍTÉS is mozgatja."},
   kemia:{title:"Csapatkémia",text:"A 11. játékos beérkezése után lefut egy elemzés. Azonos klubból jött társak dupla pluszt kapnak, azonos nemzetiségűek egyszereset. Történelmi rivális klubokból jövők között 25% eséllyel jó, 75%-ban feszült a viszony — ez egy állandó Rating-módosítót ad a teljes szezonra."},
-  egyensuly:{title:"Csapategyensúly",text:"A játék korábban egyértelműen jutalmazta a „rakj mindent egy emberre” stratégiát: a skilleket egyetlen csatárra fókuszálva született egy ember, aki egymaga rúgott 8-10 gólt meccsenként, és a többi tíz statiszta volt. Erős, de törékeny — egy sérülés vagy egy piros lap az egész szezont vitte. A Csapategyensúly ezt fordítja meg: NEM bünteti a sztárt (a bónusz sosem negatív), hanem MEGFIZETI a szélesen elosztott erőt. Aki kiegyensúlyozott keretet épít, ingyen kap csapaterőt; aki egy emberre hagyatkozik, egyszerűen nem kapja meg. HÁROM ÖSSZETEVŐ. A TEHER (45% súly) azt méri, a gólok és gólpasszok hány emberre oszlanak meg — ez a legfontosabb, mert ez írja le a tényleges függőséget. A SKILL-ELOSZLÁS (30%) azt, hogy a megszerzett képességek hány emberen ülnek; a félkész skill arányosan számít. A RATING-ELOSZLÁS (25%) a kezdő 11 effektív erejének egyenletességét nézi, a relatív szórásból (szórás osztva az átlaggal): 18%-os szórás fölött már nulla pont. A MATEMATIKA az első kettőnél az „effektív hozzájárulók száma” (1 osztva a Herfindahl-indexszel, azaz Simpson-féle diverzitás). Ha három ember hozza egyenlő arányban a termést, az effektív szám 3; ha egy ember mindent, akkor 1. Ez azért jobb mérce a puszta darabszámnál, mert a valódi súlyokat nézi: tíz góllövő közül kilenc egyetlen góllal nem tesz kiegyensúlyozottá egy csapatot. Teljes pont 6 effektív gól/gólpassz-adónál és 5 effektív skill-birtokosnál. A három rész súlyozott átlaga adja a 0-100-as pontszámot, ez pedig a csapaterőt legfeljebb +2,00-del tolja meg MINDEN meccsen — nagyjából annyival, amennyit egy telt házas csapatmorál ér. Amíg kevés az adat (6 gól+gólpassz vagy 2 skill alatt), az adott rész semleges 50%-ot ad, hogy a szezon eleje ne büntessen. A pontszámot, mindhárom összetevőt és a nyers méréseket — köztük azt, ki a legterheltebb játékosod — a HUB-ban, a kezdő 11 paneljén látod, közvetlenül a poszt-illeszkedés alatt.",},
+  egyensuly:{title:"Csapategyensúly",text:"A játék korábban egyértelműen jutalmazta a „rakj mindent egy emberre” stratégiát: a skilleket egyetlen csatárra fókuszálva született egy ember, aki egymaga rúgott 8-10 gólt meccsenként, és a többi tíz statiszta volt. Erős, de törékeny — egy sérülés vagy egy piros lap az egész szezont vitte. A Csapategyensúly ezt fordítja meg: NEM bünteti a sztárt (a bónusz sosem negatív), hanem MEGFIZETI a szélesen elosztott erőt. Aki kiegyensúlyozott keretet épít, ingyen kap csapaterőt; aki egy emberre hagyatkozik, egyszerűen nem kapja meg. HÁROM ÖSSZETEVŐ. A TEHER (45% súly) azt méri, a gólok és gólpasszok hány emberre oszlanak meg — ez a legfontosabb, mert ez írja le a tényleges függőséget. A SKILL-ELOSZLÁS (30%) azt, hogy a megszerzett képességek hány emberen ülnek; a félkész skill arányosan számít. A RATING-ELOSZLÁS (25%) a kezdő 11 effektív erejének egyenletességét nézi, a relatív szórásból (szórás osztva az átlaggal): 18%-os szórás fölött már nulla pont. A MATEMATIKA az első kettőnél az „effektív hozzájárulók száma” (1 osztva a Herfindahl-indexszel, azaz Simpson-féle diverzitás). Ha három ember hozza egyenlő arányban a termést, az effektív szám 3; ha egy ember mindent, akkor 1. Ez azért jobb mérce a puszta darabszámnál, mert a valódi súlyokat nézi: tíz góllövő közül kilenc egyetlen góllal nem tesz kiegyensúlyozottá egy csapatot. Teljes pont 6 effektív gól/gólpassz-adónál és 5 effektív skill-birtokosnál. A három rész súlyozott átlaga adja a 0-100-as pontszámot, ez pedig a csapaterőt legfeljebb +2,00-del tolja meg MINDEN meccsen — nagyjából annyival, amennyit egy telt házas csapatmorál ér. A PLAFON A KERETTEL NŐ: 100-as nyers csapaterő fölött minden teljes 10 pont +1-et tesz rá (110 → +3, 150 → +7, 180 → +10), hogy a jutalom a mezőny növekedésével se értéktelenedjen el. Amíg kevés az adat (6 gól+gólpassz vagy 2 skill alatt), az adott rész semleges 50%-ot ad, hogy a szezon eleje ne büntessen. A pontszámot, mindhárom összetevőt és a nyers méréseket — köztük azt, ki a legterheltebb játékosod — a HUB-ban, a kezdő 11 paneljén látod, közvetlenül a poszt-illeszkedés alatt.",},
   szemelyiedzo:{title:"Személyi edzők (szakmai stáb)",text:"A visszavonuló legendáid nem tűnnek el: átléphetnek a stábba. Jogosult, aki legalább 32 éves ÉS legalább 2000 PERCET játszott NÁLAD (≈22 teljes mérkőzés) — percben mérünk, nem meccsben: negyven ötperces beállás összesen alig három meccsnyi játékidő, az nem közös múlt — a SAJÁT játékosodból tehát nem lehet edzőt venni, csak kinevelni. KÜLSŐS szakembert viszont lehet szerződtetni: az Átigazolás menü „Stábtag igazolása” pontja alatt, nyitott átigazolási időszakban. Az áruk a hasonló szintű játékosok vételárának kb. 33%-a; a kínálat szintjét pedig a SAJÁT kereted szabja meg — a nálad legalább 2000 percet játszott játékosaid átlagosan hányas stábtagok lennének (mindet 32 évesen mérve), plusz 8. Egy padló is van, ami szezononként lép (1. idény 35, aztán 40 · 50 · 60 · 70 · 80), és az első idényben — ahol még nincs viszonyítási alap — a sáv fixen 35–50. A minőségét egyetlen szám adja, a SZAKÉRTELEM (20–99): ebbe a kora és a nálad LEJÁTSZOTT PERCEI mindig beleszámítanak (50 000 percnél teljes a rutin-tag, ami bő 555 teljes mérkőzés — a tapasztalat tehát lassan, csökkenő hozammal skálázódik), mellé pedig típusonként más. TÍZ TÍPUS van. Öt attribútum-mester (Gólvágó-mentor, Játékmester, Bástya, Kesztyűs mester, Sprintmester) — ezek a poszt szerint korlátozottak, és a hozzájuk tartozó attribútum fejlődését gyorsítják. A Lélekemelő a csapatmorált emeli (a karizmájából), a Csapatkovács az öltözői kémiát (a kapcsolódásából), a Ritmusmester a FORMÁT edzi: a fókuszáltjai 14 fokú formáját fölfelé húzza, és padlót tesz alá, hogy ne zuhanjanak mélyre — emellett a meccsenkénti napi formasorsolást is a javukra tolja (a vérmérsékletéből — a skála közepe a legjobb), a Gyógyító kéz pedig kevesebb és rövidebb sérülést hoz (ő az, aki maga sosem sérült meg). Az Iskolateremtő a képességeket tanítja — és a SAJÁT skilljeit adja tovább a tanítványainak. EGY EDZŐ EGY TÍPUS, a választás végleges: ugyanabból a legendából két karrierben két különböző klub épülhet. FÓKUSZ: minden edzőnek fix, 100 egységnyi figyelme van, amit szétoszt azok között, akikre ráállítod — az egész keretre, egy posztcsoportra, vagy legfeljebb két emberre. Minél szűkebb a fókusz, annál többet kap fejenként (100 vs 10,8), de annál kevesebbet termel összesen (100 vs 238) — nincs domináns választás. A morál- és a kémia-edzőnél viszont fordítva: az ő munkájuk az egész öltözőé, ott a szűk fókusz veszteséges. A fókuszt edzőnként ciklusonként egyszer válthatod (a nyár vége újítja meg). HAGYATÉK: az Iskolateremtő készlete a saját skilljeiből áll. Egy tehetségre állítva gyorsan tanít, de hamar kimerül (kb. 4 skill 2 szezon alatt); az egész keretre osztva lassabban, viszont sokkal tovább és több embernek (kb. 16 skill 23 szezon alatt) — egy skillt többen is megkaphatnak. A készlet mindig az AKTUÁLIS fókuszból számolódik, ezért a szűkítés elégetheti a maradékot. KÉT ÚTON lehet valakiből edző, és a különbség a pénz. Ha KIVÁROD a természetes visszavonulását, INGYEN marad a klubnál — ez a türelem jutalma, és mivel addig több percet játszik és idősebb lesz, JOBB edző is lesz belőle. Ha viszont TE ajánlod fel neki az edzői állást, amíg még játszik (a keretlistában, a játékos lapján), akkor kártalanítanod kell a félbehagyott pályafutásáért: az igazolási ára 20–30%-át fizeted. Az arány a hátralévő pályafutással skálázódik — 32 évesen 30%, 38 évesen már csak 20%, mert annál fiatalabban többet veszel el tőle. A SAJÁT NEVELÉSŰ stábtag Szakértelme ráadásul GYORSABBAN épül, mint a piacról vetteké: az alap-gyorsítás +50%, a saját posztjához tartozó segédedzői területen (a védő a Bástyán, a kapus a Kesztyűs mesteren) további +25%, ott pedig, ahol a statisztikái a mezőnyhöz képest tényleg kiemelkedőek, további +33%. A három összeszorzódik, a Szakértelem 99-es plafonja és a SZAK 55 pontos maximuma viszont változatlan — ugyanaz a pályafutás tehát csak ELŐBB ér fel ugyanoda. Alapból 3 stáb-helyed van, 6-ig bővíthető (20 / 35 / 61 milliárd Ft). Egy típusból egyszerre csak egy edző dolgozik. Az edzők maguk is öregszenek: minden ledolgozott szezonnal tapasztalatot gyűjtenek (két szezononként +1 Szakértelem, a belépési szintjük fölé legfeljebb +12-vel), 66 éves koruktól pedig ők is visszavonulnak — a Stáb-csarnokba. FONTOS: az edző nem tud plafont mozdítani, csak az odáig vezető utat rövidíti; és mivel a fejlődés kor-görbéje 30 fölött a negyedére esik, a személyi edző a FIATALOKON hat igazán. Az öreg játékosodból lett edző a fiatalokat neveli."},
   edzo:{title:"Edző",text:"Csapatnév-adás után egy valós, ismert edzőt sorsolsz — mindegyiknek van állandó Rating-hatása és egy saját 'hajlama', ami befolyásolja, milyen típusú események történnek gyakrabban a szezon során."},
   kapitany:{title:"Kapitány",text:"MIÉRT ÉPP Ő? A játék minden emberre kiszámol egy alkalmassági pontszámot, és a legmagasabbat ajánlja fel — de a döntés a tiéd, bárkire átválthatsz. A pontszám négy tételből áll, és a nagyságrendjük ez: KARIZMA 0-tól +40-ig — messze a legnagyobb faktor, a lehetséges pontok fele. RUTIN 0-tól +12-ig: 24 éves kortól fut fel, 34-re telítődik — egy 22 éves zseni ebből semmit nem kap. ÖSSZHANG −14-től +14-ig: nem az abszolút szám, hanem a KERETEN BELÜLI helyzete, vagyis mennyire ismeri őt a többi tíz; ez nagyjából a döntés negyede. KAPCSOLÓDÁS −7,5-től +7,5-ig, és a negatív fele (szorongó … nehéz eset) ezen felül még −8-at ér: egy bajkeverő kapitány külön költség. VÉRMÉRSÉKLET 0-tól −8-ig — ez CSAK levon, sosem ad: egy forró fej hiába karizmatikus, a kapitányság nem neki való. Családtagnál +3. ÖSSZESSÉGÉBEN a JELLEM (karizma + kapcsolódás + vérmérséklet) adja a pontok bő kétharmadát, a maradékot a rutin és az öltözői helyzet — tehát kapitányt jellemre választunk, nem Ratingre. A játékos lapján ott a saját, tételes bontása. MIT AD A KAPITÁNY: a jelleme a szezon-kezdő csapatmorált alakítja, és ha jó formában van vagy gólt szerez, az egész csapat kap egy löketet a meccsen; ha kiállítják vagy gyengélkedik, fordítva."},
@@ -41957,10 +42003,71 @@ function starValueMult(pot){
 /* A felár NÉLKÜLI érték. Ott kell, ahol az ár nem magáért a játékosért fizet,
    csak hozzá van kötve (ifi-/öreg-boost ára) — különben a csillag-felár
    végigcsordulna a HUB minden fejlesztésén. */
+/* ================= AZ ÁR KEVÉSBÉ POT-ALAPÚ (3.9.153) =================
+   BEJELENTETT PANASZ: „Legyen kevésbé POT alapú a játékosok ára. Pl. 143-as
+   18 éves 11000 POT 9 Mrd gyors eladás. 144-es 31 év, 43000 POT 120 Mrd
+   gyors eladás… És jobban kell igazítani az ifisek POT értékeit az aktuális
+   átlag POT-hoz az ő ratingjükön."
+   A MÉRÉS: a 31 éves 43 000-es POT-ja PONTOSAN az, amit a 144-es Rating
+   jelent (peakToPot(144) ≈ 45 900) — a hiba a másik oldalon ült. A 18 éves
+   143-as 11 000-es POT-ja a 107-es csúcsnak felelne meg: a saját nevelésű
+   ifi Ratingje évekig nőtt, a POT-ja viszont a születésekor rögzült, és az
+   ár (∝ POT^2,35 a csillag-felár fölött) ezt a lemaradást huszonnégyszeresen
+   nagyította fel.
+   AZ ÁR MOZGATÓJA ezért nem a nyers POT, hanem a POT és a MOSTANI Rating
+   által jelentett POT (peakToPot(rating) — az a tehetség, amit a pályán
+   már bizonyít) súlyozott mértani közepe:
+     · aki a Ratingje ALATT álló POT-tal bír (a lemaradt ifi, a túlteljesítő),
+       azt legalább a Ratingje árazza — fiatalnál teljesen, idősebbnél
+       félig;
+     · aki a Ratingje FÖLÖTT álló POT-tal bír, annál a fiatal (≤23) tehetség
+       a POT-ja szerint árazódik (az ígéret az érték), a kifutott (≥27) ember
+       félig a mostani Ratingje szerint — a kettő közt lineárisan.
+   A korai karrier árai alig mozdulnak (egy 24 éves 3000-es POT-ú 82-es −6%,
+   egy 30 éves 1700-as 80-as −9%), a fiatal tehetség ára semmit. */
+function valueRatingNow(entry){
+  if(!entry)return 0;
+  const r=entry.startRating||entry.ovr;
+  if(r>0)return r;
+  const peak=entry.peak||potToPeakOvr(entry.pot||3000);
+  return ratingAtAge(peak,entry.age||24);}
+function valueDriverPot(entry){
+  const pot=(entry&&entry.pot)||0;
+  const now=valueRatingNow(entry);
+  if(!(pot>0)||!(now>0))return pot;
+  const rp=peakToPot(now);
+  const age=(entry&&entry.age)||24;
+  const ifj=age<=23;
+  const w=pot<rp?(ifj?1:0.5):Math.max(0,Math.min(1,(age-23)/4))*0.5;
+  if(!(w>0))return pot;
+  return Math.pow(pot,1-w)*Math.pow(rp,w);}
 function baseMarketValue(entry){
-  return Math.round(entry.pot*1.2*ageValueMultiplier(entry.age)*upsideMultiplier(entry));}
+  return Math.round(valueDriverPot(entry)*1.2*ageValueMultiplier(entry.age)*upsideMultiplier(entry));}
 function marketValue(entry){
-  return Math.round(baseMarketValue(entry)*starValueMult(entry&&entry.pot));}
+  return Math.round(baseMarketValue(entry)*starValueMult(valueDriverPot(entry)));}
+/* ---- AZ IFI POT-JA FELZÁRKÓZIK A RATINGJÉHEZ (3.9.153) ----
+   A saját fiatal (≤23) játékos POT-ja a szezonváltáskor legalább annyi lesz,
+   amennyit a MOSTANI Ratingje jelent: „az aktuális átlag POT az ő
+   ratingjükön". A piaci és a draft-játékosoknál ez amúgy is így áll (az
+   applyMarketShift a csúcsukhoz húzza), a saját nevelésű ifinél viszont a POT
+   a születésekor rögzült, a Rating pedig évekig nőtt tovább.
+   A CSÚCSHOZ (peak) NEM NYÚL: a fejlődési pálya a saját szabályai szerint
+   megy tovább — ez a tehetség MÉRŐSZÁMÁT (és vele az árat) hozza helyre, nem
+   ad ajándék-fejlődést. A scout-becslés a befagyasztott arányával mozdul. */
+const YOUTH_POT_ALIGN_AGE=23;
+function youthPotAlign(entry){
+  if(!entry||!(entry.age<=YOUTH_POT_ALIGN_AGE))return 0;
+  const now=valueRatingNow(entry);
+  if(!(now>0))return 0;
+  /* A kemény plafon, nem a potCapFor puha plafonja: az a BOOSTOK határa
+     (meddig tolhatod pénzért), ez viszont a pályán már bizonyított tehetség
+     elismerése — egy 143-as Ratingű ember POT-ja a puha plafon fölött is áll. */
+  const cel=Math.min(POT_HARD_CAP,peakToPot(now));
+  if(!((entry.pot||0)<cel))return 0;
+  const volt=entry.pot||0;
+  entry.pot=cel;
+  if(entry.basePot!=null&&entry.basePot<cel)entry.basePot=cel;
+  return cel-volt;}
 /* ================= ÁRAZÁS: VÁSÁRLÁS DRÁGA, ELADÁS SZERÉNY =================
    A marketValue a "tiszta" piaci érték — ez az alap. De a VÁSÁRLÁS ennél
    érezhetően többe kerül (átigazolási felár, jutalék, versengő ajánlatok), az
@@ -60299,8 +60406,8 @@ function h2hStart(node,sim,round){
        kijelzésé. Három mező, három feladat.
        Régi kliens pillanatképében nincs → null, és az eredményjelző ilyenkor
        a megszokott számot mutatja. */
-    oppMatch:(typeof oppSnap.ovr==="number")
-      ?Math.round((oppSnap.ovr+(oppSnap.tacticEffect||0))*10)/10:null,
+    /* 3.9.153: a λ-szorzók egyenértéke is benne (snapMatchStrength) */
+    oppMatch:snapMatchStrength(oppSnap),
     /* a társ emberhátrány-tétele — a kiállítása ennyit von le az élő ⚡-jéből */
     oppRedMatch:(typeof oppSnap.redMatch==="number"&&oppSnap.redMatch>0)?oppSnap.redMatch:SIM.REDMATCH,
     /* ---- A SAJÁT MECCS-ERŐD UGYANABBÓL A KÉPLETBŐL (3.9.149) ----
@@ -60313,7 +60420,7 @@ function h2hStart(node,sim,round){
        oldal a pillanatképből, ugyanazzal a képlettel — a két gép ugyanazt
        mutatja, és az a szám az, amivel a meccs valóban lement. */
     myMatch:(()=>{const my=(node&&node[MP.role==="host"?"host":"guest"])||{};
-      return (typeof my.ovr==="number")?Math.round((my.ovr+(my.tacticEffect||0))*10)/10:null;})()};
+      return snapMatchStrength(my);})()};
   playMatch();}
 /* A párharc góljának perce a KÖZÖS listából jön, tehát mindkét kliens ugyanazt
    a számot írja ki — a lista egyszer készül el, és a vödör-szétválasztás
@@ -77800,12 +77907,77 @@ function hiddenMatchBonus(){
      különben a játékos egy +20-as hatást venne meg, ami sehol nem látszik.
      A motor NEM ezt a függvényt hívja (ott a styleOvrBonus áll), tehát ez
      nem kettőzi meg. */
-  b+=(typeof fearOvrBonus==="function")?fearOvrBonus():0;
-  b+=(typeof engOvrBonus==="function")?engOvrBonus():0;
+  /* 3.9.153: a styleOvrBonus maga — benne a rettegés és a motor-bónusz, és a
+     stílus-képességek csapaterő-tagja (ovrTeam) is, lásd lent. */
+  b+=(typeof styleOvrBonus==="function")?styleOvrBonus():0;
   /* ⚽ TALIZMÁN — a Meccs tengelyei (3.9.148): a pakli nem rejtett erő — a
      meccserőben (és így az eredményjelző ⚡ számában) is ott van */
   b+=(typeof talMeccsOvr==="function")?talMeccsOvr():0;
+  /* ---- A HIÁNYZÓ MOTOR-TAGOK (3.9.153) ----
+     BEJELENTETT PANASZ: „Nem jó a nehézség belövés D0-tól kezdve. Én 180-as
+     meccs erőn vagyok… az első D0 szezonon 30-0 lett."
+     A GYÖKÉR: a meccs-erő a buildMatchSnapshot TÜKRE kellene legyen (lásd az
+     összhang-tag fölötti indoklást), de NÉGY dolog, amivel a motor számol,
+     kimaradt belőle:
+       · a csapategyensúly csapaterő-bónusza (balBonus — a motor ovr-jében),
+       · a stílus-képességek csapaterő-tagja (ovrTeam: A gépezet, Nincs gyenge
+         láncszem, Kettős veszély… — a motorban a styleOvrBonus-on át),
+       · a stílus és az ultra-csatár GÓLSZORZÓI, az alakzat ára,
+       · a párkémia és a taktika-stílus λ-szorzói, a gólvágó család.
+     Egy kiépült karrierben ez együtt 5-15 pont is lehet — a szuperliga-
+     kalibráció ennyivel GYENGÉBB mezőnyt állított be, mint amit a vállalt rés
+     kért, és a pályán a +2-es „kiegyenlített" rajtból +12 lett.
+     A λ-szorzók ugyanazon a mércén jönnek be, mint a védekező skilleké:
+     ln(m)/K, FÉL súllyal, mert csak az egyik oldalon hatnak. A feltételes
+     szorzó (gyors kontra: csak ha gyengébb vagy) és a véletlen (pszichó
+     család, napi forma) kimarad — azok nem a keret erejéről szólnak. */
+  b+=(typeof teamBalanceBonus==="function")?teamBalanceBonus():0;
+  {let own=1,opp=1;
+   try{own*=styleOwnGoalMult()*ultraOwnMult();}catch(e){}
+   try{opp*=styleOppGoalMult();}catch(e){}
+   try{opp*=shapeOppMult();}catch(e){}
+   if(famSp==="gol")own*=1.09;
+   try{
+     const tk=S.tactics&&S.tactics.active;
+     const ts=(tk&&tacticLevel(tk)>=85)?TACTICS[tk].style:null;
+     const T=ts&&MATCH_TAC_LAM[ts];
+     if(T){own*=T[0];opp*=T[1];}
+   }catch(e){}
+   try{
+     const cp=completeChemPairsOnPitch(new Set(xi.map(s=>s.player.n)));
+     if(cp>0){const tch=(typeof talMeccsChem==="function")?Math.max(0,Math.min(0.05,talMeccsChem())):0;
+       own*=1+Math.min(0.18,cp*(tch?0.03+tch:0.03));}
+   }catch(e){}
+   b+=lamEquivOvr(own,opp);}
   return b;}
+/* A taktika-stílus FELTÉTEL NÉLKÜLI λ-szorzói (saját, ellenfél) — a
+   matchLambdas ágainak tükre. A gyors kontra feltételes (csak ha gyengébb
+   vagy), ezért nincs itt. A park the bus mindkét oldalt ×0,8-ra veszi: a
+   nettó hatása az erőviszonyra nulla. */
+const MATCH_TAC_LAM={bus:[0.8,0.8],possession:[1,0.9],total:[1.1,1.05],wings:[1.1,1.05],longball:[1.08,1]};
+/* Egy λ-szorzópár meccs-erő egyenértéke: ln(m)/K, fél súllyal (egyoldalú). */
+function lamEquivOvr(own,opp){
+  const o=(typeof own==="number"&&own>0&&isFinite(own))?own:1;
+  const a=(typeof opp==="number"&&opp>0&&isFinite(opp))?opp:1;
+  return 0.5*(Math.log(o)-Math.log(a))/SIM.K;}
+/* ---- A PILLANATKÉP MECCS-EREJE (3.9.153) ----
+   Ugyanaz a mérce, mint a hiddenMatchBonus, csak a SOROSÍTOTT pillanatképből
+   — a párharcban így a társ ⚡-ja és a sajátod is azt mondja, amit a helyi
+   meccs-erő, és a kettő egy skálán áll (a 3.9.149 óta az ovr + taktika volt,
+   ami a védekező skilleket, a talizmánt és a gólszorzókat kihagyta). Régi
+   kliens pillanatképében a hiányzó mező semleges 1. */
+function snapMatchStrength(sn){
+  if(!sn||typeof sn.ovr!=="number"||!isFinite(sn.ovr))return null;
+  const n=(x,d)=>(typeof x==="number"&&isFinite(x)&&x>0)?x:d;
+  const tc=x=>Math.max(1-TAL_MECCS_LAM_CAP/100,Math.min(1+TAL_MECCS_LAM_CAP/100,n(x,1)));
+  let own=n(sn.ownGoalMult,1)*tc(sn.talOwn)*Math.max(1,Math.min(1+TAL_TITKOS_PCT/100,n(sn.talTitkos,1)));
+  let opp=n(sn.defMult,1)*n(sn.oppGoalMult,1)*tc(sn.talOpp);
+  if(sn.famSp==="gol")own*=1.09;
+  const T=sn.tacticStyle&&MATCH_TAC_LAM[sn.tacticStyle];
+  if(T){own*=T[0];opp*=T[1];}
+  if(sn.chemPairs>0){const tch=Math.max(0,Math.min(0.05,n(sn.talChem,0)));
+    own*=1+Math.min(0.18,sn.chemPairs*(tch?0.03+tch:0.03));}
+  return Math.round((sn.ovr+(sn.tacticEffect||0)+lamEquivOvr(own,opp))*10)/10;}
 /* A csapat VALÓDI meccs-ereje: a keret + a rejtett szituatív tagok. Ez a
    nehézség-tanácsadó és az auto szintkövetés alapja. */
 /* ================= A POTENCIÁLIS MECCS-ERŐ (3.9.122) ======================
@@ -80582,6 +80754,21 @@ const BAL_TARGET_LOAD=7.5;  /* ennyi effektív gól/gólpassz-adó = teljes pont
 const BAL_TARGET_SKILL=6.25;/* ennyi effektív skill-birtokos = teljes pont */
 const BAL_RATING_CV=0.18;   /* ekkora relatív szórás fölött már nulla a pont */
 const BALANCE_MAX_OVR=2.0;  /* a tökéletes egyensúly ennyi csapat-OVR-t ér */
+/* ---- A PLAFON A KERET ERŐVEL NŐ (3.9.153) ----
+   BEJELENTETT KÉRÉS: „Csapategyensúlyért kapható meccserő bónusz scalelődjön
+   100-as nyers csapaterő fölött 10-esével (nyers csapaterő) 1 teljes
+   meccserőnyit emelkedjen a max elérhető meccserő boost."
+   A +2 egy 80-as keretnél egy telt házas morál volt; egy 180-as keretnél már
+   kerekítési hiba — a filozófia jutalma a mezőny növekedésével elértéktelenedett.
+   LÉPCSŐS (10-esével egész), ahogy a kérés mondja: 110 → +3, 150 → +7,
+   180 → +10. A nyers csapaterő a FELÁLLÁS ereje (teamStrength), nem a
+   meccserő — különben a bónusz a saját magát emelné. */
+const BALANCE_STEP_FROM=100,BALANCE_STEP=10;
+function balanceMaxOvr(raw){
+  let r=raw;
+  if(r==null){try{r=teamStrength();}catch(e){r=0;}}
+  const extra=(isFinite(r)&&r>BALANCE_STEP_FROM)?Math.floor((r-BALANCE_STEP_FROM)/BALANCE_STEP+1e-9):0;
+  return BALANCE_MAX_OVR+extra;}
 const BAL_EXT_GATE=0.80;    /* a rating-rész 100 FÖLÖTTI sávjának nyitó kapuja */
 /* Effektív hozzájárulók száma egy súly-tömbből (1/HHI). Üres/nulla összegnél
    null — a hívó dönti el, mit jelent az (általában: még nincs mit mérni). */
@@ -80765,7 +80952,8 @@ function teamBalance(){
          r+=kapu*keret*(cap-1);}}
      out.rating=Math.max(0,Math.min(cap,r));}}
   out.score=BAL_W_LOAD*out.load+BAL_W_SKILL*out.skill+BAL_W_RATING*out.rating;
-  out.bonus=BALANCE_MAX_OVR*out.score;
+  out.maxOvr=balanceMaxOvr();
+  out.bonus=out.maxOvr*out.score;
   return out;}
 /* A meccsmotor EGYETLEN belépési pontja — így a panel és a szimuláció
    ugyanabból a számból dolgozik, és nem tud elcsúszni. */
@@ -81085,7 +81273,8 @@ function specBalanceHtml(){
     <div class="sbMeter"><i style="width:${Math.round(rel(b.score)*100)}%;background:${col(b.score)}"></i></div>
     <div class="sbSub"><b style="color:${col(b.score)}">${word}</b> · meccsenkénti csapaterő-bónusz
       <b style="color:var(--grass)">+${hu(b.bonus.toFixed(2))}</b>
-      <span style="color:var(--dim2)">(max +${hu((BALANCE_MAX_OVR*cap).toFixed(2))})</span></div>
+      <span style="color:var(--dim2)">(max +${hu(((b.maxOvr||BALANCE_MAX_OVR)*cap).toFixed(2))}${
+        (b.maxOvr||0)>BALANCE_MAX_OVR?` — a ${BALANCE_STEP_FROM} fölötti nyers csapaterő ${BALANCE_STEP}-esével +1`:""})</span></div>
     <div class="kpiRow">${kpi("Teher",b.load,"load")}${kpi("Skill",b.skill,"skill")}${kpi("Rating",b.rating,"rating")}</div>
     ${nyers.length?`<div class="sbFoot">${nyers.join(" · ")}</div>`:""}
     ${skillH}
@@ -81567,7 +81756,7 @@ function buildHubDetail(loc){
        lenyitása, egy külön, szándékos felhasználói lépés. */
     guideFire("ev:poslearn");
     if(e.posLearning){
-      const L=e.posLearning;const left=Math.max(0,Math.ceil((L.needed-(L.progress||0))));
+      const L=e.posLearning;const left=Math.max(0,Math.ceil((posLearnNeededNow(e)-(L.progress||0))));
       const prog=document.createElement("div");prog.className="hdRow";prog.style.marginTop="7px";
       prog.innerHTML=`🎓 <b>Poszt-tanulás:</b> ${L.target} — még kb. <b>${left}</b> lejátszott meccs (a jó teljesítmény gyorsítja)`;
       d.appendChild(prog);
@@ -88833,8 +89022,14 @@ function mpNykResolve(mine,mate){
    ugyanazt a mezőnyt építi. Az ERŐSEBB kerethez horgonyzunk — ugyanaz a
    döntés, mint a tétmeccses közös kupánál (mpCupSharedMid): így a tornán a
    jobbik keretnek sincs sétagalopp. */
-function mpNykSharedMid(a,b){
+function mpNykSharedMid(a,b,ea,eb){
   const cap=(typeof ratingCap==="function")?ratingCap():200;
+  /* 3.9.153: ha mindkét nevezés hozza a meccs-erőt (ms) és a rejtett
+     bónuszt (hb), a közös mezőny a meccs-erőhöz mér — a kettő közül a
+     nehezebbet adó (nagyobb) célérték. Régi kliensnél a nyers −1 marad. */
+  if(ea&&eb){
+    const ma=nykMidFor(ea.ms,ea.hb),mb=nykMidFor(eb.ms,eb.hb);
+    if(ma!=null&&mb!=null)return Math.max(ma,mb);}
   const src=Math.max((typeof a==="number"?a:0),(typeof b==="number"?b:0));
   if(!(src>0))return 50;
   return Math.max(50,Math.min(cap,Math.round(src)-1));}
@@ -88850,7 +89045,7 @@ function mpNykJoinCup(mine,mate){
     mateName:String(mate.teamName||"A társad").replace(/[<>&]/g,"").slice(0,40),
     mateOvr:(typeof mate.ovr==="number")?mate.ovr:null,
     mateStr:(typeof mate.str==="number")?mate.str:null,
-    mid:mpNykSharedMid(mine&&mine.ovr,mate&&mate.ovr),
+    mid:mpNykSharedMid(mine&&mine.ovr,mate&&mate.ovr,mine,mate),
     how:"friendly",mineComp:null,mateComp:null,
     mateVer:mate.v?String(mate.v).slice(0,16):null});
   /* VERZIÓ-ELTÉRÉS: ugyanaz a mondat, mint a tétmeccses nevezésnél — a közös
@@ -88878,11 +89073,11 @@ function friendlyCupSettle(yes,next,offerable){
        a mezők, mint a tétmeccses kupanevezésnél (mpCupGate). A `str` a
        KIJELZÉSHEZ kell (a társ csapaterejét a felület boostokkal írja ki), az
        `ovr` a NYERS erő, amiből a szimuláció és a mezőny célértéke dolgozik. */
-    entry:{yes:!!yes,offer:off,at:Date.now(),
+    entry:Object.assign({yes:!!yes,offer:off,at:Date.now(),
       teamName:String(teamName||"A társad").slice(0,40),
       ovr:Math.round(teamOVRbase()),
       str:Math.round(teamStrength()),
-      v:APP_VERSION},
+      v:APP_VERSION},nykEntryMs()),
     msg:yes?"Neveztél a nyári tornára — megvárjuk a társad válaszát is. A KÖZÖS torna (ahol az ő csapata is ott van a 32 között) csak akkor indul, ha ő is nevez. Ha nem várod meg, egyedül indulsz: a mezőny a sajátod lesz."
            :(off?"Kihagynád a nyári tornát — megvárjuk a társad válaszát is."
                 :"Nálad idén nincs nyári torna (kupasorozatod van, vagy már lement) — szólunk a társadnak, hogy ne várjon rá."),
@@ -88920,13 +89115,20 @@ function friendlyCupSettle(yes,next,offerable){
         Object.assign({},{yes:true,offer:off,at:Date.now(),
           teamName:String(teamName||"A társad").slice(0,40),
           ovr:Math.round(teamOVRbase()),str:Math.round(teamStrength()),
-          v:APP_VERSION},{solo:true}));
+          v:APP_VERSION},nykEntryMs(),{solo:true}));
     }catch(e){}}:null),
     giveUpNote:(yes
       ?"⚠️ Nem vártad meg a társad nevezését — <b>egyedül indulsz</b> a nyári tornán. "
         +"A mezőny a sajátod, a társad csapata nem lesz benne. Ha ő később mégis nevez, "
         +"ő is egyedül játssza le a magáét."
       :"⚠️ A nyári kupa egyeztetése megszakadt — idén kihagyjátok a tornát.")});}
+/* A nevezés két új száma (3.9.153): a nevezési meccs-erő és a befagyasztott
+   rejtett bónusz, egy tizedesre — a közös mezőny ezekből épül bitre azonosan. */
+function nykEntryMs(){
+  const o={};
+  try{const ms=nykRatedMs();if(ms)o.ms=Math.round(ms*10)/10;}catch(e){}
+  try{o.hb=Math.round(seasonHiddenBonus()*10)/10;}catch(e){}
+  return o;}
 function friendlyCupDecline(){
   S.friendlyCupSeason=S.seasonNumber||1;
   addLine("🌴 A nyár edzőtábor és pihenés marad — felkészülési kupára idén nem neveztetek.","m ev");
@@ -88951,6 +89153,7 @@ function friendlyCupStart(joint){
 function offerFriendlyCup(next){
   const mid=euroMidRating("NYK");
   const raw=(typeof teamOVRbase==="function")?teamOVRbase():0;
+  let msNyk=null;try{msNyk=(nykMidMine()!=null)?nykRatedMs():null;}catch(e){msNyk=null;}
   $("scUnlock").classList.remove("hide");
   $("unlockTitle").textContent="🟠 NYÁRI FELKÉSZÜLÉSI KUPA";
   $("unlockBody").innerHTML=
@@ -88958,8 +89161,12 @@ function offerFriendlyCup(next){
     +`<p>Kupaindulást idén nem szereztetek — a nyár így egyetlen mérkőzés nélkül telne el. `
     +`Nevezhettek viszont a <b>Nyári Felkészülési Kupára</b>: 32 csapat, nyolc négyes csoport `
     +`oda-vissza, onnan egyenes kiesés a döntőig. Ugyanaz a lebonyolítás, mint a Kupák Kupájának Kupájában.</p>`
-    +`<p><b>A mezőny hozzátok van mérve:</b> a nyers csapaterőtök (<b>${raw?raw.toFixed(1):"—"}</b>) `
-    +`mínusz egy — a torna átlaga <b>${mid}</b>. Nem sétagalopp, de nem is fal.</p>`
+    +(msNyk
+      ?`<p><b>A mezőny hozzátok van mérve:</b> a meccs-erőtök (<b>${msNyk.toFixed(1).replace(".",",")}</b>) `
+       +`mínusz egy — a pályán ennyivel lépnek ki ellenetek (a névleges átlag <b>${mid}</b>, erre a motor `
+       +`ráteszi a rejtett előnyötök felét, ahogy minden kupában). Nem sétagalopp, de nem is fal.</p>`
+      :`<p><b>A mezőny hozzátok van mérve:</b> a nyers csapaterőtök (<b>${raw?raw.toFixed(1):"—"}</b>) `
+       +`mínusz egy — a torna átlaga <b>${mid}</b>. Nem sétagalopp, de nem is fal.</p>`)
     +`<p style="color:var(--gold)"><b>Jutalom nincs.</b> Se trófea, se pénzdíj, se Champion-kártya, `
     +`se taktika-szintugrás, se szurkoló-löket, se arany-díj. Amit hoz:</p>`
     +`<ul style="margin:4px 0 0 16px;padding:0">`
@@ -88980,7 +89187,7 @@ function offerFriendlyCup(next){
        +`Ha bármelyikőtök kihagyja, idén egyikőtök sem játszik tornát.<br>`
        +`Ha elindul, <b>ugyanabba a 32-es mezőnybe</b> kerültök: a csoportban nem sorsolhatnak össze, `
        +`a kieséses ágon viszont találkozhattok. A mezőny ilyenkor az <b>erősebb kerethez</b> van mérve `
-       +`(annak a nyers csapatereje mínusz egy) — hogy egyikőtöknek se legyen sétagalopp.</p>`
+       +`(annak a meccs-ereje mínusz egy) — hogy egyikőtöknek se legyen sétagalopp.</p>`
       :"")
     +`</div>`;
   const act=$("unlockActions");act.innerHTML="";
@@ -89323,6 +89530,12 @@ function hubShowSeasonReportBody(){
     html+=`<div style="color:var(--purple);font-weight:700;font-size:12px;text-transform:uppercase;margin:8px 0 5px">A család búcsúzik</div>
       <div style="font-size:13px">${esc(fullName(report.familyRetired.n))} ${report.familyRetired.age} évesen letette a cipőt. Örökre a csapat része marad — köszönjük, ${esc(fullName(report.familyRetired.n))}!</div>`;}
   if(report.scoutImproved)html+=`<div style="font-size:13px;color:var(--gold);margin-top:8px">A scoutod fejlődött — most már ${scoutStarsLabel(scout.stars)}</div>`;
+  /* 🌱 3.9.153: a fiatalok POT-ja felzárkózott a Ratingjükhöz */
+  if(report.potAligned&&report.potAligned.length)
+    html+=`<div style="font-size:12.5px;color:var(--grass);margin-top:8px;line-height:1.5">🌱 <b>A POT felzárkózott a Ratinghez:</b> `
+      +report.potAligned.slice(0,6).map(x=>`${esc(shortName(x.n))} → ${fmtNum(x.pot)}`).join(" · ")
+      +(report.potAligned.length>6?` és még ${report.potAligned.length-6} fő`:"")
+      +`<br><span style="color:var(--dim2)">Fiatal (≤${YOUTH_POT_ALIGN_AGE}) játékosnál a POT legalább annyi, amennyit a mostani Ratingje jelent — a csúcsukhoz nem nyúltunk.</span></div>`;
   /* ---- A SZEZON KIHÍVÁSAINAK MÉRLEGE ----
      A lezárás eddig egyetlen naplósorban történt, a szezonzárás sűrűjében —
      könnyű volt átsiklani rajta, pedig ez a kihívás-rendszer FIZETÉSE: itt
@@ -90107,6 +90320,29 @@ function talKinalat(kulcs){
    százszor is kérdez. A memó kulcsa a gyűjtemény sorszáma és mérete, tehát egy
    új talizmán vagy egy égetés azonnal érvényteleníti. */
 const TAL_HOZAM=0.85;
+/* ---- 🔗 SZÍNHŰSÉG — A KATEGÓRIA-STACK (3.9.153) ----
+   BEJELENTETT KÉRÉS: „Egy kategóriában összegyűjt X db talizmán, az is adjon
+   stack jutalmat, erősítést."
+   A csökkenő hozam (0,85^k) szándékosan fékezi az egy színre épített paklit
+   — a színhűség ennek egy RÉSZÉT adja vissza: ha egy kategóriában elég sok
+   (nem elégetett) talizmánod van, a kategória TELJES alaphatás-összege
+   szorzót kap. A plafon marad (a szorzó a plafon ELŐTT hat), tehát egy szín
+   sem szállhat el; a Meccs tengelyeinél a ±8%-os λ-plafon is áll.
+   A lépcsős változatokat (Mozgalmas piac, Jellemhullám, Hitelkeret) nem
+   érinti — azok a ritkasággal nőnek, nem az E-összeggel.
+   8 talizmánnál: a csökkenő hozam 4,52 E-t hagy a 8-ból, a ×1,35 ezt 6,1-re
+   emeli — még mindig kevesebb, mint a lineáris 8, tehát a szétterített pakli
+   (Polihisztor) sem értéktelenedik el. */
+const TAL_STACK=[{db:3,m:1.10},{db:5,m:1.20},{db:8,m:1.35}];
+function talStackFok(db){
+  let f=0;TAL_STACK.forEach((x,i)=>{if(db>=x.db)f=i+1;});return f;}
+/* A szorzó kiírása: két tizedesig, mert a talSz egyre kerekítene (1,35 → 1,4). */
+function talStackTxt(m){return String(Math.round(m*100)/100).replace(".",",");}
+function talStackMult(db){const f=talStackFok(db);return f?TAL_STACK[f-1].m:1;}
+/* Egy kategória színhűség-állása a felületnek. */
+function talStackAllas(kat){
+  const db=(talEloszlas()[kat])||0,f=talStackFok(db);
+  return {db,fok:f,m:f?TAL_STACK[f-1].m:1,kov:TAL_STACK[f]||null};}
 let _talAlapMemo=null;
 function talAlapMind(){
   if(!talOn())return null;
@@ -90118,17 +90354,18 @@ function talAlapMind(){
     const sor=T.lapok.filter(L=>!L.eget&&L.kat===K.k)
       .map(L=>({L,E:talLapE(L)})).sort((a,b)=>b.E-a.E);
     hat[K.k]=Math.pow(TAL_HOZAM,sor.length);   /* a KÖVETKEZŐ talizmán ennyit érne */
+    const stm=talStackMult(sor.length);        /* 🔗 színhűség (3.9.153) */
     sor.forEach((x,k)=>{
       /* ⚽ F5 (3.9.148): a Meccs kártyának TENGELYE van (L.al), nem változata —
          a tengely E-összege a csökkenő hozammal; az egységet a fogyasztó adja,
          mert egy tengelynek több hatása is van (λ, súly, esély). */
       if(K.k==="meccs"){
-        if(x.L.al){const id="meccs."+x.L.al;v[id]=(v[id]||0)+x.E*Math.pow(TAL_HOZAM,k);}
+        if(x.L.al){const id="meccs."+x.L.al;v[id]=(v[id]||0)+x.E*Math.pow(TAL_HOZAM,k)*stm;}
         return;}
       const V=(K.valt||[]).find(z=>z.k===x.L.valt);
       if(!V||!V.u)return;
       const id=K.k+"."+V.k;
-      v[id]=(v[id]||0)+x.E*Math.pow(TAL_HOZAM,k);});
+      v[id]=(v[id]||0)+x.E*Math.pow(TAL_HOZAM,k)*stm;});
     (K.valt||[]).forEach(V=>{
       const id=K.k+"."+V.k;
       if(v[id]!=null&&V.u)v[id]=Math.min(V.cap||Infinity,v[id]*V.u);});});
@@ -91466,13 +91703,25 @@ function talValaszt(i){
     L.csomag.forEach(id=>{if(!T.esemenyek[id])T.esemenyek[id]={szezon:v.szezon,suly:TAL_CSOMAG_SULY[src.rang]||1,uid:T.seq+1};});}
   L.uid=++T.seq;L.forras=v.forras;L.szezon=v.szezon;L.fordulo=v.fordulo;
   if(v.ms)L.ms=v.ms.t;
+  const stElotte=talStackFok((talEloszlas()[L.kat])||0);   /* 🔗 3.9.153 */
   T.lapok.push(L);
   if(L.kat==="moral"&&L.valt==="hullam")try{talHullamRegisztral(L);}catch(e){}   /* 🌊 3.9.144 */
   if(L.spec==="beragadt")try{talBeragadtProbal();}catch(e){}   /* 💎 3.9.150 */
   talLatott(kin);talSzerencseLep(kin,false);
   T.huzas=(T.huzas||0)+1;T.varo.shift();
   try{addLine(`🧿 <b>TALIZMÁN — ${esc(talLapNev(L))}</b> (${TAL_RANG[L.rang].n}, ${esc(talKatName(L.kat))}) a gyűjteménybe került.`,"m mvp");}catch(e){}
+  try{talStackBejelent(L.kat,stElotte);}catch(e){}
   return L;}
+/* 🔗 Ha a lap új színhűség-fokozatot nyitott, kimondjuk — egy némán megnőtt
+   szorzó használhatatlan visszajelzés. */
+function talStackBejelent(kat,elotte){
+  const A=talStackAllas(kat);
+  if(A.fok<=elotte)return false;
+  const K=talKat(kat);
+  addLine(`🔗 <b>SZÍNHŰSÉG ${"◆".repeat(A.fok)}</b> — ${A.db} ${esc(K?K.n:kat)} talizmán: `
+    +`a kategória alaphatása mostantól <b>×${talStackTxt(A.m)}</b>`
+    +(A.kov?` · következő fokozat ${A.kov.db} db-nál (×${talStackTxt(A.kov.m)})`:" · ez a legmagasabb fokozat"),"m mvp");
+  return true;}
 function talPasszOsszeg(){
   let w=0;try{w=fanWeeklyIncome()||0;}catch(e){w=0;}
   return Math.max(0,Math.round(w*TAL_PASSZ_PCT/100)*100);}
@@ -91648,7 +91897,9 @@ function talMenuRender(){
   TAL_KAT.forEach(k=>{if(d[k.k]>0){const i=document.createElement("i");
     i.style.width=(d[k.k]/Math.max(1,dom.ossz)*100)+"%";i.style.background=k.c;i.title=`${k.n}: ${d[k.k]}`;bar.appendChild(i);}});
   bar.classList.toggle("hide",!dom.ossz);
-  $("talLegend").innerHTML=TAL_KAT.map(k=>`<span><span class="talDot" style="background:${k.c}"></span>${k.ic} ${esc(k.n)} <b>${d[k.k]}</b></span>`).join("");
+  $("talLegend").innerHTML=TAL_KAT.map(k=>{const f=talStackFok(d[k.k]||0);
+    return `<span><span class="talDot" style="background:${k.c}"></span>${k.ic} ${esc(k.n)} <b>${d[k.k]}</b>`
+      +(f?` <span class="talStack" title="Színhűség: az alaphatás ×${talStackTxt(TAL_STACK[f-1].m)}">🔗${"◆".repeat(f)}</span>`:"")+`</span>`;}).join("");
   /* az idény állása — a következő húzásnak csak a SÁVJA látszik, a pontos
      forduló meglepetés marad */
   const kov=sz.done<TAL_UTEM?[`1–10.`,`11–20.`,`21–30.`][sz.done]:null;
@@ -91687,6 +91938,13 @@ function talMenuRender(){
        +`${L.own>1?"+"+talSz((L.own-1)*100)+"%":"±0"}, az ellenfélé ${L.opp<1?"−"+talSz((1-L.opp)*100)+"%":"±0"}</span>`
        +`<span class="talHatCap">λ-plafon ±${TAL_MECCS_LAM_CAP}% · a következő meccs talizmán ${Math.round((v._hat.meccs||1)*100)}%-ot ér</span></div>`);
      ax.forEach(A=>sorok.push(`<div class="talHatRow"><span>${A.ic} <b>${esc(A.n)}</b>: ${esc(A.t(v["meccs."+A.k]))}</span></div>`));}}
+   /* 🔗 SZÍNHŰSÉG (3.9.153): a fokozatot elért kategóriák szorzója, és hogy
+      mennyi hiányzik a következőig. Csak ahol már van mit mutatni. */
+   TAL_KAT.forEach(K=>{const A=talStackAllas(K.k);
+     if(!A.fok&&A.db<TAL_STACK[0].db-1)return;
+     sorok.push(`<div class="talHatRow"><span>🔗 <b>Színhűség${A.fok?" "+"◆".repeat(A.fok):""}</b> — ${K.ic} ${esc(K.n)}: ${A.db} db`
+       +(A.fok?` · az alaphatás <b>×${talStackTxt(A.m)}</b>`:" · még nincs szorzó")+`</span>`
+       +`<span class="talHatCap">${A.kov?`${A.kov.db} db-nál ×${talStackTxt(A.kov.m)} (még ${A.kov.db-A.db})`:"a legmagasabb fokozat"}</span></div>`);});
    /* 🃏 Mozgalmas piac */
    {const nx=talPiacExtra("nyar"),rv=talPiacExtra("rovid"),tl=talPiacExtra("teli");
     if(nx+rv+tl>0)sorok.push(`<div class="talHatRow"><span>🃏 <b>+átigazolási esemény</b>: nyár +${nx} · rövid ablak +${rv} · tél +${tl}</span>`
@@ -94093,7 +94351,7 @@ const STYLES=[
    forms:["424","343"], tactics:["hosszu","szeljatek"], col:"#c0562f"},
   {key:"harmonia", ic:"☯️", n:"Béke és harmónia",
    tag:"A csapat több, mint tizenegy ember.",
-   d:"Kiegyensúlyozottság minden téren — morál, kémia, skillek, ratingek. Nincs kiemelkedő ember, és nincs gyenge láncszem sem. A mérföldkövek a szórást, a párkémiákat és a négy csapat-tengely együttes szintjét mérik.",
+   d:"Kiegyensúlyozottság minden téren — morál, kémia, skillek, ratingek. Nincs kiemelkedő ember, és nincs gyenge láncszem sem. A mérföldkövek a szórást, a párkémiákat, a négy csapat-tengely együttes szintjét és a keret poszt-tudását mérik — itt a sokoldalú ember kincs.",
    forms:["442","433","424"], tactics:["labdatartas","totalis"], col:"#3f8f6a"},
   {key:"sztar", ic:"⭐", n:"Sztárom a párom",
    tag:"A világ egy ember körül forog — és ez nem baj.",
@@ -97216,6 +97474,15 @@ function stXI(){
   return out;}
 function stRoleOf(o){
   try{return roleInFormation(o.sl.pos,form,o.i);}catch(e){return null;}}
+/* ☯️ A POSZT-TUDÁS MÉRŐI (3.9.153) — a keret careerPool-bejegyzéseiből. */
+function stPosLists(){
+  const out=[];
+  try{msRoster().forEach(p=>{const e=p&&msEntry(p.n);
+    if(e&&Array.isArray(e.pos))out.push(e.pos);});}catch(e){}
+  return out;}
+function stVersatileCount(min){return stPosLists().filter(L=>L.length>=(min||3)).length;}
+function stPosMax(){let m=0;stPosLists().forEach(L=>{if(L.length>m)m=L.length;});return m;}
+function stPosExtraSum(){let s=0;stPosLists().forEach(L=>{s+=Math.max(0,L.length-1);});return s;}
 function stEffOvr(o){
   try{
     const e=msEntry(o.sl.player.n);
@@ -97781,6 +98048,8 @@ const ST_FAM_T={
   hm_card:"Kiemelkedő emberek egyszerre", hm_contrib:"Akik beszálltak a termelésbe",
   hm_scorersN:"Különböző gólszerzők egy idényben", hm_axisN:"A leggyengébb tengely",
   hm_balN:"A csapategyensúly",
+  hm_versN:"Sokoldalú emberek (legalább 3 poszt)",hm_posMax:"A legsokoldalúbb ember posztjai",
+  hm_posSum:"Megtanult posztok a keretben",
   hm_bondPair:"A legerősebb páros összhangja", hm_bondNet:"Erős kötések a keretben",
   hm_bondMan:"Egy ember összhangja a tizeneggyel", hm_bondTeam:"A csapat-összhang",
   hm_mvpN:"Különböző meccsemberek",
@@ -98461,6 +98730,28 @@ stTiers("harmonia","hm_scorersN",th=>`${th} különböző gólszerző`,
 stTiers("harmonia","hm_axisN",th=>`A leggyengébb tengely: ${th}`,
   th=>`Érje el mind a négy csapat-attribútum a ${hunT(th)}.`,
   ST_L6,[70,75,80,85,90,95],()=>Math.round(stWeakestAxis()));
+/* ---- A POSZT-TUDÁS (3.9.153) ----
+   BEJELENTETT KÉRÉS: „Béke és harmónia: minél több ismert pozícióval
+   rendelkező játékosokért stíluspont." A harmónia nem sztárt épít, hanem
+   olyan keretet, ahol bárki beállhat bárhová — ennek a mérője a poszt-tudás.
+   HÁROM CSALÁD, ÁLLAPOTBÓL (a mostani keret, nem a történet):
+     · hány ember tud legalább 3 posztot (az adatbázisban ez szinte senki —
+       itt a tanulás fizet),
+     · a legsokoldalúbb ember hány posztot tud (11 = mindet),
+     · a keret összes MEGTANULT posztja (az első poszton túliak összege).
+   A mérés a careerPool-bejegyzés pos-listájából dolgozik — pontosan abból,
+   amit a poszt-tanulás és a beszokás is ír. */
+stTiers("harmonia","hm_versN",th=>`${th} sokoldalú ember a keretben`,
+  th=>`Legyen egyszerre ${th} olyan játékos a keretedben, aki legalább 3 posztot ismer. `
+     +`A poszt-tanulás és a fizetés nélküli beszokás is számít.`,
+  ST_L6,[1,2,3,5,7,10],()=>stVersatileCount(3));
+stTiers("harmonia","hm_posMax",th=>`Egy ember ${th} poszton otthon`,
+  th=>th>=11?`Legyen egy játékosod, aki mind a 11 posztot ismeri — a kaputól az árnyékékig.`
+     :`Legyen egy játékosod, aki legalább ${th} posztot ismer.`,
+  [2,5,8,10,16],[4,5,6,8,11],stPosMax);
+stTiers("harmonia","hm_posSum",th=>`${th} megtanult poszt a keretben`,
+  th=>`A kereted játékosai együtt ismerjenek ${th} posztot a saját első posztjukon túl.`,
+  ST_L6,[10,15,20,30,40,55],stPosExtraSum);
 /* ================= AZ ÖSSZHANG-CSOMAG (3.8.12) =================
    BEJELENTETT KÉRÉS: „a béke és harmónia csapatstílusnak van a legkevesebb
    mérföldköve. Náluk az összhang legyen egy új mérföldkőcsomag. Legyenek két
@@ -99548,7 +99839,7 @@ const ST_INF_TOP={
    ide tartozik: a tetejüket nem a mezőny szintje szabja meg, hanem a KERET
    MÉRETE — ugyanaz az indok, mint a hm_contribM-nél. Az attribútum-CSÚCS
    (bz_gtop) viszont hosszabbodik, hiszen az a 200-as Rating-skálán fut. */
-const ST_INF_SKIP=["pz_capt","hm_card","hm_contribM","tt_chain","tt_poss",
+const ST_INF_SKIP=["pz_capt","hm_card","hm_contribM","tt_chain","tt_poss","hm_posMax",
   "bz_g80","bz_g85","bz_g90"];
 let _stInfExtended=false;
 function stExtendForInfinity(){
@@ -100076,6 +100367,22 @@ stTrait("harmonia","csapatkovacs",1,"Csapatkovács-műhely",
   {fx:{chemSpeed:0.20},note:"20% esély extra fázisra"},
   {fx:{chemSpeed:0.35},note:"35% esély"},
   {fx:{chemSpeed:0.50},note:"50% esély"}]);
+/* ---- SOKOLDALÚ KÉPZÉS (3.9.153) ----
+   BEJELENTETT KÉRÉS: „Olcsóbb és gyorsabb a pozíció tanulás — erre legyen
+   képessége a béke és harmóniának." A stílus új mérföldkő-családjai (a
+   sokoldalú emberek, az egy ember posztjai, a keret megtanult posztjai) a
+   poszt-tudást mérik — ez a képesség az eszköz hozzájuk. I. sávban, mert nem
+   erősít a pályán: pénzt és időt spórol. A beszokás (fizetés nélküli tanulás)
+   ugyanabból a számból háromszoroz, tehát az is gyorsul. */
+stTrait("harmonia","sokoldalu_kepzes",1,"Sokoldalú képzés",
+  "A poszt-tanulás olcsóbb és gyorsabb: kevesebbe kerül, és kevesebb meccs kell hozzá. A fizetés nélküli beszokás is ugyanennyivel gyorsul, és a már futó tanulásokra is azonnal hat.",[
+  {fx:{posLearnDisc:0.25,posLearnFast:0.20},note:"−25% ár · −20% meccsigény"},
+  {fx:{posLearnDisc:0.40,posLearnFast:0.33},note:"−40% ár · −33% meccsigény"},
+  {fx:{posLearnDisc:0.55,posLearnFast:0.50},note:"−55% ár · feleannyi meccs"}],
+  ()=>{
+    const n=posLearnMatchesNeeded(null);
+    return `most egy fizetett tanulás kb. ${n} meccs, a beszokás kb. ${posDriftMatchesNeeded(null)} · `
+      +`a keretben ${stVersatileCount(3)} ember tud legalább 3 posztot`;});
 stTrait("harmonia","egyenletes_edzes",1,"Egyenletes edzés",
   "A Csapatkovács és a Lélekemelő stábtagjaid gyorsabban fejlődnek — és HATÉKONYABBAN is dolgoznak: a képesség a MOSTANI stábtagod munkáját is felerősíti (öltözői kémia, csapatmorál), nem csak a fejlődését gyorsítja.",[
   {fx:{coachXp:1,coachPow:1.20,coachXpTypes:["chem","morale"]},note:"kétszeres tempó · +20% hatékonyság"},
@@ -102140,6 +102447,11 @@ function styleMidBuyMult(){return Math.max(0.4,1-styleFxMax("midBuyDisc"));}
 function styleBusLevel(){return Math.round(styleFxMax("busLv"))||0;}
 function styleMoraleFloor(){return styleFxMax("moraleFloor");}
 function styleChemSpeed(){return styleFxAdd("chemSpeed");}
+/* ☯️ SOKOLDALÚ KÉPZÉS (3.9.153): a poszt-tanulás ára és meccsigénye. A
+   legmagasabb megvett szint él; a padló 0,4, hogy a tanulás sose legyen
+   ingyen vagy azonnali. 1 = nincs megvéve. */
+function stylePosLearnCostMult(){return Math.max(0.4,1-styleFxMax("posLearnDisc"));}
+function stylePosLearnSpeedMult(){return Math.max(0.4,1-styleFxMax("posLearnFast"));}
 /* ---- OSZTOTT DICSŐSÉG: a gól- és gólpassz-sorsolás lapítása ----
    A legmagasabb megvett szint él (styleFxMax), ahogy minden más padló-jellegű
    csatornánál. 0 = nincs megvéve, ilyenkor a súlyok érintetlenek maradnak. */

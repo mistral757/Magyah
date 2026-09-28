@@ -2491,6 +2491,34 @@ node tools/talizman-f5-proba.js
 
 Részletek: `docs/talizmanok.md` (3.9.148).
 
+## egyensuly-3-9-153-proba.js — ⚖️ 3.9.153: D0, nyári kupa, árazás, csapategyensúly, poszt-tudás, színhűség
+
+```bash
+node tools/egyensuly-3-9-153-proba.js
+```
+
+**32 állítás, hét blokkban:**
+
+1. **A meccs-erő a motor tükre:** a helyi meccs-erő és a motor pillanatképéből
+   számolt ugyanaz — stílus nélkül, stílussal, kémiával; a Zárt kapu, a
+   „gépezet", az egyensúly-bónusz és egy kész párkémia pontosan annyit mozdít
+   rajta, amennyit a motorban; a párharc ⚡-je a közös képletből.
+2. **Egyensúly-plafon:** 100 fölött 10-esével +1 (110 → 3, 180 → 10), a
+   bónusz ebből számol.
+3. **Sokoldalú képzés:** −20%/−50% meccsigény (a beszokás is), −25%/−55%
+   ár, a futó tanulás is rövidül.
+4. **Poszt-tudás mérföldkövek:** a három család és a mérők; a 11 posztos
+   lépcső nem nyúlik Infinityben.
+5. **Színhűség:** 2 lap szorzó nélkül, 3/5/8 lap ×1,10/×1,20/×1,35, a
+   bejelentés, a menü.
+6. **Ár és ifi POT:** a bejelentett pár megfordul, a fiatal tehetség ára
+   változatlan, a kifutotté enyhén a Rating felé húz; a POT-felzárkózás
+   csak ≤23 évesnél és csak fölfelé.
+7. **Nyári kupa:** a mezőny a pályán a meccs-erőd mínusz egy; közös tornán a
+   nehezebb célérték, régi kliensnél a régi szabály.
+
+Részletek: `docs/egyensuly-3-9-153.md`.
+
 ## kenyelem-3-9-152-proba.js — 🧰 3.9.152: cseretervek, fejlődési görbe, fekvő talizmán, értesítés, ranglista
 
 ```bash
