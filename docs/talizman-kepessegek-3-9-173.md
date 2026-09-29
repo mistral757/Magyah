@@ -89,11 +89,32 @@ menüvel:
 * a HUB-gomb;
 * az üres állapot.
 
-## Menet közben (a 3.9.172 regressziójából)
+## Menet közben: a teljes regresszió (132 próba) igazításai
 
-* `hangtema-proba`: a lágy hangtábla 24 effektet vár (a kihívás-szignállal).
-* `csupa-ek-proba`: a próba 40 meccset játszik egymás után. A 3.9.171 óta a
-  lefújás utáni kör függőben tartja a következő kezdőrúgást, ezért a próba
-  most lezárja a kört. Mivel a próba újrahasznosítja a fordulószámot, a lefújt
-  meccs élő rekordját is törli. A játékban ez a helyes viselkedés; a próbának
-  kellett a játékos lépését megtennie.
+A teljes regresszió a 3.9.171–173 változásai után először futott végig. A
+régi `nevmod-boot` hibán kívül minden zöld, miután a próbák az új szabályokhoz
+igazodtak. **A játék viselkedésén egyik igazítás sem változtat, csak a próbák
+követik a játék új, szándékos szabályait.**
+
+* **A lefújás utáni kör függőben tartja a kezdőrúgást (3.9.171).** Négy próba
+  indított új meccset úgy, hogy az előző meccs jutalom-körét félbehagyta vagy
+  végig sem vitte. A játékban ez nem fordulhat elő (a kezdőrúgás-gomb tiltva
+  van), a próbában igen. Ezek most lezárják a kört, ahogy a játékos is
+  végigkattintaná. Mivel a próbák újrahasznosítják a fordulószámot, a lefújt
+  meccs élő rekordját is törlik, különben ugyanaz a meccs állna vissza:
+  * `csupa-ek-proba`;
+  * `kiallitas-rendszer-proba`;
+  * `szarny-kemia-epites-proba` (két helyen).
+* **A lánc lépései a rögzített sorsolás burkában futnak (3.9.171).** A
+  `kenyelem-3-9-152-proba` forrás-mintája mostantól a burkolt alakot is
+  elfogadja.
+* **A hangtábla 24 effektet vár**, a kihívás-szignállal (3.9.172):
+  `hangtema-proba`.
+* **A service worker cache-neve v7** lett, a számjegy-betű miatt (3.9.172):
+  `pixel-tema-proba` (v6 vagy későbbi).
+* **A talizmán-gombok a „Képességeid” kártyáin vannak** (3.9.173). A próbák a
+  gombokat a teljes menüben keresik, nem csak az alaphatások listájában, a
+  várakozó húzásnál pedig a kártyát is elfogadják:
+  * `talizman-proba`;
+  * `talizman-f4a-proba`, `talizman-f4c-proba`;
+  * `talizman-f6a-proba`, `talizman-f6c-proba`.

@@ -62,8 +62,8 @@ console.log("\n— 2. A BETŰK —");
     return fs.existsSync(a)&&fs.readFileSync(a).slice(0,4).toString()==="wOF2";});
   ok(van.length===4,"a négy szelet ott van, és valódi WOFF2",van);
   ok(fajlok.every(f=>html.includes(`url(/fonts/${f}.woff2)`)),"a @font-face mind a négyre mutat");
-  ok(fajlok.every(f=>sw.includes(`"/fonts/${f}.woff2"`))&&/harminc-nulla-cache-v6/.test(sw),
-     "a service worker előre cache-eli őket, és a cache-név lépett (v6)");
+  ok(fajlok.every(f=>sw.includes(`"/fonts/${f}.woff2"`))&&/harminc-nulla-cache-v([6-9]|\d{2,})/.test(sw),
+     "a service worker előre cache-eli őket, és a cache-név lépett (v6 vagy későbbi — 3.9.172: v7, a számjegy-betűvel)");
   const ofl=fs.readFileSync(path.join(ROOT,"fonts","OFL.txt"),"utf8");
   ok(/Press Start 2P/.test(ofl)&&/Pixelify Sans/.test(ofl),"a licenc-fájl mindkét családot felsorolja");
 }

@@ -353,7 +353,7 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     /* TITKOS FEGYVER — a menü gombja élesít, a pillanatképbe sül */
     _lap("titkosfegyver",3);
     talMenuOpen();
-    const gomb=$("talHatas").querySelector('[data-tal="titkos"]');
+    const gomb=$("talModal").querySelector('[data-tal="titkos"]');   /* 3.9.173: a gomb a „Képességeid" kártyán */
     ki.titkosGomb=!!gomb;
     if(gomb)gomb.click();
     const X=talTitkos();

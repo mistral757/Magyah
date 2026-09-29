@@ -352,10 +352,10 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     talDrawClose();
     _lapok([["penzfeldobas",2],["tukorvilag",4]]);
     talMenuOpen();
-    const h=$("talHatas").innerHTML;
+    const h=$("talModal").innerHTML;   /* 3.9.173: a gombok a „Képességeid" kártyáin */
     ki.erme=/data-tal="erme"/.test(h);ki.tukor=/data-tal="tukor"/.test(h);
     document.querySelector('[data-tal="erme"]').click();
-    ki.ermeUtan=/FEJ|ÍRÁS/.test($("talHatas").textContent);
+    ki.ermeUtan=/FEJ|ÍRÁS/.test($("talModal").textContent);
     talMenuClose();
     return ki;});
   console.log("\n— 5. A FELÜLET —");
