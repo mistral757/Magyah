@@ -6778,7 +6778,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.167";
+const APP_VERSION="3.9.168";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -6842,8 +6842,15 @@ function hangHangero(){
 /* az első érintés feloldja a hangot (a böngésző szabálya) */
 function hangFelold(){
   const ac=hangAc();if(!ac)return;
-  if(ac.state==="suspended")try{ac.resume();}catch(e){}
+  /* A resume ASZINKRON: eddig a zene a feloldás után a következő
+     másodperces ütemig várt (a hangZeneIgazit még „suspended" állapotot
+     látott). Mostantól a resume után azonnal indul, és egyszer előmelegít. */
+  if(ac.state==="suspended")try{
+    const pr=ac.resume();
+    if(pr&&pr.then)pr.then(()=>{try{hangZeneIgazit();}catch(e){}});}catch(e){}
+  if(!_hangMeleg){_hangMeleg=1;try{hangLagyElomeleg();}catch(e){}}
   hangZeneIgazit();}
+var _hangMeleg=0;
 function hangKesz(){return !!(_hangCtx&&_hangCtx.state==="running"&&hangBeall().on);}
 /* ---- A HANGSZEREK ---- */
 function hangHz(n){return 440*Math.pow(2,(n-69)/12);}
@@ -6992,7 +6999,9 @@ function hangZeneInditas(dal){
   const Z={dal,kulcs:hangZeneKulcs(),lep:0,kov:_hangCtx.currentTime+.08,timer:null};
   if(lagy)Z.busz=hangLagyBusz(_hangBus.zene,F);
   Z.timer=setInterval(()=>{
-    try{while(Z.kov<_hangCtx.currentTime+.12){
+    /* 0,3 mp előretekintés (korábban 0,12): egy hosszabb felület-munka
+       (HUB-rajzolás, mentés) alatt se fogyjon ki a beütemezett zene */
+    try{while(Z.kov<_hangCtx.currentTime+.3){
         if(lagy)hangLagyLepes(D,Z.lep,Z.kov,Z.busz,F,STEP);
         else hangLepes(D,Z.lep,Z.kov,_hangBus.zene);
         Z.kov+=STEP;Z.lep++;}}catch(e){}},25);
@@ -7145,13 +7154,30 @@ var HANG_LAGY_HANGULAT={
    hangszerek belső arányai érintetlenek. */
 function hangLagyBusz(bus,F,mp){
   const ac=_hangCtx,g=ac.createGain();g.gain.value=F.gain||1;
+  /* a zengetés a SZÜLŐ busz konvolverén szól (a hangulat szintjével) —
+     nem kell minden dalhoz és szignálhoz saját konvolver */
+  const rs=ac.createGain();rs.gain.value=F.gain||1;rs.connect(hangLagyRev(bus));g._rev=rs;
   /* szelíd kompresszor a hangulat-erősítő után: a pengetések és a lábdob
      tranzienseit fogja meg, hogy a csúcs a hangszóró határa alatt maradjon */
   const c=ac.createDynamicsCompressor();
   c.threshold.value=-14;c.knee.value=8;c.ratio.value=4;c.attack.value=.004;c.release.value=.25;
   g.connect(c);c.connect(bus);
-  if(mp)setTimeout(()=>{try{c.disconnect();}catch(e){}},(mp+3)*1000);
+  if(mp)setTimeout(()=>{try{c.disconnect();rs.disconnect();}catch(e){}},(mp+3)*1000);
   return g;}
+/* ELŐMELEGÍTÉS: az első feloldás után, ÜRESJÁRATBAN elkészül a két busz
+   zengetője és a futó dal pengetett hangjainak húr-puffere — így az első
+   ütem nem a számolással telik, és a zene azonnal, egyenletesen indul. */
+function hangLagyElomeleg(){
+  const fut=()=>{try{
+    if(!_hangCtx||!_hangBus)return;
+    hangLagyIR(_hangCtx);hangLagyRev(_hangBus.zene);hangLagyRev(_hangBus.sfx);
+    const F=hangLagyF(),D=HANG_DALOK_LAGY[hangBeall().dal]||HANG_DALOK_LAGY.fo;
+    if(F.comp==="gitar"||F.bass==="bogo"){
+      const hangok=new Set();
+      D.ch.forEach(ch=>{const a=hangLagyAkkord(ch,F);a.forEach(n=>{hangok.add(n+"g");hangok.add((n-12)+"b");});});
+      hangok.forEach(k=>hangKs(parseInt(k,10),k.slice(-1)==="b"));}
+  }catch(e){}};
+  try{(window.requestIdleCallback||((f)=>setTimeout(f,200)))(fut,{timeout:1500});}catch(e){fut();}}
 /* ---- A LÁGY MENÜDALOK ----
    Ugyanaz a három cím, mint a chiptune-ban (a választó közös), de lassabb,
    levegősebb dallammal és négyhangú (szeptim) akkordokkal. Ütemenként egy
@@ -7187,12 +7213,22 @@ function hangZeneKulcs(){return hangCsomag()==="lagy"?"lagy:"+hangHangulat():"ch
    Buszonként EGY konvolver (a zenéé és az effekteké külön, hogy a hangerő-
    csúszka a zengetésre is hasson). A lecsengés kódból születik: sztereó zaj,
    köbös halkulással, 2,4 másodperc. */
+/* A LECSENGÉS EGYSZER születik (mintavételi rátánként) — 3.9.168: korábban
+   minden zeneindításkor és minden stílus-szignálnál újra, egy 2,4 mp-es
+   sztereó puffer mintánkénti hatványozással, ami telefonon a zene
+   indulását késleltette és meccs közben akadást okozott. */
+var _hangIR={};
+function hangLagyIR(ac){
+  const sr=ac.sampleRate;
+  if(_hangIR[sr])return _hangIR[sr];
+  const len=Math.floor(sr*2.4),ir=ac.createBuffer(2,len,sr);
+  for(let c=0;c<2;c++){const d=ir.getChannelData(c);
+    for(let i=0;i<len;i++){const x=1-i/len;d[i]=(Math.random()*2-1)*x*x*x*Math.min(1,i/(sr*.012));}}
+  return (_hangIR[sr]=ir);}
 function hangLagyRev(bus){
   if(bus._rev)return bus._rev;
-  const ac=_hangCtx,sr=ac.sampleRate,len=Math.floor(sr*2.4),ir=ac.createBuffer(2,len,sr);
-  for(let c=0;c<2;c++){const d=ir.getChannelData(c);
-    for(let i=0;i<len;i++){const x=i/len;d[i]=(Math.random()*2-1)*Math.pow(1-x,3.2)*Math.min(1,i/(sr*.012));}}
-  const cv=ac.createConvolver();cv.buffer=ir;
+  const ac=_hangCtx;
+  const cv=ac.createConvolver();cv.buffer=hangLagyIR(ac);
   const send=ac.createGain(),wet=ac.createGain();wet.gain.value=.55;
   send.connect(cv);cv.connect(wet);wet.connect(bus);
   bus._rev=send;return send;}
@@ -53731,7 +53767,18 @@ function addLine(html,cls,budgeted){
        gólhoz tartozó híresség-összesítőt — a gól alá, nem a következő közepébe. */
     try{fameFlushNotes();}catch(e){}}
   const d=document.createElement("div");d.className=cls;d.innerHTML=html;
-  lines().appendChild(d);lines().scrollTop=lines().scrollHeight;}
+  lines().appendChild(d);addLineScroll();}
+/* A NAPLÓ ALJÁRA GÖRGETÉS KÉPKOCKÁNKÉNT EGYSZER (3.9.168). Eddig minden sor
+   után a scrollHeight kiolvasása azonnali elrendezést kényszerített ki — egy
+   gólnál a gól-, a kommentár- és a lelátó-sor háromszor egymás után. Mérve
+   (négyszeresen lassított CPU, nézett meccs) ez a kényszerített elrendezés a
+   mérkőzés egyik legnagyobb tétele volt. A görgetés most a következő
+   képkockára gyűlik össze: a látvány ugyanaz, a munka egy. */
+var _addLineRaf=0;
+function addLineScroll(){
+  if(_addLineRaf)return;
+  const fut=()=>{_addLineRaf=0;try{const L=lines();if(L)L.scrollTop=L.scrollHeight;}catch(e){}};
+  try{_addLineRaf=requestAnimationFrame(fut);}catch(e){fut();}}
 /* ================= A CSAPAT ARCULATA: KÉT SZÍN ÉS EGY NÉV =================
    A klub két színe ugyanaz a pár, amit a draftban a keret-kártya csíkja mutat
    (sq.col). Kész klubbal indulva ez maga a klub színe; DRAFTOLT csapatnál nincs
@@ -81891,6 +81938,16 @@ function canOccupyLoc(p,loc){
    (Vezetői · Együttműködés · Temperamentum), és innen indul a posztcsere is —
    így mindig egyértelmű, KIT cserélsz. */
 let hubExpandedKey=null;
+/* A részletpanel helyben cseréje (lásd a sor onclick-jét): a régi panel
+   kikerül, az új a koppintott sor UTÁN kerül be — pontosan oda, ahová a
+   renderHub is tenné (rgAdd: a sor, majd közvetlenül utána a panel). */
+function hubDetailSwap(row,loc){
+  try{
+    const box=$("hubRoster");
+    if(!box||!row||!row.isConnected||!box.contains(row))return false;
+    box.querySelectorAll(".hubDetail").forEach(x=>x.remove());
+    if(hubExpandedKey===hubLocKey(loc))row.after(buildHubDetail(loc));
+    return true;}catch(e){return false;}}
 function hubLocKey(loc){return loc.type+":"+(loc.type==="bench"?loc.key:loc.idx);}
 /* ---- GÖRGETÉS-HORGONY EGY KERETLISTA-SORHOZ ----
    Megméri, hol áll a sor a KÉPERNYŐN, és visszaad egy függvényt, ami az
@@ -83049,8 +83106,10 @@ function hdSectionize(html){
 function hdBindSections(root){
   if(!root)return;
   root.querySelectorAll("details.hdSec[data-hk]").forEach(el=>{
+    /* a lenyíló állapota nem sürgős: összevont mentés (3.9.168) — az
+       újrarajzolt lap MINDEN lenyílója toggle-t lő, ez négy mentés volt */
     el.addEventListener("toggle",()=>{
-      try{hdOpenState()[el.getAttribute("data-hk")]=el.open;saveGame();}catch(e){}});});}
+      try{hdOpenState()[el.getAttribute("data-hk")]=el.open;saveGameSoon();}catch(e){}});});}
 function buildHubDetail(loc){
   const p=loc.p,e=careerPool&&careerPool[p.n];
   const d=document.createElement("div");d.className="hubDetail";
@@ -88694,7 +88753,12 @@ function renderHub(){
          amire koppintottál. */
       const restore=hubKeepRowAnchor(key);
       hubExpandedKey=(hubExpandedKey===key)?null:key;
-      renderHub();
+      /* GYORS ÚT (3.9.168): a lenyitás/becsukás csak a részletpanelt cseréli,
+         nem rajzolja újra a teljes HUB-ot. MÉRVE: négyszeresen lassított
+         CPU-n a teljes újrarajzolás (és az utána kényszerített elrendezés)
+         koppintásonként 0,15–0,5 mp volt. Ha a gyors út bármiért nem
+         alkalmazható, a régi, teljes rajzolás fut. */
+      if(!hubDetailSwap(row,loc))renderHub();
       restore();};
     rgAdd(loc,row);
     if(hubExpandedKey===hubLocKey(loc))rgAdd(loc,buildHubDetail(loc));});
@@ -88702,8 +88766,10 @@ function renderHub(){
      újrarajzolást — a hívás idempotens (egyszer köti fel magát). */
   try{hubDragInit();}catch(e){}
   /* FIX: a HUB minden újrarajzolása egyben mentés is — vásárlás, eladás,
-     klub-szemle, szintlépés után azonnal maradandó az állapot. */
-  if(gameMode==="career")saveGame();
+     klub-szemle, szintlépés után azonnal maradandó az állapot.
+     3.9.168: ÖSSZEVONVA (saveGameSoon) — lásd ott: egy koppintás öt teljes
+     mentést indított, ez volt a HUB „laggja". */
+  if(gameMode==="career")saveGameSoon();
   /* ---- HUB-TÚRA ----
      A rajzolás LEGVÉGÉN, amikor a keretlista és a panelek már a helyükön
      vannak — a horgonyzás valós méreteket mér. NEM a szezon előtti
@@ -106514,7 +106580,41 @@ function loadIntoGame(d,key){
     _saveBroken=true;            /* 2. — innentől nem írunk sehova */
     try{console.warn("MAGYAH: a mentés betöltése elszállt —",e&&e.message);}catch(_){}
     return false;}}
+/* ---- ÖSSZEVONT MENTÉS (3.9.168) ----
+   BEJELENTETT HIBA: „vannak benne laggok bizonyos események, kattintások,
+   különösen is a HUBban játékosra kattintás hatására."
+   MÉRVE: egy HUB-soron koppintás ÖT teljes mentést indított — a renderHub
+   egyet, az újrarajzolt játékoslap négy lenyílója a toggle-eseményével még
+   négyet. Egy mentés a teljes játékos-pool csomagolása, JSON és
+   localStorage-írás: négyszeresen lassított CPU-n (≈ egy közepes telefon)
+   koppintásonként 0,5–0,8 másodperc.
+   A HUB újrarajzolása és a lenyílók állapota nem sürgős: ezek a
+   saveGameSoon-on át mennek, ami a hívásokat EGY, rövid késleltetésű mentéssé
+   vonja össze (a késleltetés végén a LEGFRISSEBB állapot íródik ki).
+   ELVESZTÉS ELLEN: a lap elhagyásakor (pagehide — újratöltés, bezárás is) és
+   háttérbe kerülésekor azonnal kiíródik, és bármely rendes saveGame() is
+   „elviszi" (az úgyis mindent ment). A `var` szándékos: a saveGame a szkript
+   elejéről is hívódhat, egy `let` ott TDZ-hibát dobna. */
+var _saveSoonT=0;
+/* 700 ms csend után, a böngésző ÜRESJÁRATÁBAN (requestIdleCallback, legfeljebb
+   további 1,5 mp) — így a mentés nem a következő koppintásra esik. */
+function saveGameSoon(){
+  if(_saveSoonT)return;
+  _saveSoonT=setTimeout(()=>{
+    const fut=()=>{if(!_saveSoonT)return;_saveSoonT=0;try{saveGame();}catch(e){}};
+    try{if(window.requestIdleCallback){window.requestIdleCallback(fut,{timeout:1500});return;}}catch(e){}
+    fut();},700);}
+function saveGameFlush(){
+  if(!_saveSoonT)return;
+  clearTimeout(_saveSoonT);_saveSoonT=0;
+  try{saveGame();}catch(e){}}
+try{
+  window.addEventListener("pagehide",saveGameFlush);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")saveGameFlush();});
+}catch(e){}
 function saveGame(){
+  /* egy függő összevont mentés ezzel együtt teljesül */
+  if(_saveSoonT){clearTimeout(_saveSoonT);_saveSoonT=0;}
   /* A kezdőképernyőn nincs mit menteni — és ha mégis írnánk, a következő
      indulást rontanánk el vele. */
   if(!hasLiveGame())return;
