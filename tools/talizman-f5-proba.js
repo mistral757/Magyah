@@ -162,7 +162,7 @@ const kozel=(a,b,e)=>Math.abs(a-b)<=(e||1e-9);
     e=E("vedok");ki.vedok={block:dialMul("chance",{kind:"block"}),line:dialMul("chance",{kind:"line"}),solo:dialMul("chance",{kind:"solo"}),vart:1+0.05*e};
     e=E("tartas");ki.tartas={poss:talMeccsPoss(),oppCh:talMeccsOppCh(),vart:[e,1-0.02*e]};
     e=E("gol");ki.gol={ket:chHatMult("X",{X:2}),egy:chHatMult("X",{X:1}),vart:1+0.03*e};
-    const src=playMatch.toString();
+    const src=playMatchMotor.toString();
     const _all=[...document.scripts].map(x=>x.textContent).join("\n");
     ki.forras={poss:/\+\(\(typeof talMeccsPoss==="function"\)\?talMeccsPoss\(\):0\),20,80\)\);/.test(_all),
       oppch:/poisson\(\(OPPCH_BASE\+la\*OPPCH_RATE\)\/18\*talMeccsOppCh\(\)\)/.test(src),

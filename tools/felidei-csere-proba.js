@@ -112,7 +112,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   /* 3. a lecserélt fele meccs: a doSub a halfOut-ba tett részesedés — a
      lefújás utáni fejlődés-elosztás ezt kapja. A stringből ellenőrizzük,
      hogy a félidei ág 45 perccel számol. */
-  const kod=await p.evaluate(()=>String(playMatch));
+  const kod=await p.evaluate(()=>String(playMatchMotor));
   console.log("\n— 3. A JÁTÉKIDŐ-RÉSZESEDÉS —");
   ok(/const most=at==null\?min:\(at===45\?45:at-1\);/.test(kod),"a félidei csere a lecseréltnek pontosan 45 percet (0,5) ír, a vödör eleji a vödör előtti perceket");
   console.log("\n— 5. OLDALHIBA —");

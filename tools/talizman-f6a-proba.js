@@ -345,7 +345,7 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     ki.pont={sp:talMeccsCsat("setpiece",{}),ct:talMeccsCsat("counter",{}),vartCt:1-talSpecV("pontrugas","con")/COUNTER_WINDOW};
     /* VASFEGYELEM */
     _lap("vasfegyelem",2);
-    ki.vas={sarga:talSargaMult(),hely:String(playMatch).indexOf("talSargaMult()")>=0,
+    ki.vas={sarga:talSargaMult(),hely:String(playMatchMotor).indexOf("talSargaMult()")>=0,
       kesoi:talMeccsCsat("own",{min:80}),korai:talMeccsCsat("own",{min:60})};
     /* MESTERSZINT */
     _nincs();const c0=tacticCeil(k),q0=coachQual({sz:60,type:"medic"});

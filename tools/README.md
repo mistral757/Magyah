@@ -8,6 +8,40 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## frissites-proba.js — ⏯ 3.9.171: a frissítés folytatás, nem újrakezdés
+
+```bash
+node tools/frissites-proba.js
+```
+
+Valódi karrier, valódi mentés, valódi oldal-újratöltés (kezdőlap →
+„Mentett meccs folytatása" → „Folytatom"). **22 állítás:**
+
+* **Kezdőrúgás:** a meccs előtti állapot a lemezen; az élő rekord (seed,
+  0 vödör, üres döntésnapló) megszületik.
+* **A mérce, megszakítás nélkül:**
+  * az élő cserepulton hozott csere a vödör számával naplózódik;
+  * a lefújáskor a forduló lekönyvelve, és a mentésben ott az eredmény meg a
+    függő jutalom-lánc (`S.utoMeccs`).
+* **Frissítés a kezdőrúgás után, majd meccs közben:**
+  * a betöltés magától indítja, ugyanazzal a sorsolással;
+  * a 7. vödörnél újra frissítve a meccs gyorsan visszajátszik a
+    megszakításig, a naplózott cserével együtt, és onnan élőben megy;
+  * a végeredmény és a teljes közvetítés soról sorra azonos a mércével.
+* **Frissítés a lefújás után:**
+  * a forduló lekönyvelve marad, a tabella a lefújáskori;
+  * két külön újratöltés ugyanazt a jutalom-képernyőt hozza;
+  * a lánc közben a kezdőrúgás nem indít új meccset;
+  * a lépésből induló időzítő (a skill-pörgetés vége) és gomb-kezelő ugyanazt
+    sorsolja, egy közbeeső idegen időzítő sem tolja el; a lépés után az
+    időzítők és a kattintás-kezelő eredeti állapotba kerülnek.
+* **Végigjátszás:** a lefújás után, a kör mentése előtt frissítve a meccs
+  ugyanazzal az eredménnyel áll vissza.
+* **Nincs oldalhiba.**
+
+A mérce is betöltött állapotból indul. A próba gyors beállítása nem vet
+kötéseket; azt a betöltés pótolja, és az a meccserőbe is beleszól.
+
 ## teljesitmeny-proba.js — ⚡ 3.9.168: gyorsabb HUB, azonnal induló zene
 
 ```bash
