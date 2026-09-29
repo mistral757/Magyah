@@ -194,7 +194,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     $("talDrawOk").click();
     $("talDrawLater").click();
     talMenuOpen();
-    ki.menuGomb=!!document.querySelector('#talHatas [data-tal^="hullam:"]');
+    ki.menuGomb=!!document.querySelector('#talModal [data-tal^="hullam:"]');
     talMenuClose();
     return ki;});
   console.log("\n— 5. 🌊 JELLEMHULLÁM —");
@@ -250,8 +250,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       const e=talHitelElotorleszt();ki.elo={ok:e.ok,lezarva:!talHitel()};
       /* a menü gombja */
       talMenuOpen();
-      ki.menuGomb=!!document.querySelector('#talHatas [data-tal="hitel"]');
-      document.querySelector('#talHatas [data-tal="hitel"]').click();
+      ki.menuGomb=!!document.querySelector('#talModal [data-tal="hitel"]');
+      document.querySelector('#talModal [data-tal="hitel"]').click();
       ki.menuFelvett=!!talHitel();
       talMenuClose();
     }finally{saleWindowOpen=_sw;addLine=_a;}

@@ -9,7 +9,8 @@
      1. a hangzás AUTOMATIKUSAN követi a színtémát (Pixel → chiptune,
         Sötét-arany → Mozi, Törtfehér → Napos, Noir → Füstös jazz), és kézzel
         rögzíthető (a választás megmarad);
-     2. a táblák teljesek: mind a 23 hangeffektnek van lágy párja, mind a
+     2. a táblák teljesek: mind a 24 hangeffektnek van lágy párja (3.9.172:
+        + a kihívás-felugró szignálja), mind a
         három menüdalnak lágy változata, a kották épek (egész ütemek); gitár
         (pengetett húr) sehol nincs (3.9.169: „nagyon agresszív");
      3. OFFLINE HANGKÁRTYÁN, hangulatonként: a menüdalok szólnak (nem
@@ -73,7 +74,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       ||Object.values(HANG_LAGY_HANGULAT).some(F=>/gitar|bogo|pluck/.test(F.comp+F.bass+F.lead+F.fel));
     return {gitar,sfx:sfx.length,hianyzik:sfx.filter(k=>!HANG_SFX_LAGY[k]),extra:lagy.filter(k=>!HANG_SFX[k]),
       dalKulcs:Object.keys(HANG_DALOK_LAGY).sort().join()===Object.keys(HANG_DALOK_NEV).sort().join(),dalok};});
-  ok(tb.sfx===23&&tb.hianyzik.length===0&&tb.extra.length===0,"mind a 23 hangeffektnek van lágy párja",tb);
+  ok(tb.sfx===24&&tb.hianyzik.length===0&&tb.extra.length===0,"mind a 24 hangeffektnek van lágy párja (a 3.9.172 kihívás-szignáljával)",tb);
   ok(tb.gitar===false,"nincs gitár: a pengetett húr (Karplus–Strong) egyik hangulatban sem szól (3.9.169)");
   ok(tb.dalKulcs&&Object.values(tb.dalok).every(d=>Number.isInteger(d.utem)&&d.utem%d.ch===0&&d.rossz===0&&d.negy),
      "mind a három menüdalnak lágy változata; a kotta ép, egész ütemek, négyhangú akkordok",tb.dalok);

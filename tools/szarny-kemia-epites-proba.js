@@ -133,6 +133,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
         S.auto=false;matchSpeed=20;S.halftimeSubs=false;S.unavailable={};S.lastMatch=null;
         if(!S.fixtures||!S.fixtures.length)buildSeasonFixtures();
         const idx0=S.idx;
+        /* 3.9.171: az előző meccs lefújás utáni köre (amit a próba a szárny-
+           választónál félbehagyott) függőben tartaná a kezdőrúgást — a játékos
+           végigkattintaná, itt lezárjuk */
+        try{utoLancVege();mEloTorol();}catch(e){}
         playMatch();
         for(let i=0;i<400;i++){
           await new Promise(r=>setTimeout(r,50));
@@ -211,6 +215,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
        össze (a próba így véletlenszerűen bukott) */
     const _bst=balanceSkillTick;balanceSkillTick=()=>true;
     try{
+      /* 3.9.171: a korábbi meccs félbehagyott lefújás utáni köre ne tartsa
+         vissza a kezdőrúgást; az újrainduló S.idx miatt az élő rekord is megy */
+      try{utoLancVege();mEloTorol();}catch(e){}
       S.auto=true;S.idx=0;buildSeasonFixtures();
       playMatch();
       for(let i=0;i<1500&&S.idx<12;i++)await new Promise(r=>setTimeout(r,50));

@@ -232,9 +232,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.nyitott=S.transferBudget-b0;
     talPalyazarFogy();ki.egy=talState().esHat.palyazar;
     talPalyazarFogy();ki.nulla=talState().esHat.palyazar;ki.aktiv=talPalyazarAktiv();
-    ki.motor=/const _talZart=!DUEL&&!fx\.neutral&&!!fx\.home&&talPalyazarAktiv\(\);/.test(playMatch.toString())
-      &&/\(fx\.neutral\|\|_talZart\)\?0:/.test(playMatch.toString())
-      &&/zart:_talZart/.test(playMatch.toString());
+    ki.motor=/const _talZart=!DUEL&&!fx\.neutral&&!!fx\.home&&talPalyazarAktiv\(\);/.test(playMatchMotor.toString())
+      &&/\(fx\.neutral\|\|_talZart\)\?0:/.test(playMatchMotor.toString())
+      &&/zart:_talZart/.test(playMatchMotor.toString());
     return ki;});
   console.log("\n— 5. PÁLYAZÁR —");
   ok(pz.zart===0&&pz.nyitott>0,"zárt kapus meccsen nincs lelátó-bevétel, nyitott kapusnál van",pz);

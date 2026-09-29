@@ -8,6 +8,126 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## lelato-proba.js — 🏟️ 3.9.174: a lelátó hangja
+
+```bash
+node tools/lelato-proba.js
+```
+
+**21 állítás** (valódi hangkártyával, `HANG_TESZT`):
+
+* **A render:** mind az öt lelátó kirenderelődik, nem néma, a hurok 15 mp
+  fölötti; a csúcs 0,9 alatt; a varrat sima; a nagy tömeg hangosabb a
+  vasárnapinál.
+* **A nézett meccs:**
+  * a választott lelátó szól, a zene 25%-on megy tovább;
+  * a gól megmozdítja a lelátót;
+  * a lefújás után a lelátó elhallgat, a zene visszaáll.
+* **Végigjátszás:** nincs lelátó.
+* **A feloldás:**
+  * a lépcsők 0 / 65 / 85 / 92 / 96;
+  * zárt lelátó nem választható;
+  * a lépcső átlépését a napló bejelenti.
+* **Az Arculat → „7 · A lelátó hangja”:**
+  * öt kártya, a zártak feltétellel;
+  * a választás azonnal érvényes, és bekerül a mentésbe;
+  * a belehallgatás szól.
+* **A Hang beállításai:** lelátó ki/be, hangerő, a 25%-os zene leírása.
+* **Nincs oldalhiba.**
+
+## talizman-kepesseg-proba.js — 🎮 3.9.173: a talizmán-képességek láthatóan
+
+```bash
+node tools/talizman-kepesseg-proba.js
+```
+
+**15 állítás:**
+
+* **A „🎮 A te képességeid" blokk:**
+  * a Talizmánok menü tetején áll (a bal oszlop első eleme, az alaphatások
+    fölött);
+  * kártyát kap a Titkos fegyver, a Pénzfeldobás, a Tükörvilág és az irányra
+    váró jellemhullám;
+  * a most használhatók világítanak, és nagy gombjuk van.
+* **A kártya gombja:**
+  * élesíti a Titkos fegyvert;
+  * a kártya „élesítve" állapotba vált, a gombja eltűnik, és hátrébb kerül.
+* **A lista:** az alaphatások listájában nincs akciógomb, a sor felfelé mutat.
+* **A gyorssáv:**
+  * közvetlenül a kezdőrúgás fölött áll, a következő meccsre ható
+    képességekkel (✓ élesítve is);
+  * koppintásra a menü a kártyánál nyílik;
+  * végigjátszásnál nincs.
+* **A HUB-gomb** kiírja, hány képesség használható, és világít.
+* **Üres állapot:** talizmán nélkül a blokk elmondja, mi kerül ide.
+* **Nincs oldalhiba.**
+
+## jelzesek-3-9-172-proba.js — 🔔 3.9.172: számok, stáb-mérleg, felugró, feed-szűrő, push
+
+```bash
+node tools/jelzesek-3-9-172-proba.js
+```
+
+**33 állítás, öt blokkban:**
+
+* **Pixel számjegyek:**
+  * a „Magyah Pixszam" áll elöl, csak a számjegyekre, betöltve;
+  * a „23580" ugyanolyan széles, mint a Pixelify-ban;
+  * a másik témák nem kérik.
+* **Stáb-mérleg:**
+  * a személyi edző pontjai külön csatornán, edzőnként könyvelődnek;
+  * a régi mérleg (pts) = edzésterv + egyéb − lassítás;
+  * a HUB játékoslapján megjelenik a „🎓 Stábtag" sor.
+* **Kihívás-felugró:**
+  * a teljesítés megnyitja, a második sorba áll, a gomb léptet és bezár;
+  * végigjátszásnál magától zárul;
+  * pixel- és sötét ruhája van;
+  * a resolveChallenge hívja.
+* **Feed-szűrő:**
+  * a sorok besorolása, a folytatósor öröklése;
+  * a kapcsolók a Vezetés menüben vannak, rejtenek és visszahoznak;
+  * a „Csak a meccsközvetítés" gomb működik, a beállítás megmarad.
+* **Push:**
+  * a fajták: kezdőrúgás előtt, idény elején, „rég" csak 8 forduló után;
+  * fordulónként egyszer szól;
+  * a sáv beúszik, a „Mutasd" a HUB-ba visz;
+  * kikapcsolva és „Semmi" módban néma, a panelen saját kapcsoló.
+* **Nincs oldalhiba.**
+
+## frissites-proba.js — ⏯ 3.9.171: a frissítés folytatás, nem újrakezdés
+
+```bash
+node tools/frissites-proba.js
+```
+
+Valódi karrier, valódi mentés, valódi oldal-újratöltés (kezdőlap →
+„Mentett meccs folytatása" → „Folytatom"). **22 állítás:**
+
+* **Kezdőrúgás:** a meccs előtti állapot a lemezen; az élő rekord (seed,
+  0 vödör, üres döntésnapló) megszületik.
+* **A mérce, megszakítás nélkül:**
+  * az élő cserepulton hozott csere a vödör számával naplózódik;
+  * a lefújáskor a forduló lekönyvelve, és a mentésben ott az eredmény meg a
+    függő jutalom-lánc (`S.utoMeccs`).
+* **Frissítés a kezdőrúgás után, majd meccs közben:**
+  * a betöltés magától indítja, ugyanazzal a sorsolással;
+  * a 7. vödörnél újra frissítve a meccs gyorsan visszajátszik a
+    megszakításig, a naplózott cserével együtt, és onnan élőben megy;
+  * a végeredmény és a teljes közvetítés soról sorra azonos a mércével.
+* **Frissítés a lefújás után:**
+  * a forduló lekönyvelve marad, a tabella a lefújáskori;
+  * két külön újratöltés ugyanazt a jutalom-képernyőt hozza;
+  * a lánc közben a kezdőrúgás nem indít új meccset;
+  * a lépésből induló időzítő (a skill-pörgetés vége) és gomb-kezelő ugyanazt
+    sorsolja, egy közbeeső idegen időzítő sem tolja el; a lépés után az
+    időzítők és a kattintás-kezelő eredeti állapotba kerülnek.
+* **Végigjátszás:** a lefújás után, a kör mentése előtt frissítve a meccs
+  ugyanazzal az eredménnyel áll vissza.
+* **Nincs oldalhiba.**
+
+A mérce is betöltött állapotból indul. A próba gyors beállítása nem vet
+kötéseket; azt a betöltés pótolja, és az a meccserőbe is beleszól.
+
 ## teljesitmeny-proba.js — ⚡ 3.9.168: gyorsabb HUB, azonnal induló zene
 
 ```bash

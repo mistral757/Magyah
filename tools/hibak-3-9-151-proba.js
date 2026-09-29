@@ -99,7 +99,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* a sorrend a rendezett listában is: a 45-ös szabály a félidő-sor UTÁN áll */
     ki.sorrend=sim.events.findIndex(e=>e.type==="half")<sim.events.findIndex(e=>e.type==="sub");
     /* a helyi motor feltétele ugyanaz */
-    ki.helyi=/const hatar=atHalf\?45:min-5;/.test(String(playMatch));   /* 3.9.166: a félidei a FÉLIDŐ-sor után, lásd felidei-csere-proba */
+    ki.helyi=/const hatar=atHalf\?45:min-5;/.test(String(playMatchMotor));   /* 3.9.166: a félidei a FÉLIDŐ-sor után, lásd felidei-csere-proba */
     /* a valódi eredményjelző: a társ ⚡-je a kezdőrúgás száma + az ő eseményei */
     sbPaintTeams({duel:true,home:true,myMatch:98,o:{n:"Vendég",ovr:87,dispOvr:88,matchOvr:94.6}});
     ki.alap=SB.teams.away.ms;
@@ -108,7 +108,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.pirosVart=Math.round((94.6+1.7-0.9-SIM.REDMATCH)*100)/100;
     ki.sajatMarad=SB.teams.home.ms;
     /* a lejátszás bekötése: a társ eseményei a saját vödrükben */
-    ki.bekotve=/duelOppBkt\[_b\]\|\|\[\]\)\.forEach\(duelApplyOpp\)/.test(String(playMatch));
+    ki.bekotve=/duelOppBkt\[_b\]\|\|\[\]\)\.forEach\(duelApplyOpp\)/.test(String(playMatchMotor));
     return ki;});
   console.log("\n— 1. PÁRHARC: A TÁRS ⚡-JE ÉLŐBEN —");
   ok(d.subs.length===2&&d.subs[0].dOvr===1.7&&d.subs[1].dOvr===-0.9,"a közös lista a csere erő-változását is viszi (véletlent nem fogyaszt)",d.subs);

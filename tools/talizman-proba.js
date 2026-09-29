@@ -309,7 +309,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.racs=document.querySelectorAll("#talGrid .talCard").length;
     ki.cim=$("talHeadTitle").textContent;
     ki.sav=document.querySelectorAll("#talBar i").length;
-    ki.huzzGomb=!$("talDrawNow").classList.contains("hide");
+    /* 3.9.173: a várakozó húzás a „Képességeid" első kártyája */
+    ki.huzzGomb=!$("talDrawNow").classList.contains("hide")||!!document.querySelector('#talKep [data-tal="huzas"]');
     ki.chipek=$("talChips").textContent;
     talMenuClose();
     /* a HUB-gomb */

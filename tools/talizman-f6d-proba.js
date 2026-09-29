@@ -124,7 +124,7 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     euroActive=ea;
     /* tizenegyes-hóhér: +10 pp; kontra: szabadrúgás-súly −20% */
     _lap("hoher",1);ki.hoher=[talHoherPP(),talHoherFkMult()];
-    const pm=playMatch.toString();
+    const pm=playMatchMotor.toString();
     ki.hoherKod=/talHoherPP\(\)/.test(pm)&&/talHoherFkMult\(\)/.test(pm);
     /* betonfal: ellenfél −3%, saját −2% */
     _lap("betonfal",2);MS=buildMatchSnapshot();

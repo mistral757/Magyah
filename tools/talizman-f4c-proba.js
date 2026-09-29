@@ -303,7 +303,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       sztar:{n:fullCareerRoster()[0].n,szezon:3,ev:{surge:1,ad:0,inv:0,dem:0}},
       igazgMult:{szezon:2,sorok:["⚽ Gólszám: 44 gól — ✓ teljesítve"],zar:"",penz:500}};
     talMenuOpen();ki.t=$("talHatas").textContent;
-    ki.gomb=!!document.querySelector('#talHatas [data-tal="szpFelbont"]');
+    ki.gomb=!!document.querySelector('#talModal [data-tal="szpFelbont"]');
     talMenuClose();
     return ki;});
   console.log("\n— 5. MIND A 16, ÉS A MENÜ —");

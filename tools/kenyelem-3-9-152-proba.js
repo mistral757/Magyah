@@ -159,7 +159,8 @@ const karrier=()=>{
   ok(g.nemDuplaz&&g.pont[0]===3&&g.pont[1]===6&&g.h>=2,"pont csak változáskor kerül a görbére (idény, forduló, Rating)",g.pont);
   ok(g.korlat,"a tömb korlátos, a legelső pont megmarad");
   ok(g.torolt,"a távozó játékos görbéje az idényváltáskor törlődik (a mentés mérete)");
-  ok(/tryAcademyOpportunity\(\(\)=>\{try\{devHistTick\(\);\}catch\(e\)\{\}talPostMatch/.test(src),"a valódi meccs utáni lánc minden meccs után hívja");
+  /* 3.9.171: a lánc lépései a rögzített sorsolás burkában (utoLepes) futnak */
+  ok(/tryAcademyOpportunity\(\(\)=>(?:utoLepes\(\(\)=>)?\{\s*try\{devHistTick\(\);\}catch\(e\)\{\}\s*talPostMatch/.test(src),"a valódi meccs utáni lánc minden meccs után hívja");
   ok(g.svg,"a valódi játékoslapon ott a görbe (SVG)");
 
   /* ---- 3. FEKVŐ TELEFON ---- */

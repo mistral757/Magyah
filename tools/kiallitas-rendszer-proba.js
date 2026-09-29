@@ -181,6 +181,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
        balansz-változás, tehát nem tippelni kell, hanem megmérni: mennyivel
        lett gyakoribb a kiállítás egy RENDES szezonban. Az auto mód a játék
        saját „szezon végigjátszása" útja, tehát reprezentatív. */
+    /* 3.9.171: az előző (nézett) meccs lefújás utáni köre függőben tartja a
+       következő kezdőrúgást — a játékos végigkattintaná, itt lezárjuk; és
+       mivel az S.idx újraindul, a lefújt meccs élő rekordját is töröljük */
+    try{utoLancVege();mEloTorol();}catch(e){}
     S.auto=true;
     const _idx0=S.idx,_reds0=S.reds||0;
     msT().maxMatchRed=0;
