@@ -16,8 +16,8 @@ hangfájl sem**, és offline is szól.
 | téma | hangulat | dallam | kíséret | basszus | dob |
 |---|---|---|---|---|---|
 | Sötét-arany | **Mozi** | elektromos zongora (FM) | lebegő pad-akkordok, csengő | mély szinusz | puha lábdob, halk shaker |
-| Törtfehér | **Napos** | kalimba | pengetett gitár-arpeggio | pengetett basszus | lábdob, shaker, peremütés |
-| Noir | **Füstös jazz** | vibrafon | zongora-akkordok a 2. és 4. ütésre | nagybőgő, walking | ride, seprű, swing |
+| Törtfehér | **Napos** | kalimba | puha marimba-akkordbontás (3.9.169 óta; előtte gitár) | kerek basszus | lábdob, shaker, peremütés |
+| Noir | **Füstös jazz** | vibrafon | zongora-akkordok a 2. és 4. ütésre | kerek walking-basszus (3.9.169 óta; előtte pengetett nagybőgő) | ride, seprű, swing |
 | Pixel | Chiptune | — a 3.9.163 szerint — | | | |
 
 **A beállítás.** A Beállítások → Hang és zene alatt új választó van:
@@ -96,3 +96,26 @@ Offline hangkártyán, a „Főcím” 24 másodpercén:
 * a hangerő-illesztést;
 * a beállító ablakot;
 * élő hangkártyán a témaváltáskori zenecserét.
+
+## 3.9.169 — a gitár kikerült
+
+> „a két olyan zenei téma, amiben gitár is van, az nagyon nem jó. A gitárt egy
+> az egyben vegyük ki belőle. Nagyon agresszív."
+
+A pengetett húr (Karplus–Strong) mindkét érintett hangulatból eltűnt, a
+húr-motorral együtt.
+
+* **Napos:**
+  * a gitár nyolcados akkordbontása helyett puha marimba szól **negyedekben**,
+    fel-le hullámzó sorrendben: nyugodtabb, nem pörög;
+  * a pengetett basszus helyett kerek basszus szól.
+* **Füstös jazz:**
+  * a walking-basszus vonala marad (alaphang, terc, kvint, félhangos
+    rávezetés), de a pengetett nagybőgő helyett kerek, pengetés nélküli
+    hangon;
+  * ez egy szinusz 15 ms-os lágy indítással, plusz halk második-harmadik
+    felhanggal, hogy telefon-hangszórón is hallható maradjon.
+* **Hangerő:** a három hangulat 0,8 dB-en belül van egymáshoz, a csúcs 0,77
+  alatt.
+* **Próba:** a `tools/hangtema-proba.js` őrzi, hogy gitár (pengetett húr)
+  egyik hangulatban se szóljon.
