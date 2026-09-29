@@ -7,6 +7,20 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
+
+## kezdolap-beallitasok-proba.js — ⚙ 3.9.164: a Beállítások és a Keretek a kezdőlapon
+
+```bash
+node tools/kezdolap-beallitasok-proba.js
+```
+
+**9 állítás:** a kezdőlapon ott a két sor (a karrierutak stílusában, folytonos
+„( A )/( B )” jelöléssel); a ⚙ sor a Beállítások ablakot nyitja a kezdőlap
+FÖLÖTT (tempó, téma, hang), a Bezár gomb tényleg elérhető; a 📊 sor a Keretek
+ablakot nyitja, a névszerkesztő is megnyílik; bezáráskor (gombbal és háttérre
+koppintva is) a réteg-emelés lekerül; a módválasztó régi két gombja emelés
+nélkül, a régi módon nyit; nincs oldalhiba.
+
 ## Használat
 
 ```bash
