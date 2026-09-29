@@ -8,7 +8,8 @@
      3. az első érintés után a hangkártya fut; minden hangeffekt, mind a
         három menüdal és mind a nyolc stílus-dallam hiba nélkül szól;
      4. minden dallam hangjegye értelmes, és minden dal egész ütemekből áll;
-     5. a zene meccs közben hallgat, a menüben szól;
+     5. a zene a menüben szól; nézett meccsen 25%-on megy tovább (3.9.174),
+        végigjátszásnál hallgat;
      6. a meccs hangjai: kezdő sípszó, gól, kapott gól, lapok, sérülés, a
         napló-szűrő (kapufa, kivédett tizenegyes, VAR, mesterhármas) — és
         végigjátszásnál (S.auto) egyik sem;
@@ -99,7 +100,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const out={};
     const B=hangBeall();B.on=true;B.zene=true;hangHangero();
     hangZeneIgazit();out.menu=!!_hangZene;
-    S.playing=true;hangZeneIgazit();out.meccs=!!_hangZene;
+    /* 3.9.174: NÉZETT meccsen a zene 25%-on szól tovább (a lelátó alatt),
+       végigjátszásnál hallgat */
+    S.playing=true;S.auto=false;hangZeneIgazit();lelatoIgazit();out.meccs=!!_hangZene;out.duck=_hangZeneDuck;
+    S.auto=true;hangZeneIgazit();out.meccsAuto=!!_hangZene;S.auto=false;
     /* meccsesemények */
     _hangNaplo.length=0;
     hangMeccs("sip");
@@ -130,7 +134,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     out.menuDal=_hangNaplo.slice();
     hangZeneAllj();_hangStilusDal=null;
     return out;});
-  ok(j.menu&&!j.meccs,"a zene a menüben szól, meccs közben hallgat",{menu:j.menu,meccs:j.meccs});
+  ok(j.menu&&j.meccs&&j.duck===.25&&!j.meccsAuto,"a zene a menüben szól; nézett meccsen 25%-on megy tovább (3.9.174), végigjátszásnál hallgat",{menu:j.menu,meccs:j.meccs,duck:j.duck,auto:j.meccsAuto});
   ok(JSON.stringify(j.esem)===JSON.stringify(["sip","gol","golKapott","sarga","piros","serules","kapufa","bravur","var","mesterharmas"]),
     "a meccs hangjai: sípszó, gól, kapott gól, sárga, piros, sérülés, kapufa, kivédett tizenegyes, VAR, mesterhármas",j.esem);
   ok(j.auto.length===0,"végigjátszásnál a meccs hangjai hallgatnak",j.auto);

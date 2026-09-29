@@ -8,6 +8,33 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## lelato-proba.js — 🏟️ 3.9.174: a lelátó hangja
+
+```bash
+node tools/lelato-proba.js
+```
+
+**21 állítás** (valódi hangkártyával, `HANG_TESZT`):
+
+* **A render:** mind az öt lelátó kirenderelődik, nem néma, a hurok 15 mp
+  fölötti; a csúcs 0,9 alatt; a varrat sima; a nagy tömeg hangosabb a
+  vasárnapinál.
+* **A nézett meccs:**
+  * a választott lelátó szól, a zene 25%-on megy tovább;
+  * a gól megmozdítja a lelátót;
+  * a lefújás után a lelátó elhallgat, a zene visszaáll.
+* **Végigjátszás:** nincs lelátó.
+* **A feloldás:**
+  * a lépcsők 0 / 65 / 85 / 92 / 96;
+  * zárt lelátó nem választható;
+  * a lépcső átlépését a napló bejelenti.
+* **Az Arculat → „7 · A lelátó hangja”:**
+  * öt kártya, a zártak feltétellel;
+  * a választás azonnal érvényes, és bekerül a mentésbe;
+  * a belehallgatás szól.
+* **A Hang beállításai:** lelátó ki/be, hangerő, a 25%-os zene leírása.
+* **Nincs oldalhiba.**
+
 ## talizman-kepesseg-proba.js — 🎮 3.9.173: a talizmán-képességek láthatóan
 
 ```bash
