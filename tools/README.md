@@ -8,6 +8,38 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## jelzesek-3-9-172-proba.js — 🔔 3.9.172: számok, stáb-mérleg, felugró, feed-szűrő, push
+
+```bash
+node tools/jelzesek-3-9-172-proba.js
+```
+
+**33 állítás, öt blokkban:**
+
+* **Pixel számjegyek:**
+  * a „Magyah Pixszam" áll elöl, csak a számjegyekre, betöltve;
+  * a „23580" ugyanolyan széles, mint a Pixelify-ban;
+  * a másik témák nem kérik.
+* **Stáb-mérleg:**
+  * a személyi edző pontjai külön csatornán, edzőnként könyvelődnek;
+  * a régi mérleg (pts) = edzésterv + egyéb − lassítás;
+  * a HUB játékoslapján megjelenik a „🎓 Stábtag" sor.
+* **Kihívás-felugró:**
+  * a teljesítés megnyitja, a második sorba áll, a gomb léptet és bezár;
+  * végigjátszásnál magától zárul;
+  * pixel- és sötét ruhája van;
+  * a resolveChallenge hívja.
+* **Feed-szűrő:**
+  * a sorok besorolása, a folytatósor öröklése;
+  * a kapcsolók a Vezetés menüben vannak, rejtenek és visszahoznak;
+  * a „Csak a meccsközvetítés" gomb működik, a beállítás megmarad.
+* **Push:**
+  * a fajták: kezdőrúgás előtt, idény elején, „rég" csak 8 forduló után;
+  * fordulónként egyszer szól;
+  * a sáv beúszik, a „Mutasd" a HUB-ba visz;
+  * kikapcsolva és „Semmi" módban néma, a panelen saját kapcsoló.
+* **Nincs oldalhiba.**
+
 ## frissites-proba.js — ⏯ 3.9.171: a frissítés folytatás, nem újrakezdés
 
 ```bash

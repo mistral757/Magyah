@@ -18,7 +18,7 @@
    telepítéseken a RÉGI ikonok maradnának örökre — pont az a rajz, amit
    jogtisztasági okból cserélni kellett. A név léptetése az egyetlen dolog,
    ami ezt kikényszeríti. */
-const CACHE_NAME = "harminc-nulla-cache-v6";   /* v6: a Pixel téma két betűje (3.9.165) */
+const CACHE_NAME = "harminc-nulla-cache-v7";   /* v7: a Pixel téma számjegy-betűje (3.9.172) */
 const STATIC_ASSETS = [
   "/",
   /* A betűk önhosztoltak (lásd az index.html @font-face blokkját). Itt kell
@@ -40,6 +40,8 @@ const STATIC_ASSETS = [
   "/fonts/press-start-2p-latin-ext.woff2",
   "/fonts/pixelify-sans-latin.woff2",
   "/fonts/pixelify-sans-latin-ext.woff2",
+  "/fonts/pixszam-400.woff2",
+  "/fonts/pixszam-700.woff2",
   "/icons/site.webmanifest",
   "/icons/favicon.ico",
   "/icons/apple-touch-icon.png",
