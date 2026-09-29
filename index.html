@@ -6778,7 +6778,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.167";
+const APP_VERSION="3.9.170";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -6842,8 +6842,15 @@ function hangHangero(){
 /* az első érintés feloldja a hangot (a böngésző szabálya) */
 function hangFelold(){
   const ac=hangAc();if(!ac)return;
-  if(ac.state==="suspended")try{ac.resume();}catch(e){}
+  /* A resume ASZINKRON: eddig a zene a feloldás után a következő
+     másodperces ütemig várt (a hangZeneIgazit még „suspended" állapotot
+     látott). Mostantól a resume után azonnal indul, és egyszer előmelegít. */
+  if(ac.state==="suspended")try{
+    const pr=ac.resume();
+    if(pr&&pr.then)pr.then(()=>{try{hangZeneIgazit();}catch(e){}});}catch(e){}
+  if(!_hangMeleg){_hangMeleg=1;try{hangLagyElomeleg();}catch(e){}}
   hangZeneIgazit();}
+var _hangMeleg=0;
 function hangKesz(){return !!(_hangCtx&&_hangCtx.state==="running"&&hangBeall().on);}
 /* ---- A HANGSZEREK ---- */
 function hangHz(n){return 440*Math.pow(2,(n-69)/12);}
@@ -6992,7 +6999,9 @@ function hangZeneInditas(dal){
   const Z={dal,kulcs:hangZeneKulcs(),lep:0,kov:_hangCtx.currentTime+.08,timer:null};
   if(lagy)Z.busz=hangLagyBusz(_hangBus.zene,F);
   Z.timer=setInterval(()=>{
-    try{while(Z.kov<_hangCtx.currentTime+.12){
+    /* 0,3 mp előretekintés (korábban 0,12): egy hosszabb felület-munka
+       (HUB-rajzolás, mentés) alatt se fogyjon ki a beütemezett zene */
+    try{while(Z.kov<_hangCtx.currentTime+.3){
         if(lagy)hangLagyLepes(D,Z.lep,Z.kov,Z.busz,F,STEP);
         else hangLepes(D,Z.lep,Z.kov,_hangBus.zene);
         Z.kov+=STEP;Z.lep++;}}catch(e){}},25);
@@ -7112,7 +7121,7 @@ function hangStilusJutalom(key){
 
    TÉMÁNKÉNT MÁS HANGULAT — a kotta közös, a hangszerelés más:
      · Sötét-arany → MOZI: lebegő padek, elektromos zongora, csengők, nagy tér;
-     · Törtfehér   → NAPOS: kalimba, pengetett gitár, shaker, közeli, meleg;
+     · Törtfehér   → NAPOS: kalimba, puha marimba-arpeggio, shaker, közeli, meleg;
      · Noir        → FÜSTÖS JAZZ: vibrafon, nagybőgő (walking), seprűs dob,
                      swing — az ötvenes évek filmnyomatához.
    A „Hangzás" beállítás alapból AUTOMATIKUS (a színtémát követi), de kézzel
@@ -7124,8 +7133,8 @@ function hangStilusJutalom(key){
      · bell   — csengő/cseleszta: nem harmonikus felhangok (2,76× és 5,4×);
      · kalimba, vibra (tremolós vibrafon);
      · pad    — két, egymáshoz képest elhangolt fűrész, lassan nyíló szűrővel;
-     · pluck / bogo — Karplus–Strong húr: egyszer kiszámolt, hangonként
-       gyorsítótárazott puffer (gitár, illetve tompább nagybőgő);
+     · marimba — puha ütős fa-hang (a gitár helyett, 3.9.169);
+     · puha   — kerek, pengetés nélküli basszus (a nagybőgő helyett);
      · sub    — tiszta, mély szinusz-basszus.
    DOBOK (hangLagyDob): puha lábdob, shaker, peremütés, seprű, ride.
 
@@ -7135,23 +7144,41 @@ function hangStilusJutalom(key){
 var HANG_LAGY_HANGULAT={
   mozi:{nev:"Mozi",tema:"Sötét-arany",leiras:"filmszerű: lebegő padek, elektromos zongora, csengők, nagy tér",
     lead:"epiano",fel:"bell",comp:"pad",bass:"sub",dob:"mozi",tempo:.92,rev:.42,swing:0,leadVol:.15,gain:.6},
-  napos:{nev:"Napos",tema:"Törtfehér",leiras:"akusztikus: kalimba, pengetett gitár, shaker, közeli, meleg hang",
-    lead:"kalimba",fel:"kalimba",comp:"gitar",bass:"bogo",dob:"napos",tempo:1,rev:.2,swing:0,leadVol:.17,gain:1.5},
-  jazz:{nev:"Füstös jazz",tema:"Noir",leiras:"vibrafon, nagybőgő, seprűs dob, swing — az ötvenes évek",
-    lead:"vibra",fel:"vibra",comp:"stab",bass:"bogo",dob:"jazz",tempo:.9,rev:.3,swing:.34,leadVol:.15,gain:1.3}};
+  napos:{nev:"Napos",tema:"Törtfehér",leiras:"kalimba, puha marimba, shaker, meleg basszus — közeli, napos hang",
+    lead:"kalimba",fel:"kalimba",comp:"marimba",bass:"puha",dob:"napos",tempo:1,rev:.22,swing:0,leadVol:.17,gain:1.5},
+  jazz:{nev:"Füstös jazz",tema:"Noir",leiras:"vibrafon, puha walking-basszus, seprűs dob, swing — az ötvenes évek",
+    lead:"vibra",fel:"vibra",comp:"stab",bass:"puha",dob:"jazz",tempo:.9,rev:.3,swing:.34,leadVol:.15,gain:1.3}};
+/* 3.9.169 — A GITÁR KIKERÜLT. BEJELENTETT: „a két olyan zenei téma, amiben
+   gitár is van, az nagyon nem jó. A gitárt egy az egyben vegyük ki belőle.
+   Nagyon agresszív." A pengetett húr (Karplus–Strong) mindkét hangulatból
+   eltűnt: a Napos gitár-arpeggiója helyett puha marimba szól negyedekben, a
+   pengetett basszus és a Noir nagybőgője helyett egy pengetés NÉLKÜLI, kerek
+   basszus (szinusz + halk felhang, lágy indítással). */
 /* A HANGULATOK SZINTJE (gain): mérve (offline, a „fo" dal 24 mp-e) a pad
    nélküli két hangulat RMS-e a mozié ~40%-a volt — a hangulatváltás
    hangerő-ugrásnak hatott. A gain egy saját erősítőn ül (hangLagyBusz), tehát a
    hangszerek belső arányai érintetlenek. */
 function hangLagyBusz(bus,F,mp){
   const ac=_hangCtx,g=ac.createGain();g.gain.value=F.gain||1;
+  /* a zengetés a SZÜLŐ busz konvolverén szól (a hangulat szintjével) —
+     nem kell minden dalhoz és szignálhoz saját konvolver */
+  const rs=ac.createGain();rs.gain.value=F.gain||1;rs.connect(hangLagyRev(bus));g._rev=rs;
   /* szelíd kompresszor a hangulat-erősítő után: a pengetések és a lábdob
      tranzienseit fogja meg, hogy a csúcs a hangszóró határa alatt maradjon */
   const c=ac.createDynamicsCompressor();
   c.threshold.value=-14;c.knee.value=8;c.ratio.value=4;c.attack.value=.004;c.release.value=.25;
   g.connect(c);c.connect(bus);
-  if(mp)setTimeout(()=>{try{c.disconnect();}catch(e){}},(mp+3)*1000);
+  if(mp)setTimeout(()=>{try{c.disconnect();rs.disconnect();}catch(e){}},(mp+3)*1000);
   return g;}
+/* ELŐMELEGÍTÉS: az első feloldás után, ÜRESJÁRATBAN elkészül a két busz
+   zengetője — így az első ütem nem a számolással telik, és a zene azonnal,
+   egyenletesen indul. */
+function hangLagyElomeleg(){
+  const fut=()=>{try{
+    if(!_hangCtx||!_hangBus)return;
+    hangLagyIR(_hangCtx);hangLagyRev(_hangBus.zene);hangLagyRev(_hangBus.sfx);
+  }catch(e){}};
+  try{(window.requestIdleCallback||((f)=>setTimeout(f,200)))(fut,{timeout:1500});}catch(e){fut();}}
 /* ---- A LÁGY MENÜDALOK ----
    Ugyanaz a három cím, mint a chiptune-ban (a választó közös), de lassabb,
    levegősebb dallammal és négyhangú (szeptim) akkordokkal. Ütemenként egy
@@ -7187,12 +7214,22 @@ function hangZeneKulcs(){return hangCsomag()==="lagy"?"lagy:"+hangHangulat():"ch
    Buszonként EGY konvolver (a zenéé és az effekteké külön, hogy a hangerő-
    csúszka a zengetésre is hasson). A lecsengés kódból születik: sztereó zaj,
    köbös halkulással, 2,4 másodperc. */
+/* A LECSENGÉS EGYSZER születik (mintavételi rátánként) — 3.9.168: korábban
+   minden zeneindításkor és minden stílus-szignálnál újra, egy 2,4 mp-es
+   sztereó puffer mintánkénti hatványozással, ami telefonon a zene
+   indulását késleltette és meccs közben akadást okozott. */
+var _hangIR={};
+function hangLagyIR(ac){
+  const sr=ac.sampleRate;
+  if(_hangIR[sr])return _hangIR[sr];
+  const len=Math.floor(sr*2.4),ir=ac.createBuffer(2,len,sr);
+  for(let c=0;c<2;c++){const d=ir.getChannelData(c);
+    for(let i=0;i<len;i++){const x=1-i/len;d[i]=(Math.random()*2-1)*x*x*x*Math.min(1,i/(sr*.012));}}
+  return (_hangIR[sr]=ir);}
 function hangLagyRev(bus){
   if(bus._rev)return bus._rev;
-  const ac=_hangCtx,sr=ac.sampleRate,len=Math.floor(sr*2.4),ir=ac.createBuffer(2,len,sr);
-  for(let c=0;c<2;c++){const d=ir.getChannelData(c);
-    for(let i=0;i<len;i++){const x=i/len;d[i]=(Math.random()*2-1)*Math.pow(1-x,3.2)*Math.min(1,i/(sr*.012));}}
-  const cv=ac.createConvolver();cv.buffer=ir;
+  const ac=_hangCtx;
+  const cv=ac.createConvolver();cv.buffer=hangLagyIR(ac);
   const send=ac.createGain(),wet=ac.createGain();wet.gain.value=.55;
   send.connect(cv);cv.connect(wet);wet.connect(bus);
   bus._rev=send;return send;}
@@ -7203,23 +7240,6 @@ function _lSin(t,f,vol,dur,dest,att){
   const ac=_hangCtx,os=ac.createOscillator(),g=ac.createGain();
   os.type="sine";os.frequency.setValueAtTime(f,t);
   _lEnv(g,t,vol,att||.004,dur);os.connect(g);g.connect(dest);os.start(t);os.stop(t+dur+.05);}
-/* KARPLUS–STRONG HÚR: egy zajimpulzus köröz egy hangmagasságnyi késleltetőben,
-   és minden körben kicsit tompul — ettől szól pengetett húrként. Hangonként
-   EGYSZER számoljuk ki, utána a puffer újrahasznosul. */
-var _hangKsTar={};
-function hangKs(n,bogo){
-  const ac=_hangCtx,sr=ac.sampleRate,k=n+(bogo?"b":"g")+sr;
-  if(_hangKsTar[k])return _hangKsTar[k];
-  const len=Math.floor(sr*(bogo?1.3:1.8)),b=ac.createBuffer(1,len,sr),d=b.getChannelData(0);
-  /* a gerjesztés SIMÍTOTT zaj (a nyers fehér zaj tüskés pengetést adott —
-     mérve a Napos hangulat csúcsa 1,4 volt, vagyis torzított volna) */
-  const N=Math.max(2,Math.round(sr/hangHz(n))),simit=bogo?.8:.5,dec=bogo?.993:.9972;
-  let pr=0;for(let i=0;i<N&&i<len;i++){pr=pr*simit+(Math.random()*2-1)*(1-simit);d[i]=pr;}
-  for(let i=N;i<len;i++)d[i]=dec*.5*(d[i-N]+(i-N-1>=0?d[i-N-1]:0));
-  /* csúcsra normálva: minden húr ugyanakkora hangerővel indul */
-  let pk=0;for(let i=0;i<len;i++)pk=Math.max(pk,Math.abs(d[i]));
-  if(pk>0){const k2=.5/pk;for(let i=0;i<len;i++)d[i]*=k2;}
-  return (_hangKsTar[k]=b);}
 /* ---- EGY HANG A LÁGY HANGSZEREKEN ----
    o: {v: hangszer, n: MIDI vagy f: Hz, dur, vol, rev: zengető-arány, pan} */
 function hangLagy(t,o,bus){
@@ -7258,12 +7278,15 @@ function hangLagy(t,o,bus){
       [-7,7].forEach(ct=>{const os=ac.createOscillator();os.type="sawtooth";os.frequency.setValueAtTime(f,t);os.detune.value=ct;
         os.connect(lp);os.start(t);os.stop(t+dur+rel+.05);});
       lp.connect(g);g.connect(ki);break;}
-    case "pluck":case "bogo":{
-      const n=o.n!=null?o.n:Math.round(69+12*Math.log2(f/440));
-      const s=ac.createBufferSource(),g=ac.createGain();s.buffer=hangKs(n,o.v==="bogo");
-      g.gain.setValueAtTime(vol,t);g.gain.setValueAtTime(vol,t+Math.max(.05,dur));
-      g.gain.exponentialRampToValueAtTime(.0005,t+dur+.35);
-      s.connect(g);g.connect(ki);s.start(t);s.stop(t+dur+.4);break;}
+    case "marimba":
+      /* puha ütő, fa-rezonátor: alaphang + a negyedik felhang, gyors,
+         pengetés nélküli lecsengéssel (4 ms-os indítás) */
+      _lSin(t,f,vol,.55+dur*.3,ki,.004);_lSin(t,f*4,vol*.12,.09,ki,.003);break;
+    case "puha":{
+      /* KEREK BASSZUS pengetés nélkül: szinusz lágy (15 ms) indítással, és egy
+         halk második felhang, hogy telefon-hangszórón is hallható legyen */
+      const d=Math.max(.3,dur);
+      _lSin(t,f,vol,d+.15,ki,.015);_lSin(t,f*2,vol*.22,d*.6,ki,.02);_lSin(t,f*3,vol*.06,d*.3,ki,.02);break;}
     case "sub":{
       const g=ac.createGain(),os=ac.createOscillator();os.type="sine";os.frequency.setValueAtTime(f,t);
       g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.03);g.gain.setValueAtTime(vol,t+dur*.6);
@@ -7307,7 +7330,7 @@ function hangLagyDob(t,tip,vol,bus){
 function hangLagyAkkord(ch,F){
   if(ch.length>=4)return ch;
   const dur=ch[1]-ch[0]===4;
-  return ch.concat([ch[0]+(dur?(F.comp==="gitar"?9:11):10)]);}
+  return ch.concat([ch[0]+(dur?(F.comp==="marimba"?9:11):10)]);}
 /* ---- EGY LÉPÉS A LÁGY HANGSZERELÉSBEN ----
    A kotta ugyanaz a formátum, mint a chiptune-é: 16 lépés = egy ütem = egy
    akkord. A swing a páratlan nyolcadokat késlelteti (jazz). */
@@ -7322,21 +7345,22 @@ function hangLagyLepes(D,lep,t,bus,F,STEP){
   if(F.comp==="pad"){
     if(s===0)ch.forEach((n,i)=>hangLagy(t,{v:"pad",n,dur:STEP*16,vol:.03,rev:F.rev*1.2,pan:(i-1.5)*.25},bus));
     if(s===8)hangLagy(t,{v:"bell",n:ch[ch.length-1]+12,dur:STEP*4,vol:.035,rev:F.rev*1.3,pan:.35},bus);}
-  else if(F.comp==="gitar"&&s%2===0){
-    const minta=[0,1,2,3,2,1,2,3];
-    hangLagy(tt,{v:"pluck",n:ch[minta[(s>>1)%8]%ch.length],dur:STEP*3,vol:.1,rev:F.rev,pan:.3},bus);}
+  else if(F.comp==="marimba"&&s%4===0){
+    /* negyedekben, fel-le hullámzó akkordbontás — nyugodt, nem pörgő */
+    const minta=[0,2,1,3];
+    hangLagy(t,{v:"marimba",n:ch[minta[(s>>2)%4]%ch.length],dur:STEP*3,vol:.075,rev:F.rev,pan:.3},bus);}
   else if(F.comp==="stab"&&(s===4||s===12))
     ch.forEach(n=>hangLagy(t,{v:"epiano",n,dur:STEP*2.5,vol:.035,rev:F.rev,pan:.2},bus));
   /* basszus */
   if(F.dob==="mozi"){if(s===0)hangLagy(t,{v:"sub",n:ch[0]-12,dur:STEP*15,vol:.2,rev:0},bus);}
   else if(F.dob==="napos"){
-    if(s===0)hangLagy(t,{v:"bogo",n:ch[0]-12,dur:STEP*6,vol:.3,rev:.05},bus);
-    if(s===8)hangLagy(t,{v:"bogo",n:ch[2]-12,dur:STEP*6,vol:.26,rev:.05},bus);}
+    if(s===0)hangLagy(t,{v:"puha",n:ch[0]-12,dur:STEP*6,vol:.22,rev:.05},bus);
+    if(s===8)hangLagy(t,{v:"puha",n:ch[2]-12,dur:STEP*6,vol:.18,rev:.05},bus);}
   else if(F.dob==="jazz"&&s%4===0){
     /* WALKING: alaphang, terc, kvint, majd félhanggal a következő akkord alá */
     const kov=D.ch[(bar+1)%D.ch.length][0];
     const n=[ch[0],ch[1],ch[2],kov-1][s>>2];
-    hangLagy(t,{v:"bogo",n:n-12,dur:STEP*3.6,vol:.34,rev:.08},bus);}
+    hangLagy(t,{v:"puha",n:n-12,dur:STEP*3.4,vol:.24,rev:.08},bus);}
   /* dob */
   if(F.dob==="mozi"){
     if(s===0)hangLagyDob(t,"kick",.24,bus);if(s===8)hangLagyDob(t,"kick",.12,bus);
@@ -38322,7 +38346,7 @@ const HU_NAME_TABLE={
  "Alekszej Mihajlicsenko":["Míhajlicsenko Elek","Míhajlicsenko"],
  "Alemão":["Németke","Németke"],
  "Alen Bokšić":["Bokszics Alán","Bokszics"],
- "Alessandro Bastoni":["Bástonyi Sándor","Bástonyi"],
+ "Alessandro Bastoni":["Bástyás Sándor","Bástyás"],
  "Alessandro Bianchi":["Bianki Sándor","Bianki"],
  "Alessandro Birindelli":["Birindelji Sándor","Birindelji"],
  "Alessandro Costacurta":["Aztakurva Sándor","Aztakurva"],
@@ -38507,7 +38531,7 @@ const HU_NAME_TABLE={
  "Antonio Nocerino":["Nocserino Antal","Nocserino"],
  "Antonio Paganin":["Páganin Antal","Páganin"],
  "Antonio Puerta":["Púerta Antal","Púerta"],
- "Antonio Rüdiger":["Rüdíger Antal","Rüdíger"],
+ "Antonio Rüdiger":["Rüdiger Antal","Rüdiger"],
  "Antonio Valencia":["Valenszia Antal","Valenszia"],
  "Antonios Nikopolidis":["Nikopolidisz Bendegúz","Nikopolidisz"],
  "Antonis Antoniadis":["Antoniadisz Gellért","Antoniadisz"],
@@ -38687,7 +38711,7 @@ const HU_NAME_TABLE={
  "Brian Dear":["Dír Brián","Dír"],
  "Brian Kidd":["Kídd Brián","Kídd"],
  "Brian Kilcline":["Kilklájn Brián","Kilklájn"],
- "Brian Laudrup":["Ládrupp Brián","Ládrupp"],
+ "Brian Laudrup":["Laudanum Brián","Laudanum"],
  "Brian McClair":["Mekkléjr Brián","Mekkléjr"],
  "Brito":["Bríto","Bríto"],
  "Bruce Grobbelaar":["Görbelábú Brúszi","Görbelábú"],
@@ -38700,7 +38724,7 @@ const HU_NAME_TABLE={
  "Bruno Fernandes":["Brunyáló Ferkó","Burnyáló"],
  "Bruno Giordano":["Dzsordano Brunó","Dzsordano"],
  "Bruno Grassi":["Grasszi Brunó","Grasszi"],
- "Bruno Guimarães":["Gúimarés Brunó","Gúimarés"],
+ "Bruno Guimarães":["Gumimaci Brunó","Gumimaci"],
  "Bruno Martins Indi":["Índi Brunó","Índi"],
  "Bruno Mora":["Móra Brunó","Móra"],
  "Bruno N'Gotty":["N'gotti Brunó","N'gotti"],
@@ -38997,7 +39021,7 @@ const HU_NAME_TABLE={
  "David Jarolím":["Járolím Dávid","Járolím"],
  "David Jemmali":["Zsemmali Dávid","Zsemmali"],
  "David Kipiani":["Kípiani Dávid","Kípiani"],
- "David Luiz":["Lúiz Dávid","Lúiz"],
+ "David Luiz":["Luísz Dávid","Luísz"],
  "David Needham":["Nídem Dávid","Nídem"],
  "David Neres":["Néres Dávid","Néres"],
  "David Nugent":["Núgent Dávid","Núgent"],
@@ -39020,7 +39044,7 @@ const HU_NAME_TABLE={
  "Davide Zappacosta":["Cappakoszta Jenő","Cappakoszta"],
  "Davie Selke":["Sélke Domonkos","Sélke"],
  "Davinson Sánchez":["Száncsesz Rezső","Száncsesz"],
- "Davor Šuker":["Dáv Siker","Siker"],
+ "Davor Šuker":["Siker Dávid","Siker"],
  "Davy De Fauw":["Defauv Dávid","Defauv"],
  "Davy Klaassen":["Klaaszfi Dávid","Klaaszfi"],
  "Dayot Upamecano":["Uppáré Dejó","Uppáré"],
@@ -39083,7 +39107,7 @@ const HU_NAME_TABLE={
  "Diego Placente":["Plaszente Dijégó","Plaszente"],
  "Diego Rico":["Riko Dijégó","Riko"],
  "Diego Rossi":["Rosszi Dijégó","Rosszi"],
- "Diego Simeone":["Szimatoló Dijégó","Szimatoló"],
+ "Diego Simeone":["Szimatoló Diegó","Szimatoló"],
  "Diego Tristán":["Trísztán Ábris","Trísztán"],
  "Dieter Eilts":["Ájlc Detre","Ájlc"],
  "Dieter Herzog":["Hercog Detre","Hercog"],
@@ -39091,7 +39115,7 @@ const HU_NAME_TABLE={
  "Dieter Müller":["Müler Detre","Müler"],
  "Dietmar Danner":["Dánner Ákos","Dánner"],
  "Dietmar Hamann":["Hámann Menyhért","Hámann"],
- "Dimitar Berbatov":["Bérbatov Kelemen","Bérbatov"],
+ "Dimitar Berbatov":["Borbátor Dömötör","Borbátor"],
  "Dimitri Liénard":["Líénard Menyhért","Líénard"],
  "Dino Baggio":["Bádzsós Dini","Bádzsós"],
  "Dino Zoff":["Zoffos Dini","Zoffos"],
@@ -39350,7 +39374,7 @@ const HU_NAME_TABLE={
  "Florent Laville":["Lavij Flórián","Lavij"],
  "Florent Malouda":["Malúda Flórián","Malúda"],
  "Florian Wirtz":["Virc Flóri","Virc"],
- "Florin Răducioiu":["Raduszioiu Pongrác","Raduszioiu"],
+ "Florin Răducioiu":["Radúcsoju Flórián","Radúcsoju"],
  "Flávio Conceição":["Konszészáó Boldizsár","Konszészáó"],
  "Fodé Mansaré":["Mánsaré Domonkos","Mánsaré"],
  "Fontaine":["ifj. Fontos","ifj. Fontos"],
@@ -39515,7 +39539,7 @@ const HU_NAME_TABLE={
  "Gervinho":["Zservinyó","Zservinyó"],
  "Gerónimo Rulli":["Ruji Gyárfás","Ruji"],
  "Gheorghe Hagi":["Hagymás György","Hagymás"],
- "Gheorghe Popescu":["Popeszku György","Popeszku"],
+ "Gheorghe Popescu":["Pöpec György","Pöpec"],
  "Giacinto Facchetti":["Fakettős Jácint","Fakettős"],
  "Giacinto Santarelli":["Santareli Ernő","Santareli"],
  "Giacomo Bulgarelli":["Bulgareli Jakab","Bulgareli"],
@@ -39713,7 +39737,7 @@ const HU_NAME_TABLE={
  "Hervé Revelli":["Reveli Jenő","Reveli"],
  "Heurelho Gomes":["Gómes Benedek","Gómes"],
  "Hidegkuti Nándor":["Hidegkutyus Nándika","Hidegkutyus"],
- "Hidetoshi Nakata":["Nákata Gergő","Nákata"],
+ "Hidetoshi Nakata":["Nagykáta Tóni","Nagykáta"],
  "Hiroki Ito":["Ító Dezső","Ító"],
  "Hirving Lozano":["Loszano Bertalan","Loszano"],
  "Holender Filip":["Hollandus Fülöp","Hollandus"],
@@ -39768,7 +39792,7 @@ const HU_NAME_TABLE={
  "Igor Akinfejev":["Ákinfejev Igor","Ákinfejev"],
  "Igor Bišćan":["Biscsan Igor","Biscsan"],
  "Igor Bogdanović":["Bogdán Ovis Igor","Bogdán Ovis"],
- "Igor Csiszlenko":["Csíszlenko Igor","Csíszlenko"],
+ "Igor Csiszlenko":["Csiszlenko Igor","Csiszlenko"],
  "Igor Denisov":["Dénisov Igor","Dénisov"],
  "Igor Duljaj":["Dúljaj Igor","Dúljaj"],
  "Igor Gabilondo":["Gábilondo Igor","Gábilondo"],
@@ -39813,7 +39837,7 @@ const HU_NAME_TABLE={
  "Iván Campo":["Kampo János","Kampo"],
  "Iván Córdoba":["Kordbársony Iván","Kordbársony"],
  "Iván Helguera":["Elguera János","Elguera"],
- "Iván Zamorano":["Szamorano János","Szamorano"],
+ "Iván Zamorano":["Zamatos Iván","Zamatos"],
  "Iván de la Peña":["Delapenya János","Delapenya"],
  "Jaap Stam":["Stampedli Jakab","Stampedli"],
  "Jacek Góralski":["Góralszki Sebő","Góralszki"],
@@ -39840,7 +39864,7 @@ const HU_NAME_TABLE={
  "Jamal Musiala":["Muzsikáló Jámbor","Muzsikáló"],
  "Jamel Saihi":["Szájhi Csongor","Szájhi"],
  "James McCarthy":["Mekárti Jakab","Mekárti"],
- "James Milner":["Mílner Jakab","Mílner"],
+ "James Milner":["Malmos Jakab","Malmos"],
  "James Morrison":["Morriszffy Jakab","Morriszffy"],
  "James Rodríguez":["Rodrigó Jakab","Rodrigó"],
  "James Tarkowski":["Tarkovszki Jakab","Tarkovszki"],
@@ -39882,14 +39906,14 @@ const HU_NAME_TABLE={
  "Javier Saviola":["Savanyó Jávor","Savanyó"],
  "Javier Zanetti":["Zanótos Jávor","Zanótos"],
  "Javier de Pedro":["Dépedro Xavér","Dépedro"],
- "Jay-Jay Okocha":["Okocsa Lehel","Okocsa"],
+ "Jay-Jay Okocha":["Okos Csaba","Okos"],
  "Jean Beausejour":["Bíusehúr János","Bíusehúr"],
  "Jean Butez":["Bútez János","Bútez"],
  "Jean Dockx":["Dokksz János","Dokksz"],
  "Jean Lamartine":["Lamarten János","Lamarten"],
  "Jean Michaël Seri":["Séri János","Séri"],
  "Jean Thissen":["Tiszfi János","Tiszfi"],
- "Jean Tigana":["Tígana János","Tígana"],
+ "Jean Tigana":["Tigana János","Tigana"],
  "Jean Vincent":["Venszan János","Venszan"],
  "Jean-Christophe Thouvenel":["Túvenel János","Túvenel"],
  "Jean-François Gillet":["Gilet János","Gilet"],
@@ -40002,7 +40026,7 @@ const HU_NAME_TABLE={
  "Johnny Rep":["Répa Jancsi","Répa"],
  "Joleon Lescott":["Leszokott Dzsóleon","Leszokott"],
  "Jon Aurtenetxe":["Aurtenecse János","Aurtenecse"],
- "Jon Dahl Tomasson":["Tomaszfi János","Tomaszfi"],
+ "Jon Dahl Tomasson":["Dalos Tamás","Dalos"],
  "Jon Flanagan":["Flenegen János","Flenegen"],
  "Jonas Föhrenbach":["Föhrenbacs Jónás","Föhrenbacs"],
  "Jonas Hofmann":["Udvarember Jónás","Udvarember"],
@@ -40046,7 +40070,7 @@ const HU_NAME_TABLE={
  "Josico":["Osiko","Osiko"],
  "Josip Iličić":["Ilicsics József","Ilicsics"],
  "Josip Stanišić":["Sztanisics József","Sztanisics"],
- "Josko Gvardiol":["Gvardijol Jóska","Gvardijol"],
+ "Josko Gvardiol":["Őrszem Jóska","Őrszem"],
  "Josué":["Jósué","Jósué"],
  "Josué Casimir":["Kasimir Dezső","Kasimir"],
  "José Altafini":["Altatós Jocó","Altatós"],
@@ -40086,7 +40110,7 @@ const HU_NAME_TABLE={
  "Juan Antonio Pizzi":["Piszszi János","Piszszi"],
  "Juan Bernat":["Bérnat János","Bérnat"],
  "Juan Carlos Rodríguez":["Rodríguesz János","Rodríguesz"],
- "Juan Carlos Valerón":["Válerón János","Válerón"],
+ "Juan Carlos Valerón":["Valerón János","Valerón"],
  "Juan Cuadrado":["Kuadrádo János","Kuadrádo"],
  "Juan Esnáider":["Ésnáider János","Ésnáider"],
  "Juan Foyth":["Foit János","Foit"],
@@ -40126,7 +40150,7 @@ const HU_NAME_TABLE={
  "Julio César Cáceres":["Kászeres Gyula","Kászeres"],
  "Julio Salinas":["Szalinas Gyula","Szalinas"],
  "Julio Salinas Manjarín":["Manharín Gyula","Manharín"],
- "Julián Álvarez":["Alvarézs Gyula","Alvarézs"],
+ "Julián Álvarez":["Alvajáró Gyula","Alvajáró"],
  "Juninho Paulista":["Páulista Máté","Páulista"],
  "Juninho Pernambucano":["Perembukó Janika","Perembukó"],
  "Junior Messias":["Messzias Sebő","Messzias"],
@@ -40284,7 +40308,7 @@ const HU_NAME_TABLE={
  "Kwadwo Asamoah":["Asamóh Csongor","Asamóh"],
  "Kwoun Sun-tae":["Kvún Kelemen","Kvún"],
  "Kyle Walker":["Vasalógép Kálmán","Vasalógép"],
- "Kylian Mbappé":["Kilján Bapé","Bapé"],
+ "Kylian Mbappé":["Mappé Kilián","Mappé"],
  "Kádár Tamás":["Kádfürdő Tomi","Kádfürdő"],
  "Káposzta Benő":["Savanyúkáposzta Benőke","Savanyúkáposzta"],
  "Kévin Zohi":["Zóhi Kelemen","Zóhi"],
@@ -40513,7 +40537,7 @@ const HU_NAME_TABLE={
  "Marcelo Díaz":["Díasz Marcell","Díasz"],
  "Marcelo Gallardo":["Gajardo Marcell","Gajardo"],
  "Marcelo Grohe":["Gróhe Marcell","Gróhe"],
- "Marcelo Salas":["Szálas Domonkos","Szálas"],
+ "Marcelo Salas":["Szálas Marcell","Szálas"],
  "Marcelo Zalayeta":["Szaléjeta Marcell","Szaléjeta"],
  "Marco Antônio":["Ántónio Márk","Ántónio"],
  "Marco Asensio":["Aszenszijjó Márk","Aszenszijjó"],
@@ -40551,7 +40575,7 @@ const HU_NAME_TABLE={
  "Mariano Izco":["Iszko Marián","Iszko"],
  "Marinho":["Marinyo","Marinyo"],
  "Marino Perani":["Pérani Pongrác","Pérani"],
- "Mario Balotelli":["Bálóteli Márió","Bálóteli"],
+ "Mario Balotelli":["Balhételi Márió","Balhételi"],
  "Mario Corso":["Korzózó Márijó","Korzózó"],
  "Mario David":["Dávid Márió","Dávid"],
  "Mario Gaspar":["Gáspar Márió","Gáspar"],
@@ -41009,11 +41033,11 @@ const HU_NAME_TABLE={
  "Paolo Cannavaro":["Kannavaro Pál","Kannavaro"],
  "Paolo De Sanctis":["Desanktis Pál","Desanktis"],
  "Paolo Di Canio":["Dikánya Pál","Dikánya"],
- "Paolo Guerrero":["Gúerrero Pál","Gúerrero"],
+ "Paolo Guerrero":["Gerrero Pál","Gerrero"],
  "Paolo Maldini":["Máldi Pál","Máldi"],
- "Paolo Montero":["Móntero Pál","Móntero"],
+ "Paolo Montero":["Montero Pál","Montero"],
  "Paolo Negro":["Négro Pál","Négro"],
- "Paolo Rossi":["Rosszi Pál","Rosszi"],
+ "Paolo Rossi":["Rosszcsont Pál","Rosszcsont"],
  "Paolo Vanoli":["Vánoli Pál","Vánoli"],
  "Papa Bouba Diop":["Díop Jenő","Díop"],
  "Pape Diakhaté":["Díakhaté Domonkos","Díakhaté"],
@@ -41128,7 +41152,7 @@ const HU_NAME_TABLE={
  "Petri Pasanen":["Paszanen Dezső","Paszanen"],
  "Pető Zoltán":["Petárdás Zoli","Petárdás"],
  "Phil Barber":["Bárber Fülöp","Bárber"],
- "Phil Foden":["Fóden Filó","Fóden"],
+ "Phil Foden":["Födém Filó","Födém"],
  "Phil Jagielka":["Dzsegelka Fülöp","Dzsegelka"],
  "Phil Jones":["Dzsonesz Fülöp","Dzsonesz"],
  "Phil King":["Kíng Fülöp","Kíng"],
@@ -41276,7 +41300,7 @@ const HU_NAME_TABLE={
  "Richard Gough":["Gúg Rikárd","Gúg"],
  "Rick Karsdorp":["Kardos Richárd","Kardos"],
  "Rico Lewis":["Levisz Lóránt","Levisz"],
- "Rigobert Song":["Sóng Csongor","Sóng"],
+ "Rigobert Song":["Zsongó Rigó","Zsongó"],
  "Rijkaard":["Rájkártya","Rájkártya"],
  "Rildo":["Ríldo","Ríldo"],
  "Rinus Israël":["Ísrael Mór","Ísrael"],
@@ -41316,7 +41340,7 @@ const HU_NAME_TABLE={
  "Roberto Miranda":["Míranda Róbert","Míranda"],
  "Roberto Mussi":["Musszi Róbert","Musszi"],
  "Roberto Piccoli":["Pikkoli Róbert","Pikkoli"],
- "Roberto Pruzzo":["Prúzzo Róbert","Prúzzo"],
+ "Roberto Pruzzo":["Prucco Róbert","Prucco"],
  "Roberto Rambaudi":["Rámbaudi Róbert","Rámbaudi"],
  "Roberto Soldado":["Szoldado Róbert","Szoldado"],
  "Roberto Solozábal":["Szoloszábal Róbert","Szoloszábal"],
@@ -41409,7 +41433,7 @@ const HU_NAME_TABLE={
  "Sacha Boey":["Boi Álmos","Boi"],
  "Sada Thioub":["Tiúb Farkas","Tiúb"],
  "Sadio Mané":["Manézs Szidónia","Manézs"],
- "Salif Keïta":["Kéita Huba","Kéita"],
+ "Salif Keïta":["Keíta Huba","Keíta"],
  "Salih Uçan":["Ucsan Kálmán","Ucsan"],
  "Sallai Roland":["Salátás Roli","Salátás"],
  "Sallai Sándor":["Salakos Sanyi","Salakos"],
@@ -41432,7 +41456,7 @@ const HU_NAME_TABLE={
  "Samu Castillejo":["Kastijeho Bálint","Kastijeho"],
  "Samuel Chukwueze":["Csukvuez Sámuel","Csukvuez"],
  "Samuel Eto'o":["Etós Sámuel","Etós"],
- "Samuel Kuffour":["Kuffúr Sámuel","Kuffúr"],
+ "Samuel Kuffour":["Kufár Sámuel","Kufár"],
  "Samuel Umtiti":["Bumm Titi Sámuel","Bumm Titi"],
  "Sander Westerveld":["Vesterfeld Kálmán","Vesterfeld"],
  "Sandro":["Szandro","Szandro"],
@@ -41533,7 +41557,7 @@ const HU_NAME_TABLE={
  "Simone Inzaghi":["Indzagi Simon","Indzagi"],
  "Simone Perrotta":["Pérrotta Simon","Pérrotta"],
  "Simão Sabrosa":["Szabrosa Kálmán","Szabrosa"],
- "Siniša Mihajlović":["Mihajlics Pongrác","Mihajlics"],
+ "Siniša Mihajlović":["Mihajlovics Pongrác","Mihajlovics"],
  "Sipeki István":["Sipákoló Pista","Sipákoló"],
  "Sir Alex Ferguson":["Szőr Sándor Ferguszon","Ferguszon"],
  "Sjaak Swart":["Svart Tihamér","Svart"],
@@ -41666,7 +41690,7 @@ const HU_NAME_TABLE={
  "Tal Ben Haim":["Héjm Ábris","Héjm"],
  "Talal El Karkouri":["Elkarkúri Álmos","Elkarkúri"],
  "Tamaz Kostava":["Kosztava Ambrus","Kosztava"],
- "Tammy Abraham":["Ábraham Tomi","Ábraham"],
+ "Tammy Abraham":["Ábrándos Tomi","Ábrándos"],
  "Tanguy Ndombele":["Ndombel Bertalan","Ndombel"],
  "Tarcisio Burgnich":["Burnyik Nándor","Burnyik"],
  "Taribo West":["Veszt Gellért","Veszt"],
@@ -41739,7 +41763,7 @@ const HU_NAME_TABLE={
  "Tom Davies":["Déjvisz Tomi","Déjvisz"],
  "Tom Huddlestone":["Huddlesztón Tomi","Huddlesztón"],
  "Tom Starke":["Stárke Tomi","Stárke"],
- "Tomas Brolin":["Brólin Tamás","Brólin"],
+ "Tomas Brolin":["Brulín Tamás","Brulín"],
  "Tomasz Brzyski":["Bzsiszki Tamás","Bzsiszki"],
  "Tomasz Jodłowiec":["Jodlovik Tamás","Jodlovik"],
  "Tomasz Kędziora":["Kédziora Tamás","Kédziora"],
@@ -41751,7 +41775,7 @@ const HU_NAME_TABLE={
  "Tomáš Hloušek":["Hlúsek Tamás","Hlúsek"],
  "Tomáš Hübschman":["Hübsman Tamás","Hübsman"],
  "Tomáš Rincón":["Rinkón Tamás","Rinkón"],
- "Tomáš Rosický":["Rózsicki Tamás","Rózsicki"],
+ "Tomáš Rosický":["Roszicki Tamás","Roszicki"],
  "Tomáš Řepka":["Rzsepka Tamás","Rzsepka"],
  "Toni Doblas":["Dóblas Csongor","Dóblas"],
  "Toni Kroos":["Krózus Tóni","Krózus"],
@@ -41994,7 +42018,7 @@ const HU_NAME_TABLE={
  "Zagallo":["Zagalo","Zagalo"],
  "Zago":["Zágo","Zágo"],
  "Zakariás József":["Zakatoló Jocó","Zakatoló"],
- "Zbigniew Boniek":["Bonik Barnabás","Bonik"],
+ "Zbigniew Boniek":["Bonyek Barnabás","Bonyek"],
  "Ze Roberto":["iZé Robi","iZé"],
  "Zeki Çelik":["Cselik Barnabás","Cselik"],
  "Zeljko Gavric":["Gavrik Zsolt","Gavrik"],
@@ -42010,7 +42034,7 @@ const HU_NAME_TABLE={
  "Zlatko Junuzović":["Junucofics Zalán","Junucofics"],
  "Zlatko Zahovič":["Zahovics Zalán","Zahovics"],
  "Zvjezdan Misimović":["Misimovics Nándor","Misimovics"],
- "Zvonimir Boban":["Bóban Zvoni","Bóban"],
+ "Zvonimir Boban":["Bóbita Zvonimír","Bóbita"],
  "Zámbó Sándor":["Zümmögő Sanyi","Zümmögő"],
  "Zé Castro":["Kastro Jocó","Kastro"],
  "Zé Maria":["Mária Jocó","Mária"],
@@ -42029,7 +42053,7 @@ const HU_NAME_TABLE={
  "Éder":["Édér","Édér"],
  "Éder Aleixo":["Aleiso Ede","Aleiso"],
  "Éder Citadin":["Csitadin Ede","Csitadin"],
- "Éder Militão":["Mílitao Ede","Mílitao"],
+ "Éder Militão":["Militáns Ede","Militáns"],
  "Éderson":["Éderfióka","Éderfióka"],
  "Édouard Cissé":["Szisszé Ede","Szisszé"],
  "Éger László":["Égerfás Laci","Égerfás"],
@@ -53731,7 +53755,18 @@ function addLine(html,cls,budgeted){
        gólhoz tartozó híresség-összesítőt — a gól alá, nem a következő közepébe. */
     try{fameFlushNotes();}catch(e){}}
   const d=document.createElement("div");d.className=cls;d.innerHTML=html;
-  lines().appendChild(d);lines().scrollTop=lines().scrollHeight;}
+  lines().appendChild(d);addLineScroll();}
+/* A NAPLÓ ALJÁRA GÖRGETÉS KÉPKOCKÁNKÉNT EGYSZER (3.9.168). Eddig minden sor
+   után a scrollHeight kiolvasása azonnali elrendezést kényszerített ki — egy
+   gólnál a gól-, a kommentár- és a lelátó-sor háromszor egymás után. Mérve
+   (négyszeresen lassított CPU, nézett meccs) ez a kényszerített elrendezés a
+   mérkőzés egyik legnagyobb tétele volt. A görgetés most a következő
+   képkockára gyűlik össze: a látvány ugyanaz, a munka egy. */
+var _addLineRaf=0;
+function addLineScroll(){
+  if(_addLineRaf)return;
+  const fut=()=>{_addLineRaf=0;try{const L=lines();if(L)L.scrollTop=L.scrollHeight;}catch(e){}};
+  try{_addLineRaf=requestAnimationFrame(fut);}catch(e){fut();}}
 /* ================= A CSAPAT ARCULATA: KÉT SZÍN ÉS EGY NÉV =================
    A klub két színe ugyanaz a pár, amit a draftban a keret-kártya csíkja mutat
    (sq.col). Kész klubbal indulva ez maga a klub színe; DRAFTOLT csapatnál nincs
@@ -81891,6 +81926,16 @@ function canOccupyLoc(p,loc){
    (Vezetői · Együttműködés · Temperamentum), és innen indul a posztcsere is —
    így mindig egyértelmű, KIT cserélsz. */
 let hubExpandedKey=null;
+/* A részletpanel helyben cseréje (lásd a sor onclick-jét): a régi panel
+   kikerül, az új a koppintott sor UTÁN kerül be — pontosan oda, ahová a
+   renderHub is tenné (rgAdd: a sor, majd közvetlenül utána a panel). */
+function hubDetailSwap(row,loc){
+  try{
+    const box=$("hubRoster");
+    if(!box||!row||!row.isConnected||!box.contains(row))return false;
+    box.querySelectorAll(".hubDetail").forEach(x=>x.remove());
+    if(hubExpandedKey===hubLocKey(loc))row.after(buildHubDetail(loc));
+    return true;}catch(e){return false;}}
 function hubLocKey(loc){return loc.type+":"+(loc.type==="bench"?loc.key:loc.idx);}
 /* ---- GÖRGETÉS-HORGONY EGY KERETLISTA-SORHOZ ----
    Megméri, hol áll a sor a KÉPERNYŐN, és visszaad egy függvényt, ami az
@@ -83049,8 +83094,10 @@ function hdSectionize(html){
 function hdBindSections(root){
   if(!root)return;
   root.querySelectorAll("details.hdSec[data-hk]").forEach(el=>{
+    /* a lenyíló állapota nem sürgős: összevont mentés (3.9.168) — az
+       újrarajzolt lap MINDEN lenyílója toggle-t lő, ez négy mentés volt */
     el.addEventListener("toggle",()=>{
-      try{hdOpenState()[el.getAttribute("data-hk")]=el.open;saveGame();}catch(e){}});});}
+      try{hdOpenState()[el.getAttribute("data-hk")]=el.open;saveGameSoon();}catch(e){}});});}
 function buildHubDetail(loc){
   const p=loc.p,e=careerPool&&careerPool[p.n];
   const d=document.createElement("div");d.className="hubDetail";
@@ -88694,7 +88741,12 @@ function renderHub(){
          amire koppintottál. */
       const restore=hubKeepRowAnchor(key);
       hubExpandedKey=(hubExpandedKey===key)?null:key;
-      renderHub();
+      /* GYORS ÚT (3.9.168): a lenyitás/becsukás csak a részletpanelt cseréli,
+         nem rajzolja újra a teljes HUB-ot. MÉRVE: négyszeresen lassított
+         CPU-n a teljes újrarajzolás (és az utána kényszerített elrendezés)
+         koppintásonként 0,15–0,5 mp volt. Ha a gyors út bármiért nem
+         alkalmazható, a régi, teljes rajzolás fut. */
+      if(!hubDetailSwap(row,loc))renderHub();
       restore();};
     rgAdd(loc,row);
     if(hubExpandedKey===hubLocKey(loc))rgAdd(loc,buildHubDetail(loc));});
@@ -88702,8 +88754,10 @@ function renderHub(){
      újrarajzolást — a hívás idempotens (egyszer köti fel magát). */
   try{hubDragInit();}catch(e){}
   /* FIX: a HUB minden újrarajzolása egyben mentés is — vásárlás, eladás,
-     klub-szemle, szintlépés után azonnal maradandó az állapot. */
-  if(gameMode==="career")saveGame();
+     klub-szemle, szintlépés után azonnal maradandó az állapot.
+     3.9.168: ÖSSZEVONVA (saveGameSoon) — lásd ott: egy koppintás öt teljes
+     mentést indított, ez volt a HUB „laggja". */
+  if(gameMode==="career")saveGameSoon();
   /* ---- HUB-TÚRA ----
      A rajzolás LEGVÉGÉN, amikor a keretlista és a panelek már a helyükön
      vannak — a horgonyzás valós méreteket mér. NEM a szezon előtti
@@ -106514,7 +106568,41 @@ function loadIntoGame(d,key){
     _saveBroken=true;            /* 2. — innentől nem írunk sehova */
     try{console.warn("MAGYAH: a mentés betöltése elszállt —",e&&e.message);}catch(_){}
     return false;}}
+/* ---- ÖSSZEVONT MENTÉS (3.9.168) ----
+   BEJELENTETT HIBA: „vannak benne laggok bizonyos események, kattintások,
+   különösen is a HUBban játékosra kattintás hatására."
+   MÉRVE: egy HUB-soron koppintás ÖT teljes mentést indított — a renderHub
+   egyet, az újrarajzolt játékoslap négy lenyílója a toggle-eseményével még
+   négyet. Egy mentés a teljes játékos-pool csomagolása, JSON és
+   localStorage-írás: négyszeresen lassított CPU-n (≈ egy közepes telefon)
+   koppintásonként 0,5–0,8 másodperc.
+   A HUB újrarajzolása és a lenyílók állapota nem sürgős: ezek a
+   saveGameSoon-on át mennek, ami a hívásokat EGY, rövid késleltetésű mentéssé
+   vonja össze (a késleltetés végén a LEGFRISSEBB állapot íródik ki).
+   ELVESZTÉS ELLEN: a lap elhagyásakor (pagehide — újratöltés, bezárás is) és
+   háttérbe kerülésekor azonnal kiíródik, és bármely rendes saveGame() is
+   „elviszi" (az úgyis mindent ment). A `var` szándékos: a saveGame a szkript
+   elejéről is hívódhat, egy `let` ott TDZ-hibát dobna. */
+var _saveSoonT=0;
+/* 700 ms csend után, a böngésző ÜRESJÁRATÁBAN (requestIdleCallback, legfeljebb
+   további 1,5 mp) — így a mentés nem a következő koppintásra esik. */
+function saveGameSoon(){
+  if(_saveSoonT)return;
+  _saveSoonT=setTimeout(()=>{
+    const fut=()=>{if(!_saveSoonT)return;_saveSoonT=0;try{saveGame();}catch(e){}};
+    try{if(window.requestIdleCallback){window.requestIdleCallback(fut,{timeout:1500});return;}}catch(e){}
+    fut();},700);}
+function saveGameFlush(){
+  if(!_saveSoonT)return;
+  clearTimeout(_saveSoonT);_saveSoonT=0;
+  try{saveGame();}catch(e){}}
+try{
+  window.addEventListener("pagehide",saveGameFlush);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")saveGameFlush();});
+}catch(e){}
 function saveGame(){
+  /* egy függő összevont mentés ezzel együtt teljesül */
+  if(_saveSoonT){clearTimeout(_saveSoonT);_saveSoonT=0;}
   /* A kezdőképernyőn nincs mit menteni — és ha mégis írnánk, a következő
      indulást rontanánk el vele. */
   if(!hasLiveGame())return;

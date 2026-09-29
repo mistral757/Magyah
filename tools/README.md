@@ -8,6 +8,26 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## teljesitmeny-proba.js — ⚡ 3.9.168: gyorsabb HUB, azonnal induló zene
+
+```bash
+node tools/teljesitmeny-proba.js
+```
+
+**11 állítás:**
+
+* **HUB-soron koppintás:**
+  * nincs szinkron mentés (korábban öt volt);
+  * nincs teljes HUB-újrarajzolás, sem lenyitásnál, sem becsukásnál;
+  * a részletpanel a koppintott sor alatt van;
+  * az összevont mentés később egyszer lefut.
+* **Függő mentés:** a lap elhagyásakor kiíródik.
+* **Zengető:** gyorsítótárazott, a hangulat-buszok nem készítenek saját
+  konvolvert.
+* **Napló:** öt sor egyetlen képkocka-görgetést kér, és a napló a végén az
+  aljára ér.
+* **Nincs oldalhiba.**
+
 ## hangtema-proba.js — 🎻 3.9.167: a lágy hangzás, témánkénti hangulattal
 
 ```bash
