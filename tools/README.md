@@ -8,6 +8,33 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## talizman-kepesseg-proba.js — 🎮 3.9.173: a talizmán-képességek láthatóan
+
+```bash
+node tools/talizman-kepesseg-proba.js
+```
+
+**15 állítás:**
+
+* **A „🎮 A te képességeid" blokk:**
+  * a Talizmánok menü tetején áll (a bal oszlop első eleme, az alaphatások
+    fölött);
+  * kártyát kap a Titkos fegyver, a Pénzfeldobás, a Tükörvilág és az irányra
+    váró jellemhullám;
+  * a most használhatók világítanak, és nagy gombjuk van.
+* **A kártya gombja:**
+  * élesíti a Titkos fegyvert;
+  * a kártya „élesítve" állapotba vált, a gombja eltűnik, és hátrébb kerül.
+* **A lista:** az alaphatások listájában nincs akciógomb, a sor felfelé mutat.
+* **A gyorssáv:**
+  * közvetlenül a kezdőrúgás fölött áll, a következő meccsre ható
+    képességekkel (✓ élesítve is);
+  * koppintásra a menü a kártyánál nyílik;
+  * végigjátszásnál nincs.
+* **A HUB-gomb** kiírja, hány képesség használható, és világít.
+* **Üres állapot:** talizmán nélkül a blokk elmondja, mi kerül ide.
+* **Nincs oldalhiba.**
+
 ## jelzesek-3-9-172-proba.js — 🔔 3.9.172: számok, stáb-mérleg, felugró, feed-szűrő, push
 
 ```bash

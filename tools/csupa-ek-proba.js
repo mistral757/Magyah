@@ -205,6 +205,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       osszes=0;ove=0;
       for(let k=0;k<N;k++){
         S.unavailable={};S.lastMatch=null;S.idx=k%10;
+        /* 3.9.171: a lefújás utáni kör (jutalmak) függőben tartja a következő
+           kezdőrúgást — a játékos végigkattintja, itt lezárjuk; és mivel a
+           próba az S.idx-et újrahasznosítja, a lefújt meccs élő rekordját is
+           töröljük, különben ugyanaz a meccs állna vissza */
+        try{utoLancVege();mEloTorol();}catch(e){}
         playMatch();
         for(let i=0;i<200&&!S.lastMatch;i++)await new Promise(r=>setTimeout(r,25));}
       return {osszes,ove,arany:osszes?ove/osszes:0,vegig:!!S.lastMatch};};
