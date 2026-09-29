@@ -8,6 +8,28 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## hangtema-proba.js — 🎻 3.9.167: a lágy hangzás, témánkénti hangulattal
+
+```bash
+node tools/hangtema-proba.js
+```
+
+**21 állítás:**
+
+* **Automatikus választás:** a hangzás követi a színtémát (Pixel →
+  chiptune, Sötét-arany → Mozi, Törtfehér → Napos, Noir → Füstös jazz), és
+  kézzel rögzíthető.
+* **Táblák:** mind a 23 effektnek és a három menüdalnak van lágy párja, a
+  kották épek.
+* **Offline hangkártyán, hangulatonként:**
+  * a dalok és az effektek szólnak, nem torzítanak (csúcs < 0,95), nincs
+    NaN;
+  * a nyolc stílus-dallam és -szignál szól;
+  * a három hangulat 3 dB-en belül van.
+* **Beállító ablak:** a „Hangzás” választó és a „Most:” sor megvan.
+* **Élő hangkártyán:** a menüzene témaváltáskor azonnal átvált.
+* **Nincs oldalhiba.**
+
 ## felidei-csere-proba.js — 🔁 3.9.166: a félidei tervezett csere a FÉLIDŐ-sor után
 
 ```bash

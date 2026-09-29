@@ -6778,13 +6778,15 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.166";
+const APP_VERSION="3.9.167";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
    lenne az igazán menő, ha a csapatstílusoknak is lenne saját dallama… és
    mindegyiknek jó lenne egy kis saját signal szerű rövid verziója."
 
+   (3.9.167 óta KÉT HANGZÁS: ez a chiptune a Pixel témáé, a többi téma a
+   LÁGY hangzást kapja témánkénti hangulattal — lásd „A LÁGY HANGZÁS" blokkot.)
    EGY RÉGI KONZOL, KÓDBÓL. Minden hang a böngésző WebAudio-jában születik
    (square, triangle, 8-bites „LFSR" zaj) — nincs letöltendő fájl, a játék mérete
    nem nő, és offline is szól.
@@ -6810,10 +6812,12 @@ var _hangZene=null;                /* {dal, lep, kov, timer} — a futó zene */
 var _hangStilusDal=null;           /* a futó stílus-dallam vége (időbélyeg) */
 function hangBeall(){
   if(_hangBeall)return _hangBeall;
-  const alap={on:true,sfx:70,zene:true,zeneVol:40,dal:"fo"};
+  /* csomag: „auto" (a színtémát követi) | „chip" | „lagy" — 3.9.167 */
+  const alap={on:true,sfx:70,zene:true,zeneVol:40,dal:"fo",csomag:"auto"};
   try{const x=JSON.parse(localStorage.getItem(HANG_KEY)||"null");
     _hangBeall=Object.assign(alap,(x&&typeof x==="object")?x:{});}catch(e){_hangBeall=alap;}
   if(!HANG_DALOK_NEV[_hangBeall.dal])_hangBeall.dal="fo";
+  if(["auto","chip","lagy"].indexOf(_hangBeall.csomag)<0)_hangBeall.csomag="auto";
   return _hangBeall;}
 function hangMent(){try{localStorage.setItem(HANG_KEY,JSON.stringify(hangBeall()));}catch(e){}}
 var HANG_DALOK_NEV={fo:"Öltözői főcím",taktika:"Taktikai tábla",meccsnap:"Meccsnap"};
@@ -6920,9 +6924,11 @@ function hang(id){
   try{pixFx(id);}catch(e){}
   try{
     _hangNaplo.push(id);if(_hangNaplo.length>60)_hangNaplo.shift();
-    if(!HANG_SFX[id]||!hangKesz())return false;
+    /* a hangzás (chiptune / lágy) a beállításból vagy a színtémából */
+    const T=(hangCsomag()==="lagy"&&HANG_SFX_LAGY[id])?HANG_SFX_LAGY:HANG_SFX;
+    if(!T[id]||!hangKesz())return false;
     if(id==="klikk"){const most=Date.now();if(most-_hangUtolsoKlikk<70)return false;_hangUtolsoKlikk=most;}
-    HANG_SFX[id](_hangCtx.currentTime+.01);
+    T[id](_hangCtx.currentTime+.01);
     return true;}catch(e){return false;}}
 /* A meccs hangjai csak NÉZETT meccsen szólnak (végigjátszásnál nem). */
 function hangMeccsNezett(){
@@ -6976,14 +6982,25 @@ function hangLepes(D,lep,t,bus){
     if(s===4||s===12)hangZaj(t,{dur:.13,vol:.15,hp:1400},bus);if(s%2===1)hangZaj(t,{dur:.025,vol:.05,hp:7500},bus);}}
 function hangZeneInditas(dal){
   if(!hangKesz())return false;
-  const D=HANG_DALOK[dal];if(!D)return false;
+  const lagy=hangCsomag()==="lagy";
+  const D=lagy?HANG_DALOK_LAGY[dal]:HANG_DALOK[dal];if(!D)return false;
   hangZeneAllj();
-  const Z={dal,lep:0,kov:_hangCtx.currentTime+.08,timer:null};
+  const F=lagy?hangLagyF():null;
+  const STEP=lagy?60/(D.bpm*F.tempo)/4:60/D.bpm/4;
+  /* a kulcs: ha a hangzás vagy a hangulat (a színtéma) változik, a
+     hangZeneIgazit újraindítja a dalt a másik hangszereléssel */
+  const Z={dal,kulcs:hangZeneKulcs(),lep:0,kov:_hangCtx.currentTime+.08,timer:null};
+  if(lagy)Z.busz=hangLagyBusz(_hangBus.zene,F);
   Z.timer=setInterval(()=>{
-    try{const STEP=60/D.bpm/4;
-      while(Z.kov<_hangCtx.currentTime+.12){hangLepes(D,Z.lep,Z.kov,_hangBus.zene);Z.kov+=STEP;Z.lep++;}}catch(e){}},25);
+    try{while(Z.kov<_hangCtx.currentTime+.12){
+        if(lagy)hangLagyLepes(D,Z.lep,Z.kov,Z.busz,F,STEP);
+        else hangLepes(D,Z.lep,Z.kov,_hangBus.zene);
+        Z.kov+=STEP;Z.lep++;}}catch(e){}},25);
   _hangZene=Z;return true;}
-function hangZeneAllj(){if(_hangZene){clearInterval(_hangZene.timer);_hangZene=null;}}
+function hangZeneAllj(){if(_hangZene){clearInterval(_hangZene.timer);
+  /* a lágy zene saját erősítője: a már ütemezett hangok még lecsenghetnek */
+  const b=_hangZene.busz;if(b)setTimeout(()=>{try{b.disconnect();}catch(e){}},4000);
+  _hangZene=null;}}
 /* A ZENE RENDEZŐJE: menüben szól, meccs közben és stílus-dallam alatt hallgat. */
 function hangZeneKell(){
   const B=hangBeall();
@@ -6994,7 +7011,7 @@ function hangZeneKell(){
   return true;}
 function hangZeneIgazit(){
   const kell=hangZeneKell(),B=hangBeall();
-  if(kell&&(!_hangZene||_hangZene.dal!==B.dal))hangZeneInditas(B.dal);
+  if(kell&&(!_hangZene||_hangZene.dal!==B.dal||_hangZene.kulcs!==hangZeneKulcs()))hangZeneInditas(B.dal);
   else if(!kell&&_hangZene)hangZeneAllj();}
 /* ---- A CSAPATSTÍLUSOK: DALLAM ÉS SZIGNÁL ----
    Mindegyik a stílus karakteréből: a Beton nehéz induló, a Villám száguldó
@@ -7039,11 +7056,15 @@ function hangStilusDallam(key){
   _hangNaplo.push("dal:"+key);
   if(!hangKesz())return false;
   hangZeneAllj();
-  const lead=D._lead||(D._lead=hangSor(D.lead));
-  const STEP=60/D.bpm/4,t0=_hangCtx.currentTime+.06;
-  for(let i=0;i<lead.length;i++)hangLepes(D,i,t0+i*STEP,_hangBus.sfx);
-  if(D.robban)hangZaj(t0+lead.length*STEP-STEP*8,{dur:.6,vol:.12,lp:1800});
-  const hossz=lead.length*STEP;
+  const t0=_hangCtx.currentTime+.06;
+  let hossz;
+  if(hangCsomag()==="lagy")hossz=hangLagyDallamSzol(D,t0,_hangBus.sfx);
+  else{
+    const lead=D._lead||(D._lead=hangSor(D.lead));
+    const STEP=60/D.bpm/4;
+    for(let i=0;i<lead.length;i++)hangLepes(D,i,t0+i*STEP,_hangBus.sfx);
+    if(D.robban)hangZaj(t0+lead.length*STEP-STEP*8,{dur:.6,vol:.12,lp:1800});
+    hossz=lead.length*STEP;}
   _hangStilusDal=Date.now()+hossz*1000+400;
   setTimeout(()=>{try{hangZeneIgazit();}catch(e){}},hossz*1000+500);
   return true;}
@@ -7061,6 +7082,7 @@ function hangStilusJel(key){
     _hangJelVolt[k]=1;
     _hangNaplo.push("jel:"+key);
     if(!hangKesz())return false;
+    if(hangCsomag()==="lagy"){hangLagyJelSzol(HANG_STILUS[key],_hangCtx.currentTime+.02,_hangBus.sfx);return true;}
     const D=HANG_STILUS[key],jel=hangSor(D.jel),STEP=60/D.bpm/4,t0=_hangCtx.currentTime+.02;
     const e=hangVisszhang();
     jel.forEach((x,i)=>{if(x&&x.n!=null)hangTon(t0+i*STEP,{f:hangHz(x.n),dur:STEP*(x.len||1)*.95,vol:.15,type:D.leadType,rel:.05,dest:e});});
@@ -7076,6 +7098,323 @@ function hangStilusMenu(){
 function hangStilusJutalom(key){
   try{const van=(typeof styleSlots==="function")&&styleSlots().some(st=>st&&st.key===key);
     return van?hangStilusJel(key):false;}catch(e){return false;}}
+/* ================= 🎻 A LÁGY HANGZÁS (3.9.167) =================
+   KIMONDOTT KÉRÉS: „legyen olyan is, ami illik a nem pixelated témánkhoz is?
+   Én valami immerzív, de azért könnyed, instrumentális témát gondolnék, ahhoz
+   illő alkalmazáshangokkal. És akkor a témaváltó a zenei témát is
+   automatikusan váltaná" — majd: „Mehet az A, témánkénti hangulatokkal!"
+
+   KÉT HANGZÁS, EGY MOTOR. A chiptune (négyszög, háromszög, 8 bites zaj) a
+   Pixel témáé. A másik három téma a LÁGY hangzást kapja: ugyanaz a
+   16-od lépéses lejátszó és ugyanaz a szöveges kotta, csak más hangszerek,
+   valódi zengető (ConvolverNode, kódból generált lecsengéssel) és lassabb,
+   levegősebb szerzemények. Továbbra sincs egyetlen hangfájl sem.
+
+   TÉMÁNKÉNT MÁS HANGULAT — a kotta közös, a hangszerelés más:
+     · Sötét-arany → MOZI: lebegő padek, elektromos zongora, csengők, nagy tér;
+     · Törtfehér   → NAPOS: kalimba, pengetett gitár, shaker, közeli, meleg;
+     · Noir        → FÜSTÖS JAZZ: vibrafon, nagybőgő (walking), seprűs dob,
+                     swing — az ötvenes évek filmnyomatához.
+   A „Hangzás" beállítás alapból AUTOMATIKUS (a színtémát követi), de kézzel
+   is rögzíthető (chiptune / lágy).
+
+   A HANGSZEREK (hangLagy):
+     · epiano — FM-zongora (a modulátor indexe gyorsan lecseng: a „Rhodes"
+       ütése, aztán tiszta szinusz);
+     · bell   — csengő/cseleszta: nem harmonikus felhangok (2,76× és 5,4×);
+     · kalimba, vibra (tremolós vibrafon);
+     · pad    — két, egymáshoz képest elhangolt fűrész, lassan nyíló szűrővel;
+     · pluck / bogo — Karplus–Strong húr: egyszer kiszámolt, hangonként
+       gyorsítótárazott puffer (gitár, illetve tompább nagybőgő);
+     · sub    — tiszta, mély szinusz-basszus.
+   DOBOK (hangLagyDob): puha lábdob, shaker, peremütés, seprű, ride.
+
+   MÉRTÉK: egy ütemben legfeljebb egy pad-akkord (4 hang × 2 oszcillátor) szól
+   a dallam, a basszus és a dob mellett — gyenge telefonon is bőven belefér.
+   A zene továbbra is csak menüben szól. */
+var HANG_LAGY_HANGULAT={
+  mozi:{nev:"Mozi",tema:"Sötét-arany",leiras:"filmszerű: lebegő padek, elektromos zongora, csengők, nagy tér",
+    lead:"epiano",fel:"bell",comp:"pad",bass:"sub",dob:"mozi",tempo:.92,rev:.42,swing:0,leadVol:.15,gain:.6},
+  napos:{nev:"Napos",tema:"Törtfehér",leiras:"akusztikus: kalimba, pengetett gitár, shaker, közeli, meleg hang",
+    lead:"kalimba",fel:"kalimba",comp:"gitar",bass:"bogo",dob:"napos",tempo:1,rev:.2,swing:0,leadVol:.17,gain:1.5},
+  jazz:{nev:"Füstös jazz",tema:"Noir",leiras:"vibrafon, nagybőgő, seprűs dob, swing — az ötvenes évek",
+    lead:"vibra",fel:"vibra",comp:"stab",bass:"bogo",dob:"jazz",tempo:.9,rev:.3,swing:.34,leadVol:.15,gain:1.3}};
+/* A HANGULATOK SZINTJE (gain): mérve (offline, a „fo" dal 24 mp-e) a pad
+   nélküli két hangulat RMS-e a mozié ~40%-a volt — a hangulatváltás
+   hangerő-ugrásnak hatott. A gain egy saját erősítőn ül (hangLagyBusz), tehát a
+   hangszerek belső arányai érintetlenek. */
+function hangLagyBusz(bus,F,mp){
+  const ac=_hangCtx,g=ac.createGain();g.gain.value=F.gain||1;
+  /* szelíd kompresszor a hangulat-erősítő után: a pengetések és a lábdob
+     tranzienseit fogja meg, hogy a csúcs a hangszóró határa alatt maradjon */
+  const c=ac.createDynamicsCompressor();
+  c.threshold.value=-14;c.knee.value=8;c.ratio.value=4;c.attack.value=.004;c.release.value=.25;
+  g.connect(c);c.connect(bus);
+  if(mp)setTimeout(()=>{try{c.disconnect();}catch(e){}},(mp+3)*1000);
+  return g;}
+/* ---- A LÁGY MENÜDALOK ----
+   Ugyanaz a három cím, mint a chiptune-ban (a választó közös), de lassabb,
+   levegősebb dallammal és négyhangú (szeptim) akkordokkal. Ütemenként egy
+   akkord; a „-" kitartás, a „." szünet. */
+var HANG_DALOK_LAGY={
+  fo:{bpm:84,ch:[[53,57,60,64],[55,59,62,64],[52,55,59,62],[57,60,64,67]],lead:
+    "A4 - - - C5 - - - E5 - - - D5 - C5 - B4 - - - D5 - - - E5 - - - - - - . "
+   +"G4 - - - B4 - - - D5 - - - E5 - D5 - C5 - - - - - - - . . . . . . . . "
+   +"A4 - C5 - E5 - G5 - A5 - - - G5 - E5 - D5 - - - B4 - - - D5 - E5 - G5 - - - "
+   +"E5 - - - D5 - B4 - G4 - - - B4 - D5 - C5 - - - - - - - - - - - . . . ."},
+  taktika:{bpm:76,ch:[[50,53,57,60],[46,50,53,57],[53,57,60,64],[48,52,55,59]],lead:
+    "F4 - - - A4 - - - C5 - - - A4 - - - D5 - - - - - C5 - A4 - - - F4 - - - "
+   +"E5 - - - C5 - - - A4 - - - C5 - - - B4 - - - - - - - G4 - - - . . . . "
+   +"A4 - - - C5 - D5 - F5 - - - E5 - D5 - F5 - - - D5 - - - C5 - - - A4 - - - "
+   +"C5 - - - A4 - G4 - A4 - - - C5 - E5 - D5 - - - - - - - - - - - . . . ."},
+  meccsnap:{bpm:100,ch:[[55,59,62,66],[52,55,59,62],[48,52,55,59],[50,54,57,59]],lead:
+    "B4 - D5 - . - D5 - E5 - D5 - B4 - G4 - B4 - - - A4 - G4 - E4 - - - G4 - - - "
+   +"E5 - - - D5 - E5 - G5 - E5 - D5 - B4 - A4 - - - - - - - F#4 - A4 - D5 - - - "
+   +"B4 - D5 - . - D5 - E5 - G5 - F#5 - E5 - D5 - - - B4 - G4 - B4 - D5 - E5 - - - "
+   +"G5 - - - E5 - D5 - C5 - B4 - A4 - G4 - A4 - - - B4 - - - G4 - - - - - . ."}};
+function hangHangulat(){
+  const t=document.documentElement.getAttribute("data-theme")||"dark";
+  return t==="paper"?"napos":t==="noir"?"jazz":"mozi";}
+/* A HANGZÁS: „auto" a színtémát követi (Pixel → chiptune, a többi → lágy). */
+function hangCsomag(){
+  const c=hangBeall().csomag||"auto";
+  if(c==="chip"||c==="lagy")return c;
+  return document.documentElement.getAttribute("data-theme")==="pixel"?"chip":"lagy";}
+function hangLagyF(){return HANG_LAGY_HANGULAT[hangHangulat()]||HANG_LAGY_HANGULAT.mozi;}
+/* a futó zene „kulcsa": ha a hangzás vagy a hangulat változik, újraindul */
+function hangZeneKulcs(){return hangCsomag()==="lagy"?"lagy:"+hangHangulat():"chip";}
+/* ---- A ZENGETŐ ----
+   Buszonként EGY konvolver (a zenéé és az effekteké külön, hogy a hangerő-
+   csúszka a zengetésre is hasson). A lecsengés kódból születik: sztereó zaj,
+   köbös halkulással, 2,4 másodperc. */
+function hangLagyRev(bus){
+  if(bus._rev)return bus._rev;
+  const ac=_hangCtx,sr=ac.sampleRate,len=Math.floor(sr*2.4),ir=ac.createBuffer(2,len,sr);
+  for(let c=0;c<2;c++){const d=ir.getChannelData(c);
+    for(let i=0;i<len;i++){const x=i/len;d[i]=(Math.random()*2-1)*Math.pow(1-x,3.2)*Math.min(1,i/(sr*.012));}}
+  const cv=ac.createConvolver();cv.buffer=ir;
+  const send=ac.createGain(),wet=ac.createGain();wet.gain.value=.55;
+  send.connect(cv);cv.connect(wet);wet.connect(bus);
+  bus._rev=send;return send;}
+function _lEnv(g,t,vol,att,dur){
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+att);
+  g.gain.exponentialRampToValueAtTime(.0005,t+Math.max(att+.02,dur));}
+function _lSin(t,f,vol,dur,dest,att){
+  const ac=_hangCtx,os=ac.createOscillator(),g=ac.createGain();
+  os.type="sine";os.frequency.setValueAtTime(f,t);
+  _lEnv(g,t,vol,att||.004,dur);os.connect(g);g.connect(dest);os.start(t);os.stop(t+dur+.05);}
+/* KARPLUS–STRONG HÚR: egy zajimpulzus köröz egy hangmagasságnyi késleltetőben,
+   és minden körben kicsit tompul — ettől szól pengetett húrként. Hangonként
+   EGYSZER számoljuk ki, utána a puffer újrahasznosul. */
+var _hangKsTar={};
+function hangKs(n,bogo){
+  const ac=_hangCtx,sr=ac.sampleRate,k=n+(bogo?"b":"g")+sr;
+  if(_hangKsTar[k])return _hangKsTar[k];
+  const len=Math.floor(sr*(bogo?1.3:1.8)),b=ac.createBuffer(1,len,sr),d=b.getChannelData(0);
+  /* a gerjesztés SIMÍTOTT zaj (a nyers fehér zaj tüskés pengetést adott —
+     mérve a Napos hangulat csúcsa 1,4 volt, vagyis torzított volna) */
+  const N=Math.max(2,Math.round(sr/hangHz(n))),simit=bogo?.8:.5,dec=bogo?.993:.9972;
+  let pr=0;for(let i=0;i<N&&i<len;i++){pr=pr*simit+(Math.random()*2-1)*(1-simit);d[i]=pr;}
+  for(let i=N;i<len;i++)d[i]=dec*.5*(d[i-N]+(i-N-1>=0?d[i-N-1]:0));
+  /* csúcsra normálva: minden húr ugyanakkora hangerővel indul */
+  let pk=0;for(let i=0;i<len;i++)pk=Math.max(pk,Math.abs(d[i]));
+  if(pk>0){const k2=.5/pk;for(let i=0;i<len;i++)d[i]*=k2;}
+  return (_hangKsTar[k]=b);}
+/* ---- EGY HANG A LÁGY HANGSZEREKEN ----
+   o: {v: hangszer, n: MIDI vagy f: Hz, dur, vol, rev: zengető-arány, pan} */
+function hangLagy(t,o,bus){
+  const ac=_hangCtx;bus=bus||_hangBus.sfx;
+  const f=o.f||hangHz(o.n),vol=o.vol==null?.15:o.vol,dur=o.dur||.5;
+  const ki=ac.createGain();let vege=ki;
+  if(o.pan&&ac.createStereoPanner){const p=ac.createStereoPanner();p.pan.value=Math.max(-1,Math.min(1,o.pan));ki.connect(p);vege=p;}
+  vege.connect(bus);
+  const rev=o.rev==null?.3:o.rev;
+  if(rev>0){const r=ac.createGain();r.gain.value=rev;vege.connect(r);r.connect(hangLagyRev(bus));}
+  switch(o.v){
+    case "epiano":{
+      const c=ac.createOscillator(),m=ac.createOscillator(),mg=ac.createGain(),g=ac.createGain();
+      c.frequency.setValueAtTime(f,t);m.frequency.setValueAtTime(f,t);
+      mg.gain.setValueAtTime(f*1.4,t);mg.gain.exponentialRampToValueAtTime(f*.06,t+.45);
+      m.connect(mg);mg.connect(c.frequency);
+      const d=Math.max(dur,.8)*1.25;
+      _lEnv(g,t,vol,.004,d);c.connect(g);g.connect(ki);
+      c.start(t);m.start(t);c.stop(t+d+.05);m.stop(t+d+.05);
+      _lSin(t,f*2,vol*.1,d*.45,ki);break;}
+    case "bell":
+      _lSin(t,f,vol,dur*1.3+.6,ki);_lSin(t,f*2.76,vol*.28,dur*.6+.3,ki);_lSin(t,f*5.4,vol*.09,dur*.3+.15,ki);break;
+    case "kalimba":
+      _lSin(t,f,vol,.85+dur*.4,ki,.002);_lSin(t,f*4.2,vol*.2,.13,ki,.001);_lSin(t,f*7.1,vol*.06,.05,ki,.001);break;
+    case "vibra":{
+      const d=Math.max(dur*1.3,1.3),g=ac.createGain(),lfo=ac.createOscillator(),lg=ac.createGain();
+      g.gain.value=1;lfo.frequency.value=5.2;lg.gain.value=.32;lfo.connect(lg);lg.connect(g.gain);g.connect(ki);
+      _lSin(t,f,vol,d,g,.003);_lSin(t,f*4,vol*.13,d*.3,g,.002);
+      lfo.start(t);lfo.stop(t+d+.05);break;}
+    case "pad":{
+      const g=ac.createGain(),lp=ac.createBiquadFilter();lp.type="lowpass";lp.Q.value=.6;
+      lp.frequency.setValueAtTime(450,t);lp.frequency.linearRampToValueAtTime(1400,t+Math.min(1.2,dur*.5));
+      const att=Math.min(.6,dur*.35),rel=Math.min(1.2,dur*.5);
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+att);
+      g.gain.setValueAtTime(vol,t+Math.max(att,dur-rel*.3));g.gain.linearRampToValueAtTime(0,t+dur+rel);
+      [-7,7].forEach(ct=>{const os=ac.createOscillator();os.type="sawtooth";os.frequency.setValueAtTime(f,t);os.detune.value=ct;
+        os.connect(lp);os.start(t);os.stop(t+dur+rel+.05);});
+      lp.connect(g);g.connect(ki);break;}
+    case "pluck":case "bogo":{
+      const n=o.n!=null?o.n:Math.round(69+12*Math.log2(f/440));
+      const s=ac.createBufferSource(),g=ac.createGain();s.buffer=hangKs(n,o.v==="bogo");
+      g.gain.setValueAtTime(vol,t);g.gain.setValueAtTime(vol,t+Math.max(.05,dur));
+      g.gain.exponentialRampToValueAtTime(.0005,t+dur+.35);
+      s.connect(g);g.connect(ki);s.start(t);s.stop(t+dur+.4);break;}
+    case "sub":{
+      const g=ac.createGain(),os=ac.createOscillator();os.type="sine";os.frequency.setValueAtTime(f,t);
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.03);g.gain.setValueAtTime(vol,t+dur*.6);
+      g.gain.exponentialRampToValueAtTime(.0005,t+dur+.2);
+      os.connect(g);g.connect(ki);os.start(t);os.stop(t+dur+.25);break;}
+    default:_lSin(t,f,vol,dur,ki);}}
+/* SIMA fehér zaj (a chiptune „LFSR" zaja itt túl érdes volna) */
+var _hangFeher=null;
+function hangLagyZaj(t,o,bus){
+  const ac=_hangCtx;bus=bus||_hangBus.sfx;
+  if(!_hangFeher||_hangFeher.sampleRate!==ac.sampleRate){
+    _hangFeher=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate);
+    const d=_hangFeher.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;}
+  const s=ac.createBufferSource();s.buffer=_hangFeher;
+  let n=s;
+  if(o.bp){const f=ac.createBiquadFilter();f.type="bandpass";f.frequency.setValueAtTime(o.bp,t);
+    if(o.bp2)f.frequency.exponentialRampToValueAtTime(o.bp2,t+o.dur);f.Q.value=o.q||1;n.connect(f);n=f;}
+  if(o.hp){const f=ac.createBiquadFilter();f.type="highpass";f.frequency.value=o.hp;n.connect(f);n=f;}
+  if(o.lp){const f=ac.createBiquadFilter();f.type="lowpass";f.frequency.value=o.lp;n.connect(f);n=f;}
+  const g=ac.createGain(),vol=o.vol==null?.08:o.vol;
+  g.gain.setValueAtTime(0,t);
+  if(o.swell){g.gain.linearRampToValueAtTime(vol,t+o.dur*.4);g.gain.linearRampToValueAtTime(0,t+o.dur);}
+  else{g.gain.linearRampToValueAtTime(vol,t+(o.att||.003));g.gain.exponentialRampToValueAtTime(.0005,t+o.dur);}
+  n.connect(g);
+  let v=g;
+  if(o.pan&&ac.createStereoPanner){const p=ac.createStereoPanner();p.pan.value=o.pan;g.connect(p);v=p;}
+  v.connect(bus);
+  if(o.rev){const r=ac.createGain();r.gain.value=o.rev;v.connect(r);r.connect(hangLagyRev(bus));}
+  s.start(t,Math.random()*1.5);s.stop(t+o.dur+.02);}
+function hangLagyDob(t,tip,vol,bus){
+  bus=bus||_hangBus.sfx;
+  if(tip==="kick"){const ac=_hangCtx,os=ac.createOscillator(),g=ac.createGain();
+    os.frequency.setValueAtTime(110,t);os.frequency.exponentialRampToValueAtTime(46,t+.16);
+    _lEnv(g,t,vol,.003,.38);os.connect(g);g.connect(bus);os.start(t);os.stop(t+.42);}
+  else if(tip==="shaker")hangLagyZaj(t,{dur:.07,vol,hp:5000,att:.012,pan:.25},bus);
+  else if(tip==="rim"){hangLagyZaj(t,{dur:.04,vol,bp:1900,q:4},bus);_lSin(t,820,vol*.5,.05,bus);}
+  else if(tip==="brush")hangLagyZaj(t,{dur:.22,vol,bp:3200,q:.7,att:.03,pan:-.2},bus);
+  else if(tip==="ride")hangLagyZaj(t,{dur:.35,vol,hp:6500,att:.001,pan:.3,rev:.2},bus);}
+/* A hármashangzatból négyhangú akkord: dúrra nagy szeptim (napos: szext),
+   mollra kis szeptim. A lágy dalok eleve négyhangúak. */
+function hangLagyAkkord(ch,F){
+  if(ch.length>=4)return ch;
+  const dur=ch[1]-ch[0]===4;
+  return ch.concat([ch[0]+(dur?(F.comp==="gitar"?9:11):10)]);}
+/* ---- EGY LÉPÉS A LÁGY HANGSZERELÉSBEN ----
+   A kotta ugyanaz a formátum, mint a chiptune-é: 16 lépés = egy ütem = egy
+   akkord. A swing a páratlan nyolcadokat késlelteti (jazz). */
+function hangLagyLepes(D,lep,t,bus,F,STEP){
+  const lead=D._lead||(D._lead=hangSor(D.lead));
+  const nL=lead.length,s=lep%16,nb=Math.max(1,Math.floor(nL/16)),bar=Math.floor(lep/16)%nb;
+  const ch=hangLagyAkkord(D.ch[bar%D.ch.length],F);
+  const tt=t+((F.swing&&s%4===2)?F.swing*STEP:0);
+  const x=lead[lep%nL];
+  if(x&&x.n!=null)hangLagy(tt,{v:F.lead,n:x.n,dur:STEP*(x.len||1),vol:F.leadVol,rev:F.rev,pan:-.1},bus);
+  /* kíséret */
+  if(F.comp==="pad"){
+    if(s===0)ch.forEach((n,i)=>hangLagy(t,{v:"pad",n,dur:STEP*16,vol:.03,rev:F.rev*1.2,pan:(i-1.5)*.25},bus));
+    if(s===8)hangLagy(t,{v:"bell",n:ch[ch.length-1]+12,dur:STEP*4,vol:.035,rev:F.rev*1.3,pan:.35},bus);}
+  else if(F.comp==="gitar"&&s%2===0){
+    const minta=[0,1,2,3,2,1,2,3];
+    hangLagy(tt,{v:"pluck",n:ch[minta[(s>>1)%8]%ch.length],dur:STEP*3,vol:.1,rev:F.rev,pan:.3},bus);}
+  else if(F.comp==="stab"&&(s===4||s===12))
+    ch.forEach(n=>hangLagy(t,{v:"epiano",n,dur:STEP*2.5,vol:.035,rev:F.rev,pan:.2},bus));
+  /* basszus */
+  if(F.dob==="mozi"){if(s===0)hangLagy(t,{v:"sub",n:ch[0]-12,dur:STEP*15,vol:.2,rev:0},bus);}
+  else if(F.dob==="napos"){
+    if(s===0)hangLagy(t,{v:"bogo",n:ch[0]-12,dur:STEP*6,vol:.3,rev:.05},bus);
+    if(s===8)hangLagy(t,{v:"bogo",n:ch[2]-12,dur:STEP*6,vol:.26,rev:.05},bus);}
+  else if(F.dob==="jazz"&&s%4===0){
+    /* WALKING: alaphang, terc, kvint, majd félhanggal a következő akkord alá */
+    const kov=D.ch[(bar+1)%D.ch.length][0];
+    const n=[ch[0],ch[1],ch[2],kov-1][s>>2];
+    hangLagy(t,{v:"bogo",n:n-12,dur:STEP*3.6,vol:.34,rev:.08},bus);}
+  /* dob */
+  if(F.dob==="mozi"){
+    if(s===0)hangLagyDob(t,"kick",.24,bus);if(s===8)hangLagyDob(t,"kick",.12,bus);
+    if(s%4===2)hangLagyDob(t,"shaker",.015,bus);}
+  else if(F.dob==="napos"){
+    if(s===0||s===8)hangLagyDob(t,"kick",.22,bus);if(s===12)hangLagyDob(t,"rim",.05,bus);
+    if(s%2===0)hangLagyDob(tt,"shaker",s%4===0?.035:.022,bus);}
+  else if(F.dob==="jazz"){
+    if(s%4===0)hangLagyDob(t,"ride",.028,bus);
+    if(s===6||s===14)hangLagyDob(tt,"ride",.02,bus);
+    if(s===4||s===12)hangLagyDob(t,"brush",.05,bus);
+    if(s===0)hangLagyDob(t,"kick",.1,bus);}}
+/* A stílus-dallamok (HANG_STILUS) a chiptune-ra íródtak, 80–172 bpm-mel. A
+   lágy hangszerelésben ugyanaz a kotta szól, visszafogottabb tempón. */
+function hangLagyStep(D,F){return 60/(Math.max(72,Math.min(112,D.bpm*.62))*F.tempo)/4;}
+/* ---- A LÁGY HANGEFFEKTEK ----
+   Ugyanaz a 23 azonosító, mint a chiptune-ban. A sípszó és a lelátó
+   valósághű marad — az a pályáról jön, nem a felületből —, a felület hangjai
+   (kattintás, értesítés, pénz) puhák, a dallamos jelzések a témához illő
+   hangszeren szólnak (csengő / kalimba / vibrafon). */
+var HANG_SFX_LAGY={
+  klikk(t){hangLagyZaj(t,{dur:.025,vol:.05,bp:2600,q:2});_lSin(t,1250,.022,.03,_hangBus.sfx);},
+  sip(t){HANG_SFX.sip(t);},
+  felido(t){HANG_SFX.felido(t);},
+  vege(t){HANG_SFX.vege(t);},
+  gol(t){const F=hangLagyF();
+    [60,64,67,71,74].forEach((n,i)=>hangLagy(t+i*.06,{v:F.fel,n:n+12,dur:.5,vol:.12,rev:.4,pan:(i-2)*.2}));
+    [48,55,64,71].forEach(n=>hangLagy(t+.05,{v:"pad",n,dur:1.3,vol:.045,rev:.5}));
+    hangLagyZaj(t,{dur:2.2,vol:.12,lp:1200,swell:true,rev:.3});},
+  golKapott(t){[[64,0],[60,.22],[57,.44]].forEach(([n,d])=>hangLagy(t+d,{v:"epiano",n,dur:.5,vol:.12,rev:.35}));
+    hangLagyZaj(t,{dur:1,vol:.05,lp:600,swell:true});},
+  sarga(t){const F=hangLagyF();hangLagy(t,{v:F.fel,n:79,dur:.25,vol:.1});hangLagy(t+.13,{v:F.fel,n:76,dur:.35,vol:.09});},
+  piros(t){const F=hangLagyF();hangLagy(t,{v:F.fel,n:67,dur:.3,vol:.12});hangLagy(t+.18,{v:F.fel,n:63,dur:.6,vol:.12});
+    hangLagyDob(t,"kick",.28);},
+  serules(t){hangLagyDob(t,"kick",.32);hangLagy(t+.12,{v:"epiano",n:57,dur:.6,vol:.1});hangLagy(t+.12,{v:"epiano",n:60,dur:.6,vol:.08});},
+  kapufa(t){const b=_hangBus.sfx;_lSin(t,1180,.11,.9,b);_lSin(t,1180*2.41,.045,.5,b);_lSin(t,1180*3.9,.022,.25,b);
+    hangLagyZaj(t,{dur:.04,vol:.06,hp:4000});},
+  bravur(t){const F=hangLagyF();[72,76,79].forEach((n,i)=>hangLagy(t+i*.07,{v:F.fel,n,dur:.3,vol:.12,rev:.35}));},
+  tizenegyes(t){hangLagyZaj(t,{dur:1.1,vol:.07,bp:900,bp2:2400,q:1.2,swell:true,rev:.3});
+    hangLagy(t+.9,{v:hangLagyF().fel,n:69,dur:.4,vol:.12});},
+  var(t){const F=hangLagyF();hangLagy(t,{v:F.fel,n:72,dur:.25,vol:.1});hangLagy(t+.2,{v:F.fel,n:74,dur:.25,vol:.1});
+    hangLagy(t+.4,{v:F.fel,n:71,dur:.5,vol:.1});},
+  mesterharmas(t){const F=hangLagyF();
+    [72,76,79,84,88,91].forEach((n,i)=>hangLagy(t+i*.08,{v:F.fel,n,dur:.4,vol:.1,rev:.45,pan:(i-2.5)*.15}));
+    hangLagyZaj(t,{dur:1.8,vol:.1,lp:1500,swell:true,rev:.3});},
+  gyozelem(t){const F=hangLagyF();
+    [[72,0],[76,.14],[79,.28],[84,.42]].forEach(([n,d])=>hangLagy(t+d,{v:F.fel,n,dur:d===.42?1:.3,vol:.13,rev:.4}));
+    [48,55,64,67].forEach(n=>hangLagy(t+.42,{v:"pad",n,dur:1.2,vol:.04,rev:.5}));},
+  vereseg(t){[[64,0],[62,.25],[60,.5],[55,.75]].forEach(([n,d])=>hangLagy(t+d,{v:"epiano",n,dur:d===.75?1:.3,vol:.11,rev:.35}));},
+  dontetlen(t){const F=hangLagyF();hangLagy(t,{v:F.fel,n:67,dur:.3,vol:.11});hangLagy(t+.25,{v:F.fel,n:72,dur:.6,vol:.1});},
+  ertesit(t){[79,84,88].forEach((n,i)=>hangLagy(t+i*.09,{v:"bell",n,dur:.4,vol:.065,rev:.45}));},
+  penz(t){hangLagy(t,{v:"bell",n:88,dur:.2,vol:.055});hangLagy(t+.07,{v:"bell",n:93,dur:.4,vol:.055,rev:.4});
+    hangLagyZaj(t,{dur:.25,vol:.025,hp:7000});},
+  huzas(t){hangLagyZaj(t,{dur:.45,vol:.08,bp:500,bp2:4000,q:1,swell:true});const F=hangLagyF();
+    hangLagy(t+.4,{v:F.fel,n:84,dur:.4,vol:.1,rev:.45});hangLagy(t+.48,{v:F.fel,n:91,dur:.6,vol:.08,rev:.45});},
+  legendas(t){[72,76,79,84,88,91,96].forEach((n,i)=>hangLagy(t+i*.05,{v:"bell",n,dur:.5,vol:.065,rev:.5,pan:(i-3)*.12}));
+    [60,67,72,76].forEach(n=>hangLagy(t+.1,{v:"pad",n,dur:1.4,vol:.035,rev:.6}));},
+  fuzio(t){[48,55,60,64].forEach(n=>hangLagy(t,{v:"pad",n,dur:.9,vol:.045,rev:.5}));
+    hangLagyZaj(t,{dur:.8,vol:.05,bp:400,bp2:3000,swell:true});hangLagy(t+.5,{v:"bell",n:96,dur:.8,vol:.065,rev:.5});},
+  eget(t){hangLagyZaj(t,{dur:1,vol:.1,lp:1800,swell:true,rev:.3});[43,50].forEach(n=>hangLagy(t,{v:"pad",n,dur:.8,vol:.045}));}};
+/* A LÁGY STÍLUS-DALLAM ÉS -SZIGNÁL. Külön függvény, hogy a próba egy
+   offline hangkártyán is lejátszhassa (a hangKesz-kaput megkerülve). */
+function hangLagyDallamSzol(D,t0,bus){
+  const F=hangLagyF(),STEP=hangLagyStep(D,F);
+  const lead=D._lead||(D._lead=hangSor(D.lead));
+  bus=hangLagyBusz(bus,F,lead.length*STEP);
+  for(let i=0;i<lead.length;i++)hangLagyLepes(D,i,t0+i*STEP,bus,F,STEP);
+  if(D.robban)hangLagyZaj(t0+lead.length*STEP-STEP*8,{dur:.8,vol:.08,lp:1600,swell:true,rev:.3},bus);
+  return lead.length*STEP;}
+function hangLagyJelSzol(D,t0,bus){
+  const F=hangLagyF(),STEP=hangLagyStep(D,F),jel=hangSor(D.jel);
+  bus=hangLagyBusz(bus,F,jel.length*STEP);
+  jel.forEach((x,i)=>{if(x&&x.n!=null)hangLagy(t0+i*STEP,{v:F.fel,n:x.n,dur:STEP*(x.len||1),vol:.13,rev:.4},bus);});
+  if(D.nehez)hangLagyDob(t0,"kick",.38,bus);
+  if(D.villan)hangLagyZaj(t0+STEP*5,{dur:.35,vol:.06,hp:5000,swell:true},bus);
+  if(D.csillog)hangLagy(t0+STEP*4,{v:"bell",n:96,dur:.5,vol:.05,rev:.5},bus);
+  if(D.robban)hangLagyZaj(t0+STEP*4,{dur:.7,vol:.08,lp:1600,swell:true,rev:.3},bus);
+  return jel.length*STEP;}
 /* A NAPLÓSOROK APRÓSÁGAI: néhány ritkább meccsesemény (kapufa, kivédett és
    megítélt tizenegyes, VAR, mesterhármas) a szövegéből ismerhető fel — egy
    szűrő a naplóban biztosabb, mint szétszórt horgok. Csak nézett meccsen. */
@@ -7094,9 +7433,16 @@ function hangBeallHtml(){
     +`<input type="range" id="hangSfx" min="0" max="100" value="${B.sfx}" aria-label="Hangerő"${B.on?"":" disabled"}></div>`
     +`<div class="hangSor"><label><input type="checkbox" id="hangZene"${B.zene?" checked":""}${B.on?"":" disabled"}> Zene</label>`
     +`<input type="range" id="hangZeneVol" min="0" max="100" value="${B.zeneVol}" aria-label="Zene hangereje"${B.on&&B.zene?"":" disabled"}></div>`
+    +`<div class="hangSor"><label for="hangCsomag">Hangzás</label><select id="hangCsomag"${B.on?"":" disabled"}>`
+    +[["auto","Automatikus — a színtémához"],["lagy","Lágy (hangszeres)"],["chip","Chiptune (8 bit)"]]
+      .map(([k,n])=>`<option value="${k}"${B.csomag===k?" selected":""}>${n}</option>`).join("")+`</select></div>`
+    +`<p class="hangMegj" id="hangMost">Most: <b>${hangCsomag()==="lagy"
+        ?`Lágy · ${esc(hangLagyF().nev)}</b> — ${esc(hangLagyF().leiras)}`
+        :`Chiptune</b> — 8 bites konzol: négyszög, háromszög, pixelzaj`}.</p>`
     +`<div class="hangSor"><label for="hangDal">Menüdal</label><select id="hangDal"${B.on&&B.zene?"":" disabled"}>${dal}</select>`
     +`<button type="button" class="btn-s" id="hangProba">▶ Belehallgatok</button></div>`
-    +`<p class="hangMegj">Minden hang a böngészőben születik, fájl nélkül. Meccs közben a zene elhalkul; végigjátszásnál a meccs hangjai hallgatnak. `
+    +`<p class="hangMegj">Minden hang a böngészőben születik, fájl nélkül. Automatikus hangzásnál a színtéma dönt: a Pixel chiptune-t kap, `
+    +`a Sötét-arany filmszerű, a Törtfehér napos-akusztikus, a Noir füstös jazz hangszerelést. Meccs közben a zene elhalkul; végigjátszásnál a meccs hangjai hallgatnak. `
     +`Minden csapatstílusnak saját dallama van (a stílus-menüben szól, ha már két filozófiád van) és rövid szignálja, ami meccsenként egyszer szólal meg.</p>`;}
 function hangBeallRender(){
   const box=document.getElementById("hangModalBody");if(!box)return;
@@ -7108,6 +7454,8 @@ function hangBeallRender(){
   if(sv)sv.onchange=()=>hang("klikk");
   const zv=document.getElementById("hangZeneVol");if(zv)zv.oninput=()=>{B.zeneVol=+zv.value;hangMent();hangHangero();};
   const d=document.getElementById("hangDal");if(d)d.onchange=()=>{B.dal=d.value;hangMent();hangZeneAllj();hangZeneIgazit();};
+  const cs=document.getElementById("hangCsomag");if(cs)cs.onchange=()=>{hangFelold();B.csomag=cs.value;hangMent();
+    hangZeneAllj();hangZeneIgazit();hangBeallRender();hang("ertesit");};
   const p=document.getElementById("hangProba");if(p)p.onclick=()=>{hangFelold();hangZeneAllj();hangZeneInditas(B.dal);};}
 /* A fejléc gombja: minden szól → csak effektek → csend → minden szól. */
 function hangFejlec(){
@@ -111107,6 +111455,9 @@ function applyTheme(id){
   try{renderHeTheme();}catch(e){}
   /* 🕹️ a pixel-ikonok a témához kötöttek: be- vagy visszacserélés */
   try{pixIconsSync();}catch(e){}
+  /* 🎻 a hangzás is (3.9.167): automatikus módban a futó menüzene azonnal a
+     téma hangszerelésére vált — a hangZeneIgazit a kulcsából látja */
+  try{hangZeneIgazit();}catch(e){}
   if(_themeInitDone&&t.id==="pixel"&&elozo!=="pixel")
     setTimeout(()=>{try{pixFx("tema");}catch(e){}},60);
 }
