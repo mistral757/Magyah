@@ -8,6 +8,30 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## pixel-tema-proba.js — 🕹️ 3.9.165: a Pixel téma
+
+```bash
+node tools/pixel-tema-proba.js
+```
+
+**26 állítás:**
+
+* **Szinkron:** a téma-listák együtt járnak (a `<head>` és a THEMES, a két
+  SZIN-térkép); az alapértelmezett téma marad a törtfehér.
+* **Betűk:** a négy új szelet valódi WOFF2, a `@font-face` és a service worker
+  (cache v6) is ismeri, a licenc felsorolja őket. Pixel témában mindkét betű
+  betöltődik, a latin-ext (ő/ű) szelettel együtt.
+* **Színek és forma:** minden jelentéshordozó szín ≥4,5:1 az alapon, a
+  panelen és a panel2-n; a sarkok élesek.
+* **Kapcsolók:** a négy kapcsoló csak Pixel témában látszik, a CRT-sor
+  kikapcsolása tényleg leveszi a réteget, és újratöltés után is megmarad.
+* **Pixel-ikonok:** a sprite-ok épek (12×12, palettaszín). Az emoji
+  cserélődik — utólag beírt és helyben átírt szövegben is —, a textContent és
+  az innerText változatlan marad. Témaváltáskor és a kapcsolóval visszafordul.
+* **Arcade-felirat:** gólnál felvillan, más témában és kikapcsolva nem.
+* **Egyéb:** a Konami-kód a Pixelbe hoz; nincs vízszintes kilógás; nincs
+  oldalhiba.
+
 ## kezdolap-beallitasok-proba.js — ⚙ 3.9.164: a Beállítások és a Keretek a kezdőlapon
 
 ```bash

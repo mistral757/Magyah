@@ -18,12 +18,12 @@
    telepítéseken a RÉGI ikonok maradnának örökre — pont az a rajz, amit
    jogtisztasági okból cserélni kellett. A név léptetése az egyetlen dolog,
    ami ezt kikényszeríti. */
-const CACHE_NAME = "harminc-nulla-cache-v5";
+const CACHE_NAME = "harminc-nulla-cache-v6";   /* v6: a Pixel téma két betűje (3.9.165) */
 const STATIC_ASSETS = [
   "/",
   /* A betűk önhosztoltak (lásd az index.html @font-face blokkját). Itt kell
      lenniük, különben offline a tipográfia szétesne: a HTML megjön a
-     cache-ből, a betűk viszont a hálózatról jönnének. Az `addAll` mind a tíz
+     cache-ből, a betűk viszont a hálózatról jönnének. Az `addAll` mind a tizennégy
      szeletet előre letölti, tehát a latin-ext (magyar ő/ű) is offline van. */
   "/fonts/archivo-latin.woff2",
   "/fonts/archivo-latin-ext.woff2",
@@ -35,6 +35,11 @@ const STATIC_ASSETS = [
   "/fonts/oswald-latin-ext.woff2",
   "/fonts/cormorant-garamond-latin.woff2",
   "/fonts/cormorant-garamond-latin-ext.woff2",
+  /* 🕹️ a Pixel téma (3.9.165): mindössze ~42 kB a négy szelet együtt */
+  "/fonts/press-start-2p-latin.woff2",
+  "/fonts/press-start-2p-latin-ext.woff2",
+  "/fonts/pixelify-sans-latin.woff2",
+  "/fonts/pixelify-sans-latin-ext.woff2",
   "/icons/site.webmanifest",
   "/icons/favicon.ico",
   "/icons/apple-touch-icon.png",

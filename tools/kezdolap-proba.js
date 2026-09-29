@@ -1,4 +1,4 @@
-/* A KEZDŐLAP — mérés mindhárom témában.
+/* A KEZDŐLAP — mérés mind a négy témában.
    Amit néz: kilóg-e a lap vízszintesen, megvan-e minden vezérlő, működik-e a
    témaváltás (a színek TÉNYLEG változnak-e), és él-e a két karrierút. */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
@@ -8,7 +8,7 @@ const {spawn}=require('child_process');
   await new Promise(r=>setTimeout(r,1200));
   const b=await chromium.launch({args:["--no-sandbox"]});
   const hiba=[]; const out={};
-  for(const [tema,cimke] of [["dark","Sötét-arany"],["paper","Törtfehér"],["noir","Noir"]]){
+  for(const [tema,cimke] of [["dark","Sötét-arany"],["paper","Törtfehér"],["noir","Noir"],["pixel","Pixel"]]){
     out[cimke]={};
     for(const w of [320,360,430]){
       const p=await b.newPage({viewport:{width:w,height:860}});

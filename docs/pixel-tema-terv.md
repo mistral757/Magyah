@@ -4,6 +4,10 @@
 > ehhez a zenéhez, amit most tettünk a játékba. Egy klasszik pixelated verzió
 > lenne ez. Nyugodtan lehet sarkos, de azért színes, és mindenképp piiiixxxeeel"
 
+> **Állapot: megvalósult a 3.9.165-ben.** Ami eltér a tervtől (a piros
+> árnyalata, a két helyett négy kapcsoló, az arcade-feliratok, a Konami-kód),
+> azt a [pixel-tema-3-9-165.md](pixel-tema-3-9-165.md) írja le.
+
 ## 0. Az egymondatos ígéret
 
 Egy **8 bites konzoljáték** a zenéhez: pixelbetű, éles sarkok, kemény
