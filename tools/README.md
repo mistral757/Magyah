@@ -8,6 +8,21 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## felidei-csere-proba.js — 🔁 3.9.166: a félidei tervezett csere a FÉLIDŐ-sor után
+
+```bash
+node tools/felidei-csere-proba.js
+```
+
+**6 állítás**, valódi, végigjátszott mérkőzésen:
+
+* a 45. percre ütemezett csere sora KÖZVETLENÜL a FÉLIDŐ-sor után áll
+  („Csere a félidőben”), és sehol nincs „a 50. percben”;
+* a félidő-sor után a beálló már a pályán van;
+* a 70. perces csere „a 71. percben” jön;
+* a lecserélt félidőben pontosan fél meccset kap;
+* nincs oldalhiba.
+
 ## pixel-tema-proba.js — 🕹️ 3.9.165: a Pixel téma
 
 ```bash

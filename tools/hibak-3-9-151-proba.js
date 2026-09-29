@@ -99,7 +99,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* a sorrend a rendezett listában is: a 45-ös szabály a félidő-sor UTÁN áll */
     ki.sorrend=sim.events.findIndex(e=>e.type==="half")<sim.events.findIndex(e=>e.type==="sub");
     /* a helyi motor feltétele ugyanaz */
-    ki.helyi=/\(r\.min\|0\)>min-5/.test(String(playMatch));
+    ki.helyi=/const hatar=atHalf\?45:min-5;/.test(String(playMatch));   /* 3.9.166: a félidei a FÉLIDŐ-sor után, lásd felidei-csere-proba */
     /* a valódi eredményjelző: a társ ⚡-je a kezdőrúgás száma + az ő eseményei */
     sbPaintTeams({duel:true,home:true,myMatch:98,o:{n:"Vendég",ovr:87,dispOvr:88,matchOvr:94.6}});
     ki.alap=SB.teams.away.ms;
