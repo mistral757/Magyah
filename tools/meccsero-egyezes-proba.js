@@ -81,6 +81,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     playMatch=()=>{lat=h2hScript;};
     const kerd=szerep=>{
       MP.role=szerep;lat=null;
+      /* két KÜLÖN gépet játszunk el egy lapon: a „párharc egyszer indul
+         munkamenetenként" zár (3.9.175) a gépé, nem a szobáé */
+      if(typeof _h2hIndult!=="undefined")_h2hIndult=null;
       try{h2hStart(node,[],5);}catch(e){return {hiba:String(e)};}
       return lat?{sajat:lat.myMatch,tars:lat.oppMatch}:null;};
     try{ki.host=kerd("host");ki.guest=kerd("guest");}

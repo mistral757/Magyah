@@ -8,6 +8,73 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## pvp-dupla-meccs-proba.js — ⚔ 3.9.175: egy párharc, egy lejátszás
+
+```bash
+node tools/pvp-dupla-meccs-proba.js
+BASE_HTML=/út/a/régi/index.html node tools/pvp-dupla-meccs-proba.js   # a javítás előtti állapot
+```
+
+Valódi karrier és valódi motor. A hálózat a helyi backend, a Firebase-ág
+fölé kötve, késleltetve. A párharc 0,1×-es tempója a próba idejére gyorsítva.
+**15 állítás:**
+
+* **Hat indítási kísérlet** (a hálózati várakozás közben is) után a motor
+  pontosan egyszer indul: egy „felsorakozik”, egy „lezárult”, egy könyvelt
+  eredmény.
+* **Futó párharc mellett** nem indít második meccset:
+  * a kupa és a bajnoki Kezdőrúgás;
+  * egy újabb csere-kör;
+  * a playMatch.
+* **Az elköteleződés** a meccs alatt a mentésben van, és a lefújás oldja fel.
+* **Kilépés meccs közben, visszatérés:**
+  * azonnal a párharc jön (nincs Kezdőrúgás, nincs HUB);
+  * egyszer, elölről, ugyanazzal az eredménnyel.
+* **Kupa-párharcba visszatérve** a közvetítés-képernyő van elöl.
+
+A régi kódon a 2. pontnál elbukik: futó párharc mellé három további motor
+indul, ez maga a bejelentett dupla feed.
+
+## valtozasok-3-9-175-proba.js — ⚖ 3.9.175: hangolás és beállítások
+
+```bash
+node tools/valtozasok-3-9-175-proba.js
+```
+
+**25 állítás:**
+
+* **PvP keret-hangolás:**
+  * a plafon a nyers erő 3%-a (100 → ±3, 170 → ±5,1);
+  * a hangoláskor rögzül, és bekerül a mentésbe;
+  * régi mentésben a ±2 marad;
+  * a hangolás és a kiolvasás is ott vág.
+* **Kupák ereje:**
+  * gyenge bajnokság → minden sorozat a sávja alján (−6/−5/−4/−3/−2);
+  * erős bajnokság → a tetején (+0/+1/+1/+2/+2);
+  * egyenrangú → a sáv közepén, megmaradó rangsorral;
+  * a KK-t az élvonal mozgatja;
+  * a PvP közös számítás ugyanabban a sávban, a két kliensen azonosan.
+* **Értesítések:**
+  * kapcsoló a Beállításokban, alapból BE;
+  * kikapcsolva:
+    * a beállítás tárolódik;
+    * a vezetés-emlékeztető nem ugrik fel;
+    * a társ jelzése a naplóba kerül;
+    * a feliratkozás nem megy ki;
+  * visszakapcsolva minden a régi.
+* **Joker színhűség:**
+  * az új események súlya ×1,25/1,55/2,00 (jók), ×1,10/1,20/1,35 (rosszak);
+  * más szín nem hat rá;
+  * a felület és a bejelentés kiírja.
+* **Nincs oldalhiba.**
+
+**Igazított próbák:**
+
+* `kupa-meccsero-proba`: a fölényt a pályán méri, és a sáv alját ellenőrzi a
+  régi kalibrációs pont helyett.
+* `pyr-szuperliga-proba`: a KK a sávja tetején, illetve alján, a régi D1+2
+  padló helyett.
+
 ## lelato-proba.js — 🏟️ 3.9.174: a lelátó hangja
 
 ```bash

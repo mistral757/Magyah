@@ -222,7 +222,12 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       playMatch();
       for(let i=0;i<1500&&S.idx<12;i++)await new Promise(r=>setTimeout(r,50));
     }finally{S.auto=false;addLine=_add;autoTitleGate=_atg;balanceSkillTick=_bst;}
+    /* terhelt gépen a 13. meccs már futhat, amikor az auto leáll: a lefújása
+       ekkor kézi lefújásnak számít, és a mentést a jutalom-lánc végéig
+       visszatartja (3.9.171) — megvárjuk, és lezárjuk a láncot */
+    for(let i=0;i<1200&&S.playing;i++)await new Promise(r=>setTimeout(r,50));
     await new Promise(r=>setTimeout(r,400));
+    try{utoLancVege();mEloTorol();}catch(e){}
     const D=szarnyState();
     ki.parok=Object.keys(D).map(k=>({st:D[k].stages,built:!!D[k].built}));
     ki.kesz=szarnyDone();ki.idx=S.idx;
