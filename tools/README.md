@@ -8,6 +8,29 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## konnyu-elso-ugras-3-9-178-proba.js — 🪜 3.9.178: könnyű első ugrás
+
+```bash
+node tools/konnyu-elso-ugras-3-9-178-proba.js
+```
+
+**12 állítás**, valódi piramis-karrierrel. Az első idény a D6-ban telik.
+
+* **Rögzítés:**
+  * a kupa felajánlásakor eltevődik a büdzsé;
+  * csak egyszer, egy későbbi, nagyobb összeg nem írja felül.
+* **Ár:**
+  * a D4-be ugrás = alap + 500 pont (1 Mrd Ft);
+  * a D3/D2/D1 ára változatlan.
+* **Feltételek:** a 2. idénytől, illetve ha az első idény nem a D6-ban telt,
+  a régi ár marad.
+* **Felület:**
+  * a valódi all-in ajánlat ezt az árat mutatja, és semmi nem utal arra,
+    honnan jön;
+  * a nyári előrejelző is ezt az árat mondja.
+* **Mentés:** a mentés viszi.
+* **Nincs oldalhiba.**
+
 ## ifiakademia-3-9-177-proba.js — 🌱 3.9.177: az Ifiakadémia menüpont
 
 ```bash
