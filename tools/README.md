@@ -8,6 +8,38 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## ifiakademia-3-9-177-proba.js — 🌱 3.9.177: az Ifiakadémia menüpont
+
+```bash
+node tools/ifiakademia-3-9-177-proba.js
+```
+
+**21 állítás**, valódi karrierrel, a valódi `academyKeep` és
+`processAcademyDevelopment` függvényekkel:
+
+* **A menüpont:**
+  * a Csapatépítés alatt ott a „🌱 Ifiakadémia” kártya;
+  * üresen a panel elmagyarázza, mi kerül ide.
+* **A visszaküldött tehetség adatai:** név, poszt, kor, Rating. 0
+  akadémiai meccsel indul, és a bemutatkozás idei jelentkezésnek számít.
+* **Fokozatos kiderülés:**
+  * 0 meccsnél a POT becslés (~), és mind a három jellem-sor zárt;
+  * 8 meccsnél nyílik a vérmérséklet, 16-nál a kapcsolódás, 24-nél a
+    karizma, 45-nél a pontos POT;
+  * a napló négyszer szól.
+* **Várható visszatérés:**
+  * 21 évesen garantált (ballagás);
+  * egyébként az idei esély százalékban;
+  * ha idén már jelentkezett, a következő idényben.
+* **A panel csak számol:** a „ha most jelentkezne” Rating kiíródik, de a
+  panel nem módosít semmit.
+* **Rendezés:** a ballagó van elöl.
+* **Régi mentés:** két eltöltött idény 60 akadémiai meccsnek számít.
+* **Mentés:** a mentés viszi a számlálót.
+* **A HUB-kártya felirata** a mai állapotot mondja.
+* **A szótár** elmondja, hol követhető.
+* **Nincs oldalhiba.**
+
 ## taktika-illeszkedes-3-9-176-proba.js — ⚙ 3.9.176: az illeszkedés a saját elvárásodhoz mér
 
 ```bash
