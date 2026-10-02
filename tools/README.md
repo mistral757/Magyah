@@ -8,6 +8,37 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## taktika-illeszkedes-3-9-176-proba.js — ⚙ 3.9.176: az illeszkedés a saját elvárásodhoz mér
+
+```bash
+node tools/taktika-illeszkedes-3-9-176-proba.js
+```
+
+**15 állítás**, valódi kerettel:
+
+* **A várt tengely:** a `teamAttrStrengths()._exp` kiadja a Ratingekből várt
+  tengelyt. Ha minden attribútum pontosan a várt értéken áll, minden
+  rendszer 50%.
+* **Monoton:**
+  * a Védekezés +12 egyetlen rendszert sem ront, és pontosan azokat
+    javítja, amelyek a Védekezésre építenek;
+  * minden tengelyen, minden rendszerre: a fókusz-tengely emelése javít, a
+    többi tengely nem mozdít semmit.
+* **A bejelentett profil:** Seb és Gól +15 többlettel a Széljáték 94% fölött.
+* **Nem sodródik:** a Rating +8 (az attribútumok 1:1 követik) nem mozdít,
+  nyitott sebesség-plafonnal.
+* **A plafon:**
+  * nyers erő szerint: 100 → +5, 110 → +6,5, 170 → +15,5, 90 → +3,5,
+    alacsony nyers erőnél a régi 2,1;
+  * 100-as nyers erőnél a 99-es szint a teljes plafont adja (×0,7…×1,3), a
+    85-ös szint 0;
+  * a büntetés (85 alatt) nem skálázódik.
+* **A panel:**
+  * a tengelyeknél ott a várt érték és a többlet;
+  * „jól illik” csak magas illeszkedésnél jelenik meg;
+  * alatta a tanács megnevezi a fő tengelyt és a +10 pont hozamát.
+* **Nincs oldalhiba.**
+
 ## pvp-dupla-meccs-proba.js — ⚔ 3.9.175: egy párharc, egy lejátszás
 
 ```bash
