@@ -167,8 +167,10 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     _lap("kulfoldi",4);
     const kc=felderit(kat);
     ki.kulfJel=kc.length?kc.map(c=>!!c._talKulf):[];
-    let s1=0,s2=0;for(let i=0;i<300;i++){s1+=talKulfoldiCel();s2+=rollSigningTarget();}
-    ki.kulfCel={fel:s1/300,alap:s2/300,lepcso:talKulfoldiLepcso()};
+    /* 3000 minta (300 helyett): a két átlag különbségének mintavételi szórása
+       300-nál akkora volt, hogy a 0,7 lépcsős küszöb alá is leeshetett */
+    const NM=3000;let s1=0,s2=0;for(let i=0;i<NM;i++){s1+=talKulfoldiCel();s2+=rollSigningTarget();}
+    ki.kulfCel={fel:s1/NM,alap:s2/NM,lepcso:talKulfoldiLepcso()};
     const ek=Object.assign({},e,{_talKulf:true});
     _nincs();const k0=buyPrice(ek);_lap("kulfoldi",4);
     ki.kulfAr={arany:buyPrice(ek)/k0,vart:1+talSpecV("kulfoldi","con")/100,masik:buyPrice(e)/buyPrice(ek)};

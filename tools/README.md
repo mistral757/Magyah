@@ -28,11 +28,12 @@ node tools/taktika-illeszkedes-3-9-176-proba.js
 * **Nem sodródik:** a Rating +8 (az attribútumok 1:1 követik) nem mozdít,
   nyitott sebesség-plafonnal.
 * **A plafon:**
-  * nyers erő szerint: 100 → +5, 110 → +6,5, 170 → +15,5, 90 → +3,5,
-    alacsony nyers erőnél a régi 2,1;
+  * nyers erő szerint: 100 → +5, 110 → +6,5, 170 → +15,5, 100 alatt a régi
+    2,1;
   * 100-as nyers erőnél a 99-es szint a teljes plafont adja (×0,7…×1,3), a
     85-ös szint 0;
-  * a büntetés (85 alatt) nem skálázódik.
+  * 100-tól a −OVR (85 alatt) ugyanilyen arányban mélyül, 100 alatt a régi
+    marad.
 * **A panel:**
   * a tengelyeknél ott a várt érték és a többlet;
   * „jól illik” csak magas illeszkedésnél jelenik meg;

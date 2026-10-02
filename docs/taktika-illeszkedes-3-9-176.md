@@ -83,22 +83,26 @@ A számítás menete:
 > növelni +5-re, és 10-esével (nyers erő) +1,5-öt növekedhet ez a plafon.
 > (Természetesen lefelé is.)"
 
-A plafon: **5 + 0,15 × (nyers erő − 100)**, de sosem a régi 2,1 alá.
+> Pontosítás: „A lefelé is úgy volt részemről, hogy 100 fölött a −OVR
+> plafonja is nőjön. 100 alatt a rögzített értékek jók."
 
-| nyers erő | ≤ 81 | 90 | 100 | 110 | 130 | 170 |
-|---|---|---|---|---|---|---|
-| plafon | 2,1 (régi) | 3,5 | 5,0 | 6,5 | 9,5 | 15,5 |
+**100-as nyers erőtől** a plafon **5 + 0,15 × (nyers erő − 100)**. **100
+alatt** minden a régi, rögzített érték marad.
 
-* **Lefelé is folytonos.** A plafon 10 pontonként 1,5-tel csökken, egészen a
-  régi 2,1-ig.
-* **A meredekség együtt nő a plafonnal.**
-  * A 99-es szint továbbra is a teljes plafont adja, a 85-ös küszöb 0.
-  * Az illeszkedés ×0,7 és ×1,3 között skáláz. 100-as nyers erőnél egy 99-es
-    rendszer tehát +3,5 … +6,5.
+| nyers erő | < 100 | 100 | 110 | 130 | 170 |
+|---|---|---|---|---|---|
+| plafon (+OVR) | 2,1 (régi) | 5,0 | 6,5 | 9,5 | 15,5 |
+| szorzó | ×1 | ×2,38 | ×3,10 | ×4,52 | ×7,38 |
+
+* **A szorzó (plafon / 2,1) mindkét irányban hat.**
+  * A 99-es szint a teljes plafont adja, a 85-ös küszöb 0.
+  * A **begyakorlatlanság büntetése** (85 alatt, a −OVR) ugyanilyen arányban
+    mélyül. Példa: egy 75-ös szintű rendszer 50%-os illeszkedéssel 100 alatt
+    −1,0, 100-nál −2,4, 170-nél −7,4.
+* **Az illeszkedés** ×0,7 és ×1,3 között skáláz. 100-as nyers erőnél egy
+  99-es rendszer tehát +3,5 … +6,5.
 * **A kitolt plafonú rendszerek** (Guardiola, Mourinho) többlete arányosan
   nő.
-* **A begyakorlatlanság büntetése** (85 alatt) nem skálázódik: az a gyakorlás
-  ára, nem az erőé.
 * **Egyetlen függvény számol** (`tacticEffectAt`). Ugyanazt a számot látja a
   motor, a taktika-panel „Meccs-hatás” sora és a felállás-előnézet.
 

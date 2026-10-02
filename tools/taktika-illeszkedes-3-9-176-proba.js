@@ -11,8 +11,9 @@
      4. NEM SODRÓDIK: a Rating emelkedése (syncAttrsToRating) nem mozdítja az
         illeszkedést;
      5. a taktika-plafon: 100-as nyers erőnél +5, 110 → +6,5, 170 → +15,5,
-        90 → +3,5, alacsony nyers erőnél a régi 2,1; a 99-es szint a teljes
-        plafont adja, 85 → 0, a büntetés (85 alatt) nem skálázódik;
+        100 alatt a régi, rögzített 2,1; a 99-es szint a teljes plafont adja,
+        85 → 0, és 100-tól a büntetés (85 alatt, a −OVR) ugyanilyen arányban
+        mélyül, 100 alatt a régi;
      6. a panel: a tengelyeknél ott a várt érték és a többlet; a tanács a
         valódi számból dönt (85% alatt megnevezi a fő tengelyt és a +10 pont
         hozamát, fölötte „jól illik”);
@@ -118,7 +119,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     out.hatas={l99:+tacticEffectAt(k0,99,1).toFixed(3),
       l99fit0:+tacticEffectAt(k0,99,0).toFixed(3),l85:+tacticEffectAt(k0,85,0.5).toFixed(3),
       l75:+tacticEffectAt(k0,75,0.5).toFixed(3)};
-    teamOVRbase=()=>60;out.hatas.l75regi=+tacticEffectAt(k0,75,0.5).toFixed(3);
+    teamOVRbase=()=>99;out.hatas.l75regi=+tacticEffectAt(k0,75,0.5).toFixed(3);
+    teamOVRbase=()=>170;out.hatas.l75r170=+tacticEffectAt(k0,75,0.5).toFixed(3);
     teamOVRbase=_t;
     /* 6. a panel */
     S.tactics.active="szeljatek";S.tactics.levels.szeljatek=95;
@@ -148,11 +150,12 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 4. nem sodródik —");
   ok(r.sodrodas.every(v=>Math.abs(v)<0.005),"a Rating +8 (az attribútumok 1:1 követik) nem mozdítja az illeszkedést (nyitott sebesség-plafon mellett)",r.sodrodas);
   console.log("\n— 5. a plafon —");
-  ok(r.cap.r100===5&&r.cap.r110===6.5&&r.cap.r170===15.5&&r.cap.r90===3.5&&r.cap.r60===2.1,
-    "100 → +5 · 110 → +6,5 · 170 → +15,5 · 90 → +3,5 · alacsony nyers erőnél a régi 2,1",r.cap);
+  ok(r.cap.r100===5&&r.cap.r110===6.5&&r.cap.r170===15.5&&r.cap.r90===2.1&&r.cap.r60===2.1,
+    "100 → +5 · 110 → +6,5 · 170 → +15,5 · 100 alatt a régi, rögzített 2,1",r.cap);
   ok(Math.abs(r.hatas.l99-6.5)<0.01&&Math.abs(r.hatas.l99fit0-3.5)<0.01&&r.hatas.l85===0,
     "100-as nyers erőnél a 99-es szint a teljes plafont adja (×0,7…×1,3 az illeszkedéssel), 85 → 0",r.hatas);
-  ok(r.hatas.l75===r.hatas.l75regi&&r.hatas.l75<0,"a büntetés (85 alatt) nem skálázódik a nyers erővel",r.hatas);
+  ok(r.hatas.l75regi===-1&&Math.abs(r.hatas.l75-(-1*5/2.1))<0.002&&Math.abs(r.hatas.l75r170-(-1*15.5/2.1))<0.002,
+    "a −OVR (85 alatt) 100-tól ugyanilyen arányban mélyül (×5/2,1 … ×15,5/2,1), 100 alatt a régi",r.hatas);
   console.log("\n— 6. a panel —");
   ok(r.panelVart,"a tengelyeknél ott a Ratingekből várt érték és a többlet");
   ok(r.panelJol,"magas illeszkedésnél (fő tengelyek +15) „jól illik”");
