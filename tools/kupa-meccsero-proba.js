@@ -10,11 +10,16 @@
        régi fölény:   4,3  →  7,3  →  12,3 →  17,3     (KK)
        új fölény:     7,3  →  7,3  →   7,3 →   7,3
 
+   3.9.175: a kupák mezőnye a Nyári Kupa számításából indul, és sorozatonként
+   egy sávban mozog (MK −6…0, FA −5…+1, KL −4…+1, EL −3…+2, KK −2…+2) — a
+   fölényt ezért a PÁLYÁN mérjük (a mezőny a rejtett bónuszod felét a motortól
+   kapja meg), és a 3. pont a sávot ellenőrzi a régi kalibrációs pont helyett.
+
    Amit mér:
-     1. a fölény ÁLLANDÓ a rejtett bónusz teljes tartományán;
+     1. a pályán mért fölény ÁLLANDÓ a rejtett bónusz teljes tartományán;
      2. …minden karrierszakaszban;
-     3. a +10-es kalibrációs ponton bitre a RÉGI értéket adja (a közép-karrier
-        nehézsége nem változott);
+     3. a ligájánál jóval erősebb keretnél a sáv ALJA: a pályán 1 − alsó
+        határ (KK 3 · OJK 4 · KONF 5 · MK 7);
      4. a sorozatok rangsora megmaradt (KK a legszorosabb, MK a legenyhébb);
      5. a dominancia SZÁNDÉKOSAN nyers maradt — meccs-erőre váltva visszatérne
         a sodródás, mert a mezőnyszinthez hasonlítja magát;
@@ -77,7 +82,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       const ms=teamStrength()+h,o={};
       COMPS.forEach(c=>{
         const dd=(EURO_COMPS[c]&&EURO_COMPS[c].oppDelta)||0;
-        o[c]=Math.round((ms-(euroMidRating(c)+dd))*10)/10;});
+        o[c]=Math.round((ms-(euroMidRating(c)+dd+seasonHiddenBonus()*OPP_BUFF_MEASURED))*10)/10;});
       return o;};
     const regiFoleny=(lvl,h)=>{
       oppTargetRating=lvl;HID=h;S.oppBuffH=null;freezeSeasonHiddenBonus();
@@ -140,24 +145,24 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       horgony:String(mpStartTick).indexOf("mine.mstr||mine.str")>=0,
       kupaMid:String(mpStartTick).indexOf("mine.mstr||mine.str")>=0,
       auto:String(mpResolveLevel).indexOf("mine.mstr||mine.str")>=0};
-    ki.edge={base:EURO_BASE_EDGE,caps:{BL:EURO_EDGE.BL.cap,MK:EURO_EDGE.MK.cap}};
+    ki.sav=CUP_BAND;
     return ki;});
 
   const azonos=(a,b,e)=>Object.keys(a).every(k=>Math.abs(a[k]-b[k])<=(e||0.6));
   console.log("\n1-2. A FÖLÉNY ÁLLANDÓ");
-  ok(azonos(t.h4,t.h10)&&azonos(t.h10,t.h20)&&azonos(t.h20,t.h30),
-     "a rejtett bónusz +4…+30 tartományán nem mozdul",
+  /* +4-nél a keret még közelebb áll a ligájához, ezért a súlyozás a sávon
+     belül kicsit feljebb tolja a mezőnyt (legfeljebb ~1 pont) — ez a
+     3.9.175-ös szabály szándékos része, nem sodródás */
+  ok(azonos(t.h4,t.h10,1.2)&&azonos(t.h10,t.h20)&&azonos(t.h20,t.h30),
+     "a rejtett bónusz +4…+30 tartományán nem mozdul (a pályán mérve)",
      {h4:t.h4,h10:t.h10,h30:t.h30});
   ok(azonos(t.keso10,t.keso30),"…késői karrierszakaszban is",{h10:t.keso10,h30:t.keso30});
   ok(azonos(t.h10,t.keso10,1.2),"…és a két karrierszakasz is egyezik",
      {korai:t.h10,kesoi:t.keso10});
 
-  console.log("\n3. A KALIBRÁCIÓS PONT");
-  ok(azonos(t.h10,t.regi10),"rejtett +10-nél BITRE a régi fölény (a közép-karrier nem változott)",
-     {uj:t.h10,regi:t.regi10});
-  ok(!azonos(t.h4,t.regi4)&&!azonos(t.h30,t.regi30),
-     "…a széleken viszont igen: ott javult a sodródás",
-     {regi4:t.regi4.BL,uj4:t.h4.BL,regi30:t.regi30.BL,uj30:t.h30.BL});
+  console.log("\n3. A SÁV ALJA (3.9.175)");
+  ok(azonos(t.h10,{BL:3,EL:4,KL:5,MK:7},0.6),
+     "a ligájánál jóval erősebb keretnél a pályán 1 − a sáv alja: KK 3 · OJK 4 · KONF 5 · MK 7",t.h10);
 
   console.log("\n4. A SOROZATOK RANGSORA");
   ok(t.h10.BL<t.h10.EL&&t.h10.EL<t.h10.KL&&t.h10.KL<t.h10.MK,
@@ -175,7 +180,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n7. PvP");
   ok(t.pvp.horgony===true,"a közös horgony és a kupa-mid az mstr-ből");
   ok(t.pvp.auto===true,"a javaslat nélküli mezőnyszint is");
-  ok(t.edge.base===6.2,"az új alap-fölény 6,2 (= 1,2 + a régi rejtett/2 a +10-es ponton)",t.edge);
+  ok(JSON.stringify(t.sav)===JSON.stringify({MK:[-6,0],FA:[-5,1],KL:[-4,1],EL:[-3,2],BL:[-2,2]}),"a sorozatsávok (3.9.175): MK −6…0, FA −5…+1, KL −4…+1, EL −3…+2, KK −2…+2",t.sav);
 
   const zaj=errs.filter(e=>!/favicon|manifest|sw\.js|ServiceWorker/i.test(e));
   ok(zaj.length===0,"nincs konzolhiba",zaj.slice(0,3));
