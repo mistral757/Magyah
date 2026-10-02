@@ -123,9 +123,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     r.kozben={fut:!!(_lelato&&_lelato.src),k:_lelato&&_lelato.k,duck:_hangZeneDuck,zeneKell:hangZeneKell(),
       zeneSzol:!!_hangZene,zeneGain:+_hangBus.zene.gain.value.toFixed(3),zajGain:+_hangBus.zaj.gain.value.toFixed(3),nezett:hangMeccsNezett()};
     await varj(2200);   /* a beúszás (2,2 mp) végigér */
-    const g0=_lelato&&_lelato.g?_lelato.g.gain.value:0;
-    r.gol=lelatoReag("gol");
-    const minta=[];for(let i=0;i<8;i++){await varj(150);minta.push(+(_lelato&&_lelato.g?_lelato.g.gain.value:0).toFixed(3));}
+    /* A MÉRÉS IDEJÉRE a futó meccs saját reakciói (egy valódi gól, egy kapott
+       gól) nem szólhatnak bele: terhelt gépen a meccs gyorsabban halad, és egy
+       épp lecsengő hullám (vagy egy kapott gól utáni elcsendesedés) elrontotta
+       a mérést. A mérés előtt a moraj megnyugszik (két minta 0,01-en belül). */
+    const _reag=lelatoReag;lelatoReag=function(){return false;};
+    const gNow=()=>_lelato&&_lelato.g?_lelato.g.gain.value:0;
+    for(let i=0;i<40;i++){const a=gNow();await varj(300);if(Math.abs(gNow()-a)<0.01)break;}
+    const g0=gNow();
+    r.gol=_reag("gol");
+    const minta=[];for(let i=0;i<8;i++){await varj(150);minta.push(+gNow().toFixed(3));}
+    lelatoReag=_reag;
     r.g0=+g0.toFixed(3);r.minta=minta;
     r.golUtan=Math.max(...minta)>g0*1.25;
     for(let i=0;i<600&&!S.lastMatch;i++)await varj(50);
