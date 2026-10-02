@@ -11,17 +11,22 @@
 
 **Feltétel:** a piramis-karrier első idénye a **D6**-ban telt.
 
-**Rögzítés** (`S.pyrLeapEasy`): eltesszük a büdzsét. Ez a szezonzáró kupa
-**indulásakor** történik:
+**Rögzítés** (`S.pyrLeapEasy`): eltesszük a büdzsét. Mindig a **választás
+pillanata** számít:
 
-* a Nyári Felkészülési Kupánál a felajánlás pillanata számít. Ha nem vállalja
-  a kupát, akkor is ez marad, mert a felajánlás és az indulás között nem lehet
-  költeni;
-* ha másik kupába jutott be, például a Magor Kupájába, annak az indulása
-  számít.
+> „Amennyiben azt választja, hogy nem indul a kupán, akkor ezt a választási
+> pillanatot kell számolni a büdzsével."
 
-A rögzítés **egyszeri**. Egy kupa közbeni újraindítás nem írhatja felül egy
-későbbi, díjakkal megnövelt összeggel.
+* **Indul a kupán:** az **indulás** pillanata (`startEuroCampaign`). Ugyanez
+  érvényes akkor is, ha egy másik kupába jutott be, például a Magor
+  Kupájába.
+* **Kihagyja a Nyári Felkészülési Kupát:** a **„Köszönjük, idén
+  kihagyjuk”** gomb megnyomásának pillanata.
+* **Felajánláskor** csak ideiglenes érték kerül be. A választás mindig
+  felülírja.
+
+A végleges érték **egyszer** íródik. Egy kupa közbeni újraindítás nem írhatja
+felül egy később, díjakkal megnövelt összeggel.
 
 **Az ár:** az első idény utáni nyáron a **D4-be ugrás** ára = a rögzített
 büdzsé + **1 Mrd Ft** (500 pont).
@@ -47,4 +52,4 @@ korábban sem írt ki fix ugrásárat, ezért ott nincs mit átírni.
 
 ## Próba
 
-`tools/konnyu-elso-ugras-3-9-178-proba.js`, 12 állítás.
+`tools/konnyu-elso-ugras-3-9-178-proba.js`, 14 állítás.

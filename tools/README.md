@@ -14,11 +14,13 @@ Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 node tools/konnyu-elso-ugras-3-9-178-proba.js
 ```
 
-**12 állítás**, valódi piramis-karrierrel. Az első idény a D6-ban telik.
+**14 állítás**, valódi piramis-karrierrel. Az első idény a D6-ban telik.
 
 * **Rögzítés:**
-  * a kupa felajánlásakor eltevődik a büdzsé;
-  * csak egyszer, egy későbbi, nagyobb összeg nem írja felül.
+  * a felajánláskor csak ideiglenes érték kerül be;
+  * a „Köszönjük, idén kihagyjuk” megnyomása, illetve az indulás
+    véglegesít;
+  * a végleges érték egyszer íródik.
 * **Ár:**
   * a D4-be ugrás = alap + 500 pont (1 Mrd Ft);
   * a D3/D2/D1 ára változatlan.

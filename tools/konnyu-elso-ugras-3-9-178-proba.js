@@ -5,9 +5,9 @@
    büdzsé + 1 Mrd Ft (500 pont) — és ezt a játékosnak nem mondjuk el.
 
    Amit mér (valódi piramis-karrier):
-     1. a rögzítés: a kupa felajánlásakor / indulásakor (offerFriendlyCup,
-        startEuroCampaign) a büdzsé eltevődik; EGYSZER — egy későbbi,
-        nagyobb büdzsé nem írja felül;
+     1. a rögzítés: a felajánláskor ideiglenes érték; a VÁLASZTÁS pillanata
+        véglegesít — kihagyásnál a gomb megnyomása, indulásnál maga az
+        indulás (startEuroCampaign); a végleges érték EGYSZER íródik;
      2. az ár: D4-be = alap + 500; a D3/D2/D1 ára változatlan;
      3. a feltételek: nem D6-ban telt első idény → nincs rögzítés, régi ár;
         a 2. idénytől a régi ár;
@@ -68,18 +68,29 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
        idényt itt a D6-ba tesszük, mert a szabály erről szól */
     S.pyr.my=6;
     out.pyr=pyrOn();out.div=pyrMyDivId();out.sz=S.seasonNumber||1;
-    /* 1. rögzítés a felajánláskor */
-    S.pyrLeapEasy=null;S.transferBudget=4321;
+    /* 1. a felajánláskor IDEIGLENES érték, a KIHAGYÁS megnyomása véglegesít */
+    S.pyrLeapEasy=null;S.transferBudget=4000;
     const _sh=document.getElementById("scUnlock");
     try{offerFriendlyCup(()=>{});}catch(e){out.offerHiba=String(e);}
+    out.ideiglenes=S.pyrLeapEasy?{b:S.pyrLeapEasy.budget,v:S.pyrLeapEasy.vegleges}:null;
+    S.transferBudget=4321;   /* a választás pillanatában ennyi van */
+    const noBtn=[...document.querySelectorAll("#unlockActions button")].find(x=>/kihagyjuk/.test(x.textContent));
+    out.vanKihagy=!!noBtn;
+    if(noBtn)noBtn.click();
     _sh.classList.add("hide");
     out.rogzit=S.pyrLeapEasy&&S.pyrLeapEasy.budget;
-    /* egyszer: egy későbbi, nagyobb büdzsé nem írja felül (kupa-indulás) */
+    out.vegleges=!!(S.pyrLeapEasy&&S.pyrLeapEasy.vegleges);
+    /* egyszer: utána egy nagyobb büdzsé (pl. egy kupa-indulás) nem írja felül */
     S.transferBudget=99999;
-    const _c=S.euroCurrent;S.euroCurrent=null;
-    pyrLeapEasyRecord();
+    pyrLeapEasyRecord(true);
     out.egyszer=S.pyrLeapEasy&&S.pyrLeapEasy.budget;
-    S.euroCurrent=_c;
+    /* az INDULÁS ága: ideiglenes után az indulás pillanata számít */
+    const mentett=S.pyrLeapEasy;
+    S.pyrLeapEasy=null;S.transferBudget=1000;pyrLeapEasyRecord(false);
+    S.transferBudget=2500;pyrLeapEasyRecord(true);   /* = startEuroCampaign */
+    out.indulas=S.pyrLeapEasy&&S.pyrLeapEasy.budget;
+    out.startHivja=String(startEuroCampaign).indexOf("pyrLeapEasyRecord(true)")>=0;
+    S.pyrLeapEasy=mentett;
     /* 2. az ár — a nyári állapot: a bajnok D5-be lépett, a szezonszám még 1 */
     S.pyr.my=5;
     out.d4=pyrLeapTargetFrom(5);
@@ -117,8 +128,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return out;});
   console.log("\n— 1. a rögzítés —");
   ok(r.pyr&&r.div===6&&r.sz===1,"a karrier első idénye a D6-ban",{pyr:r.pyr,div:r.div,sz:r.sz});
-  ok(r.rogzit===4321,"a kupa felajánlásakor a büdzsé eltevődik",r.rogzit);
-  ok(r.egyszer===4321,"egyszer: egy későbbi, nagyobb büdzsé nem írja felül",r.egyszer);
+  ok(r.ideiglenes&&r.ideiglenes.b===4000&&r.ideiglenes.v===false,"a felajánláskor csak ideiglenes érték kerül be",r.ideiglenes);
+  ok(r.vanKihagy&&r.rogzit===4321&&r.vegleges,"„Köszönjük, idén kihagyjuk”: a választás pillanatának büdzséje rögzül véglegesen",{b:r.rogzit,v:r.vegleges});
+  ok(r.egyszer===4321,"a végleges érték egyszer íródik: egy későbbi, nagyobb büdzsé nem írja felül",r.egyszer);
+  ok(r.indulas===2500&&r.startHivja,"az indulás ága: az indulás pillanata írja felül az ideiglenest (startEuroCampaign)",{b:r.indulas,hivja:r.startHivja});
   console.log("\n— 2. az ár —");
   ok(r.d4&&r.d4.to===4&&r.d4.price===4321+500,"a D4-be ugrás ára = a kupa-induláskori büdzsé + 1 Mrd (500 pont)",r.d4);
   ok(r.d3.price===30000&&r.d2.price===45000&&r.d1.price===60000,"a D3/D2/D1 ára változatlan",{d3:r.d3,d2:r.d2,d1:r.d1});
@@ -129,7 +142,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.ajanlat.van&&r.ajanlat.ar,"a valódi all-in ajánlat ezt az árat mutatja",r.ajanlat);
   ok(r.ajanlat.nemArul,"…és semmi nem utal arra, honnan jön az ár");
   ok(r.terv&&r.terv.some(a=>a.to===4&&a.price===4321+500),"a nyári előrejelző is ezt az árat mondja",r.terv);
-  ok(r.mentve&&r.mentve.budget===4321&&r.mentve.season===1,"a mentés viszi",r.mentve);
+  ok(r.mentve&&r.mentve.budget===4321&&r.mentve.season===1&&r.mentve.vegleges===true,"a mentés viszi",r.mentve);
   ok(!r.offerHiba&&!r.ajHiba&&!r.planHiba&&errs.length===0,"nincs oldalhiba",{o:r.offerHiba,a:r.ajHiba,p:r.planHiba,e:errs.slice(0,3)});
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");
