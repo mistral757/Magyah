@@ -8,6 +8,32 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## merfoldko-kategoria-nyitas-3-9-186-proba.js — 🔓 3.9.186: a stílus-kategóriát az első teljesítés nyitja
+
+```bash
+node tools/merfoldko-kategoria-nyitas-3-9-186-proba.js
+```
+
+**16 állítás.** A kérés: a stílus-kategóriákat ne lehessen pénzért megvenni.
+Az első teljesült mérföldkő nyissa meg őket felugró ablakkal, a nyitáskor
+egyszer levonva egy átlagos mérföldkő-jutalomnyi pénzt.
+
+* **A díj:** egy átlagos pénzjutalmas mérföldkő, mind a hat kategóriánál
+  ugyanaz.
+* **Zárt, teljesítés nélkül:** semmi nem nyílik, semmi nem megy le.
+* **Az első teljesítés:**
+  * megnyit, és pontosan egyszer von le;
+  * a fokozatok azonnal fizetnek, semmi nem ragad be;
+  * a napló és a felugró ablak is szól.
+* **Utána:** a további teljesítés nem von le.
+* **Mind a hat:** összesen 6 × díj, a felugrók sorba állnak.
+* **Üres kassza:** annyi megy le, amennyi van, és a kategória akkor is nyílik.
+* **Kihívás-jutalom:** díj nélkül nyit.
+* **Felület:**
+  * nincs „Megnyitom” gomb;
+  * a panel és a zárt sor elmondja a szabályt;
+  * nincs oldalhiba.
+
 ## boost-talizman-3-9-185-proba.js — ⚡ 3.9.185: boost-kedvezmény jutalom és a Boost talizmán-szín
 
 ```bash

@@ -300,7 +300,7 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
   ok(st.virt===4,"Hangsúly-virtuóz: 4 csúszka mozdítható a 3 helyett",st.virt);
   ok(kozel(st.virtCon,1.1)&&st.virtPro,"…kontra: a kár-oldal +10%, a haszon-oldal érintetlen",st.virtCon);
   ok(st.berag.kap===st.berag.vart&&st.berag.egyszer&&st.berag.marad,"Beragadt kincs: a beragadt jutalom 25%-a azonnal, talizmánonként egyszer — a jutalom beragadva marad",st.berag);
-  ok(kozel(st.beragAr,1.15,0.001),"…kontra: a mérföldkő-kategória nyitási ára +15%",st.beragAr);
+  ok(kozel(st.beragAr,1.15,0.005),"…kontra: a mérföldkő-kategória nyitási díja +15% (3.9.186: a díj kisebb szám, a kerekítés miatt ±0,5%)",st.beragAr);
   ok(st.szerep.v1===st.szerep.vart&&st.szerep.v1!==st.szerep.v0,"Szerepjáték: a valódi roleVal hatása +6%",st.szerep);
   ok(st.szerepKi.le===st.szerepKi.vart&&st.szerepKi.le>0,"…kontra: akit a valódi kiosztás lecserél, −4 morál-jelet kap",st.szerepKi);
   ok(st.mester&&kozel(st.mester.arany,st.mester.vart,st.mester.tures),"A mester jegyzetei: a csillagozás-jog ára −20%",st.mester);
