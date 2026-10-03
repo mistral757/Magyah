@@ -229,8 +229,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      "ötnél több kiállítás nem születhet: az ötödik UTÁN már nincs meccs",elo.sok.kiallDb);
   if(elo.sok.kiallDb>=5){
     ok(elo.sok.lefujva===true,"a napló kimondja a lefújást",elo.sok.lefujva);
-    ok(elo.sok.eredmeny==="0:3",
-       "a hivatalos eredmény a bemondott vereség: 0:3",elo.sok.eredmeny);
+    /* A SZABÁLY (lásd MATCH_FORFEIT_GA): 0:3, KIVÉVE ha az ellenfél addigra
+       már többel vezetett — akkor a valódi eredmény marad. Egy 0:4-es
+       lefújás tehát helyes; a próba korábban csak a 0:3-at fogadta el, és
+       ritkán (amikor a meccs már négy góllal állt) hamis hibát adott. */
+    {const m=/^(\d+):(\d+)$/.exec(String(elo.sok.eredmeny||""));
+     const gf=m?+m[1]:-1,ga=m?+m[2]:-1;
+     ok(m&&(gf===0&&ga===3||ga-gf>3),
+       "a hivatalos eredmény a bemondott vereség: 0:3 (vagy a nagyobb valódi hátrány)",elo.sok.eredmeny);}
     ok(elo.sok.letszamok[elo.sok.letszamok.length-1]==="hatan",
        "…és a lefújás előtti utolsó sor hatan-t mond",elo.sok.letszamok);}
   else console.log("  ⚠ ebben a futásban nem jött össze öt kiállítás — a lefújás ága nem mérhető");
