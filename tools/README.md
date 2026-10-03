@@ -8,6 +8,27 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## egyenlito-zseton-3-9-184-proba.js — ⚖️ 3.9.184: az egyenlítő zsetonja tényleg ingyen
+
+```bash
+node tools/egyenlito-zseton-3-9-184-proba.js
+```
+
+**10 állítás.** A bejelentett hiba: egy kihívás-jutalomból kapott ingyenes
+egyenlítő után végtelen egyenlítőt lehetett venni 200 M Ft-ért. Az ok: a
+100 pontos alsó határ miatt az ár sosem lett 0, a zseton pedig csak 0-s
+árnál fogyott el.
+
+* **A régi hiba:** zseton mellett az ár 0.
+* **A vásárlás:** elhasználja a zsetont; az egyenleg nem mozdul; az idény
+  alapáras darabjai sem fogynak.
+* **Utána:** a rendes ár jön, a következő vásárlás fizet, a zseton nem jön
+  vissza.
+* **Felület:** a megerősítő ablak és a bolt sora is „INGYEN — kihívás-jutalom”
+  feliratot mutat.
+* **Egyéb:** nincs oldalhiba.
+
+
 ## jegyar-skala-3-9-183-proba.js — 🎺 3.9.183: a jegyár 100 fölött a piaccal nő
 
 ```bash
