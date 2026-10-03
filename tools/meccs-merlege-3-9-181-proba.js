@@ -83,6 +83,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
          if(g){g.click();return false;}
          const aj=box.querySelector("[data-imm-ajanl]")||box.querySelector(".prow");
          if(aj){aj.click();return false;}}
+       /* feloldás-bejelentés (scUnlock): az első gombja visz tovább */
+       const ua=document.getElementById("unlockActions");
+       if(ua&&ua.offsetParent){
+         const g=[...ua.querySelectorAll("button")].find(x=>x.offsetParent&&!x.disabled);
+         if(g){g.click();return false;}}
        for(const id of ["talDrawLater","guideTipOk","skillOfferSkip","unlockOk"]){
          const x=document.getElementById(id);if(x&&x.offsetParent&&!x.disabled){x.click();break;}}
        return false;});

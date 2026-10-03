@@ -51,7 +51,8 @@ node tools/meccs-merlege-3-9-181-proba.js
 ```
 
 **13 állítás**, egy valódi bajnoki meccs után. A lánc közbülső ablakait
-(talizmán-húzás, jutalom-skill kiosztása) a próba továbbengedi.
+(talizmán-húzás, jutalom-skill kiosztása, feloldás-bejelentés) a próba
+továbbengedi.
 
 * A lefújás után a mérleg ugrik fel, nem a statisztika.
 * Rajta a „📊 Meccsvégi statisztikák” gomb.
