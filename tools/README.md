@@ -14,7 +14,7 @@ Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 node tools/egyenlito-zseton-3-9-184-proba.js
 ```
 
-**10 állítás.** A bejelentett hiba: egy kihívás-jutalomból kapott ingyenes
+**9 állítás.** A bejelentett hiba: egy kihívás-jutalomból kapott ingyenes
 egyenlítő után végtelen egyenlítőt lehetett venni 200 M Ft-ért. Az ok: a
 100 pontos alsó határ miatt az ár sosem lett 0, a zseton pedig csak 0-s
 árnál fogyott el.
