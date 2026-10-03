@@ -6976,7 +6976,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.178";
+const APP_VERSION="3.9.179";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -62031,9 +62031,7 @@ function mpPresencePaint(){
       +'<span style="color:var(--dim2)">— érdemes megvárni.</span>';
   }else if(on===false){
     const m=mpMateAwayMin(R);
-    const mikor=(m==null)?"" : (m<2?" (az imént)":m<60?` (${m} perce)`
-      :m<1440?` (${Math.round(m/60)} órája)`:` (${Math.round(m/1440)} napja)`);
-    el.innerHTML='<span style="color:#e6a86a">○ A társad most NINCS a játékban'+mikor+'</span>'
+    el.innerHTML='<span style="color:#e6a86a">○ A társad most NINCS a játékban'+mpTavolMikor(m)+'</span>'
       +'<br><span style="color:var(--dim2)">Nyugodtan lépj ki — a szoba és a mentésed megmarad, '
       +'és a párharc akkor is lefut, amikor ő is elindítja.</span>';
   }else{
@@ -62178,11 +62176,9 @@ function mpPresenceTick(){
   /* A SZÍVVERÉS a lekérdezéstől FÜGGETLEN ütemben megy — enélkül egy
      visszatérés vagy egy felébredő telefon után a társad örökre offline-nak
      látna (3.9.41). */
-  if(t-_mpBeatAt>=MP_PRES_BEAT_MS){
-    _mpBeatAt=t;
-    const kellPush=(t-_mpPushAt>=MP_PRES_PUSH_MS);
-    if(kellPush)_mpPushAt=t;
-    try{mpPresenceArm(MP.activeRoom,kellPush?"push":true);}catch(e){}}
+  /* 3.9.179: a szívverés a közös jelenlét-körben él (mpJelenletKor) — az
+     előtérben és aktivitás mellett ver, háttérben / tétlenül „távol"-t jelez */
+  try{mpJelenletKor();}catch(e){}
   if(t-_mpPresAt<MP_PRESENCE_MS)return;
   _mpPresAt=t;
   /* ELSŐ KÖR: a teljes szoba, mert a tempó is kell belőle. UTÁNA már csak a
@@ -64370,9 +64366,7 @@ function mpDecPresPaint(){
       +(varok?' <span style="color:var(--dim2)">— látnia kell a kérdést.</span>':"");
   else if(on===false){
     const m=mpMateAwayMin(R);
-    const mikor=(m==null)?"":(m<2?" (az imént)":m<60?` (${m} perce)`
-      :m<1440?` (${Math.round(m/60)} órája)`:` (${Math.round(m/1440)} napja)`);
-    s='<span style="color:#e6a86a">○ A társad most NINCS a játékban'+mikor+'</span>';
+    s='<span style="color:#e6a86a">○ A társad most NINCS a játékban'+mpTavolMikor(m)+'</span>';
   }else if(R)
     s='<span style="color:var(--dim2)">A társad jelenléte nem ismert.</span>';
   /* A MÁSIK IRÁNY: ha Ő vár rám, azt is ki kell mondani — a kapu másik
@@ -110894,7 +110888,11 @@ async function mpPresenceArm(code,force){
       const od=F.onDisconnect(r);
       await od.update({online:false,seenAt:mpStamp()});
       _mpPresence={code,od};}
-    await F.update(r,{online:true,seenAt:mpStamp()});
+    /* 3.9.179: CSAK AKKOR „online", ha tényleg itt vagy (előtér + friss
+       aktivitás) — lásd mpJelenVagyok. Különben a tétlenség pillanata megy ki. */
+    const _jelen=mpJelenVagyok();
+    await F.update(r,_jelen?{online:true,seenAt:mpStamp()}:{online:false,seenAt:mpUtolsoAktivSzerver()});
+    _mpJelenKiirt=_jelen;
     mpNet.presErr=null;
     /* A FELIRATKOZÁS ÚJRA KIMEGY, minden szobába. Nem kérünk engedélyt —
        csak ha MÁR megvan: a feliratkozás a szobában él, tehát egy új szoba
@@ -110914,6 +110912,96 @@ async function mpPresenceArm(code,force){
     mpNet.presErr=(e&&e.message)||String(e);
   }
 }
+/* ================= VALÓDI JELENLÉT (3.9.179) =================
+   BEJELENTETT HIBA: „Akkor is rendszeresen online-nak jelzi a társat PvP-ben,
+   amikor valójában nem az, egyszerűen csak nem zárta be az alkalmazást, de
+   már nincs az előtérben, nincs aktivitás, vagy már más alkalmazásban van."
+
+   KÉT OK VOLT:
+     1. a szívverés CSAK a beváró képernyőkön futott — máshol a legutolsó
+        `online:true` ott ragadt a szobában;
+     2. az `online:false`-t kizárólag a szerver írta be (onDisconnect), a
+        kapcsolat bontásakor. Egy háttérbe tett (de be nem zárt) alkalmazás
+        kapcsolata viszont percekig-órákig él — a böngésző nem bontja.
+
+   MOSTANTÓL „ONLINE" = a játék ELŐTÉRBEN van, ÉS az elmúlt MP_IDLE_MS-ban
+   volt aktivitás: érintés, kattintás, billentyű, görgetés — vagy olyan
+   képernyő, amin a nézés maga a játék (futó, nézett meccs; beváró réteg).
+   Fókusz nélküli (látszó, de másik programra váltott) ablaknál csak a
+   valódi mozdulat számít, és a türelem MP_IDLE_BLUR_MS.
+     · háttérbe kerüléskor (visibilitychange / pagehide) AZONNAL kimegy az
+       `online:false`, a seenAt pedig a távozás pillanata;
+     · tétlenségnél (MP_IDLE_MS) ugyanez, a seenAt az UTOLSÓ aktivitás ideje —
+       így a túloldal „N perce" felirata a valóságot mondja;
+     · az első érintésre / visszatéréskor azonnal visszaáll;
+     · a szívverés mostantól az EGÉSZ közös karrier alatt fut (nem csak a
+       beváró képernyőkön), előtérben MP_PRES_BEAT_MS-onként;
+     · az OLVASÓ oldal a szívverés elmaradását is észreveszi (MP_SEEN_STALE_MS):
+       egy régi kliens vagy egy fagyott fül `online:true`-ja sem tart örökké.
+   CSAK A MEGLÉVŐ MEZŐK (online, seenAt) — a szabályfájlhoz nem kell nyúlni. */
+const MP_IDLE_MS=180000;          /* 3 perc tétlenség után már nem „online" */
+const MP_SEEN_STALE_MS=95000;     /* ennyi szívverés-csend után a társ nincs itt */
+/* ASZTALI GÉPEN az ablak látszhat úgy is, hogy egy MÁSIK program van fókuszban
+   (a visibilityState ilyenkor „visible" marad). Fókusz nélkül rövidebb a
+   türelem, és a nézés sem számít aktivitásnak — csak a valódi mozdulat. */
+const MP_IDLE_BLUR_MS=60000;
+let _mpLastAct=Date.now(),_mpJelenKiirt=null;
+function mpLatszik(){try{return document.visibilityState!=="hidden";}catch(e){return true;}}
+function mpFokuszban(){try{return typeof document.hasFocus!=="function"||document.hasFocus();}catch(e){return true;}}
+/* A nézés is aktivitás: futó, nézett meccs, vagy egy beváró réteg előtérben. */
+function mpNezoKepernyo(){
+  try{
+    if(typeof S!=="undefined"&&S&&S.playing&&!S.auto)return true;
+    const w=document.getElementById("h2hWait");
+    return !!(w&&!w.classList.contains("hide"));
+  }catch(e){return false;}}
+function mpJelenVagyok(){
+  if(!mpLatszik())return false;
+  if(!mpFokuszban())return Date.now()-_mpLastAct<MP_IDLE_BLUR_MS;
+  return (Date.now()-_mpLastAct<MP_IDLE_MS)||mpNezoKepernyo();}
+/* Az utolsó aktivitás SZERVERIDŐBEN (a túloldal ehhez méri a „N perce"-t). */
+function mpUtolsoAktivSzerver(){
+  const most=mpNow();
+  return Math.round(most-Math.max(0,Date.now()-_mpLastAct));}
+/* A „nem vagyok itt" kiírása — azonnal, egyszer. */
+function mpJelenTavol(miert){
+  try{
+    if(mpNet.mode!=="fb"||!MP.activeRoom)return;
+    const F=mpNet.fns;if(!F||!F.update)return;
+    if(_mpJelenKiirt===false)return;
+    _mpJelenKiirt=false;
+    const r=F.ref(mpNet.db,"mp/rooms/"+MP.activeRoom+"/players/"+mpMyId());
+    F.update(r,{online:false,seenAt:miert==="hatter"?mpStamp():mpUtolsoAktivSzerver()}).catch(()=>{});
+  }catch(e){}}
+/* A jelenlét köre: előtérben szívverés, tétlenségnél / háttérben egy
+   „távol" — semmi más. A beváró képernyő mpPresenceTick-je is ezt hívja. */
+function mpJelenletKor(){
+  try{
+    if(mpNet.mode!=="fb"||!MP.activeRoom||!MP.active)return;
+    const t=Date.now();
+    if(mpJelenVagyok()){
+      if(_mpJelenKiirt!==true||t-_mpBeatAt>=MP_PRES_BEAT_MS){
+        _mpBeatAt=t;
+        const kellPush=(t-_mpPushAt>=MP_PRES_PUSH_MS);
+        if(kellPush)_mpPushAt=t;
+        mpPresenceArm(MP.activeRoom,kellPush?"push":true);}
+    }else mpJelenTavol(mpLatszik()?"tetlen":"hatter");
+  }catch(e){}}
+(function mpJelenletFigyel(){
+  try{
+    const aktiv=()=>{
+      const volt=_mpJelenKiirt;
+      _mpLastAct=Date.now();
+      if(volt===false&&mpLatszik())mpJelenletKor();};
+    ["pointerdown","keydown","touchstart","wheel","scroll"].forEach(ev=>
+      document.addEventListener(ev,aktiv,{capture:true,passive:true}));
+    document.addEventListener("visibilitychange",()=>{
+      if(mpLatszik()){_mpLastAct=Date.now();mpJelenletKor();}
+      else mpJelenTavol("hatter");});
+    window.addEventListener("pagehide",()=>mpJelenTavol("hatter"));
+    window.addEventListener("focus",aktiv);
+    setInterval(mpJelenletKor,5000);
+  }catch(e){}})();
 /* A MEGBÍZÁS VISSZAVONÁSA — és ez nem szőrszálhasogatás. Ha kilépéskor a
    szoba TÖRLŐDIK, de a megbízás áll, a szerver a szakadáskor VISSZAÍRJA a
    `players/<id>/online:false` ágat egy már nem létező szobába — és onnantól
@@ -110937,7 +111025,12 @@ function mpMateOnline(room){
     if(!tars.length)return null;
     const p=room.players[tars[0]];
     if(!p||p.online===undefined||p.online===null)return null;
-    return !!p.online;
+    if(!p.online)return false;
+    /* 3.9.179: az `online:true` önmagában nem bizonyíték — egy háttérbe tett
+       alkalmazás kapcsolata sokáig él, és a szerver addig nem írja át. Ha a
+       szívverés (MP_PRES_BEAT_MS) elmaradt, a társ nincs itt. */
+    if(typeof p.seenAt==="number"&&mpNow()-p.seenAt>MP_SEEN_STALE_MS)return false;
+    return true;
   }catch(e){return null;}
 }
 /* ================= A VÁRAKOZÁS JELE A TÚLOLDALON (3.9.41) ==================
@@ -111022,6 +111115,15 @@ function mpMateWaitLeft(room){
     return Math.max(0,h);
   }catch(e){return null;}}
 /* Mióta nem láttuk? (percben, szerveridőben mérve — lásd mpNow.) */
+/* 3.9.179: a seenAt mostantól az UTOLSÓ AKTIVITÁS (vagy a háttérbe kerülés)
+   ideje — a felirat ezt mondja ki, nem a kapcsolatét. Háttérben hagyott,
+   tétlen társnál ez a valóság: „utoljára 12 perce volt aktív". */
+function mpTavolMikor(m){
+  if(m==null)return "";
+  return m<2?" — az imént még aktív volt"
+    :m<60?` — utoljára ${m} perce volt aktív`
+    :m<1440?` — utoljára ${Math.round(m/60)} órája volt aktív`
+    :` — utoljára ${Math.round(m/1440)} napja volt aktív`;}
 function mpMateAwayMin(room){
   try{
     if(!room||!room.players)return null;

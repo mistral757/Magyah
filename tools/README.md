@@ -8,6 +8,34 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## valodi-jelenlet-3-9-179-proba.js — 🟢 3.9.179: valódi jelenlét PvP-ben
+
+```bash
+node tools/valodi-jelenlet-3-9-179-proba.js
+```
+
+**18 állítás**, hamis Firebase-réteggel (`mpNet.fns`), ami minden írást
+rögzít. A láthatóságot (`window.__vis`) és a fókuszt (`window.__focus`) a
+próba kézzel állítja.
+
+* **Saját jelenlét:**
+  * előtérben, friss aktivitással `online:true`;
+  * 3 perc tétlenség után `online:false`, a seenAt az utolsó aktivitás, és
+    ez csak egyszer megy ki;
+  * egy érintésre azonnal visszaáll;
+  * háttérbe kerüléskor azonnal távol, visszatéréskor azonnal online;
+  * a nézett meccs és a beváró réteg aktivitásnak számít;
+  * a szívverés a beváró képernyőn kívül is fut.
+* **Asztali fókusz:** látszó, de fókusz nélküli ablaknál 1 perc a küszöb, és
+  a nézés nem számít aktivitásnak; a fókusz visszatérése azonnal online.
+* **A társ oldala:**
+  * az elavult szívverés „nincs itt”;
+  * a felirat „utoljára N perce volt aktív”.
+* **Egyéb:** csak engedett mezők íródnak; nincs oldalhiba.
+
+Leírás: `docs/valodi-jelenlet-3-9-179.md`.
+
+
 ## konnyu-elso-ugras-3-9-178-proba.js — 🪜 3.9.178: könnyű első ugrás
 
 ```bash
