@@ -8,6 +8,201 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## kozos-nyari-program-3-9-181-proba.js — 🗓 3.9.181: a közös nyári program (PvP)
+
+```bash
+node tools/kozos-nyari-program-3-9-181-proba.js
+```
+
+**38 állítás.** A hálózat egy memóriabeli szoba; a közös HSZ-mezőny valódi és
+seedelt.
+
+* **Feloldás** (`mpResolveProgram`, tiszta függvény):
+  * a bejelentett eset (te D0/HSZ, a társ FA) mindkét oldalról FA → HSZ;
+  * két különböző sorozat sosem egyenlő rangú;
+  * azonos sorozatnál a selejtező szimmetrikus;
+  * régi kliens rekordja is működik.
+* **Nevezés:** a kapu a teljes programot írja be; a naplóban minden lépés,
+  annak oka, a lánc és a nyári torna szabálya.
+* **Léptetés:**
+  * a lánc (FA → KK) a társ győzelmére is elsül, mindkettőnek;
+  * a győztes nem vár;
+  * a következő lépés közös mezőnnyel indul;
+  * a szakasz-kulcsok sorozatonként külön rekeszt kapnak;
+  * a selejtező körszáma a programból jön.
+* **Nyári torna:** a hamarabb kiesőnek (a társ még versenyben), a döntő
+  vesztesének, azonos körben mindkettőnek jár; a döntő győztesének és annak,
+  aki tovább jutott, nem.
+* **Kilépés:** a lánc-várakozásból kilépni nem feladás; a HUB gombja
+  visszavisz.
+* **Közös HSZ:**
+  * a ligaszakasz végén a társ valódi eredményei kerülnek a helyükre, és a
+    tabella konzisztens marad;
+  * a top 8 nézőként megvárja a társ rájátszását.
+* **Mentés:** az új mezők mentődnek és betöltődnek.
+
+Leírás: `docs/kozos-nyari-program-3-9-181.md`.
+
+
+## meccs-merlege-3-9-181-proba.js — 🎙 3.9.181: a meccs mérlege felugrik
+
+```bash
+node tools/meccs-merlege-3-9-181-proba.js
+```
+
+**13 állítás**, egy valódi bajnoki meccs után. A lánc közbülső ablakait
+(talizmán-húzás, jutalom-skill kiosztása, feloldás-bejelentés) a próba
+továbbengedi.
+
+* A lefújás után a mérleg ugrik fel, nem a statisztika.
+* Rajta a „📊 Meccsvégi statisztikák” gomb.
+* A naplóban a mérleg két sora a meccs utolsó két sora, és csak egyszer
+  íródik ki.
+* A gomb ugyanabban az ablakban mutatja a statisztikát; a „Rendben” bezár és
+  továbbvisz.
+* A meccsképernyő statisztika-gombja változatlan.
+* Mentés és újratöltés után is megvan, és nem íródik ki újra.
+
+
+## kozvetlen-folytatas-3-9-180-proba.js — ▶ 3.9.180: nincs köztes folytató oldal
+
+```bash
+node tools/kozvetlen-folytatas-3-9-180-proba.js
+```
+
+**11 állítás**, valódi karrierrel, mentéssel és újratöltéssel.
+
+* **A sáv eltűnt:** a „Mentett meccs található” elem, a gombjai és a felirata
+  sincs a lapon.
+* **Hideg indulás:** a kezdőlap van elöl, a játék még nincs betöltve, és
+  alatta nem áll módválasztó.
+* **„Mentett meccs folytatása”:** újratöltés nélkül, egyenesen a karrierbe
+  tölt (ugyanaz a csapat, forduló, mérleg).
+* **Szándékkal érkezve** (kontextusváltás): az indulás maga tölt be.
+* **Közben törölt mentés:** nem tölt be, a módválasztó jön.
+* **Elszálló betöltés:** a hibasáv a kezdőlapon áll, a mentés a helyén marad.
+* **Egyéb:** nincs oldalhiba.
+
+Leírás: `docs/kozvetlen-folytatas-3-9-180.md`.
+
+
+## valodi-jelenlet-3-9-179-proba.js — 🟢 3.9.179: valódi jelenlét PvP-ben
+
+```bash
+node tools/valodi-jelenlet-3-9-179-proba.js
+```
+
+**18 állítás**, hamis Firebase-réteggel (`mpNet.fns`), ami minden írást
+rögzít. A láthatóságot (`window.__vis`) és a fókuszt (`window.__focus`) a
+próba kézzel állítja.
+
+* **Saját jelenlét:**
+  * előtérben, friss aktivitással `online:true`;
+  * 3 perc tétlenség után `online:false`, a seenAt az utolsó aktivitás, és
+    ez csak egyszer megy ki;
+  * egy érintésre azonnal visszaáll;
+  * háttérbe kerüléskor azonnal távol, visszatéréskor azonnal online;
+  * a nézett meccs és a beváró réteg aktivitásnak számít;
+  * a szívverés a beváró képernyőn kívül is fut.
+* **Asztali fókusz:** látszó, de fókusz nélküli ablaknál 1 perc a küszöb, és
+  a nézés nem számít aktivitásnak; a fókusz visszatérése azonnal online.
+* **A társ oldala:**
+  * az elavult szívverés „nincs itt”;
+  * a felirat „utoljára N perce volt aktív”.
+* **Egyéb:** csak engedett mezők íródnak; nincs oldalhiba.
+
+Leírás: `docs/valodi-jelenlet-3-9-179.md`.
+
+
+## konnyu-elso-ugras-3-9-178-proba.js — 🪜 3.9.178: könnyű első ugrás
+
+```bash
+node tools/konnyu-elso-ugras-3-9-178-proba.js
+```
+
+**14 állítás**, valódi piramis-karrierrel. Az első idény a D6-ban telik.
+
+* **Rögzítés:**
+  * a felajánláskor csak ideiglenes érték kerül be;
+  * a „Köszönjük, idén kihagyjuk” megnyomása, illetve az indulás
+    véglegesít;
+  * a végleges érték egyszer íródik.
+* **Ár:**
+  * a D4-be ugrás = alap + 500 pont (1 Mrd Ft);
+  * a D3/D2/D1 ára változatlan.
+* **Feltételek:** a 2. idénytől, illetve ha az első idény nem a D6-ban telt,
+  a régi ár marad.
+* **Felület:**
+  * a valódi all-in ajánlat ezt az árat mutatja, és semmi nem utal arra,
+    honnan jön;
+  * a nyári előrejelző is ezt az árat mondja.
+* **Mentés:** a mentés viszi.
+* **Nincs oldalhiba.**
+
+## ifiakademia-3-9-177-proba.js — 🌱 3.9.177: az Ifiakadémia menüpont
+
+```bash
+node tools/ifiakademia-3-9-177-proba.js
+```
+
+**21 állítás**, valódi karrierrel, a valódi `academyKeep` és
+`processAcademyDevelopment` függvényekkel:
+
+* **A menüpont:**
+  * a Csapatépítés alatt ott a „🌱 Ifiakadémia” kártya;
+  * üresen a panel elmagyarázza, mi kerül ide.
+* **A visszaküldött tehetség adatai:** név, poszt, kor, Rating. 0
+  akadémiai meccsel indul, és a bemutatkozás idei jelentkezésnek számít.
+* **Fokozatos kiderülés:**
+  * 0 meccsnél a POT becslés (~), és mind a három jellem-sor zárt;
+  * 8 meccsnél nyílik a vérmérséklet, 16-nál a kapcsolódás, 24-nél a
+    karizma, 45-nél a pontos POT;
+  * a napló négyszer szól.
+* **Várható visszatérés:**
+  * 21 évesen garantált (ballagás);
+  * egyébként az idei esély százalékban;
+  * ha idén már jelentkezett, a következő idényben.
+* **A panel csak számol:** a „ha most jelentkezne” Rating kiíródik, de a
+  panel nem módosít semmit.
+* **Rendezés:** a ballagó van elöl.
+* **Régi mentés:** két eltöltött idény 60 akadémiai meccsnek számít.
+* **Mentés:** a mentés viszi a számlálót.
+* **A HUB-kártya felirata** a mai állapotot mondja.
+* **A szótár** elmondja, hol követhető.
+* **Nincs oldalhiba.**
+
+## taktika-illeszkedes-3-9-176-proba.js — ⚙ 3.9.176: az illeszkedés a saját elvárásodhoz mér
+
+```bash
+node tools/taktika-illeszkedes-3-9-176-proba.js
+```
+
+**15 állítás**, valódi kerettel:
+
+* **A várt tengely:** a `teamAttrStrengths()._exp` kiadja a Ratingekből várt
+  tengelyt. Ha minden attribútum pontosan a várt értéken áll, minden
+  rendszer 50%.
+* **Monoton:**
+  * a Védekezés +12 egyetlen rendszert sem ront, és pontosan azokat
+    javítja, amelyek a Védekezésre építenek;
+  * minden tengelyen, minden rendszerre: a fókusz-tengely emelése javít, a
+    többi tengely nem mozdít semmit.
+* **A bejelentett profil:** Seb és Gól +15 többlettel a Széljáték 94% fölött.
+* **Nem sodródik:** a Rating +8 (az attribútumok 1:1 követik) nem mozdít,
+  nyitott sebesség-plafonnal.
+* **A plafon:**
+  * nyers erő szerint: 100 → +5, 110 → +6,5, 170 → +15,5, 100 alatt a régi
+    2,1;
+  * 100-as nyers erőnél a 99-es szint a teljes plafont adja (×0,7…×1,3), a
+    85-ös szint 0;
+  * 100-tól a −OVR (85 alatt) ugyanilyen arányban mélyül, 100 alatt a régi
+    marad.
+* **A panel:**
+  * a tengelyeknél ott a várt érték és a többlet;
+  * „jól illik” csak magas illeszkedésnél jelenik meg;
+  * alatta a tanács megnevezi a fő tengelyt és a +10 pont hozamát.
+* **Nincs oldalhiba.**
+
 ## pvp-dupla-meccs-proba.js — ⚔ 3.9.175: egy párharc, egy lejátszás
 
 ```bash

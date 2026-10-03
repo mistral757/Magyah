@@ -75,7 +75,10 @@ const srv=http.createServer((req,rp)=>{
     out.szivveres=/function mpPresenceArm\(code,force\)/.test(arm)
       &&/if\(!all&&!force\)return;/.test(arm)
       &&/if\(all\)\{/.test(arm);
-    out.tick_hiv=/mpPresenceArm\(MP\.activeRoom,kellPush\?"push":true\)/.test(mpPresenceTick.toString());
+    /* 3.9.179: a szívverés a közös jelenlét-körbe költözött (mpJelenletKor) —
+       a beváró képernyő köre azt hívja, az pedig a bejelentkezést */
+    out.tick_hiv=/mpJelenletKor\(\)/.test(mpPresenceTick.toString())
+      &&/mpPresenceArm\(MP\.activeRoom,kellPush\?"push":true\)/.test(mpJelenletKor.toString());
     out.nyitas_hiv=/mpPresenceArm\(MP\.activeRoom,"push"\)/.test(h2hWaitShow.toString());
 
     /* ---- 4. A TÚLOLDALI JELZÉS ---- */

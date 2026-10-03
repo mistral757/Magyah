@@ -89,16 +89,21 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const tarKi=()=>p.evaluate(()=>{const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);o[k]=localStorage.getItem(k);}return o;});
   const tarBe=o=>p.evaluate(o=>{localStorage.clear();for(const k in o)localStorage.setItem(k,o[k]);},o);
   const mentes=()=>p.evaluate(k=>{try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},alap.kulcs);
-  /* a VALÓDI visszatérés: újratöltés → kezdőlap → „Mentett meccs folytatása"
-     (ez maga is újratölt, a hely szándékával) → „Folytatom" */
-  const betolt=async()=>{
-    await p.reload({waitUntil:"load"});await p.waitForTimeout(700);
-    await Promise.all([p.waitForNavigation({waitUntil:"load"}).catch(()=>{}),
-      p.evaluate(()=>{const x=document.getElementById("heResumeBtn");if(x&&x.offsetParent)x.click();else location.reload();})]);
-    await p.waitForTimeout(700);
+  /* a VALÓDI visszatérés: újratöltés → kezdőlap → „Mentett meccs folytatása".
+     3.9.180 óta nincs köztes „Folytatom" sáv: ugyanarra a helyre a gomb
+     újratöltés nélkül, egyenesen betölt — ezért a naplófigyelő ELŐTTE köt. */
+  const kezdolaprol=async()=>{
     await p.evaluate(()=>{window.__sorok=[];});
     await kotes();
-    await p.evaluate(()=>{const x=document.getElementById("resumeYesBtn");if(x&&x.offsetParent)x.click();});};
+    const nav=await p.evaluate(()=>{const x=document.getElementById("heResumeBtn");
+      if(x&&x.offsetParent){x.click();return document.getElementById("mpEntry").classList.contains("hide")?"kozvetlen":"?";}
+      return "nincs-gomb";});
+    await p.waitForTimeout(700);
+    return nav;};
+  const betolt=async()=>{
+    await p.reload({waitUntil:"load"});await p.waitForTimeout(700);
+    const nav=await kezdolaprol();
+    if(nav!=="kozvetlen")throw new Error("a Folytatás nem töltött be közvetlenül: "+nav);};
   /* a csere a 3. vödör után — a FELÜLETRŐL: az élő cserepult (megállít, csere, „Mehet") */
   const csere=()=>p.evaluate(A=>{
     if(!(MATCH_CTL&&MATCH_CTL.canSub()))return false;
@@ -220,9 +225,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await p.reload({waitUntil:"load"});await p.waitForTimeout(900);
   /* a kezdőrúgás-rekord helyett: végigjátszás-mérkőzés, a lánc visszatartva */
   await p.evaluate(()=>{localStorage.removeItem(saveKey()+"::elo");});
-  await p.evaluate(()=>{const x=document.getElementById("resumeYesBtn");if(x&&x.offsetParent)x.click();});
-  await p.waitForTimeout(600);
-  await kotes();
+  const nav6=await kezdolaprol();
+  if(nav6!=="kozvetlen")throw new Error("a Folytatás nem töltött be közvetlenül: "+nav6);
   await p.evaluate(()=>{window.__lanc=0;utoLancIndit=function(){window.__lanc++;};
     S.auto=true;window.__sorok=[];playMatch();});
   await varjF(()=>window.__lanc>0,null,60000);
