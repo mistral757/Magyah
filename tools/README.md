@@ -8,6 +8,61 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## kozos-nyari-program-3-9-181-proba.js — 🗓 3.9.181: a közös nyári program (PvP)
+
+```bash
+node tools/kozos-nyari-program-3-9-181-proba.js
+```
+
+**38 állítás.** A hálózat egy memóriabeli szoba; a közös HSZ-mezőny valódi és
+seedelt.
+
+* **Feloldás** (`mpResolveProgram`, tiszta függvény):
+  * a bejelentett eset (te D0/HSZ, a társ FA) mindkét oldalról FA → HSZ;
+  * két különböző sorozat sosem egyenlő rangú;
+  * azonos sorozatnál a selejtező szimmetrikus;
+  * régi kliens rekordja is működik.
+* **Nevezés:** a kapu a teljes programot írja be; a naplóban minden lépés,
+  annak oka, a lánc és a nyári torna szabálya.
+* **Léptetés:**
+  * a lánc (FA → KK) a társ győzelmére is elsül, mindkettőnek;
+  * a győztes nem vár;
+  * a következő lépés közös mezőnnyel indul;
+  * a szakasz-kulcsok sorozatonként külön rekeszt kapnak;
+  * a selejtező körszáma a programból jön.
+* **Nyári torna:** a hamarabb kiesőnek (a társ még versenyben), a döntő
+  vesztesének, azonos körben mindkettőnek jár; a döntő győztesének és annak,
+  aki tovább jutott, nem.
+* **Kilépés:** a lánc-várakozásból kilépni nem feladás; a HUB gombja
+  visszavisz.
+* **Közös HSZ:**
+  * a ligaszakasz végén a társ valódi eredményei kerülnek a helyükre, és a
+    tabella konzisztens marad;
+  * a top 8 nézőként megvárja a társ rájátszását.
+* **Mentés:** az új mezők mentődnek és betöltődnek.
+
+Leírás: `docs/kozos-nyari-program-3-9-181.md`.
+
+
+## meccs-merlege-3-9-181-proba.js — 🎙 3.9.181: a meccs mérlege felugrik
+
+```bash
+node tools/meccs-merlege-3-9-181-proba.js
+```
+
+**13 állítás**, egy valódi bajnoki meccs után. A lánc közbülső ablakait
+(talizmán-húzás, jutalom-skill kiosztása) a próba továbbengedi.
+
+* A lefújás után a mérleg ugrik fel, nem a statisztika.
+* Rajta a „📊 Meccsvégi statisztikák” gomb.
+* A naplóban a mérleg két sora a meccs utolsó két sora, és csak egyszer
+  íródik ki.
+* A gomb ugyanabban az ablakban mutatja a statisztikát; a „Rendben” bezár és
+  továbbvisz.
+* A meccsképernyő statisztika-gombja változatlan.
+* Mentés és újratöltés után is megvan, és nem íródik ki újra.
+
+
 ## kozvetlen-folytatas-3-9-180-proba.js — ▶ 3.9.180: nincs köztes folytató oldal
 
 ```bash
