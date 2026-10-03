@@ -8,6 +8,32 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## paros-egy-osztalyban-3-9-182-proba.js — 🤝 3.9.182: a páros egy osztályban (PvP)
+
+```bash
+node tools/paros-egy-osztalyban-3-9-182-proba.js
+```
+
+**18 állítás.** Valódi piramis-karrierrel fut, mellé egy kézzel épített,
+erősebb társ-világgal (megnyílt D0, a társ ott játszik).
+
+* **Feloldás:** szimmetrikus; döntetlennél a házigazda dönt; egyező világnál
+  nincs teendő.
+* **Szintugrás és hangolás:** ha a társ erősebb osztályban van, nem jár
+  szintugrás, és egy naplósor elmondja, miért; hangolás közös karrierben
+  nincs.
+* **A gyengébb fél:**
+  * átveszi az erősebb világot és osztályt;
+  * a mezőnyszint és az ellenfél-lista az új osztályé;
+  * a fejlődés-mérő tud róla;
+  * megjelenik az „EGYÜTT KEZDITEK” ablak.
+* **Az erősebb fél:** változatlan, csak a napló szól.
+* **Egyező világ:** azonnal továbbenged.
+* **Egyéb:** a kapu a szintugrás után jön; mentés; nincs oldalhiba.
+
+Leírás: `docs/paros-egy-osztalyban-3-9-182.md`.
+
+
 ## kozos-nyari-program-3-9-181-proba.js — 🗓 3.9.181: a közös nyári program (PvP)
 
 ```bash
