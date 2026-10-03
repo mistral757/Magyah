@@ -8,6 +8,28 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## jegyar-skala-3-9-183-proba.js — 🎺 3.9.183: a jegyár 100 fölött a piaccal nő
+
+```bash
+node tools/jegyar-skala-3-9-183-proba.js
+```
+
+**11 állítás.**
+
+* **A szorzó:**
+  * 100-as nyers erőig ×1;
+  * fölötte folytonos és szigorúan nő;
+  * pontosan a piaci árgörbe aránya (117: ~×8,3 · 130: ~×28).
+* **Bevétel és bér:**
+  * a heti bevétel a szorzóval nő, a bér horgonya nem;
+  * a bérhorgony visszaszámolása a szorzót kiveszi.
+* **Felület:** a keret-bontás kiírja a szorzót, a többlet külön sorban áll;
+  a szótár szól róla.
+* **Egyéb:** nincs oldalhiba.
+
+Leírás: `docs/jegyar-skala-3-9-183.md`.
+
+
 ## paros-egy-osztalyban-3-9-182-proba.js — 🤝 3.9.182: a páros egy osztályban (PvP)
 
 ```bash
