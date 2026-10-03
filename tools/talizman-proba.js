@@ -113,7 +113,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       return h.indexOf("talCard r"+r)>=0&&!rossz(h.replace(/null/g,""));});
     return ki;});
   console.log("\n— 1. A KATALÓGUS —");
-  ok(g.katDb===10,"tíz kategória",g.katDb);
+  ok(g.katDb===11,"tizenegy kategória (3.9.185: + ⚡ Boost)",g.katDb);
   ok(g.katMin1,"minden kategóriának van átlagos szinten is elérhető speciálja");
   ok(g.specDb>=60&&g.specPerKat.every(n=>n>=6),"60+ special, kategóriánként legalább 6",{db:g.specDb,kat:g.specPerKat});
   ok(g.masikTerulet.length===0&&g.ervenyesKontra,"minden kontra MÁSIK területet üt, és létező területet",g.masikTerulet);
