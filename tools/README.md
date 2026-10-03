@@ -8,6 +8,28 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## kozvetlen-folytatas-3-9-180-proba.js — ▶ 3.9.180: nincs köztes folytató oldal
+
+```bash
+node tools/kozvetlen-folytatas-3-9-180-proba.js
+```
+
+**11 állítás**, valódi karrierrel, mentéssel és újratöltéssel.
+
+* **A sáv eltűnt:** a „Mentett meccs található” elem, a gombjai és a felirata
+  sincs a lapon.
+* **Hideg indulás:** a kezdőlap van elöl, a játék még nincs betöltve, és
+  alatta nem áll módválasztó.
+* **„Mentett meccs folytatása”:** újratöltés nélkül, egyenesen a karrierbe
+  tölt (ugyanaz a csapat, forduló, mérleg).
+* **Szándékkal érkezve** (kontextusváltás): az indulás maga tölt be.
+* **Közben törölt mentés:** nem tölt be, a módválasztó jön.
+* **Elszálló betöltés:** a hibasáv a kezdőlapon áll, a mentés a helyén marad.
+* **Egyéb:** nincs oldalhiba.
+
+Leírás: `docs/kozvetlen-folytatas-3-9-180.md`.
+
+
 ## valodi-jelenlet-3-9-179-proba.js — 🟢 3.9.179: valódi jelenlét PvP-ben
 
 ```bash
