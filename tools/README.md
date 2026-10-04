@@ -8,6 +8,36 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## hsz-dijak-3-9-199-proba.js — 💜 3.9.199: egyéni díjak a Hiper Szuper Kupában
+
+```bash
+node tools/hsz-dijak-3-9-199-proba.js
+```
+
+**23 állítás**, valódi karrier-állással. A próba a valódi `startEuroCampaign` → `euroCampaignEndNow` → `renderEuroScreen` utat járja végig.
+
+* **A három skill:**
+  * a BL-értékek +10%-a (a semleges értékhez mért többletre);
+  * a kategóriák és a 💜 nevek;
+  * mindhárom csak díjként szerezhető;
+  * a hírnév-bázis 11, a mérföldkő-súly 3,3.
+* **A díjosztás:**
+  * a saját királyok Hiper-címet és Hiper-skillt kapnak;
+  * a meglévő BL-párt a Hiper-díj lecseréli;
+  * a díjszámláló nő;
+  * a Run-mérő királyi címei.
+* **A BL utána:**
+  * a BL-díj nem írja felül és nem halmozza a Hiper-díjat;
+  * a számláló nő, az idegen királyé nem a miénk;
+  * a BL a régi címekkel és fejléccel jelenik meg;
+  * a sor szerint a játékos „megtartotta az erősebb” Hiper-díjat.
+* **A felület:**
+  * a záróképernyő fejléce és 💜 sorai;
+  * a valódi kimenet („megkapta…” / „…lecserélte…”);
+  * a Hiper-kommentár;
+  * a lecserélt BL-díj kommentárja már nem jön.
+* **Verzió, oldalhiba.**
+
 ## sajto-gol-piros-3-9-198-proba.js — 🗞️ 3.9.198: a kiállítások és a gólok száma a lapban
 
 ```bash
