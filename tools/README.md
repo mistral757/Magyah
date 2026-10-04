@@ -8,6 +8,32 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## gyilkos-paros-felbomlas-3-9-191-proba.js — 🧲 3.9.191: a gyilkos páros felbomlik, ha egy tagja távozik
+
+```bash
+node tools/gyilkos-paros-felbomlas-3-9-191-proba.js
+```
+
+**16 állítás**, a valódi eladási úton (`releasePlayer` → `pruneChemistry`).
+
+* **Kész páros:**
+  * megszűnik;
+  * a hely felszabadul;
+  * a bent maradt ember újra párosítható;
+  * a napló kimondja;
+  * a többi páros megmarad;
+  * a sebesség az emberé marad;
+  * a mérföldkő nem csökken.
+* **Félkész páros:**
+  * megszűnik;
+  * az „épül” jelölő törlődik;
+  * a napló kimondja.
+* **Régi mentés:**
+  * az első takarításnál bomlik fel;
+  * a mérföldkőben marad;
+  * az ismételt takarítás néma.
+* **A mentés, a leírás és a verzió.**
+
 ## dinamikus-ber-3-9-190-proba.js — 💸 3.9.190: dinamikus bér, a számla nem a plafont tölti ki
 
 ```bash

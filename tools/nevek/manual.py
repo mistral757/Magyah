@@ -1823,3 +1823,28 @@ JAVASLAT_3_9_187 = {
 "André Alves":("Álmos András","Álmos"),  # Álves András
 }
 MANUAL.update(JAVASLAT_3_9_187)
+
+# ── 3.9.191 — két jóváhagyott névkör (a régi alak a megjegyzésben) ─────────
+JAVASLAT_3_9_191 = {
+"Emerson Palmieri":("Pálmafás Imre","Pálmafás"),  # Palmiri Imre
+"Djibril Cissé":("Sziszegő Dzsibrill","Sziszegő"),  # Szisszé Dzsibrill
+"Marco Kurz":("Kurta Márk","Kurta"),  # Kurc Márk
+"Garry Flitcroft":("Flitteres Geri","Flitteres"),  # Flitkroft Geri
+"Fabian Ernst":("Komoly Fábián","Komoly"),  # Érnst Fábián
+"Manuel Gulde":("Gulyás Manó","Gulyás"),  # Gúlde Manó
+"Franck Kessié":("Késes Ferkó","Késes"),  # Kesszié Ferkó
+"Davide Calabria":("Kalamáris Dávid","Kalamáris"),  # Kalabria Dávid
+"Damiano Tommasi":("Tamáskodó Damján","Tamáskodó"),  # Tommazi Damján
+"Duván Zapata":("Csapatos Ödön","Csapatos"),  # Szapata Ödön
+"Harry Kewell":("Kevély Harri","Kevély"),  # Kjúúl Bálint
+"Dietmar Hamann":("Hámozó Dietmár","Hámozó"),  # Hámann Menyhért
+"Peter Crouch":("Kuporgó Péter","Kuporgó"),  # Krúcs Péter
+"Vladimír Šmicer":("Smirgli Vladi","Smirgli"),  # Szmájszer Vladi
+"Johan Neeskens":("Nyeszlett Jancsi","Nyeszlett"),  # Nyeskens Jancsi
+"Robert Prosinečki":("Prózai Robi","Prózai"),  # Prószinyecki Robi
+"Dejan Savićević":("Savanyú Deján","Savanyú"),  # Szavicsevics Deján
+"Predrag Mijatović":("Miákoló Predrág","Miákoló"),  # Mijatovics Predrág
+"Denis Law":("Lávás Dénes","Lávás"),  # Denéz Láv
+"Antoni Ramallets":("Ramazuri Tóni","Ramazuri"),  # Rámajetsz Tóni
+}
+MANUAL.update(JAVASLAT_3_9_191)
