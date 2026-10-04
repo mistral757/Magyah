@@ -98,6 +98,9 @@ szintlépéskor a naplóban látszik.
 
 ## 3. A stílus-mesterség
 
+> **3.9.197:** sokkal lassabb és gyengébb lett — az aktuális számok a
+> `docs/mesterseg-lassitas-nevek-3-9-197.md`-ben.
+
 **Mind a 8 csapatstílusnak saját mesterségszintje van** (0–10). Ez is a
 **profilé**: abban a karrierben gyűlik, ahol a stílus a filozófiád,
 elsődlegesként vagy másodlagosként.

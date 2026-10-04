@@ -1848,3 +1848,28 @@ JAVASLAT_3_9_191 = {
 "Antoni Ramallets":("Ramazuri Tóni","Ramazuri"),  # Rámajetsz Tóni
 }
 MANUAL.update(JAVASLAT_3_9_191)
+
+# ── 3.9.197 — két jóváhagyott névkör (a régi alak a megjegyzésben) ─────────
+JAVASLAT_3_9_197 = {
+"Dirk Kuyt":("Kujtorgó Dirk","Kujtorgó"),  # Köjt Barnabás
+"Michael Ballack":("Ballonos Mihály","Ballonos"),  # Bálákos Mihály
+"Sepp Maier":("Majonézes Zsepp","Majonézes"),  # Májer Zsepp
+"Andy Cole":("Kóla Bandi","Kóla"),  # Kol Bandi
+"Ihor Belanov":("Bölényes Igor","Bölényes"),  # Belánov Igor
+"Willie Miller":("Mímelő Vili","Mímelő"),  # Miler Vili
+"Nils Liedholm":("Lidérces Miklós","Lidérces"),  # Lídólm Miklós
+"Pablo Aimar":("Ájuldozó Pali","Ájuldozó"),  # Ájmár Pali
+"Zbigniew Boniek":("Bonyolult Barnabás","Bonyolult"),  # Bonyek Barnabás
+"Thiago Alcântara":("Alkudozó Tihamér","Alkudozó"),  # Alkantára Tihamér
+"Filippo Inzaghi":("Ingázó Fülöp","Ingázó"),  # Indzagi Fülöp
+"Hernán Crespo":("Kresszes Ernő","Kresszes"),  # Kreszpó Ernő
+"Geoff Hurst":("Hurkás Dzsef","Hurkás"),  # Hurszt Dzsef
+"Antonio Cassano":("Kaszinós Antal","Kaszinós"),  # Kasszano Antal
+"Billy Bremner":("Brummogó Vili","Brummogó"),  # Brémner Vili
+"Roy Makaay":("Makacs Roj","Makacs"),  # Makáj Roj
+"Radamel Falcao":("Falatozó Radamesz","Falatozó"),  # Falkó Radamesz
+"Uli Stielike":("Stiglices Ulrik","Stiglices"),  # Stilike Ulrik
+"Wim Kieft":("Kifli Vilmos","Kifli"),  # Kift Vilmos
+"Nemanja Matić":("Matekos Nándor","Matekos"),  # Matyics Nándor
+}
+MANUAL.update(JAVASLAT_3_9_197)

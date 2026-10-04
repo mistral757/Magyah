@@ -8,13 +8,113 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## hsz-merce-3-9-200-proba.js — ⚖ 3.9.200: a HSZ fordulószáma és a mezőny tényleges számai
+
+```bash
+node tools/hsz-merce-3-9-200-proba.js
+```
+
+**21 állítás**, valódi karrier-állással. A próba a valódi `startEuroCampaign` → `renderEuroScreen` utat járja végig.
+
+* **A forduló:**
+  * a HSZ fejléce „Ligaszakasz · 7/8. forduló”;
+  * a meccs-cím is /8;
+  * a BL marad „Csoportkör · 1/6.”.
+* **A mezőny:**
+  * a HSZ-számítás eltéve, és pontosan a kiírt mezőny;
+  * a képlet a nevezéskori ⚡-val és az osztály-eltolással;
+  * a HSZ-nél nincs BL-képlet;
+  * a ⚖ a motor `matchHiddenOppBuff`-jából;
+  * a tényleges ⚡ = mezőny + ⚖;
+  * a csapaterő és a ⚡ meccs-erő is kiírva;
+  * kiegyenlítés nélkül nincs ⚖ sor.
+* **A következő meccs:**
+  * az ellenfél ⚡-ja = saját + ⚖;
+  * a tiéd = az eredményjelző ⚡-ja.
+* **Tabella és összegző:**
+  * „Ligaszakasz” címke, 32 sor;
+  * a valódi továbbjutási szabály;
+  * két sávhatár;
+  * a meccs utáni összegző „Még 2 forduló a ligaszakaszból”;
+  * a BL-tabella változatlan;
+  * a BL is kiírja a ⚖-t, a saját képletével.
+* **Verzió, oldalhiba.**
+
+## hsz-dijak-3-9-199-proba.js — 💜 3.9.199: egyéni díjak a Hiper Szuper Kupában
+
+```bash
+node tools/hsz-dijak-3-9-199-proba.js
+```
+
+**23 állítás**, valódi karrier-állással. A próba a valódi `startEuroCampaign` → `euroCampaignEndNow` → `renderEuroScreen` utat járja végig.
+
+* **A három skill:**
+  * a BL-értékek +10%-a (a semleges értékhez mért többletre);
+  * a kategóriák és a 💜 nevek;
+  * mindhárom csak díjként szerezhető;
+  * a hírnév-bázis 11, a mérföldkő-súly 3,3.
+* **A díjosztás:**
+  * a saját királyok Hiper-címet és Hiper-skillt kapnak;
+  * a meglévő BL-párt a Hiper-díj lecseréli;
+  * a díjszámláló nő;
+  * a Run-mérő királyi címei.
+* **A BL utána:**
+  * a BL-díj nem írja felül és nem halmozza a Hiper-díjat;
+  * a számláló nő, az idegen királyé nem a miénk;
+  * a BL a régi címekkel és fejléccel jelenik meg;
+  * a sor szerint a játékos „megtartotta az erősebb” Hiper-díjat.
+* **A felület:**
+  * a záróképernyő fejléce és 💜 sorai;
+  * a valódi kimenet („megkapta…” / „…lecserélte…”);
+  * a Hiper-kommentár;
+  * a lecserélt BL-díj kommentárja már nem jön.
+* **Verzió, oldalhiba.**
+
+## sajto-gol-piros-3-9-198-proba.js — 🗞️ 3.9.198: a kiállítások és a gólok száma a lapban
+
+```bash
+node tools/sajto-gol-piros-3-9-198-proba.js
+```
+
+**13 állítás**, a valódi `mVerdictEnrich` és `pressHeadline`.
+
+* **Három kiállítás:**
+  * egy extra-sor mindhárom névvel;
+  * „Nyolcan is…” / „Három piros lap…”;
+  * a lead mindhármat említi;
+  * a leadben nincs „!.”.
+* **Egy kiállítás:** „Tízen is” marad.
+* **Öt gól:**
+  * „Mesterötös: X — öt gól”;
+  * minden cím-sablon a valódi számot mondja, betűvel.
+* **A mester-sorozat és a szám-szavak.**
+* **Két piros egy vereségben.**
+* **A verzió.**
+
+## szerep-kartya-3-9-196-proba.js — 🎭 3.9.196: a szerepkártya nem fut ki, nincs nyers kulcs
+
+```bash
+node tools/szerep-kartya-3-9-196-proba.js
+```
+
+**6 állítás**, a valódi `roleSectionHtml` Panzerrel és Gegenpressinggel.
+
+* Nincs nyers kulcs (`ovrkar`, `sebgol`) se a kártyán, se a
+  jelölt-listában, helyettük „Vezérerő” és „Lesi-erő” áll.
+* A címkék.
+* 260 px széles dobozban sem lóg ki semmi a kártyából.
+* A verzió.
+* Nincs oldalhiba.
+
 ## profil-szint-3-9-195-proba.js — 🎖️ 3.9.195: profilszint, stílus-mesterség, lenyitható profil
 
 ```bash
 node tools/profil-szint-3-9-195-proba.js
 ```
 
-**27 állítás.**
+**28 állítás.** 3.9.197 óta a lassabb és gyengébb mesterség számaival,
+és egy tempó-állítással: egy 3 idényes karrier kb. az 1., kétszer annyi
+kb. a 2., egy 10 idényes kb. a 3. mesterségszintet hozza.
 
 * **Visszamenőleg:** egy kitalált régi karrier-mentés idény-történetéből
   (és a futó idényből) a profil és a stílus statjai.

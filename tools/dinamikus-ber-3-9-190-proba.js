@@ -80,6 +80,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       if(!careerPool[n])careerPool[n]={n,pos:["KK"],age:25,startRating:80,peak:80,pot:3000};
       return {n,ovr:80,pos:["KK"],age:25};});
     S.wageFans=40000;S.fanBase=40000;
+    /* 3.9.192 óta a jegyárat a keret kikiáltási ára is igazítja (fanAskFactor) —
+       a próbakeret véletlen áraitól függne, és a lelátó-rész ellenében a
+       klub-keret része állandó, tehát az arány elcsúszna. Ez a próba a 3.9.190-es
+       dinamikus bér-szabályt méri: a faktor itt semleges (saját próbája van). */
+    window.fanAskFactor=()=>1;
     window.fameStarName=()=>null;
     const meas=o=>{
       const {raw=117,lvl=108,gap=0,stars=0,titles=0,succ=true,ten=0}=o;
