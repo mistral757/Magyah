@@ -14,7 +14,7 @@ Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 node tools/sajto-gol-piros-3-9-198-proba.js
 ```
 
-**14 állítás**, a valódi `mVerdictEnrich` és `pressHeadline`.
+**13 állítás**, a valódi `mVerdictEnrich` és `pressHeadline`.
 
 * **Három kiállítás:**
   * egy extra-sor mindhárom névvel;
