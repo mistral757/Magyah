@@ -8,6 +8,40 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## profil-szint-3-9-195-proba.js — 🎖️ 3.9.195: profilszint, stílus-mesterség, lenyitható profil
+
+```bash
+node tools/profil-szint-3-9-195-proba.js
+```
+
+**27 állítás.**
+
+* **Visszamenőleg:** egy kitalált régi karrier-mentés idény-történetéből
+  (és a futó idényből) a profil és a stílus statjai.
+* **A meccs:**
+  * profil- és stílusstatok, a szerepek meccsei és termése;
+  * a meccs, az idény és a kupa is duplikáció-védett;
+  * az új karrier azonosítót kap.
+* **A szintek:** az XP és a küszöbök.
+* **A mesterség-fa:**
+  * szintenként +1 pont;
+  * rang-kapuk (2 / 5 / 8);
+  * pont nélkül nincs nyitás.
+* **A hatások:**
+  * képességár −26%;
+  * mérföldkő +30%;
+  * „Második otthon”;
+  * hozott tudás (+80, egyszer, a valódi stílusválasztáskor is).
+* **A felület:**
+  * a fej;
+  * a szekciók sorrendje és alapállapota;
+  * a 8 kártya és a 80 csomópont;
+  * a megmaradó nyitott állapot;
+  * a Nyitás gomb;
+  * az „Örök csúcsok” ugrás;
+  * a mentés mezője;
+  * a verzió.
+
 ## sajto-klubarc-3-9-194-proba.js — 🗞️ 3.9.194: a lap a te klubodról szól
 
 ```bash
