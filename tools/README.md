@@ -8,6 +8,30 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## dinamikus-ber-3-9-190-proba.js — 💸 3.9.190: dinamikus bér, a számla nem a plafont tölti ki
+
+```bash
+node tools/dinamikus-ber-3-9-190-proba.js
+```
+
+**14 állítás.**
+
+* **A sáv** (a valódi `wageContext`/`wageBill`, kezdő 11 + 3 csere):
+  * a ligaszintű, friss keret a lelátó ~negyede, a plafon alatt;
+  * a számla nő:
+    * a ligához mért minőséggel;
+    * a hűséggel;
+    * a top sztárokkal;
+    * a trófeákkal;
+  * erős keret trófea nélkül még a plafon alatt marad;
+  * az erős, összeszokott, sztáros, trófeás bajnoknál fog az 50%.
+* **A minőség-szorzó:** gyökös, ×0,75–1,6.
+* **Siker nélkül:** a 125%-os plafon nem húzza fel a számlát.
+* **A felület:**
+  * a keret-bontás (minőség-szorzó, „a plafon alatt”);
+  * a súgó;
+  * a verzió.
+
 ## jatekos-fizetes-3-9-189-proba.js — 💸 3.9.189: játékosszintű fizetések, a valódi jegyáron
 
 ```bash

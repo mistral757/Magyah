@@ -150,7 +150,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* plafon: sikeres idény után 50% */
     window.wageSuccessSeason=()=>true;
     const C4=c();
-    const nagy=fullCareerRoster().concat(fullCareerRoster());   /* sok pályára lépés: biztosan plafon fölé */
+    /* 3.9.190 óta a bér dinamikus, egy átlagos keret a plafon alatt marad —
+       itt szándékosan sok pályára lépés: biztosan plafon fölé */
+    const nagy=[].concat(...Array(6).fill(0).map(()=>fullCareerRoster()));
     const bill=wageBill(nagy,C4);
     ki.szamla={capShare:C4.capShare,capped:bill.capped,due:bill.due,cap:C4.cap,raw:bill.raw,factor:bill.factor};
     /* sztár: plafonon kívül */
@@ -161,6 +163,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
 
     /* ---- 4. A FELÜLET ---- */
     S.careerStats[A.n]={g:3,a:2,mvp:1,matches:40,cs:0,saves:0};
+    /* drága keret (sok trófea): a kezdő 11 számlája a plafon fölött */
+    window.wageTitleCount=()=>12;
     let html="";try{html=hubStatZoneHtml(A);}catch(e){html="HIBA "+e;}
     ki.adatlap=html.replace(/<[^>]+>/g," ").replace(/\s+/g," ");
     const sorok=[];const _a=addLine;addLine=h=>{sorok.push(String(h).replace(/<[^>]+>/g,""));};

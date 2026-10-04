@@ -26,6 +26,10 @@ csak az 1–5%-a lett, és az 50%-os plafon gyakorlatilag soha nem fogott.
 Így a bér és a plafon is a lelátó **valódi** bevételéhez mér. Erős keretnél
 a bérszámla ezért nagyot ugrik: a jegyár-szorzóval arányosan.
 
+> **3.9.190:** a bér-bázis és a felárak arányai módosultak. A számla
+> mostantól dinamikus, és nem tölti ki mindig a plafont — lásd
+> `docs/dinamikus-ber-3-9-190.md`.
+
 ## 2. A plafon — változatlan elv
 
 | helyzet | a meccs bérszámlájának felső határa |
