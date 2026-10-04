@@ -8,6 +8,27 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## sajto-gol-piros-3-9-198-proba.js — 🗞️ 3.9.198: a kiállítások és a gólok száma a lapban
+
+```bash
+node tools/sajto-gol-piros-3-9-198-proba.js
+```
+
+**14 állítás**, a valódi `mVerdictEnrich` és `pressHeadline`.
+
+* **Három kiállítás:**
+  * egy extra-sor mindhárom névvel;
+  * „Nyolcan is…” / „Három piros lap…”;
+  * a lead mindhármat említi;
+  * a leadben nincs „!.”.
+* **Egy kiállítás:** „Tízen is” marad.
+* **Öt gól:**
+  * „Mesterötös: X — öt gól”;
+  * minden cím-sablon a valódi számot mondja, betűvel.
+* **A mester-sorozat és a szám-szavak.**
+* **Két piros egy vereségben.**
+* **A verzió.**
+
 ## szerep-kartya-3-9-196-proba.js — 🎭 3.9.196: a szerepkártya nem fut ki, nincs nyers kulcs
 
 ```bash
