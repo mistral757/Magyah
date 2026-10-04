@@ -123,7 +123,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* ---- 4. A MESTERSÉG-FA ---- */
     friss();
     const nincs=masteryOpen("beton","hozott1");
-    const sB=profStyle("beton");sB.m=60;sB.w=35;   /* 3+3 fokozat → 60+60=120 XP → 3. szint */
+    const sB=profStyle("beton");sB.m=320;sB.w=200;sB.sz=350;sB.szg=200;sB.i=11;   /* 3.9.197: 5+5+4+4+4 fokozat → 150+150+100+100+100=600 XP → 3. szint */
     const ML=masteryLevel("beton"),pt0=masteryPoints("beton");
     const o1=masteryOpen("beton","hozott1"),o2=masteryOpen("beton","fa1");
     const t2=MASTERY_NODES.find(n=>n.id==="fa2");const st2=masteryNodeState("beton",t2);
@@ -131,8 +131,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const o4=masteryOpen("beton","prem2");   /* nincs több pont */
     const t3=MASTERY_NODES.find(n=>n.id==="masodik");const st3=masteryNodeState("beton",t3);
     ki.fa={nincs:nincs.ok,ML,pt0,o1:o1.ok,o2:o2.ok,st2,o3:o3.ok,o4:o4.ok,o4ok:o4.reason,st3,pt:masteryPoints("beton")};
+    /* 3.9.197 — A TEMPÓ: egy tipikus 3 idényes, egy kétszer ilyen és egy 10 idényes karrier */
+    const tempo=v=>{friss();Object.assign(profStyle("beton"),v);return masteryLevel("beton");};
+    ki.tempo=[tempo({m:90,w:50,sz:200,szg:60,i:3,b:1,ms:30,lv:10}),
+              tempo({m:180,w:100,sz:400,szg:120,i:6,b:2,ms:60,lv:14}),
+              tempo({m:300,w:170,sz:750,szg:200,i:10,b:4,ms:100,lv:18})];
     /* ---- 5. A HATÁSOK ---- */
-    friss();const S5=profStyle("beton");S5.m=400;S5.w=250;S5.sz=550;S5.szg=300;S5.i=13;S5.b=7;S5.ms=120;S5.lv=20;
+    friss();const S5=profStyle("beton");S5.m=1000;S5.w=650;S5.sz=1300;S5.szg=800;S5.i=30;S5.b=15;S5.ms=300;S5.lv=20;
     ki.maxL=masteryLevel("beton");
     const tr=styleTraitList("beton")[0];
     S.style={key:"beton",chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}}};styleViewSet(1);
@@ -146,12 +151,12 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     S.style={key:"bombazok",chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}}};
     S.style2={key:"beton",chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}}};
     const sec=styleMsRewardFor(S.style2,30);
-    const secElso=Math.max(1,Math.round(Math.max(1,Math.round(msSpReward(30,true)*(1+fxB.msPrem)))/2));
+    const secElso=Math.max(1,Math.round(Math.max(1,Math.round(msSpReward(30,true)*(1+fxB.msPrem)))/Math.min(talStyle2MsDiv(),MASTERY_SEC2_DIV)));
     S.style2=null;
     /* hozott tudás: egyszer */
     S.masteryGranted={};const W=msState();const sp0=W.sp||0;
     const g1=masteryStartGrant("beton"),g2=masteryStartGrant("beton");
-    ki.hatas={ar0,ar1,arVart:Math.max(1,Math.round(tr.lv[0].price*talStilusArMult()*(1-0.26))),ms0,ms1,fx:fxB,sec,secElso,g1,g2,spNo:(W.sp||0)-sp0};
+    ki.hatas={ar0,ar1,arVart:Math.max(1,Math.round(tr.lv[0].price*talStilusArMult()*(1-0.10))),ms0,ms1,fx:fxB,sec,secElso,g1,g2,spNo:(W.sp||0)-sp0};
     /* a valódi választás is jóváír */
     S.style=null;S.style2=null;S.masteryGranted={};
     const _cc=styleCanChoose;window.styleCanChoose=()=>true;
@@ -170,7 +175,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     renderProfileModal(null);
     ki.ui.megmarad=document.querySelector('#profileBody details.pfSec[data-sec="helyi"]').open;
     /* nyitás gombbal */
-    friss();const S6=profStyle("tikitaka");S6.m=30;   /* 2 fokozat = 30 XP → 1. szint */
+    friss();const S6=profStyle("tikitaka");S6.m=320;   /* 3.9.197: 5 fokozat = 150 XP → 1. szint */
     renderProfileModal(null);
     const gomb=document.querySelector('#profileBody button.pfNyit[data-mst="tikitaka"]');
     if(gomb)gomb.click();
@@ -201,13 +206,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(!r.fa.nincs&&r.fa.ML===3&&r.fa.pt0===3,"pont nélkül nincs nyitás; a 3. szint 3 pontot ad",r.fa);
   ok(r.fa.o1&&r.fa.o2&&r.fa.st2==="nyithato"&&r.fa.o3,"I. rang szabadon, a II. rang 2 nyitás után",r.fa);
   ok(!r.fa.o4&&/szabad/.test(r.fa.o4ok)&&r.fa.st3==="zarva"&&r.fa.pt===0,"elfogyott pont, a III. rang zárva (5-től)",r.fa);
+  ok(JSON.stringify(r.tempo)==="[1,2,3]","a tempó (3.9.197): 3 idény ~1., kétszer annyi ~2., 10 idény ~3. mesterségszint",r.tempo);
   console.log("\n— 5. A HATÁSOK —");
   ok(r.maxL===10,"a teljes mérföldkő-tábla a 10. mesterségszint",r.maxL);
-  ok(r.hatas.ar1===r.hatas.arVart&&r.hatas.ar1<r.hatas.ar0,"a képességár −26% (8+8+10)",r.hatas);
-  ok(r.hatas.ms1>r.hatas.ms0&&Math.abs(r.hatas.fx.msPrem-0.3)<1e-9,"a mérföldkő-prémium +30%",{ms0:r.hatas.ms0,ms1:r.hatas.ms1});
-  ok(r.hatas.sec===r.hatas.secElso,"„Második otthon”: másodlagosként csak felez",{sec:r.hatas.sec,vart:r.hatas.secElso});
-  ok(r.hatas.g1===80&&r.hatas.g2===0&&r.hatas.spNo===80,"hozott tudás: +80 csapatstílus-pont, egyszer",r.hatas);
-  ok(r.valaszt.ok&&r.valaszt.plusz===80,"a valódi stílusválasztás jóváírja",r.valaszt);
+  ok(r.hatas.ar1===r.hatas.arVart&&r.hatas.ar1<=r.hatas.ar0,"a képességár −10% (3+3+4, 3.9.197)",r.hatas);
+  ok(r.hatas.ms1>=r.hatas.ms0&&Math.abs(r.hatas.fx.msPrem-0.12)<1e-9,"a mérföldkő-prémium +12% (3.9.197)",{ms0:r.hatas.ms0,ms1:r.hatas.ms1,prem:r.hatas.fx.msPrem});
+  ok(r.hatas.sec===r.hatas.secElso,"„Második otthon”: másodlagosként a 3-as osztó helyett 2,5",{sec:r.hatas.sec,vart:r.hatas.secElso});
+  ok(r.hatas.g1===30&&r.hatas.g2===0&&r.hatas.spNo===30,"hozott tudás: +30 csapatstílus-pont (6+10+14), egyszer",r.hatas);
+  ok(r.valaszt.ok&&r.valaszt.plusz===30,"a valódi stílusválasztás jóváírja",r.valaszt);
   console.log("\n— 6. A FELÜLET —");
   ok(r.ui.fej&&r.ui.secs.length>=8&&r.ui.secs[0].id==="szint"&&r.ui.secs[1].id==="mesterseg","legfelül a profilszint és a stílus-mesterség, minden szekció lenyitható",r.ui.secs);
   ok(r.ui.secs.filter(x=>x.open).map(x=>x.id).join(",").indexOf("szint,mesterseg")===0&&!r.ui.secs.find(x=>x.id==="helyi").open,"alapból a két új nyitva, a többi csukva",r.ui.secs);

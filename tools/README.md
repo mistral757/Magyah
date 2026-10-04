@@ -29,7 +29,9 @@ node tools/szerep-kartya-3-9-196-proba.js
 node tools/profil-szint-3-9-195-proba.js
 ```
 
-**27 állítás.**
+**28 állítás.** 3.9.197 óta a lassabb és gyengébb mesterség számaival,
+és egy tempó-állítással: egy 3 idényes karrier kb. az 1., kétszer annyi
+kb. a 2., egy 10 idényes kb. a 3. mesterségszintet hozza.
 
 * **Visszamenőleg:** egy kitalált régi karrier-mentés idény-történetéből
   (és a futó idényből) a profil és a stílus statjai.
