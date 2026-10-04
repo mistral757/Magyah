@@ -8,6 +8,31 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## szerep-muhely-nevek-3-9-187-proba.js — 🪓⚡ 3.9.187: Panzer szerep-erősítő, Gegenpressing műhely, névkötegek
+
+```bash
+node tools/szerep-muhely-nevek-3-9-187-proba.js
+```
+
+**16 állítás.** Két hiányzó stílus-képesség és öt jóváhagyott névköteg.
+
+* **Panzer — Kiosztott szerepek:**
+  * a fán áll, a szintje a Mészáros, a Vezér és a Falka szintje;
+  * a hatás pontosan a ROLE_DEFS értéke;
+  * a kártya szövege ugyanazt a számot írja;
+  * a szint a szerep saját stílusáé.
+* **Gegenpressing — Letámadás-műhely:**
+  * a Sprintmester és a Bástya hatékonysága ×1,20 / ×1,32 / ×1,45;
+  * a tapasztalat-tempó +1 / +2 / +3;
+  * más stábtagra nem hat.
+* **A teljes kép:** a Sztáron kívül minden stílusnak van szerep-erősítője, és
+  mind a nyolcnak van stábtag-műhelye.
+* **Nevek:**
+  * mind a 49 a táblában van;
+  * a `fullName` is az új nevet írja ki;
+  * nincs kettőzött teljes név.
+* **Egyéb:** nincs oldalhiba.
+
 ## merfoldko-kategoria-nyitas-3-9-186-proba.js — 🔓 3.9.186: a stílus-kategóriát az első teljesítés nyitja
 
 ```bash
