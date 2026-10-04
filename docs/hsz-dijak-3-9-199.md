@@ -46,7 +46,7 @@ karika és díjanként a tartós +3 Rating, akármelyik kupából jött.
   címmel, 💜 jelöléssel.
 * **A saját játékos sora azt mondja, ami tényleg történt:**
   * „megkapta a Hiper Aranycipő special skillt”;
-  * „a Hiper Aranypasszok lecserélte a korábbi BL-díját”;
+  * „a Hiper Aranypasszok lecserélte a korábbi KK-díját”;
   * „megtartotta az erősebb Hiper Aranycipő skillt”.
 
   Ez egyben javítás is: korábban a záróképernyő akkor is azt írta, hogy

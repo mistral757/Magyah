@@ -101,7 +101,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const txt=(document.getElementById("euroNext")||{}).textContent||"";
     ki.cimHSZ=txt.includes("Hiper Szuper Kupa — egyéni díjak");
     ki.sorok=["Hiper Aranycipő","Hiper Aranypasszok","Hiper Aranykesztyű"].map(l=>txt.includes("💜 "+l+": "));
-    ki.csereSor=txt.includes("a Hiper Aranypasszok lecserélte a korábbi BL-díját!");ki.kapSor=txt.includes("megkapta a Hiper Aranycipő special skillt!");
+    ki.csereSor=txt.includes("a Hiper Aranypasszok lecserélte a korábbi KK-díját!");ki.kapSor=txt.includes("megkapta a Hiper Aranycipő special skillt!");
     ki.kom={boot:goldQuoteFor(pA.n,"hs_golden_boot")||goldQuoteFor(pA.n,"bl_golden_boot"),
       pass:goldQuoteFor(pB.n,"hs_golden_passes")||goldQuoteFor(pB.n,"bl_golden_passes"),
       glove:goldQuoteFor(kp.n,"hs_golden_gloves")||goldQuoteFor(kp.n,"bl_golden_gloves")};
@@ -146,7 +146,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.megtartSor,"a BL-záróképernyő: „megtartotta az erősebb Hiper Aranycipő skillt” (nem „megkapta”)");
   console.log("\n— 4. A FELÜLET —");
   ok(!r.rendErr&&r.cimHSZ&&r.sorok.every(Boolean),"a záróképernyő: „Hiper Szuper Kupa — egyéni díjak”, 💜 sorok",{e:r.rendErr,c:r.cimHSZ,s:r.sorok});
-  ok(r.kapSor&&r.csereSor,"a sor a valódi kimenetet mondja: „megkapta…” / „…lecserélte a korábbi BL-díját”",{k:r.kapSor,c:r.csereSor});
+  ok(r.kapSor&&r.csereSor,"a sor a valódi kimenetet mondja: „megkapta…” / „…lecserélte a korábbi KK-díját”",{k:r.kapSor,c:r.csereSor});
   ok(/Hiper Szuper Kupa gólkirálya|lila aranycipő|szuperligában/.test(r.kom.boot||"")&&/Hiper Szuper Kupa gólpassz|Lila arany|legjobb passzolója/.test(r.kom.pass||"")&&/Hiper Szuper Kupa legjobb kapusa|lila kesztyű|legjobbjai ellen/.test(r.kom.glove||""),"a kommentár a Hiper-sorokat mondja",r.kom);
   ok(r.blKom===null,"a lecserélt BL-díj kommentárja már nem jön",r.blKom);
   ok(String(r.verzio).localeCompare("3.9.199",undefined,{numeric:true})>=0,"verzió legalább 3.9.199",r.verzio);
