@@ -8,6 +8,21 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## szerep-kartya-3-9-196-proba.js — 🎭 3.9.196: a szerepkártya nem fut ki, nincs nyers kulcs
+
+```bash
+node tools/szerep-kartya-3-9-196-proba.js
+```
+
+**6 állítás**, a valódi `roleSectionHtml` Panzerrel és Gegenpressinggel.
+
+* Nincs nyers kulcs (`ovrkar`, `sebgol`) se a kártyán, se a
+  jelölt-listában, helyettük „Vezérerő” és „Lesi-erő” áll.
+* A címkék.
+* 260 px széles dobozban sem lóg ki semmi a kártyából.
+* A verzió.
+* Nincs oldalhiba.
+
 ## profil-szint-3-9-195-proba.js — 🎖️ 3.9.195: profilszint, stílus-mesterség, lenyitható profil
 
 ```bash
