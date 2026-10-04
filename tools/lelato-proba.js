@@ -136,7 +136,12 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
        és a gól utáni minta is HANG-másodpercben mér. */
     const aNow=()=>_hangCtx?_hangCtx.currentTime:0;
     const hangVarj=async(sec,max)=>{const t0=aNow();for(let i=0;i<(max||200)&&aNow()-t0<sec;i++)await varj(50);};
-    for(let i=0;i<40;i++){const a=gNow();await hangVarj(0.3);if(Math.abs(gNow()-a)<0.01)break;}
+    /* NEM ELÉG A STABILITÁS: egy korábbi valódi gól hulláma 6 hang-másodpercig
+       a csúcson TART (lelatoHullam), ami „stabilnak" látszik — és onnan a mért
+       gól ugyanarra a csúcsra céloz, tehát nem nő. Az alapszint közelébe várunk. */
+    const alap=()=>{try{return lelatoSzint();}catch(e){return 0;}};
+    for(let i=0;i<80;i++){const a=gNow();await hangVarj(0.3);
+      if(Math.abs(gNow()-a)<0.01&&(!(alap()>0)||gNow()<=alap()*1.1))break;}
     const g0=gNow();
     r.gol=_reag("gol");
     const minta=[];for(let i=0;i<8;i++){await hangVarj(0.15);minta.push(+gNow().toFixed(3));}

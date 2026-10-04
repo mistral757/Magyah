@@ -8,6 +8,93 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## dinamikus-ber-3-9-190-proba.js — 💸 3.9.190: dinamikus bér, a számla nem a plafont tölti ki
+
+```bash
+node tools/dinamikus-ber-3-9-190-proba.js
+```
+
+**14 állítás.**
+
+* **A sáv** (a valódi `wageContext`/`wageBill`, kezdő 11 + 3 csere):
+  * a ligaszintű, friss keret a lelátó ~negyede, a plafon alatt;
+  * a számla nő:
+    * a ligához mért minőséggel;
+    * a hűséggel;
+    * a top sztárokkal;
+    * a trófeákkal;
+  * erős keret trófea nélkül még a plafon alatt marad;
+  * az erős, összeszokott, sztáros, trófeás bajnoknál fog az 50%.
+* **A minőség-szorzó:** gyökös, ×0,75–1,6.
+* **Siker nélkül:** a 125%-os plafon nem húzza fel a számlát.
+* **A felület:**
+  * a keret-bontás (minőség-szorzó, „a plafon alatt”);
+  * a súgó;
+  * a verzió.
+
+## jatekos-fizetes-3-9-189-proba.js — 💸 3.9.189: játékosszintű fizetések, a valódi jegyáron
+
+```bash
+node tools/jatekos-fizetes-3-9-189-proba.js
+```
+
+**22 állítás.**
+
+* **A lelátó-ár:**
+  * a bér horgonya és a sztár hírnév-horgonya a jegyár-szorzóval nő;
+  * a létszám a szerződéskori marad;
+  * a plafon a valódi árú lelátó része.
+* **A hat tényező:**
+  * szerep (perc/meccs, idény elején a kezdő 11);
+  * kapitány ×1,12;
+  * POT ×0,85–1,30;
+  * hűség legfeljebb +30%;
+  * siker −10%…+25%;
+  * friss sztár-igazolás +35/+20/+10%, olcsó vételnél semmi;
+  * ifi ×0,75;
+  * a szorzó legfeljebb ×2,5.
+* **A számla:**
+  * a bér képlete;
+  * sikeres idény után a plafon 50%;
+  * a „Sztárom a párom” sztárja a plafonon kívül.
+* **A felület:**
+  * az adatlap fizetés-sora, a plafon utáni összeggel;
+  * a napló „legtöbbet:” része;
+  * a keret-bontás sora;
+  * a súgó.
+
+## meccs-sajto-3-9-188-proba.js — 📰 3.9.188: bővebb meccsmérleg, helyi lapcímek, újságírók
+
+```bash
+node tools/meccs-sajto-3-9-188-proba.js
+```
+
+**30 állítás.**
+
+* **Valódi meccs:**
+  * a mérleg-ablakban ott a lap címe, a meccs embere (vereségnél a csapat
+    legjobbja) a fokozatával, és az extrák;
+  * a naplóban a cím a mérleg előtt áll.
+* **Az extrák és a cím:**
+  * akadémista első gól, bemutatkozó gól, mesterhármas, klubgól-jubileum,
+    fordítás, rangadó, kiütés és zakó, kiállítás, meccs-jubileum, kései döntés;
+  * mindegyik a saját címét kapja;
+  * a névelő helyes.
+* **Az újságírók:**
+  * fél csillagos lépcsők a tábor csúcsából, a csúcs nem esik vissza;
+  * a lap neve a szinttel nő;
+  * 3★-tól alcím jár;
+  * a fejlődés a naplóba is bekerül.
+* **A cikk:**
+  * liga-sáv × 0,15% × csillag × súly, a súly legfeljebb 2;
+  * vereség után fele annyi;
+  * sima meccs után nincs.
+* **Felület:**
+  * a scout és az ügynökség mellett az újságírók;
+  * a HUB-gomb felirata;
+  * a mentés viszi az állapotot;
+  * nincs oldalhiba.
+
 ## szerep-muhely-nevek-3-9-187-proba.js — 🪓⚡ 3.9.187: Panzer szerep-erősítő, Gegenpressing műhely, névkötegek
 
 ```bash
