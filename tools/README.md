@@ -8,6 +8,28 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## jegyar-keretar-3-9-192-proba.js — 🎟️ 3.9.192: a jegyár a keret kikiáltási árához igazodik
+
+```bash
+node tools/jegyar-keretar-3-9-192-proba.js
+```
+
+**14 állítás.**
+
+* **A bejelentő számai:** 52,9 Mrd → 12–15 Mrd meccsenként.
+* **A létszám és az élmény** változatlanul szoroz.
+* **A tempó** az alaphoz arányosan hat.
+* **Csak lefelé:** kis jegyárnál a faktor 1.
+* **A bér követi:** a bér-horgony és a sztár hírnév-horgonya ugyanazzal a
+  faktorral csökken.
+* **A valódi keret:** a kikiáltási ár-átlag a keretből jön, és
+  gyorsítótárazott.
+* **A felület:**
+  * a napló;
+  * a keret-bontás;
+  * a súgó;
+  * a verzió.
+
 ## gyilkos-paros-felbomlas-3-9-191-proba.js — 🧲 3.9.191: a gyilkos páros felbomlik, ha egy tagja távozik
 
 ```bash
