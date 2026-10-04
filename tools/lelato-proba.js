@@ -129,10 +129,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
        a mérést. A mérés előtt a moraj megnyugszik (két minta 0,01-en belül). */
     const _reag=lelatoReag;lelatoReag=function(){return false;};
     const gNow=()=>_lelato&&_lelato.g?_lelato.g.gain.value:0;
-    for(let i=0;i<40;i++){const a=gNow();await varj(300);if(Math.abs(gNow()-a)<0.01)break;}
+    /* A HANG-ÓRA SZERINT VÁRUNK, nem a falióra szerint (3.9.187): a görbék
+       (setTargetAtTime) az AudioContext saját idején futnak, és terhelt gépen,
+       a teljes regresszió közepén a fej nélküli böngésző hang-órája szinte
+       megáll — 1,2 mp falióra alatt a hangerő 0,002-t mozdult. A nyugvás is
+       és a gól utáni minta is HANG-másodpercben mér. */
+    const aNow=()=>_hangCtx?_hangCtx.currentTime:0;
+    const hangVarj=async(sec,max)=>{const t0=aNow();for(let i=0;i<(max||200)&&aNow()-t0<sec;i++)await varj(50);};
+    for(let i=0;i<40;i++){const a=gNow();await hangVarj(0.3);if(Math.abs(gNow()-a)<0.01)break;}
     const g0=gNow();
     r.gol=_reag("gol");
-    const minta=[];for(let i=0;i<8;i++){await varj(150);minta.push(+gNow().toFixed(3));}
+    const minta=[];for(let i=0;i<8;i++){await hangVarj(0.15);minta.push(+gNow().toFixed(3));}
     lelatoReag=_reag;
     r.g0=+g0.toFixed(3);r.minta=minta;
     r.golUtan=Math.max(...minta)>g0*1.25;
