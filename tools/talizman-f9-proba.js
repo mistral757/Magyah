@@ -92,7 +92,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const s=await p.evaluate(()=>{
     const src=document.documentElement.innerHTML;
     const i=src.indexOf('talizman:{title:"Talizmánok"');const t=src.slice(i,src.indexOf('"},',i));
-    return {spec:/A SPECIALOK — mind a 82 él/.test(t),rez:/REZONANCIA/.test(t),eget:/ÉGETÉS/.test(t),tar:/KÁRTYATÁR/.test(t),
+    return {spec:t.indexOf("A SPECIALOK — mind a "+TAL_SPEC.length+" él")>=0,rez:/REZONANCIA/.test(t),eget:/ÉGETÉS/.test(t),tar:/KÁRTYATÁR/.test(t),
       kapcs:/ki is kapcsolhatók/.test(t),kesobb:/A specialok később jönnek/.test(t),
       loj:talSpecOldal(TAL_SPEC_BY.lojalis,"pro",1,null)};});
   console.log("\n— 4. A SÚGÓ —");

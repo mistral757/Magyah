@@ -25,8 +25,10 @@
         a többi kategória beragadt jutalma érintetlen marad;
      5. hogy a stíluspont tényleg megérkezik, és a napló is írja;
      6. az üres eset: nincs zárt kategória és nincs beragadt jutalom;
-     7. és hogy a fizetős megnyitás (msUnlockCat) VÁLTOZATLAN — az továbbra is
-        beragaszt, és továbbra is fizet a büdzséből. */
+     7. (3.9.186) a fizetős megnyitás megszűnt: a kategória az első
+        teljesítéssel magától nyílik — ezt a mérföldkő-kategória-nyitás próbája
+        méri (merfoldko-kategoria-nyitas-3-9-186-proba.js). A 2. ág beragadt
+        állapotát itt kézzel, a régi mentések mintájára állítjuk elő. */
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');
 const {spawn}=require('child_process');
 let hiba=0;
@@ -76,6 +78,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       MILESTONES.forEach(d=>{
         if((maradt[d.cat]||0)>0){maradt[d.cat]--;d.p=()=>d.n;}
         else d.p=()=>d.n-1e9;});};
+    /* A RÉGI, FIZETŐS MEGNYITÁS LENYOMATA (a 3.9.186 előtti mentések): a
+       kategória nyitva, a zárás alatt teljesült fokozatok beragadva. */
+    const regiNyitas=k=>{const hold=msCatWouldHold(k);
+      M.cats[k]={season:1,price:1};hold.forEach(d=>{M.pend[d.id]=true;});};
     const tiszta=()=>{
       M.cats={};M.pend={};M.done={};M.missed={};M.log=[];
       M.sp=0;M.spEarned=0;};
@@ -100,27 +106,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* döntetlennél a drágább: két kategória 2-2 kész fokozattal */
     tiszta();
     allits({vagyon:2,trofeak:2});
-    const arVagyon=msCatPrice("vagyon"),arTrofeak=msCatPrice("trofeak");
+    const arVagyon=msCatByKey("vagyon").pct,arTrofeak=msCatByKey("trofeak").pct;
     applyChallengeReward({kind:"msUnstick"});
     ki.dontetlen={vagyon:arVagyon,trofeak:arTrofeak,
       vagyonNyitva:msCatUnlocked("vagyon"),trofeakNyitva:msCatUnlocked("trofeak")};
-
-    /* ---- 7. A FIZETŐS ÚT VÁLTOZATLAN ---- */
-    tiszta();
-    allits({piac:3});
-    S.transferBudget=50000000;
-    const b0=S.transferBudget;
-    const res=msUnlockCat("piac");
-    ki.fizetos={ok:res.ok,fizetett:b0-S.transferBudget>0,
-      beragadt:Object.keys(M.pend||{}).filter(x=>M.pend[x]).length,
-      kifizetve:Object.keys(M.done||{}).length};
 
     /* ---- 4. A MÁSODIK ÁG: minden nyitva ---- */
     tiszta();
     /* nyissunk ki MINDENT fizetősen, úgy hogy beragadjon a cucc */
     allits({piac:3,vagyon:2,trofeak:1});
     S.transferBudget=900000000;
-    MS_STYLE_CATS.forEach(c=>{msUnlockCat(c.key);});
+    MS_STYLE_CATS.forEach(c=>{regiNyitas(c.key);});
     const beragadtOssz=Object.keys(M.pend||{}).filter(x=>M.pend[x]).length;
     const perCat0={};
     Object.keys(M.pend||{}).forEach(id=>{if(!M.pend[id])return;
@@ -138,7 +134,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     tiszta();
     allits({});
     S.transferBudget=900000000;
-    MS_STYLE_CATS.forEach(c=>{msUnlockCat(c.key);});
+    MS_STYLE_CATS.forEach(c=>{regiNyitas(c.key);});
     ki.ures=applyChallengeReward({kind:"msUnstick"});
 
     MILESTONES.forEach(d=>{d.p=eredetiP[d.id];});
@@ -162,16 +158,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(t.ag1.spNott,"a csapatstílus-pont megérkezett");
   ok(t.ag1.naploVanMegnyitas,"a napló is jegyzi");
 
-  console.log("=== 3. döntetlennél a drágább ===");
+  console.log("=== 3. döntetlennél a súlyosabb ===");
   const d=t.dontetlen;
   const dragabb=d.vagyon>d.trofeak?"vagyon":"trofeak";
   ok((dragabb==="vagyon")?d.vagyonNyitva:d.trofeakNyitva,
-     "azonos kész-szám mellett a drágább kategóriát viszi",d);
-
-  console.log("=== 7. a fizetős megnyitás változatlan ===");
-  ok(t.fizetos.ok&&t.fizetos.fizetett,"továbbra is a büdzséből megy",t.fizetos);
-  ok(t.fizetos.beragadt===3&&t.fizetos.kifizetve===0,
-     "…és továbbra is BERAGASZT, nem fizet azonnal",t.fizetos);
+     "azonos kész-szám mellett a súlyosabb (régen drágább) kategóriát viszi",d);
 
   console.log("=== 4. a második ág: minden nyitva ===");
   console.log("  "+t.ag2.uzenet);

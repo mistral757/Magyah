@@ -8,6 +8,131 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## szerep-muhely-nevek-3-9-187-proba.js — 🪓⚡ 3.9.187: Panzer szerep-erősítő, Gegenpressing műhely, névkötegek
+
+```bash
+node tools/szerep-muhely-nevek-3-9-187-proba.js
+```
+
+**16 állítás.** Két hiányzó stílus-képesség és öt jóváhagyott névköteg.
+
+* **Panzer — Kiosztott szerepek:**
+  * a fán áll, a szintje a Mészáros, a Vezér és a Falka szintje;
+  * a hatás pontosan a ROLE_DEFS értéke;
+  * a kártya szövege ugyanazt a számot írja;
+  * a szint a szerep saját stílusáé.
+* **Gegenpressing — Letámadás-műhely:**
+  * a Sprintmester és a Bástya hatékonysága ×1,20 / ×1,32 / ×1,45;
+  * a tapasztalat-tempó +1 / +2 / +3;
+  * más stábtagra nem hat.
+* **A teljes kép:** a Sztáron kívül minden stílusnak van szerep-erősítője, és
+  mind a nyolcnak van stábtag-műhelye.
+* **Nevek:**
+  * mind a 49 a táblában van;
+  * a `fullName` is az új nevet írja ki;
+  * nincs kettőzött teljes név.
+* **Egyéb:** nincs oldalhiba.
+
+## merfoldko-kategoria-nyitas-3-9-186-proba.js — 🔓 3.9.186: a stílus-kategóriát az első teljesítés nyitja
+
+```bash
+node tools/merfoldko-kategoria-nyitas-3-9-186-proba.js
+```
+
+**16 állítás.** A kérés: a stílus-kategóriákat ne lehessen pénzért megvenni.
+Az első teljesült mérföldkő nyissa meg őket felugró ablakkal, a nyitáskor
+egyszer levonva egy átlagos mérföldkő-jutalomnyi pénzt.
+
+* **A díj:** egy átlagos pénzjutalmas mérföldkő, mind a hat kategóriánál
+  ugyanaz.
+* **Zárt, teljesítés nélkül:** semmi nem nyílik, semmi nem megy le.
+* **Az első teljesítés:**
+  * megnyit, és pontosan egyszer von le;
+  * a fokozatok azonnal fizetnek, semmi nem ragad be;
+  * a napló és a felugró ablak is szól.
+* **Utána:** a további teljesítés nem von le.
+* **Mind a hat:** összesen 6 × díj, a felugrók sorba állnak.
+* **Üres kassza:** annyi megy le, amennyi van, és a kategória akkor is nyílik.
+* **Kihívás-jutalom:** díj nélkül nyit.
+* **Felület:**
+  * nincs „Megnyitom” gomb;
+  * a panel és a zárt sor elmondja a szabályt;
+  * nincs oldalhiba.
+
+## boost-talizman-3-9-185-proba.js — ⚡ 3.9.185: boost-kedvezmény jutalom és a Boost talizmán-szín
+
+```bash
+node tools/boost-talizman-3-9-185-proba.js
+```
+
+**47 állítás.** A kérés: a boost-kedvezmény kihívás-jutalom legyen gyakoribb,
+a mértéke 10–45% közti sorsolt szám; és legyen egy új, boostokra épülő
+talizmán-szín (szerencse-ingyenboost max 50% / max 2 db idényenként, csomag-
+kedvezmény max 20%, fajtánkénti kedvezmény max 20-20%, boost-jutalmú
+kihívások esélye max +40%).
+
+* **Semleges:** talizmán nélkül a boost-árak, a szorzók és a jutalom-húzás
+  bitre a régi.
+* **A jutalom:** 3 példány a kalapban, 10–45% közti szám, a leírás azt mondja,
+  amit a kifizetés ad; szorzódva halmoz (30% + 30% = 51%), teteje 75%, a régi
+  szám nélküli ajánlat 10%-ot ad.
+* **A szín:** a tizenegyedik kategória, négy változat a kért plafonokkal, a
+  fajta-kedvezmény fajtánként külön gyűlik; 2000 generált lapon nincs hibás
+  szöveg, és nem céloz a karrierben nem létező fajtát.
+* **Az árak:** a csomag minden fajtát, a fajta csak a sajátját viszi le (az
+  egyenlítőét is); a zseton továbbra is 0.
+* **A kihívás-esély:** +40%-nál a boost-jutalmak aránya mérve ×1,4.
+* **A szerencse-boost:** idényenként 2 dobás, 50%-on átlag ~1, sosem több 2-nél;
+  a visszatöltés nem dob újra; a nyeremény elsüthető fajtára esik; a rezonancia
+  a legnagyobb fajta-kedvezményre teszi.
+* **A hét speciál:** sorrend-kedvezmény a budgetPay számlálójával, hatás-
+  szorzók, zseton-dupla, Árfigyelő, és mind a hét kontra a saját területén.
+* **Felület:** lap, Talizmánok menü, összhatás, Boost-központ, súgó; nincs
+  oldalhiba.
+
+## egyenlito-zseton-3-9-184-proba.js — ⚖️ 3.9.184: az egyenlítő zsetonja tényleg ingyen
+
+```bash
+node tools/egyenlito-zseton-3-9-184-proba.js
+```
+
+**9 állítás.** A bejelentett hiba: egy kihívás-jutalomból kapott ingyenes
+egyenlítő után végtelen egyenlítőt lehetett venni 200 M Ft-ért. Az ok: a
+100 pontos alsó határ miatt az ár sosem lett 0, a zseton pedig csak 0-s
+árnál fogyott el.
+
+* **A régi hiba:** zseton mellett az ár 0.
+* **A vásárlás:** elhasználja a zsetont; az egyenleg nem mozdul; az idény
+  alapáras darabjai sem fogynak.
+* **Utána:** a rendes ár jön, a következő vásárlás fizet, a zseton nem jön
+  vissza.
+* **Felület:** a megerősítő ablak és a bolt sora is „INGYEN — kihívás-jutalom”
+  feliratot mutat.
+* **Egyéb:** nincs oldalhiba.
+
+
+## jegyar-skala-3-9-183-proba.js — 🎺 3.9.183: a jegyár 100 fölött a piaccal nő
+
+```bash
+node tools/jegyar-skala-3-9-183-proba.js
+```
+
+**11 állítás.**
+
+* **A szorzó:**
+  * 100-as nyers erőig ×1;
+  * fölötte folytonos és szigorúan nő;
+  * pontosan a piaci árgörbe aránya (117: ~×8,3 · 130: ~×28).
+* **Bevétel és bér:**
+  * a heti bevétel a szorzóval nő, a bér horgonya nem;
+  * a bérhorgony visszaszámolása a szorzót kiveszi.
+* **Felület:** a keret-bontás kiírja a szorzót, a többlet külön sorban áll;
+  a szótár szól róla.
+* **Egyéb:** nincs oldalhiba.
+
+Leírás: `docs/jegyar-skala-3-9-183.md`.
+
+
 ## paros-egy-osztalyban-3-9-182-proba.js — 🤝 3.9.182: a páros egy osztályban (PvP)
 
 ```bash

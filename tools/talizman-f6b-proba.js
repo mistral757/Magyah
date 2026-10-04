@@ -193,6 +193,9 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     /* második tavasz: 30 feletti +3; a stáb Sz −1 */
     _lap("masodiktavasz",4);
     xi[6].age=33;xi[6].startRating=95;const r0=xi[6].startRating;
+    /* a speciál a LEGERŐSEBB 30 feletti emberre hat — a véletlen keretben más
+       30+ is lehetne erősebb nála; a mérés idejére mindenki más 30 alatt van */
+    fullCareerRoster().forEach(q=>{const e=careerPool[q.n];if(e&&e!==xi[6]&&e.age>30)e.age=29;});
     S.staff=[{n:"Stáb Próba",type:"morale",sz:50,szBase:50,age:40,xp:0,focus:{mode:"team"}}];
     talSpAll().tavasz=null;talF6bSzezonvaltas();
     ki.tavasz=xi[6].startRating-r0;ki.tavaszSz=S.staff[0].sz;
