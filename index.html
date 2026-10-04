@@ -4874,6 +4874,8 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
 /* a feliratban az ikon is legyen pixel */
 #pixFx .pxI{vertical-align:-.15em}
 
+/* 3.9.200: a HSZ liga-tabella sávhatárai (8. és 24. hely után) */
+#euroTable tr.hszCut td{border-top:1px dashed var(--line)}
 </style>
 </head>
 <body>
@@ -6993,7 +6995,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.199";
+const APP_VERSION="3.9.200";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -19921,10 +19923,15 @@ function hszMid(){
   }else{
     try{msRatedBegin();base=teamMatchStrength();}catch(e){base=null;}
     finally{try{msRatedEnd();}catch(e){}}}
-  if(!(base>0)&&P&&typeof P.msKick==="number"&&isFinite(P.msKick))base=P.msKick;
+  let src="meres";
+  if(!(base>0)&&P&&typeof P.msKick==="number"&&isFinite(P.msKick)){base=P.msKick;src="msKick";}
   if(!(base>0))return null;
   const ab=(typeof pyrAbove==="function")?pyrAbove():0;
-  return Math.max(50,Math.min(ratingCap(),Math.round(base+ab-2)));}
+  const mid=Math.max(50,Math.min(ratingCap(),Math.round(base+ab-2)));
+  /* 3.9.200: a kiíráshoz eltesszük, PONTOSAN miből lett — lásd euroFieldHtml */
+  _hszLast={base,src,shift:ab-2,mid};
+  return mid;}
+let _hszLast=null;
 /* ---- A NYÁRI KUPA MEZŐNYE A MECCS-ERŐHÖZ MÉR (3.9.153) ----
    BEJELENTETT KÉRÉS: „Nyári kupa nehézségi szintjét hangolni, ott még nem
    működik jól."
@@ -55561,7 +55568,7 @@ function euroMatchTitleFor(E){
   const stage=E.stage==="qual"
     ? `${euroQualLabel(E.qRound)} · ${E.idx+1}. mérkőzés`
     : E.stage==="group"
-    ? `${compSwiss(E.comp)?"Ligaszakasz":"Csoportkör"} · ${Math.min(E.md+1,compSchedule(E.comp).length)}. forduló`
+    ? `${compSwiss(E.comp)?"Ligaszakasz":"Csoportkör"} · ${Math.min(E.md+1,compSchedule(E.comp).length)}/${compSchedule(E.comp).length}. forduló`
     : (EURO_ROUND_NAMES[E.stage]||"")+(E.stage!=="final"?` · ${E.idx+1}. mérkőzés`:"");
   const where=fx.neutral?"semleges pályán":(fx.home?"hazai pályán":"idegenben");
   return `${stage} — ${esc(teamLabel(fx.o.n))} ellen, ${where}`;}
@@ -68821,7 +68828,7 @@ function playMatchMotor(){
     const ec=EURO_COMPS[S.euro.comp],E=S.euro;
     let stg;
     if(E.stage==="qual")stg=`${euroQualLabel(E.qRound).toUpperCase()} · ${Math.min(E.idx+1,2)}/2. MÉRKŐZÉS`;
-    else if(E.stage==="group")stg=`${compSwiss(E.comp)?"LIGASZAKASZ":"CSOPORTKÖR"} · ${Math.min(E.md+1,compSchedule(E.comp).length)}. FORDULÓ`;
+    else if(E.stage==="group")stg=`${compSwiss(E.comp)?"LIGASZAKASZ":"CSOPORTKÖR"} · ${Math.min(E.md+1,compSchedule(E.comp).length)}/${compSchedule(E.comp).length}. FORDULÓ`;
     else if(E.stage==="final")stg="DÖNTŐ";
     else stg=`${(EURO_ROUND_NAMES[E.stage]||E.stage).toUpperCase()} · ${Math.min(E.idx+1,2)}/2. MÉRKŐZÉS`;
     addLine(`— ${ec.n.toUpperCase()} · ${stg} · ${title} —`,"mt");
@@ -93965,6 +93972,11 @@ function startEuroCampaign(opt){
     mpSeeded:!!(mpCup()&&mpCup().comp===comp&&!mpCup().droppedApart&&f.mateIdx!=null),
     mpSeed:"s"+(S.seasonNumber||1)+":cup:"+comp,
     path:opt.path||[],pathOpen:false};   /* a menetelés naplója — lásd euroPathPush */
+  /* 3.9.200: a HSZ-mezőny SZÁMÍTÁSA a kiíráshoz (a nevezéskori meccs-erő és az
+     osztály-eltolás). Csak ha a mezőny tényleg ebből lett — közös kupában a
+     szoba közös középértéke dönt, ott nem írunk ki hamis képletet. */
+  if(compSwiss(comp)&&_hszLast&&_hszLast.mid+(EURO_COMPS[comp].oppDelta||0)===S.euro.target)
+    S.euro.hszCalc=Object.assign({},_hszLast);
   /* ---- A FIX ÁG LEKÉPEZÉSE (rmap) ----
      Az i. csoport győztese az rmap[i]. csoport másodikjával játszik a
      nyolcaddöntőben. Kikötés: rmap[i] !== i (senki nem játszhat a saját
@@ -94176,10 +94188,10 @@ function euroLogFooterHtml(){
     h+=row("Ha az összesítés döntetlen, hosszabbítás dönt — és csak utána büntetők.","var(--dim2)");
   }else if(m.k==="g"&&E.stage==="group"){
     const tbl=euroGroupTable(E.userG),pos=tbl.findIndex(r=>r.t.you)+1,me=tbl.find(r=>r.t.you);
-    const left=EURO_SCHEDULE.length-E.md;
-    h+=row(`A csoportban <b>${pos}. hely</b>${me?` — ${me.r.pts} pont, ${me.r.gf}:${me.r.ga}`:""}.`);
-    h+=row(left>0?`Még <b>${left}</b> forduló a csoportkörből. Az első két helyezett jut tovább.`
-                 :"A csoportkör véget ért.","var(--dim2)");}
+    const SW=compSwiss(E.comp),left=compSchedule(E.comp).length-E.md;
+    h+=row(`${SW?"A ligaszakaszban":"A csoportban"} <b>${pos}. hely</b>${me?` — ${me.r.pts} pont, ${me.r.gf}:${me.r.ga}`:""}.`);
+    h+=row(left>0?`Még <b>${left}</b> forduló a ${SW?"ligaszakaszból":"csoportkörből"}. ${SW?euroSwissRule():"Az első két helyezett jut tovább."}`
+                 :`A ${SW?"ligaszakasz":"csoportkör"} véget ért.`,"var(--dim2)");}
   /* ha új kör indult, mondjuk meg, mi jön és hol */
   if(((tie&&tie.won)||(gEnd&&gEnd.advanced))&&E.stage!=="done"
      &&EURO_ROUND_NAMES[E.stage]&&E.fixtures&&E.fixtures[0]){
@@ -94262,6 +94274,63 @@ function mpCupHeadHtml(){
     where=` — ${hunAz(String.fromCharCode(65+E.mateG))} <b>${String.fromCharCode(65+E.mateG)}</b> csoportban játszik, tehát a csoportkörben nem kerülhettek össze.`;
   return `<div style="font-size:11.5px;margin-top:5px;padding:6px 9px;border-radius:7px;background:color-mix(in srgb,var(--gold) 12%,transparent);color:var(--ink)">
     ⚔ <b>Közös kupa:</b> ${name} ugyanebben a mezőnyben indul${where}</div>`;}
+/* ---- A MEZŐNY ŐSZINTÉN, A TÉNYLEGES SZÁMOKKAL (3.9.200) ----
+   BEJELENTÉS: „a mezőny ereje legyen a tényleges számokkal kiírva. A számítás
+   is a tényleges számítás legyen és a csapaterő is. Mert a 184 az nem igaz,
+   mert azon van még egy kiegyenlítő extra meccserő az én meccserőmhöz
+   igazítva. Ezt jelezze a game!"
+   A HSZ fejléce eddig a BL képletét mondta (bajnoki szint / csapaterő), pedig
+   a HSZ a nevezéskori MECCS-ERŐHÖZ mér. És egyik sorozat sem mondta ki, hogy
+   a motor minden CPU-ellenfélre rátesz egy ⚖ nehézségi kiegyenlítést
+   (matchHiddenOppBuff — a rejtett meccs-bónuszod fele). A kiírt számok
+   ugyanazokból a függvényekből jönnek, amikből a motor és az eredményjelző
+   számol. */
+const euroHu1=v=>(Math.round(v*10)/10).toFixed(1).replace(".",",");
+function euroKiegNow(){
+  try{const k=matchHiddenOppBuff()||0;return k>0.05?k:0;}catch(e){return 0;}}
+/* a te meccs-erőd úgy, ahogy az eredményjelző kiírja: ⚡ + 📈 tartós forma */
+function euroMyMsNow(){
+  let ms=null;try{ms=teamMatchStrength();}catch(e){ms=null;}
+  if(!(typeof ms==="number"&&isFinite(ms)))return null;
+  let fo=0;try{fo=pformTeamOvr()||0;}catch(e){fo=0;}
+  return ms+fo;}
+/* A következő meccs: mindkét oldal csapatereje ÉS a meccs-ereje, amivel a
+   motor számol — az ellenfélnél a ⚖ kiegyenlítéssel együtt (3.9.200). */
+function euroSwissRule(){
+  return `1–${HSZ_DIRECT}. egyenesen a nyolcaddöntőbe · ${HSZ_DIRECT+1}–${HSZ_PLAYOFF}. rájátszás · ${HSZ_PLAYOFF+1}–32. kiesik.`;}
+function euroNextStrengthHtml(fx){
+  const o=fx&&fx.o;if(!o)return "";
+  const raw=(typeof o.dispOvr==="number")?o.dispOvr:o.ovr;
+  let oMs=null,kieg=0;
+  if(fx.duel)oMs=(typeof o.matchOvr==="number")?o.matchOvr:null;
+  else if(typeof o.ovr==="number"){kieg=euroKiegNow();oMs=o.ovr+kieg;}
+  let myMs=euroMyMsNow();
+  if(fx.duel&&typeof fx.myMatch==="number"&&isFinite(fx.myMatch))myMs=fx.myMatch;
+  const msOk=oMs!=null&&myMs!=null;
+  return `Ellenfél: csapaterő ${euroHu1(raw)}${msOk?` · <b>⚡${euroHu1(oMs)}</b>${kieg>0?` <span style="color:var(--dim2)">(saját ${euroHu1(o.ovr)} ⚖+${euroHu1(kieg)})</span>`:""}`:""}`
+    +`<br>Ti: csapaterő ${euroHu1(teamStrength())}${msOk?` · <b>⚡${euroHu1(myMs)}</b>`:""}`
+    +(msOk?` <span style="color:var(--dim2)">— a motor a két ⚡-val számol</span>`:"");}
+function euroFieldHtml(E,c){
+  if(E.target==null)return "";
+  const kieg=euroKiegNow(),myMs=euroMyMsNow(),ts=teamStrength();
+  const sty=`font-size:11.5px;color:var(--dim2);margin-top:3px`;
+  let calc;
+  if(compSwiss(E.comp)){
+    const h=E.hszCalc;
+    const sh=h?(h.shift>0?`+${h.shift}`:h.shift<0?`−${-h.shift}`:"±0"):"";
+    calc=h
+      ?`a nevezéskori meccs-erőd (⚡${euroHu1(h.base)}${h.src==="msKick"?", a szezonindító mérésből":""}) ${sh} osztály-eltolással (D0-n −1, osztályonként +1), kerekítve.`
+      :`a nevezéskori meccs-erődhöz mérve (D0-n −1, osztályonként +1)${E.mpSeeded?", közös kupában a két csapat közös mezőnye":""}.`;
+  }else{
+    calc=`${pyrOn()?`az élvonal szintje (D1: ${pyrTopLevel()})`:`a bajnoki szinted (${oppTargetRating})`
+      } és a csapaterőd közül a magasabbhoz igazítva, ${c.short}-szinttel.${
+      pyrOn()?` A kupában az ország ELSŐ osztálya is ott van — a mezőny nem a te osztályodhoz igazodik.`:""}`;}
+  const kiegSor=kieg>0
+    ?`<div style="${sty}">⚖ <b>Nehézségi kiegyenlítés: +${euroHu1(kieg)}</b> — a motor ezt MINDEN ellenfél meccs-erejére rárakja: a te rejtett meccs-bónuszod (morál, taktika, aura, kapitány, edző) fele, az idény elején rögzítve. A mezőny <b>tényleges</b> meccs-ereje tehát <b style="color:${c.col}">⚡${euroHu1(E.target+kieg)}</b>, nem ${Math.round(E.target)}.</div>`
+    :"";
+  const enSor=`<div style="${sty}">A ti csapaterőtök: <b>${euroHu1(ts)}</b>${myMs!=null?` · meccs-erőtök most: <b>⚡${euroHu1(myMs)}</b>`:""}${
+    myMs!=null?` · különbség a mezőnyhöz: <b>${(myMs-(E.target+kieg))>=0?"+":"−"}${euroHu1(Math.abs(myMs-(E.target+kieg)))}</b>`:""}</div>`;
+  return `<div style="${sty}">A sorozat mezőnye: <b style="color:${c.col}">${Math.round(E.target)}</b> — ${calc}</div>`+kiegSor+enSor;}
 function renderEuroScreen(){
   /* A KAPCSOLÓ A RAJZOLÁS ELEJÉN FRISSÜL, nem a végén: ennek a függvénynek
      van korai kilépése (a félbemaradt kör ága), és a sáv ott sem maradhat
@@ -94286,15 +94355,12 @@ function renderEuroScreen(){
   const stageTxt=done?"A sorozat véget ért"
     :qual?`${euroQualLabel(E.qRound)} · ${E.idx+1}/2. mérkőzés — a főtáblára jutásért`
     :ko?`${EURO_ROUND_NAMES[E.stage]} · ${E.stage==="final"?"egy mérkőzés semleges pályán":`${E.idx+1}/2. mérkőzés`}`
-       :`Csoportkör · ${E.md+1}/${EURO_SCHEDULE.length}. forduló`;
+       :`${compSwiss(E.comp)?"Ligaszakasz":"Csoportkör"} · ${Math.min(E.md+1,compSchedule(E.comp).length)}/${compSchedule(E.comp).length}. forduló`;
   $("euroHead").innerHTML=`<div style="font-family:var(--font-disp);font-size:20px;color:${c.col}">${c.n}</div>`
     +`<div style="font-size:12px;color:var(--dim);margin-top:2px">${stageTxt} · a keret és a taktika a szezonzáró állapoton fagyva</div>`
     /* A MAGYARÁZAT KÖVESSE A KÉPLETET: a piramisban a horgony nem a saját
        osztályod, hanem az ÉLVONAL — a hazai kupa nemzeti sorozat. */
-    +(E.target!=null?`<div style="font-size:11.5px;color:var(--dim2);margin-top:3px">A sorozat mezőnye: <b style="color:${c.col}">${Math.round(E.target)}</b> — ${
-        pyrOn()?`az élvonal szintje (D1: ${pyrTopLevel()})`:`a bajnoki szinted (${oppTargetRating})`
-      } és a csapaterőd (${teamStrength().toFixed(1)}) közül a magasabbhoz igazítva, ${c.short}-szinttel.${
-        pyrOn()?` A kupában az ország ELSŐ osztálya is ott van — a mezőny nem a te osztályodhoz igazodik.`:""}</div>`:"")
+    +euroFieldHtml(E,c)
     +mpProgHeadHtml()+mpCupHeadHtml();
   const nx=$("euroNext");
   if(done){
@@ -94395,9 +94461,7 @@ function renderEuroScreen(){
       extra+=`<div style="font-size:12px;color:var(--gold);margin-top:5px">🎫 Selejtező — a főtáblára jutásért. ${EURO_DROP[E.comp]?`Bukásnál ${hunAz(EURO_COMPS[EURO_DROP[E.comp]].n)} ${EURO_COMPS[EURO_DROP[E.comp]].n} főtábláján folytatjátok.`:"Bukásnál nincs kupa ebben a szezonban."} <span style="color:var(--dim2)">Itt semmilyen fejlődés nem történik.</span></div>`;}
     nx.innerHTML=`<div style="font-size:13px;color:var(--dim)">Következő mérkőzés</div>
       <div style="font-size:15px;font-weight:700;margin-top:2px">${fx.neutral?"⚖️ Semleges pálya":fx.home?"🏠 Hazai pálya":"✈️ Idegenben"} — ${esc(teamLabel(fx.o.n))}</div>
-      <div style="font-size:12px;color:var(--dim);margin-top:2px">Ellenfél ereje: ${
-        (fx.o&&typeof fx.o.dispOvr==="number")?fx.o.dispOvr.toFixed(1):Math.round(fx.o.ovr)
-      } · a ti csapaterőtök: ${teamStrength().toFixed(1)}</div>${extra}`;
+      <div style="font-size:12px;color:var(--dim);margin-top:2px">${euroNextStrengthHtml(fx)}</div>${extra}`;
     $("euroKickBtn").classList.remove("hide");$("euroDoneBtn").classList.add("hide");
     showEuroSpeedRow(true);   /* jön a mérkőzés — itt már állítható a tempó */
     updateMatchSpeedUI();     /* a csúszka a tárolt értékkel nyíljon, ne 1×-en */
@@ -94433,15 +94497,17 @@ function renderEuroScreen(){
         hh+=`<div style="font-size:11px;color:var(--dim2);padding:0 0 3px 0${me?";font-weight:600":""}">${esc(teamLabel(E.teams[t.winner].n))} ${roundKey==="final"?"nyert":"jutott tovább"} — ${esc(t.how)}</div>`;});
     box.innerHTML=hh;
   }else{
-    const lbl=$("euroTableLbl");if(lbl)lbl.textContent="Csoport";
-  /* csoporttabella */
+    const SW=compSwiss(E.comp);
+    const lbl=$("euroTableLbl");if(lbl)lbl.textContent=SW?"Ligaszakasz":"Csoport";
+  /* csoporttabella — svájci rendszerben a 32-es liga-tabella, a saját sávjaival */
   let th=`<table class="vtab"><tr><th>#</th><th>Csapat</th><th>M</th><th>GY</th><th>D</th><th>V</th><th>GK</th><th>P</th></tr>`;
   euroGroupTable(E.userG).forEach((row,i)=>{
     const r=row.r,me=row.t.you;
-    th+=`<tr${me?' style="background:color-mix(in srgb,var(--gold) 14%,transparent);font-weight:700"':(i<2?' style="color:var(--ink)"':' style="color:var(--dim)"')}>
+    const fel=SW?i<HSZ_PLAYOFF:i<2;
+    th+=`<tr${me?' style="background:color-mix(in srgb,var(--gold) 14%,transparent);font-weight:700"':(fel?' style="color:var(--ink)"':' style="color:var(--dim)"')}${SW&&(i===HSZ_DIRECT||i===HSZ_PLAYOFF)?' class="hszCut"':""}>
       <td>${i+1}.</td><td>${esc(teamLabel(row.t.n))}${me?" (TE)":""}</td><td>${r.w+r.d+r.l}</td>
       <td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.gf}:${r.ga}</td><td>${r.pts}</td></tr>`;});
-  th+=`</table><div style="font-size:11px;color:var(--dim2);margin-top:4px">Az első két helyezett jut tovább.</div>`;
+  th+=`</table><div style="font-size:11px;color:var(--dim2);margin-top:4px">${SW?euroSwissRule():"Az első két helyezett jut tovább."}</div>`;
   $("euroTable").innerHTML=th;}
   /* statisztika-listák */
   const lst=(obj,key,title)=>{

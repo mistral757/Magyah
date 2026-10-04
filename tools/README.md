@@ -8,6 +8,38 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## hsz-merce-3-9-200-proba.js — ⚖ 3.9.200: a HSZ fordulószáma és a mezőny tényleges számai
+
+```bash
+node tools/hsz-merce-3-9-200-proba.js
+```
+
+**21 állítás**, valódi karrier-állással. A próba a valódi `startEuroCampaign` → `renderEuroScreen` utat járja végig.
+
+* **A forduló:**
+  * a HSZ fejléce „Ligaszakasz · 7/8. forduló”;
+  * a meccs-cím is /8;
+  * a BL marad „Csoportkör · 1/6.”.
+* **A mezőny:**
+  * a HSZ-számítás eltéve, és pontosan a kiírt mezőny;
+  * a képlet a nevezéskori ⚡-val és az osztály-eltolással;
+  * a HSZ-nél nincs BL-képlet;
+  * a ⚖ a motor `matchHiddenOppBuff`-jából;
+  * a tényleges ⚡ = mezőny + ⚖;
+  * a csapaterő és a ⚡ meccs-erő is kiírva;
+  * kiegyenlítés nélkül nincs ⚖ sor.
+* **A következő meccs:**
+  * az ellenfél ⚡-ja = saját + ⚖;
+  * a tiéd = az eredményjelző ⚡-ja.
+* **Tabella és összegző:**
+  * „Ligaszakasz” címke, 32 sor;
+  * a valódi továbbjutási szabály;
+  * két sávhatár;
+  * a meccs utáni összegző „Még 2 forduló a ligaszakaszból”;
+  * a BL-tabella változatlan;
+  * a BL is kiírja a ⚖-t, a saját képletével.
+* **Verzió, oldalhiba.**
+
 ## hsz-dijak-3-9-199-proba.js — 💜 3.9.199: egyéni díjak a Hiper Szuper Kupában
 
 ```bash
