@@ -133,7 +133,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.fek={egymasutan,sabl};
     Math.random=_rnd;window.pressStars=_ps;
     /* ---- 4. MINDEN SABLON ---- */
-    const c={k:"A Teszt FC",e:"Az Ellenfél SE",s:"2–1",n:12,x:"Kovács",a:"Kiss",b:"Nagy",R:15,r:3,p:28,rem:5,l:"Éllovas SE",g:4,gf:40,ga:3,rec:"9 győzelem, 1 döntetlen, 5 vereség"};
+    const c={k:"A Teszt FC",e:"Az Ellenfél SE",s:"2–1",n:12,x:"Kovács",a:"Kiss",b:"Nagy",R:15,r:3,p:28,rem:5,l:"Éllovas SE",g:4,gf:40,ga:3,rec:"9 győzelem, 1 döntetlen, 5 vereség",cn:"Gárdista",tn:"Gyors kontra",st:"Teszt Aréna",fans:"40 000",sn:5};   /* 3.9.194: a klubarc mezői */
     const rossz=[];let db=0;
     Object.keys(PRESS_ST).forEach(k=>PRESS_ST[k].forEach((f,i)=>{db++;const t=f(c);if(/undefined|NaN|a\(z\)|null/.test(t)||!t.trim())rossz.push(k+i+": "+t);}));
     ki.sablon={db,rossz};

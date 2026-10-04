@@ -132,6 +132,9 @@ const {spawn}=require('child_process');
     S.seasonNumber=7;careerPool.Ifi1.age=21;
     S.academy=[{n:"Ifi1",leftAge:17,leftRating:66,leftSeason:4,times:1,offerSeason:7}];
     ajanlott=[];
+    /* 3.9.193: akadémiai ablak csak bajnoki fordulón (4…28) nyílik — a
+       fenti ciklusok után az S.idx 1596-on állna */
+    S.idx=4;S.acadAblak=null;
     tryAcademyOpportunity(()=>{});
     o.ballagas_garantalt=ajanlott[0]==="Ifi1";
     showAcademyReveal=igazi;

@@ -8,6 +8,31 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## sajto-klubarc-3-9-194-proba.js — 🗞️ 3.9.194: a lap a te klubodról szól
+
+```bash
+node tools/sajto-klubarc-3-9-194-proba.js
+```
+
+**17 állítás.**
+
+* **A csapatstílus:**
+  * mind a nyolc filozófia a saját feltételénél;
+  * a Gegenpressing a meccs labdaszerzéseiből;
+  * a ki nem választott stílus hallgat.
+* **Az edző és a taktika:**
+  * az edző neve a győzelmi és a válság-címben;
+  * a taktika neve.
+* **A stadion:**
+  * a stadionnév a hazai címekben;
+  * idegenbeli győzelem;
+  * a menedzser éve az idénynyitón.
+* **A rovatok:**
+  * a főcím és a rovat-sor más rovatból;
+  * a mérleg ablaka és a napló kiírja.
+* **Mind a 109 sablon kitölthető**, és mindegyik témának van rovata.
+* **A verzió.**
+
 ## akademia-ablak-3-9-193-proba.js — 🌱 3.9.193: az akadémiai ablakok és a garantált visszatérés
 
 ```bash
