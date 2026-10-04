@@ -6962,7 +6962,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.192";
+const APP_VERSION="3.9.193";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -29388,7 +29388,68 @@ const ACADEMY_POT_CHANCE=0.03;      /* meccsenként ekkora eséllyel kap extra P
 const ACADEMY_POT_AVG=500;          /* …és ennyit átlagosan (200-800 közepe) */
 /* Az akadémián hagyott tehetségek visszatérési esélye a meccs-ablakban: a
    mentett játékosok számával nő, de nem szorítja ki teljesen az új felfedezéseket. */
-const ACADEMY_RETURN_STEP=0.12, ACADEMY_RETURN_MAX=0.65;
+const ACADEMY_RETURN_STEP=0.12, ACADEMY_RETURN_MAX=0.65;   /* 3.9.193 óta nem használt (a beosztás váltotta) — a régi próbák miatt marad */
+/* ================= 🌱 AZ AKADÉMIAI ABLAKOK ÉS A VISSZATÉRÉS BEOSZTÁSA (3.9.193) =====
+   BEJELENTÉS: „eléggé az idény vége felé dobálja mostanában az ifiakadémia
+   jelöltjeit, és az is előfordul, hogy valakit szezonokon keresztül az
+   akadémián tart, akit egyszer odaküldtem. Szerintem itt van valami számítási
+   elcsúszás."
+   A MÉRÉS HÁROM CSÚSZÁST TALÁLT:
+     1. A KUPAMECCSEK IS ABLAKOT NYITOTTAK. Az akadémia a meccs utáni láncban
+        fut, és az a lánc a nyári kupameccsek (EK, MK, felkészülési torna,
+        osztályozó) után is lefut — ott az S.idx a 30-on áll. A „Nyitott kapu"
+        talizmán 2-es maradékú ablaka (30 % 4 = 2) így MINDEN nyári
+        kupameccsnél újra dobott: az ajánlatok az idény végére torlódtak.
+     2. A „Zsákbamacska" talizmán mindig az idény ELSŐ ablakait vette el —
+        az ajánlatok ettől is későbbre csúsztak.
+     3. A VISSZATÉRÉS CSAK ESÉLY VOLT (ablakonként a mentettek számával nőtt,
+        12%-tól): egy visszaküldött tehetség idényenként nagyjából fele
+        eséllyel jelentkezett, tehát két-három idényig is bent maradhatott,
+        egészen a 21 éves ballagásig.
+   A SZABÁLY:
+     · AKADÉMIAI ABLAK CSAK BAJNOKI FORDULÓ UTÁN NYÍLIK (4., 8., … 28.;
+        a talizmánnal a köztes 2-es maradékú is) — kupában, osztályozón nem,
+        és egy fordulóhoz legfeljebb egy;
+     · MINDEN VISSZAKÜLDÖTT TEHETSÉG IDÉNYENKÉNT EGYSZER GARANTÁLTAN
+        JELENTKEZIK: az idény első ablakában mindenki kap egy beosztott
+        fordulót a hátralévő ablakok közül (szétszórva, véletlenszerűen) —
+        ha az ablak elmegy (tele keret, befagyott akadémia), a következő
+        ablakban jön;
+     · a 21 éves ballagás változatlanul garantált és elsőbbséget élvez;
+     · a „Zsákbamacska" kihagyása egyenletesen oszlik el az idény ablakai
+        között, nem az elején torlódik. */
+const ACAD_FIRST_WIN=4, ACAD_LAST_WIN=28, ACAD_WIN_STEP=4;
+function acadWindowsFrom(fromIdx){
+  const out=[];
+  for(let i=ACAD_FIRST_WIN;i<=ACAD_LAST_WIN;i+=ACAD_WIN_STEP)if(i>=fromIdx)out.push(i);
+  return out;}
+/* Az idényben még jelentkezhető (nem ballagó, idén még nem jelentkezett) akadémisták. */
+function acadReturnables(){
+  const sz=S.seasonNumber||1;
+  return (S.academy||[]).filter(r=>r&&careerPool&&careerPool[r.n]
+    &&(careerPool[r.n].age||0)<ACADEMY_GRADUATE_AGE&&(r.offerSeason||0)!==sz);}
+/* A BEOSZTÁS: aki még nem kapott idei fordulót, most kap — a fromIdx-től
+   hátralévő ablakok közül, szétszórva (különböző ablakok, amíg jut). */
+function acadPlanReturns(fromIdx){
+  const sz=S.seasonNumber||1;
+  const nincs=acadReturnables().filter(r=>r.planSz!==sz);
+  if(!nincs.length)return 0;
+  const W=acadWindowsFrom(fromIdx);
+  if(!W.length)return 0;
+  /* a már beosztottak foglalt ablakai — az újak lehetőleg máshová kerülnek */
+  const foglalt=new Set(acadReturnables().filter(r=>r.planSz===sz).map(r=>r.planIdx));
+  let szabad=W.filter(i=>!foglalt.has(i));
+  if(szabad.length<nincs.length)szabad=W.slice();
+  /* véletlen keverés (a jutalom-lánc seedelt véletlenjével) */
+  const kev=szabad.slice();
+  for(let i=kev.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=kev[i];kev[i]=kev[j];kev[j]=t;}
+  nincs.forEach((r,k)=>{r.planSz=sz;r.planIdx=kev[k%kev.length];});
+  return nincs.length;}
+/* Ki esedékes MOST (a beosztott fordulója elérkezett vagy elmúlt)? */
+function acadReturnDue(){
+  const sz=S.seasonNumber||1,idx=S.idx||0;
+  return acadReturnables().filter(r=>r.planSz===sz&&(r.planIdx||0)<=idx)
+    .sort((a,b)=>(a.planIdx||0)-(b.planIdx||0));}
 /* ---- BALLAGÁS ("most vagy soha") ----
    Az akadémiai idő 21 éves korban lejár (U21-határ). Ekkor a tehetség NEM a
    véletlenre bízva jelentkezik, hanem GARANTÁLTAN kap egy utolsó ajánlatot:
@@ -29743,11 +29804,11 @@ function acadFigyel(rec){
   if(elotte<ACAD_FIGY.pot&&rec.figyelt>=ACAD_FIGY.pot)uj.push("pontos POT-ja");
   if(uj.length&&!S.auto)
     try{addLine(`🌱 Akadémia: kiderült ${esc(fullName(rec.n))} ${uj.join(" és ")} — HUB → Csapatépítés → 🌱 Ifiakadémia.`,"m life");}catch(e){}}
-/* Az akadémiai ablakok (minden 4. forduló) közül hány van még hátra idén. */
+/* Az akadémiai ablakok (a 4., 8., … 28. forduló után) közül hány van még
+   hátra idén. 3.9.193: a következő ablak a MOST lejátszott forduló UTÁNI —
+   eddig a 0. fordulót és a már lezajlott ablakot is beszámolta. */
 function acadAblakHatra(){
-  const i0=Math.max(0,S.idx||0);let n=0;
-  for(let i=i0;i<30;i++)if(i%4===0)n++;
-  return n;}
+  return acadWindowsFrom((S.idx||0)+1).length;}
 /* Egy akadémista várható visszatérése — {sz: szöveg, p: idei esély|null, kulcs}. */
 function acadVisszaterVarhato(rec,e){
   if(!e)return {sz:"nincs adat",p:null,kulcs:9};
@@ -29759,16 +29820,16 @@ function acadVisszaterVarhato(rec,e){
   const ballag=`legkésőbb ${ballagEv} idény múlva, ${ACADEMY_GRADUATE_AGE} évesen garantáltan (ballagás)`;
   const szezon=S.seasonNumber||1;
   if((rec.offerSeason||0)===szezon)
-    return {sz:`idén már jelentkezett (vagy idén mutatkozott be) — leghamarabb a következő idényben, ${ballag}`,p:0,kulcs:5};
-  const szabad=(S.academy||[]).filter(r=>careerPool[r.n]&&(r.offerSeason||0)!==szezon&&(careerPool[r.n].age||0)<ACADEMY_GRADUATE_AGE).length||1;
-  let tm=1;try{tm=tempoMult();}catch(x){tm=1;}
-  const pAblak=Math.min(1,tm)*Math.min(ACADEMY_RETURN_MAX,szabad*ACADEMY_RETURN_STEP)/szabad;
+    return {sz:`idén már jelentkezett (vagy idén mutatkozott be) — a következő idényben garantáltan újra jelentkezik, ${ballag}`,p:0,kulcs:5};
+  const most=S.idx||0;
+  if(rec.planSz===szezon){
+    if((rec.planIdx||0)>most)
+      return {sz:`idén a ${rec.planIdx}. forduló után garantáltan jelentkezik (beosztva) · ${ballag}`,p:1,kulcs:1+(rec.planIdx||0)/100};
+    return {sz:`a beosztott ablaka (${rec.planIdx}. forduló) elmúlt — a következő akadémiai ablakban jelentkezik · ${ballag}`,p:1,kulcs:1};}
   const W=acadAblakHatra();
-  const p=W>0?1-Math.pow(1-pAblak,W):0;
-  const pct=Math.round(p*100);
-  return {sz:W>0?`idén még ~${pct}% eséllyel jelentkezik (${W} akadémiai ablak van hátra) · ${ballag}`
-                :`idén már nincs akadémiai ablak — a következő idényben jöhet, ${ballag}`,
-    p,kulcs:W>0?(2-p):4};}
+  return {sz:W>0?`idén garantáltan jelentkezik — a fordulóját a következő akadémiai ablakban kapja meg (${W} ablak van hátra) · ${ballag}`
+                :`idén már nincs akadémiai ablak — a következő idényben garantáltan jelentkezik, ${ballag}`,
+    p:W>0?1:0,kulcs:W>0?1.5:4};}
 /* A jellem egy sora: kiderült-e már, és ha igen, mi. */
 function acadJellemSor(rec,e){
   const f=acadFigyeltDb(rec),out=[];
@@ -29831,7 +29892,7 @@ function renderAcademyPanel(){
     return;}
   box.innerHTML=L.map(o=>acadKartyaHtml(o,xi)).join("")
     +`<div class="acadMegj">A jellem és a pontos POT az akadémiai meccsekkel derül ki (vérmérséklet ${ACAD_FIGY.ver}, kapcsolódás ${ACAD_FIGY.kap}, karizma ${ACAD_FIGY.kar}, POT ${ACAD_FIGY.pot} meccs). `
-    +`A visszatérés esélye becslés: az akadémiai ablakokból (minden 4. forduló) és a visszatérés szabályából számol; a ballagás garantált. `
+    +`A visszatérés GARANTÁLT: minden visszaküldött tehetség idényenként egyszer jelentkezik — az idény első akadémiai ablakában (a 4., 8., … 28. forduló után) mindenki kap egy beosztott fordulót, és ha az elmegy, a következő ablakban jön. A 21 éves ballagás elsőbbséget élvez. `
     +`A „ha most jelentkezne” szám a visszatéréskor alkalmazott mérce — a kezdő 11-ed nyers erejéhez és az akadémián töltött évekhez igazodik.</div>`;}
 function openAcademyPanel(){
   renderAcademyPanel();
@@ -33016,7 +33077,7 @@ const GLOSSARY={
   runszint:{title:"Run szint",text:"A karriered összesített minőségi mérőszáma 0-100 között (a hagyományos mód mínuszos nehézségi fokain a teteje is nő: minden tized lépcső +10, −1,0-n akár 200) — és szándékosan NEM a csapatod erejét méri. Komponensei: milyen szerény kerettel indultál a lehetséges maximumhoz képest, milyen magas volt a kezdő nehézség, hány újrapörgetést használtál, hogyan szerepeltél az egyes szezonokban (a helyezés mellett a mezőny szintje és az „underdog-faktor” is számít), milyen gyorsan jutottál el az Infinity megnyitásáig, mennyire volt kidolgozott a taktikád, és milyen mérföldköveket gyűjtöttél (GODLIKE-kártya, kupagyőzelem, egyéni arany-díjak, 99-es taktika). Minden komponensbe beleszámít a KÖRÜLMÉNY: ugyanaz az eredmény többet ér magasabb mezőnyön és gyengébb kerettel. Ezért lehet egy 74-es csapattal magasabb Run-t elérni, mint egy szupercsapattal — a mérce a vállalás, nem a nyers erő. A HUB-ban bármikor kibontható a teljes, komponensenkénti bontás."},
   meccsrolmeccsre:{title:"Meccsről meccsre",text:"Az eredményjelző alatti kapcsoló. Bekapcsolva a KÖVETKEZŐ MÉRKŐZÉS MAGÁTÓL INDUL: a lefújás után az értékelő ablak 30 másodperc múlva bezárul, azonnal jön a FELKÉSZÜLÉS (a tábla átvált a következő párosításra, a napló megadja az eligazítást), majd további 15 másodperc múlva a kezdőrúgás — és így tovább, meccsről meccsre. A visszaszámlálás egy lebegő pirulán látszik: mi következik, hány másodperc múlva, és mellette egy ⏹ Állj gomb. A kézi út mindig gyorsabb: ha megnyomod a gombot, azonnal megtörténik, ami történt volna. AHOL MEGÁLL: rangadó, bajnoki tétmérkőzés, átigazolási időszak (a 8., 15. és 23. forduló után), a szezon vége, a közös karrier párharc-fordulója és az osztályozó — vagyis mindenhol, ahol dönteni kell, vagy ahol a mérkőzés megérdemli, hogy magad indítsd el. A megállás NEM kapcsolja ki a módot: a következő fordulótól magától folytatódik. Ha közben elnavigálsz (HUB, megnyitott ablak), a lánc szintén megáll — egy kezdőrúgás egy nyitott HUB alatt nem történhet meg. A KUPÁBAN ugyanez fut, egy lépéssel rövidebben: a lefújás utáni 30 másodperces tartás kimarad (az értékelő ablak ideje már megvolt), a kupa-nézetből pedig 15 másodperc múlva indul a következő mérkőzés. A HATÁR ott a SZAKASZ: a csoportkör lezárása, egy kieséses párharc eldőlése és a selejtező sorsa után nem megy tovább. AMIT NEM CSINÁL: nem dönt helyetted (a hiányzók panelje, a jutalom-képesség választója és minden megerősítő kérdés ugyanúgy feljön), és nem gyorsítja a közvetítést (arra a Tempó csúszka való). A SZEZON VÉGIGJÁTSZÁSA ERŐSEBB: a kettő nem futhat egyszerre — az a gép kezébe adja a döntéseket, ez épp azért van, hogy te lásd őket."},
   arculat:{title:"A klub arculata",text:"A klubod ARCA — és semmi nem kötelező benne, semmi nem kerül pénzbe. A HUB menüjének Csapatépítés ágán, a 🛡️ A klub arculata pont mögött három dolgot alkothatsz meg magadnak. A CÍMER: pajzsforma, mezőminta (sima, csíkos, átlós, negyedelt és társai) és egy jel vagy monogram — a saját címered ettől kezdve a fejlécben is ott áll, az alapértelmezett helyén. A KLUBSZÍNEK: a klub két színe egy húsz elemű palettáról, kontraszt-ellenőrzéssel — a szerkesztő szól, ha a két szín túl közel áll egymáshoz. A névből sorsolt alappár NEM számít saját választásnak: ahhoz hozzá kell nyúlnod. A SZERELÉS: két mez, hazai és idegenbeli — minta (tömör, csíkos, sávos, felezett, átlós, ék, vállpántos, kockás), ujj (mez-színű, ellenszínű, csíkos ujjvég), gallér (kerek, V-nyak, ingnyak), két szín és a mezszám színe. A hazai mez a klubszínekből épül, az idegenbeli pont attól idegenbeli, hogy más. A MEZSZÁMOK: a klub magától kioszt mindenkinek egyet — a kezdő tizenegy a megszokott 1-11-et poszt szerint, a keret többi tagja a posztjához illő számot (támadóra inkább 17, 21, 90, 99; védőre 30, 31, 32, 33, 66, 69; középpályásra 88, 23, 25, 27, 18, 26, 16) —, és mindegyik átírható 1 és 99 között; ütközésnél a két játékos megcseréli a mezét. A PÁLYAKÉP NÉZETE: a felállás-vizualizáció korongjai vagy a Ratinget mutatják, vagy a hazai mezt a mezszámmal (ez a „meccs-immerzió” mód); a kapcsoló itt és a pályakép alatt is ott van. A STADIONNÉV: a hazai mérkőzések naplója innentől ezen a néven nyit; ha nincs neve, a napló nem említi. ÖT MÉRFÖLDKŐ JÁR ÉRTE: négy elemért egy-egy (🎨 Klubszínek, 🛡️ Saját címer, 👕 Saját szerelés, 🏟️ Otthonunk neve), és ha a szín, a címer és a stadionnév mind megvan, egy ötödik is (✨ Teljes arculat). Ezek a tábla legolcsóbb fokozatai, és NINCS KATEGÓRIÁJUK — nem tartoznak egyik stílus-kategóriába sem, tehát egy ingyenes önkifejezés sem nyitási díjjal, sem zárt ajtóval nem jár. A jutalmuk CSAPATSTÍLUS-PONT: ugyanaz a valuta, amiből a filozófiád fáját építed. A SZERKESZTŐ PISZKOZATON DOLGOZIK: amíg nem mentesz, az élő állapot nem mozdul — a „Mégsem” tényleg mégsem, és a fejléc nem villog minden kattintásnál. Bármikor visszaállíthatod az egészet alaphelyzetbe. A LELÁTÓ HANGJA (7. szakasz): meccs közben a szurkolók zaja szól, a zene 25%-ra halkul alatta, és a lelátó reagál — gólnál felrobban, kapott gólnál felnyög, kapufánál „óóó”, lapnál fütyül, a lefújáskor tapsol vagy füttykoncertet ad. Öt lelátó van, és a meccseid IZGALMA nyitja őket: 🌤️ Vasárnapi délután (alap), 🏠 Hazai mag (az első „izgalmas”, 65+ meccs), 🥁 Ultrák a kapu mögött (az első „emlékezetes”, 85+), 🔥 Katlan (92+) és 🌌 Legendás éjszaka (96+) — ugyanazok a lépcsők, mint az izgalom-mérföldköveké. Mindegyikbe bele lehet hallgatni, a választás azonnal érvényes; a lelátó hangereje és ki/bekapcsolása a Hang beállításai között van. Végigjátszásnál a lelátó hallgat. Aki sosem nyitja meg, annak ez a sáv végig 0/5 marad, és pontosan ugyanazt a játékot játssza, mint eddig — az arculat semmilyen más rendszerre nem hat (a mezszámok is kiosztódnak maguktól, csak épp sosem látszanak)."},
-  sajto:{title:"Újságírók és a helyi lap",text:"A scout és az ügynökség mellett a HARMADIK CSAPAT: a scout FELMÉR, az ügynökség ÜZLETET KÖT, a sajtó a TÁBORT ÉPÍTI. MINDEN MECCSRŐL CÍMET ÍR a helyi lap — a meccs mérlegének ablakában (és a naplóban, a mérleg előtt) ott áll a címe, az este legfontosabb eseményére kötve: az akadémista első gólja, a bemutatkozó gól, a mesterhármas, a klubgól-jubileum, a búcsú, a fordítás, a kései döntés, a kiállítás, a rangadó, a kiütés vagy a zakó — és ha egyik sem, akkor az eredmény hangulata. HOGY FEJLŐDIK: nem pénzből és nem pontból, hanem a SZURKOLÓTÁBORRAL együtt — a karrier induló táborához mért valaha elért csúcs szerint, fél csillagonként: ×1,25 → 1,5★, ×1,6 → 2★, ×2 → 2,5★, ×2,6 → 3★, ×3,4 → 3,5★, ×4,5 → 4★, ×6 → 4,5★, ×8 → 5★. A csúcs nem esik vissza, tehát egy rossz idény nem rontja vissza a szerkesztőséget. A szinttel a lap is nő (Lelátói Hírlevél → Városi Krónika → Sportpanoráma → Gólvonal Napilap → Magyah Sport Napló), és 3 csillagtól a cikk ALCÍMET is kap (a meccs embere és az este többi extrája). A CIKK SZURKOLÓT HOZ egy EMLÉKEZETES este után (ha a meccsnek volt extrája, vagy legalább 75 volt az izgalma): a ligád szurkolói sávjának 0,15%-a csillagonként, az este súlyával (1–2×) — vereség után fele annyi. A Scout, ügynökség, sajtó panelen látod, hol tart, mennyi szurkolót hoztak eddig a cikkek, és mekkora tábornál jön a következő fél csillag."},
+  sajto:{title:"Újságírók és a helyi lap",text:"A scout és az ügynökség mellett a HARMADIK CSAPAT: a scout FELMÉR, az ügynökség ÜZLETET KÖT, a sajtó a TÁBORT ÉPÍTI. MINDEN MECCSRŐL CÍMET ÍR a helyi lap — a meccs mérlegének ablakában (és a naplóban, a mérleg előtt) ott áll a címe, az este legfontosabb eseményére kötve: az akadémista első gólja, a bemutatkozó gól, a mesterhármas, a klubgól-jubileum, a búcsú, a fordítás, a kései döntés, a kiállítás, a rangadó, a kiütés vagy a zakó — és ha egyik sem, akkor az eredmény hangulata. HOGY FEJLŐDIK: nem pénzből és nem pontból, hanem a SZURKOLÓTÁBORRAL együtt — a karrier induló táborához mért valaha elért csúcs szerint, fél csillagonként: ×1,25 → 1,5★, ×1,6 → 2★, ×2 → 2,5★, ×2,6 → 3★, ×3,4 → 3,5★, ×4,5 → 4★, ×6 → 4,5★, ×8 → 5★. A csúcs nem esik vissza, tehát egy rossz idény nem rontja vissza a szerkesztőséget. A szinttel a lap is nő (Lelátói Hírlevél → Városi Krónika → Sportpanoráma → Gólvonal Napilap → Magyah Sport Napló), és 3 csillagtól a cikk ALCÍMET is kap (a meccs embere és az este többi extrája). A CIKK SZURKOLÓT HOZ egy EMLÉKEZETES este után (ha a meccsnek volt extrája, vagy legalább 75 volt az izgalma): a ligád szurkolói sávjának 0,15%-a csillagonként, az este súlyával (1–2×) — vereség után fele annyi. A Scout, ügynökség, sajtó panelen látod, hol tart, mennyi szurkolót hoztak eddig a cikkek, és mekkora tábornál jön a következő fél csillag. A SZEZON TÖRTÉNETEIT IS MEGÍRJA (3.9.193): ha az estének nincs külön eseménye, a címlap gyakran a szezonról szól — győzelmi, veretlen, nyeretlen vagy vereség-széria, gólcsend, kapott gól nélküli sorozat, élre állás és trónfosztás, előny és üldözés, félidei mérleg, hajrá, a kiesőzóna, hibátlan idény, gólgyár, a csapat hangulata KÍVÜLRŐL nézve (a morálból), az összeszokott párosok (párkémia, passzkémia, gyilkos páros, szárny), ha ma mindketten termeltek, a gólkirályi verseny kerek számai, a kapitány gólja és a csapat összhangja. 2 csillagtól a lap ROVATOT is ír a cím alá a szezon egy másik történetéből. A nemrég megírt téma hátrébb sorol, hogy a lap ne ismételje magát."},
   szurkoloibevetel:{title:"Szurkolói bevétel és a tábor mérete",text:"A lelátó HETENTE fizet: minden mérkőzés után annyi pénz érkezik, ahány szurkolód van — fejenként 10 000 Ft —, és ezt szorozza a legutóbb LEZÁRT idény élménye (0,85-1,30). Ugyanezen a ritmuson megy a kiadás is: a játékosok bérét szintén meccsenként vonjuk. A klub NYÁRI KERETE ettől külön él: az a csapaterődből, az edzői fizetésből és a tempóból jön, és továbbra is egyben érkezik. AZ INDULÓ LÉTSZÁM két forrásból áll, FELE-FELE arányban összeadva: a LIGA, ahol indulsz (kis pénz kis foci 1 000 · mennyei megyei 3 000 · Magyah Másodosztály 12 000 · Magyah Élmezőny 30 000 · Biszem-baszom másodosztály 50 000 · Premier líg 150 000 — Infinityben minden tíz szintért további +150 000), és a KEZDŐ NYERS CSAPATERŐD (70 alatt 3 000 · 70-80 7 500 · 81-90 15 000 · 91-100 30 000, fölötte tízesével +30 000). A TÁBOR HETENTE VÁLTOZIK. Minden mérkőzés után: a győzelem hoz, a RANGADÓ-győzelem duplán hoz, az IZGALOM hoz (a 30-as átlag fölött, egyenletesen a 100-ig), a vereség visz. A mértékek a SAJÁT LIGÁD sávjához mértek — győzelem 0,6%, rangadó-győzelem 1,2%, vereség −0,4%, az izgalom 0,8%-ig —, tehát minden szinten ugyanúgy viselkedik a rendszer. IDÉNY VÉGÉN JÖNNEK A NAGY UGRÁSOK. A bajnoki cím a ligád sávjának FELÉT hozza új szurkolóként (2. hely 25%, 3. hely 12%, 4-5. hely 8%). A kupasorozatok győzelme fix: Magor Kupája 30 000 · Konföranszié Líg 70 000 · Ojrópai Klubcsapatok Bajnoki Kupája 100 000 · Kupák Kupájának Kupája 200 000 — a döntő 50%-ot, az elődöntő 24%-ot, a negyed- és nyolcaddöntő 16%-ot, a korábbi kiesés 8%-ot ér ugyanebből. Az Infópult „Szezon és mérleg” fülén, a szurkolói dobozban mindkét szám látszik: hányan vannak, mennyit fizetnek hetente, és mit ér egy győzelem vagy egy trófea a te ligádban. A NÖVEKEDÉS TISZTA HASZON: a játékosok bére nem a mai lelátóhoz van kötve, hanem a BÉRHORGONYHOZ — a tábor SZEZON ELEJI létszámához. Amit az idény során hozzászerzel (győzelmek, izgalom, kihívás-jutalom, kupamenetelés), annak a bevétele teljes egészében a klubé; a szerződések csak a szezonfordulón tárgyalnak újra, és akkor is csak a lemaradás FELÉT hozzák be. A bérplafon (a lelátó 50, illetve 125%-a) szintén ezen a horgonyon ül, tehát a nagyobb tábor sem engedi feljebb a bérszámlát menet közben. 100-AS NYERS ERŐ FÖLÖTT A JEGYÁR IS NŐ: ugyanazon a görbén, amin a játékosok piaci ára (100-nál ×1, 117-nél kb. ×8, 130-nál kb. ×28) — a lelátó így ugyanannyi játékost „vesz”, mint 100-nál, és nem válik jelentéktelenné. A bér 3.9.189 óta ezt is követi: a fizetések és a bér-plafon a mai jegyáron mérnek (a létszám a szerződéskori marad), különben egy erős keret bére irreálisan alacsony volna a lelátóhoz képest. A JEGYÁR A KERETED ÁRÁHOZ IGAZODIK (3.9.192): a referencia a játékosaid ÁTLAGOS KIKIÁLTÁSI ÁRA. A ligád tipikus lelátója (a fenti liga-sáv) meccsenként ennek 55%-át hozza alap tempón — a tempó ugyanúgy hat rá, mint a szezonkeretre (gyorsabb tempón több, lassabbon kevesebb). Ebből jön a referencia-jegyár; ha a fenti számítás ennél drágább jegyet adna, a jegyár erre húzódik vissza (fölfelé sosem emel). A létszám és az élmény változatlanul szoroz: a nagyobb tábor továbbra is arányosan többet hoz. A bér ugyanezt a jegyárat olvassa, tehát a fizetések is ugyanilyen arányban igazodnak. Ne lehessen túl könnyen pénzt gyűjteni: a lelátó a saját kereted árához mér, nem a piac csúcsához."},
   rivalisok:{title:"Riválisok és rangadók",text:"Minden szezon indulásakor a rendszer VÉLETLENSZERŰEN kijelöl 2 riválist a mezőnyből, és a szezon elején be is jelenti őket. A négy ellenük játszott mérkőzés RANGADÓ: külön jelölést kap a menetrendben (⚔️) és a kezdőrúgás gombján, saját meccs előtti és meccs utáni kommentárt kap, és a mérkőzés maga is másképp viselkedik. A rangadón NEM erősebb az ellenfél — a mérkőzés KISZÁMÍTHATATLANABB: a két oldal gólvárhatósága egymáshoz közelít, ezért gyakoribb a döntetlen, az egygólos különbség és a fordítás, a 90+ dráma esélye pedig közel duplájára nő. Emellett minden rangadó kap egy hangulatot is (kiélezett, feszült, gólgazdag, fordulatos), ami eldönti, sok gól esik-e vagy egyetlen találat dönt. A hangulat forró: nagyobb eséllyel jön piros lap és különleges esemény. A riválisok szezononként újra sorsolódnak, tehát minden idény más rangadókat hoz. HAJRÁ-RANGADÓ: a kijelölt riválisok mellett a TABELLA is csinál rangadót. A szezon UTOLSÓ HÉT fordulójában minden olyan mérkőzés hajrá-rangadóvá válik, ahol az ellenfél legfeljebb NÉGY ponton belül van hozzád — az a meccs hat pontot ér, mert amit nyersz, azt tőle veszed el. Ugyanazt kapja, mint egy igazi rangadó: saját hangulatot és kiszámíthatatlanabb meccsgenerálást, jelölést a kezdőrúgás gombján (🔥) és a menetrendben, saját meccs előtti és meccs utáni kommentárt, és megnő az IZGALOM tét-tétele is (a pontazonos ellenfél a legnagyobb tét). Az ellenfél ereje itt sem változik. Amit a hajrá-rangadó NEM ír át: a rangadó-kihívások számlálóit és a híresség meccs embere-szorzóját — azok továbbra is kizárólag a két kijelölt riválist ismerik."},
   bajnokihajra:{title:"Bajnoki hajrá",text:"Minden forduló után lefut egy matematikai ellenőrzés az ÉLŐ tabellán: hány meccsed van hátra, mennyi pontot szerezhetsz még, és mennyit szerezhetnek az üldözőid. Ebből derül ki, hogy a következő mérkőzésen eldőlhet-e a bajnoki cím — és ha igen, hogyan: egy DÖNTETLEN is elég, CSAK GYŐZELEM elég, vagy győzelem MELLETT más eredmények is kellenek. A tétmeccset a játék előre bejelenti, a kezdőrúgás gombja is jelöli (🏆), a kommentátor pedig a mérkőzés közben is utal rá, ha a pillanatnyi állás elég a címhez. Ha összejön, külön bajnokavatás jár érte; ha nem, a következő fordulóban újabb lehetőség. A rendszer sosem ígér többet a matematikánál: „bajnokok vagytok” csak akkor hangzik el, ha a legrosszabb esetben is utolérhetetlen vagy. A szezon során ezen felül dinamikus hírek is születnek (győzelmi sorozat, veretlenség, első hely, visszavett vezetés, növekvő előny, közeledő cím). Közös karrierben a menet közbeni tabella hiányos — a társad eredményei csak a szezonzáráskor érkeznek meg —, ezért ott a bajnoki hajrá-narratíva hallgat, a rangadók viszont ott is teljes értékűek."},
@@ -36858,53 +36919,51 @@ function showAcademyReveal(prospect,resumeCb,rec,isFinal,lift){
   $("unlockActions").innerHTML="";$("unlockActions").appendChild(yesBtn);$("unlockActions").appendChild(noBtn);
   $("scUnlock").scrollIntoView({behavior:"smooth"});}
 function tryAcademyOpportunity(cb){
+  /* 3.9.193: AKADÉMIAI ABLAK CSAK BAJNOKI FORDULÓ UTÁN — a kupa, a nyári
+     torna és az osztályozó lánca is ide fut, de ott az S.idx áll (lásd az
+     acadWindowsFrom fölötti feljegyzést). Egy fordulóhoz legfeljebb egy. */
+  if(gameMode!=="career"||!careerPool){cb();return;}
+  try{if(euroFrozen()){cb();return;}}catch(e){}
+  const _ablak=(S.seasonNumber||1)+":"+(S.idx||0);
+  if(S.acadAblak===_ablak){cb();return;}
   /* 🧿 TALIZMÁN — Nyitott kapu (3.9.142): a két négyes ütem KÖZÖTTI
      fordulóban (idx%4===2) is jöhet ajánlat, a talizmán esélyével. */
-  const _talKapu=(S.idx%4===2)&&(gameMode==="career")&&(()=>{const p=talAkadKapuP();return p>0&&Math.random()<p;})();
-  if(gameMode!=="career"||!careerPool||(S.idx%4!==0&&!_talKapu)){cb();return;}
+  const _talKapu=(S.idx%4===2)&&(()=>{const p=talAkadKapuP();return p>0&&Math.random()<p;})();
+  const _rendes=S.idx%4===0&&S.idx>=ACAD_FIRST_WIN&&S.idx<=ACAD_LAST_WIN;
+  if(!_rendes&&!_talKapu){cb();return;}
+  S.acadAblak=_ablak;
   if(S.frozenAcademySeasons>0){cb();return;}   /* challenge-büntetés: befagyott akadémia */
+  /* A VISSZATÉRÉSEK BEOSZTÁSA: az idény első ablakában mindenki kap egy
+     fordulót (a később visszaküldöttek a következő idényben). */
+  try{acadPlanReturns(S.idx||0);}catch(e){}
+  const grads=academyGraduates();
+  let due=[];try{due=acadReturnDue();}catch(e){due=[];}
   /* 🧿 F6b — Zsákbamacska / Késői virágzás (kontra): idényenként −1 ajánlat.
-     A ballagás (a lejárt akadémiai idő) sosem marad ki. */
-  if(!academyGraduates().length&&talAkadKimarad()){cb();return;}
-  /* GLOBÁLIS TEMPÓ: a 4 fordulós ütem marad, de a lehetőségek egy része némán
-     kimarad — a tempó szorzójának megfelelő arányban. Azért esély-kapu és nem
-     ritkított ütem, mert a 4-es osztó egész számokra kerekedne, és a -10% el is
-     tűnne benne. A BALLAGÁS nem eshet ki: az utolsó ajánlat garantált marad. */
-  if(!academyGraduates().length&&Math.random()>tempoMult()){cb();return;}
-  /* Egyre nagyobb eséllyel egy KORÁBBAN az akadémián hagyott tehetség tér
-     vissza (az esély a mentettek számával nő, de marad hely új felfedezésnek). */
+     A ballagás és a beosztott visszatérés sosem marad ki — csak az új
+     felfedezés. */
+  if(!grads.length&&!due.length&&talAkadKimarad()){cb();return;}
+  /* GLOBÁLIS TEMPÓ: a 4 fordulós ütem marad, de az ÚJ felfedezések egy része
+     némán kimarad — a tempó szorzójának megfelelő arányban. A ballagás és a
+     beosztott visszatérés nem esik ki. */
+  if(!grads.length&&!due.length&&Math.random()>tempoMult()){cb();return;}
   let prospect=null,rec=null,isFinal=false;
-  const kept=(S.academy||[]).filter(r=>careerPool[r.n]);
+  let lift=null;
   /* 1) BALLAGÁS ELŐSZÖR: akinek lejárt az akadémiai ideje, az garantáltan sorra
      kerül — nem véletlen-esélyen múlik, hogy megkapod-e az utolsó ajánlatot. */
-  const grads=academyGraduates();
-  let lift=null;
   if(grads.length){
     rec=grads[0];isFinal=true;
     try{lift=academyReturnLift(rec);}catch(e){lift=null;}
     prospect=careerPlayerFromPoolEntry(careerPool[rec.n]);}
-  /* 2) különben a szokásos, egyre valószínűbb visszatérés a mentettek közül.
-     ---- SZEZONONKÉNT EGYSZER (3.9.52) ----
-     BEJELENTETT KÉRÉS: „egy játékost egy szezonban csak egyszer ajánljon fel
-     visszatérőként."
-     MIÉRT JOGOS: a visszatérés esélye a mentettek SZÁMÁVAL nő (12%-tól 65%-ig),
-     tehát négy-öt akadémistával a lehetőségek nagy része visszatérés volt — és
-     ugyanaz a fiatal négyszer is bekopogott egy idényben, lényegében ugyanazzal
-     a Ratinggel. Négy egyforma kérdés ugyanarra a döntésre nem mélység, hanem
-     zaj: a válasz másodszorra sem lesz más, mert a játékos sem lett más.
-     EGY IDÉNYNYI FEJLŐDÉS az, ami tényleg új kérdést tesz fel — ezért az
-     idény a lépésköz.
-     A BALLAGÁS NEM ESIK IDE: az az 1) ág, garantált, és amúgy is egyszeri. */
-  else if(kept.length){
-    const szezon=S.seasonNumber||1;
-    const szabad=kept.filter(r=>(r.offerSeason||0)!==szezon);
-    if(szabad.length&&Math.random()<Math.min(ACADEMY_RETURN_MAX,szabad.length*ACADEMY_RETURN_STEP)){
-      rec=pick(szabad);
-      rec.offerSeason=szezon;
-      /* 🎓 AZ ÉVEK MÉRCÉJE (3.9.134) — a prospect már a felhozott Ratinggel
-         épül, tehát a képernyő, az auto-felvétel és a keret ugyanazt látja. */
-      try{lift=academyReturnLift(rec);}catch(e){lift=null;}
-      prospect=careerPlayerFromPoolEntry(careerPool[rec.n]);}}
+  /* 2) A BEOSZTOTT VISSZATÉRÉS (3.9.193): idényenként egyszer, garantáltan —
+     a régi, esélyalapú visszatérés helyett. A „szezononként egyszer" szabály
+     (3.9.52) változatlan: az offerSeason jelöli. */
+  let _elozoAjanlat=null;
+  if(!grads.length&&due.length){
+    rec=due[0];
+    _elozoAjanlat=rec.offerSeason;
+    rec.offerSeason=S.seasonNumber||1;
+    try{lift=academyReturnLift(rec);}catch(e){lift=null;}
+    prospect=careerPlayerFromPoolEntry(careerPool[rec.n]);}
   if(lift&&lift.lifted)
     addLine(`🎓 Akadémia: ${esc(fullName(rec.n))} ${lift.ev} év után ${lift.before} → <b>${lift.after}</b> Rating `
       +`(a kezdő 11 nyers ereje ${lift.xi.toFixed(1).replace(".",",")})`,"m life");
@@ -36916,7 +36975,9 @@ function tryAcademyOpportunity(cb){
       S.academy=(S.academy||[]).filter(r=>r.n!==rec.n);
       addLine(`🎓 ${esc(fullName(prospect.n))} lejárt akadémiai idővel távozott — nem volt hely a keretben`,"m life");
       cb();return;}
-    if(S.auto){cb();return;}
+    /* a beosztott visszatérés tele keretnél NEM vész el: a következő
+       ablakban újra jön (3.9.193) */
+    if(S.auto){if(rec&&!isFinal)rec.offerSeason=_elozoAjanlat;cb();return;}
     showCareerCapReached(cb,()=>{extraRoster.push(prospect);markArrived(prospect,0,true);
       if(rec)S.academy=(S.academy||[]).filter(r=>r.n!==prospect.n);
       return prospect;});
@@ -66905,7 +66966,8 @@ function mVerdictFlush(){
   if(_mVerdictPending&&_mVerdictPending!==V)_mVerdictPending.fed=true;
   try{
     /* 📰 3.9.188 — a helyi lap címe a mérleg előtt, mint egy újság címlapja */
-    if(V.head&&V.head.t)addLine(`📰 <i>${esc(V.head.paper||"")}:</i> <b>„${esc(V.head.t)}”</b>`,"m ev");
+    if(V.head&&V.head.t)addLine(`📰 <i>${esc(V.head.paper||"")}:</i> <b>„${esc(V.head.t)}”</b>`
+      +(V.head.rovat?` <span style="color:var(--dim2)">· rovat: <i>${esc(V.head.rovat)}</i></span>`:""),"m ev");
     addLine(`🎙 <b>A meccs mérlege:</b> ${V.txt}`,"m ev");
     addLine(`📊 Izgalom: <b>${V.score}/100</b> — ${V.label} <span style="color:var(--dim2)">(${V.parts})</span>`,"m ev");
   }catch(e){}}
@@ -67085,6 +67147,203 @@ function pressHeadline(V,o){
     const mv=V.mvp?`${shortName(V.mvp.n)} — ${V.mvp.grade||"értékelés nélkül"}`:"";
     lead=[mv?`A meccs embere: ${mv}.`:"",tobbi.length?tobbi.join(" · ")+".":""].filter(Boolean).join(" ");}
   return {t,lead,key,paper:pressPaper(),stars:pressStars()};}
+/* ================= 🗞️ A SZEZON TÖRTÉNETEI A CÍMLAPON (3.9.193) =================
+   BEJELENTÉS: „Lehetnének további újságcikk címek, pl olyanok, amik arról
+   beszélnek, hogy eddig milyen az idény, milyen győzelmi, vereség, gyenge, jó
+   sorozatban vagyunk, hogy a csapat morál kívülről milyennek látszik, hogy egy
+   összeszokott páros mennyire jót tesz most a csapatnak, stb. Használjunk
+   többet a meglévő infókból. Van egy csomó csomó adat amit gyűjtünk. Légy
+   kreatív, hogy ezek hogyan jelennek meg ezekben az akár humoros cikk
+   címekben is."
+   A 3.9.188-as címek az ESTE eseményeiből születtek (ifi első gólja,
+   mesterhármas, fordítás…); egy sima győzelem, döntetlen vagy vereség csak
+   általános címet kapott. Mostantól a lap a SZEZON TÖRTÉNETÉT is írja — a
+   meglévő nyilvántartásból, új számlálás nélkül (két apró kivétel: a
+   vereség-széria és a gólcsend, a lap saját jegyzetfüzetében):
+     · sorozatok: győzelmi, veretlen, nyeretlen, vereség-, gólcsend- és
+       kapott gól nélküli széria (S.winStreak, S.unbeatenStreak,
+       S.winlessStreak, S.cleanSheetStreak);
+     · a tabella: élre állás, trónfosztás, előny, üldözés, kiesőzóna,
+       félidei mérleg, hajrá, a bajnok tiszteletköre (titleSnapshot);
+     · a mérleg: hibátlan idény, gólgyár (S.W/D/L, S.GF/GA);
+     · a morál, KÍVÜLRŐL nézve (S.morale);
+     · az ÖSSZESZOKOTT PÁROSOK — párkémia, passzkémia, gyilkos páros, szárny —,
+       ha ma mindketten termeltek;
+     · a gólkirályi verseny (S.scorers), a kapitány gólja, a csapat összhangja.
+   HOGYAN KERÜL A LAPBA. A történet a lefújás UTÁN dől el, amikor a tabella,
+   a sorozatok és a morál már a friss állást mutatja (pressStoryApply, a
+   mLefujas előtt). Ha az estének nincs külön eseménye, a legerősebb
+   történet lesz a FŐCÍM (70%); egyébként — és 2★-tól mindig — a „rovat"
+   sorba kerül a cím alá. A nemrég megírt történet és a legutóbbi sablon
+   hátrébb sorol, hogy a lap ne ismételje magát. */
+const PRESS_STORY_STRONG=["youth","youthA","debut","hat","gjub","farewell","fordit","late","redW","redL","derbyW","derbyL","rout","zako"];
+const PRESS_STORY_MAIN_P=0.7, PRESS_ROVAT_STARS=2;
+const PRESS_ST={
+  ws:[c=>`Sorozatgyártás: ${pressAz(c.k)} ${c.n}. győzelme zsinórban — a gyártósor nem áll le`,
+      c=>`${c.n} meccs, ${c.n} győzelem: a városban már a pezsgőt hűtik`,
+      c=>`Ki állítja meg őket? ${c.n}. egymás utáni siker, ${pressAz(c.e)} sem talált választ`,
+      c=>`»Ne szóljatok, mert elkiabáljuk« — ${c.n} győzelem sorozatban`,
+      c=>`A győzelem rutinná vált: ${c.n}. siker zsinórban, ${c.s} ${pressAz(c.e)} ellen`],
+  wsBig:[c=>`Gépezet: ${c.n} győzelem zsinórban — a statisztikusok új oszlopot nyitnak`,
+         c=>`${c.n}! Ennyi győzelem jött sorban — a riválisok már csak a sorsolásban bíznak`],
+  ub:[c=>`${c.n} meccse veretlen ${c.k} — a vereség szó kikopott a szótárból`,
+      c=>`Golyóálló: ${c.n}. veretlen mérkőzés`,
+      c=>`Ezt a csapatot nehéz legyőzni: ${c.n} meccs vereség nélkül`],
+  wl:[c=>`${c.n} meccs győzelem nélkül — az öltöző ajtajára kiírták: »Keressük a három pontot«`,
+      c=>`Hol a győzelem? ${c.n}. nyeretlen forduló, egyre hangosabb a lelátó`,
+      c=>`Szárazság: ${c.n} meccse vár győzelemre ${c.k}`],
+  ls:[c=>`Zuhanórepülés: ${c.n}. vereség sorozatban`,
+      c=>`${c.n} vereség zsinórban — a szurkolók már azt keresik a térképen, hol van a gödör alja`,
+      c=>`Fekete széria: ${c.s} ${pressAz(c.e)} ellen, ez már ${pressAz(c.n+".")} pofon egymás után`],
+  dr:[c=>`Gólcsend: ${c.n}. meccs lőtt gól nélkül — a csatárokat a kapu keresésére küldték`,
+      c=>`Hálószaggatók helyett vakvágányon: ${c.n} meccse nem talál a kapuba ${c.k}`],
+  cs:[c=>`Lakat a kapun: ${c.n}. meccs kapott gól nélkül`,
+      c=>`A betonkeverő ma is járt — ${c.n}. kapott gól nélküli mérkőzés`,
+      c=>`A kapusunk unatkozik: ${c.n} meccs óta nem kellett a hálóból kiszednie a labdát`],
+  tookLead:[c=>`Új éllovas! ${pressAzC(c.k)} a tabella tetejére állt`,
+            c=>`Csúcstámadás sikerült: ${c.k} vezeti a bajnokságot`,
+            c=>`Fentről szép a kilátás — ${c.k} az élen ${c.R} forduló után`],
+  lostLead:[c=>`Trónfosztás: ${pressAz(c.l)} átvette a vezetést`,
+            c=>`Lecsúsztunk a csúcsról — ${c.l} lépett elénk`],
+  lead:[c=>`${c.g} pont előny az élen — ${c.l} már csak távcsővel lát minket`,
+        c=>`Elhúztak: ${c.g} pontos előnnyel vezet ${c.k}`,
+        c=>`Kényelmes páholy: ${c.g} pont a hajrá előtt`],
+  leadRace:[c=>`Mérlegen a cím: ${c.g} pont előny, ${c.rem} forduló van hátra`,
+            c=>`Számolják a pontokat: ${c.rem} forduló, ${c.g} pont előny`],
+  chase:[c=>`Lihegünk a nyakukba: már csak ${c.g} pont az éllovastól`,
+         c=>`Üldözőben: ${c.r}. hely, ${c.g} pontra ${pressAz(c.l)} mögött`],
+  bottom:[c=>`A kiesőzóna árnyékában: ${c.r}. hely ${c.R} forduló után`,
+          c=>`Lent vagyunk, de nem kint: ${c.r}. hely, ${c.p} pont`],
+  half:[c=>`Félidei mérleg: ${c.r}. hely, ${c.p} pont, ${c.rec}`,
+        c=>`Az idény fele: ${c.rec}, ${c.r}. hely — a bizonyítvány kiosztva`],
+  hajra:[c=>`Hajrá! ${c.rem} forduló van hátra, ${c.k} ${pressAz(c.r+".")} helyen`,
+         c=>`Célegyenes: ${c.rem} meccs, ${c.r}. hely — most dől el minden`],
+  champLap:[c=>`A bajnok tiszteletkört futott: ${c.k} ${c.s} ${c.e}`,
+            c=>`Bajnokként is éhesek: ${c.s} ${pressAz(c.e)} ellen`],
+  perfect:[c=>`Hibátlan: ${c.R} meccs, ${c.R} győzelem — tökéletes eddig az idény`,
+           c=>`${c.R}/${c.R}: ${pressAz(c.k)} egyetlen pontot sem hagyott el`],
+  gfa:[c=>`${c.gf}:${c.ga} — a kapusunk már keresztrejtvényt fejt a meccseken`,
+       c=>`Gólgyár üzemben: ${c.gf} lőtt gól ${c.R} meccs alatt`],
+  morHi:[c=>`Kívülről nézve: az öltözőben pezsgőfürdő, a buszon karaoke`,
+         c=>`Napsütés a bázison — a játékosok még az edzésre is mosolyogva érkeznek`,
+         c=>`Az önbizalom a plafonon: ${c.k} hangulata kívülről is ragyog`],
+  morLo:[c=>`Kívülről nézve fagyos a hangulat — az edzőpályán csak a labda beszél`,
+         c=>`Lehajtott fejek a bázison: feszült napok ${pressAz(c.k)} háza táján`,
+         c=>`Csend az öltözőben — ${pressAz(c.s)} sem oldotta a feszültséget`],
+  pair:[c=>`Az összeszokott páros: ${c.a} és ${c.b} ma is egy hullámhosszon`,
+        c=>`${c.a}–${c.b}: ez már nem véletlen, ez kémia`,
+        c=>`Telepátia? ${c.a} és ${c.b} ismét összekacsintott, ${c.e} pórul járt`],
+  gp:[c=>`Gyilkos páros: ${c.a} és ${c.b} ráugrott ${pressAz(c.e)} védelmére`,
+      c=>`Letámadás duettben: ${c.a} és ${c.b} nem hagyott levegőt ${pressAz(c.e)} számára`],
+  szarny:[c=>`Szárnyalás: ${c.a} és ${c.b} ismét feltörte az oldalt`,
+          c=>`A szélen nincs megállás — ${c.a} és ${c.b} szárnya újra szállt`],
+  scorer:[c=>`${c.x} már ${c.n} bajnoki gólnál tart — a gólkirályi trónra készül`,
+          c=>`${c.n} gól: ${c.x} kezd unalmassá válni a kapusoknak`,
+          c=>`Gólkirályi verseny: ${c.x} ${c.n}. találata — a többiek csak jegyzetelnek`],
+  cap:[c=>`A kapitány elöl jár: ${c.x} gólja vitte a hátán a csapatot`,
+       c=>`Karszalag kötelez — ${c.x} betalált, ${c.k} nyert`],
+  bond:[c=>`Egy test, egy lélek: ${c.k} összhangja a csúcson`,
+        c=>`Vakon is megtalálják egymást — a csapatösszhang ${c.n}/99`]};
+function pressNote(){const P=pressState();if(!P.st||typeof P.st!=="object")P.st={recent:[],tpl:{}};return P.st;}
+/* ugyanazt a sablont kétszer egymás után nem */
+function pressStoryPick(key,c){
+  const arr=PRESS_ST[key]||[];if(!arr.length)return "";
+  const N=pressNote();const last=N.tpl[key];
+  let i=Math.floor(Math.random()*arr.length)%arr.length;
+  if(arr.length>1&&i===last)i=(i+1)%arr.length;
+  N.tpl[key]=i;
+  return arr[i](c);}
+/* Az összeszokott párosok, akik MA mindketten termeltek (gól vagy gólpassz). */
+function pressStoryPairs(P){
+  const by={};(P||[]).forEach(p=>{if(p&&p.n)by[p.n]=p;});
+  const tett=n=>{const p=by[n];return p?((p.g||0)+(p.a||0)):0;};
+  const out=[];
+  const nez=(a,b,tipus)=>{if(!a||!b||a===b)return;const ta=tett(a),tb=tett(b);
+    if(ta>0&&tb>0)out.push({a,b,tipus,ossz:ta+tb});};
+  try{Object.values(S.chemPairs||{}).forEach(pr=>{if(pr&&(pr.stages||0)>=CHEM_PAIR_NEED)nez(pr.a,pr.b,"pair");});}catch(e){}
+  try{Object.values(passChemStore()).forEach(pr=>{if(pr&&(pr.stages||0)>=PASS_CHEM_NEED)nez(pr.a,pr.b,"pair");});}catch(e){}
+  try{const D=gpDuoState();Object.keys(D).forEach(k=>{if(gpDuoActive(D[k])){const t=k.split("||");nez(t[0],t[1],"gp");}});}catch(e){}
+  try{const D=szarnyState();Object.keys(D).forEach(k=>{if(szarnyActive(D[k])){const t=k.split("||");nez(t[0],t[1],"szarny");}});}catch(e){}
+  return out.sort((x,y)=>y.ossz-x.ossz);}
+/* A JELÖLTEK: {key, w (súly), c (a sablon mezői)} */
+function pressStoryCands(V,o){
+  const L=(S.lastMatch)||{},P=(L.players||[]).filter(Boolean);
+  const gf=o.gf||0,ga=o.ga||0,res=gf>ga?"w":gf<ga?"l":"d";
+  const N=pressNote();
+  const base={k:String(L.us||"A csapat").replace(/\s*\([^)]*\)\s*$/,""),
+    e:String(teamLabel(L.them||"az ellenfél")).replace(/\s*\([^)]*\)\s*$/,""),s:`${gf}–${ga}`};
+  const C=[];const add=(key,w,x)=>{if(w>0)C.push({key,w,c:Object.assign({},base,x||{})});};
+  /* ---- sorozatok ---- (a lap saját jegyzete: vereség-széria, gólcsend) */
+  const ws=S.winStreak||0,ub=S.unbeatenStreak||0,wl=S.winlessStreak||0;
+  if(ws>=8)add("wsBig",1.3,{n:ws});else if(ws>=3)add("ws",0.8+ws*0.05,{n:ws});
+  if(ub>=5&&ws<3)add("ub",0.7+Math.min(0.5,ub*0.03),{n:ub});
+  if((N.ls||0)>=3)add("ls",1.1,{n:N.ls});
+  else if(wl>=3&&res!=="w")add("wl",0.9,{n:wl});
+  if((N.dr||0)>=2)add("dr",0.9,{n:N.dr});
+  const cs=S.cleanSheetStreak||0;
+  if(cs>=3&&ga===0)add("cs",0.7+Math.min(0.4,cs*0.05),{n:cs});
+  /* ---- a tabella ---- (kupában nincs) */
+  let snap=null;try{if(!euroFrozen())snap=titleSnapshot();}catch(e){snap=null;}
+  if(snap&&!snap.partial&&snap.played>=1){
+    const R=snap.played,r=snap.rank,teams=snap.teams.length;
+    const ldr=String(teamLabel(snap.leader.n)).replace(/\s*\([^)]*\)\s*$/,"");
+    const t={R,r,p:snap.myPts,rem:snap.myRem,l:ldr,rec:`${S.W||0} győzelem, ${S.D||0} döntetlen, ${S.L||0} vereség`};
+    const prev=(N.rk&&N.rk.sz===(S.seasonNumber||1))?N.rk.r:null;
+    if(r===1&&prev!=null&&prev!==1)add("tookLead",1.4,t);
+    else if(prev===1&&r!==1)add("lostLead",1.3,t);
+    else if(r===1&&snap.clinched&&res==="w")add("champLap",0.9,t);
+    else if(r===1&&snap.gap>=6&&snap.myRem<=12)add("leadRace",1.0,Object.assign({g:snap.gap},t));
+    else if(r===1&&snap.gap>=5)add("lead",0.8,Object.assign({g:snap.gap},t));
+    else if(r>1&&r<=3&&-snap.gap<=3&&-snap.gap>0)add("chase",0.9,Object.assign({g:-snap.gap},t));
+    if(R>=6&&r>=teams-2&&teams>=6)add("bottom",0.9,t);
+    if(R===15)add("half",1.2,t);
+    if(snap.myRem>0&&snap.myRem<=5&&!snap.clinched&&r<=3)add("hajra",0.9,t);
+    if((S.L||0)===0&&(S.D||0)===0&&R>=5)add("perfect",1.1,t);
+    if(R>=5&&(S.GF||0)>=3*R&&(S.GA||0)<=Math.ceil(R/3))add("gfa",0.7,Object.assign({gf:S.GF||0,ga:S.GA||0},t));}
+  /* ---- a morál, kívülről ---- */
+  const mor=S.morale!=null?S.morale:50;
+  if(mor>=85)add("morHi",0.55);else if(mor<=30)add("morLo",0.75);
+  /* ---- az összeszokott párosok ---- */
+  const pr=pressStoryPairs(P)[0];
+  if(pr)add(pr.tipus,1.2+Math.min(0.4,(pr.ossz-2)*0.15),{a:shortName(pr.a),b:shortName(pr.b)});
+  /* ---- a gólkirályi verseny: kerek szám (10, 15, 20…) épp ma ---- */
+  P.forEach(p=>{const g=p.g||0;if(!g)return;const ossz=(S.scorers&&S.scorers[p.n])||0;
+    if(ossz>=10&&(ossz%5)<g)add("scorer",1.0,{x:shortName(p.n),n:ossz});});
+  /* ---- a kapitány gólja egy győzelemben ---- */
+  try{const kap=slots[captainIdx]&&slots[captainIdx].player?slots[captainIdx].player.n:null;
+    const kp=kap&&P.find(p=>p.n===kap);
+    if(kp&&(kp.g||0)>0&&res==="w")add("cap",0.5,{x:shortName(kap)});}catch(e){}
+  /* ---- az összhang ---- */
+  try{const b=teamBond();if(b>=75)add("bond",0.45,{n:Math.round(b)});}catch(e){}
+  /* a nemrég megírt történet hátrébb sorol — a legutóbbi FŐCÍM erősebben */
+  C.forEach(x=>{if(N.lastMain===x.key)x.w*=0.25;else if((N.recent||[]).indexOf(x.key)>=0)x.w*=0.6;});
+  return C.sort((a,b)=>b.w-a.w);}
+/* A LAP JEGYZETFÜZETE: a vereség-széria és a gólcsend (minden meccs után
+   egyszer), és a helyezés (a trónfosztás / élre állás méréséhez). */
+function pressStoryNote(o){
+  const N=pressNote(),gf=o.gf||0,ga=o.ga||0;
+  N.ls=gf<ga?(N.ls||0)+1:0;
+  N.dr=gf===0?(N.dr||0)+1:0;}
+function pressStoryApply(V,o){
+  if(!V||!V.head||V.story||!pressOn())return V;
+  V.story=1;
+  pressStoryNote(o);
+  let C=[];try{C=pressStoryCands(V,o);}catch(e){C=[];}
+  const N=pressNote();
+  /* a helyezés a következő meccs „előző" értéke */
+  try{if(!euroFrozen()){const sn=titleSnapshot();if(sn&&!sn.partial)N.rk={sz:S.seasonNumber||1,r:sn.rank};}}catch(e){}
+  if(!C.length)return V;
+  const H=V.head;
+  const used=[];
+  if(PRESS_STORY_STRONG.indexOf(H.key)<0&&Math.random()<PRESS_STORY_MAIN_P){
+    const top=C[0];
+    H.t=pressStoryPick(top.key,top.c);H.story=top.key;used.push(top.key);C=C.slice(1);
+    N.lastMain=top.key;}
+  else N.lastMain=null;
+  if(C.length&&pressStars()>=PRESS_ROVAT_STARS){
+    const r=C[0];H.rovat=pressStoryPick(r.key,r.c);H.rovatKey=r.key;used.push(r.key);}
+  N.recent=used.concat(N.recent||[]).slice(0,6);
+  return V;}
 /* ================= 📰 AZ ÚJSÁGÍRÓK — A HARMADIK CSAPAT =================
    A scout FELMÉR, az ügynökség ÜZLETET KÖT, a sajtó a TÁBORT ÉPÍTI.
    FEJLŐDÉS: nem pénzből és nem pontból, hanem a szurkolótábor
@@ -67178,6 +67437,7 @@ function mVerdictPressHtml(V){
     +`<div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2)">📰 ${esc(H.paper||"")} · ${"★".repeat(full)}${half?"½":""}</div>`
     +`<div style="font-size:15px;font-weight:800;line-height:1.35;margin-top:3px">„${esc(H.t)}”</div>`
     +(H.lead?`<div style="font-size:12px;color:var(--dim);margin-top:4px;line-height:1.45">${esc(H.lead)}</div>`:"")
+    +(H.rovat?`<div style="font-size:12px;margin-top:5px;line-height:1.45"><span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2)">Rovat · </span><i>${esc(H.rovat)}</i></div>`:"")
     +(V.press&&V.press.fans>0?`<div style="font-size:11.5px;color:var(--grass);margin-top:5px">🎺 A cikk nyomán <b>+${fmtNum(V.press.fans)}</b> szurkoló</div>`:"")
     +`</div>`;}
 function mVerdictMvpHtml(V){
@@ -71415,6 +71675,9 @@ function playMatchMotor(){
     /* ⏯ LEFÚJÁS = VÉGLEGES (3.9.171): mentés MOST, a jutalom-lánc előtt —
        lásd mLefujas. A lánc maga a felső szintre költözött (utoLancIndit),
        hogy egy frissítés után is folytatható legyen. */
+    /* 🗞️ 3.9.193 — a szezon története a címlapra: MOST, amikor a tabella, a
+       sorozatok és a morál már a friss állást mutatja */
+    try{if(_mVerdictPending)pressStoryApply(_mVerdictPending,{gf,ga});}catch(e){}
     mLefujas(skillReasons,careerUnlockReasons);
     /* MECCSRŐL MECCSRE (3.9.05): a lánc MÁR ITT felveszi a fonalat. A
        jutalom-képernyők (felfedezés, képesség, akadémia) az értékelő ablak
@@ -96018,6 +96281,10 @@ function talAkadKimarad(){
   const A=talSpAll(),sz=S.seasonNumber||1;
   if(!A.akadMin||A.akadMin.sz!==sz)A.akadMin={sz,db:0};
   if(A.akadMin.db>=n)return false;
+  /* 3.9.193: EGYENLETESEN az idény ablakai között — eddig mindig az első
+     ablak(ok) maradt(ak) ki, és az ajánlatok az idény végére csúsztak */
+  let hatra=1;try{hatra=Math.max(1,acadWindowsFrom(S.idx||0).length);}catch(e){hatra=1;}
+  if(Math.random()>=(n-A.akadMin.db)/hatra)return false;
   A.akadMin.db++;
   try{addLine(`🏫 Az akadémia most nem jelentkezett — a talizmánod ára (idén ${A.akadMin.db}/${n}).`,"m ev");}catch(e){}
   return true;}
@@ -110238,7 +110505,8 @@ function saveGame(){
         /* 🧲 GYILKOS PÁROS (3.9.93): a kötés-tár. Lapos, szám-értékű objektum;
            a visszatöltés bulk (Object.assign(S,d.S)). */
         gpDuo:S.gpDuo,gpDuoInProgress:S.gpDuoInProgress||null,gpDuoMig:S.gpDuoMig||0,
-        gpDuoHist:S.gpDuoHist||null,   /* 3.9.191: a felbomlott párosok is számítanak a mérföldkőbe */
+        gpDuoHist:S.gpDuoHist||null,
+        acadAblak:S.acadAblak||null,   /* 3.9.193: egy fordulóhoz egy akadémiai ablak */   /* 3.9.191: a felbomlott párosok is számítanak a mérföldkőbe */
         /* 🧿 TALIZMÁNOK (3.9.141): a teljes állapot, a seeddel együtt — a
            kínálat ebből dobódik, tehát a visszatöltés nem pörget újra. */
         tal:S.tal||null,

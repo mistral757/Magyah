@@ -8,6 +8,54 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## akademia-ablak-3-9-193-proba.js — 🌱 3.9.193: az akadémiai ablakok és a garantált visszatérés
+
+```bash
+node tools/akademia-ablak-3-9-193-proba.js
+```
+
+**13 állítás**, a valódi `tryAcademyOpportunity` végigjátszás-módban.
+
+* **Kupa:**
+  * kupában, nyári tornán és osztályozón nincs ablak;
+  * egy fordulóhoz legfeljebb egy ablak, a talizmánnal is.
+* **A garantált visszatérés:**
+  * három visszaküldött tehetség egy idényben mind pontosan egyszer
+    jelentkezik;
+  * különböző fordulókban, csak bajnoki ablakban.
+* **Tele keret:** a beosztott visszatérés nem vész el.
+* **200 idény:**
+  * az ajánlatok egyenletesen oszlanak el;
+  * a „Zsákbamacska” idényenként pontosan egyszer hagy ki, egyenletesen.
+* **A panel:**
+  * a beosztott forduló;
+  * a hátralévő ablakok pontos száma.
+* **A verzió.**
+
+## sajto-tortenet-3-9-193-proba.js — 🗞️ 3.9.193: a szezon történetei a címlapon
+
+```bash
+node tools/sajto-tortenet-3-9-193-proba.js
+```
+
+**22 állítás.**
+
+* **A források:**
+  * sorozatok;
+  * tabella;
+  * mérleg;
+  * morál kívülről;
+  * összeszokott páros (csak ha mindketten termeltek);
+  * gólkirályi kerek szám;
+  * kapitány.
+* **A címlap:**
+  * esemény nélkül a történet a főcím;
+  * erős eseménynél a rovatba kerül (2★-tól).
+* **Ismétlésfék.**
+* **Mind a 65 sablon kitölthető.**
+* **Valódi meccs** után a cím megkapja a réteget.
+* **A verzió.**
+
 ## jegyar-keretar-3-9-192-proba.js — 🎟️ 3.9.192: a jegyár a keret kikiáltási árához igazodik
 
 ```bash

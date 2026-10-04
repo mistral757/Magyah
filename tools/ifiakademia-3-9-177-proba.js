@@ -10,7 +10,8 @@
         kapcsolódás, a karizma nyílik (a valódi processAcademyDevelopment
         lépteti), 45-nél a pontos POT; a napló szól, amikor valami kiderül;
      4. a várható visszatérés: 21 évesen „garantáltan" (ballagás); ha idén
-        már jelentkezett, „a következő idényben"; egyébként idei esély %;
+        már jelentkezett, „a következő idényben"; egyébként idén garantáltan
+        (3.9.193 óta beosztott forduló);
      5. a „ha most jelentkezne" Rating a visszatérés szabályából jön, de a
         panel SEMMIT nem módosít (a Rating, a csúcs és a POT változatlan);
      6. a lista sorrendje: a ballagó elöl;
@@ -96,7 +97,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       zart:(tA.match(/🔒/g)||[]).length};
     out.sorrend=[...document.querySelectorAll("#acadBody .acadCard")].map(x=>x.dataset.acad===c.n?"ballag":"fiatal");
     out.ballagSz=/garantáltan jelentkezik/.test(document.querySelector(`#acadBody .acadCard[data-acad="${CSS.escape(c.n)}"]`).textContent);
-    out.idenEsely=/idén még ~\d+% eséllyel/.test(tA);
+    out.idenEsely=/idén garantáltan jelentkezik/.test(tA);   /* 3.9.193: garantált, beosztott visszatérés */
     out.haMost=/Ha most jelentkezne: ~\d+/.test(tA);
     /* a panel nem módosít semmit */
     const pill=x=>JSON.stringify({r:x.startRating,p:x.peak,pot:x.pot,yb:x.youthBonus||0});
@@ -123,7 +124,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* idén már jelentkezett */
     recA.offerSeason=S.seasonNumber||1;
     renderAcademyPanel();
-    out.idenMar=/idén már jelentkezett .*— leghamarabb a következő idényben/.test(
+    out.idenMar=/idén már jelentkezett .*— a következő idényben garantáltan újra jelentkezik/.test(
       ([...document.querySelectorAll("#acadBody .acadCard")].find(x=>x.dataset.acad===a.n)||{}).textContent||"");
     /* régi mentés: figyelt nélkül, két idénnyel korábban visszaküldve */
     const regi={n:a.n,leftAge:15,leftRating:60,leftSeason:(S.seasonNumber||1)-2,offerSeason:0,times:1};
@@ -154,8 +155,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.naploA.length===4,"a napló négyszer szól (vérmérséklet, kapcsolódás, karizma, POT)",r.naploA);
   console.log("\n— 4. várható visszatérés —");
   ok(r.ballagSz,"21 évesen: garantáltan jelentkezik (ballagás)");
-  ok(r.idenEsely,"egyébként: idei esély százalékban");
-  ok(r.idenMar,"ha idén már jelentkezett: leghamarabb a következő idényben");
+  ok(r.idenEsely,"egyébként: idén garantáltan jelentkezik (3.9.193 óta beosztva)");
+  ok(r.idenMar,"ha idén már jelentkezett: a következő idényben garantáltan");
   console.log("\n— 5–8. —");
   ok(r.haMost&&r.nemModosit,"a „ha most jelentkezne” Rating kiíródik, és a panel semmit nem módosít");
   ok(r.sorrend[0]==="ballag","a ballagó van elöl",r.sorrend);

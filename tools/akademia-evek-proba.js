@@ -155,8 +155,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const e={n:"Valódi Visszatérő",pos:["BSZ"],age:19,startRating:77,peak:88,basePeak:88,pot:3025,
       youthBonus:6,youthBonusStartAge:17,formPoints:0};
     initPlayerAttrs(e);careerPool[e.n]=e;
-    S.academy=[{n:e.n,leftAge:17,leftRating:64,leftSeason:3,offerSeason:3,times:1}];
-    S.auto=false;S.idx=4;S.frozenAcademySeasons=0;
+    /* 3.9.193: a visszatérés beosztott fordulóra jön — erre a fordulóra osztjuk */
+    S.academy=[{n:e.n,leftAge:17,leftRating:64,leftSeason:3,offerSeason:3,times:1,planSz:S.seasonNumber||1,planIdx:4}];
+    if((S.seasonNumber||1)===3)S.academy[0].offerSeason=2;
+    S.auto=false;S.idx=4;S.frozenAcademySeasons=0;S.acadAblak=null;
     const _r=Math.random;Math.random=()=>0.0;          /* a visszatérés biztos legyen */
     const _tm=tempoMult;tempoMult=()=>1;
     const naplo=[];const _add=addLine;addLine=(h)=>{naplo.push(String(h));};
