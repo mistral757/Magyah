@@ -131,7 +131,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 4. A FELÜLET —");
   ok(r.bontas.q&&r.bontas.alatt,"a keret-bontás: minőség-szorzó és „a plafon alatt”",r.bontas);
   ok(r.szotar,"a súgó: dinamikus bér, tompított minőség");
-  ok(r.verzio==="3.9.190","verzió 3.9.190",r.verzio);
+  ok(String(r.verzio).localeCompare("3.9.190",undefined,{numeric:true})>=0,"verzió legalább 3.9.190",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

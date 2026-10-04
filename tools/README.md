@@ -8,6 +8,161 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## profil-szint-3-9-195-proba.js — 🎖️ 3.9.195: profilszint, stílus-mesterség, lenyitható profil
+
+```bash
+node tools/profil-szint-3-9-195-proba.js
+```
+
+**27 állítás.**
+
+* **Visszamenőleg:** egy kitalált régi karrier-mentés idény-történetéből
+  (és a futó idényből) a profil és a stílus statjai.
+* **A meccs:**
+  * profil- és stílusstatok, a szerepek meccsei és termése;
+  * a meccs, az idény és a kupa is duplikáció-védett;
+  * az új karrier azonosítót kap.
+* **A szintek:** az XP és a küszöbök.
+* **A mesterség-fa:**
+  * szintenként +1 pont;
+  * rang-kapuk (2 / 5 / 8);
+  * pont nélkül nincs nyitás.
+* **A hatások:**
+  * képességár −26%;
+  * mérföldkő +30%;
+  * „Második otthon”;
+  * hozott tudás (+80, egyszer, a valódi stílusválasztáskor is).
+* **A felület:**
+  * a fej;
+  * a szekciók sorrendje és alapállapota;
+  * a 8 kártya és a 80 csomópont;
+  * a megmaradó nyitott állapot;
+  * a Nyitás gomb;
+  * az „Örök csúcsok” ugrás;
+  * a mentés mezője;
+  * a verzió.
+
+## sajto-klubarc-3-9-194-proba.js — 🗞️ 3.9.194: a lap a te klubodról szól
+
+```bash
+node tools/sajto-klubarc-3-9-194-proba.js
+```
+
+**17 állítás.**
+
+* **A csapatstílus:**
+  * mind a nyolc filozófia a saját feltételénél;
+  * a Gegenpressing a meccs labdaszerzéseiből;
+  * a ki nem választott stílus hallgat.
+* **Az edző és a taktika:**
+  * az edző neve a győzelmi és a válság-címben;
+  * a taktika neve.
+* **A stadion:**
+  * a stadionnév a hazai címekben;
+  * idegenbeli győzelem;
+  * a menedzser éve az idénynyitón.
+* **A rovatok:**
+  * a főcím és a rovat-sor más rovatból;
+  * a mérleg ablaka és a napló kiírja.
+* **Mind a 109 sablon kitölthető**, és mindegyik témának van rovata.
+* **A verzió.**
+
+## akademia-ablak-3-9-193-proba.js — 🌱 3.9.193: az akadémiai ablakok és a garantált visszatérés
+
+```bash
+node tools/akademia-ablak-3-9-193-proba.js
+```
+
+**13 állítás**, a valódi `tryAcademyOpportunity` végigjátszás-módban.
+
+* **Kupa:**
+  * kupában, nyári tornán és osztályozón nincs ablak;
+  * egy fordulóhoz legfeljebb egy ablak, a talizmánnal is.
+* **A garantált visszatérés:**
+  * három visszaküldött tehetség egy idényben mind pontosan egyszer
+    jelentkezik;
+  * különböző fordulókban, csak bajnoki ablakban.
+* **Tele keret:** a beosztott visszatérés nem vész el.
+* **200 idény:**
+  * az ajánlatok egyenletesen oszlanak el;
+  * a „Zsákbamacska” idényenként pontosan egyszer hagy ki, egyenletesen.
+* **A panel:**
+  * a beosztott forduló;
+  * a hátralévő ablakok pontos száma.
+* **A verzió.**
+
+## sajto-tortenet-3-9-193-proba.js — 🗞️ 3.9.193: a szezon történetei a címlapon
+
+```bash
+node tools/sajto-tortenet-3-9-193-proba.js
+```
+
+**22 állítás.**
+
+* **A források:**
+  * sorozatok;
+  * tabella;
+  * mérleg;
+  * morál kívülről;
+  * összeszokott páros (csak ha mindketten termeltek);
+  * gólkirályi kerek szám;
+  * kapitány.
+* **A címlap:**
+  * esemény nélkül a történet a főcím;
+  * erős eseménynél a rovatba kerül (2★-tól).
+* **Ismétlésfék.**
+* **Mind a 65 sablon kitölthető.**
+* **Valódi meccs** után a cím megkapja a réteget.
+* **A verzió.**
+
+## jegyar-keretar-3-9-192-proba.js — 🎟️ 3.9.192: a jegyár a keret kikiáltási árához igazodik
+
+```bash
+node tools/jegyar-keretar-3-9-192-proba.js
+```
+
+**14 állítás.**
+
+* **A bejelentő számai:** 52,9 Mrd → 12–15 Mrd meccsenként.
+* **A létszám és az élmény** változatlanul szoroz.
+* **A tempó** az alaphoz arányosan hat.
+* **Csak lefelé:** kis jegyárnál a faktor 1.
+* **A bér követi:** a bér-horgony és a sztár hírnév-horgonya ugyanazzal a
+  faktorral csökken.
+* **A valódi keret:** a kikiáltási ár-átlag a keretből jön, és
+  gyorsítótárazott.
+* **A felület:**
+  * a napló;
+  * a keret-bontás;
+  * a súgó;
+  * a verzió.
+
+## gyilkos-paros-felbomlas-3-9-191-proba.js — 🧲 3.9.191: a gyilkos páros felbomlik, ha egy tagja távozik
+
+```bash
+node tools/gyilkos-paros-felbomlas-3-9-191-proba.js
+```
+
+**16 állítás**, a valódi eladási úton (`releasePlayer` → `pruneChemistry`).
+
+* **Kész páros:**
+  * megszűnik;
+  * a hely felszabadul;
+  * a bent maradt ember újra párosítható;
+  * a napló kimondja;
+  * a többi páros megmarad;
+  * a sebesség az emberé marad;
+  * a mérföldkő nem csökken.
+* **Félkész páros:**
+  * megszűnik;
+  * az „épül” jelölő törlődik;
+  * a napló kimondja.
+* **Régi mentés:**
+  * az első takarításnál bomlik fel;
+  * a mérföldkőben marad;
+  * az ismételt takarítás néma.
+* **A mentés, a leírás és a verzió.**
+
 ## dinamikus-ber-3-9-190-proba.js — 💸 3.9.190: dinamikus bér, a számla nem a plafont tölti ki
 
 ```bash
