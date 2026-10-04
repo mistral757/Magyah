@@ -8,7 +8,7 @@
      2. fölötte folytonos (100,1-nél alig több mint 1) és szigorúan nő;
      3. a szorzó a piaci árgörbe aránya: peakMarketPrice(nyers)/peakMarketPrice(100)
         (117-nél ~8,3, 130-nál ~28);
-     4. a heti bevétel a szorzóval nő, a BÉR horgonya nem (a régi jegyáron);
+     4. a heti bevétel a szorzóval nő, és 3.9.189 óta a BÉR horgonya is;
      5. a bérhorgony visszaszámolása (a rögzített bevételből) a szorzót kiveszi —
         nem fújja fel a létszámot;
      6. a felület: a HUB-doboz és a keret-bontás kiírja a szorzót, a tiszta
@@ -66,7 +66,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.bontasVan=!!bontas;
     o.bontasJegy=/jegyár ×/.test(bontas);
     o.berBlokk=/bér \/ szerződéskori lelátó/.test(bontas);
-    o.bontasHaszon=/a jegyár 100 feletti szorzója/.test(bontas);
+    o.bontasHaszon=/a legjobban fizetett/.test(bontas);
     o.szotar=/100-AS NYERS ERŐ FÖLÖTT A JEGYÁR IS NŐ/.test(GLOSSARY.szurkoloibevetel.text);
     o.jegyFt=fanTicketFt();
     return o;});
@@ -78,13 +78,15 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      "a piaci árgörbe aránya (117: ~8,3 · 130: ~28)",{s117:r.s117,s130:r.s130});
   console.log("\n— bevétel és bér —");
   ok(r.incKeplet&&Math.abs(r.incArany-r.s117)<1e-6,"a heti bevétel a szorzóval nő",{arany:r.incArany});
-  ok(Math.abs(r.berValt-1)<1e-9,"a bér horgonya NEM követi (a régi jegyáron számol)",r.berValt);
+  /* 3.9.189: „a fizetések irreálisan alacsonyak" — a bér horgonya mostantól a
+     MAI jegyáron áll (a létszám marad a szerződéskori) */
+  ok(Math.abs(r.berValt-r.incArany)<1e-6,"a bér horgonya a jegyárral együtt nő (3.9.189 óta)",{ber:r.berValt,bev:r.incArany});
   ok(r.horgony===r.tabor,"a bérhorgony visszaszámolása a szorzót kiveszi — nem fújja fel a létszámot",{horgony:r.horgony,tabor:r.tabor,h:r.horgonyHiba});
   console.log("\n— felület —");
   const srcHtml=fs.readFileSync(path.join(ROOT,"index.html"),"utf8");
   ok(r.bontasVan&&r.bontasJegy,"a keret-bontás szurkolói sora kiírja a jegyár-szorzót",{van:r.bontasVan,jegy:r.bontasJegy});
-  ok(r.berBlokk?r.bontasHaszon:/…a jegyár 100 feletti szorzója/.test(srcHtml),
-     "a többlet külön sorban áll a bér-blokkban (a bér nem követi)",{berBlokk:r.berBlokk,haszon:r.bontasHaszon});
+  ok(r.berBlokk?r.bontasHaszon:/…a legjobban fizetett/.test(srcHtml),
+     "a bér-blokkban a legjobban fizetett ember sora áll (a jegyár-sor 3.9.189 óta kikerült: a bér követi)",{berBlokk:r.berBlokk,haszon:r.bontasHaszon});
   ok(r.szotar,"a szótár szól róla");
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();

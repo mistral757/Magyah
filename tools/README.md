@@ -8,6 +8,37 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## jatekos-fizetes-3-9-189-proba.js — 💸 3.9.189: játékosszintű fizetések, a valódi jegyáron
+
+```bash
+node tools/jatekos-fizetes-3-9-189-proba.js
+```
+
+**22 állítás.**
+
+* **A lelátó-ár:**
+  * a bér horgonya és a sztár hírnév-horgonya a jegyár-szorzóval nő;
+  * a létszám a szerződéskori marad;
+  * a plafon a valódi árú lelátó része.
+* **A hat tényező:**
+  * szerep (perc/meccs, idény elején a kezdő 11);
+  * kapitány ×1,12;
+  * POT ×0,85–1,30;
+  * hűség legfeljebb +30%;
+  * siker −10%…+25%;
+  * friss sztár-igazolás +35/+20/+10%, olcsó vételnél semmi;
+  * ifi ×0,75;
+  * a szorzó legfeljebb ×2,5.
+* **A számla:**
+  * a bér képlete;
+  * sikeres idény után a plafon 50%;
+  * a „Sztárom a párom” sztárja a plafonon kívül.
+* **A felület:**
+  * az adatlap fizetés-sora, a plafon utáni összeggel;
+  * a napló „legtöbbet:” része;
+  * a keret-bontás sora;
+  * a súgó.
+
 ## meccs-sajto-3-9-188-proba.js — 📰 3.9.188: bővebb meccsmérleg, helyi lapcímek, újságírók
 
 ```bash
