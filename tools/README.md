@@ -8,6 +8,38 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## meccs-sajto-3-9-188-proba.js — 📰 3.9.188: bővebb meccsmérleg, helyi lapcímek, újságírók
+
+```bash
+node tools/meccs-sajto-3-9-188-proba.js
+```
+
+**30 állítás.**
+
+* **Valódi meccs:**
+  * a mérleg-ablakban ott a lap címe, a meccs embere (vereségnél a csapat
+    legjobbja) a fokozatával, és az extrák;
+  * a naplóban a cím a mérleg előtt áll.
+* **Az extrák és a cím:**
+  * akadémista első gól, bemutatkozó gól, mesterhármas, klubgól-jubileum,
+    fordítás, rangadó, kiütés és zakó, kiállítás, meccs-jubileum, kései döntés;
+  * mindegyik a saját címét kapja;
+  * a névelő helyes.
+* **Az újságírók:**
+  * fél csillagos lépcsők a tábor csúcsából, a csúcs nem esik vissza;
+  * a lap neve a szinttel nő;
+  * 3★-tól alcím jár;
+  * a fejlődés a naplóba is bekerül.
+* **A cikk:**
+  * liga-sáv × 0,15% × csillag × súly, a súly legfeljebb 2;
+  * vereség után fele annyi;
+  * sima meccs után nincs.
+* **Felület:**
+  * a scout és az ügynökség mellett az újságírók;
+  * a HUB-gomb felirata;
+  * a mentés viszi az állapotot;
+  * nincs oldalhiba.
+
 ## szerep-muhely-nevek-3-9-187-proba.js — 🪓⚡ 3.9.187: Panzer szerep-erősítő, Gegenpressing műhely, névkötegek
 
 ```bash
