@@ -111,7 +111,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 2. A HÚZÁS —");
   ok(S1.fole===0&&S3.fole===0&&S5.fole===0,"3×600 húzásból egy sem lépett a sáv fölé",{max:[S1.max,S3.max,S5.max],hi:[S1.d.hi,S3.d.hi,S5.d.hi]});
   ok(r.regiFole>=15&&r.regiTiz>=3&&Math.abs(r.keret-r.med)<3,"a régi, egyenletes húzásnál a pool jelentős része a sáv fölött volt, és a keret átlaga +10 fölött is",{fole:r.regiFole+"%",tiz:r.regiTiz+"%",keret:r.tr,med:r.med});
-  ok(S5.atl>S1.atl+1,"az 5★ átlagban magasabbat talál, mint az 1★",{a1:+S1.atl.toFixed(2),a5:+S5.atl.toFixed(2)});
+  ok(S5.atl>S1.atl+0.4,"az 5★ átlagban magasabbat talál, mint az 1★ (a várható különbség ~1, a szórása ~0,18)",{a1:+S1.atl.toFixed(2),a5:+S5.atl.toFixed(2)});
   ok(S3.min>=S3.d.lo-1e-9,"az alsó határ alá sem megy",{min:S3.min,lo:S3.d.lo});
   ok(S3.fiatal>r.savFiatal+0.05,"a fiatalok (≤24) gyakoribbak, mint a sávban",{huzott:+S3.fiatal.toFixed(3),savban:+r.savFiatal.toFixed(3)});
   console.log("\n— 3. LEGENDÁS MAGYAHOK —");
