@@ -8,6 +8,34 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## pixel-elet-3-9-204-proba.js — 🕹️ 3.9.204: a Pixel téma saját élete
+
+```bash
+node tools/pixel-elet-3-9-204-proba.js
+```
+
+**17 állítás**, valódi böngészőben.
+
+* **Indulás:** képcső-bekapcsolás (két fél-lap + fényvonal), nem fog meg kattintást, magától eltűnik.
+* **Gombnyomás:**
+  * tíz pixelszikra;
+  * egyszerre legfeljebb három sorozat;
+  * el is tűnnek.
+* **Játékosnézet és új oldal:**
+  * az adatlap és az ablakok képcső-animációval nyílnak;
+  * a szakasz kirajzolódik, transform nélkül;
+  * más témában nem fut.
+* **Tétlenség:**
+  * az időzítő él;
+  * a focista halad (két képkocka);
+  * dekázáskor a labda a feje fölé pattog;
+  * érintésre eltűnik.
+* **A kapu:**
+  * Sötétben nincs szikra;
+  * kikapcsolt ✨ mellett semmi nem fut;
+  * lépcsős, illetve sima mozgás.
+* **Verzió, oldalhiba.**
+
 ## hatter-minden-tema-3-9-203-proba.js — ✨ 3.9.203: az élő háttér mind a négy témában
 
 ```bash
