@@ -8,6 +8,62 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## elo-hatter-3-9-202-proba.js — ✨ 3.9.202: két hasábos kezdőlap és élő háttér
+
+```bash
+node tools/elo-hatter-3-9-202-proba.js
+```
+
+**20 állítás**, valódi böngészőben, több ablakmérettel.
+
+* **Az elrendezés:**
+  * asztalon és fekvő telefonon két hasáb, mind a négy témában; állva egy;
+  * a kezdőlap sehol nem lóg ki oldalra;
+  * fekve a témagombok nem csúsznak a feliratra;
+  * a ✨ gomb nem ül rá semmire.
+* **A kapcsoló:**
+  * alapból BE;
+  * a ✨ gombbal KI, és a választás megmarad;
+  * a Beállítások kapcsolója mutatja és átállítja;
+  * „kevesebb mozgás” beállításnál alapból KI, kifejezett bekapcsolással BE;
+  * a KI állás újratöltés után is él.
+* **A kezdőlap jelenete:**
+  * kapu hálóval, 14 szereplő;
+  * mozog, a ciklus fut;
+  * a szabadrúgás labdája a lövés után a magasba és a kapu felé száll;
+  * más témában (még) nincs jelenet, és a ciklus leáll.
+* **A HUB menüje mögött:**
+  * a menü megnyitásakor és csak akkor látszik;
+  * mozog, 12 szereplővel;
+  * a lap háttere átlátszó;
+  * a menü bezárásakor eltűnik.
+* **Verzió, oldalhiba.**
+
+## felfedezes-szint-3-9-201-proba.js — 🔍 3.9.201: a scouthálózat felfedezése a kerethez mért
+
+```bash
+node tools/felfedezes-szint-3-9-201-proba.js
+```
+
+**14 állítás**, valódi karrier-állással. A keret a pool mediánján áll, mint egy draftolt keret.
+
+* **A sáv:**
+  * a felső határ a piaci sáv közepe −2 (1★) … +1 (legjobb scout);
+  * soha nem a piaci sáv fölött;
+  * az alja a sáv alja −8;
+  * jobb scout → magasabb plafon.
+* **A húzás:**
+  * 3×600 húzásból egy sem lép a sáv fölé;
+  * a régi, egyenletes húzásnál a pool jelentős része a sáv fölött volt, és a keret átlaga +10 fölött is;
+  * a jobb scout átlagban magasabbat talál;
+  * az alsó határ alá sem megy;
+  * a fiatalok gyakoribbak, mint a sávban.
+* **Legendás magyahok:** a felfújt magyar poolból sem jön sztár.
+* **Az út:**
+  * az `unlockRandomPlayer` a sávból ad, és a keretbe teszi;
+  * üres sávnál nem lép felfelé.
+* **Verzió, oldalhiba.**
+
 ## hsz-merce-3-9-200-proba.js — ⚖ 3.9.200: a HSZ fordulószáma és a mezőny tényleges számai
 
 ```bash
