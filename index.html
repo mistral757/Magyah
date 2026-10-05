@@ -6995,7 +6995,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.200";
+const APP_VERSION="3.9.201";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -74531,10 +74531,54 @@ function generateAcademyPlayer(forcePos){
   initPlayerAttrs(careerPool[name]);
   drafted.add(name);
   return careerPlayerFromPoolEntry(careerPool[name]);}
+/* ================= A FELFEDEZÉS SZINTJE (3.9.201) =================
+   BEJELENTÉS (képernyőképpel: 86,5-ös keret, az 1. idény 2. meccse után a
+   3 csillagos scout ingyen hozott egy 97-es jobbhátvédet): „Ez jó így?
+   Mekkora az esélye? Ha viszonylag normál esélye van […], akkor nem jó, mert
+   azonnal megváltozik a teljes szezon egy ekkora igazolással, ingyen!"
+   A HIBA: a felfedezés a TELJES világ-poolból húzott egyenletesen, a kereted
+   szintjétől függetlenül — miközben a fizetős piac (signingBand) a kerethez
+   mért sávban dolgozik. Mérve (3609 fős pool): egy felfedezés 5,4%-a a pool
+   közepénél 10+-szal erősebb, Legendás magyahokkal 7,7%. A felfedezés pedig
+   gyakori: meccsenként 5% a hálózat magától, plusz a teljesítmény-jutalmak.
+   A tempó-táblázat azt ígérte, hogy a talált játékos szintjét a
+   scoutQuality() vezeti — ez a kódban sosem valósult meg.
+   MOSTANTÓL a felfedezés a PIAC SÁVJA ALATT jön, mert ingyen van:
+     · felső határ: a sáv közepe −2 (1★) … +1 (5★) — a jó scout a
+       kerethez illő embert is megtalálja, ingyen sztárt senki;
+     · alsó határ: a sáv alja −8;
+     · a kúp csúcsa a scout minőségével feljebb csúszik;
+     · a 24 évesnél fiatalabbak kétszeres súllyal (a scout fiatal
+       tehetségeket keres — lásd a Scout súgóját). */
+const DISC_LO_PAD=8, DISC_HI_LO=-2, DISC_HI_HI=1;
+function discoveryBand(){
+  const b=signingBand();
+  const q=Math.max(0,Math.min(1,scoutQuality(scout)));
+  const hi=Math.min(b.hi,b.mid+DISC_HI_LO+(DISC_HI_HI-DISC_HI_LO)*q);
+  const lo=Math.min(hi-1,Math.max(40,b.lo-DISC_LO_PAD));
+  const mode=lo+(hi-lo)*(0.45+0.35*q);
+  return {lo,hi,mode,q};}
+function pickDiscoveryEntry(candidates){
+  const d=discoveryBand();
+  const inBand=candidates.filter(e=>e.startRating>=d.lo&&e.startRating<=d.hi);
+  /* üres sáv (nagyon kicsi pool): a sáv TETEJE ALATTI legjobbak közül —
+     felfelé sosem lépünk ki, az a hiba maga */
+  const pool=inBand.length?inBand
+    :candidates.filter(e=>e.startRating<=d.hi).sort((a,b)=>b.startRating-a.startRating).slice(0,12);
+  if(!pool.length)return null;
+  const t=triangularRoll(d.lo,d.hi,d.mode);
+  /* a célhoz legközelebbi néhány közül, a fiatalok dupla súllyal */
+  const near=pool.slice().sort((a,b)=>Math.abs(a.startRating-t)-Math.abs(b.startRating-t)).slice(0,8);
+  const w=near.map(e=>(e.age||26)<=24?2:1),W=w.reduce((a,b)=>a+b,0);
+  let r=Math.random()*W;
+  for(let i=0;i<near.length;i++){r-=w[i];if(r<=0)return near[i];}
+  return near[near.length-1];}
 function unlockRandomPlayer(){
   const candidates=Object.values(careerPool).filter(e=>!drafted.has(e.n));
   if(!candidates.length)return null;
-  const entry=pick(candidates);
+  let entry=null;
+  try{entry=pickDiscoveryEntry(candidates);}catch(e){entry=null;}
+  if(!entry)return null;
   const newP=careerPlayerFromPoolEntry(entry);
   drafted.add(newP.n);
   extraRoster.push(newP);

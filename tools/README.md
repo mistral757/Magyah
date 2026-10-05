@@ -8,6 +8,31 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## felfedezes-szint-3-9-201-proba.js — 🔍 3.9.201: a scouthálózat felfedezése a kerethez mért
+
+```bash
+node tools/felfedezes-szint-3-9-201-proba.js
+```
+
+**14 állítás**, valódi karrier-állással. A keret a pool mediánján áll, mint egy draftolt keret.
+
+* **A sáv:**
+  * a felső határ a piaci sáv közepe −2 (1★) … +1 (legjobb scout);
+  * soha nem a piaci sáv fölött;
+  * az alja a sáv alja −8;
+  * jobb scout → magasabb plafon.
+* **A húzás:**
+  * 3×600 húzásból egy sem lép a sáv fölé;
+  * a régi, egyenletes húzásnál a pool jelentős része a sáv fölött volt, és a keret átlaga +10 fölött is;
+  * a jobb scout átlagban magasabbat talál;
+  * az alsó határ alá sem megy;
+  * a fiatalok gyakoribbak, mint a sávban.
+* **Legendás magyahok:** a felfújt magyar poolból sem jön sztár.
+* **Az út:**
+  * az `unlockRandomPlayer` a sávból ad, és a keretbe teszi;
+  * üres sávnál nem lép felfelé.
+* **Verzió, oldalhiba.**
+
 ## hsz-merce-3-9-200-proba.js — ⚖ 3.9.200: a HSZ fordulószáma és a mezőny tényleges számai
 
 ```bash
