@@ -15,6 +15,8 @@
         transform nélkül (a fixed menüsáv miatt);
      4. TÉTLENSÉG: a 8 bites focista megjelenik, halad, dekázáskor a labda a
         feje fölé pattog; bármilyen érintésre eltűnik;
+     3b. GÖRGETÉS (3.9.205): a kirajzolódás után nem marad vágás a nézeten —
+        a képernyőn túllógó tartalom görgetéssel elérhető;
      5. A KAPU: más témában és kikapcsolt ✨ mellett semmi nem fut; a
         „Szaggatott mozgás" kikapcsolásával sima a mozgás. */
 "use strict";
@@ -89,6 +91,20 @@ async function oldal(b,{w,h,tema,ls,reduce}){
    ok(r.sec==="pxWipe"&&r.secTr==="none","a megjelenő szakasz kirajzolódik — transform nélkül (a fixed menüsáv miatt)",{a:r.sec,t:r.secTr});
    ok(r.detSotet==="none"&&r.secSotet==="none","más témában ezek nem futnak",{d:r.detSotet,s:r.secSotet});
    await ctx.close();}
+
+  console.log("\n— 3b. GÖRGETÉS (3.9.205) —");
+  /* BEJELENTVE: „Telefonos fekvő nézetben nem működik a görgetés … csak a
+     pixelated verzióban" — a kirajzolódó animáció végállapota (clip-path)
+     a nézeten maradt, és levágta a képernyőn túllógó tartalmat */
+  for(const [w,h] of [[844,390],[390,844]]){
+    const {p,ctx}=await oldal(b,{w,h,tema:"pixel"});await p.waitForTimeout(2400);
+    const r=await p.evaluate(async()=>{const e=document.getElementById("mpEntry");e.scrollTop=e.scrollHeight;
+      await new Promise(r=>setTimeout(r,300));
+      const foot=document.querySelector(".heFoot").getBoundingClientRect();
+      const el=document.elementFromPoint(innerWidth/2,Math.min(innerHeight-5,foot.top+20));
+      return {clip:getComputedStyle(document.getElementById("mpViewHome")).clipPath,lab:!!(el&&el.closest&&el.closest(".heFoot"))};});
+    ok(r.clip==="none"&&r.lab,`${w}×${h}: a kirajzolódás után nem marad vágás — a lap alja görgetéssel elérhető és kattintható`,r);
+    await ctx.close();}
 
   console.log("\n— 4. TÉTLENSÉG —");
   {const {p,ctx}=await oldal(b,{w:430,h:900,tema:"pixel"});

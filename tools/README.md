@@ -14,7 +14,7 @@ Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 node tools/pixel-elet-3-9-204-proba.js
 ```
 
-**17 állítás**, valódi böngészőben.
+**19 állítás**, valódi böngészőben.
 
 * **Indulás:** képcső-bekapcsolás (két fél-lap + fényvonal), nem fog meg kattintást, magától eltűnik.
 * **Gombnyomás:**
@@ -25,6 +25,7 @@ node tools/pixel-elet-3-9-204-proba.js
   * az adatlap és az ablakok képcső-animációval nyílnak;
   * a szakasz kirajzolódik, transform nélkül;
   * más témában nem fut.
+* **Görgetés (3.9.205):** fekve és állva sem marad vágás a nézeten; a lap alja görgetéssel elérhető és kattintható.
 * **Tétlenség:**
   * az időzítő él;
   * a focista halad (két képkocka);
