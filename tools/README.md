@@ -8,6 +8,32 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## hatter-minden-tema-3-9-203-proba.js — ✨ 3.9.203: az élő háttér mind a négy témában
+
+```bash
+node tools/hatter-minden-tema-3-9-203-proba.js
+```
+
+**15 állítás**, valódi böngészőben.
+
+* **Mind a négy téma:**
+  * él a jelenet;
+  * négy különböző gyep és mez;
+  * a Pixelben 2 px-es rács (lépcsős mozgás), a Sötétben nem;
+  * a „Szaggatott mozgás” kikapcsolásával sima.
+* **A rondó (40 passz):**
+  * mind az öt kap labdát;
+  * a szomszédos passz kevesebb mint harmad;
+  * nincs visszapassz;
+  * legalább tíz különböző passz-irány.
+* **A fekvő HUB (1920×1080):**
+  * a jelenet a háttér;
+  * a bal menüsáv a bal szélen, a fejléc alatt;
+  * nincs `backdrop-filter` a tartalmazó kártyákon.
+* **Az ikonok:** hosszú becenévvel sincs ütközés (320, 360, 375, 568×320; Sötét és Pixel).
+* **A kapcsoló:** saját osztályon.
+* **Verzió, oldalhiba.**
+
 ## elo-hatter-3-9-202-proba.js — ✨ 3.9.202: két hasábos kezdőlap és élő háttér
 
 ```bash
@@ -31,7 +57,7 @@ node tools/elo-hatter-3-9-202-proba.js
   * kapu hálóval, 14 szereplő;
   * mozog, a ciklus fut;
   * a szabadrúgás labdája a lövés után a magasba és a kapu felé száll;
-  * más témában (még) nincs jelenet, és a ciklus leáll.
+  * témaváltáskor a téma festékével él tovább; kikapcsolva eltűnik, és a ciklus leáll.
 * **A HUB menüje mögött:**
   * a menü megnyitásakor és csak akkor látszik;
   * mozog, 12 szereplővel;

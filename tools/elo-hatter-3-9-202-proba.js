@@ -18,8 +18,8 @@
      2. A KAPCSOLÓ: alapból BE; „kevesebb mozgás" rendszer-beállításnál KI,
         hacsak nem kapcsoltad be kifejezetten; a ✨ gomb és a Beállítások
         kapcsolója átállítja, a választás megmarad;
-     3. A KEZDŐLAP JELENETE: a Sötét-arany témában él és MOZOG; a többi
-        témában (még) nem látszik, és a ciklus sem fut; kikapcsolva leáll;
+     3. A KEZDŐLAP JELENETE: a Sötét-arany témában él és MOZOG; témaváltáskor
+        a téma festékével él tovább (3.9.203); kikapcsolva leáll;
      4. A HUB MENÜJE MÖGÖTT: a menü megnyitásakor a felülnézetes jelenet
         látszik és mozog; a menü bezárásakor eltűnik. */
 "use strict";
@@ -85,9 +85,9 @@ async function oldal(b,{w,h,tema,ls,reduce}){
        disp:getComputedStyle(document.getElementById("fxHome")).display};
      /* a Beállítások kapcsolója */
      renderThemeModal();const ob=document.getElementById("fxOptBtn");
-     ki.opt={van:!!ob,felirat:ob&&ob.querySelector(".pixOptSw").textContent};
+     ki.opt={van:!!ob,felirat:ob&&ob.querySelector(".fxOptSw").textContent};
      ob.click();const ob2=document.getElementById("fxOptBtn");
-     ki.opt2={felirat:ob2&&ob2.querySelector(".pixOptSw").textContent,on:!H.classList.contains("fxAnimOff"),ls:localStorage.getItem("fxAnimOff30_0")};
+     ki.opt2={felirat:ob2&&ob2.querySelector(".fxOptSw").textContent,on:!H.classList.contains("fxAnimOff"),ls:localStorage.getItem("fxAnimOff30_0")};
      return ki;});
    ok(r.alap&&r.live&&r.gomb==="true","alapból BE, a Sötét-arany témában él, a ✨ gomb benyomva",r);
    ok(r.ki.off&&!r.ki.live&&r.ki.ls==="1"&&r.ki.gomb==="false"&&r.ki.disp==="none","a ✨ gombbal KI: a jelenet eltűnik, a választás megmarad",r.ki);
@@ -118,10 +118,13 @@ async function oldal(b,{w,h,tema,ls,reduce}){
        return {x:+tr[1],y:+tr[2],cy:+g.querySelector(".fxBall").getAttribute("cy")};};
      return {nyugv:at(800),repul:at(2150),halo:at(3300)};});
    ok(fk.repul.cy<fk.nyugv.cy-20&&fk.repul.x>fk.nyugv.x&&fk.halo.x>fk.repul.x,"szabadrúgás: a labda a lövés után a magasba és a kapu felé száll",fk);
-   /* témaváltás: a többi témában nincs jelenet, és leáll */
-   const r=await p.evaluate(()=>{applyTheme("paper");return {live:document.documentElement.classList.contains("fxLive"),
-     disp:getComputedStyle(document.getElementById("fxHome")).display,raf:_fxRaf};});
-   ok(!r.live&&r.disp==="none"&&!r.raf,"más témában (még) nincs jelenet, és a ciklus leáll",r);
+   /* témaváltás (3.9.203 óta minden téma ki van festve): a jelenet él tovább,
+      más festékkel; KIKAPCSOLVA viszont a ciklus leáll */
+   const r=await p.evaluate(()=>{const fill=()=>getComputedStyle(document.querySelector("#fxHome .fxGrass")).fill;
+     const f0=fill();applyTheme("paper");const ki={live:document.documentElement.classList.contains("fxLive"),
+     disp:getComputedStyle(document.getElementById("fxHome")).display,mas:fill()!==f0};
+     fxSet(false);ki.raf=_fxRaf;ki.disp2=getComputedStyle(document.getElementById("fxHome")).display;fxSet(true);return ki;});
+   ok(r.live&&r.disp==="block"&&r.mas&&!r.raf&&r.disp2==="none","témaváltáskor a jelenet él tovább, a téma festékével; kikapcsolva eltűnik, és a ciklus leáll",r);
    await ctx.close();}
 
   console.log("\n— 4. A HUB MENÜJE MÖGÖTT —");
