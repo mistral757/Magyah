@@ -261,7 +261,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   /* A MENTÉS a meccs utáni jutalom-lánc alatt SZÁNDÉKOSAN tart (lásd saveGame,
      _utoTartas) — a 4–5. rész valódi meccset játszott, tehát előbb a lánc
      végét várjuk meg, különben a régebbi mentést olvasnánk vissza. */
-  for(let i=0;i<50;i++){const fut=await p.evaluate(()=>!!(S&&S.utoMeccs));if(!fut)break;await p.waitForTimeout(200);}
+  /* A teljes regresszió terhelése alatt a lánc a 10 mp-et is túlléphette —
+     ezért 40 mp-ig várunk (egyedül futtatva ez pár száz ms). */
+  for(let i=0;i<200;i++){const fut=await p.evaluate(()=>!!(S&&S.utoMeccs));if(!fut)break;await p.waitForTimeout(200);}
   const pm=await p.evaluate(()=>{
     const ki={};
     const nev=pos=>slots.find(s=>s.pos===pos).player.n;
