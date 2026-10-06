@@ -48,6 +48,42 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## reszt-tempo-3-9-208-proba.js — ⏱️ 3.9.208: a négy résztempó
+
+```bash
+node tools/reszt-tempo-3-9-208-proba.js
+```
+
+**26 állítás**, valódi böngészőben, egy valódi piramisos karrierben.
+
+* **Alapból:** mind a négy a fő tempót követi, a Run-tényező betűre a régi.
+* **Csatornák:** tengelyenként a saját szorzó hat, a másik tengely nem mozdítja:
+  * játékos: fejlődés, mezőny-ütem, skill-türelem;
+  * pénz: szezonkeret, lelátó;
+  * taktika: begyakorlás, összhang, párkémia-türelem, stíluspont, poszt-tanulás;
+  * akadémia: akadémiai fejlődés, tehetség, ajánlat-sűrűség.
+* **Fizetések:** a pénz-tempóval nem lassulnak (a szezonkeret igen); a fő tempóval a régi módon követnek.
+* **Run:**
+  * a négy tengely rögzül;
+  * tengelyenként a legkönnyebb használt fokozat számít;
+  * súlyozott plafon-tényező „Egyéni” felirattal;
+  * régi karrierben a régi tempó;
+  * dinamikus módban is.
+* **Felület:**
+  * lenyitható;
+  * a választás tárolódik;
+  * az összefoglaló „Egyéni”;
+  * a követő tengely együtt mozog a fő tempóval;
+  * a zárt fokozat nem választható;
+  * betöltéskor is kirajzolódik.
+* **Közös karrier:**
+  * a csomagban utazik;
+  * a szoba térképe él;
+  * régi szobában a fő tempó;
+  * a mentés viszi;
+  * az eltérést kimondja;
+  * a vendégnél zárolt.
+
 ## scout-beallito-3-9-207-proba.js — 🔭 3.9.207: a valósághű scout a beállítón
 
 ```bash
