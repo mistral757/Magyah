@@ -99,11 +99,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     window.fanMult=()=>1.0;const elm1=fanWeeklyIncome();window.fanMult=()=>1.25;
     ki.letszam={arany:Math.round(dupla/egy*1000)/1000,elmeny:Math.round(egy/elm1*1000)/1000};
     /* 3. tempó */
-    const tm=k=>{window.tempoMult=()=>k;return fanWeeklyIncome();};
+    /* 3.9.208 óta a lelátó a PÉNZ-tengelyt olvassa (tempoMultAx) — mindkét olvasót helyettesítjük */
+    const _tmAx=window.tempoMultAx;
+    const tm=k=>{window.tempoMult=()=>k;window.tempoMultAx=()=>k;return fanWeeklyIncome();};
     const alap=tm(GAME_TEMPO.normal.k);
     ki.tempo={turbo:Math.round(tm(GAME_TEMPO.turbo.k)/alap*100)/100,komotos:Math.round(tm(GAME_TEMPO.komotos.k)/alap*100)/100,
       kokorszak:Math.round(tm(GAME_TEMPO.kokorszak.k)/alap*100)/100};
-    window.tempoMult=()=>GAME_TEMPO.normal.k;
+    window.tempoMult=()=>GAME_TEMPO.normal.k;if(_tmAx)window.tempoMultAx=_tmAx;
     /* 4. csak lefelé: 100 alatti erő, kis jegyár */
     window.fanTicketScale=()=>1;window.fanLeagueBase=()=>12000;window.fanSquadAskAvg=()=>PT(3e9);
     ki.lefele=fanAskFactor();

@@ -48,6 +48,184 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## kupa-csak-donto-3-9-211-proba.js — ⚔ 3.9.211: közös kupa, csak a döntőben
+
+```bash
+node tools/kupa-csak-donto-3-9-211-proba.js
+```
+
+**10 állítás**, valódi böngészőben.
+
+* **3000 véletlen ág** (8 és 16 párharc, csoportos, ligaszakaszos és csoport nélküli):
+  * csak a döntő hozhatja össze a két csapatot;
+  * a próbák között bőven volt eredetileg egymás elleni és egy félágba eső sorsolás;
+  * minden csapat egyszer marad bent;
+  * csoporttárs nem kerül össze.
+* **Szimmetria:** a két gépen ugyanaz a fa.
+* **Kapuk:** régi kliens, döntő, kiesett társ, nincs közös kupa, nem seedelt ág → nem nyúl hozzá.
+* **Nevezés és fejléc:** a jelző utazik, a fejléc kimondja a szabályt.
+
+## padlo-vallalas-3-9-210-proba.js — ⛰ 3.9.210: a mezőny padlója és a vállalás
+
+```bash
+node tools/padlo-vallalas-3-9-210-proba.js
+```
+
+**27 állítás**, valódi böngészőben, egy valódi piramisos karrierben.
+
+* **Új karrier:** padlós; a karrier eleji vállalás a beállított rés.
+* **Kezdőrúgás:**
+  * ha elhúztál, a mezőny felnő a vállalásodig (emelésként rögzül);
+  * ha a mezőny magától erősebb, nem nyúl hozzá;
+  * idényenként egyszer fut.
+* **Vállalás:**
+  * sikertelen idény után nem nehezíthető;
+  * sikeres idény után 0,2-vel nehezíthető;
+  * könnyíteni a karrier eleji +2-ig lehet;
+  * a választás a határok közé fogva rögzül.
+* **Téli mérés:**
+  * a fele azonnal, a másik fele a hátralévő fordulókra;
+  * idényenként egyszer, és rögzül;
+  * a téli ablak zárása indítja.
+* **Nincs** szintugrás és hangolás.
+* **Run:**
+  * a plafon a vállalások átlagából;
+  * „Mezőny-emelés” sor;
+  * gyorsabb tempón kevesebbet ér.
+* **Felület:**
+  * nyáron a HUB gombja;
+  * a vállalás képernyője;
+  * a nehezítés a határig mehet;
+  * a kezdőrúgás a padlót futtatja.
+* **Közös karrier:**
+  * a szabály a csomaggal utazik;
+  * a két meccs-erő és a két vállalás átlaga;
+  * elmaradt kézfogásnál nem találgat;
+  * a kézfogás viszi a vállalást.
+* **Mérő és régi karrier:** a mérő rögzít; jelző nélkül nem padlós.
+
+## gyors-inditas-3-9-209-proba.js — ⚡🎛️ 3.9.209: gyors indítás és alapbeállítások
+
+```bash
+node tools/gyors-inditas-3-9-209-proba.js
+```
+
+**22 állítás**, valódi böngészőben.
+
+* **Gyors indítás:**
+  * a kezdőlap gombja a két kérdést nyitja;
+  * a fajta és a kezdés átváltható, és a tárba íródik;
+  * az „Indulás” a beginNewGame-et futtatja.
+* **Részletes út:**
+  * a négyoldalas beállító nyílik, vissza-gombbal;
+  * az összefoglaló sora a megfelelő oldalra visz.
+* **A tár:** a beállító mozdulatai beíródnak, és újratöltés után visszatöltődnek.
+* **Beállítások blokkja:**
+  * minden mező szerkeszthető (a résztempókkal);
+  * a futó állapotot nem írja át;
+  * a gyors indítás kikapcsolható;
+  * a következő megnyitáskor a szerkesztett értékek lépnek életbe.
+* **Zárak:**
+  * a lépcső presetje felülírja a tárat;
+  * a zárt kezdés nem választható;
+  * a dinamikus karrier kapuja él;
+  * a lépcső jelzése látszik.
+* **Osztályválasztó:**
+  * feljön, előre kijelölve;
+  * a választott lesz a következő alapja.
+* **Közös karrier:** a házigazda a saját alapbeállításaival, gyors indítással.
+
+## reszt-tempo-3-9-208-proba.js — ⏱️ 3.9.208: a négy résztempó
+
+```bash
+node tools/reszt-tempo-3-9-208-proba.js
+```
+
+**26 állítás**, valódi böngészőben, egy valódi piramisos karrierben.
+
+* **Alapból:** mind a négy a fő tempót követi, a Run-tényező betűre a régi.
+* **Csatornák:** tengelyenként a saját szorzó hat, a másik tengely nem mozdítja:
+  * játékos: fejlődés, mezőny-ütem, skill-türelem;
+  * pénz: szezonkeret, lelátó;
+  * taktika: begyakorlás, összhang, párkémia-türelem, stíluspont, poszt-tanulás;
+  * akadémia: akadémiai fejlődés, tehetség, ajánlat-sűrűség.
+* **Fizetések:** a pénz-tempóval nem lassulnak (a szezonkeret igen); a fő tempóval a régi módon követnek.
+* **Run:**
+  * a négy tengely rögzül;
+  * tengelyenként a legkönnyebb használt fokozat számít;
+  * súlyozott plafon-tényező „Egyéni” felirattal;
+  * régi karrierben a régi tempó;
+  * dinamikus módban is.
+* **Felület:**
+  * lenyitható;
+  * a választás tárolódik;
+  * az összefoglaló „Egyéni”;
+  * a követő tengely együtt mozog a fő tempóval;
+  * a zárt fokozat nem választható;
+  * betöltéskor is kirajzolódik.
+* **Közös karrier:**
+  * a csomagban utazik;
+  * a szoba térképe él;
+  * régi szobában a fő tempó;
+  * a mentés viszi;
+  * az eltérést kimondja;
+  * a vendégnél zárolt.
+
+## scout-beallito-3-9-207-proba.js — 🔭 3.9.207: a valósághű scout a beállítón
+
+```bash
+node tools/scout-beallito-3-9-207-proba.js
+```
+
+**13 állítás**, valódi böngészőben.
+
+* **Beállító:**
+  * karrierben látszik (drafttal és kész klubbal is), karrieren kívül nem;
+  * „A keret” oldalon áll;
+  * a kattintás a preferenciát írja;
+  * az összefoglalóban ott a sora.
+* **Indulás:** a `beginNewGame` rögzíti a karrierre; utána a preferencia nem írja át.
+* **Beállítások:** a futó karrier, a preferencia és a beállító választója együtt vált.
+* **Közös karrier:**
+  * a csomagban utazik;
+  * a vendégnél a házigazdáé él, a saját preferenciája érintetlen;
+  * régi szobában KI;
+  * a vendégnél zárolt;
+  * menet közben nem állítható.
+* **Betöltés:** nincs TDZ, nincs konzolhiba.
+
+## meres-mentesbol-proba.js — 📈 a mentésből készülő mérési napló
+
+```bash
+node tools/meres-mentesbol-proba.js
+```
+
+**19 állítás**, böngésző nélkül, szintetikus mentés-exporttal (a valódi
+mentések nem kerülnek a repóba).
+
+* **Osztály-út:**
+  * a helyezésekből és a szintugrásból visszafejtve;
+  * a lezárt utolsó idény helyesen kezelve;
+  * ellentmondásnál csak a kezdő osztály ismert, és jelölve van.
+* **Főkönyv:**
+  * bevétel és kiadás a kategória oldala szerint;
+  * a záró egyenleg a következő nyitója;
+  * az eladások idényenként.
+* **Kezdő keret:** a draft-kori érték és a visszaszámolt kor; a mostani attribútumok nem kerülnek bele.
+* **Futó idény és beállítások:** „folyamatban” jelölés; a scout és az ügynökség mostaniként jelölve.
+* **Névtelenítés:** se név, se seed, se szobakód.
+* **Az összegző:** `--csv` nélkül is beolvassa az első fájlt (régi hiba volt); a D0 osztály is kiíródik.
+
+## meres/mentesbol.js — mentés-exportból mérési napló
+
+```bash
+node tools/meres/mentesbol.js magyah_….json [további…] [--nevtelen] [--ki kimenet.json]
+```
+
+**A korábbi karrierek mentéseiből** a mérő naplóformátumát készíti. Mit
+tud és mit nem: lásd a fájl fejlécét. Nyilvános helyre csak `--nevtelen`
+kimenet kerülhet. Az adatkészlet a `tools/meres/adat/` mappában van.
+
 ## meres/osszegez.js — a mérési napló összegzője
 
 ```bash

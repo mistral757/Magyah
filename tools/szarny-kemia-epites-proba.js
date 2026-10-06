@@ -258,6 +258,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(k.done&&k.seb[0]===k.seb[1]&&k.seb[0]>=89,`${k.need} közös meccs után összeér, és a sebességük fölfelé kiegyenlítődik`,k);
 
   /* ---- 7. PANEL ÉS MENTÉS ---- */
+  /* A MENTÉS a meccs utáni jutalom-lánc alatt SZÁNDÉKOSAN tart (lásd saveGame,
+     _utoTartas) — a 4–5. rész valódi meccset játszott, tehát előbb a lánc
+     végét várjuk meg, különben a régebbi mentést olvasnánk vissza. */
+  for(let i=0;i<50;i++){const fut=await p.evaluate(()=>!!(S&&S.utoMeccs));if(!fut)break;await p.waitForTimeout(200);}
   const pm=await p.evaluate(()=>{
     const ki={};
     const nev=pos=>slots.find(s=>s.pos===pos).player.n;
@@ -269,9 +273,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     try{h=engSectionHtml("villam");}catch(e){ki.hiba=e.message;}
     const div=document.createElement("div");div.innerHTML=h;ki.txt=div.textContent;
     try{saveGame();}catch(e){}
-    let d=null;
-    Object.keys(localStorage).forEach(k=>{const v=localStorage.getItem(k);
-      if(!d&&v&&v.indexOf('"szarnyInProgress"')>=0&&v.indexOf('"careerPool"')>=0)d=JSON.parse(v);});
+    /* a SAJÁT mentési helyéről olvasunk, nem az első egyező kulcsról */
+    let d=null;try{d=JSON.parse(localStorage.getItem(saveKey())||"null");}catch(e){d=null;}
     ki.mentes=!!(d&&d.S&&d.S.szarnyInProgress===szarnyKey(BV,BSZ)&&d.S.szarnyMig===1);
     return ki;});
   console.log("\n— 7. PANEL ÉS MENTÉS —");

@@ -95,7 +95,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
         if(!opt.tele)extraRoster=extraRoster.filter(p=>!uj.includes(p)||ac.includes(p.n)?!uj.includes(p):false);}
       return ki;};
     S.auto=true;S.frozenAcademySeasons=0;S.acadAblak=null;
-    const _tm=tempoMult;window.tempoMult=()=>1;
+    /* 3.9.208 óta az ajánlat-sűrűség az AKADÉMIA-tengelyt olvassa (tempoMultAx) —
+       mindkét olvasót kicseréljük, különben a kapu véletlenszerűen kihagy */
+    const _tm=tempoMult,_tmAx=window.tempoMultAx;window.tempoMult=()=>1;window.tempoMultAx=()=>1;
     /* ---- 1. KUPÁBAN NINCS ABLAK ---- */
     {const _ef=euroFrozen,_kp=talAkadKapuP;
      window.euroFrozen=()=>true;window.talAkadKapuP=()=>1;
@@ -159,7 +161,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      ki.panel={szoveg:acadVisszaterVarhato(r,e).sz,plan:r.planIdx};
      S.idx=0;const h0=acadAblakHatra();S.idx=4;const h4=acadAblakHatra();S.idx=28;const h28=acadAblakHatra();
      ki.hatra=[h0,h4,h28];}
-    window.tempoMult=_tm;window.addLine=_al;S.auto=false;
+    window.tempoMult=_tm;if(_tmAx)window.tempoMultAx=_tmAx;window.addLine=_al;S.auto=false;
     ki.verzio=APP_VERSION;
     return ki;});
 
