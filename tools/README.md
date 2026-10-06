@@ -48,6 +48,37 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## gyors-inditas-3-9-209-proba.js — ⚡🎛️ 3.9.209: gyors indítás és alapbeállítások
+
+```bash
+node tools/gyors-inditas-3-9-209-proba.js
+```
+
+**22 állítás**, valódi böngészőben.
+
+* **Gyors indítás:**
+  * a kezdőlap gombja a két kérdést nyitja;
+  * a fajta és a kezdés átváltható, és a tárba íródik;
+  * az „Indulás” a beginNewGame-et futtatja.
+* **Részletes út:**
+  * a négyoldalas beállító nyílik, vissza-gombbal;
+  * az összefoglaló sora a megfelelő oldalra visz.
+* **A tár:** a beállító mozdulatai beíródnak, és újratöltés után visszatöltődnek.
+* **Beállítások blokkja:**
+  * minden mező szerkeszthető (a résztempókkal);
+  * a futó állapotot nem írja át;
+  * a gyors indítás kikapcsolható;
+  * a következő megnyitáskor a szerkesztett értékek lépnek életbe.
+* **Zárak:**
+  * a lépcső presetje felülírja a tárat;
+  * a zárt kezdés nem választható;
+  * a dinamikus karrier kapuja él;
+  * a lépcső jelzése látszik.
+* **Osztályválasztó:**
+  * feljön, előre kijelölve;
+  * a választott lesz a következő alapja.
+* **Közös karrier:** a házigazda a saját alapbeállításaival, gyors indítással.
+
 ## reszt-tempo-3-9-208-proba.js — ⏱️ 3.9.208: a négy résztempó
 
 ```bash
