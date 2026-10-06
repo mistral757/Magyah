@@ -48,6 +48,38 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## meres-mentesbol-proba.js — 📈 a mentésből készülő mérési napló
+
+```bash
+node tools/meres-mentesbol-proba.js
+```
+
+**19 állítás**, böngésző nélkül, szintetikus mentés-exporttal (a valódi
+mentések nem kerülnek a repóba).
+
+* **Osztály-út:**
+  * a helyezésekből és a szintugrásból visszafejtve;
+  * a lezárt utolsó idény helyesen kezelve;
+  * ellentmondásnál csak a kezdő osztály ismert, és jelölve van.
+* **Főkönyv:**
+  * bevétel és kiadás a kategória oldala szerint;
+  * a záró egyenleg a következő nyitója;
+  * az eladások idényenként.
+* **Kezdő keret:** a draft-kori érték és a visszaszámolt kor; a mostani attribútumok nem kerülnek bele.
+* **Futó idény és beállítások:** „folyamatban” jelölés; a scout és az ügynökség mostaniként jelölve.
+* **Névtelenítés:** se név, se seed, se szobakód.
+* **Az összegző:** `--csv` nélkül is beolvassa az első fájlt (régi hiba volt); a D0 osztály is kiíródik.
+
+## meres/mentesbol.js — mentés-exportból mérési napló
+
+```bash
+node tools/meres/mentesbol.js magyah_….json [további…] [--nevtelen] [--ki kimenet.json]
+```
+
+**A korábbi karrierek mentéseiből** a mérő naplóformátumát készíti. Mit
+tud és mit nem: lásd a fájl fejlécét. Nyilvános helyre csak `--nevtelen`
+kimenet kerülhet. Az adatkészlet a `tools/meres/adat/` mappában van.
+
 ## meres/osszegez.js — a mérési napló összegzője
 
 ```bash
