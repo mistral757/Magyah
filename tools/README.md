@@ -48,6 +48,19 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## pvp-gyors-fajta-3-9-214-proba.js — 🤝 3.9.214: gyors indítás PvP-szobában, a közös karrier fajtája
+
+```bash
+node tools/pvp-gyors-fajta-3-9-214-proba.js
+```
+
+**21 állítás**, valódi böngészőben, a szoba-backend csonkjával.
+
+* **Alapbeállítás:** saját sor (🤝 Közös karrier fajtája), a választás a tárba íródik.
+* **Házigazda:** a gyors panel a tárolt fajtával nyílik (mindkét irányban), a felirat kimondja, hogy mindkettőtökre szól, a váltás visszaíródik; az „Indulás →” a választott fajtát publikálja.
+* **A bejelentett eset:** a kezdő lépcső egyjátékos zárai a PvP-szobában feloldódnak, a váltás oda-vissza működik.
+* **Egyjátékos:** a kezdőlap dönt, és nem írja felül a közös alapbeállítást.
+
 ## skalazas-3-9-213-proba.js — 📏 3.9.213: a POT-jutalom és a felállás-árak skálázása
 
 ```bash
