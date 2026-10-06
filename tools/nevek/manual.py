@@ -18,7 +18,7 @@ MANUAL = {
 "Franz Beckenbauer":   ("Francos Bekembójer", "Bekembójer"),
 "Johan Cruyff":        ("Krojfi János", "Krojfi"),
 "Paolo Maldini":       ("Máldi Pál", "Máldi"),
-"Kylian Mbappé":       ("Mappé Kilián","Mappé"),
+"Kylian Mbappé":       ("Kilján Bapé","Bapé"),
 
 # ── B) teljes magyarítás ────────────────────────────────────────────────────
 "Cristiano Ronaldo":   ("Ronáldó Krisztián", "Ronáldó Krisztián"),  # lásd Ronaldo
@@ -341,7 +341,7 @@ FOREIGN_1 = {
 "Franco Baresi":("Baracklekvár Ferkó","Baracklekvár"),
 "Francesco Totti":("Totózó Ferkó","Totózó"),
 "Fabio Cannavaro":("Kannás Fábián","Kannás"),
-"Andrea Pirlo":("Pirul András","Pirul"),
+"Andrea Pirlo":("Piruló Andi","Piruló"),
 "Valentino Mazzola":("Mazsolás Bálint","Mazsolás"),
 "Marco Verratti":("Veréb Márkó","Veréb"),
 "Leonardo Bonucci":("Bonbonos Lénárd","Bonbonos"),
@@ -942,7 +942,7 @@ MANUAL.update({
   "Martín Demichelis": ("Demikellisz Márton", "Demikellisz"),
   "Mathieu Debuchy": ("Debuzi Máté", "Debuzi"),
   "Mauro Camoranesi": ("Kamoranézi Gyárfás", "Kamoranézi"),
-  "Michael Owen": ("Óven Mihály", "Óven"),
+  "Michael Owen": ("Májkell Óven","Óven"),
   "Milan Škriniar": ("Skrinyár Milán", "Skrinyár"),
   "Moisés Caicedo": ("Kájszédó Gyárfás", "Kájszédó"),
   "Nani": ("Nyanyi", "Nyanyi"),
@@ -981,7 +981,7 @@ MANUAL.update({
   "Vladimír Šmicer": ("Szmájszer Vladi", "Szmájszer"),
   "Vágner Love": ("Szerelmes Vágner", "Szerelmes Vágner"),
   "Warren Zaïre-Emery": ("Zaj-Imre Mór", "Zaj-Imre"),
-  "Wesley Sneijder": ("Sznájder Benedek", "Sznájder"),
+  "Wesley Sneijder": ("Veszi Snájder","Snájder"),
   "William Gallas": ("Gallyas Vilmos", "Gallyas"),
   "Willy Sagnol": ("Szanyol Vili", "Szanyol"),
   "Xherdan Shaqiri": ("Zserdány Zsagiri", "Zserdány Zsagiri"),

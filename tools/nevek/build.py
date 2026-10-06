@@ -13,6 +13,15 @@ sys.path.insert(0, D)
 from rules import (POOL as POOL_ALL, hufy, given_of, pool_given, lengthen, hu_twist, PARTICLES, strip_dia, LANG,
                    son_stem, son_suffix, SON_LANG)
 from manual import MANUAL
+# ── A FELHASZNÁLÓ SAJÁT NEVEI: UTOLSÓ, VÉDETT RÉTEG (3.9.217) ──────────────
+# A MANUAL minden blokkja (a javaslatkörök is) ELŐTTE töltődik be — a saját
+# név tehát mindent felülír, őt viszont semmi. Ha egy blokk mást adna, kiírjuk:
+# az egy elfelejtett ellenőrzés jele (lásd javaslat_ellenor.py).
+from sajat import SAJAT
+_vedve = [(k, MANUAL[k][0], v[0]) for k, v in SAJAT.items() if k in MANUAL and tuple(MANUAL[k]) != tuple(v)]
+for _k, _volna, _marad in _vedve:
+    print(f"!! SAJÁT NÉV VÉDVE: {_k} — a kézi réteg „{_volna}”-t adna, marad „{_marad}”")
+MANUAL.update(SAJAT)
 from klubok import KLUBOK, LIGAK, ORSZAGOK
 
 # ── az adat kinyerése az index.html-ből ────────────────────────────────────
