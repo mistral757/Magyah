@@ -8,13 +8,62 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## meres-scout-3-9-206-proba.js — 📈🔭 3.9.206: karrier-mérő és valósághű scout
+
+```bash
+node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek és a kivonat helye
+```
+
+**48 állítás**, valódi böngészőben, egy valódi karrierben.
+
+* **A valódi láncon** (egy teljes meccs a kezdőrúgástól a mérlegig):
+  * a napló azonosítója a seed és az első mérés ideje, a mentésben is ott van;
+  * a kezdő keret minden játékosa minden adattal rögzül;
+  * a beállítások minden része rögzül;
+  * az idény kezdő állapota és a meccs-sor rögzül;
+  * a büdzsé idősora is lép.
+* **Érkezők:** `ifi`, `vasarlas` (árral), `scout:<ok>`; az 1. idényben minden adattal.
+* **Idényzárás:**
+  * a horgok a helyükön;
+  * helyezés és végső erő rögzül;
+  * a főkönyv bevételre és kiadásra bontva, a kategória oldala szerint;
+  * a távozók.
+* **2. idény:** csak összesítő, tömör érkező.
+* **Valósághű scout:**
+  * a kapcsoló a futó karrierre és a következőre is szól;
+  * a sáv lejjebb ül, átlagban gyengébb találat;
+  * a találat listára kerül, nem a keretbe;
+  * az ár 65–75%;
+  * zárt ablakban és büdzsé nélkül nincs licit;
+  * a csúcs elutasítás után 5%-ot kúszik;
+  * van ellenajánlat, és elfogadható;
+  * a „megfigyelt” forrás rögzül;
+  * a türelem elfogy → végleges nem;
+  * ablakonként legfeljebb 3 licit, legfeljebb 8 a listán;
+  * az ügynökség számít.
+* **Mentés:** a lista, a kapcsoló és a napló-azonosító túléli.
+* **Felület:**
+  * HUB-gomb és panel;
+  * a beállítások kapcsolói;
+  * kikapcsolt feltöltésnél semmi nem megy ki.
+* **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
+
+## meres/osszegez.js — a mérési napló összegzője
+
+```bash
+node tools/meres/osszegez.js <fájl.json> [további fájlok…] [--csv kimenet.csv]
+```
+
+* **Bemenet:** a játék letöltése, a Firebase-konzol exportja vagy egyetlen napló.
+* **Kimenet:** karrierenként összefoglaló; `--csv` esetén idényenként egy sor.
+
 ## pixel-elet-3-9-204-proba.js — 🕹️ 3.9.204: a Pixel téma saját élete
 
 ```bash
 node tools/pixel-elet-3-9-204-proba.js
 ```
 
-**17 állítás**, valódi böngészőben.
+**19 állítás**, valódi böngészőben.
 
 * **Indulás:** képcső-bekapcsolás (két fél-lap + fényvonal), nem fog meg kattintást, magától eltűnik.
 * **Gombnyomás:**
@@ -25,6 +74,7 @@ node tools/pixel-elet-3-9-204-proba.js
   * az adatlap és az ablakok képcső-animációval nyílnak;
   * a szakasz kirajzolódik, transform nélkül;
   * más témában nem fut.
+* **Görgetés (3.9.205):** fekve és állva sem marad vágás a nézeten; a lap alja görgetéssel elérhető és kattintható.
 * **Tétlenség:**
   * az időzítő él;
   * a focista halad (két képkocka);
