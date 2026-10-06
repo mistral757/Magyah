@@ -35,7 +35,8 @@ def blokkok():
         if bele:
             hiba += len(bele)
             print(f"{nev}: {len(bele)} saját név — " + ", ".join(bele))
-    print(f"\n{hiba} javaslat érintett saját nevet." if hiba else "✓ egyik javaslatblokk sem nyúl saját névhez.")
+    print(f"\n{hiba} régi javaslat érintett saját nevet — ez TÖRTÉNET: a SAJAT réteg a build"
+          " végén mindet felülírja, a táblában a saját név él." if hiba else "✓ egyik javaslatblokk sem nyúl saját névhez.")
     return 0
 
 
