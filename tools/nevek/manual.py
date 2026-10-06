@@ -1908,3 +1908,17 @@ JAVASLAT_3_9_206 = {
 "Raúl Albiol":("Albínó Rudolf","Albínó"),  # Álbiol Rudolf
 }
 MANUAL.update(JAVASLAT_3_9_206)
+
+JAVASLAT_3_9_207 = {
+"Paul Ince":("Incselkedő Pál","Incselkedő"),  # Insz Pál
+"Jan Vertonghen":("Vértanú János","Vértanú"),  # Vertongen János
+"David de Gea":("Degesz Dávid","Degesz"),  # Degí Dávid
+"Claudio Gentile":("Dzsentlmen Kolos","Dzsentlmen"),  # Dzsentile Kolos
+"Fabrizio Ravanelli":("Ravaszkodó Fábián","Ravaszkodó"),  # Ravaneli Vazul
+"Ian Wright":("Rájátszó Jani","Rájátszó"),  # Vrájt János
+"Georginio Wijnaldum":("Vájkáló György","Vájkáló"),  # Vájnaldum Rezső
+"Dele Alli":("Délelőtti Ali","Délelőtti"),  # Ali Miksa
+"Torsten Frings":("Fringiás Tódor","Fringiás"),  # Fríngs Ambrus
+"Gustavo Poyet":("Pojácás Gusztáv","Pojácás"),  # Pojet Gusztáv
+}
+MANUAL.update(JAVASLAT_3_9_207)
