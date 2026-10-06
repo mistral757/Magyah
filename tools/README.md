@@ -48,6 +48,23 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## kupa-csak-donto-3-9-211-proba.js — ⚔ 3.9.211: közös kupa, csak a döntőben
+
+```bash
+node tools/kupa-csak-donto-3-9-211-proba.js
+```
+
+**10 állítás**, valódi böngészőben.
+
+* **3000 véletlen ág** (8 és 16 párharc, csoportos, ligaszakaszos és csoport nélküli):
+  * csak a döntő hozhatja össze a két csapatot;
+  * a próbák között bőven volt eredetileg egymás elleni és egy félágba eső sorsolás;
+  * minden csapat egyszer marad bent;
+  * csoporttárs nem kerül össze.
+* **Szimmetria:** a két gépen ugyanaz a fa.
+* **Kapuk:** régi kliens, döntő, kiesett társ, nincs közös kupa, nem seedelt ág → nem nyúl hozzá.
+* **Nevezés és fejléc:** a jelző utazik, a fejléc kimondja a szabályt.
+
 ## padlo-vallalas-3-9-210-proba.js — ⛰ 3.9.210: a mezőny padlója és a vállalás
 
 ```bash

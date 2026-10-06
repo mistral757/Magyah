@@ -7285,7 +7285,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.210";
+const APP_VERSION="3.9.211";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -21221,6 +21221,7 @@ function mpCupEntryExtra(){
   o.qr=(typeof t.qualRounds==="number")?t.qualRounds:null;
   try{const ft=S.finalTable||[];const i=ft.findIndex(x=>x&&x.you);o.rank=i>=0?i+1:null;}catch(e){o.rank=null;}
   try{o.div=(typeof pyrOn==="function"&&pyrOn())?pyrMyDivId():null;}catch(e){o.div=null;}
+  o.apart=1;   /* ⚔ 3.9.211 — ismerem a „csak a döntőben" szabályt */
   return o;}
 function mpCupTick(key,myField,oppField,onReady,myEntry){
   const again=()=>{if(_mpCupBusy)_mpCupPoll=setTimeout(()=>mpCupTick(key,myField,oppField,onReady,myEntry),2500);};
@@ -21263,7 +21264,9 @@ async function mpCupTickRun(key,myField,oppField,onReady,myEntry){
       mid:mpCupSharedMid(mine.mstr||mine.str,mate.mstr||mate.str,
                          mine.dom,mate.dom,r?r.comp:null),
       how:r?r.how:null,mineComp:r?r.mineComp:null,mateComp:r?r.mateComp:null,
-      mateVer:mate.v?String(mate.v).slice(0,16):null};
+      mateVer:mate.v?String(mate.v).slice(0,16):null,
+      /* ⚔ 3.9.211 — „csak a döntőben" — ha mindkét gép ismeri */
+      apart:!!(mine.apart&&mate.apart)};
     /* ---- VERZIÓ-ELTÉRÉS: AZONNAL KIMONDJUK ----
        Nem tiltjuk le a közös kupát — lehet, hogy a két verzió között semmi
        olyasmi nem változott, ami a tornát érinti. De ha később mégis
@@ -22448,7 +22451,53 @@ function euroResolveTie(t){
   return t.winner;}
 /* Sorsolás: a nyolcaddöntőben csoportgyőztes (b) kap runner-upot (a), lehetőleg
    NEM azonos csoportból; a további körökben szabad sorsolás. */
+/* ================= ⚔ KÖZÖS KUPA: CSAK A DÖNTŐBEN (3.9.211) =================
+   BEJELENTÉS: „PvP-ben kupasorozatokban mindig a döntő legyen kijelölve közös
+   találkozásnak, hogy ne egymás miatt essenek ki a sorozatból."
+   A selejtező és a csoportkör eddig is szétválasztott (lásd a KÖZÖS KUPA
+   leírását); a kieséses ágon viszont bármelyik körben összekerülhettetek.
+   Mostantól az ELSŐ kieséses kör sorsolása után a két csapat az ág két
+   ELLENTÉTES FELÉBE kerül — a fa sorrendtartó (lásd lent), tehát onnantól
+   csak a döntő hozhat össze titeket. Ha a sorsolás egymás ellen hozott volna
+   (pl. a nyolcaddöntőben vagy a HSZ rájátszásában), a párharc egyik oldala
+   előbb helyet cserél egy másik párharcéval.
+   SZIMMETRIKUS SZABÁLY: mindkét gép ugyanazt a két csapatot látja (a mezőny
+   bitre azonos), és a csere mindig a NAGYOBB indexű párharcot mozdítja — így a
+   két fa azonos marad, akárki „én" és akárki „a társ".
+   CSAK HA MINDKÉT GÉP ISMERI: a nevezés `apart` jelzője; régi klienssel a
+   régi ág marad (különben a két fa szétcsúszna). */
 function euroDrawRound(round,pool){
+  const ties=euroDrawRoundBase(round,pool);
+  try{return mpCupKeepApart(round,ties);}catch(e){return ties;}}
+function mpCupKeepApart(round,ties){
+  const E=S.euro,C=mpCup();
+  if(round==="final"||!ties||ties.length<2||!E)return ties;
+  if(!C||!C.apart||!mpCupActive()||!mpCupSeeded()||E.mateIdx==null||E.mateOut)return ties;
+  const U=E.userIdx,M=E.mateIdx;
+  const has=(t,x)=>!!t&&(t.a===x||t.b===x);
+  const both=(x,y)=>(x===U&&y===M)||(x===M&&y===U);
+  /* a nyolcaddöntőben (csoportos sorozat) csoporttárs nem kerülhet össze */
+  const grpRule=round==="r16"&&compHasGroup(E.comp)&&!compSwiss(E.comp);
+  const g=i=>{const t=E.teams[i];return t&&t.g!=null?t.g:null;};
+  const okPair=(x,y)=>x!==y&&!both(x,y)&&!(grpRule&&g(x)!=null&&g(x)===g(y));
+  /* 1. EGYMÁS ELLEN SORSOLTAK: a párharc `a` oldala helyet cserél egy másik
+     párharc `a` oldalával (a legközelebbivel, ami szabályos marad) */
+  const ti=ties.findIndex(t=>has(t,U)&&has(t,M));
+  if(ti>=0){
+    for(let d=1;d<ties.length;d++){
+      const j=ti^d;if(j>=ties.length)continue;
+      const A=ties[ti],B=ties[j];
+      if(okPair(B.a,A.b)&&okPair(A.a,B.b)){const x=A.a;A.a=B.a;B.a=x;break;}}}
+  /* 2. KÉT FÉLÁG: ha egy félágba estek, a nagyobb indexű párharc a másik
+     félág azonos helyére költözik (a fa sorrendtartó, lásd euroDrawRoundBase) */
+  const n=ties.length;
+  if((n&(n-1))===0){
+    const iu=ties.findIndex(t=>has(t,U)),im=ties.findIndex(t=>has(t,M));
+    if(iu>=0&&im>=0&&iu!==im&&Math.floor(iu/(n/2))===Math.floor(im/(n/2))){
+      const m=Math.max(iu,im),o=(m+n/2)%n;
+      const x=ties[m];ties[m]=ties[o];ties[o]=x;}}
+  return ties;}
+function euroDrawRoundBase(round,pool){
   const E=S.euro,ties=[];
   /* ---- KÖZÖS KUPA: FIX ÁG ----
      MP-ben a fa a kupa elején eldől, és onnantól SORRENDTARTÓ a párosítás:
@@ -95458,6 +95507,7 @@ function mpCupHeadHtml(){
       const base=RS.indexOf(E.stage);
       const nm=(lvl!=null&&base>=0&&RS[base+lvl])?EURO_ROUND_NAMES[RS[base+lvl]]:null;
       if(nm)where=` — ha mindketten továbbmentek, ${hunAz(nm)} <b>${nm}</b> hozhat össze titeket.`;}}
+  else if(M.apart)where=` — <b>csak a döntőben</b> találkozhattok: a kieséses ágon az ág két ellentétes felébe kerültök.`;
   else if(E.stage==="group"&&E.mateG!=null)
     where=` — ${hunAz(String.fromCharCode(65+E.mateG))} <b>${String.fromCharCode(65+E.mateG)}</b> csoportban játszik, tehát a csoportkörben nem kerülhettek össze.`;
   return `<div style="font-size:11.5px;margin-top:5px;padding:6px 9px;border-radius:7px;background:color-mix(in srgb,var(--gold) 12%,transparent);color:var(--ink)">
