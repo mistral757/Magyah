@@ -49,6 +49,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     S.pyr=null;S.idx=0;pyrPickSq={club:"draft",season:"",players:sq.players.slice(0,15)};
     pyrPickFromDraft=true;pyrPickDiv=null;pyrPendingSpeed=pyrWantedSpeed;
     renderPyrDivPick();pyrConfirmDiv();showChemistry=_sc;
+    /* 3.9.210 óta az ÚJ karrier padlós, és ott nincs szintugrás — ez a próba a
+       RÉGI szabályt méri, ami a futó (padló előtti) karrierekben él tovább */
+    delete S.pyr.padlo;
     if(!careerPool)careerPool=initCareerPlayerPool({stars:2.5});
     slots.forEach((sl,i)=>{if(sl.player)return;const src=sq.players[i%sq.players.length];
       const pl={n:src.n,ovr:src.ovr,pos:(src.pos||[sl.pos]).slice(),age:24};sl.player=pl;sl.fit=fitFor(pl,sl);});
