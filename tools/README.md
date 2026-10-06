@@ -48,6 +48,29 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## scout-beallito-3-9-207-proba.js — 🔭 3.9.207: a valósághű scout a beállítón
+
+```bash
+node tools/scout-beallito-3-9-207-proba.js
+```
+
+**12 állítás**, valódi böngészőben.
+
+* **Beállító:**
+  * karrierben látszik (drafttal és kész klubbal is), karrieren kívül nem;
+  * „A keret” oldalon áll;
+  * a kattintás a preferenciát írja;
+  * az összefoglalóban ott a sora.
+* **Indulás:** a `beginNewGame` rögzíti a karrierre; utána a preferencia nem írja át.
+* **Beállítások:** a futó karrier, a preferencia és a beállító választója együtt vált.
+* **Közös karrier:**
+  * a csomagban utazik;
+  * a vendégnél a házigazdáé él, a saját preferenciája érintetlen;
+  * régi szobában KI;
+  * a vendégnél zárolt;
+  * menet közben nem állítható.
+* **Betöltés:** nincs TDZ, nincs konzolhiba.
+
 ## meres-mentesbol-proba.js — 📈 a mentésből készülő mérési napló
 
 ```bash
