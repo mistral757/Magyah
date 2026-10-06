@@ -48,6 +48,45 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## padlo-vallalas-3-9-210-proba.js — ⛰ 3.9.210: a mezőny padlója és a vállalás
+
+```bash
+node tools/padlo-vallalas-3-9-210-proba.js
+```
+
+**27 állítás**, valódi böngészőben, egy valódi piramisos karrierben.
+
+* **Új karrier:** padlós; a karrier eleji vállalás a beállított rés.
+* **Kezdőrúgás:**
+  * ha elhúztál, a mezőny felnő a vállalásodig (emelésként rögzül);
+  * ha a mezőny magától erősebb, nem nyúl hozzá;
+  * idényenként egyszer fut.
+* **Vállalás:**
+  * sikertelen idény után nem nehezíthető;
+  * sikeres idény után 0,2-vel nehezíthető;
+  * könnyíteni a karrier eleji +2-ig lehet;
+  * a választás a határok közé fogva rögzül.
+* **Téli mérés:**
+  * a fele azonnal, a másik fele a hátralévő fordulókra;
+  * idényenként egyszer, és rögzül;
+  * a téli ablak zárása indítja.
+* **Nincs** szintugrás és hangolás.
+* **Run:**
+  * a plafon a vállalások átlagából;
+  * „Mezőny-emelés” sor;
+  * gyorsabb tempón kevesebbet ér.
+* **Felület:**
+  * nyáron a HUB gombja;
+  * a vállalás képernyője;
+  * a nehezítés a határig mehet;
+  * a kezdőrúgás a padlót futtatja.
+* **Közös karrier:**
+  * a szabály a csomaggal utazik;
+  * a két meccs-erő és a két vállalás átlaga;
+  * elmaradt kézfogásnál nem találgat;
+  * a kézfogás viszi a vállalást.
+* **Mérő és régi karrier:** a mérő rögzít; jelző nélkül nem padlós.
+
 ## gyors-inditas-3-9-209-proba.js — ⚡🎛️ 3.9.209: gyors indítás és alapbeállítások
 
 ```bash

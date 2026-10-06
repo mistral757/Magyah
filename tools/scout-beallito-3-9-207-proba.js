@@ -37,7 +37,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await p.addInitScript(()=>{window.HANG_TESZT=true;try{localStorage.setItem("scoutReal30_0","0");}catch(e){}});
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
   await p.waitForTimeout(1200);
-  ok(await p.evaluate(()=>typeof scoutRealWanted==="boolean"&&typeof renderScoutRealGrid==="function"&&APP_VERSION==="3.9.207"),"a szkript betölt, a kapcsoló állapota él (nincs TDZ)");
+  ok(await p.evaluate(()=>typeof scoutRealWanted==="boolean"&&typeof renderScoutRealGrid==="function"&&String(APP_VERSION).localeCompare("3.9.207",undefined,{numeric:true})>=0),"a szkript betölt, a kapcsoló állapota él (nincs TDZ)");
 
   console.log("\n— 1. a beállító —");
   const r1=await p.evaluate(()=>{

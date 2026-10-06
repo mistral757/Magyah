@@ -6928,6 +6928,8 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
          és a figyelmeztető állapota (piros, lüktető) csak akkor ér valamit, ha
          látszik. Egy becsukott almenüben ez elveszett. -->
     <button id="hubLevelBtn" class="lvlBtn hide" style="width:100%;margin:0 0 12px"></button>
+    <!-- ⛰ 3.9.210 — a következő idény vállalása (a padlós karrierben, nyáron) -->
+    <button id="hubVallBtn" class="lvlBtn hide" style="width:100%;margin:0 0 12px"></button>
     <!-- A MENÜ HELYE: a nehézségi szint ALATT, a büdzsé FÖLÖTT. Ez a HUB fő
          műveleti pontja, ezért nem a lap alján a helye. A gombot és a
          tartalmát (hubActions) egy indulási lépés helyezi ide — lásd
@@ -7283,7 +7285,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.209";
+const APP_VERSION="3.9.210";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -16770,7 +16772,7 @@ function pyrGrowStep(){
   if(W.grow==null)W.grow=Math.round(pyrAiRate(pyrMyDivId())/30*1000)/1000;
   return W.grow||0;}
 /* Mennyivel erősebb a mezőnyöd MOST, mint a szezon első fordulóján. */
-function pyrGrowNow(){return pyrGrowStep()*(S.idx||0);}
+function pyrGrowNow(){return pyrGrowStep()*(S.idx||0)+pyrMidLiftNow();}   /* ⛰ 3.9.210 — a téli emelés rámpája */
 /* A szezon mezőnyének átszámolása a mostani fordulóra. Idempotens: mindig az
    érintetlen ovrBase-ből dolgozik, tehát bárhonnan, bármennyiszer hívható. */
 function pyrOppRefresh(){
@@ -17929,7 +17931,9 @@ function pyrRunCap(){
      karrierek (nincs diffT) a régi, mért réssel és a régi görbével maradnak:
      egy futó karrier Run-szintje nem változhat meg attól, hogy frissült a
      játék. */
-  const dT=(P&&typeof P.diffT==="number"&&isFinite(P.diffT))?P.diffT:null;
+  let dT=(P&&typeof P.diffT==="number"&&isFinite(P.diffT))?P.diffT:null;
+  /* ⛰ 3.9.210 — a padlós karrierben a vállalások ÁTLAGA a nehézség */
+  try{if(typeof pyrFloorOn==="function"&&pyrFloorOn())dT=diffSnapT(pyrFloorAvgG());}catch(e){}
   const parts=[
     {n:`Kezdő osztály: D${d}`,v:PYR_RUN_CAP.div[d-1]||1},
     {n:`Ellenfél-tempó: ${pyrSpeedDef(sp).n}`,v:PYR_RUN_CAP.speed[sp]},
@@ -32646,6 +32650,8 @@ function twCloseCheckpointWindow(){
   const w=S.twWindow;if(!w)return;
   const evLeft=Math.max(0,w.eventLeft||0);
   S.twWindow=null;TW=null;
+  /* ⛰ 3.9.210 — a téli ablak zárásakor a második, egyoldalú mérés */
+  try{if(w.round===15)pyrFloorMid();}catch(e){}
   addLine(`🔒 ${w.label} lezárva${evLeft?` — ${evLeft} kihasználatlan átigazolási esemény maradt`:""}. Folytatódik a szezon.`,"m life");
   twResumeAfterWindow();}
 /* A checkpoint folytatása: elrejti az átigazolási felületeket és visszaadja a
@@ -35995,6 +36001,8 @@ document.querySelectorAll("#magyahToggleGrid button").forEach(b=>b.onclick=()=>{
    vagy licitre) a keretépítés egyik csatornája, tehát a házigazda dönt, és a
    vendég modulszintű értékét a szoba csomagja írja felül — a vendég saját,
    tárolt preferenciáját nem. */
+/* ⛰ 3.9.210 — a közös karrier vendégénél: a szoba csomagja padlós-e */
+let _mpPadlo=false;
 const SCOUT_REAL_KEY="scoutReal30_0";
 let scoutRealWanted=(()=>{try{return localStorage.getItem(SCOUT_REAL_KEY)==="1";}catch(e){return false;}})();
 function renderScoutRealGrid(){
@@ -39167,6 +39175,9 @@ function pyrSuperPairStash(mine,mate){
   const p=pyrSuperPairMS(mine,mate);
   if(!p)return null;
   p.for=(typeof mpUpcomingSeason==="function")?mpUpcomingSeason():(S.seasonNumber||1);
+  /* ⛰ 3.9.210 — a két vállalás (a társé hiányozhat: régi kliens) */
+  p.vallA=(mine&&typeof mine.vall==="number")?mine.vall:null;
+  p.vallB=(mate&&typeof mate.vall==="number")?mate.vall:null;
   S.pyr.superPair=p;
   return p;}
 /* ---- A KALIBRÁCIÓ KÖZÖS KARRIERBEN ----
@@ -39261,6 +39272,261 @@ function pyrSuperKickoff(){
       +`már nem a lépcső adja, hanem ez a kalibráció.`,"m skillnote");
   }catch(e){}
   return r;}
+/* ================= ⛰ A MEZŐNY PADLÓJA ÉS AZ IDÉNYENKÉNTI VÁLLALÁS (3.9.210) =================
+   BEJELENTÉS: „mi van ha a Run szint számolást hagyományos módban kicsit
+   megváltoztatjuk, és nem ezekkel a szintugrásokkal operálunk? Hanem!
+   Szezonról szezonra mindig úgy állítja be magát a mezőny ereje, hogy minimum
+   olyan erősnek kell lennie, hogy a kezdő nehézséget elérje a távolság,
+   akárcsak a D0-tól felfelé. Amennyiben pedig a mezőny alap fejlődése
+   meghaladja ezt a minimum értéket, akkor természetesen a magasabbik szám él
+   […] a Run szint mérő azt figyelné, hogy mennyit kell az egyes szezonokban
+   magán felül teljesítenie a mezőnynek […] szezonról szezonra lehetne
+   vállalást tenni, hogy milyen távolságra legyen tőled a kezdő mezőny.
+   Kezdtél +2-vel, de d5-re már vállalsz egy +1,8-at, D4-re egy +1,6-ot stb.
+   (itt is élne a szezononként max 0,2-vel nehezebbet lehet választani elv)
+   […] PvP-ben is az lenne, hogy mindkét játékos tesz egy vállalást szezonról
+   szezonra, és azok átlagával indulnánk (és persze a meccs-erők átlagával
+   is) […] (max +2-t lehetne vállalni ahhoz képest, ami a kezdő vállalás volt
+   a settingsben, ellentétben a - vállalásokkal, mert ott szezonról szezonra
+   lehetne lefelé kúszni, amennyiben sikeres […])"
+   — és a kiegészítés: a mentések szerint a dominancia az IDÉNYEN BELÜL épül
+   fel, ezért egy második, ugyanilyen egyoldalú mérés a téli ablak zárásakor.
+
+   A SZABÁLY (csak az ÚJ karrierekben — S.pyr.padlo; a futó karrierek a régi
+   szerződésükkel futnak végig):
+     · A KEZDŐRÚGÁSKOR (a 2. idénytől, MINDEN osztályban, a D0 fölött is):
+         rajtoló mezőny = max( természetes szint, meccs-erőd − vállalásod )
+       vagyis a világ CSAK FELFELÉ mozdul. Ha a mezőny magától is föléd nőtt,
+       az marad — a sebesség-fokozat így attól lesz kemény, hogy a világ
+       elhúzhat, amikor gyengébb vagy;
+     · A TÉLI ABLAK ZÁRÁSAKOR (egyjátékosban): ha a rés közben a vállalás fölé
+       nőtt, a különbség felét azonnal, a másik felét a hátralévő fordulókra
+       elosztva kapja meg a mezőny (pyrGrowNow — az egész osztály egyformán,
+       tehát az AI-meccsek erőviszonya nem változik);
+     · A VÁLLALÁS idényenként: könnyíteni a karrier eleji vállalás +2-ig
+       bármikor lehet; nehezíteni idényenként legfeljebb 0,2-vel, és csak
+       sikeres idény (bajnoki cím vagy feljutás) után;
+     · KÖZÖS KARRIERBEN a két meccs-erő ÁTLAGA és a két vállalás ÁTLAGA számít
+       (a szezonindító kézfogás viszi), a téli mérés ott nincs;
+     · SZINTUGRÁS és HANGOLÁS nincs — a padló mindkettőt fölöslegessé teszi.
+   A RUN:
+     · a plafon nehézség-tényezője a vállalások ÁTLAGÁBÓL jön (a karrier eleji
+       vállalás is benne van);
+     · új sor: „Mezőny-emelés" — idényenként mennyivel kellett a mezőnynek a
+       természetes szintje fölé emelkednie (az átlagos mezőny-erő %-ában), a
+       játékos-tempóhoz mérve (gyorsabb tempón több emelés jár magától, ezért
+       ott kevesebbet ér). A pontozás ideiglenes — a mérő adatai hangolják. */
+const PYR_FLOOR_STEP=0.2,PYR_FLOOR_EASY=2,PYR_FLOOR_TOL=0.15;
+function pyrFloorOn(){
+  try{return !!(typeof pyrOn==="function"&&pyrOn()&&S.pyr&&S.pyr.padlo);}catch(e){return false;}}
+function pyrFloorHist(){
+  const P=S.pyr;if(!P.vallH||typeof P.vallH!=="object")P.vallH={};
+  /* AZ 1. IDÉNY a karrier eleji vállalással fut (a kezdőrúgás horgonya pontosan
+     arra állította) — a feljutás-feltételhez és a téli méréshez kell a sora */
+  if(!P.vallH[1]){const g0=pyrFloorG0();
+    P.vallH[1]={g:g0,want:g0,div:P.startDiv||P.my,lift:0,mid:0,nat:null,done:true,elso:true};}
+  return P.vallH;}
+/* A KARRIER ELEJI VÁLLALÁS (G0): a beállított rés — a lépcső mezőny-ígéreténél
+   a ténylegesen kijött rajt-rés */
+function pyrFloorG0(){
+  const P=S.pyr;
+  if(typeof P.vall0==="number"&&isFinite(P.vall0))return P.vall0;
+  let w=null;try{w=pyrRetuneWant();}catch(e){w=null;}
+  if(typeof w!=="number"||!isFinite(w))w=(typeof P.gap0==="number"&&isFinite(P.gap0))?P.gap0:DIFF_DEFAULT_T/10;
+  P.vall0=Math.round(w*10)/10;
+  return P.vall0;}
+/* a soron következő idény száma (nyáron, a forduló előtt még a lezárt idényé
+   az S.seasonNumber) */
+function pyrFloorUpcoming(){
+  const sn=S.seasonNumber||1;
+  return (S.seasonHistory||[]).some(x=>x&&x.season===sn)?sn+1:sn;}
+function pyrFloorPrevG(sn){
+  const H=pyrFloorHist();
+  for(let s=sn-1;s>=1;s--)if(H[s]&&typeof H[s].g==="number")return H[s].g;
+  return pyrFloorG0();}
+/* SIKERES volt-e az előző idény: bajnoki cím, vagy feljutás (a forduló után
+   látszik — előtte csak a cím) */
+function pyrFloorPrevOk(sn){
+  const sh=(S.seasonHistory||[]).find(x=>x&&x.season===sn-1);
+  if(sh&&sh.rank===1)return true;
+  const H=pyrFloorHist(),d0=H[sn-1]&&H[sn-1].div;
+  return typeof d0==="number"&&typeof S.pyr.my==="number"&&S.pyr.my<d0;}
+function pyrFloorBounds(sn){
+  const prev=pyrFloorPrevG(sn),g0=pyrFloorG0(),ok=pyrFloorPrevOk(sn);
+  const hi=Math.round((g0+PYR_FLOOR_EASY)*10)/10;
+  const lo=Math.min(hi,Math.round((prev-(ok?PYR_FLOOR_STEP:0))*10)/10);
+  return {lo,hi,prev,g0,ok};}
+/* a következő idény vállalása (a választott, a határok közé fogva) */
+function pyrFloorWantFor(sn){
+  const b=pyrFloorBounds(sn),P=S.pyr;
+  let g=(typeof P.vallNext==="number"&&isFinite(P.vallNext))?P.vallNext:b.prev;
+  return Math.round(Math.max(b.lo,Math.min(b.hi,g))*10)/10;}
+/* A VILÁG EMELÉSE `amt` Ratinggel — ugyanaz a lánc, amit a horgonyok is
+   futtatnak az eltolás után (mezőnyszint, piac, pool, ellenféltábla). */
+function pyrFloorRaise(amt){
+  const P=S.pyr;
+  let moved=0;
+  while(amt-moved>0.05){
+    const step=Math.min(4,amt-moved);
+    pyrShiftWorld({divs:P.divs},-step);
+    if(P.spare)P.spare.ovr=Math.round((P.spare.ovr+step)*10)/10;
+    if(P.spare2)P.spare2.ovr=Math.round((P.spare2.ovr+step)*10)/10;
+    P.worldShift=Math.round(((P.worldShift||0)-step)*10)/10;
+    moved+=step;}
+  moved=Math.round(moved*10)/10;
+  if(!moved)return 0;
+  oppTargetRating=pyrLevel();
+  pyrSetMarketAnchor();
+  if(gameMode==="career"&&careerPool)Object.values(careerPool).forEach(e=>{
+    if(drafted.has(e.n))return;
+    applyMarketShift(e);
+    e.startRating=Math.round(ratingAtAge(e.peak,e.age));
+    syncAttrsToRating(e);
+    if(scout)e.estimatedPOT=estimatePOT(e.pot,scout.stars);});
+  P.grow=null;
+  SEASON_OPPS=pyrOpponents();
+  try{pyrGrowStep();pyrOppRefresh();}catch(e){}
+  try{pyrInfinityCheck();}catch(e){}
+  if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
+  return moved;}
+/* ---- A KEZDŐRÚGÁS PADLÓJA ---- (a startNextCareerSeason hívja, a menetrend
+   sorsolása előtt — ugyanott, ahol eddig a szuperliga-kalibráció futott) */
+function pyrFloorKickoff(){
+  if(!pyrFloorOn())return null;
+  const P=S.pyr,sn=S.seasonNumber||1,H=pyrFloorHist();
+  if(H[sn]&&H[sn].done)return null;
+  const mp=(typeof h2hRoomActive==="function")&&h2hRoomActive();
+  let g=pyrFloorWantFor(sn),want=g,elotte=null,utana=null,lift=0,pair=null;
+  const nat=Math.round(pyrLevel()*10)/10;
+  if(mp){
+    pair=P.superPair;
+    if(pair&&pair.for===sn){
+      /* a kézfogás a SAJÁT, már határok közé fogott vállalásomat vitte — azt
+         rögzítem (a társ gépe ugyanezt a két számot látja) */
+      if(typeof pair.vallA==="number")g=pair.vallA;
+      want=(typeof pair.vallB==="number")?Math.round((g+pair.vallB)/2*100)/100:g;
+      const mezo=()=>pyrLevel()+Math.max(0,(pair.hid||0)*OPP_BUFF_MEASURED);
+      elotte=Math.round((pair.avg-mezo())*10)/10;
+      const kell=Math.round(((pair.avg-mezo())-want)*10)/10;
+      if(kell>PYR_FLOOR_TOL)lift=pyrFloorRaise(kell);
+      utana=Math.round((pair.avg-mezo())*10)/10;}
+    else pair=null;   /* elmaradt kézfogás — nem találgatunk (ahogy a szuperliga sem) */
+  }else{
+    const _r=msRatedBegin();
+    try{
+      try{msRatedNote(_r);}catch(e){}
+      elotte=Math.round(levelGap()*10)/10;
+      const kell=Math.round((elotte-want)*10)/10;
+      if(kell>PYR_FLOOR_TOL)lift=pyrFloorRaise(kell);
+      utana=Math.round(levelGap()*10)/10;
+    }finally{try{msRatedEnd();}catch(e){}}}
+  delete P.vallNext;
+  H[sn]={g,want,div:P.my,lift,mid:0,nat,elotte,utana,done:true};
+  /* a régi kalibráció bélyege — hogy semmi ne fusson rá kétszer */
+  P.superFor=sn;
+  try{
+    const n1=x=>(x>=0?"+":"−")+Math.abs(x).toFixed(1).replace(".",",");
+    const d=pyrDiffForGap(want);
+    if(lift>0)addLine(`⛰ <b>A mezőny felnőtt hozzád.</b> A vállalásod <b>${n1(want)}</b> `
+      +`(${esc(d?d.n:"")})${mp?" — a kettőtökéé átlagolva":""}; a kereted ennél jobban elhúzott, ezért a mezőny `
+      +`<b>${n1(lift)}</b> Ratinggel a természetes szintje fölé emelkedett. Ez a „mezőny-emelés" — a Run-szinten jóváíródik.`,"m mvp");
+    else addLine(`⛰ <b>A mezőny a saját lábán áll.</b> A vállalásod <b>${n1(want)}</b>; `
+      +(elotte==null?`a padló ebben az idényben nem mért (elmaradt kézfogás).`
+        :`a rés most <b>${n1(utana)}</b> — a mezőnyt nem kellett megemelni.`),"m life");
+  }catch(e){}
+  return H[sn];}
+/* ---- A TÉLI MÉRÉS (egyjátékosban) ---- */
+function pyrMidLiftNow(){
+  try{
+    const P=S&&S.pyr,M=P&&P.midLift;
+    if(!M||M.sn!==(S.seasonNumber||1))return 0;
+    const i=S.idx||0;if(i<M.from)return 0;
+    const half=M.amt/2,span=Math.max(1,30-M.from);
+    return half+half*Math.min(1,(i-M.from)/span);
+  }catch(e){return 0;}}
+function pyrFloorMid(){
+  if(!pyrFloorOn())return null;
+  if((typeof h2hRoomActive==="function")&&h2hRoomActive())return null;
+  const P=S.pyr,sn=S.seasonNumber||1,H=pyrFloorHist();
+  const rec=H[sn];if(!rec||rec.midDone)return null;
+  rec.midDone=true;
+  let gap=null;
+  const _r=msRatedBegin();
+  try{gap=Math.round(levelGap()*10)/10;}catch(e){gap=null;}finally{try{msRatedEnd();}catch(e){}}
+  if(gap==null)return null;
+  const kell=Math.round((gap-rec.want)*10)/10;
+  if(!(kell>PYR_FLOOR_TOL))return {gap,amt:0};
+  P.midLift={sn,from:S.idx||0,amt:kell};
+  rec.mid=kell;
+  try{pyrOppRefresh();}catch(e){}
+  try{const n1=x=>(x>=0?"+":"−")+Math.abs(x).toFixed(1).replace(".",",");
+    addLine(`⛰ <b>Téli felmérés.</b> A rés az idény közepére <b>${n1(gap)}</b>-re nőtt a vállalt `
+      +`<b>${n1(rec.want)}</b> helyett — a mezőny <b>${n1(kell)}</b> Ratinggel erősödik: a fele most, `
+      +`a másik fele a hátralévő fordulókban.`,"m mvp");}catch(e){}
+  return {gap,amt:kell};}
+/* ---- A RUN ---- */
+/* a vállalások átlaga (a karrier eleji is benne) — a plafon nehézség-tényezője */
+function pyrFloorAvgG(){
+  const H=pyrFloorHist(),gs=[pyrFloorG0()];
+  Object.keys(H).map(Number).filter(s=>s>=2).sort((a,b)=>a-b).forEach(s=>{if(typeof H[s].g==="number")gs.push(H[s].g);});
+  return Math.round(gs.reduce((a,b)=>a+b,0)/gs.length*100)/100;}
+/* a mezőny-emelés sora: idényenkénti átlagos emelés %-ban, a játékos-tempóhoz mérve */
+function pyrFloorRunRow(){
+  if(!pyrFloorOn())return null;
+  const H=pyrFloorHist(),R=(S&&S.run)||{};
+  const ss=Object.keys(H).map(Number).filter(s=>s>=2&&H[s]&&H[s].done).sort((a,b)=>a-b);
+  if(!ss.length)return null;
+  const tp=(R.tempoAx&&R.tempoAx.jatekos)||R.tempo||"normal";
+  const k=(GAME_TEMPO[tp]||GAME_TEMPO.normal).k,norm=GAME_TEMPO.normal.k/k;
+  const pcts=ss.map(s=>{const h=H[s],base=Math.max(40,h.nat||oppTargetRating||84);
+    return ((h.lift||0)+(h.mid||0))/base*100*norm;});
+  const avg=pcts.reduce((a,b)=>a+b,0)/pcts.length;
+  const s=Math.max(0,Math.min(100,Math.round(50+6*avg)));   /* 100 pont ≈ 8%/idény átlagos emelés */
+  const ossz=ss.reduce((a,x)=>a+(H[x].lift||0)+(H[x].mid||0),0);
+  return {k:"padlo",n:"Mezőny-emelés",w:1.5,s,
+    d:`${ss.length} idény · összesen +${ossz.toFixed(1).replace(".",",")} Rating · átlag ${avg.toFixed(1).replace(".",",")}%/idény`
+      +(Math.abs(norm-1)>0.01?` (a ${(GAME_TEMPO[tp]||GAME_TEMPO.normal).n} tempóhoz mérve)`:"")};}
+/* ---- A FELÜLET ---- */
+function pyrFloorSummer(){
+  try{return gameMode==="career"&&pyrFloorOn()&&!twWindowOpen()&&!twClosedNow()&&!preSeasonHubMode
+    &&(S.seasonHistory||[]).length>0;}catch(e){return false;}}
+function pyrFloorLabel(g){
+  const d=pyrDiffForGap(g);
+  return `${(g>=0?"+":"−")+Math.abs(g).toFixed(1).replace(".",",")}${d?` · ${d.n}`:""}`;}
+/* A VÁLLALÁS KÉPERNYŐJE — ugyanaz a felület (#scUnlock), mint a nyári
+   döntéseké. A választás a P.vallNext-be kerül; a kezdőrúgás fogja be a
+   határok közé és rögzíti. */
+function pyrFloorOffer(next,fromHub){
+  const done=()=>{try{next&&next();}catch(e){}};
+  if(!pyrFloorOn()||S.auto){done();return;}
+  const P=S.pyr,sn=pyrFloorUpcoming(),b=pyrFloorBounds(sn);
+  let g=pyrFloorWantFor(sn);
+  const box=$("scUnlock");if(!box){done();return;}
+  ["scHub","scSim","scWindow"].forEach(id=>{const el=$(id);if(el)el.classList.add("hide");});
+  box.classList.remove("hide");
+  const rajz=()=>{
+    $("unlockTitle")&&($("unlockTitle").textContent=`🎚 Vállalás — a ${sn}. idény`);
+    const t=$("unlockBody");
+    if(t)t.innerHTML=`<div style="font-size:13px;line-height:1.55">
+      A mezőny a kezdőrúgáskor <b>legalább</b> ennyivel lesz alattad (meccs-erőben) — ha magától erősebb, az marad.
+      <div style="font-family:'Archivo Black';font-size:26px;color:var(--gold);margin:10px 0 2px">${esc(pyrFloorLabel(g))}</div>
+      <div style="font-size:12px;color:var(--dim)">Tavaly: ${esc(pyrFloorLabel(b.prev))} · a karrier eleji: ${esc(pyrFloorLabel(b.g0))}</div>
+      <div style="font-size:12px;color:var(--dim);margin-top:6px">Nehezíteni ${b.ok?`<b>0,2-vel</b> lehet (sikeres idény után)`:`most <b>nem</b> lehet — csak bajnoki cím vagy feljutás után`}; könnyíteni legfeljebb ${esc(pyrFloorLabel(b.hi))}-ig. A nehezebb vállalás a Run-plafont emeli.</div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+        <button class="btn-s" id="pyrVallMinus" ${g<=b.lo+1e-9?"disabled":""}>− nehezebb</button>
+        <button class="btn-s" id="pyrVallPlus" ${g>=b.hi-1e-9?"disabled":""}>+ könnyebb</button></div></div>`;
+    const m=$("pyrVallMinus"),pl=$("pyrVallPlus");
+    if(m)m.onclick=()=>{g=Math.max(b.lo,Math.round((g-0.1)*10)/10);rajz();};
+    if(pl)pl.onclick=()=>{g=Math.min(b.hi,Math.round((g+0.1)*10)/10);rajz();};
+    const act=$("unlockActions");
+    if(act){act.innerHTML="";
+      const ok=document.createElement("button");ok.className="btn-y stepbtn";
+      ok.textContent=fromHub?"Rendben — vissza a HUB-ba":"Rendben, ezzel indulok";
+      ok.onclick=()=>{P.vallNext=g;box.classList.add("hide");try{saveGame();}catch(e){}
+        if(fromHub){try{renderHub();$("scHub").classList.remove("hide");}catch(e){}}done();};
+      act.appendChild(ok);}};
+  rajz();
+  box.scrollIntoView({behavior:"smooth"});}
 /* ---- EGY MÉRKŐZÉS VÁRHATÓ PONTJA ADOTT ERŐKÜLÖNBSÉGNÉL ----
    Nem becslés: ugyanaz a két Poisson, amiből a mérkőzés is dolgozik
    (matchLambdas / SIM). Nyolc gólig összegzünk — afölött a valószínűség már
@@ -39786,6 +40052,10 @@ function pyrConfirmDiv(){
   try{kaPyrPickCapture(d);}catch(e){}
   pyrPending=false;
   pyrStart(d,pyrPendingSpeed,sq,pyrMpSetup()?pyrPendingUp:pyrPickUp);
+  /* ⛰ 3.9.210 — az új karrier a PADLÓ szabályával fut. Közös karrierben a
+     szoba csomagja dönt (régi házigazda → régi szabály mindkettőnél). */
+  try{const _mp=(typeof MP!=="undefined"&&MP&&MP.active);
+    if(S.pyr&&(!_mp||MP.role==="host"||_mpPadlo))S.pyr.padlo=1;}catch(e){}
   /* A VÁLLALT nehézség elmegy az állapotba — a kezdőrúgás ebből váltja be az
      ígéretet (pyrAnchorAtKickoff). Közös karrierben nem tesszük el: ott a
      szintet a két menedzser alkuja adja. */
@@ -65633,6 +65903,8 @@ async function mpStartExchange(onReady){
     /* 🤝 3.9.182: az osztályom és a világom szerkezete — ebből tudja a társ
        gépe a szintugrás felajánlása ELŐTT, hogy erősebb osztályban vagyok-e */
     pd:mpPyrMine(),
+    /* ⛰ 3.9.210 — a következő idény vállalása (már a határok közé fogva) */
+    vall:(()=>{try{return pyrFloorOn()?pyrFloorWantFor(mpUpcomingSeason()):null;}catch(e){return null;}})(),
     season:mpUpcomingSeason(),at:Date.now()};
   if(!mpStartRecOk(node&&node[myField]))await mpReput(key,myField,null,myBidRec);
   if(!_mpStartBusy)return;
@@ -79439,6 +79711,7 @@ function pyrRetuneOfferable(){
      kifizetett Run-szint nyomtalanul elveszne. Nem tiltás, hanem a kalibráció
      következménye — a beragadás ott már nem a mezőny miatt van. */
   if(typeof pyrSuperOn==="function"&&pyrSuperOn())return false;
+  if(typeof pyrFloorOn==="function"&&pyrFloorOn())return false;   /* ⛰ 3.9.210 — a padló mellett nincs mit hangolni */
   if(S.auto)return false;                   /* auto szezonban nincs döntés */
   if(!((S&&S.pyr&&S.pyr.log)||[]).length)return false;   /* még nincs lezárt idény */
   if(pyrWentUpLast())return false;           /* feljutottál — nem ragadtál be */
@@ -79638,6 +79911,7 @@ function pyrLeapOfferable(){
      feljebb is UGYANAZT a nehézséget kapnád — csak a büdzséd árán. Lásd
      pyrSuperOn. */
   if(typeof pyrSuperOn==="function"&&pyrSuperOn())return false;
+  if(typeof pyrFloorOn==="function"&&pyrFloorOn())return false;   /* ⛰ 3.9.210 — a padló mellett nincs szintugrás */
   if(pyrLeapActive())return false;
   const t=pyrLeapTarget();
   if(!t)return false;
@@ -88885,7 +89159,9 @@ function runBreakdown(){
     {const L=S.pyr.log||[];
      const up=L.filter(x=>x.to<x.div).length;
      if(up>0)rows.push({k:"pyrup",n:"Feljutások",w:0.2*up,s:100,
-       d:`${up} feljutás${L.filter(x=>x.to>x.div).length?` · ${L.filter(x=>x.to>x.div).length} kiesés (nem von le)`:""}`});}}
+       d:`${up} feljutás${L.filter(x=>x.to>x.div).length?` · ${L.filter(x=>x.to>x.div).length} kiesés (nem von le)`:""}`});}
+    /* ⛰ 3.9.210 — a mezőny-emelés */
+    try{const fr=pyrFloorRunRow();if(fr)rows.push(fr);}catch(e){}}
   let num=0,den=0;
   rows.forEach(r=>{num+=r.s*r.w;den+=r.w;});
   const base=den?Math.max(0,Math.min(100,num/den)):0;
@@ -92890,6 +93166,14 @@ function renderHub(){
      üresen nem foglal helyet a menüben. A felirat a lényeget mondja: hány licit
      vár DÖNTÉSRE, mert az a sürgős; a kirakatban álló, még ajánlat nélküli
      emberek csak háttér-információ. */
+  /* ⛰ A KÖVETKEZŐ IDÉNY VÁLLALÁSA (3.9.210) — nyáron, a padlós karrierben */
+  {const vb=$("hubVallBtn");
+   if(vb){let on=false;try{on=pyrFloorSummer();}catch(e){on=false;}
+     vb.classList.toggle("hide",!on);
+     if(on){const sn=pyrFloorUpcoming(),g=pyrFloorWantFor(sn);
+       vb.innerHTML=`🎚 A ${sn}. idény vállalása: <b>${esc(pyrFloorLabel(g))}</b>`
+         +`<small style="display:block;font-size:11px;opacity:.8">a mezőny a kezdőrúgáskor legalább ennyivel lesz alattad — koppints a módosításhoz</small>`;
+       vb.onclick=()=>pyrFloorOffer(null,true);}}}
   /* 🔭 MEGFIGYELT JÁTÉKOSOK (3.9.206): a kapcsolóval, vagy ha van kit nézni */
   {const wb=$("hubWatchBtn");
    if(wb&&gameMode==="career"&&careerPool){
@@ -96305,7 +96589,15 @@ function beginNextSeasonWithChallenges(){
        „nem jutottam feljebb" helyzetben az első kérdés a mentőöv. Ha nincs
        ajánlat, azonnal továbbenged. */
     const _retune=()=>{try{pyrRetuneOffer(_leap);}catch(e){_leap();}};
-    const _after=()=>{ if(_turn&&!S.auto)showPyrTurnReveal(_turn,_retune); else _retune(); };
+    /* ⛰ 3.9.210 — a padlós karrierben hangolás és ugrás helyett a VÁLLALÁS.
+       Közös karrierben a vállalás már a kézfogással elment (a HUB gombjáról),
+       ott nincs mit kérdezni. */
+    const _vall=()=>{
+      const mp=(typeof h2hRoomActive==="function")&&h2hRoomActive();
+      if(mp){_offerMp();return;}
+      try{pyrFloorOffer(_offerMp);}catch(e){_offerMp();}};
+    const _kov=()=>{try{return pyrFloorOn()?_vall:_retune;}catch(e){return _retune;}};
+    const _after=()=>{ const nx=_kov(); if(_turn&&!S.auto)showPyrTurnReveal(_turn,nx); else nx(); };
     _after();});});}
 /* ================= 🧿 TALIZMÁNOK — F1–F2 (3.9.141) =================
    KIMONDOTT KÉRÉS (a teljes terv: docs/talizmanok-terv.md): „szezononként
@@ -100600,7 +100892,9 @@ function startNextCareerSeason(){
      mezőnyre. A keret ekkor már a rajtoló keret (nyári igazolások, öregedés,
      friss morál mind benne), tehát a mért meccs-erő a valódi. D0 alatt nem
      csinál semmit. Lásd pyrSuperKickoff. */
-  try{pyrSuperKickoff();}catch(e){}
+  /* ⛰ 3.9.210 — az új karrierekben a PADLÓ (minden osztályban, egyoldalú),
+     a régiekben a szuperliga-kalibráció, változatlanul */
+  try{if(pyrFloorOn())pyrFloorKickoff();else pyrSuperKickoff();}catch(e){}
   try{talBombaAblakZar();}catch(e){}   /* 💣 F6b — a nyári ablak zárása */
   buildSeasonFixtures();
   try{pyrOppRefresh();}catch(e){}   /* a friss menetrend is a mostani erőket lássa */
@@ -114966,6 +115260,8 @@ function mpCollectSettings(){
     magyahEnabled,
     /* 🔭 a valósághű scout is VILÁG-tulajdonság (3.9.207) — lásd scoutRealWanted */
     scoutReal:!!scoutRealWanted,
+    /* ⛰ 3.9.210 — a padló szabálya is világ-tulajdonság */
+    padlo:1,
     wcEnabled,familyEnabled,familyNameMode,
     familyCustomNames:(familyCustomNames||[]).slice(),
     slotRoles:JSON.parse(JSON.stringify(slotRoles||{})),
@@ -115037,6 +115333,7 @@ function mpApplySettings(s){
   /* 🔭 régi szobában nincs mező — ott KI, ahogy eddig (a szoba előtti világban
      nem is létezett) */
   scoutRealWanted=!!s.scoutReal;
+  _mpPadlo=!!s.padlo;
   try{renderScoutRealGrid();updateScoutRealVisibility();}catch(e){}
   familyEnabled=!!s.familyEnabled;
   familyNameMode=s.familyNameMode||"default";
@@ -118011,7 +118308,8 @@ function meresBeall(){
     magyah:!!mTry(()=>magyahOn()),vb:!!mTry(()=>wcOn()),
     felallas:mTry(()=>form),mezony:mR1(mTry(()=>oppTargetRating)),
     piramis:P?{oszt:P.my,kezdoOszt:P.startDiv,sebesseg:P.aiSpeed,rés:P.gapWantMp!=null?P.gapWantMp:mTry(()=>pyrWantedGap),
-      fok:P.diffT!=null?P.diffT:null,eltolas:P.worldShift||0,klubNyers:P.clubRaw||null,klubEff:P.clubEff||null,gap0:P.gap0}:null,
+      fok:P.diffT!=null?P.diffT:null,eltolas:P.worldShift||0,klubNyers:P.clubRaw||null,klubEff:P.clubEff||null,gap0:P.gap0,
+      padlo:P.padlo?1:0}:null,
     szint:mR1(mTry(()=>levelGap())),scout:mTry(()=>scout?{nev:scout.name,csillag:scout.stars}:null),
     ugynokseg:mR1(mTry(()=>agencyStars())),edzo:mTry(()=>coach?{nev:coach.n||coach.name||null,csillag:coach.stars||null}:null),
     kapitany:mTry(()=>slots[captainIdx]&&slots[captainIdx].player&&slots[captainIdx].player.n),
@@ -118107,6 +118405,10 @@ function meresSzezonZar(){
     z.tav=(z.keretKezd||[]).filter(n=>!most.has(n));}catch(e){}
   /* kupa */
   try{const E=S.euro;if(E&&E.comp)z.kupa={k:E.comp,ered:E.result||null,kiesett:E.outAt||null,szakasz:E.stage};}catch(e){}
+  /* ⛰ 3.9.210 — a padló: vállalás, a mezőny emelése (rajt + tél) */
+  try{if(pyrFloorOn()){const h=pyrFloorHist()[z.sz];
+    z.padlo=h?{vall:h.g,cel:h.want,emelesRajt:h.lift||0,emelesTel:h.mid||0,termeszetes:h.nat,resElotte:h.elotte,resUtana:h.utana}
+      :{vall:pyrFloorG0(),cel:pyrFloorG0(),emelesRajt:0,emelesTel:0};}}catch(e){}
   meresSave();
   try{meresFeltolt(false);}catch(e){}}
 /* ---- KIVONAT ---- */

@@ -72,7 +72,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     beginNewGame=_b;
     o.bng=window.__bng;o.quickUtan=${vis("scQuick")};o.scout=${vis("scScout")};o.gm=gameMode;o.cs2=careerStart;
     return o;`));
-  ok(r1.v==="3.9.209"&&r1.gyors===true,"alapból gyors indítás",r1);
+  ok(String(r1.v).localeCompare("3.9.209",undefined,{numeric:true})>=0&&r1.gyors===true,"alapból gyors indítás",r1);
   ok(r1.quick&&!r1.setup&&r1.modeSel==="pyr"&&r1.recap>=5,"a kezdőlap gombja a két kérdést nyitja (a választott fajtával), alatta az alapbeállítások",r1);
   ok(r1.cs==="club"&&r1.tarStart==="club"&&r1.pyr===false&&r1.pyr2===true,"a fajta és a kezdés átváltható, és a tárba íródik",r1);
   ok(r1.bng===1&&!r1.quickUtan&&r1.scout&&r1.gm==="career"&&r1.cs2==="draft","az „Indulás” a beginNewGame-et futtatja — indul a scout és a draft",r1);

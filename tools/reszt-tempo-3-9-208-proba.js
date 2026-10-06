@@ -47,7 +47,7 @@ const kozel=(a,b,e)=>Math.abs(a-b)<(e||1e-6);
   console.log("\n— 0. betöltés —");
   const r0=await p.evaluate(()=>({v:APP_VERSION,sorok:document.querySelectorAll("#tempoAxRows select[data-tax]").length,
     sum:document.getElementById("tempoAxSum").textContent}));
-  ok(r0.v==="3.9.208"&&r0.sorok===4,"a betöltéskor kirajzolódik a négy választó (nincs TDZ-csapda)",r0);
+  ok(String(r0.v).localeCompare("3.9.208",undefined,{numeric:true})>=0&&r0.sorok===4,"a betöltéskor kirajzolódik a négy választó (nincs TDZ-csapda)",r0);
 
   /* karrier, piramissal — a csatornák méréséhez */
   await p.evaluate(()=>{
