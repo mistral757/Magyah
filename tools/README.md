@@ -48,6 +48,19 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## boost-mezony-3-9-216-proba.js — 📈 3.9.216: a boostok POT-ja és a „+2 Rating” jutalom a mezőnnyel
+
+```bash
+node tools/boost-mezony-3-9-216-proba.js
+```
+
+**23 állítás**, valódi böngészőben.
+
+* **85-ös mezőnyig változatlan:** ifi 1000–2500, öreg 1200–3000, sima 400–2500, POT 1000–10 000, kártya +2.
+* **Fölötte:** a szorzó `peakToPot(mezőny) ÷ peakToPot(85)` (100-asnál ~×3, 400-asnál ~×640) — ugyanaz, mint a kihívás POT-jutalmáé; a Rating-lépték változatlan.
+* **Felület:** az ifi- és öreg-boost panelje, a Boost-központ leírásai a skálázott sávot írják.
+* **Kártya-fejlesztés:** 400-as mezőnyben +8, azonnal és a szezonkártyák utánra halasztva is; a régi, összeg nélküli függő +2.
+
 ## ertesitesek-3-9-215-proba.js — 🔔 3.9.215: értesítések a játékon belül
 
 ```bash
