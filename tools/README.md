@@ -48,6 +48,20 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## pot-plafon-3-9-212-proba.js — 📈 3.9.212: a POT nem esik vissza 200 000-re
+
+```bash
+node tools/pot-plafon-3-9-212-proba.js
+```
+
+**20 állítás**, valódi böngészőben.
+
+* **A kemény plafon a mezőnnyel nő:** 111-es mezőnyig 200 000, fölötte `peakToPot(mezőny + 100)`, monoton.
+* **A három régi vágó ág** (kihívás-jutalom POT, 🌠 Csodagyerek, ∞ nyitó ×1,5) a plafon fölötti POT-ot nem vágja le; a jutalom a 9000 fölötti felnőttet sem.
+* **Minden boost-fajta** (ifi, öreg, sima, POT, szezonkártya) plafon fölött: a POT sosem csökken.
+* **A felhasználó útja:** 400-as Ratingű, 900 000-es POT-ú ifi a HUB ifi-boost paneljén → a POT és a Rating is nő, a könyvelés és a visszajelzés a valódi számot írja.
+* **Ifi-felzárkózás:** magas mezőnyben a Ratingje szerinti POT-ig.
+
 ## kupa-csak-donto-3-9-211-proba.js — ⚔ 3.9.211: közös kupa, csak a döntőben
 
 ```bash
@@ -110,7 +124,7 @@ node tools/padlo-vallalas-3-9-210-proba.js
 node tools/gyors-inditas-3-9-209-proba.js
 ```
 
-**22 állítás**, valódi böngészőben.
+**20 állítás**, valódi böngészőben.
 
 * **Gyors indítás:**
   * a kezdőlap gombja a két kérdést nyitja;

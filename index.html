@@ -7285,7 +7285,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.211";
+const APP_VERSION="3.9.212";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -26947,9 +26947,35 @@ function canYouthBoost(entry){
    akadémián nevelődik — ikonok nem, öreg csirkefogók nem. */
 const POT_HARD_CAP=200000;
 const POT_SOFT_CAP=9000;
+/* ================= A KEMÉNY PLAFON A MEZŐNNYEL NŐ (3.9.212) =================
+   BEJELENTETT HIBA: „boosttal nem lehet 200k fölé vinni a POT-ot, de hogy
+   vissza is ugrik ha boostolod, azt nem gondoltam." Egy 400 fölötti Ratingű
+   ifi, akinek a POT-ja eleve 200 000 fölött állt, a boost után 200 000-en
+   maradt — a Ratingje nőtt, a POT-ja visszaesett.
+
+   A KÉT HIBA EGY TŐRŐL FAKADT. A 200 000 egy rögzített szám volt, a mezőny
+   viszont nem rögzített: a POT ↔ csúcs görbén (peakToPot) a 200 000 nagyjából
+   egy 212-es csúcsnak felel meg. Egy 400-as mezőnyben az akadémia MAGÁTÓL is
+   egymillió fölötti POT-tal adja a tehetségeket (peakToPot(rating+8)), tehát
+   ott a „kemény" plafon már semmit nem korlátozott — csak a boost
+   POT-ajándékát nyelte el (aki fölötte állt, annak a boost NULLA POT-t adott),
+   és három helyen, ahol a képlet `min(plafon, …)` volt `max(mostani, …)`
+   nélkül, LE IS VÁGTA a POT-t a plafonra: a kihívás-jutalom POT-boostja, a
+   🌠 Csodagyerek talizmán és az Infinity nyitó ×1,5-e.
+
+   MOSTANTÓL a kemény plafon a mezőny fölött POT_CAP_HEADROOM Ratingnyi csúcsig
+   enged: max(200 000, peakToPot(mezőny + 100)). 111-es mezőnyig ez pontosan a
+   régi 200 000 — a karrier eleje és a 100 alatti játék nem változik —, egy
+   150-es mezőnyön ~350 000, egy 400-ason ~2,9 millió. A lágy plafon (9000) és
+   a szabály, hogy ajándék sosem vesz el, változatlan. */
+const POT_CAP_HEADROOM=100;
+function potHardCap(){
+  let top=0;
+  try{top=Number(oppTargetRating)||0;}catch(e){top=0;}
+  return Math.max(POT_HARD_CAP,peakToPot(top+POT_CAP_HEADROOM));}
 function potCapFor(entry){
-  if(infinityMode)return POT_HARD_CAP;
-  if(entry&&(canYouthBoost(entry)||inAcademy(entry.n)))return POT_HARD_CAP;
+  if(infinityMode)return potHardCap();
+  if(entry&&(canYouthBoost(entry)||inAcademy(entry.n)))return potHardCap();
   return POT_SOFT_CAP;}
 function applyYouthBoost(entry){
   msNoteBoost();   /* mérföldkő: berobbantott tehetségek darabszáma */
@@ -27043,13 +27069,13 @@ function boostLift(cur,target,cap){
    azt szabályozza, meddig nőhet egy játékos értéke magától. A boost viszont
    megvásárolt, egyszeri, szándékos ajándék — ha ezt is a piaci plafon fogná
    meg, a HUB legdrágább fejlesztése pont a legjobb emberednél érne semmit.
-   Ezért a POT-ajándékot CSAK az abszolút mennyezet (POT_HARD_CAP) fogja.
+   Ezért a POT-ajándékot CSAK az abszolút mennyezet (potHardCap) fogja.
 
    MIÉRT NEM CSAK A PLAFON FÖLÖTTIEKNEK: mert abból szakadék lenne. 8500-nál
    500-at kapnál, 9500-nál a teljes 3000-et. Az ajándék MINDENKINEK teljes. */
 function boostGiftPot(cur,add){
   const c=cur||0;
-  return Math.max(c,Math.min(POT_HARD_CAP,c+(add||0)));}
+  return Math.max(c,Math.min(potHardCap(),c+(add||0)));}
 /* ---- A MÁR MEGTÖRTÉNT KÁR HELYREÁLLÍTÁSA ----
    A hiba a boost KÖNYVELÉSÉBEN is nyomot hagyott: a naplózott nyereség
    (oldBoostT / youthBoostT / oldBoostR / youthBoostR) NEGATÍV lett, mert a
@@ -27837,7 +27863,7 @@ function infinityOwnedPotBoost(){
     if(!e||e._infPotBoosted)return;
     e._infPotBoosted=true;
     const beforePot=e.pot||0,beforePeak=e.peak||0;
-    e.pot=Math.min(POT_HARD_CAP,Math.round(beforePot*INFINITY_OWNED_POT_MULT));
+    e.pot=boostLift(beforePot,Math.round(beforePot*INFINITY_OWNED_POT_MULT),potHardCap());
     e.peak=Math.min(ratingCap(),Math.max(e.peak||0,potToPeakOvr(e.pot)));
     e.basePeak=Math.max(e.basePeak||0,e.peak);
     if(e.basePot!=null)e.basePot=Math.max(e.basePot,e.pot);
@@ -46261,7 +46287,7 @@ function youthPotAlign(entry){
   /* A kemény plafon, nem a potCapFor puha plafonja: az a BOOSTOK határa
      (meddig tolhatod pénzért), ez viszont a pályán már bizonyított tehetség
      elismerése — egy 143-as Ratingű ember POT-ja a puha plafon fölött is áll. */
-  const cel=Math.min(POT_HARD_CAP,peakToPot(now));
+  const cel=Math.min(potHardCap(),peakToPot(now));
   if(!((entry.pot||0)<cel))return 0;
   const volt=entry.pot||0;
   entry.pot=cel;
@@ -51715,8 +51741,11 @@ function applyChallengeReward(rw){
     case "pot":{
       if(!roster.length)return "POT-boost (nincs játékos)";
       const p=pick(roster),e=careerPool&&careerPool[p.n];
-      if(e){e.pot=Math.min(potCapFor(e),e.pot+rw.amount);
-        e.peak=Math.min(ratingCap(),Math.max(e.peak,potToPeakOvr(e.pot)));
+      /* 3.9.212 — AJÁNDÉK, tehát a boostok szabálya: csak a kemény plafon
+         fogja, és sosem visz lejjebb (eddig min(plafon, …) volt: a plafon
+         fölött állót LEVÁGTA, a 9000 fölötti felnőttet a lágy plafonra). */
+      if(e){e.pot=boostGiftPot(e.pot,rw.amount);
+        e.peak=boostLift(e.peak,potToPeakOvr(e.pot),ratingCap());
         p.pot=e.pot;}
       return `${shortName(p.n)} +${rw.amount} POT`;}
     case "skill":{
@@ -74966,7 +74995,7 @@ function registerIconInPool(icon){
      A lépés PONTOSAN ugyanaz, amit az applyMarketShift tesz a piaci
      játékosoknál (pot = max(basePot, peakToPot(peak))) — csak most az ikon is
      átmegy rajta. Fölfelé hat: egy amúgy is magasabb POT-t nem ront le. */
-  pot=Math.max(pot,Math.min(POT_HARD_CAP,peakToPot(peak)));
+  pot=Math.max(pot,Math.min(potHardCap(),peakToPot(peak)));
   const startRating=Math.max(icon.ovr,(cur&&cur.startRating)||0);
   const youthBonus=Math.max(0,startRating-ratingAtAge(peak,age));
   if(cur){
@@ -98316,7 +98345,7 @@ function talF6bSzezonvaltas(){
        if(!best||e.age<best.age)best=e;});}catch(e){}
      if(best){
        const volt=best.pot||0;
-       best.pot=Math.min(POT_HARD_CAP,Math.round(volt*(1+v/100)));
+       best.pot=boostLift(volt,Math.round(volt*(1+v/100)),potHardCap());   /* 3.9.212: sosem lejjebb */
        A.csoda=sz;
        try{addLine(`🌠 <b>CSODAGYEREK</b> — ${esc(shortName(best.n))} (${best.age} év), a legfiatalabb kezdőd: POT ${fmtNum(volt)} → <b>${fmtNum(best.pot)}</b>.`,"m mvp");}catch(e){}}}}
   /* 🌱 MÁSODIK TAVASZ: egy 30 feletti játékos Ratingje +3; kontra: a stáb Sz −v */
