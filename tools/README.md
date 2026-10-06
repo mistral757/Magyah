@@ -48,6 +48,18 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## ertesitesek-3-9-215-proba.js — 🔔 3.9.215: értesítések a játékon belül
+
+```bash
+node tools/ertesitesek-3-9-215-proba.js
+```
+
+**25 állítás**, valódi böngészőben.
+
+* **Szundi:** a ⏳ az idény végéig (legalább 5 fordulóig) hallgattat el, a téma megújulása nem törli, a Vezetés menüben „Ébresztés” gombbal visszahozható.
+* **Megbízás a középpályán:** a valódi megbízás-táblát nézi; beállított megbízásnál vagy a választó megnyitása után nem esedékes; nincs a kezdőrúgás előtti push-ok közt.
+* **🆕 Újdonságok:** csendes kezdés; új lelátó és a „Mutasd”; scout-szintenként egyszer; kikapcsolva csendben jegyez; minden figyelő (átigazolási esemény, ügynökség, stáb-hely, keret, felállás) hiba nélkül fut.
+
 ## pvp-gyors-fajta-3-9-214-proba.js — 🤝 3.9.214: gyors indítás PvP-szobában, a közös karrier fajtája
 
 ```bash

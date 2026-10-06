@@ -3002,6 +3002,12 @@ body.stadium.stadiumLive .immRow{display:none}
 #vezPush{border-color:var(--grass)}
 #vezPush.lent{top:calc(78px + env(safe-area-inset-top))}
 #vezPush .mpPingTx small b{display:inline;font-size:inherit;color:var(--ink)}
+/* 🆕 3.9.215 — az újdonság-értesítés arany kerettel; a „Mutasd" felvillantja a célt */
+#vezPush.uj{border-color:var(--gold)}
+#vezPush .mpPingBtns button.hide{display:none}
+@keyframes ujVillan{0%,100%{box-shadow:0 0 0 0 rgba(212,175,55,0)}50%{box-shadow:0 0 0 4px rgba(212,175,55,.75)}}
+.ujVillan{animation:ujVillan .85s ease-in-out 3}
+@media (prefers-reduced-motion:reduce){.ujVillan{animation:none;outline:3px solid var(--gold)}}
 #vezPush .vezPushGo{border-color:var(--grass);color:var(--grass)}
 /* ---- A KÜLDŐ OLDAL: a tíz hangulatjel ----
    MIND A TÍZ LÁTSZIK. Az első változat vízszintesen görgethető sor volt —
@@ -7285,7 +7291,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.214";
+const APP_VERSION="3.9.215";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -23507,6 +23513,7 @@ function cycleSlotRole(f,i,dir){
   const at=opts.indexOf(effectiveSlotPos(f,i));
   const next=opts[((at+(dir||1))%n+n)%n];
   setSlotRole(f,i,next);
+  try{if(isMidRoleSlot(f,i))teachMidRoleMark();}catch(e){}   /* 🔔 3.9.215 */
   return next;}
 /* Hány védekező / klasszikus / támadó középpályás van jelenleg beállítva.
    A szélsőre állított helyek külön számlálón futnak (JSZ/BSZ), hogy a
@@ -33842,6 +33849,19 @@ $("guideTipOff")&&($("guideTipOff").onclick=()=>{
 const TEACH_MODES=["hard","guided","light","off"];
 const TEACH_NUDGE_MAX=3;      /* egyszerre legfeljebb ennyi jelzés egy képernyőn */
 const TEACH_SNOOZE_ROUNDS=3;  /* a „Most nem" ennyi fordulóra hallgattat el */
+/* 🔔 3.9.215 — A PUSH SZUNDIJA (⏳) TARTÓS. BEJELENTETT HIBA: „Nem működik a
+   szundi gomb, legalábbis nem tartós." Két oka volt: (1) a ⏳ mindössze 3
+   fordulóra hallgattatott el, a kezdőrúgás előtti push pedig MINDEN fordulóban
+   szólhat — három meccs után ugyanaz a sáv ugyanazzal jött vissza; (2) a
+   megújuló témák (pl. az elkölthető stíluspont) minden új ponttal TÖRÖLTÉK a
+   halasztást, vagyis a szundi a következő mérföldkőnél elpárolgott.
+   MOSTANTÓL a ⏳ az IDÉNY VÉGÉIG hallgattat el (de legalább 5 fordulóra, hogy
+   egy idény utolsó fordulóiban se legyen jelképes), és a halasztást a téma
+   megújulása nem törli — a szundi kifejezett döntés, kitart, amíg le nem jár. */
+const TEACH_PUSH_SNOOZE_MIN=5;
+function teachPushSnoozeUntil(){
+  const now=teachNow(),sn=(S&&S.seasonNumber)||1;
+  return Math.max(now+TEACH_PUSH_SNOOZE_MIN,sn*30);}
 /* Ennyi SZEZONON át jelezhet egy téma úgy, hogy nem történik semmi — utána
    magától elhallgat. A felhasználó nemet mondhat hallgatással is; egy jelzés,
    amit három éven át figyelmen kívül hagytak, már nem emlékeztet, csak zajong.
@@ -33920,6 +33940,9 @@ function teachTipsOn(){const m=teachMode();return m==="hard"||m==="guided";}
 /* A régi S.guideOn a TIPPEK kapcsolója maradt: 24 helyen hivatkozik rá a kód a
    guideEnabled()-en át. Nem írjuk át mind — a mód VEZETI, nem helyettesíti. */
 function teachSyncLegacy(){if(S)S.guideOn=(gameMode==="career")&&teachTipsOn();}
+/* 🔔 3.9.215 — a megbízás-választót megnyitotta (lásd a "mid:role" témát) */
+function teachMidRoleSeen(){const t=teachStateObj();return !!(t&&t.topics["mid:role"]&&t.topics["mid:role"].seen);}
+function teachMidRoleMark(){try{const r=teachTopicRec("mid:role");if(r)r.seen=1;}catch(e){}}
 function teachTopicRec(key){
   const t=teachStateObj();if(!t)return null;
   if(!t.topics[key])t.topics[key]={st:0};
@@ -34119,11 +34142,20 @@ const TEACH_TOPICS={
     a:"hubRoster",g:"megbizas",
     why:"A középpályásaid mind alapbeállításon állnak. A megbízás ingyenes, bármikor átállítható — és valódi tétje van.",
     ready(){return teachInCareer();},
+    /* 🔔 3.9.215 — BEJELENTETT HIBA: „Vannak értesítések, amik helytelenül
+       popupolnak folyamatosan. Pl megbízás a középpályán." A régi feltétel az
+       S.roles-t nézte — az viszont a csapatstílus SZEZON-SZEREPEINEK táblája,
+       nem a megbízásoké. Aki nem használt szezon-szerepet, annál a téma ÖRÖKRE
+       esedékes maradt, akárhogy állította a megbízásokat. A megbízás a
+       slotRoles-ban él; és mert a klasszikus (alap) megbízás ott NEM hagy
+       nyomot (setSlotRole törli), a választó MEGNYITÁSA is elintézettnek
+       számít (midRoleSeen) — aki megnézte és az alapnál maradt, az döntött. */
     due(){
       try{
-        const r=S.roles;
-        if(r&&r.map&&Object.keys(r.map).length)return false;   /* már nyúlt hozzá */
+        if(teachMidRoleSeen())return false;
         if(typeof isMidRoleSlot!=="function"||!FORMS[form])return false;
+        const sr=(typeof slotRoles!=="undefined"&&slotRoles&&slotRoles[form])||{};
+        if(Object.keys(sr).some(i=>isMidRoleSlot(form,+i)))return false;   /* már nyúlt hozzá */
         return FORMS[form].slots.some((p,i)=>isMidRoleSlot(form,i));
       }catch(e){return false;}},
     steps:[
@@ -34661,7 +34693,8 @@ function teachDueList(scr){
       try{sg=String(d.sig());}catch(e){sg=null;}
       if(sg!==null){
         if(!rec)rec=teachTopicRec(key);
-        if(rec.sig!==sg){rec.sig=sg;rec.n=0;rec.lastSeason=null;delete rec.snooze;}}}
+        /* 🔔 3.9.215: a halasztás (szundi) MARAD — az kifejezett döntés */
+        if(rec.sig!==sg){rec.sig=sg;rec.n=0;rec.lastSeason=null;}}}
     if(rec&&(rec.n||0)>=TEACH_GIVEUP)return;   /* háromszor jelzett, nem történt semmi */
     if(rec&&rec.snooze&&rec.snooze>now)return;
     try{
@@ -34835,7 +34868,7 @@ $("tNudgeWhyX")&&($("tNudgeWhyX").onclick=teachWhyClose);
    és meccs közben nem szól. */
 const VEZ_PUSH={
   "style:choose":"szezon","style:roles":"szezon","style:roles-carried":"szezon","tactic:change":"szezon",
-  "train:plan":"meccs","pos:wrong":"meccs","form:shape":"meccs","mid:role":"meccs","buy:bench":"meccs",
+  "train:plan":"meccs","pos:wrong":"meccs","form:shape":"meccs","buy:bench":"meccs",
   "sale:offers":"meccs","sched:derby":"meccs",
   "tal:draw":"reg","style:spend":"reg","chem:idle":"reg","star:grow":"reg","sys:token":"reg",
   "star:boost":"reg","scout:use":"reg","boost:early":"reg","roster:expand":"reg","agency:upgrade":"reg"};
@@ -34905,7 +34938,7 @@ function vezPushEl(){
     <span class="mpPingTx" id="vezPushTx"><b></b><small></small></span>
     <span class="mpPingBtns">
       <button type="button" class="vezPushGo" id="vezPushGo" title="Mutasd meg">Mutasd</button>
-      <button type="button" id="vezPushLater" title="Később — néhány fordulóig nem szól">⏳</button>
+      <button type="button" id="vezPushLater" title="Szundi — ebben az idényben erről nem szól (legalább 5 fordulóig)">⏳</button>
       <button type="button" id="vezPushX" title="Bezárás">✕</button></span>`;
   document.body.appendChild(el);
   const most=()=>_vezPushMost;
@@ -34913,20 +34946,28 @@ function vezPushEl(){
   el.querySelector("#vezPushGo").onclick=()=>{const k=most();vezPushHide();if(k)vezPushMutasd(k);};
   el.querySelector("#vezPushLater").onclick=()=>{
     const k=most(),r=k&&teachTopicRec(k);
-    if(r){r.snooze=teachNow()+TEACH_SNOOZE_ROUNDS;teachSave();}
+    if(r){r.snooze=teachPushSnoozeUntil();teachSave();
+      try{const d=TEACH_TOPICS[k];
+        addLine(`⏳ „${esc((d&&d.n)||"")}" — szundi: ${r.snooze-teachNow()} fordulóig nem szól (a Vezetés menüben bármikor visszahozhatod).`,"m ev");}catch(e){}}
     vezPushHide();try{teachNudgeRescan();}catch(e){}};
   el.querySelector("#vezPushX").onclick=()=>vezPushHide();
   return el;}
 function vezPushNext(){
   const k=_vezPushQ.shift();
   if(!k){_vezPushMost=null;return;}
-  const d=TEACH_TOPICS[k];if(!d){vezPushNext();return;}
+  /* 🆕 3.9.215 — az ÚJDONSÁG-elem objektum (ujTick), a vezetés témája kulcs */
+  const uj=(typeof k==="object")?k:null;
+  const d=uj?null:TEACH_TOPICS[k];if(!uj&&!d){vezPushNext();return;}
   _vezPushMost=k;
   const el=vezPushEl();
-  el.querySelector("#vezPushE").textContent=d.mark||"🧭";
+  el.querySelector("#vezPushE").textContent=uj?uj.ic:(d.mark||"🧭");
   /* nev-ok: a TEACH_TOPICS bejegyzés címe, nem személy- vagy klubnév */
-  el.querySelector("#vezPushTx b").textContent=d.n||"Tennivaló";
-  el.querySelector("#vezPushTx small").innerHTML=`<b>${esc(VEZ_PUSH_CIM[VEZ_PUSH[k]]||"")}</b> · ${esc(d.why||"")}`;
+  el.querySelector("#vezPushTx b").textContent=uj?uj.t:(d.n||"Tennivaló");
+  el.querySelector("#vezPushTx small").innerHTML=uj?`<b>🆕 Újdonság</b> · ${esc(uj.x||"")}`
+    :`<b>${esc(VEZ_PUSH_CIM[VEZ_PUSH[k]]||"")}</b> · ${esc(d.why||"")}`;
+  /* az újdonság egyszeri: nincs mit szundizni rajta */
+  {const l=el.querySelector("#vezPushLater");if(l)l.classList.toggle("hide",!!uj);}
+  el.classList.toggle("uj",!!uj);
   let lent=false;try{const pb=$("mpPingBar");lent=!!(pb&&!pb.classList.contains("hide"));}catch(e){}
   el.classList.toggle("lent",lent);
   el.classList.remove("hide","mpPingIn");
@@ -34947,6 +34988,7 @@ function vezPushHide(){
 /* „Mutasd": ugyanaz az út, mint a jelzés „Mutasd meg" gombjáé — a HUB-téma
    előtt a HUB is kinyílik, ha a meccsképernyőn állsz. */
 function vezPushMutasd(key){
+  if(key&&typeof key==="object"){ujMutasd(key);return;}   /* 🆕 3.9.215 */
   const d=TEACH_TOPICS[key];if(!d)return;
   const go=()=>{
     if(d.pre){try{d.pre();}catch(e){}}
@@ -34962,7 +35004,135 @@ function vezPushMutasd(key){
     const hub=$("scHub");
     if(!hub||hub.classList.contains("hide")){try{openHubMidSeason();}catch(e){}setTimeout(go,350);return;}}
   go();}
-setInterval(()=>{try{vezPushTick();}catch(e){}},700);
+setInterval(()=>{try{vezPushTick();}catch(e){}try{ujTick();}catch(e){}},700);
+/* ================= 🆕 ÚJDONSÁG-ÉRTESÍTÉSEK (3.9.215) =================
+   KIMONDOTT KÉRÉS: „Legyenek értesítések arra, amikor új dolgok megnyílnak,
+   vagy elérhető lesz az áruk: pl emlékezetes meccs után szurkolói hangzás
+   megnyílik a klub arculata menüben, elérhető árú a scout fejlesztés, vagy van
+   felhasználatlan átigazolási esemény stb."
+
+   MIBEN MÁS, MINT A VEZETÉS PUSH-A: az egy ÁLLAPOTRÓL szól, amíg fennáll
+   (minden fordulóban újra kérdezhet), ez egy PILLANATRÓL — arról, hogy valami
+   MOST lett elérhető. Ezért EGYSZER szól minden egyes újdonságról, és nincs
+   szundija: a figyelő minden elemnek azonosítót ad (pl. a scout-fejlesztésnél
+   a mostani csillagszint), és amit egyszer bejelentett, azt megjegyzi
+   (S.teach.uj, a mentéssel utazik). Ha a következő szint is elérhető lesz, az
+   már új azonosító — arról újra szól.
+
+   HOL SZÓL: csak a HUB-ban, nyugalmi helyzetben (nem meccs, nem végigjátszás,
+   nem jutalom-lánc, nem futó bevezető) — ugyanazon a felül beúszó sávon, mint a
+   vezetés push-a, „🆕 Újdonság" címkével; a „Mutasd" odavisz.
+   AMI MÁR MEGVOLT, ARRÓL NEM SZÓL: az első futáskor (régi mentés, új karrier)
+   a figyelő csendben felveszi a mostani állapotot. Kikapcsolva is csendben
+   jegyez, hogy a visszakapcsoláskor ne zúduljon rád a múlt.
+   Saját kapcsolója van a Vezetés menüben, és a közös értesítés-kapcsoló
+   (Beállítások) is elnémítja. */
+const UJ_FIGY=[
+  /* 🏟️ A LELÁTÓ HANGJA — az izgalom-lépcsők nyitják (lásd LELATO) */
+  {k:"lelato",
+   ids(){return LELATO.filter(L=>L.kell>0&&lelatoNyitott(L)).map(L=>L.k);},
+   msg(id){const L=lelatoDef(id);
+     return {ic:L.ic,t:`Új lelátó nyílt: ${L.n}`,
+       x:`Egy ${L.kell}+ izgalmú meccs kinyitotta. A klub arculata → 7 · A lelátó hangja: választható, és bele is hallgathatsz.`};},
+   go(){identOpenPanel();setTimeout(()=>{const e=$("identLelato");if(e)e.scrollIntoView({block:"center",behavior:"smooth"});},250);}},
+  /* ⭐ A SZTÁR PIAC — a kapuja (keret-erő + ügynökség) teljesült */
+  {k:"sztarpiac",
+   ids(){return S.starMktSeen?["1"]:[];},
+   msg(){return {ic:"⭐",t:"Megnyílt a Sztár piac",
+     x:"Nyaranta az alap sávod fölötti játékosokat is kereshetsz, posztonként egyet — az Átigazolás menüben."};},
+   a:"hubStarMarketBtn"},
+  /* 🎲 FELHASZNÁLATLAN ÁTIGAZOLÁSI ESEMÉNY — időszakonként egyszer */
+  {k:"twEvent",
+   ids(){const b=$("hubTransferEventBtn");
+     if(!b||b.classList.contains("hide")||b.disabled)return [];
+     return [`${S.seasonNumber||1}|${twWindowOpen()?"w"+(S.twWindow.round||0):"nyar"}`];},
+   msg(){return {ic:"🎲",t:"Felhasználatlan átigazolási esemény",
+     x:`Nyitva az átigazolási időszak, és ${twEventLeft()}/${twEventMax()} eseményed vár — az időszak végén elvész.`};},
+   a:"hubTransferEventBtn"},
+  /* 🔭 SCOUT-FEJLESZTÉS — csillagszintenként egyszer */
+  {k:"scout",
+   ids(){if(!scout||scout.stars>=SCOUT_MAX_STARS)return [];
+     return (S.transferBudget||0)>=scoutUpgradePriceNow()?["s"+scout.stars]:[];},
+   msg(){return {ic:"🔭",t:"Elérhető áron: scout-fejlesztés",
+     x:`${scout.stars}★ → ${scout.stars+0.5}★ · ${fmtFt(scoutUpgradePriceNow())} — megvan rá a büdzséd.`};},
+   a:"hubScoutUpgradeBtn"},
+  /* 🤝 ÜGYNÖKSÉG-FEJLESZTÉS — szintenként egyszer */
+  {k:"ugynokseg",
+   ids(){return (S.transferBudget||0)>=agencyUpgradePrice()?["a"+agencyStars()]:[];},
+   msg(){const c=agencyStars();return {ic:"🤝",t:"Elérhető áron: ügynökség-fejlesztés",
+     x:`${c.toFixed(1)}★ → ${(c+0.5).toFixed(1)}★ · ${fmtFt(agencyUpgradePrice())} — megvan rá a büdzséd.`};},
+   a:"hubScoutUpgradeBtn"},
+  /* 🎓 ÚJ STÁB-HELY */
+  {k:"stabhely",
+   ids(){const cur=S.coachSlots||COACH_SLOTS_BASE;
+     if(coachSlots()>=coachSlotsMax())return [];
+     return (S.transferBudget||0)>=coachSlotPrice(cur)?["h"+cur]:[];},
+   msg(){const cur=S.coachSlots||COACH_SLOTS_BASE,n=coachSlots();
+     return {ic:"🎓",t:"Elérhető áron: új stáb-hely",
+       x:`${n} → ${n+1} személyi edző · ${fmtFt(coachSlotPrice(cur))} — a Szakmai stáb menüben.`};},
+   go(){openStaffPanel();}},
+  /* 👥 KERETBŐVÍTÉS */
+  {k:"keret",
+   ids(){const st=rosterExpandStep();
+     return (st&&(S.transferBudget||0)>=st.price)?["k"+st.from]:[];},
+   msg(){const st=rosterExpandStep();
+     return {ic:"👥",t:"Elérhető áron: keretbővítés",x:`${st.from} → ${st.to} fő · ${fmtFt(st.price)}.`};},
+   a:"hubRosterExpandBtn"},
+  /* 📋 A FELÁLLÁS-BOLT ÉS A SAJÁT FELÁLLÁS */
+  {k:"felallas",
+   ids(){const bud=S.transferBudget||0,o=[];
+     Object.keys(FORM_SHOP).forEach(k=>{if(!formBought(k)&&bud>=shopFormPrice(k))o.push("f"+k);});
+     if(bud>=customFormPrice())o.push("c"+Object.keys(S.customForms||{}).length);
+     return o;},
+   msg(id){
+     if(id[0]==="f"){const k=id.slice(1),it=FORM_SHOP[k];
+       return {ic:"📋",t:`Elérhető áron: ${FORM_LABELS[k]||k} · ${it?it.name:""}`,
+         x:`A felállás-boltban ${fmtFt(shopFormPrice(k))} — a Felállás módosítása menü alján.`};}
+     return {ic:"📐",t:"Elérhető áron: saját felállás",
+       x:`A tervezőasztalon ${fmtFt(customFormPrice())} — a Felállás módosítása menü alján.`};},
+   a:"hubFormationBtn"}];
+function ujOn(){const t=teachStateObj();return !!t&&!t.ujOff;}
+/* nyugalmi HUB: ugyanazok a kizárások, mint a vezetés push-ánál */
+function ujKapu(){
+  if(typeof S==="undefined"||!S||gameMode!=="career"||!careerPool)return false;
+  if(S.auto||S.playing)return false;
+  try{if(_utoTartas||_chPopOn||_tSteps||_guideCur)return false;}catch(e){}
+  try{if(_mpGuestReview)return false;}catch(e){}
+  const hub=$("scHub");
+  return !!(hub&&!hub.classList.contains("hide"));}
+let _ujLat=0;
+function ujTick(){
+  if(!ujKapu()){_ujLat=0;return;}
+  /* az állapotnak meg kell ülnie — a HUB épp most rajzolódik */
+  if(!_ujLat){_ujLat=Date.now();return;}
+  if(Date.now()-_ujLat<1500)return;
+  const t=teachStateObj();if(!t)return;
+  const A=t.uj||(t.uj={}),elso=!t.ujInit,szol=ujOn()&&ertesitesOn();
+  const uj=[];
+  UJ_FIGY.forEach(w=>{
+    let ids=[];try{ids=w.ids()||[];}catch(e){ids=[];}
+    const L=A[w.k]||(A[w.k]=[]);
+    ids.forEach(id=>{
+      if(L.indexOf(id)>=0)return;
+      L.push(id);
+      if(elso||!szol)return;
+      let m=null;try{m=w.msg(id);}catch(e){m=null;}
+      if(m)uj.push(Object.assign({uj:1,k:w.k,id},m));});
+    if(L.length>40)A[w.k]=L.slice(-40);});
+  if(elso){t.ujInit=1;try{saveGameSoon();}catch(e){}return;}
+  if(!uj.length)return;
+  uj.forEach(x=>_vezPushQ.push(x));
+  try{saveGameSoon();}catch(e){}
+  if(!_vezPushMost)vezPushNext();}
+/* „Mutasd": a figyelő saját útja, vagy a horgonya a HUB menüjében */
+function ujMutasd(x){
+  const w=UJ_FIGY.find(f=>f.k===x.k);if(!w)return;
+  if(typeof w.go==="function"){try{w.go();}catch(e){}return;}
+  const el=w.a?$(w.a):null;if(!el)return;
+  try{teachRevealAnchor(el);}catch(e){}
+  setTimeout(()=>{try{
+    if(el.scrollIntoView)el.scrollIntoView({block:"center",behavior:"smooth"});
+    el.classList.add("ujVillan");setTimeout(()=>{try{el.classList.remove("ujVillan");}catch(e){}},2600);}catch(e){}},80);}
 /* ================= DIAGNOSZTIKA =================
    „Nálam nem jött elő" / „nálam folyton villog" — mindkettőre ugyanaz a válasz
    kell: MI a huszonöt téma pillanatnyi állapota, és MIÉRT. Ez a dump pontosan
@@ -35238,7 +35408,7 @@ const TEACH_MODE_INFO=[
   {k:"light",n:"🔔 Csak emlékeztetők",
    d:"Magától egy szó sem: csak villogó keret ott, ahol tennivaló van. A „miért?” egy koppintásra elérhető."},
   {k:"off",n:"⬜ Semmi",
-   d:"Tiszta felület, semmilyen jelzés. A fogalomtár a kezdőképernyő chipjeiről így is elérhető."}];
+   d:"Tiszta felület, semmilyen jelzés. A fogalomtár a kezdőképernyő chipjeiről így is elérhető. (Az újdonság-értesítések külön kapcsolhatók.)"}];
 const TEACH_GROUPS=[{k:"csapatepites",n:"Csapatépítés"},{k:"piac",n:"Piac és keret"},
   {k:"hosszutav",n:"Hosszú táv"},{k:"meta",n:"Meta"}];
 function teachModeInfo(k){return TEACH_MODE_INFO.find(m=>m.k===k)||TEACH_MODE_INFO[0];}
@@ -35254,7 +35424,7 @@ function teachTopicStateLabel(key){
   const t=teachStateObj(),d=TEACH_TOPICS[key];
   const rec=(t&&t.topics[key])||{};
   if(rec.muted)return {x:"🔕 elnémítva",c:"var(--dim2)"};
-  if(rec.snooze&&rec.snooze>teachNow())return {x:"⏳ elhalasztva",c:"var(--dim2)"};
+  if(rec.snooze&&rec.snooze>teachNow())return {x:`⏳ szundi — még ${rec.snooze-teachNow()} forduló`,c:"var(--dim2)"};
   let due=false;
   try{due=typeof d.due==="function"&&(typeof d.ready!=="function"||d.ready())&&d.due();}catch(e){due=false;}
   if(due)return {x:"● most esedékes",c:"var(--gold)"};
@@ -35290,6 +35460,11 @@ function renderTeachPanel(){
     h+=`<button type="button" id="tchPush" class="fkRow${pOn?" on":""}" aria-pressed="${pOn}" style="margin:4px 0 2px">
       <span class="fkSw" aria-hidden="true"></span>
       <span class="fkTx"><b>📣 Push-értesítések</b><small>Felül beugró sáv — csak ami a kezdőrúgás vagy az idény indítása előtt számít, és amivel rég nem foglalkoztál. A 📣-vel jelölt témák szólhatnak így.</small></span></button>`;}
+  /* ---- 🆕 újdonság-értesítések (3.9.215) — a vezetés fokozatától független ---- */
+  {const uOn=!t.ujOff;
+   h+=`<button type="button" id="tchUj" class="fkRow${uOn?" on":""}" aria-pressed="${uOn}" style="margin:4px 0 2px">
+      <span class="fkSw" aria-hidden="true"></span>
+      <span class="fkTx"><b>🆕 Újdonság-értesítések</b><small>Egyszer szól, amikor valami MOST lett elérhető: új lelátó, a Sztár piac, egy felhasználatlan átigazolási esemény, vagy ha megvan a pénzed a scout-, az ügynökség-, a stáb- vagy a keretbővítésre, egy bolti vagy saját felállásra. A vezetés fokozatától független.</small></span></button>`;}
   if(t.mode!=="off"){
     /* ---- kategóriák ---- */
     const used=TEACH_GROUPS.filter(g=>teachListedTopics().some(k=>TEACH_TOPICS[k].grp===g.k));
@@ -35315,7 +35490,7 @@ function renderTeachPanel(){
           <span style="font-size:11px;color:${st.c}">${esc(st.x)}${grpOff?" · a kategória kikapcsolva":""}</span></span>
         <button class="tchTopic" data-k="${esc(k)}" style="font-size:11px;padding:4px 8px;border-radius:6px;
           border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;font-family:inherit">
-          ${rec.muted?"Vissza":"Némítás"}</button></div>`;});
+          ${rec.muted?"Vissza":(rec.snooze&&rec.snooze>teachNow())?"Ébresztés":"Némítás"}</button></div>`;});
     /* ---- az egyszeri tippek összevonva ---- */
     const tipIds=Object.keys(GUIDE_TIPS),seen=tipIds.filter(id=>S.guideSeen&&S.guideSeen[id]).length;
     h+=`<div style="font-size:11.5px;color:var(--dim);line-height:1.5;margin-top:10px;padding-top:7px;border-top:1px dashed var(--line)">
@@ -35326,7 +35501,9 @@ function renderTeachPanel(){
   box.innerHTML=h+fkHtml;
   try{feedFilterBind($("feedFilterBox"));}catch(e){}
   {const pb=$("tchPush");
-   if(pb)pb.onclick=()=>{t.pushOff=t.pushOff?0:1;if(t.pushOff){_vezPushQ=[];vezPushHide();}teachSave();renderTeachPanel();};}
+   if(pb)pb.onclick=()=>{t.pushOff=t.pushOff?0:1;if(t.pushOff){_vezPushQ=_vezPushQ.filter(x=>typeof x==="object");vezPushHide();}teachSave();renderTeachPanel();};}
+  {const ub=$("tchUj");
+   if(ub)ub.onclick=()=>{t.ujOff=t.ujOff?0:1;if(t.ujOff){_vezPushQ=_vezPushQ.filter(x=>typeof x!=="object");}teachSave();renderTeachPanel();};}
   const again=()=>{renderTeachPanel();try{teachNudgeRescan();}catch(e){}};
   box.querySelectorAll(".tchMode").forEach(b=>b.onclick=()=>{
     teachSetMode(b.getAttribute("data-m"));again();});
@@ -35338,7 +35515,9 @@ function renderTeachPanel(){
   box.querySelectorAll(".tchTopic").forEach(b=>b.onclick=()=>{
     const rec=teachTopicRec(b.getAttribute("data-k"));
     if(!rec)return;
-    if(rec.muted){delete rec.muted;delete rec.snooze;}else rec.muted=1;
+    if(rec.muted){delete rec.muted;delete rec.snooze;}
+    else if(rec.snooze&&rec.snooze>teachNow())delete rec.snooze;   /* 🔔 3.9.215 — ébresztés */
+    else rec.muted=1;
     teachSave();again();});
   {const r=$("tchReset");
    if(r)r.onclick=()=>askConfirm({title:"Kezdjük elölről a vezetést?",yes:"Igen, elölről",
@@ -82727,6 +82906,7 @@ let _midRoleSlotIdx=-1;
 function openHubMidRolePicker(loc){
   if(!loc||loc.type!=="slot"||!isRoleSlot(form,loc.idx))return;
   _midRoleSlotIdx=loc.idx;
+  if(isMidRoleSlot(form,loc.idx))teachMidRoleMark();   /* 🔔 3.9.215 — megnézte: döntött */
   $("hubMidRolePicker").classList.remove("hide");
   renderHubMidRolePicker();
   $("hubMidRolePicker").scrollIntoView({behavior:"smooth"});}
