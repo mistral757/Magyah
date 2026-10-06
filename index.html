@@ -17933,7 +17933,9 @@ function pyrRunCap(){
      játék. */
   let dT=(P&&typeof P.diffT==="number"&&isFinite(P.diffT))?P.diffT:null;
   /* ⛰ 3.9.210 — a padlós karrierben a vállalások ÁTLAGA a nehézség */
-  try{if(typeof pyrFloorOn==="function"&&pyrFloorOn())dT=diffSnapT(pyrFloorAvgG());}catch(e){}
+  /* …de csak ha már van tényleges idényvállalás (a 2. idénytől) — addig a
+     választott fok a mérce, betűre ugyanúgy, mint eddig */
+  try{if(typeof pyrFloorOn==="function"&&pyrFloorOn()&&pyrFloorHasVall())dT=diffSnapT(pyrFloorAvgG());}catch(e){}
   const parts=[
     {n:`Kezdő osztály: D${d}`,v:PYR_RUN_CAP.div[d-1]||1},
     {n:`Ellenfél-tempó: ${pyrSpeedDef(sp).n}`,v:PYR_RUN_CAP.speed[sp]},
@@ -39380,7 +39382,10 @@ function pyrFloorHist(){
 function pyrFloorG0(){
   const P=S.pyr;
   if(typeof P.vall0==="number"&&isFinite(P.vall0))return P.vall0;
-  let w=null;try{w=pyrRetuneWant();}catch(e){w=null;}
+  /* a VÁLASZTOTT fok (diffT) az elsődleges — ez a karrier vállalása; ha nincs
+     (régebbi út, lépcső), a kért rés, végül a ténylegesen kijött rajt-rés */
+  let w=(typeof P.diffT==="number"&&isFinite(P.diffT))?P.diffT/10:null;
+  if(w==null)try{w=pyrRetuneWant();}catch(e){w=null;}
   if(typeof w!=="number"||!isFinite(w))w=(typeof P.gap0==="number"&&isFinite(P.gap0))?P.gap0:DIFF_DEFAULT_T/10;
   P.vall0=Math.round(w*10)/10;
   return P.vall0;}
@@ -39412,16 +39417,37 @@ function pyrFloorWantFor(sn){
   return Math.round(Math.max(b.lo,Math.min(b.hi,g))*10)/10;}
 /* A VILÁG EMELÉSE `amt` Ratinggel — ugyanaz a lánc, amit a horgonyok is
    futtatnak az eltolás után (mezőnyszint, piac, pool, ellenféltábla). */
+/* `amt`: szám (ennyivel emel), VAGY egy hibafüggvény (mennyivel kell még
+   emelni) — az utóbbi MÉRVE közelít, mert a meccs-erő rés nem pontosan 1:1-ben
+   követi a világ eltolását (a rejtett kiegyenlítés a szinttel mozog). Lefelé
+   csak a saját túllövését veheti vissza: a természetes szint alá sosem megy. */
 function pyrFloorRaise(amt){
   const P=S.pyr;
+  const err=(typeof amt==="function")?amt:(()=>amt-moved);
   let moved=0;
-  while(amt-moved>0.05){
-    const step=Math.min(4,amt-moved);
+  for(let i=0;i<40;i++){
+    const e=err();
+    if(Math.abs(e)<PYR_FLOOR_TOL)break;
+    let step=Math.max(-4,Math.min(4,e));
+    if(moved+step<0)step=-moved;            /* a természetes szint alá nem */
+    if(Math.abs(step)<0.01)break;
     pyrShiftWorld({divs:P.divs},-step);
     if(P.spare)P.spare.ovr=Math.round((P.spare.ovr+step)*10)/10;
     if(P.spare2)P.spare2.ovr=Math.round((P.spare2.ovr+step)*10)/10;
     P.worldShift=Math.round(((P.worldShift||0)-step)*10)/10;
-    moved+=step;}
+    moved+=step;
+    oppTargetRating=pyrLevel();}
+  /* A PADLÓ A MINIMUM. A mezőnyszint egész számra kerekedik (pyrLevel), tehát
+     a rés ugrásokban mozog, és a vállalás nem mindig található el pontosan.
+     Ilyenkor a keményebb oldalra állunk: a rés a vállalás fölött nem maradhat
+     (legfeljebb egy kerekítésnyivel keményebb lehet, könnyebb soha). */
+  if(typeof amt==="function")
+    for(let i=0;i<8&&err()>PYR_FLOOR_TOL;i++){
+      pyrShiftWorld({divs:P.divs},-0.5);
+      if(P.spare)P.spare.ovr=Math.round((P.spare.ovr+0.5)*10)/10;
+      if(P.spare2)P.spare2.ovr=Math.round((P.spare2.ovr+0.5)*10)/10;
+      P.worldShift=Math.round(((P.worldShift||0)-0.5)*10)/10;
+      moved+=0.5;oppTargetRating=pyrLevel();}
   moved=Math.round(moved*10)/10;
   if(!moved)return 0;
   oppTargetRating=pyrLevel();
@@ -39457,7 +39483,7 @@ function pyrFloorKickoff(){
       const mezo=()=>pyrLevel()+Math.max(0,(pair.hid||0)*OPP_BUFF_MEASURED);
       elotte=Math.round((pair.avg-mezo())*10)/10;
       const kell=Math.round(((pair.avg-mezo())-want)*10)/10;
-      if(kell>PYR_FLOOR_TOL)lift=pyrFloorRaise(kell);
+      if(kell>PYR_FLOOR_TOL)lift=pyrFloorRaise(()=>(pair.avg-mezo())-want);
       utana=Math.round((pair.avg-mezo())*10)/10;}
     else pair=null;   /* elmaradt kézfogás — nem találgatunk (ahogy a szuperliga sem) */
   }else{
@@ -39466,7 +39492,7 @@ function pyrFloorKickoff(){
       try{msRatedNote(_r);}catch(e){}
       elotte=Math.round(levelGap()*10)/10;
       const kell=Math.round((elotte-want)*10)/10;
-      if(kell>PYR_FLOOR_TOL)lift=pyrFloorRaise(kell);
+      if(kell>PYR_FLOOR_TOL)lift=pyrFloorRaise(()=>levelGap()-want);
       utana=Math.round(levelGap()*10)/10;
     }finally{try{msRatedEnd();}catch(e){}}}
   delete P.vallNext;
@@ -39514,6 +39540,9 @@ function pyrFloorMid(){
       +`a másik fele a hátralévő fordulókban.`,"m mvp");}catch(e){}
   return {gap,amt:kell};}
 /* ---- A RUN ---- */
+function pyrFloorHasVall(){
+  const H=(S.pyr&&S.pyr.vallH)||{};
+  return Object.keys(H).some(k=>+k>=2&&H[k]&&typeof H[k].g==="number");}
 /* a vállalások átlaga (a karrier eleji is benne) — a plafon nehézség-tényezője */
 function pyrFloorAvgG(){
   const H=pyrFloorHist(),gs=[pyrFloorG0()];

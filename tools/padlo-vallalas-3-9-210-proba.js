@@ -90,7 +90,11 @@ const kozel=(a,b,e)=>Math.abs(a-b)<=(e||0.25);
     o.b_elotte=gap();const szB=pyrLevel();
     const h3=pyrFloorKickoff();o.b_utana=gap();o.b_szint=pyrLevel()-szB;o.h3=h3;
     return o;});
-  ok(r2.elotte>r2.h.want+3&&kozel(r2.utana,r2.h.want,0.3)&&r2.h.lift>3&&r2.szint1>r2.szint0,"elhúztál → a mezőny felnő a vállalásodig (és ez emelésként rögzül)",r2);
+  /* a mezőnyszint egész számra kerekedik (pyrLevel) → a rés ugrásokban mozog:
+     a padló a keményebb oldalra áll — a vállalás fölött nem marad, legfeljebb
+     egy kerekítésnyivel keményebb */
+  ok(r2.elotte>r2.h.want+3&&r2.utana<=r2.h.want+0.16&&r2.utana>=r2.h.want-1.1&&r2.h.lift>3&&r2.szint1>r2.szint0,
+     "elhúztál → a mezőny felnő a vállalásodig (a vállalás fölött nem marad, legfeljebb egy kerekítésnyivel keményebb)",r2);
   ok(r2.masodszor===null,"idényenként egyszer fut");
   ok(r2.b_elotte<r2.h3.want-3&&r2.h3.lift===0&&Math.abs(r2.b_szint)<0.01&&kozel(r2.b_utana,r2.b_elotte,0.05),"a mezőny magától erősebb → nem nyúl hozzá (egyoldalú)",{e:r2.b_elotte,u:r2.b_utana,h:r2.h3});
 
@@ -129,7 +133,7 @@ const kozel=(a,b,e)=>Math.abs(a-b)<=(e||0.25);
     o.hook=twCloseCheckpointWindow.toString().includes("pyrFloorMid");
     o.rec=pyrFloorHist()[3].mid;
     return o;});
-  ok(r4.m&&kozel(r4.m.amt,4,0.3)&&kozel(r4.most,r4.m.amt/2,0.15)&&kozel(r4.vegen,r4.m.amt,0.15),"a téli emelés fele azonnal, a másik fele a hátralévő fordulókra",r4);
+  ok(r4.m&&r4.m.amt>2&&kozel(r4.m.amt,r4.elotte-2,0.11)&&kozel(r4.most,r4.m.amt/2,0.15)&&kozel(r4.vegen,r4.m.amt,0.15),"a téli emelés fele azonnal, a másik fele a hátralévő fordulókra",r4);
   ok(r4.masodszor===null&&r4.rec===r4.m.amt,"idényenként egyszer, és rögzül",r4);
   ok(r4.hook,"a téli ablak zárása indítja");
 
@@ -199,7 +203,7 @@ const kozel=(a,b,e)=>Math.abs(a-b)<=(e||0.25);
     o.stash=pyrSuperPairStash.toString().includes("vallB");
     return o;});
   ok(r8.csomag===1&&r8.vendegRegi===false&&r8.vendegUj===true,"a szabály a szoba csomagjával utazik (régi házigazda → régi szabály)",r8);
-  ok(r8.h&&kozel(r8.h.want,2.0,0.001)&&r8.h.g===1.0&&kozel(r8.res,2.0,0.3),"a két meccs-erő és a két vállalás átlaga",r8);
+  ok(r8.h&&kozel(r8.h.want,2.0,0.001)&&r8.h.g===1.0&&r8.res<=2.16&&r8.res>=0.9,"a két meccs-erő és a két vállalás átlaga",r8);
   ok(r8.elmaradt&&r8.elmaradt.lift===0&&r8.elmaradt.elotte==null,"elmaradt kézfogásnál nem találgat",r8.elmaradt);
   ok(r8.kezfogas&&r8.stash,"a kézfogás viszi a vállalást, a pár elteszi",r8);
 

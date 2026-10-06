@@ -24,6 +24,15 @@ kétirányú kalibráció).
   kemény, hogy a világ elhúzhat, amikor gyengébb vagy.
 * **A mérce a meccs-erő:** a nevezési erő (a lebutított felállás nem
   segít), ugyanaz, amin a kezdőrúgás horgonya is dolgozik.
+* **A padló a minimum:** a mezőnyszint egész számra kerekedik, tehát a rés
+  ugrásokban mozog. Ha a vállalás nem található el pontosan, a mezőny a
+  keményebb oldalra áll — a rés a vállalás fölött nem marad, legfeljebb
+  egy kerekítésnyivel keményebb. Az emelés mérve közelít (lépésenként),
+  és a saját túllövését visszaveheti, de a természetes szint alá sosem
+  megy.
+* **A karrier eleji vállalás** a beállítón választott fok; a plafon csak
+  akkor számol a vállalások átlagával, ha már van tényleges
+  idényvállalás.
 
 **A téli ablak zárásakor** (egyjátékosban) egy második, szintén egyoldalú
 mérés:
