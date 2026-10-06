@@ -193,6 +193,12 @@ for n in sorted(table):
     if full not in _seen:
         _seen[full] = n
         continue
+    # KIVÉTEL (3.9.217): ha MINDKÉT név a projektgazda saját, szándékos döntése
+    # (SAJAT), az azonosság kért — ugyanaz az ember két kártyán (Szoboszlai:
+    # ikon és sima → „Dominic Solos Light"). A játék ezt nem ütközésnek veszi
+    # (buildHuShortDisambig: azonos teljes név két kulcson nem ütközés).
+    if n in SAJAT and _seen[full] in SAJAT and SAJAT[n][0] == full == SAJAT[_seen[full]][0]:
+        continue
     parts = full.split()
     for k in range(1, len(POOL_ALL) + 1):
         g2 = POOL_ALL[(hash_seed(n) + k) % len(POOL_ALL)]

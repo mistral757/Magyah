@@ -41,7 +41,7 @@ MANUAL = {
 "Grosics Gyula":       ("Gyorsiccs Gyuszika", "Gyorsiccs"),
 "Albert Flórián":      ("Florian Albertinho", "Albertinho"),
 "Király Gábor":        ("G. King", "G. King"),
-"Szoboszlai Dominik":  ("Dominikai Hajdúszoboszló", "Hajdúszoboszló"),
+"Szoboszlai Dominik":  ("Dominic Solos Light","Solos Light"),
 
 # ── E) szerkezeti fejtörők ──────────────────────────────────────────────────
 # A KÉT RONALDO: kifejezett kérés, hogy a RÖVID kiírás mindkettőnél a teljes
@@ -111,7 +111,7 @@ HU_MANUAL = {
 "Kocsis Sándor":("Aranyfejű Sanyi","Aranyfejű"),
 "Bozsik József":("Bozsgó Jocó","Bozsgó"),
 "Czibor Zoltán":("Cibere Zoli","Cibere"),
-"Szoboszlai":("Szoboszlóka","Szoboszlóka"),
+"Szoboszlai":("Dominic Solos Light","Solos Light"),
 "Lisztes Krisztián":("Lisztlángos Kriszti","Lisztlángos"),
 "Mészöly Kálmán":("Meszelő Kálmus","Meszelő"),
 "Halmosi Péter":("Halmozó Peti","Halmozó"),
@@ -648,7 +648,7 @@ FOREIGN_3 = {
 "Faustino Asprilla":("Aszpirines Fausztin","Aszpirines"),
 "Radamel Falcao":("Falkó Radamesz","Falkó"),
 # ── Lengyelország ───────────────────────────────────────────────────────────
-"Robert Lewandowski":("Levendulás Robi","Levendulás"),
+"Robert Lewandowski":("Levangyócki Robi","Levangyócki"),
 "Wojciech Szczęsny":("Szöszmötölő Vojtek","Szöszmötölő"),
 "Piotr Zieliński":("Zöldellő Peti","Zöldellő"),
 # ── Norvégia ────────────────────────────────────────────────────────────────
@@ -831,7 +831,7 @@ MANUAL.update({
   "Daniel Van Buyten": ("Fanböjten Dániel", "Fanböjten"),
   "Daniele De Rossi": ("Derosszígy Dani", "Derosszígy"),
   "Danilo": ("Dani a Ló", "DaniLó"),
-  "Danilo D'Ambrosio": ("Dámbrosio Dani","Dámbrosio"),
+  "Danilo D'Ambrosio": ("Dámbrózió Dani","Dámbrózió"),
   "Danny Rose": ("Rózsa Mór", "Rózsa"),
   "David Ginola": ("Zsinórka Dávid", "Zsinórka"),
   "Davide Zappacosta": ("Cappakoszta Jenő", "Cappakoszta"),
