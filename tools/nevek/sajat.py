@@ -445,6 +445,7 @@ SAJAT = {
   "Alberto Gilardino": ("Zsilárdínó Albert", "Zsilárdínó"),
   "Alberto Moreno": ("Morénó Albert", "Morénó"),
   "Aleksandr Anyukov": ("Anyukád Tas", "Anyukád"),
+  "Alessandro Bastoni": ("Bástonyi Sándor", "Bástonyi"),
   "Alessandro Birindelli": ("Birindelji Sándor", "Birindelji"),
   "Alessandro Costacurta": ("Aztakurva Sándor", "Aztakurva"),
   "Alessandro Nesta": ("Nesztea Sándor", "Nesztea"),
@@ -471,6 +472,7 @@ SAJAT = {
   "André Schürrle": ("Csürhe András", "Csürhe"),
   "André-Pierre Gignac": ("Zsinyak András", "Zsinyak"),
   "Andrés Iniesta": ("Ínyenc Pista Bandi", "Ínyenc Pista"),
+  "Antoni Ramallets": ("Rámajetsz Tóni", "Rámajetsz"),
   "Antonio Cabrini": ("Kabrió Antal", "Kabrió"),
   "Antonio Di Natale": ("Dínótál E. Antal", "Dínótál"),
   "Artem Dzyuba": ("Dzsuba Zsigmond", "Dzsuba"),
@@ -489,6 +491,7 @@ SAJAT = {
   "Branislav Ivanović": ("Iványi Branyiszló", "Iványi"),
   "Brian Laudrup": ("Laudanum Brián", "Laudanum"),
   "Bruno Fernandes": ("Brunyáló Ferkó", "Burnyáló"),
+  "Bruno Guimarães": ("Gumimaci Brunó", "Gumimaci"),
   "Bryan Cristante": ("Kristály Brájen", "Kristály"),
   "Cantona": ("ifj. Kántornak Tanult", "ifj. Kántornak"),
   "Casemiro": ("Kázijó Mirejó", "Kázijó"),
@@ -505,6 +508,7 @@ SAJAT = {
   "Claudio Pizarro": ("Pizzaszaró Lehel", "Pizzaszaró"),
   "Clint Dempsey": ("Dempszi Benedek", "Dempszi"),
   "Cody Gakpo": ("Hákpó Vilmos", "Hákpó"),
+  "Coen Moulijn": ("Múlejn Kohén", "Múlejn"),
   "Colin Calderwood": ("Kaldervúd Kóli", "Kaldervúd"),
   "Corentin Tolisso": ("Tolató Kornél", "Tolató"),
   "Costinha": ("Kosztinnya", "Kosztinnya"),
@@ -517,9 +521,10 @@ SAJAT = {
   "Daniel Van Buyten": ("Fanböjten Dániel", "Fanböjten"),
   "Daniele De Rossi": ("Derosszígy Dani", "Derosszígy"),
   "Danijel Subašić": ("Subások Dániel", "Subások"),
+  "Danilo D'Ambrosio": ("Dámbrosio Dani", "Dámbrosio"),
   "Danilo": ("Dani a Ló", "DaniLó"),
-  "Danny": ("Danika", "Danika"),
   "Danny Rose": ("Rózsa Mór", "Rózsa"),
+  "Danny": ("Danika", "Danika"),
   "Darren Anderton": ("Másiktonhal Dorián", "Másiktonhal"),
   "Darwin Núñez": ("Nyúnyez Kelemen", "Nyúnyez"),
   "David Beckham": ("Bekem Dávid", "Bekem"),
@@ -536,12 +541,14 @@ SAJAT = {
   "Derlei": ("Der Lej", "Der Lej"),
   "Di Stéfano": ("ifj. Disztefános", "ifj. Disztefános"),
   "Didi": ("Csöcs", "Csöcs"),
-  "Diego": ("Dijégó", "Dijégó"),
   "Diego Forlán": ("Fórlány Rezső", "Fórlány"),
   "Diego Milito": ("Miliméteres Dijégó", "Miliméteres"),
   "Diego Tristán": ("Trísztán Ábris", "Trísztán"),
+  "Diego": ("Dijégó", "Dijégó"),
   "Diogo Jota": ("Zsóta Dijégó", "Zsóta"),
+  "Dirk Kuyt": ("Köjt Barnabás", "Köjt"),
   "Divock Origi": ("Óriginál Vazul", "Óriginál"),
+  "Djibril Cissé": ("Sziszegő Dzsibrill", "Sziszegő"),
   "Djimi Traoré": ("Trajoré Jim", "Trajoré"),
   "Dombi Tibor": ("Bombázó Tibi", "Bombázó"),
   "Domenico Criscito": ("Krisszító Domonkos", "Krisszító"),
@@ -577,6 +584,7 @@ SAJAT = {
   "Federico Chiesa": ("Kieza Dezső", "Kieza Dezső"),
   "Federico Valverde": ("Vállvetve Frigyes", "Vállvetve"),
   "Fernando Couto": ("Kutyó Nándor", "Kutyó"),
+  "Filippo Inzaghi": ("Indzagi Fülöp", "Indzagi"),
   "Florian Wirtz": ("Virc Flóri", "Virc"),
   "Flávio Conceição": ("Konszészáó Boldizsár", "Konszészáó"),
   "Franco Mastantuono": ("Masztántónó Ferenc", "Masztántónó"),
@@ -587,6 +595,7 @@ SAJAT = {
   "Gabriel Batistuta": ("Bátyuska Gábor", "Bátyuska"),
   "Gabriel Heinze": ("Henceg Gábor", "Henceg"),
   "Gabriel Jesus": ("Jézus Gábor", "Jézus G."),
+  "Gabriel Milito": ("Milító Gábor", "Milító"),
   "Gareth Barry": ("Barika Geret", "Barika"),
   "Gareth Southgate": ("Délikapu Geret", "Délikapu"),
   "Gavi": ("Gagyi", "Gagyi"),
@@ -611,8 +620,10 @@ SAJAT = {
   "Hakim Ziyech": ("Zijes Vazul", "Zijes"),
   "Hans-Georg Schwarzenbeck": ("Svarcenbekk János-György", "Svarcenbekk"),
   "Harald Schumacher": ("Sumákoló Herold", "Sumákoló"),
+  "Harry Kewell": ("Kjúúl Bálint", "Kjúúl"),
   "Helton": ("Eltony", "Eltony"),
   "Henrikh Mkhitaryan": ("Mikitalján Henrik", "Mikitalján"),
+  "Hernán Crespo": ("Kreszpó Ernő", "Kreszpó"),
   "Hiroki Ito": ("Ító Dezső", "Ító"),
   "Hugo Ekitiké": ("Etyityike Hugó", "Etyityike"),
   "Hugo Lloris": ("Jórizs Hugó", "Jórizs"),
@@ -698,11 +709,13 @@ SAJAT = {
   "Marc Overmars": ("Óvermarsz Márk", "Óvermarsz"),
   "Marc-André ter Stegen": ("Ferstéhen Márk", "Ferstéhen"),
   "Marcel Tisserand": ("Tisszerán Marcell", "Tisszerán"),
+  "Marcelo Salas": ("Szálas Marcell", "Szálas"),
   "Marco Asensio": ("Aszenszijjó Márk", "Aszenszijjó"),
   "Marco Materazzi": ("Anyarazzia Márkó", "Anyarazzia"),
   "Marco Reus": ("Rojsz Márk", "Rojsz"),
   "Marcos Senna": ("Széna Márk", "Széna M."),
   "Marek Hamšík": ("Hám Sík Márk", "Hám Sík"),
+  "Mario Balotelli": ("Balhételi Márió", "Balhételi"),
   "Mario Corso": ("Korzózó Márijó", "Korzózó"),
   "Mario Kempes": ("Kemence Márió", "Kemence"),
   "Mark Hughes": ("Hiúz Márk", "Hiúz"),
@@ -716,6 +729,7 @@ SAJAT = {
   "Micah Richards": ("Ricsardsz Miká", "Ricsardsz"),
   "Michael Owen": ("Májkell Óven", "Óven"),
   "Milan Baroš": ("Balos Milán", "Balos"),
+  "Milan Škriniar": ("Skrinyár Milán", "Skrinyár"),
   "Mimis Domazos": ("Dómazos Mimi", "Dómazos"),
   "Moisés Caicedo": ("Kájszédó Gyárfás", "Kájszédó"),
   "Mário Jardel": ("Járd El Márió", "Járd El"),
@@ -728,6 +742,7 @@ SAJAT = {
   "Nicolò Zaniolo": ("Zanyóló Nick", "Zanyóló"),
   "Nigel Reo-Coker": ("Rejó-Kokker Nájdzsel", "Rejó-Kokker"),
   "Nigel de Jong": ("Déjó N. G. Nájdzsel", "Déjó"),
+  "Nils Liedholm": ("Lidérces Miklós", "Lidérces"),
   "Nuri Şahin": ("Sanyin Núri", "Sanyin"),
   "Nwankwo Kanu": ("Kenu Van Q", "Kenu"),
   "Ove Kindvall": ("Kindvál Óve", "Kindvál"),
@@ -738,9 +753,10 @@ SAJAT = {
   "Patrick Kluivert": ("Klájvert Patrik", "Klájvert"),
   "Patrik Schick": ("Sikk Patrik", "Sikk"),
   "Pavel Srníček": ("Szrnícsek Pál", "Szrnícsek"),
-  "Pedro": ("Pedro Amigo Mio", "Pedro Amigo Mio"),
   "Pedro Porro": ("Pornó Péter", "Pornó"),
+  "Pedro": ("Pedro Amigo Mio", "Pedro Amigo Mio"),
   "Per Mertesacker": ("Méretreszakker Szabolcs", "Méretreszakker"),
+  "Phil Foden": ("Fóden Filó", "Fóden"),
   "Philippe Coutinho": ("Kutinnyó Fülöp", "Kutinnyó"),
   "Piero Hincapié": ("Hinkanapé Bertalan", "Hinkanapé"),
   "Pietro Anastasi": ("Ananász Tázi Péter", "Ananász Tázi"),
@@ -763,6 +779,7 @@ SAJAT = {
   "Ronald Araújo": ("Áráúzsó Ronáld", "Áráúzsó"),
   "Ronald Spelbos": ("Spélbos Ronáld", "Spélbos"),
   "Roque Júnior": ("ifj. Rokve", "ifj. Rokve"),
+  "Roy Makaay": ("Makáj Roj", "Makáj"),
   "Ryan Gravenberch": ("Hráfenberh Ábris", "Hráfenberh"),
   "Sami Hyypiä": ("Hippija Samu", "Hippija"),
   "Samir Handanović": ("Handanovics Samu", "Handanovics"),
@@ -796,12 +813,14 @@ SAJAT = {
   "Thomas Hitzlsperger": ("Hiklispenger Tamás", "Hiklispenger"),
   "Thomas Häßler": ("Hesszler Tamás", "Hesszler"),
   "Thorgan Hazard": ("Házard Torgyán", "Házard"),
+  "Tomáš Rosický": ("Rózsicki Tamás", "Rózsicki"),
   "Tony Adams": ("Ádamosi Tóni", "Ádamosi"),
   "Torbjörn Nilsson": ("Nílszffy Szabolcs", "Nílszffy"),
   "Ubaldo Fillol": ("Filioli Zsombor", "Filioli"),
   "Vincent Candela": ("Kandalló Vince", "Kandalló"),
   "Vincent Kompany": ("Koppány Vince", "Koppány"),
   "Vladimir Jugović": ("Jugovics Vladi", "Jugovics"),
+  "Vladimír Šmicer": ("Szmájszer Vladi", "Szmájszer"),
   "Vágner Love": ("Szerelmes Vágner", "Szerelmes Vágner"),
   "Warren Zaïre-Emery": ("Zaj-Imre Mór", "Zaj-Imre"),
   "Wesley Sneijder": ("Veszi Snájder", "Snájder"),
@@ -817,25 +836,9 @@ SAJAT = {
   "Álvaro Morata": ("Morotva Alvár", "Morotva"),
 }
 
-# a felhasználó eredeti alakja → a mostani (egy korábbi javaslatkörből)
-DONTESRE_VAR = {
-  "Alessandro Bastoni": ("Bástonyi Sándor", "Bástonyi"),  # most: Bástyás Sándor
-  "Antoni Ramallets": ("Rámajetsz Tóni", "Rámajetsz"),  # most: Ramazuri Tóni
-  "Bruno Guimarães": ("Gúimarés Brunó", "Gúimarés"),  # most: Gumimaci Brunó
-  "Coen Moulijn": ("Múlíjn Kohén", "Múlíjn"),  # most: Múlejn Kohén
-  "Danilo D'Ambrosio": ("Dámbrosio Dani", "Dámbrosio"),  # most: Dámvadas Dani
-  "Dirk Kuyt": ("Köjt Barnabás", "Köjt"),  # most: Kujtorgó Dirk
-  "Djibril Cissé": ("Szisszé Dzsibrill", "Szisszé"),  # most: Sziszegő Dzsibrill
-  "Filippo Inzaghi": ("Indzagi Fülöp", "Indzagi"),  # most: Ingázó Fülöp
-  "Gabriel Milito": ("Milító Gábor", "Milító"),  # most: Miliméteres Gábor
-  "Harry Kewell": ("Kjúúl Bálint", "Kjúúl"),  # most: Kevély Harri
-  "Hernán Crespo": ("Kreszpó Ernő", "Kreszpó"),  # most: Kresszes Ernő
-  "Marcelo Salas": ("Szálas Domonkos", "Szálas"),  # most: Szálas Marcell
-  "Mario Balotelli": ("Bálóteli Márió", "Bálóteli"),  # most: Balhételi Márió
-  "Milan Škriniar": ("Skrinyár Milán", "Skrinyár"),  # most: Szekrényes Milán
-  "Nils Liedholm": ("Lídólm Miklós", "Lídólm"),  # most: Lidérces Miklós
-  "Phil Foden": ("Fóden Filó", "Fóden"),  # most: Födém Filó
-  "Roy Makaay": ("Makáj Roj", "Makáj"),  # most: Makacs Roj
-  "Tomáš Rosický": ("Rózsicki Tamás", "Rózsicki"),  # most: Roszicki Tamás
-  "Vladimír Šmicer": ("Szmájszer Vladi", "Szmájszer"),  # most: Smirgli Vladi
-}
+# A 19 DÖNTÉSRE VÁRÓ NÉV (2026-10-06, a projektgazda döntése): 13 visszaállt
+# az eredeti alakjára (Bástonyi, Rámajetsz, Dámbrosio, Köjt, Indzagi, Milító,
+# Kjúúl, Kreszpó, Skrinyár, Fóden, Makáj, Rózsicki, Szmájszer), 6 a javaslatkör
+# alakján maradt (Sziszegő, Gumimaci, Múlejn, Szálas Marcell, Balhételi,
+# Lidérces) — mind a 19 a SAJAT-ban, befagyasztva.
+DONTESRE_VAR = {}
