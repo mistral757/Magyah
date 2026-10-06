@@ -5624,7 +5624,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
 <section id="scQuick" class="card hide">
   <div class="steplbl">⚡ Új karrier — gyors indítás</div>
   <div id="qkLadder" class="hide"></div>
-  <div class="qkLbl">A karrier fajtája</div>
+  <div class="qkLbl" id="qkModeLbl">A karrier fajtája</div>
   <div class="optgrid two" id="qkModeGrid">
     <button data-qk="dyn">♾️ Dinamikus<small>egy mezőny, ami veled együtt lép feljebb</small></button>
     <button data-qk="pyr">🏆 Hagyományos<small>hat osztályos ligapiramis, fel- és kieséssel</small></button>
@@ -7285,7 +7285,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.211";
+const APP_VERSION="3.9.214";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -26947,9 +26947,35 @@ function canYouthBoost(entry){
    akadémián nevelődik — ikonok nem, öreg csirkefogók nem. */
 const POT_HARD_CAP=200000;
 const POT_SOFT_CAP=9000;
+/* ================= A KEMÉNY PLAFON A MEZŐNNYEL NŐ (3.9.212) =================
+   BEJELENTETT HIBA: „boosttal nem lehet 200k fölé vinni a POT-ot, de hogy
+   vissza is ugrik ha boostolod, azt nem gondoltam." Egy 400 fölötti Ratingű
+   ifi, akinek a POT-ja eleve 200 000 fölött állt, a boost után 200 000-en
+   maradt — a Ratingje nőtt, a POT-ja visszaesett.
+
+   A KÉT HIBA EGY TŐRŐL FAKADT. A 200 000 egy rögzített szám volt, a mezőny
+   viszont nem rögzített: a POT ↔ csúcs görbén (peakToPot) a 200 000 nagyjából
+   egy 212-es csúcsnak felel meg. Egy 400-as mezőnyben az akadémia MAGÁTÓL is
+   egymillió fölötti POT-tal adja a tehetségeket (peakToPot(rating+8)), tehát
+   ott a „kemény" plafon már semmit nem korlátozott — csak a boost
+   POT-ajándékát nyelte el (aki fölötte állt, annak a boost NULLA POT-t adott),
+   és három helyen, ahol a képlet `min(plafon, …)` volt `max(mostani, …)`
+   nélkül, LE IS VÁGTA a POT-t a plafonra: a kihívás-jutalom POT-boostja, a
+   🌠 Csodagyerek talizmán és az Infinity nyitó ×1,5-e.
+
+   MOSTANTÓL a kemény plafon a mezőny fölött POT_CAP_HEADROOM Ratingnyi csúcsig
+   enged: max(200 000, peakToPot(mezőny + 100)). 111-es mezőnyig ez pontosan a
+   régi 200 000 — a karrier eleje és a 100 alatti játék nem változik —, egy
+   150-es mezőnyön ~350 000, egy 400-ason ~2,9 millió. A lágy plafon (9000) és
+   a szabály, hogy ajándék sosem vesz el, változatlan. */
+const POT_CAP_HEADROOM=100;
+function potHardCap(){
+  let top=0;
+  try{top=Number(oppTargetRating)||0;}catch(e){top=0;}
+  return Math.max(POT_HARD_CAP,peakToPot(top+POT_CAP_HEADROOM));}
 function potCapFor(entry){
-  if(infinityMode)return POT_HARD_CAP;
-  if(entry&&(canYouthBoost(entry)||inAcademy(entry.n)))return POT_HARD_CAP;
+  if(infinityMode)return potHardCap();
+  if(entry&&(canYouthBoost(entry)||inAcademy(entry.n)))return potHardCap();
   return POT_SOFT_CAP;}
 function applyYouthBoost(entry){
   msNoteBoost();   /* mérföldkő: berobbantott tehetségek darabszáma */
@@ -27043,13 +27069,13 @@ function boostLift(cur,target,cap){
    azt szabályozza, meddig nőhet egy játékos értéke magától. A boost viszont
    megvásárolt, egyszeri, szándékos ajándék — ha ezt is a piaci plafon fogná
    meg, a HUB legdrágább fejlesztése pont a legjobb emberednél érne semmit.
-   Ezért a POT-ajándékot CSAK az abszolút mennyezet (POT_HARD_CAP) fogja.
+   Ezért a POT-ajándékot CSAK az abszolút mennyezet (potHardCap) fogja.
 
    MIÉRT NEM CSAK A PLAFON FÖLÖTTIEKNEK: mert abból szakadék lenne. 8500-nál
    500-at kapnál, 9500-nál a teljes 3000-et. Az ajándék MINDENKINEK teljes. */
 function boostGiftPot(cur,add){
   const c=cur||0;
-  return Math.max(c,Math.min(POT_HARD_CAP,c+(add||0)));}
+  return Math.max(c,Math.min(potHardCap(),c+(add||0)));}
 /* ---- A MÁR MEGTÖRTÉNT KÁR HELYREÁLLÍTÁSA ----
    A hiba a boost KÖNYVELÉSÉBEN is nyomot hagyott: a naplózott nyereség
    (oldBoostT / youthBoostT / oldBoostR / youthBoostR) NEGATÍV lett, mert a
@@ -27837,7 +27863,7 @@ function infinityOwnedPotBoost(){
     if(!e||e._infPotBoosted)return;
     e._infPotBoosted=true;
     const beforePot=e.pot||0,beforePeak=e.peak||0;
-    e.pot=Math.min(POT_HARD_CAP,Math.round(beforePot*INFINITY_OWNED_POT_MULT));
+    e.pot=boostLift(beforePot,Math.round(beforePot*INFINITY_OWNED_POT_MULT),potHardCap());
     e.peak=Math.min(ratingCap(),Math.max(e.peak||0,potToPeakOvr(e.pot)));
     e.basePeak=Math.max(e.basePeak||0,e.peak);
     if(e.basePot!=null)e.basePot=Math.max(e.basePot,e.pot);
@@ -36114,6 +36140,16 @@ function kaGyors(){return kaGet("gyors")!==false;}
    ebből jön a választható értékek listája ÉS a zár. `csak`: melyik
    karrier-fajtában számít (a szerkesztő ezt kiírja). */
 const KA_FIELDS=[
+  /* 🤝 3.9.214 — A KÖZÖS KARRIER FAJTÁJA. KIMONDOTT KÉRÉS: „Az egyszerű kezdés
+     jelenleg nem veszi figyelembe a választási lehetőséget dinamikus és
+     hagyományos mód között, amennyiben pvp szobát indítasz, annak kell egy
+     külön kapcsoló oda." Egyjátékosban a kezdőlap két gombja dönt, a
+     PvP-szoba házigazdája viszont gomb nélkül érkezett a gyors indításra: a
+     panel az előző (egyjátékos) választás MARADÉKÁVAL nyílt. Mostantól saját
+     alapbeállítása van; csak közös karrierben lép életbe, és a házigazda
+     választása a gyors panelen ide íródik vissza. ELSŐ mező, mert a fajta
+     dönti el, melyik további mezők (osztály, mezőny) számítanak. */
+  {k:"mpMode", n:"Közös karrier fajtája",ic:"🤝",mpMode:true,pg:0,d:"PvP-szoba indításakor (egyjátékosban a kezdőlap gombja dönt)"},
   {k:"start",  n:"Kezdés",              ic:"🎬",sel:"#careerStartGrid button",attr:"cs",pg:0},
   {k:"form",   n:"Felállás",            ic:"🧩",sel:"#formGrid button",attr:"f",pg:0},
   {k:"wc",     n:"Draft-pool",          ic:"🌍",sel:"#wcToggleGrid button",attr:"wc",pg:1},
@@ -36150,6 +36186,7 @@ function kaGridOpts(f){
   return [...document.querySelectorAll(f.sel)].filter(b=>b.dataset[f.attr]!=null).map(b=>({
     v:b.dataset[f.attr],n:kaBtnLabel(b),off:!!(b.disabled||b.classList.contains("unlockOff"))}));}
 function kaOpts(f){
+  if(f.mpMode)return [{v:"dyn",n:"♾️ Dinamikus",off:false},{v:"pyr",n:"🏆 Hagyományos",off:false}];
   if(f.sel)return kaGridOpts(f);
   if(f.range){const el=$(f.range);if(!el)return [];
     const lo=+el.min,hi=+el.max,st=+el.step||1,out=[];
@@ -36173,6 +36210,9 @@ function kaOpts(f){
    így — a futó karrier változói mást jelentenek). */
 function kaCur(k){
   try{switch(k){
+    /* csak közös karrierben: egyjátékosban a kezdőlap választása nem az
+       ALAPBEÁLLÍTÁS, hanem az adott indulás döntése — ne írja felül */
+    case "mpMode":return (typeof MP!=="undefined"&&MP&&MP.active)?(pyrWanted?"pyr":"dyn"):undefined;
     case "start":return careerStart==="club"?"club":"draft";
     case "form":return form;
     case "wc":return wcEnabled?"on":"off";
@@ -36205,6 +36245,13 @@ function kaApplyField(f,v){
   if(f.sel){const b=document.querySelector(`${f.sel}[data-${f.attr==="cs"?"cs":f.attr}="${String(v).replace(/"/g,"")}"]`);
     if(!b||b.disabled||b.classList.contains("unlockOff"))return;}
   switch(f.k){
+    case "mpMode":{if(!(typeof MP!=="undefined"&&MP&&MP.active))return;
+      if(v!=="pyr"&&v!=="dyn")return;
+      const want=v==="pyr";
+      const src=document.querySelector(`#pyrModeGrid button[data-pyr="${want?"on":"off"}"]`);
+      if(src&&!src.disabled)src.click();
+      else{pyrWanted=want;try{updatePyrSetupVisibility();}catch(e){}}
+      break;}
     case "start":setCareerStart(v);break;
     case "form":setFormChoice(v);break;
     case "wc":setWcEnabled(v==="on");renderWcGrid();break;
@@ -36277,6 +36324,9 @@ function quickShow(){
   quickRender();
   q.scrollIntoView({behavior:"smooth",block:"start"});}
 function quickRender(){
+  /* 🤝 3.9.214 — közös karrierben a fajta mindkettőtökre szól */
+  {const mp=typeof MP!=="undefined"&&MP&&MP.active,l=$("qkModeLbl");
+   if(l)l.textContent=mp?"A közös karrier fajtája — mindkettőtökre érvényes":"A karrier fajtája";}
   /* a karrier fajtája: a setup #pyrModeGrid zára (lépcső) */
   const modeLock=[...document.querySelectorAll("#pyrModeGrid button")].some(b=>b.disabled);
   /* a DINAMIKUS karrier külön kapuja (5 bajnoki cím) — ugyanaz, ami a kezdőlap
@@ -46261,7 +46311,7 @@ function youthPotAlign(entry){
   /* A kemény plafon, nem a potCapFor puha plafonja: az a BOOSTOK határa
      (meddig tolhatod pénzért), ez viszont a pályán már bizonyított tehetség
      elismerése — egy 143-as Ratingű ember POT-ja a puha plafon fölött is áll. */
-  const cel=Math.min(POT_HARD_CAP,peakToPot(now));
+  const cel=Math.min(potHardCap(),peakToPot(now));
   if(!((entry.pot||0)<cel))return 0;
   const volt=entry.pot||0;
   entry.pot=cel;
@@ -49804,6 +49854,29 @@ function challengeContext(){
 /* Pénz-tétek skálázása a jelenlegi büdzséhez és a mezőnyszinthez. */
 function challengeMoneyScale(ctx){
   return Math.max(1,(ctx.budget*0.28+2500)*(1+(ctx.oppRating-80)*0.02));}
+/* ---- A POT-JUTALOM IS A MEZŐNNYEL NŐ (3.9.213) ----
+   KIMONDOTT KÉRÉS: „Ez a típusú jutalom is legyen skálázva, mert eddig nem
+   volt." A „+N POT egy játékosra" fixen 1500 × nehézség volt — egy 85-ös
+   mezőnyben egy átlagos POT (~2400) bő fele, egy 150-esben (~54 000) a 3%-a,
+   egy 400-asban (~1,5 millió) a 0,1%-a: a jutalom a karrier előrehaladtával
+   csendben semmivé zsugorodott.
+   MOSTANTÓL a mezőny-szintű játékos POT-jával ARÁNYOS: a szorzó
+   peakToPot(mezőny) ÷ peakToPot(85), legalább 1. 85-ös mezőnyig tehát
+   betűre a régi szám, fölötte ugyanakkora ARÁNYT ad a mezőny POT-jából, mint
+   a karrier elején (100-as mezőny ~×3, 150-es ~×23, 400-as ~×640). A felső
+   határ a kemény POT-plafon (potHardCap), ami szintén a mezőnnyel nő. */
+const CH_POT_BASE=1500, CH_POT_REF_FIELD=85;
+function challengePotScale(ctx){
+  const f=(ctx&&ctx.oppRating)||oppTargetRating||80;
+  return Math.max(1,peakToPot(f)/peakToPot(CH_POT_REF_FIELD));}
+/* Kerek szám a kártyára: 10 000 alatt a régi egész, fölötte 3 értékes jegy. */
+function chNiceRound(x){
+  const v=Math.round(x);
+  if(v<10000)return v;
+  const m=Math.pow(10,Math.floor(Math.log10(v))-2);
+  return Math.round(v/m)*m;}
+function challengePotAmount(ctx,mult){
+  return chNiceRound(CH_POT_BASE*mult*challengePotScale(ctx));}
 /* Egy játékos aktuális szezon-statja a haladás méréséhez. */
 function challengeStatFor(name,stat){
   if(stat==="goals")return S.scorers[name]||0;
@@ -50639,7 +50712,7 @@ function genReward(scope,diff,ctx){
   const pool=[
     {kind:"money",amount:money,desc:`+${fmtFt(money)}`},
     {kind:"morale",amount:Math.round(10*mult),desc:`+${Math.round(10*mult)} morál`},
-    {kind:"pot",amount:Math.round(1500*mult),desc:`+${Math.round(1500*mult)} POT egy játékosra`},
+    {kind:"pot",amount:challengePotAmount(ctx,mult),desc:`+${fmtNum(challengePotAmount(ctx,mult))} POT egy játékosra`},
     {kind:"skill",desc:"egy skill egy játékosnak"},
     {kind:"scoutUp",desc:"+1 scout-csillag"},
     {kind:"rosterUp",desc:"+2 keretméret"},
@@ -51715,8 +51788,11 @@ function applyChallengeReward(rw){
     case "pot":{
       if(!roster.length)return "POT-boost (nincs játékos)";
       const p=pick(roster),e=careerPool&&careerPool[p.n];
-      if(e){e.pot=Math.min(potCapFor(e),e.pot+rw.amount);
-        e.peak=Math.min(ratingCap(),Math.max(e.peak,potToPeakOvr(e.pot)));
+      /* 3.9.212 — AJÁNDÉK, tehát a boostok szabálya: csak a kemény plafon
+         fogja, és sosem visz lejjebb (eddig min(plafon, …) volt: a plafon
+         fölött állót LEVÁGTA, a 9000 fölötti felnőttet a lágy plafonra). */
+      if(e){e.pot=boostGiftPot(e.pot,rw.amount);
+        e.peak=boostLift(e.peak,potToPeakOvr(e.pot),ratingCap());
         p.pot=e.pot;}
       return `${shortName(p.n)} +${rw.amount} POT`;}
     case "skill":{
@@ -74966,7 +75042,7 @@ function registerIconInPool(icon){
      A lépés PONTOSAN ugyanaz, amit az applyMarketShift tesz a piaci
      játékosoknál (pot = max(basePot, peakToPot(peak))) — csak most az ikon is
      átmegy rajta. Fölfelé hat: egy amúgy is magasabb POT-t nem ront le. */
-  pot=Math.max(pot,Math.min(POT_HARD_CAP,peakToPot(peak)));
+  pot=Math.max(pot,Math.min(potHardCap(),peakToPot(peak)));
   const startRating=Math.max(icon.ovr,(cur&&cur.startRating)||0);
   const youthBonus=Math.max(0,startRating-ratingAtAge(peak,age));
   if(cur){
@@ -75204,9 +75280,19 @@ function formationChangeCost(){
    dönti el. Ez a szétválasztás fontos: egy régi mentés betöltésekor a
    pillanatnyi felállás akkor is felismerhető marad, ha a kapu épp zárva
    volna. */
-const CUSTOM_FORM_PRICE=Math.round(50e9/HUF_PER_POINT);   /* 50 Mrd Ft */
+/* ---- A FELÁLLÁS-ÁRAK IS A KLUBHOZ MÉRTEK (3.9.213) ----
+   KIMONDOTT KÉRÉS: „a felállás vásárlás, saját felállás készítése sem volt
+   skálázva. Legyen ugyanúgy, mint a többi (scout fejlesztés, pozíció tanulás
+   stb)." A két ár eddig fix forint volt (75 és 50 Mrd): egy kis klubnak
+   elérhetetlen, egy felskálázódott világban jelképes. Mostantól a lenti
+   számok ALAP-pontok, és ugyanaz a scaledUpgradePrice viszi őket, mint a
+   scout-fejlesztést, a stábot és a keretbővítést: a referencia-büdzsénél
+   (20 Mrd éves keret) pontosan a régi ár, alatta arányosan kevesebb, fölötte
+   a gyöke szerint több, és az 1-2. idényben a kezdő kedvezmény is él. */
+const CUSTOM_FORM_BASE=Math.round(50e9/HUF_PER_POINT);    /* 50 Mrd Ft a referencia-büdzsénél */
+function customFormPrice(){return scaledUpgradePrice(CUSTOM_FORM_BASE,500);}
 const FORM_SHOP={
-  "424":{price:Math.round(75e9/HUF_PER_POINT),   /* 75 Mrd Ft */
+  "424":{price:Math.round(75e9/HUF_PER_POINT),   /* 75 Mrd Ft a referencia-büdzsénél (alap-pont) */
     name:"Totális futball",
     desc:"Négy védő, mindössze KÉT középpályás és NÉGY támadó. A labda kevesebb kézen megy át, cserébe elöl állandó a túlerő — ez a felállás nem véd, hanem megelőz. A két középpályásra óriási teher hárul."}};
 const STOCK_FORMS=["442","433","4231","352","343","532","451"];
@@ -75394,15 +75480,16 @@ function registerCustomForms(){
 function createCustomForm(d,m,f,w){
   const err=customFormError(d,m,f);
   if(err)return {ok:false,reason:err};
-  if((S.transferBudget||0)<CUSTOM_FORM_PRICE)
-    return {ok:false,reason:`Nincs elég büdzséd — ${fmtFt(CUSTOM_FORM_PRICE)} kellene.`};
+  const price=customFormPrice();
+  if((S.transferBudget||0)<price)
+    return {ok:false,reason:`Nincs elég büdzséd — ${fmtFt(price)} kellene.`};
   const k=customFormKey(d,m,f);
   const built=buildCustomForm(d,m,f,w);
   S.customForms=S.customForms||{};
   S.customForms[k]={d,m,f,w:built.w,label:customFormLabel(d,m,f),slots:built.slots,xy:built.xy};
   registerCustomForm(k,S.customForms[k]);
-  budgetPay(CUSTOM_FORM_PRICE,"tactic");
-  return {ok:true,key:k,label:customFormLabel(d,m,f)};}
+  budgetPay(price,"tactic");
+  return {ok:true,key:k,label:customFormLabel(d,m,f),price};}
 function buyShopForm(k){
   const it=FORM_SHOP[k];
   if(!it)return {ok:false,reason:"Ilyen felállás nincs a kínálatban."};
@@ -82438,22 +82525,22 @@ function renderFormationShop(){
   let h="";
   Object.keys(FORM_SHOP).forEach(k=>{
     if(formBought(k))return;
-    const it=FORM_SHOP[k],price=shopFormPrice(k),afford=bud>=price;
-    const disc=price<it.price;
+    const it=FORM_SHOP[k],price=shopFormPrice(k),afford=bud>=price,alap=shopFormBasePrice(k);
+    const disc=price<alap;
     h+=`<div class="hubDetail" style="margin-top:10px">`
       +`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">`
       +`<b style="font-size:14px;color:var(--gold)">${esc(FORM_LABELS[k]||k)} · ${esc(it.name)}</b>`
-      +`<span style="font-size:12px;white-space:nowrap;color:${afford?"var(--grass)":"var(--red)"}">${fmtFt(price)}</span></div>`
+      +`<span style="font-size:12px;white-space:nowrap;color:${afford?"var(--grass)":"var(--red)"}">${fmtFt(price)}${earlyDiscTag()}</span></div>`
       +`<div style="font-size:12px;color:var(--dim);margin-top:5px;line-height:1.5">${esc(it.desc)}</div>`
-      +(disc?`<div style="font-size:11.5px;color:var(--grass);margin-top:4px">A csapatstílusod kedvezménye benne van (eredetileg ${fmtFt(it.price)}).</div>`:"")
+      +(disc?`<div style="font-size:11.5px;color:var(--grass);margin-top:4px">A csapatstílusod kedvezménye benne van (eredetileg ${fmtFt(alap)}).</div>`:"")
       +`<button class="btn-${afford?"y":"s"} stepbtn" data-buyform="${k}"${afford?"":" disabled"} style="margin-top:8px">`
       +(afford?`🛒 Megveszem — ${fmtFt(price)}`:`Nincs elég büdzséd (${fmtFt(bud)})`)+`</button></div>`;});
   /* A tervező bejárata csak akkor, ha van még megépíthető alak egyáltalán. */
-  const canAfford=bud>=CUSTOM_FORM_PRICE;
+  const cfAr=customFormPrice(),canAfford=bud>=cfAr;
   h+=`<div class="hubDetail" style="margin-top:10px">`
     +`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">`
     +`<b style="font-size:14px;color:var(--gold)">Saját felállás tervezése</b>`
-    +`<span style="font-size:12px;white-space:nowrap;color:${canAfford?"var(--grass)":"var(--red)"}">${fmtFt(CUSTOM_FORM_PRICE)}</span></div>`
+    +`<span style="font-size:12px;white-space:nowrap;color:${canAfford?"var(--grass)":"var(--red)"}">${fmtFt(cfAr)}${earlyDiscTag()}</span></div>`
     +`<div style="font-size:12px;color:var(--dim);margin-top:5px;line-height:1.5">`
     +`Te adod meg a sorok létszámát <b>és a szélességüket</b> (szárnyvédőkkel vagy csupa középhátvéddel, szélsőkkel vagy befelé zárva), `
     +`a rendszer felépíti belőle a poszt-kiosztást és a pályaképet — a poszt-előnézet még fizetés előtt megmutatja. `
@@ -82497,7 +82584,7 @@ function renderFormBuilder(){
   const box=$("hubFormBuilder");if(!box||box.classList.contains("hide"))return;
   const R=CUSTOM_FORM_RULES;
   const err=customFormError(FB.d,FB.m,FB.f);
-  const bud=S.transferBudget||0,afford=bud>=CUSTOM_FORM_PRICE;
+  const cfAr=customFormPrice(),bud=S.transferBudget||0,afford=bud>=cfAr;
   const W=fbWides();
   const row=(key,label)=>`<div style="display:flex;align-items:center;gap:8px;margin-top:7px">`
     +`<span style="flex:1;font-size:13px">${label}</span>`
@@ -82532,7 +82619,7 @@ function renderFormBuilder(){
     +`<div style="margin-top:5px;font-size:12px;line-height:1.6;color:var(--dim);letter-spacing:.5px">${prev}</div>`
     +`<button class="btn-${!err&&afford?"y":"s"} stepbtn" id="hubFormCreate"${!err&&afford?"":" disabled"} style="margin-top:9px">`
     +(err?"Előbb javítsd az alakot"
-        :afford?`📐 Létrehozom — ${fmtFt(CUSTOM_FORM_PRICE)}`
+        :afford?`📐 Létrehozom — ${fmtFt(cfAr)}`
                :`Nincs elég büdzséd (${fmtFt(bud)})`)+`</button>`
     +`<div style="font-size:11.5px;color:var(--dim2);margin-top:6px;line-height:1.45">`
     +`A kapussal együtt 11 ember: ${R.outfield} mezőnyjátékost oszthatsz szét. A létrehozott felállás azonnal életbe is lép. `
@@ -82555,7 +82642,7 @@ function renderFormBuilder(){
   if(cr)cr.onclick=()=>{
     const label=customFormLabel(FB.d,FB.m,FB.f);
     askConfirm({html:`<div style="font-size:13px;line-height:1.5">`
-      +`Létrehozod ${hunAz(esc(label))} <b>${esc(label)}</b> felállást <b style="color:var(--gold)">${fmtFt(CUSTOM_FORM_PRICE)}</b>-ért?<br>`
+      +`Létrehozod ${hunAz(esc(label))} <b>${esc(label)}</b> felállást <b style="color:var(--gold)">${fmtFt(customFormPrice())}</b>-ért?<br>`
       +`<span style="color:var(--dim2);letter-spacing:.5px">${prev}</span><br>`
       +`Azonnal életbe lép: a kezdő 11 újrarendeződik az új posztokra, a kiszorulók a padra/tartalékba kerülnek.</div>`,
       onYes:()=>{
@@ -82566,7 +82653,7 @@ function renderFormBuilder(){
            váltás korlátját. */
         S.formationChangesThisSeason=(S.formationChangesThisSeason||0)+1;
         applyFormationChange(r.key);
-        addLine(`📐 Megszületett a saját felállásod: ${r.label} (−${fmtFt(CUSTOM_FORM_PRICE)}) — a kezdő 11 újrarendezve.`,"m life");
+        addLine(`📐 Megszületett a saját felállásod: ${r.label} (−${fmtFt(r.price)}) — a kezdő 11 újrarendezve.`,"m life");
         $("hubFormBuilder").classList.add("hide");
         $("hubFormationPicker").classList.add("hide");
         $("scHub").classList.remove("hide");
@@ -90459,7 +90546,26 @@ function unlockDivWhy(d){
    KÖZÖS KARRIERBEN NEM NYÚLUNK SEMMIHEZ: ott a vendég-zár szabályai élnek, és
    a két rendszer egymás `disabled` jelzőjét ütné. */
 function unlockApplyLocks(){
-  if(!unlockGatesOn())return;
+  if(!unlockGatesOn()){
+    /* 🤝 3.9.214 — KÖZÖS KARRIERBEN NINCS LÉPCSŐ ÉS NINCS KAPU, de a korábbi,
+       EGYJÁTÉKOS zárakat VISSZA is kell venni. BEJELENTETT HIBA: „Az egyszerű
+       kezdés jelenleg nem veszi figyelembe a választási lehetőséget dinamikus
+       és hagyományos mód között, amennyiben pvp szobát indítasz." Eddig itt
+       egy puszta `return` állt: aki a kezdő lépcsőn ugyanabban a munkamenetben
+       már járt az egyjátékos beállítóban (vagy a Beállításokban), annál a
+       lépcső tiltásai a PvP-szobában is a gombokon ragadtak — a módválasztó
+       zárva maradt, és a gyors panel nem engedett váltani. A vendég átnézője
+       kivétel: ott a zárolás szándékos (mpGuestReviewLock). */
+    let vendeg=false;try{vendeg=!!_mpGuestReview;}catch(e){vendeg=false;}
+    if(vendeg)return;
+    Object.keys(UNLOCK_LOCK_SEL).forEach(k=>{
+      try{document.querySelectorAll(UNLOCK_LOCK_SEL[k]).forEach(el=>{el.disabled=false;});}catch(e){}});
+    UNLOCK_GATES.forEach(g=>{
+      try{document.querySelectorAll(g.sel).forEach(el=>{
+        if(!el.classList.contains("unlockOff"))return;
+        unlockGateBtn(el,true,g.sz);el.disabled=false;});}catch(e){}});
+    {const jel=$("unlockSetupNote");if(jel)jel.classList.add("hide");}
+    return;}
   const p=unlockPreset();
   const jel=$("unlockSetupNote");
   if(!p){
@@ -98316,7 +98422,7 @@ function talF6bSzezonvaltas(){
        if(!best||e.age<best.age)best=e;});}catch(e){}
      if(best){
        const volt=best.pot||0;
-       best.pot=Math.min(POT_HARD_CAP,Math.round(volt*(1+v/100)));
+       best.pot=boostLift(volt,Math.round(volt*(1+v/100)),potHardCap());   /* 3.9.212: sosem lejjebb */
        A.csoda=sz;
        try{addLine(`🌠 <b>CSODAGYEREK</b> — ${esc(shortName(best.n))} (${best.age} év), a legfiatalabb kezdőd: POT ${fmtNum(volt)} → <b>${fmtNum(best.pot)}</b>.`,"m mvp");}catch(e){}}}}
   /* 🌱 MÁSODIK TAVASZ: egy 30 feletti játékos Ratingje +3; kontra: a stáb Sz −v */
@@ -101491,11 +101597,16 @@ const MS_STYLE_CATS=[
   {key:"ugras", n:"A nagy ugrás", pct:1.2,
    d:"A karrier két nagy határköve: az Infinity megnyitása és a tizedik lezárt szezon."}];
 /* CSAPATÉPÍTÉSI STÍLUS ("Olcsó totális futball"): a bolti felállás ára. */
+/* 3.9.213: az alapár a klubhoz mért (shopFormBasePrice), a stílus-kedvezmény
+   erre jön rá — a kettő szorzódik, ahogy minden más árnál. */
+function shopFormBasePrice(k){
+  const it=FORM_SHOP[k];
+  return it?scaledUpgradePrice(it.price,500):0;}
 function shopFormPrice(k){
   const it=FORM_SHOP[k];
   if(!it)return 0;
   const d=(typeof styleFormDiscount==="function")?styleFormDiscount():1;
-  return Math.max(1,Math.round(it.price*d));}
+  return Math.max(1,Math.round(shopFormBasePrice(k)*d));}
 function msCatByKey(k){return MS_STYLE_CATS.find(c=>c.key===k)||null;}
 function msCatUnlocked(k){
   if(!k)return true;                  /* kategória nélküli (pénzjutalmas) mérföldkő */

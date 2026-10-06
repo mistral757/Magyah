@@ -48,6 +48,45 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## pvp-gyors-fajta-3-9-214-proba.js — 🤝 3.9.214: gyors indítás PvP-szobában, a közös karrier fajtája
+
+```bash
+node tools/pvp-gyors-fajta-3-9-214-proba.js
+```
+
+**21 állítás**, valódi böngészőben, a szoba-backend csonkjával.
+
+* **Alapbeállítás:** saját sor (🤝 Közös karrier fajtája), a választás a tárba íródik.
+* **Házigazda:** a gyors panel a tárolt fajtával nyílik (mindkét irányban), a felirat kimondja, hogy mindkettőtökre szól, a váltás visszaíródik; az „Indulás →” a választott fajtát publikálja.
+* **A bejelentett eset:** a kezdő lépcső egyjátékos zárai a PvP-szobában feloldódnak, a váltás oda-vissza működik.
+* **Egyjátékos:** a kezdőlap dönt, és nem írja felül a közös alapbeállítást.
+
+## skalazas-3-9-213-proba.js — 📏 3.9.213: a POT-jutalom és a felállás-árak skálázása
+
+```bash
+node tools/skalazas-3-9-213-proba.js
+```
+
+**21 állítás**, valódi böngészőben.
+
+* **POT-jutalom:** 85-ös mezőnyig a régi 1500 × nehézség (a képen látott 1575 is), fölötte a mezőny-szintű POT arányában, monoton; a kártya és a kifizetés ugyanazt a számot adja.
+* **Felállás-árak:** a saját és a bolti felállás pontosan `scaledUpgradePrice` — referencia-büdzsénél a régi 50 / 75 Mrd, kis klubnál kevesebb, nagynál a gyöke szerint több, az 1. idényben −50%; a stílus-kedvezmény erre szorzódik.
+* **Felület:** a bolt és a tervezőasztal a skálázott árat mutatja, a vásárlás és a létrehozás pontosan azt vonja le.
+
+## pot-plafon-3-9-212-proba.js — 📈 3.9.212: a POT nem esik vissza 200 000-re
+
+```bash
+node tools/pot-plafon-3-9-212-proba.js
+```
+
+**20 állítás**, valódi böngészőben.
+
+* **A kemény plafon a mezőnnyel nő:** 111-es mezőnyig 200 000, fölötte `peakToPot(mezőny + 100)`, monoton.
+* **A három régi vágó ág** (kihívás-jutalom POT, 🌠 Csodagyerek, ∞ nyitó ×1,5) a plafon fölötti POT-ot nem vágja le; a jutalom a 9000 fölötti felnőttet sem.
+* **Minden boost-fajta** (ifi, öreg, sima, POT, szezonkártya) plafon fölött: a POT sosem csökken.
+* **A felhasználó útja:** 400-as Ratingű, 900 000-es POT-ú ifi a HUB ifi-boost paneljén → a POT és a Rating is nő, a könyvelés és a visszajelzés a valódi számot írja.
+* **Ifi-felzárkózás:** magas mezőnyben a Ratingje szerinti POT-ig.
+
 ## kupa-csak-donto-3-9-211-proba.js — ⚔ 3.9.211: közös kupa, csak a döntőben
 
 ```bash
@@ -110,7 +149,7 @@ node tools/padlo-vallalas-3-9-210-proba.js
 node tools/gyors-inditas-3-9-209-proba.js
 ```
 
-**22 állítás**, valódi böngészőben.
+**20 állítás**, valódi böngészőben.
 
 * **Gyors indítás:**
   * a kezdőlap gombja a két kérdést nyitja;
