@@ -1922,3 +1922,14 @@ JAVASLAT_3_9_207 = {
 "Gustavo Poyet":("Pojácás Gusztáv","Pojácás"),  # Pojet Gusztáv
 }
 MANUAL.update(JAVASLAT_3_9_207)
+JAVASLAT_3_9_216 = {
+"Damien Duff":("Duzzogó Damján","Duzzogó"),  # Dúff Benedek
+"Mauro Tassotti":("Taszigáló Móric","Taszigáló"),  # Tasszotti Mór
+"Dennis Wise":("Bölcselkedő Dénes","Bölcselkedő"),  # Vájs Dénes
+"Karl-Heinz Riedle":("Ridikül Károly","Ridikül"),  # Ridle Károly
+"Frédéric Kanouté":("Kanóc Frigyes","Kanóc"),  # Kanúté Frigyes
+"Eric Gerets":("Gerendás Erik","Gerendás"),  # Gérets Erik
+"Steve Mandanda":("Mandulás István","Mandulás"),  # Mándanda Pista
+"Giovane Élber":("Elbűvölő János","Elbűvölő"),  # Élbér Huba
+}
+MANUAL.update(JAVASLAT_3_9_216)
