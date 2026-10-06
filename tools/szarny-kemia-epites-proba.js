@@ -261,9 +261,21 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   /* A MENTÉS a meccs utáni jutalom-lánc alatt SZÁNDÉKOSAN tart (lásd saveGame,
      _utoTartas) — a 4–5. rész valódi meccset játszott, tehát előbb a lánc
      végét várjuk meg, különben a régebbi mentést olvasnánk vissza. */
-  /* A teljes regresszió terhelése alatt a lánc a 10 mp-et is túlléphette —
-     ezért 40 mp-ig várunk (egyedül futtatva ez pár száz ms). */
-  for(let i=0;i<200;i++){const fut=await p.evaluate(()=>!!(S&&S.utoMeccs));if(!fut)break;await p.waitForTimeout(200);}
+  /* HA A LÁNC DÖNTÉSRE VÁR (egy kisorsolt skill-jutalom választója — a
+     meccsek véletlenjén múlik, hogy jön-e), magától sosem ér véget, és a
+     mentés szándékosan tart. Ez a rész a panelt és a mentést méri, nem a
+     láncot: rövid várakozás után lezárjuk. */
+  /* AZ 5. RÉSZ UTÓJA: a végigjátszás leállítása után egy időzítőn függő
+     kezdőrúgás még elindulhat — az auto ekkor már ki van kapcsolva, tehát a
+     lefújása KÉZI lefújásnak számít, és saját láncot nyit. Addig várunk, amíg
+     legalább 1 mp-ig sem meccs, sem lánc nem fut (a függő láncot lezárjuk). */
+  for(let i=0,csend=0;i<200&&csend<5;i++){
+    const all=await p.evaluate(()=>{
+      if(S.playing)return "meccs";
+      if(S&&S.utoMeccs){try{utoLancVege();}catch(e){}return "lanc";}
+      return "";});
+    csend=all?0:csend+1;
+    await p.waitForTimeout(200);}
   const pm=await p.evaluate(()=>{
     const ki={};
     const nev=pos=>slots.find(s=>s.pos===pos).player.n;
@@ -278,12 +290,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* a SAJÁT mentési helyéről olvasunk, nem az első egyező kulcsról */
     let d=null;try{d=JSON.parse(localStorage.getItem(saveKey())||"null");}catch(e){d=null;}
     ki.mentes=!!(d&&d.S&&d.S.szarnyInProgress===szarnyKey(BV,BSZ)&&d.S.szarnyMig===1);
+    /* ha nem jött össze, a kimenet mondja meg, MI tartotta vissza a mentést */
+    if(!ki.mentes)ki.miert={uto:!!(S&&S.utoMeccs),tartas:_utoTartas,zar:_saveLock,kulcs:saveKey(),
+      torott:_saveBroken,fagyott:_saveFrozen,elo:hasLiveGame(),van:!!d,
+      futo:d&&d.S&&d.S.szarnyInProgress,mig:d&&d.S&&d.S.szarnyMig,kell:szarnyKey(BV,BSZ),
+      futoMost:S.szarnyInProgress,migMost:S.szarnyMig,phase,playing:!!S.playing};
     return ki;});
   console.log("\n— 7. PANEL ÉS MENTÉS —");
   ok(/félbemaradt: Régi Balszélső már nincs a klubnál|félbemaradt: .*már nincs a klubnál/.test(pm.txt),"a panel kimondja a félbemaradt párt, és hogy ki nincs már a klubnál",pm.txt);
   ok(/épül \(2\/5 fázis\) · ⚡ ezt építed/.test(pm.txt)&&/összeért/.test(pm.txt),"…a futó pár fázisát, és az összeért párt",pm.txt);
   ok(/5 fázis/.test(pm.txt)&&/felajánlásból épül/.test(pm.txt),"a leírás a felajánlásos építést mondja",pm.txt);
-  ok(pm.mentes,"a mentés viszi a futó párt és a migráció jelzőjét");
+  ok(pm.mentes,"a mentés viszi a futó párt és a migráció jelzőjét",pm.miert);
 
   await p.evaluate(()=>{szarnyOfferP=window._sop;passChemOn=window._pco;gpDuoOn=window._gpo;underdogFactor=window._ud;styleLevel=window._slReal;});
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
