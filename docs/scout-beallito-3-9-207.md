@@ -38,4 +38,4 @@ Ezért:
 
 ## Próba
 
-`tools/scout-beallito-3-9-207-proba.js` — 12 állítás.
+`tools/scout-beallito-3-9-207-proba.js` — 13 állítás.

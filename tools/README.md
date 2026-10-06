@@ -54,7 +54,7 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
 node tools/scout-beallito-3-9-207-proba.js
 ```
 
-**12 állítás**, valódi böngészőben.
+**13 állítás**, valódi böngészőben.
 
 * **Beállító:**
   * karrierben látszik (drafttal és kész klubbal is), karrieren kívül nem;
