@@ -7285,7 +7285,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.212";
+const APP_VERSION="3.9.213";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -49830,6 +49830,29 @@ function challengeContext(){
 /* Pénz-tétek skálázása a jelenlegi büdzséhez és a mezőnyszinthez. */
 function challengeMoneyScale(ctx){
   return Math.max(1,(ctx.budget*0.28+2500)*(1+(ctx.oppRating-80)*0.02));}
+/* ---- A POT-JUTALOM IS A MEZŐNNYEL NŐ (3.9.213) ----
+   KIMONDOTT KÉRÉS: „Ez a típusú jutalom is legyen skálázva, mert eddig nem
+   volt." A „+N POT egy játékosra" fixen 1500 × nehézség volt — egy 85-ös
+   mezőnyben egy átlagos POT (~2400) bő fele, egy 150-esben (~54 000) a 3%-a,
+   egy 400-asban (~1,5 millió) a 0,1%-a: a jutalom a karrier előrehaladtával
+   csendben semmivé zsugorodott.
+   MOSTANTÓL a mezőny-szintű játékos POT-jával ARÁNYOS: a szorzó
+   peakToPot(mezőny) ÷ peakToPot(85), legalább 1. 85-ös mezőnyig tehát
+   betűre a régi szám, fölötte ugyanakkora ARÁNYT ad a mezőny POT-jából, mint
+   a karrier elején (100-as mezőny ~×3, 150-es ~×23, 400-as ~×640). A felső
+   határ a kemény POT-plafon (potHardCap), ami szintén a mezőnnyel nő. */
+const CH_POT_BASE=1500, CH_POT_REF_FIELD=85;
+function challengePotScale(ctx){
+  const f=(ctx&&ctx.oppRating)||oppTargetRating||80;
+  return Math.max(1,peakToPot(f)/peakToPot(CH_POT_REF_FIELD));}
+/* Kerek szám a kártyára: 10 000 alatt a régi egész, fölötte 3 értékes jegy. */
+function chNiceRound(x){
+  const v=Math.round(x);
+  if(v<10000)return v;
+  const m=Math.pow(10,Math.floor(Math.log10(v))-2);
+  return Math.round(v/m)*m;}
+function challengePotAmount(ctx,mult){
+  return chNiceRound(CH_POT_BASE*mult*challengePotScale(ctx));}
 /* Egy játékos aktuális szezon-statja a haladás méréséhez. */
 function challengeStatFor(name,stat){
   if(stat==="goals")return S.scorers[name]||0;
@@ -50665,7 +50688,7 @@ function genReward(scope,diff,ctx){
   const pool=[
     {kind:"money",amount:money,desc:`+${fmtFt(money)}`},
     {kind:"morale",amount:Math.round(10*mult),desc:`+${Math.round(10*mult)} morál`},
-    {kind:"pot",amount:Math.round(1500*mult),desc:`+${Math.round(1500*mult)} POT egy játékosra`},
+    {kind:"pot",amount:challengePotAmount(ctx,mult),desc:`+${fmtNum(challengePotAmount(ctx,mult))} POT egy játékosra`},
     {kind:"skill",desc:"egy skill egy játékosnak"},
     {kind:"scoutUp",desc:"+1 scout-csillag"},
     {kind:"rosterUp",desc:"+2 keretméret"},
@@ -75233,9 +75256,19 @@ function formationChangeCost(){
    dönti el. Ez a szétválasztás fontos: egy régi mentés betöltésekor a
    pillanatnyi felállás akkor is felismerhető marad, ha a kapu épp zárva
    volna. */
-const CUSTOM_FORM_PRICE=Math.round(50e9/HUF_PER_POINT);   /* 50 Mrd Ft */
+/* ---- A FELÁLLÁS-ÁRAK IS A KLUBHOZ MÉRTEK (3.9.213) ----
+   KIMONDOTT KÉRÉS: „a felállás vásárlás, saját felállás készítése sem volt
+   skálázva. Legyen ugyanúgy, mint a többi (scout fejlesztés, pozíció tanulás
+   stb)." A két ár eddig fix forint volt (75 és 50 Mrd): egy kis klubnak
+   elérhetetlen, egy felskálázódott világban jelképes. Mostantól a lenti
+   számok ALAP-pontok, és ugyanaz a scaledUpgradePrice viszi őket, mint a
+   scout-fejlesztést, a stábot és a keretbővítést: a referencia-büdzsénél
+   (20 Mrd éves keret) pontosan a régi ár, alatta arányosan kevesebb, fölötte
+   a gyöke szerint több, és az 1-2. idényben a kezdő kedvezmény is él. */
+const CUSTOM_FORM_BASE=Math.round(50e9/HUF_PER_POINT);    /* 50 Mrd Ft a referencia-büdzsénél */
+function customFormPrice(){return scaledUpgradePrice(CUSTOM_FORM_BASE,500);}
 const FORM_SHOP={
-  "424":{price:Math.round(75e9/HUF_PER_POINT),   /* 75 Mrd Ft */
+  "424":{price:Math.round(75e9/HUF_PER_POINT),   /* 75 Mrd Ft a referencia-büdzsénél (alap-pont) */
     name:"Totális futball",
     desc:"Négy védő, mindössze KÉT középpályás és NÉGY támadó. A labda kevesebb kézen megy át, cserébe elöl állandó a túlerő — ez a felállás nem véd, hanem megelőz. A két középpályásra óriási teher hárul."}};
 const STOCK_FORMS=["442","433","4231","352","343","532","451"];
@@ -75423,15 +75456,16 @@ function registerCustomForms(){
 function createCustomForm(d,m,f,w){
   const err=customFormError(d,m,f);
   if(err)return {ok:false,reason:err};
-  if((S.transferBudget||0)<CUSTOM_FORM_PRICE)
-    return {ok:false,reason:`Nincs elég büdzséd — ${fmtFt(CUSTOM_FORM_PRICE)} kellene.`};
+  const price=customFormPrice();
+  if((S.transferBudget||0)<price)
+    return {ok:false,reason:`Nincs elég büdzséd — ${fmtFt(price)} kellene.`};
   const k=customFormKey(d,m,f);
   const built=buildCustomForm(d,m,f,w);
   S.customForms=S.customForms||{};
   S.customForms[k]={d,m,f,w:built.w,label:customFormLabel(d,m,f),slots:built.slots,xy:built.xy};
   registerCustomForm(k,S.customForms[k]);
-  budgetPay(CUSTOM_FORM_PRICE,"tactic");
-  return {ok:true,key:k,label:customFormLabel(d,m,f)};}
+  budgetPay(price,"tactic");
+  return {ok:true,key:k,label:customFormLabel(d,m,f),price};}
 function buyShopForm(k){
   const it=FORM_SHOP[k];
   if(!it)return {ok:false,reason:"Ilyen felállás nincs a kínálatban."};
@@ -82467,22 +82501,22 @@ function renderFormationShop(){
   let h="";
   Object.keys(FORM_SHOP).forEach(k=>{
     if(formBought(k))return;
-    const it=FORM_SHOP[k],price=shopFormPrice(k),afford=bud>=price;
-    const disc=price<it.price;
+    const it=FORM_SHOP[k],price=shopFormPrice(k),afford=bud>=price,alap=shopFormBasePrice(k);
+    const disc=price<alap;
     h+=`<div class="hubDetail" style="margin-top:10px">`
       +`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">`
       +`<b style="font-size:14px;color:var(--gold)">${esc(FORM_LABELS[k]||k)} · ${esc(it.name)}</b>`
-      +`<span style="font-size:12px;white-space:nowrap;color:${afford?"var(--grass)":"var(--red)"}">${fmtFt(price)}</span></div>`
+      +`<span style="font-size:12px;white-space:nowrap;color:${afford?"var(--grass)":"var(--red)"}">${fmtFt(price)}${earlyDiscTag()}</span></div>`
       +`<div style="font-size:12px;color:var(--dim);margin-top:5px;line-height:1.5">${esc(it.desc)}</div>`
-      +(disc?`<div style="font-size:11.5px;color:var(--grass);margin-top:4px">A csapatstílusod kedvezménye benne van (eredetileg ${fmtFt(it.price)}).</div>`:"")
+      +(disc?`<div style="font-size:11.5px;color:var(--grass);margin-top:4px">A csapatstílusod kedvezménye benne van (eredetileg ${fmtFt(alap)}).</div>`:"")
       +`<button class="btn-${afford?"y":"s"} stepbtn" data-buyform="${k}"${afford?"":" disabled"} style="margin-top:8px">`
       +(afford?`🛒 Megveszem — ${fmtFt(price)}`:`Nincs elég büdzséd (${fmtFt(bud)})`)+`</button></div>`;});
   /* A tervező bejárata csak akkor, ha van még megépíthető alak egyáltalán. */
-  const canAfford=bud>=CUSTOM_FORM_PRICE;
+  const cfAr=customFormPrice(),canAfford=bud>=cfAr;
   h+=`<div class="hubDetail" style="margin-top:10px">`
     +`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">`
     +`<b style="font-size:14px;color:var(--gold)">Saját felállás tervezése</b>`
-    +`<span style="font-size:12px;white-space:nowrap;color:${canAfford?"var(--grass)":"var(--red)"}">${fmtFt(CUSTOM_FORM_PRICE)}</span></div>`
+    +`<span style="font-size:12px;white-space:nowrap;color:${canAfford?"var(--grass)":"var(--red)"}">${fmtFt(cfAr)}${earlyDiscTag()}</span></div>`
     +`<div style="font-size:12px;color:var(--dim);margin-top:5px;line-height:1.5">`
     +`Te adod meg a sorok létszámát <b>és a szélességüket</b> (szárnyvédőkkel vagy csupa középhátvéddel, szélsőkkel vagy befelé zárva), `
     +`a rendszer felépíti belőle a poszt-kiosztást és a pályaképet — a poszt-előnézet még fizetés előtt megmutatja. `
@@ -82526,7 +82560,7 @@ function renderFormBuilder(){
   const box=$("hubFormBuilder");if(!box||box.classList.contains("hide"))return;
   const R=CUSTOM_FORM_RULES;
   const err=customFormError(FB.d,FB.m,FB.f);
-  const bud=S.transferBudget||0,afford=bud>=CUSTOM_FORM_PRICE;
+  const cfAr=customFormPrice(),bud=S.transferBudget||0,afford=bud>=cfAr;
   const W=fbWides();
   const row=(key,label)=>`<div style="display:flex;align-items:center;gap:8px;margin-top:7px">`
     +`<span style="flex:1;font-size:13px">${label}</span>`
@@ -82561,7 +82595,7 @@ function renderFormBuilder(){
     +`<div style="margin-top:5px;font-size:12px;line-height:1.6;color:var(--dim);letter-spacing:.5px">${prev}</div>`
     +`<button class="btn-${!err&&afford?"y":"s"} stepbtn" id="hubFormCreate"${!err&&afford?"":" disabled"} style="margin-top:9px">`
     +(err?"Előbb javítsd az alakot"
-        :afford?`📐 Létrehozom — ${fmtFt(CUSTOM_FORM_PRICE)}`
+        :afford?`📐 Létrehozom — ${fmtFt(cfAr)}`
                :`Nincs elég büdzséd (${fmtFt(bud)})`)+`</button>`
     +`<div style="font-size:11.5px;color:var(--dim2);margin-top:6px;line-height:1.45">`
     +`A kapussal együtt 11 ember: ${R.outfield} mezőnyjátékost oszthatsz szét. A létrehozott felállás azonnal életbe is lép. `
@@ -82584,7 +82618,7 @@ function renderFormBuilder(){
   if(cr)cr.onclick=()=>{
     const label=customFormLabel(FB.d,FB.m,FB.f);
     askConfirm({html:`<div style="font-size:13px;line-height:1.5">`
-      +`Létrehozod ${hunAz(esc(label))} <b>${esc(label)}</b> felállást <b style="color:var(--gold)">${fmtFt(CUSTOM_FORM_PRICE)}</b>-ért?<br>`
+      +`Létrehozod ${hunAz(esc(label))} <b>${esc(label)}</b> felállást <b style="color:var(--gold)">${fmtFt(customFormPrice())}</b>-ért?<br>`
       +`<span style="color:var(--dim2);letter-spacing:.5px">${prev}</span><br>`
       +`Azonnal életbe lép: a kezdő 11 újrarendeződik az új posztokra, a kiszorulók a padra/tartalékba kerülnek.</div>`,
       onYes:()=>{
@@ -82595,7 +82629,7 @@ function renderFormBuilder(){
            váltás korlátját. */
         S.formationChangesThisSeason=(S.formationChangesThisSeason||0)+1;
         applyFormationChange(r.key);
-        addLine(`📐 Megszületett a saját felállásod: ${r.label} (−${fmtFt(CUSTOM_FORM_PRICE)}) — a kezdő 11 újrarendezve.`,"m life");
+        addLine(`📐 Megszületett a saját felállásod: ${r.label} (−${fmtFt(r.price)}) — a kezdő 11 újrarendezve.`,"m life");
         $("hubFormBuilder").classList.add("hide");
         $("hubFormationPicker").classList.add("hide");
         $("scHub").classList.remove("hide");
@@ -101520,11 +101554,16 @@ const MS_STYLE_CATS=[
   {key:"ugras", n:"A nagy ugrás", pct:1.2,
    d:"A karrier két nagy határköve: az Infinity megnyitása és a tizedik lezárt szezon."}];
 /* CSAPATÉPÍTÉSI STÍLUS ("Olcsó totális futball"): a bolti felállás ára. */
+/* 3.9.213: az alapár a klubhoz mért (shopFormBasePrice), a stílus-kedvezmény
+   erre jön rá — a kettő szorzódik, ahogy minden más árnál. */
+function shopFormBasePrice(k){
+  const it=FORM_SHOP[k];
+  return it?scaledUpgradePrice(it.price,500):0;}
 function shopFormPrice(k){
   const it=FORM_SHOP[k];
   if(!it)return 0;
   const d=(typeof styleFormDiscount==="function")?styleFormDiscount():1;
-  return Math.max(1,Math.round(it.price*d));}
+  return Math.max(1,Math.round(shopFormBasePrice(k)*d));}
 function msCatByKey(k){return MS_STYLE_CATS.find(c=>c.key===k)||null;}
 function msCatUnlocked(k){
   if(!k)return true;                  /* kategória nélküli (pénzjutalmas) mérföldkő */

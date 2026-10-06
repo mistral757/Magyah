@@ -48,6 +48,18 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## skalazas-3-9-213-proba.js — 📏 3.9.213: a POT-jutalom és a felállás-árak skálázása
+
+```bash
+node tools/skalazas-3-9-213-proba.js
+```
+
+**21 állítás**, valódi böngészőben.
+
+* **POT-jutalom:** 85-ös mezőnyig a régi 1500 × nehézség (a képen látott 1575 is), fölötte a mezőny-szintű POT arányában, monoton; a kártya és a kifizetés ugyanazt a számot adja.
+* **Felállás-árak:** a saját és a bolti felállás pontosan `scaledUpgradePrice` — referencia-büdzsénél a régi 50 / 75 Mrd, kis klubnál kevesebb, nagynál a gyöke szerint több, az 1. idényben −50%; a stílus-kedvezmény erre szorzódik.
+* **Felület:** a bolt és a tervezőasztal a skálázott árat mutatja, a vásárlás és a létrehozás pontosan azt vonja le.
+
 ## pot-plafon-3-9-212-proba.js — 📈 3.9.212: a POT nem esik vissza 200 000-re
 
 ```bash
