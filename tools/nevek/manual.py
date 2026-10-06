@@ -1873,3 +1873,38 @@ JAVASLAT_3_9_197 = {
 "Nemanja Matić":("Matekos Nándor","Matekos"),  # Matyics Nándor
 }
 MANUAL.update(JAVASLAT_3_9_197)
+
+# 3.9.206 — három kör jóváhagyott javaslata („A névjavaslatok mehetnek")
+JAVASLAT_3_9_206 = {
+"Milan Škriniar":("Szekrényes Milán","Szekrényes"),  # Skrinyár Milán
+"Marcelo Gallardo":("Gallér Marcell","Gallér"),  # Gajardo Marcell
+"Désiré Doué":("Dúdoló Dezső","Dúdoló"),  # Dúé Jenő
+"Bruno Conti":("Kontrás Brunó","Kontrás"),  # Konti Brunó
+"Billy McNeill":("Mekegő Vili","Mekegő"),  # Mekneil Vili
+"Alen Bokšić":("Bokszos Alán","Bokszos"),  # Bokszics Alán
+"Álvaro Recoba":("Rekamiés Álmos","Rekamiés"),  # Rekoba Álmos
+"Paco Buyo":("Bújócskás Ferkó","Bújócskás"),  # Bujo Ferkó
+"Trevor Francis":("Ferences Töhötöm","Ferences"),  # Fránszisz Töhötöm
+"Enrico Albertosi":("Albérletes Imre","Albérletes"),  # Albertósi Imre
+"Oliver Bierhoff":("Sörhabos Olivér","Sörhabos"),  # Birhoff Olivér
+"Cláudio Taffarel":("Tapogató Kolos","Tapogató"),  # Táffarel Kolos
+"Stefan Effenberg":("Fenegyerek István","Fenegyerek"),  # Éffenberg István
+"Alain Giresse":("Zsírszegény Alán","Zsírszegény"),  # Zsiressz Alán
+"Jakub Błaszczykowski":("Blazírt Jakab","Blazírt"),  # Blascsikovszki Jakab
+"Adam Lallana":("Lalázó Ádám","Lalázó"),  # Lalana Ádám
+"Abel Balbo":("Bálozó Ábel","Bálozó"),  # Bálbo Ábel
+"Míchel Salgado":("Szalagos Mihály","Szalagos"),  # Szalgado Mihály
+"Aimé Jacquet":("Zakós Emil","Zakós"),  # Zsakké Ödön
+"Raúl Tamudo":("Támaszkodó Rudolf","Támaszkodó"),  # Támudo Rudolf
+"Adil Rami":("Rámpás Vili","Rámpás"),  # Rámi Vilmos
+"Adnan Januzaj":("Januári Ábris","Januári"),  # Jánuzaj Ábris
+"Alain Boghossian":("Bogyós Alán","Bogyós"),  # Bogosszian Alán
+"Alberto Tarantini":("Tarantellás Albert","Tarantellás"),  # Tárantini Albert
+"Aleksandr Kerzhakov":("Kerge Sándor","Kerge"),  # Kérzhakov Sándor
+"Alan Kennedy":("Kenyeres Alán","Kenyeres"),  # Kennedi Alán
+"Agostino Di Bartolomei":("Borotválatlan Ágoston","Borotválatlan"),  # Díbartolomei Benedek
+"Giovanni Simeone":("Simogató János","Simogató"),  # Szimeone János
+"Pavel Pogrebnyak":("Pogácsás Pál","Pogácsás"),  # Pogrebnjak Pál
+"Raúl Albiol":("Albínó Rudolf","Albínó"),  # Álbiol Rudolf
+}
+MANUAL.update(JAVASLAT_3_9_206)
