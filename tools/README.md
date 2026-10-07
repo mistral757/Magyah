@@ -48,6 +48,19 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## meccsmotor/ — ⚽ a meccsmotor szórása (elemzés, 3.9.219)
+
+```bash
+MODE=normal N=300 DS=0,2,3,5,8 node tools/meccsmotor/szoras-valos.js   # a VALÓDI motor, álórával
+MODE=big    N=300 DS=0,3,5     node tools/meccsmotor/szoras-valos.js   # rangadó / hajrá-rangadó
+node tools/meccsmotor/szoras-modell.js                                 # a hű modell + hangolási változatok
+```
+
+Nem próba (nincs ✓/✗), hanem mérő: győzelem/döntetlen/vereség a ⚡ meccserő-különbség szerint. Az elemzés: `docs/meccsmotor-szoras-elemzes.md`.
+
+* **A valódi motor:** egy 1. idényes karrierben a valódi `playMatch`-lánc fut végigjátszás-módban. A kért különbség a `matchLambdas` becsomagolásával áll be. Fele hazai, fele idegen meccs.
+* **A modell:** a mag hű másolata (Poisson-vödrök, 90+ dráma, különleges esemény, piros lap, rangadó-közelítés). Változatok: A (a zaj erőhöz kötve), B (rangadó ⅓), D (a jobb csapat rákapcsol), K (meredekség).
+
 ## scout-ar-3-9-219-proba.js — 💸 3.9.219: olcsóbb scout-találat (a régi ár 33–55%-a)
 
 ```bash
