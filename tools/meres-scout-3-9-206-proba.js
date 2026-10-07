@@ -132,6 +132,11 @@ const SP=process.env.MSP||require("os").tmpdir();
     const e2=szabad()[0],p2=careerPlayerFromPoolEntry(e2);drafted.add(p2.n);extraRoster.push(p2);markArrived(p2,3000000);
     const elotte=fullCareerRoster().length;
     let cbOk=false;processCareerUnlocksB([Object.keys(CAREER_UNLOCK_REASON_TXT)[0]],()=>{cbOk=true;});
+    /* 3.9.217: a klasszikus felfedezés a listára kerül (ingyenes), és az
+       átigazolási időszakban leigazolva érkezik — a mérés AKKOR rögzíti */
+    const lista=scoutRealState().list,rec=lista[lista.length-1];
+    const _w=scoutRealWindowOpen;scoutRealWindowOpen=()=>true;
+    try{if(rec&&rec.free)scoutFreeSign(rec.n);}finally{scoutRealWindowOpen=_w;}
     const z=meresLoad().sz[0];
     const ki=x=>({n:x.n,forras:x.forras,ar:x.ar||0,attrs:!!x.attrs,pot:x.pot});
     return {ifi:ki(z.erk.find(x=>x.n===p1.n)||{}),vett:ki(z.erk.find(x=>x.n===p2.n)||{}),
@@ -192,7 +197,10 @@ const SP=process.env.MSP||require("os").tmpdir();
     o.atl={norm:+atl(false).toFixed(2),real:+atl(true).toFixed(2)};
     /* a felfedezés: listára, nem keretbe */
     const elotte=fullCareerRoster().length,lista0=scoutRealState().list.length,megf0=(meresLoad().sz[1].megf||[]).length;
-    let cbOk=false;processCareerUnlocksB([Object.keys(CAREER_UNLOCK_REASON_TXT)[0]],()=>{cbOk=true;});
+    /* 3.9.217: a licit-méréshez fizetős találat kell (az ingyenes harmadot a
+       scout-ingyen-3-9-217-proba méri) */
+    const _fr=scoutFreeRoll;scoutFreeRoll=()=>false;
+    let cbOk=false;try{processCareerUnlocksB([Object.keys(CAREER_UNLOCK_REASON_TXT)[0]],()=>{cbOk=true;});}finally{scoutFreeRoll=_fr;}
     o.felf={cbOk,keret:fullCareerRoster().length-elotte,lista:scoutRealState().list.length-lista0,megf:(meresLoad().sz[1].megf||[]).length-megf0};
     const rec=scoutRealState().list[scoutRealState().list.length-1];
     o.rec=Object.assign({},rec);
@@ -246,7 +254,9 @@ const SP=process.env.MSP||require("os").tmpdir();
   ok(r5.sav.hi1<r5.sav.hi0&&r5.sav.mode1<r5.sav.mode0,"a felfedezési sáv lejjebb ül (felső határ és csúcs)",r5.sav);
   ok(r5.atl.real<r5.atl.norm,"átlagban gyengébbet talál — az erős ritkább",r5.atl);
   ok(r5.felf.cbOk&&r5.felf.keret===0&&r5.felf.lista===1&&r5.felf.megf===1,"a felfedezett a Megfigyelt listára kerül, NEM a keretbe (és a mérő is látja)",r5.felf);
-  ok(r5.arany>=0.635&&r5.arany<=0.765,"a meghirdetett ár a piaci vételár 65–75%-a",{arany:r5.arany,frac:r5.rec.frac});
+  /* 3.9.219 óta a 65–75%-nak is csak 33–55%-a (rec.arF) */
+  ok(r5.arany>=0.635*0.33-0.002&&r5.arany<=0.765*0.55+0.002&&Math.abs(r5.arany-r5.rec.frac*r5.rec.arF)<0.003,
+     "a meghirdetett ár a piaci vételár 65–75%-ának 33–55%-a",{arany:r5.arany,frac:r5.rec.frac,arF:r5.rec.arF});
   ok(r5.rec.turelem>=3&&r5.rec.turelem<=6&&r5.rec.rejects===0,"a türelem 3–5 (+1 jó ügynökséggel)",r5.rec);
   ok(!r5.zart.ok&&/átigazolási időszakban/.test(r5.zart.msg),"zárt ablakban nem lehet licitálni",r5.zart);
   ok(!r5.penzNincs.ok&&/büdzsé/.test(r5.penzNincs.msg),"büdzsé nélkül nem lehet",r5.penzNincs);
@@ -306,20 +316,23 @@ const SP=process.env.MSP||require("os").tmpdir();
     const varj=ms=>new Promise(r=>setTimeout(r,ms));
     document.getElementById("themeModal").classList.remove("hide");renderThemeModal();await varj(80);
     const q=s=>document.querySelector(s);
-    const o={sr:q("#scoutRealBtn")&&q("#scoutRealBtn").getAttribute("aria-pressed"),
+    /* 3.9.218: a scout az ÚJ KARRIER alapbeállítása lett (🎛️ blokk, legfelül,
+       nyitva) — a különálló kapcsoló, ami a futó karriert váltotta, megszűnt */
+    const sel=q('#kaBox select[data-ka="scoutReal"]');
+    const o={nincsKulon:!q("#scoutRealBtn"),sorVan:!!sel,nyitva:!!(q("#kaBox")&&q("#kaBox").open),
       gombok:["#meresLetoltBtn","#meresMasolBtn","#meresFelBtn","#meresAutoBtn"].map(s=>!!q(s)),
       auto:q("#meresAutoBtn")&&q("#meresAutoBtn").getAttribute("aria-pressed")};
-    q("#scoutRealBtn").click();await varj(60);
-    o.sr2=q("#scoutRealBtn").getAttribute("aria-pressed");o.on2=scoutRealOn();
-    q("#scoutRealBtn").click();await varj(60);o.on3=scoutRealOn();
+    const futo=scoutRealOn();
+    if(sel){sel.value=futo?"off":"on";sel.onchange();await varj(40);}
+    o.futoMarad=scoutRealOn()===futo;o.tar=kaGet("scoutReal");
     q("#meresAutoBtn").click();await varj(60);o.fel=meresFelOn();q("#meresAutoBtn").click();await varj(60);o.fel2=meresFelOn();
     o.kiFel=await meresFeltolt(false);
     return o;});
-  ok(r8.sr==="true"&&r8.sr2==="false"&&!r8.on2&&r8.on3,"a beállításokban a 🔭 kapcsoló oda-vissza működik",r8);
+  ok(r8.nincsKulon&&r8.sorVan&&r8.nyitva&&r8.futoMarad&&r8.tar,"a 🔭 scout az új karrier alapbeállításai közt (nyitva); a futó karriert nem váltja",r8);
   ok(r8.gombok.every(Boolean)&&r8.auto==="false","a 📈 Mérési napló blokk: letöltés, másolás, feltöltés, automatikus feltöltés (alapból KI)",r8.gombok);
   ok(r8.fel===true&&r8.fel2===false&&r8.kiFel.ok===false&&r8.kiFel.ok_==="ki","kikapcsolt feltöltésnél idényzáráskor SEMMI nem megy ki",r8.kiFel);
   await takar("#themeModal");
-  await p.evaluate(()=>{const x=document.getElementById("scoutRealBtn");if(x)x.scrollIntoView({block:"start"});});
+  await p.evaluate(()=>{const x=document.getElementById("meresAutoBtn");if(x)x.scrollIntoView({block:"start"});});
   await p.waitForTimeout(300);
   await p.screenshot({path:path.join(SP,"meres-beallitas.png")});
   await p.evaluate(()=>document.getElementById("themeModal").classList.add("hide"));

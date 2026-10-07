@@ -31,10 +31,13 @@ const srv=http.createServer((req,rp)=>{
   fs.createReadStream(abs).pipe(rp);});
 let hiba=0;
 const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSON.stringify(d).slice(0,500):""));if(!c)hiba++;};
+/* 2026-10-06: Milito és D'Ambrosio a projektgazda SAJÁT neve volt, amit ez a kör
+   felülírt — a döntése szerint visszaállt (tools/nevek/sajat.py); itt már a
+   saját alakjukat várjuk. */
 const NEVEK={
  "Xabi Alonso":"Álomszó Csabi","Kostas Manolas":"Mandolás Kostás","Theodoros Zagorakis":"Zagyva Teó",
- "Mark Viduka":"Vidámka Márk","Gabriel Milito":"Miliméteres Gábor","Julian Brandt":"Pálinkás Gyula",
- "Wolfgang Overath":"Óvárosi Farkas","Danilo D'Ambrosio":"Dámvadas Dani",
+ "Mark Viduka":"Vidámka Márk","Gabriel Milito":"Milító Gábor","Julian Brandt":"Pálinkás Gyula",
+ "Wolfgang Overath":"Óvárosi Farkas","Danilo D'Ambrosio":"Dámbrózió Dani",
  "Julio Baptista":"Keresztelő Gyula","Mikaël Silvestre":"Szilveszter Mihály","Anthony Modeste":"Módos Antal",
  "Wayne Bridge":"Hidas Vendel","Phil Barber":"Borbély Fülöp","Mario Kempes":"Kemence Márió",
  "Carsten Ramelow":"Rámolós Krisztián","Youri Mulder":"Mulató Jenő","Wolfgang Kraus":"Káosz Farkas",

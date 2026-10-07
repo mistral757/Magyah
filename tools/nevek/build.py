@@ -13,6 +13,15 @@ sys.path.insert(0, D)
 from rules import (POOL as POOL_ALL, hufy, given_of, pool_given, lengthen, hu_twist, PARTICLES, strip_dia, LANG,
                    son_stem, son_suffix, SON_LANG)
 from manual import MANUAL
+# ── A FELHASZNÁLÓ SAJÁT NEVEI: UTOLSÓ, VÉDETT RÉTEG (3.9.217) ──────────────
+# A MANUAL minden blokkja (a javaslatkörök is) ELŐTTE töltődik be — a saját
+# név tehát mindent felülír, őt viszont semmi. Ha egy blokk mást adna, kiírjuk:
+# az egy elfelejtett ellenőrzés jele (lásd javaslat_ellenor.py).
+from sajat import SAJAT
+_vedve = [(k, MANUAL[k][0], v[0]) for k, v in SAJAT.items() if k in MANUAL and tuple(MANUAL[k]) != tuple(v)]
+for _k, _volna, _marad in _vedve:
+    print(f"!! SAJÁT NÉV VÉDVE: {_k} — a kézi réteg „{_volna}”-t adna, marad „{_marad}”")
+MANUAL.update(SAJAT)
 from klubok import KLUBOK, LIGAK, ORSZAGOK
 
 # ── az adat kinyerése az index.html-ből ────────────────────────────────────
@@ -183,6 +192,12 @@ for n in sorted(table):
     full, sh = table[n]
     if full not in _seen:
         _seen[full] = n
+        continue
+    # KIVÉTEL (3.9.217): ha MINDKÉT név a projektgazda saját, szándékos döntése
+    # (SAJAT), az azonosság kért — ugyanaz az ember két kártyán (Szoboszlai:
+    # ikon és sima → „Dominic Solos Light"). A játék ezt nem ütközésnek veszi
+    # (buildHuShortDisambig: azonos teljes név két kulcson nem ütközés).
+    if n in SAJAT and _seen[full] in SAJAT and SAJAT[n][0] == full == SAJAT[_seen[full]][0]:
         continue
     parts = full.split()
     for k in range(1, len(POOL_ALL) + 1):

@@ -69,20 +69,28 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return {a,on:scoutRealOn(),mezoBe:S.scoutReal};});
   ok(r2.a===true&&r2.on===true&&r2.mezoBe===true,"a beginNewGame a karrierre rögzíti, a tárolt preferencia már nem írja át",r2);
 
-  console.log("\n— 3. a Beállítások kapcsolója —");
+  console.log("\n— 3. a Beállítások: az új karrier alapbeállítása (3.9.218) —");
   const r3=await p.evaluate(async()=>{
     const varj=ms=>new Promise(r=>setTimeout(r,ms));
     document.getElementById("themeModal").classList.remove("hide");renderThemeModal();await varj(50);
-    const btn=document.getElementById("scoutRealBtn");
-    const o={elotte:btn.getAttribute("aria-pressed"),tiltva:btn.disabled};
-    btn.click();await varj(50);
-    o.utana=document.getElementById("scoutRealBtn").getAttribute("aria-pressed");
-    o.S=S.scoutReal;o.w=scoutRealWanted;o.ls=localStorage.getItem("scoutReal30_0");
-    o.rács=document.querySelector('#scoutRealGrid button[data-sr="off"]').classList.contains("sel");
+    const kb=document.getElementById("kaModalBody"),box=document.getElementById("kaBox");
+    const sel=document.querySelector('#kaBox select[data-ka="scoutReal"]');
+    const o={kulon:!!document.getElementById("scoutRealBtn"),sor:!!sel,nyitva:!!(box&&box.open),
+      legfelul:!!(kb&&kb.contains(box)&&kb.previousElementSibling&&/Beállítások/.test(kb.previousElementSibling.textContent)),
+      opciok:sel?[...sel.options].map(x=>x.value):[]};
+    const futo=S.scoutReal;
+    sel.value="off";sel.onchange();await varj(30);
+    o.tar=kaGet("scoutReal");o.futoMarad=S.scoutReal===futo;
+    /* becsukva a munkamenetben csukva marad, egy új rajzolás nem nyitja ki */
+    box.open=false;await varj(30);renderThemeModal();await varj(30);
+    o.csukvaMarad=!document.getElementById("kaBox").open;
+    document.getElementById("kaBox").open=true;await varj(30);
     document.getElementById("themeModal").classList.add("hide");
     return o;});
-  ok(r3.elotte==="true"&&!r3.tiltva&&r3.utana==="false"&&r3.S===false&&r3.w===false&&r3.ls==="0"&&r3.rács,
-     "a futó karrier, a preferencia és a beállító választója együtt vált",r3);
+  ok(!r3.kulon&&r3.sor&&JSON.stringify(r3.opciok)==='["off","on"]',"a különálló 🔭 kapcsoló helyett a 🎛️ blokk „Scout” sora",r3);
+  ok(r3.legfelul&&r3.nyitva,"az alapbeállítások a Beállítások legtetején állnak, alapból nyitva",r3);
+  ok(r3.tar==="off"&&r3.futoMarad,"a sor az új karrier alapját írja — a futó karrier scout-módja nem változik",r3);
+  ok(r3.csukvaMarad,"ha becsukod, a munkamenetben csukva marad",r3.csukvaMarad);
 
   console.log("\n— 4. közös karrier —");
   const r4=await p.evaluate(async()=>{
@@ -103,19 +111,20 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.zar=[...document.querySelectorAll("#scoutRealGrid button")].every(b=>b.disabled);
     mpGuestReviewLock(false);
     o.lista=MP_GUEST_LOCK_SEL.includes("#scoutRealGrid");
-    /* menet közben, közös karrierben: a Beállítások kapcsolója zárolt */
+    /* menet közben, közös karrierben: a Beállítások már csak az ÚJ karrier
+       alapját írják (3.9.218), a futó közös karrier scout-módja nem változik */
     const mpA=MP.active,cp=careerPool;MP.active=true;if(!careerPool)careerPool={};
     document.getElementById("themeModal").classList.remove("hide");renderThemeModal();await varj(50);
-    const btn=document.getElementById("scoutRealBtn");
-    o.mpTiltva=btn.disabled;const elotte=scoutRealOn();btn.click();await varj(50);o.mpValtozatlan=scoutRealOn()===elotte;
-    o.mpSzoveg=/házigazda/.test(btn.parentElement.textContent);
+    const elotte=scoutRealOn();const sel=document.querySelector('#kaBox select[data-ka="scoutReal"]');
+    if(sel){sel.value=elotte?"off":"on";sel.onchange();}await varj(30);
+    o.mpValtozatlan=scoutRealOn()===elotte;o.mpKulon=!document.getElementById("scoutRealBtn");
     MP.active=mpA;careerPool=cp;document.getElementById("themeModal").classList.add("hide");
     return o;});
   ok(r4.csomag===true,"a házigazda csomagjában utazik");
   ok(r4.w===true&&r4.ls==="0"&&r4.sel,"a vendégnél a házigazda értéke él, a saját tárolt preferenciája érintetlen",r4);
   ok(r4.regi===false,"régi szobában (nincs mező) KI");
   ok(r4.zar&&r4.lista,"a vendég átnézőjén zárolt");
-  ok(r4.mpTiltva&&r4.mpValtozatlan&&r4.mpSzoveg,"közös karrierben menet közben a Beállításokban nem állítható, és ki is írja, miért",r4);
+  ok(r4.mpValtozatlan&&r4.mpKulon,"közös karrierben menet közben a Beállítások nem váltják a futó karrier scout-módját",r4);
 
   ok(!errs.length,"nincs konzolhiba",errs.slice(0,5));
   await b.close();srv.close();

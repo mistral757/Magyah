@@ -48,6 +48,59 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## scout-ar-3-9-219-proba.js — 💸 3.9.219: olcsóbb scout-találat (a régi ár 33–55%-a)
+
+```bash
+node tools/scout-ar-3-9-219-proba.js
+```
+
+**14 állítás**, valódi böngészőben.
+
+* **Árengedmény:** 600 kiszemeltnél 0,33–0,55 közötti, nagyjából egyenletes (átlag ~0,44).
+* **Az ár:** vételár × régi hányad (65–75%) × árengedmény, vagyis a piaci vételár ~21–41%-a; az ellenajánlat és az elfogadás az új árhoz mér.
+* **Régi mentés:** az árengedmény nélküli kiszemelt kap egyet, a régi ellenajánlat elvész, és az árengedmény a mentésbe kerül.
+* **Ingyenes harmad:** változatlanul ingyen.
+* **1. idény (tájékoztató):** a medián meghirdetett ár a régi és az új árral, a büdzséből kifizethetők száma.
+* **Felület:** a panel és a beállító gombja az új sávot írja.
+
+## scout-ingyen-3-9-217-proba.js — 🎁 3.9.217: ingyen igazolható scout-találat, csak átigazolási időszakban
+
+```bash
+node tools/scout-ingyen-3-9-217-proba.js
+```
+
+**18 állítás**, valódi böngészőben.
+
+* **Valósághű scout:** 600 felfedezésből ~33% ingyenes; az ingyenesre nincs licit, a fizetősre nincs ingyenes igazolás.
+* **Az időszak és a keret:** zárt időszakban nem, tele keretnél nem; nyitott időszakban 0 Ft, keretbe, mérés „scout:<ok>”.
+* **Szokásos scout:** a felfedezés listára kerül (nem a keretbe), a felfedező képernyő kimondja; végigjátszásnál csak listára.
+* **Felület:** „Felfedezett játékosok” panel és HUB-gomb, az ingyenes gomb csak nyitott időszakban él, újdonság-értesítés.
+
+## boost-mezony-3-9-216-proba.js — 📈 3.9.216: a boostok POT-ja és a „+2 Rating” jutalom a mezőnnyel
+
+```bash
+node tools/boost-mezony-3-9-216-proba.js
+```
+
+**23 állítás**, valódi böngészőben.
+
+* **85-ös mezőnyig változatlan:** ifi 1000–2500, öreg 1200–3000, sima 400–2500, POT 1000–10 000, kártya +2.
+* **Fölötte:** a szorzó `peakToPot(mezőny) ÷ peakToPot(85)` (100-asnál ~×3, 400-asnál ~×640) — ugyanaz, mint a kihívás POT-jutalmáé; a Rating-lépték változatlan.
+* **Felület:** az ifi- és öreg-boost panelje, a Boost-központ leírásai a skálázott sávot írják.
+* **Kártya-fejlesztés:** 400-as mezőnyben +8, azonnal és a szezonkártyák utánra halasztva is; a régi, összeg nélküli függő +2.
+
+## ertesitesek-3-9-215-proba.js — 🔔 3.9.215: értesítések a játékon belül
+
+```bash
+node tools/ertesitesek-3-9-215-proba.js
+```
+
+**25 állítás**, valódi böngészőben.
+
+* **Szundi:** a ⏳ az idény végéig (legalább 5 fordulóig) hallgattat el, a téma megújulása nem törli, a Vezetés menüben „Ébresztés” gombbal visszahozható.
+* **Megbízás a középpályán:** a valódi megbízás-táblát nézi; beállított megbízásnál vagy a választó megnyitása után nem esedékes; nincs a kezdőrúgás előtti push-ok közt.
+* **🆕 Újdonságok:** csendes kezdés; új lelátó és a „Mutasd”; scout-szintenként egyszer; kikapcsolva csendben jegyez; minden figyelő (átigazolási esemény, ügynökség, stáb-hely, keret, felállás) hiba nélkül fut.
+
 ## pvp-gyors-fajta-3-9-214-proba.js — 🤝 3.9.214: gyors indítás PvP-szobában, a közös karrier fajtája
 
 ```bash
@@ -216,7 +269,7 @@ node tools/reszt-tempo-3-9-208-proba.js
 node tools/scout-beallito-3-9-207-proba.js
 ```
 
-**13 állítás**, valódi böngészőben.
+**16 állítás**, valódi böngészőben.
 
 * **Beállító:**
   * karrierben látszik (drafttal és kész klubbal is), karrieren kívül nem;
@@ -224,13 +277,16 @@ node tools/scout-beallito-3-9-207-proba.js
   * a kattintás a preferenciát írja;
   * az összefoglalóban ott a sora.
 * **Indulás:** a `beginNewGame` rögzíti a karrierre; utána a preferencia nem írja át.
-* **Beállítások:** a futó karrier, a preferencia és a beállító választója együtt vált.
+* **Beállítások (3.9.218 óta):**
+  * a különálló 🔭 kapcsoló helyett a 🎛️ „Új karrier alapbeállításai” blokk „Scout” sora;
+  * a blokk a Beállítások legtetején áll, alapból nyitva, becsukva a munkamenetben csukva marad;
+  * a sor az új karrier alapját írja, a futó karrier scout-módja nem változik.
 * **Közös karrier:**
   * a csomagban utazik;
   * a vendégnél a házigazdáé él, a saját preferenciája érintetlen;
   * régi szobában KI;
   * a vendégnél zárolt;
-  * menet közben nem állítható.
+  * menet közben nem állítható (a Beállítások sem váltják a futó scout-módot).
 * **Betöltés:** nincs TDZ, nincs konzolhiba.
 
 ## meres-mentesbol-proba.js — 📈 a mentésből készülő mérési napló

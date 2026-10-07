@@ -25,6 +25,11 @@ külön karbantartandó adatfájl.
   felismerhető felső kör, az összes magyar név, az edzők, a scoutok és az
   akadémiai ikonnevek. Új ismert név ide kerül,
   `kanonikus: (teljes magyar név, rövid alak)` alakban.
+- **`sajat.py`** — a projektgazda SAJÁT átírásai (3.9.217), az UTOLSÓ,
+  védett réteg. A build.py a MANUAL minden blokkja UTÁN húzza rá, tehát sem
+  a szabálymotor, sem egy javaslatkör nem írhatja felül (ha mégis mást adna,
+  a build kiírja: „SAJÁT NÉV VÉDVE"). Lásd lentebb: „A projektgazda saját
+  nevei".
 - **`rules.py`** — a szabálymotor mindenki másra. A kiejtés nyelvfüggő (a
   „ch" a németben cs, az olaszban k, a franciában s), ezért a nemzetiség be
   van kötve.
@@ -196,6 +201,38 @@ A végén ELLENŐRZI magát: ha egyetlen valós név is bent maradt, kiírja hol
 **Két külön termék.** A mentéseik nem cserélhetők (más a kulcstér), és közös
 világot sem lehet játszani a kettő között. A `dist/` nincs verziókövetve —
 kiadás előtt kell legenerálni.
+
+## A projektgazda saját nevei — `sajat.py` és `javaslat_ellenor.py` (3.9.217)
+
+> „Olyan neveket nem kéne javasolj amik általam lettek átírva. Volt egy régi
+> commit Danisítás néven, és a körül egy jó párat én írtam még át."
+
+**A forrás a teljes git-történet**, nem emlékezet. Ha a klón sekély, előbb
+`git fetch --unshallow`.
+
+* `bf84bde` „Nevek Danisítása lvl100" (mistral757, 2026-09-01) — 240 név; a
+  `b772dd8` (3.9.07) mentette át a manual.py-ba;
+* a 29–32. köteg danisítása (3.9.81–3.9.84), a 3.9.87-es kör, a 33., 35. és
+  36. köteg — a projektgazda kézi nevei;
+* a 2026-10-06-i kérés (Beckham, Mbappé, Owen, Pirlo, Sneijder, Pirès,
+  Kluivert), plusz Ziyech és Kolo Touré.
+
+**Három tábla:**
+
+* `SAJAT_KULCSOK` — kire NEM készülhet javaslat (401 név, forrással);
+* `SAJAT` — a befagyasztott értékek, amiket a build utolsóként ráhúz;
+* `DONTESRE_VAR` — 19 saját név, amit egy KORÁBBI, jóváhagyott javaslatkör már
+  felülírt. Itt a mostani alak él, a visszaállítás a projektgazda döntése.
+
+**JAVASLAT ELŐTT KÖTELEZŐ:**
+
+```bash
+python3 tools/nevek/javaslat_ellenor.py "Jelölt Egy" "Jelölt Kettő" …   # ✗ = saját név, kizárva
+python3 tools/nevek/javaslat_ellenor.py --blokkok                        # melyik régi kör nyúlt saját névhez
+```
+
+**Új saját név** (vagy egy `DONTESRE_VAR`-beli visszaállítása) a `sajat.py`-ba
+kerül, nem egy JAVASLAT blokkba.
 
 ## A játékos saját névátírásai
 

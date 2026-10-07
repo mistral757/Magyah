@@ -14,11 +14,11 @@ MANUAL = {
 "Diego Maradona":      ("Dijégó Méridonna", "Méridonna"),
 "Lionel Messi":        ("Lijonel Messzi", "Messzi"),
 "Wayne Rooney":        ("Vén Rúni", "Rúni"),
-"Zinédine Zidane":     ("Zsindelyes Zalán", "Zsindelyes"),
+"Zinédine Zidane":     ("Zizu Zalán","Zizu"),
 "Franz Beckenbauer":   ("Francos Bekembójer", "Bekembójer"),
 "Johan Cruyff":        ("Krojfi János", "Krojfi"),
 "Paolo Maldini":       ("Máldi Pál", "Máldi"),
-"Kylian Mbappé":       ("Mappé Kilián","Mappé"),
+"Kylian Mbappé":       ("Kilján Bapé","Bapé"),
 
 # ── B) teljes magyarítás ────────────────────────────────────────────────────
 "Cristiano Ronaldo":   ("Ronáldó Krisztián", "Ronáldó Krisztián"),  # lásd Ronaldo
@@ -36,12 +36,12 @@ MANUAL = {
 "Didier Drogba":       ("Didikell Dorka", "Didikell"),
 
 # ── D) magyar ikonok ────────────────────────────────────────────────────────
-"Puskás Ferenc":       ("Kalasnyikovos Ferkó", "Kalasnyikovos"),
+"Puskás Ferenc":       ("Kalasnyikovos Ferkó","Kalasnyikovos"),
 "Hidegkuti Nándor":    ("Hidegkutyus Nándika", "Hidegkutyus"),
 "Grosics Gyula":       ("Gyorsiccs Gyuszika", "Gyorsiccs"),
 "Albert Flórián":      ("Florian Albertinho", "Albertinho"),
-"Király Gábor":        ("G. King", "G. King"),
-"Szoboszlai Dominik":  ("Dominikai Hajdúszoboszló", "Hajdúszoboszló"),
+"Király Gábor":        ("G. King","G. King"),
+"Szoboszlai Dominik":  ("Dominic Solos Light","Solos Light"),
 
 # ── E) szerkezeti fejtörők ──────────────────────────────────────────────────
 # A KÉT RONALDO: kifejezett kérés, hogy a RÖVID kiírás mindkettőnél a teljes
@@ -76,9 +76,9 @@ MANUAL = {
 
 # ── J) német összetettek ────────────────────────────────────────────────────
 # A két Müller rövid alakja ütközik → mindkettő teljes néven megy ki.
-"Bastian Schweinsteiger": ("Kondás Sebestyén", "Kondás"),
-"Gerd Müller":         ("Molnár Gerhárd", "Molnár"),
-"Thomas Müller":       ("Molnár Tamás", "Molnár"),
+"Bastian Schweinsteiger": ("Bástyás Svájntájger","Svájntájger"),
+"Gerd Müller":         ("Molnár Geri","Molnár"),
+"Thomas Müller":       ("Molnár Tamás","Molnár"),
 "Jürgen Klinsmann":    ("Klinszember György", "Klinszember"),
 
 # ── K) afrikai / arab ───────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ MANUAL = {
 "George Weah":         ("Véha György", "Véha"),
 
 # ── L) rövid angol ──────────────────────────────────────────────────────────
-"George Best":         ("Legjobb György", "Legjobb"),
+"George Best":         ("Legjobb György","Legjobb"),
 "Denis Law":           ("Denéz Láv", "Láv"),
 "Bobby Moore":         ("Bobi Mór", "Mór"),
 
@@ -111,7 +111,7 @@ HU_MANUAL = {
 "Kocsis Sándor":("Aranyfejű Sanyi","Aranyfejű"),
 "Bozsik József":("Bozsgó Jocó","Bozsgó"),
 "Czibor Zoltán":("Cibere Zoli","Cibere"),
-"Szoboszlai":("Szoboszlóka","Szoboszlóka"),
+"Szoboszlai":("Dominic Solos Light","Solos Light"),
 "Lisztes Krisztián":("Lisztlángos Kriszti","Lisztlángos"),
 "Mészöly Kálmán":("Meszelő Kálmus","Meszelő"),
 "Halmosi Péter":("Halmozó Peti","Halmozó"),
@@ -341,13 +341,13 @@ FOREIGN_1 = {
 "Franco Baresi":("Baracklekvár Ferkó","Baracklekvár"),
 "Francesco Totti":("Totózó Ferkó","Totózó"),
 "Fabio Cannavaro":("Kannás Fábián","Kannás"),
-"Andrea Pirlo":("Pirul András","Pirul"),
+"Andrea Pirlo":("Piruló Andi","Piruló"),
 "Valentino Mazzola":("Mazsolás Bálint","Mazsolás"),
 "Marco Verratti":("Veréb Márkó","Veréb"),
 "Leonardo Bonucci":("Bonbonos Lénárd","Bonbonos"),
 "Gianluca Zambrotta":("Zsemlebrottya Lukács","Zsemlebrottya"),
 "Gianluca Vialli":("Viasz Lukács","Viasz"),
-"Giorgio Chiellini":("Kelkáposzta Gyuri","Kelkáposzta"),
+"Giorgio Chiellini":("Kiellíni Gyuri","Kiellíni"),
 "Alessandro Del Piero":("Delpékáru Sándor","Delpékáru"),
 "Gianluigi Donnarumma":("Dunnarongy Lajos","Dunnarongy"),
 "Alessandro Costacurta":("Kosztkurta Sándor","Kosztkurta"),
@@ -467,13 +467,13 @@ MANUAL.update(FOREIGN_1)
 
 FOREIGN_2 = {
 # ── Németország ─────────────────────────────────────────────────────────────
-"Manuel Neuer":("Nyűgös Manó","Nyűgös"),
+"Manuel Neuer":("Nójer Manó","Nójer"),
 "Lothar Matthäus":("Matyó Lotár","Matyó"),
 "Karl-Heinz Rummenigge":("Rumosdiós Karcsi","Rumosdiós"),
 "İlkay Gündoğan":("Gondűző Ilka","Gondűző"),
 "Toni Kroos":("Krózus Tóni","Krózus"),
 "Philipp Lahm":("Lámpás Fülöp","Lámpás"),
-"Joshua Kimmich":("Kéményseprő Jozsó","Kéményseprő"),
+"Joshua Kimmich":("Ki-Mi Ch. Jozsó","Ki-Mi Ch."),
 "Sami Khedira":("Kedélyes Samu","Kedélyes"),
 "Jérôme Boateng":("Boatengó Jeromos","Boatengó"),
 "Matthias Sammer":("Szamóca Máté","Szamóca"),
@@ -541,7 +541,7 @@ FOREIGN_2 = {
 "Sergio Agüero":("Ágyúgolyó Szergej","Ágyúgolyó"),
 "Gabriel Batistuta":("Batyus Gábor","Batyus"),
 "Javier Mascherano":("Maskarás Jávor","Maskarás"),
-"Hernán Crespo":("Krepdesin Hernő","Krepdesin"),
+"Hernán Crespo":("Kreszpó Ernő","Kreszpó"),
 "Alexis Mac Allister":("Makallós Sándor","Makallós"),
 "Javier Zanetti":("Zanótos Jávor","Zanótos"),
 "Esteban Cambiasso":("Kambiumos Pista","Kambiumos"),
@@ -597,7 +597,7 @@ FOREIGN_2 = {
 "Edwin van der Sar":("Vándorsarok Ede","Vándorsarok"),
 "Johan Neeskens":("Nyeskens Jancsi","Nyeskens"),
 "Rob Rensenbrink":("Renszebrinkó Robi","Renszebrinkó"),
-"Ronald Koeman":("Kőműves Roland","Kőműves"),
+"Ronald Koeman":("Kűmen Roland","Kűmen"),
 "Jaap Stam":("Stampedli Jakab","Stampedli"),
 "Dennis Bergkamp":("Bergkempingi Dénes","Bergkempingi"),
 "Klaas-Jan Huntelaar":("Huncutlár Kolos","Huncutlár"),
@@ -648,7 +648,7 @@ FOREIGN_3 = {
 "Faustino Asprilla":("Aszpirines Fausztin","Aszpirines"),
 "Radamel Falcao":("Falkó Radamesz","Falkó"),
 # ── Lengyelország ───────────────────────────────────────────────────────────
-"Robert Lewandowski":("Levendulás Robi","Levendulás"),
+"Robert Lewandowski":("Levangyócki Robi","Levangyócki"),
 "Wojciech Szczęsny":("Szöszmötölő Vojtek","Szöszmötölő"),
 "Piotr Zieliński":("Zöldellő Peti","Zöldellő"),
 # ── Norvégia ────────────────────────────────────────────────────────────────
@@ -658,7 +658,7 @@ FOREIGN_3 = {
 # ── Wales ───────────────────────────────────────────────────────────────────
 "Gareth Bale":("Bálás Gergő","Bálás"),
 "Ryan Giggs":("Gigászi Rajmund","Gigászi"),
-"Ian Rush":("Rohanós Ivó","Rohanós"),
+"Ian Rush":("Ilyen Rás","Rás"),
 # ── Szerbia ─────────────────────────────────────────────────────────────────
 "Nemanja Vidić":("Vidámics Nándor","Vidámics"),
 "Nemanja Matić":("Matyics Nándor","Matyics"),
@@ -796,7 +796,7 @@ MANUAL.update({
   "Alberto Gilardino": ("Zsilárdínó Albert", "Zsilárdínó"),
   "Alberto Moreno": ("Morénó Albert", "Morénó"),
   "Aleksandr Anyukov": ("Anyukád Tas", "Anyukád"),
-  "Alessandro Bastoni": ("Bástyás Sándor","Bástyás"),
+  "Alessandro Bastoni": ("Bástonyi Sándor","Bástonyi"),
   "Alessio Romagnoli": ("Románjoli Miksa", "Románjoli"),
   "Alex Oxlade-Chamberlain": ("Okszi-Csamberléjn Sándor", "Okszi-Csamberléjn"),
   "Alexander Isak": ("Izsák Alex", "Izsák"),
@@ -831,7 +831,7 @@ MANUAL.update({
   "Daniel Van Buyten": ("Fanböjten Dániel", "Fanböjten"),
   "Daniele De Rossi": ("Derosszígy Dani", "Derosszígy"),
   "Danilo": ("Dani a Ló", "DaniLó"),
-  "Danilo D'Ambrosio": ("Dámvadas Dani", "Dámvadas"),
+  "Danilo D'Ambrosio": ("Dámbrózió Dani","Dámbrózió"),
   "Danny Rose": ("Rózsa Mór", "Rózsa"),
   "David Ginola": ("Zsinórka Dávid", "Zsinórka"),
   "Davide Zappacosta": ("Cappakoszta Jenő", "Cappakoszta"),
@@ -842,7 +842,7 @@ MANUAL.update({
   "Diego Forlán": ("Fórlány Rezső", "Fórlány"),
   "Diego Tristán": ("Trísztán Ábris", "Trísztán"),
   "Diogo Jota": ("Zsóta Dijégó", "Zsóta"),
-  "Dirk Kuyt": ("Köjt Barnabás", "Köjt"),
+  "Dirk Kuyt": ("Köjt Barnabás","Köjt"),
   "Divock Origi": ("Óriginál Vazul", "Óriginál"),
   "Dominic Calvert-Lewin": ("Kárérte-Levinek Lehel", "Kárérte-Levinek"),
   "Douglas Costa": ("Dugulást Okozta", "Dugulást Okozta"),
@@ -863,7 +863,7 @@ MANUAL.update({
   "Fabrizio Miccoli": ("Mikori Rezső", "Mikori"),
   "Federico Bernardeschi": ("Bernát Ezki Vilmos", "Bernát Ezki"),
   "Federico Chiesa": ("Kieza Dezső", "Kieza Dezső"),
-  "Filippo Inzaghi": ("Indzagi Fülöp", "Indzagi"),
+  "Filippo Inzaghi": ("Indzagi Fülöp","Indzagi"),
   "Flávio Conceição": ("Konszészáó Boldizsár", "Konszészáó"),
   "Franco Mastantuono": ("Masztántónó Ferenc", "Masztántónó"),
   "Frank Anguissa": ("Angyiska Ferenc", "Angyiska"),
@@ -872,7 +872,7 @@ MANUAL.update({
   "Gabi": ("Gabika", "Gabika"),
   "Gabriel Heinze": ("Henceg Gábor", "Henceg"),
   "Gabriel Jesus": ("Jézus Gábor", "Jézus G."),
-  "Gabriel Milito": ("Miliméteres Gábor", "Miliméteres"),
+  "Gabriel Milito": ("Milító Gábor","Milító"),
   "Gareth Southgate": ("Délikapu Geret", "Délikapu"),
   "Gavi": ("Gagyi", "Gagyi"),
   "Georgi Kinkladze": ("Kintyalaza Ákos", "Kintyalaza"),
@@ -942,8 +942,8 @@ MANUAL.update({
   "Martín Demichelis": ("Demikellisz Márton", "Demikellisz"),
   "Mathieu Debuchy": ("Debuzi Máté", "Debuzi"),
   "Mauro Camoranesi": ("Kamoranézi Gyárfás", "Kamoranézi"),
-  "Michael Owen": ("Óven Mihály", "Óven"),
-  "Milan Škriniar": ("Skrinyár Milán", "Skrinyár"),
+  "Michael Owen": ("Májkell Óven","Óven"),
+  "Milan Škriniar": ("Skrinyár Milán","Skrinyár"),
   "Moisés Caicedo": ("Kájszédó Gyárfás", "Kájszédó"),
   "Nani": ("Nyanyi", "Nyanyi"),
   "Nathan Aké": ("Oké Vajk", "Oké"),
@@ -953,7 +953,7 @@ MANUAL.update({
   "Pedro": ("Pedro Amigo Mio", "Pedro Amigo Mio"),
   "Pedro Porro": ("Pornó Péter", "Pornó"),
   "Per Mertesacker": ("Méretreszakker Szabolcs", "Méretreszakker"),
-  "Phil Foden": ("Födém Filó","Födém"),
+  "Phil Foden": ("Fóden Filó","Fóden"),
   "Philippe Coutinho": ("Kutinnyó Fülöp", "Kutinnyó"),
   "Piero Hincapié": ("Hinkanapé Bertalan", "Hinkanapé"),
   "Presnel Kimpembe": ("Kimenne Álmos", "Kimenne"),
@@ -977,11 +977,11 @@ MANUAL.update({
   "Teun Koopmeiners": ("Kúpásók Ince", "Kúpásók"),
   "Theo Hernández": ("Hernánt Tesz Tivadar", "Hernánt Tesz T."),
   "Thomas Hitzlsperger": ("Hiklispenger Tamás", "Hiklispenger"),
-  "Tomáš Rosický": ("Roszicki Tamás","Roszicki"),
-  "Vladimír Šmicer": ("Szmájszer Vladi", "Szmájszer"),
+  "Tomáš Rosický": ("Rózsicki Tamás","Rózsicki"),
+  "Vladimír Šmicer": ("Szmájszer Vladi","Szmájszer"),
   "Vágner Love": ("Szerelmes Vágner", "Szerelmes Vágner"),
   "Warren Zaïre-Emery": ("Zaj-Imre Mór", "Zaj-Imre"),
-  "Wesley Sneijder": ("Sznájder Benedek", "Sznájder"),
+  "Wesley Sneijder": ("Veszi Snájder","Snájder"),
   "William Gallas": ("Gallyas Vilmos", "Gallyas"),
   "Willy Sagnol": ("Szanyol Vili", "Szanyol"),
   "Xherdan Shaqiri": ("Zserdány Zsagiri", "Zserdány Zsagiri"),
@@ -1026,7 +1026,7 @@ MANUAL.update({
   "Grosics Gyula": ("Gyorsíccs Gyuszika", "Gyorsíccs"),
   "Gullit": ("Zsüli", "Zsüli"),
   "Gulácsi Péter": ("Gula Peti", "Gula"),
-  "Hernán Crespo": ("Kreszpó Ernő", "Kreszpó"),
+  "Hernán Crespo": ("Kreszpó Ernő","Kreszpó"),
   "Hugo Lloris": ("Jórizs Hugó", "Jórizs"),
   "Ivan Rakitić": ("Rakétácska Iván", "Rakétácska"),
 })
@@ -1159,8 +1159,8 @@ MANUAL.update({
   "Djimi Traoré":           ("Trajoré Jim", "Trajoré"),
   "John Arne Riise":        ("Ríííze János", "Ríííze"),
   "Milan Baroš":            ("Balos Milán", "Balos"),
-  "Djibril Cissé":          ("Szisszé Dzsibrill", "Szisszé"),
-  "Harry Kewell":           ("Kjúúl Bálint", "Kjúúl"),
+  "Djibril Cissé":          ("Sziszegő Dzsibrill","Sziszegő"),
+  "Harry Kewell":           ("Kjúúl Bálint","Kjúúl"),
   # A Josemi EGYNEVŰ — a rövid alak ugyanaz, mint a teljes.
   "Josemi":                 ("Józsimi", "Józsimi"),
 
@@ -1235,10 +1235,10 @@ MANUAL.update({
   # NYUGATOS SORREND: itt a keresztnév áll elöl, tehát a rövid alak az UTOLSÓ
   # tag — ugyanaz a szerkezet, mint a „Jaja Túr É."-nél.
   "Gunnar Nordahl":         ("Nórdal Gúnár", "Nórdal"),
-  "Nils Liedholm":          ("Lídólm Miklós", "Lídólm"),
+  "Nils Liedholm":          ("Lidérces Miklós","Lidérces"),
 
 # ── Feyenoord 1969/70 — az első holland BEK ────────────────────────────────
-  "Coen Moulijn":           ("Múlíjn Kohén", "Múlíjn"),
+  "Coen Moulijn":           ("Múlejn Kohén","Múlejn"),
   "Ove Kindvall":           ("Kindvál Óve", "Kindvál"),
 
 # ── Argentína 1978 VB ──────────────────────────────────────────────────────
@@ -1311,7 +1311,7 @@ MANUAL.update({
 # ── Barcelona 1951/52 — a Cinc Copes ──────────────────────────────────────
   # MAGYAR SORRENDŰ NÉV: a vezetéknév áll elöl.
   "Kubala László":          ("Q-Balla Lackó", "Q-Balla"),
-  "Antoni Ramallets":       ("Rámajetsz Tóni", "Rámajetsz"),
+  "Antoni Ramallets":       ("Rámajetsz Tóni","Rámajetsz"),
   "Estanislau Basora":      ("Básora Szabolcs", "Básora"),
   "Gustau Biosca":          ("Blocska Gusztáv", "Blocska"),
   "Joan Segarra":           ("Szegárá Jóvan", "Szegárá"),
@@ -1513,7 +1513,7 @@ MANUAL.update({
   # A skandináv s is sz — a „-son = fia" poén (ffy) megmarad fölötte.
   "Torbjörn Nilsson":       ("Nílszffy Szabolcs", "Nílszffy"),
   # A holland „aa" hosszú á; az általános `ay → éj` itt félrement.
-  "Roy Makaay":             ("Makáj Roj", "Makáj"),
+  "Roy Makaay":             ("Makáj Roj","Makáj"),
   # ── A -ović: visszakerül a kiesett „ov" ──────────────────────────────────
   # A motor `ovi[cć]$ → ics` szabálya a TŐBŐL is levágott: a Jovićból „Jics"
   # maradt, három betű.
@@ -1595,7 +1595,7 @@ MANUAL.update({
   # ── Kiejtés: Dabrowski, Trochowski, Moulijn, van Duijnhoven ──
   "Christoph Dabrowski": ("Dabrovszki Kristóf", "Dabrovszki"),  # Dobrovszki Kristóf
   "Piotr Trochowski": ("Trohovszki Péter", "Trohovszki"),  # Trocsovszki Péter
-  "Coen Moulijn": ("Múlejn Kohén", "Múlejn"),  # Múlíjn Kohén
+  "Coen Moulijn": ("Múlejn Kohén","Múlejn"),  # Múlíjn Kohén
   "Rein van Duijnhoven": ("Fandöjnhofen Zétény", "Fandöjnhofen"),  # Fandöjjnhofen Zétény
   # ── Névrokonok egységesítése és kiejtés (Hőnyes-kör) ──
   "Dieter Hoeneß": ("Hőnyes Detre", "Hőnyes"),  # Hoenesz Detre
@@ -1836,22 +1836,22 @@ JAVASLAT_3_9_191 = {
 "Davide Calabria":("Kalamáris Dávid","Kalamáris"),  # Kalabria Dávid
 "Damiano Tommasi":("Tamáskodó Damján","Tamáskodó"),  # Tommazi Damján
 "Duván Zapata":("Csapatos Ödön","Csapatos"),  # Szapata Ödön
-"Harry Kewell":("Kevély Harri","Kevély"),  # Kjúúl Bálint
+"Harry Kewell":("Kjúúl Bálint","Kjúúl"),  # Kjúúl Bálint
 "Dietmar Hamann":("Hámozó Dietmár","Hámozó"),  # Hámann Menyhért
 "Peter Crouch":("Kuporgó Péter","Kuporgó"),  # Krúcs Péter
-"Vladimír Šmicer":("Smirgli Vladi","Smirgli"),  # Szmájszer Vladi
+"Vladimír Šmicer":("Szmájszer Vladi","Szmájszer"),  # Szmájszer Vladi
 "Johan Neeskens":("Nyeszlett Jancsi","Nyeszlett"),  # Nyeskens Jancsi
 "Robert Prosinečki":("Prózai Robi","Prózai"),  # Prószinyecki Robi
 "Dejan Savićević":("Savanyú Deján","Savanyú"),  # Szavicsevics Deján
 "Predrag Mijatović":("Miákoló Predrág","Miákoló"),  # Mijatovics Predrág
 "Denis Law":("Lávás Dénes","Lávás"),  # Denéz Láv
-"Antoni Ramallets":("Ramazuri Tóni","Ramazuri"),  # Rámajetsz Tóni
+"Antoni Ramallets":("Rámajetsz Tóni","Rámajetsz"),  # Rámajetsz Tóni
 }
 MANUAL.update(JAVASLAT_3_9_191)
 
 # ── 3.9.197 — két jóváhagyott névkör (a régi alak a megjegyzésben) ─────────
 JAVASLAT_3_9_197 = {
-"Dirk Kuyt":("Kujtorgó Dirk","Kujtorgó"),  # Köjt Barnabás
+"Dirk Kuyt":("Köjt Barnabás","Köjt"),  # Köjt Barnabás
 "Michael Ballack":("Ballonos Mihály","Ballonos"),  # Bálákos Mihály
 "Sepp Maier":("Majonézes Zsepp","Majonézes"),  # Májer Zsepp
 "Andy Cole":("Kóla Bandi","Kóla"),  # Kol Bandi
@@ -1861,12 +1861,12 @@ JAVASLAT_3_9_197 = {
 "Pablo Aimar":("Ájuldozó Pali","Ájuldozó"),  # Ájmár Pali
 "Zbigniew Boniek":("Bonyolult Barnabás","Bonyolult"),  # Bonyek Barnabás
 "Thiago Alcântara":("Alkudozó Tihamér","Alkudozó"),  # Alkantára Tihamér
-"Filippo Inzaghi":("Ingázó Fülöp","Ingázó"),  # Indzagi Fülöp
-"Hernán Crespo":("Kresszes Ernő","Kresszes"),  # Kreszpó Ernő
+"Filippo Inzaghi":("Indzagi Fülöp","Indzagi"),  # Indzagi Fülöp
+"Hernán Crespo":("Kreszpó Ernő","Kreszpó"),  # Kreszpó Ernő
 "Geoff Hurst":("Hurkás Dzsef","Hurkás"),  # Hurszt Dzsef
 "Antonio Cassano":("Kaszinós Antal","Kaszinós"),  # Kasszano Antal
 "Billy Bremner":("Brummogó Vili","Brummogó"),  # Brémner Vili
-"Roy Makaay":("Makacs Roj","Makacs"),  # Makáj Roj
+"Roy Makaay":("Makáj Roj","Makáj"),  # Makáj Roj
 "Radamel Falcao":("Falatozó Radamesz","Falatozó"),  # Falkó Radamesz
 "Uli Stielike":("Stiglices Ulrik","Stiglices"),  # Stilike Ulrik
 "Wim Kieft":("Kifli Vilmos","Kifli"),  # Kift Vilmos
@@ -1876,7 +1876,7 @@ MANUAL.update(JAVASLAT_3_9_197)
 
 # 3.9.206 — három kör jóváhagyott javaslata („A névjavaslatok mehetnek")
 JAVASLAT_3_9_206 = {
-"Milan Škriniar":("Szekrényes Milán","Szekrényes"),  # Skrinyár Milán
+"Milan Škriniar":("Skrinyár Milán","Skrinyár"),  # Skrinyár Milán
 "Marcelo Gallardo":("Gallér Marcell","Gallér"),  # Gajardo Marcell
 "Désiré Doué":("Dúdoló Dezső","Dúdoló"),  # Dúé Jenő
 "Bruno Conti":("Kontrás Brunó","Kontrás"),  # Konti Brunó
@@ -1922,3 +1922,29 @@ JAVASLAT_3_9_207 = {
 "Gustavo Poyet":("Pojácás Gusztáv","Pojácás"),  # Pojet Gusztáv
 }
 MANUAL.update(JAVASLAT_3_9_207)
+JAVASLAT_3_9_216 = {
+"Damien Duff":("Duzzogó Damján","Duzzogó"),  # Dúff Benedek
+"Mauro Tassotti":("Taszigáló Móric","Taszigáló"),  # Tasszotti Mór
+"Dennis Wise":("Bölcselkedő Dénes","Bölcselkedő"),  # Vájs Dénes
+"Karl-Heinz Riedle":("Ridikül Károly","Ridikül"),  # Ridle Károly
+"Frédéric Kanouté":("Kanóc Frigyes","Kanóc"),  # Kanúté Frigyes
+"Eric Gerets":("Gerendás Erik","Gerendás"),  # Gérets Erik
+"Steve Mandanda":("Mandulás István","Mandulás"),  # Mándanda Pista
+"Giovane Élber":("Elbűvölő János","Elbűvölő"),  # Élbér Huba
+}
+MANUAL.update(JAVASLAT_3_9_216)
+JAVASLAT_3_9_217 = {
+"Fernando Hierro":("Hieroglifás Nándi","Hieroglifás"),  # Vasalt Nándi
+"Peter Beardsley":("Birsalmás Peti","Birsalmás"),  # Szakállasi Peti
+"Paolo Maldini":("Mandolinos Pál","Mandolinos"),  # Máldi Pál
+"Rudi Völler":("Fölöző Rudi","Fölöző"),  # Föler Rudi
+"Uli Stein":("Kövesdi Ulrik","Kövesdi"),  # Stájn Ulrik
+"Hans-Peter Briegel":("Brigádvezér János","Brigádvezér"),  # Brigel János
+"Nihat Kahveci":("Kávés Vajk","Kávés"),  # Kahvedzsi Vajk
+"Marius Lăcătuș":("Zárlakatos Márió","Zárlakatos"),  # Lakatus Márió
+"Dieter Müller":("Molnárka Detre","Molnárka"),  # Müler Detre
+"Paulo Sousa":("Szószos Pál","Szószos"),  # Szúsa Pál
+"Peter Lorimer":("Lóerős Péter","Lóerős"),  # Lórimer Péter
+"Sven Botman":("Botos Szvén","Botos"),  # Bótman Szvén
+}
+MANUAL.update(JAVASLAT_3_9_217)
