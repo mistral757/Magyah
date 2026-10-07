@@ -132,6 +132,11 @@ const SP=process.env.MSP||require("os").tmpdir();
     const e2=szabad()[0],p2=careerPlayerFromPoolEntry(e2);drafted.add(p2.n);extraRoster.push(p2);markArrived(p2,3000000);
     const elotte=fullCareerRoster().length;
     let cbOk=false;processCareerUnlocksB([Object.keys(CAREER_UNLOCK_REASON_TXT)[0]],()=>{cbOk=true;});
+    /* 3.9.217: a klasszikus felfedezés a listára kerül (ingyenes), és az
+       átigazolási időszakban leigazolva érkezik — a mérés AKKOR rögzíti */
+    const lista=scoutRealState().list,rec=lista[lista.length-1];
+    const _w=scoutRealWindowOpen;scoutRealWindowOpen=()=>true;
+    try{if(rec&&rec.free)scoutFreeSign(rec.n);}finally{scoutRealWindowOpen=_w;}
     const z=meresLoad().sz[0];
     const ki=x=>({n:x.n,forras:x.forras,ar:x.ar||0,attrs:!!x.attrs,pot:x.pot});
     return {ifi:ki(z.erk.find(x=>x.n===p1.n)||{}),vett:ki(z.erk.find(x=>x.n===p2.n)||{}),
@@ -192,7 +197,10 @@ const SP=process.env.MSP||require("os").tmpdir();
     o.atl={norm:+atl(false).toFixed(2),real:+atl(true).toFixed(2)};
     /* a felfedezés: listára, nem keretbe */
     const elotte=fullCareerRoster().length,lista0=scoutRealState().list.length,megf0=(meresLoad().sz[1].megf||[]).length;
-    let cbOk=false;processCareerUnlocksB([Object.keys(CAREER_UNLOCK_REASON_TXT)[0]],()=>{cbOk=true;});
+    /* 3.9.217: a licit-méréshez fizetős találat kell (az ingyenes harmadot a
+       scout-ingyen-3-9-217-proba méri) */
+    const _fr=scoutFreeRoll;scoutFreeRoll=()=>false;
+    let cbOk=false;try{processCareerUnlocksB([Object.keys(CAREER_UNLOCK_REASON_TXT)[0]],()=>{cbOk=true;});}finally{scoutFreeRoll=_fr;}
     o.felf={cbOk,keret:fullCareerRoster().length-elotte,lista:scoutRealState().list.length-lista0,megf:(meresLoad().sz[1].megf||[]).length-megf0};
     const rec=scoutRealState().list[scoutRealState().list.length-1];
     o.rec=Object.assign({},rec);
