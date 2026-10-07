@@ -16,7 +16,15 @@
 > összhang boostra, akkor az azonnal semmit nem mutat, de hosszabb távon
 > beindulhat."
 
-Ez **terv** — a kód nem változott. A döntési pontok a végén.
+Ez **terv** volt. **3.9.221-ben megvalósult** (`docs/pvp-hangolas-3-9-221.md`), a
+következő döntésekkel:
+
+* a felzárkóztatás formája: **rating ÉS büdzsé ÉS kedvezmény együtt**, mindegyik
+  enyhébben („a rating mindenképpen enyhébb mint eddig");
+* a többi pont a terv javaslata szerint: az elöl lévő nem veszít, a kivétellel;
+  a befektetés listája a 3. fejezet szerint; BA-padló 0,15, mozgó átlag 2:1;
+* új az eredeti tervhez képest: **az idény egésze egy mérce** — a két kapu
+  együtt sem ad többet, mint a legnagyobb mért különbség terve.
 
 ## 1. Ma így működik (`mpApplyBalance`)
 

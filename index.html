@@ -7298,7 +7298,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.220";
+const APP_VERSION="3.9.221";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -25855,6 +25855,7 @@ const LEDGER_CATS={
   talizman:{n:"Talizmán-passz",           ic:"🧿", side:1},
   loanIn:  {n:"Hitel-folyósítás",         ic:"🏦", side:1},
   talEsemeny:{n:"Talizmán-esemény",       ic:"📦", side:1},
+  mpCatch: {n:"PvP-felzárkóztatás",       ic:"🤝", side:1},
   /* 🧿 F6c (3.9.156) — a Joker és a Bank speciáljainak bevételei */
   talBef:  {n:"Befektető — talizmán",     ic:"💼", side:1},
   talKamat:{n:"Takarékbetét-kamat",       ic:"🏦", side:1},
@@ -26889,7 +26890,9 @@ function boostEarlyLeft(){
    fajta követi. */
 function boostDiscountMult(){
   let t=1;try{t=talBoostCsomagMult();}catch(e){t=1;}
-  return Math.max(0.10,(1-(S.boostDiscount||0))*(1-boostEarlyDisc())*t);}
+  /* 🤝 3.9.221 — a PvP-felzárkóztatás kedvezménye (a következő idény végéig) */
+  let m=0;try{m=mpCatchBoostDisc();}catch(e){m=0;}
+  return Math.max(0.10,(1-(S.boostDiscount||0))*(1-boostEarlyDisc())*t*(1-m));}
 /* ================= A FEJLESZTÉSEK ÁRA: BÜDZSÉHEZ MÉRVE, KEZDŐ KEDVEZMÉNNYEL (3.9.135) =====
    KIMONDOTT KÉRÉS: „A felállás módosítás is scalelődjön árban, akárcsak a
    pozíció tanulás. És a stáb bővítés is, a scout erősítés, az átigazolási
@@ -37764,7 +37767,7 @@ function beginNewGame(){
   /* F6: friss karrier — a párharc tartós állapota is nulláról indul, különben
      egy korábbi szoba kiegyenlítése átszivárogna az újba. */
   S.oppBuffH=null;   /* friss karrier → a rejtett erősítés az 1. szezon elején születik */
-  S.mpBalance=0;S.mpBalanceP={};S.mpTuneCap=null;S.mpDecision=null;S.mpDecisionCup=null;S.mpCupSeason=0;S.friendlySolo=0;S.mpProgWait=null;S.mpProgNyk=null;
+  S.mpBalance=0;S.mpBalanceP={};S.mpTuneCap=null;S.mpCatchDisc=null;S.mpCatchSeason=null;S.mpDecision=null;S.mpDecisionCup=null;S.mpCupSeason=0;S.friendlySolo=0;S.mpProgWait=null;S.mpProgNyk=null;
   S.mpMateFinal=null;S.mpSummerRef=null;S.mpCup=null;S.mpHistory=[];S.mpDuelLog=[];S.mpOrphan=false;S.mpForfeit=null;
   S.mpOppStart=null;S.mpOppSnap=null;   /* az ellenfél csapatlapja és befagyasztott felállása */
   ensureWorldSeed();
@@ -53383,7 +53386,7 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      mpBalanceP: a NÉVRE szóló hangolás-tábla (lásd mpTuneSquad);
      mpDecision / mpDecisionCup: a bajnokság utáni és a kupa utáni kapu döntése;
      mpCupSeason: melyik idényben zárult le kupasorozat (a második kapu kapuja). */
-  mpBalance:0,mpBalanceP:{},mpTuneCap:null,mpDecision:null,mpDecisionCup:null,mpCupSeason:0,
+  mpBalance:0,mpBalanceP:{},mpTuneCap:null,mpCatchDisc:null,mpCatchSeason:null,mpDecision:null,mpDecisionCup:null,mpCupSeason:0,
   friendlySolo:0,      /* egyedül játszott nyári torna: kihagyja a kupa utáni kaput (3.9.72) */
   mpProgWait:null,     /* 🗓 a közös nyári program félbehagyott lánc-egyeztetése (3.9.181) */
   mpProgNyk:null,      /* 🗓 kinek jár a program végén a nyári torna (3.9.181) */
@@ -65643,6 +65646,9 @@ function mpSeasonReport(){
       skills:Object.values(S.skills||{}).reduce((s,a)=>s+a.length,0),
       chem:(CHEM&&CHEM.goodPairs)?CHEM.goodPairs.size:0,
       balance:S.mpBalance||0,
+      /* 🤝 3.9.221 — a befektetési arány (lásd mpBefektetesiArany). A mező
+         hiánya = régi kliens: akkor mindkét oldal a régi hangolást futtatja. */
+      ba:mpBefektetesiArany(),baV:1,
       topScorer:mpTopOf(S.scorers),topAssist:mpTopOf(S.assists),topMvp:mpTopOf(S.mvps),
       /* A BAJNOKI TISZTA LAPOK is átutaznak: a három bajnoki díj közül a
          kapus-királyé eddig nem volt összemérhető a társ keretével (lásd
@@ -65680,7 +65686,9 @@ async function mpSyncSeasonEnd(){
       strength:(rep&&rep.stats&&rep.stats.strength)||mpSquadStrength(),
       /* …és a meccs-skálájú érték is, ugyanabból a pillanatból: a piramis
          osztályozója ebből dolgozik (pyrPairMatchOvr). */
-      matchStr:(rep&&rep.stats&&typeof rep.stats.matchStr==="number")?rep.stats.matchStr:null};
+      matchStr:(rep&&rep.stats&&typeof rep.stats.matchStr==="number")?rep.stats.matchStr:null,
+      /* 🤝 3.9.221 — a PUBLIKÁLT befektetési arány: a hangolás ezzel számol */
+      ba:(rep&&rep.stats&&typeof rep.stats.ba==="number")?rep.stats.ba:null};
     try{await mpBk().h2hPut(MP.activeRoom,key,myField,rep);}catch(e){}
     try{node=await mpBk().h2hGet(MP.activeRoom,key);}catch(e){}}
   if(node&&node[oppField]){
@@ -65917,6 +65925,121 @@ function mpTuneAdd(names,delta){
     const next=Math.max(-cap,Math.min(cap,cur+delta));
     if(Math.abs(next-cur)>1e-9){m[name]=next;n++;}});
   return n;}
+/* ================= 🤝 BEFEKTETÉS-ARÁNYOS HANGOLÁS (3.9.221) =================
+   A FEJLESZTŐI BESZÉLGETÉSBŐL (a társ): „7 egységgel erősebb a csapatom […]
+   Most elveszítem az előnyt, amire minden pénzem költöttem […] Ez így egy
+   külön hack." — és a válasz: „Azt lehet esetleg vizsgálni, arányosan mennyit
+   invesztált a két játékos a csapatába […] ha az egyik teljesen offolt minden
+   költést, akkor kevésbé felemelni őt." A DÖNTÉS: „a felzárkóztatás legyen
+   rating és büdzsé és kedvezmény együtt, de mindegyik enyhébb mértékű. A
+   rating mindenképpen enyhébb mint eddig." (terv: docs/terv-befektetes-
+   aranyos-hangolas.md)
+
+   A MÉRCE: a BEFEKTETÉSI ARÁNY (BA) — a befektetett kiadás a rendelkezésre
+   álló pénzhez (nyitó egyenleg + az idény bevétele) mérve, az idei és a
+   tavalyi idény 2:1 súlyú átlaga. Befektetés MINDEN, ami a csapatot építi —
+   a később megtérülő is (stáb, scout, ügynökség, felállás, poszt-tanítás):
+   aki hosszú távra épít, az ugyanúgy befektetett. NEM befektetés a bér
+   (kötelező), a hitel, a pénzügyi befektetés és a tét jellegű tételek.
+
+   A SZABÁLY (Δ = a két keret közti különbség, f = a lemaradó BA-ja az elöl
+   lévőéhez mérve, legfeljebb 1):
+     · A LEMARADÓ három csatornán zárkózik fel, mindegyik enyhébben:
+         RATING  — a különbség (Δ−1) NEGYEDE × f   (eddig a FELE, f nélkül);
+         BÜDZSÉ  — a klub éves bevételének 3%-a pontonként × f, legfeljebb 15%;
+         BOOST   — −3% pontonként × f, legfeljebb −15%, a következő idény végéig.
+     · AZ ELÖL LÉVŐ NEM VESZÍT. Egyetlen kivétel: ha lényegesen kevesebbet
+       fektetett be (a BA-ja a lemaradóénak 60%-a alatt), a fölénye nagy része
+       nem a munkájából jön — ilyenkor (Δ−1) 15%-ával lejjebb lép.
+   A KÉT GÉP EGYETÉRT: a BA a szezonzáró csomagban utazik (stats.ba), és
+   mindkét kliens a PUBLIKÁLT értékkel számol (nem egy később újraszámolttal —
+   a főkönyv a kupa és a nyár alatt még mozog). Ha a társ csomagjában nincs
+   BA (régi kliens), mindkét oldal a RÉGI szabályt futtatja. */
+const MP_CATCH={ratingShare:0.25,leaderShare:0.15,leaderBA:0.6,baFloor:0.15,
+  budgetPer:0.03,budgetMax:0.15,discPer:0.03,discMax:0.15};
+/* a befektetésnek számító főkönyvi kategóriák */
+const MP_BA_INVEST={buy:1,boost:1,boostStar:1,roster:1,staff:1,scout:1,agency:1,tactic:1,poslearn:1,msunlock:1,retain:1};
+/* egy idény BA-ja a főkönyv sorából; null, ha nincs sor */
+function mpBaRow(row){
+  if(!row||!row.cats)return null;
+  let be=0,inv=0;
+  Object.entries(row.cats).forEach(([k,v])=>{
+    const c=LEDGER_CATS[k];if(!c||!(v>0))return;
+    if(c.side>0)be+=v;else if(MP_BA_INVEST[k])inv+=v;});
+  const avail=Math.max(1,(row.open||0)+be);
+  return Math.max(0,Math.min(1,inv/avail));}
+/* a két idényes mozgó átlag (idei ×2, tavalyi ×1) — 0..1, három tizedes */
+function mpBefektetesiArany(){
+  const rows=(S&&S.ledger&&S.ledger.rows)||{},sn=(S&&S.seasonNumber)||1;
+  const a=mpBaRow(rows[sn]),b=mpBaRow(rows[sn-1]);
+  const v=(a==null&&b==null)?0:(b==null?a:(a==null?b:(2*a+b)/3));
+  return Math.round(v*1000)/1000;}
+/* a két publikált BA; null, ha bármelyik hiányzik (régi kliens / régi mentés) */
+function mpBaPair(){
+  const mine=S.mpMyFinal&&S.mpMyFinal.season===((S.seasonNumber||1))&&typeof S.mpMyFinal.ba==="number"?S.mpMyFinal.ba:null;
+  const m=mpMateFinal(),mate=(m&&m.stats&&typeof m.stats.ba==="number")?m.stats.ba:null;
+  return (mine==null||mate==null)?null:{mine,mate};}
+/* A TERV — tiszta függvény: ugyanabból a négy számból mindkét gép ugyanazt
+   kapja, a saját és a társ szemszögéből. */
+function mpCatchPlan(gap,iLead,baMine,baMate){
+  const over=Math.max(0,Math.abs(gap)-MP_BALANCE_GAP);
+  const baL=iLead?baMine:baMate,baH=iLead?baMate:baMine;
+  const f=Math.max(0,Math.min(1,baH/Math.max(baL,MP_CATCH.baFloor)));
+  const lift=over*MP_CATCH.ratingShare*f;
+  const drop=(baL<MP_CATCH.leaderBA*baH)?over*MP_CATCH.leaderShare:0;
+  const budgetPct=Math.min(MP_CATCH.budgetMax,over*MP_CATCH.budgetPer)*f;
+  const discPct=Math.min(MP_CATCH.discMax,over*MP_CATCH.discPer)*f;
+  return {over,f:Math.round(f*1000)/1000,
+    myMove:iLead?-drop:lift, mateMove:iLead?lift:-drop,
+    budgetPct:iLead?0:budgetPct, discPct:iLead?0:discPct, lead:!!iLead};}
+/* ---- AZ IDÉNY EGÉSZE EGY MÉRCE (3.9.221) ----
+   Kupás idényben két kapu van (bajnokság, kupa). Ha mindkettő a saját
+   különbségéből adna, a lemaradó egy idény alatt közel annyit kapna, mint a
+   régi szabállyal — a kérés viszont az volt, hogy MINDEN csatorna enyhébb
+   legyen. Ezért az idény teljes felzárkóztatása a legnagyobb, abban az
+   idényben MÉRT különbség terve: a második kapu csak a különbözetet adja (ha a
+   kupa alatt nőtt a szakadék, a növekmény jár). A számlálók a TERVET
+   könyvelik (nem a plafon miatt ténylegesen elértet), mert a két gépnek
+   ugyanazt kell tudnia — a társ plafonját egyik sem látja. */
+function mpCatchSeasonState(){
+  const sn=(S&&S.seasonNumber)||1;
+  if(!S.mpCatchSeason||S.mpCatchSeason.season!==sn)S.mpCatchSeason={season:sn,budgetPct:0,discPct:0,myUsed:0,mateUsed:0};
+  const C=S.mpCatchSeason;
+  ["budgetPct","discPct","myUsed","mateUsed"].forEach(k=>{if(typeof C[k]!=="number")C[k]=0;});
+  return C;}
+/* egy elmozdulásból mennyi jár még az idényben (azonos irányban a már
+   könyvelt rész levonva; ellenkező irányban teljes) */
+function mpCatchRemain(want,used){
+  if(want>0)return Math.max(0,want-Math.max(0,used));
+  if(want<0)return -Math.max(0,-want-Math.max(0,-used));
+  return 0;}
+/* a boost-kedvezmény (a következő idény végéig él) */
+function mpCatchBoostDisc(){
+  const c=S&&S.mpCatchDisc;
+  return (c&&typeof c.pct==="number"&&c.until>=((S.seasonNumber)||1))?Math.max(0,Math.min(MP_CATCH.discMax,c.pct)):0;}
+/* A KIJELZÉS — a miért is látszódjon: a két befektetési arány, és mit kapott
+   ki (a lemaradó a három csatornát, az elöl lévő a „nem veszítesz" mondatot). */
+function mpBaPct(x){return Math.round((x||0)*100)+"%";}
+function mpSzam(x,d){return Number(x||0).toFixed(d==null?1:d).replace(".",",");}
+function mpCatchMiert(bi){
+  const ba=bi.ba||{};
+  return `Befektetési arány (a bevételhez mért építő költés, 2 idény): <b>te ${mpBaPct(ba.mine)}</b>, a társad ${mpBaPct(ba.mate)}.`;}
+function mpCatchBoxText(bi){
+  const g=mpSzam(bi.gapBefore,1);
+  if((bi.gapBefore||0)<=MP_BALANCE_GAP)return `A két keret között csak ${g} OVR a különbség — nem kellett hangolni.`;
+  if(bi.lead)
+    return `A különbség ${g} OVR volt, te vezetsz. `+(bi.drop
+      ?`Mivel lényegesen kevesebbet fektettél be, a kereted <b>${mpSzam(Math.abs(bi.moved),2)}</b> ratinggel lejjebb lép. `
+      :`<b>A kereted nem változik</b> — a fölényedet megtartod. `)+mpCatchMiert(bi);
+  const tetel=[];
+  if(bi.moved>0.004)tetel.push(`<b>+${mpSzam(bi.moved,2)}</b> rating a ${bi.n||MP_TUNE_N} legnagyobb potenciálú játékosodnak`);
+  if(bi.budget>0)tetel.push(`<b>${fmtFt(bi.budget)}</b> felzárkózási büdzsé`);
+  if(bi.disc>0)tetel.push(`<b>−${Math.round(bi.disc*100)}%</b> a boostokon a következő idény végéig`);
+  return `A különbség ${g} OVR volt, a társad vezet. Felzárkóztatás: `
+    +(tetel.length?tetel.join(", ")+".":"<b>most semmi</b> — "+(bi.f>0?"az idényben már megkaptad, ami járt.":"a befektetési arányod alapján nem jár."))
+    +` ${mpCatchMiert(bi)}`+(bi.f<1?` <span style="color:var(--dim2)">(a társadéhoz mérve ${Math.round(bi.f*100)}%-os mértékben)</span>`:"");}
+function mpCatchLine(bi,k){
+  return `⚖ Kiegyenlítés a folytatáshoz (${k==="cup"?"a kupasorozat":"a bajnokság"} után): ${mpCatchBoxText(bi)}`;}
 function mpApplyBalance(){
   const st=mpDuelStanding();
   if(!st)return null;
@@ -65929,6 +66052,18 @@ function mpApplyBalance(){
      kliens ugyanezt a két számot ismeri, tehát a két célérték pontosan
      MP_BALANCE_GAP-re esik egymástól — külön egyeztetés nélkül. */
   const mid=(st.mine+st.mate)/2;
+  /* 🤝 3.9.221 — befektetés-arányos: ha mindkét BA ismert, a terv dönt */
+  const ba=mpBaPair();
+  const plan=ba?mpCatchPlan(st.gap,st.iLead,ba.mine,ba.mate):null;
+  if(plan){
+    /* az idényben már könyvelt rész levonva — lásd mpCatchSeasonState */
+    const C=mpCatchSeasonState();
+    const my=mpCatchRemain(plan.myMove,C.myUsed),mt=mpCatchRemain(plan.mateMove,C.mateUsed);
+    C.myUsed+=my;C.mateUsed+=mt;
+    plan.myMove=my;plan.mateMove=mt;
+    const bp=Math.max(0,plan.budgetPct-C.budgetPct),dp=Math.max(0,plan.discPct-C.discPct);
+    C.budgetPct+=bp;C.discPct+=dp;
+    plan.budgetPct=bp;plan.discPct=dp;}
   const target=mid+(st.iLead?MP_BALANCE_GAP/2:-MP_BALANCE_GAP/2);
   /* A KÖR itt dől el, a hangolás pillanatában: az AKKORI keret 11 legnagyobb
      potenciálú embere. Két hangolás (bajnokság és kupa után) tehát két, akár
@@ -65945,13 +66080,22 @@ function mpApplyBalance(){
   /* a plafon ennek a keretnek a MOSTANI nyers erejéből (3.9.175) */
   {const raw=mpRawStrength();if(raw>0)S.mpTuneCap=mpTuneCapFor(raw);}
   const before=mpMyStrength();
+  /* A TERV a MOSTANI (élő) erőhöz képest mozdít, nem a befagyott záró értékhez:
+     a kupa utáni kapunál a keret a kupa alatt fejlődhetett, és egy „0
+     elmozdulású" elöl lévőt a befagyott számra húzni épp az volna, amit a
+     szabály tilt. */
+  const tgt=plan?before+plan.myMove:target;
   let capped=false;
   for(let i=0;i<40;i++){
-    const diff=target-mpMyStrength();
+    const diff=tgt-mpMyStrength();
     if(Math.abs(diff)<0.005)break;
     if(!mpTuneAdd(names,diff)){capped=true;break;}}
   const after=mpMyStrength();
   const moved=after-before;
+  /* 3.9.221: a SAJÁT záró érték is követi a hangolást — különben a kupa utáni
+     kapu ugyanazt a különbséget még egyszer felzárkóztatná (a társét a hívó
+     ugyanígy átírja a mateTarget-re). */
+  if(plan&&S.mpMyFinal&&typeof S.mpMyFinal.strength==="number")S.mpMyFinal.strength=st.mine+moved;
   /* A társ oldala ugyanezzel a képlettel, ugyanebből a két számból mozdul —
      tehát a hangolás UTÁNI erejét pontosan tudjuk. Vissza is írjuk a tárolt
      jelentésébe, különben a mérleg a saját eltolásunk után a MÁR NEM ÉRVÉNYES
@@ -65959,11 +66103,11 @@ function mpApplyBalance(){
      (A plafon miatt a társ is elakadhat a saját célja előtt — azt innen nem
      látjuk. Nem is baj: a következő szezonzáráskor mindkét kliens a VALÓDI,
      mért erejét publikálja újra, tehát a becslés legfeljebb egy idényig él.) */
-  const mateTarget=mid+(st.iLead?-MP_BALANCE_GAP/2:MP_BALANCE_GAP/2);
+  const mateTarget=plan?st.mate+plan.mateMove:mid+(st.iLead?-MP_BALANCE_GAP/2:MP_BALANCE_GAP/2);
   /* A KIÍRT „utána" NEM feltételezés, hanem a TÉNYLEGESEN elért különbség:
      plafonba ütközve a régi, fix MP_BALANCE_GAP hazudott volna. */
-  const newGap=Math.abs(after-mateTarget);
-  return {moved,gap,newGap,mateTarget,names,n:names.length,capped,cap:mpTuneCap()};}
+  const newGap=plan?Math.abs(st.mine+moved-mateTarget):Math.abs(after-mateTarget);
+  return {moved,gap,newGap,mateTarget,names,n:names.length,capped,cap:mpTuneCap(),plan,ba};}
 /* A keret NYERS ereje: ugyanaz a mérce (mpSquadStrength), a PvP-hangolás
    nélkül — a plafon ebből a számból arányos. */
 function mpRawStrength(){
@@ -66653,11 +66797,29 @@ function mpMaybeApplyBalance(kind){
        hangolást a cél előtt — ilyenkor a maradék különbség a pályán dől el. */
     capped:!!(r&&r.capped),
     cap:(r&&r.cap)||mpTuneCap()};
+  /* 🤝 3.9.221 — BEFEKTETÉS-ARÁNYOS ÁG: a lemaradó büdzsét és boost-
+     kedvezményt is kap (a rating mellett, mindhárom enyhébben). Idényenként
+     a két kapu (bajnokság, kupa) EGYÜTT sem lépheti át a plafont. */
+  if(r&&r.plan){
+    const P=r.plan,bi=d.balanceInfo,sn=S.seasonNumber||1;
+    bi.uj=1;bi.lead=P.lead;bi.f=P.f;bi.ba=r.ba;bi.drop=P.lead&&P.myMove<0;
+    if(!P.lead){
+      /* a terv már az idény maradékát adja (mpApplyBalance + mpCatchSeasonState) */
+      const bp=P.budgetPct,dp=P.discPct;
+      let base=0;try{base=clubBudgetScale();}catch(e){base=0;}
+      const amt=Math.round(base*bp);
+      bi.budget=amt>0?budgetEarn(amt,"mpCatch"):0;
+      if(dp>0){
+        const pct=Math.round(Math.min(MP_CATCH.discMax,mpCatchBoostDisc()+dp)*1000)/1000;
+        S.mpCatchDisc={until:sn+1,pct};}
+      bi.disc=dp;}}
   /* a társ hangolt ereje — innentől ehhez mérünk (lásd mpApplyBalance) */
   if(r&&r.mateTarget!=null&&S.mpMateFinal&&S.mpMateFinal.rep){
     S.mpMateFinal.rep.stats=S.mpMateFinal.rep.stats||{};
     S.mpMateFinal.rep.stats.strength=r.mateTarget;}
-  if(d.balanceInfo.moved)
+  if(d.balanceInfo.uj)
+    addLine(mpCatchLine(d.balanceInfo,k),"m life");
+  else if(d.balanceInfo.moved)
     addLine(`⚖ Kiegyenlítés a folytatáshoz (${k==="cup"?"a kupasorozat":"a bajnokság"} után): `
       +`a keretetek <b>${d.balanceInfo.n} legnagyobb potenciálú játékosa</b> `
       +`${d.balanceInfo.moved>=0?"+":"−"}${Math.abs(d.balanceInfo.moved).toFixed(2)} ratinget kap `
@@ -66926,6 +67088,8 @@ function mpDecisionBox(){
   if(mine==="continue"&&mate==="continue"){
     const d=mpDecStateOf(k);
     const bi=(d&&d.balanceInfo)||{moved:0,gapBefore:0,gapAfter:0,n:0};
+    if(bi.uj)return `<div class="vsVerdict" style="background:rgba(110,190,120,.10);border-color:rgba(110,190,120,.4)">
+      🤝 <b>Mindketten folytatjátok.</b> ${mpCatchBoxText(bi)} Indulhat a következő szezon.</div>`;
     return `<div class="vsVerdict" style="background:rgba(110,190,120,.10);border-color:rgba(110,190,120,.4)">
       🤝 <b>Mindketten folytatjátok.</b> ${bi.moved
         ?`A különbség ${bi.gapBefore.toFixed(1)} OVR volt — ezt <b>${Number(bi.gapAfter).toFixed(1)}</b> OVR-re
@@ -86216,12 +86380,14 @@ function boostOpenPanel(){
      ifi- és az öreg-boostról beszélt. */
   const cd=S.boostDiscount||0,ed=boostEarlyDisc();
   let tc=0;try{tc=1-talBoostCsomagMult();}catch(e){tc=0;}   /* ⚡ 3.9.185 — Olcsóbb csomag (talizmán) */
+  let mc=0;try{mc=mpCatchBoostDisc();}catch(e){mc=0;}      /* 🤝 3.9.221 — PvP-felzárkóztatás */
   const before=Math.round(boostUnitBase()/100)*100;
-  const discNote=(cd||ed||tc>0)
+  const discNote=(cd||ed||tc>0||mc>0)
     ? `<br><span style="color:var(--grass)">Kedvezmény az egység alapárán: `
       +[ed?`<b>−${Math.round(ed*100)}%</b> a ${S.seasonNumber||1}. idényben`:null,
          cd?`<b>−${Math.round(cd*100)}%</b> kihívás-jutalomból`:null,
-         tc>0?`<b>−${talSz(tc*100)}%</b> ⚡ talizmánból`:null].filter(Boolean).join(" · ")
+         tc>0?`<b>−${talSz(tc*100)}%</b> ⚡ talizmánból`:null,
+         mc>0?`<b>−${Math.round(mc*100)}%</b> 🤝 PvP-felzárkóztatásból (a ${(S.mpCatchDisc&&S.mpCatchDisc.until)||""}. idény végéig)`:null].filter(Boolean).join(" · ")
       +` — kedvezmény nélkül ${fmtFt(before)} volna, és MIND A HÉT fajta arányosan olcsóbb.</span>`
       +(ed?`<br><span style="color:var(--gold)">A kezdő idények ablaka: 1. idény `
         +`−${Math.round(BOOST_EARLY_DISC[0]*100)}%, 2. idény −${Math.round(BOOST_EARLY_DISC[1]*100)}%, `
@@ -93994,7 +94160,8 @@ function renderHub(){
        const _ed=boostEarlyDisc();
        bb.textContent=`⚡ Boost-központ — 7 fajta, ${fmtFtShort(cheapest)}-tól`
          +(_ed?`  ·  −${Math.round(_ed*100)}% (${S.seasonNumber||1}. idény)`:"")
-         +(cd?`  ·  −${Math.round(cd*100)}% (kihívás-jutalom)`:"");
+         +(cd?`  ·  −${Math.round(cd*100)}% (kihívás-jutalom)`:"")
+         +((()=>{let m=0;try{m=mpCatchBoostDisc();}catch(e){}return m>0?`  ·  −${Math.round(m*100)}% (felzárkóztatás)`:"";})());
        bb.style.opacity=ok?"1":".55";}}}
   /* ---- SZINTLÉPÉS: SZABADON, KÉT SZEZON KÖZÖTT ----
      Nincs többé cím- vagy kudarc-feltétel. Szezon KÖZBEN viszont rejtve marad
@@ -99583,7 +99750,7 @@ function talPiacKind(round){return round===15?"teli":"rovid";}
 function talMoralCel(){return talAlap("moral","legkor");}
 function talMoralVissza(){return 1+talAlap("moral","legkor")/0.8*0.10;}
 /* ---- JOBB ÜZLETMENET ---- */
-const TAL_BANK_KIVETEL={sale:1,saleStar:1,refund:1,talizman:1,loanIn:1};
+const TAL_BANK_KIVETEL={sale:1,saleStar:1,refund:1,talizman:1,loanIn:1,mpCatch:1};
 function talBankMult(cat){
   if(TAL_BANK_KIVETEL[cat])return 1;
   return 1+talAlap("bank","bevetel")/100;}
@@ -113145,7 +113312,7 @@ function saveGame(){
            döntés, a közös előzmény és az egymás elleni napló. */
         /* a szezonra rögzített rejtett ellenfél-erősítés (lásd seasonHiddenBonus) */
         oppBuffH:S.oppBuffH,
-        mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,pendingCardUps:S.pendingCardUps,pendingCardUpR:S.pendingCardUpR||[],mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,mpTable:S.mpTable,seasonDrama:S.seasonDrama,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpBalanceP:S.mpBalanceP,mpTuneCap:S.mpTuneCap||null,
+        mpMateFinal:S.mpMateFinal,mpMyFinal:S.mpMyFinal,pendingCardUps:S.pendingCardUps,pendingCardUpR:S.pendingCardUpR||[],mpSummerRef:S.mpSummerRef,mpCup:S.mpCup,mpMateHalf:S.mpMateHalf,mpTable:S.mpTable,seasonDrama:S.seasonDrama,leaveDeals:S.leaveDeals,halftimeSubs:S.halftimeSubs,mpBalance:S.mpBalance,mpBalanceP:S.mpBalanceP,mpTuneCap:S.mpTuneCap||null,mpCatchDisc:S.mpCatchDisc||null,mpCatchSeason:S.mpCatchSeason||null,
         mpDecision:S.mpDecision,mpDecisionCup:S.mpDecisionCup,mpCupSeason:S.mpCupSeason,
         /* EGYEDÜL játszott nyári torna (3.9.72): a kupa utáni kaput kihagyja. */
         friendlySolo:S.friendlySolo,
@@ -113530,6 +113697,10 @@ function applySavedGame(d){
      kiegyenlítést, és a kupa-kapu az első kupasorozat lezárásakor nyílik meg. */
   S.mpBalanceP=d.S.mpBalanceP||{};
   S.mpTuneCap=(typeof d.S.mpTuneCap==="number"&&d.S.mpTuneCap>0)?d.S.mpTuneCap:null;
+  /* 🤝 3.9.221 — a felzárkóztatás boost-kedvezménye ({until, pct}) */
+  S.mpCatchDisc=(d.S.mpCatchDisc&&typeof d.S.mpCatchDisc.pct==="number")?d.S.mpCatchDisc:null;
+  /* …és az idényen belüli plafon számlálója (a két kapu együtt) */
+  S.mpCatchSeason=(d.S.mpCatchSeason&&typeof d.S.mpCatchSeason.season==="number")?d.S.mpCatchSeason:null;
   S.mpDecisionCup=d.S.mpDecisionCup||null;
   S.mpCupSeason=d.S.mpCupSeason||0;
   S.friendlySolo=(d.S&&d.S.friendlySolo)||0;

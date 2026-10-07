@@ -48,6 +48,24 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## pvp-hangolas-3-9-221-proba.js — 🤝 3.9.221: befektetés-arányos hangolás a közös karrierben
+
+```bash
+node tools/pvp-hangolas-3-9-221-proba.js
+```
+
+**31 állítás**, valódi böngészőben, egy valódi karrierrel (a társ záró csomagja kézzel).
+
+* **Befektetési arány:** a főkönyvből számol; a bér nem, a stáb igen; két idény 2:1.
+* **A terv:**
+  * a lemaradó (Δ−1)/4 × f ratinget kap, büdzsét és kedvezményt pontonként 3%-ot, legfeljebb 15%-ot;
+  * az elöl lévő nem veszít, kivéve kevés befektetésnél;
+  * a két gép terve tükörkép.
+* **A kapu:** rating, büdzsé a főkönyvben, −15% a boost-árban; a záró érték követi; a doboz és a napló kimondja.
+* **Kupás idény:** a második kapu csak a különbözetet adja; ha nőtt a szakadék, a növekményt.
+* **Régi társ:** a régi szabály fut.
+* **Egyéb:** a csomag viszi a befektetési arányt; mentés-kör; a kedvezmény lejár; a Jobb üzletmenet nem szorozza.
+
 ## meccsmotor-3-9-220-proba.js — ⚽ 3.9.220: a meccserő többet dönt
 
 ```bash
