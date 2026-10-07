@@ -254,7 +254,7 @@ node tools/reszt-tempo-3-9-208-proba.js
 node tools/scout-beallito-3-9-207-proba.js
 ```
 
-**13 állítás**, valódi böngészőben.
+**16 állítás**, valódi böngészőben.
 
 * **Beállító:**
   * karrierben látszik (drafttal és kész klubbal is), karrieren kívül nem;
@@ -262,13 +262,16 @@ node tools/scout-beallito-3-9-207-proba.js
   * a kattintás a preferenciát írja;
   * az összefoglalóban ott a sora.
 * **Indulás:** a `beginNewGame` rögzíti a karrierre; utána a preferencia nem írja át.
-* **Beállítások:** a futó karrier, a preferencia és a beállító választója együtt vált.
+* **Beállítások (3.9.218 óta):**
+  * a különálló 🔭 kapcsoló helyett a 🎛️ „Új karrier alapbeállításai” blokk „Scout” sora;
+  * a blokk a Beállítások legtetején áll, alapból nyitva, becsukva a munkamenetben csukva marad;
+  * a sor az új karrier alapját írja, a futó karrier scout-módja nem változik.
 * **Közös karrier:**
   * a csomagban utazik;
   * a vendégnél a házigazdáé él, a saját preferenciája érintetlen;
   * régi szobában KI;
   * a vendégnél zárolt;
-  * menet közben nem állítható.
+  * menet közben nem állítható (a Beállítások sem váltják a futó scout-módot).
 * **Betöltés:** nincs TDZ, nincs konzolhiba.
 
 ## meres-mentesbol-proba.js — 📈 a mentésből készülő mérési napló

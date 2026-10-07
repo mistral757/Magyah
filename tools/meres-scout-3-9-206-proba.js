@@ -314,20 +314,23 @@ const SP=process.env.MSP||require("os").tmpdir();
     const varj=ms=>new Promise(r=>setTimeout(r,ms));
     document.getElementById("themeModal").classList.remove("hide");renderThemeModal();await varj(80);
     const q=s=>document.querySelector(s);
-    const o={sr:q("#scoutRealBtn")&&q("#scoutRealBtn").getAttribute("aria-pressed"),
+    /* 3.9.218: a scout az ÚJ KARRIER alapbeállítása lett (🎛️ blokk, legfelül,
+       nyitva) — a különálló kapcsoló, ami a futó karriert váltotta, megszűnt */
+    const sel=q('#kaBox select[data-ka="scoutReal"]');
+    const o={nincsKulon:!q("#scoutRealBtn"),sorVan:!!sel,nyitva:!!(q("#kaBox")&&q("#kaBox").open),
       gombok:["#meresLetoltBtn","#meresMasolBtn","#meresFelBtn","#meresAutoBtn"].map(s=>!!q(s)),
       auto:q("#meresAutoBtn")&&q("#meresAutoBtn").getAttribute("aria-pressed")};
-    q("#scoutRealBtn").click();await varj(60);
-    o.sr2=q("#scoutRealBtn").getAttribute("aria-pressed");o.on2=scoutRealOn();
-    q("#scoutRealBtn").click();await varj(60);o.on3=scoutRealOn();
+    const futo=scoutRealOn();
+    if(sel){sel.value=futo?"off":"on";sel.onchange();await varj(40);}
+    o.futoMarad=scoutRealOn()===futo;o.tar=kaGet("scoutReal");
     q("#meresAutoBtn").click();await varj(60);o.fel=meresFelOn();q("#meresAutoBtn").click();await varj(60);o.fel2=meresFelOn();
     o.kiFel=await meresFeltolt(false);
     return o;});
-  ok(r8.sr==="true"&&r8.sr2==="false"&&!r8.on2&&r8.on3,"a beállításokban a 🔭 kapcsoló oda-vissza működik",r8);
+  ok(r8.nincsKulon&&r8.sorVan&&r8.nyitva&&r8.futoMarad&&r8.tar,"a 🔭 scout az új karrier alapbeállításai közt (nyitva); a futó karriert nem váltja",r8);
   ok(r8.gombok.every(Boolean)&&r8.auto==="false","a 📈 Mérési napló blokk: letöltés, másolás, feltöltés, automatikus feltöltés (alapból KI)",r8.gombok);
   ok(r8.fel===true&&r8.fel2===false&&r8.kiFel.ok===false&&r8.kiFel.ok_==="ki","kikapcsolt feltöltésnél idényzáráskor SEMMI nem megy ki",r8.kiFel);
   await takar("#themeModal");
-  await p.evaluate(()=>{const x=document.getElementById("scoutRealBtn");if(x)x.scrollIntoView({block:"start"});});
+  await p.evaluate(()=>{const x=document.getElementById("meresAutoBtn");if(x)x.scrollIntoView({block:"start"});});
   await p.waitForTimeout(300);
   await p.screenshot({path:path.join(SP,"meres-beallitas.png")});
   await p.evaluate(()=>document.getElementById("themeModal").classList.add("hide"));
