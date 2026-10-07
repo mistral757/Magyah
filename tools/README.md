@@ -365,7 +365,7 @@ node tools/pixel-elet-3-9-204-proba.js
 node tools/hatter-minden-tema-3-9-203-proba.js
 ```
 
-**14 állítás**, valódi böngészőben.
+**15 állítás**, valódi böngészőben.
 
 * **Mind a négy téma:**
   * él a jelenet;
