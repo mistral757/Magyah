@@ -12,7 +12,8 @@
         adattal;
      3. IDÉNYZÁRÁS: helyezés, végső erő, a főkönyv bevétel/kiadás bontásban,
         távozók;
-     4. A 2. IDÉNYTŐL TÖMÖR: nincs meccsenkénti részlet, az érkező tömör;
+     4. A 2. IDÉNYTŐL TÖMÖR: az érkező tömör, büdzsé-idősor nincs — a
+        meccsenkénti sor viszont 3.9.220 óta minden idényben gyűlik;
      5. VALÓSÁGHŰ SCOUT: lejjebb ülő sáv, a lista (nem a keret), 65–75%-os
         ár, zárt ablak, büdzsé, a kúszó csúcs, ellenajánlat, türelem → végleges
         nem, ablakonként három licit, legfeljebb 8 a listán, az ügynökség;
@@ -178,8 +179,10 @@ const SP=process.env.MSP||require("os").tmpdir();
     const r=meresLoad(),z=r.sz.find(x=>x.sz===2);
     return {n:r.sz.length,kezd:z.kezd,m:z.m,bi:z.budzseIdo,ossz:z.mOssz,erk:z.erk,k0:r.keret0.length};});
   ok(r4.n===2&&r4.kezd&&typeof r4.kezd.ts==="number","a 2. idény kezdő ereje rögzült",r4.kezd);
-  ok(r4.m===null&&r4.bi===null&&r4.ossz.n===2&&r4.ossz.gy===1&&r4.ossz.d===1&&r4.ossz.gf===2,
-     "a 2. idénytől nincs meccsenkénti részlet, csak összesítő",r4.ossz);
+  /* 3.9.220: a meccsenkénti sor MINDEN idényben gyűlik (a nehézség és a
+     meccsmotor hangolásához) — a budzsé-idősor marad az 1. idényé */
+  ok(Array.isArray(r4.m)&&r4.m.length===2&&r4.m[0].mot===2&&r4.bi===null&&r4.ossz.n===2&&r4.ossz.gy===1&&r4.ossz.d===1&&r4.ossz.gf===2,
+     "a 2. idényben is van meccsenkénti sor (motor-nemzedékkel), a büdzsé-idősor nincs",{m:r4.m,ossz:r4.ossz});
   ok(r4.erk.length===1&&r4.erk[0].forras==="vasarlas"&&!r4.erk[0].attrs&&r4.erk[0].ovr!=null,"az érkező tömör (attribútumok nélkül), de forrással",r4.erk[0]);
 
   /* ---- 5. A VALÓSÁGHŰ SCOUT ---- */
