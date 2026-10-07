@@ -13,13 +13,22 @@
 
    Kimenet: karrierenként egy összefoglaló blokk (beállítások, kezdő keret,
    idényenként erő, helyezés, pénz, érkezők forrás szerint), és --csv esetén
-   egy idényenként egy soros CSV (táblázatkezelőbe). */
+   egy idényenként egy soros CSV (táblázatkezelőbe).
+
+   --meccsek kimenet.csv (3.9.220): MECCSENKÉNTI CSV, minden idényből
+   — a nehézség és a meccsmotor hangolásához. Oszlopok: a ⚡ meccserő és az
+   ellenfélé (+ a különbség), a motor különbsége pályával (d), a két
+   gólvárhatóság (lf/la), kiemelt meccs (riv/hajra), a lapok, és a MOTOR
+   NEMZEDÉKE (mot: 1 = 3.9.219-ig, 2 = 3.9.220-tól; a régi sorokban hiányzik,
+   az 1-es). Így a motorváltás előtti és utáni adat szétválasztható. */
 "use strict";
 const fs=require("fs");
 const args=process.argv.slice(2);
 const csvI=args.indexOf("--csv");
 const csvOut=csvI>=0?args[csvI+1]:null;
-const fajlok=args.filter((a,i)=>a!=="--csv"&&!(csvI>=0&&i===csvI+1));
+const mI=args.indexOf("--meccsek");
+const meccsOut=mI>=0?args[mI+1]:null;
+const fajlok=args.filter((a,i)=>a!=="--csv"&&a!=="--meccsek"&&!(csvI>=0&&i===csvI+1)&&!(mI>=0&&i===mI+1));
 if(!fajlok.length){console.error("Használat: node tools/meres/osszegez.js <fájl.json> [--csv kimenet.csv]");process.exit(1);}
 /* minden bemeneti alakból a napló-objektumok listája */
 function naplok(obj){
@@ -41,7 +50,7 @@ fajlok.forEach(f=>{try{mind=mind.concat(naplok(JSON.parse(fs.readFileSync(f,"utf
 const byId={};mind.forEach(r=>{if(!byId[r.id]||(r.sz||[]).length>(byId[r.id].sz||[]).length)byId[r.id]=r;});
 mind=Object.values(byId);
 console.log(`📈 ${mind.length} karrier\n`);
-const sorok=[];
+const sorok=[],meccsek=[];
 mind.forEach(r=>{
   const b=r.beall||{},k0=r.keret0||[];
   const xi=k0.filter(p=>p.hol==="xi");
@@ -61,6 +70,15 @@ mind.forEach(r=>{
     console.log(`   ${z.sz}. idény: ${ero}${oszt!=null?` · D${oszt}`:""}`
       +` · hely ${fmt(lg.hely)} (${fmt(lg.pont)} p, ${fmt(lg.gf)}:${fmt(lg.ga)})${z.kupa?` · kupa ${z.kupa.k} ${z.kupa.ered||z.kupa.kiesett||""}`:""}`);
     console.log(`      pénz: nyitó ${fmt(p.nyit)} · be ${fmt(ossz(p.be))} · ki ${fmt(ossz(p.ki))} · záró ${fmt(p.zar)} · igazolás ${fmt((p.ki||{}).buy)} · bér ${fmt((p.ki||{}).wage)} · eladás ${fmt((p.be||{}).sale)}`);
+    /* 3.9.220 — a meccsenkénti sorok (minden idényből) */
+    const ml=Array.isArray(z.m)?z.m:[];
+    if(ml.length){
+      const ny=ml.filter(x=>x.gf>x.ga).length,dr=ml.filter(x=>x.gf===x.ga).length;
+      const mot=[...new Set(ml.map(x=>x.mot||1))].join("+");
+      console.log(`      meccsek: ${ml.length} · ${ny}/${dr}/${ml.length-ny-dr} (gy/d/v) · motor ${mot}`);
+      ml.forEach(x=>meccsek.push({karrier:r.id,idény:z.sz,oszt:oszt!=null?oszt:"",i:x.i,sorozat:x.k,hazai:x.h,gf:x.gf,ga:x.ga,
+        ms:x.ms,oMs:x.oMs,kul:(x.ms!=null&&x.oMs!=null)?Math.round((x.ms-x.oMs)*10)/10:"",
+        d:x.d!=null?x.d:"",lf:x.lf!=null?x.lf:"",la:x.la!=null?x.la:"",nagy:x.nagy||"",piros:x.r||0,oPiros:x.or||0,mot:x.mot||1}));}
     console.log(`      érkezők: ${z.erk?erkSz:"— (a mentés nem tudja)"} · távozók: ${z.tav?z.tav.length:"—"}${z.eladas?` · eladás: ${z.eladas.db} fő, ${fmt(z.eladas.osszeg)}`:""}${z.folyamatban?` · FOLYAMATBAN (${z.folyamatban.fordulo}. forduló)`:""}`);
     sorok.push({karrier:r.id,forras:r.forras||"meres",csapat:r.csapat,app:b.app||r.app0,mod:b.mod,tempo:b.tempo,alap:b.ratingAlap,magyah:b.magyah?1:0,
       sebesseg:P.sebesseg||"",nehezseg:P.nehezseg||"",res:P.rés,
@@ -73,6 +91,13 @@ mind.forEach(r=>{
       erk:(z.erk||[]).length,erkVasarlas:(erk.vasarlas||[]).length,erkScout:(erk.scout||[]).length,erkIfi:(erk.ifi||[]).length,
       erkMegfigyelt:(erk.megfigyelt||[]).length,tav:(z.tav||[]).length});});
   console.log("");});
+const irCsv=(f,rows)=>{
+  const fej=Object.keys(rows[0]);
+  const esc=v=>{const s=v==null?"":String(v);return /[",;\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;};
+  fs.writeFileSync(f,[fej.join(",")].concat(rows.map(r=>fej.map(k=>esc(r[k])).join(","))).join("\n")+"\n");};
+if(meccsOut){
+  if(meccsek.length){irCsv(meccsOut,meccsek);console.log(`✓ meccsenkénti CSV: ${meccsOut} (${meccsek.length} sor)`);}
+  else console.log("ℹ️ nincs meccsenkénti sor a naplókban");}
 if(csvOut&&sorok.length){
   const fej=Object.keys(sorok[0]);
   const esc=v=>{const s=v==null?"":String(v);return /[",;\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;};
