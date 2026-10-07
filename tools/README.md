@@ -48,6 +48,21 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## scout-ar-3-9-219-proba.js — 💸 3.9.219: olcsóbb scout-találat (a régi ár 33–55%-a)
+
+```bash
+node tools/scout-ar-3-9-219-proba.js
+```
+
+**14 állítás**, valódi böngészőben.
+
+* **Árengedmény:** 600 kiszemeltnél 0,33–0,55 közötti, nagyjából egyenletes (átlag ~0,44).
+* **Az ár:** vételár × régi hányad (65–75%) × árengedmény, vagyis a piaci vételár ~21–41%-a; az ellenajánlat és az elfogadás az új árhoz mér.
+* **Régi mentés:** az árengedmény nélküli kiszemelt kap egyet, a régi ellenajánlat elvész, és az árengedmény a mentésbe kerül.
+* **Ingyenes harmad:** változatlanul ingyen.
+* **1. idény (tájékoztató):** a medián meghirdetett ár a régi és az új árral, a büdzséből kifizethetők száma.
+* **Felület:** a panel és a beállító gombja az új sávot írja.
+
 ## scout-ingyen-3-9-217-proba.js — 🎁 3.9.217: ingyen igazolható scout-találat, csak átigazolási időszakban
 
 ```bash
@@ -350,7 +365,7 @@ node tools/pixel-elet-3-9-204-proba.js
 node tools/hatter-minden-tema-3-9-203-proba.js
 ```
 
-**15 állítás**, valódi böngészőben.
+**14 állítás**, valódi böngészőben.
 
 * **Mind a négy téma:**
   * él a jelenet;

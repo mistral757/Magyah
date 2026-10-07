@@ -254,7 +254,9 @@ const SP=process.env.MSP||require("os").tmpdir();
   ok(r5.sav.hi1<r5.sav.hi0&&r5.sav.mode1<r5.sav.mode0,"a felfedezési sáv lejjebb ül (felső határ és csúcs)",r5.sav);
   ok(r5.atl.real<r5.atl.norm,"átlagban gyengébbet talál — az erős ritkább",r5.atl);
   ok(r5.felf.cbOk&&r5.felf.keret===0&&r5.felf.lista===1&&r5.felf.megf===1,"a felfedezett a Megfigyelt listára kerül, NEM a keretbe (és a mérő is látja)",r5.felf);
-  ok(r5.arany>=0.635&&r5.arany<=0.765,"a meghirdetett ár a piaci vételár 65–75%-a",{arany:r5.arany,frac:r5.rec.frac});
+  /* 3.9.219 óta a 65–75%-nak is csak 33–55%-a (rec.arF) */
+  ok(r5.arany>=0.635*0.33-0.002&&r5.arany<=0.765*0.55+0.002&&Math.abs(r5.arany-r5.rec.frac*r5.rec.arF)<0.003,
+     "a meghirdetett ár a piaci vételár 65–75%-ának 33–55%-a",{arany:r5.arany,frac:r5.rec.frac,arF:r5.rec.arF});
   ok(r5.rec.turelem>=3&&r5.rec.turelem<=6&&r5.rec.rejects===0,"a türelem 3–5 (+1 jó ügynökséggel)",r5.rec);
   ok(!r5.zart.ok&&/átigazolási időszakban/.test(r5.zart.msg),"zárt ablakban nem lehet licitálni",r5.zart);
   ok(!r5.penzNincs.ok&&/büdzsé/.test(r5.penzNincs.msg),"büdzsé nélkül nem lehet",r5.penzNincs);
