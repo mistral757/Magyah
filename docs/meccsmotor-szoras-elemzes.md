@@ -12,7 +12,7 @@
 > csak a Joker talizmánokra építő játékos élménye az, hogy sosem tudja, mi
 > történhet egy adott meccsen."
 
-Ez **elemzés és javaslat**, a játékon nem változtat. A számok két mérőből
+Ez **elemzés és javaslat**. Az 1–4. lépés és a mérő bővítése **3.9.220-ban megvalósult** — előtte–utána mérés: `docs/meccsmotor-3-9-220.md`. A számok két mérőből
 jönnek (lásd a végén):
 
 * **a valódi motorból**, 2110 lejátszott meccsel;

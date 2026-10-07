@@ -36,7 +36,9 @@
 "use strict";
 
 /* ---- A MOTOR SAJÁT KONSTANSAI (index.html: const SIM=...) ---- */
-const SIM={K:0.09,BASE:1.3,HOME:1.2,AWAY:-0.4,OPPSPREAD:3.5};
+/* 3.9.220: K 0,09 → 0,12, a pálya gólvárhatósága változatlan (0,9 / −0,3).
+   A régi motor:  node tools/pyramid-sim.js gaps k=0.09 home=1.2 away=-0.4 */
+const SIM={K:0.12,BASE:1.3,HOME:0.9,AWAY:-0.3,OPPSPREAD:3.5};
 /* A JÁTÉKOS TEMPÓTÓL FÜGGETLEN NÖVEKEDÉSE (3.9.38). Igazolás + összhang +
    taktika: a mezőny egyikről sem tud. Három lezárt karrierből mérve, a
    levezetést lásd a 8. fejezet fejlécénél. Felülírható: `extra=…`. */
@@ -50,6 +52,8 @@ function norm(){return (Math.random()+Math.random()+Math.random()-1.5)/1.5;}
 /* ---- PARAMÉTEREK ---- */
 const ARG={};
 process.argv.slice(2).forEach(a=>{const m=/^([a-z]+)=(.+)$/.exec(a);if(m)ARG[m[1]]=+m[2];});
+/* a motor konstansai is felülírhatók (3.9.220) — a régi és az új motor összevetéséhez */
+if(ARG.k)SIM.K=ARG.k;if(ARG.home!=null&&isFinite(ARG.home))SIM.HOME=ARG.home;if(ARG.away!=null&&isFinite(ARG.away))SIM.AWAY=ARG.away;
 const CMD=process.argv.slice(2).find(a=>!a.includes("="))||"report";
 const P={
   runs:ARG.runs||200,        /* hány karriert szimuláljunk */

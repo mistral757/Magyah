@@ -48,6 +48,25 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## meccsmotor-3-9-220-proba.js — ⚽ 3.9.220: a meccserő többet dönt
+
+```bash
+node tools/meccsmotor-3-9-220-proba.js
+```
+
+**27 állítás**, valódi böngészőben, egy valódi 1. idényes karrierrel.
+
+* **Konstansok:** K 0,12; a pálya gólvárhatósága változatlan (0,9 / −0,3).
+* **A jobb csapat rákapcsol:** csak a 60. perc után és csak ha az esélyes nem vezet; ×1,25-ig, mindkét irányban.
+* **Rangadó:** a közelítés a régi harmada; a Vad idény arányosan, a Káosz-elmélet teljesen visszahozza.
+* **Dinamikus sávok:**
+  * a régi bajnoki esélyt tartják (GAP_KAL);
+  * a tárolt választás (c5) nem változik;
+  * a kiírás tizedesvesszős.
+* **Az ellenfél piros lapja** egy valódi meccsen: naplósor, 🟥 az eredményjelzőn, a mérő sora.
+* **A mérő:** meccsenkénti sor minden idényben (a régi m:null idényben is), motor-nemzedékkel.
+* **A súgó** az új számokat mondja.
+
 ## meccsmotor/ — ⚽ a meccsmotor szórása (elemzés, 3.9.219)
 
 ```bash
@@ -56,7 +75,7 @@ MODE=big    N=300 DS=0,3,5     node tools/meccsmotor/szoras-valos.js   # rangad�
 node tools/meccsmotor/szoras-modell.js                                 # a hű modell + hangolási változatok
 ```
 
-Nem próba (nincs ✓/✗), hanem mérő: győzelem/döntetlen/vereség a ⚡ meccserő-különbség szerint. Az elemzés: `docs/meccsmotor-szoras-elemzes.md`.
+Nem próba (nincs ✓/✗), hanem mérő: győzelem/döntetlen/vereség a ⚡ meccserő-különbség szerint. Az elemzés: `docs/meccsmotor-szoras-elemzes.md`; a 3.9.220 előtte–utána: `docs/meccsmotor-3-9-220.md`. A `pyramid-sim.js` a motor konstansait is felülírhatja (`k=0.09 home=1.2 away=-0.4` = a régi motor).
 
 * **A valódi motor:** egy 1. idényes karrierben a valódi `playMatch`-lánc fut végigjátszás-módban. A kért különbség a `matchLambdas` becsomagolásával áll be. Fele hazai, fele idegen meccs.
 * **A modell:** a mag hű másolata (Poisson-vödrök, 90+ dráma, különleges esemény, piros lap, rangadó-közelítés). Változatok: A (a zaj erőhöz kötve), B (rangadó ⅓), D (a jobb csapat rákapcsol), K (meredekség).
@@ -337,11 +356,14 @@ kimenet kerülhet. Az adatkészlet a `tools/meres/adat/` mappában van.
 ## meres/osszegez.js — a mérési napló összegzője
 
 ```bash
-node tools/meres/osszegez.js <fájl.json> [további fájlok…] [--csv kimenet.csv]
+node tools/meres/osszegez.js <fájl.json> [további fájlok…] [--csv kimenet.csv] [--meccsek meccsek.csv]
 ```
 
 * **Bemenet:** a játék letöltése, a Firebase-konzol exportja vagy egyetlen napló.
 * **Kimenet:** karrierenként összefoglaló; `--csv` esetén idényenként egy sor.
+* **`--meccsek` (3.9.220):** meccsenként egy sor, minden idényből.
+  * Oszlopok: ⚡ és az ellenfélé, különbség, a motor `d`/`lf`/`la` értéke, rangadó, lapok.
+  * A `mot` a motor nemzedéke: 1 = 3.9.219-ig, 2 = 3.9.220-tól.
 
 ## pixel-elet-3-9-204-proba.js — 🕹️ 3.9.204: a Pixel téma saját élete
 
