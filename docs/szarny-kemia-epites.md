@@ -31,7 +31,7 @@ fejeződő „épül” sor maradt.
 | **váltás** | „↩ Mégis másik szárnyat építek” — **a fázisok megmaradnak**, a pár később folytatható |
 | **végigjátszás** | a gép lép: a félkész párat építi tovább, vagy az ajánlottat indítja |
 | **kész (5/5)** | él a gólesély-bónusz (ha mindketten pályán vannak), és a közös meccsek **összeérést** hoznak: 14 / 11 / 8 meccs után a sebesség fölfelé kiegyenlítődik — ahogy eddig |
-| **a belépő** | a szigorú szárny-szabály marad: azonos oldal, védő + szélső, legfeljebb 3 sebesség-eltérés |
+| **a belépő** | azonos oldal, védő + szélső; a sebesség 3.9.223 óta **nem feltétel** (korábban legfeljebb 3 eltérés) |
 | **a hely** | szárnyanként **egy ÉLŐ** kész pár. Ha egy tagja elhagyja a klubot, **a szárny felszabadul** |
 
 ### A régi mentés
