@@ -48,6 +48,20 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## nehezseg/ — 🎚 az általános nehézségi rendszer mérői (terv: `docs/nehezsegi-rendszer-terv.md`)
+
+```bash
+node tools/nehezseg/idenysim.js                       # egy idény kimenete a rés szerint (GS, R, SPREAD, STEP)
+P=3 F=6.2 R=300 node tools/nehezseg/karriersim.js     # karrier-szimuláció: mostani padló vs kétoldalú szabályozó (REGI=1: a régi változatok)
+G=0 N=8 node tools/meccsmotor/spiral-valos.js          # sodródás és spirál a valódi motoron (egy idény / futás)
+node tools/meccsmotor/spiral-elemez.js                 # a spiral/*.jsonl kiértékelése
+```
+
+Nem próbák (nincs ✓/✗), hanem mérők.
+
+* **A közös meccsmodell:** `tools/nehezseg/motor.js`, a valódi motorhoz kalibrálva (+0,75 a te meccseidhez, 2110 valódi meccs alapján).
+* **A karrier-szimuláció modell:** az irányokat mutatja, a mérő valódi adatai hangolják.
+
 ## pvp-hangolas-3-9-221-proba.js — 🤝 3.9.221: befektetés-arányos hangolás a közös karrierben
 
 ```bash
