@@ -48,6 +48,25 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## erosebb-ellenfel-moral-proba.js — 💪 erősebb ellenfél: a morál méltányossága
+
+```
+node tools/erosebb-ellenfel-moral-proba.js
+```
+
+**9 állítás**, valódi böngészőben. A mérce a kezdőrúgáskori ⚡ meccs-erő
+(az eredményjelző két száma); tábla nélkül a papírforma a tartalék.
+
+* **A skála:**
+  * döntetlen: 2% → +3 … 7% → +12;
+  * egygólos vereség: 4% → +3 … 10% → +12;
+  * győzelem, nagyobb vereség és gyengébb ellenfél: 0;
+  * fokozatos, lépésenként legfeljebb +2.
+* **Valódi idények (3 × 30 meccs)** változó erejű mezőnnyel:
+  * minden döntetlen és egygólos vereség pontosan a skála szerinti jutalmat kapja;
+  * erősebb ellenfél fordításánál nincs „😤 Elveszett előny” büntetés.
+* Nincs oldalhiba.
+
 ## skill-porgetes-uto-proba.js — 🎰 a skill-pörgetés a meccs utáni láncban
 
 ```
