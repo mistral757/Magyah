@@ -48,6 +48,32 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## scout-celzas-proba.js — 🎯 scout-célzás (elsődleges 50%, másodlagos 33%)
+
+```
+node tools/scout-celzas-proba.js
+```
+
+**20 állítás**, valódi böngészőben.
+
+* **Nyílás:**
+  * az első idény 14. fordulójáig zárva, a 15.-től és a 2. idényben nyitva;
+  * zárva vagy cél nélkül a szűrő nem dob kockát.
+* **Választék:**
+  * 6 fajta cél: kor (5 sáv), poszt (4 csoport + posztok), képesség (5), átlag fölötti POT, jellem (3 × 2), válogatott + ligák;
+  * a két cél nem lehet ugyanaz a fajta;
+  * minden cél valódi szűrő, a sávban mindegyikre van megfelelő.
+* **Hatás (2000 felfedezés célonként):**
+  * elsődleges ≈ alap + 50% × maradék;
+  * másodlagos ≈ alap + 33% × maradék;
+  * a kettő együtt is talál.
+* **Mindkét mód:** a klasszikus és a valósághű felfedezés is célzott, a napló és a lista 🎯 jellel mutatja.
+* **Értesítés és felület:**
+  * a vezetés emlékeztet, amíg nincs beállítva (kezdőrúgás előtti push);
+  * az újdonság-figyelő a nyíláskor szól;
+  * a panel kezelhető, a mentés viszi.
+* Nincs oldalhiba.
+
 ## erosebb-ellenfel-moral-proba.js — 💪 erősebb ellenfél: a morál méltányossága
 
 ```
