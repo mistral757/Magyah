@@ -61,7 +61,7 @@ node tools/fokozat-csomag-3-9-223-proba.js
   * a határon csak a célrés lép, belül egy elem — a 6. fokozattól a célrés is −0,1;
   * mindig nehezebbre lép, soha vissza;
   * a célrés +5 … −1;
-  * a 6.-tól realisztikus a képesség, a 7.-től legalább Csiga a tempó;
+  * a 4.5-től realisztikus a képesség, a 6.5-től valósághű a scout, a 7.-től legalább Csiga a tempó;
   * a kimenet monoton.
 * **Az új indítás:**
   * három oldal (nehézség → egyéb → kezdés);

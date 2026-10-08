@@ -14,7 +14,8 @@
    Amit mér:
      1. A TÁBLA: a játék és a tools/nehezseg/fokozatok.js betűre azonos; a
         határon csak a célrés lép, belül egy-egy elem, mindig nehezebbre, és
-        soha vissza; 6. fölött realisztikus képesség, 7-től legalább Csiga;
+        soha vissza; 4.5-től realisztikus képesség, 6.5-től valósághű scout,
+        7-től legalább Csiga;
         a várható kimenet monoton;
      2. AZ ÚJ INDÍTÁS: három oldal; friss alapbeállításon az ajánlott 4.1;
         tíz lenyitható fokozat, mindegyikben öt belső szint; egy szint
@@ -88,9 +89,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
    const cels=r1.all.map(c=>c.cel);
    ok(cels[0]===5&&cels[15]===3.2&&cels[20]===1.6&&cels[49]===-1&&cels.slice(25).every((v,i)=>i===0||Math.abs(cels[25+i-1]-v-0.1)<1e-9),
       "a célrés +5-től −1-ig (az 1–4. fokozat +1-gyel bővebb); az 5. fokozat fölött szintenként 0,1",cels);}
-  {const real=r1.all.filter(c=>c.nf>=6).every(c=>c.skill==="real");
+  {const real=r1.all.every(c=>(c.skill==="real")===(c.nf*10+c.s>=45));
+   const scout=r1.all.every(c=>(c.scout==="on")===(c.nf*10+c.s>=65));
    const csiga=r1.all.filter(c=>c.nf>=7).every(c=>["jatekos","penz","taktika","akademia"].every(a=>r1.idx[1].ert.indexOf(c.tempo[a])>=r1.idx[1].ert.indexOf("csiga")));
-   ok(real&&csiga,"a 6. fokozattól realisztikus képesség, a 7.-től minden tempó legalább Csiga",{real,csiga});}
+   ok(real&&scout&&csiga,"a 4.5-től (az 5. fokozattól) realisztikus képesség, a 6.5-től valósághű scout, a 7.-től minden tempó legalább Csiga",{real,scout,csiga});}
   {const a=r1.all[0],z=r1.all[49];
    ok(a.speed==="alvo"&&a.tempo.jatekos==="turbo"&&z.speed==="tarto"&&r1.all.every(c=>["alvo","lassu","tarto"].includes(c.speed))&&z.tempo.jatekos==="kokorszak"&&z.icons==="ki"&&z.tel==="szigoru"&&z.holt==="2.25",
       "1.1 a legkönnyebb, 10.5 a legnehezebb csomag (a mezőny-tempó legfeljebb Lépést tartanak)",{a,z});
@@ -134,7 +136,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r2.fok.nf===4&&r2.fok.s===1&&!r2.fok.egyeni&&r2.ka==="4.1","friss alapbeállításon az ajánlott 4.1",{f:r2.fok,ka:r2.ka});
   ok(r2.szintek===10&&r2.gombok===50&&r2.nyitva===1&&r2.miert===10,"tíz lenyitható fokozat, mindegyikben öt belső szint és a célrés magyarázata",r2);
   {const a=r2.a63;
-   ok(a.sp==="tarto"&&a.t.jatekos==="komotos"&&a.t.penz==="csiga"&&a.t.taktika==="csiga"&&a.t.akademia==="csiga"&&a.sk==="real"&&a.ic==="ritka"&&a.sc===true&&a.tel==="normal"&&a.nf===6&&a.egy&&r2.jel,
+   ok(a.sp==="tarto"&&a.t.jatekos==="csiga"&&a.t.penz==="csiga"&&a.t.taktika==="csiga"&&a.t.akademia==="csiga"&&a.sk==="real"&&a.ic==="ritka"&&a.sc===false&&a.tel==="normal"&&a.nf===6&&a.egy&&r2.jel,
       "a 6.3 kiválasztása MINDEN elemet beállít",a);
    ok(a.ka==="6.3"&&a.kaSp==="tarto","…és az alapbeállításba is írja",a);}
   ok(r2.egyeni.fok.egyeni&&r2.egyeni.ka==="e6.3"&&r2.egyeni.ic==="ki"&&/Egyéni/.test(r2.egyeni.cim),"egy elem kézi átírása „Egyéni” (a 6.3-ból)",r2.egyeni);

@@ -89,8 +89,11 @@
 * **Egy elem soha nem lép vissza.** Amit egy fokozat 5. szintje elért, azzal
   indul a következő fokozat 1. szintje is.
 * **A kérésed példái:**
-  * a 6. fokozattól mindig realisztikus a képesség (az 5.5-ben lép);
-  * a 7.-től minden tempó legalább Csiga (a 6.4-ben lép az utolsó).
+  * az 5. fokozattól mindig realisztikus a képesség (a 4.5-ben lép — kérésre
+    egy fokozattal korábban: „Realisztikus skill lvl5től legyen alapértelmezett”);
+  * a 7.-től minden tempó legalább Csiga (a 6.3-ban lép az utolsó);
+  * a valósághű scout a 6.5-től él (kérésre: „realisztikus scout lvl 6.5 és
+    afölött legyen”) — a 6.4-ig a szokásos scout.
 * **Az ajánlott 4.1** (Haladó, célrés +3,2) a régi alapbeállítás közelében
   van: Lépést tartanak, Alap tempó (az akadémia Komótos), lazán, szokásos
   scout, megszokott ikonok, normál tél.
@@ -160,61 +163,61 @@ kalibrált meccsmodellel, mind az 50 belső szintre.
 
 | Szint | Célrés | Mi lép | Ellenfelek | Tempó (J / P / T / A) | Ikonok | Képesség | Scout | Tél | Holtsáv | Feljutás | Cím | Kiesőhely | Átl. rés P0 = 1,5 / 3 / 4,5 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **1.1** Homokozó | +5 | a legkönnyebb | Alvó | Villám / Villám / Villám / Villám | megszokott | lazán | szokásos | laza | 1,5 | 100% | 91% | 0% | 4,9 / 4,9 / 4,9 |
-| **1.2** | +5 | tempó: akadémia → Gyors | Alvó | Villám / Villám / Villám / Gyors | megszokott | lazán | szokásos | laza | 1,5 | 100% | 92% | 0% | 4,9 / 4,9 / 4,9 |
-| **1.3** | +5 | tempó: taktika → Gyors | Alvó | Villám / Villám / Gyors / Gyors | megszokott | lazán | szokásos | laza | 1,5 | 99% | 91% | 0% | 4,9 / 4,9 / 4,9 |
-| **1.4** | +5 | tempó: pénz → Gyors | Alvó | Villám / Gyors / Gyors / Gyors | megszokott | lazán | szokásos | laza | 1,5 | 99% | 91% | 0% | 4,9 / 4,9 / 4,9 |
+| **1.1** Homokozó | +5 | a legkönnyebb | Alvó | Villám / Villám / Villám / Villám | megszokott | lazán | szokásos | laza | 1,5 | 100% | 92% | 0% | 4,9 / 4,9 / 4,9 |
+| **1.2** | +5 | tempó: akadémia → Gyors | Alvó | Villám / Villám / Villám / Gyors | megszokott | lazán | szokásos | laza | 1,5 | 100% | 91% | 0% | 4,9 / 4,9 / 4,9 |
+| **1.3** | +5 | tempó: taktika → Gyors | Alvó | Villám / Villám / Gyors / Gyors | megszokott | lazán | szokásos | laza | 1,5 | 100% | 92% | 0% | 4,9 / 4,9 / 4,9 |
+| **1.4** | +5 | tempó: pénz → Gyors | Alvó | Villám / Gyors / Gyors / Gyors | megszokott | lazán | szokásos | laza | 1,5 | 100% | 91% | 0% | 4,9 / 4,9 / 4,9 |
 | **1.5** | +5 | tempó: játékosok → Gyors | Alvó | Gyors / Gyors / Gyors / Gyors | megszokott | lazán | szokásos | laza | 1,5 | 100% | 91% | 0% | 4,9 / 4,9 / 4,9 |
-| **2.1** Kezdő | +4,4 | **célrés** | Alvó | Gyors / Gyors / Gyors / Gyors | megszokott | lazán | szokásos | laza | 1,5 | 99% | 86% | 0% | 4,3 / 4,3 / 4,3 |
+| **2.1** Kezdő | +4,4 | **célrés** | Alvó | Gyors / Gyors / Gyors / Gyors | megszokott | lazán | szokásos | laza | 1,5 | 99% | 85% | 0% | 4,3 / 4,3 / 4,3 |
 | **2.2** | +4,4 | ellenfelek → Lassan | Lassan | Gyors / Gyors / Gyors / Gyors | megszokott | lazán | szokásos | laza | 1,5 | 99% | 86% | 0% | 4,3 / 4,3 / 4,3 |
 | **2.3** | +4,4 | tempó: akadémia → Alap | Lassan | Gyors / Gyors / Gyors / Alap | megszokott | lazán | szokásos | laza | 1,5 | 99% | 86% | 0% | 4,3 / 4,3 / 4,3 |
 | **2.4** | +4,4 | tempó: taktika → Alap | Lassan | Gyors / Gyors / Alap / Alap | megszokott | lazán | szokásos | laza | 1,5 | 99% | 86% | 0% | 4,3 / 4,3 / 4,3 |
-| **2.5** | +4,4 | tempó: pénz → Alap | Lassan | Gyors / Alap / Alap / Alap | megszokott | lazán | szokásos | laza | 1,5 | 99% | 87% | 0% | 4,3 / 4,3 / 4,3 |
-| **3.1** Simaliba | +3,8 | **célrés** | Lassan | Gyors / Alap / Alap / Alap | megszokott | lazán | szokásos | laza | 1,5 | 97% | 77% | 0% | 3,7 / 3,7 / 3,7 |
-| **3.2** | +3,8 | tempó: játékosok → Alap | Lassan | Alap / Alap / Alap / Alap | megszokott | lazán | szokásos | laza | 1,5 | 97% | 78% | 0% | 3,7 / 3,7 / 3,7 |
-| **3.3** | +3,8 | ellenfelek → Lépést tart | Lépést tart | Alap / Alap / Alap / Alap | megszokott | lazán | szokásos | laza | 1,5 | 97% | 78% | 0% | 3,7 / 3,7 / 3,7 |
+| **2.5** | +4,4 | tempó: pénz → Alap | Lassan | Gyors / Alap / Alap / Alap | megszokott | lazán | szokásos | laza | 1,5 | 99% | 86% | 0% | 4,3 / 4,3 / 4,3 |
+| **3.1** Simaliba | +3,8 | **célrés** | Lassan | Gyors / Alap / Alap / Alap | megszokott | lazán | szokásos | laza | 1,5 | 97% | 78% | 0% | 3,7 / 3,7 / 3,7 |
+| **3.2** | +3,8 | tempó: játékosok → Alap | Lassan | Alap / Alap / Alap / Alap | megszokott | lazán | szokásos | laza | 1,5 | 96% | 77% | 0% | 3,7 / 3,7 / 3,7 |
+| **3.3** | +3,8 | ellenfelek → Lépést tart | Lépést tart | Alap / Alap / Alap / Alap | megszokott | lazán | szokásos | laza | 1,5 | 97% | 77% | 0% | 3,7 / 3,7 / 3,7 |
 | **3.4** | +3,8 | tél → normál | Lépést tart | Alap / Alap / Alap / Alap | megszokott | lazán | szokásos | normál | 1,5 | 97% | 78% | 0% | 3,7 / 3,7 / 3,7 |
 | **3.5** | +3,8 | tempó: akadémia → Komótos | Lépést tart | Alap / Alap / Alap / Komótos | megszokott | lazán | szokásos | normál | 1,5 | 97% | 78% | 0% | 3,7 / 3,7 / 3,7 |
 | **4.1** Haladó | +3,2 | **célrés** | Lépést tart | Alap / Alap / Alap / Komótos | megszokott | lazán | szokásos | normál | 1,5 | 93% | 66% | 0% | 3,2 / 3,2 / 3,2 |
-| **4.2** | +3,2 | tempó: taktika → Komótos | Lépést tart | Alap / Alap / Komótos / Komótos | megszokott | lazán | szokásos | normál | 1,5 | 92% | 67% | 0% | 3,2 / 3,2 / 3,2 |
-| **4.3** | +3,2 | tempó: pénz → Komótos | Lépést tart | Alap / Komótos / Komótos / Komótos | megszokott | lazán | szokásos | normál | 1,5 | 92% | 67% | 0% | 3,2 / 3,2 / 3,2 |
-| **4.4** | +3,2 | scout → valósághű | Lépést tart | Alap / Komótos / Komótos / Komótos | megszokott | lazán | valósághű | normál | 1,5 | 92% | 67% | 0% | 3,2 / 3,2 / 3,2 |
-| **4.5** | +3,2 | tempó: játékosok → Komótos | Lépést tart | Komótos / Komótos / Komótos / Komótos | megszokott | lazán | valósághű | normál | 1,5 | 93% | 67% | 0% | 3,2 / 3,2 / 3,2 |
-| **5.1** Nehéz | +1,6 | **célrés** | Lépést tart | Komótos / Komótos / Komótos / Komótos | megszokott | lazán | valósághű | normál | 1,5 | 61% | 27% | 0% | 1,5 / 1,6 / 1,6 |
-| **5.2** | +1,6 | ikonok → ritkábban | Lépést tart | Komótos / Komótos / Komótos / Komótos | ritkábban | lazán | valósághű | normál | 1,5 | 61% | 28% | 0% | 1,3 / 1,6 / 1,6 |
-| **5.3** | +1,6 | tempó: akadémia → Csiga | Lépést tart | Komótos / Komótos / Komótos / Csiga | ritkábban | lazán | valósághű | normál | 1,5 | 61% | 28% | 0% | 1,3 / 1,6 / 1,6 |
-| **5.4** | +1,6 | tempó: taktika → Csiga | Lépést tart | Komótos / Komótos / Csiga / Csiga | ritkábban | lazán | valósághű | normál | 1,5 | 61% | 28% | 0% | 1,2 / 1,6 / 1,6 |
-| **5.5** | +1,6 | képességek → realisztikus | Lépést tart | Komótos / Komótos / Csiga / Csiga | ritkábban | realisztikus | valósághű | normál | 1,5 | 60% | 28% | 0% | 1 / 1,6 / 1,6 |
-| **6.1** Professzionális | +1,4 | **célrés** | Lépést tart | Komótos / Komótos / Csiga / Csiga | ritkábban | realisztikus | valósághű | normál | 1,5 | 54% | 24% | 0% | 0,8 / 1,3 / 1,4 |
-| **6.2** | +1,3 | holtsáv → 1,75 (+ célrés) | Lépést tart | Komótos / Komótos / Csiga / Csiga | ritkábban | realisztikus | valósághű | normál | 1,75 | 51% | 21% | 0% | 0,6 / 1,2 / 1,3 |
-| **6.3** | +1,2 | tempó: pénz → Csiga (+ célrés) | Lépést tart | Komótos / Csiga / Csiga / Csiga | ritkábban | realisztikus | valósághű | normál | 1,75 | 44% | 18% | 0% | 0,3 / 1 / 1,2 |
-| **6.4** | +1,1 | tempó: játékosok → Csiga (+ célrés) | Lépést tart | Csiga / Csiga / Csiga / Csiga | ritkábban | realisztikus | valósághű | normál | 1,75 | 44% | 16% | 0% | 0,5 / 1 / 1,1 |
-| **6.5** | +1 | tempó: akadémia → Gleccser (+ célrés) | Lépést tart | Csiga / Csiga / Csiga / Gleccser | ritkábban | realisztikus | valósághű | normál | 1,75 | 39% | 15% | 0% | 0,4 / 0,9 / 1 |
+| **4.2** | +3,2 | tempó: taktika → Komótos | Lépést tart | Alap / Alap / Komótos / Komótos | megszokott | lazán | szokásos | normál | 1,5 | 93% | 67% | 0% | 3,2 / 3,2 / 3,2 |
+| **4.3** | +3,2 | tempó: pénz → Komótos | Lépést tart | Alap / Komótos / Komótos / Komótos | megszokott | lazán | szokásos | normál | 1,5 | 93% | 66% | 0% | 3,2 / 3,2 / 3,2 |
+| **4.4** | +3,2 | tempó: játékosok → Komótos | Lépést tart | Komótos / Komótos / Komótos / Komótos | megszokott | lazán | szokásos | normál | 1,5 | 93% | 67% | 0% | 3,2 / 3,2 / 3,2 |
+| **4.5** | +3,2 | képességek → realisztikus | Lépést tart | Komótos / Komótos / Komótos / Komótos | megszokott | realisztikus | szokásos | normál | 1,5 | 93% | 67% | 0% | 3,2 / 3,2 / 3,2 |
+| **5.1** Nehéz | +1,6 | **célrés** | Lépést tart | Komótos / Komótos / Komótos / Komótos | megszokott | realisztikus | szokásos | normál | 1,5 | 61% | 28% | 0% | 1,5 / 1,6 / 1,6 |
+| **5.2** | +1,6 | ikonok → ritkábban | Lépést tart | Komótos / Komótos / Komótos / Komótos | ritkábban | realisztikus | szokásos | normál | 1,5 | 61% | 27% | 0% | 1,4 / 1,6 / 1,6 |
+| **5.3** | +1,6 | tempó: akadémia → Csiga | Lépést tart | Komótos / Komótos / Komótos / Csiga | ritkábban | realisztikus | szokásos | normál | 1,5 | 60% | 28% | 0% | 1,4 / 1,6 / 1,6 |
+| **5.4** | +1,6 | tempó: taktika → Csiga | Lépést tart | Komótos / Komótos / Csiga / Csiga | ritkábban | realisztikus | szokásos | normál | 1,5 | 61% | 27% | 0% | 1,3 / 1,6 / 1,6 |
+| **5.5** | +1,6 | tempó: pénz → Csiga | Lépést tart | Komótos / Csiga / Csiga / Csiga | ritkábban | realisztikus | szokásos | normál | 1,5 | 60% | 27% | 0% | 1,2 / 1,6 / 1,6 |
+| **6.1** Professzionális | +1,4 | **célrés** | Lépést tart | Komótos / Csiga / Csiga / Csiga | ritkábban | realisztikus | szokásos | normál | 1,5 | 55% | 24% | 0% | 1 / 1,4 / 1,4 |
+| **6.2** | +1,3 | holtsáv → 1,75 (+ célrés) | Lépést tart | Komótos / Csiga / Csiga / Csiga | ritkábban | realisztikus | szokásos | normál | 1,75 | 51% | 21% | 0% | 0,9 / 1,3 / 1,3 |
+| **6.3** | +1,2 | tempó: játékosok → Csiga (+ célrés) | Lépést tart | Csiga / Csiga / Csiga / Csiga | ritkábban | realisztikus | szokásos | normál | 1,75 | 49% | 19% | 0% | 0,9 / 1,2 / 1,2 |
+| **6.4** | +1,1 | tempó: akadémia → Gleccser (+ célrés) | Lépést tart | Csiga / Csiga / Csiga / Gleccser | ritkábban | realisztikus | szokásos | normál | 1,75 | 45% | 18% | 0% | 0,8 / 1,1 / 1,1 |
+| **6.5** | +1 | scout → valósághű (+ célrés) | Lépést tart | Csiga / Csiga / Csiga / Gleccser | ritkábban | realisztikus | valósághű | normál | 1,75 | 40% | 15% | 0% | 0,4 / 0,9 / 1 |
 | **7.1** Mesteri | +0,9 | **célrés** | Lépést tart | Csiga / Csiga / Csiga / Gleccser | ritkábban | realisztikus | valósághű | normál | 1,75 | 37% | 13% | 0% | 0,3 / 0,8 / 0,9 |
-| **7.2** | +0,8 | ikonok → nagyon ritkán (+ célrés) | Lépést tart | Csiga / Csiga / Csiga / Gleccser | nagyon ritkán | realisztikus | valósághű | normál | 1,75 | 32% | 11% | 0% | −0,1 / 0,6 / 0,8 |
-| **7.3** | +0,7 | tempó: taktika → Gleccser (+ célrés) | Lépést tart | Csiga / Csiga / Gleccser / Gleccser | nagyon ritkán | realisztikus | valósághű | normál | 1,75 | 29% | 9% | 0% | −0,3 / 0,4 / 0,7 |
-| **7.4** | +0,6 | tempó: pénz → Gleccser (+ célrés) | Lépést tart | Csiga / Gleccser / Gleccser / Gleccser | nagyon ritkán | realisztikus | valósághű | normál | 1,75 | 27% | 9% | 0% | −0,4 / 0,3 / 0,6 |
+| **7.2** | +0,8 | ikonok → nagyon ritkán (+ célrés) | Lépést tart | Csiga / Csiga / Csiga / Gleccser | nagyon ritkán | realisztikus | valósághű | normál | 1,75 | 33% | 11% | 0% | −0,1 / 0,6 / 0,8 |
+| **7.3** | +0,7 | tempó: taktika → Gleccser (+ célrés) | Lépést tart | Csiga / Csiga / Gleccser / Gleccser | nagyon ritkán | realisztikus | valósághű | normál | 1,75 | 30% | 11% | 0% | −0,2 / 0,4 / 0,7 |
+| **7.4** | +0,6 | tempó: pénz → Gleccser (+ célrés) | Lépést tart | Csiga / Gleccser / Gleccser / Gleccser | nagyon ritkán | realisztikus | valósághű | normál | 1,75 | 27% | 8% | 1% | −0,3 / 0,3 / 0,6 |
 | **7.5** | +0,5 | tempó: játékosok → Gleccser (+ célrés) | Lépést tart | Gleccser / Gleccser / Gleccser / Gleccser | nagyon ritkán | realisztikus | valósághű | normál | 1,75 | 25% | 7% | 0% | −0,3 / 0,3 / 0,5 |
 | **8.1** Legendás | +0,4 | **célrés** | Lépést tart | Gleccser / Gleccser / Gleccser / Gleccser | nagyon ritkán | realisztikus | valósághű | normál | 1,75 | 23% | 7% | 0% | −0,4 / 0,2 / 0,4 |
-| **8.2** | +0,3 | tél → szigorú (+ célrés) | Lépést tart | Gleccser / Gleccser / Gleccser / Gleccser | nagyon ritkán | realisztikus | valósághű | szigorú | 1,75 | 21% | 6% | 1% | −0,4 / 0,1 / 0,3 |
-| **8.3** | +0,2 | tempó: akadémia → Jégkorszak (+ célrés) | Lépést tart | Gleccser / Gleccser / Gleccser / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 1,75 | 19% | 5% | 1% | −0,5 / 0 / 0,2 |
-| **8.4** | +0,1 | tempó: taktika → Jégkorszak (+ célrés) | Lépést tart | Gleccser / Gleccser / Jégkorszak / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 1,75 | 16% | 5% | 1% | −0,6 / −0,1 / 0,1 |
-| **8.5** | 0 | holtsáv → 2 (+ célrés) | Lépést tart | Gleccser / Gleccser / Jégkorszak / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 2 | 15% | 4% | 1% | −0,7 / −0,2 / 0 |
-| **9.1** Gyilkos | −0,1 | **célrés** | Lépést tart | Gleccser / Gleccser / Jégkorszak / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 2 | 13% | 3% | 1% | −0,9 / −0,3 / −0,1 |
-| **9.2** | −0,2 | tempó: pénz → Jégkorszak (+ célrés) | Lépést tart | Gleccser / Jégkorszak / Jégkorszak / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 2 | 11% | 2% | 2% | −0,9 / −0,5 / −0,3 |
-| **9.3** | −0,3 | tempó: játékosok → Jégkorszak (+ célrés) | Lépést tart | Jégkorszak / Jégkorszak / Jégkorszak / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 2 | 11% | 3% | 1% | −0,8 / −0,5 / −0,4 |
+| **8.2** | +0,3 | tél → szigorú (+ célrés) | Lépést tart | Gleccser / Gleccser / Gleccser / Gleccser | nagyon ritkán | realisztikus | valósághű | szigorú | 1,75 | 21% | 6% | 0% | −0,4 / 0,1 / 0,3 |
+| **8.3** | +0,2 | tempó: akadémia → Jégkorszak (+ célrés) | Lépést tart | Gleccser / Gleccser / Gleccser / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 1,75 | 19% | 6% | 1% | −0,5 / 0 / 0,2 |
+| **8.4** | +0,1 | tempó: taktika → Jégkorszak (+ célrés) | Lépést tart | Gleccser / Gleccser / Jégkorszak / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 1,75 | 17% | 5% | 1% | −0,6 / −0,1 / 0 |
+| **8.5** | 0 | holtsáv → 2 (+ célrés) | Lépést tart | Gleccser / Gleccser / Jégkorszak / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 2 | 15% | 4% | 1% | −0,8 / −0,2 / 0 |
+| **9.1** Gyilkos | −0,1 | **célrés** | Lépést tart | Gleccser / Gleccser / Jégkorszak / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 2 | 13% | 4% | 1% | −0,8 / −0,3 / −0,2 |
+| **9.2** | −0,2 | tempó: pénz → Jégkorszak (+ célrés) | Lépést tart | Gleccser / Jégkorszak / Jégkorszak / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 2 | 11% | 3% | 2% | −0,8 / −0,5 / −0,3 |
+| **9.3** | −0,3 | tempó: játékosok → Jégkorszak (+ célrés) | Lépést tart | Jégkorszak / Jégkorszak / Jégkorszak / Jégkorszak | nagyon ritkán | realisztikus | valósághű | szigorú | 2 | 10% | 2% | 1% | −0,8 / −0,5 / −0,3 |
 | **9.4** | −0,4 | ikonok → ki (+ célrés) | Lépést tart | Jégkorszak / Jégkorszak / Jégkorszak / Jégkorszak | ki | realisztikus | valósághű | szigorú | 2 | 9% | 2% | 2% | −0,9 / −0,6 / −0,5 |
-| **9.5** | −0,5 | tempó: akadémia → Kőkorszak (+ célrés) | Lépést tart | Jégkorszak / Jégkorszak / Jégkorszak / Kőkorszak | ki | realisztikus | valósághű | szigorú | 2 | 8% | 2% | 2% | −0,9 / −0,7 / −0,6 |
-| **10.1** Semmi esély | −0,6 | **célrés** | Lépést tart | Jégkorszak / Jégkorszak / Jégkorszak / Kőkorszak | ki | realisztikus | valósághű | szigorú | 2 | 7% | 2% | 3% | −0,9 / −0,8 / −0,7 |
-| **10.2** | −0,7 | holtsáv → 2,25 (+ célrés) | Lépést tart | Jégkorszak / Jégkorszak / Jégkorszak / Kőkorszak | ki | realisztikus | valósághű | szigorú | 2,25 | 6% | 1% | 3% | −1 / −0,9 / −0,8 |
+| **9.5** | −0,5 | tempó: akadémia → Kőkorszak (+ célrés) | Lépést tart | Jégkorszak / Jégkorszak / Jégkorszak / Kőkorszak | ki | realisztikus | valósághű | szigorú | 2 | 8% | 2% | 3% | −0,9 / −0,7 / −0,6 |
+| **10.1** Semmi esély | −0,6 | **célrés** | Lépést tart | Jégkorszak / Jégkorszak / Jégkorszak / Kőkorszak | ki | realisztikus | valósághű | szigorú | 2 | 6% | 2% | 3% | −0,9 / −0,8 / −0,7 |
+| **10.2** | −0,7 | holtsáv → 2,25 (+ célrés) | Lépést tart | Jégkorszak / Jégkorszak / Jégkorszak / Kőkorszak | ki | realisztikus | valósághű | szigorú | 2,25 | 5% | 1% | 3% | −1 / −0,9 / −0,8 |
 | **10.3** | −0,8 | tempó: taktika → Kőkorszak (+ célrés) | Lépést tart | Jégkorszak / Jégkorszak / Kőkorszak / Kőkorszak | ki | realisztikus | valósághű | szigorú | 2,25 | 5% | 1% | 4% | −1 / −1 / −0,9 |
-| **10.4** | −0,9 | tempó: pénz → Kőkorszak (+ célrés) | Lépést tart | Jégkorszak / Kőkorszak / Kőkorszak / Kőkorszak | ki | realisztikus | valósághű | szigorú | 2,25 | 4% | 1% | 6% | −1,1 / −1,1 / −1 |
-| **10.5** | −1 | tempó: játékosok → Kőkorszak (+ célrés) | Lépést tart | Kőkorszak / Kőkorszak / Kőkorszak / Kőkorszak | ki | realisztikus | valósághű | szigorú | 2,25 | 3% | 1% | 4% | −1,2 / −1,1 / −1 |
+| **10.4** | −0,9 | tempó: pénz → Kőkorszak (+ célrés) | Lépést tart | Jégkorszak / Kőkorszak / Kőkorszak / Kőkorszak | ki | realisztikus | valósághű | szigorú | 2,25 | 4% | 1% | 5% | −1,1 / −1,1 / −1 |
+| **10.5** | −1 | tempó: játékosok → Kőkorszak (+ célrés) | Lépést tart | Kőkorszak / Kőkorszak / Kőkorszak / Kőkorszak | ki | realisztikus | valósághű | szigorú | 2,25 | 4% | 1% | 4% | −1,1 / −1,1 / −1 |
 
 ### Amit a számítás mutat — őszintén
 
 1. **Most fokozatos.** Közepes befektetésnél (P0 = 3) a feljutás az 1.1-es
-   98%-tól a 10.5-ös 3%-ig megy. Az 5. fokozat fölött szintenként 2–6
+   99,6%-tól a 10.5-ös 3,5%-ig megy. Az 5. fokozat fölött szintenként 2–6
    százalékpontot lép, sehol nincs ugrás.
 2. **Az 1–5. fokozatban a belső szintek a kimenetet nem mozdítják.** A
    kétoldalú szabályozó a rést a célon tartja: ha elhúzol, a mezőny felnő.
@@ -365,8 +368,8 @@ szerencsével ment át rajta.
   * betűre egyezik a szimulációéval;
   * a határon csak a célrés lép, belül pontosan egy elem;
   * nehezebbre lép, soha vissza;
-  * a 6. fokozattól realisztikus a képesség, a 7.-től minden tempó legalább
-    Csiga;
+  * az 5. fokozattól (4.5) realisztikus a képesség, a 6.5-től valósághű a
+    scout, a 7.-től minden tempó legalább Csiga;
   * a célrés +5-től −1-ig, az 5. fölött szintenként 0,1;
   * a kimenet monoton.
 * **Az új indítás:**
