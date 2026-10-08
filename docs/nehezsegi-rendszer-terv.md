@@ -5,7 +5,17 @@
 > tervezel egyet az eddigi adatok alapján és további mérésekkel, amiket esetleg
 > te tudsz csinálni, és aztán azokat a sávokat tesztelgetjük onnantól kezdve?"
 
-Ez **terv**, a játék nem változott. A számok forrása:
+Ez **terv** volt. **3.9.222-ben megvalósult** a piramisban
+(`docs/nehezseg-tizfokozat-3-9-222.md`), a következő döntésekkel:
+
+* **tíz fokozat** a hat helyett (homokozótól a semmi esélyig, célrés +6 … −3),
+  mindegyik lenyitható a beállításaival;
+* a holtsáv 1,5;
+* a dinamikus mód egyelőre marad;
+* a futó karrierek egy egyszeri **„Átállok”** gombot kapnak, ugyanazokkal a
+  lenyitható fokokkal.
+
+A számok forrása:
 
 * **a 8 karrier** a mentés-exportokból (46 idény, `tools/meres/adat/`);
 * **2110 valódi meccs** a 3.9.220-as motoron;

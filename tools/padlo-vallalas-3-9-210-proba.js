@@ -53,7 +53,11 @@ const kozel=(a,b,e)=>Math.abs(a-b)<=(e||0.25);
     showChemistry=()=>{};S.pyr=null;S.idx=0;
     pyrPickSq={club:"draft",season:"",players:sq.players.slice(0,15)};
     pyrPickFromDraft=true;pyrPickDiv=null;pyrPendingSpeed=pyrWantedSpeed;
-    renderPyrDivPick();pyrPickGap=2;pyrConfirmDiv();
+    renderPyrDivPick();pyrPickNf=null;pyrPickGap=2;pyrConfirmDiv();
+    /* 3.9.222 óta az új karrier a kétoldalú szabályozóval (padlo:2) indul — ez a
+       próba az EGYOLDALÚ padlót méri, ami a régi karrierekben és a régi
+       házigazda szobájában tovább él (a kétoldalú: nehezseg-3-9-222-proba.js) */
+    const _ujPadlo=S.pyr.padlo;S.pyr.padlo=1;
     if(!careerPool)careerPool=initCareerPlayerPool({stars:2.5});
     slots.forEach((sl,i)=>{if(sl.player)return;const src=sq.players[i%sq.players.length];
       const pl={n:src.n,ovr:src.ovr,pos:(src.pos||[sl.pos]).slice(),age:26};sl.player=pl;sl.fit=fitFor(pl,sl);});
@@ -63,9 +67,9 @@ const kozel=(a,b,e)=>Math.abs(a-b)<=(e||0.25);
     if(captainIdx<0)captainIdx=0;if(!coach)coach=COACHES[0];if(!scout)scout=generateScout();
     window.saveGame=()=>{};
     phase="season";S.seasonClosed=false;
-    return {v:APP_VERSION,padlo:S.pyr.padlo,on:pyrFloorOn(),g0:pyrFloorG0(),gapWant:S.pyr.gapWant,div:S.pyr.my};});
+    return {v:APP_VERSION,ujPadlo:_ujPadlo,padlo:S.pyr.padlo,on:pyrFloorOn(),g0:pyrFloorG0(),gapWant:S.pyr.gapWant,div:S.pyr.my};});
   console.log("\n— 1. az új karrier —");
-  ok(String(r0.v).localeCompare("3.9.210",undefined,{numeric:true})>=0&&r0.padlo===1&&r0.on,"az új karrier padlós",r0);
+  ok(String(r0.v).localeCompare("3.9.210",undefined,{numeric:true})>=0&&r0.ujPadlo>=1&&r0.padlo===1&&r0.on,"az új karrier padlós (itt az egyoldalú szabályra állítva)",r0);
   ok(typeof r0.g0==="number"&&kozel(r0.g0,r0.gapWant==null?r0.g0:r0.gapWant,0.05),"a karrier eleji vállalás a beállított rés",r0);
 
   console.log("\n— 2. a kezdőrúgás padlója —");
@@ -202,7 +206,8 @@ const kozel=(a,b,e)=>Math.abs(a-b)<=(e||0.25);
     o.kezfogas=/vall:\(\(\)=>\{try\{return pyrFloorOn\(\)\?pyrFloorWantFor/.test(document.documentElement.outerHTML);
     o.stash=pyrSuperPairStash.toString().includes("vallB");
     return o;});
-  ok(r8.csomag===1&&r8.vendegRegi===false&&r8.vendegUj===true,"a szabály a szoba csomagjával utazik (régi házigazda → régi szabály)",r8);
+  /* 3.9.222: a csomag padlo:2 (kétoldalú), a vendég szám szerint (0 nincs, 1 egyoldalú, 2 kétoldalú) */
+  ok(r8.csomag===2&&r8.vendegRegi===0&&r8.vendegUj===1,"a szabály a szoba csomagjával utazik (régi házigazda → régi szabály)",r8);
   ok(r8.h&&kozel(r8.h.want,2.0,0.001)&&r8.h.g===1.0&&r8.res<=2.16&&r8.res>=0.9,"a két meccs-erő és a két vállalás átlaga",r8);
   ok(r8.elmaradt&&r8.elmaradt.lift===0&&r8.elmaradt.elotte==null,"elmaradt kézfogásnál nem találgat",r8.elmaradt);
   ok(r8.kezfogas&&r8.stash,"a kézfogás viszi a vállalást, a pár elteszi",r8);
