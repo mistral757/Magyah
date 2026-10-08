@@ -15,7 +15,10 @@
         döntetlen és egygólos vereség pontosan a skála szerinti jutalmat
         kapja (vagy semmit), és erősebb ellenfél fordításánál nincs „😤
         Elveszett előny" büntetés;
-     4. nincs oldalhiba. */
+     4. A GYŐZELEM SOSEM ÉR KEVESEBBET A DÖNTETLENNÉL („Ja igen, logikusan ezt
+        javítani kell"): erősebb ellen a győzelem morálja legalább a döntetlen
+        skálája — az óriásölésnél a nagyobbik jár;
+     5. nincs oldalhiba. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT="/home/user/Magyah", PORT=9394;
@@ -66,7 +69,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const u=await p.evaluate(()=>{
     const j=moralErosebbJutalom;
     const o={d:[1.9,2,4.5,7,9].map(g=>j(g,1,1)),s:[3.9,4,7,10,15].map(g=>j(g,1,2)),
-      gy:j(20,2,1),nagy:j(20,0,2),neg:j(-5,1,1)};
+      gy:j(20,2,1),nagy:j(20,0,2),neg:j(-5,1,1),
+      padlo:[1.9,2,4.5,7,9].map(g=>moralGyozelemPadlo(g))};
     let mono=true,lepes=0;
     for(const [ab,gf,ga] of [[[2,7],1,1],[[4,10],0,1]]){let el=0;
       for(let g=0;g<=12;g+=0.05){const v=j(g,gf,ga);if(v<el)mono=false;if(el&&v-el>lepes)lepes=v-el;el=v;}}
@@ -76,6 +80,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return o;});
   ok(JSON.stringify(u.d)==="[0,3,8,12,12]","döntetlen: 2% → +3, 4,5% → +8, 7% → +12, fölötte 12, alatta 0",u.d);
   ok(JSON.stringify(u.s)==="[0,3,8,12,12]","egygólos vereség: 4% → +3, 7% → +8, 10% → +12, fölötte 12, alatta 0",u.s);
+  ok(JSON.stringify(u.padlo)==="[0,3,8,12,12]","a győzelem padlója a döntetlen skálája (2% → +3 … 7% → +12)",u.padlo);
   ok(u.gy===0&&u.nagy===0&&u.neg===0,"győzelem, kétgólos vereség és gyengébb ellenfél: nincs jutalom",u);
   ok(u.mono&&u.lepes<=2,"fokozatos: monoton, lépésenként legfeljebb +2",{mono:u.mono,lepes:u.lepes});
   ok(Math.abs(u.gapSB-5)<1e-9&&u.gapTartalek,"a mérce a kezdőrúgáskori ⚡; tábla nélkül a papírforma",u);
@@ -88,7 +93,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     sbStart=function(){const v=_sb.apply(this,arguments);
       cur={my:SB.msBase,op:SB.oppMsBase,sorok:[]};rek.push(cur);return v;};
     const _add=addLine;
-    addLine=function(t){if(cur&&/💪|😤 Elveszett|🙂 Elveszett|🛡️ Elveszett/.test(String(t)))cur.sorok.push(String(t));return _add.apply(this,arguments);};
+    addLine=function(t){if(cur&&/💪|⚡ Óriásölés|😤 Elveszett|🙂 Elveszett|🛡️ Elveszett/.test(String(t)))cur.sorok.push(String(t));return _add.apply(this,arguments);};
     /* változó erejű mezőny: meccsenként −8 … +16 pont kiegyenlítés */
     let k=0;const _buff=matchHiddenOppBuff;
     matchHiddenOppBuff=function(){return [-8,0,4,6,8,10,12,16][(k++>>1)%8];};
@@ -107,6 +112,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return {allapot:o.allapot,rek:rek.map(x=>Object.assign(x,{gf:null})),res:S.fixtureResults.slice(-90).map(f=>({gf:f.gf,ga:f.ga})),futott};});
   /* a meccsek és az eredmények párosítása: a rekord a kezdőrúgáskor nyílik */
   const n=Math.min(r.rek.length,r.res.length);
+  let gyDb=0,gyHibas=[];
   let hibas=[],dDb=0,sDb=0,jDb=0,fordErosebb=0,fordGyengebb=0,buntetesErosebb=0;
   const rek=r.rek.slice(-n),res=r.res.slice(-n);
   for(let i=0;i<n;i++){
@@ -114,6 +120,12 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const g=(R.op-R.my)/R.my*100;
     const vart=E.gf===E.ga?(g>=2?Math.round(3+9*Math.min(1,(g-2)/5)):0)
       :(E.ga-E.gf===1?(g>=4?Math.round(3+9*Math.min(1,(g-4)/6)):0):0);
+    if(E.gf>E.ga){
+      const pad=g>=2?Math.round(3+9*Math.min(1,(g-2)/5)):0;
+      const gl=R.sorok.find(s=>/💪 Győzelem|⚡ Óriásölés/.test(s));
+      const gk=gl?+((/[+](\d+)\)?/.exec(gl.slice(gl.lastIndexOf("+")))||[0,0])[1]):0;
+      if(pad>0){gyDb++;if(gk<pad)gyHibas.push({i,g:+g.toFixed(2),eredm:`${E.gf}:${E.ga}`,pad,kapott:gk});}
+      continue;}
     const l=R.sorok.find(s=>/💪/.test(s));
     const kapott=l?+(/Morál \+(\d+)/.exec(l)||[0,0])[1]:0;
     if(E.gf===E.ga)dDb++;if(E.ga-E.gf===1)sDb++;if(kapott)jDb++;
@@ -123,6 +135,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       else if(R.sorok.some(s=>/😤/.test(s)))fordGyengebb++;}}
   ok(r.futott>=60&&n>=60,"valódi idények lefutottak",{futott:r.futott,parositott:n,allapot:r.allapot});
   ok(!hibas.length&&dDb>0&&sDb>0&&jDb>0,"minden döntetlen és egygólos vereség pontosan a skála szerinti jutalmat kapja",{dontetlen:dDb,szoros:sDb,jutalom:jDb,hibas:hibas.slice(0,5)});
+  ok(gyDb>0&&!gyHibas.length,"erősebb ellen a győzelem legalább a döntetlen jutalmát hozza (óriásölésnél a nagyobbikat)",{gyozelem:gyDb,hibas:gyHibas.slice(0,5)});
   ok(buntetesErosebb===0,"erősebb ellenfél fordításánál nincs morál-büntetés",{fordErosebb,buntetesErosebb,fordGyengebb});
   ok(!errs.length,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();

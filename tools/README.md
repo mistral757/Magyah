@@ -80,7 +80,7 @@ node tools/scout-celzas-proba.js
 node tools/erosebb-ellenfel-moral-proba.js
 ```
 
-**9 állítás**, valódi böngészőben. A mérce a kezdőrúgáskori ⚡ meccs-erő
+**11 állítás**, valódi böngészőben. A mérce a kezdőrúgáskori ⚡ meccs-erő
 (az eredményjelző két száma); tábla nélkül a papírforma a tartalék.
 
 * **A skála:**
@@ -88,9 +88,11 @@ node tools/erosebb-ellenfel-moral-proba.js
   * egygólos vereség: 4% → +3 … 10% → +12;
   * győzelem, nagyobb vereség és gyengébb ellenfél: 0;
   * fokozatos, lépésenként legfeljebb +2.
+  * a győzelem padlója a döntetlen skálája.
 * **Valódi idények (3 × 30 meccs)** változó erejű mezőnnyel:
   * minden döntetlen és egygólos vereség pontosan a skála szerinti jutalmat kapja;
   * erősebb ellenfél fordításánál nincs „😤 Elveszett előny” büntetés.
+  * erősebb ellen a győzelem legalább a döntetlen jutalmát hozza (óriásölésnél a nagyobbikat).
 * Nincs oldalhiba.
 
 ## skill-porgetes-uto-proba.js — 🎰 a skill-pörgetés a meccs utáni láncban
