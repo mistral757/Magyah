@@ -108,6 +108,9 @@ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
     pyrOpenDivPick({club:"draft",season:"",players:sq.players.slice(0,18)});
     pyrPickFromDraft=true;
     ki.nyito=pyrPickGap;
+    /* 3.9.223 — a választó a fokozat-csomag rajt-célján nyit (az ajánlott
+       4.1-en); a fokozatot a saját feloldása nyitja, nem a tized-létra */
+    ki.nyitoVart=(typeof pyrPickNf==="number")?diffSnapT(nfRajtCel(nfCelBeall(pyrPickNf),pyrPickDiv||PYR_DIVS,null,pyrPendingSpeed))/10:2.5;
     const allowed=pyrDiffAllowed();
     ki.engedett={min:Math.min.apply(null,allowed),max:Math.max.apply(null,allowed),db:allowed.length};
     /* nehezebbet kérünk, mint a határ */
@@ -201,7 +204,7 @@ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   ok(same(L[7].uj,[1,0])&&L[7].front===0,"0,2-n nyerve: 0,1 és 0,0",L[7]);
 
   console.log("\n— A VÁLASZTÓ —");
-  ok(kozel(t.nyito,2.5,0.001),"az osztályválasztó +2,5-ön nyit",t.nyito);
+  ok(kozel(t.nyito,t.nyitoVart,0.001),"az osztályválasztó a választott fokozat rajt-célján nyit (fokozat nélkül +2,5-ön)",[t.nyito,t.nyitoVart]);
   ok(t.engedett.min===25&&t.engedett.max<=60,"a választható fokok: +2,5-től a könnyű felé",t.engedett);
   ok(kozel(t.vagas,2.5,0.001)&&kozel(t.setZart,2.5,0.001),
      "zárt fokot kérve (1,2 · 1,9) a +2,5-ön marad",[t.vagas,t.setZart]);

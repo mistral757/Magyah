@@ -48,6 +48,40 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## fokozat-csomag-3-9-223-proba.js — 🎚 3.9.223: a fokozat-csomag (10 × 5), az új indítás és a feloldás
+
+```bash
+node tools/fokozat-csomag-3-9-223-proba.js
+```
+
+**40 állítás**, valódi böngészőben.
+
+* **A tábla:**
+  * betűre azonos a `tools/nehezseg/fokozatok.js`-sel;
+  * a határon csak a célrés lép, belül egy elem — a 6. fokozattól a célrés is −0,1;
+  * mindig nehezebbre lép, soha vissza;
+  * a célrés +4 … −1;
+  * a 6.-tól realisztikus a képesség, a 7.-től legalább Csiga a tempó;
+  * a kimenet monoton.
+* **Az új indítás:**
+  * három oldal (nehézség → egyéb → kezdés);
+  * friss alapbeállításon a 4.1;
+  * egy belső szint MINDEN elemet beállít és tárol;
+  * egy elem átírása Egyéni, és újranyitva megmarad.
+* **Zárak és feloldás:**
+  * zárt elem helyett a legközelebbi nyitott;
+  * a kezdő lépcső;
+  * az első 6 fokozat nyitott;
+  * egy megnyert karrier a következő nagy fokozatot nyitja;
+  * a régi, legalább 10-es profilnak minden nyitva.
+* **Továbbá:**
+  * a 2. és a 3. oldal;
+  * az osztályválasztó összefoglalója;
+  * a téli tűrés;
+  * a 🎛️ blokk;
+  * a dinamikus mód;
+  * a közös karrier rés-csúszkája.
+
 ## nehezseg-3-9-222-proba.js — 🎚 3.9.222: tízfokozatú, kétoldalú nehézség és átállás
 
 ```bash
@@ -80,6 +114,8 @@ node tools/nehezseg/idenysim.js                       # egy idény kimenete a r�
 P=3 F=6.2 R=300 node tools/nehezseg/karriersim.js     # karrier-szimuláció: mostani padló vs kétoldalú szabályozó (REGI=1: a régi változatok)
 G=0 N=8 node tools/meccsmotor/spiral-valos.js          # sodródás és spirál a valódi motoron (egy idény / futás)
 node tools/meccsmotor/spiral-elemez.js                 # a spiral/*.jsonl kiértékelése
+P0=3 R=600 N=15 CSV=ki.csv node tools/nehezseg/fokozatsim.js   # a 10 × 5 belső szint karrier-modellben (3.9.223)
+node tools/nehezseg/kimenet-js.js tools/nehezseg/adat/fokv-P3.csv   # a játék NF_KIMENET táblája a CSV-ből
 ```
 
 Nem próbák (nincs ✓/✗), hanem mérők.

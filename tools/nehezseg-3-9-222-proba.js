@@ -99,12 +99,13 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
     /* a KA visszatölti */
     pyrPickNf=null;kaPyrPickDefaults();o.kaVissza=pyrPickNf;
     return o;});
+  /* 3.9.223: a célrés-lista maga is lenyitható (a csomag már az indításkor eldőlt) */
   ok(r6.sorok===10&&r6.lenyit>=11&&r6.finom,"tíz lenyitható sor + a létra lenyitható finomhangolásként",r6);
   ok(/Célrés/.test(r6.reszlet)&&/feljutás/.test(r6.reszlet)&&/Rajt/.test(r6.reszlet)&&/holtsáv/i.test(r6.reszlet)&&/lemaradsz/.test(r6.reszlet),
      "a lenyitott sor a beállításokat részletezi",r6.reszlet.slice(0,300));
   ok(r6.pick===3&&kozel(r6.gap,r6.vart,0.001)&&r6.jelolt,"a fok kiválasztása a rajt-célra állítja a létrát",r6);
   ok(r6.csuszka===null,"a csúszka finomhangolása a fokozatot elengedi",r6.csuszka);
-  ok(r6.padlo===2&&r6.nf===3&&r6.nf0===3&&r6.cel===3.5&&r6.on,"az új karrier kétoldalú, a választott fokkal",r6);
+  ok(r6.padlo===2&&r6.nf===3&&r6.nf0===3&&r6.cel===2.8&&r6.on,"az új karrier kétoldalú, a választott fokkal",r6);
   ok(r6.ka==="3"&&r6.kaVissza===3,"a KA megjegyzi és visszatölti",r6);
 
   /* a karrier játszhatóvá tétele */
@@ -162,15 +163,17 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
     {const kell=gap()-(o.want5-2.5);pyrShiftWorld({divs:S.pyr.divs},-kell);oppTargetRating=pyrLevel();}
     o.d_elotte=gap();const hD=pyrFloorKickoff();o.d=Object.assign({},hD);o.d_utana=gap();
     return o;});
-  ok(r3.h1.nf===3&&r3.h1.cel===3.5&&typeof r3.h1.utana==="number","az 1. idény sora a fokozattal és a rajt-réssel",r3.h1);
+  ok(r3.h1.nf===3&&r3.h1.cel===2.8&&typeof r3.h1.utana==="number","az 1. idény sora a fokozattal és a rajt-réssel",r3.h1);
   ok(r3.v1&&typeof r3.dg1==="number"&&r3.v1b===null&&kozel(r3.mert,r3.dg1,0.011),"az idény vége rögzíti a dg-t, egyszer",{dg:r3.dg1,m:r3.mert});
   ok(kozel(r3.want2,r3.want2vart,0.001),"a 2. idény rajt-célja a mért változásból tanul",{w:r3.want2,v:r3.want2vart});
-  ok(r3.a.lift>3&&r3.a_utana<=r3.a.want+0.16&&r3.a.fek===0&&r3.a.nf===3&&r3.a.cel===3.5,"elhúztál → a mezőny felnő a rajt-célig",r3.a);
+  ok(r3.a.lift>3&&r3.a_utana<=r3.a.want+0.16&&r3.a.fek===0&&r3.a.nf===3&&r3.a.cel===2.8,"elhúztál → a mezőny felnő a rajt-célig",r3.a);
   ok(r3.b.lift===0&&r3.b.fek===0&&Math.abs(r3.b_szint)<0.01,"a holtsávban a mezőny a saját útját járja",{b:r3.b,sz:r3.b_szint});
   ok(r3.c.fek>0&&r3.c.fek<=r3.utem+0.6&&r3.c_szint<0&&r3.c_utana>r3.c_elotte,"mélyen (9-cel) alatta → a fék legfeljebb egy éves ütemnyit vesz vissza",{c:r3.c,utem:r3.utem,e:r3.c_elotte,u:r3.c_utana});
   ok(r3.c_utana<r3.c.want-1.5-0.5&&r3.c.fek>=r3.utem-0.6,"a fék nem ajándék: ha az ütem kevés, a holtsávig sem húz fel",{u:r3.c_utana,w:r3.c.want});
   ok(r3.naplo,"a napló kimondja az alsó féket");
-  ok(r3.d.fek>0&&r3.d_utana>=r3.d.want-1.5-0.6&&r3.d_utana<=r3.d.want-1.5+0.6,"enyhén alatta → a holtsáv széléig",{d:r3.d,u:r3.d_utana});
+  /* a világ egész-szintű kerekítése miatt a beállított rés a széltől fél lépésen
+     belül is lehet — ilyenkor a fék joggal nem lép (3.9.223) */
+  ok((r3.d.fek>0||Math.abs(r3.d.elotte-(r3.d.want-1.5))<=0.5)&&r3.d_utana>=r3.d.want-1.5-0.6&&r3.d_utana<=r3.d.want-1.5+0.6,"enyhén alatta → a holtsáv széléig",{d:r3.d,u:r3.d_utana});
 
   console.log("\n— 4. a tél —");
   const r4=await p.evaluate(()=>{
@@ -237,7 +240,7 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
     o.beall=r&&r.beall&&r.beall.piramis;
     return o;});
   ok(r9.row&&new RegExp((r9.ossz>=0?"\\+":"−")+Math.abs(r9.ossz).toFixed(1).replace(".",",")).test(r9.row.d),"a Run sora a féket levonja (előjeles összeg)",{row:r9.row,o:r9.ossz});
-  ok(r9.padlo&&r9.padlo.nf===3&&r9.padlo.celres===3.5&&r9.padlo.fek>0&&"dgBecsles" in r9.padlo,"a mérő rögzíti a fokozatot, a célrést, a féket",r9.padlo);
+  ok(r9.padlo&&r9.padlo.nf===3&&r9.padlo.celres===2.8&&r9.padlo.fek>0&&"dgBecsles" in r9.padlo,"a mérő rögzíti a fokozatot, a célrést, a féket",r9.padlo);
   ok(r9.beall&&r9.beall.padlo===2&&r9.beall.nf===3,"a mérő beállítás-blokkja",r9.beall);
 
   console.log("\n— 8. átállás futó karrierben —");
@@ -274,7 +277,7 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
   ok(/Átállás/.test(r8.cim)&&r8.sorok===10&&r8.lenyit===10&&r8.jelolt.length===1,"az átállás képernyője: tíz lenyitható fok, a mostani jelölve",r8);
   ok(/Mi változik/.test(r8.szoveg)&&/végleges/.test(r8.szoveg)&&/Célrés/.test(r8.szoveg),"kimondja, mi változik, és a beállításokat",r8.szoveg.slice(0,200));
   ok(r8.megsem===1,"a „Mégsem” nem állít át");
-  ok(r8.padlo===2&&r8.nf===6&&r8.nf0===6&&r8.cel===0.75&&r8.on&&r8.atallva&&r8.atallva.regi===1&&r8.lvl===6,"az átállás: kétoldalú, a választott fokkal",r8);
+  ok(r8.padlo===2&&r8.nf===6&&r8.nf0===6&&r8.cel===1.4&&r8.on&&r8.atallva&&r8.atallva.regi===1&&r8.lvl===6,"az átállás: kétoldalú, a választott fokkal",r8);
   ok(r8.utana===false&&!r8.hubUtana,"utána nincs újra átállás",r8);
 
   if(KEP){
