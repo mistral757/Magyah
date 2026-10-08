@@ -64,7 +64,7 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
     const F=nfMezonyUtem(6,"tarto");
     const k=nfRajtCel(2.5,6,null,"tarto");
     return {F,k,vissza:k+(nfSodrodasModell(k)-F)/2,dg:nfRajtCel(2.5,6,4,"tarto"),
-      celRajtbol:nfCelFromRajt(k,6,"tarto"),kozel:nfNearest(2.4).nf,kozel2:nfNearest(-2.6).nf};});
+      celRajtbol:nfCelFromRajt(k,6,"tarto"),kozel:nfNearest(3.1).nf,kozel2:nfNearest(-2.6).nf};});
   ok(r2.F>0&&r2.k<2.5&&kozel(r2.vissza,2.5,0.02),"az első idényben: rajt + (sodródás − ütem)/2 = célrés",r2);
   ok(kozel(r2.dg,0.5,0.001),"mért változással: rajt = célrés − dg/2",r2.dg);
   ok(kozel(r2.celRajtbol,2.5,0.06)&&r2.kozel===4&&r2.kozel2===10,"visszaszámolás és a legközelebbi fok",r2);
@@ -105,7 +105,7 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
      "a lenyitott sor a beállításokat részletezi",r6.reszlet.slice(0,300));
   ok(r6.pick===3&&kozel(r6.gap,r6.vart,0.001)&&r6.jelolt,"a fok kiválasztása a rajt-célra állítja a létrát",r6);
   ok(r6.csuszka===null,"a csúszka finomhangolása a fokozatot elengedi",r6.csuszka);
-  ok(r6.padlo===2&&r6.nf===3&&r6.nf0===3&&r6.cel===2.8&&r6.on,"az új karrier kétoldalú, a választott fokkal",r6);
+  ok(r6.padlo===2&&r6.nf===3&&r6.nf0===3&&r6.cel===3.8&&r6.on,"az új karrier kétoldalú, a választott fokkal",r6);
   ok(r6.ka==="3"&&r6.kaVissza===3,"a KA megjegyzi és visszatölti",r6);
 
   /* a karrier játszhatóvá tétele */
@@ -163,10 +163,10 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
     {const kell=gap()-(o.want5-2.5);pyrShiftWorld({divs:S.pyr.divs},-kell);oppTargetRating=pyrLevel();}
     o.d_elotte=gap();const hD=pyrFloorKickoff();o.d=Object.assign({},hD);o.d_utana=gap();
     return o;});
-  ok(r3.h1.nf===3&&r3.h1.cel===2.8&&typeof r3.h1.utana==="number","az 1. idény sora a fokozattal és a rajt-réssel",r3.h1);
+  ok(r3.h1.nf===3&&r3.h1.cel===3.8&&typeof r3.h1.utana==="number","az 1. idény sora a fokozattal és a rajt-réssel",r3.h1);
   ok(r3.v1&&typeof r3.dg1==="number"&&r3.v1b===null&&kozel(r3.mert,r3.dg1,0.011),"az idény vége rögzíti a dg-t, egyszer",{dg:r3.dg1,m:r3.mert});
   ok(kozel(r3.want2,r3.want2vart,0.001),"a 2. idény rajt-célja a mért változásból tanul",{w:r3.want2,v:r3.want2vart});
-  ok(r3.a.lift>3&&r3.a_utana<=r3.a.want+0.16&&r3.a.fek===0&&r3.a.nf===3&&r3.a.cel===2.8,"elhúztál → a mezőny felnő a rajt-célig",r3.a);
+  ok(r3.a.lift>3&&r3.a_utana<=r3.a.want+0.16&&r3.a.fek===0&&r3.a.nf===3&&r3.a.cel===3.8,"elhúztál → a mezőny felnő a rajt-célig",r3.a);
   ok(r3.b.lift===0&&r3.b.fek===0&&Math.abs(r3.b_szint)<0.01,"a holtsávban a mezőny a saját útját járja",{b:r3.b,sz:r3.b_szint});
   ok(r3.c.fek>0&&r3.c.fek<=r3.utem+0.6&&r3.c_szint<0&&r3.c_utana>r3.c_elotte,"mélyen (9-cel) alatta → a fék legfeljebb egy éves ütemnyit vesz vissza",{c:r3.c,utem:r3.utem,e:r3.c_elotte,u:r3.c_utana});
   ok(r3.c_utana<r3.c.want-1.5-0.5&&r3.c.fek>=r3.utem-0.6,"a fék nem ajándék: ha az ütem kevés, a holtsávig sem húz fel",{u:r3.c_utana,w:r3.c.want});
@@ -240,7 +240,7 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
     o.beall=r&&r.beall&&r.beall.piramis;
     return o;});
   ok(r9.row&&new RegExp((r9.ossz>=0?"\\+":"−")+Math.abs(r9.ossz).toFixed(1).replace(".",",")).test(r9.row.d),"a Run sora a féket levonja (előjeles összeg)",{row:r9.row,o:r9.ossz});
-  ok(r9.padlo&&r9.padlo.nf===3&&r9.padlo.celres===2.8&&r9.padlo.fek>0&&"dgBecsles" in r9.padlo,"a mérő rögzíti a fokozatot, a célrést, a féket",r9.padlo);
+  ok(r9.padlo&&r9.padlo.nf===3&&r9.padlo.celres===3.8&&r9.padlo.fek>0&&"dgBecsles" in r9.padlo,"a mérő rögzíti a fokozatot, a célrést, a féket",r9.padlo);
   ok(r9.beall&&r9.beall.padlo===2&&r9.beall.nf===3,"a mérő beállítás-blokkja",r9.beall);
 
   console.log("\n— 8. átállás futó karrierben —");

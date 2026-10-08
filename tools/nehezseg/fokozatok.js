@@ -15,7 +15,8 @@
 "use strict";
 /* a célrés: +4-től −1-ig (3.9.223); a fokozat 1. belső szintjéé, a 6.
    fokozattól minden belső szint −0,1 (6.1 = +1,4 … 10.5 = −1,0) */
-const NF_CEL=[4,3.4,2.8,2.2,1.6,1.4,0.9,0.4,-0.1,-0.6];
+/* 3.9.223 — az 1–4. fokozat +1-gyel bővebb (5,0 · 4,4 · 3,8 · 3,2) */
+const NF_CEL=[5,4.4,3.8,3.2,1.6,1.4,0.9,0.4,-0.1,-0.6];
 function nfCel(nf,s){const sb=Math.max(1,Math.min(nf===10?45:5,s||1));return Math.round((NF_CEL[nf-1]-(nf>=6?0.1*(sb-1):0))*100)/100;}
 /* a legkönnyebb csomag: 1. fokozat, 1. belső szint */
 const NF_ALAP={speed:"alvo",tempo:{jatekos:"turbo",penz:"turbo",taktika:"turbo",akademia:"turbo"},
@@ -25,9 +26,9 @@ const NF_LEPESEK=[
   /* 1 Homokozó    */ ["tempo.akademia","gyors"],["tempo.taktika","gyors"],["tempo.penz","gyors"],["tempo.jatekos","gyors"],
   /* 2 Kezdő       */ ["speed","lassu"],["tempo.akademia","normal"],["tempo.taktika","normal"],["tempo.penz","normal"],
   /* 3 Simaliba    */ ["tempo.jatekos","normal"],["speed","tarto"],["tel","normal"],["tempo.akademia","komotos"],
-  /* 4 Haladó      */ ["tempo.taktika","komotos"],["tempo.penz","komotos"],["scout","on"],["tempo.jatekos","komotos"],
-  /* 5 Nehéz       */ ["icons","ritka"],["tempo.akademia","csiga"],["tempo.taktika","csiga"],["skill","real"],
-  /* 6 Profi       */ ["holt","1.75"],["tempo.penz","csiga"],["tempo.jatekos","csiga"],["tempo.akademia","gleccser"],
+  /* 4 Haladó      */ ["tempo.taktika","komotos"],["tempo.penz","komotos"],["tempo.jatekos","komotos"],["skill","real"],
+  /* 5 Nehéz       */ ["icons","ritka"],["tempo.akademia","csiga"],["tempo.taktika","csiga"],["tempo.penz","csiga"],
+  /* 6 Profi       */ ["holt","1.75"],["tempo.jatekos","csiga"],["tempo.akademia","gleccser"],["scout","on"],
   /* 7 Mesteri     */ ["icons","nagyonritka"],["tempo.taktika","gleccser"],["tempo.penz","gleccser"],["tempo.jatekos","gleccser"],
   /* 8 Legendás    */ ["tel","szigoru"],["tempo.akademia","jegkorszak"],["tempo.taktika","jegkorszak"],["holt","2"],
   /* 9 Gyilkos     */ ["tempo.penz","jegkorszak"],["tempo.jatekos","jegkorszak"],["icons","ki"],["tempo.akademia","kokorszak"],

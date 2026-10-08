@@ -246,9 +246,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
 
   /* ================= 9. SZÁRNY-KÉMIA =================
      A harmadik kötésfajta a passzkémia és a gyilkos páros mellé. Azonos
-     oldal, KÜLÖNBÖZŐ poszt (védő + szélső), és a sebességük legfeljebb
-     SZARNY_GAP-pel térhet el — utóbbi a lényeg: ez teszi keretépítési
-     döntéssé, nem automatikus jutalommá. */
+     oldal, KÜLÖNBÖZŐ poszt (védő + szélső). A sebesség 3.9.223 óta NEM
+     feltétel: „A szárny kemiánál az egymáshoz közeli sebesség attribútum
+     mint feltétel mindenképp legyen törölve". */
   const sz=await p.evaluate(()=>{
     const ki={};
     S.style={key:"villam",traits:{}};S.style2=null;
@@ -265,7 +265,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const mk=(n,pos,seb)=>{careerPool[n]={n,pos:[pos],attrs:{seb},age:26,ovr:90,pot:5000};};
     mk("Jobbhátvéd Jenő","JV",92);
     mk("Jobbszélső József","JSZ",94);   /* azonos oldal, más poszt, 2 eltérés → OK */
-    mk("Lassú Lajos","JV",80);          /* azonos oldal, de 14 eltérés → nem */
+    mk("Lassú Lajos","JV",80);          /* azonos oldal, 14 eltérés → 3.9.223 óta ez is páros */
     mk("Balhátvéd Béla","BV",88);
     mk("Balszélső Bence","BSZ",89);
     mk("Középső Károly","KV",93);       /* nem szárny */
@@ -328,8 +328,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(sz.lvl3.tier===1&&sz.lvl3.on,"a 3.-tól nyílik",sz.lvl3);
   ok(sz.lvl8===2&&sz.lvl14===3&&sz.lvl20===3,"három fokozat, 8-nál és 14-nél lép",
     {l8:sz.lvl8,l14:sz.lvl14,l20:sz.lvl20});
-  ok(sz.parok.jo&&sz.parok.bal,"JV+JSZ és BV+BSZ közeli sebességgel: páros",sz.parok);
-  ok(!sz.parok.lassu,"…de ha a sebesség elszakad, NEM (ez a keretépítési döntés)");
+  ok(sz.parok.jo&&sz.parok.bal,"JV+JSZ és BV+BSZ: páros",sz.parok);
+  ok(sz.parok.lassu,"3.9.223: a sebesség nem feltétel — 14-es eltéréssel is páros",sz.parok);
   ok(!sz.parok.masOldal&&!sz.parok.nemSzarny&&!sz.parok.azonosPoszt,
     "más oldal / nem szárny / azonos poszt: nem páros",sz.parok);
   ok(sz.elsoTick.kotesek===0&&sz.elsoTick.indult===0,

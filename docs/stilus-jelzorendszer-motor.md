@@ -150,11 +150,13 @@ oldalon — **JV+JSZ** vagy **BV+BSZ**. A magyar futballnyelv erre azt mondja:
 *„összeszokott szárny"* — és pontosan ez a Villám lelke, mert a szélen nem a
 technika dönt, hanem hogy a kettő **egyszerre indul-e meg**.
 
-### A belépő szigorú, és ez a lényeg
+### A belépő
 
-A kettő **sebessége legfeljebb 3-mal térhet el**. Ha a védő lassabb, mint a
-szélső, a labda kifut alóla — nincs mit összeszokni. Így a kötés nem jár
-automatikusan mindenkinek, hanem egy **keretépítési döntés** jutalma.
+Eredetileg a kettő **sebessége legfeljebb 3-mal térhetett el**. 3.9.223 óta
+ez **nem feltétel** (kimondott kérés: „A szárny kemiánál az egymáshoz közeli
+sebesség attribútum mint feltétel mindenképp legyen törölve"): a belépő csak
+az azonos oldal és a két különböző poszt. Az összeéréskor a sebességük úgyis
+a gyorsabbikhoz igazodik.
 
 A posztkódból döntünk, nem a slotból — ugyanúgy, ahogy a gyilkos párosnál:
 a tick csak neveket kap, és a játékos **saját posztja** mondja meg, melyik

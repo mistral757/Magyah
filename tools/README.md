@@ -48,20 +48,82 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## scout-celzas-proba.js — 🎯 scout-célzás (elsődleges 50%, másodlagos 33%)
+
+```
+node tools/scout-celzas-proba.js
+```
+
+**18 állítás**, valódi böngészőben.
+
+* **Nyílás:**
+  * az első idény 14. fordulójáig zárva, a 15.-től és a 2. idényben nyitva;
+  * zárva vagy cél nélkül a szűrő nem dob kockát.
+* **Választék:**
+  * 6 fajta cél: kor (5 sáv), poszt (4 csoport + posztok), képesség (5), átlag fölötti POT, jellem (3 × 2), válogatott + ligák;
+  * a két cél nem lehet ugyanaz a fajta;
+  * minden cél valódi szűrő, a sávban mindegyikre van megfelelő.
+* **Hatás (2000 felfedezés célonként):**
+  * elsődleges ≈ alap + 50% × maradék;
+  * másodlagos ≈ alap + 33% × maradék;
+  * a kettő együtt is talál.
+* **Mindkét mód:** a klasszikus és a valósághű felfedezés is célzott, a napló és a lista 🎯 jellel mutatja.
+* **Értesítés és felület:**
+  * a vezetés emlékeztet, amíg nincs beállítva (kezdőrúgás előtti push);
+  * az újdonság-figyelő a nyíláskor szól;
+  * a panel kezelhető, a mentés viszi.
+* Nincs oldalhiba.
+
+## erosebb-ellenfel-moral-proba.js — 💪 erősebb ellenfél: a morál méltányossága
+
+```
+node tools/erosebb-ellenfel-moral-proba.js
+```
+
+**11 állítás**, valódi böngészőben. A mérce a kezdőrúgáskori ⚡ meccs-erő
+(az eredményjelző két száma); tábla nélkül a papírforma a tartalék.
+
+* **A skála:**
+  * döntetlen: 2% → +3 … 7% → +12;
+  * egygólos vereség: 4% → +3 … 10% → +12;
+  * győzelem, nagyobb vereség és gyengébb ellenfél: 0;
+  * fokozatos, lépésenként legfeljebb +2.
+  * a győzelem padlója a döntetlen skálája.
+* **Valódi idények (3 × 30 meccs)** változó erejű mezőnnyel:
+  * minden döntetlen és egygólos vereség pontosan a skála szerinti jutalmat kapja;
+  * erősebb ellenfél fordításánál nincs „😤 Elveszett előny” büntetés.
+  * erősebb ellen a győzelem legalább a döntetlen jutalmát hozza (óriásölésnél a nagyobbikat).
+* Nincs oldalhiba.
+
+## skill-porgetes-uto-proba.js — 🎰 a skill-pörgetés a meccs utáni láncban
+
+```
+node tools/skill-porgetes-uto-proba.js
+```
+
+**4 állítás**, valódi böngészőben. A hiba: a lefújás utáni jutalom-lánc
+(3.9.171) rögzített véletlennel futtatja az időzítőket, de a `setInterval`
+minden tickje ugyanazt a kulcsot kapta, így a pörgetés végig egy néven állt.
+
+* a láncon belül legalább 4 különböző név pörög;
+* ugyanazzal a maggal betűre ugyanaz a sorozat és a kimenet;
+* a láncon kívül is pörög;
+* nincs oldalhiba.
+
 ## fokozat-csomag-3-9-223-proba.js — 🎚 3.9.223: a fokozat-csomag (10 × 5), az új indítás és a feloldás
 
 ```bash
 node tools/fokozat-csomag-3-9-223-proba.js
 ```
 
-**50 állítás**, valódi böngészőben.
+**51 állítás**, valódi böngészőben.
 
 * **A tábla:**
   * betűre azonos a `tools/nehezseg/fokozatok.js`-sel;
   * a határon csak a célrés lép, belül egy elem — a 6. fokozattól a célrés is −0,1;
   * mindig nehezebbre lép, soha vissza;
-  * a célrés +4 … −1;
-  * a 6.-tól realisztikus a képesség, a 7.-től legalább Csiga a tempó;
+  * a célrés +5 … −1;
+  * a 4.5-től realisztikus a képesség, a 6.5-től valósághű a scout, a 7.-től legalább Csiga a tempó;
   * a kimenet monoton.
 * **Az új indítás:**
   * három oldal (nehézség → egyéb → kezdés);
@@ -70,7 +132,7 @@ node tools/fokozat-csomag-3-9-223-proba.js
   * egy elem átírása Egyéni, és újranyitva megmarad.
 * **Zárak és feloldás:**
   * zárt elem helyett a legközelebbi nyitott;
-  * a kezdő lépcső;
+  * a kezdő lépcső (az 1–4. fokozat választható, csak a D3 kötött);
   * az első 6 fokozat nyitott;
   * egy megnyert karrier a következő nagy fokozatot nyitja;
   * a régi, legalább 10-es profilnak minden nyitva.
@@ -261,7 +323,7 @@ node tools/skalazas-3-9-213-proba.js
 node tools/pot-plafon-3-9-212-proba.js
 ```
 
-**20 állítás**, valódi böngészőben.
+**17 állítás**, valódi böngészőben.
 
 * **A kemény plafon a mezőnnyel nő:** 111-es mezőnyig 200 000, fölötte `peakToPot(mezőny + 100)`, monoton.
 * **A három régi vágó ág** (kihívás-jutalom POT, 🌠 Csodagyerek, ∞ nyitó ×1,5) a plafon fölötti POT-ot nem vágja le; a jutalom a 9000 fölötti felnőttet sem.
@@ -331,7 +393,7 @@ node tools/padlo-vallalas-3-9-210-proba.js
 node tools/gyors-inditas-3-9-209-proba.js
 ```
 
-**20 állítás**, valódi böngészőben.
+**17 állítás**, valódi böngészőben.
 
 * **Gyors indítás:**
   * a kezdőlap gombja a két kérdést nyitja;
