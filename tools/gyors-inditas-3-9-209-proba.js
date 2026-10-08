@@ -156,6 +156,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const r6=await p.evaluate(()=>{
     const o={};
     kaSet("pyrDiv","5");kaSet("pyrGapT","10");
+    /* 3.9.222/223 óta a tárolt fokozat (pyrFok/pyrNf) elsőbbséget kap — itt a
+       régi, CSAK rajt-fokot tároló alapbeállítást mérjük */
+    kaSet("pyrFok",null);kaSet("pyrNf",null);
     gameMode="career";enterCareerSetupFromHome(true);beginNewGame();
     const sq=SQUADS.filter(x=>!x.wc&&x.players&&x.players.length>=18)[0];
     showChemistry=()=>{};S.pyr=null;S.idx=0;
