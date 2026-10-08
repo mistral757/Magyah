@@ -48,6 +48,21 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## skill-porgetes-uto-proba.js — 🎰 a skill-pörgetés a meccs utáni láncban
+
+```
+node tools/skill-porgetes-uto-proba.js
+```
+
+**4 állítás**, valódi böngészőben. A hiba: a lefújás utáni jutalom-lánc
+(3.9.171) rögzített véletlennel futtatja az időzítőket, de a `setInterval`
+minden tickje ugyanazt a kulcsot kapta, így a pörgetés végig egy néven állt.
+
+* a láncon belül legalább 4 különböző név pörög;
+* ugyanazzal a maggal betűre ugyanaz a sorozat és a kimenet;
+* a láncon kívül is pörög;
+* nincs oldalhiba.
+
 ## fokozat-csomag-3-9-223-proba.js — 🎚 3.9.223: a fokozat-csomag (10 × 5), az új indítás és a feloldás
 
 ```bash
