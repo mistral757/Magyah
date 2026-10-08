@@ -54,7 +54,7 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
 node tools/fokozat-csomag-3-9-223-proba.js
 ```
 
-**40 állítás**, valódi böngészőben.
+**45 állítás**, valódi böngészőben.
 
 * **A tábla:**
   * betűre azonos a `tools/nehezseg/fokozatok.js`-sel;
@@ -80,7 +80,9 @@ node tools/fokozat-csomag-3-9-223-proba.js
   * a téli tűrés;
   * a 🎛️ blokk;
   * a dinamikus mód;
-  * a közös karrier rés-csúszkája.
+  * a közös karrier rés-csúszkája;
+  * a hivatalos szint (egyéninél a legközelebbi);
+  * a HUB színes sávja és a fejléc jelvénye.
 
 ## nehezseg-3-9-222-proba.js — 🎚 3.9.222: tízfokozatú, kétoldalú nehézség és átállás
 

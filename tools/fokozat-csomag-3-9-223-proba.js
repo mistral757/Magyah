@@ -82,7 +82,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      const belsoCel=c.nf>=6?Math.abs((a.cel-c.cel)-0.1)<1e-9:c.cel===a.cel;
      /* belül egy elem — a 6. fokozattól lehet „csak a célrés" lépés is (a
         gyors mezőny helyén, lásd a doksit) */
-     const elemOk=valt.length===1||(c.nf>=6&&valt.length===0);
+     const elemOk=valt.length===1;   /* minden belső szinten lép egy elem (a 6.-tól a célrés is) */
      if(vissza||(hatar?(valt.length!==0||!celLep):(!elemOk||!belsoCel))){jo=false;hol=hol||{i,valt,hatar,a:a.cel,c:c.cel};}}
    ok(jo,"a határon csak a célrés lép, belül pontosan egy elem (a 6. fokozattól a célrés is −0,1) — mindig nehezebbre, soha vissza",hol);
    const cels=r1.all.map(c=>c.cel);
@@ -92,7 +92,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
    const csiga=r1.all.filter(c=>c.nf>=7).every(c=>["jatekos","penz","taktika","akademia"].every(a=>r1.idx[1].ert.indexOf(c.tempo[a])>=r1.idx[1].ert.indexOf("csiga")));
    ok(real&&csiga,"a 6. fokozattól realisztikus képesség, a 7.-től minden tempó legalább Csiga",{real,csiga});}
   {const a=r1.all[0],z=r1.all[49];
-   ok(a.speed==="alvo"&&a.tempo.jatekos==="turbo"&&z.speed==="tarto"&&r1.all.every(c=>["alvo","lassu","tarto"].includes(c.speed))&&z.tempo.jatekos==="kokorszak"&&z.icons==="ki"&&z.tel==="szigoru",
+   ok(a.speed==="alvo"&&a.tempo.jatekos==="turbo"&&z.speed==="tarto"&&r1.all.every(c=>["alvo","lassu","tarto"].includes(c.speed))&&z.tempo.jatekos==="kokorszak"&&z.icons==="ki"&&z.tel==="szigoru"&&z.holt==="2.25",
       "1.1 a legkönnyebb, 10.5 a legnehezebb csomag (a mezőny-tempó legfeljebb Lépést tartanak)",{a,z});
    const h=r1.all[15];
    ok(h.nf===4&&h.s===1&&h.cel===2.2&&h.speed==="tarto"&&h.tempo.jatekos==="normal"&&h.skill==="loose"&&h.scout==="off"&&h.icons==="teljes"&&h.tel==="normal",
@@ -229,7 +229,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.m=pyrFloorMid();
     /* normál tűréssel (+0,5) ugyanott kisebb lenne */
     rec.midDone=false;S.pyr.tel="normal";delete S.pyr.midLift;rec.mid=0;
-    {const kell=(rec.cel+0.8)-gap();pyrShiftWorld({divs:S.pyr.divs},kell);oppTargetRating=pyrLevel();}
+    {const kell=(rec.cel+1.6)-gap();pyrShiftWorld({divs:S.pyr.divs},kell);oppTargetRating=pyrLevel();}
     o.g2=gap();o.m2=pyrFloorMid();
     return o;});
   ok(r6.m&&Math.abs(r6.m.amt-(r6.g-r6.cel))<=0.11,"szigorú télen a célrés fölötti teljes rész a mezőnyé",r6);
@@ -284,10 +284,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* nyerés a 7. fokozat 3. belső szintjén… előbb a 6.-on */
     const sn=S.seasonNumber||1;S.pyr.padlo=2;S.pyr.vallH=S.pyr.vallH||{};
     S.pyr.vallH[sn]=Object.assign({},S.pyr.vallH[sn]||{},{nf:6});
+    const _fok=S.pyr.fok;delete S.pyr.fok;   /* előbb csomag nélküli (3.9.222-es) karrier: a célrés-foka számít */
     if(S.run)delete S.run.nfWinNoted;
     o.nyer6=nfCareerWin(true);o.max6=nfNyitottMax();
     o.masodszor=nfCareerWin(true);
-    if(S.run)delete S.run.nfWinNoted;S.pyr.vallH[sn].nf=7;S.pyr.fok={nf:7,s:3,egyeni:false};
+    /* csomaggal: a HIVATALOS szint (7.3) számít */
+    if(S.run)delete S.run.nfWinNoted;
+    {const c=nfCsomag(7,3);S.pyr.vallH[sn].nf=7;S.pyr.vallH[sn].cel=c.cel;
+     S.pyr.fok={nf:7,s:3,egyeni:false,cfg:{speed:c.speed,tempo:c.tempo,icons:c.icons,skill:c.skill,scout:c.scout,tel:c.tel,holt:c.holt}};}
     o.nyer7=nfCareerWin(false);o.max7=nfNyitottMax();
     o.naplo=/Megnyílt a 8\. fokozat/.test(document.body.textContent);
     /* a korábbi, legalább 10-es profilú játékosnak minden nyitva */
@@ -307,6 +311,33 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r9.nyer7===8&&r9.max7===8&&r9.naplo,"a 7.3-on megnyert karrier a következő NAGY fokozatot (8.) nyitja, és kimondja",r9);
   ok(r9.regi.max===10&&!r9.regi.z10,"a frissítés előtt legalább 10-es profilú játékosnak minden nyitva",r9.regi);
   ok(r9.gomb7===true&&r9.gomb6===false,"a beállítón a zárt fokozat szintjei tiltva",r9);
+
+  console.log("\n— 10. a hivatalos szint és a kijelzés —");
+  const r10=await p.evaluate(()=>{
+    const o={};
+    o.sajat=true;
+    for(let nf=1;nf<=10;nf++)for(let s=1;s<=5;s++){const h=nfHivatalos(nfCsomag(nf,s));if(h.nf!==nf||h.s!==s)o.sajat=false;}
+    const pk=nfPontok().map(x=>x.p);o.novo=pk.every((v,i)=>i===0||v>pk[i-1]);
+    /* egyéni: a 4.1 + Kegyetlen mezőny (≈ −1 rés) → nehezebb hivatalos szint */
+    const c=nfCsomag(4,1);c.speed="kegyet";o.kegy=nfHivatalos(c);
+    const c2=nfCsomag(4,1);c2.speed="alvo";c2.tempo={jatekos:"turbo",penz:"turbo",taktika:"turbo",akademia:"turbo"};o.konnyu=nfHivatalos(c2);
+    /* a beállítón kiírja */
+    unlockGatesOn=()=>false;pyrWanted=true;quickShow();
+    nfCsomagAlkalmaz(4,1);
+    const el=document.querySelector('#qkDiff select[data-nfe="speed"]');el.value="kegyet";el.dispatchEvent(new Event("change"));
+    o.cim=document.querySelector("#qkDiff .nfValasztott").textContent;
+    o.beall=nfBeallHivatalos();
+    /* a karrierben: HUB-sáv és fejléc */
+    o.sav=nfHubSavHtml();
+    try{updateOppRatingBadge();}catch(e){o.err=e.message;}
+    o.badge=document.getElementById("oppRatingBadge").textContent;
+    o.kh=nfKarrierHivatalos();
+    return o;});
+  ok(r10.sajat&&r10.novo,"minden csomag hivatalos szintje önmaga; a pontok szigorúan nőnek",r10);
+  ok((r10.kegy.nf>4||(r10.kegy.nf===4&&r10.kegy.s>1))&&(r10.konnyu.nf<4),"egyéninél a legközelebbi szint: nehezebb elem → nehezebb, könnyebb → könnyebb",{k:r10.kegy,l:r10.konnyu});
+  ok(/hivatalosan ≈/.test(r10.cim)&&r10.beall.nf>=4,"a beállító kiírja a hivatalos szintet",r10.cim.slice(0,160));
+  ok(/Nehézségi szint —/.test(r10.sav)&&/nfHubSav/.test(r10.sav)&&r10.kh&&r10.kh.nf>=1,"a HUB-on a színes nehézségi sáv a karrier hivatalos szintjével",{kh:r10.kh});
+  ok(/🎚/.test(r10.badge)&&/D\d/.test(r10.badge),"a fejléc jelvénye a szintet is kiírja",r10.badge);
 
   ok(!errs.length,"nincs konzolhiba",errs.slice(0,5));
   await b.close();srv.close();

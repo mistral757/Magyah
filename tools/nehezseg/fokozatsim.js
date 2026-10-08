@@ -9,6 +9,7 @@
        rés-változásból, felül emelés, télen a célrés +0,5, alul a holtsáv 1,5),
        az alsó fék (legfeljebb egy éves ütemnyi — a mezőny megáll), a téli tűrés
        (laza +1,0 · normál +0,5 · szigorú 0 a célrés fölött);
+     · a holtsáv a csomagból (1,5 → 2,25 — a nehéz fokozatokon a világ később vár meg);
      · a meccsek: tools/nehezseg/motor.js (a valódi motorhoz kalibrálva).
    BECSLÉSEK (a mérő adatai hangolják — lásd docs/fokozat-csomag-3-9-223.md):
      · a saját idényen belüli sodródás (mért: 5,6 + 0,8 × rés, Alap tempón):
@@ -77,9 +78,9 @@ function karrier(c){
     else{
       const g=M-Lnat;
       if(g-want>TOL)L=M-want;                   /* felül: a mezőny felnő */
-      else if(g<want-HOLT-TOL){                 /* alul: az alsó fék */
+      else if(g<want-(+c.holt||HOLT)-TOL){                 /* alul: az alsó fék */
         const cap=fieldPace(c,div);
-        L=Math.max(Lnat-cap,M-(want-HOLT));fekOssz+=Lnat-L;}
+        L=Math.max(Lnat-cap,M-(want-(+c.holt||HOLT)));fekOssz+=Lnat-L;}
       else L=Lnat;}
     const g0=M-L,F=fieldPace(c,div),dr=ownDrift(c,g0);
     const r=idenyS(g0,dr,F,c.cel,TEL[c.tel]);
@@ -105,7 +106,7 @@ for(let nf=1;nf<=10;nf++)for(let s=1;s<=5;s++){
       if(x.div===1){chN++;if(x.pos===1)ch++;}});}
   top.sort((a,b)=>a-b);const med=top[Math.floor(top.length/2)];
   const row={fok:`${nf}.${s}`,cel:c.cel,speed:c.speed,tempo:`${c.tempo.jatekos}/${c.tempo.penz}/${c.tempo.taktika}/${c.tempo.akademia}`,
-    icons:c.icons,skill:c.skill,scout:c.scout,tel:c.tel,gAvg:gs/gn,fel:feln?100*fel/feln:NaN,kies:100*le/gn,
+    icons:c.icons,skill:c.skill,scout:c.scout,tel:c.tel,holt:c.holt,gAvg:gs/gn,fel:feln?100*fel/feln:NaN,kies:100*le/gn,
     stuck:stN?100*stuck/stN:0,bajnok:100*baj/gn,top:med>N?null:med,cim:chN?100*ch/chN:NaN};
   rows.push(row);
   const f=(x,d)=>isFinite(x)?x.toFixed(d):"—";
