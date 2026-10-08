@@ -54,13 +54,13 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
 node tools/fokozat-csomag-3-9-223-proba.js
 ```
 
-**50 állítás**, valódi böngészőben.
+**51 állítás**, valódi böngészőben.
 
 * **A tábla:**
   * betűre azonos a `tools/nehezseg/fokozatok.js`-sel;
   * a határon csak a célrés lép, belül egy elem — a 6. fokozattól a célrés is −0,1;
   * mindig nehezebbre lép, soha vissza;
-  * a célrés +4 … −1;
+  * a célrés +5 … −1;
   * a 6.-tól realisztikus a képesség, a 7.-től legalább Csiga a tempó;
   * a kimenet monoton.
 * **Az új indítás:**
@@ -70,7 +70,7 @@ node tools/fokozat-csomag-3-9-223-proba.js
   * egy elem átírása Egyéni, és újranyitva megmarad.
 * **Zárak és feloldás:**
   * zárt elem helyett a legközelebbi nyitott;
-  * a kezdő lépcső;
+  * a kezdő lépcső (az 1–4. fokozat választható, csak a D3 kötött);
   * az első 6 fokozat nyitott;
   * egy megnyert karrier a következő nagy fokozatot nyitja;
   * a régi, legalább 10-es profilnak minden nyitva.

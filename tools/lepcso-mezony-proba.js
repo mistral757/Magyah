@@ -24,6 +24,15 @@ const {spawn}=require('child_process');
   const srv=spawn('python3',['-m','http.server','8983'],{cwd:'/home/user/Magyah',stdio:'ignore'});
   await new Promise(r=>setTimeout(r,1200));
   const b=await chromium.launch({args:["--no-sandbox"]});
+  /* 3.9.223 — az új indításon a kezdő lépcső 1–4. fokozata választható, és a
+     választott fokozat célrése adja a nehézséget (lásd fokozat-csomag-3-9-223-
+     proba.js). EZ a próba a RÉGI részletes beállító útját méri (fokozat
+     nélkül): ott a lépcső fix mezőnye él — ezért a gyors indítás itt ki van
+     kapcsolva. */
+  {const _np=b.newPage.bind(b);
+   b.newPage=async o=>{const pg=await _np(o);
+     await pg.addInitScript(()=>{addEventListener("DOMContentLoaded",()=>{try{window.kaGyors=()=>false;}catch(e){}});});
+     return pg;};}
   const hiba=[],pageHiba=[];
   const all=(t,ok,x)=>{if(!ok)hiba.push(t+(x!==undefined?" · "+JSON.stringify(x):""));
     console.log((ok?"  ✓ ":"  ✗ ")+t+(x!==undefined?" · "+JSON.stringify(x):""));};

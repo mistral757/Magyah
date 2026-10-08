@@ -86,8 +86,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      if(vissza||(hatar?(valt.length!==0||!celLep):(!elemOk||!belsoCel))){jo=false;hol=hol||{i,valt,hatar,a:a.cel,c:c.cel};}}
    ok(jo,"a határon csak a célrés lép, belül pontosan egy elem (a 6. fokozattól a célrés is −0,1) — mindig nehezebbre, soha vissza",hol);
    const cels=r1.all.map(c=>c.cel);
-   ok(cels[0]===4&&cels[49]===-1&&cels.slice(25).every((v,i)=>i===0||Math.abs(cels[25+i-1]-v-0.1)<1e-9),
-      "a célrés +4-től −1-ig; az 5. fokozat fölött szintenként 0,1",cels);}
+   ok(cels[0]===5&&cels[15]===3.2&&cels[20]===1.6&&cels[49]===-1&&cels.slice(25).every((v,i)=>i===0||Math.abs(cels[25+i-1]-v-0.1)<1e-9),
+      "a célrés +5-től −1-ig (az 1–4. fokozat +1-gyel bővebb); az 5. fokozat fölött szintenként 0,1",cels);}
   {const real=r1.all.filter(c=>c.nf>=6).every(c=>c.skill==="real");
    const csiga=r1.all.filter(c=>c.nf>=7).every(c=>["jatekos","penz","taktika","akademia"].every(a=>r1.idx[1].ert.indexOf(c.tempo[a])>=r1.idx[1].ert.indexOf("csiga")));
    ok(real&&csiga,"a 6. fokozattól realisztikus képesség, a 7.-től minden tempó legalább Csiga",{real,csiga});}
@@ -95,7 +95,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
    ok(a.speed==="alvo"&&a.tempo.jatekos==="turbo"&&z.speed==="tarto"&&r1.all.every(c=>["alvo","lassu","tarto"].includes(c.speed))&&z.tempo.jatekos==="kokorszak"&&z.icons==="ki"&&z.tel==="szigoru"&&z.holt==="2.25",
       "1.1 a legkönnyebb, 10.5 a legnehezebb csomag (a mezőny-tempó legfeljebb Lépést tartanak)",{a,z});
    const h=r1.all[15];
-   ok(h.nf===4&&h.s===1&&h.cel===2.2&&h.speed==="tarto"&&h.tempo.jatekos==="normal"&&h.skill==="loose"&&h.scout==="off"&&h.icons==="teljes"&&h.tel==="normal",
+   ok(h.nf===4&&h.s===1&&h.cel===3.2&&h.speed==="tarto"&&h.tempo.jatekos==="normal"&&h.skill==="loose"&&h.scout==="off"&&h.icons==="teljes"&&h.tel==="normal",
       "az ajánlott 4.1 a régi alapbeállítás közelében (Lépést tartanak, Alap tempó, lazán)",h);}
   {const K=r1.kim;let mon=true;
    for(let i=1;i<50;i++)if(K[i][0]>K[i-1][0]||K[i][1]>K[i-1][1]||K[i][2]<K[i-1][2]||K[i][4]>K[i-1][4])mon=false;
@@ -155,13 +155,19 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.helySor=[...document.querySelectorAll('#qkDiff [data-fok="1.1"] .hely')].map(x=>x.textContent);
     /* a kezdő lépcső */
     u.d1=0;quickShow();
-    o.lepcso={txt:document.getElementById("qkDiff").textContent.slice(0,200),lista:document.querySelectorAll("#qkDiff .nfLvl").length};
+    o.lepcso={txt:document.getElementById("qkDiff").textContent.slice(0,300),lista:document.querySelectorAll("#qkDiff .nfLvl").length,
+      nyitott:[...document.querySelectorAll("#qkDiff .nfSub[data-fok]")].filter(x=>!x.disabled).map(x=>x.dataset.fok),max:nfNyitottMax()};
+    /* a lépcsőn választott fokozat: az osztály a lépcsőé, a nehézség a célrésé */
+    document.querySelector('#qkDiff [data-fok="2.3"]').click();
+    o.lepcso.sajat=nfLepcsoSajat();o.lepcso.field=(unlockLadderDiv()||{}).field;o.lepcso.div=(unlockLadderDiv()||{}).div;
     u.d1=3;unlockGatesOn=()=>false;
     return o;});
   ok(r3.h11.sp==="lassu"&&r3.h11.hely.some(x=>/^speed:alvo→lassu/.test(x)),"a zárt Alvó mezőny helyett a legközelebbi nyitott (Lassan követnek)",r3.h11);
   ok(r3.h61.sk==="loose"&&r3.h61.ic==="teljes"&&r3.h61.sp==="lassu"&&r3.h61.t.akademia==="normal"&&r3.h61.n>=3,"a zárt elemek a legközelebbi nyitottra esnek (képesség, ikon, ellenfél, tempók)",r3.h61);
   ok(r3.helySor.length>=1&&/helyett/.test(r3.helySor[0]),"a sor kiírja a helyettesítést",r3.helySor);
-  ok(r3.lepcso.lista===0&&/lépcső/.test(r3.lepcso.txt),"a kezdő lépcsőn a lépcső dönt (nincs fokozat-lista)",r3.lepcso);
+  ok(r3.lepcso.lista===10&&r3.lepcso.max===4&&r3.lepcso.nyitott.length===20&&r3.lepcso.nyitott.every(f=>+f.split(".")[0]<=4)&&/lépcső/.test(r3.lepcso.txt),
+     "a kezdő lépcsőn az 1–4. fokozat mind a 20 szintje választható, az 5.-től zárva",r3.lepcso);
+  ok(r3.lepcso.sajat&&r3.lepcso.field===null&&r3.lepcso.div===3,"a lépcsőn választott fokozatnál a lépcső csak az osztályt (D3) köti, a fix mezőnyt nem",r3.lepcso);
 
   console.log("\n— 4. a 2. és a 3. oldal —");
   const r4=await p.evaluate(()=>{
