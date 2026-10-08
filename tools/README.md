@@ -54,7 +54,7 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
 node tools/scout-celzas-proba.js
 ```
 
-**20 állítás**, valódi böngészőben.
+**18 állítás**, valódi böngészőben.
 
 * **Nyílás:**
   * az első idény 14. fordulójáig zárva, a 15.-től és a 2. idényben nyitva;
@@ -321,7 +321,7 @@ node tools/skalazas-3-9-213-proba.js
 node tools/pot-plafon-3-9-212-proba.js
 ```
 
-**20 állítás**, valódi böngészőben.
+**17 állítás**, valódi böngészőben.
 
 * **A kemény plafon a mezőnnyel nő:** 111-es mezőnyig 200 000, fölötte `peakToPot(mezőny + 100)`, monoton.
 * **A három régi vágó ág** (kihívás-jutalom POT, 🌠 Csodagyerek, ∞ nyitó ×1,5) a plafon fölötti POT-ot nem vágja le; a jutalom a 9000 fölötti felnőttet sem.
@@ -391,7 +391,7 @@ node tools/padlo-vallalas-3-9-210-proba.js
 node tools/gyors-inditas-3-9-209-proba.js
 ```
 
-**20 állítás**, valódi böngészőben.
+**17 állítás**, valódi böngészőben.
 
 * **Gyors indítás:**
   * a kezdőlap gombja a két kérdést nyitja;
