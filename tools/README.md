@@ -48,6 +48,45 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## nehezseg-3-9-222-proba.js — 🎚 3.9.222: tízfokozatú, kétoldalú nehézség és átállás
+
+```bash
+node tools/nehezseg-3-9-222-proba.js        # KEP=<mappa> az átállás és a nyári képernyő képe
+```
+
+**43 állítás**, valódi böngészőben, egy valódi karrierrel (a beállítón át indítva).
+
+* **A tíz fokozat:** a kért sorrendben; a célrés és a feljutás csökken, a kiesés nő; holtsáv 1,5.
+* **A rajt-cél:** az első idényben a modellből (rajt + (sodródás − ütem)/2 = célrés), utána a mért változásból (rajt = célrés − dg/2).
+* **A beállító:**
+  * tíz lenyitható sor, a régi létra lenyitható finomhangolásként;
+  * a fok a rajt-célra állítja a létrát, a csúszka elengedi;
+  * az új karrier `padlo:2`, a választott fokkal; a KA megjegyzi.
+* **A kezdőrúgás:**
+  * elhúztál → a mezőny felnő;
+  * a holtsávban nem nyúl hozzá;
+  * mélyen alatta a fék legfeljebb egy éves ütemnyit vesz vissza, enyhén alatta a holtsáv széléig;
+  * a napló kimondja.
+* **A tél** a célrés +0,5-höz mér; **az idény vége** egyszer rögzíti a dg-t, a következő rajt-cél abból tanul.
+* **A határok:** könnyíteni a kezdő fokozatnál kettővel könnyebbig, nehezíteni egy fokkal, sikeres idény után.
+* **Nyár:** a HUB a fokozatot mutatja, a képernyőn tíz lenyitható sor, a határon kívüliek zárva.
+* **Átállás:** csak két idény között; tíz lenyitható sor, a mostani jelölve; a „Mégsem” nem állít át; utána nincs újra.
+* **Run, mérő, közös karrier:** a Run levonja a féket; a mérő rögzíti a fokot, a célrést, a féket; a szoba csomagja `padlo:2`, a régi házigazda a régi padlót viszi; közösben is fékez.
+
+## nehezseg/ — 🎚 az általános nehézségi rendszer mérői (terv: `docs/nehezsegi-rendszer-terv.md`)
+
+```bash
+node tools/nehezseg/idenysim.js                       # egy idény kimenete a rés szerint (GS, R, SPREAD, STEP)
+P=3 F=6.2 R=300 node tools/nehezseg/karriersim.js     # karrier-szimuláció: mostani padló vs kétoldalú szabályozó (REGI=1: a régi változatok)
+G=0 N=8 node tools/meccsmotor/spiral-valos.js          # sodródás és spirál a valódi motoron (egy idény / futás)
+node tools/meccsmotor/spiral-elemez.js                 # a spiral/*.jsonl kiértékelése
+```
+
+Nem próbák (nincs ✓/✗), hanem mérők.
+
+* **A közös meccsmodell:** `tools/nehezseg/motor.js`, a valódi motorhoz kalibrálva (+0,75 a te meccseidhez, 2110 valódi meccs alapján).
+* **A karrier-szimuláció modell:** az irányokat mutatja, a mérő valódi adatai hangolják.
+
 ## pvp-hangolas-3-9-221-proba.js — 🤝 3.9.221: befektetés-arányos hangolás a közös karrierben
 
 ```bash

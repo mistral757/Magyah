@@ -125,7 +125,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     box.querySelector("#kaGyorsBtn").click();await varj(20);o.gyors=kaGyors();
     document.getElementById("themeModal").classList.add("hide");
     return o;});
-  ok(r4.van&&["start","form","wc","basis","magyah","scoutReal","family","rerolls","speed","pyrDiv","pyrGapT","dynLevel","autoLevel","tempo","icons","guide","skill"].every(k=>r4.mezok.includes(k))&&r4.tax===4,
+  ok(r4.van&&["start","form","wc","basis","magyah","scoutReal","family","rerolls","speed","pyrDiv","pyrNf","dynLevel","autoLevel","tempo","icons","guide","skill"].every(k=>r4.mezok.includes(k))&&r4.tax===4,
      "minden beállító-mező szerkeszthető (a négy résztempóval együtt)",r4.mezok);
   ok(r4.tar.tempo==="gyors"&&r4.tar.skill==="real"&&r4.tar.speed==="kegyet"&&r4.tar.sr==="on"&&r4.tar.dyn==="88"&&r4.tar.tax&&r4.tar.tax.penz==="csiga","a szerkesztő a tárba ír",r4.tar);
   ok(r4.eloTempo,"a futó állapotot nem írja át (a tempó-preferencia a következő beállító-megnyitásig változatlan)",r4);
