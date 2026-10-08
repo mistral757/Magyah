@@ -16,7 +16,7 @@
 /* a célrés: +4-től −1-ig (3.9.223); a fokozat 1. belső szintjéé, a 6.
    fokozattól minden belső szint −0,1 (6.1 = +1,4 … 10.5 = −1,0) */
 const NF_CEL=[4,3.4,2.8,2.2,1.6,1.4,0.9,0.4,-0.1,-0.6];
-function nfCel(nf,s){return Math.round((NF_CEL[nf-1]-(nf>=6?0.1*((s||1)-1):0))*100)/100;}
+function nfCel(nf,s){const sb=Math.max(1,Math.min(nf===10?45:5,s||1));return Math.round((NF_CEL[nf-1]-(nf>=6?0.1*(sb-1):0))*100)/100;}
 /* a legkönnyebb csomag: 1. fokozat, 1. belső szint */
 const NF_ALAP={speed:"alvo",tempo:{jatekos:"turbo",penz:"turbo",taktika:"turbo",akademia:"turbo"},
   icons:"teljes",skill:"loose",scout:"off",tel:"laza",holt:"1.5"};
@@ -34,7 +34,7 @@ const NF_LEPESEK=[
   /* 10 Semmi esély */ ["holt","2.25"],["tempo.taktika","kokorszak"],["tempo.penz","kokorszak"],["tempo.jatekos","kokorszak"]];
 function nfCsomag(nf,s){
   const c=JSON.parse(JSON.stringify(NF_ALAP));
-  const n=(nf-1)*4+(s-1);
+  const n=Math.min(NF_LEPESEK.length,(nf-1)*4+(s-1));   /* 10.6+ (extra szintek): csak a célrés lép */
   for(let i=0;i<n;i++){const [k,v]=NF_LEPESEK[i];
     if(k==="cel")continue;   /* csak a célrés lép (a 6. fokozattól −0,1) */
     if(k.startsWith("tempo."))c.tempo[k.slice(6)]=v;else c[k]=v;}

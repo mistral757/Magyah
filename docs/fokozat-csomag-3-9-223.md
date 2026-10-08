@@ -239,6 +239,37 @@ kalibrált meccsmodellel, mind az 50 belső szintre.
    lassítja. A pénz, a taktika és az akadémia tengelye viszont csak téged.
    A csomagban ezért lép a pénz és a taktika a játékos-tengely előtt.
 
+## 2/c. Extra szintek a Semmi esély fölött (10.6, 10.7 …)
+
+> „…amikor valaki 10. nehézségi szinten megnyeri a gamet (D1 win), akkor
+> kinyílik a lehetőség, hogy tovább nehezítse a játékot: 10.6, 10.7 stb,
+> amiknek a lényege, hogy a célrés fokozatosan (0.1 tizedenként növelhető),
+> egyszerre 2 szint nyílik meg mindig (mint korábban)."
+
+* **Az elemek** a 10.5-ös csomagéi, **csak a célrés lép** tovább 0,1-enként:
+  10.6 = −1,1, 10.7 = −1,2, … A felső határ a 10.45 (−5,0).
+* **Feloldás:** a 10. fokozat bármelyik szintjén megnyert karrier a **nyert
+  szint utáni két szintet** nyitja:
+  * 10.1–10.5-ön nyerve: 10.6 és 10.7;
+  * 10.7-en nyerve: 10.8 és 10.9;
+  * a már nyitottnál könnyebb szinten nyerve nem nyílik új (mint a régi
+    létrán).
+
+  A napló kimondja.
+* **A beállítón** a 10. fokozat listájában a nyitott extra szintek
+  választhatók, a következő kettő lakattal látszik.
+* A régi (≥10-es profil) bélyeg a tíz fokozatot nyitja, **az extrákat nem**.
+* **A várható kimenet** az extra szinteken a 10.5 mérése, a réssel eltolva
+  (jelölve).
+
+## 2/d. A 8/8 beilleszkedés kihívás
+
+> „8/8 beilleszkedés kihívás legyen mindig 8 meccses határidejű"
+
+* **A határidő mindig +8 forduló**, a beilleszkedéshez szükséges 8 saját
+  meccs. Eddig a következő checkpointig tartott, ami gyakran rövidebb volt.
+* Ha az idényben már nincs 8 meccs hátra, a játék nem ajánlja fel.
+
 ## 3/b. A hivatalos szint (egyéni beállításnál)
 
 > „…amikor egyénileg állítasz be sajátos setupot, akkor azt mérje meg hogy
@@ -280,6 +311,14 @@ kalibrált meccsmodellel, mind az 50 belső szintre.
 * **A fejléc színes jelvénye** is a szinttel kezd („🎚 6.3 Professzionális ·
   D6 · …”), a fokozat színével.
 
+## 3/d. A régi preferenciák védelme
+
+Ha a böngészőben már van tárolt nehézségi preferencia (tempó, résztempók,
+ikonok, scout), az új indítás **nem írja felül** az ajánlott csomaggal. Ilyenkor
+„Egyéni” marad, a hivatalos szinttel. Ez védi például a futó karrierből
+jóváírt ritkább ikonokat. A beginner-lépcső próbája (`lepcsok-proba`) fogta
+meg.
+
 ## 4. Javítás a 3.9.222-ben (alsó fék)
 
 A mezőny szintje egész számra kerekedik. Az emelésnél jogos a „keményebb
@@ -300,7 +339,7 @@ szerencsével ment át rajta.
 
 ## Próba
 
-`tools/fokozat-csomag-3-9-223-proba.js` — 45 állítás:
+`tools/fokozat-csomag-3-9-223-proba.js` — 50 állítás:
 
 * **A tábla:**
   * betűre egyezik a szimulációéval;
@@ -328,5 +367,7 @@ szerencsével ment át rajta.
 * **A 🎛️ blokk.**
 * **A hivatalos szint** (minden csomag önmaga; egyéninél a legközelebbi), a
   **HUB-sáv** és a **fejléc**.
+* **Az extra szintek** (csak a célrés lép; a nyert szint után kettő nyílik).
+* **A 8 meccses beilleszkedés-határidő.**
 * **A dinamikus mód** és a **közös karrier** (a csomag a szoba
   rés-csúszkáját is állítja).

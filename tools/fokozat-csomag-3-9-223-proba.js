@@ -112,7 +112,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.lap1=!document.getElementById("qkPg1").classList.contains("hide")&&document.getElementById("qkPg2").classList.contains("hide");
     o.fok=Object.assign({},pyrPickFok);o.ka=kaLoad().pyrFok;
     o.szintek=document.querySelectorAll("#qkDiff details.nfLvl").length;
-    o.gombok=document.querySelectorAll("#qkDiff .nfSub[data-fok]").length;
+    /* az alap 50 szint (a zár nélküli módban az extra 10.6+ szintek is látszanak) */
+    o.gombok=[...document.querySelectorAll("#qkDiff .nfSub[data-fok]")].filter(x=>/^\d+\.[1-5]$/.test(x.dataset.fok)).length;
     o.nyitva=[...document.querySelectorAll("#qkDiff details.nfLvl")].filter(d=>d.open).length;
     o.miert=document.querySelectorAll("#qkDiff details.nfLvl details").length;
     /* 6.3 kiválasztása */
@@ -250,7 +251,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     m.classList.add("hide");
     return o;});
   {const c=TOOL.nfCsomag(7,2);
-   ok(r7.van&&r7.opt===51&&r7.st.fok==="7.2"&&r7.st.nf==="7"&&r7.st.sp===c.speed&&r7.st.t===c.tempo.jatekos&&r7.st.ic===c.icons&&r7.st.sk===c.skill&&r7.st.sc===c.scout&&r7.st.tel===c.tel,
+   ok(r7.van&&r7.opt>=51&&r7.st.fok==="7.2"&&r7.st.nf==="7"&&r7.st.sp===c.speed&&r7.st.t===c.tempo.jatekos&&r7.st.ic===c.icons&&r7.st.sk===c.skill&&r7.st.sc===c.scout&&r7.st.tel===c.tel,
       "a csomag választása az elemeket is beírja",r7.st);}
   ok(r7.egyeni==="e7.2"&&r7.tel,"egy elem átírása után egyéni",r7);
 
@@ -338,6 +339,38 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(/hivatalosan ≈/.test(r10.cim)&&r10.beall.nf>=4,"a beállító kiírja a hivatalos szintet",r10.cim.slice(0,160));
   ok(/Nehézségi szint —/.test(r10.sav)&&/nfHubSav/.test(r10.sav)&&r10.kh&&r10.kh.nf>=1,"a HUB-on a színes nehézségi sáv a karrier hivatalos szintjével",{kh:r10.kh});
   ok(/🎚/.test(r10.badge)&&/D\d/.test(r10.badge),"a fejléc jelvénye a szintet is kiírja",r10.badge);
+
+  console.log("\n— 11. extra szintek (10.6 …) és a 8 meccses beilleszkedés —");
+  const r11=await p.evaluate(()=>{
+    const o={};
+    const a=nfCsomag(10,5),c=nfCsomag(10,7);
+    o.elem=JSON.stringify(Object.assign({},a,{s:0,cel:0}))===JSON.stringify(Object.assign({},c,{s:0,cel:0}));
+    o.cel=[nfCel(10,6),nfCel(10,7),nfCel(9,7)];
+    unlockGatesOn=()=>true;
+    const u=unlockState();u.nfMig=1;u.nfMind=true;delete u.nfExt;
+    o.e0=nfExtNyitott();
+    pyrWanted=true;quickShow();
+    o.gomb6=(document.querySelector('#qkDiff [data-fok="10.6"]')||{}).disabled;
+    const sn=S.seasonNumber||1;S.pyr.padlo=2;S.pyr.vallH=S.pyr.vallH||{};
+    const nyer=(nf,s)=>{const k=nfCsomag(nf,s);if(S.run)delete S.run.nfWinNoted;
+      S.pyr.vallH[sn]=Object.assign({},S.pyr.vallH[sn]||{},{nf,cel:k.cel});
+      S.pyr.fok={nf,s,egyeni:false,cfg:{speed:k.speed,tempo:k.tempo,icons:k.icons,skill:k.skill,scout:k.scout,tel:k.tel,holt:k.holt}};
+      nfCareerWin(false);return nfExtNyitott();};
+    o.n1=nyer(10,5);o.n2=nyer(10,7);o.n3=nyer(10,3);
+    o.naplo=/Megnyílt két extra szint/.test(document.body.textContent);
+    quickShow();
+    o.gomb8=(document.querySelector('#qkDiff [data-fok="10.8"]')||{}).disabled;
+    o.gomb11=(document.querySelector('#qkDiff [data-fok="10.11"]')||{}).disabled;
+    document.querySelector('#qkDiff [data-fok="10.9"]').click();
+    o.pick={fok:Object.assign({},pyrPickFok),cel:nfCelBeall(10)};
+    unlockGatesOn=()=>false;
+    o.beill=/deadlineIdx:\(S\.idx\|\|0\)\+BOND_NEW_MATCHES/.test(document.documentElement.outerHTML);
+    return o;});
+  ok(r11.elem&&r11.cel[0]===-1.1&&r11.cel[1]===-1.2&&r11.cel[2]===-0.5,"az extra szinten csak a célrés lép (10.6 = −1,1 · 10.7 = −1,2); a 9. fokozaton nincs extra",r11);
+  ok(r11.e0===5&&r11.gomb6===true,"alapból nincs extra szint (a 10.6 lakattal látszik)",r11);
+  ok(r11.n1===7&&r11.n2===9&&r11.n3===9&&r11.naplo,"a 10. fokozaton megnyert karrier a nyert szint utáni KÉT szintet nyitja",r11);
+  ok(r11.gomb8===false&&r11.gomb11===true&&r11.pick.fok.nf===10&&r11.pick.fok.s===9&&r11.pick.cel===-1.4,"a nyitott extra szint választható, a következő kettő lakattal",r11);
+  ok(r11.beill,"a 8/8 beilleszkedés kihívás határideje mindig 8 meccs");
 
   ok(!errs.length,"nincs konzolhiba",errs.slice(0,5));
   await b.close();srv.close();
