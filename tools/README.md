@@ -48,6 +48,40 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## penzmozgas-naplo-proba.js — 🧾 legutóbbi pénzmozgások (tételes könyvelés, forrással)
+
+```
+node tools/penzmozgas-naplo-proba.js
+```
+
+**6 állítás**, valódi böngészőben.
+
+* Valódi meccs után a napló tételes: kategória, összeg, idény/forduló, időpont, és a forrás (pl. `fanMatchTick ← fullTime`).
+* A kiadás is bekerül, a saját forrásával.
+* Legfeljebb 30 tétel marad, a legfrissebb a végén.
+* A büdzsé-chip lenyitásában megjelenik, és a mentés viszi.
+* Nincs oldalhiba.
+
+## kapitany-lendulet-proba.js — ⚡ a kapitány lendülete: a ±1 várható értéke
+
+```
+node tools/kapitany-lendulet-proba.js
+```
+
+**10 állítás**, valódi böngészőben. A kapitány-választó ⚡ meccserője a
+lendület várható értékét is tartalmazza: E = P(gól ∪ jó forma) − P(rossz forma ∪ piros).
+
+* **A motor súlyai:** a becsült P(jó forma) és P(rossz forma) egyezik a motor valódi
+  sorsolásával (8000 pillanatkép); a csillagos kártya a jó formát növeli, a rosszat kizárja.
+* **A várható érték:** a képlet a részekből; mérés nélkül a szerep dönt (csatár ≫ védő).
+* **A mérés súlya:**
+  * sok mért meccsnél a saját gólarány;
+  * a kapitányként mért löket a meccsszámmal egyre inkább felülírja a modellt
+    (0 → modell, 12 → félúton, 200 → ≈ mért).
+* **Rögzítés:** a meccsek után a löket mérődik, a mentés viszi.
+* **Kijelzés:** a ⚡ összeg tartalmazza a lendületet, a szöveg kimondja, miből becsült.
+* Nincs oldalhiba.
+
 ## scout-celzas-proba.js — 🎯 scout-célzás (elsődleges 50%, másodlagos 33%)
 
 ```
