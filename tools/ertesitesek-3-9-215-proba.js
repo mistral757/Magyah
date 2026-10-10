@@ -154,13 +154,18 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     msT().exciteMax=70;     /* a „Hazai mag" már nyitva */
     S.transferBudget=0;});
   const varj=async(ms)=>{await p.waitForTimeout(ms);};
-  await varj(2600);
+  /* ÁLLAPOTRA VÁRUNK, nem fix időre: a figyelő 700 ms-onként fut és 1500 ms
+     nyugalmat vár, tehát az első futás legrosszabb esetben ~2,8 mp — terhelt
+     gépen (teljes regresszió) a régi fix 2,6 mp kevés volt. A tagadó
+     ellenőrzéseknél („nem szól újra") a fix várakozás marad. */
+  const varjAmig=async(fn,ms)=>{try{await p.waitForFunction(fn,null,{timeout:ms||10000});}catch(e){}};
+  await varjAmig(()=>{const t=teachStateObj();return !!(t&&t.ujInit);});
   const r3a=await p.evaluate(()=>{const t=teachStateObj();
     return {init:!!t.ujInit,lelato:(t.uj&&t.uj.lelato)||[],sor:_vezPushQ.length,most:_vezPushMost?1:0};});
   ok(r3a.init&&r3a.lelato.includes("hazai")&&r3a.sor===0&&!r3a.most,"az első futás csendben jegyez (a már nyitott lelátóról nem szól)",r3a);
   /* egy emlékezetes meccs: 86-os izgalom → az Ultrák lelátó nyílik */
   await p.evaluate(()=>{msT().exciteMax=86;});
-  await varj(2600);
+  await varjAmig(()=>{const el=$("vezPush");return !!(el&&!el.classList.contains("hide")&&el.classList.contains("uj"));});
   const r3b=await p.evaluate(()=>{const el=$("vezPush"),m=_vezPushMost;
     return {lat:!!(el&&!el.classList.contains("hide")),uj:!!(el&&el.classList.contains("uj")),
       cim:el?el.querySelector("#vezPushTx b").textContent:"",kis:el?el.querySelector("#vezPushTx small").textContent:"",
@@ -177,7 +182,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     $("scWindow").classList.add("hide");$("scHub").classList.remove("hide");
     _vezPushQ=[];vezPushHide();
     S.transferBudget=scoutUpgradePriceNow()+10;});
-  await varj(2600);
+  await varjAmig(()=>{const el=$("vezPush");return !!(el&&!el.classList.contains("hide")&&/scout-fejlesztés/.test(el.textContent));});
   const r3d=await p.evaluate(()=>{const el=$("vezPush");
     return {cim:el?el.querySelector("#vezPushTx b").textContent:"",lat:!!(el&&!el.classList.contains("hide")),
       jegy:teachStateObj().uj.scout};});
@@ -189,12 +194,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(!r3e.most&&!r3e.sor,"ugyanarról a szintről nem szól még egyszer",r3e);
   /* a következő csillagszint újra szólhat */
   await p.evaluate(()=>{scout.stars+=0.5;S.transferBudget=scoutUpgradePriceNow()+10;});
-  await varj(2600);
+  await varjAmig(()=>{const m=_vezPushMost;return !!(m&&m.k==="scout");});
   const r3f=await p.evaluate(()=>{const m=_vezPushMost;return {k:m&&m.k,jegy:teachStateObj().uj.scout};});
   ok(r3f.k==="scout"&&r3f.jegy.length===2,"a következő csillagszint újra értesít",r3f);
   /* kikapcsolva csendben jegyez */
   await p.evaluate(()=>{_vezPushQ=[];vezPushHide();teachStateObj().ujOff=1;msT().exciteMax=93;});
-  await varj(2600);
+  await varjAmig(()=>{const u=teachStateObj().uj;return !!(u&&u.lelato&&u.lelato.includes("katlan"));});
+  await varj(800);   /* és utána sem szólt (a jegyzés és a szólás ugyanabban a futásban dől el) */
   const r3g=await p.evaluate(()=>({most:_vezPushMost?1:0,jegy:teachStateObj().uj.lelato}));
   ok(!r3g.most&&r3g.jegy.includes("katlan"),"kikapcsolva nem szól, de jegyez (a visszakapcsoláskor nem zúdul rád)",r3g);
   /* a Vezetés menü kapcsolója */
