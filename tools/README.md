@@ -48,6 +48,20 @@ node tools/meres-scout-3-9-206-proba.js        # MSP=<mappa> a képernyőképek 
   * kikapcsolt feltöltésnél semmi nem megy ki.
 * **Kivonat:** érvényes JSON, a `tools/meres/osszegez.js` lefut rajta (összefoglaló + CSV).
 
+## penzmozgas-naplo-proba.js — 🧾 legutóbbi pénzmozgások (tételes könyvelés, forrással)
+
+```
+node tools/penzmozgas-naplo-proba.js
+```
+
+**6 állítás**, valódi böngészőben.
+
+* Valódi meccs után a napló tételes: kategória, összeg, idény/forduló, időpont, és a forrás (pl. `fanMatchTick ← fullTime`).
+* A kiadás is bekerül, a saját forrásával.
+* Legfeljebb 30 tétel marad, a legfrissebb a végén.
+* A büdzsé-chip lenyitásában megjelenik, és a mentés viszi.
+* Nincs oldalhiba.
+
 ## kapitany-lendulet-proba.js — ⚡ a kapitány lendülete: a ±1 várható értéke
 
 ```
