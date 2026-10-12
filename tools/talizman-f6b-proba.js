@@ -267,7 +267,8 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     const lista=TAL_SPEC.filter(s=>["igazolas","fejlodes","stab"].indexOf(s.k)>=0);
     return {db:lista.length,mind:lista.every(s=>talSpecMukodik(s.id))};});
   console.log("\n— 4. A KATALÓGUS —");
-  ok(ui.db===24&&ui.mind,"az Igazolás, a Fejlődés és a Stáb mind a 24 speciálja él",ui);
+  /* 3.9.224: a Stáb két új speciált kapott (Szakkönyvtár, Utánpótlás-edzők) */
+  ok(ui.db===26&&ui.mind,"az Igazolás, a Fejlődés és a Stáb mind a 26 speciálja él",ui);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

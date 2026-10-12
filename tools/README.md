@@ -220,6 +220,31 @@ node tools/taktika-illeszkedes-teteje-proba.js
 * Kiváló kerettel az illeszkedés a tetőig megy, és a meccshatás vele nő.
 * A taktika-panel kiírja a nyitott tetőt; nincs oldalhiba.
 
+## talizman-ugynok-szurkolo-proba.js — 🕴️📣🎓 Ügynökség, Szurkolótábor, erősebb Stáb
+
+```
+node tools/talizman-ugynok-szurkolo-proba.js
+```
+
+**47 állítás**, valódi böngészőben (lásd `docs/talizman-ugynokseg-szurkolotabor-3-9-224.md`).
+
+* A katalógus: 13 szín, 6-6 új speciál és +2 a Stábnak. Minden új kontra másik színt üt. Öt ritkaságon egyik szöveg sem hagy benne {v}-t, NaN-t vagy undefined-ot.
+* Talizmán nélkül minden új kapaszkodó semleges, és a régi számok bitre a régiek.
+* Ügynökség:
+  * a célzott gyorsítás csak a saját célját mozdítja, és +100%-nál megáll;
+  * a garantált scout-lépés a ritkaság határáig pótol; a Mítosz többet ad, az égetett lap nem hat;
+  * az XL-gyűjtés idény közben léptet;
+  * az igazolás pontja ×2-ig nő;
+  * mind a hat speciál és a rezonancia működik.
+* Szurkolótábor:
+  * az esemény-felismerés, és hogy az izgalom-boost csak a saját eseményére jár;
+  * a kassza a 65+ izgalmú meccsen hat;
+  * a pillanatkép: a rangadó-katlan csak rangadón kerül bele;
+  * a matchLambdas csak hazai pályán hat, a zaj csak kiegyenlített meccsen; a hamis érték ±15%-ba vágva;
+  * az időfüggő rész; a speciálok és a rezonancia.
+* Stáb: mind az öt változat a pontos számmal, és a két új speciál.
+* 8 valódi forduló az összes új lappal: az XL gyűlik, minden izgalom könyvelődik, és nincs oldalhiba.
+
 ## valogatott-piramis-proba.js — 🌍 válogatottak a piramis mezőnyében
 
 ```
@@ -4177,7 +4202,7 @@ node tools/talizman-f6b-proba.js
    versenyszellem.
 3. **Stáb (8):** bővített, mentor, lojális, tapasztalatcsere, fókusz,
    legenda, a nagy öreg, konferencia.
-4. **Katalógus:** a három kategória mind a 24 speciálja él; nincs oldalhiba.
+4. **Katalógus:** a három kategória mind a 26 speciálja él (3.9.224 óta a Stábnak +2: Szakkönyvtár, Utánpótlás-edzők); nincs oldalhiba.
 
 Részletek: `docs/talizman-f6b-3-9-154.md`.
 
