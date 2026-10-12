@@ -78392,6 +78392,50 @@ function saleMarketTick(){
     if(_saleQuietTick)return;
     try{addLine(`📬 <b>Ajánlat érkezett</b> ${esc(shortName(rec.n))}-ért: ${fmtFt(off.amount)}`
       +` (a kikiáltási ára ${Math.round(off.amount/off.base*100)}%-a) — az Átigazolás menüben döntesz róla.`,"m life");}catch(e){}});}
+/* ---- A NYÁRI KUPA ELŐTT KITETT JÁTÉKOS A NYÁR VÉGÉN BIZTOSAN LICITET KAP (3.9.224) ----
+   KÉRÉS: „Nyári kupasorozat után, amikor a nyár végére lépünk, ott mindig
+   érkezzen licit azokra, akiket legkésőbb a kupa előtt feltettünk az
+   átigazolási piacra."
+   AZ OK, AMIÉRT EDDIG NEM JÖTT: a várakozás (5–15 forduló) a karrier
+   fordulószámlálóján (saleCareerRound) ketyeg, az pedig az egész nyár alatt
+   ÁLL — a 30. forduló után, a kupán át egészen az új idény 1. fordulójáig.
+   A nyáron (vagy a szezon végén) kitett ember határideje így mindig a
+   KÖVETKEZŐ idény közepére esett: a nyári ablak licit nélkül múlt el.
+   A MEGOLDÁS két pont:
+     · a nyári kupasorozat ELSŐ indulásakor (startEuroCampaign — az európai
+       kupa, a hazai kupa és a Nyári Felkészülési Kupa is ezen megy át)
+       megjelöljük a kirakatban álló összes embert (rec.kupaGar = idény);
+     · a nyár végén (hubShowSeasonReportBody — a kupa UTÁN, az új idény
+       ELŐTT) a megjelöltek határidejét MOSTRA húzzuk, és ha ebben a nyárban
+       a licit-körük már elfogyott, egy kört visszaadunk — így azonnal jön
+       egy ajánlat, és a nyári ablakban dönthetsz róla.
+   Akinek épp vár egy ajánlata, annak nem kell új: az már a licit. A kupa
+   KÖZBEN (vagy utána) kitett ember nem kap garanciát — rá a szokott
+   várakozás vonatkozik. */
+function saleKupaJelol(){
+  if(gameMode!=="career"||!careerPool)return 0;
+  if(seasonInProgress())return 0;   /* csak a nyári kupasorozat számít */
+  const sn=S.seasonNumber||1;
+  if(S.saleKupaJel===sn)return 0;   /* a sorozat ELSŐ indulása — a lánc (MK→KL) nem jelöl újra */
+  S.saleKupaJel=sn;
+  let db=0;
+  saleMarketState().list.forEach(rec=>{if(rec){rec.kupaGar=sn;db++;}});
+  return db;}
+function saleNyarvegiLicit(){
+  if(gameMode!=="career"||!careerPool)return 0;
+  const sn=S.seasonNumber||1,now=saleCareerRound();
+  try{salePrune();}catch(e){}
+  let db=0;
+  saleMarketState().list.forEach(rec=>{
+    if(!rec||rec.kupaGar!==sn)return;
+    delete rec.kupaGar;
+    if(rec.offer)return;   /* már vár rá egy licit */
+    rec.pending=true;
+    rec.due=Math.min(rec.due||now,now);
+    if(rec.winKey===saleWindowKey())rec.inWindow=Math.min(rec.inWindow||0,SALE_SUMMER_ROUNDS-1);
+    db++;});
+  if(db)try{saleMarketTick();}catch(e){}
+  return db;}
 /* Hány licit vár döntésre — ez ül ki a HUB gombjára. */
 function salePendingOffers(){
   saleMarketTick();
@@ -97504,6 +97548,7 @@ function startEuroCampaign(opt){
       return;}
     hubShowSeasonReport();return;}
   guideFire("ev:euro");   /* GUIDE: az ELSŐ európai kupa INDULÁSAKOR */
+  try{saleKupaJelol();}catch(e){}   /* 📬 3.9.224 — a kupa előtt kitettek a nyár végén licitet kapnak */
   /* A KUPA SÁRGA LAPJAI SOROZATONKÉNT GYŰLNEK, és minden új sorozat tiszta
      lappal indul — ahogy a valóságban is. A kettes határ csak így igazságos:
      egy tavalyi lappal a hátad mögött kezdeni egy új kupát nem volna az. */
@@ -98690,6 +98735,10 @@ function hubShowSeasonReportBody(){
      felajánlások (offerCoachIfEligible) ott kerülnek a sorba, és egy frissen
      felvett edző nem öregedhet ugyanabban a szezonváltásban, amikor belépett. */
   const coachRep=advanceCoachSeason();
+  /* 📬 3.9.224 — a nyár vége: a kupa előtt piacra tett emberek licitje
+     (lásd saleNyarvegiLicit). Az öregítés UTÁN, hogy a licit a nyári árból
+     számoljon, és a visszavonultak már ne szerepeljenek. */
+  try{saleNyarvegiLicit();}catch(e){}
   /* ================= A NYÁRI PÉNZ ITT ÉRKEZIK =================
      Korábban a szezonbüdzsé és a befektetés hozama a startNextCareerSeason()-ben
      íródott jóvá — vagyis AZUTÁN, hogy a felhasználó a HUB-ból kilépett a

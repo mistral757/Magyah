@@ -241,6 +241,20 @@ A statisztikai mérő: `tools/meccsmotor/kiallitas-terv.js`. Két módja van:
 
 `TERV=0` a régi, `TERV=1` az új szabállyal mér.
 
+## nyarvegi-licit-proba.js — 📬 a nyár végi licit-garancia
+
+```
+node tools/nyarvegi-licit-proba.js
+```
+
+**14 állítás** (lásd `docs/nyarvegi-licit-3-9-224.md`):
+
+* a kupa első indulása a kirakatot jelöli; a lánc és a futó szezon nem;
+* a nyár végén a megjelölt ember azonnal licitet kap (a köv. idény közepére
+  eső határidővel és elfogyott nyári körökkel is);
+* a már várakozó ajánlat marad; a kupa közben kitett ember nem kap garanciát;
+* a jelölés egyszer sül el; a két horog a helyén; nincs oldalhiba.
+
 ## pvp-fokozat-szoba-proba.js — 🎚 PvP: a választott fokozat a szobában
 
 ```
