@@ -220,6 +220,27 @@ node tools/taktika-illeszkedes-teteje-proba.js
 * Kiváló kerettel az illeszkedés a tetőig megy, és a meccshatás vele nő.
 * A taktika-panel kiírja a nyitott tetőt; nincs oldalhiba.
 
+## kiallitas-terv-proba.js — 🟥 a kiállítás-terv és a ritkább saját piros
+
+```
+node tools/kiallitas-terv-proba.js
+```
+
+**5 állítás** (lásd `docs/kiallitas-terv-3-9-224.md`):
+
+* a terv alapból él, és a saját piros szabálya is;
+* a fáradás percenkénti szorzói;
+* a kiállítás ára és a lapok −10%-a;
+* a Panzer Vadhajtások: +100 / +200 / +320%;
+* nincs oldalhiba.
+
+A statisztikai mérő: `tools/meccsmotor/kiallitas-terv.js`. Két módja van:
+
+* `MODE=termeszetes`: lapok, kiállítások és a saját piros forrása 50-50 meccseken;
+* `MODE=piros RED=30`: kényszerített saját kiállítás, 0 / +3 / +5 különbséggel.
+
+`TERV=0` a régi, `TERV=1` az új szabállyal mér.
+
 ## pvp-fokozat-szoba-proba.js — 🎚 PvP: a választott fokozat a szobában
 
 ```

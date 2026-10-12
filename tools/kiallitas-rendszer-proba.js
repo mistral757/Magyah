@@ -164,7 +164,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       kiallDb:kiall.length,
       percek:kiall.map(x=>x.min),
       mind90:kiall.length>0&&kiall.every(x=>x.min===90),
-      eltiltva:Object.keys(S.unavailable||{}).length,
+      /* csak az ELTILTÁS — a meccs közbeni véletlen sérülés is S.unavailable-be
+         kerül, az nem kiállítás (3.9.224: ritkán 6 ≠ 5-öt adott) */
+      eltiltva:Object.keys(S.unavailable||{}).filter(n=>S.unavailable[n]&&S.unavailable[n].reason==="suspension").length,
       redsKonyvelve:Object.keys(S.playerReds||{}).length,
       maxMatchRed:msT().maxMatchRed||0,
       lefujva:naplo.some(x=>/LEFÚJJA A MÉRKŐZÉST/.test(x)),
