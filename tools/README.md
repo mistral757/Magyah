@@ -220,6 +220,25 @@ node tools/taktika-illeszkedes-teteje-proba.js
 * Kiváló kerettel az illeszkedés a tetőig megy, és a meccshatás vele nő.
 * A taktika-panel kiírja a nyitott tetőt; nincs oldalhiba.
 
+## pvp-fokozat-szoba-proba.js — 🎚 PvP: a választott fokozat a szobában
+
+```
+node tools/pvp-fokozat-szoba-proba.js
+```
+
+**8 állítás** (lásd `docs/fokozat-csomag-3-9-223.md`, „Közös karrier” szakasz).
+
+* A házigazda 5.1-et választ:
+  * a szobacsomag viszi a fokozatot, a téli tűrést és a holtsávot;
+  * a közös rés a fokozat rajt-rése;
+  * a régi rés-csúszka letiltva.
+* A vendég átveszi, és a közös karrier fokozata 5.1:
+  * a célrés +1,6;
+  * a hivatalos szint és a HUB-sáv „5.1 Nehéz”;
+  * az idény célrése is a fokozaté.
+* Régi szoba (fokozat nélküli csomag): a régi út.
+* Nincs oldalhiba.
+
 ## meccsero-hianyzo-proba.js — ⚡ a meccserő a pályára lépő tizenegyről
 
 ```
