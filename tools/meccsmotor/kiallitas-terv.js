@@ -73,16 +73,23 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
         window.__cur={t,delta:(mine.ovr+mine.tacticEffect-t)-oppOvr,venue,yus:0,rus:0,rthem:0};}
       return _ml(mine,oppOvr+window.__cur.delta,venue);};
     const _sb=sbEv;
+    let _utolsoSor="";
+    const _al=addLine;
+    addLine=function(t){_utolsoSor=String(t||"");return _al.apply(this,arguments);};
     sbEv=function(side,kind){
       const c=window.__cur;
-      if(c){if(side==="us"&&kind==="yellow")c.yus++;if(side==="us"&&kind==="red")c.rus++;if(side==="them"&&kind==="red")c.rthem++;}
+      if(c){if(side==="us"&&kind==="yellow")c.yus++;
+        if(side==="us"&&kind==="red"){c.rus++;
+          const f=/MÁSODIK SÁRGA/.test(_utolsoSor)?"2sarga":/mez|MEZ/.test(_utolsoSor)?"mez":/verek|VEREK|dulak|DULAK/.test(_utolsoSor)?"verekedes":"kozvetlen";
+          (c.rf=c.rf||[]).push(f);}
+        if(side==="them"&&kind==="red")c.rthem++;}
       return _sb.apply(this,arguments);};
     const _pm=playMatchMotor;
     window.__fin=function(){
       if(window.__cur&&S.fixtureResults.length>window.__len){
         const r=S.fixtureResults[S.fixtureResults.length-1],c=window.__cur;
         const log=(typeof clutchLog!=="undefined"?clutchLog:[]).map(x=>({s:x.side,m:x.min}));
-        window.__rec.push({t:c.t,v:c.venue,gf:r.gf,ga:r.ga,yus:c.yus,rus:c.rus,rthem:c.rthem,log});
+        window.__rec.push({t:c.t,v:c.venue,gf:r.gf,ga:r.ga,yus:c.yus,rus:c.rus,rthem:c.rthem,rf:c.rf||[],log});
         window.__i++;}
       window.__cur=null;};
     playMatchMotor=function(){
@@ -125,7 +132,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     console.log(`⚡ ${t>=0?"+":""}${t}: n=${a.length}  Gy ${pc(a,r=>r.gf>r.ga)}%  D ${pc(a,r=>r.gf===r.ga)}%  V ${pc(a,r=>r.gf<r.ga)}%`
       +`  lőtt ${avg(a,r=>r.gf)} kapott ${avg(a,r=>r.ga)}`
       +(MODE==="piros"?`  · a ${RED}. perc után: lőtt ${avg(a,utanaMi)} kapott ${avg(a,utana)} (ebből 85' után ${avg(a,vege)})`
-        :`  · sárga/meccs ${avg(a,r=>r.yus)}  saját piros ${pc(a,r=>r.rus>0)}%  ellenfél piros ${pc(a,r=>r.rthem>0)}%`));}
+        :`  · sárga/meccs ${avg(a,r=>r.yus)}  saját piros ${pc(a,r=>r.rus>0)}%  ellenfél piros ${pc(a,r=>r.rthem>0)}%`
+          +`  · saját piros forrása / 100 meccs: ${["kozvetlen","2sarga","verekedes","mez"].map(k=>k+" "+(100*a.reduce((s2,r)=>s2+r.rf.filter(x=>x===k).length,0)/a.length).toFixed(1)).join(", ")}`));}
   console.log("idő",Math.round((Date.now()-t0)/1000),"s; hibák",errs.slice(0,3));
   await b.close();srv.close();process.exit(0);
 })().catch(e=>{console.error(e);process.exit(1);});
