@@ -158,7 +158,11 @@ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
     /* a plafon a karrierben. A többi tényező (osztály, két tempó) a plafont
        SZOROZZA — a tető csak akkor érhető el, ha azok is a maximumon vannak.
        Ezért két mérés: a mostani beállítással a −1,0 PONTOSAN kétszerese a
-       0,0-nak, a legnehezebb egyéb beállításokkal pedig tényleg 100 fölé megy. */
+       0,0-nak, a legnehezebb egyéb beállításokkal pedig tényleg 100 fölé megy.
+       3.9.223: a próba-karrier alapból tízfokozatú (padló 2), ahol a Run
+       teteje 100 (csak extra szinten több) — a régi lépcső mérése ezért padló
+       nélkül fut, utána visszaáll. */
+    const _padlo=S.pyr.padlo;S.pyr.padlo=0;
     S.pyr.diffT=0;
     const c0=pyrRunCap();
     S.pyr.diffT=-10;
@@ -178,6 +182,7 @@ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
     S.pyr.diffT=-10;
     const bd=runBreakdown();
     ki.run={top:bd.top,total:bd.total,cap:bd.cap,perf:bd.perf};
+    S.pyr.padlo=_padlo;
     return ki;});
 
   console.log("\n— A LÉPCSŐK —");

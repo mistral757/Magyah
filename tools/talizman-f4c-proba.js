@@ -286,7 +286,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return ki;});
   console.log("\n— 4. 🌟 SZTÁRVILÁG —");
   ok(/Sztárvilág/.test(sz.arc.cim)&&sz.arc.n,"a klub arca a legjobb kerettag",sz.arc);
-  ok(sz.ev.surge===2&&sz.ev.ad===3&&sz.ev.inv===1&&sz.ev.dem===1,"a négy hírnév-esemény a plafonjáig (2 / 3 / 1 / 1)",sz.ev);
+  ok(sz.ev.surge===2&&sz.ev.ad===2&&sz.ev.inv===1&&sz.ev.dem===1,"a négy hírnév-esemény a plafonjáig (2 / 2 / 1 / 1 — 3.9.223 óta a reklám legfeljebb 2)",sz.ev);
   ok(sz.fans>0&&sz.penz>0&&sz.ber===1.25,"szurkolók, pénz (reklám, befektető), és a követelés: +25% bér",{f:sz.fans,p:sz.penz,b:sz.ber});
   ok(sz.jovo.most===null&&sz.jovo.szezon===4,"menet közben a következő idényre szól",sz.jovo);
   ok(sz.sztarStilus.elo===null&&sz.sztarStilus.utolso===null&&sz.sztarStilus.ev===0,

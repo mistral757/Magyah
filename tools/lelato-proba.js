@@ -93,21 +93,43 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await p.waitForTimeout(400);
 
   /* ---- 4. A FELOLDÁS ---- */
-  console.log("\n— 4. A FELOLDÁS AZ IZGALOM LÉPCSŐIN —");
+  /* 3.9.223 — „Nézőszám határok is kellenek a stadion hangulatok
+     megnyitásához, és lvlenként magasabb izgalmú meccs kell." Előbb a tábor
+     éri el a küszöböt, UTÁNA egy elég izgalmas meccs nyit. */
+  console.log("\n— 4. A FELOLDÁS: SZURKOLÓSZÁM, AZTÁN IZGALOM —");
   const f=await p.evaluate(()=>{
     const r={};const t=msT();
-    t.exciteMax=0;r.l0=LELATO.map(L=>lelatoNyitott(L));
+    /* régi mentés: a régi szabállyal (csúcs 86) nyílt lelátók megmaradnak */
+    t.exciteMax=86;delete t.lelatoNyit;delete t.lelatoFan;delete t.lelatoMig;
+    r.regi=LELATO.map(L=>lelatoNyitott(L));
+    /* tiszta lap */
+    t.exciteMax=0;t.lelatoNyit={};t.lelatoFan={};t.lelatoMig=1;
+    r.l0=LELATO.map(L=>lelatoNyitott(L));
     identState().lelato="legenda";r.zartValasztas=lelatoValasztott();
     const sorok=[];const _a=addLine;addLine=h=>{sorok.push(String(h).replace(/<[^>]+>/g,""));};
-    try{msNoteMatch({excitement:88});}finally{addLine=_a;}
-    r.l88=LELATO.map(L=>lelatoNyitott(L));r.bejelentes=sorok.filter(x=>/ÚJ LELÁTÓ-HANG/.test(x));
-    t.exciteMax=96;r.l96=LELATO.map(L=>lelatoNyitott(L));r.nyitottValasztas=lelatoValasztott();
-    r.kuszob=LELATO.map(L=>L.kell);
+    try{
+      S.fanBase=60000;
+      msNoteMatch({excitement:88});r.l1=LELATO.map(L=>lelatoNyitott(L));   /* a küszöb most lett meg: még nem nyit */
+      msNoteMatch({excitement:78});r.l2=LELATO.map(L=>lelatoNyitott(L));   /* 75 ≤ 78 < 80 */
+      msNoteMatch({excitement:81});r.l3=LELATO.map(L=>lelatoNyitott(L));
+      S.fanBase=250000;
+      msNoteMatch({excitement:95});r.l4=LELATO.map(L=>lelatoNyitott(L));   /* a nagy tábor most lett meg */
+      msNoteMatch({excitement:93});r.l5=LELATO.map(L=>lelatoNyitott(L));
+    }finally{addLine=_a;}
+    r.bejelentes=sorok.filter(x=>/ÚJ LELÁTÓ-HANG/.test(x)).length;
+    r.taborSor=sorok.filter(x=>/elérte a\(z\)/.test(x)).length;
+    r.nyitottValasztas=lelatoValasztott();
+    r.kuszob=LELATO.map(L=>L.kell);r.fan=LELATO.map(L=>L.fan||0);
     return r;});
-  ok(JSON.stringify(f.kuszob)==="[0,65,85,92,96]","a lépcsők: alap · 65 izgalmas · 85 emlékezetes · 92 · 96 (az izgalom-mérföldkövek fokai)",f.kuszob);
-  ok(JSON.stringify(f.l0)==="[true,false,false,false,false]"&&f.zartValasztas==="vasarnap","kezdetben csak a vasárnapi nyitott; zárt lelátó nem választható",f);
-  ok(JSON.stringify(f.l88)==="[true,true,true,false,false]"&&f.bejelentes.length===2,"egy 88-as izgalmú meccs kettőt nyit, és be is jelenti",f.bejelentes);
-  ok(JSON.stringify(f.l96)==="[true,true,true,true,true]"&&f.nyitottValasztas==="legenda","96-nál mind nyitva, a választott szól",f);
+  ok(JSON.stringify(f.kuszob)==="[0,75,80,86,92]"&&JSON.stringify(f.fan)==="[0,20000,50000,100000,200000]",
+     "a lépcsők: 20 000 + 75 · 50 000 + 80 · 100 000 + 86 · 200 000 + 92",{kell:f.kuszob,fan:f.fan});
+  ok(JSON.stringify(f.regi)==="[true,true,true,false,false]","a régi szabállyal (86-os csúcs) nyílt lelátók megmaradnak",f.regi);
+  ok(JSON.stringify(f.l0)==="[true,false,false,false,false]"&&f.zartValasztas==="vasarnap","tiszta lapon csak a vasárnapi nyitott; zárt lelátó nem választható",f);
+  ok(JSON.stringify(f.l1)==="[true,false,false,false,false]","a küszöböt elérő meccs maga még nem nyit (88-as izgalommal sem)",f.l1);
+  ok(JSON.stringify(f.l2)==="[true,true,false,false,false]"&&JSON.stringify(f.l3)==="[true,true,true,false,false]","utána szintenként a saját izgalma nyit: 78 → Hazai mag, 81 → Ultrák",{l2:f.l2,l3:f.l3});
+  ok(JSON.stringify(f.l4)==="[true,true,true,false,false]"&&JSON.stringify(f.l5)==="[true,true,true,true,true]"&&f.nyitottValasztas==="legenda",
+     "a nagy tábor után a 93-as meccs nyitja a Katlant és a Legendás éjszakát; a választott szól",{l4:f.l4,l5:f.l5});
+  ok(f.bejelentes===4&&f.taborSor===4,"minden nyitást és minden elért tábor-küszöböt bejelent",{nyit:f.bejelentes,tabor:f.taborSor});
 
   /* ---- 2. NÉZETT MECCS ---- */
   console.log("\n— 2. NÉZETT MECCS: LELÁTÓ + 25%-OS ZENE —");
@@ -175,7 +197,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const u=await p.evaluate(async()=>{
     const varj=ms=>new Promise(r=>setTimeout(r,ms));
     for(let i=0;i<6;i++){const x=document.getElementById("guideTipOk");if(x&&x.offsetParent)x.click();await varj(50);}
-    msT().exciteMax=86;identState().lelato="vasarnap";
+    msT().exciteMax=86;msT().lelatoNyit={hazai:1,ultra:1};msT().lelatoFan={hazai:1,ultra:1};msT().lelatoMig=1;S.fanBase=30000;identState().lelato="vasarnap";
     openHubMidSeason();await varj(200);
     identOpenPanel();await varj(200);
     const sec=document.getElementById("identLelato");
@@ -191,8 +213,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     r.mentve=(()=>{try{saveGame();const d=JSON.parse(localStorage.getItem(saveKey()));return d.S&&d.S.ident&&d.S.ident.lelato;}catch(e){return "hiba:"+e.message;}})();
     return r;});
   ok(u.van&&/7 · A lelátó hangja/.test(u.cim),"az Arculat menüben: „7 · A lelátó hangja”",u.cim);
-  ok(u.kartyak.length===5&&JSON.stringify(u.kartyak.map(x=>x.zar))==="[false,false,false,true,true]","öt kártya; 86-os csúcsnál a Katlan és a Legendás éjszaka zárva",u.kartyak);
-  ok(u.kartyak[3].valaszt===false&&/92/.test(u.feltetel),"a zártnál nincs választó gomb, a feltétel ki van írva",u.feltetel);
+  ok(u.kartyak.length===5&&JSON.stringify(u.kartyak.map(x=>x.zar))==="[false,false,false,true,true]","öt kártya; a Katlan és a Legendás éjszaka zárva",u.kartyak);
+  ok(u.kartyak[3].valaszt===false&&/100[ \u00a0.]?000/.test(u.feltetel)&&/86\+/.test(u.feltetel),"a zártnál nincs választó gomb, a két feltétel (tábor, izgalom) ki van írva",u.feltetel);
   ok(u.valasztva==="ultra"&&u.most==="ultra"&&u.selUj,"a választás azonnal érvényes",u);
   ok(u.mentve==="ultra","a választás a mentésbe kerül (az arculat része)",u.mentve);
   ok(u.proba&&u.probaGomb,"a belehallgatás szól",u);

@@ -202,10 +202,90 @@ node tools/nehezseg-3-9-222-proba.js        # KEP=<mappa> az átállás és a ny
   * mélyen alatta a fék legfeljebb egy éves ütemnyit vesz vissza, enyhén alatta a holtsáv széléig;
   * a napló kimondja.
 * **A tél** a célrés +0,5-höz mér; **az idény vége** egyszer rögzíti a dg-t, a következő rajt-cél abból tanul.
-* **A határok:** könnyíteni a kezdő fokozatnál kettővel könnyebbig, nehezíteni egy fokkal, sikeres idény után.
-* **Nyár:** a HUB a fokozatot mutatja, a képernyőn tíz lenyitható sor, a határon kívüliek zárva.
+* **A határok:** a határ-függvény változatlan, de 3.9.223 óta a fokozat két idény között nem változik (a régi választás nem hat).
+* **Nyár (3.9.223):** a HUB a következő idény célrését és a rögzített fokozatot mutatja; a képernyő célrés-hangolás (±0,5, 0,1-es lépés), fokozat-lista nincs.
 * **Átállás:** csak két idény között; tíz lenyitható sor, a mostani jelölve; a „Mégsem” nem állít át; utána nincs újra.
 * **Run, mérő, közös karrier:** a Run levonja a féket; a mérő rögzíti a fokot, a célrést, a féket; a szoba csomagja `padlo:2`, a régi házigazda a régi padlót viszi; közösben is fékez.
+
+## taktika-illeszkedes-teteje-proba.js — 🎛️ a taktika-illeszkedés teteje (150% / 200%)
+
+```
+node tools/taktika-illeszkedes-teteje-proba.js
+```
+
+**6 állítás**, valódi böngészőben.
+
+* A tető: edző nélkül és 1. szinten 100%, a stílus-edző 2. szintjén 150%, 3. szintjén 200%.
+* Csak az edző saját taktikáján, a többi 100% marad.
+* Kiváló kerettel az illeszkedés a tetőig megy, és a meccshatás vele nő.
+* A taktika-panel kiírja a nyitott tetőt; nincs oldalhiba.
+
+## penz-pvp-kezdes-proba.js — 💰🤝 a pénzrobbanás fékjei és a rejtett PvP kezdő kiegyenlítés
+
+```
+node tools/penz-pvp-kezdes-proba.js
+```
+
+**18 állítás**, valódi böngészőben (lásd `docs/penz-pvp-kezdes-3-9-224.md`).
+
+* Az eladási plafon:
+  * a küszöb a működési keret másfélszerese, alatta az ár betűre a régi;
+  * fölötte logaritmikus és monoton;
+  * egy kirívó sztár ára ~3× küszöbre esik vissza, és a gyors eladás ugyanebből számol;
+  * a „Piaci plafon” sor csak akkor szól, ha fog.
+* A hírnév: a reklám és a befektető idényenként ≤ a keret 60%-a; a sztár-hozta tömeg ≤ az organikus tábor.
+* A befektetés ≤ egy idénynyi működési keret.
+* A PvP kezdő kiegyenlítés:
+  * az erősebb nem mozdul, a gyengébb 3-ból 0,75-re zárkózik fel;
+  * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
+  * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
+
+## talizman-ugynok-szurkolo-proba.js — 🕴️📣🎓 Ügynökség, Szurkolótábor, erősebb Stáb
+
+```
+node tools/talizman-ugynok-szurkolo-proba.js
+```
+
+**47 állítás**, valódi böngészőben (lásd `docs/talizman-ugynokseg-szurkolotabor-3-9-224.md`).
+
+* A katalógus: 13 szín, 6-6 új speciál és +2 a Stábnak. Minden új kontra másik színt üt. Öt ritkaságon egyik szöveg sem hagy benne {v}-t, NaN-t vagy undefined-ot.
+* Talizmán nélkül minden új kapaszkodó semleges, és a régi számok bitre a régiek.
+* Ügynökség:
+  * a célzott gyorsítás csak a saját célját mozdítja, és +100%-nál megáll;
+  * a garantált scout-lépés a ritkaság határáig pótol; a Mítosz többet ad, az égetett lap nem hat;
+  * az XL-gyűjtés idény közben léptet;
+  * az igazolás pontja ×2-ig nő;
+  * mind a hat speciál és a rezonancia működik.
+* Szurkolótábor:
+  * az esemény-felismerés, és hogy az izgalom-boost csak a saját eseményére jár;
+  * a kassza a 65+ izgalmú meccsen hat;
+  * a pillanatkép: a rangadó-katlan csak rangadón kerül bele;
+  * a matchLambdas csak hazai pályán hat, a zaj csak kiegyenlített meccsen; a hamis érték ±15%-ba vágva;
+  * az időfüggő rész; a speciálok és a rezonancia.
+* Stáb: mind az öt változat a pontos számmal, és a két új speciál.
+* 8 valódi forduló az összes új lappal: az XL gyűlik, minden izgalom könyvelődik, és nincs oldalhiba.
+
+## valogatott-piramis-proba.js — 🌍 válogatottak a piramis mezőnyében
+
+```
+node tools/valogatott-piramis-proba.js
+```
+
+**4 állítás**, valódi böngészőben. Bekapcsolt válogatottakkal a piramis merítése és a felépített világ is tartalmaz válogatottat; kikapcsolva egyik sem (betűre a régi); nincs oldalhiba.
+
+## nf-run-hangolas-proba.js — 🎚 a Run és a célrés-hangolás a tízfokozatú rendszerben
+
+```
+node tools/nf-run-hangolas-proba.js
+```
+
+**9 állítás**, valódi böngészőben, a beállítón át indított 6. fokozatú karrierrel.
+
+* A fokozat két idény között nem változik; a célrés-hangolás az idény célrésébe megy, a hivatalos szint marad.
+* A hangolás hat a Run-ra (nehezebb > alap > könnyebb); a téli tűrés is (szigorú > laza); a télen felnőtt mezőny nehezebb idény.
+* A Run teteje 100 a 10.5 alatt (a legnehezebb hangolással is); extra szinten szintenként +10 (10.7 → 120).
+* Az extra szinteket csak a 10.5-ön nyert karrier nyitja.
+* Nincs oldalhiba.
 
 ## nehezseg/ — 🎚 az általános nehézségi rendszer mérői (terv: `docs/nehezsegi-rendszer-terv.md`)
 
@@ -1430,7 +1510,7 @@ node tools/valtozasok-3-9-175-proba.js
 node tools/lelato-proba.js
 ```
 
-**21 állítás** (valódi hangkártyával, `HANG_TESZT`):
+**24 állítás** (valódi hangkártyával, `HANG_TESZT`):
 
 * **A render:** mind az öt lelátó kirenderelődik, nem néma, a hurok 15 mp
   fölötti; a csúcs 0,9 alatt; a varrat sima; a nagy tömeg hangosabb a
@@ -1440,12 +1520,14 @@ node tools/lelato-proba.js
   * a gól megmozdítja a lelátót;
   * a lefújás után a lelátó elhallgat, a zene visszaáll.
 * **Végigjátszás:** nincs lelátó.
-* **A feloldás:**
-  * a lépcsők 0 / 65 / 85 / 92 / 96;
+* **A feloldás (3.9.223: szurkolószám, aztán izgalom):**
+  * a lépcsők: 20 000 + 75 · 50 000 + 80 · 100 000 + 86 · 200 000 + 92;
+  * a régi szabállyal (csúcs-izgalom) nyílt lelátók megmaradnak;
+  * a küszöböt elérő meccs maga még nem nyit; utána szintenként a saját izgalma nyit;
   * zárt lelátó nem választható;
-  * a lépcső átlépését a napló bejelenti.
+  * minden nyitást és elért tábor-küszöböt a napló bejelent.
 * **Az Arculat → „7 · A lelátó hangja”:**
-  * öt kártya, a zártak feltétellel;
+  * öt kártya, a zártak a két feltétellel (tábor, izgalom);
   * a választás azonnal érvényes, és bekerül a mentésbe;
   * a belehallgatás szól.
 * **A Hang beállításai:** lelátó ki/be, hangerő, a 25%-os zene leírása.
@@ -4140,7 +4222,7 @@ node tools/talizman-f6b-proba.js
    versenyszellem.
 3. **Stáb (8):** bővített, mentor, lojális, tapasztalatcsere, fókusz,
    legenda, a nagy öreg, konferencia.
-4. **Katalógus:** a három kategória mind a 24 speciálja él; nincs oldalhiba.
+4. **Katalógus:** a három kategória mind a 26 speciálja él (3.9.224 óta a Stábnak +2: Szakkönyvtár, Utánpótlás-edzők); nincs oldalhiba.
 
 Részletek: `docs/talizman-f6b-3-9-154.md`.
 

@@ -64,6 +64,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     if(!coach)coach=COACHES[0];
     addLine=()=>{};
 
+    /* 3.9.223 — a padlós (kétoldalú, tízfokozatú) piramisban NINCS ugrás-terv:
+       ott a mezőny követ, az ugrás értelmetlen. Előbb ezt rögzítjük, aztán a
+       régi (padló nélküli) piramisban mérjük a tervet, ahogy eddig. */
+    S.seasonClosed=true;S.pyrLeap=null;S.auto=false;
+    hubMidSeasonMode=false;preSeasonHubMode=false;
+    ki.padlos={padlo:S.pyr&&S.pyr.padlo,terv:(()=>{const _p=S.pyr.padlo;S.pyr.padlo=2;const r=pyrLeapPlan();S.pyr.padlo=_p;return r;})()};
+    S.pyr.padlo=0;
     /* NYÁR: a szezon lezárult, az ablak nyitva, nincs élő vállalás. */
     S.seasonClosed=true;S.pyrLeap=null;S.auto=false;
     hubMidSeasonMode=false;preSeasonHubMode=false;
@@ -131,6 +138,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const agS=P=>P&&P.agak.map(a=>`${a.start}>${a.to}@${a.price}`).join(",");
 
   console.log("=== 1. a bajnok ága — „D4-ről egyből D2” ===");
+  ok(t.padlos&&t.padlos.terv===null,"3.9.223: a padlós (tízfokozatú) piramisban nincs osztályugrás-terv",t.padlos);
   ok(t.bajnok&&t.bajnok.agak.length===1,"egyetlen, BIZTOS ág",agS(t.bajnok));
   ok(t.bajnok&&t.bajnok.agak[0].start===3&&t.bajnok.agak[0].to===2,
      "a következő idény D3, az ugrás a D2-be visz",agS(t.bajnok));

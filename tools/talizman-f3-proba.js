@@ -122,7 +122,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(Math.abs(h.kov-Math.pow(0.85,3))<1e-9,"a következő talizmán hatékonysága 0,85³",h.kov);
   ok(Math.abs(h.spec-0.8*1.7)<1e-9,"special-os talizmán: nincs Tiszta-szorzó",h.spec);
   ok(h.plafon===8,"a plafon fog (Jobb illeszkedés: 8 pp)",h.plafon);
-  ok(Math.abs(h.ar-5*4.2*1.25)<1e-9&&Math.abs(h.hatas-4*1.25*0.85)<1e-9,"a sorrend az erőé: a legendás ár-talizmán teljes, az átlagos hatás-talizmán 85%",h);
+  /* 3.9.224: a Stáb erősebb — az ár egysége 7, a hatásé 6 */
+  ok(Math.abs(h.ar-7*4.2*1.25)<1e-9&&Math.abs(h.hatas-6*1.25*0.85)<1e-9,"a sorrend az erőé: a legendás ár-talizmán teljes, az átlagos hatás-talizmán 85%",h);
 
   /* ---- 3. A KAPASZKODÓK ---- */
   const k=await p.evaluate(async()=>{
@@ -245,7 +246,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(Math.abs(k.fit.pp-0.8*E)<1e-9&&Math.abs((k.fit.utana-k.fit.elotte)-Math.min(k.fit.pp/100,1-k.fit.elotte))<1e-9,
      "Jobb illeszkedés: a tacticFit pontosan a pp-vel nő",k.fit);
   ok(Math.abs(k.dev.ar-k.dev.m)<1e-9&&Math.abs(k.dev.m-(1+2.5*E/100))<1e-9,"Gyorsabb érés: a devTempo a talizmán szorzójával nő",k.dev);
-  ok(Math.abs(k.qual.ar-k.qual.m)<1e-9&&Math.abs(k.qual.m-(1+4*E/100))<1e-9,"Jobb szakemberek: a coachQual szorzója",k.qual);
+  ok(Math.abs(k.qual.ar-k.qual.m)<1e-9&&Math.abs(k.qual.m-(1+6*E/100))<1e-9,"Jobb szakemberek: a coachQual szorzója",k.qual);
   ok(Math.abs(k.staff.ar-k.staff.m)<0.002&&k.staff.m<1,"Olcsóbb stáb: a stábtag ára",k.staff);
   ok(k.slot.utana<k.slot.elotte&&Math.abs(k.slot.utana/k.slot.elotte-k.slot.m)<0.05,"Olcsóbb stáb: a stábhely ára (500-ra kerekítve)",k.slot);
   ok(Math.abs(k.ms.ar-k.ms.m)<0.02&&Math.abs(k.ms.sp-k.ms.m)<0.03,"Mérföldkő-prémium: a pénz és a stíluspont is",k.ms);

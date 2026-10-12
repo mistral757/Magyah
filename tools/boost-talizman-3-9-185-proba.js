@@ -151,7 +151,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const c=await p.evaluate(()=>{
     const ki={};
     const K=talKat("boost");
-    ki.van=!!K&&TAL_KAT.length===11&&TAL_KAT[10].k==="boost";
+    ki.van=!!K&&TAL_KAT.length>=11&&TAL_KAT[10].k==="boost";
     ki.valt=K?K.valt.map(v=>v.k+":"+v.cap):[];
     ki.spec=TAL_SPEC.filter(s=>s.k==="boost").map(s=>s.id);
     ki.specKesz=ki.spec.every(id=>talSpecMukodik(id));
@@ -180,7 +180,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.equalNincs=!eqOn()?!fajtak.equal:true;
     return ki;});
   console.log("\n— 3. A ⚡ BOOST SZÍN —");
-  ok(c.van,"a TAL_KAT tizenegyedik eleme a ⚡ Boost");
+  ok(c.van,"a TAL_KAT tizenegyedik eleme a ⚡ Boost (utána 3.9.224 óta az Ügynökség és a Szurkolótábor)");
   ok(c.valt.join(",")==="szerencse:50,csomag:20,fajta:20,kihivas:40","négy változat, a kért plafonokkal (50 / 20 / 20 / 40)",c.valt);
   ok(c.spec.length>=6&&c.specKesz&&c.min1&&c.kontraMas&&c.rez,"saját speciálok (mind él, van átlagos szinten is, a kontra MÁSIK területet üt) és rezonancia",c.spec);
   ok(Math.abs(c.szer-50)<1e-9&&Math.abs(c.szerP-0.5)<1e-9,"a szerencse-esély plafonja 50%",c.szer);
@@ -360,7 +360,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const body=$("twBody").innerText||"",act=$("twActions").innerText||"";
     ki.panel=/talizmánból/.test(body)&&/fajta-kedvezmény/.test(act)&&/Törzsvásárló/.test(act);
     ki.panelSzoveg=act.slice(0,300);
-    ki.sugo=/⚡ BOOST talizmán/.test(GLOSSARY.talizman.text)&&/tizenegy szín/.test(GLOSSARY.talizman.text)
+    ki.sugo=/⚡ BOOST talizmán/.test(GLOSSARY.talizman.text)&&/tizenhárom szín/.test(GLOSSARY.talizman.text)
       &&GLOSSARY.talizman.text.indexOf("mind a "+TAL_SPEC.length+" él")>=0;
     return ki;});
   console.log("\n— 8. A FELÜLET —");
@@ -368,7 +368,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(f.menu,"a Talizmánok menü aktív hatásai: fajtánkénti kedvezmény, csomag, kihívás-esély, az idei szerencse-dobások",f.menuSzoveg);
   ok(f.ossz,"az összhatás-panel a fajta-kedvezményt is listázza");
   ok(f.panel,"a Boost-központ kiírja a talizmán-kedvezményeket (csomag a fejlécben, fajta és sorrend a sorban)",f.panelSzoveg);
-  ok(f.sugo,"a súgó a tizenegy színről és a Boost talizmánról szól, a speciálok száma stimmel");
+  ok(f.sugo,"a súgó a tizenhárom színről (3.9.224 óta) és a Boost talizmánról szól, a speciálok száma stimmel");
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,5));
 
   await b.close();srv.close();
