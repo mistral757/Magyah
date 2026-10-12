@@ -220,6 +220,14 @@ node tools/taktika-illeszkedes-teteje-proba.js
 * Kiváló kerettel az illeszkedés a tetőig megy, és a meccshatás vele nő.
 * A taktika-panel kiírja a nyitott tetőt; nincs oldalhiba.
 
+## valogatott-piramis-proba.js — 🌍 válogatottak a piramis mezőnyében
+
+```
+node tools/valogatott-piramis-proba.js
+```
+
+**4 állítás**, valódi böngészőben. Bekapcsolt válogatottakkal a piramis merítése és a felépített világ is tartalmaz válogatottat; kikapcsolva egyik sem (betűre a régi); nincs oldalhiba.
+
 ## nf-run-hangolas-proba.js — 🎚 a Run és a célrés-hangolás a tízfokozatú rendszerben
 
 ```
