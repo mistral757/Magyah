@@ -18028,6 +18028,10 @@ function pyrRunCap(){
   /* …de csak ha már van tényleges idényvállalás (a 2. idénytől) — addig a
      választott fok a mérce, betűre ugyanúgy, mint eddig */
   try{if(typeof pyrFloorOn==="function"&&pyrFloorOn()&&pyrFloorHasVall())dT=diffSnapT(pyrFloorAvgG());}catch(e){}
+  /* 🎚 3.9.223 — a tízfokozatú rendszerben az idények HANGOLT célrése, a téli
+     felméréssel (nfRunCel) — a tető 100, csak extra szinten (10.6+) fölötte */
+  let _nfTop=null;
+  try{if(typeof nfOn==="function"&&nfOn()){const r=nfRunCel();if(r!=null){dT=diffSnapT(r);_nfTop=nfRunTop(dT);}}}catch(e){}
   const parts=[
     {n:`Kezdő osztály: D${d}`,v:PYR_RUN_CAP.div[d-1]||1},
     {n:`Ellenfél-tempó: ${pyrSpeedDef(sp).n}`,v:PYR_RUN_CAP.speed[sp]},
@@ -18057,7 +18061,7 @@ function pyrRunCap(){
   {const _up=P?pyrUpNorm(P.up):0;
    if(_up)parts.push({n:`${_up>0?"Felskálázott":"Leskálázott"} világ (${pyrUpTxt(_up)})`,v:1,info:true});}
   let cap=1;parts.forEach(x=>{cap*=x.v;});
-  const top=(dT!=null)?diffRunTop(dT):100;
+  const top=(_nfTop!=null)?_nfTop:(dT!=null)?diffRunTop(dT):100;
   return {cap:Math.max(0.05,Math.min(top/100,cap)),parts,top};}
 /* ---- A KIHÍVÁS-SZORZÓ A PIRAMISBAN: AZ OSZTÁLY DÖNT ----
    A mai szorzó abszolút Rating-szintre horgonyoz (70…110). Egy végtelenbe
@@ -40373,7 +40377,7 @@ function nfHubSavHtml(){
   let h=null;try{h=nfOn()?nfKarrierHivatalos():null;}catch(e){h=null;}
   if(!h)return "";
   const col=nfSzin(h.nf),ink=(typeof inkOn==="function")?inkOn(col):"#fff";
-  let cel=null;try{const H=S.pyr.vallH||{},sn=S.seasonNumber||1;cel=(H[sn]&&typeof H[sn].cel==="number")?H[sn].cel:nfCelK(nfLevelFor(pyrFloorUpcoming()));}catch(e){}
+  let cel=null;try{const H=S.pyr.vallH||{},sn=S.seasonNumber||1;cel=(H[sn]&&typeof H[sn].cel==="number")?H[sn].cel:nfCelFor(pyrFloorUpcoming());}catch(e){}
   return `<div class="nfHubSav" id="nfHubSav" style="background:linear-gradient(135deg,${col} 0%,${col}cc 60%,${col}99 100%);color:${ink}">`
     +`<span class="t">🎚 Nehézségi szint — ${esc(nfSzintCimke(h,h.egyeni))}</span>`
     +`<small>${cel!=null?`célrés ${nfCelTxt(cel)}`:""}${h.egyeni?" · egyéni beállítás, a legközelebbi szint szerint":""} · nyaranta a célrés állítható</small></div>`;}
@@ -40413,7 +40417,11 @@ function nfKarrierHivatalos(){
   if(!P||P.padlo!==2)return null;
   let cel=null;
   try{const H=P.vallH||{},sn=S.seasonNumber||1;
-    cel=(H[sn]&&typeof H[sn].cel==="number")?H[sn].cel:nfCelK(nfLevelFor(pyrFloorUpcoming()));}catch(e){cel=null;}
+    /* 3.9.223 — a hivatalos szint a fokozat ALAP célréséből: a nyári hangolás
+       nem írja át a szintet (az a Run-ra és a mezőnyre hat) */
+    cel=(H[sn]&&typeof H[sn].celAlap==="number")?H[sn].celAlap
+       :(H[sn]&&typeof H[sn].cel==="number"&&typeof H[sn].hang!=="number")?H[sn].cel
+       :nfCelK(nfLevelFor(pyrFloorUpcoming()));}catch(e){cel=null;}
   if(cel==null)cel=(typeof P.cel==="number")?P.cel:nfDef(P.nf||NF_AJANLOTT).cel;
   if(!P.fok||!P.fok.cfg){const x=nfNearest(cel);return {nf:x.nf,s:null,pont:null,regi:true};}
   return Object.assign(nfHivatalos(Object.assign({},P.fok.cfg,{cel})),{egyeni:!!P.fok.egyeni});}
@@ -40494,10 +40502,23 @@ function nfBounds(sn){
   /* 3.9.223 — nehezíteni a feloldott fokozatokig lehet (a mostanit sosem veszi el) */
   const nehez=Math.min(10,prev+(ok?1:0),Math.max(prev,nfNyitottMax()));
   return {lo:konnyu,hi:nehez,prev,start,ok};}
+/* 3.9.223 — „Két szezon között hangolni lehet célrést, de nehézségi szintet
+   nem lehet változtatni." A fokozat a karrier teljes idejére az, amivel
+   indult (átállásnál az átálláskori) — a régi mentés idényenként váltott
+   fokozata a legutóbbi idényé marad. A nyár a CÉLRÉST hangolja (nfHangFor). */
 function nfLevelFor(sn){
-  const b=nfBounds(sn),P=S.pyr;
-  const v=(typeof P.nfNext==="number")?P.nfNext:b.prev;
-  return Math.max(b.lo,Math.min(b.hi,v));}
+  return nfPrev(sn);}
+const NF_HANG_MAX=0.5;   /* a célrés-hangolás: a fokozat saját célrése ±0,5 */
+function nfHangFor(sn){
+  const P=S.pyr;
+  const v=(typeof P.nfHangNext==="number"&&isFinite(P.nfHangNext))?P.nfHangNext:nfHangPrev(sn);
+  return Math.round(Math.max(-NF_HANG_MAX,Math.min(NF_HANG_MAX,v))*10)/10;}
+function nfHangPrev(sn){
+  const H=pyrFloorHist();
+  for(let s=sn-1;s>=1;s--)if(H[s]&&typeof H[s].hang==="number")return H[s].hang;
+  return 0;}
+/* az idény célrése: a fokozaté, a hangolással */
+function nfCelFor(sn){return Math.round((nfCelK(nfLevelFor(sn))+nfHangFor(sn))*100)/100;}
 /* A KARRIER ELEJI VÁLLALÁS (G0): a beállított rés — a lépcső mezőny-ígéreténél
    a ténylegesen kijött rajt-rés */
 function pyrFloorG0(){
@@ -40534,7 +40555,7 @@ function pyrFloorBounds(sn){
 /* a következő idény vállalása (a választott, a határok közé fogva) */
 function pyrFloorWantFor(sn){
   /* 🎚 3.9.222 — a kétoldalú szabályozóban a „vállalás" a fokozat RAJT-CÉLJA */
-  if(nfOn())return Math.round(nfRajtCel(nfCelK(nfLevelFor(sn)),S.pyr.my,nfMertValtozas())*10)/10;
+  if(nfOn())return Math.round(nfRajtCel(nfCelFor(sn),S.pyr.my,nfMertValtozas())*10)/10;
   const b=pyrFloorBounds(sn),P=S.pyr;
   let g=(typeof P.vallNext==="number"&&isFinite(P.vallNext))?P.vallNext:b.prev;
   return Math.round(Math.max(b.lo,Math.min(b.hi,g))*10)/10;}
@@ -40649,8 +40670,9 @@ function pyrFloorKickoff(){
     }finally{try{msRatedEnd();}catch(e){}}}
   delete P.vallNext;
   H[sn]={g,want,div:P.my,lift,mid:0,nat,elotte,utana,done:true};
-  if(nfOn()){H[sn].nf=nfLevelFor(sn);H[sn].cel=nfCelK(H[sn].nf);H[sn].fek=Math.max(0,Math.round((fek||0)*10)/10);
-    H[sn].dgBecsles=nfMertValtozas();delete P.nfNext;}
+  if(nfOn()){H[sn].nf=nfLevelFor(sn);H[sn].celAlap=nfCelK(H[sn].nf);H[sn].hang=nfHangFor(sn);
+    H[sn].cel=nfCelFor(sn);H[sn].fek=Math.max(0,Math.round((fek||0)*10)/10);
+    H[sn].dgBecsles=nfMertValtozas();delete P.nfNext;delete P.nfHangNext;}
   /* a régi kalibráció bélyege — hogy semmi ne fusson rá kétszer */
   P.superFor=sn;
   try{
@@ -40717,6 +40739,40 @@ function nfIdenyVege(){
   const rajt=(typeof rec.utana==="number")?rec.utana:(typeof rec.g==="number"?rec.g:null);
   if(rajt!=null)rec.dg=Math.round((gap-rajt+(rec.mid||0))*100)/100;
   return rec;}
+/* ---- 🎚 A RUN A TÍZFOKOZATÚ RENDSZERBEN (3.9.223) ----
+   KIMONDOTT KÉRÉSEK: „A 100 fölötti Run szint pontszám csak a 10.5 szint
+   megnyerése után nyíljon meg" · „A célrés hangolás hatással van a Run
+   szintre de 10.5 nehézségi szint alatt minden 100ason belül" · „A
+   felszezonos hangolás szuper, azt tartsuk meg, szintén legyen hatással a Run
+   szintre."
+   AZ IDÉNY NEHÉZSÉGE (a Run nehézség-tényezőjének bemenete, célrés-egységben):
+     · a HANGOLT célrés (a fokozaté ± a nyári hangolás);
+     · a TÉLI FELMÉRÉS két úton: a tűrése fele (laza +0,5 · normál +0,25 ·
+       szigorú 0 — a laza tél a második félidényt könnyíti), és ha a mezőny
+       télen tényleg felnőtt, az emelés negyede (legfeljebb 0,5) nehezít.
+   A Run nehézség-tényezője ezek ÁTLAGÁBÓL (a lejátszott idényekből; az első
+   idényben a mostani). A TETŐ 100 — fölötte csak EXTRA szinten (10.6+), ami
+   csak a 10.5-ön megnyert karrier után nyílik. */
+function nfRunIdenyCel(rec,tur){
+  if(!rec||typeof rec.cel!=="number")return null;
+  const t=(typeof tur==="number")?tur:0.5;
+  const tel=Math.min(0.5,Math.max(0,(rec.mid||0)*0.25));
+  return rec.cel+t*0.5-tel;}
+function nfRunCel(){
+  if(!nfOn())return null;
+  const P=S.pyr,H=pyrFloorHist();
+  const tur=(NF_TEL[P.tel]!=null)?NF_TEL[P.tel]:0.5;
+  const v=[];
+  Object.keys(H).map(Number).sort((a,b)=>a-b).forEach(s=>{const x=nfRunIdenyCel(H[s],tur);if(x!=null)v.push(x);});
+  if(!v.length){const sn=pyrFloorUpcoming();v.push(nfCelFor(sn)+tur*0.5);}
+  return Math.round(v.reduce((a,b)=>a+b,0)/v.length*100)/100;}
+/* extra szinten (10.6+) a tető fokozatosan nyílik: szintenként +10 (10.6 →
+   110, 10.7 → 120 …), legfeljebb a célrés-görbe szerinti tetőig; alatta 100 */
+function nfRunTop(dT){
+  let h=null;try{h=nfKarrierHivatalos();}catch(e){h=null;}
+  const extra=(h&&h.nf===10)?Math.max(0,(h.s||0)-5):0;
+  if(!extra)return 100;
+  return Math.max(100,Math.min(diffRunTop(dT),100+10*extra));}
 /* ---- A RUN ---- */
 function pyrFloorHasVall(){
   const H=(S.pyr&&S.pyr.vallH)||{};
@@ -40802,26 +40858,28 @@ function nfVissza(box,fromHub,done){
   box.classList.add("hide");try{saveGame();}catch(e){}
   if(fromHub){try{renderHub();$("scHub").classList.remove("hide");}catch(e){}}
   try{done&&done();}catch(e){}}
-/* NYÁRON: a következő idény fokozata (a vállalás helyén) */
+/* NYÁRON: a következő idény CÉLRÉSE (3.9.223) — a fokozat rögzített, a célrés
+   a fokozat sajátjához képest ±NF_HANG_MAX-ig hangolható. A hangolás a mezőnyre
+   (rajt-cél, tél) és a Run-ra hat; a hivatalos szintet nem írja át. */
 function nfOffer(next,fromHub){
   const done=()=>{try{next&&next();}catch(e){}};
   if(!nfOn()||S.auto){done();return;}
-  const P=S.pyr,sn=pyrFloorUpcoming(),b=nfBounds(sn),dg=nfMertValtozas();
-  let v=nfLevelFor(sn);
+  const P=S.pyr,sn=pyrFloorUpcoming(),nf=nfLevelFor(sn),x=nfDef(nf),alap=nfCelK(nf),dg=nfMertValtozas();
+  let h=nfHangFor(sn);
   const rajz=()=>{
-    let sorok="";
-    NF_LEVELS.forEach(x=>{
-      const off=x.nf<b.lo||x.nf>b.hi;
-      const ok=x.nf>b.hi?(b.ok?"Egy idény alatt legfeljebb egy fokkal nehezíthetsz.":"Nehezíteni csak sikeres idény (bajnoki cím vagy feljutás) után lehet — egy fokkal.")
-        :x.nf<b.lo?`Könnyíteni a karrier eleji fokozatnál (${nfDef(b.start).n}) legfeljebb kettővel könnyebbig lehet.`:null;
-      sorok+=nfSorHtml(x,{sel:x.nf===v,off,adat:`data-nfval="${x.nf}"`,div:P.my,dg,zarva:ok,cel:nfCelK(x.nf)});});
-    const box=nfKepernyo(`🎚 Nehézségi fokozat — a ${sn}. idény`,
-      `A fokozat a <b>célrés</b>: ennyivel legyél az idény átlagában a mezőny fölött. A mezőny <b>kétoldalúan</b> követ — ha elhúzol, felnő; ha ${String(NF_HOLTSAV).replace(".",",")}-nél mélyebbre csúszol, megvár.`
-        +`<div style="font-size:12px;color:var(--dim);margin-top:5px">🎚 Nyaranta a <b>célrés</b> állítható; a fokozat-csomag többi eleme (mezőny-tempó, tempók, ikonok, képességek, scout, tél) a karrier induláskori beállítása${P.fok?` (<b>${esc(nfFokNev(P.fok))}</b>${P.fok.egyeni?", egyéni":""})`:""}.</div>`
-        +`<div style="font-size:12px;color:var(--dim);margin-top:5px">Tavaly: <b>${esc(nfDef(b.prev).n)}</b> · a karrier eleji: <b>${esc(nfDef(b.start).n)}</b>${dg!=null?` · a karriered mért idényen belüli rés-változása: <b>${nfCelTxt(Math.round(dg*10)/10)}</b>`:""}</div>`,
-      sorok,
-      [nfGomb(fromHub?"Rendben — vissza a HUB-ba":"Rendben, ezzel indulok","btn-y stepbtn",()=>{P.nfNext=v;nfVissza($("scUnlock"),fromHub,done);})],
-      body=>body.querySelectorAll("[data-nfval]").forEach(g=>g.onclick=()=>{v=parseInt(g.getAttribute("data-nfval"),10);rajz();}));
+    const cel=Math.round((alap+h)*100)/100;
+    const box=nfKepernyo(`🎚 Célrés-hangolás — a ${sn}. idény`,
+      `A nehézségi fokozatod a karrier végéig <b>${x.ic} ${esc(x.n)}</b> (${esc(nfSzintCimke(nfKarrierHivatalos()||{nf},P.fok&&P.fok.egyeni))}). Nyaranta a <b>célrést</b> hangolhatod: ennyivel legyél az idény átlagában a mezőny fölött — a fokozatéhoz képest legfeljebb ±${String(NF_HANG_MAX).replace(".",",")}-tel.`
+        +`<div style="font-family:'Archivo Black';font-size:26px;color:var(--gold);margin:10px 0 2px;text-align:center">${esc(nfCelTxt(cel))}</div>`
+        +`<div style="font-size:12px;color:var(--dim);text-align:center">a fokozat célrése ${esc(nfCelTxt(alap))}${h?` · hangolás ${h>0?"+":"−"}${String(Math.abs(h)).replace(".",",")} (${h>0?"könnyebb":"nehezebb"})`:" · nincs hangolva"}</div>`
+        +`<div style="font-size:12px;color:var(--dim);margin-top:8px">A nehezebb célrés a <b>Run-szintet</b> emeli, a könnyebb csökkenti (10.5 alatt a Run teteje 100).${dg!=null?` A karriered mért idényen belüli rés-változása: <b>${nfCelTxt(Math.round(dg*10)/10)}</b>.`:""}</div>`,
+      `<div style="display:flex;gap:8px;justify-content:center;margin-top:4px">
+        <button class="btn-s" id="nfHangMinus" ${h<=-NF_HANG_MAX+1e-9?"disabled":""}>− nehezebb</button>
+        <button class="btn-s" id="nfHangPlus" ${h>=NF_HANG_MAX-1e-9?"disabled":""}>+ könnyebb</button></div>`,
+      [nfGomb(fromHub?"Rendben — vissza a HUB-ba":"Rendben, ezzel indulok","btn-y stepbtn",()=>{P.nfHangNext=h;nfVissza($("scUnlock"),fromHub,done);})],
+      body=>{const m=body.querySelector("#nfHangMinus"),pl=body.querySelector("#nfHangPlus");
+        if(m)m.onclick=()=>{h=Math.max(-NF_HANG_MAX,Math.round((h-0.1)*10)/10);rajz();};
+        if(pl)pl.onclick=()=>{h=Math.min(NF_HANG_MAX,Math.round((h+0.1)*10)/10);rajz();};});
     if(!box)done();};
   rajz();}
 /* ÁTÁLLÁS: futó, egyjátékos piramis-karrier, ami még nem a kétoldalú szabályon fut */
@@ -40851,7 +40909,7 @@ function nfAtallOffer(){
         +`<div>• A nehézség egy <b>fokozat</b> lesz (homokozótól a semmi esélyig) — mindegyik egy <b>célrés</b>: ennyivel vagy az idény ÁTLAGÁBAN a mezőny fölött.</div>`
         +`<div>• A mezőny <b>kétoldalúan</b> követ: ha elhúzol, a kezdőrúgáskor felnő (és télen is); ha ${String(NF_HOLTSAV).replace(".",",")}-nél mélyebbre csúszol, egy idényre megáll. ${P.padlo?"A mostani padlód (vállalás) helyére lép.":"A szintugrás és a hangolás helyére lép."}</div>`
         +`<div>• <b>A következő idény kezdőrúgásától</b> él (átállni a két idény között lehet).</div>`
-        +`<div>• Az átállás <b>végleges</b> erre a karrierre; a fokozatot utána nyaranta állíthatod (könnyíteni bármikor, nehezíteni sikeres idény után).</div>`
+        +`<div>• Az átállás <b>végleges</b> erre a karrierre, és a fokozat is rögzül: nyaranta a <b>célrést</b> hangolhatod (±0,5), a fokozatot nem.</div>`
         +`<div style="font-size:12px;color:var(--dim);margin-top:5px">A mostani nehézséged a legközelebbi fokozatként: <b>${esc(nfDef(most).n)}</b> (jelölve). Nyisd le bármelyiket: ott áll, mit jelent beállításokban.</div>`,
       sorok,
       [nfGomb("Mégsem","btn-s stepbtn",()=>nfVissza($("scUnlock"),true)),
@@ -92466,8 +92524,10 @@ function nfCareerWin(csendes){
   const u=nfNyitasAllapot(),elotte=nfNyitottMax();
   u.nfMax=Math.max(Number(u.nfMax)||0,Math.min(10,nf+1));
   try{unlockSave();}catch(e){}
-  /* a 10. fokozaton: két extra szint nyílik a nyert szint után */
-  if(nf===10){
+  /* a 10. fokozaton: két extra szint nyílik a nyert szint után — 3.9.223 óta
+     csak a 10.5-ön (vagy extra szinten) megnyert karrier nyitja („A 100 fölötti
+     Run szint pontszám csak a 10.5 szint megnyerése után nyíljon meg") */
+  if(nf===10&&(sw||0)>=5){
     const e0=nfExtNyitott(),uj=Math.min(NF_EXT_MAX,Math.max(5,sw||5)+2);
     if(uj>e0){u.nfExt=uj;try{unlockSave();}catch(e){}
       if(!csendes)try{addLine(`🔓 <b>Megnyílt két extra szint: 10.${e0+1} és 10.${Math.min(NF_EXT_MAX,e0+2)}</b> — a 💀 Semmi esély fölött a célrés tovább lép (${nfCelTxt(nfCel(10,uj))}-ig).`,"m mvp");}catch(e){}
@@ -95125,8 +95185,9 @@ function renderHub(){
    if(vb){let on=false;try{on=pyrFloorSummer();}catch(e){on=false;}
      vb.classList.toggle("hide",!on);
      if(on&&nfOn()){const sn=pyrFloorUpcoming(),x=nfDef(nfLevelFor(sn));
-       vb.innerHTML=`🎚 A ${sn}. idény fokozata: <b>${x.nf}. ${x.ic} ${esc(x.n)}</b>`
-         +`<small style="display:block;font-size:11px;opacity:.8">célrés ${nfCelTxt(nfCelK(x.nf))} — a mezőny kétoldalúan követ · koppints a módosításhoz</small>`;
+       const _h=nfHangFor(sn);
+       vb.innerHTML=`🎚 A ${sn}. idény célrése: <b>${nfCelTxt(nfCelFor(sn))}</b>`
+         +`<small style="display:block;font-size:11px;opacity:.8">${x.ic} ${esc(x.n)} (rögzített fokozat)${_h?` · hangolva ${_h>0?"+":"−"}${String(Math.abs(_h)).replace(".",",")}`:""} — koppints a célrés hangolásához</small>`;
        vb.onclick=()=>nfOffer(null,true);}
      else if(on){const sn=pyrFloorUpcoming(),g=pyrFloorWantFor(sn);
        vb.innerHTML=`🎚 A ${sn}. idény vállalása: <b>${esc(pyrFloorLabel(g))}</b>`

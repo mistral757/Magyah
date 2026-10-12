@@ -395,3 +395,34 @@ szerencsével ment át rajta.
 * **A 8 meccses beilleszkedés-határidő.**
 * **A dinamikus mód** és a **közös karrier** (a csomag a szoba
   rés-csúszkáját is állítja).
+
+## Rögzített fokozat, célrés-hangolás és a Run (3.9.223, utólag)
+
+Kimondott kérések:
+
+> „Két szezon között hangolni lehet célrést, de nehézségi szintet nem lehet
+> változtatni"
+>
+> „A 100 fölötti Run szint pontszám csak a 10.5 szint megnyerése után nyíljon
+> meg" · „A célrés hangolás hatással van a Run szintre de 10.5 nehézségi szint
+> alatt minden 100ason belül" · „A felszezonos hangolás szuper, azt tartsuk
+> meg, szintén legyen hatással a Run szintre."
+
+* **A fokozat rögzített.** A karrier a teljes idejére azon a fokozaton marad,
+  amivel indult (átállásnál az átálláskorin). A nyári képernyő már nem
+  fokozat-lista, hanem **célrés-hangolás**: a fokozat célréséhez képest
+  ±0,5, 0,1-es lépésekben.
+  * A hangolás az idény célrésébe kerül: a rajt-célba, a télbe és a Run-ba.
+  * A **hivatalos szintet nem írja át**, mert az a fokozat alap-célréséből számol.
+* **A Run nehézség-tényezője** az idények hangolt célréséből jön, a
+  **téli felméréssel** korrigálva:
+  * a tűrés fele: laza +0,5 · normál +0,25 · szigorú 0. A laza tél könnyebb idény.
+  * Ha a mezőny télen ténylegesen felnőtt, az emelés negyede (legfeljebb 0,5)
+    nehezebb idénynek számít.
+* **A Run teteje 100** a 10.5 alatt, a legnehezebb hangolással is. Fölötte
+  csak **extra szinten**, fokozatosan: szintenként +10 (10.6 → 110,
+  10.7 → 120 …), a célrés-görbe szerinti tetőig.
+* **Az extra szinteket csak a 10.5-ön (vagy extra szinten) nyert karrier
+  nyitja.** Korábban a 10. fokozat bármelyik belső szintjén nyert karrier nyitotta.
+
+Próba: `tools/nf-run-hangolas-proba.js`.

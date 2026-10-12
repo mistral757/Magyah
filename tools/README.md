@@ -202,10 +202,24 @@ node tools/nehezseg-3-9-222-proba.js        # KEP=<mappa> az átállás és a ny
   * mélyen alatta a fék legfeljebb egy éves ütemnyit vesz vissza, enyhén alatta a holtsáv széléig;
   * a napló kimondja.
 * **A tél** a célrés +0,5-höz mér; **az idény vége** egyszer rögzíti a dg-t, a következő rajt-cél abból tanul.
-* **A határok:** könnyíteni a kezdő fokozatnál kettővel könnyebbig, nehezíteni egy fokkal, sikeres idény után.
-* **Nyár:** a HUB a fokozatot mutatja, a képernyőn tíz lenyitható sor, a határon kívüliek zárva.
+* **A határok:** a határ-függvény változatlan, de 3.9.223 óta a fokozat két idény között nem változik (a régi választás nem hat).
+* **Nyár (3.9.223):** a HUB a következő idény célrését és a rögzített fokozatot mutatja; a képernyő célrés-hangolás (±0,5, 0,1-es lépés), fokozat-lista nincs.
 * **Átállás:** csak két idény között; tíz lenyitható sor, a mostani jelölve; a „Mégsem” nem állít át; utána nincs újra.
 * **Run, mérő, közös karrier:** a Run levonja a féket; a mérő rögzíti a fokot, a célrést, a féket; a szoba csomagja `padlo:2`, a régi házigazda a régi padlót viszi; közösben is fékez.
+
+## nf-run-hangolas-proba.js — 🎚 a Run és a célrés-hangolás a tízfokozatú rendszerben
+
+```
+node tools/nf-run-hangolas-proba.js
+```
+
+**9 állítás**, valódi böngészőben, a beállítón át indított 6. fokozatú karrierrel.
+
+* A fokozat két idény között nem változik; a célrés-hangolás az idény célrésébe megy, a hivatalos szint marad.
+* A hangolás hat a Run-ra (nehezebb > alap > könnyebb); a téli tűrés is (szigorú > laza); a télen felnőtt mezőny nehezebb idény.
+* A Run teteje 100 a 10.5 alatt (a legnehezebb hangolással is); extra szinten szintenként +10 (10.7 → 120).
+* Az extra szinteket csak a 10.5-ön nyert karrier nyitja.
+* Nincs oldalhiba.
 
 ## nehezseg/ — 🎚 az általános nehézségi rendszer mérői (terv: `docs/nehezsegi-rendszer-terv.md`)
 

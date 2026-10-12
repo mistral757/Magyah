@@ -173,7 +173,7 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
   ok(r3.naplo,"a napló kimondja az alsó féket");
   /* a világ egész-szintű kerekítése miatt a beállított rés a széltől fél lépésen
      belül is lehet — ilyenkor a fék joggal nem lép (3.9.223) */
-  ok((r3.d.fek>0||Math.abs(r3.d.elotte-(r3.d.want-1.5))<=0.5)&&r3.d_utana>=r3.d.want-1.5-0.6&&r3.d_utana<=r3.d.want-1.5+0.6,"enyhén alatta → a holtsáv széléig",{d:r3.d,u:r3.d_utana});
+  ok((r3.d.fek>0||Math.abs(r3.d.elotte-(r3.d.want-1.5))<=0.5+1e-9)&&r3.d_utana>=r3.d.want-1.5-0.6&&r3.d_utana<=r3.d.want-1.5+0.6,"enyhén alatta → a holtsáv széléig",{d:r3.d,u:r3.d_utana});
 
   console.log("\n— 4. a tél —");
   const r4=await p.evaluate(()=>{
@@ -198,7 +198,9 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
     return o;});
   ok(!r5.b6.ok&&r5.b6.hi===r5.b6.prev&&r5.b6.lo===1,"sikertelen idény után nem nehezíthető; könnyíteni a kezdő −2-ig (3 → 1)",r5.b6);
   ok(r5.b6ok.ok&&r5.b6ok.hi===r5.b6ok.prev+1,"sikeres idény után egy fokkal nehezebb",r5.b6ok);
-  ok(r5.fent===r5.b6ok.hi&&r5.lent===1,"a választás a határok közé fogva",r5);
+  /* 3.9.223 — „Két szezon között hangolni lehet célrést, de nehézségi szintet
+     nem lehet változtatni": a fokozat rögzített, a régi választás nem hat */
+  ok(r5.fent===r5.b6.prev&&r5.lent===r5.b6.prev,"3.9.223: a fokozat két idény között nem változik (a régi választás nem hat)",r5);
 
   console.log("\n— 7. nyár: a HUB és a fokozat-képernyő —");
   const r7=await p.evaluate(()=>{
@@ -216,15 +218,21 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
     o.sorok=body.querySelectorAll("[data-nfval]").length;
     o.lenyit=body.querySelectorAll("details").length;
     o.zart=[...body.querySelectorAll("[data-nfval]")].filter(x=>x.disabled).map(x=>+x.dataset.nfval);
-    body.querySelector("[data-nfval='4']").click();
+    o.alap=nfCelK(nfLevelFor(6));
+    body.querySelector("#nfHangMinus").click();
+    document.getElementById("unlockBody").querySelector("#nfHangMinus").click();
+    o.celKiirva=document.getElementById("unlockBody").textContent;
     document.querySelector("#unlockActions button").click();
-    o.next=S.pyr.nfNext;
+    o.hang=S.pyr.nfHangNext;o.cel=nfCelFor(6);o.szint=nfLevelFor(6);
+    /* a plafon: ±0,5 */
+    S.pyr.nfHangNext=-3;o.minHang=nfHangFor(6);S.pyr.nfHangNext=3;o.maxHang=nfHangFor(6);
+    S.pyr.nfHangNext=o.hang;
     return o;});
-  ok(r7.nyar&&r7.up===6&&r7.gomb&&/6\. idény fokozata/.test(r7.gombTxt)&&/Simaliba/.test(r7.gombTxt),"nyáron a HUB a következő idény fokozatát mutatja",r7);
+  ok(r7.nyar&&r7.up===6&&r7.gomb&&/6\. idény célrése/.test(r7.gombTxt)&&/Simaliba/.test(r7.gombTxt)&&/rögzített fokozat/.test(r7.gombTxt),"nyáron a HUB a következő idény célrését és a rögzített fokozatot mutatja",r7);
   ok(!r7.atallGomb,"a már kétoldalú karrierben nincs átállás-gomb");
-  ok(r7.kepernyo&&/Nehézségi fokozat/.test(r7.cim)&&r7.sorok===10&&r7.lenyit===10,"a képernyőn a tíz fok, mind lenyitható",r7);
-  ok(r7.zart.join(",")==="5,6,7,8,9,10","a határon kívüliek zárva (okkal)",r7.zart);
-  ok(r7.next===4,"a választás rögzül",r7.next);
+  ok(r7.kepernyo&&/Célrés-hangolás/.test(r7.cim)&&r7.sorok===0,"3.9.223: a nyári képernyő célrés-hangolás (nincs fokozat-lista)",r7);
+  ok(Math.abs(r7.hang+0.2)<1e-9&&Math.abs(r7.cel-(r7.alap-0.2))<1e-9&&r7.szint===3,"két „nehezebb” lépés: −0,2 a fokozat célréséhez — a fokozat marad",r7);
+  ok(r7.minHang===-0.5&&r7.maxHang===0.5,"a hangolás ±0,5-ig",{min:r7.minHang,max:r7.maxHang});
 
   console.log("\n— 9a. a Run és a mérő —");
   const r9=await p.evaluate(()=>{
