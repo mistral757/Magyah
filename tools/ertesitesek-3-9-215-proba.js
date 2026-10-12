@@ -151,7 +151,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     try{renderHub();}catch(e){}
     const t=teachStateObj();delete t.uj;delete t.ujInit;delete t.ujOff;
     _vezPushQ=[];vezPushHide();
-    msT().exciteMax=70;     /* a „Hazai mag" már nyitva */
+    /* a „Hazai mag" már nyitva — 3.9.223 óta a nyitás saját tárolóban él
+       (szurkolószám, aztán izgalom: lásd lelatoNyitasFigyel) */
+    msT().exciteMax=70;msT().lelatoMig=1;msT().lelatoNyit={hazai:1};msT().lelatoFan={hazai:1};
     S.transferBudget=0;});
   const varj=async(ms)=>{await p.waitForTimeout(ms);};
   /* ÁLLAPOTRA VÁRUNK, nem fix időre: a figyelő 700 ms-onként fut és 1500 ms
@@ -164,7 +166,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return {init:!!t.ujInit,lelato:(t.uj&&t.uj.lelato)||[],sor:_vezPushQ.length,most:_vezPushMost?1:0};});
   ok(r3a.init&&r3a.lelato.includes("hazai")&&r3a.sor===0&&!r3a.most,"az első futás csendben jegyez (a már nyitott lelátóról nem szól)",r3a);
   /* egy emlékezetes meccs: 86-os izgalom → az Ultrák lelátó nyílik */
-  await p.evaluate(()=>{msT().exciteMax=86;});
+  await p.evaluate(()=>{msT().exciteMax=86;msT().lelatoNyit.ultra=1;});
   await varjAmig(()=>{const el=$("vezPush");return !!(el&&!el.classList.contains("hide")&&el.classList.contains("uj"));});
   const r3b=await p.evaluate(()=>{const el=$("vezPush"),m=_vezPushMost;
     return {lat:!!(el&&!el.classList.contains("hide")),uj:!!(el&&el.classList.contains("uj")),
@@ -198,7 +200,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const r3f=await p.evaluate(()=>{const m=_vezPushMost;return {k:m&&m.k,jegy:teachStateObj().uj.scout};});
   ok(r3f.k==="scout"&&r3f.jegy.length===2,"a következő csillagszint újra értesít",r3f);
   /* kikapcsolva csendben jegyez */
-  await p.evaluate(()=>{_vezPushQ=[];vezPushHide();teachStateObj().ujOff=1;msT().exciteMax=93;});
+  await p.evaluate(()=>{_vezPushQ=[];vezPushHide();teachStateObj().ujOff=1;msT().exciteMax=93;msT().lelatoNyit.katlan=1;});
   await varjAmig(()=>{const u=teachStateObj().uj;return !!(u&&u.lelato&&u.lelato.includes("katlan"));});
   await varj(800);   /* és utána sem szólt (a jegyzés és a szólás ugyanabban a futásban dől el) */
   const r3g=await p.evaluate(()=>({most:_vezPushMost?1:0,jegy:teachStateObj().uj.lelato}));

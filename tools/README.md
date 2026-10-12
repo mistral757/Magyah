@@ -1465,7 +1465,7 @@ node tools/valtozasok-3-9-175-proba.js
 node tools/lelato-proba.js
 ```
 
-**21 állítás** (valódi hangkártyával, `HANG_TESZT`):
+**24 állítás** (valódi hangkártyával, `HANG_TESZT`):
 
 * **A render:** mind az öt lelátó kirenderelődik, nem néma, a hurok 15 mp
   fölötti; a csúcs 0,9 alatt; a varrat sima; a nagy tömeg hangosabb a
@@ -1475,12 +1475,14 @@ node tools/lelato-proba.js
   * a gól megmozdítja a lelátót;
   * a lefújás után a lelátó elhallgat, a zene visszaáll.
 * **Végigjátszás:** nincs lelátó.
-* **A feloldás:**
-  * a lépcsők 0 / 65 / 85 / 92 / 96;
+* **A feloldás (3.9.223: szurkolószám, aztán izgalom):**
+  * a lépcsők: 20 000 + 75 · 50 000 + 80 · 100 000 + 86 · 200 000 + 92;
+  * a régi szabállyal (csúcs-izgalom) nyílt lelátók megmaradnak;
+  * a küszöböt elérő meccs maga még nem nyit; utána szintenként a saját izgalma nyit;
   * zárt lelátó nem választható;
-  * a lépcső átlépését a napló bejelenti.
+  * minden nyitást és elért tábor-küszöböt a napló bejelent.
 * **Az Arculat → „7 · A lelátó hangja”:**
-  * öt kártya, a zártak feltétellel;
+  * öt kártya, a zártak a két feltétellel (tábor, izgalom);
   * a választás azonnal érvényes, és bekerül a mentésbe;
   * a belehallgatás szól.
 * **A Hang beállításai:** lelátó ki/be, hangerő, a 25%-os zene leírása.
