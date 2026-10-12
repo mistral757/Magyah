@@ -220,6 +220,26 @@ node tools/taktika-illeszkedes-teteje-proba.js
 * Kiváló kerettel az illeszkedés a tetőig megy, és a meccshatás vele nő.
 * A taktika-panel kiírja a nyitott tetőt; nincs oldalhiba.
 
+## penz-pvp-kezdes-proba.js — 💰🤝 a pénzrobbanás fékjei és a rejtett PvP kezdő kiegyenlítés
+
+```
+node tools/penz-pvp-kezdes-proba.js
+```
+
+**18 állítás**, valódi böngészőben (lásd `docs/penz-pvp-kezdes-3-9-224.md`).
+
+* Az eladási plafon:
+  * a küszöb a működési keret másfélszerese, alatta az ár betűre a régi;
+  * fölötte logaritmikus és monoton;
+  * egy kirívó sztár ára ~3× küszöbre esik vissza, és a gyors eladás ugyanebből számol;
+  * a „Piaci plafon” sor csak akkor szól, ha fog.
+* A hírnév: a reklám és a befektető idényenként ≤ a keret 60%-a; a sztár-hozta tömeg ≤ az organikus tábor.
+* A befektetés ≤ egy idénynyi működési keret.
+* A PvP kezdő kiegyenlítés:
+  * az erősebb nem mozdul, a gyengébb 3-ból 0,75-re zárkózik fel;
+  * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
+  * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
+
 ## talizman-ugynok-szurkolo-proba.js — 🕴️📣🎓 Ügynökség, Szurkolótábor, erősebb Stáb
 
 ```
