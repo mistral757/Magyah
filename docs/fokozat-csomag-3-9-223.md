@@ -426,3 +426,44 @@ Kimondott kérések:
   nyitja.** Korábban a 10. fokozat bármelyik belső szintjén nyert karrier nyitotta.
 
 Próba: `tools/nf-run-hangolas-proba.js`.
+
+## Közös karrier: a választott fokozat a szobában (3.9.224)
+
+> „PvP settingeket beállítottam, 5.1 nehézségi szintet választottam. Nem
+> ajánlotta fel, hogy melyik divízióban kezdjünk, majd pedig a szezon
+> kezdetekor azt írja már ki, hogy Simaliba a nehézségi szint."
+> A feedben: „a rés +5.8 → +1.8 (a vállalás +1.4)".
+
+### Az ok
+
+* A választott fokozat (nf.s) **nem utazott a szobában**. Csak a régi
+  rés-csúszka értéke (`pyrWantedGap`) ment át, ez a fokozattól függetlenül
+  állt +1,4-en.
+* A karrier-indítás (`pyrConfirmDiv`) közös karrierben ebből a résből
+  számolta vissza a fokozatot: +1,4 rajt → +3,8 célrés → **3. Simaliba**.
+  Az 5.1 célrése +1,6, ami ebben az osztályban kb. +0,7-es rajt-rés.
+* A mezőny is ehhez a könnyebb réshez állt be.
+
+### A javítás
+
+* **A szobacsomag a fokozatot is viszi:** `pyr.nf`, `pyr.s`, és a házigazda
+  téli tűrését és holtsávját. A két gépen így biztosan azonos.
+* **A közös rés a fokozatból számolódik:** a fokozat rajt-rése a szoba
+  osztályában és mezőny-ütemében (`pyrMpNfGap`).
+* **A régi rés-csúszka csak kijelez:** a szoba részletes nézetében letiltva
+  áll, ha van választott fokozat.
+* **A karrier fokozata közös karrierben is a szobáé:**
+  * `S.pyr.nf` és a célrés a szobából jön;
+  * a `S.pyr.fok` az `mp` jelzővel tárolódik;
+  * a hivatalos szint (`nfKarrierHivatalos`) és a HUB-sáv a szoba fokozatát
+    mutatja.
+* **Régi szobánál**, ahol a csomag nem viszi a fokozatot, a régi út marad: a
+  fokozatot a résből számolja.
+
+### Az osztály közös karrierben
+
+Az osztályválasztás kihagyása **szándékos** (3.9.40). Közös karrierben egy
+tabellán osztoztok, ezért az osztályt a házigazda a szoba-beállítás
+„közös osztály” csúszkáján választja. A draft után nincs külön kérdés.
+
+Próba: `tools/pvp-fokozat-szoba-proba.js` (8 állítás).

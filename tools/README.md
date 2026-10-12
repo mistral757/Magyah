@@ -220,6 +220,41 @@ node tools/taktika-illeszkedes-teteje-proba.js
 * Kiváló kerettel az illeszkedés a tetőig megy, és a meccshatás vele nő.
 * A taktika-panel kiírja a nyitott tetőt; nincs oldalhiba.
 
+## pvp-fokozat-szoba-proba.js — 🎚 PvP: a választott fokozat a szobában
+
+```
+node tools/pvp-fokozat-szoba-proba.js
+```
+
+**8 állítás** (lásd `docs/fokozat-csomag-3-9-223.md`, „Közös karrier” szakasz).
+
+* A házigazda 5.1-et választ:
+  * a szobacsomag viszi a fokozatot, a téli tűrést és a holtsávot;
+  * a közös rés a fokozat rajt-rése;
+  * a régi rés-csúszka letiltva.
+* A vendég átveszi, és a közös karrier fokozata 5.1:
+  * a célrés +1,6;
+  * a hivatalos szint és a HUB-sáv „5.1 Nehéz”;
+  * az idény célrése is a fokozaté.
+* Régi szoba (fokozat nélküli csomag): a régi út.
+* Nincs oldalhiba.
+
+## meccsero-hianyzo-proba.js — ⚡ a meccserő a pályára lépő tizenegyről
+
+```
+node tools/meccsero-hianyzo-proba.js
+```
+
+**6 állítás** (lásd `docs/meccsero-hianyzo-3-9-224.md`):
+
+* hiányzó nélkül a ⚡ betűre a régi;
+* egy sérült kezdővel a ⚡ a pótlással számol, pontosan annyival, amennyi a valódi pótlási réteggel, és kérdésről kérdésre ugyanaz;
+* a próba-felépítés nem hagy nyomot;
+* a hiányzó kapitány rutin-bónusza nem jár;
+* nincs oldalhiba.
+
+A hozzá tartozó mérés: `tools/meccsmotor/kijelzes-valos.js` (`RESET=1 N=60 BOOST=3`). Valódi meccseken veti össze a kiírt ⚡-párt a motor tényleges különbségével, amelyet a két gólvárhatóságból számol vissza.
+
 ## penz-pvp-kezdes-proba.js — 💰🤝 a pénzrobbanás fékjei és a rejtett PvP kezdő kiegyenlítés
 
 ```
