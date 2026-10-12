@@ -207,6 +207,19 @@ node tools/nehezseg-3-9-222-proba.js        # KEP=<mappa> az átállás és a ny
 * **Átállás:** csak két idény között; tíz lenyitható sor, a mostani jelölve; a „Mégsem” nem állít át; utána nincs újra.
 * **Run, mérő, közös karrier:** a Run levonja a féket; a mérő rögzíti a fokot, a célrést, a féket; a szoba csomagja `padlo:2`, a régi házigazda a régi padlót viszi; közösben is fékez.
 
+## taktika-illeszkedes-teteje-proba.js — 🎛️ a taktika-illeszkedés teteje (150% / 200%)
+
+```
+node tools/taktika-illeszkedes-teteje-proba.js
+```
+
+**6 állítás**, valódi böngészőben.
+
+* A tető: edző nélkül és 1. szinten 100%, a stílus-edző 2. szintjén 150%, 3. szintjén 200%.
+* Csak az edző saját taktikáján, a többi 100% marad.
+* Kiváló kerettel az illeszkedés a tetőig megy, és a meccshatás vele nő.
+* A taktika-panel kiírja a nyitott tetőt; nincs oldalhiba.
+
 ## nf-run-hangolas-proba.js — 🎚 a Run és a célrés-hangolás a tízfokozatú rendszerben
 
 ```
