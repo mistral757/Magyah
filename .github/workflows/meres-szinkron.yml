@@ -1,0 +1,63 @@
+# 📈 A mérési naplók napi szinkronja a Firebase-ből a `meres-adat` ágra.
+# Részletek: tools/meres/firebase-lehuz.js és docs/meres-szinkron.md.
+# Titok: FIREBASE_SERVICE_ACCOUNT — a Firebase-projekt szolgáltatásfiókjának
+# JSON-kulcsa (Projektbeállítások → Szolgáltatásfiókok → Új privát kulcs).
+name: Mérési naplók szinkronja
+
+on:
+  schedule:
+    - cron: "17 3 * * *"   # naponta 03:17 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meres-szinkron
+  cancel-in-progress: false
+
+jobs:
+  szinkron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: A szkript (az alapértelmezett ágról)
+        uses: actions/checkout@v4
+        with:
+          path: kod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Lehúzás és névtelenítés
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Hiányzik a FIREBASE_SERVICE_ACCOUNT titok (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          node kod/tools/meres/firebase-lehuz.js --ki "$RUNNER_TEMP/meres"
+
+      - name: A meres-adat ág
+        run: |
+          git clone --quiet "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" adat
+          cd adat
+          git config user.name "meres-szinkron[bot]"
+          git config user.email "meres-szinkron@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin meres-adat >/dev/null; then
+            git checkout --quiet meres-adat
+          else
+            git checkout --quiet --orphan meres-adat
+            git rm -rq --cached . || true
+            find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          fi
+          mkdir -p meres
+          cp "$RUNNER_TEMP"/meres/* meres/
+          git add meres
+          if git diff --cached --quiet; then
+            echo "Nincs új adat."
+          else
+            git commit --quiet -m "Mérési naplók: $(date -u +%Y-%m-%d) — $(sed -n 's/^|karrier|\(.*\)|$/\1/p' meres/ALLAPOT.md) karrier"
+            git push --quiet origin meres-adat
+          fi

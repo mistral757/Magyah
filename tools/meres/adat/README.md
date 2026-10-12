@@ -14,6 +14,15 @@ névtelenített kivonat kerül:
 |---|---|---|
 | `mentesekbol-2026-10.json` | 8 karrier, 46 lezárt + 1 futó idény (3.9.77–3.9.174) | mentés-exportok, 2026-09-15 … 10-02 |
 
+## A Firebase-ből gyűlő, friss adat
+
+Az automatikusan feltöltött naplók NEM ide kerülnek, hanem a **`meres-adat`**
+ágra, naponta, névtelenítve. Lásd: `docs/meres-szinkron.md`.
+
+```bash
+git fetch origin meres-adat && git show origin/meres-adat:meres/osszegzes.txt
+```
+
 ## Új mentés hozzáadása
 
 ```bash
