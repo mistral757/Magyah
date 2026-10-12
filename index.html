@@ -54375,19 +54375,28 @@ function fmtSigned(v){return (v>=0?"+":"")+v.toFixed(2);}
    ilyet, mert a hiányzó NÉV csak futásidőben derül ki. */
 function poisson(l,rnd){const r=rnd||Math.random;let L=Math.exp(-l),k=0,p=1;do{k++;p*=r()}while(p>L);return k-1}
 function pick(a,rnd){return a[Math.floor((rnd||Math.random)()*a.length)]}
+/* A TARTALÉK-HÁLÓ VÁLASZTÁSA DETERMINISZTIKUS (3.9.224): a ⚡ a meccs előtt
+   PRÓBÁBAN felépíti a pótlási réteget (teamStrengthMatch), a kezdőrúgás pedig
+   élesben — a kettőnek UGYANAZT az embert kell választania, különben a kiírt
+   szám megint mást mérne, mint amivel a motor játszik. A választás a hiányzó
+   nevéből, az idényből és a fordulóból jön. */
+function findSubPick(arr,victim){
+  const k=`${(victim&&victim.n)||""}|${(S&&S.seasonNumber)||1}|${(S&&S.idx)||0}`;
+  let h=2166136261>>>0;for(let i=0;i<k.length;i++){h^=k.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}
+  return arr[h%arr.length];}
 function findSub(slot,victim){
   if(gameMode==="career"&&careerPool){
     const posOk=p=>p.pos.includes(slot.pos)||p.pos.some(pp=>RELATED[pp].includes(slot.pos));
     const extraCand=extraRoster.find(p=>!p.family&&p.n!==victim.n&&p.ovr<victim.ovr&&posOk(p));
     if(extraCand)return extraCand;
     const poolCands=Object.values(careerPool).filter(e=>!drafted.has(e.n)&&e.n!==victim.n&&e.startRating<victim.ovr&&posOk(e));
-    if(poolCands.length)return careerPlayerFromPoolEntry(pick(poolCands));
+    if(poolCands.length)return careerPlayerFromPoolEntry(findSubPick(poolCands,victim));
     return {n:"Ifista a kispadról",ovr:Math.max(55,victim.ovr-7),pos:[slot.pos],verI:2};}
   const pool=[];
   SQUADS.forEach(sq=>sq.players.forEach(p=>{
     if(drafted.has(p.n)||p.n===victim.n||p.ovr>=victim.ovr)return;
     if(p.pos.includes(slot.pos)||p.pos.some(pp=>RELATED[pp].includes(slot.pos)))pool.push(p);}));
-  return pool.length?pick(pool):{n:"Ifista a kispadról",ovr:Math.max(55,victim.ovr-7),pos:[slot.pos],verI:2};}
+  return pool.length?findSubPick(pool,victim):{n:"Ifista a kispadról",ovr:Math.max(55,victim.ovr-7),pos:[slot.pos],verI:2};}
 /* ================= HIÁNYZÁS: A JÁTÉKOSHOZ KÖTVE =================
    HIBA, amit ez javít: az eltiltás/sérülés eddig a SLOT indexén élt
    (S.subs[slotIdx]), tehát a POSZTRA ragadt, nem az emberre. Ha az eltiltott
@@ -86048,9 +86057,20 @@ function oppMatchStrength(lvl){
    Szándékosan KIHAGYJA: a meccsenként sorsolt jó/rossz formát (±SIM.FORM —
    kioltják egymást), a grudge-ot és a fegyelmi figyelmeztetést (egy meccsre
    élnek, nem jellemzik a csapatot). */
+/* A ⚡ rejtett tagjai is a PÁLYÁRA LÉPŐ tizenegyről (3.9.224): a hiányzó
+   kezdő helyén a pótlása áll — az aurája, a védekező skillje, és ha ő a
+   kapitány, a rutin-bónusz sem jár (a motor capPlaying-je ugyanígy dönt). */
+function matchSlotsView(){
+  let subs=S.subs||{};
+  if(!MATCH_XI&&!Object.keys(subs).length){
+    let hiany=false;
+    try{hiany=slots.some(sl=>sl&&sl.player&&playerUnavailable(sl.player.n));}catch(e){hiany=false;}
+    if(hiany){const keep=S.subs;try{buildMatchSubs();subs=S.subs||{};}catch(e){subs={};}finally{S.subs=keep;}}}
+  return {subs,xi:slots.map((sl,i)=>sl&&sl.player?{player:subs[i]?subs[i].sub:sl.player}:null).filter(Boolean)};}
 function hiddenMatchBonus(){
   if(gameMode!=="career")return 0;
-  const xi=slots.filter(s=>s.player);
+  const _v=matchSlotsView();
+  const xi=_v.xi;
   if(!xi.length)return 0;
   let b=(S.capMod||0)+(S.eventMod||0)+((coach&&coach.ovrMod)||0);
   b+=moraleToOvr(S.morale!=null?S.morale:50);
@@ -86064,7 +86084,7 @@ function hiddenMatchBonus(){
   if(famSp==="testver")aura+=1;
   b+=aura;
   /* kapitány-rutin — csak ha a kapitány tényleg a kezdő 11-ben van */
-  if(captainIdx>=0&&slots[captainIdx]&&slots[captainIdx].player)
+  if(captainIdx>=0&&slots[captainIdx]&&slots[captainIdx].player&&!_v.subs[captainIdx])
     b+=captainAgeExpBonus(slots[captainIdx].player.age)*0.15;
   if(S.teamFormMalus>0)b-=2.2;
   b+=teamMomentumAdj();   /* a buildMatchSnapshot chFormMalus utáni tagjának párja */
@@ -86424,8 +86444,33 @@ function msRatedNote(r){
       +`csak a felét. Ha tényleg a legjobbat állítod ki, ez a sor el sem hangzik.`,"m skillnote");
   }catch(e){}
   return true;}
+/* ================= A ⚡ A PÁLYÁRA LÉPŐ TIZENEGYRŐL SZÓL (3.9.224) =================
+   BEJELENTÉS (PvP-társ): „Az miért van, hogy 7 meccsből alig volt olyan, amit
+   nyertem annak ellenére, hogy mindig én vagyok az erősebb, és többször 3-4
+   egységgel?"
+   MÉRVE (tools/meccsmotor/kijelzes-valos.js, valódi meccseken): a kiírt ⚡ és
+   a motor különbsége a meccsek többségén 0, de MINDEN olyan meccsen, ahol egy
+   kezdő sérült vagy eltiltott volt, a motor 1,5–2,5 (két hiányzónál 4+)
+   meccserővel GYENGÉBB csapattal játszott, mint amit a ⚡ mutatott. Az ok: a
+   ⚡ a teamStrength()-ből számolt, ami a FELÁLLÁST méri — a hiányzó emberrel
+   együtt —, a motor viszont a pótlásával (S.subs, buildMatchSnapshot) lép
+   pályára. A csapaterő-sáv (teamStrengthNow) ezt 3.7.42 óta tudta, a ⚡ nem.
+   MOSTANTÓL a ⚡ a pályára lépő tizenegyet méri: meccs közben az élő
+   tizenegyet, meccs előtt — ha van hiányzó a kezdőben — a pótlási réteg
+   PRÓBA-felépítésével (a valódi S.subs érintetlen marad). Hiányzó nélkül a
+   szám betűre a régi. */
+function teamStrengthMatch(){
+  if(MATCH_XI)return teamStrengthNow();
+  let hiany=false;
+  try{hiany=slots.some(sl=>sl&&sl.player&&playerUnavailable(sl.player.n));}catch(e){hiany=false;}
+  if(!hiany)return teamStrength();
+  if(S.subs&&Object.keys(S.subs).length)return teamStrengthNow();
+  const keep=S.subs;
+  try{buildMatchSubs();return teamStrengthNow();}
+  catch(e){return teamStrength();}
+  finally{S.subs=keep;}}
 function teamMatchStrength(){
-  const live=teamStrength()+hiddenMatchBonus();
+  const live=teamStrengthMatch()+hiddenMatchBonus();
   /* A NEVEZÉSI SZÁM CSAK A KALIBRÁCIÓS ABLAKBAN MÁS (3.9.122). A keresés
      alatt (_msProbing) mindig az élő érték kell, különben önmagát hívná. */
   if(!MS_RATED||_msProbing)return live;

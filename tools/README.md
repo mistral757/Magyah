@@ -220,6 +220,22 @@ node tools/taktika-illeszkedes-teteje-proba.js
 * Kiváló kerettel az illeszkedés a tetőig megy, és a meccshatás vele nő.
 * A taktika-panel kiírja a nyitott tetőt; nincs oldalhiba.
 
+## meccsero-hianyzo-proba.js — ⚡ a meccserő a pályára lépő tizenegyről
+
+```
+node tools/meccsero-hianyzo-proba.js
+```
+
+**6 állítás** (lásd `docs/meccsero-hianyzo-3-9-224.md`):
+
+* hiányzó nélkül a ⚡ betűre a régi;
+* egy sérült kezdővel a ⚡ a pótlással számol, pontosan annyival, amennyi a valódi pótlási réteggel, és kérdésről kérdésre ugyanaz;
+* a próba-felépítés nem hagy nyomot;
+* a hiányzó kapitány rutin-bónusza nem jár;
+* nincs oldalhiba.
+
+A hozzá tartozó mérés: `tools/meccsmotor/kijelzes-valos.js` (`RESET=1 N=60 BOOST=3`). Valódi meccseken veti össze a kiírt ⚡-párt a motor tényleges különbségével, amelyet a két gólvárhatóságból számol vissza.
+
 ## penz-pvp-kezdes-proba.js — 💰🤝 a pénzrobbanás fékjei és a rejtett PvP kezdő kiegyenlítés
 
 ```
