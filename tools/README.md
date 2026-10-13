@@ -241,6 +241,42 @@ A statisztikai mérő: `tools/meccsmotor/kiallitas-terv.js`. Két módja van:
 
 `TERV=0` a régi, `TERV=1` az új szabállyal mér.
 
+## kupa-helyezes-proba.js — 🏆 az eredményjelző helyezése kupában
+
+```
+node tools/kupa-helyezes-proba.js
+```
+
+**13 állítás**: bajnokiban a bajnoki helyezés (változatlan); csoportkörben és
+ligaszakaszban mindkét csapat mellett a csoporthelyezés; az első csoportforduló
+előtt, selejtezőben, kieséses ágon és az MK-ban/FA-ban semmi; a kupa után
+megint a bajnoki; nincs oldalhiba.
+
+## unneples-konfetti-proba.js — 🎉 az ünneplő képernyő konfettije a témákban
+
+```
+node tools/unneples-konfetti-proba.js
+```
+
+**16 állítás** (lásd `docs/unneples-konfetti-3-9-224.md`): Pixelben a darabok
+saját lépésszámmal esnek és nem állnak sorba, a színek a konzolpalettából, a
+kártya pixelbetűs; a többi téma formái (fólia, ezüst, papírfecni) és betűi; a
+szaggatott mozgás kikapcsolva sima esés; nincs oldalhiba.
+
+## nyarvegi-licit-proba.js — 📬 a nyár végi licit-garancia
+
+```
+node tools/nyarvegi-licit-proba.js
+```
+
+**14 állítás** (lásd `docs/nyarvegi-licit-3-9-224.md`):
+
+* a kupa első indulása a kirakatot jelöli; a lánc és a futó szezon nem;
+* a nyár végén a megjelölt ember azonnal licitet kap (a köv. idény közepére
+  eső határidővel és elfogyott nyári körökkel is);
+* a már várakozó ajánlat marad; a kupa közben kitett ember nem kap garanciát;
+* a jelölés egyszer sül el; a két horog a helyén; nincs oldalhiba.
+
 ## pvp-fokozat-szoba-proba.js — 🎚 PvP: a választott fokozat a szobában
 
 ```
@@ -309,7 +345,7 @@ node tools/talizman-ugynok-szurkolo-proba.js
 * Ügynökség:
   * a célzott gyorsítás csak a saját célját mozdítja, és +100%-nál megáll;
   * a garantált scout-lépés a ritkaság határáig pótol; a Mítosz többet ad, az égetett lap nem hat;
-  * az XL-gyűjtés idény közben léptet;
+  * az XP-gyűjtés idény közben léptet;
   * az igazolás pontja ×2-ig nő;
   * mind a hat speciál és a rezonancia működik.
 * Szurkolótábor:
@@ -319,7 +355,7 @@ node tools/talizman-ugynok-szurkolo-proba.js
   * a matchLambdas csak hazai pályán hat, a zaj csak kiegyenlített meccsen; a hamis érték ±15%-ba vágva;
   * az időfüggő rész; a speciálok és a rezonancia.
 * Stáb: mind az öt változat a pontos számmal, és a két új speciál.
-* 8 valódi forduló az összes új lappal: az XL gyűlik, minden izgalom könyvelődik, és nincs oldalhiba.
+* 8 valódi forduló az összes új lappal: az XP gyűlik, minden izgalom könyvelődik, és nincs oldalhiba.
 
 ## valogatott-piramis-proba.js — 🌍 válogatottak a piramis mezőnyében
 

@@ -18,7 +18,7 @@
      2. TALIZMÁN NÉLKÜL minden új kapaszkodó semleges;
      3. ÜGYNÖKSÉG: a célzott gyorsítás (scout / ügynökség / sajtó) csak a
         saját célját mozdítja és +100%-nál megáll; a garantált scout-lépés a
-        ritkaság határáig pótol; az XL-gyűjtés idény közben szintet léptet;
+        ritkaság határáig pótol; az XP-gyűjtés idény közben szintet léptet;
         az igazolás pontja +100%-ig nő; a speciálok (Exkluzív szerződés,
         Hírszerző hálózat, Kapcsolati tőke, Fejvadász, Aranykéz);
      4. SZURKOLÓTÁBOR: az esemény-felismerés; az izgalom-boost csak a saját
@@ -28,7 +28,7 @@
         perctől; a Koreográfia a lelátó-küszöbön;
      5. STÁB: hatás, ár, tapasztalat, kiöregedés, stábpiac, Szakkönyvtár,
         Utánpótlás-edzők;
-     6. VALÓDI MECCSEK az összes új lappal: lefutnak, XL-pont gyűlik, és
+     6. VALÓDI MECCSEK az összes új lappal: lefutnak, XP gyűlik, és
         nincs oldalhiba. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
@@ -128,7 +128,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const n=await p.evaluate(()=>{
     _pakli([]);S.tal=null;_talAlapMemo=null;
     const L=LELATO.find(x=>x.fan>0);
-    return {fejl:["scout","ugynok","sajto"].map(talUgyFejlMult),pont:talUgyPontMult(),xl:talScoutXlPct(),gar:talUgyGaranciaFok(),
+    return {fejl:["scout","ugynok","sajto"].map(talUgyFejlMult),pont:talUgyPontMult(),xl:talScoutXpPct(),gar:talUgyGaranciaFok(),
       bev:talSzurkBevetelMult({exc:90,home:true}),mezo:talSzurkMezo(),izg:talSzurkIzgalomPlusz({diff:4,goals:6,rival:true,cup:true,comeback:1,decisiveMin:90},[],true),
       need:agencyNextPts(0),list:agencyMaxListings(1),err:scoutErrorPct(5),kuszob:lelatoFanKuszob(L)===L.fan,
       xp:talStabXpMult(),oreg:talStabOregPlusz(),vad:talStabVadaszPlusz(),ultra:talUltrakMult(),
@@ -175,16 +175,19 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       _pakli([Object.assign(_lap("ugynok","garancia",4,0.5),{eget:1})]);
       const f={stars:3};maybeImproveScout(f);ki.eget=f.stars;
     }finally{Math.random=_r;}
-    /* XL GYŰJTÉS — legendás xl: +105% → 2,05 pont / meccs; 1★ → 12 pont kell */
+    /* XP-GYŰJTÉS — legendás xl: +105% → 2,05 pont / meccs; 1★ → 12 pont kell */
     _pakli([_lap("ugynok","xl",4,0.5)]);
     const _s=scout;scout={name:"Próba",stars:1};
     const _add=addLine;addLine=()=>{};
     try{
-      ki.xlPct=talScoutXlPct();
-      let i=0;for(;i<20&&scout.stars===1;i++)talScoutXlTick();
-      ki.xlMeccs=i;ki.xlStars=scout.stars;ki.xlMarad=talScoutXlAll().pts;
-      ki.xlNeed=[scoutXlNeed(1),scoutXlNeed(5),scoutXlNeed(9.5)];
-      scout.stars=10;talScoutXlTick();ki.xlMax=[scout.stars,talScoutXlAll().pts];
+      ki.xlPct=talScoutXpPct();
+      let i=0;for(;i<20&&scout.stars===1;i++)talScoutXpTick();
+      ki.xlMeccs=i;ki.xlStars=scout.stars;ki.xlMarad=talScoutXpAll().pts;
+      ki.xlNeed=[scoutXpNeed(1),scoutXpNeed(5),scoutXpNeed(9.5)];
+      /* az XP-csík: 1,5★-on 0,3 / 15 XP (2%) */
+      const bar=scoutXpBar();
+      ki.xpBar=[/Scout XP/.test(bar),/0,3<\/b> \/ 15 XP/.test(bar),/width:2\.0%/.test(bar),!/XL/.test(bar)];
+      scout.stars=10;talScoutXpTick();ki.xlMax=[scout.stars,talScoutXpAll().pts];
     }finally{scout=_s;addLine=_add;}
     /* ÜZLETI PONTVADÁSZ: az igazolás pontja ×2 (plafon) */
     const _ag=agency;
@@ -232,8 +235,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(u.gar[0]===3.5&&u.gar[1]===6.5&&u.gar[2]===6.5&&u.gar[3]===2,"Garantált scout-lépés (ritka): pótol, de csak 6,5★-ig",u.gar);
   ok(u.mitosz===5&&u.eget===3,"…a Mítosz a nyári lépés mellé még +½★-ot ad; az égetett lap nem hat",[u.mitosz,u.eget]);
   ok(Math.abs(u.xlPct-105)<1e-9&&u.xlMeccs===6&&u.xlStars===1.5&&Math.abs(u.xlMarad-0.3)<1e-6&&u.xlNeed.join(",")==="12,36,63",
-     "Scout XL: 2,05 pont/meccs → 6 meccs után 1,5★, a maradék tovább számít; a küszöb 12 / 36 / 63",u);
+     "Scout XP: 2,05 pont/meccs → 6 meccs után 1,5★, a maradék tovább számít; a küszöb 12 / 36 / 63",u);
   ok(u.xlMax[0]===10&&u.xlMax[1]===0,"…a maximumon nem gyűjt tovább",u.xlMax);
+  ok(u.xpBar.every(Boolean),"…a scout-panel XP-csíkja: 0,3 / 15 XP, 2% (sehol nem „XL”)",u.xpBar);
   ok(Math.abs(u.pont[1]/u.pont[0]-2)<1e-9&&u.pont[2]===2,"Üzleti pontvadász: az igazolás pontja +100%-ig (×2)",u.pont);
   ok(Math.abs(u.fejvadasz[0]-1.3)<1e-9&&u.fejvadasz[2]===Math.round(100000*u.fejvadasz[3]/100),"Fejvadász: piaci eladás +30% pont · a vételár 2%-a jutalék",u.fejvadasz);
   ok(u.spec.list[1]===u.spec.list[0]+1,"Exkluzív szerződés: +1 piaci hely",u.spec.list);
@@ -352,7 +356,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       .forEach(x=>lapok.push(_lap(x.k,null,Math.max(4,x.min),0.5,x.id)));
     _pakli(lapok);
     if(!scout)scout={name:"Próba",stars:2};
-    const xl0=talScoutXlAll().pts||0,st0=scout.stars;
+    const xl0=talScoutXpAll().pts||0,st0=scout.stars;
     const _add=addLine;addLine=()=>{};
     const _atg=autoTitleGate;autoTitleGate=()=>false;
     const t0=Date.now();
@@ -367,13 +371,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     }finally{S.auto=false;addLine=_add;autoTitleGate=_atg;}
     await new Promise(r=>setTimeout(r,500));
     ki.idx=S.idx;ki.mp=Date.now()-t0;
-    const X=talScoutXlAll();
+    const X=talScoutXpAll();
     ki.xl=[xl0,X.pts,X.lep||0,st0,scout.stars];
     ki.exc=(S.seasonDrama&&S.seasonDrama.n)||0;
     return ki;});
   console.log("\n— 6. VALÓDI MECCSEK —");
   ok(v.idx>=8,"8 forduló lement az összes új lappal",v);
-  ok(v.xl[2]>0||v.xl[1]>v.xl[0],"…a Scout XL meccsről meccsre gyűlt (vagy már szintet is léptetett)",v.xl);
+  ok(v.xl[2]>0||v.xl[1]>v.xl[0],"…a Scout XP meccsről meccsre gyűlt (vagy már szintet is léptetett)",v.xl);
   ok(v.exc>=8,"…minden meccs izgalma könyvelődött",v.exc);
   ok(!errs.length,"nincs oldalhiba",errs.slice(0,3));
 

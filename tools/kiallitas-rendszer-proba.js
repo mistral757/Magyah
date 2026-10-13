@@ -234,10 +234,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* A SZABÁLY (lásd MATCH_FORFEIT_GA): 0:3, KIVÉVE ha az ellenfél addigra
        már többel vezetett — akkor a valódi eredmény marad. Egy 0:4-es
        lefújás tehát helyes; a próba korábban csak a 0:3-at fogadta el, és
-       ritkán (amikor a meccs már négy góllal állt) hamis hibát adott. */
+       ritkán (amikor a meccs már négy góllal állt) hamis hibát adott.
+       Ugyanígy a PONTOSAN három gólos valódi hátrány (pl. 1:4): a motor
+       (fullTime: `ga-gf<MATCH_FORFEIT_GA`) ilyenkor a valódi eredményt
+       hagyja — a vétlen csapat különbsége ugyanaz, a pályán szerzett gól
+       pedig nem vész el. A próba eddig csak a >3-at fogadta el. */
     {const m=/^(\d+):(\d+)$/.exec(String(elo.sok.eredmeny||""));
      const gf=m?+m[1]:-1,ga=m?+m[2]:-1;
-     ok(m&&(gf===0&&ga===3||ga-gf>3),
+     ok(m&&(gf===0&&ga===3||ga-gf>=3),
        "a hivatalos eredmény a bemondott vereség: 0:3 (vagy a nagyobb valódi hátrány)",elo.sok.eredmeny);}
     ok(elo.sok.letszamok[elo.sok.letszamok.length-1]==="hatan",
        "…és a lefújás előtti utolsó sor hatan-t mond",elo.sok.letszamok);}
