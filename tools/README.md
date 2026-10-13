@@ -345,7 +345,7 @@ node tools/talizman-ugynok-szurkolo-proba.js
 * Ügynökség:
   * a célzott gyorsítás csak a saját célját mozdítja, és +100%-nál megáll;
   * a garantált scout-lépés a ritkaság határáig pótol; a Mítosz többet ad, az égetett lap nem hat;
-  * az XL-gyűjtés idény közben léptet;
+  * az XP-gyűjtés idény közben léptet;
   * az igazolás pontja ×2-ig nő;
   * mind a hat speciál és a rezonancia működik.
 * Szurkolótábor:
@@ -355,7 +355,7 @@ node tools/talizman-ugynok-szurkolo-proba.js
   * a matchLambdas csak hazai pályán hat, a zaj csak kiegyenlített meccsen; a hamis érték ±15%-ba vágva;
   * az időfüggő rész; a speciálok és a rezonancia.
 * Stáb: mind az öt változat a pontos számmal, és a két új speciál.
-* 8 valódi forduló az összes új lappal: az XL gyűlik, minden izgalom könyvelődik, és nincs oldalhiba.
+* 8 valódi forduló az összes új lappal: az XP gyűlik, minden izgalom könyvelődik, és nincs oldalhiba.
 
 ## valogatott-piramis-proba.js — 🌍 válogatottak a piramis mezőnyében
 

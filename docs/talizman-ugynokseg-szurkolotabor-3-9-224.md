@@ -39,7 +39,7 @@ Két új speciál:
 |---|---|---|
 | **Gyorsabb fejlődés** | a lap **egy célra** szól (scout, ügynökség vagy sajtó — a húzáskor dobva), célonként külön gyűlik. Scout: a nyári fejlődési esély ×(1+x). Ügynökség: a szintek pontigénye ÷(1+x). Sajtó: a tábor-arány ×(1+x). | +12%/E, **+100%** |
 | **Garantált scout-lépés** | LÉPCSŐS. Szezonváltáskor +½★, ha a nyár magától nem hozta. A ritkaság szabja meg, meddig: 5★ / 6,5★ / 8★ / 10★. A Mítosz akkor is még +½★-ot ad, ha a nyár hozta. | lépcsős |
-| **Scout XL gyűjtés** | a scout minden meccs után XL-pontot gyűjt (1 × (1+x) × a scout-gyorsítás). A küszöb 12 + 6 × (csillag − 1). Ha összejön, **idény közben** is szintet lép, mint az ügynökség; a maradék továbbszámít. | +20%/E, **+200%** |
+| **Scout XP-gyűjtés** | a scout minden meccs után XP-t gyűjt (1 × (1+x) × a scout-gyorsítás). A küszöb 12 + 6 × (csillag − 1). Ha összejön, **idény közben** is szintet lép, mint az ügynökség; a maradék továbbszámít. | +20%/E, **+200%** |
 | **Üzleti pontvadász** | az igazolásokért kapott ügynökségi pont | +10%/E, **+100%** |
 
 Speciálok:
@@ -107,3 +107,16 @@ vereség után sem fogy a tábor.
 A katalógust, a semlegességet, mindhárom szín minden alaphatását és
 speciálját, a meccsmotor hazai/idegen és kiegyenlített/erős ágát, a
 ±15%-os vágást és 8 valódi fordulót vizsgál az összes új lappal.
+
+## Utólag: „XL" → XP
+
+> „a scout XL gyűjtő talizmán vicces lett, mert én csak elírtam az xp-t.
+> Szóval ott arra gondoltam. A szoki xp rendszer"
+
+A mechanika eleve egy szokásos XP-rendszer: meccsenként XP, a csillagszinttel
+növő küszöb (12 + 6 × (csillag − 1)), szintlépés idény közben is, a maradék
+továbbvisz. A **neve** lett XP mindenhol, ahol a játékos látja (talizmán-lap,
+súgó, napló, „Aktív alaphatások"), és a scout panelje (🤝 Scout, ügynökség és
+sajtó; 🔎 Scout fejlesztése) **XP-csíkot** kapott: „⭐ Scout XP — 0,3 / 15 XP →
+2★". A belső kulcs (`xl` a lapon és a tárolóban) a mentések és a már megszerzett
+lapok kedvéért marad.
