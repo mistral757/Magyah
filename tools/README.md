@@ -241,6 +241,17 @@ A statisztikai mérő: `tools/meccsmotor/kiallitas-terv.js`. Két módja van:
 
 `TERV=0` a régi, `TERV=1` az új szabállyal mér.
 
+## unneples-konfetti-proba.js — 🎉 az ünneplő képernyő konfettije a témákban
+
+```
+node tools/unneples-konfetti-proba.js
+```
+
+**16 állítás** (lásd `docs/unneples-konfetti-3-9-224.md`): Pixelben a darabok
+saját lépésszámmal esnek és nem állnak sorba, a színek a konzolpalettából, a
+kártya pixelbetűs; a többi téma formái (fólia, ezüst, papírfecni) és betűi; a
+szaggatott mozgás kikapcsolva sima esés; nincs oldalhiba.
+
 ## nyarvegi-licit-proba.js — 📬 a nyár végi licit-garancia
 
 ```
