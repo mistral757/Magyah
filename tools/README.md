@@ -241,6 +241,17 @@ A statisztikai mérő: `tools/meccsmotor/kiallitas-terv.js`. Két módja van:
 
 `TERV=0` a régi, `TERV=1` az új szabállyal mér.
 
+## kupa-helyezes-proba.js — 🏆 az eredményjelző helyezése kupában
+
+```
+node tools/kupa-helyezes-proba.js
+```
+
+**13 állítás**: bajnokiban a bajnoki helyezés (változatlan); csoportkörben és
+ligaszakaszban mindkét csapat mellett a csoporthelyezés; az első csoportforduló
+előtt, selejtezőben, kieséses ágon és az MK-ban/FA-ban semmi; a kupa után
+megint a bajnoki; nincs oldalhiba.
+
 ## unneples-konfetti-proba.js — 🎉 az ünneplő képernyő konfettije a témákban
 
 ```
