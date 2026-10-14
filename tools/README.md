@@ -241,6 +241,18 @@ A statisztikai mérő: `tools/meccsmotor/kiallitas-terv.js`. Két módja van:
 
 `TERV=0` a régi, `TERV=1` az új szabállyal mér.
 
+## meccsero-preset-proba.js — ⚡🧩 meccserő-bontás, felállás- és csere-presetek
+
+```
+node tools/meccsero-preset-proba.js
+```
+
+**26 állítás** (lásd `docs/meccsero-bontas-presetek-3-9-249.md`): a tételes meccserő
+összege bitre a régi (`tools/meccsero-bontas-regi.js`); a panel és a bejáratai (a ⚡
+koppintás, a két menükártya); az öt felállás-preset a saját célját javítja, az előnézet
+nem nyúl a kerethez, az alkalmazás az előnézetet írja be; a három beépített és a saját
+csere-preset a feltételeinek megfelelő, legfeljebb 3 cserét gyárt és a cseretervbe tölt.
+
 ## kupa-helyezes-proba.js — 🏆 az eredményjelző helyezése kupában
 
 ```
