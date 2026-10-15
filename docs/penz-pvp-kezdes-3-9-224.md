@@ -91,3 +91,28 @@ egy kirívó bevétel nem duplázható meg.
 ## Próba
 
 `tools/penz-pvp-kezdes-proba.js`: **18 állítás**, valódi böngészőben.
+
+## Utólag (3.9.251): a plafon mércéje a valódi bevétel
+
+> „Amikor indult a szezon, volt kb 5 játékosom, akiknek 80 milliárd körüli
+> azonnali ára volt […] a 8. héten már csak 16 milliárd körüli az azonnali
+> áruk, pedig játszottak is."
+
+A fenti plafon mércéje a **működési keret** volt (a csapaterőből és a mezőnyből
+számolt nyári pénz). A valódi bevétel java viszont a **lelátó** (hetente fizet, a
+keretben nincs benne) és a **kupadíj**: a bejelentő társának naplójában (2. idény)
+a lelátó 452 980, a kupadíj 211 122 pont volt — a működési keret ennek töredéke. A
+plafon így egy átlagos értékes játékost is az ötödére nyomott (80 → 16 Mrd), nem
+csak a kirívó sztárt.
+
+**Mostantól** a mérce a klub rendszeres bevétele egy idényre: szezonkeret + lelátó +
+kupadíj + kihívás- és mérföldkő-jutalom (az eladás nem — különben egy sztár-eladás a
+saját plafonját emelné), a tavalyi idényből vagy az idei futó ütemből (8 forduló
+után), és sosem kevesebb a működési keretnél. A küszöb továbbra is 1,5 idény.
+
+| | régi mérce | új mérce |
+|---|---|---|
+| a bejelentett ár (160 000 pont kikiáltási = 80 Mrd azonnali) | 10 331 | **160 000** (érintetlen) |
+| a mért sztár-eladás (513 315 883 pont) | — | 2 677 085 (~3,8 idénynyi valódi bevétel) |
+
+Próba: `node tools/eladasi-plafon-bevetel-proba.js` (8 állítás).

@@ -11,7 +11,7 @@
         a VALÓDI hívási helyen (felderítés, vételár, akadémia, szezonközi
         ablak, begyakorlás, stíluspont, mérföldkő, csúszka, licit, morál);
      2. a számok a kártya szövegéből jönnek: a ritkaság skálája és a plafon
-        (Ködoszlató legendáson mind a négy csoport, Kaméleon 3+ ritkaságon +2);
+        (Ködoszlató legendáson mind a négy csoport, Kaméleon 3+ ritkaságon −50% a felállás-boltban);
      3. a kártya „✦ a special él" jelet kap, a menüben a special sora áll, a
         Titkos fegyver gombja élesít, és az élesített meccs a pillanatképbe
         sül (külön mezőben — a ±8%-os sáv érintetlen);
@@ -340,6 +340,9 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     S.formationChangesThisSeason=2;const fc1b=formationChangeCost();
     _lap("kameleon",3);const fc3=formationChangeCost();
     ki.kam={nelkul:fc0,egy:fc1,egyUtan:fc1b,harom:fc3};
+    /* 3.9.248: a váltás mindenkinek ingyenes; a Kaméleon a bolti és a saját felállást olcsóbbítja */
+    _nincs();const cf0=customFormPrice();_lap("kameleon",1);const cf1=customFormPrice();_lap("kameleon",3);const cf3=customFormPrice();
+    ki.kamAr=[cf1/cf0,cf3/cf0];
     ki.kamCon=String(renderFormationPicker).indexOf('talSpecV("kameleon","con")')>=0;
     S.formationChangesThisSeason=0;
     /* PONTRÚGÁS-LABOR */
@@ -382,7 +385,8 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
   ok(kozel(tk.tablaCon,0.85)&&tk.tablaHely,"…kontra: a másodlagos edzés −15% (a kezdőkön és a padon is)",tk.tablaCon);
   ok(kozel(tk.gyors.alatta,1.3,1e-9)&&kozel(tk.gyors.felette,1,1e-12),"Gyors tanuló: 72 alatt +30% begyakorlás, fölötte változatlan",tk.gyors);
   ok(tk.gyorsCon.tel===1&&tk.gyorsCon.rovid===0,"…kontra: a téli ablakban eggyel kevesebb felderítés (a rövidben nem)",tk.gyorsCon);
-  ok(tk.kam.nelkul>0&&tk.kam.egy===0&&tk.kam.egyUtan>0&&tk.kam.harom===0,"Kaméleon: +1 ingyen felállásváltás (3+ ritkaságon +2)",tk.kam);
+  ok(tk.kam.nelkul===0&&tk.kam.egy===0&&tk.kam.egyUtan===0&&tk.kam.harom===0,"a felállásváltás mindenkinek ingyenes (3.9.248)",tk.kam);
+  ok(Math.abs(tk.kamAr[0]-0.75)<0.01&&Math.abs(tk.kamAr[1]-0.5)<0.01,"Kaméleon: a saját tervezésű felállás −25% (3+ ritkaságon −50%)",tk.kamAr);
   ok(tk.kamCon,"…kontra: a fizetős váltás morált visz (a valódi váltás-ágon)");
   ok(kozel(tk.pont.sp,1.2),"Pontrúgás-labor: a pontrúgás súlya +20%",tk.pont);
   ok(kozel(tk.pont.ct,tk.pont.vartCt),"…kontra: a kontra-ablak −2 perc",tk.pont);

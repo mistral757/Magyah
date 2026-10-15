@@ -106,7 +106,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     clubBudgetScale=_cbs;
     return ki;});
 
-  const k=["form","stab3","stab5","scout"];
+  /* 3.9.248: a felállásváltás ingyenes és korlátlan — az ár-skálázásból kikerült */
+  ok([t.ref,t.dupla,t.szaz,t.sz1].every(o=>o.form===0&&o.formIngyen===0),"a felállásváltás minden büdzsénél és idényben ingyenes (3.9.248)",t.ref.form);
+  const k=["stab3","stab5","scout"];
   console.log("\n— 1. A REFERENCIÁN A RÉGI ÁR —");
   /* 1% tűrés: az új ár 500-ra kerekít (a stáb-hely régi ára kerekítetlen volt) */
   k.forEach(x=>ok(Math.abs(t.ref[x]/t.regi[x]-1)<=0.01,`${x}: 10 000-es büdzsénél, 3. idényben a régi ár (±1% kerekítés)`,{most:t.ref[x],regi:t.regi[x]}));
@@ -133,7 +135,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
 
   console.log("\n— 4-5. INGYENES VÁLTÁS, KÉPERNYŐK —");
   ok(t.sz1.formIngyen===0&&t.ref.formIngyen===0,"az idei első felállásváltás ingyenes marad",{sz1:t.sz1.formIngyen,sz3:t.ref.formIngyen});
-  ok(t.kep1.form===true&&t.kep1.scout===true&&t.kep1.agency===true,"az 1. idényben a képernyők kiírják a kedvezményt",t.kep1);
+  ok(t.kep1.form===false&&t.kep1.scout===true&&t.kep1.agency===true,"az 1. idényben a képernyők kiírják a kedvezményt (a felállásváltásnál nincs mit: ingyenes)",t.kep1);
   ok(t.kep3.form===false&&t.kep3.scout===false&&t.kep3.agency===false,"a 3. idényben nincs kedvezmény-címke",t.kep3);
 
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
