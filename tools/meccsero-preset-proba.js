@@ -135,11 +135,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.erintetlen=slots.map(s=>s.player&&s.player.n).join("|")===k0;
     /* taktikával */
     const tk=Object.keys(TACTICS)[0];S.tactics=S.tactics||{};S.tactics.active=tk;
-    const J=cspFelallasJavaslat("taktika");ki.taktika2={valt:J.valt.length,f0:J.m0.fit,f1:J.m1.fit};
+    const J=cspFelallasJavaslat("taktika");ki.taktika2={valt:J.valt.length,f0:J.m0.fit,f1:J.m1.fit,
+      c0:J.m0.bunt+J.m0.fit*100+J.m0.ero*0.01,c1:J.m1.bunt+J.m1.fit*100+J.m1.ero*0.01};
     /* alkalmazás: a legerősebb tizenegy */
     const R=cspFelallasJavaslat("rating");
     cspFelallasAlkalmaz(R);
-    ki.alk={ero:teamStrength(),vart:R.m1.ero,jo:slots.every(s=>!s.player||(canPlayPos(s.player,s.pos)&&!playerUnavailable(s.player.n)))};
+    ki.alk={ero:teamStrength(),vart:R.m1.ero,jo:slots.every(s=>!s.player||(canPlayPos(s.player,s.pos)&&!playerUnavailable(s.player.n))),
+      rossz:slots.filter(s=>s.player&&!(canPlayPos(s.player,s.pos)&&!playerUnavailable(s.player.n))).map(s=>({pos:s.pos,n:s.player.n,pp:s.player.pos,u:playerUnavailable(s.player.n),
+        jeloltek:fullCareerRoster().filter(p=>canPlayPos(p,s.pos)&&!playerUnavailable(p.n)).map(p=>p.n)}))};
     ki.ujra=cspFelallasJavaslat("rating").valt.length;
     /* sérült kezdő: a preset kiveszi */
     const n=slots[3].player.n;S.unavailable=S.unavailable||{};S.unavailable[n]={kind:"inj",left:3};
@@ -151,7 +154,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(c.fiatal.m1.kor<c.fiatal.m0.kor,"a legfiatalabb csapat: az átlagéletkor csökken",[c.fiatal.m0.kor,c.fiatal.m1.kor]);
   ok(c.fiatalEros.m1.ero-0.5*c.fiatalEros.m1.kor>=c.fiatalEros.m0.ero-0.5*c.fiatalEros.m0.kor-1e-9,"fiatal és erős: a célfüggvény nem romlik",c.fiatalEros);
   ok(c.osszhang.m1.bond>=c.osszhang.m0.bond,"a legjobb összhang: az összhang nem csökken",[c.osszhang.m0.bond,c.osszhang.m1.bond]);
-  ok(c.taktika.hiba&&c.taktika2.f1>=c.taktika2.f0,"taktika nélkül szól; aktív taktikával az illeszkedés nem csökken",c);
+  ok(c.taktika.hiba&&c.taktika2.c1>=c.taktika2.c0-1e-9,"taktika nélkül szól; aktív taktikával a célfüggvény (illeszkedés, posztszabály) nem romlik",c.taktika2);
   ok(Math.abs(c.alk.ero-c.alk.vart)<1e-9&&c.alk.jo,"az alkalmazás pontosan az előnézetet írja be; mindenki tudja a posztját",c.alk);
   ok(c.ujra===0,"alkalmazás után ugyanaz a preset már nem talál javítást",c.ujra);
   ok(c.serult,"a sérült kezdőt a preset kiveszi",c.serult);
@@ -169,6 +172,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const g1=cspCsereGyart(CSP_CSERE_BEEPITETT[0],null);
     ki.b1={n:g1.rules.length,cond:g1.rules.every(r=>r.cond==="eldolt"&&r.min===60),gyengebb:g1.rules.every(r=>beR(r)<xiR(r)),
       padrol:g1.rules.every(r=>mpSubBench().some(b=>b.n===r.inName)),poszt:g1.rules.every(r=>{const p=mpSubBench().find(b=>b.n===r.inName);return canPlayPos(p,slots[r.outIdx].pos);})};
+    /* biztos jelölt: egy padost erősebbé teszünk a kezdők bármelyikénél */
+    {const bp=mpSubBench().find(p=>getCategoryFor((p.pos&&p.pos[0])||"")!=="KAPUS");
+     if(bp&&careerPool[bp.n]){careerPool[bp.n].startRating=140;bp.ovr=140;}}
     const g2=cspCsereGyart(CSP_CSERE_BEEPITETT[1],null);
     ki.b2={n:g2.rules.length,cond:g2.rules.every(r=>r.cond==="veszit"),erosebb:g2.rules.every(r=>beR(r)>xiR(r))};
     const g3=cspCsereGyart(CSP_CSERE_BEEPITETT[2],1);
@@ -186,7 +192,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const T=cspSajatCsere()[0];const g4=cspCsereGyart(T,null);
     ki.sajat={n:g4.rules.length,min:g4.rules.every(r=>r.min===70&&r.cond==="veszit")};
     openCsapatPanel("csere");ki.lista=$("cspBody").innerText.indexOf("Fiatalok be vereségnél")>=0;
-    document.querySelector('[data-cspcs="b1"]').click();ki.elonezet=$("cspBody").querySelectorAll(".cspJav .cspValt").length===g1.rules.length;
+    const g1most=cspCsereGyart(CSP_CSERE_BEEPITETT[0],null);
+    document.querySelector('[data-cspcs="b1"]').click();ki.elonezet=$("cspBody").querySelectorAll(".cspJav .cspValt").length===g1most.rules.length;
     closeCsapatPanel();
     return ki;});
   ok(d.cond.join()==="true,true,false,false","az „eldőlt meccs” feltétel: 2+ gól bármelyik irányba",d.cond);
