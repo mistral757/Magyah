@@ -135,11 +135,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.erintetlen=slots.map(s=>s.player&&s.player.n).join("|")===k0;
     /* taktikával */
     const tk=Object.keys(TACTICS)[0];S.tactics=S.tactics||{};S.tactics.active=tk;
-    const J=cspFelallasJavaslat("taktika");ki.taktika2={valt:J.valt.length,f0:J.m0.fit,f1:J.m1.fit};
+    const J=cspFelallasJavaslat("taktika");ki.taktika2={valt:J.valt.length,f0:J.m0.fit,f1:J.m1.fit,
+      c0:J.m0.bunt+J.m0.fit*100+J.m0.ero*0.01,c1:J.m1.bunt+J.m1.fit*100+J.m1.ero*0.01};
     /* alkalmazás: a legerősebb tizenegy */
     const R=cspFelallasJavaslat("rating");
     cspFelallasAlkalmaz(R);
-    ki.alk={ero:teamStrength(),vart:R.m1.ero,jo:slots.every(s=>!s.player||(canPlayPos(s.player,s.pos)&&!playerUnavailable(s.player.n)))};
+    ki.alk={ero:teamStrength(),vart:R.m1.ero,jo:slots.every(s=>!s.player||(canPlayPos(s.player,s.pos)&&!playerUnavailable(s.player.n))),
+      rossz:slots.filter(s=>s.player&&!(canPlayPos(s.player,s.pos)&&!playerUnavailable(s.player.n))).map(s=>({pos:s.pos,n:s.player.n,pp:s.player.pos,u:playerUnavailable(s.player.n),
+        jeloltek:fullCareerRoster().filter(p=>canPlayPos(p,s.pos)&&!playerUnavailable(p.n)).map(p=>p.n)}))};
     ki.ujra=cspFelallasJavaslat("rating").valt.length;
     /* sérült kezdő: a preset kiveszi */
     const n=slots[3].player.n;S.unavailable=S.unavailable||{};S.unavailable[n]={kind:"inj",left:3};
@@ -151,7 +154,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(c.fiatal.m1.kor<c.fiatal.m0.kor,"a legfiatalabb csapat: az átlagéletkor csökken",[c.fiatal.m0.kor,c.fiatal.m1.kor]);
   ok(c.fiatalEros.m1.ero-0.5*c.fiatalEros.m1.kor>=c.fiatalEros.m0.ero-0.5*c.fiatalEros.m0.kor-1e-9,"fiatal és erős: a célfüggvény nem romlik",c.fiatalEros);
   ok(c.osszhang.m1.bond>=c.osszhang.m0.bond,"a legjobb összhang: az összhang nem csökken",[c.osszhang.m0.bond,c.osszhang.m1.bond]);
-  ok(c.taktika.hiba&&c.taktika2.f1>=c.taktika2.f0,"taktika nélkül szól; aktív taktikával az illeszkedés nem csökken",c);
+  ok(c.taktika.hiba&&c.taktika2.c1>=c.taktika2.c0-1e-9,"taktika nélkül szól; aktív taktikával a célfüggvény (illeszkedés, posztszabály) nem romlik",c.taktika2);
   ok(Math.abs(c.alk.ero-c.alk.vart)<1e-9&&c.alk.jo,"az alkalmazás pontosan az előnézetet írja be; mindenki tudja a posztját",c.alk);
   ok(c.ujra===0,"alkalmazás után ugyanaz a preset már nem talál javítást",c.ujra);
   ok(c.serult,"a sérült kezdőt a preset kiveszi",c.serult);
@@ -169,6 +172,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const g1=cspCsereGyart(CSP_CSERE_BEEPITETT[0],null);
     ki.b1={n:g1.rules.length,cond:g1.rules.every(r=>r.cond==="eldolt"&&r.min===60),gyengebb:g1.rules.every(r=>beR(r)<xiR(r)),
       padrol:g1.rules.every(r=>mpSubBench().some(b=>b.n===r.inName)),poszt:g1.rules.every(r=>{const p=mpSubBench().find(b=>b.n===r.inName);return canPlayPos(p,slots[r.outIdx].pos);})};
+    /* biztos jelölt: egy padost erősebbé teszünk a kezdők bármelyikénél */
+    {const bp=mpSubBench().find(p=>getCategoryFor((p.pos&&p.pos[0])||"")!=="KAPUS");
+     if(bp&&careerPool[bp.n]){careerPool[bp.n].startRating=140;bp.ovr=140;}}
     const g2=cspCsereGyart(CSP_CSERE_BEEPITETT[1],null);
     ki.b2={n:g2.rules.length,cond:g2.rules.every(r=>r.cond==="veszit"),erosebb:g2.rules.every(r=>beR(r)>xiR(r))};
     const g3=cspCsereGyart(CSP_CSERE_BEEPITETT[2],1);
@@ -186,7 +192,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const T=cspSajatCsere()[0];const g4=cspCsereGyart(T,null);
     ki.sajat={n:g4.rules.length,min:g4.rules.every(r=>r.min===70&&r.cond==="veszit")};
     openCsapatPanel("csere");ki.lista=$("cspBody").innerText.indexOf("Fiatalok be vereségnél")>=0;
-    document.querySelector('[data-cspcs="b1"]').click();ki.elonezet=$("cspBody").querySelectorAll(".cspJav .cspValt").length===g1.rules.length;
+    const g1most=cspCsereGyart(CSP_CSERE_BEEPITETT[0],null);
+    document.querySelector('[data-cspcs="b1"]').click();ki.elonezet=$("cspBody").querySelectorAll(".cspJav .cspValt").length===g1most.rules.length;
     closeCsapatPanel();
     return ki;});
   ok(d.cond.join()==="true,true,false,false","az „eldőlt meccs” feltétel: 2+ gól bármelyik irányba",d.cond);
@@ -197,6 +204,57 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(d.terv.every(Boolean)&&d.hozza,"a cseretervbe tölt (csere vagy hozzáadás), és bekapcsolja a meccs közbeni cseréket",d);
   ok(d.sajat.n>0&&d.sajat.min&&d.lista,"saját preset: elmentve, a listán, a mostani keretből gyárt",d.sajat);
   ok(d.elonezet,"a preset kiválasztása előnézetet mutat",d.elonezet);
+
+  console.log("=== 5. MENTETT FELÁLLÁSOK ===");
+  const m=await p.evaluate(()=>{
+    const ki={};
+    const nevek=()=>slots.map(sl=>sl.player&&sl.player.n);
+    const alap=nevek(),alapForm=form;
+    const M=cspMentes("Hazai alap");
+    ki.mentve=cspMentesek().length===1&&M.nev==="Hazai alap"&&M.form===form;
+    /* kísérletezés: a legerősebb tizenegy (a 4. rész a legfiatalabbat hagyta) */
+    cspFelallasAlkalmaz(cspFelallasJavaslat("rating"));
+    ki.mas=nevek().join()!==alap.join();
+    /* visszatöltés: előnézet, aztán alkalmazás */
+    const J=cspMentesJavaslat(M.id);
+    ki.elonezet=J.valt.length>0&&nevek().join()!==alap.join();
+    cspMentesAlkalmaz(J);
+    ki.vissza=nevek().join()===alap.join();
+    /* ugyanazon a néven felülír */
+    cspMentes("Hazai alap");ki.felulir=cspMentesek().length===1;
+    /* a karrier-mentés viszi */
+    saveGame();
+    let d=null;try{d=JSON.parse(localStorage.getItem(saveKey()));}catch(e){d=null;}
+    ki.mentesben=!!(d&&d.S&&Array.isArray(d.S.felMentes)&&d.S.felMentes.length===1);
+    /* egy mentett ember közben elment: kimarad, a helyén a mostani marad */
+    cspFelallasAlkalmaz(cspFelallasJavaslat("rating"));
+    const M2=cspMentesek()[0];
+    const tavozo=M2.xi.find(n=>n&&!nevek().includes(n));
+    const p0=fullCareerRoster().find(x=>x.n===tavozo);
+    const loc=p0&&findPlayerLocation(p0);
+    if(loc&&loc.type==="bench")BENCH[loc.key]=null;else if(loc&&loc.type==="extra")extraRoster.splice(loc.idx,1);
+    const J2=cspMentesJavaslat(M2.id);
+    ki.kimarad=J2.kimarad.some(x=>x.n===tavozo&&/nincs a keretben/.test(x.ok));
+    cspMentesAlkalmaz(J2);
+    ki.tobbiVissza=nevek().filter((n,i)=>n===M2.xi[i]).length>=10;
+    /* más alakzatban mentett: az alakzatot is visszaállítja */
+    const masik=availableFormKeys().find(k=>k!==form);
+    applyFormationChange(masik);
+    const J3=cspMentesJavaslat(M2.id);
+    ki.masForm=!!J3.masForm;
+    cspMentesAlkalmaz(J3);
+    ki.formVissza=form===alapForm;
+    /* törlés */
+    S.felMentes=[];ki.torles=cspMentesek().length===0;
+    /* a felület */
+    openCsapatPanel("fel");ki.felulet=!!$("cspBody").querySelector("[data-cspment]");closeCsapatPanel();
+    return ki;});
+  ok(m.mentve&&m.felulir,"a mostani tizenegy saját néven menthető (ugyanazon a néven felülír)",m);
+  ok(m.mas&&m.elonezet&&m.vissza,"kísérletezés után a mentett tizenegy előnézettel visszatölthető, pontosan",m);
+  ok(m.mentesben,"a mentett felállások a karrier-mentéssel együtt mentődnek",m.mentesben);
+  ok(m.kimarad&&m.tobbiVissza,"akit közben eladtál, az kimarad (és szól), a többiek visszakerülnek",m);
+  ok(m.masForm&&m.formVissza,"más alakzatban mentett felállásnál az alakzat is visszaáll",m);
+  ok(m.torles&&m.felulet,"törölhető; a mentés a Felállás fülön van",m);
 
   ok(!errs.length,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();

@@ -83,4 +83,25 @@ régebbi verzió nem ismeri — a verzió-eltérésre a szoba már most is figye
 
 ## Próba
 
-`node tools/meccsero-preset-proba.js` — 26 állítás.
+`node tools/meccsero-preset-proba.js` — 32 állítás (a mentett felállásokkal).
+
+## 💾 Mentett felállások (3.9.252)
+
+> „ez úgy működik igazán jól, ha az aktuális felállásunkat is el lehet menteni
+> itt saját néven, és vissza lehet tölteni (ti. azt manuálisan elkészítem
+> olyanra, amilyenre akarom, elmentem és utána merek kísérletezni)"
+
+A 🧩 Felállás fül tetején: a **mostani** tizenegy saját néven menthető (ugyanazon a
+néven felülír, legfeljebb 20 mentés). A mentés az alakzatot, a tizenegyet posztonként
+és a padot viszi, név szerint; a karrier-mentés része (`S.felMentes`).
+
+A visszatöltés ugyanaz az előnézet → Alkalmazom út, mint a preseteké:
+
+* akit közben eladtál, aki sérült, eltiltott vagy zárolt, az nem kerül vissza — a
+  helyén az marad, aki most ott áll, és az előnézet meg is mondja;
+* ha a mentés más alakzatban készült, a visszatöltés az alakzatot is visszaállítja
+  (a felállásváltás 3.9.248 óta ingyenes);
+* a kapitányt nem tölti vissza: a karszalagnak saját szabályai vannak, és amíg a
+  kapitány a kezdőben marad, nála is marad.
+
+Próba: a `tools/meccsero-preset-proba.js` 5. része (6 állítás; a próba összesen 32).
