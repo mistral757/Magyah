@@ -198,6 +198,57 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(d.sajat.n>0&&d.sajat.min&&d.lista,"saját preset: elmentve, a listán, a mostani keretből gyárt",d.sajat);
   ok(d.elonezet,"a preset kiválasztása előnézetet mutat",d.elonezet);
 
+  console.log("=== 5. MENTETT FELÁLLÁSOK ===");
+  const m=await p.evaluate(()=>{
+    const ki={};
+    const nevek=()=>slots.map(sl=>sl.player&&sl.player.n);
+    const alap=nevek(),alapForm=form;
+    const M=cspMentes("Hazai alap");
+    ki.mentve=cspMentesek().length===1&&M.nev==="Hazai alap"&&M.form===form;
+    /* kísérletezés: a legerősebb tizenegy (a 4. rész a legfiatalabbat hagyta) */
+    cspFelallasAlkalmaz(cspFelallasJavaslat("rating"));
+    ki.mas=nevek().join()!==alap.join();
+    /* visszatöltés: előnézet, aztán alkalmazás */
+    const J=cspMentesJavaslat(M.id);
+    ki.elonezet=J.valt.length>0&&nevek().join()!==alap.join();
+    cspMentesAlkalmaz(J);
+    ki.vissza=nevek().join()===alap.join();
+    /* ugyanazon a néven felülír */
+    cspMentes("Hazai alap");ki.felulir=cspMentesek().length===1;
+    /* a karrier-mentés viszi */
+    saveGame();
+    let d=null;try{d=JSON.parse(localStorage.getItem(saveKey()));}catch(e){d=null;}
+    ki.mentesben=!!(d&&d.S&&Array.isArray(d.S.felMentes)&&d.S.felMentes.length===1);
+    /* egy mentett ember közben elment: kimarad, a helyén a mostani marad */
+    cspFelallasAlkalmaz(cspFelallasJavaslat("rating"));
+    const M2=cspMentesek()[0];
+    const tavozo=M2.xi.find(n=>n&&!nevek().includes(n));
+    const p0=fullCareerRoster().find(x=>x.n===tavozo);
+    const loc=p0&&findPlayerLocation(p0);
+    if(loc&&loc.type==="bench")BENCH[loc.key]=null;else if(loc&&loc.type==="extra")extraRoster.splice(loc.idx,1);
+    const J2=cspMentesJavaslat(M2.id);
+    ki.kimarad=J2.kimarad.some(x=>x.n===tavozo&&/nincs a keretben/.test(x.ok));
+    cspMentesAlkalmaz(J2);
+    ki.tobbiVissza=nevek().filter((n,i)=>n===M2.xi[i]).length>=10;
+    /* más alakzatban mentett: az alakzatot is visszaállítja */
+    const masik=availableFormKeys().find(k=>k!==form);
+    applyFormationChange(masik);
+    const J3=cspMentesJavaslat(M2.id);
+    ki.masForm=!!J3.masForm;
+    cspMentesAlkalmaz(J3);
+    ki.formVissza=form===alapForm;
+    /* törlés */
+    S.felMentes=[];ki.torles=cspMentesek().length===0;
+    /* a felület */
+    openCsapatPanel("fel");ki.felulet=!!$("cspBody").querySelector("[data-cspment]");closeCsapatPanel();
+    return ki;});
+  ok(m.mentve&&m.felulir,"a mostani tizenegy saját néven menthető (ugyanazon a néven felülír)",m);
+  ok(m.mas&&m.elonezet&&m.vissza,"kísérletezés után a mentett tizenegy előnézettel visszatölthető, pontosan",m);
+  ok(m.mentesben,"a mentett felállások a karrier-mentéssel együtt mentődnek",m.mentesben);
+  ok(m.kimarad&&m.tobbiVissza,"akit közben eladtál, az kimarad (és szól), a többiek visszakerülnek",m);
+  ok(m.masForm&&m.formVissza,"más alakzatban mentett felállásnál az alakzat is visszaáll",m);
+  ok(m.torles&&m.felulet,"törölhető; a mentés a Felállás fülön van",m);
+
   ok(!errs.length,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`✗ ${hiba} hiba`:"✓ minden rendben");
