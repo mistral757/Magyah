@@ -241,6 +241,17 @@ A statisztikai mérő: `tools/meccsmotor/kiallitas-terv.js`. Két módja van:
 
 `TERV=0` a régi, `TERV=1` az új szabállyal mér.
 
+## eladasi-plafon-bevetel-proba.js — 💰 az eladási plafon mércéje a valódi bevétel
+
+```
+node tools/eladasi-plafon-bevetel-proba.js
+```
+
+**8 állítás** (lásd `docs/penz-pvp-kezdes-3-9-224.md`, „Utólag (3.9.251)”): a bejelentett
+80 Mrd-os azonnali ár a régi mércével zsugorodott, az újjal érintetlen; a mérce keret +
+lelátó + kupadíj + jutalom, az eladás nem emeli; a sztár-eladás továbbra is plafonos; az
+idei ütem 8 forduló után vetít; az 1. idényben a működési keret a mérce.
+
 ## meccsero-preset-proba.js — ⚡🧩 meccserő-bontás, felállás- és csere-presetek
 
 ```
