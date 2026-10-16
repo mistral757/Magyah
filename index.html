@@ -7538,7 +7538,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.253";
+const APP_VERSION="3.9.254";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -17070,7 +17070,79 @@ function pyrGrowStep(){
   if(W.grow==null)W.grow=Math.round(pyrAiRate(pyrMyDivId())/30*1000)/1000;
   return W.grow||0;}
 /* Mennyivel erősebb a mezőnyöd MOST, mint a szezon első fordulóján. */
-function pyrGrowNow(){return pyrGrowStep()*(S.idx||0)+pyrMidLiftNow();}   /* ⛰ 3.9.210 — a téli emelés rámpája */
+function pyrGrowNow(){return pyrGrowStep()*(S.idx||0)+pyrMidLiftNow()+nfGyorsAcc();}   /* ⛰ 3.9.210 — a téli emelés rámpája · 🏃 3.9.254 — az idény-gyorsítás */
+/* ================= 🏃 A MEZŐNY IDÉNY KÖZBENI GYORSULÁSA (3.9.254) =================
+   KÉRÉS: „4. szezontól kezdve már a magas nehézségi szinten indított karrier is
+   elunalmasodik, mert túl jó már a csapat, túl sok a pénz, túl gyorsan
+   fejlődünk […] Be kéne vezetni a mérési adatainkból kiindulva egy olyan
+   rendszert, ami szezonról szezonra erősíti a szezon közbeni fejlődési
+   tempóját az ellenfélnek, és ezen még tovább erősít az, hogy épp hanyadik
+   divízióban vagyunk. Ez azért fontos, hogy ne növeljük a beragadás esélyét.
+   […] Eleinte lőjünk inkább alá".
+   A MÉRÉS (a meres-adat ág, 2026-10-15; a kétoldalú szabályozó `dg` mezője =
+   a rés változása egy idény alatt, mediánok): 1. idény +5,1 · 2. +10,3 ·
+   3. +13,4 · 4. ~+19 (26 forduló). Jó közelítés: dg ≈ 5 + 4,5·(idény−1). A
+   mezőny idény közben eddig CSAK az éves alapütemmel nőtt (pyrGrowStep,
+   ~4–7 pont/idény), a csapatod 15–50-et — az idényrajti horgony ezt minden
+   nyáron visszaállította, idényen belül viszont egyre gyorsabban húztál el.
+   A SZABÁLY — csak az IDÉNY KÖZBENI mezőny-növekedésre ül (az éves
+   világfejlődés és a szabályozó modellje érintetlen, különben a rajt
+   „visszaadná" a nehezítést):
+     · a 4. idénytől a mért többletnek (dg − 5) a 30%-a — ALÁLŐVE, ahogy kérve:
+       4. idény ≈ +4, 5. ≈ +5,4, 6. ≈ +6,8 … legfeljebb +10 pont egy idényre;
+     · az OSZTÁLY szorozza: a legalsó ×0,5 → az élvonal ×1,0 → a szuperligák
+       legfeljebb ×1,15 — lent, ahol a feljutásért küzdesz, kevesebb;
+     · a TEMPÓ arányosítja (a mért karrierek Komótos ×0,7-en futottak);
+     · BERAGADÁS-ŐR: abban a fordulóban, amikor a ⚡ előnyöd a mezőny fölött a
+       fokozatod célrése ALATT van, nincs gyorsulás — ami nem húzott el, azt
+       nem fékezzük tovább.
+   A gyorsulás fordulónként gyűlik (S.pyr.gyors.acc), idényhez kötve; a
+   mezőny erejébe a pyrGrowNow adja hozzá, tehát a meccs, a kijelzett erő és a
+   nehézség-tanácsadó is látja. */
+const NF_GYORS={kezd:4,arany:0.30,dg0:5,dgLep:4.5,cap:10,tempoRef:0.7,divAlul:0.5,szuperMax:1.15};
+function nfGyorsIdeny(sn){
+  if(!(sn>=NF_GYORS.kezd))return 0;
+  const dg=NF_GYORS.dg0+NF_GYORS.dgLep*(sn-1);
+  return Math.min(NF_GYORS.cap,NF_GYORS.arany*(dg-NF_GYORS.dg0));}
+function nfGyorsOszt(div){
+  if(typeof div!=="number"||!isFinite(div))return 1;
+  if(div<=0)return Math.min(NF_GYORS.szuperMax,1+0.05*(1-div));
+  const t=Math.max(0,Math.min(1,(PYR_DIVS-div)/(PYR_DIVS-1)));
+  return NF_GYORS.divAlul+(1-NF_GYORS.divAlul)*t;}
+/* egy idény teljes gyorsulása a mostani osztályban és tempón */
+function nfGyorsTeljes(sn,div){
+  let k=1;try{k=((typeof tempoMult==="function")?tempoMult():1)/NF_GYORS.tempoRef;}catch(e){k=1;}
+  return Math.min(NF_GYORS.cap*NF_GYORS.szuperMax,nfGyorsIdeny(sn)*nfGyorsOszt(div)*k);}
+function nfGyorsAcc(){
+  try{const G=S&&S.pyr&&S.pyr.gyors;return (G&&G.sn===(S.seasonNumber||1))?(G.acc||0):0;}catch(e){return 0;}}
+/* a fordulók után (a bajnoki forduló lezárásakor) — idempotens: egy fordulót
+   egyszer számol */
+function nfGyorsTick(){
+  if(!(typeof pyrOn==="function"&&pyrOn())||!S.pyr)return 0;
+  const sn=S.seasonNumber||1,idx=S.idx||0;
+  let G=S.pyr.gyors;
+  if(!G||G.sn!==sn)G=S.pyr.gyors={sn,acc:0,idx:0,szunet:0};
+  if(!(idx>G.idx))return 0;
+  const E=nfGyorsTeljes(sn,pyrMyDivId());
+  let add=0;
+  for(let i=G.idx;i<idx;i++){
+    if(!(E>0))break;
+    /* a beragadás-őr: a mostani ⚡-előny a fokozat célrése fölött? */
+    let jo=true;
+    try{
+      const cel=(typeof nfOn==="function"&&nfOn())?nfCelFor(sn):3;
+      const gap=teamMatchStrength()-oppMatchStrength();
+      jo=gap>=cel;
+    }catch(e){jo=true;}
+    if(jo)add+=E/30;else G.szunet=(G.szunet||0)+1;}
+  G.idx=idx;
+  G.acc=Math.round(((G.acc||0)+add)*1000)/1000;
+  if(add>0&&!G.szolt){
+    G.szolt=1;
+    try{addLine(`🏃 <b>A mezőny is felpörgött.</b> A ${sn}. idénytől az ellenfelek idény közben gyorsabban fejlődnek: `
+      +`ebben az idényben legfeljebb <b>+${String(Math.round(E*10)/10).replace(".",",")}</b> meccserővel az alapütemen felül. `
+      +`Ha lemaradsz a célrésed alá, a gyorsulás megáll.`,"m ev");}catch(e){}}
+  return add;}
 /* A szezon mezőnyének átszámolása a mostani fordulóra. Idempotens: mindig az
    érintetlen ovrBase-ből dolgozik, tehát bárhonnan, bármennyiszer hívható. */
 function pyrOppRefresh(){
@@ -75692,6 +75764,7 @@ function playMatchMotor(){
        fenti két könyvelés: a bajnoki forduló lezárása UTÁN, tehát az S.idx
        már a lejátszott meccsek száma — pontosan ennyi fordulónyi fejlődés
        van a mezőny mögött. */
+    try{nfGyorsTick();}catch(e){}   /* 🏃 3.9.254 — az idény-gyorsítás (a refresh előtt) */
     try{pyrOppRefresh();}catch(e){}
     /* FIX: a meccs alatt megváltozhatott bárki élő Ratingje (fejlődés/visszaesés,
        skill-szerzés, piros lap, sérülés) — a pálya és a csapaterő eddig SOHA nem
@@ -122344,7 +122417,9 @@ function meresSzezonZar(){
     z.padlo=h?{vall:h.g,cel:h.want,emelesRajt:h.lift||0,emelesTel:h.mid||0,termeszetes:h.nat,resElotte:h.elotte,resUtana:h.utana,
       /* 🎚 3.9.222 — a kétoldalú szabályozó: fokozat, célrés (idényátlag), alsó fék, záró rés, mért változás */
       nf:h.nf||null,celres:(typeof h.cel==="number")?h.cel:null,fek:h.fek||0,resVeg:(typeof h.veg==="number")?h.veg:null,
-      dg:(typeof h.dg==="number")?h.dg:null,dgBecsles:(typeof h.dgBecsles==="number")?h.dgBecsles:null}
+      dg:(typeof h.dg==="number")?h.dg:null,dgBecsles:(typeof h.dgBecsles==="number")?h.dgBecsles:null,
+      /* 🏃 3.9.254 — az idény-gyorsítás: mennyi gyűlt, hány fordulóban állt meg (őr) */
+      gyors:(S.pyr&&S.pyr.gyors&&S.pyr.gyors.sn===z.sz)?{acc:S.pyr.gyors.acc,szunet:S.pyr.gyors.szunet||0}:null}
       :{vall:pyrFloorG0(),cel:pyrFloorG0(),emelesRajt:0,emelesTel:0};}}catch(e){}
   meresSave();
   try{meresFeltolt(false);}catch(e){}}
