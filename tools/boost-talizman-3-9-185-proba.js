@@ -360,7 +360,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const body=$("twBody").innerText||"",act=$("twActions").innerText||"";
     ki.panel=/talizmánból/.test(body)&&/fajta-kedvezmény/.test(act)&&/Törzsvásárló/.test(act);
     ki.panelSzoveg=act.slice(0,300);
-    ki.sugo=/⚡ BOOST talizmán/.test(GLOSSARY.talizman.text)&&/tizenhárom szín/.test(GLOSSARY.talizman.text)
+    ki.sugo=/⚡ BOOST talizmán/.test(GLOSSARY.talizman.text)&&/(tizenhárom|tizenöt) szín/.test(GLOSSARY.talizman.text)
       &&GLOSSARY.talizman.text.indexOf("mind a "+TAL_SPEC.length+" él")>=0;
     return ki;});
   console.log("\n— 8. A FELÜLET —");
@@ -368,7 +368,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(f.menu,"a Talizmánok menü aktív hatásai: fajtánkénti kedvezmény, csomag, kihívás-esély, az idei szerencse-dobások",f.menuSzoveg);
   ok(f.ossz,"az összhatás-panel a fajta-kedvezményt is listázza");
   ok(f.panel,"a Boost-központ kiírja a talizmán-kedvezményeket (csomag a fejlécben, fajta és sorrend a sorban)",f.panelSzoveg);
-  ok(f.sugo,"a súgó a tizenhárom színről (3.9.224 óta) és a Boost talizmánról szól, a speciálok száma stimmel");
+  ok(f.sugo,"a súgó a tizenhárom (3.9.255 óta tizenöt) színről és a Boost talizmánról szól, a speciálok száma stimmel");
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,5));
 
   await b.close();srv.close();
