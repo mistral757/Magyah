@@ -18,9 +18,9 @@
 A színek száma 13-ról **15**-re nő. Mindkét új szín ugyanabban a rendszerben
 gyűlik, mint a többi: a kategórián belül csökkenő hozammal (0,85^k),
 színhűséggel (3/5/8 lapnál ×1,10/×1,20/×1,35) és saját plafonnal. A számok
-egy **E = 1** erejű lapra vonatkoznak. Speciáljuk nincs, ezért a lapjaik
-mindig „Tiszta” lapok (×1,25 alap). A 🌈 Polihisztor-díjhoz mostantól mind a
-15 színből kell lap.
+egy **E = 1** erejű lapra vonatkoznak. Mindkét színnek 6 speciálja van (a
+speciálok száma 103-ról **115**-re nő). A 🌈 Polihisztor-díjhoz mostantól mind
+a 15 színből kell lap.
 
 ## 1. A kihívás-típusok (ami eddig is volt)
 
@@ -68,6 +68,17 @@ teljesítési arányhoz igazodik (72% / 48% / 26%).
   (idén 1/3)” áll.
 * **Végigjátszásban nincs sprint**, mert ott nincs kihívás-vállalás sem.
 
+Speciálok:
+
+| speciál | min. | pro | kontra (másik szín) |
+|---|---|---|---|
+| Kockázati tőke | átlagos | a nehéz kihívások jutalma +15% | ❤️ büntetéssel zárult kihívás után −1 morál |
+| Halasztás | átlagos | a rövid kihívások határideje +1 meccs | 💰 vállalásonként a heti lelátó 2%-a |
+| Sikerdíj | ritka | teljesített kihívás után +2 morál | 📋 taktika-illeszkedés −0,4 pp |
+| Kupaláz | ritka | a kupa-kihívások jutalma +20% | 🌱 fejlődési tempó −1,5% |
+| Rutinos vállalkozó | nagyon ritka | a könnyű kihívás jutalma a közepes sávból | 🤝 −2 pp esély a tiszta üzletre |
+| Aranyszerződés | legendás | +1 egyszerre vállalható hosszú kihívás | 🎓 a stábtag és a stábhely ára +5% |
+
 **Rezonancia — Biztos kéz** (5 lap): minden felajánlásban +1 ajánlat, és a
 kihívás-jutalmak értéke további +10% (a plafonon felül).
 
@@ -107,6 +118,17 @@ jutalom-súlyainak összege. Ez ugyanaz a súly, amiből az élő stílus pontot
   kimarad). Képesség nélküli, alap erővel hat, és csak a saját meccsén él. A
   párharcban nincs.
 
+Speciálok:
+
+| speciál | min. | pro | kontra (másik szín) |
+|---|---|---|---|
+| Árnyékedző | átlagos | a titkos megbízatás esélye +4 pp (a 33%-on belül) | 💰 meccsenként a heti lelátó 2%-a |
+| Néma tanítvány | átlagos | idényenként +1 csendes képesség férhet bele | 🎭 a stíluspont-szerzés −3% |
+| Kettős ügynök | ritka | a Suttogó ajánlat ára −15% | 🕴️ az ügynökség igazolási pontja −10% |
+| Árnyék-krónika | ritka | az árnyék-mérföldkövek stíluspontja +25% | 🌱 fejlődési tempó −1,5% |
+| Szürke bíboros | nagyon ritka | a titkos megbízatás I. (legendástól II.) szintű képesség erejével hat | 📋 taktika-illeszkedés −0,4 pp |
+| Árnyékkormány | legendás | mérföldkövenként +1 külön dobás a csendes képességre | ❤️ minden csendes képesség után −2 morál |
+
 **Rezonancia — Árnyékkabinet** (5 lap): a Suttogó ajánlat ára −25%, és
 idényenként +2 csendes képesség fér bele (8).
 
@@ -120,7 +142,7 @@ idényenként +2 csendes képesség fér bele (8).
 
 ## Próba
 
-`tools/talizman-kihivas-rejtett-proba.js`: **34 állítás**, valódi böngészőben.
+`tools/talizman-kihivas-rejtett-proba.js`: **43 állítás**, valódi böngészőben.
 
 * katalógus és szövegek;
 * semlegesség;
@@ -136,4 +158,5 @@ idényenként +2 csendes képesség fér bele (8).
 * a `styleActiveFx`-be kerülés;
 * az ajánlat megvétele;
 * a csak saját meccsre szóló szerep;
+* a 12 speciál: darabszám, átlagos ritkaságú is van, mind él, a kontra másik színt üt, a szövegek tiszták, és hét pro mérve;
 * 8 valódi forduló minden új lappal.

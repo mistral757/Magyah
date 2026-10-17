@@ -374,7 +374,7 @@ node tools/penz-pvp-kezdes-proba.js
 node tools/talizman-kihivas-rejtett-proba.js
 ```
 
-**34 állítás**, valódi böngészőben (lásd `docs/talizman-kihivas-rejtett-3-9-255.md`).
+**43 állítás**, valódi böngészőben (lásd `docs/talizman-kihivas-rejtett-3-9-255.md`).
 
 * A katalógus: 15 szín, a két új a végén. Öt ritkaságon minden szöveg tiszta. A „Több hely" lap mindig kap hatókört. Mindkét színnek van rezonanciája.
 * Talizmán nélkül minden új kapaszkodó semleges: helyek, ajánlatszám, nehézség, jutalom, kegyelem, sprint, rejtett képesség és szerep.
@@ -394,6 +394,7 @@ node tools/talizman-kihivas-rejtett-proba.js
   * a képesség a `styleActiveFx`-ben hat, az élővé vált stílusé kimarad;
   * a II. szintű ajánlat pont nélkül nem, ponttal megvehető;
   * a titkos szerep csak a saját meccsén él.
+* A 12 speciál: 6-6, van átlagos ritkaságú, mind él, a kontra másik színt üt, tiszta szövegek; a Kockázati tőke, Kupaláz, Aranyszerződés, Halasztás, Árnyékedző, Néma tanítvány és Szürke bíboros pro-ja mérve.
 * 8 valódi forduló az összes új lappal, oldalhiba nélkül.
 
 ## talizman-ugynok-szurkolo-proba.js — 🕴️📣🎓 Ügynökség, Szurkolótábor, erősebb Stáb

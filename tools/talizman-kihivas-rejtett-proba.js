@@ -257,6 +257,49 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.szerep.key&&r.szerep.stil===r.szerep.best&&r.szerep.of&&r.szerep.akt,"titkos megbízatás: a legjobb rejtett stílus szerepe, egy hozzá illő játékosnál",r.szerep);
   ok(r.szerepUtana.of===null&&r.szerepUtana.akt===false,"…és csak a saját meccsén él",r.szerepUtana);
 
+  /* ---- 4b. A SPECIÁLOK ---- */
+  const sp=await p.evaluate(()=>{
+    const ki={};
+    ["kihivas","rejtett"].forEach(kat=>{
+      const L=TAL_SPEC.filter(x=>x.k===kat);
+      ki[kat]={db:L.length,min1:L.filter(x=>x.min===1).length,mind:L.every(x=>talSpecMukodik(x.id)),
+        kontraMas:L.every(x=>x.con&&x.con.k!==kat&&(talKat(x.con.k)||x.con.k==="pakli"))};});
+    const rossz=[];
+    TAL_SPEC.filter(x=>x.k==="kihivas"||x.k==="rejtett").forEach(x=>{for(let r=x.min;r<=5;r++){
+      const L={kat:x.k,rang:r,dobas:0.5,spec:x.id};
+      const t=talSpecOldal(x,"pro",r,L)+" "+talSpecOldal(x,"con",r,L)+" "+talLapNev(L);
+      if(/\{v\}|NaN|undefined/.test(t))rossz.push(x.id+": "+t);}});
+    ki.rossz=rossz;
+    const S1=(id,r)=>_pakli([_lap(TAL_SPEC_BY[id].k,null,r||Math.max(4,TAL_SPEC_BY[id].min),0.5,id)]);
+    /* pénz-jutalom nehézen és kupán */
+    const _pick=chRewardPick;chRewardPick=pool=>pool.find(x=>x.kind==="money");
+    try{const ctx=challengeContext();
+      _pakli([]);const h0=genReward("long","hard",ctx).amount,c0=genReward("cup","medium",ctx).amount;
+      S1("kockazati");ki.kock=[h0,genReward("long","hard",ctx).amount,talSpecV("kockazati","pro")];
+      S1("kupalaz");ki.kupa=[c0,genReward("cup","medium",ctx).amount,talSpecV("kupalaz","pro")];}
+    finally{chRewardPick=_pick;}
+    S1("aranyszerzodes");ki.arany=challengeSlotLimit("long")-challengeSlotBase("long");
+    S1("rutinos");{let e=0,m=0;const ctx=challengeContext();for(let i=0;i<300;i++){const o=buildChallengeOffer("short",ctx);if(o&&o.difficulty==="easy"){e++;}}ki.rutinos=e;}
+    S1("halasztas");{const ctx=challengeContext();S.idx=0;let d=null;for(let i=0;i<50&&d==null;i++){const o=buildChallengeOffer("short",ctx);if(o&&o.deadline.kind==="round"&&o.deadlineIdx==null)d=o.deadline.value;}ki.halaszt=[d,shortChallengeWindow(),talSpecV("halasztas","pro")];}
+    /* rejtett speciálok: egy rszerep lap + a speciál */
+    _pakli([_lap("rejtett","rszerep",1,0.5),_lap("rejtett",null,4,0.5,"arnyekedzo")]);
+    ki.edzo=[talRejtP("rszerep"),talAlap("rejtett","rszerep"),talSpecV("arnyekedzo","pro")];
+    S1("nemataniitvany");ki.nema=rejtKepMax();
+    S1("szurkebiboros",4);S.rejtett={szerep:{key:"b2b",name:"x",idx:S.idx||0,season:S.seasonNumber||1}};
+    ki.biboros=[roleLevel("b2b"),roleLevel("nyito")];S.rejtett=null;
+    return ki;});
+  console.log("\n— 4b. SPECIÁLOK —");
+  ok(sp.kihivas.db===6&&sp.rejtett.db===6&&sp.kihivas.min1>=1&&sp.rejtett.min1>=1,"6-6 speciál, mindkét színben van átlagos ritkaságú is",{k:sp.kihivas,r:sp.rejtett});
+  ok(sp.kihivas.mind&&sp.rejtett.mind&&sp.kihivas.kontraMas&&sp.rejtett.kontraMas,"mind él, és minden kontra MÁSIK színt üt");
+  ok(!sp.rossz.length,"a speciálok szövegei tiszták minden ritkaságon",sp.rossz.slice(0,3));
+  ok(Math.abs(sp.kock[1]/sp.kock[0]-(1+sp.kock[2]/100))<0.05,"Kockázati tőke: a nehéz kihívás pénze +v%",sp.kock);
+  ok(Math.abs(sp.kupa[1]/sp.kupa[0]-(1+sp.kupa[2]/100))<0.05,"Kupaláz: a kupa-kihívás pénze +v%",sp.kupa);
+  ok(sp.arany>=1,"Aranyszerződés: +hely a hosszú kihívások közt",sp.arany);
+  ok(sp.halaszt[0]===Math.min(30,sp.halaszt[1]+Math.round(sp.halaszt[2]))&&sp.halaszt[2]>=1,"Halasztás: a rövid határidő +v meccs",sp.halaszt);
+  ok(Math.abs(sp.edzo[0]-Math.min(0.33,(sp.edzo[1]+sp.edzo[2])/100))<1e-9&&sp.edzo[2]>0,"Árnyékedző: a titkos szerep esélye +v pp",sp.edzo);
+  ok(sp.nema>6,"Néma tanítvány: több csendes képesség fér bele",sp.nema);
+  ok(sp.biboros[0]===2&&sp.biboros[1]===0,"Szürke bíboros (legendás): a titkos szerep II. szintű erővel, a többi szerep érintetlen",sp.biboros);
+
   /* ---- 5. VALÓDI MECCSEK AZ ÖSSZES ÚJ LAPPAL ---- */
   const v=await p.evaluate(async()=>{
     const ki={};
