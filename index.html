@@ -7538,7 +7538,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.254";
+const APP_VERSION="3.9.255";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -52949,7 +52949,10 @@ function chStrongestBondPair(){
     if(v>bv){bv=v;a=ns[i];b=ns[j];}}
   return (a&&b&&bv>0)?{a,b,v:bv}:null;}
 function genReward(scope,diff,ctx){
-  const mult=challengeDiffMult(diff);
+  /* 📜 3.9.255 — Gazdagabb jutalom: a nehézségi szorzóra ül, tehát minden
+     összeg-alapú jutalom (pénz, morál, POT, stíluspont, szurkoló) vele nő */
+  let _tj=1;try{_tj=talKihJutalomMult();}catch(e){_tj=1;}
+  const mult=challengeDiffMult(diff)*_tj;
   /* A KUPA a hosszú és a rövid között áll: egyetlen sorozat, de nagy tét —
      ezért a hosszú kihívás jutalom-készletét kapja, valamivel szerényebb
      pénzzel. */
@@ -53136,8 +53139,27 @@ function chalDiffUp(diff,steps){
    ilyen van: `msClose` — az 5%-on belüli mérföldkő (3.9.39). A kapu ugyanaz a
    minta, mint a stílus-tiszta lapé: egy jelzőt teszünk fel, újrasorsolunk,
    amíg a kívánt típus jön, és a jelzőt MINDIG levesszük. */
+/* ================= 📜 IDÉNYKEZDŐ SPRINT (3.9.255) =================
+   A Kihívások szín lépcsős lapja: a szezon eleji HOSSZÚ kínálat után rövid
+   kihívások is jönnek. A felajánlás ugyanaz a képernyő; a `_chSprint` a
+   sorsolás idejére kizárja a saját határidejű sablonokat. Végigjátszásban
+   (auto) nincs vállalás — ugyanaz a szabály, mint minden kihívásnál. */
+let _chSprint=false;
+function chSprintWindow(){
+  return Math.max(1,Math.min(SHORT_CHALLENGE_MATCHES,CHECKPOINTS[0]||SHORT_CHALLENGE_MATCHES));}
+function chSprintThen(cb){
+  return function(){
+    let n=0;try{n=talKihAblakDb();}catch(e){n=0;}
+    if(!(n>0)||S.auto||!(gameMode==="career"&&careerPool)){cb();return;}
+    _chSprint=true;
+    try{showChallengeOffers("short",n,cb,false,{hubBack:true});}
+    finally{_chSprint=false;}};}
 function buildChallengeOffer(scope,ctx,force){
   let diff=pick(CHALLENGE_DIFFS);
+  /* 📜 3.9.255 — Könnyebb célok: a közepes/nehéz dobás x% eséllyel könnyűre
+     vált. A véletlent csak a lap birtokában fogyasztja. */
+  {let kp=0;try{kp=talKihKonnyuP();}catch(e){kp=0;}
+   if(kp>0&&diff!=="easy"&&Math.random()<kp)diff="easy";}
   let goal=null,cleanBoost=false;
   /* ---- A GARANTÁLT, KARNYÚJTÁSNYI MÉRFÖLDKŐ (3.9.39) ----
      Nem külön ág a lezáráshoz: csak a CÉLT állítja elő, és onnantól a
@@ -53171,6 +53193,10 @@ function buildChallengeOffer(scope,ctx,force){
     if(goal){cleanBoost=true;goal.styleClean=true;}}
   if(!goal)goal=genChallenge(scope,diff,ctx);
   if(!goal)return null;
+  /* 📜 3.9.255 — az Idénykezdő sprint nem kínál SAJÁT határidejű rövid célt
+     (rangadó, beilleszkedés, első licit): azok a mostani fordulóhoz kötnek,
+     a sprint viszont az új idény elejére horgonyoz. */
+  if(_chSprint&&(goal.deadlineIdx!=null||goal.deadlineKind))return null;
   /* Egyes kihívásoknak RÖGZÍTETT a besorolása és/vagy a jutalma (pl. a
      poszt-tanulás mindig könnyű, és mindig a betanítási ár felét adja
      vissza) — a sablon ilyenkor felülírja a sorsolást. */
@@ -54489,7 +54515,14 @@ function resolveChallenge(ch){
       reward:ch.reward.desc,punishment:ch.punishment.desc,voided:true});
     addLine(`⚪ KIHÍVÁS ÉRVÉNYTELENÍTVE: „${ch.desc}” — a kihívás átcsúszott a szezonváltáson, büntetés nélkül lezárult.`,"m life");
     return false;}
-  const outcome=met?applyChallengeReward(ch.reward):applyChallengePunishment(ch.punishment);
+  /* 📜 3.9.255 — KEGYELMI KÁRTYA: idényenként ennyi elbukott kihívás
+     büntetése elmarad. A bukás bukás marad (a mérlegben is), csak az ára nem. */
+  let _kegy=false;
+  if(!met){try{const kd=talKihKegyelemDb(),A=talKihKegyelemAll();
+    if(kd>0&&A.used<kd){A.used++;_kegy=true;}}catch(e){_kegy=false;}}
+  const outcome=met?applyChallengeReward(ch.reward)
+    :_kegy?`📜 elengedve — Kegyelmi kártya (idén ${talKihKegyelemAll().used}/${talKihKegyelemDb()})`
+    :applyChallengePunishment(ch.punishment);
   /* a lezárt kihívást eltároljuk a Kihívások-ablakhoz (szezon végéig látszik
      az eredménnyel); a szezonváltás nullázza a listát */
   if(!S.resolvedChallenges)S.resolvedChallenges=[];
@@ -54612,7 +54645,8 @@ function activeChallengeCount(scope){return (S.activeChallenges||[]).filter(c=>c
    szám, kivétel nélkül. */
 function challengeSlotBase(scope){
   return scope==="short"?CH_MAX_SHORT:scope==="cup"?CH_MAX_CUP:CH_MAX_LONG;}
-function challengeSlotLimit(scope){return challengeSlotBase(scope);}
+/* 📜 3.9.255 — a Kihívások „Több hely" lapja hatókörönként (talizmán nélkül 0) */
+function challengeSlotLimit(scope){let t=0;try{t=talKihHely(scope)||0;}catch(e){t=0;}return challengeSlotBase(scope)+t;}
 function canAcceptMore(scope){return activeChallengeCount(scope)<challengeSlotLimit(scope);}
 function acceptChallenge(ch){
   /* a max-alapú (sorozat, gólzápor) kihívásoknál a haladást a VÁLLALÁS ÓTA
@@ -54638,6 +54672,10 @@ function acceptChallenge(ch){
      A szezon KÖZBEN vállaltak határideje már jó — azokat tilos újrahorgonyozni,
      különben sosem járnának le. */
   if(S._chAnchorPending)ch.needsSeasonAnchor=true;
+  /* 📜 3.9.255 — az Idénykezdő sprint rövid kihívása is a RÉGI forduló-
+     számon születik: a határidejét a szezonváltáskor az új idény elejéhez
+     horgonyozzuk (lásd a horgonyzást a szezonváltásnál). */
+  if(S._chAnchorPending&&ch.scope==="short"&&ch.deadline&&ch.deadline.kind==="round")ch.needsRoundAnchor=true;
   /* AZONNALI MENTÉS. A vállalás eddig csak a checkpoint LEZÁRÁSAKOR mentődött
      (a resumeCb-ben). Ha a felhasználó közben kilépett vagy frissített — mert
      például holtpontra futott —, a kihívás nyomtalanul elveszett, mintha el
@@ -54774,6 +54812,8 @@ let _chOfferDetour=false;
 let _chOfferScreens=null;
 function showChallengeOffers(scope,count,resumeCb,opening,opts){
   try{hang("ertesit");}catch(e){}   /* 🔊 3.9.163 */
+  /* 📜 3.9.255 — Bővebb kínálat (és a Biztos kéz rezonancia): plusz ajánlat */
+  try{count+=talKihExtraAjanlat(scope)||0;}catch(e){}
   const ctx=challengeContext();
   /* A HUB-KITÉRŐ MOSTANTÓL AZ ALAPÉRTELMEZÉS, nem a kivétel: felelősen dönteni
      csak úgy lehet, ha közben megnézheted a keretedet. Aki mégis ki akarja
@@ -55321,6 +55361,8 @@ function freshS(){return {idx:0,W:0,D:0,L:0,GF:0,GA:0,pts:0,reds:0,injuries:0,ca
      A staffHall a kiöregedett/elküldött edzők emléke — nulla játékhatás. */
   staff:[],coachSlots:COACH_SLOTS_BASE,staffHall:[],staffIntroDone:false,
   pendingCoachOffers:[],       /* visszavonult legendák, akik döntésre várnak */
+  chKegyelem:null,             /* 📜 3.9.255 — Kegyelmi kártya: {season, used} */
+  rejtett:null,                /* 🌘 3.9.255 — a rejtett csapatstílus állapota */
   coachFocusChangeUsed:false,  /* a fókusz is ciklusonként egyszer váltható */
   /* STÁBPIAC: {key, list[]} — az AKTUÁLIS átigazolási időszak külsős ajánlatai.
      A kulcs köti az időszakhoz, tehát magától avul el (lásd staffMarketKey). */
@@ -58634,7 +58676,7 @@ $("simGo").onclick=()=>{
     if(gameMode==="career"&&careerPool&&!S.startChallengesDone){
       S.startChallengesDone=true;
       if(S.auto){autoHandleChallengeOffers("long",5);startFirstSeason();}
-      else{$("scPitch").classList.add("hide");showChallengeOffers("long",5,startFirstSeason,true);}
+      else{$("scPitch").classList.add("hide");showChallengeOffers("long",5,chSprintThen(startFirstSeason),true);}
       return;}
     startFirstSeason();});};
 /* ================= F5 — A SZEZON SORSOLÁSA =================
@@ -72505,6 +72547,7 @@ function playMatchMotor(){
      nő, ezért itt még a meccs előtti számok állnak — pont ez kell. */
   const MILE=mileBegin(active);
   try{vlMatchReset();}catch(e){}   /* VILLÁM: a meccs ritmus-mérője */
+  try{if(!DUEL)rejtSzerepDob();else if(S.rejtett)S.rejtett.szerep=null;}catch(e){}   /* 🌘 3.9.255 — titkos megbízatás erre a meccsre */
   try{roleAuraReset();}catch(e){}  /* TIKI-TAKA: az Aurafarmer még nem gyulladt ki */
   /* HANGSÚLY-CSÚSZKÁK: a szint-memó és a „ki a legjobb / leggyengébb" rangsor
      a kezdőrúgáskor frissül — a meccs alatt nem mozdul, tehát végig tartható. */
@@ -89247,6 +89290,7 @@ $("talHatas")&&($("talHatas").onclick=(ev)=>{
   else if(mit.indexOf("poli:")===0){   /* 🌈 F7 — a Polihisztor-díj */
     const r=talPoliKer(mit.slice(5));if(!r.ok)try{addLine(`🌈 ${esc(r.miert||"")}.`,"m ev");}catch(e){}
     try{saveGame();}catch(e){}talMenuRender();try{renderHub();}catch(e){}}
+  else if(mit==="rejtAjanlat"){try{rejtAjanlatMutat(true);}catch(e){}}   /* 🌘 3.9.255 */
   else if(mit==="erme"){const r=talErmeDob();if(r){const X=talErme();if(X)X.friss=true;}try{saveGame();}catch(e){}talMenuRender();}   /* 🪙 F6c */
   else if(mit==="tukor"){   /* 🪞 F6c — Tükörvilág: visszafordíthatatlan, ezért megerősítéssel */
     const f=talTukorAktivalhato();if(!f.ok){try{addLine(`🪞 ${esc(f.miert||"")}.`,"m ev");}catch(e){}return;}
@@ -96253,6 +96297,11 @@ function renderHub(){
      mérföldkövet elnyelni. */
   msScan();
   styleScan();               /* a stílus SAJÁT mérföldkövei — ugyanaz a ritmus */
+  /* 🌘 3.9.255 — a rejtett stílus II. szintű ajánlata: a HUB EGYSZER felkínálja
+     (ha épp nincs nyitva másik kérdés), utána a talizmán-menüben él tovább */
+  if(!S.auto&&S.rejtett&&S.rejtett.ajanlat&&!S.rejtett.ajanlat.lattuk)
+    setTimeout(()=>{try{const m=$("hubTacticConfirmModal");
+      if((!m||m.classList.contains("hide"))&&!$("scHub").classList.contains("hide"))rejtAjanlatMutat();}catch(e){}},350);
   /* KIHÍVÁSOK: a teljesített, korán beváltható kihívások itt is lezárulnak —
      a piaci célok (eladási érték, igazolások) a HUB-ban teljesülnek, azokra
      nem kell megvárni a következő mérkőzést. Ugyanaz a szívverés, mint a
@@ -99856,7 +99905,7 @@ function beginNextSeasonWithChallenges(){
         /* hubBack: a szezon eleji nagy vállalásoknál át lehet ugrani a HUB-ba
            megnézni a keretet, és onnan vissza ide. Az első szezon nyitó
            kihívásainál (a draft után) ez nincs — ott még nincs mit megnézni. */
-        showChallengeOffers("long",5,startNextCareerSeason,false,{hubBack:true});
+        showChallengeOffers("long",5,chSprintThen(startNextCareerSeason),false,{hubBack:true});
       }else{
         if(gameMode==="career"&&careerPool)autoHandleChallengeOffers("long",5);
         startNextCareerSeason();
@@ -100069,8 +100118,60 @@ const TAL_KAT=[
         {k:"kassza",n:"Izgalmas kassza",w:1,u:6,cap:50,f3:1,ue:"%",t:E=>`a 65+ izgalmú meccsek lelátó-bevétele +${talSz(Math.min(50,6*E))}%`},
         {k:"rangado",n:"Rangadó-katlan",w:1,u:1.5,cap:12,f3:1,ue:"%",t:E=>`hazai rangadón a saját gólvárhatóság +${talSz(Math.min(12,1.5*E))}%`},
         {k:"lelek",n:"Lélekemelő lelátó",w:1,u:1.5,cap:12,f3:1,ue:"%",t:E=>`hazai meccsen, hátrányban a saját gólvárhatóság +${talSz(Math.min(12,1.5*E))}%`},
-        {k:"bizony",n:"Elbizonytalanító zaj",w:1,u:1.2,cap:10,f3:1,ue:"%",t:E=>`kiegyenlített hazai meccsen (±${TAL_SZURK_KIEGY} meccserőn belül) az ellenfél gólvárhatósága −${talSz(Math.min(10,1.2*E))}%`}]}
+        {k:"bizony",n:"Elbizonytalanító zaj",w:1,u:1.2,cap:10,f3:1,ue:"%",t:E=>`kiegyenlített hazai meccsen (±${TAL_SZURK_KIEGY} meccserőn belül) az ellenfél gólvárhatósága −${talSz(Math.min(10,1.2*E))}%`}]},
+ /* 📜 KIHÍVÁSOK (3.9.255) — KIMONDOTT KÉRÉS: „Kihívások: több felajánlott
+    kihívás közül választhatsz; több egyszerre elfogadható kihívás (külön
+    rövid, hosszú és kupa); több könnyű kihívás; nagyobb jutalom-érték; extra
+    kihívás-ablak: szezon elején a hosszúak mellett rövidek is; szezononként
+    1→3 elbukott kihívás büntetésétől megmenekülsz." Hat alaphatás:
+      · Bővebb kínálat — ablakonként +x% (100%-onként egy biztos) ajánlat;
+      · Több hely — a lap EGY hatókörre szól (L.kh: rövid, hosszú vagy kupa,
+        a húzáskor dobva), hatókörönként külön gyűlik: az első lap +1 hely,
+        a gyűlő érték +2-ig;
+      · Könnyebb célok — a közepes/nehéz dobás x% eséllyel könnyűre vált;
+      · Gazdagabb jutalom — a jutalom nehézségi szorzója +x%;
+      · Idénykezdő sprint — LÉPCSŐS: a szezon eleji hosszú kínálat után
+        rövid kihívások is (2…5 ajánlat, a ritkaság szerint);
+      · Kegyelmi kártya — idényenként ennyi elbukott kihívás büntetése
+        elmarad: az első lap 1, a gyűlő érték 3-ig. */
+ {k:"kihivas",n:"Kihívások",ic:"📜",c:"#9c6644",cim:"A Vállalkozó",
+  q:"„Aki nem kockáztat, az nem iszik pezsgőt. Aki okosan kockáztat, az kettőt.”",
+  valt:[{k:"kinalat",n:"Bővebb kínálat",w:2,u:15,cap:200,f3:1,ue:"%",t:E=>`minden kihívás-felajánlásban +${talSz(Math.min(200,15*E))}% esély egy plusz ajánlatra (100%-onként egy biztos)`},
+        {k:"hely",n:"Több hely",w:2,u:0.25,cap:1,f3:1,ue:" hely",t:(E,L)=>`${talKihScopeNev(L&&L.kh)}: +1 egyszerre vállalható kihívás (a gyűlő érték ${talSz(Math.min(1,0.25*E))}/1 — ha betelik, +2)`},
+        {k:"konnyu",n:"Könnyebb célok",w:2,u:5,cap:40,f3:1,ue:"%",t:E=>`a közepes és nehéz ajánlatok ${talSz(Math.min(40,5*E))}%-a könnyűre vált`},
+        {k:"jutal",n:"Gazdagabb jutalom",w:2,u:4,cap:40,f3:1,ue:"%",t:E=>`a kihívás-jutalmak értéke +${talSz(Math.min(40,4*E))}%`},
+        {k:"ablak",n:"Idénykezdő sprint",w:1,f3:1,lep:[
+          "szezon elején a hosszú kihívások mellett 2 rövid kihívás is felajánlásra kerül",
+          "szezon elején a hosszú kihívások mellett 3 rövid kihívás is felajánlásra kerül",
+          "szezon elején a hosszú kihívások mellett 4 rövid kihívás is felajánlásra kerül",
+          "szezon elején a hosszú kihívások mellett 4 rövid kihívás is felajánlásra kerül, és a rövidek közt +1 hely",
+          "szezon elején a hosszú kihívások mellett 5 rövid kihívás is felajánlásra kerül, és a rövidek közt +1 hely"]},
+        {k:"kegyelem",n:"Kegyelmi kártya",w:1,u:0.4,cap:2,f3:1,ue:" db",t:E=>`idényenként ${1+Math.floor(Math.min(2,0.4*E)+1e-9)} elbukott kihívás büntetése elmarad (a gyűlő érték ${talSz(Math.min(2,0.4*E))}/2 — egészenként +1, legfeljebb 3)`}]},
+ /* 🌘 REJTETT CSAPATSTÍLUS (3.9.255) — KIMONDOTT KÉRÉS: „A nem használt
+    csapatstílusok közül le kell mérni, hogy melyikben lennél a legmagasabb
+    (mérföldkövek alapján), ha feloldanád. Ez a stílus titokban működik
+    2. vagy 3. csapatstílusként, nem árulja el a játék. […] max 33%-os
+    eséllyel jönnek a stíluspontok a legjobb rejtett stílus mérföldkövei
+    után […] Ha egy mérföldkő miatt egy másik stílus előzi a legjobb rejtett
+    stílust, akkor attól a mérföldkőtől ő veszi át. […] (1) meccsen egy
+    passzoló játékos megkapja a rejtett stílus valamelyik szerepét,
+    (2) automatikusan feloldódik a rejtett stílus egy lvl1 képessége (max 6
+    szezononként), ami onnantól mindig működik, (3) lvl2 képesség-feloldási
+    ajánlat jön: X stílusponttal feloldhatod." Négy alaphatás, mind 33%-ig. */
+ {k:"rejtett",n:"Rejtett csapatstílus",ic:"🌘",c:"#3d405b",cim:"A Szürke Eminenciás",
+  q:"„A legjobb filozófia az, amelyikről az ellenfél nem is tud.”",
+  valt:[{k:"rpont",n:"Árnyék-mérföldkövek",w:2,u:3,cap:33,f3:1,ue:"%",t:E=>`a legjobb rejtett stílus minden mérföldköve után ${talSz(Math.min(33,3*E))}% eséllyel jár érte csapatstílus-pont`},
+        {k:"rszerep",n:"Titkos megbízatás",w:1,u:3,cap:33,f3:1,ue:"%",t:E=>`minden meccs előtt ${talSz(Math.min(33,3*E))}% eséllyel egy hozzá illő játékosod megkapja a rejtett stílus egyik szerepét`},
+        {k:"rkep",n:"Csendes képesség",w:1,u:3,cap:33,f3:1,ue:"%",t:E=>`a rejtett stílus mérföldkövei után ${talSz(Math.min(33,3*E))}% eséllyel feloldódik egy I. szintű képessége (idényenként legfeljebb ${TAL_REJT_KEP_MAX}) — onnantól mindig hat`},
+        {k:"rajanl",n:"Suttogó ajánlat",w:1,u:3,cap:33,f3:1,ue:"%",t:E=>`a rejtett stílus mérföldkövei után ${talSz(Math.min(33,3*E))}% eséllyel ajánlat jön egy II. szintű képességére — stíluspontért megveheted`}]}
 ];
+/* 📜 A Kihívások hatókörei (3.9.255) — a „Több hely" lapja egyre szól. */
+const TAL_KIH_SCOPES=["short","long","cup"];
+const TAL_KIH_SCOPE_NEV={short:"a rövid kihívások",long:"a hosszú (szezon-) kihívások",cup:"a kupa-kihívások"};
+function talKihScopeNev(k){return TAL_KIH_SCOPE_NEV[k]||"a rövid, a hosszú vagy a kupa-kihívások";}
+function talKihScopeCim(k){return {short:"Rövid",long:"Hosszú",cup:"Kupa"}[k]||"?";}
+const TAL_REJT_KEP_MAX=6;     /* 🌘 idényenként legfeljebb ennyi I. szintű rejtett képesség */
+const TAL_REJT_P_CAP=33;      /* 🌘 a négy esély közös plafonja (%) */
 /* 🕴️ Az Ügynökség „Gyorsabb fejlődés" célpontjai (3.9.224). */
 const TAL_UGY_CELOK=["scout","ugynok","sajto"];
 const TAL_UGY_CEL_NEV={scout:"a scout",ugynok:"az átigazolási ügynökség",sajto:"a sajtó (az újságírók)"};
@@ -100611,6 +100712,7 @@ function talLapNev(L){
   if(L.kat==="ugynok"&&L.valt==="fejl"&&L.ug)return `${V?V.n:"Gyorsabb fejlődés"}: ${talUgyCelCim(L.ug)}`;
   if(L.kat==="szurkolo"&&L.valt==="izgalom"&&L.ie){const d=talSzurkEsDef(L.ie);
     return `${V?V.n:"Izgalom-boost"}: ${d?d.n:L.ie}`;}
+  if(L.kat==="kihivas"&&L.valt==="hely"&&L.kh)return `${V?V.n:"Több hely"}: ${talKihScopeCim(L.kh)}`;   /* 📜 3.9.255 */
   return V?V.n:"Talizmán";}
 function talSpecOldal(sp,side,rang,L){
   const D=sp[side];if(!D)return "";
@@ -100635,6 +100737,7 @@ function talUjLap(rnd,kat,rang,opts){
   if(kat==="boost"&&L.valt==="fajta")L.bf=talBoostFajtaDob(rnd);   /* ⚡ 3.9.185 */
   if(kat==="ugynok"&&L.valt==="fejl")L.ug=talPick(rnd,TAL_UGY_CELOK);   /* 🕴️ 3.9.224 */
   if(kat==="szurkolo"&&L.valt==="izgalom")L.ie=talPick(rnd,TAL_SZURK_ES).k;   /* 📣 3.9.224 */
+  if(kat==="kihivas"&&L.valt==="hely")L.kh=talPick(rnd,TAL_KIH_SCOPES);   /* 📜 3.9.255 */
   const specDob=rnd();
   /* 🌧️ F6c — Talizmán-eső (kontra): nincs Tiszta talizmán, mindig special */
   const esoKon=!opts.tiszta&&talKonDb("eso")>0;
@@ -100815,6 +100918,10 @@ function talAlapMind(){
       if(K.k==="szurkolo"&&x.L.valt==="izgalom"){
         if(x.L.ie){const id="szurkolo.izgalom."+x.L.ie;v[id]=(v[id]||0)+x.E*Math.pow(TAL_HOZAM,k)*stm;}
         return;}
+      /* 📜 3.9.255: a „Több hely" hatókörönként gyűlik (L.kh) */
+      if(K.k==="kihivas"&&x.L.valt==="hely"){
+        if(x.L.kh){const id="kihivas.hely."+x.L.kh;v[id]=(v[id]||0)+x.E*Math.pow(TAL_HOZAM,k)*stm;}
+        return;}
       const V=(K.valt||[]).find(z=>z.k===x.L.valt);
       if(!V||!V.u)return;
       const id=K.k+"."+V.k;
@@ -100830,6 +100937,9 @@ function talAlapMind(){
         if(v[id]!=null)v[id]=Math.min(V.cap,v[id]*V.u);});}
     if(K.k==="szurkolo"){const V=K.valt.find(z=>z.k==="izgalom");
       TAL_SZURK_ES.forEach(f=>{const id="szurkolo.izgalom."+f.k;
+        if(v[id]!=null)v[id]=Math.min(V.cap,v[id]*V.u);});}
+    if(K.k==="kihivas"){const V=K.valt.find(z=>z.k==="hely");
+      TAL_KIH_SCOPES.forEach(f=>{const id="kihivas.hely."+f;
         if(v[id]!=null)v[id]=Math.min(V.cap,v[id]*V.u);});}
     /* 🔗 F7 — Fő tengely (a Meccs rezonanciája): a legerősebb tengely +2 E */
     if(K.k==="meccs"&&talRez("meccs")){
@@ -100873,6 +100983,230 @@ function talUgyGaranciaFok(){
 /* 📣 3.9.224 — SZURKOLÓTÁBOR */
 function talSzurkIzgPont(es){return talAlap("szurkolo","izgalom."+es);}
 function talSzurkKasszaMult(){return 1+talAlap("szurkolo","kassza")/100;}
+/* 📜 3.9.255 — KIHÍVÁSOK. Talizmán nélkül mind semleges, és egyik sem
+   fogyaszt véletlent: a kínálat, a nehézség és a jutalom betűre a régi. */
+function talKihKinalatPct(){return talAlap("kihivas","kinalat");}
+/* A plusz ajánlatok száma egy felajánlásban: 100%-onként egy biztos, a
+   maradék egy seedelt dobás (ugyanabból az állásból ugyanaz jön). */
+function talKihExtraAjanlat(scope){
+  const pct=talKihKinalatPct();
+  let n=talRez("kihivas")?1:0;
+  if(!(pct>0))return n;
+  const fix=Math.floor(pct/100+1e-9),fr=pct/100-fix;
+  n+=fix;
+  if(fr>1e-9){let r=1;try{r=talRng("kihKin",scope,S.seasonNumber||1,S.idx||0,S.cupRunNo||0)();}catch(e){r=Math.random();}
+    if(r<fr)n++;}
+  return n;}
+/* A plusz helyek egy hatókörben: az első lap +1, a betelt gyűlő érték +2;
+   az Idénykezdő sprint 4–5. fokozata a rövidek közé még +1-et ad. */
+function talKihHely(scope){
+  const v=talAlap("kihivas","hely."+scope);
+  let n=v>0?(v>=1-1e-9?2:1):0;
+  if(scope==="short"&&talKihAblakFok()>=4)n+=1;
+  return n;}
+function talKihKonnyuP(){return talAlap("kihivas","konnyu")/100;}
+function talKihJutalomMult(){return 1+talAlap("kihivas","jutal")/100+(talRez("kihivas")?0.10:0);}
+/* Az Idénykezdő sprint fokozata: a legjobb (nem égetett) lap ritkasága. */
+const TAL_KIH_ABLAK_DB=[0,2,3,4,4,5];
+function talKihAblakFok(){
+  if(!talOn()||!S.tal||!Array.isArray(S.tal.lapok))return 0;
+  let f=0;S.tal.lapok.forEach(L=>{if(!L.eget&&L.kat==="kihivas"&&L.valt==="ablak")f=Math.max(f,Math.min(5,L.rang||1));});
+  return f;}
+function talKihAblakDb(){return TAL_KIH_ABLAK_DB[talKihAblakFok()]||0;}
+/* A Kegyelmi kártya: idényenként ennyi elbukott kihívás büntetése marad el. */
+function talKihKegyelemDb(){
+  const v=talAlap("kihivas","kegyelem");
+  return v>0?1+Math.floor(Math.min(2,v)+1e-9):0;}
+function talKihKegyelemAll(){
+  const sn=S.seasonNumber||1;
+  if(!S.chKegyelem||S.chKegyelem.season!==sn)S.chKegyelem={season:sn,used:0};
+  return S.chKegyelem;}
+/* 🌘 3.9.255 — REJTETT CSAPATSTÍLUS: a négy esély (0..0,33) */
+function talRejtP(valt){return Math.min(TAL_REJT_P_CAP,talAlap("rejtett",valt))/100;}
+/* ================= 🌘 A REJTETT CSAPATSTÍLUS (3.9.255) =================
+   A nem használt filozófiák közül az, amelyikben a mérföldkövek alapján a
+   LEGMAGASABBAN állnál, ha feloldanád. Nem kap slotot, nem kap panelt, és a
+   neve sehol nem jelenik meg: titokban dolgozik.
+     · A MÉRÉS: minden nem választott (és nem sztáros) stílus mérföldköveit
+       ugyanazzal a mérővel (def.p ≥ def.n) figyeljük, mint az élőkét. Az első
+       vizsgálat CSENDBEN rögzíti a már teljesítetteket (ezekért nem jár
+       semmi), utána minden ÚJ teljesülés beszámít. A rangsor a teljesített
+       mérföldkövek jutalom-súlyainak (val) összege — ugyanaz a súly, amiből
+       az élő stílus pontot kap.
+     · AZ ÁTVÉTEL: az új mérföldköveket egyenként könyveljük. Ha egy mérföldkő
+       után egy másik stílus kerül az élre, ATTÓL a mérföldkőtől ő a legjobb
+       rejtett stílus — és ő kapja az esélyeket.
+     · AZ ESÉLYEK (a legjobb rejtett stílus minden mérföldköve után, mind 33%-ig):
+       stíluspont (a másodlagos stílus harmad-árán), egy I. szintű képesség
+       (idényenként legfeljebb 6), és egy II. szintű vételi ajánlat.
+     · A MECCS ELŐTT: egy hozzá illő játékos megkaphatja a rejtett stílus egyik
+       szerepét erre az egy mérkőzésre (képesség nélküli, alap erővel).
+   Ami a stílus saját állapotát igényli (szerep-képesség, rendszer-képességek
+   saját motor-ággal), az kimarad: csak a CSATORNÁS hatású képességek
+   (styleActiveFx) oldódhatnak fel — azok onnantól mindig hatnak. */
+function rejtOn(){
+  try{return talOn()&&(talRejtP("rpont")>0||talRejtP("rszerep")>0||talRejtP("rkep")>0||talRejtP("rajanl")>0);}
+  catch(e){return false;}}
+function rejtState(){
+  if(!S.rejtett||typeof S.rejtett!=="object")S.rejtett={};
+  const R=S.rejtett;
+  if(!R.done||typeof R.done!=="object")R.done={};
+  if(!Array.isArray(R.kep))R.kep=[];
+  if(!R.kepSz||typeof R.kepSz!=="object")R.kepSz={};
+  if(typeof R.pontDb!=="number")R.pontDb=0;
+  return R;}
+/* A jelöltek: a most NEM élő, nem sztáros stílusok, amelyeknek van mérföldkő-táblájuk. */
+function rejtJeloltek(){
+  return STYLES.filter(d=>d&&!d.star&&!styleHasKey(d.key)&&(STYLE_MILESTONES[d.key]||[]).length).map(d=>d.key);}
+function rejtPont(k){
+  const R=rejtState(),D=R.done[k]||{};
+  let v=0;(STYLE_MILESTONES[k]||[]).forEach(def=>{if(D[def.id])v+=(def.val||1);});
+  return v;}
+function rejtLegjobb(){
+  let best=null,bv=0;
+  rejtJeloltek().forEach(k=>{const v=rejtPont(k);if(v>bv){bv=v;best=k;}});
+  return best;}
+/* A csatornás (styleActiveFx-be illő) képességek egy stílusból. A szerep-
+   képesség kimarad: az a többi szerep szintjét is emelné. */
+function rejtKepJeloltek(k,lv){
+  return styleTraitList(k).filter(t=>t&&t.key!=="szerepek"&&t.lv&&t.lv[lv-1]
+    &&t.lv[lv-1].fx&&Object.keys(t.lv[lv-1].fx).length&&!("roleLvl" in t.lv[lv-1].fx));}
+function rejtKepOf(k,key){return rejtState().kep.find(x=>x&&x.s===k&&x.k===key)||null;}
+function rejtKepMax(){return TAL_REJT_KEP_MAX+(talRez("rejtett")?2:0);}
+/* A rejtett képességek hatása — a styleActiveFx hívja. Az élővé vált stílus
+   képességei innen kimaradnak (ott a saját fája szól). */
+function rejtFx(){
+  if(!S||!S.rejtett||!Array.isArray(S.rejtett.kep)||!S.rejtett.kep.length)return [];
+  if(!talOn())return [];
+  const out=[];
+  S.rejtett.kep.forEach(x=>{
+    if(!x||styleHasKey(x.s))return;
+    const t=(STYLE_TRAITS[x.s]||[]).find(z=>z.key===x.k);
+    const L=t&&t.lv&&t.lv[Math.max(1,Math.min(3,x.lv||1))-1];
+    if(L&&L.fx)out.push(L.fx);});
+  return out;}
+/* Egy esemény seedelt dobása — ugyanabból az állásból ugyanaz jön. */
+function rejtDob(mit,id){
+  try{return talRng("rejt",mit,id,S.seasonNumber||1,S.idx||0)();}catch(e){return Math.random();}}
+/* A MÉRFÖLDKŐ-FIGYELŐ — a styleScan mellett fut (meccs után, HUB-ban). */
+function rejtScan(){
+  if(gameMode!=="career"||!rejtOn())return;
+  if(typeof phase!=="undefined"&&phase==="draft")return;
+  const R=rejtState();
+  const uj=[];
+  rejtJeloltek().forEach(k=>{
+    const D=R.done[k]||(R.done[k]={});
+    (STYLE_MILESTONES[k]||[]).forEach(def=>{
+      if(D[def.id])return;
+      let v=0;try{v=def.p()||0;}catch(e){return;}
+      if(!(v>=def.n))return;
+      if(!R.seeded)D[def.id]=1;      /* az első vizsgálat csendben rögzít */
+      else uj.push({k,def});});});
+  if(!R.seeded){R.seeded=1;R.best=rejtLegjobb();return;}
+  uj.forEach(({k,def})=>{
+    R.done[k][def.id]=1;
+    const best=rejtLegjobb();
+    R.best=best;
+    if(best!==k)return;              /* nem a legjobb rejtett stílus mérföldköve */
+    rejtJutalom(k,def);});}
+function rejtJutalom(k,def){
+  const R=rejtState(),sn=S.seasonNumber||1;
+  /* 1) stíluspont — a másodlagos stílus harmad-árán */
+  if(rejtDob("pont",def.id)<talRejtP("rpont")){
+    const sp=Math.max(1,Math.round(msSpReward(def.val,true)/STYLE2_MS_DIV));
+    const W=msState();
+    W.sp=(W.sp||0)+sp;W.spEarned=(W.spEarned||0)+sp;
+    W.log.unshift({id:"rejt_"+def.id,t:"Árnyék-mérföldkő",grp:"🌘 Rejtett filozófia",kind:"sp",who:null,
+      txt:`+${sp} csapatstílus-pont`,season:sn});
+    if(W.log.length>MS_LOG_MAX)W.log.length=MS_LOG_MAX;
+    R.pontDb+=sp;
+    try{addLine(`🌘 <b>Valami a háttérben összeállt</b> · +${sp} csapatstílus-pont`,"m mvp");}catch(e){}}
+  /* 2) egy I. szintű képesség — idényenként legfeljebb 6 (8 a rezonanciával) */
+  if((R.kepSz[sn]||0)<rejtKepMax()&&rejtDob("kep",def.id)<talRejtP("rkep")){
+    const jel=rejtKepJeloltek(k,1).filter(t=>!rejtKepOf(k,t.key));
+    if(jel.length){
+      const t=jel[Math.floor(rejtDob("kepV",def.id)*jel.length)%jel.length];
+      R.kep.push({s:k,k:t.key,lv:1,season:sn});
+      R.kepSz[sn]=(R.kepSz[sn]||0)+1;
+      try{addLine(`🌘 <b>Csendes képesség</b> — a csapat valami újat tanult, amit senki sem tanított neki.`,"m mvp");}catch(e){}}}
+  /* 3) II. szintű vételi ajánlat — egyszerre egy él */
+  if(!R.ajanlat&&rejtDob("ajanl",def.id)<talRejtP("rajanl")){
+    let jel=R.kep.filter(x=>x&&x.s===k&&(x.lv||1)===1).map(x=>(STYLE_TRAITS[k]||[]).find(z=>z.key===x.k))
+      .filter(t=>t&&rejtKepJeloltek(k,2).indexOf(t)>=0);
+    if(!jel.length)jel=rejtKepJeloltek(k,2).filter(t=>!rejtKepOf(k,t.key));
+    if(jel.length){
+      const t=jel[Math.floor(rejtDob("ajanlV",def.id)*jel.length)%jel.length];
+      const ar=Math.max(1,Math.round(t.lv[1].price*(talRez("rejtett")?0.75:1)));
+      R.ajanlat={s:k,k:t.key,ar,season:sn,lattuk:false};
+      try{addLine(`🌘 <b>Suttogó ajánlat</b> érkezett — a HUB-ban döntesz róla.`,"m life");}catch(e){}}}}
+/* A II. szintű ajánlat — a HUB egyszer felkínálja, utána a talizmán-menüből
+   bármikor elérhető, az idény végéig. */
+function rejtAjanlatHtml(A){
+  const t=(STYLE_TRAITS[A.s]||[]).find(z=>z.key===A.k);
+  const d=styleByKey(A.s);
+  const van=(msState().sp||0);
+  return `<div style="font-size:13px;line-height:1.55">🌘 Egy <b>rejtett filozófia</b> II. szintű képességét kínálják:<br><br>`
+    +`${d?d.ic:"❔"} <b>${esc(t?t.n:A.k)}</b> — II. szint<br>`
+    +`<span style="color:var(--dim2)">${esc((t&&t.lv[1]&&t.lv[1].note)||(t&&t.d)||"")}</span><br><br>`
+    +`Ára: <b>${A.ar} csapatstílus-pont</b> · most ${van} pontod van.`
+    +(van<A.ar?`<br><span style="color:var(--red)">Nincs elég pontod — az ajánlat az idény végéig él.</span>`:"")
+    +`<br><br><span style="color:var(--dim2)">Megvéve onnantól mindig hat — akkor is, ha a filozófiát sosem választod.</span></div>`;}
+function rejtAjanlatElfogad(){
+  const R=rejtState(),A=R.ajanlat;
+  if(!A)return {ok:false,miert:"nincs élő ajánlat"};
+  const W=msState();
+  if((W.sp||0)<A.ar)return {ok:false,miert:`nincs elég csapatstílus-pontod (${W.sp||0}/${A.ar})`};
+  W.sp-=A.ar;
+  const x=rejtKepOf(A.s,A.k);
+  if(x)x.lv=Math.max(x.lv||1,2);
+  else R.kep.push({s:A.s,k:A.k,lv:2,season:S.seasonNumber||1});
+  R.ajanlat=null;
+  try{addLine(`🌘 <b>Megvetted a suttogó ajánlatot</b> — −${A.ar} csapatstílus-pont. A képesség mostantól hat.`,"m mvp");}catch(e){}
+  return {ok:true};}
+function rejtAjanlatMutat(force){
+  const R=S&&S.rejtett,A=R&&R.ajanlat;
+  if(!A)return false;
+  if(A.season!==(S.seasonNumber||1)){R.ajanlat=null;return false;}   /* az idény végével lejár */
+  if(A.lattuk&&!force)return false;
+  A.lattuk=true;
+  askConfirm({title:"🌘 Suttogó ajánlat",yes:(msState().sp||0)>=A.ar?`Megveszem (${A.ar} pont)`:"Rendben",no:"Most nem",
+    html:rejtAjanlatHtml(A),
+    onYes:()=>{if((msState().sp||0)>=A.ar){const r=rejtAjanlatElfogad();
+      if(!r.ok)try{addLine(`🌘 ${esc(r.miert||"")}.`,"m ev");}catch(e){}}
+      try{saveGame();}catch(e){}try{talMenuRender();}catch(e){}}});
+  return true;}
+/* A MECCS ELŐTTI TITKOS MEGBÍZATÁS — erre az egy mérkőzésre. A szerep gazda-
+   attribútumában (ROLE_ATTR_OF) a kezdő 11 legjobbja kapja, aki még nem visel
+   szerepet. Képesség nélküli (alap) erővel hat. */
+function rejtSzerepDob(){
+  const R=S&&S.rejtett;
+  if(R)R.szerep=null;
+  if(gameMode!=="career"||!rejtOn())return null;
+  const Rs=rejtState();
+  const k=Rs.best;
+  if(!k||styleHasKey(k))return null;
+  if(rejtDob("szerep","m")>=talRejtP("rszerep"))return null;
+  const keys=(ROLE_KEYS_OF[k]||[]).filter(x=>ROLE_ATTR_OF[x]&&ROLE_ATTR_OF[x].v);
+  if(!keys.length)return null;
+  const key=keys[Math.floor(rejtDob("szerepK","m")*keys.length)%keys.length];
+  const ak=ROLE_ATTR_OF[key].v;
+  let best=null,bv=-1;
+  slots.forEach(sl=>{const p=sl&&sl.player;if(!p)return;
+    if(sl.pos==="KP")return;
+    let foglalt=null;try{foglalt=roleKeyOfPlayer(p.n);}catch(e){foglalt=null;}
+    if(foglalt)return;
+    let v=0;try{v=roleAttrOf(p,ak)||0;}catch(e){v=0;}
+    if(v>bv){bv=v;best=p;}});
+  if(!best)return null;
+  Rs.szerep={key,name:best.n,idx:S.idx||0,season:S.seasonNumber||1};
+  try{roleAttrCacheClear();}catch(e){}
+  return Rs.szerep;}
+/* Az élő titkos megbízatás (csak a saját meccsén). */
+function rejtSzerep(){
+  const R=S&&S.rejtett,x=R&&R.szerep;
+  if(!x||x.idx!==(S.idx||0)||x.season!==(S.seasonNumber||1))return null;
+  if(styleHasKey(roleStyleOf(x.key)))return null;
+  return x;}
 /* ---- ⚡ BOOST (3.9.185) — mind SEMLEGES talizmán nélkül ---- */
 function talBoostSzerencseP(){return Math.min(TAL_BOOST_SZ_CAP,talAlap("boost","szerencse")/100);}
 function talBoostCsomagMult(){return 1-talAlap("boost","csomag")/100;}
@@ -102375,7 +102709,9 @@ const TAL_REZ={
  meccs:{n:"Fő tengely",t:"a legerősebb meccs-tengelyed +2 E (a λ-plafonon belül)"},
  boost:{n:"Célzott szerencse",t:"a szerencse-ingyenboost arra a fajtára esik, amelyikre a legnagyobb fajta-kedvezményed szól (ha épp elsüthető)"},
  ugynok:{n:"Belső információ",t:"az ügynökség minden üzlete +1 pontot ér, és a scout-fejlesztés ára −15%"},
- szurkolo:{n:"Telt ház",t:"a hazai meccsek lelátó-bevétele +10%, és vereség után sem fogy a tábor"}};
+ szurkolo:{n:"Telt ház",t:"a hazai meccsek lelátó-bevétele +10%, és vereség után sem fogy a tábor"},
+ kihivas:{n:"Biztos kéz",t:"minden kihívás-felajánlásban +1 ajánlat, és a kihívás-jutalmak értéke további +10% (a plafonon felül)"},
+ rejtett:{n:"Árnyékkabinet",t:"a rejtett II. szintű ajánlat ára −25%, és idényenként +2 csendes képesség férhet bele"}};
 const TAL_REZ_PADLO=35,TAL_REZ_TAKT_MECCS=3;
 function talRez(kat){
   try{if(!talOn()||!S||!S.tal||!S.tal.lapok||!S.tal.lapok.length)return false;
@@ -103832,7 +104168,12 @@ function talMenuRender(){
      xp:"a stábtagok tapasztalatgyűjtése",oreg:"későbbi kiöregedés a stábban",vadasz:"Szakértelem a stábpiac ajánlatain",
      xl:"Scout XP-gyűjtés — a gyűjtési tempó",pont:"az ügynökség igazolásokért kapott pontja",
      kassza:"a 65+ izgalmú meccsek lelátó-bevétele",rangado:"saját gólvárhatóság hazai rangadón",
-     lelek:"saját gólvárhatóság hazai meccsen, hátrányban",bizony:"az ellenfél gólvárhatósága kiegyenlített hazai meccsen"};
+     lelek:"saját gólvárhatóság hazai meccsen, hátrányban",bizony:"az ellenfél gólvárhatósága kiegyenlített hazai meccsen",
+     /* 📜🌘 3.9.255 */
+     kinalat:"esély felajánlásonként egy plusz kihívásra",konnyu:"a közepes/nehéz ajánlatokból könnyű",
+     jutal:"a kihívás-jutalmak értéke",kegyelem:"Kegyelmi kártya — a gyűlő érték",
+     rpont:"esély stíluspontra a rejtett stílus mérföldkövei után",rszerep:"esély meccsenként egy rejtett szerepre",
+     rkep:"esély egy rejtett I. szintű képességre",rajanl:"esély egy rejtett II. szintű ajánlatra"};
    const NEG={fa:1,ar:1,csomag:1,bizony:1};
    const sorok=[];
    if(v)TAL_KAT.forEach(K=>{K.valt.forEach(V=>{
@@ -103873,6 +104214,25 @@ function talMenuRender(){
      sorok.push(`<div class="talHatRow"><span>🕴️ <b>Scout XP</b>: ${talSz(X.pts||0)} / ${scoutXpNeed(scout.stars)} XP a következő fél csillagig`
        +` · meccsenként +${talSz((1+v["ugynok.xl"]/100)*talUgyFejlMult("scout"))}${X.lep?` · eddig ${X.lep}× lépett így`:""}</span>`
        +`<span class="talHatCap">${scout.stars>=SCOUT_MAX_STARS?"a scout a maximumon":"idény közben is szintet lép"}</span></div>`);}
+    /* 📜 3.9.255 — a hatókörönkénti helyek, a sprint és a kegyelem állása */
+    {const VK=talKat("kihivas").valt.find(z=>z.k==="hely");
+     TAL_KIH_SCOPES.forEach(f=>{const x=v["kihivas.hely."+f];if(!x)return;
+      sorok.push(`<div class="talHatRow"><span>📜 <b>+${talKihHely(f)} hely</b> — ${esc(talKihScopeNev(f))}</span>`
+        +`<span class="talHatCap">${x>=VK.cap-1e-9?"⛔ plafon (+2)":`a gyűlő érték ${talSz(x)}/1 — ha betelik, +2`} · hatókörönként külön gyűlik</span></div>`);});
+     const af=talKihAblakFok();
+     if(af)sorok.push(`<div class="talHatRow"><span>📜 <b>Idénykezdő sprint</b>: szezon elején ${talKihAblakDb()} rövid kihívás is${af>=4?", és a rövidek közt +1 hely":""}</span>`
+       +`<span class="talHatCap">a legjobb lapod ritkasága dönt</span></div>`);
+     const kd=talKihKegyelemDb();
+     if(kd)sorok.push(`<div class="talHatRow"><span>📜 <b>Kegyelmi kártya</b>: idén ${Math.max(0,kd-talKihKegyelemAll().used)}/${kd} büntetés-elengedés maradt</span>`
+       +`<span class="talHatCap">idényenként legfeljebb 3</span></div>`);}
+    /* 🌘 3.9.255 — a rejtett stílus: CSAK a talizmánok maguk látszanak, a
+       stílus neve nem (a kérés szerint „nem árulja el a játék") */
+    {const R=S.rejtett;
+     if(R&&((R.kep||[]).length||R.pontDb))sorok.push(`<div class="talHatRow"><span>🌘 <b>Valami dolgozik a háttérben</b>: `
+       +`${(R.kep||[]).length} csendes képesség · ${R.pontDb||0} árnyék-stíluspont eddig</span>`
+       +`<span class="talHatCap">a filozófia neve rejtve marad</span></div>`);
+     if(R&&R.ajanlat&&R.ajanlat.season===(S.seasonNumber||1))sorok.push(`<div class="talHatRow"><span>🌘 <b>Suttogó ajánlat</b> vár — ${R.ajanlat.ar} csapatstílus-pont, az idény végéig</span>`
+       +`<button type="button" class="btn-s" data-tal="rejtAjanlat">Megnézem</button></div>`);}
     const VS=talKat("szurkolo").valt.find(z=>z.k==="izgalom");
     TAL_SZURK_ES.forEach(E=>{const x=v["szurkolo.izgalom."+E.k];if(!x)return;
      sorok.push(`<div class="talHatRow"><span>📣 <b>+${talSz(x)} izgalom</b> — ${E.ic} ${esc(E.n)}</span>`
@@ -104506,7 +104866,16 @@ function startNextCareerSeason(){
       if(CH_ABSOLUTE_TYPES.includes(ch.type)){ch.startProgress=0;ch.bestSinceAccept=0;}
       else if(CH_STATE_TYPES.includes(ch.type))ch.startProgress=0;   /* állapot: nincs mit levonni */
       else ch.startProgress=challengeRawValue(ch);
-    }});
+    }
+    /* 📜 3.9.255 — a sprint rövid kihívása: a határidő az új idény elejétől
+       számolt rövid ablak, a kezdőérték a nullázott statokból */
+    if(ch.deadline&&ch.deadline.kind==="round"&&ch.needsRoundAnchor){
+      ch.deadline.value=Math.min(30,chSprintWindow());
+      ch.acceptedSeason=S.seasonNumber;
+      delete ch.needsRoundAnchor;
+      if(CH_ABSOLUTE_TYPES.includes(ch.type)){ch.startProgress=0;ch.bestSinceAccept=0;}
+      else if(CH_STATE_TYPES.includes(ch.type))ch.startProgress=0;
+      else ch.startProgress=challengeRawValue(ch);}});
   S._chAnchorPending=false;
   /* ---- A SZUPERLIGÁK KALIBRÁCIÓJA (3.9.112) ----
      A MENETREND SORSOLÁSA ELŐTT, és pontosan ezért: a világ itt mozdulhat
@@ -107199,7 +107568,7 @@ function roleStyleActive(){
      a büntetés nem hagyhat ki egy ágat sem. A kiosztás megmarad: a szerepek
      ott állnak a keretlistán, csak nem hatnak. */
   if((S.chRoleFreeze||0)>0)return false;
-  return roleKeysForStyle().length>0;}
+  return roleKeysForStyle().length>0||!!rejtSzerep();}   /* 🌘 3.9.255 — a titkos megbízatás */
 /* A képesség szintje — stílusonként EGY képesség emeli mind a hármat.
    KULCCSAL HÍVVA a szerep SAJÁT filozófiájának szintjét adja (3.9.64); kulcs
    nélkül a nagyobbikat, a régi hívási helyek kedvéért. */
@@ -107369,6 +107738,8 @@ function roleMarkSeen(){
   return true;}
 function roleOf(key){
   if(!roleStyleActive())return null;
+  /* 🌘 3.9.255 — a rejtett stílus titkos megbízatása: csak a saját meccsén */
+  {const x=rejtSzerep();if(x&&x.key===key)return x.name;}
   if(roleKeysForStyle().indexOf(key)<0)return null;
   return roleState().map[key]||null;}
 /* Egy játékos szerepe (vagy null) — a kiosztó és a keretlista használja. */
@@ -112168,6 +112539,7 @@ function styleScan(){
   if(gameMode!=="career")return;
   if(typeof phase!=="undefined"&&phase==="draft")return;
   styleSlots().forEach(st=>styleScanSlot(st));
+  try{rejtScan();}catch(e){}   /* 🌘 3.9.255 — a rejtett stílus mérföldkövei */
   /* 🎓 3.9.195 — a stílus-mesterség: az elért stílusszint (karrierenként a csúcs) */
   try{styleSlots().forEach(st=>{if(st&&st.key&&!st.pre)profNoteStyleLevel(st.key,styleLevel(st));});}catch(e){}}
 function styleScanSlot(st){
@@ -114674,6 +115046,9 @@ function styleActiveFx(){
      moraleFloor, gpPressMult) azonnal használható a boltból is, és a
      szorzós/összeadódó szabály is magától ugyanaz marad. */
   try{engShopFx().forEach(f=>{if(f)out.push(f);});}catch(e){}
+  /* 🌘 3.9.255 — a rejtett stílus feloldott képességei: ugyanezeken a
+     csatornákon, mint az élő fa (lásd rejtFx) */
+  try{rejtFx().forEach(f=>{if(f)out.push(f);});}catch(e){}
   return out;}
 /* SZORZÓS csatorna: a képességek hatása összeszorzódik.
    AZ ÉRTÉK ITT IS LEHET FÜGGVÉNY — ugyanúgy, mint az összeadódó csatornán. A
@@ -116081,6 +116456,7 @@ function saveGame(){
         /* 🧿 TALIZMÁNOK (3.9.141): a teljes állapot, a seeddel együtt — a
            kínálat ebből dobódik, tehát a visszatöltés nem pörget újra. */
         tal:S.tal||null,
+        chKegyelem:S.chKegyelem||null,rejtett:S.rejtett||null,   /* 📜🌘 3.9.255 */
         press:S.press||null,   /* 📰 az újságírók (3.9.188) */
         szarny:S.szarny,   /* ⚡ szárny-kémia (3.9.107) */
         szarnyInProgress:S.szarnyInProgress||null,szarnyMig:S.szarnyMig||0,   /* 3.9.143 */
@@ -116682,7 +117058,7 @@ function applySavedGame(d){
     if(c.deadline&&c.deadline.kind==="season"){
       const cap=(d.S.seasonNumber||1)+(c.seasonSpan||1);
       if(c.deadline.value>cap)c.deadline.value=cap;}
-    delete c.needsSeasonAnchor;});
+    delete c.needsSeasonAnchor;delete c.needsRoundAnchor;});
   S.challengeLastOfferRound=d.S.challengeLastOfferRound!==undefined?d.S.challengeLastOfferRound:-1;
   S.challengeLastOfferSeason=d.S.challengeLastOfferSeason||0;
   S.startChallengesDone=!!d.S.startChallengesDone;

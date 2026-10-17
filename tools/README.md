@@ -368,6 +368,34 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## talizman-kihivas-rejtett-proba.js — 📜🌘 Kihívások és Rejtett csapatstílus
+
+```
+node tools/talizman-kihivas-rejtett-proba.js
+```
+
+**34 állítás**, valódi böngészőben (lásd `docs/talizman-kihivas-rejtett-3-9-255.md`).
+
+* A katalógus: 15 szín, a két új a végén. Öt ritkaságon minden szöveg tiszta. A „Több hely" lap mindig kap hatókört. Mindkét színnek van rezonanciája.
+* Talizmán nélkül minden új kapaszkodó semleges: helyek, ajánlatszám, nehézség, jutalom, kegyelem, sprint, rejtett képesség és szerep.
+* Kihívások:
+  * a helyek hatókörönként gyűlnek (+1, betelve +2);
+  * a 200%-os kínálat +2 biztos ajánlat;
+  * a könnyű arány érezhetően nő;
+  * a jutalom ×1,4;
+  * a sprint lépcsői 2/3/4/4+1/5+1, a sprint csak rövid, saját határidő nélküli célt kínál, a vállalás horgony-jelölőt kap, auto-módban kimarad;
+  * a Kegyelmi kártya 1→3, az első bukás ára elmarad, a második büntet;
+  * a Biztos kéz rezonancia +1 ajánlatot és +10% jutalmat ad.
+* Rejtett stílus:
+  * a négy esély 33%-nál megáll;
+  * az első vizsgálat csendes;
+  * az előző stílus attól a mérföldkőtől kap, a lemaradó nem;
+  * idényenként legfeljebb 6 csendes képesség;
+  * a képesség a `styleActiveFx`-ben hat, az élővé vált stílusé kimarad;
+  * a II. szintű ajánlat pont nélkül nem, ponttal megvehető;
+  * a titkos szerep csak a saját meccsén él.
+* 8 valódi forduló az összes új lappal, oldalhiba nélkül.
+
 ## talizman-ugynok-szurkolo-proba.js — 🕴️📣🎓 Ügynökség, Szurkolótábor, erősebb Stáb
 
 ```
@@ -376,7 +404,7 @@ node tools/talizman-ugynok-szurkolo-proba.js
 
 **47 állítás**, valódi böngészőben (lásd `docs/talizman-ugynokseg-szurkolotabor-3-9-224.md`).
 
-* A katalógus: 13 szín, 6-6 új speciál és +2 a Stábnak. Minden új kontra másik színt üt. Öt ritkaságon egyik szöveg sem hagy benne {v}-t, NaN-t vagy undefined-ot.
+* A katalógus: 13+ szín (3.9.255 óta 15), 6-6 új speciál és +2 a Stábnak. Minden új kontra másik színt üt. Öt ritkaságon egyik szöveg sem hagy benne {v}-t, NaN-t vagy undefined-ot.
 * Talizmán nélkül minden új kapaszkodó semleges, és a régi számok bitre a régiek.
 * Ügynökség:
   * a célzott gyorsítás csak a saját célját mozdítja, és +100%-nál megáll;

@@ -116,7 +116,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.cel=[cel,db];
     return ki;});
   console.log("— 1. A KATALÓGUS —");
-  ok(k.kat.length===13&&k.kat[11]==="ugynok"&&k.kat[12]==="szurkolo","13 szín: az Ügynökség és a Szurkolótábor a Boost után",k.kat);
+  ok(k.kat.length>=13&&k.kat[11]==="ugynok"&&k.kat[12]==="szurkolo","13+ szín (3.9.255 óta 15): az Ügynökség és a Szurkolótábor a Boost után",k.kat);
   ok(k.ugySpec===6&&k.szuSpec===6&&k.stabSpec===10&&k.mind,"6-6 új speciál, a Stábnak +2 (8 → 10) — mind él",{u:k.ugySpec,s:k.szuSpec,st:k.stabSpec});
   ok(k.kontraMas&&k.rez,"minden új kontra MÁSIK területet üt, és mindkét új színnek van rezonanciája");
   ok(k.stabValt.join(",")==="hatas,ar,xp,oreg,vadasz"&&k.stabU[0][0]===6&&k.stabU[0][1]===50&&k.stabU[1][0]===7&&k.stabU[1][1]===55,
