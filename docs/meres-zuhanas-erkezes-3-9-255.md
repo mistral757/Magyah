@@ -74,7 +74,36 @@ A kezdőrúgáskor naplózott különbség (`d`) már tartalmazza a rejtett
 ellenfél-erősítést, a pályát és a taktikát. A mezőny ereje tehát nem
 „kerülhette meg” a naplót.
 
-## 4. Következtetés
+## 4. A mentés visszajátszása
+
+A karrier mentésével a 9–14. forduló mind a hat meccsét 150-szer lejátszottuk
+a valódi motoron (`tools/meccsmotor/mentes-visszajatszas.js`), minden meccs
+előtt a mentés pontos állapotából.
+
+| ellenfél | pálya | d | Gy / D / V visszajátszva | Gy / D / V a kezdőrúgáskori gólvárhatóságból |
+|---|---|---|---|---|
+| Sampdoria | otthon | +2,0 | 47 / 27 / 27 (200-as ismétléssel: 59 / 21 / 21) | 53 / 24 / 23 |
+| São Paulo | idegenben | −1,7 | 22 / 22 / 56 | 26 / 24 / 50 |
+| Napoli | otthon | +1,5 | 45 / 24 / 31 | 49 / 24 / 26 |
+| PSV | idegenben | +1,3 | 55 / 24 / 21 | 48 / 25 / 28 |
+| Marseille | otthon | +1,5 | 47 / 26 / 27 | 49 / 24 / 26 |
+| Porto | idegenben | −1,7 | 23 / 27 / 50 | 26 / 24 / 50 |
+
+* **A hat meccs várható pontszáma 8,7.** A kezdőrúgáskori gólvárhatóságból
+  9,0 jön ki, tehát a meccs közbeni rész nem visz el semmit.
+* **≤ 1 pont esélye ebből az állapotból ≈ 0,75%** (1 : 130).
+* **A felállás alatti szám többet mutatott, mint ami a pályára ért.**
+  * A taktika (labdatartás) −0,41 meccserőt adott.
+  * Az összhang −1,5 volt: a négy érkező beilleszkedik.
+  * A morál 40,8 volt, ez −0,46.
+  * Az alakzat ára +5% az ellenfél gólesélyére.
+  * Két nehéz idegenbeli meccsen (São Paulo, Porto) a motor szerinti
+    különbség −1,7: ott a csapat volt az esélytelenebb.
+* **A Vad idény talizmán (+6,8%) nem számít.** Lappal és lap nélkül
+  ugyanaz jött ki (59 / 21 / 21 és 63 / 17 / 21, 200–200 meccs). Az első
+  150-es futás 47%-a szórás volt.
+
+## 5. Következtetés
 
 Motorhibát nem találtunk.
 
@@ -83,7 +112,12 @@ Motorhibát nem találtunk.
 * Az erős érkező nem ront.
 * A többi karrier pontosan hozza a várt pontot.
 
-Ez a hat meccs a mért eloszlás nagyon ritka szélén van. Kizárni csak a
-karrier saját állapotának visszajátszásával lehet: a mentést ugyanazokkal a
-cserékkel, presetekkel, talizmánokkal és stílussal ezerszer újrajátszva.
-Ehhez a mentés-export kell.
+A mentés visszajátszása (4. pont) ezt megerősíti. A csapat saját
+állapotából a hat meccs kb. 8,7 pontot ér. Az 1 pont rossz sorozat (kb.
+1 : 130), de nem motorhiba.
+
+A különbség oka kettős:
+
+* a „meccserő > ellenfél" kijelzés nem tartalmazza a pályát, a negatív
+  taktika-tételt és a beilleszkedés miatti összhang-levonást;
+* a két idegenbeli meccsen ténylegesen az ellenfél volt az esélyes.
