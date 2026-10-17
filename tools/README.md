@@ -252,6 +252,17 @@ node tools/eladasi-plafon-bevetel-proba.js
 lelátó + kupadíj + jutalom, az eladás nem emeli; a sztár-eladás továbbra is plafonos; az
 idei ütem 8 forduló után vetít; az 1. idényben a működési keret a mérce.
 
+## mezony-gyorsulas-proba.js — 🏃 a mezőny idény közbeni gyorsulása
+
+```
+node tools/mezony-gyorsulas-proba.js
+```
+
+**15 állítás** (lásd `docs/mezony-gyorsulas-3-9-254.md`): az 1–3. idényben nincs; a
+mért többlet 30%-a (4. idény +4,05), plafon +10, nem csökken; osztályszorzó ×0,5 … ×1,15;
+fordulónként gyűlik és az ellenfelek ereje látja; idempotens; a beragadás-őr megállítja;
+új idény nulláról; a napló egyszer szól.
+
 ## meccsero-preset-proba.js — ⚡🧩 meccserő-bontás, felállás- és csere-presetek
 
 ```

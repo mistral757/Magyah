@@ -16,7 +16,9 @@
      3. a vendég átveszi, és a közös karrier indításakor a karrier fokozata
         5.1: S.pyr.nf, a célrés (+1,6), a hivatalos szint és a HUB-sáv is;
      4. RÉGI szoba (fokozat nélküli csomag): a régi út, a résből;
-     5. nincs oldalhiba. */
+     5. 3.9.253: a HÁZIGAZDA útja — a közzétett csomagból indul (7.1), a
+        vendéggel azonos fokozaton; üres csomag-fokozatnál a saját választása;
+     6. nincs oldalhiba. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT=process.env.MROOT||"/home/user/Magyah", PORT=9464;
@@ -102,6 +104,50 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       ki.regi={nf:S.pyr.nf,fok:!!S.pyr.fok,vart:nfNearest(nfCelFromRajt(1.4,3,"tarto")).nf};
     }finally{MP.active=e0.a;MP.role=e0.r;}
     return ki;});
+
+  /* ---- 3.9.253: A HÁZIGAZDA ÚTJA (hagyományos indítás) ----
+     BEJELENTÉS: „Hostként indítom a PvP hagyományos módot […] 7.1 […] 3.
+     sima liba lesz a kezdő nehézség". A házigazda közzéteszi a csomagot, és
+     a saját draftja végén indul — a csomagot sosem „veszi át". */
+  const h=await p.evaluate(async()=>{
+    const ki={};
+    const sq={club:"A drafton összeállított kereted",season:"",players:slots.filter(s=>s&&s.player).map(s=>s.player)};
+    const e0={a:MP.active,r:MP.role,room:MP.activeRoom,st:MP.started};
+    const _bk=mpBk;
+    try{
+      MP.active=true;MP.role="host";MP.activeRoom="TESZT1";pyrWanted=true;pyrWantedDiv=3;pyrWantedSpeed="tarto";
+      _mpNfFok=null;
+      nfCsomagAlkalmaz(7,1);
+      let kozzetett=null;
+      mpBk=()=>({get:async()=>({seed:"proba-seed"}),publishStart:async(code,obj)=>{kozzetett=obj;}});
+      ki.pub=await mpPublishStart();
+      ki.csomagNf=kozzetett&&kozzetett.settings&&kozzetett.settings.pyr&&[kozzetett.settings.pyr.nf,kozzetett.settings.pyr.s];
+      ki.hostFok=_mpNfFok;
+      pyrPickSq=sq;pyrPickDiv=3;pyrPendingDiv=3;pyrPendingSpeed="tarto";pyrPickFromDraft=true;pyrPickGap=1.4;
+      const _sc=showChemistry;showChemistry=()=>{};
+      try{pyrConfirmDiv();}finally{showChemistry=_sc;}
+      ki.kar={nf:S.pyr.nf,cel:S.pyr.cel,fok:S.pyr.fok&&{nf:S.pyr.fok.nf,s:S.pyr.fok.s,mp:S.pyr.fok.mp}};
+      ki.vartCel=nfCel(7,1);
+      ki.regiAg=nfNearest(nfCelFromRajt(1.4,3,"tarto")).nf;
+      /* ugyanaz a csomag a vendégnél → ugyanaz a fokozat */
+      MP.role="guest";_mpNfFok=null;
+      mpApplySettings(JSON.parse(JSON.stringify(kozzetett.settings)));
+      ki.vendegFok=_mpNfFok;
+      /* tartalék: a házigazdánál üres csomag-fokozat (pl. újratöltés) → a saját választása */
+      MP.role="host";_mpNfFok=null;nfCsomagAlkalmaz(7,1);
+      pyrPickSq=sq;pyrPickDiv=3;pyrPendingDiv=3;pyrPendingSpeed="tarto";pyrPickFromDraft=true;pyrPickGap=1.4;
+      const _sc2=showChemistry;showChemistry=()=>{};
+      try{pyrConfirmDiv();}finally{showChemistry=_sc2;}
+      ki.tartalek=S.pyr.nf;
+    }finally{mpBk=_bk;MP.active=e0.a;MP.role=e0.r;MP.activeRoom=e0.room;MP.started=e0.st;}
+    return ki;});
+  ok(h.pub&&h.csomagNf&&h.csomagNf.join()==="7,1","a házigazda csomagja 7.1-et visz",h.csomagNf);
+  ok(h.hostFok&&h.hostFok.nf===7&&h.hostFok.s===1,"a közzétételkor a házigazda is átveszi a saját csomagja fokozatát",h.hostFok);
+  ok(h.kar.nf===7&&Math.abs(h.kar.cel-h.vartCel)<1e-9&&h.kar.fok&&h.kar.fok.nf===7&&h.kar.fok.s===1&&h.kar.fok.mp===1,
+     "a házigazda karrierje 7.1-gyel indul — nem a résből visszaszámolt „"+"Simaliba”",{kar:h.kar,regiAg:h.regiAg});
+  ok(h.regiAg!==7,"(a régi ág itt tényleg mást adott volna)",h.regiAg);
+  ok(h.vendegFok&&h.vendegFok.nf===7&&h.vendegFok.s===1,"a vendég ugyanazt a fokozatot kapja",h.vendegFok);
+  ok(h.tartalek===7,"üres csomag-fokozatnál a házigazda a saját választását használja, nem a rés-becslést",h.tartalek);
   ok(r.csomag.nf===5&&r.csomag.s===1&&r.csomag.tel&&r.csomag.holt&&Math.abs(r.csomag.gap-r.vartGap)<1e-9,
      "a házigazda 5.1-et választ: a szobacsomag viszi a fokozatot, és a közös rés a fokozat rajt-rése",{cs:r.csomag,vart:r.vartGap});
   ok(r.csuszkaTiltva&&!r.renderHiba,"a régi rés-csúszka ilyenkor csak kijelez (letiltva)",{t:r.csuszkaTiltva,h:r.renderHiba});

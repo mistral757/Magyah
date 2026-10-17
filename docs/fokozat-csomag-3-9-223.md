@@ -467,3 +467,25 @@ tabellán osztoztok, ezért az osztályt a házigazda a szoba-beállítás
 „közös osztály” csúszkáján választja. A draft után nincs külön kérdés.
 
 Próba: `tools/pvp-fokozat-szoba-proba.js` (8 állítás).
+
+
+## Utólag (3.9.253): a házigazda is a közzétett csomagból indul
+
+> „Hostként indítom a PvP hagyományos módot. 2. alkalommal történik meg […]
+> 7.1 […] 3. sima liba lesz a kezdő nehézség"
+
+A 3.9.242 a fokozatot a szobacsomagba tette, de csak a **vendég** olvasta ki
+(`mpApplySettings`). A házigazda a csomagot közzéteszi és azonnal indul — a saját
+csomagját sosem „veszi át", így nála a szoba fokozata üres maradt, és a karrier-
+indítás a régi, résből visszaszámoló ágra esett (Simaliba), miközben a vendég
+helyesen a választott fokozattal indult: a két gép két különböző fokozaton.
+
+Mostantól a házigazda a közzétételkor ugyanabból a csomagból veszi a fokozatot
+(`mpNfFokCsomagbol` — egy olvasó mindkét oldalnak), és ha a csomag-fokozat valamiért
+üres (régi út, újratöltés), a saját választott fokozatát használja, sosem a
+rés-becslést. A próba (`tools/pvp-fokozat-szoba-proba.js`) a régi kódon a jelentett
+hibát adja (7.1 helyett a résből számolt fokozat), az újon zöld.
+
+Az osztály közös karrierben továbbra is a szoba beállítása (a házigazda a
+beállítón, a „közös osztály" csúszkán választja) — a draft után ezért nincs külön
+osztályválasztó.
