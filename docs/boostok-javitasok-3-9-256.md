@@ -87,12 +87,12 @@ Az ifi-, az öreg róka és a Fénykor saját paneljén, valamint a sikeres boos
 utáni képernyőn is ott van a **← Vissza a katalógushoz** és a **Még egy …**
 gomb.
 
-## 7. 🛒 Tömeges boost (kosár)
+## 7. 🛒 Boost-kosár (tömeges vásárlás)
 
 > „Kiválasztod melyik, hány darab, és akkor csak nyomogatod. Elosztod, ki
 > mennyit kapjon (és milyen attribútummal)."
 
-A Boost-központ tetején új gomb van: **🛒 Tömeges boost**. A menete:
+A Boost-központ tetején új gomb van: **🛒 Boost-kosár** (3.9.256-ban még „Tömeges boost” néven; a 3.9.258 átnevezte, hogy ne lehessen összetéveszteni a Béke és harmónia Tömeg-boostjával, lásd lent). A menete:
 
 1. **Fajta:** sima, attribútum, POT, összjáték, skill, ifi, Fénykor vagy öreg
    róka.
@@ -106,6 +106,34 @@ A végrehajtás darabonként, ugyanazon az úton fut, mint az egyes boost. Minde
 darab a saját pillanatnyi árán megy: az ingyen-zseton, a talizmán-kedvezmények
 és az öreg róka játékosonkénti drágulása mind él. Ha a pénz elfogy, a maradék
 elmarad, és ezt a záróképernyő meg is mondja.
+
+### 3.9.258: nem téveszthető össze a Tömeg-boosttal
+
+> „Nehogy valaki véletlenül vegyen 5 boostot, amikor igazából 5 emberre akár
+> elosztani 1 boostot."
+
+A két út gyökeresen más:
+
+| | 🛒 Boost-kosár | 🤝 Tömeg-boost (Béke és harmónia képesség) |
+|---|---|---|
+| mit veszel | N **külön** boostot | **egy** boostot |
+| mennyit fizetsz | N × az ár | egyszer az árat |
+| kire hat | darabonként egy emberre | szétosztva 2–5 emberre |
+
+* Más a neve: „Boost-kosár”, nem „tömeges”.
+* Minden kosár-lépés kiírja: „5 külön boost — 5 × ár”.
+* A megerősítő címe: „5 KÜLÖN boostot veszel?”.
+* Ha a Tömeg-boost képesség megvan, a kosár három pontján piros
+  figyelmeztetés áll:
+  * a fajta-választón;
+  * a darabszámnál;
+  * a megerősítőben.
+* Ugyanott egy **🤝 Inkább EGY boostot osztanék szét** gomb egyenesen a
+  szétosztó útra visz.
+* A szétosztó gomb neve is egyértelműbb: „Több játékos — EGY boost
+  szétosztva … egyetlen ár”.
+
+Próba: `tools/boost-kosar-tomeg-3-9-258-proba.js`.
 
 ## 8. PvP: nem várunk ott, ahová a társ úgysem jön
 

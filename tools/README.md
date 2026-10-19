@@ -368,6 +368,16 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## boost-kosar-tomeg-3-9-258-proba.js — 🛒🤝 a Boost-kosár nem téveszthető össze a Tömeg-boosttal
+
+```
+node tools/boost-kosar-tomeg-3-9-258-proba.js
+```
+
+* A kosár neve „Boost-kosár”, minden lépése kimondja: N külön boost, N × ár.
+* Harmónia-képesség nélkül nincs figyelmeztetés.
+* Vele a fajta-választó, a darabszám és a megerősítő is figyelmeztet, és egy gomb a szétosztó útra visz.
+
 ## stilus-letra-3-9-257-proba.js — 🎚 a csapatstílus-rendszer egységesítése
 
 ```

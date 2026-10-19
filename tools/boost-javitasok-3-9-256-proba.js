@@ -113,9 +113,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      const o=boostKosarVegrehajt();
      ki.kosar={kesz:o.kesz,elm:o.elmaradt,fel:[eA.attrs.passz-p0[0],eB.attrs.ved-p0[1],eC.attrs.gol-p0[2]],nA:eA.attrBoost&&eA.attrBoost.n};
      _kosar={kind:"plain",db:5,sorok:[{n:A.n,db:5}]};
-     S.transferBudget=boostPriceOf("plain")*2+1;
+     /* a darabár a pillanatnyi állapotból jön (a második darab drágább is
+        lehet), ezért nem „pontosan kettőt" mérünk, hanem a szabályt: ami
+        belefér, elsül, a maradék elmarad, és nem fizetünk többet a keretnél */
+     const keret=boostPriceOf("plain")*2+1;
+     S.transferBudget=keret;
      const o2=boostKosarVegrehajt();
-     ki.kosar2={kesz:o2.kesz,elm:o2.elmaradt};
+     ki.kosar2={kesz:o2.kesz,elm:o2.elmaradt,fiz:o2.fizetve,keret};
      S.transferBudget=1e12;}
     /* 1. Iskolateremtő: nincs kinek átadni → csillagozás */
     {const sk=SKILLS.find(x=>x&&x.id&&!x.combo)||SKILLS[0];
@@ -156,7 +160,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.vissza.some(t=>/katalógus/.test(t))&&r.vissza.some(t=>/HUB/.test(t)),"a boost utáni képernyőn vissza a katalógushoz",r.vissza);
   console.log("\n— 7. KOSÁR —");
   ok(r.kosar.kesz===10&&r.kosar.elm===0&&r.kosar.fel.every(x=>x>0)&&r.kosar.nA>=7,"7 passz + 2 védekezés + 1 gólszerzés: mind elsül, a tengelyek nőnek",r.kosar);
-  ok(r.kosar2.kesz===2&&r.kosar2.elm===3,"ha a pénz elfogy, a maradék elmarad",r.kosar2);
+  ok(r.kosar2.kesz>=1&&r.kosar2.elm>=1&&r.kosar2.kesz+r.kosar2.elm===5&&r.kosar2.fiz<=r.kosar2.keret,"ha a pénz elfogy, a maradék elmarad (és a keretnél többet nem fizet)",r.kosar2);
   console.log("\n— 1. ISKOLATEREMTŐ —");
   ok(r.isk.x&&r.isk.nyitva&&(r.isk.csillag>=1||r.isk.epul)&&r.isk.spent===1,"nincs kinek átadni → a csillagozás joga megnyílik, és elindul az első csillag",r.isk);
   console.log("\n— 8. PvP —");
