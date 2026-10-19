@@ -368,6 +368,29 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## stilus-letra-3-9-257-proba.js — 🎚 a csapatstílus-rendszer egységesítése
+
+```
+node tools/stilus-letra-3-9-257-proba.js
+```
+
+Valódi böngészőben (lásd `docs/csapatstilus-egysegesites-3-9-257.md`).
+
+* Árlétra: a 10. szintig 2 500 pont, a motor és a Panzer egy táblán; a kapu 2+n.
+* Mezőny-skála: 100-ig a régi hozam, 350-nél ×3,5 (plafon, ív, hozam; motor és Panzer).
+* Panzer: négy tényező, a mélység a régi bázis, a félelem szint ≥ a régi.
+* Tiki-taka: mindhárom szerep attribútum-gazdát kap, a padló ×1, a kártya kiírja.
+* Sztár: él a motorja (négy tényező, tarifa, „pályán” tétel, szintvétel, panel, bolt).
+
+## meccsmotor/stilus-pontbevetel.js — 🎚 stíluspont-bevétel valódi meccseken
+
+```
+STY=villam LVL=10 N=40 DS=1.5 PORT=9301 node tools/meccsmotor/stilus-pontbevetel.js
+```
+
+Mérés, nem próba: meccsenként rögzíti a jóváírt stíluspontot, a nyers tételt és a plafont.
+A `STY` lehet `villam`, `bombazok`, `beton`, `harmonia`, `tikitaka`, `gegen`, `panzer` vagy `sztar`.
+
 ## boost-javitasok-3-9-256-proba.js — 🛠 boostok, egyenlítő, Iskolateremtő, PvP-kapuk
 
 ```

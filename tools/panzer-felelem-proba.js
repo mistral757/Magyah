@@ -69,7 +69,10 @@ const {spawn}=require('child_process');
 
     /* ── 2. A FÉLELEM SZINT ── */
     o.felelem={};
-    o.felelem.bazis=Math.round(fearBase()*10)/10;
+    /* 3.9.257: a félelem szint a motor négy tényezőjéből áll (fearParts) —
+       a skálázás az ÖSSZEGRE megy, a mélység betűre a régi bázis. */
+    o.felelem.bazis=Math.round(fearBaseRaw()*10)/10;
+    o.felelem.melyseg=Math.round(fearBase()*10)/10;
     /* a stílus szintje nagyítja: 1. szinten fele, 20.-on kétszerese */
     const eredetiLevel=window.styleLevel;
     window.styleLevel=()=>1;  o.felelem.lvl1=fearLevel();
@@ -107,9 +110,10 @@ const {spawn}=require('child_process');
     F.pts=100000;F.retteges=0;
     o.retteges={};
     o.retteges.zartAzElso=rettegesNextWhy();      /* 10. szinten már nem szint a gát */
-    window.styleLevel=()=>4;
+    /* 3.9.257: a kapu két szinttel lejjebb került (2+n) */
+    window.styleLevel=()=>2;
     o.retteges.negyediken=rettegesNextWhy();
-    window.styleLevel=()=>5;
+    window.styleLevel=()=>3;
     o.retteges.otodiken=rettegesNextWhy();
     /* vegyük meg mind a tízet, ha a szint engedi */
     const ivek=[];
@@ -201,7 +205,7 @@ const {spawn}=require('child_process');
      r.rettenet.plafon.kapott===r.rettenet.plafon.cap,r.rettenet.plafon);
 
   console.log("\n=== a Rettegés ===");
-  ok("az 1. szint a 4. csapatstílus-szinten még zárva, az 5.-en nyílik",
+  ok("az 1. szint a 2. csapatstílus-szinten még zárva, a 3.-on nyílik (3.9.257)",
      /csapatst/.test(r.retteges.negyediken)&&r.retteges.otodiken==="",
      {negyedik:r.retteges.negyediken,otodik:r.retteges.otodiken});
   ok("mind a 10 szint megvehető, és a százalék nő",

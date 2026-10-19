@@ -1,7 +1,8 @@
 # 3.9.256 — Boostok, egyenlítő, Iskolateremtő, PvP-kapuk
 
 A felhasználó nyolcpontos listájából hét pont ebben a kiadásban van. A
-2. pont (a csapatstílus-rendszer egységesítése) külön dokumentumban áll.
+2. pont (a csapatstílus-rendszer egységesítése) a 3.9.257-ben jött, külön
+dokumentumban: [csapatstilus-egysegesites-3-9-257.md](csapatstilus-egysegesites-3-9-257.md).
 
 ## 1. Iskolateremtő: ha nincs kinek átadni, csillagozás
 
