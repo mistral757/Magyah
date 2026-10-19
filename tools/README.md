@@ -368,6 +368,19 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## stilus-infinity-szint-3-9-259-proba.js — ♾️ a nagy ugrás nem viszi lejjebb a stílusszintet
+
+```
+node tools/stilus-infinity-szint-3-9-259-proba.js
+```
+
+Mind a nyolc stílusnál:
+
+* az Infinity megnyílásakor a szint és az SXP pontosan a régi;
+* a régi képlettel esett volna;
+* egy teljesített új lépcső emel;
+* a fejléc kiírja a hozamot.
+
 ## boost-kosar-tomeg-3-9-258-proba.js — 🛒🤝 a Boost-kosár nem téveszthető össze a Tömeg-boosttal
 
 ```
