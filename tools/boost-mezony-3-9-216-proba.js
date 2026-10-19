@@ -83,7 +83,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const a85=await meres(85,3000),a70=await meres(70,3000);
   ok(a85.sk===1&&a70.sk===1,"a szorzó 1 (70-es és 85-ös mezőnyben)",[a70.sk,a85.sk]);
   ok(a85.ifiT[0]>=1000&&a85.ifiT[1]<=2500,"az ifi-boost POT-ja 1000–2500",a85.ifiT);
-  ok(a85.oregT[0]>=1200&&a85.oregT[1]<=3000,"az öreg-boost POT-ja 1200–3000",a85.oregT);
+  ok(a85.oregT[0]>=900&&a85.oregT[1]<=2250,"az öreg-boost POT-ja 900–2250 (3.9.256 óta a régi 1200–3000 75%-a)",a85.oregT);
   ok(JSON.stringify(a85.plain)==="[400,2500]"&&JSON.stringify(a85.potB)==="[1000,10000]","a sima (400–2500) és a POT-boost (1000–10 000) korlátja a régi",[a85.plain,a85.potB]);
   ok(a85.card===2&&a70.card===2,"a kártya-jutalom +2",[a70.card,a85.card]);
 
@@ -114,7 +114,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const v=slots[4].player,ev=careerPool[v.n];Object.assign(ev,{age:33});
     try{openOldBoostPanel();}catch(x){o.oregHiba=x.message;}
     o.oreg=($("twBody").textContent||"").replace(/\s/g,"");
-    o.oregVart=`+${Math.round(1200*sk)}-${Math.round(3000*sk)}POT`;
+    o.oregVart=`+${Math.round(1200*sk*OLD_BOOST_NERF)}-${Math.round(3000*sk*OLD_BOOST_NERF)}POT`;
     return o;});
   ok(u.ifi.includes(u.ifiVart),"az ifi-boost panelje a skálázott POT-sávot írja",{vart:u.ifiVart,van:u.ifi.slice(0,160)});
   ok(u.potVart.every(x=>u.pot.includes(x))&&u.plainVart.every(x=>u.plain.includes(x)),"a Boost-központ sima és POT-leírása a skálázott korlátokat írja",{pot:u.potVart,plain:u.plainVart});

@@ -530,10 +530,12 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return ki;});
 
   console.log("=== 11. a maradék négy stílus ===");
-  ok(negy.kulcsok.join()==="beton,bombazok,gegen,harmonia,tikitaka,villam",
-    "hat stílusnak van motorja",negy.kulcsok);
-  ok(negy.nincs.join()==="panzer,sztar",
-    "és pontosan kettőnek nincs — nekik SAJÁT rendszerük van (rettenet / híresség)",
+  /* 3.9.257: a Sztár is megkapta a közös motort (Ragyogás) — a híresség
+     mellé, nem helyette. Saját rendszere csak a Panzernek maradt. */
+  ok(negy.kulcsok.join()==="beton,bombazok,gegen,harmonia,sztar,tikitaka,villam",
+    "hét stílusnak van motorja (3.9.257 óta a Sztárnak is)",negy.kulcsok);
+  ok(negy.nincs.join()==="panzer",
+    "és pontosan egynek nincs — a Panzernek SAJÁT rendszere van (rettenet)",
     negy.nincs);
   console.log("--- a három bázis-alak ---");
   ok(negy.betonKapus>0&&negy.betonKapus===negy.betonVedo,
@@ -656,7 +658,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     "a Panzernél csak a védekező villanás és a fölény néma",fd.panzerNema);
   ok(fd.kozosNema.join()==="gap","a fölény a motorban is néma",fd.kozosNema);
   {const beszedes=fd.nemak.filter(x=>x.nema==="—").map(x=>x.k);
-   ok(beszedes.length===4,"négy stílusnál MINDEN tétel megszólal",beszedes);
+   ok(beszedes.length===5,"öt stílusnál MINDEN tétel megszólal (3.9.257: a Sztár is)",beszedes);
    const nemaK=fd.nemak.filter(x=>x.nema!=="—");
    ok(nemaK.every(x=>x.nema==="tackle"||x.nema==="press"),
      "és néma csak az marad, amiből tucatnyi jön egy meccsen",nemaK);}

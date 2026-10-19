@@ -368,6 +368,61 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## boost-kosar-tomeg-3-9-258-proba.js — 🛒🤝 a Boost-kosár nem téveszthető össze a Tömeg-boosttal
+
+```
+node tools/boost-kosar-tomeg-3-9-258-proba.js
+```
+
+* A kosár neve „Boost-kosár”, minden lépése kimondja: N külön boost, N × ár.
+* Harmónia-képesség nélkül nincs figyelmeztetés.
+* Vele a fajta-választó, a darabszám és a megerősítő is figyelmeztet, és egy gomb a szétosztó útra visz.
+
+## stilus-letra-3-9-257-proba.js — 🎚 a csapatstílus-rendszer egységesítése
+
+```
+node tools/stilus-letra-3-9-257-proba.js
+```
+
+Valódi böngészőben (lásd `docs/csapatstilus-egysegesites-3-9-257.md`).
+
+* Árlétra: a 10. szintig 2 500 pont, a motor és a Panzer egy táblán; a kapu 2+n.
+* Mezőny-skála: 100-ig a régi hozam, 350-nél ×3,5 (plafon, ív, hozam; motor és Panzer).
+* Panzer: négy tényező, a mélység a régi bázis, a félelem szint ≥ a régi.
+* Tiki-taka: mindhárom szerep attribútum-gazdát kap, a padló ×1, a kártya kiírja.
+* Sztár: él a motorja (négy tényező, tarifa, „pályán” tétel, szintvétel, panel, bolt).
+
+## meccsmotor/stilus-pontbevetel.js — 🎚 stíluspont-bevétel valódi meccseken
+
+```
+STY=villam LVL=10 N=40 DS=1.5 PORT=9301 node tools/meccsmotor/stilus-pontbevetel.js
+```
+
+Mérés, nem próba: meccsenként rögzíti a jóváírt stíluspontot, a nyers tételt és a plafont.
+A `STY` lehet `villam`, `bombazok`, `beton`, `harmonia`, `tikitaka`, `gegen`, `panzer` vagy `sztar`.
+
+## boost-javitasok-3-9-256-proba.js — 🛠 boostok, egyenlítő, Iskolateremtő, PvP-kapuk
+
+```
+node tools/boost-javitasok-3-9-256-proba.js
+```
+
+Valódi böngészőben (lásd `docs/boostok-javitasok-3-9-256.md`).
+
+* Attribútum-boost: a boostolt pont egy attribútum-lépés után is megmarad (a sáv teteje vele nő).
+* Egyenlítő: a megjelenített Ratingből számol, és utána mindenki pontosan a közös számon áll.
+* 🌟 Fénykor:
+  * az ár az ifi-boost 98%-a;
+  * 24–30 évesre;
+  * a próbaidő a most induló idény;
+  * a jó idény megtartja, a gyenge pontosan levonja.
+* Öreg róka: a régi erő 75%-a.
+* Ifi-boost: tengely-választó (5 + „nem kérek").
+* Vissza a katalógushoz a boost után.
+* 🛒 Kosár: 7+2+1 elosztás mind elsül; pénz nélkül a maradék elmarad.
+* Iskolateremtő: nincs kinek átadni → csillagozás.
+* PvP: más sorozat, szétvált ág vagy véget ért program esetén nem vár; ugyanott tartó társnál és régi kliensnél vár.
+
 ## talizman-kihivas-rejtett-proba.js — 📜🌘 Kihívások és Rejtett csapatstílus
 
 ```
