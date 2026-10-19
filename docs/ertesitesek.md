@@ -614,3 +614,66 @@ Tempós vagy a Villám fokozat való.
 
 **Próba:** `tools/mp-tempo-jelenlet-proba.js` — 26 állítás, köztük a gomb
 megjelenése kilenc idő/tempó kombinációra (helyi és szerveridős ágon is).
+
+## Gyári androidos böngészők (3.9.260)
+
+> „Xiaomi böngészőből telepítve sehogy sem lehet bekapcsolni az értesítéseket."
+
+**A jelenség:** a rendszer-beállításban a böngésző minden értesítés-kapcsolója
+be van kapcsolva, a játék mégis elutasítást kap.
+
+**Az ok nem a játékban van.** A gyári Chromium-klónok a Web Push-t vagy nem
+kézbesítik, vagy a weboldal engedélykérését rögtön elutasítják, mert nincs
+mögöttük a Chrome push-szolgáltatása. Ilyenek:
+
+* Xiaomi Mi Browser (`com.android.browser`);
+* Huawei;
+* OPPO/realme HeyTap;
+* vivo;
+* UC;
+* Quark.
+
+**Nem tiltjuk előre.** Ha egy verzió mégis tud értesítést küldeni, működik.
+Ha viszont nem sikerül, a játék mostantól a valódi okot és a teendőt mondja,
+nem azt, hogy „letiltottad”:
+
+1. Nyisd meg a játékot Chrome-ban. A hibaüzenet alatt erre van egy
+   **🌐 Megnyitás Chrome-ban** gomb (`intent://…;package=com.android.chrome`).
+2. Vidd át a mentést átviteli kóddal:
+   1. a régi böngészőben: Profil → 💾 Mentések → 💾 Mentések és tárhely, majd
+      a karrier sorában a ☁ gomb kódot ad;
+   2. Chrome-ban ugyanott: „☁ Behozatal átviteli kóddal”.
+3. A kód a PvP-ülés azonosítóját is viszi, ezért a közös szobában ugyanabba a
+   székbe ülsz vissza. Ott már bekapcsolható az értesítés.
+
+Ugyanezt mondja a Beállítások értesítés-sora is.
+
+Próba: `tools/ertesites-gyari-bongeszo-3-9-260-proba.js`.
+
+## 📱 PvP-értesítések a Beállításokból (3.9.261)
+
+> „Csináljuk már meg, hogy itt a beállításokban az értesítések bekapcs működjön
+> úgy, hogy ne csak itt a várakozó képernyőn lehessen bekapcsolni a PvP
+> értesítéseket… legyen egy külön pvp értesítések gomb."
+
+**Új kapcsoló.** A Beállítások 🔔 Értesítések szakaszába a fő kapcsoló alá
+került egy külön **📱 PvP-értesítések** kapcsoló.
+
+* **Szoba nélkül is működik.** Az engedély és a böngésző feliratkozása a
+  készülékhez tartozik, nem a szobához. Bekapcsoláskor a játék engedélyt kér
+  és feliratkozik.
+* **Minden közös szobára érvényes.** A szobába írás eddig is magától ment
+  minden közös szobába, amint az engedély megvolt. Ha épp szobában vagy, oda
+  azonnal kimegy.
+* **A valódi állapotot mutatja.** Csak akkor áll BE-n, ha a készülék tényleg
+  fel van iratkozva. Ha nem sikerül, kimondja az okot. Gyári androidos
+  böngészőnél a „Megnyitás Chrome-ban” gombot is megmutatja.
+* **Kikapcsolva:** a készülék leiratkozik, és a szobából is kikerül. A vezetés
+  emlékeztetői és a társ képernyőn beúszó jelzései (a fő kapcsoló) maradnak.
+* **A fő kapcsoló KI** állásban a PvP-kapcsolót is letiltja.
+* **A várakozó képernyő 🔔 gombja megmaradt**, és ugyanezt a kapcsolót állítja.
+
+A bökésnél a „társad nem kapcsolta be” üzenet most azt is megmondja, hol
+kapcsolhatja be a társ: Beállítások → 📱 PvP-értesítések.
+
+Próba: `tools/ertesites-pvp-beallitas-3-9-261-proba.js`.

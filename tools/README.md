@@ -368,6 +368,32 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## ertesites-pvp-beallitas-3-9-261-proba.js — 📱 PvP-értesítések a Beállításokból
+
+```
+node tools/ertesites-pvp-beallitas-3-9-261-proba.js
+```
+
+* A Beállításokban két kapcsoló van: a fő és a PvP-kapcsoló.
+* Szoba nélkül bekapcsolva engedélyt kér, feliratkozik, és szobában azonnal a szobába is kiírja.
+* Kikapcsolva leiratkozik, és a szobából is kikerül.
+* Elutasított engedélynél nem mutat hamis BE-t.
+* A fő kapcsoló KI állásban letiltja a PvP-kapcsolót.
+
+## ertesites-gyari-bongeszo-3-9-260-proba.js — 🔔 gyári androidos böngésző: valódi ok és teendő
+
+```
+node tools/ertesites-gyari-bongeszo-3-9-260-proba.js
+```
+
+Xiaomi böngésző user-agenttel, elutasított engedéllyel:
+
+* a hiba kimondja, hogy a Xiaomi böngésző nem kézbesít, és mi a teendő (Chrome + átviteli kód);
+* a Beállítások sora is ugyanezt mondja;
+* egy „Megnyitás Chrome-ban” gomb jelenik meg (`intent://`).
+
+Chrome-mal a régi üzenet marad, és nincs gomb.
+
 ## stilus-infinity-szint-3-9-259-proba.js — ♾️ a nagy ugrás nem viszi lejjebb a stílusszintet
 
 ```
