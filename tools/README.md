@@ -368,6 +368,28 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## boost-javitasok-3-9-256-proba.js — 🛠 boostok, egyenlítő, Iskolateremtő, PvP-kapuk
+
+```
+node tools/boost-javitasok-3-9-256-proba.js
+```
+
+Valódi böngészőben (lásd `docs/boostok-javitasok-3-9-256.md`).
+
+* Attribútum-boost: a boostolt pont egy attribútum-lépés után is megmarad (a sáv teteje vele nő).
+* Egyenlítő: a megjelenített Ratingből számol, és utána mindenki pontosan a közös számon áll.
+* 🌟 Fénykor:
+  * az ár az ifi-boost 98%-a;
+  * 24–30 évesre;
+  * a próbaidő a most induló idény;
+  * a jó idény megtartja, a gyenge pontosan levonja.
+* Öreg róka: a régi erő 75%-a.
+* Ifi-boost: tengely-választó (5 + „nem kérek").
+* Vissza a katalógushoz a boost után.
+* 🛒 Kosár: 7+2+1 elosztás mind elsül; pénz nélkül a maradék elmarad.
+* Iskolateremtő: nincs kinek átadni → csillagozás.
+* PvP: más sorozat, szétvált ág vagy véget ért program esetén nem vár; ugyanott tartó társnál és régi kliensnél vár.
+
 ## talizman-kihivas-rejtett-proba.js — 📜🌘 Kihívások és Rejtett csapatstílus
 
 ```
