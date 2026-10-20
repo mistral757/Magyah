@@ -194,8 +194,10 @@ const srv=http.createServer((req,rp)=>{
     out.bl.eros_BL=palya("BL");
     out.bl.eros_keret=Math.round(teamStrength());
     out.bl.eros_nyk=nykMidMine();
-    /* a D1-nél jóval erősebb keretnél a KK a sávja ALJÁN: bázis − 2 */
-    out.bl_szamitott_veszi_at=(out.bl.eros_BL===out.bl.eros_nyk-2);
+    /* 3.9.262: a D1-nél jóval erősebb keretnél IS bázis + 2 (régen a sáv
+       alja, −2 — ez volt a bejelentett hiba: a túlnőtt csapatnak könnyebb
+       lett a KK, mint a nyári kupa) */
+    out.bl_szamitott_veszi_at=(out.bl.eros_BL===out.bl.eros_nyk+2);
     out.rangsor={BL:palya("BL"),EL:palya("EL"),KL:palya("KL"),MK:palya("MK")};
     out.rangsor_helyes=(out.rangsor.BL>out.rangsor.EL
       &&out.rangsor.EL>out.rangsor.KL&&out.rangsor.KL>out.rangsor.MK);
@@ -225,9 +227,9 @@ const srv=http.createServer((req,rp)=>{
     ["az AI-ütem a szuperligákban nem extrapolál",r.utem_nem_szalad===true],
     ["a bajnok a szokásos úton jut fel az ÚJ osztályba",r.feljutott===true],
     ["a világ létszáma ép marad a cserével",r.letszam_ep===true],
-    ["gyenge kerettel (erős élvonal) a KK a sávja tetején: Nyári Kupa + 2 (3.9.175)",r.bl_padlo_szol===true],
+    ["gyenge kerettel (erős élvonal) a KK: Nyári Kupa + 2",r.bl_padlo_szol===true],
     ["…a hazai kupa sosem a bázis fölött",r.bl_csak_a_bl===true],
-    ["erős kerettel a KK a sávja alján: Nyári Kupa − 2",r.bl_szamitott_veszi_at===true],
+    ["erős kerettel is a KK: Nyári Kupa + 2 (3.9.262 — a bajnokság ereje nem számít)",r.bl_szamitott_veszi_at===true],
     ["a pályán a BL a legerősebb mezőny, a hazai kupa a leggyengébb",r.rangsor_helyes===true],
     ["nincs oldalhiba",errs.length===0]];
   T.forEach(([n,ok])=>console.log((ok?"  ✓ ":"  ✗ ")+n));

@@ -145,7 +145,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       horgony:String(mpStartTick).indexOf("mine.mstr||mine.str")>=0,
       kupaMid:String(mpStartTick).indexOf("mine.mstr||mine.str")>=0,
       auto:String(mpResolveLevel).indexOf("mine.mstr||mine.str")>=0};
-    ki.sav=CUP_BAND;
+    ki.sav=CUP_TIER_ADD;
     return ki;});
 
   const azonos=(a,b,e)=>Object.keys(a).every(k=>Math.abs(a[k]-b[k])<=(e||0.6));
@@ -160,9 +160,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(azonos(t.h10,t.keso10,1.2),"…és a két karrierszakasz is egyezik",
      {korai:t.h10,kesoi:t.keso10});
 
-  console.log("\n3. A SÁV ALJA (3.9.175)");
-  ok(azonos(t.h10,{BL:3,EL:4,KL:5,MK:7},0.6),
-     "a ligájánál jóval erősebb keretnél a pályán 1 − a sáv alja: KK 3 · OJK 4 · KONF 5 · MK 7",t.h10);
+  /* 3.9.262: a sáv helyett FIX sorozat-eltolás a nyári kupa bázisán — a
+     ligájánál jóval erősebb keret sem kap könnyebb kupát (régen: sáv alja) */
+  console.log("\n3. A FIX ELTOLÁS (3.9.262)");
+  ok(azonos(t.h10,{BL:-1,EL:0,KL:1,MK:2},0.6),
+     "a ligájánál jóval erősebb keretnél is a pályán 1 − eltolás: KK −1 · OJK 0 · KONF +1 · MK +2",t.h10);
 
   console.log("\n4. A SOROZATOK RANGSORA");
   ok(t.h10.BL<t.h10.EL&&t.h10.EL<t.h10.KL&&t.h10.KL<t.h10.MK,
@@ -180,7 +182,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n7. PvP");
   ok(t.pvp.horgony===true,"a közös horgony és a kupa-mid az mstr-ből");
   ok(t.pvp.auto===true,"a javaslat nélküli mezőnyszint is");
-  ok(JSON.stringify(t.sav)===JSON.stringify({MK:[-6,0],FA:[-5,1],KL:[-4,1],EL:[-3,2],BL:[-2,2]}),"a sorozatsávok (3.9.175): MK −6…0, FA −5…+1, KL −4…+1, EL −3…+2, KK −2…+2",t.sav);
+  ok(JSON.stringify(t.sav)===JSON.stringify({MK:-1,FA:0,KL:0,EL:1,BL:2}),"a sorozat-eltolások (3.9.262): MK −1, FA 0, KL 0, EL +1, KK +2",t.sav);
 
   const zaj=errs.filter(e=>!/favicon|manifest|sw\.js|ServiceWorker/i.test(e));
   ok(zaj.length===0,"nincs konzolhiba",zaj.slice(0,3));
