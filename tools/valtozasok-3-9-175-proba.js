@@ -118,17 +118,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const ms=120;
     const pvp={};C.forEach(c=>{pvp[c]=mpCupSharedMid(ms,ms-5,0,0,c)+((EURO_COMPS[c]&&EURO_COMPS[c].oppDelta)||0)-nykMidFor(ms,0);});
     const pvpAzonos=mpCupSharedMid(ms,ms-5,0.2,0.9,"BL")===mpCupSharedMid(ms-5,ms,0.9,0.2,"BL");
-    return {nyk,gyenge,eros,egyenrangu,d1,pvp,pvpAzonos,sav:CUP_BAND};});
-  const savban=o=>Object.keys(k.sav).every(c=>o[c]>=k.sav[c][0]&&o[c]<=k.sav[c][1]);
-  ok(JSON.stringify(k.gyenge)===JSON.stringify({MK:-6,FA:-5,KL:-4,EL:-3,BL:-2}),"jóval gyengébb bajnokság (és élvonal): minden sorozat a sávja ALJÁN",k.gyenge);
-  ok(JSON.stringify(k.eros)===JSON.stringify({MK:0,FA:1,KL:1,EL:2,BL:2}),"jóval erősebb bajnokság: a sáv TETEJÉN — MK +0, FA +1, KL +1, EL +2, KK +2",k.eros);
-  /* a sáv közepe: MK −3 · FA −2 · KL −1,5 · EL −0,5 · KK 0 — egész számra
-     kerekítve az EL és a KK összeérhet, ezért a sorrend nem csökkenő */
-  {const q=k.egyenrangu;
-   ok(savban(q)&&q.MK<=q.FA&&q.FA<=q.KL&&q.KL<=q.EL&&q.EL<=q.BL&&q.MK<q.KL&&q.KL<q.BL&&q.MK===-3&&q.BL===0,
-    "egyenrangú bajnokságnál a sáv közepe (MK −3 … KK 0), és a rangsor megmarad",q);}
-  ok(k.d1.BL===2&&k.d1.MK===-6,"a KK-t az élvonal (D1) ereje mozgatja, a hazai kupát a saját bajnokság",k.d1);
-  ok(savban(k.pvp)&&k.pvpAzonos,"PvP: a közös számítás ugyanabban a sávban, és a két kliensen azonos",{pvp:k.pvp,azonos:k.pvpAzonos});
+    return {nyk,gyenge,eros,egyenrangu,d1,pvp,pvpAzonos,sav:CUP_TIER_ADD};});
+  /* 3.9.262: a bajnokság ereje NEM számít többé — minden helyzetben ugyanaz
+     a fix sorozat-eltolás a nyári kupa bázisán (a kérés: „mindegy mennyire
+     vagy túlnőve saját mezőnyödön") */
+  const vart=JSON.stringify({MK:-1,FA:0,KL:0,EL:1,BL:2});
+  ok(JSON.stringify(k.gyenge)===vart&&JSON.stringify(k.eros)===vart&&JSON.stringify(k.egyenrangu)===vart&&JSON.stringify(k.d1)===vart,
+    "gyengébb, erősebb, egyenrangú bajnokság, eltérő élvonal: mindig MK −1 · FA 0 · KL 0 · EL +1 · KK +2 a nyári kupához",{gy:k.gyenge,er:k.eros,egy:k.egyenrangu,d1:k.d1});
+  ok(JSON.stringify(k.pvp)===vart&&k.pvpAzonos,"PvP: a közös számítás ugyanazt az eltolást adja, és a két kliensen azonos",{pvp:k.pvp,azonos:k.pvpAzonos});
 
   /* ---- 3. ÉRTESÍTÉSEK ---- */
   console.log("\n— 3. értesítések ki/be —");
@@ -160,7 +157,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.pingSav=!!bar&&!bar.classList.contains("hide");
     o.pingNaplo=sorok.filter(t=>/🔕/.test(t));
     /* a jelenlét-kör nem teszi közzé a feliratkozást */
-    o.kozzeteszFeltetel=String(mpPresenceArm).indexOf("ertesitesOn()")>=0||document.documentElement.innerHTML.indexOf("ertesitesOn()&&(all||force===\"push\")")>=0;
+    /* 3.9.261: a feltétel ertesitesPvpOn() — az a fő kapcsolót is magában foglalja */
+    o.kozzeteszFeltetel=String(mpPresenceArm).indexOf("ertesitesOn()")>=0||document.documentElement.innerHTML.indexOf("ertesitesOn()&&(all||force===\"push\")")>=0
+      ||(document.documentElement.innerHTML.indexOf("ertesitesPvpOn()&&(all||force===\"push\")")>=0&&String(ertesitesPvpOn).indexOf("ertesitesOn()")>=0);
     /* vissza */
     renderThemeModal();
     const cb2=document.getElementById("ertOn");cb2.checked=true;cb2.onchange();await new Promise(r=>setTimeout(r,200));

@@ -134,7 +134,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.vagas===2,"két sávhatár (8. és 24. után)",r.vagas);
   ok(/A ligaszakaszban \d+\. hely/.test(r.lab||"")&&/Még 2 forduló a ligaszakaszból\. 1–8\./.test(r.lab||""),"a meccs utáni összegző: ligaszakasz, „Még 2 forduló” a 8-ból",r.lab||r.labErr);
   ok(r.blLbl==="Csoport"&&r.blSorok===4&&/Az első két helyezett jut tovább/.test(r.blTabla)&&!r.blCalc,"a BL-tabella változatlan",{l:r.blLbl,n:r.blSorok});
-  ok(/Nehézségi kiegyenlítés: \+5,0/.test(r.blHead)&&/bajnoki szinted|élvonal szintje/.test(r.blHead),"a BL is kiírja a ⚖-t, a saját képletével",r.blHead.slice(0,300));
+  ok(/Nehézségi kiegyenlítés: \+5,0/.test(r.blHead)&&/bajnoki szinted|élvonal szintje|nyári kupa mércéje/.test(r.blHead),"a BL is kiírja a ⚖-t, a saját képletével",r.blHead.slice(0,300));
   ok(String(r.verzio).localeCompare("3.9.200",undefined,{numeric:true})>=0,"verzió legalább 3.9.200",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();

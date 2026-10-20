@@ -368,6 +368,16 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## kupa-lap-gyorsulas-3-9-262-proba.js — 🏆 kupa-mezőny, tiszta lap, korábbi mezőny-gyorsulás
+
+```
+node tools/kupa-lap-gyorsulas-3-9-262-proba.js
+```
+
+* **Kupa-mezőny:** a nyári kupa bázisa + fix eltolás (MK −1 … KK +2), a bajnokság erejétől függetlenül. A tartós forma is beleszámít.
+* **Tiszta lap:** a kupa-sárgák és az eltiltások törlődnek a sorozat indulásakor, a csoportkör végén és a döntő előtt. A sérülés marad.
+* **Mezőny-gyorsulás:** a kezdő idény a fokozattal korábbra jön (4 → 3 → 2 → 1), a görbe változatlan.
+
 ## ertesites-pvp-beallitas-3-9-261-proba.js — 📱 PvP-értesítések a Beállításokból
 
 ```
