@@ -368,6 +368,17 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## karbantarto-3-9-273-proba.js — 🧹 a karbantartó (hosszan nyitott lap)
+
+```
+node tools/karbantarto-3-9-273-proba.js
+```
+
+* Három kezdőrúgás után is egy élő-kép hurok; a karbantartónak egy ütemezője van.
+* Napló: 500 sorból 220 a lapon, 280 archívumban, gomb a tetején; a kupa-jelölő együtt mozog; a visszahozás sorrendhelyes, a görgetés helyben marad, a témakör megmarad.
+* Meccs közben és visszafelé olvasva nem takarít; szezonváltáskor az archívum ürül.
+* Arckép-gyorsítótár: LRU, 240; a diagnosztikában ott a blokk; a pixeles előkészítés egyenként halad.
+
 ## elo-meccskep-3-9-272-proba.js — 🗺️ élő meccskép
 
 ```

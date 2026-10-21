@@ -381,6 +381,64 @@ pályán, a feed fölött (összecsukható, telefonon ~120 px magas).
 Az F0 és az F1 párhuzamosan mehet. Látható eredmény már az F1 után van: arcok
 a HUB-ban.
 
+## 5b. F6 — finomhangolás és a karbantartó (3.9.273–3.9.274)
+
+> Kérés: „beépíthetünk valami cache tisztító mechanizmust is, ami dolgozik
+> azon, hogy a hosszan megnyitott oldal se kezdjen el akadozni egy idő után."
+> Próba: `tools/karbantarto-3-9-273-proba.js`.
+
+**Mérés 1 — hosszú munkamenet** (30 meccs kézi közvetítéssel, közte
+HUB-rajzolás és adatlap-lapozás; CDP: csomópontok, figyelők, heap):
+
+| | előtte, 30. meccs | utána, 30. meccs |
+|---|---|---|
+| DOM-csomópont | 15 174 (+170/meccs, folyamatosan nő) | ~12 900–13 100 (megáll) |
+| napló a lapon | 831 sor | 220–360 sor (+ archívum) |
+| arckép-gyorsítótár | 352 (nő a 600-ig) | 240 (LRU) |
+| futó időzítő | 6 → 10 (szivárgás) | 7–8 (stabil; +1 a karbantartóé) |
+| eseményfigyelő | 651 → 689 | 652 → 694 (stabil) |
+| JS-heap | 18,9 MB | 17,9 MB |
+
+**A szivárgás:** az élő meccskép (F5) minden kezdőrúgáskor új 600 ms-os
+hurkot indított, a régi fogantyúját előbb felülírta — a régi örökké futott.
+Javítva (`ekKezd`), és a karbantartó is őrzi.
+
+**A karbantartó** (`ktFut`, üresjáratban — `requestIdleCallback` —, ~45
+mp-enként és a lap előtérbe kerülésekor; rejtett lapon soha):
+1. **Napló:** 360 sor fölött a régebbieket (220 marad) memóriabeli
+   archívumba viszi; a napló tetején „▲ Korábbi sorok betöltése (N)” gomb
+   hozza vissza 200-asával, a görgetés helyben marad, a témakör-jelölés
+   (szűrő) megmarad. Meccs közben és visszafelé olvasáskor nem nyúl hozzá; a
+   kupa-felület jelölőjét (`euroLogMark`) együtt mozgatja; szezonváltáskor az
+   archívum is ürül. Az archívum plafonja 6000 sor.
+2. **Arcképek:** valódi LRU (a találat a sor végére kerül), 240-es
+   plafon; a függőben maradt pixel-kérések nyoma törlődik.
+3. **Időzítők:** a már nem futó meccs élő-kép hurka leáll.
+4. **Diagnosztika (🧪):** új „KARBANTARTÓ” blokk — mikor futott, mennyi
+   sor van a lapon és az archívumban, a gyorsítótár mérete, a DOM mérete,
+   mióta van nyitva a lap.
+
+**Mérés 2 — gyenge telefon** (CPU 4× lassítva):
+
+| művelet | idő |
+|---|---|
+| arckép (hidegen / gyorsítótárból) | 0,9 ms / 0,02 ms |
+| pixeles raszterezés arconként | 44 ms |
+| esemény-jelenet felépítése | 10 ms |
+| élő meccskép frissítése eseményenként | 1,9 ms |
+| adatlap megnyitása | 105 ms |
+| HUB teljes újrarajzolása (régi kód) | 226 ms |
+| **egy új naplósor 800 soros naplónál** | **15 ms** |
+| **ugyanez a karbantartó után (220 sor)** | **2,8 ms** |
+
+**A pixeles előkészítés (3.9.274):** a kezdőrúgáskor eddig 11 ember × 7
+hangulat × 2 változat = 154 pixeles arc kérődött EGYSZERRE (154 × 44 ms ≈
+7 mp CPU gyenge telefonon). Most csak a figurafejek, a három leggyakoribb
+hangulattal (33 arc), EGYENKÉNT, üresjáratban.
+
+**Ami szándékosan maradt:** a HUB teljes újrarajzolása (226 ms lassítva) a
+régi kódé; a lenyitás/adatlap gyors útja (3.9.168) már kikerüli.
+
 ## 6. Kockázatok
 
 * **Fájlméret:** a teljes csomag becsülten 120–200 KB a 8 MB mellé. Ez
@@ -419,4 +477,4 @@ a HUB-ban.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0–F5 kész (3.9.266–3.9.272). Következik az F6 (finomhangolás: pixel-téma, hang, teljesítmény gyenge telefonon).*
+*Állapot: F0–F6 kész (3.9.266–3.9.274).*
