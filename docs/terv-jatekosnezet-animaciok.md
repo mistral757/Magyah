@@ -237,6 +237,34 @@ A PvP-ben a `sim.events` már strukturált. Ott csak le kell képezni.
 
 ### 3.3 Az animáció-motor
 
+> **ELKÉSZÜLT: 3.9.270 (F4).** Kód: az `index.html` „ESEMÉNY-ANIMÁCIÓK
+> (3.9.270, F4)” blokkja. Próba: `tools/esemeny-animacio-3-9-270-proba.js`.
+>
+> * **Lejátszó:** feliratkozik az F3-ra (`mevFeliratkoz`), sorba állít,
+>   egyenként játszik (`#evAnim`, z 435). A jelenet a tick UTÁN indul
+>   (setTimeout 0), hogy a gól sora (fajta, mesterhármas) már hozzákapcsolódjon.
+> * **Az óra áll** a jelenet alatt: `MATCH_CTL.animSzunet` / `animFolytat`
+>   (a cserepanel útja); ha közben a félidei panel nyílik, az indít újra.
+>   Párharcban az óra NEM áll (közös lista), ott a jelenet ráúszik, és nem
+>   torlódik.
+> * **Kezelés:** koppintás vagy a vissza gomb → tovább; „Ne mutasd többet
+>   ezen a meccsen”; háttérbe tett fülön kimarad.
+> * **Jelenetek (13 sablon, 19 típus):** gól (alap, fejes, tizenegyes,
+>   szabadrúgás; mesterhármas-felirat), kapott gól, kapufa, bravúr/védés
+>   (ziccer), tizenegyes és büntetőpárbaj (gól, kapufa, kivédve, kimarad),
+>   sárga/piros lap (a bíró felmutatja; piros: levonul), szöglet (beadás
+>   fejessel, vagy fejes tisztázás), szabadrúgás (sorfal), blokk/szerelés
+>   (becsúszás), gólvonal-mentés, letámadás (hárman zárnak), sérülés, VAR,
+>   lövés (mellé, védik, blokkolják), kidolgozás.
+> * **Szereplők:** „bobblehead” figurák — fej-váll az F1 arcképe a
+>   csapat mezében, alatta nadrág és láb. A főszereplő az esemény
+>   játékosa (a morál-arccal: gólnál vigyorog, kapott gólnál lehorgaszt).
+>   Az ellenfél mezét a nevéből generáljuk (`evaEllenfelKit`), és sosem
+>   hasonlít a miénkre. A felirat-sáv: cím, perc · név (· ellenfél), arc.
+> * **Pixel-téma:** lépcsős mozgás, szögletes keret, pixeles arc (a saját
+>   tizenegy arca a kezdőrúgáskor előre elkészül).
+> * **Beállítás:** a témaválasztó alatt „🎬 Esemény-animációk” (BE/KI).
+
 * **Egy teljes képernyős réteg** (`#evAnim`, fixed, z-index a feed fölött).
   Benne egy 16:9-es (telefonon álló 9:16) SVG-színpad.
 * **Technika:** SVG + CSS/WAAPI kulcskockák (`element.animate`). Nincs
@@ -360,4 +388,4 @@ a HUB-ban.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0–F3 kész (3.9.266–3.9.269). Következik az F4 (animáció-motor és sablonok).*
+*Állapot: F0–F4 kész (3.9.266–3.9.270). Következik az F5 (élő meccskép).*

@@ -7,12 +7,12 @@ const {spawn}=require('child_process');const fs=require('fs');
             g4/g5.png (15-ös kivágás, sima/pixeles). */
 const OUT=process.argv[2]||'.', FACE=process.argv[3];
 (async()=>{
-  const srv=spawn('python3',['-m','http.server','8971'],{cwd:'/home/user/Magyah',stdio:'ignore'});
+  const srv=spawn('python3',['-m','http.server','8973'],{cwd:'/home/user/Magyah',stdio:'ignore'});
   await new Promise(r=>setTimeout(r,1200));
   const b=await chromium.launch({args:["--no-sandbox"]});
   const p=await b.newPage({viewport:{width:1200,height:900}});
   const hiba=[];p.on('pageerror',e=>hiba.push(e.message));
-  await p.goto('http://localhost:8971/index.html',{waitUntil:'networkidle'});
+  await p.goto('http://localhost:8973/index.html',{waitUntil:'networkidle'});
   if(FACE)await p.addScriptTag({content:fs.readFileSync(FACE,'utf8')});
   await p.waitForTimeout(800);
   const html=await p.evaluate(async()=>{

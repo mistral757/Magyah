@@ -368,6 +368,16 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## esemeny-animacio-3-9-270-proba.js — 🎬 esemény-animációk
+
+```
+node tools/esemeny-animacio-3-9-270-proba.js
+```
+
+* Minden animálható típusnak van jelenete, és mind kirajzolható; a lejátszó nem húz véletlent.
+* Valódi meccs 0,1×-en: jelenetek futnak, alattuk ÁLL az óra, a meccs rendben lefut; koppintás és vissza gomb továbblép.
+* „Ne mutasd többet” után nincs több jelenet; 0,5×-en és kikapcsolva sincs.
+
 ## meccsesemeny-3-9-269-proba.js — ⚡ meccsesemények (animáció-jelöltek)
 
 ```

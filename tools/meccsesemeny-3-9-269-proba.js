@@ -63,6 +63,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const varj=ms=>new Promise(r=>setTimeout(r,ms));
     const _tm=matchSpeedTickMs;matchSpeedTickMs=()=>12;
     const regiSeb=matchSpeed;matchSpeed=seb;
+    /* 3.9.270: a kiválasztott események jelenetet kapnak, és közben áll az
+       óra — itt a KIVÁLASZTÁST mérjük, a jelenetek pillanatnyiak */
+    if(typeof evaIdoSzorzo!=="undefined")evaIdoSzorzo=0.02;
     if(opt&&opt.ki)try{localStorage.setItem(MEV_ANIM_KEY,"1");}catch(e){}
     const kapott=[];const fn=ev=>kapott.push(ev);
     if(!window._mevProbaFigyel){window._mevProbaFigyel=true;mevFeliratkoz(ev=>{(window._mevKapott=window._mevKapott||[]).push(ev);});}
@@ -82,7 +85,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
         const L=mevLista().map(e=>({t:e.t,side:e.side,p:e.p,alt:e.alt||null,extra:e.extra||null,min:e.min,anim:e.anim,forras:e.forras,sor:e.sor||""}));
         out.push({gf:S.lastMatch&&S.lastMatch.gf,ga:S.lastMatch&&S.lastMatch.ga,L,kapott:window._mevKapott.length,
           keret:(_mev||_mevUtolso||{}).keret});}
-    }finally{matchSpeedTickMs=_tm;matchSpeed=regiSeb;S.auto=false;try{localStorage.removeItem(MEV_ANIM_KEY);}catch(e){}}
+    }finally{matchSpeedTickMs=_tm;matchSpeed=regiSeb;if(typeof evaIdoSzorzo!=="undefined")evaIdoSzorzo=1;S.auto=false;try{localStorage.removeItem(MEV_ANIM_KEY);}catch(e){}}
     return out;},[db,seb,opt||null]);
 
   console.log("\n— 1-5. VALÓDI MECCSEK, LASSÚ TEMPÓ (0,1× → keret 8) —");

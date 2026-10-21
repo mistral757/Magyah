@@ -1246,6 +1246,25 @@ button.infPanel:disabled{cursor:default}
 .attrline .pri{color:var(--gold);font-weight:700}
 .attrline .sep{color:var(--dim2)}
 .hubDetail{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:2px 0 8px}
+/* 🎬 ESEMÉNY-ANIMÁCIÓ (3.9.270) — teljes képernyő a meccs fölött (z 435:
+   a közvetítés panelei fölött, a súgó és a kérdések alatt) */
+#evAnim{position:fixed;inset:0;z-index:435;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(8,9,12,.97);background:radial-gradient(circle at 50% 38%,color-mix(in srgb,var(--evaSzin,#333) 40%,#06070a) 0%,#06070a 72%);
+  cursor:pointer;-webkit-tap-highlight-color:transparent;padding:16px}
+.evaKeret{width:min(92vw,60vh,560px);display:flex;flex-direction:column;align-items:center;gap:12px}
+.evaSzinpad{width:100%;height:auto;aspect-ratio:1/1;border-radius:18px;border:2px solid rgba(255,255,255,.16);box-shadow:0 12px 44px rgba(0,0,0,.6);background:#1c4d2b}
+.evaSzinpad *{transform-box:view-box;transform-origin:0 0}
+#evaHalo,#evaVarSav{transform-box:fill-box}
+.evaCim{display:flex;align-items:center;gap:12px;opacity:0;max-width:100%}
+.evaArc{width:64px;height:64px;flex:none;border-radius:50%;border:3px solid var(--evaSzin,#888);background:#1b1f27;object-fit:cover}
+.evaCim b{display:block;font-family:var(--font-disp);font-size:30px;line-height:1.05;color:#fff;letter-spacing:.5px;text-shadow:0 2px 0 #000}
+#evAnim.evaOk .evaCim b{color:#ffc2c2}
+.evaCim span{display:block;color:#e4e4e4;font-size:14px;margin-top:3px}
+.evaGombok{position:absolute;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding:0 16px}
+.evaGombok button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:10px;padding:8px 13px;font:inherit;font-size:13px;cursor:pointer}
+[data-theme="pixel"] .evaSzinpad{border-radius:0;image-rendering:pixelated}
+[data-theme="pixel"] .evaArc{border-radius:0;image-rendering:pixelated}
+@media (prefers-reduced-motion:reduce){#evAnim{display:none!important}}
 /* 🧑 JÁTÉKOS-ADATLAP (3.9.268) — telefonon alulról felcsúszó lap, széles
    képernyőn középen álló ablak */
 /* A RÉTEG: a HUB legfelső eleme (információs gomb, 55) fölött, de MINDEN
@@ -7592,7 +7611,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.269";
+const APP_VERSION="3.9.270";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -60593,6 +60612,369 @@ function mevSb(side,kind,name,min){
     if(ev.p==="potyagól"){ev.alt=ev.alt||"potya";ev.p=null;}
     M.utolsoGol=ev;}
   mevUj(ev);}
+/* ================= 🎬 ESEMÉNY-ANIMÁCIÓK (3.9.270, F4) ====================
+   KIMONDOTT KÉRÉS: „0.25xtől lefelé bekapcsolható lenne, hogy az egyes
+   meccsbéli eseményekhez (meccsenként a sebességtől függően korlátozott
+   számú) legyen egy kis animáció, ami teljes képernyőt kitölti. Egy gól, egy
+   becsúszás, egy letámadás, egy szöglet, egy kapufa, stb. […] az érintett
+   játékos arcát felhasználva, a csapat mezét is beépítve lejátszik egy rövid
+   1-3 másodperces kis animációt."
+
+   HONNAN JÖN AZ ESEMÉNY: az F3 (MECCSESEMÉNYEK) válogatja ki — a tempótól
+   függő keret, rangsor, típusonként ≤ 2, a gól mindig. Ez a blokk csak
+   LEJÁTSZ: feliratkozik (mevFeliratkoz), sorba állítja, és egyenként mutatja.
+
+   A MECCSÓRA ÁLL, amíg a jelenet fut (MATCH_CTL.animSzunet/animFolytat — a
+   cserepanel útja), tehát semmi nem pereg el a háta mögött. KIVÉTEL a
+   PÁRHARC: ott a két kliens közös listát játszik, az óra nem állhat meg —
+   a jelenet ott csak ráúszik a közvetítésre.
+
+   A JELENET: egy négyzetes SVG-színpad (120×120) és alatta a felirat-sáv a
+   játékos arcképével. A szereplők „bobblehead" figurák: a fejük-vállukk az F1
+   arcképe (a mezükkel), alatta nadrág és láb. A mozgás WAAPI (element.animate)
+   — külső könyvtár nincs. A pixel-témában lépcsős időzítés és pixeles arc.
+   A változatok (melyik sarokba megy a labda, merre vetődik a kapus) az
+   eseményből képzett magból jönnek — a meccs véletlenjéhez nem nyúlunk.
+
+   KEZELÉS: koppintásra a jelenet véget ér; a „Ne mutasd többet ezen a
+   meccsen" gomb a meccs hátralevő részére kikapcsolja; a vissza gomb is
+   továbblép. Ha a lap nem látszik (háttérbe tett fül), a jelenet kimarad. */
+const EVA_SZINEK=["#c8102e","#0b5fa5","#1d7a3a","#f2c200","#6a2c91","#e05a00","#111318",
+  "#7a1f2b","#00a3e0","#2f2f2f","#d94a8c","#0f3d2e","#8a6d1d","#304a8c"];
+/* az ellenfél szerelése a NEVÉBŐL: mindig ugyanaz, és sosem a miénk tükre */
+function evaEllenfelKit(nev,mienk){
+  const h=faceHash("kit|"+String(nev||"Ellenfél"));
+  let c1=EVA_SZINEK[h%EVA_SZINEK.length];
+  const m=(mienk&&mienk.c1)||"#000000";
+  const kozel=(a,b)=>{const p=x=>[parseInt(x.slice(1,3),16),parseInt(x.slice(3,5),16),parseInt(x.slice(5,7),16)];
+    try{const A=p(a),B=p(b);return Math.abs(A[0]-B[0])+Math.abs(A[1]-B[1])+Math.abs(A[2]-B[2])<150;}catch(e){return false;}};
+  if(kozel(c1,m))c1=EVA_SZINEK[(h+5)%EVA_SZINEK.length];
+  if(kozel(c1,m))return {c1:"#f2f4f7",c2:EVA_SZINEK[(h+3)%EVA_SZINEK.length],pat:"solid",collar:"crew",ink:"#222"};
+  const c2=identLum(c1)>0.55?"#141414":"#ffffff";
+  return {c1,c2,pat:KIT_PATTERNS[(h>>>4)%KIT_PATTERNS.length].k,collar:["crew","v","polo"][(h>>>8)%3],ink:c2};}
+/* a futó meccs ellenfele — ugyanaz a sorrend, mint a kitAwayNow-ban */
+function evaEllenfelNev(){
+  try{if(typeof DUEL!=="undefined"&&DUEL&&DUEL.oppName)return String(DUEL.oppName);}catch(e){}
+  try{
+    let f=null;
+    if(typeof pyrPoActive==="function"&&pyrPoActive())f=pyrPoFx();
+    else if(typeof euroActive==="function"&&euroActive())f=S.euro&&S.euro.fixtures&&S.euro.fixtures[S.euro.idx];
+    else f=S.fixtures&&S.fixtures[S.idx];
+    const o=f&&f.o;
+    return String((o&&(o.n||o.name))||o||"Ellenfél");}catch(e){return "Ellenfél";}}
+/* egy játékos az archoz: a sajátunké a karrier-adatokból (kor, nemzetiség) */
+function evaJatekos(nev,side){
+  const n=String(nev||"");
+  if(side==="us"&&n){
+    const e=(typeof careerPool!=="undefined"&&careerPool&&careerPool[n])||null;
+    let p=null;try{p=(slots.find(s=>s.player&&s.player.n===n)||{}).player||null;}catch(err){}
+    return {n,nat:(e&&e.nat)||(p&&p.nat)||"",age:(e&&e.age)||(p&&p.age)||26};}
+  return {n:n||"Ellenfél",nat:"",age:27};}
+function evaKapusunk(){
+  try{const s=slots.find(x=>x.pos==="KP"&&x.player);return s?s.player.n:null;}catch(e){return null;}}
+const EVA_PIX=()=>{try{return document.documentElement.getAttribute("data-theme")==="pixel";}catch(e){return false;}};
+/* az arc URL-je a jelenetbe (pixeles, ha az a stílus és már kész) */
+function evaArcUrl(jp,kit,mood){
+  const o={kit,mood,bg:false};
+  if(faceStilus()==="pix"){const u=facePixUrl(jp,o);if(u)return u;}
+  return faceSvgUrl(jp,o);}
+/* ---- A SZÍNPAD ELEMEI (120×120-as nézet) ---- */
+function evaPalya(nezet){
+  let s=`<defs><linearGradient id="evaFu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f7a45"/><stop offset="1" stop-color="#1c4d2b"/></linearGradient></defs>`
+    +`<rect width="120" height="120" fill="url(#evaFu)"/>`;
+  for(let i=0;i<6;i++)s+=`<rect x="0" y="${i*20+10}" width="120" height="10" fill="#fff" opacity=".035"/>`;
+  const ln=`fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".8"`;
+  if(nezet==="kapu"){
+    s+=`<path d="M0 40H120" ${ln}/><path d="M18 40V74H102V40" ${ln}/><path d="M40 40V52H80V40" ${ln}/>`
+      +`<circle cx="60" cy="64" r=".9" fill="#fff" opacity=".7"/><path d="M47 74A14 14 0 0 0 73 74" ${ln}/>`;}
+  else if(nezet==="sarok"){
+    s+=`<path d="M0 26H120M100 26V120" ${ln}/><path d="M100 26A6 6 0 0 1 106 32" ${ln}/>`
+      +`<path d="M30 26V60H90V26" ${ln}/>`;}
+  else s+=`<path d="M60 0V120" ${ln}/><circle cx="60" cy="60" r="16" ${ln}/>`;
+  return s;}
+function evaKapu(){
+  let net="";
+  for(let x=34;x<=86;x+=4)net+=`M${x} 22V40`;
+  for(let y=24;y<=40;y+=3.2)net+=`M32 ${y}H88`;
+  return `<g id="evaKapu"><g id="evaHalo" style="transform-box:fill-box;transform-origin:center top">`
+    +`<rect x="32" y="22" width="56" height="18" fill="#000" opacity=".25"/>`
+    +`<path d="${net}" stroke="#fff" stroke-opacity=".35" stroke-width=".35"/></g>`
+    +`<path id="evaKeret" d="M32 41V21H88V41" fill="none" stroke="#f4f4f4" stroke-width="2" stroke-linejoin="round"/></g>`;}
+/* egy figura: a talppont (0,0) körül, ~38 egység magas */
+function evaFigura(id,url,kit,x,y,s){
+  const k=kit||{c1:"#555",c2:"#999"};
+  const sc=s||1;
+  return `<g id="${id}" style="transform:translate(${x}px,${y}px)"><g style="transform:scale(${sc})">`
+    +`<ellipse cx="0" cy="0" rx="8" ry="2.2" fill="#000" opacity=".28"/>`
+    +`<g class="evaTest"><path d="M-3.6 -10L-4.4 0M3.6 -10L4.4 0" stroke="#e9d9c8" stroke-width="2.6" stroke-linecap="round"/>`
+    +`<path d="M-4.6 -1L-5.4 0.4M4.6 -1L5.4 0.4" stroke="#111" stroke-width="2.8" stroke-linecap="round"/>`
+    +`<rect x="-6.4" y="-15" width="12.8" height="6.4" rx="2" fill="${k.c2}" stroke="#0006" stroke-width=".5"/>`
+    +`<image href="${url}" x="-16" y="-44" width="32" height="32"/></g></g></g>`;}
+function evaLabda(id,x,y){
+  return `<g id="${id}" style="transform:translate(${x}px,${y}px)"><circle r="2.6" fill="#fafafa" stroke="#222" stroke-width=".5"/>`
+    +`<path d="M0 -1.3L1.2 -.4L.8 1H-.8L-1.2 -.4Z" fill="#222"/></g>`;}
+function evaBiro(x,y){
+  /* a játékvezető: fekete mez, arc nélküli (nem egy valódi ember) */
+  return evaFigura("evaBiro",faceSvgUrl({n:"Játékvezető",nat:"",age:38},{kit:{c1:"#151515",c2:"#151515",pat:"solid",collar:"polo",ink:"#f2c200"},mood:-0.2,bg:false}),
+    {c1:"#151515",c2:"#151515"},x,y,1.05);}
+/* ---- A SABLONOK ----
+   Mindegyik: {dur, cim, svg(ctx), mozgas(A, ctx)}. Az `A(sel,frames,opts)` egy
+   WAAPI-hívás a színpadon belül; az időzítés ezredmásodpercben. */
+function evaT(x,y,r,sx){return `translate(${x}px,${y}px)`+(r?` rotate(${r}deg)`:"")+(sx?` scale(${sx})`:"");}
+const EVA_SABLON={
+  gol:{dur:2300,
+    cim:c=>c.ev.extra?({mesterharmas:"MESTERHÁRMAS!",negy:"NÉGY GÓL!",ot:"ÖT GÓL!",hat:"HAT GÓL!"}[c.ev.extra]||"GÓÓÓL!"):(c.sajat?"GÓÓÓL!":"Gól…"),
+    svg:c=>{
+      const fej=c.ev.alt==="fejes",tizi=c.ev.alt==="tizenegyes",szabad=c.ev.alt==="szabadrugas";
+      let s=evaPalya("kapu")+evaKapu();
+      if(szabad)s+=[46,54,62].map((x,i)=>evaFigura("evaFal"+i,c.vedoUrl,c.vedoKit,x,58,.8)).join("");
+      s+=evaFigura("evaKapus",c.kapusUrl,c.vedoKit,60,42,.9);
+      s+=evaFigura("evaLovo",c.loUrl,c.loKit,fej?56:tizi?60:52,fej?52:tizi?78:96,1.15);
+      s+=evaLabda("evaLabda",fej?10:tizi?60:56,fej?30:tizi?64:94);
+      s+=`<rect id="evaVillan" width="120" height="120" fill="#fff" opacity="0"/>`;
+      return s;},
+    mozgas:(A,c)=>{
+      const jobb=c.r()<0.5,cx=jobb?80:40,fej=c.ev.alt==="fejes",tizi=c.ev.alt==="tizenegyes",szabad=c.ev.alt==="szabadrugas";
+      const lx=fej?56:tizi?60:52,ly=fej?52:tizi?78:96;
+      A("#evaLovo",[{transform:evaT(lx,ly)},{transform:evaT(lx+2,ly-(fej?4:10))},{transform:evaT(lx+3,ly-(fej?6:12),-6)}],{duration:700,fill:"forwards"});
+      const bx=fej?10:tizi?60:56,by=fej?30:tizi?64:94;
+      const ut=fej?[{transform:evaT(bx,by)},{transform:evaT(40,22),offset:.45},{transform:evaT(lx,ly-40),offset:.6},{transform:evaT(cx,28)}]
+        :szabad?[{transform:evaT(bx,by)},{transform:evaT(bx,by),offset:.35},{transform:evaT(jobb?30:90,40),offset:.7},{transform:evaT(cx,28)}]
+        :[{transform:evaT(bx,by)},{transform:evaT(bx,by),offset:.35},{transform:evaT(cx,28)}];
+      A("#evaLabda",ut,{duration:1100,easing:"ease-in",fill:"forwards"});
+      A("#evaKapus",[{transform:evaT(60,42)},{transform:evaT(60,42),offset:.55},{transform:evaT(jobb?44:76,40,jobb?-70:70)}],{duration:1150,fill:"forwards"});
+      A("#evaHalo",[{transform:"scale(1,1)"},{transform:"scale(1,1)",offset:.62},{transform:"scale(1.05,1.22)",offset:.75},{transform:"scale(.98,1.05)",offset:.88},{transform:"scale(1,1)"}],{duration:1500,fill:"forwards"});
+      if(c.sajat)A("#evaVillan",[{opacity:0},{opacity:0,offset:.5},{opacity:.55,offset:.6},{opacity:0}],{duration:1600,fill:"forwards"});}},
+  kapufa:{dur:1900,cim:()=>"KAPUFA!",
+    svg:c=>evaPalya("kapu")+evaKapu()+evaFigura("evaKapus",c.kapusUrl,c.vedoKit,60,42,.9)
+      +evaFigura("evaLovo",c.loUrl,c.loKit,54,96,1.15)+evaLabda("evaLabda",56,94),
+    mozgas:(A,c)=>{
+      const jobb=c.r()<0.5,px=jobb?88:32;
+      A("#evaLovo",[{transform:evaT(54,96)},{transform:evaT(56,86,-6)}],{duration:600,fill:"forwards"});
+      A("#evaLabda",[{transform:evaT(56,94)},{transform:evaT(56,94),offset:.3},{transform:evaT(px,30),offset:.62},{transform:evaT(px+(jobb?-26:26),78)}],{duration:1300,easing:"ease-out",fill:"forwards"});
+      A("#evaKeret",[{strokeWidth:2,stroke:"#f4f4f4"},{strokeWidth:2,stroke:"#f4f4f4",offset:.6},{strokeWidth:3.4,stroke:"#ffe066",offset:.66},{strokeWidth:2,stroke:"#f4f4f4"}],{duration:1400,fill:"forwards"});
+      A("#evaKapu",[{transform:"translate(0px,0px)"},{transform:"translate(0px,0px)",offset:.6},{transform:"translate(1.2px,0px)",offset:.66},{transform:"translate(-1.2px,0px)",offset:.72},{transform:"translate(0px,0px)"}],{duration:1400,fill:"forwards"});}},
+  bravur:{dur:2000,cim:c=>c.ev.alt==="ziccer"?"SZEMTŐL SZEMBE!":c.ev.t==="vedes"?"Megfogja!":"BRAVÚR!",
+    svg:c=>evaPalya("kapu")+evaKapu()+evaFigura("evaLovo",c.loUrl,c.loKit,58,c.ev.alt==="ziccer"?62:94,1.1)
+      +evaFigura("evaKapus",c.kapusUrl,c.vedoKit,60,42,1)+evaLabda("evaLabda",58,c.ev.alt==="ziccer"?60:92),
+    mozgas:(A,c)=>{
+      const jobb=c.r()<0.5,cx=jobb?82:38,zic=c.ev.alt==="ziccer",fog=c.ev.t==="vedes";
+      const by=zic?60:92;
+      A("#evaLabda",[{transform:evaT(58,by)},{transform:evaT(58,by),offset:.25},{transform:evaT(fog?60:cx,fog?32:30),offset:.6},{transform:evaT(fog?60:cx+(jobb?14:-14),fog?32:12)}],{duration:1300,fill:"forwards",easing:"ease-out"});
+      A("#evaKapus",fog?[{transform:evaT(60,42)},{transform:evaT(60,42),offset:.45},{transform:evaT(60,40,0,1.08)},{transform:evaT(60,42)}]
+        :[{transform:evaT(60,42)},{transform:evaT(60,42),offset:.3},{transform:evaT(cx-(jobb?6:-6),36,jobb?-80:80),offset:.62},{transform:evaT(cx-(jobb?8:-8),40,jobb?-90:90)}],{duration:1300,fill:"forwards"});}},
+  tizenegyes:{dur:2300,cim:c=>({kivedve:"KIVÉDVE!",kapufa:"Kapufa!",kimarad:"Kimarad!",gol:"GÓL!",kihagy:"Kihagyta!"}[c.ev.alt]||"TIZENEGYES!"),
+    svg:c=>evaPalya("kapu")+evaKapu()+evaFigura("evaKapus",c.kapusUrl,c.vedoKit,60,42,1)
+      +evaFigura("evaLovo",c.loUrl,c.loKit,60,80,1.15)+evaLabda("evaLabda",60,64),
+    mozgas:(A,c)=>{
+      const jobb=c.r()<0.5,cx=jobb?80:40,alt=c.ev.alt;
+      A("#evaLovo",[{transform:evaT(60,80)},{transform:evaT(60,80),offset:.3},{transform:evaT(61,70,-8)}],{duration:900,fill:"forwards"});
+      const vegX=alt==="kapufa"?(jobb?88:32):alt==="kimarad"||alt==="kihagy"?(jobb?100:20):cx;
+      const vegY=alt==="kimarad"||alt==="kihagy"?14:alt==="kapufa"?30:28;
+      A("#evaLabda",[{transform:evaT(60,64)},{transform:evaT(60,64),offset:.45},{transform:evaT(vegX,vegY)}].concat(alt==="kivedve"?[]:[]),{duration:1200,easing:"ease-in",fill:"forwards"});
+      const vetX=alt==="kivedve"?cx-(jobb?4:-4):(jobb?40:80);
+      A("#evaKapus",[{transform:evaT(60,42)},{transform:evaT(60,42),offset:.5},{transform:evaT(vetX,38,(vetX>60?1:-1)*75)}],{duration:1200,fill:"forwards"});
+      if(alt==="gol")A("#evaHalo",[{transform:"scale(1,1)"},{transform:"scale(1,1)",offset:.62},{transform:"scale(1.05,1.22)",offset:.78},{transform:"scale(1,1)"}],{duration:1500,fill:"forwards"});}},
+  lap:{dur:2100,cim:c=>c.ev.t==="piros"?"PIROS LAP!":"Sárga lap",
+    svg:c=>evaPalya("kozep")+evaFigura("evaLovo",c.loUrl,c.loKit,44,92,1.35)+evaBiro(84,90)
+      +`<g id="evaLap" style="transform:translate(92px,64px)"><rect x="-4" y="-6" width="8" height="11" rx="1" fill="${c.ev.t==="piros"?"#d0021b":"#ffd400"}" stroke="#0005" stroke-width=".4"/></g>`,
+    mozgas:(A,c)=>{
+      A("#evaLap",[{transform:"translate(92px,72px) scale(.2)",opacity:0},{transform:"translate(92px,72px) scale(.2)",opacity:0,offset:.25},{transform:"translate(92px,40px) scale(1.5)",opacity:1,offset:.45},{transform:"translate(92px,40px) scale(1.5)",opacity:1}],{duration:1800,fill:"forwards"});
+      if(c.ev.t==="piros")A("#evaLovo",[{transform:evaT(44,92,0,1)},{transform:evaT(44,92,0,1),offset:.55},{transform:evaT(-20,98,0,1),opacity:.4}],{duration:2000,fill:"forwards"});
+      else A("#evaLovo",[{transform:evaT(44,92,0,1)},{transform:evaT(44,92,-5,1),offset:.5},{transform:evaT(44,92,4,1),offset:.7},{transform:evaT(44,92,0,1)}],{duration:1800,fill:"forwards"});}},
+  szoglet:{dur:2100,cim:c=>c.ev.alt==="tisztazas"?"Fejjel tisztáz!":"Szöglet",
+    svg:c=>evaPalya("sarok")+`<path d="M106 26V12" stroke="#eee" stroke-width=".8"/><path d="M106 12L114 15L106 18Z" fill="#f2c200"/>`
+      +evaFigura("evaVedo",c.vedoUrl,c.vedoKit,52,62,1.05)+evaFigura("evaLovo",c.loUrl,c.loKit,64,70,1.05)
+      +evaFigura("evaRugo",c.rugoUrl,c.rugoKit,108,32,.85)+evaLabda("evaLabda",104,28),
+    mozgas:(A,c)=>{
+      const tiszt=c.ev.alt==="tisztazas";
+      A("#evaLabda",[{transform:evaT(104,28)},{transform:evaT(104,28),offset:.2},{transform:evaT(80,6),offset:.5},{transform:evaT(58,24),offset:.78},{transform:tiszt?evaT(20,0):evaT(70,4)}],{duration:1700,fill:"forwards"});
+      A(tiszt?"#evaVedo":"#evaLovo",[{transform:evaT(tiszt?52:64,tiszt?62:70)},{transform:evaT(tiszt?52:64,tiszt?62:70),offset:.55},{transform:evaT(tiszt?55:60,tiszt?52:60,0,1.05),offset:.78},{transform:evaT(tiszt?55:60,tiszt?58:66)}],{duration:1700,fill:"forwards"});}},
+  szabadrugas:{dur:2100,cim:()=>"Szabadrúgás",
+    svg:c=>evaPalya("kapu")+evaKapu()+[46,54,62].map((x,i)=>evaFigura("evaFal"+i,c.vedoUrl,c.vedoKit,x,60,.8)).join("")
+      +evaFigura("evaKapus",c.kapusUrl,c.vedoKit,60,42,.9)+evaFigura("evaLovo",c.loUrl,c.loKit,70,98,1.1)+evaLabda("evaLabda",66,92),
+    mozgas:(A,c)=>{
+      const jobb=c.r()<0.5;
+      A("#evaLabda",[{transform:evaT(66,92)},{transform:evaT(66,92),offset:.3},{transform:evaT(jobb?28:94,44),offset:.65},{transform:evaT(jobb?40:84,14)}],{duration:1500,fill:"forwards"});
+      [0,1,2].forEach(i=>A("#evaFal"+i,[{transform:evaT(46+i*8,60,0,.8)},{transform:evaT(46+i*8,60,0,.8),offset:.35},{transform:evaT(46+i*8,56,0,.8),offset:.5},{transform:evaT(46+i*8,60,0,.8)}],{duration:1500,fill:"forwards"}));}},
+  blokk:{dur:1900,cim:c=>c.ev.t==="golvonal"?"A GÓLVONALRÓL!":c.ev.t==="szereles"?"Becsúszik!":"BLOKK!",
+    svg:c=>evaPalya(c.ev.t==="golvonal"?"kapu":"kozep")+(c.ev.t==="golvonal"?evaKapu():"")
+      +evaFigura("evaLovo",c.loUrl,c.loKit,c.ev.t==="golvonal"?58:30,c.ev.t==="golvonal"?84:78,1.15)
+      +evaFigura("evaVedo",c.vedoUrl,c.vedoKit,c.ev.t==="golvonal"?84:94,c.ev.t==="golvonal"?42:80,1.15)
+      +evaLabda("evaLabda",c.ev.t==="golvonal"?58:40,c.ev.t==="golvonal"?80:78),
+    mozgas:(A,c)=>{
+      const gv=c.ev.t==="golvonal";
+      if(gv){
+        A("#evaLabda",[{transform:evaT(58,80)},{transform:evaT(58,80),offset:.25},{transform:evaT(66,40),offset:.6},{transform:evaT(110,20)}],{duration:1400,fill:"forwards"});
+        A("#evaVedo",[{transform:evaT(84,42)},{transform:evaT(84,42),offset:.25},{transform:evaT(68,40,-25),offset:.6},{transform:evaT(70,42,-10)}],{duration:1400,fill:"forwards"});}
+      else{
+        A("#evaVedo",[{transform:evaT(94,80)},{transform:evaT(94,80),offset:.2},{transform:evaT(50,84,-70),offset:.6},{transform:evaT(46,84,-80)}],{duration:1300,fill:"forwards",easing:"ease-out"});
+        A("#evaLabda",[{transform:evaT(40,78)},{transform:evaT(46,78),offset:.55},{transform:evaT(70,44),offset:.8},{transform:evaT(84,58)}],{duration:1400,fill:"forwards"});
+        A("#evaLovo",[{transform:evaT(30,78)},{transform:evaT(36,78),offset:.55},{transform:evaT(40,80,25)}],{duration:1400,fill:"forwards"});}}},
+  letamadas:{dur:2000,cim:()=>"LETÁMADÁS!",
+    svg:c=>evaPalya("kozep")+evaFigura("evaEllen",c.vedoUrl,c.vedoKit,60,64,1.05)+evaLabda("evaLabda",64,66)
+      +evaFigura("evaLovo",c.loUrl,c.loKit,20,40,1.05)+evaFigura("evaTars1",c.tarsUrl,c.loKit,104,46,.95)+evaFigura("evaTars2",c.tarsUrl2,c.loKit,66,112,.95),
+    mozgas:(A,c)=>{
+      A("#evaLovo",[{transform:evaT(20,40)},{transform:evaT(52,58)}],{duration:900,fill:"forwards",easing:"ease-in"});
+      A("#evaTars1",[{transform:evaT(104,46)},{transform:evaT(72,58)}],{duration:900,fill:"forwards",easing:"ease-in"});
+      A("#evaTars2",[{transform:evaT(66,112)},{transform:evaT(62,80)}],{duration:900,fill:"forwards",easing:"ease-in"});
+      A("#evaLabda",[{transform:evaT(64,66)},{transform:evaT(64,66),offset:.5},{transform:evaT(56,62),offset:.65},{transform:evaT(20,96)}],{duration:1700,fill:"forwards"});
+      A("#evaEllen",[{transform:evaT(60,64)},{transform:evaT(60,64),offset:.5},{transform:evaT(62,64,15)}],{duration:1600,fill:"forwards"});}},
+  serules:{dur:1900,cim:()=>"Sérülés",
+    svg:c=>evaPalya("kozep")+evaFigura("evaLovo",c.loUrl,c.loKit,60,78,1.3)
+      +`<g id="evaOrvos" style="transform:translate(60px,30px)" opacity="0"><rect x="-8" y="-8" width="16" height="16" rx="3" fill="#fff"/><path d="M-2.4 -6H2.4V-2.4H6V2.4H2.4V6H-2.4V2.4H-6V-2.4H-2.4Z" fill="#d0021b"/></g>`,
+    mozgas:A=>{
+      A("#evaLovo",[{transform:evaT(60,78)},{transform:evaT(60,78),offset:.2},{transform:evaT(66,90,85)}],{duration:900,fill:"forwards",easing:"ease-in"});
+      A("#evaOrvos",[{opacity:0},{opacity:0,offset:.45},{opacity:1}],{duration:1500,fill:"forwards"});}},
+  var:{dur:2000,cim:()=>"VAR",
+    svg:()=>evaPalya("kozep")+`<g id="evaVar"><rect x="14" y="26" width="92" height="58" rx="5" fill="#0d1117" stroke="#fff" stroke-width="1.6"/>`
+      +`<text x="60" y="52" text-anchor="middle" font-size="14" font-weight="900" fill="#fff" font-family="'Archivo Black',Impact,sans-serif">VAR</text>`
+      +`<rect x="26" y="62" width="68" height="5" rx="2.5" fill="#333"/><rect id="evaVarSav" x="26" y="62" width="68" height="5" rx="2.5" fill="#f2c200" style="transform-box:fill-box;transform-origin:left center;transform:scaleX(0)"/>`
+      +`<text id="evaVarDont" x="60" y="78" text-anchor="middle" font-size="7" font-weight="700" fill="#ff5a5a" opacity="0">NINCS GÓL</text></g>`,
+    mozgas:A=>{
+      A("#evaVarSav",[{transform:"scaleX(0)"},{transform:"scaleX(1)"}],{duration:1200,fill:"forwards"});
+      A("#evaVarDont",[{opacity:0},{opacity:0,offset:.65},{opacity:1}],{duration:1700,fill:"forwards"});}},
+  loves:{dur:1700,cim:c=>c.ev.alt==="vedve"?"Védik!":c.ev.alt==="blokkolva"?"Beblokkolják":"Mellé!",
+    svg:c=>evaPalya("kapu")+evaKapu()+evaFigura("evaKapus",c.kapusUrl,c.vedoKit,60,42,.9)+evaFigura("evaLovo",c.loUrl,c.loKit,48,94,1.15)+evaLabda("evaLabda",50,92),
+    mozgas:(A,c)=>{
+      const jobb=c.r()<0.5,alt=c.ev.alt;
+      const v=alt==="vedve"?[jobb?74:46,36]:alt==="blokkolva"?[54,70]:[jobb?100:18,14];
+      A("#evaLabda",[{transform:evaT(50,92)},{transform:evaT(50,92),offset:.3},{transform:evaT(v[0],v[1])}],{duration:1100,fill:"forwards",easing:"ease-in"});
+      if(alt==="vedve")A("#evaKapus",[{transform:evaT(60,42)},{transform:evaT(60,42),offset:.45},{transform:evaT(jobb?70:50,40,jobb?50:-50)}],{duration:1100,fill:"forwards"});}},
+  kidolgozas:{dur:1800,cim:()=>"Remek kidolgozás",
+    svg:c=>evaPalya("kozep")+evaFigura("evaLovo",c.loUrl,c.loKit,28,82,1.1)+evaFigura("evaTars1",c.tarsUrl,c.loKit,92,44,1.05)
+      +evaFigura("evaVedo",c.vedoUrl,c.vedoKit,60,62,1)+evaLabda("evaLabda",32,80),
+    mozgas:A=>{
+      A("#evaLabda",[{transform:evaT(32,80)},{transform:evaT(32,80),offset:.25},{transform:evaT(88,44)}],{duration:1100,fill:"forwards",easing:"ease-out"});
+      A("#evaVedo",[{transform:evaT(60,62)},{transform:evaT(60,62),offset:.35},{transform:evaT(64,58,-40)}],{duration:1000,fill:"forwards"});}}};
+/* a típus → sablon (néhány típus egy közös jeleneten osztozik) */
+const EVA_TIPUS_SABLON={gol:"gol",golKapott:"gol",kapufa:"kapufa",bravur:"bravur",vedes:"bravur",
+  tizenegyes:"tizenegyes",buntetoparbaj:"tizenegyes",sarga:"lap",piros:"lap",szoglet:"szoglet",
+  szabadrugas:"szabadrugas",blokk:"blokk",golvonal:"blokk",szereles:"blokk",letamadas:"letamadas",
+  serules:"serules",var:"var",loves:"loves",kidolgozas:"kidolgozas"};
+/* ---- A JELENET KONTEXTUSA: ki kicsoda, milyen mezben ---- */
+function evaKontextus(ev){
+  const mi=(()=>{try{return kitForNow();}catch(e){return identKitOrDefault("home");}})();
+  const oppNev=evaEllenfelNev();
+  const ok=evaEllenfelKit(oppNev,mi);
+  /* a TÁMADÓ oldal: kié a lövés / a gól / a labda — a VÉDŐ a másik */
+  const vedekezo=["bravur","vedes","golvonal","blokk","szereles"].indexOf(ev.t)>=0||(ev.t==="szoglet"&&ev.alt==="tisztazas");
+  const tamado={gol:"us",golKapott:"them"}[ev.t]||(vedekezo
+    ?(ev.side==="us"?"them":"us"):(ev.side||"us"));
+  const sajatTamad=tamado==="us";
+  const loKit=sajatTamad?mi:ok,vedoKit=sajatTamad?ok:mi;
+  const hash=faceHash(String(ev.p||"")+"|"+ev.t+"|"+(ev.min||0)+"|"+(ev.seq||0));
+  let a=hash;const r=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
+  /* a FŐSZEREPLŐ az eseményé; a védő oldalon a kapus/védő */
+  const fo=evaJatekos(ev.p,ev.side||"us");
+  const kapusNev=sajatTamad?`${oppNev} kapusa`:(evaKapusunk()||"Kapus");
+  const kapus=evaJatekos(kapusNev,sajatTamad?"them":"us");
+  const foTamado=(ev.side||"us")===tamado;
+  const lo=foTamado?fo:evaJatekos(sajatTamad?"Támadó":`${oppNev} csatára`,tamado);
+  const vedo=!foTamado?fo:evaJatekos(sajatTamad?`${oppNev} védője`:"Védő",sajatTamad?"them":"us");
+  const hangulat=ev.t==="golKapott"?-1:ev.t==="gol"?1:ev.t==="piros"?-1:ev.t==="sarga"?-.5:ev.t==="serules"?-.8:.4;
+  /* a kapus a fő, ha bravúr/védés/kivédett tizenegyes */
+  const kapusFo=["bravur","vedes"].indexOf(ev.t)>=0||(ev.alt==="kivedve");
+  const tars=evaJatekos(sajatTamad?"Társ":`${oppNev} játékosa`,tamado);
+  const c={ev,sajat:ev.t==="gol"||(ev.side==="us"&&ev.t!=="golKapott"&&ev.t!=="piros"&&ev.t!=="sarga"&&ev.t!=="serules"),
+    r,loKit,vedoKit,oppNev,
+    loUrl:evaArcUrl(kapusFo?evaJatekos(sajatTamad?"Támadó":`${oppNev} csatára`,tamado):lo,loKit,ev.t==="gol"?1:ev.t==="golKapott"?.6:hangulat),
+    vedoUrl:evaArcUrl(kapusFo?evaJatekos(sajatTamad?`${oppNev} védője`:"Védő",sajatTamad?"them":"us"):vedo,vedoKit,-.2),
+    kapusUrl:evaArcUrl(kapusFo?fo:kapus,vedoKit,kapusFo?.8:ev.t==="golKapott"?-1:-.4),
+    tarsUrl:evaArcUrl(tars,loKit,.3),tarsUrl2:evaArcUrl(evaJatekos((sajatTamad?"Társ2":`${oppNev} játékosa 2`),tamado),loKit,.3),
+    rugoUrl:evaArcUrl(evaJatekos(sajatTamad?"Rúgó":`${oppNev} rúgója`,tamado),loKit,.2),rugoKit:loKit,
+    /* a feliratsáv arca: a FŐSZEREPLŐÉ, a saját mezében */
+    foArc:ev.p?evaArcUrl(fo,(ev.side||"us")==="us"?mi:ok,hangulat):null,
+    foNev:ev.p?shortName(ev.p):null,
+    /* a FŐSZEREPLŐ csapatának színe: ez adja a háttér és az arc-keret színét */
+    foKit:(ev.side||"us")==="us"?mi:ok};
+  /* a lap- és sérülés-jelenetben a fő a „lövő" helyén áll */
+  if(ev.t==="sarga"||ev.t==="piros"||ev.t==="serules"){c.loUrl=evaArcUrl(fo,(ev.side||"us")==="us"?mi:ok,hangulat);c.loKit=(ev.side||"us")==="us"?mi:ok;}
+  return c;}
+/* ---- A LEJÁTSZÓ ---- */
+const _evaSor=[];let _evaFut=null,_evaSzunet=false;
+/* az időtartamok szorzója — a próbák gyorsítják, a játékban 1 */
+let evaIdoSzorzo=1;
+function evaElem(){
+  let el=$("evAnim");if(el)return el;
+  el=document.createElement("div");el.id="evAnim";el.className="hide";
+  el.setAttribute("role","img");
+  el.innerHTML=`<div class="evaKeret"><svg class="evaSzinpad" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid meet"></svg>`
+    +`<div class="evaCim"><img class="evaArc" alt=""><div><b></b><span></span></div></div></div>`
+    +`<div class="evaGombok"><button type="button" id="evaTovabb">Tovább ›</button>`
+    +`<button type="button" id="evaKi">Ne mutasd többet ezen a meccsen</button></div>`;
+  document.body.appendChild(el);
+  el.addEventListener("click",ev=>{if(ev.target&&ev.target.id==="evaKi")return;evaLezar();});
+  el.querySelector("#evaKi").addEventListener("click",ev=>{ev.stopPropagation();
+    if(_mev)_mev.anim=false;_evaSor.length=0;evaLezar();});
+  return el;}
+function evaKer(ev){
+  if(!ev)return;
+  /* a párharcban a jelenet nem állítja meg az órát — ott nem torlódhat */
+  if(_mev&&_mev.duel&&_evaSor.length>=1&&MEV_TIPUS[ev.t]&&!MEV_TIPUS[ev.t].mindig)return;
+  _evaSor.push(ev);
+  /* a következő pillanatban indul: addigra a tick végig lefut, és a gól
+     sora is hozzákapcsolódik az eseményhez (a fajtája, a mesterhármas) */
+  if(!_evaFut)setTimeout(evaKov,0);}
+function evaKov(){
+  if(_evaFut)return;
+  const ev=_evaSor.shift();
+  if(!ev){evaFolytat();return;}
+  if(typeof document!=="undefined"&&document.hidden){_evaSor.length=0;evaFolytat();return;}
+  /* a meccs közben lefújt vagy kikapcsolt animáció */
+  if(!_mev||!_mev.anim){_evaSor.length=0;evaFolytat();return;}
+  const sk=EVA_TIPUS_SABLON[ev.t],T=sk&&EVA_SABLON[sk];
+  if(!T){evaKov();return;}
+  /* az óra áll (párharcban nem) */
+  if(!_evaSzunet&&!(_mev&&_mev.duel)){
+    try{_evaSzunet=!!(MATCH_CTL&&MATCH_CTL.animSzunet&&MATCH_CTL.animSzunet());}catch(e){_evaSzunet=false;}}
+  let c;try{c=evaKontextus(ev);}catch(e){evaKov();return;}
+  const el=evaElem(),svg=el.querySelector(".evaSzinpad");
+  try{svg.innerHTML=T.svg(c);}catch(e){evaKov();return;}
+  el.className="eva-"+sk+(c.sajat?" evaMi":" evaOk");
+  el.style.setProperty("--evaSzin",(c.foKit&&c.foKit.c1)||"#333");
+  const cim=el.querySelector(".evaCim");
+  cim.querySelector("b").textContent=(T.cim(c)||"");
+  const tm=MEV_TIPUS[ev.t]||{};
+  const percTx=ev.min!=null?`${Math.floor(ev.min)}'`:"";
+  cim.querySelector("span").textContent=[percTx,c.foNev||"",ev.t==="golKapott"||ev.side==="them"?c.oppNev:""].filter(Boolean).join(" · ");
+  const arc=cim.querySelector(".evaArc");
+  if(c.foArc){arc.src=c.foArc;arc.style.display="";}else arc.style.display="none";
+  arc.style.imageRendering=faceStilus()==="pix"?"pixelated":"";
+  el.setAttribute("aria-label",`${tm.n||"Esemény"}${c.foNev?" — "+c.foNev:""}`);
+  const anims=[];
+  const lepcso=EVA_PIX();
+  const A=(sel,frames,opt)=>{
+    const t=svg.querySelector(sel);if(!t||!t.animate)return null;
+    const o=Object.assign({},opt||{});
+    if(lepcso)o.easing="steps(8,end)";
+    if(o.duration)o.duration*=evaIdoSzorzo;
+    const a=t.animate(frames,o);anims.push(a);return a;};
+  try{T.mozgas(A,c);}catch(e){}
+  try{cim.animate([{transform:"translateY(14px) scale(.9)",opacity:0},{transform:"translateY(14px) scale(.9)",opacity:0,offset:.35},{transform:"none",opacity:1,offset:.5},{transform:"none",opacity:1}],
+    {duration:T.dur*evaIdoSzorzo,fill:"forwards",easing:lepcso?"steps(6,end)":"ease-out"});}catch(e){}
+  _evaFut={ev,anims,t:setTimeout(evaLezar,(T.dur+650)*evaIdoSzorzo)};
+  el.classList.remove("hide");}
+/* a jelenet vége (lejárt, koppintottál, vagy vissza gomb) */
+function evaLezar(){
+  const F=_evaFut;
+  if(F){clearTimeout(F.t);F.anims.forEach(a=>{try{a.cancel();}catch(e){}});}
+  _evaFut=null;
+  const el=$("evAnim");
+  if(!_evaSor.length&&el)el.classList.add("hide");
+  setTimeout(evaKov,_evaSor.length?120:0);}
+function evaFolytat(){
+  const el=$("evAnim");if(el)el.classList.add("hide");
+  if(_evaSzunet){_evaSzunet=false;
+    try{if(MATCH_CTL&&MATCH_CTL.animFolytat)MATCH_CTL.animFolytat();}catch(e){}}}
+mevFeliratkoz(evaKer);
+/* a pixeles arcok előre: a kezdőrúgáskor a saját tizenegy arca elkészül,
+   hogy a jelenetben már kész legyen (a pixeles kép aszinkron születik) */
+function evaArcElo(){
+  if(faceStilus()!=="pix")return;
+  try{const mi=kitForNow();
+    slots.forEach(s=>{if(!s.player)return;const jp=evaJatekos(s.player.n,"us");
+      [1,.6,-.5,-1,.8,.4,-.2].forEach(m=>facePixUrl(jp,{kit:mi,mood:m,bg:false}));});}catch(e){}}
 function addLine(html,cls,budgeted,tipp){
   try{hangSorFigyel(html);}catch(e){}   /* 🔊 3.9.163 — kapufa, tizenegyes, VAR, mesterhármas */
   try{html=evDecorate(html,cls);}catch(e){}
@@ -74517,6 +74899,7 @@ function playMatchMotor(){
   clutchMatchReset();
   /* ⚡ 3.9.269: a meccsesemény-lista (F3) — az előző meccsé _mevUtolso lesz */
   try{mevVege();mevKezd({auto:!!S.auto,duel:!!DUEL});}catch(e){}
+  try{if(_mev&&_mev.anim&&_mev.keret>0)evaArcElo();}catch(e){}   /* 🎬 3.9.270 */
   crowdReset(!!RIVAL_MOOD);   /* a lelátó hangja (F3): meccsenként max két sor */
   const chemPairCount=MS.chemPairs;
   /* A pályán lévők névhalmaza a GÓLSZERZŐ-VÁLASZTÁSHOZ kell (a párkémia
@@ -75994,6 +76377,13 @@ function playMatchMotor(){
   MATCH_CTL={
     canSub:()=>halftimeSubsOn()&&!S.auto&&!DUEL,
     canPause:()=>!!iv,
+    /* 🎬 3.9.270: az esemény-animáció idejére áll az óra (a cserepanel útja).
+       A folytatás csak akkor indít, ha közben senki más nem vette át (egy
+       félidei panel a saját onDone-jával indít újra). */
+    animSzunet:()=>{if(!iv)return false;clearInterval(iv);iv=null;try{sbClockPause();}catch(e){}return true;},
+    animFolytat:()=>{if(iv||MATCH_CTL==null)return;
+      try{const hp=$("htSubPanel");if(hp&&!hp.classList.contains("hide"))return;}catch(e){}
+      try{sbClockResume();}catch(e){}iv=setInterval(tickFn,tickMs);},
     subsLeft:()=>HALFTIME_SUB_MAX-halfSubs.used.length,
     open:()=>{
       if(!iv)return;                       /* hosszabbítás vagy épp nyitott panel */
@@ -123472,6 +123862,17 @@ function renderThemeModal(){
    o.querySelector("#faceStyleOptBtn").onclick=()=>{
      faceStilusSet(fs==="auto"?"sima":fs==="sima"?"pix":"auto");renderThemeModal();};
    box.appendChild(o);}
+  /* 🎬 ESEMÉNY-ANIMÁCIÓK (3.9.270) */
+  {let on=true;try{on=localStorage.getItem(MEV_ANIM_KEY)!=="1";}catch(e){}
+   const o=document.createElement("div");o.className="fxOpts";
+   o.innerHTML=`<div class="fxOptH">🎬 Esemény-animációk</div>
+     <button type="button" class="fxOpt" id="evaOptBtn" aria-pressed="${on}">
+       <span class="fxOptIc">⚽</span><span class="fxOptTx"><b>Rövid jelenet a nagy pillanatokhoz</b>
+       <i>0,25× és lassabb tempón a gólok és a meccs nagy pillanatai (kapufa, bravúr, tizenegyes, lap, szöglet, letámadás…) 1–3 másodperces, teljes képernyős jelenetet kapnak, a játékos arcával és a csapat mezével. Meccsenként a tempótól függően korlátozott számú (0,25×: 3 · 0,1×: 8, a gólokon felül). Koppintásra továbblép.${fxOn()?"":" <b>Az élő háttér kikapcsolása ezt is kikapcsolja.</b>"}</i></span>
+       <span class="fxOptSw">${on?"BE":"KI"}</span></button>`;
+   o.querySelector("#evaOptBtn").onclick=()=>{
+     try{localStorage.setItem(MEV_ANIM_KEY,on?"1":"0");}catch(e){}renderThemeModal();};
+   box.appendChild(o);}
   /* 🎛️ ÚJ KARRIER ALAPBEÁLLÍTÁSAI — 3.9.218: az ablak LEGTETEJÉN, saját
      helyen (#kaModalBody), alapból NYITVA. KIMONDOTT KÉRÉS: „A scout
      beállítást be kéne tenni az új karrier beállítások mögé. Oda való. Ezek a
@@ -125284,6 +125685,8 @@ const BACK_EXIT_MS=2500;
    dobozon belül keresünk egy látható, visszalépést jelentő feliratút. */
 const BACK_LAYERS=[
   /* megerősítő kérdések és kapuzó ablakok — ezek ülnek a legfelül */
+  /* 🎬 az esemény-animáció (3.9.270): a vissza gomb továbblép */
+  {el:"evAnim",               btn:"evaTovabb"},
   {el:"hubTacticConfirmModal",btn:"hubTacticConfirmNo"},
   {el:"sellConfirmModal",     btn:"sellConfirmNo"},
   /* HIÁNYZÓK PANEL (3.9.31). Eddig BACK_BLOCKERS volt: a vissza gomb néma
