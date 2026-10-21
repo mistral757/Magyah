@@ -166,3 +166,24 @@ Hogyan jelez:
   * HUB-doboz és gomb.
 * A `jegyar-skala-3-9-183` és a `jegyar-keretar-3-9-192` próba a jegyár-láncot
   méri, ezért ott a stadion-réteg ki van kapcsolva.
+
+## 3.9.277 — olcsóbb első idények
+
+> „A stadionfejlesztési és merch árak 1. szezonban a mostani ötödére
+> csökkentendők, második szezonban harmadára, harmadikban felére, negyediktől
+> a mostani kalkuláció."
+
+A bővítés és a merch-fejlesztés ára a 3.9.276-os végárhoz (a kezdő idények
+boost-kedvezményével együtt) képest szorzódik (`stadionIdenySzorzo`):
+
+| idény | 1. | 2. | 3. | 4.+ |
+|---|---|---|---|---|
+| szorzó | 1/5 | 1/3 | 1/2 | 1 |
+
+Mérve (nagy stadion, 700 ezres tábor): bővítés 1900 → 400 (1.), 2600 → 900
+(2.), 3800 → 1900 (3.), a 4. idénytől változatlan; a merch ugyanígy. A
+fenntartás és a bevételek nem változnak. A próba
+(`tools/stadion-merch-3-9-264-proba.js`, 10. pont) ezt méri; a felugró
+emlékeztető ellenőrzése pedig stabilabb lett (a többi téma a mérés idejére
+nem esedékes — eddig véletlenen múlt).
+
