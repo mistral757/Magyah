@@ -368,6 +368,17 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## jatekos-adatlap-3-9-268-proba.js — 🪪 a játékos-adatlap ablaka
+
+```
+node tools/jatekos-adatlap-3-9-268-proba.js [kép-mappa]
+```
+
+* Valódi karrierben: a sorra koppintva ablak nyílik (arckép, név, Rating; a törzs a régi lap), mentés és teljes újrarajzolás nélkül.
+* Lapozás körbe, Sima/Pixel váltó, a renderHub nyitva hagyja.
+* A posztcsere előtt bezárul; a megerősítés fölötte ül; a vissza gomb és a háttér zár.
+* KI állásban a régi lenyíló. Kép-mappával képernyőképet is ment (négy témában).
+
 ## arckep-3-9-267-proba.js — 🧑 az arckép-generátor
 
 ```

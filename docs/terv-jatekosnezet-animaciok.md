@@ -133,6 +133,23 @@ díjátadók.
 
 ### 2.2 Az adatlap-ablak (F2)
 
+> **ELKÉSZÜLT: 3.9.268.** Próba: `tools/jatekos-adatlap-3-9-268-proba.js`.
+>
+> * A törzs a régi lenyíló (`buildHubDetail`) változatlanul; a nyitott lapot
+>   továbbra is a `hubExpandedKey` jelöli, a `renderHub` minden újrarajzoláskor
+>   az ablakot frissíti (`plSheetSync`), vagy bezárja, ha a játékos eltűnt.
+> * Fejléc: arckép (Sima/Pixel váltó), mezszám, név, poszt és hely
+>   (kezdő/pad/tartalék), kor, nemzetiség, kártyaszint, morál, forma,
+>   összhang; jobbra a Rating (a poszton érvényes) és a POT.
+> * Lapozás: ‹ › gombok, oldalra húzás a fejlécen, ← → billentyűk; körbe ér.
+> * Bezárás: ✕, a háttérre koppintás, a telefon vissza gombja, Esc.
+> * A posztcsere-, poszt-tanulás- és megbízás-választó előtt az ablak
+>   bezárul (azok a HUB-ban nyílnak). A felugró ablakok (eladás-megerősítő,
+>   szójegyzék, súgó) fölötte ülnek: az ablak z-indexe 58, azoké 60+.
+> * Beállítások → témaválasztó alatt: „🧑 Játékos-adatlap — Külön ablakban,
+>   arcképpel” (KI = a régi lenyíló), és „Arckép: automatikus / sima /
+>   pixeles”.
+
 * A HUB-ban a játékosra koppintva **nem nyílik le** a sor. Egy teljes
   magasságú lap (`.plSheet`) nyílik meg: telefonon alulról felcsúszó, széles
   képernyőn középen álló modal.
@@ -316,4 +333,4 @@ a HUB-ban.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0 (3.9.266) és F1 (3.9.267) kész. Következik az F2 (adatlap-ablak).*
+*Állapot: F0 (3.9.266), F1 (3.9.267) és F2 (3.9.268) kész. Következik az F3 (eseménymodell).*
