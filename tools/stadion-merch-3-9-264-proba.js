@@ -112,6 +112,27 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const kk=stadionState().kap;
     try{document.getElementById("twstadionBovitBtn").click();}catch(e){ki.ablakGombHiba=String(e);}
     ki.ablakBovit=stadionState().kap===kk+1&&!!document.getElementById("twstadionBovitBtn");
+    /* 9. 🔔 3.9.265 — emlékeztetők: a vezetés témái és a felugró push */
+    {const T9=stadionState();
+     try{teachStateObj().mode="on";}catch(e){}
+     const esed=()=>{let l=[];try{l=teachDueList(null);}catch(e){l=[];}return {st:l.indexOf("stadion:bovit")>=0,me:l.indexOf("merch:fejleszt")>=0};};
+     /* kint maradnak és van pénz → mindkettő */
+     S.fanBase=100000;T9.kap=3;T9.merch=2;T9.forma=[3,3,3,3,3];T9.uj=[2000,2000,2000,2000,2000];S.transferBudget=1e12;
+     ki.em={mind:esed()};
+     /* van hely (nincs kint senki) → stadion nem, merch igen */
+     T9.kap=STAD_KAP.length-1;S.fanBase=50000;ki.em.vanHely=esed();
+     /* nincs pénz → egyik sem */
+     T9.kap=3;S.fanBase=100000;S.transferBudget=0;ki.em.nincsPenz=esed();
+     /* a felugró emlékeztető: 8 forduló esedékesség után a „reg" sorban */
+     S.transferBudget=1e12;
+     ki.em.pushTip=[VEZ_PUSH["stadion:bovit"],VEZ_PUSH["merch:fejleszt"]];
+     const _now=window.teachNow;let t0=1000;window.teachNow=()=>t0;
+     /* forduló közben, nem a kezdőrúgás előtt: a „meccs" és a „szezon" témák
+        itt nem versenyeznek a két helyért, csak a „reg" sor */
+     S.idx=10;
+     try{vezPushJelolt(null);t0+=VEZ_PUSH_REG_KORAN;ki.em.push=vezPushJelolt(null);}catch(e){ki.em.pushHiba=String(e);}
+     window.teachNow=_now;
+     ki.em.horgony=TEACH_TOPICS["stadion:bovit"].a==="hubStadionBtn"&&TEACH_TOPICS["merch:fejleszt"].a==="hubStadionBtn";}
     ki.verzio=APP_VERSION;
     return ki;});
   await p.screenshot({path:process.env.KEP||"/dev/null",fullPage:false}).catch(()=>{});
@@ -141,7 +162,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.kartya.van&&!r.kartya.rejtett&&/férőhely/.test(r.kartya.ds),"a Csapatépítés menüben ott a „🏟️ Stadion, merch és PR” kártya, élő alsorral",r.kartya);
   ok(/Stadion, merch és PR/.test(r.ablak.cim)&&r.ablak.gomb&&!r.nyitHiba,"a kártya megnyitja a saját ablakát",r.ablak);
   ok(r.ablakBovit&&!r.ablakGombHiba,"az ablakban a bővítés működik, és az ablak frissül",{ok:r.ablakBovit,h:r.ablakGombHiba});
-  ok(String(r.verzio).localeCompare("3.9.264",undefined,{numeric:true})>=0,"verzió legalább 3.9.264",r.verzio);
+  console.log("=== 9. emlékeztetők (3.9.265) ===");
+  ok(r.em.mind.st&&r.em.mind.me,"kint maradnak a szurkolók és van pénz: mindkét téma esedékes",r.em.mind);
+  ok(!r.em.vanHely.st&&r.em.vanHely.me,"ha van szabad hely, a stadion nem szól (a merch igen)",r.em.vanHely);
+  ok(!r.em.nincsPenz.st&&!r.em.nincsPenz.me,"pénz nélkül egyik sem szól",r.em.nincsPenz);
+  ok(r.em.pushTip.join()==="reg,reg"&&!r.em.pushHiba&&(r.em.push||[]).some(k=>k==="stadion:bovit"||k==="merch:fejleszt"),"8 forduló után a „Rég nem foglalkoztál vele” felugró emlékeztetőben is ott vannak",{tip:r.em.pushTip,push:r.em.push,h:r.em.pushHiba});
+  ok(r.em.horgony,"a „Mutasd” a HUB „🏟️ Stadion, merch és PR” kártyájára visz");
+  ok(String(r.verzio).localeCompare("3.9.265",undefined,{numeric:true})>=0,"verzió legalább 3.9.265",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");
