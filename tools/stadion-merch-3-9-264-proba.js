@@ -1,0 +1,134 @@
+/* 🏟️ 3.9.264 — STADION + MERCH/PR.
+
+   KÉRÉS: stadion (bővíthető, fenntartási költséggel, legfeljebb 120 ezer
+   férőhely), a nézőszám a formától és az új szurkolóktól függ; mellette a
+   merch és PR részleg a TELJES táborból hoz bevételt, az új szurkolók
+   tagdíjat fizetnek. Első idénytől fejleszthető, nagyjából a régi bevételi
+   ütemmel (de dolgozni kell érte), és eleinte sokkal olcsóbb, mint egy boost.
+
+   Amit mér:
+     1. átállás: futó karrierben a stadion a táborhoz épül, új karrierben kicsi;
+     2. a férőhely legfeljebb 120 ezer, a tetején nincs tovább;
+     3. a kereslet: győzelmek + új szurkolók → tele; vereségek, új nélkül → kevés;
+        a néző sosem több a férőhelynél;
+     4. kalibráció a régi bevételhez: korán ~90–100%, középen ~100–120%, a
+        700 ezres táborral kiépítve ~60–80%;
+     5. az árak korán könnyűek (stadion < 25%, merch < 5% egy ifi-boostnak);
+     6. a fejlesztés fizet, növel, könyvel; a meccs-tick jegyre, merchre,
+        tagdíjra és fenntartásra bontva könyvel; zárt kapunál nincs bevétel;
+     7. a HUB-doboz kirajzolódik, a gomb működik;
+     8. nincs oldalhiba. */
+"use strict";
+const http=require("http"),fs=require("fs"),path=require("path");
+const ROOT=process.env.MROOT||"/home/user/Magyah", PORT=+process.env.PORT||9264;
+const {chromium}=require("/opt/node22/lib/node_modules/playwright");
+const TYPES={".html":"text/html; charset=utf-8",".js":"text/javascript",".css":"text/css",
+  ".woff2":"font/woff2",".png":"image/png",".ico":"image/x-icon",".webmanifest":"application/manifest+json"};
+const srv=http.createServer((req,rp)=>{
+  let f=decodeURIComponent(req.url.split("?")[0]); if(f==="/")f="/index.html";
+  const abs=path.join(ROOT,f);
+  if(!abs.startsWith(ROOT)||!fs.existsSync(abs)||fs.statSync(abs).isDirectory()){rp.statusCode=404;rp.end();return;}
+  rp.setHeader("content-type",TYPES[path.extname(abs)]||"application/octet-stream");
+  fs.createReadStream(abs).pipe(rp);});
+let hiba=0;
+const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSON.stringify(d).slice(0,600):""));if(!c)hiba++;};
+(async()=>{
+  await new Promise(r=>srv.listen(PORT,"127.0.0.1",r));
+  const b=await chromium.launch({args:["--no-sandbox"]});
+  const p=await (await b.newContext({viewport:{width:430,height:900}})).newPage();
+  const errs=[];p.on("pageerror",e=>errs.push(String(e)));
+  p.on("console",m=>{if(m.type()==="error"&&!/Failed to load resource|404/.test(m.text()))errs.push(m.text());});
+  await p.addInitScript(()=>{window.HANG_TESZT=true;});
+  await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
+  await p.waitForTimeout(1200);
+  await p.waitForFunction(()=>typeof cupLapTorles==="function",null,{timeout:15000});
+
+  const r=await p.evaluate(()=>{
+    const ki={};
+    gameMode="career";
+    enterCareerSetupFromHome(true);
+    beginNewGame();
+    const sq=SQUADS.filter(x=>!x.wc&&x.players&&x.players.length>=18)[0];
+    showChemistry=()=>{};
+    S.pyr=null;S.idx=0;
+    pyrPickSq={club:"draft",season:"",players:sq.players.slice(0,15)};
+    pyrPickFromDraft=true;pyrPickDiv=null;pyrPendingSpeed=pyrWantedSpeed;
+    renderPyrDivPick();pyrConfirmDiv();
+    if(!careerPool)careerPool=initCareerPlayerPool({stars:2.5});
+    slots.forEach((sl,i)=>{if(sl.player)return;const src=sq.players[i%sq.players.length];
+      const pl={n:src.n,ovr:src.ovr,pos:(src.pos||[sl.pos]).slice(),age:26};sl.player=pl;sl.fit=fitFor(pl,sl);});
+    slots.forEach(sl=>{const pl=sl.player;if(!pl)return;
+      if(!careerPool[pl.n])careerPool[pl.n]={n:pl.n,pos:pl.pos.slice(),age:26,startRating:pl.ovr,peak:pl.ovr,pot:3000};
+      const e=careerPool[pl.n];if(!e.attrs)initPlayerAttrs(e);});
+    if(captainIdx<0)captainIdx=0;if(!coach)coach=COACHES[0];
+    window.saveGame=()=>{};
+    window.saveGame=()=>{};
+    const _tm=window.fanTicketMult,_fm=window.fanMult;
+    window.fanTicketMult=()=>1;window.fanMult=()=>1;
+    /* 1. átállás */
+    S.stadion=null;S.fanBase=700000;ki.atallNagy=JSON.parse(JSON.stringify(stadionState()));
+    S.stadion=null;S.fanBase=8000;ki.atallKicsi=JSON.parse(JSON.stringify(stadionState()));
+    /* 2. plafon */
+    ki.max=STAD_KAP[STAD_KAP.length-1];
+    S.stadion.kap=STAD_KAP.length-1;ki.maxAr=stadionKovAr();S.transferBudget=1e12;ki.maxBovit=stadionBovit();
+    /* 3. kereslet */
+    const T=stadionState();
+    S.fanBase=100000;T.kap=STAD_KAP.length-1;
+    T.forma=[3,3,3,3,3];T.uj=[2000,2000,2000,2000,2000];ki.jo={a:stadionKeresletArany(),n:stadionNezo()};
+    T.forma=[0,0,0,0,0];T.uj=[0,0,0,0,0];ki.rossz={a:stadionKeresletArany(),n:stadionNezo()};
+    T.kap=2;T.forma=[3,3,3,3,3];T.uj=[2000,2000,2000,2000,2000];ki.korlat={n:stadionNezo(),kap:stadionKap()};
+    /* 4. kalibráció (közepes forma: 2 győzelem, 2 döntetlen, 1 vereség, mérsékelt beáramlás) */
+    const kozep=()=>{T.forma=[3,1,3,1,0];T.uj=[1,1,1,1,1].map(()=>Math.round(fanBase()*0.004));};
+    const arany=(fb,kap,m)=>{S.fanBase=fb;T.kap=STAD_KAP.indexOf(kap);T.merch=m;kozep();
+      const regi=fb*FAN_TICKET;return Math.round((fanWeeklyIncome()-stadionFenntartas())/regi*100)/100;};
+    ki.kal={korai:arany(8000,5000,0),kozep:arany(60000,35000,4),kesoi:arany(700000,120000,8)};
+    /* 5. árak korán */
+    window.fanTicketMult=_tm;window.fanMult=_fm;
+    S.fanBase=8000;T.kap=1;T.merch=0;
+    ki.arak={stadion:stadionKovAr(),merch:merchKovAr(),boost:boostUnitPrice()};
+    /* 6. fejlesztés + könyvelés */
+    S.transferBudget=1e9;const k0=T.kap,m0=T.merch;
+    ki.bovit=stadionBovit();ki.fejl=merchFejleszt();ki.lep={kap:[k0,T.kap],merch:[m0,T.merch]};
+    S.ledger={v:LEDGER_V,rows:{}};
+    try{fanMatchTick({win:true,exc:60});}catch(e){ki.tickHiba=String(e);}
+    const c1=JSON.parse(JSON.stringify((ledgerSum(S.seasonNumber||1).row||{}).cats||{}));
+    ki.konyv=c1;
+    S.ledger={v:LEDGER_V,rows:{}};
+    try{fanMatchTick({loss:true,zart:true});}catch(e){ki.tickHiba2=String(e);}
+    ki.zart=JSON.parse(JSON.stringify((ledgerSum(S.seasonNumber||1).row||{}).cats||{}));
+    ki.kat=["stadion","fenntartas","merchFejl","merch","tagdij"].every(k=>!!LEDGER_CATS[k]);
+    /* 7. HUB-doboz */
+    const w=document.createElement("div");w.innerHTML=stadionBoxHtml();document.body.appendChild(w);
+    ki.doboz=/Stadion/.test(w.textContent)&&/Merch és PR/.test(w.textContent)&&!!w.querySelector("#stadionBovitBtn")&&!!w.querySelector("#merchFejlBtn");
+    const k1=T.kap;try{stadionBind();w.querySelector("#stadionBovitBtn").click();}catch(e){ki.gombHiba=String(e);}
+    ki.gomb=T.kap===k1+1;w.remove();
+    ki.verzio=APP_VERSION;
+    return ki;});
+  console.log("=== 1. átállás ===");
+  ok(r.atallNagy.kap===11&&r.atallNagy.merch===3,"700 ezres tábornál: a legnagyobb (120 ezres) stadion és 3. merch-szint",r.atallNagy);
+  ok(r.atallKicsi.kap===1&&r.atallKicsi.merch===0,"új karrier (8 ezres tábor): 5 ezres stadion, 0. merch-szint",r.atallKicsi);
+  console.log("=== 2. plafon ===");
+  ok(r.max===120000&&r.maxAr===null&&r.maxBovit===false,"legfeljebb 120 ezer férőhely, a tetején nincs tovább",{max:r.max,ar:r.maxAr});
+  console.log("=== 3. kereslet ===");
+  ok(r.jo.a===1&&r.jo.n===100000,"5 győzelem + sok új szurkoló: a teljes tábor jönne (tele a stadion)",r.jo);
+  ok(r.rossz.a<=0.31&&r.rossz.n<=31000,"5 vereség, új szurkoló nélkül: a tábornak csak ~30%-a",r.rossz);
+  ok(r.korlat.n===r.korlat.kap,"a néző sosem több a férőhelynél",r.korlat);
+  console.log("=== 4. kalibráció a régihez ===");
+  ok(r.kal.korai>=0.85&&r.kal.korai<=1.05,"korán (8 ezres tábor, 5 ezres stadion, merch 0): ~90–100%",r.kal.korai);
+  ok(r.kal.kozep>=0.95&&r.kal.kozep<=1.25,"középen (60 ezer, 35 ezres stadion, merch 4): ~100–120%",r.kal.kozep);
+  ok(r.kal.kesoi>=0.55&&r.kal.kesoi<=0.8,"700 ezres tábor, kiépítve (120 ezer, merch 8): ~60–80% — „pozitív, de ne ennyire”",r.kal.kesoi);
+  console.log("=== 5. árak korán ===");
+  ok(r.arak.stadion<0.25*r.arak.boost&&r.arak.merch<0.05*r.arak.boost,"a stadion < 25%, a merch < 5% egy ifi-boostnak",r.arak);
+  console.log("=== 6. fejlesztés és könyvelés ===");
+  ok(r.bovit&&r.fejl&&r.lep.kap[1]===r.lep.kap[0]+1&&r.lep.merch[1]===r.lep.merch[0]+1,"a bővítés és a fejlesztés fizet és növel",r.lep);
+  ok(!r.tickHiba&&r.konyv.fans>0&&r.konyv.merch>0&&r.konyv.fenntartas>0,"a meccs-tick jegyre, merchre és fenntartásra bontva könyvel",r.konyv);
+  ok(!r.tickHiba2&&!(r.zart.fans>0)&&!(r.zart.merch>0)&&r.zart.fenntartas>0,"zárt kapunál nincs bevétel, a fenntartás marad",r.zart);
+  ok(r.kat,"az öt új könyvelési kategória megvan");
+  console.log("=== 7. HUB ===");
+  ok(r.doboz&&r.gomb&&!r.gombHiba,"a doboz kirajzolódik, a bővítés gombja működik",{doboz:r.doboz,gomb:r.gomb,h:r.gombHiba});
+  ok(String(r.verzio).localeCompare("3.9.264",undefined,{numeric:true})>=0,"verzió legalább 3.9.264",r.verzio);
+  ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
+  await b.close();srv.close();
+  console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");
+  process.exit(hiba?1:0);
+})().catch(e=>{console.error(e);process.exit(1);});

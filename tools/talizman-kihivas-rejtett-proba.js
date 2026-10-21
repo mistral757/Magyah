@@ -131,6 +131,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.konnyuP=talKihKonnyuP();ki.konnyu1=arany();
     /* jutalom: a pénz-tétel ×(1+x) — a sorsolót a pénzre állítjuk */
     const _pick=chRewardPick;chRewardPick=pool=>pool.find(x=>x.kind==="money");
+    /* 3.9.263: a pénz-tét a klub léptékéből jön (nem az egyenlegből) — egy nagy
+       valódi bevétel adja a nagy alapot, hogy az 500-as kerekítés ne torzítson */
+    S.ledger={v:LEDGER_V,rows:{[S.seasonNumber||1]:{open:0,cats:{fans:2e7}}}};
     try{const ctx=challengeContext();
       _pakli([]);ki.penz0=genReward("long","medium",ctx).amount;
       _pakli([1,2,3,4].map(()=>_lap("kihivas","jutal",5,1)));
@@ -273,6 +276,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const S1=(id,r)=>_pakli([_lap(TAL_SPEC_BY[id].k,null,r||Math.max(4,TAL_SPEC_BY[id].min),0.5,id)]);
     /* pénz-jutalom nehézen és kupán */
     const _pick=chRewardPick;chRewardPick=pool=>pool.find(x=>x.kind==="money");
+    S.ledger={v:LEDGER_V,rows:{[S.seasonNumber||1]:{open:0,cats:{fans:2e7}}}};   /* 3.9.263 — lásd fent */
     try{const ctx=challengeContext();
       _pakli([]);const h0=genReward("long","hard",ctx).amount,c0=genReward("cup","medium",ctx).amount;
       S1("kockazati");ki.kock=[h0,genReward("long","hard",ctx).amount,talSpecV("kockazati","pro")];
