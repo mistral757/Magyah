@@ -322,6 +322,30 @@ szól, csak eddig a sorhoz kötődött.
 
 ## 4. Élő meccskép (F5)
 
+> **ELKÉSZÜLT: 3.9.272.** Kód: az `index.html` „ÉLŐ MECCSKÉP (3.9.272, F5)”
+> blokkja; a helye a közvetítés sorai fölött (`#elokep`). Próba:
+> `tools/elo-meccskep-3-9-272-proba.js`.
+>
+> * **Pálya:** vízszintes, mi balról jobbra támadunk. A saját tizenegy a
+>   valódi felállás helyein, az élő állapotból (`MATCH_XI`: csere,
+>   kiállítás); az ellenfél alap 4-4-2-ben, tükrözve; mindkettő a mezének
+>   színében (az ellenfélé a nevéből, mint az F4-ben). A két blokk a labda
+>   felé húzódik (±8).
+> * **Labda:** minden eseménynél a zónájába vándorol (az F3 MINDEN eseményét
+>   kapja, `mevFeliratkozMind`): támadás → az ellenfél harmada, szöglet →
+>   a sarok, tizenegyes → a büntetőpont, gól → a háló (fénygyűrűvel),
+>   védekezés → a saját kapunk előtere, lap/sérülés/VAR → középen.
+>   Események között a fölény szerint sodródik (percenként).
+> * **Fölény-sáv:** a helyzetekből (súlyozva: gól 3, kapufa/tizenegyes 2,
+>   bravúr/gólvonal 1,6 …). Szándékosan nem „labdabirtoklás”: a motor azt
+>   nem számol.
+> * **Lendület:** 18 ötperces oszlop (fel: mi, le: ők), az idővonalon a
+>   gólok, lapok és cserék jelével; a lejátszott rész halványan kiemelve.
+> * **Kezelés:** alapból nyitva, a fejlécre koppintva összecsukható (az
+>   állapot megmarad: `ekCsuk30_0`); az első kezdőrúgásig rejtve.
+> * Minden tempón követi a meccset; végigjátszásban nem sodródik. Nem húz
+>   véletlent, a szimulációhoz nem nyúl.
+
 Ez nem fizikai szimuláció. Az események **vizuális követése** egy kis
 pályán, a feed fölött (összecsukható, telefonon ~120 px magas).
 
@@ -395,4 +419,4 @@ a HUB-ban.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0–F4 kész (3.9.266–3.9.270). Következik az F5 (élő meccskép).*
+*Állapot: F0–F5 kész (3.9.266–3.9.272). Következik az F6 (finomhangolás: pixel-téma, hang, teljesítmény gyenge telefonon).*

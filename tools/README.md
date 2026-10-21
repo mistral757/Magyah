@@ -368,6 +368,16 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## elo-meccskep-3-9-272-proba.js — 🗺️ élő meccskép
+
+```
+node tools/elo-meccskep-3-9-272-proba.js [kép-mappa]
+```
+
+* Az első kezdőrúgásig rejtve; utána 11+11 pötty és a labda.
+* Meccs közben a labda mozog, a lendület-oszlopok és a fölény frissül; a végén annyi gól-jel, ahány gól.
+* Az ellenfél kiállítottja halvány; összecsukható, és az állapot megmarad; nem húz véletlent.
+
 ## esemeny-animacio-3-9-270-proba.js — 🎬 esemény-animációk
 
 ```
