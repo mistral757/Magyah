@@ -7660,7 +7660,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.277";
+const APP_VERSION="3.9.278";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -24275,11 +24275,13 @@ function pickPaceFlavor(scorerName,asstName){
     if(!name)return;
     playerSkills(name).forEach(inst=>{
       const b=PACE_FLAVOR[inst.skill&&inst.skill.id];
-      if(b&&b[role]&&b[role].length)opts.push({name,texts:b[role]});});};
+      if(b&&b[role]&&b[role].length)opts.push({name,texts:b[role],id:inst.skill.id,role});});};
   add(scorerName,"scorer");
   if(asstName&&asstName!==scorerName)add(asstName,"asst");
   if(!opts.length)return null;
   const pick=opts[Math.floor(Math.random()*opts.length)];
+  /* 🎬 3.9.278: a gól-jelenet tudja, KINEK melyik skillje szólalt meg */
+  pickPaceFlavor.utolso={id:pick.id,role:pick.role,name:pick.name};
   const txt=pick.texts[Math.floor(Math.random()*pick.texts.length)];
   return txt.replace("%N%",esc(shortName(pick.name)));}
 /* ================= MÉRÉSEK: VÉGSEBESSÉG ÉS LÖVÉSERŐ =================
@@ -60652,6 +60654,15 @@ function mevSor(html,cls,tipp){
   M.seq++;
   const tx=evPlainText(html).replace(/\s+/g," ").trim();
   const c=String(cls||"");
+  /* 🎬 3.9.278 — A SKILL A GÓLON. A látványos skillek (Elastico, Húzd meg a
+     szélét!, Usain Bolt, Ágyúgolyó, Szitálós, Szabadrúgás-mester) a gól UTÁNI
+     ízesítő-sorban szólalnak meg: a tipp {skill, skillP} nem új esemény, hanem
+     az imént lőtt saját gól jelzője — a gól-jelenet ebből választ skill-
+     változatot. Az első nyer (egy gólhoz egy jelenet). */
+  if(tipp&&tipp.skill&&!tipp.t&&!/\bm (goal|oppgoal)\b/.test(c)){
+    const g=M.utolsoGol;
+    if(g&&g.side==="us"&&M.seq-g.seq<=16&&!g.skill){g.skill=tipp.skill;g.skillP=tipp.skillP||g.p;}
+    return;}
   /* a GÓL SORA: csak a fajtát és a jelzőt hozza */
   if(/\bm (goal|oppgoal)\b/.test(c)&&!(tipp&&tipp.t)){
     const side=/oppgoal/.test(c)?"them":"us";
@@ -60660,9 +60671,10 @@ function mevSor(html,cls,tipp){
       return;}
     let alt=null;for(const [re,a] of MEV_GOL_ALT)if(re.test(tx)){alt=a;break;}
     const g=M.utolsoGol;
+    const sk=(tipp&&tipp.skill)||null;
     /* az sbEv már lefutott: a sor az ő góljáé */
-    if(g&&g.side===side&&M.seq-g.seq<=2&&!g.sor){g.alt=g.alt||alt;g.sor=tx.slice(0,140);M.golSor=null;return;}
-    M.golSor={side,alt,seq:M.seq,sor:tx.slice(0,140)};
+    if(g&&g.side===side&&M.seq-g.seq<=2&&!g.sor){g.alt=g.alt||alt;g.sor=tx.slice(0,140);if(sk&&!g.skill){g.skill=sk;g.skillP=g.p;}M.golSor=null;return;}
+    M.golSor={side,alt,seq:M.seq,sor:tx.slice(0,140),skill:sk};
     return;}
   if(tipp&&tipp.t){
     mevUj({t:tipp.t,side:tipp.side||null,p:tipp.p||null,p2:tipp.p2||null,alt:tipp.alt||null,
@@ -60684,7 +60696,7 @@ function mevSb(side,kind,name,min){
   if(kind==="goal"){
     const s=M.golSor;
     /* a felhasznált sor elfogy — két gyors gól ne ossza meg ugyanazt */
-    if(s&&s.side===ev.side&&M.seq-s.seq<=2){ev.alt=s.alt;ev.sor=s.sor;M.golSor=null;}
+    if(s&&s.side===ev.side&&M.seq-s.seq<=2){ev.alt=s.alt;ev.sor=s.sor;if(s.skill){ev.skill=s.skill;ev.skillP=ev.p;}M.golSor=null;}
     if(ev.p==="öngól"){ev.alt=ev.alt||"ongol";ev.p=null;}
     if(ev.p==="potyagól"){ev.alt=ev.alt||"potya";ev.p=null;}
     M.utolsoGol=ev;}
@@ -60963,6 +60975,169 @@ const EVA_SABLON={
     mozgas:A=>{
       A("#evaLabda",[{transform:evaT(32,80)},{transform:evaT(32,80),offset:.25},{transform:evaT(88,44)}],{duration:1100,fill:"forwards",easing:"ease-out"});
       A("#evaVedo",[{transform:evaT(60,62)},{transform:evaT(60,62),offset:.35},{transform:evaT(64,58,-40)}],{duration:1000,fill:"forwards"});}}};
+/* ================= 🎬 SKILL-JELENETEK (3.9.278) ==========================
+   KIMONDOTT KÉRÉS: „Az animációkat kezdjük el bővíteni: legyenek a special
+   skillekhez járó animációk: Elastico, Húzd meg a szelet, Usain Bolt,
+   Ágyúgolyó, Szitálós, Szabadrúgás mester. Kezdjük ezekkel. Ezek a
+   leglátványosabbak."
+   Ha egy gólnál a játékos skillje megszólal a közvetítésben (az F3 a gólra
+   teszi: ev.skill, ev.skillP), a gól a skill SAJÁT jelenetét kapja a
+   sima gól-jelenet helyett:
+     · Elastico! — a labda ki-be villan a védő előtt, a védő rossz irányba
+       vetődik, aztán a lövés;
+     · Húzd meg a szélét! — elhúz a szélen (sebesség-csíkok), lerázza a
+       védőjét, betör és lő — vagy, ha ő a gólpasszadó, beadja;
+     · Usain Bolt — a leshatárról indul, a km/h kiírva, a védővonal
+       hátul marad, a kapus kifut, de késő;
+     · Ágyúgolyó — védő a saját térfeléről: tűzcsóvás bomba, a kép
+       megremeg, a háló kiszakad, a lövéserő kiírva;
+     · Szitálós — húsz méterről: a léc alját csókolva a hálóba;
+     · Szabadrúgás-mester — a sorfal felugrik, a labda röppályája
+       kirajzolódik, és a felső sarokba csavarodik.
+   A változatok (oldal, sebesség, erő) az eseményből képzett magból jönnek. */
+function evaBez(p0,p1,p2,n){
+  const o=[];for(let i=0;i<=n;i++){const t=i/n,a=(1-t)*(1-t),b=2*(1-t)*t,d=t*t;
+    o.push([a*p0[0]+b*p1[0]+d*p2[0],a*p0[1]+b*p1[1]+d*p2[1]]);}return o;}
+/* pontsor → kulcskockák: `elotte` ideig áll, aztán végigmegy, `utana` ideig áll */
+function evaUt(pts,elotte,utana){
+  const e=elotte||0,u=utana||0,span=1-e-u;
+  const k=[{transform:evaT(pts[0][0],pts[0][1]),offset:0}];
+  if(e>0)k.push({transform:evaT(pts[0][0],pts[0][1]),offset:e});
+  pts.forEach((p,i)=>{if(i)k.push({transform:evaT(p[0],p[1]),offset:Math.min(1,e+span*i/(pts.length-1))});});
+  if(u>0)k.push({transform:evaT(pts[pts.length-1][0],pts[pts.length-1][1]),offset:1});
+  else k[k.length-1].offset=1;
+  return k;}
+/* tűzcsóva / elmosódás: a labda mögött futó, halványuló golyók */
+function evaCsova(pre,x,y,szinek){
+  return szinek.map((sz,i)=>`<g id="${pre}${i}" style="transform:translate(${x}px,${y}px)"><circle r="${(2.4-i*.35).toFixed(2)}" fill="${sz}" opacity="${(.85-i*.15).toFixed(2)}"/></g>`).join("");}
+function evaCsovaMozgat(A,pre,n,frames,opt){
+  for(let i=0;i<n;i++)A("#"+pre+i,frames,Object.assign({},opt,{delay:(opt.delay||0)+40*(i+1)}));}
+/* sebesség-csíkok egy pont mögött (fölfelé futó játékoshoz) */
+function evaCsikok(id,x,y){
+  let s=`<g id="${id}" opacity="0" style="transform:translate(${x}px,${y}px)">`;
+  for(let i=0;i<5;i++){const dx=-8+i*4,h=8+(i%2)*6;s+=`<path d="M${dx} 4V${4+h}" stroke="#fff" stroke-width="1.1" stroke-linecap="round" opacity="${(.5+.1*(i%3)).toFixed(2)}"/>`;}
+  return s+`</g>`;}
+function evaMeresTx(id,x,y,tx){
+  return `<g id="${id}" opacity="0" style="transform:translate(${x}px,${y}px)"><rect x="-17" y="-7" width="34" height="11" rx="3" fill="#0d1117" opacity=".82"/>`
+    +`<text x="0" y="1.6" text-anchor="middle" font-size="6.4" font-weight="800" fill="#ffe066" font-family="'Archivo Black',Impact,sans-serif">${tx}</text></g>`;}
+function evaRazas(A,offset0,hossz){
+  const f=[{transform:"translate(0px,0px)",offset:0},{transform:"translate(0px,0px)",offset:offset0}];
+  [[2,-1.4],[-2.2,1.2],[1.6,1.8],[-1.2,-1.6],[0.8,0.6]].forEach((d,i)=>f.push({transform:`translate(${d[0]}px,${d[1]}px)`,offset:Math.min(.99,offset0+hossz*(i+1)/6)}));
+  f.push({transform:"translate(0px,0px)",offset:1});
+  A("#evaKamera",f,{duration:2600,fill:"forwards"});}
+function evaHaloRaz(A,erosen,mikor){
+  const m=mikor||.62;
+  A("#evaHalo",[{transform:"scale(1,1)"},{transform:"scale(1,1)",offset:m},{transform:erosen?"scale(1.1,1.5)":"scale(1.05,1.22)",offset:m+.1},{transform:"scale(.98,1.05)",offset:m+.22},{transform:"scale(1,1)"}],{duration:1600,fill:"forwards"});}
+const EVA_SKILL_NEV={mf_elastico:"ELASTICO!",sp_flank:"HÚZD MEG A SZÉLÉT!",sp_bolt:"USAIN BOLT!",df_cannon:"ÁGYÚGOLYÓ!",fw_cannon:"SZITÁLÓS!",mf_fk:"SZABADRÚGÁS-MESTER!"};
+const EVA_SKILL_SABLON={mf_elastico:"skElastico",sp_flank:"skSzel",sp_bolt:"skBolt",df_cannon:"skAgyu",fw_cannon:"skSzitalos",mf_fk:"skSzabad"};
+Object.assign(EVA_SABLON,{
+  skElastico:{dur:2700,skill:true,cim:c=>EVA_SKILL_NEV.mf_elastico,
+    svg:c=>evaPalya("kapu")+evaKapu()+evaFigura("evaKapus",c.kapusUrl,c.vedoKit,60,42,.9)
+      +evaFigura("evaVedo",c.vedoUrl,c.vedoKit,58,74,1.1)+evaFigura("evaLovo",c.loUrl,c.loKit,50,104,1.15)
+      +`<circle id="evaKor" cx="0" cy="0" r="5" fill="none" stroke="#ffe066" stroke-width="1.2" opacity="0" style="transform:translate(60px,82px)"/>`
+      +evaCsova("evaSzell",53,98,["#ffffff","#ffffff"])+evaLabda("evaLabda",53,98)+`<rect id="evaVillan" width="120" height="120" fill="#fff" opacity="0"/>`,
+    mozgas:(A,c)=>{
+      const jobb=c.r()<0.5,cx=jobb?80:40;
+      A("#evaLovo",[{transform:evaT(50,104)},{transform:evaT(55,86),offset:.28},{transform:evaT(62,82),offset:.42},{transform:evaT(68,66),offset:.6},{transform:evaT(68,64,-8),offset:.7},{transform:evaT(68,64,-8)}],{duration:2700,fill:"forwards"});
+      const ut=[{transform:evaT(53,98),offset:0},{transform:evaT(58,84),offset:.28},{transform:evaT(66,83),offset:.35},{transform:evaT(56,82),offset:.41},{transform:evaT(71,76),offset:.5},{transform:evaT(70,64),offset:.62},{transform:evaT(70,64),offset:.68},{transform:evaT(cx,28),offset:.82},{transform:evaT(cx,28),offset:1}];
+      A("#evaLabda",ut,{duration:2700,fill:"forwards"});
+      evaCsovaMozgat(A,"evaSzell",2,ut,{duration:2700,fill:"forwards"});
+      A("#evaKor",[{opacity:0,transform:"translate(60px,82px) scale(.4)"},{opacity:0,transform:"translate(60px,82px) scale(.4)",offset:.33},{opacity:1,transform:"translate(60px,82px) scale(1.4)",offset:.42},{opacity:0,transform:"translate(60px,82px) scale(2.2)",offset:.52},{opacity:0,transform:"translate(60px,82px) scale(2.2)"}],{duration:2700,fill:"forwards"});
+      A("#evaVedo",[{transform:evaT(58,74)},{transform:evaT(58,74),offset:.36},{transform:evaT(50,76,-35),offset:.46},{transform:evaT(46,80,-75),offset:.6},{transform:evaT(46,80,-80)}],{duration:2700,fill:"forwards"});
+      A("#evaKapus",[{transform:evaT(60,42)},{transform:evaT(60,42),offset:.7},{transform:evaT(jobb?46:74,40,jobb?-70:70)}],{duration:2700,fill:"forwards"});
+      evaHaloRaz(A,false,.5);
+      A("#evaVillan",[{opacity:0},{opacity:0,offset:.8},{opacity:.5,offset:.85},{opacity:0}],{duration:2700,fill:"forwards"});}},
+  skSzel:{dur:2800,skill:true,cim:c=>EVA_SKILL_NEV.sp_flank,
+    svg:c=>{const kulon=c.skFig&&c.ev.skillP&&c.ev.skillP!==c.ev.p;
+      return evaPalya("kapu")+evaKapu()+evaFigura("evaKapus",c.kapusUrl,c.vedoKit,60,42,.9)
+        +(kulon?evaFigura("evaBefejezo",c.loUrl,c.loKit,50,66,1.05):"")
+        +evaFigura("evaVedo",c.vedoUrl,c.vedoKit,92,84,1)+evaCsikok("evaCsik",100,100)
+        +evaFigura("evaFuto",kulon?c.skFig:c.loUrl,c.loKit,100,112,1.05)+evaLabda("evaLabda",98,104)
+        +`<rect id="evaVillan" width="120" height="120" fill="#fff" opacity="0"/>`;},
+    mozgas:(A,c)=>{
+      const kulon=c.skFig&&c.ev.skillP&&c.ev.skillP!==c.ev.p,jobb=c.r()<0.5,cx=jobb?82:42;
+      A("#evaFuto",[{transform:evaT(100,112)},{transform:evaT(101,70),offset:.38},{transform:evaT(101,56),offset:.5},{transform:evaT(92,48),offset:.62},{transform:evaT(90,48,-8)}],{duration:2800,fill:"forwards",easing:"ease-in"});
+      A("#evaCsik",[{opacity:0,transform:evaT(100,118)},{opacity:.9,transform:evaT(100,96),offset:.18},{opacity:.9,transform:evaT(101,74),offset:.4},{opacity:0,transform:evaT(101,62),offset:.52},{opacity:0,transform:evaT(101,62)}],{duration:2800,fill:"forwards"});
+      A("#evaVedo",[{transform:evaT(92,84)},{transform:evaT(95,80),offset:.22},{transform:evaT(96,74,8),offset:.4},{transform:evaT(94,76,14)}],{duration:2800,fill:"forwards"});
+      const ut=kulon
+        ?[{transform:evaT(98,104),offset:0},{transform:evaT(100,62),offset:.48},{transform:evaT(92,50),offset:.6},{transform:evaT(54,52),offset:.72},{transform:evaT(cx,28),offset:.86},{transform:evaT(cx,28),offset:1}]
+        :[{transform:evaT(98,104),offset:0},{transform:evaT(100,62),offset:.48},{transform:evaT(90,50),offset:.62},{transform:evaT(90,50),offset:.66},{transform:evaT(84,27),offset:.8},{transform:evaT(84,27),offset:1}];
+      A("#evaLabda",ut,{duration:2800,fill:"forwards"});
+      if(kulon)A("#evaBefejezo",[{transform:evaT(50,66)},{transform:evaT(50,66),offset:.55},{transform:evaT(54,58,-6),offset:.7},{transform:evaT(55,56,-10)}],{duration:2800,fill:"forwards"});
+      A("#evaKapus",[{transform:evaT(60,42)},{transform:evaT(66,42),offset:.6},{transform:evaT(kulon?(jobb?44:76):72,40,kulon?(jobb?-70:70):60)}],{duration:2800,fill:"forwards"});
+      evaHaloRaz(A,false,.52);
+      A("#evaVillan",[{opacity:0},{opacity:0,offset:.8},{opacity:.45,offset:.85},{opacity:0}],{duration:2800,fill:"forwards"});}},
+  skBolt:{dur:2800,skill:true,cim:c=>EVA_SKILL_NEV.sp_bolt,
+    svg:c=>{const kmh=(34.5+c.r()*3.4).toFixed(1).replace(".",",");c._kmh=kmh;
+      return evaPalya("kapu")+evaKapu()+`<path id="evaLes" d="M8 66H112" stroke="#ffe066" stroke-width=".9" stroke-dasharray="3 2" opacity=".85"/>`
+        +[34,58,82].map((x,i)=>evaFigura("evaSor"+i,c.vedoUrl,c.vedoKit,x,66,.85)).join("")
+        +evaFigura("evaKapus",c.kapusUrl,c.vedoKit,60,42,.9)+evaCsikok("evaCsik",44,76)
+        +evaFigura("evaLovo",c.loUrl,c.loKit,44,72,1.05)+evaLabda("evaLabda",40,116)
+        +evaMeresTx("evaKmh",80,92,kmh+" km/h")+`<rect id="evaVillan" width="120" height="120" fill="#fff" opacity="0"/>`;},
+    mozgas:(A,c)=>{
+      const jobb=c.r()<0.5,cx=jobb?80:40;
+      A("#evaLabda",[{transform:evaT(40,116)},{transform:evaT(40,116),offset:.12},{transform:evaT(52,54),offset:.48},{transform:evaT(54,50),offset:.56},{transform:evaT(cx,28),offset:.74},{transform:evaT(cx,28)}],{duration:2800,fill:"forwards"});
+      A("#evaLovo",[{transform:evaT(44,72)},{transform:evaT(44,72),offset:.15},{transform:evaT(52,54),offset:.5},{transform:evaT(54,50,-8),offset:.58},{transform:evaT(54,50,-8)}],{duration:2800,fill:"forwards",easing:"ease-in"});
+      A("#evaCsik",[{opacity:0,transform:evaT(44,80)},{opacity:0,transform:evaT(44,80),offset:.16},{opacity:.95,transform:evaT(48,68),offset:.3},{opacity:.9,transform:evaT(52,58),offset:.48},{opacity:0,transform:evaT(53,54),offset:.58},{opacity:0,transform:evaT(53,54)}],{duration:2800,fill:"forwards"});
+      [0,1,2].forEach(i=>A("#evaSor"+i,[{transform:evaT(34+i*24,66,0,.85)},{transform:evaT(34+i*24,66,0,.85),offset:.3},{transform:evaT(36+i*20,60,0,.85),offset:.7},{transform:evaT(38+i*18,58,0,.85)}],{duration:2800,fill:"forwards"}));
+      A("#evaKapus",[{transform:evaT(60,42)},{transform:evaT(60,42),offset:.35},{transform:evaT(58,48),offset:.55},{transform:evaT(jobb?66:52,46,jobb?55:-55)}],{duration:2800,fill:"forwards"});
+      A("#evaKmh",[{opacity:0,transform:"translate(80px,92px) scale(.6)"},{opacity:0,transform:"translate(80px,92px) scale(.6)",offset:.3},{opacity:1,transform:"translate(80px,86px) scale(1.15)",offset:.4},{opacity:1,transform:"translate(80px,86px) scale(1)",offset:.9},{opacity:.8,transform:"translate(80px,86px) scale(1)"}],{duration:2800,fill:"forwards"});
+      evaHaloRaz(A,false,.46);
+      A("#evaVillan",[{opacity:0},{opacity:0,offset:.72},{opacity:.5,offset:.77},{opacity:0}],{duration:2800,fill:"forwards"});}},
+  skAgyu:{dur:2700,skill:true,cim:c=>EVA_SKILL_NEV.df_cannon,
+    svg:c=>{const ero=Math.round(118+c.r()*24);
+      return evaPalya("kapu")+evaKapu()+evaFigura("evaKapus",c.kapusUrl,c.vedoKit,60,42,.9)
+        +evaFigura("evaLovo",c.loUrl,c.loKit,62,118,1.05)
+        +evaCsova("evaTuz",60,108,["#ffd84a","#ff9a1f","#ff5a1a","#d1301a"])+evaLabda("evaLabda",60,108)
+        +evaMeresTx("evaEro",30,92,ero+" km/h")+`<rect id="evaVillan" width="120" height="120" fill="#ffd27a" opacity="0"/>`;},
+    mozgas:(A,c)=>{
+      const jobb=c.r()<0.5,cx=jobb?84:36;
+      A("#evaLovo",[{transform:evaT(62,118)},{transform:evaT(61,110),offset:.22},{transform:evaT(62,108,-10),offset:.3},{transform:evaT(62,108,-10)}],{duration:2700,fill:"forwards"});
+      const ut=[{transform:evaT(60,108),offset:0},{transform:evaT(60,108),offset:.3},{transform:evaT(cx,23),offset:.48},{transform:evaT(cx,25),offset:1}];
+      A("#evaLabda",ut,{duration:2700,fill:"forwards",easing:"ease-in"});
+      evaCsovaMozgat(A,"evaTuz",4,ut,{duration:2700,fill:"forwards",easing:"ease-in"});
+      evaHaloRaz(A,true,.46);
+      evaRazas(A,.47,.25);
+      A("#evaKapus",[{transform:evaT(60,42)},{transform:evaT(60,42),offset:.42},{transform:evaT(jobb?74:46,40,jobb?70:-70),offset:.6},{transform:evaT(jobb?76:44,42,jobb?85:-85)}],{duration:2700,fill:"forwards"});
+      A("#evaEro",[{opacity:0},{opacity:0,offset:.44},{opacity:1,offset:.52},{opacity:1}],{duration:2700,fill:"forwards"});
+      A("#evaVillan",[{opacity:0},{opacity:0,offset:.46},{opacity:.6,offset:.5},{opacity:0,offset:.7},{opacity:0}],{duration:2700,fill:"forwards"});}},
+  skSzitalos:{dur:2600,skill:true,cim:c=>EVA_SKILL_NEV.fw_cannon,
+    svg:c=>{const ero=Math.round(110+c.r()*26);
+      return evaPalya("kapu")+evaKapu()+evaFigura("evaKapus",c.kapusUrl,c.vedoKit,60,42,.9)
+        +evaFigura("evaLovo",c.loUrl,c.loKit,50,96,1.15)
+        +evaCsova("evaSzell",52,90,["#ffffff","#ffffff","#ffffff"])+evaLabda("evaLabda",52,90)
+        +evaMeresTx("evaEro",88,84,ero+" km/h")+`<rect id="evaVillan" width="120" height="120" fill="#fff" opacity="0"/>`;},
+    mozgas:(A,c)=>{
+      const jobb=c.r()<0.5,cx=jobb?78:42;
+      A("#evaLovo",[{transform:evaT(50,96)},{transform:evaT(52,90),offset:.22},{transform:evaT(53,88,-12),offset:.3},{transform:evaT(53,88,-12)}],{duration:2600,fill:"forwards"});
+      /* a léc alját csókolja (y≈22), onnan pattan le a hálóba */
+      const ut=[{transform:evaT(52,90),offset:0},{transform:evaT(52,90),offset:.3},{transform:evaT(cx,22.5),offset:.46},{transform:evaT(cx+(jobb?-2:2),34),offset:.54},{transform:evaT(cx+(jobb?-3:3),36),offset:1}];
+      A("#evaLabda",ut,{duration:2600,fill:"forwards",easing:"ease-in"});
+      evaCsovaMozgat(A,"evaSzell",3,ut,{duration:2600,fill:"forwards",easing:"ease-in"});
+      A("#evaKeret",[{stroke:"#f4f4f4",strokeWidth:2},{stroke:"#f4f4f4",strokeWidth:2,offset:.45},{stroke:"#ffe066",strokeWidth:3.2,offset:.48},{stroke:"#f4f4f4",strokeWidth:2,offset:.6},{stroke:"#f4f4f4",strokeWidth:2}],{duration:2600,fill:"forwards"});
+      evaHaloRaz(A,true,.5);
+      evaRazas(A,.46,.18);
+      A("#evaKapus",[{transform:evaT(60,42)},{transform:evaT(60,42),offset:.4},{transform:evaT(jobb?70:50,38,jobb?60:-60)}],{duration:2600,fill:"forwards"});
+      A("#evaEro",[{opacity:0},{opacity:0,offset:.42},{opacity:1,offset:.5},{opacity:1}],{duration:2600,fill:"forwards"});
+      A("#evaVillan",[{opacity:0},{opacity:0,offset:.47},{opacity:.45,offset:.5},{opacity:0,offset:.62},{opacity:0}],{duration:2600,fill:"forwards"});}},
+  skSzabad:{dur:3000,skill:true,cim:c=>EVA_SKILL_NEV.mf_fk,
+    svg:c=>{const jobb=c.r()<0.5;c._jobb=jobb;
+      const cx=jobb?84:36,ivX=jobb?118:2;
+      const d=`M62 92Q${ivX} 44 ${cx} 24`;
+      return evaPalya("kapu")+evaKapu()+[42,50,58,66].map((x,i)=>evaFigura("evaFal"+i,c.vedoUrl,c.vedoKit,x,62,.82)).join("")
+        +evaFigura("evaKapus",c.kapusUrl,c.vedoKit,jobb?54:66,42,.9)
+        +`<path id="evaPalyaIv" d="${d}" fill="none" stroke="#ffe066" stroke-width="1" stroke-dasharray="2.2 2.2" opacity=".85" pathLength="100" style="stroke-dashoffset:100"/>`
+        +evaFigura("evaLovo",c.loUrl,c.loKit,70,104,1.1)+evaLabda("evaLabda",62,92)
+        +`<rect id="evaVillan" width="120" height="120" fill="#fff" opacity="0"/>`;},
+    mozgas:(A,c)=>{
+      const jobb=c._jobb,cx=jobb?84:36,ivX=jobb?118:2;
+      A("#evaLovo",[{transform:evaT(70,104)},{transform:evaT(66,97),offset:.26},{transform:evaT(64,95,-10),offset:.33},{transform:evaT(64,95,-10)}],{duration:3000,fill:"forwards"});
+      A("#evaLabda",evaUt(evaBez([62,92],[ivX,44],[cx,24],14),.33,.2),{duration:3000,fill:"forwards"});
+      A("#evaPalyaIv",[{strokeDashoffset:100},{strokeDashoffset:100,offset:.33},{strokeDashoffset:0,offset:.8},{strokeDashoffset:0}],{duration:3000,fill:"forwards"});
+      [0,1,2,3].forEach(i=>A("#evaFal"+i,[{transform:evaT(42+i*8,62,0,.82)},{transform:evaT(42+i*8,62,0,.82),offset:.32},{transform:evaT(42+i*8,55,0,.82),offset:.44},{transform:evaT(42+i*8,62,0,.82),offset:.58},{transform:evaT(42+i*8,62,0,.82)}],{duration:3000,fill:"forwards"}));
+      A("#evaKapus",[{transform:evaT(jobb?54:66,42)},{transform:evaT(jobb?54:66,42),offset:.62},{transform:evaT(jobb?70:50,38,jobb?65:-65)}],{duration:3000,fill:"forwards"});
+      evaHaloRaz(A,false,.78);
+      A("#evaVillan",[{opacity:0},{opacity:0,offset:.79},{opacity:.5,offset:.83},{opacity:0}],{duration:3000,fill:"forwards"});}}});
 /* hányadik gólja ez a játékosnak a meccsen (a saját oldalon; az öngól és a
    potyagól nem számít) — az esemény-listából, a jelenetig bezárólag */
 const EVA_GOL_SZAM={3:"MESTERHÁRMAS",4:"NÉGY GÓL",5:"ÖT GÓL",6:"HAT GÓL",7:"HÉT GÓL",8:"NYOLC GÓL",9:"KILENC GÓL",10:"TÍZ GÓL"};
@@ -61015,6 +61190,8 @@ function evaKontextus(ev){
     foKit:(ev.side||"us")==="us"?mi:ok};
   /* a lap- és sérülés-jelenetben a fő a „lövő" helyén áll */
   if(ev.t==="sarga"||ev.t==="piros"||ev.t==="serules"){c.loUrl=evaFig(fo,(ev.side||"us")==="us"?mi:ok,hangulat);c.loKit=(ev.side||"us")==="us"?mi:ok;}
+  /* 🎬 3.9.278: a skill gazdája (ha nem a gólszerző) — figura és felirat-arc */
+  if(ev.skillP&&ev.skillP!==ev.p){const sp=evaJatekos(ev.skillP,"us");c.skFig=evaFig(sp,mi,1);c.foArc=evaArcUrl(sp,mi,1);}
   return c;}
 /* ---- A LEJÁTSZÓ ---- */
 const _evaSor=[];let _evaFut=null,_evaSzunet=false;
@@ -61048,21 +61225,31 @@ function evaKov(){
   if(typeof document!=="undefined"&&document.hidden){_evaSor.length=0;evaFolytat();return;}
   /* a meccs közben lefújt vagy kikapcsolt animáció */
   if(!_mev||!_mev.anim){_evaSor.length=0;evaFolytat();return;}
-  const sk=EVA_TIPUS_SABLON[ev.t],T=sk&&EVA_SABLON[sk];
+  /* 🎬 3.9.278: ha a gólnál a játékos skillje szólalt meg, a skill jelenete */
+  let sk=EVA_TIPUS_SABLON[ev.t];
+  if(ev.t==="gol"&&ev.skill&&EVA_SKILL_SABLON[ev.skill])sk=EVA_SKILL_SABLON[ev.skill];
+  const T=sk&&EVA_SABLON[sk];
   if(!T){evaKov();return;}
   /* az óra áll (párharcban nem) */
   if(!_evaSzunet&&!(_mev&&_mev.duel)){
     try{_evaSzunet=!!(MATCH_CTL&&MATCH_CTL.animSzunet&&MATCH_CTL.animSzunet());}catch(e){_evaSzunet=false;}}
   let c;try{c=evaKontextus(ev);}catch(e){evaKov();return;}
   const el=evaElem(),svg=el.querySelector(".evaSzinpad");
-  try{svg.innerHTML=T.svg(c);}catch(e){evaKov();return;}
+  /* a kamera-csoport: a rázás (Ágyúgolyó, Szitálós) az egész képet mozgatja */
+  try{svg.innerHTML=`<g id="evaKamera">${T.svg(c)}</g>`;}catch(e){evaKov();return;}
   el.className="eva-"+sk+(c.sajat?" evaMi":" evaOk");
   el.style.setProperty("--evaSzin",(c.foKit&&c.foKit.c1)||"#333");
   const cim=el.querySelector(".evaCim");
   cim.querySelector("b").textContent=(T.cim(c)||"");
   const tm=MEV_TIPUS[ev.t]||{};
   const percTx=ev.min!=null?`${Math.floor(ev.min)}'`:"";
-  cim.querySelector("span").textContent=[percTx,c.foNev||"",ev.t==="golKapott"||ev.side==="them"?c.oppNev:""].filter(Boolean).join(" · ");
+  /* skill-jelenetnél: ha a skill gazdája nem a gólszerző (pl. a szélen
+     elhúzó gólpasszadó), mindkettő; és a gólszám, ha az mesterhármas vagy több */
+  let foNev=c.foNev||"";
+  if(T.skill&&ev.skillP&&ev.skillP!==ev.p)foNev=`${shortName(ev.skillP)} → ${foNev}`;
+  const _gsz=T.skill?evaGolSzam(ev):0;
+  cim.querySelector("span").textContent=[percTx,foNev,ev.t==="golKapott"||ev.side==="them"?c.oppNev:"",
+    _gsz>=3?(EVA_GOL_SZAM[_gsz]||`${_gsz} GÓL`):""].filter(Boolean).join(" · ");
   const arc=cim.querySelector(".evaArc");
   if(c.foArc){arc.src=c.foArc;arc.style.display="";}else arc.style.display="none";
   arc.style.imageRendering=faceStilus()==="pix"?"pixelated":"";
@@ -75784,7 +75971,7 @@ function playMatchMotor(){
         try{vlNoteGoal(_fgm,taker.n,null);}catch(e){}
         const fkSk=playerSkills(taker.n).find(i=>i.skill.id==="mf_fk"||i.skill.id==="df_cannon");
         updateTTBoard(fx,gf,ga,Math.min(90,min));
-        addLine(`${sbMinTxt(_fgm)}  SZABADRÚGÁSGÓL! ${esc(shortName(taker.n))} a sorfal fölött a kapuba csavarja${fkSk?` — ${esc(fkSk.skill.name)}${skillProgressSuffix(fkSk)} is közrejátszott`:""}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal");
+        addLine(`${sbMinTxt(_fgm)}  SZABADRÚGÁSGÓL! ${esc(shortName(taker.n))} a sorfal fölött a kapuba csavarja${fkSk?` — ${esc(fkSk.skill.name)}${skillProgressSuffix(fkSk)} is közrejátszott`:""}  ${fx.home?gf+":"+ga:ga+":"+gf}`,"m goal",false,fkSk?{skill:fkSk.skill.id}:null);
         sbEv("us","goal",taker.n);
         /* Saját szövegkészlet: eddig a gólra EGYETLEN mondat jutott, ezért a
            szabadrúgás mindig ugyanúgy hangzott. */
@@ -76316,7 +76503,7 @@ function playMatchMotor(){
           `→ Micsoda erő! ${esc(shortName(scorer.n))} nem cifrázta: meglátta a kaput és rálőtt. Bent is van.`,
           `→ ${esc(shortName(scorer.n))} lekapta a labdát és eleresztette — a kapus meg sem mozdult. Szitálós a javából!`,
           `→ Kapufa-belső, majd a hálóban! ${esc(shortName(scorer.n))} lövése akkorát csattant, hogy a lelátón is hallani lehetett.`];
-        addLine(cannonTexts[Math.floor(Math.random()*cannonTexts.length)],"m skillnote",true);}
+        addLine(cannonTexts[Math.floor(Math.random()*cannonTexts.length)],"m skillnote",true,{skill:"fw_cannon"});}
       /* ÁGYÚGOLYÓ (df_cannon): a védő bombagólja. Külön szövegek, mert a
          poénja épp az, hogy HÁTULRÓL jön — ezt a Szitálós sorai nem mondják. */
       if(playerSkills(scorer.n).some(i=>i.skill&&i.skill.id==="df_cannon")&&Math.random()<fp(0.6)){
@@ -76336,14 +76523,14 @@ function playMatchMotor(){
           String(scorer.n).trim()==="Roberto Carlos"
             ?`→ Tudjuk, hogy ágyú az a balláb, ő, Karcsi Robi, mindenki tudja, hogy nem szabad engedni, hogy lőjön. De a védők inkább menekülnek az útjából. Tűzcsóvát húzott maga után a labda, akkora erővel száguldott a jobbfelsőbe!`
             :`→ Tudjuk, hogy ágyú az a balláb, akárcsak Roberto Carlosé. ${_n} elereszt egy löketet. Ó, micsoda gól! Hát erre azért senki sem számított!`];
-        addLine(dcTexts[Math.floor(Math.random()*dcTexts.length)],"m skillnote",true);}
+        addLine(dcTexts[Math.floor(Math.random()*dcTexts.length)],"m skillnote",true,{skill:"df_cannon"});}
       /* A SZABADRÚGÁS-MESTER ezen a rutin-soron csak SZÓLÓ gólnál szólalhat meg.
          A szabadrúgásnak nincs gólpasszadója — egy asszisztos találatnál tehát a
          "Szabadrúgás-mester — érződött a rutin" épp az ellenkezőjét állítja
          annak, ami a pályán történt. Ilyenkor a játékos MÁSIK goalw-skillje
          beszélhet helyette, ha van. (Ugyanaz az elv, mint az Elasticónál lent.) */
       const scorerSk=playerSkills(scorer.n).find(i=>i.skill.type==="goalw"&&!(i.skill.id==="mf_fk"&&asstName));
-      if(scorerSk&&Math.random()<fp(0.6))addLine(`→ ${esc(scorerSk.skill.name)}${skillProgressSuffix(scorerSk)} — érződött a rutin`,"m skillnote",true);
+      if(scorerSk&&Math.random()<fp(0.6))addLine(`→ ${esc(scorerSk.skill.name)}${skillProgressSuffix(scorerSk)} — érződött a rutin`,"m skillnote",true,{skill:scorerSk.skill.id});
       if(asstSk&&Math.random()<fp(0.6))addLine(`→ ${esc(asstSk.skill.name)}${skillProgressSuffix(asstSk)} — pontos volt az indítás`,"m skillnote",true);
       /* F5: fejlett (88+) taktika hangja a gólnál — meccsenként max 1 */
       if(!tacGoalFlavorShown&&S.tactics&&S.tactics.active&&tacticLevel(S.tactics.active)>=88&&Math.random()<fp(0.35)){
@@ -76357,7 +76544,7 @@ function playMatchMotor(){
          kiszolgálta a gólszerzőt, nem ő vitte be egyedül a labdát. */
       const scorerElastico=playerSkills(scorer.n).find(i=>i.skill.id==="mf_elastico");
       if(scorerElastico&&!asstName&&Math.random()<fp(0.6))
-        addLine(`→ ${esc(shortName(scorer.n))} mozgását senki sem tudja követni, és mekkora csel! Elastico! Hirtelen lábmozdulatokkal tolta el védője mellett`,"m skillnote",true);
+        addLine(`→ ${esc(shortName(scorer.n))} mozgását senki sem tudja követni, és mekkora csel! Elastico! Hirtelen lábmozdulatokkal tolta el védője mellett`,"m skillnote",true,{skill:"mf_elastico"});
       /* SEBESSÉG-SKILLEK (3. fázis): a gólhoz fűzött íz, ami a SEBESSÉG-
          eseményre utal. A gólszerző és a gólpasszadó is elsütheti, de a
          szövegek szerepre szabottak — a Villámbeck Queen felfut és beadja
@@ -76365,7 +76552,9 @@ function playMatchMotor(){
          (ezért a gólszerzőnél). Meccsenként legfeljebb egyszer. */
       if(!paceFlavorShown){
         const paceLine=pickPaceFlavor(scorer.n,asstName);
-        if(paceLine){paceFlavorShown=true;addLine(`→ ${paceLine}`,"m skillnote",true);}}
+        if(paceLine){paceFlavorShown=true;
+          const _pu=pickPaceFlavor.utolso;
+          addLine(`→ ${paceLine}`,"m skillnote",true,_pu?{skill:_pu.id,skillP:_pu.name}:null);}}
       /* „A győzelemnek csekély az esélye. Mire várunk még?” — a skill a hajrában
          és nagy hátrányban dolgozik, ezért a hangja is OTT szólal meg, ahol a
          hatása: késői vagy fordító gólnál. Meccsenként egyszer. */

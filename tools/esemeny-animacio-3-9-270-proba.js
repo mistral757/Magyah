@@ -96,6 +96,41 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return r;});
   ok(s276.c3==="MESTERHÁRMAS!"&&s276.c6==="HAT GÓL!"&&s276.c7==="HÉT GÓL!"&&s276.c2==="GÓÓÓL!","a gólszám a játékos meccsbeli góljaiból (7 → HÉT GÓL!)",s276);
   ok(s276.fut&&s276.pixVolt&&s276.pixRejtve&&s276.utana,"jelenet közben a pixel-téma felugrója rejtve, utána újra él",s276);
+  /* 3.9.278: a SKILL-jelenetek — a skill a gólra kerül, és a gól a skill
+     jelenetét kapja */
+  const sk=await p.evaluate(()=>{
+    const r={};
+    mevKezd({});_mev.keret=8;_mev.anim=false;
+    /* a skill-sorok a gólonkénti kommentár-keretből fogynak — ha nem férnek
+       bele, a közvetítésben sem látszanak, jelenet sem jár hozzájuk */
+    goalNoteLeft=10;
+    /* a sor ELŐBB, aztán az sbEv, aztán a skill ízesítő-sora */
+    addLine(`12'  GÓL! Bomba  1:0`,"m goal");sbEv("us","goal","Bomba Béla",12);
+    addLine(`→ BOMBAGÓL! Bomba húsz méterről — Szitálós!`,"m skillnote",true,{skill:"fw_cannon"});
+    addLine(`→ Ágyúgolyó is`,"m skillnote",true,{skill:"df_cannon"});   /* a második nem írja felül */
+    /* sebesség-skill: a GÓLPASSZADÓÉ */
+    sbEv("us","goal","Klose Miró",20);addLine(`20'  GÓL! Klose  2:0`,"m goal");
+    addLine(`→ Robben elhúzott a szélen`,"m skillnote",true,{skill:"sp_flank",skillP:"Arjen Robben"});
+    /* szabadrúgásgól: a skill a GÓL SORÁN jön */
+    addLine(`30'  SZABADRÚGÁSGÓL! Juni a sorfal fölött — Szabadrúgás-mester is közrejátszott  3:0`,"m goal",false,{skill:"mf_fk"});sbEv("us","goal","Juni Pernambuco",30);
+    /* ellenfél gólja után a skill-sor nem tapad rá */
+    sbEv("them","goal","Ellen Fél",40);addLine(`→ Elastico`,"m skillnote",true,{skill:"mf_elastico"});
+    const L=mevLista().filter(e=>e.t==="gol"||e.t==="golKapott");
+    r.g=L.map(e=>[e.t,e.p,e.skill||null,e.skillP||null]);
+    /* a hat jelenet kirajzolódik, a saját feliratával */
+    r.jelenet=Object.keys(EVA_SKILL_SABLON).map(id=>{
+      const ev={t:"gol",side:"us",p:"Teszt Elek",min:30,seq:99,skill:id,skillP:id==="sp_flank"?"Szél Elek":"Teszt Elek"};
+      const T=EVA_SABLON[EVA_SKILL_SABLON[id]];
+      try{const c=evaKontextus(ev);const svg=T.svg(c);
+        return {id,ok:/evaLabda/.test(svg)&&/evaKapus/.test(svg),cim:T.cim(c),kulon:id==="sp_flank"?/evaBefejezo/.test(svg):null};}
+      catch(e){return {id,hiba:e.message};}});
+    mevVege();
+    return r;});
+  ok(JSON.stringify(sk.g[0])===JSON.stringify(["gol","Bomba Béla","fw_cannon","Bomba Béla"]),"a skill a gólra kerül (az első nyer)",sk.g[0]);
+  ok(JSON.stringify(sk.g[1])===JSON.stringify(["gol","Klose Miró","sp_flank","Arjen Robben"]),"sebesség-skill: a gólpasszadó a gazdája",sk.g[1]);
+  ok(JSON.stringify(sk.g[2])===JSON.stringify(["gol","Juni Pernambuco","mf_fk","Juni Pernambuco"]),"szabadrúgásgól: a skill a gól sorából",sk.g[2]);
+  ok(sk.g[3]&&sk.g[3][0]==="golKapott"&&sk.g[3][2]===null,"az ellenfél gólja nem kap skillt",sk.g[3]);
+  ok(sk.jelenet.length===6&&sk.jelenet.every(j=>j.ok&&/!$/.test(j.cim))&&sk.jelenet.find(j=>j.id==="sp_flank").kulon,"mind a hat skill-jelenet kirajzolódik a saját feliratával (a szélen elhúzó gólpasszadóval is)",sk.jelenet.map(j=>j.id+":"+(j.cim||j.hiba)));
   ok(s1.test.torzs&&s1.test.fejViewBox&&s1.test.nincsVall&&s1.test.bor,"a figura: csak-fej kép + saját mezes törzs, a bőrszínnel",s1.test);
 
   const meccs=async(seb,opt)=>p.evaluate(async([seb,opt])=>{

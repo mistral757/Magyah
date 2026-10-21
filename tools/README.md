@@ -399,6 +399,7 @@ node tools/esemeny-animacio-3-9-270-proba.js
 * Valódi meccs 0,1×-en: jelenetek futnak, alattuk ÁLL az óra, a meccs rendben lefut; koppintás és vissza gomb továbblép.
 * „Ne mutasd többet” után nincs több jelenet; 0,5×-en és kikapcsolva sincs.
 * 3.9.276: a gólszám a játékos meccsbeli góljaiból (7 → HÉT GÓL!); jelenet közben a pixel-téma felugrója rejtve.
+* 3.9.278: a hat skill (Elastico, Húzd meg a szelet, Usain Bolt, Ágyúgolyó, Szitálós, Szabadrúgás mester) sora a gólhoz ragad, a gól a skill jelenetét kapja, és mind a hat kirajzolható.
 
 ## meccsesemeny-3-9-269-proba.js — ⚡ meccsesemények (animáció-jelöltek)
 

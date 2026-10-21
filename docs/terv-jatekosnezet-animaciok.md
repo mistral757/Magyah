@@ -280,6 +280,20 @@ A PvP-ben a `sim.events` már strukturált. Ott csak le kell képezni.
 >   * „fekvő módban … nagyon picibe össze vannak nyomva": fekve (≤ 640 px
 >     magas) a felirat a színpad MELLÉ kerül, a színpad a teljes magasságot
 >     kapja (a gomboknak hagyott sávval).
+> * **3.9.278 — SKILL-JELENETEK.** „legyenek a special skillekhez járó
+>   animációk: Elastico, Húzd meg a szelet, Usain bolt, Ágyúgolyó, Szitálós,
+>   Szabadrúgás mester." Ha a gólt egy skill hozta (a közvetítés skill-sora
+>   `tipp.skill`-lel jelöli, a `mevSor` a legutóbbi saját gólra ragasztja),
+>   a sima gól-jelenet helyett a skill saját jelenete fut
+>   (`EVA_SKILL_SABLON`):
+>   * **Elastico** — labda kifelé-befelé, a védő rossz irányba lép, áthúzás;
+>   * **Húzd meg a szelet** — szélső sprint a vonal mentén, csíkok, beadás;
+>   * **Usain Bolt** — elfutás a védők mellett, km/h-mérő, utánhúzott nyom;
+>   * **Ágyúgolyó** — védő bombája, a kamera rázkódik, a háló beszakad;
+>   * **Szitálós** — lebegő, cikázó röppálya, a kapus rossz felé mozdul;
+>   * **Szabadrúgás mester** — fal, ív a fal fölött a felső sarokba.
+>   A felirat a skill nevét mutatja; ha a skillt más játszotta meg, mint aki
+>   gólt lőtt, „skilles → gólszerző" (a skilles figurája is a sajátja).
 > * **Pixel-téma:** lépcsős mozgás, szögletes keret, pixeles arc (a saját
 >   tizenegy arca a kezdőrúgáskor előre elkészül).
 > * **Beállítás:** a témaválasztó alatt „🎬 Esemény-animációk” (BE/KI).
@@ -517,4 +531,4 @@ régi kódé; a lenyitás/adatlap gyors útja (3.9.168) már kikerüli.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0–F6 kész (3.9.266–3.9.274); az F5 élő meccsképe 3.9.275-ben momentum-sávra cserélve.*
+*Állapot: F0–F6 kész (3.9.266–3.9.274); az F5 élő meccsképe 3.9.275-ben momentum-sávra cserélve; 3.9.278: hat skill-jelenet.*
