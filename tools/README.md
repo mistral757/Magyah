@@ -368,6 +368,19 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## stadion-merch-3-9-264-proba.js — 🏟️ stadion + merch és PR
+
+```
+node tools/stadion-merch-3-9-264-proba.js
+```
+
+* Átállás és a 120 ezres férőhely-plafon.
+* Kereslet: a forma és az új szurkolók beáramlása szerint, a férőhely korlátjával.
+* Kalibráció a régi bevételhez (~99% / ~113% / ~71%).
+* A korai árak könnyűek (a boost töredéke).
+* Fejlesztés és könyvelés (jegy, merch, tagdíj, fenntartás), zárt kapu.
+* A HUB-doboz és a gombja.
+
 ## penz-leptek-3-9-263-proba.js — 💰 a pénz a 3–4. idény után is józan marad
 
 ```

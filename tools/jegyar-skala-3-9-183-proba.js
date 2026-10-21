@@ -36,6 +36,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await p.addInitScript(()=>{window.HANG_TESZT=true;});
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
   await p.waitForTimeout(1500);
+  /* 3.9.264: a stadion + merch/PR réteg kikapcsolva — ez a próba a JEGYÁR-
+     láncot méri (fanTicketScale, fanAskFactor), ami változatlan; a stadion
+     saját próbája: stadion-merch-3-9-264-proba.js */
+  await p.evaluate(()=>{window.stadionState=()=>null;});
   const r=await p.evaluate(()=>{
     const o={};
     let RAW=90;window.teamOVRbase=()=>RAW;
