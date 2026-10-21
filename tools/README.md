@@ -400,6 +400,7 @@ node tools/esemeny-animacio-3-9-270-proba.js
 * „Ne mutasd többet” után nincs több jelenet; 0,5×-en és kikapcsolva sincs.
 * 3.9.276: a gólszám a játékos meccsbeli góljaiból (7 → HÉT GÓL!); jelenet közben a pixel-téma felugrója rejtve.
 * 3.9.278: a hat skill (Elastico, Húzd meg a szelet, Usain Bolt, Ágyúgolyó, Szitálós, Szabadrúgás mester) sora a gólhoz ragad, a gól a skill jelenetét kapja, és mind a hat kirajzolható.
+* 3.9.279: mind a 12 skill-jelenet kirajzolódik és lefut; a hős felülír, a jelenet nélküli skill nem foglal, a Sebészi passz a gólpasszadóé; a „Fogd meg a söröm!” bravúrjára a védés sora ráolvad; a Torghelle-becsúszás névvel, saját jelenettel; a skill-jelenet csak a saját eseménytípusán, és a keret fölött is jár.
 
 ## meccsesemeny-3-9-269-proba.js — ⚡ meccsesemények (animáció-jelöltek)
 

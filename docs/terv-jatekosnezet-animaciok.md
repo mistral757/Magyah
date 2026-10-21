@@ -294,6 +294,33 @@ A PvP-ben a `sim.events` már strukturált. Ott csak le kell képezni.
 >   * **Szabadrúgás mester** — fal, ív a fal fölött a felső sarokba.
 >   A felirat a skill nevét mutatja; ha a skillt más játszotta meg, mint aki
 >   gólt lőtt, „skilles → gólszerző" (a skilles figurája is a sajátja).
+> * **3.9.279 — SKILL-JELENETEK, 2. KÖR.** „Jöhet a következő kör
+>   skill-animáció, a győzelemnek csekély az esélye, fogd meg a söröm,
+>   torghelle sanyitól tanultam, sebészi passz, tökéletes beadás, villámbekk
+>   queen."
+>   * **A győzelemnek csekély az esélye. Mire várunk még?** — a hajrá gólja:
+>     pirosan lüktető meccsóra, két védő otthagyva, aranyfény. A gólon minden
+>     más skillt felülír (a hős sora a gól-blokk végén jön).
+>   * **Sebészi passz** — a négyes védősort szikevékony, izzó passz vágja
+>     ketté, a csatár a résen fut be (a gólpasszadó sora jelöli).
+>   * **A tökéletes beadás** — az alapvonalról, kirajzolt röppályával, fejes
+>     a levegőben (a gólpasszadóé).
+>   * **Villámbeck Queen** — a bekk villámmal és koronával húz el a szélen,
+>     visszagurít — vagy maga fejezi be.
+>   * **Fogd meg a söröm!** — nem gól, hanem a kapus BRAVÚRJA: a kapufánál
+>     letett söröskorsó, keresztbe vetődés a túlsó sarokba, kifröccsenő hab.
+>     A skill sora a védés sora előtt jön; a védés sora ráolvad (egy esemény).
+>   * **Torghelle Sanyitól tanultam tisztán szerelni** — nem gól, hanem a
+>     becsúszás: a támadó repül, a labda a miénk, a bíró int — „TISZTA!".
+>   * A két nem-gól skill-pillanat a meccsenkénti kereten FÖLÖTT is jelenetet
+>     kap (ritka: meccsenként legfeljebb egyszer szólal meg).
+>   * Csak a jelenettel bíró skill foglalja le a gólt — egy „Gyors kontra"
+>     sora nem veszi el a helyet a később megszólaló Szitálós elől.
+>   * **Javítva (3.9.278-ból):** a háló a labda becsapódásakor rándul (eddig
+>     egy fix 1,6 mp-es görbe arányára, jóval korábban); a több kulcskockás
+>     mozgás easingje a kulcskockán ül (az egész animációra tett easing
+>     elcsúsztatta a labdát a vetődéshez képest); a falemberek és a Bolt
+>     védősora nem zsugorodik össze az indulásnál (kettős skálázás).
 > * **Pixel-téma:** lépcsős mozgás, szögletes keret, pixeles arc (a saját
 >   tizenegy arca a kezdőrúgáskor előre elkészül).
 > * **Beállítás:** a témaválasztó alatt „🎬 Esemény-animációk” (BE/KI).
@@ -531,4 +558,4 @@ régi kódé; a lenyitás/adatlap gyors útja (3.9.168) már kikerüli.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0–F6 kész (3.9.266–3.9.274); az F5 élő meccsképe 3.9.275-ben momentum-sávra cserélve; 3.9.278: hat skill-jelenet.*
+*Állapot: F0–F6 kész (3.9.266–3.9.274); az F5 élő meccsképe 3.9.275-ben momentum-sávra cserélve; 3.9.278–279: tizenkét skill-jelenet.*

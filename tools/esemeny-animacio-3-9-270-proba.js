@@ -119,18 +119,53 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     r.g=L.map(e=>[e.t,e.p,e.skill||null,e.skillP||null]);
     /* a hat jelenet kirajzolódik, a saját feliratával */
     r.jelenet=Object.keys(EVA_SKILL_SABLON).map(id=>{
-      const ev={t:"gol",side:"us",p:"Teszt Elek",min:30,seq:99,skill:id,skillP:id==="sp_flank"?"Szél Elek":"Teszt Elek"};
-      const T=EVA_SABLON[EVA_SKILL_SABLON[id]];
+      const t=(EVA_SKILL_TIPUS[id]||["gol"])[0];
+      const asst=["sp_flank","mf_surgeon","mf_cross","sp_queen"].indexOf(id)>=0;
+      const ev={t,side:"us",p:"Teszt Elek",min:30,seq:99,skill:id,skillP:asst?"Szél Elek":"Teszt Elek"};
+      const T=EVA_SABLON[evaSkillSablon(ev)];
       try{const c=evaKontextus(ev);const svg=T.svg(c);
-        return {id,ok:/evaLabda/.test(svg)&&/evaKapus/.test(svg),cim:T.cim(c),kulon:id==="sp_flank"?/evaBefejezo/.test(svg):null};}
+        const A=()=>({});T.mozgas(A,c);
+        return {id,ok:/evaLabda/.test(svg)&&(t==="szereles"||/evaKapus/.test(svg)),cim:T.cim(c),
+          kulon:asst?(/evaBefejezo|evaPasszolo|evaBeado/.test(svg)&&svg.indexOf(c.skFig.fej)>=0):null};}
       catch(e){return {id,hiba:e.message};}});
+    /* 3.9.279 — a második kör */
+    sbEv("us","goal","Hős Huba",88);addLine(`88'  GÓL! Hős  4:1`,"m goal");
+    addLine(`→ Gyors kontra — pontos volt az indítás`,"m skillnote",true,{skill:"df_launch",skillP:"Indító Iván"});   /* jelenet nélküli: nem foglal */
+    addLine(`→ BOMBAGÓL!`,"m skillnote",true,{skill:"fw_cannon"});
+    addLine(`→ 🍺 Mindenki a lefújást várta`,"m mvp",false,{skill:"clutch_hero"});   /* felülír */
+    sbEv("us","goal","Csatár Csaba",89);addLine(`89'  GÓL! Csatár  5:1`,"m goal");
+    addLine(`→ Sebészi passz — pontos volt az indítás`,"m skillnote",true,{skill:"mf_surgeon",skillP:"Sebész Sebő"});
+    sbEv("us","goal","Gól Gábor",90);addLine(`90'  GÓL! Gól  6:1`,"m goal");
+    addLine(`→ Gyors kontra`,"m skillnote",true,{skill:"df_launch",skillP:"Indító Iván"});
+    /* „Fogd meg a söröm!": a skill sora ELŐBB, a védés sora ráolvad */
+    addLine(`→ 🍺 Fogd meg a söröm!`,"m mvp",false,{t:"bravur",side:"us",p:"Kapus Kálmán",skill:"clutch_wall"});
+    addLine(`70'  ZICCER! Kettesben a kapussal… Kapus kifut és hárít!`,"m ev",false,{t:"bravur",side:"us",p:"Kapus Kálmán",alt:"ziccer"});
+    /* Torghelle: a kemény belépő sora maga az esemény */
+    addLine(`72'  🦵 Szerelő beleszáll — Torghelle Sanyitól tanultam tisztán szerelni`,"m ev",false,{t:"szereles",side:"us",p:"Szerelő Szilárd",skill:"df_torghelle"});
+    addLine(`74'  🦵 Más becsúszik — Labda vót spori!`,"m ev",false,{t:"szereles",side:"us",p:"Más Máté",skill:"df_clean"});
+    const L2=mevLista();
+    const g2=L2.filter(e=>e.t==="gol").slice(3).map(e=>[e.p,e.skill||null,e.skillP||null]);
+    r.g2=g2;
+    r.bravur=L2.filter(e=>e.t==="bravur").map(e=>[e.p,e.skill,e.alt]);
+    r.szer=L2.filter(e=>e.t==="szereles").map(e=>[e.p,e.skill,evaSkillSablon(e)]);
+    r.tipus=[evaSkillSablon({t:"gol",skill:"clutch_wall"}),evaSkillSablon({t:"bravur",skill:"clutch_wall"}),evaSkillSablon({t:"gol",skill:"df_torghelle"})];
     mevVege();
+    /* a skill-pillanat a keret fölött is jelenetet kap; a sima szerelés nem */
+    mevKezd({});_mev.anim=true;_mev.keret=3;_mev.hasznalt=3;
+    r.keretSkill=mevValaszt({t:"szereles",side:"us",p:"X",skill:"df_torghelle",min:20});
+    r.keretSima=mevValaszt({t:"szereles",side:"us",p:"Y",min:20});
+    mevVege();_evaSor.length=0;
     return r;});
   ok(JSON.stringify(sk.g[0])===JSON.stringify(["gol","Bomba Béla","fw_cannon","Bomba Béla"]),"a skill a gólra kerül (az első nyer)",sk.g[0]);
   ok(JSON.stringify(sk.g[1])===JSON.stringify(["gol","Klose Miró","sp_flank","Arjen Robben"]),"sebesség-skill: a gólpasszadó a gazdája",sk.g[1]);
   ok(JSON.stringify(sk.g[2])===JSON.stringify(["gol","Juni Pernambuco","mf_fk","Juni Pernambuco"]),"szabadrúgásgól: a skill a gól sorából",sk.g[2]);
   ok(sk.g[3]&&sk.g[3][0]==="golKapott"&&sk.g[3][2]===null,"az ellenfél gólja nem kap skillt",sk.g[3]);
-  ok(sk.jelenet.length===6&&sk.jelenet.every(j=>j.ok&&/!$/.test(j.cim))&&sk.jelenet.find(j=>j.id==="sp_flank").kulon,"mind a hat skill-jelenet kirajzolódik a saját feliratával (a szélen elhúzó gólpasszadóval is)",sk.jelenet.map(j=>j.id+":"+(j.cim||j.hiba)));
+  ok(sk.jelenet.length===12&&sk.jelenet.every(j=>j.ok&&/!$/.test(j.cim)&&j.kulon!==false),"mind a 12 skill-jelenet kirajzolódik és lefut, a saját feliratával (a gólpasszadó skillesek a saját figurájukkal)",sk.jelenet.map(j=>j.id+":"+(j.cim||j.hiba)+(j.kulon===false?"(!kulon)":"")));
+  ok(JSON.stringify(sk.g2)===JSON.stringify([["Hős Huba","clutch_hero","Hős Huba"],["Csatár Csaba","mf_surgeon","Sebész Sebő"],["Gól Gábor",null,null]]),"3.9.279: a hős felülír, a jelenet nélküli skill nem foglal, a Sebészi passz a gólpasszadóé",sk.g2);
+  ok(JSON.stringify(sk.bravur)===JSON.stringify([["Kapus Kálmán","clutch_wall","ziccer"]]),"„Fogd meg a söröm!”: egy bravúr-esemény, a védés sora ráolvad",sk.bravur);
+  ok(JSON.stringify(sk.szer)===JSON.stringify([["Szerelő Szilárd","df_torghelle","skTorghelle"],["Más Máté","df_clean",null]]),"Torghelle: a becsúszás névvel, a saját jelenetével (a többi szerelés sima)",sk.szer);
+  ok(JSON.stringify(sk.tipus)===JSON.stringify([null,"skSor",null]),"a skill-jelenet csak a saját eseménytípusán",sk.tipus);
+  ok(sk.keretSkill===true&&sk.keretSima===false,"a skill-pillanat a keret fölött is jelenetet kap",[sk.keretSkill,sk.keretSima]);
   ok(s1.test.torzs&&s1.test.fejViewBox&&s1.test.nincsVall&&s1.test.bor,"a figura: csak-fej kép + saját mezes törzs, a bőrszínnel",s1.test);
 
   const meccs=async(seb,opt)=>p.evaluate(async([seb,opt])=>{
