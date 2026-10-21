@@ -368,6 +368,26 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## arckep-3-9-267-proba.js — 🧑 az arckép-generátor
+
+```
+node tools/arckep-3-9-267-proba.js
+```
+
+* Determinisztikus; 400 valódi játékosból 400 különböző arc, minden hajstílus és ≥ 8 bőrtónus.
+* A kor csak a korfüggő vonásokat mozgatja; a hajvonal csak egy résznél húzódik vissza; 21 évesen senki sem ősz.
+* A régió súlyoz, de nem kötelez; a morál látszik.
+* Minden SVG betölt; a pixeles 40×40-es PNG a saját palettáján, a helyőrző magától cserélődik.
+* Sima/pixeles választás (auto a téma szerint).
+
+## arckep-galeria.js — 🖼️ arcok szemre ellenőrzéshez
+
+```
+node tools/arckep-galeria.js <kimeneti-mappa>
+```
+
+100 valódi játékos sima (`g1.png`) és pixeles (`g2.png`) arca, öregedés- és morál-sorok (`g3.png`).
+
 ## tempo-skala-3-9-266-proba.js — ⏱️ az új tempó-skála
 
 ```

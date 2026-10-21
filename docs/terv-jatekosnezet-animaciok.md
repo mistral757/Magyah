@@ -67,6 +67,23 @@ Ez **lineáris, ×0,5-ös átszámozásként** áll össze: `régi = új × 0,5`
 
 ### 2.1 Az arckép-generátor (F1)
 
+> **ELKÉSZÜLT: 3.9.267** (még nem jelenik meg a játékban; az F2 teszi ki az
+> adatlapra). A kód az `index.html` „ARCKÉP (3.9.267, F1)” blokkja.
+> Próba: `tools/arckep-3-9-267-proba.js`. Mintaoldal: `tools/arckep-galeria.js`.
+>
+> Ami a terv óta pontosodott:
+> * 19 hajstílus, 7 szakáll, 5 szemforma, 6 orr, 6 száj (a morál húzza), 10
+>   bőrtónus, 9 hajszín, 6 szemszín; 400 valódi játékosból 400 különböző arc.
+> * A kor: őszülés (31–41 évesen indul, mindenkinek a maga idején), ráncok,
+>   és a játékosok kb. 40%-ánál visszahúzódó hajvonal. Aki kopaszodik, rövidre
+>   vágatja a frufrut és a bokrot; a végén „patkó” marad.
+> * A pixeles változat 40×40-es, a rajz saját palettájára (≈25 szín)
+>   kvantálva. A vonalak ehhez vastagabbak (`bold`).
+> * Választás: `faceStilus()` — „auto” (pixel-témában pixeles), „sima”,
+>   „pix” (`faceStyle30_0`). A kapcsoló az F2 adatlapjára kerül.
+> * Ismert korlát: az arc a névből és a nemzetiségből sorsolódik, ezért egy
+>   valódi sztár bőrtónusa nem feltétlenül egyezik a valóságossal.
+
 **Elv:** determinisztikus, procedurális SVG, rétegekből. Ugyanaz a játékos
 mindig ugyanazt az arcot kapja, minden gépen. A PvP-ben az ellenfél is ezt
 látja. Nincs kép-fájl és nincs hálózat.
@@ -299,4 +316,4 @@ a HUB-ban.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0 kész (3.9.266). Következik az F1 (arckép-generátor).*
+*Állapot: F0 (3.9.266) és F1 (3.9.267) kész. Következik az F2 (adatlap-ablak).*
