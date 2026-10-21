@@ -130,12 +130,33 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      /* forduló közben, nem a kezdőrúgás előtt: a „meccs" és a „szezon" témák
         itt nem versenyeznek a két helyért, csak a „reg" sor */
      S.idx=10;
+     /* 3.9.277: a TÖBBI „reg" téma a mérés idejére nem esedékes. Enélkül a
+        próba véletlenen múlt: ha épp a talizmán-húzás (prio 30) vagy más,
+        magasabb rangú téma is esedékes volt, kiszorította a két helyről a
+        stadiont — a teszt hol átment, hol nem (mérve). */
+     const _dueMent={};
+     Object.keys(VEZ_PUSH).forEach(k=>{if(VEZ_PUSH[k]==="reg"&&k!=="stadion:bovit"&&k!=="merch:fejleszt"&&TEACH_TOPICS[k]){
+       _dueMent[k]=TEACH_TOPICS[k].due;TEACH_TOPICS[k].due=()=>false;}});
      try{vezPushJelolt(null);t0+=VEZ_PUSH_REG_KORAN;ki.em.push=vezPushJelolt(null);}catch(e){ki.em.pushHiba=String(e);}
+     Object.keys(_dueMent).forEach(k=>{TEACH_TOPICS[k].due=_dueMent[k];});
      window.teachNow=_now;
      ki.em.horgony=TEACH_TOPICS["stadion:bovit"].a==="hubStadionBtn"&&TEACH_TOPICS["merch:fejleszt"].a==="hubStadionBtn";}
+    /* 10. 💸 3.9.277 — az első idények ára: ötöd, harmad, fél, aztán a régi */
+    {const T=stadionState();T.kap=8;T.merch=4;S.fanBase=700000;
+     const sn0=S.seasonNumber,_sz=stadionIdenySzorzo;
+     ki.idenyAr=[1,2,3,4,5].map(n=>{S.seasonNumber=n;
+       const uj=[stadionKovAr(),merchKovAr()];
+       stadionIdenySzorzo=()=>1;const regi=[stadionKovAr(),merchKovAr()];stadionIdenySzorzo=_sz;
+       return {n,uj,regi,sz:Math.round(_sz()*1000)/1000,st:Math.round(uj[0]/regi[0]*100)/100,me:Math.round(uj[1]/regi[1]*100)/100};});
+     S.seasonNumber=sn0;}
     ki.verzio=APP_VERSION;
     return ki;});
   await p.screenshot({path:process.env.KEP||"/dev/null",fullPage:false}).catch(()=>{});
+  console.log("=== 10. az első idények ára (3.9.277) ===");
+  {const v=r.idenyAr||[];const varj=[0.2,0.33,0.5,1,1];
+   /* az ár 100-ra kerekül, és legalább 100 — kis árnál ez a lépés látszik */
+   ok(v.length===5&&v.every((x,i)=>Math.abs(x.sz-varj[i])<0.01&&[0,1].every(j=>Math.abs(x.uj[j]-Math.max(100,x.regi[j]*x.sz))<=100)),
+     "stadion és merch: 1. idény ötöd, 2. harmad, 3. fél, 4-től a régi ár",v);}
   console.log("=== 1. átállás ===");
   ok(r.atallNagy.kap===11&&r.atallNagy.merch===3,"700 ezres tábornál: a legnagyobb (120 ezres) stadion és 3. merch-szint",r.atallNagy);
   ok(r.atallKicsi.kap===1&&r.atallKicsi.merch===0,"új karrier (8 ezres tábor): 5 ezres stadion, 0. merch-szint",r.atallKicsi);
