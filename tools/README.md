@@ -368,6 +368,18 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## penz-leptek-3-9-263-proba.js — 💰 a pénz a 3–4. idény után is józan marad
+
+```
+node tools/penz-leptek-3-9-263-proba.js
+```
+
+* A karrier elején a lépték a működési keret (a régi szabály).
+* Nagy valódi bevételnél a bevétel fele a lépték. Az eladás, a hitel, a visszatérítés és a felzárkóztatás nem számít bele.
+* Egy idénybe legfeljebb ~1,8 ifi-boost fér.
+* A kihívás pénz-tétje nem függ az egyenlegtől, és a saját jutalma nem gerjeszti.
+* A katalógus kiírja a léptéket.
+
 ## kupa-lap-gyorsulas-3-9-262-proba.js — 🏆 kupa-mezőny, tiszta lap, korábbi mezőny-gyorsulás
 
 ```

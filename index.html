@@ -7538,7 +7538,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.262";
+const APP_VERSION="3.9.263";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -27397,8 +27397,60 @@ const FORMATION_PRICE_MULT=0.5;     /* fizetős felállásváltás −50% */
    kupagyőzelmekkel kilő a büdzsé. A hangolás egyetlen számon áll, és az arány
    (nem az abszolút ár) marad állandó a karrier egészén. */
 const BOOST_UNIT_SEASONS=1.10;   /* hány idénynyi keretbe kerül egy ifi-boost */
+/* ================= 💰 A FEJLESZTÉSEK ÁRA A VALÓDI BEVÉTELHEZ IS MÉR (3.9.263) =================
+   BEJELENTÉS (a közös karrier társától): „Kb 120 ifi boost fér bele […] Itt
+   egyszer csak valahol tízszeres sebességgel kezd el ömleni a pénz. Ami tök
+   jó, csak irreális fejlesztéseket tesz lehetővé ahhoz képest, hogy egy
+   darabig minden fillért meg kellett becsülni." — KÉRÉS: „A mérési adatainkat
+   is böngészd. És próbálj valamit kidolgozni, amivel 3-4. szezon után is még
+   reasonable lesz az anyagi oldala a játéknak."
+   A MÉRÉS (meres-adat ág, 13 karrier, a `penz` bontás): a bevétel a 3→4.
+   idényben ×30–×190-et ugrik (pl. 29 ezer → 5,5 milliárd), miközben a
+   csapaterő alig duplázódik. A bevétel szinte egésze a PIACI ÁRAKHOZ kötött
+   csatornákból jön — lelátó (a keret átlagos kikiáltási ára), kupadíj (a
+   piac teteje), kihívás-jutalom —, ezek a POT-görbével exponenciálisan
+   nőnek. A boost-egység horgonya viszont a MŰKÖDÉSI KERET (clubBudgetScale:
+   a csapaterőből, 4,5%/pont), ami ehhez képest lemarad: a 4. idényre a
+   „klub éves bevétele” mérce a valódi bevétel ~1%-a lett — innen a 120
+   ifi-boost. A 1. idényben (mérve, valódi motorral): valódi bevétel ≈ 1,5 ×
+   működési keret, egy idény ≈ 1,4 ifi-boostot fizet.
+   A SZABÁLY: a fejlesztések léptéke a működési keret ÉS a valódi éves
+   bevétel FELE közül a NAGYOBB. A valódi éves bevétel = az előző lezárt
+   idény és a mostani idény eddigi bevétele közül a nagyobb, az eladások, a
+   hitel, a visszatérítés és a PvP-felzárkóztatás NÉLKÜL (azok nem a klub
+   szerkezeti bevételei, és az eladás beszámítása a keret kiárusítását
+   büntetné). A karrier eleje így BETŰRE a régi (0,5 × 1,5 < 1), később a
+   vásárlóerő az első idényekéhez hasonló marad: egy idény bevétele ~1,5–2
+   ifi-boostot fizet, nem százat.
+   NEM MANIPULÁLHATÓ: a költés nem csökkenti (bevételt mér, nem egyenleget),
+   az eladás nem emeli. A PvP-felzárkóztatás összege SZÁNDÉKOSAN a régi
+   léptéken marad (az bevétel — a valódi bevételhez kötve önmagát gerjesztené). */
+const PENZ_VALOS_K=0.5;
+const PENZ_VALOS_KI=["sale","saleStar","refund","loanIn","mpCatch"];
+function penzIdenyBevetel(sn,jutalomNelkul){
+  try{
+    const st=(S&&S.ledger&&S.ledger.v===LEDGER_V)?S.ledger:null;
+    const r=st&&st.rows?st.rows[sn]:null;
+    if(!r||!r.cats)return 0;
+    let t=0;
+    Object.keys(r.cats).forEach(k=>{
+      const def=LEDGER_CATS[k];
+      if(!def||!(def.side>0)||PENZ_VALOS_KI.indexOf(k)>=0)return;
+      if(jutalomNelkul&&k==="reward")return;
+      t+=r.cats[k]||0;});
+    return t;
+  }catch(e){return 0;}}
+function penzEvesValos(jutalomNelkul){
+  if(gameMode!=="career")return 0;
+  const sn=(S&&S.seasonNumber)||1;
+  return Math.max(penzIdenyBevetel(sn-1,jutalomNelkul),penzIdenyBevetel(sn,jutalomNelkul));}
+/* jutalomNelkul: a kihívás- és mérföldkő-jutalom kimarad a mérésből — a
+   kihívás pénz-tétje ezt kéri, különben önmagát gerjesztené */
+function penzLeptek(jutalomNelkul){
+  let c=0;try{c=clubBudgetScale();}catch(e){c=2000;}
+  return Math.max(c,PENZ_VALOS_K*penzEvesValos(jutalomNelkul));}
 function boostUnitBase(){
-  return Math.max(500,BOOST_UNIT_SEASONS*clubBudgetScale());}
+  return Math.max(500,BOOST_UNIT_SEASONS*penzLeptek());}
 /* ---- A KEZDŐ IDÉNYEK KEDVEZMÉNYE — VISSZA (3.9.48) ----
    A 3.8.13-ban bevezetett ablak (1. idény −50%, 2. idény −33%) a KÖVETKEZŐ
    committal kikerült: akkor az árat átkötöttük a klub éves bevételéhez
@@ -27476,7 +27528,7 @@ const PRICE_BUDGET_REF=10000;
    tizede). A drágulás tehát megmarad, csak a mértéke józan. */
 function budgetPriceScale(){
   let b=PRICE_BUDGET_REF;
-  try{b=clubBudgetScale();}catch(e){b=PRICE_BUDGET_REF;}
+  try{b=penzLeptek();}catch(e){b=PRICE_BUDGET_REF;}   /* 💰 3.9.263 — a valódi bevételt is látja */
   const s=b/PRICE_BUDGET_REF;
   return s<=1?Math.max(0.05,s):Math.sqrt(s);}
 /* Egy régi, fix pontár mai ára: büdzséhez mérve, a kezdő kedvezménnyel. */
@@ -30571,7 +30623,7 @@ function posLearnCost(entry){
   let d=0;try{d=boostEarlyDisc();}catch(e){d=0;}
   /* ☯️ 3.9.153 — a Béke és harmónia „Sokoldalú képzés" képessége (1 = nincs). */
   let h=1;try{h=stylePosLearnCostMult();}catch(e){h=1;}
-  return Math.max(100,Math.round(clubBudgetScale()*share*(1-d)*h/100)*100);}
+  return Math.max(100,Math.round(penzLeptek()*share*(1-d)*h/100)*100);}   /* 💰 3.9.263 */
 /* ================= A TANULÁS TEMPÓJA: EGY BÁZIS, KÉT ÚT =================
    MEGVÁSÁROLVA a bázis MINDENKINÉL 12 lejátszott meccs. Korábban a kor és a
    POT szabta (9-20 meccs), és ezt cseréljük le: a tempó-különbséget mostantól
@@ -52873,8 +52925,23 @@ function challengeContext(){
     oppRating:oppTargetRating||80,
     seasonNum:S.seasonNumber||1};}
 /* Pénz-tétek skálázása a jelenlegi büdzséhez és a mezőnyszinthez. */
+/* ---- 💰 A PÉNZ-TÉT NEM AZ EGYENLEGBŐL SZÁMOL (3.9.263) ----
+   A RÉGI KÉPLET: (0,28 × egyenleg + 2500) × (1 + (mezőny − 80) × 0,02). Ez
+   KAMATOS KAMAT volt: a jutalom a FELHALMOZOTT pénzzel nőtt, és egy 228-as
+   mezőnyben (×3,96) egy nehéz, hosszú kihívás (×1,25 × 1,5) az egyenleg
+   KÉTSZERESÉT fizette — a mérésben egy 4. idényben 2,29 milliárd, a bevétel
+   42%-a. Minél többet gyűjtöttél, annál gyorsabban nőtt, és aki elköltötte,
+   azt büntette.
+   MOSTANTÓL a klub LÉPTÉKÉHEZ mér — ugyanaz a mérce, mint a fejlesztéseké
+   (penzLeptek), de a kihívás-jutalom NÉLKÜL számolt valódi bevétellel, hogy a
+   jutalom ne gerjeszthesse önmagát. A karrier elején (a működési keret dönt)
+   a szám ugyanott van, ahol eddig: 85-ös mezőnyben, 5 000-es egyenlegnél a
+   régi ~4 200, az új ~4 500. */
+const CH_MONEY_K=0.85;
 function challengeMoneyScale(ctx){
-  return Math.max(1,(ctx.budget*0.28+2500)*(1+(ctx.oppRating-80)*0.02));}
+  let b=0;try{b=penzLeptek(true);}catch(e){b=0;}
+  if(!(b>0))return Math.max(1,(((ctx&&ctx.budget)||0)*0.28+2500)*(1+(((ctx&&ctx.oppRating)||80)-80)*0.02));
+  return Math.max(1,CH_MONEY_K*b);}
 /* ---- A POT-JUTALOM IS A MEZŐNNYEL NŐ (3.9.213) ----
    KIMONDOTT KÉRÉS: „Ez a típusú jutalom is legyen skálázva, mert eddig nem
    volt." A „+N POT egy játékosra" fixen 1500 × nehézség volt — egy 85-ös
@@ -54779,7 +54846,7 @@ function posLearnTypicalCost(){
   /* Üres keretnél (elméleti eset) a sáv közepe a klub léptékéből — nem egy
      bedrótozott szám, ami a karrier felénél már értelmetlen volna. */
   return costs.length?costs[Math.floor(costs.length/2)]
-    :Math.round(clubBudgetScale()*(POS_LEARN_SHARE[0]+POS_LEARN_SHARE[1])/2);}
+    :Math.round(penzLeptek()*(POS_LEARN_SHARE[0]+POS_LEARN_SHARE[1])/2);}
 function posLearnRefundDesc(){
   return `a betanítási ár fele (kb. +${fmtFt(Math.round(posLearnTypicalCost()/2))})`;}
 /* ---- A KÖTÖTT JUTALMAK FELIRATA ----
@@ -89729,10 +89796,13 @@ function boostOpenPanel(){
   /* AZ ÁR MÉRCÉJE KIÍRVA. Egy budzsé-arányos ár csak akkor érthető, ha látszik,
      mihez mérjük: enélkül a felhasználó azt látná, hogy az árak "maguktól"
      nőnek idényről idényre. */
+  const _cbs=Math.round(clubBudgetScale()),_valos=Math.round(penzEvesValos()),_lep=Math.round(penzLeptek());
   const scaleNote=`<br><span style="color:var(--dim2)">Az egység a KLUB ÉVES BEVÉTELÉHEZ mért: `
-    +`a mostani lépték ${fmtFt(Math.round(clubBudgetScale()))} (a működési keret + a presztízs-prémium fele), `
-    +`egy ifi-boost nagyjából ennyi. Ahogy a klub nő — csapaterő, mezőny, vitrin —, úgy nő az ár is; `
-    +`a karrier elején ezért olcsó, és ott hozza a legtöbbet.</span>`;
+    +`a mostani lépték <b>${fmtFt(_lep)}</b> — a működési keret (${fmtFt(_cbs)}, a presztízs-prémium felével) és a `
+    +`valódi éves bevétel fele (${fmtFt(Math.round(_valos*PENZ_VALOS_K))}; eladások nélkül, az előző és a mostani idény nagyobbika) közül a nagyobb`
+    +`${_lep>_cbs?" — most a <b>valódi bevétel</b> dönt":""}. Egy ifi-boost nagyjából ennyi. `
+    +`Ahogy a klub nő, úgy nő az ár is: a karrier elején ezért olcsó, és ott hozza a legtöbbet — `
+    +`később pedig nem lesz belőle száz egy idényre.</span>`;
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
     Hétféle fejlesztés, mind a büdzséből. Az árak <b>egységben</b> értendők — egy egység a legdrágább boost,
     az ifi-boost ára: <b style="color:var(--gold)">${fmtFt(unit)}</b>. Az egyenleged <b>${fmtFt(S.transferBudget||0)}</b>.${discNote}<br>
