@@ -94,8 +94,16 @@ régi bevétel kb. 40%-áról indul, és fejlesztéssel ~70%-ig viheti fel.
 
 ## Felület
 
-* **HUB** (Infópult → Szezon és mérleg): új „🏟️ Stadion · 🛍️ Merch és PR”
-  doboz. Megmutatja:
+* **HUB → Menü → Csapatépítés → „🏟️ Stadion, merch és PR”** kártya. Ez a
+  többi fejlesztés (Scout, ügynökség, sajtó; Keretbővítés) mellett ül, saját
+  ablakkal. Az alsó sora élőben mutatja:
+  * a férőhelyet;
+  * a nézőszámot;
+  * a merch-szintet;
+  * a nettó bevételt meccsenként.
+
+  Az első kiadásban csak az Infópultban volt, és ott nem találták meg.
+* **Infópult → Szezon és mérleg:** ugyanaz a doboz a gazdasági kép alatt. Megmutatja:
   * a férőhelyet, a keresletet, a nézőszámot és a telítettséget;
   * hány szurkoló nem fér be;
   * a jegy-, a merch-, a tagdíj- és a fenntartás-összeget;

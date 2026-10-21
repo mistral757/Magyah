@@ -102,8 +102,19 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.doboz=/Stadion/.test(w.textContent)&&/Merch és PR/.test(w.textContent)&&!!w.querySelector("#stadionBovitBtn")&&!!w.querySelector("#merchFejlBtn");
     const k1=T.kap;try{stadionBind();w.querySelector("#stadionBovitBtn").click();}catch(e){ki.gombHiba=String(e);}
     ki.gomb=T.kap===k1+1;w.remove();
+    /* 8. a HUB menüje: saját kártya, saját ablak (3.9.264, a felhasználó nem találta) */
+    try{renderHub();}catch(e){ki.hubHiba=String(e);}
+    const hb=document.getElementById("hubStadionBtn");
+    ki.kartya={van:!!hb,rejtett:!!(hb&&hb.classList.contains("hide")),ds:(document.getElementById("hubStadionDs")||{}).textContent||""};
+    S.transferBudget=1e12;
+    try{hb.click();}catch(e){ki.nyitHiba=String(e);}
+    ki.ablak={cim:(document.getElementById("twTitle")||{}).textContent||"",gomb:!!document.getElementById("twstadionBovitBtn")};
+    const kk=stadionState().kap;
+    try{document.getElementById("twstadionBovitBtn").click();}catch(e){ki.ablakGombHiba=String(e);}
+    ki.ablakBovit=stadionState().kap===kk+1&&!!document.getElementById("twstadionBovitBtn");
     ki.verzio=APP_VERSION;
     return ki;});
+  await p.screenshot({path:process.env.KEP||"/dev/null",fullPage:false}).catch(()=>{});
   console.log("=== 1. átállás ===");
   ok(r.atallNagy.kap===11&&r.atallNagy.merch===3,"700 ezres tábornál: a legnagyobb (120 ezres) stadion és 3. merch-szint",r.atallNagy);
   ok(r.atallKicsi.kap===1&&r.atallKicsi.merch===0,"új karrier (8 ezres tábor): 5 ezres stadion, 0. merch-szint",r.atallKicsi);
@@ -126,6 +137,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.kat,"az öt új könyvelési kategória megvan");
   console.log("=== 7. HUB ===");
   ok(r.doboz&&r.gomb&&!r.gombHiba,"a doboz kirajzolódik, a bővítés gombja működik",{doboz:r.doboz,gomb:r.gomb,h:r.gombHiba});
+  console.log("=== 8. a HUB menüje ===");
+  ok(r.kartya.van&&!r.kartya.rejtett&&/férőhely/.test(r.kartya.ds),"a Csapatépítés menüben ott a „🏟️ Stadion, merch és PR” kártya, élő alsorral",r.kartya);
+  ok(/Stadion, merch és PR/.test(r.ablak.cim)&&r.ablak.gomb&&!r.nyitHiba,"a kártya megnyitja a saját ablakát",r.ablak);
+  ok(r.ablakBovit&&!r.ablakGombHiba,"az ablakban a bővítés működik, és az ablak frissül",{ok:r.ablakBovit,h:r.ablakGombHiba});
   ok(String(r.verzio).localeCompare("3.9.264",undefined,{numeric:true})>=0,"verzió legalább 3.9.264",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
