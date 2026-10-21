@@ -77,6 +77,25 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(s1.hiany.length===0,"minden animálható típusnak van jelenete",s1.hiany);
   ok(s1.rossz.length===0,"minden jelenet kirajzolható, felirattal",s1.rossz);
   ok(!s1.random,"a lejátszó nem húz véletlent");
+  /* 3.9.276: a gólszám a listából (nem a közvetítés „HAT GÓL — VAGY MÉG
+     TÖBB?!" sorából), és a pixel-téma felugrója nem lóg a jelenetbe */
+  const s276=await p.evaluate(async()=>{
+    mevKezd({});_mev.keret=8;_mev.anim=true;
+    const L=[];for(let i=1;i<=7;i++){const ev={t:"gol",side:"us",p:"Gólgép Géza",min:i*10,seq:i,extra:i>=6?"hat":null};_mev.lista.push(ev);L.push(ev);}
+    const cim=n=>EVA_SABLON.gol.cim({ev:L[n-1],sajat:true});
+    const r={c3:cim(3),c6:cim(6),c7:cim(7),c2:cim(2)};
+    try{applyTheme("pixel");}catch(e){}
+    evaIdoSzorzo=3;evaKer(L[6]);await new Promise(x=>setTimeout(x,120));
+    try{pixFx("gol");}catch(e){}
+    const fx=document.getElementById("pixFx");
+    r.fut=document.body.classList.contains("evaFut");
+    r.pixVolt=!!fx&&fx.classList.contains("on");r.pixRejtve=!!fx&&getComputedStyle(fx).display==="none";
+    _evaSor.length=0;evaLezar();await new Promise(x=>setTimeout(x,60));
+    r.utana=!document.body.classList.contains("evaFut");
+    evaIdoSzorzo=1;try{applyTheme("dark");}catch(e){}
+    return r;});
+  ok(s276.c3==="MESTERHÁRMAS!"&&s276.c6==="HAT GÓL!"&&s276.c7==="HÉT GÓL!"&&s276.c2==="GÓÓÓL!","a gólszám a játékos meccsbeli góljaiból (7 → HÉT GÓL!)",s276);
+  ok(s276.fut&&s276.pixVolt&&s276.pixRejtve&&s276.utana,"jelenet közben a pixel-téma felugrója rejtve, utána újra él",s276);
   ok(s1.test.torzs&&s1.test.fejViewBox&&s1.test.nincsVall&&s1.test.bor,"a figura: csak-fej kép + saját mezes törzs, a bőrszínnel",s1.test);
 
   const meccs=async(seb,opt)=>p.evaluate(async([seb,opt])=>{

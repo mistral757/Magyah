@@ -1,7 +1,7 @@
 /* 📊 3.9.275 — MOMENTUM (az élő meccskép helyett) — élő mérés.
    Amit néz:
-     1. az első kezdőrúgásig rejtve; utána csak a sáv (nincs pálya, pötty,
-        labda), a két csapat nevével;
+     1. az első kezdőrúgásig rejtve; utána a sáv (nincs pálya, pötty,
+        labda), a két csapat nevével; alatta (3.9.276) a lendület-oszlopok;
      2. valódi meccs közben a sáv mozog;
      3. MOMENTUM: a régi helyzetek súlya fogy (EK_FELEZES), a friss nyomás
         átbillenti;
@@ -72,7 +72,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     S.auto=false;S.lastMatch=null;playMatch();
     await varj(200);
     const el=document.getElementById("elokep");
-    return {lathato:!el.classList.contains("hide"),palya:!!document.getElementById("ekPalya")||document.querySelectorAll(".ekP,#ekLabda,#ekLend").length,
+    return {lathato:!el.classList.contains("hide"),palya:!!document.getElementById("ekPalya")||document.querySelectorAll(".ekP,#ekLabda").length,
       sav:!!document.getElementById("ekBirMi"),mi:document.getElementById("ekMiNev").textContent,ok:document.getElementById("ekOkNev").textContent};});
   ok(m.lathato&&!m.palya&&m.sav,"a kezdőrúgás után: csak a sáv, pálya nélkül",m);
   ok(m.mi.length>0&&m.ok.length>0&&m.ok!=="Ellenfél"&&!/\(/.test(m.ok),"a két csapat neve a sáv két végén (évad-zárójel nélkül)",{mi:m.mi,ok:m.ok});
@@ -88,8 +88,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
         document.getElementById("elokep").scrollIntoView({block:"center"});});
       await p.waitForTimeout(300);const h=await p.$("#elokep");const bb=h&&await h.boundingBox();
       if(bb)await p.screenshot({path:OUT+"/momentum.png",clip:{x:0,y:Math.max(0,bb.y-70),width:430,height:bb.height+150}});}}
-  await p.evaluate(()=>{matchSpeedTickMs=window._mTm;matchSpeed=window._mSeb;});
+  const lend=await p.evaluate(()=>{matchSpeedTickMs=window._mTm;matchSpeed=window._mSeb;
+    const L=document.getElementById("ekLend");
+    return {oszlop:L?L.querySelectorAll("rect[rx]").length:0,golJel:L?[...L.querySelectorAll("text")].filter(t=>t.textContent==="⚽").length:0,
+      gol:(S.lastMatch?S.lastMatch.gf+S.lastMatch.ga:-1),magas:L?L.getBoundingClientRect().height:0};});
   ok(szel.size>=3,"a sáv mozog",{kulonbozo:szel.size});
+  /* 3.9.276: „Ez a Line maradjon meg, csak legyen magasabb" */
+  ok(lend.oszlop>=3&&lend.golJel===lend.gol,"a lendület-oszlopok megvannak, annyi gól-jellel, ahány gól",lend);
   console.log("\n— 3. MOMENTUM —");
   const d=await p.evaluate(()=>{
     ekKezd();

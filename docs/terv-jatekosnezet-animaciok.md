@@ -268,6 +268,18 @@ A PvP-ben a `sim.events` már strukturált. Ott csak le kell képezni.
 >   gallérral (a klub mintája ráfeszítve), nadrág, a bőrszínhez illő kar és
 >   comb, sportszár a mez színében, cipő. A fej nagyobb a testnél
 >   (bobblehead), a nyak a gallérba fut.
+> * **3.9.276 — három javítás:**
+>   * „A pixelated módban a sima közvetítés beugró ablakai, amik a gólt
+>     ünneplik, belelógnak az animációba": a pixel-téma felugrója (`#pixFx`),
+>     szikrái és futkosó figurája z 9980–9990-en ül, a jelenet fölött — amíg
+>     jelenet fut (`body.evaFut`), ezek rejtve vannak.
+>   * „6 gól után mindig 6 gólt jelez az animáció": a felirat a közvetítés
+>     sorából jött, ami 6 fölött mindig „HAT GÓL — VAGY MÉG TÖBB?!". Most a
+>     jelenet maga számolja meg a játékos meccsbeli góljait (`evaGolSzam`):
+>     MESTERHÁRMAS · NÉGY … TÍZ GÓL, afölött „N GÓL!".
+>   * „fekvő módban … nagyon picibe össze vannak nyomva": fekve (≤ 640 px
+>     magas) a felirat a színpad MELLÉ kerül, a színpad a teljes magasságot
+>     kapja (a gomboknak hagyott sávval).
 > * **Pixel-téma:** lépcsős mozgás, szögletes keret, pixeles arc (a saját
 >   tizenegy arca a kezdőrúgáskor előre elkészül).
 > * **Beállítás:** a témaválasztó alatt „🎬 Esemény-animációk” (BE/KI).
@@ -342,6 +354,11 @@ szól, csak eddig a sorhoz kötődött.
 >   kérése alapból KI-re állítja.
 > * Próba: `tools/momentum-3-9-275-proba.js` (a régi élő-meccskép próba
 >   törölve).
+>
+> * **3.9.276:** a lendület-oszlopok visszakerültek a sáv alá, magasabban
+>   (76 px; kérés: „Ez a Line maradjon meg, csak legyen magasabb"): 18
+>   ötperces oszlop, fölfelé mi, lefelé ők, a gólok, lapok, cserék jelével. Az
+>   oszlopok nem fogynak (a meccs krónikája), csak a sáv (a momentum).
 >
 > Az alábbi F5-leírás a 3.9.272-es, már nem élő változaté.
 
