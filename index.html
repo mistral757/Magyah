@@ -1246,6 +1246,9 @@ button.infPanel:disabled{cursor:default}
 .attrline .pri{color:var(--gold);font-weight:700}
 .attrline .sep{color:var(--dim2)}
 .hubDetail{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:2px 0 8px}
+/* 🧹 a napló archívum-gombja (3.9.273) */
+#ttLines .ktArchiv{padding:4px 0 6px;text-align:center}
+#ttLines .ktArchiv button{background:var(--panel2);border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:5px 10px;font:inherit;font-size:12px;cursor:pointer}
 /* 🗺️ ÉLŐ MECCSKÉP (3.9.272) */
 #elokep{margin:6px 0 8px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:6px 8px 8px}
 .ekCsuk{background:none;border:0;color:var(--dim);font:inherit;font-size:12px;font-weight:700;letter-spacing:.4px;cursor:pointer;padding:2px 0;width:100%;text-align:left}
@@ -7634,7 +7637,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.272";
+const APP_VERSION="3.9.273";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -22169,6 +22172,9 @@ function mpDiagCollect(){
       L.push("");L.push("── VEZETÉS (futó állapot)");
       L.push(teachDebugText());}
   }catch(e){L.push("teach-dump hiba: "+e.message);}
+  /* 🧹 3.9.273: a karbantartó — egy „akadozik, ha sokáig nyitva van"
+     bejelentésnél ez mondja meg, mekkora a lap és mit takarított */
+  try{L.push("");L.push("── KARBANTARTÓ");L.push(ktAllapotSzoveg());}catch(e){}
   /* ---- A VILÁG TENGELYEI (3.8.37) ----
      Közös karrierben ez a HÁROM szám dönti el, hogy a két gép ugyanazt a
      világot futtatja-e. Egy „szétcsúszott a karrierünk" bejelentés így két
@@ -39723,6 +39729,7 @@ function teardownGameScreens(){
      karrier első kezdőrúgása egy idegen szezon sorai alá írna. */
   ["ttLines","standing","euroLog","hubRoster","squadList"].forEach(id=>{
     const el=$(id);if(el)el.innerHTML="";});
+  try{ktArchivUrit();}catch(e){}
   /* futó guide-buborék horgonya nem maradhat a törölt képernyőn */
   try{if(typeof guideClearAnchor==="function")guideClearAnchor();}catch(e){}
   _guideQ=[];_guideCur=null;
@@ -61080,6 +61087,9 @@ function ekKezd(){
   let mi,ok;
   try{mi=kitForNow();}catch(e){mi={c1:"#c8102e",c2:"#fff"};}
   try{ok=evaEllenfelKit(evaEllenfelNev(),mi);}catch(e){ok={c1:"#1d4f91",c2:"#fff"};}
+  /* 3.9.273: az előző meccs hurka ELŐBB áll le — eddig az új állapot
+     felülírta a fogantyút, és a régi időzítő örökké futott (mérve: +1/meccs) */
+  if(_ek&&_ek.iv){clearInterval(_ek.iv);_ek.iv=null;}
   _ek={mi,ok,labda:[80,50],ut:[],lend:new Array(18).fill(0).map(()=>({mi:0,ok:0})),jelek:[],
     fMi:0,fOk:0,utolsoPerc:-1,okKiall:0,gol:0};
   const ln=`fill="none" stroke="#fff" stroke-opacity=".5" stroke-width=".7"`;
@@ -61101,7 +61111,6 @@ function ekKezd(){
   el.classList.remove("hide");
   ekCsukAllit();
   ekSajat();ekRajzSav();ekLabdaAllit();
-  if(_ek.iv)clearInterval(_ek.iv);
   _ek.iv=setInterval(ekLeptet,600);}
 /* a saját tizenegy a valódi, élő állapotból (csere, kiállítás) */
 function ekSajat(){
@@ -61198,6 +61207,121 @@ function ekRajzSav(){
   L.innerHTML=s;}
 /* a feliratkozás: MINDEN esemény (nem csak a jelenetre kiválasztottak) */
 mevFeliratkozMind(ekEsemeny);
+/* ================= 🧹 KARBANTARTÓ (3.9.273, F6) ==========================
+   KIMONDOTT KÉRÉS: „beépíthetünk valami cache tisztító mechanizmust is, ami
+   dolgozik azon, hogy a hosszan megnyitott oldal se kezdjen el akadozni egy
+   idő után."
+
+   MÉRVE (30 meccs kézi közvetítéssel, közte HUB és adatlap — CDP-vel):
+     · a DOM meccsenként ~170 csomóponttal nőtt — szinte mind a NAPLÓ sora:
+       a #ttLines csak a szezon elején ürül, egy szezon + kupák alatt
+       ezerszám gyűlnek a sorok (és minden új sor egy egyre hosszabb lista
+       aljára görget);
+     · az arckép-gyorsítótár meccsenként ~12 elemmel nőtt (hangulat × mez
+       változatai), a 600-as plafonig;
+     · a futó időzítők száma NŐTT (6 → 10): az élő meccskép minden
+       kezdőrúgáskor újat indított, a régit nem állította le — JAVÍTVA
+       (ekKezd), és a karbantartó is őrzi;
+     · az eseményfigyelők száma és a heap görbéje stabil.
+
+   AMIT CSINÁL — csendben, a böngésző ÜRESJÁRATÁBAN (requestIdleCallback),
+   ~45 mp-enként, és amikor a lap újra előtérbe kerül; rejtett lapon soha:
+     1. NAPLÓ: ha a #ttLines több mint KT_FEED_MAX sort tart, a régebbieket
+        (csak az utolsó KT_FEED_MARAD marad) kiveszi a DOM-ból egy memóriabeli
+        ARCHÍVUMBA — a napló tetején egy „▲ Korábbi sorok" gomb visszahozza
+        őket, darabonként. A szezon krónikája tehát nem vész el, csak nem
+        terheli a lapot. Meccs közben nem nyúl hozzá, és akkor sem, ha épp
+        visszafelé olvasol (a napló nem az alján áll).
+     2. ARCKÉPEK: a gyorsítótár LRU — a találat a sor végére kerül, a
+        karbantartó KT_ARC_MAX fölött a legrégebben használtakat dobja; a
+        függőben maradt pixel-kérések nyomát is törli.
+     3. IDŐZÍTŐK: egy már nem futó meccs élő-kép hurka leáll.
+   A diagnosztikában (🧪) látszik, mikor futott és mit takarított. */
+const KT_FEED_MAX=360,KT_FEED_MARAD=220,KT_ARCHIV_MAX=6000,KT_VISSZA=200,KT_ARC_MAX=240,KT_PERIODUS=45000;
+let _ktArchiv=[];
+const _kt={futas:0,utolso:0,sorKi:0,sorVissza:0,arcKi:0,ms:0,uj:0};
+/* a napló sorai (az archívum-gomb nélkül) */
+function ktSorok(L){return [...L.children].filter(el=>!el.classList.contains("ktArchiv"));}
+function ktArchivUrit(){
+  _ktArchiv=[];
+  try{const L=lines();const g=L&&L.querySelector(":scope>.ktArchiv");if(g)g.remove();}catch(e){}}
+/* a gomb a napló legtetején: annyit hoz vissza, amennyit kérsz */
+function ktArchivGomb(){
+  const L=lines();if(!L)return;
+  let g=L.querySelector(":scope>.ktArchiv");
+  if(!_ktArchiv.length){
+    if(g){g.remove();try{euroLogMark=Math.max(0,euroLogMark-1);}catch(e){}}
+    return;}
+  if(!g){
+    g=document.createElement("div");g.className="ktArchiv";
+    g.innerHTML=`<button type="button"></button>`;
+    g.querySelector("button").onclick=ev=>{ev.stopPropagation();ktArchivVissza();};
+    L.insertBefore(g,L.firstChild);
+    try{euroLogMark+=1;}catch(e){}}
+  g.querySelector("button").textContent=`▲ Korábbi sorok betöltése (${_ktArchiv.length})`;}
+function ktArchivVissza(){
+  const L=lines();if(!L||!_ktArchiv.length)return;
+  const db=Math.min(KT_VISSZA,_ktArchiv.length);
+  const resz=_ktArchiv.splice(_ktArchiv.length-db,db);
+  const g=L.querySelector(":scope>.ktArchiv");
+  const h0=L.scrollHeight,t0=L.scrollTop;
+  const tmp=document.createElement("div");tmp.innerHTML=resz.join("");
+  const frag=document.createDocumentFragment();
+  while(tmp.firstChild)frag.appendChild(tmp.firstChild);
+  L.insertBefore(frag,g?g.nextSibling:L.firstChild);
+  try{euroLogMark+=db;}catch(e){}
+  _kt.sorVissza+=db;
+  ktArchivGomb();
+  /* a szem ott marad, ahol volt: a beszúrt sorok fölé kerülnek */
+  L.scrollTop=t0+(L.scrollHeight-h0);}
+function ktNaploTakarit(){
+  const L=lines();if(!L)return 0;
+  try{if(S&&S.playing)return 0;}catch(e){}
+  const sorok=ktSorok(L);
+  if(sorok.length<=KT_FEED_MAX)return 0;
+  /* ha látszik és nem az alján áll, épp visszafelé olvasol — nem zavarunk */
+  const latszik=L.offsetParent!==null&&L.clientHeight>0;
+  if(latszik&&L.scrollHeight-L.scrollTop-L.clientHeight>40)return 0;
+  const ki=sorok.length-KT_FEED_MARAD;
+  const html=[];
+  for(let i=0;i<ki;i++){html.push(sorok[i].outerHTML);sorok[i].remove();}
+  _ktArchiv.push(...html);
+  if(_ktArchiv.length>KT_ARCHIV_MAX)_ktArchiv.splice(0,_ktArchiv.length-KT_ARCHIV_MAX);
+  try{euroLogMark=Math.max(0,euroLogMark-ki);}catch(e){}
+  ktArchivGomb();
+  if(latszik)L.scrollTop=L.scrollHeight;
+  return ki;}
+function ktArcTakarit(){
+  let ki=0;
+  try{
+    while(_faceCache.size>KT_ARC_MAX){_faceCache.delete(_faceCache.keys().next().value);ki++;}
+    _facePixVar.forEach((v,k)=>{if(!v.fut&&!v.length)_facePixVar.delete(k);});
+  }catch(e){}
+  return ki;}
+function ktIdozitok(){
+  try{if(_ek&&_ek.iv&&(!_mev||!S.playing)){clearInterval(_ek.iv);_ek.iv=null;}}catch(e){}}
+function ktFut(){
+  if(typeof document!=="undefined"&&document.hidden)return;
+  const t0=(performance&&performance.now)?performance.now():Date.now();
+  const s=ktNaploTakarit(),a=ktArcTakarit();
+  ktIdozitok();
+  _kt.futas++;_kt.utolso=Date.now();_kt.sorKi+=s;_kt.arcKi+=a;
+  _kt.ms=Math.round((((performance&&performance.now)?performance.now():Date.now())-t0)*10)/10;}
+function ktUtemez(){
+  const f=()=>{try{ktFut();}catch(e){}};
+  try{if(window.requestIdleCallback){requestIdleCallback(f,{timeout:3000});return;}}catch(e){}
+  setTimeout(f,0);}
+function ktAllapotSzoveg(){
+  let dom="?";try{dom=document.getElementsByTagName("*").length;}catch(e){}
+  let sor="?";try{sor=ktSorok(lines()).length;}catch(e){}
+  return `futott: ${_kt.futas}× · utoljára: ${_kt.utolso?new Date(_kt.utolso).toLocaleTimeString("hu-HU"):"még nem"} (${_kt.ms} ms)\n`
+    +`napló: ${sor} sor a lapon · ${_ktArchiv.length} archívumban · eddig ${_kt.sorKi} kivéve, ${_kt.sorVissza} visszahozva\n`
+    +`arckép-gyorsítótár: ${(typeof _faceCache!=="undefined")?_faceCache.size:"?"} / ${KT_ARC_MAX} · eddig ${_kt.arcKi} kidobva\n`
+    +`DOM-elem: ${dom} · nyitva: ${Math.round((Date.now()-_kt.uj)/60000)} perce`;}
+(function ktIndul(){
+  _kt.uj=Date.now();
+  setInterval(ktUtemez,KT_PERIODUS);
+  try{document.addEventListener("visibilitychange",()=>{if(!document.hidden)ktUtemez();});}catch(e){}})();
 function addLine(html,cls,budgeted,tipp){
   try{hangSorFigyel(html);}catch(e){}   /* 🔊 3.9.163 — kapufa, tizenegyes, VAR, mesterhármas */
   try{html=evDecorate(html,cls);}catch(e){}
@@ -62342,7 +62466,8 @@ function faceKulcs(p,o){
 function faceSvgUrl(p,opts){
   const o=Object.assign({},opts||{});
   const k="s|"+faceKulcs(p,o);
-  if(_faceCache.has(k))return _faceCache.get(k);
+  /* LRU (3.9.273): a találat a sor végére kerül — a karbantartó elölről dob */
+  if(_faceCache.has(k)){const u=_faceCache.get(k);_faceCache.delete(k);_faceCache.set(k,u);return u;}
   const u="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(faceSVG(p,256,o));
   _faceCache.set(k,u);
   if(_faceCache.size>600)_faceCache.delete(_faceCache.keys().next().value);
@@ -62355,7 +62480,7 @@ const _facePixVar=new Map();
 function facePixUrl(p,opts,cb){
   const o=Object.assign({},opts||{},{bold:true});
   const k="p|"+faceKulcs(p,o);
-  if(_faceCache.has(k)){if(cb)cb(_faceCache.get(k));return _faceCache.get(k);}
+  if(_faceCache.has(k)){const u=_faceCache.get(k);_faceCache.delete(k);_faceCache.set(k,u);if(cb)cb(u);return u;}
   if(cb){if(!_facePixVar.has(k))_facePixVar.set(k,[]);_facePixVar.get(k).push(cb);}
   if(_facePixVar.get(k)&&_facePixVar.get(k).fut)return null;
   if(!_facePixVar.has(k))_facePixVar.set(k,[]);
@@ -107642,6 +107767,7 @@ function startNextCareerSeason(){
      vissza. Minden szezonindításnál fel kell fedni. */
   if(gameMode==="career")$("matchHubBtn").classList.remove("hide");
   $("ttLines").innerHTML="";
+  try{ktArchivUrit();}catch(e){}   /* 🧹 3.9.273: a régi szezon archívuma is megy */
   $("ttTeam").textContent=teamName.toUpperCase().slice(0,16);
   /* A SZEZONFORDULÓ A NAPLÓ TETEJÉN. A mondatok a HUB-ban már megjelentek egy
      saját képernyőn; ide azért kerülnek be újra, mert a napló a szezon
