@@ -379,15 +379,15 @@ node tools/karbantarto-3-9-273-proba.js
 * Meccs közben és visszafelé olvasva nem takarít; szezonváltáskor az archívum ürül.
 * Arckép-gyorsítótár: LRU, 240; a diagnosztikában ott a blokk; a pixeles előkészítés egyenként halad.
 
-## elo-meccskep-3-9-272-proba.js — 🗺️ élő meccskép
+## momentum-3-9-275-proba.js — 📊 momentum-sáv és az animáció-kapcsoló
 
 ```
-node tools/elo-meccskep-3-9-272-proba.js [kép-mappa]
+node tools/momentum-3-9-275-proba.js [kép-mappa]
 ```
 
-* Az első kezdőrúgásig rejtve; utána 11+11 pötty és a labda.
-* Meccs közben a labda mozog, a lendület-oszlopok és a fölény frissül; a végén annyi gól-jel, ahány gól.
-* Az ellenfél kiállítottja halvány; összecsukható, és az állapot megmarad; nem húz véletlent.
+* A kezdőrúgás után a sáv (pálya nélkül), a két csapat nevével, alatta a lendület-oszlopok (annyi gól-jel, ahány gól); valódi meccsen mozog.
+* Momentum: a régi helyzetek súlya fogy, a friss nyomás átbillenti; összecsukható, az állapot megmarad.
+* Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
 ## esemeny-animacio-3-9-270-proba.js — 🎬 esemény-animációk
 
@@ -398,6 +398,7 @@ node tools/esemeny-animacio-3-9-270-proba.js
 * Minden animálható típusnak van jelenete, és mind kirajzolható; a lejátszó nem húz véletlent.
 * Valódi meccs 0,1×-en: jelenetek futnak, alattuk ÁLL az óra, a meccs rendben lefut; koppintás és vissza gomb továbblép.
 * „Ne mutasd többet” után nincs több jelenet; 0,5×-en és kikapcsolva sincs.
+* 3.9.276: a gólszám a játékos meccsbeli góljaiból (7 → HÉT GÓL!); jelenet közben a pixel-téma felugrója rejtve.
 
 ## meccsesemeny-3-9-269-proba.js — ⚡ meccsesemények (animáció-jelöltek)
 

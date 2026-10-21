@@ -1,7 +1,7 @@
 /* 🧹 3.9.273–274 — A KARBANTARTÓ (F6) — élő mérés.
    Amit néz:
-     1. az élő meccskép hurka: két kezdőrúgás után is csak EGY fut (a régi
-        szivárgott: +1 időzítő/meccs);
+     1. a momentum-sávnak (3.9.275) nincs saját hurka — a 3.9.272-es élő
+        meccskép hurka szivárgott (+1 időzítő/meccs), az kikerült;
      2. a napló: sok sor → a régebbiek archívumba, a lapon az utolsó 220, a
         tetején a „▲ Korábbi sorok" gomb; a kupa-jelölő (euroLogMark) együtt
         mozog; a gomb darabonként visszahoz, a görgetés a helyén marad, a
@@ -34,8 +34,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* 1 */
     document.getElementById("scSim").classList.remove("hide");
     mevKezd({});ekKezd();ekKezd();ekKezd();
-    o.ekHurok=[...window._ivA.values()].filter(s=>/ekLeptet/.test(s)).length;
-    clearInterval(_ek.iv);_ek.iv=null;
+    o.ekHurok=[...window._ivA.values()].filter(s=>/ekLeptet|ekEsemeny|ekRajz/.test(s)).length;
     o.ktHurok=[...window._ivA.values()].filter(s=>/ktUtemez/.test(s)).length;
     /* 2 */
     const L=lines();L.innerHTML="";ktArchivUrit();S.playing=false;
@@ -83,7 +82,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.pix={csucs,kesz:[..._faceCache.keys()].filter(k=>k.indexOf("p|")===0).length};
     return o;});
   console.log(JSON.stringify(r,null,1));
-  ok(r.ekHurok===1,"három kezdőrúgás után is egy élő-kép hurok",r.ekHurok);
+  ok(r.ekHurok===0,"a momentum-sávnak nincs saját hurka (három kezdőrúgás után sem)",r.ekHurok);
   ok(r.ktHurok===1,"a karbantartó egyetlen ütemezője fut",r.ktHurok);
   ok(r.lapon===220&&r.archiv===280&&r.gomb,"500 sorból 220 a lapon, 280 archívumban, gomb a tetején",{lapon:r.lapon,archiv:r.archiv});
   ok(r.mark===201,"a kupa-jelölő együtt mozog (480 − 280 + 1 gomb)",r.mark);
