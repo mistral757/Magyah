@@ -368,6 +368,17 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## tempo-skala-3-9-266-proba.js — ⏱️ az új tempó-skála
+
+```
+node tools/tempo-skala-3-9-266-proba.js
+```
+
+* A csúszkák 0,1–3× között állnak, az alap 0,25× (= a régi 0,125×, 2640 ms / 5 perc).
+* A végek: 3× = 220 ms (a régi max), 1× = 660 ms, 0,1× = 6600 ms.
+* A régi kulcs ×2-vel átszámolódik, a tempó betűre a régi; ha az új kulcs él, az nyer.
+* A két csúszka szinkronja, a vágás, a párharc fix üteme.
+
 ## stadion-merch-3-9-264-proba.js — 🏟️ stadion + merch és PR
 
 ```

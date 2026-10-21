@@ -26,6 +26,9 @@ meccsen (ott a sorok csak HTML-szövegek), meccs közbeni pályakép.
 
 ## 1. A tempó-skála átszámozása (F0, a többi alapja)
 
+> **ELKÉSZÜLT: 3.9.266.** A döntés: az első értelmezés, az alap az új 0,25×.
+> Próba: `tools/tempo-skala-3-9-266-proba.js`.
+
 ### 1.1 A kérés értelmezése
 
 A kérés: „az 1x sebesség lenne a régi 0.5x, és lenne mostantól 3x, és
@@ -37,8 +40,8 @@ Ez **lineáris, ×0,5-ös átszámozásként** áll össze: `régi = új × 0,5`
 |---|---|---|---|
 | 3× (új max) | 1,5× (a mostani max) | 220 ms | ~4 mp |
 | 1× | 0,5× | 660 ms | ~12 mp |
-| 0,5× (új alap) | 0,25× (mostani alap) | 1,32 s | ~24 mp |
-| 0,25× (az animáció küszöbe) | 0,125× | 2,64 s | ~48 mp |
+| 0,5× | 0,25× (a régi alap) | 1,32 s | ~24 mp |
+| 0,25× (új alap, az animáció küszöbe) | 0,125× | 2,64 s | ~48 mp |
 | 0,1× (új min) | 0,05× | 6,6 s | ~2 perc |
 
 **Kétértelmű pont:** a „fele olyan gyors mint a régi 1x” szó szerint a régi
@@ -50,10 +53,11 @@ Ez **lineáris, ×0,5-ös átszámozásként** áll össze: `régi = új × 0,5`
 * Egy `MATCH_SPEED_SCALE=0.5`. A `tickMs` ezen megy át:
   `Math.round(330/(matchSpeed*MATCH_SPEED_SCALE))`.
 * A csúszkák (`#matchSpeedRange`, `#euroSpeedRange`) új tartománya
-  0,1–3. A lépés 0,05; 1 fölött ez 0,1 legyen.
+  0,1–3, a lépés végig 0,05.
 * **Átköltöztetés:** új kulcs, `harminc_nulla_matchspeed_v2`. Ha csak a v1
   létezik, `v2 = v1 × 2`. Így a beállított TEMPÓ marad, csak a felirat
-  változik. Az alapérték 0,5× lesz, ami a mostani 0,25× tempó.
+  változik. Az alapérték (döntés) az új 0,25×, ami a régi 0,125×: aki sosem
+  állította, lassabb közvetítést kap, mint eddig.
 * Az auto-mód (18 ms) és a párharc fix ütem (`H2H_TICK_MS`) nem változik. A
   párharc szövegében a „0,1×” felirat igazodik, ha kell.
 * Próba: a régi kulcs átszámolódik, a tickMs betűre a régi egy átállított
@@ -271,7 +275,16 @@ a HUB-ban.
 * **A régi próbák:** a HUB-lenyílóra és a tempó-feliratra építő tesztek
   frissülnek (`tools/`).
 
-## 7. Nyitott kérdések a projektgazdához
+## 7. Döntések (a projektgazda válaszai)
+
+1. Tempó: az első értelmezés (új 0,1× = régi 0,05×).
+2. Alapértelmezés: az új 0,25×.
+3. Arckép: rajzfilmes / „bobblehead”.
+4. Arc csak az adatlapon és az animációkban, a HUB-lista soraiban nem.
+5. Az ellenfél játékosai is kapnak arcot.
+6. Az élő meccskép alapból nyitva.
+
+### Az eredeti kérdések
 
 1. **Tempó:** az új 0,1× a régi 0,05× legyen (a meccs ~2 perc), vagy a régi
    0,1× maradjon az alja (új 0,2× = régi 0,1×)? A terv az előbbivel számol.
@@ -286,4 +299,4 @@ a HUB-ban.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: terv. A jóváhagyás után az F0-val indul a megvalósítás.*
+*Állapot: F0 kész (3.9.266). Következik az F1 (arckép-generátor).*

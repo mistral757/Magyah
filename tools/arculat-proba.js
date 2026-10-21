@@ -41,7 +41,7 @@ const {spawn}=require('child_process');
      kupa:parseFloat(document.getElementById("euroSpeedRange").value),
      felirat:document.getElementById("matchSpeedVal").textContent,
      /* a tényleges ütem: alacsonyabb szorzó = lassabb közvetítés */
-     tickMs:Math.round(330/matchSpeed)}));
+     tickMs:matchSpeedTickMs()}));
    await p.close();}
   {const p=await lap(1.5);
    out.tempo_orzott=await p.evaluate(()=>({ertek:matchSpeed}));
@@ -115,8 +115,8 @@ const {spawn}=require('child_process');
   ok("friss telepítésen a meccs alap-tempója 0,25×",
      T.ertek===0.25&&T.alap===0.25&&T.csuszka===0.25&&T.kupa===0.25);
   ok("a felirat és a tényleges ütem is ezt mondja",
-     T.felirat==="0.25×"&&T.tickMs===1320);
-  ok("aki már állította, azt nem írjuk felül", out.tempo_orzott.ertek===1.5);
+     T.felirat==="0.25×"&&T.tickMs===2640);  /* 3.9.266: új skála, régi 0,125× */
+  ok("aki már állította, azt nem írjuk felül (régi 1,5× → új 3×, ugyanaz a tempó)", out.tempo_orzott.ertek===3);
   const C=out.arculat.cimer;
   ok("a címer kap fényt, mélységet és belső keretet",
      C.teli.grad===2&&C.teli.arnyek&&C.teli.belsoKeret);
