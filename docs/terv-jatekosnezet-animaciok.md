@@ -322,6 +322,29 @@ szól, csak eddig a sorhoz kötődött.
 
 ## 4. Élő meccskép (F5)
 
+> **CSERÉLVE: 3.9.275 — MOMENTUM.** A projektgazda döntése: „Az élő meccskép
+> nem tetszik. Legyen helyette csak a dominanciát jelző sáv. Nem kell a pálya
+> a felállásokkal. […] nevezzük át "momentum"-nak és ugyanúgy legyen
+> bezárható. Az hogy legyenek meccs közbeni animációk, az valahol ugyanitt
+> kellene hogy ki-be-kapcsolható legyen."
+>
+> * A pálya, a pöttyök, a labda és a lendület-oszlopok KIKERÜLTEK (velük a
+>   saját időzítő is). Ami maradt: egy sáv a két csapat színével és nevével,
+>   alatta a százalék.
+> * MOMENTUM, nem összesítés: minden helyzet súlya 12 perc alatt feleződik
+>   (`EK_FELEZES`) — a sáv azt mutatja, MOST ki van fölényben.
+> * A fejlécben, összecsukva is: „🎬 Animációk: BE/KI" — ugyanaz a
+>   beállítás, mint a Beállításokban, és meccs közben azonnal hat (KI: a
+>   futó jelenet és a sor is leáll). Gyors tempón kiírja: „csak 0,25× és
+>   lassabb tempón".
+> * Az animációk kapcsolója mostantól ÖNÁLLÓ (az élő háttér kikapcsolása nem
+>   viszi magával); ha még nem döntöttél, a rendszer „kevesebb mozgás"
+>   kérése alapból KI-re állítja.
+> * Próba: `tools/momentum-3-9-275-proba.js` (a régi élő-meccskép próba
+>   törölve).
+>
+> Az alábbi F5-leírás a 3.9.272-es, már nem élő változaté.
+
 > **ELKÉSZÜLT: 3.9.272.** Kód: az `index.html` „ÉLŐ MECCSKÉP (3.9.272, F5)”
 > blokkja; a helye a közvetítés sorai fölött (`#elokep`). Próba:
 > `tools/elo-meccskep-3-9-272-proba.js`.
@@ -477,4 +500,4 @@ régi kódé; a lenyitás/adatlap gyors útja (3.9.168) már kikerüli.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0–F6 kész (3.9.266–3.9.274).*
+*Állapot: F0–F6 kész (3.9.266–3.9.274); az F5 élő meccsképe 3.9.275-ben momentum-sávra cserélve.*
