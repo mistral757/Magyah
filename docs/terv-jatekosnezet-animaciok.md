@@ -195,6 +195,33 @@ díjátadók.
 
 ### 3.2 Eseménymodell: honnan tudjuk, MI történt
 
+> **ELKÉSZÜLT: 3.9.269 (F3).** Kód: az `index.html` „MECCSESEMÉNYEK (3.9.269,
+> F3)” blokkja, közvetlenül az `addLine` előtt. Próba:
+> `tools/meccsesemeny-3-9-269-proba.js` (valódi meccsekkel).
+>
+> * **A csatorna:** az esemény ott születik, ahol a közvetítés sora: amit a
+>   motor csak némán könyvel el, azt a néző nem látta, animáció sem jár hozzá.
+> * **Három forrás:** az `sbEv` (gól, sárga, piros, sérülés, névvel), az
+>   `addLine` 4. paramétere (tipp: `{t, side, p, alt}` — bravúr, védés,
+>   blokk, gólvonal, szöglet-tisztázás, kapufa, lövés, kidolgozás,
+>   tizenegyes, VAR, letámadás, büntetőpárbaj, csere), és a szöveg-tartalék
+>   (`MEV_SOR`, csak percbélyeges közvetítés-sorra).
+> * **A gól két fele:** az esemény az `sbEv`-ből lesz (név), a sora adja a
+>   fajtát (`alt`: fejes, tizenegyes, szabadrúgás, letámadás, padról,
+>   potya, öngól, hosszabbítás) — mindkét sorrendben; a mesterhármas és
+>   társai az utolsó saját gól jelzője (`extra`).
+> * **Kiválasztás** (`mevValaszt`): csak új 0,25× és lassabb tempón, kézi
+>   közvetítésben, bekapcsolt animációval (`evAnimOff30_0`; az élő háttér
+>   kikapcsolása is kikapcsolja). A gól mindig; a többi a keretből
+>   (0,25×: 3 · 0,2×: 4 · 0,15×: 6 · 0,1×: 8), időarányosan (ha a keret a
+>   meccs eddigi részénél jobban fogyott, csak prio ≥ 60), típusonként ≤ 2.
+>   A csere sosem. A megszakított meccs gyorsított újrajátszása alatt sem.
+> * **Átadás az F4-nek:** `mevFeliratkoz(fn)` — a kiválasztott események;
+>   `mevLista()` — a futó (vagy az utolsó) meccs összes eseménye.
+> * **Mérve 10 meccsen (0,1×):** minden gól esemény (az eredménnyel
+>   egyezően, névvel, a sorával); 14 eseménytípus; a gólok mellett
+>   meccsenként 4–8 animáció; a modul nem húz véletlent.
+
 A normál meccsen az események jelenleg csak HTML-sorok. Két út van:
 
 1. **Strukturált tipp (fő út):** az `addLine` kap egy 4. paramétert:
@@ -333,4 +360,4 @@ a HUB-ban.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0 (3.9.266), F1 (3.9.267) és F2 (3.9.268) kész. Következik az F3 (eseménymodell).*
+*Állapot: F0–F3 kész (3.9.266–3.9.269). Következik az F4 (animáció-motor és sablonok).*

@@ -368,6 +368,17 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## meccsesemeny-3-9-269-proba.js — ⚡ meccsesemények (animáció-jelöltek)
+
+```
+node tools/meccsesemeny-3-9-269-proba.js
+```
+
+* 10 valódi meccs 0,1×-en: minden gól esemény (az eredménnyel egyezően, névvel, a sorával), ≥ 7 típus, a tippek névvel.
+* Kiválasztás: minden gól; a többi a kereten (8) belül, típusonként ≤ 2; a feliratkozó pontosan ezeket kapja; csere sosem.
+* 0,5×-en, kikapcsolva és végigjátszásban nincs animáció.
+* A gól két fele mindkét sorrendben; a szöveg-tartalék; a modul nem húz véletlent.
+
 ## jatekos-adatlap-3-9-268-proba.js — 🪪 a játékos-adatlap ablaka
 
 ```
