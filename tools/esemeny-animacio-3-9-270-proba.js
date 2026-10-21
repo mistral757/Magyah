@@ -1,6 +1,7 @@
 /* 🎬 3.9.270 — ESEMÉNY-ANIMÁCIÓK (F4) — élő mérés valódi meccseken.
    Amit néz:
-     1. minden sablon kirajzolódik (minden animálható típusnak van jelenete),
+     1. minden sablon kirajzolódik (minden animálható típusnak van jelenete);
+        3.9.271: a figura a portréból csak a fejet kapja, a teste saját,
      2. lassú tempón a kiválasztott események jelenetet kapnak, a jelenet
         alatt a meccsóra ÁLL, utána megy tovább, és a meccs rendben lefut;
      3. koppintásra továbblép; a vissza gomb is; a „Ne mutasd többet" a meccs
@@ -65,10 +66,18 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       try{const c=evaKontextus({t,side:"us",p:"Teszt Elek",min:30,seq:1,alt:t==="szoglet"?"tisztazas":null});
         const T=EVA_SABLON[EVA_TIPUS_SABLON[t]];const svg=T.svg(c);
         if(!/<g id=/.test(svg)||!T.cim(c))rossz.push(t);}catch(e){rossz.push(t+": "+e.message);}});
-    return {hiany,rossz,random:[evaKer,evaKov,evaLezar,evaKontextus,evaFolytat].some(f=>/Math\.random/.test(String(f)))};});
+    /* 3.9.271: a figura a portréból CSAK A FEJET kapja, a teste saját (mezes
+       törzs a klub mintájával) — nem a portré válla két vékony lábon */
+    const c=evaKontextus({t:"gol",side:"us",p:"Teszt Elek",min:30,seq:1});
+    const g=EVA_SABLON.gol.svg(c);
+    const fejSvg=decodeURIComponent(String(c.loUrl.fej).split(",")[1]||"");
+    const test={torzs:/clip-path="url\(#evaLovoT\)"/.test(g),fejViewBox:/viewBox="16 -8 68 84"/.test(fejSvg)||String(c.loUrl.fej).indexOf("data:image/png")===0,
+      nincsVall:!/clip-path="url\(#fc\d+v\)"/.test(fejSvg),bor:/^#[0-9a-f]{6}$/i.test(c.loUrl.bor)};
+    return {test,hiany,rossz,random:[evaKer,evaKov,evaLezar,evaKontextus,evaFolytat].some(f=>/Math\.random/.test(String(f)))};});
   ok(s1.hiany.length===0,"minden animálható típusnak van jelenete",s1.hiany);
   ok(s1.rossz.length===0,"minden jelenet kirajzolható, felirattal",s1.rossz);
   ok(!s1.random,"a lejátszó nem húz véletlent");
+  ok(s1.test.torzs&&s1.test.fejViewBox&&s1.test.nincsVall&&s1.test.bor,"a figura: csak-fej kép + saját mezes törzs, a bőrszínnel",s1.test);
 
   const meccs=async(seb,opt)=>p.evaluate(async([seb,opt])=>{
     const varj=ms=>new Promise(r=>setTimeout(r,ms));

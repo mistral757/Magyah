@@ -261,6 +261,13 @@ A PvP-ben a `sim.events` már strukturált. Ott csak le kell képezni.
 >   játékosa (a morál-arccal: gólnál vigyorog, kapott gólnál lehorgaszt).
 >   Az ellenfél mezét a nevéből generáljuk (`evaEllenfelKit`), és sosem
 >   hasonlít a miénkre. A felirat-sáv: cím, perc · név (· ellenfél), arc.
+> * **3.9.271 — a figura teste:** az első változat a portré mellszobrát
+>   (széles váll a mezzel) tette két vékony lábra — nem illeszkedett. Most a
+>   portréból csak a FEJ jön (`faceSVG` `csakFej`: váll és gallér nélkül,
+>   álló 68×84-es kivágás), a test saját, arányos rajz: mezes törzs ujjal és
+>   gallérral (a klub mintája ráfeszítve), nadrág, a bőrszínhez illő kar és
+>   comb, sportszár a mez színében, cipő. A fej nagyobb a testnél
+>   (bobblehead), a nyak a gallérba fut.
 > * **Pixel-téma:** lépcsős mozgás, szögletes keret, pixeles arc (a saját
 >   tizenegy arca a kezdőrúgáskor előre elkészül).
 > * **Beállítás:** a témaválasztó alatt „🎬 Esemény-animációk” (BE/KI).
