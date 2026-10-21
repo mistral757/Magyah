@@ -84,25 +84,26 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       const key=row.getAttribute("data-hubkey");
       row.click();
       r.szinkronMentes=ment;r.teljesRajz=rajz;
-      const det=document.querySelector("#hubRoster .hubDetail");
-      r.panel=!!det;r.helyen=!!det&&det.previousElementSibling===row;
-      r.egyPanel=document.querySelectorAll("#hubRoster .hubDetail").length;
+      /* 3.9.268: a lap külön ABLAKBAN nyílik (plSheet), nem a sor alatt */
+      const lapEl=document.getElementById("plSheet");
+      const det=document.querySelector("#plSheetBody .hubDetail");
+      r.panel=!!det;r.helyen=!lapEl.classList.contains("hide")&&lapEl.getAttribute("data-key")===key;
+      r.egyPanel=document.querySelectorAll("#plSheetBody .hubDetail").length+document.querySelectorAll("#hubRoster .hubDetail").length;
       r.lenyilok=det?det.querySelectorAll("details.hdSec").length:0;
       await varj(2600);
       r.kesobbMentes=ment;
-      /* becsukás: a panel eltűnik, továbbra sincs teljes rajzolás */
-      const row2=[...document.querySelectorAll("#hubRoster [data-hubkey]")].find(x=>x.getAttribute("data-hubkey")===key);
-      row2.click();
-      r.becsukva=document.querySelectorAll("#hubRoster .hubDetail").length===0;
+      /* becsukás: az ablak bezárul, továbbra sincs teljes rajzolás */
+      document.getElementById("plSheetClose").click();
+      r.becsukva=lapEl.classList.contains("hide");
       r.rajzBecsuk=rajz;
       await varj(2600);
     }finally{saveGame=_sg;renderHub=_rh;}
     return r;});
   ok(k.szinkronMentes===0,"a koppintás pillanatában NINCS mentés (korábban öt volt)",k);
   ok(k.teljesRajz===0&&k.rajzBecsuk===0,"a teljes HUB nem rajzolódik újra — lenyitásnál és becsukásnál sem",k);
-  ok(k.panel&&k.helyen&&k.egyPanel===1,"a részletpanel a koppintott sor alatt van, és csak egy",k);
+  ok(k.panel&&k.helyen&&k.egyPanel===1,"a részletpanel a koppintott játékos ablakában van, és csak egy",k);
   ok(k.kesobbMentes===1,"az összevont mentés később EGYSZER lefut (a lenyílók toggle-jeivel együtt)",k);
-  ok(k.becsukva,"újra koppintva a panel bezárul");
+  ok(k.becsukva,"a bezáró gombbal az ablak bezárul");
 
   /* ---- 2. PAGEHIDE ---- */
   console.log("\n— 2. A FÜGGŐ MENTÉS NEM VÉSZ EL —");

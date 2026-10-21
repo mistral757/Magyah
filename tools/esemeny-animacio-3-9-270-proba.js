@@ -1,0 +1,139 @@
+/* 🎬 3.9.270 — ESEMÉNY-ANIMÁCIÓK (F4) — élő mérés valódi meccseken.
+   Amit néz:
+     1. minden sablon kirajzolódik (minden animálható típusnak van jelenete);
+        3.9.271: a figura a portréból csak a fejet kapja, a teste saját,
+     2. lassú tempón a kiválasztott események jelenetet kapnak, a jelenet
+        alatt a meccsóra ÁLL, utána megy tovább, és a meccs rendben lefut;
+     3. koppintásra továbblép; a vissza gomb is; a „Ne mutasd többet" a meccs
+        hátralevő részére kikapcsolja;
+     4. gyors tempón és kikapcsolva nincs jelenet;
+     5. a lejátszó nem húz véletlent;
+     6. nincs oldalhiba.
+   Használat: node tools/esemeny-animacio-3-9-270-proba.js   (MROOT=… másik mappára) */
+"use strict";
+const http=require("http"),fs=require("fs"),path=require("path");
+const ROOT=process.env.MROOT||"/home/user/Magyah", PORT=9215;
+const {chromium}=require("/opt/node22/lib/node_modules/playwright");
+const TYPES={".html":"text/html; charset=utf-8",".js":"text/javascript",".css":"text/css",
+  ".woff2":"font/woff2",".png":"image/png",".ico":"image/x-icon",".webmanifest":"application/manifest+json"};
+const srv=http.createServer((req,rp)=>{
+  let f=decodeURIComponent(req.url.split("?")[0]); if(f==="/")f="/index.html";
+  const abs=path.join(ROOT,f);
+  if(!abs.startsWith(ROOT)||!fs.existsSync(abs)||fs.statSync(abs).isDirectory()){rp.statusCode=404;rp.end();return;}
+  rp.setHeader("content-type",TYPES[path.extname(abs)]||"application/octet-stream");
+  fs.createReadStream(abs).pipe(rp);});
+let hiba=0;
+const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSON.stringify(d):""));if(!c)hiba++;};
+(async()=>{
+  await new Promise(r=>srv.listen(PORT,"127.0.0.1",r));
+  const b=await chromium.launch({args:["--no-sandbox","--autoplay-policy=no-user-gesture-required"]});
+  const p=await (await b.newContext({viewport:{width:430,height:900}})).newPage();
+  const errs=[];p.on("pageerror",e=>errs.push(String(e)));
+  p.on("console",m=>{if(m.type()==="error"&&!/Failed to load resource|404/.test(m.text()))errs.push(m.text());});
+  await p.addInitScript(()=>{window.HANG_TESZT=true;});
+  await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
+  await p.waitForTimeout(1200);
+  /* egy valódi egyjátékos karrier (mentési zárral), szezonban, nyitott HUB-bal */
+  await p.evaluate(()=>document.getElementById("mpSoloBtn").click());await p.waitForTimeout(700);
+  await p.evaluate(()=>{const b=document.getElementById("unlockWelBtn");if(b&&b.offsetParent)b.click();});
+  await p.waitForLoadState("load");await p.waitForTimeout(2000);
+  await p.evaluate(()=>{const b=document.getElementById("modeCareerPyrBtn");if(b&&b.offsetParent)b.click();});await p.waitForTimeout(500);
+  await p.evaluate(()=>{
+    beginNewGame();
+    const sq=SQUADS.filter(x=>!x.wc&&x.players&&x.players.length>=18)[0];
+    const _sc=showChemistry;showChemistry=()=>{};
+    S.pyr=null;S.idx=0;pyrPickSq={club:"draft",season:"",players:sq.players.slice(0,15)};
+    pyrPickFromDraft=true;pyrPickDiv=null;pyrPendingSpeed=pyrWantedSpeed;
+    renderPyrDivPick();pyrConfirmDiv();showChemistry=_sc;
+    if(!careerPool)careerPool=initCareerPlayerPool({stars:2.5});
+    slots.forEach((sl,i)=>{if(sl.player)return;const src=sq.players[i%sq.players.length];
+      const pl={n:src.n,ovr:src.ovr,pos:(src.pos||[sl.pos]).slice(),age:26};sl.player=pl;sl.fit=fitFor(pl,sl);});
+    slots.forEach(sl=>{if(!sl.player)return;
+      if(!careerPool[sl.player.n])careerPool[sl.player.n]={n:sl.player.n,pos:sl.player.pos.slice(),age:26,startRating:sl.player.ovr,peak:sl.player.ovr,pot:3000};
+      const e=careerPool[sl.player.n];if(!e.attrs)initPlayerAttrs(e);});
+    if(captainIdx<0)captainIdx=0;if(!coach)coach=COACHES[0];if(!scout)scout=generateScout();
+    startFirstSeason();
+    for(const id of ["talDrawLater","guideTipOk"]){const x=document.getElementById(id);if(x&&x.offsetParent)x.click();}
+    openHubMidSeason();});
+  await p.waitForTimeout(1500);   /* a nyitáskori összevont mentés is lefusson */
+
+
+  console.log("\n— 1. A SABLONOK —");
+  const s1=await p.evaluate(()=>{
+    const hiany=Object.keys(MEV_TIPUS).filter(t=>MEV_TIPUS[t].anim!==false&&!EVA_SABLON[EVA_TIPUS_SABLON[t]]);
+    const rossz=[];
+    Object.keys(EVA_TIPUS_SABLON).forEach(t=>{
+      try{const c=evaKontextus({t,side:"us",p:"Teszt Elek",min:30,seq:1,alt:t==="szoglet"?"tisztazas":null});
+        const T=EVA_SABLON[EVA_TIPUS_SABLON[t]];const svg=T.svg(c);
+        if(!/<g id=/.test(svg)||!T.cim(c))rossz.push(t);}catch(e){rossz.push(t+": "+e.message);}});
+    /* 3.9.271: a figura a portréból CSAK A FEJET kapja, a teste saját (mezes
+       törzs a klub mintájával) — nem a portré válla két vékony lábon */
+    const c=evaKontextus({t:"gol",side:"us",p:"Teszt Elek",min:30,seq:1});
+    const g=EVA_SABLON.gol.svg(c);
+    const fejSvg=decodeURIComponent(String(c.loUrl.fej).split(",")[1]||"");
+    const test={torzs:/clip-path="url\(#evaLovoT\)"/.test(g),fejViewBox:/viewBox="16 -8 68 84"/.test(fejSvg)||String(c.loUrl.fej).indexOf("data:image/png")===0,
+      nincsVall:!/clip-path="url\(#fc\d+v\)"/.test(fejSvg),bor:/^#[0-9a-f]{6}$/i.test(c.loUrl.bor)};
+    return {test,hiany,rossz,random:[evaKer,evaKov,evaLezar,evaKontextus,evaFolytat].some(f=>/Math\.random/.test(String(f)))};});
+  ok(s1.hiany.length===0,"minden animálható típusnak van jelenete",s1.hiany);
+  ok(s1.rossz.length===0,"minden jelenet kirajzolható, felirattal",s1.rossz);
+  ok(!s1.random,"a lejátszó nem húz véletlent");
+  ok(s1.test.torzs&&s1.test.fejViewBox&&s1.test.nincsVall&&s1.test.bor,"a figura: csak-fej kép + saját mezes törzs, a bőrszínnel",s1.test);
+
+  const meccs=async(seb,opt)=>p.evaluate(async([seb,opt])=>{
+    const varj=ms=>new Promise(r=>setTimeout(r,ms));
+    const _tm=matchSpeedTickMs;matchSpeedTickMs=()=>40;
+    const regi=matchSpeed;matchSpeed=seb;evaIdoSzorzo=0.12;
+    if(opt&&opt.ki)try{localStorage.setItem(MEV_ANIM_KEY,"1");}catch(e){}
+    const r={jelenet:0,orasAll:0,oraJar:0,tovabb:0,vissza:0,kiGomb:false,utanaKi:0};
+    let lattam=null;
+    try{
+      for(let i=0;i<400&&S.playing;i++)await varj(40);
+      for(const id of ["talDrawLater","guideTipOk"]){const x=document.getElementById(id);if(x&&x.offsetParent)x.click();}
+      try{utoLancVege();mEloTorol();}catch(e){}
+      if(S.idx>=28)S.idx=0;
+      S.auto=false;S.lastMatch=null;
+      playMatch();
+      for(let i=0;i<2500&&!S.lastMatch;i++){
+        await varj(20);
+        const el=document.getElementById("evAnim");
+        const lat=!!el&&!el.classList.contains("hide");
+        if(lat&&_evaFut&&_evaFut!==lattam){
+          lattam=_evaFut;r.jelenet++;
+          /* az óra áll? */
+          if(MATCH_CTL&&!MATCH_CTL.canPause())r.orasAll++;else r.oraJar++;
+          if(opt&&opt.tovabb&&r.jelenet===2){el.click();r.tovabb++;}
+          if(opt&&opt.vissza&&r.jelenet===3){if(gameBackStep())r.vissza++;}
+          if(opt&&opt.kiGomb&&r.jelenet===2){document.getElementById("evaKi").click();r.kiGomb=true;}}
+        if(r.kiGomb&&lat&&_evaFut&&_evaFut!==lattam)r.utanaKi++;}
+      await varj(300);
+      r.vege=!!S.lastMatch;r.kivalasztott=mevLista().filter(e=>e.anim).length;
+      r.keret=(_mev||_mevUtolso||{}).keret;r.rejtve=document.getElementById("evAnim")?document.getElementById("evAnim").classList.contains("hide"):true;
+      r.sor=_evaSor.length;
+    }finally{matchSpeedTickMs=_tm;matchSpeed=regi;evaIdoSzorzo=1;try{localStorage.removeItem(MEV_ANIM_KEY);}catch(e){}}
+    return r;},[seb,opt||null]);
+
+  console.log("\n— 2. VALÓDI MECCS, 0,1× —");
+  const m1=await meccs(0.1,{tovabb:true,vissza:true});
+  ok(m1.vege,"a meccs lefut",m1);
+  ok(m1.jelenet>=3,"jelenetek futnak",{jelenet:m1.jelenet,kivalasztott:m1.kivalasztott});
+  ok(m1.jelenet<=m1.kivalasztott,"nem több jelenet, mint kiválasztott esemény",m1);
+  ok(m1.orasAll===m1.jelenet&&m1.oraJar===0,"minden jelenet alatt ÁLL az óra",{all:m1.orasAll,jar:m1.oraJar});
+  ok(m1.tovabb===1&&m1.vissza===1,"koppintás és vissza gomb továbblép",m1);
+  ok(m1.rejtve&&m1.sor===0,"a végén nincs nyitott jelenet és sor",m1);
+
+  console.log("\n— 3. „NE MUTASD TÖBBET” —");
+  const m2=await meccs(0.1,{kiGomb:true});
+  ok(m2.vege&&m2.kiGomb&&m2.utanaKi===0,"a gomb után a meccs hátralevő részében nincs jelenet",m2);
+
+  console.log("\n— 4. GYORS TEMPÓ ÉS KIKAPCSOLVA —");
+  const m3=await meccs(0.5);
+  ok(m3.vege&&m3.jelenet===0,"0,5×: nincs jelenet",m3);
+  const m4=await meccs(0.1,{ki:true});
+  ok(m4.vege&&m4.jelenet===0,"kikapcsolva: nincs jelenet",m4);
+
+  console.log("\n— 6. HIBÁK —");
+  ok(errs.length===0,"nincs oldalhiba",errs.slice(0,4));
+  await b.close();srv.close();
+  console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");
+  process.exit(hiba?1:0);
+})();

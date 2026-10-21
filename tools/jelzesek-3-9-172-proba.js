@@ -124,8 +124,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const kulcs=hubLocKey(findPlayerLocation(pl));
     const row=[...document.querySelectorAll("#hubRoster [data-hubkey]")].find(x=>x.getAttribute("data-hubkey")===kulcs);
     if(row)row.click();await varj(300);
-    const sec=document.querySelector("#hubRoster .hubDetail .hdTrSplit");
+    /* 3.9.268: a lap külön ablakban nyílik (#plSheetBody); a régi lenyíló a tartalék */
+    const sec=document.querySelector("#plSheetBody .hubDetail .hdTrSplit")||document.querySelector("#hubRoster .hubDetail .hdTrSplit");
     const txt=sec?sec.parentElement.textContent.replace(/\s+/g," "):"";
+    try{plSheetClose();}catch(x){}
     try{hubMidSeasonReturn();}catch(x){}
     staff().splice(staff().indexOf(c),1);
     return {stabGol:tl.stab&&tl.stab.gol,by:tl.stabBy&&Object.keys(tl.stabBy),tipus:tl.stabBy&&tl.stabBy["Teszt Mester"]&&tl.stabBy["Teszt Mester"].tipus,

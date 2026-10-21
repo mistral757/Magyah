@@ -368,6 +368,90 @@ node tools/penz-pvp-kezdes-proba.js
   * egyszer fut, csak az 1. idény előtt, és 0,75-ön belül nem lép;
   * a nyers erő és a szezonvégi tábla nem látja; a mentés viszi.
 
+## karbantarto-3-9-273-proba.js — 🧹 a karbantartó (hosszan nyitott lap)
+
+```
+node tools/karbantarto-3-9-273-proba.js
+```
+
+* Három kezdőrúgás után is egy élő-kép hurok; a karbantartónak egy ütemezője van.
+* Napló: 500 sorból 220 a lapon, 280 archívumban, gomb a tetején; a kupa-jelölő együtt mozog; a visszahozás sorrendhelyes, a görgetés helyben marad, a témakör megmarad.
+* Meccs közben és visszafelé olvasva nem takarít; szezonváltáskor az archívum ürül.
+* Arckép-gyorsítótár: LRU, 240; a diagnosztikában ott a blokk; a pixeles előkészítés egyenként halad.
+
+## elo-meccskep-3-9-272-proba.js — 🗺️ élő meccskép
+
+```
+node tools/elo-meccskep-3-9-272-proba.js [kép-mappa]
+```
+
+* Az első kezdőrúgásig rejtve; utána 11+11 pötty és a labda.
+* Meccs közben a labda mozog, a lendület-oszlopok és a fölény frissül; a végén annyi gól-jel, ahány gól.
+* Az ellenfél kiállítottja halvány; összecsukható, és az állapot megmarad; nem húz véletlent.
+
+## esemeny-animacio-3-9-270-proba.js — 🎬 esemény-animációk
+
+```
+node tools/esemeny-animacio-3-9-270-proba.js
+```
+
+* Minden animálható típusnak van jelenete, és mind kirajzolható; a lejátszó nem húz véletlent.
+* Valódi meccs 0,1×-en: jelenetek futnak, alattuk ÁLL az óra, a meccs rendben lefut; koppintás és vissza gomb továbblép.
+* „Ne mutasd többet” után nincs több jelenet; 0,5×-en és kikapcsolva sincs.
+
+## meccsesemeny-3-9-269-proba.js — ⚡ meccsesemények (animáció-jelöltek)
+
+```
+node tools/meccsesemeny-3-9-269-proba.js
+```
+
+* 10 valódi meccs 0,1×-en: minden gól esemény (az eredménnyel egyezően, névvel, a sorával), ≥ 7 típus, a tippek névvel.
+* Kiválasztás: minden gól; a többi a kereten (8) belül, típusonként ≤ 2; a feliratkozó pontosan ezeket kapja; csere sosem.
+* 0,5×-en, kikapcsolva és végigjátszásban nincs animáció.
+* A gól két fele mindkét sorrendben; a szöveg-tartalék; a modul nem húz véletlent.
+
+## jatekos-adatlap-3-9-268-proba.js — 🪪 a játékos-adatlap ablaka
+
+```
+node tools/jatekos-adatlap-3-9-268-proba.js [kép-mappa]
+```
+
+* Valódi karrierben: a sorra koppintva ablak nyílik (arckép, név, Rating; a törzs a régi lap), mentés és teljes újrarajzolás nélkül.
+* Lapozás körbe, Sima/Pixel váltó, a renderHub nyitva hagyja.
+* A posztcsere előtt bezárul; a megerősítés fölötte ül; a vissza gomb és a háttér zár.
+* KI állásban a régi lenyíló. Kép-mappával képernyőképet is ment (négy témában).
+
+## arckep-3-9-267-proba.js — 🧑 az arckép-generátor
+
+```
+node tools/arckep-3-9-267-proba.js
+```
+
+* Determinisztikus; 400 valódi játékosból 400 különböző arc, minden hajstílus és ≥ 8 bőrtónus.
+* A kor csak a korfüggő vonásokat mozgatja; a hajvonal csak egy résznél húzódik vissza; 21 évesen senki sem ősz.
+* A régió súlyoz, de nem kötelez; a morál látszik.
+* Minden SVG betölt; a pixeles 40×40-es PNG a saját palettáján, a helyőrző magától cserélődik.
+* Sima/pixeles választás (auto a téma szerint).
+
+## arckep-galeria.js — 🖼️ arcok szemre ellenőrzéshez
+
+```
+node tools/arckep-galeria.js <kimeneti-mappa>
+```
+
+100 valódi játékos sima (`g1.png`) és pixeles (`g2.png`) arca, öregedés- és morál-sorok (`g3.png`).
+
+## tempo-skala-3-9-266-proba.js — ⏱️ az új tempó-skála
+
+```
+node tools/tempo-skala-3-9-266-proba.js
+```
+
+* A csúszkák 0,1–3× között állnak, az alap 0,25× (= a régi 0,125×, 2640 ms / 5 perc).
+* A végek: 3× = 220 ms (a régi max), 1× = 660 ms, 0,1× = 6600 ms.
+* A régi kulcs ×2-vel átszámolódik, a tempó betűre a régi; ha az új kulcs él, az nyer.
+* A két csúszka szinkronja, a vágás, a párharc fix üteme.
+
 ## stadion-merch-3-9-264-proba.js — 🏟️ stadion + merch és PR
 
 ```

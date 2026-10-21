@@ -94,8 +94,16 @@ régi bevétel kb. 40%-áról indul, és fejlesztéssel ~70%-ig viheti fel.
 
 ## Felület
 
-* **HUB** (Infópult → Szezon és mérleg): új „🏟️ Stadion · 🛍️ Merch és PR”
-  doboz. Megmutatja:
+* **HUB → Menü → Csapatépítés → „🏟️ Stadion, merch és PR”** kártya. Ez a
+  többi fejlesztés (Scout, ügynökség, sajtó; Keretbővítés) mellett ül, saját
+  ablakkal. Az alsó sora élőben mutatja:
+  * a férőhelyet;
+  * a nézőszámot;
+  * a merch-szintet;
+  * a nettó bevételt meccsenként.
+
+  Az első kiadásban csak az Infópultban volt, és ott nem találták meg.
+* **Infópult → Szezon és mérleg:** ugyanaz a doboz a gazdasági kép alatt. Megmutatja:
   * a férőhelyet, a keresletet, a nézőszámot és a telítettséget;
   * hány szurkoló nem fér be;
   * a jegy-, a merch-, a tagdíj- és a fenntartás-összeget;
@@ -113,6 +121,32 @@ régi bevétel kb. 40%-áról indul, és fejlesztéssel ~70%-ig viheti fel.
   A valódi bevétel mérése (3.9.263) ezeket is látja.
 * **A „heti lelátó”-hoz mért tételek** (hírnév, talizmánok) mostantól az új
   bruttó bevételhez mérnek.
+
+## 🔔 Emlékeztetők (3.9.265)
+
+> „Értesítéseket és emlékeztetőket is kössük be rá, akárcsak arra, amikor már
+> egy ideje nem költöttél boostra, scoutra stb és elérhető árú amúgy a cucc."
+
+Két új vezetés-téma, ugyanazon a gépezeten, mint a keretbővítés és az
+ügynökség.
+
+| téma | mikor szól |
+|---|---|
+| 🏟️ **Stadionbővítés** | a kereslet több mint 5%-kal a férőhely fölött van (kint maradnak a szurkolók), és a büdzsé fedezi a következő fokozatot |
+| 🛍️ **Merch és PR fejlesztése** | a büdzsé fedezi a következő szintet |
+
+Hogyan jelez:
+
+* **Pötty:** a „🏟️ Stadion, merch és PR” kártyán. A „Mutasd” kinyitja a
+  menüt, és odavisz.
+* **Felugró emlékeztető** („Rég nem foglalkoztál vele”): ha a téma 8 fordulója
+  esedékes, utána 10 fordulónként.
+* **Korlátok:** ugyanazok, mint a többi emlékeztetőnél:
+  * fordulónként legfeljebb kettő;
+  * szundi (⏳);
+  * elnémítás;
+  * kategória-kapcsoló;
+  * a fő Értesítések kapcsoló.
 
 ## Ami nem változott
 
