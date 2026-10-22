@@ -120,14 +120,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* a hat jelenet kirajzolódik, a saját feliratával */
     r.jelenet=Object.keys(EVA_SKILL_SABLON).map(id=>{
       const t=(EVA_SKILL_TIPUS[id]||["gol"])[0];
-      const asst=["sp_flank","mf_surgeon","mf_cross","sp_queen"].indexOf(id)>=0;
+      const asst=["sp_flank","mf_surgeon","mf_cross","sp_queen","chem_pair"].indexOf(id)>=0;
       const altT=id==="fw_clutch"||id==="fw_coolclose"?"tizenegyes":null;
       const ev={t,side:"us",p:"Teszt Elek",min:30,seq:99,skill:id,skillP:asst?"Szél Elek":"Teszt Elek",alt:altT};
       const T=EVA_SABLON[evaSkillSablon(ev)];
       try{const c=evaKontextus(ev);const svg=T.svg(c);
         const A=()=>({});T.mozgas(A,c);
         return {id,ok:/evaLabda/.test(svg)&&(t==="szereles"||/evaKapus/.test(svg)),cim:T.cim(c),
-          kulon:asst?(/evaBefejezo|evaPasszolo|evaBeado/.test(svg)&&svg.indexOf(c.skFig.fej)>=0):null};}
+          kulon:asst?(/evaBefejezo|evaPasszolo|evaBeado|evaTars1/.test(svg)&&svg.indexOf(c.skFig.fej)>=0):null};}
       catch(e){return {id,hiba:e.message};}});
     /* 3.9.279 — a második kör */
     sbEv("us","goal","Hős Huba",88);addLine(`88'  GÓL! Hős  4:1`,"m goal");
@@ -177,6 +177,51 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       const ev={t,side:t==="gol"?"us":"them",p:null,min:30,seq:5,alt};const sk=evaAltSablon(ev);
       if(!sk)return [t,alt,null];
       try{const T=EVA_SABLON[sk],c=evaKontextus(ev),svg=T.svg(c);T.mozgas(()=>({}),c);return [t,alt,sk,/evaLabda/.test(svg),T.cim(c)];}catch(e){return [t,alt,sk,"HIBA "+e.message];}});
+    /* 3.9.283 — A KAPU RÁCSA */
+    {const rnd=faceRnd("racs","proba");
+     const sarok=s=>{let n=0;for(let i=0;i<3000;i++){const c=evaRacsValaszt(rnd,s);if(evaRacsSarok(c.col,c.row)>=.75)n++;}return n/3000;};
+     r.racs={s:[0,.25,.5,.75,1].map(sarok),skala:[evaRacsS(40),evaRacsS(220),evaRacsS(400),evaRacsS(600)]};}
+    /* minden gól- és védés-jelenet: a labda a cellába megy, a cella villan */
+    {const ered=[];
+     const proba=(sk,ev)=>{try{const c=evaKontextus(ev);_evaCel=c.cel;const T=EVA_SABLON[sk];const svg=T.svg(c);
+       const hiv=[];T.mozgas((sel,fr,o)=>{hiv.push({sel,fr,o});return {};},c);
+       const lab=hiv.filter(h=>h.sel==="#evaLabda").flatMap(h=>h.fr);
+       const talal=lab.some(f=>{const m=/translate\(([-\d.]+)px, ?([-\d.]+)px\)/.exec(f.transform||"");return m&&Math.abs(+m[1]-c.cel.x)<.6&&Math.abs(+m[2]-c.cel.y)<.6;});
+       const villan=hiv.some(h=>h.sel==="#evaCella");
+       const kap=hiv.filter(h=>h.sel==="#evaKapus").flatMap(h=>h.fr).map(f=>{const m=/rotate\(([-\d.]+)deg\)/.exec(f.transform||"");return m?+m[1]:0;});
+       return {sk,cel:[c.cel.col,c.cel.row],talal,villan,rect:/id="evaCella"/.test(evaCellaRect()),fajta:c.cel.fajta,maxRot:kap.reduce((a,b)=>Math.abs(b)>Math.abs(a)?b:a,0),jobb:c.cel.x>=60};}
+       catch(e){return {sk,hiba:e.message};}};
+     const gol={t:"gol",side:"us",p:"Teszt Elek",min:30};
+     Object.keys(EVA_SKILL_SABLON).forEach(id=>{const t=(EVA_SKILL_TIPUS[id]||["gol"])[0];
+       ered.push(proba(EVA_SKILL_SABLON[id],Object.assign({},gol,{t,skill:id,skillP:"Teszt Elek",seq:ered.length})));});
+     ["gol"].forEach(sk=>[null,"fejes","szabadrugas","tizenegyes"].forEach(alt=>ered.push(proba(sk,Object.assign({},gol,{alt,seq:ered.length})))));
+     ered.push(proba("gol",{t:"golKapott",side:"them",p:"Ellen Fél",min:40,seq:90}));
+     ["ongol","potya","csere","letamadas"].forEach(alt=>ered.push(proba(evaAltSablon({t:"gol",alt}),Object.assign({},gol,{alt,seq:ered.length}))));
+     for(let i=0;i<8;i++)ered.push(proba("bravur",{t:"bravur",side:"us",p:"Kapus",min:50,seq:100+i}));
+     ered.push(proba("tizenegyes",{t:"tizenegyes",side:"us",p:"Kapus",alt:"kivedve",min:50,seq:120}));
+     ered.push(proba("tizenegyes",{t:"tizenegyes",side:"us",p:"Lövő",alt:"gol",min:50,seq:121}));
+     ered.push(proba("loves",{t:"loves",side:"us",p:"Lövő",alt:"vedve",min:50,seq:122}));
+     r.cel=ered.filter(x=>x.fajta==="gol"||x.fajta==="ved");
+     r.celHiba=ered.filter(x=>x.hiba);
+     r.bravurIrany=ered.filter(x=>x.sk==="bravur").map(x=>[x.jobb,x.maxRot]);}
+    /* a szöglet a kapu előtt */
+    {const c=evaKontextus({t:"szoglet",side:"us",p:"Teszt Elek",min:20,seq:3});const svg=EVA_SABLON.szoglet.svg(c);
+     r.szoglet={kapu:/id="evaKapu"/.test(svg),kapus:/id="evaKapus"/.test(svg),vedo:/id="evaVedo"/.test(svg),lovo:/id="evaLovo"/.test(svg)};}
+    /* új horgok: párkémia, tiki-taka (passzszám), buszsofőr */
+    mevKezd({});_mev.keret=8;_mev.anim=false;goalNoteLeft=10;
+    sbEv("us","goal","Kém Ia",30);addLine(`30'  GÓL! Kém  1:0`,"m goal");
+    addLine(`→ 🤝 Nagyon összeszokottan játszanak`,"m skillnote",true,{skill:"chem_pair",skillP:"Pár Társ"});
+    sbEv("us","goal","Tiki Taka",40);addLine(`40'  GÓL! Tiki  2:0`,"m goal");
+    addLine(`→ 🌀 23 PASSZ!`,"m skillnote",false,{skill:"tikitaka",skillN:23});
+    addLine(`🚌 JÖHET A BUSZSOFŐR!`,"m rc",false,{t:"busz",side:"us",p:null});
+    {const L=mevLista();r.uj={kemia:L.filter(e=>e.p==="Kém Ia").map(e=>[e.skill,e.skillP]),tiki:L.filter(e=>e.p==="Tiki Taka").map(e=>[e.skill,e.skillN]),
+      busz:L.filter(e=>e.t==="busz").map(e=>evaSkillSablon(e)||evaAltSablon(e)||EVA_TIPUS_SABLON[e.t])};}
+    mevVege();
+    mevKezd({});_mev.anim=true;_mev.keret=3;_mev.hasznalt=3;r.buszMindig=mevValaszt({t:"busz",side:"us",min:70});mevVege();_evaSor.length=0;
+    /* a kapusmez: a klasszik párból, a csapat színeitől elütve */
+    {const K=kapusKitNow(),H=kitForNow();r.kapus={k:K.c1,h:H.c1,tav:kapusMezTav(K.c1,H.c1),ajanlat:KAPUS_MEZ_AJANLAT.some(a=>a.c1===K.c1)};
+     const c=evaKontextus({t:"bravur",side:"us",p:"Kapus",min:5,seq:7});r.kapus.jelenet=c.kapusKit&&c.kapusKit.c1===K.c1;
+     const c2=evaKontextus({t:"gol",side:"us",p:"Teszt Elek",min:5,seq:8});r.kapus.ellen=c2.kapusKit&&c2.kapusKit.c1!==c2.vedoKit.c1;}
     /* 3.9.280 — BEJELENTETT HIBA: az ellenfél csapatneve a jelenetben a
        megjelenítési rétegen megy át (a valós név csak kalóz módban) */
     {const nyers="Real Madrid CF (2010/11)";const volt=huNamesOn();
@@ -189,7 +234,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(JSON.stringify(sk.g[1])===JSON.stringify(["gol","Klose Miró","sp_flank","Arjen Robben"]),"sebesség-skill: a gólpasszadó a gazdája",sk.g[1]);
   ok(JSON.stringify(sk.g[2])===JSON.stringify(["gol","Juni Pernambuco","mf_fk","Juni Pernambuco"]),"szabadrúgásgól: a skill a gól sorából",sk.g[2]);
   ok(sk.g[3]&&sk.g[3][0]==="golKapott"&&sk.g[3][2]===null,"az ellenfél gólja nem kap skillt",sk.g[3]);
-  ok(sk.jelenet.length===18&&sk.jelenet.every(j=>j.ok&&/!$/.test(j.cim)&&j.kulon!==false),"mind a 18 skill-jelenet kirajzolódik és lefut, a saját feliratával (a gólpasszadó skillesek a saját figurájukkal)",sk.jelenet.map(j=>j.id+":"+(j.cim||j.hiba)+(j.kulon===false?"(!kulon)":"")));
+  ok(sk.jelenet.length===21&&sk.jelenet.every(j=>j.ok&&/!$/.test(j.cim)&&j.kulon!==false),"mind a 21 skill-jelenet kirajzolódik és lefut, a saját feliratával (a gólpasszadó skillesek a saját figurájukkal)",sk.jelenet.filter(j=>!(j.ok&&/!$/.test(j.cim)&&j.kulon!==false)).map(j=>j.id+":"+(j.cim||j.hiba)+(j.kulon===false?"(!kulon)":"")+(j.ok?"":"(!ok)")));
   ok(JSON.stringify(sk.g2)===JSON.stringify([["Hős Huba","clutch_hero","Hős Huba"],["Csatár Csaba","mf_surgeon","Sebész Sebő"],["Gól Gábor",null,null]]),"3.9.279: a hős felülír, a jelenet nélküli skill nem foglal, a Sebészi passz a gólpasszadóé",sk.g2);
   ok(JSON.stringify(sk.bravur)===JSON.stringify([["Kapus Kálmán","clutch_wall","ziccer"]]),"„Fogd meg a söröm!”: egy bravúr-esemény, a védés sora ráolvad",sk.bravur);
   ok(JSON.stringify(sk.szer)===JSON.stringify([["Szerelő Szilárd","df_torghelle","skTorghelle"],["Más Máté","df_clean",null]]),"Torghelle: a becsúszás névvel, a saját jelenetével (a többi szerelés sima)",sk.szer);
@@ -198,6 +243,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(JSON.stringify(sk.h3.sablon)===JSON.stringify(["skJeg","evOngol","evCsere"])&&JSON.stringify(sk.h3.szocske)===JSON.stringify([["Szöcske Szilárd","gk_grasshopper","skSzocske"]]),"ICE COLD, öngól, a padról, a szöcske: a saját jelenetük",[sk.h3.sablon,sk.h3.szocske]);
   ok(sk.egyszer[0]===true&&sk.egyszer[1]===false,"a skill-pillanat keret fölött meccsenként egyszer",sk.egyszer);
   ok(sk.alt.filter(a=>a[2]).length===5&&sk.alt.every(a=>a[2]===null?a[0]==="golKapott"&&a[1]==="csere":a[3]===true&&/!|…/.test(a[4])),"öngól, potyagól (mindkét oldalon), a padról (csak a miénk): kirajzolódik, lefut",sk.alt);
+  console.log("— 3.9.283 —");
+  {const v=sk.racs.s;ok(v.every((x,i)=>i===0||x>v[i-1])&&v[0]<.12&&v[4]>.6,"a rács: minél jobb a képesség, annál inkább a sarok (40→400 folyamatosan)",v.map(x=>Math.round(x*100)+"%"));
+   ok(JSON.stringify(sk.racs.skala)===JSON.stringify([0,.5,1,1]),"a skála 40-től 400-ig",sk.racs.skala);}
+  ok(sk.celHiba.length===0&&sk.cel.length>=30&&sk.cel.every(x=>x.talal&&x.villan&&x.rect),"minden gól- és védés-jelenetben a labda a célzott cellába megy, és az villan",sk.cel.filter(x=>!(x.talal&&x.villan&&x.rect)).map(x=>x.sk).concat(sk.celHiba.map(x=>x.sk+":"+x.hiba)));
+  ok(sk.bravurIrany.every(([j,r])=>r===0||(j?r>0:r<0)),"a bravúr vetődése mindig a lövés felé (a forgatás előjele)",sk.bravurIrany);
+  ok(Object.values(sk.szoglet).every(Boolean),"a szöglet a kapu előtt: kapu, kapus, védő, támadó",sk.szoglet);
+  ok(JSON.stringify(sk.uj)===JSON.stringify({kemia:[["chem_pair","Pár Társ"]],tiki:[["tikitaka",23]],busz:["evBusz"]})&&sk.buszMindig===true,"párkémia, tiki-taka (a passzszámmal), buszsofőr: a saját jelenetük",[sk.uj,sk.buszMindig]);
+  ok(sk.kapus.ajanlat&&sk.kapus.tav>120&&sk.kapus.jelenet&&sk.kapus.ellen,"a kapusmez: klasszik pár, elüt a mezünktől; a jelenetben a mi kapusunk abban, az övék egy elütőben",sk.kapus);
   ok(sk.cimke.hu===sk.cimke.tabla&&!/Real Madrid/.test(sk.cimke.hu)&&sk.cimke.valos==="Real Madrid CF","az ellenfél neve: magyar módban az átírt, kalóz módban a valós (szezon nélkül)",sk.cimke);
   ok(sk.keretSkill===true&&sk.keretSima===false,"a skill-pillanat a keret fölött is jelenetet kap",[sk.keretSkill,sk.keretSima]);
   ok(s1.test.torzs&&s1.test.fejViewBox&&s1.test.nincsVall&&s1.test.bor,"a figura: csak-fej kép + saját mezes törzs, a bőrszínnel",s1.test);
