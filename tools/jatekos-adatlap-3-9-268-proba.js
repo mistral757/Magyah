@@ -116,6 +116,20 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     await p.evaluate(()=>{try{applyTheme("pixel");}catch(e){}faceStilusSet("auto");plSheetRender(_plSheetLoc);});await foto("adatlap-pixeltema");}
   await p.click('#plSheetHead [data-fs="sima"]');
 
+  console.log("\n— 3b. 🎨 KINÉZET (3.9.281) —");
+  await p.click('#plSheetHead [data-fed]');await p.waitForTimeout(300);
+  const fed=await p.evaluate(()=>{const m=document.getElementById("fedModal");
+    const o={nyitva:!!m&&!m.classList.contains("hide"),reteg:_fed&&_fed.scope,ket:document.querySelectorAll("#fedRetegek [data-fr]").length};
+    const n=_fed.nev,src0=document.querySelector("#plSheetHead img.faceImg").src;
+    m.querySelector('[data-fk="haj"][data-fd="1"]').click();
+    document.getElementById("fedMent").click();
+    o.mentve=!!(S.faceMod&&S.faceMod[n])&&!faceModGlobal()[n];
+    o.frissult=document.querySelector("#plSheetHead img.faceImg").src!==src0;
+    faceModSet("karrier",n,{});o.torolve=!(S.faceMod&&S.faceMod[n]);
+    return o;});
+  ok(fed.nyitva&&fed.reteg==="karrier"&&fed.ket===2,"az adatlap 🎨 gombja a karrier-szerkesztőt nyitja (globálisra is váltható)",fed);
+  ok(fed.mentve&&fed.frissult&&fed.torolve,"a mentés a karrierbe ír (nem a globálisba), az adatlap arca frissül",fed);
+
   console.log("\n— 4. ÚJRARAJZOLÁS —");
   const r4=await p.evaluate(()=>{const k0=document.getElementById("plSheet").getAttribute("data-key");
     renderHub();const b=document.getElementById("plSheet");

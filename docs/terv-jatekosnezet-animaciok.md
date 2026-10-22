@@ -321,6 +321,24 @@ A PvP-ben a `sim.events` már strukturált. Ott csak le kell képezni.
 >     mozgás easingje a kulcskockán ül (az egész animációra tett easing
 >     elcsúsztatta a labdát a vetődéshez képest); a falemberek és a Bolt
 >     védősora nem zsugorodik össze az indulásnál (kettős skálázás).
+> * **3.9.280 — 3. KÖR + HIBAJAVÍTÁS.**
+>   * **Bejelentett hiba:** „Animációknál az ellenfél játékosainak
+>     névkiírásában ott van a csapatnév is, de nem az átírt, hanem a
+>     jogvédett eredeti." A felirat a nyers nevet írta ki; most a
+>     megjelenítési rétegen megy át (`evaEllenfelCimke` → `teamLabel`, a
+>     szezon nélkül): a valós név csak kalóz módban látszik. A nyers név
+>     belső kulcs marad (mez, arcok).
+>   * **Skillek:** ICE COLD / COOL (a tizenegyes: dér, toporgó kapus, nyugodt
+>     befejezés), A szöcske! (rugós, magas, vízszintes repülés a felső
+>     sarokba — bravúr), Reptér! (szöglet, a védő a többiek fölé száll,
+>     kondenzcsíkkal), Ollóra! (ollózás hanyatt), Gólzsák (kipattanó, a
+>     csatár ott terem, „+1 GÓL").
+>   * **Események, a gól fajtája szerint:** öngól (a védő a saját kapujába
+>     fejel, fogja a fejét), potyagól (a labda átcsúszik a kapus lába
+>     között) — mindkét oldalon; a padról (csere-tábla, a beállt játékos
+>     betalál) — a mienk.
+>   * A keret fölötti skill-pillanat meccsenként SKILLENKÉNT egyszer jár (a
+>     szöcske gyakori lehet).
 > * **Pixel-téma:** lépcsős mozgás, szögletes keret, pixeles arc (a saját
 >   tizenegy arca a kezdőrúgáskor előre elkészül).
 > * **Beállítás:** a témaválasztó alatt „🎬 Esemény-animációk” (BE/KI).
@@ -558,4 +576,4 @@ régi kódé; a lenyitás/adatlap gyors útja (3.9.168) már kikerüli.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0–F6 kész (3.9.266–3.9.274); az F5 élő meccsképe 3.9.275-ben momentum-sávra cserélve; 3.9.278–279: tizenkét skill-jelenet.*
+*Állapot: F0–F6 kész (3.9.266–3.9.274); az F5 élő meccsképe 3.9.275-ben momentum-sávra cserélve; 3.9.278–280: tizennyolc skill-jelenet, három gólfajta-jelenet.*

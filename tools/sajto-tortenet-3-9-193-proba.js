@@ -133,7 +133,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.fek={egymasutan,sabl};
     Math.random=_rnd;window.pressStars=_ps;
     /* ---- 4. MINDEN SABLON ---- */
-    const c={k:"A Teszt FC",e:"Az Ellenfél SE",s:"2–1",n:12,x:"Kovács",a:"Kiss",b:"Nagy",R:15,r:3,p:28,rem:5,l:"Éllovas SE",g:4,gf:40,ga:3,rec:"9 győzelem, 1 döntetlen, 5 vereség",cn:"Gárdista",tn:"Gyors kontra",st:"Teszt Aréna",fans:"40 000",sn:5};   /* 3.9.194: a klubarc mezői */
+    const c={k:"A Teszt FC",e:"Az Ellenfél SE",s:"2–1",n:12,x:"Kovács",a:"Kiss",b:"Nagy",R:15,r:3,p:28,rem:5,l:"Éllovas SE",g:4,gf:40,ga:3,rec:"9 győzelem, 1 döntetlen, 5 vereség",cn:"Gárdista",tn:"Gyors kontra",st:"Teszt Aréna",fans:"40 000",sn:5,nz:"18 500",kap:"20 000",pct:93,rek:"17 200",ek:"12 000",at:"16 000",fogy:24,res:"w"};   /* 3.9.194: a klubarc mezői · 3.9.280: a lelátóé */
     const rossz=[];let db=0;
     Object.keys(PRESS_ST).forEach(k=>PRESS_ST[k].forEach((f,i)=>{db++;const t=f(c);if(/undefined|NaN|a\(z\)|null/.test(t)||!t.trim())rossz.push(k+i+": "+t);}));
     ki.sablon={db,rossz};

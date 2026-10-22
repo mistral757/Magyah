@@ -61,7 +61,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       if(!careerPool[pl.n])careerPool[pl.n]={n:pl.n,pos:pl.pos.slice(),age:26,startRating:pl.ovr,peak:pl.ovr,pot:3000};
       const e=careerPool[pl.n];if(!e.attrs)initPlayerAttrs(e);});
     if(captainIdx<0)captainIdx=0;if(!coach)coach=COACHES[0];
-    window.saveGame=()=>{};
+    window._eredetiMentes=window._eredetiMentes||saveGame;   /* a 12. pont a valódit hívja */
     window.saveGame=()=>{};
     const _tm=window.fanTicketMult,_fm=window.fanMult;
     window.fanTicketMult=()=>1;window.fanMult=()=>1;
@@ -149,6 +149,45 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
        stadionIdenySzorzo=()=>1;const regi=[stadionKovAr(),merchKovAr()];stadionIdenySzorzo=_sz;
        return {n,uj,regi,sz:Math.round(_sz()*1000)/1000,st:Math.round(uj[0]/regi[0]*100)/100,me:Math.round(uj[1]/regi[1]*100)/100};});
      S.seasonNumber=sn0;}
+    /* 11. 🏟️ 3.9.280 — a hazai nézőszám: napló, a lap alja, a cikk */
+    {const T=stadionState();T.hazai=[];T.rekord=0;T.hazaiKap=null;T.voltTelt=0;T.teltSor=0;T.kap=3;
+     const kap0=STAD_KAP[3];
+     const meccs=(nezo,o)=>{T.utolso={nezo};const E=stadionNezoJegyez(T,Object.assign({home:true},o||{}));return E?Object.assign({},E):null;};
+     const L=[];
+     L.push(meccs(8000));                 /* 0: az első — nem csúcs */
+     L.push(meccs(9000));                 /* 1: csúcs (8000) */
+     L.push(meccs(kap0));                 /* 2: első telt ház (+csúcs) */
+     L.push(meccs(5000,{home:false}));    /* 3: idegenben — nincs */
+     L.push(meccs(kap0));                 /* 4: telt ház, 2. sorban */
+     L.push(meccs(kap0));                 /* 5: 3. sorban */
+     T.kap=4;
+     L.push(meccs(13000));                /* 6: a bővített stadion első meccse (+csúcs) */
+     L.push(meccs(7000));                 /* 7: fogyás az átlaghoz képest */
+     L.push(meccs(0,{zart:true}));        /* 8: zárt kapu */
+     ki.nz=L.map(E=>E&&{z:E.zart||0,r:E.rekord,t:E.telt,te:E.teltElso,ts:E.teltSor,b:E.bovult,a:E.atlag,n:E.nezo});
+     ki.nzKap0=kap0;
+     /* a mérleg egyszer olvassa ki */
+     T.nezoEsemeny={nezo:9000,kap:kap0,atlag:8000,telt:0,rekord:8000,teltElso:0,teltSor:0,bovult:null};
+     const V={txt:"x"};try{mVerdictEnrich(V,{last:{players:[]},M:{},gf:2,ga:1});}catch(e){}
+     ki.nzOlvas={v:!!V.nezo,ures:T.nezoEsemeny===null};
+     /* a lap alja */
+     ki.nzHtml=[mVerdictNezoHtml({nezo:L[2]}),mVerdictNezoHtml({nezo:L[6]}),mVerdictNezoHtml({nezo:L[7]}),mVerdictNezoHtml({nezo:L[8]}),mVerdictNezoHtml({})].map(h=>String(h).replace(/<[^>]+>/g,""));
+     /* a cikk reagál */
+     const cikk=E=>{let C=[];try{C=pressStoryCands({nezo:E},{gf:2,ga:1,home:true});}catch(e){return {hiba:String(e)};}
+       const nz=C.filter(x=>/^nz/.test(x.key));
+       return nz.map(x=>({k:x.key,t:(PRESS_ST[x.key]||[]).map(f=>f(x.c))}));};
+     ki.nzCikk={rek:cikk(L[1]),telt:cikk(L[2]),sor:cikk(L[5]),bov:cikk(L[6]),fogy:cikk(L[7]),zart:cikk(L[8])};
+     ki.nzRovat=pressRovatCim("nzRekord");}
+    /* 12. 💾 3.9.281 — JAVÍTÁS: a stadion (és a kinézet karrier-rétege) a mentésben */
+    {const T=stadionState();T.kap=6;T.merch=5;T.rekord=33333;
+     S.faceMod={"Teszt Elek":{haj:3}};
+     let hibaM=null;try{_eredetiMentes();}catch(e){hibaM=String(e);}
+     const d=loadSavedGame();
+     ki.mentes={hiba:hibaM,van:!!d,st:d&&d.S&&d.S.stadion,fm:d&&d.S&&d.S.faceMod};
+     /* a betöltés: Object.assign(S,d.S) — a stadion nem épül újra a táborból */
+     if(d&&d.S){delete S.stadion;delete S.faceMod;Object.assign(S,JSON.parse(JSON.stringify({stadion:d.S.stadion,faceMod:d.S.faceMod})));
+       const T2=stadionState();ki.vissza={kap:T2.kap,merch:T2.merch,rek:T2.rekord,fm:faceTraits({n:"Teszt Elek",nat:"",age:26}).haj};}
+     S.faceMod=null;}
     ki.verzio=APP_VERSION;
     return ki;});
   await p.screenshot({path:process.env.KEP||"/dev/null",fullPage:false}).catch(()=>{});
@@ -157,6 +196,30 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
    /* az ár 100-ra kerekül, és legalább 100 — kis árnál ez a lépés látszik */
    ok(v.length===5&&v.every((x,i)=>Math.abs(x.sz-varj[i])<0.01&&[0,1].every(j=>Math.abs(x.uj[j]-Math.max(100,x.regi[j]*x.sz))<=100)),
      "stadion és merch: 1. idény ötöd, 2. harmad, 3. fél, 4-től a régi ár",v);}
+  console.log("=== 11. a hazai nézőszám (3.9.280) ===");
+  {const z=r.nz||[],K=r.nzKap0;
+   ok(z[0]&&z[0].r===null&&!z[0].t&&z[0].n===8000,"az első hazai meccs: nézőszám, de még nem „csúcs”",z[0]);
+   ok(z[1]&&z[1].r===8000,"új nézőcsúcs (az előző csúccsal)",z[1]);
+   ok(z[2]&&z[2].t===1&&z[2].te===1&&z[2].r===9000,"az első telt ház (és csúcs)",z[2]);
+   ok(z[3]===null,"idegenben nincs nézőszám a lapon",z[3]);
+   ok(z[4]&&z[4].t&&!z[4].te&&z[4].ts===2&&z[4].r===null&&z[5].ts===3,"telt ház-sorozat számolva, az egyenlő nem csúcs",[z[4],z[5]]);
+   ok(z[6]&&z[6].b===K&&z[6].r===K,"a bővített stadion első meccse (a régi férőhellyel)",z[6]);
+   ok(z[7]&&z[7].a>0&&z[7].n<z[7].a*0.8&&z[7].r===null,"fogyás az utóbbi hazai meccsek átlagához képest",z[7]);
+   ok(z[8]&&z[8].z===1,"zárt kapu",z[8]);}
+  ok(r.nzOlvas&&r.nzOlvas.v&&r.nzOlvas.ures,"a mérleg egyszer olvassa ki (utána elfogy)",r.nzOlvas);
+  {const h=r.nzHtml||[];
+   ok(/Nézőszám: .*\/.*férőhely/.test(h[0])&&/TELT HÁZ/.test(h[0])&&/új nézőcsúcs/.test(h[0]),"a lap alja: nézőszám / férőhely, telt ház, csúcs",h[0]);
+   ok(/bővített stadion első meccse/.test(h[1])&&/jóval kevesebben/.test(h[2])&&/Zárt kapus/.test(h[3])&&h[4]==="","bővítés, fogyás, zárt kapu; idegenben üres",h.slice(1));}
+  {const C=r.nzCikk||{};const k=x=>(x||[]).map(y=>y.k);
+   const mind=[].concat(...Object.values(C).filter(Array.isArray).map(a=>[].concat(...a.map(y=>y.t))));
+   ok(k(C.rek).includes("nzRekord")&&k(C.telt).includes("nzTelt")&&k(C.sor).includes("nzTeltSor")&&k(C.bov).includes("nzBovit")&&k(C.fogy).includes("nzFogy")&&!k(C.zart).length,
+     "a cikk reagál: csúcs, első telt ház, telt ház-sorozat, bővítés, fogyás (zárt kapunál nem)",Object.fromEntries(Object.entries(C).map(([a,b])=>[a,k(b)])));
+   ok(mind.length>=12&&mind.every(t=>t&&!/undefined|NaN|null/.test(t)),"minden lelátó-cím kitöltött",mind.slice(0,4));
+   ok(r.nzRovat==="Lelátói hangok","a rovat: Lelátói hangok",r.nzRovat);}
+  console.log("=== 12. a mentés (3.9.281) ===");
+  ok(r.mentes&&!r.mentes.hiba&&r.mentes.van&&r.mentes.st&&r.mentes.st.kap===6&&r.mentes.st.merch===5&&r.mentes.fm&&r.mentes.fm["Teszt Elek"],
+    "a stadion (férőhely, merch-szint) és a kinézet karrier-rétege a mentésbe kerül",r.mentes);
+  ok(r.vissza&&r.vissza.kap===6&&r.vissza.merch===5&&r.vissza.rek===33333&&r.vissza.fm===3,"betöltés után ugyanaz (nem épül újra a táborból)",r.vissza);
   console.log("=== 1. átállás ===");
   ok(r.atallNagy.kap===11&&r.atallNagy.merch===3,"700 ezres tábornál: a legnagyobb (120 ezres) stadion és 3. merch-szint",r.atallNagy);
   ok(r.atallKicsi.kap===1&&r.atallKicsi.merch===0,"új karrier (8 ezres tábor): 5 ezres stadion, 0. merch-szint",r.atallKicsi);

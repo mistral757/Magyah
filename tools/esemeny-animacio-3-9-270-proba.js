@@ -121,7 +121,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     r.jelenet=Object.keys(EVA_SKILL_SABLON).map(id=>{
       const t=(EVA_SKILL_TIPUS[id]||["gol"])[0];
       const asst=["sp_flank","mf_surgeon","mf_cross","sp_queen"].indexOf(id)>=0;
-      const ev={t,side:"us",p:"Teszt Elek",min:30,seq:99,skill:id,skillP:asst?"Szél Elek":"Teszt Elek"};
+      const altT=id==="fw_clutch"||id==="fw_coolclose"?"tizenegyes":null;
+      const ev={t,side:"us",p:"Teszt Elek",min:30,seq:99,skill:id,skillP:asst?"Szél Elek":"Teszt Elek",alt:altT};
       const T=EVA_SABLON[evaSkillSablon(ev)];
       try{const c=evaKontextus(ev);const svg=T.svg(c);
         const A=()=>({});T.mozgas(A,c);
@@ -155,16 +156,49 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     r.keretSkill=mevValaszt({t:"szereles",side:"us",p:"X",skill:"df_torghelle",min:20});
     r.keretSima=mevValaszt({t:"szereles",side:"us",p:"Y",min:20});
     mevVege();_evaSor.length=0;
+    /* 3.9.280 — a harmadik kör: a tizenegyes skillje a gólra, a szöcske a bravúrra */
+    mevKezd({});_mev.keret=8;_mev.anim=false;goalNoteLeft=10;
+    addLine(`60'  TIZENEGYES! Jég magabiztosan értékesíti  1:0`,"m goal");sbEv("us","goal","Jég Elek",60);
+    addLine(`→ Jéghideg a legnagyobb pillanatban — ICE COLD`,"m skillnote",false,{skill:"fw_clutch"});
+    addLine(`62'  BRAVÚR! Szöcske hihetetlen vetődéssel fogja a labdát — A szöcske!`,"m ev",false,{t:"bravur",side:"us",p:"Szöcske Szilárd",skill:"gk_grasshopper"});
+    addLine(`64'  Öngól — ÖNGÓL! A védő a saját kapujába  2:0`,"m goal");sbEv("us","goal","öngól",64);
+    addLine(`66'  🔥 A PADRÓL! Csere beugrik  3:0`,"m goal");sbEv("us","goal","Csere Csaba",66);
+    const L3=mevLista();
+    r.h3={pen:L3.filter(e=>e.t==="gol").map(e=>[e.p,e.alt||null,e.skill||null]),
+      szocske:L3.filter(e=>e.t==="bravur").map(e=>[e.p,e.skill,evaSkillSablon(e)])};
+    r.h3.sablon=L3.filter(e=>e.t==="gol").map(e=>evaSkillSablon(e)||evaAltSablon(e)||EVA_TIPUS_SABLON[e.t]);
+    mevVege();
+    /* skillenként egyszer a keret fölött */
+    mevKezd({});_mev.anim=true;_mev.keret=3;_mev.hasznalt=3;
+    r.egyszer=[mevValaszt({t:"bravur",side:"us",p:"Sz",skill:"gk_grasshopper",min:20}),mevValaszt({t:"bravur",side:"us",p:"Sz",skill:"gk_grasshopper",min:60})];
+    mevVege();_evaSor.length=0;
+    /* a gól fajtája szerinti jelenetek */
+    r.alt=[["gol","ongol"],["golKapott","ongol"],["gol","potya"],["golKapott","potya"],["gol","csere"],["golKapott","csere"]].map(([t,alt])=>{
+      const ev={t,side:t==="gol"?"us":"them",p:null,min:30,seq:5,alt};const sk=evaAltSablon(ev);
+      if(!sk)return [t,alt,null];
+      try{const T=EVA_SABLON[sk],c=evaKontextus(ev),svg=T.svg(c);T.mozgas(()=>({}),c);return [t,alt,sk,/evaLabda/.test(svg),T.cim(c)];}catch(e){return [t,alt,sk,"HIBA "+e.message];}});
+    /* 3.9.280 — BEJELENTETT HIBA: az ellenfél csapatneve a jelenetben a
+       megjelenítési rétegen megy át (a valós név csak kalóz módban) */
+    {const nyers="Real Madrid CF (2010/11)";const volt=huNamesOn();
+     setHuNames(true);const hu=evaEllenfelCimke(nyers);
+     setHuNames(false);const valos=evaEllenfelCimke(nyers);
+     setHuNames(volt);
+     r.cimke={hu,valos,tabla:clubLabel("Real Madrid CF")};}
     return r;});
   ok(JSON.stringify(sk.g[0])===JSON.stringify(["gol","Bomba Béla","fw_cannon","Bomba Béla"]),"a skill a gólra kerül (az első nyer)",sk.g[0]);
   ok(JSON.stringify(sk.g[1])===JSON.stringify(["gol","Klose Miró","sp_flank","Arjen Robben"]),"sebesség-skill: a gólpasszadó a gazdája",sk.g[1]);
   ok(JSON.stringify(sk.g[2])===JSON.stringify(["gol","Juni Pernambuco","mf_fk","Juni Pernambuco"]),"szabadrúgásgól: a skill a gól sorából",sk.g[2]);
   ok(sk.g[3]&&sk.g[3][0]==="golKapott"&&sk.g[3][2]===null,"az ellenfél gólja nem kap skillt",sk.g[3]);
-  ok(sk.jelenet.length===12&&sk.jelenet.every(j=>j.ok&&/!$/.test(j.cim)&&j.kulon!==false),"mind a 12 skill-jelenet kirajzolódik és lefut, a saját feliratával (a gólpasszadó skillesek a saját figurájukkal)",sk.jelenet.map(j=>j.id+":"+(j.cim||j.hiba)+(j.kulon===false?"(!kulon)":"")));
+  ok(sk.jelenet.length===18&&sk.jelenet.every(j=>j.ok&&/!$/.test(j.cim)&&j.kulon!==false),"mind a 18 skill-jelenet kirajzolódik és lefut, a saját feliratával (a gólpasszadó skillesek a saját figurájukkal)",sk.jelenet.map(j=>j.id+":"+(j.cim||j.hiba)+(j.kulon===false?"(!kulon)":"")));
   ok(JSON.stringify(sk.g2)===JSON.stringify([["Hős Huba","clutch_hero","Hős Huba"],["Csatár Csaba","mf_surgeon","Sebész Sebő"],["Gól Gábor",null,null]]),"3.9.279: a hős felülír, a jelenet nélküli skill nem foglal, a Sebészi passz a gólpasszadóé",sk.g2);
   ok(JSON.stringify(sk.bravur)===JSON.stringify([["Kapus Kálmán","clutch_wall","ziccer"]]),"„Fogd meg a söröm!”: egy bravúr-esemény, a védés sora ráolvad",sk.bravur);
   ok(JSON.stringify(sk.szer)===JSON.stringify([["Szerelő Szilárd","df_torghelle","skTorghelle"],["Más Máté","df_clean",null]]),"Torghelle: a becsúszás névvel, a saját jelenetével (a többi szerelés sima)",sk.szer);
   ok(JSON.stringify(sk.tipus)===JSON.stringify([null,"skSor",null]),"a skill-jelenet csak a saját eseménytípusán",sk.tipus);
+  ok(JSON.stringify(sk.h3.pen)===JSON.stringify([["Jég Elek","tizenegyes","fw_clutch"],[null,"ongol",null],["Csere Csaba","csere",null]]),"3.9.280: a tizenegyes skillje a gólra kerül; öngól, a padról",sk.h3.pen);
+  ok(JSON.stringify(sk.h3.sablon)===JSON.stringify(["skJeg","evOngol","evCsere"])&&JSON.stringify(sk.h3.szocske)===JSON.stringify([["Szöcske Szilárd","gk_grasshopper","skSzocske"]]),"ICE COLD, öngól, a padról, a szöcske: a saját jelenetük",[sk.h3.sablon,sk.h3.szocske]);
+  ok(sk.egyszer[0]===true&&sk.egyszer[1]===false,"a skill-pillanat keret fölött meccsenként egyszer",sk.egyszer);
+  ok(sk.alt.filter(a=>a[2]).length===5&&sk.alt.every(a=>a[2]===null?a[0]==="golKapott"&&a[1]==="csere":a[3]===true&&/!|…/.test(a[4])),"öngól, potyagól (mindkét oldalon), a padról (csak a miénk): kirajzolódik, lefut",sk.alt);
+  ok(sk.cimke.hu===sk.cimke.tabla&&!/Real Madrid/.test(sk.cimke.hu)&&sk.cimke.valos==="Real Madrid CF","az ellenfél neve: magyar módban az átírt, kalóz módban a valós (szezon nélkül)",sk.cimke);
   ok(sk.keretSkill===true&&sk.keretSima===false,"a skill-pillanat a keret fölött is jelenetet kap",[sk.keretSkill,sk.keretSima]);
   ok(s1.test.torzs&&s1.test.fejViewBox&&s1.test.nincsVall&&s1.test.bor,"a figura: csak-fej kép + saját mezes törzs, a bőrszínnel",s1.test);
 

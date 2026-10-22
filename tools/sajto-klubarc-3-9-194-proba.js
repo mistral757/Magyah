@@ -136,7 +136,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     Math.random=_rnd;window.pressStars=_ps;
     /* ---- 5. MINDEN SABLON ---- */
     const c={k:"A Teszt FC",e:"Az Ellenfél SE",s:"2–1",n:12,x:"Kovács",a:"Kiss",b:"Nagy",R:15,r:3,p:28,rem:5,l:"Éllovas SE",g:4,gf:40,ga:3,
-      rec:"9 győzelem, 1 döntetlen, 5 vereség",cn:"Gárdista",tn:"Hosszú labdák",st:"Teszt Aréna",fans:"40 000",sn:5};
+      rec:"9 győzelem, 1 döntetlen, 5 vereség",cn:"Gárdista",tn:"Hosszú labdák",st:"Teszt Aréna",fans:"40 000",sn:5,nz:"18 500",kap:"20 000",pct:93,rek:"17 200",ek:"12 000",at:"16 000",fogy:24,res:"w"};   /* 3.9.280: a lelátó mezői */
     const rossz=[];let db=0,nincsRovat=[];
     Object.keys(PRESS_ST).forEach(k=>{if(pressRovatCim(k)==="Szezonrovat")nincsRovat.push(k);
       PRESS_ST[k].forEach((f,i)=>{db++;const t=f(c);if(/undefined|NaN|a\(z\)|null/.test(t)||!t.trim())rossz.push(k+i+": "+t);});});
