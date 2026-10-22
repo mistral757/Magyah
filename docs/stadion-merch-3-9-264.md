@@ -187,3 +187,27 @@ fenntartás és a bevételek nem változnak. A próba
 emlékeztető ellenőrzése pedig stabilabb lett (a többi téma a mérés idejére
 nem esedékes — eddig véletlenen múlt).
 
+
+## 3.9.280 — a nézőszám a meccs mérlegén és a lapban
+
+> „a meccsvégi újságcikkes értesítős, értékelős lap alján a hazai meccseknél
+> a meccsre ellátogató szurkolók száma is legyen feltüntetve, és akár az
+> újságcikk is reagálhat arra, ha a stadion mérete, vagy a látogatók száma
+> tekintetben valami jelentős változás van"
+
+* **A napló** (`stadionNezoJegyez`, a heti elszámolásban): hazai meccsen
+  feljegyzi a nézőszámot (az utolsó 6 hazai meccs, a valaha mért csúcs, a
+  telt ház-sorozat, az előző hazai meccs férőhelye). Idegenben törli az
+  előző bejegyzést, így régi adat nem kerülhet egy későbbi lapra.
+* **A lap alja** (`mVerdictNezoHtml`): „🏟️ Nézőszám: N / férőhely (x%) ·
+  stadion", alatta a jelzők — TELT HÁZ (3-tól a sorozat száma), új
+  nézőcsúcs (az előzővel), a bővített stadion első meccse (régi → új
+  férőhely), jóval kevesebben az utóbbi hazai átlagnál. Zárt kapunál:
+  „Zárt kapus mérkőzés". Idegenben nincs sor.
+* **A cikk** (a „Lelátói hangok" rovat új témái): `nzBovit` / `nzBovitUres`
+  (a bővítés avatója — tele vagy foghíjasan), `nzTelt` (az első telt ház),
+  `nzRekord` (nézőcsúcs), `nzTeltSor` (zsinórban 3+ telt ház — „kicsi lesz a
+  stadion?"), `nzFogy` (legalább 20%-kal kevesebben, mint az utóbbi hazai
+  átlag), `nzNo` (legalább 25%-kal többen). A „Zúgott a lelátó" cím mostantól
+  a valódi nézőszámot mondja, nem a teljes tábort.
+* Próba: `tools/stadion-merch-3-9-264-proba.js`, 11. pont.

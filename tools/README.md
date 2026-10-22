@@ -401,6 +401,7 @@ node tools/esemeny-animacio-3-9-270-proba.js
 * 3.9.276: a gólszám a játékos meccsbeli góljaiból (7 → HÉT GÓL!); jelenet közben a pixel-téma felugrója rejtve.
 * 3.9.278: a hat skill (Elastico, Húzd meg a szelet, Usain Bolt, Ágyúgolyó, Szitálós, Szabadrúgás mester) sora a gólhoz ragad, a gól a skill jelenetét kapja, és mind a hat kirajzolható.
 * 3.9.279: mind a 12 skill-jelenet kirajzolódik és lefut; a hős felülír, a jelenet nélküli skill nem foglal, a Sebészi passz a gólpasszadóé; a „Fogd meg a söröm!” bravúrjára a védés sora ráolvad; a Torghelle-becsúszás névvel, saját jelenettel; a skill-jelenet csak a saját eseménytípusán, és a keret fölött is jár.
+* 3.9.280: mind a 18 skill-jelenet; a tizenegyes skillje a gólra, a szöcske a bravúrra; öngól, potyagól, a padról jelenete; a keret fölötti skill-pillanat skillenként egyszer; az ellenfél neve a megjelenítési rétegen át (magyar módban az átírt, kalóz módban a valós).
 
 ## meccsesemeny-3-9-269-proba.js — ⚡ meccsesemények (animáció-jelöltek)
 
@@ -467,6 +468,8 @@ node tools/stadion-merch-3-9-264-proba.js
 * A korai árak könnyűek (a boost töredéke).
 * Fejlesztés és könyvelés (jegy, merch, tagdíj, fenntartás), zárt kapu.
 * A HUB-doboz és a gombja.
+* 3.9.277: az első idények ára (ötöd, harmad, fél).
+* 3.9.280: a hazai nézőszám naplója (csúcs, első telt ház, sorozat, bővítés, fogyás, zárt kapu), a mérleg alja és a lap lelátó-címei.
 
 ## penz-leptek-3-9-263-proba.js — 💰 a pénz a 3–4. idény után is józan marad
 
