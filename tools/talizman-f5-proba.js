@@ -164,7 +164,9 @@ const kozel=(a,b,e)=>Math.abs(a-b)<=(e||1e-9);
     e=E("gol");ki.gol={ket:chHatMult("X",{X:2}),egy:chHatMult("X",{X:1}),vart:1+0.03*e};
     const src=playMatchMotor.toString();
     const _all=[...document.scripts].map(x=>x.textContent).join("\n");
-    ki.forras={poss:/\+\(\(typeof talMeccsPoss==="function"\)\?talMeccsPoss\(\):0\),20,80\)\);/.test(_all),
+    /* 3.9.282: a birtoklás várható értéke közös függvénybe költözött
+       (mstatPossAlap — a Momentum is ebből dolgozik); a talizmán ott ül */
+    ki.forras={poss:/\+\(\(typeof talMeccsPoss==="function"\)\?talMeccsPoss\(\):0\);\}/.test(_all)&&/mstatPossAlap\(c\.diff,stl,grip,z,MOD\)/.test(_all),
       oppch:/poisson\(\(OPPCH_BASE\+la\*OPPCH_RATE\)\/18\*talMeccsOppCh\(\)\)/.test(src),
       /* 3.9.158: a Tizenegyes-hóhér kontrája ugyanide szoroz (*talHoherFkMult()) */
       fk:/25,24\*talMeccsFkW\(\)(\*talHoherFkMult\(\))?\]/.test(src)&&/Math\.random\(\)<0\.35\+talMeccsFkPP\(\)/.test(src)};

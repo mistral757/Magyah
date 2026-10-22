@@ -339,6 +339,39 @@ A PvP-ben a `sim.events` már strukturált. Ott csak le kell képezni.
 >     betalál) — a mienk.
 >   * A keret fölötti skill-pillanat meccsenként SKILLENKÉNT egyszer jár (a
 >     szöcske gyakori lehet).
+> * **3.9.283 — A KAPU RÁCSA, ÚJ JELENETEK, JAVÍTÁSOK.**
+>   * **A kapu 4×8-as rácsa** (x 32–88, y 22–40; sosem látszik): minden gól és
+>     minden védés egy cellába megy, a labda pontosan oda, és a becsapódás /
+>     hárítás pillanatában a cella PIROSAN villan (a jelenet legfelső
+>     rétegén). A cella a lövő Gólszerzés-, illetve a kapus Kapus-
+>     attribútumából: s = (érték−40)/360, a cella súlya exp((−2,5+8,5·s)·e),
+>     ahol e a „sarok-érték" (a kapu közepén 0, a sarkokban 1). 40-től 400-ig
+>     folyamatos: ~100-nál a közép ~3×, ~250-nél a sarok ~11×, 400-nál ~400×.
+>     Az ellenfél emberét a meccserejéből becsüljük. Minden gól- és
+>     védés-jelenet ebből dolgozik (a sima gól, fejes, szabadrúgás, tizenegyes,
+>     a kapott gól, minden skill-jelenet, öngól, potyagól — az a kapus lába
+>     között —, a padról, a bravúr, a védett lövés, a kivédett tizenegyes, a
+>     Fogd meg a söröm!, A szöcske!).
+>   * **Vetődés a lövés felé:** a bravúrnál a forgatás előjele fordított volt
+>     („sokszor másfelé vetődik, mint amerre a lövés megy"); most a vetődés a
+>     célzott cellára számolt (evaVetodes): a keze a labdán, középen nem
+>     vetődik, csak lép és nyúl.
+>   * **A szöglet** a kapu előtt (a régi a tizenhatost az oldalvonalra
+>     rajzolta, kapu nélkül): zászló a gólvonal végén, ívelés, a támadó és a
+>     védő együtt ugrik, a kapus a vonalon.
+>   * **Kapusmez:** külön tervezhető a klub arculatában (🧤 Kapusmez), nyolc
+>     ajánlott klasszik párral; az alapértelmezés az, amelyik a hazai és az
+>     idegenbeli mez alapszínétől is a legmesszebb esik. Megjelenik a
+>     pályaképen (KP), az adatlapon és a jelenetekben; az ellenfél kapusa is
+>     elütő klasszik párt kap.
+>   * **Új jelenetek:** párkémia közös gólja (egy-kettő, szívek), Klasszik
+>     10-es (felvillan a rés), letámadásból gól (hárman rárontanak),
+>     tiki-taka (rombuszban jár a labda, a valódi passzszámmal), a
+>     buszsofőr (a busz begördül a kapunk elé, a sofőr kiszáll). A szöcske
+>     védése is a rácsra került, magasabb, „a kamera felé" ugrással.
+>   * **Szöveg:** a „Beblokkolt lövés" kifejezés mindenhonnan kikerült —
+>     helyette „a lövést blokkolják", „Blokk!", „elakad a blokkban"; a
+>     statisztika sora: „blokk".
 > * **Pixel-téma:** lépcsős mozgás, szögletes keret, pixeles arc (a saját
 >   tizenegy arca a kezdőrúgáskor előre elkészül).
 > * **Beállítás:** a témaválasztó alatt „🎬 Esemény-animációk” (BE/KI).
@@ -418,6 +451,29 @@ szól, csak eddig a sorhoz kötődött.
 >   (76 px; kérés: „Ez a Line maradjon meg, csak legyen magasabb"): 18
 >   ötperces oszlop, fölfelé mi, lefelé ők, a gólok, lapok, cserék jelével. Az
 >   oszlopok nem fogynak (a meccs krónikája), csak a sáv (a momentum).
+>
+> * **3.9.282 — A MOMENTUM-GÖRBE** (a sáv és az oszlopok helyett). Kérés: „A
+>   Momentum nézzen ki inkább úgy, mint egy szép függvény, aminek folytonos a
+>   vonala. És ne csak a közvetítés eseményei alakítsák […], hanem a
+>   szimulációban résztvevő változók is, amikből a meccs végén meccsvégi
+>   statisztikákat csinálunk. […] azt akarom látni, ahogy dinamikusan mozog
+>   ott egy vonal fel alá a Momentum mértéke szerint."
+>   * Egy folytonos, sima görbe (Catmull–Rom → Bézier, percenként egy pont) a
+>     0–90. percen: fölötte a mi színünk, alatta az ellenfélé, a fején egy
+>     pötty; a feje élőben halad (requestAnimationFrame, csak amíg a meccs
+>     megy és a panel látszik), a vödrök között végigfut, nem ugrik. Fölötte
+>     a két csapat neve és a pillanatnyi arány; a gól-, lap- és csere-jelek.
+>   * HÁROM RÉTEG: (1) ALAPVONAL — a meccsvégi labdabirtoklás várható értéke
+>     ugyanabból a képletből (`mstatPossAlap`, a meccsvégi statisztika is ezt
+>     hívja): erőkülönbség, taktika és begyakorlás, stílus, Passz-tengely,
+>     skillek, szerepek, poszt-illeszkedés, Gegenpressing, talizmán;
+>     (2) A MOTOR VÖDRE — ötpercenként a két csapat gólvárhatósága (λ, amiből
+>     a motor a gólokat sorsolja: rákapcsolás, fáradás, emberhátrány, busz,
+>     hajrá, lelátó…) és a vödörben ténylegesen kidolgozott helyzetek és gólok
+>     (ugyanazok, amikből a lövés-, védés-, blokk-statisztika lesz);
+>     (3) A KÖZVETÍTÉS — minden helyzet egy lecsengő kilengés a maga percében.
+>     Rá egy kis, meccsenként rögzített hullám. A meccs véletlenjéhez nem nyúl.
+>   * A motorban a két λ külön változóba került (a sorsolás változatlan).
 >
 > Az alábbi F5-leírás a 3.9.272-es, már nem élő változaté.
 
@@ -576,4 +632,4 @@ régi kódé; a lenyitás/adatlap gyors útja (3.9.168) már kikerüli.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0–F6 kész (3.9.266–3.9.274); az F5 élő meccsképe 3.9.275-ben momentum-sávra cserélve; 3.9.278–280: tizennyolc skill-jelenet, három gólfajta-jelenet.*
+*Állapot: F0–F6 kész (3.9.266–3.9.274); az F5 élő meccsképe 3.9.275-ben momentum-sávra cserélve; 3.9.278–283: huszonegy skill-jelenet, négy gólfajta-jelenet, buszsofőr, a kapu rácsa.*

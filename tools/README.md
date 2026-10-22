@@ -379,14 +379,14 @@ node tools/karbantarto-3-9-273-proba.js
 * Meccs közben és visszafelé olvasva nem takarít; szezonváltáskor az archívum ürül.
 * Arckép-gyorsítótár: LRU, 240; a diagnosztikában ott a blokk; a pixeles előkészítés egyenként halad.
 
-## momentum-3-9-275-proba.js — 📊 momentum-sáv és az animáció-kapcsoló
+## momentum-3-9-275-proba.js — 📊 momentum-görbe és az animáció-kapcsoló
 
 ```
 node tools/momentum-3-9-275-proba.js [kép-mappa]
 ```
 
-* A kezdőrúgás után a sáv (pálya nélkül), a két csapat nevével, alatta a lendület-oszlopok (annyi gól-jel, ahány gól); valódi meccsen mozog.
-* Momentum: a régi helyzetek súlya fogy, a friss nyomás átbillenti; összecsukható, az állapot megmarad.
+* 3.9.282: a kezdőrúgás után a momentum-GÖRBE (sáv és pálya nélkül), a két csapat nevével; valódi meccsen folyamatosan mozog fel-alá, egyetlen összefüggő görbe, a feje előre halad; a motor 18 vödre (λ, helyzetek) és a birtoklás-alapvonal táplálja; a végén a 90. percig ér, annyi gól-jellel, ahány gól, és a rajzoló leáll.
+* A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
 ## esemeny-animacio-3-9-270-proba.js — 🎬 esemény-animációk
@@ -402,6 +402,7 @@ node tools/esemeny-animacio-3-9-270-proba.js
 * 3.9.278: a hat skill (Elastico, Húzd meg a szelet, Usain Bolt, Ágyúgolyó, Szitálós, Szabadrúgás mester) sora a gólhoz ragad, a gól a skill jelenetét kapja, és mind a hat kirajzolható.
 * 3.9.279: mind a 12 skill-jelenet kirajzolódik és lefut; a hős felülír, a jelenet nélküli skill nem foglal, a Sebészi passz a gólpasszadóé; a „Fogd meg a söröm!” bravúrjára a védés sora ráolvad; a Torghelle-becsúszás névvel, saját jelenettel; a skill-jelenet csak a saját eseménytípusán, és a keret fölött is jár.
 * 3.9.280: mind a 18 skill-jelenet; a tizenegyes skillje a gólra, a szöcske a bravúrra; öngól, potyagól, a padról jelenete; a keret fölötti skill-pillanat skillenként egyszer; az ellenfél neve a megjelenítési rétegen át (magyar módban az átírt, kalóz módban a valós).
+* 3.9.283: mind a 21 skill-jelenet; a kapu rácsa — minél jobb a képesség, annál inkább a sarok (40→400 folyamatosan); minden gól- és védés-jelenetben a labda a célzott cellába megy és az villan; a bravúr vetődése a lövés felé; a szöglet a kapu előtt; párkémia, tiki-taka (passzszámmal), buszsofőr; a kapusmez.
 
 ## meccsesemeny-3-9-269-proba.js — ⚡ meccsesemények (animáció-jelöltek)
 

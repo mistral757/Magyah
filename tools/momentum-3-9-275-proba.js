@@ -1,10 +1,13 @@
 /* 📊 3.9.275 — MOMENTUM (az élő meccskép helyett) — élő mérés.
    Amit néz:
-     1. az első kezdőrúgásig rejtve; utána a sáv (nincs pálya, pötty,
-        labda), a két csapat nevével; alatta (3.9.276) a lendület-oszlopok;
-     2. valódi meccs közben a sáv mozog;
-     3. MOMENTUM: a régi helyzetek súlya fogy (EK_FELEZES), a friss nyomás
-        átbillenti;
+     1. az első kezdőrúgásig rejtve; utána (3.9.282) a momentum-GÖRBE, a két
+        csapat nevével;
+     2. valódi meccs közben a vonal folyamatosan mozog fel-alá, egyetlen
+        összefüggő görbe, a feje előre halad; a motor 18 vödre táplálja; a
+        végén a 90. percig ér, a gól-jelekkel, és a rajzoló leáll;
+     3. A MODELL: a két csapat gólvárhatósága billenti, az alapvonal a
+        meccsvégi birtoklás képletéből jön, a gól kilengése lecseng, a görbe
+        folytonos, és a meccs véletlenjéhez nem nyúl;
      4. összecsukható, és az állapot megmarad;
      5. az animáció-kapcsoló a fejlécben: meccs közben azonnal hat (a futó
         jelenetet és a sort is leállítja), ugyanaz a beállítás, mint a
@@ -67,47 +70,74 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const m=await p.evaluate(async()=>{
     const varj=ms=>new Promise(r=>setTimeout(r,ms));
     for(const id of ["talDrawLater","guideTipOk"]){const x=document.getElementById(id);if(x&&x.offsetParent)x.click();}
-    window._mTm=matchSpeedTickMs;matchSpeedTickMs=()=>120;window._mSeb=matchSpeed;matchSpeed=0.5;
+    window._mTm=matchSpeedTickMs;matchSpeedTickMs=()=>260;window._mSeb=matchSpeed;matchSpeed=0.5;
     try{utoLancVege();mEloTorol();}catch(e){}
     S.auto=false;S.lastMatch=null;playMatch();
     await varj(200);
     const el=document.getElementById("elokep");
     return {lathato:!el.classList.contains("hide"),palya:!!document.getElementById("ekPalya")||document.querySelectorAll(".ekP,#ekLabda").length,
-      sav:!!document.getElementById("ekBirMi"),mi:document.getElementById("ekMiNev").textContent,ok:document.getElementById("ekOkNev").textContent};});
-  ok(m.lathato&&!m.palya&&m.sav,"a kezdőrúgás után: csak a sáv, pálya nélkül",m);
-  ok(m.mi.length>0&&m.ok.length>0&&m.ok!=="Ellenfél"&&!/\(/.test(m.ok),"a két csapat neve a sáv két végén (évad-zárójel nélkül)",{mi:m.mi,ok:m.ok});
+      sav:!!document.getElementById("ekBirMi"),gorbe:!!document.getElementById("ekVonal"),
+      mi:document.getElementById("ekMiNev").textContent,ok:document.getElementById("ekOkNev").textContent};});
+  ok(m.lathato&&!m.palya&&!m.sav&&m.gorbe,"a kezdőrúgás után: a momentum-GÖRBE (3.9.282), sáv és pálya nélkül",m);
+  ok(m.mi.length>0&&m.ok.length>0&&m.ok!=="Ellenfél"&&!/\(/.test(m.ok),"a két csapat neve a görbe fölött (évad-zárójel nélkül)",{mi:m.mi,ok:m.ok});
   console.log("\n— 2. VALÓDI MECCS —");
-  const szel=new Set();
-  for(let i=0;i<200;i++){
-    await p.waitForTimeout(200);
-    const r=await p.evaluate(()=>({v:!!S.lastMatch,w:document.getElementById("ekBirMi").style.width}));
-    if(r.v)break;szel.add(r.w);
-    if(i===4&&OUT){await p.evaluate(()=>{for(const id of ["guideTipOk"]){const x=document.getElementById(id);if(x&&x.offsetParent)x.click();}
-        try{document.getElementById("scHub").classList.add("hide");document.getElementById("scSim").classList.remove("hide");}catch(e){}
+  const cy=[],hossz=[];let shot=false,folyt=true;
+  for(let i=0;i<400;i++){
+    await p.waitForTimeout(90);
+    const r=await p.evaluate(()=>{const v=document.getElementById("ekVonal"),pt=document.getElementById("ekPont");
+      const d=v?v.getAttribute("d")||"":"";
+      return {v:!!S.lastMatch,cy:pt?+pt.getAttribute("cy"):null,cx:pt?+pt.getAttribute("cx"):null,m:(d.match(/M/g)||[]).length,len:d.length};});
+    if(r.v)break;
+    if(r.cy!=null){cy.push(r.cy);hossz.push(r.cx);}
+    if(r.m>1)folyt=false;
+    if(!shot&&OUT&&cy.length>40){shot=true;
+      await p.evaluate(()=>{try{document.getElementById("scHub").classList.add("hide");document.getElementById("scSim").classList.remove("hide");}catch(e){}
         for(const id of ["guideTip","guideDim"]){const x=document.getElementById(id);if(x)x.style.display="none";}
         document.getElementById("elokep").scrollIntoView({block:"center"});});
-      await p.waitForTimeout(300);const h=await p.$("#elokep");const bb=h&&await h.boundingBox();
-      if(bb)await p.screenshot({path:OUT+"/momentum.png",clip:{x:0,y:Math.max(0,bb.y-70),width:430,height:bb.height+150}});}}
-  const lend=await p.evaluate(()=>{matchSpeedTickMs=window._mTm;matchSpeed=window._mSeb;
-    const L=document.getElementById("ekLend");
-    return {oszlop:L?L.querySelectorAll("rect[rx]").length:0,golJel:L?[...L.querySelectorAll("text")].filter(t=>t.textContent==="⚽").length:0,
-      gol:(S.lastMatch?S.lastMatch.gf+S.lastMatch.ga:-1),magas:L?L.getBoundingClientRect().height:0};});
-  ok(szel.size>=3,"a sáv mozog",{kulonbozo:szel.size});
-  /* 3.9.276: „Ez a Line maradjon meg, csak legyen magasabb" */
-  ok(lend.oszlop>=3&&lend.golJel===lend.gol,"a lendület-oszlopok megvannak, annyi gól-jellel, ahány gól",lend);
-  console.log("\n— 3. MOMENTUM —");
+      await p.waitForTimeout(200);const h=await p.$("#elokep");const bb=h&&await h.boundingBox();
+      if(bb)await p.screenshot({path:OUT+"/momentum.png",clip:{x:0,y:Math.max(0,bb.y-60),width:430,height:bb.height+130}});}}
+  await p.waitForTimeout(400);
+  const vege=await p.evaluate(()=>{matchSpeedTickMs=window._mTm;matchSpeed=window._mSeb;
+    const L=document.getElementById("ekLend"),pt=document.getElementById("ekPont");
+    const W=L.viewBox.baseVal.width;
+    return {W,cx:+pt.getAttribute("cx"),golJel:[...L.querySelectorAll("text")].filter(t=>t.textContent==="⚽").length,
+      gol:(S.lastMatch?S.lastMatch.gf+S.lastMatch.ga:-1),vodor:_ek.cel.length,
+      tk:new Set(_ek.cel.map(c=>Math.round(c.tk*100))).size,alap:_ek.alap,raf:_ek.raf};});
+  const kul=new Set(cy.map(v=>Math.round(v))).size;
+  ok(kul>=12&&folyt,"a vonal folyamatosan mozog fel-alá, egyetlen összefüggő görbeként",{kulonbozo:kul,minta:cy.length,folytonos:folyt});
+  ok(hossz.length>10&&hossz.every((x,i)=>i===0||x>=hossz[i-1]-0.01),"a görbe feje előre halad (nem ugrál vissza)",hossz.length);
+  ok(vege.vodor===18&&vege.tk>=4&&vege.alap>0.2&&vege.alap<0.8,"a motor 18 vödre táplálja (a két csapat λ-ja), és a birtoklás-alapvonal",vege);
+  ok(Math.abs(vege.cx-vege.W)<2&&vege.golJel===vege.gol&&!vege.raf,"a végén a görbe a 90. percig ér, annyi gól-jellel, ahány gól; a rajzoló leállt",vege);
+  console.log("\n— 3. A MODELL —");
   const d=await p.evaluate(()=>{
-    ekKezd();
-    for(let i=0;i<5;i++)ekEsemeny({t:"loves",side:"us",min:10,seq:i});
-    const a=ekFoleny();
-    ekEsemeny({t:"loves",side:"them",min:40,seq:9});ekEsemeny({t:"kapufa",side:"them",min:40,seq:10});
-    const b=ekFoleny();
-    ekKezd();for(let i=0;i<5;i++)ekEsemeny({t:"loves",side:"us",min:10,seq:i});
-    ekEsemeny({t:"loves",side:"them",min:11,seq:9});ekEsemeny({t:"kapufa",side:"them",min:11,seq:10});
-    const c=ekFoleny();
-    return {a,b,c,tx:document.getElementById("ekBirTx").textContent};});
-  ok(d.a>0.6,"a mi nyomásunk: a sáv felénk billen",d);
-  ok(d.b<0.5&&d.c>0.5,"30 perccel később a friss ellen-nyomás átbillenti; ugyanez azonnal még nem",d);
+    const r={};
+    /* a) a szimuláció változói: a λ-arány billenti */
+    ekKezd();_ek.alap=.5;
+    for(let k=1;k<=6;k++)ekMotor(k*5,.14,.04,0,0,0);
+    r.miNyom=ekErtek(25);
+    for(let k=7;k<=12;k++)ekMotor(k*5,.03,.15,0,0,0);
+    r.okNyom=ekErtek(57);
+    /* b) az alapvonal: a birtoklás képletéből */
+    r.alapErős=ekAlapvonal(10);r.alapGyenge=ekAlapvonal(-10);
+    /* c) a közvetítés: a gól kilengés, ami lecseng */
+    ekKezd();_ek.alap=.5;for(let k=1;k<=18;k++)ekMotor(k*5,.08,.08,0,0,0);
+    const v31=ekErtek(31),v55=ekErtek(55),v28=ekErtek(28);
+    ekEsemeny({t:"gol",side:"us",min:30,seq:1});
+    r.golUtan=ekErtek(31)-v31;r.kesobb=ekErtek(55)-v55;r.elotteNem=Math.abs(ekErtek(28)-v28);
+    /* d) folytonos: 0,1 percenként nincs ugrás */
+    let ugr=0;for(let x=0;x<90;x+=.1)ugr=Math.max(ugr,Math.abs(ekErtek(x+.1)-ekErtek(x)));
+    r.ugras=ugr;
+    /* e) a meccs véletlenjéhez nem nyúl */
+    const _r=Math.random;let hiv=0;Math.random=()=>{hiv++;return _r();};
+    for(let x=0;x<90;x+=.5)ekErtek(x);ekRajz();ekMotor(90,.1,.1,0,0,0);
+    Math.random=_r;r.random=hiv;
+    r.tx=document.getElementById("ekBirTx").textContent;
+    return r;});
+  ok(d.miNyom>0.3&&d.okNyom<-0.2,"a két csapat gólvárhatósága billenti a vonalat (fel, majd le)",d);
+  ok(d.alapErős>d.alapGyenge,"az alapvonal a meccsvégi birtoklás képletéből: az erősebb többet birtokol",[d.alapErős,d.alapGyenge]);
+  ok(d.golUtan>0.25&&Math.abs(d.kesobb)<0.08&&d.elotteNem<1e-9,"a gól kilengés a maga percében (előtte nem), ami lecseng",d);
+  ok(d.ugras<0.06,"folytonos: 0,1 percenként legfeljebb kis lépés",d.ugras);
+  ok(d.random===0&&/^\d+% – \d+%$/.test(d.tx),"a meccs véletlenjéhez nem nyúl; fölötte a pillanatnyi arány",d);
   console.log("\n— 4. ÖSSZECSUKÁS —");
   const c=await p.evaluate(()=>{const b=document.getElementById("ekCsuk");b.click();
     const r={rejtve:document.getElementById("ekTest").classList.contains("hide"),tx:b.textContent,
