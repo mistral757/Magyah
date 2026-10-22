@@ -379,14 +379,14 @@ node tools/karbantarto-3-9-273-proba.js
 * Meccs közben és visszafelé olvasva nem takarít; szezonváltáskor az archívum ürül.
 * Arckép-gyorsítótár: LRU, 240; a diagnosztikában ott a blokk; a pixeles előkészítés egyenként halad.
 
-## momentum-3-9-275-proba.js — 📊 momentum-sáv és az animáció-kapcsoló
+## momentum-3-9-275-proba.js — 📊 momentum-görbe és az animáció-kapcsoló
 
 ```
 node tools/momentum-3-9-275-proba.js [kép-mappa]
 ```
 
-* A kezdőrúgás után a sáv (pálya nélkül), a két csapat nevével, alatta a lendület-oszlopok (annyi gól-jel, ahány gól); valódi meccsen mozog.
-* Momentum: a régi helyzetek súlya fogy, a friss nyomás átbillenti; összecsukható, az állapot megmarad.
+* 3.9.282: a kezdőrúgás után a momentum-GÖRBE (sáv és pálya nélkül), a két csapat nevével; valódi meccsen folyamatosan mozog fel-alá, egyetlen összefüggő görbe, a feje előre halad; a motor 18 vödre (λ, helyzetek) és a birtoklás-alapvonal táplálja; a végén a 90. percig ér, annyi gól-jellel, ahány gól, és a rajzoló leáll.
+* A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
 ## esemeny-animacio-3-9-270-proba.js — 🎬 esemény-animációk

@@ -419,6 +419,29 @@ szól, csak eddig a sorhoz kötődött.
 >   ötperces oszlop, fölfelé mi, lefelé ők, a gólok, lapok, cserék jelével. Az
 >   oszlopok nem fogynak (a meccs krónikája), csak a sáv (a momentum).
 >
+> * **3.9.282 — A MOMENTUM-GÖRBE** (a sáv és az oszlopok helyett). Kérés: „A
+>   Momentum nézzen ki inkább úgy, mint egy szép függvény, aminek folytonos a
+>   vonala. És ne csak a közvetítés eseményei alakítsák […], hanem a
+>   szimulációban résztvevő változók is, amikből a meccs végén meccsvégi
+>   statisztikákat csinálunk. […] azt akarom látni, ahogy dinamikusan mozog
+>   ott egy vonal fel alá a Momentum mértéke szerint."
+>   * Egy folytonos, sima görbe (Catmull–Rom → Bézier, percenként egy pont) a
+>     0–90. percen: fölötte a mi színünk, alatta az ellenfélé, a fején egy
+>     pötty; a feje élőben halad (requestAnimationFrame, csak amíg a meccs
+>     megy és a panel látszik), a vödrök között végigfut, nem ugrik. Fölötte
+>     a két csapat neve és a pillanatnyi arány; a gól-, lap- és csere-jelek.
+>   * HÁROM RÉTEG: (1) ALAPVONAL — a meccsvégi labdabirtoklás várható értéke
+>     ugyanabból a képletből (`mstatPossAlap`, a meccsvégi statisztika is ezt
+>     hívja): erőkülönbség, taktika és begyakorlás, stílus, Passz-tengely,
+>     skillek, szerepek, poszt-illeszkedés, Gegenpressing, talizmán;
+>     (2) A MOTOR VÖDRE — ötpercenként a két csapat gólvárhatósága (λ, amiből
+>     a motor a gólokat sorsolja: rákapcsolás, fáradás, emberhátrány, busz,
+>     hajrá, lelátó…) és a vödörben ténylegesen kidolgozott helyzetek és gólok
+>     (ugyanazok, amikből a lövés-, védés-, blokk-statisztika lesz);
+>     (3) A KÖZVETÍTÉS — minden helyzet egy lecsengő kilengés a maga percében.
+>     Rá egy kis, meccsenként rögzített hullám. A meccs véletlenjéhez nem nyúl.
+>   * A motorban a két λ külön változóba került (a sorsolás változatlan).
+>
 > Az alábbi F5-leírás a 3.9.272-es, már nem élő változaté.
 
 > **ELKÉSZÜLT: 3.9.272.** Kód: az `index.html` „ÉLŐ MECCSKÉP (3.9.272, F5)”
