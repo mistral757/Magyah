@@ -7171,6 +7171,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
     <div style="display:flex;gap:6px;margin-top:8px;flex:none">
       <button id="squadModeCards" class="btn-s" style="flex:1;padding:6px 8px;font-size:12px;border-radius:8px">📊 Keretek</button>
       <button id="squadModeNames" class="btn-s" style="flex:1;padding:6px 8px;font-size:12px;border-radius:8px">✏️ Nevek átírása</button>
+      <button id="squadModeFaces" class="btn-s" style="flex:1;padding:6px 8px;font-size:12px;border-radius:8px">🎨 Kinézet</button>
     </div>
     <div id="squadModalBody" style="margin-top:9px;overflow-y:auto;flex:1;min-height:0"></div>
     <button id="squadCloseBtn" class="btn-s stepbtn">Bezár</button>
@@ -7660,7 +7661,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.280";
+const APP_VERSION="3.9.281";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -62820,7 +62821,8 @@ function faceTraits(p){
    T.fulbe=q()<0.09;
    T.szeplo=T.bor<=2&&q()<0.18;
    T.pantSzin=q();}
-  return T;}
+  /* 🎨 3.9.281 — a kézi felülírás (globális, rá a karrieré) */
+  return faceModAlkalmaz(T,nev);}
 /* A MORÁL → -1 … +1 (a 0-9-es fokozatból). Ha nincs mit olvasni: semleges. */
 function faceMood(p){
   try{if(typeof moraleImpact==="function"&&p)return (moraleImpact(p)-4.5)/4.5;}catch(e){}
@@ -63107,7 +63109,7 @@ const _faceCache=new Map();
 function faceKulcs(p,o){
   const K=o.kit||{};
   const m=o.mood!=null?Math.round(o.mood*4):Math.round(faceMood(p)*4);
-  return [p&&p.n,p&&p.age,p&&p.nat,K.c1,K.c2,K.pat,K.collar,K.ink,m,o.bg===false?"-":(o.bg||""),o.bold?1:0,o.csakFej?"f":""].join("|");}
+  return [p&&p.n,p&&p.age,p&&p.nat,K.c1,K.c2,K.pat,K.collar,K.ink,m,o.bg===false?"-":(o.bg||""),o.bold?1:0,o.csakFej?"f":"",faceModSig(p&&p.n)].join("|");}
 function faceSvgUrl(p,opts){
   const o=Object.assign({},opts||{});
   const k="s|"+faceKulcs(p,o);
@@ -63177,6 +63179,472 @@ function faceImgHtml(p,size,opts){
   if(kesz)return `<img class="faceImg pix${o.cls?" "+o.cls:""}" src="${kesz}" alt="${alt}" style="${st}">`;
   const k="p|"+faceKulcs(p,Object.assign({},o,{bold:true}));
   return `<img class="faceImg pix${o.cls?" "+o.cls:""}" data-facepix="${k.replace(/"/g,"&quot;")}" src="${faceSvgUrl(p,Object.assign({},o,{bold:true}))}" alt="${alt}" style="${st}">`;}
+
+/* ================= 🎨 KINÉZET-SZERKESZTŐ (3.9.281) ========================
+   KIMONDOTT KÉRÉS: „Építsük be a játékosok profilját szerkesztő felületet,
+   hogy globálisan is, és aktuális karrierben is lehessen szerkeszteni a
+   játékosok kinézetét. (A globálist a beállításokban lehetne, ahol a
+   játékosok neveit is lehet módosítani.) És ha nem túl bonyolult, akkor
+   lehetne ebbe beépíteni egy olyan motort, ami egy feltöltött fényképen
+   felismeri az arcot és legenerálja az alapján a saját
+   játékoskarakterizálónkkal a kinézetet."
+
+   KÉT RÉTEG, a névátíráshoz hasonlóan:
+     · GLOBÁLIS — a böngészőben (localStorage, FACE_MOD_KEY), minden
+       karrierben és a gyorsmeccsben is él; a Beállítások → Adatbázis →
+       „🎨 Kinézet" fülön szerkeszthető (ott, ahol a nevek is);
+     · KARRIER — a mentés része (S.faceMod), csak ebben a karrierben; a
+       játékos-adatlap „🎨 Kinézet" gombjáról.
+   A karrier rétege a globálisra ül rá (mezőnként), az pedig a generált
+   arcra. Amit nem írtál felül, az marad a név magjából — a kor továbbra is
+   őszít és ritkít, hacsak azt is rögzíted.
+
+   A FELÜLÍRÁS a faceTraits VÉGÉN hat, tehát minden arckép (adatlap,
+   esemény-jelenet figurája, pixeles változat) ugyanazt látja; a
+   gyorsítótár kulcsa a felülírást is tartalmazza.
+
+   FOTÓBÓL (fotoElemzes): a kép a böngészőben marad, sehova nem megy, és
+   nem is tároljuk — csak a belőle becsült vonások. Az arc helyét a böngésző
+   arcfelismerője adja (FaceDetector), ha van; ha nincs, egy bőrszín-alapú
+   kereső. A keretet kézzel is igazíthatod (húzás + méret). A keretből:
+     · bőrtónus — az arc két oldalának mediánja, a tónusskála legközelebbi
+       fokára;
+     · haj — a homlok fölötti sáv: ha bőrszínű, kopasz; ha a háttér látszik,
+       gépi vágás; különben a színe (őszt is felismer), a magassága
+       (rövid / bokor / afro / magas tető), oldalt lelógó haj (hosszú),
+       homlokba hulló frufru;
+     · arcszőrzet — az áll, az állkapocs és a felső ajak sötétedése a
+       pofához képest (borosta, szakáll, kecskeszakáll, bajusz…);
+     · szemszín — a két szem legsötétebb képpontjainak árnyalata;
+     · arcforma — a keret szélesség/magasság aránya.
+   Ez BECSLÉS: utána minden vonás kézzel tovább állítható. */
+const FACE_MOD_KEY="faceMod30_0";
+const FACE_MOD_MEZOK={bor:[0,9],hajSzin:[0,8],haj:[0,18],szemSzin:[0,5],szemTip:[0,4],szemoldTip:[0,4],
+  orr:[0,5],szaj:[0,4],szakall:[-1,6],fejW:[22,29],allW:[12,24],kopas:[0,1],osz:[0,.8],
+  fejpant:"b",fulbe:"b",szeplo:"b",tapasz:"b"};
+const FACE_EGESZ=["bor","hajSzin","haj","szemSzin","szemTip","szemoldTip","orr","szaj","szakall"];
+let _faceModG=null,_faceModElo=null;
+function faceModGlobal(){
+  if(_faceModG)return _faceModG;
+  let o=null;try{o=JSON.parse(localStorage.getItem(FACE_MOD_KEY)||"{}");}catch(e){o=null;}
+  _faceModG=(o&&typeof o==="object"&&!Array.isArray(o))?o:{};
+  return _faceModG;}
+function faceModKarrier(){
+  try{return (typeof S!=="undefined"&&S&&S.faceMod&&typeof S.faceMod==="object")?S.faceMod:null;}catch(e){return null;}}
+/* csak az ismert mezők, a saját tartományukban */
+function faceModTisztit(ov){
+  const o={};if(!ov||typeof ov!=="object")return o;
+  for(const k of Object.keys(FACE_MOD_MEZOK)){
+    const v=ov[k],t=FACE_MOD_MEZOK[k];
+    if(v===undefined||v===null)continue;
+    if(t==="b"){o[k]=!!v;continue;}
+    const n=Number(v);if(!isFinite(n))continue;
+    const c=Math.max(t[0],Math.min(t[1],n));
+    o[k]=FACE_EGESZ.indexOf(k)>=0?Math.round(c):Math.round(c*1000)/1000;}
+  return o;}
+function faceModFor(nev){
+  if(_faceModElo&&_faceModElo.nev===nev)return _faceModElo.ov;
+  const g=faceModGlobal()[nev],K=faceModKarrier(),c=K&&K[nev];
+  if(!g&&!c)return null;
+  return Object.assign({},g||{},c||{});}
+function faceModAlkalmaz(T,nev){
+  const ov=faceModFor(nev);if(!ov)return T;
+  let db=0;
+  for(const k of Object.keys(FACE_MOD_MEZOK))if(ov[k]!==undefined&&ov[k]!==null){T[k]=ov[k];db++;}
+  if(db)T.mod=db;
+  return T;}
+/* a gyorsítótár kulcsába: a felülírás lenyomata */
+function faceModSig(nev){
+  const m=faceModFor(nev);
+  return m&&Object.keys(m).length?JSON.stringify(m):"";}
+function faceModSet(scope,nev,ov){
+  if(!nev)return false;
+  const o=faceModTisztit(ov),ures=!Object.keys(o).length;
+  if(scope==="global"){
+    const G=faceModGlobal();
+    if(ures)delete G[nev];else G[nev]=o;
+    try{localStorage.setItem(FACE_MOD_KEY,JSON.stringify(G));}catch(e){}}
+  else{
+    if(typeof S==="undefined"||!S)return false;
+    if(!S.faceMod||typeof S.faceMod!=="object")S.faceMod={};
+    if(ures)delete S.faceMod[nev];else S.faceMod[nev]=o;
+    try{saveGame();}catch(e){}}
+  faceModValt();
+  return true;}
+function faceModDb(scope){
+  const M=scope==="global"?faceModGlobal():(faceModKarrier()||{});
+  return Object.keys(M).length;}
+/* a régi képek kidobása, a nyitott adatlap frissítése */
+function faceModValt(){
+  try{_faceCache.clear();}catch(e){}
+  try{if(typeof plSheetOpen==="function"&&plSheetOpen()&&_plSheetLoc)plSheetRender(_plSheetLoc);}catch(e){}
+  try{if($("squadModal")&&!$("squadModal").classList.contains("hide")&&_squadMode==="arc")renderSquadModal();}catch(e){}}
+
+/* ---------- A SZERKESZTŐ ---------- */
+const FED_SZEMTIP=["kerek","mandula","keskeny","álmos","nagy"];
+const FED_ARC={keskeny:[23.6,.62],átlagos:[25.6,.72],széles:[27.8,.8]};
+function fedSorok(){
+  const n=(db,cim)=>Array.from({length:db},(x,i)=>({v:i,t:`${cim} ${i+1}`}));
+  const tri=[{v:null,t:"eredeti"},{v:true,t:"van"},{v:false,t:"nincs"}];
+  return [
+    {k:"bor",n:"Bőrtónus",opt:FACE_SKIN.map((c,i)=>({v:i,sw:c,t:`${i+1}. árnyalat`}))},
+    {k:"hajSzin",n:"Hajszín",opt:FACE_HAIR.map((h,i)=>({v:i,sw:h[1],t:h[0]}))},
+    {k:"haj",n:"Frizura",opt:FACE_HAJ_STILUS.map((t,i)=>({v:i,t}))},
+    {k:"osz",n:"Őszülés",opt:[{v:null,t:"a kora szerint"},{v:0,t:"nincs"},{v:.35,t:"őszülő"},{v:.8,t:"ősz"}]},
+    {k:"kopas",n:"Hajvonal",opt:[{v:null,t:"a kora szerint"},{v:0,t:"teljes"},{v:.5,t:"ritkuló"},{v:1,t:"kopaszodó"}]},
+    {k:"szakall",n:"Arcszőrzet",opt:[{v:-1,t:"nincs"}].concat(FACE_SZAKALL.map((t,i)=>({v:i,t})))},
+    {k:"szemSzin",n:"Szemszín",opt:FACE_EYE.map((c,i)=>({v:i,sw:c,t:["sötétbarna","barna","mogyoró","zöld","kék","szürke"][i]}))},
+    {k:"szemTip",n:"Szemforma",opt:FED_SZEMTIP.map((t,i)=>({v:i,t}))},
+    {k:"szemoldTip",n:"Szemöldök",opt:n(5,"változat")},
+    {k:"orr",n:"Orr",opt:n(6,"változat")},
+    {k:"szaj",n:"Száj",opt:n(5,"változat")},
+    {k:"arc",n:"Arcforma",opt:[{v:null,t:"eredeti"}].concat(Object.keys(FED_ARC).map(t=>({v:t,t})))},
+    {k:"fejpant",n:"Fejpánt",opt:tri},{k:"fulbe",n:"Fülbevaló",opt:tri},
+    {k:"szeplo",n:"Szeplő",opt:tri},{k:"tapasz",n:"Ragtapasz",opt:tri}];}
+let _fed=null;
+function fedArcKod(o){
+  if(o.fejW==null)return null;
+  let best=null,bd=1e9;
+  for(const k of Object.keys(FED_ARC)){const d=Math.abs(FED_ARC[k][0]-o.fejW);if(d<bd){bd=d;best=k;}}
+  return best;}
+/* a szerkesztés alatti felülírás (a választott rétegben), és ami a képre kerül */
+function fedLatszo(){
+  const F=_fed;if(!F)return {};
+  if(F.scope==="global")return Object.assign({},F.vazlat);
+  return Object.assign({},faceModGlobal()[F.nev]||{},F.vazlat);}
+/* a generált (felülírás nélküli) vonások */
+function fedAlap(jp){
+  const regi=_faceModElo;_faceModElo={nev:jp.n,ov:{}};
+  try{return faceTraits(jp);}finally{_faceModElo=regi;}}
+function fedEloKep(jp,ov,opts){
+  const regi=_faceModElo;_faceModElo={nev:jp.n,ov};
+  try{return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(faceSVG(jp,220,opts||{}));}finally{_faceModElo=regi;}}
+function fedCss(){
+  if($("fedCss"))return;
+  const st=document.createElement("style");st.id="fedCss";
+  st.textContent=`#fedModal{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:490;display:flex;align-items:center;justify-content:center;padding:12px}
+#fedModal.hide{display:none}
+#fedModal .fedKartya{max-width:560px;width:100%;max-height:92vh;display:flex;flex-direction:column}
+#fedModal .fedFo{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+#fedModal .fedKep{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px}
+#fedModal .fedKep img{width:132px;height:132px;border-radius:14px;background:#2c3442}
+#fedModal .fedSorok{flex:1 1 250px;min-width:0;padding-right:2px}
+#fedModal .fedSor{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:12.5px}
+#fedModal .fedSor>span{flex:0 0 84px;color:var(--dim)}
+#fedModal .fedSor .fedErt{flex:1;min-width:0;display:flex;align-items:center;gap:6px;padding:4px 7px;border-radius:7px;background:var(--bg);border:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fedModal .fedSor .fedErt.mod{border-color:var(--gold)}
+#fedModal .fedSor .fedErt i{font-style:normal;color:var(--dim2);font-size:11px}
+#fedModal .fedSor button{flex:0 0 auto;min-width:28px;padding:4px 6px;border-radius:7px;font-size:13px}
+#fedModal .fedSw{display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid #0006;flex:none}
+#fedModal .fedRetegek{display:flex;gap:6px;margin:8px 0 2px;flex-wrap:wrap}
+#fedModal .fedRetegek button[aria-pressed="true"]{outline:2px solid var(--gold);outline-offset:-2px;color:var(--gold)}
+#fedModal .fedGombok{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+#fedModal .fedGombok button{flex:1 1 auto;padding:7px 8px;border-radius:8px;font-size:12.5px}
+#fedModal .fedFoto{margin-top:8px}
+#fedModal .fedFoto canvas{max-width:100%;border-radius:10px;touch-action:none;display:block;margin:0 auto;background:#111}
+#fedModal .fedMegj{font-size:11.5px;color:var(--dim2);line-height:1.45;margin-top:6px}`;
+  document.head.appendChild(st);}
+function fedElem(){
+  let m=$("fedModal");if(m)return m;
+  fedCss();
+  m=document.createElement("div");m.id="fedModal";m.className="hide";
+  m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");m.setAttribute("aria-labelledby","fedCim");
+  m.innerHTML=`<div class="card fedKartya"><div class="steplbl" style="color:var(--gold)" id="fedCim">🎨 Kinézet</div>
+    <div id="fedAl" style="font-size:12px;color:var(--dim);margin-top:2px"></div>
+    <div class="fedRetegek" id="fedRetegek"></div>
+    <div style="overflow-y:auto;min-height:0;flex:1"><div class="fedFo"><div class="fedKep"><img id="fedKep" alt=""><img id="fedKepPix" alt="" style="width:64px;height:64px;image-rendering:pixelated;border-radius:8px"></div>
+      <div class="fedSorok" id="fedSorok"></div></div>
+      <div class="fedFoto hide" id="fedFoto"></div></div>
+    <div class="fedGombok"><button type="button" class="btn-s" id="fedFotoBtn">📷 Fotóból</button>
+      <button type="button" class="btn-s" id="fedVeletlen">🎲 Véletlen</button>
+      <button type="button" class="btn-s" id="fedEredeti">↺ Eredeti</button></div>
+    <div class="fedGombok"><button type="button" class="btn-s" id="fedMegse">Mégse</button>
+      <button type="button" class="btn" id="fedMent">Mentés</button></div>
+    <input type="file" id="fedFile" accept="image/*" style="display:none"></div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click",ev=>{if(ev.target===m)fedBezar();});
+  $("fedMegse").onclick=()=>fedBezar();
+  $("fedMent").onclick=()=>fedMentes();
+  $("fedVeletlen").onclick=()=>{fedVeletlen();fedRajz();};
+  $("fedEredeti").onclick=()=>{_fed.vazlat={};fedRajz();};
+  $("fedFotoBtn").onclick=()=>$("fedFile").click();
+  $("fedFile").onchange=ev=>{const f=ev.target.files&&ev.target.files[0];ev.target.value="";if(f)fedFotoBetolt(f);};
+  document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&fedNyitva()){ev.stopPropagation();fedBezar();}},true);
+  return m;}
+function fedNyitva(){const m=$("fedModal");return !!m&&!m.classList.contains("hide");}
+/* MEGNYITÁS. o: {scope:"global"|"karrier", kit, csakGlobal} */
+function fedNyit(jp,o){
+  if(!jp||!jp.n)return;
+  const q=o||{};
+  const vanKarrier=!q.csakGlobal&&typeof S!=="undefined"&&S&&gameMode==="career"&&!!careerPool;
+  const scope=vanKarrier?(q.scope||"karrier"):"global";
+  const p={n:jp.n,nat:jp.nat||"",age:jp.age!=null?jp.age:26};
+  _fed={nev:p.n,jp:p,scope,vanKarrier,kit:q.kit||null,foto:null,
+    vazlat:Object.assign({},scope==="global"?(faceModGlobal()[p.n]||{}):((faceModKarrier()||{})[p.n]||{}))};
+  fedElem();
+  $("fedCim").textContent=`🎨 Kinézet — ${typeof fullName==="function"?fullName(p.n):p.n}`;
+  $("fedFoto").classList.add("hide");$("fedFoto").innerHTML="";
+  fedRajz();
+  $("fedModal").classList.remove("hide");}
+function fedBezar(){
+  const m=$("fedModal");if(m)m.classList.add("hide");
+  _fed=null;_faceModElo=null;}
+function fedRetegValt(scope){
+  const F=_fed;if(!F||F.scope===scope)return;
+  F.scope=scope;
+  F.vazlat=Object.assign({},scope==="global"?(faceModGlobal()[F.nev]||{}):((faceModKarrier()||{})[F.nev]||{}));
+  fedRajz();}
+function fedRajz(){
+  const F=_fed;if(!F)return;
+  const lat=fedLatszo(),alap=fedAlap(F.jp);
+  const eff=Object.assign({},alap,lat);
+  $("fedAl").innerHTML=F.scope==="global"
+    ?`<b>Globális</b>: minden karrierben és a gyorsmeccsben is így néz ki — a böngésződben marad.`
+    :`<b>Csak ebben a karrierben</b> — a mentés része.${faceModGlobal()[F.nev]?" A globális beállítás alapján, arra rátéve.":""}`;
+  const R=$("fedRetegek");
+  R.innerHTML=F.vanKarrier?`<button type="button" class="btn-s" data-fr="karrier" aria-pressed="${F.scope==="karrier"}">🏟️ Ebben a karrierben</button>`
+    +`<button type="button" class="btn-s" data-fr="global" aria-pressed="${F.scope==="global"}">🌐 Globálisan</button>`:"";
+  R.querySelectorAll("[data-fr]").forEach(b=>b.onclick=()=>fedRetegValt(b.getAttribute("data-fr")));
+  const opts={kit:F.kit||undefined,mood:.4,bg:"#2c3442"};
+  $("fedKep").src=fedEloKep(F.jp,lat,opts);
+  const pk=$("fedKepPix");
+  {const regi=_faceModElo;_faceModElo={nev:F.jp.n,ov:lat};
+   try{const u=facePixUrl(F.jp,opts,url=>{if(_fed===F&&pk)pk.src=url;});if(u)pk.src=u;}finally{_faceModElo=regi;}}
+  const sorok=fedSorok();
+  $("fedSorok").innerHTML=sorok.map(s=>{
+    const kulcs=s.k==="arc"?fedArcKod(F.vazlat):F.vazlat[s.k];
+    const mod=s.k==="arc"?kulcs!=null:(F.vazlat[s.k]!==undefined);
+    let v=s.k==="arc"?(kulcs!=null?kulcs:null):(mod?F.vazlat[s.k]:(s.opt.some(o=>o.v===null)?null:eff[s.k]));
+    if(s.k==="szakall"&&!mod)v=eff.szakall;
+    let o=s.opt.find(x=>x.v===v);
+    if(!o&&typeof v==="number")o=s.opt.reduce((a,b)=>typeof b.v==="number"&&Math.abs(b.v-v)<Math.abs((typeof a.v==="number"?a.v:1e9)-v)?b:a,s.opt[0]);
+    if(!o)o=s.opt[0];
+    const tx=o.t||"";
+    return `<div class="fedSor"><span>${esc(s.n)}</span><button type="button" class="btn-s" data-fk="${s.k}" data-fd="-1" aria-label="${esc(s.n)}: előző">‹</button>`
+      +`<div class="fedErt${mod?" mod":""}">${o.sw?`<span class="fedSw" style="background:${o.sw}"></span>`:""}${esc(tx)}${mod?"":` <i>(eredeti)</i>`}</div>`
+      +`<button type="button" class="btn-s" data-fk="${s.k}" data-fd="1" aria-label="${esc(s.n)}: következő">›</button>`
+      +`<button type="button" class="btn-s" data-fr0="${s.k}" title="Vissza az eredetire"${mod?"":" disabled"}>↺</button></div>`;}).join("");
+  $("fedSorok").querySelectorAll("[data-fk]").forEach(b=>b.onclick=()=>{fedLep(b.getAttribute("data-fk"),+b.getAttribute("data-fd"));fedRajz();});
+  $("fedSorok").querySelectorAll("[data-fr0]").forEach(b=>b.onclick=()=>{const k=b.getAttribute("data-fr0");
+    if(k==="arc"){delete F.vazlat.fejW;delete F.vazlat.allW;}else delete F.vazlat[k];fedRajz();});}
+/* egy lépés a választékban — a jelenlegi (látszó) értéktől */
+function fedLep(k,d){
+  const F=_fed;if(!F)return;
+  const s=fedSorok().find(x=>x.k===k);if(!s)return;
+  const eff=Object.assign({},fedAlap(F.jp),fedLatszo());
+  let cur;
+  if(k==="arc")cur=fedArcKod(F.vazlat);
+  else cur=F.vazlat[k]!==undefined?F.vazlat[k]:(s.opt.some(o=>o.v===null)?null:eff[k]);
+  let i=s.opt.findIndex(o=>o.v===cur);
+  if(i<0&&typeof cur==="number"){let bd=1e9;s.opt.forEach((o,j)=>{if(typeof o.v==="number"&&Math.abs(o.v-cur)<bd){bd=Math.abs(o.v-cur);i=j;}});}
+  if(i<0)i=0;
+  const n=s.opt[(i+d+s.opt.length)%s.opt.length];
+  if(k==="arc"){
+    if(n.v==null){delete F.vazlat.fejW;delete F.vazlat.allW;}
+    else{const a=FED_ARC[n.v];F.vazlat.fejW=a[0];F.vazlat.allW=Math.round(a[0]*a[1]*100)/100;}}
+  else if(n.v===null)delete F.vazlat[k];
+  else F.vazlat[k]=n.v;}
+function fedVeletlen(){
+  const F=_fed;if(!F)return;
+  const r=x=>Math.floor(Math.random()*x);
+  const v=F.vazlat;
+  v.haj=r(FACE_HAJ_STILUS.length);v.hajSzin=r(FACE_HAIR.length);
+  v.szakall=Math.random()<.45?r(FACE_SZAKALL.length):-1;
+  v.szemSzin=r(FACE_EYE.length);v.szemTip=r(5);v.szemoldTip=r(5);v.orr=r(6);v.szaj=r(5);
+  const a=FED_ARC[Object.keys(FED_ARC)[r(3)]];v.fejW=a[0];v.allW=Math.round(a[0]*a[1]*100)/100;}
+function fedMentes(){
+  const F=_fed;if(!F)return;
+  faceModSet(F.scope,F.nev,F.vazlat);
+  try{backToast(`🎨 ${F.scope==="global"?"Globálisan":"Ebben a karrierben"} elmentve: ${shortName(F.nev)} kinézete.`);}catch(e){}
+  fedBezar();}
+
+/* ---------- FOTÓBÓL ---------- */
+function fotoMedian(px){
+  if(!px.length)return null;
+  const m=c=>{const a=px.map(p=>p[c]).sort((x,y)=>x-y);return a[a.length>>1];};
+  return [m(0),m(1),m(2)];}
+function fotoMinta(D,W,H,x0,y0,x1,y1){
+  const o=[];
+  const xa=Math.max(0,Math.floor(Math.min(x0,x1))),xb=Math.min(W-1,Math.ceil(Math.max(x0,x1)));
+  const ya=Math.max(0,Math.floor(Math.min(y0,y1))),yb=Math.min(H-1,Math.ceil(Math.max(y0,y1)));
+  const lx=Math.max(1,Math.floor((xb-xa)/14)),ly=Math.max(1,Math.floor((yb-ya)/14));
+  for(let y=ya;y<=yb;y+=ly)for(let x=xa;x<=xb;x+=lx){const i=(y*W+x)*4;o.push([D[i],D[i+1],D[i+2]]);}
+  return o;}
+const fotoLuma=c=>c?(.299*c[0]+.587*c[1]+.114*c[2]):0;
+function fotoTav(a,b){
+  if(!a||!b)return 1e9;
+  const dl=fotoLuma(a)-fotoLuma(b);
+  const ca=[a[0]-fotoLuma(a),a[2]-fotoLuma(a)],cb=[b[0]-fotoLuma(b),b[2]-fotoLuma(b)];
+  return Math.sqrt(dl*dl+.6*((ca[0]-cb[0])**2+(ca[1]-cb[1])**2));}
+function fotoHex(h){return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+function fotoLegkozelebbi(c,lista){
+  let best=0,bd=1e9;lista.forEach((h,i)=>{const d=fotoTav(c,fotoHex(h));if(d<bd){bd=d;best=i;}});return best;}
+function fotoTelitett(c){const mx=Math.max(...c),mn=Math.min(...c);return mx?(mx-mn)/mx:0;}
+/* bőrszín-szabály (YCbCr) */
+function fotoBor(r,g,b){
+  const cb=128-.168736*r-.331264*g+.5*b,cr=128+.5*r-.418688*g-.081312*b;
+  return cb>=77&&cb<=130&&cr>=132&&cr<=176&&r>40;}
+/* TARTALÉK ARCKERESŐ: a bőrszínű képpontok sűrűjének befoglaló kerete */
+function fotoArcKeres(D,W,H){
+  const col=new Array(W).fill(0),row=new Array(H).fill(0);
+  let ossz=0;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(fotoBor(D[i],D[i+1],D[i+2])){col[x]++;ossz++;}}
+  if(ossz<W*H*.02)return {x:W*.3,y:H*.22,w:W*.4,h:H*.5,mod:"közép"};
+  const span=(a,frac)=>{let mx=0,mi=0;a.forEach((v,i)=>{if(v>mx){mx=v;mi=i;}});
+    const t=mx*frac;let l=mi,r=mi;while(l>0&&a[l-1]>=t)l--;while(r<a.length-1&&a[r+1]>=t)r++;return [l,r];};
+  const [x0,x1]=span(col,.35);
+  for(let y=0;y<H;y++)for(let x=x0;x<=x1;x++){const i=(y*W+x)*4;if(fotoBor(D[i],D[i+1],D[i+2]))row[y]++;}
+  const w=x1-x0+1;
+  let y0=row.findIndex(v=>v>=w*.25);if(y0<0)y0=Math.round(H*.2);
+  let y1=y0;for(let y=y0;y<H&&y<y0+w*1.45;y++)if(row[y]>=w*.25)y1=y;
+  const h=Math.max(w*1.05,Math.min(w*1.4,y1-y0+1));
+  return {x:x0,y:y0,w,h,mod:"bőrszín"};}
+/* A BECSLÉS — box: az arc a homloktól (hajvonaltól) az állig */
+function fotoElemzes(D,W,H,box){
+  const b=box,ov={},info={};
+  const M=(fx0,fy0,fx1,fy1)=>fotoMedian(fotoMinta(D,W,H,b.x+b.w*fx0,b.y+b.h*fy0,b.x+b.w*fx1,b.y+b.h*fy1));
+  const pofa=fotoMedian(fotoMinta(D,W,H,b.x+b.w*.18,b.y+b.h*.52,b.x+b.w*.34,b.y+b.h*.66)
+    .concat(fotoMinta(D,W,H,b.x+b.w*.66,b.y+b.h*.52,b.x+b.w*.82,b.y+b.h*.66)));
+  if(!pofa)return {ov,info};
+  ov.bor=fotoLegkozelebbi(pofa,FACE_SKIN);info.bor=pofa;
+  const hatter=fotoMedian(fotoMinta(D,W,H,0,0,W*.12,H*.12).concat(fotoMinta(D,W,H,W*.88,0,W-1,H*.12)));
+  /* a homlok fölötti sáv */
+  const fent=M(.3,-.16,.7,-.03);
+  const homlok=M(.3,.03,.7,.12);
+  const Lp=fotoLuma(pofa);
+  let haj=null;
+  /* kopasz: a homlok fölött is BŐR van — a homlokhoz és a pofához is közel
+     (a világosszőke haj fényességre hasonlít a bőrre, de az árnyalata más) */
+  const bortav=Math.min(fotoTav(fent,pofa),homlok?fotoTav(fent,homlok):1e9);
+  info.fentTav=Math.round(bortav);
+  if(fent&&bortav<22){ov.haj=0;info.haj="kopasz";}
+  else if(fent&&hatter&&fotoTav(fent,hatter)<28){ov.haj=1;info.haj="gépi (a háttér látszik)";}
+  else if(fent){
+    haj=fent;
+    /* ősz: telítetlen és világos */
+    const sat=fotoTelitett(haj),L=fotoLuma(haj);
+    if(sat<.14&&L>105){ov.osz=.8;ov.hajSzin=1;info.ősz=1;}
+    else{ov.hajSzin=fotoLegkozelebbi(haj,FACE_HAIR.map(x=>x[1]));if(ov.osz==null)ov.osz=0;}
+    /* a haj magassága: meddig tart fölfelé a hajszín */
+    let sor=0;const lep=Math.max(1,b.h/40);
+    for(let y=b.y-b.h*.03;y>=0&&y>b.y-b.h*.9;y-=lep){
+      const c=fotoMedian(fotoMinta(D,W,H,b.x+b.w*.35,y,b.x+b.w*.65,y));
+      if(c&&fotoTav(c,haj)<40&&!(hatter&&fotoTav(c,hatter)<18))sor+=lep;else break;}
+    const ar=sor/b.h;info.hajMagas=Math.round(ar*100)/100;
+    /* oldalt lelóg? */
+    const bal=M(-.14,.35,-.02,.8),jobb=M(1.02,.35,1.14,.8);
+    info.oldal=[bal&&Math.round(fotoTav(bal,haj)),jobb&&Math.round(fotoTav(jobb,haj))];
+    /* elég az egyik oldal (a hosszú hajat gyakran az egyik fül mögé tűrik) —
+       de csak ha a minta a hajhoz közelebb áll, mint a háttérhez */
+    const oldalHaj=c=>!!c&&fotoTav(c,haj)<32&&(!hatter||fotoTav(c,haj)<fotoTav(c,hatter)-8);
+    const hosszu=oldalHaj(bal)||oldalHaj(jobb);
+    const frufru=homlok&&fotoTav(homlok,haj)<fotoTav(homlok,pofa)*.7;
+    if(hosszu)ov.haj=15;
+    else if(ar<.1)ov.haj=1;
+    else if(ar<.3)ov.haj=frufru?7:2;
+    else if(ar<.42)ov.haj=ov.bor>=6?9:4;
+    else ov.haj=ov.bor>=5?10:11;
+    info.haj=FACE_HAJ_STILUS[ov.haj];}
+  /* arcszőrzet: sötétedés a pofához képest */
+  const sot=c=>c?Math.max(0,(Lp-fotoLuma(c))/Math.max(1,Lp)):0;
+  const all=sot(M(.36,.88,.64,.98)),allk=Math.max(sot(M(.14,.72,.28,.9)),sot(M(.72,.72,.86,.9))),bajusz=sot(M(.4,.69,.6,.75));
+  info.sz={all:Math.round(all*100)/100,allk:Math.round(allk*100)/100,bajusz:Math.round(bajusz*100)/100};
+  if(all>.3&&allk>.25)ov.szakall=1;
+  else if(all>.28&&bajusz>.25&&allk<.18)ov.szakall=2;
+  else if(all>.3&&allk<.15)ov.szakall=3;
+  else if(bajusz>.3&&all<.15)ov.szakall=4;
+  else if(all>.14&&allk>.1)ov.szakall=0;
+  else ov.szakall=-1;
+  /* szemszín: a két szem legsötétebb képpontjai */
+  const szem=fotoMinta(D,W,H,b.x+b.w*.24,b.y+b.h*.38,b.x+b.w*.42,b.y+b.h*.48).concat(fotoMinta(D,W,H,b.x+b.w*.58,b.y+b.h*.38,b.x+b.w*.76,b.y+b.h*.48));
+  if(szem.length){
+    szem.sort((p,q)=>fotoLuma(p)-fotoLuma(q));
+    const s=szem.slice(0,Math.max(3,Math.round(szem.length*.15)));
+    const c=[0,1,2].map(i=>s.reduce((a,p)=>a+p[i],0)/s.length);
+    const L=fotoLuma(c),sat=fotoTelitett(c);
+    if(c[2]>c[0]+8&&c[2]>=c[1])ov.szemSzin=4;
+    else if(c[1]>c[0]+4&&c[1]>c[2])ov.szemSzin=3;
+    else if(sat<.12&&L>70)ov.szemSzin=5;
+    else ov.szemSzin=L<45?0:L<75?1:2;
+    info.szem=c.map(Math.round);}
+  /* arcforma */
+  const ar=b.w/b.h;info.arany=Math.round(ar*100)/100;
+  const k=ar<.7?"keskeny":ar>.82?"széles":"átlagos";
+  ov.fejW=FED_ARC[k][0];ov.allW=Math.round(FED_ARC[k][0]*FED_ARC[k][1]*100)/100;info.arc=k;
+  return {ov,info};}
+/* a kép betöltése, az arc megkeresése, a keret igazítása */
+function fedFotoBetolt(file){
+  const F=_fed;if(!F)return;
+  const url=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=async()=>{
+    URL.revokeObjectURL(url);
+    const MAX=360,s=Math.min(1,MAX/Math.max(img.width,img.height));
+    const W=Math.max(1,Math.round(img.width*s)),H=Math.max(1,Math.round(img.height*s));
+    const c=document.createElement("canvas");c.width=W;c.height=H;
+    const g=c.getContext("2d",{willReadFrequently:true});g.drawImage(img,0,0,W,H);
+    const D=g.getImageData(0,0,W,H).data;
+    let box=null,mod="";
+    try{
+      if(typeof window.FaceDetector==="function"){
+        const fd=new window.FaceDetector({fastMode:true,maxDetectedFaces:1});
+        const r=await fd.detect(c);
+        if(r&&r[0]){const bb=r[0].boundingBox;box={x:bb.x,y:bb.y-bb.height*.08,w:bb.width,h:bb.height*1.1};mod="a böngésző arcfelismerője";}}
+    }catch(e){box=null;}
+    if(!box){box=fotoArcKeres(D,W,H);mod=box.mod==="bőrszín"?"bőrszín-alapú kereső":"nem találtam arcot — igazítsd a keretet";}
+    F.foto={c,D,W,H,box,mod,kep:img};
+    fedFotoRajz();};
+  img.onerror=()=>{URL.revokeObjectURL(url);try{backToast("Ezt a képet nem tudtam megnyitni.");}catch(e){}};
+  img.src=url;}
+function fedFotoRajz(){
+  const F=_fed;if(!F||!F.foto)return;
+  const P=F.foto,el=$("fedFoto");
+  el.classList.remove("hide");
+  if(!el.querySelector("canvas")){
+    el.innerHTML=`<canvas id="fedVaszon"></canvas>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:12px"><span style="color:var(--dim)">Keret mérete</span>
+        <input type="range" id="fedMeret" min="20" max="100" style="flex:1"></div>
+      <div class="fedMegj" id="fedFotoInfo"></div>
+      <div class="fedGombok"><button type="button" class="btn-s" id="fedFotoEl">Fotó elvetése</button>
+        <button type="button" class="btn" id="fedFotoAlk">Átvétel a fotóról</button></div>`;
+    const cv=$("fedVaszon");cv.width=P.W;cv.height=P.H;
+    let fog=null;
+    const pont=ev=>{const r=cv.getBoundingClientRect();return [(ev.clientX-r.left)*P.W/r.width,(ev.clientY-r.top)*P.H/r.height];};
+    cv.addEventListener("pointerdown",ev=>{const [x,y]=pont(ev);fog=[x-P.box.x,y-P.box.y];cv.setPointerCapture(ev.pointerId);});
+    cv.addEventListener("pointermove",ev=>{if(!fog)return;const [x,y]=pont(ev);
+      P.box.x=Math.max(-P.box.w*.3,Math.min(P.W-P.box.w*.7,x-fog[0]));P.box.y=Math.max(-P.box.h*.3,Math.min(P.H-P.box.h*.7,y-fog[1]));fedFotoKeret();});
+    cv.addEventListener("pointerup",()=>{if(fog){fog=null;fedFotoElemez();}});
+    const sl=$("fedMeret");
+    sl.value=Math.round(P.box.w/Math.max(P.W,P.H)*100);
+    sl.oninput=()=>{const cx=P.box.x+P.box.w/2,cy=P.box.y+P.box.h/2,ar=P.box.h/P.box.w;
+      P.box.w=Math.max(12,+sl.value/100*Math.max(P.W,P.H));P.box.h=P.box.w*ar;P.box.x=cx-P.box.w/2;P.box.y=cy-P.box.h/2;fedFotoKeret();};
+    sl.onchange=()=>fedFotoElemez();
+    $("fedFotoEl").onclick=()=>{F.foto=null;el.classList.add("hide");el.innerHTML="";};
+    $("fedFotoAlk").onclick=()=>{if(F.fotoOv)Object.assign(F.vazlat,F.fotoOv);fedRajz();try{$("fedKep").scrollIntoView({block:"nearest"});}catch(e){}};}
+  fedFotoKeret();fedFotoElemez();}
+function fedFotoKeret(){
+  const F=_fed;if(!F||!F.foto)return;
+  const P=F.foto,cv=$("fedVaszon");if(!cv)return;
+  const g=cv.getContext("2d");g.drawImage(P.kep,0,0,P.W,P.H);
+  const b=P.box;
+  g.save();g.strokeStyle="#f2c200";g.lineWidth=2;g.setLineDash([]);
+  g.beginPath();g.ellipse(b.x+b.w/2,b.y+b.h/2,b.w/2,b.h/2,0,0,Math.PI*2);g.stroke();
+  g.setLineDash([4,3]);g.strokeStyle="rgba(255,255,255,.75)";g.lineWidth=1;
+  [[.43,"szem"],[.72,"száj"]].forEach(([f])=>{g.beginPath();g.moveTo(b.x+b.w*.15,b.y+b.h*f);g.lineTo(b.x+b.w*.85,b.y+b.h*f);g.stroke();});
+  g.restore();}
+function fedFotoElemez(){
+  const F=_fed;if(!F||!F.foto)return;
+  const P=F.foto,{ov,info}=fotoElemzes(P.D,P.W,P.H,P.box);
+  F.fotoOv=ov;
+  const bits=[];
+  if(info.haj)bits.push(`haj: ${info.haj}`);
+  if(ov.hajSzin!=null&&ov.haj!==0)bits.push(info.ősz?"ősz":FACE_HAIR[ov.hajSzin][0]);
+  if(ov.szakall!=null)bits.push(ov.szakall<0?"nincs arcszőrzet":FACE_SZAKALL[ov.szakall]);
+  if(info.arc)bits.push(`${info.arc} arc`);
+  const el=$("fedFotoInfo");
+  if(el)el.innerHTML=`Arc: <b>${esc(P.mod)}</b>. Húzd a sárga keretet az arcra (teteje a hajvonalnál, alja az állnál, a vonalak a szem és a száj magasságában), és állítsd a méretét. `
+    +`Becslés: <b>${esc(bits.join(" · "))}</b>${ov.bor!=null?` · bőrtónus ${ov.bor+1}.`:""}<br>`
+    +`A fotó csak a böngésződben, ideiglenesen van — nem mentjük el, sehova nem kerül el. Csak a kiválasztott vonások maradnak meg, és utána mindegyik tovább állítható.`;}
 
 /* ================= MEZSZÁMOK (3.9.00) ===================================
    MIÉRT SAJÁT NYILVÁNTARTÁS: a játékos-objektumok a draftból, az akadémiáról
@@ -93056,7 +93524,8 @@ function plSheetHeadHtml(loc){
     +`<div class="plFace">${face}`
       +`<div class="plFaceSw" role="group" aria-label="Arckép">`
         +`<button type="button" data-fs="sima" aria-pressed="${fs==="sima"}">Sima</button>`
-        +`<button type="button" data-fs="pix" aria-pressed="${fs==="pix"}">Pixel</button></div></div>`
+        +`<button type="button" data-fs="pix" aria-pressed="${fs==="pix"}">Pixel</button>`
+        +`<button type="button" data-fed="1" title="Kinézet szerkesztése" aria-label="Kinézet szerkesztése">🎨</button></div></div>`
     +`<div class="plId">`
       +`<div class="plNm" id="plSheetName">${num?`<span class="plNum">${num}</span>`:""}${esc(fullName(p.n))}</div>`
       +`<div class="plSub">${sub}</div>`
@@ -93085,6 +93554,10 @@ function plSheetRender(loc){
   $("plSheetPrev").disabled=$("plSheetNext").disabled=L.length<2;
   $("plSheetHead").querySelectorAll("[data-fs]").forEach(b=>b.onclick=()=>{
     faceStilusSet(b.getAttribute("data-fs"));plSheetRender(_plSheetLoc);});
+  /* 🎨 3.9.281 — a kinézet: karrierben ebben a karrierben (vagy globálisan) */
+  {const fb=$("plSheetHead").querySelector("[data-fed]");
+   if(fb)fb.onclick=()=>{const p=loc.p,e=(careerPool&&careerPool[p.n])||null;
+     fedNyit({n:p.n,nat:(e&&e.nat)||p.nat||"",age:(e&&e.age!=null)?e.age:p.age},{kit:plSheetKit()});};}
   box.classList.remove("hide");
   document.body.classList.add("plSheetNyitva");
   card.scrollTop=sc;}
@@ -120065,6 +120538,11 @@ function saveGame(){
         /* 🧿 TALIZMÁNOK (3.9.141): a teljes állapot, a seeddel együtt — a
            kínálat ebből dobódik, tehát a visszatöltés nem pörget újra. */
         tal:S.tal||null,
+        /* 🏟️ 3.9.281 — JAVÍTÁS: a stadion és a merch-részleg állapota (férőhely,
+           szint, a kereslet emlékezete, a nézőszám-napló) 3.9.264 óta NEM került
+           a mentésbe — újratöltéskor a stadionState a táborból építette újra,
+           vagyis a megvett bővítések elvesztek. 🎨 És a kinézet karrier-rétege. */
+        stadion:S.stadion||null,faceMod:S.faceMod||null,
         chKegyelem:S.chKegyelem||null,rejtett:S.rejtett||null,   /* 📜🌘 3.9.255 */
         press:S.press||null,   /* 📰 az újságírók (3.9.188) */
         szarny:S.szarny,   /* ⚡ szárny-kémia (3.9.107) */
@@ -125187,13 +125665,52 @@ function renderNameEditor(){
   const ra=$("nmResetAll");
   if(ra)ra.onclick=()=>{huUserClear();renderNameEditor();};}
 
+/* ---- 🎨 KINÉZET (3.9.281) — a GLOBÁLIS réteg szerkesztője ----
+   Ugyanaz a kereső, mint a névátírásnál: üres kereséskor a már átszabott
+   arcok, két betűtől a teljes adatbázis játékosai (az első 40). */
+let _faceModLista=null;
+function faceModJatekosok(){
+  if(_faceModLista)return _faceModLista;
+  const volt=new Map();
+  SQUADS.forEach(sq=>(sq.players||[]).forEach(p=>{if(p&&p.n&&!volt.has(p.n))volt.set(p.n,{n:p.n,nat:p.nat||""});}));
+  _faceModLista=[...volt.values()];
+  return _faceModLista;}
+function renderFaceModList(){
+  const body=$("squadModalBody");if(!body)return;
+  const q=(($("squadSearch")&&$("squadSearch").value)||"").trim().toLowerCase();
+  const G=faceModGlobal(),db=Object.keys(G).length;
+  $("squadModalHead").innerHTML=`Bármelyik játékos arcát átszabhatod — <b>globálisan</b>: minden karrierben és a gyorsmeccsben is így néz ki. `
+    +`A böngésződben marad, a mentésnek nem része. Egy karrieren belül az adatlap „🎨” gombja csak abban a karrierben szab.`
+    +(db?` <b style="color:var(--gold)">${db}</b> átszabott arcod van.`:"");
+  const fbox=$("squadFilters");if(fbox)fbox.innerHTML="";
+  const L=faceModJatekosok();
+  let lista;
+  if(q.length<2)lista=L.filter(p=>G[p.n]);
+  else lista=L.filter(p=>String(p.n).toLowerCase().includes(q)||String(fullName(p.n)).toLowerCase().includes(q));
+  const CAP=40,ossz=lista.length;lista=lista.slice(0,CAP);
+  if(!lista.length){
+    body.innerHTML=`<div class="note" style="padding:10px 2px;color:var(--dim)">`
+      +(q.length>=2?"Nincs találat.":"Még nincs átszabott arc. Írj be legalább két betűt egy játékos kereséséhez.")+`</div>`;
+    return;}
+  body.innerHTML=`<div style="font-size:11.5px;color:var(--dim2);margin-bottom:7px">`
+    +(q.length<2?"Az átszabott arcok":`${ossz} találat${ossz>CAP?` (az első ${CAP} látszik)`:""}`)+`</div>`
+    +lista.map(p=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+        ${faceImgHtml({n:p.n,nat:p.nat,age:26},36,{mood:.3,bg:"#2c3442",pix:false})}
+        <div style="flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(fullName(p.n))}
+          <span style="font-size:11px;color:var(--dim2)">${esc(natLabel(p.nat)||"")}</span>${G[p.n]?` <span style="font-size:10.5px;color:var(--gold)">● átszabva</span>`:""}</div>
+        <button data-fmn="${esc(p.n)}" class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;border-radius:7px">🎨 Szerkeszt</button>
+      </div>`).join("");
+  body.querySelectorAll("button[data-fmn]").forEach(b=>{
+    const n=b.getAttribute("data-fmn"),p=L.find(x=>x.n===n);
+    b.onclick=()=>fedNyit({n,nat:p?p.nat:"",age:26},{csakGlobal:true});});}
 function renderSquadModal(){
   const body=$("squadModalBody");if(!body)return;
-  {const bc=$("squadModeCards"),bn=$("squadModeNames");
+  {const bc=$("squadModeCards"),bn=$("squadModeNames"),bf=$("squadModeFaces");
    const mark=(el,on)=>{if(el)el.style.cssText=el.style.cssText
      .replace(/;?outline[^;]*/g,"")+(on?";outline:2px solid var(--gold);outline-offset:-2px;color:var(--gold)":"");};
-   mark(bc,_squadMode==="kartyak");mark(bn,_squadMode==="nevek");}
+   mark(bc,_squadMode==="kartyak");mark(bn,_squadMode==="nevek");mark(bf,_squadMode==="arc");}
   if(_squadMode==="nevek")return renderNameEditor();
+  if(_squadMode==="arc")return renderFaceModList();
   const q=(($("squadSearch")&&$("squadSearch").value)||"").trim().toLowerCase();
   const clubs=SQUADS.filter(x=>!x.wc),nat=SQUADS.filter(x=>x.wc);
   $("squadModalHead").innerHTML=
@@ -125286,7 +125803,9 @@ function closeHomeModal(id){
      if(ss){ss.value="";ss.placeholder=ph;}
      renderSquadModal();};
    if(bc)bc.onclick=valt("kartyak","Keresés: klub, szezon, bajnokság…");
-   if(bn)bn.onclick=valt("nevek","Keresés: játékos vagy klub neve…");}
+   if(bn)bn.onclick=valt("nevek","Keresés: játékos vagy klub neve…");
+   const bf=$("squadModeFaces");
+   if(bf)bf.onclick=valt("arc","Keresés: játékos neve…");}
   /* háttérre koppintva is bezárul, mint a többi ablaknál */
   [["themeModal"],["squadModal"]].forEach(([id])=>{
     const m=$(id);if(m)m.onclick=(ev)=>{if(ev.target.id===id)closeHomeModal(id);};});
@@ -126738,6 +127257,8 @@ const BACK_LAYERS=[
   /* megerősítő kérdések és kapuzó ablakok — ezek ülnek a legfelül */
   /* 🎬 az esemény-animáció (3.9.270): a vissza gomb továbblép */
   {el:"evAnim",               btn:"evaTovabb"},
+  /* 🎨 a kinézet-szerkesztő (3.9.281): a vissza gomb = Mégse */
+  {el:"fedModal",             btn:"fedMegse"},
   {el:"hubTacticConfirmModal",btn:"hubTacticConfirmNo"},
   {el:"sellConfirmModal",     btn:"sellConfirmNo"},
   /* HIÁNYZÓK PANEL (3.9.31). Eddig BACK_BLOCKERS volt: a vissza gomb néma

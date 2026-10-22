@@ -61,7 +61,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       if(!careerPool[pl.n])careerPool[pl.n]={n:pl.n,pos:pl.pos.slice(),age:26,startRating:pl.ovr,peak:pl.ovr,pot:3000};
       const e=careerPool[pl.n];if(!e.attrs)initPlayerAttrs(e);});
     if(captainIdx<0)captainIdx=0;if(!coach)coach=COACHES[0];
-    window.saveGame=()=>{};
+    window._eredetiMentes=window._eredetiMentes||saveGame;   /* a 12. pont a valódit hívja */
     window.saveGame=()=>{};
     const _tm=window.fanTicketMult,_fm=window.fanMult;
     window.fanTicketMult=()=>1;window.fanMult=()=>1;
@@ -178,6 +178,16 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
        return nz.map(x=>({k:x.key,t:(PRESS_ST[x.key]||[]).map(f=>f(x.c))}));};
      ki.nzCikk={rek:cikk(L[1]),telt:cikk(L[2]),sor:cikk(L[5]),bov:cikk(L[6]),fogy:cikk(L[7]),zart:cikk(L[8])};
      ki.nzRovat=pressRovatCim("nzRekord");}
+    /* 12. 💾 3.9.281 — JAVÍTÁS: a stadion (és a kinézet karrier-rétege) a mentésben */
+    {const T=stadionState();T.kap=6;T.merch=5;T.rekord=33333;
+     S.faceMod={"Teszt Elek":{haj:3}};
+     let hibaM=null;try{_eredetiMentes();}catch(e){hibaM=String(e);}
+     const d=loadSavedGame();
+     ki.mentes={hiba:hibaM,van:!!d,st:d&&d.S&&d.S.stadion,fm:d&&d.S&&d.S.faceMod};
+     /* a betöltés: Object.assign(S,d.S) — a stadion nem épül újra a táborból */
+     if(d&&d.S){delete S.stadion;delete S.faceMod;Object.assign(S,JSON.parse(JSON.stringify({stadion:d.S.stadion,faceMod:d.S.faceMod})));
+       const T2=stadionState();ki.vissza={kap:T2.kap,merch:T2.merch,rek:T2.rekord,fm:faceTraits({n:"Teszt Elek",nat:"",age:26}).haj};}
+     S.faceMod=null;}
     ki.verzio=APP_VERSION;
     return ki;});
   await p.screenshot({path:process.env.KEP||"/dev/null",fullPage:false}).catch(()=>{});
@@ -206,6 +216,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      "a cikk reagál: csúcs, első telt ház, telt ház-sorozat, bővítés, fogyás (zárt kapunál nem)",Object.fromEntries(Object.entries(C).map(([a,b])=>[a,k(b)])));
    ok(mind.length>=12&&mind.every(t=>t&&!/undefined|NaN|null/.test(t)),"minden lelátó-cím kitöltött",mind.slice(0,4));
    ok(r.nzRovat==="Lelátói hangok","a rovat: Lelátói hangok",r.nzRovat);}
+  console.log("=== 12. a mentés (3.9.281) ===");
+  ok(r.mentes&&!r.mentes.hiba&&r.mentes.van&&r.mentes.st&&r.mentes.st.kap===6&&r.mentes.st.merch===5&&r.mentes.fm&&r.mentes.fm["Teszt Elek"],
+    "a stadion (férőhely, merch-szint) és a kinézet karrier-rétege a mentésbe kerül",r.mentes);
+  ok(r.vissza&&r.vissza.kap===6&&r.vissza.merch===5&&r.vissza.rek===33333&&r.vissza.fm===3,"betöltés után ugyanaz (nem épül újra a táborból)",r.vissza);
   console.log("=== 1. átállás ===");
   ok(r.atallNagy.kap===11&&r.atallNagy.merch===3,"700 ezres tábornál: a legnagyobb (120 ezres) stadion és 3. merch-szint",r.atallNagy);
   ok(r.atallKicsi.kap===1&&r.atallKicsi.merch===0,"új karrier (8 ezres tábor): 5 ezres stadion, 0. merch-szint",r.atallKicsi);

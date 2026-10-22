@@ -424,6 +424,7 @@ node tools/jatekos-adatlap-3-9-268-proba.js [kép-mappa]
 * Lapozás körbe, Sima/Pixel váltó, a renderHub nyitva hagyja.
 * A posztcsere előtt bezárul; a megerősítés fölötte ül; a vissza gomb és a háttér zár.
 * KI állásban a régi lenyíló. Kép-mappával képernyőképet is ment (négy témában).
+* 3.9.281: az adatlap 🎨 gombja a karrier-szerkesztőt nyitja; a mentés a karrierbe ír, az arc frissül.
 
 ## arckep-3-9-267-proba.js — 🧑 az arckép-generátor
 
@@ -456,6 +457,18 @@ node tools/tempo-skala-3-9-266-proba.js
 * A régi kulcs ×2-vel átszámolódik, a tempó betűre a régi; ha az új kulcs él, az nyer.
 * A két csúszka szinkronja, a vágás, a párharc fix üteme.
 
+## kinezet-3-9-281-proba.js — 🎨 a kinézet-szerkesztő és a fotóelemző
+
+```
+node tools/kinezet-3-9-281-proba.js [kép-mappa]
+```
+
+* A rétegek: tisztítás; a globális a böngészőben, a karrieré a mentésben, mezőnként ráülve; egy másik karrierben csak a globális.
+* A kép tényleg változik; a kor-függő vonás „a kora szerint” marad, ha nem rögzíted.
+* A szerkesztő: 16 vonás, léptetés (az előnézet is), „Eredeti”, Mégse, Mentés; minden érték körbeléptethető.
+* A Beállítások „🎨 Kinézet” füle keres és a globális szerkesztőt nyitja.
+* Fotóból, a saját generált arcainkon: bőrtónus ±1, hajszín, kopasz, hosszú, afró, arcszőrzet; a tartalék arckereső megtalálja az arcot.
+
 ## stadion-merch-3-9-264-proba.js — 🏟️ stadion + merch és PR
 
 ```
@@ -470,6 +483,7 @@ node tools/stadion-merch-3-9-264-proba.js
 * A HUB-doboz és a gombja.
 * 3.9.277: az első idények ára (ötöd, harmad, fél).
 * 3.9.280: a hazai nézőszám naplója (csúcs, első telt ház, sorozat, bővítés, fogyás, zárt kapu), a mérleg alja és a lap lelátó-címei.
+* 3.9.281: a stadion (és a kinézet karrier-rétege) a mentésben — mentés → betöltés → ugyanaz.
 
 ## penz-leptek-3-9-263-proba.js — 💰 a pénz a 3–4. idény után is józan marad
 
