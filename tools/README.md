@@ -399,6 +399,7 @@ node tools/fekvo-nezet-3-9-285-proba.js [kép-mappa]
 * Kezdőrúgás előtt (a momentum-panel még rejtve) nincs kapcsoló, a mostani elrendezés él.
 * Meccs közben a kapcsoló kint; „Tábla + feed” (alap) → „Momentum + feed” (a görbe kitölti a magasságot, a viewBox a valódi méret — nem torzul; összecsukott momentumnál is nyitva) → „Tábla + momentum” (a napló nulla magas, a tempó a helyén) → körbe.
 * A választás a böngészőben marad; álló nézetben semmi nem változik, visszafektetve a választott nézet jön.
+* 3.9.286: „Momentum + feed”-ben mini eredményjelző a momentum fejsorában, a két csapatnév között (az állás a nagy tábláé, a perc az óráé, lefújás után „Vége”); a másik két nézetben nincs; asztali 16:9-en is, nagyobban.
 
 ## esemeny-animacio-3-9-270-proba.js — 🎬 esemény-animációk
 
