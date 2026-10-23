@@ -389,6 +389,17 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## sp-sulyozott-3-9-289-proba.js — ⚖️ súlyozott mezőny és célrés-becslés egyjátékosban
+
+```
+node tools/sp-sulyozott-3-9-289-proba.js [kép-mappa]
+```
+
+* Az új karrier a súlyozott képlettel fut (`S.pyr.suly`); az idény vége rögzíti a záró NEVEZÉSI meccs-erőt (`zaroMs`).
+* A kezdőrúgás: a rés a súlyozott meccs-erőből áll be — nyári +12 mellett a mezőny ≈ 12/2,25-tel gyengébb, mint a régi képlettel; a napló és az idény sora rögzíti.
+* A futó (régi) karrier `suly` nélkül betűre a régi szerint fut.
+* A nyári célrés-ablak becslése: várható mezőny, súlyozott meccs-erő, esélyek; nehezebb célrés → erősebb mezőny.
+
 ## pvp-hardcore-3-9-288-proba.js — 🛡 hardcore: szakaszos közös seed + kézfogás
 
 ```
