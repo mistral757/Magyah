@@ -180,8 +180,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      {alatta:t.kuszob.alatta,rajta:t.kuszob.rajta});
   ok(t.kuszob.nyersElott.nyers===false&&t.kuszob.nyersElott.szorzott===true,
      "a szorzott érték ÁTBILLENTENÉ — ezért kapja a nyerset",t.kuszob.nyersElott);
-  ok(Object.keys(t.kuszob.tabla).length===10,
-     "mind a tíz típusnak saját, mért küszöbe van",Object.keys(t.kuszob.tabla).length);
+  ok(Object.keys(t.kuszob.tabla).length===11,
+     "mind a tizenegy típusnak (3.9.292: + Kispad-mester) saját, mért küszöbe van",Object.keys(t.kuszob.tabla).length);
 
   console.log("=== 5. a stábpiac érintetlen ===");
   ok(t.piac.vanOwn===false,"a piaci lenyomatokon nincs `own` jelző");
