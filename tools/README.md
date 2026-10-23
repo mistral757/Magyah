@@ -389,6 +389,17 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## fekvo-nezet-3-9-285-proba.js — 📐 a három fekvő nézet
+
+```
+node tools/fekvo-nezet-3-9-285-proba.js [kép-mappa]
+```
+
+* Valódi karrier, valódi meccs, 844×390-es fekvő telefon.
+* Kezdőrúgás előtt (a momentum-panel még rejtve) nincs kapcsoló, a mostani elrendezés él.
+* Meccs közben a kapcsoló kint; „Tábla + feed” (alap) → „Momentum + feed” (a görbe kitölti a magasságot, a viewBox a valódi méret — nem torzul; összecsukott momentumnál is nyitva) → „Tábla + momentum” (a napló nulla magas, a tempó a helyén) → körbe.
+* A választás a böngészőben marad; álló nézetben semmi nem változik, visszafektetve a választott nézet jön.
+
 ## esemeny-animacio-3-9-270-proba.js — 🎬 esemény-animációk
 
 ```
@@ -469,6 +480,7 @@ node tools/kinezet-3-9-281-proba.js [kép-mappa]
 * A kép tényleg változik; a kor-függő vonás „a kora szerint” marad, ha nem rögzíted.
 * A szerkesztő: 16 vonás, léptetés (az előnézet is), „Eredeti”, Mégse, Mentés; minden érték körbeléptethető.
 * A Beállítások „🎨 Kinézet” füle keres és a globális szerkesztőt nyitja.
+* 3.9.285: a Mentés helyben rögzít (az ablak nyitva, „Elmentve”; nem mentett változásnál „Mégse”); karrierben „🌐 Átmentés a globálisba” — a látszó kinézet a globálisba, a karrier-réteg kiürül, a kép nem változik, új karrierben is él; görgetéskor az arckép a doboz tetején marad.
 * Fotóból, a saját generált arcainkon: bőrtónus ±1, hajszín, kopasz, hosszú, afró, arcszőrzet; a tartalék arckereső megtalálja az arcot.
 
 ## stadion-merch-3-9-264-proba.js — 🏟️ stadion + merch és PR

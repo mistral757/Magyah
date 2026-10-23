@@ -107,6 +107,42 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     if(gomb){gomb.click();o.fül.nyit=!document.getElementById("fedModal").classList.contains("hide")&&_fed.scope==="global"&&!_fed.vanKarrier;
       document.getElementById("fedMegse").click();}
     closeHomeModal("squadModal");
+    /* 3b. 3.9.285 — helyben mentés, átmentés a globálisba, ragadós arckép */
+    {const gmR=gameMode,cpR=careerPool,fmR=S.faceMod;
+     gameMode="career";if(!careerPool)careerPool={};S.faceMod={};
+     const jp2={n:"Átment Elek",nat:"Magyarország",age:25};
+     faceModSet("global",jp2.n,{haj:0});
+     fedNyit(jp2);
+     const m=document.getElementById("fedModal");
+     const all=()=>document.getElementById("fedAllapot").textContent;
+     const x={reteg:_fed.scope,atLatszik:!document.getElementById("fedAtRow").classList.contains("hide"),gombBezar:document.getElementById("fedMegse").textContent};
+     m.querySelector('[data-fk="szakall"][data-fd="1"]').click();
+     x.piszkos=/Nem mentett/.test(all())&&document.getElementById("fedMegse").textContent==="Mégse";
+     const szk=_fed.vazlat.szakall;
+     document.getElementById("fedMent").click();
+     x.mentNyitva=!m.classList.contains("hide")&&/Elmentve/.test(all())&&document.getElementById("fedMegse").textContent==="Bezárás";
+     x.karrMentve=JSON.stringify(S.faceMod[jp2.n])===JSON.stringify({szakall:szk});
+     m.querySelector('[data-fk="szemSzin"][data-fd="1"]').click();   /* még nem mentett lépés is átmegy */
+     const szem=_fed.vazlat.szemSzin;
+     const kepElotte=faceTraits(jp2);
+     document.getElementById("fedAtment").click();
+     const G=faceModGlobal()[jp2.n]||{};
+     x.at=G.haj===0&&G.szakall===szk&&G.szemSzin===szem&&!S.faceMod[jp2.n]&&/Átmentve/.test(all());
+     const t2=faceTraits(jp2);
+     x.kepUgyanaz=t2.haj===0&&t2.szakall===szk&&t2.szemSzin===szem;
+     /* egy új karrierben (üres karrier-réteg) is így néz ki */
+     S.faceMod={};const t3=faceTraits(jp2);x.ujKarrierben=t3.szakall===szk&&t3.szemSzin===szem;
+     /* a globális rétegben nincs átmentés-gomb */
+     fedRetegValt("global");x.globalNincsAt=document.getElementById("fedAtRow").classList.contains("hide");
+     /* ragadós arckép: a kép a görgető doboz tetején marad */
+     const kep=m.querySelector(".fedKep");x.sticky=getComputedStyle(kep).position==="sticky";
+     const gd=m.querySelector(".fedKartya>div[style*=overflow]");gd.scrollTop=gd.scrollHeight;
+     const rk=kep.getBoundingClientRect(),rg=gd.getBoundingClientRect();
+     x.tetejen=gd.scrollTop>0?Math.abs(rk.top-rg.top)<2:"nem görget";
+     document.getElementById("fedMegse").click();
+     faceModSet("global",jp2.n,{});
+     gameMode=gmR;careerPool=cpR;S.faceMod=fmR;
+     o.ment285=x;}
     return o;});
   console.log("=== 1-2. a rétegek ===");
   ok(JSON.stringify(r.tiszta)===JSON.stringify({bor:0,hajSzin:3,haj:18,fejW:29,fejpant:true}),"tisztítás: csak ismert mező, tartományban",r.tiszta);
@@ -119,6 +155,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.ed.eredeti&&r.ed.megse,"az „Eredeti” kiürít, a Mégse nem ment",r.ed);
   ok(r.ed.ment&&r.ed.torles,"a Mentés pontosan a vázlatot írja; a törlés visszaadja a generált arcot",r.ed);
   ok(r.ed.korbe,"minden vonás minden értéke körbeléptethető",r.ed.lephiba);
+  {const x=r.ment285;
+   ok(x.reteg==="karrier"&&x.atLatszik&&x.gombBezar==="Bezárás"&&x.piszkos,"3.9.285: karrierben az átmentés-gomb kint; a nem mentett változás jelezve (Mégse)",x);
+   ok(x.mentNyitva&&x.karrMentve,"3.9.285: a Mentés helyben rögzít, az ablak nyitva marad, „Elmentve”",x);
+   ok(x.at&&x.kepUgyanaz&&x.ujKarrierben&&x.globalNincsAt,"3.9.285: átmentés a globálisba — a látszó kinézet (a nem mentett lépéssel), a karrier-réteg kiürül, a kép nem változik, új karrierben is él",x);
+   ok(x.sticky&&x.tetejen===true,"3.9.285: görgetéskor az arckép a doboz tetején marad",x);}
   console.log("=== 4. a Beállítások fül ===");
   ok(r.fül.sorok>0&&r.fül.arc&&r.fül.nyit,"keres, arcképet mutat, a globális szerkesztőt nyitja",r.fül);
 

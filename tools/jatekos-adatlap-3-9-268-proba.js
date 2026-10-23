@@ -126,9 +126,12 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.mentve=!!(S.faceMod&&S.faceMod[n])&&!faceModGlobal()[n];
     o.frissult=document.querySelector("#plSheetHead img.faceImg").src!==src0;
     faceModSet("karrier",n,{});o.torolve=!(S.faceMod&&S.faceMod[n]);
+    /* 3.9.285: a Mentés helyben rögzít, az ablak nyitva marad — a Bezárás zár */
+    o.nyitvaMarad=!m.classList.contains("hide");
+    document.getElementById("fedMegse").click();o.bezarva=m.classList.contains("hide");
     return o;});
   ok(fed.nyitva&&fed.reteg==="karrier"&&fed.ket===2,"az adatlap 🎨 gombja a karrier-szerkesztőt nyitja (globálisra is váltható)",fed);
-  ok(fed.mentve&&fed.frissult&&fed.torolve,"a mentés a karrierbe ír (nem a globálisba), az adatlap arca frissül",fed);
+  ok(fed.mentve&&fed.frissult&&fed.torolve&&fed.nyitvaMarad&&fed.bezarva,"a mentés a karrierbe ír (nem a globálisba), az adatlap arca frissül; a szerkesztő nyitva marad, a Bezárás zár",fed);
 
   console.log("\n— 4. ÚJRARAJZOLÁS —");
   const r4=await p.evaluate(()=>{const k0=document.getElementById("plSheet").getAttribute("data-key");
