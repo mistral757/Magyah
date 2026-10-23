@@ -403,6 +403,7 @@ node tools/esemeny-animacio-3-9-270-proba.js
 * 3.9.279: mind a 12 skill-jelenet kirajzolódik és lefut; a hős felülír, a jelenet nélküli skill nem foglal, a Sebészi passz a gólpasszadóé; a „Fogd meg a söröm!” bravúrjára a védés sora ráolvad; a Torghelle-becsúszás névvel, saját jelenettel; a skill-jelenet csak a saját eseménytípusán, és a keret fölött is jár.
 * 3.9.280: mind a 18 skill-jelenet; a tizenegyes skillje a gólra, a szöcske a bravúrra; öngól, potyagól, a padról jelenete; a keret fölötti skill-pillanat skillenként egyszer; az ellenfél neve a megjelenítési rétegen át (magyar módban az átírt, kalóz módban a valós).
 * 3.9.283: mind a 21 skill-jelenet; a kapu rácsa — minél jobb a képesség, annál inkább a sarok (40→400 folyamatosan); minden gól- és védés-jelenetben a labda a célzott cellába megy és az villan; a bravúr vetődése a lövés felé; a szöglet a kapu előtt; párkémia, tiki-taka (passzszámmal), buszsofőr; a kapusmez.
+* 3.9.284: mind a 26 skill-jelenet (új: Tessék, Zolika!, Gyere kicsibe!, Nagylabda!, Katapult, Gyors kontra); a jelenet mérő-kijelzője pontosan a feed számát mutatja, első mérés / új rekord (az eddigi csúccsal) / sima mérés, mérés nélkül nincs kijelző, a sorsolt mérőórák eltűntek; a blokkolt lövésben a lövő rúg, az ellenfél védője a lövés útjába csúszik, a labda belé vágódik és kipattan; ifi-boost: 23 éves korig bárki (ifi-bónusz nélkül is), 24 évesen és ikonként nem.
 
 ## meccsesemeny-3-9-269-proba.js — ⚡ meccsesemények (animáció-jelöltek)
 

@@ -120,24 +120,26 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* a hat jelenet kirajzolódik, a saját feliratával */
     r.jelenet=Object.keys(EVA_SKILL_SABLON).map(id=>{
       const t=(EVA_SKILL_TIPUS[id]||["gol"])[0];
-      const asst=["sp_flank","mf_surgeon","mf_cross","sp_queen","chem_pair"].indexOf(id)>=0;
+      const asst=["sp_flank","mf_surgeon","mf_cross","sp_queen","chem_pair","fw_dribble","fw_firsttouch","df_calm_buildup","gk_assist","df_launch"].indexOf(id)>=0;
       const altT=id==="fw_clutch"||id==="fw_coolclose"?"tizenegyes":null;
       const ev={t,side:"us",p:"Teszt Elek",min:30,seq:99,skill:id,skillP:asst?"Szél Elek":"Teszt Elek",alt:altT};
       const T=EVA_SABLON[evaSkillSablon(ev)];
       try{const c=evaKontextus(ev);const svg=T.svg(c);
         const A=()=>({});T.mozgas(A,c);
         return {id,ok:/evaLabda/.test(svg)&&(t==="szereles"||/evaKapus/.test(svg)),cim:T.cim(c),
-          kulon:asst?(/evaBefejezo|evaPasszolo|evaBeado|evaTars1/.test(svg)&&svg.indexOf(c.skFig.fej)>=0):null};}
+          kulon:asst?(/evaBefejezo|evaPasszolo|evaBeado|evaTars1|evaKirugoF/.test(svg)
+          /* a Katapult kapusa a saját kapusmezében */
+          &&svg.indexOf(id==="gk_assist"?evaFig(evaJatekos(ev.skillP,"us"),kapusKitNow(),1).fej:c.skFig.fej)>=0):null};}
       catch(e){return {id,hiba:e.message};}});
     /* 3.9.279 — a második kör */
     sbEv("us","goal","Hős Huba",88);addLine(`88'  GÓL! Hős  4:1`,"m goal");
-    addLine(`→ Gyors kontra — pontos volt az indítás`,"m skillnote",true,{skill:"df_launch",skillP:"Indító Iván"});   /* jelenet nélküli: nem foglal */
+    addLine(`→ Motor — pontos volt az indítás`,"m skillnote",true,{skill:"mf_engine",skillP:"Indító Iván"});   /* jelenet nélküli: nem foglal */
     addLine(`→ BOMBAGÓL!`,"m skillnote",true,{skill:"fw_cannon"});
     addLine(`→ 🍺 Mindenki a lefújást várta`,"m mvp",false,{skill:"clutch_hero"});   /* felülír */
     sbEv("us","goal","Csatár Csaba",89);addLine(`89'  GÓL! Csatár  5:1`,"m goal");
     addLine(`→ Sebészi passz — pontos volt az indítás`,"m skillnote",true,{skill:"mf_surgeon",skillP:"Sebész Sebő"});
     sbEv("us","goal","Gól Gábor",90);addLine(`90'  GÓL! Gól  6:1`,"m goal");
-    addLine(`→ Gyors kontra`,"m skillnote",true,{skill:"df_launch",skillP:"Indító Iván"});
+    addLine(`→ Motor`,"m skillnote",true,{skill:"mf_engine",skillP:"Indító Iván"});
     /* „Fogd meg a söröm!": a skill sora ELŐBB, a védés sora ráolvad */
     addLine(`→ 🍺 Fogd meg a söröm!`,"m mvp",false,{t:"bravur",side:"us",p:"Kapus Kálmán",skill:"clutch_wall"});
     addLine(`70'  ZICCER! Kettesben a kapussal… Kapus kifut és hárít!`,"m ev",false,{t:"bravur",side:"us",p:"Kapus Kálmán",alt:"ziccer"});
@@ -229,12 +231,53 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      setHuNames(false);const valos=evaEllenfelCimke(nyers);
      setHuNames(volt);
      r.cimke={hu,valos,tabla:clubLabel("Real Madrid CF")};}
+    /* 3.9.284 — A MÉRÉS: a jelenet ugyanazt a számot mutatja, mint a feed */
+    {const meresSor=()=>{const L=[...lines().children].reverse().find(d=>/📡/.test(d.textContent));const m=L&&/([\d.,]+) km\/h/.exec(L.textContent);return m?m[1]:null;};
+     const nev="Mérő Márk "+Date.now();
+     mevKezd({});_mev.keret=8;_mev.anim=false;goalNoteLeft=10;
+     sbEv("us","goal",nev,10);addLine(`10'  GÓL! Mérő  1:0`,"m goal");
+     emitMeasure("shot",nev,111.7,"10' ",true);
+     const e1=mevLista().find(e=>e.t==="gol"&&e.p===nev);const f1=meresSor();
+     sbEv("us","goal",nev,20);addLine(`20'  GÓL! Mérő  2:0`,"m goal");
+     emitMeasure("shot",nev,124.3,"20' ",true);
+     const e2=mevLista().filter(e=>e.t==="gol"&&e.p===nev)[1];const f2=meresSor();
+     sbEv("us","goal",nev,30);addLine(`30'  GÓL! Mérő  3:0`,"m goal");
+     emitMeasure("shot",nev,98.2,"30' ",true);
+     const e3=mevLista().filter(e=>e.t==="gol"&&e.p===nev)[2];const f3=meresSor();
+     sbEv("us","goal","Mérés Nélkül",40);addLine(`40'  GÓL! Nélkül  4:0`,"m goal");
+     const e4=mevLista().find(e=>e.p==="Mérés Nélkül");
+     const kij=m=>{const h=evaMeresKijelzo(m);const x=/>([\d.,]+) km\/h</.exec(h);return {szam:x?x[1]:null,rek:/ÚJ REKORD/.test(h),elso:/ELSŐ MÉRÉS/.test(h),eddig:(/eddig ([\d.,]+) km/.exec(h)||[])[1]||null};};
+     r.meres={f:[f1,f2,f3],m:[e1&&e1.meres,e2&&e2.meres,e3&&e3.meres].map(m=>m&&m.ert),k:[kij(e1&&e1.meres),kij(e2&&e2.meres),kij(e3&&e3.meres)],
+       nincs:evaMeresKijelzo(e4&&e4.meres)==="",
+       /* a régi, sorsolt mérőórák eltűntek a skill-jelenetekből */
+       regi:["skBolt","skAgyu","skSzitalos"].some(k=>{const c=evaKontextus({t:"gol",side:"us",p:"T",min:5,seq:1,skill:"sp_bolt"});_evaCel=c.cel;return /evaKmh|evaEro"/.test(EVA_SABLON[k].svg(c));})};
+     /* a jelenetben: a kijelző a kamerán kívül, és animálódik */
+     {const ev=Object.assign({},e2);const c=evaKontextus(ev);const hiv=[];evaMeresMozgas((sel)=>{hiv.push(sel);return {};},ev.meres,2000);r.meres.mozog=hiv;}
+     mevVege();}
+    /* 3.9.284 — A BLOKKOLT LÖVÉS: van védő, a labda belé vágódik és kipattan */
+    {const ev={t:"loves",side:"us",p:"Lövő Lajos",alt:"blokkolva",min:33,seq:44};
+     const c=evaKontextus(ev);_evaCel=c.cel;const T=EVA_SABLON.loves;const svg=T.svg(c);const hiv=[];
+     T.mozgas((sel,fr,o)=>{hiv.push({sel,fr,o});return {};},c);
+     const pos=f=>{const m=/translate\(([-\d.]+)px, ?([-\d.]+)px\)/.exec(f.transform||"");return m?[+m[1],+m[2]]:null;};
+     const lab=(hiv.find(h=>h.sel==="#evaLabda")||{fr:[]}).fr.map(pos);
+     const ved=(hiv.find(h=>h.sel==="#evaVedo")||{fr:[]}).fr.map(pos);
+     const lov=hiv.some(h=>h.sel==="#evaLovo");
+     const talal=lab.some(p=>p&&Math.abs(p[0]-60)<2&&Math.abs(p[1]-73)<2);
+     const vegLab=lab[lab.length-1],vegVed=ved[ved.length-1];
+     r.blokk={vedo:/id="evaVedo"/.test(svg),vedoKit:svg.indexOf(c.vedoKit.c1)>=0,csatt:hiv.some(h=>h.sel==="#evaCsatt"),lov,talal,
+       vedoUtban:!!vegVed&&(Math.abs(vegVed[0]-52)<1||Math.abs(vegVed[0]-68)<1)&&Math.abs(vegVed[1]-74)<1,kipattan:!!vegLab&&vegLab[1]>90,nincsCella:!hiv.some(h=>h.sel==="#evaCella"),cim:T.cim(c)};
+     /* a mellé-lövésnél is ott a védő */
+     const c2=evaKontextus({t:"loves",side:"us",p:"Lövő Lajos",alt:"melle",min:34,seq:45});r.blokk.mellevedo=/id="evaVedo"/.test(T.svg(c2));}
+    /* 3.9.284 — IFI-BOOST: 23 éves korig bárki, az ikon nem */
+    r.ifi={k23:canYouthBoost({n:"Ifi Huszonhárom",age:23,youthBonus:0}),k18:canYouthBoost({n:"Ifi Tizennyolc",age:18}),
+      k24:canYouthBoost({n:"Nem Ifi",age:24,youthBonus:0}),ikon:canYouthBoost({n:"Ikon Ifi",age:20,isIcon:true}),
+      regi:canYouthBoost({n:"Régi Bejegyzés",youthBonus:3}),plafon:potCapFor({n:"Ifi Huszonhárom",age:23})===potHardCap()};
     return r;});
   ok(JSON.stringify(sk.g[0])===JSON.stringify(["gol","Bomba Béla","fw_cannon","Bomba Béla"]),"a skill a gólra kerül (az első nyer)",sk.g[0]);
   ok(JSON.stringify(sk.g[1])===JSON.stringify(["gol","Klose Miró","sp_flank","Arjen Robben"]),"sebesség-skill: a gólpasszadó a gazdája",sk.g[1]);
   ok(JSON.stringify(sk.g[2])===JSON.stringify(["gol","Juni Pernambuco","mf_fk","Juni Pernambuco"]),"szabadrúgásgól: a skill a gól sorából",sk.g[2]);
   ok(sk.g[3]&&sk.g[3][0]==="golKapott"&&sk.g[3][2]===null,"az ellenfél gólja nem kap skillt",sk.g[3]);
-  ok(sk.jelenet.length===21&&sk.jelenet.every(j=>j.ok&&/!$/.test(j.cim)&&j.kulon!==false),"mind a 21 skill-jelenet kirajzolódik és lefut, a saját feliratával (a gólpasszadó skillesek a saját figurájukkal)",sk.jelenet.filter(j=>!(j.ok&&/!$/.test(j.cim)&&j.kulon!==false)).map(j=>j.id+":"+(j.cim||j.hiba)+(j.kulon===false?"(!kulon)":"")+(j.ok?"":"(!ok)")));
+  ok(sk.jelenet.length===26&&sk.jelenet.every(j=>j.ok&&/!$/.test(j.cim)&&j.kulon!==false),"mind a 26 skill-jelenet kirajzolódik és lefut, a saját feliratával (a gólpasszadó skillesek a saját figurájukkal)",sk.jelenet.filter(j=>!(j.ok&&/!$/.test(j.cim)&&j.kulon!==false)).map(j=>j.id+":"+(j.cim||j.hiba)+(j.kulon===false?"(!kulon)":"")+(j.ok?"":"(!ok)")));
   ok(JSON.stringify(sk.g2)===JSON.stringify([["Hős Huba","clutch_hero","Hős Huba"],["Csatár Csaba","mf_surgeon","Sebész Sebő"],["Gól Gábor",null,null]]),"3.9.279: a hős felülír, a jelenet nélküli skill nem foglal, a Sebészi passz a gólpasszadóé",sk.g2);
   ok(JSON.stringify(sk.bravur)===JSON.stringify([["Kapus Kálmán","clutch_wall","ziccer"]]),"„Fogd meg a söröm!”: egy bravúr-esemény, a védés sora ráolvad",sk.bravur);
   ok(JSON.stringify(sk.szer)===JSON.stringify([["Szerelő Szilárd","df_torghelle","skTorghelle"],["Más Máté","df_clean",null]]),"Torghelle: a becsúszás névvel, a saját jelenetével (a többi szerelés sima)",sk.szer);
@@ -253,6 +296,15 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(sk.kapus.ajanlat&&sk.kapus.tav>120&&sk.kapus.jelenet&&sk.kapus.ellen,"a kapusmez: klasszik pár, elüt a mezünktől; a jelenetben a mi kapusunk abban, az övék egy elütőben",sk.kapus);
   ok(sk.cimke.hu===sk.cimke.tabla&&!/Real Madrid/.test(sk.cimke.hu)&&sk.cimke.valos==="Real Madrid CF","az ellenfél neve: magyar módban az átírt, kalóz módban a valós (szezon nélkül)",sk.cimke);
   ok(sk.keretSkill===true&&sk.keretSima===false,"a skill-pillanat a keret fölött is jelenetet kap",[sk.keretSkill,sk.keretSima]);
+  console.log("— 3.9.284 —");
+  {const M=sk.meres;
+   ok(M.f.every(Boolean)&&M.f.every((x,i)=>x===String(M.m[i])&&x===M.k[i].szam),"a jelenet mérő-kijelzője pontosan a feed számát mutatja",M);
+   ok(M.k[0].elso&&!M.k[0].rek&&M.k[1].rek&&M.k[1].eddig==="111.7"&&!M.k[2].rek&&!M.k[2].elso,"első mérés / új rekord (az eddigi csúccsal) / sima mérés",M.k);
+   ok(M.nincs&&!M.regi,"mérés nélkül nincs kijelző; a régi, sorsolt mérőórák eltűntek",[M.nincs,M.regi]);
+   ok(M.mozog.indexOf("#evaMeres")>=0&&M.mozog.indexOf("#evaRekord")>=0,"a kijelző és a rekord-jelvény animálódik",M.mozog);}
+  {const B=sk.blokk;ok(B.vedo&&B.vedoKit&&B.csatt&&B.lov&&B.talal&&B.vedoUtban&&B.kipattan&&B.nincsCella&&B.cim==="Blokk!"&&B.mellevedo,
+    "a blokkolt lövés: a lövő rúg, az ellenfél védője a lövés útjába csúszik, a labda belé vágódik és kipattan",B);}
+  {const I=sk.ifi;ok(I.k23&&I.k18&&!I.k24&&!I.ikon&&I.regi&&I.plafon,"ifi-boost: 23 éves korig bárki (ifi-bónusz nélkül is), 24 évesen nem, ikon nem",I);}
   ok(s1.test.torzs&&s1.test.fejViewBox&&s1.test.nincsVall&&s1.test.bor,"a figura: csak-fej kép + saját mezes törzs, a bőrszínnel",s1.test);
 
   const meccs=async(seb,opt)=>p.evaluate(async([seb,opt])=>{

@@ -339,6 +339,30 @@ A PvP-ben a `sim.events` már strukturált. Ott csak le kell képezni.
 >     betalál) — a mienk.
 >   * A keret fölötti skill-pillanat meccsenként SKILLENKÉNT egyszer jár (a
 >     szöcske gyakori lehet).
+> * **3.9.284 — A MÉRÉS A JELENETBEN, A BLOKK, ÖT ÚJ SKILL-JELENET.**
+>   * **A mért szám = a feed száma.** Eddig a Usain Bolt, az Ágyúgolyó és a
+>     Szitálós jelenete egy SORSOLT km/h-t írt ki, ami nem egyezett a közvetítés
+>     📡 sorával. Most az emitMeasure a mérést tippként adja (fajta, érték,
+>     kié, az eddigi csúcs), a sor a legutóbbi saját gólra tapad (ev.meres),
+>     és MINDEN gól-jelenet a jobb felső sarokban mutatja: „📡 LÖVÉSERŐ /
+>     VÉGSEBESSÉG — X km/h", pontosan ugyanazzal a számmal. Új egyéni csúcsnál
+>     külön, villogó piros jelvény: „🏅 ÚJ REKORD! — eddig Y km/h"; az első
+>     mérésnél zöld „ELSŐ MÉRÉS" (csak ha a feedben is kifér a hozzá tartozó
+>     sor). Ha a mérés sorát a gólonkénti keret elnyelte, a jelenetben sincs.
+>     A régi, sorsolt mérőórák törölve.
+>   * **A blokkolt lövés** („mintha egyedül lenne a játékosunk, de nem tudná
+>     lőni"): a lövő ténylegesen rúg, az ellenfél védője lábbal előre a lövés
+>     vonalába csúszik és keresztben fekszik rajta, a labda a testébe vágódik
+>     (csattanás), és oldalra-hátra kipattan. A mellé/védett lövésnél is ott a
+>     későn érkező védő.
+>   * **Öt új skill-jelenet** — a gólpasszadó skilljei, a passzadó a
+>     főszereplő, a gól a rács-cellába megy: **Tessék, Zolika!** (két védő
+>     kicselezve, „TESSÉK!" és tálcán a gól), **Gyere kicsibe!** (bársonyos
+>     átvétel, kifordulás, laposan be az ötösre — az ötös felvillan),
+>     **Nagylabda!** (hosszú ív a védősor fölött a befutó csatár elé),
+>     **Katapult** (a kapusunk a kapusmezében kirúg, a labda üstökösként
+>     érkezik), **Gyors kontra** (becsúszó labdaszerzés, azonnali mélységi
+>     passz, sprintelő csatár). Összesen 26 skill-jelenet.
 > * **3.9.283 — A KAPU RÁCSA, ÚJ JELENETEK, JAVÍTÁSOK.**
 >   * **A kapu 4×8-as rácsa** (x 32–88, y 22–40; sosem látszik): minden gól és
 >     minden védés egy cellába megy, a labda pontosan oda, és a becsapódás /
@@ -632,4 +656,4 @@ régi kódé; a lenyitás/adatlap gyors útja (3.9.168) már kikerüli.
 6. **Élő meccskép:** a feed fölött alapból nyitva legyen, vagy összecsukva?
 
 ---
-*Állapot: F0–F6 kész (3.9.266–3.9.274); az F5 élő meccsképe 3.9.275-ben momentum-sávra cserélve; 3.9.278–283: huszonegy skill-jelenet, négy gólfajta-jelenet, buszsofőr, a kapu rácsa.*
+*Állapot: F0–F6 kész (3.9.266–3.9.274); az F5 élő meccsképe 3.9.275-ben momentum-sávra cserélve; 3.9.278–284: huszonhat skill-jelenet, négy gólfajta-jelenet, buszsofőr, a kapu rácsa, a mérés a jelenetben, a blokk.*
