@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## pvp-hol-tartok-3-9-291-proba.js — 📍 „Hol tartok” válasz a bökésre
+
+```
+node tools/pvp-hol-tartok-3-9-291-proba.js [kép-mappa]
+```
+
+* A bökés sávján a „📍 Hol tartok” gomb; a koppintás a saját rekeszbe írja az állást (idény, lejátszott fordulók, mit csinál), visszaigazol, fékez.
+* A váró oldal a saját kapujához méri: „még 2 forduló”, ugyanott, előrébb; idényhatáron át is; a válasz-sávon nincs újabb gomb; a régi/már látott válasz nem ugrik be.
+* Az állás-szöveg ablakban, nyáron, forduló előtt.
+
 ## cp-folytatas-3-9-290-proba.js — ⏸ félbehagyott checkpoint újratöltés után
 
 ```

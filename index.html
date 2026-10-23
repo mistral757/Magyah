@@ -3114,6 +3114,11 @@ body.stadium.stadiumLive .immRow{display:none}
 #mpPingBar .mpPingBtns,#vezPush .mpPingBtns{flex:none;display:flex;gap:4px}
 #mpPingBar .mpPingBtns button,#vezPush .mpPingBtns button{font-size:13px;padding:4px 8px;border-radius:9px;
   line-height:1;background:transparent;border:1px solid var(--line);color:var(--dim)}
+/* 📍 3.9.291 — a „Hol tartok" válasz-gomb: ez a sáv egyetlen kiemelt művelete */
+#mpPingBar .mpPingBtns button#mpPingAllas{font-size:11.5px;font-weight:700;color:var(--gold);
+  border-color:var(--gold);white-space:nowrap}
+#mpPingBar .mpPingBtns button.hide{display:none}
+#mpPingBar .mpPingTx small b{display:inline;font-size:inherit;color:var(--ink)}
 /* 📣 A VEZETÉS PUSH-ÉRTESÍTÉSE (3.9.172) ugyanaz a sáv — ha a társ jelzése
    épp kint van, alatta áll meg, nem rajta. Az arany keret helyett a fű színe:
    ez a játék szól, nem a társ. */
@@ -7023,6 +7028,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
   <span class="mpPingE" id="mpPingEmoji">👋</span>
   <span class="mpPingTx" id="mpPingTx"><b></b><small></small></span>
   <span class="mpPingBtns">
+    <button id="mpPingAllas" type="button" class="hide" title="Elküldöm a társamnak, hányadik fordulónál járok">📍 Hol tartok</button>
     <button id="mpPingMute" type="button" title="Némítás 15 percre">🔕</button>
     <button id="mpPingClose" type="button" title="Bezárás">✕</button>
   </span>
@@ -7729,7 +7735,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.290";
+const APP_VERSION="3.9.291";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -123901,6 +123907,93 @@ const MP_PING_MIN_MS=45000;        /* két küldés közt legalább ennyi */
 const MP_PING_FRESH_MS=180000;     /* ennél régebbi jelzést már nem mutatunk */
 const MP_PING_MUTE_MS=900000;      /* a némítás 15 perc — a kért érték */
 const MP_PING_SHOW_MS=12000;       /* meddig áll a sáv magától */
+/* ---- 📍 3.9.291 — „HOL TARTOK": VÁLASZ A BÖKÉSRE ----
+   KÉRÉS: „Amikor ott vagy a játékban és úgy kapsz értesítést a társadtól,
+   hogy vár, akkor legyen egy gomb, ami […] elküldi a társadnak, hogy
+   hányadik fordulónál jár épp, hogy tudja, hogy mennyit kell még várnia."
+   A bökés-sávon egy „📍 Hol tartok" gomb: egy koppintás, és a saját
+   állásod (idény, lejátszott fordulók, mit csinálsz épp) a h2h-ág saját
+   rekeszébe kerül. A váró fél a következő jelenlét-körben megkapja, és a
+   SAJÁT kapujához méri: „még ~2 forduló, mire odaér". Nincs új szabály: a
+   h2h ág nyitott. */
+const MP_ALLAS_ROUND="pingAllas";
+const MP_ALLAS_MIN_MS=15000;       /* két válasz közt legalább ennyi */
+let _mpAllasAt=0,_mpAllasSeen=0,_mpPingBarFajta="ping";
+/* a saját állásom — a társ ebből számol */
+function mpAllasMost(){
+  const sn=S.seasonNumber||1,idx=S.idx||0;
+  let hol="",mit="";
+  try{
+    const w=$("h2hWait");
+    if(twWindowOpen()){mit="ablak";hol=`${hunAzNum(S.twWindow.round)} ${S.twWindow.round}. forduló utáni átigazolási ablakban`;}
+    else if(w&&!w.classList.contains("hide")){mit="var";hol=`bevár${mpPingGateName()?" — "+mpPingGateName():""}`;}
+    else if(S.cpFolyamat&&S.cpFolyamat.lepes==="kihivas"){mit="kihivas";hol=`${hunAzNum(idx)} ${idx}. forduló utáni kihívásokat választja`;}
+    else if(S.hc&&S.hc.fuggo){mit="kezfogas";hol="a kézfogásnál";}
+    else if(euroActive()){mit="kupa";hol="a nemzetközi kupában";}
+    else if(phase!=="season"||S.seasonClosed||idx>=30){mit="nyar";hol=`${hunAzNum(sn)} ${sn}. idény utáni nyári szünetben`;}
+    else if(S.playing){mit="meccs";hol=`${hunAzNum(idx+1)} ${idx+1}. fordulót játssza`;}
+    else{mit="elott";hol=`${hunAzNum(idx+1)} ${idx+1}. forduló előtt`;}
+  }catch(e){mit="elott";hol=`a ${idx+1}. forduló előtt`;}
+  return {sn,idx,mit,hol,t:String(teamName||"").replace(/[<>&]/g,"").slice(0,24),at:Date.now()};}
+function mpAllasWhyNot(){
+  try{
+    if(!(typeof h2hRoomActive==="function"&&h2hRoomActive())||!MP.activeRoom)return "Ehhez közös szoba kell.";
+    if(mpNet.mode!=="fb")return "Helyi módban nincs mit küldeni.";
+    const h=MP_ALLAS_MIN_MS-(Date.now()-_mpAllasAt);
+    if(h>0)return `Az imént küldted — újra ${Math.ceil(h/1000)} mp múlva.`;
+    return "";
+  }catch(e){return "Most nem érhető el.";}}
+async function mpAllasKuld(){
+  const baj=mpAllasWhyNot();
+  if(baj)return {ok:false,miert:baj};
+  const rec=mpAllasMost();
+  _mpAllasAt=Date.now();
+  try{await mpBk().h2hPut(MP.activeRoom,MP_ALLAS_ROUND,mpMyId(),rec);}
+  catch(e){_mpAllasAt=0;return {ok:false,miert:(e&&e.message)||"nem sikerült elküldeni"};}
+  return {ok:true,szoveg:`${rec.sn}. idény · ${rec.idx}/30 forduló lejátszva · ${rec.hol}`};}
+/* A VÁRÓ OLDAL: a társ állása a SAJÁT kapumhoz mérve. A kapum = ahol most
+   állok (idény + lejátszott fordulók); a társnak ennyi fordulót kell még
+   lejátszania, hogy ugyanide érjen. */
+function mpAllasBecsles(rec){
+  const enSn=S.seasonNumber||1,enIdx=S.idx||0;
+  const hatra=(enSn-(rec.sn||1))*30+(enIdx-(rec.idx||0));
+  let fej,al;
+  const ki=rec.t?esc(String(rec.t)):"A társad";
+  fej=`${ki}: ${rec.sn||1}. idény, ${rec.idx||0}/30 forduló`;
+  if(hatra>0){
+    const most=rec.mit==="meccs"?" (az egyiket épp játssza)":"";
+    al=`Most ${esc(String(rec.hol||""))}. Még <b>${hatra}</b> forduló${most}, mire odaér, ahol te vársz.`;}
+  else if(hatra===0)
+    al=`Most ${esc(String(rec.hol||""))}. Ugyanannál a fordulónál tart — már csak az ottani teendőit intézi.`;
+  else al=`Most ${esc(String(rec.hol||""))}. Előrébb jár nálad (${-hatra} fordulóval) — ő vár rád.`;
+  return {fej,al,hatra};}
+function mpAllasShow(rec){
+  const bar=$("mpPingBar");if(!bar)return;
+  const b=mpAllasBecsles(rec);
+  const em=$("mpPingEmoji"),tx=$("mpPingTx"),ab=$("mpPingAllas");
+  if(em)em.textContent="📍";
+  if(tx)tx.innerHTML=`<b>${b.fej}</b><small>${b.al}</small>`;
+  if(ab)ab.classList.add("hide");
+  _mpPingBarFajta="allas";
+  bar.classList.remove("hide");
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{try{bar.classList.add("mpPingIn");}catch(e){}}));
+  if(_mpPingHideT)clearTimeout(_mpPingHideT);
+  _mpPingHideT=setTimeout(()=>{try{mpPingHide();}catch(e){}},MP_PING_SHOW_MS);
+  try{if(navigator.vibrate)navigator.vibrate(18);}catch(e){}}
+async function mpAllasPoll(){
+  const node=await mpBk().h2hGet(MP.activeRoom,MP_ALLAS_ROUND);
+  if(!node)return;
+  const me=mpMyId();let best=null;
+  Object.keys(node).forEach(k=>{if(k===me)return;const v=node[k];
+    if(!v||typeof v.at!=="number")return;if(!best||v.at>best.at)best=v;});
+  if(!best||best.at<=_mpAllasSeen)return;
+  _mpAllasSeen=best.at;
+  if((Date.now()-best.at)>MP_PING_FRESH_MS)return;
+  const b=mpAllasBecsles(best);
+  /* a napló mindig megkapja (ott később is visszaolvasható) */
+  try{addLine(`📍 ${b.fej} — ${b.al}`,"m ev");}catch(e){}
+  if(!ertesitesOn())return;
+  mpAllasShow(best);}
 /* A TÍZ HANGULATJEL. Mind ugyanazt mondja — „rád várok" —, csak más hangon:
    a felirat a küldő fülének szól (a gomb címkéje), a jel a társ képernyőjére
    kerül. Szándékosan nincs köztük sértő: egy közös karrier két embere közt a
@@ -123991,6 +124084,7 @@ async function mpPingPoll(){
   try{
     if(!(gameMode==="career"&&typeof h2hRoomActive==="function"&&h2hRoomActive()))return;
     if(!MP.activeRoom||mpNet.mode!=="fb")return;
+    try{await mpAllasPoll();}catch(e){}   /* 📍 3.9.291 */
     const node=await mpBk().h2hGet(MP.activeRoom,MP_PING_ROUND);
     if(!node)return;
     const me=mpMyId();
@@ -124026,6 +124120,10 @@ function mpPingShow(p){
     const hol=(p&&p.g)?esc(String(p.g)):"";
     tx.innerHTML=`<b>${ki} vár rád</b>`
       +`<small>${hol?"Ott áll "+hol+" — ":""}koppints, és odaviszünk.</small>`;}
+  _mpPingBarFajta="ping";
+  /* 📍 3.9.291 — egy koppintással visszaüzenhetsz, hol tartasz */
+  {const ab=$("mpPingAllas");
+   if(ab){ab.classList.remove("hide");ab.disabled=false;ab.textContent="📍 Hol tartok";}}
   bar.classList.remove("hide");
   /* Két képkocka kell a beúszáshoz: az elem előbb legyen a DOM-ban a kezdő
      (fenti) állapotával, és csak UTÁNA kapja meg az osztályt — különben a
@@ -124063,7 +124161,21 @@ function mpPingJump(){
     _mpPingHideT=setTimeout(()=>{try{mpPingHide();}catch(e){}},MP_PING_SHOW_MS);
     return false;
   }catch(e){return false;}}
-$("mpPingTx")&&($("mpPingTx").onclick=()=>{try{mpPingJump();}catch(e){}});
+$("mpPingTx")&&($("mpPingTx").onclick=()=>{try{if(_mpPingBarFajta==="allas")mpPingHide();else mpPingJump();}catch(e){}});
+$("mpPingAllas")&&($("mpPingAllas").onclick=async()=>{
+  const ab=$("mpPingAllas");if(!ab||ab.disabled)return;
+  ab.disabled=true;ab.textContent="…";
+  if(_mpPingHideT){clearTimeout(_mpPingHideT);_mpPingHideT=null;}
+  let r={ok:false};try{r=await mpAllasKuld();}catch(e){r={ok:false,miert:String(e&&e.message||e)};}
+  const tx=$("mpPingTx");
+  if(r.ok){
+    ab.textContent="✓ Elküldve";
+    if(tx)tx.innerHTML=`<b>📍 Elküldtük, hol tartasz</b><small>${esc(r.szoveg||"")}</small>`;
+    try{addLine(`📍 Jelezted a társadnak, hol tartasz: ${esc(r.szoveg||"")}.`,"m ev");}catch(e){}
+  }else{
+    ab.disabled=false;ab.textContent="📍 Hol tartok";
+    if(tx)tx.innerHTML=`<b>Nem ment ki</b><small>${esc(r.miert||"próbáld újra")}</small>`;}
+  _mpPingHideT=setTimeout(()=>{try{mpPingHide();}catch(e){}},r.ok?4000:MP_PING_SHOW_MS);});
 $("mpPingClose")&&($("mpPingClose").onclick=()=>{try{mpPingHide();}catch(e){}});
 $("mpPingMute")&&($("mpPingMute").onclick=()=>{
   try{
