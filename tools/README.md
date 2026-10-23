@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## cp-folytatas-3-9-290-proba.js — ⏸ félbehagyott checkpoint újratöltés után
+
+```
+node tools/cp-folytatas-3-9-290-proba.js [kép-mappa]
+```
+
+* Valódi mentés → friss lap → `loadIntoGame` + `resumeUIFromSave`.
+* Egyjátékos: kihívás-választás közben újratöltve ugyanaz a lista (az elvállalt megmarad, a forduló nem lép); utána az ablak; ablak közben a HUB.
+* Hardcore, két kliens: kihívás közben újratöltve a lista; utána a kézfogás vár; „Később folytatom” → a HUB fő gombja a kézfogás (a jelzés nem gomb), a kezdőrúgás nem ígér fordulót, menü ki-be sem írja felül; újratöltve egyből a HUB, a kézfogás újra vár; a társ megérkezésekor mindkét oldalon nyílik a 8. forduló utáni ablak.
+
 ## sp-sulyozott-3-9-289-proba.js — ⚖️ súlyozott mezőny és célrés-becslés egyjátékosban
 
 ```
