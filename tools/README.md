@@ -389,6 +389,31 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## pvp-hardcore-3-9-288-proba.js — 🛡 hardcore: szakaszos közös seed + kézfogás
+
+```
+node tools/pvp-hardcore-3-9-288-proba.js
+```
+
+* Két lap egy böngészőben, a játék helyi szoba-hátterén — valódi kétkliens-kézfogás; ugyanaz a világ-seed, más keret.
+* A szakaszok (a, tw8, b, tw15, c, tw23, d, nyár); a hcVel determinisztikus, könnyedben semleges.
+* A kihívás-típusok a két gépen egyeznek; a talizmán: közös seed, az 1. szakaszban mindhárom lap közös, később a 2–3. hely közös, az 1. a main szerint eltérhet.
+* A scout-terv közös, a felfedezések a közös célerő körül; a skill-sor újratöltése és az ifi-ablak közös.
+* A kézfogás: vár, mindkét kliens továbblép, az egyeztetés kimondja az eltérést, nem kér újra; a megszakítás függőben hagyja, a HUB gombja folytat, a forduló addig nem indul; az ablak nyitása/zárása hardcore-ban kézfogás, könnyedben nem.
+
+## pvp-szigor-3-9-287-proba.js — 🛡 idénynyitó célrés, súlyozott mezőny, szigorúság
+
+```
+node tools/pvp-szigor-3-9-287-proba.js [kép-mappa]
+```
+
+* A képlet: (indító×1,25 + záró)/2,25 — a kérés példája 102,89; a pár tükörszimmetrikus, régi társnál a régi képlet.
+* A záró NEVEZÉSI meccs-erő a szezonzáró csomagban és a kézfogásban.
+* A kezdőrúgás (valódi piramis-karrier): a mezőny a súlyozott átlagból áll be; a nyári növekmény ≈44%-a megmarad; a napló kimondja.
+* Az arányos padló (tavalyi rajtszint × (1 + ütem/85)); más osztályban nem él.
+* A szigorúság: kapcsoló, beállítás-csomag, átvétel, `mpHardcore()`.
+* Az idénynyitó célrés-ablak: a társ élő előnézete, a közzététel, a léptetés, Rendben / Még maradok, a már elküldött rekord, egyjátékosban nincs.
+
 ## fekvo-nezet-3-9-285-proba.js — 📐 a három fekvő nézet
 
 ```
@@ -399,6 +424,7 @@ node tools/fekvo-nezet-3-9-285-proba.js [kép-mappa]
 * Kezdőrúgás előtt (a momentum-panel még rejtve) nincs kapcsoló, a mostani elrendezés él.
 * Meccs közben a kapcsoló kint; „Tábla + feed” (alap) → „Momentum + feed” (a görbe kitölti a magasságot, a viewBox a valódi méret — nem torzul; összecsukott momentumnál is nyitva) → „Tábla + momentum” (a napló nulla magas, a tempó a helyén) → körbe.
 * A választás a böngészőben marad; álló nézetben semmi nem változik, visszafektetve a választott nézet jön.
+* 3.9.286: „Momentum + feed”-ben mini eredményjelző a momentum fejsorában, a két csapatnév között (az állás a nagy tábláé, a perc az óráé, lefújás után „Vége”); a másik két nézetben nincs; asztali 16:9-en is, nagyobban.
 
 ## esemeny-animacio-3-9-270-proba.js — 🎬 esemény-animációk
 

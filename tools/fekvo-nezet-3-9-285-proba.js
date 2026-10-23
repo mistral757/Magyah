@@ -17,6 +17,9 @@
      5. körbeér, a választás a böngészőben marad;
      6. álló nézetben semmi nem változik (nincs kapcsoló, a momentum a
         helyén);
+     3.9.286: a „Momentum + feed" nézetben mini eredményjelző a momentum
+        fejsorában (az állás a nagy tábláé, a perc az óráé, lefújás után
+        „Vége"); a másik két nézetben nincs; asztali 16:9-en is;
      7. nincs oldalhiba.
    Használat: node tools/fekvo-nezet-3-9-285-proba.js [kép-mappa] */
 "use strict";
@@ -74,7 +77,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       tabla:lat($("sbWrap")),tablaR:r($("sbWrap")),ek:lat($("elokep")),ekR:r($("elokep")),
       naplo:lat($("ttLines")),naploR:r($("ttLines")),ttxtH:Math.round($("ttxt").getBoundingClientRect().height),
       gorbeH:Math.round(L.getBoundingClientRect().height),vbH:vb[3]||0,ekTest:lat($("ekTest")),
-      tempo:lat($("speedRow")),tar:(()=>{try{return localStorage.getItem("fekvoNezet30_0");}catch(e){return null;}})()};});
+      tempo:lat($("speedRow")),
+      mini:lat($("fkMini")),miniAll:($("fkMiniAll")||{}).textContent,miniPerc:($("fkMiniPerc")||{}).textContent,
+      vart:`${SB.us} : ${SB.them}`,ora:(()=>{const f=[...document.querySelectorAll("#sbClock .sbFlip")].map(x=>x.textContent.trim()).join("");return f.length>=2?(+f.slice(0,2))+"'":"";})(),
+      miniR:r($("fkMini")),tar:(()=>{try{return localStorage.getItem("fekvoNezet30_0");}catch(e){return null;}})()};});
 
   /* 1. kezdőrúgás előtt, fekve */
   await p.evaluate(()=>{document.querySelectorAll("#guideTip,.guideTip").forEach(x=>x.remove());
@@ -90,6 +96,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await p.waitForTimeout(6000);
   const a1=await allapot();
   console.log("— 2. TÁBLA + FEED (alap) —");
+  ok(!a1.mini,"a „Tábla + feed” nézetben nincs mini tábla (ott a nagy)",a1.mini);
   ok(a1.van&&a1.gomb&&a1.gombTx==="Tábla + feed"&&a1.tabla&&a1.naplo&&!a1.ek&&a1.tablaR.bottom<=a1.naploR.top+2,"a kapcsoló kint; felül a tábla, alul a napló, a momentum nem látszik",a1);
   if(KEP){fs.mkdirSync(KEP,{recursive:true});await p.screenshot({path:path.join(KEP,"fekvo-tf.png")});}
 
@@ -100,6 +107,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("— 3. MOMENTUM + FEED —");
   ok(a2.mf&&a2.gombTx==="Momentum + feed"&&!a2.tabla&&a2.ek&&a2.naplo&&a2.ekR.top<5&&a2.ekR.bottom<=a2.naploR.top+2,"felül a momentum, alul a napló, a tábla rejtve",a2);
   ok(a2.ekTest&&a2.gorbeH>=120&&Math.abs(a2.vbH-a2.gorbeH)<=2,"a görbe kitölti a magasságot, nem torzul (összecsukva mentett panelnél is nyitva)",{gorbeH:a2.gorbeH,vbH:a2.vbH,ekTest:a2.ekTest});
+  ok(a2.mini&&a2.miniAll===a2.vart&&a2.miniR.top>=a2.ekR.top&&a2.miniR.bottom<=a2.ekR.top+90,"3.9.286: a mini eredményjelző a momentum fejsorában, az állás a nagy tábláé",{mini:a2.mini,all:a2.miniAll,vart:a2.vart,miniR:a2.miniR});
+  ok(/^\d+'$/.test(a2.miniPerc)&&(a2.ora===""||Math.abs(parseInt(a2.miniPerc)-parseInt(a2.ora))<=1),"3.9.286: a mini tábla perce az óráé",{perc:a2.miniPerc,ora:a2.ora});
   if(KEP)await p.screenshot({path:path.join(KEP,"fekvo-mf.png")});
 
   /* 4. tábla + momentum */
@@ -107,6 +116,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await p.waitForTimeout(700);
   const a3=await allapot();
   console.log("— 4. TÁBLA + MOMENTUM —");
+  ok(!a3.mini,"a „Tábla + momentum” nézetben sincs mini tábla",a3.mini);
   ok(a3.tm&&a3.gombTx==="Tábla + momentum"&&a3.tabla&&a3.ek&&a3.tablaR.bottom<=a3.ekR.top+2&&a3.ttxtH===0&&a3.tempo,"felül a tábla, alul a momentum, a napló nulla magas, a tempó a helyén",a3);
   ok(Math.abs(a3.vbH-a3.gorbeH)<=2&&a3.gorbeH>=40,"a görbe az új magassághoz igazodik",{gorbeH:a3.gorbeH,vbH:a3.vbH});
   if(KEP)await p.screenshot({path:path.join(KEP,"fekvo-tm.png")});
@@ -127,6 +137,16 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await p.setViewportSize({width:844,height:390});await p.waitForTimeout(800);
   const a6=await allapot();
   ok(a6.mf&&!a6.tabla&&a6.ek,"visszafektetve a választott nézet jön",a6);
+  /* asztali 16:9 ablak: ugyanott, nagyobban */
+  await p.setViewportSize({width:1600,height:900});await p.waitForTimeout(800);
+  const a7=await allapot();
+  ok(a7.stadium&&a7.mf&&a7.mini&&a7.miniAll===a7.vart&&a7.miniR.h>=a2.miniR.h,"3.9.286: asztali 16:9-en is a fejsorban, nagyobban",{mini:a7.mini,h:a7.miniR.h,telefonH:a2.miniR.h});
+  if(KEP)await p.screenshot({path:path.join(KEP,"fekvo-mf-pc.png")});
+  await p.setViewportSize({width:844,height:390});
+  for(let i=0;i<600;i++){if(await p.evaluate(()=>!!S.lastMatch&&!S.playing))break;await p.waitForTimeout(100);}
+  await p.waitForTimeout(400);
+  const a8=await allapot();
+  ok(a8.miniPerc==="Vége"&&a8.miniAll===a8.vart,"3.9.286: lefújás után „Vége”, a végeredménnyel",{perc:a8.miniPerc,all:a8.miniAll,vart:a8.vart,mf:a8.mf,mini:a8.mini});
   await p.evaluate(()=>{try{localStorage.removeItem(EK_KEY);localStorage.removeItem(MEV_ANIM_KEY);}catch(e){}});
 
   console.log("— 7. HIBÁK —");
