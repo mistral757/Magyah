@@ -74,3 +74,27 @@ kereslet emlékezete, a 3.9.280-as nézőszám-napló) **3.9.264 óta kimaradt**
 bővítések és merch-szintek elvesztek. Most a mentés része
 (`tools/stadion-merch-3-9-264-proba.js`, 12. pont: mentés → betöltés →
 ugyanaz).
+
+## 3.9.285 — mentés helyben, átmentés a globálisba, rögzített arckép
+
+KÉRÉS: „ha egy játékos kinézetét beállítod, lehessen elmenteni, és lehessen
+átmenteni a globálra azt, amit egy aktuális karrierben éppen beállítottál
+neki. És a játékos customizáló felületen ahogy görgetsz le a beállításokban,
+a játékos arcképe legyen mindig rögzítve a képernyő tetején."
+
+* **💾 Mentés helyben.** A Mentés rögzít, de az ablak nyitva marad: lehet
+  tovább igazítani vagy átmenteni. Az állapotsor mutatja, mi a helyzet:
+  „● Nem mentett változás” (ilyenkor a bal gomb **Mégse**, és eldobja), vagy
+  „✓ Elmentve — ebben a karrierben / globálisan” (ilyenkor **Bezárás**).
+* **🌐 Átmentés a globálisba** (csak karrier-rétegben): a most LÁTSZÓ kinézet
+  — a globális alap, rajta a karrieres vázlat, a még nem mentett lépésekkel
+  együtt — lesz a globális beállítás; a karrier saját rétege kiürül, mert
+  már a globális hordozza. A kép ebben a karrierben nem változik, minden más
+  (és minden új) karrierben is így néz ki, és egy későbbi globális igazítás
+  itt is érvényesül.
+* **📌 Rögzített arckép.** A kép a görgető doboz tetejére tapad
+  (`position:sticky`). Keskeny kijelzőn (≤ 560 px) a sorok fölött teljes
+  szélességű sáv lesz belőle — a nagy kép és a pixeles párja egymás mellett,
+  alatta görögnek a sorok —, szélesen a sorok mellett áll.
+
+Próba: `tools/kinezet-3-9-281-proba.js` 3b. pont; `tools/jatekos-adatlap-3-9-268-proba.js` 3b.

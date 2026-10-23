@@ -389,6 +389,17 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## fekvo-nezet-3-9-285-proba.js — 📐 a három fekvő nézet
+
+```
+node tools/fekvo-nezet-3-9-285-proba.js [kép-mappa]
+```
+
+* Valódi karrier, valódi meccs, 844×390-es fekvő telefon.
+* Kezdőrúgás előtt (a momentum-panel még rejtve) nincs kapcsoló, a mostani elrendezés él.
+* Meccs közben a kapcsoló kint; „Tábla + feed” (alap) → „Momentum + feed” (a görbe kitölti a magasságot, a viewBox a valódi méret — nem torzul; összecsukott momentumnál is nyitva) → „Tábla + momentum” (a napló nulla magas, a tempó a helyén) → körbe.
+* A választás a böngészőben marad; álló nézetben semmi nem változik, visszafektetve a választott nézet jön.
+
 ## esemeny-animacio-3-9-270-proba.js — 🎬 esemény-animációk
 
 ```
@@ -403,6 +414,7 @@ node tools/esemeny-animacio-3-9-270-proba.js
 * 3.9.279: mind a 12 skill-jelenet kirajzolódik és lefut; a hős felülír, a jelenet nélküli skill nem foglal, a Sebészi passz a gólpasszadóé; a „Fogd meg a söröm!” bravúrjára a védés sora ráolvad; a Torghelle-becsúszás névvel, saját jelenettel; a skill-jelenet csak a saját eseménytípusán, és a keret fölött is jár.
 * 3.9.280: mind a 18 skill-jelenet; a tizenegyes skillje a gólra, a szöcske a bravúrra; öngól, potyagól, a padról jelenete; a keret fölötti skill-pillanat skillenként egyszer; az ellenfél neve a megjelenítési rétegen át (magyar módban az átírt, kalóz módban a valós).
 * 3.9.283: mind a 21 skill-jelenet; a kapu rácsa — minél jobb a képesség, annál inkább a sarok (40→400 folyamatosan); minden gól- és védés-jelenetben a labda a célzott cellába megy és az villan; a bravúr vetődése a lövés felé; a szöglet a kapu előtt; párkémia, tiki-taka (passzszámmal), buszsofőr; a kapusmez.
+* 3.9.284: mind a 26 skill-jelenet (új: Tessék, Zolika!, Gyere kicsibe!, Nagylabda!, Katapult, Gyors kontra); a jelenet mérő-kijelzője pontosan a feed számát mutatja, első mérés / új rekord (az eddigi csúccsal) / sima mérés, mérés nélkül nincs kijelző, a sorsolt mérőórák eltűntek; a blokkolt lövésben a lövő rúg, az ellenfél védője a lövés útjába csúszik, a labda belé vágódik és kipattan; ifi-boost: 23 éves korig bárki (ifi-bónusz nélkül is), 24 évesen és ikonként nem.
 
 ## meccsesemeny-3-9-269-proba.js — ⚡ meccsesemények (animáció-jelöltek)
 
@@ -468,6 +480,7 @@ node tools/kinezet-3-9-281-proba.js [kép-mappa]
 * A kép tényleg változik; a kor-függő vonás „a kora szerint” marad, ha nem rögzíted.
 * A szerkesztő: 16 vonás, léptetés (az előnézet is), „Eredeti”, Mégse, Mentés; minden érték körbeléptethető.
 * A Beállítások „🎨 Kinézet” füle keres és a globális szerkesztőt nyitja.
+* 3.9.285: a Mentés helyben rögzít (az ablak nyitva, „Elmentve”; nem mentett változásnál „Mégse”); karrierben „🌐 Átmentés a globálisba” — a látszó kinézet a globálisba, a karrier-réteg kiürül, a kép nem változik, új karrierben is él; görgetéskor az arckép a doboz tetején marad.
 * Fotóból, a saját generált arcainkon: bőrtónus ±1, hajszín, kopasz, hosszú, afró, arcszőrzet; a tartalék arckereső megtalálja az arcot.
 
 ## stadion-merch-3-9-264-proba.js — 🏟️ stadion + merch és PR

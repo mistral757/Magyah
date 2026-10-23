@@ -108,6 +108,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(hossz.length>10&&hossz.every((x,i)=>i===0||x>=hossz[i-1]-0.01),"a görbe feje előre halad (nem ugrál vissza)",hossz.length);
   ok(vege.vodor===18&&vege.tk>=4&&vege.alap>0.2&&vege.alap<0.8,"a motor 18 vödre táplálja (a két csapat λ-ja), és a birtoklás-alapvonal",vege);
   ok(Math.abs(vege.cx-vege.W)<2&&vege.golJel===vege.gol&&!vege.raf,"a végén a görbe a 90. percig ér, annyi gól-jellel, ahány gól; a rajzoló leállt",vege);
+  /* 3.9.285: a ráadásban (90+3) esett gól jele is kirajzolódik — a fej 90-nél áll */
+  const rad=await p.evaluate(()=>{const L=document.getElementById("ekLend");
+    const n0=[...L.querySelectorAll("text")].filter(t=>t.textContent==="⚽").length;
+    _ek.jelek.push({t:"gol",min:90.03,mi:true});ekRajzGorbe();
+    const n1=[...L.querySelectorAll("text")].filter(t=>t.textContent==="⚽").length;
+    _ek.jelek.pop();ekRajzGorbe();return {n0,n1};});
+  ok(rad.n1===rad.n0+1,"a hosszabbításban esett gól jele is megjelenik a görbe végén",rad);
   console.log("\n— 3. A MODELL —");
   const d=await p.evaluate(()=>{
     const r={};
