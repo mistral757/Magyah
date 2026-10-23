@@ -389,6 +389,17 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## kispad-mester-3-9-292-proba.js — ⏱ Kispad-mester stábtag
+
+```
+node tools/kispad-mester-3-9-292-proba.js
+```
+
+* A perc-táblázat betűre (40: 1/3/7 · 50: 3/7/12 · 65: 5/10/15 · 77: 10/20/30), köztes lineáris, fölötte arányos.
+* A Szakértelem tisztán a percekből, monoton; jelöltként felkínálható; a stábpiac a sávban ad ilyet.
+* Valódi meccseken: csak a nem játszó cserék kapnak percet, a pályafutás-percbe is; a fejlődés gyűlik; a munkanapló percben.
+* Fókusz: posztcsoport, egy játékos (max 1); a sérült nem edz, az eltiltott igen; a második Kispad-mester inaktív; az előnézet mindhárom módra kiírja a percet.
+
 ## pvp-hol-tartok-3-9-291-proba.js — 📍 „Hol tartok” válasz a bökésre
 
 ```
