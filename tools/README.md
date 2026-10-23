@@ -389,6 +389,48 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## kispad-mester-3-9-292-proba.js — ⏱ Kispad-mester stábtag
+
+```
+node tools/kispad-mester-3-9-292-proba.js
+```
+
+* A perc-táblázat betűre (40: 1/3/7 · 50: 3/7/12 · 65: 5/10/15 · 77: 10/20/30), köztes lineáris, fölötte arányos.
+* A Szakértelem tisztán a percekből, monoton; jelöltként felkínálható; a stábpiac a sávban ad ilyet.
+* Valódi meccseken: csak a nem játszó cserék kapnak percet, a pályafutás-percbe is; a fejlődés gyűlik; a munkanapló percben.
+* Fókusz: posztcsoport, egy játékos (max 1); a sérült nem edz, az eltiltott igen; a második Kispad-mester inaktív; az előnézet mindhárom módra kiírja a percet.
+
+## pvp-hol-tartok-3-9-291-proba.js — 📍 „Hol tartok” válasz a bökésre
+
+```
+node tools/pvp-hol-tartok-3-9-291-proba.js [kép-mappa]
+```
+
+* A bökés sávján a „📍 Hol tartok” gomb; a koppintás a saját rekeszbe írja az állást (idény, lejátszott fordulók, mit csinál), visszaigazol, fékez.
+* A váró oldal a saját kapujához méri: „még 2 forduló”, ugyanott, előrébb; idényhatáron át is; a válasz-sávon nincs újabb gomb; a régi/már látott válasz nem ugrik be.
+* Az állás-szöveg ablakban, nyáron, forduló előtt.
+
+## cp-folytatas-3-9-290-proba.js — ⏸ félbehagyott checkpoint újratöltés után
+
+```
+node tools/cp-folytatas-3-9-290-proba.js [kép-mappa]
+```
+
+* Valódi mentés → friss lap → `loadIntoGame` + `resumeUIFromSave`.
+* Egyjátékos: kihívás-választás közben újratöltve ugyanaz a lista (az elvállalt megmarad, a forduló nem lép); utána az ablak; ablak közben a HUB.
+* Hardcore, két kliens: kihívás közben újratöltve a lista; utána a kézfogás vár; „Később folytatom” → a HUB fő gombja a kézfogás (a jelzés nem gomb), a kezdőrúgás nem ígér fordulót, menü ki-be sem írja felül; újratöltve egyből a HUB, a kézfogás újra vár; a társ megérkezésekor mindkét oldalon nyílik a 8. forduló utáni ablak.
+
+## sp-sulyozott-3-9-289-proba.js — ⚖️ súlyozott mezőny és célrés-becslés egyjátékosban
+
+```
+node tools/sp-sulyozott-3-9-289-proba.js [kép-mappa]
+```
+
+* Az új karrier a súlyozott képlettel fut (`S.pyr.suly`); az idény vége rögzíti a záró NEVEZÉSI meccs-erőt (`zaroMs`).
+* A kezdőrúgás: a rés a súlyozott meccs-erőből áll be — nyári +12 mellett a mezőny ≈ 12/2,25-tel gyengébb, mint a régi képlettel; a napló és az idény sora rögzíti.
+* A futó (régi) karrier `suly` nélkül betűre a régi szerint fut.
+* A nyári célrés-ablak becslése: várható mezőny, súlyozott meccs-erő, esélyek; nehezebb célrés → erősebb mezőny.
+
 ## pvp-hardcore-3-9-288-proba.js — 🛡 hardcore: szakaszos közös seed + kézfogás
 
 ```
