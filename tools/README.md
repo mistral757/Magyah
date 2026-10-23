@@ -389,6 +389,18 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## pvp-hardcore-3-9-288-proba.js — 🛡 hardcore: szakaszos közös seed + kézfogás
+
+```
+node tools/pvp-hardcore-3-9-288-proba.js
+```
+
+* Két lap egy böngészőben, a játék helyi szoba-hátterén — valódi kétkliens-kézfogás; ugyanaz a világ-seed, más keret.
+* A szakaszok (a, tw8, b, tw15, c, tw23, d, nyár); a hcVel determinisztikus, könnyedben semleges.
+* A kihívás-típusok a két gépen egyeznek; a talizmán: közös seed, az 1. szakaszban mindhárom lap közös, később a 2–3. hely közös, az 1. a main szerint eltérhet.
+* A scout-terv közös, a felfedezések a közös célerő körül; a skill-sor újratöltése és az ifi-ablak közös.
+* A kézfogás: vár, mindkét kliens továbblép, az egyeztetés kimondja az eltérést, nem kér újra; a megszakítás függőben hagyja, a HUB gombja folytat, a forduló addig nem indul; az ablak nyitása/zárása hardcore-ban kézfogás, könnyedben nem.
+
 ## pvp-szigor-3-9-287-proba.js — 🛡 idénynyitó célrés, súlyozott mezőny, szigorúság
 
 ```
