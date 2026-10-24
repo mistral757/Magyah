@@ -654,8 +654,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return ki;});
 
   console.log("=== 12. a feed sűrűsége ===");
-  ok(fd.panzerNema.join()==="gap,tackle",
-    "a Panzernél csak a védekező villanás és a fölény néma",fd.panzerNema);
+  /* 3.9.295: a hétköznapi tételek (meccs, győzelem, nullás, gól, blokk) is
+     némák — meccsenként jönnek, sorként elárasztanák a közvetítést; a meccs
+     végi mérlegben tételesen látszanak */
+  ok(fd.panzerNema.join()==="block,cs,gap,goal,played,tackle,winAny",
+    "a Panzernél a védekező villanás, a fölény és a hétköznapi tételek némák",fd.panzerNema);
   ok(fd.kozosNema.join()==="gap","a fölény a motorban is néma",fd.kozosNema);
   {const beszedes=fd.nemak.filter(x=>x.nema==="—").map(x=>x.k);
    ok(beszedes.length===5,"öt stílusnál MINDEN tétel megszólal (3.9.257: a Sztár is)",beszedes);

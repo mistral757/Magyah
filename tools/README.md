@@ -389,6 +389,31 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## panzer-hetkoznap-3-9-295-proba.js — 🛡️ a Panzer hétköznapi rettenete és mérföldkövei
+
+```
+node tools/panzer-hetkoznap-3-9-295-proba.js
+```
+
+* A hétköznapi rettenet-tételek (meccs 0,5 · győzelem 1 · nullás 1 · gól 0,25 · blokk/tisztázás 0,15) a mérlegbe kerülnek, némán, a plafon fog.
+* Öt új család a táblán; a győzelem/gól számláló az idény-történetből + a futó idényből (a lezárt nem duplázódik); a nullás meccs csapat-szintű.
+* Valódi meccseken minden meccs hoz rettenetet.
+
+Mérés: `tools/meccsmotor/stilus-merfoldko-utem.js` — `STY=panzer N=28 PORT=… node …`: egy idény valódi meccsei után a stílus saját táblájából teljesülő pont, családonként.
+
+## csapatszerepek-3-9-293-proba.js — 🎽 csapatszerepek, 🎚 a taktika csúszkái
+
+```
+node tools/csapatszerepek-3-9-293-proba.js [kép-mappa]
+```
+
+* Az alkalmasság képletei (átlag × skill-szorzó; félkész fele bónusz; csillagonként +20%); a minőség 70→0, 160→0,5, 250→1 (3.9.294).
+* A rúgó: nincs → régi út; automatikus → a legalkalmasabb; kijelölt → ő; ha nincs a pályán vagy kiállították → a legalkalmasabb.
+* Valódi meccseken (a ritka különleges esemény kikényszerítve): a tizenegyest és a szabadrúgást a kijelölt rúgja; a pontrúgás-helyzetek a szöglet-rúgóé / bedobóé, van bedobás.
+* A pillanatkép: a bedobó −1…−5%-kal húzza az ellenfél gólesélyét; a bedobás-jelenet felépül.
+* A taktika csúszkái: 60→1 … 150→5; a görbe az ismertségből, az illeszkedés szoroz; a keret; taktikánként külön; a motorban hat.
+* A két panel (Csapatszerepek; Taktika → Hangsúly-csúszkák) állítható; képek a kép-mappába.
+
 ## kispad-mester-3-9-292-proba.js — ⏱ Kispad-mester stábtag
 
 ```
