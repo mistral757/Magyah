@@ -242,9 +242,12 @@ const KEP=process.argv[2]||null;
       o.cim=document.getElementById("unlockTitle").textContent;
       o.kapuElott=kapu;
       const t=document.getElementById("unlockBody").textContent;
-      o.elo=/élő adat/.test(t);o.becsles=/Becsült idény/.test(t)&&/A társad/.test(t)&&/súlyozott/.test(t)&&/feljutás ~/.test(t);
-      o.tarsMs=/indító 118/.test(t);
-      o.dontes=/Mit jelent a döntésed/.test(t);
+      /* 3.9.297 — a lényeg, rizsa nélkül: egy fő szám (a mezőny várható
+         meccs-ereje), alatta a te és a társad meccs-ereje és rése */
+      o.elo=/● élő/.test(t);o.becsles=/várható meccs-ereje/.test(t)&&/A te meccs-erőd/.test(t)&&/A társadé/.test(t)&&/~\d/.test(t);
+      o.tarsMs=/A társadé: 118/.test(t);
+      o.dontes=/átlagához áll be/.test(t);
+      o.nincsRizsa=!/súlyozott|feljutás ~|Mit jelent a döntésed|természetes ~|idényátlag/.test(t);
       const elso=JSON.parse(JSON.stringify(tar["s"+sn+"pre"].host||null));
       o.kozzetett=!!elso&&elso.v===1&&elso.season===sn&&typeof elso.cel==="number"&&elso.mz===96;
       const cel0=elso.cel;
@@ -272,7 +275,7 @@ const KEP=process.argv[2]||null;
     }finally{window.mpSeasonGate=_gate;window.h2hRoomActive=_h;window.mpBk=_bk;MP.active=false;}
     return o;});
   ok(r6.kell&&r6.nyitva&&/Célrés/.test(r6.cim)&&r6.kapuElott===0,"a 2. idénytől az „Irány az idény” előbb a célrés-ablakot nyitja (a kapu előtt)",r6);
-  ok(r6.becsles&&r6.elo&&r6.tarsMs&&r6.dontes,"a becslés a társ ÉLŐ előnézetével számol, és megmondja, mit jelent a döntés",r6);
+  ok(r6.becsles&&r6.elo&&r6.tarsMs&&r6.dontes&&r6.nincsRizsa,"a becslés a társ ÉLŐ előnézetével számol: egy fő szám (a mezőny várható meccs-ereje), alatta a két meccs-erő és rés — rizsa nélkül (3.9.297)",r6);
   ok(r6.kozzetett&&r6.lepett===-0.1&&r6.kijelzo,"a saját előnézet közzétéve; a léptetés frissíti",r6);
   ok(r6.maradKapu===0&&r6.maradZarva,"„Még maradok”: nincs kapu",r6);
   ok(r6.rendbenKapu===1&&r6.hang===r6.hangVart&&r6.celFor===r6.celV,"Rendben: a választott célréssel a közös kapura",r6);

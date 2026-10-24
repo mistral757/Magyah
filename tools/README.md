@@ -490,6 +490,7 @@ node tools/pvp-szigor-3-9-287-proba.js [kép-mappa]
 * Az arányos padló (tavalyi rajtszint × (1 + ütem/85)); más osztályban nem él.
 * A szigorúság: kapcsoló, beállítás-csomag, átvétel, `mpHardcore()`.
 * Az idénynyitó célrés-ablak: a társ élő előnézete, a közzététel, a léptetés, Rendben / Még maradok, a már elküldött rekord, egyjátékosban nincs.
+* 3.9.297: a célrés-ablak lényege — egyetlen nagy szám: az ellenfelek várható meccs-ereje (a mezőny közepe) a választott célréssel; alatta a te (és a társad) meccs-ereje a réssel. Ugyanaz a skála, mint a HUB-on; nincs nyers erő, súlyozott-képlet, kimenet-szöveg („rizsa nélkül").
 
 ## fekvo-nezet-3-9-285-proba.js — 📐 a három fekvő nézet
 
