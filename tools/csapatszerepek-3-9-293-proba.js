@@ -99,12 +99,12 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     S.skills[p0.n]=[{skill:SKILLS.find(x=>x.id==="mf_cross"),stagesCompleted:1,stagesNeeded:1}];
     o.cor=genRoleScore(p0,genRoleDef("corner")).v;           /* 70×1,5 = 105 */
     S.skills[p0.n]=[];
-    o.q=[genRoleQ(55),genRoleQ(90),genRoleQ(125),genRoleQ(150)];
+    o.q=[genRoleQ(70),genRoleQ(160),genRoleQ(250),genRoleQ(300),genRoleQ(55)];
     return o;});
   const kb=(a,b)=>Math.abs(a-b)<0.01;
   ok(kb(t1.fkAlap,80)&&kb(t1.fkKesz,120)&&kb(t1.fkFel,100)&&kb(t1.fk3,144),"szabadrúgás: (gól+passz)/2 × Szabadrúgás-mester 1,5 (félkész 1,25; 3★ 1,8)",t1);
   ok(kb(t1.pen,135)&&kb(t1.thr,97.5)&&kb(t1.cor,105),"tizenegyes ×1,5 (ICE COLD a COOL fölött) · bedobás (véd+passz)/2 × Nagylabda 1,5 · szöglet passz × tökéletes beadás 1,5",t1);
-  ok(kb(t1.q[0],0)&&kb(t1.q[1],0.5)&&kb(t1.q[2],1)&&kb(t1.q[3],1),"a minőség 55→0, 125→1",t1.q);
+  ok(kb(t1.q[0],0)&&kb(t1.q[1],0.5)&&kb(t1.q[2],1)&&kb(t1.q[3],1)&&kb(t1.q[4],0),"a minőség skálája 70–250: 70→0, 160→0,5, 250→1 (alatta 0, fölötte 1)",t1.q);
 
   console.log("\n— 2. a rúgó —");
   const t2=await p.evaluate(()=>{
@@ -175,9 +175,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const t4=await p.evaluate(()=>{
     S.genRoles={};const a=buildMatchSnapshot().defMult;
     const xi=slots.filter(s=>s.player&&s.pos!=="KP").map(s=>s.player);
-    const e=careerPool[xi[0].n];e.attrs.ved=125;e.attrs.passz=125;S.skills[xi[0].n]=[];
+    const e=careerPool[xi[0].n];e.attrs.ved=250;e.attrs.passz=250;S.skills[xi[0].n]=[];
     S.genRoles={throw:xi[0].n};const b=buildMatchSnapshot().defMult;
-    e.attrs.ved=55;e.attrs.passz=55;const c=buildMatchSnapshot().defMult;
+    e.attrs.ved=70;e.attrs.passz=70;const c=buildMatchSnapshot().defMult;
     S.genRoles={};
     return {a,b,c,arany:b/a,arany2:c/a};});
   ok(Math.abs(t4.arany-0.95)<0.002&&Math.abs(t4.arany2-0.99)<0.002,"a bedobó: csúcs-alkalmasságnál −5%, a legkisebbnél −1% az ellenfél gólesélyén",t4);

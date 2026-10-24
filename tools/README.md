@@ -395,7 +395,7 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 node tools/csapatszerepek-3-9-293-proba.js [kép-mappa]
 ```
 
-* Az alkalmasság képletei (átlag × skill-szorzó; félkész fele bónusz; csillagonként +20%); a minőség 55→0, 125→1.
+* Az alkalmasság képletei (átlag × skill-szorzó; félkész fele bónusz; csillagonként +20%); a minőség 70→0, 160→0,5, 250→1 (3.9.294).
 * A rúgó: nincs → régi út; automatikus → a legalkalmasabb; kijelölt → ő; ha nincs a pályán vagy kiállították → a legalkalmasabb.
 * Valódi meccseken (a ritka különleges esemény kikényszerítve): a tizenegyest és a szabadrúgást a kijelölt rúgja; a pontrúgás-helyzetek a szöglet-rúgóé / bedobóé, van bedobás.
 * A pillanatkép: a bedobó −1…−5%-kal húzza az ellenfél gólesélyét; a bedobás-jelenet felépül.

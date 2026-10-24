@@ -32,7 +32,7 @@
 * Több skill közül a legnagyobb szorzó számít (COOL és ICE COLD esetén az
   ICE COLD).
 
-**Minőség (q):** 55-ös alkalmasság alatt 0, 125-nél 1.
+**Minőség (q):** 70-es alkalmasság alatt 0, 250-nél 1 (3.9.294 óta; előtte 55–125). A skála lineáris: 160-nál 50%.
 
 **Kijelölés** (szerepenként):
 
