@@ -389,6 +389,18 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## panzer-hetkoznap-3-9-295-proba.js — 🛡️ a Panzer hétköznapi rettenete és mérföldkövei
+
+```
+node tools/panzer-hetkoznap-3-9-295-proba.js
+```
+
+* A hétköznapi rettenet-tételek (meccs 0,5 · győzelem 1 · nullás 1 · gól 0,25 · blokk/tisztázás 0,15) a mérlegbe kerülnek, némán, a plafon fog.
+* Öt új család a táblán; a győzelem/gól számláló az idény-történetből + a futó idényből (a lezárt nem duplázódik); a nullás meccs csapat-szintű.
+* Valódi meccseken minden meccs hoz rettenetet.
+
+Mérés: `tools/meccsmotor/stilus-merfoldko-utem.js` — `STY=panzer N=28 PORT=… node …`: egy idény valódi meccsei után a stílus saját táblájából teljesülő pont, családonként.
+
 ## csapatszerepek-3-9-293-proba.js — 🎽 csapatszerepek, 🎚 a taktika csúszkái
 
 ```
