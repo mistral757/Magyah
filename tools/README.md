@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## mp-padlo-gyogyit-3-9-296-proba.js — 🩹 a közös karrier nehézségi szabálya újratöltés után
+
+```
+node tools/mp-padlo-gyogyit-3-9-296-proba.js
+```
+
+* A S.pyrMp a szoba szabályát (padlo) és fokozatát is viszi, a betöltés visszaállítja.
+* A már padló nélkül indult vendég-karrier a szoba csomagjából gyógyul: szabály, fokozat, nehézségi sáv; ha megvan az idény közös párja, a mezőny-emelés azonnal lefut.
+* Ép karriert és régi szobát nem bánt.
+
 ## panzer-hetkoznap-3-9-295-proba.js — 🛡️ a Panzer hétköznapi rettenete és mérföldkövei
 
 ```
