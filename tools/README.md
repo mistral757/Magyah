@@ -389,6 +389,19 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## csapatszerepek-3-9-293-proba.js — 🎽 csapatszerepek, 🎚 a taktika csúszkái
+
+```
+node tools/csapatszerepek-3-9-293-proba.js [kép-mappa]
+```
+
+* Az alkalmasság képletei (átlag × skill-szorzó; félkész fele bónusz; csillagonként +20%); a minőség 55→0, 125→1.
+* A rúgó: nincs → régi út; automatikus → a legalkalmasabb; kijelölt → ő; ha nincs a pályán vagy kiállították → a legalkalmasabb.
+* Valódi meccseken (a ritka különleges esemény kikényszerítve): a tizenegyest és a szabadrúgást a kijelölt rúgja; a pontrúgás-helyzetek a szöglet-rúgóé / bedobóé, van bedobás.
+* A pillanatkép: a bedobó −1…−5%-kal húzza az ellenfél gólesélyét; a bedobás-jelenet felépül.
+* A taktika csúszkái: 60→1 … 150→5; a görbe az ismertségből, az illeszkedés szoroz; a keret; taktikánként külön; a motorban hat.
+* A két panel (Csapatszerepek; Taktika → Hangsúly-csúszkák) állítható; képek a kép-mappába.
+
 ## kispad-mester-3-9-292-proba.js — ⏱ Kispad-mester stábtag
 
 ```
