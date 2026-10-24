@@ -100,17 +100,19 @@ const KEP=process.argv[2]||null;
     /* a mezőny jóval alattad: a célrés (a képlet) a mérvadó, nem a természetes szint */
     pyrShiftWorld({divs:S.pyr.divs},25);oppTargetRating=pyrLevel();
     nfOffer(null,true);
-    o0=/most a meccs-erőd és a célrés adja/.test(document.getElementById("unlockBody").textContent);
     const t=()=>document.getElementById("unlockBody").textContent;
-    const o={keplet:o0,becsles:/Becsült idény/.test(t()),szint:/mezőny várható szintje/.test(t()),sulyozott:/súlyozott/.test(t()),
-      kimenet:/feljutás ~/.test(t()),dontes:/Mit jelent a döntésed/.test(t()),zaro:/záró/.test(t())};
-    const m=(/mezőny várható szintje: ~([\d,]+)/.exec(t())||[])[1];
+    /* 3.9.297 — a lényeg: a mezőny várható meccs-ereje, alatta a te meccs-erőd és a rés */
+    try{const en0=mpCelresSajat();en0.mz=H[1].zaroMs;const c0=nfCelFor(pyrFloorUpcoming());
+      o0=mpCelresBecsles(en0,{ms:en0.ms,mz:en0.mz,hid:en0.hid,rajt:mpCelresRajt(c0)},c0,c0,{elore:false,rel:false}).mi==="keplet";}catch(e){o0=false;}
+    const o={keplet:o0,becsles:/várható meccs-ereje/.test(t()),szint:/A te meccs-erőd/.test(t()),sulyozott:/rés/.test(t()),
+      kimenet:!/feljutás ~|súlyozott|Mit jelent/.test(t()),dontes:true,zaro:true};
+    const m=(/célréssel\s*~([\d,]+)/.exec(t())||[])[1];
     document.getElementById("nfHangMinus").click();
-    const m2=(/mezőny várható szintje: ~([\d,]+)/.exec(t())||[])[1];
+    const m2=(/célréssel\s*~([\d,]+)/.exec(t())||[])[1];
     o.m=m;o.m2=m2;
     try{const en=mpCelresSajat();en.mz=H[1].zaroMs;const c=nfCelFor(pyrFloorUpcoming());o.dbg=mpCelresBecsles(en,{ms:en.ms,mz:en.mz,hid:en.hid,rajt:mpCelresRajt(c)},c,c,{elore:false,rel:false});o.dbg.lvl=pyrLevel();o.dbg.ms=en.ms;}catch(e){o.dbg=String(e);}
     return o;});
-  ok(n.becsles&&n.szint&&n.sulyozott&&n.kimenet&&n.dontes&&n.zaro,"a nyári ablak: a becslés, a záró és a súlyozott meccs-erő, a kimenet, a döntés jelentése",n);
+  ok(n.becsles&&n.szint&&n.sulyozott&&n.kimenet&&n.dontes&&n.zaro,"a nyári ablak (3.9.297): a mezőny várható meccs-ereje, a te meccs-erőd és a rés — rizsa nélkül",n);
   ok(n.keplet&&n.m&&n.m2&&n.m!==n.m2,"ha a célrés a mérvadó, a léptetés újraszámol (nehezebb célrés → erősebb mezőny)",{elotte:n.m,utana:n.m2,keplet:n.keplet,dbg:n.dbg});
   if(KEP){fs.mkdirSync(KEP,{recursive:true});
     await p.evaluate(()=>document.querySelectorAll("body *").forEach(el=>{if(getComputedStyle(el).position==="fixed"&&!el.contains(document.getElementById("scUnlock")))el.style.display="none";}));

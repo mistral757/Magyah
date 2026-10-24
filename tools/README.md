@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## mp-padlo-gyogyit-3-9-296-proba.js — 🩹 a közös karrier nehézségi szabálya újratöltés után
+
+```
+node tools/mp-padlo-gyogyit-3-9-296-proba.js
+```
+
+* A S.pyrMp a szoba szabályát (padlo) és fokozatát is viszi, a betöltés visszaállítja.
+* A már padló nélkül indult vendég-karrier a szoba csomagjából gyógyul: szabály, fokozat, nehézségi sáv; ha megvan az idény közös párja, a mezőny-emelés azonnal lefut.
+* Ép karriert és régi szobát nem bánt.
+
 ## panzer-hetkoznap-3-9-295-proba.js — 🛡️ a Panzer hétköznapi rettenete és mérföldkövei
 
 ```
@@ -480,6 +490,7 @@ node tools/pvp-szigor-3-9-287-proba.js [kép-mappa]
 * Az arányos padló (tavalyi rajtszint × (1 + ütem/85)); más osztályban nem él.
 * A szigorúság: kapcsoló, beállítás-csomag, átvétel, `mpHardcore()`.
 * Az idénynyitó célrés-ablak: a társ élő előnézete, a közzététel, a léptetés, Rendben / Még maradok, a már elküldött rekord, egyjátékosban nincs.
+* 3.9.297: a célrés-ablak lényege — egyetlen nagy szám: az ellenfelek várható meccs-ereje (a mezőny közepe) a választott célréssel; alatta a te (és a társad) meccs-ereje a réssel. Ugyanaz a skála, mint a HUB-on; nincs nyers erő, súlyozott-képlet, kimenet-szöveg („rizsa nélkül").
 
 ## fekvo-nezet-3-9-285-proba.js — 📐 a három fekvő nézet
 
