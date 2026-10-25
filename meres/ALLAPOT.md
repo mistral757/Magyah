@@ -1,15 +1,15 @@
 # Mérési naplók a Firebase-ből
 
-Az adat kivonata: `7edaa5cdfcb832f0`.
+Az adat kivonata: `8c10751aae50669c`.
 
 | | |
 |---|---|
 |játékos (névtelen)|4|
-|karrier|17|
-|idény|43|
-|meccs-sor|1500|
+|karrier|19|
+|idény|47|
+|meccs-sor|1614|
 
-A legutóbbi feltöltés: 2026-10-24T07:59:50.505Z.
+A legutóbbi feltöltés: 2026-10-25T08:14:51.210Z.
 
 Fájlok: `meres-firebase.json` (a teljes, névtelenített napló), `osszegzes.txt`, `idenyek.csv`, `meccsek.csv`.
 Újragenerálás: `node tools/meres/osszegez.js meres-firebase.json --csv idenyek.csv --meccsek meccsek.csv`.
