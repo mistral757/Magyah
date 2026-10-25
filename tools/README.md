@@ -389,6 +389,26 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## hc-seed-mero-3-9-298-proba.js — 🔬 a hardcore seed-mérő és a szigorúság gyógyítása
+
+```
+node tools/hc-seed-mero-3-9-298-proba.js [kép-mappa]
+```
+
+* Az alap-jelzés (a szoba `hcmer` rekesze): a hardcore és a könnyed gép összeveti az ujjlenyomatát, mindkettő kimondja az eltérést, egyszer.
+* A gyógyítás: a szoba csomagja hardcore → a karrier hardcore-ra áll; könnyed szobát és ép karriert nem bánt.
+* A húzás-napló: kihívás, scout-terv, felfedezés, talizmán, skill-sor — a két gépen azonos kivonat-sor, olvasható részlettel; könnyedben nem naplóz.
+* A kézfogás mindkét oldal részletes naplóját eltárolja; a panel (Infópult → 🔬 Seed-mérő) az alapot, a kézfogásokat (=/≠) és a naplót mutatja; a mérési napló letöltése viszi.
+
+## meres/seed-osszevet.js — 🔬 két gép seed-naplójának összevetése
+
+```
+node tools/meres/seed-osszevet.js <házigazda.json> [vendég.json]
+```
+
+* Egy fájllal: az alap, a figyelmeztetések, kézfogásonként a két oldal egyezése (fajtánként, az első eltérésekkel).
+* Két fájllal: a közös karriert a szoba + seed-kivonat párosítja, és a teljes napló szakaszonként összevethető.
+
 ## mp-padlo-gyogyit-3-9-296-proba.js — 🩹 a közös karrier nehézségi szabálya újratöltés után
 
 ```
