@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## nyari-kupa-nem-var-3-9-308-proba.js — 🟠 a nyári kupa nem vár a társra, ha neki nincs
+
+```
+node tools/nyari-kupa-nem-var-3-9-308-proba.js
+```
+
+* A társ kupába nevezett / épp más sorozatot játszik (🛰) → a nevezés azonnal végrehajtódik, várakozó képernyő nélkül: igen → egyedül indul (S.friendlySolo), nem → kihagy; a szobában `kulon` jelölés, a napló kimondja az okot.
+* Jel nélkül a régi várakozás; ha a társ közben kupát kezd, a kapu a következő körben továbbenged.
+* A már fent lévő nyári nevezés a rendes közös út; a később érkező társ a `kulon` mellett szintén nem vár.
+
 ## edzo-kalauz-3-9-307-proba.js — 👔📖 az edző mint idegenvezető
 
 ```

@@ -7843,7 +7843,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.307";
+const APP_VERSION="3.9.308";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -88773,6 +88773,17 @@ async function mpGateTickRun(o,key,myField,oppField,finish){
   const mine=node&&node[myField],mate=node&&node[oppField];
   h2hWaitShow(o.title,$("h2hWaitMsg").innerHTML,!!mine,!!mate,o.wait,h2hWaitInfoNow());
   if(mine&&mate){finish(o.resolve(mine,mate));return;}
+  /* 🟠 3.9.308 — a kapu saját „ide már nem jön" próbája (pl. a társ kupát
+     kezdett). A szobát a hívó jelöli meg (onTarsMashol), aztán a saját
+     döntésünk megy — a kiút szokásos „Nem vártad meg" mondata nélkül. */
+  if(o.tarsMashol){
+    let ok=null;try{ok=await o.tarsMashol();}catch(e){ok=null;}
+    if(!g.busy)return;
+    if(ok){
+      const f=g.fb;g.fb=null;mpGateAbort(o.id);
+      if(o.onTarsMashol){try{o.onTarsMashol(ok);}catch(e){}}
+      if(f){try{f.done(f.solo);}catch(e){}}
+      return;}}
   /* JELZŐFÉNY (3.8.28): ha a társ bizonyíthatóan MÁS kapunál vár, ide már nem
      jön — ne várjunk örökre, menjünk tovább a helyi tartalékkal. */
   if(await mpBeaconPing(o.id)){
@@ -105951,6 +105962,10 @@ const MP_WAIT_NYK={mine:"A te nevezésed",opp:"A társad nevezése",
    vagy a két nevezés együtt. Igazként viselkedik, tehát a régi hívási ág
    (`if(go)`) változatlanul jó. */
 function mpNykResolve(mine,mate){
+  /* 🟠 3.9.308 — KÜLÖN NYÁR: ha valamelyikünk úgy döntött, hogy a társ máshol
+     jár (kupát játszik), a nyár már nem közös: aki igent mondott, egyedül
+     indul, a másik döntése nem köti. */
+  if(mine&&mate&&(mine.kulon||mate.kulon))return (mine.yes&&mine.offer!==false)?{solo:true}:null;
   if(!(mine&&mine.yes&&mate&&mate.yes))return null;
   /* A FELAJÁNLHATÓSÁG IS EGYHANGÚ (3.8.28). A régi kliens nem küld `offer`
      mezőt — ott a hiánya IGENT jelent, tehát a régi viselkedést kapja. */
@@ -106014,17 +106029,64 @@ function friendlyCupSettle(yes,next,offerable){
   /* Az `offer` a HELYI felajánlhatóság — a kapu ebből is egyhangúságot kér
      (lásd hubNextSeasonFlow). Ha a hívó nem adja meg, a mai állapot dönt. */
   const off=(offerable===undefined)?friendlyCupOfferable():!!offerable;
+  /* 🟠 3.9.308 — HA A TÁRSNAK NINCS NYÁRI KUPÁJA, NEM VÁRUNK.
+     BEJELENTETT KÉRÉS: „Amikor csak egyik játékosnak van nyári kupa, akkor ne
+     kelljen várakoznia a másik játékosra a kupa előtti screenen."
+     A kapu előtt megnézzük a szobát: ha a társ kupába nevezett, vagy épp egy
+     másik sorozatot játszik (és a nyári nevezése még nincs fent), ő ide nem
+     jön — a döntésed azonnal végrehajtódik, várakozó képernyő nélkül. A
+     szobában megjelöljük (kulon), hogy ha később mégis ideér, ő se várjon. */
+  const kulon=ok=>{
+    nykKulonJelol(yes,off);
+    try{addLine(`🟠 <b>Nem kell a társadra várnod:</b> ${esc(ok)} — idén nincs közös nyári torna. `
+      +(yes?"A Nyári Felkészülési Kupát <b>egyedül</b> játszod, a saját mezőnyödben."
+           :"A tornát kihagytad, megyünk tovább."),"m life");}catch(e){}};
+  mpNykTarsMashol().then(ok=>{
+    if(ok){kulon(ok);apply(yes?{solo:true}:false);return;}
+    friendlyCupGate(yes,off,next,apply,kulon);});}
+/* A nevezés bejegyzése (a közös mezőnyhöz kellő számokkal) — egy helyen,
+   mert a kapu, a kiút és a külön-nyár jelölése is ezt teszi fel. */
+function nykEntry(yes,off,extra){
+  return Object.assign({yes:!!yes,offer:off,at:Date.now(),
+    teamName:String(teamName||"A társad").slice(0,40),
+    ovr:Math.round(teamOVRbase()),str:Math.round(teamStrength()),
+    v:APP_VERSION},nykEntryMs(),extra||{});}
+function nykKulonJelol(yes,off){
+  try{mpBk().h2hPut(MP.activeRoom,"s"+(S.seasonNumber||1)+"nyk",MP.role==="host"?"host":"guest",
+    nykEntry(yes,off,yes?{kulon:true,solo:true}:{kulon:true}));}catch(e){}}
+/* Jön-e ide a társ? Igaz (az okkal) → biztosan nem, vagy csak egy egész
+   kupasorozat után: kupába nevezett (a kupanevezés bejegyzése), vagy épp egy
+   másik sorozatot játszik (a 🛰 helyzetjelző). Ha a nyári nevezése már fent
+   van, a rendes közös út dönt. Hibatűrő: hálózati gondnál null (várunk). */
+async function mpNykTarsMashol(){
+  try{
+    if(!(friendlyCupJoint()&&MP&&MP.activeRoom))return null;
+    const opp=MP.role==="host"?"guest":"host";
+    const ido=p=>Promise.race([Promise.resolve(p).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),4000))]);
+    const nyk=await ido(mpBk().h2hGet(MP.activeRoom,"s"+(S.seasonNumber||1)+"nyk"));
+    if(nyk&&nyk[opp])return null;
+    const nev=c=>(EURO_COMPS[c]&&EURO_COMPS[c].n)||c;
+    const cup=await ido(mpBk().h2hGet(MP.activeRoom,mpCupKey()));
+    const m=cup&&cup[opp];
+    if(m){
+      const pl=mpCupPlaceOf(m);
+      if(pl&&pl.comp!=="NYK")return `a társad idén ${hunAz(nev(pl.comp))} ${nev(pl.comp)} indulója`;
+      if(mpCupHszOf(m))return `a társad idén ${hunAz(nev("HSZ"))} ${nev("HSZ")} indulója`;}
+    const pos=await ido(mpBk().h2hGet(MP.activeRoom,mpPosKey()));
+    const pm=pos&&pos[opp];
+    if(pm&&pm.comp&&pm.comp!=="NYK"&&!pm.done)return `a társad épp ${hunAz(nev(pm.comp))} ${nev(pm.comp)} meccseit játssza`;
+    return null;
+  }catch(e){return null;}}
+function friendlyCupGate(yes,off,next,apply,kulon){
   mpBothGate({id:"nyk",key:"s"+(S.seasonNumber||1)+"nyk",
+    /* 🟠 3.9.308 — várakozás közben is: ha a társ közben kupát kezd, megyünk */
+    tarsMashol:mpNykTarsMashol,onTarsMashol:kulon,
     title:"NYÁRI KUPA",wait:MP_WAIT_NYK,
     /* A NEVEZÉS MAGÁVAL VISZI A KÖZÖS MEZŐNYHÖZ KELLŐ SZÁMOKAT is — ugyanazok
        a mezők, mint a tétmeccses kupanevezésnél (mpCupGate). A `str` a
        KIJELZÉSHEZ kell (a társ csapaterejét a felület boostokkal írja ki), az
        `ovr` a NYERS erő, amiből a szimuláció és a mezőny célértéke dolgozik. */
-    entry:Object.assign({yes:!!yes,offer:off,at:Date.now(),
-      teamName:String(teamName||"A társad").slice(0,40),
-      ovr:Math.round(teamOVRbase()),
-      str:Math.round(teamStrength()),
-      v:APP_VERSION},nykEntryMs()),
+    entry:nykEntry(yes,off),
     msg:yes?"Neveztél a nyári tornára — megvárjuk a társad válaszát is. A KÖZÖS torna (ahol az ő csapata is ott van a 32 között) csak akkor indul, ha ő is nevez. Ha nem várod meg, egyedül indulsz: a mezőny a sajátod lesz."
            :(off?"Kihagynád a nyári tornát — megvárjuk a társad válaszát is."
                 :"Nálad idén nincs nyári torna (kupasorozatod van, vagy már lement) — szólunk a társadnak, hogy ne várjon rá."),
@@ -106058,11 +106120,7 @@ function friendlyCupSettle(yes,next,offerable){
        a sajátomat játszom — lásd mpNykResolve. */
     onSolo:(yes?()=>{try{
       mpBk().h2hPut(MP.activeRoom,"s"+(S.seasonNumber||1)+"nyk",
-        MP.role==="host"?"host":"guest",
-        Object.assign({},{yes:true,offer:off,at:Date.now(),
-          teamName:String(teamName||"A társad").slice(0,40),
-          ovr:Math.round(teamOVRbase()),str:Math.round(teamStrength()),
-          v:APP_VERSION},nykEntryMs(),{solo:true}));
+        MP.role==="host"?"host":"guest",nykEntry(true,off,{solo:true}));
     }catch(e){}}:null),
     giveUpNote:(yes
       ?"⚠️ Nem vártad meg a társad nevezését — <b>egyedül indulsz</b> a nyári tornán. "
