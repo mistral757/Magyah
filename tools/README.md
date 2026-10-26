@@ -389,6 +389,51 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## mezony-novekedes-3-9-302-proba.js — 📈 a mezőny idény közbeni erősödése (2. szerződés)
+
+```
+node tools/mezony-novekedes-3-9-302-proba.js
+```
+
+* Az új karrier `S.pyr.gyv = 2`; a régi a 3.9.254 görbén marad.
+* E = szint × R(idény) × P(pénz-tempó) × T(fokozat) × K(kezdet) − alapütem; T: 1.1 → 0,30 · 8.5 → 1,00 · 9.1 → 1,10 · 10.5 → 1,45.
+* 8.5-ön az 1. idény 0, a 4. a szint ~40%-a; 9.1-től már az 1. idényben is; gyorsabb pénz → gyorsabb mezőny.
+* 30 forduló alatt a teljes E gyűlik, a célrés alatt (beragadás-őr) nem.
+
+## nyar-igazolas-3-9-301-proba.js — 🌞 igazolás a teljes nyáron
+
+```
+node tools/nyar-igazolas-3-9-301-proba.js
+```
+
+* A nyári kupa közben (lezárt idény, a kupából nyitott HUB) az átigazolás nyitva; futó szezonban zárva, mint eddig.
+* A kirakatba tett játékosra a kupameccsek alatt is jön licit (meccsenként 2 forduló a várakozáson); kupán kívül a horog nem léptet.
+* A HUB fő gombja a kupából: „Vissza a kupához”.
+
+## edzo-3-9-300-proba.js — 👔 az edző: arckép, szint, irányok, elemzés
+
+```
+node tools/edzo-3-9-300-proba.js [kép-mappa]
+```
+
+* 17 különböző edző-arckép (szemüveg, sapka, pirospozsga… a jellegzetes jegyek).
+* XP: meccs 10, győzelem +5, döntetlen +2; a 2. szint 120 XP-nél, hírrel; pénzen a következő szint a büdzséből.
+* Elemző irányok: 2. szinttől szintenként 1 pont, irányonként legfeljebb 3; elemzés meccsenként 1/2/3/4 (1., 4., 7., 10. szint).
+* Az elemzés: megerősítés → elemzés, az esélyek összege 100%, a meccs nem indul, a stáb munkanaplója nem nő, a kvóta fogy; a fejlett edző irány-szekciói.
+* 3.9.303: „Amit csinál” — a meccs-magyarázat is az edzőé, az utolsó meccs gombjával.
+
+## meccs-magyarazat-3-9-299-proba.js — 🔍 miért lett ez az eredmény?
+
+```
+node tools/meccs-magyarazat-3-9-299-proba.js [kép-mappa]
+```
+
+* Valódi meccseken: 18 vödör, pozitív xG, a λ-ból jött gól nem több a lőttnél, a mérési sor viszi (`mx`).
+* A kezdőrúgás figyelmeztet, ha a meccs előtt ismert rejtett tényező ~1 meccserőnyinél többet dolgozik ellened (pl. kiürített közép ×1,4 ≈ −1,3), és hallgat, ha nincs ilyen.
+* Az elemzés: esélyesként 0:4 = balszerencse (az esély kimondva); hangsúly-csúszkák ×1,8 = +0,7 kapott gól ≈ −1,7 meccserőnyi; a gólvárhatóságon kívüli gól; a várt eredmény nem meglepetés.
+* A mérleg (meglepetésnél) és a statisztika (mindig) ablaka mutatja.
+* 3.9.303: az edző mondja — a figyelmeztetés az ő nevével kezdődik, a blokk fejében az arcképe.
+
 ## hc-seed-mero-3-9-298-proba.js — 🔬 a hardcore seed-mérő és a szigorúság gyógyítása
 
 ```
