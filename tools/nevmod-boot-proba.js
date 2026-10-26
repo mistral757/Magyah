@@ -86,7 +86,8 @@ const VEGE=["gameBackStep","pwaShowManual","xferNewCode","renderStoreModal",
   ok("a hét filozófus-edző fája mindkét módban ugyanúgy felépül",
      valos.fa===magyar.fa&&/\d/.test(String(valos.fa)),{magyar:magyar.fa,valos:valos.fa});
   ok("az edzők rövid neve mindkét módban értelmes (nem keresztnév)",
-     Array.isArray(valos.edzok)&&valos.edzok.length===7
+     /* 3.9.306: ≥7 — azóta nyolcadik filozófus is jött (a próba lényege a keresztnév-tilalom) */
+     Array.isArray(valos.edzok)&&valos.edzok.length>=7&&valos.edzok.length===magyar.edzok.length
      &&valos.edzok.indexOf("János")<0&&valos.edzok.indexOf("Pál")<0
      &&valos.edzok.indexOf("Béla")<0&&valos.edzok.indexOf("József")<0,
      {magyar:magyar.edzok,valos:valos.edzok});
