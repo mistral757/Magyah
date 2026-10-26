@@ -72,9 +72,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* 3.9.169: a gitár (pengetett húr) kikerült — se hangszer, se húr-motor */
     const gitar=typeof hangKs!=="undefined"||/"pluck"|"bogo"/.test(String(hangLagy)+String(hangLagyLepes))
       ||Object.values(HANG_LAGY_HANGULAT).some(F=>/gitar|bogo|pluck/.test(F.comp+F.bass+F.lead+F.fel));
-    return {gitar,sfx:sfx.length,hianyzik:sfx.filter(k=>!HANG_SFX_LAGY[k]),extra:lagy.filter(k=>!HANG_SFX[k]),
+    /* 3.9.310: a jelenet fizikai zörejei („a" előtag) külön számolódnak */
+    const jel=sfx.filter(k=>/^a[A-Z]/.test(k));
+    return {gitar,sfx:sfx.length-jel.length,jel:jel.length,hianyzik:sfx.filter(k=>!HANG_SFX_LAGY[k]),extra:lagy.filter(k=>!HANG_SFX[k]),
       dalKulcs:Object.keys(HANG_DALOK_LAGY).sort().join()===Object.keys(HANG_DALOK_NEV).sort().join(),dalok};});
-  ok(tb.sfx===24&&tb.hianyzik.length===0&&tb.extra.length===0,"mind a 24 hangeffektnek van lágy párja (a 3.9.172 kihívás-szignáljával)",tb);
+  ok(tb.sfx===24&&tb.jel===15&&tb.hianyzik.length===0&&tb.extra.length===0,"mind a 24 hangeffektnek és a 15 jelenet-zörejnek van lágy párja (a 3.9.172 kihívás-szignáljával)",tb);
   ok(tb.gitar===false,"nincs gitár: a pengetett húr (Karplus–Strong) egyik hangulatban sem szól (3.9.169)");
   ok(tb.dalKulcs&&Object.values(tb.dalok).every(d=>Number.isInteger(d.utem)&&d.utem%d.ch===0&&d.rossz===0&&d.negy),
      "mind a három menüdalnak lágy változata; a kotta ép, egész ütemek, négyhangú akkordok",tb.dalok);

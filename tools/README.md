@@ -389,6 +389,15 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## animacio-hang-3-9-310-proba.js — 🎬🔊 a jelenet saját hangja, a közvetítés utána
+
+```
+node tools/animacio-hang-3-9-310-proba.js
+```
+
+* Mind a 44 jelenet-sablon kap hangot a mozgásából (gól: rúgás + háló; kapufa; bravúr: kesztyű/vetődés; Szitálós: bomba + lebegés; blokk; lap); a hang a kulcskocka idején szól.
+* Jelenet közben a közvetítés sora és hangja pufferben vár (a valódi addLine + sbEv úton is), és a jelenet után jön ki; átugrott jelenetnél a hátralévő jelenet-hangok elmaradnak; gyors módban és jelenet nélkül a régi út.
+
 ## vedohalo-3-9-309-proba.js — 🛟 a lefújás utáni lánc nem állhat meg némán
 
 ```
