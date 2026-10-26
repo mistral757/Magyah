@@ -7761,7 +7761,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *::after{
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.298";
+const APP_VERSION="3.9.299";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -68252,6 +68252,155 @@ function pformTeamOvr(){
   let o=s/11;
   if(bn){const m=1-be/bn;if(m>0&&m!==1)o+=lamEquivOvr(1,m);}
   return o;}
+/* ================= 🔍 A MECCS-MAGYARÁZAT (3.9.299) =================
+   KIMONDOTT KÉRÉS: „Mi lehet az oka egy ilyen jelentős vereségnek ilyen
+   jelentős meccserő fölény mellett? […] Ha valami jelentősen megkavarja a
+   meccsmotort, ami a meccserőből nem kiolvasható, azt valahogy jelezni kell a
+   játékos felé. […] Tőlem lehet ilyen (nagyon kis eséllyel), de lehessen
+   tudni mi az oka."
+   A HELYZET: a ⚡ meccserő a gólvárhatóság ALAPJA (1,3 × e^(0,12 × különbség)),
+   de a motor erre még egy tucat szorzót tesz — a kezdőrúgáskor (védekező
+   képességek, az alakzat ára, a hátsó sor formája, a csapatstílus, a
+   taktika-stílus, a rangadó-hangulat, a talizmánok) és ÖTPERCENKÉNT
+   (rákapcsolás, stílus-szerepek, busz, villám-fáradás, hangsúly-csúszkák,
+   időfüggő talizmánok, a kiállítás utáni fáradás). Ezek eddig némák voltak.
+   A MÉRŐ (MX) nem nyúl a motorhoz: ugyanazokat a szorzókat, ugyanabban a
+   sorrendben számolja ki, mint eddig, csak NÉVVEL jegyzi fel őket. A
+   lefújáskor kimondja:
+     · mit ígértek a meccserők (a ⚡ különbségből várható gólarány),
+     · mennyivel számolt TÉNYLEGESEN a motor (a percenkénti gólvárhatóságok
+       összege), és a kettő közti különbséget melyik tényező okozta — gólban;
+     · hány gól jött a gólvárhatóságon kívülről (11-es, öngól, VAR,
+       pontrúgás-skill);
+     · és mekkora a SZERENCSE része: ilyen vagy rosszabb eredmény ezekkel az
+       esélyekkel hány meccsből egyszer jön ki.
+   A kezdőrúgáskor pedig, ha a meccserőn kívüli tényezők már a meccs ELŐTT
+   érezhetően elhúzzák az esélyeket (≈1 meccserőnyinél többel), egy sor
+   figyelmeztet — nem utólag derül ki. */
+const MX_ELO_KUSZOB=1.0;    /* ⚡-egyenértékben: ennyi rejtett hátránytól szól a kezdőrúgás */
+const MX_NEV={fp:"rákapcsolás (a jobb csapat a hajrában)",clutch:"hajrá-képesség",bus:"buszsofőr",role:"stílus-szerepek",
+  szarny:"szárnyjáték",villam:"villám-fáradás",bz:"gólétvágy (Bombázók)",dial:"hangsúly-csúszkák",talIdo:"talizmán (időzített)",
+  szurk:"szurkolótábor",kiall:"kiállítás utáni fáradás",ero:"erőváltozás a meccs közben (csere, kiállítás)",
+  defSk:"védekező képességek",shape:"alakzat: a kiürített közép",thr:"a kijelölt bedobó",back:"a hátsó sor formája",
+  stilus:"csapatstílus",takt:"taktika-stílus",rival:"rangadó-hangulat",egyeb:"egyéb (összhang, talizmán, család)"};
+function mxLam(d){return Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)));}
+function mxHatsoSor(active){
+  let be=0,bn=0;
+  try{active.forEach(a=>{
+    const pos=slots[a.idx]&&slots[a.idx].pos;
+    if(!pos)return;
+    if(pos!=="KP"&&roleInFormation(pos)!=="VEDO")return;
+    be+=pformEdge(a.p.n);bn++;});}catch(e){}
+  return bn?(1-be/bn):1;}
+/* a kezdőrúgás pillanata: a meccserőkből várható λ és a rejtett előzetes szorzók */
+function mxKezd(MS,L,diff,lf,la){
+  try{
+    const lf0=mxLam(diff),la0=mxLam(-diff);
+    const st=MS.tacticStyle;
+    const tsOwn=st==="bus"?0.8:st==="counter"&&diff<0?1.15:(st==="total"||st==="wings")?1.1:st==="longball"?1.08:1;
+    const tsOpp=st==="bus"?0.8:st==="possession"?0.9:(st==="total"||st==="wings")?1.05:1;
+    const stOwn=(typeof MS.ownGoalMult==="number")?MS.ownGoalMult:mTryX(()=>styleOwnGoalMult(),1);
+    const stOpp=(typeof MS.oppGoalMult==="number")?MS.oppGoalMult:mTryX(()=>styleOppGoalMult(),1);
+    const shape=mTryX(()=>shapeOppMult(),1),thr=mTryX(()=>genThrowOppMult(MS.active),1),back=mxHatsoSor(MS.active||[]);
+    const famD=MS.famSp==="200iq"?0.97:MS.famSp==="tank"?0.92:1;
+    const def=MS.defMult||1;
+    const defSk=def/Math.max(1e-6,shape*thr*back*famD);
+    const preA={defSk,shape,thr,back,stilus:stOpp,takt:tsOpp,rival:la/Math.max(1e-6,L.la),
+      egyeb:(L.la/la0)/Math.max(1e-6,def*stOpp*tsOpp)};
+    const preO={stilus:stOwn,takt:tsOwn,rival:lf/Math.max(1e-6,L.lf),egyeb:(L.lf/lf0)/Math.max(1e-6,stOwn*tsOwn)};
+    return {lf0,la0,lfK:lf,laK:la,diff,preO,preA,
+      o:{n:0,xg:0,pg:0,ln:{}},a:{n:0,xg:0,pg:0,ln:{}}};
+  }catch(e){return null;}}
+function mTryX(f,d){try{const v=f();return (typeof v==="number"&&isFinite(v)&&v>0)?v:d;}catch(e){return d;}}
+/* egy ötperces vödör: a szorzók névvel (a λ ugyanígy szorzódik, lásd playMatch) */
+function mxVodor(MX,old,base,K0,nevek,szorzok,lam){
+  if(!MX)return;
+  try{const T=MX[old];T.n++;T.xg+=lam;
+    T.ln.ero=(T.ln.ero||0)+Math.log(Math.max(1e-6,base)/Math.max(1e-6,K0));
+    nevek.forEach((n,i)=>{const m=szorzok[i];if(typeof m==="number"&&isFinite(m)&&m>0&&m!==1)T.ln[n]=(T.ln[n]||0)+Math.log(m);});}catch(e){}}
+function mxPoisCdfDiff(lo,la,k){
+  /* P(X − Y ≤ k), X~Pois(lo), Y~Pois(la) */
+  const pf=(l,n)=>{let p=Math.exp(-l),o=[p];for(let i=1;i<=n;i++){p*=l/i;o.push(p);}return o;};
+  const N=25,A=pf(lo,N),B=pf(la,N);let s=0;
+  for(let x=0;x<=N;x++)for(let y=0;y<=N;y++)if(x-y<=k)s+=A[x]*B[y];
+  return Math.min(1,s);}
+const mxSz=v=>String(Math.round(v*10)/10).replace(".",",");
+/* a lefújás: az elemzés */
+function mxVege(MX,gf,ga){
+  if(!MX||!MX.o.n)return null;
+  try{
+    const n=MX.o.n,ar=n/18;
+    const ex0={o:MX.lf0*ar,a:MX.la0*ar};
+    const xg={o:MX.o.xg,a:MX.a.xg};
+    /* tényezőnként: hány gólt tett hozzá / vett el (a tényleges xG-hez mérve) */
+    const tet=[];
+    const add=(old,kulcs,m)=>{if(!(m>0)||Math.abs(Math.log(m))<0.02)return;
+      const x=old==="o"?xg.o:xg.a;const gol=x*(1-1/m);
+      /* a te szemszögedből: a saját gól +, a kapott −. A MECCSERŐ-EGYENÉRTÉK az
+         a ⚡-eltérés, ami UGYANENNYI gólkülönbséget okozna — a ⚡ mindkét oldal
+         λ-ját mozgatja (dGK/dd ≈ K·(λmi+λők)), egy rejtett szorzó csak az egyikét. */
+      const neked=old==="o"?gol:-gol,me=neked/(SIM.K*Math.max(0.3,xg.o+xg.a));
+      tet.push({old,k:kulcs,m,gol,neked,me});};
+    Object.keys(MX.preO).forEach(k=>add("o",k,MX.preO[k]));
+    Object.keys(MX.preA).forEach(k=>add("a",k,MX.preA[k]));
+    ["o","a"].forEach(old=>{const T=MX[old];Object.keys(T.ln).forEach(k=>add(old,k,Math.exp(T.ln[k]/T.n)));});
+    tet.sort((x,y)=>Math.abs(y.neked)-Math.abs(x.neked));
+    const extra={o:Math.max(0,gf-MX.o.pg),a:Math.max(0,ga-MX.a.pg)};
+    /* a szerencse: ilyen vagy rosszabb (jobb) gólkülönbség a TÉNYLEGES λ-kkal */
+    const kul=MX.o.pg-MX.a.pg;
+    const pRossz=mxPoisCdfDiff(xg.o,xg.a,kul);
+    const pJobb=1-mxPoisCdfDiff(xg.o,xg.a,kul-1);
+    const varGd=ex0.o-ex0.a,tenyGd=xg.o-xg.a,rejtett=tenyGd-varGd;
+    const esely=varGd>=0.5;   /* a meccserők szerint te voltál az esélyes */
+    const meglepo=(esely&&gf<ga)||((gf-ga)<=varGd-2.5)||(varGd<=-0.5&&gf>ga)||((gf-ga)>=varGd+3);
+    const rossz=(gf-ga)<varGd;
+    return {gf,ga,ex0,xg,tet:tet.slice(0,8),extra,pg:{o:MX.o.pg,a:MX.a.pg},pRossz,pJobb,varGd,tenyGd,rejtett,meglepo,rossz,
+      elo:{o:MX.preO,a:MX.preA},n};
+  }catch(e){return null;}}
+function mxEsely(p){
+  if(!(p>0))return "gyakorlatilag soha";
+  if(p>=0.5)return "a meccsek több mint felében";
+  const n=Math.round(1/p);
+  return n<=2?"minden második meccsen":`kb. ${n} meccsből egyszer`;}
+/* a feed sora és az ablak szövege — ugyanaz a magyarázat */
+function mxSzoveg(X,rovid){
+  if(!X)return "";
+  const sor=[];
+  sor.push(`A meccserők alapján <b>${mxSz(X.ex0.o)} : ${mxSz(X.ex0.a)}</b> volt a várható gólarány; a motor a mérkőzés alatt ténylegesen <b>${mxSz(X.xg.o)} : ${mxSz(X.xg.a)}</b>-del számolt.`);
+  const fontos=X.tet.filter(t=>Math.abs(t.neked)>=0.12);
+  if(fontos.length){
+    const ell=fontos.filter(t=>t.neked<0),mel=fontos.filter(t=>t.neked>0);
+    const tx=t=>`${esc(MX_NEV[t.k]||t.k)} <b>${t.old==="o"?(t.gol>=0?"+":"−")+mxSz(Math.abs(t.gol))+" lőtt":(t.gol>=0?"+":"−")+mxSz(Math.abs(t.gol))+" kapott"}</b> gól (≈${t.me>=0?"+":"−"}${mxSz(Math.abs(t.me))} meccserőnyi)`;
+    if(ell.length)sor.push(`Ellened dolgozott: ${ell.slice(0,rovid?3:5).map(tx).join(" · ")}.`);
+    if(mel.length&&!rovid)sor.push(`Neked dolgozott: ${mel.slice(0,4).map(tx).join(" · ")}.`);}
+  else sor.push(`A meccserőn kívüli tényezők érdemben nem mozdították el az esélyeket.`);
+  if(X.extra.o||X.extra.a)sor.push(`A gólvárhatóságon kívülről (11-es, öngól, VAR, pontrúgás-skill): ${X.extra.o?`+${X.extra.o} lőtt`:""}${X.extra.o&&X.extra.a?", ":""}${X.extra.a?`+${X.extra.a} kapott`:""} gól.`);
+  const p=X.rossz?X.pRossz:X.pJobb;
+  if(X.rossz){
+    if(p<0.12)sor.push(`<b>A szerencse része:</b> ilyen vagy ennél rosszabb eredmény ezekkel az esélyekkel ${mxEsely(p)} jön ki — ${X.rejtett<-0.6?"a rejtett tényezők rontottak az esélyeken, a többi balszerencse":"vagyis ez döntően balszerencse, nem rejtett hiba"}.`);
+    else if(X.rejtett<-0.6)sor.push(`<b>A fő ok:</b> a meccserőn kívüli tényezők — nélkülük a várható gólkülönbség ${mxSz(X.varGd)} lett volna, így ${mxSz(X.tenyGd)}.`);
+    else sor.push(`Ilyen vagy rosszabb eredmény ezekkel az esélyekkel ${mxEsely(p)} előfordul — a futball része.`);}
+  else if(p<0.12)sor.push(`<b>A szerencse része:</b> ilyen vagy ennél jobb eredmény ezekkel az esélyekkel ${mxEsely(p)} jön ki.`);
+  return sor.join(" ");}
+/* a kezdőrúgás figyelmeztetése: ha a meccs ELŐTT ismert rejtett tényezők érezhetőek */
+function mxElojelzes(MX){
+  if(!MX)return;
+  try{
+    const lnA=Object.values(MX.preA).reduce((s,m)=>s+Math.log(Math.max(1e-6,m)),0);
+    const lnO=Object.values(MX.preO).reduce((s,m)=>s+Math.log(Math.max(1e-6,m)),0);
+    /* a meccs előtt ismert rejtett szorzók gólkülönbség-hatása → ⚡-egyenérték */
+    const hat=MX.lf0*(Math.exp(lnO)-1)-MX.la0*(Math.exp(lnA)-1);
+    const me=hat/(SIM.K*Math.max(0.3,MX.lf0+MX.la0));
+    if(me>-MX_ELO_KUSZOB)return;   /* csak ha ellened dolgozik, legalább ~1 meccserőnyit */
+    const tet=[];
+    Object.keys(MX.preA).forEach(k=>{const m=MX.preA[k];if(m>1.04)tet.push(`${MX_NEV[k]||k} ×${String(Math.round(m*100)/100).replace(".",",")}`);});
+    Object.keys(MX.preO).forEach(k=>{const m=MX.preO[k];if(m<0.96)tet.push(`${MX_NEV[k]||k} (saját) ×${String(Math.round(m*100)/100).replace(".",",")}`);});
+    addLine(`⚠️ <b>A meccserőn kívül ezen a meccsen:</b> ${tet.length?esc(tet.join(" · ")):"több apró tényező együtt"} — ez nagyjából <b>${me>=0?"+":"−"}${mxSz(Math.abs(me))} meccserőnyi</b> a ⚡-hoz képest. A lefújás után a 🔍 elemzés megmutatja, mennyit számított.`,"m skillnote");
+  }catch(e){}}
+function mxHtml(X){
+  if(!X)return "";
+  return `<div style="font-size:12.5px;line-height:1.55;margin-top:10px;padding:8px 10px;border-radius:8px;background:var(--panel2)">`
+    +`<div style="font-weight:700;margin-bottom:3px">🔍 Miért lett ez az eredmény?</div>${mxSzoveg(X,false)}</div>`;}
 function matchLambdas(mine,oppOvr,venueAdj){
   const lam=d=>Math.max(.15,Math.min(4.5,SIM.BASE*Math.exp(SIM.K*d)));
   /* 🏟️ TALIZMÁN — a hazai pálya eltolása (3.9.156: Stadionbővítés; F6d: Hazai
@@ -76500,6 +76649,7 @@ function mstatVerdictRender(){
     +`<span class="msTeam">${esc(teamLabel(M.them))}</span></div>`
     +mVerdictPressHtml(V)
     +`<div style="font-size:14px;line-height:1.6;margin-top:10px">🎙 ${V.txt}</div>`
+    +(M.mx&&M.mx.meglepo?mxHtml(M.mx):"")   /* 🔍 3.9.299 — meglepetésnél a mérlegben is */
     +mVerdictMvpHtml(V)
     +mVerdictExtrasHtml(V)
     +`<div style="font-size:13px;margin-top:10px">📊 Izgalom: <b>${V.score}/100</b> — ${V.label}</div>`
@@ -76539,6 +76689,7 @@ function mstatRender(){
     (M.drivers||[]).forEach(d=>bits.push(esc(d)));
     if(M.fit!=null)bits.push(`poszt-illeszkedés <b>${M.fit}%</b>`);
     if(bits.length)h+=`<div class="msDrv">${bits.join(" &nbsp;·&nbsp; ")}</div>`;}
+  if(M.mx)h+=mxHtml(M.mx);   /* 🔍 3.9.299 — a statisztikában mindig */
   const ps=M.players||[];
   /* A DOBOGÓRA CSAK ÉRTÉKELT JÁTÉKOS KERÜLHET: egy „—"-os sor a három legjobb
      között értelmetlen volna. (A rendezés miatt ők amúgy is a lista végén
@@ -77695,6 +77846,10 @@ function playMatchMotor(){
      hogy kiemelt meccs-e. A lefújáskor adjuk át (meresMeccs). */
   const _meresKick=DUEL?null:{d:Math.round(diff*100)/100,lf:Math.round(lf*1000)/1000,la:Math.round(la*1000)/1000,
     nagy:RIVAL_MOOD?(isRivalFixture(fx)?"riv":"hajra"):null};
+  /* 🔍 3.9.299 — a meccs-magyarázat mérője: a meccserőkből várható λ és a
+     meccs előtt ismert rejtett szorzók (a motorhoz nem nyúl, lásd mxKezd) */
+  const MX=DUEL?null:mxKezd(MS,_L,diff,lf,la);
+  try{if(MX&&!S.auto)mxElojelzes(MX);}catch(e){}
   /* SORSDÖNTŐ MÉRKŐZÉS: ezen a meccsen lehet kiérdemelni a két hős-skillt.
      A nyomkövetők (gól-krónika, bravúrok, védekező villanások) minden meccsen
      futnak — olcsók, és így a kiértékelésnek nincs külön ága. */
@@ -78514,8 +78669,14 @@ function playMatchMotor(){
     const _fp=DUEL?{own:1,opp:1}:favPushMult(diff,min,gf,ga);
     /* 📊 3.9.282: a vödör gólvárhatósága KÜLÖN változóban — a Momentum ebből
        dolgozik. A sorsolás ugyanaz (az argumentum ugyanígy értékelődik ki). */
-    const _lamOwn=DUEL?null:(_fp.own*lf*clutchAttackMult(active,min,gf,ga)*busOwnMult()*roleOwnGoalMult(active,redIdxs)*szarnyGoalMult(active,redIdxs)*villamFadeOwn(min)*bzRecGoalMult(gf)*dialMul("own",_dialCtx)*talIdoOwn(MS,min,gf,ga)*talSzurkIdo(MS,min,gf,ga,_talHazaiP)*kiallFaradas(oppRedMin,min)/18);
+    /* 🔍 3.9.299 — ugyanazok a szorzók, ugyanabban a sorrendben (a kiértékelés
+       és a szorzás is balról jobbra, tehát a λ bitre a régi) — csak névvel,
+       hogy a meccs-magyarázat lássa őket */
+    const _mfOwn=DUEL?null:[clutchAttackMult(active,min,gf,ga),busOwnMult(),roleOwnGoalMult(active,redIdxs),szarnyGoalMult(active,redIdxs),villamFadeOwn(min),bzRecGoalMult(gf),dialMul("own",_dialCtx),talIdoOwn(MS,min,gf,ga),talSzurkIdo(MS,min,gf,ga,_talHazaiP),kiallFaradas(oppRedMin,min)];
+    const _lamOwn=DUEL?null:(()=>{let x=_fp.own*lf;for(const m of _mfOwn)x*=m;return x/18;})();
+    try{if(MX)mxVodor(MX,"o",lf,MX.lfK,["fp","clutch","bus","role","szarny","villam","bz","dial","talIdo","szurk","kiall"],[_fp.own].concat(_mfOwn),_lamOwn);}catch(e){}
     let g=DUEL?duelMine.length:poisson(_lamOwn);   /* ⚽ F6d — az időfüggő λ · 📣 3.9.224 — a lelátó */
+    if(MX)MX.o.pg+=g;   /* 🔍 3.9.299 — a gólvárhatóságból jött gólok */
     /* ---- BOMBÁZÓK · GÓLÉTVÁGY ----
        Az előző ötpercben gólszerző képességgel esett gól: most dől el, jön-e a
        folytatás. Meccsenként EGY extra gól, párharcban sosem (lásd fent). */
@@ -78836,8 +78997,11 @@ function playMatchMotor(){
     /* PÁRHARCBAN a kapott gólok is a közös listából jönnek — és a gólszerző a
        társad VALÓDI játékosa, nem egy hangulatnév. */
     const duelOpp=DUEL?(duelBkt.opp[min/5]||[]):null;
-    const _lamOpp=DUEL?null:(_fp.opp*la*roleOppGoalMult(active,redIdxs,min,ga)*busOppMult()*villamFadeOpp(min)*dialMul("opp",{min:gnow(min),gf,ga,red:redIdxs.size>0,injured:_dialInjured})*talIdoOpp(MS,min)*kiallFaradas(redIdxs.size?Math.min(...Object.values(mRedMin)):null,min)/18);
+    const _mfOpp=DUEL?null:[roleOppGoalMult(active,redIdxs,min,ga),busOppMult(),villamFadeOpp(min),dialMul("opp",{min:gnow(min),gf,ga,red:redIdxs.size>0,injured:_dialInjured}),talIdoOpp(MS,min),kiallFaradas(redIdxs.size?Math.min(...Object.values(mRedMin)):null,min)];
+    const _lamOpp=DUEL?null:(()=>{let x=_fp.opp*la;for(const m of _mfOpp)x*=m;return x/18;})();   /* 🔍 3.9.299 — lásd _mfOwn */
+    try{if(MX)mxVodor(MX,"a",la,MX.laK,["fp","role","bus","villam","dial","talIdo","kiall"],[_fp.opp].concat(_mfOpp),_lamOpp);}catch(e){}
     let og=DUEL?duelOpp.length:poisson(_lamOpp);
+    if(MX)MX.a.pg+=og;
     try{ekMotor(min,_lamOwn,_lamOpp,diff,redIdxs.size,oppRedDone?1:0,{chMi:_ekChMi,chOk:_ekChOk,g,og});}catch(e){}   /* 📊 3.9.282 */   /* ⚽ F6d — a Villámrajt kontrája: a SAJÁT pillanatképemből, az ellenfél λ-ján */
     for(let k=0;k<og;k++){ga++;
       const dOpp=duelOpp?duelOpp[k]:null;
@@ -80880,7 +81044,15 @@ function playMatchMotor(){
     try{if(_mVerdictPending)pressStoryApply(_mVerdictPending,{gf,ga,home:!!(fx&&fx.home)});}catch(e){}
     /* 🎖️ 3.9.195 — a profilszint és a stílus-mesterség meccse (duplikáció-védett) */
     try{profNoteMatch({gf,ga});}catch(e){}
-    try{meresMeccs(fx,gf,ga,Object.assign({or:oppRedDone?1:0,r:redIdxs.size},_meresKick||{}));}catch(e){}   /* 📈 3.9.206 · 3.9.220: + a motor-állapot */
+    /* 🔍 3.9.299 — a meccs-magyarázat: a mérlegbe, meglepetésnél a naplóba is */
+    let _mxR=null;
+    try{_mxR=mxVege(MX,gf,ga);
+      if(_mxR&&S.lastMatch)S.lastMatch.mx=_mxR;
+      if(_mxR&&_mxR.meglepo&&!S.auto)addLine(`🔍 <b>Miért lett ${gf}:${ga}?</b> ${mxSzoveg(_mxR,true)}`,"m skillnote");}catch(e){}
+    try{meresMeccs(fx,gf,ga,Object.assign({or:oppRedDone?1:0,r:redIdxs.size},_meresKick||{},
+      _mxR?{mx:{xf:Math.round(_mxR.xg.o*100)/100,xa:Math.round(_mxR.xg.a*100)/100,ef:Math.round(_mxR.ex0.o*100)/100,ea:Math.round(_mxR.ex0.a*100)/100,
+        pf:_mxR.pg.o,pa:_mxR.pg.a,p:Math.round((_mxR.rossz?_mxR.pRossz:_mxR.pJobb)*1000)/1000,
+        t:_mxR.tet.slice(0,4).map(t=>[t.old+":"+t.k,Math.round(t.neked*100)/100])}}:{}));}catch(e){}   /* 📈 3.9.206 · 3.9.220: + a motor-állapot · 🔍 3.9.299: + a magyarázat */
     mLefujas(skillReasons,careerUnlockReasons);
     /* MECCSRŐL MECCSRE (3.9.05): a lánc MÁR ITT felveszi a fonalat. A
        jutalom-képernyők (felfedezés, képesség, akadémia) az értékelő ablak
@@ -129686,7 +129858,7 @@ function meresMeccs(fx,gf,ga,mot){
   /* 3.9.220 — a motor-állapot a kezdőrúgásból (d: különbség pályával, lf/la:
      a két gólvárhatóság, nagy: riv/hajra) és a lapok (r: a mi kiállításaink,
      or: az ellenfélé). Hiányzó mezőt nem írunk (párharc, régi hívó). */
-  if(mot&&typeof mot==="object")["d","lf","la","nagy","r","or"].forEach(k=>{if(mot[k]!=null&&mot[k]!==0)rec[k]=mot[k];});
+  if(mot&&typeof mot==="object")["d","lf","la","nagy","r","or","mx"].forEach(k=>{if(mot[k]!=null&&mot[k]!==0)rec[k]=mot[k];});
   const os=z.mOssz;os.n++;os.gf+=gf||0;os.ga+=ga||0;if(gf>ga)os.gy++;else if(gf<ga)os.v++;else os.d++;
   if(z.m)z.m.push(rec);
   if(z.budzseIdo)z.budzseIdo.push([rec.i,rec.k,rec.b]);

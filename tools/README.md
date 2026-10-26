@@ -389,6 +389,17 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## meccs-magyarazat-3-9-299-proba.js — 🔍 miért lett ez az eredmény?
+
+```
+node tools/meccs-magyarazat-3-9-299-proba.js [kép-mappa]
+```
+
+* Valódi meccseken: 18 vödör, pozitív xG, a λ-ból jött gól nem több a lőttnél, a mérési sor viszi (`mx`).
+* A kezdőrúgás figyelmeztet, ha a meccs előtt ismert rejtett tényező ~1 meccserőnyinél többet dolgozik ellened (pl. kiürített közép ×1,4 ≈ −1,3), és hallgat, ha nincs ilyen.
+* Az elemzés: esélyesként 0:4 = balszerencse (az esély kimondva); hangsúly-csúszkák ×1,8 = +0,7 kapott gól ≈ −1,7 meccserőnyi; a gólvárhatóságon kívüli gól; a várt eredmény nem meglepetés.
+* A mérleg (meglepetésnél) és a statisztika (mindig) ablaka mutatja.
+
 ## hc-seed-mero-3-9-298-proba.js — 🔬 a hardcore seed-mérő és a szigorúság gyógyítása
 
 ```
