@@ -389,6 +389,14 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## edzo-elemzes-kulcs-3-9-314-proba.js — 🧠 az edzői elemzés minden meccsre újra jár
+
+```
+node tools/edzo-elemzes-kulcs-3-9-314-proba.js
+```
+
+* Az elemzés-számláló újra nyílik az osztályozó visszavágóján, kupában szakasz-, selejtezőkör- és kupaváltáskor (régen a kulcs "po" / "e"+idx volt, és ütközött); ugyanarra a meccsre nem nyílik újra (mentés után sem). A meccs-visszaállítás azonosítója is egyedi: a döntő lefújt rekordja nem illik a következő kupa első meccsére, a régi formátumú félbe maradt rekord igen.
+
 ## pixel-sima-3-9-313-proba.js — 🎞 Pixel témában is sima mozgás a meccsen
 
 ```

@@ -67,6 +67,10 @@ const MAX=+(process.env.MAX||40);
       if(S.euro.stage==="qf"&&S.euro.idx===0)euroFinishUserMatch(0,4);else euroFinishUserMatch(3,0);
       euroAfterUserMatch();n++;}
     window._pillanat=JSON.stringify(S.euro);
+    /* ugyanazt a visszavágót játsszuk újra és újra: a lapok gyűlnek, és egy
+       eltiltott kezdő miatt a hiányzó-panel várna a játékosra — a próbában a
+       motor pótolja (ahogy végigjátszásnál is) */
+    unavailableStarters=()=>[];
     /* a lefújás utáni lánc itt nem kell — csak az, hogy elinduljon */
     window._lanc=0;utoLancIndit=function(){window._lanc++;};
     window._sorok=[];const al=addLine;addLine=function(t){try{window._sorok.push(String(t).replace(/<[^>]+>/g,""));}catch(e){}return al.apply(this,arguments);};

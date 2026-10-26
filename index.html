@@ -7848,7 +7848,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.313";
+const APP_VERSION="3.9.314";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -69018,8 +69018,17 @@ function edzoKovetkezoMeccs(){
     if(gameMode!=="career"||!careerPool)return null;
     if(S.playing)return null;
     let fx=null,kulcs=null;
-    if(typeof pyrPoActive==="function"&&pyrPoActive()){fx=pyrPoFx();kulcs="po";}
-    else if(typeof euroActive==="function"&&euroActive()){fx=S.euro.fixtures[S.euro.idx];kulcs="e"+S.euro.idx;}
+    /* 🧠 3.9.314 — BEJELENTETT HIBA: „néha az edzői elemzések nem resetelődnek
+       két meccs között". A kulcs eddig az osztályozóban "po" volt (a két meccs
+       közös!), a kupában "e"+idx — az idx viszont minden szakasz (és minden
+       selejtezőkör, és a nyár minden kupája) elején 0-ról indul, így pl. a
+       nyolcaddöntő első meccse és a negyeddöntő első meccse ugyanazt a kulcsot
+       kapta, ha közben nem kértél elemzést. Most a kulcs a sorozatot, a
+       szakaszt, a selejtezőkört, a meccs-indexet és az ellenfelet is tartalmazza. */
+    if(typeof pyrPoActive==="function"&&pyrPoActive()){fx=pyrPoFx();
+      kulcs="po"+((S.pyrPo&&S.pyrPo.idx)||0)+":"+((fx&&fx.o&&fx.o.n)||"");}
+    else if(typeof euroActive==="function"&&euroActive()){const E=S.euro;fx=E.fixtures[E.idx];
+      kulcs=["e",E.comp||"",E.stage||"",E.qRound||0,E.idx,(fx&&fx.o&&fx.o.n)||""].join(":");}
     else if(!S.seasonClosed&&(S.idx||0)<30){fx=S.fixtures&&S.fixtures[S.idx];kulcs="l"+(S.idx||0);
       /* ⚔ 3.9.305 — párharc-fordulóban a társ az ellenfél, menetrendi sor nélkül is */
       try{if((!fx||!fx.o)&&h2hIsDuelRound())fx={duel:true,o:{n:"⚔ A társad",ovr:0}};}catch(e){}}
@@ -78766,11 +78775,29 @@ function mUIDontes(rng,fn,d){
   const e=Math.random;if(rng)Math.random=rng;
   try{return fn();}finally{Math.random=e;try{mEloIr();}catch(x){}}}
 /* a meccs azonosítója: szezon, forduló, kupa- és osztályozó-index */
+/* 3.9.314: a kupa-rész a sorozatot, a szakaszt és a selejtezőkört is
+   tartalmazza. Eddig csak "e"+idx volt — az idx viszont minden szakasz és
+   minden kupa elején 0-ról indul, így egy kupadöntő (e0) és a nyár következő
+   kupájának első meccse (szintén e0, S.idx 30) ugyanazt az azonosítót kapta:
+   a kezdőrúgás a döntő lefújt rekordját találta, és annak sorsolását
+   pörgette volna le élő meccs helyett. */
 function mMeccsId(){
+  let e="",p="";
+  try{if(euroActive()){const E=S.euro;e="e"+[E.comp||"",E.stage||"",E.qRound||0,E.idx||0].join(".");}}catch(x){}
+  try{if(pyrPoActive())p="p"+((S.pyrPo&&S.pyrPo.idx)||0);}catch(x){}
+  return `${gameMode}|${S.seasonNumber||1}|${S.idx||0}|${e}|${p}`;}
+/* a 3.9.314 előtti azonosító — egy frissítéskor félbe maradt meccs ezzel
+   folytatódik (a frissítés ne adjon új esélyt); a LEFÚJT régi rekord viszont
+   nem: épp az ütközött a következő kupa első meccsével */
+function mMeccsIdRegi(){
   let e="",p="";
   try{if(euroActive())e="e"+((S.euro&&S.euro.idx)||0);}catch(x){}
   try{if(pyrPoActive())p="p"+((S.pyrPo&&S.pyrPo.idx)||0);}catch(x){}
   return `${gameMode}|${S.seasonNumber||1}|${S.idx||0}|${e}|${p}`;}
+function mEloEgyezik(x){
+  if(!x||!x.id)return false;
+  if(x.id===mMeccsId())return true;
+  return !x.vege&&x.id===mMeccsIdRegi();}
 function mEloKulcs(){let k="x";try{k=saveKey();}catch(e){}return k+"::elo";}
 function mEloIr(){
   const M=_mElo;if(!M)return;
@@ -78794,7 +78821,7 @@ function playMatch(){
   let M=_mFolyt;_mFolyt=null;
   if(!M){
     const regi=mEloOlvas();
-    if(regi&&regi.id===mMeccsId())
+    if(mEloEgyezik(regi))
       M={v:1,id:regi.id,seed:regi.seed>>>0,auto:!!regi.auto,t:0,log:regi.log||[],cel:regi.vege?999:(regi.t|0)};
   }
   if(!M){
@@ -78915,7 +78942,7 @@ function mUtoFolytatasUtemez(){
 function mMeccsFolytatasBetolteskor(){
   if(S&&S.utoMeccs)return true;           /* a lánc van soron, nem a meccs */
   const M=mEloOlvas();if(!M)return false;
-  if(M.id!==mMeccsId()||S.playing){mEloTorol();return false;}
+  if(!mEloEgyezik(M)||S.playing){mEloTorol();return false;}
   _mFolyt={v:1,id:M.id,seed:M.seed>>>0,auto:!!M.auto,t:0,log:M.log||[],cel:M.vege?999:(M.t|0)};
   if(M.auto&&!S.auto){S.auto=true;_mFolyt.autoVissza=true;}
   try{const b=$("kickBtn");if(b)b.disabled=true;}catch(e){}
