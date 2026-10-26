@@ -39,7 +39,9 @@ const {spawn}=require('child_process');
     /* 2 */
     const kulcs=q=>{const T=faceTraits(q);return [T.bor,T.text,T.hajSzin,T.szemSzin,T.haj,T.szemTip,T.orr,T.szaj,T.szemoldTip,Math.round(T.fejW),T.szakall].join(",");};
     o.kulonbozo=new Set(minta.map(kulcs)).size;
-    o.stilusok=new Set(minta.map(q=>faceTraits(q).haj)).size;
+    /* 3.9.315: 38 frizura mellett a ritkák (pl. „fonott") egy 400-as mintából
+       kimaradhatnak — az előfordulást a TELJES állományon nézzük */
+    o.stilusok=new Set(all.map(q=>faceTraits({n:q.n,nat:q.nat,age:26}).haj)).size;
     o.stilusOssz=FACE_HAJ_STILUS.length;
     o.tonusok=new Set(minta.map(q=>faceTraits(q).bor)).size;
     /* 3-4 */
