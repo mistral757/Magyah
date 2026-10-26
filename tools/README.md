@@ -389,6 +389,14 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## pixel-sima-3-9-313-proba.js — 🎞 Pixel témában is sima mozgás a meccsen
+
+```
+node tools/pixel-sima-3-9-313-proba.js
+```
+
+* Góljelenet sötét és Pixel témában: a labda ugyanannyi helyzetben látszik (régen 7 vs 33), a jelenet egyetlen animációja sem lépcsős, a képkocka-idő egyenletes, a pixeles arc marad; a meccs-képernyőn és a jelenetben a CSS sem lépcsőz, a menükben a téma lépcsője marad (és a „Szaggatott mozgás" kapcsolóval kikapcsol).
+
 ## donto-pillanat-3-9-312-proba.js — 🎬📣 a döntő pillanat: gólöröm a hálónál, előtte izgalom
 
 ```
