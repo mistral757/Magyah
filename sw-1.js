@@ -85,6 +85,11 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      /* 🆕 3.9.306: a régi worker által eltett version.json-válaszok ki */
+      .then(() => caches.open(CACHE_NAME))
+      .then((cache) => cache.keys().then((reqs) => Promise.all(
+        reqs.filter((r) => /\/version\.json(\?|$)/.test(r.url)).map((r) => cache.delete(r)))))
+      .catch(() => {})
       .then(() => self.clients.claim())
   );
 });
@@ -138,6 +143,11 @@ self.addEventListener("notificationclick", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
+  /* 🆕 3.9.306: a version.json-t SOSEM cache-eljük — az „új verzió érhető el"
+     sáv ebből tudja, mi van kint. A statikus ág cache-first-je örökre az első
+     választ adná vissza. Visszatérés respondWith nélkül = a böngésző maga
+     kéri le a hálózatról. */
+  try { if (new URL(req.url).pathname === "/version.json") return; } catch (e) {}
 
   const isHTML = req.mode === "navigate" ||
     (req.headers.get("accept") || "").includes("text/html");

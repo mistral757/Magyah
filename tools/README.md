@@ -389,6 +389,36 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## futtat.js — 🧪 a regressziós futtató (3.9.306)
+
+```bash
+node tools/futtat.js                    # mind, 3 párhuzamosan
+node tools/futtat.js --uj 15            # a 15 legújabb (a fájlnév verziószáma szerint)
+node tools/futtat.js --minta edzo,kupa  # névrészlet szerint (vesszővel: bármelyik)
+node tools/futtat.js -j 4 --ido 400     # 4 párhuzamosan, próbánként ≤400 mp
+node tools/futtat.js --check            # előtte a check.sh
+node tools/futtat.js --lista            # csak kiírja, mit futtatna
+```
+
+* **Egy parancs a ~235 próbára.** Próbánként egy sor: ✓/✗, a teljesült és bukott állítások száma, az idő; bukásnál az első ✗ sorok.
+* **Bukás:** nem nulla kilépési kód, VAGY „✗”-gel kezdődő sor (néhány régi próba hibánál is 0-val lép ki), VAGY lejárt az idő.
+* **Portok:** a próba forrásából (`PORT=…`); két azonos portú próba sosem fut egyszerre.
+* **Napló:** próbánként a teljes kimenet és egy `OSSZEGZES.txt` a `/tmp/magyah-futtatas-<idő>/` mappában (vagy `FUTTAT_KI=<mappa>`).
+* **Képernyőképek:** a végén a követett fájlok visszaállnak (`git checkout`), a futás alatt keletkezett újak törlődnek; ami előtte is ott volt, marad.
+* Kilépési kód: 0 = minden zöld.
+
+## uj-verzio-3-9-306-proba.js — 🆕 új verzió érhető el
+
+```
+node tools/uj-verzio-3-9-306-proba.js
+```
+
+* A repó `version.json`-ja = az `APP_VERSION` (**ez kapja el, ha egy kiadásnál a léptetés elmarad**).
+* Verzió-összevetés; újabb kint lévő verzió → sáv mindkét számmal, ugyanaz/régebbi → csend; tízperces fék.
+* „Később” erre a verzióra elhallgattat, egy még újabbra nem; „Frissítés most” futó meccs alatt csak szól, egyébként ment, aztán újratölt.
+* A service worker a version.json-t átengedi; a RÉGI worker alatt is friss (időbélyeg), és az új worker kitakarítja, amit a régi eltett.
+* 🐞 Párharcban az esemény-animáció a társ nevét és erejét veszi.
+
 ## parharc-felkeszules-3-9-305-proba.js — ⚔ párharc-felkészülés és ellenfél-elemzés
 
 ```
