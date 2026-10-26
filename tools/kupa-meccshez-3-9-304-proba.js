@@ -106,7 +106,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
 
   console.log("\n— 3. az edzői elemzés a kupameccsre —");
   const e=await p.evaluate(()=>{const M=edzoKovetkezoMeccs();return {van:!!M,ellen:M&&M.fx.o.n,kulcs:M&&M.kulcs};});
-  ok(e.van&&e.ellen==="Teszt Kupacsapat FC"&&/:e0$/.test(e.kulcs),"az edzői elemzés a kupameccsre szól",e);
+  ok(e.van&&e.ellen==="Teszt Kupacsapat FC"&&/:e:[A-Z]+:[a-z0-9]+:\d+:0:Teszt Kupacsapat FC$/.test(e.kulcs),"az edzői elemzés a kupameccsre szól (3.9.314: a kulcsban sorozat, szakasz, kör, index, ellenfél)",e);
 
   console.log("\n— 4. vissza a kupa-táblához —");
   const v=await p.evaluate(()=>{const o={};const s0=window._ses;

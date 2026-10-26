@@ -78,7 +78,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     m.querySelector('[data-fk="hajSzin"][data-fd="1"]').click();
     o.ed.lep=document.getElementById("fedKep").src!==src0&&_fed.vazlat.hajSzin===((alap.hajSzin+4)%9);
     m.querySelector('[data-fk="arc"][data-fd="1"]').click();
-    o.ed.arc=_fed.vazlat.fejW!=null;
+    o.ed.arc=_fed.vazlat.arcF!=null;   /* 3.9.315: az arcforma sorszámként (arcF) tárolódik */
     document.getElementById("fedEredeti").click();
     o.ed.eredeti=Object.keys(_fed.vazlat).length===0;
     m.querySelector('[data-fk="szakall"][data-fd="1"]').click();
@@ -145,12 +145,12 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      o.ment285=x;}
     return o;});
   console.log("=== 1-2. a rétegek ===");
-  ok(JSON.stringify(r.tiszta)===JSON.stringify({bor:0,hajSzin:3,haj:18,fejW:29,fejpant:true}),"tisztítás: csak ismert mező, tartományban",r.tiszta);
+  ok(JSON.stringify(r.tiszta)===JSON.stringify({bor:0,hajSzin:3,haj:37,fejW:29,fejpant:true}),"tisztítás: csak ismert mező, tartományban",r.tiszta);
   ok(Object.values(r.glob).every(Boolean),"globális: a vonás átíródik, a böngészőben tárolva, a kép megváltozik, a kor-függő vonás marad",r.glob);
   ok(Object.values(r.karr).every(Boolean),"karrier: a mentésbe kerül, mezőnként ráül a globálisra",r.karr);
   ok(r.ujKarr.haj,"egy másik karrierben csak a globális él",r.ujKarr);
   console.log("=== 3. a szerkesztő ===");
-  ok(r.ed.nyitva&&r.ed.sorok===16&&r.ed.reteg==="global","megnyílik, 16 vonás, beállításokból globális",r.ed);
+  ok(r.ed.nyitva&&r.ed.sorok===17&&r.ed.reteg==="global","megnyílik, 16 vonás + az arcvonás-pörgetés sora (3.9.315), beállításokból globális",r.ed);
   ok(r.ed.lep&&r.ed.arc,"a léptetés változtat (az előnézet is), az arcforma is",r.ed);
   ok(r.ed.eredeti&&r.ed.megse,"az „Eredeti” kiürít, a Mégse nem ment",r.ed);
   ok(r.ed.ment&&r.ed.torles,"a Mentés pontosan a vázlatot írja; a törlés visszaadja a generált arcot",r.ed);
