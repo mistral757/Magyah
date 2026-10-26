@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## parharc-felkeszules-3-9-305-proba.js — ⚔ párharc-felkészülés és ellenfél-elemzés
+
+```
+node tools/parharc-felkeszules-3-9-305-proba.js [kép-mappa]
+```
+
+* A párharc-forduló gombja előbb „🔍 Felkészülés": nem indít párharcot, a két gép kicseréli a friss csapatlapját (stílus, forma, morál, csúcs/mélypont, skillek); a második koppintás a párharc.
+* Az edzői elemzés párharcban: a társ ⚡-jával, ⚖ nélkül, és a részletes ellenfél-blokkal (a két csapat egymás mellett, legerősebbek, sorok párharca, előzmények).
+* A lap bővítése hosszra és sávra vágva jön át.
+
 ## kupa-meccshez-3-9-304-proba.js — ⚽ kupameccs: „Irány a meccs"
 
 ```
