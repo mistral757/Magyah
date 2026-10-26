@@ -148,4 +148,19 @@ kiterjeszthető:
 
 ## Az első teljes regresszió (3.9.306)
 
-*(A futtató első teljes köre — lásd lent.)*
+`node tools/futtat.js -j 4 --ido 420`, 234 próba, 712 mp:
+
+**227/234 zöld · 4432 teljesült és 11 bukott állítás.**
+
+| próba | ok | mi lett vele |
+|---|---|---|
+| `kommentar-ikon` | **valódi lemaradás:** a 3.9.293-as hosszú bedobás két kommentárja nem kapott típusjelet | javítva: 🚩 pontrúgás |
+| `talizman-f5` | a forrásminta nem ismerte a 3.9.293-as szabadrúgó-szorzót | a minta frissítve (a talizmán a helyén volt) |
+| `nevmod-boot` | pontosan 7 filozófus-edzőt várt, azóta 8 van | ≥7 |
+| `akademia-ablak` | seed nélküli statisztika, a tűrés csak ~2,7σ volt (~5% vakriasztás) | ±60% ≈ 3,5σ |
+| `jelzesek-3-9-172` | fix 2,8 mp várakozás, terhelt gépen kevés (önmagában 3/3 zöld) | legfeljebb 6 mp-ig lesi |
+| `szezon-iv` | **a futtató hibája:** a régi próbák egy része a portját csak az URL-ben nevezi meg, és két 8977-es egyszerre futott | a futtató most minden portalakot felismer |
+| `sargalap` | a 3.9.33-as mérőszkript a régi, klubválasztós indítási úton kattint | **elavult, nem javítva**; ha kell a sárgalap-mérés, az új indítási útra kell átírni |
+
+**Az újrafuttatás után: 8/9 zöld.** Egyedül a `sargalap` maradt piros. A
+párharc-animáció hibáját (1. pont) a `check.sh` fogta meg, nem a próbák.
