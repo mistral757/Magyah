@@ -44,6 +44,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     pyrPickSq={club:"draft",season:"",players:sq.players.slice(0,15)};
     pyrPickFromDraft=true;pyrPickDiv=null;pyrPendingSpeed=pyrWantedSpeed;
     renderPyrDivPick();pyrConfirmDiv();
+    /* 3.9.302: az új karrier már a 2. szerződéssel (gyv) indul — ez a próba a
+       FUTÓ karrierek 3.9.254 görbéjét méri, ezért a jelzőt levesszük */
+    try{delete S.pyr.gyv;}catch(e){}
     if(!careerPool)careerPool=initCareerPlayerPool({stars:2.5});
     slots.forEach((sl,i)=>{
       if(sl.player)return;

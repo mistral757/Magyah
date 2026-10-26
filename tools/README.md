@@ -389,6 +389,17 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## mezony-novekedes-3-9-302-proba.js — 📈 a mezőny idény közbeni erősödése (2. szerződés)
+
+```
+node tools/mezony-novekedes-3-9-302-proba.js
+```
+
+* Az új karrier `S.pyr.gyv = 2`; a régi a 3.9.254 görbén marad.
+* E = szint × R(idény) × P(pénz-tempó) × T(fokozat) × K(kezdet) − alapütem; T: 1.1 → 0,30 · 8.5 → 1,00 · 9.1 → 1,10 · 10.5 → 1,45.
+* 8.5-ön az 1. idény 0, a 4. a szint ~40%-a; 9.1-től már az 1. idényben is; gyorsabb pénz → gyorsabb mezőny.
+* 30 forduló alatt a teljes E gyűlik, a célrés alatt (beragadás-őr) nem.
+
 ## nyar-igazolas-3-9-301-proba.js — 🌞 igazolás a teljes nyáron
 
 ```
