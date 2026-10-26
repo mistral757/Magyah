@@ -420,6 +420,7 @@ node tools/edzo-3-9-300-proba.js [kép-mappa]
 * XP: meccs 10, győzelem +5, döntetlen +2; a 2. szint 120 XP-nél, hírrel; pénzen a következő szint a büdzséből.
 * Elemző irányok: 2. szinttől szintenként 1 pont, irányonként legfeljebb 3; elemzés meccsenként 1/2/3/4 (1., 4., 7., 10. szint).
 * Az elemzés: megerősítés → elemzés, az esélyek összege 100%, a meccs nem indul, a stáb munkanaplója nem nő, a kvóta fogy; a fejlett edző irány-szekciói.
+* 3.9.303: „Amit csinál” — a meccs-magyarázat is az edzőé, az utolsó meccs gombjával.
 
 ## meccs-magyarazat-3-9-299-proba.js — 🔍 miért lett ez az eredmény?
 
@@ -431,6 +432,7 @@ node tools/meccs-magyarazat-3-9-299-proba.js [kép-mappa]
 * A kezdőrúgás figyelmeztet, ha a meccs előtt ismert rejtett tényező ~1 meccserőnyinél többet dolgozik ellened (pl. kiürített közép ×1,4 ≈ −1,3), és hallgat, ha nincs ilyen.
 * Az elemzés: esélyesként 0:4 = balszerencse (az esély kimondva); hangsúly-csúszkák ×1,8 = +0,7 kapott gól ≈ −1,7 meccserőnyi; a gólvárhatóságon kívüli gól; a várt eredmény nem meglepetés.
 * A mérleg (meglepetésnél) és a statisztika (mindig) ablaka mutatja.
+* 3.9.303: az edző mondja — a figyelmeztetés az ő nevével kezdődik, a blokk fejében az arcképe.
 
 ## hc-seed-mero-3-9-298-proba.js — 🔬 a hardcore seed-mérő és a szigorúság gyógyítása
 

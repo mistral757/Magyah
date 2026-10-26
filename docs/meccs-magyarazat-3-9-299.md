@@ -139,3 +139,7 @@ rendszeresen.
   * a várt eredmény nem meglepetés;
 * **az ablakok;**
 * **nincs oldalhiba.**
+
+## 3.9.303
+
+A magyarázat mindhárom megszólalása (figyelmeztetés, naplósor, mérleg/statisztika blokk) az **edzőé** lett: az ő nevével és arcképével szól, és az Edző menü „Amit csinál” blokkjában is ott van. Lásd `docs/edzo-3-9-300.md`.

@@ -106,8 +106,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     window.shapeOppMult=_sh;
     mxElojelzes(MX1);
     o.sor=(sorok.filter(t=>/meccserőn kívül/.test(t)).slice(-1)[0]||"").replace(/<[^>]+>/g,"");
+    o.edzo=coach?fullName(coach.n):"";
     window.addLine=_al;return o;});
   ok(f.csend,"rejtett tényező nélkül nincs figyelmeztetés");
+  ok(f.edzo&&f.sor.indexOf("👔 "+f.edzo)===0,"3.9.303: a figyelmeztetést az edző mondja (név elöl)",f.sor.slice(0,80));
   ok(/alakzat: a kiürített közép ×1,4/.test(f.sor)&&/−1,3 meccserőnyi/.test(f.sor)&&!/egyéb/.test(f.sor),"a kiürített közép ×1,4 → figyelmeztet, ⚡-egyenértékben (≈−1,3: ugyanennyi gólkülönbség)",f.sor);
 
   console.log("\n— 3. az elemzés —");
@@ -128,7 +130,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const D=mxVege(Object.assign(alap(),{o:{n:18,xg:1.9,pg:2,ln:{}},a:{n:18,xg:0.85,pg:1,ln:{}}}),2,1);o.D=D.meglepo;
     return o;});
   ok(e.A.meglepo&&e.A.p<0.02&&/1,9 : 0,9/.test(e.A.tx)&&/balszerencse/.test(e.A.tx)&&/meccsből egyszer/.test(e.A.tx),"esélyesként 0:4 → meglepetés, a szerencse esélye kimondva (balszerencse)",e.A);
-  ok(/Ellened dolgozott: hangsúly-csúszkák \+0,7 kapott gól \(≈−1,7 meccserőnyi\)/.test(e.B.tx),"rejtett tényező: a hangsúly-csúszkák +0,7 kapott gól (≈ meccserőben is)",e.B);
+  ok(/Ellenünk dolgozott: hangsúly-csúszkák \+0,7 kapott gól \(≈−1,7 meccserőnyi\)/.test(e.B.tx),"rejtett tényező: a hangsúly-csúszkák +0,7 kapott gól (≈ meccserőben is)",e.B);
   ok(/\+1 kapott gól/.test(e.C)&&/11-es, öngól/.test(e.C),"a gólvárhatóságon kívüli gól külön sor",e.C);
   ok(e.D===false,"a várható eredmény nem meglepetés");
 
@@ -146,7 +148,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.vMod=!!mVerdictOf();
     mstatShow(null);await varj(200);
     o.stats=/Miért lett ez az eredmény/.test($("mstatBody").textContent);
+    o.edzoFej=/elemzése a meccsről/.test($("mstatBody").textContent)&&!!$("mstatBody").querySelector("svg");
     return o;});
+  ok(w.edzoFej,"3.9.303: a blokk fejében az edző arcképe és neve",w);
   ok(w.stats&&(w.verdict||!w.vMod),"a statisztika ablaka mindig, a mérleg meglepetésnél mutatja",w);
   if(kep){fs.mkdirSync(kep,{recursive:true});
     await p.evaluate(()=>{document.querySelectorAll("body *").forEach(el=>{const m=document.getElementById("mstatModal");if(getComputedStyle(el).position==="fixed"&&el!==m&&!m.contains(el)&&!el.contains(m))el.style.display="none";});

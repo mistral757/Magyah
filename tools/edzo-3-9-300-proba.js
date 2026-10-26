@@ -103,6 +103,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     edzoXp(99999);o.max=edzoLvl();o.elemzes=[1,3,4,6,7,9,10].map(l=>edzoElemzesMax(l));
     edzoPontTesz("kulcs");edzoPontTesz("kulcs");o.kulcs3=edzoIrany("kulcs");o.negyedik=edzoPontTesz("kulcs");
     renderHubCoachPanel();o.gombok=$("hubCoachBody").querySelectorAll("[data-edzo-pont]").length;
+    /* 3.9.303 — az edző munkája: a meccs-magyarázat is az övé */
+    o.amit=/Amit csinál/.test($("hubCoachBody").textContent)&&/miért lett ez az eredmény/.test($("hubCoachBody").textContent);
+    if(S.lastMatch){S.lastMatch.mx=S.lastMatch.mx||{ex0:{o:1,a:1},xg:{o:1,a:1},tet:[],extra:{o:0,a:0},pg:{o:0,a:0},pRossz:0.5,pJobb:0.5,rossz:false,rejtett:0,varGd:0,tenyGd:0};renderHubCoachPanel();}
+    o.utolso=!S.lastMatch||!!$("edzoUtolsoBtn");
     return o;});
   ok(m.nyitva&&m.alap,"a menü: adatlap, szint, „amit hoz”, kedvelt taktikák, elemző irányok",m);
   ok(m.xp1===15&&m.xp2===27&&m.xp3===37,"XP: győzelem 15, döntetlen 12, vereség 10",[m.xp1,m.xp2,m.xp3]);
@@ -110,6 +114,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(m.vett.ok&&m.vett.lvl===3&&m.vett.fizetett===m.vett.ar&&m.vett.ar>0,"pénzen: a következő szint a büdzséből",m.vett);
   ok(m.max===10&&m.elemzes.join()==="1,1,2,2,3,3,4","10. szint a plafon; elemzés meccsenként 1/2/3/4 (1., 4., 7., 10. szint)",m.elemzes);
   ok(m.kulcs3===3&&!m.negyedik,"egy irányba legfeljebb 3 pont",m);
+  ok(m.amit&&m.utolso,"3.9.303: „Amit csinál” — a meccs-magyarázat is az edzőé, az utolsó meccs gombjával",{amit:m.amit,utolso:m.utolso});
   if(kep){fs.mkdirSync(kep,{recursive:true});
     await p.evaluate(()=>{coach=COACHES.find(c=>c.n==="Jürgen Klopp");S.edzo=null;edzoXp(800);edzoPontTesz("rejtett");edzoPontTesz("kulcs");edzoPontTesz("kulcs");edzoPontTesz("ero");renderHubCoachPanel();
       const w=document.createElement("div");w.id="kepMenu";w.className="card";w.style.cssText="position:fixed;left:0;top:0;width:430px;z-index:99999;max-height:none";
