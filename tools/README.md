@@ -389,6 +389,14 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## forditas-kieses-3-9-311-proba.js — 🛟 fordítás, mégis kiesés: a lefújás nem akadhat el
+
+```
+node tools/forditas-kieses-3-9-311-proba.js     (MAX=40 — legfeljebb ennyi visszavágó)
+```
+
+* Valódi NYK-negyeddöntő visszavágók (első meccs 0:4) addig, amíg kétszer elő nem áll a „hátrányból pont, mégis kiesés" eset: a lefújás lefut, a lánc elindul, nincs meccs embere, nincs oldalhiba. Javítás nélkül a fullTime itt `active[-1]`-en hibára futott — ez akasztotta meg a guestet a nyári kupában.
+
 ## animacio-hang-3-9-310-proba.js — 🎬🔊 a jelenet saját hangja, a közvetítés utána
 
 ```
