@@ -78,9 +78,19 @@ const MAX=+(process.env.MAX||40);
       S.euro=JSON.parse(window._pillanat);mEloTorol();S.utoMeccs=null;_utoTartas=false;S.playing=false;
       window._lanc=0;window._sorok=[];
       document.querySelectorAll("section").forEach(x=>x.classList.add("hide"));showEuroScreen();});
-    for(const id of ["euroKickBtn","kickBtn","kickBtn"]){await p.evaluate(id=>{const x=$(id);if(x)x.click();},id);await p.waitForTimeout(250);}
+    /* a kezdőrúgás a valódi úton: „Irány a meccs" → „Felkészülés" → „Kezdőrúgás".
+       A gomb felirata dönti el, mi a következő lépés — egy átmenet közben
+       elnyelt kattintás így nem akasztja meg a próbát. */
+    await p.evaluate(()=>{const x=$("euroKickBtn");if(x)x.click();});await p.waitForTimeout(300);
+    for(let k=0;k<12;k++){
+      const all=await p.evaluate(()=>{
+        if(S.playing||window._sorok.some(t=>/^VÉGE/.test(t)))return "fut";
+        const kb=$("kickBtn");if(kb&&!kb.disabled)kb.click();
+        return kb?kb.textContent:"-";});
+      if(all==="fut")break;
+      await p.waitForTimeout(350);}
     const t0=Date.now();let r;
-    while(Date.now()-t0<60000){
+    while(Date.now()-t0<45000){
       await p.waitForTimeout(300);
       r=await p.evaluate(()=>{const S_=window._sorok;
         return {playing:S.playing,lanc:window._lanc,vege:S_.some(t=>/^VÉGE/.test(t)),
@@ -96,7 +106,8 @@ const MAX=+(process.env.MAX||40);
     const uj=errs.slice(e0);
     const jo=r.vege&&!r.playing&&r.lanc===1&&uj.length===0;
     if(!jo)rossz.push({i,...r,hiba:uj[0]||null});
-    if(r.ford&&r.kiesett){eset++;esetek.push({i,eredm:r.eredm,jo,mvp:r.mvp,hiba:uj[0]||null});}}
+    if(r.ford&&r.kiesett){eset++;esetek.push({i,eredm:r.eredm,jo,mvp:r.mvp,hiba:uj[0]||null});}
+    if(!jo)break;}   /* egy beragadt lefújás után a lap állapota már nem tiszta */
   console.log(`  ${db} visszavágó, ebből ${eset} „fordítás + kiesés"`);
   ok(eset>=1,"előállt a „fordítás, mégis kiesés” eset (a próba csak így bizonyít)",{db,eset});
   ok(esetek.length>0&&esetek.every(x=>x.jo&&!x.mvp),"a fordítás-esetben a lefújás lefut, a lánc elindul, nincs meccs embere és nincs hiba",esetek);
