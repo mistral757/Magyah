@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## nyar-igazolas-3-9-301-proba.js — 🌞 igazolás a teljes nyáron
+
+```
+node tools/nyar-igazolas-3-9-301-proba.js
+```
+
+* A nyári kupa közben (lezárt idény, a kupából nyitott HUB) az átigazolás nyitva; futó szezonban zárva, mint eddig.
+* A kirakatba tett játékosra a kupameccsek alatt is jön licit (meccsenként 2 forduló a várakozáson); kupán kívül a horog nem léptet.
+* A HUB fő gombja a kupából: „Vissza a kupához”.
+
 ## edzo-3-9-300-proba.js — 👔 az edző: arckép, szint, irányok, elemzés
 
 ```
