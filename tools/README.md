@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## edzo-kalauz-3-9-307-proba.js — 👔📖 az edző mint idegenvezető
+
+```
+node tools/edzo-kalauz-3-9-307-proba.js [kép-mappa]
+```
+
+* Az edző szava a ☰ Menü fölött: az 1. idény köszöntése a fejezetekkel (a csendes alapállapottal), egy újonnan megjelent menüelem → „Megnyílt valami új”, „Értem” → csend, a 2. idény eligazítása.
+* Az egy javaslat a tanító réteg legelső esedékes témája; „Mutasd” a vezetés saját útja, „›” lapoz.
+* A kalauz: 10 fejezet, a zártak 🔒-tel; minden nyitott lépés élő (id nélküli, inert) képet ad, a jelölők a képen belül; az utolsó „Értem” olvasottnak jelöl; az Edző menüből is nyílik; „Semmi” fokozatban a kártya rejtve; a mentés viszi.
+
 ## futtat.js — 🧪 a regressziós futtató (3.9.306)
 
 ```bash
