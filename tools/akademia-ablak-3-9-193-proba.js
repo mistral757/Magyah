@@ -179,7 +179,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(ws.every(i=>Math.abs((h[i]||0)-atl)<atl*0.12)&&Object.keys(h).every(k=>ws.includes(+k)),"az ajánlatok egyenletesen oszlanak a 7 ablak között",h);
   const kk=r.zsak.kih,ka=200/7;
   ok(r.zsak.egy,"Zsákbamacska: idényenként pontosan egy kihagyás",kk);
-  ok(ws.every(i=>(kk[i]||0)>ka*0.55&&(kk[i]||0)<ka*1.45),"…egyenletesen az ablakok között (nem az elején)",kk);
+  /* 3.9.306: a húzás seed nélküli; 200 idény / 7 ablak → ablakonként ~28,6, szórás ~4,95.
+     A régi ±45% csak ~2,7σ volt: 7 ablakon ~5% eséllyel magától bukott (a teljes
+     regresszióban meg is tette, {12:42}). ±60% ≈ 3,5σ — az „elejére tömörül" hibát
+     (pl. a 4. ablakban 60+) így is biztosan elkapja. */
+  ok(ws.every(i=>(kk[i]||0)>ka*0.4&&(kk[i]||0)<ka*1.6),"…egyenletesen az ablakok között (nem az elején)",kk);
   console.log("\n— 5. A PANEL —");
   ok(new RegExp("idén a "+r.panel.plan+"\\. forduló után garantáltan").test(r.panel.szoveg),"a beosztott forduló kiírva",r.panel);
   ok(JSON.stringify(r.hatra)==="[7,6,0]","a hátralévő ablakok száma pontos",r.hatra);

@@ -261,9 +261,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     r.j2=vezPushJelolt("meccs");
     /* a valódi ütem: az állapot megül, a sáv beúszik */
     _vezPushKulcs=null;_vezPushLat=0;
+    /* 3.9.306: legalább 2,8 mp (a megülés), utána legfeljebb 6 mp-ig lesi — párhuzamos
+       regresszióban, terhelt gépen a fix 2,8 mp kevés volt (önmagában mindig zöld) */
     await varj(2800);
     const el=document.getElementById("vezPush");
-    r.sav=!!el&&!el.classList.contains("hide")&&el.classList.contains("mpPingIn");
+    const latszik=()=>!!el&&!el.classList.contains("hide")&&el.classList.contains("mpPingIn");
+    for(let i=0;i<30&&!latszik();i++)await varj(200);
+    r.sav=latszik();
     r.savTx=el?el.textContent.replace(/\s+/g," "):"";
     r.pAt=teachTopicRec("proba:meccs").pAt===now;
     r.ujra=vezPushJelolt("meccs");
