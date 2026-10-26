@@ -19,8 +19,9 @@
    ideje. A teljes kimenet próbánként a naplómappába kerül (alapból
    /tmp/magyah-futtatas-<idő>/, vagy FUTTAT_KI=<mappa>).
 
-   PORTOK: a próba forrásából olvassa ki (`PORT=9306`). Két azonos portú
-   próba sosem fut egyszerre — a második megvárja az elsőt.
+   PORTOK: a próba forrásából olvassa ki — `PORT=…`, `listen(…)`, és az
+   URL-be égetett `127.0.0.1:…`. Két közös portú próba sosem fut egyszerre —
+   a második megvárja az elsőt.
 
    KÉPERNYŐKÉPEK: a próbák az icons/screenshots/ alá írnak. A futás végén a
    futtató visszaállítja a követett fájlokat (git checkout) és törli azokat
@@ -47,10 +48,19 @@ function verzioKulcs(f){
 let probak=fs.readdirSync(path.join(ROOT,"tools")).filter(f=>/proba.*\.js$/.test(f)).sort();
 if(MINTA.length)probak=probak.filter(f=>MINTA.some(m=>f.includes(m)));
 if(UJ>0)probak=probak.slice().sort((a,b)=>verzioKulcs(b)-verzioKulcs(a)||a.localeCompare(b)).slice(0,UJ);
-const port=f=>{try{const m=fs.readFileSync(path.join(ROOT,"tools",f),"utf8").match(/\bPORT\s*=\s*(\d{4,5})/);return m?m[1]:"egyedi:"+f;}catch(e){return "egyedi:"+f;}};
-const feladat=probak.map(f=>({f,port:port(f)}));
+/* MINDEN port, amit a próba használ: a `PORT=…` (akár `process.env.PORT||9260`
+   alakban), a `listen(8952…)`, és az URL-be égetett `127.0.0.1:8977` / `localhost:…`.
+   (Az első teljes körben a `PORT=` alak egymagában kevés volt: a régebbi próbák
+   egy része csak az URL-ben nevezi meg a portját, és két 8977-es egyszerre futott.) */
+const portok=f=>{
+  let src="";try{src=fs.readFileSync(path.join(ROOT,"tools",f),"utf8");}catch(e){return ["egyedi:"+f];}
+  const k=new Set();
+  for(const re of [/\bPORT\s*=\s*[^;\n]{0,40}?\b(\d{4,5})\b/g,/\.listen\(\s*(\d{4,5})/g,/(?:127\.0\.0\.1|localhost):(\d{4,5})\b/g])
+    for(const m of src.matchAll(re))k.add(m[1]);
+  return k.size?[...k]:["egyedi:"+f];};
+const feladat=probak.map(f=>({f,portok:portok(f)}));
 
-if(van("--lista")){feladat.forEach(x=>console.log(`${x.f}  (port ${x.port})`));console.log(`\n${feladat.length} próba`);process.exit(0);}
+if(van("--lista")){feladat.forEach(x=>console.log(`${x.f}  (port ${x.portok.join(", ")})`));console.log(`\n${feladat.length} próba`);process.exit(0);}
 if(!feladat.length){console.error("Nincs futtatandó próba (nézd meg a --minta / --uj szűrőt).");process.exit(1);}
 
 if(van("--check")){
@@ -102,11 +112,11 @@ function utemez(){
       if(kovetkezo>=feladat.length&&fut===0){kesz();return;}
       while(fut<J){
         /* a következő olyan feladat, aminek a portja szabad */
-        const i=feladat.findIndex((x,k)=>k>=kovetkezo&&!x.indult&&!foglalt.has(x.port));
+        const i=feladat.findIndex((x,k)=>k>=kovetkezo&&!x.indult&&x.portok.every(p=>!foglalt.has(p)));
         if(i<0)break;
-        const x=feladat[i];x.indult=true;foglalt.add(x.port);fut++;
+        const x=feladat[i];x.indult=true;x.portok.forEach(p=>foglalt.add(p));fut++;
         while(kovetkezo<feladat.length&&feladat[kovetkezo].indult)kovetkezo++;
-        indit(x).then(()=>{foglalt.delete(x.port);fut--;lep();});}};
+        indit(x).then(()=>{x.portok.forEach(p=>foglalt.delete(p));fut--;lep();});}};
     lep();});}
 
 (async()=>{

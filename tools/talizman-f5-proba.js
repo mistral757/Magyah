@@ -169,7 +169,10 @@ const kozel=(a,b,e)=>Math.abs(a-b)<=(e||1e-9);
     ki.forras={poss:/\+\(\(typeof talMeccsPoss==="function"\)\?talMeccsPoss\(\):0\);\}/.test(_all)&&/mstatPossAlap\(c\.diff,stl,grip,z,MOD\)/.test(_all),
       oppch:/poisson\(\(OPPCH_BASE\+la\*OPPCH_RATE\)\/18\*talMeccsOppCh\(\)\)/.test(src),
       /* 3.9.158: a Tizenegyes-hóhér kontrája ugyanide szoroz (*talHoherFkMult()) */
-      fk:/25,24\*talMeccsFkW\(\)(\*talHoherFkMult\(\))?\]/.test(src)&&/Math\.random\(\)<0\.35\+talMeccsFkPP\(\)/.test(src)};
+      /* 3.9.306: a 3.9.293 óta a kijelölt szabadrúgó (_grFk) is szoroz/beleszól — a
+         talizmán szorzója és pontos-rúgás-bónusza ugyanott marad */
+      fk:/25,24\*talMeccsFkW\(\)(\*talHoherFkMult\(\))?(\*\(_grFk\?[^\]]*\))?\]/.test(src)
+        &&/Math\.random\(\)<(0\.35|\(_grFk\?0\.28\+0\.17\*_grFk\.q:0\.35\))\+talMeccsFkPP\(\)/.test(src)};
     return ki;});
   console.log("\n— 6. MÁSODLAGOS CSATORNÁK —");
   ok(kozel(c.goalw.cs,c.goalw.vart)&&c.goalw.kp===1,"Csatárok: a csatár gólsúlya +3% × E, a kapusé nem",c.goalw);
