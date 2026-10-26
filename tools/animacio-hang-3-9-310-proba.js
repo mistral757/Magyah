@@ -126,7 +126,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       hangPuffer:_kozv.hangok.length,kozvHang:window._hl.filter(x=>!/^a[A-Z]/.test(x[1])).map(x=>x[1])};
     await _var();await new Promise(r=>setTimeout(r,900));
     const utolsoJel=Math.max(0,...window._hl.filter(x=>/^a[A-Z]/.test(x[1])).map(x=>x[0]));
-    const kozv=window._hl.filter(x=>!/^a[A-Z]/.test(x[1]));
+    /* 3.9.312: a gól hangja a jelenet DÖNTŐ PILLANATÁBAN szól (a hálónál) —
+       az a jelenet része, nem a közvetítésé */
+    const kozv=window._hl.filter(x=>!/^a[A-Z]/.test(x[1])&&x[1]!=="gol");
     const tx=[...L.children].slice(n0).map(d=>d.textContent);
     mevVege();S.playing=false;evaIdoSzorzo=1;
     return {kozben,utana:{sorKint:tx.length,tx,puffer:_kozv.sorok.length,
