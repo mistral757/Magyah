@@ -389,6 +389,14 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## vedohalo-3-9-309-proba.js — 🛟 a lefújás utáni lánc nem állhat meg némán
+
+```
+node tools/vedohalo-3-9-309-proba.js
+```
+
+* Hibát erőltetve: a mérleg-ablak rajzolási hibánál is kinyílik, és a bezárása továbbviszi a láncot; a „meccsről meccsre” ágban a kupa léptetési hibája után a kupa-nézet jön elő; a már futó kör-lezárás újabb hívása a várakozó réteget mutatja.
+
 ## nyari-kupa-nem-var-3-9-308-proba.js — 🟠 a nyári kupa nem vár a társra, ha neki nincs
 
 ```
