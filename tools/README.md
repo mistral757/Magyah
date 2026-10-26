@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## kupa-meccshez-3-9-304-proba.js — ⚽ kupameccs: „Irány a meccs"
+
+```
+node tools/kupa-meccshez-3-9-304-proba.js
+```
+
+* A kupa-képernyő gombja „Irány a meccs": a bajnoki meccsnézet nyílik (meccs nem indul), a végigjátszás rejtve, „Vissza a kupa-táblához" és az edzői elemzés látszik.
+* A kezdőrúgás két lépésben: 🔍 Felkészülés → ⚽ Kezdőrúgás; az elemzés a kupameccsre szól.
+* A végigjátszás és a meccsről-meccsre lánc egyenesen indít.
+
 ## mezony-novekedes-3-9-302-proba.js — 📈 a mezőny idény közbeni erősödése (2. szerződés)
 
 ```
