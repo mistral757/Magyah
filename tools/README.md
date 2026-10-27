@@ -389,6 +389,15 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## osztott-nehezseg-3-9-316-proba.js — ⚖️ nagy különbségnél: maradunk / befejezzük / osztott nehézség
+
+```
+node tools/osztott-nehezseg-3-9-316-proba.js
+```
+
+* A közös kezdőkapunál −2/+2 fölötti becsült résnél a felajánlás (tükörszimmetrikus becslés, régi társnál nincs); csak egyező választás dönt.
+* Osztott nehézség: a lemaradó a legkönnyebb, az elöl álló a legnehezebb célrést kapja; a saját bajnoki meccseken az ellenfél eltolása pontosan a célra hozza a rést, a közös világ szintje (a tabella) nem mozdul, párharcban/kupában nem hat. „Befejezzük": győzött az erősebb, új közös idény nem indul.
+
 ## arc-stylist-3-9-315-proba.js — 🧑✂️🌍 frizurák, arcformák, arcvonás-pörgetés, stylist-mód
 
 ```
