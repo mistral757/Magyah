@@ -389,6 +389,17 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## mez-stylist-3-9-320-proba.js — 🎽 a meccs előtti mez-ablak (stylist-mód)
+
+```
+node tools/mez-stylist-3-9-320-proba.js
+```
+
+* A kapcsoló csak stylist-módban látszik; bekapcsolva minden saját meccs kezdőrúgása előtt felugrik az ablak (akkor is, ha a csapatnak már van meze), a „Most nem" továbbenged; automatikus végigjátszásnál nincs.
+* A mentés azonnal hat (az ellenfél meze mindenhol a beállított, ütközésnél a váltómeze), és a stylist/<uid>/ ágra megy (v:2, „mez:" név); a „vissza a sorsoltra" töröl.
+* Két szint: a klub minden szezonja vagy csak egy klub-szezon; a klub-szezoné elsőbb, a többi szezonon a klubé marad; a szezon saját mezének törlése után a klubé jön vissza.
+* A napi beépítő a MEZ-ALAP blokkba teszi (kulcs szerint, név nélkül, szűrve), a betöltött játék ezt használja; az üres bejegyzés kiveszi.
+
 ## klub-megerosites-3-9-319-proba.js — ✋ kész csapat: rákérdezés a választáskor
 
 ```
