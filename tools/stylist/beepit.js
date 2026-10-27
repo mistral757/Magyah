@@ -109,7 +109,17 @@ function mezSzabaly(src){
   const lista=nev=>{const m=new RegExp(`const ${nev}=\\[([\\s\\S]*?)\\];`).exec(src);
     if(!m)throw new Error(`Nem találom a ${nev} listát.`);
     const out=[];const re=/\{k:"([a-z]+)"/g;let x;while((x=re.exec(m[1])))out.push(x[1]);return out;};
-  return {pat:lista("KIT_PATTERNS"),sleeve:lista("KIT_SLEEVES"),collar:lista("KIT_COLLARS")};}
+  return {pat:lista("KIT_PATTERNS"),sleeve:lista("KIT_SLEEVES"),collar:lista("KIT_COLLARS"),
+          jelHely:lista("KIT_JEL_HELYEK")};}
+/* 🔣 egy jel a mezen (3.9.321) — ugyanaz a szabály, mint a játék kitJelTisztit-je:
+   egyetlen graféma, vezérlő- és HTML-jelek nélkül */
+function jelTisztit(v){
+  const t=String(v==null?"":v).replace(/[\u0000-\u001f\u007f<>&"'`\\]/g,"").trim();
+  if(!t)return "";
+  let g="";
+  try{const it=new Intl.Segmenter(undefined,{granularity:"grapheme"}).segment(t)[Symbol.iterator]().next();g=it.done?"":String(it.value.segment);}catch(e){g="";}
+  if(!g)g=Array.from(t)[0]||"";
+  return (g.trim()&&g.length<=24)?g:"";}
 function mezTisztit(k,MS){
   if(!k||typeof k!=="object"||Array.isArray(k))return null;
   const hex=v=>(typeof v==="string"&&/^#[0-9a-fA-F]{6}$/.test(v))?v.toLowerCase():null;
@@ -117,6 +127,8 @@ function mezTisztit(k,MS){
     pat:MS.pat.includes(k.pat)?k.pat:"solid",sleeve:MS.sleeve.includes(k.sleeve)?k.sleeve:"same",collar:MS.collar.includes(k.collar)?k.collar:"crew"};
   if(!o.c1||!o.c2)return null;
   if(!o.ink)o.ink="#ffffff";
+  const j=jelTisztit(k.jel);
+  if(j){o.jel=j;o.jelHely=MS.jelHely.includes(k.jelHely)?k.jelHely:"mellb";}
   return o;}
 function blokkIr(tabla){
   const k=Object.keys(tabla).sort((x,y)=>x.localeCompare(y,"hu"));

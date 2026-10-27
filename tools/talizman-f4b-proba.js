@@ -69,8 +69,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     if(captainIdx<0)captainIdx=0;if(!coach)coach=COACHES[0];
     phase="season";S.seasonNumber=3;S.idx=5;S.tal=null;
     addLine=()=>{};   /* a napló itt zaj — a próba az állapotot méri */
+    /* 3.9.321 óta minden esemény alapból a pakliban van: a próba úgy szűkít egy
+       eseményre, hogy a TÖBBIT „idén már kijött"-re állítja */
     window._pakli=ids=>{
       S.tal=null;const T=talState();
+      TAL_ESEMENY.forEach(e=>{if(ids.indexOf(e.id)<0)T.esemenyek[e.id]={utolso:S.seasonNumber||1};});
       ids.forEach(id=>{T.esemenyek[id]={szezon:3,suly:1,uid:1};});
       return T;};
     /* a valódi sorsolás, a hátsó sávra kényszerítve: a TRANSFER_TYPES súlya
@@ -98,27 +101,28 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.forras=/\.concat\(_talEs\)\)?;/.test(twResolvePhase2.toString());
     return ki;});
   console.log("\n— 1. SEMLEGES —");
-  ok(n.ures===0&&n.talNincs&&n.csomagNelkul===0,"talizmán és csomag nélkül a pakli üres, és az olvasás nem hoz létre állapotot",n);
+  ok(n.ures===16&&n.talNincs&&n.csomagNelkul===16,"3.9.321: talizmán nélkül is mind a 16 esemény a pakliban, és az olvasás nem hoz létre állapotot",n);
   ok(n.olvasok.join()==="1,1,false","a fejlődés-, a bér- és a pályazár-olvasó semleges",n.olvasok);
-  ok(n.forras,"a pakli a hátsó sáv tömbjének VÉGÉRE fűződik (üresen a sorsolás betűre a régi)");
+  ok(n.forras,"a pakli a hátsó sáv tömbjének VÉGÉRE fűződik");
 
   /* ---- 2. A PAKLI ---- */
   const pk=await p.evaluate(()=>{
     const ki={};
     const T=_pakli(["fiatalodas","hirnevmamor","igazgatosag"]);
-    T.esemenyek.fiatalodas.suly=2;
+    /* 🃏 3.9.321 — egy ezüst Joker-lap kiemeli a fiatalodást (×5,2: 0,25 → 1,3) */
+    T.lapok.push({uid:77,kat:"joker",valt:"csomag",rang:2,dobas:0.5,spec:null,csomag:["fiatalodas"]});
     /* egy még nem bekötött esemény — 3.9.146 óta mind a 16 működik, ezért a
        szűrőt egy ideiglenesen „kikapcsolt" eseménnyel mérjük */
     const _ig=TAL_ES_IMPL.igazgatosag;delete TAL_ES_IMPL.igazgatosag;
-    ki.elotte=talEsemenyPakli().map(x=>x.tal+":"+x.weight);
+    ki.elotte=talEsemenyPakli().map(x=>x.tal+":"+Math.round(x.weight*100)/100);
     TAL_ES_IMPL.igazgatosag=_ig;
     T.esemenyek.fiatalodas.utolso=3;
     ki.utana=talEsemenyPakli().map(x=>x.tal);
     ki.mukodik=TAL_ESEMENY.map(e=>talEsemenyMukodik(e.id));
     return ki;});
   console.log("\n— 2. A PAKLI —");
-  ok(pk.elotte.join()==="fiatalodas:2,hirnevmamor:1","a működő események a súlyukkal; egy még nem bekötött esemény kimarad",pk.elotte);
-  ok(pk.utana.join()==="hirnevmamor,igazgatosag","ami idén már kijött, az idényre kiesik",pk.utana);
+  ok(pk.elotte.join()==="fiatalodas:1.3,hirnevmamor:0.25","az alap súly 0,25, a Joker-lap kiemelése ×5,2 (ezüst); egy nem bekötött esemény kimarad",pk.elotte);
+  ok(pk.utana.slice().sort().join()==="hirnevmamor,igazgatosag","ami idén már kijött, az idényre kiesik",pk.utana);
   ok(pk.mukodik.length===16&&pk.mukodik.every(x=>x),"mind a 16 esemény működik (3.9.146 óta az igazgatóság, a szponzor és a sztárvilág is)",pk.mukodik);
 
   /* ---- 3. A VALÓDI SORSOLÁS — AZONNALI ESEMÉNYEK ---- */
@@ -335,23 +339,23 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const ki={};
     const T=_pakli(["hirnevmamor","igazgatosag","ado"]);
     T.esemenyek.ado.utolso=3;
+    T.lapok.push({uid:78,kat:"joker",valt:"csomag",rang:1,dobas:0.5,spec:null,csomag:["edzotabor","nyiltnap","turne","ado"]});
     T.esHat={mamor:{n:_xi()[3].n,hatra:7,pad:1,m:0},palyazar:1,ber:{[_xi()[4].n]:{m:1.5,szezon:3}}};
     const _ig=TAL_ES_IMPL.igazgatosag,_sp=TAL_ES_IMPL.szponzor;
     delete TAL_ES_IMPL.igazgatosag;delete TAL_ES_IMPL.szponzor;
     talMenuOpen();
     ki.t=$("talHatas").textContent;
     talMenuClose();
-    const L={uid:9,kat:"joker",valt:"csomag",rang:2,dobas:0.5,spec:null,csomag:["tekozlo","turne","szponzor"]};
+    const L={uid:9,kat:"joker",valt:"csomag",rang:2,dobas:0.5,spec:null,csomag:["tekozlo","turne","szponzor","botrany"]};
     ki.lap=talAlapSzoveg(L);
     TAL_ES_IMPL.igazgatosag=_ig;TAL_ES_IMPL.szponzor=_sp;
     ki.lapMind=talAlapSzoveg(L);
     ki.aktiv=talAlapAktiv(L);
     return ki;});
   console.log("\n— 8. MENÜ ÉS LAP —");
-  ok(/Igazgatósági ülés ⏳/.test(mn.t)&&/Adóellenőrzés ✓/.test(mn.t)&&/idén már kijött/.test(mn.t),"a menüben: ✓ idén már kijött, ⏳ később kapcsol be",mn.t.slice(0,300));
+  ok(/Joker-lapjaid kiemelik/.test(mn.t)&&/Adóellenőrzés ×4 ✓/.test(mn.t)&&/idén már kijött/.test(mn.t)&&/mind a 16 esemény/.test(mn.t),"a menüben: a Joker-kiemelések a szorzóval, ✓ idén már kijött",mn.t.slice(0,400));
   ok(/Hírnév-mámor/.test(mn.t)&&/1\/3/.test(mn.t)&&/Pályazár: még 1/.test(mn.t)&&/bére \+50%/.test(mn.t),"a futó hatások a menüben: mámor (pad 1/3), pályazár, béremelés",mn.t.slice(-400));
-  ok(/Mezszponzor ⏳/.test(mn.lap)&&!/tékozló fiú ⏳/.test(mn.lap)&&mn.aktiv,"a lapon a még nem működő esemény ⏳ — és az Eseménycsomag alaphatása él",mn.lap);
-  ok(!/⏳/.test(mn.lapMind),"ha mind működik, a lapon nincs ⏳",mn.lapMind);
+  ok(/×5,2/.test(mn.lapMind)&&/✦ 🔁 A tékozló fiú/.test(mn.lapMind)&&/negatív oldala: ✖ 📸 Öltözői botrány/.test(mn.lapMind)&&mn.aktiv,"a lapon a három kiemelt jó és a negatív oldal rossz eseménye, a szorzóval — és az alaphatás él",mn.lapMind);
 
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();

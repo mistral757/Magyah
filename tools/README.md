@@ -389,6 +389,18 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## mez-jel-esemeny-3-9-321-proba.js — 🃏🔣 minden esemény a pakliban, jel a mezen, mezszponzor-jel
+
+```
+node tools/mez-jel-esemeny-3-9-321-proba.js
+```
+
+* Talizmán nélkül is mind a 16 átigazolási esemény a pakliban, alapsúlyon (0,25); a Joker „Esemény-kiemelés" lapja 3 jó + 1 rossz eseményt emel ki (a ritkasággal ×4–×10), a többi alapsúlyon marad; az égetett lap már nem emel ki.
+* A jel-tisztító egy grafémát hagy (zászló, bőrszínes és ZWJ-emoji egyben), a HTML-jeleket kidobja.
+* A jel a mezen a választott helyen rajzolódik (7 hely, alap: bal mell); a szerkesztőben beírható, a mentés megőrzi, a pályakép hordja, a „Nincs jel" törli; a stylist mez-ablakban is, a mentett ellenfél-mez viszi.
+* A mezszponzor negyedik ajánlata: a cég jele a mezünkön (a kért helyen, a saját jel helyett, a kapusmezen is), meccsenként fizet, a kötbér számol vele, lejárat után a saját jel jön vissza.
+* A szponzorszín-szerződés az ablak-díj után is él (régi hiba), az elrontott mentés helyreáll.
+
 ## mez-stylist-3-9-320-proba.js — 🎽 a meccs előtti mez-ablak (stylist-mód)
 
 ```
