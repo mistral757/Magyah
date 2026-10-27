@@ -180,6 +180,9 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
     const o={};
     const gap=()=>{msRatedBegin();try{return Math.round(levelGap()*10)/10;}finally{msRatedEnd();}};
     const rec=pyrFloorHist()[5];S.idx=15;
+    /* 🎯 3.9.318 — az új karrier a folyamatos rés-követéssel fut (az váltja a
+       telet); a téli felmérést a régi szerződés idényén mérjük */
+    delete rec.kov;
     {const kell=(rec.cel+0.5+3)-gap();pyrShiftWorld({divs:S.pyr.divs},kell);oppTargetRating=pyrLevel();}
     o.elotte=gap();o.cel=rec.cel;o.want=rec.want;
     o.m=pyrFloorMid();

@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## boost-plafon-3-9-318-proba.js — 🧮🎯 boost-plafon, folyamatos rés-követés, boost-adósság
+
+```
+node tools/boost-plafon-3-9-318-proba.js
+```
+
+* Plafon: egy boost a Ratinget legfeljebb 11 × min(1% × kezdő 11, 1,5) ponttal emeli (legalább +12); a 298-as öreg róka 350-es mezőnyben 314 (+16); a csúcs nem ugrik el, a POT hozzá igazodik; idényváltáskor sincs utólagos ugrás; az idény 2. boostja ugyanazon a játékoson ×0,7; az egyenlítő kivétel (a célszám a csoport legjobbja alatt marad); a karrier eleje változatlan; a sima boost ára az egység 0,335-e.
+* Követés: a kezdőrúgás indítja (rajt, várt növekedés, tűrés), a téli felmérés helyett 5 fordulónként a várt pályához mér és fokozatosan emel; a kezdőrúgás utáni boost fele adósság (a motor és a kijelzés ugyanannyit lát); kupában/osztályozóban nem hat; a záró rés a kompenzáció nélkül mér; a beárazható növekedés teteje 20.
+* Futó karrierben a nyári célrés-ablakban kapcsolható be, közös karrierben csak mindkét rekorddal; a mérő a boostokat és a követés lépéseit is naplózza.
+
 ## osztott-nehezseg-3-9-316-proba.js — ⚖️ nagy különbségnél: maradunk / befejezzük / osztott nehézség
 
 ```
@@ -1348,7 +1358,7 @@ kimenet kerülhet. Az adatkészlet a `tools/meres/adat/` mappában van.
 ## meres/osszegez.js — a mérési napló összegzője
 
 ```bash
-node tools/meres/osszegez.js <fájl.json> [további fájlok…] [--csv kimenet.csv] [--meccsek meccsek.csv]
+node tools/meres/osszegez.js <fájl.json> [további fájlok…] [--csv kimenet.csv] [--meccsek meccsek.csv] [--boostok boostok.csv]
 ```
 
 * **Bemenet:** a játék letöltése, a Firebase-konzol exportja vagy egyetlen napló.
@@ -1356,6 +1366,8 @@ node tools/meres/osszegez.js <fájl.json> [további fájlok…] [--csv kimenet.c
 * **`--meccsek` (3.9.220):** meccsenként egy sor, minden idényből.
   * Oszlopok: ⚡ és az ellenfélé, különbség, a motor `d`/`lf`/`la` értéke, rangadó, lapok.
   * A `mot` a motor nemzedéke: 1 = 3.9.219-ig, 2 = 3.9.220-tól.
+* **`--boostok` (3.9.318):** boostonként egy sor: fajta, forduló, nyár, a játékos előtte/utána, a 🧮 plafon és a levágott rész, a kezdő 11-re eső hatás, a boost-adósság.
+* **Az összefoglalóban (3.9.318):** idényenként a boostok fajtánként és a 🎯 rés-követés (rajt, várt növekedés, emelések, adósság).
 
 ## pixel-elet-3-9-204-proba.js — 🕹️ 3.9.204: a Pixel téma saját élete
 

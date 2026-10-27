@@ -115,7 +115,7 @@ function nevtelenit(x){
   /* az összegző ugyanabból a fájlból */
   const osz=path.join(__dirname,"osszegez.js");
   let txt="";
-  try{txt=execFileSync(process.execPath,[osz,fo,"--csv",path.join(KI,"idenyek.csv"),"--meccsek",path.join(KI,"meccsek.csv")],
+  try{txt=execFileSync(process.execPath,[osz,fo,"--csv",path.join(KI,"idenyek.csv"),"--meccsek",path.join(KI,"meccsek.csv"),"--boostok",path.join(KI,"boostok.csv")],
     {encoding:"utf8",maxBuffer:64*1024*1024});}
   catch(e){txt="(az összegző hibára futott: "+String(e.message).slice(0,300)+")\n"+(e.stdout||"");}
   fs.writeFileSync(path.join(KI,"osszegzes.txt"),txt);
@@ -130,7 +130,7 @@ function nevtelenit(x){
     +`| | |\n|---|---|\n|játékos (névtelen)|${jatekosok.size}|\n|karrier|${karrierek.length}|\n|idény|${idenyek}|\n|meccs-sor|${meccsek}|\n`
     +(hibas?`|olvashatatlan rekord|${hibas}|\n`:"")
     +`\nA legutóbbi feltöltés: ${karrierek.reduce((a,k)=>k.feltoltve&&k.feltoltve>a?k.feltoltve:a,"")||"—"}.\n\n`
-    +`Fájlok: \`meres-firebase.json\` (a teljes, névtelenített napló), \`osszegzes.txt\`, \`idenyek.csv\`, \`meccsek.csv\`.\n`
-    +`Újragenerálás: \`node tools/meres/osszegez.js meres-firebase.json --csv idenyek.csv --meccsek meccsek.csv\`.\n`);
+    +`Fájlok: \`meres-firebase.json\` (a teljes, névtelenített napló), \`osszegzes.txt\`, \`idenyek.csv\`, \`meccsek.csv\`, \`boostok.csv\` (3.9.318-tól).\n`
+    +`Újragenerálás: \`node tools/meres/osszegez.js meres-firebase.json --csv idenyek.csv --meccsek meccsek.csv --boostok boostok.csv\`.\n`);
   console.log(`✓ ${jatekosok.size} játékos · ${karrierek.length} karrier · ${idenyek} idény · ${meccsek} meccs-sor${hibas?` · ${hibas} olvashatatlan`:""} → ${KI}`);
 })().catch(e=>{console.error("✗ "+e.message);process.exit(1);});

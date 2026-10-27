@@ -20,7 +20,11 @@
    ellenfélé (+ a különbség), a motor különbsége pályával (d), a két
    gólvárhatóság (lf/la), kiemelt meccs (riv/hajra), a lapok, és a MOTOR
    NEMZEDÉKE (mot: 1 = 3.9.219-ig, 2 = 3.9.220-tól; a régi sorokban hiányzik,
-   az 1-es). Így a motorváltás előtti és utáni adat szétválasztható. */
+   az 1-es). Így a motorváltás előtti és utáni adat szétválasztható.
+
+   --boostok kimenet.csv (3.9.318): BOOSTONKÉNTI CSV — fajta, forduló, nyár,
+   a játékos előtte/utána (Rating, csúcs, POT), a 🧮 plafon és a levágott
+   rész, a kezdő 11-re eső hatás, a boost-adósság, a mezőnyszám. */
 "use strict";
 const fs=require("fs");
 const args=process.argv.slice(2);
@@ -28,7 +32,9 @@ const csvI=args.indexOf("--csv");
 const csvOut=csvI>=0?args[csvI+1]:null;
 const mI=args.indexOf("--meccsek");
 const meccsOut=mI>=0?args[mI+1]:null;
-const fajlok=args.filter((a,i)=>a!=="--csv"&&a!=="--meccsek"&&!(csvI>=0&&i===csvI+1)&&!(mI>=0&&i===mI+1));
+const bI=args.indexOf("--boostok");
+const boostOut=bI>=0?args[bI+1]:null;
+const fajlok=args.filter((a,i)=>a!=="--csv"&&a!=="--meccsek"&&a!=="--boostok"&&!(csvI>=0&&i===csvI+1)&&!(mI>=0&&i===mI+1)&&!(bI>=0&&i===bI+1));
 if(!fajlok.length){console.error("Használat: node tools/meres/osszegez.js <fájl.json> [--csv kimenet.csv]");process.exit(1);}
 /* minden bemeneti alakból a napló-objektumok listája */
 function naplok(obj){
@@ -50,7 +56,7 @@ fajlok.forEach(f=>{try{mind=mind.concat(naplok(JSON.parse(fs.readFileSync(f,"utf
 const byId={};mind.forEach(r=>{if(!byId[r.id]||(r.sz||[]).length>(byId[r.id].sz||[]).length)byId[r.id]=r;});
 mind=Object.values(byId);
 console.log(`📈 ${mind.length} karrier\n`);
-const sorok=[],meccsek=[];
+const sorok=[],meccsek=[],boostok=[];
 mind.forEach(r=>{
   const b=r.beall||{},k0=r.keret0||[];
   const xi=k0.filter(p=>p.hol==="xi");
@@ -79,6 +85,17 @@ mind.forEach(r=>{
       ml.forEach(x=>meccsek.push({karrier:r.id,idény:z.sz,oszt:oszt!=null?oszt:"",i:x.i,sorozat:x.k,hazai:x.h,gf:x.gf,ga:x.ga,
         ms:x.ms,oMs:x.oMs,kul:(x.ms!=null&&x.oMs!=null)?Math.round((x.ms-x.oMs)*10)/10:"",
         d:x.d!=null?x.d:"",lf:x.lf!=null?x.lf:"",la:x.la!=null?x.la:"",nagy:x.nagy||"",piros:x.r||0,oPiros:x.or||0,mot:x.mot||1}));}
+    /* 🧮 3.9.318 — a boostok (fajtánként: darab, átlagos Rating-ugrás, a plafon levágása, adósság) */
+    const bl=Array.isArray(z.boost)?z.boost:[];
+    if(bl.length){
+      const fajta={};bl.forEach(x=>{(fajta[x.k]=fajta[x.k]||[]).push(x);});
+      console.log(`      boostok: ${bl.length} · `+Object.entries(fajta).map(([k,l])=>`${k} ${l.length} (átl. +${fmt(atl(l.map(x=>x.dR)))} R, levágva ${fmt(atl(l.map(x=>x.levR||0)))})`).join(", ")
+        +` · kezdő 11-re összesen +${fmt(bl.reduce((a,x)=>a+(x.dXi||0),0))} · adósság ${fmt(bl.reduce((a,x)=>a+(x.ad||0),0))}`);
+      bl.forEach(x=>boostok.push({karrier:r.id,idény:z.sz,i:x.i,nyar:x.nyar,fajta:x.k,pos:x.pos||"",kor:x.age,r0:x.r0,r1:x.r1,dR:x.dR,pk0:x.pk0,pk1:x.pk1,
+        pot0:x.pot0,pot1:x.pot1,plafon:x.cap,levR:x.levR||0,levPk:x.levPk||0,xi:x.xi,dXi:x.dXi,adossag:x.ad||0,ismet:x.n,mezony:x.mezony,inf:x.inf}));}
+    /* 🎯 3.9.318 — a folyamatos rés-követés */
+    const kv=z.padlo&&z.padlo.kovet;
+    if(kv)console.log(`      rés-követés: rajt ${fmt(kv.rajt)} · várt növekedés ${fmt(kv.dgB)} · tűrés ${fmt(kv.tur)} · emelések ${(kv.emel||[]).map(x=>x.f+".: +"+fmt(x.amt)).join(" ")||"—"} · boost-adósság ${fmt(kv.ad)} (${kv.adDb||0} boost)`);
     console.log(`      érkezők: ${z.erk?erkSz:"— (a mentés nem tudja)"} · távozók: ${z.tav?z.tav.length:"—"}${z.eladas?` · eladás: ${z.eladas.db} fő, ${fmt(z.eladas.osszeg)}`:""}${z.folyamatban?` · FOLYAMATBAN (${z.folyamatban.fordulo}. forduló)`:""}`);
     sorok.push({karrier:r.id,forras:r.forras||"meres",csapat:r.csapat,app:b.app||r.app0,mod:b.mod,tempo:b.tempo,alap:b.ratingAlap,magyah:b.magyah?1:0,
       sebesseg:P.sebesseg||"",nehezseg:P.nehezseg||"",res:P.rés,
@@ -98,6 +115,9 @@ const irCsv=(f,rows)=>{
 if(meccsOut){
   if(meccsek.length){irCsv(meccsOut,meccsek);console.log(`✓ meccsenkénti CSV: ${meccsOut} (${meccsek.length} sor)`);}
   else console.log("ℹ️ nincs meccsenkénti sor a naplókban");}
+if(boostOut){
+  if(boostok.length){irCsv(boostOut,boostok);console.log(`✓ boostonkénti CSV: ${boostOut} (${boostok.length} sor)`);}
+  else console.log("ℹ️ nincs boost-sor a naplókban (3.9.318 előtti napló)");}
 if(csvOut&&sorok.length){
   const fej=Object.keys(sorok[0]);
   const esc=v=>{const s=v==null?"":String(v);return /[",;\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;};
