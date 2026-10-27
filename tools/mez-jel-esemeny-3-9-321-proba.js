@@ -24,7 +24,8 @@
         a lejárat után a saját jel visszajön;
      7. a szponzorszín-szerződés az ablak-díj után is él (régi hiba), és a
         már elrontott mentés helyreáll;
-     8. nincs oldalhiba. */
+     8. a mez eleje vagy hátulja az animációkban (arculat, 6. szakasz);
+     9. nincs oldalhiba. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT=process.env.MROOT||"/home/user/Magyah", PORT=9321;
@@ -221,7 +222,36 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r7.egyszer===1000&&r7.el&&r7.utolso===(await p.evaluate(()=>S.seasonNumber||1))+1,"az ablak-díj egyszer jár, és a szerződés él tovább",r7);
   ok(r7.helyreall&&r7.nemDuplaz===0,"az elrontott mentés helyreáll, a már kifizetett ablak nem fizet újra",r7);
 
-  console.log("— 8. oldalhibák —");
+  console.log("— 8. a mez eleje vagy hátulja az animációkban —");
+  const r8=await p.evaluate(()=>{
+    const o={};
+    o.alap=animHatul();
+    const k={c1:"#c8102e",c2:"#ffffff",pat:"solid",collar:"crew",ink:"#ffffff",jel:"🦁",jelHely:"mellb"};
+    const jp={n:"Teszt Elek",nat:"HU",age:25};
+    const elol=evaFigura("pf1",evaFig(jp,k,.5),k,50,50,1);
+    o.elolJel=/data-evajel="mellb"/.test(elol)&&elol.includes("🦁")&&!/data-evaszam/.test(elol);
+    identOpenPanel();
+    o.gombok=!!document.getElementById("identAnimEleje")&&!!document.getElementById("identAnimHatul");
+    document.getElementById("identAnimHatul").click();
+    o.be=animHatul()&&identState().animHatul===true;
+    o.gombSel=document.getElementById("identAnimHatul").classList.contains("on");
+    _identDraft=null;
+    const F=evaFig(jp,k,.5);
+    const hat=evaFigura("pf2",F,k,50,50,1);
+    o.hatSzam=/data-evaszam/.test(hat)&&!/data-evajel/.test(hat)&&F.hatul===true&&typeof F.num==="number";
+    o.fejMas=F.fej!==evaFig(jp,k,.5).fej?"cache-hiba":(F.fej!==(()=>{identState().animHatul=false;const u=evaFig(jp,k,.5).fej;identState().animHatul=true;return u;})());
+    const svg=faceSVG(jp,60,{kit:k,bg:false,csakFej:true,hatul:true});
+    o.nincsSzem=!/#fbfbf8/.test(svg);
+    o.kapusEgy=evaMezSzam({n:"Ellenfél kapusa"})===1;
+    o.stabil=evaMezSzam({n:"Valaki"})===evaMezSzam({n:"Valaki"});
+    animHatulSet(false);o.ki=!animHatul();
+    return o;});
+  ok(r8.alap===false&&r8.elolJel,"alapból elölről: arc, a mellen a jel, szám nélkül",r8);
+  ok(r8.gombok&&r8.be&&r8.gombSel,"az arculat 6. szakaszában kapcsolható, azonnal érvényes",r8);
+  ok(r8.hatSzam&&r8.fejMas===true&&r8.nincsSzem,"hátulról: tarkó (szemek nélkül), a háton a szám, jel nélkül",r8);
+  ok(r8.kapusEgy&&r8.stabil&&r8.ki,"az ellenfél kapusa 1-es, a többi szám névből stabil; visszakapcsolható",r8);
+
+  console.log("— 9. oldalhibák —");
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,5));
   await b.close();srv.close();
   console.log(hiba?`✗ ${hiba} hiba`:"✓ minden rendben");

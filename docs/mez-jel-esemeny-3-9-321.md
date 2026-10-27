@@ -128,9 +128,38 @@ első kifizetés (a 8. forduló) után csendben megszűnt: nem fizetett tovább,
   szerződés hosszából áll vissza;
 * a már kifizetett ablak nem fizet újra.
 
+## 6. Eleje vagy hátulja az animációkban (3.9.322)
+
+> „a csapat arculatánál lehessen beállítani, hogy a meccseken az animációkban
+> a mezek eleje vagy hátulja látszódjon. (Azaz az új cucc, amit a mezre lehet
+> tenni, az természetesen az elejére kerüljön.)"
+
+**A kapcsoló** a klub arculatának 6. szakaszában van („Mit mutasson a
+pályakép"). Azonnal érvényes, és a mentéssel megmarad (`S.ident.animHatul`).
+
+**Elölről** (ez az alap, a régi kép):
+
+* a figurák arca látszik;
+* a mez mellén a jel ül, ugyanazon a helyen, mint a mezrajzon;
+* mezszponzornál a szponzor jele.
+
+**Hátulról:**
+
+* **A fej:** tarkó és haj, arc nélkül. A kopasz fej bőr marad, a kopaszodónál
+  csak a „patkó" látszik. Az irokéz egy csík, az undercut alul felnyírt. A
+  hosszú haj a nyakra omlik.
+* **A mez hátán a mezszám:**
+  * a mieinknél a valódi mezszám;
+  * az ellenfél kapusánál 1-es;
+  * az ellenfél többi játékosánál a névből adott szám, ami mindig ugyanaz.
+* **A jel nem látszik**, mert az a mez elején van.
+
+**Hatókör:** minden figurára hat, a saját csapatra és az ellenfélre is. A
+feliratsáv portréja továbbra is szemből mutatja az arcot.
+
 ## Próba
 
-`tools/mez-jel-esemeny-3-9-321-proba.js` (24 állítás):
+`tools/mez-jel-esemeny-3-9-321-proba.js` (32 állítás):
 
 * a pakli talizmán nélkül;
 * a Joker-kiemelés és az égetés;
@@ -138,6 +167,7 @@ első kifizetés (a 8. forduló) után csendben megszűnt: nem fizetett tovább,
 * a jel a mezen, a szerkesztőben és a stylist-ablakban;
 * a mezszponzor jele (ajánlat, mez, fizetés, kötbér, lejárat);
 * a szponzorszín-hiba és a helyreállítás;
+* elölről és hátulról az animációkban;
 * oldalhibák.
 
 **Az igazított régi próbák:**

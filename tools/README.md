@@ -400,6 +400,7 @@ node tools/mez-jel-esemeny-3-9-321-proba.js
 * A jel a mezen a választott helyen rajzolódik (7 hely, alap: bal mell); a szerkesztőben beírható, a mentés megőrzi, a pályakép hordja, a „Nincs jel" törli; a stylist mez-ablakban is, a mentett ellenfél-mez viszi.
 * A mezszponzor negyedik ajánlata: a cég jele a mezünkön (a kért helyen, a saját jel helyett, a kapusmezen is), meccsenként fizet, a kötbér számol vele, lejárat után a saját jel jön vissza.
 * A szponzorszín-szerződés az ablak-díj után is él (régi hiba), az elrontott mentés helyreáll.
+* 3.9.322: az arculat 6. szakaszában a meccs-animációk figurái elölről (arc, a mellen a jel) vagy hátulról (tarkó, a háton a mezszám, jel nélkül) látszanak; az ellenfél kapusa 1-es, a többi szám névből stabil.
 
 ## mez-stylist-3-9-320-proba.js — 🎽 a meccs előtti mez-ablak (stylist-mód)
 
