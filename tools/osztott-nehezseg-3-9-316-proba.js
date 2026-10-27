@@ -150,6 +150,40 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r3.parharc===0&&r3.kupa===0&&r3.kovetkezo===0,"párharc-fordulóban és kupában nem hat, a következő idényben lejár",{p:r3.parharc,k:r3.kupa,kov:r3.kovetkezo});
   ok(r3.lvlOszt===r3.lvlNelkul,"a közös világ szintje (a tabella alapja) nem mozdul a felosztástól",{oszt:r3.lvlOszt,nelkul:r3.lvlNelkul});
 
+  console.log("— 3.9.317: a kezdőrúgás előtti kapu (a fel-/kiesés után) —");
+  const r6=await p.evaluate(async()=>{
+    const o={};
+    S.seasonNumber=2;S.idx=0;const sn=3;
+    S.mpOsztDont=null;S.pyr.osztottKell=null;S.pyr.osztott=null;S.pyr.osztRegiNaplo=null;
+    S.pyr.superPair={for:sn,avg:106.5,hid:0,a:100.5,b:112.5,suly:0,wa:100.5,wb:112.5,vallA:0.4,vallB:0.9,osztV:true};
+    /* a közös világ szintje: a becslés a MOSTANI (forduló utáni) szintből dolgozik */
+    o.B=mpOsztBecslesPar(S.pyr.superPair);
+    let tovabb=0;
+    await mpBk().h2hPut(MP.activeRoom,mpOsztKulcs(sn),"guest",null).catch?.(()=>{});
+    o.atvette=mpOsztottKezdoKapu(()=>{tovabb++;});
+    await new Promise(r=>setTimeout(r,300));
+    o.cim=$("unlockTitle").textContent;o.szoveg=/fel- és kiesés után/.test($("unlockBody").textContent);
+    $("unlockActions").querySelectorAll("button")[2].click();
+    await mpBk().h2hPut(MP.activeRoom,mpOsztKulcs(sn),"guest",{c:3,season:sn,at:Date.now()});
+    await new Promise(r=>setTimeout(r,3000));
+    o.tovabb=tovabb;o.kell=S.pyr.osztottKell;
+    o.masodszor=mpOsztottKezdoKapu(()=>{tovabb++;});
+    /* régi társ: nem kérdez, de a napló kimondja */
+    S.mpOsztDont=null;S.pyr.osztottKell=null;S.pyr.superPair.osztV=false;
+    window._nlog=[];const al=addLine;window.addLine=addLine=function(t){window._nlog.push(String(t));return al.apply(this,arguments);};
+    o.regi=mpOsztottKezdoKapu(()=>{});
+    o.regiNaplo=window._nlog.some(t=>/régebbi verzióval/.test(t));
+    window.addLine=addLine=al;
+    /* kis különbségnél nincs kérdés */
+    S.pyr.superPair=Object.assign({},S.pyr.superPair,{osztV:true,wa:105,wb:107,avg:106});
+    o.kicsi=mpOsztottKezdoKapu(()=>{});
+    return o;});
+  ok(r6.B&&r6.B.gE<=-2&&r6.B.gT>=2,"a becslés a kézfogás számaiból és a mostani közös világból",r6.B);
+  ok(r6.atvette&&/Nagy a különbség/.test(r6.cim)&&r6.szoveg,"a felajánlás a kezdőrúgás előtt jön (a fel- és kiesés után)",{at:r6.atvette,cim:r6.cim});
+  ok(r6.tovabb===1&&r6.kell&&r6.kell.szerep==="hatrany"&&r6.masodszor===false,"egyező választás után a kezdőrúgás folytatódik, másodszor nem kérdez",{tovabb:r6.tovabb,kell:r6.kell,m:r6.masodszor});
+  ok(r6.regi===false&&r6.regiNaplo,"régi társnál nem kérdez, de a napló kimondja, miért",{regi:r6.regi,naplo:r6.regiNaplo});
+  ok(r6.kicsi===false,"kis különbségnél nincs kérdés",r6.kicsi);
+
   console.log("— 4–5. maradunk / befejezzük —");
   const r4=await p.evaluate(([A,B])=>{S.mpOsztDont={season:mpUpcomingSeason(),c:1};S.pyr.osztottKell=null;
     let k=0;mpOsztottKapu(A,B,()=>{k++;});return {k,kell:S.pyr.osztottKell};},[rek(100.5,0.4),rek(112.5,0.9)]);

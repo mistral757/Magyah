@@ -7848,7 +7848,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.316";
+const APP_VERSION="3.9.319";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -28096,7 +28096,7 @@ function applyYouthBoost(entry){
   /* A KÖNYVELÉS A TÉNYLEGES NYERESÉGET ŐRZI, nem a sorsolt szándékot: ha a
      plafon (Rating: ratingCap) mégis lecsípne valamit, a napló és a
      boost-történet se ígérhet többet, mint ami megérkezett. */
-  const potBefore=entry.pot,ratBefore=entry.startRating;
+  const potBefore=entry.pot,ratBefore=entry.startRating,_el=boostElotte(entry);
   entry.pot=boostGiftPot(entry.pot,tBoost);
   entry.peak=boostLift(entry.peak,potToPeakOvr(entry.pot),ratingCap());
   entry.startRating=boostRaise(entry.startRating,rBoost,ratingCap());
@@ -28107,6 +28107,7 @@ function applyYouthBoost(entry){
   entry.peak=boostLift(entry.peak,entry.startRating,ratingCap());
   if(entry.basePeak!=null)entry.basePeak=Math.max(entry.basePeak,entry.peak);
   if(entry.basePot!=null)entry.basePot=Math.max(entry.basePot,entry.pot);
+  boostNormal(entry,"youth",_el);   /* 🧮 3.9.318 */
   const raw=ratingAtAge(entry.peak,entry.age);
   entry.youthBonus=Math.max(0,entry.startRating-raw);entry.youthBonusStartAge=entry.age;
   if(scout)entry.estimatedPOT=estimatePOT(entry.pot,scout.stars);
@@ -28187,6 +28188,78 @@ function boostLift(cur,target,cap){
 function boostGiftPot(cur,add){
   const c=cur||0;
   return Math.max(c,Math.min(potHardCap(),c+(add||0)));}
+/* ================= 🧮 A BOOST-PLAFON (3.9.318) =================
+   KIMONDOTT KÉRÉS: „a boostok ereje elszabadul 3. szezontól kezdve […] Főleg
+   az öreg róka boost az ami crazy mekkorakat dob a ratingon. 298as játékosból
+   most csinált pl. 423-ast […] úgy legyen számolva, hogy ha az adott játékos a
+   kezdőben lenne, akkor a boost hatására a kezdő 11 meccsereje max x%-ot és
+   max X rating pontot ugorhat általa."
+   A MÉRÉS (a meres-adat ág, négy karrier, a játék saját függvényeivel): a
+   piramis 100 fölött Infinity-szabállyal fut — a POT-görbe teteje nyitott, és
+   55 éves korig nincs öregedés —, ezért a mezőny POT-léptékével (2,5-ös
+   hatvány) nőtt POT-ajándék a peaken át AZONNAL ratinggé vált: 280-as
+   mezőnyben az öreg róka +44…+93, 400-asban +65…+133 Ratinget adott. A
+   fénykor és a sima boost ugyanezt a következő idényváltáskor hozta (egy
+   373-as játékos fénykorral két idény alatt +83-mal ment a boost nélküli
+   pályája fölé). A motor az ABSZOLÚT különbséget nézi, tehát egy ratingpont
+   100-on és 400-on ugyanannyi nehézséget ér.
+   A SZABÁLY (minden Ratinget emelő boostra, minden karrierben):
+     · egy boost a játékos Ratingjét legfeljebb R = 11 × min(1% × a kezdő 11
+       ereje, 1,5) ponttal emeli — vagyis a kezdő 11 átlaga (ha ő kezdene)
+       legfeljebb 1%-kal ÉS legfeljebb 1,5 ponttal nő —, de R sosem kisebb
+       12-nél: a karrier eleje (kb. a 110-es kezdő 11-ig) betűre a régi;
+     · ugyanazon a játékoson egy idényen belül minden további boost plafonja ×0,7;
+     · a PEAK (a jövőbeli Rating) sem ugorhat el: az öreg rókánál, a
+       fénykornál és az egyenlítőnél csak annyit nő, amennyit a Rating; a sima
+       boostnál és a felnőtt POT-boostnál legfeljebb R-rel; az ifinél és a 26
+       év alatti POT-boostnál legfeljebb 2R-rel (ott a fejlődés a lényeg). Ha
+       a peaket vágni kellett, a POT is hozzá igazodik — különben egy későbbi
+       POT → peak lépés visszahozná a levágott részt.
+   A Rating-sávok (+6–12 × mezőny/100 stb.) változatlanok: a nagy ugrásokat a
+   POT-ból lett peak adta, és ez szűnik meg. */
+const BOOST_XI_N=11,BOOST_XI_PCT=0.01,BOOST_XI_MAX=1.5,BOOST_CAP_MIN_R=12,BOOST_ISMET_MULT=0.7;
+/* a kezdő 11 ereje (a felállás ereje — ugyanaz, amit a HUB csapaterőként mutat) */
+function boostXiRef(){
+  let v=0;try{v=teamStrength();}catch(e){v=0;}
+  if(!(v>0)){try{v=Number(oppTargetRating)||0;}catch(e){v=0;}}
+  return v;}
+/* hány Ratinget emelő boostot kapott már EBBEN az idényben (0 = ez az első) */
+function boostIsmetN(entry){
+  const sn=(S&&S.seasonNumber)||1,b=entry&&entry.bSzez;
+  return (b&&b.sn===sn)?(b.n||0):0;}
+/* az alap-plafon (ismétlés nélkül) és a játékosra szóló */
+function boostCapAlap(){
+  return Math.max(BOOST_CAP_MIN_R,Math.floor(BOOST_XI_N*Math.min(BOOST_XI_PCT*boostXiRef(),BOOST_XI_MAX)));}
+function boostCapR(entry){
+  return Math.max(1,Math.floor(boostCapAlap()*Math.pow(BOOST_ISMET_MULT,boostIsmetN(entry))));}
+/* a plafon egy mondatban — a boost-panelek írják ki */
+function boostPlafonTxt(entry){
+  const R=entry?boostCapR(entry):boostCapAlap();
+  const n=entry?boostIsmetN(entry):0;
+  return `🧮 plafon: legfeljebb <b>+${R} Rating</b>${n?` (az idei ${n+1}. boostja rajta — ×${String(Math.round(Math.pow(BOOST_ISMET_MULT,n)*100)/100).replace(".",",")})`:""}`
+    +` — a kezdő 11-re legfeljebb +${String(Math.round(R/BOOST_XI_N*10)/10).replace(".",",")}`;}
+function boostElotte(entry){
+  return {r:entry.startRating||0,peak:entry.peak||0,pot:entry.pot||0,bp:entry.basePeak,bt:entry.basePot};}
+/* A NORMALIZÁLÁS — a boost saját lépései UTÁN, a könyvelése ELŐTT hívandó.
+   kind: old · prime · equal · plain · pot · youth. Visszaadja, mi történt. */
+function boostNormal(entry,kind,el,capR0){
+  const cap=(capR0!=null)?capR0:boostCapR(entry);
+  const out={cap,levagR:0,levagPeak:0};
+  let g=(entry.startRating||0)-el.r;
+  if(g>cap){out.levagR=g-cap;entry.startRating=el.r+cap;g=cap;}
+  const fiatal=kind==="youth"||(kind==="pot"&&(entry.age!=null?entry.age:30)<26);
+  const keret=(kind==="old"||kind==="prime"||kind==="equal")?g:(fiatal?2*cap:cap);
+  const maxPeak=Math.max(el.peak+Math.max(g,keret),entry.startRating||0);
+  if((entry.peak||0)>maxPeak+1e-9){
+    out.levagPeak=Math.round((entry.peak-maxPeak)*10)/10;
+    entry.peak=maxPeak;
+    entry.pot=Math.max(el.pot,Math.min(entry.pot||0,peakToPot(entry.peak)));}
+  if(el.bp!=null)entry.basePeak=Math.max(el.bp,entry.peak);
+  if(el.bt!=null)entry.basePot=Math.max(el.bt,entry.pot);
+  if(g>0||kind==="pot"){const sn=(S&&S.seasonNumber)||1;
+    entry.bSzez={sn,n:boostIsmetN(entry)+1};}
+  try{boostUtoHatas(entry,kind,el,out);}catch(e){}
+  return out;}
 /* ---- A MÁR MEGTÖRTÉNT KÁR HELYREÁLLÍTÁSA ----
    A hiba a boost KÖNYVELÉSÉBEN is nyomot hagyott: a naplózott nyereség
    (oldBoostT / youthBoostT / oldBoostR / youthBoostR) NEGATÍV lett, mert a
@@ -28248,7 +28321,8 @@ const OLD_BOOST_RETIRE_AGE=41;
 const OLD_BOOST_NERF=0.75;
 function oldBoostRanges(){
   const sc=youthBoostScaleFx("old")*OLD_BOOST_NERF,scT=youthBoostPotScaleFx("old")*OLD_BOOST_NERF;
-  return {rLo:Math.round(OLD_BOOST_RATING[0]*sc),rHi:Math.round(OLD_BOOST_RATING[1]*sc),
+  const cap=boostCapAlap();   /* 🧮 3.9.318 — a sáv a plafonig */
+  return {rLo:Math.min(cap,Math.round(OLD_BOOST_RATING[0]*sc)),rHi:Math.min(cap,Math.round(OLD_BOOST_RATING[1]*sc)),
     tLo:Math.round(OLD_BOOST_POT[0]*scT),tHi:Math.round(OLD_BOOST_POT[1]*scT)};}
 /* 0,8 EGYSÉG (3.8.12). Az ifi-boosttal párhuzamosan drágul — csak most már
    annak a 80%-án, a katalógus egységrendszere szerint. */
@@ -28281,7 +28355,7 @@ function applyOldBoost(entry){
   const sc=youthBoostScaleFx("old")*OLD_BOOST_NERF,scT=youthBoostPotScaleFx("old")*OLD_BOOST_NERF;   /* 🧿 Csodaszer; 3.9.216: a POT a saját léptékével · 🎩 3.9.256: −25% */
   const tBoost=Math.round((OLD_BOOST_POT[0]+Math.random()*(OLD_BOOST_POT[1]-OLD_BOOST_POT[0]))*scT);
   const rBoost=Math.round((OLD_BOOST_RATING[0]+Math.random()*(OLD_BOOST_RATING[1]-OLD_BOOST_RATING[0]))*sc);
-  const potBefore=entry.pot,ratBefore=entry.startRating;
+  const potBefore=entry.pot,ratBefore=entry.startRating,_el=boostElotte(entry);
   entry.pot=boostGiftPot(entry.pot,tBoost);
   entry.peak=boostLift(entry.peak,potToPeakOvr(entry.pot),ratingCap());
   /* előbb a kor-görbe (ez volt eddig is), UTÁNA a tényleges emelés */
@@ -28293,6 +28367,8 @@ function applyOldBoost(entry){
   entry.peak=boostLift(entry.peak,entry.startRating,ratingCap());
   if(entry.basePeak!=null)entry.basePeak=Math.max(entry.basePeak,entry.peak);
   if(entry.basePot!=null)entry.basePot=Math.max(entry.basePot,entry.pot);
+  /* 🧮 3.9.318 — a POT-ból lett peak és a kor-görbe ugrása a plafonig vágva */
+  boostNormal(entry,"old",_el);
   /* a nyugdíj-halasztás sosem rövidülhet egy újabb boosttól */
   entry._retireExtendTo=Math.max(entry._retireExtendTo||0,OLD_BOOST_RETIRE_AGE);
   entry._oldBoosted=true;                        /* a régi mentések jelzője marad */
@@ -28342,7 +28418,8 @@ function isPrimeBoostable(entry){
   return !!(entry&&entry.age!=null&&entry.age>=PRIME_AGE_MIN&&entry.age<=PRIME_AGE_MAX);}
 function primeBoostRanges(){
   const sc=youthBoostScaleFx("old"),scT=youthBoostPotScaleFx("old");
-  return {rLo:Math.round(OLD_BOOST_RATING[0]*sc),rHi:Math.round(OLD_BOOST_RATING[1]*sc),
+  const cap=boostCapAlap();   /* 🧮 3.9.318 — a sáv a plafonig */
+  return {rLo:Math.min(cap,Math.round(OLD_BOOST_RATING[0]*sc)),rHi:Math.min(cap,Math.round(OLD_BOOST_RATING[1]*sc)),
     tLo:Math.round(OLD_BOOST_POT[0]*scT),tHi:Math.round(OLD_BOOST_POT[1]*scT)};}
 /* A próbaidő idénye: nyáron (vagy a szezon első meccse előtt) a most induló,
    idény közben a következő. */
@@ -28355,13 +28432,14 @@ function applyPrimeBoost(entry){
   const sc=youthBoostScaleFx("old"),scT=youthBoostPotScaleFx("old");
   const tBoost=Math.round((OLD_BOOST_POT[0]+Math.random()*(OLD_BOOST_POT[1]-OLD_BOOST_POT[0]))*scT);
   const rBoost=Math.round((OLD_BOOST_RATING[0]+Math.random()*(OLD_BOOST_RATING[1]-OLD_BOOST_RATING[0]))*sc);
-  const potBefore=entry.pot,ratBefore=entry.startRating;
+  const potBefore=entry.pot,ratBefore=entry.startRating,_el=boostElotte(entry);
   entry.pot=boostGiftPot(entry.pot,tBoost);
   entry.peak=boostLift(entry.peak,potToPeakOvr(entry.pot),ratingCap());
   entry.startRating=boostRaise(entry.startRating,rBoost,ratingCap());
   entry.peak=boostLift(entry.peak,entry.startRating,ratingCap());
   if(entry.basePeak!=null)entry.basePeak=Math.max(entry.basePeak,entry.peak);
   if(entry.basePot!=null)entry.basePot=Math.max(entry.basePot,entry.pot);
+  boostNormal(entry,"prime",_el);   /* 🧮 3.9.318 */
   if(scout)entry.estimatedPOT=estimatePOT(entry.pot,scout.stars);
   try{syncAttrsToRating(entry);}catch(e){}
   const tGot=entry.pot-potBefore,rGot=entry.startRating-ratBefore;
@@ -28429,7 +28507,7 @@ function openPrimeBoostPanel(){
   const {rLo,rHi,tLo,tHi}=primeBoostRanges();
   const affordable=S.transferBudget>=price;
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
-    Ára <b style="color:#f5b942">${fmtFt(price)}</b> · hatása: <b>+${rLo}-${rHi} Rating</b> és <b>+${tLo}-${tHi} POT</b>. Csak ${PRIME_AGE_MIN}–${PRIME_AGE_MAX} évesre.<br>
+    Ára <b style="color:#f5b942">${fmtFt(price)}</b> · hatása: <b>+${rLo}-${rHi} Rating</b>, és a POT vele együtt nő. Csak ${PRIME_AGE_MIN}–${PRIME_AGE_MAX} évesre.<br><span style="font-size:11.5px;color:var(--dim2)">${boostPlafonTxt()}</span><br>
     <b>Próbaidő:</b> a boost utáni első teljes idényben legalább ${PRIME_MIN_MATCHES} meccs és egy <b>ezüst-szintű idény</b> kell (gól+gólpassz, meccs embere, bravúr vagy tiszta lap — a szezonkártyák mércéje). Ha nem jön össze, a kapott Rating és POT <b>levonódik</b>.<br>
     ${affordable?"Válaszd ki, kit hozol fénykorba:":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget)}).</span>`}</p>`;
   $("twActions").innerHTML="";
@@ -28445,7 +28523,7 @@ function openPrimeBoostPanel(){
         html:`<div style="font-size:15px;font-weight:700">🌟 ${esc(shortName(p.n))}</div>
           <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))}</div>
           <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(price)}</b> — az egyenleged ${fmtFt(S.transferBudget)} → <b>${fmtFt(S.transferBudget-price)}</b>.<br>
-          Hatása <b>+${rLo}-${rHi} Rating</b> és <b>+${tLo}-${tHi} POT</b>. A próbaidő a <b>${dl}. idény</b> végéig tart: ha addig nincs meg legalább ${PRIME_MIN_MATCHES} meccs és egy ezüst-szintű idény, a boost értéke levonódik.</div>`,
+          Hatása <b>+${rLo}-${rHi} Rating</b>, és a POT vele együtt nő (${boostPlafonTxt(e)}). A próbaidő a <b>${dl}. idény</b> végéig tart: ha addig nincs meg legalább ${PRIME_MIN_MATCHES} meccs és egy ezüst-szintű idény, a boost értéke levonódik.</div>`,
         onYes:()=>{
           if(S.transferBudget<price)return;
           if(price===0)boostFreeSpend("prime");
@@ -28658,6 +28736,11 @@ function boostKosarEgy(kind,e,attrKey){
 function boostKosarVegrehajt(){
   const kind=_kosar.kind;
   const out={kesz:0,elmaradt:0,fizetve:0,sorok:[]};
+  _bAdGyujt={ad:0,db:0};
+  try{return boostKosarVegrehajtBelso(kind,out);}
+  finally{const G=_bAdGyujt;_bAdGyujt=null;
+    if(G&&G.db)try{addLine(`🎯 <b>Boost-adósság:</b> a kosár ${G.db} boostjának kezdő 11-re eső hatásából <b>+${String(Math.round(G.ad*100)/100).replace(".",",")}</b> meccs-erő az idény hátralévő bajnokijain az ellenfeleidhez kerül (a hatás fele).`,"m skillnote");}catch(e){}}}
+function boostKosarVegrehajtBelso(kind,out){
   kosarSorok().forEach(x=>{
     const e=careerPool&&careerPool[x.n];if(!e)return;
     const r0=e.startRating,t0=e.pot;
@@ -28704,7 +28787,7 @@ function boostKosarEredmeny(r){
      0,8         🎩 Öreg róka
      0,6         🎯 Attribútum boost
      0,6         📈 POT boost
-     0,5         💪 Sima boost
+     0,335       💪 Sima boost          (3.9.318: 0,5 → −33%, KIMONDOTT KÉRÉS)
      0,4         ✨ Skill boost
      0,33        🤝 Összjáték boost      a legolcsóbb: lassan, közvetve fizet
 
@@ -28717,7 +28800,10 @@ function boostKosarEredmeny(r){
 
    AMI MIND A HÉTRE IGAZ: ismételhető, visszavonhatatlan, és a hatás a
    `careerPool`-bejegyzésben él — tehát a mentés magától viszi. */
-const BOOST_UNIT_KIND={plain:0.5,attr:0.6,pot:0.6,bond:0.33,skill:0.4,youth:1,old:0.8,
+/* 💪 3.9.318 — KIMONDOTT KÉRÉS: „sima boost az új verzióban legyen olcsóbb.
+   Kb 33%-kal mint eddig." A 🧮 boost-plafon mellett a sima boost (+1–4%
+   Rating) a karrier végén is mérsékelt marad, így az ára is lejjebb jöhet. */
+const BOOST_UNIT_KIND={plain:0.335,attr:0.6,pot:0.6,bond:0.33,skill:0.4,youth:1,old:0.8,
   prime:0.98,   /* 🌟 3.9.256 — „A fénykor ára 98% ifi boost." */
   /* EGYENLÍTŐ (3.9.67): egyszerre 2-5 emberre hat, ezért az ifi-boost
      közelében árazzuk — és a szintenkénti darabszám fölött duplázódik
@@ -28862,7 +28948,7 @@ function applyPlainBoost(entry){return applyPlainDelta(entry,plainBoostPlan(entr
 function applyPlainDelta(entry,plan){
   const rWant=Math.max(0,Math.round((plan&&plan.r)||0));
   const tWant=Math.max(0,Math.round((plan&&plan.t)||0));
-  const potBefore=entry.pot,ratBefore=entry.startRating;
+  const potBefore=entry.pot,ratBefore=entry.startRating,_el=boostElotte(entry);
   entry.pot=boostGiftPot(entry.pot,tWant);
   entry.startRating=boostRaise(entry.startRating,rWant,ratingCap());
   /* A PEAK KÖVESSE A BOOSTOLT RATINGET — ugyanaz az indok, mint az
@@ -28872,6 +28958,7 @@ function applyPlainDelta(entry,plan){
   entry.peak=boostLift(entry.peak,entry.startRating,ratingCap());
   if(entry.basePeak!=null)entry.basePeak=Math.max(entry.basePeak,entry.peak);
   if(entry.basePot!=null)entry.basePot=Math.max(entry.basePot,entry.pot);
+  boostNormal(entry,"plain",_el);   /* 🧮 3.9.318 */
   if(scout)entry.estimatedPOT=estimatePOT(entry.pot,scout.stars);
   try{syncAttrsToRating(entry);}catch(e){}
   const rGot=entry.startRating-ratBefore,tGot=entry.pot-potBefore;
@@ -28932,11 +29019,12 @@ function potBoostPlan(entry){
 function applyPotBoost(entry){return applyPotDelta(entry,potBoostPlan(entry));}
 function applyPotDelta(entry,plan){
   const want=Math.max(0,Math.round((plan&&plan.t)||0));
-  const before=entry.pot;
+  const before=entry.pot,_el=boostElotte(entry);
   entry.pot=boostGiftPot(entry.pot,want);
   entry.peak=boostLift(entry.peak,potToPeakOvr(entry.pot),ratingCap());
   if(entry.basePeak!=null)entry.basePeak=Math.max(entry.basePeak,entry.peak);
   if(entry.basePot!=null)entry.basePot=Math.max(entry.basePot,entry.pot);
+  boostNormal(entry,"pot",_el);   /* 🧮 3.9.318 */
   if(scout)entry.estimatedPOT=estimatePOT(entry.pot,scout.stars);
   const got=entry.pot-before;
   entry.potBoosts=(entry.potBoosts||0)+1;
@@ -29133,13 +29221,18 @@ function applyEqualizeBoost(names,lvl){
   es.forEach(e=>{
     const R=eqRatingOf(e);
     const elotte=Math.round(R.disp)||0;
-    const alapElotte=e.startRating||0;
+    const alapElotte=e.startRating||0,_el=boostElotte(e);
     /* az alap úgy áll be, hogy a MEGJELENÍTETT Rating legyen a közös szám */
     e.startRating=Math.max(1,Math.min(cap,Math.round(cel-R.bonus)));
     if(e.startRating>alapElotte){
       /* FELFELÉ: a peak követi — ugyanaz az indok, mint a sima boostnál. */
       e.peak=boostLift(e.peak,e.startRating,cap);
-      if(e.basePeak!=null)e.basePeak=Math.max(e.basePeak,e.peak);}
+      if(e.basePeak!=null)e.basePeak=Math.max(e.basePeak,e.peak);
+      /* 🧮 3.9.318 — az egyenlítő a Rating-plafon ALÓL kivétel: a célszám a
+         csoport legjobbja alatt marad (a jelen osztódik szét, nem új erő jön
+         létre), tehát nem tud elszállni. A csúcs viszont csak a Ratinggel nő,
+         és a kezdőrúgás utáni felhúzás adósság (boostNormal). */
+      boostNormal(e,"equal",_el,Infinity);}
     try{syncAttrsToRating(e);}catch(x){}
     e.eqBoosts=(e.eqBoosts||0)+1;
     e.eqBoostR=(e.eqBoostR||0)+(e.startRating-alapElotte);
@@ -29149,7 +29242,7 @@ function applyEqualizeBoost(names,lvl){
       const pl=(currentRoster().find(x=>x.n===e.n))||(extraRoster.find(x=>x.n===e.n));
       if(pl)pl.ovr=e.startRating;
     }catch(x){}
-    sorok.push({n:e.n,elotte,utana:cel});});
+    sorok.push({n:e.n,elotte,utana:Math.round((e.startRating||0)+R.bonus)});});
   S.eqBoostsUsed=(S.eqBoostsUsed||0)+1;
   return {cel,sorok};}
 
@@ -35675,7 +35768,7 @@ const GLOSSARY={
   csaladtag:{title:"Családtag",text:"Karrier mód elején egy családtagod is bekerülhet a keretbe, saját specialitással (pl. gyors reflexek, kőkemény játékos, 200 IQ). Ő sosem cserélhető le automatikusan, és ha kiemelkedő pillanata van egy meccsen, a csapat morálja jobban felnagyítva reagál rá."},
   infinity:{title:"Infinity mód",text:"A 100-as szint elérése után feloldható a végtelen mód: eltűnik a 119-es Rating-plafon, a játékosok 55 éves korig játszhatnak, az akadémia a mezőnyszinthez skálázódik, a nehézség pedig 200-ig (majd további szintekkel még feljebb) tolható. Itt már nincs Rating-hanyatlás, csak a fejlődés és a végtelen kihívás. A MEGNYITÁS PILLANATÁBAN a teljes kereted — kezdő 11, cserepad és tartalék egyaránt — egyszeri POT-boostot kap: magasabb lesz a fejlődési plafonjuk, amibe játékkal lehet belenőni. A SZINTLÉPÉS 100 FÖLÖTT PONTOSAN UGYANAZ, mint alatta: a mezőnyt állítja, a te keretedhez nem nyúl. Ami megvéd az elavulástól, az a piac: 100 fölött a megvásárolható és a scout által talált játékosok jóval lassabban erősödnek, mint a mezőny — így a saját, felnevelt kereted marad a karriered gerince, nem a folyamatos vásárlás."},
   ifiboost:{title:"Ifi-boost",text:"A HUB-ban egy topjátékos áráért berobbanthatod egy fiatal (legfeljebb 23 éves) játékosod fejlődését: azonnal +6-12 Rating és jelentős POT-ugrás, ami a hosszú távú fejlődését is felgyorsítja. Magasabb mezőnyszinten arányosan drágább, de erősebb is. Így egy ígéretes tehetség pár szezon alatt sztárrá érlelhető. Az ifi-boost a BOOST-KÖZPONT hét fajtája közül a legdrágább — lásd a Boostok szócikket."},
-  boostok:{title:"Boostok — a hét fajta",text:"A boost az az út, amin a büdzse NEM igazolásba megy, hanem abba, akid már van. Hétféle létezik, és mind a HUB Boost-központjában érhető el egy helyen. AZ ÁRAK EGYSÉGBEN ÉRTENDŐK: egy egység a legdrágább boost, az ifi-boost ára — az pedig A KLUB ÉVES BEVÉTELÉHEZ van kötve: nagyjából egy idénynyi keret (a működési keret plusz a presztízs-prémium fele). A hét fajta ennek egy arányát fizeti, tehát egyetlen szám hangolja az egészet. EZÉRT OLCSÓ A BOOST A KARRIER ELEJÉN és drága a végén: nem az ár változik, hanem a klub mérete — és pont a korai boost hozza a legtöbbet, mert egy berobbantott fiatalt még öt-hat szezonon át élvezel. Ahogy a csapaterő, a mezőny és a vitrin nő, úgy nő az ár is: a trófeákkal kilövő büdzsét a prémium felén keresztül követi. HÁROM KEDVEZMÉNY ÜL AZ EGYSÉG ALAPÁRÁN, és mindhárom MIND A HÉT fajtára hat. (1) A KEZDŐ IDÉNYEK ABLAKA: az 1. idényben −50%, a 2.-ban −33%, utána teljes ár. Ez nem mond ellent a büdzsé-aránynak, hanem másra felel: az ár ARÁNYÁT a klub mérete adja, az IDŐZÍTÉST viszont ez az ablak — a boost akkor a legolcsóbb, amikor a legtöbbet is hozza, mert a korán berobbantott játékost még öt-hat idényen át élvezed. A napló a szezon elején és a nyári keret megérkezésekor is emlékeztet rá, a HUB pedig ⚡ jelzést tesz ki, amíg az ablak nyitva van. (2) A KIHÍVÁS-JUTALOM (\"olcsóbb boostok\"): jutalmanként egy 10–45% közti, a felajánláskor sorsolt kedvezmény (a kártyán az a szám áll, amit kapsz); a jutalmak egymásra is szorzódnak (két 30%-os együtt 51%), összesen legfeljebb −75%. (3) A ⚡ BOOST TALIZMÁN Olcsóbb csomagja: legfeljebb −20% az egész csomagon — és mellé fajtánként külön legfeljebb −20% a Fajta-kedvezményből. Ezek mind SZORZÓDNAK, nem összeadódnak, és 0,10-es padló alá egyik sem viszi az egység árát. 💪 SIMA BOOST (0,5 egység): Rating +1-4%, POT +15-45% — a POT-ugrás legalább 400, legfeljebb 2500. Bárkire elsüthető, ez a kiegyensúlyozott, mindenre jó fejlesztés. 🎯 ATTRIBÚTUM BOOST (0,6): TE választod meg, melyik tengely (Védekezés, Védés, Passz, Gólszerzés, Sebesség). Azonnal +4-9%, és onnantól TARTÓSAN is épül rajta: meccsenként 0,4 pont, vagyis egy MÁSODLAGOS edzésnyi — az edzésterved MELLÉ, nem helyette. Ugyanarra a tengelyre ismételve halmozódik, másikat választva átáll. 📈 POT BOOST (0,6): csak a POT-t emeli, de nagyot: +33-66%, legalább 1000, legfeljebb 10 000. A Rating nem ugrik tőle — a HOSSZÚ TÁVÚ fejlődési pálya nyílik ki, és vele az eladási ár is. 🤝 ÖSSZJÁTÉK BOOST (0,33): az egész csapattal való összeszokása gyorsul, minden kötése 33-66%-kal gyorsabban épül, tartósan. A legolcsóbb, mert lassan és közvetve fizet — de egy frissen igazolt kulcsemberen ez hozza vissza leghamarabb a csapat-összhangot. Ismételhető, legfeljebb 3× ütemig. ✨ SKILL BOOST (0,4): REALISZTIKUS skill-módban nagyobb súllyal indul a képesség-sorsolásban — nagyobb eséllyel az ő képessége épül tovább, és nagyobb eséllyel esik rá a választás akkor is, amikor a csapat ÚJ képességet kap (olyankor a merítés is az ő posztcsoportjából megy). Laza módban nem csinál semmit, ezért ott nem is vásárolható. Ismételhető, legfeljebb 4× súlyig. ⚡ IFI-BOOST (1): a legdrágább és a legerősebb, de csak akadémistára — lásd a saját szócikkét. 🎩 ÖREG RÓKA (0,8): az ifi-boost tükörképe a pálya másik végén, 30 fölötti játékosra: Rating- és POT-ugrás, plusz 41 éves korig kitolt nyugdíj; ugyanazon az emberen minden újabb boost drágább. MIND A HÉT visszavonhatatlan, ismételhető, és csak azt az EGY játékost érinti — a nyomuk pedig ott marad a játékos lapján, hogy évek múlva is látszódjon, kire mennyit fordítottál."},
+  boostok:{title:"Boostok — a hét fajta",text:"A boost az az út, amin a büdzse NEM igazolásba megy, hanem abba, akid már van. Hétféle létezik, és mind a HUB Boost-központjában érhető el egy helyen. AZ ÁRAK EGYSÉGBEN ÉRTENDŐK: egy egység a legdrágább boost, az ifi-boost ára — az pedig A KLUB ÉVES BEVÉTELÉHEZ van kötve: nagyjából egy idénynyi keret (a működési keret plusz a presztízs-prémium fele). A hét fajta ennek egy arányát fizeti, tehát egyetlen szám hangolja az egészet. EZÉRT OLCSÓ A BOOST A KARRIER ELEJÉN és drága a végén: nem az ár változik, hanem a klub mérete — és pont a korai boost hozza a legtöbbet, mert egy berobbantott fiatalt még öt-hat szezonon át élvezel. Ahogy a csapaterő, a mezőny és a vitrin nő, úgy nő az ár is: a trófeákkal kilövő büdzsét a prémium felén keresztül követi. HÁROM KEDVEZMÉNY ÜL AZ EGYSÉG ALAPÁRÁN, és mindhárom MIND A HÉT fajtára hat. (1) A KEZDŐ IDÉNYEK ABLAKA: az 1. idényben −50%, a 2.-ban −33%, utána teljes ár. Ez nem mond ellent a büdzsé-aránynak, hanem másra felel: az ár ARÁNYÁT a klub mérete adja, az IDŐZÍTÉST viszont ez az ablak — a boost akkor a legolcsóbb, amikor a legtöbbet is hozza, mert a korán berobbantott játékost még öt-hat idényen át élvezed. A napló a szezon elején és a nyári keret megérkezésekor is emlékeztet rá, a HUB pedig ⚡ jelzést tesz ki, amíg az ablak nyitva van. (2) A KIHÍVÁS-JUTALOM (\"olcsóbb boostok\"): jutalmanként egy 10–45% közti, a felajánláskor sorsolt kedvezmény (a kártyán az a szám áll, amit kapsz); a jutalmak egymásra is szorzódnak (két 30%-os együtt 51%), összesen legfeljebb −75%. (3) A ⚡ BOOST TALIZMÁN Olcsóbb csomagja: legfeljebb −20% az egész csomagon — és mellé fajtánként külön legfeljebb −20% a Fajta-kedvezményből. Ezek mind SZORZÓDNAK, nem összeadódnak, és 0,10-es padló alá egyik sem viszi az egység árát. 🧮 A BOOST-PLAFON (3.9.318): egy boost egy játékos Ratingjét legfeljebb annyival emeli, hogy a kezdő 11 átlaga (ha ő kezdene) legfeljebb 1%-kal és legfeljebb 1,5 ponttal nőjön — de a plafon sosem kevesebb +12-nél, így a karrier elején semmi nem változik. Ugyanazon a játékoson egy idényen belül minden további boost plafonja ×0,7. A jövőbeli csúcs (a peak) sem ugorhat el: az öreg rókánál és a fénykornál csak annyit nő, amennyit a Rating, a sima és a felnőtt POT-boostnál legfeljebb a plafonnyit, az ifinél és a 26 év alatti POT-boostnál legfeljebb kétszer annyit. 💪 SIMA BOOST (0,335 egység — 3.9.318 óta harmadával olcsóbb): Rating +1-4%, POT +15-45% — a POT-ugrás legalább 400, legfeljebb 2500. Bárkire elsüthető, ez a kiegyensúlyozott, mindenre jó fejlesztés. 🎯 ATTRIBÚTUM BOOST (0,6): TE választod meg, melyik tengely (Védekezés, Védés, Passz, Gólszerzés, Sebesség). Azonnal +4-9%, és onnantól TARTÓSAN is épül rajta: meccsenként 0,4 pont, vagyis egy MÁSODLAGOS edzésnyi — az edzésterved MELLÉ, nem helyette. Ugyanarra a tengelyre ismételve halmozódik, másikat választva átáll. 📈 POT BOOST (0,6): csak a POT-t emeli, de nagyot: +33-66%, legalább 1000, legfeljebb 10 000. A Rating nem ugrik tőle — a HOSSZÚ TÁVÚ fejlődési pálya nyílik ki, és vele az eladási ár is. 🤝 ÖSSZJÁTÉK BOOST (0,33): az egész csapattal való összeszokása gyorsul, minden kötése 33-66%-kal gyorsabban épül, tartósan. A legolcsóbb, mert lassan és közvetve fizet — de egy frissen igazolt kulcsemberen ez hozza vissza leghamarabb a csapat-összhangot. Ismételhető, legfeljebb 3× ütemig. ✨ SKILL BOOST (0,4): REALISZTIKUS skill-módban nagyobb súllyal indul a képesség-sorsolásban — nagyobb eséllyel az ő képessége épül tovább, és nagyobb eséllyel esik rá a választás akkor is, amikor a csapat ÚJ képességet kap (olyankor a merítés is az ő posztcsoportjából megy). Laza módban nem csinál semmit, ezért ott nem is vásárolható. Ismételhető, legfeljebb 4× súlyig. ⚡ IFI-BOOST (1): a legdrágább és a legerősebb, de csak akadémistára — lásd a saját szócikkét. 🎩 ÖREG RÓKA (0,8): az ifi-boost tükörképe a pálya másik végén, 30 fölötti játékosra: Rating- és POT-ugrás, plusz 41 éves korig kitolt nyugdíj; ugyanazon az emberen minden újabb boost drágább. MIND A HÉT visszavonhatatlan, ismételhető, és csak azt az EGY játékost érinti — a nyomuk pedig ott marad a játékos lapján, hogy évek múlva is látszódjon, kire mennyit fordítottál."},
   hiresseg:{title:"Híresség (Sztárom a párom)",text:"A ⭐ Sztárom a párom filozófia saját valutája: a KIJELÖLT SZTÁR hírneve. Három forrásból gyűlik. (1) KOMMENTÁTORI MEGJEGYZÉS — 1 pont; nem a gól maga, hanem a hozzá tartozó ízesítő sor (bombagól, párkémia, díj-idézet), gólonként legfeljebb három; a 3., 4., 5. és 6+. gól saját, hangsúlyos kommentárja 3-3 pont. (2) A MECCS EMBERE — bajnokiban 1, rangadón 2, a Magor Kupájában 2, Konföranszié Lígben 3, Ojrópai Klubcsapatok Bajnoki Kupájában 4, Kupák Kupájának Kupájában 5; az európai kupák kieséses szakaszában ×1,5, a döntőben ×4 (a kettő nem szorzódik össze). (3) EGYÉNI DÍJ — a legritkább és a legnagyobb: bajnoki és Magor Kupája-gólkirály/gólpasszkirály 1, Konföranszié 1,5, Ojrópai Kupa 3, Kupák Kupája 10, Aranylabda 15 — mindet a MEZŐNY SZINTJE szorozza (szint/5), ezért egy díj a magasabb ligában nagyságrenddel többet ér. A gyűlő pontnak két következménye van: MÉRFÖLDKŐ-lépcsőt fizet, és HÍRESSÉG-SZINTET ad (hat fokozat, Helyi kedvenctől az Élő legendáig). A szint nyitja a sztár körüli véletlen bevételeket: szurkoló-robbanás (a törzsközönség 20-250%-a, idényenként max 4), reklámszerződés (a heti lelátó 100-700%-a, idényenként 2-8 a szinttől függően) és befektető (a heti lelátó 1000-10 000%-a, idényenként max 1 — csak a 2. híresség-szinttől és legalább a második idénytől). Az ára is kiugró: a sztár bére nem a Rating-kulcsból jön, hanem a hírnevéből, és a keret-bér plafonja RÁ NEM VONATKOZIK — emiatt a csapatbér a feltételek teljesülése ellenére is túllépheti a szurkolói bevétel felét. A hírneve által hozott tömeg viszont nem drágítja vissza a saját bérét. A SZTÁR NEM CSAK AD, HANEM KÖVETEL IS — ez a stílus kockázati oldala. Az elvágyódás-esemény itt PONTOSAN KÉTSZER olyan gyakori, mint bármely más stílusban (mérve: 8,3% helyett 16,7% a váratlan fordulatokból), és ha jön, 50% eséllyel épp a SZTÁR akar menni. (Az első idényben ez is néma: ott egyetlen stílusban sincs elvágyódás.) Ezen felül két saját követeléssel állhat elő az átigazolási időszakban: GÓLONKÉNTI BÓNUSZT kér (a heti lelátó 2-10%-a minden góljáért — innentől minden találata a kasszából is fizet, és minél jobb, annál drágább), vagy BÉREMELÉST (+50-400% a meccs-bérére; a halmozott emelés hatszorosnál megáll). Mindkettő visszautasítható, de nem következmény nélkül: a sértődés 6 morált visz, és minden egyes visszautasítás FÉLSZERESÉVEL tovább emeli az elvágyódás esélyét (egy nem után 3×, kettő után 4×). A HARMADIK KÖVETELÉS A MEZSZÁM: a sztár egy konkrét számot kér (7, 9, 10, 11, 17, 21, 23, 99 és társaik), mert a mostanival nincs megelégedve. Ez az egyetlen kérése, ami INGYEN teljesíthető — a szám két koppintás az arculat-szerkesztő Mezszámok pontjában, és ha a szám máshol van, a két játékos megcseréli a mezét. A határidő a KÖVETKEZŐ MÉRKŐZÉS: ha a kezdőrúgásig nem az övé a szám, a lefújás után a klub magától kifizeti neki NÉGY HETI BÉRÉT (a szezonmérleg sztár-blokkjában külön soron). Morált nem visz, és az elvágyódást sem emeli: ez határidő, nem sértődés. A megkötött alkuk a karrier végéig élnek, és a szezonmérleg sztár-blokkjában külön sorban látszanak. HA A SZTÁR ELMEGY, A FILOZÓFIA NEM HAL MEG. Amíg a sztár a keretedben van, NEM cserélhető — a kijelölés végleges. Amint viszont kikerül a keretből (eladtad, elengedted az elvágyódásnál, vagy visszavonult), a trón MEGÜRESEDIK: a klub arc nélkül marad, a híresség-bevételek (reklám, befektető, szurkoló-robbanás) szünetelnek, és a sztárhoz kötött képességek alszanak. Ilyenkor BÁRMELYIK kerettagodat kinevezheted utódnak a Csapatstílus menüben. A mérföldkövek innentől RÓLA szólnak: a MÁR TELJESÍTETT mérföldkövek és a teljes képességfa megmaradnak, a többi mérföldkő viszont az ŐÁLTALA a klubnál összeszedett számokat méri (meccs, gól, díj, kártya, összhang) — az elődje gyűjtése nem öröklődik rá, de ami az utódnak már megvan nálad, az beszámít. Ezért érdemes olyat kinevezni, akinek már van múltja a klubban. Az ára nem a kinevezéskor, hanem a TÁVOZÁSKOR dől el, és attól függ, hogyan ment el: aki NÁLAD VONULT VISSZA, azzal a hírességpont 85%-a marad a klubnál, akit ELADTÁL vagy elengedtél, azzal csak 60% — a hűségnek tehát mérhető ára van. A távozás egyszeri morálütést is hoz (−8), az új arc kinevezése pedig visszaad ebből (+4). A személyhez szólt alkuk (gólbónusz, béremelés, sértődés-számláló, mezszám-kérés) elévülnek: az utód tiszta szerződéssel indul. A várakozás nem spórol semmit — az ár már lement —, csak a híresség-bevételt viszi, amíg üres a trón. A volt sztárjaid a stílus-panel alján, A klub arcai voltak listában maradnak meg, idényekkel, meccsekkel és a hozott hírességponttal."},
   bajnokilistak:{title:"Bajnoki góllövő-, gólpassz- és tisztalap-lista",text:"A kupasorozatnak mindig volt egész mezőnyre szóló egyéni statisztikája; mostantól a BAJNOKSÁGNAK is. A Menetrend és tabella képernyőn, a tabella alatt látod a teljes, 16 csapatos mezőny három egyéni versenyét: góllövőlista, gólpassz-lista, tisztalap-lista. A mezőny AI-meccseinek gólszerzőit ugyanaz a súlyozás választja ki, mint a kupában (poszt + játékoserő), valódi klubkeretekből — a listán tehát igazi nevek állnak, és a számok pontosan a tabella eredményeiből jönnek. A szezon végén mindhárom lista élén álló játékos díjat kap; ha a TIÉD, tartós képességet is: a Bajnoki gólkirály, a Bajnoki gólpassz-király és a Bajnoki kapus-király a kupa megfelelő arany-díjának a HARMADÁT éri. A díj beleszámít az Aranylabda szavazásába is."},
   statisztika:{title:"Statisztika",text:"A karrier során vezetjük minden játékos mindenkori teljesítményét: meccsek, gólok, gólpasszok, mesterhármasok (MH), MVP-k, bravúrok, tiszta lapok. A kártyaszintű játékosok neve a saját színükkel jelenik meg a táblázatban. A karrier lezárásakor egy összefoglaló .txt is letölthető."},
@@ -41360,7 +41453,12 @@ function renderClubPickList(q){
         det.innerHTML=clubPeekHtml(sq);
         det.classList.remove("hide");
         const btn=det.querySelector("[data-clubgo]");
-        if(btn)btn.onclick=(ev)=>{if(ev&&ev.stopPropagation)ev.stopPropagation();go();};
+        /* ✋ 3.9.319 — KIMONDOTT KÉRÉS: „Kész csapatos módban legyen egy
+           rákérdezés hogy biztosan ezt a csapatot választod […] mindegy hogy
+           pvp vagy single player". A választás a karrier egészére szól, ezért
+           MINDEN úton (egyjátékos, közös karrier, hagyományos és dinamikus)
+           egy megerősítés előzi meg. */
+        if(btn)btn.onclick=(ev)=>{if(ev&&ev.stopPropagation)ev.stopPropagation();klubValasztasMegerosit(sq,go);};
         det.scrollIntoView({behavior:"smooth",block:"nearest"});};
       det.setAttribute("data-clubdet","1");
       box.appendChild(b);box.appendChild(det);});});}
@@ -41418,6 +41516,19 @@ function clubPeekRows(sq){
                up:Math.max(0,Math.round(peak-ovr))});});
   rows.sort((a,b)=>b.kilatas-a.kilatas||b.ovr-a.ovr);
   return rows;}
+/* ✋ 3.9.319 — a kész csapat választásának megerősítése (egyjátékosban és
+   közös karrierben ugyanígy). Az „Igen" indítja a karriert (vagy az
+   osztályválasztót), a „Mégse" a listán hagy, a betekintő nyitva marad. */
+function klubValasztasMegerosit(sq,go){
+  const mp=(typeof MP!=="undefined"&&MP&&MP.active)||!!(pyrPending&&pyrPendingDiv);
+  const tovabb=pyrPending&&!pyrPendingDiv;
+  askConfirm({title:"Biztosan ezt a csapatot választod?",
+    yes:tovabb?"Igen, tovább":"Igen, ezzel indulok",no:"Még nézelődöm",
+    html:`<div style="font-size:15px;font-weight:700">${esc(clubLabel(sq.club))} <span style="color:var(--dim2);font-weight:400">(${esc(seasonLabel(sq.season))})</span></div>`
+      +`<div style="font-size:12.5px;color:var(--dim);margin-top:3px">${(sq.players||[]).length} fős keret · top-11 átlag <b style="color:var(--gold)">${Math.round(squadAvgOvr(sq))}</b></div>`
+      +`<div style="font-size:13px;margin-top:9px;line-height:1.5">A karriered ezzel a kerettel indul, a klub később nem cserélhető.`
+      +(mp?` Közös karrierben a választás után egyből indul az idény.`:tovabb?` A következő lépés az osztály kiválasztása.`:"")+`</div>`,
+    onYes:go});}
 function clubPeekHtml(sq){
   const all=clubPeekRows(sq);
   const rows=all.slice(0,CLUB_PEEK_N);
@@ -42084,6 +42195,10 @@ function pyrSuperPairStash(mine,mate){
   /* ⛰ 3.9.210 — a két vállalás (a társé hiányozhat: régi kliens) */
   p.vallA=(mine&&typeof mine.vall==="number")?mine.vall:null;
   p.vallB=(mate&&typeof mate.vall==="number")?mate.vall:null;
+  /* ⚖️ 3.9.316 — mindkét kliens ismeri-e az osztott nehézség felajánlását */
+  p.osztV=!!(mine&&mate&&mine.osztV&&mate.osztV);
+  /* 🎯 3.9.318 — a követés csak akkor indul, ha mindkét gép kéri / futtatja */
+  p.kov=!!(mine&&mate&&mine.kov&&mate.kov);
   S.pyr.superPair=p;
   return p;}
 /* ---- A KALIBRÁCIÓ KÖZÖS KARRIERBEN ----
@@ -42316,7 +42431,9 @@ function nfMertValtozas(){
   const ss=Object.keys(H).map(Number).filter(s=>H[s]&&typeof H[s].dg==="number").sort((a,b)=>b-a).slice(0,2);
   if(!ss.length)return null;
   const v=ss.reduce((a,s)=>a+H[s].dg,0)/ss.length;
-  return Math.max(-6,Math.min(10,Math.round(v*100)/100));}
+  /* 🎯 3.9.318 — a követéses szerződésben a beárazható növekedés teteje 20 */
+  const fel=(S.pyr&&S.pyr.kovetV)?NF_DG_MAX_KOV:NF_DG_MAX;
+  return Math.max(-6,Math.min(fel,Math.round(v*100)/100));}
 /* a választott rajt-résből visszaszámolt célrés (a csúszkás finomhangolásnál) */
 function nfCelFromRajt(kick,div,speedKey){
   const F=nfMezonyUtem(div,speedKey);
@@ -42775,6 +42892,8 @@ function pyrFloorKickoff(){
      HUB ezt olvassa); a közös mezőny számai (want, utana) érintetlenek */
   if(P.osztott&&P.osztott.sn===sn){H[sn].osztott={off:P.osztott.off,szerep:P.osztott.szerep};
     if(nfOn()&&typeof P.osztott.cel==="number")H[sn].cel=P.osztott.cel;}
+  /* 🎯 3.9.318 — a folyamatos rés-követés indítása (a rajt-rés, a várt növekedés, a tűrés) */
+  try{nfKovIndit(H[sn],sn,mp,pair);}catch(e){}
   /* a régi kalibráció bélyege — hogy semmi ne fusson rá kétszer */
   P.superFor=sn;
   try{
@@ -42834,9 +42953,133 @@ function pyrMidLiftNow(){
     const half=M.amt/2,span=Math.max(1,30-M.from);
     return half+half*Math.min(1,(i-M.from)/span);
   }catch(e){return 0;}}
+/* ================= 🎯 FOLYAMATOS RÉS-KÖVETÉS ÉS BOOST-ADÓSSÁG (3.9.318) =================
+   KIMONDOTT KÉRÉS: „ez mutatja azt is, hogy már gyakorlatilag a 3. Idénytől
+   nem jól működik ez a célrés dolog, mert ha kapásból tud boosttal kezdeni a
+   player, akkor egy -1es különbséget is gyorsan +2re tud változtatni. Szóval
+   itt is okosabbnak kellene lenni" · „jó lesz, hogy rendszeresen az idény
+   közben összevetjük a várt fejlődést a ténylegessel."
+   A MÉRÉS: a célrés legfeljebb +10-es idényen belüli rés-növekedést árazott be
+   (rajt-cél = célrés − a várt növekedés ÷ 2), a 3–4. idényekben viszont
+   +12…+55 volt a valóság — és a téli felmérés egyszer, a 15. fordulóban lépett
+   (közös karrierben egyáltalán nem).
+   A SZABÁLY (az új karrierekben, és ahol bekapcsolták — szerződés-zászló):
+     · KÖVETÉS: az 5., 10., 15., 20. és 25. forduló után az utolsó 5 forduló
+       ÁTLAGOS rését összevetjük a VÁRT PÁLYÁVAL: a rajt-rés + a beárazott
+       idényen belüli növekedés arányos része + a tél tűrése (laza +1 ·
+       normál +0,5 · szigorú 0). Ha a rés a pálya fölött jár, a többletet a
+       következő 5 fordulóban fokozatosan behozzák az ellenfelek. Az átlag
+       azért kell, hogy egy kiugró meccs ne emelje meg a mezőnyt. Ez váltja a
+       téli felmérést.
+     · ADÓSSÁG: a kezdőrúgás után vett boost kezdő 11-re eső hatásának (Δ
+       Rating ÷ 11) a FELE azonnal az ellenfeleidhez kerül. A boost így félig a
+       tiéd marad (megérte), félig a célrés tartja a szerződést — és a követés
+       nem emeli meg kétszer ugyanazt.
+   HOL HAT: a SAJÁT bajnoki meccseiden, ugyanazon a csatornán, ahol a mért
+   rejtett bónuszod fele és az osztott nehézség eltolása is ül
+   (matchHiddenOppBuff / oppMatchStrength). A közös világ (a gépi csapatok,
+   a tabella, a piac) nem mozdul — közös karrierben így a két gép világa nem
+   csúszhat szét. A kupa, az osztályozó és a közös karrier két párharca
+   (15. és 30. forduló) érintetlen.
+   A TANULÁS: a záró rés (és belőle a következő idény rajt-célja) a követés és
+   az adósság NÉLKÜL mér — és a beárazható növekedés teteje 10-ről 20-ra nő. */
+const NF_KOV_LEPES=5,NF_KOV_ABLAK=5,NF_KOV_ADOSSAG_K=0.5,NF_DG_MAX=10,NF_DG_MAX_KOV=20;
+/* az idény követési rekordja (null, ha ebben az idényben nem él) */
+function nfKovRec(){
+  try{
+    if(!pyrFloorOn())return null;
+    const r=pyrFloorHist()[S.seasonNumber||1];
+    return (r&&r.kov)?r:null;}catch(e){return null;}}
+/* a mostani személyes eltolás a követésből és az adósságból — a kizárásokkal */
+function nfKovOff(){
+  try{
+    const r=nfKovRec();if(!r)return 0;
+    if(typeof euroActive==="function"&&euroActive())return 0;
+    if(typeof pyrPoActive==="function"&&pyrPoActive())return 0;
+    if(typeof h2hRoomActive==="function"&&h2hRoomActive()&&typeof h2hIsDuelRound==="function"&&h2hIsDuelRound())return 0;
+    return nfKovOffNyers(r);}catch(e){return 0;}}
+function nfKovOffNyers(r){
+  const K=r.kov,i=S.idx||0;
+  let v=K.ad||0;
+  (K.emel||[]).forEach(x=>{v+=x.amt*Math.min(1,Math.max(0,(i-x.f+1)/NF_KOV_LEPES));});
+  return Math.round(v*100)/100;}
+/* a SAJÁT bajnoki meccseim személyes csatornája: osztott nehézség + követés */
+function nfSajatOff(){
+  let v=0;
+  try{v+=mpOsztottOff()||0;}catch(e){}
+  try{v+=nfKovOff()||0;}catch(e){}
+  return v;}
+/* a várt pálya a j. forduló után */
+function nfKovPalya(K,j){return K.rajt+K.dgB*j/30+K.tur;}
+/* a kezdőrúgás rögzíti (pyrFloorKickoff): él-e, honnan indul, mennyit vár */
+function nfKovIndit(rec,sn,mp,pair){
+  const P=S.pyr;
+  if(!nfOn()||!rec)return;
+  if(!mp&&P.kovetKer&&!P.kovetV){P.kovetV=1;delete P.kovetKer;
+    try{addLine(`🎯 <b>Bekapcsolva: folyamatos rés-követés és boost-adósság.</b> Ettől az idénytől 5 fordulónként összevetjük a résedet a várt pályával, és a kezdőrúgás utáni boostok fele az ellenfelekhez kerül.`,"m life");}catch(e){}}
+  if(mp){
+    const mind=!!(pair&&pair.kov);
+    if(mind&&!P.kovetV){P.kovetV=1;delete P.kovetKer;
+      try{addLine(`🎯 <b>Bekapcsolva (mindkettőtöknél): folyamatos rés-követés és boost-adósság.</b>`,"m life");}catch(e){}}
+    if(P.kovetV&&!mind){
+      try{addLine(`🎯 A folyamatos rés-követés ebben az idényben <b>nem él</b>: a társad kliense még nem ismeri, vagy nem kapcsolta be. Közös karrierben csak kettőtöknél együtt indul.`,"m ev");}catch(e){}
+      return;}}
+  if(!P.kovetV)return;
+  /* az ÉLŐ rés (nem a nevezési): a fordulónkénti mérés is ezt nézi — egy
+     mérce a pályához és a pontokhoz, és nem kell minden forduló után a
+     legjobb felállást végigkeresni */
+  let rajt=null;
+  try{rajt=Math.round(levelGap()*10)/10;}catch(e){rajt=null;}
+  if(rajt==null||!isFinite(rajt))return;
+  let dgB=(typeof rec.dgBecsles==="number")?rec.dgBecsles:null;
+  if(dgB==null){try{dgB=Math.max(0,nfSodrodasModell(rajt)-nfMezonyUtem(P.my));}catch(e){dgB=0;}}
+  const tur=(NF_TEL[P.tel]!=null)?NF_TEL[P.tel]:0.5;
+  rec.kov={v:1,rajt,dgB:Math.round(dgB*100)/100,tur,emel:[],ad:0,adDb:0,g:{}};}
+/* minden bajnoki forduló után (a forduló már lekönyvelve, S.idx = a lejátszott meccsek száma) */
+function nfKovForduloUtan(){
+  const r=nfKovRec();if(!r||r.veg!=null)return null;
+  if(typeof euroActive==="function"&&euroActive())return null;
+  if(typeof pyrPoActive==="function"&&pyrPoActive())return null;
+  const K=r.kov,i=S.idx||0;
+  let gap=null;
+  try{gap=levelGap();}catch(e){gap=null;}
+  if(gap==null||!isFinite(gap))return null;
+  /* a NYERS rés: a követés és az adósság nélkül (amit a mérés épp most beleszámolt) */
+  const nyers=Math.round((gap+nfKovOff())*100)/100;
+  K.g[i]=nyers;
+  if(i%NF_KOV_LEPES!==0||i<NF_KOV_LEPES||i>=30)return {i,nyers};
+  const js=Object.keys(K.g).map(Number).filter(j=>j>i-NF_KOV_ABLAK&&j<=i);
+  if(!js.length)return {i,nyers};
+  const atl=js.reduce((a,j)=>a+(K.g[j]-nfKovPalya(K,j)),0)/js.length;
+  const mar=(K.emel||[]).reduce((a,x)=>a+x.amt,0)+(K.ad||0);
+  const kell=Math.round((atl-mar)*10)/10;
+  if(!(kell>PYR_FLOOR_TOL))return {i,nyers,kell:0};
+  K.emel.push({f:i,amt:kell});
+  try{const n1=x=>(x>=0?"+":"−")+Math.abs(x).toFixed(1).replace(".",",");
+    addLine(`🎯 <b>Rés-követés (${i}. forduló).</b> Az utolsó ${js.length} forduló átlagában a rés <b>${n1(atl)}</b>-del járt a várt pálya fölött`
+      +`${mar>0?` (a korábbi emelések és a boost-adósság ${n1(mar)}-t már behoztak)`:""} — az ellenfeleid a következő ${NF_KOV_LEPES} fordulóban fokozatosan `
+      +`<b>${n1(kell)}</b> meccs-erővel erősebbek lesznek.`,"m mvp");}catch(e){}
+  try{meresKovet({i,atl:Math.round(atl*10)/10,kell});}catch(e){}
+  return {i,nyers,kell};}
+/* a boost-adósság (a boostNormal hívja, a boost után). A Boost-kosár egyetlen
+   összegző sort ír (_bAdGyujt), nem darabonként egyet. */
+let _bAdGyujt=null;
+function boostUtoHatas(entry,kind,el,out){
+  const g=(entry.startRating||0)-el.r;
+  let ad=0;
+  const r=nfKovRec();
+  if(r&&r.veg==null&&g>0){
+    ad=Math.round(NF_KOV_ADOSSAG_K*g/BOOST_XI_N*100)/100;
+    r.kov.ad=Math.round(((r.kov.ad||0)+ad)*100)/100;r.kov.adDb=(r.kov.adDb||0)+1;
+    if(_bAdGyujt){_bAdGyujt.ad+=ad;_bAdGyujt.db++;}
+    else try{const sz=x=>String(x).replace(".",",");
+      addLine(`🎯 <b>Boost-adósság:</b> ${esc(shortName(entry.n))} +${g} Rating (a kezdő 11-re +${sz(Math.round(g/BOOST_XI_N*10)/10)}) — ennek a fele, <b>+${sz(ad)}</b> meccs-erő, az idény hátralévő bajnokijain az ellenfeleidhez kerül.`,"m skillnote");}catch(e){}}
+  try{meresBoost(entry,kind,el,out,ad);}catch(e){}}
 function pyrFloorMid(){
   if(!pyrFloorOn())return null;
   if((typeof h2hRoomActive==="function")&&h2hRoomActive())return null;
+  /* 🎯 3.9.318 — ahol a folyamatos követés él, az váltja a téli felmérést */
+  if(nfKovRec())return null;
   const P=S.pyr,sn=S.seasonNumber||1,H=pyrFloorHist();
   const rec=H[sn];if(!rec||rec.midDone)return null;
   rec.midDone=true;
@@ -42875,6 +43118,9 @@ function nfIdenyVege(){
   /* ⚖️ 3.9.316 — osztott nehézségnél a rés a KÖZÖS mezőnyhöz mérve tanít
      (a rajt-rés is az volt) — a személyes eltolás nem a világ változása */
   try{const O=S.pyr&&S.pyr.osztott;if(O&&O.sn===sn&&O.off)gap=Math.round((gap+O.off)*10)/10;}catch(e){}
+  /* 🎯 3.9.318 — a követés és a boost-adósság nélkül (az nem a világ változása) */
+  try{if(rec.kov){const ko=nfKovOff();rec.kov.vegOff=ko;rec.kov.emelOssz=Math.round((rec.kov.emel||[]).reduce((a,x)=>a+x.amt,0)*10)/10;
+    gap=Math.round((gap+ko)*10)/10;}}catch(e){}
   rec.veg=gap;
   /* ⚖️ 3.9.289 — a ZÁRÓ nevezési meccs-erő (a következő idény súlyozott
      mezőnyéhez — lásd pyrFloorKickoff) */
@@ -42899,7 +43145,9 @@ function nfIdenyVege(){
 function nfRunIdenyCel(rec,tur){
   if(!rec||typeof rec.cel!=="number")return null;
   const t=(typeof tur==="number")?tur:0.5;
-  const tel=Math.min(0.5,Math.max(0,(rec.mid||0)*0.25));
+  /* 🎯 3.9.318 — a követés emelései ugyanúgy nehezítenek, mint a téli emelés */
+  const kov=(rec.kov&&rec.kov.emel)?rec.kov.emel.reduce((a,x)=>a+x.amt,0):0;
+  const tel=Math.min(0.5,Math.max(0,((rec.mid||0)+kov)*0.25));
   return rec.cel+t*0.5-tel;}
 function nfRunCel(){
   if(!nfOn())return null;
@@ -43004,6 +43252,23 @@ function nfVissza(box,fromHub,done){
 /* NYÁRON: a következő idény CÉLRÉSE (3.9.223) — a fokozat rögzített, a célrés
    a fokozat sajátjához képest ±NF_HANG_MAX-ig hangolható. A hangolás a mezőnyre
    (rajt-cél, tél) és a Run-ra hat; a hivatalos szintet nem írja át. */
+/* 🎯 3.9.318 — FUTÓ karrierben a folyamatos rés-követés és a boost-adósság
+   BEKAPCSOLHATÓ (a nehézségi szerződés része, ezért nem magától): a nyári
+   célrés-ablakban egy gomb; a következő kezdőrúgástól él, véglegesen.
+   Közös karrierben akkor indul, ha a társad is bekapcsolta (a kézfogás viszi). */
+function nfKovValaszthato(){try{return nfOn()&&S.pyr&&!S.pyr.kovetV;}catch(e){return false;}}
+function nfKovKapcsoloHtml(){
+  if(!nfKovValaszthato())return "";
+  const on=!!S.pyr.kovetKer,mp=(typeof h2hRoomActive==="function")&&h2hRoomActive();
+  return `<div style="margin-top:12px;padding:9px 11px;border:1px dashed var(--line);border-radius:10px;font-size:12px;line-height:1.5;text-align:left">`
+    +`🎯 <b>Új szabály (3.9.318): folyamatos rés-követés és boost-adósság.</b> 5 fordulónként összevetjük a résedet a várt pályával, és ami fölötte jár, `
+    +`azt a következő fordulókban behozzák az ellenfelek (a téli felmérés helyett). A kezdőrúgás utáni boostok kezdő 11-re eső hatásának fele az ellenfelekhez kerül. `
+    +`A kupát, az osztályozót${mp?" és a két párharcot":""} nem érinti. Bekapcsolás után végleges.`
+    +(mp?` <i>Közös karrierben akkor indul, ha a társad is bekapcsolja.</i>`:"")
+    +`<div style="margin-top:6px;text-align:center"><button class="btn-s" id="nfKovBtn">${on?"✅ Bekapcsolva a következő idénytől — mégsem":"Bekapcsolom a következő idénytől"}</button></div></div>`;}
+function nfKovKapcsoloKot(body,ujra){
+  const b=body&&body.querySelector("#nfKovBtn");
+  if(b)b.onclick=()=>{S.pyr.kovetKer=!S.pyr.kovetKer;if(!S.pyr.kovetKer)delete S.pyr.kovetKer;try{saveGame();}catch(e){}ujra();};}
 function nfOffer(next,fromHub){
   const done=()=>{try{next&&next();}catch(e){}};
   if(!nfOn()||S.auto){done();return;}
@@ -43030,9 +43295,9 @@ function nfOffer(next,fromHub){
         +_becsles(cel),
       `<div style="display:flex;gap:8px;justify-content:center;margin-top:4px">
         <button class="btn-s" id="nfHangMinus" ${h<=-NF_HANG_MAX+1e-9?"disabled":""}>− nehezebb</button>
-        <button class="btn-s" id="nfHangPlus" ${h>=NF_HANG_MAX-1e-9?"disabled":""}>+ könnyebb</button></div>`,
+        <button class="btn-s" id="nfHangPlus" ${h>=NF_HANG_MAX-1e-9?"disabled":""}>+ könnyebb</button></div>`+nfKovKapcsoloHtml(),
       [nfGomb(fromHub?"Rendben — vissza a HUB-ba":"Rendben, ezzel indulok","btn-y stepbtn",()=>{P.nfHangNext=h;nfVissza($("scUnlock"),fromHub,done);})],
-      body=>{const m=body.querySelector("#nfHangMinus"),pl=body.querySelector("#nfHangPlus");
+      body=>{nfKovKapcsoloKot(body,rajz);const m=body.querySelector("#nfHangMinus"),pl=body.querySelector("#nfHangPlus");
         if(m)m.onclick=()=>{h=Math.max(-NF_HANG_MAX,Math.round((h-0.1)*10)/10);rajz();};
         if(pl)pl.onclick=()=>{h=Math.min(NF_HANG_MAX,Math.round((h+0.1)*10)/10);rajz();};});
     if(!box)done();};
@@ -43685,6 +43950,7 @@ function pyrConfirmDiv(){
          célrését — átállítottad) és a téli tűrés. Közös karrierben a tél nem
          mér (pyrFloorMid), a tűrés ott csak tájékoztató. */
       S.pyr.tel=_mf?_mf.tel:(NF_TEL[pyrPickTel]!=null&&!_mp)?pyrPickTel:"normal";
+      S.pyr.kovetV=1;   /* 🎯 3.9.318 — az új karrier a folyamatos rés-követéssel és a boost-adóssággal indul */
       S.pyr.holt=_mf?_mf.holt:_mp?"1.5":pyrPickHolt;   /* közös karrierben a két gépen azonos kell legyen — 3.9.224: a szobából */
       if(_mf){
         const a=nfAktualis();
@@ -75407,6 +75673,8 @@ async function mpStartExchange(onReady){
     /* ⚖️ 3.9.316 — ez a kliens ismeri az osztott nehézség felajánlását (egy
        régi társnál nem kérdezünk: ő sosem válaszolna, a kapu beragadna) */
     osztV:1,
+    /* 🎯 3.9.318 — a folyamatos rés-követés: él már, vagy ettől az idénytől kérem */
+    kov:(()=>{try{return (S.pyr&&(S.pyr.kovetV||S.pyr.kovetKer))?1:0;}catch(e){return 0;}})(),
     /* 🛡 3.9.288 — hardcore: a lezárt idény utolsó szakaszainak ujjlenyomata
        (a 24–30. forduló, a nyár, a kupa) — a kapu veti össze */
     hcNy:(()=>{try{if(!mpHardcore())return null;const H=hcAllapot(),sp=mpUpcomingSeason()-1,o={};
@@ -75527,9 +75795,7 @@ async function mpStartTick(key,myField,oppField,onReady,myBidRec){
           addLine(`✦ A mezőny már a helyén állt — nem kellett igazítani.`,"m ev");
       }
       try{saveGame();}catch(e){}
-      /* ⚖️ 3.9.316 — nagy különbségnél a felajánlás: maradunk / befejezzük /
-         osztott nehézség (ha nincs mit kérdezni, azonnal továbbenged) */
-      mpOsztottKapu(mine,mate,onReady);return;}
+      onReady();return;}
     /* MINDKÉT KLIENS UGYANEZT SZÁMOLJA ki ugyanabból a két rekordból — ezért
        nincs szükség "döntőbíró" oldalra, és nem is csúszhat szét. */
     const r=mpResolveLevel(mine,mate);
@@ -82688,6 +82954,8 @@ function playMatchMotor(){
          tehát az élő tabella a friss állást mutatja — innen jön a rangadó utáni
          kommentár, a bajnokavatás és a dinamikus szezonhír. */
       try{afterLeagueRound(fx,gf,ga);}catch(e){}
+      /* 🎯 3.9.318 — a folyamatos rés-követés: a forduló már lekönyvelve */
+      try{nfKovForduloUtan();}catch(e){}
       /* CSAPATEGYENSÚLY: a szezon első felének letelte átbillenti a
          teher-mérőt a tavalyi mintáról az ideire — a forduló MÁR lekönyvelve. */
       try{balLoadHandoverNote();}catch(e){}}
@@ -93957,7 +94225,7 @@ function matchHiddenOppBuff(){
   const _cup=euroActive()&&S.euro&&S.euro.target!=null;
   return _cup
     ?Math.max(0,seasonHiddenBonus()*OPP_BUFF_MEASURED)
-    :oppBuffFor(oppTargetRating,seasonHiddenBonus())+mpOsztottOff();}
+    :oppBuffFor(oppTargetRating,seasonHiddenBonus())+nfSajatOff();}   /* ⚖️ 3.9.316 osztott · 🎯 3.9.318 követés + boost-adósság */
 function oppBuffFor(lvl,hidden){
   if(gameMode!=="career")return 0;
   const meas=Math.max(0,(hidden||0)*OPP_BUFF_MEASURED);
@@ -94015,7 +94283,7 @@ function oppMatchStrength(lvl){
      „itt és most" kérdésre adjuk hozzá; a kifejezett szintre kérdezők
      (hipotetikus számolások) a tiszta értéket kapják. */
   const g=(lvl===undefined&&typeof pyrGrowNow==="function")?pyrGrowNow():0;
-  return v+g+oppBuffFor(v,hiddenMatchBonus())+(lvl===undefined?mpOsztottOff():0);}
+  return v+g+oppBuffFor(v,hiddenMatchBonus())+(lvl===undefined?nfSajatOff():0);}
 /* ================= REJTETT MECCS-BÓNUSZOK =================
    A KIJELZETT csapaterő (teamStrength) szándékosan csak a KERETET méri: a
    szituatív tagokat — morál, edző, aura-skillek, kapitány-rutin, taktika,
@@ -95776,11 +96044,13 @@ function openYouthBoostPanel(){
   $("twPanel").classList.remove("hide");
   $("twTitle").textContent="⚡ Ifi-boost — a fejlődés berobbantása";
   const sc=youthBoostScaleFx("youth"),scT=youthBoostPotScaleFx("youth");
-  const rLo=Math.round(YOUTH_BOOST_RATING[0]*sc),rHi=Math.round(YOUTH_BOOST_RATING[1]*sc);
+  const _cap=boostCapAlap();   /* 🧮 3.9.318 */
+  const rLo=Math.min(_cap,Math.round(YOUTH_BOOST_RATING[0]*sc)),rHi=Math.min(_cap,Math.round(YOUTH_BOOST_RATING[1]*sc));
   const tLo=Math.round(YOUTH_BOOST_POT[0]*scT),tHi=Math.round(YOUTH_BOOST_POT[1]*scT);
   const affordable=S.transferBudget>=price;
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
-    Ára <b style="color:#00e5ff">${fmtFt(price)}</b> · hatása: <b>+${rLo}-${rHi} Rating</b> és <b>+${tLo}-${tHi} POT</b> (a fejlődés berobban, a játékos ezután is tovább nő).<br>
+    Ára <b style="color:#00e5ff">${fmtFt(price)}</b> · hatása: <b>+${rLo}-${rHi} Rating</b> és <b>+${tLo}-${tHi} POT</b> (a fejlődés berobban, a játékos ezután is tovább nő — a jövőbeli csúcsa legfeljebb +${2*_cap}-vel).<br>
+    <span style="font-size:11.5px">${boostPlafonTxt()}</span><br>
     ${affordable?"Válaszd ki, kit boostolsz:":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget)}).</span>`}</p>`;
   $("twActions").innerHTML="";
   if(affordable)prospects.forEach(p=>{
@@ -95836,13 +96106,13 @@ function openYouthBoostPanel(){
 const BOOST_KINDS=[
   {k:"plain",ic:"💪",n:"Sima boost",col:"#22c55e",
    short:()=>`Rating +${BOOST_PLAIN_R[0]}-${BOOST_PLAIN_R[1]}% · POT +${BOOST_PLAIN_T[0]}-${BOOST_PLAIN_T[1]}%`,
-   long:()=>`A klasszikus, kiegyensúlyozott fejlesztés: a Rating <b>${BOOST_PLAIN_R[0]}-${BOOST_PLAIN_R[1]}%-kal</b> nő, a POT <b>${BOOST_PLAIN_T[0]}-${BOOST_PLAIN_T[1]}%-kal</b> — de a POT-ugrás legalább <b>${fmtNum(boostPlainTMin())}</b>, és legfeljebb <b>${fmtNum(boostPlainTMax())}</b>. Bárkire elsüthető.`},
+   long:()=>`A klasszikus, kiegyensúlyozott fejlesztés: a Rating <b>${BOOST_PLAIN_R[0]}-${BOOST_PLAIN_R[1]}%-kal</b> nő, a POT <b>${BOOST_PLAIN_T[0]}-${BOOST_PLAIN_T[1]}%-kal</b> — de a POT-ugrás legalább <b>${fmtNum(boostPlainTMin())}</b>, és legfeljebb <b>${fmtNum(boostPlainTMax())}</b>. Bárkire elsüthető. A Rating- és a csúcs-ugrás a 🧮 boost-plafonig (most +${boostCapAlap()}).`},
   {k:"attr",ic:"🎯",n:"Attribútum boost",col:"#f59e0b",
    short:()=>`egy tengely +${BOOST_ATTR_PCT[0]}-${BOOST_ATTR_PCT[1]}% · és tartósan edződik`,
    long:()=>`Te választod meg, MELYIK tengely. Azonnal <b>+${BOOST_ATTR_PCT[0]}-${BOOST_ATTR_PCT[1]}%</b>, és onnantól <b>tartósan</b> is épül rajta: meccsenként <b>${String(TRAIN_SEC_PTS).replace(".",",")} pont</b>, vagyis egy MÁSODLAGOS edzésnyi — az edzésterved MELLÉ, nem helyette. Ugyanarra a tengelyre ismételve halmozódik.`},
   {k:"pot",ic:"📈",n:"POT boost",col:"#38bdf8",
    short:()=>`POT +${BOOST_POT_T[0]}-${BOOST_POT_T[1]}%`,
-   long:()=>`Csak a POT-t emeli, de nagyot: <b>+${BOOST_POT_T[0]}-${BOOST_POT_T[1]}%</b>, legalább <b>${fmtNum(boostPotTMin())}</b>, legfeljebb <b>${fmtNum(boostPotTMax())}</b>. A Rating nem ugrik tőle — a HOSSZÚ TÁVÚ fejlődési pálya nyílik ki, és vele az eladási ár is.`},
+   long:()=>`Csak a POT-t emeli, de nagyot: <b>+${BOOST_POT_T[0]}-${BOOST_POT_T[1]}%</b>, legalább <b>${fmtNum(boostPotTMin())}</b>, legfeljebb <b>${fmtNum(boostPotTMax())}</b>. A Rating nem ugrik tőle — a HOSSZÚ TÁVÚ fejlődési pálya nyílik ki, és vele az eladási ár is. A csúcsa a 🧮 boost-plafonnyit nőhet (26 év alatt kétszer annyit).`},
   {k:"bond",ic:"🤝",n:"Összjáték boost",col:"#c9a233",
    short:()=>`az összhang-építése +${BOOST_BOND_PCT[0]}-${BOOST_BOND_PCT[1]}%`,
    long:()=>`Az egész csapattal való összeszokása gyorsul: minden kötése <b>${BOOST_BOND_PCT[0]}-${BOOST_BOND_PCT[1]}%-kal</b> gyorsabban épül, tartósan. A legolcsóbb boost, mert lassan és közvetve fizet — de egy frissen igazolt kulcsemberen ez hozza vissza leghamarabb a csapat-összhangot. Ismételhető, legfeljebb ${String(BOOST_BOND_MAX).replace(".",",")}× ütemig.`},
@@ -95866,12 +96136,12 @@ const BOOST_KINDS=[
      +`a keret a nyár nyílásakor töltődik újra.`},
   {k:"prime",ic:"🌟",n:"Fénykor",col:"#f5b942",
    short:()=>`${PRIME_AGE_MIN}–${PRIME_AGE_MAX} év: nagy ugrás, próbaidővel`,
-   long:()=>{const r=primeBoostRanges();return `A játékosok fénykora (${PRIME_AGE_MIN}–${PRIME_AGE_MAX} év): <b>+${r.rLo}-${r.rHi} Rating</b> és <b>+${r.tLo}-${r.tHi} POT</b> — a régi öreg róka teljes ereje. `
+   long:()=>{const r=primeBoostRanges();return `A játékosok fénykora (${PRIME_AGE_MIN}–${PRIME_AGE_MAX} év): <b>+${r.rLo}-${r.rHi} Rating</b>, és a POT vele együtt nő — a régi öreg róka teljes ereje, a 🧮 boost-plafonig. `
      +`<b>Próbaidővel:</b> a következő teljes idényben legalább ${PRIME_MIN_MATCHES} meccs és egy ezüst-szintű idény kell (a szezonkártyák mércéje), különben a kapott érték levonódik.`;},
    go:()=>openPrimeBoostPanel()},
   {k:"old",ic:"🎩",n:"Öreg róka boost",col:"#d9b98a",
    short:()=>`30 fölött: rutin és kitolt nyugdíj`,
-   long:()=>{const r=oldBoostRanges();return `Az ifi-boost tükörképe a pálya másik végén: egy 30 fölötti játékosod Ratingje (<b>+${r.rLo}-${r.rHi}</b>) és POT-je (<b>+${r.tLo}-${r.tHi}</b>) ugrik, és <b>${OLD_BOOST_RETIRE_AGE} éves koráig</b> nem vonul vissza. Ugyanazon az emberen minden újabb boost drágább. (3.9.256 óta 25%-kal szerényebb — a teljes erő a 🌟 Fénykoré.)`;},
+   long:()=>{const r=oldBoostRanges();return `Az ifi-boost tükörképe a pálya másik végén: egy 30 fölötti játékosod Ratingje (<b>+${r.rLo}-${r.rHi}</b>, a 🧮 boost-plafonig) és vele a POT-je ugrik, és <b>${OLD_BOOST_RETIRE_AGE} éves koráig</b> nem vonul vissza. Ugyanazon az emberen minden újabb boost drágább. (3.9.256 óta 25%-kal szerényebb — a teljes erő a 🌟 Fénykoré.)`;},
    go:()=>openOldBoostPanel()}];
 function boostKindDef(k){return BOOST_KINDS.find(x=>x.k===k)||null;}
 /* ⚡ 3.9.185 — a fajtára szóló talizmán-kedvezmények a katalógus sorában:
@@ -96398,7 +96668,8 @@ function openOldBoostPanel(){
   const cheapest=Math.min(...vets.map(p=>oldBoostPriceFor(careerPool[p.n])));
   const affordable=S.transferBudget>=cheapest;
   $("twBody").innerHTML=`<p style="font-size:12.5px;line-height:1.55;color:var(--dim2)">
-    Alapára <b style="color:#a67c4a">${fmtFt(price)}</b> · hatása: <b>+${rLo}-${rHi} Rating</b> (aki a saját potenciálja alatt állt, még többet kap) és <b>+${tLo}-${tHi} POT</b>, és a játékos <b>${OLD_BOOST_RETIRE_AGE} éves koráig</b> nem vonul vissza. Csak 30 fölötti játékosra.<br>
+    Alapára <b style="color:#a67c4a">${fmtFt(price)}</b> · hatása: <b>+${rLo}-${rHi} Rating</b> (aki a saját potenciálja alatt állt, az is legfeljebb a plafonig), és a POT vele együtt nő; a játékos <b>${OLD_BOOST_RETIRE_AGE} éves koráig</b> nem vonul vissza. Csak 30 fölötti játékosra.<br>
+    <span style="font-size:11.5px">${boostPlafonTxt()}</span><br>
     <b>Ismételhető</b> — de UGYANAZON az emberen minden újabb boost drágább: +25%, +33%, +50%, +75%, majd +100%. Másik veteránnál mindig az alapár él.<br>
     ${affordable?"Válaszd ki az öreg rókát:":`<span style="color:var(--red)">Nincs elég büdzséd (${fmtFt(S.transferBudget)}) a legolcsóbb boostra sem (${fmtFt(cheapest)}).</span>`}</p>`;
   $("twActions").innerHTML="";
@@ -96418,7 +96689,7 @@ function openOldBoostPanel(){
           <div style="font-size:12.5px;color:var(--dim);margin-top:3px">${e.pos.join("/")} · ${e.age} év · Rating ${Math.round(pOvr(p))} · ${potTag(p.n)||("POT "+e.pot)}</div>
           ${cnt?`<div style="font-size:12px;color:#d9b98a;margin-top:4px">🎩 Ez már a ${cnt+1}. boostja — eddig +${e.oldBoostR||0} Rating és +${e.oldBoostT||0} POT jött belőle, ezért az ára ${Math.round((pr/price-1)*100)}%-kal magasabb az alapárnál (${fmtFt(price)}).</div>`:""}
           <div style="font-size:13px;margin-top:9px;line-height:1.5">Ára <b style="color:var(--gold)">${fmtFt(pr)}</b> — az egyenleged ${fmtFt(S.transferBudget)} → <b>${fmtFt(S.transferBudget-pr)}</b>.
-            Hatása <b>+${rLo}-${rHi} Rating</b> és <b>+${tLo}-${tHi} POT</b>, és ${OLD_BOOST_RETIRE_AGE} éves koráig a pályán tartja.</div>`,
+            Hatása <b>+${rLo}-${rHi} Rating</b>, és a POT vele együtt nő (${boostPlafonTxt(e)}); ${OLD_BOOST_RETIRE_AGE} éves koráig a pályán tartja.</div>`,
         onYes:()=>{
       if(S.transferBudget<pr||!isVeteranBoostable(e))return;
       if(pr===0)boostFreeSpend("old");      /* ingyen-zseton (3.9.76) */
@@ -107391,7 +107662,7 @@ function mpCelresAblak(tovabb){
             <button class="btn-s" id="mpCelMinus" ${cel<=H0.lo+1e-9?"disabled":""}>− nehezebb</button>
             <button class="btn-s" id="mpCelPlus" ${cel>=H0.hi-1e-9?"disabled":""}>+ könnyebb</button></div>`
         +`<div id="mpCelBecsles">${becslesHtml()}</div>`,
-      "",
+      nfKovKapcsoloHtml(),
       [nfGomb("Rendben — indul az idény","btn-y stepbtn",()=>{
           if(H0.nf)S.pyr.nfHangNext=Math.round((cel-H0.alap)*100)/100;else S.pyr.vallNext=cel;
           zar();kozzetesz();
@@ -107401,6 +107672,7 @@ function mpCelresAblak(tovabb){
           zar();$("scUnlock").classList.add("hide");
           try{renderHub();$("scHub").classList.remove("hide");}catch(e){}})],
       body=>{
+        nfKovKapcsoloKot(body,rajz);
         const m=body.querySelector("#mpCelMinus"),pl=body.querySelector("#mpCelPlus");
         if(m)m.onclick=()=>{cel=Math.max(H0.lo,Math.round((cel-0.1)*100)/100);rajz();kozzetesz();};
         if(pl)pl.onclick=()=>{cel=Math.min(H0.hi,Math.round((cel+0.1)*100)/100);rajz();kozzetesz();};});
@@ -107470,6 +107742,38 @@ function mpOsztottOff(){
     return O.off;}catch(e){return 0;}}
 function mpParharcLezarva(){
   try{return (typeof h2hRoomActive==="function"&&h2hRoomActive())&&!!S.mpParharcVege;}catch(e){return false;}}
+/* a kezdőrúgás előtti kapu: true, ha átvette az irányítást (kérdez, vagy a
+   párharc lezárult) — ilyenkor a döntés után ő hívja újra a folytatást */
+function mpOsztottKezdoKapu(tovabb){
+  if(!(typeof h2hRoomActive==="function"&&h2hRoomActive()))return false;
+  if(!(typeof pyrOn==="function"&&pyrOn()&&pyrFloorOn())||S.auto)return false;
+  const P=S.pyr,pair=P&&P.superPair,sn=(S.seasonNumber||1)+1;
+  if(!pair||pair.for!==sn||sn<2)return false;
+  const B=mpOsztBecslesPar(pair);if(!B)return false;
+  const nagy=Math.min(B.gE,B.gT)<=-MP_OSZT_KUSZOB&&Math.max(B.gE,B.gT)>=MP_OSZT_KUSZOB;
+  /* régi kliens (az indító rekordjában nincs osztV): nem kérdezünk — ő sosem
+     válaszolna —, de NEM némán: a napló kimondja, miért maradt el */
+  if(!pair.osztV){
+    if(nagy&&P.osztRegiNaplo!==sn){P.osztRegiNaplo=sn;
+      try{addLine(`⚖️ Nagy a különbség (becsült rés: te ${String(B.gE).replace(".",",")}, a társad ${String(B.gT).replace(".",",")}), de az osztott nehézség felajánlása kimaradt: valamelyikőtök indítása még egy régebbi verzióval ment fel. A következő idénytől — ha mindketten frissítettetek — megjelenik.`,"m life");}catch(e){}}
+    return false;}
+  const D=S.mpOsztDont;
+  if(D&&D.season===sn){
+    if(D.c===2){mpParharcVegeAblak();return true;}
+    if(D.c===3&&!(P.osztottKell&&P.osztottKell.sn===sn)&&!(P.osztott&&P.osztott.sn===sn))mpOsztAlkalmaz(3,B,sn,()=>{});
+    return false;}
+  const lo=Math.min(B.gE,B.gT),hi=Math.max(B.gE,B.gT);
+  if(!(lo<=-MP_OSZT_KUSZOB&&hi>=MP_OSZT_KUSZOB))return false;
+  mpOsztAblak(B,sn,tovabb);
+  return true;}
+/* a becslés a kézfogás eltett számaiból és a MOSTANI (a forduló utáni) közös
+   világból — mindkét gépen ugyanaz, tükörben */
+function mpOsztBecslesPar(pair){
+  if(typeof pair.vallA!=="number"||typeof pair.vallB!=="number")return null;
+  const want=(pair.vallA+pair.vallB)/2;
+  let lvl=0;try{lvl=pyrLevel();}catch(e){lvl=0;}
+  const mezo=Math.max(pair.avg-want,lvl+Math.max(0,(pair.hid||0)*OPP_BUFF_MEASURED));
+  return {gE:Math.round((pair.wa-mezo)*10)/10,gT:Math.round((pair.wb-mezo)*10)/10,mezo:Math.round(mezo*10)/10,wa:pair.wa,wb:pair.wb};}
 function mpOsztottKapu(mine,mate,onReady){
   const sn=mpUpcomingSeason();
   let B=null;try{B=mpOsztKell(mine,mate);}catch(e){B=null;}
@@ -107508,7 +107812,7 @@ function mpOsztAblak(B,sn,onReady){
       :!A.tars?`<span class="h2hDot"></span> A választásod elment — várunk a társadra.`
       :A.en!==A.tars?`A társad mást választott (${A.tars}.) — ha egyetértesz vele, válaszd te is; vagy várd meg, átvált-e.`:"";
     nfKepernyo(`⚖️ Nagy a különbség — a ${sn}. idény előtt`,
-      `Mindketten elindítottátok az idényt, de a két csapat messze van egymástól. A közös mezőnyhöz mérve a becsült rés:`
+      `Indulna az idény, de a két csapat messze van egymástól. A közös mezőnyhöz mérve (a fel- és kiesés után) a becsült rés:`
       +`<div style="display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px"><span>A te csapatod</span><b style="color:${B.gE<0?"var(--red)":"var(--grass)"}">${n1(B.gE)}</b></div>`
       +`<div style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><span>A társadé</span><b style="color:${B.gT<0?"var(--red)":"var(--grass)"}">${n1(B.gT)}</b></div>`
       +`<div style="font-size:11.5px;color:var(--dim2);margin-top:4px">${hatrany?"Te vagy lemaradva":"Te állsz elöl"} — a közös mezőny ~${String(B.mezo).replace(".",",")} meccs-erő.</div>`
@@ -112406,6 +112710,12 @@ function talRezonanciaHtml(){
   return h;}
 
 function startNextCareerSeason(){
+  /* ⚖️ 3.9.317 — a nagy különbség felajánlása IDE került, a kezdőrúgás elé:
+     az osztályozó és a fel-/kiesés (a páros egy osztályba kerülése) UTÁN. A
+     3.9.316-ban a közös kapunál kérdezett, ahol a mezőny még a régi osztályé
+     volt — egy feljutás utáni nagy rés ott nem látszott (bejelentett eset:
+     D3 → D2, −2,8 / +7,1, és nem jött kérdés). */
+  try{if(mpOsztottKezdoKapu(startNextCareerSeason))return;}catch(e){}
   /* 🛡 3.9.288 — hardcore: az idény első szakaszának scout-terve */
   try{if(mpHardcore())setTimeout(()=>hcScoutTervNaplo(`s${S.seasonNumber||1}:a`),0);}catch(e){}
   phase="season";
@@ -131867,7 +132177,9 @@ function meresBeall(){
       fok:P.diffT!=null?P.diffT:null,eltolas:P.worldShift||0,klubNyers:P.clubRaw||null,klubEff:P.clubEff||null,gap0:P.gap0,
       padlo:P.padlo||0,nf:P.nf||null,cel:(typeof P.cel==="number")?P.cel:null,
       /* 🎚 3.9.223 — a fokozat-csomag és a téli tűrés */
-      fok:P.fok?`${P.fok.egyeni?"e":""}${P.fok.nf}.${P.fok.s}`:null,tel:P.tel||null}:null,
+      fok:P.fok?`${P.fok.egyeni?"e":""}${P.fok.nf}.${P.fok.s}`:null,tel:P.tel||null,
+      /* 🎯 3.9.318 — a követéses szerződés */
+      kovet:P.kovetV?1:0}:null,
     szint:mR1(mTry(()=>levelGap())),scout:mTry(()=>scout?{nev:scout.name,csillag:scout.stars}:null),
     ugynokseg:mR1(mTry(()=>agencyStars())),edzo:mTry(()=>coach?{nev:coach.n||coach.name||null,csillag:coach.stars||null}:null),
     kapitany:mTry(()=>slots[captainIdx]&&slots[captainIdx].player&&slots[captainIdx].player.n),
@@ -131954,6 +132266,30 @@ function meresMegfigyelt(e,ok){
   const z=meresSzezon();if(!z)return;
   (z.megf=z.megf||[]).push({n:e.n,i:(S&&S.idx)||0,ok,ovr:mR1(e.startRating),pot:e.pot,age:e.age,pos:(e.pos||[])[0]||null});
   meresSave();}
+/* 3c. 🧮 3.9.318 — MINDEN Ratinget/csúcsot emelő boost: fajta, forduló, a
+   játékos előtte/utána, a plafon, a levágott rész, a kezdő 11-re eső hatás és
+   az adósság. KIMONDOTT KÉRÉS: „építsük be a boost mérőt a firebase feltöltős
+   cuccba" — ebből látszik majd, mennyit ér egy boost a karrier egyes
+   szakaszaiban, és mennyit vág le belőle a plafon. */
+function meresBoost(entry,kind,el,out,ad){
+  if(!meresOn()||!entry)return;
+  const z=meresSzezon();if(!z)return;
+  const xi=mTry(()=>boostXiRef());
+  const dR=Math.round(((entry.startRating||0)-el.r)*10)/10;
+  (z.boost=z.boost||[]).push({k:kind,i:(S&&S.idx)||0,
+    nyar:(mTry(()=>{const r=pyrFloorHist()[S.seasonNumber||1];return !(r&&r.done&&r.veg==null);})?1:0),
+    pos:((entry.pos||[])[0])||null,age:entry.age!=null?entry.age:null,
+    r0:mR1(el.r),r1:mR1(entry.startRating),dR,pk0:mR1(el.peak),pk1:mR1(entry.peak),pot0:el.pot||0,pot1:entry.pot||0,
+    cap:out?out.cap:null,levR:out?(out.levagR||0):0,levPk:out?(out.levagPeak||0):0,
+    xi:mR1(xi),dXi:mR1(dR/BOOST_XI_N),ad:ad||0,n:mTry(()=>boostIsmetN(entry)),
+    mezony:mR1(mTry(()=>oppTargetRating)),inf:mTry(()=>infinityMode)?1:0});
+  meresSave();}
+/* 3d. 🎯 3.9.318 — a rés-követés lépései (forduló, átlagos eltérés a pályától, emelés) */
+function meresKovet(x){
+  if(!meresOn()||!x)return;
+  const z=meresSzezon();if(!z)return;
+  (z.kovet=z.kovet||[]).push(x);
+  meresSave();}
 /* 4. a bajnokság lezárása (a szezontörténet bejegyzése után) */
 function meresLiga(e){
   if(!meresOn()||!e)return;
@@ -131983,7 +132319,9 @@ function meresSzezonZar(){
       nf:h.nf||null,celres:(typeof h.cel==="number")?h.cel:null,fek:h.fek||0,resVeg:(typeof h.veg==="number")?h.veg:null,
       dg:(typeof h.dg==="number")?h.dg:null,dgBecsles:(typeof h.dgBecsles==="number")?h.dgBecsles:null,
       /* 🏃 3.9.254 — az idény-gyorsítás: mennyi gyűlt, hány fordulóban állt meg (őr) */
-      gyors:(S.pyr&&S.pyr.gyors&&S.pyr.gyors.sn===z.sz)?{acc:S.pyr.gyors.acc,szunet:S.pyr.gyors.szunet||0}:null}
+      gyors:(S.pyr&&S.pyr.gyors&&S.pyr.gyors.sn===z.sz)?{acc:S.pyr.gyors.acc,szunet:S.pyr.gyors.szunet||0}:null,
+      /* 🎯 3.9.318 — a folyamatos rés-követés: rajt, várt növekedés, tűrés, emelések, boost-adósság, a fordulónkénti nyers rés */
+      kovet:h.kov?{rajt:h.kov.rajt,dgB:h.kov.dgB,tur:h.kov.tur,emel:h.kov.emel||[],ad:h.kov.ad||0,adDb:h.kov.adDb||0,g:h.kov.g||{}}:null}
       :{vall:pyrFloorG0(),cel:pyrFloorG0(),emelesRajt:0,emelesTel:0};}}catch(e){}
   meresSave();
   try{meresFeltolt(false);}catch(e){}}

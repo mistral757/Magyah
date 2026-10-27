@@ -77,7 +77,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       const q=mk(25),r3=applyPotBoost(q);o.potT.push(r3.tBoost);
       const w=mk(25),r4=applyPlainBoost(w);o.plainT.push(r4.tBoost);}
     const mm=a=>[Math.min(...a),Math.max(...a)];
-    return {sk:o.sk,ch:o.ch,plain:o.plain,potB:o.potB,card:o.card,ifiT:mm(o.ifiT),ifiR:mm(o.ifiR),oregT:mm(o.oregT),potT:mm(o.potT),plainT:mm(o.plainT)};},[field,pot]);
+    return {cap:boostCapAlap(),sk:o.sk,ch:o.ch,plain:o.plain,potB:o.potB,card:o.card,ifiT:mm(o.ifiT),ifiR:mm(o.ifiR),oregT:mm(o.oregT),potT:mm(o.potT),plainT:mm(o.plainT)};},[field,pot]);
 
   console.log("— 1. 85-ös mezőnyig semmi nem változik —");
   const a85=await meres(85,3000),a70=await meres(70,3000);
@@ -91,10 +91,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const a100=await meres(100,7000),a400=await meres(400,900000);
   ok(a100.sk>2.9&&a100.sk<3.3&&a400.sk>600&&a400.sk<680,"a szorzó 100-asnál ~×3, 400-asnál ~×640",[a100.sk,a400.sk]);
   ok(a100.sk===a100.ch&&a400.sk===a400.ch,"egy mérce: pontosan a kihívás POT-jutalmáé",[a100.ch,a400.ch]);
-  ok(a400.ifiT[0]>=Math.round(1000*a400.sk)-1&&a400.ifiT[0]>500000,"400-as mezőnyben a 900 000-es ifi legalább ~640 000 POT-ot kap (régen ~5 000)",a400.ifiT);
-  ok(a400.potT[0]>=Math.min(Math.round(1000*a400.sk),2872510-900000)-1,"a POT-boost alsó korlátja is nőtt (a kemény plafonig)",a400.potT);
-  ok(a400.plainT[0]>=Math.round(400*a400.sk)-1,"a sima boost POT-ja a megnőtt alsó korlát fölött",a400.plainT);
-  ok(a400.ifiR[0]>=Math.round(6*4)-1&&a400.ifiR[1]<=Math.round(12*4)+1,"a Rating-ugrás léptéke változatlan (mezőny/100: 400-asnál ×4)",a400.ifiR);
+  /* 🧮 3.9.318 ÓTA: a POT-ajándék a csúcshoz igazodik (a boost-plafon) — a
+     skálázott sáv a FELSŐ határ, nem a garantált összeg; a Rating-ugrás a
+     plafonig. A részleteket a boost-plafon-3-9-318-proba méri. */
+  ok(a400.ifiT[0]>=0&&a400.ifiT[1]<=Math.round(2500*a400.sk)+1,"400-as mezőnyben az ifi POT-ja a skálázott sávon belül, a 🧮 plafonig (3.9.318)",a400.ifiT);
+  ok(a400.potT[0]>=0&&a400.potT[1]<=Math.round(10000*a400.sk)+1,"a POT-boost POT-ja a skálázott korláton belül, a 🧮 plafonig (3.9.318)",a400.potT);
+  ok(a400.plainT[0]>=0&&a400.plainT[1]<=Math.round(2500*a400.sk)+1,"a sima boost POT-ja a skálázott korláton belül, a 🧮 plafonig (3.9.318)",a400.plainT);
+  ok(a400.ifiR[1]<=a400.cap&&a400.ifiR[0]>=Math.min(a400.cap,Math.round(6*4))-1,"a Rating-ugrás a mezőny/100 léptékkel, a 🧮 plafonig (3.9.318)",{r:a400.ifiR,cap:a400.cap});
   const c400=await p.evaluate(()=>[cardUpRatingFor(0),cardUpRatingFor(150),cardUpRatingFor(400)]);
   ok(a100.card===2&&c400[0]===2,"a kártya-jutalom 100-as mezőnyig +2",[a100.card,c400[0]]);
   ok(c400[1]===3&&c400[2]===8,"150-esnél +3, 400-asnál +8",c400);
@@ -118,7 +121,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return o;});
   ok(u.ifi.includes(u.ifiVart),"az ifi-boost panelje a skálázott POT-sávot írja",{vart:u.ifiVart,van:u.ifi.slice(0,160)});
   ok(u.potVart.every(x=>u.pot.includes(x))&&u.plainVart.every(x=>u.plain.includes(x)),"a Boost-központ sima és POT-leírása a skálázott korlátokat írja",{pot:u.potVart,plain:u.plainVart});
-  ok(u.oreg.includes(u.oregVart),"az öreg-boost panelje a skálázott POT-sávot írja",{vart:u.oregVart,hiba:u.oregHiba});
+  ok(/🧮plafon/.test(u.oreg)&&/POTvele/.test(u.oreg),"az öreg-boost panelje a 🧮 plafont írja, a POT a Ratinggel nő (3.9.318)",{van:u.oreg.slice(0,200),hiba:u.oregHiba});
 
   console.log("\n— 4. a kártya-fejlesztés —");
   const k=await p.evaluate(()=>{
