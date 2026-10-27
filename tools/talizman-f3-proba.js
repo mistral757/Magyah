@@ -295,7 +295,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     for(let i=0;i<200;i++){
       const c=talCsomagDob(rnd);
       const jo=c.filter(id=>TAL_ESEMENY_BY[id].jo).length;
-      if(c.length===3&&jo===2)jo2rossz1++;
+      if(c.length===4&&jo===3)jo2rossz1++;   /* 3.9.321: 3 jó + 1 rossz */
       if(new Set(c).size===c.length)kulonbozo++;}
     ki.jo2rossz1=jo2rossz1;ki.kulonbozo=kulonbozo;
     /* a lapon látszik, és a választás a paklihoz adja */
@@ -304,19 +304,20 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.szoveg=talAlapSzoveg(L);
     T.varo=[{id:"cs-1",forras:"utem",n:1,szezon:3,fordulo:5,kinalat:[L,talUjLap(rnd,"bank",1),talUjLap(rnd,"scout",1)]}];
     talValaszt(0);
-    ki.pakli=Object.keys(T.esemenyek);
+    const K=talEsemenyKiemelt();
+    ki.pakli=Object.keys(K);
     ki.egyezik=JSON.stringify(ki.pakli.slice().sort())===JSON.stringify(L.csomag.slice().sort());
-    /* ami már bent van, nem jön újra */
-    let ujra=0;for(let i=0;i<100;i++)talCsomagDob(rnd).forEach(id=>{if(T.esemenyek[id])ujra++;});
+    /* ami már ki van emelve, nem jön újra lapon */
+    let ujra=0;for(let i=0;i<100;i++)talCsomagDob(rnd).forEach(id=>{if(K[id])ujra++;});
     ki.ujra=ujra;
     ki.szam={jo:TAL_ESEMENY.filter(e=>e.jo).length,rossz:TAL_ESEMENY.filter(e=>!e.jo).length};
     ki.specDb=TAL_SPEC.length;
     return ki;});
   console.log("\n— 5. A JOKER ESEMÉNYCSOMAGJA —");
-  ok(j.jo2rossz1===200&&j.kulonbozo===200,"minden csomag 2 jó és 1 rossz, ismétlés nélkül",j);
-  ok(/📦/.test(j.szoveg)&&(j.szoveg.match(/✦/g)||[]).length===2&&(j.szoveg.match(/✖/g)||[]).length===1,"a csomag tartalma a lapon látszik",j.szoveg);
-  ok(j.egyezik&&j.pakli.length===3,"a választás a három eseményt a paklihoz adja",j.pakli);
-  ok(j.ujra===0,"ami már a pakliban van, nem jön újra csomagban",j.ujra);
+  ok(j.jo2rossz1===200&&j.kulonbozo===200,"3.9.321: minden Joker-lap 3 jó és 1 rossz (negatív oldal) eseményt emel ki, ismétlés nélkül",j);
+  ok(/🃏/.test(j.szoveg)&&(j.szoveg.match(/✦/g)||[]).length===3&&(j.szoveg.match(/✖/g)||[]).length===1,"a kiemelt események a lapon látszanak",j.szoveg);
+  ok(j.egyezik&&j.pakli.length===4,"a választott lap a négy eseményt kiemeli",j.pakli);
+  ok(j.ujra===0,"ami már ki van emelve, nem jön újra lapon",j.ujra);
   ok(j.szam.jo>=9&&j.szam.rossz>=7&&j.specDb>=80,"a tár: legalább 9 jó és 7 rossz esemény, 80+ special",{...j.szam,spec:j.specDb});
 
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));

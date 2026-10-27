@@ -70,7 +70,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     if(captainIdx<0)captainIdx=0;if(!coach)coach=COACHES[0];
     phase="season";S.seasonNumber=3;S.idx=0;S.W=0;S.D=0;S.L=0;S.tal=null;
     addLine=()=>{};
-    window._pakli=ids=>{S.tal=null;const T=talState();ids.forEach(id=>{T.esemenyek[id]={szezon:3,suly:1,uid:1};});return T;};
+    /* 3.9.321: minden esemény alapból a pakliban — a többit „idén kijött"-re állítjuk */
+    window._pakli=ids=>{S.tal=null;const T=talState();
+      TAL_ESEMENY.forEach(e=>{if(ids.indexOf(e.id)<0)T.esemenyek[e.id]={utolso:S.seasonNumber||1};});
+      ids.forEach(id=>{T.esemenyek[id]={szezon:3,suly:1,uid:1};});return T;};
     window._sorsol=()=>{
       const regi=TRANSFER_TYPES.map(t=>t.weight),_r=Math.random;
       TRANSFER_TYPES.forEach(t=>{t.weight=0;});
@@ -228,8 +231,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* a gép a legtöbbet érőt */
     _pakli(["szponzor"]);
     const h=talEsemenyElo("szponzor");
-    const ertek=k=>{const a=h.aj[k];return (a.k==="logo"?w*a.pct*30:a.k==="szin"?a.osszeg*3:a.osszeg)*a.ev;};
-    const best=["logo","szin","stadion"].sort((x,y)=>ertek(y)-ertek(x))[0];
+    const ertek=k=>{const a=h.aj[k];return ((a.k==="logo"||a.k==="mezjel")?w*a.pct*30:a.k==="szin"?a.osszeg*3:a.osszeg)*a.ev;};
+    const best=["logo","szin","mezjel","stadion"].sort((x,y)=>ertek(y)-ertek(x))[0];
     ki.auto={val:h.auto(),best};
     /* futó szerződés mellett nincs új ajánlat */
     talEsFut().szponzor={k:"logo",logo:"🍺",cegnev:"X",pct:0.1,elso:3,utolso:3};
@@ -237,7 +240,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     talEsFut().szponzor=null;
     return ki;});
   console.log("\n— 3. 🎽 SZPONZOR —");
-  ok(/Mezszponzor/.test(sp.kepernyo.cim)&&sp.kepernyo.jel==="__TAL_PENDING__"&&sp.kepernyo.gombok===4,"a valódi képernyő: három ajánlat és a „nem”",sp.kepernyo);
+  ok(/Mezszponzor/.test(sp.kepernyo.cim)&&sp.kepernyo.jel==="__TAL_PENDING__"&&sp.kepernyo.gombok===5,"a valódi képernyő: négy ajánlat (3.9.321: mezjel) és a „nem”",sp.kepernyo);
   ok(sp.logo.logo&&sp.logo.fejlec,"🍺 a logó a fejlécben, a címer sarkában",sp.logo);
   ok(sp.logoFizet.kap===sp.logoFizet.vart&&sp.logoFizet.kap>0,"a logó meccsenként fizet (a heti lelátó %-a)",sp.logoFizet);
   ok(sp.felbont.ok&&sp.felbont.fizet===sp.felbont.kot&&sp.felbont.kot>0&&sp.felbont.nincs&&sp.felbont.fejlec,"a felbontás kötbére a hátralévő érték fele, és a logó eltűnik",sp.felbont);

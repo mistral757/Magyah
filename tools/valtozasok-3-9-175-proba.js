@@ -188,11 +188,16 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     S.tal=null;const T=talState();
     const ids=Object.keys(TAL_ES_IMPL).filter(id=>TAL_ESEMENY_BY[id]);
     const jo=ids.find(id=>TAL_ESEMENY_BY[id].jo),rossz=ids.find(id=>!TAL_ESEMENY_BY[id].jo);
-    T.esemenyek={[jo]:{suly:1},[rossz]:{suly:1}};
+    /* 3.9.321: a Joker-színhűség a KIEMELT eseményekre hat — egy bronz kiemelő lap
+       (×4: 0,25 → 1) teszi a kettőt az összevethető 1-es súlyra */
+    const kiemelo={kat:"joker",rang:1,dobas:0.5,valt:"csomag",csomag:[jo,rossz],uid:99,szezon:1};
     const suly=()=>{_talAlapMemo=null;const o={};talEsemenyPakli().forEach(x=>{o[x.tal]=x.weight;});return [o[jo],o[rossz]];};
     /* minden állapot saját sorszámot kap — a talEloszlas memója erre figyel */
     let sq=100;
-    const lapok=(kat,n)=>{sq+=10;T.lapok=Array.from({length:n},(_,i)=>({kat,rang:1,dobas:0.5,valt:"_nincs",uid:sq+i,szezon:1}));T.seq=sq;};
+    const lapok=(kat,n)=>{sq+=10;T.lapok=Array.from({length:n},(_,i)=>({kat,rang:1,dobas:0.5,valt:"_nincs",uid:sq+i,szezon:1}));
+      /* a kiemelő lap maga is Joker: a fokozat a többivel együtt számol, ezért eggyel kevesebb sima lap */
+      if(kat==="joker"&&n>0)T.lapok[0]=Object.assign({},kiemelo,{uid:sq});else T.lapok.push(Object.assign({},kiemelo,{uid:sq+50}));
+      T.seq=sq;};
     const out={};
     lapok("joker",0);out.j0=suly();
     lapok("joker",2);out.j2=suly();
