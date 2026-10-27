@@ -19,10 +19,37 @@
 A kiváltó helyzet (képernyőkép): a közös mezőny ~104,3, a te résed −3,8, a
 társadé +8,2.
 
+## 3.9.317 — a felajánlás a kezdőrúgás elé került
+
+**A bejelentett eset.** A 2. idény után D3 → D2 feljutás jött, osztályozóval.
+A közös mezőny ~103,7–105,5 lett, a két rés −2,8 és +7,1. Mégis kérdés nélkül
+indult az idény.
+
+**Ok 1: rossz pillanat.** A 3.9.316 a felajánlást a közös kezdőkapunál
+kérdezte. Ott a mezőny még a RÉGI osztályé volt: az osztályozó, a fel- és
+kiesés és a páros egy osztályba kerülése csak UTÁNA jön.
+
+**Ok 2: néma kihagyás.** A kérdés csak akkor jön, ha mindkét indító rekord
+tudja, hogy a kliens ismeri a felajánlást (`osztV`). Ha valamelyikőtök
+indítása még a frissítés előtt ment fel, vagy régebbi verzióval, a felajánlás
+**némán** kimaradt.
+
+**Most:**
+
+* **Új időpont:** a felajánlás a **kezdőrúgás előtt** jön
+  (`startNextCareerSeason` → `mpOsztottKezdoKapu`), tehát az osztályozó és a
+  fel- vagy kiesés UTÁN. A becslés a kézfogás eltett számaiból (a két
+  súlyozott meccs-erő, a két vállalás, a pár rejtett bónusza) és a MOSTANI
+  közös világból számol, mindkét gépen ugyanúgy, tükörben.
+* **Régi kliensnél** sem kérdez, mert az sosem válaszolna, de nagy
+  különbségnél a napló kimondja, miért maradt el.
+* **A közös kezdőkapu** csak a kézfogást végzi; azt is elteszi, hogy mindkét
+  kliens ismeri-e a felajánlást (`superPair.osztV`).
+
 ## Mikor jön elő
 
-**A pillanat:** a közös kezdőkapunál (`mpSeasonGate`), amikor **mindkét**
-indító rekord fent van, vagyis mindketten rányomtatok az indításra.
+**A pillanat (3.9.317 óta):** a kezdőrúgás előtt, miután mindketten
+rányomtatok az indításra, és lement az osztályozó és a fel- vagy kiesés.
 Piramis-karrierben, a padlós (célrés) rendszerrel, a 2. idénytől.
 
 **A feltétel:** a két becsült rés egyike **legfeljebb −2**, a másik
@@ -122,7 +149,7 @@ nem torzítja a világ jövő évi fejlődését.
 
 ## Próba
 
-`tools/osztott-nehezseg-3-9-316-proba.js`, 16 állítás, a játék helyi
+`tools/osztott-nehezseg-3-9-316-proba.js`, 21 állítás (a 3.9.317-es kapuval együtt), a játék helyi
 szoba-hátterén:
 
 **A becslés:**

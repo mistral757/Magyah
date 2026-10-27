@@ -7848,7 +7848,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.316";
+const APP_VERSION="3.9.317";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -42084,6 +42084,8 @@ function pyrSuperPairStash(mine,mate){
   /* ⛰ 3.9.210 — a két vállalás (a társé hiányozhat: régi kliens) */
   p.vallA=(mine&&typeof mine.vall==="number")?mine.vall:null;
   p.vallB=(mate&&typeof mate.vall==="number")?mate.vall:null;
+  /* ⚖️ 3.9.316 — mindkét kliens ismeri-e az osztott nehézség felajánlását */
+  p.osztV=!!(mine&&mate&&mine.osztV&&mate.osztV);
   S.pyr.superPair=p;
   return p;}
 /* ---- A KALIBRÁCIÓ KÖZÖS KARRIERBEN ----
@@ -75512,9 +75514,7 @@ async function mpStartTick(key,myField,oppField,onReady,myBidRec){
           addLine(`✦ A mezőny már a helyén állt — nem kellett igazítani.`,"m ev");
       }
       try{saveGame();}catch(e){}
-      /* ⚖️ 3.9.316 — nagy különbségnél a felajánlás: maradunk / befejezzük /
-         osztott nehézség (ha nincs mit kérdezni, azonnal továbbenged) */
-      mpOsztottKapu(mine,mate,onReady);return;}
+      onReady();return;}
     /* MINDKÉT KLIENS UGYANEZT SZÁMOLJA ki ugyanabból a két rekordból — ezért
        nincs szükség "döntőbíró" oldalra, és nem is csúszhat szét. */
     const r=mpResolveLevel(mine,mate);
@@ -107455,6 +107455,38 @@ function mpOsztottOff(){
     return O.off;}catch(e){return 0;}}
 function mpParharcLezarva(){
   try{return (typeof h2hRoomActive==="function"&&h2hRoomActive())&&!!S.mpParharcVege;}catch(e){return false;}}
+/* a kezdőrúgás előtti kapu: true, ha átvette az irányítást (kérdez, vagy a
+   párharc lezárult) — ilyenkor a döntés után ő hívja újra a folytatást */
+function mpOsztottKezdoKapu(tovabb){
+  if(!(typeof h2hRoomActive==="function"&&h2hRoomActive()))return false;
+  if(!(typeof pyrOn==="function"&&pyrOn()&&pyrFloorOn())||S.auto)return false;
+  const P=S.pyr,pair=P&&P.superPair,sn=(S.seasonNumber||1)+1;
+  if(!pair||pair.for!==sn||sn<2)return false;
+  const B=mpOsztBecslesPar(pair);if(!B)return false;
+  const nagy=Math.min(B.gE,B.gT)<=-MP_OSZT_KUSZOB&&Math.max(B.gE,B.gT)>=MP_OSZT_KUSZOB;
+  /* régi kliens (az indító rekordjában nincs osztV): nem kérdezünk — ő sosem
+     válaszolna —, de NEM némán: a napló kimondja, miért maradt el */
+  if(!pair.osztV){
+    if(nagy&&P.osztRegiNaplo!==sn){P.osztRegiNaplo=sn;
+      try{addLine(`⚖️ Nagy a különbség (becsült rés: te ${String(B.gE).replace(".",",")}, a társad ${String(B.gT).replace(".",",")}), de az osztott nehézség felajánlása kimaradt: valamelyikőtök indítása még egy régebbi verzióval ment fel. A következő idénytől — ha mindketten frissítettetek — megjelenik.`,"m life");}catch(e){}}
+    return false;}
+  const D=S.mpOsztDont;
+  if(D&&D.season===sn){
+    if(D.c===2){mpParharcVegeAblak();return true;}
+    if(D.c===3&&!(P.osztottKell&&P.osztottKell.sn===sn)&&!(P.osztott&&P.osztott.sn===sn))mpOsztAlkalmaz(3,B,sn,()=>{});
+    return false;}
+  const lo=Math.min(B.gE,B.gT),hi=Math.max(B.gE,B.gT);
+  if(!(lo<=-MP_OSZT_KUSZOB&&hi>=MP_OSZT_KUSZOB))return false;
+  mpOsztAblak(B,sn,tovabb);
+  return true;}
+/* a becslés a kézfogás eltett számaiból és a MOSTANI (a forduló utáni) közös
+   világból — mindkét gépen ugyanaz, tükörben */
+function mpOsztBecslesPar(pair){
+  if(typeof pair.vallA!=="number"||typeof pair.vallB!=="number")return null;
+  const want=(pair.vallA+pair.vallB)/2;
+  let lvl=0;try{lvl=pyrLevel();}catch(e){lvl=0;}
+  const mezo=Math.max(pair.avg-want,lvl+Math.max(0,(pair.hid||0)*OPP_BUFF_MEASURED));
+  return {gE:Math.round((pair.wa-mezo)*10)/10,gT:Math.round((pair.wb-mezo)*10)/10,mezo:Math.round(mezo*10)/10,wa:pair.wa,wb:pair.wb};}
 function mpOsztottKapu(mine,mate,onReady){
   const sn=mpUpcomingSeason();
   let B=null;try{B=mpOsztKell(mine,mate);}catch(e){B=null;}
@@ -107493,7 +107525,7 @@ function mpOsztAblak(B,sn,onReady){
       :!A.tars?`<span class="h2hDot"></span> A választásod elment — várunk a társadra.`
       :A.en!==A.tars?`A társad mást választott (${A.tars}.) — ha egyetértesz vele, válaszd te is; vagy várd meg, átvált-e.`:"";
     nfKepernyo(`⚖️ Nagy a különbség — a ${sn}. idény előtt`,
-      `Mindketten elindítottátok az idényt, de a két csapat messze van egymástól. A közös mezőnyhöz mérve a becsült rés:`
+      `Indulna az idény, de a két csapat messze van egymástól. A közös mezőnyhöz mérve (a fel- és kiesés után) a becsült rés:`
       +`<div style="display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px"><span>A te csapatod</span><b style="color:${B.gE<0?"var(--red)":"var(--grass)"}">${n1(B.gE)}</b></div>`
       +`<div style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><span>A társadé</span><b style="color:${B.gT<0?"var(--red)":"var(--grass)"}">${n1(B.gT)}</b></div>`
       +`<div style="font-size:11.5px;color:var(--dim2);margin-top:4px">${hatrany?"Te vagy lemaradva":"Te állsz elöl"} — a közös mezőny ~${String(B.mezo).replace(".",",")} meccs-erő.</div>`
@@ -112391,6 +112423,12 @@ function talRezonanciaHtml(){
   return h;}
 
 function startNextCareerSeason(){
+  /* ⚖️ 3.9.317 — a nagy különbség felajánlása IDE került, a kezdőrúgás elé:
+     az osztályozó és a fel-/kiesés (a páros egy osztályba kerülése) UTÁN. A
+     3.9.316-ban a közös kapunál kérdezett, ahol a mezőny még a régi osztályé
+     volt — egy feljutás utáni nagy rés ott nem látszott (bejelentett eset:
+     D3 → D2, −2,8 / +7,1, és nem jött kérdés). */
+  try{if(mpOsztottKezdoKapu(startNextCareerSeason))return;}catch(e){}
   /* 🛡 3.9.288 — hardcore: az idény első szakaszának scout-terve */
   try{if(mpHardcore())setTimeout(()=>hcScoutTervNaplo(`s${S.seasonNumber||1}:a`),0);}catch(e){}
   phase="season";
