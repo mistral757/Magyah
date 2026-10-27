@@ -25,7 +25,8 @@
      7. a szponzorszín-szerződés az ablak-díj után is él (régi hiba), és a
         már elrontott mentés helyreáll;
      8. a mez eleje vagy hátulja az animációkban (arculat, 6. szakasz);
-     9. nincs oldalhiba. */
+     9. 3.9.323: ütközéskor a váltómez felcserélt színekkel, a jellel (Brighton-eset);
+    10. nincs oldalhiba. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT=process.env.MROOT||"/home/user/Magyah", PORT=9321;
@@ -251,10 +252,40 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r8.hatSzam&&r8.fejMas===true&&r8.nincsSzem,"hátulról: tarkó (szemek nélkül), a háton a szám, jel nélkül",r8);
   ok(r8.kapusEgy&&r8.stabil&&r8.ki,"az ellenfél kapusa 1-es, a többi szám névből stabil; visszakapcsolható",r8);
 
-  console.log("— 9. oldalhibák —");
+  console.log("— 9. 3.9.323: a beállított ellenfél-mez ütközéskor (Brighton) —");
+  const r9=await p.evaluate(()=>{
+    const o={};
+    const nev=mezEllenfelNev();
+    const H=mezHelyi();H[mezKulcs(nev,"klub")]={c1:"#f2f4f7",c2:"#1668c1",pat:"stripes",sleeve:"same",collar:"crew",ink:"#1668c1",jel:"🕊️",jelHely:"mellb"};
+    if(mezVanSzezon(nev))H[mezKulcs(nev,"szezon")]=0;
+    mezHelyiIr(H);
+    o.nincsUtk=JSON.stringify(evaEllenfelKit(nev,{c1:"#c8102e"}));
+    const V=evaEllenfelKit(nev,{c1:"#f2f4f7"});
+    o.V=V;
+    /* kettős ütközés: kék a mienk, a csere is ütközne (fehér-fehér mez) */
+    H[mezKulcs(nev,"klub")]={c1:"#f2f4f7",c2:"#eeeeee",pat:"hoops",collar:"v",ink:"#222222",jel:"★",jelHely:"has"};mezHelyiIr(H);
+    o.D=evaEllenfelKit(nev,{c1:"#f2f4f7"});
+    /* a stylist-ablak szól */
+    H[mezKulcs(nev,"klub")]={c1:"#f2f4f7",c2:"#1668c1",pat:"stripes",sleeve:"same",collar:"crew",ink:"#1668c1",jel:"🕊️",jelHely:"mellb"};mezHelyiIr(H);
+    const _k=kitForNow;kitForNow=()=>({c1:"#f2f4f7",c2:"#c8102e",pat:"solid"});
+    mezAblak(()=>{});
+    o.figy=!!document.getElementById("mezUtkozes")&&/váltómezét/.test(document.getElementById("mezUtkozes").textContent);
+    kitForNow=()=>({c1:"#c8102e",c2:"#ffffff",pat:"solid"});
+    mezAblak(()=>{});
+    o.csend=!document.getElementById("mezUtkozes");
+    kitForNow=_k;mezZar();
+    const H2=mezHelyi();delete H2[mezKulcs(nev,"klub")];mezHelyiIr(H2);
+    return o;});
+  ok(/"pat":"stripes"/.test(r9.nincsUtk)&&/"c1":"#f2f4f7"/.test(r9.nincsUtk),"ütközés nélkül a beállított mez megy, ahogy van",r9.nincsUtk);
+  ok(r9.V.c1==="#1668c1"&&r9.V.c2==="#f2f4f7"&&r9.V.pat==="stripes"&&r9.V.jel==="🕊️"&&r9.V.ink!==r9.V.c1,"fehér mez ellen: kék alap, fehér csíkok, a jel marad (nem sima fehér)",r9.V);
+  ok(r9.D.c1!=="#f2f4f7"&&!evaKitKozelP(r9.D.c1,"#f2f4f7")&&r9.D.pat==="hoops"&&r9.D.jel==="★","ha a csere is ütközne, sötét/színes alap, a minta és a jel marad",r9.D);
+  ok(r9.figy&&r9.csend,"a stylist-ablak szól, ha ezen a meccsen a váltómez megy — és hallgat, ha nem",r9);
+
+  console.log("— 10. oldalhibák —");
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,5));
   await b.close();srv.close();
   console.log(hiba?`✗ ${hiba} hiba`:"✓ minden rendben");
   process.exit(hiba?1:0);
 })().catch(e=>{console.error(e);process.exit(2);});
+function evaKitKozelP(a,b){const p=x=>[1,3,5].map(i=>parseInt(x.slice(i,i+2),16));const A=p(a),B=p(b);return Math.abs(A[0]-B[0])+Math.abs(A[1]-B[1])+Math.abs(A[2]-B[2])<150;}
 function kitJelHelyOk(h){return ["mellb","mellk","mellj","ujjb","has"].includes(h);}

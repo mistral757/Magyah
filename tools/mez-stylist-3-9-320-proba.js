@@ -155,7 +155,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r4.ugyanaz,"ugyanannak a meccsnek a második kezdőrúgásánál nem kérdez újra",r4.ugyanaz);
   ok(r4.ablak&&r4.voltSzoveg&&r4.gombok.length===3,"a következő meccs előtt is felugrik — akkor is, ha a csapatnak már van meze (és kiírja)",{v:r4.voltSzoveg,g:r4.gombok});
   ok(r4.motor===2&&r4.kitMarad==="#1668c1","„Most nem”: indul a meccs, a mez marad",{m:r4.motor,k:r4.kitMarad});
-  ok(r4.utkozes.c1==="#f2f4f7"&&r4.utkozes.c2==="#1668c1","ha a mienkhez túl közel esik, a váltómeze jön (világos alap, a klub színével)",r4.utkozes);
+  ok(r4.utkozes.c1==="#f2f4f7"&&r4.utkozes.c2==="#1668c1","ha a mienkhez túl közel esik, a váltómeze jön (3.9.323: felcserélt színek — itt fehér alap, kék)",r4.utkozes);
   ok(r4.auto,"automatikus végigjátszásnál nincs ablak",r4.auto);
   ok(r4.visszaGomb&&r4.torolve,"„vissza a sorsoltra” törli a beállított mezt",{g:r4.visszaGomb,t:r4.torolve});
 
