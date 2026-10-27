@@ -389,6 +389,15 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## klub-megerosites-3-9-319-proba.js — ✋ kész csapat: rákérdezés a választáskor
+
+```
+node tools/klub-megerosites-3-9-319-proba.js
+```
+
+* A klubválasztó „Ezzel a klubbal indulok" gombja előtt megerősítő ablak jön (a klub nevével, keretével); „Még nézelődöm": semmi nem indul; „Igen": indul.
+* Egyjátékosban, hagyományos karrierben (az osztályválasztó felé) és közös karrierben ugyanígy.
+
 ## boost-plafon-3-9-318-proba.js — 🧮🎯 boost-plafon, folyamatos rés-követés, boost-adósság
 
 ```
