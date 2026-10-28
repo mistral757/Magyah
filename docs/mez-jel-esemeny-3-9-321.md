@@ -157,6 +157,34 @@ pályakép"). Azonnal érvényes, és a mentéssel megmarad (`S.ident.animHatul`
 **Hatókör:** minden figurára hat, a saját csapatra és az ellenfélre is. A
 feliratsáv portréja továbbra is szemből mutatja az arcot.
 
+## 7. Javított hiba: a beállított ellenfél-mez ütközéskor (3.9.323)
+
+> „brighton mezt csináltam fehér alapon kék csíkokkal, szívnél egy szárnnyal,
+> és sima fehér mez jelent meg a meccsen"
+
+**Az ok:** ha a stylist által beállított mez alapszíne túl közel esett a mi
+aktuális mezünkéhez, a játék „váltómezt" adott. Ennek a képlete ez volt:
+világos alap, a klub alapszínével díszítve. Egy fehér alapú mezből így
+fehér alapon fehér díszítés lett, vagyis sima fehér mez:
+
+* a csíkok eltűntek;
+* a jel elveszett;
+* az ütközés sem oldódott meg.
+
+Idegenben, ahol a mi alap-idegenbeli mezünk fehér, ez minden fehér alapú
+beállított mezzel megtörtént. Ezért tűnt úgy, hogy „néha igen, néha nem".
+
+**Most** a váltómez a beállított mez **két színét felcseréli**. A minta, az
+ujj, a gallér és a jel marad. A Brighton így kék alapon fehér csíkokkal, a
+szárnnyal fut ki.
+
+* Ha a csere is ütközne, egy elütő színes vagy sötét alapot kap, a klub
+  színével.
+* A szám színe az új alaphoz igazodik.
+* **A stylist mez-ablaka szól**, ha a beállított mez a soron következő
+  meccsen ütközik: megmutatja a váltómezt is. A beállított mez ettől még
+  az marad, ami.
+
 ## Próba
 
 `tools/mez-jel-esemeny-3-9-321-proba.js` (32 állítás):

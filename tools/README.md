@@ -389,6 +389,35 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## ifi-piac-kihivas-3-9-326-proba.js — 🐞 „Kínáld piaci eladásra egy 20 év alatti játékosodat": azonnal teljesül
+
+```
+node tools/ifi-piac-kihivas-3-9-326-proba.js
+```
+
+* A 20 alatti kitétele AZONNAL teljesíti és kifizeti a kihívást (nem a határidőn, a pillanatnyi kirakatból).
+* Ha a kirakott fiatal elkel (piaci licit vagy azonnali eladás), az is teljesítés; a retesz miatt utóbb semmi nem veszi el; 20 fölötti kitétele nem teljesíti.
+
+## szajak-3-9-325-proba.js — 👄 többféle száj a játékos-szerkesztőben
+
+```
+node tools/szajak-3-9-325-proba.js
+```
+
+* 12 száj névvel (a régi öt is nevet kapott), köztük a kapafog; a szerkesztő mind a 12-t felkínálja.
+* Mind rajzolódik jókedvben, semlegesen és rosszkedvben; a jellegzetesek mások, mint a generáltak; a kapafog rosszkedvben is kilóg.
+* A generált arcok szája nem változott (az első ötből); a stylist-szabály a 11-est átengedi; a pixeles változat is elkészül.
+
+## hc-scout-15-3-9-324-proba.js — 🛡🔭 hardcore: a 15. fordulóig a scout egy az egyben ugyanazt találja
+
+```
+node tools/hc-scout-15-3-9-324-proba.js
+```
+
+* Két gép (ugyanaz a világ-seed, más keret, mindkettő hardcore): a szakasz terve ugyanazokban a fordulókban hozza a találatokat (a határfordulók nélkül), a mérföldkő a 15. fordulóig nem hoz külön felfedezést.
+* Ugyanaz a játékos és ingyenesség, akkor is, ha az egyik gépen a jelölt-sáv egy játékosa boostot kapott (a rangsor a seedből született világ-erő, a célerő a házigazda horgonya).
+* Az ár és a türelem közös eltérő ügynökséggel is; a célzás a 2. idény elején nem szűr, a 15. forduló után igen; a vendég megkapja a horgonyt, nélküle jelez; a napló kimondja a tervet.
+
 ## mez-jel-esemeny-3-9-321-proba.js — 🃏🔣 minden esemény a pakliban, jel a mezen, mezszponzor-jel
 
 ```
@@ -400,6 +429,7 @@ node tools/mez-jel-esemeny-3-9-321-proba.js
 * A jel a mezen a választott helyen rajzolódik (7 hely, alap: bal mell); a szerkesztőben beírható, a mentés megőrzi, a pályakép hordja, a „Nincs jel" törli; a stylist mez-ablakban is, a mentett ellenfél-mez viszi.
 * A mezszponzor negyedik ajánlata: a cég jele a mezünkön (a kért helyen, a saját jel helyett, a kapusmezen is), meccsenként fizet, a kötbér számol vele, lejárat után a saját jel jön vissza.
 * A szponzorszín-szerződés az ablak-díj után is él (régi hiba), az elrontott mentés helyreáll.
+* 3.9.323: a beállított ellenfél-mez ütközéskor felcserélt színű váltómezt kap (a minta és a jel marad; Brighton-eset: fehér mez ellen kék alap, fehér csíkok); ha a csere is ütközne, színes/sötét alap; a stylist-ablak szól.
 * 3.9.322: az arculat 6. szakaszában a meccs-animációk figurái elölről (arc, a mellen a jel) vagy hátulról (tarkó, a háton a mezszám, jel nélkül) látszanak; az ellenfél kapusa 1-es, a többi szám névből stabil.
 
 ## mez-stylist-3-9-320-proba.js — 🎽 a meccs előtti mez-ablak (stylist-mód)
