@@ -389,6 +389,15 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## ifi-piac-kihivas-3-9-326-proba.js — 🐞 „Kínáld piaci eladásra egy 20 év alatti játékosodat": azonnal teljesül
+
+```
+node tools/ifi-piac-kihivas-3-9-326-proba.js
+```
+
+* A 20 alatti kitétele AZONNAL teljesíti és kifizeti a kihívást (nem a határidőn, a pillanatnyi kirakatból).
+* Ha a kirakott fiatal elkel (piaci licit vagy azonnali eladás), az is teljesítés; a retesz miatt utóbb semmi nem veszi el; 20 fölötti kitétele nem teljesíti.
+
 ## szajak-3-9-325-proba.js — 👄 többféle száj a játékos-szerkesztőben
 
 ```

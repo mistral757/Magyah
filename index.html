@@ -7848,7 +7848,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.325";
+const APP_VERSION="3.9.326";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -54769,7 +54769,7 @@ function genChallenge(scope,diff,ctx){
       if(!y)return null;                 /* nincs 20 alatti a keretben */
       return {type:"youthListed",target:1,
         desc:`Kínáld piaci eladásra az egyik 20 év alatti játékosodat`,
-        rule:`Piacra csak az vihető, akinek legalább ${SALE_LIST_MIN_MINUTES} LEJÁTSZOTT PERCE van nálad. Érj el ${SALE_LIST_MIN_MINUTES} játékpercet az egyik ifistéddel — cseréként is behozhatod, de ha egész meccsen játszatod, gyorsan összegyűlnek. Most ${shortName(y.n)} áll a legközelebb: ${y.perc} perc. A kihívás akkor teljesül, ha egy 20 év alatti játékosod OTT ÁLL a piacon (eladni nem kell).`};},
+        rule:`Piacra csak az vihető, akinek legalább ${SALE_LIST_MIN_MINUTES} LEJÁTSZOTT PERCE van nálad. Érj el ${SALE_LIST_MIN_MINUTES} játékpercet az egyik ifistéddel — cseréként is behozhatod, de ha egész meccsen játszatod, gyorsan összegyűlnek. Most ${shortName(y.n)} áll a legközelebb: ${y.perc} perc. A kihívás abban a pillanatban teljesül, amikor egy 20 év alatti játékosodat a piacra teszed (eladni nem kell — de ha közben el is kel, az is teljesítés).`};},
     /* --- RÖVID: összhang-boost egy érkezőnek --- */
     ()=>{if(!short)return null;
       return {type:"bondBoostNew",target:1,
@@ -55372,6 +55372,8 @@ const CH_EARLY_CUP_TYPES=["cupWin","cupDepth","cupComeback","cupScalps",
   "cupAwayHaul","cupHomeHaul","cupAgg","cupCleanSheets","cupPlayerGoals"];
 function challengeEarlyPayable(ch){
   if(!ch||ch.inverse)return false;
+  /* 🐞 3.9.326 — a kitétel (vagy a kirakott fiatal eladása) a teljesítés */
+  if(ch.type==="youthListed")return !!ch.metLatched;
   if(CH_CUP_TYPES.includes(ch.type))return CH_EARLY_CUP_TYPES.includes(ch.type);
   return !CH_STATE_TYPES.includes(ch.type);}
 function challengeRawValue(ch){
@@ -55411,7 +55413,7 @@ function challengeRawValue(ch){
     /* ---- ÚJ TÍPUSOK (3.9.37) ---- */
     case "msOne":        return (ch.msId&&msState().done&&msState().done[ch.msId])?1:0;
     case "tensionOut":   return chWorstReplaced(ch);   /* ugyanaz: már nincs a keretben */
-    case "youthListed":  return chYouthListed(20)?1:0;
+    case "youthListed":  return chYouthListedNow(ch);
     case "bondBoostNew": return S.chBondBoostNew||0;
     case "staffFromPlayer":return S.chStaffFromPlayer||0;
     case "staffBought":  return S.chStaffBought||0;
@@ -55566,6 +55568,7 @@ function challengeLiveNote(ch){
   if(ch.type==="youthListed"){
     const y=chYouthClosest(20);
     if(chYouthListed(20))return "Egy 20 év alatti játékosod már ott áll a piacon.";
+    if(ch.metLatched)return "Teljesült: a 20 év alatti játékosodat piacra tetted (el is kelt).";
     if(!y)return "Nincs 20 év alatti játékosod — igazolj egyet, vagy hozz fel egy akadémistát.";
     const kell=Math.max(0,SALE_LIST_MIN_MINUTES-y.perc);
     return kell>0
@@ -55757,6 +55760,17 @@ function chTensionPlayer(){
   Object.keys(cnt).forEach(n=>{if(bent.has(n)&&cnt[n]>bv){bv=cnt[n];best=n;}});
   return (best&&bv>=2)?{n:best,db:bv}:null;}
 /* Van-e piacra bocsátott, 20 év alatti játékosod. */
+/* 🐞 3.9.326 — BEJELENTETT HIBA: „Ez a kihívás nem teljesítettre jön ki abban
+   az esetben, ha idő előtt azt a játékost, akit piaci eladásra kínáltál, el is
+   adtad … abban a pillanatban, hogy egy ilyen játékost el is adtál, azonnal
+   teljesített kihívást kell hogy kihozzon."
+   Az ok: a kihívás ÁLLAPOT volt („áll-e MOST a piacon egy 20 alatti"), és csak
+   a határidőnél döntött — az eladott ember már nem állt a piacon. Mostantól
+   a kitétel PILLANATA teljesít (retesz + azonnali kifizetés), és a kirakott
+   20 alatti eladása is (ha addig valamiért nem fizetett volna). */
+function chYouthListedNow(ch){
+  if(chYouthListed(20)){if(ch)ch.metLatched=true;return 1;}
+  return (ch&&ch.metLatched)?1:0;}
 function chYouthListed(maxAge){
   return chRoster().some(p=>{
     const e=careerPool&&careerPool[p.n];
@@ -86724,6 +86738,8 @@ function saleListPlayer(p){
      „a következő 3 LICITRE BOCSÁTOTT játékosod". */
   if((S.chBidFloor90||0)>0){S.chBidFloor90--;rec.askFloor=true;}
   saleMarketState().list.push(rec);
+  /* 🐞 3.9.326 — a 20 alatti kitétele azonnal teljesíti a kihívást */
+  try{(S.activeChallenges||[]).forEach(ch=>{if(ch&&ch.type==="youthListed")chYouthListedNow(ch);});settleEarlyChallenges();}catch(e){}
   return rec;}
 /* ---- A LEVÉTEL EGY KOPPINTÁS VOLT, ÉS SOKBA KERÜLT ----
    A piacon állás IDŐVEL fizet: az első licit 5-15 forduló múlva jön, minden
@@ -86949,6 +86965,9 @@ function saleRejectOffer(rec){
    pad, kezdő) — ezért burkoló, nem beszúrt sor: egy ágat elfelejteni pont az a
    hiba volna, amit ez a javítás orvosol. */
 function releasePlayer(p,sell,priceOverride){
+  /* 🐞 3.9.326 — a kirakott 20 alatti eladása: a kihívás MOST reteszel (amíg
+     még a piacon áll), a lenti beváltás pedig ki is fizeti */
+  try{if(sell&&p&&saleIsListed(p.n))(S.activeChallenges||[]).forEach(ch=>{if(ch&&ch.type==="youthListed")chYouthListedNow(ch);});}catch(e){}
   const r=_releasePlayerCore(p,sell,priceOverride);
   try{if(r&&r.ok)settleEarlyChallenges();}catch(e){}
   return r;}
