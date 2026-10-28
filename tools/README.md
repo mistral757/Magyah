@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## eva-melyseg-3-9-329-proba.js — 🎞 perspektivikus takarás az esemény-animációkban
+
+```
+node tools/eva-melyseg-3-9-329-proba.js
+```
+
+* A rendező a pillanatnyi talppont (a transform y-ja) szerint rendezi a figurákat: ami lejjebb áll, az kerül elöl; a labda és a villanás a figurák fölött marad.
+* A rendezés a futó WAAPI-animációkat nem szakítja meg, rendezett állapotban nem nyúl a DOM-hoz; a lejátszóban a jelenet alatt végig követ, a lezáráskor leáll.
+* A tiki-taka rombusza szét van nyitva: a lövő nem áll egy vonalban a középső passzoló mögött.
+
 ## infopult-skillek-3-9-328-proba.js — 🎯 az infópult „Skillek" füle, ⚖️ az egyenlítő-keret felirata
 
 ```
