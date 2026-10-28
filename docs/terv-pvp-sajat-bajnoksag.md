@@ -1,6 +1,7 @@
 # Terv: 🌍 PvP „saját bajnokság" mód — Könnyed (ajánlott) / Hardcore
 
 *Állapot: TERVEZET, döntésre vár. Kód még nem készült.*
+*Kiegészítve: közös célrés (4.1) és idényvégi Run-összevetés (7.1).*
 
 ## 1. A kiindulás
 
@@ -105,17 +106,60 @@ Ugyanott, ahol a szigorúság (3.9.287 minta):
 | | Könnyed (saját bajnokság) | Hardcore (közös, mai) |
 |---|---|---|
 | világ, tabella, osztály | **külön**: mindenkinek a saját piramisa | közös |
-| a mezőny ereje | **egyjátékos-szabály**: a saját súlyozott meccs-erőd és a saját célrésed | a két meccs-erő átlaga |
+| a mezőny ereje | **külön mezőny, közös célréssel**: a saját súlyozott meccs-erőd mínusz a két választott célrés átlaga (4.1) | a két meccs-erő átlaga |
 | fel- és kiesés | **külön** (lehettek más osztályban) | páros, együtt |
 | nehézségi fokozat | a házigazdáé, mindkettőtöknek ugyanaz (D2) | közös |
-| idénynyitó célrés-ablak | a saját (egyjátékos-változat) | közös, élő előnézettel |
+| idénynyitó célrés-ablak | **közös**: mindketten választotok, az átlag mindkettőtökre érvényes (4.1) | közös, élő előnézettel |
 | felzárkóztatás, osztott nehézség | **nincs** (nincs közös mezőny, amit kiegyenlíteni kellene) | van |
 | a világ tengelyei (tempó, sorsolás, VB, ikon) | **közös** (a házigazdáé, rögzítve) | közös |
 | draft | **közös** (ugyanaz a pool, ugyanaz a mag, a rejtett ≤0,75-ös kezdő kiegyenlítés marad) | közös |
 | piac, scout, ifi, kihívás, talizmán | külön (egyjátékos) | közös seed / szakaszos seed |
 | párharc | a 15. és a 30. forduló után, **külön meccsnap** (5. pont) | a 15. és a 30. **bajnoki** forduló |
 | kupa | **közös program, relatív mezőnnyel** (6. pont) | közös |
-| kézfogás | csak párharcnál és kupánál | minden idényindításnál (+ szakaszhatárok) |
+| kézfogás | párharcnál, kupánál és az idényindító célrés-cserénél | minden idényindításnál (+ szakaszhatárok) |
+
+### 4.1 A közös célrés — külön mezőny, közös mérce
+
+**A kérés:** „a célrés számítás szintén legyen közös. Mindketten választanak
+egy célrést. Annak az átlagát adjuk mindkettő csapat erejéhez külön-külön, a
+külön mezőnyök ereje megállapításához."
+
+**A képlet** (minden idény kezdőrúgásakor, mindkét gépen):
+
+```
+közös célrés   c̄ = (c_A + c_B) / 2
+A mezőnye      = W_A − c̄        (W_A: A súlyozott meccs-ereje, indító×1,25 + záró, /2,25)
+B mezőnye      = W_B − c̄
+```
+
+* **Külön mezőny, ugyanaz a rés.** A 98-as és a 92-es mezőny megmarad (a
+  saját keretetekből jön), de mindkettőtök ugyanakkora réssel indul a saját
+  bajnokságában. Ez a „mindketten ugyanannyira könnyen haladunk" számszerű
+  alakja.
+* **A választás ára.** A te +0,4-ed a közös célrésben +0,2. Ugyanúgy, mint a
+  közös bajnokságnál. Aki könnyebbet kér, a társának is könnyít.
+* **A saját világ többi szabálya változatlan.** A padló, az alsó fék, a
+  relatív padló és a súlyozott meccs-erő a `pyrFloorKickoff` egyjátékos-ágán
+  fut, csak a cél (`want`) lesz a közös c̄.
+* **Az idény közbeni követés** (3.9.318, folyamatos rés-követés) is a közös
+  c̄-hez igazít, mindkét gépen.
+* **Az 1. idény:** a közös fokozat alap-célrése (D2), mindkettőtöknek
+  ugyanaz, tehát nincs csere.
+
+**A csere.** A 3.9.287-es idénynyitó célrés-ablak és az élő előnézet
+(`s<N>pre`) újrahasznosítva:
+
+* mindketten választotok, az ablak élőben mutatja a társ pillanatnyi
+  választását és a c̄-t;
+* a becslés mindkét világra kiírja a várható rajt-rést, a mezőny szintjét,
+  a feljutás és a kiesés esélyét;
+* a kezdőrúgás csak akkor indul, ha mindkét választás fent van (a
+  `superPair` `vallA`/`vallB` mezői ma is ezt viszik);
+* **„Villám" sebességnél** 3 perc után a társ legutóbbi célrésével számol;
+* a választás az indulás után zárolva van, ahogy most.
+
+**Mi NEM közös:** a mezőny szintje, a W és a fel- és kiesés. Csak a cél
+(a rés) közös.
 
 ### Miért ugyanaz a fokozat mindkettőtöknek (D2)
 
@@ -178,9 +222,13 @@ tabelládban. Ezért **külön meccsnap** lesz:
 
 ### 5.3 Várakozás
 
-* **Az egyetlen kötelező megálló** a párharc-nap. Aki előbb ér a 15.
-  forduló végére, az ott vár. Addig az átigazolási ablak, a HUB és minden más
-  szabad.
+* **Három kötelező megálló:**
+  * az idényindító célrés-csere (4.1);
+  * a két párharc-nap;
+  * a kupa.
+
+  Aki előbb ér oda, az ott vár. Addig az átigazolási ablak, a HUB és minden
+  más szabad.
 * A mai eszközök mind működnek:
   * a bökés és a „📍 Hol tartok";
   * a sebesség („Villám": 3 perc után a társ legutóbbi keretével lejátssza).
@@ -241,8 +289,41 @@ létezik:
 * a tabella-helyezéseket;
 * a párharc-mérleget.
 
-**A szezonzáró kapu** („folytatjátok?") marad, a felzárkóztatás nélkül. A
-végső ítélet a párharc-mérleg, egyenlőségnél a Run-szint (D5).
+**A szezonzáró kapu** („folytatjátok?") marad, a felzárkóztatás nélkül.
+
+### 7.1 Idényvégi Run-összevetés — külön
+
+**A kérés:** „Szezonok végén Run-szint összehasonlítás is külön."
+
+**Hol:** a 30. forduló (és a II. párharc-nap) után, a szezonzáró kapu
+előtt, **önálló kártya**: „📈 Run-összevetés — X. idény". Kupás idényben a
+kupa után frissül, mert a kupa is mozdítja a Runt.
+
+**Mit mutat, egymás mellett:**
+
+| | te | társad |
+|---|---|---|
+| Run-szint az idény elején | … | … |
+| Run-szint most | … | … |
+| **idénybeli gyarapodás** | **+…** | **+…** |
+| a játszott közös célrés | c̄ | c̄ |
+| osztály, helyezés, fel- vagy kiesés | … | … |
+| a mezőny szintje | … | … |
+
+**Az idény Run-győztese** az, aki többet gyarapodott. Ez **nem a
+pillanatnyi szint**, mert azt az előző idények előnye is viszi.
+
+* A Run-idénygyőzelmek külön mérlegbe gyűlnek („📈 Run-idények: 3–1").
+* Nem keveredik a párharc-mérleggel.
+* A naplóba is bekerül egy sor.
+
+**Csatorna:** a szezonzáró csomag (`stats`) új mezői: `run0`, `run1`, `dRun`,
+`celres`, `div`, `rank`, `runV:1`. Régi társnál a kártya nem jelenik meg (nincs
+hamis 0).
+
+**A végső ítélet (D5).** A záró összesítő **két külön mérleget** mond ki: a
+párharc-mérleget és a Run-mérleget. Ha egyetlen győztes kell: a
+párharc-mérleg dönt, egyenlőségnél a karrier teljes Run-gyarapodása.
 
 ## 8. A megvalósítás menete
 
@@ -252,11 +333,11 @@ karriert egyik sem érinthet.
 | fázis | tartalom |
 |---|---|
 | **F1 — kapcsoló és csatorna** | a „🌍 Bajnokság" blokk; `cfg`, `start.settings`, `S.mpVilag`; `mpSajatVilag()`; lobby, vendég-zár, diagnosztika; a szigorúság-blokk csak közösnél |
-| **F2 — két külön világ** | a karrier indulásakor mindkét gépen egyjátékos-világ épül: közös seed, közös draft, a társ klubja nélkül. A kezdőrúgás a `pyrFloorKickoff` egyjátékos-ágát futtatja. Kimarad: a szezonindítási alku mezőny-része, a páros-léptetés, a felzárkóztatás, az osztott nehézség. A világ tengelyei egyszer, az induláskor rögzülnek. |
+| **F2 — két külön világ, közös célrés** | a karrier indulásakor mindkét gépen egyjátékos-világ épül: közös seed, közös draft, a társ klubja nélkül. A kezdőrúgás a `pyrFloorKickoff` egyjátékos-ágát futtatja, a közös c̄ céllal; az idénynyitó célrés-csere és kapu (4.1), az idény közbeni követés is c̄-hez. Kimarad: a szezonindítási alku mezőny-része, a páros-léptetés, a felzárkóztatás, az osztott nehézség. A világ tengelyei egyszer, az induláskor rögzülnek. |
 | **F3 — párharc-nap** | menetrend: a két extra meccsnap a 15. és a 30. után. Az indító kapu, a mai párharc-motor bekötése, a mérleg, a díj, a morál, a fáradtság és a lapok kupa-szabálya. Bökés, „Hol tartok" és Villám a meccsnapon. |
 | **F4 — kupa relatív mezőnnyel** | eltolás-alapú kupamezőny, saját horgony, a gépi meccsek a különbségből; a program, a szinkron, a döntő. Ujjlenyomat-próba: a két gép csoportjai egyeznek. |
-| **F5 — párharc-lap és ítélet** | HUB-lap, szezonzáró kapu, összesítés, napló, Kalauz-fejezet, súgó |
-| **F6 — próbák és doksi** | két kliens a helyi szoba-háttéren (ahogy az osztott nehézség próbája). Egy teljes idény mindkét oldalon: a két világ szétválik, a párharc és a kupa egyezik. A Hardcore regressziója változatlan. |
+| **F5 — párharc-lap, Run-összevetés, ítélet** | HUB-lap, az idényvégi Run-összevetés kártyája és mérlege (7.1), szezonzáró kapu, a két mérleges összesítés, napló, Kalauz-fejezet, súgó |
+| **F6 — próbák és doksi** | két kliens a helyi szoba-háttéren (ahogy az osztott nehézség próbája). Egy teljes idény mindkét oldalon: a két világ szétválik, a két rajt-rés pontosan c̄, a párharc és a kupa egyezik, a Run-összevetés tükörkép. A Hardcore regressziója változatlan. |
 
 **A kockázat** a kód sok olyan helye, amely ma azt feltételezi, hogy
 „közös karrier = közös világ": `h2hRoomActive()` kb. 100 helyen, `MP.active`
@@ -276,7 +357,8 @@ háromfelé sorolása:
 | D2 | Nehézségi fokozat | **a házigazdáé, közös** | mindenki a sajátját |
 | D3 | Ugyanaz a játékos mindkét keretben | **engedjük (🪞 jelöléssel), a draft kizárólagos** | kizárólagos piac is |
 | D4 | Erő a párharcban | **valódi meccs-erők** | enyhe hendikep a gyengébbnek |
-| D5 | A végső ítélet | **párharc-mérleg, egyenlőségnél Run-szint** | Run-szint elsődlegesen |
+| D5 | A végső ítélet | **két külön mérleg (párharc, Run-idények); ha egy győztes kell: párharc, egyenlőségnél a teljes Run-gyarapodás** | Run elsődlegesen |
+| D9 | Az idény Run-győztese | **a nagyobb idénybeli gyarapodás** | a magasabb Run-szint |
 | D6 | A párharc helye | **külön meccsnap a 15. és a 30. forduló után** | (nincs jó alternatíva: a társ klubja nincs a tabelládban) |
 | D7 | A párharc-díj | **a saját heti lelátó-bevétel ×1,5 (győzelem), ×0,75 (döntetlen)** | csak presztízs, pénz nélkül |
 | D8 | Futó közös karrier átállítása | **nem lehet** (a világ már közös, nem bontható ketté) | — |
