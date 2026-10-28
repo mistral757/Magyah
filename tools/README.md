@@ -389,6 +389,45 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## taktika-utem-3-9-330-proba.js — ⚙️ gyorsabb taktika-begyakorlás, 🎚 a csúszkák a plafonig
+
+```
+node tools/taktika-utem-3-9-330-proba.js
+```
+
+* A lassulás 72 fölött 5%/szint (0,92 → 0,95); döntetlen 0,5, vereség 0,25 — valódi meccs utáni lépéssel is; egy közepes idény kb. kétszer annyit ad.
+* A taktika-csúszkák 60-tól a plafonig: 99-nél 60 · 70 · 80 · 89 · 99, 125-nél 60 · 76 · 93 · 109 · 125; a plafonon a teljes hatás; a panel az új küszöböket írja.
+
+## eva-melyseg-3-9-329-proba.js — 🎞 perspektivikus takarás az esemény-animációkban
+
+```
+node tools/eva-melyseg-3-9-329-proba.js
+```
+
+* A rendező a pillanatnyi talppont (a transform y-ja) szerint rendezi a figurákat: ami lejjebb áll, az kerül elöl; a labda és a villanás a figurák fölött marad.
+* A rendezés a futó WAAPI-animációkat nem szakítja meg, rendezett állapotban nem nyúl a DOM-hoz; a lejátszóban a jelenet alatt végig követ, a lezáráskor leáll.
+* A tiki-taka rombusza szét van nyitva: a lövő nem áll egy vonalban a középső passzoló mögött.
+
+## infopult-skillek-3-9-328-proba.js — 🎯 az infópult „Skillek" füle, ⚖️ az egyenlítő-keret felirata
+
+```
+node tools/infopult-skillek-3-9-328-proba.js
+```
+
+* Skill nélkül a fül nem elérhető, skillel igen; összesítés, a félkészek elöl (fázis-állás, hiány), az épülő csillagok, játékosonként minden skill; koppintásra a leírás; páros-tipp.
+* Az egyenlítő alapáras keretjének töltésekor a napló kimondja, hogy a nyári egyenlítők már a következő idény keretéből mennek.
+
+## csukafejes-3-9-327-proba.js — 🐟 új skill: Csukafejes
+
+```
+node tools/csukafejes-3-9-327-proba.js
+```
+
+* Csatár-skill, goalw ×1,4 (a legenyhébb a csatár gólszerző-skillek közt), pörgethető.
+* Skill nélkül minden szorzó 1; vele a csapat gólvárhatósága ×1,03, a szögletgól-arány ×1,3, szögletnél ő ×1,5; kiállítva nem hat.
+* Duó a tökéletes beadással +8%, a kémiák rátesznek (pár +15%, passz +10%, gyilkos +7%, szárny +12%); félig megtanulva fele hatás.
+* Valódi meccseken a meccs-magyarázat néven nevezi; a jelenet (CSUKAFEJES!) és a közvetítés-sor a gólhoz kötve.
+
 ## ifi-piac-kihivas-3-9-326-proba.js — 🐞 „Kínáld piaci eladásra egy 20 év alatti játékosodat": azonnal teljesül
 
 ```
