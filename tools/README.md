@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## hc-scout-15-3-9-324-proba.js — 🛡🔭 hardcore: a 15. fordulóig a scout egy az egyben ugyanazt találja
+
+```
+node tools/hc-scout-15-3-9-324-proba.js
+```
+
+* Két gép (ugyanaz a világ-seed, más keret, mindkettő hardcore): a szakasz terve ugyanazokban a fordulókban hozza a találatokat (a határfordulók nélkül), a mérföldkő a 15. fordulóig nem hoz külön felfedezést.
+* Ugyanaz a játékos és ingyenesség, akkor is, ha az egyik gépen a jelölt-sáv egy játékosa boostot kapott (a rangsor a seedből született világ-erő, a célerő a házigazda horgonya).
+* Az ár és a türelem közös eltérő ügynökséggel is; a célzás a 2. idény elején nem szűr, a 15. forduló után igen; a vendég megkapja a horgonyt, nélküle jelez; a napló kimondja a tervet.
+
 ## mez-jel-esemeny-3-9-321-proba.js — 🃏🔣 minden esemény a pakliban, jel a mezen, mezszponzor-jel
 
 ```

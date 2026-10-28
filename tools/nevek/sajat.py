@@ -22,7 +22,8 @@ A FORRÁSOK (a teljes git-történetből kigyűjtve, nem emlékezetből)
   · a 29–32. köteg danisítása (3.9.81–3.9.84) — a felhasználó kézi átiratai;
   · a 3.9.87-es kör, a 33., a 35. és a 36. köteg — a felhasználó kézbe vett
     nevei;
-  · a 2026-10-06-i kérés: hét név, és Ziyech + Kolo Touré.
+  · a 2026-10-06-i kérés: hét név, és Ziyech + Kolo Touré;
+  · 2026-10-28: Riquelme („Rick Elme Huán Román").
 
 HOGYAN BŐVÜL: ha a felhasználó új nevet ír át (vagy visszaállít egyet a
 DONTESRE_VAR-ból), az ide kerül — nem a manual.py valamelyik JAVASLAT
@@ -274,6 +275,7 @@ SAJAT_KULCSOK = {
   "João Manuel Pinto": "a 29–32. köteg danisítása (3.9.81–3.9.84)",
   "João Neves": "bf84bde — Nevek Danisítása lvl100 (2026-09-01)",
   "Juan Cuadrado": "bf84bde — Nevek Danisítása lvl100 (2026-09-01)",
+  "Juan Román Riquelme": "a felhasználó saját neve (2026-10-28)",
   "Julian Brandt": "a 29–32. köteg danisítása (3.9.81–3.9.84)",
   "Julian Draxler": "bf84bde — Nevek Danisítása lvl100 (2026-09-01)",
   "Jérémy Mathieu": "a 3.9.87-es kör (a kért gépi-név felülírások)",
@@ -693,6 +695,7 @@ SAJAT = {
   "João Manuel Pinto": ("Pin-Tó János", "Pin-Tó"),
   "João Neves": ("Nevezetes János", "Nevezetes"),
   "Juan Cuadrado": ("Kuadrádo János", "Kuadrádo"),
+  "Juan Román Riquelme": ("Rick Elme Huán Román", "Rick Elme"),
   "Julian Brandt": ("Pálinkás Gyula", "Pálinkás"),
   "Julian Draxler": ("Drakszler Gyula", "Drakszler"),
   "Jérémy Mathieu": ("Matyóka Jeremiás", "Matyóka"),

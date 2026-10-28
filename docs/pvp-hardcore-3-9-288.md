@@ -99,6 +99,8 @@ A felfedezést továbbra is a pályán szerzett mérföldkő váltja ki:
 
 A terv a szakasz elején a naplóba kerül.
 
+**3.9.324 óta** minden idény 1–15. fordulójában a scout **egy az egyben ugyanazt** találja a két gépen: ugyanazt a játékost, ugyanabban a fordulóban, ugyanazon az áron (a mérföldkő itt nem hoz külön találatot, a célzás nem szűr). Lásd `docs/hc-scout-15-3-9-324.md`.
+
 ## A kézfogás
 
 **A kapu.** Az átigazolási ablak nyitása és zárása hardcore-ban kézfogás. A
