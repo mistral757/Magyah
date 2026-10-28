@@ -389,6 +389,16 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## szajak-3-9-325-proba.js — 👄 többféle száj a játékos-szerkesztőben
+
+```
+node tools/szajak-3-9-325-proba.js
+```
+
+* 12 száj névvel (a régi öt is nevet kapott), köztük a kapafog; a szerkesztő mind a 12-t felkínálja.
+* Mind rajzolódik jókedvben, semlegesen és rosszkedvben; a jellegzetesek mások, mint a generáltak; a kapafog rosszkedvben is kilóg.
+* A generált arcok szája nem változott (az első ötből); a stylist-szabály a 11-est átengedi; a pixeles változat is elkészül.
+
 ## hc-scout-15-3-9-324-proba.js — 🛡🔭 hardcore: a 15. fordulóig a scout egy az egyben ugyanazt találja
 
 ```
