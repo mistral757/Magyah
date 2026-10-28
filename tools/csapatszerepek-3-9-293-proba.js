@@ -19,7 +19,7 @@
      4. a pillanatkép: a bedobó −(1–5)%-kal húzza az ellenfél gólesélyét;
      5. a bedobás-animáció jelenete hiba nélkül felépül;
      6. a taktika csúszkái: 60→1 … 150→5; a haszon/kár az ismertségből, az
-        illeszkedés szoroz; a keret; taktikánként külön állás; a motorban hat;
+        illeszkedés szoroz (3.9.330 óta 60→99); a keret; taktikánként külön állás; a motorban hat;
      7. a két panel: Csapatszerepek (általános + stílus-szerepek), a Taktika
         alatt a Hangsúly-csúszkák (taktika + stílus) — állítható, mentődik;
      8. nincs oldalhiba. */
@@ -195,24 +195,24 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 6. a taktika csúszkái —");
   const t6=await p.evaluate(()=>{
     const o={};
-    o.keret=[59,60,82,82.5,105,127.5,149,150].map(tdMaxFor);
+    o.keret=[59,60,69,70,79,80,98,99].map(L=>tdMaxFor(L));   /* 3.9.330: a skála a 99-es plafonig */
     const k=S.tactics.active||Object.keys(TACTICS)[0];S.tactics.active=k;
     const set=L=>{S.tactics.levels[k]=L;tdMemoClear();return tdMemo();};
     let M=set(60);o.p60={pro:dialProCurve(M.lv),con:dialConCurve(M.lv)};
-    M=set(150);o.p150={pro:dialProCurve(M.lv),con:dialConCurve(M.lv),fm:M.fm,fit:M.fit};
+    M=set(99);o.p150={pro:dialProCurve(M.lv),con:dialConCurve(M.lv),fm:M.fm,fit:M.fit};
     /* az illeszkedés-szorzó: a haszon ×f, a kár ÷f */
     S.tactics.dials={};tdStore()["vonal"]=10;
     const ef=TACTIC_DIALS[0].R.fx;
     o.pro=tdPct(ef[0],10)*100;o.con=tdPct(ef[1],10)*100;
     o.proVart=dialProCurve(20)*M.fm;o.conVart=dialConCurve(20)/M.fm;
-    /* a keret: 82-nél 1 */
-    S.tactics.dials={};set(82);
+    /* a keret: 69-nél 1 */
+    S.tactics.dials={};set(69);
     o.elso=tdSet("vonal",5);o.masodik=tdSet("tempo",3);o.nulla=tdSet("vonal",0);o.most=tdSet("tempo",3);
     /* taktikánként külön */
     const k2=Object.keys(TACTICS).find(x=>x!==k);
     o.kulon=!(S.tactics.dials[k2]&&S.tactics.dials[k2].tempo);
     /* a motorban: a Magas védővonal emeli a saját gólesélyt */
-    S.tactics.dials={};set(150);
+    S.tactics.dials={};set(99);
     const m0=dialMul("own",{min:20,gf:0,ga:0});
     tdStore()["vonal"]=10;tdMemoClear();
     const m1=dialMul("own",{min:20,gf:0,ga:0}),o1=dialMul("opp",{min:20,gf:0,ga:0});
@@ -222,10 +222,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.mentHat=dialMul("own",{min:50,gf:0,ga:1});o.mentVezet=dialMul("own",{min:50,gf:1,ga:0});
     S.tactics.dials={};tdMemoClear();
     return o;});
-  ok(t6.keret.join()==="0,1,1,2,3,4,4,5","60 → 1, 82,5 → 2, 105 → 3, 127,5 → 4, 150 → 5",t6.keret);
-  ok(Math.abs(t6.p60.pro-2.5)<0.01&&Math.abs(t6.p60.con-6)<0.01&&Math.abs(t6.p150.pro-20.55)<0.06&&Math.abs(t6.p150.con-5)<0.01,"a görbe az ismertségből: 60 → +2,5% / −6%, 150 → +20,6% / −5%",t6);
+  ok(t6.keret.join()==="0,1,1,2,2,3,4,5","60 → 1, 70 → 2, 80 → 3, 89 → 4, 99 → 5 (3.9.330: a 99-es plafonig)",t6.keret);
+  ok(Math.abs(t6.p60.pro-2.5)<0.01&&Math.abs(t6.p60.con-6)<0.01&&Math.abs(t6.p150.pro-20.55)<0.06&&Math.abs(t6.p150.con-5)<0.01,"a görbe az ismertségből: 60 → +2,5% / −6%, 99 → +20,6% / −5%",t6);
   ok(Math.abs(t6.pro-t6.proVart)<0.01&&Math.abs(t6.con-t6.conVart)<0.01,"az illeszkedés szoroz: haszon ×f, kár ÷f",{pro:t6.pro,con:t6.con,fm:t6.p150.fm,fit:t6.p150.fit});
-  ok(t6.elso&&!t6.masodik&&t6.nulla&&t6.most&&t6.kulon,"a keret (82-nél 1 csúszka), nullázás után másik mozdítható; taktikánként külön állás",t6);
+  ok(t6.elso&&!t6.masodik&&t6.nulla&&t6.most&&t6.kulon,"a keret (69-nél 1 csúszka), nullázás után másik mozdítható; taktikánként külön állás",t6);
   ok(t6.own>1.1&&t6.opp>1.02&&t6.mentHat>1.1&&Math.abs(t6.mentVezet-1)<1e-9,"a motorban hat: Magas védővonal → saját ↑, ellenfél ↑; Mindent bele csak hátrányban",t6);
 
   console.log("\n— 7. a két panel —");

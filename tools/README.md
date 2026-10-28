@@ -389,6 +389,15 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## taktika-utem-3-9-330-proba.js — ⚙️ gyorsabb taktika-begyakorlás, 🎚 a csúszkák a plafonig
+
+```
+node tools/taktika-utem-3-9-330-proba.js
+```
+
+* A lassulás 72 fölött 5%/szint (0,92 → 0,95); döntetlen 0,5, vereség 0,25 — valódi meccs utáni lépéssel is; egy közepes idény kb. kétszer annyit ad.
+* A taktika-csúszkák 60-tól a plafonig: 99-nél 60 · 70 · 80 · 89 · 99, 125-nél 60 · 76 · 93 · 109 · 125; a plafonon a teljes hatás; a panel az új küszöböket írja.
+
 ## eva-melyseg-3-9-329-proba.js — 🎞 perspektivikus takarás az esemény-animációkban
 
 ```
