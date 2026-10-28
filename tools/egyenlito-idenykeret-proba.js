@@ -102,10 +102,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       const src=document.documentElement.innerHTML;
       return {
         kepesseg:/megy ALAPÁRON <b>idényenként<\/b>/.test(src),
-        katalogus:/még \$\{eqFreeLeft\(\)\} alapáron ebben az idényben/.test(src),
-        megerosito:/egyenlítőd ebben az idényben, alapáron/.test(src),
-        elfogyott:/az idény alapáras darabjai elfogytak/i.test(src),
-        mero:/egyenlítő ebben az idényben/.test(src)};})();
+        /* 3.9.328 — a felirat kimondja, MELYIK keretből fogy: idény közben
+           „ebben az idényben", nyáron „a következő idény keretéből" */
+        katalogus:/még \$\{eqFreeLeft\(\)\} alapáron \$\{eqKeretTxt\(\)\}/.test(src),
+        megerosito:/alapáras egyenlítőd \$\{eqKeretTxt\(\)\}/.test(src),
+        elfogyott:/alapáras darabjai elfogytak/i.test(src),
+        mero:/egyenlítő \$\{eqKeretTxt\(\)\}/.test(src),
+        nyar:(()=>{const _c=window.twClosedNow,_w=window.twWindowOpen;
+          window.twClosedNow=()=>false;window.twWindowOpen=()=>false;const ny=eqKeretTxt();
+          window.twClosedNow=()=>true;const sz=eqKeretTxt();
+          window.twClosedNow=_c;window.twWindowOpen=_w;
+          return /következő idény keretéből/.test(ny)&&sz==="ebben az idényben";})()};})();
     return ki;});
 
   console.log("=== 1. az idényen belüli létra (a régi viselkedés) ===");
@@ -146,6 +153,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(t.szovegek.megerosito,"a megerősítő ablak");
   ok(t.szovegek.elfogyott,"…és az „elfogytak” ág is");
   ok(t.szovegek.mero,"a képesség élő mérősora");
+  ok(t.szovegek.nyar,"3.9.328: nyáron a felirat a következő idény keretét mondja, idény közben ezt az idényt");
 
   console.log("=== hibák a konzolon ===");
   ok(h.length===0,"nincs futásidejű hiba",h.slice(0,2));

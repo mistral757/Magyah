@@ -389,6 +389,15 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## infopult-skillek-3-9-328-proba.js — 🎯 az infópult „Skillek" füle, ⚖️ az egyenlítő-keret felirata
+
+```
+node tools/infopult-skillek-3-9-328-proba.js
+```
+
+* Skill nélkül a fül nem elérhető, skillel igen; összesítés, a félkészek elöl (fázis-állás, hiány), az épülő csillagok, játékosonként minden skill; koppintásra a leírás; páros-tipp.
+* Az egyenlítő alapáras keretjének töltésekor a napló kimondja, hogy a nyári egyenlítők már a következő idény keretéből mennek.
+
 ## csukafejes-3-9-327-proba.js — 🐟 új skill: Csukafejes
 
 ```
