@@ -389,6 +389,17 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## csukafejes-3-9-327-proba.js — 🐟 új skill: Csukafejes
+
+```
+node tools/csukafejes-3-9-327-proba.js
+```
+
+* Csatár-skill, goalw ×1,4 (a legenyhébb a csatár gólszerző-skillek közt), pörgethető.
+* Skill nélkül minden szorzó 1; vele a csapat gólvárhatósága ×1,03, a szögletgól-arány ×1,3, szögletnél ő ×1,5; kiállítva nem hat.
+* Duó a tökéletes beadással +8%, a kémiák rátesznek (pár +15%, passz +10%, gyilkos +7%, szárny +12%); félig megtanulva fele hatás.
+* Valódi meccseken a meccs-magyarázat néven nevezi; a jelenet (CSUKAFEJES!) és a közvetítés-sor a gólhoz kötve.
+
 ## ifi-piac-kihivas-3-9-326-proba.js — 🐞 „Kínáld piaci eladásra egy 20 év alatti játékosodat": azonnal teljesül
 
 ```
