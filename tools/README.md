@@ -389,6 +389,15 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## edzo-szerencse-3-9-334-proba.js — 🔍 az edző elemzése a végeredményre számol
+
+```
+node tools/edzo-szerencse-3-9-334-proba.js
+```
+
+* A bejelentett eset (3,1 : 0,6 várható gól, 2:2, +1 kapott nem-xG gól): kb. 7 meccsből egyszer (régen 3); a szöveg kimondja az eredményt.
+* A nem-xG gólok rátája a karrierből mérődik (20 meccstől, addig 0,15), és mentődik.
+
 ## kihivas-nev-menu-3-9-333-proba.js — 🔁 a félbehagyott kihívás-ajánlat, 👆 a játékos-név menü
 
 ```
