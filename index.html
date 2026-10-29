@@ -7874,7 +7874,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.336";
+const APP_VERSION="3.9.337";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -63460,6 +63460,49 @@ const EVA_TIPUS_SABLON={gol:"gol",golKapott:"gol",kapufa:"kapufa",bravur:"bravur
   tizenegyes:"tizenegyes",buntetoparbaj:"tizenegyes",sarga:"lap",piros:"lap",szoglet:"szoglet",
   szabadrugas:"szabadrugas",blokk:"blokk",golvonal:"blokk",szereles:"blokk",letamadas:"letamadas",
   serules:"serules",var:"var",loves:"loves",kidolgozas:"kidolgozas",bedobas:"bedobas"};
+/* ---- 👥 A MI STATISZTÁINK HELYETT A MI JÁTÉKOSAINK (3.9.337) ----
+   KIMONDOTT KÉRÉS: „Azokban az animációkban, amelyeknél a mi játékosainkat
+   statiszták veszik át, azokba építsük be, hogy vagy érintett, vagy random,
+   de a mi játékosaink legyenek ott. Pl. gegenpressing nyomás gólja, gólzsák
+   gólja, remek kijátszás passza stb."
+   Eddig a főszereplőn (és a kapusunkon) kívül minden saját figura egy
+   helyőrző névből („Társ", „Rúgó", „Támadó", „Védő") kapta az arcát — egy
+   idegen arcot a mi mezünkben. Mostantól a kezdő tizenegyünkből jönnek:
+     1. ELŐBB AZ ÉRINTETT: a gól sorában zárójelben álló gólpasszadó, illetve
+        az esemény második szereplője (p2);
+     2. UTÁNA a poszthoz illő társ (támadásban elöl játszók, védekezésben a
+        hátsó sor), az eseményből képzett, rögzített maggal — ugyanaz a
+        jelenet mindig ugyanazokat mutatja, és a meccs véletlenjéhez nem nyúl.
+   A főszereplő, a skill gazdája és a kapus nem ismétlődik; ha elfogynak a
+   mieink (pl. teszt-keret), a régi helyőrző marad. */
+const EVA_POSZT_ELOL=["CS","ÁÉ","JSZ","BSZ","TKP","KKP"];
+const EVA_POSZT_HATUL=["KV","JV","BV","VKP","KKP"];
+function evaSajatKeret(){
+  try{return slots.filter(x=>x&&x.player&&x.pos!=="KP").map(x=>({n:x.player.n,pos:x.pos}));}
+  catch(e){return [];}}
+/* a gól sorából a gólpasszadó (a közvetítés rövid nevével) → teljes név */
+function evaGolpassz(ev,keret){
+  const m=/G[ÓO]L!?\s+[^()]*?\(([^)]+)\)/i.exec(String((ev&&ev.sor)||""));
+  if(!m)return null;
+  const rov=m[1].trim();
+  const t=keret.find(x=>{try{return shortName(x.n)===rov||x.n===rov;}catch(e){return x.n===rov;}});
+  return t?t.n:null;}
+/* a stáb: n darab név, érintett elöl, aztán poszt szerint, rögzített maggal */
+function evaSajatStab(ev,n,irany,kizar){
+  const keret=evaSajatKeret();
+  if(!keret.length)return [];
+  const ki=new Set((kizar||[]).filter(Boolean));
+  const out=[];
+  const tesz=nev=>{if(nev&&!ki.has(nev)&&out.indexOf(nev)<0&&keret.some(x=>x.n===nev))out.push(nev);};
+  if(ev.t==="gol")tesz(evaGolpassz(ev,keret));
+  if(ev.p2&&ev.t!=="csere")tesz(ev.p2);
+  let a=faceHash("stab|"+String(ev.p||"")+"|"+ev.t+"|"+(ev.min||0)+"|"+(ev.seq||0));
+  const r=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
+  const pref=irany==="hatul"?EVA_POSZT_HATUL:EVA_POSZT_ELOL;
+  const kever=L=>L.map(x=>({x,k:r()})).sort((p,q)=>p.k-q.k).map(o=>o.x.n);
+  kever(keret.filter(x=>pref.indexOf(x.pos)>=0)).forEach(tesz);
+  kever(keret.filter(x=>pref.indexOf(x.pos)<0)).forEach(tesz);
+  return out.slice(0,n);}
 /* ---- A JELENET KONTEXTUSA: ki kicsoda, milyen mezben ---- */
 function evaKontextus(ev){
   const mi=(()=>{try{return kitForNow();}catch(e){return identKitOrDefault("home");}})();
@@ -63479,22 +63522,35 @@ function evaKontextus(ev){
   let a=hash;const r=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
   /* a FŐSZEREPLŐ az eseményé; a védő oldalon a kapus/védő */
   const fo=evaJatekos(ev.p,ev.side||"us");
+  /* 👥 3.9.337: a mi stábunk — érintett elöl, aztán a poszthoz illő társak */
+  const _kiz=[(ev.side||"us")==="us"?ev.p:null,ev.skillP,evaKapusunk()];
+  const _stabT=sajatTamad?evaSajatStab(ev,4,"elol",_kiz):[];
+  const _stabV=!sajatTamad?evaSajatStab(ev,1,"hatul",_kiz):[];
+  const _sajat=(i,alap)=>_stabT[i]?evaJatekos(_stabT[i],"us"):evaJatekos(alap,"us");
   const kapusNev=sajatTamad?`${oppNev} kapusa`:(evaKapusunk()||"Kapus");
   const kapus=evaJatekos(kapusNev,sajatTamad?"them":"us");
   const foTamado=(ev.side||"us")===tamado;
-  const lo=foTamado?fo:evaJatekos(sajatTamad?"Támadó":`${oppNev} csatára`,tamado);
-  const vedo=!foTamado?fo:evaJatekos(sajatTamad?`${oppNev} védője`:"Védő",sajatTamad?"them":"us");
+  /* a tiki-taka passzolója a gólpasszadó helye: ott az érintett a rúgó */
+  const _tiki=sajatTamad&&ev.skill==="tikitaka";
+  const _iT=_tiki?[1,2,0]:[0,1,2];   /* társ, társ2, rúgó → a stáb melyik tagja */
+  const _ures=sajatTamad&&!foTamado;   /* a mi támadónk nem főszereplő → ő is a stábból */
+  const _off=_ures?1:0;
+  const lo=foTamado?fo:(sajatTamad?_sajat(0,"Támadó"):evaJatekos(`${oppNev} csatára`,tamado));
+  const _vedoSajat=_stabV[0]?evaJatekos(_stabV[0],"us"):evaJatekos("Védő","us");
+  const vedo=!foTamado?fo:(sajatTamad?evaJatekos(`${oppNev} védője`,"them"):_vedoSajat);
   const hangulat=ev.t==="golKapott"?-1:ev.t==="gol"?1:ev.t==="piros"?-1:ev.t==="sarga"?-.5:ev.t==="serules"?-.8:.4;
   /* a kapus a fő, ha bravúr/védés/kivédett tizenegyes */
   const kapusFo=["bravur","vedes"].indexOf(ev.t)>=0||(ev.alt==="kivedve");
-  const tars=evaJatekos(sajatTamad?"Társ":`${oppNev} játékosa`,tamado);
+  const tars=sajatTamad?_sajat(_iT[0]+_off,"Társ"):evaJatekos(`${oppNev} játékosa`,tamado);
   const c={ev,sajat:ev.t==="gol"||(ev.side==="us"&&ev.t!=="golKapott"&&ev.t!=="piros"&&ev.t!=="sarga"&&ev.t!=="serules"),
     r,loKit,vedoKit,kapusKit,oppNev,
-    loUrl:evaFig(kapusFo?evaJatekos(sajatTamad?"Támadó":`${oppNev} csatára`,tamado):lo,loKit,ev.t==="gol"?1:ev.t==="golKapott"?.6:hangulat),
-    vedoUrl:evaFig(kapusFo?evaJatekos(sajatTamad?`${oppNev} védője`:"Védő",sajatTamad?"them":"us"):vedo,vedoKit,-.2),
+    loUrl:evaFig(kapusFo?(sajatTamad?_sajat(0,"Támadó"):evaJatekos(`${oppNev} csatára`,tamado)):lo,loKit,ev.t==="gol"?1:ev.t==="golKapott"?.6:hangulat),
+    vedoUrl:evaFig(kapusFo?(sajatTamad?evaJatekos(`${oppNev} védője`,"them"):_vedoSajat):vedo,vedoKit,-.2),
     kapusUrl:evaFig(kapusFo?fo:kapus,kapusKit,kapusFo?.8:ev.t==="golKapott"?-1:-.4),
-    tarsUrl:evaFig(tars,loKit,.3),tarsUrl2:evaFig(evaJatekos((sajatTamad?"Társ2":`${oppNev} játékosa 2`),tamado),loKit,.3),
-    rugoUrl:evaFig(evaJatekos(sajatTamad?"Rúgó":`${oppNev} rúgója`,tamado),loKit,.2),rugoKit:loKit,
+    tarsUrl:evaFig(tars,loKit,.3),tarsUrl2:evaFig(sajatTamad?_sajat(_iT[1]+_off,"Társ2"):evaJatekos(`${oppNev} játékosa 2`,tamado),loKit,.3),
+    rugoUrl:evaFig(sajatTamad?_sajat(_iT[2]+_off,"Rúgó"):evaJatekos(`${oppNev} rúgója`,tamado),loKit,.2),rugoKit:loKit,
+    /* 👥 3.9.337: a próba (és a hibakeresés) ebből látja, kik álltak a jelenetben */
+    stab:{t:_stabT.slice(),v:_stabV.slice()},
     /* a feliratsáv arca: a FŐSZEREPLŐÉ, a saját mezében */
     foArc:ev.p?evaArcUrl(fo,(ev.side||"us")==="us"?mi:ok,hangulat):null,
     foNev:ev.p?shortName(ev.p):null,

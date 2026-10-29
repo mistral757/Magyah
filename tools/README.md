@@ -389,6 +389,14 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## statisztak-3-9-337-proba.js — 👥 statiszták helyett a mi játékosaink az animációkban
+
+```
+node tools/statisztak-3-9-337-proba.js
+```
+
+* A saját figurák a kezdő tizenegyből jönnek: előbb az érintett (gólpasszadó, p2), aztán a poszthoz illő társ, rögzített maggal, ismétlés nélkül. A tiki-taka passzolója a gólpasszadó, a kapott gólnál a védő a hátsó sorból jön. Üres keretnél a régi helyőrző marad.
+
 ## 📊 3.9.336 — a párharc momentum-görbéje (a sajat-bajnoksag-3-9-331-proba.js-ben)
 
 * Egy valódi, két gépen lefutó párharc után a két momentum-görbe vödrönkénti λ-aránya pontosan tükörkép: mindkét gép a közös szimuláció `sim.lamB`-jéből dolgozik, nem a helyi erőkülönbségből.
