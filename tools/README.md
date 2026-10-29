@@ -389,6 +389,15 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## kihivas-nev-menu-3-9-333-proba.js — 🔁 a félbehagyott kihívás-ajánlat, 👆 a játékos-név menü
+
+```
+node tools/kihivas-nev-menu-3-9-333-proba.js
+```
+
+* Az idénynyitó ajánlat a mentésbe kerül, betöltéskor ugyanazokkal nyílik vissza (az elvállalt kimarad), a „Kész" lezárja; a mentés a párharc-nap és a Run-összevetés adatait is viszi.
+* A skill-választóban a név koppintható; menü (Őt választom / Adatlap); az adatlap betekintőként a döntés fölött nyílik, a HUB-újrarajzolás nem zárja be; a név melletti és a programból indított koppintás a régi út.
+
 ## sajat-bajnoksag-3-9-331-proba.js — 🌍 PvP saját bajnokság (Könnyed) a közös (Hardcore) mellett
 
 ```
