@@ -1,6 +1,6 @@
 # Terv: 🌍 PvP „saját bajnokság" mód — Könnyed (ajánlott) / Hardcore
 
-*Állapot: TERVEZET, döntésre vár. Kód még nem készült.*
+*Állapot: MEGVALÓSÍTVA a 3.9.331-ben (lásd docs/sajat-bajnoksag-3-9-331.md). A döntési pontok mind a javaslat szerint dőltek el.*
 *Kiegészítve: közös célrés (4.1) és idényvégi Run-összevetés (7.1).*
 
 ## 1. A kiindulás

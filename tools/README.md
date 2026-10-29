@@ -389,6 +389,20 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## sajat-bajnoksag-3-9-331-proba.js — 🌍 PvP saját bajnokság (Könnyed) a közös (Hardcore) mellett
+
+```
+node tools/sajat-bajnoksag-3-9-331-proba.js
+```
+
+* Két lap a helyi szoba-háttéren (házigazda + vendég, közös seed).
+* A kapcsoló (csomag, alapérték, régi szoba = közös); a saját világ (egyjátékos-piramis, a közös-világ ágak kikapcsolnak).
+* A közös célrés: élő csere, bevárás, átlag, a kezdőrúgás az átlaggal számol.
+* A súlyozott seed: ugyanaz a húzás és scout-terv, a célerő a saját mezőnyszinthez mér; kézfogás nélkül.
+* A párharc-nap: valódi, két gépen lefutó párharc (tükörben azonos eredmény), mérleg, díj, az S.idx marad; a II. nap és a szezonzárás őre.
+* A közös kupa relatív mezőnnyel: azonos klubok, kalapok, csoportok, gépi meccsek, a horgony-különbséggel eltolva.
+* A Run-összevetés (a gyarapodás dönt, tükörben) és a HUB párharc-lapja.
+
 ## taktika-utem-3-9-330-proba.js — ⚙️ gyorsabb taktika-begyakorlás, 🎚 a csúszkák a plafonig
 
 ```

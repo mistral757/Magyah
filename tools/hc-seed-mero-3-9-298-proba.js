@@ -84,7 +84,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const j1=await jel(A);
   ok(j1.tars===null&&!j1.figy.length,"az első gépnél még nincs társ-jelzés — nincs figyelmeztetés",j1);
   const j2=await jel(B),j3=await jel(A);
-  ok(j2.tars==="hardcore"&&/szigorúság/.test(j2.sor)&&/Hardcore/.test(j2.sor),"B kimondja: a társ gépén hardcore, nálad könnyed",j2.sor);
+  ok(j2.tars==="hardcore"&&/szigorúság/.test(j2.sor)&&/Be \(fejlesztés alatt\)/.test(j2.sor),"B kimondja: a társ gépén hardcore, nálad könnyed",j2.sor);
   ok(j3.tars==="konnyed"&&/szigorúság/.test(j3.sor),"A is kimondja (nálad Hardcore, nála Könnyed)",j3.sor);
   const j4=await A.evaluate(async()=>{await hcmJelez("újra");return hcmAllapot().figy.length;});
   ok(j4===1,"ugyanaz az eltérés egyszer kerül a naplóba",j4);
@@ -137,14 +137,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const pn=await A.evaluate(async()=>{
     try{hubInfoShow("set");}catch(e){}
     await new Promise(r=>setTimeout(r,300));
-    const sorTx=[...document.querySelectorAll("#careerSetupBox .csRow")].map(r=>r.textContent).find(t=>/PvP szigorúság/.test(t))||"";
+    const sorTx=[...document.querySelectorAll("#careerSetupBox .csRow")].map(r=>r.textContent).find(t=>/Szakaszos közös seed/.test(t))||"";
     const gomb=document.querySelector("#careerSetupBox [data-hcm-open]");
     if(gomb)gomb.click();
     await new Promise(r=>setTimeout(r,500));
     const m=document.getElementById("hcmModal");
     return {sorTx,gomb:!!gomb,nyitva:!!m&&!m.classList.contains("hide"),tx:m?m.textContent:"",
       egyenlo:[...document.querySelectorAll("#hcmBody td")].filter(t=>t.textContent==="=").length};});
-  ok(/Hardcore/.test(pn.sorTx)&&pn.gomb,"az Infópultban: „PvP szigorúság: Hardcore” és a 🔬 Seed-mérő gomb",pn.sorTx.slice(0,120));
+  ok(/Be \(fejlesztés alatt\)/.test(pn.sorTx)&&pn.gomb,"az Infópultban (3.9.331 óta): „Szakaszos közös seed: Be” és a 🔬 Seed-mérő gomb",pn.sorTx.slice(0,120));
   ok(pn.nyitva&&/Az alap/.test(pn.tx)&&/Kézfogások \(1\)/.test(pn.tx)&&/Seedelt húzásaid/.test(pn.tx),"a gomb megnyitja a panelt: alap, kézfogások, napló",pn.tx.slice(0,200));
   ok(/Eltérés: szigorúság|✓ A két gép alapja egyezik/.test(pn.tx),"a panel kimondja az alap egyezését / eltérését",(pn.tx.match(/(⚠️ Eltérés[^.]*|✓ A két gép[^)]*)/)||[])[0]);
   ok(pn.egyenlo>0,"a kézfogás összevetése soronként (=)",pn.egyenlo);
