@@ -7874,7 +7874,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.334";
+const APP_VERSION="3.9.335";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -52771,6 +52771,124 @@ function engBump(k,id){
   if(!E.buy)E.buy={};
   E.buy[id]=(E.buy[id]||0)+1;
   return E.buy[id];}
+/* ================= 🎯 CÉLZOTT SKILL (3.9.335) =================
+   BEJELENTETT KÉRÉS: „Minden csapatstílushoz tartozzon egy plusz dolog, amit
+   a speciális pontjaiból vásárolhat (amiből csapaterőt is, panzernél ez a
+   rettenet). Kiválaszthat szezononként kétszer 1 db skillt […], amit nagyobb
+   eséllyel kap meg a csapat. Erre összesen 10x lehet ezt a speciális
+   csapatstílus pontot adni, és eszerint erősödik a hatása két faktorosan:
+   1. A skill megszerzésének esélye nő 15 ⇒ 75% a 10 szint alatt, 2. A skill
+   választható lesz, hogy kinek adjuk (realisztikus skill módban csak),
+   25 ⇒ 100%."
+
+   AZ ÁLLAPOT a stílus-állapotban lakik (st.celSk), mint az `eng` és a
+   `fear` — így a mentés magától viszi, és két filozófia sem keveri össze.
+   A FIZETŐESZKÖZ a stílus saját valutája: a motoros stílusoknál az, amiből
+   a csapaterő-szintet is veszed (engPay), a Panzernél a rettenet (dreadSpend).
+
+   AZ 1. HATÁS minden ÚJ képesség sorsolásánál egy külön esély: ennyivel jön
+   a célzott képesség a sorsolt helyett — a pakliból, a realisztikus mód
+   „nem te döntesz" ágán és a „te döntesz, mindent" típus-választásnál is.
+   Csak akkor sül el, ha a képesség feloldott, és van, aki megkaphatja.
+   A 2. HATÁS a realisztikus mód „nem te döntesz" ágán áll: ha a célzott
+   képesség jön, ennyi eséllyel mégis TE választod ki, ki kapja. */
+const CELSK_MAX=10;
+const CELSK_PRICE=[0,20,30,45,65,90,120,155,195,240,290];   /* a fele a csapaterő-szintnek */
+const CELSK_VALT_MAX=2;               /* idényenként ennyiszer választhatsz */
+function celSkP1(l){return l>0?0.15+(Math.min(CELSK_MAX,l)-1)*0.60/(CELSK_MAX-1):0;}
+function celSkP2(l){return l>0?0.25+(Math.min(CELSK_MAX,l)-1)*0.75/(CELSK_MAX-1):0;}
+/* A pénztárca: ugyanaz a felület a motoros stílusoknak és a Panzernek. */
+function celSkWallet(k){
+  if(gameMode!=="career"||!k)return null;
+  if(k==="panzer"){
+    let F=null;try{F=fearOn()?fearState():null;}catch(e){F=null;}
+    if(!F)return null;
+    return {pts:F.pts,ptsN:"rettenet pont",pay:ar=>dreadSpend(ar)};}
+  let E=null;try{E=engLive(k)?engState(k):null;}catch(e){E=null;}
+  if(!E)return null;
+  const d=engDef(k);
+  return {pts:E.pts,ptsN:(d&&d.ptsN)||"pont",pay:ar=>engPay(k,ar)};}
+function celSkState(k){
+  let st=null;try{st=styleStateFor(k);}catch(e){st=null;}
+  if(!st)return null;
+  if(!st.celSk||typeof st.celSk!=="object")st.celSk={lvl:0,id:null,valt:null};
+  const C=st.celSk;
+  if(!(C.lvl>=0))C.lvl=0;
+  return C;}
+function celSkSkill(id){return (id&&SKILLS.find(x=>x&&x.id===id))||null;}
+/* Ebben az idényben még hányszor választhatsz. */
+function celSkValtLeft(k){
+  const C=celSkState(k);if(!C)return 0;
+  const sn=S.seasonNumber||1;
+  const db=(C.valt&&C.valt.sn===sn)?(C.valt.db||0):0;
+  return Math.max(0,CELSK_VALT_MAX-db);}
+function celSkNextPrice(k){const C=celSkState(k);return (!C||C.lvl>=CELSK_MAX)?null:CELSK_PRICE[C.lvl+1];}
+function celSkBuyWhy(k){
+  const C=celSkState(k),W=celSkWallet(k);
+  if(!C||!W)return "ehhez a stílushoz nincs pénztárca";
+  if(C.lvl>=CELSK_MAX)return "a célzás a tetején áll";
+  const ar=celSkNextPrice(k);
+  if(W.pts<ar)return `${engNum(ar-W.pts)} ${W.ptsN} hiányzik`;
+  return "";}
+function celSkBuyLevel(k){
+  if(celSkBuyWhy(k))return false;
+  const C=celSkState(k),W=celSkWallet(k),ar=celSkNextPrice(k);
+  if(!W.pay(ar))return false;
+  C.lvl++;
+  try{addLine(`🎯 <b>Célzott skill — ${C.lvl}. szint.</b> A képesség-esély most `
+    +`<b>${Math.round(celSkP1(C.lvl)*100)}%</b>, a „te választod, ki kapja" esély `
+    +`<b>${Math.round(celSkP2(C.lvl)*100)}%</b>. <span style="color:var(--dim2)">(−${ar} ${esc(W.ptsN)})</span>`,"m life");}catch(e){}
+  try{saveGame();}catch(e){}
+  return true;}
+/* A VÁLASZTÁS. Idényenként kétszer — a második is lehet a régi visszavétele. */
+function celSkSet(k,id){
+  const C=celSkState(k);
+  if(!C||!celSkWallet(k))return false;
+  if(id===C.id)return false;
+  if(celSkValtLeft(k)<=0)return false;
+  const sk=id?celSkSkill(id):null;
+  if(id&&(!sk||skillDeck().indexOf(sk)<0))return false;
+  const sn=S.seasonNumber||1;
+  if(!C.valt||C.valt.sn!==sn)C.valt={sn,db:0};
+  C.valt.db++;
+  C.id=id||null;
+  try{addLine(sk?`🎯 <b>Célzott skill:</b> ${esc(sk.name)}. Ebben az idényben még `
+      +`<b>${celSkValtLeft(k)}</b> változtatás maradt.`
+    :`🎯 A célzott skill kijelölése visszavonva.`,"m ev");}catch(e){}
+  try{saveGame();}catch(e){}
+  return true;}
+/* A FUTÓ CÉLZÁSOK, slot-sorrendben. Két élő filozófia két külön célt
+   tarthat; mindkettő a saját szintjével dob. */
+function celSkActive(){
+  if(gameMode!=="career")return [];
+  const out=[];
+  try{styleSlots().forEach(st=>{
+    if(!st||!st.key||!styleLive(st)||!celSkWallet(st.key))return;
+    const C=st.celSk;
+    if(!C||!(C.lvl>0)||!C.id)return;
+    const sk=celSkSkill(C.id);
+    if(!sk||skillDeck().indexOf(sk)<0)return;
+    out.push({k:st.key,lvl:C.lvl,sk});});}catch(e){}
+  return out;}
+/* AZ 1. HATÁS DOBÁSA. `ok` az, hogy az adott ágon szóba jöhet-e (pl. a
+   típus-választásnál csak a választott kategória). Csak olyan képességet ad,
+   amit valaki ténylegesen megkaphat — különben a jutalom elveszne. */
+function celSkRoll(ok){
+  const a=celSkActive();
+  for(let i=0;i<a.length;i++){
+    const x=a[i];
+    if(ok&&!ok(x.sk))continue;
+    let elig=0;try{elig=eligibleForSkill(x.sk).length;}catch(e){elig=0;}
+    if(!elig)continue;
+    if(Math.random()<celSkP1(x.lvl))return x.sk;}
+  return null;}
+/* A 2. HATÁS: ha a célzott képesség jött, mekkora eséllyel választod te a
+   címzettet (a legmagasabb szintű, erre a képességre szóló célzás dönt). */
+function celSkPickP(sk){
+  if(!sk)return 0;
+  let p=0;
+  celSkActive().forEach(x=>{if(x.sk.id===sk.id)p=Math.max(p,celSkP2(x.lvl));});
+  return p;}
 /* ---- A HANGOLÓK ----
    Egy `tune` tétel egyetlen SZÁMOT told el, amit a stílus SAJÁT gépezete
    olvas. Az olvasók (bzRecGoalMult, bz9GoalMult, passChemOfferP,
@@ -58158,6 +58276,11 @@ function drawSkillFromPoolRaw(){
      Egy egész csapatstílus (⚡ Hol jön a mennydörgés?) áll rajta, és a
      kijelzett szorzója is a pakli nyers arányából számol. */
   poolRefillKind(isPaceSkill);
+  /* 🎯 CÉLZOTT SKILL (3.9.335): a stílus-boltban megvett célzás minden más
+     torzítás előtt dob — ez a játékos kimondott szándéka. A pakliból veszi
+     el a példányt, ha van benne (poolTake), különben egy friss példányt ad. */
+  {let c=null;try{c=celSkRoll();}catch(e){c=null;}
+   if(c){const sk=poolTake(x=>x&&x.id===c.id);if(sk)return sk;}}
   /* A sebesség-ág: a taktika adja az esélyt, a Villám képessége pedig SZOROZZA
      (lásd paceBiasTotal). */
   const b=paceBiasTotal();
@@ -87723,10 +87846,15 @@ function skillRealDrawFor(name){
   const has=(S.skills&&S.skills[name])||[];
   const owned=id=>has.some(i=>i.skill&&i.skill.id===id);
   let pool=skillDeck().filter(sk=>!owned(sk.id));
+  /* 🎯 3.9.335: a célzott képesség, ha ez az ember megkaphatja. */
+  {let c=null;try{c=celSkRoll(sk=>!owned(sk.id)&&eligibleForSkill(sk).some(p=>p.n===name));}catch(e){c=null;}
+   if(c)return c;}
   if(cat){const c=pool.filter(sk=>sk.cat===cat);if(c.length)pool=c;}
   return pool.length?pick(pool):pick(skillDeck());}
 /* A SORSOLÁS a "nem te döntesz" ágon, a stílus-torzítással. */
 function skillRealDrawBiased(){
+  {let c=null;try{c=celSkRoll();}catch(e){c=null;}
+   if(c)return c;}   /* 🎯 3.9.335 */
   const b=skillRealBias();
   if(b&&Math.random()<b.p){
     const pool=skillDeck().filter(b.test);
@@ -87783,7 +87911,14 @@ function grantSkillDecide(skill,reason,stagesNeeded,resumeCb,stagesDone,fromName
   if(skillRealOn()&&!noReal){
     const plan=skillRealPlan();
     if(plan.mode==="auto"){
-      skillRealAuto(plan.skill||skill,reason,stagesNeeded,done,plan.target,resumeCb);return;}
+      const _sk=plan.skill||skill;
+      /* 🎯 CÉLZOTT SKILL, 2. hatás (3.9.335): ha a célzott képesség jött, a
+         célzás szintje szerinti eséllyel mégis te választod, ki kapja. */
+      {let p2=0;try{p2=celSkPickP(_sk);}catch(e){p2=0;}
+       if(p2>0&&Math.random()<p2){
+         try{addLine(`🎯 <b>Célzott skill:</b> ${esc(_sk.name)} — ezúttal <b>te választod</b>, ki kapja.`,"m ev");}catch(e){}   /* nev-ok: képességnév */
+         showSkillDraw(_sk,reason,stagesNeeded,resumeCb,done,fromName);return;}}
+      skillRealAuto(_sk,reason,stagesNeeded,done,plan.target,resumeCb);return;}
     if(plan.mode==="both"){
       showSkillTypePick(reason,stagesNeeded,done,resumeCb);return;}
     /* "who": a képesség a hívóé marad, csak a címzettet választod. */
@@ -87902,7 +88037,9 @@ function showSkillTypePick(reason,stagesNeeded,done,resumeCb){
     b.className="btn-s stepbtn";b.style.marginBottom="6px";
     b.textContent=`${c.n} — ${pool.length} képességből`;
     b.onclick=()=>{
-      const skill=pick(pool);
+      /* 🎯 3.9.335: a választott kategórián belül a célzott képesség esélye. */
+      let skill=null;try{skill=celSkRoll(sk=>sk.cat===c.k);}catch(e){skill=null;}
+      if(!skill)skill=pick(pool);
       showSkillDraw(skill,reason,stagesNeeded,resumeCb,done,null);};
     box.appendChild(b);});
   $("skillAssignWrap").classList.remove("hide");
@@ -117677,7 +117814,8 @@ function renderStylePanel(){
   body.innerHTML=(def?styleDashboardHtml(st,def):styleChooserHtml(null))
     +skillRealStarPickHtml(starStyle(),styleByKey("sztar"));
   styleBindPanel(body);
-  skillRealStarPickBind(body);}
+  skillRealStarPickBind(body);
+  try{celSkBind(body);}catch(e){}   /* 🎯 3.9.335 */}
 /* ---- SZTÁROM A PÁROM: A KÉPESSÉG-KATEGÓRIA ----
    Csak REALISZTIKUS skill-módban és csak ennél a stílusnál létezik. A stílus
    ráhatása itt nem trait-vásárlás, hanem egy FOGADÁS: egyetlen kategóriára
@@ -117998,6 +118136,12 @@ function styleDashboardHtml(st,def){
        `${engNum(engState(_ek).pts)} ${esc(_ed.ptsN)}`,
        engOvrBonusK(_ek)?`+${engNum(engOvrBonusK(_ek))} meccserő`:"",
        ()=>engSectionHtml(_ek),false);}
+  /* ---- 🎯 CÉLZOTT SKILL (3.9.335): minden pénztárcás stílusnál ---- */
+  {const _ck=st.key;
+   if(styleLive(st)&&celSkWallet(_ck)&&celSkState(_ck)){
+     const C=celSkState(_ck),_s=celSkSkill(C.id);
+     h+=styleSecHtml("celsk","🎯 Célzott skill",`${C.lvl}/${CELSK_MAX} szint`,
+       _s?_s.name:(C.lvl?"válassz!":""),()=>celSkHtml(_ck),false);}}
   /* A HÍRESSÉG csak a sztáros filozófiánál létezik, és csak ha van kijelölt
      ember — enélkül a szakasz üresen állna. */
   if(fameStarName())
@@ -118259,6 +118403,86 @@ function engPartRow(p){
       +`margin:6px 0 4px;overflow:hidden"><div style="height:100%;width:${tele}%;`
       +`background:var(--gold)"></div></div>`:"")
     +`<div class="msDesc">${p.d}</div></div>`;}
+/* ---- 🎯 A CÉLZOTT SKILL BLOKKJA (3.9.335) ---- */
+const CELSK_CAT_N={KAPUS:"Kapus",VEDO:"Védő",KOZEPPALYAS:"Középpályás",CSATAR:"Csatár"};
+function celSkHtml(k){
+  const C=celSkState(k),W=celSkWallet(k);
+  if(!C||!W)return "";
+  const L=C.lvl,sk=celSkSkill(C.id),left=celSkValtLeft(k);
+  const ar=celSkNextPrice(k),baj=celSkBuyWhy(k);
+  const pc=x=>Math.round(x*100)+"%";
+  const real=skillRealOn();
+  let h=`<div class="infoCard"><div class="infoCardH">🎯 Célzott skill</div>`
+    +`<div class="msDesc" style="margin-bottom:8px">Kijelölsz <b>egy képességet</b>, és a `
+    +`csapat nagyobb eséllyel kapja meg: minden új képesség sorsolásánál külön esély, hogy `
+    +`a sorsolt helyett ez jön. A ${esc(W.ptsN)}ból veszed — ugyanabból, amiből `
+    +(k==="panzer"?"a rettenet-szinteket":"a csapaterő-szinteket")+`.</div>`
+    +`<div class="msList">`
+    /* A SZINT */
+    +`<div class="msItem"><div class="msTop"><b>🎯 A célzás ereje</b>`
+    +`<span class="msRew">${L}/${CELSK_MAX}${ar?` · ${ar} pont`:""}</span></div>`
+    +`<div class="msDesc">`
+    +`1. <b>A képesség esélye</b> minden sorsolásnál: most <b>${L?pc(celSkP1(L)):"—"}</b>`
+    +(L<CELSK_MAX?`, a következő szinten <b>${pc(celSkP1(L+1))}</b>`:"")+` (1. szint 15% → 10. szint 75%).<br>`
+    +`2. <b>Te választod, ki kapja</b> — realisztikus skill-módban, amikor a gép döntene: `
+    +`most <b>${L?pc(celSkP2(L)):"—"}</b>`
+    +(L<CELSK_MAX?`, a következő szinten <b>${pc(celSkP2(L+1))}</b>`:"")+` (25% → 100%).`
+    +(real?"":` <span style="color:var(--dim2)">Laza módban amúgy is mindig te választasz, `
+      +`ezért itt csak az 1. hatás számít.</span>`)
+    +`<br><span style="color:var(--dim2)">Egyenleg: <b>${engNum(W.pts)}</b> ${esc(W.ptsN)}.</span></div>`
+    +`<button class="btn-${baj?"s":"y"} stepbtn" id="celSkBuy"${baj?" disabled":""} style="margin-top:7px;padding:8px">`
+    +(baj?esc(baj):`Megveszem — ${ar} pont`)+`</button></div>`;
+  /* A VÁLASZTÁS */
+  let birt=0,elig=0;
+  if(sk){
+    try{birt=Object.keys(S.skills||{}).filter(n=>(S.skills[n]||[]).some(i=>i.skill&&i.skill.id===sk.id)).length;}catch(e){birt=0;}
+    try{elig=eligibleForSkill(sk).length;}catch(e){elig=0;}}
+  h+=`<div class="msItem"><div class="msTop"><b>🧩 A kijelölt képesség</b>`
+    +`<span class="msRew">${sk?esc(sk.name):"nincs"}</span></div>`
+    +`<div class="msDesc">`
+    +(sk?esc(sk.desc||"")+`<br><span style="color:var(--dim2)">${esc(CELSK_CAT_N[sk.cat]||sk.cat||"")} · `
+      +`${birt} játékosodnak megvan · ${elig} kaphatja még meg</span>`
+      +(!elig?`<br><b style="color:var(--gold)">Most senki sem kaphatja meg — a célzás szünetel, amíg nem lesz rá jogosult.</b>`:"")
+      +(skillDeck().indexOf(sk)<0?`<br><b style="color:var(--gold)">Ez a képesség most zárolt — a célzás szünetel.</b>`:"")
+     :`Még nincs kijelölve képesség${L?" — a megvett szintek addig nem hatnak":""}.`)
+    +`</div>`
+    +`<div class="msWarn">⚠️ Idényenként <b>${CELSK_VALT_MAX}</b>-szer választhatsz — ebben az idényben még `
+    +`<b>${left}</b>. Válassz körültekintően: ha valaki megkapta, vagy meggondolod magad, `
+    +`a csere is egy választásba kerül.</div>`;
+  if(left>0){
+    h+=`<select id="celSkPick" style="${STYLE_SEL_CSS}">`
+      +`<option value="">${sk?"— kijelölés visszavonása —":"— válassz képességet —"}</option>`;
+    ["KAPUS","VEDO","KOZEPPALYAS","CSATAR"].forEach(cat=>{
+      const lst=skillDeck().filter(x=>x&&x.cat===cat);
+      if(!lst.length)return;
+      h+=`<optgroup label="${esc(CELSK_CAT_N[cat])}">`;
+      lst.forEach(x=>{h+=`<option value="${esc(x.id)}"${sk&&sk.id===x.id?" selected":""}>${esc(x.name)}</option>`;});   /* nev-ok: képességnév */
+      h+=`</optgroup>`;});
+    h+=`</select>`;}
+  h+=`</div></div></div>`;
+  return h;}
+function celSkBind(body){
+  if(!body)return;
+  let k=null;try{k=styleViewKey();}catch(e){k=null;}
+  if(!k||!celSkWallet(k))return;
+  const b=body.querySelector("#celSkBuy");
+  if(b)b.onclick=()=>{if(celSkBuyLevel(k)){renderStylePanel();try{renderHub();}catch(e){}}};
+  const sel=body.querySelector("#celSkPick");
+  if(sel)sel.onchange=()=>{
+    const id=sel.value||null;
+    const C=celSkState(k);
+    if(!C||id===C.id)return;
+    const sk=id?celSkSkill(id):null;
+    const left=celSkValtLeft(k);
+    /* A választó előbb visszaáll: a „Mégse" így nem hagy hamis állapotot. */
+    renderStylePanel();
+    askConfirm({title:sk?"Ezt a képességet célzod?":"Visszavonod a kijelölést?",
+      yes:sk?"Igen, ezt célzom":"Igen, visszavonom",
+      html:(sk?`🎯 <b>${esc(sk.name)}</b><br><span style="color:var(--dim2)">${esc(sk.desc||"")}</span><br><br>`
+          :`A célzás szünetel, amíg újra nem választasz.<br><br>`)
+        +`Ez <b>egy választás</b> az idény ${CELSK_VALT_MAX} lehetőségéből — utána még `
+        +`<b>${left-1}</b> marad. Válassz körültekintően.`,
+      onYes:()=>{celSkSet(k,id);renderStylePanel();}});};}
 function engSectionHtml(k0){
   const k=k0||engKey(),d=engDef(k),E=engState(k);
   if(!k||!d||!E||!engLive(k))return "";
@@ -128185,7 +128409,9 @@ function mpAllasMost(){
   return {sn,idx,mit,hol,t:String(teamName||"").replace(/[<>&]/g,"").slice(0,24),at:Date.now()};}
 function mpAllasWhyNot(){
   try{
-    if(!(typeof h2hRoomActive==="function"&&h2hRoomActive())||!MP.activeRoom)return "Ehhez közös szoba kell.";
+    /* 3.9.335: a SZOBA kell, nem a közös világ — saját bajnokságban (Könnyed)
+       a h2hRoomActive() szándékosan hamis, a társsal viszont ott is beszélünk. */
+    if(!(typeof mpRoomOn==="function"&&mpRoomOn())||!MP.activeRoom)return "Ehhez közös szoba kell.";
     if(mpNet.mode!=="fb")return "Helyi módban nincs mit küldeni.";
     const h=MP_ALLAS_MIN_MS-(Date.now()-_mpAllasAt);
     if(h>0)return `Az imént küldted — újra ${Math.ceil(h/1000)} mp múlva.`;
@@ -128279,7 +128505,7 @@ function mpPingMuteSet(ms){
    gomb a felhasználót a saját készülékével gyanúsítaná meg. */
 function mpPingWhyNot(){
   try{
-    if(!(typeof h2hRoomActive==="function"&&h2hRoomActive())||!MP.activeRoom)
+    if(!(typeof mpRoomOn==="function"&&mpRoomOn())||!MP.activeRoom)   /* 3.9.335: Könnyed szobában is */
       return "Ehhez közös szoba kell.";
     if(mpNet.mode!=="fb")return "Helyi módban nincs mit küldeni.";
     if(!mpMateId(_mpPresRoom))return "A társad még nem csatlakozott ehhez a szobához.";
@@ -128330,7 +128556,7 @@ function mpPingGateName(){
    CSAK a players ágat hozza le (F0), a jelzés viszont a h2h alatt él. */
 async function mpPingPoll(){
   try{
-    if(!(gameMode==="career"&&typeof h2hRoomActive==="function"&&h2hRoomActive()))return;
+    if(!(gameMode==="career"&&typeof mpRoomOn==="function"&&mpRoomOn()))return;   /* 3.9.335 */
     if(!MP.activeRoom||mpNet.mode!=="fb")return;
     try{await mpAllasPoll();}catch(e){}   /* 📍 3.9.291 */
     const node=await mpBk().h2hGet(MP.activeRoom,MP_PING_ROUND);

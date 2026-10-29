@@ -389,6 +389,15 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## celzott-skill-3-9-335-proba.js — 🎯 célzott skill a csapatstílus-boltban
+
+```
+node tools/celzott-skill-3-9-335-proba.js
+```
+
+* Az esélyek: a képesség esélye 15% → 75%, a „te választod, ki kapja" esély 25% → 100% (1–10. szint, egyenletesen). A szint a stílus saját valutájából megy (motoros stílus: a csapaterő pontjai, Panzer: rettenet), 10-nél megáll.
+* Idényenként két választás. A pakli-húzás és a realisztikus sorsolás a megígért arányban céloz. Jogosult nélkül nem céloz. A mentés viszi, a panel megerősítéssel állít.
+
 ## edzo-szerencse-3-9-334-proba.js — 🔍 az edző elemzése a végeredményre számol
 
 ```
