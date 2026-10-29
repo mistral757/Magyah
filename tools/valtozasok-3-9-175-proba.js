@@ -148,8 +148,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.vezKi=!(vp&&!vp.classList.contains("hide"))&&!_vezPushMost;
     /* a társ jelzése: sáv helyett napló */
     const sorok=[];const _a=addLine;addLine=function(h){sorok.push(String(h).replace(/<[^>]+>/g,""));return _a.apply(this,arguments);};
-    const _b=mpBk,_ra=h2hRoomActive;const mode=mpNet.mode,room=MP.activeRoom;
-    h2hRoomActive=()=>true;mpNet.mode="fb";MP.activeRoom="ERTPRB";
+    const _b=mpBk,_ra=h2hRoomActive,_ro=mpRoomOn;const mode=mpNet.mode,room=MP.activeRoom;
+    h2hRoomActive=()=>true;mpRoomOn=()=>true;mpNet.mode="fb";MP.activeRoom="ERTPRB";
     mpBk=()=>({h2hGet:async()=>({tars:{at:Date.now(),e:"👋",t:"Társ FC",g:"a szezonindításnál"}})});
     _mpPingSeen=0;
     await mpPingPoll();
@@ -172,7 +172,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     await mpPingPoll();
     o.pingSavBe=!!bar&&!bar.classList.contains("hide");
     try{mpPingHide();}catch(x){}
-    addLine=_a;mpBk=_b;h2hRoomActive=_ra;mpNet.mode=mode;MP.activeRoom=room;
+    addLine=_a;mpBk=_b;h2hRoomActive=_ra;mpRoomOn=_ro;mpNet.mode=mode;MP.activeRoom=room;
     vezPushKapu=_k;vezPushJelolt=_j;vezPushOn=_on;
     return o;});
   ok(e.kapcsolo&&e.alapOn&&/Értesítések/.test(e.szoveg)&&/Készülék-értesítés/.test(e.szoveg),"a Beállításokban ott a kapcsoló, alapból BE, és elmondja, mire hat",e.szoveg.slice(0,140));
