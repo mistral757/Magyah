@@ -146,11 +146,15 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const c=evaKontextus(ev);const svg=T.svg(c);let hiba=null;
     try{T.mozgas(()=>({}),c);}catch(e){hiba=String(e);}
     /* a közvetítés-sor jelöli a gólt */
+    /* a közvetítés-sor egy élő meccs listájába kerül — ha épp nincs (a korábbi
+       meccsek lezárultak), egy üreset nyitunk a mérés idejére */
+    const _mev0=_mev;if(!_mev)_mev={lista:[],anim:false,duel:false};
     sbEv("us","goal",window._csA,33);addLine(`33'  SZÖGLET UTÁN, FEJJEL! GÓL! Teszt  1:0`,"m goal");
     addLine(`→ 🐟 CSUKAFEJES! Teszt vetődve fejelt`,"m skillnote",true,{skill:"fw_header",skillP:window._csA});
-    const L=mevLista().filter(e=>e.t==="gol");const g=L[L.length-1];
+    const L=mevLista().filter(e=>e.t==="gol");const g=L.filter(e=>e.p===window._csA&&e.min===33).pop()||L[L.length-1];_mev=_mev0;
+    window._dbgL=L.slice(-3).map(e=>({p:e.p,min:e.min,skill:e.skill}));
     return {nev,cim:T.cim(c),alcim:T.alcim&&T.alcim(c),ok:/evaLabda/.test(svg)&&/evaLovo/.test(svg)&&/evaKapus/.test(svg),hiba,
-      esemeny:g&&g.skill,sablon:g&&evaSkillSablon(g)};});
+      esemeny:g&&g.skill,sablon:g&&evaSkillSablon(g),utolsok:window._dbgL};});
   ok(r5.nev==="skCsuka"&&r5.cim==="CSUKAFEJES!"&&r5.ok&&!r5.hiba,"a jelenet: CSUKAFEJES! felirattal, szögletzászló, ívelés, vetődés",r5);
   ok(r5.esemeny==="fw_header"&&r5.sablon==="skCsuka","a közvetítés-sor a gólt a Csukafejes jelenetéhez köti",r5);
 

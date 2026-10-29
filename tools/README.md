@@ -389,6 +389,33 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## celzott-skill-3-9-335-proba.js — 🎯 célzott skill a csapatstílus-boltban
+
+```
+node tools/celzott-skill-3-9-335-proba.js
+```
+
+* Az esélyek: a képesség esélye 15% → 75%, a „te választod, ki kapja" esély 25% → 100% (1–10. szint, egyenletesen). A szint a stílus saját valutájából megy (motoros stílus: a csapaterő pontjai, Panzer: rettenet), 10-nél megáll.
+* Idényenként két választás. A pakli-húzás és a realisztikus sorsolás a megígért arányban céloz. Jogosult nélkül nem céloz. A mentés viszi, a panel megerősítéssel állít.
+
+## edzo-szerencse-3-9-334-proba.js — 🔍 az edző elemzése a végeredményre számol
+
+```
+node tools/edzo-szerencse-3-9-334-proba.js
+```
+
+* A bejelentett eset (3,1 : 0,6 várható gól, 2:2, +1 kapott nem-xG gól): kb. 7 meccsből egyszer (régen 3); a szöveg kimondja az eredményt.
+* A nem-xG gólok rátája a karrierből mérődik (20 meccstől, addig 0,15), és mentődik.
+
+## kihivas-nev-menu-3-9-333-proba.js — 🔁 a félbehagyott kihívás-ajánlat, 👆 a játékos-név menü
+
+```
+node tools/kihivas-nev-menu-3-9-333-proba.js
+```
+
+* Az idénynyitó ajánlat a mentésbe kerül, betöltéskor ugyanazokkal nyílik vissza (az elvállalt kimarad), a „Kész" lezárja; a mentés a párharc-nap és a Run-összevetés adatait is viszi.
+* A skill-választóban a név koppintható; menü (Őt választom / Adatlap); az adatlap betekintőként a döntés fölött nyílik, a HUB-újrarajzolás nem zárja be; a név melletti és a programból indított koppintás a régi út.
+
 ## sajat-bajnoksag-3-9-331-proba.js — 🌍 PvP saját bajnokság (Könnyed) a közös (Hardcore) mellett
 
 ```
