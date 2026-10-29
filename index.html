@@ -7874,7 +7874,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.335";
+const APP_VERSION="3.9.336";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -63945,7 +63945,8 @@ function ekMotor(min,lamMi,lamOk,diff,pirosMi,pirosOk,v){
     const akt=(mi+.6)/(mi+ok+1.2);
     tk=.42*tk+.58*akt;}
   const cel=Math.max(-1,Math.min(1,(tk-.5)*2*1.5+(_ek.alap-.5)*2*.45));
-  _ek.cel.push({min,v:cel,tk,alap:_ek.alap});
+  _ek.cel.push({min,v:cel,tk,alap:_ek.alap,
+    lr:(lamMi!=null&&lamOk!=null&&(lamMi+lamOk)>0)?lamMi/(lamMi+lamOk):null});   /* 📊 3.9.336: a próba ezt veti össze a két gépen */
   _ek.t0=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
   try{_ek.ms=Math.max(120,(typeof matchSpeedTickMs==="function")?matchSpeedTickMs():1000);}catch(e){_ek.ms=1000;}
   _ek.min=min;
@@ -72432,6 +72433,21 @@ function h2hRoleAssistW(X,scorerName){
    A hívási SORREND része a szerződésnek — ha valaha új véletlen-fogyasztó kerül
    ide, azt a lista végére kell tenni, különben a régi mentések eredménye
    elcsúszna. Paraméter nélkül a régi (Math.random) viselkedés marad. */
+/* 📊 3.9.336 — a közös vödör-λ a SAJÁT nézőpontomból: {mine, opp} egy
+   percre. A régi lista (lamB nélkül) a meccsvégi közös λ-t adja; ha az sincs,
+   null (marad a régi, helyi számolás). */
+function duelLamFn(D){
+  const sim=D&&D.sim;if(!sim)return null;
+  const B=Array.isArray(sim.lamB)&&sim.lamB.length?sim.lamB:null;
+  const L=sim.lam&&typeof sim.lam.home==="number"&&typeof sim.lam.away==="number"?sim.lam:null;
+  if(!B&&!L)return null;
+  const me=!!D.iAmHome;
+  return m=>{
+    let h,a;
+    if(B){const q=B[Math.max(0,Math.min(B.length-1,Math.ceil((m||5)/5)-1))];
+      if(!q||!(q[0]>0)||!(q[1]>0))return null;h=q[0];a=q[1];}
+    else{h=L.home;a=L.away;if(!(h>0)||!(a>0))return null;}
+    return me?{mine:h,opp:a}:{mine:a,opp:h};};}
 function h2hSimulate(home,away,rnd,neutral){
   const R=rnd||Math.random;
   const CL=x=>Math.max(.15,Math.min(4.5,x));
@@ -72503,6 +72519,7 @@ function h2hSimulate(home,away,rnd,neutral){
     if(A.redName&&A.redOppMult!==1)lamHome=CL(lamHome*A.redOppMult);}
   recalc();
   const ev=[];let hg=0,ag=0;
+  const lamB=[];   /* 📊 3.9.336 — vödrönkénti [hazai, vendég] λ */
   ev.push({min:0,type:"start",home:home.teamName,away:away.teamName});
   /* ---- AZ ELŐRE BEÁLLÍTOTT CSERÉK VÉGREHAJTÁSA ----
      A SORREND a rangsor: felülről lefelé haladunk, és a cserekeret is így fogy
@@ -72656,6 +72673,10 @@ function h2hSimulate(home,away,rnd,neutral){
     const _fpD=favPushMult(Math.log(Math.max(1e-6,lamHome)/Math.max(1e-6,lamAway))/(2*SIM.K),min,hg,ag);
     side(H,CL(lamH*_fpD.own),true);
     side(A,CL(lamA*_fpD.opp),false);
+    /* 📊 3.9.336: a vödör KÖZÖS gólvárhatósága — ebből dolgozik a két gépen a
+       momentum-görbe, a gólon kívüli helyzetek és a birtoklás. Véletlent nem
+       fogyaszt, a lista többi része betűre ugyanaz. */
+    lamB.push([Math.round(CL(lamH*_fpD.own)*1000)/1000,Math.round(CL(lamA*_fpD.opp)*1000)/1000]);
     /* A félidő a 9. tick VÉGÉN: ekkor van kész az 1-45. perc. */
     if(min===45)ev.push({min:45,type:"half",hg,ag});}
   ev.push({min:90,type:"end",hg,ag});
@@ -72678,7 +72699,7 @@ function h2hSimulate(home,away,rnd,neutral){
   /* A LISTA VERZIÓJA. v>=2 azt jelenti: a cserék és a piros lapok ITT dőlnek
      el, tehát a lejátszásnak nem szabad saját lapot dobnia. v>=3: a SÁRGA
      lapok is (3.9.86). Régi (verzió nélküli) listánál minden marad a régiben. */
-  return {v:3,events:ev,hg,ag,lam:{home:lamHome,away:lamAway}};}
+  return {v:3,events:ev,hg,ag,lam:{home:lamHome,away:lamAway},lamB};}
 /* ================= EGY VÖDÖRBEN CSAK AZ EGYIK CSAPAT GÓLJA =================
    BEJELENTETT HIBA: a párharc naplójában a 74. percben esett a saját gól, és
    utána a 73. percben az ellenfél egyenlítése — vagyis az idő VISSZAFELÉ ugrott.
@@ -75483,6 +75504,17 @@ function h2hStart(node,sim,round,key){
   h2hStaleDisarm();
   const oppField=MP.role==="host"?"guest":"host";
   const oppSnap=(node&&node[oppField])||{};
+  /* 📊 3.9.336 — ha a tárolt listából hiányzik a vödrönkénti közös λ (régi
+     kliens írta, vagy a szerver eldobta), UGYANAZZAL a maggal a két
+     pillanatképből újraszámoljuk. Csak a λ-t vesszük át; az eseménylista a
+     tárolt marad. */
+  try{
+    if(sim&&!(Array.isArray(sim.lamB)&&sim.lamB.length)&&node&&node.host&&node.guest){
+      const _hh=h2hHostIsSimHome(round);
+      const _r=h2hSimulate(_hh?node.host:node.guest,_hh?node.guest:node.host,
+        rngFor("h2hduel:"+(MP.activeRoom||"")+":"+round),h2hNeutralVenue());
+      if(_r&&_r.hg===sim.hg&&_r.ag===sim.ag&&Array.isArray(_r.lamB))sim=Object.assign({},sim,{lamB:_r.lamB});}
+  }catch(e){}
   /* ---- P1b: KIMONDJUK, HA NEM AZ AKTUÁLIS KERET JÁTSZOTT ----
      MINDKÉT OLDALON. Aki helyettesített, az tudja, mit tett; a VISSZATÉRŐNEK
      viszont ez az egyetlen esélye megérteni, miért játszott a csapata anélkül,
@@ -80595,6 +80627,21 @@ function playMatchMotor(){
   /* AZ ALAKZAT ÁRA: a mostani mérkőzésre eső extra kapott gól várható értéke */
   try{shapeNoteMatch(_L.la);}catch(e){}
   let diff=_L.diff,lf=_L.lf,la=_L.la;
+  /* ---- 📊 PÁRHARCBAN A KÖZÖS GÓLVÁRHATÓSÁG (3.9.336) ----
+     BEJELENTETT HIBA: „Nem, az enyémen főleg nálam volt a momentum" — a két
+     gépen mindkét menedzser a SAJÁT fölényét látta. A gólok a közös listából
+     jöttek, a momentum-görbe, a gólon kívüli helyzetek és a birtoklás viszont
+     a HELYI `diff`/`lf`/`la`-ból: a saját teljes meccs-pillanatképed a társ
+     nyers keret-erejével (és a gépi ellenfeleknek szóló rejtett erősítéssel)
+     szemben. Mindkét oldalon a saját csapat jött ki erősebbnek.
+     Mostantól a közös szimuláció vödrönkénti λ-ja (sim.lamB) dönt — a két gép
+     ugyanabból a két számból dolgozik, csak tükörben. */
+  const _duelLam=DUEL?duelLamFn(DUEL):null;
+  const duelLamApply=m=>{
+    if(!_duelLam)return;
+    const q=_duelLam(m);if(!q)return;
+    lf=q.mine;la=q.opp;diff=Math.log(Math.max(1e-6,lf)/Math.max(1e-6,la))/(2*SIM.K);};
+  duelLamApply(5);
   /* ---- AZ EMBERHÁTRÁNY ÖSSZEGE KÜLÖN SZÁMLÁN (3.9.133) ----
      A kiállítás a `diff`-ből von le; a csere viszont a `diff`-et a
      pillanatképből ÚJRASZÁMOLJA (matchLambdas) — és ezzel eddig némán
@@ -81356,6 +81403,7 @@ function playMatchMotor(){
        viszont kell — ezért itt tesszük le. Ötperces vödör, ami a
        negyedóra-határokhoz bőven elég pontos. */
     _engMin=min;
+    duelLamApply(min);   /* 📊 3.9.336 */
     /* az óra a fejlécben az aktuális 5-perces bucketet mutatja (a gólok saját,
        1-perc pontos bélyeget kapnak a gmin()-től) */
     updateTTBoard(fx,gf,ga,Math.min(90,min));
@@ -81471,6 +81519,7 @@ function playMatchMotor(){
        monoton nőnek, tehát a gól tényleg a tisztázás UTÁN esik. A gólok számát
        ez nem érinti: azt továbbra is a Poisson dönti el, változatlanul. */
     let _ekChOk=0,_ekChMi=0;   /* 📊 3.9.282: a vödör helyzetei a Momentumnak */
+    duelLamApply(min);   /* 📊 3.9.336: egy csere közben újraszámolhatta a helyit */
     {const chN=poisson((OPPCH_BASE+la*OPPCH_RATE)/18*talMeccsOppCh());_ekChOk=chN;
      for(let c=0;c<chN;c++)oppChance(min);}
     /* ---- ÉS A MI GÓLON KÍVÜLI TÁMADÁSAINK (3.9.04) ----
@@ -81899,7 +81948,7 @@ function playMatchMotor(){
     try{if(MX)mxVodor(MX,"a",la,MX.laK,["fp","role","bus","villam","dial","talIdo","kiall"],[_fp.opp].concat(_mfOpp),_lamOpp);}catch(e){}
     let og=DUEL?duelOpp.length:poisson(_lamOpp);
     if(MX)MX.a.pg+=og;
-    try{ekMotor(min,_lamOwn,_lamOpp,diff,redIdxs.size,oppRedDone?1:0,{chMi:_ekChMi,chOk:_ekChOk,g,og});}catch(e){}   /* 📊 3.9.282 */   /* ⚽ F6d — a Villámrajt kontrája: a SAJÁT pillanatképemből, az ellenfél λ-ján */
+    try{ekMotor(min,DUEL&&_duelLam?lf/18:_lamOwn,DUEL&&_duelLam?la/18:_lamOpp,diff,redIdxs.size,oppRedDone?1:0,{chMi:_ekChMi,chOk:_ekChOk,g,og});}catch(e){}   /* 📊 3.9.282 */   /* ⚽ F6d — a Villámrajt kontrája: a SAJÁT pillanatképemből, az ellenfél λ-ján */
     for(let k=0;k<og;k++){ga++;
       const dOpp=duelOpp?duelOpp[k]:null;
       const oppScorer=dOpp?dOpp.scorer:pickOpponentScorer(fx.o);

@@ -172,6 +172,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     penz:Math.round(S.transferBudget||0),led:(S.ledger||[]).filter?null:null,log:window._nlog.filter(t=>/Párharc-nap I:/.test(t)).slice(-1)[0]}));
   const rg=await g.evaluate(()=>({m:S.svPh&&S.svPh.m["2:1"],M:S.svPh&&S.svPh.merleg,idx:S.idx,esed:svPhEsedekes(),penz:Math.round(S.transferBudget||0)}));
   ok(kesz&&ra.m&&rg.m&&ra.m.gf===rg.m.ga&&ra.m.ga===rg.m.gf,"a párharc lefut mindkét gépen, és ugyanaz az eredmény (tükörben)",{a:ra.m,g:rg.m});
+  /* 📊 3.9.336 — a momentum-görbe a KÖZÖS gólvárhatóságból dolgozik: a két
+     gép vödrönkénti λ-aránya pontosan tükörkép (a + b = 1). */
+  {const lr=pp=>pp.evaluate(()=>(_ek&&_ek.cel||[]).map(c=>c.lr));
+   const la_=await lr(p),lg_=await lr(g);
+   const n=Math.min(la_.length,lg_.length);
+   const tukor=n>=17&&la_.slice(0,n).every((x,i)=>x!=null&&lg_[i]!=null&&Math.abs(x+lg_[i]-1)<1e-9);
+   ok(tukor,"párharcban a momentum a közös λ-ból: a két gép aránya vödrönként tükörkép",{n,a:la_.slice(0,4),g:lg_.slice(0,4)});}
   ok(ra.idx===15&&rg.idx===15&&ra.esed===0&&!/PÁRHARC/.test(ra.label),"nem bajnoki forduló: az S.idx marad, utána a 16. forduló jön",{idx:ra.idx,label:ra.label});
   {const w=ra.m&&ra.m.gf>ra.m.ga,d=ra.m&&ra.m.gf===ra.m.ga;
    ok(ra.M&&ra.M.p===(w?3:d?1:0)&&rg.M.p===(ra.m.ga>ra.m.gf?3:d?1:0),"a párharc-mérleg 3/1/0 pontot könyvel mindkét oldalon",{a:ra.M,g:rg.M});
