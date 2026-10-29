@@ -74183,6 +74183,8 @@ $("absHubBtn")&&($("absHubBtn").onclick=()=>{
      van hiányzó a kezdőben. */
   try{openHubMidSeason();}catch(e){}});
 function startRound(){
+  /* 🌍 3.9.331 — az idény induló Run-szintje (és az előző idény lezárása) */
+  try{if(mpSv()&&(S.idx||0)===0&&!euroActive())svRunInditas();}catch(e){}
   /* ---- A VÉGIGJÁTSZÁS MEGÁLL A BAJNOKI TÉTMÉRKŐZÉS ELŐTT (3.8.33) ----
      A kapu itt van, mert ez a forduló EGYETLEN belépési pontja — a kezdőrúgás,
      az auto-lánc és a párharc is erre jön. Ha megállított, nem indul mérkőzés:
@@ -92498,6 +92500,7 @@ function finish(){
       const kb=$("kickBtn");if(kb){kb.disabled=false;kb.textContent=kickBtnLabel();}
       addLine(`⚔ A szezon a <b>II. párharc-nappal</b> zárul — előbb azt játsszátok le.`,"m ev");}catch(e){}
     return;}
+  try{if(mpSv())setTimeout(()=>{try{svRunKozzetesz(S.seasonNumber||1,false);}catch(e){}},0);}catch(e){}
   /* ---- F5: A KÖZÖS TABELLA MEGVÁRJA A TÁRSADAT ----
      A helyezésed a KÖZÖS mezőnyben dől el, és a helyezésből jön a szezon-
      történet bejegyzése meg az európai kvalifikáció is. Ha a társad zárása még
@@ -104064,7 +104067,9 @@ function renderRunMeter(){
   if(rb)rb.onclick=(ev)=>{ev.stopPropagation();
     let cur=false;try{cur=localStorage.getItem("30-0-runboard-open")==="1";}catch(e){}
     try{localStorage.setItem("30-0-runboard-open",cur?"0":"1");}catch(e){}
-    renderRunMeter();};}
+    renderRunMeter();};
+  /* 🌍 3.9.331 — saját bajnokságban a Run-mérő alá a párharc-lap */
+  try{if(mpSv())box.insertAdjacentHTML("beforeend",svParharcLapHtml());}catch(e){}}
 /* ================= HUB MENÜ + HARMONIKA =================
    A menü csak egy BURKOLAT a meglévő gombok köré: egyetlen kattintás-kezelőt
    és egyetlen láthatóság-szabályt sem írtunk át. A renderHub() sosem építi újra
@@ -128480,6 +128485,108 @@ function svPhEsedekes(){
     if(i>=30&&!S.seasonClosed&&!M[sn+":2"])return 2;
     return 0;}catch(e){return 0;}}
 function svDuelNow(){return svPhEsedekes()>0;}
+/* ================= 🌍 RUN-ÖSSZEVETÉS ÉS A PÁRHARC-LAP (3.9.331) =================
+   KÉRÉS: „Szezonok végén Run szint összehasonlítás is külön."
+   Saját bajnokságban nincs közös tabella, ezért az idény két mércéje külön
+   áll: a ⚔ PÁRHARC-MÉRLEG (a két párharc-nap) és a 📈 RUN-IDÉNYEK — az idény
+   Run-győztese az, aki TÖBBET GYARAPODOTT (nem a pillanatnyi szint, mert azt
+   az előző idények előnye is viszi). Az idény a következő kezdőrúgásnál
+   zárul véglegesen (a kupa is mozdítja a Runt); addig a lap élő állást mutat.
+   Szoba: `s<N>svrun` → {host,guest}: {r0,r1,div,rank,cel,mezo,ms,vegleges}. */
+function svRunMost(){try{const t=runBreakdown().total;return (typeof t==="number"&&isFinite(t))?Math.round(t*10)/10:null;}catch(e){return null;}}
+function svRunKulcs(sn){return "s"+sn+"svrun";}
+function svRunAll(){
+  if(!S.svRun||S.svRun.v!==1)S.svRun={v:1,r0:{},sajat:{},tars:{},szamolt:{},gyoz:{w:0,d:0,l:0}};
+  ["r0","sajat","tars","szamolt"].forEach(k=>{if(!S.svRun[k]||typeof S.svRun[k]!=="object")S.svRun[k]={};});
+  if(!S.svRun.gyoz)S.svRun.gyoz={w:0,d:0,l:0};
+  return S.svRun;}
+function svRunRekord(sn,vegleges){
+  const R=svRunAll();let rank=null,div=null,mezo=null,ms=null,cel=null;
+  try{const ft=S.finalTable||[];const i=ft.findIndex(x=>x&&x.you);rank=i>=0?i+1:null;}catch(e){}
+  try{div=(typeof pyrOn==="function"&&pyrOn())?pyrMyDivId():null;}catch(e){}
+  try{mezo=Math.round(pyrLevel()*10)/10;}catch(e){}
+  try{msRatedBegin();try{ms=Math.round(teamMatchStrength()*10)/10;}finally{msRatedEnd();}}catch(e){}
+  try{const c=S.pyr&&S.pyr.svCel;if(c&&c.sn===sn&&typeof c.avg==="number")cel=Math.round((nfCelK(nfLevelFor(sn))+c.avg)*100)/100;}catch(e){}
+  return {r0:(typeof R.r0[sn]==="number")?R.r0[sn]:null,r1:svRunMost(),div,rank,mezo,ms,cel,
+    team:String(teamName||"").slice(0,40),vegleges:!!vegleges,season:sn,at:Date.now(),v:1};}
+async function svRunKozzetesz(sn,vegleges){
+  if(!mpSv())return;
+  const R=svRunAll();
+  if(R.sajat[sn]&&R.sajat[sn].vegleges)return;
+  const rec=svRunRekord(sn,vegleges);R.sajat[sn]=rec;
+  try{await mpBk().h2hPut(MP.activeRoom,svRunKulcs(sn),svMyField(),rec);}catch(e){}
+  try{saveGame();}catch(e){}}
+/* a kezdőrúgásnál: az előző idény véglegesítése, az új idény induló Runja */
+function svRunInditas(){
+  if(!mpSv())return;
+  const R=svRunAll(),sn=S.seasonNumber||1;
+  if(R.r0[sn]!=null)return;
+  if(sn>1&&!(R.sajat[sn-1]&&R.sajat[sn-1].vegleges))svRunKozzetesz(sn-1,true);
+  R.r0[sn]=svRunMost();
+  try{saveGame();}catch(e){}}
+/* a társ rekordja; ha mindkettő végleges, a mérleg könyvel */
+async function svRunFrissit(sn){
+  if(!mpSv()||!sn)return null;
+  const R=svRunAll();
+  try{const n=await mpBk().h2hGet(MP.activeRoom,svRunKulcs(sn));const t=n&&n[svMateField()];
+    if(t&&typeof t==="object")R.tars[sn]=t;}catch(e){}
+  const a=R.sajat[sn],t=R.tars[sn];
+  if(a&&t&&a.vegleges&&t.vegleges&&!R.szamolt[sn]){
+    const da=svRunGyar(a),dt=svRunGyar(t);
+    if(da!=null&&dt!=null){
+      const cls=Math.abs(da-dt)<0.05?"d":(da>dt?"w":"l");
+      R.gyoz[cls]++;R.szamolt[sn]=cls;
+      try{addLine(`📈 <b>Run-összevetés — a ${sn}. idény:</b> te ${svRunTxt(da)}, a társad ${svRunTxt(dt)} — `
+        +(cls==="w"?"<b>a Run-idény a tiéd</b>":cls==="l"?"<b>a Run-idény a társadé</b>":"döntetlen")
+        +` · Run-idények: <b>${R.gyoz.w}–${R.gyoz.d}–${R.gyoz.l}</b>.`,cls==="w"?"m win":cls==="l"?"m loss":"m ev");}catch(e){}
+      try{saveGame();}catch(e){}}}
+  return t||null;}
+function svRunGyar(r){return (r&&typeof r.r0==="number"&&typeof r.r1==="number")?Math.round((r.r1-r.r0)*10)/10:null;}
+function svRunTxt(x){return x==null?"—":(x>=0?"+":"−")+String(Math.abs(x).toFixed(1)).replace(".",",");}
+/* melyik idényről szóljon a lap: a lezárt (nyár), különben a futó */
+function svLapIdeny(){
+  const sn=S.seasonNumber||1,R=svRunAll();
+  if((S.idx||0)===0&&!S.seasonClosed&&sn>1&&(R.sajat[sn-1]||R.tars[sn-1]||R.r0[sn-1]!=null))return sn-1;
+  return sn;}
+let _svLapAt=0;
+function svParharcLapHtml(){
+  if(!mpSv())return "";
+  const sn=svLapIdeny(),R=svRunAll();
+  /* a társ rekordját ritkán kérjük le; a saját élőt helyben számoljuk */
+  if(Date.now()-_svLapAt>15000){_svLapAt=Date.now();
+    svRunFrissit(sn).then(()=>{try{const b=$("svLapBox");if(b)b.outerHTML=svParharcLapHtml();}catch(e){}}).catch(()=>{});
+    if(!(R.sajat[sn]&&R.sajat[sn].vegleges)&&sn===(S.seasonNumber||1))svRunKozzetesz(sn,false);}
+  const a=(R.sajat[sn]&&R.sajat[sn].vegleges)?R.sajat[sn]:svRunRekord(sn,false),t=R.tars[sn]||null;
+  const P=svPhAll(),M=P.merleg,G=R.gyoz;
+  const nm=(t&&t.team)||"A társad";
+  const cell=(x,f)=>`<td style="text-align:right;padding:2px 6px">${x==null?"—":f?f(x):esc(String(x))}</td>`;
+  const sz=x=>(typeof x==="number"?(Math.round(x*10)/10).toFixed(1):String(x)).replace(".",",");
+  const sor=(c,fa,ft,f)=>`<tr><td style="color:var(--dim);padding:2px 6px">${c}</td>${cell(fa,f)}${cell(ft,f)}</tr>`;
+  const da=svRunGyar(a),dt=svRunGyar(t);
+  const php=sn2=>[1,2].map(n=>{const r=P.m[sn2+":"+n];return r?`${n===1?"I":"II"}: <b>${r.gf}–${r.ga}</b>`:`${n===1?"I":"II"}: —`;}).join(" · ");
+  /* az állás a döntés szerint: párharc-mérleg, egyenlőségnél a Run-gyarapodás */
+  let allas="";
+  if(M.w+M.d+M.l>0){
+    allas=M.w>M.l?"te vezetsz a párharcokban":M.w<M.l?`${esc(nm)} vezet a párharcokban`
+      :(G.w>G.l?"a párharc döntetlen, a Run-idényekben te vezetsz":G.w<G.l?`a párharc döntetlen, a Run-idényekben ${esc(nm)} vezet`:"teljes az egyenlőség");}
+  return `<div class="infoCard" id="svLapBox" style="margin:8px 0;font-size:12.5px;line-height:1.5">
+    <div class="infoCardH">⚔ Párharc-lap — ${esc(teamName)} vs ${esc(nm)}</div>
+    <div>⚔ <b>Párharc-mérleg:</b> ${M.w}–${M.d}–${M.l} (${M.p} pont, gólok ${M.gf}–${M.ga}) · ${sn}. idény: ${php(sn)}</div>
+    <div>📈 <b>Run-idények:</b> ${G.w}–${G.d}–${G.l}</div>
+    ${allas?`<div style="color:var(--gold)">${allas}</div>`:""}
+    <div style="margin-top:6px;font-weight:700">📈 Run-összevetés — a ${sn}. idény${(a.vegleges&&t&&t.vegleges)?"":" <span style='font-weight:400;color:var(--dim)'>(élő állás; a következő kezdőrúgásnál zárul)</span>"}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:3px">
+      <tr><td></td><td style="text-align:right;padding:2px 6px"><b>te</b></td><td style="text-align:right;padding:2px 6px"><b>${esc(nm)}</b></td></tr>
+      ${sor("Run az idény elején",a.r0,t&&t.r0,sz)}
+      ${sor("Run most",a.r1,t&&t.r1,sz)}
+      ${sor("<b>gyarapodás</b>",da,dt,svRunTxt)}
+      ${sor("közös célrés",a.cel,t&&t.cel,x=>esc(nfCelTxt(x)))}
+      ${sor("osztály",a.div,t&&t.div,x=>"D"+x)}
+      ${sor("helyezés",a.rank,t&&t.rank,x=>x+".")}
+      ${sor("a mezőny szintje",a.mezo,t&&t.mezo,sz)}
+      ${sor("⚡ meccs-erő",a.ms,t&&t.ms,sz)}
+    </table>
+    ${t?"":`<div style="color:var(--dim2);font-size:11.5px">A társad adatai még nem érkeztek meg.</div>`}</div>`;}
 /* ================= 🌍 A KÖZÖS KUPA KÉT KÜLÖN VILÁGBÓL (3.9.331) =================
    A közös nyári program (a jobbik kvalifikáció visz, HSZ, lánc, nyári torna,
    „csak a döntőben") saját bajnokságban is él. A mezőny viszont RELATÍV:

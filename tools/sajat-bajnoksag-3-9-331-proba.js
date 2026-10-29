@@ -217,6 +217,25 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     "a kalapok és a csoportok a két gépen ugyanazok",{a:ka.csop.slice(0,2),g:kg.csop.slice(0,2)});
   ok(ka.seeded&&JSON.stringify(ka.sim)===JSON.stringify(kg.sim),"két gépi csapat meccse a két gépen ugyanaz (csak a különbség számít)",{a:ka.sim,g:kg.sim});
 
+  console.log("— 7. a Run-összevetés és a párharc-lap —");
+  const runPrep=(pp,r0)=>pp.evaluate(async(r0)=>{
+    S.svRun=null;S.seasonNumber=4;S.idx=0;S.seasonClosed=false;
+    const R=svRunAll();R.r0[4]=r0;
+    await svRunKozzetesz(4,true);return {r1:R.sajat[4].r1,veg:R.sajat[4].vegleges};},0);
+  const ra0=await runPrep(p,0),rg0=await runPrep(g,0);
+  /* a vendég induló Runját feljebb tesszük: kevesebbet gyarapodott */
+  await g.evaluate(async()=>{const R=svRunAll();R.sajat[4].r0=R.sajat[4].r1-1;await mpBk().h2hPut(MP.activeRoom,svRunKulcs(4),svMyField(),R.sajat[4]);});
+  await p.evaluate(async()=>{const R=svRunAll();R.sajat[4].r0=R.sajat[4].r1-3;await mpBk().h2hPut(MP.activeRoom,svRunKulcs(4),svMyField(),R.sajat[4]);});
+  const fa=await p.evaluate(async()=>{await svRunFrissit(4);const R=svRunAll();return {sz:R.szamolt[4],gy:R.gyoz,log:window._nlog.filter(t=>/Run-összevetés/.test(t)).slice(-1)[0]};});
+  const fg=await g.evaluate(async()=>{await svRunFrissit(4);const R=svRunAll();return {sz:R.szamolt[4],gy:R.gyoz};});
+  ok(fa.sz==="w"&&fg.sz==="l"&&fa.gy.w===1&&fg.gy.l===1,"az idény Run-győztese a nagyobb gyarapodás (+3 vs +1) — tükörben, külön mérlegben",{a:fa,g:fg});
+  ok(/Run-idények/.test(fa.log||""),"a napló kimondja",fa.log);
+  const lap=await p.evaluate(()=>{S.seasonNumber=4;S.idx=5;const h=svParharcLapHtml().replace(/<[^>]+>/g," ").replace(/\s+/g," ");return h;});
+  ok(/Párharc-lap/.test(lap)&&/Párharc-mérleg/.test(lap)&&/Run-idények: 1–0–0/.test(lap)&&/gyarapodás \+3,0 \+1,0/.test(lap)&&/VENDEG FC/.test(lap),
+    "a HUB párharc-lapja: a két mérleg és a Run-összevetés táblája",lap.slice(0,400));
+  const infl=await p.evaluate(()=>{S.svRun.r0={};S.seasonNumber=5;S.idx=0;svRunInditas();return {r0:S.svRun.r0[5]};});
+  ok(typeof infl.r0==="number","a kezdőrúgásnál rögzül az idény induló Runja",infl);
+
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,5));
   await b.close();srv.close();
   console.log(hiba?`✗ ${hiba} hiba`:"✓ minden rendben");
