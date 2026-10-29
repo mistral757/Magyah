@@ -187,6 +187,36 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r6.esed===2&&r6.key==="s2svd2"&&r6.home===false&&/párharc-nap II/i.test(r6.label)&&r6.phase==="season"&&!r6.zarva,
     "a 30. forduló után a II. párharc-nap jön (a vendég a hazai); a szezon nem zárul előtte",r6);
 
+  console.log("— 6. a közös kupa relatív mezőnnyel —");
+  const kPrep=(pp,nev,comp)=>pp.evaluate(([nev,comp])=>{
+    teamName=nev;S.seasonNumber=3;S.idx=30;S.seasonClosed=true;S.mpCup=null;S.euro=null;
+    S.euroCurrent=comp;S.euroCurrentQual=false;S.euroOptOut=false;window._kupaKesz=0;
+    mpCupGate(()=>{window._kupaKesz++;});return true;},[nev,comp]);
+  await kPrep(p,"HAZAI FC","KL");await kPrep(g,"VENDEG FC","EL");
+  for(let i=0;i<20;i++){await p.waitForTimeout(700);
+    const k=await p.evaluate(()=>window._kupaKesz)+await g.evaluate(()=>window._kupaKesz);if(k>=2)break;}
+  const kupa=pp=>pp.evaluate(()=>{
+    const C=S.mpCup;if(!C||!C.comp)return {nincs:true,C};
+    startEuroCampaign();const E=S.euro;
+    const nev=i=>{const t=E.teams[i];return t.you?"@"+teamName:t.mate?"@"+C.mateName:t.n;};
+    const ai={};E.teams.forEach(t=>{if(!t.you&&!t.mate)ai[t.n]=t.ovr;});
+    const me=E.teams.find(t=>t.you),mate=E.teams.find(t=>t.mate);
+    const csop=E.groups.map(g=>g.map(nev).sort().join("|"));
+    /* két gépi csapat meccse a csoportból (a közös kupa-seed folyamából) */
+    const g0=E.groups.find(g=>g.every(i=>!E.teams[i].you&&!E.teams[i].mate))||E.groups[0];
+    const aiIdx=g0.filter(i=>!E.teams[i].you&&!E.teams[i].mate).slice(0,2);
+    const r=euroSimResult(E.teams[aiIdx[0]].ovr,E.teams[aiIdx[1]].ovr,"proba:"+aiIdx.join("-"));
+    return {comp:C.comp,mid:C.mid,mateMids:!!C.mateSvMids,ai,me:me&&me.ovr,mate:mate&&mate.ovr,csop,sim:[E.teams[aiIdx[0]].n,E.teams[aiIdx[1]].n,r.h,r.a],seeded:E.mpSeeded};});
+  const ka=await kupa(p),kg=await kupa(g);
+  ok(!ka.nincs&&ka.comp==="EL"&&kg.comp==="EL"&&ka.mateMids&&kg.mateMids,"a közös program saját bajnokságban is él: a jobbik kvalifikáció (EL) visz, a horgonyok átutaznak",{a:{comp:ka.comp,mid:ka.mid},g:{comp:kg.comp,mid:kg.mid}});
+  {const D=ka.mid-kg.mid,nevek=Object.keys(ka.ai);
+   const kul=nevek.map(n=>Math.round((ka.ai[n]-kg.ai[n])*1000)/1000);
+   ok(nevek.length>=28&&nevek.every(n=>n in kg.ai)&&kul.every(x=>Math.abs(x-D)<1e-6),"ugyanazok a gépi csapatok, mindegyik a saját horgonyhoz mérve: a különbség pontosan a két horgony különbsége",{D,kul:[...new Set(kul)].slice(0,5)});
+   ok(Math.abs((ka.mate-kg.me)-D)<1e-6&&Math.abs((ka.me-kg.mate)-D)<1e-6,"a társ a saját horgonyához mért távolságával kerül a te skáládra",{a:{me:ka.me,mate:ka.mate},g:{me:kg.me,mate:kg.mate},D});}
+  ok(JSON.stringify(ka.csop.map(x=>x.replace("@HAZAI FC","A").replace("@VENDEG FC","B")).sort())===JSON.stringify(kg.csop.map(x=>x.replace("@VENDEG FC","B").replace("@HAZAI FC","A")).sort()),
+    "a kalapok és a csoportok a két gépen ugyanazok",{a:ka.csop.slice(0,2),g:kg.csop.slice(0,2)});
+  ok(ka.seeded&&JSON.stringify(ka.sim)===JSON.stringify(kg.sim),"két gépi csapat meccse a két gépen ugyanaz (csak a különbség számít)",{a:ka.sim,g:kg.sim});
+
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,5));
   await b.close();srv.close();
   console.log(hiba?`✗ ${hiba} hiba`:"✓ minden rendben");

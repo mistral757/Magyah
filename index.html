@@ -21762,7 +21762,7 @@ function mpProgStartNext(){
   const st=C.prog[ni];
   if(!st||!EURO_COMPS[st.comp])return false;
   C.pi=ni;C.comp=st.comp;C.qual=!!st.qual;C.droppedApart=false;
-  try{C.mid=mpCupSharedMid(C.sa,C.sb,C.da,C.db,st.comp);}catch(e){}
+  try{C.mid=mpSv()?svKupaMid(st.comp):mpCupSharedMid(C.sa,C.sb,C.da,C.db,st.comp);}catch(e){}
   S.euro=null;S.euroCurrent=st.comp;S.euroCurrentQual=!!st.qual;S.euroOptOut=false;
   try{$("scEuro").classList.add("hide");}catch(e){}
   const w=mpProgWhy(st,ni,C);
@@ -21910,7 +21910,7 @@ let _mpMkNev=null,_mpMkProg=false;
 function mpMkNevek(){return _mpMkNev||cupChainNevek();}
 async function mpMkChainGate(iWon,cb,opt){
   opt=opt||{};
-  if(!h2hRoomActive()){cb(iWon);return;}
+  if(!mpKupaKozos()){cb(iWon);return;}
   if(opt.quick){
     try{await mpNetInit();}catch(e){}
     try{await mpBk().h2hPut(MP.activeRoom,mpMkKey(),MP.role==="host"?"host":"guest",{won:!!iWon,at:Date.now()});}catch(e){}
@@ -22053,7 +22053,7 @@ function mpCupSolo(onReady){
   try{saveGame();}catch(e){}
   if(typeof onReady==="function")onReady();}
 async function mpCupGate(onReady){
-  if(!h2hRoomActive()){onReady();return;}
+  if(!mpKupaKozos()){onReady();return;}
   if(mpCupSettled()){onReady();return;}
   if(mpWaitStuck(_mpCupBusy,_mpCupPoll))mpCupAbort();   /* beragadt jelző feloldása */
   if(_mpCupBusy)return;
@@ -22096,6 +22096,9 @@ async function mpCupGate(onReady){
      selejtezőm, és honnan nevezek (a felirathoz). A régi kliens ezeket nem
      küldi — a HSZ-t akkor a `comp` árulja el. */
   Object.assign(myEntry,mpCupEntryExtra());
+  /* 🌍 3.9.331 — saját bajnokságban a mezőny RELATÍV: a saját horgonyaid
+     minden sorozatra (a társ ezekhez méri a csapatodat a saját skáláján) */
+  if(mpSv())try{myEntry.svMids=svKupaMids();}catch(e){}
   await mpReput(key,myField,node,myEntry);
   if(!_mpCupBusy)return;
   mpCupTick(key,myField,oppField,onReady,myEntry);}
@@ -22149,8 +22152,11 @@ async function mpCupTickRun(key,myField,oppField,onReady,myEntry){
       /* A KÖZÖS mezőny-célérték: ugyanaz a képlet, mint az euroMidRating-ben,
          de az ERŐSEBB keretre horgonyozva. Így a két kliens azonos mezőnyt
          épít, és a sorozat egyikőtöknek sem lesz sétagalopp. */
-      mid:mpCupSharedMid(mine.mstr||mine.str,mate.mstr||mate.str,
+      mid:mpSv()?svKupaMid(r?r.comp:null)
+        :mpCupSharedMid(mine.mstr||mine.str,mate.mstr||mate.str,
                          mine.dom,mate.dom,r?r.comp:null),
+      /* 🌍 3.9.331 — a társ horgonyai (saját bajnokság: relatív mezőny) */
+      mateSvMids:(mate.svMids&&typeof mate.svMids==="object")?mate.svMids:null,
       how:r?r.how:null,mineComp:r?r.mineComp:null,mateComp:r?r.mateComp:null,
       mateVer:mate.v?String(mate.v).slice(0,16):null,
       /* ⚔ 3.9.211 — „csak a döntőben" — ha mindkét gép ismeri */
@@ -22732,7 +22738,7 @@ function mpBeaconReset(){_mpBeacon={gate:null,seen:null,hits:0};}
    mint hogy tévesen szétdobjuk a két karriert). */
 async function mpBeaconPing(gate){
   try{
-    if(!h2hRoomActive()||!gate||!MP||!MP.activeRoom)return false;
+    if(!mpKupaKozos()||!gate||!MP||!MP.activeRoom)return false;
     const key=mpBeaconKey(),myField=MP.role==="host"?"host":"guest";
     const oppField=myField==="host"?"guest":"host";
     if(_mpBeacon.gate!==gate)_mpBeacon={gate,seen:null,hits:0};
@@ -22766,7 +22772,7 @@ function mpPosKey(){return "s"+(S.seasonNumber||1)+"pos";}
 function mpPosPi(){try{const C=mpProg();return C?(C.pi||0):0;}catch(e){return 0;}}
 function mpPosPut(rec){
   try{
-    if(!(gameMode==="career"&&h2hRoomActive()&&MP&&MP.activeRoom))return;
+    if(!(gameMode==="career"&&mpKupaKozos()&&MP&&MP.activeRoom))return;
     const myField=MP.role==="host"?"host":"guest";
     const r=Object.assign({pi:mpPosPi(),at:Date.now(),v:APP_VERSION},rec||{});
     Promise.resolve(mpBk().h2hPut(MP.activeRoom,mpPosKey(),myField,r)).catch(()=>{});
@@ -22776,7 +22782,7 @@ function mpPosPut(rec){
    esetén false (inkább várunk, mint hogy tévesen szétdobjuk a két kupát). */
 async function mpMateElsewhere(){
   try{
-    if(!(gameMode==="career"&&h2hRoomActive()&&MP&&MP.activeRoom))return null;
+    if(!(gameMode==="career"&&mpKupaKozos()&&MP&&MP.activeRoom))return null;
     const oppField=MP.role==="host"?"guest":"host";
     const node=await mpBk().h2hGet(MP.activeRoom,mpPosKey());
     const m=node&&node[oppField];
@@ -23030,12 +23036,17 @@ function buildEuroField(comp){
      azzal a kerettel, amivel a bajnokságban is találkozol (lásd _pref) —
      különben az Arsenal (2025/26) a bajnokságban és az Arsenal (1990/91) a
      kupában ugyanaz a klub volna két különböző csapatként. */
-  const usedClubs=new Set((typeof SEASON_OPPS!=="undefined"?SEASON_OPPS:[])
+  /* 🌍 3.9.331 — saját bajnokságban a két gép bajnoki mezőnye és horgonya
+     más: a NEVEK kiválasztása ezért közös mércéből megy (a két horgony
+     átlaga, a bajnoki kizárás nélkül) — az erők a saját horgonyra ülnek */
+  const _svKoz=!!(M&&mpSv()&&M.mateSvMids&&typeof M.mateSvMids[comp]==="number");
+  const usedClubs=new Set(_svKoz?[]:(typeof SEASON_OPPS!=="undefined"?SEASON_OPPS:[])
     .map(o=>clubOfTeamName(o&&o.n)).filter(Boolean));
   const homeField=!!(c.domestic&&c.leagues&&c.leagues.length);
+  const selTarget=_svKoz?(M.mid+M.mateSvMids[comp])/2+c.oppDelta:target;
   const pool=SQUADS.map((sq,i)=>({sq,i,n:`${sq.club} (${sq.season})`,avg:squadAvgOvr(sq)}))   /* nev-ok: kanonikus mezőny-azonosító, nem kiírás */
     .filter(x=>!x.sq.wc&&(homeField||!usedClubs.has(x.sq.club)));
-  const ranked=pool.slice().sort((a,b)=>Math.abs(a.avg-target)-Math.abs(b.avg-target));
+  const ranked=pool.slice().sort((a,b)=>(Math.abs(a.avg-selTarget)-Math.abs(b.avg-selTarget))||(a.i-b.i));
   /* EGY KLUB CSAK EGYSZER: a 32-es mezőnyben sem állhat két azonos nevű csapat
      (Real Madrid 2017 és Real Madrid 2002 egy csoportban értelmezhetetlen).
      Klubonként a kupa CÉLÉRTÉKÉHEZ legközelebbi szezon versenyez — a dedup a
@@ -23045,7 +23056,7 @@ function buildEuroField(comp){
      sorrendjét nem borítja fel: a klub ott jelenik meg, ahol a saját
      távolsága szerint amúgy is állna. */
   const _pref={};
-  if(homeField)(typeof SEASON_OPPS!=="undefined"?SEASON_OPPS:[]).forEach(o=>{
+  if(homeField&&!_svKoz)(typeof SEASON_OPPS!=="undefined"?SEASON_OPPS:[]).forEach(o=>{
     const cl=clubOfTeamName(o&&o.n);if(cl)_pref[cl]=o.n;});
   const _seenClub=new Set(),rankedClubs=[];
   ranked.forEach(x=>{
@@ -23106,9 +23117,14 @@ function buildEuroField(comp){
      boostokkal számolt csapaterő kell (dispOvr): a "következő mérkőzés" doboz
      a saját oldaladon teamStrength()-et ír, tehát a társad nyers száma mellette
      rendszeresen gyengébbnek mutatta őt a valóságosnál. */
+  /* 🌍 3.9.331 — saját bajnokságban a társ a SAJÁT horgonyához mért
+     távolságával kerül a te skáládra: a gépi csapatok és a két ember közti
+     különbségek így mindkét gépen azonosak (a szimuláció csak a különbséget
+     nézi), tehát a gépi meccsek és a kalapok bitre ugyanazok */
+  const _svD=svKupaEltolas(M,comp);
   if(M)teams.push({n:M.mateName||"A társad",mate:true,you:false,sq:null,
-    ovr:Math.max(50,Math.min(cap,M.mateOvr||target)),
-    dispOvr:(typeof M.mateStr==="number")?M.mateStr:null});
+    ovr:Math.max(50,Math.min(cap,(M.mateOvr||target)+_svD)),
+    dispOvr:(typeof M.mateStr==="number")?M.mateStr+_svD:null});
   /* KALAPOS beosztás: erősség szerint 4 kalap, minden csoportba kalaponként
      egy csapat — így minden négyesben van erős és gyengébb ellenfél is. */
   /* MP: a kalapsorrendnek DÖNTETLENNÉL is kliensfüggetlennek kell lennie.
@@ -70546,7 +70562,7 @@ function edzoElemGombFrissit(){
 let _duelPrep=null,_duelTars=null;
 function duelKulcs(){try{return "dp:"+h2hKey();}catch(e){return "dp:?";}}
 function duelPrepKell(){
-  try{return (h2hRoomActive()||svDuelNow())&&h2hIsDuelRound()&&!S.auto&&!S.playing&&_duelPrep!==duelKulcs();}catch(e){return false;}}
+  try{return (h2hRoomActive()||mpSv())&&h2hIsDuelRound()&&!S.auto&&!S.playing&&_duelPrep!==duelKulcs();}catch(e){return false;}}
 /* a régi (tárolt) lapok közül a legfrissebb */
 function duelTarolt(){
   const s=(typeof mpOppSnapNow==="function")?mpOppSnapNow():null;
@@ -73716,7 +73732,7 @@ function h2hPendingClear(){
    belerángatni egy nem oda tartozó párharcba. */
 function h2hDuelPendingNow(){
   try{
-    if(!(h2hRoomActive()||svDuelNow())||!S.h2hPending)return false;
+    if(!(h2hRoomActive()||mpSv())||!S.h2hPending)return false;
     if(!h2hIsDuelRound())return false;
     return S.h2hPending.key===h2hKey();
   }catch(e){return false;}}
@@ -76191,7 +76207,7 @@ function levelChangeLockReason(){
     const c=euroPendingComp();
     return `A nehézségi szint zárolva: még hátravan ${hunAz((c&&c.n)||"európai kupa")} ${(c&&c.n)||"európai kupa"}. A sorozat mezőnye a mostani szintedből épül, ezért csak a kupa UTÁN, a nyári ablakban állítható át.`;}
   /* 3) KÖZÖS KARRIER: a kupanevezési kézfogás előtt még nincs mit javasolni. */
-  if(h2hRoomActive()&&!S.euroOptOut&&!mpCupSettled()&&(phase==="verdict"||phase==="hub"))
+  if(mpKupaKozos()&&!S.euroOptOut&&!mpCupSettled()&&(phase==="verdict"||phase==="hub"))
     return "Előbb a közös kupanevezés dől el — utána adhatod meg a következő szezonra a javaslatodat.";
   return "";}
 /* `atBoundary` — a SZEZONHATÁR az egyetlen jogos pillanat, amikor a mezőny
@@ -106031,7 +106047,7 @@ function hszSpectateWait(cb){
     E2.hszSpect=false;
     try{saveGame();}catch(e){}
     cb(E2.ties.map(t=>t.winner));};
-  if(mt<0||E.mateOut||!h2hRoomActive()){finish();return;}
+  if(mt<0||E.mateOut||!mpKupaKozos()){finish();return;}
   if(mpWaitStuck(_hszPoBusy,_hszPoPoll))hszSpectateAbort();
   if(_hszPoBusy)return;
   _hszPoBusy=true;
@@ -106806,7 +106822,7 @@ function endEuroCampaign(){
   const E=S.euro;
   /* 3.9.181: KÖZÖS NYÁRI PROGRAM — a lánc, a következő lépés és a nyári torna
      a programból jön, nem a helyi osztályból (az a két gépen eltérhet). */
-  if(E&&h2hRoomActive()&&gameMode==="career"&&mpProgIsStep(E)){mpProgCampaignEnd(E);return;}
+  if(E&&mpKupaKozos()&&gameMode==="career"&&mpProgIsStep(E)){mpProgCampaignEnd(E);return;}
   /* ---- A HAZAI KUPA → A NEKI JÁRÓ SOROZAT LÁNCA ----
      Egyjátékosban a saját győzelem indítja. KÖZÖS KARRIERBEN viszont KÖZÖS
      döntés: ha bármelyikőtök megnyerte a hazai kupát, MINDKETTEN indultok —
@@ -106831,7 +106847,7 @@ function endEuroCampaign(){
       +`${hunAz(esc(EURO_COMPS[c.gives].n))} <b>${esc(EURO_COMPS[c.gives].n)}</b> indulást — a sorozat MOST következik`
       +`${c.qual?", a selejtezőtől":""}!`,"m life");
     startEuroCampaign();saveGame();};
-  if(chainable&&h2hRoomActive()&&gameMode==="career"){
+  if(chainable&&mpKupaKozos()&&gameMode==="career"){
     mpMkChainGate(wonMK,fire=>{
       if(fire){fireChain();return;}
       /* Egyikőtök sem nyerte meg: a kampány itt zárul, jöhet a kupa utáni kapu. */
@@ -107327,7 +107343,7 @@ function renderEuroScreen(){
     /* A ZÁRÓ GOMB FELIRATA a KÖVETKEZMÉNYT mondja, nem a lépést: ha a hazai
        kupa győzelme Konföranszié Líg indulást ért, akkor a gomb nem a
        szezonzárásra visz, hanem egy újabb sorozatba — mondja is ki. */
-    $("euroDoneBtn").textContent=(h2hRoomActive()&&mpProgIsStep(E))
+    $("euroDoneBtn").textContent=(mpKupaKozos()&&mpProgIsStep(E))
       ? mpProgDoneLabel(E)
       : euroMkChainPending()
       ? cupChainGomb()
@@ -107563,7 +107579,7 @@ function hubNextSeasonFlow(){
   /* 3.9.181 — A KÖZÖS NYÁRI PROGRAM FÉLBEHAGYOTT PONTJAI. Ha a lánc
      egyeztetéséből vagy a nyári torna döntéséből kiléptél (vagy újratöltöttél),
      a gomb ide hoz vissza — nem egy másik kapuba, ahol a társad nem vár. */
-  if(h2hRoomActive()&&gameMode==="career"&&!S.euro){
+  if(mpKupaKozos()&&gameMode==="career"&&!S.euro){
     const sn=S.seasonNumber||1;
     if(S.mpProgWait&&S.mpProgWait.season===sn){mpProgChainResume();return;}
     if(S.mpProgNyk&&S.mpProgNyk.season===sn&&!S.mpProgNyk.done&&!euroPending()){
@@ -107571,7 +107587,7 @@ function hubNextSeasonFlow(){
   /* KÖZÖS KUPA: a nevezés kialkudása MEGELŐZI a sorozat indítását — és akkor is
      lefut, ha én magam nem kvalifikáltam, mert a társam jogán bekerülhetek.
      A kapu egyszer fut le szezononként (mpCupSettled), utána visszatér ide. */
-  if(h2hRoomActive()&&gameMode==="career"&&!S.euroOptOut&&!mpCupSettled()){
+  if(mpKupaKozos()&&gameMode==="career"&&!S.euroOptOut&&!mpCupSettled()){
     mpCupGate(()=>hubNextSeasonFlow());return;}
   if(euroPending()&&!S.euroOptOut&&typeof startEuroCampaign==="function"){
     startEuroCampaign();return;}
@@ -107635,7 +107651,7 @@ function friendlyCupOfferable(){
    futtató fél nem is tudná lejátszani. Így a két kliens vagy együtt lép a
    tornába, vagy együtt marad ki — a kapu-jelző sosem csúszhat szét. */
 function friendlyCupJoint(){
-  return !!(typeof h2hRoomActive==="function"&&h2hRoomActive()&&gameMode==="career");}
+  return !!(typeof mpKupaKozos==="function"&&mpKupaKozos()&&gameMode==="career");}
 const MP_WAIT_NYK={mine:"A te nevezésed",opp:"A társad nevezése",
   cancel:"✕ Nem várom meg"};
 /* ---- A NEVEZÉS EREDMÉNYE: NEM IGEN/NEM, HANEM A KÖZÖS TORNA ADATAI (3.7.36)
@@ -128464,6 +128480,27 @@ function svPhEsedekes(){
     if(i>=30&&!S.seasonClosed&&!M[sn+":2"])return 2;
     return 0;}catch(e){return 0;}}
 function svDuelNow(){return svPhEsedekes()>0;}
+/* ================= 🌍 A KÖZÖS KUPA KÉT KÜLÖN VILÁGBÓL (3.9.331) =================
+   A közös nyári program (a jobbik kvalifikáció visz, HSZ, lánc, nyári torna,
+   „csak a döntőben") saját bajnokságban is él. A mezőny viszont RELATÍV:
+   mindkét gép a SAJÁT horgonyára (euroMidRating) építi, a gépi csapatok a
+   közös kupa-seedből sorsolt eltolással ülnek rajta, a társ pedig a saját
+   horgonyához mért távolságával. A szimuláció csak a két erő KÜLÖNBSÉGÉT
+   nézi (euroLam), ezért a gépi meccsek, a kalapok és a csoportok a két
+   gépen ugyanazok — a te meccseid viszont a te skáládon, a te
+   mezőnyödben mennek, ahogy egyjátékosban. */
+function mpKupaKozos(){try{return h2hRoomActive()||mpSv();}catch(e){return false;}}
+function svKupaMid(comp){
+  if(!comp||!EURO_COMPS[comp])return null;
+  try{return Math.round(euroMidRating(comp));}catch(e){return null;}}
+function svKupaMids(){
+  const o={};Object.keys(EURO_COMPS).forEach(c=>{const m=svKupaMid(c);if(typeof m==="number"&&isFinite(m))o[c]=m;});
+  return o;}
+/* a társ értékeinek eltolása a te skáládra (közös bajnokságban 0) */
+function svKupaEltolas(M,comp){
+  try{if(!mpSv()||!M||!M.mateSvMids||typeof M.mid!=="number")return 0;
+    const t=M.mateSvMids[comp];
+    return (typeof t==="number"&&isFinite(t))?M.mid-t:0;}catch(e){return 0;}}
 function svPhRogzit(gf,ga,tars){
   const n=svPhEsedekes();if(!n)return;
   const P=svPhAll(),sn=S.seasonNumber||1,M=P.merleg;
