@@ -107,7 +107,7 @@ KLUBOK = {
 # ── Olaszország ─────────────────────────────────────────────────────────────
 "Juventus FC":("Torinói Szarkák", "JUH"),
 "AC Milan":("ÁCsé Milánó", "MIL"),
-"Inter Milan":("Milánói Ördögök", "INT"),
+"Inter Milan":("Nemzetközi Milánóiak", "INT"),   # a felhasználó kérése (2026-10-29)
 "AS Roma":("Ász Rómaiak", "RÓM"),
 "SS Lazio":("Laciházi Szolgálat", "LAC"),
 "SSC Napoli":("Nápolyi", "NÁP"),

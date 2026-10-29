@@ -24,6 +24,8 @@ A FORRÁSOK (a teljes git-történetből kigyűjtve, nem emlékezetből)
     nevei;
   · a 2026-10-06-i kérés: hét név, és Ziyech + Kolo Touré;
   · 2026-10-28: Riquelme („Rick Elme Huán Román").
+  · 2026-10-29: 30 név a felismerhetetlen sztárok listájáról (Pelé →
+    Peleves, Eusébio → Európai Zébió, … Nkunku → N. Kukucskáló Kristóf).
 
 HOGYAN BŐVÜL: ha a felhasználó új nevet ír át (vagy visszaállít egyet a
 DONTESRE_VAR-ból), az ide kerül — nem a manual.py valamelyik JAVASLAT
@@ -448,6 +450,36 @@ SAJAT_KULCSOK = {
   "Zinédine Zidane": "a felhasználó döntése (2026-10-06, sztár-kör)",
   "Álvaro Morata": "a 3.9.87-es kör (a kért gépi-név felülírások)",
   "Édmilson": "bf84bde — Nevek Danisítása lvl100 (2026-09-01)",
+  "Pelé": "a felhasználó saját neve (2026-10-29)",
+  "Eusébio": "a felhasználó saját neve (2026-10-29)",
+  "Lev Jasin": "a felhasználó saját neve (2026-10-29)",
+  "Raúl": "a felhasználó saját neve (2026-10-29)",
+  "Didier Drogba": "a felhasználó saját neve (2026-10-29)",
+  "Luis Suárez": "a felhasználó saját neve (2026-10-29)",
+  "Christian Vieri": "a felhasználó saját neve (2026-10-29)",
+  "Cafu": "a felhasználó saját neve (2026-10-29)",
+  "Bobby Charlton": "a felhasználó saját neve (2026-10-29)",
+  "Roberto Carlos": "a felhasználó saját neve (2026-10-29)",
+  "Paul Gascoigne": "a felhasználó saját neve (2026-10-29)",
+  "Roy Keane": "a felhasználó saját neve (2026-10-29)",
+  "Carlos Alberto Torres": "a felhasználó saját neve (2026-10-29)",
+  "Dida": "a felhasználó saját neve (2026-10-29)",
+  "Raí": "a felhasználó saját neve (2026-10-29)",
+  "Luis Suárez Miramontes": "a felhasználó saját neve (2026-10-29)",
+  "Thiago Alcântara": "a felhasználó saját neve (2026-10-29)",
+  "Didier Deschamps": "a felhasználó saját neve (2026-10-29)",
+  "Hidetoshi Nakata": "a felhasználó saját neve (2026-10-29)",
+  "Thierry Henry": "a felhasználó saját neve (2026-10-29)",
+  "Franco Baresi": "a felhasználó saját neve (2026-10-29)",
+  "Fabio Cannavaro": "a felhasználó saját neve (2026-10-29)",
+  "Víctor Valdés": "a felhasználó saját neve (2026-10-29)",
+  "Zico": "a felhasználó saját neve (2026-10-29)",
+  "Xavi": "a felhasználó saját neve (2026-10-29)",
+  "Claude Makélélé": "a felhasználó saját neve (2026-10-29)",
+  "Fabien Barthez": "a felhasználó saját neve (2026-10-29)",
+  "Gary Neville": "a felhasználó saját neve (2026-10-29)",
+  "Lamine Yamal": "a felhasználó saját neve (2026-10-29)",
+  "Christopher Nkunku": "a felhasználó saját neve (2026-10-29)",
 }
 
 SAJAT = {
@@ -867,6 +899,36 @@ SAJAT = {
   "Ze Roberto": ("iZé Robi", "iZé"),
   "Zinédine Zidane": ("Zizu Zalán", "Zizu"),
   "Álvaro Morata": ("Morotva Alvár", "Morotva"),
+  "Pelé": ("Peleves", "Peleves"),
+  "Eusébio": ("Európai Zébió", "Zébió"),
+  "Lev Jasin": ("Levi Jancsi", "Levi"),
+  "Raúl": ("Ráül", "Ráül"),
+  "Didier Drogba": ("Didikell Dorka", "Didikell"),
+  "Luis Suárez": ("Luisz Szujárez", "Szujárez"),
+  "Christian Vieri": ("Krisztián V. Éri", "V. Éri"),
+  "Cafu": ("Kátyu", "Kátyu"),
+  "Bobby Charlton": ("Csarnokos Bobi", "Csarnokos"),
+  "Roberto Carlos": ("Robertó Károly", "Robertó"),
+  "Paul Gascoigne": ("Pól Gázkony", "Gázkony"),
+  "Roy Keane": ("Rój Kéne", "Kéne"),
+  "Carlos Alberto Torres": ("Károly Albert Toresz", "Toresz"),
+  "Dida": ("D. Da", "D. Da"),
+  "Raí": ("Ráj", "Ráj"),
+  "Luis Suárez Miramontes": ("Luisz Szuárez Miremondtadezt", "Miremondtadezt"),
+  "Thiago Alcântara": ("Tiágó Alkantár", "Alkantár"),
+  "Didier Deschamps": ("Didi Desamp", "Desamp"),
+  "Hidetoshi Nakata": ("Hidegtósi Nagykáta", "Nagykáta"),
+  "Thierry Henry": ("Tyerri Ari", "Ari"),
+  "Franco Baresi": ("Barézi Ferkó", "Barézi"),
+  "Fabio Cannavaro": ("Kannát Váró Fábián", "Kannát Váró"),
+  "Víctor Valdés": ("Vál-Dés Viktor", "Vál-Dés"),
+  "Zico": ("Zakó", "Zakó"),
+  "Xavi": ("Csávó", "Csávó"),
+  "Claude Makélélé": ("Klód Makrélalé", "Makrélalé"),
+  "Fabien Barthez": ("Bár Te Z. Fábián", "Bár Te Z."),
+  "Gary Neville": ("Geri Nevill", "Nevill"),
+  "Lamine Yamal": ("Jamalka Levente", "Jamalka"),
+  "Christopher Nkunku": ("N. Kukucskáló Kristóf", "N. Kukucskáló"),
 }
 
 # A 19 DÖNTÉSRE VÁRÓ NÉV (2026-10-06, a projektgazda döntése): 13 visszaállt
