@@ -389,6 +389,15 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## negy-parharc-3-9-338-proba.js — ⚔ négy párharc-nap a saját bajnokságban
+
+```
+node tools/negy-parharc-3-9-338-proba.js
+```
+
+* Minden szünet után egy nap (a 8., 15., 23. és 30. forduló után). A hazai felváltva a házigazdáé és a vendégé, saját kulcsokkal (svq1–4).
+* A menetrend az idény első kezdőrúgásakor rögzül; a régi renddel futó idény változatlan. A valódi, két gépen lefutó 8. fordulós párharcot a sajat-bajnoksag-3-9-331-proba.js méri.
+
 ## statisztak-3-9-337-proba.js — 👥 statiszták helyett a mi játékosaink az animációkban
 
 ```
