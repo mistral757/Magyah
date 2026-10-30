@@ -69,3 +69,26 @@ Nem kell hozzá a társ beleegyezése, és a párharc-napokat nem érinti.
 * `tools/sajat-bajnoksag-3-9-331-proba.js`, új állítások: valódi, két gépen
   lefutó párharc a 8. forduló után. Tükörben ugyanaz az eredmény, utána a
   9. bajnoki jön.
+
+## ⚔ Javítás (3.9.341): az edzői elemzés a párharc-napot elemzi
+
+> „Az edzői elemzés nem a párharcnapot, hanem az utána jövő meccset
+> elemezte. Ez nem jó így. Az az elemzés különösen fontos, és ki is
+> dolgoztunk rá egy alaposabb rendszert már. Csak be kéne oda kötni."
+
+**Mi volt a hiba.** Az elemzés a soron következő meccset a menetrendből
+vette (`edzoKovetkezoMeccs`). A saját bajnokság párharc-napja nem
+menetrendi forduló. Amíg esedékes, a menetrend következő sora, vagyis a
+következő bajnoki várakozik, ezért az elemzés azt kapta.
+
+**A javítás.** Ha párharc-nap esedékes, az elemzés a párharcot kapja, saját
+kulccsal (`svph` + a nap szoba-utótagja). Ez a 30. forduló utáni, utolsó
+napra is áll. Az elemzés a már kidolgozott párharc-ágon fut (3.9.305):
+
+* a társ csapatlapjának meccs-ereje, kiegyenlítés nélkül;
+* a közös pálya-szabály;
+* a társ csapatneve a fejlécben.
+
+A párharc után a következő bajnoki jön, és arra újra jár az elemzés.
+
+**Próba:** `tools/edzo-elemzes-kulcs-3-9-314-proba.js`, két új állítás.

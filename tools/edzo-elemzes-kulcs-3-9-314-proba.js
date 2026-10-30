@@ -115,6 +115,21 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       regiFelbe:mEloEgyezik({id:mMeccsIdRegi(),vege:0}),
       sajat:mEloEgyezik({id:mMeccsId(),vege:1})};
     S.euro=null;
+    /* 6. ⚔ 3.9.341 — saját bajnokság, párharc-nap: a párharcot elemzi, nem az utána jövő bajnokit */
+    {const _sv=mpSv;mpSv=()=>true;
+     S.seasonClosed=false;S.seasonNumber=2;S.idx=15;
+     S.svPh={v:1,m:{},merleg:{w:0,d:0,l:0,gf:0,ga:0,p:0}};
+     const lig={o:{n:"Bajnoki FC",ovr:70},home:true};S.fixtures=S.fixtures||[];S.fixtures[15]=lig;
+     const M1=edzoKovetkezoMeccs();
+     out.ph={duel:!!(M1&&M1.fx.duel),kulcs:M1&&M1.kulcs};
+     let o=null;try{o=edzoElemzesSzamol(M1.fx);}catch(e){o={hiba:String(e)};}
+     out.ph.szamol={duel:o&&o.duel,hiba:o&&o.hiba||null};
+     kimeritve();out.ph.kimerult=edzoElemzesMarad();
+     /* a párharc lezárult → a következő bajnoki jön, újra jár az elemzés */
+     S.svPh.m["2:1"]={gf:1,ga:0};
+     const M2=edzoKovetkezoMeccs();
+     out.ph.utana={duel:!!(M2&&M2.fx.duel),ell:M2&&M2.fx.o.n,marad:edzoElemzesMarad()};
+     mpSv=_sv;}
     return out;});
   console.log("  "+JSON.stringify(r));
   const M=r.max;
@@ -126,6 +141,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.ugyanaz===0&&r.visszatoltve===0,"ugyanarra a meccsre nem jár újra — mentés-visszatöltés után sem",{ugyanaz:r.ugyanaz,vissza:r.visszatoltve});
   ok(r.id.donto!==r.id.kov&&!r.id.ujLefujt&&!r.id.regiLefujt,"a döntő lefújt rekordja nem illik a következő kupa első meccsére (új és régi formátumban sem)",r.id);
   ok(r.id.regiFelbe&&r.id.sajat,"a régi formátumú félbe maradt rekord és a saját rekord illik (a frissítés nem ad új esélyt)",r.id);
+  ok(r.ph&&r.ph.duel&&/svph/.test(r.ph.kulcs)&&r.ph.szamol.duel===true&&!r.ph.szamol.hiba,"saját bajnokság: a párharc-napon az elemzés a párharcot elemzi (saját kulccsal, a párharc-szabállyal)",r.ph);
+  ok(r.ph&&r.ph.kimerult===0&&!r.ph.utana.duel&&r.ph.utana.ell==="Bajnoki FC"&&r.ph.utana.marad===M,"a párharc után a következő bajnoki jön, és arra újra jár az elemzés",r.ph&&r.ph.utana);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,5));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden állítás teljesült");
