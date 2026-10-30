@@ -172,6 +172,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     penz:Math.round(S.transferBudget||0),led:(S.ledger||[]).filter?null:null,log:window._nlog.filter(t=>/Párharc-nap I:/.test(t)).slice(-1)[0]}));
   const rg=await g.evaluate(()=>({m:S.svPh&&S.svPh.m["2:1"],M:S.svPh&&S.svPh.merleg,idx:S.idx,esed:svPhEsedekes(),penz:Math.round(S.transferBudget||0)}));
   ok(kesz&&ra.m&&rg.m&&ra.m.gf===rg.m.ga&&ra.m.ga===rg.m.gf,"a párharc lefut mindkét gépen, és ugyanaz az eredmény (tükörben)",{a:ra.m,g:rg.m});
+  /* 📊 3.9.336 — a momentum-görbe a KÖZÖS gólvárhatóságból dolgozik: a két
+     gép vödrönkénti λ-aránya pontosan tükörkép (a + b = 1). */
+  {const lr=pp=>pp.evaluate(()=>(_ek&&_ek.cel||[]).map(c=>c.lr));
+   const la_=await lr(p),lg_=await lr(g);
+   const n=Math.min(la_.length,lg_.length);
+   const tukor=n>=17&&la_.slice(0,n).every((x,i)=>x!=null&&lg_[i]!=null&&Math.abs(x+lg_[i]-1)<1e-9);
+   ok(tukor,"párharcban a momentum a közös λ-ból: a két gép aránya vödrönként tükörkép",{n,a:la_.slice(0,4),g:lg_.slice(0,4)});}
   ok(ra.idx===15&&rg.idx===15&&ra.esed===0&&!/PÁRHARC/.test(ra.label),"nem bajnoki forduló: az S.idx marad, utána a 16. forduló jön",{idx:ra.idx,label:ra.label});
   {const w=ra.m&&ra.m.gf>ra.m.ga,d=ra.m&&ra.m.gf===ra.m.ga;
    ok(ra.M&&ra.M.p===(w?3:d?1:0)&&rg.M.p===(ra.m.ga>ra.m.gf?3:d?1:0),"a párharc-mérleg 3/1/0 pontot könyvel mindkét oldalon",{a:ra.M,g:rg.M});
@@ -186,6 +193,26 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return o;});
   ok(r6.esed===2&&r6.key==="s2svd2"&&r6.home===false&&/párharc-nap II/i.test(r6.label)&&r6.phase==="season"&&!r6.zarva,
     "a 30. forduló után a II. párharc-nap jön (a vendég a hazai); a szezon nem zárul előtte",r6);
+
+  /* ⚔ 3.9.338 — az új (négy napos) rend: valódi párharc a 8. forduló után */
+  {const prep8=pp=>pp.evaluate(()=>{
+     S.seasonNumber=6;S.idx=8;S.seasonClosed=false;S.playing=false;S.h2hPending=null;phase="season";
+     S.svPh={v:1,m:{},merleg:{w:0,d:0,l:0,gf:0,ga:0,p:0},r:{6:[8,15,23,30]}};
+     S.subPlanAsked=h2hKey();
+     const o={esed:svPhEsedekes(),key:h2hKey(),home:h2hHostIsSimHome(),label:kickBtnLabel()};
+     _duelPrep=duelKulcs();   /* a felkészülés-képernyőt itt átugorjuk — nem azt mérjük */
+     return o;});
+   const a8=await prep8(p),g8=await prep8(g);
+   ok(a8.esed===1&&a8.key==="s6svq1"&&g8.key==="s6svq1"&&a8.home===true&&g8.home===true&&/párharc-nap I\b/i.test(a8.label),
+     "új rend: a 8. forduló után az I. párharc-nap (közös kulcs, a házigazda hazai)",{a8,g8});
+   await p.evaluate(()=>{startRound();});await g.evaluate(()=>{startRound();});
+   let k8=false;
+   for(let i=0;i<180&&!k8;i++){await p.waitForTimeout(1000);
+     k8=await p.evaluate(()=>!!(S.svPh&&S.svPh.m["6:q1"]))&&await g.evaluate(()=>!!(S.svPh&&S.svPh.m["6:q1"]));}
+   const x8=pp=>pp.evaluate(()=>({m:S.svPh.m["6:q1"],idx:S.idx,esed:svPhEsedekes(),label:kickBtnLabel()}));
+   const ra8=await x8(p),rg8=await x8(g);
+   ok(k8&&ra8.m.gf===rg8.m.ga&&ra8.m.ga===rg8.m.gf&&ra8.idx===8&&ra8.esed===0&&!/PÁRHARC/.test(ra8.label),
+     "a 8. forduló utáni párharc lefut mindkét gépen, tükörben; utána a 9. bajnoki jön",{a:ra8,g:rg8});}
 
   console.log("— 6. a közös kupa relatív mezőnnyel —");
   const kPrep=(pp,nev,comp)=>pp.evaluate(([nev,comp])=>{

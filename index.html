@@ -7874,7 +7874,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.335";
+const APP_VERSION="3.9.339";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -63460,6 +63460,49 @@ const EVA_TIPUS_SABLON={gol:"gol",golKapott:"gol",kapufa:"kapufa",bravur:"bravur
   tizenegyes:"tizenegyes",buntetoparbaj:"tizenegyes",sarga:"lap",piros:"lap",szoglet:"szoglet",
   szabadrugas:"szabadrugas",blokk:"blokk",golvonal:"blokk",szereles:"blokk",letamadas:"letamadas",
   serules:"serules",var:"var",loves:"loves",kidolgozas:"kidolgozas",bedobas:"bedobas"};
+/* ---- 👥 A MI STATISZTÁINK HELYETT A MI JÁTÉKOSAINK (3.9.337) ----
+   KIMONDOTT KÉRÉS: „Azokban az animációkban, amelyeknél a mi játékosainkat
+   statiszták veszik át, azokba építsük be, hogy vagy érintett, vagy random,
+   de a mi játékosaink legyenek ott. Pl. gegenpressing nyomás gólja, gólzsák
+   gólja, remek kijátszás passza stb."
+   Eddig a főszereplőn (és a kapusunkon) kívül minden saját figura egy
+   helyőrző névből („Társ", „Rúgó", „Támadó", „Védő") kapta az arcát — egy
+   idegen arcot a mi mezünkben. Mostantól a kezdő tizenegyünkből jönnek:
+     1. ELŐBB AZ ÉRINTETT: a gól sorában zárójelben álló gólpasszadó, illetve
+        az esemény második szereplője (p2);
+     2. UTÁNA a poszthoz illő társ (támadásban elöl játszók, védekezésben a
+        hátsó sor), az eseményből képzett, rögzített maggal — ugyanaz a
+        jelenet mindig ugyanazokat mutatja, és a meccs véletlenjéhez nem nyúl.
+   A főszereplő, a skill gazdája és a kapus nem ismétlődik; ha elfogynak a
+   mieink (pl. teszt-keret), a régi helyőrző marad. */
+const EVA_POSZT_ELOL=["CS","ÁÉ","JSZ","BSZ","TKP","KKP"];
+const EVA_POSZT_HATUL=["KV","JV","BV","VKP","KKP"];
+function evaSajatKeret(){
+  try{return slots.filter(x=>x&&x.player&&x.pos!=="KP").map(x=>({n:x.player.n,pos:x.pos}));}
+  catch(e){return [];}}
+/* a gól sorából a gólpasszadó (a közvetítés rövid nevével) → teljes név */
+function evaGolpassz(ev,keret){
+  const m=/G[ÓO]L!?\s+[^()]*?\(([^)]+)\)/i.exec(String((ev&&ev.sor)||""));
+  if(!m)return null;
+  const rov=m[1].trim();
+  const t=keret.find(x=>{try{return shortName(x.n)===rov||x.n===rov;}catch(e){return x.n===rov;}});
+  return t?t.n:null;}
+/* a stáb: n darab név, érintett elöl, aztán poszt szerint, rögzített maggal */
+function evaSajatStab(ev,n,irany,kizar){
+  const keret=evaSajatKeret();
+  if(!keret.length)return [];
+  const ki=new Set((kizar||[]).filter(Boolean));
+  const out=[];
+  const tesz=nev=>{if(nev&&!ki.has(nev)&&out.indexOf(nev)<0&&keret.some(x=>x.n===nev))out.push(nev);};
+  if(ev.t==="gol")tesz(evaGolpassz(ev,keret));
+  if(ev.p2&&ev.t!=="csere")tesz(ev.p2);
+  let a=faceHash("stab|"+String(ev.p||"")+"|"+ev.t+"|"+(ev.min||0)+"|"+(ev.seq||0));
+  const r=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
+  const pref=irany==="hatul"?EVA_POSZT_HATUL:EVA_POSZT_ELOL;
+  const kever=L=>L.map(x=>({x,k:r()})).sort((p,q)=>p.k-q.k).map(o=>o.x.n);
+  kever(keret.filter(x=>pref.indexOf(x.pos)>=0)).forEach(tesz);
+  kever(keret.filter(x=>pref.indexOf(x.pos)<0)).forEach(tesz);
+  return out.slice(0,n);}
 /* ---- A JELENET KONTEXTUSA: ki kicsoda, milyen mezben ---- */
 function evaKontextus(ev){
   const mi=(()=>{try{return kitForNow();}catch(e){return identKitOrDefault("home");}})();
@@ -63479,22 +63522,35 @@ function evaKontextus(ev){
   let a=hash;const r=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
   /* a FŐSZEREPLŐ az eseményé; a védő oldalon a kapus/védő */
   const fo=evaJatekos(ev.p,ev.side||"us");
+  /* 👥 3.9.337: a mi stábunk — érintett elöl, aztán a poszthoz illő társak */
+  const _kiz=[(ev.side||"us")==="us"?ev.p:null,ev.skillP,evaKapusunk()];
+  const _stabT=sajatTamad?evaSajatStab(ev,4,"elol",_kiz):[];
+  const _stabV=!sajatTamad?evaSajatStab(ev,1,"hatul",_kiz):[];
+  const _sajat=(i,alap)=>_stabT[i]?evaJatekos(_stabT[i],"us"):evaJatekos(alap,"us");
   const kapusNev=sajatTamad?`${oppNev} kapusa`:(evaKapusunk()||"Kapus");
   const kapus=evaJatekos(kapusNev,sajatTamad?"them":"us");
   const foTamado=(ev.side||"us")===tamado;
-  const lo=foTamado?fo:evaJatekos(sajatTamad?"Támadó":`${oppNev} csatára`,tamado);
-  const vedo=!foTamado?fo:evaJatekos(sajatTamad?`${oppNev} védője`:"Védő",sajatTamad?"them":"us");
+  /* a tiki-taka passzolója a gólpasszadó helye: ott az érintett a rúgó */
+  const _tiki=sajatTamad&&ev.skill==="tikitaka";
+  const _iT=_tiki?[1,2,0]:[0,1,2];   /* társ, társ2, rúgó → a stáb melyik tagja */
+  const _ures=sajatTamad&&!foTamado;   /* a mi támadónk nem főszereplő → ő is a stábból */
+  const _off=_ures?1:0;
+  const lo=foTamado?fo:(sajatTamad?_sajat(0,"Támadó"):evaJatekos(`${oppNev} csatára`,tamado));
+  const _vedoSajat=_stabV[0]?evaJatekos(_stabV[0],"us"):evaJatekos("Védő","us");
+  const vedo=!foTamado?fo:(sajatTamad?evaJatekos(`${oppNev} védője`,"them"):_vedoSajat);
   const hangulat=ev.t==="golKapott"?-1:ev.t==="gol"?1:ev.t==="piros"?-1:ev.t==="sarga"?-.5:ev.t==="serules"?-.8:.4;
   /* a kapus a fő, ha bravúr/védés/kivédett tizenegyes */
   const kapusFo=["bravur","vedes"].indexOf(ev.t)>=0||(ev.alt==="kivedve");
-  const tars=evaJatekos(sajatTamad?"Társ":`${oppNev} játékosa`,tamado);
+  const tars=sajatTamad?_sajat(_iT[0]+_off,"Társ"):evaJatekos(`${oppNev} játékosa`,tamado);
   const c={ev,sajat:ev.t==="gol"||(ev.side==="us"&&ev.t!=="golKapott"&&ev.t!=="piros"&&ev.t!=="sarga"&&ev.t!=="serules"),
     r,loKit,vedoKit,kapusKit,oppNev,
-    loUrl:evaFig(kapusFo?evaJatekos(sajatTamad?"Támadó":`${oppNev} csatára`,tamado):lo,loKit,ev.t==="gol"?1:ev.t==="golKapott"?.6:hangulat),
-    vedoUrl:evaFig(kapusFo?evaJatekos(sajatTamad?`${oppNev} védője`:"Védő",sajatTamad?"them":"us"):vedo,vedoKit,-.2),
+    loUrl:evaFig(kapusFo?(sajatTamad?_sajat(0,"Támadó"):evaJatekos(`${oppNev} csatára`,tamado)):lo,loKit,ev.t==="gol"?1:ev.t==="golKapott"?.6:hangulat),
+    vedoUrl:evaFig(kapusFo?(sajatTamad?evaJatekos(`${oppNev} védője`,"them"):_vedoSajat):vedo,vedoKit,-.2),
     kapusUrl:evaFig(kapusFo?fo:kapus,kapusKit,kapusFo?.8:ev.t==="golKapott"?-1:-.4),
-    tarsUrl:evaFig(tars,loKit,.3),tarsUrl2:evaFig(evaJatekos((sajatTamad?"Társ2":`${oppNev} játékosa 2`),tamado),loKit,.3),
-    rugoUrl:evaFig(evaJatekos(sajatTamad?"Rúgó":`${oppNev} rúgója`,tamado),loKit,.2),rugoKit:loKit,
+    tarsUrl:evaFig(tars,loKit,.3),tarsUrl2:evaFig(sajatTamad?_sajat(_iT[1]+_off,"Társ2"):evaJatekos(`${oppNev} játékosa 2`,tamado),loKit,.3),
+    rugoUrl:evaFig(sajatTamad?_sajat(_iT[2]+_off,"Rúgó"):evaJatekos(`${oppNev} rúgója`,tamado),loKit,.2),rugoKit:loKit,
+    /* 👥 3.9.337: a próba (és a hibakeresés) ebből látja, kik álltak a jelenetben */
+    stab:{t:_stabT.slice(),v:_stabV.slice()},
     /* a feliratsáv arca: a FŐSZEREPLŐÉ, a saját mezében */
     foArc:ev.p?evaArcUrl(fo,(ev.side||"us")==="us"?mi:ok,hangulat):null,
     foNev:ev.p?shortName(ev.p):null,
@@ -63945,7 +64001,8 @@ function ekMotor(min,lamMi,lamOk,diff,pirosMi,pirosOk,v){
     const akt=(mi+.6)/(mi+ok+1.2);
     tk=.42*tk+.58*akt;}
   const cel=Math.max(-1,Math.min(1,(tk-.5)*2*1.5+(_ek.alap-.5)*2*.45));
-  _ek.cel.push({min,v:cel,tk,alap:_ek.alap});
+  _ek.cel.push({min,v:cel,tk,alap:_ek.alap,
+    lr:(lamMi!=null&&lamOk!=null&&(lamMi+lamOk)>0)?lamMi/(lamMi+lamOk):null});   /* 📊 3.9.336: a próba ezt veti össze a két gépen */
   _ek.t0=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
   try{_ek.ms=Math.max(120,(typeof matchSpeedTickMs==="function")?matchSpeedTickMs():1000);}catch(e){_ek.ms=1000;}
   _ek.min=min;
@@ -72490,6 +72547,21 @@ function h2hRoleAssistW(X,scorerName){
    A hívási SORREND része a szerződésnek — ha valaha új véletlen-fogyasztó kerül
    ide, azt a lista végére kell tenni, különben a régi mentések eredménye
    elcsúszna. Paraméter nélkül a régi (Math.random) viselkedés marad. */
+/* 📊 3.9.336 — a közös vödör-λ a SAJÁT nézőpontomból: {mine, opp} egy
+   percre. A régi lista (lamB nélkül) a meccsvégi közös λ-t adja; ha az sincs,
+   null (marad a régi, helyi számolás). */
+function duelLamFn(D){
+  const sim=D&&D.sim;if(!sim)return null;
+  const B=Array.isArray(sim.lamB)&&sim.lamB.length?sim.lamB:null;
+  const L=sim.lam&&typeof sim.lam.home==="number"&&typeof sim.lam.away==="number"?sim.lam:null;
+  if(!B&&!L)return null;
+  const me=!!D.iAmHome;
+  return m=>{
+    let h,a;
+    if(B){const q=B[Math.max(0,Math.min(B.length-1,Math.ceil((m||5)/5)-1))];
+      if(!q||!(q[0]>0)||!(q[1]>0))return null;h=q[0];a=q[1];}
+    else{h=L.home;a=L.away;if(!(h>0)||!(a>0))return null;}
+    return me?{mine:h,opp:a}:{mine:a,opp:h};};}
 function h2hSimulate(home,away,rnd,neutral){
   const R=rnd||Math.random;
   const CL=x=>Math.max(.15,Math.min(4.5,x));
@@ -72561,6 +72633,7 @@ function h2hSimulate(home,away,rnd,neutral){
     if(A.redName&&A.redOppMult!==1)lamHome=CL(lamHome*A.redOppMult);}
   recalc();
   const ev=[];let hg=0,ag=0;
+  const lamB=[];   /* 📊 3.9.336 — vödrönkénti [hazai, vendég] λ */
   ev.push({min:0,type:"start",home:home.teamName,away:away.teamName});
   /* ---- AZ ELŐRE BEÁLLÍTOTT CSERÉK VÉGREHAJTÁSA ----
      A SORREND a rangsor: felülről lefelé haladunk, és a cserekeret is így fogy
@@ -72714,6 +72787,10 @@ function h2hSimulate(home,away,rnd,neutral){
     const _fpD=favPushMult(Math.log(Math.max(1e-6,lamHome)/Math.max(1e-6,lamAway))/(2*SIM.K),min,hg,ag);
     side(H,CL(lamH*_fpD.own),true);
     side(A,CL(lamA*_fpD.opp),false);
+    /* 📊 3.9.336: a vödör KÖZÖS gólvárhatósága — ebből dolgozik a két gépen a
+       momentum-görbe, a gólon kívüli helyzetek és a birtoklás. Véletlent nem
+       fogyaszt, a lista többi része betűre ugyanaz. */
+    lamB.push([Math.round(CL(lamH*_fpD.own)*1000)/1000,Math.round(CL(lamA*_fpD.opp)*1000)/1000]);
     /* A félidő a 9. tick VÉGÉN: ekkor van kész az 1-45. perc. */
     if(min===45)ev.push({min:45,type:"half",hg,ag});}
   ev.push({min:90,type:"end",hg,ag});
@@ -72736,7 +72813,7 @@ function h2hSimulate(home,away,rnd,neutral){
   /* A LISTA VERZIÓJA. v>=2 azt jelenti: a cserék és a piros lapok ITT dőlnek
      el, tehát a lejátszásnak nem szabad saját lapot dobnia. v>=3: a SÁRGA
      lapok is (3.9.86). Régi (verzió nélküli) listánál minden marad a régiben. */
-  return {v:3,events:ev,hg,ag,lam:{home:lamHome,away:lamAway}};}
+  return {v:3,events:ev,hg,ag,lam:{home:lamHome,away:lamAway},lamB};}
 /* ================= EGY VÖDÖRBEN CSAK AZ EGYIK CSAPAT GÓLJA =================
    BEJELENTETT HIBA: a párharc naplójában a 74. percben esett a saját gól, és
    utána a 73. percben az ellenfél egyenlítése — vagyis az idő VISSZAFELÉ ugrott.
@@ -72867,7 +72944,7 @@ function h2hKey(){
      két külön csere), különben a bajnoki forduló. */
   if(mpCupDuelNow())
     return "s"+(S.seasonNumber||1)+"cupd"+S.euro.stage+"l"+(S.euro.idx||0);
-  if(svDuelNow())return "s"+(S.seasonNumber||1)+"svd"+svPhEsedekes();   /* 🌍 3.9.331 */
+  if(svDuelNow())return "s"+(S.seasonNumber||1)+svPhSzobaUt(S.seasonNumber||1,svPhEsedekes());   /* 🌍 3.9.331 · ⚔ 3.9.338 */
   return "s"+(S.seasonNumber||1)+"r"+((S.idx||0)+1);}
 /* Ki a hazai? A 15. fordulóban a HÁZIGAZDA, a 30.-ban a VENDÉG — így a két
    párharcból mindkettőnek jut egy hazai pálya, és a hazai előny kiegyenlítődik. */
@@ -72888,7 +72965,7 @@ function h2hHostIsSimHome(round){
     if(E.stage==="final")return hostIsA;
     return (E.idx||0)===0?hostIsA:!hostIsA;}
   /* 🌍 3.9.331 — a párharc-napon: az I.-en a házigazda, a II.-on a vendég hazai */
-  if(svDuelNow())return svPhEsedekes()===1;
+  if(svDuelNow())return svPhEsedekes()%2===1;   /* ⚔ 3.9.338: I., III. a házigazdáé */
   const r=(round!=null)?round:((S.idx||0)+1);
   return r===H2H_ROUNDS[0];}
 /* SEMLEGES PÁLYA: a kupadöntő egyetlen mérkőzése. Nincs pályaválasztói előny,
@@ -73067,7 +73144,7 @@ function kickBtnLabel(){
   try{if(kupaElo()){const c=kupaCim().split(" — ")[0];   /* ⚽ 3.9.304 — a gombra csak a szakasz és a forduló */
     if(mpCupDuelNow())return duelPrepKell()?`🔍 Felkészülés — ⚔ ${c}`:`⚔ PÁRHARC — ${c}`;
     return kupaPrepKell()?`🔍 Felkészülés — ${c}`:`⚽ Kezdőrúgás — ${c}`;}}catch(e){}
-  try{if(svDuelNow()){const n=svPhEsedekes()===1?"I":"II";return duelPrepKell()?`🔍 Felkészülés — ⚔ párharc-nap ${n}`:`⚔ PÁRHARC-NAP ${n}`;}}catch(e){}   /* 🌍 3.9.331 */
+  try{if(svDuelNow()){const n=svPhRomai(svPhEsedekes());return duelPrepKell()?`🔍 Felkészülés — ⚔ párharc-nap ${n}`:`⚔ PÁRHARC-NAP ${n}`;}}catch(e){}   /* 🌍 3.9.331 */
   if(h2hIsDuelRound())return duelPrepKell()?`🔍 Felkészülés — ⚔ párharc, ${r}. forduló`:`⚔ PÁRHARC — ${r}. forduló`;   /* ⚔ 3.9.305 */
   /* AMÍG NEM VOLT FELKÉSZÜLÉS, a gomb SEMMIT nem árul el a mérkőzésről. A
      rangadó- és tétmeccs-jelölés a felfedés UTÁN jön vissza (lásd lentebb) —
@@ -74406,7 +74483,7 @@ $("absHubBtn")&&($("absHubBtn").onclick=()=>{
   try{openHubMidSeason();}catch(e){}});
 function startRound(){
   /* 🌍 3.9.331 — az idény induló Run-szintje (és az előző idény lezárása) */
-  try{if(mpSv()&&(S.idx||0)===0&&!euroActive())svRunInditas();}catch(e){}
+  try{if(mpSv()&&(S.idx||0)===0&&!euroActive()){svPhRendRogzit();svRunInditas();}}catch(e){}   /* ⚔ 3.9.338: a menetrend is itt rögzül */
   /* ---- A VÉGIGJÁTSZÁS MEGÁLL A BAJNOKI TÉTMÉRKŐZÉS ELŐTT (3.8.33) ----
      A kapu itt van, mert ez a forduló EGYETLEN belépési pontja — a kezdőrúgás,
      az auto-lánc és a párharc is erre jön. Ha megállított, nem indul mérkőzés:
@@ -74848,7 +74925,7 @@ let _mpSoloFired=null;
    tehát pontosan itt kell értelmezni, és így MINDEN hívó megjavul egyszerre. */
 function h2hWaitTitle(round){
   if(typeof round!=="number")return String(round);
-  try{if(svDuelNow())return "PÁRHARC-NAP "+(svPhEsedekes()===1?"I":"II");}catch(e){}   /* 🌍 3.9.331 */
+  try{if(svDuelNow())return "PÁRHARC-NAP "+svPhRomai(svPhEsedekes());}catch(e){}   /* 🌍 3.9.331 */
   try{
     if(mpCupDuelNow()){
       const E=S.euro||{};
@@ -75541,6 +75618,17 @@ function h2hStart(node,sim,round,key){
   h2hStaleDisarm();
   const oppField=MP.role==="host"?"guest":"host";
   const oppSnap=(node&&node[oppField])||{};
+  /* 📊 3.9.336 — ha a tárolt listából hiányzik a vödrönkénti közös λ (régi
+     kliens írta, vagy a szerver eldobta), UGYANAZZAL a maggal a két
+     pillanatképből újraszámoljuk. Csak a λ-t vesszük át; az eseménylista a
+     tárolt marad. */
+  try{
+    if(sim&&!(Array.isArray(sim.lamB)&&sim.lamB.length)&&node&&node.host&&node.guest){
+      const _hh=h2hHostIsSimHome(round);
+      const _r=h2hSimulate(_hh?node.host:node.guest,_hh?node.guest:node.host,
+        rngFor("h2hduel:"+(MP.activeRoom||"")+":"+round),h2hNeutralVenue());
+      if(_r&&_r.hg===sim.hg&&_r.ag===sim.ag&&Array.isArray(_r.lamB))sim=Object.assign({},sim,{lamB:_r.lamB});}
+  }catch(e){}
   /* ---- P1b: KIMONDJUK, HA NEM AZ AKTUÁLIS KERET JÁTSZOTT ----
      MINDKÉT OLDALON. Aki helyettesített, az tudja, mit tett; a VISSZATÉRŐNEK
      viszont ez az egyetlen esélye megérteni, miért játszott a csapata anélkül,
@@ -80653,6 +80741,21 @@ function playMatchMotor(){
   /* AZ ALAKZAT ÁRA: a mostani mérkőzésre eső extra kapott gól várható értéke */
   try{shapeNoteMatch(_L.la);}catch(e){}
   let diff=_L.diff,lf=_L.lf,la=_L.la;
+  /* ---- 📊 PÁRHARCBAN A KÖZÖS GÓLVÁRHATÓSÁG (3.9.336) ----
+     BEJELENTETT HIBA: „Nem, az enyémen főleg nálam volt a momentum" — a két
+     gépen mindkét menedzser a SAJÁT fölényét látta. A gólok a közös listából
+     jöttek, a momentum-görbe, a gólon kívüli helyzetek és a birtoklás viszont
+     a HELYI `diff`/`lf`/`la`-ból: a saját teljes meccs-pillanatképed a társ
+     nyers keret-erejével (és a gépi ellenfeleknek szóló rejtett erősítéssel)
+     szemben. Mindkét oldalon a saját csapat jött ki erősebbnek.
+     Mostantól a közös szimuláció vödrönkénti λ-ja (sim.lamB) dönt — a két gép
+     ugyanabból a két számból dolgozik, csak tükörben. */
+  const _duelLam=DUEL?duelLamFn(DUEL):null;
+  const duelLamApply=m=>{
+    if(!_duelLam)return;
+    const q=_duelLam(m);if(!q)return;
+    lf=q.mine;la=q.opp;diff=Math.log(Math.max(1e-6,lf)/Math.max(1e-6,la))/(2*SIM.K);};
+  duelLamApply(5);
   /* ---- AZ EMBERHÁTRÁNY ÖSSZEGE KÜLÖN SZÁMLÁN (3.9.133) ----
      A kiállítás a `diff`-ből von le; a csere viszont a `diff`-et a
      pillanatképből ÚJRASZÁMOLJA (matchLambdas) — és ezzel eddig némán
@@ -81414,6 +81517,7 @@ function playMatchMotor(){
        viszont kell — ezért itt tesszük le. Ötperces vödör, ami a
        negyedóra-határokhoz bőven elég pontos. */
     _engMin=min;
+    duelLamApply(min);   /* 📊 3.9.336 */
     /* az óra a fejlécben az aktuális 5-perces bucketet mutatja (a gólok saját,
        1-perc pontos bélyeget kapnak a gmin()-től) */
     updateTTBoard(fx,gf,ga,Math.min(90,min));
@@ -81529,6 +81633,7 @@ function playMatchMotor(){
        monoton nőnek, tehát a gól tényleg a tisztázás UTÁN esik. A gólok számát
        ez nem érinti: azt továbbra is a Poisson dönti el, változatlanul. */
     let _ekChOk=0,_ekChMi=0;   /* 📊 3.9.282: a vödör helyzetei a Momentumnak */
+    duelLamApply(min);   /* 📊 3.9.336: egy csere közben újraszámolhatta a helyit */
     {const chN=poisson((OPPCH_BASE+la*OPPCH_RATE)/18*talMeccsOppCh());_ekChOk=chN;
      for(let c=0;c<chN;c++)oppChance(min);}
     /* ---- ÉS A MI GÓLON KÍVÜLI TÁMADÁSAINK (3.9.04) ----
@@ -81957,7 +82062,7 @@ function playMatchMotor(){
     try{if(MX)mxVodor(MX,"a",la,MX.laK,["fp","role","bus","villam","dial","talIdo","kiall"],[_fp.opp].concat(_mfOpp),_lamOpp);}catch(e){}
     let og=DUEL?duelOpp.length:poisson(_lamOpp);
     if(MX)MX.a.pg+=og;
-    try{ekMotor(min,_lamOwn,_lamOpp,diff,redIdxs.size,oppRedDone?1:0,{chMi:_ekChMi,chOk:_ekChOk,g,og});}catch(e){}   /* 📊 3.9.282 */   /* ⚽ F6d — a Villámrajt kontrája: a SAJÁT pillanatképemből, az ellenfél λ-ján */
+    try{ekMotor(min,DUEL&&_duelLam?lf/18:_lamOwn,DUEL&&_duelLam?la/18:_lamOpp,diff,redIdxs.size,oppRedDone?1:0,{chMi:_ekChMi,chOk:_ekChOk,g,og});}catch(e){}   /* 📊 3.9.282 */   /* ⚽ F6d — a Villámrajt kontrája: a SAJÁT pillanatképemből, az ellenfél λ-ján */
     for(let k=0;k<og;k++){ga++;
       const dOpp=duelOpp?duelOpp[k]:null;
       const oppScorer=dOpp?dOpp.scorer:pickOpponentScorer(fx.o);
@@ -84082,9 +84187,9 @@ function proceedAfterMatch(){
     $("kickBtn").disabled=false;$("kickBtn").textContent=kickBtnLabel();saveGame();
     if(S.auto)setTimeout(startRound,60);return;}
   /* a 30. forduló után előbb a II. párharc-nap */
-  if(S.idx>=30&&svPhEsedekes()===2){
+  if(S.idx>=30&&svPhUtolso(svPhEsedekes())){
     $("kickBtn").disabled=false;$("kickBtn").textContent=kickBtnLabel();saveGame();
-    try{addLine(`⚔ <b>Jön a II. párharc-nap</b> — a bajnokság lezárult, az idény a társad elleni meccsel ér véget.`,"m ev");}catch(e){}
+    try{addLine(`⚔ <b>Jön a ${svPhRomai(svPhEsedekes())}. párharc-nap</b> — a bajnokság lezárult, az idény a társad elleni meccsel ér véget.`,"m ev");}catch(e){}
     if(S.auto)setTimeout(startRound,60);return;}
   if(S.idx>=30){$("kickBtn").textContent="Szezon vége";finish();return;}
   if(CHECKPOINTS.includes(S.idx)){
@@ -92731,10 +92836,10 @@ function autoResolveCheckpoint(round){
 function finish(){
   /* 🌍 3.9.331 — saját bajnokságban a szezon a II. párharc-nappal zárul: ha még
      nem volt meg, nem zárunk — a gomb a párharcot kínálja */
-  if(gameMode==="career"&&svPhEsedekes()===2){
+  if(gameMode==="career"&&svPhUtolso(svPhEsedekes())){
     try{phase="season";$("scSim").classList.remove("hide");
       const kb=$("kickBtn");if(kb){kb.disabled=false;kb.textContent=kickBtnLabel();}
-      addLine(`⚔ A szezon a <b>II. párharc-nappal</b> zárul — előbb azt játsszátok le.`,"m ev");}catch(e){}
+      addLine(`⚔ A szezon a <b>${svPhRomai(svPhEsedekes())}. párharc-nappal</b> zárul — előbb azt játsszátok le.`,"m ev");}catch(e){}
     return;}
   try{if(mpSv())setTimeout(()=>{try{svRunKozzetesz(S.seasonNumber||1,false);}catch(e){}},0);}catch(e){}
   /* ---- F5: A KÖZÖS TABELLA MEGVÁRJA A TÁRSADAT ----
@@ -98200,8 +98305,11 @@ function jatNevTerkep(){
   const M=new Map();
   const tesz=(alak,n)=>{if(alak&&alak.length>=3&&!M.has(alak))M.set(alak,n);};
   let keret=[];try{keret=hubRosterEntries().map(x=>x.p&&x.p.n).filter(Boolean);}catch(e){}
+  /* 🔒 3.9.339 — CSAK A SAJÁT KERET. A világ játékosainak (igazolási
+     jelöltek, licitek, scout-találatok) adatlapja a scout POT-korlátját
+     kerülte volna meg: a betekintő a pontos POT-ot és a teljes profilt
+     mutatta, amit a játék a scout szintje szerint szándékosan takar. */
   keret.forEach(n=>{try{tesz(fullName(n),n);}catch(e){}});
-  try{Object.keys(careerPool||{}).forEach(n=>{try{tesz(fullName(n),n);}catch(e){}});}catch(e){}
   keret.forEach(n=>{try{tesz(shortName(n),n);}catch(e){}});
   _jatNevek=[...M.entries()].sort((a,b)=>b[0].length-a[0].length);_jatNevekAt=Date.now();
   return _jatNevek;}
@@ -98256,13 +98364,13 @@ function jatMenuNyit(sp,x,y){
     ev.stopPropagation();const k=b.getAttribute("data-jm");jatMenuZar();
     if(k==="val"&&val){val.click();return;}
     if(k==="lap")plSheetPeek(n);});}
-/* BETEKINTŐ ADATLAP: a keret tagjáé a teljes lap, a világ játékosáé a
-   pool-adataiból; a műveletek zárva, a választás alatta érintetlen */
+/* BETEKINTŐ ADATLAP: csak a keret tagjáé (3.9.339); a műveletek zárva, a
+   választás alatta érintetlen */
 function plSheetPeek(n){
   let loc=null;
   try{loc=hubRosterEntries().find(x=>x.p&&x.p.n===n)||null;}catch(e){loc=null;}
-  if(!loc){const e=careerPool&&careerPool[n];if(!e)return false;
-    loc={type:"peek",idx:n,p:{n,pos:(e.pos||[]).slice(),ovr:Math.round(e.startRating||0),age:e.age,nat:e.nat}};}
+  /* 🔒 3.9.339 — idegen játékos adatlapja nem nyílik (a scout POT-korlátja) */
+  if(!loc)return false;
   const box=$("plSheet");if(!box)return false;
   box.classList.add("plPeek");
   try{plSheetRender(loc);}catch(e){
@@ -128928,15 +129036,47 @@ function svPhAll(){
   if(!S.svPh.m||typeof S.svPh.m!=="object")S.svPh.m={};
   if(!S.svPh.merleg)S.svPh.merleg={w:0,d:0,l:0,gf:0,ga:0,p:0};
   return S.svPh;}
+/* ---- ⚔ NÉGY PÁRHARC-NAP: MINDEN SZÜNET UTÁN EGY (3.9.338) ----
+   KÉRÉS: „ebben a módban jót tenne, ha több ponton lenne lehetőség
+   lekövetni, mennyire vagy lemaradva PvP ellenfeledtől. Minden szünet után
+   lenne egy meccs: párharcnapból így összesen 4 lenne, nem 2."
+   A szünetek: a 8. (rövid ablak), a 15. (téli ablak), a 23. (második rövid
+   ablak) és a 30. forduló (a bajnokság vége) — mindegyik után egy nap.
+   Hazai: I. és III. a házigazda, II. és IV. a vendég.
+   A MENETREND IDÉNYENKÉNT RÖGZÜL (S.svPh.r[idény]) az idény első
+   kezdőrúgásakor; ami már a régi (két napos) renddel indult, az azzal megy
+   végig. A régi rend kulcsai (svd1/svd2, "<idény>:1/2") változatlanok, az
+   újé külön (svq1–4, "<idény>:q1–4"), így egy félbehagyott régi idény adata
+   sosem keveredik az újjal. */
+const SV_PH_REGI=[15,30],SV_PH_UJ=[8,15,23,30];
+function svPhRend(sn){
+  const r=S.svPh&&S.svPh.r&&S.svPh.r[sn||S.seasonNumber||1];
+  return (Array.isArray(r)&&r.length)?r:SV_PH_REGI;}
+function svPhUj(sn){return svPhRend(sn).length===4;}
+/* a nap rekord-kulcsa és a szoba-kulcs utótagja */
+function svPhMKulcs(sn,n){return svPhUj(sn)?sn+":q"+n:sn+":"+n;}
+function svPhSzobaUt(sn,n){return (svPhUj(sn)?"svq":"svd")+n;}
+function svPhRomai(n){return ["","I","II","III","IV"][n]||String(n);}
+function svPhUtolso(n,sn){return n>0&&n===svPhRend(sn).length;}
+/* az idény első kezdőrúgásakor rögzül az idény menetrendje */
+function svPhRendRogzit(){
+  if(!mpSv()||(S.idx||0)!==0)return;
+  const P=svPhAll(),sn=S.seasonNumber||1;
+  if(!P.r||typeof P.r!=="object")P.r={};
+  if(P.r[sn])return;
+  P.r[sn]=SV_PH_UJ.slice();
+  try{addLine(`⚔ <b>Négy párharc-nap ebben az idényben</b> — minden szünet után egy: a ${SV_PH_UJ.join("., ")}. forduló után.`,"m life");}catch(e){}}
 /* melyik párharc-nap esedékes most (0 = egyik sem) */
 function svPhEsedekes(){
   try{
     if(!mpSv())return 0;
     if(typeof euroActive==="function"&&euroActive())return 0;
     if(typeof pyrPoActive==="function"&&pyrPoActive())return 0;
-    const sn=S.seasonNumber||1,i=S.idx||0,M=(S.svPh&&S.svPh.m)||{};
-    if(i===15&&!M[sn+":1"])return 1;
-    if(i>=30&&!S.seasonClosed&&!M[sn+":2"])return 2;
+    const sn=S.seasonNumber||1,i=S.idx||0,M=(S.svPh&&S.svPh.m)||{},R=svPhRend(sn);
+    for(let k=0;k<R.length;k++){
+      const n=k+1,utolso=k===R.length-1;
+      if(M[svPhMKulcs(sn,n)])continue;
+      if(utolso?(i>=R[k]&&!S.seasonClosed):i===R[k])return n;}
     return 0;}catch(e){return 0;}}
 function svDuelNow(){return svPhEsedekes()>0;}
 /* ================= 🌍 RUN-ÖSSZEVETÉS ÉS A PÁRHARC-LAP (3.9.331) =================
@@ -129017,7 +129157,7 @@ function svParharcLapHtml(){
   const sz=x=>(typeof x==="number"?(Math.round(x*10)/10).toFixed(1):String(x)).replace(".",",");
   const sor=(c,fa,ft,f)=>`<tr><td style="color:var(--dim);padding:2px 6px">${c}</td>${cell(fa,f)}${cell(ft,f)}</tr>`;
   const da=svRunGyar(a),dt=svRunGyar(t);
-  const php=sn2=>[1,2].map(n=>{const r=P.m[sn2+":"+n];return r?`${n===1?"I":"II"}: <b>${r.gf}–${r.ga}</b>`:`${n===1?"I":"II"}: —`;}).join(" · ");
+  const php=sn2=>svPhRend(sn2).map((_,k)=>{const n=k+1,r=P.m[svPhMKulcs(sn2,n)];return r?`${svPhRomai(n)}: <b>${r.gf}–${r.ga}</b>`:`${svPhRomai(n)}: —`;}).join(" · ");
   /* az állás a döntés szerint: párharc-mérleg, egyenlőségnél a Run-gyarapodás */
   let allas="";
   if(M.w+M.d+M.l>0){
@@ -129066,14 +129206,14 @@ function svPhRogzit(gf,ga,tars){
   const n=svPhEsedekes();if(!n)return;
   const P=svPhAll(),sn=S.seasonNumber||1,M=P.merleg;
   const cls=gf>ga?"w":gf===ga?"d":"l";
-  P.m[sn+":"+n]={gf,ga,at:Date.now(),tars:tars||null};
+  P.m[svPhMKulcs(sn,n)]={gf,ga,at:Date.now(),tars:tars||null};
   M[cls]++;M.gf+=gf;M.ga+=ga;M.p+=(cls==="w"?3:cls==="d"?1:0);
   _svPhUtan=true;
   let dij=0;
   if(cls!=="l"){let heti=0;try{heti=fanWeeklyIncome();}catch(e){heti=0;}
     dij=Math.round(heti*SV_PH_DIJ[cls]);
-    if(dij>0)dij=budgetEarn(dij,"svPh","párharc-nap "+(n===1?"I":"II"));}
-  try{addLine(`⚔ <b>Párharc-nap ${n===1?"I":"II"}: ${gf}–${ga}</b> — `
+    if(dij>0)dij=budgetEarn(dij,"svPh","párharc-nap "+svPhRomai(n));}
+  try{addLine(`⚔ <b>Párharc-nap ${svPhRomai(n)}: ${gf}–${ga}</b> — `
     +(cls==="w"?"GYŐZELEM":cls==="d"?"döntetlen":"vereség")
     +(dij>0?` · párharc-díj <b>${fmtFt(dij)}</b>`:"")
     +` · a párharc-mérleg: <b>${M.w}–${M.d}–${M.l}</b>, ${M.p} pont.`,cls==="w"?"m win":cls==="l"?"m loss":"m ev");}catch(e){}}

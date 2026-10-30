@@ -53,7 +53,7 @@ const fs=require('fs');
     gameMode="career";
     MP.role="host";MP.activeRoom="ABCD";
     mpNet.mode="fb";
-    window.h2hRoomActive=()=>true;
+    window.h2hRoomActive=()=>true;window.mpRoomOn=()=>true;   /* 3.9.335: a jelzés a szobára kérdez */
     teamName="Próba FC";
     const naplo=[];window.addLine=(t)=>naplo.push(String(t));
     try{localStorage.removeItem(MP_PING_MUTE_KEY);}catch(e){}
