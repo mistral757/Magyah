@@ -389,6 +389,22 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## kupa-dij-3-9-342-proba.js — 💰 kupa-díj fordulónként
+
+```
+node tools/kupa-dij-3-9-342-proba.js
+```
+
+* A díj = sorozat-súly × elért kör: a KK negyeddöntő > OJK győzelem; a KK csoportköre is fizet, a selejtező és a felkészülési kupa nem. Minden sorozat monoton, a sorozatok sorrendje áll; a valódi zárás (euroCampaignEndNow) így fizet.
+
+## kezdo-osztaly-3-9-342-proba.js — 🏟 kezdő osztály a PvP gyors indításon
+
+```
+node tools/kezdo-osztaly-3-9-342-proba.js
+```
+
+* Közös karrierben az Egyéb lapon D1–D6 választó; a szoba mezőjébe és a beállítás-csomagba kerül. Egyjátékosban és dinamikus módban nincs.
+
 ## dg-javitas-3-9-340-proba.js — 🩹 a felfújt 1. idényes rés-változás javítása
 
 ```
