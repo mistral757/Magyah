@@ -81,3 +81,26 @@ lánc) is a régi úton megy, menü nélkül.
 * a koppintható név, a menü, az „Őt választom", a betekintő lap és annak
   zártsága;
 * a HUB-újrarajzolás, a régi út és a programból indított kattintás.
+
+## 🔒 Javítás (3.9.339): csak a saját játékosaink adatlapja
+
+> „A játékos adatlap megtekintési lehetőséget azoknál a játékosoknál vegyük
+> ki, akik nem a mi játékosaink. Pl. igazolásoknál ez teljesen felülírja a
+> POT megtekintési korlátjait a scoutnak. Ez bizonyára véletlenül alakult
+> így."
+
+**Mi volt a hiba.** A névtérkép a saját keret mellett a világ összes
+játékosát is tartalmazta. Így egy igazolási jelölt, egy licit vagy egy
+scout-találat neve is koppintható lett. A betekintő adatlap pedig a pontos
+POT-ot és a teljes profilt mutatta, amit a játék a scout szintje szerint
+szándékosan takar.
+
+**A javítás.**
+
+* Koppintható név csak a **saját keretünk** játékosainál lesz.
+* A betekintő adatlap (`plSheetPeek`) idegen játékosra nem nyílik.
+* Idegen név koppintására a régi viselkedés marad: a sor vagy a gomb
+  koppintása a megszokott választást futtatja.
+
+A próba (`tools/kihivas-nev-menu-3-9-333-proba.js`) új állítása: idegen
+játékos neve nem koppintható, és az adatlapja nem nyílik.

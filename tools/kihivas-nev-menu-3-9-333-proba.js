@@ -116,6 +116,20 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await p.click(".jatMenu [data-jm='val']");
   const m2=await p.evaluate(()=>({val:window._valasztva,menu:!!document.querySelector(".jatMenu")}));
   ok(m2.val===1&&!m2.menu,"az „Őt választom” a régi választást futtatja",m2);
+  /* 🔒 3.9.339 — idegen játékos (nem a mi keretünk) neve nem lesz link, és
+     az adatlapja sem nyílik: a scout POT-korlátját nem kerülheti meg */
+  const idegen=await p.evaluate(async()=>{
+    const sajat=new Set((hubRosterEntries()||[]).map(x=>x.p&&x.p.n));
+    const n=Object.keys(careerPool).find(k=>!sajat.has(k)&&fullName(k).length>=6);
+    const row=document.createElement("div");row.className="prow";row.id="probaIdegen";
+    row.innerHTML=`<span class="main"><div class="nm">${esc(fullName(n))}</div></span>`;
+    row.onclick=()=>{window._idegenKatt=(window._idegenKatt||0)+1;};
+    $("skillAssignList").appendChild(row);
+    _jatNevek=null;
+    await new Promise(r=>setTimeout(r,300));
+    const o={link:!!document.querySelector("#probaIdegen .jatLink"),peek:plSheetPeek(n),nyitva:plSheetOpen()};
+    return o;});
+  ok(!idegen.link&&idegen.peek===false&&!idegen.nyitva,"idegen játékos neve nem koppintható, az adatlapja nem nyílik (a scout POT-korlátja áll)",idegen);
   await p.click("#probaSor .jatLink");await p.click(".jatMenu [data-jm='lap']");
   const m3=await p.evaluate(()=>{const b=$("plSheet");const o={nyitva:plSheetOpen(),peek:b.classList.contains("plPeek"),
     z:getComputedStyle(b).zIndex,nev:($("plSheetHead").textContent||"").slice(0,80),megjegyzes:!!b.querySelector(".plPeekNote"),
