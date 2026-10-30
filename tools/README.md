@@ -389,6 +389,15 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## dg-javitas-3-9-340-proba.js — 🩹 a felfújt 1. idényes rés-változás javítása
+
+```
+node tools/dg-javitas-3-9-340-proba.js
+```
+
+* Az 1. idény mérés-sora a kalibrált rajt-rést kapja; a felfújt dg (12,7) helyett a helyes (5,8) számít.
+* A futó idény mezőnye a különbséggel lejjebb kerül, a rés-követés pályája is átáll. Egyszer fut; ép karrierhez nem nyúl.
+
 ## negy-parharc-3-9-338-proba.js — ⚔ négy párharc-nap a saját bajnokságban
 
 ```

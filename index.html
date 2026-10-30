@@ -7874,7 +7874,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.339";
+const APP_VERSION="3.9.340";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -42090,6 +42090,12 @@ function pyrAnchorAtKickoff(){
        a rés pedig a következménye, tehát itt külön le kell olvasni: az
        `after` odafent a MEZŐNYT tartja, nem a rést. */
     P.gap0=Math.round((mezoWant!=null?levelGap():after)*10)/10;
+    /* 🩹 3.9.340 — az 1. idény mérés-sora a KALIBRÁLT rajt-rést kapja. A sor
+       lustán születik (pyrFloorHist): ha a kezdőrúgás ELŐTT már létrejött, a
+       horgony előtti nyers rést őrizte, és az idény végén ebből mért, felfújt
+       rés-változás (dg) a következő idényt indokolatlanul keményre állította. */
+    try{const H1=P.vallH&&P.vallH[1];
+      if(H1&&H1.elso&&H1.veg==null&&P.padlo===2)H1.utana=P.gap0;}catch(e){}
     SEASON_OPPS=pyrOpponents();
     pyrGrowStep();pyrOppRefresh();
     if(typeof updateOppRatingBadge==="function")updateOppRatingBadge();
@@ -43206,6 +43212,54 @@ function nfIdenyVege(){
   const rajt=(typeof rec.utana==="number")?rec.utana:(typeof rec.g==="number"?rec.g:null);
   if(rajt!=null)rec.dg=Math.round((gap-rajt+(rec.mid||0))*100)/100;
   return rec;}
+/* ---- 🩹 A FELFÚJT 1. IDÉNYES RÉS-VÁLTOZÁS JAVÍTÁSA (3.9.340) ----
+   BEJELENTETT HIBA (saját bajnokság, vendég, 2. idény): „esélytelen nehézségen
+   fut, pedig saját célréssel kellett volna" — rajt-rés −5,8 a +0,5-ös célrés
+   mellett. AZ OK: az 1. idény mérés-sora (vallH[1]) a kezdőrúgás ELŐTT jött
+   létre, és a horgony előtti, nyers rajt-rést (−5,4) őrizte a kalibrált
+   (+1,5, P.gap0) helyett. Az idény végén a rés-változás így 12,7 lett a valódi
+   ≈5,8 helyett, és a 2. idény rajt-célja (célrés − dg/2) 3,45-tel keményebb.
+   A JAVÍTÁS EGYSZER fut, betöltéskor: a sor a kalibrált rajtot kapja, a dg
+   újraszámolódik; ha a futó idény már a hibás becsléssel indult, a mezőny
+   annyival lejjebb kerül, amennyivel a rajt-cél keményebb volt (és a
+   rés-követés pályája is a helyes becslésre áll). A napló kimondja. */
+function nfDgJavit(){
+  try{
+    if(!pyrFloorOn())return null;
+    const P=S.pyr;if(P.dgJav)return null;
+    const H=P.vallH,H1=H&&H[1];
+    if(!H1||!H1.elso||typeof P.gap0!=="number"||typeof H1.utana!=="number"||typeof H1.veg!=="number"||typeof H1.dg!=="number")return null;
+    if(Math.abs(H1.utana-P.gap0)<0.3){P.dgJav=1;return null;}
+    const regiBecs=nfMertValtozas();
+    const dgRegi=H1.dg;
+    H1.utanaRegi=H1.utana;H1.utana=P.gap0;
+    H1.dg=Math.round((H1.veg-H1.utana+(H1.mid||0))*100)/100;
+    P.dgJav=1;
+    const n1=x=>(x>=0?"+":"−")+Math.abs(x).toFixed(1).replace(".",",");
+    let szoveg=`🩹 <b>Javítva: az 1. idény rés-változása.</b> A mérés a kalibrálás előtti rajt-résből (${n1(H1.utanaRegi)}) számolt `
+      +`a valódi (${n1(H1.utana)}) helyett: <b>${n1(dgRegi)}</b> helyett <b>${n1(H1.dg)}</b>.`;
+    /* a futó idény: ha a hibás becsléssel indult, és még tart */
+    const sn=S.seasonNumber||1,R=H[sn];
+    if(sn>=2&&R&&R.done&&R.veg==null&&typeof R.dgBecsles==="number"&&!(S.seasonClosed)){
+      const ujBecs=nfMertValtozas();
+      const regi=(typeof regiBecs==="number")?regiBecs:R.dgBecsles;
+      const d=Math.round(((regi-ujBecs)/2)*10)/10;   /* ennyivel volt keményebb a rajt-cél */
+      if(d>0.2){
+        /* a pálya szintje egész: a CÉL-RÉSRE lövünk (a legközelebbi elérhetőre), és
+           a sorokat a TÉNYLEGES rés-változással frissítjük */
+        let g0=0;try{g0=levelGap();}catch(e){g0=0;}
+        pyrFloorRaise(()=>levelGap()-(g0+d),-(d+0.5));
+        let moved=d;try{moved=Math.round((levelGap()-g0)*10)/10;}catch(e){}
+        ["g","want","utana"].forEach(k=>{if(typeof R[k]==="number")R[k]=Math.round((R[k]+moved)*10)/10;});
+        R.dgBecsles=ujBecs;R.dgJav=moved;
+        if(R.kov){R.kov.rajt=Math.round((R.kov.rajt+moved)*100)/100;R.kov.dgB=ujBecs;}
+        szoveg+=` A ${sn}. idény rajtja emiatt <b>${n1(-d)}</b>-del keményebb volt a kelleténél — a mezőnyöd most `
+          +`<b>${n1(-moved)}</b> Ratinggel lejjebb kerül, és a rés-követés pályája is a helyes becslésre áll (${n1(ujBecs)}).`;}
+      else{R.dgBecsles=ujBecs;if(R.kov)R.kov.dgB=ujBecs;}}
+    try{addLine(szoveg,"m life");}catch(e){}
+    try{saveGame();}catch(e){}
+    return {dgRegi,dg:H1.dg};
+  }catch(e){return null;}}
 /* ---- 🎚 A RUN A TÍZFOKOZATÚ RENDSZERBEN (3.9.223) ----
    KIMONDOTT KÉRÉSEK: „A 100 fölötti Run szint pontszám csak a 10.5 szint
    megnyerése után nyíljon meg" · „A célrés hangolás hatással van a Run
@@ -127636,6 +127690,8 @@ function applySavedGame(d){
     bondEnsureArrivals();
   }catch(e){}}
 function resumeUIFromSave(){
+  /* 🩹 3.9.340 — a felfújt 1. idényes rés-változás egyszeri javítása */
+  try{if(gameMode==="career")nfDgJavit();}catch(e){}
   /* 🔁 3.9.333 — félbehagyott kihívás-ajánlat: a képernyő felépülése UTÁN */
   try{if(S&&S.chKinal)setTimeout(()=>{try{chKinalBetolteskor();}catch(e){}},60);}catch(e){}
   /* ⏯ a lefújás utáni függő kör — a képernyő felépülése UTÁN indul */
