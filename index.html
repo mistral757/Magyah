@@ -7907,7 +7907,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.347";
+const APP_VERSION="3.9.348";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -56494,8 +56494,8 @@ function applyChallengeReward(rw){
          (ugyanaz a választó-képernyő, mint a meccs-jutalmaknál). */
       const skill=pick(skillDeck());
       if(!S.pendingRewardSkills)S.pendingRewardSkills=[];
-      S.pendingRewardSkills.push({skillId:skill.id,stagesNeeded:rollStagesNeeded()});
-      return `${skill.name} skill — te választod ki, kié legyen`;}
+      S.pendingRewardSkills.push({skillId:skill.id,stagesNeeded:rollStagesNeeded(),reason:"challenge"});
+      return `${skill.name} skill — kész képesség, te választod a kategóriát és azt, kié legyen`;}
     case "scoutUp":
       if(scout)scout.stars=Math.min(SCOUT_MAX_STARS,scout.stars+1);
       return "+1 scout-csillag";
@@ -84609,6 +84609,8 @@ function processSkillQueueB(reasons,cb){
     if(S.auto){
       applyUpgrade(pick(incompleteCands));
       processSkillQueue(reasons,cb);
+    }else if(skillRealOn()&&Math.random()<skillRealAutoShare()){
+      skillRealAutoUpgrade(incompleteCands,()=>processSkillQueue(reasons,cb));
     }else showSkillCompletion(()=>processSkillQueue(reasons,cb),incompleteCands);
     return;
   }
@@ -88264,7 +88266,13 @@ function grantSkillDecide(skill,reason,stagesNeeded,resumeCb,stagesDone,fromName
      a döntést: előbb a kategória (vagy a sorsolt képesség), aztán az ember.
      A kihívás-büntetés célzás-zára (chSkillPickLock) megmarad — az egy
      vállalt büntetés, nem a mód sajátja. */
-  const done=Math.max(1,stagesNeeded||1);
+  /* 🎖 3.9.348 — PONTOSÍTÁS: „Csak a kihívásjutalom skilleknél kértem ezt.
+     Nem az összesnél." A kész képesség és a saját választás (kategória, aztán
+     ember) CSAK a kihívás-jutalomé; minden más jutalom (meccs utáni, karrier-
+     indító, örökség) a 3.9.343 előtti úton megy: a megadott készültséggel, és
+     realisztikus módban a gép döntésével (skillRealPlan). */
+  const kihivas=(reason==="challenge");
+  const done=kihivas?Math.max(1,stagesNeeded||1):(stagesDone||1);
   /* ---- KIHÍVÁS-BÜNTETÉS: A CÉLZÁS ZÁRA (3.9.37) ----
      „Laza módban 15 meccsen át, realisztikusban 30 meccsen át nem választhatod
      ki a skillek célzottjait." Itt a helye, mert ez a rendszer EGYETLEN kapuja
@@ -88275,9 +88283,26 @@ function grantSkillDecide(skill,reason,stagesNeeded,resumeCb,stagesDone,fromName
      tehát pontosan azt veszi el, amit ígér — a döntést, nem a jutalmat. */
   if((S.chSkillPickLock||0)>0&&!noReal){
     skillRealAuto(skill,reason,stagesNeeded,done,null,resumeCb);return;}
-  /* a konkrét képesség (örökség, stábtag átadása): csak az embert választod */
-  if(noReal||fromName){showSkillDraw(skill,reason,stagesNeeded,resumeCb,done,fromName);return;}
-  showSkillTypePick(reason,stagesNeeded,done,resumeCb,skill);}
+  if(kihivas){
+    /* a kihívás-jutalom: kész képesség, előbb a kategória (vagy a sorsolt), aztán az ember */
+    if(noReal||fromName){showSkillDraw(skill,reason,stagesNeeded,resumeCb,done,fromName);return;}
+    showSkillTypePick(reason,stagesNeeded,done,resumeCb,skill);return;}
+  if(skillRealOn()&&!noReal){
+    const plan=skillRealPlan();
+    if(plan.mode==="auto"){
+      const _sk=plan.skill||skill;
+      /* 🎯 CÉLZOTT SKILL, 2. hatás (3.9.335): ha a célzott képesség jött, a
+         célzás szintje szerinti eséllyel mégis te választod, ki kapja. */
+      {let p2=0;try{p2=celSkPickP(_sk);}catch(e){p2=0;}
+       if(p2>0&&Math.random()<p2){
+         try{addLine(`🎯 <b>Célzott skill:</b> ${esc(_sk.name)} — ezúttal <b>te választod</b>, ki kapja.`,"m ev");}catch(e){}   /* nev-ok: képességnév */
+         showSkillDraw(_sk,reason,stagesNeeded,resumeCb,done,fromName);return;}}
+      skillRealAuto(_sk,reason,stagesNeeded,done,plan.target,resumeCb);return;}
+    if(plan.mode==="both"){
+      showSkillTypePick(reason,stagesNeeded,done,resumeCb);return;}
+    /* "who": a képesség a hívóé marad, csak a címzettet választod. */
+    showSkillDraw(plan.skill||skill,reason,stagesNeeded,resumeCb,done,fromName);return;}
+  showSkillDraw(skill,reason,stagesNeeded,resumeCb,done,fromName);}
 /* ---- A FEJLESZTÉS-JUTALOM "NEM TE DÖNTESZ" ÁGA ----
    A jutalmak zöme nem új képesség, hanem FOLYTATÁS: a continueChance a
    félkészek számával 0,35-ről 0,78-ig nő. Ha ez az ág végig kézi maradna, a
@@ -88320,7 +88345,8 @@ function drainRewardSkills(cb){
      változatlanul 1/N fázisról indul; az ÖRÖKSÉG (Béke és harmónia) viszont
      azzal a készültséggel érkezik, ahogy a távozónál állt. */
   const done=Math.max(1,Math.min(item.stagesNeeded||1,item.stagesCompleted||1));
-  if(S.auto){autoAssignSkill(skill,item.stagesNeeded,done);drainRewardSkills(cb);return;}
+  /* 🎖 3.9.348: a kihívás-jutalom végigjátszásnál is kész képesség */
+  if(S.auto){autoAssignSkill(skill,item.stagesNeeded,(item.reason||"challenge")==="challenge"?item.stagesNeeded:done);drainRewardSkills(cb);return;}
   const next=()=>drainRewardSkills(cb);
   /* ---- REALISZTIKUS MÓD ----
      AZ ÖRÖKSÉG KIVÉTEL: ott a KONKRÉT képesség megy tovább a távozótól, azt
@@ -88382,7 +88408,7 @@ function showSkillTypePick(reason,stagesNeeded,done,resumeCb,sorsolt){
     +` — te döntesz (${done}/${stagesNeeded} fázis)`;
   $("skillSpinBtn").classList.add("hide");
   $("skillSpinName").textContent="Milyen képesség legyen?";
-  $("skillDesc").textContent="Előbb a típust választod, utána azt, ki kapja. A képesség készen érkezik.";
+  $("skillDesc").textContent="Előbb a típust választod, utána azt, ki kapja."+(done>=stagesNeeded?" A képesség készen érkezik.":"");
   const box=$("skillAssignList");box.innerHTML="";
   const kaphato=sk=>{try{return eligibleForSkill(sk).length>0;}catch(e){return true;}};
   /* 🎖 3.9.343 — a sorsolt képesség is választható, egy koppintással */
@@ -88588,7 +88614,7 @@ function immSkillPick(skill){
   for(let i=1;i<rang.length;i++){const v=ert(rang[i]);if(v>bv){bv=v;best=rang[i];}}
   return best;}
 function autoAssignSkill(skill,stagesNeeded,stagesDone){
-  const done=Math.max(1,stagesNeeded||1);   /* 🎖 3.9.343 — minden módban kész képesség */
+  const done=Math.max(1,Math.min(stagesNeeded||1,stagesDone||1));
   /* ---- AUTO-KIOSZTÁS: A LEGTÖBBET ÍGÉRŐ KEZDŐNEK ----
      Eddig VÉLETLEN jelöltet választott, így egy skill simán elkallódott egy
      36 éves tartalékon, aki két szezon múlva visszavonul.
@@ -118853,6 +118879,7 @@ function celSkHtml(k){
   const L=C.lvl,sk=celSkSkill(C.id),left=celSkValtLeft(k);
   const ar=celSkNextPrice(k),baj=celSkBuyWhy(k);
   const pc=x=>Math.round(x*100)+"%";
+  const real=skillRealOn();
   let h=`<div class="infoCard"><div class="infoCardH">🎯 Célzott skill</div>`
     +`<div class="msDesc" style="margin-bottom:8px">Kijelölsz <b>egy képességet</b>, és a `
     +`csapat nagyobb eséllyel kapja meg: minden új képesség sorsolásánál külön esély, hogy `
@@ -118865,8 +118892,12 @@ function celSkHtml(k){
     +`<div class="msDesc">`
     +`1. <b>A képesség esélye</b> minden sorsolásnál: most <b>${L?pc(celSkP1(L)):"—"}</b>`
     +(L<CELSK_MAX?`, a következő szinten <b>${pc(celSkP1(L+1))}</b>`:"")+` (1. szint 15% → 10. szint 75%).<br>`
-    +`2. <b>Te választod, ki kapja</b> — 3.9.343 óta minden módban, minden jutalomnál te `
-    +`választasz (kategóriát és embert), a képesség pedig készen érkezik; ez a hatás ezért mindig teljes.`
+    +`2. <b>Te választod, ki kapja</b> — realisztikus skill-módban, amikor a gép döntene: `
+    +`most <b>${L?pc(celSkP2(L)):"—"}</b>`
+    +(L<CELSK_MAX?`, a következő szinten <b>${pc(celSkP2(L+1))}</b>`:"")+` (25% → 100%).`
+    +(real?"":` <span style="color:var(--dim2)">Laza módban amúgy is mindig te választasz, `
+      +`ezért itt csak az 1. hatás számít.</span>`)
+    +` <span style="color:var(--dim2)">A kihívás-jutalom képessége (3.9.348) mindig kész, és ott mindig te választasz.</span>`
     +`<br><span style="color:var(--dim2)">Egyenleg: <b>${engNum(W.pts)}</b> ${esc(W.ptsN)}.</span></div>`
     +`<button class="btn-${baj?"s":"y"} stepbtn" id="celSkBuy"${baj?" disabled":""} style="margin-top:7px;padding:8px">`
     +(baj?esc(baj):`Megveszem — ${ar} pont`)+`</button></div>`;
