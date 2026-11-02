@@ -8,11 +8,16 @@
    Amit mér:
      1. a két gép ugyanazokból a ⚡-okból dönt: pontosan az alacsonyabb kapja,
         egyenlőnél senki; hardcore szobában és szoba nélkül nincs ajánlat;
-     2. a vásárlás: N boost → a Run pontosan N×0,1-gyel kevesebb, a sima boost
-        ára 0 (N ingyen-zseton), a Run-bontásban ott a sor;
-     3. a Run-pontnál többet nem lehet venni;
-     4. a HUB-on a Run-mérő alatt a kártya, a gomb a csúszkás ablakot nyitja,
-        és a megerősítés végrehajtja;
+     2. a vásárlás: N boost → a Run pontosan N×0,1-gyel kevesebb, a Run-
+        bontásban ott a sor;
+     3. (3.9.354) „Amint eléri az ellenfél parharckori meccs erő +1 ratingot
+        az ő meccs ereje, nem vehet többet. Ezért egyszerre max 5-öt vehet. És
+        csak olyannak adhatja, aki a párharcban kezdő volt, vagy kezdő akart
+        lenni, csak pont el volt tiltva, vagy serulve, vagy csereként be lett
+        hozva a meccsre" — egyszerre ≤5, a plafonnál boostonként megáll, csak
+        a névsoron lévő kaphat;
+     4. a HUB-on a Run-mérő alatt a kártya, a gomb a játékosonkénti
+        számlálós ablakot nyitja, és a megerősítés végrehajtja;
      5. egy valódi bajnoki meccs után az ajánlat lejár; nincs oldalhiba. */
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT=process.env.MROOT||"/home/user/Magyah", PORT=9347;
@@ -81,43 +86,86 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(!r1.egyenlo,"egyenlő (tizedre kerekítve) ⚡-nál senki",r1.egyenlo);
   ok(!r1.hc&&!r1.szobaNelkul,"hardcore szobában és szoba nélkül nincs ajánlat",r1);
 
-  console.log("\n— 2–3. vásárlás —");
+  console.log("\n— 2–3. vásárlás (3.9.354: max 5, plafon +1, csak a párharc szereplői) —");
   const r2=await p.evaluate(()=>{
-    const o={};S.runFelzark=0;S.chFreeBoost={};
-    felzAjanl({myMatch:90,oppMatch:95});
+    const o={};S.runFelzark=0;
+    const R=fullCareerRoster().filter(Boolean);
+    const XI=slots.map(sl=>sl&&sl.player&&sl.player.n).filter(Boolean);
+    /* aki nem szerepelt: a névsorból kihagyott utolsó kezdő */
+    const kivul=XI[XI.length-1];
+    o.kivul=kivul;
+    /* a ⚡ a próbában boostonként +0,4-et lép — így a plafon mérhető */
+    window.__ms=90;const _tms=teamMatchStrength;window.__tms=_tms;teamMatchStrength=()=>window.__ms;
+    const _ap=applyPlainBoost;window.__ap=_ap;
+    applyPlainBoost=function(e){window.__ms=Math.round((window.__ms+0.4)*100)/100;return _ap.apply(this,arguments);};
+    window._felzNevekBe=XI.slice(0,-1);
+    _felzNevekMost=XI.slice(0,-1);
+    felzAjanl({myMatch:90,oppMatch:91});
+    o.nevek=(S.felzark&&S.felzark.nevek||[]).length;o.xi=XI.length;
+    o.plafon=felzPlafon();
     o.run0=runBreakdown().total;o.max=felzMax();
-    o.ar0=boostPriceOf("plain")>0;
-    const v=felzVesz(7);o.v=v.ok;
-    o.run1=Math.round(runBreakdown().total*1000)/1000;o.zseton=S.chFreeBoost.plain;o.ar1=boostPriceOf("plain");
-    o.sor=runBreakdown().rows.some(r=>r.k==="felzark"&&/−0,7 Run-pont · 7 sima boost/.test(r.d));
-    o.tul=felzVesz(felzMax()+1).ok;
+    o.jelolt=felzJeloltek().map(x=>x.n);
+    o.kivulJelolt=kivul?o.jelolt.indexOf(kivul)>=0:null;
+    o.kivulVesz=kivul?felzVesz([{n:kivul,db:1}]):null;
+    o.hat=felzVesz([{n:XI[0],db:3},{n:XI[1],db:3}]);
+    o.ures=felzVesz([]);
+    const e0=careerPool[XI[0]].startRating;
+    o.v=felzVesz([{n:XI[0],db:2},{n:XI[1],db:1}]);
+    o.e0d=careerPool[XI[0]].startRating-e0;
+    o.ms1=window.__ms;o.felz1=S.runFelzark;o.run1=Math.round(runBreakdown().total*1000)/1000;
+    o.sor=runBreakdown().rows.some(r=>r.k==="felzark");
+    /* 91,2 → +0,4 = 91,6 → +0,4 = 92,0 = a plafon: a 2. után megáll */
+    o.v2=felzVesz([{n:XI[2],db:5}]);
+    o.ms2=window.__ms;o.felz2=S.runFelzark;o.max2=felzMax();
+    o.v3=felzVesz([{n:XI[2],db:1}]);
+    o.db=S.felzark.db;
+    o.html=felzHtml();
     return o;});
-  ok(r2.run0===4&&r2.max===40,"4,0 Run → legfeljebb 40 boost",r2);
-  ok(r2.v&&Math.abs(r2.run1-3.3)<1e-9&&r2.zseton===7,"7 boost → −0,7 Run, 7 ingyen sima boost",r2);
-  ok(r2.ar0&&r2.ar1===0,"a sima boost ára a zsetonnal 0",r2);
-  ok(!r2.tul,"a Run-pontnál többet nem lehet venni",r2.tul);
+  ok(r2.nevek===r2.xi-1&&r2.nevek>=10,"az ajánlat a párharc szereplőinek névsorát viszi",{nevek:r2.nevek,xi:r2.xi});
+  ok(Math.abs(r2.plafon-92)<1e-9,"a plafon a társ párharckori ⚡-a +1",r2.plafon);
+  ok(r2.run0===4&&r2.max===5,"4,0 Run mellett is egyszerre legfeljebb 5",{run0:r2.run0,max:r2.max});
+  ok(r2.kivul&&r2.kivulJelolt===false&&r2.kivulVesz&&!r2.kivulVesz.ok,"aki nem szerepelt a párharcban, nem kaphat",{kivul:r2.kivul,v:r2.kivulVesz});
+  ok(r2.hat&&!r2.hat.ok&&/legfeljebb 5/.test(r2.hat.miert),"6 boost egyszerre elutasítva",r2.hat);
+  ok(r2.ures&&!r2.ures.ok,"üres választás elutasítva",r2.ures);
+  ok(r2.v.ok&&r2.v.db===3&&Math.abs(r2.felz1-0.3)<1e-9&&Math.abs(r2.run1-3.7)<1e-9,"3 boost → −0,3 Run",r2);
+  ok(r2.e0d>0,"a kiválasztott játékos ratingje nőtt",r2.e0d);
   ok(r2.sor,"a Run-bontásban ott a felzárkóztatás sora",r2.sor);
+  ok(r2.v2.ok&&r2.v2.db===2&&r2.v2.leallt&&Math.abs(r2.felz2-0.5)<1e-9,"a plafonnál megáll: 5-ből 2 fogyott, csak az került Run-ba",r2.v2);
+  ok(r2.max2===0&&r2.v3&&!r2.v3.ok&&r2.db===5,"a plafon után nem vehet többet",{max2:r2.max2,v3:r2.v3,db:r2.db});
+  ok(/Felzárkóztál/.test(r2.html)&&!/id="felzBtn"/.test(r2.html),"a kártya jelzi, hogy felzárkózott, gomb nélkül",null);
 
   const rv=await p.evaluate(()=>{S.runFelzark=0;const a=window.__rb().total;S.runFelzark=0.5;const b=window.__rb().total;S.runFelzark=0;return {a,b};});
   ok(rv.a>0.5&&Math.abs(rv.a-rv.b-0.5)<1e-9,"a valódi Run-számítás pontosan levonja a felzárkóztatás árát",rv);
 
   console.log("\n— 4. a HUB —");
   const r4=await p.evaluate(()=>{
-    const o={};S.runFelzark=0;S.chFreeBoost={};felzAjanl({myMatch:90,oppMatch:95});
+    const o={};S.runFelzark=0;window.__ms=90;
+    _felzNevekMost=window._felzNevekBe.slice();felzAjanl({myMatch:90,oppMatch:95});
     renderRunMeter();
-    o.kartya=!!$("felzBox");const b=$("felzBtn");o.gomb=!!b;
+    o.kartya=!!$("felzBox");const b=$("felzBtn");o.gomb=!!b;o.gombTx=b?b.textContent:"";
     if(b)b.click();
-    o.ablak=!$("hubTacticConfirmModal").classList.contains("hide")&&!!$("felzDb");
-    if($("felzDb")){$("felzDb").value="3";$("felzDb").dispatchEvent(new Event("input"));o.tx=$("felzDbTx").textContent;}
+    const box=$("hubTacticConfirmBody");
+    o.ablak=!$("hubTacticConfirmModal").classList.contains("hide");
+    o.sorok=box.querySelectorAll("[data-fz='+']").length;
+    const plusz=[...box.querySelectorAll("[data-fz='+']")];
+    const n0=plusz[0].getAttribute("data-n"),n1=plusz[1].getAttribute("data-n");
+    for(let i=0;i<4;i++)plusz[0].click();
+    for(let i=0;i<3;i++)plusz[1].click();   /* 5 fölött nem lép */
+    o.tx=$("felzOssz").textContent;
+    [...box.querySelectorAll("[data-fz='-']")].find(x=>x.getAttribute("data-n")===n0).click();
+    o.tx2=$("felzOssz").textContent;
+    const r0a=careerPool[n0].startRating,r1a=careerPool[n1].startRating;
     $("hubTacticConfirmYes").click();
-    o.zseton=(S.chFreeBoost||{}).plain||0;o.felz=S.runFelzark;
+    o.felz=S.runFelzark;o.db=S.felzark.db;o.n0=careerPool[n0].startRating>r0a;o.n1=careerPool[n1].startRating>r1a;
+    teamMatchStrength=window.__tms;applyPlainBoost=window.__ap;
     return o;});
-  ok(r4.kartya&&r4.gomb,"a Run-mérő alatt a kártya és a gomb",r4);
-  ok(r4.ablak&&/3 boost — 0,3 Run/.test(r4.tx||""),"a gomb csúszkás ablakot nyit, a felirat követi",r4);
-  ok(r4.zseton===3&&Math.abs(r4.felz-0.3)<1e-9,"a megerősítés végrehajtja",r4);
+  ok(r4.kartya&&r4.gomb&&/legfeljebb 5 boost/.test(r4.gombTx),"a Run-mérő alatt a kártya és a gomb",r4);
+  ok(r4.ablak&&r4.sorok===10,"a gomb játékosonkénti számlálós ablakot nyit",r4.sorok);
+  ok(/^5 \/ 5 boost — 0,5 Run/.test(r4.tx||"")&&/^4 \/ 5 boost — 0,4 Run/.test(r4.tx2||""),"a számlálók 5-nél megállnak, az összesítő követi",{tx:r4.tx,tx2:r4.tx2});
+  ok(Math.abs(r4.felz-0.4)<1e-9&&r4.db===4&&r4.n0&&r4.n1,"a megerősítés a kiválasztottakra osztja ki",r4);
 
   console.log("\n— 5. lejár a következő bajnokin —");
-  await p.evaluate(()=>{S.felzark={sn:S.seasonNumber||1,my:90,op:95,at:Date.now(),db:0};
+  await p.evaluate(()=>{S.felzark={sn:S.seasonNumber||1,my:90,op:95,at:Date.now(),db:0,nevek:[]};
     S.auto=false;S.halftimeSubs=false;try{subPlanState().rules=[];}catch(e){}
     window.__n0=S.fixtureResults.length;playMatch();});
   {const t0=Date.now();let kesz=false;

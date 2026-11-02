@@ -201,13 +201,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
    /* 🆙 3.9.347 — a felzárkóztatás ajánlata MINDEN párharc után: pontosan az
       alacsonyabb ⚡-ú fél kapja (a két gép ugyanabból a két számból dönt) */
    {const fz=pp=>pp.evaluate(()=>({f:S.felzark,log:(window._nlog||[]).filter(t=>/Felzárkóztatás/.test(t)).length,
-      html:!!felzHtml(),max:felzMax(),run:(()=>{try{return runBreakdown().total;}catch(e){return null;}})()}));
+      html:!!felzHtml(),max:felzMax(),run:(()=>{try{return runBreakdown().total;}catch(e){return null;}})(),
+      xi:slots.map(sl=>sl&&sl.player&&sl.player.n).filter(Boolean),jel:felzJeloltek().length}));
     const fa=await fz(p),fg=await fz(g);
     const egyenlo=fa.f==null&&fg.f==null;
     const egy=(!!fa.f)!==(!!fg.f);
     const also=fa.f?fa:fg.f?fg:null;
     ok(egy||egyenlo,"15. forduló utáni párharc: pontosan az egyik fél kap felzárkóztatási ajánlatot",{a:fa,g:fg});
-    ok(!also||(also.f.my<also.f.op&&also.log>=1&&also.html),"15. forduló utáni párharc: az alacsonyabb ⚡-ú kapja, a napló szól, a HUB-kártya megjelenik",also);}
+    ok(!also||(also.f.my<also.f.op&&also.log>=1&&also.html),"15. forduló utáni párharc: az alacsonyabb ⚡-ú kapja, a napló szól, a HUB-kártya megjelenik",also);
+    /* 🆙 3.9.354 — a névsor: a párharc kezdői (a kiesett kezdő is a helyén marad) + beállt cserék; egyszerre ≤5 */
+    ok(!also||(Array.isArray(also.f.nevek)&&also.xi.every(n=>also.f.nevek.indexOf(n)>=0)&&also.f.nevek.length>=also.xi.length&&also.jel>=also.xi.length&&also.max<=5),
+      "15. forduló utáni párharc: a felzárkóztatás címzettjei a párharc szereplői, egyszerre legfeljebb 5",also&&{nevek:also.f.nevek.length,xi:also.xi.length,jel:also.jel,max:also.max});}
 
   const r6=await p.evaluate(()=>{
     S.idx=30;S.seasonClosed=false;const o={};
@@ -239,13 +243,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
    /* 🆙 3.9.347 — a felzárkóztatás ajánlata MINDEN párharc után: pontosan az
       alacsonyabb ⚡-ú fél kapja (a két gép ugyanabból a két számból dönt) */
    {const fz=pp=>pp.evaluate(()=>({f:S.felzark,log:(window._nlog||[]).filter(t=>/Felzárkóztatás/.test(t)).length,
-      html:!!felzHtml(),max:felzMax(),run:(()=>{try{return runBreakdown().total;}catch(e){return null;}})()}));
+      html:!!felzHtml(),max:felzMax(),run:(()=>{try{return runBreakdown().total;}catch(e){return null;}})(),
+      xi:slots.map(sl=>sl&&sl.player&&sl.player.n).filter(Boolean),jel:felzJeloltek().length}));
     const fa=await fz(p),fg=await fz(g);
     const egyenlo=fa.f==null&&fg.f==null;
     const egy=(!!fa.f)!==(!!fg.f);
     const also=fa.f?fa:fg.f?fg:null;
     ok(egy||egyenlo,"8. forduló utáni párharc: pontosan az egyik fél kap felzárkóztatási ajánlatot",{a:fa,g:fg});
-    ok(!also||(also.f.my<also.f.op&&also.log>=1&&also.html),"8. forduló utáni párharc: az alacsonyabb ⚡-ú kapja, a napló szól, a HUB-kártya megjelenik",also);}}
+    ok(!also||(also.f.my<also.f.op&&also.log>=1&&also.html),"8. forduló utáni párharc: az alacsonyabb ⚡-ú kapja, a napló szól, a HUB-kártya megjelenik",also);
+    /* 🆙 3.9.354 — a névsor: a párharc kezdői (a kiesett kezdő is a helyén marad) + beállt cserék; egyszerre ≤5 */
+    ok(!also||(Array.isArray(also.f.nevek)&&also.xi.every(n=>also.f.nevek.indexOf(n)>=0)&&also.f.nevek.length>=also.xi.length&&also.jel>=also.xi.length&&also.max<=5),
+      "8. forduló utáni párharc: a felzárkóztatás címzettjei a párharc szereplői, egyszerre legfeljebb 5",also&&{nevek:also.f.nevek.length,xi:also.xi.length,jel:also.jel,max:also.max});}}
 
   console.log("— 6. a közös kupa relatív mezőnnyel —");
   const kPrep=(pp,nev,comp)=>pp.evaluate(([nev,comp])=>{

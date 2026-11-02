@@ -7907,7 +7907,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.353";
+const APP_VERSION="3.9.354";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -83595,6 +83595,11 @@ function playMatchMotor(){
     const playedAll=active.filter(a=>!a.bus).map(a=>a.p)
       .concat(halfOut.map(h=>h&&h.p).filter(Boolean));
     playedAll.forEach(p=>{S.seasonMatches[p.n]=(S.seasonMatches[p.n]||0)+1;});
+    /* 🆙 3.9.354 — a párharc szereplői a felzárkóztatáshoz: aki pályára lépett
+       (kezdő, beállt csere), és aki a felállásban a kezdőbe volt szánva, de
+       eltiltás/sérülés miatt más állt a helyére (a felállás-helyén maradt) */
+    if(fx&&fx.duel)try{_felzNevekMost=[...new Set(playedAll.map(p=>p&&p.n)
+      .concat(slots.map(sl=>sl&&sl.player&&sl.player.n)).filter(Boolean))];}catch(e){_felzNevekMost=null;}
     /* ================= LEJÁTSZOTT PERCEK (3.9.33) =================
        KIMONDOTT KÉRÉS: az átigazolási piacra tétel és az edzővé válás
        mostantól PERCEKEN múljon, ne meccsszámon — „azzal a taktikával amit most
@@ -129800,10 +129805,23 @@ function svKupaEltolas(M,comp){
        ajánlata a nyáron át, a következő idény első bajnokijáig).
      · AZ ÁR: 0,1 Run-pont / sima boost, a Run kész számából (runBreakdown).
        Legfeljebb annyi, amennyi Run-pontod van.
-     · A BOOST: ingyen-zsetonként érkezik (S.chFreeBoost.plain) — a Boost-
-       központban a sima boost ára 0, és te választod ki, kire megy. A
-       párharcba számít; a bajnokin a szokásos boost-adósság szabálya él. */
-const FELZ_BOOST_PER_RUN=10;
+     · A BOOST (3.9.354): a felzárkóztatás SAJÁT ablakában osztod ki, közvetlenül
+       a játékosra (nem ingyen-zseton a Boost-központba). KIMONDOTT KÉRÉS:
+       „Amint eléri az ellenfél párharckori meccs erő +1 ratingot az ő meccs
+       ereje, nem vehet többet. Ezért egyszerre max 5-öt vehet. És csak olyannak
+       adhatja, aki a párharcban kezdő volt, vagy kezdő akart lenni, csak pont
+       el volt tiltva, vagy sérülve, vagy csereként be lett hozva a meccsre."
+         - egyszerre legfeljebb 5 boost (FELZ_EGYSZERRE);
+         - a PLAFON: a társ párharckori ⚡-a + 1. Minden egyes boost előtt
+           mérünk (teamMatchStrength): ha a ⚡-od elérte, a vásárlás megáll, és
+           a maradék nem kerül Run-pontba;
+         - CÍMZETT csak a párharc szereplője: aki pályára lépett (kezdő vagy
+           beállt csere), és aki a felállásban a kezdőbe volt szánva, de
+           eltiltás vagy sérülés miatt más állt a helyére (a felállás-helyén
+           marad, lásd S.subs). A lista a lefújáskor rögzül (_felzNevekMost).
+       A bajnokin a szokásos boost-adósság szabálya él. */
+const FELZ_BOOST_PER_RUN=10,FELZ_EGYSZERRE=5,FELZ_PLAFON=1;
+let _felzNevekMost=null;
 function felzKonnyed(){
   try{if(typeof mpHardcore==="function"&&mpHardcore())return false;
     return mpSv()||(typeof h2hRoomActive==="function"&&h2hRoomActive());}catch(e){return false;}}
@@ -129814,50 +129832,99 @@ function felzAjanl(D){
   if(!isFinite(my)||!isFinite(op))return null;
   const r1=x=>Math.round(x*10)/10;
   if(r1(my)>=r1(op)){S.felzark=null;return null;}
-  S.felzark={sn:S.seasonNumber||1,my:r1(my),op:r1(op),at:Date.now(),db:0};
+  const nevek=Array.isArray(_felzNevekMost)?_felzNevekMost.slice():[];
+  _felzNevekMost=null;
+  S.felzark={sn:S.seasonNumber||1,my:r1(my),op:r1(op),at:Date.now(),db:0,nevek};
   try{addLine(`🆙 <b>Felzárkóztatás</b>: a párharcban a ⚡ meccs-erőd ${String(r1(my)).replace(".",",")} volt, `
     +`a társadé ${String(r1(op)).replace(".",",")}. A következő bajnokiig sima boostot vehetsz Run-pontért `
-    +`(<b>0,1 Run / boost</b>) — a HUB-on, a Run-mérő alatt.`,"m ev");}catch(e){}
+    +`(<b>0,1 Run / boost</b>, egyszerre legfeljebb ${FELZ_EGYSZERRE}), a párharc szereplőinek, amíg a ⚡-od el nem éri `
+    +`a <b>${String(r1(op+FELZ_PLAFON)).replace(".",",")}</b>-et — a HUB-on, a Run-mérő alatt.`,"m ev");}catch(e){}
   return S.felzark;}
 function felzAktiv(){return !!(S&&S.felzark&&felzKonnyed());}
-function felzMax(){
+function felzPlafon(){return (S.felzark?S.felzark.op:0)+FELZ_PLAFON;}
+function felzMostMs(){try{return teamMatchStrength();}catch(e){return 0;}}
+function felzMaxRun(){
   let r=0;try{r=runBreakdown().total||0;}catch(e){r=0;}
   return Math.max(0,Math.floor(r*FELZ_BOOST_PER_RUN+1e-9));}
-function felzVesz(db){
-  db=Math.floor(+db||0);
-  if(!felzAktiv()||db<=0)return {ok:false,miert:"nincs ajánlat"};
-  const mx=felzMax();if(db>mx)return {ok:false,miert:"nincs ennyi Run-pontod"};
+/* a kiosztható darab most: Run, egyszerre-korlát, és a plafon alatt */
+function felzMax(){
+  if(!felzAktiv())return 0;
+  if(felzMostMs()>=felzPlafon()-1e-9)return 0;
+  return Math.min(FELZ_EGYSZERRE,felzMaxRun());}
+/* a párharc szereplői, akik ma is a keretben vannak */
+function felzJeloltek(){
+  if(!felzAktiv())return [];
+  const nv=new Set(S.felzark.nevek||[]);
+  let R=[];try{R=fullCareerRoster().filter(Boolean);}catch(e){R=[];}
+  return R.filter(p=>nv.has(p.n)&&careerPool&&careerPool[p.n]);}
+/* lista: [{n,db}] — sorban, boostonként mérve a plafont */
+function felzVesz(lista){
+  if(!felzAktiv())return {ok:false,miert:"nincs ajánlat"};
+  const jo=new Set(felzJeloltek().map(p=>p.n));
+  const L=(Array.isArray(lista)?lista:[]).map(x=>({n:x&&x.n,db:Math.max(0,Math.floor(+(x&&x.db)||0))})).filter(x=>x.db>0);
+  const ossz=L.reduce((a,x)=>a+x.db,0);
+  if(!ossz)return {ok:false,miert:"nincs kiválasztott boost"};
+  if(L.some(x=>!jo.has(x.n)))return {ok:false,miert:"csak a párharc szereplői kaphatnak felzárkóztatást"};
+  if(ossz>FELZ_EGYSZERRE)return {ok:false,miert:`egyszerre legfeljebb ${FELZ_EGYSZERRE} boost`};
+  if(ossz>felzMaxRun())return {ok:false,miert:"nincs ennyi Run-pontod"};
+  const plafon=felzPlafon();let db=0,leallt=false;const kapott=[];
+  for(const x of L){for(let k=0;k<x.db;k++){
+    if(felzMostMs()>=plafon-1e-9){leallt=true;break;}
+    const e=careerPool[x.n];if(!e)break;
+    try{applyPlainBoost(e);}catch(er){break;}
+    try{const pl=currentRoster().find(y=>y.n===e.n)||extraRoster.find(y=>y.n===e.n);if(pl){pl.ovr=e.startRating;pl.pot=e.pot;}}catch(er){}
+    db++;kapott.push(x.n);}
+   if(leallt)break;}
+  if(!db)return {ok:false,miert:"a ⚡-od már elérte a társad párharckori ⚡-a +1-et",leallt:true};
   const ar=db/FELZ_BOOST_PER_RUN;
   S.runFelzark=Math.round(((+S.runFelzark||0)+ar)*1000)/1000;
-  S.chFreeBoost=S.chFreeBoost||{};S.chFreeBoost.plain=(S.chFreeBoost.plain||0)+db;
   S.felzark.db=(S.felzark.db||0)+db;
-  try{addLine(`🆙 <b>Felzárkóztatás: ${db} sima boost</b> a Boost-központban ingyen vár — `
-    +`ára <b>${String(Math.round(ar*10)/10).replace(".",",")} Run-pont</b>.`,"m life");}catch(e){}
+  const sz=x=>String(Math.round(x*10)/10).replace(".",",");
+  try{const cs={};kapott.forEach(n=>{cs[n]=(cs[n]||0)+1;});
+    addLine(`🆙 <b>Felzárkóztatás: ${db} sima boost</b> — ${Object.keys(cs).map(n=>`${esc(shortName(n))}${cs[n]>1?` ×${cs[n]}`:""}`).join(", ")}; `
+      +`ára <b>${sz(ar)} Run-pont</b>. A ⚡-od most ${sz(felzMostMs())} (a plafon ${sz(plafon)})`
+      +(leallt?" — elérted, a többi nem fogyott.":"."),"m life");}catch(e){}
   try{saveGame();}catch(e){}
-  return {ok:true,db,ar};}
+  return {ok:true,db,ar,leallt};}
 function felzHtml(){
   if(!felzAktiv())return "";
-  const F=S.felzark,mx=felzMax(),sz=x=>String(x).replace(".",",");
+  const F=S.felzark,mx=felzMax(),sz=x=>String(Math.round(x*10)/10).replace(".",",");
+  const most=felzMostMs(),pl=felzPlafon(),jel=felzJeloltek().length;
+  const ok=most<pl-1e-9;
   return `<div class="infoCard" id="felzBox" style="margin:8px 0;font-size:12.5px;line-height:1.5;border-left:3px solid var(--gold)">
     <div class="infoCardH">🆙 Felzárkóztatás a párharc után</div>
     <div>A párharcban a ⚡-od <b>${sz(F.my)}</b> volt, a társadé <b>${sz(F.op)}</b>. A következő bajnokiig
-      sima boostot vehetsz <b>Run-pontért</b>: 1 boost = 0,1 Run, 1 teljes Run-szint = 10 boost.
-      A boostok ingyen-zsetonként a Boost-központba kerülnek — te döntöd el, kire mennek.</div>
+      sima boostot vehetsz <b>Run-pontért</b> (1 boost = 0,1 Run), <b>egyszerre legfeljebb ${FELZ_EGYSZERRE}</b>-öt,
+      a párharc szereplőinek (${jel} játékos) — amíg a ⚡-od el nem éri a <b>${sz(pl)}</b>-et. Most: <b>${sz(most)}</b>.</div>
     ${F.db?`<div style="color:var(--dim)">Ebből az ajánlatból eddig: ${F.db} boost.</div>`:""}
-    ${mx>0?`<button type="button" class="btn-s" id="felzBtn" style="width:100%;margin-top:6px">🆙 Felzárkóztatást kérek (legfeljebb ${mx} boost)</button>`
+    ${!ok?`<div style="color:var(--grass)">✓ Felzárkóztál: a ⚡-od elérte a plafont.</div>`
+      :!jel?`<div style="color:var(--dim2)">A párharc szereplői közül senki nincs már a keretben.</div>`
+      :mx>0?`<button type="button" class="btn-s" id="felzBtn" style="width:100%;margin-top:6px">🆙 Felzárkóztatást kérek (most legfeljebb ${mx} boost)</button>`
       :`<div style="color:var(--dim2)">Nincs elég Run-pontod.</div>`}</div>`;}
 function felzNyit(){
-  const mx=felzMax();if(!mx)return;
-  const alap=Math.min(5,mx);
-  askConfirm({title:"Felzárkóztatás — hány sima boost?",yes:"Megveszem",
-    html:`<div style="font-size:13px;line-height:1.55">1 sima boost = <b>0,1 Run-pont</b>. A boostok a Boost-központban várnak, ingyen.<br><br>`
-      +`<input type="range" id="felzDb" min="1" max="${mx}" value="${alap}" style="width:100%">`
-      +`<div id="felzDbTx" style="text-align:center;font-weight:700;margin-top:4px">${alap} boost — ${String(alap/10).replace(".",",")} Run</div></div>`,
-    onYes:()=>{const v=+(($("felzDb")||{}).value||0);const r=felzVesz(v);
+  const mx=felzMax(),J=felzJeloltek();if(!mx||!J.length)return;
+  const db={};J.forEach(p=>{db[p.n]=0;});
+  const ossz=()=>Object.values(db).reduce((a,x)=>a+x,0);
+  const sor=p=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)">
+      <span style="flex:1">${esc(shortName(p.n))} <small style="color:var(--dim)">${esc((p.pos||[])[0]||"")} · ${Math.round(p.ovr||0)}</small></span>
+      <button type="button" class="btn-s" data-fz="-" data-n="${esc(p.n)}" style="width:34px;padding:4px">−</button>
+      <b data-fzdb="${esc(p.n)}" style="min-width:16px;text-align:center">0</b>
+      <button type="button" class="btn-s" data-fz="+" data-n="${esc(p.n)}" style="width:34px;padding:4px">+</button></div>`;
+  askConfirm({title:"Felzárkóztatás — kire menjen a boost?",yes:"Megveszem",
+    html:`<div style="font-size:12.5px;line-height:1.5">A párharc szereplői (kezdők, beállt cserék, és akik eltiltás vagy sérülés miatt maradtak ki). `
+      +`Egyszerre legfeljebb <b>${mx}</b> boost, 0,1 Run / boost. Ha közben a ⚡-od eléri a plafont, a többi nem fogy el.</div>`
+      +`<div style="margin-top:6px;max-height:46vh;overflow:auto">${J.map(sor).join("")}</div>`
+      +`<div id="felzOssz" style="text-align:center;font-weight:700;margin-top:6px">0 / ${mx} boost — 0 Run</div>`,
+    onYes:()=>{const r=felzVesz(Object.keys(db).map(n=>({n,db:db[n]})));
       if(!r.ok)try{addLine(`🆙 ${esc(r.miert||"")}.`,"m ev");}catch(e){}
       try{renderHub();}catch(e){}}});
-  const inp=$("felzDb"),tx=$("felzDbTx");
-  if(inp&&tx)inp.oninput=()=>{tx.textContent=`${inp.value} boost — ${String(Math.round(inp.value)/10).replace(".",",")} Run`;};}
+  const box=$("hubTacticConfirmBody");if(!box)return;
+  box.querySelectorAll("[data-fz]").forEach(b=>{b.onclick=()=>{
+    const n=b.getAttribute("data-n"),d=b.getAttribute("data-fz")==="+"?1:-1;
+    if(d>0&&ossz()>=mx)return;
+    db[n]=Math.max(0,(db[n]||0)+d);
+    const t=[...box.querySelectorAll("[data-fzdb]")].find(x=>x.getAttribute("data-fzdb")===n);if(t)t.textContent=db[n];
+    const o=$("felzOssz");if(o)o.textContent=`${ossz()} / ${mx} boost — ${String(ossz()/10).replace(".",",")} Run`;};});}
 function svPhRogzit(gf,ga,tars){
   const n=svPhEsedekes();if(!n)return;
   const P=svPhAll(),sn=S.seasonNumber||1,M=P.merleg;
