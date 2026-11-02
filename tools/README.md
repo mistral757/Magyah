@@ -389,6 +389,24 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## talizman-fuzio-3-9-344-proba.js — 🧬 a fúzió nem gyengébb a két külön lapnál
+
+```
+node tools/talizman-fuzio-3-9-344-proba.js
+```
+
+* Ritkaság-párokra (1+1, 2+2, 3+3, 4+1, 4+4, 1+3), üres és 3 lapos kategóriában: a fúzió utáni alaphatás ≥ a két külön lapé, a darabszám azonos, a special legalább olyan erős; ahol a ritkaság-ugrás magától nyer, nincs pótlék; a gomb kimondja a garanciát.
+
+## rivalis-strigula-3-9-344-proba.js — ⚔️ rivális-skalp a meccs pillanatában
+
+```
+node tools/rivalis-strigula-3-9-344-proba.js
+```
+
+* Valódi bajnoki meccs után a rekord (`S.fixtureResults`) viszi a lefújáskor mért `rival` jelzőt.
+* A „Győzz le N rivális erejű ellenfelet" számlálója ezt nézi: a keret utólagos erősödése nem veszi el a strigulát, a gyengülése nem csinál utólag skalpot; jelző nélküli régi rekordnál a korábbi becslés marad.
+* Az `eladas-kihivas-proba.js` 1b szakasza a „Szabadulj meg tőle" (tensionOut) első-licites határidejét méri.
+
 ## kupa-dij-3-9-342-proba.js — 💰 kupa-díj fordulónként
 
 ```

@@ -75,6 +75,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       fizetes:challengePayoutText(ch),
       korai:challengeEarlyPayable(ch)};
 
+    /* ---- 1b. ⏳ 3.9.344 — a „Szabadulj meg tőle" is az első licitig él ---- */
+    {const nev=slots[4].player.n;
+     S.lockerLog=[{s:S.seasonNumber||1,who:[nev]},{s:S.seasonNumber||1,who:[nev]},{s:S.seasonNumber||1,who:[nev]}];
+     let to=null;
+     const _cx=challengeContext();for(let i=0;i<600&&!to;i++){const o=buildChallengeOffer("short",_cx);if(o&&o.type==="tensionOut")to=o;}
+     ki.tension=to?{kind:to.deadline.kind,nev:to.targetName===nev,szoveg:challengeDeadlineText(to)}:null;
+     if(to){S.activeChallenges=[to];const db=chSaleRefused(nev);ki.tension.bukas=db===1&&!S.activeChallenges.length;}
+     S.lockerLog=[];S.activeChallenges=[];}
     /* ---- 2. AZ IDŐ MÚLÁSA NEM VISZI EL ---- */
     S.activeChallenges=[mk()];
     S.idx=29;S.seasonNumber=3;
@@ -154,6 +162,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
 
   console.log("=== 1. a határidő fajtája és a kiírt szövegek (1.+3.) ===");
   ok(t.hatarido.kind==="firstBid","a határidő `firstBid`, nem meccsszám",t.hatarido.kind);
+  ok(t.tension&&t.tension.kind==="firstBid"&&t.tension.nev&&t.tension.szoveg==="az első licitig"&&t.tension.bukas,
+     "3.9.344: a „Szabadulj meg tőle” határideje is az első licit; a visszautasított licit elbuktatja",t.tension);
   ok(t.hatarido.szoveg==="az első licitig","a felület „az első licitig”-et ír",t.hatarido.szoveg);
   ok(/ELADÁS pillanatában/.test(t.hatarido.fizetes),
      "…és hogy a jutalom az ELADÁS pillanatában érkezik",t.hatarido.fizetes);
