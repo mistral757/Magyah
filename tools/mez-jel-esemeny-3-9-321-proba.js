@@ -237,10 +237,12 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.be=animHatul()&&identState().animHatul===true;
     o.gombSel=document.getElementById("identAnimHatul").classList.contains("on");
     _identDraft=null;
-    const F=evaFig(jp,k,.5);
+    /* 🎬 3.9.353: hátulról csak a TÁMADÓ figura (4. paraméter) */
+    const F=evaFig(jp,k,.5,true);
+    o.vedoSzemben=evaFig(jp,k,.5).hatul===false;
     const hat=evaFigura("pf2",F,k,50,50,1);
     o.hatSzam=/data-evaszam/.test(hat)&&!/data-evajel/.test(hat)&&F.hatul===true&&typeof F.num==="number";
-    o.fejMas=F.fej!==evaFig(jp,k,.5).fej?"cache-hiba":(F.fej!==(()=>{identState().animHatul=false;const u=evaFig(jp,k,.5).fej;identState().animHatul=true;return u;})());
+    o.fejMas=F.fej!==evaFig(jp,k,.5,true).fej?"cache-hiba":(F.fej!==(()=>{identState().animHatul=false;const u=evaFig(jp,k,.5,true).fej;identState().animHatul=true;return u;})());
     const svg=faceSVG(jp,60,{kit:k,bg:false,csakFej:true,hatul:true});
     o.nincsSzem=!/#fbfbf8/.test(svg);
     o.kapusEgy=evaMezSzam({n:"Ellenfél kapusa"})===1;
@@ -250,6 +252,23 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r8.alap===false&&r8.elolJel,"alapból elölről: arc, a mellen a jel, szám nélkül",r8);
   ok(r8.gombok&&r8.be&&r8.gombSel,"az arculat 6. szakaszában kapcsolható, azonnal érvényes",r8);
   ok(r8.hatSzam&&r8.fejMas===true&&r8.nincsSzem,"hátulról: tarkó (szemek nélkül), a háton a szám, jel nélkül",r8);
+  ok(r8.vedoSzemben,"3.9.353: a hátulról nézetben is a védő (nem támadó figura) szemben marad",r8.vedoSzemben);
+  const rKs=await p.evaluate(()=>{
+    const o={};identState().animHatul=true;
+    const H=ev=>{const c=evaKontextus(ev);return {lo:c.loUrl.hatul,tars:c.tarsUrl.hatul,rugo:c.rugoUrl.hatul,vedo:c.vedoUrl.hatul,vedo2:c.vedoUrl2.hatul,kapus:c.kapusUrl.hatul};};
+    o.gol=H({t:"gol",side:"us",p:"Teszt Elek",min:10,seq:1,sor:"GÓL! T. Elek"});
+    o.kapott=H({t:"golKapott",side:"them",p:"Ellen Fél",min:20,seq:2});
+    o.bravur=H({t:"bravur",side:"us",p:"Kapus Kálmán",min:30,seq:3});
+    o.lap=H({t:"sarga",side:"us",p:"Teszt Elek",min:40,seq:4});
+    identState().animHatul=false;
+    o.ki=H({t:"gol",side:"us",p:"Teszt Elek",min:10,seq:5,sor:"GÓL! T. Elek"});
+    return o;});
+  const tamHat=x=>x.lo&&x.tars&&x.rugo,vedSzem=x=>!x.vedo&&!x.vedo2&&!x.kapus;
+  ok(tamHat(rKs.gol)&&vedSzem(rKs.gol),"saját gól: a támadóink háttal, a védők és a kapus szemben",rKs.gol);
+  ok(tamHat(rKs.kapott)&&vedSzem(rKs.kapott),"kapott gól: az ellenfél támadói háttal, a mi védőink és kapusunk szemben",rKs.kapott);
+  ok(rKs.bravur.lo&&!rKs.bravur.kapus&&!rKs.bravur.vedo,"bravúr: a lövő háttal, a kapus és a védő szemben",rKs.bravur);
+  ok(!rKs.lap.lo,"lap-jelenet: a lapot kapó szemben (a bíróval szemben áll)",rKs.lap);
+  ok(!rKs.ki.lo&&!rKs.ki.tars&&vedSzem(rKs.ki),"elölről nézetben mindenki szemben",rKs.ki);
   ok(r8.kapusEgy&&r8.stabil&&r8.ki,"az ellenfél kapusa 1-es, a többi szám névből stabil; visszakapcsolható",r8);
 
   console.log("— 9. 3.9.323: a beállított ellenfél-mez ütközéskor (Brighton) —");
