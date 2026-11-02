@@ -389,6 +389,14 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## skill-jutalom-3-9-343-proba.js — 🎖 a kihívás-jutalom skillje (3.9.348-tól csak az)
+
+```
+node tools/skill-jutalom-3-9-343-proba.js
+```
+
+* A kihívás-jutalom kész képesség, kategória- és címzett-választással minden módban; a meccs-jutalom realisztikus módban a gépé marad, a megadott készültséggel.
+
 ## felzarkoztatas-3-9-347-proba.js — 🆙 felzárkóztatás a párharc után
 
 ```

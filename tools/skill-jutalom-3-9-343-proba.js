@@ -1,11 +1,15 @@
-/* 🎖 Skill-jutalom: kész képesség, kategória- és címzett-választás minden módban (3.9.343).
+/* 🎖 KIHÍVÁS-jutalom skill: kész képesség, kategória- és címzett-választás minden módban
+   (3.9.343, pontosítva 3.9.348).
 
    KIMONDOTT KÉRÉS: „Skill jutalomnál minden játékmódban teljes skillt
    kapjunk, és tényleg lehessen kiválasztani, ki kapja, és lehessen
-   választani, melyik kategóriából."
+   választani, melyik kategóriából." — PONTOSÍTÁS (3.9.348): „Csak a
+   kihívásjutalom skilleknél kértem ezt. Nem az összesnél."
 
-   Amit mér: realisztikus módban is a sorsolt / kategória választó jön; a
-   képesség 3/3; a címzettet te választod; nincs oldalhiba. */
+   Amit mér: a kihívás-jutalomnál realisztikus módban is a sorsolt / kategória
+   választó jön, a képesség 3/3, a címzettet te választod; a MECCS-jutalom
+   realisztikus módban a gépé marad (a megadott készültséggel); a kihívás
+   sorba tett skillje „challenge" okkal kerül a sorba; nincs oldalhiba. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT="/home/user/Magyah", PORT=9490;
@@ -51,12 +55,27 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     window._kesz=0;
     const sk=skillDeck().find(x=>eligibleForSkill(x).length>0);window._sk=sk.id;
     ["scHub","scSim","scWindow"].forEach(id=>$(id)&&$(id).classList.add("hide"));
-    grantSkillDecide(sk,"match",3,()=>{window._kesz++;},1,null,false);});
+    /* a meccs-jutalom: realisztikus módban a gép dönt, a készültség marad */
+    {const oA=skillRealAuto,oT=showSkillTypePick,oP=skillRealPlan;let auto=null,tipus=0;
+     skillRealPlan=()=>({mode:"auto",skill:sk,target:null});
+     skillRealAuto=(s2,r,sn,d)=>{auto=[d,sn];};showSkillTypePick=()=>{tipus++;};
+     grantSkillDecide(sk,"match",3,()=>{},1,null,false);
+     window._meccs={auto,tipus};skillRealAuto=oA;showSkillTypePick=oT;skillRealPlan=oP;}
+    /* a kihívás-jutalom sora */
+    {const q0=(S.pendingRewardSkills||[]).length;
+     try{const rw={type:"skill",kind:"skill"};const f=(typeof applyChallengeReward==="function")?applyChallengeReward:null;
+       if(f)f(rw);}catch(e){}
+     const q=S.pendingRewardSkills||[];window._sor=q.length>q0?q[q.length-1].reason:"nincs";
+     S.pendingRewardSkills=[];}
+    grantSkillDecide(sk,"challenge",3,()=>{window._kesz++;},1,null,false);});
   await p.waitForTimeout(300);
   const a=await p.evaluate(()=>{
     const bs=[...$("skillAssignList").querySelectorAll("button")].map(b=>b.textContent);
     return {latszik:!$("scSkill").classList.contains("hide"),bs};});
-  ok(a.latszik&&/A sorsolt/.test(a.bs[0]||"")&&a.bs.filter(t=>/képességből/.test(t)).length>=2,"realisztikus módban is: előbb a sorsolt képesség vagy egy kategória",a.bs);
+  const mc=await p.evaluate(()=>({m:window._meccs,sor:window._sor}));
+  ok(mc.m.tipus===0&&mc.m.auto&&mc.m.auto[0]===1,"meccs-jutalom: realisztikus módban a gép dönt, a készültség 1/3 marad",mc.m);
+  ok(mc.sor==="challenge","a kihívás-jutalom skillje „challenge” okkal kerül a sorba",mc.sor);
+  ok(a.latszik&&/A sorsolt/.test(a.bs[0]||"")&&a.bs.filter(t=>/képességből/.test(t)).length>=2,"kihívás-jutalom, realisztikus módban is: előbb a sorsolt képesség vagy egy kategória",a.bs);
   /* egy kategória választása */
   await p.evaluate(()=>{const b=[...$("skillAssignList").querySelectorAll("button")].find(x=>/képességből/.test(x.textContent));b.click();});
   await p.waitForTimeout(2500);

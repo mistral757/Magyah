@@ -133,14 +133,33 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* 7. a realisztikus „nem te döntesz" sorsolás */
     hit=0;for(let i=0;i<N;i++){const sk=skillRealDrawBiased();if(sk&&sk.id===cel.id)hit++;}
     ki.rb10=hit/N;
-    /* 8. 🎖 3.9.343 — minden jutalomnál te választasz (kategória → ember), kész képesség */
+    /* 8. 2. hatás (3.9.348-tól ismét: a NEM kihívás-jutalmaknál) */
+    S.skillReal=true;
+    const oPlan=skillRealPlan,oDraw=showSkillDraw,oAuto=skillRealAuto;
+    let te=0,gep=0;
+    skillRealPlan=()=>({mode:"auto",skill:cel,target:null});
+    showSkillDraw=()=>{te++;};
+    skillRealAuto=()=>{gep++;};
+    const oLock=S.chSkillPickLock;S.chSkillPickLock=0;
+    for(let i=0;i<400;i++)grantSkillDecide(cel,"match",1,()=>{},1,null,false);
+    ki.te10=te;ki.gep10=gep;
+    celSkState("villam").lvl=1;te=0;gep=0;
+    for(let i=0;i<2000;i++)grantSkillDecide(cel,"match",1,()=>{},1,null,false);
+    ki.te1=te/2000;
+    celSkState("villam").lvl=10;te=0;gep=0;
+    skillRealPlan=()=>({mode:"auto",skill:masik,target:null});
+    for(let i=0;i<200;i++)grantSkillDecide(masik,"match",1,()=>{},1,null,false);
+    ki.teMas=te;
+    skillRealPlan=oPlan;showSkillDraw=oDraw;skillRealAuto=oAuto;S.chSkillPickLock=oLock;
+    S.skillReal=false;
+    /* 🎖 3.9.348 — a KIHÍVÁS-jutalom: realisztikus módban is te választasz, kész képesség */
     {let tipus=0,draw=0,auto=0,done=null;
      const oT=showSkillTypePick,oD=showSkillDraw,oA=skillRealAuto;
      showSkillTypePick=(r,sn,d)=>{tipus++;done=[d,sn];};showSkillDraw=()=>{draw++;};skillRealAuto=()=>{auto++;};
-     S.skillReal=true;const oLock=S.chSkillPickLock;S.chSkillPickLock=0;
-     for(let i=0;i<50;i++)grantSkillDecide(cel,"match",3,()=>{},1,null,false);
+     S.skillReal=true;const oLock2=S.chSkillPickLock;S.chSkillPickLock=0;
+     for(let i=0;i<50;i++)grantSkillDecide(cel,"challenge",3,()=>{},1,null,false);
      ki.mindig={tipus,draw,auto,done};
-     showSkillTypePick=oT;showSkillDraw=oD;skillRealAuto=oA;S.chSkillPickLock=oLock;S.skillReal=false;}
+     showSkillTypePick=oT;showSkillDraw=oD;skillRealAuto=oA;S.chSkillPickLock=oLock2;S.skillReal=false;}
     /* 9. nincs jogosult → nem céloz */
     {const oE=eligibleForSkill;
      eligibleForSkill=sk=>sk&&sk.id===cel.id?[]:oE(sk);
@@ -165,7 +184,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(t.r10>0.72&&t.r10<0.83,"10. szinten a húzások ~75%-a a célzott képesség",t.r10);
   ok(t.r1>0.13&&t.r1<0.25&&t.r0<0.08,"1. szinten ~15% (+ a véletlen), célzás nélkül csak az alapesély",{r1:t.r1,r0:t.r0});
   ok(t.rb10>0.72&&t.rb10<0.83,"a realisztikus „nem te döntesz” sorsolás is céloz",t.rb10);
-  ok(t.mindig.tipus===50&&t.mindig.auto===0&&t.mindig.done[0]===3,"3.9.343: realisztikus módban is mindig te választasz (kategória → ember), és a képesség kész (3/3)",t.mindig);
+  ok(t.te10===400&&t.gep10===0,"10. szinten a célzott képességnél mindig te választod, ki kapja",{te:t.te10,gep:t.gep10});
+  ok(t.te1>0.21&&t.te1<0.29,"1. szinten ~25%-ban te választasz",t.te1);
+  ok(t.teMas===0,"más képességnél a gép döntése marad");
+  ok(t.mindig.tipus===50&&t.mindig.auto===0&&t.mindig.done[0]===3,"3.9.348: a kihívás-jutalomnál realisztikus módban is te választasz (kategória → ember), és a képesség kész (3/3)",t.mindig);
   ok(t.nincsJog===0,"akinek nincs jogosultja, arra nem céloz");
   ok(t.mentve&&!t.mentHiba,"a mentés viszi a célzást",t.mentHiba);
 
