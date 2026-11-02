@@ -158,6 +158,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       window.setTimeout=function(f,ms,...a){return _st.call(this,f,(ms>=3000&&ms<60000)?15:ms,...a);};
       window.setInterval=function(f,ms,...a){return _si.call(this,f,(ms>=3000&&ms<60000)?15:ms,...a);};}
     S.subPlanAsked=h2hKey();
+    /* ⚔ 3.9.352 — a bajnoki mérleg a párharc előtt */
+    S.W=10;S.D=3;S.L=2;S.GF=30;S.GA=12;S.pts=33;S.fixtureResults=(S.fixtureResults||[]).filter(f=>!f.duel);
+    window.__merleg0=JSON.stringify([S.W,S.D,S.L,S.GF,S.GA,S.pts,S.fixtureResults.length]);
     const o={esed:svPhEsedekes(),duel:h2hIsDuelRound(),key:h2hKey(),home:h2hHostIsSimHome(),label:kickBtnLabel(),
       penz0:Math.round(S.transferBudget||0)};
     return o;});
@@ -179,6 +182,16 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
    const n=Math.min(la_.length,lg_.length);
    const tukor=n>=17&&la_.slice(0,n).every((x,i)=>x!=null&&lg_[i]!=null&&Math.abs(x+lg_[i]-1)<1e-9);
    ok(tukor,"párharcban a momentum a közös λ-ból: a két gép aránya vödrönként tükörkép",{n,a:la_.slice(0,4),g:lg_.slice(0,4)});}
+  {const mm=pp=>pp.evaluate(()=>({elotte:window.__merleg0,utana:JSON.stringify([S.W,S.D,S.L,S.GF,S.GA,S.pts,S.fixtureResults.length]),duelSor:S.fixtureResults.some(f=>f.duel)}));
+   const ma=await mm(p),mg=await mm(g);
+   ok(ma.elotte===ma.utana&&mg.elotte===mg.utana&&!ma.duelSor&&!mg.duelSor,"3.9.352: a párharc-nap NEM kerül a bajnoki mérlegbe (GY/D/V, gólok, pont, fordulók) — egyik gépen sem",{ma,mg});
+   /* a régi, beszámolt párharc-sor betöltéskor kikerül */
+   const jv=await p.evaluate(()=>{S.fixtureResults.push({o:{n:"⚔"},gf:2,ga:1,home:true,duel:true,round:16});S.W++;S.GF+=2;S.GA+=1;S.pts=3*S.W+S.D;
+     const n=svPhPontJavit();return {n,most:JSON.stringify([S.W,S.D,S.L,S.GF,S.GA,S.pts,S.fixtureResults.length]),elotte:window.__merleg0,ujra:svPhPontJavit()};});
+   ok(jv.n===1&&jv.most===jv.elotte&&jv.ujra===0,"3.9.352: a már beszámolt párharc-sor a javítással kikerül (idempotens)",jv);
+   /* hardcore / közös bajnokságban a párharc a 30 forduló része: számít */
+   const hc=await p.evaluate(()=>{const v=S.mpVilag,m=mpSv;S.mpVilag=null;mpSv=()=>false;const r=svPhNemSzamit({duel:true});S.mpVilag=v;mpSv=m;return r;});
+   ok(hc===false,"közös bajnokságban (hardcore) a párharc továbbra is a bajnoki mérlegbe számít",hc);}
   ok(ra.idx===15&&rg.idx===15&&ra.esed===0&&!/PÁRHARC/.test(ra.label),"nem bajnoki forduló: az S.idx marad, utána a 16. forduló jön",{idx:ra.idx,label:ra.label});
   {const w=ra.m&&ra.m.gf>ra.m.ga,d=ra.m&&ra.m.gf===ra.m.ga;
    ok(ra.M&&ra.M.p===(w?3:d?1:0)&&rg.M.p===(ra.m.ga>ra.m.gf?3:d?1:0),"a párharc-mérleg 3/1/0 pontot könyvel mindkét oldalon",{a:ra.M,g:rg.M});
