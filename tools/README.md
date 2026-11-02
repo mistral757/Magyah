@@ -405,13 +405,29 @@ node tools/skill-jutalom-3-9-343-proba.js
 
 * A kihívás-jutalom kész képesség, kategória- és címzett-választással minden módban; a meccs-jutalom realisztikus módban a gépé marad, a megadott készültséggel.
 
+## stadion-real-3-9-357-proba.js — 🏟️ törzsszurkolók és hiányfelár
+
+```
+node tools/stadion-real-3-9-357-proba.js
+```
+
+* A törzs görbéje (60 ezerig a tábor 60%-a, fölötte lassul); a kereslet a törzs 55–100%-a; a hiányfelár (tábor/törzs)^0,6, legfeljebb 1,8; a tábor növekedése változatlan; a lelátó pénze korán és egy 300 ezres táborral a régihez mérve; a stadion-doboz kiírja a törzset és a felárat.
+
+## osztaly-lepcso-3-9-356-proba.js — 🪜 nehézségfüggő osztálylépcső, a világ idény közbeni emelése
+
+```
+node tools/osztaly-lepcso-3-9-356-proba.js
+```
+
+* A lépcső 1–3: 3,0 · 4–6: 3,5 · 7–8: 4,0 · 9–10: 4,5; új 2. és 8. fokozatú karrier világának mért lépcsője; a világ emelése (gyorsítás + követés, adósság nélkül) a létra többi osztályán; a feljutási pótlék (8. fokozaton 1,0, maradás/kiesés/régi szerződés 0); a fokozat-választó felirata.
+
 ## felzarkoztatas-3-9-347-proba.js — 🆙 felzárkóztatás a párharc után
 
 ```
 node tools/felzarkoztatas-3-9-347-proba.js
 ```
 
-* Pontosan az alacsonyabb ⚡-ú fél kap ajánlatot (egyenlőnél, hardcore-ban, szoba nélkül senki); N boost → −N×0,1 Run, N ingyen sima boost, a Run-nál többet nem lehet; a Run-bontás sora és a valódi levonás; a HUB-kártya és a csúszkás ablak; egy valódi bajnoki után az ajánlat lejár.
+* Pontosan az alacsonyabb ⚡-ú fél kap ajánlatot (egyenlőnél, hardcore-ban, szoba nélkül senki); N boost → −N×0,1 Run; 3.9.354: egyszerre legfeljebb 5, csak a párharc szereplői (névsor), a társ párharckori ⚡-a +1-nél boostonként megáll; a Run-bontás sora és a valódi levonás; a HUB-kártya és a játékosonkénti számlálós ablak; 3.9.355: ötösével ismételhető, egy valódi bajnoki után is él, a következő párharc váltja le.
 
 ## sima-gol-3-9-346-proba.js — ⚽ a sima gól: védők, csatár-mozdulat, passz
 

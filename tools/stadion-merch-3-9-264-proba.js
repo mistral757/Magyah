@@ -74,8 +74,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* 3. kereslet */
     const T=stadionState();
     S.fanBase=100000;T.kap=STAD_KAP.length-1;
-    T.forma=[3,3,3,3,3];T.uj=[2000,2000,2000,2000,2000];ki.jo={a:stadionKeresletArany(),n:stadionNezo()};
-    T.forma=[0,0,0,0,0];T.uj=[0,0,0,0,0];ki.rossz={a:stadionKeresletArany(),n:stadionNezo()};
+    T.forma=[3,3,3,3,3];T.uj=[2000,2000,2000,2000,2000];ki.jo={a:stadionKeresletArany(),n:stadionNezo(),torzs:lelatoTorzs()};
+    T.forma=[0,0,0,0,0];T.uj=[0,0,0,0,0];ki.rossz={a:stadionKeresletArany(),n:stadionNezo(),torzs:lelatoTorzs()};
     T.kap=2;T.forma=[3,3,3,3,3];T.uj=[2000,2000,2000,2000,2000];ki.korlat={n:stadionNezo(),kap:stadionKap()};
     /* 4. kalibráció (közepes forma: 2 győzelem, 2 döntetlen, 1 vereség, mérsékelt beáramlás) */
     const kozep=()=>{T.forma=[3,1,3,1,0];T.uj=[1,1,1,1,1].map(()=>Math.round(fanBase()*0.004));};
@@ -226,8 +226,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("=== 2. plafon ===");
   ok(r.max===120000&&r.maxAr===null&&r.maxBovit===false,"legfeljebb 120 ezer férőhely, a tetején nincs tovább",{max:r.max,ar:r.maxAr});
   console.log("=== 3. kereslet ===");
-  ok(r.jo.a===1&&r.jo.n===100000,"5 győzelem + sok új szurkoló: a teljes tábor jönne (tele a stadion)",r.jo);
-  ok(r.rossz.a<=0.31&&r.rossz.n<=31000,"5 vereség, új szurkoló nélkül: a tábornak csak ~30%-a",r.rossz);
+  /* 🏟️ 3.9.357 — a kereslet a TÖRZSSZURKOLÓKHOZ mér, nem a teljes táborhoz */
+  ok(r.jo.a===1&&r.jo.n===r.jo.torzs&&r.jo.n<100000,"5 győzelem + sok új szurkoló: a törzs mind jön (3.9.357 óta a teljes tábor sosem)",r.jo);
+  ok(Math.abs(r.rossz.a-0.55)<1e-9&&r.rossz.n===Math.round(r.rossz.torzs*0.55),"5 vereség, új szurkoló nélkül: a törzsnek csak 55%-a",r.rossz);
   ok(r.korlat.n===r.korlat.kap,"a néző sosem több a férőhelynél",r.korlat);
   console.log("=== 4. kalibráció a régihez ===");
   ok(r.kal.korai>=0.85&&r.kal.korai<=1.05,"korán (8 ezres tábor, 5 ezres stadion, merch 0): ~90–100%",r.kal.korai);
