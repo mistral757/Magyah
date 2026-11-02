@@ -60,7 +60,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     $("skillSpinName").textContent="?";
     if(lanc)_uto={seed:"12345",n:0};
     let kesz=null;
-    const go=()=>grantSkillDecide(sk,"challenge",3,()=>{},1,null,false);
+    /* 3.9.343: a kapu előbb a kategória-választót nyitja; a pörgetés a showSkillDraw-é */
+    const go=()=>showSkillDraw(sk,"challenge",3,()=>{},3,null);
     if(lanc)utoLepes(go);else go();
     const s=[];
     for(let i=0;i<40&&$("skillSpinBtn").classList.contains("hide")===false;i++){

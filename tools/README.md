@@ -389,6 +389,64 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## felzarkoztatas-3-9-347-proba.js — 🆙 felzárkóztatás a párharc után
+
+```
+node tools/felzarkoztatas-3-9-347-proba.js
+```
+
+* Pontosan az alacsonyabb ⚡-ú fél kap ajánlatot (egyenlőnél, hardcore-ban, szoba nélkül senki); N boost → −N×0,1 Run, N ingyen sima boost, a Run-nál többet nem lehet; a Run-bontás sora és a valódi levonás; a HUB-kártya és a csúszkás ablak; egy valódi bajnoki után az ajánlat lejár.
+
+## sima-gol-3-9-346-proba.js — ⚽ a sima gól: védők, csatár-mozdulat, passz
+
+```
+KEPEK=/valami/mappa node tools/sima-gol-3-9-346-proba.js
+```
+
+* Passz-döntés (saját gól: a sor gólpasszadója; kapott gól: rögzített mag), két védő minden változatban, passzoló csak passznál; a labda a passzolótól a ráfutó csatárhoz, onnan a célzott cellába; a hang két rúgás + háló; passz nélkül csel és a védő a csel irányába; a fejes, a tizenegyes és a szabadrúgás változatlan. `KEPEK` megadásával képkockákat ment a lejátszóból.
+
+## fekvo-menu-tartalom-3-9-345-proba.js — 🖥️ fekve a menü tartalma a középső sávban
+
+```
+node tools/fekvo-menu-tartalom-3-9-345-proba.js
+```
+
+* 1366×768 és 844×390: a Csapatstílus törzse a jobb oszlop fölött lebeg, teljes szélességben; a ✕ Bezár és egy másik menüpont becsukja; a talizmán- és a csapat-panel ablaka a jobb oszlopot tölti ki; a felállásváltó széles. Állva (390×844) semmi nem változik.
+
+## talizman-fuzio-3-9-344-proba.js — 🧬 a fúzió nem gyengébb a két külön lapnál
+
+```
+node tools/talizman-fuzio-3-9-344-proba.js
+```
+
+* Ritkaság-párokra (1+1, 2+2, 3+3, 4+1, 4+4, 1+3), üres és 3 lapos kategóriában: a fúzió utáni alaphatás ≥ a két külön lapé, a darabszám azonos, a special legalább olyan erős; ahol a ritkaság-ugrás magától nyer, nincs pótlék; a gomb kimondja a garanciát.
+
+## rivalis-strigula-3-9-344-proba.js — ⚔️ rivális-skalp a meccs pillanatában
+
+```
+node tools/rivalis-strigula-3-9-344-proba.js
+```
+
+* Valódi bajnoki meccs után a rekord (`S.fixtureResults`) viszi a lefújáskor mért `rival` jelzőt.
+* A „Győzz le N rivális erejű ellenfelet" számlálója ezt nézi: a keret utólagos erősödése nem veszi el a strigulát, a gyengülése nem csinál utólag skalpot; jelző nélküli régi rekordnál a korábbi becslés marad.
+* Az `eladas-kihivas-proba.js` 1b szakasza a „Szabadulj meg tőle" (tensionOut) első-licites határidejét méri.
+
+## kupa-dij-3-9-342-proba.js — 💰 kupa-díj fordulónként
+
+```
+node tools/kupa-dij-3-9-342-proba.js
+```
+
+* A díj = sorozat-súly × elért kör: a KK negyeddöntő > OJK győzelem; a KK csoportköre is fizet, a selejtező és a felkészülési kupa nem. Minden sorozat monoton, a sorozatok sorrendje áll; a valódi zárás (euroCampaignEndNow) így fizet.
+
+## kezdo-osztaly-3-9-342-proba.js — 🏟 kezdő osztály a PvP gyors indításon
+
+```
+node tools/kezdo-osztaly-3-9-342-proba.js
+```
+
+* Közös karrierben az Egyéb lapon D1–D6 választó; a szoba mezőjébe és a beállítás-csomagba kerül. Egyjátékosban és dinamikus módban nincs.
+
 ## dg-javitas-3-9-340-proba.js — 🩹 a felfújt 1. idényes rés-változás javítása
 
 ```

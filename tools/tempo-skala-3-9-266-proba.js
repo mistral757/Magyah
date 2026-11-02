@@ -65,7 +65,7 @@ const {spawn}=require('child_process');
   const varT={0.25:[0.5,1320],1.5:[3,220],0.1:[0.2,3300],1:[2,330]};
   ok("régi érték ×2, a tempó betűre a régi",out.atszamol.every(x=>x.v===varT[x.regi][0]&&x.tick===varT[x.regi][1]&&x.v2===String(varT[x.regi][0])));
   ok("ha a v2 él, az nyer",out.v2nyer===0.4);
-  ok("a párharc fix ütemét nem érinti (3300 ms)",F.h2h===3300);
+  ok("a párharc fix ütemét nem érinti (az új skála 0,1×-e: 6600 ms, 3.9.343)",F.h2h===6600);
   ok("nincs oldalhiba",hiba.length===0);
 
   console.log(JSON.stringify(out,null,1));
