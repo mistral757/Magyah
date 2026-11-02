@@ -405,6 +405,14 @@ node tools/skill-jutalom-3-9-343-proba.js
 
 * A kihívás-jutalom kész képesség, kategória- és címzett-választással minden módban; a meccs-jutalom realisztikus módban a gépé marad, a megadott készültséggel.
 
+## osztaly-lepcso-3-9-356-proba.js — 🪜 nehézségfüggő osztálylépcső, a világ idény közbeni emelése
+
+```
+node tools/osztaly-lepcso-3-9-356-proba.js
+```
+
+* A lépcső 1–3: 3,0 · 4–6: 3,5 · 7–8: 4,0 · 9–10: 4,5; új 2. és 8. fokozatú karrier világának mért lépcsője; a világ emelése (gyorsítás + követés, adósság nélkül) a létra többi osztályán; a feljutási pótlék (8. fokozaton 1,0, maradás/kiesés/régi szerződés 0); a fokozat-választó felirata.
+
 ## felzarkoztatas-3-9-347-proba.js — 🆙 felzárkóztatás a párharc után
 
 ```
