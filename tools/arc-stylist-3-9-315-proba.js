@@ -113,7 +113,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const L=FACE_ARCFORMAK.map((a,i)=>{const t=T(i);return [t.fejW,t.allW,t.fejTop,t.allY,t.allCsucs,t.allHegy,t.homlok].map(x=>Math.round(x*100)).join(",");});
     const regiMentes=fedArcKod({fejW:27.8,allW:22.24});
     return {db:FACE_ARCFORMAK.length,kul:new Set(L).size,regiMentes,ujNev:FACE_ARCFORMAK.slice(3).map(a=>a[0])};});
-  ok(r3.db===8&&r3.kul===8,"8 arcforma, mind más fejet ad",r3);
+  /* ✂️ 3.9.351: a gyémánt kivéve (a sor a tömbben marad, a szív alakú rajzolódik helyette) */
+  ok(r3.db===8&&r3.kul===7,"8 arcforma-sor, 7 különböző fej (a gyémánt 3.9.351 óta a szív alakúval rajzolódik)",r3);
   ok(r3.regiMentes===2,"a 3.9.315 előtti (fejW-s) mentés a régi „széles” formára olvas",r3.regiMentes);
 
   console.log("\n— 4. a vonás-mag —");
@@ -141,11 +142,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     sor.click();await new Promise(r=>setTimeout(r,60));o.mag=_fed.vazlat.vonas;
     $("fedVonas").click();await new Promise(r=>setTimeout(r,60));o.mag2=_fed.vazlat.vonas;
     $("fedVonas0").click();await new Promise(r=>setTimeout(r,60));o.vissza=_fed.vazlat.vonas===undefined;
-    for(let i=0;i<8;i++){fedLep("arc",1);}o.arcF=_fed.vazlat.arcF;o.nincsFejW=_fed.vazlat.fejW===undefined;
+    for(let i=0;i<7;i++){fedLep("arc",1);}o.arcF=_fed.vazlat.arcF;o.nincsFejW=_fed.vazlat.fejW===undefined;
     fedVeletlen();o.veletlenMag=_fed.vazlat.vonas>0;
     fedBezar();return o;});
   ok(r5.van&&r5.mag>0&&r5.mag2>0&&r5.mag!==r5.mag2&&r5.vissza,"🎲 pörget (minden kattintás új mag), ↺ visszaáll a név szerintire",r5);
-  ok(r5.arcF===7&&r5.nincsFejW,"az Arcforma sor az új formákra lép (8. lépés: gyémánt)",r5);
+  ok(r5.arcF===6&&r5.nincsFejW,"az Arcforma sor az új formákra lép (7. lépés: szív alakú — a gyémánt 3.9.351 óta nincs a kínálatban)",r5);
   ok(r5.veletlenMag,"a 🎲 Véletlen gomb a vonás-magot is pörgeti",r5.veletlenMag);
 
   console.log("\n— 6. a közös lista mint alap —");
