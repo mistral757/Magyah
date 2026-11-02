@@ -18,7 +18,10 @@
         a névsoron lévő kaphat;
      4. a HUB-on a Run-mérő alatt a kártya, a gomb a játékosonkénti
         számlálós ablakot nyitja, és a megerősítés végrehajtja;
-     5. egy valódi bajnoki meccs után az ajánlat lejár; nincs oldalhiba. */
+     5. (3.9.355) „miután vett 5öt, vehet újra 5öt, ötösével, ameddig akar a
+        két párharc között, amíg ez a feltétel teljesül" — ötösével ismételhető,
+        egy valódi bajnoki után is él, a következő párharc váltja le; nincs
+        oldalhiba. */
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT=process.env.MROOT||"/home/user/Magyah", PORT=9347;
 const {chromium}=require("/opt/node22/lib/node_modules/playwright");
@@ -164,9 +167,19 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(/^5 \/ 5 boost — 0,5 Run/.test(r4.tx||"")&&/^4 \/ 5 boost — 0,4 Run/.test(r4.tx2||""),"a számlálók 5-nél megállnak, az összesítő követi",{tx:r4.tx,tx2:r4.tx2});
   ok(Math.abs(r4.felz-0.4)<1e-9&&r4.db===4&&r4.n0&&r4.n1,"a megerősítés a kiválasztottakra osztja ki",r4);
 
-  console.log("\n— 5. lejár a következő bajnokin —");
-  await p.evaluate(()=>{S.felzark={sn:S.seasonNumber||1,my:90,op:95,at:Date.now(),db:0,nevek:[]};
-    S.auto=false;S.halftimeSubs=false;try{subPlanState().rules=[];}catch(e){}
+  console.log("\n— 5. ötösével újra és újra, a következő párharcig (3.9.355) —");
+  const r5a=await p.evaluate(()=>{
+    const o={};S.runFelzark=0;
+    _felzNevekMost=window._felzNevekBe.slice();felzAjanl({myMatch:80,oppMatch:95});
+    const n=window._felzNevekBe;
+    o.v1=felzVesz([{n:n[0],db:5}]);o.max1=felzMax();
+    o.v2=felzVesz([{n:n[1],db:5}]);o.max2=felzMax();
+    o.v3=felzVesz([{n:n[2],db:5}]);
+    o.felz=S.runFelzark;o.db=S.felzark.db;
+    return o;});
+  ok(r5a.v1.ok&&r5a.v2.ok&&r5a.v3.ok&&r5a.max1===5&&r5a.max2===5&&r5a.db===15&&Math.abs(r5a.felz-1.5)<1e-9,
+    "5 után újra 5, majd újra 5 (a plafon alatt) — 15 boost, −1,5 Run",r5a);
+  await p.evaluate(()=>{S.auto=false;S.halftimeSubs=false;try{subPlanState().rules=[];}catch(e){}
     window.__n0=S.fixtureResults.length;playMatch();});
   {const t0=Date.now();let kesz=false;
    while(!kesz&&Date.now()-t0<150000){
@@ -174,8 +187,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
        for(const id of ["subPanelSkip","halfSubSkip","guideTipOk","talDrawLater","unlockOk","skillOk"]){const x=document.getElementById(id);if(x&&x.offsetParent)x.click();}
        return !S.playing&&S.fixtureResults.length>window.__n0;});
      if(!kesz)await p.waitForTimeout(500);}}
-  const r5=await p.evaluate(()=>({felz:S.felzark}));
-  ok(r5.felz===null,"egy bajnoki után az ajánlat lejárt",r5);
+  const r5=await p.evaluate(()=>{const o={felz:S.felzark&&{op:S.felzark.op,db:S.felzark.db},max:felzMax()};
+    /* a következő párharc leváltja: most ő a magasabb → nincs új ajánlat, a régi megszűnik */
+    felzAjanl({myMatch:99,oppMatch:95});o.utana=S.felzark;return o;});
+  ok(r5.felz&&r5.felz.op===95&&r5.felz.db===15&&r5.max>0,"egy bajnoki után az ajánlat megmarad, és tovább lehet venni",r5);
+  ok(r5.utana===null,"a következő párharc leváltja az ajánlatot",r5.utana);
   ok(!errs.length,"nincs oldalhiba",errs.slice(0,5));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

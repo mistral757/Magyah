@@ -411,7 +411,7 @@ node tools/skill-jutalom-3-9-343-proba.js
 node tools/felzarkoztatas-3-9-347-proba.js
 ```
 
-* Pontosan az alacsonyabb ⚡-ú fél kap ajánlatot (egyenlőnél, hardcore-ban, szoba nélkül senki); N boost → −N×0,1 Run; 3.9.354: egyszerre legfeljebb 5, csak a párharc szereplői (névsor), a társ párharckori ⚡-a +1-nél boostonként megáll; a Run-bontás sora és a valódi levonás; a HUB-kártya és a játékosonkénti számlálós ablak; egy valódi bajnoki után az ajánlat lejár.
+* Pontosan az alacsonyabb ⚡-ú fél kap ajánlatot (egyenlőnél, hardcore-ban, szoba nélkül senki); N boost → −N×0,1 Run; 3.9.354: egyszerre legfeljebb 5, csak a párharc szereplői (névsor), a társ párharckori ⚡-a +1-nél boostonként megáll; a Run-bontás sora és a valódi levonás; a HUB-kártya és a játékosonkénti számlálós ablak; 3.9.355: ötösével ismételhető, egy valódi bajnoki után is él, a következő párharc váltja le.
 
 ## sima-gol-3-9-346-proba.js — ⚽ a sima gól: védők, csatár-mozdulat, passz
 

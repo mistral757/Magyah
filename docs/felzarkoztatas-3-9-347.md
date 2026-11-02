@@ -8,7 +8,8 @@
 > **3.9.354 óta:** egyszerre legfeljebb 5 boost, csak a párharc szereplőinek,
 > és a társ párharckori ⚡-a +1-nél megáll. A boost közvetlenül a
 > felzárkóztatás ablakában történik, ingyen-zseton nélkül. Részletek:
-> `docs/felzarkoztatas-3-9-354.md`.
+> `docs/felzarkoztatas-3-9-354.md`. **3.9.355 óta** ötösével ismételhető, és
+> az ajánlat a következő párharcig él (a bajnoki nem viszi el).
 
 ## Ki kapja
 
