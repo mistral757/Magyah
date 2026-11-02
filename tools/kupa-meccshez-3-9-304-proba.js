@@ -107,6 +107,26 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 3. az edzői elemzés a kupameccsre —");
   const e=await p.evaluate(()=>{const M=edzoKovetkezoMeccs();return {van:!!M,ellen:M&&M.fx.o.n,kulcs:M&&M.kulcs};});
   ok(e.van&&e.ellen==="Teszt Kupacsapat FC"&&/:e:[A-Z]+:[a-z0-9]+:\d+:0:Teszt Kupacsapat FC$/.test(e.kulcs),"az edzői elemzés a kupameccsre szól (3.9.314: a kulcsban sorozat, szakasz, kör, index, ellenfél)",e);
+  console.log("\n— 4. 🩹 3.9.343: hiányzó-panel → HUB → vissza a kupához —");
+  const h=await p.evaluate(async()=>{const o={};
+    S.playing=false;
+    const n=slots.find(x=>x.player&&x.pos!=="KP").player.n;
+    S.unavailable={};S.unavailable[n]={reason:"injury",matchesLeft:2};
+    /* a valódi út: „Irány a meccs" → a meccsnézetből indul a kezdőrúgás */
+    $("scEuro").classList.add("hide");$("scSim").classList.remove("hide");
+    _kupaElo=true;kupaInditas();
+    o.panel=!$("absPanel").classList.contains("hide");
+    $("absHubBtn").click();
+    await new Promise(r=>setTimeout(r,150));
+    o.hub=!$("scHub").classList.contains("hide");
+    hubMidSeasonReturn();
+    await new Promise(r=>setTimeout(r,150));
+    o.euro=!$("scEuro").classList.contains("hide");o.sim=!$("scSim").classList.contains("hide");
+    /* újra elindítható: a kupa kezdőrúgása a panelt ismét felkínálja */
+    kupaInditas();o.ujra=!$("absPanel").classList.contains("hide");
+    $("absPanel").classList.add("hide");S.unavailable={};
+    return o;});
+  ok(h.panel&&h.hub&&h.euro&&!h.sim&&h.ujra,"kupameccs hiányzóval: a panelről a HUB-ba, onnan vissza a kupa-képernyőre, és a kezdőrúgás újra indítható",h);
 
   console.log("\n— 4. vissza a kupa-táblához —");
   const v=await p.evaluate(()=>{const o={};const s0=window._ses;

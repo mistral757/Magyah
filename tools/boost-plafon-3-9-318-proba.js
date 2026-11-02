@@ -29,8 +29,8 @@
         kompenzációt nem emeli meg kétszer; kupában és osztályozóban nem hat;
      8. a záró rés a követés és az adósság NÉLKÜL mér; a beárazható
         növekedés teteje 20;
-     9. futó (régi szerződésű) karrierben magától nem él; a nyári ablak
-        gombjával bekapcsolható, és a következő kezdőrúgástól él;
+     9. futó karrierben is magától él a következő kezdőrúgástól (3.9.343:
+        nincs bekapcsoló gomb);
     10. közös karrierben csak akkor, ha mindkét kézfogás-rekord kéri;
     11. a mérő naplózza a boostokat és a követést (a feltöltés ezt viszi);
     12. nincs oldalhiba. */
@@ -234,23 +234,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const r9=await p.evaluate(async()=>{
     const o={};
     const P=S.pyr;delete P.kovetV;delete P.kovetKer;
+    /* 🎯 3.9.343 — futó karrierben is MAGÁTÓL él a következő kezdőrúgástól (nincs gomb) */
     S.seasonNumber=5;S.idx=0;const H=pyrFloorHist();delete H[5];
-    pyrFloorKickoff();o.regi=!H[5].kov;
-    /* a téli felmérés a régi szerződésben fut */
-    o.telFut=pyrFloorMid()!==null;
-    /* a nyári ablak gombja */
+    window._nlog=[];
+    pyrFloorKickoff();o.auto=!!(H[5].kov&&P.kovetV===1);
+    o.naplo=window._nlog.some(t=>/magától él/.test(t));
+    o.telNem=pyrFloorMid()===null;   /* a téli felmérést a követés váltja */
     S.seasonClosed=true;S.idx=30;
     nfOffer(()=>{},false);
     await new Promise(r=>setTimeout(r,200));
-    const btn=document.querySelector("#nfKovBtn");o.gomb=!!btn;
-    if(btn)btn.click();
-    o.ker=!!P.kovetKer;
-    const btn2=document.querySelector("#nfKovBtn");o.gombSzoveg=btn2&&btn2.textContent;
+    o.gomb=!!document.querySelector("#nfKovBtn");
     $("scUnlock").classList.add("hide");
-    S.seasonNumber=6;S.idx=0;delete H[6];
-    window._nlog=[];
-    pyrFloorKickoff();o.bekapcs=!!(H[6].kov&&P.kovetV===1&&!P.kovetKer);
-    o.naplo=window._nlog.some(t=>/Bekapcsolva: folyamatos rés-követés/.test(t));
     /* közös karrier: a kézfogás */
     const A={mstr:110,str:108,vall:0.4,mz:109,mzV:1,osztV:1,kov:1,season:7},B=Object.assign({},A,{kov:1}),C=Object.assign({},A,{kov:0});
     const p1=pyrSuperPairStash(A,B);o.par1=!!(p1&&p1.kov);
@@ -261,9 +255,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.mpNem=!rec.kov&&window._nlog.some(t=>/nem él/.test(t));
     const rec2={dgBecsles:5};nfKovIndit(rec2,7,true,{kov:true});o.mpIgen=!!rec2.kov;
     return o;});
-  ok(r9.regi&&r9.telFut,"futó (régi szerződésű) karrierben magától nem él, a téli felmérés marad",r9);
-  ok(r9.gomb&&r9.ker&&/Bekapcsolva/.test(r9.gombSzoveg||""),"a nyári célrés-ablakban bekapcsolható",{gomb:r9.gomb,ker:r9.ker,sz:r9.gombSzoveg});
-  ok(r9.bekapcs&&r9.naplo,"a következő kezdőrúgástól él (végleges), és a napló kimondja",{b:r9.bekapcs,n:r9.naplo});
+  ok(r9.auto&&r9.naplo&&r9.telNem,"futó karrierben is magától él a következő kezdőrúgástól (3.9.343), a napló kimondja, a téli felmérést váltja",r9);
+  ok(!r9.gomb,"a nyári ablakban nincs bekapcsoló gomb (nincs mit választani)",{gomb:r9.gomb});
   ok(r9.par1&&!r9.par2,"közös karrierben a kézfogás csak akkor indítja, ha mindkét rekord kéri",{p1:r9.par1,p2:r9.par2});
   ok(r9.mpNem&&r9.mpIgen,"ha a társ nem kéri, abban az idényben nem él (napló), ha igen, elindul",{nem:r9.mpNem,igen:r9.mpIgen});
 
