@@ -80,6 +80,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
      if(!kesz)await p.waitForTimeout(500);}}
   const r1=await p.evaluate(()=>{const z=meresSzezon();const r=z.m[z.m.length-1];const s=ntSor(r,z.m);return {r,s};});
   ok(typeof r1.r.mo==="number"&&typeof r1.r.vn==="number"&&typeof r1.r.mzMs==="number"&&typeof r1.r.mz==="number","a sor viszi: ⚡ a pályán, pálya-eltolás, „mezőny most\", osztályközép",r1.r);
+  ok(typeof r1.r.hub==="number"&&Math.abs(r1.r.hub-(r1.r.mo-(r1.r.fo||0)))<1.0,"3.9.350: valódi meccsen a kezdőrúgáskori HUB-szám és a motor száma (forma nélkül) egyezik",{hub:r1.r.hub,mo:r1.r.mo,fo:r1.r.fo||0});
   ok(Math.abs(r1.s.resPalya-(r1.r.d-r1.r.vn))<1e-9,"rés a pályán = motor-különbség − pálya-eltolás",r1.s);
 
   console.log("\n— 2–4. az ablak két idény adatából —");
@@ -119,9 +120,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.zaras=/záró rés \+3,9/.test(t)&&/rés-változása \+2,5/.test(t);
     o.svg=!!B.querySelector("svg path");
     /* a „Most" kártya: a panel 118, az utolsó 5 ellenfél ~108,6 → figyelmeztet */
-    const oM=oppMatchStrength;oppMatchStrength=()=>118;
-    nehezTortNyit();o.figy=/⚠ A pályára lépő ellenfelek átlaga/.test($("nehezModalBody").textContent);
-    oppMatchStrength=oM;
+    /* a 2. idény szintetikus sorain a mért rés (motor, forma nélkül) 1,0-val tér el a HUB-étól → szól */
+    o.figy=/Mérési eltérés/.test(t)&&/mérési eltérés/.test(t);
+    /* ha a motor száma = a HUB száma, „egyezik" */
+    M.sz[1].m.forEach(r=>{if(typeof r.mo==="number")r.mo=r.ms;});
+    nehezTortNyit();o.egyezik=/A HUB és a pálya egyezik/.test($("nehezModalBody").textContent)&&!/Mérési eltérés/.test($("nehezModalBody").textContent);
     /* a 2. idény első blokkja: rés pályán = átlag(d − vn) */
     const rows=M.sz[1].m.filter(r=>r.k==="liga"&&!r.pd&&r.i<=5);
     o.vart=rows.reduce((a,r)=>a+(r.d-r.vn),0)/rows.length;
@@ -134,8 +137,33 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r2.rajt&&r2.zaras,"rajt és zárás a kalibrálással és a mért változással",r2);
   ok(r2.parharc&&r2.kupa,"párharc és kupa külön sorban",r2);
   ok(r2.svg,"a karrier-görbe kirajzolódik",r2.svg);
-  ok(r2.figy,"a „Most” kártya figyelmeztet a tartós eltérésre",r2.figy);
-  ok(new RegExp(String(Math.round(r2.vart*10)/10).replace(".",",")).test(r2.blokkSor||""),"a blokk „rés pályán” átlaga a d − pálya átlaga",{vart:r2.vart,sor:r2.blokkSor});
+  ok(r2.figy,"a „Most” kártya és a blokk is jelzi a mérési eltérést (HUB vs. pálya)",r2.figy);
+  ok(r2.egyezik,"ha a motor és a HUB egyezik, a kártya ezt mondja, és nincs figyelmeztetés",r2.egyezik);
+  ok(new RegExp(String(Math.round(r2.vart*10)/10).replace(".",",")).test(r2.blokkSor||""),"a blokk „rés aznap” átlaga a d − pálya átlaga",{vart:r2.vart,sor:r2.blokkSor});
+
+  console.log("\n— 7. 3.9.350: a rés-követés a pályát méri —");
+  const r7=await p.evaluate(()=>{
+    const o={};
+    o.kepl=nfKovMertNyers({mo:100,fo:2,mzMs:97,ko:0.5});
+    o.nincs=nfKovMertNyers({d:3});
+    const oR=nfKovRec,oL=levelGap,oK=nfKovOff,oA=addLine,oi=S.idx;
+    const rec={kov:{rajt:0,dgB:0,tur:0,emel:[],ad:0,g:{}}};const sorok=[];
+    nfKovRec=()=>rec;levelGap=()=>0;nfKovOff=()=>0;addLine=(x)=>{sorok.push(String(x));};
+    S.idx=3;nfKovForduloUtan({mo:100,fo:0,mzMs:96,ko:0});
+    o.g3=rec.kov.g[3];o.gm3=rec.kov.gm&&rec.kov.gm[3];
+    S.idx=4;nfKovForduloUtan(null);o.g4=rec.kov.g[4];
+    S.idx=5;rec.kov.g={};rec.kov.gm={};
+    [3,4].forEach(j=>{rec.kov.g[j]=2;rec.kov.gm[j]=0;});
+    nfKovForduloUtan({mo:100,fo:0,mzMs:98,ko:0});
+    o.szolt=sorok.some(x=>/Mérési eltérés \(5\. forduló\)/.test(x));
+    o.emel=(rec.kov.emel||[]).length;
+    nfKovRec=oR;levelGap=oL;nfKovOff=oK;addLine=oA;S.idx=oi;
+    return o;});
+  ok(r7.kepl===1.5&&r7.nincs===null,"mért nyers rés = (⚡ pályán − forma) − „mezőny most” + követés",r7);
+  ok(r7.g3===4&&r7.gm3===0,"a rés-követés a motor számát jegyzi fel, a modellét összevetésnek",r7);
+  ok(r7.g4===0,"mért adat nélkül (párharc, régi hívó) a modell marad",r7);
+  ok(r7.szolt,"tartós eltérésnél a napló szól",r7);
+  ok(r7.emel===1,"az emelés a mért résből dől el",r7);
   console.log("\n— 6. a mérés a meccs erősítésével —");
   const r6=await p.evaluate(()=>{
     const o={};const hm=hiddenMatchBonus;
