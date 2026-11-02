@@ -389,6 +389,14 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## sima-gol-3-9-346-proba.js — ⚽ a sima gól: védők, csatár-mozdulat, passz
+
+```
+KEPEK=/valami/mappa node tools/sima-gol-3-9-346-proba.js
+```
+
+* Passz-döntés (saját gól: a sor gólpasszadója; kapott gól: rögzített mag), két védő minden változatban, passzoló csak passznál; a labda a passzolótól a ráfutó csatárhoz, onnan a célzott cellába; a hang két rúgás + háló; passz nélkül csel és a védő a csel irányába; a fejes, a tizenegyes és a szabadrúgás változatlan. `KEPEK` megadásával képkockákat ment a lejátszóból.
+
 ## fekvo-menu-tartalom-3-9-345-proba.js — 🖥️ fekve a menü tartalma a középső sávban
 
 ```

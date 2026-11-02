@@ -109,7 +109,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const rp=await jelenet({...E,t:"sarga",seq:6});
   ok(rp.ids.includes("aSipRovid")&&rp.ids.includes("aLap"),"lap: síp + a lap suhanása",rp.ids);
   /* a terv (a kulcskockákból) és a valódi megszólalás ugyanazt az időt adja */
-  const elter=[rg,rk,rs].map(r=>{const m=[];r.sz.forEach(([ms,id])=>{const t=r.terv.find(x=>x[1]===id);if(t)m.push(Math.abs(ms-t[0]));});return Math.max(0,...m);});
+  /* 3.9.346: egy hang többször is szólhat egy jeleneten belül (a sima gólnál a
+     passz ÉS a lövés is rúgás) — a legközelebbi azonos tervezett hanghoz mérünk */
+  const elter=[rg,rk,rs].map(r=>{const m=[];r.sz.forEach(([ms,id])=>{const T=r.terv.filter(x=>x[1]===id);
+    if(T.length)m.push(Math.min(...T.map(t=>Math.abs(ms-t[0]))));});return Math.max(0,...m);});
   ok(elter.every(x=>x<200),"a hang a kulcskocka idején szól (≤200 ms eltérés, sebesség-szorzóval)",elter);
   const golRug=rg.sz.find(x=>x[1]==="aRugas"),golHalo=rg.sz.find(x=>x[1]==="aHalo");
   ok(golRug&&golHalo&&golRug[0]<golHalo[0],"a rúgás előbb szól, mint a háló",{golRug,golHalo});

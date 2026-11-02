@@ -88,7 +88,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const ev4={t:"golKapott",side:"them",p:"Ellenfél csatára",min:80,seq:20};
     const c4=evaKontextus(ev4);
     ki.g4=c4.stab.v;
-    ki.g4Hatul=c4.stab.v.length===1&&hatul.some(x=>x.n===c4.stab.v[0]);
+    /* 3.9.346: a sima gól két védőt mutat — az első a hátsó sorunkból */
+    ki.g4Hatul=c4.stab.v.length>=1&&c4.stab.v.length<=2&&hatul.some(x=>x.n===c4.stab.v[0]);
     ki.g4Vedo=c4.vedoUrl.fej===evaFig(evaJatekos(c4.stab.v[0],"us"),mi,-.2).fej;
     /* 5. az ellenfél kapusának bravúrja: a mi lövőnk is a mieink közül */
     const ev5={t:"bravur",side:"them",p:"Ellenfél kapusa",min:40,seq:9};
