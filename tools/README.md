@@ -389,6 +389,14 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## fekvo-menu-tartalom-3-9-345-proba.js — 🖥️ fekve a menü tartalma a középső sávban
+
+```
+node tools/fekvo-menu-tartalom-3-9-345-proba.js
+```
+
+* 1366×768 és 844×390: a Csapatstílus törzse a jobb oszlop fölött lebeg, teljes szélességben; a ✕ Bezár és egy másik menüpont becsukja; a talizmán- és a csapat-panel ablaka a jobb oszlopot tölti ki; a felállásváltó széles. Állva (390×844) semmi nem változik.
+
 ## talizman-fuzio-3-9-344-proba.js — 🧬 a fúzió nem gyengébb a két külön lapnál
 
 ```
