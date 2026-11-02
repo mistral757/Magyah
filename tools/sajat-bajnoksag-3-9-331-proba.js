@@ -198,6 +198,16 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
    const nyert=w?ra:(ra.m.ga>ra.m.gf?rg:null),nyertPrep=w?pa:pg;
    ok(!nyert||nyert.penz>nyertPrep.penz0,"a győztes párharc-díjat kap",nyert?{elotte:nyertPrep.penz0,utana:nyert.penz}:"döntetlen");}
   ok(/párharc-mérleg/.test(ra.log||""),"a napló kiírja az eredményt és a mérleget",ra.log);
+   /* 🆙 3.9.347 — a felzárkóztatás ajánlata MINDEN párharc után: pontosan az
+      alacsonyabb ⚡-ú fél kapja (a két gép ugyanabból a két számból dönt) */
+   {const fz=pp=>pp.evaluate(()=>({f:S.felzark,log:(window._nlog||[]).filter(t=>/Felzárkóztatás/.test(t)).length,
+      html:!!felzHtml(),max:felzMax(),run:(()=>{try{return runBreakdown().total;}catch(e){return null;}})()}));
+    const fa=await fz(p),fg=await fz(g);
+    const egyenlo=fa.f==null&&fg.f==null;
+    const egy=(!!fa.f)!==(!!fg.f);
+    const also=fa.f?fa:fg.f?fg:null;
+    ok(egy||egyenlo,"15. forduló utáni párharc: pontosan az egyik fél kap felzárkóztatási ajánlatot",{a:fa,g:fg});
+    ok(!also||(also.f.my<also.f.op&&also.log>=1&&also.html),"15. forduló utáni párharc: az alacsonyabb ⚡-ú kapja, a napló szól, a HUB-kártya megjelenik",also);}
 
   const r6=await p.evaluate(()=>{
     S.idx=30;S.seasonClosed=false;const o={};
@@ -225,7 +235,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
    const x8=pp=>pp.evaluate(()=>({m:S.svPh.m["6:q1"],idx:S.idx,esed:svPhEsedekes(),label:kickBtnLabel()}));
    const ra8=await x8(p),rg8=await x8(g);
    ok(k8&&ra8.m.gf===rg8.m.ga&&ra8.m.ga===rg8.m.gf&&ra8.idx===8&&ra8.esed===0&&!/PÁRHARC/.test(ra8.label),
-     "a 8. forduló utáni párharc lefut mindkét gépen, tükörben; utána a 9. bajnoki jön",{a:ra8,g:rg8});}
+     "a 8. forduló utáni párharc lefut mindkét gépen, tükörben; utána a 9. bajnoki jön",{a:ra8,g:rg8});
+   /* 🆙 3.9.347 — a felzárkóztatás ajánlata MINDEN párharc után: pontosan az
+      alacsonyabb ⚡-ú fél kapja (a két gép ugyanabból a két számból dönt) */
+   {const fz=pp=>pp.evaluate(()=>({f:S.felzark,log:(window._nlog||[]).filter(t=>/Felzárkóztatás/.test(t)).length,
+      html:!!felzHtml(),max:felzMax(),run:(()=>{try{return runBreakdown().total;}catch(e){return null;}})()}));
+    const fa=await fz(p),fg=await fz(g);
+    const egyenlo=fa.f==null&&fg.f==null;
+    const egy=(!!fa.f)!==(!!fg.f);
+    const also=fa.f?fa:fg.f?fg:null;
+    ok(egy||egyenlo,"8. forduló utáni párharc: pontosan az egyik fél kap felzárkóztatási ajánlatot",{a:fa,g:fg});
+    ok(!also||(also.f.my<also.f.op&&also.log>=1&&also.html),"8. forduló utáni párharc: az alacsonyabb ⚡-ú kapja, a napló szól, a HUB-kártya megjelenik",also);}}
 
   console.log("— 6. a közös kupa relatív mezőnnyel —");
   const kPrep=(pp,nev,comp)=>pp.evaluate(([nev,comp])=>{
