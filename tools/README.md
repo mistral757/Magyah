@@ -389,6 +389,14 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## nehezseg-tortenet-3-9-349-proba.js — 📊 a nehézség története mérve + a rés-mérés javítása
+
+```
+KEPEK=/valami/mappa node tools/nehezseg-tortenet-3-9-349-proba.js
+```
+
+* Egy valódi meccs sora viszi a kezdőrúgás tényleges számait; a létra gombja megnyitja az ablakot; két idény adatából rajt, 5 fordulós blokkok, események (rés-követés, téli felmérés, boost-adósság), zárás, párharc és kupa külön; görbe és eltérés-figyelmeztetés. A javítás: idényben a „mezőny most” ugyanazt a befagyasztott erősítést használja, mint a meccs, nyáron a mostanit.
+
 ## skill-jutalom-3-9-343-proba.js — 🎖 a kihívás-jutalom skillje (3.9.348-tól csak az)
 
 ```
