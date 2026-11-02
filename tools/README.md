@@ -405,6 +405,14 @@ node tools/skill-jutalom-3-9-343-proba.js
 
 * A kihívás-jutalom kész képesség, kategória- és címzett-választással minden módban; a meccs-jutalom realisztikus módban a gépé marad, a megadott készültséggel.
 
+## stadion-real-3-9-357-proba.js — 🏟️ törzsszurkolók és hiányfelár
+
+```
+node tools/stadion-real-3-9-357-proba.js
+```
+
+* A törzs görbéje (60 ezerig a tábor 60%-a, fölötte lassul); a kereslet a törzs 55–100%-a; a hiányfelár (tábor/törzs)^0,6, legfeljebb 1,8; a tábor növekedése változatlan; a lelátó pénze korán és egy 300 ezres táborral a régihez mérve; a stadion-doboz kiírja a törzset és a felárat.
+
 ## osztaly-lepcso-3-9-356-proba.js — 🪜 nehézségfüggő osztálylépcső, a világ idény közbeni emelése
 
 ```
