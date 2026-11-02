@@ -7907,7 +7907,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.346";
+const APP_VERSION="3.9.347";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -84245,8 +84245,12 @@ function playMatchMotor(){
     if(euroActive()||pyrPoActive()){S.playing=false;updateStanding();updateMorale();tacticTrainAfterMatch(gf,ga);}
     /* 🌍 3.9.331 — a saját bajnokság párharc-napja: nincs bajnoki léptetés,
        nincs tabella — a mérlegbe és a pénztárba könyvelünk */
-    else if(svDuelNow()){S.playing=false;tacticTrainAfterMatch(gf,ga);svPhRogzit(gf,ga,DUEL&&DUEL.oppName);updateStanding();updateMorale();}
+    else if(svDuelNow()){S.playing=false;tacticTrainAfterMatch(gf,ga);svPhRogzit(gf,ga,DUEL&&DUEL.oppName);updateStanding();updateMorale();
+      try{felzAjanl(DUEL);}catch(e){}}   /* 🆙 3.9.347 */
     else{S.idx++;S.playing=false;tacticTrainAfterMatch(gf,ga);updateStanding();updateMorale();
+      /* 🆙 3.9.347 — a felzárkóztatás ajánlata a következő bajnokiig él; a
+         közös bajnokság könnyed párharca (DUEL) maga is ajánlatot adhat */
+      try{if(DUEL)felzAjanl(DUEL);else if(S.felzark)S.felzark=null;}catch(e){}
       /* RIVÁLIS + BAJNOKI NARRATÍVA: a fordulót MÁR lekönyveltük (S.idx nőtt),
          tehát az élő tabella a friss állást mutatja — innen jön a rangadó utáni
          kommentár, a bajnokavatás és a dinamikus szezonhír. */
@@ -101351,8 +101355,14 @@ function runBreakdown(){
   /* A TETŐ 100 — kivéve a mínuszos nehézségi fokokon (3.9.130), ahol minden
      tized lépcső +10-et nyit rajta (diffRunTop). */
   const top=(capInfo&&capInfo.top)?capInfo.top:100;
-  const total=Math.max(0,Math.min(top,perf*cap*rt));
-  return {rows,total,perf,cap,top,retune:rt,retunes:_pyr?pyrRetuneCount():0,
+  /* 🆙 3.9.347 — A FELZÁRKÓZTATÁS ÁRA: a párharc után vett sima boostok
+     Run-pontban (0,1 / boost), a kész számból — a plafon és a hangolás UTÁN,
+     hogy pontosan annyit vigyen, amennyit a felület ígér. */
+  const felz=Math.max(0,+S.runFelzark||0);
+  const total=Math.max(0,Math.min(top,perf*cap*rt)-felz);
+  if(felz>0)rows.push({k:"felzark",n:"Felzárkóztatás",w:0,s:0,
+    d:`−${String(Math.round(felz*10)/10).replace(".",",")} Run-pont · ${Math.round(felz*FELZ_BOOST_PER_RUN)} sima boost a párharcok után`});
+  return {rows,total,perf,cap,top,retune:rt,retunes:_pyr?pyrRetuneCount():0,felzark:felz,
     capParts:capInfo?capInfo.parts:null,
     missing:Object.keys(RUN_MILESTONES).filter(k=>!R.ms[k])};}
 /* A határidő-sor előállítása. Három állapota van, és mindhárom mást mond:
@@ -104727,7 +104737,9 @@ function renderRunMeter(){
     try{localStorage.setItem("30-0-runboard-open",cur?"0":"1");}catch(e){}
     renderRunMeter();};
   /* 🌍 3.9.331 — saját bajnokságban a Run-mérő alá a párharc-lap */
-  try{if(mpSv())box.insertAdjacentHTML("beforeend",svParharcLapHtml());}catch(e){}}
+  try{if(mpSv())box.insertAdjacentHTML("beforeend",svParharcLapHtml());}catch(e){}
+  /* 🆙 3.9.347 — a felzárkóztatás ajánlata */
+  try{const h=felzHtml();if(h){box.insertAdjacentHTML("beforeend",h);const b=$("felzBtn");if(b)b.onclick=felzNyit;}}catch(e){}}
 /* ================= HUB MENÜ + HARMONIKA =================
    A menü csak egy BURKOLAT a meglévő gombok köré: egyetlen kattintás-kezelőt
    és egyetlen láthatóság-szabályt sem írtunk át. A renderHub() sosem építi újra
@@ -126853,6 +126865,7 @@ function saveGame(){
         /* 🌍 3.9.331 — a párharc-napok és a Run-összevetés (3.9.333: eddig kimaradt
            a mentésből — frissítés után a lejátszott párharc-nap újra esedékes lett) */
         svPh:S.svPh||null,svRun:S.svRun||null,
+        felzark:S.felzark||null,runFelzark:S.runFelzark||0,   /* 🆙 3.9.347 — felzárkóztatás */
         mxExtra:S.mxExtra||null,   /* 🔍 3.9.334 — a nem-xG gólok mért rátája */
         chKinal:S.chKinal||null,   /* 🔁 3.9.333 — a félbehagyott kihívás-ajánlat */
         edzo:S.edzo||null,   /* 👔 3.9.300 — az edző szintje, irányai, a meccs elemzései */
@@ -129464,6 +129477,77 @@ function svKupaEltolas(M,comp){
   try{if(!mpSv()||!M||!M.mateSvMids||typeof M.mid!=="number")return 0;
     const t=M.mateSvMids[comp];
     return (typeof t==="number"&&isFinite(t))?M.mid-t:0;}catch(e){return 0;}}
+/* ================= 🆙 FELZÁRKÓZTATÁS A PÁRHARC UTÁN (3.9.347) =================
+   KIMONDOTT KÉRÉS: „Minden párharc után, könnyed módban, legyen felajánlva az
+   alacsonyabb szinten járó csapatnak, hogy felzárkóztatást kérhessen. Ára: Run
+   szint pontok. Módja, sima boostok, 1 teljes Run szint 10 sima boost, azaz
+   0.1 Run színtért lehet venni 1 sima boostot ilyenkor."
+     · KI KAPJA: akinek a párharcban kisebb volt a ⚡ meccs-ereje. A két szám a
+       közös pillanatképekből jön (DUEL.myMatch / DUEL.oppMatch), tehát a két
+       gépen UGYANAZ a döntés születik: pontosan az egyikük kapja (egyenlőnél
+       senki). Hardcore szobában és kupa-párharcban nincs ajánlat.
+     · MEDDIG ÉL: a következő bajnoki meccsig (a 30. forduló utáni párharc
+       ajánlata a nyáron át, a következő idény első bajnokijáig).
+     · AZ ÁR: 0,1 Run-pont / sima boost, a Run kész számából (runBreakdown).
+       Legfeljebb annyi, amennyi Run-pontod van.
+     · A BOOST: ingyen-zsetonként érkezik (S.chFreeBoost.plain) — a Boost-
+       központban a sima boost ára 0, és te választod ki, kire megy. A
+       párharcba számít; a bajnokin a szokásos boost-adósság szabálya él. */
+const FELZ_BOOST_PER_RUN=10;
+function felzKonnyed(){
+  try{if(typeof mpHardcore==="function"&&mpHardcore())return false;
+    return mpSv()||(typeof h2hRoomActive==="function"&&h2hRoomActive());}catch(e){return false;}}
+function felzAjanl(D){
+  if(!D||!felzKonnyed())return null;
+  try{if(euroActive()||pyrPoActive())return null;}catch(e){}
+  const my=+D.myMatch,op=+D.oppMatch;
+  if(!isFinite(my)||!isFinite(op))return null;
+  const r1=x=>Math.round(x*10)/10;
+  if(r1(my)>=r1(op)){S.felzark=null;return null;}
+  S.felzark={sn:S.seasonNumber||1,my:r1(my),op:r1(op),at:Date.now(),db:0};
+  try{addLine(`🆙 <b>Felzárkóztatás</b>: a párharcban a ⚡ meccs-erőd ${String(r1(my)).replace(".",",")} volt, `
+    +`a társadé ${String(r1(op)).replace(".",",")}. A következő bajnokiig sima boostot vehetsz Run-pontért `
+    +`(<b>0,1 Run / boost</b>) — a HUB-on, a Run-mérő alatt.`,"m ev");}catch(e){}
+  return S.felzark;}
+function felzAktiv(){return !!(S&&S.felzark&&felzKonnyed());}
+function felzMax(){
+  let r=0;try{r=runBreakdown().total||0;}catch(e){r=0;}
+  return Math.max(0,Math.floor(r*FELZ_BOOST_PER_RUN+1e-9));}
+function felzVesz(db){
+  db=Math.floor(+db||0);
+  if(!felzAktiv()||db<=0)return {ok:false,miert:"nincs ajánlat"};
+  const mx=felzMax();if(db>mx)return {ok:false,miert:"nincs ennyi Run-pontod"};
+  const ar=db/FELZ_BOOST_PER_RUN;
+  S.runFelzark=Math.round(((+S.runFelzark||0)+ar)*1000)/1000;
+  S.chFreeBoost=S.chFreeBoost||{};S.chFreeBoost.plain=(S.chFreeBoost.plain||0)+db;
+  S.felzark.db=(S.felzark.db||0)+db;
+  try{addLine(`🆙 <b>Felzárkóztatás: ${db} sima boost</b> a Boost-központban ingyen vár — `
+    +`ára <b>${String(Math.round(ar*10)/10).replace(".",",")} Run-pont</b>.`,"m life");}catch(e){}
+  try{saveGame();}catch(e){}
+  return {ok:true,db,ar};}
+function felzHtml(){
+  if(!felzAktiv())return "";
+  const F=S.felzark,mx=felzMax(),sz=x=>String(x).replace(".",",");
+  return `<div class="infoCard" id="felzBox" style="margin:8px 0;font-size:12.5px;line-height:1.5;border-left:3px solid var(--gold)">
+    <div class="infoCardH">🆙 Felzárkóztatás a párharc után</div>
+    <div>A párharcban a ⚡-od <b>${sz(F.my)}</b> volt, a társadé <b>${sz(F.op)}</b>. A következő bajnokiig
+      sima boostot vehetsz <b>Run-pontért</b>: 1 boost = 0,1 Run, 1 teljes Run-szint = 10 boost.
+      A boostok ingyen-zsetonként a Boost-központba kerülnek — te döntöd el, kire mennek.</div>
+    ${F.db?`<div style="color:var(--dim)">Ebből az ajánlatból eddig: ${F.db} boost.</div>`:""}
+    ${mx>0?`<button type="button" class="btn-s" id="felzBtn" style="width:100%;margin-top:6px">🆙 Felzárkóztatást kérek (legfeljebb ${mx} boost)</button>`
+      :`<div style="color:var(--dim2)">Nincs elég Run-pontod.</div>`}</div>`;}
+function felzNyit(){
+  const mx=felzMax();if(!mx)return;
+  const alap=Math.min(5,mx);
+  askConfirm({title:"Felzárkóztatás — hány sima boost?",yes:"Megveszem",
+    html:`<div style="font-size:13px;line-height:1.55">1 sima boost = <b>0,1 Run-pont</b>. A boostok a Boost-központban várnak, ingyen.<br><br>`
+      +`<input type="range" id="felzDb" min="1" max="${mx}" value="${alap}" style="width:100%">`
+      +`<div id="felzDbTx" style="text-align:center;font-weight:700;margin-top:4px">${alap} boost — ${String(alap/10).replace(".",",")} Run</div></div>`,
+    onYes:()=>{const v=+(($("felzDb")||{}).value||0);const r=felzVesz(v);
+      if(!r.ok)try{addLine(`🆙 ${esc(r.miert||"")}.`,"m ev");}catch(e){}
+      try{renderHub();}catch(e){}}});
+  const inp=$("felzDb"),tx=$("felzDbTx");
+  if(inp&&tx)inp.oninput=()=>{tx.textContent=`${inp.value} boost — ${String(Math.round(inp.value)/10).replace(".",",")} Run`;};}
 function svPhRogzit(gf,ga,tars){
   const n=svPhEsedekes();if(!n)return;
   const P=svPhAll(),sn=S.seasonNumber||1,M=P.merleg;

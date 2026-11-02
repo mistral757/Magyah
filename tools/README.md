@@ -389,6 +389,14 @@ node tools/momentum-3-9-275-proba.js [kép-mappa]
 * A modell: a gólvárhatóság fel-le billenti, az alapvonal a meccsvégi birtoklás képletéből, a gól kilengése lecseng, folytonos, a meccs véletlenjéhez nem nyúl; összecsukható, az állapot megmarad.
 * Az animáció-kapcsoló a fejlécben (összecsukva is): meccs közben azonnal hat, ugyanaz, mint a Beállításokban; gyors tempón figyelmeztet; „kevesebb mozgás" esetén alapból KI.
 
+## felzarkoztatas-3-9-347-proba.js — 🆙 felzárkóztatás a párharc után
+
+```
+node tools/felzarkoztatas-3-9-347-proba.js
+```
+
+* Pontosan az alacsonyabb ⚡-ú fél kap ajánlatot (egyenlőnél, hardcore-ban, szoba nélkül senki); N boost → −N×0,1 Run, N ingyen sima boost, a Run-nál többet nem lehet; a Run-bontás sora és a valódi levonás; a HUB-kártya és a csúszkás ablak; egy valódi bajnoki után az ajánlat lejár.
+
 ## sima-gol-3-9-346-proba.js — ⚽ a sima gól: védők, csatár-mozdulat, passz
 
 ```
