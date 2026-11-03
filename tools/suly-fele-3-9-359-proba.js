@@ -6,8 +6,9 @@
 
    Amit mér:
      1. a súly fele-fele: (indító + záró) / 2;
-     2. a nyárzáró értékelés (hubShowSeasonReportBody) az advanceCareerSeason
-        UTÁN méri a záró nevezési meccs-erőt;
+     2. a nyárzáró értékelés (hubShowSeasonReportBody) a szezonkártyák
+        kiosztása (és a kártya-fejlesztések) UTÁN méri a záró nevezési
+        meccs-erőt (3.9.360 — 3.9.359-ben még a kártyák előtt);
      3. a mérés felülírja a 30. fordulós zárót (a régi megmarad zaro30-ként),
         idényenként egyszer, és a közös karrier saját záró értéke is ez;
      4. a mentésbe kerül; nincs oldalhiba. */
@@ -63,8 +64,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const r=await p.evaluate(()=>{const o={};
     o.fele=mpMsSuly(135.1,114.7);
     const src=hubShowSeasonReportBody.toString();
-    const iA=src.indexOf("advanceCareerSeason()"),iZ=src.indexOf("nfZaroUtanRogzit(");
-    o.sorrend=iA>0&&iZ>iA;
+    const iA=src.indexOf("advanceCareerSeason()"),iK=src.indexOf("determineSeasonCards()"),iD=src.indexOf("drainPendingCardUps(cardResults)"),iZ=src.indexOf("nfZaroUtanRogzit(");
+    o.sorrend=iA>0&&iK>iA&&iD>iK&&iZ>iD&&src.indexOf("nfZaroUtanRogzit(",iZ+1)<0;
     const H=pyrFloorHist(),sn=S.seasonNumber||1;
     H[sn]=Object.assign(H[sn]||{},{zaroMs:100});
     S.zaroUtan=null;
@@ -76,7 +77,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     saveGame();let mentve=false;try{for(let i=0;i<localStorage.length;i++){const t=localStorage.getItem(localStorage.key(i));if(t&&t.indexOf('"zaroUtan":{')>=0){mentve=true;break;}}}catch(e){}
     o.mentve=mentve;return o;});
   ok(Math.abs(r.fele-124.9)<1e-9,"fele-fele: (135,1 + 114,7) / 2 = 124,9",r.fele);
-  ok(r.sorrend,"a nyárzáró értékelés az öregedés és az éves fejlődés UTÁN méri a zárót",r.sorrend);
+  ok(r.sorrend,"a nyárzáró értékelés a szezonkártyák (és a kártya-fejlesztések) UTÁN méri a zárót — 3.9.360",r.sorrend);
   ok(r.u1&&r.u1.ms===112.3&&r.h1.zaroMs===112.3&&r.h1.zaro30===100&&r.h1.utan===1,"a mérés felülírja a 30. fordulós zárót (a régi zaro30-ként megmarad)",r.h1);
   ok(r.u2.ms===112.3&&r.h2===112.3,"idényenként egyszer: a jelentés újranyitása nem méri újra",{u2:r.u2,h2:r.h2});
   ok(r.mp===112.3,"a közös karrier saját záró értéke is a nyárzáró utáni",r.mp);
