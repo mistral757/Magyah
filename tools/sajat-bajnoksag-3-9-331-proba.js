@@ -255,6 +255,26 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ok(!also||(Array.isArray(also.f.nevek)&&also.xi.every(n=>also.f.nevek.indexOf(n)>=0)&&also.f.nevek.length>=also.xi.length&&also.jel>=also.xi.length&&also.max<=5),
       "8. forduló utáni párharc: a felzárkóztatás címzettjei a párharc szereplői, egyszerre legfeljebb 5",also&&{nevek:also.f.nevek.length,xi:also.xi.length,jel:also.jel,max:also.max});}}
 
+  /* ⚔ 3.9.362 — „Nem volt párharc a 15 és 23 forduló után sem. Mi lett vele?"
+     — az elmaradt nap pótolható (idx ≥ nap), sorrendben; offline jelzés */
+  {const r=await p.evaluate(()=>{const o={};
+     const keep=JSON.parse(JSON.stringify(S.svPh));
+     S.seasonNumber=6;S.seasonClosed=false;S.playing=false;phase="season";
+     S.svPh={v:1,m:{"6:q1":{gf:1,ga:0}},merleg:{w:1,d:0,l:0,gf:1,ga:0,p:3},r:{6:[8,15,23,30]}};
+     S.idx=20;o.e20=svPhEsedekes();o.l20=kickBtnLabel();
+     S.svPh.m["6:q2"]={gf:0,ga:0};o.e20b=svPhEsedekes();
+     S.idx=23;o.e23=svPhEsedekes();
+     S.idx=29;delete S.svPh.m["6:q2"];o.e29=svPhEsedekes();
+     /* a szoba nem él: egyszer szól */
+     const _m=mpSv;mpSv=()=>false;S.svPhJelzett={};
+     const n0=(window._nlog||[]).length;svPhElmaradtJelez();svPhElmaradtJelez();
+     o.jel=(window._nlog||[]).slice(n0).filter(t=>/párharc-nap most nem indulhat/.test(t)).length;
+     o.offEsed=svPhEsedekes();mpSv=_m;
+     S.svPh=keep;S.idx=8;return o;});
+   ok(r.e20===2&&/PÁRHARC-NAP II/i.test(r.l20),"a 15. forduló után elmaradt II. nap a 20. fordulóban is esedékes (pótlás)",r);
+   ok(r.e20b===0&&r.e23===3&&r.e29===2,"pótlás után a következő nap a saját fordulójától; sorrendben a legelső hiányzó jön",r);
+   ok(r.jel===1&&r.offEsed===0,"ha a szoba nem él, a nap nem indul, de a napló egyszer kimondja",r);}
+
   console.log("— 6. a közös kupa relatív mezőnnyel —");
   const kPrep=(pp,nev,comp)=>pp.evaluate(([nev,comp])=>{
     teamName=nev;S.seasonNumber=3;S.idx=30;S.seasonClosed=true;S.mpCup=null;S.euro=null;

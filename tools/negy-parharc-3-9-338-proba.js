@@ -45,21 +45,31 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     try{euroActive=()=>false;}catch(e){}
     /* 1. régi idény (nincs rögzített menetrend): a régi két nap, a régi kulcsokkal */
     S.idx=15;ki.regi15={n:svPhEsedekes(),key:h2hKey()};
+    /* ⚔ 3.9.362 — az elmaradt nap pótlódik: a II. előtt az I.-et lejátszottnak vesszük */
+    svPhAll().m["2:1"]={gf:0,ga:0};
     S.idx=30;ki.regi30={n:svPhEsedekes(),utolso:svPhUtolso(svPhEsedekes())};
+    S.svPh=null;
     S.idx=8;ki.regi8=svPhEsedekes();
     /* 2. az idény első kezdőrúgása rögzíti az új rendet */
     S.idx=0;svPhRendRogzit();
     ki.rend=svPhRend(2);
     S.idx=5;S.svPh.r[3]=null;svPhRendRogzit();ki.kozben=!!(S.svPh.r[3]);   /* menet közben nem rögzít */
     /* 3. a négy nap: időpont, kulcs, hazai, felirat */
-    const nap=i=>{S.idx=i;const n=svPhEsedekes();
+    /* ⚔ 3.9.362 — minden korábbi nap lejátszva (különben a hiányzó pótlódna) */
+    const nap=i=>{S.idx=i;const M=svPhAll().m;Object.keys(M).forEach(k=>{delete M[k];});
+      [8,15,23,30].forEach((d,k)=>{if(d<i)M["2:q"+(k+1)]={gf:0,ga:0};});
+      const n=svPhEsedekes();
       return {n,key:n?h2hKey():null,hostHazai:n?h2hHostIsSimHome():null,cimke:n?kickBtnLabel():null,utolso:svPhUtolso(n)};};
     ki.n7=nap(7).n;ki.n8=nap(8);ki.n9=nap(9).n;ki.n15=nap(15);ki.n23=nap(23);ki.n30=nap(30);
     /* 4. a lejátszott nap nem jön újra; a mérleg könyvel */
     try{fanWeeklyIncome=()=>0;}catch(e){}
+    {const M=svPhAll().m;Object.keys(M).forEach(k=>{delete M[k];});}
     S.idx=8;svPhRogzit(2,1,"Társ FC");ki.m8=S.svPh.m["2:q1"];ki.ujra8=svPhEsedekes();
     ki.merleg=Object.assign({},S.svPh.merleg);
+    /* a II. és a III. közben lejátszva (a pótlás különben előbb őket kérné) */
+    S.svPh.m["2:q2"]={gf:0,ga:0};S.svPh.m["2:q3"]={gf:0,ga:0};
     S.idx=30;svPhRogzit(0,0,"Társ FC");ki.ujra30=svPhEsedekes();
+    delete S.svPh.m["2:q2"];delete S.svPh.m["2:q3"];
     /* 5. a párharc-lap mind a négy napot mutatja */
     let lap="";try{lap=svParharcLapHtml();}catch(e){lap="hiba:"+e;}
     ki.lap=/I: <b>2–1<\/b>/.test(lap)&&/II: —/.test(lap)&&/III: —/.test(lap)&&/IV: <b>0–0<\/b>/.test(lap);
