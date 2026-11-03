@@ -64,14 +64,14 @@ const KEP=process.argv[2]||null;
     o.nincsZaro=mpMsSuly(107,null);
     const A={mstr:107,str:100,mz:100,mzV:1},B={mstr:120,str:110,mz:114,mzV:1};
     const p1=pyrSuperPairMS(A,B),p2=pyrSuperPairMS(B,A);
-    o.avg=Math.round(p1.avg*100)/100;o.vart=Math.round(((107*1.25+100)/2.25+(120*1.25+114)/2.25)/2*100)/100;
+    o.avg=Math.round(p1.avg*100)/100;o.vart=Math.round(((107+100)/2+(120+114)/2)/2*100)/100;   /* 🧮 3.9.359 — fele-fele */
     o.tukor=Math.abs(p1.avg-p2.avg)<1e-9&&p1.suly===1&&p2.suly===1;
     const regi=pyrSuperPairMS({mstr:107,str:100},B);
     o.regi={avg:regi.avg,suly:regi.suly};
     const fel=pyrSuperPairMS({mstr:107,str:100,mz:100},B);   /* mzV nélkül */
     o.fel=fel.suly;
     return o;});
-  ok(r1.pelda===102.89,"(107×1,25+100)/2,25 − 1 = 102,89 (a kérés példája: 103,89 a súlyozott, −1 a célrés)",r1.pelda);
+  ok(r1.pelda===102.5,"3.9.359 óta fele-fele: (107+100)/2 − 1 = 102,5 (a 3.9.287-es példa ×1,25-tel 102,89 volt)",r1.pelda);
   ok(r1.nincsZaro===107,"záró érték nélkül az indító",r1.nincsZaro);
   ok(r1.avg===r1.vart&&r1.tukor,"a pár: a két súlyozott érték átlaga, tükörszimmetrikusan",r1);
   ok(r1.regi.suly===0&&r1.regi.avg===113.5&&r1.fel===0,"régi társnál (nincs mz/mzV) a régi képlet — mindkét gépen",r1);
@@ -162,7 +162,7 @@ const KEP=process.argv[2]||null;
     return o;});
   ok(r3.h&&r3.h.lift>0&&kozel(r3.res,r3.want,0.6),"a mezőny a SÚLYOZOTT átlagból áll be a rajt-célra",r3);
   ok(r3.h&&r3.h.suly&&r3.h.suly.wa===r3.wa&&r3.h.suly.wb===r3.wb&&typeof r3.h.rajtSzint==="number","az idény sora rögzíti a súlyozott számokat és a rajtszintet",r3.h);
-  ok(kozel(r3.megmarad,r3.nyari*(1/2.25),0.05),"a nyári +12-ből ≈44% (5,3) a tiéd marad",{megmarad:r3.megmarad});
+  ok(kozel(r3.megmarad,r3.nyari*(1/2),0.05),"a nyári +12-ből a fele (6) a tiéd marad (3.9.359 óta fele-fele)",{megmarad:r3.megmarad});
   ok(r3.naplo,"a napló kimondja a képletet");
 
   console.log("\n— 4. a relatív padló —");

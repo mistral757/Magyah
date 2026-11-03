@@ -405,6 +405,14 @@ node tools/skill-jutalom-3-9-343-proba.js
 
 * A kihívás-jutalom kész képesség, kategória- és címzett-választással minden módban; a meccs-jutalom realisztikus módban a gépé marad, a megadott készültséggel.
 
+## suly-fele-3-9-359-proba.js — 🧮 súlyozás fele-fele, nyárzáró utáni záróval
+
+```
+node tools/suly-fele-3-9-359-proba.js
+```
+
+* (indító + záró)/2; a záró az advanceCareerSeason UTÁN mérődik, felülírja a 30. fordulósat (zaro30 megmarad), idényenként egyszer; a közös karrier saját záró értéke is ez; mentésbe kerül.
+
 ## celres-suly-3-9-358-proba.js — 🧮 a célrés-ablak súlyozás-magyarázata
 
 ```

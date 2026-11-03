@@ -73,9 +73,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const b2=mpCelresBecsles(en2,Object.assign({},en2,{rajt:T.rajt}),-0.1,-0.1,{elore:false,rel:false});
     o.mezo2=b2.mezo;o.html2=celresLenyegHtml(b2,en2,null,"");
     pyrLevel=_pl;mpCelresRajt=_r;return o;});
-  ok(Math.abs(r.b.mezo-126.1)<0.06&&Math.abs(r.b.mezo-r.vart)<0.06,"a mezőny-szám a súlyozott ⚡ − rajt-cél (a bejelentett 126,1), a ⚖ már benne",{mezo:r.b.mezo,vart:r.vart,wE:r.b.wE});
-  ok(/Miért nem ~135,2/.test(r.html)&&/126,1/.test(r.html)&&/\+20,4/.test(r.html)&&/44%/.test(r.html)&&/rá már nem jön semmi/.test(r.html),
-    "az ablak kiírja a bontást: 135,2 helyett 126,1, a nyári +20,4 44%-a a tiéd",null);
+  ok(Math.abs(r.b.mezo-r.vart)<0.06&&Math.abs(r.b.mezo-125)<0.11,"a mezőny-szám a súlyozott ⚡ − rajt-cél (3.9.358-ban a bejelentett 126,1; 3.9.359 óta fele-fele: ~125,0), a ⚖ már benne",{mezo:r.b.mezo,vart:r.vart,wE:r.b.wE});
+  ok(/Miért nem ~135,2/.test(r.html)&&/\+20,4/.test(r.html)&&/50%/.test(r.html)&&/nyárzáró értékelés utáni/.test(r.html)&&/rá már nem jön semmi/.test(r.html),
+    "az ablak kiírja a bontást: 135,2 helyett a súlyozott, a nyári +20,4 fele (50%) a tiéd",null);
   ok(Math.abs(r.mezo2-135.2)<0.06&&!/Miért nem/.test(r.html2),"záró ⚡ nélkül a mezőny a mostani ⚡ − célrés, magyarázat nélkül",{mezo2:r.mezo2});
   ok(!errs.length,"nincs oldalhiba",errs.slice(0,5));
   await b.close();srv.close();
