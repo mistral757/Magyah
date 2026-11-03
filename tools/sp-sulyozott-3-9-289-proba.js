@@ -80,8 +80,8 @@ const KEP=process.argv[2]||null;
   ok(k1.suly===1&&k1.padlo===2,"az új karrier súlyozott képlettel fut",k1);
   const a=await rugas(true);
   ok(a.zaro===a.zaroVart&&a.zaro>0,"az idény vége rögzíti a záró nevezési meccs-erőt",{zaro:a.zaro,ms:a.msMost});
-  ok(a.h.suly&&a.h.suly.w===Math.round(((a.msMost*1.25)+(a.msMost-12))/2.25*10)/10,"a sor: (indító×1,25 + záró)/2,25",a.h.suly);
-  ok(Math.abs((a.gapUtan-12/2.25)-a.want)<=1.0,"a SÚLYOZOTT rés áll be a rajt-célra (a valódi rés ≈ +5,3-del nagyobb)",{gapUtan:a.gapUtan,want:a.want});
+  ok(a.h.suly&&a.h.suly.w===Math.round(((a.msMost)+(a.msMost-12))/2*10)/10,"a sor: (indító + záró)/2 (3.9.359 óta fele-fele)",a.h.suly);
+  ok(Math.abs((a.gapUtan-12/2)-a.want)<=1.0,"a SÚLYOZOTT rés áll be a rajt-célra (a valódi rés ≈ +6-tal nagyobb)",{gapUtan:a.gapUtan,want:a.want});
   ok(a.naplo,"a napló kimondja a képletet");
 
   console.log("\n— 4. régi szabály (ugyanaz a világ) —");
@@ -105,7 +105,7 @@ const KEP=process.argv[2]||null;
     try{const en0=mpCelresSajat();en0.mz=H[1].zaroMs;const c0=nfCelFor(pyrFloorUpcoming());
       o0=mpCelresBecsles(en0,{ms:en0.ms,mz:en0.mz,hid:en0.hid,rajt:mpCelresRajt(c0)},c0,c0,{elore:false,rel:false}).mi==="keplet";}catch(e){o0=false;}
     const o={keplet:o0,becsles:/várható meccs-ereje/.test(t()),szint:/A te meccs-erőd/.test(t()),sulyozott:/rés/.test(t()),
-      kimenet:!/feljutás ~|súlyozott|Mit jelent/.test(t()),dontes:true,zaro:true};
+      kimenet:!/feljutás ~|súlyozott|Mit jelent/.test(t().replace(/🧮 Miért nem[\s\S]*?rá már nem jön semmi\./,"")),   /* 🧮 3.9.358 — a kért magyarázósor kivétel */dontes:true,zaro:true};
     const m=(/célréssel\s*~([\d,]+)/.exec(t())||[])[1];
     document.getElementById("nfHangMinus").click();
     const m2=(/célréssel\s*~([\d,]+)/.exec(t())||[])[1];
