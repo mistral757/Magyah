@@ -1,4 +1,13 @@
-# 3.9.359 — súlyozott mezőny: fele-fele, a nyárzáró értékelés utáni záróval
+# 3.9.359–360 — súlyozott mezőny: fele-fele, a nyárzáró értékelés utáni záróval
+
+> **3.9.360 — javítás:** „A nyárzáró értékelés az nem akkor van, ahová most
+> tetted. Az akkor van, amikor lement minden kupa, és megkapják a szezon
+> kártyákat a játékosok..." A mérés ezért a szezonkártyák, a
+> Fénykor-próbaidő és a kihívásból járó kártya-fejlesztés UTÁN fut
+> (3.9.359-ben még az öregítés után, a kártyák ELŐTT). Ha egy futó karrier a
+> 3.9.359-cel már átment egy szezonjelentésen, az idei záró a kártyák előtti
+> érték marad (utólag nem mérhető vissza), a következő idénytől helyes. A
+> rekord `v:2` jelzi az új mérési pontot.
 
 > „Minden módban állítsuk át a súlyozást úgy, hogy a súly egyik fele a
 > nyárzáró értékelés utáni meccs erő, másik fele az új szezon indításkori
@@ -9,7 +18,7 @@
 | | Eddig (3.9.287 / 3.9.289) | Mostantól |
 |---|---|---|
 | A képlet | (indító × 1,25 + záró) / 2,25 | (indító + záró) / 2 |
-| A záró ⚡ mérése | a 30. fordulónál, a kupák és az évforduló előtt | a nyárzáró értékelés (szezonjelentés) után, az öregedés és az éves fejlődés után, a nyári pénz és az igazolások előtt |
+| A záró ⚡ mérése | a 30. fordulónál, a kupák és az évforduló előtt | a nyárzáró értékelés után: minden kupa lement, a játékosok megkapták a szezonkártyákat (az öregedés és az éves fejlődés is lefutott), az igazolások előtt |
 | A nyári fejlesztésből megmarad | ≈44% | a fele |
 
 * **Minden módban** érvényes: egyjátékosban, közös karrierben és saját
