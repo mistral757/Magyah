@@ -405,6 +405,14 @@ node tools/skill-jutalom-3-9-343-proba.js
 
 * A kihívás-jutalom kész képesség, kategória- és címzett-választással minden módban; a meccs-jutalom realisztikus módban a gépé marad, a megadott készültséggel.
 
+## celres-suly-3-9-358-proba.js — 🧮 a célrés-ablak súlyozás-magyarázata
+
+```
+node tools/celres-suly-3-9-358-proba.js
+```
+
+* A bejelentett számokkal (135,1 indító, 114,7 záró, −0,1 célrés) a becslés 126,1, a ⚖ már benne; a doboz kiírja a súlyozás bontását; záró ⚡ nélkül 135,2 és nincs magyarázat.
+
 ## stadion-real-3-9-357-proba.js — 🏟️ törzsszurkolók és hiányfelár
 
 ```
