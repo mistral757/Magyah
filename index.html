@@ -7907,7 +7907,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.360";
+const APP_VERSION="3.9.361";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -22753,6 +22753,7 @@ function mpCupDiagText(round,mine,mate){
    közös kupa szétcsúszását elárulja. SZÁNDÉKOSAN csak ezeket: a teljes mentés
    megabájtos és olvashatatlan volna. */
 function mpDiagCollect(){
+  try{saveGameFlush();}catch(e){}   /* ⚡ 3.9.361 */
   const L=[];
   L.push("MAGYAH diagnosztika · v"+APP_VERSION+" · "+new Date().toISOString());
   /* A FUTÓ állapot ELŐL: a "nálam nem jött elő" kérdésekre ez felel, és nem a
@@ -26153,14 +26154,25 @@ function pointsToHuf(p){return Math.round(p||0)*HUF_PER_POINT;}
    Millió Ft-ra kerekít (a valós átigazolási díjakat is így közlik), és a
    kerekítést a milliókon végzi, hogy a 999,6 M ne "1000 M"-ként jelenjen meg,
    hanem rendesen átvigye a milliárdba. */
+/* ⚡ 3.9.361 — EGY FORMÁZÓ, NEM MINDEN SZÁMNÁL ÚJ. A toLocaleString minden
+   hívásnál felépíti a saját formázóját; a HUB egy rajzolásnál több százat ír
+   ki. A kimenet a szabvány szerint betűre ugyanaz. LUSTÁN épül, `var`-ral: a
+   szkript betöltése közben is hívódhat (egy const itt TDZ-hibát dobna). */
+var _NF_HU=null,_NF_HU3=null;
+function nfHuSzam(n){
+  if(_NF_HU===null)try{_NF_HU=new Intl.NumberFormat("hu-HU");}catch(e){_NF_HU=false;}
+  return _NF_HU?_NF_HU.format(n):Number(n).toLocaleString("hu-HU");}
+function nfHuSzam3(n){
+  if(_NF_HU3===null)try{_NF_HU3=new Intl.NumberFormat("hu",{maximumFractionDigits:3});}catch(e){_NF_HU3=false;}
+  return _NF_HU3?_NF_HU3.format(n):Number(n).toLocaleString("hu",{maximumFractionDigits:3});}
 function fmtFt(points){
   const ft=pointsToHuf(points),neg=ft<0,a=Math.abs(ft);
   const totalM=Math.round(a/1e6);
   const mrd=Math.floor(totalM/1000),m=totalM%1000;
   let s;
-  if(!totalM)s=a.toLocaleString("hu");
-  else if(mrd&&m)s=`${mrd.toLocaleString("hu")} Mrd ${m} M`;
-  else if(mrd)s=`${mrd.toLocaleString("hu")} Mrd`;
+  if(!totalM)s=nfHuSzam(a);
+  else if(mrd&&m)s=`${nfHuSzam(mrd)} Mrd ${m} M`;
+  else if(mrd)s=`${nfHuSzam(mrd)} Mrd`;
   else s=`${m} M`;
   return (neg?"−":"")+s+" Ft";}
 /* TÖMÖR alak — gombfeliratra, chipre, ahol kevés a hely: "43,186 Mrd Ft"
@@ -26171,9 +26183,9 @@ function fmtFtShort(points){
   /* LEGFELJEBB 3 tizedes, a fölösleges nullák nélkül. Fix 3 tizedessel a kerek
      összegek félreolvashatók lennének: 200 Mrd → "200,000 Mrd", ami magyarul
      (ahol a vessző a tizedesjel) simán olvasható 200 ezer milliárdnak. */
-  if(a>=1e9)s=(a/1e9).toLocaleString("hu",{maximumFractionDigits:3})+" Mrd";
-  else if(a>=1e6)s=Math.round(a/1e6).toLocaleString("hu")+" M";
-  else s=a.toLocaleString("hu");
+  if(a>=1e9)s=nfHuSzam3(a/1e9)+" Mrd";
+  else if(a>=1e6)s=nfHuSzam(Math.round(a/1e6))+" M";
+  else s=nfHuSzam(a);
   return (neg?"−":"")+s+" Ft";}
 /* A kiemelt, zöld, pénzes büdzsé-chip HTML-je — egységes megjelenés a HUB-ban
    és a szezonközi átigazolásnál. */
@@ -51200,7 +51212,7 @@ function fanTicketScale(){
    A BÉR KÖVETI (a jegyár-szorzót olvassa: wageAnchorWeek, fameWageAnchor),
    tehát a fizetések ugyanilyen arányban csökkennek. */
 const FAN_ASK_SHARE=0.55,FAN_ASK_MIN=0.02;
-let _fanAskAvgC=null;
+let _fanAskAvgC=null,_fanAskAvgT=null,_fanAskAvgBusy=false;
 /* A keret átlagos kikiáltási ára (pont). Meccsenként többször kérdezik
    (bevétel, bér, felület), ezért a keret-összetétel és a forduló szerint
    gyorsítótárazva. */
@@ -51210,12 +51222,32 @@ function fanSquadAskAvg(){
   if(!roster.length)return 0;
   const key=(S.seasonNumber||0)+":"+(S.idx||0)+":"+roster.map(p=>p.n).join("|");
   if(_fanAskAvgC&&_fanAskAvgC.key===key)return _fanAskAvgC.v;
-  const v=roster.map(p=>{let a=0;
+  /* ⚡ 3.9.361 — TÖBB KULCS EGYSZERRE. MÉRVE (3 meccs): 2992 hívásból 1489
+     teljes újraszámolás volt, miközben csak KÉT kulcs fordult elő — a meccs
+     körül két állapot váltakozik (pl. a forduló előtti és utáni idx), és az
+     egyelemes tár mindig kiütötte a másikat. Ugyanaz a kulcs, ugyanaz az
+     érték: csak most a legutóbbi néhány marad meg. */
+  if(_fanAskAvgT&&_fanAskAvgT.has(key)){_fanAskAvgC={key,v:_fanAskAvgT.get(key)};return _fanAskAvgC.v;}
+  /* ⚡ 3.9.361 — ÚJRABELÉPÉS-ŐR. A lánc önmagába fut vissza (a kikiáltási ár
+     → szezonkeret → lelátó → jegyár → ez a függvény). MÉRVE: egy számolás
+     523 szint mélyre hívta önmagát (1045 + 12 029 hívás), és csak egy
+     veremtúlcsordulás állította meg — azt a játékos-ár try/catch-e nyelte el,
+     tehát ott 0 lett az átlag, és a jegyár-szorzó semleges (1). Az őr pontosan
+     ezt a 0-t adja vissza az ELSŐ visszalépésnél: ugyanaz a fixpont, egyetlen
+     szinten, és nem függ a böngésző veremméretétől. */
+  if(_fanAskAvgBusy)return 0;
+  _fanAskAvgBusy=true;
+  let v=[];
+  try{v=roster.map(p=>{let a=0;
       try{a=saleAskPrice(p)||0;}catch(e){a=0;}
       if(!(a>0))try{const e=careerPool[p.n];a=e?(saleAskPrice(e)||0):0;}catch(e){a=0;}
-      return a;}).filter(a=>a>0);
+      return a;}).filter(a=>a>0);}
+  finally{_fanAskAvgBusy=false;}
   const avg=v.length?v.reduce((x,y)=>x+y,0)/v.length:0;
   _fanAskAvgC={key,v:avg};
+  if(!_fanAskAvgT)_fanAskAvgT=new Map();
+  _fanAskAvgT.set(key,avg);
+  if(_fanAskAvgT.size>8)_fanAskAvgT.delete(_fanAskAvgT.keys().next().value);
   return avg;}
 /* a tempó az ALAP tempóhoz mérve (a szezonkeret az abszolút szorzót kapja;
    itt a kalibráció az alapon áll, a többi fokozat ehhez arányos) */
@@ -51533,7 +51565,7 @@ function fanCupAward(comp,won,outAt,label){
   return fanAdd(n,won?`${cn}-győzelem — a siker új szurkolókat hozott`
     :`${cn}: ${label||"menetelés"} — a lelátó nőtt`);}
 /* Ezres tagolás a lelátó-számokhoz. */
-function fmtNum(n){return Math.round(n||0).toLocaleString("hu-HU");}
+function fmtNum(n){return nfHuSzam(Math.round(n||0));}   /* ⚡ 3.9.361 — lásd nfHuSzam */
 function fanBaseLabel(){
   const b=fanBase();
   return b>=150000?"országos tömegbázis":b>=80000?"megtelt nagystadion"
@@ -64578,7 +64610,17 @@ function ekEsemeny(ev){
   if(ki){
     _ek[ki]+=suly;
     _ek.imp.push({min,w:(ki==="mi"?1:-1)*suly*.16,tau:suly>=3?9:suly>=1.6?6:4});}
-  ekRajz();}
+  ekRajzHamar();}
+/* ⚡ 3.9.361 — AZ ESEMÉNYEK RAJZOLÁSA KÉPKOCKÁNKÉNT EGYSZER. Az ekRajzGorbe
+   percenként újraszámolja a görbét és elrendezést mér (clientWidth); a gyors
+   tempón egy képkockára több esemény is esik — mindegyik külön rajzolt.
+   MÉRVE (3 végigjátszott meccs, 4× lassított CPU): ~240 ms. Az adat (_ek)
+   azonnal frissül, a RAJZ a következő képkockában — egyszer. */
+let _ekRajzRaf=0;
+function ekRajzHamar(){
+  if(_ekRajzRaf)return;
+  if(typeof requestAnimationFrame!=="function"){ekRajz();return;}
+  _ekRajzRaf=requestAnimationFrame(()=>{_ekRajzRaf=0;try{ekRajz();}catch(e){}});}
 /* AZ ÉRTÉK egy percben (a vödör-célok sima átmenete + kilengések + hullám) */
 function ekErtek(x){
   const E=_ek;if(!E)return 0;
@@ -96425,8 +96467,23 @@ function msPotSig(){
     return [S.seasonNumber||1,S.idx||0,form,captainIdx,tk,tl,Math.round(S.morale||0),xi,ker].join("|");
   }catch(e){return null;}}
 /* A nyers, élő meccs-erő — a keresés ezt maximalizálja. */
+/* ⚡ 3.9.361 — A KERESÉS ALATT EGY KONFIGURÁCIÓ EGYSZER SZÁMOL. MÉRVE: egy
+   legjobb-felállás keresés 696 kiértékeléséből csak 428 volt egyedi (a helyi
+   keresés minden slotnál újraméri a már mért kiinduló állapotot). A kulcs
+   mindaz, amit a keresés mozgat: felállás, kapitány, taktika és a slotok
+   (játékos + poszt). Csak a msWithRestore idejére él — kívül nincs memó. */
+let _msRawMemo=null;
+function msRawKulcs(){
+  return form+"|"+captainIdx+"|"+((S&&S.tactics&&S.tactics.active)||"")+"|"
+    +slots.map(sl=>sl?((sl.player?sl.player.n:"-")+"@"+sl.pos):"x").join(",");}
 function msRaw(){
-  try{return teamStrength()+hiddenMatchBonus();}catch(e){return 0;}}
+  let k=null;
+  if(_msRawMemo){try{k=msRawKulcs();}catch(e){k=null;}
+    if(k!=null&&_msRawMemo.has(k))return _msRawMemo.get(k);}
+  let v=0;
+  try{v=teamStrength()+hiddenMatchBonus();}catch(e){v=0;}
+  if(_msRawMemo&&k!=null)_msRawMemo.set(k,v);
+  return v;}
 /* ---- A KERESÉS SOSEM HAGY NYOMOT ----
    A globálisokhoz (slots, form, captainIdx, aktív taktika) hozzá KELL nyúlni,
    mert a meccs-erő minden tagja azokból olvas. A `finally` ág ezért
@@ -96441,7 +96498,7 @@ function msWithRestore(fn){
   const pr=_msProbing;_msProbing=true;
   /* A bontott állapot gyorsítótára a keresés idejére nyílik ki, és a keresés
      végén bezárul — kívül sosem él (lásd engBaseParts). */
-  if(!pr)engPartsCacheClear();
+  if(!pr){engPartsCacheClear();_msRawMemo=new Map();}   /* ⚡ 3.9.361 */
   try{return fn();}
   catch(e){return null;}
   finally{
@@ -96451,7 +96508,7 @@ function msWithRestore(fn){
     extraRoster=sv.extra;
     if(typeof S!=="undefined"&&S&&S.tactics)S.tactics.active=sv.tac;
     _msProbing=pr;
-    if(!pr)engPartsCacheClear();}}
+    if(!pr){engPartsCacheClear();_msRawMemo=null;}}}
 /* ---- A KERESÉS ----
    Négy tengely, mindegyik VALÓDI menedzseri lépés:
      1. FELÁLLÁS   — minden ismert felállás, a kerettel feltöltve
@@ -125873,7 +125930,33 @@ function styleHas(traitKey){return styleTraitLevel(traitKey)>0;}
 /* MIND A KÉT FILOZÓFIA HATÁSAI (3.9.64). Slotonként a SAJÁT fája és a SAJÁT
    szintjei — így a másodlagos képességei ugyanúgy élnek, mint az elsődlegesé,
    és a csatorna-összesítők (max, szorzat, összeg) változatlanul működnek. */
+/* ⚡ 3.9.361 — A LISTA GYORSÍTÓTÁRBAN. Minden csatorna-kérdés (styleFxMul /
+   Add / Max) ezen megy végig — egy HUB-rajzolás és egy legjobb-felállás
+   keresés alatt több százszor. MÉRVE (4× lassított CPU): egy változás utáni
+   HUB-rajzolás ~800 ms-ából ~300 ms ennek az újraépítése volt (a sebesség-
+   plafon kérdése játékosonként és attribútumonként). Az AZONOSSÁG a bemenetek
+   olcsó aláírása: a két filozófia kulcsa, nulladik szintje, megvett szintjei
+   és stílusboltja (st.eng), a kispadon ülő edző (az ingyen szint), a rejtett
+   stílus képességei és a talizmán-kapcsoló — bármelyik változik, a lista
+   újraépül, ezért nem kell minden módosító helyre kézi ürítés. */
+let _sAfxC=null;
+function styleActiveFxSig(){
+  try{
+    const sl=st=>st?[st.key,st.pre?1:0,JSON.stringify(st.traits||null),JSON.stringify(st.eng||null)].join("~"):"-";
+    let tal=0;try{tal=talOn()?1:0;}catch(e){tal=0;}
+    return [gameMode,sl(S.style),sl(S.style2),(coach&&coach.n)||"",tal,
+      JSON.stringify((S.rejtett&&S.rejtett.kep)||null)].join("|");}
+  catch(e){return null;}}
 function styleActiveFx(){
+  /* a legjobb-felállás keresés alatt a stílus nem változhat (csak a felállás,
+     a kapitány és a taktika mozog) — az aláírás sem kell */
+  if(_sAfxC&&typeof _msProbing!=="undefined"&&_msProbing)return _sAfxC.out;
+  const sig=styleActiveFxSig();
+  if(sig!=null&&_sAfxC&&_sAfxC.sig===sig)return _sAfxC.out;
+  const out=styleActiveFxEpit();
+  if(sig!=null)_sAfxC={sig,out:Object.freeze(out)};
+  return out;}
+function styleActiveFxEpit(){
   const out=[];
   styleSlots().forEach(st=>{
     /* A NULLADIK SZINTEN (3.9.70) EGYETLEN képesség hat: a Fordított jellem.
@@ -126954,6 +127037,7 @@ function unpackCareerPool(pk){
    Egy helyen felsorolja, mi foglal helyet: az egyjátékos mentés és minden
    szoba-mentés, mérettel és annyi tartalommal, hogy fel lehessen ismerni. */
 function saveSlotList(){
+  try{saveGameFlush();}catch(e){}   /* ⚡ 3.9.361 */
   let keys=[];
   try{keys=Object.keys(localStorage);}catch(e){return [];}
   const cur=saveKey();
@@ -127158,19 +127242,28 @@ function loadIntoGame(d,key){
    háttérbe kerülésekor azonnal kiíródik, és bármely rendes saveGame() is
    „elviszi" (az úgyis mindent ment). A `var` szándékos: a saveGame a szkript
    elejéről is hívódhat, egy `let` ott TDZ-hibát dobna. */
-var _saveSoonT=0;
+var _saveSoonT=0,_saveMost=false;
+/* ⚡ 3.9.361 — felhasználói esemény közben vagyunk-e (window.event) */
+function saveUserEventNow(){
+  try{const e=window.event;
+    return !!(e&&typeof e.type==="string"&&/^(click|change|input|pointerup|pointerdown|touchend|touchstart|mouseup|keydown|keyup|submit|toggle)$/.test(e.type));}
+  catch(x){return false;}}
+/* az AZONNALI írás — újratöltés, szobaváltás, kiírás előtt */
+function saveGameNow(){
+  _saveMost=true;
+  try{saveGame();}finally{_saveMost=false;}}
 /* 700 ms csend után, a böngésző ÜRESJÁRATÁBAN (requestIdleCallback, legfeljebb
    további 1,5 mp) — így a mentés nem a következő koppintásra esik. */
 function saveGameSoon(){
   if(_saveSoonT)return;
   _saveSoonT=setTimeout(()=>{
-    const fut=()=>{if(!_saveSoonT)return;_saveSoonT=0;try{saveGame();}catch(e){}};
+    const fut=()=>{if(!_saveSoonT)return;_saveSoonT=0;try{saveGameNow();}catch(e){}};
     try{if(window.requestIdleCallback){window.requestIdleCallback(fut,{timeout:1500});return;}}catch(e){}
     fut();},700);}
 function saveGameFlush(){
   if(!_saveSoonT)return;
   clearTimeout(_saveSoonT);_saveSoonT=0;
-  try{saveGame();}catch(e){}}
+  try{saveGameNow();}catch(e){}}
 try{
   window.addEventListener("pagehide",saveGameFlush);
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")saveGameFlush();});
@@ -127179,6 +127272,18 @@ function saveGame(){
   /* ⏯ A JUTALOM-LÁNC ALATT A MENTÉS TART (3.9.171) — lásd mLefujas. Védőháló:
      negyedóra után magától enged, ha a lánc valamiért nem ért volna véget. */
   if(_utoTartas&&S&&S.utoMeccs&&Date.now()-_utoKezd<15*60*1000)return;
+  /* ⚡ 3.9.361 — A KOPPINTÁS ALATT NEM ÍRUNK. KIMONDOTT KÉRÉS: „Egyre gyűlnek
+     az olyan promptok a játékban, amik után jelentősebb 1000ms fölötti pingek
+     is vannak […] Játékosok megbízásának módosítása, csapatstílus feloldása,
+     stb." MÉRVE (90 lejátszott meccs, 4× lassított CPU ≈ telefon): egy
+     szerepváltás 228 ms-ából a mentés 188 ms (a pool csomagolása, a JSON és a
+     localStorage-írás) — és ez a mentés méretével nő. Ha a hívás egy
+     felhasználói esemény (koppintás, választás, gépelés) közben jön, a mentés
+     az összevont, üresjárati útra kerül (saveGameSoon): a képernyő azonnal
+     válaszol, a kiírás a következő csendes pillanatban történik. Elvesztés
+     ellen ugyanaz védi, ami a 3.9.168 óta: a lap elhagyása és háttérbe kerülése
+     azonnal kiírja. A kényszerített, azonnali írás: saveGameNow(). */
+  if(!_saveMost&&saveUserEventNow()){saveGameSoon();return;}
   /* egy függő összevont mentés ezzel együtt teljesül */
   if(_saveSoonT){clearTimeout(_saveSoonT);_saveSoonT=0;}
   /* A kezdőképernyőn nincs mit menteni — és ha mégis írnánk, a következő
@@ -127521,6 +127626,7 @@ function saveGame(){
   try{runBoardEnsure("mentes");}catch(e){}}
 /* key nélkül a MOSTANI kontextus helyét olvassa (egyjátékos vagy az aktív szoba) */
 function loadSavedGame(key){
+  try{saveGameFlush();}catch(e){}   /* ⚡ 3.9.361 — a függő mentés előbb kiíródik */
   try{
     const raw=localStorage.getItem(key||saveKey());
     if(!raw)return null;
@@ -128853,6 +128959,7 @@ function mpCtxKey(){return (MP.active&&MP.activeRoom)?("room:"+MP.activeRoom):("
    ki, hanem újra és újra annak a szobának a lobbyjában. Ezért a paramétert
    kivesszük az URL-ből, és a tiszta címre navigálunk. */
 function mpReloadWithIntent(intent){
+  try{saveGameFlush();}catch(e){}   /* ⚡ 3.9.361 */
   try{sessionStorage.setItem(MP_BOOT_KEY,JSON.stringify(intent||{solo:true}));}catch(e){}
   try{
     const q=new URLSearchParams(location.search);
@@ -132341,7 +132448,7 @@ $("mpResumeBtn")&&($("mpResumeBtn").onclick=()=>{
    használ (mpSwitchContext); a {home:true} se szobát, se egyjátékost nem kér,
    tehát az indulás a kezdőlapon áll meg — pontosan úgy, mint egy hidegindítás. */
 function goHomeScreen(){
-  try{if(!S.playing)saveGame();}catch(e){}
+  try{if(!S.playing)saveGameNow();}catch(e){}   /* ⚡ 3.9.361 — újratöltés előtt azonnal */
   mpReloadWithIntent({home:true});}
 /* ---- MECCS KÖZBEN A 🏠 VISSZAKÉRDEZ ----
    A meccs alatt nem mentünk (csak lezárt pillanatokban írunk), az újratöltés
@@ -133415,7 +133522,7 @@ function ujVerzioFrissit(){
     if(m)m.innerHTML="⚽ Most meccs fut — a lefújás után koppints újra.";
     return false;}
   try{saveGameFlush();}catch(e){}
-  try{saveGame();}catch(e){}
+  try{saveGameNow();}catch(e){}
   try{location.reload();}catch(e){}
   return true;}
 (function(){

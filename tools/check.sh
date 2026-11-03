@@ -100,5 +100,41 @@ else
   FAIL=1
 fi
 
+# 4. KÉTSZER DEKLARÁLT FÜGGVÉNY (3.9.361) — egy közös globális scope-ban a
+#    KÉSŐBBI deklaráció csendben felülírja a korábbit. Így írta felül egy új
+#    számformázó (huSzam) a meglévő, raggal író huSzam-ot: a node --check és az
+#    eslint is zöldet mondott, a játékban pedig minden szám „1234567-es” lett
+#    volna. Hiba, ha ugyanaz a név kétszer áll, és a két törzs ELTÉR (a betűre
+#    azonos másolat ártalmatlan).
+echo -n "  kétszer deklarált függvény … "
+if DUP=$(python3 - "$OUT" <<'PY'
+import re,sys
+L=open(sys.argv[1],encoding="utf-8").read().split("\n")
+rx=re.compile(r"^(?:async )?function ([A-Za-z_$][A-Za-z0-9_$]*)\(")
+hol={}
+for i,l in enumerate(L):
+    m=rx.match(l)
+    if m: hol.setdefault(m.group(1),[]).append(i)
+def torzs(i):
+    out=[L[i]]
+    for j in range(i+1,len(L)):
+        if L[j][:1] not in (""," ","\t","}",")","]") : break
+        out.append(L[j])
+    return "\n".join(out).rstrip()
+rossz=[]
+for n,ii in hol.items():
+    if len(ii)>1 and len(set(torzs(i) for i in ii))>1: rossz.append(n+" ("+", ".join(str(i+1) for i in ii)+". blokksor)")
+if rossz:
+    print("\n".join(rossz)); sys.exit(1)
+PY
+); then
+  echo "ok"
+else
+  echo "HIBA — eltérő törzzsel kétszer deklarálva:"
+  echo "$DUP" | sed 's/^/    /'
+  echo "  (a blokksorhoz adj hozzá $A-t az index.html-beli helyhez)"
+  FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then echo "✓ minden rendben"; else echo "✗ javítandó"; fi
 exit $FAIL

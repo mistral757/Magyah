@@ -405,6 +405,14 @@ node tools/skill-jutalom-3-9-343-proba.js
 
 * A kihívás-jutalom kész képesség, kategória- és címzett-választással minden módban; a meccs-jutalom realisztikus módban a gépé marad, a megadott készültséggel.
 
+## gyorsitas-3-9-361-proba.js — ⚡ gyorsítások, változatlan eredménnyel
+
+```
+node tools/gyorsitas-3-9-361-proba.js
+```
+
+* A legjobb-felállás keresés memóval és anélkül ugyanazt adja (a memó utána bezárul); a jegyár keret-ár átlaga legfeljebb 2 szint mély és egyezik a kiírt árak átlagával; a stílushatás-lista a tárból ugyanaz, vásárlás után azonnal az új; a számformázás betűre a régi; koppintás közben a mentés késleltetve, de kiíródik, betöltés előtt kiíródik, a saveGameNow azonnal ír.
+
 ## suly-fele-3-9-359-proba.js — 🧮 súlyozás fele-fele, nyárzáró utáni záróval
 
 ```
