@@ -211,7 +211,30 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ok(!also||(also.f.my<also.f.op&&also.log>=1&&also.html),"15. forduló utáni párharc: az alacsonyabb ⚡-ú kapja, a napló szól, a HUB-kártya megjelenik",also);
     /* 🆙 3.9.354 — a névsor: a párharc kezdői (a kiesett kezdő is a helyén marad) + beállt cserék; egyszerre ≤5 */
     ok(!also||(Array.isArray(also.f.nevek)&&also.xi.every(n=>also.f.nevek.indexOf(n)>=0)&&also.f.nevek.length>=also.xi.length&&also.jel>=also.xi.length&&also.max<=5),
-      "15. forduló utáni párharc: a felzárkóztatás címzettjei a párharc szereplői, egyszerre legfeljebb 5",also&&{nevek:also.f.nevek.length,xi:also.xi.length,jel:also.jel,max:also.max});}
+      "15. forduló utáni párharc: a felzárkóztatás címzettjei a párharc szereplői, egyszerre legfeljebb 5",also&&{nevek:also.f.nevek.length,xi:also.xi.length,jel:also.jel,max:also.max});
+    /* 🆙 3.9.363 — „Vagy nagyon el van rejtve, vagy nem működik." — az ajánlat
+       a meccs mérlegében (a felugró ablakban) is ott van, gombbal; a társnál nincs */
+    {const vz=pp=>pp.evaluate(async()=>{
+       const V=S.lastMatch&&S.lastMatch.verdict,o={felz:!!(V&&V.felz),aktiv:felzAktiv(),
+         run:(()=>{try{return runBreakdown().total;}catch(e){return null;}})()};
+       const _mr=felzMaxRun;if(o.aktiv&&felzMaxRun()<5)felzMaxRun=()=>50;   /* a gombhoz Run kell — itt nem azt mérjük */
+       try{mstatShow(null,"verdict");}catch(e){o.hiba=String(e);}
+       const bx=document.getElementById("felzVBox"),bt=document.getElementById("felzVBtn");
+       o.box=!!(bx&&bx.offsetParent);o.gomb=!!(bt&&bt.offsetParent);o.tx=bx?bx.textContent.replace(/\s+/g," ").slice(0,160):null;
+       if(bt){bt.click();await new Promise(r=>setTimeout(r,200));
+         const m=document.getElementById("hubTacticConfirmModal");o.modal=!!(m&&!m.classList.contains("hide"));
+         o.sorok=document.querySelectorAll("#hubTacticConfirmBody [data-fz='+']").length;
+         const pl=document.querySelector("#hubTacticConfirmBody [data-fz='+']");if(pl)pl.click();
+         const ms0=felzMostMs();document.getElementById("hubTacticConfirmYes").click();await new Promise(r=>setTimeout(r,200));
+         o.db=S.felzark&&S.felzark.db;o.nott=felzMostMs()>=ms0;
+         o.frissult=!!document.getElementById("felzVBox")&&/eddig|Most:/.test(document.getElementById("felzVBox").textContent);}
+       try{mstatClose();}catch(e){}
+       felzMaxRun=_mr;
+       return o;});
+     const va=await vz(p),vg=await vz(g);
+     const lo=fa.f?va:fg.f?vg:null,hi=fa.f?vg:fg.f?va:null;
+     ok(!lo||(lo.felz&&lo.box&&lo.gomb&&lo.modal&&lo.sorok>=1&&lo.db===1),"3.9.363: a gyengébb fél mérleg-ablakában ott a felzárkóztatás, a gombja a kiválasztót nyitja, a vásárlás lefut",lo);
+     ok(!hi||(!hi.felz&&!hi.box),"3.9.363: az erősebb fél mérlegében nincs felzárkóztatás",hi);}}
 
   const r6=await p.evaluate(()=>{
     S.idx=30;S.seasonClosed=false;const o={};
