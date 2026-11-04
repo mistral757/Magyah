@@ -211,7 +211,30 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ok(!also||(also.f.my<also.f.op&&also.log>=1&&also.html),"15. forduló utáni párharc: az alacsonyabb ⚡-ú kapja, a napló szól, a HUB-kártya megjelenik",also);
     /* 🆙 3.9.354 — a névsor: a párharc kezdői (a kiesett kezdő is a helyén marad) + beállt cserék; egyszerre ≤5 */
     ok(!also||(Array.isArray(also.f.nevek)&&also.xi.every(n=>also.f.nevek.indexOf(n)>=0)&&also.f.nevek.length>=also.xi.length&&also.jel>=also.xi.length&&also.max<=5),
-      "15. forduló utáni párharc: a felzárkóztatás címzettjei a párharc szereplői, egyszerre legfeljebb 5",also&&{nevek:also.f.nevek.length,xi:also.xi.length,jel:also.jel,max:also.max});}
+      "15. forduló utáni párharc: a felzárkóztatás címzettjei a párharc szereplői, egyszerre legfeljebb 5",also&&{nevek:also.f.nevek.length,xi:also.xi.length,jel:also.jel,max:also.max});
+    /* 🆙 3.9.363 — „Vagy nagyon el van rejtve, vagy nem működik." — az ajánlat
+       a meccs mérlegében (a felugró ablakban) is ott van, gombbal; a társnál nincs */
+    {const vz=pp=>pp.evaluate(async()=>{
+       const V=S.lastMatch&&S.lastMatch.verdict,o={felz:!!(V&&V.felz),aktiv:felzAktiv(),
+         run:(()=>{try{return runBreakdown().total;}catch(e){return null;}})()};
+       const _mr=felzMaxRun;if(o.aktiv&&felzMaxRun()<5)felzMaxRun=()=>50;   /* a gombhoz Run kell — itt nem azt mérjük */
+       try{mstatShow(null,"verdict");}catch(e){o.hiba=String(e);}
+       const bx=document.getElementById("felzVBox"),bt=document.getElementById("felzVBtn");
+       o.box=!!(bx&&bx.offsetParent);o.gomb=!!(bt&&bt.offsetParent);o.tx=bx?bx.textContent.replace(/\s+/g," ").slice(0,160):null;
+       if(bt){bt.click();await new Promise(r=>setTimeout(r,200));
+         const m=document.getElementById("hubTacticConfirmModal");o.modal=!!(m&&!m.classList.contains("hide"));
+         o.sorok=document.querySelectorAll("#hubTacticConfirmBody [data-fz='+']").length;
+         const pl=document.querySelector("#hubTacticConfirmBody [data-fz='+']");if(pl)pl.click();
+         const ms0=felzMostMs();document.getElementById("hubTacticConfirmYes").click();await new Promise(r=>setTimeout(r,200));
+         o.db=S.felzark&&S.felzark.db;o.nott=felzMostMs()>=ms0;
+         o.frissult=!!document.getElementById("felzVBox")&&/eddig|Most:/.test(document.getElementById("felzVBox").textContent);}
+       try{mstatClose();}catch(e){}
+       felzMaxRun=_mr;
+       return o;});
+     const va=await vz(p),vg=await vz(g);
+     const lo=fa.f?va:fg.f?vg:null,hi=fa.f?vg:fg.f?va:null;
+     ok(!lo||(lo.felz&&lo.box&&lo.gomb&&lo.modal&&lo.sorok>=1&&lo.db===1),"3.9.363: a gyengébb fél mérleg-ablakában ott a felzárkóztatás, a gombja a kiválasztót nyitja, a vásárlás lefut",lo);
+     ok(!hi||(!hi.felz&&!hi.box),"3.9.363: az erősebb fél mérlegében nincs felzárkóztatás",hi);}}
 
   const r6=await p.evaluate(()=>{
     S.idx=30;S.seasonClosed=false;const o={};
@@ -254,6 +277,26 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* 🆙 3.9.354 — a névsor: a párharc kezdői (a kiesett kezdő is a helyén marad) + beállt cserék; egyszerre ≤5 */
     ok(!also||(Array.isArray(also.f.nevek)&&also.xi.every(n=>also.f.nevek.indexOf(n)>=0)&&also.f.nevek.length>=also.xi.length&&also.jel>=also.xi.length&&also.max<=5),
       "8. forduló utáni párharc: a felzárkóztatás címzettjei a párharc szereplői, egyszerre legfeljebb 5",also&&{nevek:also.f.nevek.length,xi:also.xi.length,jel:also.jel,max:also.max});}}
+
+  /* ⚔ 3.9.362 — „Nem volt párharc a 15 és 23 forduló után sem. Mi lett vele?"
+     — az elmaradt nap pótolható (idx ≥ nap), sorrendben; offline jelzés */
+  {const r=await p.evaluate(()=>{const o={};
+     const keep=JSON.parse(JSON.stringify(S.svPh));
+     S.seasonNumber=6;S.seasonClosed=false;S.playing=false;phase="season";
+     S.svPh={v:1,m:{"6:q1":{gf:1,ga:0}},merleg:{w:1,d:0,l:0,gf:1,ga:0,p:3},r:{6:[8,15,23,30]}};
+     S.idx=20;o.e20=svPhEsedekes();o.l20=kickBtnLabel();
+     S.svPh.m["6:q2"]={gf:0,ga:0};o.e20b=svPhEsedekes();
+     S.idx=23;o.e23=svPhEsedekes();
+     S.idx=29;delete S.svPh.m["6:q2"];o.e29=svPhEsedekes();
+     /* a szoba nem él: egyszer szól */
+     const _m=mpSv;mpSv=()=>false;S.svPhJelzett={};
+     const n0=(window._nlog||[]).length;svPhElmaradtJelez();svPhElmaradtJelez();
+     o.jel=(window._nlog||[]).slice(n0).filter(t=>/párharc-nap most nem indulhat/.test(t)).length;
+     o.offEsed=svPhEsedekes();mpSv=_m;
+     S.svPh=keep;S.idx=8;return o;});
+   ok(r.e20===2&&/PÁRHARC-NAP II/i.test(r.l20),"a 15. forduló után elmaradt II. nap a 20. fordulóban is esedékes (pótlás)",r);
+   ok(r.e20b===0&&r.e23===3&&r.e29===2,"pótlás után a következő nap a saját fordulójától; sorrendben a legelső hiányzó jön",r);
+   ok(r.jel===1&&r.offEsed===0,"ha a szoba nem él, a nap nem indul, de a napló egyszer kimondja",r);}
 
   console.log("— 6. a közös kupa relatív mezőnnyel —");
   const kPrep=(pp,nev,comp)=>pp.evaluate(([nev,comp])=>{
