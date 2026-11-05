@@ -137,7 +137,7 @@ async function oldal(b,{w,h,tema,ls,reduce}){
    const r=await p.evaluate(()=>{renderThemeModal();return {fx:document.querySelectorAll("#themeModal .fxOpt,.fxOpt").length,pix:document.querySelectorAll(".pixOpt").length,
      v:APP_VERSION};});
    ok(r.fx>=1&&r.pix===0,"a ✨ kapcsoló saját osztályon (.fxOpt), a Pixel finomhangolói nem jelennek meg más témában",r);
-   ok(String(r.v).localeCompare("3.9.203",undefined,{numeric:true})>=0,"verzió legalább 3.9.203",r.v);
+   ok((/^1\.0\./.test(String(r.v))||String(r.v).localeCompare("3.9.203",undefined,{numeric:true})>=0),"verzió legalább 3.9.203",r.v);
    await ctx.close();}
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();

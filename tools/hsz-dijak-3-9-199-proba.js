@@ -149,7 +149,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.kapSor&&r.csereSor,"a sor a valódi kimenetet mondja: „megkapta…” / „…lecserélte a korábbi KK-díját”",{k:r.kapSor,c:r.csereSor});
   ok(/Hiper Szuper Kupa gólkirálya|lila aranycipő|szuperligában/.test(r.kom.boot||"")&&/Hiper Szuper Kupa gólpassz|Lila arany|legjobb passzolója/.test(r.kom.pass||"")&&/Hiper Szuper Kupa legjobb kapusa|lila kesztyű|legjobbjai ellen/.test(r.kom.glove||""),"a kommentár a Hiper-sorokat mondja",r.kom);
   ok(r.blKom===null,"a lecserélt BL-díj kommentárja már nem jön",r.blKom);
-  ok(String(r.verzio).localeCompare("3.9.199",undefined,{numeric:true})>=0,"verzió legalább 3.9.199",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.199",undefined,{numeric:true})>=0),"verzió legalább 3.9.199",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

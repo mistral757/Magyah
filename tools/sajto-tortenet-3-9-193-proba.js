@@ -181,7 +181,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return {idx:S.idx,story:V&&V.story,cim:V&&V.head&&V.head.t,naplo:sorok.filter(t=>/📰/.test(t)).slice(0,2)};});
   console.log("\n— 5. VALÓDI MECCS —");
   ok(m.story===1&&m.cim&&m.naplo.length>0,"a lefújás után a cím megkapta a történet-réteget, a naplóban is",m);
-  ok(String(r.verzio).localeCompare("3.9.193",undefined,{numeric:true})>=0,"verzió legalább 3.9.193",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.193",undefined,{numeric:true})>=0),"verzió legalább 3.9.193",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

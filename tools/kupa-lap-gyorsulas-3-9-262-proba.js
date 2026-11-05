@@ -134,7 +134,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(JSON.stringify(r.gorbe7)===JSON.stringify([0,1.35,2.7,4.05,5.4]),"7. fokozat: a 2. idénytől, ugyanazon a görbén",r.gorbe7);
   ok(r.gorbe10[0]>0&&r.gorbe10[0]<r.gorbe10[1]&&r.gorbe10[1]===1.35,"10. fokozat: már az 1. idényben (a 2. idény fele)",r.gorbe10);
   ok(r.nfNelkul===4,"tízfokozatú rendszer nélkül marad a 4. idény");
-  ok(String(r.verzio).localeCompare("3.9.262",undefined,{numeric:true})>=0,"verzió legalább 3.9.262",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.262",undefined,{numeric:true})>=0),"verzió legalább 3.9.262",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

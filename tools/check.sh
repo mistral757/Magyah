@@ -136,5 +136,32 @@ else
   FAIL=1
 fi
 
+# 5. A VERZIÓSZÁM (1.0.4.8.03) — a szabály: docs/VERZIOZAS.md. Forma:
+#    1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű; a version.json `verzio` mezője
+#    ugyanez, a régi `v` mező befagyott (3.9.369 — a régi kliensek frissítési
+#    sávjáért, SOHA ne írd át).
+echo -n "  verziószám … "
+if VER=$(python3 - "." <<'PY'
+import re,sys,json,os
+root=sys.argv[1]
+t=open(os.path.join(root,"index.html"),encoding="utf-8").read()
+m=re.search(r'const APP_VERSION="([^"]+)";',t)
+v=m.group(1) if m else None
+hib=[]
+if not v or not re.fullmatch(r"1\.0\.\d+\.\d+\.\d{2}",v): hib.append(f"APP_VERSION formája rossz: {v!r} (1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű)")
+try: J=json.load(open(os.path.join(root,"version.json"),encoding="utf-8"))
+except Exception as e: J={};hib.append(f"version.json nem olvasható: {e}")
+if J.get("verzio")!=v: hib.append(f"version.json verzio={J.get('verzio')!r} ≠ APP_VERSION={v!r}")
+if J.get("v")!="3.9.369": hib.append(f"version.json v={J.get('v')!r} — befagyott mező, 3.9.369-nek kell maradnia")
+if hib: print("\n".join(hib)); sys.exit(1)
+PY
+); then
+  echo "ok"
+else
+  echo "HIBA"
+  echo "$VER" | sed 's/^/    /'
+  FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then echo "✓ minden rendben"; else echo "✗ javítandó"; fi
 exit $FAIL

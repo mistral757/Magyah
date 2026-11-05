@@ -253,7 +253,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(!r.em.nincsPenz.st&&!r.em.nincsPenz.me,"pénz nélkül egyik sem szól",r.em.nincsPenz);
   ok(r.em.pushTip.join()==="reg,reg"&&!r.em.pushHiba&&(r.em.push||[]).some(k=>k==="stadion:bovit"||k==="merch:fejleszt"),"8 forduló után a „Rég nem foglalkoztál vele” felugró emlékeztetőben is ott vannak",{tip:r.em.pushTip,push:r.em.push,h:r.em.pushHiba});
   ok(r.em.horgony,"a „Mutasd” a HUB „🏟️ Stadion, merch és PR” kártyájára visz");
-  ok(String(r.verzio).localeCompare("3.9.265",undefined,{numeric:true})>=0,"verzió legalább 3.9.265",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.265",undefined,{numeric:true})>=0),"verzió legalább 3.9.265",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

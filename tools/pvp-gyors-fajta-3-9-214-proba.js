@@ -65,7 +65,7 @@ const HOST=(want)=>{
      o.tar=kaGet("mpMode");
      host.remove();
      return o;});
-   ok(String(r.v).localeCompare("3.9.214",undefined,{numeric:true})>=0,"a verzió legalább 3.9.214",r.v);
+   ok((/^1\.0\./.test(String(r.v))||String(r.v).localeCompare("3.9.214",undefined,{numeric:true})>=0),"a verzió legalább 3.9.214",r.v);
    ok(r.van&&JSON.stringify(r.opts)==='["dyn","pyr"]',"saját sora van a két fajtával",r.opts);
    ok(/Közös karrier fajtája/.test(r.sor)&&/PvP/.test(r.sor),"a sor megnevezi, és kimondja, hogy PvP-szobára szól",r.sor);
    ok(r.tar==="pyr","a választás a tárba íródik",r.tar);

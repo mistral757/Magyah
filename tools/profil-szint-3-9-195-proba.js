@@ -222,7 +222,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.ui.gomb,"a Nyitás gomb nyit");
   ok(r.ui.rekordNyitva,"az „Örök csúcsok” ugrás kinyitja a szekciót");
   ok(r.mentes,"a mentés viszi a karrier-azonosítót");
-  ok(String(r.verzio).localeCompare("3.9.195",undefined,{numeric:true})>=0,"verzió legalább 3.9.195",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.195",undefined,{numeric:true})>=0),"verzió legalább 3.9.195",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

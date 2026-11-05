@@ -60,7 +60,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     if(captainIdx<0)captainIdx=0;if(!coach)coach=COACHES[0];if(!scout)scout=generateScout();
     window.saveGame=()=>{};phase="hub";S.seasonNumber=2;S.idx=0;S.transferBudget=5e9;S.auto=false;
     return {v:APP_VERSION,p:typeof SCOUT_REAL_FREE_P!=="undefined"?SCOUT_REAL_FREE_P:null};});
-  ok(String(r0.v).localeCompare("3.9.217",undefined,{numeric:true})>=0,"a verzió legalább 3.9.217",r0.v);
+  ok((/^1\.0\./.test(String(r0.v))||String(r0.v).localeCompare("3.9.217",undefined,{numeric:true})>=0),"a verzió legalább 3.9.217",r0.v);
   ok(r0.p===0.33,"az arány 33%",r0.p);
 
   console.log("\n— 1. a valósághű scout —");

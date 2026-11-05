@@ -69,7 +69,7 @@ const kozel=(a,b,e)=>Math.abs(a-b)<=(e||0.25);
     phase="season";S.seasonClosed=false;
     return {v:APP_VERSION,ujPadlo:_ujPadlo,padlo:S.pyr.padlo,on:pyrFloorOn(),g0:pyrFloorG0(),gapWant:S.pyr.gapWant,div:S.pyr.my};});
   console.log("\n— 1. az új karrier —");
-  ok(String(r0.v).localeCompare("3.9.210",undefined,{numeric:true})>=0&&r0.ujPadlo>=1&&r0.padlo===1&&r0.on,"az új karrier padlós (itt az egyoldalú szabályra állítva)",r0);
+  ok((/^1\.0\./.test(String(r0.v))||String(r0.v).localeCompare("3.9.210",undefined,{numeric:true})>=0)&&r0.ujPadlo>=1&&r0.padlo===1&&r0.on,"az új karrier padlós (itt az egyoldalú szabályra állítva)",r0);
   ok(typeof r0.g0==="number"&&kozel(r0.g0,r0.gapWant==null?r0.g0:r0.gapWant,0.05),"a karrier eleji vállalás a beállított rés",r0);
 
   console.log("\n— 2. a kezdőrúgás padlója —");

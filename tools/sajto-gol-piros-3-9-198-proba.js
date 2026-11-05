@@ -110,7 +110,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(JSON.stringify(r.szo)===JSON.stringify(["mesterhármas","mesternégyes","mesterötös","mesterhatos","mesterhetes","mesternyolcas","mesterkilences","mestertízes"]),"a mester-sorozat 3-tól 10-ig",r.szo);
   ok(JSON.stringify(r.szam)===JSON.stringify(["két","három","négy","öt","tizenegy"]),"a szám-szavak",r.szam);
   ok(r.ketPiros.key==="redL"&&/^A két piros lap mindent elrontott/.test(r.ketPiros.cim),"két piros egy vereségben: „A két piros lap…”",r.ketPiros.cim);
-  ok(String(r.verzio).localeCompare("3.9.198",undefined,{numeric:true})>=0,"verzió legalább 3.9.198",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.198",undefined,{numeric:true})>=0),"verzió legalább 3.9.198",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

@@ -86,7 +86,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ok(E.regiC<E.ujC,`${k}: a régi képlettel esett volna (C ${Math.round(E.regiC)} < ${Math.round(E.ujC)})`);
     ok(E.lepcsoUtan&&E.lepcsoUtan.sxp>E.utana.sxp,`${k}: egy teljesített új lépcső után nő`,{elotte:E.utana.sxp,utana:E.lepcsoUtan&&E.lepcsoUtan.sxp});}
   ok(r.e.beton.fejlec,"a fejléc kiírja az Infinity-lépcsők hozamát");
-  ok(String(r.verzio).localeCompare("3.9.259",undefined,{numeric:true})>=0,"verzió legalább 3.9.259",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.259",undefined,{numeric:true})>=0),"verzió legalább 3.9.259",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

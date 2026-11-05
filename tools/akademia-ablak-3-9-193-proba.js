@@ -187,7 +187,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 5. A PANEL —");
   ok(new RegExp("idén a "+r.panel.plan+"\\. forduló után garantáltan").test(r.panel.szoveg),"a beosztott forduló kiírva",r.panel);
   ok(JSON.stringify(r.hatra)==="[7,6,0]","a hátralévő ablakok száma pontos",r.hatra);
-  ok(String(r.verzio).localeCompare("3.9.193",undefined,{numeric:true})>=0,"verzió legalább 3.9.193",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.193",undefined,{numeric:true})>=0),"verzió legalább 3.9.193",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

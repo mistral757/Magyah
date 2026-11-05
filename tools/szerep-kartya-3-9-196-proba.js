@@ -90,7 +90,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(!nyers(r.gegen.szoveg)&&!nyers(r.gegen.opciok)&&/Lesi-erő/.test(r.gegen.szoveg),"Gegenpressing: nincs nyers kulcs, „Vezérerő” és „Lesi-erő”",r.gegen.opciok.slice(0,200));
   ok(JSON.stringify(r.cimke)===JSON.stringify(["Vezérerő","Lesi-erő","Védekezés"]),"a címkék",r.cimke);
   ok(r.panzer.kilog.length===0&&r.gegen.kilog.length===0,"260 px-en sem lóg ki semmi a kártyából",{p:r.panzer.kilog,g:r.gegen.kilog});
-  ok(String(r.verzio).localeCompare("3.9.196",undefined,{numeric:true})>=0,"verzió legalább 3.9.196",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.196",undefined,{numeric:true})>=0),"verzió legalább 3.9.196",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");
