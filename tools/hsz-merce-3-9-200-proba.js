@@ -119,14 +119,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(/Csoportkör · 1\/6\. forduló/.test(r.blHead),"a BL marad: „Csoportkör · 1/6. forduló”",r.blHead.slice(0,120));
   console.log("\n— 2. A MEZŐNY —");
   ok(r.calc&&r.calc.mid===r.target&&r.calc.base>0&&r.calc.src==="meres","a HSZ-számítás eltéve: a mérésből, és pontosan a kiírt mezőny",{c:r.calc,t:r.target});
-  ok(new RegExp("A sorozat mezőnye: "+Math.round(r.target)+" — a nevezéskori meccs-erőd \\(⚡"+r.vart.base+"\\) [+−±]").test(r.head),"a képlet a valódi bemenettel: a nevezéskori ⚡ és az osztály-eltolás",r.head.match(/A sorozat mezőnye:[^.]*\./));
+  ok(new RegExp("A sorozat mezőnye: ⚡"+r.vart.tenyl+" — a nevezéskori meccs-erőd \\(⚡"+r.vart.base+"\\) [+−±]").test(r.head),"a képlet a valódi bemenettel: a nevezéskori ⚡ és az osztály-eltolás",r.head.match(/A sorozat mezőnye:[^.]*\./));
   ok(!/bajnoki szinted|élvonal szintje/.test(r.head),"a HSZ-nél nincs BL-képlet");
-  ok(Math.abs(r.kieg-5)<1e-9&&r.head.includes("Nehézségi kiegyenlítés: +"+r.vart.kieg),"⚖ +5,0 — a motor saját matchHiddenOppBuff-jából (rejtett 10 fele)",{k:r.kieg});
-  ok(r.head.includes("tényleges meccs-ereje tehát ⚡"+r.vart.tenyl+", nem "+Math.round(r.target)),"a tényleges ⚡ = mezőny + kiegyenlítés",{v:r.vart.tenyl});
+  /* ⚡ 3.9.367 — a mezőny egy számmal: a teljes ⚡ (a ⚖ benne, külön nem írjuk) */
+  ok(Math.abs(r.kieg-5)<1e-9&&!/Nehézségi kiegyenlítés/.test(r.head)&&r.head.includes("A sorozat mezőnye: ⚡"+r.vart.tenyl),"3.9.367: a mezőny a teljes ⚡-val (mezőny + a motor ⚖-je), ⚖ sor nélkül",{k:r.kieg,v:r.vart.tenyl});
   ok(r.head.includes("A ti csapaterőtök: "+r.vart.ts)&&r.head.includes("meccs-erőtök most: ⚡"+r.vart.ms),"a csapaterő és a meccs-erő (⚡ + 📈) is ott van",r.vart);
-  ok(!/Nehézségi kiegyenlítés/.test(r.head0)&&!/⚖/.test(r.next0)&&/A sorozat mezőnye/.test(r.head0)&&!r.rendErr0,"kiegyenlítés nélkül nincs ⚖ sor");
+  ok(!/Nehézségi kiegyenlítés/.test(r.head0)&&!/⚖/.test(r.next0)&&/A sorozat mezőnye/.test(r.head0)&&!r.rendErr0,"kiegyenlítés nélkül sincs ⚖ sor");
   console.log("\n— 3. A KÖVETKEZŐ MECCS —");
-  ok(r.vartN&&r.next.includes("⚡"+r.vartN.oMs+" (saját "+r.vartN.oOvr+" ⚖+"+r.vart.kieg+")"),"az ellenfél ⚡-ja = saját + ⚖",{n:r.next.slice(0,260),v:r.vartN});
+  ok(r.vartN&&r.next.includes("⚡"+r.vartN.oMs)&&!/⚖/.test(r.next),"3.9.367: az ellenfél ⚡-ja a teljes szám, ⚖ bontás nélkül",{n:r.next.slice(0,260),v:r.vartN});
   ok(r.next.includes("Ti: csapaterő "+r.vart.ts+" · ⚡"+r.vart.ms)&&/a motor a két ⚡-val számol/.test(r.next),"a tiéd: csapaterő és az eredményjelző ⚡-ja",r.next.slice(0,260));
   console.log("\n— 4. A TABELLA ÉS AZ ÖSSZEGZŐ —");
   ok(r.lbl==="Ligaszakasz"&&r.sorok===32,"32-es tabella, „Ligaszakasz” címkével",{l:r.lbl,n:r.sorok});
@@ -134,7 +134,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.vagas===2,"két sávhatár (8. és 24. után)",r.vagas);
   ok(/A ligaszakaszban \d+\. hely/.test(r.lab||"")&&/Még 2 forduló a ligaszakaszból\. 1–8\./.test(r.lab||""),"a meccs utáni összegző: ligaszakasz, „Még 2 forduló” a 8-ból",r.lab||r.labErr);
   ok(r.blLbl==="Csoport"&&r.blSorok===4&&/Az első két helyezett jut tovább/.test(r.blTabla)&&!r.blCalc,"a BL-tabella változatlan",{l:r.blLbl,n:r.blSorok});
-  ok(/Nehézségi kiegyenlítés: \+5,0/.test(r.blHead)&&/bajnoki szinted|élvonal szintje|nyári kupa mércéje/.test(r.blHead),"a BL is kiírja a ⚖-t, a saját képletével",r.blHead.slice(0,300));
+  ok(!/Nehézségi kiegyenlítés/.test(r.blHead)&&/A sorozat mezőnye: ⚡/.test(r.blHead)&&/bajnoki szinted|élvonal szintje|nyári kupa mércéje/.test(r.blHead),"a BL is a teljes ⚡-val, a saját képletével",r.blHead.slice(0,300));
   ok(String(r.verzio).localeCompare("3.9.200",undefined,{numeric:true})>=0,"verzió legalább 3.9.200",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
