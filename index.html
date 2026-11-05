@@ -7907,7 +7907,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    ránézésre a nagyobbik tűnik kisebbnek (a mező szöveg, nem szám: a fejléc, a
    multiplayer verzió-egyeztetés és a diagnosztika is így hasonlítja). A 3.7.1
    ennek a sémának a 3.7.01-e volt. */
-const APP_VERSION="3.9.365";
+const APP_VERSION="3.9.366";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -68405,6 +68405,7 @@ function kickoffTap(){
   if(kupaElo()){
     try{immCancel();}catch(e){}
     if(mpCupDuelNow()&&duelPrepKell()){duelPrepArm();return;}   /* ⚔ 3.9.305 */
+    if(mpCupDuelNow()&&dkKapu(()=>kupaInditas()))return;   /* 📣 3.9.366 — a keret kihirdetése */
     if(kupaPrepKell()){kupaPrepArm();return;}
     kupaInditas();return;}
   if(S.playing||(S.idx>=30&&!svDuelNow()))return;   /* 🌍 3.9.331 — a II. párharc-nap a 30. után */
@@ -68412,6 +68413,7 @@ function kickoffTap(){
   if(hcFuggoKapu())return;
   /* ⚔ 3.9.305 — a párharc előtt is felkészülés (a friss csapatlap-csere) */
   if(duelPrepKell()){try{immCancel();}catch(e){}duelPrepArm();return;}
+  if(dkKapu(()=>startRound()))return;   /* 📣 3.9.366 — a keret kihirdetése */
   /* Ha kézzel indítottad, a futó visszaszámlálás elévült — a lánc innentől a
      mérkőzésé. (A mód bekapcsolva marad: a lefújás után újra felveszi.) */
   try{immCancel();}catch(e){}
@@ -71510,7 +71512,7 @@ function edzoElemzesKer(){
         try{b.scrollTop=0;}catch(e){}};
       /* ⚔ 3.9.305 — párharc előtt a friss csapatlap-csere is lefut */
       let duel=!!M.fx.duel;try{duel=duel||mpCupDuelNow();}catch(e){}
-      if(duel){const T=duelTarsLap();if(!(T&&T.friss)){Promise.resolve(duelLapCsere()).then(kesz,kesz);return;}}
+      if(duel){Promise.resolve(duelLapCsere()).then(kesz,kesz);return;}   /* 📣 3.9.366 — mindig a társ friss (akár újra kihirdetett) lapja */
       kesz();}});}
 function edzoElemGombFrissit(){
   const b=$("edzoElemKickBtn");if(!b)return;
@@ -71554,7 +71556,7 @@ async function duelLapCsere(){
   try{
     if(!(MP&&MP.activeRoom))return duelTarolt();
     const myF=MP.role==="host"?"host":"guest",opF=myF==="host"?"guest":"host";
-    try{await mpBk().h2hPut(MP.activeRoom,k,myF,{card:mpTeamCard(),at:Date.now()});}catch(e){}
+    try{await mpBk().h2hPut(MP.activeRoom,k,myF,dkLapRekord());}catch(e){}   /* 📣 3.9.366 — a kihirdetés jelzésével */
     let node=null;try{node=await mpBk().h2hGet(MP.activeRoom,k);}catch(e){}
     const c=node&&node[opF]&&mpCardClean(node[opF].card);
     if(c){_duelTars={k,card:c,forras:"friss csapatlap a társad gépéről",friss:true};return _duelTars;}
@@ -71668,6 +71670,165 @@ function duelEllenfelHtml(o){
   const el=duelElozmeny();if(el)h+=sor(`📜 Egymás ellen eddig: ${el}`);
   if(!T.friss)h+=sor(`<span style="color:var(--dim2)">Friss lapért kérj felkészülést — a társad gépe akkor küldi a mostani csapatát.</span>`);
   return h;}
+/* ================= 📣 A KERET KIHIRDETÉSE A PÁRHARC ELŐTT (3.9.366) =================
+   KIMONDOTT KÉRÉS: „Párharc előtt: hogy lehessen edzői elemzéssel dolgozni
+   értelmesen. Amikor a felkészültem gombra rányomsz, akkor legyen egy felugró
+   ablak: a keret kihirdetése, 1. igen, és mehet a meccs, 2. Igen, de még
+   lehet, hogy változtatok, 3. Nem, még módosítanom kell. És akkor ha ez
+   megvan, akkor már el lesz küldve az adat a másik csapatnak. A másik oldalon
+   ugyanez, és amint mindketten rányomnak az igenre, mindketten kapnak egy
+   elemzést, hogy milyenek az esélyek. Aki az 1. választotta, az megnézheti az
+   elemzést, majd ha azt bezárta, automatikusan indul neki a meccs. (Ezt az 1.
+   választásnál jelezni is kell, hogy ha erre rányom, akkor nem lesz
+   változtatási lehetősége, kivéve akkor, ha várakozó képernyőn, ha még a
+   másiknak nem Ready a kerete, onnan még visszalép.) Aki a 2.-t választotta,
+   az visszaléphet, módosíthat a csapaton, és kérhet még edzői elemzést, annyit,
+   ahány az edzőnek van alapból. Ilyenkor az első, mindenkinek járó elemzés
+   ingyen van."
+   A MENET (a kezdőrúgás gombján, a 🔍 Felkészülés UTÁN — kickoffTap → dkKapu):
+     1. ha még nem döntöttél a cseretervről, az jön előbb (utána már nem
+        kérdez — az 1. választás után nem állhat meg semmi a meccs előtt);
+     2. a kihirdetés ablaka a három választással;
+     3. az 1. és a 2. a csapatlapot a `kesz` jelzéssel felteszi a szobába (a
+        felkészülés `dp:<párharc-kulcs>` rekeszébe — ugyanoda, ahonnan a társ
+        gépe az elemzéshez olvas);
+     4. várakozás a társ kihirdetésére — innen VISSZA LEHET LÉPNI (a jelzés
+        lekerül, a lap marad); ha a társ gépe nem válaszol (régi kliens, nincs
+        kapcsolat), egy perc után elemzés nélkül is tovább lehet menni;
+     5. amint mindketten kihirdettetek: az INGYENES elemzés, a két kihirdetett
+        keretből (nem fogy az edző elemzéseiből);
+     6. az 1. választásnál az elemzés bezárása indítja a párharcot (a szokásos
+        keret-feltöltés és a közös szimuláció); a 2.-nál a gomb „📣 Kihirdetve"
+        marad, a keret szabadon módosítható, a fizetős elemzések az edző
+        szintje szerint járnak, és a következő nyomásra ugyanez az ablak jön —
+        már elemzés nélkül, hiszen az ingyenes megvolt. */
+let _dk=null,_dkAt=null,_dkPoll=null,_dkUtanOk=null;
+const DK_TURELEM=60000;
+function dkAllapot(){const k=duelKulcs();if(!_dk||_dk.k!==k)_dk={k,kesz:0,elemzes:0};return _dk;}
+function dkLapRekord(){
+  const A=dkAllapot();
+  return {card:mpTeamCard(),at:Date.now(),kesz:A.kesz||0,dkv:1};}
+function dkParharcMost(){
+  try{if(kupaElo()&&mpCupDuelNow())return true;}catch(e){}
+  try{if(svDuelNow())return true;}catch(e){}
+  try{if(h2hRoomActive()&&h2hIsDuelRound())return true;}catch(e){}
+  return false;}
+function dkKell(){
+  try{
+    if(S.auto||S.playing||gameMode!=="career")return false;
+    if(!(MP&&MP.activeRoom))return false;
+    if(!dkParharcMost())return false;
+    const key=h2hKey();
+    if(S.h2hPending&&S.h2hPending.key===key)return false;   /* a keret már fent van: a várakozás viszi */
+    return true;}catch(e){return false;}}
+/* a kezdőrúgás kapuja: true, ha átvette a szót */
+function dkKapu(tovabb){
+  if(!dkKell())return false;
+  const k=duelKulcs();
+  if(_dkAt===k)return false;
+  const key=h2hKey();
+  if(S.subPlanAsked!==key){
+    try{openSubPlanner({duel:true,key,onDone:()=>dkKihirdet(tovabb)});return true;}catch(e){}}
+  dkKihirdet(tovabb);
+  return true;}
+function dkGombCimke(t){
+  try{if(!dkKell())return t;
+    if(_dkAt===duelKulcs())return t;
+    const A=dkAllapot();
+    return (A.kesz===2?"📣 Kihirdetve — ":"✅ Felkészültem — ")+t;}catch(e){return t;}}
+/* a saját ablaka (a többi modál fölött, az elemzés alatt nem: az ingyenes
+   elemzés az edző megszokott ablakában jön) */
+function dkAblak(cim,html,gombok){
+  let m=$("dkModal");
+  if(!m){m=document.createElement("div");m.id="dkModal";m.className="hide";
+    m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.80);z-index:468;display:flex;align-items:center;justify-content:center;padding:14px";
+    m.innerHTML=`<div class="card" style="max-width:460px;width:100%;max-height:88vh;overflow-y:auto"><div class="steplbl" id="dkCim" style="color:var(--gold)"></div>`
+      +`<div id="dkBody" style="margin-top:6px;font-size:13px;line-height:1.5"></div><div id="dkGombok" style="display:flex;flex-direction:column;gap:7px;margin-top:12px"></div></div>`;
+    document.body.appendChild(m);}
+  $("dkCim").textContent=cim;$("dkBody").innerHTML=html;
+  const g=$("dkGombok");g.innerHTML="";
+  (gombok||[]).forEach(x=>{const b=document.createElement("button");b.className=x.cls||"mpBtn";b.textContent=x.t;
+    if(x.id)b.id=x.id;if(x.hide)b.classList.add("hide");b.onclick=x.f;g.appendChild(b);});
+  m.classList.remove("hide");
+  return m;}
+function dkZar(){const m=$("dkModal");if(m)m.classList.add("hide");if(_dkPoll){clearTimeout(_dkPoll);_dkPoll=null;}}
+function dkGombFrissit(){try{const b=$("kickBtn");if(b&&!S.playing){b.disabled=false;b.textContent=kickBtnLabel();}}catch(e){}}
+function dkKihirdet(tovabb){
+  const A=dkAllapot();
+  const ujra=A.kesz===2;
+  dkAblak("📣 A keret kihirdetése",
+    `<div>A párharc előtt kihirdeted a keretedet: a csapatlapod (kezdő tizenegy, felállás, taktika, ⚡) a társad gépére megy, `
+    +`az övé hozzád. ${A.elemzes?`Az ingyenes edzői elemzést erre a párharcra már megkaptad.`
+      :`Amint mindketten kihirdettétek, mindketten kaptok egy <b>ingyenes edzői elemzést</b> az esélyekről.`}</div>`
+    +`<div style="margin-top:8px;padding:7px 9px;border-left:3px solid var(--gold);background:var(--panel2);font-size:12px">`
+    +`<b>1.</b> — ha ezt választod, <b>a keretet már nem változtathatod</b>: ${A.elemzes?"a párharc azonnal indul":"az elemzés bezárása után a párharc magától indul"}. `
+    +`Kivétel: amíg a társad kerete nincs kihirdetve, a várakozó képernyőről még visszaléphetsz.</div>`,
+    [{t:"✅ 1. Igen — mehet a meccs",cls:"mpBtn gold",f:()=>dkValaszt(1,tovabb)},
+     {t:ujra?"📝 2. Igen, de még változtathatok (a mostani keret megy ki)":"📝 2. Igen, de még lehet, hogy változtatok",f:()=>dkValaszt(2,tovabb)},
+     {t:"✋ 3. Nem, még módosítanom kell",f:()=>{dkZar();dkGombFrissit();}}]);}
+async function dkKuld(){
+  try{const k=duelKulcs(),myF=MP.role==="host"?"host":"guest";
+    await mpBk().h2hPut(MP.activeRoom,k,myF,dkLapRekord());return true;}catch(e){return false;}}
+async function dkValaszt(m,tovabb){
+  const A=dkAllapot();A.kesz=m;
+  dkAblak("📣 A keret kihirdetése",`<div style="text-align:center">A kereted kihirdetése…</div>`,[]);
+  const ok=await dkKuld();
+  try{addLine(`📣 <b>Kihirdetted a keretedet</b> a párharcra${m===1?" — ezzel indulsz":" — még változtathatsz rajta"}.`
+    +(ok?"":" (A szobába most nem ment fel — a felkészülés lapja marad.)"),"m ev");}catch(e){}
+  if(A.elemzes){dkZar();if(m===1)dkIndit(tovabb);else dkGombFrissit();return;}
+  dkVar(tovabb);}
+function dkIndit(tovabb){
+  _dkAt=duelKulcs();
+  dkZar();
+  try{tovabb();}catch(e){dkGombFrissit();}}
+/* a társ kihirdetett lapja, ha van (a `kesz` jelzés a mostani párharc rekeszében) */
+async function dkTarsOlvas(){
+  try{const k=duelKulcs(),opF=MP.role==="host"?"guest":"host";
+    const n=await mpBk().h2hGet(MP.activeRoom,k),r=n&&n[opF];
+    if(!r||!(r.kesz>=1))return null;
+    const c=mpCardClean(r.card);if(!c)return null;
+    return {k,card:c,forras:"a társad kihirdetett kerete",friss:true,kesz:r.kesz};}catch(e){return null;}}
+function dkVar(tovabb){
+  const A=dkAllapot(),t0=Date.now(),k=A.k;
+  const rajz=(lejart)=>dkAblak("📣 Kihirdetve — várjuk a társadat",
+    `<div style="text-align:center;font-size:22px;margin:4px 0">⏳</div>`
+    +`<div>A kereted kint van${A.kesz===1?" (<b>ezzel indulsz</b>)":" (<b>még változtathatsz</b>)"}. Amint a társad is kihirdeti az övét, `
+    +`megkapjátok az ingyenes edzői elemzést${A.kesz===1?", és a bezárása után indul a párharc":""}.</div>`
+    +(lejart?`<div style="margin-top:7px;color:var(--dim)">A társad gépe még nem jelzett. Ha régebbi verziót futtat vagy nincs kapcsolata, elemzés nélkül is továbbléphetsz.</div>`:""),
+    [{t:"↩ Visszalépek — még módosítok",f:async()=>{
+        if(_dkPoll){clearTimeout(_dkPoll);_dkPoll=null;}
+        A.kesz=0;await dkKuld();dkZar();dkGombFrissit();
+        try{addLine(`↩ Visszavontad a kihirdetést — módosíthatod a keretet.`,"m ev");}catch(e){}}},
+     ...(lejart?[{t:A.kesz===1?"Tovább elemzés nélkül — indul a párharc":"Tovább elemzés nélkül",f:()=>{
+        if(_dkPoll){clearTimeout(_dkPoll);_dkPoll=null;}
+        A.elemzes=1;if(A.kesz===1)dkIndit(tovabb);else{dkZar();dkGombFrissit();}}}]:[])]);
+  let lejartRajz=false;
+  rajz(false);
+  const kor=async()=>{
+    _dkPoll=null;
+    const m=$("dkModal");if(!m||m.classList.contains("hide")||!_dk||_dk.k!==k)return;
+    const T=await dkTarsOlvas();
+    if(!_dk||_dk.k!==k||!(A.kesz>=1))return;
+    const m2=$("dkModal");if(!m2||m2.classList.contains("hide"))return;
+    if(T){_duelTars=T;A.elemzes=1;dkZar();dkElemzes(A.kesz===1?()=>dkIndit(tovabb):()=>dkGombFrissit());return;}
+    if(!lejartRajz&&Date.now()-t0>=DK_TURELEM){lejartRajz=true;rajz(true);}
+    _dkPoll=setTimeout(kor,2500);};
+  _dkPoll=setTimeout(kor,600);}
+/* az ingyenes elemzés — az edző megszokott ablakában, a két kihirdetett keretből */
+function dkElemzes(utana){
+  let M=null;try{M=edzoKovetkezoMeccs();}catch(e){M=null;}
+  let o=null;try{o=M?edzoElemzesSzamol(M.fx):null;}catch(e){o=null;}
+  const m=$("edzoElemModal"),b=$("edzoElemBody");
+  if(!m||!b){if(utana)utana();return;}
+  const A=dkAllapot();
+  b.innerHTML=`<div style="font-size:12px;color:var(--grass);margin-bottom:6px">📣 A két kihirdetett keretből — <b>ingyenes</b>, nem fogy az edződ elemzéseiből.</div>`
+    +(o?edzoElemzesHtml(o):`<div style="font-size:13px">Az elemzés most nem készült el.</div>`)
+    +(A.kesz===1?`<div style="margin-top:10px;font-size:12.5px;color:var(--gold)">Az „Értem" gombbal indul a párharc.</div>`
+      :`<div style="margin-top:10px;font-size:12.5px;color:var(--dim)">Még változtathatsz a kereten, és kérhetsz további elemzést (${edzoElemzesMarad()} / ${edzoElemzesMax()}). Ha kész vagy, a kezdőrúgás gombja újra kihirdet.</div>`);
+  const uj=$("edzoElemUjra");if(uj)uj.classList.add("hide");
+  _dkUtanOk=utana||null;
+  m.classList.remove("hide");
+  try{b.scrollTop=0;}catch(e){}}
 /* ================= 👔 AZ EDZŐ MINT IDEGENVEZETŐ (3.9.307) =================
    KIMONDOTT KÉRÉS: „Sok a rendszer. […] az edző lenne az idegenvezető […]
    Idény elején elmondaná, mi nyílt meg, és a menü tetején egyetlen javaslatot
@@ -73845,10 +74006,10 @@ function kickBtnLabel(){
   const r=Math.min(30,(S.idx||0)+1);
   try{if(hcFuggoMost())return "🛡 Előbb a kézfogás a társaddal";}catch(e){}   /* 🛡 3.9.290 */
   try{if(kupaElo()){const c=kupaCim().split(" — ")[0];   /* ⚽ 3.9.304 — a gombra csak a szakasz és a forduló */
-    if(mpCupDuelNow())return duelPrepKell()?`🔍 Felkészülés — ⚔ ${c}`:`⚔ PÁRHARC — ${c}`;
+    if(mpCupDuelNow())return duelPrepKell()?`🔍 Felkészülés — ⚔ ${c}`:dkGombCimke(`⚔ PÁRHARC — ${c}`);
     return kupaPrepKell()?`🔍 Felkészülés — ${c}`:`⚽ Kezdőrúgás — ${c}`;}}catch(e){}
-  try{if(svDuelNow()){const n=svPhRomai(svPhEsedekes());return duelPrepKell()?`🔍 Felkészülés — ⚔ párharc-nap ${n}`:`⚔ PÁRHARC-NAP ${n}`;}}catch(e){}   /* 🌍 3.9.331 */
-  if(h2hIsDuelRound())return duelPrepKell()?`🔍 Felkészülés — ⚔ párharc, ${r}. forduló`:`⚔ PÁRHARC — ${r}. forduló`;   /* ⚔ 3.9.305 */
+  try{if(svDuelNow()){const n=svPhRomai(svPhEsedekes());return duelPrepKell()?`🔍 Felkészülés — ⚔ párharc-nap ${n}`:dkGombCimke(`⚔ PÁRHARC-NAP ${n}`);}}catch(e){}   /* 🌍 3.9.331 */
+  if(h2hIsDuelRound())return duelPrepKell()?`🔍 Felkészülés — ⚔ párharc, ${r}. forduló`:dkGombCimke(`⚔ PÁRHARC — ${r}. forduló`);   /* ⚔ 3.9.305 */
   /* AMÍG NEM VOLT FELKÉSZÜLÉS, a gomb SEMMIT nem árul el a mérkőzésről. A
      rangadó- és tétmeccs-jelölés a felfedés UTÁN jön vissza (lásd lentebb) —
      ha itt is ott állna, épp azt lőné le, amiért a lépés létezik. */
@@ -76292,6 +76453,7 @@ async function h2hTickRun(key,myField,oppField,round,gen){
           szabályok is elavulnak — a következő indításkor újra megkérdezzük. */
        h2hPendingClear();
        S.subPlanAsked=null;
+       _dkAt=null;try{const A=dkAllapot();A.kesz=0;dkKuld();}catch(e){}   /* 📣 3.9.366 — újra ki kell hirdetni */
        h2hStaleDisarm();   /* P1b: a keret visszahívásával a felajánlás is tárgytalan */
        h2hForcedEnd();
        /* ---- VISSZA ODA, AHONNAN A PÁRHARC INDULT ----
@@ -125954,7 +126116,9 @@ $("hubCoachBtn")&&($("hubCoachBtn").onclick=()=>{
   $("hubCoachPicker").scrollIntoView({behavior:"smooth"});});
 $("hubCoachClose")&&($("hubCoachClose").onclick=()=>{$("hubCoachPicker").classList.add("hide");});
 $("edzoElemKickBtn")&&($("edzoElemKickBtn").onclick=()=>{try{edzoElemzesKer();}catch(e){}});
-$("edzoElemOk")&&($("edzoElemOk").onclick=()=>{$("edzoElemModal").classList.add("hide");try{edzoElemGombFrissit();}catch(e){}try{if(!$("hubCoachPicker").classList.contains("hide"))renderHubCoachPanel();}catch(e){}});
+$("edzoElemOk")&&($("edzoElemOk").onclick=()=>{$("edzoElemModal").classList.add("hide");try{edzoElemGombFrissit();}catch(e){}try{if(!$("hubCoachPicker").classList.contains("hide"))renderHubCoachPanel();}catch(e){}
+  /* 📣 3.9.366 — a kihirdetés ingyenes elemzése után: indul a párharc (1.) vagy vissza a gombhoz (2.) */
+  const f=_dkUtanOk;_dkUtanOk=null;if(f)try{f();}catch(e){}});
 $("edzoElemUjra")&&($("edzoElemUjra").onclick=()=>{$("edzoElemModal").classList.add("hide");try{edzoElemzesKer();}catch(e){}});
 $("edzoElemModal")&&($("edzoElemModal").onclick=ev=>{if(ev.target.id==="edzoElemModal")$("edzoElemOk").click();});
 /* ---- A SZINTLÉPÉS HÍRE ----
