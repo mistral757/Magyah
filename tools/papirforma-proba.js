@@ -164,8 +164,12 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
        prepBriefing(fx);
      }catch(e){}
      addLine=orig;
-     const sor=log.find(x=>x.indexOf("Papírforma")>=0)||null;
+     /* ⚡ 3.9.367 — a fő sor a meccs-erő (⚡ — ⚡), a papírforma alatta, az óriásölés mércéjeként */
+     const sor=log.find(x=>/Papírforma|papírforma/.test(x))||null;
+     const f1=v=>v.toFixed(1).replace(".",",");
+     const vMs=f1(teamMatchStrength()+(pformTeamOvr()||0)),vO=f1(fx.o.ovr+(matchHiddenOppBuff()||0));
      ki.sor={van:!!sor,kozep:sor?sor.indexOf(String(n1(paperRefNow())).replace(".",","))>=0:false,
+       ms:sor?(sor.indexOf("⚡ Meccs-erő: <b>"+vMs+"</b> — <b>"+vO+"</b>")>=0):false,
        szoveg:sor?sor.replace(/<[^>]+>/g,"").slice(0,220):null};}
 
     /* ---- 8. A MÉRFÖLDKŐ ---- */
@@ -210,7 +214,8 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
      [t.keso.uj,t.keso.db,t.keso.mezony]);
 
   console.log("\n— A MECCS ELŐTTI SOR —");
-  ok(t.sor.van&&t.sor.kozep,"a meccs előtti sor a KÖZEPET írja ki",t.sor.szoveg);
+  ok(t.sor.van&&t.sor.kozep,"a meccs előtti sor a KÖZEPET is kiírja (az óriásölés mércéjeként)",t.sor.szoveg);
+  ok(t.sor.ms,"3.9.367: a fő sor a két ⚡ — a tiéd a formával, az ellenfélé a teljes meccs-erő (mint az eredményjelzőn)",t.sor.szoveg);
 
   console.log("\n— A MÉRFÖLDKŐ —");
   ok(t.ms.alatta[0]===0&&t.ms.alatta[1]===0,"a küszöb (5%) alatt nem számít óriásölésnek",t.ms.alatta);

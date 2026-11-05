@@ -39,3 +39,26 @@ A régi elvárásokat az új kijelzéshez igazítottuk:
 - `tools/hsz-merce-3-9-200-proba.js` — a HSZ és a BL mezőnye ⚡-val, ⚖ sor
   nélkül; a következő meccs bontás nélkül;
 - `tools/celres-meccsero-3-9-364-proba.js` — a mezőny egy számmal.
+
+## 3.9.368 — a felkészülés sora is
+
+> „És a feednek ezt a kiírását is javítsuk eszerint” (a képen: „⚖️
+> Papírforma: 144,9 — 142,9 · papíron 2,0-del erősebb vagy”, miközben az
+> eredményjelzőn ⚡152,6 állt ⚡142,9 ⚖+14,8 ellen).
+
+A felkészülés sora eddig a **papírformát** írta ki: a te oldaladon a nyers
+csapaterőd és a ⚡ közepét, az ellenfélnél a csapaterejét, kiegyenlítés
+nélkül. A képen ez +2,0-t mutatott, a motor szerinti valódi erőviszony
+viszont 152,6 a 157,7 ellen, vagyis −5,1 volt.
+
+Mostantól:
+- **A fő sor a meccs-erő:** „⚡ Meccs-erő: 152,6 — 157,7 · 5,1-del gyengébb
+  vagy”. Ezek ugyanazok a számok, amelyeket az eredményjelző mutat, és
+  amelyekkel a motor számol: a tiéd a tartós formával, az ellenfélé a teljes
+  ⚡.
+- **A papírforma alatta, halványan marad,** mert az **óriásölés** mércéje
+  változatlanul az: a nyers csapaterőd és a ⚡ közepe, az ellenfél
+  csapaterejével szemben. Az óriásölés szabálya nem változott.
+
+`tools/papirforma-proba.js`: a fő sor a két ⚡, a papírforma középértéke
+alatta szerepel.
