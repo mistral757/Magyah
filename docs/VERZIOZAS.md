@@ -150,3 +150,4 @@ Minden minor és major ide kap egy sort.
 | verzió | dátum | csomag |
 |---|---|---|
 | 1.0.4.8.03 | 11-05 | (patch) az új verziószámozás és ez a lap |
+| **1.0.4.9.00** | 11-05 | kerethirdetés a párharc előtt — két mód (rögtön a meccs / előbb az elemzés), nincs külön felkészülés |

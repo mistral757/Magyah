@@ -5,8 +5,8 @@
    legyen részletesebb."
 
    KÉT LAP, a játék helyi szoba-hátterén (mint a 3.9.288). Amit mér:
-     1. a párharc-forduló kezdőrúgás-gombja előbb „🔍 Felkészülés", és az
-        első koppintás NEM indítja a párharcot;
+     1. a párharc-forduló kezdőrúgás-gombja „📣 Kerethirdetés" (1.0.4.9.00 óta
+        nincs külön felkészülés), és nem indítja a párharcot;
      2. a felkészülés kicseréli a két gép friss csapatlapját (a bővítéssel:
         stílus, forma, morál, csúcs/mélypont, skillek);
      3. a második koppintás már a párharc;
@@ -68,31 +68,30 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const elo=p=>p.evaluate(()=>{
     S.idx=H2H_ROUNDS[0]-1;S.playing=false;S.auto=false;S.euro=null;S.mpDuelLog=[{season:1,round:5,gf:2,ga:1,home:true}];
     window._sr=0;window.startRound=function(){window._sr++;};
+    try{$("scSim").classList.remove("hide");}catch(e){}   /* a kerethirdetés a meccsképernyőről indul */
     if(!coach)coach=COACHES[0];S.edzo=null;
     return {duel:h2hIsDuelRound(),label:kickBtnLabel()};});
   console.log("— 1. a gomb —");
   const a0=await elo(A),b0=await elo(B);
-  ok(a0.duel&&/Felkészülés/.test(a0.label)&&/párharc/.test(a0.label),"a párharc-forduló gombja: 🔍 Felkészülés — ⚔ párharc",a0);
+  /* 📣 1.0.4.9.00 — nincs külön felkészülés: a lapcsere a kerethirdetéssel megy */
+  ok(a0.duel&&/^📣 Kerethirdetés — ⚔ PÁRHARC/.test(a0.label),"a párharc-forduló gombja: 📣 Kerethirdetés — ⚔ párharc",a0);
 
-  console.log("\n— 2. a felkészülés: csapatlap-csere —");
-  await A.evaluate(()=>{kickoffTap();});await A.waitForTimeout(600);
-  await B.evaluate(()=>{kickoffTap();});await B.waitForTimeout(800);
+  console.log("\n— 2. a kerethirdetés: csapatlap-csere —");
+  const hirdet=(P,re)=>P.evaluate(async src=>{S.subPlanAsked=h2hKey();kickoffTap();await new Promise(r=>setTimeout(r,150));
+    const b=[...document.querySelectorAll("#dkGombok button")].find(x=>new RegExp(src).test(x.textContent));if(b)b.click();
+    await new Promise(r=>setTimeout(r,500));return !!b;},re);
+  await hirdet(A,"^🧠 2\\.");await hirdet(B,"^🧠 2\\.");
+  await B.waitForTimeout(1500);await A.waitForTimeout(1500);
   const pb=await B.evaluate(()=>{const T=duelTarsLap();return {sr:window._sr,friss:!!(T&&T.friss),team:T&&T.card&&T.card.team,
-    ext:T&&T.card&&T.card.ext,label:kickBtnLabel(),
-    naplo:[...document.querySelectorAll("#ttLines div")].map(d=>d.textContent).filter(t=>/FELKÉSZÜLÉS · ⚔ PÁRHARC|Az ellenfeled/.test(t)).length};});
-  ok(pb.sr===0&&pb.friss&&pb.team&&pb.naplo>=2,"B: a felkészülés nem indít párharcot, és a friss lapot kapja (napló)",pb);
+    ext:T&&T.card&&T.card.ext,label:kickBtnLabel(),elem:!$("edzoElemModal").classList.contains("hide")};});
+  ok(pb.sr===0&&pb.friss&&pb.team&&pb.elem,"B: a kerethirdetés nem indít párharcot, a friss lapot kapja, és jön az elemzés",pb);
   ok(pb.ext&&pb.ext.moral!=null&&Array.isArray(pb.ext.sk),"a lap bővítése megjön (stílus, forma, morál, skillek)",pb.ext);
-  ok(/PÁRHARC/.test(pb.label)&&!/Felkészülés/.test(pb.label),"utána a gomb: ⚔ PÁRHARC",pb.label);
+  ok(/^⚔ Kezdőrúgás — PÁRHARC/.test(pb.label),"utána a gomb: ⚔ Kezdőrúgás",pb.label);
+  await B.evaluate(()=>$("edzoElemOk").click());await A.evaluate(()=>{if(!$("edzoElemModal").classList.contains("hide"))$("edzoElemOk").click();});
 
-  console.log("\n— 3. a második koppintás —");
-  /* 📣 3.9.366 — a második koppintás a keret kihirdetését nyitja; a társ
-     nélkül (itt nem hirdet ki) a várakozásból elemzés nélkül is tovább lehet */
-  const k2=await B.evaluate(async()=>{S.subPlanAsked=h2hKey();kickoffTap();const ablak=!$("dkModal").classList.contains("hide")&&window._sr===0;
-    [...document.querySelectorAll("#dkGombok button")].find(x=>/^✅ 1\./.test(x.textContent)).click();
-    await new Promise(r=>setTimeout(r,400));
-    const A=dkAllapot();A.elemzes=1;dkIndit(()=>startRound());
-    return {ablak,sr:window._sr};});
-  ok(k2.ablak&&k2.sr===1,"a második koppintás a kihirdetés ablaka (utána indul a párharc)",k2);
+  console.log("\n— 3. a kezdőrúgás —");
+  const k2=await B.evaluate(()=>{kickoffTap();return {sr:window._sr};});
+  ok(k2.sr===1,"az elemzés után a kezdőrúgás indítja a párharcot",k2);
 
   console.log("\n— 4. az edzői elemzés a párharcra —");
   const e=await A.evaluate(async()=>{const varj=ms=>new Promise(r=>setTimeout(r,ms));
