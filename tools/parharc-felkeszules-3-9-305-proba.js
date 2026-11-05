@@ -85,8 +85,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(/PÁRHARC/.test(pb.label)&&!/Felkészülés/.test(pb.label),"utána a gomb: ⚔ PÁRHARC",pb.label);
 
   console.log("\n— 3. a második koppintás —");
-  const k2=await B.evaluate(()=>{kickoffTap();return window._sr;});
-  ok(k2===1,"a második koppintás a párharc",k2);
+  /* 📣 3.9.366 — a második koppintás a keret kihirdetését nyitja; a társ
+     nélkül (itt nem hirdet ki) a várakozásból elemzés nélkül is tovább lehet */
+  const k2=await B.evaluate(async()=>{S.subPlanAsked=h2hKey();kickoffTap();const ablak=!$("dkModal").classList.contains("hide")&&window._sr===0;
+    [...document.querySelectorAll("#dkGombok button")].find(x=>/^✅ 1\./.test(x.textContent)).click();
+    await new Promise(r=>setTimeout(r,400));
+    const A=dkAllapot();A.elemzes=1;dkIndit(()=>startRound());
+    return {ablak,sr:window._sr};});
+  ok(k2.ablak&&k2.sr===1,"a második koppintás a kihirdetés ablaka (utána indul a párharc)",k2);
 
   console.log("\n— 4. az edzői elemzés a párharcra —");
   const e=await A.evaluate(async()=>{const varj=ms=>new Promise(r=>setTimeout(r,ms));

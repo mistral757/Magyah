@@ -93,8 +93,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(Math.abs(r.ablak.mezo-r.oppMs)<=0.6&&Math.abs(r.ablak.gE-r.valodiGap)<=0.6,"2. az ablak ⚡-mezőnye és rése a szezon valódi számai",{ablak:r.ablak,oppMs:r.oppMs,gap:r.valodiGap});
   ok(Math.abs(r.ablak.hid-Math.round(r.hNyar*10)/10)<0.06&&Math.abs(r.B.buff-r.hNyar/2)<0.06&&Math.abs(r.kieg-r.hNyar/2)<0.06,"3. a ⚖ az ablakban a motoré: a rejtett bónusz fele",{hid:r.ablak.hid,buff:r.B.buff,motor:r.kieg});
   {const sz=x=>String(Math.round(x*10)/10).replace(".",",");
-   ok(r.html.includes(`nyers ${sz(r.ablak.ms-r.ablak.hid)}`)&&r.html.includes(`⚡${sz(r.ablak.ms)}`)&&r.html.includes(`nyers ${sz(r.B.szint)}`)&&r.html.includes(`⚖ kiegyenlítés`)&&r.html.includes(`⚡${sz(r.B.mezo)}`),
-     "4. az ablak bontva írja: nyers + extrák = ⚡ (te), nyers + ⚖ = ⚡ (a mezőny)",r.html.slice(0,500));}
+   ok(r.html.includes(`nyers ${sz(r.ablak.ms-r.ablak.hid)}`)&&r.html.includes(`⚡${sz(r.ablak.ms)}`)&&!r.html.includes(`⚖ kiegyenlítés`)&&r.html.includes(`A mezőny: ⚡${sz(r.B.mezo)}`)&&r.html.includes(`⚡${sz(r.B.mezo)}`),
+     "4. az ablak bontva írja: nyers + extrák = ⚡ (te); a mezőny a teljes ⚡-val (3.9.367)",r.html.slice(0,500));}
   ok(!errs.length,"5. nincs oldalhiba",errs.slice(0,5));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

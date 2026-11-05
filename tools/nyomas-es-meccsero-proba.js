@@ -214,8 +214,9 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
   console.log("\n— 5. AZ EREDMÉNYJELZŐ —");
   ok(kozel(t.tabla.en,t.tabla.varEn,0.051),"a saját ⚡ meccs-erő a táblán",t.tabla);
   ok(kozel(t.tabla.o,t.tabla.varO,0.051),"a CPU ⚡ meccs-ereje = ovr + a motor rejtett erősítése",t.tabla);
-  ok(kozel(t.tabla.sajat,t.tabla.varSajat,0.051)&&(t.tabla.varKieg>0.05?kozel(t.tabla.kieg,t.tabla.varKieg,0.051):t.tabla.kieg===0),
-     "3.9.143: a ⚡ az ellenfél SAJÁT ereje, a ⚖ külön a nehézségi kiegyenlítés",t.tabla);
+  /* ⚡ 3.9.367 — „már eleve a teljes SUM meccs erő legyen ott mindig": a CPU sorában egy szám, ⚖ külön nélkül */
+  ok(kozel(t.tabla.sajat,t.tabla.varO,0.051)&&t.tabla.kieg===0,
+     "3.9.367: a CPU sorában a teljes ⚡ (ovr + a rejtett erősítés), a ⚖ nincs külön kiírva",t.tabla);
   ok(t.tabla.nincsKieg,"kiegyenlítés nélkül nincs ⚖ a sorban");
   ok(t.tabla.ovrSor,"a csapaterő sora is megmarad",t.tabla.ovrSor);
   ok(kozel(t.tabla.elo,Math.round((t.tabla.varEn-2.5)*10)/10,0.051),"az élő frissítés átírja a számot",t.tabla);
