@@ -64,7 +64,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.idx=NF_ELEMEK.map(e=>({k:e.k,ert:e.ert}));
     o.kim=NF_KIMENET;o.n=NF_LEPESEK.length;
     return o;});
-  ok(String(r1.v).localeCompare("3.9.223",undefined,{numeric:true})>=0,"verzió",r1.v);
+  ok((/^1\.0\./.test(String(r1.v))||String(r1.v).localeCompare("3.9.223",undefined,{numeric:true})>=0),"verzió",r1.v);
   {let egyezik=true,elso=null;
    for(let nf=1;nf<=10;nf++)for(let s=1;s<=5;s++){
      const a=r1.all[(nf-1)*5+s-1],t=TOOL.nfCsomag(nf,s);

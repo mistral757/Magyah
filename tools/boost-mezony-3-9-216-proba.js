@@ -59,7 +59,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* a 🧿 Csodaszer ne torzítsa a mérést */
     window.talBoostHatasMult=()=>1;
     return {v:APP_VERSION,fn:typeof boostPotFieldScale==="function"&&typeof cardUpRatingFor==="function"};});
-  ok(String(r0.v).localeCompare("3.9.216",undefined,{numeric:true})>=0,"a verzió legalább 3.9.216",r0.v);
+  ok((/^1\.0\./.test(String(r0.v))||String(r0.v).localeCompare("3.9.216",undefined,{numeric:true})>=0),"a verzió legalább 3.9.216",r0.v);
   ok(r0.fn,"a közös POT-lépték és a kártya-összeg függvénye létezik");
   if(!r0.fn){await b.close();srv.close();console.log(`\n✗ ${hiba} hiba`);process.exit(1);}
 

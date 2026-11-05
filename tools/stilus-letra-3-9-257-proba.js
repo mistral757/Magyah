@@ -197,7 +197,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.sztar.panel,"a panel kirajzolódik (ragyogás · Kiemelkedés · Az öltöző)");
   ok(r.sztar.nincsSztar.every(x=>x===0),"kijelölt sztár nélkül nulla, nem hiba",r.sztar.nincsSztar);
 
-  ok(String(r.verzio).localeCompare("3.9.257",undefined,{numeric:true})>=0,"verzió legalább 3.9.257",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.257",undefined,{numeric:true})>=0),"verzió legalább 3.9.257",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

@@ -110,7 +110,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.chJutalom.chA===r.chJutalom.chB,"a saját jutalom-bevétele nem emeli (nem gerjeszti önmagát)",r.chJutalom);
   console.log("=== 5. a katalógus ===");
   ok(/valódi bevétel/.test(r.kat)&&/most a valódi bevétel dönt/.test(r.kat),"a katalógus kiírja, hogy most a valódi bevétel dönt",r.kat.slice(0,300));
-  ok(String(r.verzio).localeCompare("3.9.263",undefined,{numeric:true})>=0,"verzió legalább 3.9.263",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.263",undefined,{numeric:true})>=0),"verzió legalább 3.9.263",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

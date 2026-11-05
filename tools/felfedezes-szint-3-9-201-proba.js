@@ -119,7 +119,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 4. AZ ÚT —");
   ok(r.ut.n&&r.ut.bent&&r.ut.draft&&r.ut.ovr<=r.ut.hi+1e-9,"az unlockRandomPlayer a sávból ad, és a keretbe teszi",r.ut);
   ok(r.ures===null,"ha a sávban és alatta nincs senki, nem lép felfelé (nincs felfedezés)",r.ures);
-  ok(String(r.verzio).localeCompare("3.9.201",undefined,{numeric:true})>=0,"verzió legalább 3.9.201",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.201",undefined,{numeric:true})>=0),"verzió legalább 3.9.201",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

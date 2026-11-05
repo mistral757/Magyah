@@ -162,7 +162,7 @@ async function oldal(b,{w,h,tema,ls,reduce}){
    ok(r.elotte!=="block"&&r.menu&&r.disp==="block","a ☰ Menü megnyitásakor (és csak akkor) a felülnézetes jelenet látszik",r);
    ok(r.a&&r.b&&r.a!==r.b&&r.rondo>=12,"a menü mögött is MOZOG (rondó, kocogók, passzolók — 12 szereplő)",{a:r.a,b:r.b,n:r.rondo});
    ok(/rgba\(0, 0, 0, 0\)|transparent/.test(r.bg)&&r.utana==="none","menü-módban a lap háttere átlátszó; a menü bezárásakor a jelenet eltűnik",{bg:r.bg,utana:r.utana});
-   ok(await p.evaluate(()=>String(APP_VERSION).localeCompare("3.9.202",undefined,{numeric:true})>=0),"verzió legalább 3.9.202");
+   ok(await p.evaluate(()=>(/^1\.0\./.test(String(APP_VERSION))||String(APP_VERSION).localeCompare("3.9.202",undefined,{numeric:true})>=0)),"verzió legalább 3.9.202");
    await ctx.close();}
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();

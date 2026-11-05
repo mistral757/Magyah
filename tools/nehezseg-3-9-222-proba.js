@@ -52,7 +52,7 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
   console.log("\n— 1. a tíz fokozat —");
   const r1=await p.evaluate(()=>({v:APP_VERSION,L:NF_LEVELS.map(x=>({nf:x.nf,n:x.n,cel:x.cel,fel:x.fel,cim:x.cim,kies:x.kies})),
     hs:NF_HOLTSAV,aj:NF_AJANLOTT}));
-  ok(String(r1.v).localeCompare("3.9.222",undefined,{numeric:true})>=0,"verzió",r1.v);
+  ok((/^1\.0\./.test(String(r1.v))||String(r1.v).localeCompare("3.9.222",undefined,{numeric:true})>=0),"verzió",r1.v);
   ok(r1.L.map(x=>x.n).join("|")==="Homokozó|Kezdő|Simaliba|Haladó|Nehéz|Professzionális|Mesteri|Legendás|Gyilkos|Semmi esély",
      "a tíz fokozat a kért sorrendben",r1.L.map(x=>x.n));
   ok(r1.L.every((x,i)=>x.nf===i+1&&(i===0||x.cel<r1.L[i-1].cel)&&(i===0||x.fel<=r1.L[i-1].fel)&&(i===0||x.kies>=r1.L[i-1].kies)),

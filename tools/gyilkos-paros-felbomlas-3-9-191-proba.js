@@ -136,7 +136,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 5. MENTÉS, LEÍRÁS —");
   ok(r.mentes,"a mentés viszi a történetet (gpDuoHist)");
   ok(r.leiras,"a képesség leírása kimondja a felbomlást");
-  ok(String(r.verzio).localeCompare("3.9.191",undefined,{numeric:true})>=0,"verzió legalább 3.9.191",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.191",undefined,{numeric:true})>=0),"verzió legalább 3.9.191",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

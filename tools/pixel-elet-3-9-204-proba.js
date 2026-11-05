@@ -150,7 +150,7 @@ async function oldal(b,{w,h,tema,ls,reduce}){
    ok(r.sotet===0,"a Sötét témában nincs pixelszikra",r.sotet);
    ok(r.ki2.szikra===0&&!r.ki2.boot&&!r.ki2.fut,"kikapcsolt ✨ mellett a Pixelben sincs szikra, bekapcsolás, futó",r.ki2);
    ok(r.e1==="steps(5)"&&r.e2==="ease-out","lépcsős mozgás — a „Szaggatott mozgás” kikapcsolásával sima",{e1:r.e1,e2:r.e2});
-   ok(String(r.v).localeCompare("3.9.204",undefined,{numeric:true})>=0,"verzió legalább 3.9.204",r.v);
+   ok((/^1\.0\./.test(String(r.v))||String(r.v).localeCompare("3.9.204",undefined,{numeric:true})>=0),"verzió legalább 3.9.204",r.v);
    await ctx.close();}
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();

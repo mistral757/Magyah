@@ -102,7 +102,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 4. nevezés és fejléc —");
   ok(r.nevezes===1,"a nevezés viszi a jelzőt");
   ok(/csak a döntőben/.test(r.fej),"a fejléc kimondja",r.fej);
-  ok(String(r.v).localeCompare("3.9.211",undefined,{numeric:true})>=0,"verzió legalább 3.9.211",r.v);
+  ok((/^1\.0\./.test(String(r.v))||String(r.v).localeCompare("3.9.211",undefined,{numeric:true})>=0),"verzió legalább 3.9.211",r.v);
   ok(!errs.length,"nincs konzolhiba",errs.slice(0,5));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

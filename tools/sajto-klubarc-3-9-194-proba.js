@@ -167,7 +167,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.naplo.indexOf(r.rovat.rovatCim)>=0,"a napló is",r.naplo);
   console.log("\n— 5. MINDEN SABLON —");
   ok(r.sablon.rossz.length===0&&r.sablon.nincsRovat.length===0&&r.sablon.db>=100,`mind a ${r.sablon.db} sablon kitölthető, mindegyik témának van rovata`,r.sablon);
-  ok(String(r.verzio).localeCompare("3.9.194",undefined,{numeric:true})>=0,"verzió legalább 3.9.194",r.verzio);
+  ok((/^1\.0\./.test(String(r.verzio))||String(r.verzio).localeCompare("3.9.194",undefined,{numeric:true})>=0),"verzió legalább 3.9.194",r.verzio);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");

@@ -45,8 +45,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   /* 1. a repó két verziószáma */
   const html=fs.readFileSync(path.join(ROOT,"index.html"),"utf8");
   const appV=(html.match(/const APP_VERSION="([^"]+)"/)||[])[1];
-  let fajlV=null;try{fajlV=JSON.parse(fs.readFileSync(path.join(ROOT,"version.json"),"utf8")).v;}catch(e){}
+  /* 🔢 1.0.x óta: a `verzio` mező az APP_VERSION; a régi `v` befagyott, de a
+     régi (3.9.368-as) kliensek számtagonkénti összevetésén újabbnak látszik */
+  let fajlV=null,regiV=null;try{const J=JSON.parse(fs.readFileSync(path.join(ROOT,"version.json"),"utf8"));fajlV=J.verzio||J.v;regiV=J.v;}catch(e){}
   ok(appV&&fajlV===appV,"version.json = APP_VERSION",{appV,fajlV});
+  {const regi=(a,b)=>{const x=String(a).split(".").map(n=>parseInt(n,10)||0),y=String(b).split(".").map(n=>parseInt(n,10)||0);
+     for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d>0;}return false;};
+   ok(/^1\.0\./.test(appV)?regi(regiV,"3.9.368"):true,"a régi `v` mező a 3.9.368-as kliens szerint is újabb (látja a frissítési sávot)",regiV);}
   const sw=fs.readFileSync(path.join(ROOT,"sw-1.js"),"utf8");
   ok(/pathname === "\/version\.json"\) return;/.test(sw),"a service worker kódja átengedi a version.json-t");
 
@@ -64,14 +69,19 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const cmp=await p.evaluate(()=>[verzioUjabb("3.9.307","3.9.306"),verzioUjabb("3.10.0","3.9.306"),
     verzioUjabb("3.9.306","3.9.306"),verzioUjabb("3.9.305","3.9.306"),verzioUjabb("4","3.9.306"),verzioUjabb("","3.9.306")]);
   ok(JSON.stringify(cmp)===JSON.stringify([true,true,false,false,true,false]),"verzió-összevetés",cmp);
+  /* 🔢 az új forma: 1.0.MAJOR.MINOR.PATCH, a régi sorozat mind előtte */
+  const cmp2=await p.evaluate(()=>[verzioUjabb("1.0.4.8.03","3.9.368"),verzioUjabb("3.9.368","1.0.4.8.03"),
+    verzioUjabb("1.0.4.8.04","1.0.4.8.03"),verzioUjabb("1.0.4.9.00","1.0.4.8.12"),verzioUjabb("1.0.5.0.00","1.0.4.9.07"),
+    verzioUjabb("1.0.4.8.03","1.0.4.8.03"),verzioUjabb("9.9.999","1.0.4.8.03")]);
+  ok(JSON.stringify(cmp2)===JSON.stringify([true,false,true,true,true,false,false]),"az új forma: a régi sorozat mind előtte, patch < minor < major",cmp2);
 
   /* 3. ugyanaz / régebbi → csend; újabb → sáv */
   const nez=async v=>{kintV=v;return p.evaluate(async()=>{try{localStorage.removeItem("ujvKesobb");}catch(e){}
     const r=await ujVerzioNez(true);const el=document.getElementById("ujvSav");return {r,sav:!!el,tx:el?el.innerText:""};});};
   let s=await nez(appV);ok(!s.sav&&s.r===appV,"ugyanaz a verzió kint → nincs sáv",s);
   s=await nez("3.9.1");ok(!s.sav,"régebbi kint → nincs sáv",s);
-  s=await nez("9.9.999");
-  ok(s.sav&&/Új verzió érhető el: v9\.9\.999/.test(s.tx)&&s.tx.includes("v"+appV)&&/Frissítés most/.test(s.tx)&&/Később/.test(s.tx),"újabb kint → sáv, mindkét verzióval",s.tx);
+  s=await nez("1.0.9.9.99");
+  ok(s.sav&&/Új verzió érhető el: v1\.0\.9\.9\.99/.test(s.tx)&&s.tx.includes("v"+appV)&&/Frissítés most/.test(s.tx)&&/Később/.test(s.tx),"újabb kint → sáv, mindkét verzióval",s.tx);
   await p.screenshot({path:path.join(ROOT,"icons/screenshots/uj-verzio-sav.png")}).catch(()=>{});
   /* a tízperces fék: kényszer nélkül nem kérdez újra */
   const fek=await p.evaluate(async()=>{const t=_ujvUtolso;await ujVerzioNez(false);return _ujvUtolso===t;});
@@ -82,8 +92,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const el1=!!document.getElementById("ujvSav");
     await ujVerzioNez(true);const el2=!!document.getElementById("ujvSav");
     return {el1,el2,ls:localStorage.getItem("ujvKesobb")};});
-  ok(!kes.el1&&!kes.el2&&kes.ls==="9.9.999","„Később” → eltűnik, erre a verzióra nem jön vissza",kes);
-  kintV="9.9.1000";
+  ok(!kes.el1&&!kes.el2&&kes.ls==="1.0.9.9.99","„Később” → eltűnik, erre a verzióra nem jön vissza",kes);
+  kintV="1.0.9.9.100";
   const ujabb=await p.evaluate(async()=>{await ujVerzioNez(true);return !!document.getElementById("ujvSav");});
   ok(ujabb,"egy még újabb verzióra a sáv újra megjelenik");
 
@@ -127,10 +137,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await q.reload({waitUntil:"load"});await q.waitForTimeout(800);
   const regi=await q.evaluate(async()=>{const vez=!!navigator.serviceWorker.controller;
     await ujVerzioNez(true);const s1=!!document.getElementById("ujvSav");return {vez,s1};});
-  kintV="9.1.1";
+  kintV="1.0.9.1.01";
   const regi2=await q.evaluate(async()=>{await ujVerzioNez(true);const el=document.getElementById("ujvSav");
     let db=0;for(const k of await caches.keys()){const c=await caches.open(k);db+=(await c.keys()).filter(x=>/version\.json/.test(x.url)).length;}
-    return {s2:!!el&&/9\.1\.1/.test(el.innerText),db};});
+    return {s2:!!el&&/1\.0\.9\.1\.01/.test(el.innerText),db};});
   ok(regi.vez&&!regi.s1&&regi2.s2,"a régi worker alatt is friss a kint lévő verzió (időbélyeg)",{regi,regi2});
   swRegi=false;
   const tak=await q.evaluate(async()=>{

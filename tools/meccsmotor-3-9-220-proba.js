@@ -72,7 +72,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return {v:APP_VERSION,K:SIM.K,H:SIM.HOME,A:SIM.AWAY,
       elotte:f(5,60,0,0),dontetlen:f(5,65,1,1),vezet:f(5,80,2,1),hatrany:f(2.5,90,0,1),tele:f(9,70,0,0),
       ellenEselyes:f(-5,75,1,1),ellenVezet:f(-5,75,0,1),nulla:f(0,80,0,0)};});
-  ok(String(r1.v).localeCompare("3.9.220",undefined,{numeric:true})>=0,"a verzió legalább 3.9.220",r1.v);
+  ok((/^1\.0\./.test(String(r1.v))||String(r1.v).localeCompare("3.9.220",undefined,{numeric:true})>=0),"a verzió legalább 3.9.220",r1.v);
   ok(r1.K===0.12&&r1.H===0.9&&r1.A===-0.3,"K 0,12; a pálya gólvárhatósága változatlan (0,9 / −0,3)",r1);
   ok(r1.elotte[0]===1&&r1.vezet[0]===1&&r1.nulla[0]===1,"a 60. percig, vezetésnél és egyenlő erőnél nincs rákapcsolás",r1);
   ok(r1.dontetlen[0]===1.25&&r1.dontetlen[1]===0.8&&r1.tele[0]===1.25,"5 meccserőnél (és fölötte) ×1,25 / ÷1,25",r1);

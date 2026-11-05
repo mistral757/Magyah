@@ -63,7 +63,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     window.saveGame=()=>{};
     S.seasonNumber=2;S.idx=10;S.transferBudget=0;
     return {v:APP_VERSION,mode:teachMode()};});
-  ok(String(r0.v).localeCompare("3.9.215",undefined,{numeric:true})>=0,"a verzió legalább 3.9.215",r0.v);
+  ok((/^1\.0\./.test(String(r0.v))||String(r0.v).localeCompare("3.9.215",undefined,{numeric:true})>=0),"a verzió legalább 3.9.215",r0.v);
 
   console.log("\n— 1. a szundi —");
   const r1=await p.evaluate(()=>{

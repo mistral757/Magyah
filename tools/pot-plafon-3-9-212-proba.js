@@ -64,7 +64,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     window.saveGame=()=>{};
     phase="hub";S.transferBudget=1e13;
     return {v:APP_VERSION};});
-  ok(String(r0.v).localeCompare("3.9.212",undefined,{numeric:true})>=0,"a verzió legalább 3.9.212",r0.v);
+  ok((/^1\.0\./.test(String(r0.v))||String(r0.v).localeCompare("3.9.212",undefined,{numeric:true})>=0),"a verzió legalább 3.9.212",r0.v);
 
   console.log("\n— 1. a kemény plafon a mezőnnyel nő —");
   const r1=await p.evaluate(()=>{
