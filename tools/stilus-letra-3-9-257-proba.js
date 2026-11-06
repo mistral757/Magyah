@@ -67,7 +67,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       try{styleLvlCacheClear();}catch(e){}};
 
     /* ── 1. AZ ÁRLÉTRA ── */
-    ki.ar={osszeg:ENG_PRICE.reduce((a,x)=>a+x,0),egyTabla:ENG_PRICE===RETTEGES_PRICE,
+    ki.ar={osszeg:ENG_PRICE.slice(0,STYLE_ENG_BASE_MAX+1).reduce((a,x)=>a+x,0),egyTabla:ENG_PRICE===RETTEGES_PRICE,
       kapu:[1,2,3,4,5,6,7,8,9,10].map(n=>engNeedLevel(n)),kapuP:[1,10].map(n=>rettegesNeedLevel(n))};
 
     /* ── 2. A MEZŐNY-SKÁLA ── */
