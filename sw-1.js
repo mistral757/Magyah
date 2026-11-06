@@ -18,9 +18,12 @@
    telepítéseken a RÉGI ikonok maradnának örökre — pont az a rajz, amit
    jogtisztasági okból cserélni kellett. A név léptetése az egyetlen dolog,
    ami ezt kikényszeríti. */
-const CACHE_NAME = "harminc-nulla-cache-v7";   /* v7: a Pixel téma számjegy-betűje (3.9.172) */
+const CACHE_NAME = "harminc-nulla-cache-v8";   /* v8: a verziótörténet oldala előre cache-elve (1.0.4.10.00) · v7: a Pixel téma számjegy-betűje (3.9.172) */
 const STATIC_ASSETS = [
   "/",
+  /* 📜 1.0.4.10.00 — a verziószámra koppintva ez nyílik; előre cache-elve,
+     hogy offline is megnyíljon (a betűi már a listában vannak) */
+  "/verziotortenet/",
   /* A betűk önhosztoltak (lásd az index.html @font-face blokkját). Itt kell
      lenniük, különben offline a tipográfia szétesne: a HTML megjön a
      cache-ből, a betűk viszont a hálózatról jönnének. Az `addAll` mind a tizennégy
