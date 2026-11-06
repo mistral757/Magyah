@@ -117,7 +117,7 @@ const {spawn}=require('child_process');
     o.retteges.otodiken=rettegesNextWhy();
     /* vegyük meg mind a tízet, ha a szint engedi */
     const ivek=[];
-    for(let i=1;i<=RETTEGES_MAX;i++){
+    for(let i=1;i<=STYLE_ENG_BASE_MAX;i++){   /* a régi (1–10.) létra; a 11–20. a 20. szinten nyílik — 1.0.4.11.00 */
       window.styleLevel=()=>rettegesNeedLevel(i);
       if(rettegesNextWhy())break;
       dreadSpend(rettegesNextPrice());

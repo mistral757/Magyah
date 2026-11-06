@@ -152,3 +152,5 @@ Minden minor és major ide kap egy sort.
 | 1.0.4.8.03 | 11-05 | (patch) az új verziószámozás és ez a lap |
 | **1.0.4.9.00** | 11-05 | kerethirdetés a párharc előtt — két mód (rögtön a meccs / előbb az elemzés), nincs külön felkészülés |
 | **1.0.4.10.00** | 11-06 | a verziótörténet beépítve a játékba: a verziószámra koppintva nyílik (bármelyik gazdagépen és alútvonalon), a 2.2 előtti 26 állapottal bővítve |
+| 1.0.4.10.01 | 11-06 | (patch) a sztár hírnév-készpénzének plafonja a klub tényleges léptékéhez (`clubBudgetScale`) mér |
+| **1.0.4.11.00** | 11-06 | a 20. csapatstílus-szint jutalmai: újabb filozófia, csúcsfok (3 képesség +3 szint), a pontgyűjtő +10 szintje |
