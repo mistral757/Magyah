@@ -58,8 +58,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const sq=SQUADS.filter(x=>!x.wc&&x.players&&x.players.length>=18)[sqi];
     showChemistry=()=>{};S.pyr=null;S.idx=0;
     pyrPickSq={club:"draft",season:"",players:sq.players.slice(0,15)};
-    pyrPickFromDraft=true;pyrPickDiv=null;pyrPendingSpeed=pyrWantedSpeed;pyrPickNf=null;
-    renderPyrDivPick();document.querySelector("#pyrDiffList [data-nfpick='4']").click();pyrConfirmDiv();
+    /* 1.0.4.13.00 óta az ajánlás mindig a D3; a mérés a régi ajánlás osztályain fut (D1 / D2) —
+       MÁR AZ ELSŐ RAJZOLÁS ELŐTT, mert a világ felskálázása a kijelölt osztályhoz igazodik */
+    pyrPickFromDraft=true;pyrPickDiv=sqi===0?1:2;pyrPendingSpeed=pyrWantedSpeed;pyrPickNf=null;
+    renderPyrDivPick();document.querySelector("#pyrDiffList [data-nfpick='4']").click();
+    pyrConfirmDiv();
     if(!careerPool)careerPool=initCareerPlayerPool({stars:2.5});
     slots.forEach((sl,i)=>{if(sl.player)return;const src=sq.players[i%sq.players.length];
       const pl={n:src.n,ovr:src.ovr,pos:(src.pos||[sl.pos]).slice(),age:26};sl.player=pl;sl.fit=fitFor(pl,sl);});

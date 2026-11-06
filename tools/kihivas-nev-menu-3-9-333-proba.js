@@ -50,7 +50,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const _sc=showChemistry;showChemistry=()=>{};
     S.pyr=null;S.idx=0;pyrPickSq={club:"draft",season:"",players:sq.players.slice(0,15)};
     pyrPickFromDraft=true;pyrPickDiv=null;pyrPendingSpeed=pyrWantedSpeed;
-    renderPyrDivPick();pyrConfirmDiv();showChemistry=_sc;
+    renderPyrDivPick();mgmtNyit=()=>false;pyrConfirmDiv();showChemistry=_sc;   /* 1.0.4.13.00: a célkitűzés-ablakot a saját próbája méri */
     if(!careerPool)careerPool=initCareerPlayerPool({stars:2.5});
     slots.forEach((sl,i)=>{if(sl.player)return;const src=sq.players[i%sq.players.length];
       const pl={n:src.n,ovr:src.ovr,pos:(src.pos||[sl.pos]).slice(),age:22};sl.player=pl;sl.fit=fitFor(pl,sl);});
