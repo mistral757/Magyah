@@ -117,7 +117,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       msNoteMatch({excitement:93});r.l5=LELATO.map(L=>lelatoNyitott(L));
     }finally{addLine=_a;}
     r.bejelentes=sorok.filter(x=>/ÚJ LELÁTÓ-HANG/.test(x)).length;
-    r.taborSor=sorok.filter(x=>/elérte a\(z\)/.test(x)).length;
+    r.taborSor=sorok.filter(x=>/elérte az? /.test(x)).length;   /* 1.0.4.14.00: a(z) → a / az */
     r.nyitottValasztas=lelatoValasztott();
     r.kuszob=LELATO.map(L=>L.kell);r.fan=LELATO.map(L=>L.fan||0);
     return r;});

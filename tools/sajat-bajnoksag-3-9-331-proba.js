@@ -183,8 +183,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   {const e=await p.evaluate(()=>{const ok=svErtNyit(null,null,()=>{window.__ertCb=1;});
      const t=($("svErtBody")||{}).textContent||"";const nyit=!$("svErtModal").classList.contains("hide");
      $("svErtOk").click();
-     return {ok,nyit,t:t.replace(/\s+/g," ").slice(0,500),cb:window.__ertCb===1,zarva:$("svErtModal").classList.contains("hide")};});
-   ok(e.ok&&e.nyit&&/Run szint/.test(e.t)&&/Párharc-mérleg/.test(e.t)&&/Eddigi párharcok/.test(e.t),"1.0.4.12.00: az értékelő ablak kinyílik a valódi párharc adataival",e.t);
+     return {ok,nyit,t:t.replace(/\s+/g," "),cb:window.__ertCb===1,zarva:$("svErtModal").classList.contains("hide")};});
+   ok(e.ok&&e.nyit&&/Run szint/.test(e.t)&&/Párharc-mérleg/.test(e.t)&&/Eddigi párharcok/.test(e.t),"1.0.4.12.00: az értékelő ablak kinyílik a valódi párharc adataival",e.t.slice(0,500));
    ok(e.cb&&e.zarva,"1.0.4.12.00: a „Tovább” bezárja, és viszi tovább a folyamatot",{cb:e.cb,zarva:e.zarva});}
   /* 📊 3.9.336 — a momentum-görbe a KÖZÖS gólvárhatóságból dolgozik: a két
      gép vödrönkénti λ-aránya pontosan tükörkép (a + b = 1). */
