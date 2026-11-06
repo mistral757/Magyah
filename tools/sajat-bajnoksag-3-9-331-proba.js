@@ -175,6 +175,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     penz:Math.round(S.transferBudget||0),led:(S.ledger||[]).filter?null:null,log:window._nlog.filter(t=>/Párharc-nap I:/.test(t)).slice(-1)[0]}));
   const rg=await g.evaluate(()=>({m:S.svPh&&S.svPh.m["2:1"],M:S.svPh&&S.svPh.merleg,idx:S.idx,esed:svPhEsedekes(),penz:Math.round(S.transferBudget||0)}));
   ok(kesz&&ra.m&&rg.m&&ra.m.gf===rg.m.ga&&ra.m.ga===rg.m.gf,"a párharc lefut mindkét gépen, és ugyanaz az eredmény (tükörben)",{a:ra.m,g:rg.m});
+  /* ⚔ 1.0.4.12.00 — a párharc rekordja viszi a két ⚡-t és a két Run szintet (tükörben), és az értékelő ablak kirajzolódik */
+  ok(ra.m&&typeof ra.m.my==="number"&&typeof ra.m.op==="number"&&Math.abs(ra.m.my-rg.m.op)<0.05&&Math.abs(ra.m.op-rg.m.my)<0.05,
+    "1.0.4.12.00: a rekord a két ⚡-t a közös pillanatképből viszi, a két gépen tükörben",{a:[ra.m.my,ra.m.op],g:[rg.m.my,rg.m.op]});
+  ok(typeof ra.m.runMy==="number"&&typeof ra.m.runOp==="number"&&Math.abs(ra.m.runOp-rg.m.runMy)<0.15&&Math.abs(ra.m.runMy-rg.m.runOp)<0.15,
+    "1.0.4.12.00: a társ Run szintje a pillanatképből jön, és egyezik azzal, amit ő magáról rögzített",{a:[ra.m.runMy,ra.m.runOp],g:[rg.m.runMy,rg.m.runOp]});
+  {const e=await p.evaluate(()=>{const ok=svErtNyit(null,null,()=>{window.__ertCb=1;});
+     const t=($("svErtBody")||{}).textContent||"";const nyit=!$("svErtModal").classList.contains("hide");
+     $("svErtOk").click();
+     return {ok,nyit,t:t.replace(/\s+/g," ").slice(0,500),cb:window.__ertCb===1,zarva:$("svErtModal").classList.contains("hide")};});
+   ok(e.ok&&e.nyit&&/Run szint/.test(e.t)&&/Párharc-mérleg/.test(e.t)&&/Eddigi párharcok/.test(e.t),"1.0.4.12.00: az értékelő ablak kinyílik a valódi párharc adataival",e.t);
+   ok(e.cb&&e.zarva,"1.0.4.12.00: a „Tovább” bezárja, és viszi tovább a folyamatot",{cb:e.cb,zarva:e.zarva});}
   /* 📊 3.9.336 — a momentum-görbe a KÖZÖS gólvárhatóságból dolgozik: a két
      gép vödrönkénti λ-aránya pontosan tükörkép (a + b = 1). */
   {const lr=pp=>pp.evaluate(()=>(_ek&&_ek.cel||[]).map(c=>c.lr));

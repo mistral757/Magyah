@@ -148,6 +148,39 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(JSON.stringify(m.vissza)===JSON.stringify(["villam","panzer"])&&m.nezet===4&&m.slots===4,"2e. a betöltés visszaállítja az extrákat és a nézetet",{vissza:m.vissza,nezet:m.nezet,slots:m.slots});
   ok(m.picks&&m.picks[0]==="villamkontra"&&m.szint===5,"2f. a csúcsfok-jelölés és a 4–6. szint is megmarad",{picks:m.picks,szint:m.szint});
 
+  /* ---- 2g. A KÜSZÖB A NEHÉZSÉGGEL (1.0.4.12.00) ---- */
+  const n=await p.evaluate(()=>{
+    const o={};
+    o.tab=[[1,1],[4,5],[5,5],[6,1],[6,5],[7,1],[8,1],[9,1],[10,1],[10,5],[10,9]].map(x=>[x.join("."),styleXNeedFor(x[0],x[1])]);
+    /* monoton: soha nem nő a nehézséggel */
+    let mono=true,prev=99;
+    for(let f=1;f<=10;f++)for(let b=1;b<=5;b++){const v=styleXNeedFor(f,b);if(v>prev+1e-9)mono=false;prev=v;}
+    o.mono=mono;
+    /* élő: 8.3-as karrier, 18,4-es filozófia → nyit (küszöb 17,4); 17,2 → nem */
+    const mk=k=>({key:k,chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null});
+    S.style=mk("beton");S.style2=mk("bombazok");S.styleExtra=[];S.styleView=1;
+    const _nf=styleXNfMost;styleXNfMost=()=>({nf:8,s:3});
+    const _el=styleEffLevel;
+    styleEffLevel=st=>st.key==="beton"?18.4:5;
+    o.need=styleXNeed();o.nyit=styleXCanChoose();
+    styleEffLevel=st=>st.key==="beton"?17.2:5;
+    o.zar=styleXCanChoose();o.why=styleXGateWhy();
+    o.bar=style2BarHtml().replace(/<[^>]+>/g," ").replace(/\s+/g," ");
+    styleXNfMost=()=>null;o.nincsFok=styleXNeed();
+    styleXNfMost=_nf;styleEffLevel=_el;
+    o.txt=[styleXNeedTxt(20,true),styleXNeedTxt(18.6,true),styleXNeedTxt(15,false)];
+    return o;});
+  const tab=Object.fromEntries(n.tab);
+  ok(tab["1.1"]===20&&tab["4.5"]===20&&tab["5.5"]===20,"2g. az 5. fokozatig a küszöb a 20. szint",n.tab);
+  ok(tab["6.1"]<20&&tab["6.1"]>19.5,"2h. a 6.1-en kezd lejjebb jönni (19,8)",tab["6.1"]);
+  ok(tab["10.5"]===15&&tab["10.9"]===15,"2i. a 10.5-ön (és fölötte) a 15. szint",{a:tab["10.5"],b:tab["10.9"]});
+  ok(n.mono,"2j. a küszöb a nehézséggel fokozatosan, monoton csökken",1);
+  ok(Math.abs(n.need-17.4)<1e-9&&n.nyit===true&&n.zar===false,"2k. 8.3-on 17,4 a küszöb: a 18,4 nyit, a 17,2 nem",{need:n.need,nyit:n.nyit,zar:n.zar});
+  ok(/17\. szint 40%-át/.test(n.why)&&/8\.3/.test(n.why),"2l. a szöveg kimondja a küszöböt és a nehézséget",n.why);
+  ok(/8\.3 nehézségen/.test(n.bar)&&/10\.5-ön a 15/.test(n.bar),"2m. a menü is jelzi a nehézségfüggő küszöböt",n.bar.slice(0,400));
+  ok(n.nincsFok===20,"2n. fokozat nélküli (klasszikus) karrierben a 20. szint",n.nincsFok);
+  ok(n.txt[0]==="a 20. szintet"&&n.txt[1]==="a 18. szint 60%-át"&&n.txt[2]==="a 15. szint","2o. a küszöb szövege",n.txt);
+
   /* ---- 3. CSÚCSFOK ---- */
   const c=await p.evaluate(()=>{
     const o={};
