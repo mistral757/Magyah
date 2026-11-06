@@ -1,17 +1,23 @@
-# Magyah — verziótörténet (2026-07-27 → 2026-11-05)
+# Magyah — verziótörténet (0.758-tól 2026-11-05-ig)
 
-*Rekonstrukció a repó 1 039 commitjából, a verziószámok és a kód méretének
-változásából. A csillagok (★) a saját értékelésem: mennyire alakította át a
-játékot, nem mennyi munka volt benne. Olvasási idő: ~6 perc; az első táblázat
-magában is elmond mindent.*
+*Rekonstrukció a repó 1 039 commitjából (2026-07-27 → 2026-11-05), és a 2.2
+előtti időkből megmaradt 19 teljes állapotból (0.758.12 → 1.4.09, dátum
+nélkül). A csillagok (★) a saját értékelésem: mennyire alakította át a játékot,
+nem mennyi munka volt benne. Olvasási idő: ~7 perc; az első táblázat magában is
+elmond mindent.*
 
 ## 1. Egy pillantás
 
 | Verzió | Dátum | Verziók | `index.html` a végén | Mi lett belőle | Súly |
 |---|---|---|---|---|---|
+| 0.758–0.810 | a repó előtt | 7 állapot | 5 500 sor | **A játék csírája:** Klasszikus mód és a készülő Karrier mód, akadémia, szezonvégi kártyák, szintlépés; a végén a PWA első nyoma | ★★★★ |
+| 0.993–0.995 | a repó előtt | 2 állapot | 6 200 | **Infinity mód**, Rating-plafon, új árazás, ifi-boost, élő eredménytábla, scout-fejlesztés | ★★★ |
+| 1.1–1.2.61 | a repó előtt | 8 állapot | 9 300 | Válogatottak (70 → 110 keret), párkémia, kihívások, **attribútum-rendszer**, poszt-tanulás | ★★★ |
+| 1.3.00 | a repó előtt | 1 állapot | 10 400 | **Európai kupák és taktika-rendszer** egyetlen lépésben (+58 függvény) | ★★★★ |
+| 1.4.09 | a repó előtt | 1 állapot | 11 000 | Kész klubbal indulás, félidényi HUB; a Karrier mód a módválasztó élére kerül | ★★ |
 | **2.2** | 07-27 | 1 | 13 700 sor | A repó első commitja: kész játék, service worker, ikonok | — |
 | 2.3–2.4 | 07-27 → 07-28 | 25 | 14 200 | Karrier-csiszolás; **a PvP váza (F0–F3): szobák, seedelt folyamok** | ★★★★ |
-| **2.5** | 07-28 → 08-04 | 114 | 25 000 | **Párharc a szezonban (15./30. forduló)**, kupák, Infinity, Run-szint | ★★★★★ |
+| **2.5** | 07-28 → 08-04 | 114 | 25 000 | **Párharc a szezonban (15./30. forduló)**, kupa-bővítések, közös Infinity, Run-szint | ★★★★★ |
 | 2.6 | 08-04 → 08-09 | 78 | 33 200 | Rating-alap fokozatok, Infinity-finomítás, közös kupa hibák hada | ★★★ |
 | 2.7 | 08-09 → 08-10 | 10 | 34 200 | Kiadás-előkészítés, Run-ranglisták | ★★ |
 | **3.0** | 08-10 | 13 | 37 800 | **Mérföldkövek + csapatstílusok (a klub filozófiája)** | ★★★★★ |
@@ -30,13 +36,16 @@ magában is elmond mindent.*
 | 3.9.347–368 | 11-02 → 11-05 | 22 | 136 000 | Felzárkóztatás, osztálylépcső, lelátó, a keret kihirdetése | ★★★ |
 | **1.0.4.8.03** | 11-05 | — | 136 000 | Új verziószámozás | ★ |
 
-(A „Verziók” oszlop a kiadott egyedi verziószámok száma; a commit több: 1 039. A 3.9.223–247 számait utólag, egy commitban pótolták.)
+(A „Verziók” oszlop a kiadott egyedi verziószámok száma; a commit több: 1 039. A 3.9.223–247 számait utólag, egy commitban pótolták. A „a repó előtt” sorok a megmaradt állapotok száma, a sorrend a verziószámból következik; dátumot egyik sem hordoz.)
 
 ## 2. A számok
 
 - **101 nap, 1 039 commit.** Ebből 831 hordozott verziószámot.
 - **A kód:** 13 700 → 136 000 sor (×10). Az utolsó 65 nap (a 3.9) adta a
   teljes méret 38%-át.
+- **Az ősidők:** a legkorábbi megmaradt állapot (0.758.12) 3 755 soros; az
+  1.4.09 10 998, a repó első commitja 13 691, ma 136 000. Vagyis a
+  kezdetektől ×36. A beépített keretek száma 47 klub-szezonról 110-re nőtt.
 - **Próbák:** a 3.9 elején még nem volt `tools/*-proba.js`; ma **280** van.
   A leírások (`docs/`) 52-ről 294-re nőttek.
 - **Tempó:** a 2.5 (114 verzió) és a 2.6 (78 verzió) együtt kb. 13 nap alatt
@@ -48,11 +57,60 @@ magában is elmond mindent.*
 
 ## 3. A történet
 
-### Előtörténet — 2.2 (07-27)
-A repó nem a nulláról indul: az első commit már egy működő, 13 700 soros
-játék (service worker, ikonok, karrier mód). Hogy mi volt előtte, a repóból
-nem rekonstruálható. A verzió 2.2.00. Egyetlen nap alatt 2.3 és 2.4 lett
-belőle.
+### Ősidők — 0.758 → 1.4.09 (a repó előtt) ★★★★
+Dátum egyik megmaradt állapotban sincs, ezért itt csak a sorrend és a
+tartalom rekonstruálható; a sorrendet a verziószám adja.
+
+**A kezdet (0.758.12, 3 755 sor).** A böngészőfül címe „30-0 · NB I draft
+2007–2015”, az oldalon a játék neve „Magyah Szutykos Kutyusok a Topligás
+Kutyaszarvasalók Között”. 47 valódi klub-szezon áll benne: a magyar NB I
+2007–2015 között, plusz Real Madrid, Barca, Bayern, Man City, PSG,
+Liverpool és társaik (16 bajnokság, 5 kontinens). Két mód van: a
+**Klasszikus** (egyetlen szezon, draft az elejétől) és a **Karrier mód**, amiről
+a módválasztó még azt írja: „most épül”. A kódban viszont már ott a
+karrier-HUB, a scout és a draft-jelöltek, a TSI és a fejlődési görbe, a
+szezonváltás, az edzők, az ikonikus játékosok, a jutalom-skillek, a
+klubrivalizálás (kémia) és a családtag-kör. A kód szerint ez már „nem demó,
+hanem élő, futó projekt”.
+
+A bemutatkozó szöveg rímekbe szedve állította, hogy „nincs itt UEFA, nincs
+itt Bajnokok Ligája cifra fénye”. Az 1.3.00-ban megjöttek az európai kupák.
+
+**Az ív**, a megmaradt állapotok szerint:
+- **0.766–0.810:** fogalomtár, ifjúsági akadémia, átigazolási büdzsé;
+  ikon-ajánlatok és kapitányváltás; **szezonvégi kártyák**, nyári
+  klub-szemle és szintlépés; játékos-adatlap; az igazolási szint a
+  mezőnyhöz kötve; a karrier lezárása és letölthető története. A 0.797 és a
+  0.810 között jelenik meg a service worker és a manifest, a **telepíthető
+  (PWA) játék** első nyoma.
+- **0.993–0.995:** az **Infinity mód**, a Rating-plafon, a „vásárlás drága,
+  eladás szerény” árazás, az ifi-boost, az élő eredménytábla és perc-óra,
+  a scout fejleszthetősége. A verziószám középső tagja itt ugrik 0.810-ről
+  0.993-ra, köztes állapot nem maradt.
+- **1.1–1.2.61:** ikonok fejlődése; VB- és EB-győztes válogatottak (a
+  keretek 76-ról 108-ra), párkémia, **kihívás-rendszer**, az „öreg
+  csirkefogó” boost, kapitány-alkalmasság, **attribútum-rendszer**,
+  poszt-tanulás.
+- **1.3.00:** **európai kupák** (kvalifikáció, kapu, BL egyéni aranydíjak) és a
+  **taktika-rendszer**, egyetlen lépésben: +58 függvény, +1 100 sor. Ez a
+  legnagyobb ugrás az ősidőkben.
+- **1.4.09:** csak-díj skillek, **kész klubbal indulás**, félidényi HUB. A
+  módválasztón a Karrier mód kerül előre, a Klasszikus hátra: a „most épül”
+  mód lett a játék.
+
+**Értékelés:** a 0.758.12 már a mai játék csírája. A karrier-HUB, a scout, a
+fejlődési görbe és a kémia mind benne van. Három fordulópont látszik: a
+0.993 (az Infinity, az első „végtelen” nehézség), az 1.2.x (az
+attribútum-alapú játékos) és az 1.3.00 (európai kupák és taktika). A 2.x
+elején pedig megszületik a PvP. A névben a „30-0” és az „NB I” a 3.9.13-ban
+került ki (jogtisztaság), de a service worker gyorsítótárának neve ma is
+`harminc-nulla-cache`.
+
+### Az első commit — 2.2 (07-27)
+A repó az 1.4.09 után indul, a 2.2.00-val: az első commit már egy működő,
+13 700 soros játék (service worker, ikonok, karrier mód). Az 1.4.09 és a
+2.2.00 között a 1.4.x vége és a 2.0–2.1 nem maradt meg. Egyetlen nap alatt
+2.3 és 2.4 lett belőle.
 
 ### A PvP megszületése — 2.3–2.5 (07-27 → 08-04) ★★★★★
 A játék legfontosabb szerkezeti döntése **egy napon belül született meg**
@@ -67,9 +125,11 @@ determinizmus a kulcs: két gép ugyanazt a világot és ugyanazt a meccset
 számolja ki. A 3.9-es PvP-fejlesztések (célrés, hardcore seed, saját
 bajnokság) mind ezen állnak.
 
-Ugyanebben a szakaszban jött a kupák rendszere (Magyar Kupa, selejtező,
-közös nyári kupa), az **Infinity** (a végtelen nehézségi lépcső) és a
-**Run-szint**, a karrier teljesítményének mérőszáma.
+Ugyanebben a szakaszban bővült a kupák rendszere (az európai kupák már az
+1.3.00 óta megvoltak; most jött a Magyar Kupa, a selejtező és a közös nyári
+kupa), az **Infinity** (a végtelen nehézségi lépcső, a 0.993 óta létezik)
+közös karrierre is kiterjedt, és megjött a **Run-szint**, a karrier
+teljesítményének mérőszáma.
 
 A hátránya is látszik: a 2.5–2.6 commitjainak nagy része
 „nem ragadhat be”, „nem csúszhat szét”, „önmagát gyógyítja”. A PvP-kupa
@@ -149,6 +209,8 @@ második felében ezt a próbák és a mérés kezdték ellensúlyozni.
 
 ## 5. A számozás története (érdekesség)
 
+- Az ősidőkben a séma `0.757.X` volt (az X minden kiadással nő), az 1.4.09
+  kódja már `1.2.XX`-et ír. A középső tag 0.810-ről 0.993-ra ugrott.
 - A patch-számok formája nem állt: `2.5.0`, `2.5.04`, `2.5.126`, aztán a
   2.6-ban háromjegyű (`2.6.001`), majd a 3.0-tól kétjegyű (`3.0.00`).
 - A 3.9.223-tól a 3.9.247-ig **24 változás verzió nélkül ment ki**, ezeket a
@@ -160,7 +222,9 @@ második felében ezt a próbák és a mérés kezdték ellensúlyozni.
 
 ## 6. Mire érdemes figyelni
 
-- A 2.2 előtti időszak nem látszik a repóban.
+- A 2.2 előtti időszak 19 megmaradt állapotból van rekonstruálva. Dátumot
+  nem hordoznak, a sorrend a verziószámból következik, és hézagok vannak
+  köztük (0.810 → 0.993, 1.1.12 előtt, 1.4.09 → 2.2.00).
 - A „súly” oszlop és a csillagok az én ítéletem, nem mérés.
 - A méretek (`index.html` sorai) az adott szakasz utolsó verziójának
   commitjából mért értékek, kerekítve.
