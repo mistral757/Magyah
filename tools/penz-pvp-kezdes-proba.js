@@ -15,7 +15,7 @@
         sztár ára a keret néhányszorosára esik vissza; a gyors eladás és a
         kijelzés ugyanazt a plafonos számot látja;
      2. A HÍRNÉV: a sztár-hozta tömeg legfeljebb az organikus tábor; a reklám
-        és a befektető idényenként legfeljebb a működési keret 60%-a;
+        és a befektető idényenként legfeljebb a klub léptékének (clubBudgetScale) 60%-a (1.0.4.10.01);
      3. A BEFEKTETÉS legfeljebb egy idénynyi működési keret;
      4. A PvP KEZDŐ KIEGYENLÍTÉS: a gyengébb oldal pontosan 0,75-re zárkózik
         fel, az erősebb nem mozdul; egyszer fut, csak az 1. idény előtt; a
@@ -118,11 +118,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
       Math.random=()=>0;   /* minden esemény elsül, a legkisebb százalékkal */
       for(let i=0;i<30;i++){F.ev={surge:0,ad:0,inv:0};fameRevenueTick();}
     }finally{fameState=_fs;fameStarName=_fn;fameLevel=_fl;Math.random=_r;addLine=_add;fanWeeklyIncome=_fw;}
-    ki.cash=[F.cashSz&&F.cashSz.got,B*FAME_CASH_CAP];
+    ki.cash=[F.cashSz&&F.cashSz.got,clubBudgetScale()*FAME_CASH_CAP,B*FAME_CASH_CAP];
     ki.boost=[F.fanBoost,fanBase()-F.fanBoost];
     return ki;});
   console.log("\n— 2. A HÍRNÉV —");
-  ok(f.cash[0]>0&&f.cash[0]<=f.cash[1]+1,"a reklám és a befektető együtt legfeljebb a működési keret 60%-a az idényben",f.cash);
+  ok(f.cash[0]>0&&f.cash[0]<=f.cash[1]+1&&f.cash[1]>=f.cash[2],"a reklám és a befektető együtt legfeljebb a klub léptékének (clubBudgetScale) 60%-a az idényben — és a plafon nem kisebb a nyers keret 60%-ánál",f.cash);
   ok(f.boost[0]>0&&f.boost[0]<=f.boost[1]*1+1,"a sztár-hozta tömeg legfeljebb az organikus tábor",f.boost);
 
   /* ---- 3. A BEFEKTETÉS ---- */
