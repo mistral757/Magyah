@@ -158,3 +158,4 @@ Minden minor és major ide kap egy sort.
 | **1.0.4.13.00** | 11-06 | ligalépcső: a Run a kezdő osztálynál kettővel feljebbi bajnoki címmel megvan (a számítás változatlan); ajánlott kezdés D3; menedzsment-célkitűzések ablak |
 | **1.0.4.14.00** | 11-06 | 📋 Menedzsment menüpont: Run + fő elvárás, aktív kihívások sávja, 3 közeli mérföldkő, igazgatóság, rendszerezett listák; a kihívás-ajánlatok menedzsment-stílusban; névelő-javítások |
 | **1.0.4.15.00** | 11-07 | csapatstílus: legfeljebb 4 filozófia; új út a meccserővel (250 → 3., 350 → 4.); L10 után újraválasztás 33% visszatérítéssel; mindez a stílus-panel felső sávjában |
+| **1.0.4.16.00** | 11-07 | edzői meccs-elemzés: minden gólforrás külön (gegenpressing, Tiki-Taka, gólétvágy, 11-es, öngól, szabadrúgás, 90+, csere-csatár, potyagól, hosszabbítás), a stílus-csatornák várható gólja a szerencse-számításban és a tényezők között; összefoglaló + három lenyitható fül |

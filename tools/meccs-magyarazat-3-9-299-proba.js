@@ -131,7 +131,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return o;});
   ok(e.A.meglepo&&e.A.p<0.02&&/1,9 : 0,9/.test(e.A.tx)&&/balszerencse/.test(e.A.tx)&&/meccsből egyszer/.test(e.A.tx),"esélyesként 0:4 → meglepetés, a szerencse esélye kimondva (balszerencse)",e.A);
   ok(/Ellenünk dolgozott: hangsúly-csúszkák \+0,7 kapott gól \(≈−1,7 meccserőnyi\)/.test(e.B.tx),"rejtett tényező: a hangsúly-csúszkák +0,7 kapott gól (≈ meccserőben is)",e.B);
-  ok(/\+1 kapott gól/.test(e.C)&&/11-es, öngól/.test(e.C),"a gólvárhatóságon kívüli gól külön sor",e.C);
+  ok(/\+1 kapott gól/.test(e.C)&&/gólvárhatóságon kívülről/.test(e.C),"a gólvárhatóságon kívüli gól külön sor (1.0.4.16.00: forrásonként)",e.C);
   ok(e.D===false,"a várható eredmény nem meglepetés");
 
   console.log("\n— 4. az ablakok —");
