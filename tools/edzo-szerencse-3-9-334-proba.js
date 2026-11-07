@@ -72,9 +72,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
 
   console.log("\n— 2. a mért ráta —");
   const t2=await p.evaluate(()=>{
-    S.mxExtra={n:40,o:4,a:16};const r=mxExtraRata();
-    S.mxExtra={n:5,o:5,a:5};const r0=mxExtraRata();
-    S.mxExtra={n:40,o:4,a:16};saveGame();const d=loadSavedGame();
+    S.mxExtra={v:2,n:40,o:4,a:16};const r=mxExtraRata();
+    S.mxExtra={v:2,n:5,o:5,a:5};const r0=mxExtraRata();
+    S.mxExtra={v:2,n:40,o:4,a:16};saveGame();const d=loadSavedGame();
     return {r,r0,mentve:!!(d&&d.S&&d.S.mxExtra&&d.S.mxExtra.n===40)};});
   ok(t2.r.mert&&Math.abs(t2.r.o-0.1)<1e-9&&Math.abs(t2.r.a-0.4)<1e-9&&!t2.r0.mert&&t2.r0.o===0.15,"20 meccstől a karrier mért rátája, addig 0,15",t2);
   ok(t2.mentve,"a mért ráta mentődik",t2.mentve);

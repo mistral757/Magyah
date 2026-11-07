@@ -243,7 +243,7 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
     S.run=null;runInit();runCaptureStart();
     o.row=pyrFloorRunRow();
     const H=pyrFloorHist();
-    o.ossz=[2,3,4,5].reduce((a,s)=>a+(H[s].lift||0)+(H[s].mid||0)-(H[s].fek||0),0);
+    o.ossz=[2,3,4,5].reduce((a,s)=>a+(H[s].lift||0)-(H[s].fek||0),0);   /* 🏃 1.0.5.0.00 — a téli emelés nem számít */
     S.seasonNumber=4;
     try{meresSzezonZar();}catch(e){o.err=e.message;}
     const r=meresLoad();const z=r&&r.sz.find(x=>x.sz===4);
