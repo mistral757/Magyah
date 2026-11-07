@@ -37,3 +37,18 @@ Fent mindig: a meccserők ígérete → minden gólforrással várható → a v�
 (táblázat forrásonként, a várható értékkel), **🎲 Mennyi volt a szerencse**.
 
 Próba: `tools/edzo-elemzes-forrasok-1-0-4-16-00-proba.js` (valódi meccsekkel).
+
+## 1.0.5.0.01 — a meccs előtti elemzés is
+„Az edzői elemzésben csak az utóelemzést javítottad az előzetest nem?" — Igen,
+az maradt ki. Most ugyanazzal a mércével számol (`mxElorejelzes`):
+- a gegenpressing-büntetés várható gólja a motor saját valószínűségéből
+  (ötpercenként labdaszerzés × büntetés, a plafonnal: E[min(X, plafon)]);
+- a Tiki-Taka és a 🔥 gólétvágy a saját, aktív meccseken mért rátájából
+  (a gólétvágy rátája mostantól mérődik);
+- a 11-es, öngól, szabadrúgás, 90+ ráadás… a karrier mért átlagából.
+Az **esélyek** (győzelem/döntetlen/vereség), a legvalószínűbb végeredmények és
+a félidős bontás minden gólforrással számol; a csatornák a „meccserőn kívül"
+tényezők között is ott vannak. A felület: fent az esélyek, a három szám
+(⚡ szerint → motor λ → minden gólforrással) és egy mondat; alatta lenyitható
+fülek (gólforrások, a meccserőn kívül, kulcsemberek, és az elemző irányok
+szakaszai). Párharcban a csatornák nem futnak — ezt ki is mondja.
