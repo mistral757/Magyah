@@ -143,8 +143,9 @@ const {spawn}=require('child_process');
       nezet2Cim:(styleViewKey()),
       msLista2:styleMsList().length===(STYLE_MILESTONES.bombazok||[]).length,
       fa2:styleTraitList(styleViewKey()).length===styleTraitList("bombazok").length,
-      gombVan:/Ugrás az elsődleges/.test(style2BarHtml()),
-      nezet1Gomb:(styleViewSet(1),/Ugrás a másodlagos/.test(style2BarHtml()))};
+      /* 1.0.4.15.03 — a váltó a csempe maga: a NEM nézett csempe kattintható */
+      gombVan:/data-styleview="1"[^>]*aria-pressed="false"/.test(style2BarHtml())&&!/id="style2Swap"/.test(style2BarHtml()),
+      nezet1Gomb:(styleViewSet(1),/data-styleview="2"[^>]*aria-pressed="false"/.test(style2BarHtml()))};
 
     /* ── 6. A SZTÁR AKKOR IS A SZTÁROSÉ, HA MÁSODLAGOS ── */
     S.style={key:"beton",chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null};
