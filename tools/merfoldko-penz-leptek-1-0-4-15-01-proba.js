@@ -61,6 +61,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.nagy=m();
     sor(1,{fans:BIG,prize:BIG*0.5,reward:BIG*50});sor(2,{});
     ki.jutalommal=m();
+    sor(1,{fans:BIG,prize:BIG*0.5,reward:BIG*50,investRet:BIG*40,talKamat:BIG*9,talTozsde:BIG*9,talEsemeny:BIG*9});sor(2,{});
+    ki.szarmmal=m();ki.szarm=penzSzarmLeptek();
+    ki.budzseCel=TAL_IGAZG_FAJTA.budzse.cel();
     return ki;});
   const E=r.eleje,N=r.nagy;
   console.log("\n— 1. a karrier eleje —");
@@ -72,6 +75,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(N.ms30>N.ms10,"a nagyobb fokozat többet ad",[N.ms10,N.ms30]);
   console.log("\n— 3. nem gerjeszti önmagát —");
   ok(r.jutalommal.ms10===N.ms10,"a jutalom-bevétel nem emeli",[N.ms10,r.jutalommal.ms10]);
+  ok(r.szarmmal.ms10===N.ms10,"a befektetés hozama, a kamat, a tőzsde és a talizmán-esemény sem (1.0.4.15.02)",[N.ms10,r.szarmmal.ms10]);
+  ok(Math.abs(r.budzseCel-Math.round(r.szarm*0.25))<=1,"az igazgatóság büdzsé-célja ugyanerre a mércére ül",{cel:r.budzseCel,merce:Math.round(r.szarm)});
   console.log("\n— 4. a kategória-nyitás ára —");
   ok(Math.abs(N.cat/E.cat-N.lepJ/E.lepJ)<0.01*(N.lepJ/E.lepJ),"ugyanazzal a mércével mozog",{eleje:Math.round(E.cat),nagy:Math.round(N.cat)});
   console.log("\n— 5. oldalhiba —");

@@ -111,7 +111,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* 3 elvárás kézzel, hogy a mérés determinisztikus legyen — mind kiváló */
     const mk=elv=>{S.tal.esHat=S.tal.esHat||{};S.tal.esHat.ber={};
       S.tal.esHat.igazg={szezon:3,elv,indult:true,fb0:1000,ms:0,mn:0,zaro:null};};
-    let base=0;try{base=seasonBudgetCore();}catch(e){}
+    let base=0;try{base=penzSzarmLeptek();}catch(e){}
     ki.base=base;
     mk([{k:"helyezes",cel:5},{k:"gol",cel:40},{k:"moral",cel:50}]);
     /* a morál a meccseken gyűlik */
