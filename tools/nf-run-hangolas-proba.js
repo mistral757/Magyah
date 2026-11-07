@@ -108,7 +108,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(o.szint===6&&Math.abs(o.cel3-(o.alap-0.3))<1e-9&&o.hiv&&o.hiv0&&o.hiv.nf===o.hiv0.nf&&o.hiv.s===o.hiv0.s,"a fokozat nem változik (a régi választás nem hat); a hangolás a célrésbe megy, a hivatalos szint marad",{szint:o.szint,cel3:o.cel3,hiv0:o.hiv0,hiv:o.hiv});
   ok(o.cNehez.cap>o.c0.cap&&o.cKonnyu.cap<o.c0.cap,`a hangolás hat a Run-ra: nehezebb ${o.cNehez.cap.toFixed(3)} > alap ${o.c0.cap.toFixed(3)} > könnyebb ${o.cKonnyu.cap.toFixed(3)}`,{n:o.cNehez.cap,a:o.c0.cap,k:o.cKonnyu.cap});
   ok(o.cSzig.cap>o.cLaza.cap,`a téli tűrés hat: szigorú ${o.cSzig.cap.toFixed(3)} > laza ${o.cLaza.cap.toFixed(3)}`,{sz:o.cSzig.cap,l:o.cLaza.cap});
-  ok(o.cMid.cap>o.c0.cap,`a télen felnőtt mezőny nehezebb idény: ${o.cMid.cap.toFixed(3)} > ${o.c0.cap.toFixed(3)}`,{m:o.cMid.cap,a:o.c0.cap});
+  /* 🏃 1.0.5.0.00 — KÉRÉS: „a 15. fordulós nagy igazításért nem kell külön járjon Run szint emelés" */
+  ok(Math.abs(o.cMid.cap-o.c0.cap)<1e-9,`a téli emelés nem hat a Run-plafonra (1.0.5.0.00): ${o.cMid.cap.toFixed(3)} = ${o.c0.cap.toFixed(3)}`,{m:o.cMid.cap,a:o.c0.cap});
   ok(o.top6===100&&o.top105===100,"10.5 alatt (és a 10.5-ön a legnehezebb hangolással is) a Run teteje 100",{top6:o.top6,top105:o.top105});
   ok(o.top107===120&&o.top105b===100,`extra szinten fokozatosan nyílik: 10.7 → ${o.top107}, a 10.5-ön 100`,{top107:o.top107,top105:o.top105b});
   ok(o.ext103===5&&o.ext105===7,"az extra szinteket csak a 10.5-ön nyert karrier nyitja (10.3 → nincs, 10.5 → 10.6 és 10.7)",{e103:o.ext103,e105:o.ext105});
