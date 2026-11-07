@@ -210,6 +210,45 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(!r3b.busy&&r3b.rec&&r3b.rec.won===true&&JSON.stringify(r3b.kampany)==='["BLq"]',
      "győztesként nincs várakozás: a rekord felmegy, a KK azonnal indul",r3b);
 
+  /* 🏆 1.0.4.15.00 — BEJELENTETT HIBA: „Nem vitt magával az ellenfelem. Ő nyerte a
+     FA kupát … nekem csak nyári kupa lett." A SZÉTVÁLT ág (mateIdx null) nem
+     azt jelenti, hogy a társ kiesett: meg kell várni az ő eredményét. */
+  const r3c=await p.evaluate(async()=>{
+    const o={};
+    const varj=ms=>new Promise(r=>setTimeout(r,ms));
+    const alap=()=>{S.mkToKLDone=false;S.mpProgWait=null;try{mpMkAbort();}catch(e){}
+      S.mpCup.prog=[{comp:"FA",qual:false,chain:{gives:"BL",qual:true}},{comp:"HSZ",qual:false,chain:null}];
+      S.mpCup.pi=0;S.mpCup.comp="FA";S.mpCup.droppedApart=false;
+      delete window.__szoba[mpMkKey()];delete window.__szoba[mpPosKey()];window.__kampany=[];};
+    /* A — szétvált ág, kiestem; a társ közben megnyeri */
+    alap();
+    S.euro={comp:"FA",result:"out",outAt:"r16",stage:"done",mateIdx:null,mateOut:"r16"};
+    endEuroCampaign();await varj(60);
+    o.aVar=_mpMkBusy&&!!S.mpProgWait;o.aKamp0=window.__kampany.slice();
+    window.__szoba[mpMkKey()]=window.__szoba[mpMkKey()]||{};
+    window.__szoba[mpMkKey()].guest={won:true,at:Date.now()};
+    await varj(3000);
+    o.aKamp=window.__kampany.slice();o.aProg=S.mpCup.prog.map(x=>x.comp+(x.qual?"q":""));
+    /* B — „nem várok tovább" után; a társ rekordja nem ért fel, de már a BL-ben játszik */
+    alap();
+    S.euro={comp:"FA",result:"out",outAt:"qf",stage:"done",mateIdx:5,mateOut:"qf"};
+    endEuroCampaign();await varj(60);
+    o.bVar=_mpMkBusy;
+    window.__szoba[mpPosKey()]={guest:{comp:"BL",pi:1,at:Date.now()}};
+    await varj(3000);
+    o.bKamp=window.__kampany.slice();
+    /* C — a társ VALÓBAN kiesett (a saját eredménye): nincs várakozás, nincs lánc */
+    alap();
+    S.euro={comp:"FA",result:"out",outAt:"sf",stage:"done",mateIdx:5,mateOut:"qf",mateLost:true};
+    endEuroCampaign();await varj(80);
+    o.cBusy=_mpMkBusy;o.cKamp=window.__kampany.slice();
+    return o;});
+  console.log("\n— 3c. a szétvált ág és a lánc (1.0.4.15.00) —");
+  ok(r3c.aVar&&!r3c.aKamp0.length,"szétvált ágon kiesve a lánc megvárja a társ eredményét (nem ugrik a nyári tornára)",r3c);
+  ok(JSON.stringify(r3c.aKamp)==='["BLq"]'&&JSON.stringify(r3c.aProg)==='["FA","BLq","HSZ"]',"a társ FA-győzelmére a BL-selejtező nekem is jár",{k:r3c.aKamp,p:r3c.aProg});
+  ok(r3c.bVar&&JSON.stringify(r3c.bKamp)==='["BLq"]',"ha a társ már a BL-ben játszik (a rekordja nélkül is), a lánc elsül",r3c.bKamp);
+  ok(!r3c.cBusy&&JSON.stringify(r3c.cKamp)==='["HSZ"]',"ha a társ valóban kiesett, nincs várakozás és nincs lánc",{busy:r3c.cBusy,k:r3c.cKamp});
+
   /* ================= 4. A NYÁRI TORNA ================= */
   const r4=await p.evaluate(async()=>{
     const o={};

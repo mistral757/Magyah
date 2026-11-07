@@ -8001,7 +8001,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.4.14.00";
+const APP_VERSION="1.0.4.14.01";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -22074,10 +22074,10 @@ function mpCupMarkMateGroupOut(){
   try{
     if(compSwiss(E.comp)){
       const r=euroGroupTable(0).findIndex(x=>x.i===E.mateIdx)+1;
-      if(r>HSZ_PLAYOFF)E.mateOut="group";
+      if(r>HSZ_PLAYOFF){E.mateOut="group";E.mateLost=true;}
     }else if(E.mateG!=null){
       const r=euroGroupTable(E.mateG).findIndex(x=>x.i===E.mateIdx)+1;
-      if(r>2)E.mateOut="group";}
+      if(r>2){E.mateOut="group";E.mateLost=true;}}
   }catch(e){}}
 /* ================= A MENETELÉS NAPLÓJA =================
    A kampány közben a megtett út SEHOL nem maradt meg: az E.ties körönként
@@ -22422,9 +22422,17 @@ function mpProgCampaignEnd(E){
   const won=E.result==="win";
   const earlier=mpProgEarlierOut(E);
   const ch=st&&st.chain;
-  /* ÁTENGEDÉS: ha én nyertem, a lánc biztosan elsül; ha a társ már kiesett
-     (vagy szétvált az ág), ő sem nyerhette meg — egyikben sincs mire várni. */
-  const quick=won||E.mateIdx==null||!!E.mateOut;
+  /* ÁTENGEDÉS: ha én nyertem, a lánc biztosan elsül; ha a társ BIZONYÍTHATÓAN
+     kiesett (a saját eredménye a közös táblán vagy párharcban), ő sem nyerhette
+     meg — csak ilyenkor nincs mire várni.
+     🏆 1.0.4.15.00 — BEJELENTETT HIBA (PvP könnyed): „Nem vitt magával az
+     ellenfelem. Ő nyerte a FA kupát. Ezért nevezhetett BL-be. Vinnie kellett
+     volna magával BL-be, de nekem csak nyári kupa lett." Az ok: a SZÉTVÁLT ág
+     (mateIdx null) és a „nem várok tovább" is `mateOut`-ot állít — ezek
+     viszont csak azt jelentik, hogy nem követjük egymást, a társ attól még
+     versenyben van, és MEGNYERHETI. Mostantól ilyenkor is megvárjuk az ő
+     eredményét (a kapu elhagyható, és visszatéréskor innen folytatódik). */
+  const quick=won||(!!E.mateOut&&!!E.mateLost);
   S.euro=null;S.euroCurrent=null;
   try{$("scEuro").classList.add("hide");}catch(e){}
   if(ch&&EURO_COMPS[ch.gives]&&!S.mkToKLDone){
@@ -22453,7 +22461,7 @@ function mpProgChainStep(won,earlier,quick){
         +`${hunAz(esc(nev.cel))} <b>${esc(nev.cel)}</b> indulást — MINDKETTŐTÖKNEK, és rögtön most következik`
         +`${ch.qual?", a selejtezőtől":""}.`,"m life");}
     try{saveGame();}catch(e){}
-    mpProgAfter(earlier);},{nev,quick});}
+    mpProgAfter(earlier);},{nev,quick,celComp:ch.gives});}
 /* Visszatérés a mentett lánc-várakozáshoz (a HUB gombjáról). */
 function mpProgChainResume(){
   const w=S.mpProgWait;
@@ -22507,7 +22515,7 @@ const MP_WAIT_MK={mine:"A te hazai kupád",opp:"A társad hazai kupája",
 function mpMkKey(){return "s"+(S.seasonNumber||1)+"mkkl";}
 function mpMkAbort(){
   mpSoloClear();
-  _mpMkBusy=false;_mpMkNev=null;_mpMkProg=false;
+  _mpMkBusy=false;_mpMkNev=null;_mpMkProg=false;_mpMkCel=null;
   if(_mpMkPoll){clearTimeout(_mpMkPoll);_mpMkPoll=null;}
   h2hWaitHide();}
 /* A KILÉPŐ GOMB NEM HAGYHAT FÉLÚTON. A szezonzárás közepén vagyunk: ha a
@@ -22530,7 +22538,18 @@ function mpMkGiveUp(){
      nev   — a forrás- és cél-sorozat neve (a programból, nem a helyi osztályból)
      quick — nincs mire várni (én nyertem, vagy a társ már kiesett): a rekord
              felmegy, és azonnal továbblépünk a saját eredményünkkel. */
-let _mpMkNev=null,_mpMkProg=false;
+let _mpMkNev=null,_mpMkProg=false,_mpMkCel=null;
+/* 🏆 1.0.4.15.00 — a társ már a lánc CÉLsorozatában jár (pl. a BL-ben)? Akkor
+   megnyerte a forrás-kupát: ez maga a bizonyíték, akkor is, ha a „won"
+   rekordja valamiért nem ért fel a szobába. */
+async function mpMkMateInCel(){
+  try{
+    if(!_mpMkCel||!(MP&&MP.activeRoom))return false;
+    const oppField=MP.role==="host"?"guest":"host";
+    const node=await mpBk().h2hGet(MP.activeRoom,mpPosKey());
+    const m=node&&node[oppField];
+    return !!(m&&m.comp===_mpMkCel);
+  }catch(e){return false;}}
 function mpMkNevek(){return _mpMkNev||cupChainNevek();}
 async function mpMkChainGate(iWon,cb,opt){
   opt=opt||{};
@@ -22542,7 +22561,7 @@ async function mpMkChainGate(iWon,cb,opt){
   if(mpWaitStuck(_mpMkBusy,_mpMkPoll))mpMkAbort();
   if(_mpMkBusy)return;
   _mpMkBusy=true;
-  _mpMkNev=opt.nev||null;_mpMkProg=!!opt.nev;
+  _mpMkNev=opt.nev||null;_mpMkProg=!!opt.nev;_mpMkCel=opt.celComp||null;
   const key=mpMkKey(),myField=MP.role==="host"?"host":"guest";
   const oppField=myField==="host"?"guest":"host";
   _mpMkFallback={iWon:!!iWon,cb};
@@ -22590,6 +22609,11 @@ async function mpMkTickRun(key,myField,oppField,myEntry,done){
   /* 3.9.181: a programban a társ a kupája belső kapuinál (párharc, csoport,
      statisztika) is állhat — az nem „máshol tart", hanem még játszik. */
   /* 🛰 3.9.256 — a programja véget ért, vagy másik sorozatban jár: ide már nem jön */
+  /* 🏆 1.0.4.15.00 — ha a társ már a lánc célsorozatában játszik, ő nyert: mindkettőtöknek jár */
+  if(!(mine&&mate)&&_mpMkProg&&await mpMkMateInCel()){
+    const N=mpMkNevek();
+    try{addLine(`🎫 A társad már ${hunAz(esc(N.cel))} ${esc(N.cel)} sorozatban játszik — ${hunAz(esc(N.forras))} ${esc(N.forras)} megnyerésével. Az ő jogán te is indulsz.`,"m life");}catch(e){}
+    done(true);return;}
   if(!(mine&&mate)&&_mpMkProg){const why=await mpMateElsewhere();
     if(why&&/véget ért|másik lépés/.test(why)){
       try{addLine(`⚔ Nem várunk a társadra a hazai kupa-láncnál — ${esc(why)}.`,"m ev");}catch(e){}
@@ -23549,7 +23573,7 @@ async function mpCupTieTickRun(key,myField,oppField,round,onReady,myRec){
       /* A társ párharcának VALÓDI kimenetele felülírja a helyi szimulációt. */
       t.winner=mate.won?E.mateIdx:(t.a===E.mateIdx?t.b:t.a);
       if(!mate.won){
-        E.mateOut=round;
+        E.mateOut=round;E.mateLost=true;   /* 🏆 1.0.4.15.00 — VALÓDI kiesés (a társ saját eredménye) */
         addLine(`⚔ A társad (${esc((mpCup()&&mpCup().mateName)||"a társad")}) kiesett ${hunAz(EURO_ROUND_NAMES[round]||round)} ${EURO_ROUND_NAMES[round]||round} során — nem találkoztok idén.`,"m life");}}
     mpCupTieAbort();
     try{saveGame();}catch(e){}
@@ -108197,7 +108221,7 @@ function euroResolveRoundAfterSync(round){
     /* Ha ÉPP a társaddal csaptatok össze, a párharc dönti el az ő sorsát is —
        nincs mit külön szinkronizálni, csak könyvelni. */
     if(mpCupActive()&&E.mateIdx!=null&&(ut.a===E.mateIdx||ut.b===E.mateIdx)){
-      if(userWon)E.mateOut=round;
+      if(userWon){E.mateOut=round;E.mateLost=true;}
       addLine(`⚔ A KIESÉSES ÁG ÖSSZEHOZOTT TITEKET — ${EURO_ROUND_NAMES[round]}: ${userWon?"te jutottál tovább!":"a társad jutott tovább."}`,"m life");}
     addLine(`${userWon?"✅":(round==="final"?"🥈":"❌")} ${EURO_ROUND_NAMES[round]} — ${round==="final"?"":"összesítés "}${mine}:${theirs}, ${ut.how}. ${userWon?(round==="final"?"MEGNYERTÉTEK A SOROZATOT!":"Tovább!"):(round==="final"?"Vesztettetek a döntőben — ezüstérmesek lettetek.":"Kiestetek.")}`,"m life");}
   const winners=E.ties.map(t=>t.winner);
