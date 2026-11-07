@@ -257,8 +257,8 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
   const bk=await p.evaluate(()=>{
     const ki={};
     /* valószerű szezonkeret: a fixture-é olyan kicsi, hogy a 100-as kerekítés elnyelné */
-    const _sbc=seasonBudgetCore;seasonBudgetCore=()=>1e9;
-    const base=seasonBudgetCore();
+    const _sbc=penzSzarmLeptek;penzSzarmLeptek=()=>1e9;
+    const base=penzSzarmLeptek();
     /* takarékbetét: idényzáráskor kamat (plafon: a szezonkeret 10%-a); kontra: vételár +3% */
     _lap("takarek",1);
     S.transferBudget=Math.round(base*0.5);const b0=S.transferBudget;
@@ -294,7 +294,7 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     const b5=S.transferBudget;talKotvenyFelvesz(talState().lapok[0]);ki.kotv=S.transferBudget-b5;ki.kotvSor=_sor(null,"talKotveny");
     S.morale=60;talBankMeccs("loss");ki.kotvMor=S.morale;
     S.seasonNumber=5;S.morale=60;talBankMeccs("loss");ki.kotvMorKesobb=S.morale;S.seasonNumber=3;
-    S.morale=60;S.transferBudget=5e9;seasonBudgetCore=_sbc;
+    S.morale=60;S.transferBudget=5e9;penzSzarmLeptek=_sbc;
     return ki;});
   console.log("\n— 3. BANK —");
   ok(kozel(bk.kamat,0.04,0.001)&&bk.kamatSor>0&&bk.masodszor===null&&kozel(bk.kamatPlafon,0.10,0.001),

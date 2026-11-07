@@ -107,7 +107,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.fast[0]===1&&r.fast[1]===1,"1m. a szint-memó extra slotra is él",r.fast);
   ok(r.extraFx>1,"1n. az extra filozófia képességei élnek a motoron",r.extraFx);
   ok(/id="style2Pick"/.test(r.barNyitva)&&/Válaszd ki a 4\. csapatstílust/.test(r.barNyitva),"2a. nyitott hely: a sáv gombja kiírja (hányadik filozófia)",r.barNyitva.replace(/<[^>]+>/g," ").slice(0,200));
-  ok(/ugrás|Ugrás/.test(r.barZarva)&&/id="style2Swap"/.test(r.barZarva),"2b. a váltó a négy filozófiára is megvan",1);
+  ok((r.barZarva.match(/data-styleview="\d"/g)||[]).length>=3&&!/id="style2Swap"/.test(r.barZarva),"2b. a váltó a négy filozófiára is megvan — a csempék maguk (1.0.4.15.03)",1);
 
   /* ---- 2c. a jelzés: a menüsáv jelzi a célt ---- */
   const s2=await p.evaluate(()=>{
@@ -255,6 +255,26 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return o;});
   ok(qq.gomb&&qq.valaszto&&qq.zarva&&qq.vGomb==="Erre cserélem"&&qq.kerdes&&qq.uj==="villam"&&qq.elso==="beton",
     "2y. a felületen: gomb → választó (a meglévő filozófiák zárva) → megerősítő → a nézett hely cserélődik",qq);
+
+  /* ---- 2z. A CSEMPE MAGA A VÁLTÓ (1.0.4.15.03) ---- */
+  const tz=await p.evaluate(()=>{
+    const o={};
+    const mk=k=>({key:k,chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null});
+    S.style=mk("beton");S.style2=mk("bombazok");S.styleExtra=[mk("villam")];S.styleView=3;
+    styleLvlCacheClear();hubStyleSetOpen(true);renderStylePanel();
+    const body=$("hubStyleBody");
+    o.zoldGomb=!!$("style2Swap");
+    o.csempek=body.querySelectorAll("[data-styleview]").length;
+    body.querySelector('[data-styleview="1"]').click();
+    o.utan1=styleViewIdx();
+    $("hubStyleBody").querySelector('[data-styleview="1"]').click();   /* a nézett csempe: nem csinál semmit */
+    o.ujra1=styleViewIdx();
+    $("hubStyleBody").querySelector('[data-styleview="2"]').click();
+    o.utan2=styleViewIdx();
+    o.jelolt=$("hubStyleBody").querySelector('[data-styleview="2"]').getAttribute("aria-pressed");
+    return o;});
+  ok(!tz.zoldGomb&&tz.csempek===3&&tz.utan1===1&&tz.ujra1===1&&tz.utan2===2&&tz.jelolt==="true",
+    "2z. nincs külön váltógomb — a filozófia-csempére kattintva vált, a nézett csempe jelölt",tz);
 
   /* ---- 3. CSÚCSFOK ---- */
   const c=await p.evaluate(()=>{
