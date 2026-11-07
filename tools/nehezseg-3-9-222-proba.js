@@ -154,7 +154,7 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
     o.utem=nfMezonyUtem(S.pyr.my);
     const hC=pyrFloorKickoff();o.c=Object.assign({},hC);o.c_utana=gap();
     o.c_szint=Math.round((pyrLevel()-szC)*10)/10;
-    o.naplo=[...document.querySelectorAll("#log .line, #log div")].map(x=>x.textContent).filter(t=>/Alsó fék/.test(t)).length
+    o.naplo=[...document.querySelectorAll("#log .line, #log div")].map(x=>x.textContent).filter(t=>/Alsó fék|Rajt-igazítás/.test(t)).length
       ||/Alsó fék/.test(document.body.textContent);
     /* D) enyhén alatta (2,5-del): a fék csak a holtsáv széléig húz */
     S.seasonHistory.push({season:4,rank:10,pts:38,w:9,d:11,l:10,gf:30,ga:38,oppRating:oppTargetRating,teamAvg:86});
@@ -167,13 +167,15 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
   ok(r3.v1&&typeof r3.dg1==="number"&&r3.v1b===null&&kozel(r3.mert,r3.dg1,0.011),"az idény vége rögzíti a dg-t, egyszer",{dg:r3.dg1,m:r3.mert});
   ok(kozel(r3.want2,r3.want2vart,0.001),"a 2. idény rajt-célja a mért változásból tanul",{w:r3.want2,v:r3.want2vart});
   ok(r3.a.lift>3&&r3.a_utana<=r3.a.want+0.16&&r3.a.fek===0&&r3.a.nf===3&&r3.a.cel===3.8,"elhúztál → a mezőny felnő a rajt-célig",r3.a);
-  ok(r3.b.lift===0&&r3.b.fek===0&&Math.abs(r3.b_szint)<0.01,"a holtsávban a mezőny a saját útját járja",{b:r3.b,sz:r3.b_szint});
-  ok(r3.c.fek>0&&r3.c.fek<=r3.utem+0.6&&r3.c_szint<0&&r3.c_utana>r3.c_elotte,"mélyen (9-cel) alatta → a fék legfeljebb egy éves ütemnyit vesz vissza",{c:r3.c,utem:r3.utem,e:r3.c_elotte,u:r3.c_utana});
-  ok(r3.c_utana<r3.c.want-1.5-0.5&&r3.c.fek>=r3.utem-0.6,"a fék nem ajándék: ha az ütem kevés, a holtsávig sem húz fel",{u:r3.c_utana,w:r3.c.want});
-  ok(r3.naplo,"a napló kimondja az alsó féket");
+  /* 🎚 1.0.6.0.00 — A RAJT-CÉL A MINIMUM: a régi alsó fék (holtsáv, legfeljebb
+     egyévnyi ütem) helyett a mezőny a rajt-célig visszalép — keményebb nem
+     maradhat, a világ egész-szintű kerekítése miatt legfeljebb egy lépésnyivel könnyebb */
+  ok(r3.b.lift===0&&r3.b.utana>=r3.b.want-0.16&&r3.b.utana<=r3.b.want+1.1,"kicsit a rajt-cél alatt → a mezőny a rajt-célig lép vissza (nem keményebb)",{b:r3.b,sz:r3.b_szint});
+  ok(r3.c.fek>0&&r3.c_szint<0&&r3.c_utana>=r3.c.want-0.16&&r3.c_utana<=r3.c.want+1.1,"mélyen (9-cel) alatta → a mezőny a rajt-célig lép vissza, nem csak egy ütemnyit",{c:r3.c,utem:r3.utem,e:r3.c_elotte,u:r3.c_utana});
+  ok(r3.naplo,"a napló kimondja a rajt-igazítást");
   /* a világ egész-szintű kerekítése miatt a beállított rés a széltől fél lépésen
      belül is lehet — ilyenkor a fék joggal nem lép (3.9.223) */
-  ok((r3.d.fek>0||Math.abs(r3.d.elotte-(r3.d.want-1.5))<=0.5+1e-9)&&r3.d_utana>=r3.d.want-1.5-0.6&&r3.d_utana<=r3.d.want-1.5+0.6,"enyhén alatta → a holtsáv széléig",{d:r3.d,u:r3.d_utana});
+  ok(r3.d.utana>=r3.d.want-0.16&&r3.d.utana<=r3.d.want+1.1,"enyhén alatta → a rajt-célig (1.0.6.0.00: nem a holtsáv széléig)",{d:r3.d,u:r3.d.utana});
 
   console.log("\n— 4. a tél —");
   const r4=await p.evaluate(()=>{

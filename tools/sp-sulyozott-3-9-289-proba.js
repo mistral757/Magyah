@@ -62,7 +62,9 @@ const KEP=process.argv[2]||null;
     if(!suly)delete S.pyr.suly;
     S.idx=30;o.vege=nfIdenyVege();o.zaro=H[1].zaroMs;
     let ms=0;msRatedBegin();try{ms=teamMatchStrength();}finally{msRatedEnd();}
-    o.msMost=Math.round(ms*10)/10;o.zaroVart=o.msMost;
+    o.msMost=Math.round(ms*10)/10;
+    /* 🎚 1.0.6.0.00 — a záró TARTÓSAN: az átmeneti tagok és a morál alapszint fölötti része nélkül */
+    o.zaroVart=Math.round((ms-msTartosKorr())*10)/10;
     /* nyáron +12-t épített: a záró 12-vel kevesebb volt */
     H[1].zaroMs=Math.round((ms-12)*10)/10;
     S.seasonHistory=[{season:1,rank:3,pts:60,w:18,d:6,l:6,gf:50,ga:30,oppRating:oppTargetRating,teamAvg:85}];
