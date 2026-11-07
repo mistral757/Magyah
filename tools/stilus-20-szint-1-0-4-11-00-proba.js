@@ -106,7 +106,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(JSON.stringify(r.korbe)===JSON.stringify([4,1,2,3,4]),"1l. a nézet körbeváltható mind a négy filozófián",r.korbe);
   ok(r.fast[0]===1&&r.fast[1]===1,"1m. a szint-memó extra slotra is él",r.fast);
   ok(r.extraFx>1,"1n. az extra filozófia képességei élnek a motoron",r.extraFx);
-  ok(/id="style2Pick"/.test(r.barNyitva)&&/20\. szint jutalma/.test(r.barNyitva),"2a. nyitott hely: a sáv gombja kiírja",r.barNyitva.replace(/<[^>]+>/g," ").slice(0,200));
+  ok(/id="style2Pick"/.test(r.barNyitva)&&/Válaszd ki a 4\. csapatstílust/.test(r.barNyitva),"2a. nyitott hely: a sáv gombja kiírja (hányadik filozófia)",r.barNyitva.replace(/<[^>]+>/g," ").slice(0,200));
   ok(/ugrás|Ugrás/.test(r.barZarva)&&/id="style2Swap"/.test(r.barZarva),"2b. a váltó a négy filozófiára is megvan",1);
 
   /* ---- 2c. a jelzés: a menüsáv jelzi a célt ---- */
@@ -116,7 +116,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const h=style2BarHtml();
     const plain=h.replace(/<[^>]+>/g," ").replace(/\s+/g," ");
     return {plain,pick:/id="style2Pick"/.test(h)};});
-  ok(!s2.pick&&/Újabb csapatstílus/.test(s2.plain)&&/20\. szintet/.test(s2.plain)&&/mesterfok|csúcsfok|Csúcsfok/i.test(s2.plain),"2c. a cél látszik a csapatstílus menüben (szint, jutalom, haladás)",s2.plain.slice(0,420));
+  ok(!s2.pick&&/A 3\. csapatstílus/.test(s2.plain)&&/20\. szintet/.test(s2.plain)&&/mesterfok|csúcsfok|Csúcsfok/i.test(s2.plain),"2c. a cél látszik a csapatstílus menüben (szint, jutalom, haladás)",s2.plain.slice(0,420));
 
   /* ---- 2d. MENTÉS KÖRBE ---- */
   const m=await p.evaluate(()=>{
@@ -180,6 +180,81 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(/8\.3 nehézségen/.test(n.bar)&&/10\.5-ön a 15/.test(n.bar),"2m. a menü is jelzi a nehézségfüggő küszöböt",n.bar.slice(0,400));
   ok(n.nincsFok===20,"2n. fokozat nélküli (klasszikus) karrierben a 20. szint",n.nincsFok);
   ok(n.txt[0]==="a 20. szintet"&&n.txt[1]==="a 18. szint 60%-át"&&n.txt[2]==="a 15. szint","2o. a küszöb szövege",n.txt);
+
+  /* ---- 2p. NÉGY FILOZÓFIA, A MECCSERŐ-ÚT, AZ ÚJRAVÁLASZTÁS (1.0.4.15.00) ---- */
+  const q=await p.evaluate(()=>{
+    const o={};
+    const mk=k=>({key:k,chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null});
+    const _nf=styleXNfMost;styleXNfMost=()=>null;
+    S.style=mk("beton");S.style2=mk("bombazok");S.styleExtra=[];S.styleView=1;S.styleXMs=0;
+    window.__L={beton:9,bombazok:9};styleLvlCacheClear();
+    /* a felső határ: négy */
+    S.styleExtra=[mk("villam"),mk("tikitaka")];styleLvlCacheClear();
+    o.cap=[styleXCanChoose(),styleXGateWhy()];
+    o.capBar=style2BarHtml().replace(/<[^>]+>/g," ").replace(/\s+/g," ");
+    /* meccserő-út: 250 → 3., 350 → 4. */
+    S.styleExtra=[];S.styleXMs=249;styleLvlCacheClear();o.ms249=styleXCanChoose();
+    o.bar249=style2BarHtml().replace(/<[^>]+>/g," ").replace(/\s+/g," ");
+    S.styleXMs=250;o.ms250=styleXCanChoose();
+    S.styleExtra=[mk("villam")];styleLvlCacheClear();
+    S.styleXMs=300;o.ms300_4=styleXCanChoose();
+    S.styleXMs=350;o.ms350_4=styleXCanChoose();
+    /* a 3. a szint-úton nyílt 250 előtt: a 4. nem 250-nél, csak 350-nél */
+    window.__L={beton:20,bombazok:9,villam:5};styleLvlCacheClear();
+    S.styleXMs=260;o.lvl260=styleXCanChoose();
+    S.styleXMs=350;o.lvl350=styleXCanChoose();
+    /* a csúcs számít: a meccserő mérése nem csökkenti */
+    S.styleXMs=300;const _tms=teamMatchStrength;teamMatchStrength=()=>120;styleXMsNote();o.csucs=S.styleXMs;teamMatchStrength=_tms;
+    /* újraválasztás */
+    S.styleExtra=[];window.__L={beton:9,bombazok:9};styleLvlCacheClear();
+    o.reselZar=styleReselWhy();
+    o.reselBar0=style2BarHtml().replace(/<[^>]+>/g," ").replace(/\s+/g," ");
+    window.__L={beton:10,bombazok:4};styleLvlCacheClear();
+    o.reselNyit=styleReselWhy();
+    /* a bombázók fájába 2 + 1 szint, a pontgyűjtőből 120 elköltve */
+    const t0=styleTraitList("bombazok")[0],t1=styleTraitList("bombazok")[1];
+    S.style2.traits={[t0.key]:2,[t1.key]:1};S.style2.eng={pts:5,earned:200,spent:120,lvl:3};
+    const kolt=t0.lv[0].price+t0.lv[1].price+t1.lv[0].price;
+    msState().sp=100;
+    S.styleView=2;
+    o.reselBar=style2BarHtml().replace(/<[^>]+>/g," ").replace(/\s+/g," ");
+    o.dupla=styleReselect(2,"beton",null);
+    const r=styleReselect(2,"villam",null);
+    o.r=r;o.sp=msState().sp;o.vart=100+Math.round(kolt*0.33);
+    o.uj=S.style2&&S.style2.key;o.ujEng=S.style2&&S.style2.eng;o.ujTraits=JSON.stringify(S.style2.traits);
+    o.nezet=styleViewIdx();
+    styleXNfMost=_nf;
+    return o;});
+  ok(q.cap[0]===false&&/felső határ/.test(q.cap[1])&&/Mind a 4 filozófia-hely betelt/.test(q.capBar),"2p. legfeljebb négy filozófia — a sáv kimondja",{why:q.cap[1],bar:q.capBar.slice(0,160)});
+  ok(q.ms249===false&&q.ms250===true,"2q. 250-es meccserőnél megnyílik a 3. filozófia",{a:q.ms249,b:q.ms250});
+  ok(/meccserő eléri a 250-et/.test(q.bar249)&&/249/.test(q.bar249),"2r. a sáv a meccserő-utat is mutatja (haladással)",q.bar249.slice(0,500));
+  ok(q.ms300_4===false&&q.ms350_4===true,"2s. a 4. a meccserő-úton 350-nél nyílik",{a:q.ms300_4,b:q.ms350_4});
+  ok(q.lvl260===false&&q.lvl350===true,"2t. ha a 3. a szint-úton nyílt, a 4. nem 250-nél, csak 350-nél",{a:q.lvl260,b:q.lvl350});
+  ok(q.csucs===300,"2u. a meccserő csúcsa számít (gyengébb mérés nem veszi vissza)",q.csucs);
+  ok(/10\. szintet/.test(q.reselZar)&&q.reselNyit===""&&/újraválasztás/i.test(q.reselBar0),"2v. az újraválasztás a 10. szinttől nyílik — a sáv kiírja a feltételt",{z:q.reselZar,n:q.reselNyit});
+  ok(/újraválasztása/.test(q.reselBar)&&/33% visszatérítés/.test(q.reselBar),"2w. a nézett filozófia újraválasztása gombbal, a visszatérítés becslésével",q.reselBar.slice(0,400));
+  ok(q.dupla.ok===false&&q.r.ok===true&&q.uj==="villam"&&q.sp===q.vart&&q.ujEng&&Math.abs(q.ujEng.pts-39.6)<0.05&&q.ujTraits==="{}"&&q.nezet===2,
+    "2x. a csere: a fára költött pont és a pontgyűjtőből elköltött pont 33%-a vissza, az új tiszta lappal indul",{sp:q.sp,vart:q.vart,eng:q.ujEng,uj:q.uj});
+
+  const qq=await p.evaluate(()=>{
+    const o={};
+    const mk=k=>({key:k,chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null});
+    S.style=mk("beton");S.style2=mk("bombazok");S.styleExtra=[];S.styleView=2;
+    window.__L={beton:12,bombazok:5};styleLvlCacheClear();
+    hubStyleSetOpen(true);renderStylePanel();
+    const b=$("styleReselBtn");o.gomb=!!b;if(!b)return o;
+    b.click();
+    const body=$("hubStyleBody");
+    o.valaszto=/Újraválasztás — /.test(body.textContent);
+    o.zarva=!!body.querySelector('[data-style2="beton"][disabled]');
+    const v=body.querySelector('[data-style2="villam"]');o.vGomb=v&&v.textContent;
+    v.click();
+    o.kerdes=/Lecseréled a filozófiát/.test(($("hubTacticConfirmTitle")||{}).textContent||"");
+    $("hubTacticConfirmYes").click();
+    o.uj=S.style2&&S.style2.key;o.elso=S.style&&S.style.key;
+    return o;});
+  ok(qq.gomb&&qq.valaszto&&qq.zarva&&qq.vGomb==="Erre cserélem"&&qq.kerdes&&qq.uj==="villam"&&qq.elso==="beton",
+    "2y. a felületen: gomb → választó (a meglévő filozófiák zárva) → megerősítő → a nézett hely cserélődik",qq);
 
   /* ---- 3. CSÚCSFOK ---- */
   const c=await p.evaluate(()=>{
