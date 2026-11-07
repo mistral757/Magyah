@@ -8039,7 +8039,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.4.16.00";
+const APP_VERSION="1.0.4.16.01";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -30922,6 +30922,60 @@ function playerFromStamp(n,from){
   if(!e||e.from)return;
   const f=from||playerFromDerive(n);
   if(f)e.from=Object.assign({},f,{sz:(S&&S.seasonNumber)||1});}
+/* ================= 🧭 MILYEN ÚTON JÖTT (1.0.4.16.01) =================
+   KÉRÉS: „A [játékos-adatlap fejlécére] kerüljön be, hogy az adott játékos
+   melyik csapatból jött hozzánk és milyen úton (draft, vásárlás, scout,
+   ifiakadémia, átigazolási esemény)."
+   A klub-bélyeg (e.from, 3.9.151) mellé az ÚT is rákerül: e.from.via (+ a
+   részlet: e.from.det). Minden érkezési út meghívja az erkUtJegyez-t —
+   közvetlenül, vagy a markArrived-on át (p._erkUt / p._erkKlub előre
+   beállítva). A klub az első érkezéskor rögzül; az út minden érkezéskor
+   (visszavásárlás, hazatérés) frissül. Régi mentésben az út hiányzik: ott a
+   rendelkezésre álló jelekből (kezdő keret, akadémia, vételár) következtetünk. */
+const ERK_UT={
+  draft:{ic:"📝",n:"draft"},klub:{ic:"🏟️",n:"a klub kezdő kerete"},
+  piac:{ic:"💰",n:"vásárlás"},szemle:{ic:"💰",n:"vásárlás (klub-szemle)"},
+  scout:{ic:"🔭",n:"scout"},ifi:{ic:"🌱",n:"ifiakadémia"},
+  esemeny:{ic:"📨",n:"átigazolási esemény"},ikon:{ic:"👑",n:"ikon-igazolás"},
+  csalad:{ic:"👪",n:"család"},potlas:{ic:"♻️",n:"pótlás (egy visszavonult helyére)"},
+  vissza:{ic:"🔁",n:"visszavásárlás"},hazater:{ic:"🔁",n:"hazatérés"},
+  talizman:{ic:"🧿",n:"talizmán-ajánlat"}};
+const _erkFriss={};
+function erkUtJegyez(n,via,klub,det){
+  if(!n||gameMode!=="career"||typeof careerPool==="undefined"||!careerPool)return;
+  const e=careerPool[n];if(!e)return;
+  const sz=(S&&S.seasonNumber)||1;
+  if(!e.from){
+    const f=klub||playerFromDerive(n);
+    e.from=Object.assign({},f||{},{sz});}
+  else if(klub&&!e.from.club&&!e.from.akad)Object.assign(e.from,klub);
+  if(via){e.from.via=via;e.from.viaSz=sz;
+    if(det)e.from.det=det;else delete e.from.det;
+    _erkFriss[n]=1;}}
+/* a fejléc sora: „honnan · milyen úton" */
+function erkUtTxt(p,e){
+  if(!p)return "";
+  if(p.family)return "👪 családtag";
+  const f=(e&&e.from)||null;
+  let honnan="";
+  if(f&&f.akad)honnan="saját akadémia";
+  else{const d=(f&&f.club)?f:playerFromDerive(p.n);
+    if(d&&d.club){let nev=d.club;try{nev=clubLabel(d.club);}catch(err){}
+      honnan=String(nev||"")+(d.season?` (${d.season})`:"");}}
+  let via=f&&f.via;
+  /* régi mentés: következtetés */
+  if(!via&&f){
+    const fs=(S&&S.foundingSquad)||[];
+    if(f.akad)via="ifi";
+    else if(fs.indexOf(p.n)>=0&&(f.sz||1)<=1)via="draft";
+    else if(e&&e.boughtFor>0)via="piac";
+    /* az 1. idényben, vételár nélkül érkezett: a kezdő keret tagja */
+    else if((f.sz||1)<=1)via="draft";}
+  const U=via?ERK_UT[via]:null;
+  const ut=U?`${U.ic} ${U.n}${f&&f.det?` — ${f.det}`:""}`:"";
+  const mikor=f&&(f.viaSz||f.sz)?`${f.viaSz||f.sz}. idény`:"";
+  if(!honnan&&!ut)return "";
+  return [honnan?`🛫 ${esc(honnan)}`:"",ut?esc(ut):"",mikor?esc(mikor):""].filter(Boolean).join(" · ");}
 function playerFromTxt(p,e){
   if(p&&p.family)return "👪 családtag";
   const f=(e&&e.from)||playerFromDerive(p&&p.n);
@@ -33713,7 +33767,7 @@ function advanceCareerSeason(){
       const codes=locCodes(loc);
       const repl=Object.values(careerPool).find(e=>!draftedNow.has(e.n)&&e.pos.some(pp=>codes.includes(pp)));
       if(repl){
-        draftedNow.add(repl.n);drafted.add(repl.n);
+        draftedNow.add(repl.n);drafted.add(repl.n);try{erkUtJegyez(repl.n,"potlas");}catch(e){}
         const newP=careerPlayerFromPoolEntry(repl);
         newP._arrivedAtIdx=0;
         if(loc.type==="slot"){slots[loc.idx].player=newP;slots[loc.idx].fit=fitFor(newP,slots[loc.idx]);}
@@ -36258,7 +36312,7 @@ function applyLeaveDeparture(cand){
   const idx=cand.idx,leaver=cand.leaver;
   if(!slots[idx]||slots[idx].player!==leaver)return `${esc(fullName(leaver.n))} elköszönt a csapattól.`;
   const repl=findReplacement([slots[idx].pos],{requireWorseThan:leaver.ovr+1})||synthWeak(leaver.ovr,slots[idx].pos);
-  drafted.add(repl.n);
+  drafted.add(repl.n);try{erkUtJegyez(repl.n,"esemeny",null,"egy távozó helyére");}catch(e){}
   slots[idx].player=repl;slots[idx].fit=fitFor(repl,slots[idx]);slots[idx].origin=null;
   pruneChemistry();
   return `${esc(fullName(leaver.n))} elköszönt a csapattól (elégedetlen volt a szerepével). Érkezett: ${esc(fullName(repl.n))} (${repl.ovr}).`;}
@@ -36305,7 +36359,7 @@ function applyTransfer(type){
   if(type.key==="dream"){
     const cand=computeDreamCandidate();
     if(!cand)return "Próbálkoztunk egy nagy dobással, de az igazolás végül meghiúsult.";
-    drafted.add(cand.repl.n);
+    drafted.add(cand.repl.n);try{erkUtJegyez(cand.repl.n,"esemeny",null,"álomigazolás");}catch(e){}
     slots[cand.idx].player=cand.repl;slots[cand.idx].fit=fitFor(cand.repl,slots[cand.idx]);slots[cand.idx].origin=null;
     return `Végre megszereztétek! Érkezett: ${esc(fullName(cand.repl.n))} (${cand.repl.ovr}) — ${esc(fullName(cand.cur.n))} (${cand.cur.ovr}) helyére.`;
   }
@@ -36315,7 +36369,7 @@ function applyTransfer(type){
     const parts=idxs.map(idx=>{
       const cur=slots[idx].player;
       const repl=findReplacement([slots[idx].pos],{})||synthWeak(cur.ovr,slots[idx].pos,3);
-      drafted.add(repl.n);
+      drafted.add(repl.n);repl._erkUt="esemeny";repl._erkDet="kölcsön";try{erkUtJegyez(repl.n,"esemeny",null,"kölcsön");}catch(e){}
       if(gameMode==="career"&&careerPool){
         if(fullCareerRoster().length>=MAX_CAREER_ROSTER){
           /* NEM ZSÁKUTCA: várólistára kerül, és a szöveg után egyesével kapja
@@ -36350,7 +36404,7 @@ function applyTransfer(type){
         try{const c=getCategoryFor(slots[idx].pos);const RC=ROLE_CATS.find(x=>x.key===c);if(RC)kodok=RC.codes.slice();}catch(e){}
         repl=findReplacement(kodok,kor);}}
     if(!repl)repl=findReplacement([slots[idx].pos],{requireWorseThan:cur.ovr-3})||synthWeak(cur.ovr,slots[idx].pos,10);
-    drafted.add(repl.n);
+    drafted.add(repl.n);repl._erkUt="esemeny";repl._erkDet="akadémiai bemutatkozás";try{erkUtJegyez(repl.n,"esemeny",null,"akadémiai bemutatkozás");}catch(e){}
     if(gameMode==="career"&&careerPool){
       if(fullCareerRoster().length>=MAX_CAREER_ROSTER)
         return queueArrival(repl,`Akadémiai bemutatkozás: <b>${esc(fullName(repl.n))}</b> (${repl.ovr}) jelentkezett, de a kereted megtelt.`)
@@ -41926,7 +41980,7 @@ function finalizeFamilyPlacement(){
     player.estimatedPOT=careerPool[player.n].estimatedPOT;}
   const slot=slots[familyState.slotIdx];
   slot.player=player;slot.fit=1;slot.origin="Család";
-  drafted.add(player.n);
+  drafted.add(player.n);try{erkUtJegyez(player.n,"csalad");}catch(e){}
   const spName=FAMILY_SPECIALTIES.find(s=>s.id===familyState.specialty).name;
   $("familyWrap").classList.add("hide");
   $("spinCard").classList.remove("hide");$("spinRow").classList.remove("hide");
@@ -42135,6 +42189,7 @@ function place(p,slot){
   commitSeasonBasis(p);   /* szezon-alapon a kártya értékei most válnak véglegessé */
   slot.player=p;slot.fit=fitFor(p,slot);slot.origin=curSquad.club;pendingPlayer=null;drafted.add(p.n);
   playerFromStamp(p.n,{club:curSquad.club,season:curSquad.season});
+  try{erkUtJegyez(p.n,"draft",{club:curSquad.club,season:curSquad.season});}catch(e){}
   slots.forEach(s=>s.el&&s.el.classList.remove("open-elig"));
   $("rerollBtn").classList.add("hide");
   $("squadList").innerHTML="";$("spinBtn").disabled=false;
@@ -42155,7 +42210,8 @@ function place(p,slot){
 function placeBench(p){
   commitSeasonBasis(p);   /* szezon-alapon a kártya értékei most válnak véglegessé */
   BENCH[draftBenchCat().key]=p;drafted.add(p.n);
-  if(curSquad)playerFromStamp(p.n,{club:curSquad.club,season:curSquad.season});
+  if(curSquad){playerFromStamp(p.n,{club:curSquad.club,season:curSquad.season});
+    try{erkUtJegyez(p.n,"draft",{club:curSquad.club,season:curSquad.season});}catch(e){}}
   $("squadList").innerHTML="";$("spinBtn").disabled=false;$("rerollBtn").classList.add("hide");
   benchCatIndex++;
   if(benchCatIndex<DRAFT_BENCH_CATS.length){updateRound();}
@@ -45194,6 +45250,7 @@ function startClubCareer(sq){
     Math.max(MAX_CAREER_ROSTER_BASE,roster.length+CLUB_ROSTER_SPARE));
   clubFillSquad(roster,sq.club);
   roster.forEach(x=>playerFromStamp(x&&x.n,{club:sq.club,season:sq.season}));
+  roster.forEach(x=>{try{if(x&&x.n)erkUtJegyez(x.n,"klub",{club:sq.club,season:sq.season});}catch(e){}});
   /* Ifi-kiegészítés a poszt-hű beillesztés UTÁN: így pontosan azt pótoljuk,
      ami tényleg hiányzik (kezdő 11 + mind a négy cserehely). */
   const youth=clubFillYouth(sq.club);
@@ -45534,7 +45591,14 @@ function markArrived(p,_price,fromAcademy){
   try{delete p._meresForras;}catch(e){}
   /* 🏟️ HONNAN JÖTT (3.9.151): ha még nincs bélyeg, most kap — az akadémista
      a saját akadémiát, mindenki más az utolsó klubját a világ kereteiből. */
-  try{if(fromAcademy)playerFromStamp(p&&p.n,{akad:1});else playerFromStamp(p&&p.n,null);}catch(e){}
+  try{if(fromAcademy)playerFromStamp(p&&p.n,{akad:1});else playerFromStamp(p&&p.n,(p&&p._erkKlub)||null);}catch(e){}
+  /* 🧭 1.0.4.16.01 — az érkezés ÚTJA: a hívó előre megmondja (p._erkUt), vagy
+     ha az útvonal már közvetlenül feljegyezte, azt nem írjuk felül */
+  try{if(p&&p.n){
+    if(p._erkUt||!_erkFriss[p.n]){
+      const via=p._erkUt||(fromAcademy?"ifi":(_price>0?"piac":((p.icon||p._icon||p.isIcon)?"ikon":null)));
+      if(via)erkUtJegyez(p.n,via,p._erkKlub||(fromAcademy?{akad:1}:null),p._erkDet||null);}
+    delete _erkFriss[p.n];delete p._erkUt;delete p._erkKlub;delete p._erkDet;}}catch(e){}
   /* ---- INFINITY SZINT-KÖVETÉS HORGONYA ----
      Itt rögzítjük, milyen mezőnyszinten került hozzád — ettől kezdve tart
      lépést a szinttel (lásd applyOwnedShift). A markArrived MINDEN igazolási
@@ -86749,6 +86813,7 @@ function twScout(){
       go.onclick=(ev)=>{
         if(ev&&ev.stopPropagation)ev.stopPropagation();
         if(TW&&TW.busy)return;
+        c._erkUt="piac";
         twConfirmBuy(c,()=>twResolveSigning(c));};
       det.appendChild(go);};
     head.addEventListener("click",()=>{if(!det.classList.contains("hide"))buildDet();});
@@ -87571,7 +87636,7 @@ function showDreamOffer(cand){
       Elfogadod az ajánlatot?</p>`;
   const yesBtn=document.createElement("button");yesBtn.className="btn-y stepbtn";yesBtn.textContent="Igen, elfogadom";
   yesBtn.onclick=()=>{
-    drafted.add(cand.repl.n);
+    drafted.add(cand.repl.n);cand.repl._erkUt="esemeny";cand.repl._erkDet="álomigazolás";
     cand.repl._negotiatedPrice=0;
     TW.category=getCategoryFor(cand.repl.pos[0]);
     /* AZ ÁLOMIGAZOLÁS AZ EGYETLEN, AMI NEM A TARTALÉKBA JÖN. Az ajánlat maga
@@ -94501,7 +94566,7 @@ function autoResolveCheckpoint(round){
     if(result.title==="__DREAM_PENDING__"){
       const cand=computeDreamCandidate();
       if(!cand)return {title:"Álomigazolás",text:"Próbálkoztunk egy nagy dobással, de az igazolás végül meghiúsult."};
-      drafted.add(cand.repl.n);
+      drafted.add(cand.repl.n);try{erkUtJegyez(cand.repl.n,"esemeny",null,"álomigazolás");}catch(e){}
       slots[cand.idx].player=cand.repl;slots[cand.idx].fit=fitFor(cand.repl,slots[cand.idx]);slots[cand.idx].origin=null;
       return {title:"Álomigazolás!",text:`Végre megszereztétek! Érkezett: ${esc(fullName(cand.repl.n))} (${cand.repl.ovr}) — ${esc(fullName(cand.cur.n))} (${cand.cur.ovr}) helyére.`};}
     return result;}
@@ -96988,6 +97053,7 @@ function showCsSquad(sq){
              igazolás, a csRefused halmazba kerül — a lista újrarajzolásakor
              már elhalványítva, kattinthatatlanul jelenik meg. Az ár csak a
              megerősítő képernyőn derül ki (twConfirmBuy). */
+          p._erkUt="szemle";p._erkKlub={club:sq.club,season:sq.season};
           twConfirmBuy(p,()=>twResolveSigning(p,completeFn,null,{noRetry:true,onLost:()=>csRefused.add(p.n)}),completeFn);};
         det.appendChild(go);};
       head.addEventListener("click",()=>{if(!det.classList.contains("hide"))buildDet();});
@@ -99959,6 +100025,7 @@ function plSheetHeadHtml(loc){
     +`<div class="plId">`
       +`<div class="plNm" id="plSheetName">${num?`<span class="plNum">${num}</span>`:""}${esc(fullName(p.n))}</div>`
       +`<div class="plSub">${sub}</div>`
+      +(()=>{if(gameMode!=="career")return "";try{const t=erkUtTxt(p,e);return t?`<div class="plSub plErk">${t}</div>`:"";}catch(err){return "";}})()
       +(tier?`<div class="plSub"><span style="${cardTierBadgeStyle(tier)};font-weight:700;font-size:9.5px;padding:1px 6px;border-radius:8px;letter-spacing:.5px;text-transform:uppercase">${cardTierLabel(tier)}</span></div>`:"")
       +`<div class="plSub">${MORALE_FACES[mi]} ${esc(MORALE_FACE_TXT[mi])}</div>`
       +(gameMode==="career"?`<div class="plSub">${pformBarsHtml(pformStep(p.n))} <span style="color:var(--dim2)">forma ${pformStep(p.n)}/${PFORM_MAX}</span></div>`:"")
@@ -113258,6 +113325,7 @@ function talVisszavasarol(n){
      ugyanaz az ember jön vissza, nem a piac újradobott életkora */
   if(typeof X.age==="number")careerPool[n].age=X.age;
   const p=careerPlayerFromPoolEntry(careerPool[n]);
+  p._erkUt="vissza";
   extraRoster.push(p);drafted.add(p.n);markArrived(p,X.ar);
   budgetPay(X.ar,"buy",p.n);
   talSpAll().vissza=Object.assign(talSpAll().vissza||{},{[n]:S.seasonNumber||1});
@@ -113297,6 +113365,7 @@ function talBombaElfogad(){
   if(fullCareerRoster().length>=MAX_CAREER_ROSTER)return {ok:false,miert:"tele a keret"};
   if((S.transferBudget||0)<O.ar)return {ok:false,miert:"nincs elég büdzsé"};
   const p=careerPlayerFromPoolEntry(O.e);
+  p._erkUt="talizman";
   extraRoster.push(p);drafted.add(p.n);markArrived(p,O.ar);
   budgetPay(O.ar,"buy",p.n);
   talSpAll().bomba=null;
@@ -115046,10 +115115,10 @@ const TAL_ES_IMPL={
     if(fullCareerRoster().length>=MAX_CAREER_ROSTER){
       if(!queueArrival(p,`🔁 <b>${esc(fullName(p.n))}</b> hazatérne, de a kereted megtelt.`))
         return `${esc(shortName(h.n))} hazajött volna, de tele a keret — nem fért be.`;
-      budgetPay(h.ar,"buy",h.n);drafted.add(h.n);
+      budgetPay(h.ar,"buy",h.n);drafted.add(h.n);try{erkUtJegyez(h.n,"hazater");}catch(e){}
       return `<b>${esc(fullName(h.n))}</b> hazatér (−${_talFt(h.ar)}) — a keret tele van, mindjárt döntesz róla.`;}
     budgetPay(h.ar,"buy",h.n);drafted.add(h.n);
-    extraRoster.push(p);markArrived(p,h.ar);
+    p._erkUt="hazater";extraRoster.push(p);markArrived(p,h.ar);
     return `<b>${esc(fullName(h.n))}</b> hazatért: a tartalék-keretben vár (−${_talFt(h.ar)}). A szurkolók megbocsátottak.`;}},
  /* ✖ 🥂 HÍRNÉV-MÁMOR — a legnagyobb POT-ú 21 év alatti lecsúszik: 10 meccsen
     át −30% fejlődés és ingadozó forma. KIGYÓGYÍTHATÓ: 3 meccs a padon. */
@@ -136466,6 +136535,7 @@ function scoutFreeSign(n){
   if(!e||drafted.has(e.n)){st.list=st.list.filter(x=>x!==rec);return {ok:false,msg:"Már nem elérhető."};}
   const p=careerPlayerFromPoolEntry(e);
   drafted.add(p.n);extraRoster.push(p);NAT_BY_NAME[p.n]=p.nat;
+  try{erkUtJegyez(p.n,"scout",null,"ingyenes leigazolás");}catch(err){}
   try{bondStartIntegration(p.n);}catch(err){}
   try{meresErkezo(p,"scout:"+(rec.ok||"scoutfind"),0);}catch(err){}
   st.list=st.list.filter(x=>x!==rec);
@@ -136568,7 +136638,7 @@ function scoutRealBid(n,pct,counter){
   const paid=budgetPay(amount,"buy",n);
   const p=careerPlayerFromPoolEntry(e);
   drafted.add(p.n);extraRoster.push(p);NAT_BY_NAME[p.n]=p.nat;
-  p._meresForras="megfigyelt";
+  p._meresForras="megfigyelt";p._erkUt="scout";
   try{markArrived(p,paid);}catch(err){}
   st.list=st.list.filter(x=>x!==rec);
   const msg=`🔭 Megvetted: ${esc(shortName(p.n))} — ${fmtFt(paid)} (a meghirdetett ár ${Math.round(paid/L*100)}%-a).`;
