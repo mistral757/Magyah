@@ -344,18 +344,20 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const o={};
     o.max=[ENG_MAX,RETTEGES_MAX];
     o.need=[engNeedLevel(10),engNeedLevel(11),engNeedLevel(20),rettegesNeedLevel(11)];
+    o.lepcso=[];for(let n=1;n<=20;n++)o.lepcso.push(engNeedLevel(n));
     o.pct=[ENG_PCT[10],ENG_PCT[11],ENG_PCT[20],RETTEGES_PCT[10],RETTEGES_PCT[20]];
     o.ar=[ENG_PRICE[10],ENG_PRICE[11],ENG_PRICE[20]];
     o.arany=Math.round(ENG_PCT[20]/RETTEGES_PCT[20]*100)/100;
-    /* a Bombázók motorja: 10. szinten állunk, 19-es stílusszinttel */
+    /* a Bombázók motorja: 10. szinten állunk, 12-es stílusszinttel (1.0.6.0.02: a 11. szinthez 13-as kell) */
     S.style=({key:"bombazok",chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null});
     S.style2=null;S.styleExtra=[];S.styleView=1;
-    window.__L={bombazok:19};styleLvlCacheClear();
+    window.__L={bombazok:12};styleLvlCacheClear();
     const E=engState("bombazok");
     o.van=!!E;
     if(!E)return o;
     E.lvl=10;E.pts=100000;
     o.why19=engNextWhy("bombazok");
+    window.__L.bombazok=13;styleLvlCacheClear();o.why13=engNextWhy("bombazok");
     window.__L.bombazok=20;styleLvlCacheClear();
     const cap10=engOvrCapK("bombazok");   /* 20. stílusszint, 10. szint */
     o.why20=engNextWhy("bombazok");
@@ -369,11 +371,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.tetején=engNextWhy("bombazok");
     return o;});
   ok(e.max[0]===20&&e.max[1]===20,"4a. a létra 20 szintes",e.max);
-  ok(e.need[0]===12&&e.need[1]===20&&e.need[2]===20&&e.need[3]===20,"4b. az 1–10. szint a régi kapuval (2+n), a 11–20. a 20. stílusszinttel",e.need);
+  /* 🪜 1.0.6.0.02 — a 11–20. szint egyenletesen a 13.–20. stílusszint között (törés nélkül) */
+  ok(e.need[0]===12&&e.need[1]===13&&e.need[2]===20&&e.need[3]===13,"4b. az 1–10. szint a régi kapuval (2+n), a 11–20. egyenletesen 13-tól 20-ig",e.need);
+  {const L=e.lepcso||[];let mon=true,ugras=0;for(let i=1;i<L.length;i++){if(L[i]<L[i-1])mon=false;ugras=Math.max(ugras,L[i]-L[i-1]);}
+   ok(mon&&ugras<=1&&L[19]===20&&JSON.stringify(L.slice(10))==="[13,14,14,15,16,17,18,18,19,20]","4c. a teljes lépcső monoton, sehol nincs egynél nagyobb ugrás",L);}
   ok(e.pct[0]===0.09&&e.pct[1]>e.pct[0]&&e.pct[2]>e.pct[1]&&e.pct[4]>e.pct[3],"4c. a hozam a 11–20. szinten tovább nő (a régi 1–10. változatlan)",e.pct);
   ok(e.ar[0]===580&&e.ar[1]>e.ar[0]&&e.ar[2]>e.ar[1],"4d. az ár a 10. után tovább drágul (580 → ...)",e.ar);
   ok(Math.abs(e.arany-0.6)<0.01,"4e. a nem-Panzer létra továbbra is a Panzer 0,6-szerese",e.arany);
-  ok(e.van&&/20\. csapatstílus-szint/.test(e.why19),"4f. 19. stílusszinten a 11. szint zárva, a szöveg megmondja miért",e.why19);
+  ok(e.van&&/13\. csapatstílus-szint/.test(e.why19)&&e.why13==="","4f. 12-es stílusszinten a 11. szint zárva (a szöveg megmondja: 13. kell), 13-ason nyitva",{z:e.why19,ny:e.why13});
   ok(e.why20===""&&e.buy&&e.lvl11===11,"4g. 20. stílusszinten a 11. szint megvehető",{why:e.why20,lvl:e.lvl11});
   ok(e.lvl20===20&&e.tovabb===false&&e.lvlMax===20,"4h. a létra a 20. szinten megáll",{lvl20:e.lvl20,tovabb:e.tovabb});
   ok(Math.abs(e.capArany-1.5)<0.02,"4i. a meccserő-plafon a 20. szinten ×1,5 (a 10. szinthez képest)",e.capArany);
