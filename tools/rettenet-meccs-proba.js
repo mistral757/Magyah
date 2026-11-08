@@ -63,7 +63,7 @@ const {spawn}=require('child_process');
       ujStilus();naplo.length=0;
       fearMatchStart();
       (extra||[]).forEach(k=>fearNote(k));
-      fearNoteWin(won,gap);
+      fearNoteWin(won,{r:(gap)/5,gap:(gap),need:5});   /* ⚡ 1.0.6.0.01 — a régi %-os eset arányként (5% = 1 küszöb) */
       const kap=fearMatchEnd();
       return {kap,naplo:naplo.slice()};};
     /* A HELYZETEK A KÜSZÖBHÖZ MÉRVE (3.9.140): ¼, ½, 1× és 2× — így a próba
@@ -132,7 +132,7 @@ const {spawn}=require('child_process');
 
     /* ---- 5. A MÉRLEG NULLÁZÓDIK KÉT MECCS KÖZÖTT ---- */
     ujStilus();
-    fearMatchStart();fearNote("red");fearNoteWin(true,10);
+    fearMatchStart();fearNote("red");fearNoteWin(true,{r:(10)/5,gap:(10),need:5});
     const e1=fearMatchEnd();
     fearMatchStart();                       /* új meccs, semmi esemény */
     const e2=fearMatchEnd();
@@ -142,14 +142,14 @@ const {spawn}=require('child_process');
     S.style={key:"beton",chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null};
     naplo.length=0;
     fearMatchStart();fearNote("red");
-    const nw=fearNoteWin(true,20);
+    const nw=fearNoteWin(true,{r:(20)/5,gap:(20),need:5});
     o.nincsPanzer={on:fearOn(),win:nw,kap:fearMatchEnd(),sorok:naplo.length};
 
     /* ---- 7. A NULLADIK SZINTEN (3.9.70) SEM ---- */
     ujStilus();S.style.pre=1;
     naplo.length=0;
     fearMatchStart();fearNote("red");
-    o.nulladik={on:fearOn(),win:fearNoteWin(true,20),kap:fearMatchEnd(),sorok:naplo.length};
+    o.nulladik={on:fearOn(),win:fearNoteWin(true,{r:(20)/5,gap:(20),need:5}),kap:fearMatchEnd(),sorok:naplo.length};
     delete S.style.pre;
     return o;});
 

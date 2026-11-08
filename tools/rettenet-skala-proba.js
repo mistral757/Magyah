@@ -80,7 +80,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     [100,200,1000].forEach(L=>{
       SZINT=L;nulla();
       _dreadRaw=0;_dreadGap=0;_dreadBy=null;
-      const pont=fearNoteWin(true,dreadWinGiant());   /* teljes óriásölés */
+      const pont=fearNoteWin(true,{r:1,gap:5,need:5});   /* ⚡ 1.0.6.0.01 — az arány: 1 = óriásölés */   /* teljes óriásölés */
       ki.gyozelem[L]={pont:Math.round(pont*10)/10,cap:fearMatchCap()};});
 
     /* ---- 5. EGY TIPIKUS MÉRKŐZÉS ----

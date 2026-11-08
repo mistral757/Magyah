@@ -129,7 +129,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     _engMin=70;  engGoalNote(roster[1].n);          /* csak gól (+villámláb) */
     engAssistNote();
     const nyersElott=E.pts;
-    engNoteWin(true,3,3,0);                          /* győzelem + háromgólos */
+    engNoteWin(true,{r:0.6,gap:3,need:5},3,0);      /* győzelem + háromgólos (⚡ 1.0.6.0.01: az arány — a régi 3% = 0,6 küszöb) */
     const kapott=engMatchEnd();
     addLine=_a;
     ki.meccs={kapott,egyenleg:E.pts,cap:ki.cap,
