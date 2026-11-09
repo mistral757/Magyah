@@ -8059,7 +8059,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.6.1.01";
+const APP_VERSION="1.0.6.1.02";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -61634,7 +61634,37 @@ function ttOn(){return gameMode==="career"&&ttLevel()>0;}
 /* A jelöltek: a pályán lévő MEZŐNYJÁTÉKOSOK (a kapus és a kiállított kimarad,
    a buszsofőr nem személy). Névvel és a két attribútummal, hogy a szimuláció
    ne olvasson újra a poolból harmincszor. */
-function ttChainPool(active,redIdx){
+/* ---- ⚡ A STÍLUS-GÓLOK MÉRCÉJE: MECCSERŐ A MECCSERŐ ELLEN (1.0.6.1.02) ----
+   KÉRÉS: „A csapatstílus specifikus góloknál, ahol az attribútumok számítanak,
+   ne egyszerűen az ellenfél nyers erejéhez mérjünk. A mért attribútum
+   értékeinket fel kell skálázni a meccserő többletével minden játékos
+   esetében, és ezt kell hozzámérni az ellenfél meccserejéhez."
+   A szorzó (k) a mi kezdőrúgáskori ⚡ meccserőnk (teamMatchStrength + a tartós
+   forma) ÷ a nyers csapaterőnk (teamStrength) — ugyanaz a két szám, ami az
+   eredményjelzőn áll (lásd sbPaintTeams). Minden mért attribútum (a tiki-taka
+   Passza és Gólszerzése, a Sortűz Gólszerzése, a Phalanx Védekezése, a
+   Száguldás Sebessége) ezzel szorzódik, a mérce pedig az ellenfél ⚡
+   meccsereje: fx.o.ovr + matchHiddenOppBuff(). Ha a meccserőnk a nyers erő
+   ALATT van (pl. mélyponton a morál), a szorzó 1 alá is mehet — a mérce
+   mindkét irányba becsületes. A szorzó a [0,6 … 1,8] sávba van szorítva, hogy
+   egy félrement mérés ne vigye el a gólforrást. */
+const STM_K_MIN=0.6,STM_K_MAX=1.8;
+function stilusMerce(fx){
+  let raw=null,ms=null,op=null;
+  try{raw=teamStrength();}catch(e){raw=null;}
+  try{ms=teamMatchStrength()+((typeof pformTeamOvr==="function"&&pformTeamOvr())||0);}catch(e){ms=null;}
+  try{const o=fx&&fx.o;
+    if(o&&typeof o.ovr==="number")op=o.ovr+((typeof matchHiddenOppBuff==="function"&&matchHiddenOppBuff())||0);}catch(e){op=null;}
+  const ok=v=>typeof v==="number"&&isFinite(v);
+  const k=(ok(raw)&&raw>0&&ok(ms)&&ms>0)?Math.max(STM_K_MIN,Math.min(STM_K_MAX,ms/raw)):1;
+  if(!ok(op)){const f=(fx&&fx.o&&fx.o.ovr)||oppTargetRating||0;op=f;}
+  return {k,opp:op,my:ok(ms)?ms:null,raw:ok(raw)?raw:null};}
+/* a következő bajnoki ellenfél (a stílusfa élő mérésének) */
+function stilusMerceMost(){
+  let f=null;try{f=S.fixtures&&S.fixtures[S.idx];}catch(e){f=null;}
+  return stilusMerce(f&&f.o?f:{o:{ovr:oppTargetRating||0}});}
+function ttChainPool(active,redIdx,k){
+  const m=(typeof k==="number"&&k>0)?k:1;
   const out=[];
   active.forEach((a,i)=>{
     if(!a||!a.p||a.bus||redHas(redIdx,i))return;
@@ -61644,7 +61674,7 @@ function ttChainPool(active,redIdx){
     let at=null;
     try{at=attrsOfPlayer(a.p);}catch(e){}
     if(!at)return;
-    out.push({n:a.p.n,passz:at.passz||0,gol:at.gol||0});});
+    out.push({n:a.p.n,passz:(at.passz||0)*m,gol:(at.gol||0)*m});});
   return out;}
 /* EGY passzsor lefuttatása. Tisztán számol: nem ír állapotot és nem naplóz —
    így ugyanez a függvény használható mérésre és teszteléshez is. */
@@ -61721,10 +61751,10 @@ function ttRunChain(pool,oppOvr,lvl,boost){
     starter:chain[0].n};}
 /* A MECCS TERVE. A kezdőrúgáskor fut le; a percek külön vödörbe esnek, hogy a
    két akció ne torlódjon egymásra. */
-function ttPlanMatch(active,redIdx,oppOvr){
+function ttPlanMatch(active,redIdx,oppOvr,k){
   if(!ttOn())return [];
   const L=ttLevel(),tries=TT_TRIES[L]||0;
-  const pool=ttChainPool(active,redIdx);
+  const pool=ttChainPool(active,redIdx,k);
   if(pool.length<2)return [];
   /* A HAJTÓERŐ A KEZDŐRÚGÁSKOR FAGY BE, egyszer — a taktika és az illeszkedés
      a mérkőzés alatt úgysem változik, a fit viszont drága számítás. */
@@ -61761,7 +61791,7 @@ function ttPlanMatch(active,redIdx,oppOvr){
      🛡️ Beton — Phalanx          · ☯️ Harmónia — Egyensúly
      ⚡ Villám — Száguldás! A port se szeretem.
    A MÉRCE: a tiki-taka (1.0.6.1.00-s, 1,32-es falú) próbálkozásonkénti
-   gólesélye az erőkülönbség (a mért tengely ÷ az ellenfél nyers csapatereje,
+   gólesélye az erőkülönbség (a mért tengely — 1.0.6.1.02 óta a meccserő-többlettel felskálázva — ÷ az ellenfél meccsereje,
    %-ban) függvényében, begyakorolt rendszerrel MÉRVE (AKC_TT_P). Egy akció
    próbálkozásonkénti esélye úgy áll be, hogy szintenként a tiki-taka
    ugyanazon szintű hozamának FELE jöjjön ki:
@@ -61817,9 +61847,10 @@ const akcAtl=(L,f)=>L.length?L.reduce((s,x)=>s+f(x),0)/L.length:0;
 const akcTop=(L,f,k)=>L.slice().sort((a,b)=>f(b)-f(a)).slice(0,k);
 const akcSzelso=p=>/^[BJ]/.test(p.pos||"");
 /* AZ ERŐKÜLÖNBSÉG %-ban — akciónként a saját tengelyén */
-function akcDp(k,pool,opp){
-  const o=(opp>0)?opp:0;
-  const rel=v=>o>0?(v-o)/o*100:0;
+function akcDp(k,pool,opp,mul){
+  const o=(opp>0)?opp:0,m=(typeof mul==="number"&&mul>0)?mul:1;
+  /* ⚡ 1.0.6.1.02 — a mért érték a meccserő-többlettel felskálázva, az ellenfél meccserejéhez */
+  const rel=v=>o>0?(v*m-o)/o*100:0;
   if(k==="sortuz"){if(pool.length<3)return null;return rel(akcAtl(akcTop(pool,x=>x.at.gol||0,4),x=>x.at.gol||0));}
   if(k==="phalanx"){if(pool.length<6)return null;return rel(akcAtl(akcTop(pool,x=>x.at.ved||0,6),x=>x.at.ved||0));}
   if(k==="szaguld"){const w=pool.filter(akcSzelso);const L=w.length>=2?w:pool;if(L.length<3)return null;
@@ -61830,20 +61861,20 @@ function akcDp(k,pool,opp){
     const fn=f/(f+30);return -10+30*fn;}
   return null;}
 /* a kezdőrúgás terve: mindegyik aktív akcióhoz a szintnyi alkalom, külön vödrökben */
-function akcPlanMatch(active,red,opp){
+function akcPlanMatch(active,red,opp,mul){
   const ks=akcAktiv();if(!ks.length)return [];
   const pool=akcPool(active,red),used={},out=[];
   ks.forEach(k=>{
-    const L=akcLv(k),dp=akcDp(k,pool,opp);if(dp==null)return;
+    const L=akcLv(k),dp=akcDp(k,pool,opp,mul);if(dp==null)return;
     const q=akcQ(L,dp);
     for(let i=0;i<L;i++){
       let b=0,g=0;do{b=2+Math.floor(Math.random()*17);}while(used[b]&&g++<20);
       used[b]=1;out.push({k,bucket:b*5,q,dp,L,i:i+1});}});
   return out.sort((x,y)=>x.bucket-y.bucket);}
 /* a meccs előtti elemzésnek és a lefújásnak: akciónként a várható gól */
-function akcVart(active,opp){
+function akcVart(active,opp,mul){
   const o={};const pool=akcPool(active,null);
-  akcAktiv().forEach(k=>{const L=akcLv(k),dp=akcDp(k,pool,opp);if(dp==null)return;o[k]=akcQ(L,dp)*L;});
+  akcAktiv().forEach(k=>{const L=akcLv(k),dp=akcDp(k,pool,opp,mul);if(dp==null)return;o[k]=akcQ(L,dp)*L;});
   return o;}
 /* a végrehajtás az akció percében: ki van a jelenetben, ki rúgja be */
 function akcVegrehajt(a,active,red){
@@ -72106,8 +72137,8 @@ function mxElorejelzes(act,fx){
     try{if(ttOn())out.o.tt=rt.tt;}catch(e){}
     try{if(bzAppetiteLevel()>0&&rt.bz>0)out.o.bz=rt.bz;}catch(e){}
     /* 🎬 1.0.6.1.00 — az akció-képességek várható gólja (ugyanaz a q, amivel a motor sorsol) */
-    try{const opp=(fx&&fx.o&&typeof fx.o.ovr==="number")?fx.o.ovr:(oppTargetRating||0);
-      const V=akcVart(act,opp);Object.keys(V).forEach(k=>{if(V[k]>0)out.o[k]=V[k];});}catch(e){}
+    try{const M=stilusMerce(fx&&fx.o?fx:{o:{ovr:oppTargetRating||0}});
+      const V=akcVart(act,M.opp,M.k);Object.keys(V).forEach(k=>{if(V[k]>0)out.o[k]=V[k];});}catch(e){}
   }catch(e){}
   out.cso=Object.values(out.o).reduce((a,b)=>a+b,0);
   out.csa=Object.values(out.a).reduce((a,b)=>a+b,0);
@@ -83293,9 +83324,11 @@ function playMatchMotor(){
   /* 🌀 TIKI-TAKA · PASSZREKORD: a passzsorok MOST dőlnek el, a kezdőrúgáskor —
      a kommentárjuk a kisorsolt percben szólal meg (lásd ttPlanMatch). A
      párharcban nem fut: ott az eredményt a közös eseménylista adja. */
-  const TT_PLAN=DUEL?[]:(()=>{try{return ttPlanMatch(MS.active,-1,fx.o.ovr);}catch(e){return [];}})();
+  /* ⚡ 1.0.6.1.02 — a stílus-gólok mércéje: a meccserő-többlettel felskálázott attribútum az ellenfél meccsereje ellen */
+  const STM=DUEL?null:(()=>{try{return stilusMerce(fx);}catch(e){return null;}})();
+  const TT_PLAN=DUEL?[]:(()=>{try{return ttPlanMatch(MS.active,-1,STM?STM.opp:fx.o.ovr,STM?STM.k:1);}catch(e){return [];}})();
   /* 🎬 1.0.6.1.00 — az akció-képességek terve (Sortűz, Phalanx, Száguldás, Tankoljunk, Egyensúly) */
-  const AKC_PLAN=DUEL?[]:(()=>{try{return akcPlanMatch(MS.active,null,fx.o.ovr);}catch(e){return [];}})();
+  const AKC_PLAN=DUEL?[]:(()=>{try{return akcPlanMatch(MS.active,null,STM?STM.opp:fx.o.ovr,STM?STM.k:1);}catch(e){return [];}})();
   try{if(MX)AKC_PLAN.forEach(a=>mxVart(MX,"o",a.k,a.q));}catch(e){}
   let min=0,gf=0,ga=0,redIdx=-1,redMin=null,saveCount=0,maxDeficit=0,maxLead=0,specialEventHappened=false,specialEventCount=0,titleLiveNotes=0,skillFlavorShown=false,paceFlavorShown=false,supersubStruck=false,tierQuoteShown=false,tacGoalFlavorShown=false,tacRawShown=false,genGoalShown=false,styleLineShown=false,hardTackleShown=false,clutchWallShown=false,clutchHeroShown=false,paceGoalsThisMatch=0,
     /* BOMBÁZÓK: képesség-gólok ezen a meccsen · a gólétvágy állapota (élesítve
@@ -126580,7 +126613,7 @@ stTrait("tikitaka","passzkemia",3,"Passzkémia",
    A 3. szint nem harmadik sort ad, hanem KÖNNYEBBÉ teszi mindkettőt: a passz
    sorsolási ablaka feljebb csúszik, a befejezés ráadása nő. */
 stTrait("tikitaka","passzrekord",3,"Passzrekord",
-  "A hosszú passzsorból gól is születhet. A mérkőzés indításakor eldől, meddig bírja a labdajáratás: minden lépésnél a két szomszédos ember Passzának átlaga mérkőzik az ellenfél nyers csapaterejével, és ahol elakad, ott jön a befejezés. A befejező ember nem a legjobb csatár — az, akihez épp odaért a labda.<br><br>A SOR HOSSZÁT A TAKTIKÁD HAJTJA: a Labdatartás ismertsége és illeszkedése is beleszámít, a képesség szintje mellett. Egy be nem gyakorolt rendszerrel a járatás pár passz után elakad. A BEFEJEZÉS viszont nem kap ebből semmit — a leghosszabb sor sem ér semmit, ha nem igazi befejezőnél ér véget.",[
+  "A hosszú passzsorból gól is születhet. A mérkőzés indításakor eldől, meddig bírja a labdajáratás: minden lépésnél a két szomszédos ember Passzának átlaga — a meccserő-többleteddel felskálázva — mérkőzik az ellenfél meccserejével, és ahol elakad, ott jön a befejezés. A befejező ember nem a legjobb csatár — az, akihez épp odaért a labda.<br><br>A SOR HOSSZÁT A TAKTIKÁD HAJTJA: a Labdatartás ismertsége és illeszkedése is beleszámít, a képesség szintje mellett. Egy be nem gyakorolt rendszerrel a járatás pár passz után elakad. A BEFEJEZÉS viszont nem kap ebből semmit — a leghosszabb sor sem ér semmit, ha nem igazi befejezőnél ér véget.",[
   {fx:{tikiLv:1},note:"egy passzsor mérkőzésenként · passz ±10% · befejezés +15-30%"},
   {fx:{tikiLv:2},note:"KÉT passzsor mérkőzésenként"},
   {fx:{tikiLv:3},note:"két passzsor · passz −5…+15% · befejezés +20-40%"}],
@@ -126609,24 +126642,24 @@ function akcHint(k){
   try{
     const L=akcLv(k);if(!L)return "";
     const act=slots.map((s,idx)=>({p:s&&s.player,idx})).filter(a=>a.p);
-    let opp=0;try{const f=S.fixtures&&S.fixtures[S.idx];opp=(f&&f.o&&f.o.ovr)||oppTargetRating||0;}catch(e){opp=0;}
-    const dp=akcDp(k,akcPool(act,null),opp);
+    const M=stilusMerceMost();
+    const dp=akcDp(k,akcPool(act,null),M.opp,M.k);
     if(dp==null)return "most nincs elég ember a pályán az akcióhoz";
     const sz=v=>String(Math.round(v*100)/100).replace(".",",");
-    return `most ~${sz(akcQ(L,dp)*L)} gól várható meccsenként ebből (${L} alkalom · a mércéd ${dp>=0?"+":"−"}${String(Math.abs(Math.round(dp))).replace(".",",")}% az ellenfél nyers erejéhez)`;
+    return `most ~${sz(akcQ(L,dp)*L)} gól várható meccsenként ebből (${L} alkalom · a mércéd ${dp>=0?"+":"−"}${String(Math.abs(Math.round(dp))).replace(".",",")}% az ellenfél meccserejéhez, a te ⚡ többleteddel ×${String(Math.round(M.k*100)/100).replace(".",",")})`;
   }catch(e){return "";}}
 const AKC_SZINT=(k,mit)=>[
   {fx:{[AKC_DEFS[k].fx]:1},note:`1 alkalom mérkőzésenként · ${mit}`},
   {fx:{[AKC_DEFS[k].fx]:2},note:"2 alkalom"},
   {fx:{[AKC_DEFS[k].fx]:3},note:"3 alkalom · erősebb befejezés"}];
 stTrait("bombazok","sortuz",3,"Sortűz",
-  "A mérkőzésen 1/2/3 alkalommal a csapat mindent belead, és csak lő, lő, lő. A labda lepattan a védőről, a kapusról — végül valaki bevágja. Bárki lehet a gólszerző, de a GÓL-KÉPESSÉGEK adják az elsődleges esélyt. A gól esélye a 4 legjobb Gólszerzésedből jön, az ellenfél nyers erejéhez mérve.",
+  "A mérkőzésen 1/2/3 alkalommal a csapat mindent belead, és csak lő, lő, lő. A labda lepattan a védőről, a kapusról — végül valaki bevágja. Bárki lehet a gólszerző, de a GÓL-KÉPESSÉGEK adják az elsődleges esélyt. A gól esélye a 4 legjobb Gólszerzésedből jön: a meccserő-többleteddel felskálázva, az ellenfél meccserejéhez mérve.",
   AKC_SZINT("sortuz","a gólszerző képességűek a fő esélyesek"),()=>akcHint("sortuz"));
 stTrait("beton","phalanx",3,"Phalanx",
-  "A mérkőzésen 1/2/3 alkalommal a védelem egyre feljebb tolódik, míg végül teljesen beszorítjuk az ellenfelet: hat ember vállvetve nyomul a kapu felé, a labda falról falra pattog — és a végén bárkiről bepattanhat. A gól esélye a 6 legjobb Védekezésedből jön, az ellenfél nyers erejéhez mérve.",
+  "A mérkőzésen 1/2/3 alkalommal a védelem egyre feljebb tolódik, míg végül teljesen beszorítjuk az ellenfelet: hat ember vállvetve nyomul a kapu felé, a labda falról falra pattog — és a végén bárkiről bepattanhat. A gól esélye a 6 legjobb Védekezésedből jön: a meccserő-többleteddel felskálázva, az ellenfél meccserejéhez mérve.",
   AKC_SZINT("phalanx","a hat legjobb védekező nyomul előre"),()=>akcHint("phalanx"));
 stTrait("villam","szaguldas",3,"Száguldás! A port se szeretem.",
-  "A mérkőzésen 1/2/3 alkalommal mindkét szélen elfutnak a szélsők — védők, középpályások, támadók is lehetnek —, és óriási tempóban adogatnak egymásnak. Végül a középen érkező fejezi be (legnagyobb eséllyel a Robben berobban szerep viselője). A gól esélye a szélsők Sebességéből jön, az ellenfél nyers erejéhez mérve.",
+  "A mérkőzésen 1/2/3 alkalommal mindkét szélen elfutnak a szélsők — védők, középpályások, támadók is lehetnek —, és óriási tempóban adogatnak egymásnak. Végül a középen érkező fejezi be (legnagyobb eséllyel a Robben berobban szerep viselője). A gól esélye a szélsők Sebességéből jön: a meccserő-többleteddel felskálázva, az ellenfél meccserejéhez mérve.",
   AKC_SZINT("szaguld","a két szélső + a középen érkező"),()=>akcHint("szaguld"));
 stTrait("panzer","tankoljunk",3,"Tankoljunk",
   "A mérkőzésen 1/2/3 alkalommal hárman beülnek a Panzerkampfwagenbe, és a csövéből lövöldözik a labdát a kapu felé. Játékos gólszerző itt nincs — a gól a Panzerkampfwagené. Az esélye a szinttel és a csapat FÉLELEM SZINTJÉVEL fokozatosan nő.",
