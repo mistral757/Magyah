@@ -129,7 +129,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await lancFog();
   await p.evaluate(()=>{window.__sorok=[];playMatch();});
   const SNAP_K=await tarKi();
-  const m0=JSON.parse(SNAP_K[alap.kulcs]||"null"),e0=JSON.parse(SNAP_K[alap.kulcs+"::elo"]||"null");
+  const m0=JSON.parse(await p.evaluate(v=>mzUnpack(v),SNAP_K[alap.kulcs]||"null")),e0=JSON.parse(SNAP_K[alap.kulcs+"::elo"]||"null");
   ok(m0&&m0.S&&m0.S.idx===idx0&&!m0.S.playing,"a kezdőrúgás pillanatában a meccs előtti állapot a lemezen",{idx:m0&&m0.S.idx});
   ok(e0&&e0.seed>0&&e0.t===0&&Array.isArray(e0.log),"az élő rekord megszületett (seed, 0 vödör, üres napló)",e0);
 
