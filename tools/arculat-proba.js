@@ -37,8 +37,8 @@ const {spawn}=require('child_process');
   {const p=await lap(null);
    out.tempo_friss=await p.evaluate(()=>({
      ertek:matchSpeed, alap:MATCH_SPEED_DEFAULT,
-     csuszka:parseFloat(document.getElementById("matchSpeedRange").value),
-     kupa:parseFloat(document.getElementById("euroSpeedRange").value),
+     csuszka:matchSpeedFromPos(document.getElementById("matchSpeedRange").value),
+     kupa:matchSpeedFromPos(document.getElementById("euroSpeedRange").value),
      felirat:document.getElementById("matchSpeedVal").textContent,
      /* a tényleges ütem: alacsonyabb szorzó = lassabb közvetítés */
      tickMs:matchSpeedTickMs()}));

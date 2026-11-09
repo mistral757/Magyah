@@ -74,7 +74,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const el=document.getElementById("hubLedgerLog");
     o.panel=!!el&&/Legutóbbi pénzmozgások/i.test(el.textContent)&&/forrás:/.test(el.textContent);
     saveGame();try{saveGameFlush&&saveGameFlush();}catch(e){}
-    let raw=null;try{raw=JSON.parse(localStorage.getItem(saveKey()));}catch(e){}
+    let raw=null;try{raw=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));}catch(e){}
     o.mentes=!!(raw&&raw.S&&raw.S.ledger&&Array.isArray(raw.S.ledger.log)&&raw.S.ledger.log.length===o.plafon);
     return o;});
   ok(r.lelato&&r.lelato.a>0&&r.lelato.sz===1&&/fanMatchTick/.test(r.lelato.f)&&r.lelato.t>0,

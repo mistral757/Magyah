@@ -130,7 +130,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     S.auto=false;for(let i=0;i<60&&S.playing;i++)await new Promise(r=>setTimeout(r,100));
     const L=S.capLokes[cn]||null;
     saveGame();try{saveGameFlush&&saveGameFlush();}catch(e){}
-    let raw=null;try{raw=JSON.parse(localStorage.getItem(saveKey()));}catch(e){}
+    let raw=null;try{raw=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));}catch(e){}
     return {L,mentes:!!(raw&&raw.S&&raw.S.capLokes&&raw.S.capLokes[cn]),idx:S.idx,capMod:S.capMod};});
   ok(r.L&&r.L.m>=4&&Math.abs(r.L.s)<=r.L.m,"a meccsek után a kapitány lökete mérődik (m meccs, ±1-ek összege)",r);
   ok(r.mentes,"a mentés viszi a mért löketet",r.mentes);

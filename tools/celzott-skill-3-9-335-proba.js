@@ -169,7 +169,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* 10. mentés */
     try{saveGame();saveGameFlush&&saveGameFlush();}catch(e){ki.mentHiba=String(e);}
     let talalt=false;
-    try{for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i))||"";
+    try{for(let i=0;i<localStorage.length;i++){const v=mzUnpack(localStorage.getItem(localStorage.key(i))||"");
       if(v.indexOf('"celSk"')>=0&&v.indexOf(cel.id)>=0)talalt=true;}}catch(e){}
     ki.mentve=talalt;
     ki.celId=celSkState("villam").id;

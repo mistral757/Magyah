@@ -196,7 +196,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const e9=await p.evaluate(()=>{
     let csomag=null;const regi=localStorage.setItem.bind(localStorage);
     try{window.saveGame&&saveGame();}catch(e){}
-    const kulcsok=Object.keys(localStorage).filter(k=>{const v=localStorage.getItem(k)||"";return v.includes('"kalauz"');});
+    const kulcsok=Object.keys(localStorage).filter(k=>{const v=mzUnpack(localStorage.getItem(k)||"");return v.includes('"kalauz"');});
     return {kulcsok:kulcsok.length,src:String(saveGame).length>0};});
   const forras=fs.readFileSync(path.join(ROOT,"index.html"),"utf8");
   ok(/kalauz:S\.kalauz\|\|null/.test(forras)&&/S\.kalauz=\(d\.S\.kalauz&&d\.S\.kalauz\.v===1\)\?d\.S\.kalauz:null/.test(forras),

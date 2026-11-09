@@ -88,7 +88,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.kiolvas=mpBalanceOffset(r.names[0]);
     /* mentés-kör */
     saveGame();
-    let d=null;try{d=JSON.parse(localStorage.getItem(saveKey()));}catch(e){}
+    let d=null;try{d=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));}catch(e){}
     o.mentve=d&&d.S&&d.S.mpTuneCap;
     S.mpBalanceP={};S.mpTuneCap=null;
     return o;});

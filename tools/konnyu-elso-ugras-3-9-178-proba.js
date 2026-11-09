@@ -116,7 +116,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     S.finalTable=_ft;
     /* 6. mentés */
     saveGame();
-    let d=null;try{d=JSON.parse(localStorage.getItem(saveKey()));}catch(e){}
+    let d=null;try{d=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));}catch(e){}
     out.mentve=d&&d.S&&d.S.pyrLeapEasy;
     /* 3. feltételek: második idény */
     S.seasonNumber=2;S.pyr.my=5;

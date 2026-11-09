@@ -338,7 +338,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     let d=null;
     try{
       Object.keys(localStorage).forEach(k=>{
-        if(d)return;const v=localStorage.getItem(k);
+        if(d)return;const v=mzUnpack(localStorage.getItem(k));
         if(v&&v.indexOf('"tal":{')>=0&&v.indexOf('"careerPool"')>=0)d=JSON.parse(v);});
     }catch(e){}
     ki.benne=!!(d&&d.S&&d.S.tal&&d.S.tal.seed===T.seed&&d.S.tal.lapok.length===T.lapok.length);

@@ -194,7 +194,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const sn=S.seasonNumber||1;
     S.mpCatchDisc={until:sn+1,pct:0.12};S.mpCatchSeason={season:sn,budgetPct:0.1,discPct:0.12};
     saveGame();
-    let d=null;try{d=JSON.parse(localStorage.getItem(saveKey()));}catch(e){}
+    let d=null;try{d=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));}catch(e){}
     o.mentve=d&&d.S&&d.S.mpCatchDisc;o.mentveSz=d&&d.S&&d.S.mpCatchSeason;
     o.most=mpCatchBoostDisc();
     S.seasonNumber=sn+1;o.kovetkezo=mpCatchBoostDisc();

@@ -77,7 +77,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const ujratolt=async(key,mp)=>{const p=await lap();
     await p.evaluate(([key,mp])=>{unlockGatesOn=()=>false;mpNet.mode="local";window.mpNetInit=async()=>{};
       if(mp){MP.active=true;MP.activeRoom=mp.room;MP.role=mp.role;MP.started=true;}
-      const d=JSON.parse(localStorage.getItem(key));
+      const d=JSON.parse(mzUnpack(localStorage.getItem(key)));
       ["mpEntry"].forEach(id=>{const e=$(id);if(e)e.classList.add("hide");});
       if(!loadIntoGame(d,key))throw new Error("betöltés elszállt");
       if(mp){MP.active=true;MP.activeRoom=mp.room;MP.role=mp.role;MP.started=true;}

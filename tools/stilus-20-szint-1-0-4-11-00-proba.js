@@ -131,7 +131,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     for(let i=0;i<localStorage.length;i++){
       const k=localStorage.key(i);
       if(!/^30-0-save/.test(k))continue;
-      try{const j=JSON.parse(localStorage.getItem(k));if(j&&j.S&&Array.isArray(j.S.styleExtra)&&j.S.styleExtra.length){d=j;break;}}catch(e){}}
+      try{const j=JSON.parse(mzUnpack(localStorage.getItem(k)));if(j&&j.S&&Array.isArray(j.S.styleExtra)&&j.S.styleExtra.length){d=j;break;}}catch(e){}}
     o.van=!!d;
     if(!d)return o;
     o.mentett=d.S.styleExtra.map(x=>x.key);

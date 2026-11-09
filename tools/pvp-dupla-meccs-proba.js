@@ -120,7 +120,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     for(const ms of [120,200,260,400,500]){await new Promise(r=>setTimeout(r,ms));h2hBeginDuel();}});
   await p.waitForFunction(()=>S.playing||window.__motor>0,null,{timeout:30000,polling:20});
   /* ---- 3a. a meccs ALATT a mentés még őrzi az elköteleződést ---- */
-  const kozben=await p.evaluate(()=>{let d=null;try{d=JSON.parse(localStorage.getItem(saveKey()));}catch(e){}
+  const kozben=await p.evaluate(()=>{let d=null;try{d=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));}catch(e){}
     return {pend:d&&d.S&&d.S.h2hPending,raw:localStorage.getItem(saveKey())};});
   /* ---- 2. futó párharc mellett semmi nem indít második meccset ---- */
   const masodik=await p.evaluate(async()=>{
@@ -138,7 +138,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await p.waitForTimeout(300);
   const utana=await p.evaluate(()=>{
     const sorok=window.__sorok;
-    let d=null;try{d=JSON.parse(localStorage.getItem(saveKey()));}catch(e){}
+    let d=null;try{d=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));}catch(e){}
     return {motor:window.__motor,felsorakozik:sorok.filter(t=>/felsorakozik/.test(t)).length,
       lezarult:sorok.filter(t=>/A párharc lezárult/.test(t)).length,
       W:S.W,D:S.D,L:S.L,idx:S.idx,pend:S.h2hPending,mentettPend:d&&d.S&&d.S.h2hPending,
@@ -160,7 +160,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await p.reload({waitUntil:"load"});await p.waitForTimeout(1500);
   await halozat();
   const vissza=await p.evaluate(({k,KOD})=>{
-    const d=JSON.parse(localStorage.getItem(k));
+    const d=JSON.parse(mzUnpack(localStorage.getItem(k)));
     window.__sorok.length=0;
     loadIntoGame(d,k);
     MP.active=true;MP.activeRoom=KOD;MP.started=true;

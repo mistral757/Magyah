@@ -210,7 +210,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     r.selUj=!!document.querySelector('#identLelato .lelatoKartya.sel[data-lelato="ultra"]');
     const pb=document.querySelector('#identLelato [data-lelato-proba="hazai"]');pb.click();await varj(900);
     r.proba=!!_lelatoProba;r.probaGomb=pb.disabled;
-    r.mentve=(()=>{try{saveGame();const d=JSON.parse(localStorage.getItem(saveKey()));return d.S&&d.S.ident&&d.S.ident.lelato;}catch(e){return "hiba:"+e.message;}})();
+    r.mentve=(()=>{try{saveGame();const d=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));return d.S&&d.S.ident&&d.S.ident.lelato;}catch(e){return "hiba:"+e.message;}})();
     return r;});
   ok(u.van&&/7 · A lelátó hangja/.test(u.cim),"az Arculat menüben: „7 · A lelátó hangja”",u.cim);
   ok(u.kartyak.length===5&&JSON.stringify(u.kartyak.map(x=>x.zar))==="[false,false,false,true,true]","öt kártya; a Katlan és a Legendás éjszaka zárva",u.kartyak);

@@ -74,7 +74,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ms=150;o.u2=nfZaroUtanRogzit(sn);o.h2=H[sn].zaroMs;
     o.mp=mpSajatZaro(sn);
     teamMatchStrength=_t;
-    saveGame();let mentve=false;try{for(let i=0;i<localStorage.length;i++){const t=localStorage.getItem(localStorage.key(i));if(t&&t.indexOf('"zaroUtan":{')>=0){mentve=true;break;}}}catch(e){}
+    saveGame();let mentve=false;try{for(let i=0;i<localStorage.length;i++){const t=mzUnpack(localStorage.getItem(localStorage.key(i)));if(t&&t.indexOf('"zaroUtan":{')>=0){mentve=true;break;}}}catch(e){}
     o.mentve=mentve;return o;});
   ok(Math.abs(r.fele-124.9)<1e-9,"fele-fele: (135,1 + 114,7) / 2 = 124,9",r.fele);
   ok(r.sorrend,"a nyárzáró értékelés a szezonkártyák (és a kártya-fejlesztések) UTÁN méri a zárót — 3.9.360",r.sorrend);
