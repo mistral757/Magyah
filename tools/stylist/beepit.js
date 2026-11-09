@@ -28,6 +28,16 @@
    #rrggbb szín, a játék KIT_PATTERNS / KIT_SLEEVES / KIT_COLLARS listájának
    egy-egy eleme); csapatonként a legfrissebb dönt; az üres d = törlés.
 
+   ✏️ 1.0.7.2.00 — A NÉVCSERE ugyanezen az ágon jön (v:3, a név "nev:"
+   előtaggal, a kulcs a "nev:<kanonikus név>" hash-e, d = {"f":"<új név>"}
+   vagy "" = törlés). A NEV-ALAP:KEZD … NEV-ALAP:VEG blokkba kerül, kanonikus
+   név szerint (mint az ARC_ALAP). Szűrés: a kanonikus név a játékban LÉTEZŐ
+   magyarított név (HU_NAME_TABLE kulcsa); a név a játék stylistNevTisztit-
+   jével azonos szabály (2–40 karakter, legalább egy betű, vezérlő- és
+   HTML-jelek nélkül); a beépített magyarítással egyező név = törlés; MÁSIK
+   játékos (beépített vagy közös) nevével egyező név elvetve; nevenként a
+   legfrissebb dönt.
+
    Használat:
      FIREBASE_SERVICE_ACCOUNT='<kulcs JSON>' node tools/stylist/beepit.js [--html index.html]
      node tools/stylist/beepit.js --fajl <firebase-export.json> [--html <másolat>]   (próba)
@@ -45,6 +55,21 @@ const KEZD="/*ARC-ALAP:KEZD*/",VEG="/*ARC-ALAP:VEG*/";
 const MKEZD="/*MEZ-ALAP:KEZD*/",MVEG="/*MEZ-ALAP:VEG*/";
 const MAX_MEZ=5000;
 const MAX_JATEKOS=5000;
+const NKEZD="/*NEV-ALAP:KEZD*/",NVEG="/*NEV-ALAP:VEG*/";
+const MAX_NEV=5000;
+/* a játék stylistNevTisztit-je */
+function nevTisztit(v){
+  const r=String(v==null?"":v);
+  if(/[\u0000-\u001f\u007f<>&"'`\\{}]/.test(r.replace(/[\t\n\r]/g," ")))return "";   /* tiltott jel: elutasítva, nem csendben kivágva */
+  const t=r.replace(/\s+/g," ").trim();
+  if(t.length<2||t.length>40)return "";
+  if(!/\p{L}/u.test(t))return "";
+  return t;}
+/* a HU_NAME_TABLE: kanonikus → beépített magyar név */
+function huTabla(src){
+  const m=new Map();const re=/\n "((?:[^"\\]|\\.)+)":\["((?:[^"\\]|\\.)*)","/g;let x;
+  while((x=re.exec(src)))m.set(JSON.parse(`"${x[1]}"`),JSON.parse(`"${x[2]}"`));
+  return m;}
 
 function keres(url,o){
   return new Promise((res,rej)=>{
@@ -139,7 +164,8 @@ function blokkIr(tabla){
   const SZ=jatekSzabaly(src),NEVEK=ismertNevek(src);
   const B=blokkOlvas(src),regi=JSON.stringify(B.tabla);
   const MS=mezSzabaly(src),MB=blokkOlvas(src,MKEZD,MVEG),mregi=JSON.stringify(MB.tabla);
-  const mezLeg=new Map();
+  const mezLeg=new Map(),nevLeg=new Map();
+  const HU=huTabla(src),NB=blokkOlvas(src,NKEZD,NVEG),nregi=JSON.stringify(NB.tabla);
   const adat=await lehuz();
   /* nevenként a legfrissebb, érvényes bejegyzés */
   const legfrissebb=new Map();let elvetett=0,osszes=0;
@@ -153,6 +179,12 @@ function blokkIr(tabla){
       if(t.n.startsWith("mez:")){
         if(t.n.length<5||t.n.length>84||kulcsa(t.n)!==k){elvetett++;continue;}
         const e=mezLeg.get(k);if(!e||t.at>e.at)mezLeg.set(k,t);
+        continue;}
+      /* ✏️ névcsere */
+      if(t.n.startsWith("nev:")){
+        const kan=t.n.slice(4);
+        if(!HU.has(kan)||kulcsa(t.n)!==k){elvetett++;continue;}
+        const e=nevLeg.get(kan);if(!e||t.at>e.at)nevLeg.set(kan,t);
         continue;}
       if(!NEVEK.has(t.n)||kulcsa(t.n)!==k){elvetett++;continue;}
       const e=legfrissebb.get(t.n);
@@ -174,13 +206,28 @@ function blokkIr(tabla){
     if(!volt)muj++;else if(JSON.stringify(volt)!==JSON.stringify(kit))mmod++;
     M[k]=kit;}
   if(Object.keys(M).length>MAX_MEZ)throw new Error(`Túl sok mez (${Object.keys(M).length}) — gyanús, nem írom be.`);
-  const valtA=JSON.stringify(T)!==regi,valtM=JSON.stringify(M)!==mregi,valt=valtA||valtM;
-  const uzenet=`🌍 Stylist-lista: ${Object.keys(T).length} játékos (+${uj} új, ${mod} módosult, ${torolt} törölve) · 🎽 ${Object.keys(M).length} mez (+${muj} új, ${mmod} módosult, ${mtorolt} törölve)`;
+  /* ✏️ a nevek — időrendben, hogy ütközésnél a korábbi foglalás nyerjen */
+  const N=Object.assign({},NB.tabla);let nuj=0,nmod=0,ntorolt=0;
+  const nevSor=[...nevLeg.entries()].sort((x,y)=>x[1].at-y[1].at);
+  for(const [kan,t] of nevSor){
+    let f="";if(t.d){try{const o=JSON.parse(t.d);f=nevTisztit(o&&o.f);}catch(e){f="";}if(!f){elvetett++;continue;}}
+    if(f&&f===HU.get(kan))f="";
+    if(f){const F=f.toLowerCase();let utk=false;
+      for(const [k2,h2] of HU){if(k2===kan)continue;if(String(N[k2]||h2).toLowerCase()===F){utk=true;break;}}
+      if(utk){elvetett++;continue;}}
+    const volt=N[kan];
+    if(!f){if(volt!==undefined){delete N[kan];ntorolt++;}continue;}
+    if(volt===undefined)nuj++;else if(volt!==f)nmod++;
+    N[kan]=f;}
+  if(Object.keys(N).length>MAX_NEV)throw new Error(`Túl sok név (${Object.keys(N).length}) — gyanús, nem írom be.`);
+  const valtA=JSON.stringify(T)!==regi,valtM=JSON.stringify(M)!==mregi,valtN=JSON.stringify(N)!==nregi,valt=valtA||valtM||valtN;
+  const uzenet=`🌍 Stylist-lista: ${Object.keys(T).length} játékos (+${uj} új, ${mod} módosult, ${torolt} törölve) · 🎽 ${Object.keys(M).length} mez (+${muj} új, ${mmod} módosult, ${mtorolt} törölve) · ✏️ ${Object.keys(N).length} név (+${nuj} új, ${nmod} módosult, ${ntorolt} törölve)`;
   if(valt){
     /* a két blokk közül előbb a későbbit írjuk, hogy a korábbi pozíciója ne csússzon */
-    const blokkok=[{a:B.a,b:B.b,K:KEZD,txt:blokkIr(T)},{a:MB.a,b:MB.b,K:MKEZD,txt:blokkIr(M)}].sort((x,y)=>y.a-x.a);
+    const blokkok=[{a:B.a,b:B.b,K:KEZD,txt:blokkIr(T)},{a:MB.a,b:MB.b,K:MKEZD,txt:blokkIr(M)},
+      {a:NB.a,b:NB.b,K:NKEZD,txt:blokkIr(N)}].sort((x,y)=>y.a-x.a);
     let out=src;for(const x of blokkok)out=out.slice(0,x.a+x.K.length)+x.txt+out.slice(x.b);
     fs.writeFileSync(HTML,out);}
-  console.log(`${osszes} feltöltés, ${legfrissebb.size} játékos, ${mezLeg.size} mez, ${elvetett} elvetve → ${valt?uzenet:"nincs változás"}`);
+  console.log(`${osszes} feltöltés, ${legfrissebb.size} játékos, ${mezLeg.size} mez, ${nevLeg.size} név, ${elvetett} elvetve → ${valt?uzenet:"nincs változás"}`);
   if(process.env.GITHUB_OUTPUT)fs.appendFileSync(process.env.GITHUB_OUTPUT,`valtozas=${valt?1:0}\nuzenet=${uzenet}\n`);
 })().catch(e=>{console.error("✗ "+(e&&e.message||e));process.exit(1);});
