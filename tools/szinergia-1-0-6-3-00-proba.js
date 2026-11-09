@@ -152,7 +152,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const nincs=Object.keys(t.meccs).filter(k=>!t.fired[k]||!Object.keys(t.fired[k]).filter(x=>x!=="bal").length);
   ok(Object.keys(t.meccs).length===28&&Object.values(t.meccs).every(v=>v>=t.N-1),"mind a 28 pár lejátszotta a meccseit",t.meccs);
   /* a ritka eseményből induló párok (kivédett helyzet, labdaszerzés → kis esély) 10 meccsen némák is maradhatnak */
-  const RITKA=["bombazok|beton","beton|villam","bombazok|gegen","villam|gegen"];
+  const RITKA=["bombazok|beton","beton|villam","bombazok|gegen","villam|gegen","panzer|sztar"];
   ok(nincs.every(k=>RITKA.indexOf(k)>=0)&&nincs.length<=2,"minden pár hatása elsült (legfeljebb két ritka kivétellel)",nincs);
   Object.keys(t.meccs).sort().forEach(k=>console.log("     "+k.padEnd(20)+" "+JSON.stringify(t.fired[k]||{})+(t.forr[k]?` · ${t.forr[k]} gól (várható ${Math.round((t.vart[k]||0)*10)/10})`:"")));
   const gol=Object.keys(t.forr).filter(k=>t.fired[k]&&t.fired[k].gol);

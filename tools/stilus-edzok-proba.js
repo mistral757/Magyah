@@ -95,7 +95,8 @@ const {spawn}=require('child_process');
     console.log(`  ${x.kepesseg.padEnd(12)} ${x.edzo.padEnd(18)} ${x.taktikaNev||x.taktika}`);
     console.log(`     plafon ${x.lv0.ceil} → ${x.lv1.ceil} → ${x.lv2.ceil} → ${x.lv3.ceil}`
       +` · tempó ${x.lv0.tempo}× → ${x.lv1.tempo}× · sapka ${x.lv3.cap}`);
-    tier.push(x.tier);arak.push(JSON.stringify(x.arak));
+    /* ⚡ 1.0.6.4.00 — a Villám minden képessége ×0,95 áron: a sor árát visszaszámolva vetjük össze */
+    tier.push(x.tier);arak.push(JSON.stringify(x.stilus==="villam"?(x.arak||[]).map(v=>Math.round(v/0.95)):x.arak));
     ceil.push([x.lv0.ceil,x.lv1.ceil,x.lv2.ceil,x.lv3.ceil].join("-"));
     tempo.push(x.lv0.tempo+"/"+x.lv1.tempo);
     ingyen.push(x.ingyen+"/"+x.ingyenCeil+"/"+x.ingyenTempo);

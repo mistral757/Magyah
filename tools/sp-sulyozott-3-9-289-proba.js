@@ -37,6 +37,8 @@ const KEP=process.argv[2]||null;
   p.on("console",m=>{if(m.type()==="error"&&!/Failed to load resource|404/.test(m.text()))errs.push(m.text());});
   await p.addInitScript(()=>{window.HANG_TESZT=true;});
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
+  /* 🏁 1.0.7.0.00 — a RÉGI (korlátlan) súlyozás mérése; az új rajt a megtartott részt a W 2%-áig engedi (tools/ideny-rajt-1-0-7-0-00-proba.js) */
+  await p.evaluate(()=>{window.nrAktiv=()=>false;});
   await p.waitForTimeout(1200);
   const karrier=()=>p.evaluate(()=>{
     unlockGatesOn=()=>false;pendingWorldSeed="SULY0001";worldSeed=null;
