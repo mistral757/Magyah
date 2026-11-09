@@ -8,8 +8,8 @@
 > sok variáció. A szinergia ettől függetlenül a harmadik stílustól nyílik meg,
 > és a választási lehetőség ugyanúgy lenne."
 
-Ez a dokumentum **terv**: a kód még nem készült el. A jóváhagyásod után
-építem meg.
+**Megvalósítva az 1.0.6.3.00-ban** — a részletek és a tervtől való eltérések:
+[szinergia-1-0-6-3-00.md](szinergia-1-0-6-3-00.md).
 
 ---
 
