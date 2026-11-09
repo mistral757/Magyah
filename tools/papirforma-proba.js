@@ -165,18 +165,19 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
      }catch(e){}
      addLine=orig;
      /* ⚡ 3.9.367 — a fő sor a meccs-erő (⚡ — ⚡), a papírforma alatta, az óriásölés mércéjeként */
-     const sor=log.find(x=>/Papírforma|papírforma/.test(x))||null;
+     const sor=log.find(x=>/Meccs-erő:|Papírforma|papírforma/.test(x))||null;
      const f1=v=>v.toFixed(1).replace(".",",");
      const vMs=f1(teamMatchStrength()+(pformTeamOvr()||0)),vO=f1(fx.o.ovr+(matchHiddenOppBuff()||0));
-     ki.sor={van:!!sor,kozep:sor?sor.indexOf(String(n1(paperRefNow())).replace(".",","))>=0:false,
+     ki.sor={van:!!sor,
        ms:sor?(sor.indexOf("⚡ Meccs-erő: <b>"+vMs+"</b> — <b>"+vO+"</b>")>=0):false,
        szoveg:sor?sor.replace(/<[^>]+>/g,"").slice(0,220):null};}
 
     /* ---- 8. A MÉRFÖLDKŐ ---- */
     {const T=msT();T.giantMax=30;delete T.giantMaxPct;T.giantKills=0;
-     msNoteGiantKill(MS_GIANT_PCT-0.1);const a=[T.giantKills,T.giantMaxPct||0];
-     msNoteGiantKill(14.2);
-     ki.ms={alatta:a,folotte:[T.giantKills,T.giantMaxPct],regiMarad:T.giantMax};
+     /* ⚡ 1.0.6.0.01 — meccs-erőből: az arány (r) és a pont-többlet (gap), új mező: giantMaxMs */
+     msNoteGiantKill({r:0.98,gap:2.4,need:2.45});const a=[T.giantKills,T.giantMaxMs||0];
+     msNoteGiantKill({r:2.9,gap:7.1,need:2.45});
+     ki.ms={alatta:a,folotte:[T.giantKills,T.giantMaxMs],regiMarad:T.giantMax,regiPct:T.giantMaxPct};
      /* 3.9.140: a régi lépcső-azonosítók (giantgap_12, _17) sorszám szerint
         az új értékekre költöznek — kétszer nem fizet */
      const M=msState();M.done.giantgap_12=3;M.done.giantgap_17=4;delete M.giantMig140;
@@ -214,12 +215,12 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
      [t.keso.uj,t.keso.db,t.keso.mezony]);
 
   console.log("\n— A MECCS ELŐTTI SOR —");
-  ok(t.sor.van&&t.sor.kozep,"a meccs előtti sor a KÖZEPET is kiírja (az óriásölés mércéjeként)",t.sor.szoveg);
+  ok(t.sor.van&&/óriásölés|ÓRIÁSÖLÉS/i.test(t.sor.szoveg||"")&&/meccs-erő/.test(t.sor.szoveg||"")&&!/%/.test(t.sor.szoveg||""),"1.0.6.0.01: a meccs előtti sor az óriásölést meccs-erőben, pontban mondja (nem papírforma-%)",t.sor.szoveg);
   ok(t.sor.ms,"3.9.367: a fő sor a két ⚡ — a tiéd a formával, az ellenfélé a teljes meccs-erő (mint az eredményjelzőn)",t.sor.szoveg);
 
   console.log("\n— A MÉRFÖLDKŐ —");
-  ok(t.ms.alatta[0]===0&&t.ms.alatta[1]===0,"a küszöb (5%) alatt nem számít óriásölésnek",t.ms.alatta);
-  ok(t.ms.folotte[0]===1&&t.ms.folotte[1]===14.2,"fölötte az ÚJ, százalékos mezőbe ír",t.ms.folotte);
+  ok(t.ms.alatta[0]===0&&t.ms.alatta[1]===0,"a küszöb alatt nem számít óriásölésnek",t.ms.alatta);
+  ok(t.ms.folotte[0]===1&&t.ms.folotte[1]===7.1&&t.ms.regiPct==null,"fölötte az ÚJ, pontos (meccs-erő) mezőbe ír (giantMaxMs), a %-osat nem írja",t.ms);
   ok(t.ms.regiMarad===30,"…a régi, pontos `giantMax`-hoz nem nyúl",t.ms.regiMarad);
   ok(t.migr.uj6===3&&t.migr.uj9===4&&t.migr.regi12===undefined&&t.migr.uj11===undefined,
      "a régi lépcsők (12%, 17%) sorszám szerint a 6%-ra és 9%-ra költöznek — kétszer nem fizetnek",t.migr);

@@ -126,7 +126,7 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     ki.ketSzoveg=talSpecOldal(sp,"pro",1,{dp:1});
     /* fekete bárány: óriásölésnél ×1,5; esélyesként −2% saját λ */
     _lap("feketebarany",2);
-    ki.fb=[talFeketeMult(MS_GIANT_PCT+1),talFeketeMult(MS_GIANT_PCT-1),talSpecFav()];
+    ki.fb=[talFeketeMult(1.2),talFeketeMult(0.8),talSpecFav()];   /* ⚡ 1.0.6.0.01 — az arány (1 = óriásölés) */
     const mine={ovr:100,tacticEffect:0,defMult:1,ownGoalMult:1,oppGoalMult:1,talFav:talSpecFav()};
     const semm=Object.assign({},mine,{talFav:undefined});
     ki.fbEsely=matchLambdas(mine,95,0).lf/matchLambdas(semm,95,0).lf;

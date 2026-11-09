@@ -208,16 +208,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("=== 3. a pressing-motor ===");
   console.log("  "+Object.keys(t.press).map(k=>`${k}: ${t.press[k]}`).join(" · "));
   ok(t.press.lv0===0,"képesség nélkül nincs pressing",t.press.lv0);
-  ok(t.press.lv1===2&&t.press.lv2===2.8&&t.press.lv3===3.6,
-     "a várható labdaszerzés 2,0 / 2,8 / 3,6 mérkőzésenként",t.press);
+  /* 🧲 1.0.6.1.00 — a hatás −33% (×0,67): 2,0 / 2,8 / 3,6 → 1,34 / 1,88 / 2,41 */
+  ok(t.press.lv1===1.34&&t.press.lv2===1.88&&t.press.lv3===2.41,
+     "a várható labdaszerzés 1,34 / 1,88 / 2,41 mérkőzésenként (a régi ×0,67)",t.press);
 
   console.log("=== 4. a büntetés ===");
   console.log("  "+Object.keys(t.punish).map(k=>`${k}: ${t.punish[k].p} / ${t.punish[k].cap}`).join(" · "));
   ok(t.punish.lv0.p===0&&t.punish.lv0.cap===0,"képesség nélkül nincs gól belőle");
-  ok(t.punish.lv1.p===0.25&&t.punish.lv1.cap===2
-   &&t.punish.lv2.p===0.33&&t.punish.lv2.cap===2
-   &&t.punish.lv3.p===0.5 &&t.punish.lv3.cap===3,
-     "a kimondott számok: 25%/2 · 33%/2 · 50%/3",t.punish);
+  ok(t.punish.lv1.p===0.168&&t.punish.lv1.cap===2
+   &&t.punish.lv2.p===0.221&&t.punish.lv2.cap===2
+   &&t.punish.lv3.p===0.335&&t.punish.lv3.cap===3,
+     "a számok (1.0.6.1.00: ×0,67): 17%/2 · 22%/2 · 34%/3",t.punish);
 
   console.log("=== 5. a „nem kell nekünk labda” alkuja ===");
   Object.keys(t.alku).forEach(k=>{const x=t.alku[k];

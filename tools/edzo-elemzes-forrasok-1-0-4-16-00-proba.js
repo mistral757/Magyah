@@ -76,6 +76,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* a büntetés esélyét felhúzzuk, hogy kevés meccsből is legyen pressing-gól */
     const _pp=gpPunishP;window.gpPunishP=a=>Math.min(0.95,_pp(a)*3+0.3);
     window.mezKerdesKell=()=>false;window.saveGame=()=>{};
+    /* 1.0.5.0.01 — az ELŐZETES elemzés ugyanazzal a mércével */
+    try{const fx=S.fixtures[S.idx];const o=edzoElemzesSzamol(fx);
+      const A=edzoPoisson(o.lf),B=edzoPoisson(o.la);let gy0=0,T0=0;
+      for(let x=0;x<=10;x++)for(let y=0;y<=10;y++){const q=A[x]*B[y];T0+=q;if(x>y)gy0+=q;}
+      ki.pre={press:o.cs.o.press||0,lf:o.lf,lfT:o.lfT,laT:o.laT,la:o.la,alt:o.cs.alt,gy:o.gy,gy0:gy0/T0,html:edzoElemzesHtml(o)};}catch(e){ki.preErr=String(e&&e.stack||e).slice(0,300);}
     const meccsek=[];
     for(let k=0;k<12;k++){
       S.unavailable={};S.lastMatch=null;S.idx=k%10;
@@ -109,6 +114,16 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 4. az általános mérés —");
   const pressOssz=M.reduce((a,m)=>a+m.press,0);
   ok(t.E&&t.E.v===2&&t.E.n===M.length&&t.E.o<=M.reduce((a,m)=>a+m.sumO,0)-pressOssz+1e-9,"a pressing-gól nem kerül az általános (11-es, öngól…) átlagba",t.E);
+  console.log("\n— 4b. az előzetes elemzés (1.0.5.0.01) —");
+  const pre=t.pre||{};
+  ok(!t.preErr&&pre.press>0.3,"a meccs előtti elemzés is látja a pressing-büntetés várható gólját",t.preErr||pre.press);
+  const exAtl=M.reduce((a,m)=>a+m.exPress,0)/Math.max(1,M.length);
+  ok(Math.abs(pre.press-exAtl)<Math.max(0.6,exAtl*0.35),"az előzetes várható pressing-gól a lefújáskori mérés közelében",{elozetes:pre.press,lefujas:Math.round(exAtl*100)/100});
+  ok(Math.abs(pre.lfT-(pre.lf+pre.press+pre.alt.o))<1e-6&&Math.abs(pre.laT-(pre.la+pre.alt.a))<1e-6,"a gólvárhatóság minden forrással = λ + csatornák + általános források",{press:pre.press,lf:pre.lf,lfT:pre.lfT,la:pre.la,laT:pre.laT,alt:pre.alt});
+  ok(pre.gy>pre.gy0,"a győzelmi esély a csatornákkal nagyobb, mint a λ-ból magában",{vele:pre.gy,nelkule:pre.gy0});
+  const ph=pre.html||"";
+  ok((ph.match(/<details class="mxFul"/g)||[]).length>=3&&/mxHarom/.test(ph)&&/Gólvárhatóság és gólforrások/.test(ph)&&/A meccserőn kívül/.test(ph)&&/Kulcsemberek/.test(ph),"lenyitható fülek: gólforrások, a meccserőn kívül, kulcsemberek",(ph.match(/<details class="mxFul"/g)||[]).length);
+  ok(/gegenpressing/.test(ph)&&/várhatóan \+/.test(ph),"a gegenpressing a gólforrások és a tényezők között",1);
   console.log("\n— 5. a felület —");
   const h=t.html||"";
   ok(!!t.minta,"van minta-meccs legalább két pressing-góllal",!!t.minta);
