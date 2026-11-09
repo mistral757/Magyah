@@ -49,6 +49,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const errs=[];p.on("pageerror",e=>errs.push(String(e)));
   await p.addInitScript(()=>{window.HANG_TESZT=true;});
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
+  /* 🏁 1.0.7.0.00 — ez a próba a RÉGI rajt-szerződést méri (a közös karrier ága él vele); az új egyjátékos rajtot a tools/ideny-rajt-1-0-7-0-00-proba.js méri */
+  await p.evaluate(()=>{window.nrAktiv=()=>false;});
   await p.waitForTimeout(1200);
   const r=await p.evaluate(()=>{
     unlockGatesOn=()=>false;pendingWorldSeed="KIEG0001";worldSeed=null;
