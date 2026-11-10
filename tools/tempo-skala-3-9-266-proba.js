@@ -35,10 +35,10 @@ const {spawn}=require('child_process');
      const r=document.getElementById("matchSpeedRange"),e=document.getElementById("euroSpeedRange");
      const o={v:matchSpeed,alap:MATCH_SPEED_DEFAULT,tick:matchSpeedTickMs(),
        felirat:document.getElementById("matchSpeedVal").textContent,
-       min:[r.min,e.min],max:[r.max,e.max],h2h:H2H_TICK_MS,
+       min:[matchSpeedFromPos(r.min),matchSpeedFromPos(e.min)],max:[matchSpeedFromPos(r.max),matchSpeedFromPos(e.max)],h2h:H2H_TICK_MS,
        vege:[matchSpeedTickMs(3),matchSpeedTickMs(0.1),matchSpeedTickMs(1)]};
      setMatchSpeed(2.4);
-     o.szinkron=[parseFloat(r.value),parseFloat(e.value),document.getElementById("euroSpeedVal").textContent];
+     o.szinkron=[matchSpeedFromPos(r.value),matchSpeedFromPos(e.value),document.getElementById("euroSpeedVal").textContent];
      setMatchSpeed(9);o.tetoVag=matchSpeed;
      setMatchSpeed(0.01);o.aljaVag=matchSpeed;
      o.mentve=localStorage.getItem("harminc_nulla_matchspeed_v2");

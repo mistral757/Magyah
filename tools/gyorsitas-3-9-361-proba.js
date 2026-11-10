@@ -98,14 +98,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.koppintasAlatt=localStorage.getItem(kulcs)===elotte;
     o.fugg=!!_saveSoonT;
     await new Promise(r=>setTimeout(r,3500));
-    o.utana=(JSON.parse(localStorage.getItem(kulcs)||"{}").S||{}).fanBase===jel1;
+    o.utana=(JSON.parse(mzUnpack(localStorage.getItem(kulcs))||"{}").S||{}).fanBase===jel1;
     const jel2=jel1+1;S.fanBase=jel2;
     const sel2=document.createElement("select");document.body.appendChild(sel2);
     sel2.onchange=()=>{saveGame();loadSavedGame(kulcs);};sel2.dispatchEvent(new Event("change"));
-    o.betoltesElott=(JSON.parse(localStorage.getItem(kulcs)||"{}").S||{}).fanBase===jel2;
+    o.betoltesElott=(JSON.parse(mzUnpack(localStorage.getItem(kulcs))||"{}").S||{}).fanBase===jel2;
     const jel3=jel1+2;S.fanBase=jel3;
     sel.onchange=()=>{saveGameNow();};sel.dispatchEvent(new Event("change"));
-    o.most=(JSON.parse(localStorage.getItem(kulcs)||"{}").S||{}).fanBase===jel3;
+    o.most=(JSON.parse(mzUnpack(localStorage.getItem(kulcs))||"{}").S||{}).fanBase===jel3;
     return o;});
   ok(r.kereses.a===r.kereses.b&&r.kereses.an===r.kereses.bn&&r.kereses.form[0]===r.kereses.form[1],"a legjobb-felállás keresés memóval és anélkül ugyanazt adja",r.kereses);
   ok(r.memoZarva,"a keresés után a memó bezárul",r.memoZarva);

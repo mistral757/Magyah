@@ -226,7 +226,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.cim=document.getElementById("twTitle").textContent;
     try{csReturnToHub();}catch(e){}
     saveGame();
-    let d=null;try{d=JSON.parse(localStorage.getItem(saveKey()));}catch(e){d=null;}
+    let d=null;try{d=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));}catch(e){d=null;}
     ki.mentve=!!(d&&d.S&&d.S.press&&d.S.press.v===1);
     return ki;});
   console.log("\n— 5. A FELÜLET —");

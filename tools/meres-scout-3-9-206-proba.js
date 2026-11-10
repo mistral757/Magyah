@@ -283,7 +283,7 @@ const SP=process.env.MSP||require("os").tmpdir();
     window.__lsw=null;const _s=Storage.prototype.setItem;
     Storage.prototype.setItem=function(k,v){if(k===saveKey())window.__lsw=v;return _s.apply(this,arguments);};
     try{saveGame();}finally{Storage.prototype.setItem=_s;}
-    let d=null;try{d=JSON.parse(window.__lsw);}catch(e){}
+    let d=null;try{d=JSON.parse(mzUnpack(window.__lsw));}catch(e){}
     if(!d)return {nincs:true,len:(window.__lsw||"").length};
     const lista=S.scoutWatch.list.length,id=S.meresId;
     S.scoutWatch={v:1,list:[]};S.scoutReal=null;S.meresId=null;

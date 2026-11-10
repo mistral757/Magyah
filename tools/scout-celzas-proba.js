@@ -183,7 +183,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* mentés oda-vissza */
     saveGame();try{saveGameFlush&&saveGameFlush();}catch(x){}
     const mentett=S.scoutCel;S.scoutCel=null;
-    let raw=null;try{raw=JSON.parse(localStorage.getItem(saveKey()));}catch(x){}
+    let raw=null;try{raw=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));}catch(x){}
     o.mentesben=!!(raw&&raw.S&&raw.S.scoutCel&&raw.S.scoutCel.p&&raw.S.scoutCel.p.v==="ver+");
     S.scoutCel=mentett;
     return o;});

@@ -88,7 +88,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
 
   const tarKi=()=>p.evaluate(()=>{const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);o[k]=localStorage.getItem(k);}return o;});
   const tarBe=o=>p.evaluate(o=>{localStorage.clear();for(const k in o)localStorage.setItem(k,o[k]);},o);
-  const mentes=()=>p.evaluate(k=>{try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},alap.kulcs);
+  const mentes=()=>p.evaluate(k=>{try{return JSON.parse(mzUnpack(localStorage.getItem(k)));}catch(e){return null;}},alap.kulcs);
   /* a VALÓDI visszatérés: újratöltés → kezdőlap → „Mentett meccs folytatása".
      3.9.180 óta nincs köztes „Folytatom" sáv: ugyanarra a helyre a gomb
      újratöltés nélkül, egyenesen betölt — ezért a naplófigyelő ELŐTTE köt. */
@@ -129,7 +129,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await lancFog();
   await p.evaluate(()=>{window.__sorok=[];playMatch();});
   const SNAP_K=await tarKi();
-  const m0=JSON.parse(SNAP_K[alap.kulcs]||"null"),e0=JSON.parse(SNAP_K[alap.kulcs+"::elo"]||"null");
+  const m0=JSON.parse(await p.evaluate(v=>mzUnpack(v),SNAP_K[alap.kulcs]||"null")),e0=JSON.parse(SNAP_K[alap.kulcs+"::elo"]||"null");
   ok(m0&&m0.S&&m0.S.idx===idx0&&!m0.S.playing,"a kezdőrúgás pillanatában a meccs előtti állapot a lemezen",{idx:m0&&m0.S.idx});
   ok(e0&&e0.seed>0&&e0.t===0&&Array.isArray(e0.log),"az élő rekord megszületett (seed, 0 vödör, üres napló)",e0);
 
@@ -137,7 +137,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 2. A MÉRCE: MEGSZAKÍTÁS NÉLKÜL —");
   await varjF(()=>_mElo&&_mElo.t>=3);
   const cs0=await csere();
-  const e1=await p.evaluate(k=>JSON.parse(localStorage.getItem(k)),alap.kulcs+"::elo");
+  const e1=await p.evaluate(k=>JSON.parse(mzUnpack(localStorage.getItem(k))),alap.kulcs+"::elo");
   ok(cs0&&e1.log.length===1&&e1.log[0].k==="sub"&&e1.log[0].t>=3,"a felületi csere naplózódott, a vödör számával",e1.log);
   await varjF(()=>window.__lanc>0,null,90000);
   const R0=await p.evaluate(()=>({sorok:window.__sorok.slice(),gf:S.lastMatch&&S.lastMatch.gf,ga:S.lastMatch&&S.lastMatch.ga,idx:S.idx}));
@@ -157,7 +157,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await varjF(()=>_mElo&&_mElo.t>=3);
   await csere();
   await varjF(()=>_mElo&&_mElo.t>=7);
-  const e7=await p.evaluate(k=>JSON.parse(localStorage.getItem(k)),alap.kulcs+"::elo");
+  const e7=await p.evaluate(k=>JSON.parse(mzUnpack(localStorage.getItem(k))),alap.kulcs+"::elo");
   ok(e7.t>=7&&e7.log.length===1,"a rekord a 7. vödörnél: vödör-szám és a csere a naplóban",{t:e7.t,log:e7.log});
   await betolt();   /* ← frissítés MECCS KÖZBEN */
   await varjF(()=>_mElo&&S.playing,null,15000);

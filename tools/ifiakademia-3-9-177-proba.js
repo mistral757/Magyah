@@ -131,7 +131,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     out.regiFigy=acadFigyeltDb(regi);
     /* a mentés viszi */
     saveGame();
-    let d=null;try{d=JSON.parse(localStorage.getItem(saveKey()));}catch(e){}
+    let d=null;try{d=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));}catch(e){}
     const mr=d&&d.S&&(d.S.academy||[]).find(x=>x.n===a.n);
     out.mentve=mr&&mr.figyelt;
     out.felirat=document.getElementById("hubAcademyDs").textContent;

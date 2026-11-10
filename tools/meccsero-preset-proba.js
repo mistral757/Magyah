@@ -224,7 +224,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     cspMentes("Hazai alap");ki.felulir=cspMentesek().length===1;
     /* a karrier-mentés viszi */
     saveGame();
-    let d=null;try{d=JSON.parse(localStorage.getItem(saveKey()));}catch(e){d=null;}
+    let d=null;try{d=JSON.parse(mzUnpack(localStorage.getItem(saveKey())));}catch(e){d=null;}
     ki.mentesben=!!(d&&d.S&&Array.isArray(d.S.felMentes)&&d.S.felMentes.length===1);
     /* egy mentett ember közben elment: kimarad, a helyén a mostani marad */
     cspFelallasAlkalmaz(cspFelallasJavaslat("rating"));

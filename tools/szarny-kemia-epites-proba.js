@@ -288,7 +288,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const div=document.createElement("div");div.innerHTML=h;ki.txt=div.textContent;
     try{saveGame();}catch(e){}
     /* a SAJÁT mentési helyéről olvasunk, nem az első egyező kulcsról */
-    let d=null;try{d=JSON.parse(localStorage.getItem(saveKey())||"null");}catch(e){d=null;}
+    let d=null;try{d=JSON.parse(mzUnpack(localStorage.getItem(saveKey()))||"null");}catch(e){d=null;}
     ki.mentes=!!(d&&d.S&&d.S.szarnyInProgress===szarnyKey(BV,BSZ)&&d.S.szarnyMig===1);
     /* ha nem jött össze, a kimenet mondja meg, MI tartotta vissza a mentést */
     if(!ki.mentes)ki.miert={uto:!!(S&&S.utoMeccs),tartas:_utoTartas,zar:_saveLock,kulcs:saveKey(),

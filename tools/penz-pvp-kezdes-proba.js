@@ -167,7 +167,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     S.mpStartEq=null;S.mpStartP=null;mpStartEqualize(ms0,ms0+2);
     const P=JSON.stringify(S.mpStartP);
     saveGame();
-    const d=JSON.parse(localStorage.getItem(saveKey())||"null");
+    const d=JSON.parse(mzUnpack(localStorage.getItem(saveKey()))||"null");
     ki.mentes=!!(d&&d.S&&d.S.mpStartP&&JSON.stringify(d.S.mpStartP)===P&&d.S.mpStartEq&&d.S.mpStartEq.done);
     return ki;});
   console.log("\n— 4. A PvP KEZDŐ KIEGYENLÍTÉS —");
