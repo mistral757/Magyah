@@ -8109,7 +8109,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.7.3.00";
+const APP_VERSION="1.0.7.3.01";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -73592,8 +73592,16 @@ function duelEllenfelHtml(o){
    kérhetsz elemzést (2.).
    A CSATORNA: a szoba `dp:<párharc-kulcs>` rekesze (a csapatlap a `kesz`
    jelzéssel: 1 = meccs, 2 = elemzés) — innen olvas a társ gépe. */
+let _dkHazaMegy=false;
 let _dk=null,_dkAt=null,_dkPoll=null,_dkUtanOk=null,_dkVarMost=false,_dkTarolt=null,_dkUtolso=null;
-function dkAllapot(){const k=duelKulcs();if(!_dk||_dk.k!==k)_dk={k,kesz:0,elemzes:0,fuggo:0};return _dk;}
+/* ⏳ 1.0.7.3.01 — az állapot a MENTÉSBEN él (S.dk): kezdőlapra lépve vagy a
+   játékot bezárva és újraindítva is megmarad, hogy kihirdettél és az elemzésre
+   vársz — a betöltés visszavisz a várakozóba (dkVarFolytatas). */
+function dkAllapot(){
+  const k=duelKulcs();
+  if(_dk&&_dk.k===k){S.dk=_dk;return _dk;}
+  if(S.dk&&S.dk.k===k){_dk=S.dk;return _dk;}
+  _dk={k,kesz:0,elemzes:0,fuggo:0,var:0};S.dk=_dk;return _dk;}
 function dkLapRekord(){
   const A=dkAllapot();
   return {card:mpTeamCard(),at:Date.now(),kesz:A.kesz||0,dkv:2};}
@@ -73676,6 +73684,7 @@ async function dkValaszt(m,tovabb){
   const A=dkAllapot();A.kesz=m;
   dkAblak("📣 Kerethirdetés",`<div style="text-align:center">A kereted kihirdetése…</div>`,[]);
   const ok=await dkKuld();
+  try{saveGameNow();}catch(e){}   /* ⏳ 1.0.7.3.01 — a kihirdetés túlél egy bezárást */
   try{addLine(`📣 <b>Kihirdetted a keretedet</b> a párharcra — ${m===1?"rögtön a meccs következik":"az edző elemzésére vársz"}.`
     +(ok?"":" (A szobába most nem ment fel — a következő kísérlet újra elküldi.)"),"m ev");}catch(e){}
   dkZar();
@@ -73695,6 +73704,9 @@ async function dkTarsOlvas(){
 function dkVar(){
   const A=dkAllapot();
   _dkVarMost=true;
+  /* ⏳ 1.0.7.3.01 — a várakozó a visszatérés helye: amíg nem lépsz vissza
+     kifejezetten a kerethez, a betöltés ide hoz */
+  A.var=1;try{saveGameNow();}catch(e){}
   try{$("h2hWaitErr").textContent="";}catch(e){}
   h2hWaitShow((S.idx||0)+1,
     `<span class="h2hDot"></span>📣 A kereted kihirdetve. Várjuk a társad kerethirdetését — amint megjön, megkapod az edző elemzését, és utána még változtathatsz.`,
@@ -73702,9 +73714,31 @@ function dkVar(){
     `Ha visszalépsz, a kihirdetésed akkor is érvényes: amint a társad kihirdeti a keretét, megkapod az elemzést. `
     +`Ide csak újabb kihirdetéssel jöhetsz vissza, és innen a meccs-várakozóra egyből nem lehet átváltani.`);
   dkPollInd();}
+/* ⏳ 1.0.7.3.01 — A VISSZATÉRÉS A VÁRAKOZÓBA.
+   KIMONDOTT KÉRÉS: „Miután a párharc előtt itt rányomsz valamelyik gombra,
+   amivel elindul a várakozás, azután [a várakozó] képernyőre hozzon vissza
+   téged a játék akkor is, ha ez után visszamész a kezdőképernyőre, vagy
+   egyenesen bezárod a játékot és később indítod csak újra."
+   Az 1. gomb (rögtön a meccs) a keretet a szobába tölti (S.h2hPending): ezt a
+   betöltés eddig is a meccs-várakozóba vitte (h2hResumeForced). A 2. gomb
+   (előbb az elemzés) állapota eddig csak a memóriában élt — mostantól a
+   mentésben (S.dk), és ha a várakozó volt nyitva (var=1), a betöltés oda tér
+   vissza. Ha közben megjött a társ kerete, a várakozó azonnal az elemzésre
+   vált (a szokásos kör). Kifejezett „↩ Vissza a kerethez" után nem dobjuk
+   vissza — a kihirdetés ettől érvényes marad. */
+function dkVarFolytatas(){
+  if(!dkKell())return false;
+  const A=S.dk;
+  if(!A||A.k!==duelKulcs()||A.kesz!==2||!A.var||A.elemzes)return false;
+  _dk=A;
+  dkGombFrissit();
+  dkVar();
+  return true;}
 function dkVarKilep(){
   if(!_dkVarMost)return;
   _dkVarMost=false;
+  /* a kezdőlap-gomb NEM bontja le a visszatérést; a „Vissza a kerethez" igen */
+  if(!_dkHazaMegy){try{const A=dkAllapot();A.var=0;saveGameNow();}catch(e){}}
   try{h2hWaitHide();}catch(e){}
   dkGombFrissit();
   try{addLine(`↩ Visszaléptél a kerethez — a kihirdetésed érvényes marad: amint a társad is kihirdet, megkapod az elemzést.`,"m ev");}catch(e){}}
@@ -73720,7 +73754,7 @@ function dkPollInd(){
     const T=await dkTarsOlvas();
     if(!_dk||_dk.k!==k||_dk.kesz!==2||_dk.elemzes)return;
     if(T){
-      _duelTars=T;A.elemzes=1;
+      _duelTars=T;A.elemzes=1;A.var=0;try{saveGameNow();}catch(e){}
       if(_dkVarMost){_dkVarMost=false;try{h2hWaitHide();}catch(e){}}
       const lathato=!S.playing&&((()=>{try{return !$("scSim").classList.contains("hide")||!$("scHub").classList.contains("hide");}catch(e){return false;}})());
       if(lathato)dkElemzes(()=>dkGombFrissit());
@@ -77972,7 +78006,9 @@ $("h2hWaitInfoBtn")&&($("h2hWaitInfoBtn").onclick=()=>{
    működik" élmény. Mostantól a leave hibája nem állhat a kilépés útjába, és ha
    maga a kilépés is elhasal, marad a nyers újratöltés. */
 $("h2hWaitHomeBtn")&&($("h2hWaitHomeBtn").onclick=()=>{
+  _dkHazaMegy=true;   /* ⏳ 1.0.7.3.01 — a kerethirdetés-várakozás visszatérése megmarad */
   try{h2hWaitLeave();}catch(e){}
+  _dkHazaMegy=false;
   try{goHomeScreen();}
   catch(e){try{location.reload();}catch(e2){}}
   /* Védőháló: ha másfél másodperc múlva még mindig itt vagyunk (a mentés vagy
@@ -131778,6 +131814,7 @@ function saveGame(){
            őrei, amelyek nélkül egy újratöltés után a jutalom kétszer menne ki,
            az ajánlat újra felugrana, a kikapcsolt talizmán visszakapcsolna. */
         szin:S.szin||null,
+        dk:S.dk||null,   /* ⏳ 1.0.7.3.01 — a kerethirdetés állapota (várakozás az elemzésre) */
         vl0Asked:S.vl0Asked||0,
         akcGol:S.akcGol||null,
         talOff:!!S.talOff,talDuelOff:!!S.talDuelOff,
@@ -132917,6 +132954,7 @@ function resumeUIFromSave(){
     /* ELKÖTELEZETT KUPA-PÁRHARC: a kereted már fent van a szobában, tehát nincs
        mit mérlegelni — a mérkőzés folytatódik. */
     if(h2hDuelPendingNow())h2hResumeForced();
+    else try{dkVarFolytatas();}catch(e){}   /* ⏳ 1.0.7.3.01 */
     return;}
   if(phase==="verdict"){finish();return;}
   if(phase==="hub"||phase==="hubreport"){
@@ -132985,6 +133023,7 @@ function resumeUIFromSave(){
        elcsúszhatott a felküldött pillanatkép alól — miközben a társa oldalán a
        mérkőzés a RÉGI kerettel futott volna le. */
     if(h2hDuelPendingNow()){h2hResumeForced();return;}
+    try{if(dkVarFolytatas())return;}catch(e){}   /* ⏳ 1.0.7.3.01 — vissza a kerethirdetés-várakozóba */
     $("scSim").scrollIntoView({behavior:"smooth"});
     /* ⏯ megszakadt meccs vagy lefújás utáni kör: az megy tovább (3.9.171) */
     try{if(mMeccsFolytatasBetolteskor())return;}catch(e){}

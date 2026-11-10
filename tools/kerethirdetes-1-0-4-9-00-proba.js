@@ -24,7 +24,14 @@
            után lefut a párharc;
      C) 1–1 (6. idény, 15. forduló után):
         9. mindketten 1. → elemzés nélkül lefut; mindkét mérlegen ott az elemzés;
-    10. nincs oldalhiba. */
+     D) ⏳ 1.0.7.3.01 — A VISSZATÉRÉS A VÁRAKOZÓBA (6. idény, 23. forduló után):
+    11. a 2. után a kezdőlap-gomb: a várakozás jelzője megmarad (S.dk, a
+        mentésben is); „újraindítás" (a memória üres, az állapot a mentésből)
+        után a betöltés a várakozóba hoz vissza, ugyanazzal a felirattal;
+    12. ha közben a társ kihirdetett, a visszatérés után megjön az elemzés;
+    13. a „↩ Vissza a kerethez" után a betöltés NEM dob vissza a várakozóba;
+    14. az 1. (rögtön a meccs) után a betöltés a meccs-várakozóba visz;
+    15. nincs oldalhiba. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT=process.env.MROOT||"/home/user/Magyah", PORT=9367;
@@ -187,7 +194,44 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const LC=await lefut("6:q2");
   const ma=await merleg(p),mb=await merleg(g);
   ok(LC.k&&LC.a.gf===LC.b.ga&&ma.gomb&&mb.gomb&&ma.nyit&&mb.nyit,"9. 1–1: elemzés nélkül lefut; mindkét mérlegen ott a meccs előtti elemzés",{LC,ma,mb});
-  ok(errs.length===0,"10. nincs oldalhiba",errs.slice(0,5));
+  console.log("— D) ⏳ visszatérés a várakozóba —");
+  await prep(p,6,23,null);await prep(g,6,23,null);
+  const ujraindit=pp=>pp.evaluate(()=>{S.dk=JSON.parse(JSON.stringify(S.dk));_dk=null;_dkVarMost=false;
+    if(_dkPoll){clearTimeout(_dkPoll);_dkPoll=null;}try{h2hWaitHide();}catch(e){}
+    const r=dkVarFolytatas();
+    return {r,var:S.dk.var,kesz:S.dk.kesz,wait:!$("h2hWait").classList.contains("hide"),tx:$("h2hWait").textContent.replace(/\s+/g," ")};});
+  /* 13. a „Vissza a kerethez" után nincs visszadobás */
+  await kick(p);await p.waitForTimeout(150);await nyom(p,"^🧠 2\\.");
+  await varj(p,()=>!$("h2hWait").classList.contains("hide"));
+  await p.evaluate(()=>$("h2hWaitCancelBtn").click());await p.waitForTimeout(150);
+  const vk=await ujraindit(p);
+  ok(vk.var===0&&vk.kesz===2&&!vk.r&&!vk.wait,"13. a „↩ Vissza a kerethez” után a betöltés nem dob vissza a várakozóba (a kihirdetés érvényes marad)",vk);
+  /* 11. újra kihirdetve, a kezdőlap-gomb (a navigációt kiiktatjuk: a gomb saját útját mérjük) */
+  await kick(p);await p.waitForTimeout(150);await nyom(p,"Újra kihirdetem");
+  await varj(p,()=>!$("h2hWait").classList.contains("hide"));
+  const haza=await p.evaluate(()=>{window.goHomeScreen=()=>{};
+    try{$("h2hWaitHomeBtn").onclick();}catch(e){}
+    if(_dkPoll){clearTimeout(_dkPoll);_dkPoll=null;}
+    return {var:S.dk&&S.dk.var,kesz:S.dk&&S.dk.kesz,wait:!$("h2hWait").classList.contains("hide")};});
+  const mentesben=await p.evaluate(()=>/dk:S\.dk\|\|null/.test(document.documentElement.innerHTML));
+  ok(haza.var===1&&haza.kesz===2&&!haza.wait&&mentesben,"11. a kezdőlap-gomb után a várakozás jelzője megmarad (S.dk, a mentésben is)",{haza,mentesben});
+  const ujra=await ujraindit(p);
+  ok(ujra.r&&ujra.wait&&/Várjuk a társad kerethirdetését/.test(ujra.tx),"11. „újraindítás” után a betöltés a várakozóba hoz vissza, a saját feliratával",{r:ujra.r,tx:ujra.tx.slice(0,120)});
+  /* 12. ismét ki; közben a társ kihirdet; a visszatérés után megjön az elemzés */
+  await p.evaluate(()=>{try{$("h2hWaitHomeBtn").onclick();}catch(e){}if(_dkPoll){clearTimeout(_dkPoll);_dkPoll=null;}});
+  await kick(g);await g.waitForTimeout(150);await nyom(g,"^⚔ 1\\.");
+  await varj(g,()=>!!(S.h2hPending&&S.h2hPending.key===h2hKey()));
+  await ujraindit(p);
+  const pe3=await varj(p,()=>!$("edzoElemModal").classList.contains("hide"),60);
+  const s5=await all(p);
+  ok(pe3&&!s5.wait&&/ingyenes/.test(s5.elemTx),"12. ha közben a társ kihirdetett, a visszatérés után megjön az elemzés",{pe3,wait:s5.wait});
+  await p.evaluate(()=>$("edzoElemOk").click());
+  const vegul=await p.evaluate(()=>({var:S.dk.var,elem:S.dk.elemzes,folyt:dkVarFolytatas(),label:kickBtnLabel()}));
+  ok(vegul.var===0&&vegul.elem===1&&vegul.folyt===false&&/^⚔ Kezdőrúgás/.test(vegul.label),"12. az elemzés után a betöltés már nem a várakozóba visz — a ⚔ Kezdőrúgás jön",vegul);
+  /* 14. a társ (1. gomb) mentett állapota: a meccs-várakozó a h2hPending-ből */
+  const gp=await g.evaluate(()=>({pend:h2hDuelPendingNow()}));
+  ok(gp.pend,"14. az 1. gomb után a mentett állapot a meccs-várakozóba visz (h2hDuelPendingNow → h2hResumeForced)",gp);
+  ok(errs.length===0,"15. nincs oldalhiba",errs.slice(0,5));
   await b.close();srv.close();
   console.log(hiba?`✗ ${hiba} hiba`:"✓ minden rendben");
   process.exit(hiba?1:0);
