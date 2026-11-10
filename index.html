@@ -4622,6 +4622,19 @@ html.pixMoveOff[data-theme="pixel"]{--pxStep:ease-out;--pxStep7:ease-out}
 .pxBoot .pxBootT{top:0}.pxBoot .pxBootB{bottom:0}
 .pxBoot i{position:absolute;left:0;right:0;top:calc(50% - 2px);height:4px;background:#fff1e8;
   box-shadow:0 0 14px #29adff;transform:scaleX(0)}
+/* ⚽ 1.0.7.4.00 — A DEKÁZÓ TÖLTŐ: homályos háttér, középen a figura */
+#toltoRet{position:fixed;inset:0;z-index:99990;display:none;align-items:center;justify-content:center;flex-direction:column;
+  background:rgba(8,10,14,.32);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);pointer-events:auto;opacity:0}
+#toltoRet.be{display:flex}
+#toltoRet .toltoFig{position:relative;width:60px;height:78px;will-change:transform}
+#toltoRet .toltoTest{position:absolute;inset:0}
+#toltoRet .toltoTest svg{position:absolute;inset:0;width:60px;height:78px}
+#toltoRet .toltoLabda{position:absolute;left:18px;top:-30px;width:24px;height:24px;will-change:transform}
+#toltoRet .toltoLabda svg{width:24px;height:24px}
+#toltoRet svg{filter:drop-shadow(3px 0 0 #0b1230) drop-shadow(-3px 0 0 #0b1230) drop-shadow(0 3px 0 #0b1230) drop-shadow(0 -3px 0 #0b1230)}
+#toltoRet .toltoArny{position:absolute;left:8px;right:8px;bottom:-8px;height:8px;border-radius:50%;background:rgba(0,0,0,.35)}
+#toltoRet .toltoSzoveg{margin-top:22px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#f2efe6;opacity:.85;
+  text-shadow:0 1px 2px rgba(0,0,0,.6)}
 .pxRunner{position:fixed;left:0;bottom:calc(10px + env(safe-area-inset-bottom));z-index:9980;
   pointer-events:none;width:30px;height:39px;transform:translateX(-80px)}
 .pxRunBody{position:relative;width:30px;height:39px}
@@ -8109,7 +8122,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.7.3.01";
+const APP_VERSION="1.0.7.4.00";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -8888,7 +8901,7 @@ function hangFejlecKattint(){
     /* minden gomb halk kattanást ad — a letiltott nem */
     document.addEventListener("click",ev=>{
       try{const b=ev.target&&ev.target.closest&&ev.target.closest("button");
-        if(b&&!b.disabled&&b.id!=="hangToggle")hang("klikk");}catch(e){}},true);
+        if(b&&!b.disabled&&b.id!=="hangToggle"&&!(typeof _toltoAtenged!=="undefined"&&_toltoAtenged))hang("klikk");}catch(e){}},true);
     document.addEventListener("visibilitychange",()=>{try{hangZeneIgazit();}catch(e){}});
     setInterval(()=>{try{hangZeneIgazit();}catch(e){}},1000);
     const run=()=>{try{hangFejlec();const t=document.getElementById("hangToggle");if(t)t.onclick=hangFejlecKattint;}catch(e){}};
@@ -131301,16 +131314,28 @@ function saveOkNotice(){
      · a fájlba kimentés és az átviteli kód a VISSZAFEJTETT mentést viszi, a
        fájl formátuma tehát nem változott. */
 const MZ_PRE="MZ1~",MZ_MIN=2048;
+/* ⚡ 1.0.7.4.00 — gyorsítva: több bit egyszerre, előre foglalt kimenet, a hosszú
+   egyezés belseje ritkítva indexelve. A formátum VÁLTOZATLAN (a régi és az új
+   kölcsönösen olvassa egymást). Mérve: 57 → 41 ms tömörítés, 28 → 22 ms vissza. */
 function mzPack(s){
-  const n=s.length,out=[];let acc=0,nb=0;
-  /* bitek írása, a legfelső bittől; 15 bit = egy karakter */
-  const put=(v,k)=>{for(let i=k-1;i>=0;i--){acc=(acc<<1)|((v>>>i)&1);if(++nb===15){out.push(acc+32);acc=0;nb=0;}}};
+  const n=s.length;
+  let out=new Uint16Array(Math.max(64,(n>>2)+64)),on=0,acc=0,nb=0;
+  const grow=()=>{const o=new Uint16Array(out.length*2);o.set(out);out=o;};
+  /* több bit egyszerre: legfeljebb 16 bites érték, a 15 bites csomagok határán átvágva */
+  const put=(v,k)=>{
+    while(k>0){
+      const room=15-nb;
+      if(k<room){acc=(acc<<k)|(v&((1<<k)-1));nb+=k;return;}
+      const sh=k-room;
+      acc=(acc<<room)|((v>>>sh)&((1<<room)-1));
+      if(on>=out.length)grow();
+      out[on++]=acc+32;acc=0;nb=0;k=sh;v&=(1<<sh)-1;}};
   const HB=16,HM=(1<<HB)-1,head=new Int32Array(1<<HB).fill(-1),prev=new Int32Array(Math.max(1,n));
   const c=new Uint16Array(n);for(let i=0;i<n;i++)c[i]=s.charCodeAt(i);
   const hash=i=>(((c[i]*2654435761)^(c[i+1]*40503)^(c[i+2]<<7)^(c[i+3]*31))>>>0)&HM;
-  const WIN=(1<<20)-1,MAXL=4096,CH=16;
+  const WIN=(1<<20)-1,MAXL=4096,CH=8;
   const ins=j=>{if(j+3<n){const h=hash(j);prev[j]=head[h];head[h]=j;}};
-  put(n>>>16,16);put(n&0xFFFF,16);   /* fejléc: az eredeti hossz */
+  put(n>>>16,16);put(n&0xFFFF,16);
   let i=0;
   while(i<n){
     let bl=0,bd=0;
@@ -131323,21 +131348,21 @@ function mzPack(s){
           if(l>bl){bl=l;bd=i-j;if(l>=lim)break;}}
         j=prev[j];}}
     if(bl>=4){
-      /* hivatkozás: 1 · hossz−3 Elias-gammával · a távolság bitszáma 5 biten,
-         majd a bitjei a vezető egyes nélkül */
-      put(1,1);
-      const g=bl-3,gb=32-Math.clz32(g);put(0,gb-1);put(g,gb);
-      const db=32-Math.clz32(bd);put(db,5);if(db>1)put(bd,db-1);
-      for(let k=0;k<bl;k++)ins(i+k);
+      const g=bl-3,gb=32-Math.clz32(g);
+      put(1,1);put(0,gb-1);put(g,gb);
+      const db=32-Math.clz32(bd);put(db,5);if(db>1){const r=db-1;if(r>16){put(bd>>>16,r-16);put(bd&0xFFFF,16);}else put(bd,r);}
+      /* a hosszú egyezés belsejét csak ritkítva indexeljük */
+      if(bl<=32){for(let k=0;k<bl;k++)ins(i+k);}
+      else{for(let k=0;k<16;k++)ins(i+k);for(let k=bl-8;k<bl;k++)ins(i+k);}
       i+=bl;}
     else{
-      /* betű: 0 · 0+7 bit (ASCII) vagy 1+16 bit */
-      put(0,1);const x=c[i];
-      if(x<128){put(0,1);put(x,7);}else{put(1,1);put(x,16);}
+      const x=c[i];
+      if(x<128)put(x,9);   /* 0 · 0 · 7 bit */
+      else{put(1,2);put(x,16);}   /* 0 · 1 · 16 bit */
       ins(i);i++;}}
-  if(nb>0)out.push((acc<<(15-nb))+32);
+  if(nb>0){if(on>=out.length)grow();out[on++]=(acc<<(15-nb))+32;}
   let r=MZ_PRE;
-  for(let k=0;k<out.length;k+=8192)r+=String.fromCharCode.apply(null,out.slice(k,k+8192));
+  for(let k=0;k<on;k+=8192)r+=String.fromCharCode.apply(null,out.subarray(k,Math.min(on,k+8192)));
   return r;}
 function mzIs(raw){return typeof raw==="string"&&raw.slice(0,4)===MZ_PRE;}
 /* Nem tömörített bemenetet változatlanul ad vissza. Sérült tömörített alakra
@@ -131346,22 +131371,27 @@ function mzIs(raw){return typeof raw==="string"&&raw.slice(0,4)===MZ_PRE;}
 function mzUnpack(r){
   if(!mzIs(r))return r;
   let p=4,acc=0,nb=0;const L=r.length;
+  const get=k=>{let v=0;
+    while(k>0){
+      if(nb===0){if(p>=L)throw new Error("MZ: csonka adat");acc=r.charCodeAt(p++)-32;nb=15;}
+      const t=k<nb?k:nb;nb-=t;v=(v<<t)|((acc>>>nb)&((1<<t)-1));k-=t;}
+    return v;};
   const bit=()=>{if(nb===0){if(p>=L)throw new Error("MZ: csonka adat");acc=r.charCodeAt(p++)-32;nb=15;}nb--;return (acc>>>nb)&1;};
-  const get=k=>{let v=0;for(let i=0;i<k;i++)v=(v<<1)|bit();return v;};
   const n=get(16)*65536+get(16);
   const c=new Uint16Array(n);let i=0;
   while(i<n){
     if(bit()){
       let z=0;while(!bit()){if(++z>24)throw new Error("MZ: hibás hossz");}
-      let g=1;for(let k=0;k<z;k++)g=(g<<1)|bit();
-      const l=g+3,db=get(5),d=db>1?((1<<(db-1))|get(db-1)):1;
+      const g=z?((1<<z)|get(z)):1;
+      const l=g+3,db=get(5);
+      let d=1;if(db>1){const rr=db-1;d=rr>16?((1<<(db-1))|(get(rr-16)<<16)|get(16)):((1<<(db-1))|get(rr));}
       if(d>i||i+l>n)throw new Error("MZ: hibás hivatkozás");
-      for(let k=0;k<l;k++){c[i]=c[i-d];i++;}}
+      if(d>=l)c.copyWithin(i,i-d,i-d+l);else for(let k=0;k<l;k++)c[i+k]=c[i+k-d];
+      i+=l;}
     else c[i++]=bit()?get(16):get(7);}
   let s="";
-  for(let k=0;k<n;k+=8192)s+=String.fromCharCode.apply(null,c.subarray(k,k+8192));
+  for(let k=0;k<n;k+=8192)s+=String.fromCharCode.apply(null,c.subarray(k,Math.min(n,k+8192)));
   return s;}
-/* A tárolandó alak: tömörített, ha megéri ÉS hibátlanul visszafejthető. */
 function mzForStore(json){
   if(typeof json!=="string"||json.length<MZ_MIN||mzIs(json))return json;
   try{const z=mzPack(json);if(z.length<json.length&&mzUnpack(z)===json)return z;}catch(e){}
@@ -131451,8 +131481,16 @@ function lsIr(key,val){
       try{localStorage.setItem(key,val);_lsHiba=null;return true;}
       catch(e2){_lsHiba=e2;}}
     return false;}}
+/* ⚡ 1.0.7.4.00 — HA A MENTÉS NEM VÁLTOZOTT, NEM ÍRUNK. MÉRVE: egy késői
+   karrier mentése 4× lassított CPU-n ~400–500 ms (csomagolás, tömörítés,
+   ellenőrzés), és a képernyőváltások jó része (HUB megnyitása, vissza a
+   szezonhoz) semmit nem változtat a mentett állapoton. A JSON összevetése
+   ennek töredéke; a tárolt alak ugyanaz marad. */
+const _saveUtolso={};
 function saveWrite(key,json){
-  if(lsIr(key,mzForStore(json))){saveOkNotice();return true;}
+  try{if(_saveUtolso[key]===json&&localStorage.getItem(key)!=null){saveOkNotice();return true;}}catch(e){}
+  if(lsIr(key,mzForStore(json))){_saveUtolso[key]=json;saveOkNotice();return true;}
+  delete _saveUtolso[key];
   saveFailNotice(_lsHiba);return false;}
 /* Egyszer betöltésenként, az első csendes pillanatban: a régi, nyers
    mentések összenyomása. Nem a mentés útjában fut, és nem a rajtnál. */
@@ -139223,6 +139261,127 @@ function pxRunPass(){
 window.addEventListener("scroll",pxIdleReset,{capture:true,passive:true});
 document.addEventListener("visibilitychange",()=>{if(document.hidden)pxIdleReset();});
 setTimeout(()=>{try{pxBoot();}catch(e){}try{pxIdleReset();}catch(e){}},30);
+/* ================= ⚽ A DEKÁZÓ TÖLTŐ (1.0.7.4.00) =================
+   KIMONDOTT KÉRÉS: „…ahol elkerülhetetlen, hogy legyen 200ms-nél hosszabb
+   töltési idő, ott a kis figuránk, aki idle módban alul el szokott futni, ő
+   ugorjon be a képernyő közepére, a háttér kicsit homályosodjon el, és kezdjen
+   dekázni. Legyen inkább hosszabb a várakozás, akkor 1000-2000ms, de közben
+   legyen egy kis animáció, mint hogy legyen egy kellemetlen, laggolás érzést
+   keltő 3-500ms időtartam. […] »Ugrás a HUB«-ba, »Irány a szezon«, »Irány a
+   … kupa« gombokra mindenképp legyen rákötve, és keressünk még olyanokat, amik
+   hajlamosak 200ms fölé vinni a framefreeze-t."
+   MÉRVE (3. idényes karrier, 4× lassított CPU ≈ közepes telefon):
+     · „Ugrás a HUB-ba": 760–1000 ms fagyás (a HUB kirajzolása 600–700 ms),
+       és UTÁNA még egy 450–500 ms-os, amikor a halasztott mentés lefutott —
+       épp, amikor görgetnél;
+     · „← Vissza a szezonhoz": ~50 ms.
+   HOGYAN:
+     1. A KATTINTÁST ELFOGJUK (capture fázis, a dokumentumon): ha a gomb
+        nehéz, a kattintás megáll, beugrik a töltő, és KÉT KÉPKOCKA MÚLVA — ha
+        már kirajzolódott — ugyanaz a gomb újra „megnyomódik" (el.click()), a
+        saját kezelőivel, változatlanul. A figura mozgása a kompozitor-szálon
+        fut (transform, opacity), tehát a nehéz munka alatt sem akad meg.
+     2. A HALASZTOTT MENTÉS a töltő alatt fut le (saveGameFlush), nem utána,
+        görgetés közben.
+     3. A töltő legalább 1 mp-ig látszik (TOLTO_MIN): egy rövid villanás
+        rosszabb, mint egy nyugodt, rövid jelenet.
+     4. KIT ÉRINT: a megnevezett képernyőváltó gombok (TOLTO_MINDIG) — és
+        MINDEN gomb, amelyiknél a mérés (a kattintástól a következő kirajzolt
+        képkockáig) 200 ms fölött járt. A mérés gombonként tanul (mozgó átlag,
+        localStorage), tehát egy gyors gépen a töltő elmarad, ahol nem kell,
+        egy lassú telefonon pedig magától megjelenik ott is, ahova senki nem
+        gondolt.
+   KIVÉTEL: a fájlválasztó, a vágólap, a hang és a teljes képernyő gombjai
+   (a böngésző ott a közvetlen koppintást kéri), és amit data-notolto jelöl. */
+const TOLTO_MIN=1000,TOLTO_KUSZOB=200,TOLTO_GYORS=150,TOLTO_KEY="toltoMs30_0";
+const TOLTO_MINDIG=new Set(["matchHubBtn","euroHubBtn","hubNextSeasonBtn","hubNextSeasonBtn2","simGo","euroKickBtn","absHubBtn"]);
+const TOLTO_TILT=/^(storeImpBtn|storeImpFile|hangToggle|fsBtn|hcmCopyBtn|xferCopy|kickBtn|autoBtn)$/;
+var _toltoAtenged=false;   /* var: a hang-figyelő a fájl elején olvassa */
+let _toltoMsMem=null,_toltoAktiv=false,_toltoMeres=null;
+function toltoMsAll(){
+  if(_toltoMsMem)return _toltoMsMem;
+  try{_toltoMsMem=JSON.parse(localStorage.getItem(TOLTO_KEY)||"{}")||{};}catch(e){_toltoMsMem={};}
+  return _toltoMsMem;}
+function toltoRogzit(k,ms){
+  if(!k||!(ms>=0))return;
+  const M=toltoMsAll(),r=M[k];
+  M[k]=Math.round(r==null?ms:(r*0.5+ms*0.5));
+  /* legfeljebb 120 gomb — a legrégebbiek kiesnek */
+  const ks=Object.keys(M);if(ks.length>120)delete M[ks[0]];
+  try{localStorage.setItem(TOLTO_KEY,JSON.stringify(M));}catch(e){}}
+/* a kulcs: az azonosító ÉS a felirat (a számok nélkül). Ugyanaz a gomb más
+   felirattal mást csinál — a hubNextSeasonBtn egyszer „← Vissza a szezonhoz"
+   (gyors), máskor „Irány a pályára →" (a nyárzárás); a közös megerősítő ablak
+   „Igen" gombja is sokféle műveletet indít. */
+function toltoKulcs(el){
+  const t=String(el.textContent||"").replace(/\s+/g," ").replace(/\d+([.,]\d+)?/g,"#").trim().slice(0,32);
+  if(!el.id&&!t)return null;
+  return (el.id||"")+"|"+t;}
+function toltoKell(el,k){
+  const ms=toltoMsAll()[k];
+  if(TOLTO_MINDIG.has(el.id))return ms==null||ms>TOLTO_GYORS;
+  return ms!=null&&ms>TOLTO_KUSZOB;}
+/* a jelenet: homályos háttér, a figura beugrik középre, és dekázik */
+function toltoMutat(){
+  let o=document.getElementById("toltoRet");
+  if(!o){
+    o=document.createElement("div");o.id="toltoRet";o.setAttribute("aria-hidden","true");
+    o.innerHTML=`<div class="toltoFig"><div class="toltoTest">${pxGridSvg(PX_RUN[0],"toltoF0")}${pxGridSvg(PX_RUN[1],"toltoF1")}</div>`
+      +`<div class="toltoLabda">${pxGridSvg(PX_BALL,"toltoL")}</div><i class="toltoArny"></i></div><div class="toltoSzoveg">Pillanat…</div>`;
+    document.body.appendChild(o);}
+  o.classList.remove("ki");o.classList.add("be");
+  const fig=o.querySelector(".toltoFig"),lab=o.querySelector(".toltoLabda"),f0=o.querySelector(".toltoF0"),f1=o.querySelector(".toltoF1");
+  try{o.getAnimations({subtree:true}).forEach(a=>a.cancel());}catch(e){}
+  try{
+    o.animate([{opacity:0},{opacity:1}],{duration:160,fill:"forwards"});
+    /* a beugrás: lentről, ívben, egy kis landolással */
+    fig.animate([{transform:"translate(0,46vh) scale(.7)"},{transform:"translate(0,-34px) scale(1.05)",offset:.62},
+      {transform:"translate(0,6px) scale(1,.94)",offset:.84},{transform:"translate(0,0) scale(1)"}],
+      {duration:420,easing:"ease-out",fill:"forwards"});
+    /* dekázás: a labda a fej fölé pattog, a rúgó láb váltakozik */
+    lab.animate([{transform:"translate(0,0)"},{transform:"translate(0,-70px)",offset:.5},{transform:"translate(0,0)"}],
+      {duration:620,delay:380,iterations:Infinity,easing:"cubic-bezier(.33,.0,.67,1)"});
+    f0.animate([{opacity:1},{opacity:0}],{duration:620,delay:380,iterations:Infinity,easing:"steps(2,jump-none)"});
+    f1.animate([{opacity:0},{opacity:1}],{duration:620,delay:380,iterations:Infinity,easing:"steps(2,jump-none)"});
+  }catch(e){}
+  return o;}
+function toltoRejt(){
+  const o=document.getElementById("toltoRet");if(!o)return;
+  try{const a=o.animate([{opacity:1},{opacity:0}],{duration:200,fill:"forwards"});
+    a.onfinish=()=>{o.classList.remove("be");o.classList.add("ki");try{o.getAnimations({subtree:true}).forEach(x=>x.cancel());}catch(e){}};}
+  catch(e){o.classList.remove("be");o.classList.add("ki");}}
+/* egy nehéz művelet a töltő alatt (gombon kívül is hívható: toltoFut(fn)) */
+function toltoFut(fn,k,min){
+  if(_toltoAktiv){try{fn();}catch(e){console.warn(e);}return;}
+  _toltoAktiv=true;
+  const t0=performance.now();
+  try{toltoMutat();}catch(e){}
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const t1=performance.now();
+    try{fn();}catch(e){try{console.warn("MAGYAH: töltő alatti művelet —",e);}catch(_){}}
+    /* a halasztott mentés MOST, a töltő alatt — nem görgetés közben */
+    try{saveGameFlush();}catch(e){}
+    requestAnimationFrame(()=>setTimeout(()=>{
+      const most=performance.now();
+      if(k)toltoRogzit(k,most-t1);
+      const marad=Math.max(0,(min||TOLTO_MIN)-(most-t0));
+      setTimeout(()=>{_toltoAktiv=false;toltoRejt();},marad);},0));}));}
+document.addEventListener("click",ev=>{
+  if(_toltoAtenged||!ev.isTrusted)return;
+  let el=null;try{el=ev.target&&ev.target.closest&&ev.target.closest("button,.hubCard,.mpRoomChip,[role=button]");}catch(e){el=null;}
+  if(!el||el.disabled||el.closest("[data-notolto]")||TOLTO_TILT.test(el.id||""))return;
+  if(el.closest("#toltoRet"))return;
+  const k=toltoKulcs(el);if(!k)return;
+  if(_toltoAktiv){ev.stopImmediatePropagation();ev.preventDefault();return;}   /* a töltő alatt nem nyomunk mást */
+  if(!toltoKell(el,k)){
+    /* közvetlenül fut — de mérjük: a kattintástól a következő kirajzolt képkockáig */
+    const t0=performance.now();
+    requestAnimationFrame(()=>setTimeout(()=>{toltoRogzit(k,performance.now()-t0);},0));
+    return;}
+  ev.stopImmediatePropagation();ev.preventDefault();
+  toltoFut(()=>{
+    _toltoAtenged=true;
+    try{if(el.isConnected&&!el.disabled)el.click();}finally{_toltoAtenged=false;}},k);},true);
 /* ================= 🔭 VALÓSÁGHŰ SCOUT — A KAPCSOLÓ (3.9.206) =================
    A futó karrierre szól (S.scoutReal); az új karrier a legutóbbi választást
    örökli (localStorage). A mechanikát lásd lentebb: scoutReal… */
