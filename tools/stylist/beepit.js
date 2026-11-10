@@ -30,7 +30,8 @@
 
    ✏️ 1.0.7.2.00 — A NÉVCSERE ugyanezen az ágon jön (v:3, a név "nev:"
    előtaggal, a kulcs a "nev:<kanonikus név>" hash-e, d = {"f":"<új név>"}
-   vagy "" = törlés). A NEV-ALAP:KEZD … NEV-ALAP:VEG blokkba kerül, kanonikus
+   vagy "" = törlés; 1.0.7.5.00 óta {"f","r"} — a rövid név is, akkor a
+   bejegyzés [f,r], és az f lehet üres, ha csak a rövid név változott). A NEV-ALAP:KEZD … NEV-ALAP:VEG blokkba kerül, kanonikus
    név szerint (mint az ARC_ALAP). Szűrés: a kanonikus név a játékban LÉTEZŐ
    magyarított név (HU_NAME_TABLE kulcsa); a név a játék stylistNevTisztit-
    jével azonos szabály (2–40 karakter, legalább egy betű, vezérlő- és
@@ -65,11 +66,21 @@ function nevTisztit(v){
   if(t.length<2||t.length>40)return "";
   if(!/\p{L}/u.test(t))return "";
   return t;}
-/* a HU_NAME_TABLE: kanonikus → beépített magyar név */
+/* a RÖVID név (1.0.7.5.00): ugyanaz a szabály, legfeljebb 20 karakter */
+function rovTisztit(v){const t=nevTisztit(v);return (t&&t.length<=20)?t:"";}
+/* a HU_NAME_TABLE: kanonikus → beépített magyar név (és a rövid alak) */
+const HUR=new Map();
 function huTabla(src){
-  const m=new Map();const re=/\n "((?:[^"\\]|\\.)+)":\["((?:[^"\\]|\\.)*)","/g;let x;
-  while((x=re.exec(src)))m.set(JSON.parse(`"${x[1]}"`),JSON.parse(`"${x[2]}"`));
+  /* CSAK a HU_NAME_TABLE blokkja — a NEV-ALAP bejegyzései ([f,r]) ugyanilyen
+     alakúak, és különben a beépített névnek látszanának */
+  const i=src.indexOf("const HU_NAME_TABLE={"),j=i<0?-1:src.indexOf("\n};",i);
+  if(i<0||j<0)throw new Error("Nem találom a HU_NAME_TABLE táblát az index.html-ben.");
+  src=src.slice(i,j+1);
+  const m=new Map();const re=/\n "((?:[^"\\]|\\.)+)":\["((?:[^"\\]|\\.)*)","((?:[^"\\]|\\.)*)"\]/g;let x;
+  while((x=re.exec(src))){const k=JSON.parse(`"${x[1]}"`);m.set(k,JSON.parse(`"${x[2]}"`));HUR.set(k,JSON.parse(`"${x[3]}"`));}
   return m;}
+/* a védett lista egy bejegyzésének teljes neve (szöveg vagy [f,r]) */
+const nevF=v=>Array.isArray(v)?String(v[0]||""):String(v||"");
 
 function keres(url,o){
   return new Promise((res,rej)=>{
@@ -210,15 +221,21 @@ function blokkIr(tabla){
   const N=Object.assign({},NB.tabla);let nuj=0,nmod=0,ntorolt=0;
   const nevSor=[...nevLeg.entries()].sort((x,y)=>x[1].at-y[1].at);
   for(const [kan,t] of nevSor){
-    let f="";if(t.d){try{const o=JSON.parse(t.d);f=nevTisztit(o&&o.f);}catch(e){f="";}if(!f){elvetett++;continue;}}
+    let f="",r="";
+    if(t.d){let o=null;try{o=JSON.parse(t.d);}catch(e){o=null;}
+      if(!o||typeof o!=="object"){elvetett++;continue;}
+      const fn=String(o.f||"").trim(),rn=String(o.r||"").trim();
+      f=fn?nevTisztit(fn):"";r=rn?rovTisztit(rn):"";
+      if((fn&&!f)||(rn&&!r)||(!f&&!r)){elvetett++;continue;}}
     if(f&&f===HU.get(kan))f="";
+    if(r&&r===HUR.get(kan))r="";
     if(f){const F=f.toLowerCase();let utk=false;
-      for(const [k2,h2] of HU){if(k2===kan)continue;if(String(N[k2]||h2).toLowerCase()===F){utk=true;break;}}
+      for(const [k2,h2] of HU){if(k2===kan)continue;if(String(nevF(N[k2])||h2).toLowerCase()===F){utk=true;break;}}
       if(utk){elvetett++;continue;}}
-    const volt=N[kan];
-    if(!f){if(volt!==undefined){delete N[kan];ntorolt++;}continue;}
-    if(volt===undefined)nuj++;else if(volt!==f)nmod++;
-    N[kan]=f;}
+    const volt=N[kan],ertek=r?[f,r]:f;
+    if(!f&&!r){if(volt!==undefined){delete N[kan];ntorolt++;}continue;}
+    if(volt===undefined)nuj++;else if(JSON.stringify(volt)!==JSON.stringify(ertek))nmod++;
+    N[kan]=ertek;}
   if(Object.keys(N).length>MAX_NEV)throw new Error(`Túl sok név (${Object.keys(N).length}) — gyanús, nem írom be.`);
   const valtA=JSON.stringify(T)!==regi,valtM=JSON.stringify(M)!==mregi,valtN=JSON.stringify(N)!==nregi,valt=valtA||valtM||valtN;
   const uzenet=`🌍 Stylist-lista: ${Object.keys(T).length} játékos (+${uj} új, ${mod} módosult, ${torolt} törölve) · 🎽 ${Object.keys(M).length} mez (+${muj} új, ${mmod} módosult, ${mtorolt} törölve) · ✏️ ${Object.keys(N).length} név (+${nuj} új, ${nmod} módosult, ${ntorolt} törölve)`;
