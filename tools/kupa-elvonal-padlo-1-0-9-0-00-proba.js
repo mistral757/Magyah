@@ -3,7 +3,7 @@
    NBI-ben. Ez így irreálisan könnyű."
    Amit mér:
      1. D3-as, első idényes karrier: a KK mezőnye (⚡, a pályán) = a létra D1
-        sora +2; OJK −1, KONF −4, HSZ +2 — és mind erősebb, mint a hozzád mért régi;
+        sora +2; OJK −1, KONF −4; HSZ = a saját osztály −1 (D2) +2 — és mind erősebb, mint a hozzád mért régi;
      2. a hazai kupák (MK, FA) és a felkészülési kupa nem változnak;
      3. túlnőtt keret (jóval a D1 fölött): a padló nem szól bele, a régi
         hozzád mért szabály marad;
@@ -61,6 +61,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const lad=document.createElement("div");lad.innerHTML=pyrLadderHtml();
     const sor=[...lad.querySelectorAll(".pyrRung")].find(x=>x.querySelector(".n").textContent==="D"+ki.top);
     ki.lada=sor?parseFloat(sor.querySelector("b").textContent.replace(",",".")):null;
+    /* HSZ: a saját osztály fölötti (D2) sor */
+    const sor2=[...lad.querySelectorAll(".pyrRung")].find(x=>x.querySelector(".n").textContent==="D"+(ki.div-1));
+    ki.lada2=sor2?parseFloat(sor2.querySelector("b").textContent.replace(",",".")):null;
+    ki.d2=cupDivMostMs(ki.div-1);
+    /* a csúcs fölötti, még nem létező osztály: a legfelső + egy lépcső */
+    const T=pyrDivs().find(x=>x.id===pyrTopId());
+    ki.d0=cupDivMostMs(pyrTopId()-1);
+    ki.d0vart=oppMatchStrength(T.mean+pyrLepcso()+pyrAiRate(T.id)*(S.idx||0)/30+pyrVilagEmeles());
     const ms=c=>{const m=euroMidRating(c)+((EURO_COMPS[c]&&EURO_COMPS[c].oppDelta)||0);return {t:m,ms:Math.round((m+k)*10)/10,last:_cupLast&&_cupLast.comp===c?{rel:_cupLast.rel,aktiv:_cupLast.aktiv}:null};};
     ki.lent={};["BL","HSZ","EL","KL","MK","FA","NYK"].forEach(c=>{if(EURO_COMPS[c])ki.lent[c]=ms(c);});
     /* 3. túlnőtt keret: 30 ponttal a D1 fölött */
@@ -80,7 +88,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.div===3,"D3-as karrier",r.div);
   ok(r.lada!=null&&near(r.lada,r.d1,0.1),"a padló alapja = a létra D1 sora",{lada:r.lada,d1:r.d1});
   ok(near(r.lent.BL.ms,r.d1+2)&&r.lent.BL.last.aktiv,"1. KK = D1 + 2 (⚡, a pályán)",{kk:r.lent.BL.ms,d1:r.d1});
-  ok(r.lent.HSZ&&near(r.lent.HSZ.ms,r.d1+2),"1. HSZ = D1 + 2",r.lent.HSZ);
+  ok(r.lada2!=null&&near(r.lada2,r.d2,0.1),"1. a HSZ-padló alapja = a létra D2 sora (a saját osztályod −1)",{lada2:r.lada2,d2:r.d2});
+  ok(r.lent.HSZ&&near(r.lent.HSZ.ms,r.d2+2),"1. HSZ = a saját osztály fölötti (D2) + 2",{hsz:r.lent.HSZ,d2:r.d2});
+  ok(r.d0!=null&&near(r.d0,r.d0vart,0.01)&&r.d0>r.d1,"1. a csúcson: a fölötte nyíló osztály (D0) = a legfelső + egy lépcső",{d0:r.d0,vart:r.d0vart,d1:r.d1});
   ok(near(r.lent.EL.ms,r.d1-1),"1. OJK = D1 − 1",r.lent.EL);
   ok(near(r.lent.KL.ms,r.d1-4),"1. KONF = D1 − 4",r.lent.KL);
   ok(r.lent.BL.ms>r.lent.EL.ms&&r.lent.EL.ms>r.lent.KL.ms,"1. a rangsor: KK > OJK > KONF");

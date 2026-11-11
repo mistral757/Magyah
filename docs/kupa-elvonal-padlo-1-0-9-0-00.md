@@ -32,7 +32,7 @@ lépő mezőnyre vonatkozik, ⚡-ban:
 | sorozat | padló |
 |---|---|
 | Kupák Kupájának Kupája (KK) | D1 **+2** |
-| Hiper Szuper Kupa (HSZ) | D1 **+2** |
+| Hiper Szuper Kupa (HSZ) | a **saját osztályod −1** (pl. D0-ból a D−1) **+2** — 1.0.9.0.01 |
 | Ojrópai Klubcsapatok Bajnoki Kupája (OJK) | D1 **−1** |
 | Konföranszié Líg (KONF) | D1 **−4** (≈ a D2 szintje) |
 
@@ -55,6 +55,19 @@ ugyanabból a függvényből (`euroMidRating`) jön.
 **A kupa-képernyő kiírja**, ha a padló döntött: az élvonal ⚡-ját a
 nevezéskor, az eltolást, és hogy mennyi lett volna a hozzád mért mérce.
 
+## 1.0.9.0.01 — a HSZ a saját osztályod fölöttihez mér
+
+> „Hsz padló az a játékos aktuális divíziója −1, azaz pl. D0-ában van, akkor
+> D−1 szintje, és ahhoz adjuk a +2-t."
+
+A HSZ padlója nem az élvonal, hanem a **saját osztályod fölötti osztály**
+mostani meccs-ereje +2. Ugyanaz a szám, ami a létrán annak az osztálynak a
+sorában áll.
+
+**Ha te vagy a csúcson**, és fölötted még nincs osztály, a fölötte nyíló
+osztály szintjével számol: a legfelső osztály közepe + egy lépcső
+(`pyrLepcso`), a legfelső saját ütemével (`cupDivMostMs`).
+
 ## Megjegyzés
 
 A 3.9.175 kérése a KK-t a nyári kupához képest legfeljebb +2-re korlátozta.
@@ -66,7 +79,9 @@ erősebb lehet nálad, ahogy egy valódi elit-sorozatban.
 `tools/kupa-elvonal-padlo-1-0-9-0-00-proba.js`:
 
 - **D3-as első idény:**
-  - KK = D1+2, HSZ = D1+2, OJK = D1−1, KONF = D1−4;
+  - KK = D1+2, OJK = D1−1, KONF = D1−4;
+  - HSZ = D2+2 (a saját osztály −1);
+  - a csúcs fölötti osztály = a legfelső + egy lépcső;
   - a padló alapja azonos a létra D1 sorával.
 - **Hazai kupák:** változatlanok.
 - **Túlnőtt keret:** a régi mérce marad.
