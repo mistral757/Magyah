@@ -2,7 +2,8 @@
    Amit mér:
      1. a Szinergia (pár, szint, váltás) és a többi tartós jelző túléli a
         mentést és a visszatöltést (eddig a S.szin kimaradt a mentésből);
-     2. stylist-mód nélkül nincs ✏️; stylist-módban az adatlapon ott a gomb;
+     2. a ✏️ minden játékosnál ott van: stylist nélkül a saját (helyi) teljes és
+        rövid név, stylistnál a közös lista (1.0.7.5.00);
      3. a névcsere azonnal hat (teljes és rövid név), sorba áll a feltöltésre
         (v:3, "nev:" előtag, a kulcs a név hash-e), a törlés visszaadja az alapot;
      4. a szabály: tiltott jelek, hossz, betű, ütközés egy másik játékos nevével;
@@ -87,6 +88,15 @@ const karrier=()=>{
     const loc={type:"slot",idx:slots.findIndex(s=>s.player===jp),p:jp};
     stylistSet(false);
     plSheetRender(loc);o.gombNelkul=!!$("plSheetHead").querySelector("[data-nevedit]");
+    o.cimNelkul=($("plSheetHead").querySelector("[data-nevedit]")||{}).title||"";
+    /* ✏️ 1.0.7.5.00 — stylist nélkül a SAJÁT név (teljes + rövid), csak helyben */
+    window.lbInit=async()=>({mode:"off"});
+    $("plSheetHead").querySelector("[data-nevedit]").click();
+    o.sajatAblak=/csak a te gépeden/.test($("hubTacticConfirmBody").textContent)&&!!$("stRovInp");
+    $("stNevInp").value="Saját Elek";$("stRovInp").value="Elek";
+    $("hubTacticConfirmYes").click();
+    o.sajat={f:fullName(n),r:shortName(n),sor:stylistSor().filter(x=>x.n==="nev:"+n).length};
+    huUserSet(n,"");huUserRovidSet(n,"");
     stylistSet(true);
     plSheetRender(loc);o.gombVan=!!$("plSheetHead").querySelector("[data-nevedit]");
     /* a feltöltés hálózat nélkül: a sor marad */
@@ -94,7 +104,7 @@ const karrier=()=>{
     /* az ablak */
     $("plSheetHead").querySelector("[data-nevedit]").click();
     o.ablak=!!$("stNevInp")&&!$("hubTacticConfirmModal").classList.contains("hide");
-    $("stNevInp").value="  Próba   Péter ";
+    $("stNevInp").value="  Próba   Péter ";$("stRovInp").value="";
     $("hubTacticConfirmYes").click();
     o.teljes=fullName(n);o.rovid=shortName(n);
     o.lapon=($("plSheetName")||{}).textContent||"";
@@ -108,6 +118,11 @@ const karrier=()=>{
     o.utkNev=fullName(n);
     o.nemListas=stylistNevSet("Nincs Ilyen Játékos 123","Valaki").ok;
     stylistNevSet(n,"Próba Péter");
+    /* ✏️ 1.0.7.5.00 — a közös RÖVID név */
+    stylistNevSet(n,"Próba Péter","Pepe");o.kozosRovid={r:shortName(n),f:fullName(n),
+      d:(stylistSor().find(x=>x.n==="nev:"+n)||{}).d};
+    o.rovidTilt=stylistNevSet(n,"Próba Péter","x".repeat(21)).ok;
+    stylistNevSet(n,"Próba Péter","");
     /* valós nevek módja */
     setHuNames(false);o.valos=fullName(n);setHuNames(true);
     /* törlés: vissza az alapra */
@@ -119,6 +134,9 @@ const karrier=()=>{
     o.export={stylist:{uidA:{}}};
     stylistSor().forEach(x=>{o.export.stylist.uidA[x.k]={v:x.v||1,at:x.at,app:APP_VERSION,n:x.n,d:x.d};});
     /* egy hamis feltöltés: nem létező név, rossz kulcs, tiltott név */
+    /* ✏️ 1.0.7.5.00 — egy másik játékos: csak a rövid neve változik */
+    const harmadik=Object.keys(HU_NAME_TABLE).find(k=>k!==n&&k!==masik);o.harmadik=harmadik;
+    o.export.stylist.uidC={[stylistKulcs("nev:"+harmadik)]:{v:3,at:Date.now(),n:"nev:"+harmadik,d:JSON.stringify({f:"",r:"Rövidke"})}};
     o.export.stylist.uidB={
       [stylistKulcs("nev:Nincs Ilyen")]:{v:3,at:Date.now(),n:"nev:Nincs Ilyen",d:JSON.stringify({f:"Hamis"})},
       "hrossz":{v:3,at:Date.now(),n:"nev:"+masik,d:JSON.stringify({f:"Rossz Kulcs"})},
@@ -126,7 +144,10 @@ const karrier=()=>{
     o.masik=masik;
     return o;});
   console.log("\n— 2–5. a névcsere —");
-  ok(!r2.gombNelkul&&r2.gombVan,"✏️ csak stylist-módban, az adatlapon a név mellett",[r2.gombNelkul,r2.gombVan]);
+  ok(r2.gombNelkul&&r2.gombVan&&/csak a te gépeden/.test(r2.cimNelkul),"✏️ minden játékosnál ott van; stylist nélkül a saját (helyi) átnevezés",[r2.gombNelkul,r2.gombVan,r2.cimNelkul]);
+  ok(r2.sajatAblak&&r2.sajat.f==="Saját Elek"&&r2.sajat.r==="Elek"&&r2.sajat.sor===0,"stylist nélkül: a teljes és a rövid név is átírható, csak helyben (a közös sorba nem kerül)",r2.sajat);
+  ok(r2.kozosRovid.r==="Pepe"&&r2.kozosRovid.f==="Próba Péter"&&/"r":"Pepe"/.test(r2.kozosRovid.d||""),"a stylist a RÖVID nevet is a közös listára küldi",r2.kozosRovid);
+  ok(r2.rovidTilt===false,"a rövid név legfeljebb 20 karakter");
   ok(r2.ablak,"a gomb megnyitja a név-ablakot");
   ok(r2.teljes==="Próba Péter"&&/Próba Péter/.test(r2.lapon),"a név azonnal hat (a szóközök összevonva), az adatlap is mutatja",[r2.teljes,r2.lapon]);
   ok(r2.rovid==="Péter"||r2.rovid==="Próba","a rövid alak a névből jön (a nemzetiség szerinti szó)",r2.rovid);
@@ -149,8 +170,8 @@ const karrier=()=>{
   const m=/\/\*NEV-ALAP:KEZD\*\/([\s\S]*?)\/\*NEV-ALAP:VEG\*\//.exec(uj);
   let tabla=null;try{tabla=JSON.parse(m[1]);}catch(e){}
   console.log("\n— 6. a napi beépítés —");
-  ok(/✏️ 1 név/.test(ki),"a beépítés egy nevet vett át",ki.trim());
-  ok(tabla&&tabla[r2.n]==="Próba Péter"&&Object.keys(tabla).length===1,"a NEV_ALAP blokkban a név; a hamis, a rossz kulcsú és az ütköző feltöltés elvetve",tabla);
+  ok(/✏️ 2 név/.test(ki),"a beépítés két nevet vett át",ki.trim());
+  ok(tabla&&tabla[r2.n]==="Próba Péter"&&JSON.stringify(tabla[r2.harmadik])==='["","Rövidke"]'&&Object.keys(tabla).length===2,"a NEV_ALAP blokkban a név és egy csak-rövid-név bejegyzés ([\"\",\"Rövidke\"]); a hamis, a rossz kulcsú és az ütköző feltöltés elvetve",tabla);
   /* a második futás nem változtat */
   let ki2="";try{ki2=cp.execFileSync("node",[path.join(ROOT,"tools/stylist/beepit.js"),"--fajl",exp,"--html",html],{encoding:"utf8"});}catch(e){ki2="HIBA";}
   ok(/nincs változás/.test(ki2),"újrafuttatva nincs változás (idempotens)",ki2.trim());
@@ -160,9 +181,10 @@ const karrier=()=>{
   await p2.addInitScript(()=>{window.HANG_TESZT=true;});
   await p2.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});await p2.waitForTimeout(1200);
   await p2.waitForFunction(()=>typeof stylistNevFor==="function",null,{timeout:15000});
-  const r6=await p2.evaluate(n=>{try{localStorage.removeItem(STYLIST_NEV_KEY);}catch(e){}_stNev=null;stylistSet(false);
-    return {nev:fullName(n),van:NEV_ALAP[n]};},r2.n);
+  const r6=await p2.evaluate(([n,h])=>{try{localStorage.removeItem(STYLIST_NEV_KEY);}catch(e){}_stNev=null;stylistSet(false);
+    return {nev:fullName(n),van:NEV_ALAP[n],hR:shortName(h),hF:fullName(h),hAlap:HU_NAME_TABLE[h][0]};},[r2.n,r2.harmadik]);
   ok(r6.nev==="Próba Péter","a beépített listával mindenkinél ez a név (stylist nélkül is)",r6);
+  ok(r6.hR==="Rövidke"&&r6.hF===r6.hAlap,"a csak-rövid-név bejegyzés: a rövid név változik, a teljes az alap marad",r6);
   await p2.close();
   try{fs.rmSync(tmp,{recursive:true,force:true});}catch(e){}
 

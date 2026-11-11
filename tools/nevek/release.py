@@ -141,6 +141,17 @@ if n_pass != 1:
 #  a megjelenítési rétegből és az adatbázisból generálódik, tehát nincs mit
 #  lecserélni rajta.)
 
+# ── 5b. A VALÓDI KLUBKÓDOK (1.0.7.4.02) ───────────────────────────────────────
+# A CLUB_ABBR a valós nevű mód kódjait tartja (PSV, BVB, ATM…). A kiadott
+# buildben a valós nevű mód nem kapcsolható be, tehát a tábla sosem jelenik
+# meg — de a forrásban ne is legyen: a kódokat a magyarított tábla adja.
+# A tábla „…"Blackpool FC":"BLK"};" alakban zárul (nem új sorban), tehát a
+# minta az ELSŐ „};"-nél áll meg — egy „\n};" a mögötte álló BIRTH_YEAR-t is
+# elnyelné. Az értékek és a kulcsok nem tartalmaznak „}"-t.
+s, n_abbr = re.subn(r'const CLUB_ABBR=\{[^}]*\};', 'const CLUB_ABBR={};', s, count=1)
+if n_abbr != 1:
+    raise SystemExit("nem találom a CLUB_ABBR táblát")
+
 # ── 6. KOMMENTEK ───────────────────────────────────────────────────────────
 # 2600+ kommentben szerepel valós név. A kommentek eltávolítása
 # string-, sablon- és regex-tudatos: egy naiv regex a szövegek belsejét is
