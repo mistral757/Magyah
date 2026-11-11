@@ -175,7 +175,11 @@ const srv=http.createServer((req,rp)=>{
     /* 3.9.175: a régi D1+2-es padló helyett a Nyári Kupa bázisa + sáv. A KK
        vonatkoztatási mezőnye az élvonal: a jóval erősebb D1 a KK-t a sávja
        TETEJÉRE viszi (bázis + 2), a hazai kupa sosem megy a bázis fölé. */
-    out.bl_padlo_szol=(out.bl.gyenge_BL===out.bl.nyk+2);
+    /* 🏆 1.0.9.0.00: a nemzetközi kupáknak újra van élvonal-padlója (D1 + 2, a
+       pályán) — a mezőny a kettő közül a nagyobb */
+    {let _pd=null;try{_pd=cupPadloFor("BL");}catch(e){_pd=null;}
+     out.bl.padlo=_pd?_pd.t:null;
+     out.bl_padlo_szol=(out.bl.gyenge_BL===Math.max(out.bl.nyk+2,_pd?_pd.t:-1e9));}
     out.bl_csak_a_bl=(out.bl.gyenge_MK<=out.bl.nyk);
     /* A SOROZATOK RANGSORA A PÁLYÁN: a BL a legerősebb mezőny, a hazai kupa a
        leggyengébb. Ezt az EURO_EDGE.add viszi; a próba azért méri, mert a
@@ -227,7 +231,7 @@ const srv=http.createServer((req,rp)=>{
     ["az AI-ütem a szuperligákban nem extrapolál",r.utem_nem_szalad===true],
     ["a bajnok a szokásos úton jut fel az ÚJ osztályba",r.feljutott===true],
     ["a világ létszáma ép marad a cserével",r.letszam_ep===true],
-    ["gyenge kerettel (erős élvonal) a KK: Nyári Kupa + 2",r.bl_padlo_szol===true],
+    ["gyenge kerettel (erős élvonal) a KK: max(Nyári Kupa + 2, élvonal-padló)",r.bl_padlo_szol===true],
     ["…a hazai kupa sosem a bázis fölött",r.bl_csak_a_bl===true],
     ["erős kerettel is a KK: Nyári Kupa + 2 (3.9.262 — a bajnokság ereje nem számít)",r.bl_szamitott_veszi_at===true],
     ["a pályán a BL a legerősebb mezőny, a hazai kupa a leggyengébb",r.rangsor_helyes===true],

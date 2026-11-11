@@ -102,7 +102,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   /* ---- 2. KUPÁK EREJE ---- */
   console.log("\n— 2. kupák ereje: Nyári Kupa + sorozatsáv —");
   const k=await p.evaluate(()=>{
-    const palya=c=>euroMidRating(c)+((EURO_COMPS[c]&&EURO_COMPS[c].oppDelta)||0);
+    /* 🏆 1.0.9.0.00: a hozzád mért mércét mérjük (a nemzetközi kupák élvonal-
+       padlóját a tools/kupa-elvonal-padlo-1-0-9-0-00-proba.js őrzi) */
+    const palya=c=>{const v=euroMidRating(c)+((EURO_COMPS[c]&&EURO_COMPS[c].oppDelta)||0);
+      return (typeof _cupLast!=="undefined"&&_cupLast&&_cupLast.comp===c)?_cupLast.rel:v;};
     const C=["MK","FA","KL","EL","BL"];
     const nyk=nykMidMine();
     const meres=()=>{const o={};C.forEach(c=>{o[c]=palya(c)-nyk;});return o;};
