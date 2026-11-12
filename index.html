@@ -8157,7 +8157,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.8.1.00";
+const APP_VERSION="1.0.8.1.01";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -140967,6 +140967,18 @@ function backToast(msg){
      változás, a kulcsok kiírása előtt a mentés megfagy (_saveFrozen), utána
      újratöltünk — pontosan úgy, ahogy a fájlból visszatöltés teszi. Meccs
      közben (S.playing) és a jutalom-lánc alatt várunk. */
+/* 1.0.8.1.01 — A JÁTÉK SAJÁT SZINKRON-PROJEKTJE. Ezzel a játékosnak semmit nem
+   kell beillesztenie; a saját projekt a beállító ablak „haladó" lenyílójában
+   továbbra is megadható. Az apiKey NEM titok (nyilvános kliens-azonosító,
+   lásd a netlify.toml-t is): a hozzáférést a Firestore-szabályok döntik el
+   (tools/firestore-szinkron.rules), az adat pedig titkosítva van — a
+   projekt gazdája sem tudja elolvasni. */
+const SYNC_FB_DEFAULT={
+  apiKey:"AIzaSyDVWzmkFu-Px1LAiG0Z5ffndXJSZXvIRuY",
+  authDomain:"magyahszinkron.firebaseapp.com",
+  projectId:"magyahszinkron",
+  appId:"1:1083724958040:web:46074c2d025e3d35f83d2d"};
+const syncFbIsDefault=fb=>!!fb&&fb.projectId===SYNC_FB_DEFAULT.projectId&&fb.apiKey===SYNC_FB_DEFAULT.apiKey;
 const SYNC_CFG_KEY="magyah_sync_v1";
 const SYNC_BASE_KEY="magyah_sync_base_v1";
 const SYNC_COLL="magyah";
@@ -141013,7 +141025,7 @@ service cloud.firestore {
       allow get: if isMain() || isPart();
       allow create: if (isMain() && okMain() && request.resource.data.rev == 1) || (isPart() && okPart());
       allow update: if (isMain() && okMain() && request.resource.data.rev == resource.data.rev + 1) || (isPart() && okPart());
-      allow delete: if isPart();
+      allow delete: if isMain() || isPart();
       allow list: if false;
     }
     match /{document=**} {
@@ -141139,11 +141151,13 @@ const _syncB64url=s=>syncB64(_syncEnc.encode(s)).replace(/\+/g,"-").replace(/\x2
 const _syncUnb64url=s=>_syncDec.decode(syncUnb64(s.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((s.length+3)%4)));
 function syncPairLink(){
   if(!SY.conf)return null;
-  return `${location.origin}${location.pathname}#sync=${_syncB64url(JSON.stringify({f:SY.conf.fb,k:SY.conf.code}))}`;}
+  /* a beépített projektnél a beállítás nem utazik — rövidebb a link */
+  const o=syncFbIsDefault(SY.conf.fb)?{k:SY.conf.code}:{f:SY.conf.fb,k:SY.conf.code};
+  return `${location.origin}${location.pathname}#sync=${_syncB64url(JSON.stringify(o))}`;}
 function syncParsePairHash(hash){
   const m=/^#sync=([A-Za-z0-9_-]+)/.exec(hash||"");
   if(!m)return null;
-  try{const o=JSON.parse(_syncUnb64url(m[1]));const fb=syncParseConfig(JSON.stringify(o.f));const code=syncNormCode(o.k);
+  try{const o=JSON.parse(_syncUnb64url(m[1]));const fb=o.f?syncParseConfig(JSON.stringify(o.f)):Object.assign({},SYNC_FB_DEFAULT);const code=syncNormCode(o.k);
     return fb&&code?{fb,code}:null;}catch(e){return null;}}
 /* ---- állapotjelzés ---- */
 function syncSetStatus(state,extra){
@@ -141284,7 +141298,10 @@ async function syncRun(){
   for(let attempt=0;attempt<6;attempt++){
     const local=await syncLocalSnapshot();
     const base=SY.base.h||{},lt=SY.base.t||{};
-    const snap=await firestore.getDoc(SY.ref);
+    /* MINDIG A SZERVERRŐL. A getDoc a futó figyelő nézetéből is válaszolhat,
+       és közvetlenül a saját tranzakciónk után az még „nem létezik"-et mutat
+       (mérve: a létrehozás utáni kör „az adat eltűnt" hibára futott). */
+    const snap=await firestore.getDocFromServer(SY.ref);
     if(!elo())return;
     let rev=0,rman={};
     if(snap.exists()){const d=snap.data();rev=d.rev||0;rman=await syncReadManifest(d);}
@@ -141341,7 +141358,7 @@ async function syncRun(){
            szabály (rev == régi + 1) már az új számhoz mér, és a Firestore
            „permission-denied"-et ad, nem ütközést. Ilyenkor újratervezünk. */
         if(!(err&&err.code==="permission-denied"))throw err;
-        const s2=await firestore.getDoc(SY.ref);
+        const s2=await firestore.getDocFromServer(SY.ref);
         if(((s2.exists()&&s2.data().rev)||0)===rev)throw err;
         okTx=false;}
       if(!okTx){
@@ -141456,6 +141473,23 @@ async function syncJoin(fb,codeInput){
   SY.base={rev:0,h:{},t:{}};syncSaveBase();syncWriteJSON(SYNC_CFG_KEY,SY.conf);
   syncWrapStorage();
   await syncStart();}
+/* A FELHŐBEN LÉVŐ PROFIL TÖRLÉSE — a darabok, aztán a fődokumentum. A
+   többi eszköz a következő körben „az adat eltűnt" hibát kap, és nem ír
+   vissza semmit (a fő dokumentumot csak rev 1-gyel lehet újra létrehozni,
+   azt pedig csak az „új szinkron" teszi). */
+async function syncWipeCloud(){
+  if(!SY.conf)return;
+  if(!SY.started||!SY.ref){await syncStart();}
+  if(!SY.ref)throw syncErr("unavailable","offline");
+  const {firestore}=SY.fs;
+  const ref=SY.ref,db=SY.db;
+  const snap=await firestore.getDocFromServer(ref);
+  if(snap.exists()){
+    let man={};try{man=await syncReadManifest(snap.data());}catch(e){}
+    const ids=[];for(const e of Object.values(man))if(e&&e.p)for(let i=0;i<(e.n||1);i++)ids.push(syncPartId(e.p,i));
+    await syncPool(ids,4,async id=>{await firestore.deleteDoc(firestore.doc(db,SYNC_COLL,id));});
+    await firestore.deleteDoc(ref);}
+  syncDisconnect();}
 function syncDisconnect(){
   syncStop();SY.conf=null;syncWriteJSON(SYNC_CFG_KEY,null);syncWriteJSON(SYNC_BASE_KEY,null);
   SY.base={rev:0,h:{},t:{}};syncSetStatus("off");}
@@ -141494,12 +141528,14 @@ function syncCloseModal(){
   $("syncModal").classList.add("hide");}
 function syncMsgHtml(){return SY.msg?`<div style="font-size:12px;margin-top:8px;color:${SY.msg.err?"var(--red)":"var(--grass)"}">${esc(SY.msg.text)}</div>`:"";}
 function syncSetupGuideHtml(){
-  return `<details class="pfSec" style="margin-top:10px"><summary>📖 Beállítás lépésről lépésre</summary><div class="pfSecBody">
-    <ol class="syncSteps">
+  return `<details class="pfSec" style="margin-top:10px"${String(SY.cfgDraft||"").trim()?" open":""}><summary>⚙️ Saját Firebase-projekt (haladó)</summary><div class="pfSecBody">
+    <p class="pfP" style="margin-top:4px">Alapból a játék saját szinkron-szervere tárolja a titkosított profilt — ehhez semmit nem kell beállítanod. Ha inkább a <b>saját</b> Firebase-projektedet használnád, illeszd be ide a beállítását, mielőtt az „Új szinkron” vagy a „Csatlakozás” gombot megnyomod (mindkét eszközön ugyanazt).</p>
+    <textarea id="syncFbCfg" class="syncTa" style="min-height:80px" placeholder='const firebaseConfig = { apiKey: "…", authDomain: "…", projectId: "…", appId: "…" };'>${esc(SY.cfgDraft)}</textarea>
+    <ol class="syncSteps" style="margin-top:8px">
       <li><b>Firestore létrehozása:</b> a <a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase-konzolban</a> nyisd meg (vagy hozd létre) a projektedet → <b>Build → Firestore Database → Create database</b>. Helynek válassz európait (pl. <code>eur3</code>), és indítsd <b>production mode</b>-ban. Fizetni nem kell, az ingyenes (Spark) csomag bőven elég.</li>
       <li><b>Szabályok:</b> ugyanott a <b>Rules</b> fülön cseréld le a teljes szöveget az alábbira, és nyomj <b>Publish</b>-t. Ha ebben a projektben más alkalmazás (pl. a Zsebőr) is használja a Firestore-t, a meglévő <code>match</code> blokkjait hagyd meg, és csak a <code>match /magyah/{docId} { … }</code> részt tedd melléjük.</li>
       <li><b>Webalkalmazás:</b> <b>Project settings</b> (fogaskerék) → <b>Your apps</b> → ha még nincs, a <code>&lt;/&gt;</code> ikonnal adj hozzá egyet (Hosting nem kell). Másold ki a <code>firebaseConfig = { … }</code> részt.</li>
-      <li><b>Első eszköz:</b> illeszd be fent a beállítást → <b>Új szinkron indítása az itteni adatokkal</b>. Megjelenik a párosító link.</li>
+      <li><b>Első eszköz:</b> illeszd be fent a beállítást → <b>Új szinkron indítása az itteni adatokkal</b>. Megjelenik a párosító link (benne a beállítással).</li>
       <li><b>Második eszköz:</b> nyisd meg rajta a párosító linket (abban a böngészőben, ahol a Magyaht játszod), és nyomd meg a <b>Csatlakozás</b> gombot. Ha linket nem tudsz átvinni, a beállítást és a 25 karakteres kódot kézzel is beírhatod.</li>
     </ol>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px"><b style="font-size:12px;flex:1">Firestore-szabályok</b><button id="syncRulesCopy" class="btn-s" type="button" style="padding:5px 10px;font-size:12px">📋 Másolás</button></div>
@@ -141511,7 +141547,7 @@ function syncRenderModal(){
   if(SY.view==="join"&&SY.pair){
     const fb=SY.pair.fb;
     const sajat=syncOwnSummary();
-    box.innerHTML=`<p class="pfP" style="margin-top:6px">Projekt: <b style="color:var(--ink)">${esc(fb.projectId)}</b></p>
+    box.innerHTML=`${syncFbIsDefault(fb)?"":`<p class="pfP" style="margin-top:6px">Saját Firebase-projekt: <b style="color:var(--ink)">${esc(fb.projectId)}</b></p>`}
       <p class="pfP">${sajat.n?`Ezen az eszközön már van ${esc(sajat.txt)}. A csak itt meglévő adatok megmaradnak és felkerülnek; ahol <b>ugyanaz a hely</b> mindkét eszközön foglalt (pl. az 1. karrier-hely vagy a profil), ott a <b>közös (felhős) változat</b> marad meg. Ha itt is van értékes karriered ugyanazon a helyen, előbb mentsd ki fájlba (Profil → Mentések és tárhely → ⬇).`:"Ez az eszköz átveszi a közös profilt: karriereket, szobákat, beállításokat, mindent."}${SY.conf?" A mostani szinkron-kapcsolat helyére ez lép.":""}</p>
       <p class="pfP">Csatlakozás után a játék egyszer újraindul a közös adatokkal.</p>
       <button id="syncJoinYes" class="btn-y stepbtn">🔗 Csatlakozás</button>${syncMsgHtml()}`;
@@ -141523,7 +141559,7 @@ function syncRenderModal(){
     return;}
   if(SY.view==="link"&&info){
     const link=syncPairLink();
-    box.innerHTML=`<p class="pfP" style="margin-top:6px">Nyisd meg ezt a linket a <b>másik eszközön</b> (abban a böngészőben, ahol a Magyaht játszod), és ott csatlakozik. Benne van a Firebase-beállítás és a szinkronkód is, ezért <b>csak magadnak</b> küldd el.</p>
+    box.innerHTML=`<p class="pfP" style="margin-top:6px">Nyisd meg ezt a linket a <b>másik eszközön</b> (abban a böngészőben, ahol a Magyaht játszod), és ott csatlakozik. Benne van a szinkronkód, ezért <b>csak magadnak</b> küldd el.</p>
       <textarea readonly id="syncLinkTxt" class="syncTa" style="min-height:90px;font-size:11.5px">${esc(link)}</textarea>
       <div class="syncBtns">${navigator.share?`<button id="syncLinkShare" class="btn-s" type="button">📤 Megosztás</button>`:""}<button id="syncLinkCopy" class="btn-y" type="button">📋 Másolás</button></div>${syncMsgHtml()}`;
     $("syncCloseBtn").textContent="Vissza";
@@ -141534,16 +141570,23 @@ function syncRenderModal(){
     if($("syncLinkShare"))$("syncLinkShare").onclick=()=>navigator.share({title:"Magyah párosítás",text:link}).catch(()=>{});
     return;}
   if(SY.view==="off"&&info){
-    box.innerHTML=`<p class="pfP" style="margin-top:6px">Ez az eszköz többé nem szinkronizál. Az itteni adatok megmaradnak, a felhőben lévők és a másik eszközé sem törlődnek.</p>
-      <button id="syncOffYes" class="btn-s stepbtn" style="color:var(--red);border-color:var(--red)">Leválasztás</button>`;
+    box.innerHTML=`<p class="pfP" style="margin-top:6px"><b>Leválasztás:</b> ez az eszköz többé nem szinkronizál. Az itteni adatok megmaradnak, a felhőben lévők és a másik eszközé sem törlődnek.</p>
+      <button id="syncOffYes" class="btn-s stepbtn" style="color:var(--red);border-color:var(--red)">Leválasztás</button>
+      <p class="pfP" style="margin-top:14px"><b>Törlés a felhőből is:</b> a titkosított profil a szerverről végleg törlődik, és a többi eszközöd sem szinkronizál tovább (náluk is minden helyben megmarad).</p>
+      <button id="syncWipeYes" class="btn-s stepbtn" style="color:var(--red);border-color:var(--red)">Leválasztás és törlés a felhőből</button>${syncMsgHtml()}`;
     $("syncCloseBtn").textContent="Mégse";
     $("syncOffYes").onclick=()=>{syncDisconnect();SY.showCode=false;SY.view="main";SY.msg={text:"Leválasztva."};syncRenderModal();};
+    $("syncWipeYes").onclick=async()=>{
+      const b=$("syncWipeYes");b.disabled=true;b.textContent="Törlés…";
+      try{await syncWipeCloud();SY.showCode=false;SY.view="main";SY.msg={text:"Leválasztva, a felhőből törölve."};}
+      catch(e){SY.msg={text:"A törlés nem sikerült: "+(syncErrText(e)||"nincs internet")+".",err:true};}
+      syncRenderModal();};
     return;}
   SY.view="main";
   $("syncCloseBtn").textContent="Bezár";
   if(info){
     const waiting=info.mode==="join";
-    box.innerHTML=`<p class="pfP" style="margin-top:6px">Firebase-projekt: <b style="color:var(--ink)">${esc(info.projectId)}</b></p>
+    box.innerHTML=`<p class="pfP" style="margin-top:6px">${syncFbIsDefault(SY.conf.fb)?"A játék szinkron-szerverén, titkosítva":`Saját Firebase-projekt: <b style="color:var(--ink)">${esc(info.projectId)}</b>`}</p>
       <p id="syncStatus" style="font-size:13px;font-weight:700;margin:8px 0 0">${esc(syncStatusText(SY.status))}</p>
       <p class="pfP" style="margin-top:6px">${waiting?"Csatlakozás folyamatban: várom a közös adatot a felhőből.":"Ami itt változik — karrierek, szobák, profil, beállítások, nevek —, pár másodperc múlva a többi eszközödön is megjelenik, és fordítva. Netkapcsolat nélkül is játszhatsz: utána összefésülöm. Ha a másik eszközön változott valami, a játék egyszer újraindul a friss adatokkal (meccs közben nem, csak utána)."}</p>
       <p class="pfP" style="margin-top:6px">Karrier törlése a szinkron miatt a többi eszközről is töröl. Ha <b>ugyanazt</b> a karriert két eszközön egyszerre viszed, a később mentett marad meg.</p>
@@ -141559,19 +141602,20 @@ function syncRenderModal(){
     $("syncNowBtn").onclick=()=>{SY.msg=null;syncNow();syncRenderModal();};
     $("syncOff").onclick=()=>{SY.view="off";SY.msg=null;syncRenderModal();};
   }else{
-    box.innerHTML=`<p class="pfP" style="margin-top:6px">A saját Firebase-projekteden keresztül a telefon és a gép (vagy két telefon) folyamatosan ugyanazt a profilt látja: <b>minden karriert, szobát, beállítást, a profilszintet, a feloldásokat, a rekordokat és a saját játékosneveket</b>. Az adat <b>titkosítva</b> kerül a felhőbe: a kulcs csak a szinkronkódban van, a Firebase sem tudja elolvasni.</p>
-      <div class="pfH" style="margin-top:12px;font-size:12px">1. Firebase-beállítás <span style="color:var(--dim2);font-weight:400">— Project settings → Your apps → firebaseConfig</span></div>
-      <textarea id="syncFbCfg" class="syncTa" style="min-height:90px" placeholder='const firebaseConfig = { apiKey: "…", authDomain: "…", projectId: "…", appId: "…" };'>${esc(SY.cfgDraft)}</textarea>
-      <div class="pfH" style="margin-top:12px;font-size:12px">2/a. Első eszközön</div>
+    box.innerHTML=`<p class="pfP" style="margin-top:6px">A telefon és a gép (vagy két telefon) folyamatosan ugyanazt a profilt látja: <b>minden karriert, szobát, beállítást, a profilszintet, a feloldásokat, a rekordokat és a saját játékosneveket</b>. Fiók és regisztráció nem kell. Az adat <b>titkosítva</b> kerül a felhőbe: a kulcs csak a szinkronkódban van, a szerver gazdája sem tudja elolvasni.</p>
+      <div class="pfH" style="margin-top:12px;font-size:12px">Az első eszközön</div>
       <button id="syncCreate" class="btn-y stepbtn" style="margin-top:6px">✨ Új szinkron indítása az itteni adatokkal</button>
-      <div class="pfH" style="margin-top:14px;font-size:12px">2/b. Második eszközön <span style="color:var(--dim2);font-weight:400">— vagy nyisd meg az első eszközön kapott párosító linket</span></div>
+      <div class="pfH" style="margin-top:14px;font-size:12px">A második eszközön <span style="color:var(--dim2);font-weight:400">— a kód, vagy nyisd meg az első eszközön kapott párosító linket</span></div>
       <div style="display:flex;gap:7px;margin-top:6px">
         <input id="syncCode" type="text" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" autocapitalize="characters" autocomplete="off" spellcheck="false" class="syncIn">
         <button id="syncJoin" class="btn-s" type="button" style="flex:none;padding:9px 12px">Csatlakozás</button></div>
       ${syncMsgHtml()}${syncSetupGuideHtml()}`;
     const ta=$("syncFbCfg");ta.oninput=()=>{SY.cfgDraft=ta.value;};
-    const needCfg=()=>{const fb=syncParseConfig(SY.cfgDraft);
-      if(!fb){SY.msg={text:"Először másold be a Firebase-beállítást (kell benne apiKey és projectId).",err:true};syncRenderModal();try{$("syncFbCfg").focus();}catch(e){}}
+    /* üres mező = a játék saját projektje */
+    const needCfg=()=>{
+      if(!String(SY.cfgDraft||"").trim())return Object.assign({},SYNC_FB_DEFAULT);
+      const fb=syncParseConfig(SY.cfgDraft);
+      if(!fb){SY.msg={text:"A beillesztett Firebase-beállítás hiányos (kell benne apiKey és projectId) — vagy töröld ki a mezőt, és a játék saját szerverét használom.",err:true};syncRenderModal();try{$("syncFbCfg").focus();}catch(e){}}
       return fb;};
     $("syncCreate").onclick=async()=>{
       const fb=needCfg();if(!fb)return;

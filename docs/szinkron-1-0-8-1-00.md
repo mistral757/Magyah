@@ -136,6 +136,28 @@ következő lap írása percekig nem kap választ. Ezért újratöltés előtt
 (`pageshow`) újraindul. Valós hálózaton ugyanez a long-polling módnál
 (proxy mögött) jönne elő.
 
+## 1.0.8.1.01 — beépített szinkron-projekt
+
+- A játék saját Firestore-projektje (`magyahszinkron`, `SYNC_FB_DEFAULT`) az
+  alapértelmezés: **a játékosnak semmit nem kell beillesztenie**, csak az
+  „Új szinkron” / „Csatlakozás” gombot nyomja meg.
+- A saját projekt a **⚙️ Saját Firebase-projekt (haladó)** lenyílóban
+  továbbra is megadható (üres mező = a beépített).
+- A párosító link a beépített projektnél csak a kódot viszi.
+- **Leválasztás és törlés a felhőből**: a darabok, aztán a fődokumentum
+  törlődik (a szabály ezért a fődokumentum törlését is engedi). A többi
+  eszköz a következő körben „az adat eltűnt” hibát kap, és nem ír vissza.
+- A jegyzék mindig `getDocFromServer`-rel olvasódik: a `getDoc` a futó
+  figyelő nézetéből is válaszolhat, és közvetlenül a létrehozó tranzakció
+  után még „nem létezik”-et mutatott (mérve) — ez „az adat eltűnt”
+  hibára futott.
+- `netlify.toml`: az új `apiKey` is kivéve a titok-szkenner heurisztikájából
+  (nyilvános kliens-azonosító, mint az RTDB-é).
+
+**Teendő (egyszer, a projektgazdának):** a `magyahszinkron` projektben
+Firestore Database → Create database (európai hely, production mode), majd
+Rules → a `tools/firestore-szinkron.rules` teljes szövege → Publish.
+
 ## A Firebase-oldal
 
 A szabályfájl: **`tools/firestore-szinkron.rules`** — ugyanez a szöveg a
@@ -156,7 +178,7 @@ Zsebőr is ott van, a két `match` blokkot egy fájlba kell tenni.
 
 ## Próba
 
-`tools/szinkron-1-0-8-1-00-proba.js` — 59 állítás, két külön böngészőprofil,
+`tools/szinkron-1-0-8-1-00-proba.js` — 64 állítás, két külön böngészőprofil,
 a valódi Firestore-emulátor a valódi szabályokkal (lásd a fájl fejkommentjét).
 Benne egy valódi karrier: az A eszközön elindítva, a B eszközön bájtra
 azonosan megérkezik, betölthető és folytatható.

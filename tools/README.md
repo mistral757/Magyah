@@ -14,10 +14,10 @@ Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 # egy mappában, ahol a firebase.json a tools/firestore-szinkron.rules-ra mutat
 # (port 8085), és telepítve van a firebase-tools + a firebase@10.12.2 csomag:
 FB_SDK_DIR=<…/node_modules/firebase> npx firebase emulators:exec --only firestore \
-  --project demo-magyah "node /home/user/Magyah/tools/szinkron-1-0-8-1-00-proba.js"
+  --project magyahszinkron "node /home/user/Magyah/tools/szinkron-1-0-8-1-00-proba.js"
 ```
 
-**59 állítás**, két külön böngészőprofil („két eszköz”), a valódi
+**64 állítás**, két külön böngészőprofil („két eszköz”), a valódi
 Firestore-emulátor a valódi szabályokkal. Emulátor nélkül kihagyja magát.
 
 * a profil-ablak legelső eleme a szinkron gomb, a beállító ablak a profil fölött;
@@ -28,7 +28,9 @@ Firestore-emulátor a valódi szabályokkal. Emulátor nélkül kihagyja magát.
 * élő frissítés és törlés mindkét irányban; ütközésnél a később módosított nyer;
 * meccs közben vár; tele tárhelynél nem tölt újra, hanem szól;
 * a felhőben minden titkosított, nincs árva darab; a szabályok tiltják a
-  listázást; a beépített szabályszöveg = a fájl; leválasztás után nem ír.
+  listázást; a beépített szabályszöveg = a fájl; leválasztás után nem ír;
+* a beépített projekt beillesztés nélkül, a link csak a kódot viszi; a
+  „törlés a felhőből” után a szerveren egy dokumentum sem marad.
 
 ## meres-scout-3-9-206-proba.js — 📈🔭 3.9.206: karrier-mérő és valósághű scout
 
