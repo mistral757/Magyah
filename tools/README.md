@@ -8,6 +8,30 @@ elkapná a hibát** — pedig a 33 000 sor EGY globális scope-on osztozik.
 Ez a mappa ezt a hiányt pótolja, build-lépés nélkül.
 
 
+## szinkron-1-0-8-1-00-proba.js — 🔄 1.0.8.1.00: a teljes profil szinkronja eszközök között
+
+```bash
+# egy mappában, ahol a firebase.json a tools/firestore-szinkron.rules-ra mutat
+# (port 8085), és telepítve van a firebase-tools + a firebase@10.12.2 csomag:
+FB_SDK_DIR=<…/node_modules/firebase> npx firebase emulators:exec --only firestore \
+  --project magyahszinkron "node /home/user/Magyah/tools/szinkron-1-0-8-1-00-proba.js"
+```
+
+**60 állítás**, két külön böngészőprofil („két eszköz”), a valódi
+Firestore-emulátor a valódi szabályokkal. Emulátor nélkül kihagyja magát.
+
+* a profil-ablak legelső eleme a szinkron gomb, a beállító ablak a profil fölött;
+* létrehozás → párosító link (friss betöltéssel és a nyitott játékba illesztve
+  is) → csatlakozás, egy újratöltéssel;
+* minden kulcs átmegy (egy valódi karrier bájtra azonosan, betölthetően; egy
+  1,5 millió karakteres érték darabolva), az eszközhöz kötöttek nem;
+* élő frissítés és törlés mindkét irányban; ütközésnél a később módosított nyer;
+* meccs közben vár; tele tárhelynél nem tölt újra, hanem szól;
+* a felhőben minden titkosított, nincs árva darab; a szabályok tiltják a
+  listázást; leválasztás után nem ír;
+* a beépített projekt beillesztés nélkül, a link csak a kódot viszi; a
+  „törlés a felhőből” után a szerveren egy dokumentum sem marad.
+
 ## meres-scout-3-9-206-proba.js — 📈🔭 3.9.206: karrier-mérő és valósághű scout
 
 ```bash
