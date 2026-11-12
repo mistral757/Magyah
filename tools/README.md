@@ -17,7 +17,7 @@ FB_SDK_DIR=<…/node_modules/firebase> npx firebase emulators:exec --only firest
   --project magyahszinkron "node /home/user/Magyah/tools/szinkron-1-0-8-1-00-proba.js"
 ```
 
-**64 állítás**, két külön böngészőprofil („két eszköz”), a valódi
+**60 állítás**, két külön böngészőprofil („két eszköz”), a valódi
 Firestore-emulátor a valódi szabályokkal. Emulátor nélkül kihagyja magát.
 
 * a profil-ablak legelső eleme a szinkron gomb, a beállító ablak a profil fölött;
@@ -28,7 +28,7 @@ Firestore-emulátor a valódi szabályokkal. Emulátor nélkül kihagyja magát.
 * élő frissítés és törlés mindkét irányban; ütközésnél a később módosított nyer;
 * meccs közben vár; tele tárhelynél nem tölt újra, hanem szól;
 * a felhőben minden titkosított, nincs árva darab; a szabályok tiltják a
-  listázást; a beépített szabályszöveg = a fájl; leválasztás után nem ír;
+  listázást; leválasztás után nem ír;
 * a beépített projekt beillesztés nélkül, a link csak a kódot viszi; a
   „törlés a felhőből” után a szerveren egy dokumentum sem marad.
 

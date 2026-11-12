@@ -141,8 +141,10 @@ következő lap írása percekig nem kap választ. Ezért újratöltés előtt
 - A játék saját Firestore-projektje (`magyahszinkron`, `SYNC_FB_DEFAULT`) az
   alapértelmezés: **a játékosnak semmit nem kell beillesztenie**, csak az
   „Új szinkron” / „Csatlakozás” gombot nyomja meg.
-- A saját projekt a **⚙️ Saját Firebase-projekt (haladó)** lenyílóban
-  továbbra is megadható (üres mező = a beépített).
+- 1.0.8.1.02: a saját projekt megadása (és a Firebase-útmutató) kikerült a
+  felületről — a játékos csak az „Új szinkron” gombot, a kódot és a
+  párosító linket látja. A szabályszöveg csak a
+  `tools/firestore-szinkron.rules`-ban él.
 - A párosító link a beépített projektnél csak a kódot viszi.
 - **Leválasztás és törlés a felhőből**: a darabok, aztán a fődokumentum
   törlődik (a szabály ezért a fődokumentum törlését is engedi). A többi
@@ -178,7 +180,7 @@ Zsebőr is ott van, a két `match` blokkot egy fájlba kell tenni.
 
 ## Próba
 
-`tools/szinkron-1-0-8-1-00-proba.js` — 64 állítás, két külön böngészőprofil,
+`tools/szinkron-1-0-8-1-00-proba.js` — 60 állítás, két külön böngészőprofil,
 a valódi Firestore-emulátor a valódi szabályokkal (lásd a fájl fejkommentjét).
 Benne egy valódi karrier: az A eszközön elindítva, a B eszközön bájtra
 azonosan megérkezik, betölthető és folytatható.

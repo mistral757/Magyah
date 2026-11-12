@@ -18,7 +18,6 @@
    · meccs közben (S.playing) a felhős változás vár, utána töltődik be;
    · a felhőben minden titkosított (a becenév sehol), nincs árva darab;
    · a szabályok: kód nélkül nem listázható, rossz azonosító nem olvasható;
-   · a beépített szabályszöveg = a tools/firestore-szinkron.rules.
 
    Futtatás (Java + firebase-tools + a firebase@10.12.2 npm-csomag kell):
      cd <mappa, benne firebase.json: {"firestore":{"rules":".../tools/firestore-szinkron.rules"},
@@ -37,12 +36,6 @@ if(!EMU||!SDK){console.log("  – kihagyva: nincs FIRESTORE_EMULATOR_HOST / FB_S
 const [EH,EP]=EMU.split(':');
 /* a játék beépített szinkron-projektje (SYNC_FB_DEFAULT) — az emulátort is erre indítsd */
 const PROJECT=process.env.GCLOUD_PROJECT||'magyahszinkron';
-const CFG=`const firebaseConfig = {
-  apiKey: "demo-api-key",
-  authDomain: "${PROJECT}.firebaseapp.com",
-  projectId: "${PROJECT}",
-  appId: "1:1:web:1"
-};`;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{
   const srv=spawn('python3',['-m','http.server',String(PORT)],{cwd:ROOT,stdio:'ignore'});
@@ -84,9 +77,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
   /* ============ 0. a szabályszöveg egyezik a fájllal ============ */
   const A=await eszkoz("A");
-  {const beepitett=await A.p.evaluate(()=>SYNC_RULES);
-   ok("a beépített szabályszöveg = tools/firestore-szinkron.rules",beepitett===fs.readFileSync(path.join(ROOT,'tools/firestore-szinkron.rules'),'utf8'));
-   ok("a verziószám legalább 1.0.8.1.01",await A.p.evaluate(()=>verzioUjabb(APP_VERSION,"1.0.8.1.00")));}
+  {ok("a verziószám legalább 1.0.8.1.01",await A.p.evaluate(()=>verzioUjabb(APP_VERSION,"1.0.8.1.00")));}
 
   /* ============ 1. az „A" eszköz adatai ============ */
   /* véletlen tartalom: a gzip sem nyomja 1 MB alá */
@@ -145,22 +136,11 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   await A.p.click("#profSyncBtn");
   await A.p.waitForTimeout(300);
   {const r=await A.p.evaluate(()=>({lat:!$("syncModal").classList.contains("hide"),
-     cfg:!!$("syncFbCfg"),create:!!$("syncCreate"),code:!!$("syncCode"),join:!!$("syncJoin"),
+     cfg:!$("syncFbCfg")&&!/firebaseConfig|Firebase-beállítás|Firebase-konzol/.test($("syncBody").textContent),create:!!$("syncCreate"),code:!!$("syncCode"),join:!!$("syncJoin"),
      z:+getComputedStyle($("syncModal")).zIndex,zp:+getComputedStyle($("profileModal")).zIndex}));
-   ok("a beállító ablak felugrik (új szinkron, kód, csatlakozás; a saját projekt csak a haladó lenyílóban)",r.lat&&r.cfg&&r.create&&r.code&&r.join,r);
-   ok("a saját projekt mezője egy CSUKOTT lenyílóban ül",await A.p.evaluate(()=>{const d=$("syncFbCfg").closest("details");return !!d&&!d.open;}));
+   ok("a beállító ablak felugrik: új szinkron, kód, csatlakozás — Firebase-beállítás sehol",r.lat&&r.cfg&&r.create&&r.code&&r.join,r);
    ok("a beállító ablak a profil fölött ül",r.z>r.zp,r);}
-  /* hibás saját beállítással nem indul */
-  await A.p.evaluate(()=>{$("syncFbCfg").closest("details").open=true;});
-  await A.p.fill("#syncFbCfg","ez nem config");
-  await A.p.click("#syncCreate");
-  ok("hibás saját beállítással szól, és nem indul",await A.p.evaluate(()=>!SY.conf&&/hiányos/.test($("syncBody").textContent)));
-  /* a szabályok kimásolhatók */
-  ok("a beállítási útmutató és a szabályok az ablakban",await A.p.evaluate(()=>!!$("syncRulesTxt")&&$("syncRulesTxt").value===SYNC_RULES));
   await A.p.screenshot({path:path.join(process.env.MSP||'/tmp','szinkron-beallitas.png')});
-  /* üres mező = a beépített projekt: a játékosnak semmit nem kell beillesztenie */
-  await A.p.fill("#syncFbCfg","");
-  await A.p.evaluate(()=>{SY.cfgDraft="";});
   await A.p.click("#syncCreate");
   await varOk(A.p,40000,"A létrehozás");
   {const r=await A.p.evaluate(()=>({view:SY.view,link:$("syncLinkTxt")&&$("syncLinkTxt").value,code:SY.conf.code}));
