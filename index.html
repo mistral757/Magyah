@@ -8157,7 +8157,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.9.0.01";
+const APP_VERSION="1.0.9.0.02";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -102696,8 +102696,8 @@ function hubDragDrop(){
   /* A LAP ODA ÁLL, AHOVÁ VITTED — ugyanaz az elv, mint a panelből indított
      cserénél: azt akarod megnézni, jól sült-e el. */
   const backKey=hubLocKey(to);
-  renderHub();drawPitch();updateBar();saveGame();
-  hubScrollRowIntoView(backKey);
+  /* 🔁 1.0.9.0.02 — a kirajzolás és a mentés a töltő alatt (toltoCsere) */
+  toltoCsere(()=>{renderHub();drawPitch();updateBar();saveGame();hubScrollRowIntoView(backKey);});
   return true;}
 function hubDragInit(){
   const box=$("hubRoster");
@@ -110227,8 +110227,8 @@ function openHubPositionPicker(loc){
         if(ok===false){$("hubPositionPicker").classList.add("hide");renderHub();hubScrollRowIntoView(back);return;}   /* elavult csere → ne mentsünk törött állapotot */
         loc.p._arrivedAtIdx=0;other.p._arrivedAtIdx=0;}
       $("hubPositionPicker").classList.add("hide");
-      renderHub();drawPitch();updateBar();saveGame();
-      hubScrollRowIntoView(back);};
+      /* 🔁 1.0.9.0.02 — a kirajzolás és a mentés a töltő alatt (toltoCsere) */
+      toltoCsere(()=>{renderHub();drawPitch();updateBar();saveGame();hubScrollRowIntoView(back);});};
     box.appendChild(row);});
   if(!box.children.length)
     box.innerHTML=`<div style="font-size:12px;line-height:1.5;color:var(--dim2);padding:4px 2px">${fillEmptyBench
@@ -118810,8 +118810,20 @@ function msSpReward(val,masod){
   const m=(typeof tempoMultAx==="function")?tempoMultAx("taktika"):1;   /* ⏱️ 3.9.208 — csapatstílus-pont: taktika-tengely */
   /* 🧿 F6a — Egy úr, egy út: az elsődleges stílus minden forrásból többet kap */
   return Math.max(1,Math.round((val||0)*m*talMsPremium()*talSpSzorzo(!!masod)));}
+/* ⚡ 1.0.9.0.02 — UGYANAZ A KÉPLET, A SZORZÓK EGYSZER LEKÉRVE. A tempó- és a
+   két talizmán-szorzó a teljes talizmán-gyűjteményt végigpásztázza; egy
+   lista összegzésénél (styleSxpParts, msSpSum) eddig MINDEN mérföldkőnél
+   újra — a HUB egy kirajzolásánál ez sok százszor futott (mérve, 4×
+   lassított CPU: a renderHub idejének ~40%-a). A tényezők sorrendje a
+   msSpReward-é, tehát az eredmény bitre ugyanaz. Csak a tiszta, összegző
+   hívók használják; a jutalom kifizetése a msSpReward-on megy tovább. */
+function msSpRewardFn(masod){
+  const m=(typeof tempoMultAx==="function")?tempoMultAx("taktika"):1;
+  const pr=talMsPremium(),sz=talSpSzorzo(!!masod);
+  return val=>Math.max(1,Math.round((val||0)*m*pr*sz));}
 function msSpSum(list){
-  return (list||[]).reduce((a,d)=>a+msSpReward(d.val),0);}
+  const f=msSpRewardFn();
+  return (list||[]).reduce((a,d)=>a+f(d.val),0);}
 function msState(){
   if(!S.ms)S.ms={done:{},seen:{},sp:0,spEarned:0,cash:0,log:[],t:{},cats:{},missed:{},pend:{}};
   if(!S.ms.t)S.ms.t={};
@@ -129337,8 +129349,9 @@ function styleSxpParts(st0){
     z.ms.max=msSpSum(alap);
     z.msExt.max=msSpSum(ext);
     if(M){
-      z.ms.got=alap.filter(d=>M.done[d.id]).reduce((a,d)=>a+msSpReward(d.val),0);
-      z.msExt.got=ext.filter(d=>M.done[d.id]).reduce((a,d)=>a+msSpReward(d.val),0);}
+      const _f=msSpRewardFn();   /* ⚡ 1.0.9.0.02 — a szorzók egyszer */
+      z.ms.got=alap.filter(d=>M.done[d.id]).reduce((a,d)=>a+_f(d.val),0);
+      z.msExt.got=ext.filter(d=>M.done[d.id]).reduce((a,d)=>a+_f(d.val),0);}
   }catch(e){}
   const r=(g,m)=>m>0?Math.max(0,Math.min(1,g/m)):0;
   z.a=400*r(z.tree.got,z.tree.max);
@@ -132130,6 +132143,21 @@ function loadIntoGame(d,key){
    „elviszi" (az úgyis mindent ment). A `var` szándékos: a saveGame a szkript
    elejéről is hívódhat, egy `let` ott TDZ-hibát dobna. */
 var _saveSoonT=0,_saveMost=false;
+/* 🔁 1.0.9.0.02 — A CSERE-SOROZAT MENTÉSE EGYBEN. Cserélgetni sorozatban
+   szokás; minden csere után a teljes mentés (csomagolás, tömörítés,
+   ellenőrzés, írás — mérve ≈450 ms, 4× lassított CPU) a várakozás kétharmada
+   volt. A csere után a mentés VÁR (_saveTart), és EGYBEN íródik ki: a
+   következő töltőnél (a HUB elhagyása is az), a lap elhagyásakor / háttérbe
+   kerülésekor, egy kifejezett azonnali mentésnél, vagy végső esetben
+   SAVE_TART_MAX csend után. */
+var _saveTart=false,_saveTartFuggo=false,_saveTartT=0;
+const SAVE_TART_MAX=20000;
+function saveTartIndit(){
+  _saveTart=true;
+  /* egy már függő, rövid halasztású mentés is a sorozat végére kerül */
+  if(_saveSoonT){clearTimeout(_saveSoonT);_saveSoonT=0;_saveTartFuggo=true;}
+  if(_saveTartT)clearTimeout(_saveTartT);
+  _saveTartT=setTimeout(()=>{_saveTartT=0;const f=_saveTartFuggo;_saveTart=false;_saveTartFuggo=false;if(f)saveGameSoon();},SAVE_TART_MAX);}
 /* ⚡ 3.9.361 — felhasználói esemény közben vagyunk-e (window.event) */
 function saveUserEventNow(){
   try{const e=window.event;
@@ -132138,18 +132166,23 @@ function saveUserEventNow(){
 /* az AZONNALI írás — újratöltés, szobaváltás, kiírás előtt */
 function saveGameNow(){
   _saveMost=true;
-  try{saveGame();}finally{_saveMost=false;}}
+  try{saveGame();}finally{_saveMost=false;}
+  /* a teljes írás a várakozó csere-mentést is elviszi */
+  _saveTartFuggo=false;}
 /* 700 ms csend után, a böngésző ÜRESJÁRATÁBAN (requestIdleCallback, legfeljebb
    további 1,5 mp) — így a mentés nem a következő koppintásra esik. */
 function saveGameSoon(){
+  if(_saveTart){_saveTartFuggo=true;return;}   /* 🔁 1.0.9.0.02 — a csere-sorozat végén, egyben */
   if(_saveSoonT)return;
   _saveSoonT=setTimeout(()=>{
     const fut=()=>{if(!_saveSoonT)return;_saveSoonT=0;try{saveGameNow();}catch(e){}};
     try{if(window.requestIdleCallback){window.requestIdleCallback(fut,{timeout:1500});return;}}catch(e){}
     fut();},700);}
 function saveGameFlush(){
-  if(!_saveSoonT)return;
-  clearTimeout(_saveSoonT);_saveSoonT=0;
+  const tart=_saveTartFuggo;
+  _saveTart=false;_saveTartFuggo=false;if(_saveTartT){clearTimeout(_saveTartT);_saveTartT=0;}
+  if(!_saveSoonT&&!tart)return;
+  if(_saveSoonT){clearTimeout(_saveSoonT);_saveSoonT=0;}
   try{saveGameNow();}catch(e){}}
 try{
   window.addEventListener("pagehide",saveGameFlush);
@@ -132170,7 +132203,7 @@ function saveGame(){
      válaszol, a kiírás a következő csendes pillanatban történik. Elvesztés
      ellen ugyanaz védi, ami a 3.9.168 óta: a lap elhagyása és háttérbe kerülése
      azonnal kiírja. A kényszerített, azonnali írás: saveGameNow(). */
-  if(!_saveMost&&saveUserEventNow()){saveGameSoon();return;}
+  if(!_saveMost&&(saveUserEventNow()||_saveTart)){saveGameSoon();return;}   /* 🔁 1.0.9.0.02 — csere-sorozat alatt is vár */
   /* egy függő összevont mentés ezzel együtt teljesül */
   if(_saveSoonT){clearTimeout(_saveSoonT);_saveSoonT=0;}
   /* A kezdőképernyőn nincs mit menteni — és ha mégis írnánk, a következő
@@ -139910,7 +139943,7 @@ function toltoRejt(){
     a.onfinish=()=>{o.classList.remove("be");o.classList.add("ki");try{o.getAnimations({subtree:true}).forEach(x=>x.cancel());}catch(e){}};}
   catch(e){o.classList.remove("be");o.classList.add("ki");}}
 /* egy nehéz művelet a töltő alatt (gombon kívül is hívható: toltoFut(fn)) */
-function toltoFut(fn,k,min){
+function toltoFut(fn,k,min,mentesNelkul){
   if(_toltoAktiv){try{fn();}catch(e){console.warn(e);}return;}
   _toltoAktiv=true;
   const t0=performance.now();
@@ -139918,13 +139951,36 @@ function toltoFut(fn,k,min){
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     const t1=performance.now();
     try{fn();}catch(e){try{console.warn("MAGYAH: töltő alatti művelet —",e);}catch(_){}}
-    /* a halasztott mentés MOST, a töltő alatt — nem görgetés közben */
-    try{saveGameFlush();}catch(e){}
+    /* a halasztott mentés MOST, a töltő alatt — nem görgetés közben
+       (a csere-sorozatnál nem: ott a mentés a sorozat végén megy egyben) */
+    if(!mentesNelkul)try{saveGameFlush();}catch(e){}
     requestAnimationFrame(()=>setTimeout(()=>{
       const most=performance.now();
       if(k)toltoRogzit(k,most-t1);
       const marad=Math.max(0,(min||TOLTO_MIN)-(most-t0));
       setTimeout(()=>{_toltoAktiv=false;toltoRejt();},marad);},0));}));}
+/* ================= 🔁 A CSERE IS A TÖLTŐ ALATT (1.0.9.0.02) =================
+   KÉRÉS: „Kellene még »pillanat…« töltőképernyős cuccot kötni arra, amikor
+   játékosokat cserélgetünk. Ott nagyon jelentős a várakozási idő."
+   MÉRVE (3. idényes karrier, 4× lassított CPU): a csere-lista sorára
+   koppintva ≈320 ms fagyás (a HUB újrarajzolása), és 0,7 mp múlva még egy
+   ≈310–390 ms-os, amikor a halasztott mentés lefutott — épp a következő
+   koppintásra. A csere-lista sora és a húzás nem gomb, ezért a gombokra
+   tanuló elfogó (lent) sosem vette észre.
+   MOSTANTÓL: a csere ADATA azonnal megtörténik, a kirajzolás ÉS a mentés a
+   töltő alatt fut, egyben — a csere után nincs második fagyás. A töltő
+   rövidebb (TOLTO_CSERE_MIN), mert cserélgetni sorozatban szokás, és ugyanúgy
+   tanul, mint a gombok: ahol a csere 150 ms alatt kész, ott nem jön be. */
+const TOLTO_CSERE_MIN=600,TOLTO_CSERE_KULCS="csere";
+function toltoCsere(fn){
+  const k=TOLTO_CSERE_KULCS,ms=toltoMsAll()[k];
+  if(ms!=null&&ms<=TOLTO_GYORS){
+    const t0=performance.now();
+    try{fn();}finally{
+      requestAnimationFrame(()=>setTimeout(()=>{toltoRogzit(k,performance.now()-t0);},0));}
+    return;}
+  saveTartIndit();
+  toltoFut(fn,k,TOLTO_CSERE_MIN,true);}
 document.addEventListener("click",ev=>{
   if(_toltoAtenged||!ev.isTrusted)return;
   let el=null;try{el=ev.target&&ev.target.closest&&ev.target.closest("button,.hubCard,.mpRoomChip,[role=button]");}catch(e){el=null;}
