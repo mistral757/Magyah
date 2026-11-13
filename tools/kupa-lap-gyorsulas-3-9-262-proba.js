@@ -69,7 +69,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     window.saveGame=()=>{};
     /* ── 1. KUPA-MEZŐNY ── */
     const C=["MK","FA","KL","EL","BL"];
-    const palya=c=>euroMidRating(c)+((EURO_COMPS[c]&&EURO_COMPS[c].oppDelta)||0);
+    /* 🏆 1.0.9.0.00: a hozzád mért mércét mérjük (a nemzetközi kupák élvonal-
+       padlóját a tools/kupa-elvonal-padlo-1-0-9-0-00-proba.js őrzi) */
+    const palya=c=>{const v=euroMidRating(c)+((EURO_COMPS[c]&&EURO_COMPS[c].oppDelta)||0);
+      return (typeof _cupLast!=="undefined"&&_cupLast&&_cupLast.comp===c)?_cupLast.rel:v;};
     const _pf=window.pformTeamOvr;window.pformTeamOvr=()=>0;
     const nyk=nykMidMine();
     const ot=oppTargetRating,_top=pyrTopLevel,_g=pyrGrowNow;pyrGrowNow=()=>0;
