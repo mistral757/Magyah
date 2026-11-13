@@ -8157,7 +8157,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.9.0.02";
+const APP_VERSION="1.0.9.1.00";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -18368,6 +18368,49 @@ function nfGyors2Teljes(sn,div){
   return Math.max(0,Math.round(E*100)/100);}
 function nfGyorsAcc(){
   try{const G=S&&S.pyr&&S.pyr.gyors;return (G&&G.sn===(S.seasonNumber||1))?(G.acc||0):0;}catch(e){return 0;}}
+/* ================= 📈 A KUPA-MEZŐNY IS FEJLŐDIK (1.0.9.1.00) =================
+   KÉRÉS: „A kupasorozat alatt is legyen ellenfél fejlődés ugyanúgy, mint liga
+   szezon alatt. Mértéke, tempója ugyanaz legyen, nehézségi szinthez
+   igazítva. Vigyázzunk, hogy ne legyen eszement fejlődés azért :)"
+   EDDIG a kupa mezőnye az induláskor befagyott, és a kupa végéig egy tizedet
+   sem nőtt — a bajnokságban viszont a mezőny fordulónként erősödik.
+   MOSTANTÓL a gépi kupacsapatok minden lejátszott kupameccsed után ugyanannyit
+   nőnek, amennyit a bajnoki mezőnyöd egy forduló alatt:
+     · az idény alapüteme (pyrGrowStep — az osztályod és a nehézségi fokozat
+       ütemével, ugyanaz a szám, mint a bajnokságban), plusz
+     · az idény mért gyorsulásának (nfGyorsAcc, a 4. idénytől) egy fordulóra
+       eső átlaga;
+     · a téli emelés rámpája NEM (az egyszeri, idénybeli lépés, nem tempó).
+   A FÉK: legfeljebb CUP_GROW_MAX_MECCS kupameccsnyi (fél bajnoki idény)
+   növekedés — egy hosszú, selejtezővel induló sorozat sem szalad el.
+   A te csapatod és a társad (közös kupa) nem nő a kupa jóvoltából: a társ
+   ereje az ő sajátja. A háttérmeccsek a gépi csapatok KÜLÖNBSÉGÉT nézik
+   (euroLam), azok egyformán nőnek — a közös kupa két gépe nem csúszik szét. */
+const CUP_GROW_MAX_MECCS=15;
+function cupGrowStep(){
+  try{
+    if(!(typeof pyrOn==="function"&&pyrOn()))return 0;
+    const base=pyrGrowStep()||0;
+    const idx=Math.max(1,(S.idx||0));
+    const gy=Math.max(0,nfGyorsAcc()||0)/Math.max(idx,30);
+    const v=base+gy;
+    return (isFinite(v)&&v>0)?v:0;}catch(e){return 0;}}
+function cupGrowNow(){
+  const E=S&&S.euro;if(!E)return 0;
+  const n=Math.min(CUP_GROW_MAX_MECCS,Math.max(0,E.nGrow||0));
+  return Math.round(cupGrowStep()*n*100)/100;}
+/* idempotens: mindig az érintetlen ovrBase-ből (mint a pyrOppRefresh) */
+function euroOppRefresh(){
+  const E=S&&S.euro;if(!E||!Array.isArray(E.teams))return;
+  const g=cupGrowNow();
+  E.teams.forEach(t=>{
+    if(!t||t.you||t.mate||typeof t.ovr!=="number")return;
+    if(t.ovrBase==null)t.ovrBase=t.ovr;
+    t.ovr=g>0?t.ovrBase+g:t.ovrBase;});   /* kerekítés nélkül: 0-nál bitre az eredeti */
+  (E.fixtures||[]).forEach(fx=>{
+    if(!fx||!fx.o||fx.oi==null)return;
+    const t=E.teams[fx.oi];
+    if(t&&typeof t.ovr==="number"&&!t.you&&!t.mate)fx.o.ovr=t.ovr;});}
 /* a fordulók után (a bajnoki forduló lezárásakor) — idempotens: egy fordulót
    egyszer számol */
 function nfGyorsTick(){
@@ -84373,7 +84416,7 @@ function playMatchMotor(){
        ...(DUEL.myMatch!=null?{myMatch:DUEL.myMatch}:{}),
        home:!DUEL.neutral&&!!DUEL.iAmHome,duel:true}
     /* OSZTÁLYOZÓ: saját, két meccses menetrend — ugyanabban az alakban. */
-    :(pyrPoActive()?pyrPoFx():(euroActive()?S.euro.fixtures[S.euro.idx]:S.fixtures[S.idx]));
+    :(pyrPoActive()?pyrPoFx():(euroActive()?((()=>{try{euroOppRefresh();}catch(e){}})(),S.euro.fixtures[S.euro.idx]):S.fixtures[S.idx]));   /* 📈 1.0.9.1.00 */
   /* VÉDŐHÁLÓ: ha a kupa-meccs bármiért hiányzik (elcsúszott állapot), ne dobjunk
      kivételt a meccs közepén — inkább visszatérünk a kupa-képernyőre. */
   if(!fx){
@@ -110444,6 +110487,7 @@ function penHit(shooterOvr,keeperOvr){
   return Math.random()<Math.max(0.45,Math.min(0.92,0.76+(shooterOvr-keeperOvr)*0.006));}
 function euroFinishUserMatch(gf,ga){
   const E=S.euro,fx=E.fixtures[E.idx],ui=E.userIdx,oi=fx.oi;
+  E.nGrow=(E.nGrow||0)+1;   /* 📈 1.0.9.1.00 — a kupa-mezőny fejlődésének órája (euroOppRefresh) */
   if(E.stage==="qual"){
     /* selejtező: nincs csoporttabella és nincs bracket — csak a saját párharc */
     E.qLegs[E.idx]=[gf,ga];
@@ -111866,9 +111910,17 @@ function euroFieldHtml(E,c){
     ?`<div style="${sty}">⚖ <b>Nehézségi kiegyenlítés: +${euroHu1(kieg)}</b> — a motor ezt MINDEN ellenfél meccs-erejére rárakja: a te rejtett meccs-bónuszod (morál, taktika, aura, kapitány, edző) fele, az idény elején rögzítve. A mezőny <b>tényleges</b> meccs-ereje tehát <b style="color:${c.col}">⚡${euroHu1(E.target+kieg)}</b>, nem ${Math.round(E.target)}.</div>`
     :"";
   const enSor=`<div style="${sty}">A ti csapaterőtök: <b>${euroHu1(ts)}</b>${myMs!=null?` · meccs-erőtök most: <b>⚡${euroHu1(myMs)}</b>`:""}${
-    myMs!=null?` · különbség a mezőnyhöz: <b>${(myMs-(E.target+kieg))>=0?"+":"−"}${euroHu1(Math.abs(myMs-(E.target+kieg)))}</b>`:""}</div>`;
-  return `<div style="${sty}">A sorozat mezőnye: <b style="color:${c.col}">⚡${euroHu1(E.target+kieg)}</b> — ${calc}</div>`+kiegSor+enSor;}
+    myMs!=null?(()=>{let _g=0;try{_g=cupGrowNow();}catch(e){}const d=myMs-(E.target+kieg+_g);return ` · különbség a mezőnyhöz: <b>${d>=0?"+":"−"}${euroHu1(Math.abs(d))}</b>`;})():""}</div>`;
+  /* 📈 1.0.9.1.00 — a kupa-mezőny fejlődése */
+  let gN=0,gS=0;try{gN=cupGrowNow();gS=cupGrowStep();}catch(e){}
+  const nM=Math.min(CUP_GROW_MAX_MECCS,E.nGrow||0);
+  const growSor=gS>0
+    ?`<div style="${sty}">📈 <b>A mezőny a kupa alatt is fejlődik</b>, ugyanazzal az ütemmel, mint a bajnokságban: kupameccsenként <b>+${String(Math.round(gS*100)/100).replace(".",",")}</b>`
+      +` — eddig <b>+${euroHu1(gN)}</b> (${nM} meccs után; legfeljebb ${CUP_GROW_MAX_MECCS} meccsnyi, +${euroHu1(gS*CUP_GROW_MAX_MECCS)}).</div>`
+    :"";
+  return `<div style="${sty}">A sorozat mezőnye: <b style="color:${c.col}">⚡${euroHu1(E.target+kieg+gN)}</b>${gN>0?` <span style="opacity:.75">(induláskor ⚡${euroHu1(E.target+kieg)})</span>`:""} — ${calc}</div>`+growSor+kiegSor+enSor;}
 function renderEuroScreen(){
+  try{euroOppRefresh();}catch(e){}   /* 📈 1.0.9.1.00 — a kupa-mezőny a lejátszott kupameccsek szerint */
   /* A KAPCSOLÓ A RAJZOLÁS ELEJÉN FRISSÜL, nem a végén: ennek a függvénynek
      van korai kilépése (a félbemaradt kör ága), és a sáv ott sem maradhat
      elavult állapotban. Amiből olvas (fut-e a sorozat, megy-e mérkőzés, be
