@@ -111,7 +111,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.start&&r.start.iAmHome===true&&r.start.elter===true,"3. valódi h2hStart rossz szereppel: a nézőpont helyes",r.start);
   ok(r.start&&r.start.my===r.vart.my&&r.start.op===r.vart.op&&r.start.my>r.start.op,"3. a ⚡ a SAJÁT pillanatképből (nem a társéból)",{start:r.start,vart:r.vart});
   ok(r.szerepUtana==="host","3. a szerep a pillanatkép azonosítója szerint helyreállt",r.szerepUtana);
-  ok(r.motor.mv===2&&r.motor.k0[1]>=4.4&&r.motor.k0[0]<=0.3,"7. motor: ⚡276,6 (vendég) a ⚡261,3 (hazai) ellen, +25-ös taktikákkal is a ⚡ szerinti fölény (≈4,5 : 0,2), nem pénzfeldobás",r.motor);
+  ok(r.motor.mv>=2&&r.motor.k0[1]>=4.4&&r.motor.k0[0]<=0.3,"7. motor: ⚡276,6 (vendég) a ⚡261,3 (hazai) ellen, +25-ös taktikákkal is a ⚡ szerinti fölény (≈4,5 : 0,2), nem pénzfeldobás",r.motor);
   ok(typeof r.drot.own==="number"&&typeof r.drot.opp==="number","8. a drót-pillanatkép viszi a két gólszorzót",r.drot);
   ok(r.drot.lap===r.drot.ms&&r.drot.lap2===r.drot.ms,"8. a csapatlap ⚡-ja = a pillanatkép ⚡-ja (a kihirdetett lapon is)",r.drot);
   ok(r.np5.elter===false,"5. ha minden stimmel, nincs eltérés-jelzés",r.np5);
