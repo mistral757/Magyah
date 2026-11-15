@@ -8157,7 +8157,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.9.2.01";
+const APP_VERSION="1.0.9.3.00";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -91170,15 +91170,48 @@ function generateAcademyPlayer(forcePos){
      · a 24 évesnél fiatalabbak kétszeres súllyal (a scout fiatal
        tehetségeket keres — lásd a Scout súgóját). */
 const DISC_LO_PAD=8, DISC_HI_LO=-2, DISC_HI_HI=1;
+/* ================= 🔍 1.0.9.3.00 — A SCOUT A NEHÉZSÉGGEL A KERETEDHEZ HÚZ =================
+   KIMONDOTT KÉRÉS: „A Scout által talált játékosok (nem a sima átigazolási
+   piac) átlag ratingja nehézségi szintenként egyre növekvő mértékben
+   közeledjen a csapat nyers erejéhez a mezőny erejével szemben. Azaz pl itt
+   9.2-n kb már félúton legyen […] 10.5-nél pedig már 15%-kal a nyers erő felé."
+   A felfedezés sávja eddig a piaci sáv közepéhez (a mezőny szintjéhez) ült; a
+   kereted nyers ereje a sávban ±15-re van a mezőnyhöz szorítva, tehát egy
+   erősen lemaradó keret is a mezőny szintjén kapott ingyen embert.
+   MOSTANTÓL a sáv (alja, teteje, kúpcsúcsa) együtt csúszik a kereted nyers
+   ereje (bandTeamRaw, a kezdők Rating-átlaga, szorítás NÉLKÜL) felé, a
+   nehézséggel gyorsuló mértékben:
+     t = 0,5 · (i / 41)^1,47, ahol i a nehézség belső sorszáma (1.1 → 0 ·
+     9.2 → 41 · 10.5 → 49): 5.1 → 17% · 7.1 → 32% · 9.2 → 50% · 10.5 → 65%
+     (a félút + 15%). A csúszás CSAK LEFELÉ hat: ha a kereted erősebb a
+     mezőnynél, a scout nem hoz ingyen sztárt (3.9.201 óta ez a szabály).
+   Csak a scout-találatra (klasszikus felfedezés, valósághű kiszemelt) hat, a
+   fizetős piacra (signingBand) nem; a hardcore közös scout-terve (a
+   mezőnyhöz mért, mindenkinél azonos célerő) változatlan. */
+const DISC_RAW_T9=0.5, DISC_RAW_I9=41, DISC_RAW_EXP=1.47;
+function discRawT(nf,s){
+  nf=Math.round(+nf||0);s=Math.max(1,Math.min(5,Math.round(+s||1)));
+  if(!(nf>=1))return 0;
+  const i=Math.max(0,Math.min(49,(Math.min(10,nf)-1)*5+(s-1)));
+  return DISC_RAW_T9*Math.pow(i/DISC_RAW_I9,DISC_RAW_EXP);}
+function discRawTMost(){
+  try{const d=styleXNfMost();return d?discRawT(d.nf,d.s):0;}catch(e){return 0;}}
+/* mennyivel csúszik le a felfedezés sávja (≤ 0) */
+function discRawShift(b){
+  const t=discRawTMost();if(!(t>0))return 0;
+  let raw=null;try{raw=bandTeamRaw();}catch(e){raw=null;}
+  if(raw==null||!isFinite(raw))return 0;
+  return Math.min(0,t*(raw-b.mid));}
 function discoveryBand(real){
   const b=signingBand();
   const q=Math.max(0,Math.min(1,scoutQuality(scout)));
+  const sh=discRawShift(b);   /* 🔍 1.0.9.3.00 */
   /* 🔭 3.9.206 — valósághű scout: a felső határ 1,5-tel lejjebb, a kúp
      csúcsa a sáv alsó felébe — erős játékost ritkábban talál */
-  const hi=Math.min(b.hi,b.mid+DISC_HI_LO+(DISC_HI_HI-DISC_HI_LO)*q-(real?1.5:0));
-  const lo=Math.min(hi-1,Math.max(40,b.lo-DISC_LO_PAD));
+  const hi=Math.max(41,Math.min(b.hi,b.mid+DISC_HI_LO+(DISC_HI_HI-DISC_HI_LO)*q-(real?1.5:0))+sh);
+  const lo=Math.min(hi-1,Math.max(40,b.lo-DISC_LO_PAD+sh));
   const mode=lo+(hi-lo)*(real?(0.30+0.30*q):(0.45+0.35*q));
-  return {lo,hi,mode,q};}
+  return {lo,hi,mode,q,sh};}
 function pickDiscoveryEntry(candidates,real){
   /* 🛡 3.9.288 — hardcore: a szakasz scout-tervének n-edik találata — a
      célerő a KÖZÖS mezőnyszinthez mért, seedelt eltolás; a scout-célzás csak
