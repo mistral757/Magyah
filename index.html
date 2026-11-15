@@ -8161,7 +8161,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.9.4.00";
+const APP_VERSION="1.0.9.5.00";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -36619,6 +36619,120 @@ function settleLeaveDeals(){
         :(releasePlayer(p,false),pruneChemistry(),`${esc(shortName(d.name))} kikerült a keretből.`);
       addLine(`💔 A megtartási díj (${fmtFt(d.amount)}) nem jött össze a szezon végére. ${how}`,"m ev");}});
   S.leaveDeals=(S.leaveDeals||[]).filter(d=>d&&d.season>season);}
+/* ================= 🔄 1.0.9.5.00 — A KÖLCSÖNJÁTÉKOS TÉNYLEG KÖLCSÖN =================
+   KIMONDOTT KÉRÉS: „Az 1.0.9.3.00 scout gyengítős commitját érvényesítsük a
+   három kölcsönjátékos érkezett átigazolási eseményre is. Ezek is túl erősek.
+   Plusz ezek a kölcsönjátékosok legyenek tényleg azok, amiknek mondják
+   magukat. Legyen rajtuk, nevük mellett egy számláló. 15 forduló és 2. szezon
+   közötti időtartamra jön mindegyik, külön külön sorsolva. Kell nekik bért
+   fizetni, ha nem kapnak elég játékpercet, akkor elmennek, nem lehet őket
+   eladni. Egyetlen opció van, vissza lehet küldeni a kölcsön klubhoz 0 Ft-ért.
+   Vagy megtartani a kölcsön végéig és játszatni."
+   AZ ERŐ: eddig a findReplacement a TELJES világ-poolból húzott egyenletesen
+   (a poszton belül), a kereted szintjétől függetlenül. Mostantól a scout
+   felfedezési sávja (discoveryBand — benne az 1.0.9.3.00-ás, nehézséggel
+   növekvő húzás a kereted nyers ereje felé) adja a kölcsönjátékos erejét is,
+   a poszton belül, a scout-célzás nélkül.
+   A KÖLCSÖN (S.kolcson.list: {n, left, total, perc[]}):
+     · IDŐTARTAM: játékosonként külön sorsolva 15–60 bajnoki forduló (két
+       idény); a számláló a neve mellett áll, és CSAK a bajnoki fordulók
+       fogyasztják (a kupa- és osztályozó-meccsek nem);
+     · BÉR: a pályára lépők bérét a meccs-elszámolás (chargeMatchWages) amúgy
+       is levonja; a kölcsönjátékos bére AKKOR IS jár, ha nem lépett pályára —
+       ez a kölcsönszerződés ára;
+     · JÁTÉKPERC: az utolsó 6 meccsén legalább 180 perc (a lehetséges harmada)
+       kell; ha ez nincs meg, visszamegy a klubjához. Egy meccsel előtte
+       figyelmeztet;
+     · NEM ELADHATÓ, nem vihető piacra, nem ajánlható fel neki edzői állás;
+       EGYETLEN művelet van: visszaküldés a kölcsönadó klubhoz, 0 Ft-ért;
+     · A LEJÁRATKOR visszamegy (a kezdőből is: a helyére a szokásos pótlás lép). */
+const KOLCSON_MIN=15,KOLCSON_MAX=60,KOLCSON_ABLAK=6,KOLCSON_PERC=180;
+function kolcsonAllapot(){
+  if(!S.kolcson||S.kolcson.v!==1||!Array.isArray(S.kolcson.list))S.kolcson={v:1,list:[]};
+  return S.kolcson;}
+function kolcsonRec(n){
+  try{if(!S||!S.kolcson||S.kolcson.v!==1||!Array.isArray(S.kolcson.list))return null;
+    return S.kolcson.list.find(x=>x&&x.n===n)||null;}catch(e){return null;}}
+function kolcsonVan(n){return gameMode==="career"&&!!kolcsonRec(n);}
+function kolcsonHossz(){return KOLCSON_MIN+Math.floor(Math.random()*(KOLCSON_MAX-KOLCSON_MIN+1));}
+/* a felvétel: az érkezéskor (markArrived) — a várólistáról érkező is itt kap rekordot */
+function kolcsonFelvesz(p){
+  if(!p||!p.n||gameMode!=="career")return null;
+  const st=kolcsonAllapot();
+  let r=st.list.find(x=>x&&x.n===p.n);
+  if(r)return r;
+  const L=Math.max(KOLCSON_MIN,Math.min(KOLCSON_MAX,(p._kolcsonL|0)||kolcsonHossz()));
+  r={n:p.n,left:L,total:L,perc:[],s:S.seasonNumber||1};
+  st.list.push(r);
+  delete p._kolcsonL;
+  return r;}
+/* a jelölt: a scout felfedezési sávjában, a poszton belül */
+function kolcsonJelolt(pos){
+  if(!(gameMode==="career"&&careerPool))return null;
+  const cands=Object.values(careerPool).filter(e=>e&&!drafted.has(e.n)&&(e.pos||[]).includes(pos));
+  if(!cands.length)return null;
+  const d=discoveryBand(false);
+  let pool=cands.filter(e=>e.startRating>=d.lo&&e.startRating<=d.hi);
+  if(!pool.length)pool=cands.filter(e=>e.startRating<=d.hi).sort((a,b)=>b.startRating-a.startRating).slice(0,12);
+  if(!pool.length)pool=cands.slice().sort((a,b)=>a.startRating-b.startRating).slice(0,6);
+  const t=triangularRoll(d.lo,d.hi,d.mode);
+  const near=pool.slice().sort((a,b)=>Math.abs(a.startRating-t)-Math.abs(b.startRating-t)).slice(0,8);
+  return near.length?careerPlayerFromPoolEntry(near[Math.floor(Math.random()*near.length)]):null;}
+/* a számláló a név mellé */
+function kolcsonCimkeHtml(n){
+  const r=kolcsonRec(n);if(!r||gameMode!=="career")return "";
+  const left=Math.max(0,r.left|0);
+  const sz=(r.perc||[]).reduce((a,b)=>a+(b||0),0);
+  const veszely=(r.perc||[]).length>=KOLCSON_ABLAK-1&&kolcsonPercUtolso(r,KOLCSON_ABLAK-1)<KOLCSON_PERC;
+  return ` <span title="Kölcsönben: még ${left} bajnoki forduló · utolsó ${Math.min(KOLCSON_ABLAK,(r.perc||[]).length)} meccsén ${sz} perc (${KOLCSON_PERC} kell ${KOLCSON_ABLAK} meccsre)" `
+    +`style="font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:8px;white-space:nowrap;`
+    +`border:1px solid ${veszely?"var(--red)":"#38bdf8"};color:${veszely?"var(--red)":"#7dd3fc"}">🔄 kölcsön · ${left} ford.</span>`;}
+function kolcsonPercUtolso(r,k){return (r.perc||[]).slice(-k).reduce((a,b)=>a+(b||0),0);}
+/* a távozás: lejárat, kevés játékperc vagy visszaküldés */
+function kolcsonTavozik(n,ok){
+  const st=kolcsonAllapot();
+  const r=st.list.find(x=>x&&x.n===n);
+  let p=null;try{p=findRosterPlayerByName(n);}catch(e){p=null;}
+  if(!p){st.list=st.list.filter(x=>x!==r);return {ok:true,nincs:true};}
+  const res=releasePlayer(p,false);
+  if(!res||!res.ok)return {ok:false,reason:res&&res.reason};
+  st.list=st.list.filter(x=>x!==r);
+  try{drafted.delete(n);}catch(e){}   /* visszament a klubjához: a világ piacán újra ott van */
+  try{pruneChemistry();}catch(e){}
+  const nev=esc(shortName(n));
+  const txt=ok==="lejart"?`🔄 Lejárt ${nev} kölcsönszerződése — visszatért a klubjához.`
+    :ok==="perc"?`🔄 ${nev} kevés játéklehetőséget kapott (az utolsó ${KOLCSON_ABLAK} meccsén ${r?kolcsonPercUtolso(r,KOLCSON_ABLAK):0} perc, ${KOLCSON_PERC} kellett volna) — a kölcsönadó klub visszahívta.`
+    :`↩ Visszaküldted ${nev}-t a kölcsönadó klubhoz — ingyen, 0 Ft-ért.`;
+  try{addLine(txt+(res.replacedBy?` A helyén: ${esc(shortName(res.replacedBy.n))}.`:""),"m ev");}catch(e){}
+  return {ok:true};}
+/* a meccs utáni elszámolás (a bérek után): játékperc, számláló, bér, távozás */
+function kolcsonMeccsUtan(played,perc,liga){
+  if(gameMode!=="career"||!careerPool)return;
+  const st=kolcsonAllapot();if(!st.list.length)return;
+  const jatszott=new Set((played||[]).filter(Boolean).map(p=>p.n));
+  const nem=[];
+  st.list.slice().forEach(r=>{
+    let p=null;try{p=findRosterPlayerByName(r.n);}catch(e){p=null;}
+    if(!p){st.list=st.list.filter(x=>x!==r);return;}
+    r.perc=(r.perc||[]).concat([Math.max(0,Math.round((perc&&perc[r.n])||0))]).slice(-KOLCSON_ABLAK);
+    if(liga)r.left=Math.max(0,(r.left|0)-1);
+    if(!jatszott.has(r.n))nem.push(p);});
+  /* a kölcsönszerződés bére a pályára nem lépetteknek is jár */
+  if(nem.length){
+    try{
+      const due=Math.round(wageBill(nem).due);   /* ugyanaz a bérszámítás és plafon, mint a pályára lépőké */
+      const paid=Math.min(Math.max(0,S.transferBudget||0),due);
+      if(paid>0)budgetPay(paid,"wage");
+      addLine(`🔄 Kölcsön-bér: <b>−${fmtFt(paid)}</b> (${nem.map(p=>esc(shortName(p.n))).join(", ")} — nem lépett pályára, a szerződés szerint akkor is jár)`
+        +(due>paid?` · <span style="color:var(--red)">${fmtFt(due-paid)} fedezetlen</span>`:""),"m skillnote");
+    }catch(e){}}
+  st.list.slice().forEach(r=>{
+    if(r.left<=0){kolcsonTavozik(r.n,"lejart");return;}
+    if((r.perc||[]).length>=KOLCSON_ABLAK&&kolcsonPercUtolso(r,KOLCSON_ABLAK)<KOLCSON_PERC){kolcsonTavozik(r.n,"perc");return;}
+    if((r.perc||[]).length>=KOLCSON_ABLAK-1&&kolcsonPercUtolso(r,KOLCSON_ABLAK-1)<KOLCSON_PERC)
+      try{addLine(`⚠️ ${esc(shortName(r.n))} (kölcsön) keveset játszik: az utolsó ${KOLCSON_ABLAK-1} meccsén ${kolcsonPercUtolso(r,KOLCSON_ABLAK-1)} perc. Ha a következő meccsen sem kap elég időt, a klubja visszahívja (${KOLCSON_PERC} perc kell ${KOLCSON_ABLAK} meccsre).`,"m ev");}catch(e){}
+    else if(r.left===3)
+      try{addLine(`🔄 ${esc(shortName(r.n))} kölcsöne még 3 bajnoki fordulóig tart.`,"m ev");}catch(e){}});}
 function applyTransfer(type){
   if(type.key==="quiet")return "Nem történt átigazolás, marad a megszokott keret.";
   if(type.key==="bondcamp")return applyBondCamp();
@@ -36639,7 +36753,10 @@ function applyTransfer(type){
     while(idxs.length<3&&pool.length){const r=pool.splice(Math.floor(Math.random()*pool.length),1)[0];idxs.push(r);}
     const parts=idxs.map(idx=>{
       const cur=slots[idx].player;
-      const repl=findReplacement([slots[idx].pos],{})||synthWeak(cur.ovr,slots[idx].pos,3);
+      /* 🔄 1.0.9.5.00 — a scout felfedezési sávjából (lásd kolcsonJelolt) */
+      let repl=null;try{repl=kolcsonJelolt(slots[idx].pos);}catch(e){repl=null;}
+      repl=repl||findReplacement([slots[idx].pos],{})||synthWeak(cur.ovr,slots[idx].pos,3);
+      if(gameMode==="career"&&careerPool)repl._kolcsonL=kolcsonHossz();   /* a kölcsön hossza: az érkezéskor él (markArrived) */
       drafted.add(repl.n);repl._erkUt="esemeny";repl._erkDet="kölcsön";try{erkUtJegyez(repl.n,"esemeny",null,"kölcsön");}catch(e){}
       if(gameMode==="career"&&careerPool){
         if(fullCareerRoster().length>=MAX_CAREER_ROSTER){
@@ -36649,13 +36766,15 @@ function applyTransfer(type){
             ? `(${esc(fullName(repl.n))} még helyre vár)`
             : `(${esc(fullName(repl.n))} nem fért be — tele a keret)`;}
         extraRoster.push(repl);markArrived(repl);
-        return `${esc(fullName(repl.n))} (${repl.ovr}) a tartalékba`;
+        const _kr=kolcsonRec(repl.n);
+        return `${esc(fullName(repl.n))} (${repl.ovr}) a tartalékba${_kr?` — ${_kr.total} fordulóra`:""}`;
       }
       const cat=roleInFormation(slots[idx].pos,form,idx);
       const bp=BENCH[cat];
       if(bp){BENCH[cat]=repl;return `${esc(fullName(bp.n))} → ${esc(fullName(repl.n))} (${repl.ovr}) a padon`;}
       return `${esc(fullName(repl.n))} (${repl.ovr}) érkezett, de nem fért be`;});
-    return "Három kölcsönjátékos érkezett télen a tartalékba: "+parts.join(" · ");
+    return "Három kölcsönjátékos érkezett télen a tartalékba: "+parts.join(" · ")
+      +(gameMode==="career"&&careerPool?` <span style="color:var(--dim2)">— 🔄 kölcsönben vannak: a bérük akkor is jár, ha nem játszanak; ha ${KOLCSON_ABLAK} meccsen nem kapnak legalább ${KOLCSON_PERC} percet, visszamennek; nem adhatók el, csak ingyen visszaküldhetők.</span>`:"");
   }
   if(type.key==="youth"){
     const idx=pick(nonCaptainIdxs());
@@ -46128,6 +46247,8 @@ function chemHomecoming(name){
   return mate;}
 function markArrived(p,_price,fromAcademy){
   p._arrivedAtIdx=S.idx;
+  /* 🔄 1.0.9.5.00 — a kölcsönjátékos az érkezésekor kap szerződést */
+  if(p&&p._kolcsonL)try{kolcsonFelvesz(p);}catch(e){}
   /* 📈 3.9.206 — a mérő: honnan jött */
   try{meresErkezo(p,p._meresForras||(fromAcademy?"ifi":(_price>0?"vasarlas":(p.icon||p._icon||p.isIcon?"ikon":"egyeb"))),_price);}catch(e){}
   try{delete p._meresForras;}catch(e){}
@@ -87624,6 +87745,8 @@ function playMatchMotor(){
          könyvelődik — egy hely, egy igazság: akinek meccse nőtt, azért fizetsz.
          A félidőben lecserélt ember tehát a bérét is megkapja: játszott. */
       try{chargeMatchWages(playedAll);}catch(e){}
+      /* 🔄 1.0.9.5.00 — a kölcsönök: játékperc, számláló (csak bajnoki forduló), bér, távozás */
+      try{kolcsonMeccsUtan(playedAll,_percThisMatch,!(euroActive()||pyrPoActive()));}catch(e){}
       /* A SZTÁR MEZSZÁM-KÖVETELÉSÉNEK HATÁRIDEJE ITT JÁR LE (3.9.00): a
          követelés a KÖVETKEZŐ mérkőzésre szólt, ez az. A bér UTÁN, mert ha
          fizetni kell, az ugyanannak a hétnek a költsége. */
@@ -91753,6 +91876,7 @@ function saleListingCount(){
 function saleListBlock(p){
   if(gameMode!=="career"||!careerPool||!p)return {kind:"mode"};
   if(p.family)return {kind:"family"};
+  if(kolcsonVan(p.n))return {kind:"kolcson"};   /* 🔄 1.0.9.5.00 */
   if(saleIsListed(p.n))return {kind:"listed"};
   /* A SORREND SZÁNDÉKOS: előbb a JÁTÉKOSRÓL szóló feltétel, utána a globális
      kapacitás. Fordítva egy pályára sem lépett ember mellett is az „ügynökség
@@ -92016,6 +92140,8 @@ function releasePlayer(p,sell,priceOverride){
   try{if(r&&r.ok)settleEarlyChallenges();}catch(e){}
   return r;}
 function _releasePlayerCore(p,sell,priceOverride){
+  /* 🔄 1.0.9.5.00 — a kölcsönjátékos nem a tiéd: nem adható el (csak visszaküldhető) */
+  if(sell&&p&&kolcsonVan(p.n))return{ok:false,reason:"kolcson"};
   const loc=findPlayerLocation(p);
   if(!loc)return{ok:false,reason:"notfound"};
   const credit=sell?((priceOverride!=null&&isFinite(priceOverride))?Math.round(priceOverride):sellValue(p)):0;
@@ -104503,7 +104629,37 @@ function buildHubDetail(loc){
      visszafordíthatatlan művelet nem való a böngészés útjába, ezért ide került,
      a posztcsere és a poszt-tanulás alá. Az ár a gombon látszik, forintban.
      A megerősítő párbeszéd (askSellConfirm) változatlanul közbeiktatódik. */
-  if(!p.family){
+  /* 🔄 1.0.9.5.00 — KÖLCSÖNJÁTÉKOS: egyetlen művelet, a visszaküldés (0 Ft) */
+  if(!p.family&&kolcsonVan(p.n)){
+    const kr=kolcsonRec(p.n);
+    const info=document.createElement("div");
+    info.style.cssText="font-size:11.5px;color:var(--dim2);margin-top:6px;line-height:1.5";
+    info.innerHTML=`🔄 <b style="color:#7dd3fc">Kölcsönben</b> — még <b>${kr.left}</b> bajnoki forduló (${kr.total}-ből). `
+      +`Az utolsó ${Math.min(KOLCSON_ABLAK,(kr.perc||[]).length)} meccsén <b>${kolcsonPercUtolso(kr,KOLCSON_ABLAK)}</b> perc — `
+      +`${KOLCSON_ABLAK} meccsre legalább ${KOLCSON_PERC} kell, különben a klubja visszahívja. `
+      +`A bére akkor is jár, ha nem lép pályára. Nem adható el és nem vihető piacra.`;
+    d.appendChild(info);
+    const vBtn=document.createElement("button");
+    vBtn.className="btn-s stepbtn";vBtn.style.marginTop="6px";
+    vBtn.style.color="#7dd3fc";vBtn.style.borderColor="#0284c7";
+    vBtn.textContent="↩ Visszaküldés a kölcsönadó klubhoz — 0 Ft";
+    vBtn.onclick=(ev)=>{
+      if(ev&&ev.stopPropagation)ev.stopPropagation();
+      askConfirm({title:"Visszaküldöd a kölcsönadó klubhoz?",yes:"Igen, visszaküldöm",
+        html:`<div style="font-size:13px;line-height:1.55"><b>${esc(shortName(p.n))}</b> azonnal visszatér a klubjához. `
+          +`Ezért <b>nem kapsz pénzt</b> (0 Ft), és a bérét sem fizeted tovább. Ez nem vonható vissza.</div>`,
+        onYes:()=>{
+          const r=kolcsonTavozik(p.n,"vissza");
+          if(!r||!r.ok){
+            setDraftStatus(r&&r.reason==="noreplacement"
+              ?"Ő az utolsó embered ebben a posztkategóriában — előbb hozz valakit a helyére."
+              :"Most nem sikerült visszaküldeni.");
+            return;}
+          $("hubPositionPicker").classList.add("hide");
+          hubExpandedKey=null;
+          renderHub();drawPitch();updateBar();saveGame();}});};
+    d.appendChild(vBtn);}
+  if(!p.family&&!kolcsonVan(p.n)){
     const sellBtn=document.createElement("button");
     sellBtn.className="btn-s stepbtn";sellBtn.style.marginTop="6px";
     sellBtn.style.color="var(--gold)";sellBtn.style.borderColor="var(--gold)";
@@ -104627,7 +104783,7 @@ function buildHubDetail(loc){
      mit veszítesz: a fiatalabb belépő kevesebb kort és meccset hoz, tehát
      GYENGÉBB edző lesz. */
   {const _e=(careerPool&&careerPool[p.n])||null;
-   if(_e&&coachEligible(_e)&&!p.family){
+   if(_e&&coachEligible(_e)&&!p.family&&!kolcsonVan(p.n)){
     const cands=coachCandidates(careerFingerprint(_e));
     const best=cands[0];
     const price=coachOfferPrice(_e);
@@ -110435,7 +110591,8 @@ function renderHub(){
     const posTxt=hubLocPosTxt(loc);         /* a HELY kódja — ez adja a színt */
     const posLabel=hubLocPosLabel(loc);     /* a JÁTÉKOS posztjai — ez a felirat */
     const ageTxt=p.family?(p.age?`${p.age} év`:"családtag"):(p.age!==undefined?`${p.age} év`:"—");
-    const tag=loc.type==="bench"?" <small>(pad)</small>":loc.type==="extra"?" <small>(tartalék)</small>":"";
+    const tag=(loc.type==="bench"?" <small>(pad)</small>":loc.type==="extra"?" <small>(tartalék)</small>":"")
+      +kolcsonCimkeHtml(p.n);   /* 🔄 1.0.9.5.00 — a kölcsön számlálója */
     const tier=playerCardTier(p.n);
     const cardBadge=tier?` <span style="${cardTierBadgeStyle(tier)};font-weight:700;font-size:9.5px;padding:1px 6px;border-radius:8px;letter-spacing:.5px;text-transform:uppercase">${cardTierLabel(tier)}</span>`:"";
     /* A RATING NEM SZEREPEL A SOR ALATT. A szám a sor JOBB SZÉLÉN áll, nagy
@@ -132934,7 +133091,7 @@ function saveGame(){
            írhatja át őket a mai létszámra. */
         wageFans:S.wageFans,wageFansSeason:S.wageFansSeason,
         /* BÉRMÉRŐ: szezononkénti bevétel/bér napló a hangoláshoz. */
-        wageProbe:S.wageProbe,ledger:S.ledger,scoutReal:S.scoutReal,scoutWatch:S.scoutWatch,scoutCel:S.scoutCel||null,meresId:S.meresId,
+        wageProbe:S.wageProbe,ledger:S.ledger,scoutReal:S.scoutReal,scoutWatch:S.scoutWatch,scoutCel:S.scoutCel||null,kolcson:S.kolcson||null,meresId:S.meresId,
         mpRanks:S.mpRanks,
         /* KÖZÖS INFINITY: a társ legmagasabb bajnoki mezőnyszintje (a kapu
            másik fele), a saját vállalásod és a társ befizetése. Mindhárom
@@ -133735,6 +133892,7 @@ function applySavedGame(d){
   S.scoutWatch=(d.S.scoutWatch&&d.S.scoutWatch.v===1&&Array.isArray(d.S.scoutWatch.list))?d.S.scoutWatch:{v:1,list:[]};
   /* 🎯 3.9.223 — a scout-célzás (régi mentésben nincs: üres, a nyitás a fordulóból számol) */
   S.scoutCel=(d.S.scoutCel&&d.S.scoutCel.v===1)?d.S.scoutCel:{v:1,p:null,m:null};
+  S.kolcson=(d.S.kolcson&&d.S.kolcson.v===1&&Array.isArray(d.S.kolcson.list))?d.S.kolcson:{v:1,list:[]};   /* 🔄 1.0.9.5.00 */
   S.meresId=(typeof d.S.meresId==="string"&&/^[A-Za-z0-9_-]{1,60}$/.test(d.S.meresId))?d.S.meresId:null;
   S.unbeatenStreak=d.S.unbeatenStreak||0;S.cleanSheetStreak=d.S.cleanSheetStreak||0;
   S.chSeasonMaxUnbeaten=d.S.chSeasonMaxUnbeaten||0;S.chSeasonMaxCleanStreak=d.S.chSeasonMaxCleanStreak||0;S.chSeasonComebacks=d.S.chSeasonComebacks||0;S.chSeasonBestHaul=d.S.chSeasonBestHaul||0;S.chSeasonCleanSheets=d.S.chSeasonCleanSheets||0;S.chSeasonSubGoals=d.S.chSeasonSubGoals||0;
