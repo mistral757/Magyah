@@ -8161,7 +8161,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.9.5.00";
+const APP_VERSION="1.0.9.6.00";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -31952,13 +31952,18 @@ function attrOverPerf(entry){
      +16 fölött  negyedről indul és gyorsan nullába fut → felső határ ~+4.55
    Vagyis egy szélsőségesen specializált játékos legfeljebb ~4.6 Rating-pontot
    kap ebből, akkor is, ha az attribútuma +30-cal a profilja fölött van. */
-const ATTR_ADJ_FULL=0.35, ATTR_ADJ_S1=8, ATTR_ADJ_S2=16, ATTR_ADJ_TAIL=4;
-function attrDevToRating(dev){
+const ATTR_ADJ_FULL=0.55, ATTR_ADJ_S1=8, ATTR_ADJ_S2=16, ATTR_ADJ_TAIL=4;   /* 🏋️ 1.0.9.6.00 — 0,35 → 0,55 Rating/pont */
+function attrDevToRating(dev,sc){
+  /* 🏋️ 1.0.9.6.00 — a sávok a játékos szintjével tágulnak (sc = trainScale),
+     ugyanúgy, ahogy a specializációs sáv: egy 150-es játékos +16-os passza nem
+     „telített", hanem ugyanakkora arányú specializáció, mint egy 80-asé +8-on */
+  const k=(sc>0&&isFinite(sc))?sc:1;
+  const S1=ATTR_ADJ_S1*k,S2=ATTR_ADJ_S2*k,TL=ATTR_ADJ_TAIL*k;
   const sign=dev<0?-1:1, d=Math.abs(dev);
-  let r=Math.min(d,ATTR_ADJ_S1)*ATTR_ADJ_FULL;
-  r+=Math.min(Math.max(d-ATTR_ADJ_S1,0),ATTR_ADJ_S2-ATTR_ADJ_S1)*ATTR_ADJ_FULL*0.5;
-  const t=Math.max(d-ATTR_ADJ_S2,0);
-  r+=ATTR_ADJ_FULL*0.25*ATTR_ADJ_TAIL*(1-Math.exp(-t/ATTR_ADJ_TAIL));
+  let r=Math.min(d,S1)*ATTR_ADJ_FULL;
+  r+=Math.min(Math.max(d-S1,0),S2-S1)*ATTR_ADJ_FULL*0.5;
+  const t=Math.max(d-S2,0);
+  r+=ATTR_ADJ_FULL*0.25*TL*(1-Math.exp(-t/TL));
   return sign*r;}
 /* ================= ÁTLÁTHATÓ EFFEKTÍV RATING EGY POSZTON =================
    A központi, ÉRTHETŐ fogalom: egy játékos mennyit ér egy ADOTT poszton az
@@ -31983,7 +31988,7 @@ function posEffectiveRating(entry,pos){
   const ownMainKey=attrTrainedBy((entry.pos&&entry.pos[0])||pos);
   const mainAttr=entry.attrs[mainKey]||40;
   const ownExpected=attrExpected(entry,ownMainKey);   /* amit a saját posztján elvárnánk */
-  const attrAdj=attrDevToRating(mainAttr-ownExpected);   /* csökkenő hozamú átváltás */
+  const attrAdj=attrDevToRating(mainAttr-ownExpected,trainScale(entry));   /* csökkenő hozamú átváltás · 🏋️ 1.0.9.6.00: szintarányos sávok */
   /* poszt-ismereti malus (Rating-pontban): a fő poszton 0, idegenen nagy */
   const famPenalty={1:0,0.6:-1,0.35:-3,0:-12};
   const fit=attrPosFit(entry,pos);
@@ -32078,6 +32083,40 @@ const CH_TRAIN_BOOST_MULT=1.5;
    oldja fel, külön takarítás nélkül. */
 function chTrainSecFrozen(){return (S.chTrainSecFreeze||0)>=(S.seasonNumber||1);}
 const TRAIN_SEC_PTS=0.4;     /* mellék edzés: a fő fele */
+/* ================= 🏋️ 1.0.9.6.00 — AZ EDZÉS ÉS A STÁB ERŐSEBB =================
+   KIMONDOTT KÉRÉS: „A stábtagok és az edzés borzasztóan gyengék. Ezeket sokkal
+   kevésbé kellene gyengíteni a nehézségi szintekkel. És alapból is az egész
+   rendszernek jóval erősebbnek kellene lennie. Jelenleg szinte teljesen
+   hatástalanok ezek. Nézz rá a számokra..."
+   A MÉRÉS (egy valódi, 8.1-es, Gleccser-tempós karrier, 100–160-as keret):
+     · egy teljes szezon fő edzése játékosonként 0,4–2,6 attribútum-lépés
+       (0,8 pont/meccs × szint × kor × 0,45 tempó, 15 pont = 1 lépés);
+     · +5 a TELJES kezdő 11 passzán = +0,5 meccserő, a gólszerzésen 0 — az
+       attribútum→Rating átváltás sávjai (8 / 16) fix számok voltak, egy 150-es
+       játékos specializációja a „telített" farokban ült;
+     · a Lélekemelő +11,9 morál = +0,6 meccserő; az attribútum-mester a
+       játékos szintjével sem nőtt (a többi edzés-csatornától eltérően).
+   A JAVÍTÁS NÉGY HELYEN:
+     1. a NEHÉZSÉGI TEMPÓ lassításának csak a 30%-a hat az edzésre és a stábra
+        (edzTempoKomp): 9.2-n a Gleccser 0,45 helyett 0,84, a Kőkorszak 0,26
+        helyett 0,78;
+     2. az EDZÉSTERV pontjai 2,5-szeresre nőnek (fő 2,0 · mellék 1,0
+        pont/meccs) — a TRAIN_MAIN/SEC_PTS a többi csatornáé (boost,
+        passzkémia) marad;
+     3. az attribútum→Rating átváltás SÁVJAI a játékos szintjével tágulnak
+        (attrDevToRating × trainScale), mint a specializációs sáv maga;
+     4. a STÁB alapszorzója 1,5 → 2,5 (a skill-kiosztásé 2,0, mert az máshol is
+        hatványoz), és az attribútum-mester a játékos szintjével nő. */
+const TRAIN_PLAN_MAIN=2.0, TRAIN_PLAN_SEC=1.0;
+const TRAIN_PLAN_SZORZO=TRAIN_PLAN_MAIN/0.8;   /* a régi fő edzéshez mért arány (a Kényszerítő ígérete is ehhez igazodik) */
+const EDZ_TEMPO_RESZ=0.30;   /* a nehézségi tempó lassításának ennyi része hat az edzésre és a stábra */
+function edzTempoK(ax){
+  let k=1;try{k=tempoMultAx(ax||"jatekos");}catch(e){k=1;}
+  return 1-(1-k)*EDZ_TEMPO_RESZ;}
+/* a devTempo-n belüli (teljes) tempó-tag helyére a csillapított: szorzó */
+function edzTempoKomp(ax){
+  let k=1;try{k=tempoMultAx(ax||"jatekos");}catch(e){k=1;}
+  return k>0?edzTempoK(ax)/k:1;}
 const TRAIN_SLOW=0.12;       /* a két nem edzett attribútum ennyivel lassabban gyűlik */
 /* ================= AZ EDZÉS EREJE KÖVESSE A CSAPAT SZINTJÉT =================
    BEJELENTETT PANASZ: "az edzés jelentősége elhalványul, ahogy fejlődik a
@@ -32441,6 +32480,8 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
          POZITÍV fejlődés akár 1.5x-re gyorsul. A büntetéseket (negatív v)
          szándékosan NEM skálázzuk: a küzdelem tanít, nem büntet jobban. */
       let val=ageScaleAttr(entry.age,v)*devTempo();
+      /* 🏋️ 1.0.9.6.00 — az edzésterv és a stáb a nehézségi tempónak csak a töredékét kapja */
+      if(val>0&&(isTrain==="terv"||(isTrain&&isTrain.stab)))val*=edzTempoKomp();
       if(val>0)val*=1+underdogFactor()*0.5;
       /* FEJLŐDÉS GYORSÍTÁS („Sztárom a párom"): a kijelölt sztár EGY választott
          attribútuma gyorsabban épül. A KÖZÖS csatornán ül, tehát az edzésterv,
@@ -32484,8 +32525,8 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
       /* 🧿 TALIZMÁN — Hatékony edzés (3.9.142): a TERVEZETT edzésre hat */
       const _tm=((S.chTrainBoost||0)>0?CH_TRAIN_BOOST_MULT:1)*talEdzesMult()*talEdzHatMult();   /* 🧿 F6b — Kemény edzés */
       const _secOff=chTrainSecFrozen();
-      if(_tr.main)addA(_tr.main,TRAIN_MAIN_PTS*_ts*share*_tm*talFoEdzMult(),"terv");   /* 🧿 F6b — Specialista */
-      if(_tr.sec&&!_secOff)addA(_tr.sec,TRAIN_SEC_PTS*_ts*share*_tm*talMasodEdzMult(),"terv");}   /* 🧿 F6a — Tábla és kréta (kontra) */
+      if(_tr.main)addA(_tr.main,TRAIN_PLAN_MAIN*_ts*share*_tm*talFoEdzMult(),"terv");   /* 🧿 F6b — Specialista · 🏋️ 1.0.9.6.00 */
+      if(_tr.sec&&!_secOff)addA(_tr.sec,TRAIN_PLAN_SEC*_ts*share*_tm*talMasodEdzMult(),"terv");}   /* 🧿 F6a — Tábla és kréta (kontra) */
     /* ---- ATTRIBÚTUM BOOST: A TARTÓS CSATORNA (3.8.12) ----
        UGYANABBA a csatornába folyik, mint az edzésterv: ugyanaz a kor-görbe,
        a trainScale és a globális tempó hat rá. A MÁSODLAGOS edzés ütemén megy
@@ -32514,7 +32555,7 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
     playerSkills(p.n).forEach(_i=>{
       const _at=_i.skill&&_i.skill.attrTrain;
       if(!_at)return;
-      addA(_at.key,_at.val*skillProgOf(_i)*trainScale(entry)*share,true);});
+      addA(_at.key,_at.val*TRAIN_PLAN_SZORZO*skillProgOf(_i)*trainScale(entry)*share,true);});   /* 🏋️ 1.0.9.6.00 — „az edzéstervnél is gyorsabban" marad */
     /* ---- SZEMÉLYI EDZŐ: AZ ATTRIBÚTUM-MESTEREK ----
        UGYANABBA a csatornába folynak, mint az edzésterv pontjai, tehát a
        kor-görbe (ageScaleAttr), az underdog-szorzó, a globális tempó és az
@@ -32525,7 +32566,7 @@ function processCareerDevelopment(active,mScore,mAssist,gi,bi,bestIdx,redIdx,inj
        A plafont NEM mozdítja: az ATTR_SPEC_CEIL sáv kemény határ marad, az
        edző csak az odáig vezető utat rövidíti. */
     attrCoachesFor(p.n).forEach(_c=>{
-      const _v=COACH_ATTR_PTS*coachPower(_c,p.n)*share;
+      const _v=COACH_ATTR_PTS*coachPower(_c,p.n)*trainScale(entry)*share;   /* 🏋️ 1.0.9.6.00 — a játékos szintjével nő, mint az edzésterv */
       addA(_c.attrKey,_v,{stab:_c});
       coachWorkAdd(_c,_v);});   /* munkanapló: pontosan annyi, amennyit tényleg adott */
     addA(pri,0.3*share);                              /* részvétel a poszt fő attribútumát edzi */
@@ -33596,15 +33637,15 @@ function processBenchDevelopment(){
       const tl=trainLogFor(entry);
       const add=(key,v)=>{
         if(key==="seb")v=v/speedTrainDiv(entry);   /* a sebesség lassabban formálható */
-        let val=ageScaleAttr(entry.age,v)*mult*devTempo();
+        let val=ageScaleAttr(entry.age,v)*mult*devTempo()*edzTempoKomp();   /* 🏋️ 1.0.9.6.00 */
         /* STÍLUSBOLT · EDZÉS-GYORSÍTÁS (3.9.127): a padon is jár. A tétel a
            keret leggyengébb emberéről szól — ha kiszorul a kezdőből, attól
            még ő a felzárkóztatandó, és pont ilyenkor van rá a legnagyobb
            szükség. Itt is CSAK a pozitív fejlődést szorozza. */
         if(val>0)val*=engTrainMult(p.n,key);
         tl.pts[key]+=val;trainLogAdd(tl,"terv",key,val);ap[key]=(ap[key]||0)+val;};
-      if(tr.main)add(tr.main,TRAIN_MAIN_PTS*talFoEdzMult()*talEdzHatMult());   /* 🧿 F6b */
-      if(tr.sec) add(tr.sec, TRAIN_SEC_PTS*talMasodEdzMult()*talEdzHatMult());   /* 🧿 F6a/F6b */
+      if(tr.main)add(tr.main,TRAIN_PLAN_MAIN*talFoEdzMult()*talEdzHatMult());   /* 🧿 F6b · 🏋️ 1.0.9.6.00 */
+      if(tr.sec) add(tr.sec, TRAIN_PLAN_SEC*talMasodEdzMult()*talEdzHatMult());   /* 🧿 F6a/F6b */
       ATTR_KEYS.forEach(k=>{
         while(ap[k]>=CAREER_DEV_THRESHOLD){ap[k]-=CAREER_DEV_THRESHOLD;bumpAttr(entry,k,1);}
         while(ap[k]<=-CAREER_DEV_THRESHOLD){ap[k]+=CAREER_DEV_THRESHOLD;bumpAttr(entry,k,-1);}});}});}
@@ -35314,7 +35355,7 @@ function advanceCoachSeason(){
     /* CSAPATÉPÍTÉSI STÍLUS: a stílushoz illő edzőtípusok gyorsabban érnek. */
     /* GLOBÁLIS TEMPÓ (3.8.32): a stáb fejlődése is a lassításra ül — a stábon
        keresztül különben ugyanaz a fejlődési előny visszaszivárgott volna. */
-    c.xp=(c.xp||0)+(((typeof tempoMult==="function")?tempoMult():1)+styleCoachXp(c.type))*talStabXpMult()   /* 🎓 3.9.224 — Gyors tanulók */
+    c.xp=(c.xp||0)+(((typeof edzTempoK==="function")?edzTempoK("jatekos"):1)+styleCoachXp(c.type))*talStabXpMult()   /* 🎓 3.9.224 — Gyors tanulók */
       +(talSpecLap("tapasztalat")?COACH_XP_PER_STEP:0);   /* 🧿 F6b — Tapasztalatcsere: +1 Sz / idény */
     const cap=coachSzCap(c);
     const want=Math.min(cap,(c.szBase||c.sz)+Math.floor(c.xp/COACH_XP_PER_STEP));
@@ -36981,7 +37022,7 @@ const GLOSSARY={
   nehezseg:{title:"Ellenfelek erőssége",text:"Csúszkával, szabadon választod ki az ellenfél-mezőny célerejét 70-től felfelé. A magas szinteknek saját nevük van (Túlvilági, Halálos, Isteni...). A szintet KÉT SZEZON KÖZÖTT BÁRMIKOR átállíthatod, fel és le is — nincs hozzá feltétel. Ez fontos, mert a csapatod folyamatosan fejlődik, a mezőny viszont nem: ha a kereted messze a mezőny fölé nő, a szezonok tét nélkülivé válnak, ráadásul a sok gól miatt a fejlődésed is felgyorsul, így a különbség magától tovább tágul. A HUB Nehézség-gombja ezért mutatja, hány ponttal vagy a mezőny fölött vagy alatt: ha jóval fölé kerülsz, a gomb színt vált és figyelmeztet. A csúszka mozgatásakor élőben látod, milyen lesz a szezon a beállított értékkel (kiegyensúlyozott, kihívást jelentő, tét nélküli...). A szint állításakor a piac azonnal felzárkózik: a scout onnantól az új szinthez mérten keres igazolásokat."},
   kihivasok:{title:"Kihívások",text:"Vállalható célok, amiket a játék felajánl — elvállalni SOHA nem kötelező, de amit elvállaltál, annak a büntetése akkor is lecsap, ha közben meggondolod magad. Két fajta van: az ÉVSZAK-kihívás egy 8 meccses ablakra szól, a SZEZON-kihívás egy teljes idényre (némelyik anyagi cél többre is). Mindkettőből egyszerre legfeljebb 2 lehet aktív. A JUTALOM A TELJESÍTÉS PILLANATÁBAN ÉRKEZIK, nem a határidőnél: amint a cél összejött, a kihívás lezárul, kifizet, és a helye azonnal felszabadul — így egy jól sikerült első félidény nem köti le a helyeidet a szezon második felére. Két fajta kihívás kivétel, és mindkettőnél ugyanaz az ok — a hátralévő idő még elveheti, amit elértél: a FORDÍTOTT kihívás („kapj legfeljebb 8 gólt”) a lejáratig bármikor elromolhat, az ÁLLAPOT-kihívás („álljon a taktikád 3. szinten”) pedig a határidő pillanatában mért állást nézi. Ezek a határidőnél dőlnek el, és az ajánlat-kártyán ki is van írva, melyik hogyan fizet. A nehézség nem képletből jön, hanem MÉRÉSBŐL: vállaláskor a játék lefuttat 300 szezont a te aktuális szintkülönbségeddel a meccsmotor saját gólmodelljével, és a célszámot arra a percentilisre teszi, ahol a kívánt teljesítési arány kijön — a Könnyű kb. 72%, a Közepes 48%, a Nehéz 26%. Ezért egy „Nehéz\" nagyjából ugyanolyan nehéz sereghajtóként és bajnokesélyesként is. A jutalom lehet egyszeri (pénz, morál, POT, skill, scout-csillag, keretméret, kártya-fejlesztés (a fokozatlépés MELLETT egységesen +2 Rating, akkor is, ha a kártya már a csúcson van), CSAPATSTÍLUS-PONT, SZURKOLÓ a táborba, egy zárt STÍLUS-KATEGÓRIA díj nélküli megnyitása (ha már mind nyitva, a beragadt mérföldkő-jutalmak kifizetése), vagy egy garantáltan 100%-os LICIT a piacon álló játékosodra) vagy TARTÓS, ami a karriered ívét alakítja (olcsóbb boostok, kedvezményes igazolások, edzői fizetésemelés, ingyen igazolás, befektetés). A büntetés ritkán csonkítja a keretet — inkább a mozgásteret szűkíti: zárt átigazolási ablak, drágább vásárlás, gyengébb scout, befagyott akadémia, cserezár egy játékosra. A legkeményebbek (skill-vesztés, távozó játékos) csak a hosszú, nehéz kihívásoknál jönnek elő. A SZURKOLÓ-TÉT NEM FIX SZÁM, hanem a klubod méretéhez mért: a mércéje a ligád sávja és a tényleges táborod közül a nagyobbik (a tábor legfeljebb a sáv két és félszereséig számít bele). Ebből egy 8 meccses évszak-kihívás nagyjából 5%-ot ér, a kupa-kihívás 10%-ot, egy egész szezonos vállalás 14%-ot — a nehézség pedig ezt szorozza (0,85 / 1,05 / 1,25). Így a jutalom a karrier elején és egy 300 ezres lelátónál is ugyanazt JELENTI, és a legnagyobb tét sem éri el a bajnoki cím szurkoló-hozamát. A büntetés ennek a kétharmada. A haladást a HUB kihívás-paneljén bármikor visszanézheted. AZ ÚJ TÉTEK a gazdasági ágakhoz kötnek: jutalomként 8-24 csapatstílus-pont, SZURKOLÓ a táborba, fél vagy egész csillag az ÁTIGAZOLÁSI ÜGYNÖKSÉGNEK; büntetésként 4-16 stíluspont, szurkoló-veszteség, fél csillag ügynökség-veszteség, vagy három olyan licit, ami kisebb eséllyel éri el a 100%-ot. A büntetések tudatosan kisebbek a párjuknál: a rendszer építeni jutalmaz, nem rombolni büntet. A TELJESÍTETT KIHÍVÁSOK A KARRIER EGÉSZÉRE IS GYŰLNEK: az Infó fül mérföldkövei közt van egy „Kihívások” sáv, ami a teljesítések SZÁMÁT méri (1, 2, 3, 5, 7, 9, 10, 12, 15, 17, 20, 25, 30, 35, 40, 45, 50, onnan tízesével 100-ig), és minden fokozatnál PÉNZ jár érte. Ez a kihívás saját jutalmán FELÜL van, nem helyette; a számláló a karrierhez tartozik, a szezonváltás nem nullázza. Csak a teljesített kihívás számít bele — az elbukott és az érvénytelenített nem."},
   taktika:{title:"Taktikák",text:"Az edződ 3 kedvelt taktikával érkezik (80/76/70-es szintről indulnak, a többi 60-ról). A HUB Taktika-paneljén aktiválhatsz egyet: 85-ös szint FÖLÖTT előnyt ad és stílust kap a csapat (a busz zárt meccseket, a kontra az erősebb ellenfelek ellen él, a labdatartás elveszi a labdát...), ALATTA még begyakorolatlan és visszahúz. Minden taktika MÁS csapat-attribútumokra épül: a Park the bus a Védekezésre és a Védésre, a Labdatartás a Passzra, a Hosszú labdák a Gólszerzésre, a Széljáték pedig a Sebességre és a Gólszerzésre. A kezdő 11 ÖT tengelyét (Védekezés, Védés, Passz, Gólszerzés, Sebesség) NÉGY réteg adja össze, és a Taktika-panel mind a négyet külön kiírja: (1) a POSZT — a pályán lévők attribútumai, poszt szerint súlyozva (egy védő sokat tesz a Védekezéshez, keveset a Gólszerzéshez); (2) a FELÁLLÁS ALAKJA — ugyanaz a tizenegy ember más rendszerben mást ér: a 4-4-2-höz mérve az 5-4-1 +1,3 Védekezést és −1,3 Gólszerzést ad, a 4-5-1 +0,5-öt véd és +0,6-ot passzol, a 4-3-3 −0,5 véd / +0,8 gól, a 3-4-3 −1,3 / +1,3, egy saját 3-6-1 pedig +1,4 Passz. A felállás-választóban táblázatban látod, melyik alak mit ad; (3) a MEGBÍZÁSOK — minden védekező középpályás +3 attribútumpontot tesz a Védekezéshez a Gólszerzés rovására, a támadó pontosan fordítva, a klasszikus és a szélső semleges (a hatás a felállás saját alapbeállításához mérten értendő); (4) a SKILLEK — a pályán lévők megszerzett képességei (pl. a kupa Aranycipője a Gólszerzés-tengelyt tolja meg). A SEBESSÉG külön eset: nem a Ratingből jön, egyénibb a többinél (a kisorsolása szélesebb sávban szór), 1,5x lassabban edzhető, és 99-nél kemény plafonja van — ez a plafon az Infinity megnyitásakor feloldódik, de fölötte a fejlődés a többi attribútum negyedére lassul. Maga a JÁTÉK is gyorsít valamennyit — a poszt sprint-igénye szerint (a csatár a legtöbbet, a kapus alig) —, de ez a passzív út a SZÜLETÉSI érték +15%-ánál megáll. Efölé kizárólag célzott edzésterv visz. Vagyis a gyorsaság alapvetően veleszületett adottság: aki lassúnak született, játékkal csak korlátozottan javul — cserébe a Széljáték és a Gyors kontra szinte ezen áll vagy bukik. HOGYAN SZÁMOL AZ ILLESZKEDÉS (3.9.176): minden taktikának vannak FŐ TENGELYEI (a lapos 20% fölötti súlyúak). A rendszer azt nézi, mennyivel erősebb a kereted ezeken, mint amit a játékosaid Ratingjéből várnánk — a többletet az edzésterv, az attribútum-boost, a skillek, a megbízások és a felállás adják. Egy fő tengely +10 pont többlettel kb. 88%-ot ér, +20-szal 98%-ot; többlet nélkül 50%. Egy tengely, amire a taktika nem épít, NEM ront rajta: egy Védekezés-boost a Széljátéknak semleges. A Rating fejlődése az elvárást és a tényleges értéket együtt viszi, ezért az illeszkedés magától nem esik vissza (normál módban a Sebesség 99-es plafonja levághatja a betanított többletet). A MECCS-HATÁS a nyers csapaterővel nő: 100-as nyers erőtől a plafon +5, és 10-enként +1,5-tel nő (170-nél +15,5) — ugyanilyen arányban mélyül a begyakorlatlanság büntetése is (a −OVR); 100 alatt a régi, rögzített értékek érvényesek (+2,1). Az így kapott illeszkedés kétszeresen számít: gyorsítja a begyakorlást, és skálázza a meccs-hatást is — a jól illeszkedő rendszer előnye nagyobb, a rosszul illeszkedő begyakorlatlanságának büntetése mélyebb. A panelen tengelyenként látod, hol állsz, és melyik erősséged emeli vagy melyik gyengeséged húzza vissza az egyes rendszereket. Egy ERŐS keret (85 fölötti csapaterő) gyorsabban vesz fel egy új rendszert: a begyakorlás 90-es szintig fokozatosan gyorsul a csapaterővel, 90 fölött viszont a mesteri csiszolás mindenkinek ugyanannyi munka. Így egy átformálódó nagy csapat gyorsan felhozhat egy másik taktikát."},
-  edzesterv:{title:"Edzésterv",text:"A HUB-ban kijelölhetsz egy FŐ és egy MELLÉK edzést. Mindkettőhöz egy attribútumot választasz (Védekezés, Sebesség, Védés, Passz, Gólszerzés) és legfeljebb 2 poszt-csoportot (kapus, védők, középpályások, csatárok), akikre vonatkozik. A fő edzés meccsenként 0,8 pontot ad a választott attribútumra, a mellék a felét (0,4) — cserébe az érintett játékosok NEM edzett attribútumai lassabban gyűlnek. Az edzés tehát nem ingyen gyorsítás, hanem irányválasztás: azt fejleszted, amire a taktikádnak szüksége van. A hatás korfüggő: 21 év alatt kétszeres, 25 alatt 1,6-szoros, 30 alatt 0,8-szoros, afölött 0,4-szeres — fiatalt érdemes képezni. Egy attribútum a poszt-profiljához képest +30-ig specializálható, de a Rating-hozam csökken (a +8 fölötti rész felét, a +16 fölötti a negyedét éri) — a TAKTIKA-illeszkedésben viszont teljes értékkel számít. Így egy 130-as passzú középpályás valódi passzmester lesz a Labdatartáshoz, anélkül hogy a Ratingje elszaladna. A SEBESSÉG külön eset: 1,5x lassabban formálható, és a játék magától csak a születési érték +15%-áig viszi — azon túl KIZÁRÓLAG edzéssel jutsz feljebb, 99-ig. Infinityben a 99 is feloldódik, de fölötte a sebesség már csak negyed tempóval épül."},
+  edzesterv:{title:"Edzésterv",text:"A HUB-ban kijelölhetsz egy FŐ és egy MELLÉK edzést. Mindkettőhöz egy attribútumot választasz (Védekezés, Sebesség, Védés, Passz, Gólszerzés) és legfeljebb 2 poszt-csoportot (kapus, védők, középpályások, csatárok), akikre vonatkozik. A fő edzés meccsenként 2 pontot ad a választott attribútumra, a mellék a felét (1) — a játékos szintjével arányosan többet (80-as Rating fölött), és a nehézségi fokozat tempó-lassításának csak a 30%-a hat rá. Cserébe az érintett játékosok NEM edzett attribútumai lassabban gyűlnek. Az edzés tehát nem ingyen gyorsítás, hanem irányválasztás: azt fejleszted, amire a taktikádnak szüksége van. A hatás korfüggő: 21 év alatt kétszeres, 25 alatt 1,6-szoros, 30 alatt 0,8-szoros, afölött 0,4-szeres — fiatalt érdemes képezni. Egy attribútum a poszt-profiljához képest +30-ig specializálható, de a Rating-hozam csökken (a +8 fölötti rész felét, a +16 fölötti a negyedét éri) — a TAKTIKA-illeszkedésben viszont teljes értékkel számít. Így egy 130-as passzú középpályás valódi passzmester lesz a Labdatartáshoz, anélkül hogy a Ratingje elszaladna. A SEBESSÉG külön eset: 1,5x lassabban formálható, és a játék magától csak a születési érték +15%-áig viszi — azon túl KIZÁRÓLAG edzéssel jutsz feljebb, 99-ig. Infinityben a 99 is feloldódik, de fölötte a sebesség már csak negyed tempóval épül."},
   karriermod:{title:"Karrier mód vs. Klasszikus mód",text:"A klasszikus egy szezonos móddal szemben a karrier mód több szezonon át tartó, fejlődő történet: a játékosaid öregednek és fejlődnek, van átigazolási piac, scout, akadémia, és a csapatod hosszú távon formálódik."},
   pot:{title:"POT",text:"A POT egy rejtett, a Ratingnél sokkal szélesebb skálájú érték, ami egy játékos hosszú távú, valódi potenciálját mutatja. Egy fiatal, alacsony Ratingű, de magas POT-jű játékos idővel akár sztárrá válhat. IDEGEN játékosnál a scoutod ereje szabja meg, hány POT-t nézhetsz meg — azt viszont te választod ki, kikét. A SAJÁT KERETEDNÉL nincs korlát: minden játékosod POT-je folyamatosan látszik a HUB-ban. Amíg kevesebb, mint 15 meccset játszott nálad, a scoutod érkezéskori becslése látszik (~ jellel); 15 meccs után a pontos érték — ennyi idő alatt kiderül, mi van benne. A becslés nem sorsolódik újra szezononként: az érkezéskori tévedés aránya fix, tehát ha a játékos POT-je nő (ifi-boost, akadémia, kihívás-jutalom), a becslés vele mozdul. MI MENNYIT JELENT? A POT egyetlen dolgot mond meg: milyen Rating-CSÚCSIG tud felnőni az ember. POT 800 ≈ 75-ös csúcs (kiegészítő), 1400 ≈ 80 (stabil kezdő), 2200 ≈ 84 (jó játékos), 3000 ≈ 88 (kiváló), 4000 ≈ 91 (sztár), 5650 ≈ 96 — ez a plafon, e fölött már csak az ára nő. A DRAFTON a medián 1630 körül van, a 2230 fölötti már a felső negyed, a 3040 fölötti a felső tized, az 5260 fölötti a felső század. AMIT KERESS: fiatalt, akinek a POT-ja jóval a mai Ratingje fölé mutat. Egy 20 éves, 74-es Ratingű, 2600-as POT-ú emberből 86-os játékos lesz; egy 28 éves, 82-es Ratingű, 1700-as POT-ú viszont már ott van, ahova eljutott. Az öreg és magas POT-ú ember nem hibás vétel — csak ne fejlődést várj tőle, hanem MOST erőt."},
   scout:{title:"Scout",text:"A scout dolga a FELMÉRÉS. A csillagereje szabja meg, hány IDEGEN játékos POT-jét nézheted meg egy keretből vagy jelöltlistából — és mivel az árak rejtve vannak, a scout-megtekintés az egyetlen módja felmérni egy leigazolás előtt álló játékos valódi erejét. (A saját játékosaid POT-je ingyen, folyamatosan látszik: a scout korlátja a VÁSÁRLÁS előtti felmérésről szól. A csillagereje ott is számít, hogy mennyire pontos a becslés, amit a keretedbe került játékosról az első 15 meccsén látsz.) Övé az AKADÉMIA és a hálózatán keresztül felfedezett nagy nevek esélye is. AMI MÁR NEM AZ ÖVÉ: az átigazolások lebonyolítása. A tárgyalások száma, a felderítési keret, a klub-szemle, a képesség-keresés és a piaci esemény átkerült az ÁTIGAZOLÁSI ÜGYNÖKSÉGHEZ — lásd a saját bejegyzését. A scoutot a karrier elején sorsolod (1-5 csillag), idővel magától is fejlődik, és fiatal (25 év alatti) tehetségeket keres előszeretettel. Fejleszteni a HUB Csapatépítés menüjében, az Ügynökség fejlesztése pont alatt lehet."},
@@ -99181,13 +99222,13 @@ function coachOfferFarewell(fp){
    A ×1.5 után egy csúcs-attribútummester a teljes figyelmét egy emberre adva
    0.825 pont/meccset ad, vagyis a FŐ edzésterv (0.8) fölé kerül — a személyi
    edző innentől nem kiegészítés, hanem valódi döntés. */
-const COACH_EFFECT_MULT=1.5;
+const COACH_EFFECT_MULT=2.5;   /* 🏋️ 1.0.9.6.00 — 1,5 → 2,5 (lásd az edzés-blokkot) */
 const COACH_ATTR_PTS=0.55*COACH_EFFECT_MULT;   /* pont/meccs, a fő edzésterv 0.8-ához mérve */
 const COACH_MORALE_PER=9*COACH_EFFECT_MULT, COACH_MORALE_MAX=14*COACH_EFFECT_MULT;
 const COACH_CHEM_MAX=6*COACH_EFFECT_MULT;
 const COACH_FORM_W=1.5*COACH_EFFECT_MULT;      /* forma-sorsolás súlyszorzó */
 const COACH_MEDIC_W=0.65*COACH_EFFECT_MULT;    /* sérülés-jelölt súlycsökkentés */
-const COACH_SKILL_W=1.8*COACH_EFFECT_MULT;     /* skill-kiosztási súlyszorzó */
+const COACH_SKILL_W=1.8*2.0;   /* 🏋️ 1.0.9.6.00 — a skill-kiosztás 2,0-s alapszorzóval (máshol is hatványoz) */      /* skill-kiosztási súlyszorzó */
 const COACH_SEASON_MATCHES=30;   /* egy szezon nagyságrendje az előnézethez */
 let _staffFocusEdit=null;    /* melyik edző fókuszát szerkesztjük épp (index) */
 let _staffHallOpen=false;    /* ki van-e nyitva a Stáb-csarnok */
@@ -99274,9 +99315,11 @@ function coachEffectLines(c){
      let _ic="🎯";try{const _d=styleDef();if(_d&&_d.ic)_ic=_d.ic;}catch(e){}
      L.push(`<span style="color:var(--grass)">${_ic} A stílus műhely-képessége <b>×${hu(_m.toFixed(2))}</b>-re erősíti a munkáját — az alábbi számok ezt már tartalmazzák.</span>`);}}
   if(c.attrKey){
-    const pts=COACH_ATTR_PTS*pw;
+    /* 🏋️ 1.0.9.6.00 — a (csillapított) tempóval; a játékos szintjével arányosan több */
+    const pts=COACH_ATTR_PTS*pw*edzTempoK();
     const steps=pts*COACH_SEASON_MATCHES/CAREER_DEV_THRESHOLD;
-    L.push(`<b>+${hu(pts.toFixed(2))}</b> ${esc(ATTR_LABELS[c.attrKey])}-pont/meccs — ≈ <b>${hu(steps.toFixed(1))}</b> lépés/szezon, fejenként`);
+    L.push(`<b>+${hu(pts.toFixed(2))}</b> ${esc(ATTR_LABELS[c.attrKey])}-pont/meccs — ≈ <b>${hu(steps.toFixed(1))}</b> lépés/szezon, fejenként `
+      +`<span style="color:var(--dim2)">(egy 80-as játékoson; a játékos szintjével arányosan több, 176-tól 2,2×)</span>`);
   }else if(c.type==="skill"){
     L.push(`Skill-esély a fókuszáltakon: <b>×${hu((1+COACH_SKILL_W*pw).toFixed(2))}</b>`);
     const bud=legacyBudget(c),left=legacyLeft(c),rate=legacyRate(c)*COACH_SEASON_MATCHES;
@@ -100608,7 +100651,7 @@ function renderTrainingPlanner(){
     html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">
       <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);font-weight:700">
         ${isMain?"Fő edzés":"Mellék edzés"} <span style="color:var(--dim2);letter-spacing:0;text-transform:none;font-weight:400">
-        (+${isMain?TRAIN_MAIN_PTS:TRAIN_SEC_PTS} pont/meccs)</span></div>
+        (+${String(isMain?TRAIN_PLAN_MAIN:TRAIN_PLAN_SEC).replace(".",",")} pont/meccs)</span></div>
       <div class="optgrid two" style="margin-top:7px" data-tr-stat="${slot}"></div>
       <div style="font-size:11.5px;color:var(--dim2);margin-top:7px">Mely posztok kapják?</div>
       <div class="optgrid two" style="margin-top:5px" data-tr-grp="${slot}"></div>
