@@ -7082,6 +7082,10 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
         <span id="matchSpeedVal" class="speedVal">0.25×</span>
         <datalist id="speedPresetList"></datalist>
       </div>
+      <!-- ⏭ 1.0.9.4.00 — UGRÁS A MECCS VÉGÉRE: a tempó mellett, mert az is a
+           közvetítés sebességéről szól. A párharcban nincs (közös, fix tempójú
+           közvetítés). Lásd MATCH_CTL.vegere. -->
+      <div id="vegereSor" class="hide" style="margin-top:6px"><button type="button" id="vegereBtn" class="btn-s matchWide">⏭ Szimuláció a meccs végéig</button></div>
     </div>
     <div id="standing"></div>
     <div id="moraleLine"></div>
@@ -8157,7 +8161,7 @@ html[data-theme="pixel"]:not(.pixMoveOff) *:where(:not(#scSim *,#evAnim *))::aft
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.9.3.00";
+const APP_VERSION="1.0.9.4.00";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -78191,6 +78195,11 @@ $("htSubClearBtn")&&($("htSubClearBtn").onclick=()=>{
    gomb magától eltűnik — nincs külön takarítás. */
 let MATCH_CTL=null;
 function updateLiveSubBar(){
+  /* ⏭ 1.0.9.4.00 — a „végére" gomb ugyanazzal a fogantyúval él */
+  try{const vs=$("vegereSor");if(vs){
+    const vOn=!!(MATCH_CTL&&MATCH_CTL.canVegere&&MATCH_CTL.canVegere());
+    const vWas=!vs.classList.contains("hide");vs.classList.toggle("hide",!vOn);
+    if(vWas!==vOn&&typeof sbSizeFeed==="function")sbSizeFeed();}}catch(e){}
   const bar=$("liveSubBar"),btn=$("liveSubBtn");if(!bar||!btn)return;
   const on=!!(MATCH_CTL&&MATCH_CTL.canSub());
   const was=!bar.classList.contains("hide");
@@ -78205,6 +78214,8 @@ function updateLiveSubBar(){
      megállni — a gomb ilyenkor tiltott, nem eltűnő: a helye maradjon meg. */
   btn.disabled=left<=0||!MATCH_CTL.canPause();
   btn.textContent=left>0?`🔁 Csere — még ${left}`:"🔁 Nincs több csere";}
+$("vegereBtn")&&($("vegereBtn").onclick=()=>{
+  if(MATCH_CTL&&MATCH_CTL.canVegere&&MATCH_CTL.canVegere())MATCH_CTL.vegere();});
 $("liveSubBtn")&&($("liveSubBtn").onclick=()=>{
   if(MATCH_CTL&&MATCH_CTL.canSub()&&MATCH_CTL.subsLeft()>0)MATCH_CTL.open();});
 /* A `megse` a VISSZALÉPÉS: a panel bezárul, de a forduló NEM indul el. A
@@ -84793,6 +84804,8 @@ function playMatchMotor(){
      KÉSLELTETETT visszanézés is lassan pereg: aki nem volt jelen az élő
      lefutásnál, visszatéréskor ugyanezt a 0,1×-es közvetítést kapja. */
   let tickMs=DUEL?H2H_TICK_MS:(S.auto?18:matchSpeedTickMs());
+  /* ⏭ 1.0.9.4.00 — a felhasználó a meccs végére ugrott (lásd MATCH_CTL.vegere) */
+  let _ugras=false;
   /* ⏯ FOLYTATÁS: a megszakítás pontjáig GYORSÍTVA pereg (lásd mFolytatasVege) */
   const _mNormMs=tickMs;
   if(!DUEL&&_mElo&&_mElo.cel>0)tickMs=S.auto?18:45;
@@ -86604,7 +86617,7 @@ function playMatchMotor(){
     /* ⏯ VISSZAJÁTSZÁSBAN a csereszünet csak akkor nyílik, ha a megszakítás
        épp itt, a nyitott panelnél történt — különben a naplózott döntések a
        következő vödör elején futnak le, ahogy eredetileg. */
-    if(min===45&&subHalftimeStopOn()&&!S.auto&&!DUEL&&!(_mElo&&_mElo.cel>_mElo.t+1)){
+    if(min===45&&subHalftimeStopOn()&&!S.auto&&!DUEL&&!_ugras&&!(_mElo&&_mElo.cel>_mElo.t+1)){
       try{if(_mElo&&_mElo.cel)mDontesAlk(_mElo.t+1);}catch(e){}
       clearInterval(iv);iv=null;
       sbClockPause();
@@ -86652,7 +86665,7 @@ function playMatchMotor(){
     M.t++;mEloIr();
     if(M.cel&&M.t>=M.cel){
       mFolytatasVege(M);
-      tickMs=_mNormMs;
+      if(!_ugras)tickMs=_mNormMs;
       /* az óra onnan megy tovább, ahol a visszajátszás tart */
       try{SB.tickMs=tickMs;SB.t0=sbNow()-M.t*tickMs;}catch(e2){}
       /* ha épp a csereszünet panelje áll nyitva, az onDone indítja újra */
@@ -86687,6 +86700,33 @@ function playMatchMotor(){
       try{const hp=$("htSubPanel");if(hp&&!hp.classList.contains("hide"))return;}catch(e){}
       try{sbClockResume();}catch(e){}iv=setInterval(tickFn,tickMs);},
     subsLeft:()=>HALFTIME_SUB_MAX-halfSubs.used.length,
+    /* ---- ⏭ 1.0.9.4.00 — SZIMULÁCIÓ A MECCS VÉGÉIG ----
+       KIMONDOTT KÉRÉS: „néha már első félidőben eldől a meccs és akkor
+       lehessen a végére ugrani ha akarsz. Kivéve PvP párharcban."
+       NEM egy külön, gyors szimuláció: UGYANAZ a motor fut tovább, ugyanazzal a
+       véletlennel, csak villámtempóval (a végigjátszás 18 ms-ánál is
+       gyorsabban), jelenetek nélkül és a félidei csereszünet megállója nélkül
+       (a tervezett cserék lefutnak). Az eredmény, a statisztika, a fejlődés és a
+       könyvelés tehát pontosan az, ami a lassú közvetítésben is lett volna. */
+    canVegere:()=>!DUEL&&!S.auto&&!_ugras&&min<90&&MATCH_CTL!=null,
+    vegere:()=>{
+      if(DUEL||S.auto||_ugras||!(min<90))return false;
+      _ugras=true;
+      const regi=tickMs;
+      tickMs=8;
+      /* a jelenetek ezen a meccsen elmaradnak, a futó jelenet bezárul */
+      try{if(_mev)_mev.anim=false;}catch(e){}
+      try{_evaSor.length=0;}catch(e){}
+      /* az óra a mostani perctől pereg tovább, az új ütemben */
+      try{const now=sbNow();const sec=(now-SB.t0)/(SB.tickMs||regi);SB.tickMs=tickMs;SB.t0=now-sec*tickMs;}catch(e){}
+      try{addLine(`⏭ <b>Szimuláció a meccs végéig</b> — a mérkőzés ugyanúgy lejátszódik, csak jelenetek és megállás nélkül.`,"m ev");}catch(e){}
+      if(iv){clearInterval(iv);iv=setInterval(tickFn,tickMs);}
+      else{
+        /* egy jelenet állította meg az órát: a bezárása indítja újra (az új ütemben) */
+        try{const el=$("evAnim");if(el&&!el.classList.contains("hide"))evaLezar();}catch(e){}
+        if(!iv&&MATCH_CTL&&MATCH_CTL.animFolytat)try{MATCH_CTL.animFolytat();}catch(e){}}
+      try{updateLiveSubBar();}catch(e){}
+      return true;},
     open:()=>{
       if(!iv)return;                       /* hosszabbítás vagy épp nyitott panel */
       clearInterval(iv);iv=null;
