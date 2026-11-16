@@ -73,6 +73,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
        pl.pos=[sl.pos];sl.player=pl;sl.fit=fitFor(pl,sl);drafted.add(e.n);});
      BENCH_KEYS.forEach(k=>{BENCH[k]=null;});extraRoster=[];
      ki.med=med;ki.keret=bandTeamRaw();}
+    /* 🔍 1.0.9.3.00 óta a sáv a nehézséggel a keret nyers erejéhez csúszik (lásd scout-nyers-1-0-9-3-00-proba);
+       ez a próba a 3.9.201-es alapsávot méri, ezért a csúszást kikapcsolja */
+    if(typeof discRawTMost==="function")window.discRawTMost=()=>0;
     const huz=(stars,n)=>{scout={name:"Teszt Elek",stars};const d=discoveryBand();const rs=[];let fiatal=0;
       for(let i=0;i<n;i++){const e=pickDiscoveryEntry(cands());rs.push(e.startRating);if((e.age||26)<=24)fiatal++;}
       const sb=signingBand();
