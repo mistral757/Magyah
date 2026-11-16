@@ -174,6 +174,7 @@ const KEP=process.env.KEP||"";
   if(KEP){await zar();
     await p.evaluate(()=>{
       [...document.querySelectorAll("body *")].forEach(e=>{const c=getComputedStyle(e);
+        if(c.position==="fixed"&&/rgba\(0, 0, 0, 0\.5\)/.test(c.backgroundColor)){e.style.display="none";return;}
         if(c.position==="fixed"&&!e.id&&e.offsetWidth>300&&e.offsetHeight>300&&/rgba\(0, 0, 0, 0\.5\)/.test(c.backgroundColor))e.style.display="none";});
       document.querySelector('[data-dlallas="d"]').click();document.getElementById("hubDialPicker").scrollIntoView();window.scrollBy(0,-70);});
     await p.waitForTimeout(400);await p.screenshot({path:path.join(KEP,"hangsuly-osszkep-utana.png")});}
@@ -196,6 +197,7 @@ const KEP=process.env.KEP||"";
   if(KEP){await zar();await p.evaluate(()=>{
       /* a tanító réteg névtelen sötétítője a képen csak takarna */
       [...document.querySelectorAll("body *")].forEach(e=>{const c=getComputedStyle(e);
+        if(c.position==="fixed"&&/rgba\(0, 0, 0, 0\.5\)/.test(c.backgroundColor)){e.style.display="none";return;}
         if(c.position==="fixed"&&!e.id&&e.offsetWidth>600&&e.offsetHeight>300&&/rgba\(0, 0, 0, 0\.5\)/.test(c.backgroundColor))e.style.display="none";});
       document.getElementById("hubDialPicker").scrollIntoView({block:"start"});});
     await p.waitForTimeout(300);await p.screenshot({path:path.join(KEP,"hangsuly-osszkep-fekvo.png")});}

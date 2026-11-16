@@ -78,6 +78,8 @@ lenyitható. A szöveg jó és pontos — a helye rossz.
 illeszkedés), utána a 🎚 kártya és a rendszerek; az öt tengely bontása és a
 magyarázat `<details>`-be kerül („A kereted öt tengelye — részletek”),
 semmi nem vész el. **Kockázat** kicsi. → **1.0.9.8.01.**
+Képek: `taktika-fejlec-elotte.png` → `taktika-fejlec-utana.png` (az első
+rendszer-kártya a panel tetejétől 274 px-re kezdődik a korábbi ~900 helyett).
 
 ## C · A csúszkák halmozva sokat érnek — mérés (5)
 
