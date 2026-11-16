@@ -6,6 +6,8 @@
      CFG=stilus   — ugyanaz + a három legerősebb csúszka (vonal◀ belepo▶ busz◀)
      CFG=taktika0 — aktív taktika 99-es ismertséggel, csúszkák középen
      CFG=taktika  — ugyanaz + vonal◀ tempo▶ press▶ mental◀ teljesen kihúzva
+     CFG=halmozva — a taktika négy csúszkája ÉS a Beton hármasa egyszerre
+   DIALV=0|2 — a csúszkák szerződése (0: nincs plafon, 2: ±40%-os plafon)
    A különbség rögzítve van (DS, alapból 0), tehát a taktika meccserő-hatása
    és a stílus szintje NEM szól bele: ami a két futás között eltér, azt a
    csúszkák gólvárhatóság-szorzói teszik.
@@ -62,22 +64,30 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return {idx:S.idx};});
 
   const CFG=process.env.CFG||"alap";
-  const cfgKi=await p.evaluate((CFG)=>{
+  const cfgKi=await p.evaluate(({CFG,DIALV})=>{
     const ki={CFG};
     if(CFG==="stilus0"||CFG==="stilus"){
       S.style={key:"beton",chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null,dials:{}};
       const _sl=styleLevel;styleLevel=function(st){const s=st||styleState();return (s&&s.key&&!s.pre)?20:0;};
       if(CFG==="stilus")S.style.dials={vonal:-10,belepo:10,busz:-10};
       styleLvlCacheClear();ki.szint=styleLevelFast();}
-    if(CFG==="taktika0"||CFG==="taktika"){
+    /* 🎚 1.0.10.0.00 — CFG=halmozva: a taktika négy csúszkája ÉS a Beton hármasa
+       egyszerre; DIALV=0 a régi szabály (nincs plafon), DIALV=2 az új karriereké */
+    if(CFG==="halmozva"){
+      S.style={key:"beton",chosenSeason:1,traits:{},ms:{done:{},seen:{},t:{}},star:null,dials:{vonal:-10,belepo:10,busz:-10}};
+      styleLevel=function(st){const s=st||styleState();return (s&&s.key&&!s.pre)?20:0;};
+      styleLvlCacheClear();ki.szint=styleLevelFast();}
+    if(CFG==="taktika0"||CFG==="taktika"||CFG==="halmozva"){
       const k=Object.keys(TACTICS).slice().sort((a,b)=>tacticFit(b)-tacticFit(a))[0];
       S.tactics.active=k;S.tactics.levels[k]=99;S.tactics.dials={};
-      if(CFG==="taktika")S.tactics.dials[k]={vonal:-10,tempo:10,press:10,mental:-10};
+      if(CFG==="taktika"||CFG==="halmozva")S.tactics.dials[k]={vonal:-10,tempo:10,press:10,mental:-10};
       tdMemoClear();const M=tdMemo();ki.takt={k,L:M.L,max:M.max,fm:M.fm,fit:M.fit};}
-    const mul=(ch,ctx)=>{let m=1;dialEach(ch,(ef,v,l)=>{if(dialMatch(ef,ctx))m*=dialFactor(ef,v,l);});return m;};
+    if(DIALV!==null)S.dialV=DIALV;ki.dialV=S.dialV;
+    const _t=talMeccsCsat;talMeccsCsat=()=>1;const mul=(ch,ctx)=>dialMul(ch,ctx);
     ki.own=[15,40,60,80].map(m=>+mul("own",{min:m,gf:0,ga:0}).toFixed(3));
     ki.opp=[15,40,60,80].map(m=>+mul("opp",{min:m,gf:0,ga:0}).toFixed(3));
-    return ki;},CFG);
+    talMeccsCsat=_t;
+    return ki;},{CFG,DIALV:process.env.DIALV!=null?+process.env.DIALV:null});
   console.log("cfg",JSON.stringify(cfgKi));
   await p.clock.install();
   const N=+process.env.N||200, DIFFS=(process.env.DS||"0,2,3,5").split(",").map(Number), FIXS=(process.env.FIXS||"5,6").split(",").map(Number);
