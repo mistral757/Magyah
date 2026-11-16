@@ -30,7 +30,7 @@ megvalósult, annak a verziója a tétel végén áll.)*
 | D | 5 | A „Sztárom a párom” csúszkái a meccsre nem hatnak | közepes | közepes | kicsi | javaslat |
 | E | 3 | Az edzésterv választásakor nincs előrejelzés | közepes | kicsi | közepes | javaslat (részben megvan utólag) |
 | F | 2 | Nincs betűméret- és lekerekítés-skála (43 + 14 érték) | közepes | **nagy** | nagy | javaslat; az új felületek a meglévő osztályokból építkeznek |
-| G | 4 | Régi panelek: szövegfal elöl, döntés alul | közepes | közepes | nagy | B-ben egy panel; a többi javaslat |
+| G | 4 | Régi panelek: szövegfal elöl, döntés alul | közepes | közepes | nagy | Taktika (1.0.9.8.01) és Boost-központ (**1.0.9.8.02**) kész; a többi javaslat |
 | H | 1 | A HUB-ban egyszerre két „alpanel-nyelv” él | kicsi | közepes | nagy | javaslat |
 
 ---
@@ -196,6 +196,15 @@ panelenként egy patch, a B tétel mintájára (állapot elöl, magyarázat
 `<details>`-ben, a szöveg változatlan). Ebben a körben a Taktika készül el;
 a Boost-központ a következő jelölt (ott a legnagyobb a fal).
 
+**Megvalósult (1.0.9.8.02):** a Boost-központ fejléce 252 → 155 px (430 px-es
+nézet, 1. idény): elöl három csempe (az egység ára, az egyenleg, a kedvezmény
+százaléka) és a kedvezmény forrásai, az árazás magyarázata lenyitható. Képek:
+`boost-fejlec-elotte.png` → `boost-fejlec-utana.png`. Tanulság: az első
+változat a kedvezmény forrásait is a fülbe tette, és ezt a régi
+`boost-talizman-3-9-185-proba.js` megfogta („talizmánból” legyen kint) —
+jogosan, ezért kint maradtak. Hátravan: Edzésterv, Szakmai stáb, Felállás,
+Scout–ügynökség–sajtó.
+
 ## H · Két „alpanel-nyelv” a HUB-ban (1)
 
 A régebbi alpanelek a HUB oldalába nyíló kártyák (`hubTacticsPicker`,
@@ -211,3 +220,25 @@ sok kattintási utat és ~40 próbát érint — javaslat marad.
   számot láttatni; az Összkép ugyanezt a nyelvet követi.
 - Az edzői elemzés a meccs után a csúszkák gólvárhatóság-tagját már ma is
   külön kezeli (`mxVodor` „dial” tényező).
+
+## Regresszió a megvalósítás után
+
+`node tools/futtat.js -j 3` az 1.0.9.8.01 állapotán: **306/320 próba zöld**
+(5726 teljesült állítás). A 14 bukottat az eredeti, 1.0.9.7.00-ás
+`index.html`-lel is lefuttattam:
+
+- **11 az eredetin is ugyanúgy bukik** (tehát nem ettől a munkától):
+  `boost-plafon-3-9-318`, `hsz-merce-3-9-200`, `kerethirdetes-1-0-4-9-00`
+  (időtúllépés is), `mez-stylist-3-9-320`, `nyomas-es-meccsero`,
+  `osztalyletszam`, `pvp-parharc-rendszerek`, `sargalap`,
+  `stylist-nev-szinergia-1-0-7-2-00`, `uj-verzio-3-9-306`, és a
+  `csapatszerepek-3-9-293` (ez utóbbi 7 mintás arányt mér: ismételve hol zöld,
+  hol nem, a változtatás előtt és után is).
+- **3 mindkét állapoton ingadozik** (a sorsolt kerettől függ):
+  `parharc-stilusgol-1-0-9-2-00` (az eredetin 4-ből 3 bukás, utána 4-ből 3),
+  `ideny-rajt-1-0-7-0-00` (az eredetin 3-ból 1, utána más-más állítás),
+  `celres-tartos-1-0-6-0-00` (ismételve zöld).
+
+Ezeket nem javítottam: nehézség-, kupa- és párharc-számításokat mérnek, a
+hibás állítás okának felderítése külön feladat — javaslat a következő körre,
+mert egy tartósan piros próba elfedi a valódi regressziót.
