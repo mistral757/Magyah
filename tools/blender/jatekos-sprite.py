@@ -6,6 +6,14 @@ Futtatás:
       [--bor "#e0ac8a"] [--haj "#3b2a1e"] [--kockak 8] [--meret 128]
 
 Kimenet: KIMENET_MAPPA/futas_00.png … futas_07.png (átlátszó háttér).
+
+--mod retegek (a játékba szánt, futás közben színezhető változat):
+  KIMENET_MAPPA/arny_NN.png — minden testrész FEHÉR, csak a fény formálja;
+  KIMENET_MAPPA/id_NN.png   — minden testrész egy egyszínű KÓD (nincs élsimítás):
+      mez = piros · csík = zöld · nadrág = kék · sportszár = sárga ·
+      bőr = bíbor · haj = cián · szem és cipő = fehér.
+  Az atlaszt a tools/blender/sprite-atlasz.py fűzi össze, a játék (sprFut*)
+  a böngészőben színezi ki a gólszerző mezére.
 Az összefűzést (sprite-sheet, pixelesítés) a tools/blender/sprite-sheet.py végzi.
 A figura alapformákból áll (nincs külső modell, nincs licenckérdés): stilizált,
 nagy fejű „chibi" arányok, hogy kis méretben is olvasható maradjon.
@@ -21,6 +29,7 @@ ap.add_argument("--bor", default="#e0ac8a"); ap.add_argument("--haj", default="#
 ap.add_argument("--cipo", default="#111111")
 ap.add_argument("--kockak", type=int, default=8); ap.add_argument("--meret", type=int, default=128)
 ap.add_argument("--mintak", type=int, default=24)
+ap.add_argument("--mod", default="alap", choices=["alap", "retegek"])
 A = ap.parse_args(argv)
 os.makedirs(A.ki, exist_ok=True)
 
@@ -127,8 +136,28 @@ r.resolution_x = r.resolution_y = A.meret; r.film_transparent = True
 r.image_settings.file_format = "PNG"; r.image_settings.color_mode = "RGBA"
 sc.view_settings.view_transform = "Standard"
 
-for f in range(N):
-    sc.frame_set(f)
-    r.filepath = os.path.join(A.ki, "futas_%02d.png" % f)
-    bpy.ops.render.render(write_still=True)
-print("KESZ", N, "kocka ->", A.ki)
+def renderel(elotag):
+    for f in range(N):
+        sc.frame_set(f)
+        r.filepath = os.path.join(A.ki, "%s_%02d.png" % (elotag, f))
+        bpy.ops.render.render(write_still=True)
+
+if A.mod == "alap":
+    renderel("futas")
+else:
+    # 1) ÁRNYALÁS: minden anyag fehér (az érdesség marad)
+    for m in M.values():
+        m.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.8, 0.8, 0.8, 1)
+    renderel("arny")
+    # 2) AZONOSÍTÓ: egyszínű emisszió, élsimítás nélkül (a kód nem keveredhet)
+    KOD = dict(mez=(1, 0, 0), mez2=(0, 1, 0), nadrag=(0, 0, 1), szar=(1, 1, 0),
+               bor=(1, 0, 1), haj=(0, 1, 1), szem=(1, 1, 1), cipo=(1, 1, 1))
+    for nev, m in M.items():
+        nt = m.node_tree; nt.nodes.clear()
+        em = nt.nodes.new("ShaderNodeEmission"); ki = nt.nodes.new("ShaderNodeOutputMaterial")
+        em.inputs["Color"].default_value = KOD[nev] + (1,); em.inputs["Strength"].default_value = 1
+        nt.links.new(em.outputs["Emission"], ki.inputs["Surface"])
+    vilag.node_tree.nodes["Background"].inputs["Strength"].default_value = 0
+    sc.cycles.samples = 1; r.filter_size = 0.01
+    renderel("id")
+print("KESZ", N, "kocka ->", A.ki, A.mod)
