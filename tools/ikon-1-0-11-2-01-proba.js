@@ -84,13 +84,13 @@ console.log("\n— 5. A MANIFEST —");
 const man=JSON.parse(fs.readFileSync(path.join(I,"site.webmanifest"),"utf8"));
 {
   ok(man.theme_color==="#06141a"&&man.background_color==="#06141a","a színek az új alaphoz igazodnak (#06141a)",{t:man.theme_color,b:man.background_color});
-  const hiany=man.icons.concat(man.screenshots).map(x=>x.src).filter(s=>!fs.existsSync(path.join(ROOT,s)));
+  const hiany=man.icons.concat(man.screenshots).map(x=>x.src).filter(s=>!fs.existsSync(path.join(ROOT,s.split("?")[0])));
   ok(hiany.length===0,"minden hivatkozott fájl létezik",hiany);
   ok(man.icons.filter(x=>x.purpose==="maskable").length===2,"a két maskable ikon „purpose: maskable”-lel");
   const ss=py(`
 from PIL import Image
 import json,hashlib
-print(json.dumps([[list(Image.open(${JSON.stringify(ROOT)}+s).size),hashlib.md5(open(${JSON.stringify(ROOT)}+s,"rb").read()).hexdigest()] for s in ${JSON.stringify(man.screenshots.map(x=>x.src))}]))`);
+print(json.dumps([[list(Image.open(${JSON.stringify(ROOT)}+s).size),hashlib.md5(open(${JSON.stringify(ROOT)}+s,"rb").read()).hexdigest()] for s in ${JSON.stringify(man.screenshots.map(x=>x.src.split("?")[0]))}]))`);
   ok(ss.every(x=>x[0][0]===1080&&x[0][1]===1920)&&new Set(ss.map(x=>x[1])).size===ss.length,"a négy képernyőkép 1080×1920-as, és mind különböző",ss.map(x=>x[0]));
 }
 
@@ -98,10 +98,22 @@ console.log("\n— 6. A SERVICE WORKER —");
 {
   const sw=fs.readFileSync(path.join(ROOT,"sw-1.js"),"utf8");
   const v=+(sw.match(/harminc-nulla-cache-v(\d+)/)||[])[1];
-  ok(v>=10,"a cache-név v10 vagy későbbi (az ikonok cserélődtek)",v);
-  const kell=man.icons.map(x=>x.src).concat(["/icons/favicon.ico","/icons/apple-touch-icon.png","/icons/site.webmanifest"]);
+  ok(v>=11,"a cache-név v11 vagy későbbi (az ikonok címe verziót kapott)",v);
+  const html=fs.readFileSync(path.join(ROOT,"index.html"),"utf8");
+  const fejV=[...html.slice(0,html.indexOf("<script>")).matchAll(/href="\/icons\/(?:favicon\.ico|apple-touch-icon\.png)(\?v=\d+)?"/g)].map(m=>m[1]||"");
+  const V=fejV[0]||"";
+  const kell=man.icons.map(x=>x.src).concat(["/icons/favicon.ico"+V,"/icons/apple-touch-icon.png"+V,"/icons/site.webmanifest"]);
   const nincs=kell.filter(s=>!sw.includes(`"${s}"`));
-  ok(nincs.length===0,"minden ikon előre cache-elve",nincs);
+  ok(nincs.length===0,"minden ikon előre cache-elve (ugyanazon a címen, amin a manifest és a <head> kéri)",nincs);
+  /* 1.0.11.4.02 — „újra telepítettem az appot, és nekem az ikon nem változott
+     meg": az új ikon a régi fájlnéven a gyorsítótárakból a régit adhatta.
+     Mostantól minden ikon-hivatkozás UGYANAZT a verzió-utótagot viseli, a
+     manifest címe viszont NEM (az azonosítja a telepített alkalmazást). */
+  const manV=new Set(man.icons.concat(man.screenshots).map(x=>(x.src.match(/\?v=\d+$/)||[""])[0]));
+  const swV=new Set([...sw.matchAll(/"\/icons\/(?:icon-[^"?]+\.png|favicon\.ico|apple-touch-icon\.png)(\?v=\d+)?"/g)].map(m=>m[1]||""));
+  ok(V&&fejV.length===2&&fejV.every(x=>x===V)&&manV.size===1&&manV.has(V)&&swV.size===1&&swV.has(V),
+     "az ikonok címe verziót visel, és a manifest, a <head> és a service worker ugyanazt",{fej:fejV,manifest:[...manV],sw:[...swV]});
+  ok(/<link rel="manifest" href="\/icons\/site\.webmanifest">/.test(html),"a manifest címe változatlan (az azonosítja a telepített alkalmazást)");
 }
 
 console.log("\n— 7. AZ ÁRUHÁZI GRAFIKA —");
