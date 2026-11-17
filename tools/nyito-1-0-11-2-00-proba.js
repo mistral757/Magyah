@@ -185,7 +185,7 @@ console.log("\n— 1. A FORRÁS —");
     await p.mouse.click(hol.x,hol.y);await p.waitForTimeout(600);
     const r=await p.evaluate(()=>{const w=document.getElementById("unlockWelcome");
       return {nyilt:!!w&&!w.classList.contains("hide")&&getComputedStyle(w).display!=="none",
-        wipe:document.getAnimations().filter(a=>a.animationName==="refWipe").length};});
+        wipe:document.getAnimations().filter(a=>a.animationName==="refFade").length};});
     ok(fx&&r.nyilt,"✨ BE mellett a nyitó utáni ELSŐ koppintás a Karrier-gombon célba ér",{fx,...r});
     await ctx.close();
   }

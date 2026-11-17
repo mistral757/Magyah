@@ -413,7 +413,9 @@ const REGI_BETU={dark:["Archivo","Archivo Black"],paper:["Oswald","Anton"],noir:
       await q.waitForTimeout(600);
       /* ablak: a beállítások */
       r.ablak=await q.evaluate(()=>{openSettingsModal(true);const c=document.querySelector("#themeModal>.card");
-        return (c&&c.getAnimations?c.getAnimations():[]).map(a=>a.animationName);});
+        /* a lap áttűnése + a háttér ::after rétegén a reflektor-fény */
+        const fen=document.getAnimations().filter(a=>a.effect&&a.effect.pseudoElement==="::after"&&a.effect.target&&a.effect.target.id==="themeModal").map(a=>a.animationName);
+        return (c&&c.getAnimations?c.getAnimations():[]).map(a=>a.animationName).concat(fen);});
       await q.waitForTimeout(700);
       r.ablakUtan=await q.evaluate(()=>{const c=document.querySelector("#themeModal>.card"),cs=getComputedStyle(c);
         return {clip:cs.clipPath,filter:cs.filter};});
@@ -461,17 +463,24 @@ const REGI_BETU={dark:["Archivo","Archivo Black"],paper:["Oswald","Anton"],noir:
     const be=await probal({fx:true});
     ok(be.fxLive&&be.kezdo.cim.includes("refTitle")&&be.kezdo.cta.includes("refGlint"),"✨ BE: a főcím élesedik, a fő gomb csillan",be.kezdo);
     ok(be.gyuru===1,"✨ BE: a gomb lenyomására gyűrű nyílik",be.gyuru);
-    ok(be.ablak.includes("refBeam")&&be.ablakUtan.clip==="none"&&be.ablakUtan.filter==="none","✨ BE: az ablak reflektorral nyílik, és utána nem marad rajta vágás vagy szűrő",{an:be.ablak,utan:be.ablakUtan});
+    ok(be.ablak.includes("refBeam")&&be.ablak.includes("refFade")&&be.ablakUtan.clip==="none"&&be.ablakUtan.filter==="none","✨ BE: az ablak áttűnik, a reflektor-fény a háttér saját rétegén söpör, és utána nem marad rajta vágás vagy szűrő",{an:be.ablak,utan:be.ablakUtan});
     /* a REFLEKTOR-ÉLET egyetlen animációja sem tehet transformot vagy filtert
        olyan elemre, aminek fix pozíciójú leszármazottja lehet (a csoportra, a
        lenyíló törzsre, az ablakra, az oldalra) — lásd a fekvő menü hibáját */
     {const css=html.slice(html.indexOf("REFLEKTOR-ÉLET (1.0.11.1.00)"),html.indexOf("</style>",html.indexOf("REFLEKTOR-ÉLET (1.0.11.1.00)")));
      const kf=n=>(css.match(new RegExp("@keyframes "+n+"\\{[\\s\\S]*?\\}\\}"))||[""])[0];
-     const rossz=["refWipe","refBeam","refReveal","refDim"].filter(n=>!kf(n)||/transform|filter/.test(kf(n)));
-     ok(rossz.length===0,"az oldal, az ablak és a lenyíló törzs animációja se transformot, se filtert nem használ",rossz);}
+     const rossz=["refFade","refReveal","refDim"].filter(n=>!kf(n)||/transform|filter/.test(kf(n)));
+     ok(rossz.length===0,"az oldal, az ablak és a lenyíló törzs animációja se transformot, se filtert nem használ",rossz);
+     /* ⚡ 1.0.11.4.01 — CSAK GPU-N FUTÓ TULAJDONSÁG: minden ref… kulcskocka
+        csak opacity / transform / filter (a fő gomb csillanása, refGlint, a
+        kis gombon háttér-pozíció — ez az egyetlen, dokumentált kivétel) */
+     const nevek=[...css.matchAll(/@keyframes (ref\w+)/g)].map(m=>m[1]).filter(n=>n!=="refGlint");
+     const tilos=nevek.filter(n=>{const k=kf(n).replace(/@keyframes \w+/,"");
+       return [...k.matchAll(/([a-z-]+)\s*:/g)].map(m=>m[1]).some(pr=>!/^(opacity|transform|filter)$/.test(pr));});
+     ok(nevek.length>=8&&tilos.length===0,`mind a ${nevek.length} saját belépő animáció csak GPU-n futó tulajdonságot animál (nincs clip-path, box-shadow, betűköz)`,tilos);}
     ok(be.gol.v&&be.gol.on&&/GÓÓÓL/.test(be.gol.szoveg)&&be.golUtan==="","✨ BE: gólnál „alsó harmad” felirat, utána eltűnik",{...be.gol,utan:be.golUtan});
     ok(be.boot===1&&be.bootUtan===0,"✨ BE: a témára váltva a stadion felkapcsol, a réteg utána eltűnik",{be:be.boot,utan:be.bootUtan});
-    ok(be.oldal.includes("refWipe"),"✨ BE: az új oldal ferde vágással beúszik",be.oldal);
+    ok(be.oldal.includes("refFade"),"✨ BE: az új oldal áttűnik",be.oldal);
     ok(be.menu>=3,"✨ BE: a menü csoportjai egymás után beemelkednek",be.menu);
     for(const [nev,o] of [["kevesebb mozgás (rendszer), ✨ kézzel BE",{fx:true,reduced:true}],["✨ KI",{fx:false}]]){
       const r=await probal(o);
