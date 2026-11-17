@@ -55,6 +55,25 @@ const APRO_HATAR = 32, MINI_HATAR = 48;
 
   await b.close(); srv.kill();
 
+  /* ── TÖMÖRÍTÉS (1.0.11.2.01) ─────────────────────────────────────────────
+     Az új rajz színátmenetei miatt a nyers PNG a régi négy-ötszöröse (az
+     512-es 100 kB). A service worker MINDET előre letölti, tehát számít.
+       · ≥72 px: pngquant, minőség 88–100 — palettás PNG árnyalás-simítással;
+         a színátmenet nem sávosodik (szemmel és a lenti ellenőrzéssel nézve);
+       · minden PNG: optipng -o5, veszteségmentesen.
+     A 16–48-as lapok NEM palettásodnak: ott minden pixel számít.
+     Ha az eszközök nincsenek telepítve (apt-get install pngquant optipng), a
+     lépés kimarad, és a gyártó szól — a készlet akkor is helyes, csak nagyobb. */
+  const van = c => { try { execFileSync('which', [c]); return true; } catch (e) { return false; } };
+  if (van('pngquant') && van('optipng')) {
+    for (const [f] of kesz) {
+      if (!/\.png$/.test(f)) continue;
+      const m = +((f.match(/(\d+)x\d+/) || [])[1] || 180);
+      if (m >= 72) execFileSync('pngquant', ['--quality=88-100', '--speed', '1', '--force', '--ext', '.png', '--', f]);
+      execFileSync('optipng', ['-quiet', '-fix', '-o5', f]);   /* -fix: a pngquant átlátszósági táblája néha egy elemmel hosszabb a palettánál — ezt teszi rendbe */
+    }
+  } else console.log('⚠ pngquant / optipng nincs telepítve — a tömörítés kimaradt');
+
   /* ── favicon.ico: 16 + 32 + 48 egy fájlban ─────────────────────────────── */
   execFileSync('python3', ['-c', `
 from PIL import Image
@@ -69,4 +88,42 @@ k[2].save("${GYOKER}/icons/favicon.ico", format="ICO", sizes=[(16,16),(32,32),(4
     console.log(`  ${f.split('/').pop().padEnd(28)} ${String(s.size).padStart(7)} B   ${v}`);
   });
   console.log(hiba.length ? '\nHIBÁK: ' + hiba.join(' | ') : '\nrajzolási hiba: nincs');
+
+  /* ── AZ ELLENŐRZÉS (1.0.11.2.01) ─────────────────────────────────────────
+     Nem elég, hogy a fájl létrejött: a tartalmát is megnézzük.
+       · minden PNG pontosan a nevében álló méretű;
+       · a lekerekített ikonok sarka átlátszó, a közepük nem;
+       · a MASKABLE teljes széltében kitöltött (nincs átlátszó pixel), és a
+         jel (a volt-sárga és a fehér pontok) a középső 80%-os KÖRÖN belül
+         marad — az Android launcher ezen kívül bármit levághat;
+       · a favicon.ico mindhárom méretet tartalmazza. */
+  const ell = execFileSync('python3', ['-c', `
+from PIL import Image
+import math,json,glob,re
+G="${GYOKER}/icons/";ki=[]
+for f in sorted(glob.glob(G+"icon-*.png"))+[G+"apple-touch-icon.png"]:
+    im=Image.open(f).convert("RGBA");w,h=im.size;n=f.split("/")[-1]
+    m=re.search(r"(\\d+)x(\\d+)",n);vart=int(m.group(1)) if m else 180
+    if (w,h)!=(vart,vart):ki.append(n+": méret "+str((w,h)));continue
+    if "maskable" in n:
+        px=im.load();R=0.4*w;kint=0;atl=0
+        for y in range(h):
+            for x in range(w):
+                r,g,b,a=px[x,y]
+                if a<255:atl+=1
+                d=math.hypot(x+.5-w/2,y+.5-h/2)
+                jel=(g>200 and b<140) or (r>235 and g>235 and b>235)
+                if d>R and jel:kint+=1
+        if atl:ki.append(n+": "+str(atl)+" átlátszó pixel")
+        if kint:ki.append(n+": "+str(kint)+" jel-pixel a biztonsági körön kívül")
+    else:
+        if im.getpixel((0,0))[3]>40 or im.getpixel((w-1,h-1))[3]>40:ki.append(n+": a sarok nem átlátszó")
+        if im.getpixel((w//2,h//2))[3]<255:ki.append(n+": a közepe átlátszó")
+ico=Image.open(G+"favicon.ico");mer=sorted(ico.info.get("sizes",[]))
+if mer!=[(16,16),(32,32),(48,48)]:ki.append("favicon.ico: "+str(mer))
+print(json.dumps(ki,ensure_ascii=False))
+`]).toString().trim();
+  const hibak2 = JSON.parse(ell);
+  console.log(hibak2.length ? '✗ ELLENŐRZÉS: ' + hibak2.join(' | ') : '✓ ellenőrzés: méretek, átlátszó sarkok, maskable biztonsági zóna, favicon — mind rendben');
+  if (hiba.length || hibak2.length) process.exitCode = 1;
 })();

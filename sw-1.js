@@ -18,7 +18,16 @@
    telepítéseken a RÉGI ikonok maradnának örökre — pont az a rajz, amit
    jogtisztasági okból cserélni kellett. A név léptetése az egyetlen dolog,
    ami ezt kikényszeríti. */
-const CACHE_NAME = "harminc-nulla-cache-v8";   /* v8: a verziótörténet oldala előre cache-elve (1.0.4.10.00) · v7: a Pixel téma számjegy-betűje (3.9.172) */
+const CACHE_NAME = "harminc-nulla-cache-v11";  /* v11: az ikonok címe verziót kapott (?v=2), 1.0.11.4.02 · v10: az új ikonkészlet és a manifest színei (1.0.11.2.01) · v9: a Reflektor téma betűi (1.0.11.1.00) · v8: a verziótörténet oldala előre cache-elve (1.0.4.10.00) · v7: a Pixel téma számjegy-betűje (3.9.172) */
+/* ⚠️ AZ IKONOK CÍME VERZIÓT VISEL (?v=2, 1.0.11.4.02). BEJELENTVE: „újra
+   telepítettem az appot, és nekem az ikon nem változott meg." Az 1.0.11.2.01
+   új ikonjai a RÉGI fájlnevekre kerültek, és minden gyorsítótár — ez a worker
+   (cache-first), a böngésző, az iOS ikon-tára, a telepítő — a CÍM alapján
+   dönti el, hogy van-e már ilyen ikonja. Ugyanazon a címen a régit adhatta.
+   Új cím = új kérés mindenhol. HA AZ IKON ÚJRA VÁLTOZIK: a ?v= lépjen a
+   manifestben, az index.html <head>-jében és itt, EGYÜTT (a
+   tools/ikon-1-0-11-2-01-proba.js méri). A MANIFEST CÍME NEM VÁLTOZHAT: az
+   azonosítja a már telepített alkalmazást. */
 const STATIC_ASSETS = [
   "/",
   /* 📜 1.0.4.10.00 — a verziószámra koppintva ez nyílik; előre cache-elve,
@@ -45,21 +54,27 @@ const STATIC_ASSETS = [
   "/fonts/pixelify-sans-latin-ext.woff2",
   "/fonts/pixszam-400.woff2",
   "/fonts/pixszam-700.woff2",
+  /* ◈ a Reflektor téma (1.0.11.1.00): a szövegbetű változó (két szelet,
+     ~72 kB), a kövér kurzív címbetű szűkített (két szelet, ~22 kB) */
+  "/fonts/exo-2-latin.woff2",
+  "/fonts/exo-2-latin-ext.woff2",
+  "/fonts/exo-2-cim-latin.woff2",
+  "/fonts/exo-2-cim-latin-ext.woff2",
   "/icons/site.webmanifest",
-  "/icons/favicon.ico",
-  "/icons/apple-touch-icon.png",
-  "/icons/icon-72x72.png",
-  "/icons/icon-96x96.png",
-  "/icons/icon-128x128.png",
-  "/icons/icon-144x144.png",
-  "/icons/icon-152x152.png",
-  "/icons/icon-192x192.png",
-  "/icons/icon-256x256.png",
-  "/icons/icon-384x384.png",
-  "/icons/icon-512x512.png",
+  "/icons/favicon.ico?v=2",
+  "/icons/apple-touch-icon.png?v=2",
+  "/icons/icon-72x72.png?v=2",
+  "/icons/icon-96x96.png?v=2",
+  "/icons/icon-128x128.png?v=2",
+  "/icons/icon-144x144.png?v=2",
+  "/icons/icon-152x152.png?v=2",
+  "/icons/icon-192x192.png?v=2",
+  "/icons/icon-256x256.png?v=2",
+  "/icons/icon-384x384.png?v=2",
+  "/icons/icon-512x512.png?v=2",
   /* Maskable ikonok: az Android launcher ezeket vágja körre/squircle-re. */
-  "/icons/icon-maskable-192x192.png",
-  "/icons/icon-maskable-512x512.png"
+  "/icons/icon-maskable-192x192.png?v=2",
+  "/icons/icon-maskable-512x512.png?v=2"
 ];
 
 /* MIÉRT NEM addAll.
@@ -114,8 +129,8 @@ self.addEventListener("push", (event) => {
   const cim = d.title || "MAGYAH";
   const opts = {
     body: d.body || "A társad vár rád.",
-    icon: "/icons/icon-192x192.png",
-    badge: "/icons/icon-96x96.png",
+    icon: "/icons/icon-192x192.png?v=2",
+    badge: "/icons/icon-96x96.png?v=2",
     /* A CÍMKE ÖSSZEVONJA a szoba korábbi értesítéseit: három bökésből nem
        lesz három sor az értesítési sávban, hanem egy, a legfrissebbel. */
     tag: d.tag || "magyah-nudge",
