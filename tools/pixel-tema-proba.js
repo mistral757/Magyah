@@ -53,7 +53,9 @@ console.log("\n— 1. A TÉMA-LISTÁK SZINKRONJA —");
   const alap=(html.match(/const DEFAULT_THEME="(\w+)"/)||[])[1];
   ok(JSON.stringify(fejId)===JSON.stringify(temak)&&temak.includes("pixel"),"a <head> ID-listája = a THEMES (benne a pixel)",{fejId,temak});
   ok(szin.length===2&&szin[0]===szin[1]&&/pixel:"#1d2b53"/.test(szin[0]),"a két SZIN-térkép egyforma, a pixelé az éjkék #1d2b53",szin);
-  ok(fej[2]===alap&&alap==="paper","az alapértelmezett téma változatlan: törtfehér",{fej:fej[2],alap});
+  /* 1.0.11.1.00: kifejezett kérésre az alapértelmezett a Reflektor lett
+     („az új alapértelmezett téma legyen az új téma"); a Pixel nem az */
+  ok(fej[2]===alap&&alap==="reflektor","az alapértelmezett téma a két helyen egyezik (1.0.11.1.00 óta: reflektor), nem a pixel",{fej:fej[2],alap});
 }
 console.log("\n— 2. A BETŰK —");
 {

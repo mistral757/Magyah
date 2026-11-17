@@ -31,7 +31,13 @@ const KEP=process.env.KEP||"",REGI=!!process.env.REGI;
   const b=await chromium.launch({args:["--no-sandbox"]});
   const p=await (await b.newContext({viewport:{width:430,height:900}})).newPage();
   const errs=[];p.on("pageerror",e=>errs.push(String(e)));
-  await p.addInitScript(()=>{window.HANG_TESZT=true;try{localStorage.setItem("scoutReal30_0","0");localStorage.setItem("meresFel30_0","0");}catch(e){}});
+  /* 1.0.11.1.00: a 170 px-es mérce a TÖRTFEHÉR témában (keskeny Oswald betű)
+     készült, amikor még az volt az alapértelmezett. Az új alap (Reflektor)
+     szélesebb betűvel 187 px — ugyanannyi, mint a Noir, kevesebb, mint a
+     Sötét-arany (204) —, ezért a próba a saját eredeti feltételéhez kötve
+     mér, a mérce nem lazul. */
+  await p.addInitScript(()=>{window.HANG_TESZT=true;try{localStorage.setItem("scoutReal30_0","0");localStorage.setItem("meresFel30_0","0");
+    if(!localStorage.getItem("theme30_0"))localStorage.setItem("theme30_0","paper");}catch(e){}});
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
   await p.waitForTimeout(1200);
   await p.evaluate(()=>document.getElementById("mpSoloBtn").click());await p.waitForTimeout(700);

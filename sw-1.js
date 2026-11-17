@@ -18,7 +18,7 @@
    telepítéseken a RÉGI ikonok maradnának örökre — pont az a rajz, amit
    jogtisztasági okból cserélni kellett. A név léptetése az egyetlen dolog,
    ami ezt kikényszeríti. */
-const CACHE_NAME = "harminc-nulla-cache-v8";   /* v8: a verziótörténet oldala előre cache-elve (1.0.4.10.00) · v7: a Pixel téma számjegy-betűje (3.9.172) */
+const CACHE_NAME = "harminc-nulla-cache-v10";  /* v10: az új ikonkészlet és a manifest színei (1.0.11.2.01) · v9: a Reflektor téma betűi (1.0.11.1.00) · v8: a verziótörténet oldala előre cache-elve (1.0.4.10.00) · v7: a Pixel téma számjegy-betűje (3.9.172) */
 const STATIC_ASSETS = [
   "/",
   /* 📜 1.0.4.10.00 — a verziószámra koppintva ez nyílik; előre cache-elve,
@@ -45,6 +45,12 @@ const STATIC_ASSETS = [
   "/fonts/pixelify-sans-latin-ext.woff2",
   "/fonts/pixszam-400.woff2",
   "/fonts/pixszam-700.woff2",
+  /* ◈ a Reflektor téma (1.0.11.1.00): a szövegbetű változó (két szelet,
+     ~72 kB), a kövér kurzív címbetű szűkített (két szelet, ~22 kB) */
+  "/fonts/exo-2-latin.woff2",
+  "/fonts/exo-2-latin-ext.woff2",
+  "/fonts/exo-2-cim-latin.woff2",
+  "/fonts/exo-2-cim-latin-ext.woff2",
   "/icons/site.webmanifest",
   "/icons/favicon.ico",
   "/icons/apple-touch-icon.png",

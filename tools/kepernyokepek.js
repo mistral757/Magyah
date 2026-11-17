@@ -1,4 +1,11 @@
-/* Play-listához és a manifest `screenshots` mezőjéhez: valódi képernyőképek. */
+/* Play-listához és a manifest `screenshots` mezőjéhez: valódi képernyőképek.
+   node tools/kepernyokepek.js → icons/screenshots/01…04.png (1080×1920)
+
+   1.0.11.2.01: ÁTÍRVA. A régi változat az „Egyedül játszom" feliratú gombot
+   kereste, ami a 3.9-es kezdőlappal megszűnt — onnantól mind a négy kép a
+   kezdőlap lett, a manifest képei pedig a 3.9.09-es állapotot mutatták.
+   Most a karrier a próbák gyors útján indul (ugyanaz, mint a
+   tools/*-proba.js-ekben), a képek az alapértelmezett témában készülnek. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT="/home/user/Magyah", PORT=8899, OUT=path.join(ROOT,"icons","screenshots");
@@ -18,7 +25,11 @@ const srv=http.createServer((req,rp)=>{
   const b=await chromium.launch({args:["--no-sandbox"]});
   // 1080×1920 a Play telefonos ajánlása; DPR 2-vel 540×960 CSS-ben
   const ctx=await b.newContext({viewport:{width:540,height:960},deviceScaleFactor:2});
+  /* az élő háttér maradjon (az a kezdőlap része), a nyitóképernyőt már
+     „látta" a böngésző — a kép a kész kezdőlapot mutassa */
+  await ctx.addInitScript(()=>{try{localStorage.setItem("nyitoLatta30_0","1");}catch(e){}});
   const p=await ctx.newPage();
+  const hibak=[];p.on("pageerror",e=>hibak.push(e.message));
   const varj=ms=>p.waitForTimeout(ms);
   /* A tanító buborékok jó dolgok a játékban, de egy áruházi képen csak
      takarnak — a kép előtt mindet elléptetjük. */
@@ -26,7 +37,7 @@ const srv=http.createServer((req,rp)=>{
     for(let i=0;i<6;i++){
       const volt=await p.evaluate(()=>{
         let n=0;
-        for(const id of ["guideTipOk","tNudgeWhyX"]){
+        for(const id of ["guideTipOk","tNudgeWhyX","talDrawLater","tStepsSkip","vezPushX"]){
           const b=document.getElementById(id);
           if(b&&b.offsetParent&&!b.disabled){b.click();n++;}}
         for(const id of ["guideTip","guideDim","tNudgeWhy","tNudgeDots","tStepDim"]){
@@ -40,47 +51,57 @@ const srv=http.createServer((req,rp)=>{
     const f=path.join(OUT,nev+".png");await p.screenshot({path:f});
     console.log("  "+nev+".png");};
 
+  /* 1. A kezdőlap */
   await p.goto(`http://127.0.0.1:${PORT}/`,{waitUntil:"load"});
-  await varj(1600);
+  await varj(2600);
   await lo("01-cimlap");
 
-  await p.evaluate(()=>{const b=[...document.querySelectorAll("button")]
-    .find(e=>e.offsetParent&&/Egyedül játszom/.test(e.innerText));if(b)b.click();});
-  await varj(500);
-  await p.click("#modeCareerDynBtn").catch(()=>{});
-  await varj(700);
+  /* 2. A karrier indítása: a Karrier-gomb az üdvözlő ablakot nyitja */
+  await p.evaluate(()=>document.getElementById("mpSoloBtn").click());
+  await varj(1100);
   await lo("02-beallitas");
 
-  for(let k=0;k<20;k++){
-    const cs=await p.$('button[data-cs="club"]');
-    if(cs&&await cs.isVisible()){await cs.click().catch(()=>{});await varj(250);}
-    let ment=false;
-    for(const s of ["#setupNextBtn","#startBtn"]){
-      const e=await p.$(s);
-      if(e&&await e.isVisible()){await e.click().catch(()=>{});await varj(300);ment=true;break;}}
-    if(!ment)break;}
+  /* 3–4. Gyors karrier (a próbák útja), a felállás és egy élő meccs */
+  await p.goto(`http://127.0.0.1:${PORT}/`,{waitUntil:"load"});await varj(1400);
+  await p.evaluate(()=>{
+    gameMode="career";window.mgmtNyit=()=>false;
+    enterCareerSetupFromHome(true);beginNewGame();
+    const sq=SQUADS.filter(x=>!x.wc&&x.players&&x.players.length>=18)[0];
+    const _sc=showChemistry;showChemistry=()=>{};S.pyr=null;S.idx=0;
+    pyrPickSq={club:"draft",season:"",players:sq.players.slice(0,15)};
+    pyrPickFromDraft=true;pyrPickDiv=null;pyrPendingSpeed=pyrWantedSpeed;
+    renderPyrDivPick();pyrConfirmDiv();showChemistry=_sc;
+    if(!careerPool)careerPool=initCareerPlayerPool({stars:2.5});
+    if(captainIdx<0)captainIdx=0;if(!coach)coach=COACHES[0];
+    form="433";slotRoles={};S.ultraSlot=null;
+    slots=FORMS["433"].slots.map((pp,i)=>({pos:effectiveSlotPos("433",i),xy:slotXY("433",i),player:null,fit:1,origin:null}));
+    slots.forEach((sl,i)=>{const src=sq.players[i%sq.players.length];
+      const pl={n:src.n,ovr:src.ovr,pos:[sl.pos],age:26};sl.player=pl;sl.fit=1;
+      if(!careerPool[pl.n])careerPool[pl.n]={n:pl.n,pos:[sl.pos],age:26,startRating:pl.ovr,peak:pl.ovr};
+      const e=careerPool[pl.n];e.pos=[sl.pos];if(!e.attrs)initPlayerAttrs(e);});
+    if(!scout)scout=generateScout();
+    startFirstSeason();phase="season";window.mezKerdesKell=()=>false;window.saveGame=()=>{};
+    document.getElementById("mpEntry").classList.add("hide");});
+  await varj(900);await tisztit();
+  await p.evaluate(()=>document.getElementById("scoutSpinBtn").click());await varj(2600);await tisztit();
+  /* 3. a HUB: a keret, a run-szint, a kémia — a karrier „központja" */
+  await p.evaluate(()=>{openHubMidSeason();window.scrollTo(0,0);});
+  await varj(900);await tisztit();
+  await p.evaluate(()=>{const m=document.getElementById("hubActions");if(m&&!m.classList.contains("hide"))document.getElementById("hubMenuBtn").click();window.scrollTo(0,0);});
   await varj(600);
-
-  for(let k=0;k<14;k++){
-    if(await p.evaluate(()=>typeof phase!=="undefined"&&phase!=="draft"))break;
-    await p.evaluate(()=>{
-      const bs=[...document.querySelectorAll("button")].filter(e=>e.offsetParent&&!e.disabled);
-      const t=e=>(e.innerText||"").trim();
-      const pick=bs.find(e=>/^Ezzel a klubbal indulok/.test(t(e)))
-        ||bs.find(e=>/^Sorsolás|^Irány a|^Irány az/.test(t(e)))
-        ||bs.find(e=>/\(\d{4}\/\d{2}\)/.test(t(e)));
-      if(pick)pick.click();});
-    await varj(1000);}
-  await varj(800);
   await lo("03-keret");
+  await p.evaluate(()=>{try{hubMidSeasonReturn();}catch(e){}});await varj(800);await tisztit();
 
-  for(let k=0;k<40;k++){
-    if(await p.evaluate(()=>typeof phase!=="undefined"&&phase==="season"))break;
-    await p.evaluate(()=>{
-      const bs=[...document.querySelectorAll("button")].filter(e=>e.offsetParent&&!e.disabled);
-      if(bs.length)bs[bs.length-1].click();});
-    await varj(700);}
-  await varj(1000);
+  for(let i=0;i<2;i++){await p.evaluate(()=>{const k=document.getElementById("kickBtn");if(k&&k.offsetParent)k.click();});
+    await varj(1500);await tisztit();}
+  /* az esemény-animáció („Megfogja!") átléptetése, aztán a meccs halad */
+  for(let i=0;i<6;i++){await p.evaluate(()=>{const t=document.getElementById("evaTovabb");if(t&&t.offsetParent)t.click();});await varj(1200);}
+  /* 4. a futó meccs: az eredményjelző és a közvetítés */
+  await varj(4000);
+  await p.evaluate(()=>{const t=document.getElementById("evaTovabb");if(t&&t.offsetParent)t.click();
+    const w=document.getElementById("sbWrap");if(w){w.scrollIntoView();window.scrollBy(0,-10);}});
+  await varj(700);
   await lo("04-szezon");
   await b.close(); srv.close();
+  if(hibak.length)console.log("⚠ oldalhiba: "+hibak.slice(0,3).join(" | "));
 })();
