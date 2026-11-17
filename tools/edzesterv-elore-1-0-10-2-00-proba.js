@@ -88,7 +88,8 @@ const KEP=process.env.KEP||"",REGI=!!process.env.REGI;
       if(ki.minta.length<4)ki.minta.push([x.pad?"pad":"kezdő",x.pos,t.key,+t.pt.toFixed(4),+mert.toFixed(4)]);});});
     /* 4. a hozam képlete és a sáv */
     ki.keplet=E.sorok.every(x=>x.t.every(t=>t.fal||Math.abs(t.lep-t.pt*E.F.n/CAREER_DEV_THRESHOLD)<1e-9));
-    {const x=E.sorok.find(q=>!q.pad),e=careerPool[x.n],t=x.t[0];const b=attrBandOf(e,t.key);const mento=e.attrs[t.key];
+    /* a LEGFIATALABB kezdő: az életkor-szorzó (×0,4 30 év fölött) miatt a sáv-teszt egy öreg kezdőnél a véletlen függvénye volt */
+    {const x=E.sorok.filter(q=>!q.pad).sort((q,w)=>(careerPool[q.n].age||99)-(careerPool[w.n].age||99))[0],e=careerPool[x.n],t=x.t[0];const b=attrBandOf(e,t.key);const mento=e.attrs[t.key];
       e.attrs[t.key]=b.hi-1;const E2=trainEloreSzamol(trainingFor);const t2=E2.sorok.find(q=>q.n===x.n).t[0];
       ki.sav=[t2.fal,t2.lep,t.pt*E.F.n/CAREER_DEV_THRESHOLD];e.attrs[t.key]=mento;}
     /* 5. a panel: a vázlatból él */

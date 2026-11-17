@@ -90,7 +90,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log(JSON.stringify(r).slice(0,2500));
   ok(Math.abs(r.tempo.gl-0.835)<0.001&&Math.abs(r.tempo.ko-0.778)<0.001&&r.tempo.tu===1,"1. a nehézségi tempó lassításának csak 30%-a hat (Gleccser 0,835 · Kőkorszak 0,778)",r.tempo);
   ok(Math.abs(r.atv.a10_1-4.95)<0.01&&Math.abs(r.atv.a10_2-5.5)<0.01&&r.atv.a20_2>r.atv.a20_1&&Math.abs(r.atv.neg+2.75)<0.01,"2. 0,55 Rating/pont, a sávok a szint-szorzóval tágulnak (és a hátrány is szimmetrikus)",r.atv);
-  ok(r.stab.mult===2.5&&Math.abs(r.stab.attr-1.375)<1e-9&&Math.abs(r.stab.skill-3.6)<1e-9&&r.stab.morale===22.5,"3. a stáb alapszorzója 2,5 (a skill-kiosztásé 2,0)",r.stab);
+  ok(r.stab.mult===2.5&&Math.abs(r.stab.attr-1.375*4.5)<1e-9&&Math.abs(r.stab.skill-3.6)<1e-9&&r.stab.morale===22.5,"3. a stáb alapszorzója 2,5 (a skill-kiosztásé 2,0; az attribútum-mesteré 1.0.11.4.03 óta ×4,5)",r.stab);
   const jok=(r.kozep||[]).filter(x=>x.kapott>0);
   ok(r.vege&&jok.length>0&&jok.every(x=>x.kapott>=x.uj*0.6&&x.kapott<=x.uj*2.6&&x.kapott>x.regi*2.5),"4. valódi meccs (Gleccser): a fő edzés pontja a képlet szerinti, sokszorosa a réginek",r.kozep);
   ok(!errs.length,"5. nincs oldalhiba",errs.slice(0,3));
