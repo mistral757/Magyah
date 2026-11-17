@@ -41,6 +41,12 @@
       document.documentElement.classList.add("fxAnimOff");}catch(e){}
   /* A BÖNGÉSZŐ SÁVJA IS A TÉMÁÉ. Eddig fixen a sötét alapszín állt itt, tehát
      világos témában a rendszer-sáv elütött a laptól. */
+  /* 🎬 a nyitóképernyő címbetűje előre (1.0.11.2.00): a téma fő betűjének
+     latin szelete már a <head>-ben kérve van, így a nyitó felirata nem a
+     pótbetűvel villan fel. Saját szerverről jön, külső kérés nincs. */
+  try{var BETU={dark:"cormorant-garamond-latin",paper:"anton-latin",noir:"anton-latin",pixel:"press-start-2p-latin",reflektor:"exo-2-cim-latin"}[t];
+    if(BETU){var l=document.createElement("link");l.rel="preload";l.as="font";l.type="font/woff2";l.crossOrigin="anonymous";
+      l.href="/fonts/"+BETU+".woff2";document.head.appendChild(l);}}catch(e){}
   var SZIN={dark:"#101011",paper:"#efe9dd",noir:"#0b0b0c",pixel:"#1d2b53",reflektor:"#06141a"};
   try{
     var m=document.querySelector('meta[name="theme-color"]');
@@ -6102,8 +6108,16 @@ html.fxLive[data-theme="reflektor"] .heCta{animation:magyahFadeUp .7s cubic-bezi
 /* 2. ÚJ OLDAL: ferde vágással beúszik, mint egy közvetítés-felirat */
 /* body>section, NEM section.card: a játék oldalai (scHub, scScout, scSim…)
    osztály nélküli szakaszok, a .card bennük ül — mérve */
-html.fxLive[data-theme="reflektor"] body>section:not(.hide),
-html.fxLive[data-theme="reflektor"] #mpEntry>.mpView.on{animation:refWipe .52s cubic-bezier(.2,.8,.2,1) backwards}
+/* A BETÖLTÉSKOR LÁTHATÓ NÉZET NEM ÚSZIK BE (1.0.11.2.00): azt a
+   nyitóképernyő mutatja be. Mérve, lassú telefonon: a betöltés végén induló
+   beúszás vágása 0,1–0,5 mp-ig eltakarta a Karrier-gombot. A nyitó szkriptje
+   a „kész" jelzéskor [data-elso]-val jelöli a látható nézeteket; a jelző
+   ELEMENKÉNT kerül le, amikor az a nézet elrejtődik — így a következő
+   megjelenésekor már beúszik, a látható kezdőlap viszont soha, egy
+   koppintásra sem (egy korábbi, globális kapcsolós változat az első
+   koppintáskor indította el, és a vágás elnyelte a koppintást). */
+html.fxLive[data-theme="reflektor"] body>section:not(.hide):not([data-elso]),
+html.fxLive[data-theme="reflektor"] #mpEntry>.mpView.on:not([data-elso]){animation:refWipe .52s cubic-bezier(.2,.8,.2,1) backwards}
 @keyframes refWipe{0%{clip-path:polygon(0 0,0 0,-18% 100%,-18% 100%);opacity:.25}
   100%{clip-path:polygon(0 0,118% 0,100% 100%,-18% 100%);opacity:1}}
 /* 3. ABLAK: fénykör nyílik felülről, a lap felizzik */
@@ -6145,6 +6159,275 @@ html.fxLive[data-theme="reflektor"] .heTitle{animation:refTitle 1.15s cubic-bezi
 </style>
 </head>
 <body>
+<!-- ═══════════ 🎬 A NYITÓKÉPERNYŐ (1.0.11.2.00) ═══════════
+     KÉRÉS: „Készíts egy nyitó (splash) töltőképernyőt, amely a játék
+     megnyitásakor jön be, a kezdőlap előtt. Mind az 5 témában más."
+     A <body> LEGELSŐ eleme: a téma a <head> szkriptjéből már ismert, tehát az
+     első festés a jó témában történik, villanás nélkül.
+     NEM MESTERSÉGES VÁRAKOZÁS. Addig látszik, amíg a nagy szkript lefut és a
+     mentés betölt (a végén a nyitoKesz() jelez), de legalább:
+       · első megnyitáskor 1,2 mp-ig (a bemutatkozás),
+       · visszatérőként 0,5 mp-ig (rövidített, összevont koreográfia),
+       · „kevesebb mozgás" rendszerbeállításnál 0,6 mp-ig, mozdulatlanul;
+     a mérés a navigáció kezdetétől számít, tehát ha a betöltés úgyis tovább
+     tart, egy ezredmásodpercet sem ad hozzá. Koppintásra AZONNAL eltűnik, és
+     6 mp után akkor is, ha a jelzés valamiért nem jönne. Hangot nem ad.
+     A KEZDŐLAP BELÉPŐ ANIMÁCIÓI NEM SZÜNETELNEK alatta. Kipróbálva: lassú
+     betöltésnél a szüneteltetés után még 1–2 mp-ig úsztak be a kezdőlap
+     elemei — a nyitó így lassított volna. Szünet nélkül a kezdőlap a nyitó
+     mögött elkészül, és az eltűnésekor azonnal teljes.
+     A MOZGÁS-SZABÁLY: minden animáció „backwards" kitöltésű, és az elemek
+     alap-stílusa a VÉGÁLLAPOT — a „kevesebb mozgás" ezért egyszerűen
+     kikapcsolja az animációkat, és a kész kép marad. -->
+<style>
+#nyito{position:fixed;inset:0;z-index:100000;overflow:hidden;cursor:pointer;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+  transition:opacity .34s ease,visibility 0s linear .34s}
+#nyito.ki{opacity:0;visibility:hidden;pointer-events:none}
+#nyito.csend.ki{transition:none}
+#nyito.csend *,#nyito.csend *::before,#nyito.csend *::after{animation:none!important;transition:none!important}
+#nyito.rovid *,#nyito.rovid *::before,#nyito.rovid *::after{animation-delay:0s!important;
+  animation-duration:.42s!important;animation-iteration-count:1!important}
+#nyito .nyK{position:absolute;inset:0}
+/* ── ◈ REFLEKTOR: a stadion felkapcsol ─────────────────────────────── */
+#nyito.ny-reflektor{background:radial-gradient(120% 80% at 50% 110%,#0d3a2c 0%,#082029 45%,#030c10 100%)}
+.nyR .bank{position:absolute;top:5vh;display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:6px;
+  background:#0d1d24;border:1px solid #23414d;border-radius:4px;transform:skewX(-8deg)}
+.nyR .bank.l{left:6vw}.nyR .bank.r{right:6vw;transform:skewX(8deg)}
+.nyR .bank i{width:13px;height:9px;border-radius:2px;background:#f4fffb;
+  box-shadow:0 0 10px 2px rgba(200,250,255,.85),0 0 30px 6px rgba(160,236,255,.35);
+  animation:nyLamp .16s steps(2) backwards}
+@keyframes nyLamp{0%{background:#22343b;box-shadow:none}}
+.nyR .bank.l i:nth-child(1){animation-delay:.05s}.nyR .bank.l i:nth-child(2){animation-delay:.11s}
+.nyR .bank.l i:nth-child(3){animation-delay:.17s}.nyR .bank.l i:nth-child(4){animation-delay:.23s}
+.nyR .bank.r i:nth-child(1){animation-delay:.12s}.nyR .bank.r i:nth-child(2){animation-delay:.18s}
+.nyR .bank.r i:nth-child(3){animation-delay:.24s}.nyR .bank.r i:nth-child(4){animation-delay:.3s}
+.nyR .kup{position:absolute;top:6vh;width:120vmax;height:120vh;mix-blend-mode:screen;pointer-events:none;
+  background:linear-gradient(180deg,rgba(190,245,255,.26),rgba(190,245,255,0) 75%);
+  animation:nyKup .4s ease-out .3s backwards}
+.nyR .kup.l{left:-10vmax;clip-path:polygon(16% 0,20% 0,92% 100%,30% 100%)}
+.nyR .kup.r{right:-10vmax;clip-path:polygon(80% 0,84% 0,70% 100%,8% 100%);
+  background:linear-gradient(180deg,rgba(226,255,150,.2),rgba(226,255,150,0) 75%);animation-delay:.38s}
+@keyframes nyKup{0%{opacity:0}}
+.nyR .gyep{position:absolute;left:50%;bottom:16vh;width:min(118vw,720px);
+  transform:translateX(-50%) perspective(520px) rotateX(57deg);transform-origin:50% 100%}
+.nyR .gyep svg{display:block;width:100%;height:auto}
+.nyR .gyep .cs{animation:nyKup .5s ease-out .2s backwards}
+.nyR .gyep .vn{fill:none;stroke:rgba(226,246,240,.6);stroke-width:1.4;stroke-dasharray:1;
+  animation:nyRajz .6s cubic-bezier(.3,.7,.2,1) .32s backwards}
+@keyframes nyRajz{0%{stroke-dashoffset:1}}
+.nyR .gyep .m{fill:none;stroke:#d6ff3f;stroke-width:2.6;stroke-linejoin:round;stroke-dasharray:1;
+  filter:drop-shadow(0 0 4px rgba(214,255,63,.8));animation:nyRajz .4s ease-out .66s backwards}
+.nyR .gyep .p{fill:#d6ff3f;filter:drop-shadow(0 0 5px rgba(214,255,63,.9));transform-box:fill-box;transform-origin:center;
+  animation:nyPont .3s cubic-bezier(.3,1.6,.5,1) backwards}
+@keyframes nyPont{0%{transform:scale(0)}}
+.nyR .cim{position:absolute;left:0;right:0;top:22vh;display:flex;flex-direction:column;align-items:center}
+.nyR .sav{display:flex;align-items:stretch;transform:skewX(-12deg);box-shadow:0 20px 50px -16px #000;
+  animation:nySav .45s cubic-bezier(.2,.9,.2,1) .4s backwards}
+@keyframes nySav{0%{transform:skewX(-12deg) translateX(-110vw)}}
+.nyR .sav .tg{width:14px;background:#d6ff3f}
+.nyR .sav .bd{padding:6px 24px 8px 18px;background:linear-gradient(100deg,#0f2b37,#06141a)}
+.nyR .sav b{display:block;transform:skewX(12deg);font-family:'Exo 2 Cim','Exo 2',system-ui,sans-serif;font-weight:800;
+  font-size:clamp(52px,17vw,104px);line-height:1;color:#eaf6f4;letter-spacing:-.5px;text-shadow:0 0 30px rgba(150,236,255,.3)}
+.nyR .al{margin-top:14px;font:700 12px/1 'Exo 2',system-ui,sans-serif;letter-spacing:3.4px;color:#a3bdc1;text-transform:uppercase;
+  animation:nyKup .35s ease-out .62s backwards}
+.nyR .al em{font-style:normal;color:#ff8080}
+.nyR .al em::before{content:"● ";animation:nyVillog 1s steps(2) .9s infinite}
+@keyframes nyVillog{50%{opacity:0}}
+.nyR .eredm{margin-top:18px;display:flex;align-items:center;gap:10px;padding:7px 14px;background:rgba(6,20,26,.82);
+  border:1px solid #2b5263;border-radius:6px;font:700 10px/1 'Exo 2',system-ui,sans-serif;letter-spacing:2.4px;color:#a3bdc1;
+  animation:nyKup .35s ease-out .7s backwards}
+.nyR .eredm b{font-family:'Exo 2 Cim','Exo 2',sans-serif;font-size:26px;letter-spacing:0;color:#d6ff3f;font-variant-numeric:tabular-nums;min-width:2ch;text-align:right}
+.nyR .eredm b.ok{animation:nyHarminc .5s ease-out}
+@keyframes nyHarminc{0%{transform:scale(1.6);text-shadow:0 0 18px #d6ff3f}}
+.nyR .eredm span.n{font-family:'Exo 2 Cim','Exo 2',sans-serif;font-size:26px;letter-spacing:0;color:#eaf6f4}
+/* ── ● SÖTÉT-ARANY: trófea-vitrin ─────────────────────────────────── */
+#nyito.ny-dark{background:radial-gradient(90% 70% at 50% 45%,#1c1a16 0%,#101011 60%,#0a0a0b 100%)}
+.nyD{display:flex;align-items:center;justify-content:center}
+.nyD svg{position:absolute;width:min(78vmin,360px);height:min(78vmin,360px)}
+.nyD svg circle{fill:none;stroke:#c9a233;stroke-width:.8;stroke-dasharray:1;transform:rotate(-90deg);transform-origin:center;
+  animation:nyRajz .9s cubic-bezier(.5,0,.2,1) .05s backwards}
+.nyD svg circle.b{stroke:rgba(201,162,51,.42);stroke-width:.5;animation-delay:.18s}
+.nyD .tx{position:relative;text-align:center;color:#eae7e1}
+.nyD small{display:block;font:600 9.5px/1 'Archivo',sans-serif;letter-spacing:4.5px;color:#c9a233;animation:nyKup .5s ease-out .4s backwards}
+.nyD b{display:block;margin:12px 0 10px;font:300 clamp(48px,15vw,78px)/1 'Cormorant Garamond',serif;letter-spacing:.06em;
+  animation:nyRitkit .9s cubic-bezier(.2,.7,.2,1) .12s backwards}
+@keyframes nyRitkit{0%{opacity:0;letter-spacing:.4em}}
+.nyD .hr{display:block;height:1px;width:120px;margin:0 auto 12px;background:linear-gradient(90deg,transparent,#c9a233,transparent);
+  animation:nyNyit .6s ease-out .45s backwards}
+@keyframes nyNyit{0%{transform:scaleX(0)}}
+.nyD small.al{color:#8c897f;letter-spacing:3px;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:15px;font-weight:400;
+  animation-delay:.6s}
+.nyD .feny{position:absolute;inset:-20%;background:linear-gradient(115deg,transparent 42%,rgba(255,230,160,.10) 50%,transparent 58%);
+  opacity:0;animation:nyFeny 1.1s ease-in-out .45s backwards}
+@keyframes nyFeny{0%{opacity:1;transform:translateX(-45%)}100%{opacity:1;transform:translateX(45%)}}
+/* ── ◐ TÖRTFEHÉR: nyomtatott meccsprogram ─────────────────────────── */
+#nyito.ny-paper{background:#efe9dd;color:#1a1712}
+#nyito.ny-paper::before{content:"";position:absolute;inset:0;opacity:.07;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.nyP .vj{position:absolute;width:26px;height:26px;border-color:#1a1712;border-style:solid;border-width:0;animation:nyKup .3s ease-out backwards}
+.nyP .vj.tl{top:18px;left:18px;border-top-width:1px;border-left-width:1px}.nyP .vj.tr{top:18px;right:18px;border-top-width:1px;border-right-width:1px;animation-delay:.06s}
+.nyP .vj.bl{bottom:18px;left:18px;border-bottom-width:1px;border-left-width:1px;animation-delay:.12s}.nyP .vj.br{bottom:18px;right:18px;border-bottom-width:1px;border-right-width:1px;animation-delay:.18s}
+.nyP .lap{position:absolute;left:9vw;right:9vw;top:24vh}
+.nyP .fej,.nyP .alj{display:flex;justify-content:space-between;font:500 10.5px/1 'Oswald',sans-serif;letter-spacing:2.2px;text-transform:uppercase}
+.nyP .vn{display:block;height:0;border-top:3px solid #1a1712;margin:9px 0 6px;transform-origin:left;animation:nyNyit .4s ease-out .1s backwards}
+.nyP .vn.v{border-top-width:1px;margin:8px 0 10px;animation-delay:.55s}
+.nyP .cim{display:block;font:400 clamp(64px,20.5vw,150px)/.92 'Anton',sans-serif;letter-spacing:1px;
+  animation:nyNyom .5s steps(7,end) .22s backwards}
+@keyframes nyNyom{0%{clip-path:inset(0 100% 0 0)}100%{clip-path:inset(0 0 0 0)}}
+.nyP p{margin-top:16px;font:italic 400 17px/1.35 'Cormorant Garamond',serif;color:#5c564a;animation:nyKup .4s ease-out .62s backwards}
+.nyP .belyeg{position:absolute;right:11vw;top:calc(24vh + clamp(64px,20.5vw,150px) + 120px);transform:rotate(-11deg);
+  padding:6px 12px 5px;border:3px double #a03e34;color:#a03e34;text-align:center;opacity:.9;mix-blend-mode:multiply;
+  font:400 34px/1 'Anton',sans-serif;letter-spacing:1px;animation:nyBelyeg .24s cubic-bezier(.5,0,.75,0) .72s backwards}
+.nyP .belyeg small{display:block;font:600 9px/1 'Oswald',sans-serif;letter-spacing:3px;margin-top:3px}
+@keyframes nyBelyeg{0%{opacity:0;transform:rotate(-20deg) scale(2.4)}}
+/* ── ◧ NOIR: filmfőcím ─────────────────────────────────────────────── */
+#nyito.ny-noir{background:#0b0b0c;color:#f7f5ee}
+.nyN .sv{position:absolute;left:0;right:0;height:11vh;background:#000;z-index:2;animation:nySvF .35s ease-out backwards}
+.nyN .sv.f{top:0}.nyN .sv.a{bottom:0;animation-name:nySvA}
+@keyframes nySvF{0%{transform:translateY(-100%)}}@keyframes nySvA{0%{transform:translateY(100%)}}
+.nyN .ld{position:absolute;left:50%;top:50%;width:min(60vmin,260px);height:min(60vmin,260px);margin:-130px 0 0 -130px;
+  margin-left:calc(min(60vmin,260px) / -2);margin-top:calc(min(60vmin,260px) / -2);opacity:0;animation:nyLd .7s linear backwards}
+@keyframes nyLd{0%,88%{opacity:1}100%{opacity:0}}
+.nyN .ld svg{position:absolute;inset:0;width:100%;height:100%}
+.nyN .ld svg *{fill:none;stroke:rgba(247,245,238,.55);stroke-width:1}
+.nyN .ld .sw{position:absolute;inset:8%;border-radius:50%;
+  background:conic-gradient(rgba(247,245,238,.22) 0 90deg,transparent 90deg);animation:nyFordul .23s linear 3 backwards}
+@keyframes nyFordul{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+.nyN .ld span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;
+  font:400 min(30vmin,120px)/1 'Anton',sans-serif;color:#f7f5ee}
+.nyN .ld .n3{animation:nyN3 .7s linear backwards}.nyN .ld .n2{animation:nyN2 .7s linear backwards}.nyN .ld .n1{animation:nyN1 .7s linear backwards}
+@keyframes nyN3{0%,32%{opacity:1}33%,100%{opacity:0}}
+@keyframes nyN2{0%,32%{opacity:0}33%,65%{opacity:1}66%,100%{opacity:0}}
+@keyframes nyN1{0%,65%{opacity:0}66%,97%{opacity:1}98%,100%{opacity:0}}
+.nyN .cim{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  animation:nyCim .35s ease-out .66s backwards,nyVibral .14s steps(2) 1.05s infinite}
+@keyframes nyCim{0%{opacity:0;filter:blur(3px)}}
+@keyframes nyVibral{50%{opacity:.93}}
+.nyN .cim small{font:600 9.5px/1 'Archivo',sans-serif;letter-spacing:5px;color:#8b8985}
+.nyN .cim b{margin:14px 0;font:400 clamp(54px,17vw,110px)/1 'Anton',sans-serif;letter-spacing:.14em;padding-left:.14em}
+.nyN .zaj{position:absolute;inset:-50%;opacity:.09;pointer-events:none;z-index:1;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:nyZaj .4s steps(4) infinite}
+@keyframes nyZaj{25%{transform:translate(-7%,4%)}50%{transform:translate(5%,-6%)}75%{transform:translate(-3%,7%)}}
+.nyN .vig{position:absolute;inset:0;background:radial-gradient(110% 85% at 50% 50%,transparent 45%,rgba(0,0,0,.75) 100%);z-index:1}
+#nyito.rovid .nyN .ld{display:none}
+/* ── ▦ PIXEL: a konzol bekapcsol ──────────────────────────────────── */
+#nyito.ny-pixel{background:#1d2b53;color:#fff1e8;font-family:'Press Start 2P',ui-monospace,monospace}
+.nyX{display:flex;align-items:center;justify-content:center}
+.nyX .doboz{width:min(88vw,460px);padding:22px 18px;border:4px solid #fff1e8;background:#16214a;
+  box-shadow:6px 6px 0 #000;animation:nyBe .42s steps(6) backwards}
+@keyframes nyBe{0%{clip-path:inset(49% 0 49% 0);filter:brightness(2.6)}60%{clip-path:inset(20% 0 20% 0);filter:brightness(1.6)}
+  100%{clip-path:inset(0);filter:none}}
+.nyX .logo{display:block;text-align:center;font-size:clamp(24px,8.2vw,38px);line-height:1.2;color:#ffec27;text-shadow:4px 4px 0 #ff004d;margin-bottom:18px}
+.nyX .sor{font-family:'Pixelify Sans',system-ui,sans-serif;font-size:14px;line-height:1.75;letter-spacing:.5px;white-space:nowrap;overflow:hidden;animation:nyGepel .2s steps(14,end) backwards}
+.nyX .sor b{color:#00e436;font-weight:400}
+.nyX .s1{animation-delay:.3s}.nyX .s2{animation-delay:.44s}.nyX .s3{animation-delay:.58s}.nyX .s4{animation-delay:.72s}
+@keyframes nyGepel{0%{clip-path:inset(0 100% 0 0)}100%{clip-path:inset(0 0 0 0)}}
+.nyX .sav{display:flex;gap:3px;margin:14px 0 12px;padding:3px;border:2px solid #fff1e8}
+.nyX .sav i{flex:1;height:12px;background:#ffec27;animation:nyLamp .05s steps(1) backwards}
+.nyX .sav i:nth-child(1){animation-delay:0.300s}.nyX .sav i:nth-child(2){animation-delay:0.355s}.nyX .sav i:nth-child(3){animation-delay:0.410s}
+.nyX .sav i:nth-child(4){animation-delay:0.465s}.nyX .sav i:nth-child(5){animation-delay:0.520s}.nyX .sav i:nth-child(6){animation-delay:0.575s}
+.nyX .sav i:nth-child(7){animation-delay:0.630s}.nyX .sav i:nth-child(8){animation-delay:0.685s}.nyX .sav i:nth-child(9){animation-delay:0.740s}
+.nyX .sav i:nth-child(10){animation-delay:0.795s}
+.nyX .start{text-align:center;font-family:'Pixelify Sans',system-ui,sans-serif;font-weight:700;font-size:15px;letter-spacing:1px;color:#ff77a8;animation:nyVillog .8s steps(1) .9s infinite}
+.nyX .crt{position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px),radial-gradient(125% 95% at 50% 45%,transparent 55%,rgba(0,0,0,.45) 100%)}
+/* ── FEKVŐ TELEFON: kevés a magasság — a gyep kisebb és lejjebb, a cím feljebb ── */
+@media (orientation:landscape) and (max-height:560px){
+  .nyR .cim{top:9vh}
+  .nyR .sav b{font-size:clamp(40px,15vh,70px)}
+  .nyR .eredm{margin-top:10px}
+  .nyR .gyep{width:min(62vw,560px);bottom:-14vh}
+  .nyR .bank{top:3vh}
+  .nyP .lap{top:16vh}
+  .nyP .cim{font-size:clamp(54px,24vh,120px)}
+  .nyP .belyeg{top:auto;bottom:12vh;right:9vw}
+  .nyD b{font-size:clamp(40px,13vh,60px)}
+  .nyX .doboz{padding:12px 16px}.nyX .logo{margin-bottom:8px}.nyX .sav{margin:8px 0}
+}
+</style>
+<div id="nyito" aria-hidden="true"></div>
+<script>
+(function(){
+  var el=document.getElementById("nyito"),h=document.documentElement;
+  var t=h.getAttribute("data-theme")||"dark";
+  var M=[[78,150],[104,74],[150,118],[196,74],[222,150]];   /* a taktikai M: öt játékos */
+  var pont="";for(var i=0;i<M.length;i++)pont+='<circle class="p" cx="'+M[i][0]+'" cy="'+M[i][1]+'" r="5.5" style="animation-delay:'+(.66+i*.06).toFixed(2)+'s"/>';
+  var csik="";for(i=0;i<10;i++)csik+='<rect x="'+(i*30)+'" y="0" width="15" height="200" fill="#114434"/>';
+  var S={
+    reflektor:'<div class="nyK nyR"><div class="bank l"><i></i><i></i><i></i><i></i></div><div class="bank r"><i></i><i></i><i></i><i></i></div>'
+      +'<div class="kup l"></div><div class="kup r"></div>'
+      +'<div class="gyep"><svg viewBox="0 0 300 200"><g class="cs"><rect width="300" height="200" fill="#0d3a2c"/>'+csik+'</g>'
+      +'<path class="vn" pathLength="1" d="M10 6H290V194H10Z"/><path class="vn" pathLength="1" d="M10 100H290"/>'
+      +'<circle class="vn" pathLength="1" cx="150" cy="100" r="30"/><path class="vn" pathLength="1" d="M95 6V44H205V6"/><path class="vn" pathLength="1" d="M95 194V156H205V194"/>'
+      +'<path class="m" pathLength="1" d="M'+M.map(function(p){return p.join(" ");}).join("L")+'"/>'+pont+'</svg></div>'
+      +'<div class="cim"><div class="sav"><span class="tg"></span><span class="bd"><b>MAGYAH</b></span></div>'
+      +'<div class="al">Esti rangadó · <em>élő</em></div>'
+      +'<div class="eredm">HIBÁTLAN IDÉNY <b id="nyRszam">0</b><span class="n">–0</span></div></div></div>',
+    dark:'<div class="nyK nyD"><svg viewBox="0 0 200 200"><circle pathLength="1" cx="100" cy="100" r="96"/><circle class="b" pathLength="1" cx="100" cy="100" r="89"/></svg>'
+      +'<div class="feny"></div><div class="tx"><small>A HIBÁTLAN IDÉNY</small><b>Magyah</b><span class="hr"></span><small class="al">harminc forduló · egy cél</small></div></div>',
+    paper:'<div class="nyK nyP"><i class="vj tl"></i><i class="vj tr"></i><i class="vj bl"></i><i class="vj br"></i>'
+      +'<div class="lap"><div class="fej"><span>Hivatalos meccsprogram</span><span>1. szám</span></div><i class="vn"></i>'
+      +'<b class="cim">MAGYAH</b><i class="vn v"></i><div class="alj"><span>Magyar futballmenedzser</span><span>Ára: 30 pont</span></div>'
+      +'<p>Harminc forduló, egy keret, egyetlen cél.</p></div><div class="belyeg">30–0<small>HIBÁTLAN</small></div></div>',
+    noir:'<div class="nyK nyN"><div class="vig"></div><div class="ld"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="96"/><circle cx="100" cy="100" r="78"/>'
+      +'<path d="M0 100H200M100 0V200"/></svg><div class="sw"></div><span class="n3">3</span><span class="n2">2</span><span class="n1">1</span></div>'
+      +'<div class="cim"><small>EGY HIBÁTLAN IDÉNY TÖRTÉNETE</small><b>MAGYAH</b><small>— 30 : 0 —</small></div>'
+      +'<div class="zaj"></div><div class="sv f"></div><div class="sv a"></div></div>',
+    pixel:'<div class="nyK nyX"><div class="doboz"><b class="logo">MAGYAH</b>'
+      +'<div class="sor s1">MAGYAH-BIOS V1.0 · 8 BIT</div><div class="sor s2">KERET ...... <b>11 OK</b></div>'
+      +'<div class="sor s3">KÉMIA ...... <b>OK</b></div><div class="sor s4">CÉL ........ <b>30-0</b></div>'
+      +'<div class="sav"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>'
+      +'<div class="start">NYOMJ STARTOT ▶</div></div><div class="crt"></div></div>'};
+  var rovid=false,csend=false;
+  try{rovid=localStorage.getItem("nyitoLatta30_0")==="1";localStorage.setItem("nyitoLatta30_0","1");}catch(e){}
+  try{csend=matchMedia("(prefers-reduced-motion: reduce)").matches;}catch(e){}
+  el.className="ny-"+(S[t]?t:"dark")+(rovid?" rovid":"")+(csend?" csend":"");
+  /* a betöltéskor látható nézet nem úszik be újra a téma oldal-animációjával:
+     azt ez a képernyő mutatta be (lásd a REFLEKTOR-ÉLET „ÚJ OLDAL" pontját).
+     A jelző elemenként kerül le, amikor az a nézet elrejtődik. */
+  function jelol(){try{
+    var L=document.querySelectorAll("#mpEntry>.mpView.on,body>section:not(.hide)");
+    for(var i=0;i<L.length;i++)L[i].setAttribute("data-elso","");
+    if(!L.length||!window.MutationObserver)return;
+    var mo=new MutationObserver(function(rs){
+      for(var j=0;j<rs.length;j++){var e=rs[j].target;if(!e.hasAttribute||!e.hasAttribute("data-elso"))continue;
+        if((e.classList.contains("mpView")&&!e.classList.contains("on"))||(e.tagName==="SECTION"&&e.classList.contains("hide")))
+          e.removeAttribute("data-elso");}
+      if(!document.querySelector("[data-elso]"))mo.disconnect();});
+    mo.observe(document.body,{attributes:true,subtree:true,attributeFilter:["class"]});}catch(e){}}
+  el.innerHTML=S[t]||S.dark;
+    var most=function(){try{return performance.now();}catch(e){return 0;}};
+  var MIN=csend?600:(rovid?500:1200),kesz=false,ki=false;
+  var N=window.NYITO={tema:t,rovid:rovid,csend:csend,min:MIN,kesz:null,ki:null,mod:null};
+  /* A 30–0 SZÁMLÁLÓ (Reflektor) VALÓDI TÖLTÉSJELZŐ: lassuló ütemben 29-ig
+     megy, a 30. győzelmet a nyitoKesz() adja — a hibátlan idény az, amikor a
+     játék betöltött. Az eltelt időből számol, nem lépésszámból: ha a szál
+     foglalt, ugrik, de nem lassít. */
+  var sz=document.getElementById("nyRszam");
+  if(sz){if(rovid||csend)sz.textContent="30";
+    else{var szamol=function(){if(kesz||ki)return;var x=Math.max(0,most()-450);
+      sz.textContent=String(Math.min(29,Math.floor(29*(1-Math.exp(-x/700)))));requestAnimationFrame(szamol);};requestAnimationFrame(szamol);}}
+  function harminc(){if(sz&&sz.textContent!=="30"){sz.textContent="30";sz.className="ok";}}
+  function eltunik(mod){
+    if(ki)return;ki=true;N.ki=Math.round(most());N.mod=mod;
+    harminc();
+    el.classList.add("ki");
+    setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},csend?0:380);}
+  window.nyitoKesz=function(){
+    if(kesz)return;kesz=true;N.kesz=Math.round(most());harminc();jelol();
+    /* ha a minimum már letelt, AZONNAL (egy setTimeout a betöltés utáni
+       feladatok mögé sorolódna — mérve +0,6 mp lassú telefonon) */
+    var maradt=MIN-most();
+    if(maradt<=0)eltunik("kesz");else setTimeout(function(){eltunik("kesz");},maradt);};
+  /* koppintásra azonnal — és a koppintás NEM megy át a kezdőlapra */
+  el.addEventListener("pointerdown",function(e){try{e.preventDefault();e.stopPropagation();}catch(x){}eltunik("koppintas");});
+  el.addEventListener("click",function(e){try{e.preventDefault();e.stopPropagation();}catch(x){}});
+  window.addEventListener("load",function(){window.nyitoKesz();});
+  setTimeout(function(){eltunik("biztonsag");},6000);
+})();
+</script>
 <!-- ================= BELÉPŐ KÉPERNYŐ + MULTIPLAYER-VÁZ (F0) =================
      Overlay minden fölött. Az "Egyedül játszom" egyszerűen elrejti, és alatta
      ott a mai játék, érintetlenül. A "Gyere 1v1!" a hálózat NÉLKÜLI MP-vázra
@@ -8532,7 +8815,7 @@ html.fxLive[data-theme="reflektor"] .heTitle{animation:refTitle 1.15s cubic-bezi
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.11.1.00";
+const APP_VERSION="1.0.11.2.00";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -143707,6 +143990,8 @@ function syncBootPairLink(){
 try{syncBoot();}catch(e){try{console.warn("MAGYAH szinkron: az indítás elszállt —",e&&e.message);}catch(x){}}
 initSaveSystem();
 try{syncBootPairLink();}catch(e){}
+/* 🎬 a nagy szkript és a mentés kész: a nyitóképernyő mehet (1.0.11.2.00) */
+try{if(window.nyitoKesz)window.nyitoKesz();}catch(e){}
 </script>
 <script>
 /* A FÁJL NEVE "sw-1.js" — egy korai elírás, ami így maradt. Sokáig itt

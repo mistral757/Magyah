@@ -115,7 +115,9 @@ const lathato=(p,id)=>p.evaluate(i=>{const e=document.getElementById(i);return !
 
   console.log("— 6. service worker —");
   const sw=fs.readFileSync(path.join(ROOT,"sw-1.js"),"utf8");
-  ok(/cache-v8/.test(sw)&&/"\/verziotortenet\/",/.test(sw),"a cache v8, és a /verziotortenet/ előre cache-elve");
+  /* 1.0.11.1.00: a cache-név azóta tovább lépett (új betűk) — a feltétel „v8
+     vagy későbbi", ahogy a pixel-tema próbában */
+  ok(+(sw.match(/cache-v(\d+)/)||[])[1]>=8&&/"\/verziotortenet\/",/.test(sw),"a cache v8 vagy későbbi, és a /verziotortenet/ előre cache-elve");
   ok(errs.length===0,"nincs oldalhiba (összesen)",errs.slice(0,4));
   await b.close();srv.close();
   console.log(hiba?`✗ ${hiba} hiba`:"✓ minden rendben");
