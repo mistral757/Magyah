@@ -26,9 +26,9 @@ megvalósult, annak a verziója a tétel végén áll.)*
 |--:|:--:|---|:--:|:--:|:--:|---|
 | A | 3, 1 | A hangsúly-csúszkák rejtve vannak, és nincs összkép | nagy | kicsi | közepes | **megvalósítom** (1.0.9.8.00) |
 | B | 1, 4 | A Taktika-panel: 1000 px magyarázat a választás előtt | közepes | kicsi | kicsi | **megvalósítom** (1.0.9.8.01) |
-| C | 5 | A csúszkák halmozva több meccserőt érnek, mint a nehézségi ablak | nagy | **nagy** | — | **javaslat**, a felhasználó dönt |
-| D | 5 | A „Sztárom a párom” csúszkái a meccsre nem hatnak | közepes | közepes | kicsi | javaslat |
-| E | 3 | Az edzésterv választásakor nincs előrejelzés | közepes | kicsi | közepes | javaslat (részben megvan utólag) |
+| C | 5 | A csúszkák halmozva több meccserőt érnek, mint a nehézségi ablak | nagy | **nagy** | — | jóváhagyva → **1.0.10.0.00**: ±40%-os plafon, csak új karrierekben |
+| D | 5 | A „Sztárom a párom” csúszkái a meccsre nem hatnak | közepes | közepes | kicsi | jóváhagyva → **1.0.10.1.00** (új karrierek) |
+| E | 3 | Az edzésterv választásakor nincs előrejelzés | közepes | kicsi | közepes | jóváhagyva → **1.0.10.2.00** |
 | F | 2 | Nincs betűméret- és lekerekítés-skála (43 + 14 érték) | közepes | **nagy** | nagy | javaslat; az új felületek a meglévő osztályokból építkeznek |
 | G | 4 | Régi panelek: szövegfal elöl, döntés alul | közepes | közepes | nagy | Taktika (1.0.9.8.01) és Boost-központ (**1.0.9.8.02**) kész; a többi javaslat |
 | H | 1 | A HUB-ban egyszerre két „alpanel-nyelv” él | kicsi | közepes | nagy | javaslat |

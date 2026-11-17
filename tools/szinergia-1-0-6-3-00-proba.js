@@ -76,6 +76,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     ki.har={on:szinOn(),parok:szinParok(),par:szinPar(),lv:szinLv(),valt:szinValthat()};
     const W=msState();W.sp=1000;
     ki.ar=[szinAr()];szinValaszt("bombazok|villam");ki.elso=szinState().valt;
+    /* 🔗 1.0.11.0.00 — a szintet a pár két stílusának SAJÁT pontgyűjtője fizeti */
+    try{szinFizetok().forEach(f=>{f.o.pts=1000;});}catch(e){}
     ki.vesz=[szinVesz().ok,szinAr(),szinVesz().ok,szinAr(),szinVesz().ok,szinAr(),szinVesz().ok];
     ki.sp=W.sp;
     ki.valt1=szinValaszt("bombazok|beton").ok;ki.valt2=szinValaszt("beton|villam");ki.lvValt=szinLv();
@@ -139,7 +141,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log("\n— 1. a keret —");
   ok(!t.ket.on&&!t.ket.chip,"két stílusnál nincs Szinergia",t.ket);
   ok(t.har.on&&t.har.parok.length===3&&!t.har.par&&t.har.lv===0&&t.har.valt,"három stílusnál nyílik: 3 pár, még nincs választva",t.har);
-  ok(t.ar[0]>=80&&t.ar[0]<=90&&t.vesz[0]&&t.vesz[2]&&t.vesz[4]&&!t.vesz[6]&&t.vesz[5]===null,"az ár és a 3 szint",{ar:t.ar,vesz:t.vesz,sp:t.sp});
+  ok(t.ar[0]===100&&t.vesz[0]&&t.vesz[2]&&t.vesz[4]&&!t.vesz[6]&&t.vesz[5]===null,"az ár és a 3 szint",{ar:t.ar,vesz:t.vesz,sp:t.sp});
   ok(t.elso==null,"az első választás ingyenes (nem fogyasztja az idény váltását)",t.elso);
   ok(t.valt1&&!t.valt2.ok&&t.lvValt===3&&t.valt3,"idényenként egy váltás, a szint megmarad",{v1:t.valt1,v2:t.valt2,lv:t.lvValt,v3:t.valt3});
   ok(t.due===true&&t.due2===false,"a szezonkezdési jelzés: él, a megnézés nyugtázza",[t.due,t.due2]);

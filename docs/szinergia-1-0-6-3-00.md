@@ -7,6 +7,7 @@ lettek a tervek. Egyelőre mindegyik tetszik! […] Építsd be").
 
 - A 3. csapatstílustól nyílik. Mindig **egy pár** szinergiája él a meglévő
   stílusok közül: 3 stílusnál 3, 4-nél 6 pár közül.
+- *(1.0.11.0.00 óta az ár a pár két stílusának saját pontgyűjtőjéből megy: 100 · 200 · 300 mindkettőből, és csúcsfok-jelöléssel 6 szintig vihető — lásd [szinergia-ar-1-0-11-0-00.md](szinergia-ar-1-0-11-0-00.md). Az alábbi sor az eredeti, 1.0.6.3.00-ás szabály.)*
 - **3 szint** a közös csapatstílus-pontból: **90 / 150 / 240** (a talizmán
   „Olcsóbb fa” kedvezménye is él). A szint a Szinergiáé, a párváltás nem
   viszi el. Szorzó: ×1 / ×1,7 / ×2,5; a 3. szinten a pár saját csavarja.
