@@ -614,6 +614,7 @@ button:disabled{opacity:.35;cursor:default}
 .trEloPad{margin-top:8px;font-size:12px}.trEloPad>summary{cursor:pointer;color:var(--dim);padding:4px 0}
 .trEloUres{font-size:12px;color:var(--dim);margin-top:7px;line-height:1.5}
 .trEloMegj{font-size:11px;color:var(--dim2);line-height:1.5;margin-top:9px}.trEloMegj b{color:var(--dim)}
+.stElo{margin:8px 0 2px;padding:9px 10px}
 @media (max-width:380px){.trEloSor{flex-direction:column;gap:1px}.trEloSor .v{text-align:left;white-space:normal}}
 /* ---- 📊 HANGSÚLY-ÖSSZKÉP (1.0.9.8.00) ---- */
 .dlOssz{background:var(--panel2);border:1px solid color-mix(in srgb,var(--gold) 55%,var(--line));border-left:3px solid var(--gold);
@@ -8815,7 +8816,7 @@ html.fxLive[data-theme="reflektor"] .heTitle{animation:refTitle 1.15s cubic-bezi
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.11.2.01";
+const APP_VERSION="1.0.11.3.00";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -100205,6 +100206,9 @@ function renderStaffPanel(){
         +`</div>`;}
     h+=`<div id="staffEffect${i}" class="${hi("effect").trim()}" style="border-top:1px dashed var(--line);padding-top:5px;font-size:12.5px;line-height:1.55">`
       +coachEffectLines(c).map(x=>`<div>${x}</div>`).join("")+`</div>`;
+    /* 📈 1.0.11.3.00 — kinek mennyit hoz az idény végéig (a fókusz minden
+       módosítása újrarajzolja a panelt, tehát a becslés azonnal követi) */
+    h+=stabEloreHtml(c);
     /* A vezetett bevezető doboza a kártyán BELÜL ül: így sosem csúszhat el a
        tartalomtól, és nem takar el semmit, amit épp elmagyaráz. A dobozt a
        KÖZÖS lépéssor-motor rajzolja (inline forma) — a panel csak a helyét
@@ -101424,6 +101428,154 @@ function trainEloreHtml(tervOf){
     +`A meccseken szerzett fejlődés ezen FELÜL jár; a nem edzett képességek meccs-bevétele ${Math.round(TRAIN_SLOW*100)}%-kal kisebb. `
     +`🔒 = a specializációs sáv teteje, ott megáll.</div></div>`;
   return h;}
+/* ================= 📈 A STÁB ELŐREJELZÉSE (1.0.11.3.00) =================
+   KÉRÉS: „A scoutoknál [a Szakmai stábnál — tisztázva] is legyen olyan
+   előrejelzési rendszer, mint amit mostanában építettünk be az edzéshez. Kire
+   milyen mértékű lesz a hatása a szezonban."
+   A kártya eddig egy ÁLTALÁNOS számot mondott („egy 80-as játékoson"), azt
+   nem, hogy a fókuszált emberek KÖZÜL kinek mennyit hoz az idény végéig.
+   EZ KIJELZÉS, a motor tükre, típusonként:
+     · attribútum-mesterek → processCareerDevelopment, az attrCoachesFor ága:
+       COACH_ATTR_PTS × coachPower × trainScale, majd a közös addA-lánc (kor-
+       görbe, nehézségi tempó, edzTempoKomp, underdog, stílus-szorzók) ÉS az
+       edzésterv lassítása, ha a mester képessége a játékosnál lassított —
+       pontosan az, amit a motor a mérlegbe (stabBy) könyvel. CSAK A PÁLYÁN
+       hat: a fókuszált, de most nem kezdő ember „ha kezd" értéket kap;
+     · Kispad-mester → processPadEdzo / padEdzoAd: a fókuszált, NEM játszó
+       cserék perce, és belőle a Rating és a fő tengely részvételi fejlődése;
+     · Iskolateremtő → legacyRate és COACH_STAGE_P: várható átadás és fázis;
+     · Ritmusmester, Gyógyító kéz → a fókuszáltakra ható erő (coachPower);
+     · Lélekemelő, Csapatkovács → csapat-szintű, álló hatás.
+   A próba (tools/stab-elore-1-0-11-3-00-proba.js) a motor valódi
+   könyvelésével veti össze. Amit nem tud előre: a cseréket (részidő), a
+   sérüléseket és a fókusz későbbi módosítását — „a mostani kerettel". */
+function stabElorePont(c,p,entry,pos){
+  if(!c||!c.attrKey||!entry)return 0;
+  const pw=coachPower(c,p.n);if(!(pw>0))return 0;
+  if(potBlockActive(p.n))return 0;   /* POT-blokk: a pozitív pont 0-ra áll */
+  const key=c.attrKey;
+  let v=COACH_ATTR_PTS*pw*trainScale(entry);
+  if(key==="seb")v=v/speedTrainDiv(entry);
+  let val=ageScaleAttr(entry.age,v)*devTempo();
+  if(val>0)val*=edzTempoKomp();
+  if(val>0)val*=1+underdogFactor()*0.5;
+  if(val>0)val*=styleStarAttrMult(p.n,key);
+  if(val>0)val*=passChemAttrMult(p.n,key);
+  if(val>0)val*=roleHeirDevMult(p.n);
+  if(val>0&&key==="seb")val*=gpSpeedDevMult(p.n);
+  if(val>0)val*=engTrainMult(p.n,key);
+  /* az edzésterv lassítása a stáb pontjára is hat (a motor addA-jában) */
+  const tr=trainingFor(getCategoryFor(pos||(p.pos&&p.pos[0])||"KKP"));
+  if(tr&&tr.slow&&tr.slow.indexOf(key)>=0&&val>0)val-=val*TRAIN_SLOW;
+  return val;}
+/* a Kispad-mester egy meccsnyi adagja egy NEM játszó fókuszáltnak (padEdzoAd) */
+function stabElorePad(c,p,entry){
+  const perc=padEdzoPerc(c);if(!(perc>0)||!entry)return null;
+  const share=perc/90,age=entry.age;
+  let rat=0,tengely=0;
+  if(!potBlockActive(p.n)){
+    let d=0.3*share;
+    if(age<21)d*=2.0;else if(age<25)d*=1.6;else if(age<30)d*=0.8;else d*=0.4;
+    d*=talMamorDev(p.n);d*=talKorDev(age,p.n);
+    rat=d*devTempo();
+    tengely=ageScaleAttr(age,0.3*share)*devTempo();}
+  return {perc,rat,tengely,key:attrTrainedBy((p.pos&&p.pos[0])||"KKP")};}
+function stabEloreSzamol(c){
+  const F=trainEloreFordulok(),t=coachTypeByKey(c.type)||{},T=focusTargets(c);
+  const R={F,tipus:c.type,aktiv:coachIsActive(c),sorok:[],csapat:[],T:T.length};
+  if(!R.aktiv||!T.length)return R;
+  const xi=new Map();(slots||[]).forEach(sl=>{if(sl&&sl.player)xi.set(sl.player.n,sl.pos);});
+  const roster=new Map(((typeof fullCareerRoster==="function"?fullCareerRoster():[])||[]).filter(Boolean).map(p=>[p.n,p]));
+  const serult=n=>!!(S.unavailable&&S.unavailable[n]&&S.unavailable[n].reason==="injury");
+  const num=x=>Math.round(x*100)/100;
+  if(c.attrKey){
+    T.forEach(n=>{
+      const p=roster.get(n),entry=careerPool&&careerPool[n];if(!p||!entry)return;
+      try{syncAttrsToRating(entry);}catch(e){}
+      const kezd=xi.has(n),pos=kezd?xi.get(n):((p.pos&&p.pos[0])||"");
+      const pt=stabElorePont(c,p,entry,pos);
+      let lep=pt*F.n/CAREER_DEV_THRESHOLD,fal=false;
+      try{const b=attrBandOf(entry,c.attrKey),hely=Math.max(0,b.hi-((entry.attrs&&entry.attrs[c.attrKey])||0));
+        if(lep>hely+0.05){lep=hely;fal=true;}}catch(e){}
+      R.sorok.push({n,pos,kezd,pt,lep,fal,blokk:potBlockActive(n),key:c.attrKey});});
+  }else if(c.type==="bench"){
+    T.forEach(n=>{
+      const p=roster.get(n),entry=careerPool&&careerPool[n];if(!p||!entry||xi.has(n))return;
+      const a=stabElorePad(c,p,entry);if(!a)return;
+      R.sorok.push({n,pos:(p.pos&&p.pos[0])||"",kezd:false,serult:serult(n),perc:a.perc,percOssz:a.perc*F.n,
+        rat:a.rat*F.n/CAREER_DEV_THRESHOLD,tengely:a.tengely*F.n/CAREER_DEV_THRESHOLD,key:a.key,pt:a.tengely});});
+  }else if(c.type==="skill"){
+    const rate=legacyRate(c),pairs=legacyValidPairs(c),left=legacyLeft(c);
+    const atadas=pairs>0?Math.min(left,pairs,rate*F.n):0;
+    const felk=new Map();try{findIncompleteSkills().forEach(x=>{if(T.indexOf(x.name)>=0)felk.set(x.name,(felk.get(x.name)||0)+1);});}catch(e){}
+    const fazis=felk.size?COACH_STAGE_P*coachPower(c,[...felk.keys()][0])*F.n:0;
+    R.csapat.push({k:"atadas",v:atadas,rate:rate*F.n,left,pairs},{k:"fazis",v:fazis,db:felk.size});
+    felk.forEach((db,n)=>{const p=roster.get(n);R.sorok.push({n,pos:p&&p.pos?p.pos[0]:"",kezd:xi.has(n),felk:db});});
+  }else if(c.type==="form"||c.type==="medic"){
+    T.forEach(n=>{const p=roster.get(n);if(!p)return;
+      const pw=coachPower(c,n);
+      R.sorok.push({n,pos:xi.has(n)?xi.get(n):((p.pos&&p.pos[0])||""),kezd:xi.has(n),pw,
+        jo:Math.round(COACH_FORM_W*pw*100),rossz:Math.round(Math.min(75,COACH_FORM_W*pw*100)),
+        huzas:PFORM_COACH_PULL*pw,serules:Math.round(Math.min(65,COACH_MEDIC_W*pw*100))});});
+  }else if(c.type==="morale"){
+    const b=Math.min(COACH_MORALE_MAX,COACH_MORALE_PER*coachTeamScope(c));
+    R.csapat.push({k:"moral",v:b,ovr:moraleToOvr(50+b)});
+  }else if(c.type==="chem"){
+    const nv=[...xi.keys()].filter(n=>T.indexOf(n)>=0);
+    for(let i=0;i<nv.length;i++)for(let j=i+1;j<nv.length;j++){
+      let m=1;try{m=bondCoachMult(nv[i],nv[j]);}catch(e){}
+      if(m>1.0005)R.sorok.push({n:nv[i],n2:nv[j],m});}
+    R.sorok.sort((a,b)=>b.m-a.m);}
+  return R;}
+function stabEloreHtml(c){
+  let R;try{R=stabEloreSzamol(c);}catch(e){return "";}
+  const num=x=>String(Math.round(x*10)/10).replace(".",",");
+  const t=coachTypeByKey(c.type)||{};
+  let h=`<div class="trElo stElo"><div class="trEloH">📈 Várható hatás <span>${R.F.kov?`a következő idényre (${R.F.n} bajnoki forduló)`:`az idény végéig — még ${R.F.n} bajnoki forduló`}</span></div>`;
+  if(!R.aktiv)return h+`<div class="trEloUres">Inaktív — amíg van előtte ugyanilyen típusú stábtag, nem hat senkire.</div></div>`;
+  if(!R.T)return h+`<div class="trEloUres">Nincs kire figyelnie — állíts be fókuszt.</div></div>`;
+  const nev=r=>`<span class="n">${esc(shortName(r.n))}<em>${esc(r.pos||"")}</em></span>`;
+  if(c.attrKey){
+    const lbl=trainStatName(c.attrKey);
+    const kezdo=R.sorok.filter(r=>r.kezd).sort((a,b)=>b.lep-a.lep),tobbi=R.sorok.filter(r=>!r.kezd).sort((a,b)=>b.lep-a.lep);
+    const sor=r=>`<div class="trEloSor">${nev(r)}<span class="v">${r.blokk?`<i title="POT-blokk">⛔ POT-blokk</i>`
+      :`<b class="${r.kezd?"fo":"mel"}">${esc(lbl)} +${num(r.lep)}</b>${r.fal?`<i title="a specializációs sáv teteje">🔒</i>`:""}`}</span></div>`;
+    const ossz=a=>a.reduce((s,r)=>s+r.lep,0);
+    if(kezdo.length)h+=`<div class="trEloSec">A kezdő tizenegyben · összesen ≈ <b>+${num(ossz(kezdo))}</b> ${esc(lbl)}-pont</div>`+kezdo.map(sor).join("");
+    else h+=`<div class="trEloUres">A fókuszból most senki nincs a kezdő tizenegyben — a mester csak a pályán dolgozik.</div>`;
+    if(tobbi.length)h+=`<details class="trEloPad"><summary>A fókuszban, de most nem kezd — ${tobbi.length} játékos · „ha végig kezd”</summary>`+tobbi.map(sor).join("")+`</details>`;
+    h+=`<div class="trEloMegj">A mester <b>csak a pályán</b> dolgozik: a kezdőknek a mostani szorzókkal (kor, szint, nehézségi tempó, stílus, és az edzésterv lassítása, ha ${esc(lbl.toLowerCase())} náluk lassított), végigjátszott meccsekre. 🔒 = a specializációs sáv teteje.</div>`;
+  }else if(c.type==="bench"){
+    const L=R.sorok.sort((a,b)=>b.tengely-a.tengely);
+    if(!L.length)h+=`<div class="trEloUres">A fókuszból mindenki a kezdő tizenegyben van — a Kispad-mester csak a NEM játszó cseréket edzi.</div>`;
+    else{
+      h+=`<div class="trEloSec">Meccsenként <b>${L[0].perc}'</b> mindenkinek, aki NEM lép pályára · ${L.length} játékos</div>`
+        +L.map(r=>`<div class="trEloSor">${nev(r)}<span class="v">${r.serult?`<i>🤕 most sérült, nem edz</i> · `:""}<b class="fo">${fmtNum(Math.round(r.percOssz))}'</b> · Rating +${num(r.rat)} · ${esc(trainStatName(r.key))} +${num(r.tengely)}</span></div>`).join("");}
+    h+=`<div class="trEloMegj">Lépésben (egy lépés = ${CAREER_DEV_THRESHOLD} pont), ha a játékos az idény hátralévő részében egyszer sem lép pályára. Amelyik meccsen játszik, ott a pálya fejleszti, nem a mester.</div>`;
+  }else if(c.type==="skill"){
+    const a=R.csapat.find(x=>x.k==="atadas"),f=R.csapat.find(x=>x.k==="fazis");
+    h+=`<div class="trEloSec">Hagyaték-átadás: ≈ <b>${num(a.v)}</b> <span style="color:var(--dim2)">(maradék készlet ${a.left}, érvényes pár ${a.pairs})</span></div>`
+      +`<div class="trEloSec">Képesség-fázis gyorsítás: ≈ <b>${num(f.v)}</b> fázis · ${f.db} fókuszáltnak van félkész képessége</div>`;
+    if(R.sorok.length)h+=R.sorok.map(r=>`<div class="trEloSor">${nev(r)}<span class="v">${r.felk} félkész képesség</span></div>`).join("");
+    h+=`<div class="trEloMegj">Valószínűségi hatás: a várható érték, a mostani fókusszal és kerettel.</div>`;
+  }else if(c.type==="form"||c.type==="medic"){
+    const kezdo=R.sorok.filter(r=>r.kezd),tobbi=R.sorok.filter(r=>!r.kezd);
+    const sor=r=>`<div class="trEloSor">${nev(r)}<span class="v">${c.type==="form"
+      ?`<b class="fo">+${num(r.huzas)} fok</b> · jó forma +${r.jo}% · rossz −${r.rossz}%`
+      :`<b class="fo">sérülés −${r.serules}%</b>`}</span></div>`;
+    h+=`<div class="trEloSec">${c.type==="form"?"Minden meccsen, a fókuszáltak formáján":"Minden meccsen, a fókuszáltak sérülés-kockázatán"} · ${R.F.n} meccs</div>`
+      +(kezdo.length?kezdo.map(sor).join(""):`<div class="trEloUres">A fókuszból most senki nincs a kezdő tizenegyben.</div>`);
+    if(tobbi.length)h+=`<details class="trEloPad"><summary>A többi fókuszált — ${tobbi.length} játékos</summary>`+tobbi.map(sor).join("")+`</details>`;
+    h+=`<div class="trEloMegj">A hatás játékosonként ugyanakkora (a fókusz méretével osztva): szűkebb fókusz — erősebb hatás kevesebb emberen.</div>`;
+  }else if(c.type==="morale"){
+    const m=R.csapat[0];
+    h+=`<div class="trEloSec">Csapatmorál <b>+${num(m.v)}</b> ≈ <b>+${String(m.ovr.toFixed(2)).replace(".",",")}</b> csapat-OVR — mind a ${R.F.n} hátralévő meccsen, az egész keretnek</div>`;
+  }else if(c.type==="chem"){
+    if(!R.sorok.length)h+=`<div class="trEloUres">A kezdő tizenegyben nincs olyan pár, amelynek mindkét tagja a fókuszban áll.</div>`;
+    else h+=`<div class="trEloSec">A kezdő tizenegy fókuszált párjai — ennyivel gyorsabban épül a kötésük · ${R.sorok.length} pár</div>`
+      +R.sorok.slice(0,8).map(r=>`<div class="trEloSor"><span class="n">${esc(shortName(r.n))} + ${esc(shortName(r.n2))}</span><span class="v"><b class="fo">×${String(r.m.toFixed(2)).replace(".",",")}</b></span></div>`).join("")
+      +(R.sorok.length>8?`<div class="trEloMegj">…és még ${R.sorok.length-8} pár.</div>`:"");}
+  return h+`</div>`;}
 /* ================= EDZÉSTERV KÉPERNYŐ ================= */
 let trainDraft=null;
 function openTrainingPlanner(){
