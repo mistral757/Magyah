@@ -18,7 +18,7 @@
    telepítéseken a RÉGI ikonok maradnának örökre — pont az a rajz, amit
    jogtisztasági okból cserélni kellett. A név léptetése az egyetlen dolog,
    ami ezt kikényszeríti. */
-const CACHE_NAME = "harminc-nulla-cache-v9";   /* v9: a Reflektor téma betűi (1.0.11.1.00) · v8: a verziótörténet oldala előre cache-elve (1.0.4.10.00) · v7: a Pixel téma számjegy-betűje (3.9.172) */
+const CACHE_NAME = "harminc-nulla-cache-v10";  /* v10: az új ikonkészlet és a manifest színei (1.0.11.2.01) · v9: a Reflektor téma betűi (1.0.11.1.00) · v8: a verziótörténet oldala előre cache-elve (1.0.4.10.00) · v7: a Pixel téma számjegy-betűje (3.9.172) */
 const STATIC_ASSETS = [
   "/",
   /* 📜 1.0.4.10.00 — a verziószámra koppintva ez nyílik; előre cache-elve,
