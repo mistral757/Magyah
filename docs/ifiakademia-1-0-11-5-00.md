@@ -18,8 +18,9 @@
 
 HUB → Csapatépítés → 🌱 Ifiakadémia, a panel tetején. Az 1. idény 8.
 fordulója után nyílik (a 2. idénytől mindig nyitva), addig 🔒 és a gyűjtött
-XP látszik. Az állapot az `S.ifiAk`-ban él. Régi mentésben üresen jön létre,
-és a futó karrier a következő megnyitáskor nyitva találja.
+XP látszik. Az állapot az `S.ifiAk`-ban él, és a mentés viszi (a mezőlistás
+mentésbe az 1.0.11.5.01 vette fel). Régi mentésben üresen jön létre, és a
+futó karrier a következő megnyitáskor nyitva találja.
 
 ## Az XP és a szint
 
@@ -117,7 +118,8 @@ felhozott csúcsához tartozó érték (`peakToPot(peak)`, a kemény plafonig).
 - a négy szakember, a kész skill átadása a felvételkor, és hogy 1. szinten
   csak egy hely dolgozik;
 - a visszatérő ifi POT-ja;
-- a panel kattintásai.
+- a panel kattintásai;
+- a mentés–visszatöltés (1.0.11.5.01).
 
 A régi akadémia-, ifi- és talizmán-próbák változatlanul zöldek.
 

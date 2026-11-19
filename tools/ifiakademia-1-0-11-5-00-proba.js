@@ -20,7 +20,8 @@
         tehetségvadász a bent nevelt ifik fejlődését;
      7. a visszatérő ifi POT-ja a felhozott csúcsához áll;
      8. a panel: irány-gomb, fókusz, szakember választása és célja kattintással,
-        a felirat a hatást mondja; nincs oldalhiba. */
+        a felirat a hatást mondja;
+     9. a mentés viszi (1.0.11.5.01 — a mentés mezőlistás); nincs oldalhiba. */
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path");
 const ROOT="/home/user/Magyah", PORT=9231;
@@ -66,7 +67,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     try{startFirstSeason();}catch(e){ki.sfs=String(e);}
     for(const id of ["talDrawLater","guideTipOk"]){const x=document.getElementById(id);if(x&&x.offsetParent)x.click();}
     phase="season";
-    window.saveGame=()=>{};window.saveGameNow=()=>{};
+    window.__sg=saveGame;window.saveGame=()=>{};window.saveGameNow=()=>{};
     const med=a=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.floor(s.length/2)];};
     /* 1. nyitás */
     S.ifiAk=null;S.seasonNumber=1;S.idx=7;
@@ -136,6 +137,15 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     S.academy=[{n:vp.n,leftAge:17,leftRating:120,leftSeason:1,offerSeason:1,times:1}];
     const L=academyReturnLift(S.academy[0]);
     ki.vissza={lifted:L&&L.lifted,after:L&&L.after,pot:ve.pot,peak:Math.round(ve.peak),vart:Math.min(potHardCap(),peakToPot(ve.peak)),potElotte:L&&L.potElotte};
+    /* 9. a mentés viszi (1.0.11.5.01) */
+    S.ifiAk={v:1,xp:777,forras:{csapat:777},irany:-1,fokusz:"VEDO",szak:[{t:"poszt",c:"KV"}],nyitva:1,szintLatott:6};
+    window.__lsw=null;const _s=Storage.prototype.setItem;
+    Storage.prototype.setItem=function(k,v){if(k===saveKey())window.__lsw=v;return _s.apply(this,arguments);};
+    try{window.__sg();}catch(e){ki.saveErr=String(e);}finally{Storage.prototype.setItem=_s;}
+    let dd=null;try{dd=JSON.parse(mzUnpack(window.__lsw));}catch(e){}
+    ki.mentes={van:!!(dd&&dd.S&&dd.S.ifiAk&&dd.S.ifiAk.xp===777)};
+    if(dd){S.ifiAk=null;try{applySavedGame(dd);}catch(e){ki.loadErr=String(e);}
+      ki.mentes.vissza=!!(S.ifiAk&&S.ifiAk.xp===777&&S.ifiAk.fokusz==="VEDO"&&S.ifiAk.szak[0].c==="KV"&&S.ifiAk.irany===-1);}
     /* 8. a panel */
     S.ifiAk={v:1,xp:500,forras:{csapat:300,felvett:200},irany:0,fokusz:null,szak:[],nyitva:1};
     openAcademyPanel();
@@ -176,6 +186,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.aktivL1===1,"6f. 1. szinten csak az 1. hely dolgozik",r.aktivL1);
   ok(r.vissza.lifted&&r.vissza.pot===r.vissza.vart&&r.vissza.potElotte===800&&r.vissza.pot>800,"7. a visszatérő ifi POT-ja a felhozott csúcsához áll (800 → a csúcs POT-ja)",r.vissza);
   ok(r.uiIrany===1&&r.uiTiltott&&r.uiFokusz==="CSATAR"&&r.uiSzak==='{"t":"poszt","c":"BSZ"}'&&r.uiSzoveg&&r.uiZarHely===1,"8. a panel: irány, fókusz, szakember és cél kattintással; a zárt hely (4. szint: 1)",{i:r.uiIrany,t:r.uiTiltott,f:r.uiFokusz,s:r.uiSzak,sz:r.uiSzoveg,z:r.uiZarHely});
+  ok(r.mentes&&r.mentes.van&&r.mentes.vissza&&!r.loadErr,"9. a mentés viszi az akadémia állapotát (XP, irány, fókusz, szakember)",{m:r.mentes,e:r.loadErr,s:r.saveErr});
   ok(!errs.length,"nincs oldalhiba",errs.slice(0,3));
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");
   await b.close();srv.close();process.exit(hiba?1:0);})();
