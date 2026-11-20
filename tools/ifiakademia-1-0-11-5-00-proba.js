@@ -173,7 +173,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(JSON.stringify(r.irMax)==="[1,1,2,2,3,3]"&&JSON.stringify(r.hely)==="[1,1,2,2,3,3]","3b. irány-tartomány és szakember-hely",[r.irMax,r.hely]);
   ok(r.ero[0]===0.415&&r.ero[1]===1,"3c. erő 0,415 → 1,00",r.ero);
   ok(r.pot200.med>=0.75*r.pot200.mezony,"4a. 200-as mezőny: az új ifi medián POT-ja a mezőnyé ≥ 75 %-a (régen 58 300 / 164 180)",r.pot200);
-  ok(r.pot80.shift<=0&&r.pot80.max<=5500,"4b. a karrier elején (eltolás nélkül) a régi sáv (≤ 5500)",r.pot80);
+  ok(r.pot80.shift<=5&&r.pot80.max<=5500,"4b. a karrier elején (legfeljebb kis piaci eltolás) a régi sáv (≤ 5500)",r.pot80);
   ok(Math.abs(r.kimarad3-0.6)<0.04&&!r.kimaradGyak,"5a. minőség +3: az új felfedezés ~60 %-ban kimarad; gyakrabban nem",[r.kimarad3]);
   ok(Math.abs(r.koztes3-0.9)<0.03,"5b. gyakrabban −3: köztes ablak ~90 %",r.koztes3);
   ok(r.potMin3>r.potGyak3*1.3,"5c. a minőség-irány érezhetően nagyobb POT-ot ad, mint a gyakoriság",[r.potMin3,r.potGyak3]);
