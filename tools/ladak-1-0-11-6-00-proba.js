@@ -4,7 +4,7 @@
         a várható érték / ár 84–98 %, a nagyobb láda nem rosszabb;
         20 000 dobás ládánként a tábla szerint oszlik;
      2. a befizetés: pénz (U/100 Ft érménként), stíluspont (2,5), játékos
-        (piaci érték 25 %-a, a keretből kikerül — és mérve a gyors eladás
+        (piaci érték 40 %-a, legalább 1,5× a gyors eladás, a keretből kikerül — és mérve a gyors eladás
         fölött van), stábtag (40 %), talizmán (ritkaság szerint);
      3. a vásárlás: kevés érméből nem megy; ×5 → öt jutalom, az érme fogy;
      4. a kategóriák hatása és lejárata: kupon (az ár −25 %, fizetéskor fogy),
@@ -72,15 +72,15 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* 2. befizetés */
     S.lada=null;S.transferBudget=Math.round(U*5);
     const b0=S.transferBudget;let r=ladaBefizetPenz(100);
-    ki.penz={ok:r.ok,erme:ladaErme(),fizetett:b0-S.transferBudget,vart:Math.round(U)};
-    const M=msState();M.sp=100;r=ladaBefizetSp(40);ki.sp={ok:r.ok,e:r.e,sp:M.sp};
+    ki.penz={ok:r.ok,erme:ladaErme(),fizetett:b0-S.transferBudget,vart:Math.round(100*ladaErmeAr()),regi:Math.round(U),nf:ladaNfSzorzo()};
+    const M=msState();M.sp=100;r=ladaBefizetSp(40);ki.sp={ok:r.ok,e:r.e,vart:ladaSpErme(40),sp:M.sp};
     /* egy valódi tartalék: 19 éves, a mezőny szintjén */
     const tp=generateAcademyPlayer();const tpe=careerPool[tp.n];tpe.age=19;tpe.startRating=55;tpe.pot=9000;tpe.peak=potToPeakOvr(9000);
     const tpl=careerPlayerFromPoolEntry(tpe);extraRoster.push(tpl);
     const J=ladaJatJeloltek();const jo=J.find(o=>o.p.n===tp.n);
     const je=careerPool[jo.p.n];const sv=sellValue(jo.p),mv=marketValue(je);
     const e0=ladaErme();r=ladaBefizetJatekos(jo.p.n);
-    ki.jat={ok:r.ok,uz:r.uz,e:r.e,vart:Math.round(mv*LADA_JAT_K/U*100),bent:!!fullCareerRoster().find(p=>p&&p.n===jo.p.n),
+    ki.jat={ok:r.ok,uz:r.uz,e:r.e,vart:Math.round(Math.max(mv*LADA_JAT_K,sv*1.5)/U*100*ladaNfSzorzo()),bent:!!fullCareerRoster().find(p=>p&&p.n===jo.p.n),
       gyorsEladasErme:Math.round(sv/U*100),arany:+(r.e/Math.max(1,Math.round(sv/U*100))).toFixed(2),delta:ladaErme()-e0};
     ki.kezdoUz=(()=>{const x=ladaJatJeloltek().find(o=>slots.some(s=>s.player===o.p));if(!x)return null;const rr=ladaBefizetJatekos(x.p.n);return rr.ok?"ok":rr.uz;})();
     S.staff=[{n:"Láda Teszt",type:"attr:passz",attrKey:"passz",sz:60,szBase:60,age:40,xp:0,since:1,focus:{mode:"team",group:null,names:[]}}];
@@ -143,6 +143,17 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const szerepKulcs=tst.szerep.slice();
     for(let i=0;i<14;i++)ladaMeccsUtan();
     ki.stilus.vege={n:styleSlots().length,van:!!S.lada.stilus,szint:styleTraitLevel(tk[0]),szerepMaradt:szerepKulcs.filter(k=>roleState().map[k]).length,nezet:S.styleView};
+    /* 8. (1.0.11.6.01) nehézség-szorzó, kihívás-jutalom */
+    const _nfm=window.styleXNfMost;
+    const nfp=(nf,s)=>{window.styleXNfMost=()=>({nf,s});const v=+ladaNfSzorzo().toFixed(3);return v;};
+    ki.nfTab={"1.1":nfp(1,1),"5.1":nfp(5,1),"7.1":nfp(7,1),"9.5":nfp(9,5),"10.5":nfp(10,5)};
+    window.styleXNfMost=()=>({nf:5,s:1});
+    const ar5=ladaErmeAr(),sp5=ladaSpErme(40);window.styleXNfMost=()=>({nf:9,s:5});const ar9=ladaErmeAr(),sp9=ladaSpErme(40);
+    ki.nfHat={ar5:Math.round(ar5),ar9:Math.round(ar9),sp5,sp9};
+    window.styleXNfMost=_nfm;
+    const ce0=ladaErme();const ctxt=applyChallengeReward({kind:"ladaErme",amount:55});ki.kihivas={txt:ctxt,d:ladaErme()-ce0};
+    let vanPool=0;for(let i=0;i<30&&!vanPool;i++){try{const rw=genReward("long",3,{oppRating:oppTargetRating});}catch(e){}}
+    ki.poolSzoveg=/kind:"ladaErme"/.test(genReward.toString());
     /* 6. mentés */
     S.lada.erme=1.23;S.lada.log.unshift({t:"ki",sz:"teszt",sz2:3,s:3,i:11});
     window.__lsw=null;const _s=Storage.prototype.setItem;
@@ -196,16 +207,35 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* a befizetés fül */
     _ladaFul="be";_ladaBefFul="jat";renderLada();
     out.jatSor=document.querySelectorAll("#ladaBody [data-lbj]").length;
+    out.jatLink=document.querySelectorAll("#ladaBody .ldSor .jatLink[data-jat]").length;
+    S.staff=[{n:"Info Teszt",type:"attr:passz",attrKey:"passz",sz:60,szBase:60,age:44,xp:0,since:1,focus:{mode:"team",group:null,names:[]}}];
+    _ladaBefFul="stab";renderLada();
+    document.querySelector('#ladaBody [data-ldinfo="stab:0"]').click();
+    out.stabInfo=document.getElementById("ladaInfo").classList.contains("on")&&/Szakértelem/.test(document.getElementById("ladaInfo").textContent);
+    document.getElementById("ladaInfoZar").click();
+    talState().lapok.push({kat:"scout",valt:"lista",rang:3,dobas:0.4});
+    _ladaBefFul="tal";renderLada();
+    const tl=document.querySelectorAll('#ladaBody [data-ldinfo^="tal:"]');tl[tl.length-1].click();
+    out.talInfo=document.getElementById("ladaInfo").classList.contains("on")&&document.getElementById("ladaInfo").textContent.length>40;
+    document.getElementById("ladaInfoZar").click();
+    _ladaBefFul="jat";renderLada();
     return out;});
   await p.waitForTimeout(400);await shot("lada-befizetes.png");
-  console.log(JSON.stringify({ui,ui2,ui3}));
+  /* a játékosnév valódi koppintása: menü → adatlap a ládák fölött */
+  const nevEl=await p.$("#ladaBody .ldSor .jatLink");
+  if(nevEl){await nevEl.click();await p.waitForTimeout(150);
+    const menu=await p.$('.jatMenu [data-jm="lap"]');if(menu){await menu.click();await p.waitForTimeout(400);}}
+  const peek=await p.evaluate(()=>{const b=document.getElementById("plSheet");if(!b)return null;
+    return {lat:!b.classList.contains("hide"),z:+getComputedStyle(b).zIndex};});
+  await shot("lada-adatlap.png");
+  console.log(JSON.stringify({ui,ui2,ui3,peek}));
 
   ok(r.tabla.every(t=>Math.abs(t.sum-1)<1e-6)&&r.olt6===0.0005,"1a. minden láda esélye 1-re összegződik; az Öltözői 6. szintje 0,05 %",r.tabla.map(t=>t.sum));
   ok(r.tabla.every(t=>t.ev>=0.84&&t.ev<=0.98)&&r.tabla.every((t,i)=>i===0||t.ev>=r.tabla[i-1].ev-1e-9),"1b. a várható érték / ár 84–98 %, a nagyobb láda nem rosszabb",r.tabla.map(t=>t.ev));
   ok(r.dob.every(d=>d.max<0.012),"1c. 20 000 dobás ládánként a tábla szerint (eltérés < 1,2 pp)",r.dob);
-  ok(r.penz.ok&&r.penz.erme===100&&Math.abs(r.penz.fizetett-r.penz.vart)<=1,"2a. pénz: 100 érme = 1 U",r.penz);
-  ok(r.sp.ok&&r.sp.e===100&&r.sp.sp===60,"2b. stíluspont: 40 pont = 100 érme",r.sp);
-  ok(r.jat.ok&&r.jat.e===r.jat.vart&&!r.jat.bent&&r.jat.arany>=1,"2c. játékos: a piaci érték 25 %-a, kikerül a keretből, ≥ a gyors eladás",r.jat);
+  ok(r.penz.ok&&r.penz.erme===100&&Math.abs(r.penz.fizetett-r.penz.vart)<=1&&r.penz.fizetett<=0.8*r.penz.regi/r.penz.nf+1,"2a. pénz: 100 érme ≥ 20%-kal olcsóbb, mint 1 U (a nehézség-szorzó fölött)",r.penz);
+  ok(r.sp.ok&&r.sp.e===r.sp.vart&&r.sp.sp===60,"2b. stíluspont: 40 pont = 100 érme × a nehézség-szorzó",r.sp);
+  ok(r.jat.ok&&r.jat.e===r.jat.vart&&!r.jat.bent&&r.jat.arany>=1.4,"2c. játékos: a piaci érték 40 %-a (≥ 1,5× gyors eladás), kikerül a keretből",r.jat);
   ok(r.kezdoUz===null||r.kezdoUz==="ok"||/nincs, aki a helyére/.test(r.kezdoUz),"2c'. pótlás nélküli kezdő: érthető elutasítás",r.kezdoUz);
   ok(r.stab.ok&&r.stab.e===r.stab.vart&&r.stab.db===0,"2d. stábtag: a stábpiaci ár 40 %-a, távozik",r.stab);
   ok(r.tal.ok&&r.tal.e===r.tal.vart,"2e. talizmán: a ritkaság szerint",r.tal);
@@ -232,9 +262,14 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(T.vesz&&T.vesz.ok===false&&/nem fejleszthető/.test(T.vesz.reason||""),"5b. nem fejleszthető",T.vesz);
   ok(T.vege.n===T.n0&&!T.vege.van&&T.vege.szint===0&&T.vege.szerepMaradt===0&&T.vege.nezet<=T.n0,"5c. 14 meccs után lejár: slot, képesség, szerepek, nézet vissza",T.vege);
   ok(r.mentes&&r.mentes.van&&r.mentes.vissza&&!r.loadErr,"6. a mentés viszi",{m:r.mentes,e:r.loadErr});
+  ok(r.nfTab["9.5"]===1&&r.nfTab["1.1"]===2&&r.nfTab["7.1"]>1.3&&r.nfTab["10.5"]<1&&r.nfTab["5.1"]>r.nfTab["7.1"],"8a. nehézség-szorzó: 9.5 ×1, lefelé több, a 10-es fokozaton kevesebb",r.nfTab);
+  ok(r.nfHat.ar5<r.nfHat.ar9&&r.nfHat.sp5>r.nfHat.sp9,"8b. könnyebb nehézségen olcsóbb az érme, több a stíluspont-hozam",r.nfHat);
+  ok(r.kihivas.d===55&&/ládaérme/.test(r.kihivas.txt)&&r.poolSzoveg,"8c. kihívás-jutalom: +55 ládaérme, és a jutalom-készletben is ott van",r.kihivas);
   ok(ui.gomb&&ui.kartyak===6&&ui.letiltott===0,"7a. HUB-gomb, hat láda; 600 érméből mind nyitható",ui);
   ok(ui2.on&&ui2.k===5&&ui2.erme>=600-70&&ui2.erme<600&&ui2.db>=5,"7b. ×5 Öltözői: a jelenet öt kártyával, 70 érme fogy (tele stábnál a stábtag-jutalom érmeként visszajön)",ui2);
   ok(ui3.zarva&&ui3.tov===true&&ui3.tov2===false&&ui3.fugg===0&&ui3.kartyaRang>=2&&ui3.jatSor>0,"7c. a „Rendben” zár; a választós kártya kiosztása, addig nem lehet továbblépni; befizetés-lista",ui3);
+  ok(ui3.jatLink>0&&ui3.stabInfo&&ui3.talInfo,"7d. befizetésnél a játékos, a stábtag és a talizmán neve kis ablakot nyit",{j:ui3.jatLink,s:ui3.stabInfo,t:ui3.talInfo});
+  ok(peek&&peek.lat&&peek.z>465,"7e. a névre koppintva a játékos adatlapja a ládák ablaka fölött nyílik",peek);
   ok(!errs.length,"nincs oldalhiba",errs.slice(0,3));
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");
   await b.close();srv.close();process.exit(hiba?1:0);})();
