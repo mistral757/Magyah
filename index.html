@@ -1617,6 +1617,10 @@ button.infPanel:disabled{cursor:default}
 .evaKeret{width:min(92vw,60vh,560px);display:flex;flex-direction:column;align-items:center;gap:12px}
 .evaSzinpad{width:100%;height:auto;aspect-ratio:1/1;border-radius:18px;border:2px solid rgba(255,255,255,.16);box-shadow:0 12px 44px rgba(0,0,0,.6);background:#1c4d2b}
 .evaSzinpad *{transform-box:view-box;transform-origin:0 0}
+/* 🎥 1.0.11.12.00 — a színpad és fölötte a 3D kameraállások vászna */
+.evaKepkeret{position:relative;width:100%;line-height:0}
+.evaKamVaszon{position:absolute;inset:0;width:100%;height:100%;border-radius:18px;border:2px solid rgba(255,255,255,.16);box-sizing:border-box;background:#06110b}
+[data-theme="pixel"] .evaKamVaszon{border-radius:0;image-rendering:pixelated}
 #evaHalo,#evaVarSav{transform-box:fill-box}
 .evaCim{display:flex;align-items:center;gap:12px;opacity:0;max-width:100%}
 .evaArc{width:64px;height:64px;flex:none;border-radius:50%;border:3px solid var(--evaSzin,#888);background:#1b1f27;object-fit:cover}
@@ -1633,6 +1637,7 @@ button.infPanel:disabled{cursor:default}
 @media (orientation:landscape) and (max-height:640px){
   #evAnim{padding:10px 16px 52px}
   .evaKeret{width:auto;flex-direction:row;align-items:center;gap:22px;max-width:100%}
+  .evaKepkeret{width:auto;flex:none}
   .evaSzinpad{width:min(calc(100vh - 72px),62vw);flex:none}
   .evaCim{flex-direction:column;align-items:flex-start;max-width:34vw}
   .evaArc{width:72px;height:72px}
@@ -9176,7 +9181,7 @@ html.fxLive[data-theme="reflektor"] .heTitle{animation:refTitle 1.15s cubic-bezi
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.11.11.00";
+const APP_VERSION="1.0.11.12.00";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -68354,6 +68359,325 @@ function evaKontextus(ev){
   /* 🥅 3.9.283: a célzott cella — a lövő vagy a kapus képességéből */
   try{const sk=evaSkillSablon(ev)||evaAltSablon(ev)||EVA_TIPUS_SABLON[ev.t];c.cel=evaCelSzamol(ev,sk,c);}catch(e){c.cel=evaRacsKozep(5,1);}
   return c;}
+/* ================= 🎥 KAMERÁK — 1. FÁZIS (1.0.11.12.00) =================
+   KIMONDOTT KÉRÉS: „kezdjünk bele a kameraállásos tervbe. Az állások
+   mindegyike hozza az eddigi feelinget, amilyen eddig volt a játék. A
+   játékosarcok is maradjanak meg, a mozgás, stb. Csak új kamerákkal."
+   A TERV: docs/kozvetites-unneples-terv.md (1. fázis). A jelenet-szabályok:
+   .claude/skills/jelenet/SKILL.md.
+
+   MIÉRT NEM DÖNTJÜK MEG A MOSTANI RAJZOT 3D-BEN: a jelenetek színpada
+   (120×120) STILIZÁLT kép — a kapu a valósnál jóval szélesebb (a 4×8-as
+   célrácsnak hely kell), a kapu-nézetben a függőleges tengely egyszerre
+   mélység és magasság. Egy ilyen rajzot oldalról nézve a kapu „lefeküdne", a
+   mozgás széthullana. Ezért két, egymást kiegészítő kamera van:
+
+   1. A RENDEZŐ A JELENETEN BELÜL (kamRendezo…): a mostani jelenet, BITRE a
+      mostani mozgással és arcokkal, egy kamera-csoportban (#evaRendezo) fut,
+      amit a rendező KÖVET (közeli, a labdán) és VÁG (totál ↔ közeli). Csak
+      nagyít és mozgat — semmit nem torzít.
+   2. ÚJ 3D KAMERAÁLLÁSOK A STADIONNAL (kamFelvetel…): a lövés jellegű
+      események elé NYITÓ VÁGÁS (főkamera / kapu mögötti / lelátó-totál), a
+      gólok mögé REAKCIÓ-VÁGÁS (lelátó-totál, tomboló szektor, füst a
+      klubszínekben). A világ méterben (105×68-as pálya), a lelátó a stadion
+      adataiból (befogadóképesség, nézőszám, klubszínek, a vendégszektor az
+      ellenfél mezében, esti meccsen villanyfény). A szereplők UGYANAZOK a
+      figurák (evaFigura: arc, mez, szám) képpé alakítva — új szögből.
+
+   A VÁGÁSOK az esemény magjából (mindig ugyanaz ugyanarra az eseményre), a
+   meccs véletlenjéhez nem nyúlnak. PÁRHARCBAN nincs kamera (ott az óra nem
+   áll meg, a jelenet nem nyúlhat). KAPCSOLÓ: Beállítások → 🎬 Esemény-
+   animációk → 🎥 Kameravágások (alapból BE; kikapcsolva betűre a régi). */
+const KAM_KEY="evaKamOff30_0";
+function kamBe(){let v=null;try{v=localStorage.getItem(KAM_KEY);}catch(e){}return v!=="1";}
+function kamAllit(on){try{localStorage.setItem(KAM_KEY,on?"0":"1");}catch(e){}}
+/* a lövés jellegű események: ezek kapnak nyitó vágást és rendezőt */
+const KAM_LOVES_T=new Set(["gol","golKapott","kapufa","bravur","vedes","tizenegyes","szabadrugas","loves"]);
+const KAM_ELO_MS=1150,KAM_UTO_MS=1500;
+let _kamNaplo=[];   /* a próbáknak: a lejátszott felvételek sorrendje */
+function kamMag(ev,s){return faceHash("kam|"+s+"|"+(ev.p||"")+"|"+ev.t+"|"+(ev.min||0)+"|"+(ev.seq||0));}
+function kamAktiv(ev){
+  try{return kamBe()&&!!ev&&KAM_LOVES_T.has(ev.t)&&!(_mev&&_mev.duel);}catch(e){return false;}}
+
+/* ---------- 1. A RENDEZŐ A JELENETEN BELÜL ---------- */
+/* a felvétel-lista: a jelenet hosszának arányában (a = eleje, b = vége) */
+function kamRendezoTerv(ev){
+  const v=kamMag(ev,"rend")%3;
+  if(v===0)return [{a:0,b:.5,m:"kovet",z:1.45},{a:.5,b:1,m:"total",z:1}];
+  if(v===1)return [{a:0,b:.3,m:"total",z:1},{a:.3,b:.66,m:"kovet",z:1.55},{a:.66,b:1,m:"total",z:1}];
+  return [{a:0,b:.6,m:"kovet",z:1.35},{a:.6,b:1,m:"total",z:1.06}];}
+function kamRendezoIndit(svg,ev,dur){
+  const g=svg&&svg.querySelector("#evaRendezo");if(!g)return null;
+  const terv=kamRendezoTerv(ev),naplo=[];
+  const t0=performance.now();let fx=60,fy=70,elozo=-1,fut=true;
+  /* a követett pont: a labda, ha van; különben a főszereplő */
+  const cel=()=>{const el=svg.querySelector("#evaLabda")||svg.querySelector("#evaLovo");if(!el)return null;
+    try{const m=new window.DOMMatrix(getComputedStyle(el).transform);return [m.e,m.f-8];}catch(e){return null;}};
+  const lep=()=>{
+    if(!fut)return;
+    const p=Math.min(1,(performance.now()-t0)/Math.max(1,dur));
+    let i=terv.findIndex(s=>p>=s.a&&p<s.b);if(i<0)i=terv.length-1;
+    const s=terv[i];let tx=60,ty=60;
+    if(s.m==="kovet"){const c=cel();
+      if(c){if(i!==elozo){fx=c[0];fy=c[1];}else{fx+=(c[0]-fx)*.16;fy+=(c[1]-fy)*.16;}}
+      tx=fx;ty=fy;}
+    if(i!==elozo){naplo.push(s.m);elozo=i;}
+    const fel=60/s.z;
+    tx=Math.max(fel,Math.min(120-fel,tx));ty=Math.max(fel,Math.min(120-fel,ty));
+    g.setAttribute("transform",`translate(60 60) scale(${s.z.toFixed(3)}) translate(${(-tx).toFixed(2)} ${(-ty).toFixed(2)})`);
+    if(p<1)requestAnimationFrame(lep);};
+  lep();
+  return {stop:()=>{fut=false;},naplo};}
+
+/* ---------- 2. A 3D VILÁG ÉS A KAMERÁK ---------- */
+function kamSub(a,b){return [a[0]-b[0],a[1]-b[1],a[2]-b[2]];}
+function kamDot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+function kamCrs(a,b){return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
+function kamNrm(a){const l=Math.hypot(a[0],a[1],a[2])||1;return [a[0]/l,a[1]/l,a[2]/l];}
+/* egy kamera: hol áll (c), hová néz (t), látószög (fov) — a vászon méretére */
+function kamKamera(c,t,fov,W,H){
+  const f=kamNrm(kamSub(t,c)),r=kamNrm(kamCrs(f,[0,0,1])),u=kamCrs(r,f);
+  return {c,f,r,u,F:(W/2)/Math.tan(fov*Math.PI/360),W,H};}
+function kamVet(K,p){
+  const d=kamSub(p,K.c),z=kamDot(d,K.f);if(z<0.4)return null;
+  return [K.W/2+kamDot(d,K.r)/z*K.F,K.H/2-kamDot(d,K.u)/z*K.F,z];}
+/* KÖZELSÍK-VÁGÁS: a kamera mögé lógó sokszög- és vonalrészeket levágjuk (a
+   pályán álló kameránál a gyep és a vonalak egy része a kamera mögött van —
+   enélkül az egész sokszög kiesne a képből) */
+const KAM_KOZEL=0.4;
+function kamKamTer(K,p){const d=kamSub(p,K.c);return [kamDot(d,K.r),kamDot(d,K.u),kamDot(d,K.f)];}
+function kamKepre(K,q){return [K.W/2+q[0]/q[2]*K.F,K.H/2-q[1]/q[2]*K.F,q[2]];}
+function kamVagSokszog(K,pts){
+  const be=pts.map(p=>kamKamTer(K,p)),ki=[];
+  for(let i=0;i<be.length;i++){const a=be[i],b=be[(i+1)%be.length],aIn=a[2]>=KAM_KOZEL,bIn=b[2]>=KAM_KOZEL;
+    if(aIn)ki.push(a);
+    if(aIn!==bIn){const t=(KAM_KOZEL-a[2])/(b[2]-a[2]);ki.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,KAM_KOZEL]);}}
+  return ki.length>=3?ki.map(q=>kamKepre(K,q)):null;}
+function kamVagSzakasz(K,a,b){
+  let A=kamKamTer(K,a),B=kamKamTer(K,b);
+  if(A[2]<KAM_KOZEL&&B[2]<KAM_KOZEL)return null;
+  if(A[2]<KAM_KOZEL){const t=(KAM_KOZEL-A[2])/(B[2]-A[2]);A=[A[0]+(B[0]-A[0])*t,A[1]+(B[1]-A[1])*t,KAM_KOZEL];}
+  else if(B[2]<KAM_KOZEL){const t=(KAM_KOZEL-B[2])/(A[2]-B[2]);B=[B[0]+(A[0]-B[0])*t,B[1]+(A[1]-B[1])*t,KAM_KOZEL];}
+  return [kamKepre(K,A),kamKepre(K,B)];}
+/* a kameraállások (a támadás mindig a +x kapu felé megy) */
+const KAM_ALLAS={
+  fo:   {n:"FŐKAMERA",fov:40,pos:(L,u)=>({c:[L[0]-7+u*4,-33,12],t:[L[0]+4,L[1]*.6,1.2]})},
+  kapu: {n:"KAPU MÖGÖTTI",fov:46,pos:(L,u)=>({c:[64-u*2,L[1]*.3-3,8.5],t:[L[0]-3,L[1]*.7,1]})},
+  mogul:{n:"TÁMADÓK MÖGÖTTI",fov:44,pos:(L,u)=>({c:[L[0]-15+u*5,L[1]*.5+4,5.5],t:[50,L[1]*.2,1.2]})},
+  /* a reakció: a pályáról, a gólszerző mögött a tomboló lelátó (L = a gólszerző) */
+  reak: {n:"A LELÁTÓ TOMBOL",fov:48,pos:(L,u)=>({c:[L[0]-9+u*2,L[1]+(L[1]<0?17:-17),5.2],t:[L[0]+1.5,L[1]+(L[1]<0?-9:9),3]})}};
+/* a figurák magassága méterben: a jelenetek „nagyfejű" arányai — a valódinál
+   kb. kétszer nagyobb, hogy az arcok az új szögekből is látsszanak */
+const KAM_FIG_M=3.6;
+/* a stadion a játék adataiból */
+function kamStadionAdat(c){
+  let kap=12000,telt=.8;
+  try{const k=stadionKap();if(isFinite(k)&&k>0)kap=k;const n=stadionNezo();if(isFinite(n)&&kap)telt=Math.max(.12,Math.min(1,n/kap));}catch(e){}
+  let kupa=false;try{kupa=typeof euroActive==="function"&&euroActive();}catch(e){}
+  if(kupa)telt=Math.max(telt,.9);
+  let hazaiMi=true;
+  try{let f=null;
+    if(typeof pyrPoActive==="function"&&pyrPoActive())f=pyrPoFx();
+    else if(kupa)f=S.euro.fixtures[S.euro.idx];
+    else f=S.fixtures&&S.fixtures[S.idx];
+    if(f&&f.home===false)hazaiMi=false;}catch(e){}
+  let ejjel=kupa;
+  try{if(!kupa){const k=fixtureKick((S.idx||0)+1);ejjel=k.hh>=18||k.hh<6;}}catch(e){}
+  let mi={c1:"#c9a233",c2:"#1a1a1a"};try{const t=teamColors();mi={c1:t[0],c2:t[1]};}catch(e){}
+  let ok={c1:"#1d4f91",c2:"#f2f4f7"};
+  try{ok=evaEllenfelKit(c&&c.oppNev||evaEllenfelNev(),{c1:mi.c1})||ok;}catch(e){}
+  let tabla="#ffd34d";
+  try{if(kupa)tabla=EURO_COMPS[S.euro.comp].col;else if(pyrOn())tabla=pyrDivArculat(pyrMyDivId()).c;}catch(e){}
+  return {kap,telt,ejjel,hazai:hazaiMi?mi:{c1:ok.c1,c2:ok.c2||"#fff"},vendeg:hazaiMi?{c1:ok.c1,c2:ok.c2||"#fff"}:mi,hazaiMi,tabla};}
+/* a lelátó pontjai és szerkezete (méterben) — egyszer épül felvételenként */
+function kamLelatoEpit(A,seed){
+  const out=[],szint=A.kap<=8000?1:A.kap<=35000?2:3;
+  let a=seed>>>0||7;const R=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
+  const ki=STAD_KAP.findIndex(c=>c>=A.kap),sur=Math.min(1,.38+Math.max(0,ki)*.055);
+  for(let sz=0;sz<szint;sz++){
+    const be=8+sz*15,mely=13,emel=1.5+sz*9,dol=.55;
+    const hx0=52.5+be,hy0=34+be,hx1=hx0+mely,hy1=hy0+mely,z0=emel,z1=emel+mely*dol;
+    const old=[[[-hx0,-hy0],[hx0,-hy0],[-hx1,-hy1],[hx1,-hy1]],[[hx0,-hy0],[hx0,hy0],[hx1,-hy1],[hx1,hy1]],
+      [[hx0,hy0],[-hx0,hy0],[hx1,hy1],[-hx1,hy1]],[[-hx0,hy0],[-hx0,-hy0],[-hx1,hy1],[-hx1,-hy1]]];
+    const li=(P,Q,u)=>[P[0]+(Q[0]-P[0])*u,P[1]+(Q[1]-P[1])*u];
+    old.forEach(([a0,a1,b0,b1],oi)=>{const L=Math.hypot(a1[0]-a0[0],a1[1]-a0[1]),n=Math.max(2,Math.ceil(L/15));
+      for(let i=0;i<n;i++){const u0=i/n,u1=(i+1)/n,i0=li(a0,a1,u0),i1=li(a0,a1,u1),o0=li(b0,b1,u0),o1=li(b0,b1,u1);
+        out.push({lap:[[i0[0],i0[1],z0],[i1[0],i1[1],z0],[o1[0],o1[1],z1],[o0[0],o0[1],z1]],tip:"l"});
+        out.push({lap:[[i0[0],i0[1],0],[i1[0],i1[1],0],[i1[0],i1[1],z0],[i0[0],i0[1],z0]],tip:"f"});
+        out.push({lap:[[o0[0],o0[1],z1],[o1[0],o1[1],z1],[o1[0],o1[1],z1+2.2],[o0[0],o0[1],z1+2.2]],tip:"h"});}
+      /* a nézők: sorokban, a telítettség szerint üres székekkel */
+      const sorok=Math.round(9*sur)+4;
+      for(let s=0;s<sorok;s++){const t=s/(sorok-1),off=t*mely,z=emel+t*mely*dol;
+        const P=li(a0,b0,t),Q=li(a1,b1,t),Ls=Math.hypot(Q[0]-P[0],Q[1]-P[1]),lepes=1.45/sur,m=Math.floor(Ls/lepes);
+        for(let k=0;k<m;k++){const u=(k+R()*.6)/m,x=P[0]+(Q[0]-P[0])*u,y=P[1]+(Q[1]-P[1])*u;
+          /* a vendégszektor: a +x kapu mögötti lelátó egyik fele */
+          const vendeg=oi===1&&y>hy0*.3;
+          const ures=R()>A.telt;
+          const q=R();
+          const col=ures?(A.ejjel?"#262b31":"#4c535c"):vendeg?(q<.6?A.vendeg.c1:A.vendeg.c2)
+            :(q<.46?A.hazai.c1:q<.8?A.hazai.c2:q<.92?"#d9d2c3":"#2b2b2b");
+          out.push({p:[x,y,z+R()*.4],col,ures,vendeg,f:R()*6.28});}
+        void off;}});}
+  return out;}
+/* a figura képpé alakítva — UGYANAZ a rajz, mint a jelenetben (arc, mez, szám) */
+const _kamFig=new Map();
+function kamFigKep(fig,kit){
+  const k=(fig&&fig.fej||"")+"|"+JSON.stringify(kit||{})+"|"+(fig&&fig.hatul?"h":"")+(fig&&fig.num||"");
+  if(_kamFig.has(k))return _kamFig.get(k);
+  const img=new Image();
+  try{
+    const s=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="-14 -62 28 66" width="112" height="264">${evaFigura("kamF",fig,kit,0,0,1/0.82)}</svg>`;
+    img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(s);}catch(e){}
+  _kamFig.set(k,img);
+  if(_kamFig.size>160)_kamFig.delete(_kamFig.keys().next().value);
+  return img;}
+/* a nyitó vágás szereplői: méterben, a felvétel elején (a) és végén (b) */
+function kamVilagElo(c,ev){
+  const m=kamMag(ev,"vilag"),tukor=(m&1)?1:-1,Y=v=>v*tukor;
+  const lo=c.loKit,vk=c.vedoKit;
+  const vedoN=i=>{try{return evaVedoN(c,i);}catch(e){return c.vedoUrl;}};
+  const T=[
+    {fig:c.loUrl,kit:lo,a:[29,Y(-7)],b:[37.5,Y(-3)],fo:1},
+    {fig:c.tarsUrl,kit:lo,a:[35,Y(15)],b:[37,Y(11)]},
+    {fig:c.tarsUrl2||c.tarsUrl,kit:lo,a:[20,Y(-19)],b:[27,Y(-17)]},
+    {fig:c.rugoUrl||c.tarsUrl,kit:lo,a:[17,Y(20)],b:[23,Y(18)]},
+    {fig:c.vedoUrl,kit:vk,a:[40,Y(-9)],b:[42.5,Y(-6)]},
+    {fig:c.vedoUrl2||c.vedoUrl,kit:vk,a:[42,Y(7)],b:[44,Y(4)]},
+    {fig:vedoN(2),kit:vk,a:[34,Y(-21)],b:[37,Y(-16)]},
+    {fig:vedoN(3),kit:vk,a:[36,Y(19)],b:[39,Y(14)]},
+    {fig:c.kapusUrl,kit:c.kapusKit,a:[51.2,Y(0)],b:[50.6,Y(-1.2)]}];
+  /* a labda: a passzolótól a lövőhöz (tizenegyesnél, szabadrúgásnál a lövő előtt áll) */
+  const pontrol=ev.t==="tizenegyes"||ev.t==="szabadrugas";
+  if(pontrol){T[0].a=[38,Y(-2)];T[0].b=[40.5,Y(-.6)];}
+  const labda=pontrol?[[41.5,Y(0),.11,0],[41.5,Y(0),.11,1]]
+    :[[35,Y(14),.11,0],[35,Y(14),.11,.18],[36.5,Y(-1.5),1.4,.55],[38.4,Y(-2.6),.11,.72],[39.4,Y(-2.8),.11,1]];
+  return {T,labda,L:[38,Y(-2)]};}
+/* a reakció-vágás: a gólszerző a szöglet felé fut, a társak utána */
+function kamVilagUto(c,ev){
+  const m=kamMag(ev,"uto"),Y=v=>v*((m&1)?1:-1),lo=c.loKit,vk=c.vedoKit;
+  const T=[
+    {fig:c.loUrl,kit:lo,a:[44,Y(-4)],b:[49,Y(-24)],fo:1,ugral:1},
+    /* a társak a lelátó felőli oldalon érik utol — a gólszerző elöl marad */
+    {fig:c.tarsUrl,kit:lo,a:[40,Y(-12)],b:[50.5,Y(-28.5)],ugral:1},
+    {fig:c.tarsUrl2||c.tarsUrl,kit:lo,a:[34,Y(-16)],b:[46.5,Y(-29)],ugral:1},
+    {fig:c.vedoUrl,kit:vk,a:[45,Y(2)],b:[45.5,Y(3)]},
+    {fig:c.kapusUrl,kit:c.kapusKit,a:[51,Y(1)],b:[51,Y(1.2)]}];
+  return {T,labda:[[52.9,Y(1),.3,0],[52.9,Y(1),.11,1]],L:[44,0]};}
+/* egy felvétel lejátszása a vásznon. fajta: "elo" | "uto" */
+function kamFelvetel(cv,c,ev,fajta,ms,kesz){
+  if(!cv||!cv.getContext){if(kesz)kesz();return {stop(){}};}
+  const box=cv.getBoundingClientRect();
+  const pix=(typeof faceStilus==="function"&&faceStilus()==="pix");
+  const sk=pix?.42:Math.min(2,window.devicePixelRatio||1);
+  const W=Math.max(120,Math.round((box.width||360)*sk)),H=Math.max(120,Math.round((box.height||360)*sk));
+  cv.width=W;cv.height=H;
+  const g=cv.getContext("2d");g.imageSmoothingEnabled=!pix;
+  const A=kamStadionAdat(c);
+  const lelato=kamLelatoEpit(A,kamMag(ev,"lelato"));
+  const V=fajta==="uto"?kamVilagUto(c,ev):kamVilagElo(c,ev);
+  const allasK=fajta==="uto"?"reak":(["fo","kapu","mogul"][kamMag(ev,"allas")%3]);
+  const allas=KAM_ALLAS[allasK];
+  _kamNaplo.push(fajta+":"+allasK);
+  V.T.forEach(s=>{s.kep=kamFigKep(s.fig,s.kit);});
+  /* a gólt ünneplő tábor: a gólszerző csapatáé */
+  const unnepHazai=fajta==="uto"&&((ev.t==="gol")===A.hazaiMi);
+  const szikra=[];
+  let fut=true;const t0=performance.now();
+  const lapSzin=A.ejjel?{l:"#20262d",f:"#151a20",h:"#0f1318"}:{l:"#8a9199",f:"#5d646d",h:"#4a5058"};
+  const rajz=()=>{
+    if(!fut)return;
+    const el=performance.now()-t0,u=Math.min(1,el/Math.max(1,ms)),e=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+    /* a labda helye most */
+    let L=V.labda[0];for(let i=1;i<V.labda.length;i++){const p=V.labda[i-1],q=V.labda[i];
+      if(u>=p[3]&&u<=q[3]){const w=(u-p[3])/Math.max(1e-6,q[3]-p[3]);L=[p[0]+(q[0]-p[0])*w,p[1]+(q[1]-p[1])*w,p[2]+(q[2]-p[2])*w];break;}
+      if(u>q[3])L=q;}
+    let LF=[L[0],L[1]];
+    if(fajta==="uto"){const f=V.T[0];LF=[f.a[0]+(f.b[0]-f.a[0])*e,f.a[1]+(f.b[1]-f.a[1])*e];}
+    const pz=allas.pos(LF,e);
+    const K=kamKamera(pz.c,pz.t,allas.fov,W,H);
+    const P=p=>kamVet(K,p);
+    const poly=(pts,fill)=>{const q=kamVagSokszog(K,pts);if(!q)return;g.beginPath();q.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.fillStyle=fill;g.fill();};
+    const vonal=(pts,col,lw)=>{g.beginPath();for(let i=1;i<pts.length;i++){const sz=kamVagSzakasz(K,pts[i-1],pts[i]);if(!sz)continue;g.moveTo(sz[0][0],sz[0][1]);g.lineTo(sz[1][0],sz[1][1]);}g.strokeStyle=col;g.lineWidth=lw;g.stroke();};
+    /* ég */
+    const eg=g.createLinearGradient(0,0,0,H);
+    if(A.ejjel){eg.addColorStop(0,"#03060d");eg.addColorStop(1,"#0d1a24");}else{eg.addColorStop(0,"#7fb6e6");eg.addColorStop(1,"#cfe5f5");}
+    g.fillStyle=eg;g.fillRect(0,0,W,H);
+    poly([[-220,-220,0],[220,-220,0],[220,220,0],[-220,220,0]],A.ejjel?"#15191c":"#5b6066");
+    /* gyep: nyírt sávok, ugyanazok a zöldek, mint a jelenet színpadán */
+    const gy1=A.ejjel?"#2a7a43":"#2f7a45",gy2=A.ejjel?"#256b3b":"#29693c";
+    poly([[-58,-38,0],[58,-38,0],[58,38,0],[-58,38,0]],gy2);
+    for(let i=0;i<12;i++){const x0=-52.5+i*8.75;poly([[x0,-34,0],[x0+8.75,-34,0],[x0+8.75,34,0],[x0,34,0]],i%2?gy1:gy2);}
+    const vc="rgba(255,255,255,.8)",lw=Math.max(1,K.F/650);
+    vonal([[-52.5,-34,0],[52.5,-34,0],[52.5,34,0],[-52.5,34,0],[-52.5,-34,0]],vc,lw*1.3);
+    vonal([[0,-34,0],[0,34,0]],vc,lw);
+    {const kor=[];for(let i=0;i<=36;i++){const a=i/36*Math.PI*2;kor.push([Math.cos(a)*9.15,Math.sin(a)*9.15,0]);}vonal(kor,vc,lw);}
+    for(const s of [-1,1]){
+      vonal([[s*52.5,-20.16,0],[s*36,-20.16,0],[s*36,20.16,0],[s*52.5,20.16,0]],vc,lw);
+      vonal([[s*52.5,-9.16,0],[s*47,-9.16,0],[s*47,9.16,0],[s*52.5,9.16,0]],vc,lw);}
+    /* reklámtáblák a sorozat / a divízió színében */
+    poly([[-56,-37,0],[56,-37,0],[56,-37,1],[-56,-37,1]],A.tabla);
+    poly([[56,-37,0],[56,37,0],[56,37,1],[56,-37,1]],A.tabla);
+    poly([[-56,37,0],[56,37,0],[56,37,1],[-56,37,1]],A.tabla);
+    /* a lelátó és a nézők, mélység szerint */
+    const elemek=[];
+    for(const x of lelato){
+      if(x.lap){const q=kamVagSokszog(K,x.lap);if(!q)continue;elemek.push({d:q.reduce((a,v)=>a+v[2],0)/q.length,q,col:lapSzin[x.tip]});}
+      else{const q=P(x.p);if(!q)continue;
+        /* a gólt ünneplő tábor ugrál */
+        let dy=0;if(fajta==="uto"&&!x.ures&&(x.vendeg!==unnepHazai))dy=-Math.max(0,Math.sin(el/90+x.f))*K.F*.5/q[2];
+        elemek.push({d:q[2],q:[q[0],q[1]+dy,q[2]],col:x.col,pont:1});}}
+    elemek.sort((a,b)=>b.d-a.d);
+    for(const x of elemek){
+      if(x.pont){const r=Math.max(1.2,Math.min(14,K.F*1.35/x.q[2]));g.fillStyle=x.col;g.fillRect(x.q[0]-r/2,x.q[1]-r,r,r*1.15);}
+      else{g.beginPath();x.q.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.fillStyle=x.col;g.fill();}}
+    /* kapuk */
+    for(const s of [-1,1]){const x=s*52.5;
+      vonal([[x,-3.66,0],[x,-3.66,2.44],[x,3.66,2.44],[x,3.66,0]],"#ffffff",Math.max(1.5,lw*1.8));
+      poly([[x,-3.66,2.44],[x,3.66,2.44],[x+s*2,3.66,0],[x+s*2,-3.66,0]],"rgba(255,255,255,.16)");}
+    /* villanyfény */
+    if(A.ejjel)for(const [x,y] of [[-82,-64],[82,-64],[82,64],[-82,64]]){
+      vonal([[x,y,0],[x,y,44]],"#6b7480",2);
+      const q=P([x,y,45]);if(q){const r=Math.max(6,K.F*6/q[2]);const gr=g.createRadialGradient(q[0],q[1],0,q[0],q[1],r*4);
+        gr.addColorStop(0,"rgba(255,255,230,.9)");gr.addColorStop(1,"rgba(255,255,230,0)");g.fillStyle=gr;g.fillRect(q[0]-r*4,q[1]-r*4,r*8,r*8);}}
+    /* füst és szikra a gólt ünneplő táborban (a stadion telítettségével arányos) */
+    if(fajta==="uto"){
+      if(szikra.length<Math.round(40*A.telt)&&Math.random()<.7){
+        const hx=60+Math.random()*12,y0=(unnepHazai?-1:1)*(Math.random()*30),oldal=Math.random()<.5;
+        const kol=unnepHazai?A.hazai:A.vendeg;
+        szikra.push({p:oldal?[Math.random()*90-45,-(42+Math.random()*10),4+Math.random()*6]:[hx,y0,4+Math.random()*6],v:.04+Math.random()*.05,
+          col:Math.random()<.5?kol.c1:kol.c2,t:0});}
+      for(const s of szikra){s.t++;s.p[2]+=s.v*6;const q=P(s.p);if(!q)continue;
+        const r=Math.max(2,K.F*(.6+s.t*.02)/q[2]);g.globalAlpha=Math.max(0,.75-s.t*.012);
+        g.fillStyle=s.col;g.beginPath();g.arc(q[0],q[1],r,0,7);g.fill();}
+      g.globalAlpha=1;}
+    /* a szereplők (ugyanazok a figurák) és a labda, mélység szerint */
+    const sz=[];
+    V.T.forEach(s=>{const x=s.a[0]+(s.b[0]-s.a[0])*e,y=s.a[1]+(s.b[1]-s.a[1])*e;
+      const ug=s.ugral?Math.abs(Math.sin(el/140+(s.fo?0:1.3)))*.5:0;
+      sz.push({p:[x,y,ug],s,q:P([x,y,ug])});});
+    sz.push({p:L,labda:1,q:P(L)});
+    sz.filter(x=>x.q).sort((a,b)=>b.q[2]-a.q[2]).forEach(x=>{
+      if(x.labda){const r=Math.max(2,K.F*.34/x.q[2]);
+        const ar=P([L[0],L[1],0]);if(ar){g.fillStyle="rgba(0,0,0,.3)";g.beginPath();g.ellipse(ar[0],ar[1],r,r*.4,0,0,7);g.fill();}
+        g.fillStyle="#fff";g.beginPath();g.arc(x.q[0],x.q[1]-r,r,0,7);g.fill();g.strokeStyle="#222";g.lineWidth=Math.max(.6,r*.18);g.stroke();return;}
+      const fej=P([x.p[0],x.p[1],x.p[2]+KAM_FIG_M]);if(!fej)return;
+      const h=x.q[1]-fej[1],w=h*28/66;
+      const k=x.s.kep;
+      if(k&&k.complete&&k.naturalWidth){g.drawImage(k,x.q[0]-w/2,fej[1],w,h*1.0);}
+      else{g.fillStyle=(x.s.kit&&x.s.kit.c1)||"#888";g.fillRect(x.q[0]-w*.3,x.q[1]-h*.75,w*.6,h*.45);
+        g.fillStyle="#e3b38e";g.beginPath();g.arc(x.q[0],x.q[1]-h*.86,w*.28,0,7);g.fill();}});
+    /* a közvetítés jelzése */
+    const fs=Math.max(pix?4:9,Math.round(W/34));   /* a pixeles (kis felbontású) vásznon arányos marad */
+    g.font=`800 ${fs}px Archivo, system-ui, sans-serif`;
+    const tx=allas.n,tw=g.measureText(tx).width;
+    g.fillStyle="rgba(0,0,0,.55)";g.fillRect(fs*.7,fs*.7,tw+fs*2.2,fs*1.7);
+    g.fillStyle="#ff4d4d";g.beginPath();g.arc(fs*1.45,fs*1.55,fs*.33,0,7);g.fill();
+    g.fillStyle="#d8ff5c";g.fillText(tx,fs*2.1,fs*1.95);
+    if(u<1)requestAnimationFrame(rajz);};
+  rajz();
+  const tm=setTimeout(()=>{fut=false;if(kesz)kesz();},ms);
+  return {stop(){fut=false;clearTimeout(tm);},allas:allasK};}
+
 /* ---- A LEJÁTSZÓ ---- */
 const _evaSor=[];let _evaFut=null,_evaSzunet=false;
 /* az időtartamok szorzója — a próbák gyorsítják, a játékban 1 */
@@ -68362,7 +68686,8 @@ function evaElem(){
   let el=$("evAnim");if(el)return el;
   el=document.createElement("div");el.id="evAnim";el.className="hide";
   el.setAttribute("role","img");
-  el.innerHTML=`<div class="evaKeret"><svg class="evaSzinpad" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid meet"></svg>`
+  el.innerHTML=`<div class="evaKeret"><div class="evaKepkeret"><svg class="evaSzinpad" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid meet"></svg>`
+    +`<canvas class="evaKamVaszon hide" aria-hidden="true"></canvas></div>`   /* 🎥 1.0.11.12.00 — a 3D kameraállások vászna */
     +`<div class="evaCim"><img class="evaArc" alt=""><div><b></b><span></span></div></div></div>`
     +`<div class="evaGombok"><button type="button" id="evaTovabb">Tovább ›</button>`
     +`<button type="button" id="evaKi">Ne mutasd többet ezen a meccsen</button></div>`;
@@ -68398,7 +68723,11 @@ function evaKov(){
   _evaCel=evaCelFajta(ev,sk)?c.cel:null;
   const el=evaElem(),svg=el.querySelector(".evaSzinpad");
   /* a kamera-csoport: a rázás (Ágyúgolyó, Szitálós) az egész képet mozgatja */
-  try{svg.innerHTML=`<g id="evaKamera">${T.svg(c)}${evaCellaRect()}</g>${evaMeresKijelzo(ev.meres)}`;}catch(e){evaKov();return;}
+  /* 🎥 1.0.11.12.00 — a rendező csoportja (#evaRendezo) a kamera-csoport (#evaKamera) körül */
+  try{svg.innerHTML=`<g id="evaRendezo"><g id="evaKamera">${T.svg(c)}${evaCellaRect()}</g></g>${evaMeresKijelzo(ev.meres)}`;}catch(e){evaKov();return;}
+  const kamOn=kamAktiv(ev),cv=el.querySelector(".evaKamVaszon");
+  svg.style.visibility="";if(cv)cv.classList.add("hide");
+  const _melyStop=evaMelysegIndit(svg);   /* a nyitó vágás alatt is rendezett a színpad */
   el.className="eva-"+sk+(c.sajat?" evaMi":" evaOk");
   el.style.setProperty("--evaSzin",(c.foKit&&c.foKit.c1)||"#333");
   const cim=el.querySelector(".evaCim");
@@ -68417,6 +68746,9 @@ function evaKov(){
   if(c.foArc){arc.src=c.foArc;arc.style.display="";}else arc.style.display="none";
   arc.style.imageRendering=faceStilus()==="pix"?"pixelated":"";
   el.setAttribute("aria-label",`${tm.n||"Esemény"}${c.foNev?" — "+c.foNev:""}`);
+  /* 🎥 a jelenet maga — kamerával a nyitó vágás UTÁN indul */
+  const indit=()=>{
+  if(cv)cv.classList.add("hide");svg.style.visibility="";
   const anims=[],hangJ=[];
   /* 🎞 3.9.313 — BEJELENTETT HIBA: „Pixelated módban az animációk nagyon
      szaggatnak. Legyenek ugyanolyan szép smooth animációk, mint a többi
@@ -68434,13 +68766,32 @@ function evaKov(){
     const a=t.animate(frames,o);anims.push(a);return a;};
   try{T.mozgas(A,c);}catch(e){}
   try{evaMeresMozgas(A,ev.meres,T.dur);}catch(e){}
-  const melyStop=evaMelysegIndit(svg);   /* 🎞 3.9.329 — perspektivikus takarás */
+  const melyStop=_melyStop;   /* 🎞 3.9.329 — perspektivikus takarás (a felépítéskor indul) */
   try{cim.animate([{transform:"translateY(14px) scale(.9)",opacity:0},{transform:"translateY(14px) scale(.9)",opacity:0,offset:.35},{transform:"none",opacity:1,offset:.5},{transform:"none",opacity:1}],
     {duration:T.dur*evaIdoSzorzo,fill:"forwards",easing:"ease-out"});}catch(e){}
-  _evaFut={ev,anims,t:setTimeout(evaLezar,(T.dur+650)*evaIdoSzorzo),hangT:evaHangUtemez(hangJ),hangJ,melyStop};
+  /* 🎥 a gól után a reakció-vágás (lelátó-totál), különben a megszokott vég */
+  const vege=()=>{
+    if(kamOn&&(ev.t==="gol"||ev.t==="golKapott")&&cv&&_evaFut&&_evaFut.ev===ev){
+      svg.style.visibility="hidden";cv.classList.remove("hide");
+      _evaFut.kam=kamFelvetel(cv,c,ev,"uto",KAM_UTO_MS*evaIdoSzorzo,()=>evaLezar());
+      return;}
+    evaLezar();};
+  /* egy esemény = egy _evaFut (a nyitó vágás objektumát folytatjuk) */
+  const _uj={ev,anims,t:setTimeout(vege,(T.dur+650)*evaIdoSzorzo),hangT:evaHangUtemez(hangJ),hangJ,melyStop};
+  if(_evaFut&&_evaFut.ev===ev)Object.assign(_evaFut,_uj);else _evaFut=_uj;
+  if(kamOn)_evaFut.rendezo=kamRendezoIndit(svg,ev,T.dur*evaIdoSzorzo);
   try{const D=evaDontoPont(ev,hangJ);if(D){_evaFut.donto=D;_evaFut.hangT.push(evaDontoUtemez(_evaFut,D));}}catch(e){}
+  };
   el.classList.remove("hide");
-  document.body.classList.add("evaFut");}
+  document.body.classList.add("evaFut");
+  /* 🎥 1.0.11.12.00 — a nyitó vágás: új kameraállás a stadionnal, aztán a jelenet */
+  if(kamOn&&cv){
+    svg.style.visibility="hidden";cv.classList.remove("hide");
+    const F={ev,anims:[],hangT:[],t:null,melyStop:_melyStop};
+    _evaFut=F;
+    F.kam=kamFelvetel(cv,c,ev,"elo",KAM_ELO_MS*evaIdoSzorzo,()=>{if(_evaFut===F)indit();});
+    return;}
+  indit();}
 /* 🎞 A PERSPEKTÍVA (3.9.329) — BEJELENTETT HIBA: „A tikitaka gólnál nem jól
    vannak beállítva a játékosok overlapjei. Össze vissza fedik egymást. Nem
    perspektíva szerűen."
@@ -68482,6 +68833,7 @@ function evaMelysegIndit(svg){
 function evaLezar(){
   const F=_evaFut;
   if(F){clearTimeout(F.t);try{if(F.melyStop)F.melyStop();}catch(e){}
+    try{if(F.kam)F.kam.stop();if(F.rendezo)F.rendezo.stop();}catch(e){}   /* 🎥 1.0.11.12.00 */
     F.anims.forEach(a=>{try{a.cancel();}catch(e){}});
     (F.hangT||[]).forEach(x=>clearTimeout(x));
     if(F.izgStop)try{F.izgStop();}catch(e){}}   /* 🎬🔊 átugrott jelenet: a hátralévő hang elmarad */
@@ -143628,6 +143980,13 @@ function renderThemeModal(){
        <i>0,25× és lassabb tempón a gólok és a meccs nagy pillanatai (kapufa, bravúr, tizenegyes, lap, szöglet, letámadás…) 1–3 másodperces, teljes képernyős jelenetet kapnak, a játékos arcával és a csapat mezével. Meccsenként a tempótól függően korlátozott számú (0,25×: 3 · 0,1×: 8, a gólokon felül). Koppintásra továbblép. Meccs közben a Momentum sáv fejlécében is kapcsolható.</i></span>
        <span class="fxOptSw">${on?"BE":"KI"}</span></button>`;
    o.querySelector("#evaOptBtn").onclick=()=>{mevAnimAllit(!on);renderThemeModal();};
+   /* 🎥 1.0.11.12.00 — a kameravágások kapcsolója */
+   {const kon=kamBe();
+    o.insertAdjacentHTML("beforeend",`<button type="button" class="fxOpt" id="evaKamOptBtn" aria-pressed="${kon}">
+       <span class="fxOptIc">🎥</span><span class="fxOptTx"><b>Kameravágások</b>
+       <i>A lövéseknél, góloknál és védéseknél új kameraállások a stadionnal: nyitó vágás a főkamerából, a kapu mögül vagy a lelátóról, a jelenetben követő közeli és totál, gól után a tomboló lelátó. Kikapcsolva a jelenetek a megszokott, egy nézetes formájukban futnak.</i></span>
+       <span class="fxOptSw">${kon?"BE":"KI"}</span></button>`);
+    o.querySelector("#evaKamOptBtn").onclick=()=>{kamAllit(!kon);renderThemeModal();};}
    box.appendChild(o);}
   /* 🎛️ ÚJ KARRIER ALAPBEÁLLÍTÁSAI — 3.9.218: az ablak LEGTETEJÉN, saját
      helyen (#kaModalBody), alapból NYITVA. KIMONDOTT KÉRÉS: „A scout
