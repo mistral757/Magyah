@@ -73,9 +73,9 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     const minta=()=>{const e=el();if(!e){setTimeout(minta,50);return;}const cv=e.querySelector(".evaKamVaszon"),svg=e.querySelector(".evaSzinpad"),R=e.querySelector("#evaRendezo");
       _kamT.push({t:Math.round(performance.now()-t0),vaszon:cv&&!cv.classList.contains("hide"),szin:svg&&svg.style.visibility!=="hidden",
         tr:R&&R.getAttribute("transform")||"",fut:!!_evaFut,F:_evaFut,anims:_evaFut?(_evaFut.anims||[]).length:0});
-      if(performance.now()-t0<8000)setTimeout(minta,100);};
+      if(performance.now()-t0<10500)setTimeout(minta,100);};
     minta();});
-  await w(8200);
+  await w(10700);
   const r2=await p.evaluate(()=>{
     const T=_kamT,szakasz=[];let elozo=null;
     T.forEach(x=>{const s=!x.fut?"vege":x.vaszon?"vaszon":x.szin?"szinpad":"?";if(s!==elozo){szakasz.push(s);elozo=s;}});
@@ -87,7 +87,8 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     const svgSzoveg=decodeURIComponent(img.src.split(",")[1]||"");
     const fig={azonosRajz:svgSzoveg.indexOf(evaFigura("kamF",c.loUrl,c.loKit,0,0,1/0.82))>=0,arc:svgSzoveg.indexOf(c.loUrl.fej.slice(0,60))>=0};
     return {szakasz,egyFut:Fs.size,naplo:_kamNaplo.slice(),nagyit,total,anim,fig,vege:T.filter(x=>!x.fut).length?T.find(x=>!x.fut).t:null};});
-  ok(r2.szakasz.join(">")==="vaszon>szinpad>vaszon>vege","2a. sorrend: nyitó vágás (vászon) → jelenet (színpad) → reakció (vászon) → vége",r2.szakasz);
+  /* 1.0.11.14.00 óta az alap a „Mindkettő": a teljes 3D jelenet és a gólöröm (vászon), utána a rajz visszajátszásként */
+  ok(r2.szakasz.join(">")==="vaszon>szinpad>vege","2a. sorrend: 3D jelenet + gólöröm (vászon) → a rajzolt jelenet ismétlésként (színpad) → vége",r2.szakasz);
   ok(r2.egyFut===1&&/^elo:[a-zA-Z]+$/.test(r2.naplo[0])&&r2.naplo[1]==="uto:reakcio","2b. egy esemény = egy lejátszás; a nyitó és a reakció-kamera",{egy:r2.egyFut,naplo:r2.naplo});
   ok(r2.nagyit>=3&&r2.total>=3&&r2.anim>=5,"3. a jelenetben a rendező követ (nagyítás) és vág (totál); a jelenet animációi futnak",{nagyit:r2.nagyit,total:r2.total,anim:r2.anim});
   ok(r2.fig.azonosRajz&&r2.fig.arc,"4. a 3D figura ugyanaz a rajz (evaFigura), benne az arc",r2.fig);
