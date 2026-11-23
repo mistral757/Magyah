@@ -103,7 +103,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const m=document.getElementById("mezModal");
     o.ablak=!!m&&!m.classList.contains("hide");o.motorElotte=window._motor;
     o.cim=$("mezCim").textContent;o.ujSzoveg=/még nincs beállított meze/.test($("mezTorzs").textContent);
-    o.gombok=[...$("mezGombok").querySelectorAll("button")].map(b=>b.textContent);
+    o.gombok=[...$("mezGombok").querySelectorAll("button")].map(b=>b.textContent).filter(t=>!/játékosokat is/.test(t));   /* 🧑‍🎨 1.0.11.9.00 — az új gomb nem számít */
     /* kék-fehér csíkos, V-nyak */
     const kat=(sel)=>{const b=$("mezTorzs").querySelector(sel);if(b)b.click();return !!b;};
     kat('[data-mezsw="c1"][data-hex="#1668c1"]');kat('[data-mezsw="c2"][data-hex="#f2f4f7"]');
@@ -136,7 +136,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     playMatch();
     o.ablak=!document.getElementById("mezModal").classList.contains("hide");
     o.voltSzoveg=/már van beállított meze|minden szezonjára szóló meze/.test($("mezTorzs").textContent);
-    o.gombok=[...$("mezGombok").querySelectorAll("button")].map(b=>b.textContent);
+    o.gombok=[...$("mezGombok").querySelectorAll("button")].map(b=>b.textContent).filter(t=>!/játékosokat is/.test(t));   /* 🧑‍🎨 1.0.11.9.00 — az új gomb nem számít */
     $("mezGombok").querySelectorAll("button")[1].click();   /* Most nem (a számláló: 1 az előző + 1 ez) */
     o.motor=window._motor;o.kitMarad=evaEllenfelKit(nev,{c1:"#c8102e"}).c1;
     /* ütközés: a mi mezünk is kék */
@@ -146,7 +146,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.auto=window._motor===1&&document.getElementById("mezModal").classList.contains("hide");S.auto=false;
     /* vissza a sorsoltra */
     S.idx=4;S.playing=false;S.fixtures[4].o=S.fixtures[1].o;playMatch();
-    const gs=[...$("mezGombok").querySelectorAll("button")];
+    const gs=[...$("mezGombok").querySelectorAll("button")].filter(b=>!/játékosokat is/.test(b.textContent));
     o.visszaGomb=gs.length===3;gs[2].click();
     await new Promise(r=>setTimeout(r,200));
     o.torolve=mezFor(nev)===null&&evaEllenfelKit(nev,{c1:"#c8102e"}).c1!=="#1668c1";

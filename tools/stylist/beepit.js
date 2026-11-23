@@ -114,12 +114,14 @@ function jatekSzabaly(src){
   const m1=/const FACE_MOD_MEZOK=(\{[\s\S]*?\});/.exec(src),m2=/const FACE_EGESZ=(\[[^\]]*\]);/.exec(src);
   if(!m1||!m2)throw new Error("Nem találom a FACE_MOD_MEZOK / FACE_EGESZ táblát az index.html-ben.");
   return {MEZOK:Function(`"use strict";return (${m1[1]});`)(),EGESZ:Function(`"use strict";return (${m2[1]});`)()};}
-function tisztit(ov,SZ){
+function tisztit(ov,SZ,NEVEK){
   const o={};if(!ov||typeof ov!=="object"||Array.isArray(ov))return o;
   for(const k of Object.keys(SZ.MEZOK)){
     const v=ov[k],t=SZ.MEZOK[k];
     if(v===undefined||v===null)continue;
     if(t==="b"){o[k]=!!v;continue;}
+    /* 📋 1.0.11.9.00 — minta: csak a játékban létező név */
+    if(t==="s"){if(typeof v==="string"&&NEVEK&&NEVEK.has(v))o[k]=v;continue;}
     const n=Number(v);if(!isFinite(n))continue;
     const c=Math.max(t[0],Math.min(t[1],n));
     o[k]=SZ.EGESZ.indexOf(k)>=0?Math.round(c):Math.round(c*1000)/1000;}
@@ -202,7 +204,7 @@ function blokkIr(tabla){
       if(!e||t.at>e.at)legfrissebb.set(t.n,t);}}
   const T=Object.assign({},B.tabla);let uj=0,mod=0,torolt=0;
   for(const [n,t] of legfrissebb){
-    let ov={};if(t.d){try{ov=tisztit(JSON.parse(t.d),SZ);}catch(e){elvetett++;continue;}}
+    let ov={};if(t.d){try{ov=tisztit(JSON.parse(t.d),SZ,NEVEK);}catch(e){elvetett++;continue;}}
     const volt=T[n];
     if(!Object.keys(ov).length){if(volt){delete T[n];torolt++;}continue;}
     if(!volt)uj++;else if(JSON.stringify(volt)!==JSON.stringify(ov))mod++;
