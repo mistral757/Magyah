@@ -516,4 +516,5 @@ akarom én ezt tolni."* Kiegészítve:
 | Fázis | Állapot |
 |---|---|
 | 1 · Belépés | ✅ **Kész: 1.0.11.15.00** — tudásszint-kérdés, mind a 10 fokozat nyitva „kinek ajánlott” sorral, kezdőnek 2 lépéses indító és megerősítés 7+ fokozatnál, osztály-tanács, az edző tippje és horgonyzott draft-tippek; a dinamikus mód kivéve; költés-figyelmeztetés. |
-| 0 · Audit, 2–7 | következik |
+| 2 · Motor | ✅ **Kész: 1.0.11.16.00** — `S.kut`, a menü-kapu, 7 szakasz célfeladatokkal és tartalék-fordulóval, a Kezdő út kártya, a kinyílás-ablak „Mutasd meg”-gel, a piac a 8. fordulótól, a kihívások és a zárt funkciók leckéi a nyitásig hallgatnak. Lásd [kezdo-ut-motor-1-0-11-16-00.md](kezdo-ut-motor-1-0-11-16-00.md). |
+| 0 · Audit, 3–7 | következik |
