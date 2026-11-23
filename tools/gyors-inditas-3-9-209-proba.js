@@ -43,7 +43,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const p=await ctx.newPage();
   const errs=[];p.on("pageerror",e=>errs.push(String(e)));
   p.on("console",m=>{if(m.type()==="error"&&!/Failed to load resource|404/.test(m.text()))errs.push(m.text());});
-  await p.addInitScript(()=>{window.HANG_TESZT=true;});
+  /* 🧭 1.0.11.15.00 — „Most kezdem" módban a lépcső-doboz rejtett (a nehézség-doboz
+     elég); ez a próba a „Játszottam már" utat méri */
+  await p.addInitScript(()=>{window.HANG_TESZT=true;try{localStorage.setItem("magyah_tudas_v1","halado");}catch(e){}});
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
   await p.waitForTimeout(1200);
   /* a lépcső nélkül (egy már „végigjátszott" profil) — a zárakat a 5. részben külön mérjük */

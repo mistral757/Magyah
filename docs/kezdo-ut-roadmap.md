@@ -491,22 +491,29 @@ már” = Kezdő út + guided; a Profi = nincs Kezdő út + light.
 
 ---
 
-## 15. Döntések, amiket tőled kérek
+## 15. Döntések (rögzítve: 1.0.11.15.00)
 
-1. **A lépcsők sorsa** (`docs/lepcsok-roadmap.md`, karriereken átívelő zárak). A nehézséget a kérésed szerint feloldjuk. A többi lépcső-zár:
-   - **(a)** mind megszűnik — a kezdő út átveszi a tanítást;
-   - **(b)** a beállítás-zárak maradnak (tempók, ikonok, dinamikus mód, Run-kapuk), csak a nehézség és az osztály szabad — *ezt javaslom*;
-   - **(c)** a stílus-kapuk („az N. karrieredben nyílik a Tiki-Taka”) is megszűnnek, mert a 7. szakasz a stílusokat amúgy is fokozatosan tanítja.
-2. **A „Mennyire ismered?” három szintje** — megfelel így (Most kezdem / Játszottam már / Ismerem, mindent kérek)? Az első karrierben a „Most kezdem” legyen az alap?
-3. **Jutalom a feladatokért:**
-   - (a) csak a nyitás — *ezt javaslom*;
-   - (b) + szakaszonként egy kis ajándék (talizmán-húzás / láda);
-   - (c) + pénz.
-4. **„Az edző tippje” a drafton** (a legjobban illő jelölt megjelölése „Most kezdem” módban) — kell, vagy túl sokat segít?
-5. **A tartalékok hossza** (hány forduló után nyit magától az edző) — a 6.4 számai jók kiindulásnak?
-6. **A költés-figyelmeztetés** küszöbe (a büdzsé 40%-a egy tételre) — legyen-e, és csak „Most kezdem” módban?
-7. **A szakaszok sorrendje:** a Talizmánok és a Ládák a 4. szakaszban, a Boost-központ az 5.-ben, a teljes piac csak az első nyáron. Elfogadható, hogy az első idényben nincs vétel (csak a kényszerpótlás)?
-8. **A dinamikus mód** is kapja-e a kezdő utat, vagy csak a hagyományos (ligapiramis) karrier?
+A válasz: *„A kérdéseidre mindre az a válaszom, hogy hol sejted, milyen irányba
+akarom én ezt tolni."* Kiegészítve:
+- *„Egyelőre a dinamikus módot vegyük ki a választható játékmódok közül. […] Amikor játékot indítasz nem is kell utána semmi felület, egyből a hagyományos módon belüli első kijelző jöhet."*
+- *„Fontos, hogy az eddigi funkciókból semmit ne vegyünk el, de azokat képesek legyünk meghaladni, megtölteni, érthetőbbé tenni."*
+- *„Már az első idényben is végig legyen átigazolási lehetőség a 8. fordulótól kezdve."*
+- *„Költés figyelmeztetés minden módban legyen. Amint túl kevés tartalékod marad, vagy éppen túl magasra nősz a mezőny fölé (várható győzelmi esély a következő ellenfél ellen meghaladja a 85%-ot)."*
 
-Ha ezekre válaszolsz, az **1. fázissal** (Belépés) kezdem: az a legkisebb
-kockázatú, és az ad a legtöbbet az első percben.
+| # | Kérdés | Döntés |
+|---|---|---|
+| 1 | A lépcsők sorsa | **(b)**: a nehézség szabad (mind a 10 fokozat), a többi lépcső-kapu marad (tempók, ikonok, a stílus-kapuk, a lépcső kötött D3-a) — „semmit ne vegyünk el”. |
+| 2 | A „Mennyire ismered?” | Így marad: Most kezdem / Játszottam már / Ismerem, mindent kérek. Az alap a „Most kezdem”; aki már lezárt karriert, annak a „Játszottam már”. A választás a játékosé (localStorage), karrierek közt megmarad. |
+| 3 | Jutalom | **(a)**: csak a nyitás. |
+| 4 | Az edző tippje a drafton | **Kell** — „Most kezdem” módban, indoklással, csak jelölés. |
+| 5 | A tartalékok hossza | A 6.4 számai. |
+| 6 | Költés-figyelmeztetés | **Minden módban**, két feltétellel: (a) kevés tartalék marad, (b) 85% fölötti győzelmi esély a következő ellenfél ellen (erősítő költésnél). Részletek: `docs/kezdo-ut-belepes-1-0-11-15-00.md`. |
+| 7 | Vétel az első idényben | **A 8. fordulótól végig.** Az első idényben is megvan a 8., 15. és 23. forduló utáni átigazolási időszak; a Kezdő út a piacot a 8. fordulónál nyitja, és onnan nyitva marad (a 6.4 menetrendjében a piac az „Első nyár” helyett a 2. szakaszba kerül, a nyár a gazdaság-leckéké marad). |
+| 8 | A dinamikus mód | **Kivéve a választható módok közül** (a kódja marad, a régi mentések betölthetők). A Kezdő út csak a hagyományos karrierre készül. |
+
+## 16. Állapot
+
+| Fázis | Állapot |
+|---|---|
+| 1 · Belépés | ✅ **Kész: 1.0.11.15.00** — tudásszint-kérdés, mind a 10 fokozat nyitva „kinek ajánlott” sorral, kezdőnek 2 lépéses indító és megerősítés 7+ fokozatnál, osztály-tanács, az edző tippje és horgonyzott draft-tippek; a dinamikus mód kivéve; költés-figyelmeztetés. |
+| 0 · Audit, 2–7 | következik |
