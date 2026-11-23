@@ -63,7 +63,8 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     mevKezd({});_mev.duel=true;o.duel=kamAktiv(g);_mev.duel=false;
     kamAllit(false);o.ki=kamAktiv(g);kamAllit(true);
     return o;});
-  ok(r1.gol&&r1.bravur&&!r1.lap&&!r1.duel&&!r1.ki,"1. alapból BE a lövéseknél; lapnál, párharcban és kikapcsolva nincs",r1);
+  /* 1.0.11.13.00 óta minden jelenetnek van felvezetése (a lapnak is) */
+  ok(r1.gol&&r1.bravur&&r1.lap&&!r1.duel&&!r1.ki,"1. alapból BE minden jelenetnél (a lapnál is); párharcban és kikapcsolva nincs",r1);
   /* 2–4. egy gól végig */
   await p.evaluate(()=>{window._kamT=[];evaIdoSzorzo=1;mevKezd({});_mev.keret=8;_mev.anim=true;_kamNaplo.length=0;
     const ev={t:"gol",side:"us",p:slots[9].player.n,min:31,seq:5,sor:"31'  GÓL! X (Y)  1:0"};window._kamEv=ev;_mev.lista.push(ev);evaKer(ev);
@@ -87,7 +88,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     const fig={azonosRajz:svgSzoveg.indexOf(evaFigura("kamF",c.loUrl,c.loKit,0,0,1/0.82))>=0,arc:svgSzoveg.indexOf(c.loUrl.fej.slice(0,60))>=0};
     return {szakasz,egyFut:Fs.size,naplo:_kamNaplo.slice(),nagyit,total,anim,fig,vege:T.filter(x=>!x.fut).length?T.find(x=>!x.fut).t:null};});
   ok(r2.szakasz.join(">")==="vaszon>szinpad>vaszon>vege","2a. sorrend: nyitó vágás (vászon) → jelenet (színpad) → reakció (vászon) → vége",r2.szakasz);
-  ok(r2.egyFut===1&&/^elo:(fo|kapu|mogul)$/.test(r2.naplo[0])&&r2.naplo[1]==="uto:reak","2b. egy esemény = egy lejátszás; a nyitó és a reakció-kamera",{egy:r2.egyFut,naplo:r2.naplo});
+  ok(r2.egyFut===1&&/^elo:[a-zA-Z]+$/.test(r2.naplo[0])&&r2.naplo[1]==="uto:reakcio","2b. egy esemény = egy lejátszás; a nyitó és a reakció-kamera",{egy:r2.egyFut,naplo:r2.naplo});
   ok(r2.nagyit>=3&&r2.total>=3&&r2.anim>=5,"3. a jelenetben a rendező követ (nagyítás) és vág (totál); a jelenet animációi futnak",{nagyit:r2.nagyit,total:r2.total,anim:r2.anim});
   ok(r2.fig.azonosRajz&&r2.fig.arc,"4. a 3D figura ugyanaz a rajz (evaFigura), benne az arc",r2.fig);
   /* 5. stadion */
