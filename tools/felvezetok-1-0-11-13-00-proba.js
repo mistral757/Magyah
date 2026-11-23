@@ -86,13 +86,13 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   const r3=await p.evaluate(async()=>{
     const archs=Object.keys(KAM_FORGATO);evaIdoSzorzo=.5;window.__kamMer=[];
     const el=evaElem();el.classList.remove("hide");const cv=el.querySelector(".evaKamVaszon");cv.classList.remove("hide");el.querySelector(".evaSzinpad").style.visibility="hidden";
-    const sk0={passz:"kapufa",csel:"skElastico",beadas:"skBeadas",beadasSarok:"skCsuka",tizi:"tizenegyes",szabad:"szabadrugas",egyedul:"skJeg",kiugratas:"skSebesz",
+    const sk0={passz:"kapufa",csel:"skElastico",beadas:"skBeadas",beadasSarok:"skCsuka",tizi:"tizenegyes",szabad:"szabadrugas",egyedul:"bravur",kiugratas:"skSebesz",
       tavoli:"skAgyu",sortuz:"skSortuz",tank:"skTank",phalanx:"skPhalanx",szaguld:"skSzaguld",tiki:"skTiki",egyketto:"skKemia",letamadas:"letamadas",kontra:"skKontra",
       nagylabda:"skNagylabda",katapult:"skKatapult",vagta:"skBolt",szoglet:"szoglet",bedobas:"bedobas",busz:"evBusz",csere:"evCsere",szabalytalan:"lap",
       utkozes:"serules",var:"var",kidolgozas:"kidolgozas",vedekezes:"blokk"};
     const nincs=archs.filter(a=>!sk0[a]);
     for(const a of archs){if(!sk0[a])continue;
-      const ev={t:"gol",side:"us",p:slots[9].player.n,min:30,seq:3};const c=evaKontextus(ev);
+      const ev={t:"gol",side:"us",p:slots[9].player.n,min:30,seq:3,alt:a==="egyedul"?"ziccer":undefined};const c=evaKontextus(ev);   /* a Jéghideg 1.0.11.14.00 óta tizenegyes; az „egyedül" a ziccer-bravúré */
       if(kamArchetipus(sk0[a],ev,c)!==a&&a!=="passz"){nincs.push(a+"?");continue;}
       await new Promise(r=>kamFelvetel(cv,c,ev,"elo",r,{sk:sk0[a]}));}
     evaIdoSzorzo=1;const M=window.__kamMer;window.__kamMer=null;el.classList.add("hide");
@@ -120,7 +120,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     evaIdoSzorzo=1;
     const Rlat=getComputedStyle(el.querySelector(".evaReplay")).display;
     return {T,naplo:_kamNaplo.slice(),egy:Fs.size,Rlat};},[ev,ido]);
-  await p.evaluate(()=>kamModAllit("visszajatszas"));
+  await p.evaluate(()=>kamModAllit("mindketto"));   /* 1.0.11.14.00: a régi „visszajátszás" mód = Mindkettő */
   const r5=await futas({t:"gol",side:"us",p:await p.evaluate(()=>slots[9].player.n),min:55,seq:11},15000);
   ok(JSON.stringify(r5.T)===JSON.stringify(["vaszon","szinpadR","vege"])&&r5.naplo.length===2&&/^elo:/.test(r5.naplo[0])&&r5.naplo[1]==="uto:reakcio"&&r5.egy===1,
     "5. visszajátszás-mód, gól: élő 3D → gólöröm (egy vásznon) → a jelenet R-rel → vége; nincs második reakció",r5);
@@ -130,12 +130,13 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   ok(r5b.halo&&r5b.hang.includes("aHalo")&&r5b.cel[0]>52&&Math.abs(r5b.cel[1])<=3.66&&r5b.cel[2]<=2.44,"5b. az élő befejezés: a labda a kapuba (a célzott cellába), háló-hang",r5b);
   /* 6. nem gól: nincs R */
   const r6=await futas({t:"kapufa",side:"us",p:await p.evaluate(()=>slots[9].player.n),min:60,seq:12},12000);
-  ok(!r6.T.includes("szinpadR")&&r6.T[0]==="vaszon"&&r6.T.includes("szinpad"),"6. visszajátszás-mód, nem gól: felvezetés + jelenet, R nélkül",r6.T);
+  /* 1.0.11.14.00 óta a Mindkettő minden jelenetnél ismétel (a kérés: „a régi … a teljes jelenet után jön be villogó R felirattal") */
+  ok(JSON.stringify(r6.T)===JSON.stringify(["vaszon","szinpadR","vege"]),"6. Mindkettő, nem gól: 3D jelenet → a rajz R-rel",r6.T);
   /* 7. a beállítás három állása */
-  const r7=await p.evaluate(()=>{const o=[];kamModAllit("felvezetes");o.push(kamMod());
-    kamModAllit(kamMod()==="felvezetes"?"visszajatszas":"ki");o.push(kamMod());kamModAllit("ki");o.push(kamMod(),kamAktiv({t:"gol",side:"us",p:"X",min:1,seq:1}));
-    kamModAllit("felvezetes");o.push(kamMod());return o;});
-  ok(JSON.stringify(r7)===JSON.stringify(["felvezetes","visszajatszas","ki",false,"felvezetes"]),"7. a mód: felvezetés → élő + ismétlés → ki",r7);
+  const r7=await p.evaluate(()=>{const o=[];kamModAllit("mindketto");o.push(kamMod());
+    kamModAllit("uj");o.push(kamMod());kamModAllit("regi");o.push(kamMod(),kamAktiv({t:"gol",side:"us",p:"X",min:1,seq:1}));
+    kamModAllit("mindketto");o.push(kamMod());return o;});
+  ok(JSON.stringify(r7)===JSON.stringify(["mindketto","uj","regi",false,"mindketto"]),"7. a mód: mindkettő → új → régi",r7);
   ok(!errs.length,"8. nincs oldalhiba",errs.slice(0,3));
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");
   await b.close();srv.close();process.exit(hiba?1:0);})().catch(e=>{console.error(e);process.exit(1);});

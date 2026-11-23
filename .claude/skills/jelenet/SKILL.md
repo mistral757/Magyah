@@ -53,21 +53,31 @@ Előbb mindig olvasd el a `CLAUDE.md`-t és a `docs/VERZIOZAS.md`-t (verziószá
   - minden változat az esemény magjából jön (`c.r()`, `faceHash(...)`), így ugyanaz az esemény mindig ugyanúgy néz ki.
 - **A labda a célzott cellába megy** (`c.cel.x`, `c.cel.y`), és a cella villan. A gól- és védésjelenetekben ez kötelező (próba méri).
 
-## 3. A kamerák (1.0.11.12.00 + felvezetők 1.0.11.13.00)
-- **Kapcsoló, három állás:** `kamMod()` → `"felvezetes"` (alap) | `"visszajatszas"` | `"ki"`; `kamModAllit(m)`.
-  - Tárolás: `evaKamOff30_0` ("1" = ki) és `evaKamMod30_0` ("replay").
-  - `kamAktiv(ev)`: minden `KAM_LOVES_T` típus (a lövések mellett a lap, a szöglet, a bedobás, a blokk, a letámadás, a sérülés, a VAR, a kidolgozás és a busz is); párharcban soha.
-- **Sorrend egy eseménynél (Felvezetés):**
-  1. a felvezetés (`kamFelvetel(cv,c,ev,"elo",kesz,{sk})`) a `.evaKamVaszon` vásznon (a színpad rejtve);
-  2. a jelenet, benne a rendező (`kamRendezoIndit`): követő közeli ↔ totál;
-  3. gólnál reakció-vágás (`"uto"`, `kamReakcio`);
-  4. `evaLezar`.
-- **Élő + ismétlés, gólnál:**
-  1. felvezetés + élő 3D befejezés (`{sk,elo3d:true}` → `kamBefejezes`: lövés vagy fejes, a labda a `c.cel` cellába, a kapus vetődik, háló- és rúgáshang);
-  2. reakció;
-  3. a jelenet `indit(true)`-val: `#evAnim.evaReplayOn` → villogó R; utána nincs második reakció.
+## 3. A kamerák és a 3D jelenet (1.0.11.12.00 → 1.0.11.14.00)
+- **A mód, három állás:**
+  - `kamMod()` → `"mindketto"` (alap) | `"uj"` | `"regi"`; `kamModAllit(m)`;
+  - tárolás: `evaKamOff30_0` ("1" = régi), `evaKamMod30_0` ("uj");
+  - `kamAktiv(ev)`: minden `KAM_LOVES_T` típus; párharcban soha.
+- **Egy esemény (Új / Mindkettő):**
+  1. a TELJES 3D jelenet (`kamFelvetel(cv,c,ev,"elo",kesz,{sk,teljes:true})`): felvezetés (`kamForgatokonyv`) + a régi jelenet kimenetele (`kamKimenetel`);
+  2. gólnál a gólöröm (`"uto"`, `kamReakcio`, a célrács tovább látszik: `{racs}`);
+  3. Mindkettőben a rajzolt jelenet `indit(true)`-val: `#evAnim.evaReplayOn` → villogó R; Újban `evaLezar`;
+  4. a döntő pillanat hangja (`EVA_DONTO`) a 3D jelenet `F.donto` idejében, egyszer: az ismétlés (`ismetles`) nem ütemezi újra;
+  5. a feliratsáv (`.evaCim`) a 3D jelenet csúcspontján (`F.csucs`) jelenik meg.
 
-  Egy esemény = EGY `_evaFut` (a próbák számolják).
+  Egy esemény = EGY `_evaFut` (a próbák számolják). Régi módban betűre a régi (kamera nélkül).
+- **A KIMENETEL (`kamKimenet(sk,ev,arch)`)** mindig ugyanaz, amit a régi jelenet mutat (eseménytípus + `ev.alt`):
+  - gol, ongol, kapufa, vedes, fog, melle, blokk, golvonal, szereles, tisztazas, fogKi;
+  - lap, serules, var, labdaszerzes, kidolgozas, busz.
+  - **Új régi jelenetnél, vagy ha egy régi jelenet kimenetele változik, ide is vedd fel.** A próba (`jelenet3d-1-0-11-14-00`) eseményenként ellenőrzi.
+- **A gól a célzott cellába:** `kamCel3D(c)` (a rajz kapuja x 32–88, y 22–40 → a 3D kapu y ±3,4, z 0,2–2,2). A cella neve: `kamCellaNev`.
+- **A régi infók a képen (`kamHud`):**
+  - célrács + villogó cella („GÓL · BAL FELSŐ SAROK”);
+  - mérés + rekord (`ev.meres`);
+  - skill neve és színe (`KAM_SKILL_FX`: szín, effekt: jeg / ora / razas / lebeg / villam);
+  - VAR-sáv + „NINCS GÓL”; orvos.
+  - A 3D világban: lap a bíró kezében (`F.kartya`), VAR-monitor (`F.monitor`), busz (`F.busz`), kapufa-villanás, háló-remegés, a labda csíkja.
+  - Új skill-jelenetnél vegyél fel egy sort a `KAM_SKILL_FX`-be.
 - **FORGATÓKÖNYVEK (`KAM_FORGATO`, ~29 archetípus):** minden sablonhoz a `kamArchetipus(sk,ev,c)` választ.
   - **Új jelenet-sablonnál ide is vegyél fel egy sort** (a próba ellenőrzi, hogy mindnek van létező archetípusa).
   - A felvezetés úgy érjen véget, ahogy a rajzolt jelenet kezdődik (pl. a letámadásnál a labda az ELLENFÉLNÉL kezd, a csukafejesnél a szögletzászlótól jön a beadás).
@@ -95,7 +105,7 @@ Előbb mindig olvasd el a `CLAUDE.md`-t és a `docs/VERZIOZAS.md`-t (verziószá
   - **Pixel-téma:** kis felbontású vászon (×0,42), felnagyítva, `image-rendering:pixelated`.
 
 ## 4. Próbák
-- **Minta:** a `tools/kamerak-1-0-11-12-00-proba.js` és a `tools/felvezetok-1-0-11-13-00-proba.js` (karrier-indítás, `mevKezd({})`, `_mev.anim=true`, `evaKer(ev)`, mintavétel `setTimeout`-tal).
+- **Minta:** a `tools/kamerak-1-0-11-12-00-proba.js`, a `tools/felvezetok-1-0-11-13-00-proba.js` és a `tools/jelenet3d-1-0-11-14-00-proba.js` (karrier-indítás, `mevKezd({})`, `_mev.anim=true`, `evaKer(ev)`, mintavétel `setTimeout`-tal).
   - A mintavételező akkor is ütemezzen újra, ha az elem még nincs meg.
 - **A jelenet saját időzítését mérő próbák** (hang-időpontok, animációszám rögtön az `evaKer` után) a kamerát kikapcsolva futnak: `addInitScript`-ben `localStorage.setItem("evaKamOff30_0","1")`.
   - Példa: `donto-pillanat-3-9-312`, `pixel-sima-3-9-313`.
