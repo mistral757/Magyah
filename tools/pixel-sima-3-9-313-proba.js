@@ -37,7 +37,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const p=await (await b.newContext({viewport:{width:430,height:900}})).newPage();
   const errs=[];p.on("pageerror",e=>errs.push(String(e)));
   p.on("console",m=>{if(m.type()==="error"&&!/Failed to load resource|404/.test(m.text()))errs.push(m.text());});
-  await p.addInitScript(()=>{window.HANG_TESZT=true;});
+  await p.addInitScript(()=>{try{localStorage.setItem("evaKamOff30_0","1");}catch(e){}   /* 🎥 1.0.11.12.00 — a jelenet SAJÁT animációit méri: kameravágás nélkül */window.HANG_TESZT=true;});
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
   await p.waitForTimeout(1200);
   await p.evaluate(()=>document.getElementById("mpSoloBtn").click());await p.waitForTimeout(700);
