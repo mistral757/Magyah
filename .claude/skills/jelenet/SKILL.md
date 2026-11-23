@@ -53,24 +53,36 @@ Előbb mindig olvasd el a `CLAUDE.md`-t és a `docs/VERZIOZAS.md`-t (verziószá
   - minden változat az esemény magjából jön (`c.r()`, `faceHash(...)`), így ugyanaz az esemény mindig ugyanúgy néz ki.
 - **A labda a célzott cellába megy** (`c.cel.x`, `c.cel.y`), és a cella villan. A gól- és védésjelenetekben ez kötelező (próba méri).
 
-## 3. A kamerák (1. fázis)
-- **Kapcsoló:**
-  - `kamBe()` / `kamAllit(on)` (localStorage `evaKamOff30_0`, alapból BE); `kamAktiv(ev)`;
-  - csak a `KAM_LOVES_T` típusoknál (gol, golKapott, kapufa, bravur, vedes, tizenegyes, szabadrugas, loves);
-  - párharcban soha (ott az óra nem áll).
-- **Sorrend egy eseménynél:**
-  1. nyitó vágás (`kamFelvetel(…,"elo")`, `KAM_ELO_MS`) a `.evaKamVaszon` vásznon (a színpad rejtve);
-  2. a jelenet, benne a rendező (`kamRendezoIndit`): követő közeli (a labdán) ↔ totál vágás, a felvétel-lista az esemény magjából (`kamRendezoTerv`);
-  3. gólnál reakció-vágás (`"uto"`, `KAM_UTO_MS`): a tomboló tábor ugrál, füst a klubszínekben;
+## 3. A kamerák (1.0.11.12.00 + felvezetők 1.0.11.13.00)
+- **Kapcsoló, három állás:** `kamMod()` → `"felvezetes"` (alap) | `"visszajatszas"` | `"ki"`; `kamModAllit(m)`.
+  - Tárolás: `evaKamOff30_0` ("1" = ki) és `evaKamMod30_0` ("replay").
+  - `kamAktiv(ev)`: minden `KAM_LOVES_T` típus (a lövések mellett a lap, a szöglet, a bedobás, a blokk, a letámadás, a sérülés, a VAR, a kidolgozás és a busz is); párharcban soha.
+- **Sorrend egy eseménynél (Felvezetés):**
+  1. a felvezetés (`kamFelvetel(cv,c,ev,"elo",kesz,{sk})`) a `.evaKamVaszon` vásznon (a színpad rejtve);
+  2. a jelenet, benne a rendező (`kamRendezoIndit`): követő közeli ↔ totál;
+  3. gólnál reakció-vágás (`"uto"`, `kamReakcio`);
   4. `evaLezar`.
+- **Élő + ismétlés, gólnál:**
+  1. felvezetés + élő 3D befejezés (`{sk,elo3d:true}` → `kamBefejezes`: lövés vagy fejes, a labda a `c.cel` cellába, a kapus vetődik, háló- és rúgáshang);
+  2. reakció;
+  3. a jelenet `indit(true)`-val: `#evAnim.evaReplayOn` → villogó R; utána nincs második reakció.
 
-  Egy esemény = EGY `_evaFut` objektum (a nyitó vágásét folytatja a jelenet; a próbák számolják).
+  Egy esemény = EGY `_evaFut` (a próbák számolják).
+- **FORGATÓKÖNYVEK (`KAM_FORGATO`, ~29 archetípus):** minden sablonhoz a `kamArchetipus(sk,ev,c)` választ.
+  - **Új jelenet-sablonnál ide is vegyél fel egy sort** (a próba ellenőrzi, hogy mindnek van létező archetípusa).
+  - A felvezetés úgy érjen véget, ahogy a rajzolt jelenet kezdődik (pl. a letámadásnál a labda az ELLENFÉLNÉL kezd, a csukafejesnél a szögletzászlótól jön a beadás).
+  - A forma: `{ms, sz:{szerep:[[t,x,y,forgás,magasság],…]}, labda:[[t,x,y,z],…], vagas:[{ig,n:"nézet",f:[fókusz…]}], hang:[[t,"aRugas"]]}`. Az `Y(v)` a tükrözés (a mag dönti).
+  - Szerepek: lo, pa, t2, ru, v1–v4, kap, biro, sk0 (`kamSzereplok`, mind saját arccal).
+  - Ív: `kamIv`. Az útvonal-interpoláció: `kamUt` (simított), a labdáé `kamLabdaUt` (lineáris).
+- **Automatikus képkivágás:** a nézet (`KAM_NEZET`: fo, szemben, mogul, kapu, magas, oldal, reak) csak IRÁNY és látószög.
+  - A távolságot a `kamKivagas` számolja a fókuszpontokra (talp, fej, labda).
+  - A fókusz-lista PRIORITÁS: ha `KAM_TAV_MAX` (22 m) fölött férne csak be, hátulról ejt. A legfontosabb szereplőt tedd előre.
+  - Ha egy vágás a labdára nyit (`f:["L",…]`), a fő „szereplő” a labda.
+  - A `window.__kamMer` mérőhorog (próbához) képkockánként rögzíti a fő szereplő méretét és látszását.
 - **3D világ:**
   - méterben, 105×68-as pálya, a támadás mindig a +x kapu felé;
   - `kamKamera(c,t,fov,W,H)`, `kamVet`;
-  - közelsík-vágás: `kamVagSokszog` / `kamVagSzakasz`. Pályán álló kamera mögé lógó sokszöget soha ne dobj el egészben, vágd.
-- **Kameraállások:** `KAM_ALLAS` (fo, kapu, mogul, reak); mindegyik `pos(L,u)` a labdához/főszereplőhöz (L) és az időhöz (u, 0..1).
-  - Új állás: új kulcs + `pos`, és a választó listába (`kamFelvetel`: `["fo","kapu","mogul"]`).
+  - közelsík-vágás: `kamVagSokszog` / `kamVagSzakasz`; a lencse elé került figura elhalványul.
 - **A stadion az adatokból** (`kamStadionAdat`):
   - méret és nézők: `stadionKap()`, `stadionNezo()`;
   - színek: hazai/vendég `teamColors()` / `evaEllenfelKit`, a szektor a hazai-idegen szerint;
@@ -83,7 +95,7 @@ Előbb mindig olvasd el a `CLAUDE.md`-t és a `docs/VERZIOZAS.md`-t (verziószá
   - **Pixel-téma:** kis felbontású vászon (×0,42), felnagyítva, `image-rendering:pixelated`.
 
 ## 4. Próbák
-- **Minta:** a `tools/kamerak-1-0-11-12-00-proba.js` (karrier-indítás, `mevKezd({})`, `_mev.anim=true`, `evaKer(ev)`, mintavétel `setTimeout`-tal).
+- **Minta:** a `tools/kamerak-1-0-11-12-00-proba.js` és a `tools/felvezetok-1-0-11-13-00-proba.js` (karrier-indítás, `mevKezd({})`, `_mev.anim=true`, `evaKer(ev)`, mintavétel `setTimeout`-tal).
   - A mintavételező akkor is ütemezzen újra, ha az elem még nincs meg.
 - **A jelenet saját időzítését mérő próbák** (hang-időpontok, animációszám rögtön az `evaKer` után) a kamerát kikapcsolva futnak: `addInitScript`-ben `localStorage.setItem("evaKamOff30_0","1")`.
   - Példa: `donto-pillanat-3-9-312`, `pixel-sima-3-9-313`.
