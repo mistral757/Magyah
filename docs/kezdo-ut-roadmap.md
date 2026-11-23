@@ -517,4 +517,5 @@ akarom én ezt tolni."* Kiegészítve:
 |---|---|
 | 1 · Belépés | ✅ **Kész: 1.0.11.15.00** — tudásszint-kérdés, mind a 10 fokozat nyitva „kinek ajánlott” sorral, kezdőnek 2 lépéses indító és megerősítés 7+ fokozatnál, osztály-tanács, az edző tippje és horgonyzott draft-tippek; a dinamikus mód kivéve; költés-figyelmeztetés. |
 | 2 · Motor | ✅ **Kész: 1.0.11.16.00** — `S.kut`, a menü-kapu, 7 szakasz célfeladatokkal és tartalék-fordulóval, a Kezdő út kártya, a kinyílás-ablak „Mutasd meg”-gel, a piac a 8. fordulótól, a kihívások és a zárt funkciók leckéi a nyitásig hallgatnak. Lásd [kezdo-ut-motor-1-0-11-16-00.md](kezdo-ut-motor-1-0-11-16-00.md). |
-| 0 · Audit, 3–7 | következik |
+| 3 · Az első idény | ✅ **Kész: 1.0.11.17.00** — 8 lecke (Kép → Mutasd → Csináld → Összegzés, ≤ 4 lépés), köztük a 7.1 erőforrás-lecke és a 7.2 piaci lecke röviden; a Vezetés-kapcsoló és a leckék újranézése; a „kezdő bot” végigjátszás próbája. Lásd [kezdo-ut-leckek-1-0-11-17-00.md](kezdo-ut-leckek-1-0-11-17-00.md). |
+| 0 · Audit, 4–7 | következik (4: erőmérleg-jelző és gazdasági visszatekintő; 5: stílus-összevető; 6: záró ablak, jelvény; 7: csiszolás) |
