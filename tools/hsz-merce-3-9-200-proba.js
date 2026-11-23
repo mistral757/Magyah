@@ -94,8 +94,8 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* ---- 4. A TABELLA ÉS AZ ÖSSZEGZŐ ---- */
     ki.lbl=txtOf("euroTableLbl");
     ki.tabla=txtOf("euroTable");
-    ki.vagas=document.querySelectorAll("#euroTable tr.hszCut").length;
-    ki.sorok=document.querySelectorAll("#euroTable tr").length-1;
+    ki.vagas=document.querySelectorAll("#euroTable .hszCut").length;   /* 📊 1.0.11.10.01 — a tabella új szerkezete */
+    ki.sorok=document.querySelectorAll("#euroTable .ltSor:not(.ltHead)").length;
     E.path=(E.path||[]).concat([{k:"g",round:"group",md:5,opp:fxN.o.n,mine:2,theirs:1,home:true,neutral:false,oovr:fxN.o.ovr}]);
     try{ki.lab=euroLogFooterHtml().replace(/<[^>]+>/g,"");}catch(e){ki.labErr=String(e);}
     /* ---- kiegyenlítés nélkül ---- */
@@ -108,7 +108,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     try{startEuroCampaign({skipQual:true});}catch(e){ki.startErr2=String(e);}
     try{renderEuroScreen();}catch(e){ki.rendErr2=String(e);}
     ki.blHead=txtOf("euroHead");ki.blLbl=txtOf("euroTableLbl");ki.blTabla=txtOf("euroTable");
-    ki.blCalc=S.euro.hszCalc||null;ki.blSorok=document.querySelectorAll("#euroTable tr").length-1;
+    ki.blCalc=S.euro.hszCalc||null;ki.blSorok=document.querySelectorAll("#euroTable .ltSor:not(.ltHead)").length;
     ki.verzio=APP_VERSION;
     return ki;});
 
