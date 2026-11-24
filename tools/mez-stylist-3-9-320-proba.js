@@ -72,7 +72,19 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     window.saveGame=()=>{};
     /* a meccsmotor helyett egy számláló — a kapu a kezdőrúgás ELŐTT dönt */
     window._motor=0;playMatchMotor=function(){window._motor++;};
-    window._toast=[];backToast=function(m){window._toast.push(String(m));};});
+    window._toast=[];backToast=function(m){window._toast.push(String(m));};
+    /* 🧪 1.0.12.2.04 — ELSZIGETELÉS AZ ÉLŐ KÖZÖS LISTÁTÓL. A próba 3.9.320-kor
+       üres MEZ_ALAP mellett készült. Azóta a napi stylist-szinkron bot
+       (.github/workflows/stylist-szinkron.yml → tools/stylist/beepit.js)
+       valódi mezeket épít be — 2026-11-05-én már 81, ma 115 darabot —, köztük
+       épp a próba ellenfeléét (CR Flamengo, kulcs h1ogx2gj). A játék ezt
+       helyesen „beállított meznek” veszi (mezFor → MEZ_ALAP), ezért az ablak
+       „✅ már van beállított meze” szöveggel és a harmadik („↺ Vissza a
+       sorsolt mezre”) gombbal nyílt, és a 2. szakasz két állítása elbukott.
+       Ez nem játékhiba: a próba itt a „még nincs meze” kezdőállapotot méri,
+       ezért a lapon belül kiürítjük a beépített táblát (a repó fájlja nem
+       változik). */
+    for(const k of Object.keys(MEZ_ALAP))delete MEZ_ALAP[k];});
   await p.waitForTimeout(800);
 
   console.log("— 1. a kapcsoló —");
@@ -209,10 +221,20 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     u2:{[K]:{v:2,at:500,n:"mez:"+csapat,d:JSON.stringify({c1:"#111318",c2:"#ffd400"})}}}};
   fs.writeFileSync(path.join(dir,"e1.json"),JSON.stringify(exp));
   const fut=f=>cp.execFileSync("node",[path.join(ROOT,"tools/stylist/beepit.js"),"--fajl",path.join(dir,f),"--html",MASOLAT],{encoding:"utf8"});
-  const ki1=fut("e1.json");
   const mezBlokk=()=>JSON.parse(/\/\*MEZ-ALAP:KEZD\*\/([\s\S]*?)\/\*MEZ-ALAP:VEG\*\//.exec(fs.readFileSync(MASOLAT,"utf8"))[1]);
+  /* 🧪 1.0.12.2.04 — a beépítő a MEGLÉVŐ blokkba fésül (ez a szándék, l.
+     beepit.js: M=Object.assign({},MB.tabla)). 3.9.320-kor a blokk üres volt,
+     ezért itt korábban „pontosan 1 kulcs” volt az elvárás; a napi bot óta a
+     blokkban valódi mezek ülnek. Ezért most a kiinduló blokkhoz mérünk: a
+     kulcsok halmaza = eredeti ∪ {K}, a többi bejegyzés érintetlen, a rossz
+     színű („Rossz Szín”) nem kerül be. */
+  const T0=mezBlokk();
+  const ki1=fut("e1.json");
   const T1=mezBlokk();
-  ok(T1[K]&&T1[K].c1==="#0a7d34"&&T1[K].pat==="hoops"&&!("gonosz" in T1[K])&&Object.keys(T1).length===1,"a legfrissebb mez épül be; rossz szín és ismeretlen mező kimarad",{T1,ki:ki1.trim()});
+  const kulcsVart=[...new Set([...Object.keys(T0),K])].sort().join(),rossz=h("mez:Rossz Szín");
+  const tobbiMarad=Object.keys(T0).filter(k=>k!==K).every(k=>JSON.stringify(T0[k])===JSON.stringify(T1[k]));
+  ok(T1[K]&&T1[K].c1==="#0a7d34"&&T1[K].pat==="hoops"&&!("gonosz" in T1[K])&&!(rossz in T1)&&Object.keys(T1).sort().join()===kulcsVart&&tobbiMarad,
+    "a legfrissebb mez épül be; rossz szín és ismeretlen mező kimarad (a meglévő bejegyzések érintetlenek)",{K:T1[K],db:[Object.keys(T0).length,Object.keys(T1).length],tobbiMarad,ki:ki1.trim()});
   ok(!fs.readFileSync(MASOLAT,"utf8").split("/*MEZ-ALAP:KEZD*/")[1].split("/*MEZ-ALAP:VEG*/")[0].includes(csapat),"a repóba csapatnév nem kerül (csak a kulcs)",K);
   const ki2=fut("e1.json");
   ok(/nincs változás/.test(ki2),"újrafuttatva nem változtat",ki2.trim());
