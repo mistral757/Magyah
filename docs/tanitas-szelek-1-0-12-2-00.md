@@ -107,3 +107,17 @@ A „Az átigazolás” lecke (`KUT_LECKE.piac`) újraírva.
   - vissza, majd a **lezárás** gombja, végül három szabály.
 - **Az eladás gombjainak jele:** `data-kut="elad"` és `data-kut="piacra"`.
 - **Próba:** `tools/piac-lecke-1-0-12-2-01-proba.js` (magától indul; minden lépés látható és keretezett céllal; nincs oldalhiba).
+
+## 1.0.12.2.02 — A „Hol?” zárt gombra mutatott (régebben indult karrier)
+
+> BEJELENTETT HIBA (kép, fekvő nézet): „Próbálja megmutatni nekem a következő feladatot, csak még nem nyitotta ki közben a menüben ezt a fület... Újabb bug. Ezeket módszeresen irtsuk ki..."
+
+- **Az ok:** a Csapatszerepek gombját a Kezdő út zárta (`kutZar`), nem a menücsoport volt csukva. Az 1.0.11.22.00-ban a szakaszok nyitásai átrendeződtek. Egy korábban indult karrierben a már teljesített szakasz új nyitása sosem futott le, így a következő szakasz feladatai zárt gombra mutattak.
+- **Állandó szabály:**
+  - a kiértékelés (`kutErtekel`, minden HUB-rajzoláskor) csendben pótolja minden már teljesített szakasz nyitását;
+  - biztonsági hálóként a „Hol?” indításkor kinyitja a feladat funkcióját, ha az mégis zárva volna.
+- **Módszeres próba:** `tools/hol-mind-1-0-12-2-02-proba.js`, álló és `--fekvo` nézetben.
+  - Mind a 22 feladatra, régi mentést utánozva (üres nyitás-lista), ellenőrzi:
+    - a gomb nincs zárva;
+    - a „Hol?” eljut a célig, és az ott látható, keretezett.
+  - A javítás nélküli kódon 12 zárt gombot mutat ki; a javítással zöld.
