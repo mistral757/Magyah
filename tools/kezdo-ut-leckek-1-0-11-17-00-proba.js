@@ -64,7 +64,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
       L.l.forEach((st,i)=>{
         if(!["kep","mutasd","csinald","osszeg","katt"].includes(st.t))hiba.push(id+"/"+i+": típus "+st.t);
         /* 1.0.11.22.00: a panelek belső gombjai (pl. az edző lapjáé) csak a panel megnyitásakor születnek */
-        const DINAMIKUS=["edzoElemzesBtn","edzoElemBody","edzoElemOk"];
+        const DINAMIKUS=["edzoElemzesBtn","edzoElemBody","edzoElemOk","trAjanlBox","trAjanlBtn","trainEloBox","btAjanlBox","btAjanlBtn","unlockOkBtn"];   /* 1.0.12.2.00: az ajánlás-dobozok és a felfedezés gombja is */
         if(st.el&&!document.getElementById(st.el)&&!DINAMIKUS.includes(st.el))hiba.push(id+"/"+i+": nincs #"+st.el);
         (st.kep||[]).forEach(k=>{if(!document.getElementById(k))hiba.push(id+"/"+i+": nincs kép #"+k);});
         if(st.t==="csinald"&&!BIZTONSAGOS.includes(st.var))hiba.push(id+"/"+i+": nem biztonságos jel "+st.var);
@@ -73,7 +73,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     if(!KUT_LECKE.piac)nyito.push("piac");
     return {hiba,hianyzo:nyito,db:Object.keys(KUT_LECKE).length};});
   /* 1.0.11.19.00: +2 stílus-lecke (a döntés előtt és után) */
-  ok(!r1.hiba.length&&!r1.hianyzo.length&&r1.db===17,"1. 17 lecke (1.0.11.22.01: + a talizmán-húzás; 1.0.12.1.00: + a 6 jutalom-képernyő), mind ≤ 4 lépés, létező elemekre mutat; minden nyitásnak van leckéje; a „Csináld” csak visszafordítható",r1);
+  ok(!r1.hiba.length&&!r1.hianyzo.length&&r1.db===18,"1. 18 lecke (1.0.11.22.01: + a talizmán-húzás; 1.0.12.1.00: + a 6 jutalom-képernyő; 1.0.12.2.00: + a scout-felfedezés), mind ≤ 4 lépés, létező elemekre mutat; minden nyitásnak van leckéje; a „Csináld” csak visszafordítható",r1);
   await p.evaluate(()=>{const b=document.getElementById("mgmtOk");if(b&&b.offsetParent)b.click();
     for(const id of ["guideTipOk","guideTipOff"]){const x=document.getElementById(id);if(x&&x.offsetParent)x.click();}
     const t=document.getElementById("guideTip");if(t)t.classList.add("hide");});
@@ -112,11 +112,13 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   await p.waitForTimeout(1500);
   await p.evaluate(()=>{const b=document.getElementById("mgmtOk");if(b&&b.offsetParent)b.click();const t=document.getElementById("guideTip");if(t)t.classList.add("hide");});
   await p.waitForTimeout(2500);
-  const r3=await p.evaluate(()=>{const o={modal:!document.getElementById("hubTacticConfirmModal").classList.contains("hide"),cim:document.getElementById("hubTacticConfirmTitle").textContent};
-    if(o.modal)document.getElementById("hubTacticConfirmYes").click();
+  /* 1.0.12.2.00: a szakasz vége saját, nagy ablak (#kutKeszModal) — a régi kérdés-ablak helyett */
+  const r3=await p.evaluate(()=>{const m=document.getElementById("kutKeszModal");
+    const o={modal:!!(m&&!m.classList.contains("hide")),cim:m?m.querySelector(".kkCim").textContent+" "+((m.querySelector(".kkAl")||{}).textContent||""):""};
+    if(o.modal)m.querySelector('[data-kk="i"]').click();
     o.dbg={ac:window._acLog,sz:S.kut.sz,uj:JSON.stringify(S.kut.uj),kl:_kutL&&_kutL.id,mas:kutMasAblak(),kesz:JSON.stringify(S.kut.kesz)};
     o.lecke=_kutL&&_kutL.id;o.lcim=document.querySelector("#kutLecke .kutLCim")&&document.querySelector("#kutLecke .kutLCim").textContent;return o;});
-  ok(r3.modal&&/Kinyíl/.test(r3.cim)&&r3.lecke==="meccsek"&&/edzésterv/i.test(r3.lcim),"3. a „🔓 Kinyíltak” ablak „Mutasd meg →” gombja a szakasz leckéjét indítja (Edzés és összhang)",r3);
+  ok(r3.modal&&/Szakasz teljesítve|kinyílt/i.test(r3.cim)&&r3.lecke==="meccsek"&&/edzésterv/i.test(r3.lcim),"3. a „🔓 Kinyíltak” ablak „Mutasd meg →” gombja a szakasz leckéjét indítja (Edzés és összhang)",r3);
   /* 4. másik ablak alatt: kis sáv a modális ablakok alatt (1.0.11.22.00: a vezetett lecke a menü-lépésnél) */
   const r4=await p.evaluate(()=>{const o={lepes:_kutL&&_kutL.i};
     askConfirm({title:"Próba-ablak",html:"x"});return o;});
