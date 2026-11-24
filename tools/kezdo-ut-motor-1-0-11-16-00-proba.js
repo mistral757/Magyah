@@ -81,17 +81,17 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   ok(r2.form&&r2.sz1===1&&r2.ketMeccsUtan===1&&r2.haromMeccsUtan===1&&r2.sz2===2&&r2.nyitEdzes&&!r2.nyitBoost&&r2.edzesGomb&&r2.uj.length>=1,
     "2. a feladatok jelből és meccsből pipálódnak (a 2. szakasz: gól + 3 meccs + tempó — vereséggel is teljesíthető); a szakasz lezárul, az edzés és az összhang kinyílik (a boost még zárt)",r2);
   /* 3. az ünneplés megvárja a többi ablakot */
-  const r3a=await p.evaluate(()=>({mas:kutMasAblak(),modal:!document.getElementById("hubTacticConfirmModal").classList.contains("hide")&&/Kinyíl/.test(document.getElementById("hubTacticConfirmTitle").textContent)}));
+  /* 1.0.12.2.00: a szakasz vége saját, nagy ablak (#kutKeszModal) */
+  const r3a=await p.evaluate(()=>{const m=document.getElementById("kutKeszModal");return {mas:kutMasAblak("#kutKeszModal"),modal:!!(m&&!m.classList.contains("hide"))};});
   await p.evaluate(()=>{const b=document.getElementById("mgmtOk");if(b&&b.offsetParent)b.click();
     for(const id of ["guideTipOk","guideTipOff"]){const x=document.getElementById(id);if(x&&x.offsetParent)x.click();}});
   await p.waitForTimeout(3500);
   await p.evaluate(()=>{const t=document.getElementById("guideTip");if(t)t.classList.add("hide");});
   await p.waitForTimeout(2200);
-  const r3=await p.evaluate(()=>({modal:!document.getElementById("hubTacticConfirmModal").classList.contains("hide"),
-    cim:document.getElementById("hubTacticConfirmTitle").textContent,
-    mutasd:/Mutasd/.test((document.getElementById("hubTacticConfirmYes")||{}).textContent||document.getElementById("hubTacticConfirmModal").textContent)}));
-  ok((r3a.mas?!r3a.modal:true)&&r3.modal&&/Kinyíl/.test(r3.cim)&&r3.mutasd,"3. a nyitás-ünneplés (🔓 Kinyílt…, „Mutasd meg →”) a többi ablak után jön, nem rájuk",{elotte:r3a,utana:r3});
-  await p.evaluate(()=>document.getElementById("hubTacticConfirmModal").classList.add("hide"));
+  const r3=await p.evaluate(()=>{const m=document.getElementById("kutKeszModal");const be=!!(m&&!m.classList.contains("hide"));
+    return {modal:be,cim:be?m.textContent.slice(0,120):"",mutasd:be&&/Mutasd/.test((m.querySelector('[data-kk="i"]')||{}).textContent||"")};});
+  ok((r3a.mas?!r3a.modal:true)&&r3.modal&&/Szakasz teljesítve|Kinyíl/i.test(r3.cim)&&r3.mutasd,"3. a nyitás-ünneplés (🔓 Kinyílt…, „Mutasd meg →”) a többi ablak után jön, nem rájuk",{elotte:r3a,utana:r3});
+  await p.evaluate(()=>{document.getElementById("hubTacticConfirmModal").classList.add("hide");const m=document.getElementById("kutKeszModal");if(m)m.classList.add("hide");});
   /* 4–6: piac a 8. fordulótól, tartalék-továbblépés, vége, Mindent kinyitok */
   const r4=await p.evaluate(()=>{
     const o={};
