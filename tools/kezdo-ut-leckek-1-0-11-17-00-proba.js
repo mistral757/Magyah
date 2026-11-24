@@ -69,7 +69,8 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     const nyito=KUT_SZAKASZ.filter(sz=>sz.nyit.length).map(sz=>sz.id).filter(id=>!KUT_LECKE[id]);
     if(!KUT_LECKE.piac)nyito.push("piac");
     return {hiba,hianyzo:nyito,db:Object.keys(KUT_LECKE).length};});
-  ok(!r1.hiba.length&&!r1.hianyzo.length&&r1.db===8,"1. 8 lecke, mind ≤ 4 lépés, létező elemekre mutat; minden nyitásnak van leckéje; a „Csináld” csak visszafordítható",r1);
+  /* 1.0.11.19.00: +2 stílus-lecke (a döntés előtt és után) */
+  ok(!r1.hiba.length&&!r1.hianyzo.length&&r1.db===10,"1. 10 lecke, mind ≤ 4 lépés, létező elemekre mutat; minden nyitásnak van leckéje; a „Csináld” csak visszafordítható",r1);
   await p.evaluate(()=>{const b=document.getElementById("mgmtOk");if(b&&b.offsetParent)b.click();
     for(const id of ["guideTipOk","guideTipOff"]){const x=document.getElementById(id);if(x&&x.offsetParent)x.click();}
     const t=document.getElementById("guideTip");if(t)t.classList.add("hide");});
@@ -151,8 +152,8 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     o.zart=Object.keys(KUT_FUNKCIO).filter(f=>!kutNyitva(f));
     o.feladat=Object.keys(S.kut.kesz).length;
     return o;});
-  ok(r6.idx>=30&&r6.sz===6&&r6.cim==="hosszu"&&r6.zart.length===2&&r6.zart.includes("akademia")&&r6.zart.includes("euro"),
-    "6. KEZDŐ BOT: a tétlenül végigjátszott első idény után a 0–5. szakasz lezárult, minden első idényes funkció nyitva, csak az akadémia és a kupa vár",r6);
+  ok(r6.idx>=30&&r6.sz===6&&r6.cim==="filozofia"&&r6.zart.length===2&&r6.zart.includes("akademia")&&r6.zart.includes("euro"),
+    "6. KEZDŐ BOT: a tétlenül végigjátszott első idény után a 0–5. szakasz lezárult (a filozófia-szakasz következik), minden első idényes funkció nyitva, csak az akadémia és a kupa vár",r6);
   ok(errs.length===0,"7. nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");process.exit(hiba?1:0);})();
