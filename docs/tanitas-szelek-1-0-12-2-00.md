@@ -107,3 +107,42 @@ A „Az átigazolás” lecke (`KUT_LECKE.piac`) újraírva.
   - vissza, majd a **lezárás** gombja, végül három szabály.
 - **Az eladás gombjainak jele:** `data-kut="elad"` és `data-kut="piacra"`.
 - **Próba:** `tools/piac-lecke-1-0-12-2-01-proba.js` (magától indul; minden lépés látható és keretezett céllal; nincs oldalhiba).
+
+## 1.0.12.2.02 — A „Hol?” zárt gombra mutatott (régebben indult karrier)
+
+> BEJELENTETT HIBA (kép, fekvő nézet): „Próbálja megmutatni nekem a következő feladatot, csak még nem nyitotta ki közben a menüben ezt a fület... Újabb bug. Ezeket módszeresen irtsuk ki..."
+
+- **Az ok:** a Csapatszerepek gombját a Kezdő út zárta (`kutZar`), nem a menücsoport volt csukva. Az 1.0.11.22.00-ban a szakaszok nyitásai átrendeződtek. Egy korábban indult karrierben a már teljesített szakasz új nyitása sosem futott le, így a következő szakasz feladatai zárt gombra mutattak.
+- **Állandó szabály:**
+  - a kiértékelés (`kutErtekel`, minden HUB-rajzoláskor) csendben pótolja minden már teljesített szakasz nyitását;
+  - biztonsági hálóként a „Hol?” indításkor kinyitja a feladat funkcióját, ha az mégis zárva volna.
+- **Módszeres próba:** `tools/hol-mind-1-0-12-2-02-proba.js`, álló és `--fekvo` nézetben.
+  - Mind a 22 feladatra, régi mentést utánozva (üres nyitás-lista), ellenőrzi:
+    - a gomb nincs zárva;
+    - a „Hol?” eljut a célig, és az ott látható, keretezett.
+  - A javítás nélküli kódon 12 zárt gombot mutat ki; a javítással zöld.
+
+## 1.0.12.2.03 — Menetrend és tabella: új kinézet, nyers klubnév nélkül
+
+> BEJELENTÉS (kép): „A menetrend és tabella már egy ideje nem lett frissítve kinézetileg. Plusz ott becsúsztak még jogvédett tartalmak."
+
+- **A jogvédett nevek:**
+  - **Az ok:** a bajnoki egyéni listák klub-oszlopa a csapat TELJES nevét kapta szezonnal (pl. „Stade de Reims (1959/60)”). A `clubLabel` a fordítótáblában szezon nélkül keres, ezért nyersen engedte ki.
+  - **A javítás:** a `clubLabel` a szezonos alakot a `teamLabel`-nek adja át, így minden hívó helyén működik, nem csak itt.
+- **Új kinézet:**
+  - **Fülek:** három fül (📅 Menetrend · 🏆 Tabella · ⭐ Egyéni listák). Az utolsó választott fül megmarad, ez csak kényelmi, böngészőnként.
+  - **Menetrend:** a tabella stílusában, mezzel és teljes névvel.
+    - címkék: ⚔️ rivális, 🔥 hajrá-rangadó, 🏆 bajnoki döntő, a következő meccs kezdési ideje;
+    - H/I jelzés;
+    - színes eredmény-pirula (győzelem, döntetlen, vereség);
+    - „▼ következik” elválasztó, a következő meccs kiemelve;
+    - a fejlécben a lejátszott meccsek száma és a mérleg.
+  - **Egyéni listák:** a tabella stílusában.
+    - 🥇🥈🥉 az első háromnak;
+    - mez;
+    - név, alatta a klub a fordítórétegen át;
+    - nagy szám;
+    - a saját játékosod a klubszíneiddel kiemelve.
+- **Próba:** `tools/menetrend-1-0-12-2-03-proba.js`.
+  - Egyik fülön sincs olyan nyers klubnév, amelynek van magyar megfelelője.
+  - Három fül, 30 mezes sor, eredmény-pirulák, a következő meccs kiemelve, mezes egyéni listák a klubbal.
