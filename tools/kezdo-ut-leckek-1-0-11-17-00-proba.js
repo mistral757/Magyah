@@ -73,7 +73,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     if(!KUT_LECKE.piac)nyito.push("piac");
     return {hiba,hianyzo:nyito,db:Object.keys(KUT_LECKE).length};});
   /* 1.0.11.19.00: +2 stílus-lecke (a döntés előtt és után) */
-  ok(!r1.hiba.length&&!r1.hianyzo.length&&r1.db===11,"1. 11 lecke (1.0.11.22.01: + a talizmán-húzás), mind ≤ 4 lépés, létező elemekre mutat; minden nyitásnak van leckéje; a „Csináld” csak visszafordítható",r1);
+  ok(!r1.hiba.length&&!r1.hianyzo.length&&r1.db===17,"1. 17 lecke (1.0.11.22.01: + a talizmán-húzás; 1.0.12.1.00: + a 6 jutalom-képernyő), mind ≤ 4 lépés, létező elemekre mutat; minden nyitásnak van leckéje; a „Csináld” csak visszafordítható",r1);
   await p.evaluate(()=>{const b=document.getElementById("mgmtOk");if(b&&b.offsetParent)b.click();
     for(const id of ["guideTipOk","guideTipOff"]){const x=document.getElementById(id);if(x&&x.offsetParent)x.click();}
     const t=document.getElementById("guideTip");if(t)t.classList.add("hide");});

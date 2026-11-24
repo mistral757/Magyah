@@ -118,7 +118,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     o.uj=S.gazd===null;window.saveGame=_s;return o;});
   ok(r6.mentve&&r6.vissza&&r6.regi&&r6.uj,"6. a mentés viszi az S.gazd-ot, a betöltés visszaadja, a régi mentés nélküle tölt; az új karrier nullázza",r6);
   /* 7. a lecke */
-  const r7=await p.evaluate(()=>{const st=KUT_LECKE.merleg.l[1];return {t:st.t,el:st.el,van:!!document.getElementById(st.el),x:/erőmérleg/.test(kutLeckeSzov(st.x))};});   /* 1.0.11.22.00: a szöveg lehet függvény (élő példa) */
+  const r7=await p.evaluate(()=>{const st=KUT_LECKE.merleg.l[1];return {t:st.t,el:st.el,van:!!document.getElementById(st.el),x:/erőmérleg/.test(kutLeckeSzov(st.c)+kutLeckeSzov(st.x))&&/célrés/.test(kutLeckeSzov(st.x))};});   /* 1.0.11.22.00: a szöveg lehet függvény (élő példa); 1.0.12.1.00: a szó a címben áll, a szöveg a célrést magyarázza */
   ok(r7.t==="mutasd"&&r7.el==="hubEromerleg"&&r7.van&&r7.x,"7. a „Erőforrás és a mezőny” lecke 2. lépése az erőmérlegre mutat",r7);
   ok(errs.length===0,"8. nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();
