@@ -29,7 +29,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   const b=await chromium.launch({args:["--no-sandbox"]});
   const p=await (await b.newContext({viewport:{width:430,height:900}})).newPage();
   const errs=[];p.on("pageerror",e=>errs.push(String(e)));
-  await p.addInitScript(()=>{window.HANG_TESZT=true;});
+  await p.addInitScript(()=>{window.HANG_TESZT=true;try{localStorage.setItem("evaKamMod30_0","both");}catch(e){}});   /* 1.0.11.22.00: az alap az „Új” — ez a próba a Mindkettőt (3D + rajzolt ismétlés) méri */
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});await p.waitForTimeout(1200);
   await p.evaluate(()=>document.getElementById("mpSoloBtn").click());await p.waitForTimeout(700);
   await p.evaluate(()=>{const b=document.getElementById("unlockWelBtn");if(b&&b.offsetParent)b.click();});

@@ -71,13 +71,15 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     o.form=!!S.kut.kesz["elso11:form"];
     kutJel("view:tactics");kutJel("view:midrole");
     o.sz1=S.kut.sz;
-    kutMeccsUtan(1,0);o.sz2=S.kut.sz;o.nyitEdzes=kutNyitva("edzes");o.nyitBoost=kutNyitva("boost");
+    /* 1.0.11.22.00 — a 2. szakasz tanító céljai: gól, 3 lejátszott meccs, tempó-váltás (eredménytől függetlenül) */
+    kutMeccsUtan(1,0);o.ketMeccsUtan=S.kut.sz;kutMeccsUtan(0,2);kutMeccsUtan(0,0);o.haromMeccsUtan=S.kut.sz;
+    kutJel("set:tempo");o.sz2=S.kut.sz;o.nyitEdzes=kutNyitva("edzes");o.nyitBoost=kutNyitva("boost");
     document.getElementById("hubFormationPicker").classList.add("hide");document.getElementById("scHub").classList.remove("hide");
     S.idx=1;renderHub();
     o.edzesGomb=v("hubTrainingBtn");o.uj=S.kut.uj.slice();
     return o;});
-  ok(r2.form&&r2.sz1===1&&r2.sz2===2&&r2.nyitEdzes&&!r2.nyitBoost&&r2.edzesGomb&&r2.uj.length>=1,
-    "2. a feladatok jelből és meccsből pipálódnak; a szakasz lezárul, az edzés és az összhang kinyílik (a boost még zárt)",r2);
+  ok(r2.form&&r2.sz1===1&&r2.ketMeccsUtan===1&&r2.haromMeccsUtan===1&&r2.sz2===2&&r2.nyitEdzes&&!r2.nyitBoost&&r2.edzesGomb&&r2.uj.length>=1,
+    "2. a feladatok jelből és meccsből pipálódnak (a 2. szakasz: gól + 3 meccs + tempó — vereséggel is teljesíthető); a szakasz lezárul, az edzés és az összhang kinyílik (a boost még zárt)",r2);
   /* 3. az ünneplés megvárja a többi ablakot */
   const r3a=await p.evaluate(()=>({mas:kutMasAblak(),modal:!document.getElementById("hubTacticConfirmModal").classList.contains("hide")&&/Kinyíl/.test(document.getElementById("hubTacticConfirmTitle").textContent)}));
   await p.evaluate(()=>{const b=document.getElementById("mgmtOk");if(b&&b.offsetParent)b.click();
