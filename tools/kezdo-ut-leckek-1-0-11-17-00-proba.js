@@ -73,7 +73,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     if(!KUT_LECKE.piac)nyito.push("piac");
     return {hiba,hianyzo:nyito,db:Object.keys(KUT_LECKE).length};});
   /* 1.0.11.19.00: +2 stílus-lecke (a döntés előtt és után) */
-  ok(!r1.hiba.length&&!r1.hianyzo.length&&r1.db===10,"1. 10 lecke, mind ≤ 4 lépés, létező elemekre mutat; minden nyitásnak van leckéje; a „Csináld” csak visszafordítható",r1);
+  ok(!r1.hiba.length&&!r1.hianyzo.length&&r1.db===11,"1. 11 lecke (1.0.11.22.01: + a talizmán-húzás), mind ≤ 4 lépés, létező elemekre mutat; minden nyitásnak van leckéje; a „Csináld” csak visszafordítható",r1);
   await p.evaluate(()=>{const b=document.getElementById("mgmtOk");if(b&&b.offsetParent)b.click();
     for(const id of ["guideTipOk","guideTipOff"]){const x=document.getElementById(id);if(x&&x.offsetParent)x.click();}
     const t=document.getElementById("guideTip");if(t)t.classList.add("hide");});
@@ -87,7 +87,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   await p.waitForTimeout(1300);
   const r2b=await p.evaluate(async()=>{
     const w=ms=>new Promise(r=>setTimeout(r,ms));
-    const d=document.getElementById("kutLDim"),fr=d.querySelector("b").getBoundingClientRect(),el=document.getElementById("hubRoster").getBoundingClientRect();
+    const d=document.getElementById("kutLDim"),fr=d.querySelector("b").getBoundingClientRect(),el=kutElsoSor().getBoundingClientRect();   /* 1.0.11.22.01: a kijelölés egy sor (a példa-játékosé) */
     const o={dim:!d.classList.contains("hide"),keret:Math.abs(fr.top-(el.top-5))<3&&Math.abs(fr.height-(el.height+10))<3};
     document.querySelector('#kutLecke [data-kl="tovabb"]').click();o.c2=document.querySelector("#kutLecke .kutLCim").textContent;
     document.querySelector('#kutLecke [data-kl="tovabb"]').click();await w(900);
@@ -101,8 +101,8 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     o.zarva=!document.getElementById("kutLecke")&&!_kutL&&!document.querySelector(".kutCelVillog");
     plSheetClose();
     o.latta=!!(S.kut.lecke&&S.kut.lecke.elso11);return o;});
-  ok(r2a.auto==="elso11"&&/A kereted/.test(r2a.cim)&&/1\/21/.test(r2a.lepes)&&r2b.dim&&r2b.keret&&/Csere/.test(r2b.c2)&&r2b.villog&&r2b.nincsTovabbFo&&r2b.lap&&/attribút/i.test(r2b.c4)&&r2b.pipa&&r2b.zarva&&r2b.latta,
-    "2. az „Első tizenegy” magától indul: Mutasd (sötétítés + keret a kereten) → „katt” (a sor villog, a koppintás a lapot nyitja és léptet) → kihagyható; a lecke „látott”",Object.assign({},r2a,r2b));
+  ok(r2a.auto==="elso11"&&/A kereted/.test(r2a.cim)&&/1\/\d+/.test(r2a.lepes)&&r2b.dim&&r2b.keret&&/Csere/.test(r2b.c2)&&r2b.villog&&r2b.nincsTovabbFo&&r2b.lap&&/attribút/i.test(r2b.c4)&&r2b.pipa&&r2b.zarva&&r2b.latta,
+    "2. az „Első tizenegy” magától indul: Mutasd (sötétítés + keret EGY soron, a képernyőn belül) → „katt” (a sor villog, a koppintás a lapot nyitja és léptet) → kihagyható; a lecke „látott”",Object.assign({},r2a,r2b));
   /* 3. a nyitás-ablak a leckét indítja */
   await p.evaluate(()=>{window._acLog=[];const _ac=askConfirm;window.askConfirm=function(o){window._acLog.push(o&&o.title);return _ac.apply(this,arguments);};
     kutJel("view:formation");kutJel("view:tactics");
