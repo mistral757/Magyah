@@ -105,7 +105,10 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   for(const id of ["meccsek","fejlodes","lelek","kockazat","merleg","hosszu"]){
     await p.evaluate((id)=>{kutLeckeZar();document.querySelectorAll('[role="dialog"],.hubModal').forEach(e=>{if(!e.closest("#kutLecke"))e.classList.add("hide");});
       try{hubMenuExit();}catch(e){}["scWindow","twPanel","hubFormationPicker"].forEach(x=>{const e=document.getElementById(x);if(e)e.classList.add("hide");});
-      document.getElementById("scHub").classList.remove("hide");renderHub();kutLeckeIndit(id);},id);
+      document.getElementById("scHub").classList.remove("hide");renderHub();
+      /* 1.0.12.1.00: a lecke a futó lépéssort félreteszi, így a renderHub egy újat indíthat (ami kinyitja
+         a menüt) — a próba a csukott menüs HUB-ról indítja a leckét */
+      try{if(_tSteps){_tSteps=null;teachStepsHide();}hubMenuExit();}catch(e){}kutLeckeIndit(id);},id);
     const nyom=[];let elozo="",ism=0,elakadt=0,kattDb=0;
     for(let k=0;k<80;k++){
       await p.waitForTimeout(450);
