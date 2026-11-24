@@ -84,3 +84,26 @@ Az első idényben a hangsúly-panelen csak a **taktika-csúszkák** vannak (`td
   - `kezdo-ut-motor`: az új szakaszzáró ablak.
 - **Zöld még:** a Kezdő út összes próbája, a `motor-jutalom`, az `eromerleg`, és minden próba, ami az edzéstervet, az összhangot, a felfedezést, a kezdőrúgást, a láncot vagy az `askConfirm`-ot érinti (37 próba).
 - **Már a HEAD-en is hibás, nem e kör miatt:** `boost-plafon-3-9-318` és `pvp-szigor-3-9-287`.
+
+## 1.0.12.2.01 — Az első átigazolási ablak, vezetve
+
+> KIMONDOTT KÉRÉS: „Az első rövid átigazolási ablakban azt is el kellett volna magyarázza a játék, hogy milyen fajta átigazolási lehetőségek vannak, mi az átigazolási esemény, mi ez a scout által talált ingyen játékos. Mindegyikre ravinni a kurzort stb. És a mi játékoseladásaink ügyében szintén oda kellett volna vigyen, hogy lássam, miképpen működik ez az eladás dolog."
+
+A „Az átigazolás” lecke (`KUT_LECKE.piac`) újraírva.
+- **Mikor indul magától:** az első ablak megnyitásakor (`twOpenCheckpointWindow`). Megvárja a közbejövő ablakokat, és a HUB minden rajzolásakor újrapróbálja, amíg az ablak nyitva van (`kutPiacAuto`).
+- **Mire mutat, sorban:** keretezve, élő számokkal.
+  1. az időszak (mennyi felderítés, esemény maradt);
+  2. 🛒 Vásárlás;
+  3. 🔍 Klub-szemle;
+  4. 🎯 Képesség-keresés;
+  5. 🎲 Átigazolási esemény (álomigazolás, ikon, elvágyódás; ablakonként kevés, nem kötelező);
+  6. 🔍 Felfedezett játékosok (a scout meccs utáni találatai, a 🎁 ingyenes, csak ablakban, bérrel);
+  7. ⭐ Sztár piac, 🎓 Stábtag igazolása, 📈 Eladási ajánlatok.
+- **Az eladás:**
+  - villog egy **valódi tartalék** sora (az üres padhely nem);
+  - megnyílik az adatlapja;
+  - keretezve a **💰 Eladás most** (a kikiáltási ár negyede);
+  - keretezve a **📈 Piacra bocsátás** (5–15 forduló, a licit 60–125%, 500 perc kell);
+  - vissza, majd a **lezárás** gombja, végül három szabály.
+- **Az eladás gombjainak jele:** `data-kut="elad"` és `data-kut="piacra"`.
+- **Próba:** `tools/piac-lecke-1-0-12-2-01-proba.js` (magától indul; minden lépés látható és keretezett céllal; nincs oldalhiba).
