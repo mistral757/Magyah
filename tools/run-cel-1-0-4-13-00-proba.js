@@ -61,12 +61,18 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(/AJÁNLOTT/.test(r.d3)&&r.ajanlottDb===1,"1b. az osztályválasztó a D3-at jelöli ajánlottnak",r.d3);
   ok(/Run-cél: Biszem-baszom premier líg/.test(r.d3)&&/Run-cél: Magyah Élmezőny/.test(r.d5)&&!/Run-cél: D\d/.test(r.d5),"1c. minden sor névvel írja ki a Run-célt (D3 → élvonal, D5 → D3)",{d3:r.d3,d5:r.d5});
   await p.waitForTimeout(300);
+  /* 🧭 1.0.11.21.00 — KIMONDOTT KÉRÉS: „a menedzsment feladata nem jön be, majd csak a
+     HUB-ban": a karrier kezdetén NEM nyílik, az első HUB-on igen (egyszer) */
+  const m0=await p.evaluate(()=>{const mod=$("mgmtModal");return {vis:!!(mod&&!mod.classList.contains("hide")),seen:!!S.mgmtSeen};});
+  await p.evaluate(()=>{try{$("scHub").classList.remove("hide");mgmtHubElso();}catch(e){}});
+  await p.waitForTimeout(300);
   const m=await p.evaluate(()=>{
     const mod=$("mgmtModal");const vis=mod&&!mod.classList.contains("hide");
     const t=(($("mgmtBody")||{}).textContent||"").replace(/\s+/g," ");
     $("mgmtOk").click();
-    return {vis,t,zar:mod.classList.contains("hide"),seen:!!S.mgmtSeen,start:S.pyr&&S.pyr.startDiv,goal:pyrRunGoalDivId()};});
-  ok(m.vis&&m.start===5&&m.goal===3,"2a. a karrier kezdetén felugrik a célkitűzés-ablak (D5-ből a cél a D3)",{vis:m.vis,start:m.start,goal:m.goal});
+    mgmtHubElso();const ujra=!$("mgmtModal").classList.contains("hide");
+    return {vis,t,zar:mod.classList.contains("hide")&&!ujra,seen:!!S.mgmtSeen,start:S.pyr&&S.pyr.startDiv,goal:pyrRunGoalDivId()};});
+  ok(!m0.vis&&!m0.seen&&m.vis&&m.start===5&&m.goal===3,"2a. a célkitűzés-ablak NEM a karrier kezdetén, hanem az első HUB-on ugrik fel (D5-ből a cél a D3)",{kezdet:m0,vis:m.vis,start:m.start,goal:m.goal});
   ok(/Nyerd meg: Magyah Élmezőny/.test(m.t)&&/Magyah Harmadosztály mezőnyéből/.test(m.t)&&!/\bD\d\b/.test(m.t),"2b. a cél a divízió NEVÉVEL szerepel, D-szám nélkül",m.t.slice(0,300));
   ok(m.zar&&m.seen,"2c. a gomb bezárja, és egyszer jelenik meg",{zar:m.zar,seen:m.seen});
   const c=await p.evaluate(()=>{

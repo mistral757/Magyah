@@ -132,7 +132,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   const g4c=await p.evaluate(()=>window._golHang);
   ok(JSON.stringify(r4c.T)===JSON.stringify(["vaszon","szinpadR","vege"])&&g4c===1,"4b. Mindkettő: 3D → a rajz R-rel; a gól hangja az ismétlésben nem szól újra (összesen egyszer)",{T:r4c.T,golHang:g4c});
   const r4d=await p.evaluate(()=>{kamModAllit("uj");const ev={t:"kapufa",side:"us",p:slots[9].player.n,min:73,seq:23};
-    evaKer(ev);return new Promise(r=>setTimeout(()=>{const o=parseFloat(getComputedStyle(document.querySelector("#evAnim .evaCim")).opacity);evaLezar();kamModAllit("mindketto");r(o);},2600));});
+    evaKer(ev);return new Promise(r=>setTimeout(()=>{const o=parseFloat(getComputedStyle(document.querySelector("#evAnim .evaCim")).opacity);evaLezar();kamModAllit("mindketto");r(o);},2600*KAM_LASSU));});   /* 1.0.11.22.00: a 3D jelenet lassabb */
   ok(r4d>.9,"4c. Új: a feliratsáv (a régi jelenet címe, perc, név) a 3D jelenet csúcspontján megjelenik",r4d);
   ok(!errs.length,"5. nincs oldalhiba",errs.slice(0,3));
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");
