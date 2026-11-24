@@ -45,7 +45,7 @@ const KEP=process.env.KEP||"";   /* képernyőképek könyvtára (opcionális) *
   const p=await (await b.newContext({viewport:{width:430,height:900}})).newPage();
   const errs=[];p.on("pageerror",e=>errs.push(String(e)));
   p.on("console",m=>{if(m.type()==="error"&&!/Failed to load resource|404/.test(m.text()))errs.push(m.text());});
-  await p.addInitScript(()=>{window.HANG_TESZT=true;});
+  await p.addInitScript(()=>{window.HANG_TESZT=true;try{if(!localStorage.getItem("magyah_tudas_v1"))localStorage.setItem("magyah_tudas_v1","profi");}catch(e){}/* 🧭 1.0.11.16.00 — a teljes menü (Kezdő út nélkül) */});
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
   /* 🏁 1.0.7.0.00 — ez a próba a RÉGI rajt-szerződést méri (a közös karrier ága él vele); az új egyjátékos rajtot a tools/ideny-rajt-1-0-7-0-00-proba.js méri */
   await p.evaluate(()=>{window.nrAktiv=()=>false;});

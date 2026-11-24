@@ -74,6 +74,12 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
     /* ---- 3-4. A VÁLASZTÓ A LÉTRÁN, A HÁZIGAZDA HATÁRÁIG ---- */
     MP.active=true;MP.role="host";
     pyrWanted=true;pyrWantedDiv=5;_pyrMpDetail=true;
+    /* 🎓 1.0.11.20.00 — a dinamikus mód kivétele óta (1.0.11.15.00) a karrier mindig
+       hagyományos, így a gyors indító a házigazdának is beállítja az ajánlott
+       fokozatot — és a fokozat vezeti a rés-csúszkát (3.9.224). Ez a próba a
+       FOKOZAT NÉLKÜLI, szabad lépcső-csúszkát méri, ezért azt kifejezetten
+       kikapcsoljuk. */
+    pyrPickFok=null;
     pyrWantedGap=2.5;renderPyrMpAll();
     const L=pyrMpDiffAllowed();
     const r=$("pyrMpGap");
@@ -89,6 +95,7 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=e;
     /* ---- 5. A VENDÉG: nincs kapu ---- */
     naplo({diffFront:25});                       /* a vendég saját naplója még az alapon */
     MP.role="guest";
+    _mpNfFok=null;   /* 🎓 1.0.11.20.00 — a házigazda átküldött fokozata nélkül (lásd fent) */
     pyrWantedGap=1.9;renderPyrMpAll();
     ki.vendeg={marad:pyrWantedGap,kapu:diffMpGateT()};
     MP.role="host";

@@ -88,11 +88,12 @@ const HOST=(want)=>{
   {const {p,errs}=await uj(b);
    const h=await p.evaluate(()=>{kaSet("mpMode","dyn");return null;});void h;
    const r=await p.evaluate(HOST);
-   ok(r.quick&&r.sel==="dyn"&&r.pyrWanted===false,"a másik irány: a tárolt Dinamikussal nyílik",r);
+   /* 🧭 1.0.11.15.00 — a dinamikus karrier nem választható: a tárolt Dinamikus is a Hagyományossal nyílik */
+   ok(r.quick&&r.sel==="pyr"&&r.pyrWanted===true,"a tárolt Dinamikus is a Hagyományossal nyílik (1.0.11.15.00)",r);
    await p.evaluate(()=>{$("qkGoBtn").click();});
    await p.waitForFunction(()=>!!window._pub,null,{timeout:15000}).catch(()=>{});
    const pub=await p.evaluate(()=>window._pub&&window._pub.settings&&window._pub.settings.pyr);
-   ok(pub&&pub.on===false,"…és a Dinamikust publikálja",pub);
+   ok(pub&&pub.on===true,"…és a Hagyományost publikálja (1.0.11.15.00)",pub);
    ok(!errs.length,"nincs oldalhiba (2)",errs.slice(0,3));
    await p.context().close();}
 
@@ -118,7 +119,7 @@ const HOST=(want)=>{
      o.jegyzet=!$("unlockSetupNote").classList.contains("hide");
      return o;},HOST.toString());
    ok(r.lepcso&&r.spZar,"előfeltétel: a kezdő lépcsőn az egyjátékos beállító zárolja a módválasztót",r);
-   ok(r.mp.sel==="dyn"&&!r.mpZar&&r.qkZar.every(x=>!x),"a PvP-szobában a lépcső zárai feloldódnak, mindkét gomb választható",r);
+   ok(r.mp.sel==="pyr"&&!r.mpZar,"a PvP-szobában a lépcső zára nem köt; a fajta a Hagyományos (a dinamikus 1.0.11.15.00 óta nem választható)",r);
    ok(r.utanPyr===true&&r.utanDyn===false,"a gyors panelen a váltás oda-vissza működik",[r.utanPyr,r.utanDyn]);
    ok(!r.jegyzet,"a lépcső jegyzete nem látszik a közös karrierben");
    ok(!errs.length,"nincs oldalhiba (5)",errs.slice(0,3));
@@ -136,7 +137,7 @@ const HOST=(want)=>{
      document.querySelector('#qkModeGrid button[data-qk="dyn"]').click();
      o.tar=kaGet("mpMode");
      return o;});
-   ok(r.sel==="dyn"&&r.pyrWanted===false,"a kezdőlap Dinamikus gombja dönt, nem a közös alapbeállítás",r);
+   ok(r.sel==="pyr"&&r.pyrWanted===true,"egyjátékosban mindig a Hagyományos (a dinamikus belépő is oda visz, 1.0.11.15.00)",r);
    ok(r.lbl==="A karrier fajtája","egyjátékosban a megszokott felirat",r.lbl);
    ok(r.tar==="pyr","az egyjátékos váltás nem írja felül a közös karrier alapbeállítását",r.tar);
    ok(!errs.length,"nincs oldalhiba (3)",errs.slice(0,3));

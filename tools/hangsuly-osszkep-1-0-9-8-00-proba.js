@@ -40,7 +40,7 @@ const KEP=process.env.KEP||"";
   const ctx=await b.newContext({viewport:{width:430,height:900}});
   const p=await ctx.newPage();
   const errs=[];p.on("pageerror",e=>errs.push(String(e)));
-  await p.addInitScript(()=>{window.HANG_TESZT=true;try{localStorage.setItem("scoutReal30_0","0");localStorage.setItem("meresFel30_0","0");}catch(e){}});
+  await p.addInitScript(()=>{window.HANG_TESZT=true;try{if(!localStorage.getItem("magyah_tudas_v1"))localStorage.setItem("magyah_tudas_v1","profi");}catch(e){}/* 🧭 1.0.11.16.00 — a teljes menü (Kezdő út nélkül) */try{localStorage.setItem("scoutReal30_0","0");localStorage.setItem("meresFel30_0","0");}catch(e){}});
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
   await p.waitForTimeout(1200);
   /* ---- egy valódi egyjátékos karrier, az 1. idény elején ---- */

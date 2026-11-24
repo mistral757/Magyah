@@ -28,6 +28,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   await new Promise(r=>srv.listen(PORT,"127.0.0.1",r));
   const b=await chromium.launch({args:["--no-sandbox"]});
   const p=await (await b.newContext({viewport:{width:430,height:900}})).newPage();
+  await p.addInitScript(()=>{try{if(!localStorage.getItem("magyah_tudas_v1"))localStorage.setItem("magyah_tudas_v1","profi");}catch(e){}/* 🧭 1.0.11.16.00 — a teljes menü (Kezdő út nélkül) */});
   const errs=[];p.on("pageerror",e=>errs.push(String(e)));
   p.on("console",m=>{if(m.type()==="error")errs.push(m.text());});
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});

@@ -53,7 +53,9 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const p=await (await b.newContext({viewport:{width:430,height:900}})).newPage();
   const errs=[];p.on("pageerror",e=>errs.push(String(e)));
   p.on("console",m=>{if(m.type()==="error"&&!/Failed to load resource|404|MIME/.test(m.text()))errs.push(m.text());});
-  await p.addInitScript(()=>{window.HANG_TESZT=true;});
+  /* 🧭 1.0.11.15.00 — a gyors indító lapszáma és ajánlása a „Mennyire ismered?"
+     választól függ; ez a próba a „Játszottam már" (3 lap, ajánlott 4.1) utat méri */
+  await p.addInitScript(()=>{window.HANG_TESZT=true;try{localStorage.setItem("magyah_tudas_v1","halado");}catch(e){}});
   await p.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:"load"});
   await p.waitForTimeout(1200);
 
@@ -167,8 +169,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r3.h11.sp==="lassu"&&r3.h11.hely.some(x=>/^speed:alvo→lassu/.test(x)),"a zárt Alvó mezőny helyett a legközelebbi nyitott (Lassan követnek)",r3.h11);
   ok(r3.h61.sk==="loose"&&r3.h61.ic==="teljes"&&r3.h61.sp==="lassu"&&r3.h61.t.akademia==="normal"&&r3.h61.n>=3,"a zárt elemek a legközelebbi nyitottra esnek (képesség, ikon, ellenfél, tempók)",r3.h61);
   ok(r3.helySor.length>=1&&/helyett/.test(r3.helySor[0]),"a sor kiírja a helyettesítést",r3.helySor);
-  ok(r3.lepcso.lista===10&&r3.lepcso.max===4&&r3.lepcso.nyitott.length===20&&r3.lepcso.nyitott.every(f=>+f.split(".")[0]<=4)&&/lépcső/.test(r3.lepcso.txt),
-     "a kezdő lépcsőn az 1–4. fokozat mind a 20 szintje választható, az 5.-től zárva",r3.lepcso);
+  /* 🧭 1.0.11.15.00 — KIMONDOTT KÉRÉS: „a nehézségi szintből bármit lehessen
+     választani" — a lépcsőn is mind a 10 fokozat (50 belső szint) nyitva */
+  ok(r3.lepcso.lista===10&&r3.lepcso.max===10&&r3.lepcso.nyitott.filter(f=>+f.split(".")[1]<=5).length===50&&/lépcső/.test(r3.lepcso.txt),
+     "a kezdő lépcsőn is mind a 10 fokozat (50 belső szint) választható (1.0.11.15.00)",r3.lepcso);
   ok(r3.lepcso.sajat&&r3.lepcso.field===null&&r3.lepcso.div===3,"a lépcsőn választott fokozatnál a lépcső csak az osztályt (D3) köti, a fix mezőnyt nem",r3.lepcso);
 
   console.log("\n— 4. a 2. és a 3. oldal —");
@@ -267,7 +271,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   const r8=await p.evaluate(()=>{
     const o={};
     gameMode="career";enterCareerSetupFromHome(false);
-    o.dyn={lista:document.querySelectorAll("#qkDiff .nfLvl").length,
+    o.dyn={pyr:pyrWanted,lista:document.querySelectorAll("#qkDiff .nfLvl").length,
       mezok:[...document.querySelectorAll("#qkDiff select[data-qka],#qkDiff select[data-qkaim],#qkDiff select[data-qktax]")].map(x=>x.dataset.qka||(x.dataset.qkaim?"aim":"tax:"+x.dataset.qktax))};
     /* közös karrier: a csomag a szoba rés-csúszkáját is állítja */
     MP.active=true;pyrWanted=true;pyrWantedDiv=5;
@@ -275,8 +279,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.mpVart=diffSnapT(nfRajtCel(nfDef(5).cel,5,null,nfCsomagHatasos(nfCsomag(5,1)).speed))/10;
     MP.active=false;
     return o;});
-  ok(r8.dyn.lista===0&&["dynLevel","aim","tempo","icons","skill","scoutReal"].every(k=>r8.dyn.mezok.includes(k))&&r8.dyn.mezok.filter(x=>/^tax:/.test(x)).length===4,
-     "dinamikus módban a fokozat nem él, az elemek egyenként",r8.dyn);
+  /* 🧭 1.0.11.15.00 — a dinamikus karrier nem választható: a „dinamikus" belépő
+     is a hagyományos karrier fokozat-választóját nyitja */
+  ok(r8.dyn.pyr===true&&r8.dyn.lista===10,
+     "a dinamikus belépő is a hagyományos karrier fokozat-választóját nyitja (1.0.11.15.00)",r8.dyn);
   ok(Math.abs(r8.mpGap-r8.mpVart)<1e-9,"közös karrierben a csomag a szoba rés-csúszkáját a rajt-célra teszi",r8);
 
   console.log("\n— 9. a fokozatok feloldása —");
@@ -314,12 +320,13 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.gomb6=document.querySelector('#qkDiff [data-fok="6.5"]').disabled;
     unlockGatesOn=()=>false;
     return o;});
-  ok(r9.uj.max===6&&!r9.uj.z6&&r9.uj.z7&&r9.uj.mind===false,"új játékosnak az első 6 fokozat nyitott",r9.uj);
-  ok(r9.kesobb===6,"aki a frissítés után éri el a 10-es profilt, annak nem nyílik minden",r9.kesobb);
-  ok(r9.nyer6===7&&r9.max6===7&&r9.masodszor===null,"a 6. fokozaton megnyert karrier a 7.-et nyitja (karrierenként egyszer)",r9);
-  ok(r9.nyer7===8&&r9.max7===8&&r9.naplo,"a 7.3-on megnyert karrier a következő NAGY fokozatot (8.) nyitja, és kimondja",r9);
-  ok(r9.regi.max===10&&!r9.regi.z10,"a frissítés előtt legalább 10-es profilú játékosnak minden nyitva",r9.regi);
-  ok(r9.gomb7===true&&r9.gomb6===false,"a beállítón a zárt fokozat szintjei tiltva",r9);
+  ok(r9.uj.max===10&&!r9.uj.z6&&!r9.uj.z7,"új játékosnak is mind a 10 fokozat nyitott (1.0.11.15.00)",r9.uj);
+  /* 🧭 1.0.11.15.00 — a fokozat-kapuk megszűntek (KIMONDOTT KÉRÉS: „a nehézségi
+     szintből bármit lehessen választani"): a napló bármely állapotában — új
+     játékos, frissítés utáni 10-es profil, 6. és 7. fokozaton nyert karrier,
+     régi profil — mind a 10 fokozat nyitva, a beállítón egyik sem tiltott. */
+  ok(r9.kesobb===10&&r9.max6===10&&r9.max7===10&&r9.regi.max===10&&!r9.regi.z10&&r9.gomb7===false&&r9.gomb6===false,
+     "a napló bármely állapotában mind a 10 fokozat nyitva, a beállítón egyik sem tiltott (1.0.11.15.00)",r9);
 
   console.log("\n— 10. a hivatalos szint és a kijelzés —");
   const r10=await p.evaluate(()=>{
