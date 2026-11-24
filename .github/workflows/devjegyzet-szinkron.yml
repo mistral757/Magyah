@@ -1,0 +1,63 @@
+# 🐞 A fejlesztői jegyzetek szinkronja a Firebase-ből a `dev-jegyzetek` ágra.
+# Részletek: tools/devjegyzet/lehuz.js és docs/dev-jegyzetek.md.
+# Titok: FIREBASE_SERVICE_ACCOUNT — ugyanaz, mint a mérési szinkroné.
+# Kézzel is indítható: Actions → „Fejlesztői jegyzetek szinkronja” → Run workflow.
+name: Fejlesztői jegyzetek szinkronja
+
+on:
+  schedule:
+    - cron: "41 */3 * * *"   # háromóránként
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: devjegyzet-szinkron
+  cancel-in-progress: false
+
+jobs:
+  szinkron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: A szkript (az alapértelmezett ágról)
+        uses: actions/checkout@v4
+        with:
+          path: kod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Lehúzás
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Hiányzik a FIREBASE_SERVICE_ACCOUNT titok (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          node kod/tools/devjegyzet/lehuz.js --ki "$RUNNER_TEMP/devjegyzet"
+
+      - name: A dev-jegyzetek ág
+        run: |
+          git clone --quiet "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" adat
+          cd adat
+          git config user.name "devjegyzet-szinkron[bot]"
+          git config user.email "devjegyzet-szinkron@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin dev-jegyzetek >/dev/null; then
+            git checkout --quiet dev-jegyzetek
+          else
+            git checkout --quiet --orphan dev-jegyzetek
+            git rm -rq --cached . || true
+            find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          fi
+          mkdir -p devjegyzet
+          cp "$RUNNER_TEMP"/devjegyzet/* devjegyzet/
+          git add devjegyzet
+          if git diff --cached --quiet; then
+            echo "Nincs új jegyzet."
+          else
+            git commit --quiet -m "Fejlesztői jegyzetek: $(date -u +%Y-%m-%dT%H:%M) — $(sed -n 's/^\([0-9]*\) jegyzet.*/\1/p' devjegyzet/JEGYZETEK.md | head -1) jegyzet"
+            git push --quiet origin dev-jegyzetek
+          fi
