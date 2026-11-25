@@ -81,5 +81,18 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   ok(t.bennt,"4. a buborék a képernyőn belül marad",t);
   ok(!t.kisfiu,"4. a pixel téma 8 bites kisfiúja ilyenkor nem jön");
   ok(t.eltunt&&t.ki,"4. érintésre azonnal eltűnik; a jelenet-kapcsoló kikapcsolja",t);
+  /* 🧍 1.0.12.8.01 — hamarabb, és a meccsképernyőn is (ha nem fut a meccs) */
+  const m=await p.evaluate(async()=>{const o={ms:OE_IDLE_MS};
+    $("scHub").classList.add("hide");$("scSim").classList.remove("hide");
+    S.playing=false;o.szunet=oeLehet();
+    S.playing=true;o.fut=oeLehet();S.playing=false;
+    const _f=_evaFut;_evaFut={};o.jelenet=oeLehet();_evaFut=_f;
+    /* a valódi indítás a meccsképernyőn */
+    await new Promise(r=>setTimeout(r,500));   /* a képernyőváltás görgetése (oeReset) előbb lecseng */
+    const R=Math.random;Math.random=()=>0.5;const tok=++_oeTok;oeJelenet(tok).catch(()=>{});setTimeout(()=>{Math.random=R;},40);
+    await new Promise(r=>setTimeout(r,3500));o.el=!!$("oeIdle");o.kep=$("oeIdle")?$("oeIdle").querySelectorAll("image").length:0;
+    _oeTok++;oeTorol();$("scSim").classList.add("hide");$("scHub").classList.remove("hide");return o;});
+  ok(m.ms<=8000,"5. a tétlen jelenet hamarabb jön (8 mp)",m.ms);
+  ok(m.szunet&&!m.fut&&!m.jelenet&&m.el&&m.kep>=1,"5. a meccsképernyőn is fut, ha nincs folyamatban a meccs (futó meccs és jelenet alatt nem)",m);
   ok(errs.length===0,"nincs oldalhiba",errs);
   await b.close();srv.close();process.exit(hiba?1:0);})().catch(e=>{console.log("HIBA",e);process.exit(1);});
