@@ -1,7 +1,63 @@
 # 🐞 Fejlesztői jegyzetek
 
-26 jegyzet · a legújabb elöl.
+31 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmww64v98jvrm — Felület: nem látszik / nem működik egy gomb, rossz helyen van · normál
+
+- **Mikor:** 2026-11-25T13:37:47.324Z · v1.0.12.8.00
+- **Hol:** Pálya + Kupa
+- **Állapot:** 6. idény, 30. forduló
+- **Nézet:** 375×794 · téma: reflektor · képernyők: scPitch, scEuro
+
+> Kupa hub meccs előtti mezek nézetében a saját csapat meze nem az, ami az arculatban el van készítve, be van állítva, hanen valami leegyszerűsített cucc
+
+---
+
+## jmww62xmvfycx — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-25T13:36:17.095Z · v1.0.12.8.00
+- **Hol:** Pálya + Meccs
+- **Állapot:** 6. idény, 30. forduló
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> A csapatstílus góloknál legyenek ott az új animációs jeleneteknél is azok az infók, amik a régieken voltak. Találjunk nekik helyet. És az egyensúly csapatstílus gól legyen tényleg libikókázós, aminek a vége az az, hogy valaki lepattan a libikókáról, a másik vége a földre esik, ő pedig gólt lő.
+
+---
+
+## jmww60sd257tr — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-25T13:34:36.950Z · v1.0.12.8.00
+- **Hol:** Pálya + Meccs
+- **Állapot:** 6. idény, 30. forduló
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Letámadás jelenet, amikor nincs gól: ne a kapu előtt legyen a jelenet, hanem valahol a védekező fél felénél, 16oson kívül. 
+> Sortűz jelenetnél nem lövések vannak jelenleg. Ezt javítsuk. Lövés, lepattan, lövés, lepattan, lövés, kivédi a kapus, lövés, gól.
+
+---
+
+## jmww5wqotet2u — Egyéb hiba · 🔥 sürgős
+
+- **Mikor:** 2026-11-25T13:31:28.157Z · v1.0.12.8.00
+- **Hol:** Pálya + HUB
+- **Állapot:** 6. idény, 30. forduló
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Run szint mérése elcsúszott. Még a régi módon mér: a kezdő osztalyodbol mennyi időn belül lehet elérni a d1-et. És ott győzni. Már nem ez a Run szint rögzítés féltele, hanem hogy 2 osztállyal climbolj feljebb és ott nyerj. Azaz azt is kell referenciának venni. A régi számítást tehát ezzel kell átírni, hogy nem a d1 elérésének idejéhez mérünk, hanem a kezdő osztály -2 elérésének idejéhez.
+
+---
+
+## jmww5qrkf8zdv — Egyéb hiba · normál
+
+- **Mikor:** 2026-11-25T13:26:49.359Z · v1.0.12.8.00
+- **Hol:** HUB
+- **Állapot:** 6. idény, 26. forduló
+- **Nézet:** 375×794 · téma: reflektor · képernyők: scHub
+
+> Brave böngészőből telepített telefonos verzioban, ha megnyitok egy másik ablakot és visszajövök ide, vagy lehúzom az értesítés panelt a telefonon és vissza, akkor van hogy megszűnik a teljes képernyő, és fent lesz egy sáv, ami az értesítési panel sávja, de csak simán fehér. Ezt valahogy jó lenne ha érzékelné a játék, vagy lenne rá egy gomb, és vissza tudna váltani teljes képernyőre anélkül, hogy a főmenübe kellene lépni (mert abban az esetben egyébként automatikusan újra teljes kijelzős lesz mindig)
 
 ---
 
