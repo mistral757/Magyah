@@ -1,7 +1,29 @@
 # 🐞 Fejlesztői jegyzetek
 
-31 jegyzet · a legújabb elöl.
+33 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmww8z554g4aw — Nehézség / egyensúly: túl könnyű vagy túl nehéz · normál
+
+- **Mikor:** 2026-11-25T14:57:19.048Z · v1.0.12.10.00
+- **Hol:** Pálya + HUB
+- **Állapot:** 6. idény, 30. forduló
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> 9.5 nehézségen átigazolási eseményben pörgettem egy legendás igazolást. Az elméletileg a 9.5 leírása szerint lehetetlen mert itt 0%ra van állítva ennek az esélye ..
+
+---
+
+## jmww86laydqkd — Új animáció / jelenet / ünneplés · normál
+
+- **Mikor:** 2026-11-25T14:35:06.970Z · v1.0.12.10.00
+- **Hol:** Pálya + Kupa
+- **Állapot:** 6. idény, 30. forduló
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scEuro
+
+> Nem volt ünneplés a BL döntő győzelem után. Ez nagyon szomi. Minden kupa végén legyen. És utána legyen a konfettis screen. És csak utána minden szokásos meccs utáni értesítés skillekkel, meccsettekeléssel stb
 
 ---
 
