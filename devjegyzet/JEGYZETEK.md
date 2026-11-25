@@ -1,7 +1,88 @@
 # 🐞 Fejlesztői jegyzetek
 
-19 jegyzet · a legújabb elöl.
+26 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmww2se9aggzv — Egyéb hiba · 🔥 sürgős
+
+- **Mikor:** 2026-11-25T12:04:06.574Z · v1.0.12.8.00
+- **Hol:** Pálya + HUB › ☰ Menü › ⚡ Az Alkimista
+- **Állapot:** 1. idény, 30. forduló
+- **Nézet:** 1280×720 · téma: reflektor · képernyők: scPitch, scHub · ablakok: talModal („⚡ Az Alkimista”)
+
+> Talizmánösszeolvasztás:
+> Volt egy legendás talizmánom, ami az összes boost árát csökkentette x %-kal. És kaptam egy másik legendás boost talizmánt, ami csak a POT boost árát csökkentette volna külön asszem 20%-kal. Felajánlotta a merge-t. Elfodadtam. A POT-boost kedvezmény rész elveszett. A talizmánom az eredeti minden boostot olcsóbbá tevő részt tartotta meg csak a leírása szerint. NAGY HIBA! Mindkettő alaphatás is meg kell maradjon külön-külön, és a special hatások is. A merge lényege, hogy mindezek megmaradnak és még erősödnek is pluszban.
+
+---
+
+## jmww2opzrhlmr — Egyéb hiba · normál
+
+- **Mikor:** 2026-11-25T12:01:15.159Z · v1.0.12.8.00
+- **Hol:** Pálya + HUB › ☰ Menü
+- **Állapot:** 1. idény, 30. forduló
+- **Nézet:** 1280×720 · téma: reflektor · képernyők: scPitch, scHub
+
+> Vegyük ki ezt a MK + KK indulunk gombot a mebüből. Nagyon béna is és nincs is értelme ezt külön eldönteni. Csak a nyári kupánál lehet releváns, de ott meg fel is dobjuk neki a kérdést.
+
+---
+
+## jmww2kr7q4iob — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-25T11:58:10.119Z · v1.0.12.8.00
+- **Hol:** Pálya + HUB › ☰ Menü
+- **Állapot:** 1. idény, 30. forduló
+- **Nézet:** 1280×720 · téma: reflektor · képernyők: scPitch, scHub
+
+> Csapatstílus választás után csak megmutatja, mi micsoda, és otthagy. Nincsen egy végigvezetés azon, hogy beállítod az új csapatszerepeket, nincsen egy rész, hogy memgutassa, hogyan gyűjtöd majd a sajátos pontokat, mire költheted majd (amikor később ténylegesen összegyűlik valami elkölthető, akkor külön kéne rá egy tanítás), és nem mutatott meg egy képességet, amit pl érdemes lehet feloldani. 
+> Aztán ez a lecke lezárult, feljött az utolsó 3. Abból az elsőt, az erőmérleget megcsináltam és vége. Eltűnt a kis lecke sávom. 
+> Pedig még el se kezdtük a kupát, nem volt szezonzárás, stb. Csomó dolgot kell majd még tanítani.
+
+---
+
+## jmww2fclmac9b — Felület: nem látszik / nem működik egy gomb, rossz helyen van · normál
+
+- **Mikor:** 2026-11-25T11:53:57.898Z · v1.0.12.8.00
+- **Hol:** Pálya + HUB › ☰ Menü
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: filozofia
+- **Nézet:** 1280×720 · téma: reflektor · képernyők: scPitch, scHub
+
+> A Sztárom a páromnál amikor kiválasztom, ki legyen a sztár, azután a felületen egy csomót kell görgetni lentre, hogy elfogadd véglegesen. Legyen az, hogy rányomsz, hogy legyen ő a sztár, kér egy megerősítést egy figyelmeztető ablakban, és ott megerősíted és go.
+
+---
+
+## jmww2cbx128tj — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-25T11:51:37.045Z · v1.0.12.8.00
+- **Hol:** Pálya + HUB › ☰ Menü › 👆 🎯 Csapatstílusdönts!válaszd ki a klub f
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: filozofia · lecke: hol_valaszt 2. lépés
+- **Nézet:** 1280×720 · téma: reflektor · képernyők: scPitch, scHub · ablakok:  („👆 🎯 Csapatstílusdönts!válaszd ki a klub f”)
+
+> A klubfilozófia tanítás nem indult el azonnal liga végén, mert a run szintemet keztde magyarázni a játék. Aztán elindítottam én manuálisan, és nem lehetett rajta végigmenni.
+
+---
+
+## jmww27ib4jnn1 — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-25T11:47:52.048Z · v1.0.12.8.00
+- **Hol:** Meccs
+- **Állapot:** 1. idény, 28. forduló · Kezdő út: filozofia
+- **Nézet:** 1280×720 · téma: reflektor · képernyők: scSim
+
+> Sárgalapos figyelmeztetés animációjánál a bírónak nem a saját keze emeli a lapot, hanem egy külön kis fekete vonalka. Orvosoljuk, nagyon vicces, de gagyi.
+> Ja és a kapu-háló is lehetne kicsi szebben animálva minden jelenetben.
+
+---
+
+## jmww25gtm70ib — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-25T11:46:16.810Z · v1.0.12.8.00
+- **Hol:** Meccs
+- **Állapot:** 1. idény, 28. forduló · Kezdő út: filozofia
+- **Nézet:** 2560×1440 · téma: reflektor · képernyők: scSim
+
+> PC-n nyugodtan lehetnének szélesvásznú(bb) jelenetek. Meg fekvő módban is. Így kicsit furi, hogy a képernyő közepén van egy kis jelenetke.
 
 ---
 
