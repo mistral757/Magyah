@@ -212,7 +212,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     return ki;});
   console.log("\n— 4. AZ ÁRAK —");
   ok(Math.abs(a.uArany-0.8)<0.02,"a csomag-kedvezmény (20%) az egység árát — vele mind a nyolc fajtát — 20%-kal viszi le",a.uArany);
-  ok(Math.abs(a.bond-0.8)<0.03&&a.tobbi,"a fajta-kedvezmény csak a saját fajtáját vágja (a többi ára bitre ugyanaz)",{bond:a.bond,tobbi:a.tobbi});
+  ok(Math.abs(a.bond-0.8)<0.05&&a.tobbi,"a fajta-kedvezmény csak a saját fajtáját vágja (a többi ára bitre ugyanaz; az ár 100-ra kerekít — 1.0.12.9.00)",{bond:a.bond,tobbi:a.tobbi});
   ok(Math.abs(a.eq-0.8)<0.03&&a.eqIngyen===0,"az egyenlítő is követi; zsetonnál továbbra is 0",{eq:a.eq,ingyen:a.eqIngyen});
 
   /* ---- 5. A KIHÍVÁS-ESÉLY ---- */

@@ -74,12 +74,30 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     o.bennt=el?(()=>{const r=el.querySelector(".oeBub.on");if(!r)return false;const b=r.getBoundingClientRect();return b.left>=0&&b.right<=innerWidth&&b.top>=0;})():false;
     /* a pixel téma kisfiúja nem jön, amíg mi futunk */
     const _p=pxLifeOn;window.pxLifeOn=()=>true;_pxIdleOn=true;pxRunPass();o.kisfiu=!!document.querySelector(".pxRunner");window.pxLifeOn=_p;_pxIdleOn=false;clearTimeout(_pxRunT);
-    document.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));await w(500);o.eltunt=!$("oeIdle");o.hiba=hiba;
-    jsavAllit(false);o.ki=!oeLehet();jsavAllit(true);
+    /* 1.0.12.9.01: a felület máshol való érintése NEM tünteti el — csak a jelenetre koppintás */
+    document.body.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));window.dispatchEvent(new Event("scroll"));await w(400);o.marad=!!$("oeIdle");
+    const fg=$("oeIdle")&&$("oeIdle").querySelector("[data-mely]");if(fg)fg.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));
+    await w(500);o.eltunt=!$("oeIdle");o.hiba=hiba;
+    oeAllit(false);o.ki=!oeLehet();oeAllit(true);o.jsavFuggetlen=(jsavAllit(false),oeLehet());jsavAllit(true);
     return o;});
   ok(t.lehet&&t.el&&t.kep>=1&&t.nev,"4. tétlenség: a HUB-on a saját játékosunk kivágott figurával, a buborékban a neve",t);
   ok(t.bennt,"4. a buborék a képernyőn belül marad",t);
   ok(!t.kisfiu,"4. a pixel téma 8 bites kisfiúja ilyenkor nem jön");
-  ok(t.eltunt&&t.ki,"4. érintésre azonnal eltűnik; a jelenet-kapcsoló kikapcsolja",t);
+  ok(t.marad&&t.eltunt&&t.ki&&t.jsavFuggetlen,"4. (1.0.12.9.01) a felület máshol érintve marad; a figurára koppintva eltűnik; saját kapcsoló (A klub arculata), a felső sávtól független",t);
+  /* 🧍 1.0.12.8.01 — hamarabb, és a meccsképernyőn is (ha nem fut a meccs) */
+  const m=await p.evaluate(async()=>{const o={ms:OE_IDLE_MS,gap:OE_GAP_MS};
+    /* 1.0.12.9.01: bármelyik képernyőn (pl. egy nyitott ablak mögött is), ha nem fut meccs */
+    $("scWindow").classList.remove("hide");o.ablak=oeLehet();$("scWindow").classList.add("hide");
+    $("scHub").classList.add("hide");$("scSim").classList.remove("hide");
+    S.playing=false;o.szunet=oeLehet();
+    S.playing=true;o.fut=oeLehet();S.playing=false;
+    const _f=_evaFut;_evaFut={};o.jelenet=oeLehet();_evaFut=_f;
+    /* a valódi indítás a meccsképernyőn */
+    await new Promise(r=>setTimeout(r,500));   /* a képernyőváltás görgetése (oeReset) előbb lecseng */
+    const R=Math.random;Math.random=()=>0.5;const tok=++_oeTok;oeJelenet(tok).catch(()=>{});setTimeout(()=>{Math.random=R;},40);
+    await new Promise(r=>setTimeout(r,3500));o.el=!!$("oeIdle");o.kep=$("oeIdle")?$("oeIdle").querySelectorAll("image").length:0;
+    _oeTok++;oeTorol();$("scSim").classList.add("hide");$("scHub").classList.remove("hide");return o;});
+  ok(m.ms===10000&&m.gap===7000&&m.ablak,"5. (1.0.12.9.01) 10 mp után bármelyik felületen, a jelenetek közt 7 mp",m);
+  ok(m.szunet&&!m.fut&&!m.jelenet&&m.el&&m.kep>=1,"5. a meccsképernyőn is fut, ha nincs folyamatban a meccs (futó meccs és jelenet alatt nem)",m);
   ok(errs.length===0,"nincs oldalhiba",errs);
   await b.close();srv.close();process.exit(hiba?1:0);})().catch(e=>{console.log("HIBA",e);process.exit(1);});

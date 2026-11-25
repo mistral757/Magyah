@@ -79,3 +79,21 @@ A képernyő alján a mi játékosaink jelennek meg, kivágott meccsfigurával.
   - nincs oldalhiba.
 - **Igazítva:** `jelenetsav-1-0-12-4-00` (a figura `<image>` is számít).
 - **Lefutott:** `pixel-elet-3-9-204`, `tolto-1-0-7-4-00` és `csere-tolto-1-0-9-0-02` is.
+
+## 1.0.12.8.01: hamarabb, és a meccsképernyőn is
+**KIMONDOTT KÉRÉS:**
+> „Az idle prompt kapcsoljon be hamarabb és ne csak a HUBban, hanem a meccs felületen is (amikor épp nincs
+> folyamatban a meccs természetesen)"
+
+**Időzítés:** a tétlen jelenet 20 helyett 8 mp után indul, két jelenet között 10 mp a szünet.
+
+**Hol fut:**
+- a HUB-on;
+- a meccsképernyőn is, ha mind igaz:
+  - nem fut a mérkőzés (`S.playing`);
+  - nem pereg jelenet (`_evaFut`);
+  - nincs elöl jutalom-, ablak- vagy feloldás-lap.
+
+A meccs előtt és a lefújás után tehát jönnek a játékosok, közben nem.
+
+**Próba:** a `figura-jelenet` próba 5. pontja.
