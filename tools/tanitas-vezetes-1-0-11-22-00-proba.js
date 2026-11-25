@@ -78,7 +78,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     const TILT=["gyoz","nulla","zsinor2","veretlen3","ketgol"],TILTA=["felsofel","felsofel25"];
     const eredmeny=[];const zart=[];
     const nyitva=new Set(Object.keys(KUT_FUNKCIO).filter(f=>!KUT_FUNKCIO[f].el||false));
-    const elotte=new Set();   /* a szakasz kezdetén már nyitott funkciók */
+    const elotte=new Set(Object.keys((kutUj()||{nyit:{}}).nyit));   /* a szakasz kezdetén már nyitott funkciók (1.0.12.5.00: a Menedzsment az elejétől) */
     const funkcioElem={};Object.keys(KUT_FUNKCIO).forEach(f=>KUT_FUNKCIO[f].el.forEach(id=>funkcioElem[id]=f));
     KUT_SZAKASZ.forEach(sz=>{
       sz.fel.forEach(f=>{

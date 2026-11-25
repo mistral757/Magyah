@@ -64,6 +64,9 @@ const kozel=(a,b,e)=>Math.abs(a-b)<(e||1e-6);
     window.saveGame=()=>{};
     /* a lassítások zárját feloldjuk — itt a csatornákat mérjük, nem a kaput */
     Object.keys(GAME_TEMPO).forEach(k=>{try{unlockGift("tempo",k);}catch(e){}});
+    /* 1.0.12.6.00 — a fokozat-csomag elemei nyitva: az ajánlott 4.1 a „Gyors" tempót írja elő; a
+       csatornákat a „Normál" alapról mérjük */
+    TEMPO_AX_IDS.forEach(a=>setTempoAx(a,null));setGameTempo("normal");
     renderTempoGrid();});
 
   console.log("\n— 1. alapból a fő tempó —");

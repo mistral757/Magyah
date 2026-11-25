@@ -166,9 +166,10 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     o.lepcso.sajat=nfLepcsoSajat();o.lepcso.field=(unlockLadderDiv()||{}).field;o.lepcso.div=(unlockLadderDiv()||{}).div;
     u.d1=3;unlockGatesOn=()=>false;
     return o;});
-  ok(r3.h11.sp==="lassu"&&r3.h11.hely.some(x=>/^speed:alvo→lassu/.test(x)),"a zárt Alvó mezőny helyett a legközelebbi nyitott (Lassan követnek)",r3.h11);
-  ok(r3.h61.sk==="loose"&&r3.h61.ic==="teljes"&&r3.h61.sp==="lassu"&&r3.h61.t.akademia==="normal"&&r3.h61.n>=3,"a zárt elemek a legközelebbi nyitottra esnek (képesség, ikon, ellenfél, tempók)",r3.h61);
-  ok(r3.helySor.length>=1&&/helyett/.test(r3.helySor[0]),"a sor kiírja a helyettesítést",r3.helySor);
+  /* 🎚 1.0.12.6.00 — „Minden nyitva eleve": a csomag elemei nem zártak, nincs helyettesítés */
+  ok(r3.h11.sp==="alvo"&&r3.h11.hely.length===0,"1.1: az Alvó mezőny nyitva, nincs helyettesítés (1.0.12.6.00)",r3.h11);
+  ok(r3.h61.sk==="real"&&r3.h61.ic==="ritka"&&r3.h61.sp==="tarto"&&r3.h61.n===0,"6.1: a csomag minden eleme változatlanul fut (1.0.12.6.00)",r3.h61);
+  ok(r3.helySor.length===0,"nincs „még zárt, helyette” sor",r3.helySor);
   /* 🧭 1.0.11.15.00 — KIMONDOTT KÉRÉS: „a nehézségi szintből bármit lehessen
      választani" — a lépcsőn is mind a 10 fokozat (50 belső szint) nyitva */
   ok(r3.lepcso.lista===10&&r3.lepcso.max===10&&r3.lepcso.nyitott.filter(f=>+f.split(".")[1]<=5).length===50&&/lépcső/.test(r3.lepcso.txt),
