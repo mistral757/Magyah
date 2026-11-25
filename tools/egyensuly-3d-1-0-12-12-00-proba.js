@@ -1,5 +1,6 @@
 /* ⚖️ 1.0.12.12.00 — AZ EGYENSÚLY-GÓL 3D-BEN (libikóka a stadionban)
    KIMONDOTT KÉRÉS: „Az egyensúly gólt nem tudnád megcsinálni 3d új animációval? Olyan gagyi így a régivel. Nagyon kilóg"
+   — és (1.0.12.12.01): „De legyen benne ez a libikókázás"
    Amit mér:
      1. a skEgyens saját 3D forgatókönyvet kap („egyensuly"): libikóka, öt csapattárs (saját figurával, nem a
         befejező klónjai), a kimenetel fejes gól;
@@ -56,11 +57,12 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     const szog=F.libiko&&F.libiko.sz.map(x=>x[1]);
     const zVeg=k=>kamUt(F.sz[k].ut,.8)[4];
     const K=kamKimenetel(kamForgatokonyv(c,ev,"skEgyens"),c,ev,"skEgyens");
-    return {arch:F.arch,e:e.length,klon,szogMax:Math.max(...szog.slice(0,8).map(Math.abs)),nyug:kamUt(F.libiko.sz,.55)[1],
+    return {arch:F.arch,e:e.length,klon,szogMax:Math.max(...szog.slice(0,8).map(Math.abs)),nyug:kamUt(F.libiko.sz,.66)[1],teli:F.libiko.sz.filter(x=>x[0]<.45&&Math.abs(Math.abs(x[1])-Math.asin(F.libiko.h0/F.libiko.L)*180/Math.PI)<.01).length,
+      hup:(()=>{const u=F.sz.e0.ut;return u.some((k,i)=>i&&k[4]>u[i-1][4]+.3&&kamUt(F.libiko.sz,k[0])[1]<0);})(),
       csap:kamUt(F.libiko.sz,.9)[1],e0fel:zVeg("e0"),e4fel:zVeg("e4"),labdaMax:Math.max(...F.labda.map(l=>l[3])),
       kim:K.kim,halo:!!K.halo,libiK:!!K.libiko,info:(c._info||[]).length};},EV);
   ok(r1.arch==="egyensuly"&&r1.e===5&&r1.klon===0,"1. saját forgatókönyv, öt csapattárs a palló-n (nem a befejező klónjai)",r1);
-  ok(r1.szogMax>4&&Math.abs(r1.nyug)<.01&&r1.csap>4&&r1.e0fel<.4&&r1.e4fel>1.5&&r1.labdaMax>3,"2. kileng, megnyugszik; a lecsapódáskor a túlsó vég a földön, a kapu felőli fent, a labda felpattan",r1);
+  ok(r1.szogMax>4&&Math.abs(r1.nyug)<.01&&r1.csap>4&&r1.e0fel<.6&&r1.teli>=6&&r1.hup&&r1.e4fel>1.5&&r1.labdaMax>3,"2. libikókázik (hat teljes, földig érő lengés, elrugaszkodással), megnyugszik; a lecsapódáskor a túlsó vég a földön, a kapu felőli fent, a labda felpattan",r1);
   ok(r1.kim==="gol"&&r1.halo&&r1.libiK,"2b. a kimenetel gól (a háló megmozdul), a libikóka a teljes jelenetben is ott van",r1);
   /* 3. Új mód: csak a 3D */
   const r3=await p.evaluate(async([EV,KEP])=>{kamModAllit("uj");const ev=eval(EV);
@@ -78,7 +80,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   ok(r3.n>10&&(r3.ki+r3.kicsi)/r3.n<=.05,"4. a fő szereplő a képen, nem pötty",r3);
   if(process.env.KEP){
     await p.evaluate(EV=>{kamModAllit("uj");evaKer(Object.assign({sor:"x"},eval(EV)));},EV);
-    for(const t of [700,1500,2300,3000,3500,3900,4400,5000,5600]){await p.waitForTimeout(t-(t>700?[700,1500,2300,3000,3500,3900,4400,5000,5600][[700,1500,2300,3000,3500,3900,4400,5000,5600].indexOf(t)-1]:0));
+    const TT=[900,1500,2100,2700,3300,4500,5600,6300,7100,8000];for(const t of TT){await p.waitForTimeout(t-(TT.indexOf(t)?TT[TT.indexOf(t)-1]:0));
       await p.screenshot({path:`${KEPDIR}/e-${t}.png`});}}
   ok(errs.length===0,"5. nincs oldalhiba",errs.slice(0,3));
   await b.close();srv.close();

@@ -38,3 +38,15 @@ Saját 3D forgatókönyv (`KAM_FORGATO.egyensuly`), a stadionban:
 - hogy nincs oldalhiba.
 
 A `felvezetok-1-0-11-13-00` próba archetípus-listájába bekerült az `egyensuly`.
+
+## 1.0.12.12.01 — több libikókázás
+**KIMONDOTT KÉRÉS:**
+> „De legyen benne ez a libikókázás"
+
+**A felvezetés most valódi libikókázás:**
+- a két vég felváltva földig ér, hat teljes lengéssel;
+- a billenés nagyobb, ±12,5°, a végek kb. 2,6 m-t járnak;
+- minden földet érésnél tompa puffanás szól, és a lent lévők elrugaszkodnak (felhuppannak);
+- csak ezután csillapodik, áll meg egyensúlyban, és jön a leugrás, a lecsapódás és a fejes.
+
+A felvezetés 3,4 helyett 5,6 mp. A próba a hat teljes lengést és az elrugaszkodást is méri.
