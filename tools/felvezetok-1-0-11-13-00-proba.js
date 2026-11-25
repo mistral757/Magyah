@@ -77,7 +77,8 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
       le:[le.arch,elso(le)],pg:[pg.arch,elso(pg)],cs:[cs.arch,+csP[1].toFixed(1),+Math.abs(csP[2]).toFixed(1)],fe:fe.arch,
       ko:[ko.arch,ko.labda[0][1]],lap:[lap.arch,!!lap.sz.biro,!!(lap.sz.biro&&lap.sz.biro.fig)],szr:[szr.arch,["v1","v2","v3","v4"].filter(k=>szr.sz[k]).length]};});
   ok(r1.n>=45&&!r1.hiany.length,"1. minden jelenet-sablonnak van illő, létező felvezetése",{sablon:r1.n,hiany:r1.hiany});
-  ok(r1.le[0]==="letamadas"&&/^v/.test(r1.le[1])&&r1.pg[0]==="letamadas"&&/^v/.test(r1.pg[1]),"2a. letámadás(-gól): a labda az ELLENFÉL védőjénél kezd",{le:r1.le,pg:r1.pg});
+  /* 1.0.12.10.00: a gól nélküli letámadás saját felvezetése a 16-oson kívül (letamadasKozep) */
+  ok(r1.le[0]==="letamadasKozep"&&/^v/.test(r1.le[1])&&r1.pg[0]==="letamadas"&&/^v/.test(r1.pg[1]),"2a. letámadás(-gól): a labda az ELLENFÉL védőjénél kezd",{le:r1.le,pg:r1.pg});
   ok(r1.cs[0]==="beadasSarok"&&r1.cs[1]>50&&r1.cs[2]>30&&r1.fe==="beadas","2b. csukafejes: beadás a szögletzászlótól; fejes gól: beadás",{cs:r1.cs,fe:r1.fe});
   ok(r1.ko[0]==="kontra"&&r1.ko[1]<0,"2c. kontra: a labda a saját térfelünkön kezd",r1.ko);
   ok(r1.lap[0]==="szabalytalan"&&r1.lap[2]&&r1.szr[0]==="szabad"&&r1.szr[1]===4,"2d. lap: becsúszás + játékvezető (saját figura); szabadrúgás: 4 fős sorfal",{lap:r1.lap,szr:r1.szr});
@@ -87,7 +88,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     const archs=Object.keys(KAM_FORGATO);evaIdoSzorzo=.5;window.__kamMer=[];
     const el=evaElem();el.classList.remove("hide");const cv=el.querySelector(".evaKamVaszon");cv.classList.remove("hide");el.querySelector(".evaSzinpad").style.visibility="hidden";
     const sk0={passz:"kapufa",csel:"skElastico",beadas:"skBeadas",beadasSarok:"skCsuka",tizi:"tizenegyes",szabad:"szabadrugas",egyedul:"bravur",kiugratas:"skSebesz",
-      tavoli:"skAgyu",sortuz:"skSortuz",tank:"skTank",phalanx:"skPhalanx",szaguld:"skSzaguld",tiki:"skTiki",egyketto:"skKemia",letamadas:"letamadas",kontra:"skKontra",
+      tavoli:"skAgyu",sortuz:"skSortuz",tank:"skTank",phalanx:"skPhalanx",szaguld:"skSzaguld",tiki:"skTiki",egyketto:"skKemia",letamadas:"evPresGol",letamadasKozep:"letamadas",kontra:"skKontra",
       nagylabda:"skNagylabda",katapult:"skKatapult",vagta:"skBolt",szoglet:"szoglet",bedobas:"bedobas",busz:"evBusz",csere:"evCsere",szabalytalan:"lap",
       utkozes:"serules",var:"var",kidolgozas:"kidolgozas",vedekezes:"blokk"};
     const nincs=archs.filter(a=>!sk0[a]);
