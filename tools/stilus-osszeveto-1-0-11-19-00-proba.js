@@ -12,7 +12,7 @@
      4. a választó megnyitásakor (szezonjelentés) a stílus leckéje magától
         indul — a menedzsment-ablakot megvárja —, a 2. lépés a listát emeli ki;
      5. a választás után: a feladat kipipálva, a „Stíluspont és képességfa"
-        lecke indul, mindhárom kiemelése a valódi szakaszra mutat;
+        lecke indul, mind a négy kiemelése (1.0.12.9.00: + a szezon-szerepek) a valódi szakaszra mutat;
      6. a képességfa megnyitása a 2. feladat — a szakasz 2/3-mal lezárul;
      7. Kezdő út nélkül nincs lecke, a három sor viszont ott van;
      8. nincs oldalhiba. */
@@ -110,15 +110,15 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     const o={ok:chooseStyle("beton").ok};renderStylePanel();await varj(1600);
     o.pipa=!!S.kut.kesz["filozofia:valaszt"];o.lecke=_kutL&&_kutL.id;
     const lep=[];
-    for(let i=0;i<3;i++){
+    for(let i=0;i<4;i++){   /* 1.0.12.9.00: + a szezon-szerepek lépése */
       lep.push({c:(document.querySelector("#kutLecke .kutLCim")||{}).textContent,dim:!document.getElementById("kutLDim").classList.contains("hide"),nincs:!!document.querySelector("#kutLecke .kutLNincs")});
       document.querySelector('#kutLecke [data-kl="tovabb"]').click();await varj(900);}
     o.lep=lep;o.utolso=(document.querySelector("#kutLecke .kutLCim")||{}).textContent;kutLeckeZar();
     const sz0=S.kut.sz;
     const tb=document.querySelector('#hubStyleBody [data-stylesec="trait"]');if(tb&&!tb.classList.contains("open"))tb.click();
     o.fa=!!S.kut.kesz["filozofia:fa"];o.lezart=S.kut.sz===sz0+1&&KUT_SZAKASZ[S.kut.sz].id==="hosszu";return o;});
-  ok(r5.ok&&r5.pipa&&r5.lecke==="filozofia"&&r5.lep.every(x=>x.dim&&!x.nincs)&&/csapatstílus-pont/.test(r5.lep[0].c)&&/képességfa/.test(r5.lep[1].c)&&/mérföldkövek/.test(r5.lep[2].c)&&/Takarékosan/.test(r5.utolso),
-    "5. a választás után a feladat kipipálva, és indul a „Stíluspont és képességfa” lecke: mindhárom kiemelés a valódi szakaszra mutat",r5);
+  ok(r5.ok&&r5.pipa&&r5.lecke==="filozofia"&&r5.lep.every(x=>x.dim&&!x.nincs)&&/csapatstílus-pont/.test(r5.lep[0].c)&&/szezon-szerepek/.test(r5.lep[1].c)&&/képességfa/.test(r5.lep[2].c)&&/mérföldkövek/.test(r5.lep[3].c)&&/Takarékosan/.test(r5.utolso),
+    "5. a választás után a feladat kipipálva, és indul a „Stíluspont és képességfa” lecke: mind a négy kiemelés (pont, szerepek, fa, mérföldkövek) a valódi szakaszra mutat",r5);
   ok(r5.fa&&r5.lezart,"6. a képességfa megnyitása a 2. feladat — a szakasz 2/3-mal lezárul, jön a „Hosszú táv”",{fa:r5.fa,lezart:r5.lezart});
   /* 7. Kezdő út nélkül */
   const r7=await p.evaluate(async()=>{const varj=ms=>new Promise(r=>setTimeout(r,ms));

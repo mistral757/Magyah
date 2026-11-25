@@ -66,7 +66,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   ok(r2.t==="kezdo","2. tiszta játékosnál (nincs lezárt karrier, nincs végigjárt út) a tudásszint alapja „Most kezdem”",r2);
   /* 3. az út vége */
   const r3=await p.evaluate(()=>{
-    S.kut.sz=KUT_SZAKASZ.length-1;S.kut.uj=[];S.seasonNumber=2;S.idx=6;
+    S.kut.sz=KUT_SZAKASZ.length-1;S.kut.uj=[];S.seasonNumber=3;S.idx=2;   /* 1.0.12.9.00: az utolsó szakasz (szezon vége) tartaléka a 61. forduló */
     try{const _s=window.saveGame;window.saveGame=()=>{};kutErtekel();window.saveGame=_s;}catch(e){}
     /* a piac (8. forduló) nyitása is a sorba került volna — itt csak az utolsó szakaszé marad */
     S.kut.uj=S.kut.uj.filter(x=>x.sz==="hosszu");

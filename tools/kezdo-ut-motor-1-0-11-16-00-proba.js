@@ -99,10 +99,12 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     S.idx=8;kutErtekel();o.piac8=kutNyitva("piac");
     S.idx=13;kutErtekel();o.sz13=S.kut.sz;
     S.idx=31;S.seasonNumber=1;kutErtekel();o.sz31=S.kut.sz;
-    S.seasonNumber=2;S.idx=6;kutErtekel();o.vege=S.kut.kesz_ut;o.akademia=kutNyitva("akademia");o.aktiv=kutAktiv();
+    /* 1.0.12.9.00: két új szakasz (kupák, szezon vége) — az út a 3. idény elején ér véget */
+    S.seasonNumber=2;S.idx=10;kutErtekel();o.akad40=kutNyitva("akademia");o.vege2=!!S.kut.kesz_ut;
+    S.seasonNumber=3;S.idx=2;kutErtekel();o.vege=S.kut.kesz_ut;o.akademia=kutNyitva("akademia");o.aktiv=kutAktiv();
     return o;});
   ok(!r4.piac7&&r4.piac8,"4. az átigazolási piac a 8. fordulótól nyitva (előtte zárt)",r4);
-  ok(r4.sz13>=3&&r4.sz31===6&&r4.vege&&r4.akademia&&!r4.aktiv,"5. a tartalék-fordulók után az edző magától továbblép; a 2. idényben az út véget ér, minden nyitva",r4);
+  ok(r4.sz13>=3&&r4.sz31===6&&r4.akad40&&!r4.vege2&&r4.vege&&r4.akademia&&!r4.aktiv,"5. a tartalék-fordulók után az edző magától továbblép; a 2. idényben nyílik az akadémia, de az út még tart (kupák, szezon vége — 1.0.12.9.00); a 3. idény elején véget ér, minden nyitva",r4);
   const r6=await p.evaluate(()=>{
     S.kut={v:1,tudas:"kezdo",sz:0,kesz:{},nyit:{},uj:[],zs:0,vt:0,mutatott:{}};S.seasonNumber=1;S.idx=1;
     const o={zart:!kutNyitva("boost")};renderHub();

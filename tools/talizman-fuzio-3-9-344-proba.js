@@ -95,7 +95,7 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     $("talDrawFuse").click();
     talMenuOpen();const sav=document.getElementById("talGrid").textContent;talMenuClose();
     return {t,sav:/🧬/.test(sav)};});
-  ok(/legalább annyit ér, mint a kettő külön/.test(g.t),"a gomb kimondja a garanciát",g.t);
+  ok(/mindkét alaphatás megmarad/.test(g.t),"a gomb kimondja a garanciát",g.t);
   ok(!errs.length,"nincs oldalhiba",errs.slice(0,5));
   await b.close();srv.close();
   console.log(hiba?`\n✗ ${hiba} hiba`:"\n✓ minden rendben");
