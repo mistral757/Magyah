@@ -3955,6 +3955,8 @@ body.stadium #scSim{position:fixed;inset:0;margin:0;padding:0;display:flex}
 body.stadium{--stHdr:38px}
 /* 🧍 1.0.12.8.00 — a tétlen jelenet (a saját játékosaink a HUB alján) */
 #oeIdle{position:fixed;left:0;bottom:0;width:100vw;height:300px;pointer-events:none;z-index:9960;overflow:hidden}
+/* 🧍 1.0.12.9.01 — csak a figura és a buborék fogja a koppintást (eltünteti); a felület többi része kezelhető */
+#oeIdle svg [data-mely],#oeIdle svg .jsLabdaF,#oeIdle .oeBub.on{pointer-events:auto;cursor:pointer}
 #oeIdle svg{position:absolute;left:0;bottom:0;overflow:visible}
 #oeIdle svg *{transform-box:view-box}
 #oeIdle .oeBub{position:absolute;bottom:150px;max-width:min(300px,78vw);padding:7px 11px;border-radius:12px;background:#fffdf6;color:#1b1b1b;
@@ -9582,7 +9584,7 @@ html.fxLive[data-theme="reflektor"] .heTitle{animation:refTitle 1.15s cubic-bezi
    Forma: 1.0.MAJOR.MINOR.PATCH, a PATCH kétjegyű (00, 01 …). Az „1" az első
    kiadás, a „0", hogy még a kiadás előtt járunk. A régi sorozat (3.9.368-ig)
    a 1.0.4.8.02-nek felel meg (lásd ott a megfeleltetést). */
-const APP_VERSION="1.0.12.9.00";
+const APP_VERSION="1.0.12.9.01";
 /* ================= 🔊 HANG ÉS ZENE (3.9.163) =================
    KIMONDOTT KÉRÉS: „Nagyon tetszik a hangmintánk. Mindent csinálj, amit a
    folytatásnak írtál, és írj még kis apróságokat a meccseseményekhez is. És az
@@ -76915,39 +76917,47 @@ function jsavLada(C){
 /* 🧍 1.0.12.8.01 — KIMONDOTT KÉRÉS: „Az idle prompt kapcsoljon be hamarabb és ne csak a HUBban, hanem a meccs
    felületen is (amikor épp nincs folyamatban a meccs természetesen)" — 20 mp helyett 8 mp; a meccsképernyőn is,
    ha nem fut a mérkőzés (S.playing), nem pereg jelenet (_evaFut), és nincs elöl jutalom-, ablak- vagy feloldás-lap. */
-const OE_IDLE_MS=8000,OE_GAP_MS=10000;
-let _oeT=0,_oeTok=0,_oeEl=null;
+/* 🧍 1.0.12.9.01 — KIMONDOTT KÉRÉS: „A kis animációk ne csak idle-ben jöjjenek be. 10mp után, ha nincs meccs
+   indítva, akkor bármelyik felületen jöjjenek be, és két jelenet között 7mp szünet legyen mindig. És csak akkor
+   tűnjenek el, ha konkrétan rájuk kattint a user. De az után ismét 10mp múlva indul az első animáció. És ezt is
+   lehessen kikapcsolni a klub arculata menü alatt."
+   MOSTANTÓL: a koppintás, görgetés, gépelés NEM állítja le (a felület többi része ugyanúgy kezelhető —
+   a jelenet csak a saját figuráin és buborékján fogja a koppintást); bármelyik képernyőn jön, ha nem fut
+   mérkőzés és nem pereg meccsjelenet; az első 10 mp-cel azután, hogy ez lehetővé vált; két jelenet közt 7 mp;
+   a figurára / buborékra koppintva eltűnik, és 10 mp múlva jön a következő. Saját kapcsoló (oeBe): 🛡️ A klub
+   arculata → Animációk → „🧍 A játékosaid a képernyő alján". */
+const OE_IDLE_MS=10000,OE_GAP_MS=7000,OE_KEY="magyah_oe30_0";
+let _oeT=0,_oeTok=0,_oeEl=null,_oeMehet=false;
+function oeBe(){try{return localStorage.getItem(OE_KEY)!=="0";}catch(e){return true;}}
+function oeAllit(on){try{localStorage.setItem(OE_KEY,on?"1":"0");}catch(e){}oeReset();}
 function oeLehet(){
   try{
-    if(!jsavBe())return false;
+    if(!oeBe())return false;
     if(navigator.webdriver&&!window.JSAV_TESZT)return false;
     if(document.hidden)return false;
     if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)return false;
     if(gameMode!=="career"||!careerPool||!slots||!slots.some(s=>s&&s.player))return false;
-    const lat=id=>{const e=$(id);return !!(e&&!e.classList.contains("hide"));};
-    const hub=lat("scHub");
     let evaFut=false;try{evaFut=!!_evaFut;}catch(e){}
-    const meccs=lat("scSim")&&!S.playing&&!evaFut&&!lat("scSkill")&&!lat("scWindow")&&!lat("scUnlock");
-    if(!hub&&!meccs)return false;
-    if(S.playing||S.auto)return false;
-    if(typeof _kutL!=="undefined"&&_kutL)return false;
-    if($("jsav"))return false;
-    /* egy nyitott tipp vagy felugró ablak alatt nem kezdünk jelenetbe */
-    {const g=$("guideTip");if(g&&!g.classList.contains("hide"))return false;}
-    if(document.querySelector('[id$="Modal"]:not(.hide)[style*="fixed"],#plSheet:not(.hide),#kutKeszModal:not(.hide)'))return false;
+    if(S.playing||S.auto||evaFut)return false;
     return true;}catch(e){return false;}}
 function oeTorol(){
   const r=_oeEl;_oeEl=null;if(!r)return;
   try{r.getAnimations({subtree:true}).forEach(a=>{try{a.cancel();}catch(e){}});}catch(e){}
   try{r.animate([{opacity:1},{opacity:0}],{duration:180,fill:"forwards"}).onfinish=()=>r.remove();}catch(e){r.remove();}
   setTimeout(()=>{if(r.isConnected)r.remove();},400);}
+/* leállít, és 10 mp múlva (ha addig is lehet) jön a következő */
 function oeReset(){
-  _oeTok++;clearTimeout(_oeT);oeTorol();
-  _oeT=setTimeout(oeIndul,OE_IDLE_MS);}
+  _oeTok++;clearTimeout(_oeT);oeTorol();_oeMehet=false;
+  _oeT=setTimeout(oeIndul,0);}
 function oeIndul(){
-  if(!oeLehet()){_oeT=setTimeout(oeIndul,OE_IDLE_MS);return;}
+  clearTimeout(_oeT);
+  /* amíg nem lehet (meccs fut, jelenet pereg), másodpercenként nézzük; ha lehetővé vált, még 10 mp */
+  if(!oeLehet()){if(_oeMehet){_oeTok++;oeTorol();}_oeMehet=false;_oeT=setTimeout(oeIndul,1000);return;}
+  if(!_oeMehet){_oeMehet=true;_oeT=setTimeout(oeIndul,OE_IDLE_MS);return;}
   const tok=++_oeTok;
   oeJelenet(tok).catch(()=>{}).then(()=>{if(tok!==_oeTok)return;oeTorol();_oeT=setTimeout(oeIndul,OE_GAP_MS);});}
+/* koppintás a jelenet figurájára vagy buborékára: eltűnik, 10 mp múlva újra */
+function oeKattint(ev){try{ev.stopPropagation();ev.preventDefault();}catch(e){}oeReset();}
 const oeV=a=>a[Math.floor(Math.random()*a.length)];
 function oeRoster(){let r=[];try{r=currentRoster().filter(Boolean);}catch(e){}if(!r.length)r=slots.filter(s=>s&&s.player).map(s=>s.player);return r;}
 function oeKezdo(n){try{return slots.some(s=>s&&s.player&&s.player.n===n);}catch(e){return false;}}
@@ -76981,6 +76991,7 @@ function oeSzinpad(){
   const el=document.createElement("div");el.id="oeIdle";el.setAttribute("aria-hidden","true");
   el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"></svg><div class="oeBub" data-i="0"></div><div class="oeBub" data-i="1"></div>`;
   document.body.appendChild(el);_oeEl=el;
+  el.addEventListener("pointerdown",oeKattint);el.addEventListener("click",oeKattint);   /* 🧍 1.0.12.9.01 */
   return {el,W,H,svg:el.querySelector("svg")};}
 function oeHozzaad(st,html){st.svg.insertAdjacentHTML("beforeend",html);}
 const oeVar=(tok,ms)=>new Promise((res,rej)=>setTimeout(()=>tok===_oeTok&&oeLehet()?res():rej(0),ms));
@@ -77069,8 +77080,6 @@ async function oeJelenet(tok){
   await rug.finished;if(tok!==_oeTok)throw 0;
   oeLep(A,1);
   await oeMegy(tok,A,[mid,Y],[W+90,Y],2600);}
-["pointerdown","keydown","wheel","touchstart"].forEach(t=>document.addEventListener(t,oeReset,{capture:true,passive:true}));
-window.addEventListener("scroll",oeReset,{capture:true,passive:true});
 document.addEventListener("visibilitychange",()=>{if(document.hidden)oeReset();});
 setTimeout(()=>{try{oeReset();}catch(e){}},60);
 function identAnimHtml(){
@@ -77081,15 +77090,19 @@ function identAnimHtml(){
     +`<p class="identHint" style="margin-top:8px">Melyik jelenet fusson?</p>`
     +`<div class="labdaMintak">`+[["uj","🎥 Új (3D, stadion)"],["mindketto","Új + régi ismétlés (R)"],["regi","Régi (rajzolt)"]]
       .map(([k,n])=>`<button type="button" class="btn-s${km===k?" on":""}" data-identkam="${k}">${n}</button>`).join("")+`</div>`
-    +`<p class="identHint" style="margin-top:8px">🎬 Felületi jelenetek (kis felső sáv a menüpontoknál, és tétlenségben a játékosaid a HUB alján):</p>`
+    +`<p class="identHint" style="margin-top:8px">🎬 Felületi jelenetek (kis felső sáv a menüpontoknál):</p>`
     +`<div class="labdaMintak"><button type="button" class="btn-s${jsavBe()?" on":""}" data-identjsav="be">▶ BE</button>`
-    +`<button type="button" class="btn-s${jsavBe()?"":" on"}" data-identjsav="ki">⏸ KI</button></div>`;}
+    +`<button type="button" class="btn-s${jsavBe()?"":" on"}" data-identjsav="ki">⏸ KI</button></div>`
+    +`<p class="identHint" style="margin-top:8px">🧍 A játékosaid a képernyő alján (10 mp után bármelyik képernyőn, ha nem fut meccs; koppintásra eltűnnek):</p>`
+    +`<div class="labdaMintak"><button type="button" class="btn-s${oeBe()?" on":""}" data-identoe="be">▶ BE</button>`
+    +`<button type="button" class="btn-s${oeBe()?"":" on"}" data-identoe="ki">⏸ KI</button></div>`;}
 function identAnimKot(){
   const box=$("identAnim");if(!box)return;
   const fr=()=>{box.innerHTML=box.querySelector(".identSecH").outerHTML+box.querySelector(".identHint").outerHTML+identAnimHtml();identAnimKot();};
   box.querySelectorAll("[data-identanim]").forEach(b=>b.onclick=()=>{try{mevAnimAllit(b.dataset.identanim==="be");}catch(e){}fr();});
   box.querySelectorAll("[data-identkam]").forEach(b=>b.onclick=()=>{try{kamModAllit(b.dataset.identkam);}catch(e){}fr();});
-  box.querySelectorAll("[data-identjsav]").forEach(b=>b.onclick=()=>{jsavAllit(b.dataset.identjsav==="be");fr();});}   /* 🎬 1.0.12.4.00 */
+  box.querySelectorAll("[data-identjsav]").forEach(b=>b.onclick=()=>{jsavAllit(b.dataset.identjsav==="be");fr();});   /* 🎬 1.0.12.4.00 */
+  box.querySelectorAll("[data-identoe]").forEach(b=>b.onclick=()=>{oeAllit(b.dataset.identoe==="be");fr();});}   /* 🧍 1.0.12.9.01 */
 function identBindPanel(){
   try{labdaSzerkKot();identAnimKot();}catch(e){}   /* ⚽🎬 1.0.12.0.00 */
   const D=_identDraft;if(!D)return;

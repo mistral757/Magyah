@@ -76,3 +76,16 @@ Hét új jelenet, mindegyikben a saját játékosaink figurái láthatók:
   - `kezdo-ut-zaro` (az út a 3. idény elején ér véget; a 4. pont már előtte is bukott);
   - `boost-talizman-3-9-185` (100-ra kerekített ár);
   - `talizman-fuzio-3-9-344` (gombszöveg).
+
+## 1.0.12.9.01 — a játékos-jelenetek bárhol (patch)
+KIMONDOTT KÉRÉS: „A kis animációk ne csak idle-ben jöjjenek be. 10mp után, ha nincs meccs indítva, akkor bármelyik
+felületen jöjjenek be, és két jelenet között 7mp szünet legyen mindig. És csak akkor tűnjenek el, ha konkrétan rájuk
+kattint a user. De az után ismét 10mp múlva indul az első animáció. És ezt is lehessen kikapcsolni a klub arculata
+menü alatt."
+
+- Indulás: 10 mp azután, hogy lehet. Feltétel: karrier, nem fut mérkőzés (`S.playing`), nem pereg meccsjelenet (`_evaFut`), nincs gépi végigjátszás.
+- Futás: bármelyik képernyőn megy, nyitott ablak mögött is.
+- Szünet: két jelenet között `OE_GAP_MS` = 7000 ms.
+- Ha meccs indul, a jelenet leáll; amikor újra lehet, megint 10 mp-et vár.
+- Eltűnés: a felület többi részének érintése, görgetése nem tünteti el. A figurára vagy a buborékra koppintva eltűnik (`oeKattint`), és 10 mp múlva jön az első.
+- Kapcsoló: saját, `oeBe` / `oeAllit` (localStorage `magyah_oe30_0`), a 🛡️ A klub arculata → Animációk alatt. Független a felső jelenetsáv kapcsolójától.
