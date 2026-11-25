@@ -58,7 +58,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     S.bondsSeeded=true;S.guideOn=false;});
   await p.waitForTimeout(2500);
   const sav=()=>p.evaluate(()=>{const e=document.getElementById("jsav");if(!e)return null;const r=e.getBoundingClientRect();
-    return {k:e.dataset.k,h:r.height,top:r.top,vh:innerHeight,szoveg:e.querySelector(".jsBub").textContent,arc:e.querySelectorAll(".jsSzin svg").length,
+    return {k:e.dataset.k,h:r.height,top:r.top,vh:innerHeight,szoveg:e.querySelector(".jsBub").textContent,arc:e.querySelectorAll(".jsSzin svg, .jsSzin image").length,
       kint:e.classList.contains("ki")};});
   const jelenetek=[["info","hubInfoShow('set')"],["edzes","openTrainingPlanner()"],["vasar","$('hubBuyBtn').onclick()"],["menetrend","$('scheduleViewBtn').click()"]];
   for(const [kul,nyit] of jelenetek){
