@@ -87,7 +87,8 @@ const KEP=process.env.KEP||"",REGI=!!process.env.REGI;
      ki.rejtve=B.getBoundingClientRect().height===0||(typeof B.checkVisibility==="function"&&!B.checkVisibility({contentVisibilityAuto:true,checkVisibilityCSS:true}));
      ki.rejtveDbg=[D.open,B.getBoundingClientRect().height];}
     const elso=document.querySelector("#hubTacticsBody .hubCard,#hubTacticsBody>*");
-    ki.csuszkaKartya=document.getElementById("hubDialOpenBtn").getBoundingClientRect().top-P.getBoundingClientRect().top;
+    /* 🐞 1.0.12.5.00 — a 🎚 kártya kikerült a taktika-panelből (a csúszkák a menü saját pontján) */
+    ki.csuszkaKartya=document.getElementById("hubDialOpenBtn")?999:0;
     const kartyak=[...document.querySelectorAll("#hubTacticsBody>*")].filter(e=>e.id!=="hubDialOpenBtn");
     ki.elsoRendszer=kartyak[0].getBoundingClientRect().top-P.getBoundingClientRect().top;
     /* aktiválás */
@@ -105,7 +106,7 @@ const KEP=process.env.KEP||"",REGI=!!process.env.REGI;
   ok(r.teng.length===5&&r.teng.every(x=>/^(Véd|Kap|Pas|Gól|Seb) \d+$/.test(x)),"1. az öt tengely csempéje elöl látszik",r.teng);
   ok(r.csukva&&r.rejtve,"2. a magyarázat csukott fülben van",r.rejtveDbg);
   ok(r.szoveg,"2. a fül szövege betűre megvan (öt tengely, várt érték, illeszkedés, 85-ös szint)");
-  ok(r.elsoRendszer<520&&r.csuszkaKartya<400,"3. a 🎚 kártya és az első rendszer a panel tetején",{csuszka:Math.round(r.csuszkaKartya),elsoRendszer:Math.round(r.elsoRendszer)});
+  ok(r.elsoRendszer<520&&r.csuszkaKartya===0,"3. az első rendszer a panel tetején (🎚 kártya nincs — 1.0.12.5.00)",{csuszka:Math.round(r.csuszkaKartya),elsoRendszer:Math.round(r.elsoRendszer)});
   ok(r.sums.length===3&&r.sums[0].indexOf(r.vart[0])>=0&&r.sums[1].indexOf(r.vart[1])===0&&r.sums[2].indexOf(r.vart[2])===0,"4. aktiválás után: rendszer · ismertség · illeszkedés",r.sums);
   ok(r.nyitvaMarad,"5. a lenyitott fül újrarajzoláskor nyitva marad");
   ok(r.tul===0,"6. 430 px: nincs vízszintes túlcsordulás",r.tul);
