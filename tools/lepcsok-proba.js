@@ -83,15 +83,14 @@ const {spawn}=require('child_process');
   const VART={
     1:{diff:78,rerolls:5,speed:"lassu",guide:"hard",
        zart:["#diffSlider","#rerollSlider","#guideGrid button","#wcToggleGrid button",
-             "#pyrSpeedGrid button","#iconGrid button","#ratingBasisGrid button",
-             "#careerStartGrid button"],
+             "#ratingBasisGrid button","#careerStartGrid button"],
        nyitott:[]},
     2:{diff:80,rerolls:3,speed:"lassu",guide:"hard",
-       zart:["#diffSlider","#rerollSlider","#wcToggleGrid button","#pyrSpeedGrid button",
-             "#iconGrid button","#ratingBasisGrid button","#careerStartGrid button"],
+       zart:["#diffSlider","#rerollSlider","#wcToggleGrid button",
+             "#ratingBasisGrid button","#careerStartGrid button"],
        nyitott:["#guideGrid button"]},
     3:{diff:80,rerolls:null,speed:"tarto",guide:"hard",
-       zart:["#diffSlider","#wcToggleGrid button","#pyrSpeedGrid button","#iconGrid button",
+       zart:["#diffSlider","#wcToggleGrid button",
              "#ratingBasisGrid button","#careerStartGrid button"],
        nyitott:["#guideGrid button","#rerollSlider"]}};
   out.lepcsok={};
@@ -661,6 +660,7 @@ const {spawn}=require('child_process');
   /* ═══════════ ÉRTÉKELÉS ═══════════ */
   const A=[];
   const ok=(n,f)=>A.push({n,ok:!!f});
+  const PYR_SPEEDS_KEYS_OK=k=>["alvo","lassu","tarto","kegyet","konyortelen","vegtelen"].indexOf(k)>=0;
   ok("üres napló: 0 D1, 1. lépcső", out.ures.d1===0&&out.ures.lepcso===1&&out.ures.lepcson===true);
   ok("üres napló: van preset, a dinamikus zárva", out.ures.preset_van&&out.ures.dyn_zarva&&out.ures.div4_zarva);
   ok("üdvözlő: az első koppintásra nyílik", out.udvozlo.rejtve_elotte&&out.udvozlo.megnyilt);
@@ -676,11 +676,9 @@ const {spawn}=require('child_process');
     ok(`${n}. lépcső: nincs válogatott, nincs családtag`, L.wc===false&&L.family===false);
     ok(`${n}. lépcső: Rating a csúcson`, L.basis==="peak");
     ok(`${n}. lépcső: kezdő nehézség ${V.diff}`, L.diff===V.diff&&L.alap===V.diff&&L.csuszka_diff===V.diff);
-    ok(`${n}. lépcső: ellenfél-fokozat ${V.speed}`, L.speed===V.speed);
-    ok(`${n}. lépcső: a preset JÓVÁÍRJA, amit rád ad`,
-       L.gift_speed===true&&L.gift_tempo===true);
-    ok(`${n}. lépcső: alap tempó, megszokott ikonok, laza skillek`,
-       L.tempo==="normal"&&L.icons==="teljes"&&L.skill==="loose");
+    /* 🎚 1.0.12.6.00 — „Minden nyitva eleve": a fokozat-csomag elemei (mezőny-tempó, tempó, ikonok, képesség-mód) nem kapuk többé */
+    ok(`${n}. lépcső: a mezőny-tempó és az ikon-rács nem kötött (a fokozat-csomag dönt)`,
+       L.zar.speed===false&&L.zar.icons===false&&!!PYR_SPEEDS_KEYS_OK(L.speed));
     if(V.rerolls!=null)ok(`${n}. lépcső: ${V.rerolls} újrapörgetés`,
        L.rerolls===V.rerolls&&L.csuszka_reroll===V.rerolls);
     ok(`${n}. lépcső: a jelzés kiírja, hol tartunk`, L.jelzes&&/lépcső/.test(L.jelzes_szoveg));
@@ -696,10 +694,10 @@ const {spawn}=require('child_process');
     ok(`${n}. lépcső: a felállás mindig a tiéd`, L.forma_nyitva===true);});
   ok("3 cím után: nincs preset, nincs jelzés", out.szabad.lepcson===false&&out.szabad.preset===null&&out.szabad.jelzes_rejtve);
   ok("3 cím után: a lépcső RÁCS-zárai eltűntek", out.szabad.barmi_zart.length===0);
-  ok("3 cím után: a fokozat- és tempó-rács a RUN-kapuk alatt marad",
-     out.szabad.run_kapuzott.length===2);
-  ok("3 cím után: az ikon- és válogatott-rács a GYŰJTŐ kapuk alatt marad",
-     out.szabad.gyujto_kapuzott.length===2);
+  ok("3 cím után: a fokozat- és tempó-rács nyitva (1.0.12.6.00)",
+     out.szabad.run_kapuzott.length===0);
+  ok("3 cím után: az ikon-rács nyitva, csak a válogatott-rács gyűjtő kapu (1.0.12.6.00)",
+     out.szabad.gyujto_kapuzott.length===1&&out.szabad.gyujto_kapuzott[0]==="#wcToggleGrid button");
   ok("3 cím után: az EGYES kapuk viszont még állnak (lutri, kész klub)",
      out.szabad.kapuzott.length===2);
   ok("3 cím után: nehézség/Rating/D4 nyitva, D5 és dinamikus még nem",
@@ -720,7 +718,7 @@ const {spawn}=require('child_process');
   ok("győzelem: ugyanaz a feloldás nem jön elő kétszer", out.gyozelem.ismetles_nem_jott);
   ok("válogatott-kapcsoló: jogtiszta felirat, a VB/EB eltűnt",
      /Nemzeti válogatottak/.test(out.valogatott.felirat)&&out.valogatott.regi_maradt===false);
-  ok("számláló: az ikon-igazolás gyűlik, a sima nem", out.szamlalok.icons===1&&out.szamlalok.icon2_zarva);
+  ok("számláló: az ikon-igazolás gyűlik, a sima nem (a sűrűség már nem kapu)", out.szamlalok.icons===1&&!out.szamlalok.icon2_zarva);
   ok("számláló: a nemzeti válogatott külön gyűlik",
      out.szamlalok.nat===1&&out.szamlalok.nat_nevsor>100);
   ok("számláló: 10 ikonnál nyílik az ikon-sűrűség 2. szintje",
@@ -729,13 +727,13 @@ const {spawn}=require('child_process');
      out.szamlalok.skills===10&&out.szamlalok.maxSkills===10&&out.szamlalok.skillReal===true);
   ok("Run: a ranglistából SZÁRMAZIK, visszamenőleg is (3 futás, legjobb 71)",
      out.run_szarmaztatas.runs===3&&out.run_szarmaztatas.bestRun===71);
-  ok("Run: a fokozatok a Run-szintet követik (71-es csúcs → a végtelen még zárva)",
+  ok("Run: minden mezőny-tempó nyitva, a Run-szinttől függetlenül (1.0.12.6.00)",
      out.run_szarmaztatas.lassu&&out.run_szarmaztatas.tarto
      &&out.run_szarmaztatas.kegyet&&out.run_szarmaztatas.konyortelen
-     &&!out.run_szarmaztatas.vegtelen);
-  ok("Run: a játék-tempó lassításai a Run-szintet követik (71 → csiga igen, jégkorszak nem)",
+     &&out.run_szarmaztatas.vegtelen);
+  ok("Run: minden játék-tempó nyitva (1.0.12.6.00)",
      out.run_szarmaztatas.tempo_normal&&out.run_szarmaztatas.tempo_csiga
-     &&!out.run_szarmaztatas.tempo_jegkorszak&&!out.run_szarmaztatas.tempo_kokorszak);
+     &&out.run_szarmaztatas.tempo_jegkorszak&&out.run_szarmaztatas.tempo_kokorszak);
   ok("Run: a csapatstílusok a futásaidat követik (3 lezárt → a 4. fut → tiki-taka is)",
      out.run_szarmaztatas.stilus.beton&&out.run_szarmaztatas.stilus.villam
      &&out.run_szarmaztatas.stilus.tiki&&!out.run_szarmaztatas.stilus.panzer);
@@ -770,39 +768,33 @@ const {spawn}=require('child_process');
      out.osztalylista.ajanlott<=out.osztalylista.divMax);
   /* --- 3. fázis: a Run-kapuk --- */
   {const K=out.run_kapu_0;
-   ok("Run-kapu 0: az alapfokozat nyitva, a többi zárt",
-      K.ok.lassu===true&&K.ok.tarto===false&&K.ok.alvo===false&&K.ok.kegyet===false);
-   ok("Run-kapu 0: a fokozat-rács öt zárt gombja szürke, a feltétellel",
-      K.fokozatok.filter(x=>x.tiltva).length===5
-      &&K.fokozatok.filter(x=>x.tiltva).every(x=>x.szurke&&/🔒/.test(x.sz)));
-   ok("Run-kapu 0: a feliratok magyarul toldalékolnak (40-es, 60-as, 75-ös)",
-      K.fokozatok.some(x=>/40-es/.test(x.sz))&&K.fokozatok.some(x=>/60-as/.test(x.sz))
-      &&K.fokozatok.some(x=>/75-ös/.test(x.sz)));
-   ok("Run-kapu 0: a kijelölés a nyitott fokozatra esik vissza",
-      K.valasztott==="lassu"&&K.fokozatok.filter(x=>x.sel).length===1);
-   ok("Run-kapu 0: a tempó-rács három gyorsítója nyitva, öt lassítása zárt",
-      K.tempok.filter(x=>!x.tiltva).map(x=>x.id).sort().join()==="gyors,normal,turbo");
+   ok("Run-kapu 0: minden mezőny-tempó nyitva (1.0.12.6.00)",
+      K.ok.lassu===true&&K.ok.tarto===true&&K.ok.alvo===true&&K.ok.kegyet===true);
+   ok("Run-kapu 0: a fokozat-rácsban nincs zárt gomb, és nincs lakat-felirat",
+      K.fokozatok.filter(x=>x.tiltva).length===0&&!K.fokozatok.some(x=>/🔒/.test(x.sz)));
+   ok("Run-kapu 0: pontosan egy kijelölés",K.fokozatok.filter(x=>x.sel).length===1);
+   ok("Run-kapu 0: a tempó-rács minden gombja nyitva",
+      K.tempok.length>=8&&K.tempok.every(x=>!x.tiltva));
    ok("Run-kapu 0: a stílusok közül három nyitva (beton, bombázók, harmónia)",
       K.stilus.beton&&K.stilus.bombazok&&K.stilus.harmonia
       &&!K.stilus.villam&&!K.stilus.sztar&&!K.stilus.tikitaka&&!K.stilus.panzer);
-   ok("Run-kapu 0: minden zár MEGMONDJA, mi nyitja ki",
+   ok("Run-kapu 0: a stílus-zár MEGMONDJA, mi nyitja ki; a tempóknak nincs zára",
       /2\. karriered/.test(K.miert.villam)&&/negatív jellemvonás/.test(K.miert.panzer)
-      &&/2\. lezárt karriered/.test(K.miert.tarto)&&/40/.test(K.miert.kegyet)
-      &&/50/.test(K.miert.csiga));}
+      &&!K.miert.tarto&&!K.miert.kegyet&&!K.miert.csiga);}
   {const K=out.run_kapu_62;
-   ok("Run-kapu 62: a fokozatok a táblázat szerint (+3-ig, +4 még nem)",
+   ok("Run-kapu 62: minden mezőny-tempó nyitva (1.0.12.6.00)",
       K.runs===3&&K.best===62&&K.speed.tarto&&K.speed.alvo&&K.speed.kegyet
-      &&K.speed.konyortelen&&!K.speed.vegtelen);
-   ok("Run-kapu 62: a tempó a táblázat szerint (−2-ig, −3 még nem)",
+      &&K.speed.konyortelen&&K.speed.vegtelen);
+   ok("Run-kapu 62: minden tempó nyitva (1.0.12.6.00)",
       K.tempo.normal&&K.tempo.komotos&&K.tempo.csiga
-      &&!K.tempo.gleccser&&!K.tempo.jegkorszak&&!K.tempo.kokorszak);
+      &&K.tempo.gleccser&&K.tempo.jegkorszak&&K.tempo.kokorszak);
    ok("Run-kapu 62: a 4. futásodban a tiki-taka is nyitva",
       K.stilus.villam&&K.stilus.sztar&&K.stilus.tikitaka);}
   {const J=out.jovairas;
    ok("jóváírás: amit HASZNÁLTÁL, az a Run-küszöb alatt is a tiéd marad",
       J.runs===1&&J.best===5&&J.kokorszak===true&&J.vegtelen===true&&J.tikitaka===true);
-   ok("jóváírás: amit NEM használtál, az továbbra is zárva",
-      J.jegkorszak===false&&J.konyortelen===false&&J.sztar===false);
+   ok("jóváírás: a tempók nyitva; a nem használt stílus továbbra is zárva",
+      J.jegkorszak===true&&J.konyortelen===true&&J.sztar===false);
    ok("jóváírás: a választó a jóváírt tempón marad, nem esik vissza",
       J.valasztott==="kokorszak");}
   {const P=out.panzer;
@@ -823,18 +815,15 @@ const {spawn}=require('child_process');
       L.sorok.filter(x=>x.zart).every(x=>/Még zárva/.test(x.gomb)&&x.felirat));}
   /* --- 4. fázis: a gyűjtő kapuk --- */
   {const G=out.gyujto_0;
-   ok("gyűjtő 0: a három ikon-fokozat és a válogatottak és a realisztikus skill zárt",
-      G.ritka.tiltva&&G.nagyonritka.tiltva&&G.ki.tiltva&&G.wc.tiltva&&G.real.tiltva);
+   ok("gyűjtő 0: az ikon-fokozatok és a realisztikus skill nyitva, csak a válogatottak zártak (1.0.12.6.00)",
+      !G.ritka.tiltva&&!G.nagyonritka.tiltva&&!G.ki.tiltva&&G.wc.tiltva&&!G.real.tiltva);
    ok("gyűjtő 0: a mindig nyitott választásokat nem bántjuk",
       G.teljes.tiltva===false&&G.laza.tiltva===false);
    ok("gyűjtő 0: a felirat a SAJÁT ÁLLÁSÁT mondja, nem csak a küszöböt",
-      /0\/10/.test(G.ritka.sz)&&/még 10 hiányzik/.test(G.ritka.sz)
-      &&/0\/20/.test(G.wc.sz));}
+      /0\/20/.test(G.wc.sz)&&/még 20 hiányzik/.test(G.wc.sz));}
   {const G=out.gyujto_12;
-   ok("gyűjtő 12 ikon: az első fokozat nyílik, a többi még nem",
-      G.ritka.tiltva===false&&G.nagyonritka.tiltva===true&&G.ki.tiltva===true);
-   ok("gyűjtő 12 ikon: a hátralévő szám pontos (még 8 a 20-ig)",
-      /12\/20/.test(G.nagyonritka.sz)&&/még 8 hiányzik/.test(G.nagyonritka.sz));
+   ok("gyűjtő 12 ikon: minden ikon-fokozat nyitva (1.0.12.6.00)",
+      G.ritka.tiltva===false&&G.nagyonritka.tiltva===false&&G.ki.tiltva===false);
    ok("gyűjtő 12 ikon: a kinyitott gomb VISSZAKAPJA az eredeti feliratát",
       !/🔒/.test(G.ritka.sz)&&/45%/.test(G.ritka.sz));}
   {const G=out.gyujto_teli;
@@ -844,26 +833,27 @@ const {spawn}=require('child_process');
    ok("jóváírás: aki ma ritkább ikonokkal játszik, megtartja — a LÉTRA alsó foka is",
       G.ritka.tiltva===false&&G.nagyonritka.tiltva===false
       &&G.beallitas.ikon==="nagyonritka");
-   ok("jóváírás: amit nem használt, az továbbra is zárva (ikonok: kikapcsolva)",
-      G.ki.tiltva===true);
+   ok("jóváírás: az ikonok kikapcsolása is nyitva (1.0.12.6.00)",
+      G.ki.tiltva===false);
    ok("jóváírás: a bekapcsolt válogatottak megmaradnak",
       G.wc.tiltva===false&&G.beallitas.wcEnabled===true);}
   {const A=out.gyujto_ablak;
-   ok("gyűjtő: a 10. ikon és a 20. válogatott a PILLANATBAN ablakot nyit",
-      A.icon_nyit&&/Tíz legenda/.test(A.icon_cim)&&/Húsz válogatott/.test(A.wc_cim)
+   ok("gyűjtő: a 20. válogatott a PILLANATBAN ablakot nyit (az ikon-sűrűség már nem feloldás)",
+      /Húsz válogatott/.test(A.wc_cim)
       &&A.szamlalok.icons===10&&A.szamlalok.nat===20);}
   /* --- 5. fázis: a haladás panel --- */
   {const P=out.panel;
    /* A SORSZÁM SZINTÉN SZÁMOLVA: a lépcső-panel annyi sorból áll, amennyi kapu
       van — egy új filozófia egy új sort jelent. */
-   ok(`panel: öt csoport, ${P.sorok} sor, hat kész`,
-      P.csoportok===5&&P.sorok>=22&&P.kesz===6,{sorok:P.sorok,kesz:P.kesz});
+   /* 🎚 1.0.12.6.00 — a tempó- és a képesség-csoport kikerült, az ikon-sorok is (nyitva): három csoport */
+   ok(`panel: három csoport, ${P.sorok} sor, ${P.kesz} kész`,
+      P.csoportok===3&&P.sorok>=9&&P.kesz>=0&&P.kesz<P.sorok,{sorok:P.sorok,kesz:P.kesz});
    ok("panel: a fejléc a haladást mondja",
       new RegExp(`${P.kesz}\\/${P.sorok}`).test(P.fejlec),{fejlec:P.fejlec});
    ok("panel: minden sor UGYANAZT mondja, amit a felület kapui", P.egyezik===true);
    ok("panel: minden zárt sor megmondja, mi nyitja ki", P.mind_indokolt===true);
-   ok("panel: kiírja, hogy a tempó-kapcsolók a 3. lezárt karriertől nyílnak",
-      P.lezart_jelzes===true);
+   ok("panel: nincs tempó-feloldás csoport (1.0.12.6.00)",
+      P.lezart_jelzes===false);
    ok("panel: a Profil tényleg kirajzolja", P.profilban===true);}
   /* --- 3.9.47: az osztályválasztó a lépcsőn --- */
   [1,2,3].forEach(n=>{
@@ -880,8 +870,7 @@ const {spawn}=require('child_process');
    ok("végig: a karrier tényleg a D3-ban indul, 78-as mezőnnyel",
       E.div===3&&Math.abs(E.mezony-78)<0.15&&/Élmezőny/.test(E.nev||""));
    ok("végig: a lépcső minden döntése átér a karrierbe",
-      E.fokozat==="lassu"&&E.tempo==="normal"&&E.ikon==="teljes"
-      &&E.wc===false&&E.skillReal===false&&E.rerolls===5);
+      PYR_SPEEDS_KEYS_OK(E.fokozat)&&E.wc===false&&E.rerolls===5);
    /* MEGFORDÍTOTT ÁLLÍTÁS (3.9.53). Eddig azt mértük, hogy a lépcsőn a KIÍRT
       RÉS megy a horgonyba. Az élesben kiderült, hogy maga a mérce volt rossz:
       a lépcső nem rést, hanem MEZŐNYSZINTET ígér („rögzített 80-as mezőny"),
@@ -895,24 +884,22 @@ const {spawn}=require('child_process');
      out.osztaly_szabad.sorok===6&&out.osztaly_szabad.nehezseg_lathato===true
      &&out.osztaly_szabad.kimondas===false);
   /* --- 3.9.47: a könnyítő tempók --- */
-  ok("gyorsítás: a Villám- és Gyors fejlődés is zárva az elején",
-     out.gyorsitas.nulla.turbo===false&&out.gyorsitas.nulla.gyors===false
+  ok("gyorsítás: a Villám- és Gyors fejlődés az elejétől nyitva (1.0.12.6.00)",
+     out.gyorsitas.nulla.turbo===true&&out.gyorsitas.nulla.gyors===true
      &&out.gyorsitas.nulla.normal===true);
-  ok("gyorsítás: megmondja, mi nyitja ki", /3 bajnoki cím/.test(out.gyorsitas.miert));
   ok("gyorsítás: 3 bajnoki címmel nyílik, a szabad beállítással együtt",
      out.gyorsitas3.turbo===true&&out.gyorsitas3.gyors===true);
   /* --- 3.9.47: a ritka rácsok elrejtése --- */
   {const R=out.rejtes[0].latszik,N=out.rejtes[0].nyitva;
-   ok("rejtés 0: a lépcsőn EGYETLEN rács sem látszik (mind kötött)",
-      !R.tempo&&!R.speed&&!R.ikon&&!R.wc&&!R.skill&&!R.basis&&!R.start&&!R.guide
+   ok("rejtés 0: a lépcsőn a kötött rácsok rejtve, a fokozat-csomag rácsai látszanak (1.0.12.6.00)",
+      R.tempo&&R.speed&&R.ikon&&R.skill&&!R.wc&&!R.basis&&!R.start&&!R.guide
       &&!R.family&&!R.reroll);
-   ok("rejtés 0: és tényleg nincs is bennük választható elem",
-      N.tempo<2&&N.speed<2&&N.ikon<2&&N.guide<2);}
+   ok("rejtés 0: a kötött rácsban nincs választható elem",N.guide<2);}
   {const R=out.rejtes[3].latszik,N=out.rejtes[3].nyitva;
    ok("rejtés 3: a tempó-, a vezetés- és a Rating-rács előjön (2+ választással)",
       R.tempo&&R.guide&&R.basis&&N.tempo>=3&&N.guide===4);
-   ok("rejtés 3: amiből még mindig egy van, az rejtve marad (ikon, válogatott, skill, fokozat)",
-      !R.ikon&&!R.wc&&!R.skill&&!R.speed);
+   ok("rejtés 3: amiből még mindig egy van, az rejtve marad (válogatott); az ikon, a skill és a fokozat látszik",
+      R.ikon&&!R.wc&&R.skill&&R.speed);
    ok("rejtés 3: az újrapörgetés és a családtag viszont már a tiéd",
       R.reroll&&R.family);}
   ok("rejtés 5: a kezdés módja is előjön (draft + kész klub)",
