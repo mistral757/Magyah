@@ -1,7 +1,84 @@
 # 🐞 Fejlesztői jegyzetek
 
-12 jegyzet · a legújabb elöl.
+19 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwvwgbxqhkev — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-25T09:06:45.998Z · v1.0.12.6.00
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 28. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Nem volt bajnoki győztes animáció, pedig úgy emlékeztem, hogy beépítettük. Ezhel mizu?
+
+---
+
+## jmwvupnn3jf9e — Tanítás: a lecke-lap vagy a kiemelés takar, nem lehet befejezni a műveletet · normál
+
+- **Mikor:** 2026-11-25T08:18:01.840Z · v1.0.12.6.00
+- **Hol:** Pálya + Meccs + Panel › 🎯 Évszak-kihívások › 👆 Döntés
+- **Állapot:** 1. idény, 23. forduló · Kezdő út: filozofia · lecke: kihivas 4. lépés
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim, scWindow · ablakok:  („👆 Döntés”)
+
+> A kihívás lecke megmutat egy kihívást, azt ajánlja, hogy vállaljam el ha vállalható, de a többit így nem lehet megnézni, a végén pedig a kész tovább gombra visz. Ha arra logikusan rányomunk, a kihívások vállalása nélkül, akkor úszott a lehetőség, hogy vállaljunk. Miután megmutatott egy kihívást, még kéne szűnjön a fókusz mód, engedje, hogy válasszak. És majd én kilépek, ha akarok. + 3mp gondolkodás után itt mutassa meg, hogy ha nem tudom eldönteni, érdemes e vallani, ugrohatok a menübe és megnézhetem azt, amire szükség lehet hozzá, és vissza tudok jönni a kihívás vállaláshoz
+
+---
+
+## jmwvuij112r68 — Felület: nem látszik / nem működik egy gomb, rossz helyen van · normál
+
+- **Mikor:** 2026-11-25T08:12:29.269Z · v1.0.12.6.00
+- **Hol:** Pálya + Jutalom-képernyő + Meccs
+- **Állapot:** 1. idény, 16. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSkill, scSim
+
+> Párkémia építés fázisszámai nem látszanak az 5. új megjelenési témánál
+
+---
+
+## jmwvuerlk3at9 — Ide magyarázat / tanítás kell (mi ez, mire jó, mit érdemes) · normál
+
+- **Mikor:** 2026-11-25T08:09:33.752Z · v1.0.12.6.00
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 15. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> A csapategyensúlyról nem tanítottunk eddig semmit. Ezt pótolni kell.
+
+---
+
+## jmwvspztm1im2 — Új funkció / rendszer · normál
+
+- **Mikor:** 2026-11-25T07:22:18.394Z · v1.0.12.6.00
+- **Hol:** Pálya + HUB › ☰ Menü
+- **Állapot:** 1. idény, 15. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> A csapatépítés menüponton belül is minden ablakként nyíljon meg. Amikor az ablakot bezárjuk, akkor ne a HUBba ugorjunk vissza, hanem a menübe érkezzünk vissza ugyanoda, ahol a megnyitás előtt voltunk. A ládák menüpont szépen ablakban nyílik meg pl. de bezárás után a HUBba esünk vissza, nem a menübe.
+
+---
+
+## jmwvsmwnf9q2h — Új funkció / rendszer · normál
+
+- **Mikor:** 2026-11-25T07:19:54.315Z · v1.0.12.6.00
+- **Hol:** Pálya + HUB › ☰ Menü
+- **Állapot:** 1. idény, 15. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Az áigazolás menü fülein belül, rányomunk az egyes alpontok egységesen külön ablakként nyíljanak meg. Ahhoz hasonlóan, ahogy az infopult, a meccserő összetételes pont stb. És a kinézetüket is újítsuk meg
+
+---
+
+## jmwvsmfp2egzk — Új funkció / rendszer · normál
+
+- **Mikor:** 2026-11-25T07:19:32.342Z · v1.0.12.6.00
+- **Hol:** Pálya + HUB › ☰ Menü
+- **Állapot:** 1. idény, 15. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Az áigazolás menü fülein belül, rányomunk az egyes alpontok egységesen külön ablakként nyíljanak meg. Ahhoz hasonlóan, ahogy az infopult, a meccserő összetételes pont stb. És a kinézetüket is újítsuk meg
 
 ---
 
