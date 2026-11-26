@@ -1,7 +1,30 @@
 # 🐞 Fejlesztői jegyzetek
 
-50 jegyzet · a legújabb elöl.
+52 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwy4573jh1ss — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-26T22:17:35.791Z · v1.0.12.15.00
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 8. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Túl sok a kis besétáló játékosok animáció a HUBban. Túl gyakori. Legyen randomabb. Ne mindig 5mp időközönként jöjjön. Hanem 7-11 mp, és legyen olyan animáció is, ami csak egy oldalról vagy felülről benézés, mint a régi Windows xp varázsló. És legyen az, hogy minden 3. ilyen animációnál az egyik játékos úgy jöjjön be, hogy csak bejön és megkérdezi, hogy: "Mester, szólj, ha idegesítünk, és akkor lelépünk egy időre!" Vagy: "Mester, minden oké? Ha egy kis magányra vágysz, csak egy szabadba kerül!" És ha erre rákattintasz, akkor be lehet állítani ott rögtön hogy mennyi szundi idő legyen ezeknek az animációknak. 
+> Ja és a pillanat... Átvezető kijelzőn ezentúl nem a kis pixel figura legyen hanem valamelyik játékosunk dekázzon azon mindig.
+
+---
+
+## jmwy3zuxxc79j — Felület: levágott / betűnként törő szöveg, olvashatatlan szín · normál
+
+- **Mikor:** 2026-11-26T22:13:26.757Z · v1.0.12.15.00
+- **Hol:** Pálya + HUB › ☰ Menü › 🎁 Ládák
+- **Állapot:** 1. idény, 8. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub · ablakok: ladaModal („🎁 Ládák”)
+
+> Nagyon menő a legendás igazolás képernyő, de glitchel sajnos. Ezt meg kell javítani, mert amúgy nagyon menő. Ez a Style minden igazolásnálegyen ott.
 
 ---
 
