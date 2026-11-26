@@ -1,7 +1,29 @@
 # 🐞 Fejlesztői jegyzetek
 
-38 jegyzet · a legújabb elöl.
+40 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwxqi725bylw — Új funkció / rendszer · normál
+
+- **Mikor:** 2026-11-26T15:55:47.646Z · v1.0.12.12.01
+- **Hol:** Panel › 🎯 Kezdő kihívások
+- **Állapot:** 1. idény, 0. forduló · Kezdő út: meccsek
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scWindow
+
+> Jót tenne egy vérfrissítés a kihívásjutalmaknak és büntetéseknek. Vannak nagyon kis semmilyen jutalmak. Vannak nagyon nehéz kihívások stb. Készíts egy listát, mit vennél ki, mit raknál be, mit formálnal át.
+
+---
+
+## jmwxqg09o8736 — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T15:54:05.532Z · v1.0.12.12.01
+- **Hol:** Panel › 🎯 Kezdő kihívások › Kihívások — vállalás, nem feladat
+- **Állapot:** 1. idény, 0. forduló · Kezdő út: meccsek
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scWindow · ablakok: guideTip („Kihívások — vállalás, nem feladat”)
+
+> Kétféle tanítás van a kihívásokról. Nem kell a régi is az újra.
 
 ---
 
