@@ -1,7 +1,52 @@
 # 🐞 Fejlesztői jegyzetek
 
-46 jegyzet · a legújabb elöl.
+50 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwy1ceu6abed — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T20:59:13.566Z · v1.0.12.12.01
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 8. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Az egész átigazolás tanítás el volt cseszve. Szerintem ki kéne kapcsolni ezt a fókusz kijelölés üzemmódot. Elég a kijelölés, nem kell minden mást elsotetiteni. Ja meg az odagorgetes is eleve segít. És az átigazolás tanításnál az egyes átigazolási típusokbe beléptetett, de nem léptetett ki.
+
+---
+
+## jmwxzciptisnh — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T20:03:19.361Z · v1.0.12.12.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 5. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Öltözőbe se visz be a játék, nincs oda kapcsolodó tanítás
+
+---
+
+## jmwxzbfqzg728 — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T20:02:28.859Z · v1.0.12.12.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 5. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Stadion és merch részre nem volt tanítás, se a keretbővítésre, scout, ügynökség fejlesztésre
+
+---
+
+## jmwxyxn6h94ry — Új funkció / rendszer · normál
+
+- **Mikor:** 2026-11-26T19:51:45.305Z · v1.0.12.12.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 3. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Szüntessuk meg azt, hogy a stílus mérföldkő kinyitása pénzlevonással jár. Nagyon fura.
+> És minden mérföldkő feloldása jöjjön ilyen menő üzenetben, mindegyikről kapjunk mindig értesítést, és lehessen kikapcsolni az értesítés ablakban, ha akarod. De minden mérföldkő kategória külön kikapcsolható legyen: sima pénzes mérföldkövek, stiluskategóriák általános mérföldkövei és csapatstílus mérföldkövek.
 
 ---
 
