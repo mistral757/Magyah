@@ -1,7 +1,75 @@
 # 🐞 Fejlesztői jegyzetek
 
-40 jegyzet · a legújabb elöl.
+46 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwxxshuu9u4t — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T19:19:45.510Z · v1.0.12.12.01
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 3. forduló · Kezdő út: merleg
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Ja és minden leckénél az van, hogy ha sikerült elvégezni, és amúgy is a HUBban voltál, akkor nem tudja frissíteni, hogy melyik menüponton látszanak. Csak akkor frissül, amikor átlélsz a meccsnézetne és vissza. Így nem jó
+
+---
+
+## jmwxxrkr0fzxi — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T19:19:02.604Z · v1.0.12.12.01
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 3. forduló · Kezdő út: merleg
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Jelenleg a 3. Leckétől kezdve csak a menü pontjain végigmászkálva végig ki lehet nyitni a leckéket. Legyen minden leckében még további olyan feladat, ami kicsit elnyújtja a dolgot. Szerezz további 3 gólt, adjon egy játékosod összesen 3 gólpasszt (a szezonban), juss el az első rövid átigazolási szakaszig, szerezz egy talizmánt. 
+> És a kapitány váltást a leckében hozzuk hamarabbra. Mondjuk 3. Leckére.
+
+---
+
+## jmwxxiwnphdoq — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T19:12:18.133Z · v1.0.12.12.01
+- **Hol:** Pálya + HUB › ☰ Menü › 👆 Meccserő-bontás
+- **Állapot:** 1. idény, 3. forduló · Kezdő út: lelek · lecke: fejlodes 2. lépés
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub · ablakok:  („👆 Meccserő-bontás”)
+
+> 3. Lecke alatt megnyílt a boost központ, de nem kaptunk hozzá magyarázatot. 
+> 3. Leckét teljesítettem, megnyílt a negyedik, akarta mutatni a meccserő bontást, de a menüpont még nem volt kinyitva így nem tudta mutatni...
+
+---
+
+## jmwxx3lnp6y5f — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T19:00:24.037Z · v1.0.12.12.01
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 2. forduló · Kezdő út: meccsek
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> A változtasd meg a meccs tempójátnál a hol?-ra kattintva csak egy kis üzenet jön fel alul. Rá kéne vezessen a vissza a szezonhoz gombra, aztán pedig meg kéne mutassa nekem a csúszkát.
+
+---
+
+## jmwxx1pntfmwv — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T18:58:55.913Z · v1.0.12.12.01
+- **Hol:** Pálya + Jutalom-képernyő + Meccs › 👆 Válassz!
+- **Állapot:** 1. idény, 2. forduló · Kezdő út: meccsek · lecke: jut_kemia 4. lépés
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSkill, scSim · ablakok:  („👆 Válassz!”)
+
+> Párkémia építős tanításnál szintén beragadunk abban, hogy amit ajánl a játék az van hoglightolva és ha mást akarsz választani, akkor homályban kell választanod.
+
+---
+
+## jmwxx068qay6y — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-26T18:57:44.090Z · v1.0.12.12.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 1. forduló · Kezdő út: meccsek
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Animációknál van olyan, hogy a játékos fejének aljá eltakarja a meze. Plusz a mezek nem pont olyanok mint a tervezőben.
 
 ---
 
