@@ -56,3 +56,42 @@
 7. nincs oldalhiba.
 
 Lefutott még: `figura-jelenet-1-0-12-8-00`, `kihivas-lada-igazolas-1-0-12-14-00`, `lecke-vegig-1-0-12-15-00`, `tolto-1-0-7-4-00`, `csere-tolto-1-0-9-0-02`.
+
+---
+
+# 1.0.12.16.01 — A távoli lövés 3D-ben: igazi bombagól messziről
+
+## KIMONDOTT KÉRÉS (🐞 jegyzet jmwy4qba47ws4)
+> „Szitálós gólnál mikor megkapja a játékos a labdát, utána tol egyet rajta úgy, gjgy gyakorlatilag beletolja a
+> védőbe. És tök közel is kerül így a kapuhoz. Menőbb lenne, ha távol maradna a kaputól, és onnan messziről egy
+> enyhe labdaigazítás után lőné rá, és igazi távoli bombagól lenne belőle."
+
+## Az ok
+A 3D kimenetel (`kamKimenetel`) minden 36 m-nél hátrébb végződő felvezetésnél „rátört a kapura”:
+- a lövő 15 m-t vitte előre a labdát, x≈41-ig, vagyis 11 m-re a kaputól;
+- a védő (v1) közben elé lépett, így a lövő gyakorlatilag beletolta a labdát (0,97 m-re került tőle).
+
+A kontránál és a vágtánál ez jó, a távoli lövésnél nem.
+
+## A javítás
+A „tavoli” felvezetésnél (Szitálós, Ágyúgolyó, potyagól, a sima távoli lövés) a lövő nem tör be. Helyette:
+1. egy rövid, ~1,5 m-es igazítás oldalra, a védőtől el;
+2. a védő későn lép oda, és nem éri el;
+3. a lövés ~25 m-ről jön.
+
+A kimenetel ugyanaz marad: gól, védés, kapufa, mellé.
+
+## Próba
+`tools/tavoli-bomba-1-0-12-16-01-proba.js`, 36 eset.
+
+| | Régi kód | Új kód |
+|---|---|---|
+| lövés a gólvonaltól | 11,3 m | 25 m |
+| mozgás a lövésig | 15 m | 2 m |
+| lövő–védő minimum | 0,97 m | 3,6 m |
+
+Ezek is maradtak:
+- a kimenetel és az idővonal;
+- a nem távoli felvezetés továbbra is betör.
+
+Lefutott még: `jelenet3d-1-0-11-14-00`, `felvezetok-1-0-11-13-00`, `szinergia-3d-1-0-12-13-00`, `egyensuly-3d-1-0-12-12-00`.
