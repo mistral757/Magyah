@@ -88,7 +88,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     const archs=Object.keys(KAM_FORGATO);evaIdoSzorzo=.5;window.__kamMer=[];
     const el=evaElem();el.classList.remove("hide");const cv=el.querySelector(".evaKamVaszon");cv.classList.remove("hide");el.querySelector(".evaSzinpad").style.visibility="hidden";
     const sk0={passz:"kapufa",csel:"skElastico",beadas:"skBeadas",beadasSarok:"skCsuka",tizi:"tizenegyes",szabad:"szabadrugas",egyedul:"bravur",kiugratas:"skSebesz",
-      tavoli:"skAgyu",sortuz:"skSortuz",egyensuly:"skEgyens",tank:"skTank",phalanx:"skPhalanx",szaguld:"skSzaguld",tiki:"skTiki",egyketto:"skKemia",letamadas:"evPresGol",letamadasKozep:"letamadas",kontra:"skKontra",
+      tavoli:"skAgyu",sortuz:"skSortuz",egyensuly:"skEgyens",szinergia:"skSzin",tank:"skTank",phalanx:"skPhalanx",szaguld:"skSzaguld",tiki:"skTiki",egyketto:"skKemia",letamadas:"evPresGol",letamadasKozep:"letamadas",kontra:"skKontra",
       nagylabda:"skNagylabda",katapult:"skKatapult",vagta:"skBolt",szoglet:"szoglet",bedobas:"bedobas",busz:"evBusz",csere:"evCsere",szabalytalan:"lap",
       utkozes:"serules",var:"var",kidolgozas:"kidolgozas",vedekezes:"blokk"};
     const nincs=archs.filter(a=>!sk0[a]);
