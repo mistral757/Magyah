@@ -1,7 +1,63 @@
 # 🐞 Fejlesztői jegyzetek
 
-33 jegyzet · a legújabb elöl.
+38 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwxizewdgppg — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T12:25:14.029Z · v1.0.12.12.01
+- **Hol:** Pálya + HUB › ☰ Menü
+- **Állapot:** 1. idény, 0. forduló · Kezdő út: meccsek
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Legyen tanítás a játék elején a klub arculata után arra, hogy a játékosok kinézetét, arcát is kusztomizálni lehet.
+
+---
+
+## jmwx8rlxg1kro — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T07:39:13.732Z · v1.0.12.12.01
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 0. forduló · Kezdő út: elso11
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Mikor az első skillt kapjuk, akkor az még nem meccs jutalom skill, pedig a leírás azt sejteti. 
+> Plusz béna, hogy kijelöli nekünk, hogy a játékmotor szerint kinek érdemes adni, és aztán nem hagy békén, gyakorlatilag vagy olyat választasz, akinek a neve full sötétítve van, vagy a játék ajánlatát. Ami esetünkben nagyon béna lett volna: egy 66osnak adni az első teljes skillt a 95ös Messzi helyett... Szóval magát az ajánlatado rendszert is kicsit jó lenne újragondolni. De ennél a tanításánál egyszerűen csak meg kellett volna szűnjön a kiemelés a választás idejére.
+
+---
+
+## jmwx8kt2ybpb9 — Egyéb hiba · normál
+
+- **Mikor:** 2026-11-26T07:33:56.410Z · v1.0.12.12.01
+- **Hol:** scClubPick
+- **Állapot:** 1. idény, 0. forduló · Kezdő út: elso11
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scClubPick
+
+> Kész csapat választásnál nagyon furák ezek a Run plafon értékek, amik kijönnek. Mindegyiknél 100 fölötti kb úgy hogy épp 5.1 nehézségen vagyok ahol nem lehet 100 fölöttit elérni...
+
+---
+
+## jmwx8fk0c38dj — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-26T07:29:51.372Z · v1.0.12.12.01
+- **Hol:** scQuick
+- **Állapot:** 1. idény, 0. forduló
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scQuick
+
+> Aki a nehézségnél a " most kezdem"-et állította, annak ezen a második oldalon ne legyen összefoglaló, viszont legyen választható, hogy milyen felállással, hány újrapörgetéssel, legendás magyarokkal vagy nélkülük szeretne játszani.
+
+---
+
+## jmwx883nl3ix0 — Új animáció / jelenet / ünneplés · normál
+
+- **Mikor:** 2026-11-26T07:24:03.585Z · v1.0.12.12.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 7. idény, 4. forduló
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Jó lenne ha megcsinálnád a szinergiagólokat is sajátosra. És erről jut eszembe, hogy most én a szinergia gólomat jelöltem maxolósra, és így összesen lvl 6ig fejlesztettem. Ami menő, de nem lehet tudni, hogy lvl 4től kezdve pontosan mi fejlődik benne. Ezt jelölni kéne.
 
 ---
 
