@@ -88,15 +88,16 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
       sz.nyit.forEach(f=>elotte.add(f));});
     const m=KUT_SZAKASZ[1];
     return {eredmeny,zart,masodik:m.fel.map(f=>f.id),kell:m.kell};});
-  ok(!r2.eredmeny.length&&!r2.zart.length&&JSON.stringify(r2.masodik)===JSON.stringify(["gol","meccs3","tempo"])&&r2.kell===3,
-    "2a. nincs eredményhez kötött cél; minden cél funkciója a szakasz kezdetén nyitva; a 2. szakasz: gól + 3 meccs + tempó",r2);
+  ok(!r2.eredmeny.length&&!r2.zart.length&&JSON.stringify(r2.masodik)===JSON.stringify(["gol","meccs3","tempo","oltozo"])&&r2.kell===4,
+    "2a. nincs eredményhez kötött cél; minden cél funkciója a szakasz kezdetén nyitva; a 2. szakasz: gól + 3 meccs + tempó + öltöző (1.0.12.15.00)",r2);
   const r2b=await p.evaluate(()=>{
     const K=S.kut;K.sz=1;K.kesz={};K.md={};
     kutMeccsUtan(1,3);const a=K.sz;kutMeccsUtan(0,2);kutMeccsUtan(0,1);const b2=K.sz;
     /* a tempó: a csúszka nyila */
     const st=document.querySelector("#speedRow .speedStep");st&&st.click();
+    kutJel("view:locker");   /* 1.0.12.15.00 — az öltöző-feladat */
     return {egyMeccsUtan:a,haromVeresegUtan:b2,tempoUtan:K.sz,pipak:Object.keys(K.kesz)};});
-  ok(r2b.egyMeccsUtan===1&&r2b.haromVeresegUtan===1&&r2b.tempoUtan===2,"2b. a 2. szakasz három vereséggel is teljesül (gól + 3 meccs + a tempó nyila)",r2b);
+  ok(r2b.egyMeccsUtan===1&&r2b.haromVeresegUtan===1&&r2b.tempoUtan===2,"2b. a 2. szakasz három vereséggel is teljesül (gól + 3 meccs + a tempó nyila + öltöző)",r2b);
   /* 4. a vezetett leckék */
   await p.evaluate(()=>{kutLeckeZar();try{_guideQ.length=0;guideShowNext();}catch(e){}   /* a gyors indítás kint hagyott guide-tippje */
     Object.keys(KUT_FUNKCIO).forEach(f=>S.kut.nyit[f]=1);S.kut.uj=[];   /* a 2. rész szakasz-lezárásának ünneplése itt ne indítson más leckét */S.kut.lecke={elso11:1};renderHub();});

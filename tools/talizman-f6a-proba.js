@@ -248,7 +248,7 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
     ki.berag={kap:sp1-sp0,vart:Math.max(1,Math.round(msSpReward(def.val)*talSpecV("beragadt","pro")/100)),egyszer:r1!=null&&r2===null,marad:!!M.pend[def.id]};
     delete M.pend[def.id];
     const cat=MS_STYLE_CATS[0].key;
-    _nincs();const cp0=msCatPrice(cat);_lap("beragadt",2);ki.beragAr=msCatPrice(cat)/cp0;
+    _nincs();const cp0=msCashReward(MS_PCT_BASE);_lap("beragadt",2);ki.beragAr=msCashReward(MS_PCT_BASE)/cp0;   /* 1.0.12.15.00: a kontra a pénzes mérföldkövön ül */
     /* SZEREPJÁTÉK — a valódi szerep-tábla és a valódi kiosztás */
     const _st=S.style;S.style={key:"bombazok"};
     try{
@@ -300,7 +300,7 @@ const kozel=(a,b,e)=>typeof a==="number"&&isFinite(a)&&Math.abs(a-b)<=(e==null?1
   ok(st.virt===4,"Hangsúly-virtuóz: 4 csúszka mozdítható a 3 helyett",st.virt);
   ok(kozel(st.virtCon,1.1)&&st.virtPro,"…kontra: a kár-oldal +10%, a haszon-oldal érintetlen",st.virtCon);
   ok(st.berag.kap===st.berag.vart&&st.berag.egyszer&&st.berag.marad,"Beragadt kincs: a beragadt jutalom 25%-a azonnal, talizmánonként egyszer — a jutalom beragadva marad",st.berag);
-  ok(kozel(st.beragAr,1.15,0.005),"…kontra: a mérföldkő-kategória nyitási díja +15% (3.9.186: a díj kisebb szám, a kerekítés miatt ±0,5%)",st.beragAr);
+  ok(kozel(st.beragAr,0.85,0.005),"…kontra: a pénzes mérföldkövek jutalma −15% (1.0.12.15.00 óta — a kategória-nyitás ingyenes lett)",st.beragAr);
   ok(st.szerep.v1===st.szerep.vart&&st.szerep.v1!==st.szerep.v0,"Szerepjáték: a valódi roleVal hatása +6%",st.szerep);
   ok(st.szerepKi.le===st.szerepKi.vart&&st.szerepKi.le>0,"…kontra: akit a valódi kiosztás lecserél, −4 morál-jelet kap",st.szerepKi);
   ok(st.mester&&kozel(st.mester.arany,st.mester.vart,st.mester.tures),"A mester jegyzetei: a csillagozás-jog ára −20%",st.mester);

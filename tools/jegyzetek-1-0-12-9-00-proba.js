@@ -83,7 +83,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     o.dontes=kutStilusDontes();
     window.styleCanChoose=_sc;window.styleState=_ss;o.utana=kutStilusDontes();S.kut.mind=1;
     return o;});
-  ok(r3.ids.join(",").endsWith("filozofia,hosszu,kupa,zaras")&&r3.hosszuKell===3&&r3.hosszuFel===3&&r3.leckek&&r3.sor,"3. a „Hosszú táv” 3/3 feladat, utána a kupák és a szezon vége, saját leckével",r3);
+  ok(r3.ids.join(",").endsWith("filozofia,hosszu,kupa,zaras")&&r3.hosszuKell===5&&r3.hosszuFel===6&&r3.leckek&&r3.sor,"3. a „Hosszú táv” 5/6 feladat (1.0.12.15.00: + stadion, scout, keretbővítés), utána a kupák és a szezon vége, saját leckével",r3);
   ok(r3.filLep.some(c=>/szerep/i.test(c))&&r3.hol,"3. a filozófia-lecke a szezon-szerepeken is átvisz; a „Hol?” a választóig vezet",r3.filLep);
   ok(r3.ujra&&r3.egyszer,"3. az idő előtt lezárult Kezdő út egyszer újranyílik (a 3. idényig)",{ujra:r3.ujra,egyszer:r3.egyszer});
   ok(r3.dontes&&!r3.utana,"3. a stílus-döntés alatt a tippek és a nyitás-ünnep várnak; a döntés után nem",{dontes:r3.dontes,utana:r3.utana});

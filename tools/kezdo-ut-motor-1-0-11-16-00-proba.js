@@ -73,7 +73,7 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
     o.sz1=S.kut.sz;
     /* 1.0.11.22.00 — a 2. szakasz tanító céljai: gól, 3 lejátszott meccs, tempó-váltás (eredménytől függetlenül) */
     kutMeccsUtan(1,0);o.ketMeccsUtan=S.kut.sz;kutMeccsUtan(0,2);kutMeccsUtan(0,0);o.haromMeccsUtan=S.kut.sz;
-    kutJel("set:tempo");o.sz2=S.kut.sz;o.nyitEdzes=kutNyitva("edzes");o.nyitBoost=kutNyitva("boost");
+    kutJel("set:tempo");kutJel("view:locker");o.sz2=S.kut.sz;o.nyitEdzes=kutNyitva("edzes");o.nyitBoost=kutNyitva("boost");
     document.getElementById("hubFormationPicker").classList.add("hide");document.getElementById("scHub").classList.remove("hide");
     S.idx=1;renderHub();
     o.edzesGomb=v("hubTrainingBtn");o.uj=S.kut.uj.slice();
