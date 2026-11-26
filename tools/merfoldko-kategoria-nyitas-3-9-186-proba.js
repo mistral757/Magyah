@@ -135,16 +135,16 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     _chPopQ=[];try{chPopClose();}catch(e){}
     _msCatOpen=true;
     const h=msCatShopHtml();
-    ki.panel={nincsGomb:!/Megnyitom|data-mscat/.test(h),szabaly:/Megvenni nem kell/.test(h)&&/csak egyszer/.test(h),
-      zartSor:/magától nyílik/.test(h),nyitottSor:/nyitási díj:/.test(h)};
+    ki.panel={nincsGomb:!/Megnyitom|data-mscat/.test(h),szabaly:/Megvenni nem kell/.test(h)&&/ingyenes/.test(h),
+      zartSor:/magától, <b>ingyen<\/b> nyílik/.test(h),nyitottSor:/Megnyílt/.test(h)};
     renderMilestones();
     const box=($("hubMilestonesPanel")&&$("hubMilestonesPanel").innerHTML)||"";
-    ki.lista={nincsLock:!/data-mslock|msLockBtn/.test(box),zartInfo:/magától nyílik/.test(box)};
+    ki.lista={nincsLock:!/data-mslock|msLockBtn/.test(box),zartInfo:/magától(, <b>ingyen<\/b>)? nyílik/.test(box)};
     MILESTONES.forEach(d=>{d.p=eredetiP[d.id];});
     return ki;});
 
   console.log("\n— 1. A DÍJ —");
-  ok(r.egyforma&&r.pontos,"a nyitási díj egy átlagos pénzjutalmas mérföldkő, mind a hat kategóriánál ugyanaz",{dij:r.dij[0],atlag:r.atlag});
+  ok(r.dij.every(x=>x===0),"1.0.12.15.00: a nyitás ingyenes (díj 0) mind a hat kategóriánál",{dij:r.dij});
   console.log("\n— 2. ZÁRT, TELJESÍTÉS NÉLKÜL —");
   ok(r.zart.nyitott===0&&r.zart.budzse===1e9,"teljesítés nélkül semmi nem nyílik, és semmi nem megy le",r.zart);
   console.log("\n— 3. AZ ELSŐ TELJESÍTÉS —");
@@ -152,7 +152,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.elso.levont===r.elso.dij&&r.elso.info&&r.elso.info.auto===1&&r.elso.info.price===r.elso.dij,"a díj PONTOSAN egyszer megy le, és a mentésbe is beíródik",{levont:r.elso.levont,dij:r.elso.dij});
   ok(r.elso.done===2&&r.elso.pend===0&&r.elso.sp>0,"a teljesült fokozatok azonnal fizetnek — semmi nem ragad be",r.elso);
   ok(r.elso.naplo,"a napló jegyzi");
-  ok(r.pop.lat&&/stílus-kategória megnyílt/i.test(r.pop.szoveg)&&/Transzferpiac/.test(r.pop.szoveg)&&/nyitási díj/i.test(r.pop.szoveg),"felugró ablak: megnyílt, melyik, mennyi ment le",r.pop.szoveg);
+  ok(r.pop.lat&&/stílus-kategória megnyílt/i.test(r.pop.szoveg)&&/Transzferpiac/.test(r.pop.szoveg)&&/ingyenes/i.test(r.pop.szoveg),"felugró ablak: megnyílt, melyik — ingyen",r.pop.szoveg);
   console.log("\n— 4. UTÁNA SZABADON —");
   ok(r.utana.levont===0&&r.utana.done===3,"a következő teljesítés fizet, és nem von le semmit",r.utana);
   console.log("\n— 5. MIND A HAT —");
@@ -160,11 +160,11 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.hat.utana===0,"az újabb teljesítések és kiértékelések már semmit nem vonnak le",r.hat.utana);
   ok(r.hat.sorban>=5,"a hat felugró sorba áll, nem egymásra",r.hat.sorban);
   console.log("\n— 6. ÜRES KASSZA —");
-  ok(r.ures.nyitva&&r.ures.budzse===0&&r.ures.info.price===100,"üres kasszánál annyi megy le, amennyi van, és a kategória akkor is nyílik",r.ures);
+  ok(r.ures.nyitva&&r.ures.info.price===0,"a kategória a kassza állásától függetlenül, díj nélkül nyílik",r.ures);
   console.log("\n— 7. KIHÍVÁS-JUTALOM —");
   ok(r.ajandek.nyitva&&r.ajandek.levont===0&&r.ajandek.kesobb===0&&r.ajandek.info.granted===1,"a kihívás-jutalom díj nélkül nyit, és később sem von le",r.ajandek);
   console.log("\n— 8. A FELÜLET —");
-  ok(r.panel.nincsGomb&&r.panel.szabaly&&r.panel.zartSor&&r.panel.nyitottSor,"az Infópult panelen nincs „Megnyitom”, a szabály és a díj ki van írva",r.panel);
+  ok(r.panel.nincsGomb&&r.panel.szabaly&&r.panel.zartSor&&r.panel.nyitottSor,"az Infópult panelen nincs „Megnyitom”, és ki van írva: ingyen nyílik",r.panel);
   ok(r.lista.nincsLock&&r.lista.zartInfo,"a zárt mérföldkő sora nem gomb, hanem tájékoztat",r.lista);
   ok(errs.length===0,"nincs oldalhiba",errs.slice(0,5));
 

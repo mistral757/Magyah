@@ -1,7 +1,7 @@
 /* 🎁 1.0.11.6.00 — LÁDÁK: ÖT FIZETŐESZKÖZ, HAT LÁDA, HAT SZINT.
    Amit mér:
      1. az esélytábla: minden láda összege 1; az Öltözői 6. szintje 0,05 %;
-        a várható érték / ár 84–98 %, a nagyobb láda nem rosszabb;
+        a várható érték / ár 118–140 % (1.0.12.14.00 óta a láda ×0,71, a valuta ×1,41), a nagyobb láda nem rosszabb;
         20 000 dobás ládánként a tábla szerint oszlik;
      2. a befizetés: pénz (U/100 Ft érménként), stíluspont (2,5), játékos
         (piaci érték 40 %-a, legalább 1,5× a gyors eladás, a keretből kikerül — és mérve a gyors eladás
@@ -80,7 +80,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     const J=ladaJatJeloltek();const jo=J.find(o=>o.p.n===tp.n);
     const je=careerPool[jo.p.n];const sv=sellValue(jo.p),mv=marketValue(je);
     const e0=ladaErme();r=ladaBefizetJatekos(jo.p.n);
-    ki.jat={ok:r.ok,uz:r.uz,e:r.e,vart:Math.round(Math.max(mv*LADA_JAT_K,sv*1.5)/U*100*ladaNfSzorzo()),bent:!!fullCareerRoster().find(p=>p&&p.n===jo.p.n),
+    ki.jat={ok:r.ok,uz:r.uz,e:r.e,vart:Math.round(Math.max(mv*LADA_JAT_K,sv*1.5)/U*100*ladaNfSzorzo()*LADA_VALUTA_X),bent:!!fullCareerRoster().find(p=>p&&p.n===jo.p.n),
       gyorsEladasErme:Math.round(sv/U*100),arany:+(r.e/Math.max(1,Math.round(sv/U*100))).toFixed(2),delta:ladaErme()-e0};
     ki.kezdoUz=(()=>{const x=ladaJatJeloltek().find(o=>slots.some(s=>s.player===o.p));if(!x)return null;const rr=ladaBefizetJatekos(x.p.n);return rr.ok?"ok":rr.uz;})();
     S.staff=[{n:"Láda Teszt",type:"attr:passz",attrKey:"passz",sz:60,szBase:60,age:40,xp:0,since:1,focus:{mode:"team",group:null,names:[]}}];
@@ -90,7 +90,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
     /* 3. vásárlás */
     S.lada.erme=0.1;ki.kevés=ladaVesz("bajnoki",1).ok;
     S.lada.erme=10;const e1=ladaErme();const v=ladaVesz("kupa",5);
-    ki.vesz={ok:v.ok,db:v.jut.length,fogy:e1-ladaErme(),vart:49*5,szintek:v.jut.map(j=>j.szint),szamlalo:S.lada.db.kupa};
+    ki.vesz={ok:v.ok,db:v.jut.length,fogy:e1-ladaErme(),vart:ladaDef("kupa").ar*5,szintek:v.jut.map(j=>j.szint),szamlalo:S.lada.db.kupa};
     /* 4. kategóriák */
     const K={};
     S.chFreeBoost={};S.boostTokens=0;S.lada.kupon={};const ar0=boostPriceOf("plain");
@@ -231,7 +231,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   console.log(JSON.stringify({ui,ui2,ui3,peek}));
 
   ok(r.tabla.every(t=>Math.abs(t.sum-1)<1e-6)&&r.olt6===0.0005,"1a. minden láda esélye 1-re összegződik; az Öltözői 6. szintje 0,05 %",r.tabla.map(t=>t.sum));
-  ok(r.tabla.every(t=>t.ev>=0.84&&t.ev<=0.98)&&r.tabla.every((t,i)=>i===0||t.ev>=r.tabla[i-1].ev-1e-9),"1b. a várható érték / ár 84–98 %, a nagyobb láda nem rosszabb",r.tabla.map(t=>t.ev));
+  ok(r.tabla.every(t=>t.ev>=1.18&&t.ev<=1.40)&&r.tabla.every((t,i)=>i===0||t.ev>=r.tabla[i-1].ev-1e-9),"1b. a várható érték / ár 118–140 % (1.0.12.14.00: a láda ×0,71), a nagyobb láda nem rosszabb",r.tabla.map(t=>t.ev));
   ok(r.dob.every(d=>d.max<0.012),"1c. 20 000 dobás ládánként a tábla szerint (eltérés < 1,2 pp)",r.dob);
   ok(r.penz.ok&&r.penz.erme===100&&Math.abs(r.penz.fizetett-r.penz.vart)<=1&&r.penz.fizetett<=0.8*r.penz.regi/r.penz.nf+1,"2a. pénz: 100 érme ≥ 20%-kal olcsóbb, mint 1 U (a nehézség-szorzó fölött)",r.penz);
   ok(r.sp.ok&&r.sp.e===r.sp.vart&&r.sp.sp===60,"2b. stíluspont: 40 pont = 100 érme × a nehézség-szorzó",r.sp);
@@ -239,7 +239,7 @@ const ok=(c,t,d)=>{console.log((c?"  ✓ ":"  ✗ ")+t+(d!==undefined?" · "+JSO
   ok(r.kezdoUz===null||r.kezdoUz==="ok"||/nincs, aki a helyére/.test(r.kezdoUz),"2c'. pótlás nélküli kezdő: érthető elutasítás",r.kezdoUz);
   ok(r.stab.ok&&r.stab.e===r.stab.vart&&r.stab.db===0,"2d. stábtag: a stábpiaci ár 40 %-a, távozik",r.stab);
   ok(r.tal.ok&&r.tal.e===r.tal.vart,"2e. talizmán: a ritkaság szerint",r.tal);
-  ok(r.kevés===false&&r.vesz.ok&&r.vesz.db===5&&r.vesz.fogy===r.vesz.vart&&r.vesz.szamlalo===5,"3. kevés érméből nem megy; ×5: öt jutalom, 245 érme fogy",r.vesz);
+  ok(r.kevés===false&&r.vesz.ok&&r.vesz.db===5&&r.vesz.fogy===r.vesz.vart&&r.vesz.szamlalo===5,"3. kevés érméből nem megy; ×5: öt jutalom, 5 × 34 érme fogy",r.vesz);
   const K=r.K;
   ok(K.kupon.utana<K.kupon.elotte&&Math.abs(K.kupon.utana/K.kupon.elotte-0.75)<0.03&&K.kupon.vissza===K.kupon.elotte,"4a. kupon: −25 %, fizetéskor elfogy",K.kupon);
   ok(K.ingyen.db===2&&K.ingyen.ar===0,"4b. 6. szint: 2 ingyen ifi-boost, 0 Ft",K.ingyen);
