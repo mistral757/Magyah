@@ -1,7 +1,18 @@
 # 🐞 Fejlesztői jegyzetek
 
-52 jegyzet · a legújabb elöl.
+53 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwy4qba47ws4 — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-26T22:34:00.988Z · v1.0.12.15.00
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 8. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Szitálós gólnál mikor megkapja a játékos a labdát, utána tol egyet  rajta úgy, gjgy gyakorlatilag beletolja a védőbe. És tök közel is kerül így a kapuhoz. Menőbb lenne, ha távol maradna a kaputól, és onnan messziről egy enyhe labdaigazítás után lőné rá, és igazi távoli bombagól lenne belőle.
 
 ---
 
