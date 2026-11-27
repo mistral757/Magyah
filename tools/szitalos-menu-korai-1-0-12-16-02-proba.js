@@ -65,8 +65,11 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
       const k=F0.ms;const F=kamKimenetel(F0,c,ev,sk);const kk=k/F.ms;
       const utan=F.vagas.filter(v=>v.ig>kk+1e-6);return {utan:utan.map(v=>v.n+(v.fix?"*":"")),repul:Math.round((F.csucs-F.lovesT)*F.ms),kim:F.kim};};
     o.szit=[1,2,3,4].map(i=>fut("skSzitalos","gol",i));o.szitV=fut("skSzitalos","bravur",7);o.agyu=fut("skAgyu","gol",5);return o;});
-  ok(r1.szit.every(x=>x.utan.length===1&&x.utan[0]==="mogul*"&&x.repul>=900)&&r1.szitV.utan.length===1&&r1.agyu.utan.length===2,
-    "1. Szitálós: egy rögzített kamera a lövő mögül, a labda ≥ 0,9 mp-ig repül; az Ágyúgolyó két felvétel marad",r1);
+  /* 🎯 1.0.12.18.01 — KIMONDOTT KÉRÉS (🐞 jmwzcbs1lavh0): „Állítsd vissza a regire." + (🐞 jmwzbyohsfdnp): „Nagyon lassú
+     lett a labda a szitálós gólnál" — a rögzített lövő mögötti kamera és a lassítás visszavonva: a régi tempó
+     (a labda ~0,3–0,5 mp-ig repül), és EGY vágás nélküli kapu mögötti felvétel az átvételtől a végéig. */
+  ok(r1.szit.every(x=>x.utan.length===1&&x.utan[0]==="kapu"&&x.repul>=250&&x.repul<700)&&r1.szitV.utan.length===1&&r1.agyu.utan.length===2,
+    "1. Szitálós: egy, vágás nélküli kapu mögötti felvétel, a régi tempó; az Ágyúgolyó két felvétel marad",r1);
   /* 4. — a korai lecke (Kezdő út) */
   await p.evaluate(()=>{if(S.kut){S.kut.lecke=S.kut.lecke||{};S.kut.lecke.elso11=1;}
     window.__vl=vl0Szamol;window.__us=unlockStyleOk;window.vl0Szamol=()=>({n95:4,n99:1});window.unlockStyleOk=()=>true;S.vl0Asked=0;vl0Tick();});
