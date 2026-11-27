@@ -1,7 +1,74 @@
 # 🐞 Fejlesztői jegyzetek
 
-56 jegyzet · a legújabb elöl.
+62 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwzapt9ae3u2 — Új funkció / rendszer · normál
+
+- **Mikor:** 2026-11-27T18:09:21.502Z · v1.0.12.16.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 23. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> A HUB-ban legyen mindig látványosan elérhető egy gomb, ami visszavisz a szezonhoz. Kicsit sok minden van már a HUBban és sokszor van hogy keresem, hol a gomb. Legyen egyértelmű, mire kell kattintsak, hogy visszamenjek. Ugyanezt a másik irányba is megcsinálhatnánk. Ne ott alul a többi gombbal legyen az irány a HUB-ba. Ezek a fő felületeink. Legyenek egyértelműek és mindig könnyen elérhetők. 
+> Az öltözőt pedig át kéne vinni a menübe és ahhoz is tanítás kapcsolni. És ahhoz is animációt csinálni.
+
+---
+
+## jmwzahwiw6lxn — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-27T18:03:12.488Z · v1.0.12.16.01
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 23. forduló · Kezdő út: hosszu
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Amíg futnak az egyes menüpontok animációi, addig legyen az egész kezelőfelület annyival lejjebb tolva, amennyit felülről elfoglal a kis animáció, különben csak simán zavar a cucc. Legyen Smooth az, amikor lemegy az animáció és minden visszatolódik fentre. Vagy amikor a user rákattint az animációra, hogy eltűnjön.
+
+---
+
+## jmwzaft1hx47 — Menü / navigáció: rossz helyre visz, nem nyílik, beragad · normál
+
+- **Mikor:** 2026-11-27T18:01:34.661Z · v1.0.12.16.01
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 23. forduló · Kezdő út: hosszu
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Most egy csomó dolog visszadob a menüből a HUB-ba. Játékosok leigazolása, átigazolási esemény stb. Valami bug van ezzel. Egyszer már megoldottuk.
+
+---
+
+## jmwzacxt539zx — Felület: elcsúszik, egymásra lóg, kilóg a képből, takar · normál
+
+- **Mikor:** 2026-11-27T17:59:20.873Z · v1.0.12.16.01
+- **Hol:** Pálya + HUB › ☰ Menü › Biztosan módosítod?
+- **Állapot:** 1. idény, 23. forduló · Kezdő út: hosszu
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub · ablakok: hubTacticConfirmModal („Biztosan módosítod?”)
+
+> Kinyitottam egy cspaatilus képességet. Miután rányomtam a megerősítésre, visszadobott a HUB-ba. Nem a menüben, nem a csapatstílus almenüben folytatódott. Ez így biztosan probléma
+
+---
+
+## jmwzabcow2vcq — Nincs értesítés, vagy késve jön (szakasz vége, nyitás, jutalom) · normál
+
+- **Mikor:** 2026-11-27T17:58:06.848Z · v1.0.12.16.01
+- **Hol:** Pálya + HUB › ☰ Menü
+- **Állapot:** 1. idény, 23. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Amikor kinyitsz egy új csapatstílust akkor általában azonnal feloldódik vagy 20-30 mérföldkő. Azokat egy nagy csomagban közölje a játék ilyenkor. Lehessen végignézni a kis értesítési ablakban görgetve, de ha nem érdekel, lehessen elhajtani egyből. Most végig kellett nyomkodni a 25 értesítést vagy nem tusom msnnyit, mert kikapcsolni viszont nem akartam
+
+---
+
+## jmwza7zdd87hj — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-27T17:55:29.617Z · v1.0.12.16.01
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 23. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> A sarokból benéző játékos az idle kijelzőn a téma. Rossz helyen van a kis üzenet buborékja.
 
 ---
 
