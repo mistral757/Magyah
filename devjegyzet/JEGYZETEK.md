@@ -1,7 +1,18 @@
 # 🐞 Fejlesztői jegyzetek
 
-55 jegyzet · a legújabb elöl.
+56 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwz1nhpk6unb — Tanítás: rossz helyre visz / nem nyitja ki, amit kéne (menü, csoport, lap) · normál
+
+- **Mikor:** 2026-11-27T13:55:36.680Z · v1.0.12.16.01
+- **Hol:** HUB › ⚡ Hol jön a mennydörgés — nulladik szint
+- **Állapot:** 1. idény, 23. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scHub · ablakok: hubTacticConfirmModal („⚡ Hol jön a mennydörgés — nulladik szint”)
+
+> Nincs tanítás arra, hogy mi van akkor, ha beköszönt a mennydörgés vagy a panzer idő előtt. (Amikor ez a két stílus első szezon vége előtt kap egy lehetőséget elindulni)
 
 ---
 
