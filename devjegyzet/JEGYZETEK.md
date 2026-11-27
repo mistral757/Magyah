@@ -1,7 +1,84 @@
 # 🐞 Fejlesztői jegyzetek
 
-62 jegyzet · a legújabb elöl.
+69 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwzcbs1lavh0 — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-27T18:54:25.977Z · v1.0.12.18.00
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Sőt a szitálós animáció teljesen elcsesződött. Tök jó volt előtte, csak a kamerára kellett volna figyelni, hogy minden esetben olyan szögben legyen véve, amelyikről végig látszik a gól. Állítsd vissza a regire.
+
+---
+
+## jmwzc2q8fjsm8 — Átigazolás / piac / eladás / felfedezett játékos · normál
+
+- **Mikor:** 2026-11-27T18:47:23.727Z · v1.0.12.18.00
+- **Hol:** Pálya + Panel › ☰ Menü › 🔍 Felfedezett játékosok
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scWindow
+
+> A scout felfedezettek leigazolásakor is legyen az a menő animáció amivel megkapjuk a játékost (kártyával mindennel)
+
+---
+
+## jmwzbyohsfdnp — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-27T18:44:14.848Z · v1.0.12.18.00
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Nagyon lassú lett a labda a szitálós gólnál
+
+---
+
+## jmwzbup3z7nvf — Menü / navigáció: rossz helyre visz, nem nyílik, beragad · normál
+
+- **Mikor:** 2026-11-27T18:41:09.023Z · v1.0.12.18.00
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Továbbra is van egy csomó menün belüli almenupont, amit ha megnyitok, és utána bezárok, akkor utána nem a menü legutóbbi pontjához kerülök vissza, hanem bumm, vissza a HUB-ba, kezdheted elölről...
+
+---
+
+## jmwzbrugjb7rm — Felület: elcsúszik, egymásra lóg, kilóg a képből, takar · normál
+
+- **Mikor:** 2026-11-27T18:38:55.987Z · v1.0.12.18.00
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Eltüntettük az öltöző gombot a kihívás gomb mellől de nem húztuk ki a kihívás gombot teljes szélességre. Gagyi
+
+---
+
+## jmwzb62fh55ir — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-27T18:21:59.885Z · v1.0.12.16.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 27. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> A blokk animációnál valami fura dolog történik a védővel. Javítsuk
+
+---
+
+## jmwzaygxr5228 — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-27T18:16:05.439Z · v1.0.12.16.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 24. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Öngólnak nincs megcsinálva az animációja
 
 ---
 
