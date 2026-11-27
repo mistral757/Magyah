@@ -1,7 +1,29 @@
 # 🐞 Fejlesztői jegyzetek
 
-53 jegyzet · a legújabb elöl.
+55 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwyl7uwa5ajb — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-27T06:15:33.418Z · v1.0.12.16.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 17. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Nem igazán lehetett látni a szitálós gól animációját. Túl gyors volt és valahogy a kamera pont lövés közben váltott és így gyakorlatilag pont maga a szitálás nem látszott. Legyen rögzített ennél a gól fajtánál, hogy vagy a kapu mögül, vagy a játékos mögül látszik a gól végig, 1 kameraállásból, hogy jól látszódjon a szitálás.
+
+---
+
+## jmwy8icxp8q2v — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-27T00:19:48.349Z · v1.0.12.16.01
+- **Hol:** Pálya + HUB › ☰ Menü
+- **Állapot:** 1. idény, 15. forduló · Kezdő út: filozofia
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Átigazolási esemény animáció és kipörgetés után nem a menübe kerülünk vissza, hanem a HUBba. Nagyon babra így... Ennél is ugyanoda kell visszakerülünk, ahol előtte voltunk. Átigazolás fül lenyitva, Menü
 
 ---
 
