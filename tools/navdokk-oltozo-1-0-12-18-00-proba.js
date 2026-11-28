@@ -59,6 +59,8 @@ const srv=http.createServer((req,rp)=>{let f=decodeURIComponent(req.url.split("?
   await w(700);
   /* 1. dokk */
   const d1=await p.evaluate(async()=>{const v=ms=>new Promise(r=>setTimeout(r,ms));const o={};
+    /* 🧭 1.0.12.18.02 (🐞 jmwzf2h7v8ypc) — menü-módban nincs dokk (a menülistára lógott): a HUB-ot menü nélkül mérjük */
+    o.menuben=_inHubMenu;if(_inHubMenu)hubMenuExit();
     _navDock.tick();const d=$("navDock");o.hubLat=!d.classList.contains("hide");o.hubTx=d.textContent.trim();o.hubGomb=$("hubNextSeasonBtn").textContent.trim();
     $("navDockBtn").click();await v(900);_navDock.tick();
     o.meccsen=!$("scSim").classList.contains("hide");o.meccsTx=d.textContent.trim();o.meccsLat=!d.classList.contains("hide");

@@ -164,3 +164,73 @@
 8. nincs oldalhiba.
 
 A `szitalos-menu-korai-1-0-12-16-02` próba 1. pontja az új (régi) Szitálóst méri: egy kapu mögötti felvétel, a labda 0,25–0,7 mp-ig repül.
+
+---
+
+# 1.0.12.18.02 — hat új jegyzet: menü (dokk, védőháló, napló), büdzsé, kupa-kihívás, Száguldás, szöglet-gól
+
+## Menü: dokk menü-módban rejtve, védőháló, napló
+**KIMONDOTT KÉRÉS (🐞 jegyzet jmwzf2h7v8ypc):** „Csapatépítés menüponton belül ha megnyitom a cuccokat, és utána bezárom, majdnem mind visszadob a HUBba továbbra is. Nem ezt kéne! 10x alkalommal javítjuk. Bezárom és ott találom magam, ahol megnyitottam az imént azt az almenupotnot. Edző esetében pl. menü, csapatépítés. Ahol meg lehet nyitni azt az almenut. Nagyon idegesítő"
+**KIMONDOTT KÉRÉS (🐞 jegyzet jmx03zjtt3oqf):** „Klub arculata menupontbol akár mentéssel, akár x-szel lélek ki, a HUBba dob, nem a menübe vissza. Stadionnál pedig csak az x-szel ugrik a HUBba a menü helyett"
+
+**Mérés.** A menü minden alpontját végigpróbáltuk, minden bezáró gombbal (✕, Bezárás, Mentés, Mégse, Vissza a menübe), a következő feltételek mellett:
+- telefon-emulációval, valódi koppintással;
+- a Kezdő út „zárás” szakaszában;
+- valódi mentéssel (`saveGame`).
+
+Mindegyik a menübe tért vissza. Egy valódi hibát találtunk: a navigációs dokk („← Vissza a szezonhoz”) menü-módban is látszott, és rálógott a menülista alsó pontjaira. Valódi koppintással a dokkot találta el, és kivitt a menüből.
+
+**Javítás:**
+- **Dokk:** menü-módban nincs navigációs dokk; a menünek megvannak a saját kijáratai.
+- **Védőháló:** ha a menüt nem a felhasználó hagyta el, hanem a HUB egy pillanatra eltűnt (a menü-állapot ezért elfelejtődött), és 6 mp-en belül a HUB-ra érkezünk vissza, a menü visszaáll a nyitott füllel és a görgetéssel együtt. A saját kilépés (menü becsukása, „Vissza a HUB-ba”) után nem áll vissza.
+- **Napló:** minden menü-elhagyás (kilépés, becsukás, „elhagy:<látható képernyők>”, visszaállítás) a hívó függvénnyel együtt a 🐞 jegyzet helyébe kerül (`hely.menuNaplo`, az utolsó 8). Ha a kidobás ezek után is előjön, a következő jegyzetből pontosan látszik, ki tette.
+
+## Büdzsé: nem csúszik el a kijelző
+**KIMONDOTT KÉRÉS (🐞 jegyzet jmx04ehoy8cip):** „Ha a büdzsé részt lenyitjuk, akkor elcsúszik az egész kijelző, mert túlfutón vannak szövegrészek. Javítsuk."
+
+- **Az ok:**
+  - a sor értéke (`b`) nem törhetett (`white-space:nowrap`);
+  - a címke (`span`) nem zsugorodhatott a leghosszabb szava alá (flex `min-width:auto`);
+  - egy hosszú érték (pl. „142% (a plafon fölött — plafon 125%)”) vagy egy hosszú forrás-sor ezért kitolta a sort.
+- **Mérve 375 px-en:** a lap 649 px-re szélesedett.
+- **Most:**
+  - a címke zsugorodik és tördel;
+  - a hosszú érték is tördelhető (jobbra zárva, legfeljebb a sor 64%-a);
+  - a doboz soha nem szélesebb a helyénél (375 → 375).
+
+## Kupa-kihívás: azonnal, nem egy fordulóval később
+**KIMONDOTT KÉRÉS (🐞 jegyzet jmx03uqmkjva9):** „1 fordulóval később kapjuk meg a kupában a jutalmat bizonyos kihívásokért. Pl. 10 gólos különbséggel kellett nyerni egy párharcot"
+
+- **Az ok:**
+  - a kihívásokat a **lefújás** értékeli (`chAfterMatchBook`);
+  - a párharc összesítése (`k:"tie"`) viszont csak utána, a kupa-nézetre lépéskor kerül a naplóba;
+  - a következő kiértékelés így csak a következő meccs után jött.
+- **Most** a párharc lezárásakor és a csoportkör végén azonnal lefut a beváltás (`settleEarlyChallenges`).
+
+## Száguldás: széles totál
+**KIMONDOTT KÉRÉS (🐞 jegyzet jmx03szue53hq):** „Száguldás gólnál nem igazán látszik, mi történik. Legyen távolabbi kamerával véve az egész, hogy látsszanak a játékosok a szélén, akik adogatnak"
+
+- **Az ok:** a két szélső 50 m-re van egymástól, a 22 m-es kivágás eddig kiejtette őket.
+- **Most** a vágás saját irányt (`V.d`) és saját legnagyobb távolságot (`V.tav`) kaphat. A Száguldás nyitó felvétele egy magas, oldalról vett totál (legfeljebb 70 m-ről): mindkét szélső, a két átadás és a középen rohanó befejező is a képen van. A lövés előtt egy közelebbi, mögüli kép jön.
+
+## Beadásos fejes vs. szöglet-gól
+**KIMONDOTT KÉRÉS (🐞 jegyzet jmx0447hddba4):** „Van az a gol, amikor elhúz a szélén a játékos, aztán beadja és valaki közepén befejeli. Ez tök szuper, de A feed kommentár ezeknél mindig szögletet közvetít. Legyen az, hogy az ilyen gólok felé maradjon meg animáció szintén ugyanilyen, csak A feed legyen hozzaigazitva, azaz legyen az mondva, hogy valaki a szélén elhúzott, beadta és befejelte egy másik, a másik felében az eseteknek pedig maradjon A feed szöveg, és az animációt kell megcsinálni a szögletre (ami már meg van, csak eddig abból csak olyan volt, amikor felszabadított a védő)"
+
+- **A fejes gólok fele:** „<beadó> ELHÚZOTT A SZÉLEN, BEADTA — FEJJEL! GÓL!”.
+  - A sorból `alt:"fejes"` lesz, ami a szélen elhúzós beadás-jelenetet kapja.
+  - Ha a gólpasszt a kijelölt szögletrúgó adja, mindig a szöglet-változat jön.
+- **A másik fele:** „SZÖGLET UTÁN, FEJJEL! GÓL!”.
+  - A sorból `alt:"szogletfej"` lesz, ami a **szöglet-felvezetést** kapja: rúgó a zászlónál, beívelés, fejes a hálóba. Eddig ebből csak a tisztázás létezett.
+  - A 2D jelenet ugyanúgy fejes marad.
+- **A statisztika** (szöglet-gólok száma) nem változik.
+
+## Próba
+`tools/jegyzetek-1-0-12-18-02-proba.js`: 8/8.
+1. dokk a menüben / a HUB-on;
+2. védőháló (és a saját kilépés után nem áll vissza);
+3. menü-napló a 🐞 helyben;
+4. büdzsé 375 px-en, hosszú sorral;
+5. a kupa-kihívás azonnal (`tie` → beváltás, +8);
+6. Száguldás totál;
+7. a két fejes-sor és a két jelenet;
+8. nincs oldalhiba.
