@@ -1,7 +1,18 @@
 # 🐞 Fejlesztői jegyzetek
 
-75 jegyzet · a legújabb elöl.
+76 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmx05cykg30uf — Új funkció / rendszer · normál
+
+- **Mikor:** 2026-11-28T08:27:09.952Z · v1.0.12.18.01
+- **Hol:** HUB
+- **Állapot:** 1. idény, 30. forduló
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scHub
+
+> Szárny kémia: ne legyen korlátozás a párnál, hogy melyik szélen vannak a játékosok és nem kell hogy védő legyen az egyik. Azaz: jsz középpályás és bsz csatár, jv és bsz középpályás, bv és jsz csatár, ezek mind működő párosok legyenek.
 
 ---
 
