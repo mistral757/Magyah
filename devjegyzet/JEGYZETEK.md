@@ -1,7 +1,18 @@
 # 🐞 Fejlesztői jegyzetek
 
-69 jegyzet · a legújabb elöl.
+70 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmwzf2h7v8ypc — Menü / navigáció: rossz helyre visz, nem nyílik, beragad · normál
+
+- **Mikor:** 2026-11-27T20:11:10.891Z · v1.0.12.18.01
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Csapatépítés menüponton belül ha megnyitom a cuccokat, és utána bezárom, majdnem mind visszadob a HUBba továbbra is. Nem ezt kéne! 10x alkalommal javítjuk. Bezárom és ott találom magam, ahol megnyitottam az imént azt az almenupotnot. Edző esetében pl. menü, csapatépítés. Ahol meg lehet nyitni azt az almenut. Nagyon idegesítő
 
 ---
 
