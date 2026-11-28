@@ -1,7 +1,63 @@
 # 🐞 Fejlesztői jegyzetek
 
-70 jegyzet · a legújabb elöl.
+75 jegyzet · a legújabb elöl.
 A feldolgozottakat a fő ágon a `tools/devjegyzet/kezelt.json` tartja nyilván.
+
+---
+
+## jmx04ehoy8cip — Felület: elcsúszik, egymásra lóg, kilóg a képből, takar · normál
+
+- **Mikor:** 2026-11-28T08:00:21.778Z · v1.0.12.18.01
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 30. forduló
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Ha a büdzsé részt lenyitjuk, akkor elcsúszik az egész kijelző, mert túlfutón vannak szövegrészek. Javítsuk.
+
+---
+
+## jmx0447hddba4 — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-28T07:52:21.985Z · v1.0.12.18.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Van az a gol, amikor elhúz a szélén a játékos, aztán beadja és valaki közepén befejeli. Ez tök szuper, de A feed kommentár ezeknél mindig szögletet közvetít. Legyen az, hogy az ilyen gólok felé maradjon meg animáció szintén ugyanilyen, csak A feed legyen hozzaigazitva, azaz legyen az mondva, hogy valaki a szélén elhúzott, beadta és befejelte egy másik, a másik felében az eseteknek pedig maradjon A feed szöveg, és az animációt kell megcsinálni a szögletre (ami már meg van, csak eddig abból csak olyan volt, amikor felszabadított a védő)
+
+---
+
+## jmx03zjtt3oqf — Menü / navigáció: rossz helyre visz, nem nyílik, beragad · normál
+
+- **Mikor:** 2026-11-28T07:48:44.705Z · v1.0.12.18.01
+- **Hol:** Pálya + HUB
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scHub
+
+> Klub arculata menupontbol akár mentéssel, akár x-szel lélek ki, a HUBba dob, nem a menübe vissza.
+> Stadionnál pedig csak az x-szel ugrik a  HUBba a menü helyett
+
+---
+
+## jmx03uqmkjva9 — Nincs értesítés, vagy késve jön (szakasz vége, nyitás, jutalom) · normál
+
+- **Mikor:** 2026-11-28T07:45:00.236Z · v1.0.12.18.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> 1 fordulóval később kapjuk meg a kupában a jutalmat bizonyos kihívásokért. Pl. 10 gólos különbséggel kellett nyerni egy párharcot
+
+---
+
+## jmx03szue53hq — Animáció / jelenet / kamera hiba · normál
+
+- **Mikor:** 2026-11-28T07:43:38.870Z · v1.0.12.18.01
+- **Hol:** Pálya + Meccs
+- **Állapot:** 1. idény, 30. forduló · Kezdő út: zaras
+- **Nézet:** 375×834 · téma: reflektor · képernyők: scPitch, scSim
+
+> Száguldás gólnál nem igazán látszik, mi történik. Legyen távolabbi kamerával véve az egész, hogy látsszanak a játékosok a szélén, akik adogatnak
 
 ---
 
